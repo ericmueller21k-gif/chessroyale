@@ -1,0 +1,816 @@
+{
+  "model": "claude-opus-5-5",
+  "effort": "high",
+  "capUsd": 3,
+  "usage": {
+    "calls": 7,
+    "input": 37179,
+    "output": 20838,
+    "cacheWrite": 0,
+    "cacheRead": 0,
+    "usd": 0.565476
+  },
+  "calls": [
+    {
+      "step": "sheet gingerbread",
+      "usd": 0.062736,
+      "input": 3214,
+      "output": 2494
+    },
+    {
+      "step": "sheet grex",
+      "usd": 0.066408,
+      "input": 3512,
+      "output": 2618
+    },
+    {
+      "step": "relationship gingerbread-grex",
+      "usd": 0.097928,
+      "input": 7572,
+      "output": 3382
+    },
+    {
+      "step": "lines gingerbread",
+      "usd": 0.043276,
+      "input": 4134,
+      "output": 1337
+    },
+    {
+      "step": "lines grex",
+      "usd": 0.051368,
+      "input": 4587,
+      "output": 1651
+    },
+    {
+      "step": "conversations gingerbread-grex",
+      "usd": 0.107404,
+      "input": 5721,
+      "output": 4226
+    },
+    {
+      "step": "critique",
+      "usd": 0.136356,
+      "input": 8439,
+      "output": 5130
+    }
+  ],
+  "sheets": [
+    {
+      "name": "Ginger",
+      "id": "gingerbread",
+      "pitch": "A furious gingerbread cookie, left in a bakery freezer over a long weekend, who now ices everything she touches.",
+      "whoTheyAre": "Ginger was baked to smile in a bakery's holiday window. Then someone shut her in the walk-in freezer over the long weekend. She came out frosted solid, gripping a candy cane snapped off the display, with a cold streak that never thawed. Now anyone who gets close gets frozen. She wants to be feared, not nibbled, and she'll never be anybody's cute decoration again. To her, the other bosses are half-baked. She grudgingly respects anyone who runs cold. Anything warm, glowing or fiery is a natural enemy, and she says so loudly.",
+      "voice": {
+        "words": [
+          "snap",
+          "crumb",
+          "stale",
+          "half-baked",
+          "icing",
+          "frosty",
+          "chill",
+          "gumdrops",
+          "freezer",
+          "crumble"
+        ],
+        "rhythm": "Short, clipped bursts with lots of exclamation marks. She opens or closes with \"Snap!\" or a grumpy \"Hmph.\" Baking and frost puns arrive back to back. Trailing \"…\" only when she's plotting or cracking.",
+        "catchphrases": [
+          "Crunchy outside. Frozen inside. Hmph!",
+          "Nobody touches the cane!",
+          "Snap to it, or snap in half!",
+          "I've been colder than you since the long weekend."
+        ],
+        "neverSays": [
+          "Let's all warm up by the oven!",
+          "Aww, group hug?",
+          "No rush, take your time, sweetie."
+        ]
+      },
+      "loves": [
+        "The hum of a walk-in freezer, which is her lullaby",
+        "Her candy cane, which she swears she only borrowed",
+        "Perfectly piped icing with crisp, sharp edges",
+        "The crunch of frost underfoot",
+        "Snow days, when nobody bakes anything"
+      ],
+      "hates": [
+        "Ovens, which she won't even look at",
+        "Warm hands",
+        "Being dunked in milk, the soggiest fate there is",
+        "Being called cute",
+        "Long weekends"
+      ],
+      "flawOrSecret": "She still keeps the little price tag from the bakery window tucked behind her bow tie. She gets very touchy if anyone asks what she was worth.",
+      "powerBrags": [
+        "Your best piece? Iced. Frozen solid. Hmph!",
+        "Snap! That one's not going anywhere for a while.",
+        "Blizzard! One piece wiggles. The rest? Snowed in!"
+      ],
+      "powerGripes": [
+        "I can't ice the king. Something about manners. Bah!",
+        "My blizzard thaws out by the end. Drip, drip… rude.",
+        "Check melts my ice? Who made ice so soft?!"
+      ],
+      "newDetails": [
+        "The freezer's hum is her lullaby",
+        "She keeps the bakery price tag behind her bow tie and hates being asked her price",
+        "She calls the snapped-off candy cane \"borrowed\"",
+        "She won't look at ovens",
+        "Being dunked in milk is her worst fear (soggy)",
+        "She hates being called cute",
+        "She hates warm hands",
+        "She hates long weekends",
+        "She loves crisp icing edges and crunchy frost",
+        "She loves snow days because nobody bakes",
+        "She respects cold bosses and picks fights with warm or fiery ones",
+        "Pronouns: this sheet uses she/her per the lore, FAQ and area pages; the sprite comments' \"his\" is still for Eric to settle"
+      ]
+    },
+    {
+      "name": "Jefferson",
+      "id": "grex",
+      "pitch": "A cocky, fire-happy giraffe who spent years sure he was a dinosaur and now works as a fireworks stand's mascot, lighting things he really shouldn't.",
+      "whoTheyAre": "Jefferson grew up certain he was a dinosaur and answered to G-REX for years. Nobody had the heart to tell him otherwise, so he roared at everything, and the roars still slip out. Being a dinosaur never paid, so he took the mascot job at the fireworks stand, and he has been lighting things he shouldn't ever since. He wants the biggest 'ooh' and the loudest 'aah' in town, plus a good view of both, which his neck provides. He sizes up the other bosses by height first. He is the tallest boss around, and the God King only matches him with his wings spread, which Jefferson calls cheating. He teases any ice or water type as a born enemy of a good show. Anyone who likes light and sparkle is a potential opening act.",
+      "voice": {
+        "words": [
+          "sizzlin'",
+          "toasty",
+          "crispy",
+          "spark",
+          "fuse",
+          "boom",
+          "rawr",
+          "neck",
+          "hot stuff",
+          "fireworks"
+        ],
+        "rhythm": "Short, loud bursts with lots of exclamation marks. He drops his g's (sizzlin', smokin') and leans on cooking puns: toast, crispy, well done, simmer. When he gets excited he roars like a dinosaur, then catches himself with an awkward '…I mean.' He brags in threes and counts down a lot.",
+        "catchphrases": [
+          "Stand back. Further. Little further. Perfect!",
+          "Mascot by day, menace by also day.",
+          "Rawr! …Okay, that one was on purpose.",
+          "Three, two, one… whoops, started early!"
+        ],
+        "neverSays": [
+          "Maybe we should keep this low-key.",
+          "I'm just a regular giraffe.",
+          "Let's put that out before it spreads."
+        ]
+      },
+      "loves": [
+        "The quiet half-second between the 'ooh' and the 'aah'",
+        "Being the tallest one in every group picture",
+        "Toasting marshmallows on his own horn tips",
+        "The dinosaur museum, especially the gift shop",
+        "Birthday cakes with way too many candles"
+      ],
+      "hates": [
+        "Rain, drizzle, and anyone who brings an umbrella to a show",
+        "'NO FIREWORKS' signs, which he takes personally",
+        "Being asked how the weather is up there",
+        "Fire extinguishers, which he calls 'the red party poopers'",
+        "Cakes with only one candle"
+      ],
+      "flawOrSecret": "He's afraid of the dark. That's the real reason everything around him is always lit, and he sleeps with both sparklers on.",
+      "powerBrags": [
+        "One square, three stages, tick, tick… toast! Better scoot!",
+        "Your half, my campfire. Don't get comfy on it.",
+        "Some fireballs land on my side. My crew never burns. Ha!"
+      ],
+      "powerGripes": [
+        "My sparkler won't touch a king. Not even a little singe!",
+        "They just step off the fire. Every time. Where's the fun?",
+        "The shadows show up early! It spoils the whole surprise!"
+      ],
+      "newDetails": [
+        "He's the tallest boss around, and he calls the God King's spread wings 'cheating' in height contests",
+        "He teases ice and water bosses as born enemies of a good show",
+        "He's afraid of the dark and sleeps with both sparklers lit",
+        "He toasts marshmallows on his flaming horn tips",
+        "He loves the dinosaur museum and its gift shop",
+        "He loves cakes with too many candles and hates cakes with just one",
+        "He hates rain, umbrellas, 'NO FIREWORKS' signs and fire extinguishers ('the red party poopers')",
+        "He gets annoyed when people ask how the weather is up there",
+        "His roars still slip out by accident, and he follows them with an awkward '…I mean'",
+        "He counts down a lot and sometimes starts early"
+      ]
+    }
+  ],
+  "relationship": {
+    "pair": [
+      "gingerbread",
+      "grex"
+    ],
+    "opposites": [
+      "Ice vs. fire: she freezes everything she touches, he sets fire to everything he can reach, and each calls the other a natural enemy out loud.",
+      "Size: a cookie you could hold in one hand vs. the tallest boss in town, who sizes everyone up by height first.",
+      "Dark vs. light: she naps to the hum of a dark walk-in freezer, while he keeps everything lit and sleeps with both sparklers on.",
+      "Baking: ovens are her worst nightmare, but he loves birthday cakes with way too many candles and calls a good hit 'well done.'"
+    ],
+    "inCommon": [
+      "Both were hired to be cute: she was a holiday window decoration, he's a fireworks stand mascot, and both hate being treated like decor.",
+      "Both talk in short, loud bursts with lots of exclamation marks, and both say 'Let it simmer…' when they're thinking.",
+      "Both carry a stick into battle (her 'borrowed' candy cane, his two sparklers), and neither power can touch a king, which bugs them both.",
+      "Both hide a soft spot: her price tag behind the bow tie, his fear of the dark."
+    ],
+    "dynamic": "Loud frenemies. Ginger thinks Jefferson is an oven on legs, and Jefferson thinks Ginger is a walking 'NO FIREWORKS' sign. In the town square, she stays a few steps away so his flames can't sweat her gumdrops, and he follows her around trying to toast a marshmallow 'near' her. On the same team, the bickering turns into competitive pride. Her ice pins a piece in place and his fire burns the square under it, so a frozen piece can't step off the fire. Each insists the combo is their own doing. They never admit they like working together, but they high-five through a cloud of steam.",
+    "sillyAngles": [
+      "The weather war: Ginger asks 'How's the weather up there?' on purpose because she knows he hates it, and he fires back about the weather 'down there.'",
+      "Steam: whenever they stand too close, the steam clouds the view and both blame the other for ruining the show or the icing.",
+      "Jefferson is secretly fascinated and terrified by the freezer ('how dark does it get in there?'), and Ginger realizes she can use it against him.",
+      "Jefferson loves cakes and baked goods a little too much, and Ginger is a baked good. She keeps her cane between them at all times.",
+      "Prehistoric jokes: Ginger calls his dinosaur phase 'stale' and asks if he's a fossil yet; he says she's the one who got kept on ice."
+    ],
+    "questionsAToB": [
+      "How's the weather up there? Frosty, I hope! Hmph!",
+      "Snap! Why do your horns smoke? Is your brain baking?",
+      "You were a dinosaur? Which kind? The half-baked kind?"
+    ],
+    "questionsBToA": [
+      "How's the weather down there? Not fun, huh?! Rawr! …I mean, ha!",
+      "Is it dark in that freezer? Like, really dark? …Asking for a pal.",
+      "You were in a holiday window? How much were they askin' for ya?"
+    ],
+    "runningJoke": "They both say 'Let it simmer…' and keep fighting over whose line it is. Jefferson says simmering is a fire thing and she stole it. Ginger snaps that it's a baking word, she had it first, and her simmer is 'the cold kind.' Every time one of them says it, the other mutters 'Thief!'",
+    "newDetails": [
+      "Ginger asks Jefferson 'How's the weather up there?' on purpose, knowing he hates it",
+      "Jefferson answers by asking about the weather 'down there'",
+      "They both use 'Let it simmer…' and argue over who said it first; Ginger claims hers is 'the cold kind'",
+      "Ginger calls Jefferson 'an oven on legs'",
+      "Jefferson calls Ginger 'shorty' and 'cookie' and thinks of her as a walking 'NO FIREWORKS' sign",
+      "Ginger keeps a few steps away from Jefferson in the town square so his flames won't sweat her gumdrops",
+      "Jefferson keeps trying to toast a marshmallow near Ginger, and she keeps her candy cane between them",
+      "Jefferson is curious about and scared of how dark the walk-in freezer gets",
+      "Standing close makes steam, and each blames the other for it",
+      "On a team, each claims the freeze-plus-fire combo as their own idea and won't admit they like it",
+      "They high-five through a cloud of steam when the combo works",
+      "Jefferson asks how much Ginger was priced at in the window, which touches her price-tag sore spot"
+    ]
+  },
+  "lines": [
+    {
+      "id": "L-gingerbread-1",
+      "speaker": "gingerbread",
+      "situation": "town",
+      "first": "Hmph. Hear that freezer hum? Best lullaby in the whole square.",
+      "text": "Hmph. Hear that freezer hum? Best lullaby in the whole square.",
+      "verdict": "keep",
+      "reason": "In voice; uses her lullaby detail.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "L-gingerbread-2",
+      "speaker": "gingerbread",
+      "situation": "town",
+      "first": "What's behind my bow tie? Nothing! Mind your own crumbs!",
+      "text": "What's behind my bow tie? Nothing! Mind your own crumbs!",
+      "verdict": "keep",
+      "reason": "Touchy price-tag secret, nicely hinted.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "L-gingerbread-3",
+      "speaker": "gingerbread",
+      "situation": "town",
+      "first": "Who said cute? Snap! I heard cute! Say it again, I dare you!",
+      "text": "Who said cute? Snap! I heard cute! Say it again, I dare you!",
+      "verdict": "keep",
+      "reason": "Funny, clipped, and in character.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "L-gingerbread-4",
+      "speaker": "gingerbread",
+      "situation": "greet",
+      "first": "Hmph. You again. Still half-baked, I see.",
+      "text": "Hmph. You again. Still half-baked, I see.",
+      "verdict": "keep",
+      "reason": "Short, grumpy, and uses her signature insult.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "L-gingerbread-5",
+      "speaker": "gingerbread",
+      "situation": "greet",
+      "first": "Snap! Warm hands? Keep them in your pockets, buddy!",
+      "text": "Snap! Warm hands? Keep them in your pockets, buddy!",
+      "verdict": "keep",
+      "reason": "Specific hate, punchy delivery.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "L-gingerbread-6",
+      "speaker": "gingerbread",
+      "situation": "greet",
+      "first": "Quick question: hot or cold? Answer carefully, crumb.",
+      "text": "Hot or cold? Pick wrong and you're iced. Snap!",
+      "verdict": "rewrite",
+      "reason": "Same 'Quick question:' opener as Jefferson's greet.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "L-gingerbread-7",
+      "speaker": "gingerbread",
+      "situation": "teammatePower",
+      "first": "Snap! Not bad. Almost as crisp as my icing!",
+      "text": "Snap! Not bad. Almost as crisp as my icing!",
+      "verdict": "keep",
+      "reason": "Grudging praise tied to her icing pride.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "L-gingerbread-8",
+      "speaker": "gingerbread",
+      "situation": "teammatePower",
+      "first": "Hmph. Fine. That was frosty. Don't let it go to your head!",
+      "text": "Hmph. Fine. That was frosty. Don't let it go to your head!",
+      "verdict": "keep",
+      "reason": "'Frosty' as top praise fits her.",
+      "ok": false,
+      "rejected": [
+        "a famous catchphrase (lines must be original)"
+      ]
+    },
+    {
+      "id": "L-gingerbread-9",
+      "speaker": "gingerbread",
+      "situation": "teammatePower",
+      "first": "Did you borrow that trick? I only borrowed my cane. Honest!",
+      "text": "Did you borrow that trick? I only borrowed my cane. Honest!",
+      "verdict": "keep",
+      "reason": "Funny self-own about the 'borrowed' cane.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "L-gingerbread-10",
+      "speaker": "gingerbread",
+      "situation": "winTogether",
+      "first": "Snap! We crunched them like frost underfoot!",
+      "text": "Snap! We crunched them like frost underfoot!",
+      "verdict": "keep",
+      "reason": "Uses a love; vivid and short.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "L-gingerbread-11",
+      "speaker": "gingerbread",
+      "situation": "winTogether",
+      "first": "Hmph. We won. No hugging. I mean it!",
+      "text": "Hmph. We won. No hugging. I mean it!",
+      "verdict": "keep",
+      "reason": "Characterful refusal of affection.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "L-gingerbread-12",
+      "speaker": "gingerbread",
+      "situation": "winTogether",
+      "first": "Victory! Better than a snow day. Almost.",
+      "text": "Victory! Better than a snow day. Almost.",
+      "verdict": "keep",
+      "reason": "Specific love, good comic beat.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "L-gingerbread-13",
+      "speaker": "gingerbread",
+      "situation": "loseTogether",
+      "first": "Hmph. Your fault. Mine? Never. Okay… maybe a crumb.",
+      "text": "Hmph. Your fault. Mine? Never. Okay… maybe a crumb.",
+      "verdict": "keep",
+      "reason": "Cracking pause used well.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "L-gingerbread-14",
+      "speaker": "gingerbread",
+      "situation": "loseTogether",
+      "first": "We lost?! That's staler than a long weekend!",
+      "text": "We lost?! That's staler than a long weekend!",
+      "verdict": "keep",
+      "reason": "Combines her words and a hate.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "L-gingerbread-15",
+      "speaker": "gingerbread",
+      "situation": "loseTogether",
+      "first": "Just don't dunk me in milk. I'm soggy enough inside…",
+      "text": "Hmph… Just keep the milk away. Losing AND soggy? Never!",
+      "verdict": "rewrite",
+      "reason": "'Soggy inside' contradicts 'Frozen inside.'",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "L-grex-1",
+      "speaker": "grex",
+      "situation": "town",
+      "first": "Sun's going down? No problem! I'll just light… everything.",
+      "text": "Sun's going down? No problem! I'll just light… everything.",
+      "verdict": "keep",
+      "reason": "Nice hint at his fear of the dark.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "L-grex-2",
+      "speaker": "grex",
+      "situation": "town",
+      "first": "Who hung a NO FIREWORKS sign by my stand? Rude! So rude!",
+      "text": "Who hung a NO FIREWORKS sign by my stand? Rude! So rude!",
+      "verdict": "keep",
+      "reason": "He takes the signs personally; in voice.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "L-grex-3",
+      "speaker": "grex",
+      "situation": "town",
+      "first": "Marshmallows! Horn-toasted! Golden, gooey, crispy! Who wants one?",
+      "text": "Marshmallows! Horn-toasted! Golden, gooey, crispy! Who wants one?",
+      "verdict": "keep",
+      "reason": "Brags in threes with a cooking pun.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "L-grex-4",
+      "speaker": "grex",
+      "situation": "greet",
+      "first": "Hey! Stand back to back with me. …Ha! Still the tallest!",
+      "text": "Hey! Stand back to back with me. …Ha! Still the tallest!",
+      "verdict": "keep",
+      "reason": "Sizes people up by height; funny.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "L-grex-5",
+      "speaker": "grex",
+      "situation": "greet",
+      "first": "Do you sparkle? Glow? Shine? Great! You're my opening act!",
+      "text": "Do you sparkle? Glow? Shine? Great! You're my opening act!",
+      "verdict": "keep",
+      "reason": "Uses the opening-act lore, in threes.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "L-grex-6",
+      "speaker": "grex",
+      "situation": "greet",
+      "first": "Quick question: is your birthday soon? I've got SO many candles.",
+      "text": "Quick question: is your birthday soon? I've got SO many candles.",
+      "verdict": "keep",
+      "reason": "Silly question tied to his candle love.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "L-grex-7",
+      "speaker": "grex",
+      "situation": "teammatePower",
+      "first": "Ooh! Nice spark! Can I light the end of it?",
+      "text": "Ooh! Nice spark! Can I light the end of it?",
+      "verdict": "keep",
+      "reason": "Fire-happy and eager, in voice.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "L-grex-8",
+      "speaker": "grex",
+      "situation": "teammatePower",
+      "first": "That got a big 'ooh'! Now where's my 'aah'?",
+      "text": "That got a big 'ooh'! Now where's my 'aah'?",
+      "verdict": "keep",
+      "reason": "Uses his ooh/aah obsession.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "L-grex-9",
+      "speaker": "grex",
+      "situation": "teammatePower",
+      "first": "Not bad! Needs more fire, but not bad!",
+      "text": "Not bad! Little more fire and it's well done. Medium-rare for now!",
+      "verdict": "rewrite",
+      "reason": "'Needs more fire' was generic; add his cooking puns.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "L-grex-10",
+      "speaker": "grex",
+      "situation": "winTogether",
+      "first": "Group picture! I'll stand in the back… obviously.",
+      "text": "Group picture! I'll stand in the back… obviously.",
+      "verdict": "keep",
+      "reason": "Tall-boss pride, light touch.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "L-grex-11",
+      "speaker": "grex",
+      "situation": "winTogether",
+      "first": "Rawr! We won! …I mean, ahem, lovely teamwork, everyone.",
+      "text": "Rawr! We won! …I mean, ahem, lovely teamwork, everyone.",
+      "verdict": "keep",
+      "reason": "Classic roar-then-catch beat.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "L-grex-12",
+      "speaker": "grex",
+      "situation": "winTogether",
+      "first": "Victory cake tonight! You bring the cake, I bring fifty candles!",
+      "text": "Victory cake tonight! You bring the cake, I bring fifty candles!",
+      "verdict": "keep",
+      "reason": "Too-many-candles love, fun.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "L-grex-13",
+      "speaker": "grex",
+      "situation": "loseTogether",
+      "first": "Snuffed out… Somebody brought an umbrella. I just know it.",
+      "text": "Snuffed out… Somebody brought an umbrella. I just know it.",
+      "verdict": "keep",
+      "reason": "Blames his umbrella nemesis; funny.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "L-grex-14",
+      "speaker": "grex",
+      "situation": "loseTogether",
+      "first": "That fizzled… Hey, can you leave a light on tonight? Just asking.",
+      "text": "That fizzled… Hey, can you leave a light on tonight? Just asking.",
+      "verdict": "keep",
+      "reason": "Soft spot slips out naturally.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "L-grex-15",
+      "speaker": "grex",
+      "situation": "loseTogether",
+      "first": "Lost? Nah. We're a slow roast. Real slow. Like, next fight slow.",
+      "text": "Lost? Nah. We're a slow roast. Real slow. Like, next fight slow.",
+      "verdict": "keep",
+      "reason": "Cooking-pun denial, good rhythm.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "C1-1",
+      "speaker": "gingerbread",
+      "situation": "town: The weather war: each asks about the weather at the other's height",
+      "first": "Snap! How's the weather up there, oven on legs?",
+      "text": "Snap! How's the weather up there, oven on legs?",
+      "verdict": "keep",
+      "reason": "Sets up the weather war with her nickname.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "C1-2",
+      "speaker": "grex",
+      "situation": "town: The weather war: each asks about the weather at the other's height",
+      "first": "Rawr! …I mean, toasty! How's the weather down there, shorty?",
+      "text": "Toasty! Sunny! Great view! How's the weather down there, shorty?",
+      "verdict": "rewrite",
+      "reason": "Roar-catch didn't fit here and is overused; brag in threes.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "C1-3",
+      "speaker": "gingerbread",
+      "situation": "town: The weather war: each asks about the weather at the other's height",
+      "first": "Frosty. Forecast says your fuse gets soggy. Hmph!",
+      "text": "Frosty. Forecast says your fuse gets soggy. Hmph!",
+      "verdict": "keep",
+      "reason": "Sharp comeback, in voice.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "C2-1",
+      "speaker": "grex",
+      "situation": "town: Jefferson asks how dark the walk-in freezer gets, and Ginger takes note",
+      "first": "Hey cookie… that freezer. Is it dark in there? Like, really dark?",
+      "text": "Hey cookie… that freezer. Is it dark in there? Like, really dark?",
+      "verdict": "keep",
+      "reason": "Nervous curiosity reads well.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "C2-2",
+      "speaker": "gingerbread",
+      "situation": "town: Jefferson asks how dark the walk-in freezer gets, and Ginger takes note",
+      "first": "Pitch dark. Just the hum. And the cold. All weekend long…",
+      "text": "Pitch dark. Just the hum. And the cold. All weekend long…",
+      "verdict": "keep",
+      "reason": "Plotting pause, nicely ominous.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "C2-3",
+      "speaker": "grex",
+      "situation": "town: Jefferson asks how dark the walk-in freezer gets, and Ginger takes note",
+      "first": "Cool! Great! Not scared! Both sparklers on tonight. No reason!",
+      "text": "Cool! Great! Not scared! Both sparklers on tonight. No reason!",
+      "verdict": "keep",
+      "reason": "Funny overcompensation.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "C2-4",
+      "speaker": "gingerbread",
+      "situation": "town: Jefferson asks how dark the walk-in freezer gets, and Ginger takes note",
+      "first": "Hmph. Interesting… Stand too close again and see for yourself.",
+      "text": "Hmph. Interesting… Stand too close again and see for yourself.",
+      "verdict": "keep",
+      "reason": "She takes note and weaponizes it.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "C3-1",
+      "speaker": "gingerbread",
+      "situation": "town: Teasing about his dinosaur years and her time on ice",
+      "first": "So you were a dinosaur. Which kind? The half-baked kind?",
+      "text": "So you were a dinosaur. Which kind? The half-baked kind?",
+      "verdict": "keep",
+      "reason": "Pack question, in voice.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "C3-2",
+      "speaker": "grex",
+      "situation": "town: Teasing about his dinosaur years and her time on ice",
+      "first": "G-REX! Tallest! Fiercest! Sizzlin'-est! Rawr! …I mean, yes.",
+      "text": "G-REX! Tallest! Fiercest! Sizzlin'-est! Rawr! …I mean, yes.",
+      "verdict": "keep",
+      "reason": "Threes plus roar-catch; funny.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "C3-3",
+      "speaker": "gingerbread",
+      "situation": "town: Teasing about his dinosaur years and her time on ice",
+      "first": "Stale news, beanpole. Are you a fossil yet?",
+      "text": "Stale news, beanpole. Are you a fossil yet?",
+      "verdict": "keep",
+      "reason": "Prehistoric jab with her word.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "C3-4",
+      "speaker": "grex",
+      "situation": "town: Teasing about his dinosaur years and her time on ice",
+      "first": "Says the cookie somebody kept on ice all weekend!",
+      "text": "Says the cookie somebody kept on ice all weekend!",
+      "verdict": "keep",
+      "reason": "Good comeback from the pack angle.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "C4-1",
+      "speaker": "grex",
+      "situation": "fight: Freeze-plus-fire combo: both claim it, then a steamy high five",
+      "first": "Cookie! Freeze that one! I've got a campfire with its name on it!",
+      "text": "Cookie! Freeze that one! I've got a campfire with its name on it!",
+      "verdict": "keep",
+      "reason": "Clear combo setup, in voice.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "C4-2",
+      "speaker": "gingerbread",
+      "situation": "fight: Freeze-plus-fire combo: both claim it, then a steamy high five",
+      "first": "Iced! Frozen solid! Now it can't step off your fire. My idea!",
+      "text": "Iced! Frozen solid! Now it can't step off your fire. My idea!",
+      "verdict": "keep",
+      "reason": "Explains combo as players see it.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "C4-3",
+      "speaker": "grex",
+      "situation": "fight: Freeze-plus-fire combo: both claim it, then a steamy high five",
+      "first": "Your idea? I'm the fire! Toast! …Okay, high five. Through the steam.",
+      "text": "Your idea? I'm the fire! Toast! …Okay, high five. Through the steam.",
+      "verdict": "keep",
+      "reason": "Claim fight plus steamy high five.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "C4-4",
+      "speaker": "gingerbread",
+      "situation": "fight: Freeze-plus-fire combo: both claim it, then a steamy high five",
+      "first": "Hmph. Just this once. And don't sweat my gumdrops!",
+      "text": "Hmph. Just this once. And don't sweat my gumdrops!",
+      "verdict": "keep",
+      "reason": "Grudging, uses town detail.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "C5-1",
+      "speaker": "gingerbread",
+      "situation": "fight: Neither power can touch a king, plus the 'Let it simmer…' fight",
+      "first": "Can't ice the king. Manners, they say. Bah! Let it simmer…",
+      "text": "Can't ice the king. Manners, they say. Bah! Let it simmer…",
+      "verdict": "keep",
+      "reason": "Gripe plus running joke setup.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "C5-2",
+      "speaker": "grex",
+      "situation": "fight: Neither power can touch a king, plus the 'Let it simmer…' fight",
+      "first": "Thief! Simmer's a fire word! …Also, my sparkler can't singe him.",
+      "text": "Thief! Simmer's a fire word! …Also, my sparkler can't singe him.",
+      "verdict": "keep",
+      "reason": "Running joke and shared gripe.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "C5-3",
+      "speaker": "gingerbread",
+      "situation": "fight: Neither power can touch a king, plus the 'Let it simmer…' fight",
+      "first": "Baking word. I had it first. Mine's the cold kind. Hmph!",
+      "text": "Baking word. I had it first. Mine's the cold kind. Hmph!",
+      "verdict": "keep",
+      "reason": "Lands the running joke.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "C6-1",
+      "speaker": "grex",
+      "situation": "fight: Jefferson asks Ginger's window price and backs off fast",
+      "first": "Hey shorty, in that window… how much were they askin' for ya?",
+      "text": "Hey shorty, in that window… how much were they askin' for ya?",
+      "verdict": "keep",
+      "reason": "Pokes her sore spot, in voice.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "C6-2",
+      "speaker": "gingerbread",
+      "situation": "fight: Jefferson asks Ginger's window price and backs off fast",
+      "first": "Snap! Nobody asks that! Ask again and you're iced next. Hmph!",
+      "text": "Snap! Nobody asks that! Ask again and you're iced next. Hmph!",
+      "verdict": "keep",
+      "reason": "Touchy reaction fits her secret.",
+      "ok": true,
+      "rejected": []
+    },
+    {
+      "id": "C6-3",
+      "speaker": "grex",
+      "situation": "fight: Jefferson asks Ginger's window price and backs off fast",
+      "first": "Nope! Priceless! Totally priceless! Rawr! …I mean, sorry.",
+      "text": "Nope! Priceless! Totally priceless! Backing away now. Three, two…",
+      "verdict": "rewrite",
+      "reason": "Roar-catch overused; countdown backs off fast.",
+      "ok": true,
+      "rejected": []
+    }
+  ],
+  "stoppedEarly": null
+}
