@@ -160,8 +160,9 @@ test("online boss raid: one resigns, a bot takes the seat, the other plays on (a
   for (const p of [a, b]) {
     await p.goto(`/?debug&pool=${q}`);
     await openBossRaid(p);
-    await p.getByRole("button", { name: /^Join a raid/ }).click();
   }
+  // Both join back to back: bots fill this raid 8 s after its first join, and a page load in between can outlast that.
+  for (const p of [a, b]) await p.getByRole("button", { name: /^Join a raid/ }).click();
   // Bots fill at 8 s here; the boss's intro, then the crowd's first move.
   await expect.poll(() => phase(a), { timeout: 60_000 }).toBe("play");
   await expect.poll(() => phase(b), { timeout: 30_000 }).toMatch(/^(play|scoring)$/);
