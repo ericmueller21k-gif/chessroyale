@@ -31,7 +31,8 @@ import { CLOSE, QUOTE_INK, STATUE_W, quoteFace, statueArt, statueFrame, statueH,
 import { CAP, LEADING, layout, lineWidth, renderLines } from "./sign-font.ts";
 import { look, mixMist, mixRGB, mixTint, type SkyWeights } from "./sky.ts";
 import { SkyPainter } from "./sky-draw.ts";
-import { COLISEUM_PLACE, STATUES, onColiseum, plotAt, type Boss, type Home, type HomeId, type Person, type Place, type Pose, type Statue, type Town } from "./world.ts";
+import { PARK_BENCH, PARK_FOUNTAIN, PARK_TABLE, PARK_TREES, TABLE_TOP } from "./houses/park.ts";
+import { COLISEUM_PLACE, GRASS, PAVING, PROPS, STATUES, TABLES, groundAt, onColiseum, plotAt, seated, type Boss, type Home, type HomeId, type Person, type Place, type Pose, type Prop, type Statue, type Table, type Town } from "./world.ts";
 
 /** Each boss's sprite (its real one: its `idle` frames). */
 export const BOSS_ART: Record<HomeId, Character> = {
@@ -83,8 +84,17 @@ const rgb = (v: readonly number[]) => `rgb(${v[0]! | 0},${v[1]! | 0},${v[2]! | 0
 
 /** The haze strip's lines under the horizon. */
 const HAZE_LINES = 10;
-/** The squares' colors (65 steps toward the sky, light or dark, on a plot or not), and at most this many squares a frame. */
-const SQ_KEYS = (MIX_STEPS + 1) * 4;
+/**
+ * The squares' colors: 65 steps toward the sky, light or dark, and the ground (the board, the board under a home or the
+ * Coliseum, the park's paving, its grass); and at most this many squares a frame.
+ */
+const GROUNDS = 4;
+const SQ_KEYS = (MIX_STEPS + 1) * GROUNDS * 2;
+/** The park's paving (a light stone, two tones) and its grass (two greens, mown in squares). */
+const PAVE_LIGHT = [222, 214, 198] as const;
+const PAVE_DARK = [203, 194, 177] as const;
+const GRASS_LIGHT = [128, 184, 84] as const;
+const GRASS_DARK = [113, 170, 74] as const;
 const SQ_MAX = 3000;
 
 /**
@@ -98,18 +108,23 @@ interface GroundColors {
   skirt: string;
   horizon: string;
 }
+/** A square's color key: its step toward the sky, its ground (0 board, 1 board under a home, 2 paving, 3 grass), light or dark. */
+const sqKeyOf = (mix: number, ground: number, alt: number) => (mix * GROUNDS + ground) * 2 + alt;
 function groundColors(skyh: readonly number[]): GroundColors {
   const fill: string[] = [];
   const seam: string[] = [];
   for (let i = 0; i <= MIX_STEPS; i++)
-    for (let alt = 0; alt < 2; alt++)
-      for (let plot = 0; plot < 2; plot++) {
-        let base: readonly number[] = alt ? SQ_DARK : SQ_LIGHT;
-        if (plot) base = base.map((x) => x * 0.9); // a faint darker tint under a home (and the Coliseum)
+    for (let g = 0; g < GROUNDS; g++)
+      for (let alt = 0; alt < 2; alt++) {
+        let base: readonly number[] = g === 2 ? (alt ? PAVE_DARK : PAVE_LIGHT) : g === 3 ? (alt ? GRASS_DARK : GRASS_LIGHT) : alt ? SQ_DARK : SQ_LIGHT;
+        if (g === 1) base = base.map((x) => x * 0.9); // a faint darker tint under a home (and the Coliseum)
         const t = i / MIX_STEPS;
         const f = mix(base, skyh, t);
-        fill[i * 4 + alt * 2 + plot] = rgb(f);
-        seam[i * 4 + alt * 2 + plot] = rgb(f.map((x) => x * (0.86 + 0.14 * t))); // the seam fades out too
+        const k = sqKeyOf(i, g, alt);
+        fill[k] = rgb(f);
+        // The seam fades out too; the grass's is faint (a lawn, not tiles), the paving's a little stronger (its slabs).
+        const d = g === 3 ? 0.95 : g === 2 ? 0.84 : 0.86;
+        seam[k] = rgb(f.map((x) => x * (d + (1 - d) * t)));
       }
   const haze = Array.from({ length: HAZE_LINES }, (_, i) => `rgba(${skyh[0]! | 0},${skyh[1]! | 0},${skyh[2]! | 0},${(0.75 * Math.pow(1 - i / HAZE_LINES, 1.7)).toFixed(3)})`);
   return { fill, seam, haze, skirt: rgb(mix(SQ_LIGHT, skyh, 0.85)), horizon: rgb(skyh) };
@@ -194,10 +209,12 @@ class FrameCache {
 
 /** One thing standing on the ground this frame: where it was drawn (for taps, tags and chips) and how to sort it. */
 interface Item {
-  kind: "house" | "boss" | "person";
+  kind: "house" | "boss" | "person" | "prop";
   i: number;
   dx: number;
   dz: number;
+  /** Its depth for the drawing order (the park's things a little behind whoever stands on their row: a stool's sitter). */
+  sz: number;
   /** Drawn this frame (inside the rim, on screen). */
   on: boolean;
   depth: number;
@@ -212,7 +229,7 @@ interface Item {
   /** Faded out in front of a statue up close: taps go through it. */
   faded: boolean;
 }
-const newItem = (kind: Item["kind"], i: number): Item => ({ kind, i, dx: 0, dz: 0, on: false, depth: 0, x0: 0, y0: 0, x1: 0, y1: 0, fx: 0, fy: 0, hy: 0, faded: false });
+const newItem = (kind: Item["kind"], i: number): Item => ({ kind, i, dx: 0, dz: 0, sz: 0, on: false, depth: 0, x0: 0, y0: 0, x1: 0, y1: 0, fx: 0, fy: 0, hy: 0, faded: false });
 
 /** An edge chip this frame: which place (a home, or the Coliseum), where on the box's edge, which way its arrow points (degrees). */
 export interface Chip {
@@ -228,6 +245,7 @@ export type Hit =
   | { kind: "house"; home: Home }
   | { kind: "coliseum" }
   | { kind: "statue"; statue: Statue }
+  | { kind: "table"; table: Table }
   | { kind: "boss"; boss: Boss }
   | { kind: "person"; person: Person };
 
@@ -303,6 +321,12 @@ export class Renderer {
   private readonly bossFrames: FrameCache[];
   private readonly houseFrames: FrameCache[];
   private readonly chipIcon: FrameCache;
+  /** The park's things' items, and their pictures (one cache a kind, each tree's own). */
+  private readonly propItems: Item[];
+  private readonly propFrames: FrameCache[];
+  private readonly propTop: number[];
+  /** This person sits at a chess table (drawn lower, on its stool). */
+  private sitting = false;
   private readonly pose: Pose = { x: 0, y: 0, hop: 0, tilt: 0 };
   private readonly p = newPt();
   private readonly soft = document.createElement("canvas");
@@ -392,7 +416,14 @@ export class Renderer {
       return { ...layout(h.name, face.w, face.h), art: [] };
     });
     this.bossItems = town.bosses.map((_, i) => newItem("boss", i));
-    this.items = [...this.houseItems, ...this.bossItems];
+    this.propItems = PROPS.map((_, i) => newItem("prop", i));
+    this.items = [...this.houseItems, ...this.bossItems, ...this.propItems];
+    const trees = PARK_TREES.map((t) => new FrameCache(t));
+    const bench = new FrameCache(PARK_BENCH);
+    const table = new FrameCache(PARK_TABLE);
+    const fountain = new FrameCache(PARK_FOUNTAIN);
+    this.propFrames = PROPS.map((p) => (p.kind === "tree" ? trees[p.v]! : p.kind === "bench" ? bench : p.kind === "table" ? table : fountain));
+    this.propTop = PROPS.map(() => 0);
     this.bossFrames = town.bosses.map((b) => new FrameCache(BOSS_ART[b.home.id]));
     this.houseFrames = this.places.map((h) => new FrameCache(artOf(h).ch));
     this.chipIcon = new FrameCache(COLISEUM_CHIP);
@@ -403,7 +434,8 @@ export class Renderer {
       const n = this.nSq;
       if (n >= SQ_MAX) return;
       const m = Math.round(clamp(hazeMix(this.view, cu - this.camX, ru - this.camY, this.mist), 0, 1) * MIX_STEPS);
-      this.sqKey[n] = m * 4 + ((c + r) & 1) * 2 + (plotAt[r * N + c] || onColiseum(c, r) ? 1 : 0);
+      const gk = groundAt[r * N + c]!;
+      this.sqKey[n] = sqKeyOf(m, gk === PAVING ? 2 : gk === GRASS ? 3 : plotAt[r * N + c] || onColiseum(c, r) ? 1 : 0, (c + r) & 1);
       const o = n * 8;
       const cx = (q[0]! + q[2]! + q[4]! + q[6]!) / 4;
       const cy = (q[1]! + q[3]! + q[5]! + q[7]!) / 4;
@@ -881,8 +913,14 @@ export class Renderer {
         const h = places[it.i]!;
         x = h.cx;
         y = h.cy - h.foot; // where the picture's foot stands (a home's: half a square in front of the plot's middle)
-        margin = h.half + 1;
-        below = h.half > 2 ? 7 : below; // (the Coliseum is tall: its top shows while its foot is well under the box)
+        // (The Coliseum is wide and tall: its sides and top show while its foot is off to the side or well under the box.)
+        margin = Math.max(h.half + 1, this.houseFrames[it.i]!.ch.w / 2 / f.housePxPerSquare + 0.5);
+        below = h.half > 2 ? 10 : below;
+      } else if (it.kind === "prop") {
+        const pr = PROPS[it.i]!;
+        x = pr.x;
+        y = pr.y;
+        margin = 2;
       } else {
         const w = it.kind === "boss" ? town.bosses[it.i]!.walker : people[it.i]!.walker;
         w.pose(now, pose);
@@ -892,15 +930,21 @@ export class Renderer {
       }
       it.dx = wrapF(x - this.camX);
       it.dz = wrapF(y - this.camY);
+      it.sz = it.kind === "prop" ? it.dz + 0.05 : it.dz;
       it.on = drawable(v, it.dx, it.dz, margin, below);
     }
     items.sort(byFarFirst);
     for (const b of town.bosses) b.onScreen = false;
     for (const b of this.statueBox) b.on = false;
     for (const nm of this.names) nm.a = 0;
+    // The Coliseum past the rim, its top over the horizon (slice 6: the landmark from anywhere), behind everything.
+    const col = this.houseItems[this.homes.length]!;
+    this.farOn = false;
+    if (!col.on) this.drawFarColiseum(col, now);
     for (const it of items) {
       if (!it.on) continue;
       if (it.kind === "house") this.drawHouse(it, now);
+      else if (it.kind === "prop") this.drawProp(it, now);
       else if (it.kind === "boss") {
         const b = town.bosses[it.i]!;
         const ch = BOSS_ART[b.home.id];
@@ -918,6 +962,10 @@ export class Renderer {
         const person = people[it.i]!;
         const w = person.walker;
         w.pose(now, pose);
+        // Sitting at a chess table: lower, on its stool, facing the board.
+        const table = seated(person);
+        this.sitting = !!table;
+        const facing = table ? (w.c < table.c ? 1 : -1) : w.facing;
         // Up close on a statue, the people in front of it (you, on its square) fade: they'd stand between the camera and it.
         this.fade = it.dz < this.statueDz ? 1 - f.closeNearFade * this.close.e : 1;
         it.faded = this.fade < 0.5;
@@ -926,17 +974,80 @@ export class Renderer {
           const art = this.youArt;
           const k = 1 + 2 * (art?.pad ?? 0);
           const pad = art?.pad ?? 0;
-          this.drawSprite(it, art?.img ?? pawnImage(person.look.side, person.look.tint), f.youSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.youHop, pose.tilt * f.hobbleTilt, w.facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k);
+          this.drawSprite(it, art?.img ?? pawnImage(person.look.side, person.look.tint), f.youSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.youHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.youSquares);
           if (this.fade > 0.02) this.tag(person.name, it.fx, it.hy - 2, true, clamp((11 * this.p.k) / v.kf, 8, 12), this.fade);
         } else {
-          this.drawSprite(it, pawnImage(person.look.side, person.look.tint), f.botSquares, 0.5, PAWN_FOOT, 1, pose.hop * f.botHop, pose.tilt * f.hobbleTilt, w.facing, 1, PAWN_HEAD, true);
+          this.drawSprite(it, pawnImage(person.look.side, person.look.tint), f.botSquares, 0.5, PAWN_FOOT, 1, pose.hop * f.botHop, pose.tilt * f.hobbleTilt, facing, 1, PAWN_HEAD, true, 1, f.botSquares);
           // Name tags on the near ones only.
           const far = farOf(v, it.dz);
           if (far < f.tagFar && this.fade > 0.02) this.tag(person.name, it.fx, it.hy - 2, false, clamp((11 * this.p.k) / v.kf, 8, 12), clamp((f.tagFar - far) / 0.12, 0, 1) * this.fade);
         }
         this.fade = 1;
+        this.sitting = false;
       }
     }
+  }
+
+  /**
+   * The Coliseum seen from afar (slice 6): when its foot is past the rim, but not more than `farReach` squares past it, its
+   * picture stands on the horizon where it lies, smaller with distance, sunk behind the world's curve (`farSink` squares
+   * a square past the rim), hazed like the far band. Only its top shows over the horizon, so it looms from across the
+   * world. It isn't tapped (its chip is), and it has no floating name.
+   */
+  private drawFarColiseum(it: Item, now: number): void {
+    const { ctx, view: v, p } = this;
+    const f = TOWN_FEEL;
+    const R = radial(v, it.dx, it.dz);
+    if (it.dz <= 0 || R <= v.rim || R > v.rim + f.farReach || v.rimN < 2) return;
+    const t = (v.rim - 0.05) / R;
+    if (!proj(v, it.dx * t, it.dz * t, 0, p)) return;
+    const k = p.k * (v.rim / R);
+    const px = k / f.housePxPerSquare;
+    const ch = artOf(this.places[it.i]!).ch;
+    const w = ch.w * px;
+    const h = ch.h * px;
+    const x0 = p.x - ch.foot[0] * px;
+    if (x0 > this.W || x0 + w < 0) return;
+    const y0 = p.y + (R - v.rim) * f.farSink * k - ch.foot[1] * px;
+    if (y0 > p.y) return; // (all of it behind the curve)
+    // Only above the horizon: the world's curve hides the rest.
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(v.rimPx[0]!, -10);
+    for (let i = 0; i < v.rimN; i++) ctx.lineTo(v.rimPx[i]!, v.rimPy[i]!);
+    ctx.lineTo(v.rimPx[v.rimN - 1]!, -10);
+    ctx.closePath();
+    ctx.clip();
+    // Fading in as it comes within reach, and as hazy as the far band.
+    ctx.globalAlpha = (1 - f.bandFade * f.farHaze) * clamp((v.rim + f.farReach - R) / 2, 0, 1);
+    this.blitSoft(this.houseFrames[it.i]!.at(now, it.i * 613), x0, y0, w, h, f.farHaze, 0.88 * f.farHaze);
+    ctx.restore();
+    this.farOn = true;
+  }
+  /** The Coliseum was drawn from afar this frame (so its chip isn't shown: it's in view). */
+  private farOn = false;
+
+  /** One of the park's things: its picture at the camera's scale (the fountain's water moving). */
+  private drawProp(it: Item, now: number): void {
+    const { ctx, view: v, p } = this;
+    if (!proj(v, it.dx, it.dz, 0, p)) return;
+    const fc = this.propFrames[it.i]!;
+    const ch = fc.ch;
+    const px = p.k / TOWN_FEEL.housePxPerSquare;
+    const w = ch.w * px;
+    const h = ch.h * px;
+    const x0 = p.x - ch.foot[0] * px;
+    const y0 = p.y - ch.foot[1] * px;
+    const s = bandOf(v, it.dx, it.dz);
+    const alpha = (1 - 0.6 * s) * enterOf(v, it.dx, it.dz);
+    const img = fc.at(now, it.i * 211);
+    ctx.globalAlpha = alpha;
+    ctx.imageSmoothingEnabled = px < 1.5;
+    if (s > 0.02) this.blitSoft(img, x0, y0, w, h, s, 0.88 * s);
+    else ctx.drawImage(img, x0, y0, w, h);
+    ctx.globalAlpha = 1;
+    this.propTop[it.i] = p.y - (PROPS[it.i]!.kind === "table" ? TABLE_TOP * px : ch.foot[1] * px);
+    this.box(it, p.depth, x0, y0, x0 + w, y0 + h, p.x, p.y, y0);
   }
 
   /**
@@ -983,13 +1094,18 @@ export class Renderer {
    * lifts. Fills the item's box; its head is `head` of the way down the box; the pawn is `base` of the box's width (less
    * than 1 when the box has a margin for items).
    */
-  private drawSprite(it: Item, img: CanvasImageSource, sq: number, fx: number, fy: number, aspect: number, lift: number, tilt: number, flip: number, shadow: number, head = 0, pawn = false, base = 1): void {
+  private drawSprite(it: Item, img: CanvasImageSource, sq: number, fx: number, fy: number, aspect: number, lift: number, tilt: number, flip: number, shadow: number, head = 0, pawn = false, base = 1, body = sq): void {
     const { ctx, view: v, p } = this;
     if (!proj(v, it.dx, it.dz, 0, p)) return;
     const h = sq * p.k;
     const w = h * aspect;
     const x0 = p.x - fx * w;
-    const y0 = p.y - fy * h - lift * p.k;
+    // Sitting (a pawn on a chess table's stool): the pawn's lower part (`sitCut` of its `body` squares) goes behind the
+    // stool, the rest rests on its seat: lower than standing.
+    const F0 = TOWN_FEEL;
+    const seat = p.y - F0.sitSeat * p.k;
+    const drop = this.sitting ? seat + F0.sitCut * body * p.k - p.y : 0;
+    const y0 = p.y - fy * h - lift * p.k + drop;
     const s = bandOf(v, it.dx, it.dz); // in the far band: fade, haze and blur
     const alpha = (1 - TOWN_FEEL.bandFade * s) * enterOf(v, it.dx, it.dz) * this.fade;
     ctx.save();
@@ -999,16 +1115,22 @@ export class Renderer {
     const grow = 1 / (1 + up * F.shadowLiftShrink);
     const fade = Math.max(0, 1 - up * F.shadowLiftFade);
     ctx.fillStyle = SHADOW;
-    const soft = shadow;
+    const soft = this.sitting ? 0 : shadow; // (sitting: the stool's shadow is its own)
     ctx.globalAlpha = alpha * F.shadowAlpha * (1 - s) * (0.5 + 0.5 * fade);
     ctx.beginPath();
     ctx.ellipse(p.x, p.y, Math.min(w * base * 0.42, p.k * 0.42 * soft) * grow, p.k * 0.12 * soft * grow, 0, 0, Math.PI * 2);
     ctx.fill();
     const cw = pawn ? w * base * F.contactShadowW : p.k * F.contactShadowW * 1.45 * Math.min(shadow, 1.2);
-    ctx.globalAlpha = alpha * F.contactShadowAlpha * (1 - s) * fade;
-    ctx.beginPath();
-    ctx.ellipse(p.x, p.y, cw * grow, p.k * F.contactShadowDepth * grow, 0, 0, Math.PI * 2);
-    ctx.fill();
+    if (!this.sitting) {
+      ctx.globalAlpha = alpha * F.contactShadowAlpha * (1 - s) * fade;
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, cw * grow, p.k * F.contactShadowDepth * grow, 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.rect(x0 - w, y0 - h, 3 * w, seat - (y0 - h));
+      ctx.clip();
+    }
     ctx.globalAlpha = alpha;
     if (tilt) {
       ctx.translate(p.x, p.y);
@@ -1362,7 +1484,15 @@ export class Renderer {
   }
 
   /** Where a card points: over a boss's head or a place's top (`i`: its index in the homes, then the Coliseum), on screen (false: not drawn this frame). */
-  anchor(kind: "boss" | "home", i: number, out: { x: number; y: number }): boolean {
+  anchor(kind: "boss" | "home" | "table", i: number, out: { x: number; y: number }): boolean {
+    if (kind === "table") {
+      // Over its board.
+      const it = this.propItems[PROPS.findIndex((p) => p.table === i)]!;
+      if (!it?.on) return false;
+      out.x = it.fx;
+      out.y = this.propTop[it.i]! - 4;
+      return out.y > 0 && out.y < this.H && out.x > 0 && out.x < this.W;
+    }
     if (kind === "boss") {
       const it = this.bossItems[i]!;
       if (!it.on) return false;
@@ -1378,6 +1508,9 @@ export class Renderer {
     // Over the home's floating name (it rises about this high over the building), so the card never covers it.
     out.x = nm.x;
     out.y = nm.y - (TOWN_FEEL.floatingNames ? TOWN_FEEL.cardOverName : 0);
+    // A building taller than the view (the Coliseum from the park on a computer): its top is above the box, so the card
+    // stands at the box's top, over it.
+    if (out.y <= 0 && it.y1 > 0) out.y = 1;
     return out.y > 0 && out.y < this.H && out.x > 0 && out.x < this.W;
   }
 
@@ -1386,7 +1519,20 @@ export class Renderer {
    * tap lands on it: if something nearer stands over that point (a boss in front of its home, a bot at the gate), the
    * first point of a grid over its picture that a tap would hit. False if it isn't drawn or none is clear. (For tests.)
    */
-  tapPoint(kind: "boss" | "home" | "statue", i: number, out: { x: number; y: number }): boolean {
+  tapPoint(kind: "boss" | "home" | "statue" | "table", i: number, out: { x: number; y: number }): boolean {
+    if (kind === "table") {
+      // Its board's middle, or a point on its leg or a stool if someone stands in front of that.
+      const it = this.propItems[PROPS.findIndex((p) => p.table === i)];
+      if (!it?.on) return false;
+      const top = this.propTop[it.i]!;
+      for (const [u, y] of [[0, top + 2], [0, (top + it.fy) / 2], [-0.33, it.fy - 3], [0.33, it.fy - 3]] as const) {
+        out.x = it.fx + u * (it.x1 - it.x0);
+        out.y = y;
+        const h = out.x > 0 && out.x < this.W && out.y > 0 && out.y < this.H ? this.pick(out.x, out.y) : null;
+        if (h?.kind === "table" && h.table === TABLES[i]) return true;
+      }
+      return false;
+    }
     if (kind === "statue") {
       // Its pedestal's middle, or higher up the figure if someone stands in front of that.
       const b = this.statueBox[i];
@@ -1439,11 +1585,35 @@ export class Renderer {
         return { kind: "house", home: this.homes[it.i]! };
       }
       if (it.kind === "boss") return { kind: "boss", boss: this.town.bosses[it.i]! };
+      if (it.kind === "prop") {
+        // A chess table (its stools too): its table. A tree, a bench or the fountain: the square under the tap.
+        const pr = PROPS[it.i]!;
+        if (pr.kind === "table" && this.propHit(it, x, y)) return { kind: "table", table: TABLES[pr.table]! };
+        continue;
+      }
       return { kind: "person", person: this.town.people[it.i]! };
     }
     const sq = pickSquare(this.view, this.camX, this.camY, x, y);
     return sq ? { kind: "square", c: sq.c, r: sq.r } : null;
   }
+
+  /** Is (x, y) on a drawn pixel of a park thing's picture? (A mask made once a kind: no read-back per tap.) */
+  private propHit(it: Item, x: number, y: number): boolean {
+    const fc = this.propFrames[it.i]!;
+    let m = this.propMasks.get(fc);
+    if (!m) {
+      const img = fc.get(0);
+      const d = img.getContext("2d")!.getImageData(0, 0, img.width, img.height).data;
+      m = new Uint8Array(img.width * img.height);
+      for (let i = 0; i < m.length; i++) m[i] = d[i * 4 + 3]! > 0 ? 1 : 0;
+      this.propMasks.set(fc, m);
+    }
+    const w = fc.ch.w;
+    const px = clamp(Math.floor(((x - it.x0) / (it.x1 - it.x0)) * w), 0, w - 1);
+    const py = clamp(Math.floor(((y - it.y0) / (it.y1 - it.y0)) * fc.ch.h), 0, fc.ch.h - 1);
+    return !!m[py * w + px];
+  }
+  private readonly propMasks = new Map<FrameCache, Uint8Array>();
 
   /** The statue (its figure or its pedestal) drawn under (x, y), or null. */
   private statueHit(x: number, y: number): Statue | null {
@@ -1483,7 +1653,7 @@ export class Renderer {
     for (let i = 0; i < places.length; i++) {
       const hi = this.houseItems[i]!;
       if (i >= this.homes.length) {
-        if (hi.on && hi.x1 > 0 && hi.x0 < W && hi.y0 < H && hi.y1 > 0) continue;
+        if ((hi.on && hi.x1 > 0 && hi.x0 < W && hi.y0 < H && hi.y1 > 0) || this.farOn) continue;
       } else {
         if (hi.on && hi.fx > 0 && hi.fx < W && hi.hy < H) continue;
         if (town.bosses[i]!.onScreen) continue; // (the bosses are in the homes' order: world.ts)
@@ -1565,7 +1735,7 @@ const SHADOW = "rgb(60,35,10)";
 /** A square's corners from its middle, in half-squares: far left, far right, near right, near left. */
 const CORNERS = [-1, 1, 1, 1, 1, -1, -1, -1] as const;
 const SCRATCH_ORDER: number[] = [];
-const byFarFirst = (a: Item, b: Item) => b.dz - a.dz;
+const byFarFirst = (a: Item, b: Item) => b.sz - a.sz;
 const dist2 = (h: Place, x: number, y: number) => wrapF(h.cx - x) ** 2 + wrapF(h.cy - y) ** 2;
 /** The Coliseum's chip shows all of its icon. */
 const CHIP_ICON_BOX = [0, 0, COLISEUM_CHIP.w] as const;

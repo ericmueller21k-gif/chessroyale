@@ -15,10 +15,11 @@ export interface Sq {
 }
 
 /**
- * The Coliseum's ground in the world's middle (6 x 6 squares; slice 5 builds it: solid, you walk round it). `c0`, `r0` its
- * first column and row. Its gate faces south, toward your start.
+ * The Coliseum's ground in the world's middle (12 x 12 squares since slice 6, which made it about twice its size; slice 5
+ * built it on 6 x 6: solid, you walk round it). `c0`, `r0` its first column and row. Its gate faces south, over the park
+ * toward your start.
  */
-export const COLISEUM = { c0: 17, r0: 16, size: 6 } as const;
+export const COLISEUM = { c0: 17, r0: 23, size: 12 } as const;
 /** Whether (c, r) is the Coliseum's ground. */
 export const onColiseum = (c: number, r: number): boolean => {
   const i = wrapI(c) - COLISEUM.c0;
@@ -30,7 +31,7 @@ export const onColiseum = (c: number, r: number): boolean => {
  * gather (nothing is built there; your start is on it). Nearest the gate first: a tap on the Coliseum ends you on the
  * first free one (`destFor`), so a crowd at the gate grows outward from it in a half ring.
  */
-export const APRON_ROWS = 4;
+export const APRON_ROWS = 3;
 /** The middle of the gate's sill, on the Coliseum's front edge (between its two middle columns). */
 const GATE_X = COLISEUM.c0 + (COLISEUM.size - 1) / 2;
 const GATE_Y = COLISEUM.r0 - 0.5;
@@ -63,8 +64,108 @@ export const STATUES: readonly Statue[] = [
 /** The statue whose viewing square (c, r) is, or null. */
 export const statueAt = (c: number, r: number): Statue | null => STATUES.find((s) => s.c === wrapI(c) && s.r === wrapI(r)) ?? null;
 
-/** Your square when the page opens: just south of the Coliseum's ground, facing it (the camera looks north, r rising). */
-export const START: Sq = { c: 20, r: 13 };
+// ---- The park (slice 6; Eric, Oct 26: "a little park… filled with chess boards on little tables where you can walk up
+// and sit… benches, sidewalks, even a water fountain in the middle, trees… a very cozy city park feel. I'd say 10 chess
+// boards to start with… open up the space in front of the coliseum and it can go there").
+
+/**
+ * The park in front of the Coliseum's gate, south of its apron: 20 squares across (the Coliseum's 12 and 4 more each
+ * side), 10 deep. `c0` its first column, `r1` its row nearest the gate (the camera looks north, r rising).
+ */
+export const PARK = { c0: COLISEUM.c0 - 4, r1: COLISEUM.r0 - APRON_ROWS - 1, w: 20, d: 10 } as const;
+/**
+ * Its plan, a row a line from the gate's side (north) to the plaza's (south), a square a letter: `=` paving, `.` grass,
+ * `t` a tree (on grass), `b` a bench (on grass, facing south), `B` a bench on paving, `T` a chess table (its two stools
+ * `s` either side, facing each other across it), `F` the fountain (2 x 2, on paving; `f` its other squares). A paved
+ * walk all round; the promenade (4 wide) runs up the middle from the plaza to the gate, round the fountain in the
+ * middle; five tables either side of it; lawns with trees and benches outside them.
+ */
+const PARK_PLAN = [
+  "=.t..sTs====sTs..t.=",
+  "=...b...====...b...=",
+  "=t...sTs====sTs...t=",
+  "=......B====B......=",
+  "=.t..sTs=Ff=sTs..t.=",
+  "=......==ff==......=",
+  "=t...sTs====sTs...t=",
+  "=...b...====...b...=",
+  "=.t..sTs====sTs..t.=",
+  "====================",
+] as const;
+
+/** What a square of ground is: the town's board, paving (the park's walks, the Coliseum's apron) or the park's grass. */
+export const BOARD_GROUND = 0;
+export const PAVING = 1;
+export const GRASS = 2;
+/** Each square's ground (index r * N + c). */
+export const groundAt = new Uint8Array(N * N);
+
+/** A chess table: its square (solid) and its two stools (walkable), west and east of it, facing each other across it. */
+export interface Table {
+  i: number;
+  c: number;
+  r: number;
+  stools: readonly [Sq, Sq];
+}
+/** Something standing in the park: a tree, a bench, the fountain or a chess table (with its stools). */
+export interface Prop {
+  kind: "tree" | "bench" | "fountain" | "table";
+  /** Its square (the fountain's: its front left one). */
+  c: number;
+  r: number;
+  /** Where its picture's foot stands (the fountain's: the middle of its front edge). */
+  x: number;
+  y: number;
+  /** Its variant (the trees differ a little: 0 to 2). */
+  v: number;
+  /** A table's index in TABLES (-1: not a table). */
+  table: number;
+}
+const tables: Table[] = [];
+const props: Prop[] = [];
+/** Squares something in the park stands on (walked round). */
+const parkSolid = new Uint8Array(N * N);
+PARK_PLAN.forEach((line, v) => {
+  const r = PARK.r1 - v;
+  for (let u = 0; u < PARK.w; u++) {
+    const ch = line[u]!;
+    const c = PARK.c0 + u;
+    const k = r * N + c;
+    groundAt[k] = ch === "." || ch === "t" || ch === "b" ? GRASS : PAVING;
+    if (ch === "t" || ch === "b" || ch === "B") {
+      parkSolid[k] = 1;
+      props.push({ kind: ch === "t" ? "tree" : "bench", c, r, x: c, y: r, v: (u * 7 + v * 3) % 3, table: -1 });
+    } else if (ch === "T") {
+      parkSolid[k] = 1;
+      const t: Table = { i: tables.length, c, r, stools: [{ c: c - 1, r }, { c: c + 1, r }] };
+      tables.push(t);
+      props.push({ kind: "table", c, r, x: c, y: r, v: 0, table: t.i });
+    } else if (ch === "F" || ch === "f") {
+      parkSolid[k] = 1;
+      if (ch === "F" && line[u + 1] === "f") props.push({ kind: "fountain", c, r: r - 1, x: c + 0.5, y: r - 1.5, v: 0, table: -1 });
+    }
+  }
+});
+// The Coliseum's apron is paved too.
+for (let r = COLISEUM.r0 - APRON_ROWS; r < COLISEUM.r0; r++) for (let c = COLISEUM.c0; c < COLISEUM.c0 + COLISEUM.size; c++) groundAt[r * N + c] = PAVING;
+/** The ten chess tables, in the plan's order (north to south, west to east). */
+export const TABLES: readonly Table[] = tables;
+/** Everything standing in the park. */
+export const PROPS: readonly Prop[] = props;
+/** The table whose stool (c, r) is, or null. */
+export const stoolAt = (c: number, r: number): Table | null => {
+  const wc = wrapI(c);
+  const wr = wrapI(r);
+  return TABLES.find((t) => t.stools.some((s) => s.c === wc && s.r === wr)) ?? null;
+};
+/** The table on square (c, r), or null. */
+export const tableAt = (c: number, r: number): Table | null => TABLES.find((t) => t.c === wrapI(c) && t.r === wrapI(r)) ?? null;
+
+/**
+ * Your square when the page opens: in the park on its promenade, just south of the fountain, facing the Coliseum over it
+ * (the camera looks north, r rising): the park around you and the Coliseum looming beyond it.
+ */
+export const START: Sq = { c: PARK.c0 + 9, r: PARK.r1 - 6 };
 
 export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil";
 
@@ -100,27 +201,27 @@ export interface Home extends Place {
 export const COLISEUM_PLACE: Place = { id: "coliseum", name: "The Coliseum", color: "#1f2530", cx: GATE_X, cy: COLISEUM.r0 + (COLISEUM.size - 1) / 2, half: COLISEUM.size / 2, foot: COLISEUM.size / 2 };
 
 /**
- * The thirteen homes, spread evenly over the world that wraps: the points of a lattice on the 40 x 40 torus (14 points,
- * one of them the Coliseum's middle), so neighbors are about 8 to 10 squares apart and none stands in the plaza south of
- * the Coliseum (docs/decisions/2026-10-26-town-square-slice-3.md has the map). Pairs that play off each other stand side
- * by side: Ginger Igloo and Jefferson's Fireworks (ice and fire), Hollow Peak and Moo & Moon Meadow (dark and night).
- * Names: "Ginger Igloo", "Hollow Peak" and "Moo & Moon Meadow" are Eric's; the rest the director's.
+ * The thirteen homes, spread evenly round the middle (the Coliseum and its park) over the 46 x 46 world that wraps: every
+ * home's nearest neighbor is 8 to 10 squares away, as on slice 3's smaller map, and no home's roaming ground reaches the
+ * park or the Coliseum (docs/decisions/2026-10-26-town-square-slice-6.md has the map). Pairs that play off each other
+ * stand side by side: Ginger Igloo and Jefferson's Fireworks (ice and fire), Hollow Peak and Moo & Moon Meadow (dark and
+ * night). Names: "Ginger Igloo", "Hollow Peak" and "Moo & Moon Meadow" are Eric's; the rest the director's.
  */
 export const HOMES: readonly Home[] = (
   [
-    { id: "gingerbread", boss: "Ginger", name: "Ginger Igloo", color: "#3fae4f", cx: 11, cy: 16 },
-    { id: "grex", boss: "Jefferson", name: "Jefferson's Fireworks", color: "#e5566a", cx: 3, cy: 13 },
-    { id: "tiger", boss: "Babur", name: "Babur's Circus", color: "#2f7fe0", cx: 29, cy: 22 },
-    { id: "bigboy", boss: "Big Boy", name: "Big Boy's Crib", color: "#23a8a8", cx: 37, cy: 25 },
-    { id: "hollow", boss: "Hollow", name: "Hollow Peak", color: "#7a4fd0", cx: 6, cy: 28 },
-    { id: "moo", boss: "Moo & Moon", name: "Moo & Moon Meadow", color: "#5d7ad8", cx: 14, cy: 30 },
-    { id: "alfil", boss: "Alfil", name: "Alfil's Pyramid", color: "#b4840f", cx: 23, cy: 33 },
-    { id: "smudgy", boss: "Smudgy", name: "Smudgy's Art Gallery", color: "#f5832d", cx: 31, cy: 36 },
-    { id: "clown", boss: "Boingo", name: "Boingo's Funhouse", color: "#7d3b93", cx: 0, cy: 39 },
-    { id: "hopper", boss: "Chub & Chirp", name: "Chub & Chirp's Grassland", color: "#447a1f", cx: 9, cy: 2 },
-    { id: "gardener", boss: "Puddles", name: "Puddles' Botanical Garden", color: "#d6747b", cx: 17, cy: 5 },
-    { id: "sawyer", boss: "Sawyer", name: "Sawyer's Woodshed", color: "#d39a0b", cx: 26, cy: 8 },
-    { id: "pig", boss: "Wrangler", name: "Wrangler's Stall", color: "#8f5629", cx: 34, cy: 10 },
+    { id: "gingerbread", boss: "Ginger", name: "Ginger Igloo", color: "#3fae4f", cx: 39, cy: 11 },
+    { id: "grex", boss: "Jefferson", name: "Jefferson's Fireworks", color: "#e5566a", cx: 39, cy: 3 },
+    { id: "tiger", boss: "Babur", name: "Babur's Circus", color: "#2f7fe0", cx: 28, cy: 4 },
+    { id: "bigboy", boss: "Big Boy", name: "Big Boy's Crib", color: "#23a8a8", cx: 43, cy: 31 },
+    { id: "hollow", boss: "Hollow", name: "Hollow Peak", color: "#7a4fd0", cx: 0, cy: 43 },
+    { id: "moo", boss: "Moo & Moon", name: "Moo & Moon Meadow", color: "#5d7ad8", cx: 8, cy: 40 },
+    { id: "alfil", boss: "Alfil", name: "Alfil's Pyramid", color: "#b4840f", cx: 22, cy: 42 },
+    { id: "smudgy", boss: "Smudgy", name: "Smudgy's Art Gallery", color: "#f5832d", cx: 35, cy: 40 },
+    { id: "clown", boss: "Boingo", name: "Boingo's Funhouse", color: "#7d3b93", cx: 5, cy: 27 },
+    { id: "hopper", boss: "Chub & Chirp", name: "Chub & Chirp's Grassland", color: "#447a1f", cx: 6, cy: 8 },
+    { id: "gardener", boss: "Puddles", name: "Puddles' Botanical Garden", color: "#d6747b", cx: 16, cy: 2 },
+    { id: "sawyer", boss: "Sawyer", name: "Sawyer's Woodshed", color: "#d39a0b", cx: 40, cy: 23 },
+    { id: "pig", boss: "Wrangler", name: "Wrangler's Stall", color: "#8f5629", cx: 4, cy: 17 },
   ] satisfies Omit<Home, "half" | "foot">[]
 ).map((h) => ({ ...h, half: 1.5, foot: 0.5 }));
 /** Every place: the homes (in the bosses' order), then the Coliseum. */
@@ -146,8 +247,11 @@ export const BOTS: readonly ({ name: string } & Look)[] = [
 export const plotAt: (Home | null)[] = new Array(N * N).fill(null);
 for (const h of HOMES) for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) plotAt[wrapI(h.cy + dr) * N + wrapI(h.cx + dc)] = h;
 
-/** A square you can stand on: not a home's plot, not the Coliseum's ground. */
-export const walkable = (c: number, r: number): boolean => plotAt[wrapI(r) * N + wrapI(c)] === null && !onColiseum(c, r);
+/** A square you can stand on: not a home's plot, not the Coliseum's ground, nothing in the park standing on it (a stool is a square you stand on). */
+export const walkable = (c: number, r: number): boolean => {
+  const k = wrapI(r) * N + wrapI(c);
+  return plotAt[k] === null && !parkSolid[k] && !onColiseum(c, r);
+};
 /** Steps between two squares, the short way round. */
 export const tdist = (a: Sq, b: Sq): number => Math.abs(wrapF(a.c - b.c)) + Math.abs(wrapF(a.r - b.r));
 /** How far a square is from a home's plot (0 on it, 1 on the ring around it). */
@@ -316,6 +420,17 @@ export interface Person {
   /** This device's player (a gold tag; the camera follows them). */
   you: boolean;
   walker: Walker;
+  /**
+   * Sits down when it stops on a chess table's stool (`seated`): a bot always does; you do when a tap on a table sent you
+   * there, until you walk on or its card closes.
+   */
+  sit: boolean;
+}
+
+/** Whether a person sits at a chess table now: stopped on one of its stools, meaning to sit. Its table, or null. */
+export function seated(p: Person): Table | null {
+  const w = p.walker;
+  return p.sit && !w.moving() ? stoolAt(w.c, w.r) : null;
 }
 
 export interface Boss {
@@ -357,10 +472,10 @@ function lcg(seed: number): () => number {
 export function createTown(now: number, seed = 20261025): Town {
   const rnd = lcg(seed);
   const f = TOWN_FEEL;
-  const you: Person = { id: "you", name: "", look: { side: "light", tint: null }, you: true, walker: new Walker(START, f.youStepMs, true, f.walkEase) };
+  const you: Person = { id: "you", name: "", look: { side: "light", tint: null }, you: true, walker: new Walker(START, f.youStepMs, true, f.walkEase), sit: false };
   // Each boss starts on the square in front of its home's middle (toward the camera).
   const bosses: Boss[] = HOMES.map((home) => ({ home, walker: new Walker({ c: home.cx, r: wrapI(home.cy - 2) }, f.bossStepMs, false), nextAt: null, onScreen: false, held: false, lastLine: null }));
-  // The bots stand around the plaza (16 x 14 squares around you), apart, off the bosses' roaming ground.
+  // The bots stand around you in the park (16 x 14 squares round you), apart, off the bosses' roaming ground.
   const bots: Person[] = [];
   for (const b of BOTS) {
     let c = 0;
@@ -371,7 +486,7 @@ export function createTown(now: number, seed = 20261025): Town {
       const sq = { c, r };
       if (walkable(c, r) && !statueAt(c, r) && tdist(sq, START) >= 3 && !HOMES.some((h) => plotDist(h, c, r) <= f.bossRoam) && !bots.some((o) => tdist(sq, o.walker.here()) < 3)) break;
     }
-    bots.push({ id: `bot:${bots.length}`, name: b.name, look: { side: b.side, tint: b.tint }, you: false, walker: new Walker({ c, r }, f.botStepMs, true) });
+    bots.push({ id: `bot:${bots.length}`, name: b.name, look: { side: b.side, tint: b.tint }, you: false, walker: new Walker({ c, r }, f.botStepMs, true), sit: true });
   }
   return {
     people: [you, ...bots],
@@ -445,8 +560,8 @@ export function spotNear(t: Town, w: Walker, at: Sq, beside: boolean): Sq | null
   return null;
 }
 
-/** What a tap asks for: a square, the squares beside someone, the ring around a home, or the Coliseum's apron. */
-export type Target = { kind: "square"; c: number; r: number } | { kind: "beside"; at: Sq } | { kind: "home"; home: Home } | { kind: "coliseum" } | { kind: "statue"; statue: Statue };
+/** What a tap asks for: a square, the squares beside someone, the ring around a home, the Coliseum's apron, a statue's square or a chess table's stool. */
+export type Target = { kind: "square"; c: number; r: number } | { kind: "beside"; at: Sq } | { kind: "home"; home: Home } | { kind: "coliseum" } | { kind: "statue"; statue: Statue } | { kind: "table"; table: Table };
 
 /**
  * The square `w` would end on for a target (null: none; where it stands already counts). A square: itself if free, else
@@ -476,6 +591,17 @@ export function destFor(t: Town, w: Walker, target: Target): Sq | null {
     return path ? path[path.length - 1]! : null;
   }
   if (target.kind === "beside") return spotNear(t, w, target.at, true);
+  // A chess table: its free stool `w` reaches in fewer steps (where it sits already counts); both taken, the nearest free
+  // square beside the table.
+  if (target.kind === "table") {
+    const d = stepsFrom(w.here());
+    let best: Sq | null = null;
+    for (const s of target.table.stools) {
+      const k = d[s.r * N + s.c]!;
+      if (k >= 0 && !taken(t, s.c, s.r, w) && (!best || k < d[best.r * N + best.c]!)) best = s;
+    }
+    return best ?? spotNear(t, w, target.table, true);
+  }
   // A statue: its viewing square, or (someone stands there) the nearest free square beside it.
   if (target.kind === "statue") return spotNear(t, w, target.statue, false);
   if (plotAt[target.r * N + target.c]) {
@@ -571,12 +697,16 @@ function botsWander(t: Town, now: number): void {
   // (Never on a statue's viewing square: it's kept free for whoever comes to look.)
   const ok = (c: number, r: number) => walkable(c, r) && !taken(t, c, r, w) && !t.bosses.some((b) => plotDist(b.home, c, r) === 1) && !statueAt(c, r);
   const targets: Sq[] = [];
-  for (let dc = -hi; dc <= hi; dc++)
-    for (let dr = -hi; dr <= hi; dr++) {
+  // Now and then one goes to sit at a chess table nearby (a free stool), and one sitting may stay a while longer.
+  if (seated(bot) && t.rnd() < f.botStaySeated) return;
+  const sitting = t.rnd() < f.botSitChance;
+  const reach = sitting ? f.botSitReach : hi;
+  for (let dc = -reach; dc <= reach; dc++)
+    for (let dr = -reach; dr <= reach; dr++) {
       const d = Math.abs(dc) + Math.abs(dr);
       const c = wrapI(h.c + dc);
       const r = wrapI(h.r + dr);
-      if (d >= lo && d <= hi && ok(c, r)) targets.push({ c, r });
+      if (d >= lo && d <= reach && ok(c, r) && (!sitting || stoolAt(c, r)) && (sitting || d <= hi)) targets.push({ c, r });
     }
   if (!targets.length) return;
   const to = pick(t, targets);
