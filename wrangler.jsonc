@@ -6,6 +6,9 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "chessroyale",
+  // The account (not a secret: it is in every dashboard address). Wrangler needs it to name the engine server's pinned
+  // image below; without it, `wrangler dev` (the e2e suite) would ask Cloudflare who you are, which needs a login.
+  "account_id": "86dbf3bbeb8ae6e99afcc62ea1c80492",
   "main": "packages/server/src/index.ts",
   "compatibility_date": "2025-09-01",
   "assets": {

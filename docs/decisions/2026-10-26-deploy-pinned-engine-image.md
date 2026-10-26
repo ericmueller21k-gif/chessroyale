@@ -21,3 +21,8 @@ The engine server no longer rebuilds by itself when `engine/` changes. It rarely
 push a new image by hand, or how to go back to building on each deploy once Workers Builds can run Docker again.
 `npx wrangler dev` with containers on now pulls the pinned image instead of building it; the e2e suite runs with
 containers off, as before.
+
+`wrangler.jsonc` also names the account (`account_id`; not a secret, it's in every dashboard address). With a
+registry image wrangler needs the account to name it, and without `account_id` it asks Cloudflare, which needs a
+login: the first CI run of this change failed in every shard that way ("Not logged in") as `wrangler dev` started.
+Checked with no login, no cached account and no Docker: `wrangler dev` starts and `wrangler deploy --dry-run` passes.
