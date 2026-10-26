@@ -13,6 +13,7 @@
     "typecheck": "tsc -p packages/core --noEmit && tsc -p packages/chess --noEmit && tsc -p packages/sim --noEmit && tsc -p packages/app --noEmit && tsc -p packages/server --noEmit && tsc -p packages/maia-worker --noEmit",
     "replays:bots": "tsx packages/sim/scripts/bot-replays.ts",
     "simulate": "tsx packages/sim/scripts/simulate.ts",
+    "boss-art": "tsx scripts/boss-art/run.ts",
     "boss-lines": "tsx scripts/boss-lines/main.ts",
     "sim:squads": "tsx packages/sim/scripts/squads-sim.ts",
     "preview:items": "node scripts/preview-items.mjs",
