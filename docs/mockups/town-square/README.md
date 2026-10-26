@@ -29,3 +29,10 @@ the two sets (0.6 = phone, 1.4 = computer).
   scale-down blur that works without `ctx.filter`). Houses, bosses and pawns are drawn only once their square is inside
   the rim, always whole, fading in over their first half square; the haze strip is drawn behind them.
 - Frame rate in a headless browser with software rendering: about 54–59 fps on both sizes. Not yet measured on a real phone.
+
+## Eric's pictures for the homes (Oct 26, 2026)
+
+`ginger-igloo.webp` (Ginger Igloo), `hollow-peak.webp` (Hollow Peak) and `moo-meadow.webp` (Moo & Moon Meadow): small copies
+of the pictures Eric sent for the bosses' homes. The game takes each one's idea and shape, drawn in its own pixel style
+(`packages/app/src/town/houses/`); the names are written by the game, never part of the art. Slice 1 of the square is at
+`/town`: `docs/areas/town-square.md`.

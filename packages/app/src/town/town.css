@@ -1,0 +1,156 @@
+/*
+ * The town square (/town): a slim bar, then the world filling the rest of the screen, phone and computer alike. The
+ * bar's back button, the zoom pair and "Back to me" stay put (Eric's rule: nothing hidden, nothing shifts). Its own
+ * file, loaded with the page's code (so none of it is in the main bundle). docs/areas/town-square.md.
+ */
+.town-screen {
+  position: fixed;
+  inset: var(--banner-h, 0px) 0 0 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+  font-family: Archivo, system-ui, sans-serif;
+}
+.town-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: calc(52px + env(safe-area-inset-top));
+  padding: env(safe-area-inset-top) calc(14px + env(safe-area-inset-right)) 0 calc(14px + env(safe-area-inset-left));
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+}
+.town-bar h1 {
+  margin: 0;
+  font: 400 18px/1 "Archivo Black", Archivo, sans-serif;
+}
+.town-back {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+/* The world's box: whatever is left. The world works its camera out from this box's shape. */
+.town-box {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: #bfe3f3;
+}
+.town-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+}
+.town-canvas:active {
+  cursor: grabbing;
+}
+.town-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+/* An edge chip: the boss's face in a ring of its home's color, an arrow on the ring pointing at the home. */
+.town-chip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+}
+.town-chip-rot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+}
+.town-chip-arrow {
+  position: absolute;
+  left: -7px;
+  top: -41px;
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-bottom: 11px solid var(--town-chip, #3b2f25);
+}
+.town-chip-face {
+  position: absolute;
+  left: -23px;
+  top: -23px;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #fff;
+  border: 3px solid var(--town-chip, #3b2f25);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  pointer-events: auto;
+  cursor: pointer;
+}
+.town-chip-face canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+.town-controls {
+  position: absolute;
+  right: calc(14px + env(safe-area-inset-right));
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+.town-zoom {
+  display: flex;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+.town-zoom button {
+  width: 44px;
+  height: 36px;
+  border: 0;
+  background: #fff;
+  color: #1f2530;
+  font: 700 18px Archivo, sans-serif;
+  cursor: pointer;
+}
+.town-zoom button[aria-pressed="true"] {
+  background: #1f2530;
+  color: #fff;
+}
+.town-recenter {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid #d8ccb6;
+  background: #fff;
+  color: #1f2530;
+  font: 700 13px Archivo, sans-serif;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}

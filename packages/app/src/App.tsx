@@ -35,6 +35,7 @@ import { setInviteHost } from "./friends.ts";
 import { FriendsScreen } from "./screens/Friends.tsx";
 import { SettingsScreen } from "./screens/Settings.tsx";
 import { AutoChessScreen } from "./screens/AutoChess.tsx";
+import { TownPage } from "./town/TownPage.tsx";
 import { FaqScreen } from "./screens/Faq.tsx";
 import { Logo } from "./components/FrontDoor.tsx";
 import { FrontFrame, type FrontNav } from "./components/FrontMenu.tsx";
@@ -280,6 +281,8 @@ export function App() {
    * 19 until then), and Settings' Testing row does too.
    */
   const [showAutoChess, setShowAutoChess] = useState(() => location.pathname === "/autochess");
+  /** The town square (/town; hidden, nothing links to it yet: slice 1 of Boss raid's town square, docs/areas/town-square.md). */
+  const [showTown, setShowTown] = useState(() => location.pathname === "/town");
   // Chose "play vs bots as a guest" on the landing page (this device remembers).
   const [guest, setGuest] = useState(storedGuest);
   const [inviteSkipped, setInviteSkipped] = useState(false);
@@ -439,10 +442,10 @@ export function App() {
   }, [config, profile]);
 
   // Warm the engine up in the background so play starts instantly (not on Auto chess, whose fights use the HunChess engine:
-  // Stockfish isn't loaded there; it warms when you leave it).
+  // Stockfish isn't loaded there; it warms when you leave it). Not in the town square either: nothing there plays chess yet.
   useEffect(() => {
-    if (!showAutoChess) void enginePool();
-  }, [showAutoChess]);
+    if (!showAutoChess && !showTown) void enginePool();
+  }, [showAutoChess, showTown]);
 
   // Back on a lobby link this device already has a seat in (a reload, the app reopened, a dropped connection):
   // rejoin straight away (if the lobby has closed since, the connection is refused and the note shows). Otherwise
@@ -1178,6 +1181,16 @@ export function App() {
       <AutoChessScreen
         onBack={() => {
           setShowAutoChess(false);
+          history.replaceState(null, "", "/");
+        }}
+      />
+    );
+  }
+  if (!match && showTown) {
+    return (
+      <TownPage
+        onBack={() => {
+          setShowTown(false);
           history.replaceState(null, "", "/");
         }}
       />
