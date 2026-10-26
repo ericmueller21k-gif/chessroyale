@@ -25,11 +25,11 @@ import { SMUDGY } from "../characters/smudgy.ts";
 import { TIGER_FIGURE } from "../characters/tiger-figure.ts";
 import { N, bandOf, clamp, drawable, enterOf, farOf, forEachSquare, hazeMix, newPt, newView, pastCurve, pickSquare, proj, radial, rimYAt, setView, wrapF, type Quad, type View } from "./camera.ts";
 import { TOWN_FEEL } from "./feel.ts";
-import { HOUSES } from "./houses/index.ts";
+import { COLISEUM_CHIP, artOf } from "./houses/index.ts";
 import { CAP, layout, renderLines } from "./sign-font.ts";
 import { look, mixMist, mixRGB, mixTint, type SkyWeights } from "./sky.ts";
 import { SkyPainter } from "./sky-draw.ts";
-import { plotAt, type Boss, type Home, type HomeId, type Person, type Pose, type Town } from "./world.ts";
+import { COLISEUM_PLACE, onColiseum, plotAt, type Boss, type Home, type HomeId, type Person, type Place, type Pose, type Town } from "./world.ts";
 
 /** Each boss's sprite (its real one: its `idle` frames). */
 export const BOSS_ART: Record<HomeId, Character> = {
@@ -103,7 +103,7 @@ function groundColors(skyh: readonly number[]): GroundColors {
     for (let alt = 0; alt < 2; alt++)
       for (let plot = 0; plot < 2; plot++) {
         let base: readonly number[] = alt ? SQ_DARK : SQ_LIGHT;
-        if (plot) base = base.map((x) => x * 0.9); // a faint darker tint under a home
+        if (plot) base = base.map((x) => x * 0.9); // a faint darker tint under a home (and the Coliseum)
         const t = i / MIX_STEPS;
         const f = mix(base, skyh, t);
         fill[i * 4 + alt * 2 + plot] = rgb(f);
@@ -121,11 +121,24 @@ const BUBBLE_FONT = `500 12px ${FONT}`;
 // ---- The pawn (cburnett's, as on the boards: src/board/pieces/SOURCES.md), drawn once per look at a good size.
 const PAWN_PATH =
   "m 22.5,9 c -2.21,0 -4,1.79 -4,4 0,0.89 0.29,1.71 0.78,2.38 C 17.33,16.5 16,18.59 16,21 c 0,2.03 0.94,3.84 2.41,5.03 C 15.41,27.09 11,31.58 11,39.5 H 34 C 34,31.58 29.59,27.09 26.59,26.03 28.06,24.84 29,23.03 29,21 29,18.59 27.67,16.5 25.72,15.38 26.21,14.71 26.5,13.89 26.5,13 c 0,-2.21 -1.79,-4 -4,-4 z";
-const PAWN_PX = 160;
+export const PAWN_PX = 160;
 /** The pawn's head is this far down its box (its top at y 9 of the piece's 45): name tags sit on it. */
 const PAWN_HEAD = 9 / 45;
+/**
+ * And its base's foot (the path's bottom at y 39.5, and half its outline): this point stands on the square's middle, so
+ * the base sits on the square. (Slices 1 to 4 stood it at 0.96, about a tenth of a square lower: it seemed to float.)
+ */
+const PAWN_FOOT = (39.5 + 0.75) / 45;
+
+/** Your own pawn's picture: the plain pawn, or your dressed pawn (`pad`: the margin round the pawn's box for its items). */
+export interface YouArt {
+  img: HTMLCanvasElement;
+  pad: number;
+  /** The top of what's drawn (a hat over the head), down its box: your name tag sits on it. */
+  top: number;
+}
 const pawnCache = new Map<string, HTMLCanvasElement>();
-function pawnImage(side: "light" | "dark", tint: string | null): HTMLCanvasElement {
+export function pawnImage(side: "light" | "dark", tint: string | null): HTMLCanvasElement {
   const key = side + (tint ?? "");
   let c = pawnCache.get(key);
   if (c) return c;
@@ -197,16 +210,16 @@ interface Item {
 }
 const newItem = (kind: Item["kind"], i: number): Item => ({ kind, i, dx: 0, dz: 0, on: false, depth: 0, x0: 0, y0: 0, x1: 0, y1: 0, fx: 0, fy: 0, hy: 0 });
 
-/** An edge chip this frame: which home, where on the box's edge, which way its arrow points (degrees). */
+/** An edge chip this frame: which place (a home, or the Coliseum), where on the box's edge, which way its arrow points (degrees). */
 export interface Chip {
-  home: Home | null;
+  place: Place | null;
   x: number;
   y: number;
   angle: number;
 }
 
 /** What a tap landed on. */
-export type Hit = { kind: "square"; c: number; r: number } | { kind: "house"; home: Home } | { kind: "boss"; boss: Boss } | { kind: "person"; person: Person };
+export type Hit = { kind: "square"; c: number; r: number } | { kind: "house"; home: Home } | { kind: "coliseum" } | { kind: "boss"; boss: Boss } | { kind: "person"; person: Person };
 
 // Can the canvas blur (not in older iOS Safari; there the shrink alone does the work)?
 const BLUR_OK = (() => {
@@ -226,17 +239,20 @@ export class Renderer {
   DPR = 1;
   camX = 0;
   camY = 0;
-  readonly chips: Chip[] = Array.from({ length: TOWN_FEEL.maxChips }, () => ({ home: null, x: 0, y: 0, angle: 0 }));
+  readonly chips: Chip[] = Array.from({ length: TOWN_FEEL.maxChips }, () => ({ place: null, x: 0, y: 0, angle: 0 }));
   /** The buttons' box over the world (set by Town.tsx): no chip covers it. */
   readonly keepClear = { x: 0, y: 0, w: 0, h: 0 };
   /** This frame's name tags, homes' names and bubble, as boxes (x, y, w, h each) that no chip may cover. */
   private readonly clearBoxes = new Float32Array(4 * 96);
   private nClear = 0;
   private items: Item[];
-  /** The homes' items, by home (the items themselves are sorted every frame). */
+  /** Every place the town names: the homes (in the bosses' order), then the Coliseum. */
+  private readonly places: readonly Place[];
+  /** The places' items, by place (the items themselves are sorted every frame). */
   private readonly houseItems: Item[];
   private readonly bossFrames: FrameCache[];
   private readonly houseFrames: FrameCache[];
+  private readonly chipIcon: FrameCache;
   private readonly pose: Pose = { x: 0, y: 0, hop: 0, tilt: 0 };
   private readonly p = newPt();
   private readonly soft = document.createElement("canvas");
@@ -266,12 +282,18 @@ export class Renderer {
   /** The boss's items, by boss (for its card's place). */
   private readonly bossItems: Item[];
   private readonly q4 = new Float64Array(8);
+  /** Your ring's points this frame, its fade and its line's width. */
+  private readonly ringPts = new Float64Array(RING_N * 2);
+  private ringAlpha = 1;
+  private ringLine = 1.5;
+  /** Your dressed pawn (null: the plain pawn): set by Town.tsx when your look changes. */
+  youArt: YouArt | null = null;
   /** Tag widths by name and size; sign and bubble layouts by text. */
   private readonly tagW = new Map<string, number[]>();
   private readonly nameW = new Map<string, number[]>();
   /** Each home's sign lettering: laid out once, drawn once per size (in device pixels a font pixel). */
   private readonly signs: { lines: string[]; w: number; h: number; art: HTMLCanvasElement[] }[];
-  /** Where each home's name floats this frame (drawn over everything, after the homes): x, the building's top, its fade. */
+  /** Where each place's name floats this frame (drawn over everything, after the homes): x, the building's top, its fade. */
   private readonly names: { x: number; y: number; a: number; k: number }[];
   private readonly tops: number[] = [];
   private readonly bubbles = new Map<string, { lines: string[]; w: number }>();
@@ -291,23 +313,25 @@ export class Renderer {
     private readonly town: Town,
     private readonly homes: readonly Home[],
   ) {
-    this.houseItems = homes.map((_, i) => newItem("house", i));
-    this.names = homes.map(() => ({ x: 0, y: 0, a: 0, k: 0 }));
-    this.signs = homes.map((h) => {
-      const face = HOUSES[h.id].sign;
+    this.places = [...homes, COLISEUM_PLACE];
+    this.houseItems = this.places.map((_, i) => newItem("house", i));
+    this.names = this.places.map(() => ({ x: 0, y: 0, a: 0, k: 0 }));
+    this.signs = this.places.map((h) => {
+      const face = artOf(h).sign;
       return { ...layout(h.name, face.w, face.h), art: [] };
     });
     this.bossItems = town.bosses.map((_, i) => newItem("boss", i));
     this.items = [...this.houseItems, ...this.bossItems];
     this.bossFrames = town.bosses.map((b) => new FrameCache(BOSS_ART[b.home.id]));
-    this.houseFrames = homes.map((h) => new FrameCache(HOUSES[h.id].ch));
+    this.houseFrames = this.places.map((h) => new FrameCache(artOf(h).ch));
+    this.chipIcon = new FrameCache(COLISEUM_CHIP);
     // Each square is kept this frame (its corners, its face's corners, its color) and drawn with all the others of its
     // color in one fill (drawGround): a few dozen fills a frame instead of two per square.
     this.drawSquare = (c, r, cu, ru, q) => {
       const n = this.nSq;
       if (n >= SQ_MAX) return;
       const m = Math.round(clamp(hazeMix(this.view, cu - this.camX, ru - this.camY, this.mist), 0, 1) * MIX_STEPS);
-      this.sqKey[n] = m * 4 + ((c + r) & 1) * 2 + (plotAt[r * N + c] ? 1 : 0);
+      this.sqKey[n] = m * 4 + ((c + r) & 1) * 2 + (plotAt[r * N + c] || onColiseum(c, r) ? 1 : 0);
       const o = n * 8;
       const cx = (q[0]! + q[2]! + q[4]! + q[6]!) / 4;
       const cy = (q[1]! + q[3]! + q[5]! + q[7]!) / 4;
@@ -570,7 +594,7 @@ export class Renderer {
   // ---- The homes, bosses and pawns, far to near.
 
   private drawThings(now: number): void {
-    const { town, view: v, homes, pose } = this;
+    const { town, view: v, places, pose } = this;
     const f = TOWN_FEEL;
     // One item per person in the square (the list can change: people come and go).
     const people = town.people;
@@ -586,11 +610,13 @@ export class Renderer {
       let x: number;
       let y: number;
       let margin = 1;
+      let below = 3.2;
       if (it.kind === "house") {
-        const h = homes[it.i]!;
+        const h = places[it.i]!;
         x = h.cx;
-        y = h.cy - 0.5; // the picture's foot stands half a square in front of the plot's middle
-        margin = 2.5;
+        y = h.cy - h.foot; // where the picture's foot stands (a home's: half a square in front of the plot's middle)
+        margin = h.half + 1;
+        below = h.half > 2 ? 7 : below; // (the Coliseum is tall: its top shows while its foot is well under the box)
       } else {
         const w = it.kind === "boss" ? town.bosses[it.i]!.walker : people[it.i]!.walker;
         w.pose(now, pose);
@@ -600,7 +626,7 @@ export class Renderer {
       }
       it.dx = wrapF(x - this.camX);
       it.dz = wrapF(y - this.camY);
-      it.on = drawable(v, it.dx, it.dz, margin);
+      it.on = drawable(v, it.dx, it.dz, margin, below);
     }
     items.sort(byFarFirst);
     for (const b of town.bosses) b.onScreen = false;
@@ -626,11 +652,17 @@ export class Renderer {
         const w = person.walker;
         w.pose(now, pose);
         if (person.you) {
-          this.drawRing(it);
-          this.drawSprite(it, pawnImage(person.look.side, person.look.tint), f.youSquares, 0.5, 0.96, 1, pose.hop * f.youHop, pose.tilt * f.hobbleTilt, w.facing, 0.6, PAWN_HEAD);
+          // Inside your ring: its back half on the ground behind you, its front half over your base.
+          const ring = this.ringAround(it);
+          if (ring) this.drawRingHalf(false);
+          const art = this.youArt;
+          const k = 1 + 2 * (art?.pad ?? 0);
+          const pad = art?.pad ?? 0;
+          this.drawSprite(it, art?.img ?? pawnImage(person.look.side, person.look.tint), f.youSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.youHop, pose.tilt * f.hobbleTilt, w.facing, 0.6, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true);
+          if (ring) this.drawRingHalf(true);
           this.tag(person.name, it.fx, it.hy - 2, true, clamp((11 * this.p.k) / v.kf, 8, 12), 1);
         } else {
-          this.drawSprite(it, pawnImage(person.look.side, person.look.tint), f.botSquares, 0.5, 0.96, 1, pose.hop * f.botHop, pose.tilt * f.hobbleTilt, w.facing, 1, PAWN_HEAD);
+          this.drawSprite(it, pawnImage(person.look.side, person.look.tint), f.botSquares, 0.5, PAWN_FOOT, 1, pose.hop * f.botHop, pose.tilt * f.hobbleTilt, w.facing, 1, PAWN_HEAD, true);
           // Name tags on the near ones only.
           const far = farOf(v, it.dz);
           if (far < f.tagFar) this.tag(person.name, it.fx, it.hy - 2, false, clamp((11 * this.p.k) / v.kf, 8, 12), clamp((f.tagFar - far) / 0.12, 0, 1));
@@ -644,16 +676,16 @@ export class Renderer {
    * Each fades in (rising a little) as you come within a few squares of its plot and fades out as you leave.
    */
   private drawNames(now: number): void {
-    const { ctx, homes, pose, view: v } = this;
+    const { ctx, places, pose, view: v } = this;
     const f = TOWN_FEEL;
     const me = this.town.you.walker.pose(now, pose);
-    for (let i = 0; i < homes.length; i++) {
-      const h = homes[i]!;
+    for (let i = 0; i < places.length; i++) {
+      const h = places[i]!;
       const it = this.houseItems[i]!;
       const nm = this.names[i]!;
       if (!it.on || nm.a <= 0.01) continue;
-      // How far you are from the plot's edge (it's 3 squares across), in squares.
-      const d = Math.max(0, Math.abs(wrapF(me.x - h.cx)) - 1.5, Math.abs(wrapF(me.y - h.cy)) - 1.5);
+      // How far you are from the edge of its ground (a home's plot is 3 squares across, the Coliseum's 6), in squares.
+      const d = Math.max(0, Math.abs(wrapF(me.x - h.cx)) - h.half, Math.abs(wrapF(me.y - h.cy)) - h.half);
       const a = nm.a * clamp((f.nameShowFrom - d) / (f.nameShowFrom - f.nameFullAt), 0, 1);
       if (a <= 0.01) continue;
       const size = Math.round(clamp((15 * nm.k) / v.kf, 12, 20));
@@ -676,28 +708,60 @@ export class Renderer {
     ctx.globalAlpha = 1;
   }
 
-  /** Your gold ring on the ground, under your pawn. */
-  private drawRing(it: Item): void {
-    const { ctx, view: v, p } = this;
-    if (!proj(v, it.dx, it.dz, 0, p)) return;
+  /**
+   * Your gold ring, lying flat on the ground round your base in the ground's own perspective (a circle of `ringSize`
+   * squares across, projected point by point). Its points into `ringPts`; false if it isn't drawn.
+   */
+  private ringAround(it: Item): boolean {
+    const { view: v, p, ringPts } = this;
+    const r = TOWN_FEEL.ringSize / 2;
+    for (let i = 0; i < RING_N; i++) {
+      const a = (i / RING_N) * Math.PI * 2;
+      if (!proj(v, it.dx + r * Math.cos(a), it.dz + r * Math.sin(a), 0, p)) return false;
+      ringPts[i * 2] = p.x;
+      ringPts[i * 2 + 1] = p.y;
+    }
+    this.ringAlpha = enterOf(v, it.dx, it.dz);
+    proj(v, it.dx, it.dz, 0, p);
+    this.ringLine = Math.max(1.5, p.k * 0.06);
+    return true;
+  }
+
+  /** The ring's back half (with its fill, on the ground) or its front half (over your base). */
+  private drawRingHalf(front: boolean): void {
+    const { ctx, ringPts: q } = this;
     ctx.save();
-    ctx.globalAlpha = enterOf(v, it.dx, it.dz);
-    ctx.fillStyle = "rgba(255,215,106,.45)";
-    ctx.strokeStyle = "#c9962a";
-    ctx.lineWidth = Math.max(1.5, p.k * 0.06);
+    ctx.globalAlpha = this.ringAlpha;
+    ctx.lineWidth = this.ringLine;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = TOWN_FEEL.pressEdge;
+    if (!front) {
+      ctx.fillStyle = "rgba(255,215,106,.45)";
+      ctx.beginPath();
+      ctx.moveTo(q[0]!, q[1]!);
+      for (let i = 1; i < RING_N; i++) ctx.lineTo(q[i * 2]!, q[i * 2 + 1]!);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // The back half: the points from angle 0 round to half a turn (farther than its middle); the front half the rest.
     ctx.beginPath();
-    ctx.ellipse(p.x, p.y, p.k * 0.42, p.k * 0.16, 0, 0, Math.PI * 2);
-    ctx.fill();
+    const from = front ? RING_N / 2 : 0;
+    ctx.moveTo(q[from * 2]!, q[from * 2 + 1]!);
+    for (let j = 1; j <= RING_N / 2; j++) {
+      const i = (from + j) % RING_N;
+      ctx.lineTo(q[i * 2]!, q[i * 2 + 1]!);
+    }
     ctx.stroke();
     ctx.restore();
   }
 
   /**
    * A sprite standing on the ground: its foot at (fx, fy) of its box, `sq` squares tall; lifted `lift` squares (the
-   * hop), tilted `tilt` degrees, flipped to face its walk; a soft shadow under it. Fills the item's box; its head is
-   * `head` of the way down the box.
+   * hop), tilted `tilt` degrees, flipped to face its walk; a soft shadow under it and a contact shadow right under its
+   * base (`pawn`: the base's width, else `shadow` sizes it), both tight and dark standing, smaller and lighter as it
+   * lifts. Fills the item's box; its head is `head` of the way down the box.
    */
-  private drawSprite(it: Item, img: CanvasImageSource, sq: number, fx: number, fy: number, aspect: number, lift: number, tilt: number, flip: number, shadow: number, head = 0): void {
+  private drawSprite(it: Item, img: CanvasImageSource, sq: number, fx: number, fy: number, aspect: number, lift: number, tilt: number, flip: number, shadow: number, head = 0, pawn = false): void {
     const { ctx, view: v, p } = this;
     if (!proj(v, it.dx, it.dz, 0, p)) return;
     const h = sq * p.k;
@@ -707,10 +771,21 @@ export class Renderer {
     const s = bandOf(v, it.dx, it.dz); // in the far band: fade, haze and blur
     const alpha = (1 - TOWN_FEEL.bandFade * s) * enterOf(v, it.dx, it.dz);
     ctx.save();
-    ctx.globalAlpha = alpha * 0.22 * (1 - s); // the shadow, gone by the rim (no shadows on the sky)
+    // The shadows follow the height: the higher it is, the smaller and lighter they are; gone by the rim.
+    const F = TOWN_FEEL;
+    const up = Math.max(0, lift);
+    const grow = 1 / (1 + up * F.shadowLiftShrink);
+    const fade = Math.max(0, 1 - up * F.shadowLiftFade);
     ctx.fillStyle = SHADOW;
+    const soft = shadow;
+    ctx.globalAlpha = alpha * F.shadowAlpha * (1 - s) * (0.5 + 0.5 * fade);
     ctx.beginPath();
-    ctx.ellipse(p.x, p.y, Math.min(w * 0.42, p.k * 0.42 * shadow), p.k * 0.12 * shadow, 0, 0, Math.PI * 2);
+    ctx.ellipse(p.x, p.y, Math.min(w * 0.42, p.k * 0.42 * soft) * grow, p.k * 0.12 * soft * grow, 0, 0, Math.PI * 2);
+    ctx.fill();
+    const cw = pawn ? w * F.contactShadowW : p.k * F.contactShadowW * 1.45 * Math.min(shadow, 1.2);
+    ctx.globalAlpha = alpha * F.contactShadowAlpha * (1 - s) * fade;
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y, cw * grow, p.k * F.contactShadowDepth * grow, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = alpha;
     if (tilt) {
@@ -774,8 +849,7 @@ export class Renderer {
   /** A home: its picture at the camera's scale, its name written on its sign. */
   private drawHouse(it: Item, now: number): void {
     const { ctx, view: v, p } = this;
-    const home = this.homes[it.i]!;
-    const art = HOUSES[home.id];
+    const art = artOf(this.places[it.i]!);
     const ch = art.ch;
     if (!proj(v, it.dx, it.dz, 0, p)) return;
     const px = p.k / TOWN_FEEL.housePxPerSquare; // screen pixels per picture pixel
@@ -1020,56 +1094,51 @@ export class Renderer {
         ctx.stroke();
       }
     }
-    // The pressed square: in (darker, a little lower and smaller, its far wall in shadow) with a bold glowing gold border
-    // while the finger is down; then one pulse of the border, outward, as it lets go.
+    // The pressed square (Eric's slice 4 test: the border, the seam and an inner line read as layers): its face dims a
+    // little and evenly, and one bold gold border lies exactly on its edge, over its seam, with a soft glow outside it
+    // only. As the finger lifts, that same border brightens, widens a little and fades.
     const ps = this.pressSq;
-    if (ps.on) {
+    const a = ps.upAt < 0 ? 0 : (now - ps.upAt) / f.pulseMs;
+    if (ps.on && a >= 1) ps.on = false;
+    if (ps.on && this.squareQuad(ps.c, ps.r, 1, 0)) {
       const k = this.squarePx(ps.c, ps.r);
       const bold = Math.max(f.pressBorderMinPx, k * f.pressBorder);
-      if (ps.upAt < 0) {
-        if (this.squareQuad(ps.c, ps.r, 1, 0)) {
+      {
+        const fade = 1 - a;
+        if (ps.upAt < 0) {
           this.quadPath();
-          ctx.fillStyle = `rgba(40,24,8,${(f.pressDarken * 2).toFixed(3)})`; // the hole, its far wall darkest
+          ctx.fillStyle = `rgba(40,24,8,${f.pressDarken.toFixed(3)})`;
           ctx.fill();
         }
-        if (this.squareQuad(ps.c, ps.r, 1 - f.pressInset, f.pressDip)) {
-          this.quadPath();
-          ctx.fillStyle = `rgba(40,24,8,${f.pressDarken.toFixed(3)})`; // the face, sunk
-          ctx.fill();
-        }
-        if (this.squareQuad(ps.c, ps.r, 1, 0)) {
-          this.quadPath();
-          ctx.lineJoin = "round";
-          ctx.shadowColor = f.pressColor;
-          ctx.shadowBlur = f.pressGlowPx;
-          ctx.strokeStyle = f.pressColor;
-          ctx.lineWidth = bold;
-          ctx.stroke();
-          ctx.shadowBlur = 0;
-          ctx.shadowColor = "transparent";
-          ctx.strokeStyle = f.pressEdge;
-          ctx.lineWidth = Math.max(1, bold * 0.3);
-          ctx.stroke();
-        }
-      } else {
-        const a = (now - ps.upAt) / f.pulseMs;
-        if (a >= 1) ps.on = false;
-        else if (this.squareQuad(ps.c, ps.r, 1 + f.pulseGrow * a, 0)) {
-          this.quadPath();
-          ctx.lineJoin = "round";
-          ctx.globalAlpha = 1 - a;
-          ctx.shadowColor = f.pressColor;
-          ctx.shadowBlur = f.pressGlowPx * (1 + a);
-          ctx.strokeStyle = f.pressColor;
-          ctx.lineWidth = bold * (1 - 0.5 * a);
-          ctx.stroke();
-        }
+        ctx.lineJoin = "miter";
+        ctx.strokeStyle = ps.upAt < 0 ? f.pressColor : f.pulseColor;
+        ctx.lineWidth = bold * (1 + f.pulseWiden * a);
+        // The glow, outside the square only: everything but the square is clipped in (even-odd).
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, this.W, this.H);
+        const q = this.q4;
+        ctx.moveTo(q[0]!, q[1]!);
+        for (let i = 2; i < 8; i += 2) ctx.lineTo(q[i]!, q[i + 1]!);
+        ctx.closePath();
+        ctx.clip("evenodd");
+        ctx.globalAlpha = fade;
+        ctx.shadowColor = f.pressColor;
+        ctx.shadowBlur = f.pressGlowPx;
+        this.quadPath();
+        ctx.stroke();
+        ctx.restore();
+        // The border itself, crisp, on the edge.
+        ctx.globalAlpha = fade;
+        this.quadPath();
+        ctx.stroke();
+        ctx.globalAlpha = 1;
       }
     }
     ctx.restore();
   }
 
-  /** Where a card points: over a boss's head or a home's top, on screen (false: not drawn this frame). */
+  /** Where a card points: over a boss's head or a place's top (`i`: its index in the homes, then the Coliseum), on screen (false: not drawn this frame). */
   anchor(kind: "boss" | "home", i: number, out: { x: number; y: number }): boolean {
     if (kind === "boss") {
       const it = this.bossItems[i]!;
@@ -1089,13 +1158,34 @@ export class Renderer {
     return out.y > 0 && out.y < this.H && out.x > 0 && out.x < this.W;
   }
 
-  /** A point to tap on a boss (its body's middle) or a home (low on its picture), on screen; false if it isn't drawn. */
+  /**
+   * A point to tap on a boss (its body's middle) or a place (low on its picture; the Coliseum's gate), on screen, where a
+   * tap lands on it: if something nearer stands over that point (a boss in front of its home, a bot at the gate), the
+   * first point of a grid over its picture that a tap would hit. False if it isn't drawn or none is clear. (For tests.)
+   */
   tapPoint(kind: "boss" | "home", i: number, out: { x: number; y: number }): boolean {
     const it = kind === "boss" ? this.bossItems[i]! : this.houseItems[i]!;
     if (!it.on) return false;
+    const ok = (x: number, y: number) => {
+      if (!(x > 0 && x < this.W && y > 0 && y < this.H)) return false;
+      const h = this.pick(x, y);
+      if (kind === "boss") return h?.kind === "boss" && h.boss === this.town.bosses[i];
+      return i >= this.homes.length ? h?.kind === "coliseum" : h?.kind === "house" && h.home === this.homes[i];
+    };
     out.x = kind === "boss" ? (it.x0 + it.x1) / 2 : it.fx;
-    out.y = kind === "boss" ? it.y0 + 0.6 * (it.y1 - it.y0) : it.y0 + 0.8 * (it.y1 - it.y0);
-    return out.x > 0 && out.x < this.W && out.y > 0 && out.y < this.H;
+    out.y = kind === "boss" ? it.y0 + 0.6 * (it.y1 - it.y0) : it.y0 + (this.places[it.i] === COLISEUM_PLACE ? 0.88 : 0.8) * (it.y1 - it.y0);
+    if (ok(out.x, out.y)) return true;
+    for (let v = 0.9; v > 0.2; v -= 0.1)
+      for (let u = 0.5, n = 0; n < 9; n++, u = 0.5 + (n % 2 ? 1 : -1) * Math.ceil(n / 2) * 0.08) {
+        const x = it.x0 + u * (it.x1 - it.x0);
+        const y = it.y0 + v * (it.y1 - it.y0);
+        if (ok(x, y)) {
+          out.x = x;
+          out.y = y;
+          return true;
+        }
+      }
+    return false;
   }
 
   /** What's under (x, y) in the box: a home, a boss or a person (nearest first), else a square, else null (the sky). */
@@ -1106,6 +1196,7 @@ export class Renderer {
       if (it.kind === "house") {
         // A home's picture is wide: only its drawn part (not the sky around its roof) counts.
         if (!this.houseHit(it, x, y)) continue;
+        if (it.i >= this.homes.length) return { kind: "coliseum" };
         return { kind: "house", home: this.homes[it.i]! };
       }
       if (it.kind === "boss") return { kind: "boss", boss: this.town.bosses[it.i]! };
@@ -1124,32 +1215,43 @@ export class Renderer {
     return a > 0;
   }
 
-  // ---- The edge chips: the boss homes off screen, nearest to you first; a face at the box's edge pointing there.
+  // ---- The edge chips: the places off screen (the boss homes and the Coliseum), nearest to you first; a face (or the
+  // Coliseum's crown) at the box's edge pointing there.
 
   private placeChips(now: number): void {
-    const { town, view: v, W, H, p, chips } = this;
+    const { town, view: v, W, H, p, chips, places } = this;
     const you = town.you.walker.pose(now, this.pose);
     const yx = you.x;
     const yy = you.y;
     let n = 0;
-    for (const ch of chips) ch.home = null;
-    // Nearest first: a home is left out when its picture or its boss is on screen.
+    for (const ch of chips) ch.place = null;
+    // Nearest first: a home is left out when its picture or its boss is on screen; the Coliseum when any of it is.
     const order = SCRATCH_ORDER;
     order.length = 0;
-    for (let i = 0; i < this.homes.length; i++) {
+    for (let i = 0; i < places.length; i++) {
       const hi = this.houseItems[i]!;
-      if (hi.on && hi.fx > 0 && hi.fx < W && hi.hy < H) continue;
-      if (town.bosses[i]!.onScreen) continue; // (the bosses are in the homes' order: world.ts)
+      if (i >= this.homes.length) {
+        if (hi.on && hi.x1 > 0 && hi.x0 < W && hi.y0 < H && hi.y1 > 0) continue;
+      } else {
+        if (hi.on && hi.fx > 0 && hi.fx < W && hi.hy < H) continue;
+        if (town.bosses[i]!.onScreen) continue; // (the bosses are in the homes' order: world.ts)
+      }
       order.push(i);
     }
-    order.sort((a, b) => dist2(this.homes[a]!, yx, yy) - dist2(this.homes[b]!, yx, yy));
+    order.sort((a, b) => dist2(places[a]!, yx, yy) - dist2(places[b]!, yx, yy));
+    // The Coliseum, when it's among the nearest few, is placed first: it takes its spot before the homes' chips.
+    const col = order.indexOf(this.homes.length);
+    if (col > 0 && col < chips.length) {
+      for (let k = col; k > 0; k--) order[k] = order[k - 1]!;
+      order[0] = this.homes.length;
+    }
     const M = 44;
     const ox = W / 2;
     const oy = clamp(v.fy, H * 0.4, H * 0.75);
     // Only the nearest few are thought of (`maxChips`): one with no room is left out, not swapped for a farther one.
     for (let o = 0; o < order.length && o < chips.length; o++) {
       const i = order[o]!;
-      const h = this.homes[i]!;
+      const h = places[i]!;
       const dx0 = wrapF(h.cx - this.camX);
       const dz0 = wrapF(h.cy - this.camY);
       // Aim along the drawn ground when the home is ahead and before the curve; otherwise by its map direction.
@@ -1192,25 +1294,30 @@ export class Renderer {
       }
       if (Number.isNaN(found)) continue;
       const c = chips[n++]!;
-      c.home = h;
+      c.place = h;
       c.x = side ? x0 : found;
       c.y = side ? found : y0;
       c.angle = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
     }
   }
 
-  /** A boss's first idle frame (for its chip's face). */
-  bossFace(id: HomeId): HTMLCanvasElement {
-    return this.bossFrames[this.town.bosses.findIndex((b) => b.home.id === id)]!.get(0);
+  /** What a place's chip shows: its boss's first idle frame and the box round the boss's head, or the Coliseum's crown. */
+  chipFace(place: Place): { img: HTMLCanvasElement; box: readonly [x: number, y: number, size: number] } {
+    if (place.id === "coliseum") return { img: this.chipIcon.get(0), box: CHIP_ICON_BOX };
+    return { img: this.bossFrames[this.town.bosses.findIndex((b) => b.home.id === place.id)]!.get(0), box: BOSS_FACE[place.id] };
   }
 }
 
 const SHADOW = "rgb(60,35,10)";
+/** The ring's points round its circle. */
+const RING_N = 32;
 /** A square's corners from its middle, in half-squares: far left, far right, near right, near left. */
 const CORNERS = [-1, 1, 1, 1, 1, -1, -1, -1] as const;
 const SCRATCH_ORDER: number[] = [];
 const byFarFirst = (a: Item, b: Item) => b.dz - a.dz;
-const dist2 = (h: Home, x: number, y: number) => wrapF(h.cx - x) ** 2 + wrapF(h.cy - y) ** 2;
+const dist2 = (h: Place, x: number, y: number) => wrapF(h.cx - x) ** 2 + wrapF(h.cy - y) ** 2;
+/** The Coliseum's chip shows all of its icon. */
+const CHIP_ICON_BOX = [0, 0, COLISEUM_CHIP.w] as const;
 
 function roundRect(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
   g.beginPath();

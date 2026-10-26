@@ -15,28 +15,64 @@ export interface Sq {
 }
 
 /**
- * The Coliseum's ground in the world's middle (6 x 6 squares, kept clear for it: slice 3 builds nothing there yet). `c0`,
- * `r0` its first column and row.
+ * The Coliseum's ground in the world's middle (6 x 6 squares; slice 5 builds it: solid, you walk round it). `c0`, `r0` its
+ * first column and row. Its gate faces south, toward your start.
  */
 export const COLISEUM = { c0: 17, r0: 16, size: 6 } as const;
+/** Whether (c, r) is the Coliseum's ground. */
+export const onColiseum = (c: number, r: number): boolean => {
+  const i = wrapI(c) - COLISEUM.c0;
+  const j = wrapI(r) - COLISEUM.r0;
+  return i >= 0 && i < COLISEUM.size && j >= 0 && j < COLISEUM.size;
+};
+/**
+ * The apron: the open squares in front of the Coliseum's gate, as wide as the Coliseum and `APRON_ROWS` deep, where people
+ * gather (nothing is built there; your start is on it). Nearest the gate first: a tap on the Coliseum ends you on the
+ * first free one (`destFor`), so a crowd at the gate grows outward from it in a half ring.
+ */
+export const APRON_ROWS = 4;
+/** The middle of the gate's sill, on the Coliseum's front edge (between its two middle columns). */
+const GATE_X = COLISEUM.c0 + (COLISEUM.size - 1) / 2;
+const GATE_Y = COLISEUM.r0 - 0.5;
+export const APRON: readonly Sq[] = Array.from({ length: COLISEUM.size * APRON_ROWS }, (_, i) => ({ c: COLISEUM.c0 + (i % COLISEUM.size), r: COLISEUM.r0 - 1 - Math.floor(i / COLISEUM.size) })).sort(
+  (a, b) => Math.hypot(a.c - GATE_X, a.r - GATE_Y) - Math.hypot(b.c - GATE_X, b.r - GATE_Y),
+);
 
 /** Your square when the page opens: just south of the Coliseum's ground, facing it (the camera looks north, r rising). */
 export const START: Sq = { c: 20, r: 13 };
 
 export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil";
 
-/** A boss's home: a 3 x 3 plot. (cx, cy) is its middle square. */
-export interface Home {
-  id: HomeId;
-  /** The boss's name. */
-  boss: string;
-  /** The home's name: written by the game (floating over it, and on its sign), never drawn into the art. */
+/**
+ * A place with a picture, a name (floating over it and on its sign) and an edge chip: a boss's home, or the Coliseum.
+ * (cx, cy) is its ground's middle.
+ */
+export interface Place {
+  id: HomeId | "coliseum";
+  /** Its name: written by the game (floating over it, and on its sign), never drawn into the art. */
   name: string;
   /** The chip's ring color. */
   color: string;
   cx: number;
   cy: number;
+  /** Half its ground's side, in squares (a home's 3 x 3 plot: 1.5). */
+  half: number;
+  /** Where its picture's foot stands, in squares in front of (cx, cy) (a home's: half a square). */
+  foot: number;
 }
+
+/** A boss's home: a 3 x 3 plot. (cx, cy) is its middle square. */
+export interface Home extends Place {
+  id: HomeId;
+  /** The boss's name. */
+  boss: string;
+}
+
+/**
+ * The Coliseum as a place: its name, its chip's ring (the game's navy), its ground's middle; its picture's foot (the
+ * gate's sill) stands on its ground's front edge.
+ */
+export const COLISEUM_PLACE: Place = { id: "coliseum", name: "The Coliseum", color: "#1f2530", cx: GATE_X, cy: COLISEUM.r0 + (COLISEUM.size - 1) / 2, half: COLISEUM.size / 2, foot: COLISEUM.size / 2 };
 
 /**
  * The thirteen homes, spread evenly over the world that wraps: the points of a lattice on the 40 x 40 torus (14 points,
@@ -45,21 +81,25 @@ export interface Home {
  * by side: Ginger Igloo and Jefferson's Fireworks (ice and fire), Hollow Peak and Moo & Moon Meadow (dark and night).
  * Names: "Ginger Igloo", "Hollow Peak" and "Moo & Moon Meadow" are Eric's; the rest the director's.
  */
-export const HOMES: readonly Home[] = [
-  { id: "gingerbread", boss: "Ginger", name: "Ginger Igloo", color: "#3fae4f", cx: 11, cy: 16 },
-  { id: "grex", boss: "Jefferson", name: "Jefferson's Fireworks", color: "#e5566a", cx: 3, cy: 13 },
-  { id: "tiger", boss: "Babur", name: "Babur's Circus", color: "#2f7fe0", cx: 29, cy: 22 },
-  { id: "bigboy", boss: "Big Boy", name: "Big Boy's Crib", color: "#23a8a8", cx: 37, cy: 25 },
-  { id: "hollow", boss: "Hollow", name: "Hollow Peak", color: "#7a4fd0", cx: 6, cy: 28 },
-  { id: "moo", boss: "Moo & Moon", name: "Moo & Moon Meadow", color: "#5d7ad8", cx: 14, cy: 30 },
-  { id: "alfil", boss: "Alfil", name: "Alfil's Pyramid", color: "#b4840f", cx: 23, cy: 33 },
-  { id: "smudgy", boss: "Smudgy", name: "Smudgy's Art Gallery", color: "#f5832d", cx: 31, cy: 36 },
-  { id: "clown", boss: "Boingo", name: "Boingo's Funhouse", color: "#7d3b93", cx: 0, cy: 39 },
-  { id: "hopper", boss: "Chub & Chirp", name: "Chub & Chirp's Grassland", color: "#447a1f", cx: 9, cy: 2 },
-  { id: "gardener", boss: "Puddles", name: "Puddles' Botanical Garden", color: "#d6747b", cx: 17, cy: 5 },
-  { id: "sawyer", boss: "Sawyer", name: "Sawyer's Woodshed", color: "#d39a0b", cx: 26, cy: 8 },
-  { id: "pig", boss: "Wrangler", name: "Wrangler's Stall", color: "#8f5629", cx: 34, cy: 10 },
-];
+export const HOMES: readonly Home[] = (
+  [
+    { id: "gingerbread", boss: "Ginger", name: "Ginger Igloo", color: "#3fae4f", cx: 11, cy: 16 },
+    { id: "grex", boss: "Jefferson", name: "Jefferson's Fireworks", color: "#e5566a", cx: 3, cy: 13 },
+    { id: "tiger", boss: "Babur", name: "Babur's Circus", color: "#2f7fe0", cx: 29, cy: 22 },
+    { id: "bigboy", boss: "Big Boy", name: "Big Boy's Crib", color: "#23a8a8", cx: 37, cy: 25 },
+    { id: "hollow", boss: "Hollow", name: "Hollow Peak", color: "#7a4fd0", cx: 6, cy: 28 },
+    { id: "moo", boss: "Moo & Moon", name: "Moo & Moon Meadow", color: "#5d7ad8", cx: 14, cy: 30 },
+    { id: "alfil", boss: "Alfil", name: "Alfil's Pyramid", color: "#b4840f", cx: 23, cy: 33 },
+    { id: "smudgy", boss: "Smudgy", name: "Smudgy's Art Gallery", color: "#f5832d", cx: 31, cy: 36 },
+    { id: "clown", boss: "Boingo", name: "Boingo's Funhouse", color: "#7d3b93", cx: 0, cy: 39 },
+    { id: "hopper", boss: "Chub & Chirp", name: "Chub & Chirp's Grassland", color: "#447a1f", cx: 9, cy: 2 },
+    { id: "gardener", boss: "Puddles", name: "Puddles' Botanical Garden", color: "#d6747b", cx: 17, cy: 5 },
+    { id: "sawyer", boss: "Sawyer", name: "Sawyer's Woodshed", color: "#d39a0b", cx: 26, cy: 8 },
+    { id: "pig", boss: "Wrangler", name: "Wrangler's Stall", color: "#8f5629", cx: 34, cy: 10 },
+  ] satisfies Omit<Home, "half" | "foot">[]
+).map((h) => ({ ...h, half: 1.5, foot: 0.5 }));
+/** Every place: the homes (in the bosses' order), then the Coliseum. */
+export const PLACES: readonly Place[] = [...HOMES, COLISEUM_PLACE];
 
 /** How a person's pawn looks: its side (white or black), and a tint for a few. (Dressed pawns come later.) */
 export interface Look {
@@ -81,7 +121,8 @@ export const BOTS: readonly ({ name: string } & Look)[] = [
 export const plotAt: (Home | null)[] = new Array(N * N).fill(null);
 for (const h of HOMES) for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) plotAt[wrapI(h.cy + dr) * N + wrapI(h.cx + dc)] = h;
 
-export const walkable = (c: number, r: number): boolean => plotAt[wrapI(r) * N + wrapI(c)] === null;
+/** A square you can stand on: not a home's plot, not the Coliseum's ground. */
+export const walkable = (c: number, r: number): boolean => plotAt[wrapI(r) * N + wrapI(c)] === null && !onColiseum(c, r);
 /** Steps between two squares, the short way round. */
 export const tdist = (a: Sq, b: Sq): number => Math.abs(wrapF(a.c - b.c)) + Math.abs(wrapF(a.r - b.r));
 /** How far a square is from a home's plot (0 on it, 1 on the ring around it). */
@@ -379,15 +420,29 @@ export function spotNear(t: Town, w: Walker, at: Sq, beside: boolean): Sq | null
   return null;
 }
 
-/** What a tap asks for: a square, the squares beside someone, or the ring around a home. */
-export type Target = { kind: "square"; c: number; r: number } | { kind: "beside"; at: Sq } | { kind: "home"; home: Home };
+/** What a tap asks for: a square, the squares beside someone, the ring around a home, or the Coliseum's apron. */
+export type Target = { kind: "square"; c: number; r: number } | { kind: "beside"; at: Sq } | { kind: "home"; home: Home } | { kind: "coliseum" };
 
 /**
  * The square `w` would end on for a target (null: none; where it stands already counts). A square: itself if free, else
  * the nearest free one next to it. Someone: the nearest free square beside them. A home: the nearest free square on the
- * ring around its plot.
+ * ring around its plot. The Coliseum (or its ground): the free square of its apron nearest the gate (of two as near, the
+ * one `w` reaches in fewer steps); a full apron, the nearest free square round the gate.
  */
 export function destFor(t: Town, w: Walker, target: Target): Sq | null {
+  if (target.kind === "coliseum" || (target.kind === "square" && onColiseum(target.c, target.r))) {
+    const d = stepsFrom(w.here());
+    let best: Sq | null = null;
+    let bestK = Infinity;
+    for (const s of APRON) {
+      const k = Math.round(Math.hypot(s.c - GATE_X, s.r - GATE_Y) * 1000) * 1000 + d[s.r * N + s.c]!;
+      if (d[s.r * N + s.c]! >= 0 && k < bestK && !taken(t, s.c, s.r, w)) {
+        best = s;
+        bestK = k;
+      }
+    }
+    return best ?? spotNear(t, w, APRON[0]!, false);
+  }
   if (target.kind === "home") {
     const h = target.home;
     const here = w.here();
