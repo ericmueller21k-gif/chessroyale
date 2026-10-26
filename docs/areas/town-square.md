@@ -107,8 +107,9 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
 
 - **You** (slice 5): your pawn wears your profile's crate items (`town/you-look.ts`: `Avatar` drawn once into a canvas,
   again only when your look changes; plain when signed out or wearing nothing; bots stay plain). Every pawn's base stands
-  on its square's middle, with a contact shadow under it that shrinks and fades as the hop lifts it; your gold ring lies
-  flat round your base in the ground's perspective, its front half over your base.
+  on its square's middle, with a contact shadow under it that shrinks and fades as the hop lifts it. You have no ring
+  under you (Oct 26, Eric: the ring and the shadow together "looks sloppy"); your gold name tag marks you, and your
+  shadows are a bot's, sized from the pawn rather than the margin your items are drawn in.
 
 ## The feel: `town/feel.ts`
 

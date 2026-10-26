@@ -283,12 +283,6 @@ export const TOWN_FEEL = {
   /** Your pawn. */
   youSquares: 1.45,
   /**
-   * Your gold ring, flat on the ground in the ground's own perspective round your base (its back half behind you, its
-   * front half over your base), this many squares across. (Slices 1 to 4: a flat screen ellipse 0.84 x 0.32 squares,
-   * all of it under your pawn.)
-   */
-  ringSize: 0.84,
-  /**
    * The shadows under a pawn (and a boss): the soft one this strong (as before), and a contact shadow right under the
    * base, this share of the pawn's width across (about its base's), this many squares deep, this strong (Eric's slice 4
    * test: "the shadows below never change and makes it look like I'm floating")...
