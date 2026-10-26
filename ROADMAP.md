@@ -408,13 +408,23 @@ the building art and the names, which are wrong) and `chatgpt-town-square-overvi
 - Small pawns, big bosses. You are your own small dressed pawn in the middle of the view; no big picture of you in a corner
   (Eric, Oct 25: "it's fine if he's just the center on the map").
 - **A shop** stands in the square. Which shop it is (Shop & crates, or a raid shop) is still open.
+- **Every boss's home is also its shop** (Eric, Oct 26): special equippables, animations and the like, sold by that boss.
+  For now, tapping a home shows "Shop" greyed with "Coming soon".
 
 **Moving and tapping**
 - **Tap a square to walk there:** a quick hobble, about 90 ms a square, the camera following. Drag to look around; "Back to
-  me" returns. A **zoom toggle** (Eric: "love the zoom in and out") shows more of the world.
+  me" returns. A **zoom toggle** (Eric: "love the zoom in and out") shows more of the world; the square opens zoomed out
+  (Eric, Oct 26).
+- **The press** (Eric, Oct 26): a finger down on a square presses it in and lights a bold glowing border on it; lifting the
+  finger releases it with a pulse and you set off ("pressing down feels like pressing down, lifting up releases"). No sound
+  and no vibration for moving ("other games have no sound when moving around").
+- **Your trail:** as you run you leave a few small white droplets behind that fade out, seen only by you.
+- **One pawn per square, like chess:** nobody stops on a taken square; you may pass through people on the way. Walking up
+  to a person or a boss puts you on a free square beside them, so a crowd forms a ring around them, as in an MMO.
 - Small chips at the edge of the view point to bosses off screen; a tap glides the camera there.
-- **Tap a boss: "Challenge alone."** While you fight, you stand next to the boss in the square, labeled "[name] is battling
-  [boss]". This is one of the ways to play a boss solo.
+- **Tap a boss: "Challenge alone."** Solo stays on the boss select screen, apart from the town square (Eric, Oct 26), so it
+  first asks "Leave the town square?" and then takes you out of the square to Boss alone, that boss picked. (This replaces
+  the Oct 25 idea of fighting in the square under a "[name] is battling [boss]" label.)
 - **Tap a player: "Invite to party"**, and "Trade", shown greyed with "Coming soon" until trading exists.
 
 **Screens**
@@ -436,7 +446,12 @@ the building art and the names, which are wrong) and `chatgpt-town-square-overvi
 - **The Coliseum** (Eric, Oct 25; named Oct 26): a building in the middle of the town square, where raids with people
   start. Walk up to it (within a square) or tap it to open its menu. What the menu holds is still to brainstorm; Eric
   thinks of something like the God King's strike menu.
-- **Then today's Boss raid screen becomes the Coliseum's pre-fight screen.** Your team stands on the left, as in
+- **Idea: gather your three bosses** (Eric, Oct 26; not in the menus yet). Each boss gets "Challenge at the Coliseum".
+  Tapping it, the boss names a partner it won't come without (Boingo: "I'm not bouncing anywhere without Babur"); you go
+  and ask that boss, who asks for a random third; once you have all three, you challenge them at the Coliseum. A way to
+  choose the raid's three instead of the random pick below; which one wins is open.
+- **Then today's Boss raid screen becomes the Coliseum's pre-fight screen.** (Boss alone keeps its own select screen as it
+  is, Eric, Oct 26.) Your team stands on the left, as in
   `eric-paint-crowd.png`. The boss tiles shuffle, a highlight running across them, and three bosses are picked at random and
   dropped onto the stage. A countdown starts the raid, and the screen may need a button or two.
 - **The bosses talk to each other.** The raid's three bosses are on a team, so they get lines for each other, and the
