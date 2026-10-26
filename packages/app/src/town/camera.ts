@@ -173,11 +173,14 @@ export function hazeMix(v: View, dx: number, dz: number, mist = 0): number {
   return base + (TOWN_FEEL.bandMix - base) * bandOf(v, dx, dz);
 }
 
-/** Can a thing standing at (dx, dz) be drawn? Inside the rim, in front of the camera, before the curve, roughly on screen. */
-export function drawable(v: View, dx: number, dz: number, margin: number): boolean {
+/**
+ * Can a thing standing at (dx, dz) be drawn? Inside the rim, in front of the camera, before the curve, roughly on screen
+ * (`margin` squares past either side, its foot up to `below` squares under the box: a tall thing's top still shows).
+ */
+export function drawable(v: View, dx: number, dz: number, margin: number, below = 3.2): boolean {
   if (radial(v, dx, dz) > v.rim || dz < -v.back + 0.6) return false;
   if (!proj(v, dx, dz, 0, tmp)) return false;
-  if (tmp.x < -margin * tmp.k || tmp.x > v.W + margin * tmp.k || tmp.y > v.H + tmp.k * 3.2) return false;
+  if (tmp.x < -margin * tmp.k || tmp.x > v.W + margin * tmp.k || tmp.y > v.H + tmp.k * below) return false;
   return !pastCurve(v, dx, dz);
 }
 

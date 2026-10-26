@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { N, forEachSquare, newPt, newView, pickSquare, proj, rowsInView, setView, wrapF, wrapI } from "../src/town/camera.ts";
-import { COLISEUM, HOMES, START, ease, findPath, walkable } from "../src/town/world.ts";
+import { COLISEUM, HOMES, START, ease, findPath, plotAt, walkable } from "../src/town/world.ts";
 
 /** The town square's camera (src/town/camera.ts): pure projection math, on a phone's box and a computer's. */
 const BOXES = [
@@ -119,8 +119,8 @@ describe("town square walking", () => {
       expect(near, `${h.id}'s nearest neighbor`).toBeGreaterThanOrEqual(8);
       expect(near, `${h.id}'s nearest neighbor`).toBeLessThanOrEqual(10);
     }
-    // The Coliseum's 6 x 6 ground is walkable (no home on it), and you start just south of it.
-    for (let r = COLISEUM.r0; r < COLISEUM.r0 + COLISEUM.size; r++) for (let c = COLISEUM.c0; c < COLISEUM.c0 + COLISEUM.size; c++) expect(walkable(c, r)).toBe(true);
+    // No home stands on the Coliseum's 6 x 6 ground (slice 5 built the Coliseum there: solid), and you start just south of it.
+    for (let r = COLISEUM.r0; r < COLISEUM.r0 + COLISEUM.size; r++) for (let c = COLISEUM.c0; c < COLISEUM.c0 + COLISEUM.size; c++) expect(plotAt[r * N + c]).toBeNull();
     expect(START.r).toBeLessThan(COLISEUM.r0);
     expect(COLISEUM.r0 - START.r).toBeLessThanOrEqual(3);
     expect(START.c).toBeGreaterThanOrEqual(COLISEUM.c0);

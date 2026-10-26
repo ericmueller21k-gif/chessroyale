@@ -282,6 +282,24 @@ export const TOWN_FEEL = {
   botSquares: 1.25,
   /** Your pawn. */
   youSquares: 1.45,
+  /**
+   * Your gold ring, flat on the ground in the ground's own perspective round your base (its back half behind you, its
+   * front half over your base), this many squares across. (Slices 1 to 4: a flat screen ellipse 0.84 x 0.32 squares,
+   * all of it under your pawn.)
+   */
+  ringSize: 0.84,
+  /**
+   * The shadows under a pawn (and a boss): the soft one this strong (as before), and a contact shadow right under the
+   * base, this share of the pawn's width across (about its base's), this many squares deep, this strong (Eric's slice 4
+   * test: "the shadows below never change and makes it look like I'm floating")...
+   */
+  shadowAlpha: 0.22,
+  contactShadowW: 0.3,
+  contactShadowDepth: 0.11,
+  contactShadowAlpha: 0.55,
+  /** ...both shrinking (1 / (1 + this x the lift in squares)) and fading (1 - this x the lift) as the hop lifts it. */
+  shadowLiftShrink: 4,
+  shadowLiftFade: 4,
   /** A house's pixels per square (the tent, 144 pixels wide, is about 3.9 squares). */
   housePxPerSquare: 37,
   /** A square drawn less than this many pixels tall (far off) gets no seam: it's barely visible there, and it halves the work. */
@@ -325,24 +343,24 @@ export const TOWN_FEEL = {
   // ---- The press (slice 4; Eric, Oct 26: "a pulse/light up bold border of the tile… pressing down feels like pressing
   // down, lifting up releases"). It replaces slice 1's tap ripple (a thin gold ring growing from the finger, 700 ms).
   // No sound and no vibration (Eric: "leave those out").
-  /** While the finger is down, the pressed square darkens by this much (0 to 1)... */
-  pressDarken: 0.16,
-  /** ...and sinks this many squares (its face drawn lower and a little smaller, its far wall in shadow)... */
-  pressDip: 0.05,
-  /** ...its face this much smaller (a share of the square)... */
-  pressInset: 0.07,
-  /** ...and its border is this bold: this many squares wide (at least `pressBorderMinPx` pixels)... */
-  pressBorder: 0.12,
+  // Eric's slice 4 test: "it's like yellow, brown, yellow, then the tile… looks cheap". Now one clean thing: the face
+  // dims evenly, one bold gold border lies exactly on the square's edge (over its seam), a soft glow outside it only.
+  // (Slice 4 also sank the face 0.05 squares and shrank it 0.07, with its far wall in shadow and a fine darker inner
+  // line on the border: gone.)
+  /** While the finger is down, the pressed square's face dims evenly by this much (0 to 1). (Slice 4: 0.16, and twice that in the hole.) */
+  pressDarken: 0.12,
+  /** Its border is this bold: this many squares wide (at least `pressBorderMinPx` pixels), centered on the edge... */
+  pressBorder: 0.1,
   pressBorderMinPx: 4,
-  /** ...glowing this many pixels round (a blur, drawn only while a square is pressed or pulsing). */
-  pressGlowPx: 16,
-  /** The border's gold (the game's soft gold) and its fine inner line. */
+  /** ...glowing this many pixels round, outside the square only (a blur, drawn only while a square is pressed or pulsing). */
+  pressGlowPx: 14,
+  /** The border's gold (the game's soft gold); and the ring's line and your destination's mark. */
   pressColor: "#ffd76a",
   pressEdge: "#c9962a",
-  /** Lifted on the same square: the border pulses once, outward, fading over this many ms... */
+  /** Lifted on the same square: the same border brightens to this gold, widens by this share and fades, over this many ms. (Slice 4: it grew outward by 0.35 of the square.) */
+  pulseColor: "#fff1b8",
+  pulseWiden: 0.4,
   pulseMs: 300,
-  /** ...growing by this share of the square as it goes. */
-  pulseGrow: 0.35,
   /** A home's card (slice 4) stands this many pixels over the building's top, above its floating name. */
   cardOverName: 30,
   /** Your destination's mark (a small gold ring on its square, until you arrive): this share of a square across. */
