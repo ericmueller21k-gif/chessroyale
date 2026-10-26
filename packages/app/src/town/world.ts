@@ -134,11 +134,16 @@ export interface Pose {
   tilt: number;
 }
 
+/** Claims are numbered in the order they're made: the earlier claim on a square keeps it (keepApart). */
+let claims = 0;
+
 /** Someone who walks square to square: you, a bot or a boss. */
 export class Walker {
   c: number;
   r: number;
   facing: 1 | -1 = 1;
+  /** When it claimed the square it will end on (its goal): the order of `go`s, 0 for where it first stood. */
+  claim = 0;
   private queue: Sq[] = [];
   /** The step being taken: from, to, when it began, and whether it eases off from standing and eases into a stop. */
   private step: { fc: number; fr: number; to: Sq; dc: number; dr: number; t0: number; first: boolean; last: boolean } | null = null;
@@ -165,9 +170,20 @@ export class Walker {
   moving(): boolean {
     return !!this.step || this.queue.length > 0;
   }
-  /** Walk this path (after the step it's on). */
+  /** The square it will end on: its path's last, or where it's stepping, or where it stands. */
+  goalC(): number {
+    return this.queue.length ? this.queue[this.queue.length - 1]!.c : this.hereC();
+  }
+  goalR(): number {
+    return this.queue.length ? this.queue[this.queue.length - 1]!.r : this.hereR();
+  }
+  goal(): Sq {
+    return { c: this.goalC(), r: this.goalR() };
+  }
+  /** Walk this path (after the step it's on), claiming its last square. */
   go(path: Sq[]): void {
     this.queue = path.slice();
+    this.claim = ++claims;
   }
   update(now: number): void {
     for (let g = 0; g < 64; g++) {
@@ -243,6 +259,8 @@ export interface Boss {
   nextAt: number | null;
   /** Whether it was drawn on screen, near enough to talk, last frame (render.ts sets it). */
   onScreen: boolean;
+  /** Held where it is (its card is open): it doesn't roam off. */
+  held: boolean;
   lastLine: string | null;
 }
 
@@ -275,7 +293,7 @@ export function createTown(now: number, seed = 20261025): Town {
   const f = TOWN_FEEL;
   const you: Person = { id: "you", name: "", look: { side: "light", tint: null }, you: true, walker: new Walker(START, f.youStepMs, true, f.walkEase) };
   // Each boss starts on the square in front of its home's middle (toward the camera).
-  const bosses: Boss[] = HOMES.map((home) => ({ home, walker: new Walker({ c: home.cx, r: wrapI(home.cy - 2) }, f.bossStepMs, false), nextAt: null, onScreen: false, lastLine: null }));
+  const bosses: Boss[] = HOMES.map((home) => ({ home, walker: new Walker({ c: home.cx, r: wrapI(home.cy - 2) }, f.bossStepMs, false), nextAt: null, onScreen: false, held: false, lastLine: null }));
   // The bots stand around the plaza (16 x 14 squares around you), apart, off the bosses' roaming ground.
   const bots: Person[] = [];
   for (const b of BOTS) {
@@ -304,14 +322,125 @@ export function createTown(now: number, seed = 20261025): Town {
 const between = (t: Town, [a, b]: readonly [number, number]) => a + t.rnd() * (b - a);
 const pick = <T>(t: Town, a: readonly T[]): T => a[Math.floor(t.rnd() * a.length)]!;
 
-export function occupied(t: Town, c: number, r: number, except: Walker | null): boolean {
-  for (const w of t.all) if (w !== except && w.hereC() === c && w.hereR() === r) return true;
+/**
+ * Whether (c, r) is someone else's: the square another walker stands on or will end on (one pawn a square, like chess).
+ * Passing over a square doesn't claim it: people walk through each other; only where they stop counts.
+ */
+export function taken(t: Town, c: number, r: number, except: Walker | null): boolean {
+  for (const w of t.all) if (w !== except && w.goalC() === c && w.goalR() === r) return true;
   return false;
+}
+
+/** Steps from `from` to every square (-1: no way there), around the homes; people don't block. */
+export function stepsFrom(from: Sq, ok: (c: number, r: number) => boolean = walkable): Int16Array {
+  const d = new Int16Array(N * N).fill(-1);
+  const start = from.r * N + from.c;
+  d[start] = 0;
+  const q = [start];
+  for (let qi = 0; qi < q.length; qi++) {
+    const k = q[qi]!;
+    const c = k % N;
+    const r = (k - c) / N;
+    for (const [dc, dr] of DIRS) {
+      const nk = wrapI(r + dr) * N + wrapI(c + dc);
+      if (d[nk] !== -1 || !ok(wrapI(c + dc), wrapI(r + dr))) continue;
+      d[nk] = d[k]! + 1;
+      q.push(nk);
+    }
+  }
+  return d;
+}
+
+/** How far out a ring around a spot is looked for a free square (the rings fill nearest first). */
+const RINGS = 6;
+
+/**
+ * Where `w` should end up to stand at `at` (`beside`: next to it), one pawn a square: `at` itself if it's free (and not
+ * `beside`), else the nearest free square around it, ring by ring (the 8 squares touching it, then the 16 round those,
+ * ...), and in a ring the one `w` reaches in fewest steps. Null if there's none (or no way there).
+ */
+export function spotNear(t: Town, w: Walker, at: Sq, beside: boolean): Sq | null {
+  const d = stepsFrom(w.here());
+  for (let k = beside ? 1 : 0; k <= RINGS; k++) {
+    let best: Sq | null = null;
+    let bestD = Infinity;
+    for (let dr = -k; dr <= k; dr++)
+      for (let dc = -k; dc <= k; dc++) {
+        if (Math.max(Math.abs(dc), Math.abs(dr)) !== k) continue;
+        const c = wrapI(at.c + dc);
+        const r = wrapI(at.r + dr);
+        const s = d[r * N + c]!;
+        if (s < 0 || s >= bestD || !walkable(c, r) || taken(t, c, r, w)) continue;
+        best = { c, r };
+        bestD = s;
+      }
+    if (best) return best;
+  }
+  return null;
+}
+
+/** What a tap asks for: a square, the squares beside someone, or the ring around a home. */
+export type Target = { kind: "square"; c: number; r: number } | { kind: "beside"; at: Sq } | { kind: "home"; home: Home };
+
+/**
+ * The square `w` would end on for a target (null: none; where it stands already counts). A square: itself if free, else
+ * the nearest free one next to it. Someone: the nearest free square beside them. A home: the nearest free square on the
+ * ring around its plot.
+ */
+export function destFor(t: Town, w: Walker, target: Target): Sq | null {
+  if (target.kind === "home") {
+    const h = target.home;
+    const here = w.here();
+    if (plotDist(h, here.c, here.r) === 1 && !taken(t, here.c, here.r, w)) return here;
+    const path = findPath(here, (c, r) => plotDist(h, c, r) === 1 && walkable(c, r) && !taken(t, c, r, w), walkable);
+    return path ? path[path.length - 1]! : null;
+  }
+  if (target.kind === "beside") return spotNear(t, w, target.at, true);
+  if (plotAt[target.r * N + target.c]) {
+    const h = plotAt[target.r * N + target.c]!;
+    return destFor(t, w, { kind: "home", home: h });
+  }
+  return spotNear(t, w, { c: target.c, r: target.r }, false);
+}
+
+/** `w` walks to `to` the shortest way round the homes (through people). False if there's no way. */
+export function walkWalker(w: Walker, to: Sq): boolean {
+  const h = w.here();
+  if (h.c === to.c && h.r === to.r) {
+    w.go([]);
+    return true;
+  }
+  const path = findPath(h, (c, r) => c === to.c && r === to.r, walkable);
+  if (!path) return false;
+  w.go(path);
+  return true;
+}
+
+/**
+ * One pawn a square: when two walkers will end on the same square, the later claim gives way to the nearest free square
+ * beside it (someone stepped onto your last square while you walked).
+ */
+export function keepApart(t: Town): void {
+  const all = t.all;
+  for (let i = 0; i < all.length; i++) {
+    const w = all[i]!;
+    const gc = w.goalC();
+    const gr = w.goalR();
+    for (let j = 0; j < all.length; j++) {
+      const o = all[j]!;
+      if (o === w || o.goalC() !== gc || o.goalR() !== gr || o.claim > w.claim || (o.claim === w.claim && j > i)) continue;
+      // `o` was there first: `w` stops beside it instead.
+      const to = spotNear(t, w, { c: gc, r: gr }, true);
+      if (to) walkWalker(w, to);
+      break;
+    }
+  }
 }
 
 /** One tick of the town's life: everyone steps, the bosses roam, a bot may walk, a boss may talk. */
 export function tick(t: Town, now: number): void {
   for (const w of t.all) w.update(now);
+  keepApart(t);
   bossesRoam(t, now);
   botsWander(t, now);
   updateSpeech(t, now);
@@ -321,7 +450,7 @@ function bossesRoam(t: Town, now: number): void {
   const f = TOWN_FEEL;
   for (const b of t.bosses) {
     const w = b.walker;
-    if (w.moving()) continue;
+    if (w.moving() || b.held) continue;
     if (b.nextAt === null) {
       b.nextAt = now + between(t, f.bossPauseMs);
       continue;
@@ -338,11 +467,11 @@ function bossesRoam(t: Town, now: number): void {
         const d = Math.abs(dc) + Math.abs(dr);
         const c = wrapI(h.c + dc);
         const r = wrapI(h.r + dr);
-        if (d >= 1 && d <= n && near(c, r) && !occupied(t, c, r, w)) targets.push({ c, r });
+        if (d >= 1 && d <= n && near(c, r) && !taken(t, c, r, w)) targets.push({ c, r });
       }
     if (!targets.length) continue;
     const to = pick(t, targets);
-    const path = findPath(h, (c, r) => c === to.c && r === to.r, (c, r) => near(c, r) && !occupied(t, c, r, w));
+    const path = findPath(h, (c, r) => c === to.c && r === to.r, (c, r) => near(c, r) && !taken(t, c, r, w));
     if (path && path.length <= n) w.go(path);
   }
 }
@@ -357,7 +486,7 @@ function botsWander(t: Town, now: number): void {
   const w = bot.walker;
   const h = w.here();
   const [lo, hi] = f.botWalk;
-  const ok = (c: number, r: number) => walkable(c, r) && !occupied(t, c, r, w) && !t.bosses.some((b) => plotDist(b.home, c, r) === 1);
+  const ok = (c: number, r: number) => walkable(c, r) && !taken(t, c, r, w) && !t.bosses.some((b) => plotDist(b.home, c, r) === 1);
   const targets: Sq[] = [];
   for (let dc = -hi; dc <= hi; dc++)
     for (let dr = -hi; dr <= hi; dr++) {
@@ -393,27 +522,8 @@ function updateSpeech(t: Town, now: number): void {
   s.until = now + f.speechMs;
 }
 
-/** You walk to (c, r) along the shortest way around the homes. False if there's no way (or it's a home's square). */
-export function walkTo(t: Town, c: number, r: number): boolean {
-  const h = t.you.walker.here();
-  if (h.c === c && h.r === r) return true;
-  if (!walkable(c, r)) return false;
-  const path = findPath(h, (cc, rr) => cc === c && rr === r, walkable);
-  if (!path) return false;
-  t.you.walker.go(path);
-  return true;
-}
-
-/**
- * You walk next to something: the nearest free square that `isNext` takes (one beside a boss or a bot, or on the ring
- * around a home). Already there: nothing to do.
- */
-export function walkNextTo(t: Town, isNext: (c: number, r: number) => boolean): boolean {
-  const w = t.you.walker;
-  const h = w.here();
-  if (isNext(h.c, h.r)) return true;
-  const path = findPath(h, (c, r) => isNext(c, r) && walkable(c, r) && !occupied(t, c, r, w), walkable);
-  if (!path) return false;
-  w.go(path);
-  return true;
+/** You walk to a target (a square, someone, a home): to the square `destFor` gives. False if there's none. */
+export function walkYou(t: Town, target: Target): boolean {
+  const to = destFor(t, t.you.walker, target);
+  return !!to && walkWalker(t.you.walker, to);
 }

@@ -5,7 +5,10 @@ import { test } from "./helpers.ts";
  * The town square (/town; hidden: docs/areas/town-square.md), on a phone and a computer: the page loads, its world is
  * drawn (not blank), a tap a few rows ahead walks you toward it, the zoom pair works (it opens zoomed out), back goes
  * home, and `?sky=` picks the sky's look whatever the clock says.
- * Test hooks: the canvas carries `data-you="c,r"` (your square) and `data-ready="1"` once its first frame is drawn.
+ * Slice 4: a boss's card ("Challenge alone", its confirm, Leave to the Boss raid screen with that boss's tile picked)
+ * and a home's (its shop greyed, "Coming soon").
+ * Test hooks: the canvas carries `data-you="c,r"` (your square) and `data-ready="1"` once its first frame is drawn;
+ * `window.__townAt("boss" | "home", id)` says where to tap a boss or a home (with the test switches on, as here).
  */
 test.use({ actionTimeout: 15_000 });
 
@@ -107,5 +110,76 @@ test("the sky by the time of day: ?sky=day and ?sky=night draw different skies (
   expect(day[2]!, `day's sky is blue: ${day.map(Math.round)}`).toBeGreaterThan(200);
   expect(lum(night), `night's sky is dark: ${night.map(Math.round)}`).toBeLessThan(40);
   expect(lum(day) - lum(night), "day is far lighter than night").toBeGreaterThan(100);
+  expect(errors).toEqual([]);
+});
+
+/** Where to tap Babur (or his circus) now, in the page; null while he isn't drawn. */
+async function tapPoint(p: Page, kind: "boss" | "home") {
+  const xy = await p.evaluate((k) => (window as unknown as { __townAt?: (k: string, id: string) => { x: number; y: number } | null }).__townAt?.(k, "tiger") ?? null, kind);
+  if (!xy) return null;
+  const cv = (await canvas(p).boundingBox())!;
+  return { x: cv.x + xy.x, y: cv.y + xy.y };
+}
+/** Brings Babur's Circus into view: it's often there from the start; else its chip glides the camera to it. */
+async function toBabur(p: Page) {
+  if (await tapPoint(p, "home")) return;
+  await p.getByRole("button", { name: "Go to Babur's Circus" }).click({ force: true });
+  await expect.poll(() => tapPoint(p, "home"), { message: "the circus comes into view" }).not.toBeNull();
+}
+/** Taps Babur or his circus until its card opens (he may stroll a step between the look and the tap). */
+async function openCard(p: Page, kind: "boss" | "home", name: string) {
+  const card = p.getByRole("dialog", { name, exact: true });
+  await expect(async () => {
+    if (await card.isVisible()) return;
+    const at = await tapPoint(p, kind);
+    expect(at, "drawn").not.toBeNull();
+    await p.mouse.click(at!.x, at!.y);
+    await expect(card).toBeVisible({ timeout: 1500 });
+  }).toPass({ timeout: 20_000 });
+  return card;
+}
+
+test("a boss's card: 'Challenge alone', then 'Leave the town square?'; Stay keeps you, Leave opens the Boss raid screen with that boss's tile picked", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/town");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await toBabur(page);
+  let card = await openCard(page, "boss", "Babur");
+  await card.getByRole("button", { name: "Challenge alone" }).click();
+  let confirm = page.getByRole("dialog", { name: "Leave the town square?" });
+  await expect(confirm.getByRole("heading", { name: "Leave the town square?" })).toBeVisible();
+  await expect(confirm.getByText("You'll fight Babur alone in Solo Boss Mode.")).toBeVisible();
+  // Stay: the confirm closes, and you're still in the town square.
+  await confirm.getByRole("button", { name: "Stay" }).click();
+  await expect(confirm).toBeHidden();
+  await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
+  // Again, and Leave: the Boss raid screen (its tiles and stage), Babur's tile picked.
+  card = await openCard(page, "boss", "Babur");
+  await card.getByRole("button", { name: "Challenge alone" }).click();
+  confirm = page.getByRole("dialog", { name: "Leave the town square?" });
+  await confirm.getByRole("button", { name: "Leave" }).click();
+  const tiles = page.getByRole("radiogroup", { name: "Bosses" });
+  await expect(tiles).toBeVisible();
+  await expect(tiles.getByRole("radio", { name: "Babur", exact: true })).toHaveAttribute("aria-checked", "true");
+  await expect(page.locator(".bs-name")).toHaveText("Babur");
+  expect(new URL(page.url()).pathname).toBe("/");
+  await expect(page.getByRole("heading", { name: "Town square" })).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("a home's card: its name, 'Shop' greyed (shown, not tappable) and 'Coming soon'; a tap anywhere else closes it", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/town");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await toBabur(page);
+  const card = await openCard(page, "home", "Babur's Circus");
+  const shop = card.getByRole("button", { name: "Shop" });
+  await expect(shop).toBeVisible();
+  await expect(shop).toBeDisabled();
+  await expect(card.getByText("Coming soon", { exact: true })).toBeVisible();
+  // A tap on the world elsewhere (low in the middle) closes it.
+  const cv = (await canvas(page).boundingBox())!;
+  await page.mouse.click(cv.x + cv.width * 0.3, cv.y + cv.height * 0.85);
+  await expect(card).toBeHidden();
   expect(errors).toEqual([]);
 });

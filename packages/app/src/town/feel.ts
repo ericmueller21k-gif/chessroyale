@@ -321,4 +321,40 @@ export const TOWN_FEEL = {
   chipClear: 27,
   /** A chip that would cover one slides along its edge in steps this many pixels long, nearest spot first; none: it's left out. */
   chipSlideStep: 6,
+
+  // ---- The press (slice 4; Eric, Oct 26: "a pulse/light up bold border of the tile… pressing down feels like pressing
+  // down, lifting up releases"). It replaces slice 1's tap ripple (a thin gold ring growing from the finger, 700 ms).
+  // No sound and no vibration (Eric: "leave those out").
+  /** While the finger is down, the pressed square darkens by this much (0 to 1)... */
+  pressDarken: 0.16,
+  /** ...and sinks this many squares (its face drawn lower and a little smaller, its far wall in shadow)... */
+  pressDip: 0.05,
+  /** ...its face this much smaller (a share of the square)... */
+  pressInset: 0.07,
+  /** ...and its border is this bold: this many squares wide (at least `pressBorderMinPx` pixels)... */
+  pressBorder: 0.12,
+  pressBorderMinPx: 4,
+  /** ...glowing this many pixels round (a blur, drawn only while a square is pressed or pulsing). */
+  pressGlowPx: 16,
+  /** The border's gold (the game's soft gold) and its fine inner line. */
+  pressColor: "#ffd76a",
+  pressEdge: "#c9962a",
+  /** Lifted on the same square: the border pulses once, outward, fading over this many ms... */
+  pulseMs: 300,
+  /** ...growing by this share of the square as it goes. */
+  pulseGrow: 0.35,
+  /** A home's card (slice 4) stands this many pixels over the building's top, above its floating name. */
+  cardOverName: 30,
+  /** Your destination's mark (a small gold ring on its square, until you arrive): this share of a square across. */
+  targetSize: 0.5,
+
+  // ---- Your trail (slice 4; Eric: "a little trail your guy leaves behind as he runs… like you're leaving little
+  // droplets"). Yours only: other people's pawns leave none.
+  /** A droplet on the square you leave, at most one every this many ms (so about three show while you run)... */
+  trailEveryMs: 150,
+  /** ...each fading and shrinking out over this many ms... */
+  trailLifeMs: 520,
+  /** ...this share of a square across when it lands, soft white at this opacity. */
+  trailSize: 0.3,
+  trailAlpha: 0.9,
 } as const;
