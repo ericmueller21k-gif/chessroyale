@@ -7,6 +7,7 @@ npm run boss-lines -- packs [out]           # the source packs only, no API call
 npm run boss-lines -- sample                # Ginger and Jefferson -> docs/boss-lines/sample/
 npm run boss-lines -- pair <id> <id> [out]  # any two bosses (roster ids), same steps as the sample
 npm run boss-lines -- boss <id> [out]       # one boss: its sheet and 100 everyday lines, then the critique
+npm run boss-lines -- sheets [out]          # the 13 character sheets only (about $1), for Eric to approve first
 ```
 
 - **Key:** `BOSS_LINES_API_KEY` from the environment (an environment variable in the cloud environment's settings; `ANTHROPIC_API_KEY` is kept for Claude Code's own sign-in and isn't passed to sessions), read only by the SDK (never printed or written). The base URL is pinned to `https://api.anthropic.com`.

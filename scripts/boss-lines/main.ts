@@ -6,6 +6,8 @@
  *                                              6 conversations, the critique; out docs/boss-lines/sample
  *   npm run boss-lines -- pair <id> <id> [out] the same for any two bosses (roster ids)
  *   npm run boss-lines -- boss <id> [out]      one boss: its sheet and 100 everyday lines (20 a situation), the critique
+ *   npm run boss-lines -- sheets [out]         the 13 character sheets only, for Eric to approve before any lines;
+ *                                              out docs/boss-lines/sheets
  *
  * BOSS_LINES_CAP_USD (default 3) caps the run's spend: a call that could pass it isn't sent. Results go to the out folder
  * as JSON plus a readable sample.md. scripts/boss-lines/README.md has the details.
@@ -81,14 +83,14 @@ async function run(plan: Plan, cap: number): Promise<void> {
       result.sheets.push(await w.json<Sheet>(`sheet ${p.id}`, SYSTEM, sheetPrompt(packText(p)), SHEET_SCHEMA));
       write();
     }
-    const [a, b] = result.sheets;
+    const [a, b] = plan.ids.length === 2 ? result.sheets : [];
     if (a && b) {
       console.log(`${a.name} and ${b.name}: relationship`);
       result.relationship = await w.json<Relationship>(`relationship ${a.id}-${b.id}`, SYSTEM, relationPrompt(a, b, packText(packs[0]!), packText(packs[1]!)), RELATION_SCHEMA);
       write();
     }
     const draft: Omit<Drafted, "text" | "verdict" | "reason" | "ok" | "rejected">[] = [];
-    for (const [i, p] of packs.entries()) {
+    for (const [i, p] of plan.perSituation > 0 ? packs.entries() : []) {
       console.log(`${p.name}: everyday lines`);
       const got = await w.json<{ lines: Line[] }>(`lines ${p.id}`, SYSTEM, linesPrompt(result.sheets[i]!, packText(p), plan.perSituation), LINES_SCHEMA);
       got.lines.forEach((l, k) => draft.push({ id: `L-${p.id}-${k + 1}`, speaker: p.id, situation: l.situation, first: tidy(l.text) }));
@@ -102,15 +104,17 @@ async function run(plan: Plan, cap: number): Promise<void> {
     result.lines = draft.map((d) => ({ ...d, text: d.first, verdict: "unreviewed", reason: "", ...verdictOf(d.first, d.speaker) }));
     write();
 
-    console.log("critique");
-    const items = draft.map((d) => `${d.id} [${name(d.speaker)} · ${d.situation}]: ${JSON.stringify(d.first)}`).join("\n");
-    const got = await w.json<{ items: Verdict[] }>("critique", SYSTEM, critiquePrompt(items, result.sheets, result.relationship), CRITIQUE_SCHEMA);
-    const byId = new Map(got.items.map((v) => [v.id, v]));
-    result.lines = draft.map((d) => {
-      const v = byId.get(d.id);
-      const text = v ? tidy(v.text) : d.first;
-      return { ...d, text, verdict: v ? v.verdict : "unreviewed", reason: v?.reason ?? "the critique skipped this line", ...verdictOf(text, d.speaker) };
-    });
+    if (draft.length > 0) {
+      console.log("critique");
+      const items = draft.map((d) => `${d.id} [${name(d.speaker)} · ${d.situation}]: ${JSON.stringify(d.first)}`).join("\n");
+      const got = await w.json<{ items: Verdict[] }>("critique", SYSTEM, critiquePrompt(items, result.sheets, result.relationship), CRITIQUE_SCHEMA);
+      const byId = new Map(got.items.map((v) => [v.id, v]));
+      result.lines = draft.map((d) => {
+        const v = byId.get(d.id);
+        const text = v ? tidy(v.text) : d.first;
+        return { ...d, text, verdict: v ? v.verdict : "unreviewed", reason: v?.reason ?? "the critique skipped this line", ...verdictOf(text, d.speaker) };
+      });
+    }
   } catch (e) {
     if (!(e instanceof SpendCapReached)) {
       write();
@@ -145,7 +149,7 @@ function report(plan: Plan, packs: readonly SourcePack[], r: { sheets: Sheet[]; 
     `> 1. Built: \`scripts/boss-lines/\` (\`npm run boss-lines\`): source packs from the repo, then ${MODEL} at effort "high" with structured outputs writes sheets, a relationship, lines and conversations, and a critique pass rewrites the weak ones.`,
     `> 2. Cost: ${u.calls} calls, ${u.input.toLocaleString("en-US")} input + ${u.output.toLocaleString("en-US")} output tokens = **$${u.usd.toFixed(4)}** (cap $${w.capUsd}).${r.stoppedEarly ? ` Stopped early: ${r.stoppedEarly}.` : ""}`,
     `> 3. ${r.lines.length} lines: the critique kept ${kept} and rewrote ${rewritten}${unreviewed ? ` (${unreviewed} not reviewed: shown as first written)` : ""}; the automatic check (Eric's writing rules, ${MAX_CHARS} characters) rejected ${rejected.length}.`,
-    "> 4. Unsure: Ginger's pronouns (the lore sketch, FAQ and area pages say \"she\", the sprite file says \"his\"; the packs say \"she\"). The lore sketches for the first seven bosses come from PR #264's description (draft lore, never in the repo); Hollow's is Eric's own, kept exactly.",
+    "> 4. Lore: Hollow's and Ginger's are Eric's own, kept exactly. The other sketches for the first seven bosses come from PR #264's description (draft lore, never in the repo); the rest from their decision files.",
     "> 5. Drafts only: nothing here is in the game. Each sheet lists the details it added beyond the sources (\"New details\"), for Eric to approve or cut.",
     "",
   ];
@@ -239,12 +243,14 @@ async function main(): Promise<void> {
       const [a, b] = [asId(args[0]), asId(args[1])];
       return run({ ids: [a, b], perSituation: 3, convos: 6, out: args[2] ?? `docs/boss-lines/pairs/${a}-${b}`, title: `Boss lines: ${a} and ${b}` }, cap);
     }
+    case "sheets":
+      return run({ ids: [...BOSS_IDS], perSituation: 0, convos: 0, out: args[0] ?? "docs/boss-lines/sheets", title: "Boss lines: the 13 character sheets" }, cap);
     case "boss": {
       const id = asId(args[0]);
       return run({ ids: [id], perSituation: 20, convos: 0, out: args[1] ?? `docs/boss-lines/bosses/${id}`, title: `Boss lines: ${id}` }, cap);
     }
     default:
-      throw new Error(`mode: packs, sample, pair <id> <id> or boss <id> (got "${mode ?? ""}")`);
+      throw new Error(`mode: packs, sample, sheets, pair <id> <id> or boss <id> (got "${mode ?? ""}")`);
   }
 }
 
