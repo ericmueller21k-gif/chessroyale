@@ -1,0 +1,236 @@
+[
+  {
+    "id": "gingerbread",
+    "name": "Ginger",
+    "pronouns": "she/her (lore sketch, FAQ and area pages; the sprite file's comments say \"his\": unsettled, flagged for Eric)",
+    "powers": {
+      "passive": "freeze",
+      "ultimate": "blizzard",
+      "faq": "Plays from the game so far.\n\n- **Freeze** (passive): from turn 2, one of your pieces that matters (one of your three most valuable, mobile pieces; never the king) is iced and can't move for 2 turns. Then again every 4 to 6 turns.\n- **Blizzard** (ultimate): it lasts 3 turns. On its first turn, only one of your pieces may move, picked at random from those that have a move (never your king nor the frozen piece, unless nothing else can move); its banner names it. On its second, 4 or 5 may move in all: the pieces already free stay free, and more thaw, picked at random, those with a move first (never your king, unless it's the only piece that can move); the banner names them. On its third, the ice is gone and every piece moves again. The pieces that thaw next turn show cracked, dripping ice the turn before. A piece that can move is always free: in check, one that can get you out of it. The Freeze waits until the Blizzard is over."
+    },
+    "look": [
+      "Ginger, the Freeze boss: an angry gingerbread man with white icing trim, a green bow tie, red gumdrop buttons and a big candy cane he holds like a weapon, after Eric's reference picture, redrawn. He's the Freeze boss, so his icing glints like frost, his eyes go ice-blue and his cane glows when he casts. Drawn facing front, light from the top left. Rigging: the head, bow tie and torso are typed or painted once; the arms, legs and the cane are painted from their pose's points (a shoulder, an elbow, a fist; a hip and a foot; the cane's grip and direction), so a new pose is a handful of numbers. The cane hand (his right, on our left) always grips the cane; the other arm is free."
+    ],
+    "lore": [
+      {
+        "source": "PR #264 (the boss select, Oct 16), \"DRAFTS FOR ERIC\" (not shipped; draft lore)",
+        "text": "Ginger: Baked for a bakery's holiday window, then left in the walk-in freezer over the long weekend. She came out iced over, with a candy cane snapped off the display and a cold streak that never thawed. Anyone who gets close gets frozen."
+      }
+    ],
+    "selectLines": [
+      "Ginger is here!",
+      "You'll crumble!",
+      "Fresh out of the freezer!",
+      "Cool as ice."
+    ],
+    "kitLines": {
+      "entrance": [
+        "Ginger is here!",
+        "You'll crumble!",
+        "Fresh out of the freezer!"
+      ],
+      "move": [
+        "Snap!",
+        "Hmph!",
+        "Out of my way!",
+        "Cold move. Colder heart."
+      ],
+      "capture": [
+        "Crumbs to crumbs!",
+        "Into the cookie jar!",
+        "Snapped it up!",
+        "That one's iced!"
+      ],
+      "check": [
+        "Check! Feeling a chill?",
+        "Your king's on thin ice!",
+        "Snap! Check!"
+      ],
+      "hurt": [
+        "My icing!",
+        "Ow! I'm cracking!",
+        "You'll pay for that crumb!"
+      ],
+      "thinking": [
+        "Sugar and spite…",
+        "Let it simmer…",
+        "Cooling down… not."
+      ],
+      "smug": [
+        "Half-baked, all of you!",
+        "Stale! So stale!",
+        "Cool as ice."
+      ],
+      "rattled": [
+        "My gumdrops are sweating!",
+        "Stop! I'll melt!",
+        "Not my icing!"
+      ],
+      "defeat": [
+        "I… crumble…",
+        "Oh, snap…",
+        "Back to the oven…"
+      ],
+      "victory": [
+        "Snap! I win!",
+        "Sweet, sweet victory!",
+        "Iced you all! Ha!"
+      ],
+      "strike": [
+        "Snap! You're done!",
+        "Crumbled!"
+      ],
+      "power": [
+        "Chill out!",
+        "Stay frosty!",
+        "On ice you go!",
+        "Cold feet?"
+      ],
+      "ultimateWarn": [
+        "A storm is brewing…",
+        "Feel that chill?",
+        "Wrap up warm…",
+        "The frost is coming…"
+      ],
+      "ultimate": [
+        "Let it snow!",
+        "Freeze, all of you!",
+        "Snow day! Ha!"
+      ],
+      "kingAttack": [
+        "Frostbite, your majesty!",
+        "Snap! Snap! Snap!",
+        "Feeling a chill yet?"
+      ],
+      "ultimateHit": [
+        "Melting? Already?!",
+        "Hmph. Don't get comfy.",
+        "My lovely ice!",
+        "Drip, drip… bah!"
+      ]
+    }
+  },
+  {
+    "id": "grex",
+    "name": "Jefferson",
+    "pronouns": null,
+    "powers": {
+      "passive": "sparkler",
+      "ultimate": "candle",
+      "faq": "Plays from the game so far.\n\n- **Sparkler** (passive): from turn 2, a square on your half catches fire and burns in 3 stages, one a turn. A piece of yours still on it after your move on the last stage burns (never your king, nor a piece whose loss would leave a king in check: then it fizzles). The judge counts a piece left to burn as already gone, so moving it off is never a mistake. The next Sparkler comes 1 turn after a fire goes out.\n- **Roman Candle** (ultimate): 24 fireballs in waves of 1, 2, 3, 4, 4, 4, 3, 2, 1, one wave a turn, from 3 turns after he fires. About 40% of each wave falls on his own half (his pieces never burn: the first time one stands in that fire, he laughs about it), the rest on yours. Each wave's squares show as growing shadows 3 turns ahead, and each fireball lands as a fresh fire (never on your king's square as it's picked; if your king stands there when it lands, it fizzles). A piece of yours left on any of his fires burns, wherever it is."
+    },
+    "look": [
+      "Jefferson (id \"grex\"; G-REX until Oct 10), the Fire boss: a cocky giraffe with a mischievous look and a fiery glint in his eyes, flames on his horn tips, down his mane and on the end of his tail, a cheeky grin, a sparkler in each hand and a wide fighting stance, after Eric's reference picture, redrawn. Yellow with orange-brown spots, light from the top left. A giraffe first (Eric, Oct 9): a long neck, so he stands taller than the other bosses (about the God King's height with his wings spread; his frame grows upward), and a typical giraffe face, no sunglasses. The head stays big for a phone, so his eyes, grin and flaming ossicones read. Drawn three-quarters, facing right (our right), as in the reference: the flames (mane, tail) on our left, the sparklers on our right, toward the board. Rigging: the head, torso and hooves are painted once per look; the neck, arms, legs and tail are painted from their pose's points (a shoulder, an elbow, a fist; a hip, a knee, an ankle), and the sparklers from the fist in the arm's direction, so a new pose is a handful of numbers. The flames (horn tips, mane, tail tuft) are small painted parts in three flicker shapes, picked per frame, and the sparklers spit sparks (seeded specks), so every frame crackles without anyone drawing it."
+    ],
+    "lore": [
+      {
+        "source": "PR #264 (the boss select, Oct 16), \"DRAFTS FOR ERIC\" (not shipped; draft lore)",
+        "text": "Jefferson: A giraffe who grew up sure he was a dinosaur (he answered to G-REX for years). He landed a job as the fireworks stand's mascot and has been lighting things he shouldn't ever since."
+      }
+    ],
+    "selectLines": [
+      "Jefferson in the house!",
+      "Feel the heat!",
+      "Rawr! I mean… hi.",
+      "Hot stuff coming through!"
+    ],
+    "kitLines": {
+      "entrance": [
+        "Jefferson in the house!",
+        "Feel the heat!",
+        "Rawr! I mean… hi.",
+        "Hot stuff coming through!"
+      ],
+      "move": [
+        "Sizzlin'!",
+        "Too hot to handle?",
+        "Smokin'!",
+        "Watch and learn."
+      ],
+      "capture": [
+        "Toast!",
+        "Extra crispy!",
+        "Burnt to a crisp!",
+        "Well done. Very well done."
+      ],
+      "check": [
+        "Check! Feeling warm?",
+        "Your king's toast!",
+        "Hot seat, your majesty!",
+        "Check! Getting hot?"
+      ],
+      "hurt": [
+        "Hey! Not the face!",
+        "Ow! That's hot!",
+        "You singed me!",
+        "Rude!"
+      ],
+      "thinking": [
+        "Let it simmer…",
+        "Slow roast…",
+        "Warming up…"
+      ],
+      "smug": [
+        "Too hot to handle?",
+        "Tiny arms? Not me!",
+        "Burn, baby, burn!",
+        "Neck and neck? Nope!"
+      ],
+      "rattled": [
+        "Is it hot in here?",
+        "My neck's sweating!",
+        "Not cool. Not cool!"
+      ],
+      "defeat": [
+        "Burnt out…",
+        "Extinct… again…",
+        "My flame… fizzled…"
+      ],
+      "victory": [
+        "Too hot for you!",
+        "Rawr! Champion!",
+        "Hottest neck in town!",
+        "Fire it up!"
+      ],
+      "strike": [
+        "Torched!",
+        "Flame on!"
+      ],
+      "power": [
+        "Catch!",
+        "Hot potato!",
+        "Light it up!",
+        "Heads up!",
+        "Spark it!"
+      ],
+      "powerHit": [
+        "Toasty!",
+        "Ashes to ashes!",
+        "Poof! Crispy!",
+        "Smells like victory!"
+      ],
+      "ultimateWarn": [
+        "Got a big one for you…",
+        "Wanna see a trick?",
+        "Lighting the fuse…",
+        "Big bang coming…"
+      ],
+      "ultimate": [
+        "Fireworks time!",
+        "Ooh! Aah! Ha!",
+        "Look up! Way up!"
+      ],
+      "ultimateHit": [
+        "Incoming!",
+        "It's raining fire!",
+        "Hot rain! Ha!",
+        "Here they come!"
+      ],
+      "kingAttack": [
+        "Fireworks, your majesty!",
+        "Ooh! Aah! Ouch!",
+        "Let's light up the king!"
+      ]
+    }
+  }
+]

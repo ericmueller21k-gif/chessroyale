@@ -13,6 +13,7 @@
     "typecheck": "tsc -p packages/core --noEmit && tsc -p packages/chess --noEmit && tsc -p packages/sim --noEmit && tsc -p packages/app --noEmit && tsc -p packages/server --noEmit && tsc -p packages/maia-worker --noEmit",
     "replays:bots": "tsx packages/sim/scripts/bot-replays.ts",
     "simulate": "tsx packages/sim/scripts/simulate.ts",
+    "boss-lines": "tsx scripts/boss-lines/main.ts",
     "sim:squads": "tsx packages/sim/scripts/squads-sim.ts",
     "preview:items": "node scripts/preview-items.mjs",
     "preview:characters": "tsx scripts/preview-characters.ts",
@@ -49,6 +50,7 @@
     "ops:report": "NODE_USE_ENV_PROXY=1 node --disable-warning=UNDICI-EHPA scripts/ops-report.mjs"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^1.3.0",
     "@cloudflare/workers-types": "^5.20261002.1",
     "@playwright/test": "^1.56.1",
     "@types/node": "^22.20.5",
