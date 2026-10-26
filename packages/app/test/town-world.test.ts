@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { N, wrapF, wrapI } from "../src/town/camera.ts";
 import { TOWN_FEEL } from "../src/town/feel.ts";
-import { APRON, COLISEUM, GRASS, HOMES, PARK, PAVING, PROPS, START, STATUES, TABLES, Walker, createTown, destFor, findPath, groundAt, onColiseum, plotDist, seated, statueAt, stoolAt, tableAt, taken, tick, walkWalker, walkable, type Sq, type Town } from "../src/town/world.ts";
+import { APRON, APRON_ROWS, COLISEUM, GRASS, HOMES, PARK, PAVING, PROPS, START, STATUES, TABLES, Walker, createTown, destFor, findPath, groundAt, onColiseum, plotDist, seated, statueAt, stoolAt, tableAt, taken, tick, walkWalker, walkable, type Sq, type Town } from "../src/town/world.ts";
 
 /** One pawn a square (src/town/world.ts): where a walk ends, and rings of people round someone. */
 
@@ -201,8 +201,10 @@ describe("town square: the statues", () => {
 describe("town square: the park (slice 6)", () => {
   const inPark = (c: number, r: number) => c >= PARK.c0 && c < PARK.c0 + PARK.w && r <= PARK.r1 && r > PARK.r1 - PARK.d;
 
-  it("lies in front of the Coliseum's gate, south of its apron: paving and grass, no home's roaming ground on it", () => {
-    expect(PARK.r1).toBe(COLISEUM.r0 - 4);
+  it("lies in front of the Coliseum's gate, back from it past its apron and a walk: paving and grass, no home's roaming ground on it", () => {
+    // Eric, Oct 26: "It shouldn't literally be right next to it… 8 to 10 tiles away."
+    expect(COLISEUM.r0 - PARK.r1).toBeGreaterThanOrEqual(8);
+    expect(COLISEUM.r0 - PARK.r1).toBeLessThanOrEqual(10);
     expect(PARK.c0 + PARK.w / 2).toBe(COLISEUM.c0 + COLISEUM.size / 2);
     let grass = 0;
     let paving = 0;
@@ -217,8 +219,14 @@ describe("town square: the park (slice 6)", () => {
     expect(grass + paving).toBe(PARK.w * PARK.d);
     expect(grass).toBeGreaterThan(40);
     expect(paving).toBeGreaterThan(60);
-    // The apron is paved; you start in the park.
+    // The apron is paved, and so is the promenade across the walk to it, and nothing stands there; you start in the park.
     for (const s of APRON) expect(groundAt[s.r * N + s.c]).toBe(PAVING);
+    for (let r = PARK.r1 + 1; r < COLISEUM.r0 - APRON_ROWS; r++)
+      for (let c = START.c - 1; c <= START.c + 2; c++) {
+        expect(groundAt[r * N + c], `the promenade at ${c},${r}`).toBe(PAVING);
+        expect(walkable(c, r)).toBe(true);
+        for (const h of HOMES) expect(plotDist(h, c, r), `${h.id} roams onto the walk at ${c},${r}`).toBeGreaterThan(2);
+      }
     expect(inPark(START.c, START.r)).toBe(true);
   });
 
@@ -244,9 +252,9 @@ describe("town square: the park (slice 6)", () => {
     const fountain = PROPS.filter((p) => p.kind === "fountain");
     expect(fountain).toHaveLength(1);
     const f = fountain[0]!;
-    // Its 2 x 2 squares: the park's middle two columns, its middle two rows.
+    // Its 2 x 2 squares: the park's middle two columns, and the middle two of its rows south of its north walk.
     expect(f.c).toBe(PARK.c0 + PARK.w / 2 - 1);
-    expect(f.r).toBe(PARK.r1 - PARK.d / 2);
+    expect(f.r).toBe(PARK.r1 - 1 - (PARK.d - 1) / 2);
     for (const [dc, dr] of [[0, 0], [1, 0], [0, 1], [1, 1]] as const) expect(walkable(f.c + dc, f.r + dr)).toBe(false);
     expect(PROPS.filter((p) => p.kind === "tree").length).toBeGreaterThanOrEqual(8);
     expect(PROPS.filter((p) => p.kind === "bench").length).toBeGreaterThanOrEqual(4);

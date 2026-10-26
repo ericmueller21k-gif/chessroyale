@@ -219,8 +219,8 @@ test("the Coliseum: a tap on its gate walks you to the apron in front of it and 
   await expect(raids).toBeVisible();
   await expect(raids).toBeDisabled();
   await expect(card.getByText("Coming soon", { exact: true })).toBeVisible();
-  // You end on the apron at the gate: the row just in front of its ground (row 22), one of its two middle columns.
-  await expect.poll(async () => (await you(page)).join(","), { message: "you walk to the gate", timeout: 5000 }).toMatch(/^(22|23),22$/);
+  // You end on the apron at the gate: the row just in front of its ground (row 27), one of its two middle columns.
+  await expect.poll(async () => (await you(page)).join(","), { message: "you walk to the gate", timeout: 5000 }).toMatch(/^(22|23),27$/);
   // A tap on the world elsewhere (low on the left) closes it.
   await page.mouse.click(cv.x + cv.width * 0.3, cv.y + cv.height * 0.85);
   await expect(card).toBeHidden();
@@ -245,8 +245,8 @@ type Cam = {
 const cam = (p: Page) => p.evaluate(() => (window as unknown as { __townCam: () => Cam }).__townCam());
 
 for (const st of [
-  { id: "bronze", sq: [28, 22], quote: "Concrete considerations always take precedence over general principles", zoomIn: false },
-  { id: "marble", sq: [17, 22], quote: "Nothing is so healing as the human touch", zoomIn: true },
+  { id: "bronze", sq: [28, 27], quote: "Concrete considerations always take precedence over general principles", zoomIn: false },
+  { id: "marble", sq: [17, 27], quote: "Nothing is so healing as the human touch", zoomIn: true },
 ] as const) {
   test(`the ${st.id} statue: a tap on it walks you up to it, the camera glides in close on it and its quote shows word for word; a tap elsewhere glides back out to the zoom you had and clears it`, async ({ page }) => {
     const errors = watchErrors(page);
