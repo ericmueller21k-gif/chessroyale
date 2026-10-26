@@ -231,13 +231,18 @@ export type Hit =
   | { kind: "boss"; boss: Boss }
   | { kind: "person"; person: Person };
 
-/** A character's first idle frame on a canvas. */
-function canvasOf(ch: Character): HTMLCanvasElement {
+/** A character's first idle frame on a canvas (and, `mask`, which of its pixels are drawn, for taps). */
+function canvasOf(ch: Character, mask?: Uint8Array[]): HTMLCanvasElement {
   const { w, h, data } = renderFrame(ch, ch.anims.idle!.frames[0]!);
   const c = document.createElement("canvas");
   c.width = w;
   c.height = h;
   c.getContext("2d")!.putImageData(new ImageData(new Uint8ClampedArray(data), w, h), 0, 0);
+  if (mask) {
+    const m = new Uint8Array(w * h);
+    for (let i = 0; i < m.length; i++) m[i] = data[i * 4 + 3]! > 0 ? 1 : 0;
+    mask.push(m);
+  }
   return c;
 }
 
@@ -318,6 +323,8 @@ export class Renderer {
   readonly statueBox = STATUES.map(() => ({ on: false, x0: 0, y0: 0, x1: 0, y1: 0 }));
   /** The statues at the world's scale; their close-ups (null until made, a slice a frame) and when each was ready. */
   private readonly statueImg: HTMLCanvasElement[];
+  /** Which of each world's-scale statue's pixels are drawn (taps read this, never the canvas: a read-back stalls). */
+  private readonly statueMask: Uint8Array[] = [];
   private readonly closeImg: (HTMLCanvasElement | null)[] = STATUES.map(() => null);
   private readonly closeReady: number[] = STATUES.map(() => NaN);
   private closeJob: { i: number; steps: ReturnType<typeof statueSteps>; layers: { part: import("../characters/sprite.ts").Part; at: readonly [number, number] }[] | null; next: number; cv: HTMLCanvasElement | null } | null = null;
@@ -389,7 +396,7 @@ export class Renderer {
     this.bossFrames = town.bosses.map((b) => new FrameCache(BOSS_ART[b.home.id]));
     this.houseFrames = this.places.map((h) => new FrameCache(artOf(h).ch));
     this.chipIcon = new FrameCache(COLISEUM_CHIP);
-    this.statueImg = STATUES.map((st) => canvasOf(statueArt(st.id, 1)));
+    this.statueImg = STATUES.map((st) => canvasOf(statueArt(st.id, 1), this.statueMask));
     // Each square is kept this frame (its corners, its face's corners, its color) and drawn with all the others of its
     // color in one fill (drawGround): a few dozen fills a frame instead of two per square.
     this.drawSquare = (c, r, cu, ru, q) => {
@@ -1446,7 +1453,7 @@ export class Renderer {
       const img = this.statueImg[i]!;
       const px = Math.floor(((x - b.x0) / (b.x1 - b.x0)) * img.width);
       const py = Math.floor(((y - b.y0) / (b.y1 - b.y0)) * img.height);
-      if (img.getContext("2d")!.getImageData(px, py, 1, 1).data[3]! > 0) return STATUES[i]!;
+      if (this.statueMask[i]![py * img.width + px]) return STATUES[i]!;
     }
     return null;
   }

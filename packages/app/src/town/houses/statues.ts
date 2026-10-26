@@ -459,7 +459,7 @@ const KNIGHT: Figure = {
 export const PED_W = 52;
 export const PED_H = 44;
 /** Its panel's face, where the quote goes: across from its middle and up from its foot (Coliseum pixels). */
-const FACE = { x0: -22, x1: 22, j0: 5, j1: 37 } as const;
+const FACE = { x0: -23, x1: 23, j0: 4, j1: 37 } as const;
 
 function pedestal(cx: number, fy: number, s: number, kind: StatueId): Generator<void, Painted> {
   const marble = kind === "marble";

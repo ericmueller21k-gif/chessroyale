@@ -22,12 +22,14 @@ stone). Neither statue, pedestal nor plaque carries a name, and no name floats o
   from the ground's size), so the apron square right in front of it (`STATUES` in `world.ts`: (17, 15) and (22, 15)) is
   where you stand to look at it.
   - **The pedestal**: 52 × 44 Coliseum pixels (a chess piece's plinth is 26 × 14): a base, a tall die, a cornice; a
-    panel on its face for the quote. The marble statue's is marble with a sunk panel (the quote engraved); the bronze
+    46 × 33 panel on its face for the quote, sized so the longer quote fits in 15-pixel letters up close even in a
+    360 × 640 phone's box and a 1280 × 600 laptop window (a first try at 44 × 32 held only 12.5-pixel letters on a
+    390 × 664 phone). The marble statue's is marble with a sunk panel (the quote engraved); the bronze
     statue's is the Coliseum's stone with a bronze plaque, riveted (the quote cast in it). Blank in the world: the quote
     renders in up close.
   - **The pieces shifted** to make room, nothing removed: from the gate outward, the bronze queen, the marble statue, the
     marble bishop and the marble rook on the left; the bronze king, the bronze statue, the marble knight and a marble pawn
-    on the right; the other marble pawn stays at the back left corner. The picture grew from 320 to 352 pixels wide (the
+    on the right; the other marble pawn stays at the back left corner. The picture grew from 320 to 360 pixels wide (the
     building itself is unchanged). Nothing covers the gate or its tablet.
 - **The bronze statue, a second pass on the face and hair, and the new pose.** Tall and lanky, a long face with full
   cheeks (not gaunt) and a rounded chin, strong straight brows over deep-set eyes, a long straight nose, a warm closed
@@ -58,7 +60,7 @@ stone). Neither statue, pedestal nor plaque carries a name, and no name floats o
   close-up. − and + also set their own zoom, as they always do.
 - **The quote renders in** on the pedestal's panel once the camera has arrived, word for word, in the signs' pixel
   capitals (`sign-font.ts`, the lettering the game writes on every sign in the square), wrapped to the panel at the
-  biggest whole size that fits (15 CSS pixels tall on a phone and on a computer), engraved in the marble (dark letters,
+  biggest whole size that fits (measured: 15 CSS pixels tall at 360 × 640, 390 × 664 and 1280 × 600, 20 at 390 × 844, 15 at 1440 × 900 on a 1x screen), engraved in the marble (dark letters,
   their lower edge lit) or cast in the bronze plaque (light letters, shadowed): line by line, each line fading in over
   320 ms, 140 ms after the one above; it fades out over 200 ms when you leave. For screen readers the quote is also in an
   off-screen live region (`.town-sr`, `aria-live="polite"`) while you're there.
@@ -74,8 +76,7 @@ stone). Neither statue, pedestal nor plaque carries a name, and no name floats o
   front of the pedestal and would cover the quote. It fades as the camera comes in and back as it leaves; taps pass
   through a faded pawn. The bots never stop on a statue's square (it's kept free to look from).
 - **The quote is in capitals** (the signs' lettering has only capitals); the words are the quotes' own, word for word,
-  with no attribution; the live region has them as given. On a short laptop window (about 1280 × 600) the panel holds
-  them only at 10-pixel letters on a 1x screen; on phones and full-size computer windows they're 15 pixels.
+  with no attribution; the live region has them as given.
 - **The Coliseum's background up close** stays the world's picture (big pixels) behind the finer statue: drawing a
   finer wall too would be a second Coliseum for one view.
 - **The bronze statue's knight**: the brief allowed a small chess piece at hip height or a hand in a pocket; a knight
@@ -83,6 +84,8 @@ stone). Neither statue, pedestal nor plaque carries a name, and no name floats o
 - **Placement follows the Coliseum**: the statues' places, their squares, the pieces beyond them and the frame's width
   come from the Coliseum's ground size and the pedestal's width; the close-up's framing and the quote's layout come from
   the statue's drawn box and the panel's, so a bigger Coliseum (slice 6) carries them along.
+- **Taps on a statue** read a mask of its drawn pixels kept when it's drawn, never the canvas (a read-back can stall a
+  frame).
 - **The empty plinth's brass plate is gone** (the plinth is now the marble statue's pedestal); `plinth` lost its `plate`.
 
 ## Numbers (all in `TOWN_FEEL`, `feel.ts`)

@@ -89,7 +89,7 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
   a gold crown over the board's squares (`COLISEUM_CHIP`, `houses/coliseum.ts`).
 - **The Coliseum** (`town/houses/coliseum.ts`, slice 5): a Roman amphitheater of warm stone, chess-themed (checkered
   bands, a chessboard arena, pieces carved over the gate, navy and gold banners, statues of the pieces on plinths round
-  it), 352 × 246 pixels at the homes' scale;
+  it), 360 × 246 pixels at the homes' scale;
   its foot is the gate's sill on its ground's front edge. Its sign is a tablet over the gate. It's drawn like a home
   (frames made once, one image a frame, only when its foot is inside the rim; `drawable`'s `below` lets its top draw
   while its foot is under the box). The design and the calls: `docs/decisions/2026-10-26-town-square-slice-5.md`.
