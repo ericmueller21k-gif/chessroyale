@@ -273,8 +273,10 @@ export function App() {
    * straight to the solo boss picker, unlisted, not admin-gated; Oct 16). Used once: a match started clears it.
    */
   const [homeIntent, setHomeIntent] = useState<{ kind: "boss" | "friends"; n: number } | null>(() => (location.pathname === "/bosses" ? { kind: "boss", n: 0 } : null));
-  /** The Boss raid screen (its card on home, the side menu's Boss raid, ?mode=raid). */
+  /** The Boss raid screen (the Solo Boss Mode card on home, the side menu's Solo Boss Mode, ?mode=raid). */
   const [raidOpen, setRaidOpen] = useState(raidInUrl);
+  /** That screen is the full one (?mode=raid, the test link: every raid choice), not the Solo Boss Mode form (Eric, Oct 26). */
+  const [raidFull, setRaidFull] = useState(raidInUrl);
   const [legal, setLegal] = useState<LegalPage | null>(() => legalPageOf(location.pathname));
   /**
    * Auto chess, the demo (/autochess; client-only, no account needed). Home's card opens it (Eric, Oct 24; shelved on Oct
@@ -1009,9 +1011,18 @@ export function App() {
       setHomeIntent(null);
       setRaidOpen(false);
     },
-    bossRaid: () => {
+    bossArena: () => {
       goHome();
       setHomeIntent(null);
+      setRaidOpen(false);
+      // (The town square, as /town opens it: the page replaces the front door, as Auto chess's does.)
+      setShowTown(true);
+      history.replaceState(null, "", "/town");
+    },
+    soloBoss: () => {
+      goHome();
+      setHomeIntent(null);
+      setRaidFull(false);
       setRaidOpen(true);
     },
     friends: () => {
@@ -1095,7 +1106,7 @@ export function App() {
     },
     profile: () => openProfile({ you: true, name: account().profile?.user.name ?? "" }),
     ...Object.fromEntries(
-      (["bossRaid", "friends", "shop", "settings", "friendsList"] as const).map((k) => [
+      (["bossArena", "soloBoss", "friends", "shop", "settings", "friendsList"] as const).map((k) => [
         k,
         () => {
           if (match) leave();
@@ -1193,13 +1204,15 @@ export function App() {
           setShowTown(false);
           history.replaceState(null, "", "/");
         }}
-        // A boss's "Challenge alone", confirmed: out of the town square to the Boss raid screen (as the side menu opens
-        // it), that boss's tile picked (the screen reads its pick from rememberBossPick as it opens).
+        // A boss's "Challenge alone", confirmed: out of the town square to the Solo Boss Mode screen (the solo form, as the
+        // side menu opens it; Eric, Oct 26), that boss's tile picked (the screen reads its pick from rememberBossPick as it
+        // opens).
         onBossAlone={(id) => {
           rememberBossPick(id);
           setShowTown(false);
           history.replaceState(null, "", "/");
           setHomeIntent(null);
+          setRaidFull(false);
           setRaidOpen(true);
         }}
       />
@@ -1340,8 +1353,11 @@ export function App() {
         side={side}
         intent={homeIntent}
         raid={raidOpen}
+        full={raidFull}
+        onBossArena={nav.bossArena}
         onRaid={(open) => {
           setRaidOpen(open);
+          setRaidFull(false);
           // (?mode=raid opened it: closed, the address is home's.)
           if (!open && raidInUrl()) {
             const q = new URLSearchParams(location.search);

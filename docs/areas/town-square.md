@@ -3,8 +3,9 @@
 Boss raid's coming home: a small round world where players walk around and meet the bosses at their homes (the plan:
 `ROADMAP.md`, "Boss raid: the town square"). **Slices 1 to 3** are the world alone, on a hidden address: the sky by
 the time of day, the curved ground, all thirteen boss homes with their bosses roaming near them, six bots and you; slice 4
-added the press, the trail and the cards; **slice 5 the Coliseum** in the middle. Nothing links to it yet; open
-`hunchess.com/town` (behind Cloudflare Access like the rest of the site). Phone and computer.
+added the press, the trail and the cards; **slice 5 the Coliseum** in the middle. Home's **Boss Arena** card (Oct 26, Eric)
+opens it, and the computer's side menu's Boss Arena item; the address `/town` opens it directly too (`hunchess.com/town`,
+behind Cloudflare Access like the rest of the site). Phone and computer.
 
 ## How it works
 
