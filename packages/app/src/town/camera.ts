@@ -167,9 +167,9 @@ export function bandOf(v: View, dx: number, dz: number): number {
   const t = clamp((radial(v, dx, dz) / v.rim - b) / (1 - b), 0, 1);
   return t * t * (3 - 2 * t);
 }
-/** The mix toward the sky's color: a light haze with distance, then the band's dissolve. */
-export function hazeMix(v: View, dx: number, dz: number): number {
-  const base = TOWN_FEEL.hazeNear * Math.pow(farOf(v, dz), 1.5);
+/** The mix toward the sky's color: a light haze with distance (more with dawn's `mist`), then the band's dissolve. */
+export function hazeMix(v: View, dx: number, dz: number, mist = 0): number {
+  const base = (TOWN_FEEL.hazeNear + mist) * Math.pow(farOf(v, dz), 1.5);
   return base + (TOWN_FEEL.bandMix - base) * bandOf(v, dx, dz);
 }
 

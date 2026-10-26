@@ -26,6 +26,30 @@ export interface CamSet {
   rimX: number;
 }
 
+type RGB = readonly [number, number, number];
+
+/** One look of the sky (sky.ts blends them by the hour). */
+export interface SkyLook {
+  /** The gradient from the top of the box down to the horizon, one color per stop (sky.ts, SKY_STOPS); the last is the
+   * horizon's, which the far ground and the haze dissolve into. */
+  sky: readonly [RGB, RGB, RGB, RGB, RGB];
+  /** The tint laid over the world and everything on it: color and strength (0: none). */
+  tint: readonly [number, number, number, number];
+  /** The clouds: their lit tops, bodies and bases, and how strongly they show. */
+  cloud: readonly [RGB, RGB, RGB];
+  cloudAlpha: number;
+  /** The sun (or the moon, at night): its disc, its glow and how strong the glow is, and where it stands across the box. */
+  sunDisc: string;
+  sunGlow: RGB;
+  sunGlowAlpha: number;
+  sunX: number;
+  /**
+   * Dawn's morning mist: how much more the far ground fades into the horizon's own color (added to `hazeNear`; 0: none).
+   * (Slice 2's first try drew it as light strokes over the ground: Eric saw a white smudge.)
+   */
+  mist: number;
+}
+
 export const TOWN_FEEL = {
   // ---- The walk (Eric: "perfect"; square to square "makes it feel like chess").
   /** Your step: one square in this many ms. (Prototype: 90.) */
@@ -54,6 +78,8 @@ export const TOWN_FEEL = {
   /** The box shapes (width / height) where the blend is all phone and all computer. */
   aspectTall: 0.6,
   aspectWide: 1.4,
+  /** The page opens zoomed out (Eric, Oct 26: "it feels a little nicer"); − / + work as before. (Slice 1: zoomed in.) */
+  startZoomedOut: true,
   /** Zoomed out: the camera's height x (1 + this). */
   zoomOutHeight: 0.75,
   /** Zoomed out: how far back x (1 + this). */
@@ -84,6 +110,11 @@ export const TOWN_FEEL = {
   bandMix: 0.93,
   /** How much sprites fade at the rim (0 to 1). */
   bandFade: 0.7,
+  /**
+   * The far band of ground softened by a blurred copy of itself laid back over it (the prototype's). Off: its low-res copy
+   * ghosted the far squares (doubled, smeared), most at dawn (Eric, Oct 26); the haze alone fades them cleanly.
+   */
+  softenFarBand: false,
   /** How much sprites blur in the far band (a shrink, then a stretch back). */
   bandBlur: 2.6,
   /** A light haze with distance before the band (at the rim, before the band's own). */
@@ -96,6 +127,131 @@ export const TOWN_FEEL = {
   cloudParallax: 0.12,
   /** And this many pixels per square as you walk ahead. */
   cloudParallaxAhead: 2,
+
+  // ---- The sky by the time of day (sky.ts: the looks' colors; ?sky=day|dawn|dusk|night overrides the clock).
+  /** When each look begins, in minutes past local midnight: dawn 5:30, day 7:30, dusk 17:30, night 19:30 (in that order). */
+  skyHours: { dawn: 5 * 60 + 30, day: 7 * 60 + 30, dusk: 17 * 60 + 30, night: 19 * 60 + 30 },
+  /** Each change blends over this many minutes (centered on its hour), so it's never sudden. */
+  skyBlendMinutes: 30,
+  /** How often the clock is read, in ms (not every frame). */
+  skyCheckMs: 60_000,
+  /** The sun or the moon (where it stands across the box is each look's `sunX`): its radius (a fraction of the box's smaller side)... */
+  sunSize: 0.085,
+  /** ...how far below the horizon its middle sits (a fraction of its radius: it rests low, partly behind the world)... */
+  sunLow: 0.1,
+  /** ...and how far it swings across the box (a fraction of its width) as you walk once round the world: barely. */
+  sunParallax: 0.12,
+  /**
+   * The four looks (Eric, Oct 26). Day: slice 1's blue, a big soft sun, white clouds. Dawn: soft and cool, light blue
+   * through lavender and pink to peach and pale gold, the sun rising on the side opposite dusk's, clouds lit soft pink,
+   * a faint mist low over the far ground. Dusk: the deep warm sunset, dark blue, purple, red-orange, gold, the sun big,
+   * low and orange, clouds lit pink and orange from below. Night: deep navy, stars, a big pale moon, few faint clouds,
+   * a cool dark tint light enough that the checker, the homes and the tags read.
+   */
+  skyLooks: {
+    dawn: {
+      sky: [
+        [150, 192, 236],
+        [184, 172, 222],
+        [232, 176, 204],
+        [250, 200, 176],
+        [255, 226, 176],
+      ],
+      tint: [255, 214, 220, 0.05],
+      cloud: [
+        [255, 240, 244],
+        [250, 210, 222],
+        [236, 178, 196],
+      ],
+      cloudAlpha: 0.95,
+      sunDisc: "#ffe2b0",
+      sunGlow: [255, 214, 190],
+      sunGlowAlpha: 0.5,
+      sunX: 0.3,
+      mist: 0.22,
+    },
+    day: {
+      sky: [
+        [104, 178, 246],
+        [129, 192, 248],
+        [154, 205, 251],
+        [188, 220, 248],
+        [214, 230, 246],
+      ],
+      tint: [0, 0, 0, 0],
+      cloud: [
+        [255, 255, 255],
+        [238, 243, 250],
+        [196, 211, 230],
+      ],
+      cloudAlpha: 1,
+      sunDisc: "#fff4c9",
+      sunGlow: [255, 236, 170],
+      sunGlowAlpha: 0.55,
+      sunX: 0.7,
+      mist: 0,
+    },
+    dusk: {
+      sky: [
+        [29, 43, 94],
+        [74, 58, 126],
+        [169, 79, 134],
+        [236, 110, 72],
+        [255, 187, 102],
+      ],
+      tint: [255, 120, 50, 0.1],
+      cloud: [
+        [190, 140, 190],
+        [240, 150, 140],
+        [255, 185, 110],
+      ],
+      cloudAlpha: 1,
+      sunDisc: "#ffab55",
+      sunGlow: [255, 120, 60],
+      sunGlowAlpha: 0.55,
+      sunX: 0.7,
+      mist: 0,
+    },
+    night: {
+      sky: [
+        [6, 10, 24],
+        [11, 19, 50],
+        [19, 32, 74],
+        [29, 44, 92],
+        [44, 60, 110],
+      ],
+      tint: [12, 22, 64, 0.34],
+      cloud: [
+        [84, 98, 140],
+        [62, 74, 112],
+        [44, 54, 88],
+      ],
+      cloudAlpha: 0.55,
+      sunDisc: "#f2f4ff",
+      sunGlow: [210, 220, 255],
+      sunGlowAlpha: 0.25,
+      sunX: 0.7,
+      mist: 0,
+    },
+  } satisfies Record<string, SkyLook> as Record<"dawn" | "day" | "dusk" | "night", SkyLook>,
+  /** The clouds: how many in a strip of sky 1000 pixels wide (some big, some small, a few wisps). */
+  cloudsPer1000: 6,
+  /** Their pixel size (in CSS pixels): drawn in the game's pixel style, like the homes. */
+  cloudPixel: 3,
+  /** The band of sky they float in, as fractions of the sky's height above the horizon (never on the horizon). */
+  cloudBand: [0.22, 0.88] as const,
+  /** How fast they drift on their own, in pixels a second. */
+  cloudDrift: 4,
+  /** The stars at night: how many, and how many of them twinkle (gently). */
+  stars: 70,
+  twinkles: 8,
+
+  // ---- The world's edge.
+  /** A dark line along the world's rim instead of the haze alone (Eric was curious; off by default)... */
+  rimLine: false,
+  /** ...its color and width (CSS pixels). */
+  rimLineColor: "#1f2530",
+  rimLineWidth: 2,
 
   // ---- The bosses.
   /** A boss stands still this long between walks (a random time between the two). */
@@ -128,6 +284,8 @@ export const TOWN_FEEL = {
   youSquares: 1.45,
   /** A house's pixels per square (the tent, 144 pixels wide, is about 3.9 squares). */
   housePxPerSquare: 37,
+  /** A square drawn less than this many pixels tall (far off) gets no seam: it's barely visible there, and it halves the work. */
+  seamMinPx: 7,
   /** Name tags hide past this fraction of the way to the rim. */
   tagFar: 2 / 3,
 
@@ -140,8 +298,11 @@ export const TOWN_FEEL = {
   nameFullAt: 2,
   /** It rises this many pixels as it fades in. */
   nameRise: 6,
-  /** The game writes each home's name on its sign board, in its pixel font... */
+  /** The game writes each home's name on its sign board, in its own small pixel capitals (sign-font.ts)... */
   signNames: true,
-  /** ...when its letters would be at least this many pixels (else the board stays blank). */
-  signMinPx: 6,
+  /**
+   * ...when its letters would be at least this many CSS pixels tall (else the board stays blank). (Slice 1: 6, in the
+   * game's Press Start 2P, a font twice as wide: the meadow's sign stayed blank at the zoomed-out view.)
+   */
+  signMinCap: 4.5,
 } as const;

@@ -227,9 +227,9 @@ const shadow = groundShadow(CX, FOOT - 1.5, 66, 4.5);
 
 // ---- The sign: a blank board on two posts at its front left. The game writes "Ginger Igloo" on its face.
 
-const BOARD: Pt = [4, 91];
+const BOARD: Pt = [4, 88];
 const BW = 50;
-const BH = 19;
+const BH = 24;
 const board = signBoard(BOARD[0], BOARD[1], BW, BH, WOOD, "KEU", "L");
 const posts = [signPost(BOARD[0] + 5, BOARD[1] + BH - 4, FOOT, WOOD), signPost(BOARD[0] + BW - 8, BOARD[1] + BH - 4, FOOT, WOOD)];
 
