@@ -285,6 +285,11 @@ export const TOWN_FEEL = {
   // ---- Sizes, in squares.
   /** A boss's picture is this many squares tall. */
   bossSquares: 3.0,
+  /**
+   * Some bosses smaller than that in the town square, by their home's id (Eric, Oct 26: "Sawyer the raccoon and the pig
+   * are massive. And the chameleon … about 65% or three-fourths"; Puddles and Jefferson are the right size).
+   */
+  bossScale: { sawyer: 0.7, pig: 0.7, smudgy: 0.7 } as Readonly<Record<string, number>>,
   /** A bot's pawn. */
   botSquares: 1.25,
   /** Your pawn. */

@@ -950,7 +950,7 @@ export class Renderer {
         const ch = BOSS_ART[b.home.id];
         const img = this.bossFrames[it.i]!.at(now, it.i * 977);
         b.walker.pose(now, pose);
-        this.drawSprite(it, img, f.bossSquares, ch.foot[0] / ch.w, ch.foot[1] / ch.h, ch.w / ch.h, 0, 0, b.walker.facing, 1.6);
+        this.drawSprite(it, img, f.bossSquares * (f.bossScale[b.home.id] ?? 1), ch.foot[0] / ch.w, ch.foot[1] / ch.h, ch.w / ch.h, 0, 0, b.walker.facing, 1.6);
         b.onScreen = it.fx > -40 && it.fx < this.W + 40 && it.fy > 0 && it.hy < this.H && bandOf(v, it.dx, it.dz) < 0.6; // (a boss deep in the haze doesn't talk)
         if (town.speech.boss === b) {
           this.bubble.on = true;
