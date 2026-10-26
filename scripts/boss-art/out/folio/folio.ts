@@ -21,9 +21,10 @@ export const FOLIO_PALETTE: Record<string, string> = {
   C: "#dccba9",
   D: "#bba98b",
   E: "#97866f",
-  i: "#b69b78", // ink on light paper (sepia), on shaded paper, ink run (rattled)
-  j: "#94806a",
-  s: "#d2bc9a",
+  i: "#cbb08b", // ink (faint sepia, as if seen through the paper): on lit paper, on mid paper, on shaded paper, ink run
+  j: "#b89e7b",
+  l: "#9c8669",
+  s: "#ddc8a6",
   x: "#1c1620", // the eye
   U: "#8ea5d6", // an ink stroke off the page (the check's underline)
   u: "#5b74aa",
@@ -37,8 +38,8 @@ export const FOLIO_PALETTE: Record<string, string> = {
 };
 
 /** Fade levels for a line of sepia ink, and for ink-blue (thinking): 0 gone .. 3 full. */
-const SEPIA = [PAPER_B, "#e4d2b1", "#c9ae86", "#a8885f"];
-const BLUE = [PAPER_B, "#d9d7d6", "#a7b2cf", "#5b74aa"];
+const SEPIA = [PAPER_B, "#e9dabd", "#dcc7a3", "#c4a780"];
+const BLUE = [PAPER_B, "#dcdcdc", "#aab6d2", "#6c84b8"];
 
 type Pt = readonly [number, number];
 const add2 = (a: Pt, b: Pt): Pt => [a[0] + b[0], a[1] + b[1]];
@@ -59,7 +60,8 @@ interface Ink {
   /** Origin and direction of the lines of writing. */
   o: Pt;
   d: Pt;
-  gap: number;
+  /** Line spacing (default 3: a stroke, its humps above it, a blank row). */
+  gap?: number;
   key: string;
   seed: number;
   /** Lines (by index) drawn in a key of their own (fading lines). */
@@ -82,27 +84,107 @@ interface Drawing {
   smear?: boolean;
 }
 
-function inWord(li: number, s: number, seed: number, dense = false): boolean {
-  const t = s + (hash(li, 99, seed) % 7) + 700;
-  const w = Math.floor(t / 7);
-  return t % 7 < (dense ? 5 : 3) + (hash(li, w, seed + 1) % (dense ? 2 : 3));
+/**
+ * One line of cursive along u (-160..160), by pixel: 0 blank, 1 the stroke on its line, 2 a hump (the stroke lifts a
+ * pixel: n, m, u), 3 a loop (the stroke and a pixel above it: e, l). Words of 3..11 px with 2 px between them, and now
+ * and then a longer blank (a line's end, a new sentence), so lines run to different lengths.
+ */
+const WORDS = new Map<string, Uint8Array>();
+function wordsOf(li: number, seed: number): Uint8Array {
+  const id = `${li}:${seed}`;
+  let a = WORDS.get(id);
+  if (a) return a;
+  a = new Uint8Array(320);
+  let u = hash(li, 1, seed) % 9;
+  for (let n = 0; u < 320; n++) {
+    const len = 3 + (hash(li, n, seed + 3) % 9);
+    // Humps every 2-3 px of stroke, a pixel or two wide; now and then a loop instead.
+    let i = 1 + (hash(li, n, seed + 4) % 2);
+    for (let j = 0; j < len && u + j < 320; j++) a[u + j] = 1;
+    for (let m = 0; i < len - 1; m++) {
+      const h = hash(li, n * 31 + m, seed + 5);
+      const wide = h % 3 === 0 && i < len - 2 ? 2 : 1;
+      for (let j = 0; j < wide; j++) a[u + i + j] = h % 5 === 0 ? 3 : 2;
+      i += wide + 2 + ((h >> 4) % 2);
+    }
+    u += len + (hash(li, n, seed + 6) % 5 === 0 ? 6 + (hash(li, n, seed + 7) % 10) : 2);
+  }
+  WORDS.set(id, a);
+  return a;
 }
-function inkAt(ink: Ink, X: number, Y: number): string | null {
-  const px = X + 0.5 - ink.o[0];
-  const py = Y + 0.5 - ink.o[1];
+/**
+ * The strokes of an Ink over a box: each line of writing walked a pixel at a time along its direction, the stroke on
+ * the line or lifted a pixel at a hump, and joined up with 1-px lines within a word (cursive). Pixel "X,Y" -> key.
+ */
+function strokes(ink: Ink, x0: number, y0: number, x1: number, y1: number): Map<string, string> {
+  const out = new Map<string, string>();
   const [dx, dy] = ink.d;
-  const u = px * dx + py * dy;
-  const v = -px * dy + py * dx;
-  const li = Math.floor(v / ink.gap);
-  const r = v - li * ink.gap;
-  if (ink.skip?.includes(li)) return null;
-  const s = Math.floor(u);
-  const fk = ink.fade?.[li];
-  if (!inWord(li, s, ink.seed, !!fk)) return null;
-  const key = fk ?? ink.key;
-  if (r >= 1 && r < 2) return key;
-  if (r < 1 && hash(li, s, ink.seed) % 4 === 0) return key;
-  return null;
+  const n: Pt = [-dy, dx];
+  const g = ink.gap ?? 3;
+  const corners: Pt[] = [[x0, y0], [x1 + 1, y0], [x0, y1 + 1], [x1 + 1, y1 + 1]];
+  const us = corners.map(([X, Y]) => (X - ink.o[0]) * dx + (Y - ink.o[1]) * dy);
+  const vs = corners.map(([X, Y]) => -(X - ink.o[0]) * dy + (Y - ink.o[1]) * dx);
+  const u0 = Math.max(-160, Math.floor(Math.min(...us)));
+  const u1 = Math.min(159, Math.ceil(Math.max(...us)));
+  for (let li = Math.floor(Math.min(...vs) / g) - 1; li <= Math.ceil(Math.max(...vs) / g); li++) {
+    if (ink.skip?.includes(li)) continue;
+    const key = ink.fade?.[li] ?? ink.key;
+    const words = wordsOf(li, ink.seed);
+    const at = (u: number, lift: number): Pt => {
+      const v = li * g + 1.5 - lift;
+      return [Math.floor(ink.o[0] + u * dx + v * n[0]), Math.floor(ink.o[1] + u * dy + v * n[1])];
+    };
+    let prev: Pt | null = null;
+    for (let u = u0; u <= u1; u++) {
+      const w = words[u + 160] ?? 0;
+      if (!w) {
+        prev = null;
+        continue;
+      }
+      const p = at(u, w === 2 ? 1 : 0);
+      if (w === 3) {
+        const q = at(u, 1);
+        out.set(`${q[0]},${q[1]}`, key);
+      }
+      if (prev) {
+        // A 1-px join (Bresenham) from the last pixel.
+        let [cx, cy] = prev;
+        const sx = Math.sign(p[0] - cx);
+        const sy = Math.sign(p[1] - cy);
+        while (cx !== p[0] || cy !== p[1]) {
+          if (cx !== p[0]) cx += sx;
+          if (cy !== p[1] && (cx === p[0] || Math.abs(p[1] - cy) > Math.abs(p[0] - cx))) cy += sy;
+          out.set(`${cx},${cy}`, key);
+        }
+      }
+      out.set(`${p[0]},${p[1]}`, key);
+      prev = p;
+    }
+  }
+  return out;
+}
+
+/** Clips a polygon to the side of the line a-b that `keep` is on. */
+function clipHalf(pts: readonly Pt[], a: Pt, b: Pt, keep: Pt): Pt[] {
+  const side = (p: Pt) => (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]);
+  const s0 = Math.sign(side(keep));
+  const out: Pt[] = [];
+  pts.forEach((p, i) => {
+    const q = pts[(i + 1) % pts.length]!;
+    const sp = side(p) * s0;
+    const sq = side(q) * s0;
+    if (sp >= 0) out.push(p);
+    if (sp * sq < 0) out.push(lerp(p, q, sp / (sp - sq)));
+  });
+  return out;
+}
+/** A point bulging out from the edge a-b at t, `w` px, on the side away from `away`. */
+function bulge(a: Pt, b: Pt, away: Pt, t: number, w: number): Pt {
+  const c = lerp(a, b, t);
+  const d = unit([b[0] - a[0], b[1] - a[1]]);
+  let n: Pt = [-d[1], d[0]];
+  if ((away[0] - c[0]) * n[0] + (away[1] - c[1]) * n[1] > 0) n = [-n[0], -n[1]];
+  return add2(c, [n[0] * w, n[1] * w]);
 }
 
 function boxOf(d: Drawing): [number, number, number, number] {
@@ -134,12 +216,13 @@ function paint(d: Drawing, outline = true): Part {
         set(X, Y, k);
       }
     if (!f.ink) continue;
+    const st = strokes(f.ink, x0, y0, x1, y1);
     for (let Y = y0; Y <= y1; Y++)
       for (let X = x0; X <= x1; X++) {
         let ok = true;
         for (let a = -1; a <= 1 && ok; a++) for (let b = -1; b <= 1 && ok; b++) if (!inside(X + a, Y + b)) ok = false;
         if (!ok) continue;
-        const k = inkAt(f.ink, X, Y);
+        const k = st.get(`${X},${Y}`);
         if (k) {
           set(X, Y, k);
           inked.push([X, Y]);
@@ -177,23 +260,24 @@ const H = 92;
 const GROUND = 86;
 const MID = 46;
 
-const BODY = { L: [33, 60] as Pt, T: [46, 55] as Pt, R: [59, 60] as Pt, B: [46, 79] as Pt };
-const NECK_BASE: readonly [Pt, Pt] = [[36, 71], [41, 64]];
-const TAIL_BASE: readonly [Pt, Pt] = [[52, 65], [56, 70]];
-const WING_N: readonly [Pt, Pt] = [[33, 62], [60, 60]];
-const WING_F: readonly [Pt, Pt] = [[37, 58], [54, 58]];
-const REST = { neck: [14, 26] as Pt, tail: [85, 40] as Pt, wingN: [73, 9] as Pt, wingF: [24, 11] as Pt };
+const BODY = { L: [28, 59] as Pt, T: [46, 50] as Pt, R: [64, 58] as Pt, B: [47, 81] as Pt };
+const NECK_BASE: readonly [Pt, Pt] = [[33, 72], [41, 62]];
+const TAIL_BASE: readonly [Pt, Pt] = [[51, 62], [59, 72]];
+const WING_N: readonly [Pt, Pt] = [[29, 61], [64, 59]];
+const WING_F: readonly [Pt, Pt] = [[34, 57], [58, 56]];
+const REST = { neck: [14, 27] as Pt, tail: [84, 38] as Pt, wingN: [72, 11] as Pt, wingF: [23, 11] as Pt };
 
 /** The fading lines' indices on the near wing's front face. */
-const FADE_LINES: Readonly<Record<number, string>> = { [-6]: "3", [-4]: "2", [-2]: "1" };
-const INK_D = unit([1, -0.22]);
+const FADE_LINES: Readonly<Record<number, string>> = { [-2]: "1", [0]: "2", [2]: "3" };
+/** The near wing's lines run along it, toward its tip. */
+const INK_D = unit([1, -0.85]);
 
 function bodyDrawing(smear: boolean): Drawing {
   const { L, T, R, B } = BODY;
   return {
     faces: [
-      { pts: [L, T, B], key: "B", hi: "A", ink: { o: L, d: unit([1, 0.5]), gap: 4, key: "i", seed: 1 } },
-      { pts: [T, R, B], key: "C", lo: "D", ink: { o: R, d: unit([1, -0.6]), gap: 4, key: "i", seed: 2 } },
+      { pts: [L, T, B], key: "B", hi: "A", ink: { o: L, d: unit([1, 0.42]), key: "i", seed: 1 } },
+      { pts: [T, R, B], key: "C", lo: "D", ink: { o: R, d: unit([1, -0.5]), key: "j", seed: 2 } },
     ],
     creases: [[T, B, "D"]],
     smear,
@@ -205,7 +289,7 @@ function pointDrawing(base: readonly [Pt, Pt], tip: Pt, litFirst: boolean): Draw
   const [a, b] = base;
   const m = lerp(a, b, 0.5);
   const n = unit([tip[0] - m[0], tip[1] - m[1]]);
-  const side: Pt = [-n[1] * 0.9, n[0] * 0.9];
+  const side: Pt = [-n[1] * 1.5, n[0] * 1.5];
   const tA = add2(tip, side);
   const tB: Pt = [tip[0] - side[0], tip[1] - side[1]];
   // Which tip corner belongs to a's side: the one nearer a's side of the axis.
@@ -217,69 +301,85 @@ function pointDrawing(base: readonly [Pt, Pt], tip: Pt, litFirst: boolean): Draw
 }
 
 export type Head = "rest" | "dip" | "up" | "none";
-const HEADS: Record<Exclude<Head, "none">, { c: Pt; bk: Pt; ch: Pt; bt: Pt; eye: Pt }> = {
-  rest: { c: [-1, -3], bk: [3, 0], ch: [0, 3], bt: [-10, 4], eye: [-2, -1] },
-  dip: { c: [-2, -3], bk: [3, 0], ch: [1, 3], bt: [-7, 8], eye: [-2, -1] },
-  up: { c: [0, -3], bk: [3, 1], ch: [0, 3], bt: [-10, -3], eye: [-1, -1] },
+/** The eye: open (dark, a glint top left), wide (startled: taller), happy (pleased: a closed arc), narrow (a slit, a blink). */
+export type Eye = "open" | "wide" | "happy" | "narrow";
+const EYES: Record<Eye, readonly (readonly [number, number, string])[]> = {
+  open: [[0, 0, "A"], [1, 0, "x"], [0, 1, "x"], [1, 1, "x"]],
+  wide: [[0, -1, "x"], [1, -1, "x"], [0, 0, "A"], [1, 0, "x"], [0, 1, "x"], [1, 1, "x"]],
+  happy: [[0, 0, "x"], [1, 0, "x"], [-1, 1, "x"], [2, 1, "x"]],
+  narrow: [[0, 1, "x"], [1, 1, "x"], [-1, 1, "D"]],
 };
-function headDrawing(tip: Pt, mode: Exclude<Head, "none">): Drawing {
+const HEADS: Record<Exclude<Head, "none">, { c: Pt; bk: Pt; ch: Pt; bt: Pt; eye: Pt }> = {
+  rest: { c: [-1, -4], bk: [4, 0], ch: [0, 4], bt: [-12, 4], eye: [-3, -1] },
+  dip: { c: [-2, -4], bk: [4, -1], ch: [1, 4], bt: [-8, 10], eye: [-2, -1] },
+  up: { c: [0, -5], bk: [4, 1], ch: [-1, 4], bt: [-12, -3], eye: [-2, -3] },
+};
+function headDrawing(tip: Pt, mode: Exclude<Head, "none">, eye: Eye): Drawing {
   const h = HEADS[mode];
   const P = (q: Pt) => add2(tip, q);
-  const e = P(h.eye);
+  const e = r2(P(h.eye));
   return {
     faces: [
       { pts: [P(h.c), P(h.bk), P(h.bt)], key: "B", hi: "A" },
       { pts: [P(h.bk), P(h.ch), P(h.bt)], key: "C", lo: "D" },
     ],
     creases: [[P(h.bk), P(h.bt), "D"]],
-    dots: [[Math.round(e[0]), Math.round(e[1]), "x"]],
+    dots: EYES[eye].map(([a, b, k]) => [e[0] + a, e[1] + b, k] as const),
   };
 }
 
+/**
+ * The near wing: its leading edge from the root L to the tip, its trailing edge bowed out (Q) and back to R. A lit front
+ * face (L, tip, M), and behind the crease two shaded faces (M, tip, Q) and (M, Q, R): a broad flap of paper.
+ */
 function wingNDrawing(tip: Pt, dent: number, smear: boolean): Drawing {
   const [L, R] = WING_N;
-  const M = lerp(L, R, 0.6);
-  const front: Ink = { o: L, d: INK_D, gap: 4, key: "i", seed: 3, fade: FADE_LINES };
-  const back: Ink = { o: L, d: INK_D, gap: 4, key: "j", seed: 3, skip: [-6, -4, -2] };
-  const creases: [Pt, Pt, string][] = [[M, tip, "D"]];
-  if (dent === 0) return { faces: [{ pts: [L, tip, M], key: "B", hi: "A", ink: front }, { pts: [M, tip, R], key: "C", lo: "D", ink: back }], creases, smear };
+  const M = lerp(L, R, 0.56);
+  const len = Math.hypot(tip[0] - R[0], tip[1] - R[1]);
+  const Q = bulge(R, tip, L, 0.45, Math.min(11, len * 0.2));
+  const front: Ink = { o: L, d: INK_D, key: "i", seed: 3, fade: FADE_LINES };
+  const back: Ink = { o: L, d: INK_D, key: "j", seed: 5 };
+  const low: Ink = { o: L, d: INK_D, key: "l", seed: 5 };
+  let faces: Face[] = [
+    { pts: [L, tip, M], key: "B", hi: "A", ink: front },
+    { pts: [M, tip, Q], key: "C", ink: back },
+    { pts: [M, Q, R], key: "D", lo: "E", ink: low },
+  ];
+  const creases: [Pt, Pt, string][] = [[M, tip, "D"], [M, Q, "E"]];
+  if (dent === 0) return { faces, creases, smear };
   // Hurt: the trailing edge crumpled into a zigzag, creases running in from it; harder, the tip folded over too.
-  const n1 = add2(lerp(R, tip, 0.22), [-4, 0]);
-  const n2 = lerp(R, tip, 0.36);
-  const n3 = add2(lerp(R, tip, 0.5), [-6, 1]);
-  const n4 = lerp(R, tip, 0.62);
-  const crum: [Pt, string][] = [[n1, "E"], [n3, "E"]];
-  for (const [n, k] of crum) creases.push([n, lerp(M, tip, 0.25 + (n === n3 ? 0.2 : 0)), k]);
-  if (dent === 1) return { faces: [{ pts: [L, tip, M], key: "B", hi: "A", ink: front }, { pts: [M, tip, n4, n3, n2, n1, R], key: "C", lo: "D", ink: back }], creases, smear };
-  const f = 0.66;
-  const top = lerp(L, tip, f);
-  const topR = lerp(n4, tip, (f - 0.62) / 0.38 + 0.05);
-  const topM = lerp(M, tip, f);
-  // The flap: the tip reflected across the fold line, lying over the wing's face.
-  const [ax, ay] = top;
-  const ux = topR[0] - ax;
-  const uy = topR[1] - ay;
-  const t = ((tip[0] - ax) * ux + (tip[1] - ay) * uy) / (ux * ux + uy * uy);
-  const foot: Pt = [ax + ux * t, ay + uy * t];
+  const n1 = bulge(R, Q, Q, 0.3, 0);
+  const n2 = add2(lerp(R, Q, 0.45), [(M[0] - R[0]) * 0.25, (M[1] - R[1]) * 0.25]);
+  const n3 = lerp(R, Q, 0.62);
+  const n4 = add2(lerp(R, Q, 0.8), [(M[0] - Q[0]) * 0.3, (M[1] - Q[1]) * 0.3]);
+  faces[2] = { pts: [M, Q, n4, n3, n2, n1, R], key: "D", lo: "E", ink: low };
+  creases.push([n2, lerp(M, Q, 0.4), "E"], [n4, lerp(M, tip, 0.3), "E"]);
+  if (dent === 1) return { faces, creases, smear };
+  // The flap: the tip folded across the line A-B, lying over the wing's faces.
+  const A = lerp(L, tip, 0.64);
+  const B = lerp(Q, tip, 0.45);
+  const ux = B[0] - A[0];
+  const uy = B[1] - A[1];
+  const t = ((tip[0] - A[0]) * ux + (tip[1] - A[1]) * uy) / (ux * ux + uy * uy);
+  const foot: Pt = [A[0] + ux * t, A[1] + uy * t];
   const flapTip: Pt = [2 * foot[0] - tip[0], 2 * foot[1] - tip[1]];
-  return {
-    faces: [
-      { pts: [L, top, topM, M], key: "B", hi: "A", ink: front },
-      { pts: [M, topM, topR, n4, n3, n2, n1, R], key: "C", lo: "D", ink: back },
-      { pts: [top, topR, flapTip], key: "D", lo: "E" },
-    ],
-    creases: [[M, topM, "D"], [top, topR, "E"], ...creases.slice(1)],
-    smear,
-  };
+  faces = faces.map((f) => ({ ...f, pts: clipHalf(f.pts, A, B, L) }));
+  faces.push({ pts: [A, B, flapTip], key: "D", lo: "E" });
+  const mt = clipHalf([M, tip, tip], A, B, L);
+  return { faces, creases: [[M, mt[1] ?? M, "D"], [A, B, "E"], ...creases.slice(1)], smear };
 }
 
+/** The far wing, behind: in shade, its outer edge bowed out to the left. */
 function wingFDrawing(tip: Pt, smear: boolean): Drawing {
   const [L, R] = WING_F;
-  const M = lerp(L, R, 0.45);
+  const M = lerp(L, R, 0.42);
+  const len = Math.hypot(tip[0] - L[0], tip[1] - L[1]);
+  const Q = bulge(L, tip, R, 0.48, Math.min(10, len * 0.18));
+  const d = unit([-1, -1.3]);
   return {
     faces: [
-      { pts: [L, tip, M], key: "C", hi: "B", ink: { o: R, d: unit([1, 0.3]), gap: 4, key: "j", seed: 4 } },
-      { pts: [M, tip, R], key: "D", ink: { o: R, d: unit([1, 0.3]), gap: 4, key: "j", seed: 4 } },
+      { pts: [L, Q, tip, M], key: "C", hi: "B", ink: { o: R, d, key: "j", seed: 4 } },
+      { pts: [M, tip, R], key: "D", ink: { o: R, d, key: "l", seed: 6 } },
     ],
     creases: [[M, tip, "E"]],
     smear,
@@ -293,12 +393,12 @@ function shadowDrawing(rx: number): Drawing {
 // ---- The page on its own (the entrance and the defeat), drawn round (0, 0).
 
 /** A loose sheet, upright or tipping: `skew` slants it, `h` its height (a sheet seen tipped is short). */
-function pageDrawing(skew: number, h: number, w = 38): Drawing {
+function pageDrawing(skew: number, h: number, w = 46): Drawing {
   const t = -h / 2;
   const b = h / 2;
   const pts: Pt[] = [[-w / 2 + skew, t], [w / 2 + skew, t], [w / 2 - skew, b], [-w / 2 - skew, b]];
   const key = h < 12 ? "C" : "B";
-  return { faces: [{ pts, key, hi: "A", lo: h < 12 ? "D" : "C", ink: { o: [0, t + 1], d: [1, 0], gap: h < 8 ? 3 : 4, key: "i", seed: 7 } }] };
+  return { faces: [{ pts, key, hi: "A", lo: h < 12 ? "D" : "C", ink: { o: [0, t + 1], d: [1, 0], gap: h < 10 ? 2 : 3, key: h < 12 ? "j" : "i", seed: 7 } }] };
 }
 /** The page creased into a square seen corner-up: four faces round the middle (a shallow pyramid). */
 function squareDrawing(r: number): Drawing {
@@ -310,27 +410,27 @@ function squareDrawing(r: number): Drawing {
   const d = unit([1, 1]);
   return {
     faces: [
-      { pts: [T, O, L], key: "B", hi: "A", ink: { o: O, d, gap: 4, key: "i", seed: 8 } },
-      { pts: [T, R, O], key: "C", ink: { o: O, d, gap: 4, key: "i", seed: 8 } },
-      { pts: [L, O, B], key: "C", ink: { o: O, d, gap: 4, key: "i", seed: 8 } },
-      { pts: [O, R, B], key: "D", ink: { o: O, d, gap: 4, key: "j", seed: 8 } },
+      { pts: [T, O, L], key: "B", hi: "A", ink: { o: O, d, key: "i", seed: 8 } },
+      { pts: [T, R, O], key: "C", ink: { o: O, d, key: "j", seed: 8 } },
+      { pts: [L, O, B], key: "C", ink: { o: O, d, key: "j", seed: 8 } },
+      { pts: [O, R, B], key: "D", ink: { o: O, d, key: "l", seed: 8 } },
     ],
     creases: [[T, B, "E"], [L, R, "E"], [lerp(T, L, 0.5), O, "D"], [lerp(T, R, 0.5), O, "D"]],
   };
 }
 /** The bird base: a long diamond, its flaps up top, its two legs below split by a slit. */
 function birdBaseDrawing(): Drawing {
-  const T: Pt = [0, -28];
-  const L: Pt = [-10, 0];
-  const R: Pt = [10, 0];
-  const B: Pt = [0, 26];
+  const T: Pt = [0, -33];
+  const L: Pt = [-13, 0];
+  const R: Pt = [13, 0];
+  const B: Pt = [0, 31];
   const O: Pt = [0, 0];
   return {
     faces: [
-      { pts: [T, O, L], key: "B", hi: "A", ink: { o: O, d: unit([1, -1.4]), gap: 4, key: "i", seed: 9 } },
-      { pts: [T, R, O], key: "C", ink: { o: O, d: unit([1, 1.4]), gap: 4, key: "i", seed: 9 } },
-      { pts: [L, O, B], key: "C", ink: { o: O, d: unit([1, 1.2]), gap: 4, key: "i", seed: 10 } },
-      { pts: [O, R, B], key: "D", ink: { o: O, d: unit([1, -1.2]), gap: 4, key: "j", seed: 10 } },
+      { pts: [T, O, L], key: "B", hi: "A", ink: { o: O, d: unit([1, -1.4]), key: "i", seed: 9 } },
+      { pts: [T, R, O], key: "C", ink: { o: O, d: unit([1, 1.4]), key: "j", seed: 9 } },
+      { pts: [L, O, B], key: "C", ink: { o: O, d: unit([1, 1.2]), key: "j", seed: 10 } },
+      { pts: [O, R, B], key: "D", ink: { o: O, d: unit([1, -1.2]), key: "l", seed: 10 } },
     ],
     creases: [[L, R, "D"], [T, O, "D"], [[0, 2], B, "E"], [lerp(T, L, 0.5), [0, -6], "D"], [lerp(T, R, 0.5), [0, -6], "E"]],
   };
@@ -338,7 +438,8 @@ function birdBaseDrawing(): Drawing {
 
 // ---- Little paper things: the piece it takes (a folded pawn) and the tiny crane it folds for you.
 
-const PIECE = ["..AB..", ".ABBC.", "..BC..", ".ABCC.", "..BC..", ".ABCD.", "ABBCCD"];
+/** A paper pawn: a round head, a neck, a collar, a wide base; a crease down its shaded side. */
+const PIECE = ["..AB..", ".ABBC.", ".BBCD.", "..BC..", "..BD..", ".ABCD.", "ABBCDD"];
 const MINI: Record<string, readonly string[]> = {
   square: ["...A...", "..ABC..", ".ABBCC.", "ABBBCCD", ".BBCCD.", "..CCD..", "...D..."],
   kite: ["..A..", ".ABC.", ".ABC.", "ABBCC", "ABBCD", ".BCD.", ".BCD.", "..D..", "..D.."],
@@ -360,6 +461,7 @@ export interface FolioPose {
   neck?: Pt;
   tail?: Pt;
   head?: Head;
+  eye?: Eye;
   dent?: 0 | 1 | 2;
   smear?: boolean;
   /** Wing edges curling (a ripple up the wings, rattled). */
@@ -391,13 +493,14 @@ export function folioLayers(p: FolioPose): Layer[] {
   const wf = r2(add2(REST.wingF, p.wingF ?? [0, 0]));
   const sm = !!p.smear;
   const wave = p.curl ? { wave: { along: "rows" as const, amp: p.curl, len: 18, phase: p.phase ?? 0, pin: "bottom" as const } } : {};
-  const layers: Layer[] = [shadowLayer(p.shadow ?? Math.max(6, 13 + Math.min(0, dy)))];
+  const layers: Layer[] = [shadowLayer(p.shadow ?? Math.max(6, 15 + Math.min(0, dy)))];
   layers.push(at(use(`wingF:${key(wf)}:${sm}`, () => wingFDrawing(wf, sm)), wave));
   layers.push(at(use(`tail:${key(tail)}`, () => pointDrawing(TAIL_BASE, tail, true))));
   layers.push(at(use(`body:${sm}`, () => bodyDrawing(sm))));
   layers.push(at(use(`neck:${key(neck)}`, () => pointDrawing(NECK_BASE, neck, true))));
   const head = p.head ?? "rest";
-  if (head !== "none") layers.push(at(use(`head:${key(neck)}:${head}`, () => headDrawing(neck, head))));
+  const eye = p.eye ?? "open";
+  if (head !== "none") layers.push(at(use(`head:${key(neck)}:${head}:${eye}`, () => headDrawing(neck, head, eye))));
   if (p.piece) layers.push({ part: "piece", x: p.piece[0], y: p.piece[1] });
   layers.push(at(use(`wingN:${key(wn)}:${p.dent ?? 0}:${sm}`, () => wingNDrawing(wn, p.dent ?? 0, sm)), wave));
   layers.push(...(p.extra ?? []));
@@ -416,7 +519,7 @@ function pageFrame(ms: number, d: { name: string; at: Pt }, cx: number, cy: numb
   return { ms, layers: [shadowLayer(rx), { part: d.name, x: d.at[0] + cx, y: d.at[1] + cy }], ...extra };
 }
 const page = (skew: number, h: number) => use(`page:${skew}:${h}`, () => pageDrawing(skew, h));
-const square = () => use("square", () => squareDrawing(17));
+const square = () => use("square", () => squareDrawing(21));
 const birdBase = () => use("birdbase", birdBaseDrawing);
 
 /** Ink-line fades: levels 0..3 for keys 1, 2, 3, in sepia or blue. */
@@ -471,6 +574,7 @@ const IDLE: Frame[] = Array.from({ length: 24 }, (_, i) => {
     wingF: [0, -lift],
     neck: dip ? [-1, i === 9 || i === 12 ? 1 : 2] : [0, 0],
     head: dip && i !== 9 && i !== 12 ? "dip" : "rest",
+    eye: i === 19 ? "narrow" : "open",
   }, { pal: fades(l1, l2) });
 });
 
@@ -480,13 +584,13 @@ const IDLE: Frame[] = Array.from({ length: 24 }, (_, i) => {
  * the neck and tail swing up, the head folds down, the wings open; a glint runs up the wing edge, and it breathes.
  */
 const ENTRANCE: Frame[] = [
-  pageFrame(170, page(5, 14), 38, 11, 3, { cue: "rustle" }),
-  pageFrame(170, page(-3, 8), 52, 22, 4),
-  pageFrame(170, page(-6, 20), 40, 34, 6, { cue: "rustle" }),
-  pageFrame(170, page(4, 12), 50, 44, 8),
-  pageFrame(260, page(0, 28), 46, 50, 11),
-  pageFrame(200, square(), 46, 50, 11, { cue: "fold", specks: sparkle(46, 33) }),
-  pageFrame(200, birdBase(), 46, 50, 11, { cue: "fold", specks: sparkle(46, 22) }),
+  pageFrame(170, page(5, 16), 38, 11, 3, { cue: "rustle" }),
+  pageFrame(170, page(-3, 9), 52, 22, 4),
+  pageFrame(170, page(-6, 24), 40, 34, 6, { cue: "rustle" }),
+  pageFrame(170, page(4, 14), 50, 44, 9),
+  pageFrame(260, page(0, 34), 46, 50, 13),
+  pageFrame(200, square(), 46, 50, 13, { cue: "fold", specks: sparkle(46, 28) }),
+  pageFrame(200, birdBase(), 46, 50, 12, { cue: "fold", specks: sparkle(46, 16) }),
   F(160, { wingN: [-20, 4], wingF: [19, 2], neck: [30, 58], tail: [-37, 44], head: "none", shadow: 11 }, { cue: "fold" }),
   F(130, { wingN: [-20, 4], wingF: [19, 2], neck: [5, 33], tail: [-5, 23], head: "none", shadow: 12 }),
   F(130, { wingN: [-20, 4], wingF: [19, 2], neck: [0, 0], tail: [0, 0], head: "none" }),
@@ -550,12 +654,12 @@ const CAPTURE: Frame[] = [
 
 /** Hurt: a crease bends into the near wing (cue `crumple`), its tip folds over, the crane shudders; then it smooths out. */
 const HURT: Frame[] = [
-  F(70, { dent: 1, wingN: [2, 3], wingF: [1, 2], neck: [2, 1], head: "dip" }, { cue: "crumple", shake: [-1, 0] }),
-  F(80, { dent: 2, wingN: [2, 3], wingF: [1, 2], neck: [3, 2], head: "dip" }, { shake: [1, 0] }),
-  F(90, { dent: 2, wingN: [1, 2], wingF: [1, 1], neck: [3, 2], head: "dip" }, { shake: [-1, 0] }),
-  F(240, { dent: 2, wingN: [1, 2], wingF: [1, 1], neck: [2, 2], head: "dip" }),
+  F(70, { dent: 1, wingN: [2, 3], wingF: [1, 2], neck: [2, 1], head: "dip", eye: "wide" }, { cue: "crumple", shake: [-1, 0] }),
+  F(80, { dent: 2, wingN: [2, 3], wingF: [1, 2], neck: [3, 2], head: "dip", eye: "wide" }, { shake: [1, 0] }),
+  F(90, { dent: 2, wingN: [1, 2], wingF: [1, 1], neck: [3, 2], head: "dip", eye: "wide" }, { shake: [-1, 0] }),
+  F(240, { dent: 2, wingN: [1, 2], wingF: [1, 1], neck: [2, 2], head: "dip", eye: "narrow" }),
   F(120, { dent: 1, wingN: [0, 1], neck: [1, 1] }, { cue: "smooth" }),
-  F(120, { wingN: [0, -1] }, { specks: sparkle(62, 30, false) }),
+  F(120, { wingN: [0, -1] }, { specks: sparkle(64, 28, false) }),
   F(160, {}),
 ];
 
@@ -579,24 +683,24 @@ const CHECK: Frame[] = [
 const BOW = { neck: [3, 6] as Pt, head: "dip" as Head };
 const SMUG: Frame[] = [
   F(110, { neck: [1, 2] }),
-  F(150, { ...BOW, wingN: [0, 1], wingF: [0, 1] }),
-  F(110, { ...BOW, wingN: [0, 1], wingF: [0, 1] }, { cue: "glint", specks: edgeGlint(0.12, [0, 1]) }),
-  F(100, { ...BOW, wingN: [0, 1], wingF: [0, 1] }, { specks: edgeGlint(0.36, [0, 1]) }),
-  F(100, { ...BOW, wingN: [0, 1], wingF: [0, 1] }, { specks: edgeGlint(0.6, [0, 1]) }),
-  F(110, { neck: [1, 2], wingN: [0, -1] }, { specks: edgeGlint(0.84, [0, -1]) }),
-  F(120, { wingN: [0, -2], wingF: [0, -1], dy: -1 }, { specks: sparkle(REST.wingN[0] - 1, REST.wingN[1] - 4) }),
+  F(150, { ...BOW, wingN: [0, 1], wingF: [0, 1], eye: "happy" }),
+  F(110, { ...BOW, wingN: [0, 1], wingF: [0, 1], eye: "happy" }, { cue: "glint", specks: edgeGlint(0.12, [0, 1]) }),
+  F(100, { ...BOW, wingN: [0, 1], wingF: [0, 1], eye: "happy" }, { specks: edgeGlint(0.36, [0, 1]) }),
+  F(100, { ...BOW, wingN: [0, 1], wingF: [0, 1], eye: "happy" }, { specks: edgeGlint(0.6, [0, 1]) }),
+  F(110, { neck: [1, 2], wingN: [0, -1], eye: "happy" }, { specks: edgeGlint(0.84, [0, -1]) }),
+  F(120, { wingN: [0, -2], wingF: [0, -1], dy: -1, eye: "happy" }, { specks: sparkle(REST.wingN[0] - 1, REST.wingN[1] - 4) }),
   F(260, { wingN: [0, -1] }, { specks: sparkle(REST.wingN[0] - 1, REST.wingN[1] - 3, false) }),
 ];
 
 /** Rattled: its wing edges curl and flutter (cue `flutter`), the ink runs a little, it shivers, then steadies itself. */
 const RATTLED: Frame[] = [
-  F(80, { curl: 1, phase: 0, wingN: [1, 1], neck: [1, 1], smear: true }, { cue: "flutter", shake: [1, 0] }),
-  F(80, { curl: 2, phase: 1.6, wingN: [0, -1], wingF: [0, 1], neck: [2, 1], head: "up", smear: true }, { shake: [-1, 0] }),
-  F(80, { curl: 2, phase: 3.2, wingN: [1, 0], wingF: [0, -1], neck: [1, 0], head: "up", smear: true }, { shake: [1, 0] }),
-  F(80, { curl: 2, phase: 4.8, wingN: [0, -1], wingF: [0, 1], neck: [2, 1], head: "up", smear: true }, { shake: [-1, 0] }),
-  F(90, { curl: 1, phase: 0, wingN: [1, 0], neck: [1, 1], smear: true }, { shake: [1, 0] }),
-  F(100, { curl: 1, phase: 2.4, wingN: [0, 1], neck: [1, 1], smear: true }),
-  F(300, { wingN: [0, 2], wingF: [0, 1], neck: [0, 1], head: "dip", smear: true }),
+  F(80, { curl: 1, phase: 0, wingN: [1, 1], neck: [1, 1], smear: true, eye: "wide" }, { cue: "flutter", shake: [1, 0] }),
+  F(80, { curl: 2, phase: 1.6, wingN: [0, -1], wingF: [0, 1], neck: [2, 1], head: "up", smear: true, eye: "wide" }, { shake: [-1, 0] }),
+  F(80, { curl: 2, phase: 3.2, wingN: [1, 0], wingF: [0, -1], neck: [1, 0], head: "up", smear: true, eye: "wide" }, { shake: [1, 0] }),
+  F(80, { curl: 2, phase: 4.8, wingN: [0, -1], wingF: [0, 1], neck: [2, 1], head: "up", smear: true, eye: "wide" }, { shake: [-1, 0] }),
+  F(90, { curl: 1, phase: 0, wingN: [1, 0], neck: [1, 1], smear: true, eye: "wide" }, { shake: [1, 0] }),
+  F(100, { curl: 1, phase: 2.4, wingN: [0, 1], neck: [1, 1], smear: true, eye: "wide" }),
+  F(300, { wingN: [0, 2], wingF: [0, 1], neck: [0, 1], head: "dip", smear: true, eye: "narrow" }),
   F(160, { wingN: [0, -1], dy: -1 }),
   F(160, {}),
 ];
@@ -607,18 +711,18 @@ const RATTLED: Frame[] = [
  * ground (cue `settle`).
  */
 const DEFEAT: Frame[] = [
-  F(260, { neck: [1, 3], head: "dip", wingN: [0, 2], wingF: [0, 2] }),
-  F(240, { wingN: [-10, 3], wingF: [10, 2], neck: [1, 3], head: "dip" }, { cue: "unfold" }),
+  F(260, { neck: [1, 3], head: "dip", wingN: [0, 2], wingF: [0, 2], eye: "narrow" }),
+  F(240, { wingN: [-10, 3], wingF: [10, 2], neck: [1, 3], head: "dip", eye: "narrow" }, { cue: "unfold" }),
   F(240, { wingN: [-20, 4], wingF: [19, 2], head: "none" }),
   F(220, { wingN: [-20, 4], wingF: [19, 2], neck: [5, 33], tail: [-5, 23], head: "none", shadow: 12 }),
   F(220, { wingN: [-20, 4], wingF: [19, 2], neck: [30, 58], tail: [-37, 44], head: "none", shadow: 11 }),
-  pageFrame(260, birdBase(), 46, 50, 11, { cue: "unfold" }),
-  pageFrame(260, square(), 46, 50, 11),
-  pageFrame(300, page(0, 28), 46, 50, 11),
-  pageFrame(220, page(3, 18), 47, 60, 13),
-  pageFrame(220, page(5, 10), 45, 72, 15),
-  pageFrame(240, page(6, 6), 46, 82, 17, { cue: "settle" }),
-  pageFrame(1400, page(6, 6), 46, 83, 19),
+  pageFrame(260, birdBase(), 46, 50, 12, { cue: "unfold" }),
+  pageFrame(260, square(), 46, 50, 13),
+  pageFrame(300, page(0, 34), 46, 50, 13),
+  pageFrame(220, page(3, 22), 47, 61, 15),
+  pageFrame(220, page(5, 12), 45, 73, 18),
+  pageFrame(240, page(6, 7), 46, 82, 21, { cue: "settle" }),
+  pageFrame(1400, page(6, 7), 46, 83, 23),
 ];
 
 /** Victory: from a corner of its page it folds a tiny crane at its beak (cue `fold`), a square, a kite, a crane; sends it up and away (cue `launch`) and watches it go, pleased. */
@@ -634,10 +738,10 @@ const VICTORY: Frame[] = [
   F(110, { neck: [0, -1], head: "up", wingN: [0, -1], wingF: [0, -1], extra: [mini("down", 1, 7)] }),
   F(110, { neck: [0, -1], head: "up", extra: [mini("up", 7, 3)] }),
   F(110, { neck: [0, -1], head: "up", extra: [mini("down", 16, 3)] }),
-  F(120, { neck: [0, -1], head: "up" }, { specks: sparkle(28, 4) }),
-  F(140, { neck: [0, -1], head: "up" }, { specks: sparkle(33, 3, false) }),
-  F(160, { ...BOW }),
-  F(300, {}),
+  F(120, { neck: [0, -1], head: "up", eye: "happy" }, { specks: sparkle(28, 4) }),
+  F(140, { neck: [0, -1], head: "up", eye: "happy" }, { specks: sparkle(33, 3, false) }),
+  F(160, { ...BOW, eye: "happy" }),
+  F(300, { eye: "happy" }),
 ];
 
 /** Everything is drawn round x MID; the frame keeps OX pixels more on the left (the beak, the pointing wing). */
