@@ -379,7 +379,16 @@ Added Oct 14, 2026 (Eric; notes only, nothing built):
   - Test lanes: every logic change goes back to the full lane per PR (CLAUDE.md, "Test lanes": the targeted lane
     and batch full runs are pre-launch only).
 
-## Boss raid: the town square (Eric, Oct 25, 2026; a look-only prototype, nothing built yet)
+## Boss raid: the town square (Eric, Oct 25, 2026; being built in slices)
+
+Slice 1 (the world, five homes, bots) is at `/town`, a hidden page. Eric's way of building it (Oct 26): one slice at a time on
+the hidden page, Eric tests each one and sends back small changes ("the winning play for us here… is that it feels fun and
+good to run around in this kind of world"), then the next slice. The numbers that shape the feel are in
+`packages/app/src/town/feel.ts`.
+
+**The name** (Eric, Oct 26): Boss raid will become **Boss Arena**, the mode and its world ("that more implies… an arena or…
+a world"). The building in the middle, called the Boss Arena below until now, is **the Coliseum**. The game keeps saying
+"Boss raid" until Eric says to switch.
 
 Eric's direction, from a day of mockups: Boss raid becomes a **town square**, a small round world where players hang out,
 walk around, and meet the bosses at their homes. The prototype he tested on his phone ("feels great") is
@@ -399,13 +408,23 @@ the building art and the names, which are wrong) and `chatgpt-town-square-overvi
 - Small pawns, big bosses. You are your own small dressed pawn in the middle of the view; no big picture of you in a corner
   (Eric, Oct 25: "it's fine if he's just the center on the map").
 - **A shop** stands in the square. Which shop it is (Shop & crates, or a raid shop) is still open.
+- **Every boss's home is also its shop** (Eric, Oct 26): special equippables, animations and the like, sold by that boss.
+  For now, tapping a home shows "Shop" greyed with "Coming soon".
 
 **Moving and tapping**
 - **Tap a square to walk there:** a quick hobble, about 90 ms a square, the camera following. Drag to look around; "Back to
-  me" returns. A **zoom toggle** (Eric: "love the zoom in and out") shows more of the world.
+  me" returns. A **zoom toggle** (Eric: "love the zoom in and out") shows more of the world; the square opens zoomed out
+  (Eric, Oct 26).
+- **The press** (Eric, Oct 26): a finger down on a square presses it in and lights a bold glowing border on it; lifting the
+  finger releases it with a pulse and you set off ("pressing down feels like pressing down, lifting up releases"). No sound
+  and no vibration for moving ("other games have no sound when moving around").
+- **Your trail:** as you run you leave a few small white droplets behind that fade out, seen only by you.
+- **One pawn per square, like chess:** nobody stops on a taken square; you may pass through people on the way. Walking up
+  to a person or a boss puts you on a free square beside them, so a crowd forms a ring around them, as in an MMO.
 - Small chips at the edge of the view point to bosses off screen; a tap glides the camera there.
-- **Tap a boss: "Challenge alone."** While you fight, you stand next to the boss in the square, labeled "[name] is battling
-  [boss]". This is one of the ways to play a boss solo.
+- **Tap a boss: "Challenge alone."** Solo stays on the boss select screen, apart from the town square (Eric, Oct 26), so it
+  first asks "Leave the town square?" and then takes you out of the square to Boss alone, that boss picked. (This replaces
+  the Oct 25 idea of fighting in the square under a "[name] is battling [boss]" label.)
 - **Tap a player: "Invite to party"**, and "Trade", shown greyed with "Coming soon" until trading exists.
 
 **Screens**
@@ -424,9 +443,40 @@ the building art and the names, which are wrong) and `chatgpt-town-square-overvi
 - Being in the square doesn't queue you. A raid with people faces **3 bosses picked at random**, each harder than the last
   (maybe 4 later); beat one to face the next. The first should feel winnable. ("The gauntlet" was a working name only; the
   mode has no special name.)
-- Still to settle: how READY queues you, whether the square replaces today's pick-a-boss screen (Eric has ideas), how many
-  players share one square and whether bots wander in it, the shop, how the three bosses are ordered, what losing mid-way
-  means, scoring across bosses, whether the God King's charges carry over, time per boss, and the rewards.
+- **The Coliseum** (Eric, Oct 25; named Oct 26): a building in the middle of the town square, where raids with people
+  start. Walk up to it (within a square) or tap it to open its menu. What the menu holds is still to brainstorm; Eric
+  thinks of something like the God King's strike menu.
+- **Idea: gather your three bosses** (Eric, Oct 26; not in the menus yet). Each boss gets "Challenge at the Coliseum".
+  Tapping it, the boss names a partner it won't come without (Boingo: "I'm not bouncing anywhere without Babur"); you go
+  and ask that boss, who asks for a random third; once you have all three, you challenge them at the Coliseum. A way to
+  choose the raid's three instead of the random pick below; which one wins is open.
+- **Then today's Boss raid screen becomes the Coliseum's pre-fight screen.** (Boss alone keeps its own select screen as it
+  is, Eric, Oct 26.) Your team stands on the left, as in
+  `eric-paint-crowd.png`. The boss tiles shuffle, a highlight running across them, and three bosses are picked at random and
+  dropped onto the stage. A countdown starts the raid, and the screen may need a button or two.
+- **The bosses talk to each other.** The raid's three bosses are on a team, so they get lines for each other, and the
+  town square's bosses chat too: everyday lines, short conversations between pairs, nods to what they share or oppose
+  (fire and ice, dark and light), and silly questions. A line bank of 100+ lines per boss is being drafted with the Claude
+  API from a character sheet per boss and a relationship per pair. Eric reviews every line; only kept lines go in the
+  game, so nothing calls the API live.
+- Still to settle: the Coliseum's menu and look, whether bots wander in a square, the shop,
+  how the three bosses are ordered, what losing mid-way means, scoring across bosses, whether the God King's charges carry
+  over, time per boss, and the rewards.
+
+**Rooms** (Eric, Oct 26: "we can't have 10,000 people in this little world")
+- Each town square is a **room**, its own copy of the world. Opening Boss Arena puts you in the busiest room that still has
+  space, so rooms feel lively.
+- **Random joins stop at about 75** (a 50 v 50 can't start in a square anyway). Friends you invite can still come in, up to
+  a hard cap of about 100. A new room opens when the others are full; an empty room closes.
+- Maybe later: a challenge area in the square where you queue other modes.
+- How it runs: one Durable Object per room, like the lobbies, Squads and 1 v 1 games, using Cloudflare's sleep mode
+  (WebSocket hibernation) as they do. Walking goes square to square, so a phone sends one small message per tap (where to
+  walk), not a stream of positions; the bosses and bots move by the same script on every phone, so the server only passes
+  taps along and mostly sleeps. Each phone draws only the people near it.
+- Cost, from Cloudflare's published prices (Oct 26): a full room of 75 people tapping every few seconds all day comes to
+  about $0.50 a month; 100 full rooms nonstop, about $50. Rooms that never sleep would cost far more (Cloudflare's own
+  example: about $143 a month for 100 rooms), so the design keeps them asleep. A fresh estimate goes to Eric before rooms
+  are built.
 
 **Art**
 - One building per boss, in the game's pixel style, drawn in code like the bosses. **Opus draws all art:** Haiku was tested

@@ -6,6 +6,9 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "chessroyale",
+  // The account (not a secret: it is in every dashboard address). Wrangler needs it to name the engine server's pinned
+  // image below; without it, `wrangler dev` (the e2e suite) would ask Cloudflare who you are, which needs a login.
+  "account_id": "86dbf3bbeb8ae6e99afcc62ea1c80492",
   "main": "packages/server/src/index.ts",
   "compatibility_date": "2025-09-01",
   "assets": {
@@ -28,8 +31,10 @@
       { "name": "DUELS", "class_name": "DuelGame" }
     ]
   },
-  // The engine server: one vCPU (Stockfish is single-threaded here), asleep after 3 idle minutes.
-  "containers": [{ "class_name": "EngineServer", "image": "./engine/Dockerfile", "instance_type": "standard-2", "max_instances": 2 }],
+  // The engine server: one vCPU (Stockfish is single-threaded here), asleep after 3 idle minutes. Its image is the one
+  // built from engine/Dockerfile and pushed by the Oct 26, 17:20 UTC deploy, pinned by digest, so a deploy needs no
+  // Docker (Workers Builds stopped being able to start it that evening). To change the engine server: DEPLOY.md.
+  "containers": [{ "class_name": "EngineServer", "image": "registry.cloudflare.com/86dbf3bbeb8ae6e99afcc62ea1c80492/chessroyale-engineserver@sha256:7ebd716c0837096245ddb783fc8713c5aace7e7ae9b41715aef83dd5b464e3d0", "instance_type": "standard-2", "max_instances": 2 }],
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["Lobby"] },
     { "tag": "v2", "new_sqlite_classes": ["Matchmaker"] },

@@ -1,7 +1,7 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "preact/hooks";
 import { type MatchmakingType, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
-import { bossInUrl, bossTierFromUrl, chosenBoss, chosenHomeMode, chosenMode, lobbyModeOf, raidInUrl } from "./screens/Home.tsx";
+import { bossInUrl, bossTierFromUrl, chosenBoss, chosenHomeMode, chosenMode, lobbyModeOf, raidInUrl, rememberBossPick } from "./screens/Home.tsx";
 import { lastBoss } from "./boss-history.ts";
 import { unlockAudio } from "./components/Countdown.tsx";
 import { RaceTower } from "./components/RaceTower.tsx";
@@ -35,6 +35,7 @@ import { setInviteHost } from "./friends.ts";
 import { FriendsScreen } from "./screens/Friends.tsx";
 import { SettingsScreen } from "./screens/Settings.tsx";
 import { AutoChessScreen } from "./screens/AutoChess.tsx";
+import { TownPage } from "./town/TownPage.tsx";
 import { FaqScreen } from "./screens/Faq.tsx";
 import { Logo } from "./components/FrontDoor.tsx";
 import { FrontFrame, type FrontNav } from "./components/FrontMenu.tsx";
@@ -272,14 +273,18 @@ export function App() {
    * straight to the solo boss picker, unlisted, not admin-gated; Oct 16). Used once: a match started clears it.
    */
   const [homeIntent, setHomeIntent] = useState<{ kind: "boss" | "friends"; n: number } | null>(() => (location.pathname === "/bosses" ? { kind: "boss", n: 0 } : null));
-  /** The Boss raid screen (its card on home, the side menu's Boss raid, ?mode=raid). */
+  /** The Boss raid screen (the Solo Boss Mode card on home, the side menu's Solo Boss Mode, ?mode=raid). */
   const [raidOpen, setRaidOpen] = useState(raidInUrl);
+  /** That screen is the full one (?mode=raid, the test link: every raid choice), not the Solo Boss Mode form (Eric, Oct 26). */
+  const [raidFull, setRaidFull] = useState(raidInUrl);
   const [legal, setLegal] = useState<LegalPage | null>(() => legalPageOf(location.pathname));
   /**
    * Auto chess, the demo (/autochess; client-only, no account needed). Home's card opens it (Eric, Oct 24; shelved on Oct
    * 19 until then), and Settings' Testing row does too.
    */
   const [showAutoChess, setShowAutoChess] = useState(() => location.pathname === "/autochess");
+  /** The town square (/town; hidden, nothing links to it yet: slice 1 of Boss raid's town square, docs/areas/town-square.md). */
+  const [showTown, setShowTown] = useState(() => location.pathname === "/town");
   // Chose "play vs bots as a guest" on the landing page (this device remembers).
   const [guest, setGuest] = useState(storedGuest);
   const [inviteSkipped, setInviteSkipped] = useState(false);
@@ -439,10 +444,10 @@ export function App() {
   }, [config, profile]);
 
   // Warm the engine up in the background so play starts instantly (not on Auto chess, whose fights use the HunChess engine:
-  // Stockfish isn't loaded there; it warms when you leave it).
+  // Stockfish isn't loaded there; it warms when you leave it). Not in the town square either: nothing there plays chess yet.
   useEffect(() => {
-    if (!showAutoChess) void enginePool();
-  }, [showAutoChess]);
+    if (!showAutoChess && !showTown) void enginePool();
+  }, [showAutoChess, showTown]);
 
   // Back on a lobby link this device already has a seat in (a reload, the app reopened, a dropped connection):
   // rejoin straight away (if the lobby has closed since, the connection is refused and the note shows). Otherwise
@@ -1006,9 +1011,18 @@ export function App() {
       setHomeIntent(null);
       setRaidOpen(false);
     },
-    bossRaid: () => {
+    bossArena: () => {
       goHome();
       setHomeIntent(null);
+      setRaidOpen(false);
+      // (The town square, as /town opens it: the page replaces the front door, as Auto chess's does.)
+      setShowTown(true);
+      history.replaceState(null, "", "/town");
+    },
+    soloBoss: () => {
+      goHome();
+      setHomeIntent(null);
+      setRaidFull(false);
       setRaidOpen(true);
     },
     friends: () => {
@@ -1092,7 +1106,7 @@ export function App() {
     },
     profile: () => openProfile({ you: true, name: account().profile?.user.name ?? "" }),
     ...Object.fromEntries(
-      (["bossRaid", "friends", "shop", "settings", "friendsList"] as const).map((k) => [
+      (["bossArena", "soloBoss", "friends", "shop", "settings", "friendsList"] as const).map((k) => [
         k,
         () => {
           if (match) leave();
@@ -1179,6 +1193,27 @@ export function App() {
         onBack={() => {
           setShowAutoChess(false);
           history.replaceState(null, "", "/");
+        }}
+      />
+    );
+  }
+  if (!match && showTown) {
+    return (
+      <TownPage
+        onBack={() => {
+          setShowTown(false);
+          history.replaceState(null, "", "/");
+        }}
+        // A boss's "Challenge alone", confirmed: out of the town square to the Solo Boss Mode screen (the solo form, as the
+        // side menu opens it; Eric, Oct 26), that boss's tile picked (the screen reads its pick from rememberBossPick as it
+        // opens).
+        onBossAlone={(id) => {
+          rememberBossPick(id);
+          setShowTown(false);
+          history.replaceState(null, "", "/");
+          setHomeIntent(null);
+          setRaidFull(false);
+          setRaidOpen(true);
         }}
       />
     );
@@ -1318,8 +1353,11 @@ export function App() {
         side={side}
         intent={homeIntent}
         raid={raidOpen}
+        full={raidFull}
+        onBossArena={nav.bossArena}
         onRaid={(open) => {
           setRaidOpen(open);
+          setRaidFull(false);
           // (?mode=raid opened it: closed, the address is home's.)
           if (!open && raidInUrl()) {
             const q = new URLSearchParams(location.search);

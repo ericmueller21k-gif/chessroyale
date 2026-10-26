@@ -473,11 +473,11 @@ test("the layout: the stage under the tiles, the ways to play under the stage an
   }
 });
 
-test("home's Boss raid card: a still portrait that moves on to the next boss you can meet, never the Hidden Boss, the card never changing size", async ({ page }) => {
+test("home's Boss Arena card: a still portrait that moves on to the next boss you can meet, never the Hidden Boss, the card never changing size", async ({ page }) => {
   // (?cardMs=: the turn quicker than its 30 s, a test switch: a second, so a busy machine's looks, about every 0.2 s,
   // never miss one.)
   await page.goto("/?debug&cardMs=1000");
-  const card = page.getByRole("main").getByRole("button", { name: /^Boss raid/ });
+  const card = page.getByRole("main").getByRole("button", { name: /^Boss Arena/ });
   const face = card.locator(".rd-face-stack");
   await expect(face).toBeVisible();
   // (Measured once the page's fonts are in: the card's words in Archivo Black are a little taller than the fallback's.)

@@ -8793,14 +8793,14 @@ button.fd-logo {
   align-items: center;
   justify-content: center;
   width: 100%;
-  /* (Oct 24: a third shorter than 64 px; its width and text are as they were.) */
-  height: 43px;
+  /* (Oct 26, Eric: "the play button is too small": as tall as the Other modes cards, 64 px, its label bigger to match.) */
+  height: 64px;
   border: 0;
   border-radius: 18px;
   background: var(--fd-gold);
   color: var(--fd-gold-ink);
   font-family: "Archivo Black", Archivo, sans-serif;
-  font-size: 24px;
+  font-size: 30px;
   letter-spacing: 1px;
   cursor: pointer;
   transition: transform 80ms;
@@ -8844,7 +8844,7 @@ button.fd-logo {
     height: 1.3em;
     margin-bottom: 2.1px;
   }
-  .fd-play-col:has(> .fd-go > .fd-hint-line) > .fd-auto-card {
+  .fd-play-col:has(> .fd-go > .fd-hint-line) > .rd-pair {
     margin-bottom: 14.8px;
   }
 }
@@ -8854,18 +8854,23 @@ button.fd-logo {
  * above it. On a very small screen the card stops shrinking and the page scrolls.
  */
 @media (max-width: 1023px) {
+  /* (Oct 26: 8 px gaps and tighter top and bottom padding, so a taller PLAY still fits: 24 px saved at every size.) */
   .fd-home:not(.queueing) {
-    gap: 10px;
-    padding-top: calc(env(safe-area-inset-top) + 12px);
-    padding-bottom: calc(env(safe-area-inset-bottom) + 14px);
+    gap: 8px;
+    padding-top: calc(env(safe-area-inset-top) + 10px);
+    padding-bottom: calc(env(safe-area-inset-bottom) + 10px);
   }
   .fd-home-main,
   .fd-play-col,
   .fd-go {
-    gap: 10px;
+    gap: 8px;
   }
   .fd-hint {
     margin-top: -4px;
+  }
+  /* (The column's gap is 8 px here, so the label gets 2 px back: it stays 14 px under the line, as Eric approved.) */
+  .fd-other-label {
+    margin-top: 2px;
   }
   .fd-hero {
     flex: 1 1 0;
@@ -8919,10 +8924,11 @@ button.fd-logo {
     }
   }
 }
-/* Under PLAY (Oct 24): "Other modes", the RANKED label's style at 11 px, over the Boss raid and Auto chess cards. */
+/* Under PLAY (Oct 24): "Other modes", the RANKED label's style at 11 px, over the Boss raid and Auto chess cards. Centered over
+   the cards (Oct 26, Eric). */
 .fd-other-label {
   font-size: 11px;
-  padding-left: 4px;
+  text-align: center;
 }
 /* The RANKED row (Eric, Oct 16): its small label right above the three ranked modes. */
 .fd-ranked {
@@ -8973,6 +8979,10 @@ button.fd-logo {
 }
 .rd-face .boss-portrait {
   width: 56px;
+}
+/* Solo Boss Mode's card picture: the crown, in the card's gold (CrownArt, Home.tsx). */
+.fd-crown {
+  color: var(--fd-gold-text);
 }
 /* The card's portrait: a still that moves on to the next boss (BossCardFace), the new one fading in over the last. */
 .rd-face-stack,
@@ -9313,6 +9323,68 @@ button.fd-logo {
   }
   .fd-root.framed .fd-play-col .rd-card-text strong {
     font-size: 18px;
+  }
+}
+
+/*
+ * Solo Boss Mode and Auto chess: two half cards side by side under Boss Arena (Eric, Oct 26; a phone and a computer alike).
+ * Each keeps the rd-card look (picture, name, one short line, the ›), stacked so a name fits half a 320 px phone: the
+ * picture on top, the › in its corner. On a phone the pair is 84 px tall, as the two cards it replaces, so home fits as
+ * before. The selectors carry .fd-root and .rd-card so they win over the computer's card rules above.
+ */
+.fd-root .rd-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.fd-root .rd-pair .rd-card.rd-half {
+  position: relative;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 4px;
+  min-width: 0;
+  min-height: 84px;
+  padding: 6px 8px;
+}
+.fd-root .rd-pair .rd-card.rd-half .rd-face {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+}
+.fd-root .rd-pair .rd-card.rd-half .rd-face svg {
+  width: 26px;
+  height: 26px;
+}
+.fd-root .rd-pair .rd-card.rd-half .rd-card-text {
+  width: 100%;
+}
+.fd-root .rd-pair .rd-card.rd-half .rd-card-text strong {
+  font-size: 13px;
+}
+.fd-root .rd-pair .rd-card.rd-half .rd-card-text span {
+  font-size: 12px;
+}
+.fd-root .rd-pair .rd-card.rd-half .rd-card-go {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 22px;
+}
+/*
+ * On a computer the half cards lie flat, picture beside the words, as tall as the Boss Arena card (64 px), so home is no
+ * taller than with the two cards they replace and the live window above keeps its size.
+ */
+@media (min-width: 1024px) {
+  .fd-root .rd-pair .rd-card.rd-half {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    min-height: 64px;
+  }
+  .fd-root .rd-pair .rd-card.rd-half .rd-card-text {
+    width: auto;
+    min-width: 0;
   }
 }
 
@@ -10843,17 +10915,18 @@ button.fd-seat {
     gap: 12px;
   }
   .fd-root.framed .fd-play {
-    height: 59px;
-    font-size: 32px;
+    height: 64px;
+    font-size: 36px;
   }
-  /* (A short window, a laptop's: the column closer, so the live window keeps a board worth seeing.) */
+  /* (A short window, a laptop's: the column closer, so the live window keeps a board worth seeing. PLAY 48 px here, up from
+     43 (Oct 26), the most the live window's board can give up at 680 px tall.) */
   @media (max-height: 760px) {
     .fd-root.framed .fd-play-col {
       gap: 8px;
     }
     .fd-root.framed .fd-play {
-      height: 43px;
-      font-size: 26px;
+      height: 48px;
+      font-size: 28px;
     }
   }
   /* The queue: your card and the chat on the left, the lobby (the green area) on the right. */

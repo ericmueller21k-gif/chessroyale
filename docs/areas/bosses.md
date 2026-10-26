@@ -12,10 +12,10 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 - **Where bosses are met:** the boss raid (up to 50 people, online; or a Solo raid with 49 bots), the Crowd 50 v 50's
   boss final (the top 4, always against the Hidden Boss since Oct 14), and solo's "Boss alone" (one of the Boss raid
   screen's choices, or `/bosses`; [hub.md](hub.md); you pick every move
-  against a boss you choose on the Boss raid screen's tiles, at a difficulty from Easy to Hardest, `BOSS_DIFFICULTY`). The Hidden Boss
+  against a boss you choose on the Solo Boss Mode screen's tiles (the Boss raid screen's since Oct 26, Eric), at a difficulty from Easy to Hardest, `BOSS_DIFFICULTY`). The Hidden Boss
   (below) is met by everyone in the Crowd's boss final, solo and online, and otherwise only by an admin, in Boss alone
-  from the `/bosses` picker (his tile on the Boss raid screen is dark and locked for everyone).
-- **The Boss raid screen's character select** (Eric, Oct 16; docs/decisions/2026-10-16-boss-character-select.md;
+  from the `/bosses` picker (his tile on the select screen is dark and locked for everyone).
+- **The Boss raid screen's character select** (Eric, Oct 16; now the Solo Boss Mode screen's, Oct 26; docs/decisions/2026-10-16-boss-character-select.md;
   `components/BossSelect.tsx`, `characters/boss-select.ts`): a tile per boss you can meet, the picked one on a stage in
   its idle (one sprite animating, on the shared loop; reduced motion: a still, no drop). **The grid** (Eric, Oct 21 to 23; from a Street Fighter 6 select;
   docs/decisions/2026-10-23-boss-select-sf.md): fourteen tiles since Puddles, all the very same tall slanted tile (visible
@@ -28,7 +28,7 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   softened into a gradient: darker in the dark theme, lighter in the light); no names. The Hidden Boss is his figure as a violet-edged
   silhouette on a dark tile, "?" a plain tile. The picked one's frame is gold. Windows up to 800 px tall have the stage 210 px
   wide (not 280), up to 700 px 170 px, so the ways to play stay on screen where they can (a 320 x 568 phone scrolls to them). A tap drops it on (the 1 v 1
-  stage's drop), plays its sound once (`SELECT_SOUND`: Ginger `gingerCrackle`, her freeze; Boingo `clownSplat`, his
+  stage's drop), plays its sound once (`SELECT_SOUND`: Ginger `gingerCrackle`, his freeze; Boingo `clownSplat`, his
   pie; Jefferson `grexFizz`, his sparkler; Hollow `hollowCast`, his darkness; Big Boy `bigboyClack`, a toy block
   landing; Sawyer `sawyerRev`, his saw; Wrangler `pigWhirl`, his lasso; Alfil `alfilTrumpet`, his trumpet; Chub & Chirp
   `hopperChirp`, Chirp's chirp; Smudgy `smudgySplash`, paint landing; Moo & Moon `mooHappy`, a happy moo; Puddles `gardenerHello`, a hello in his quick made-up talk and a splash; Babur `tigerHello`, a bored yawn and a balloon squeak; the Hidden Boss `recluseHum`, his stare) and
@@ -66,7 +66,7 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   [engine.md](engine.md)). **Boss alone** picks the boss's moves at its difficulty's Maia rating, whatever your
   rating: Easy 1000, Normal 1400, Hard 1800, Hardest 2200 (`BOSS_DIFFICULTY`'s `maia`, settings.bossAloneMaia,
   `bossBrainFor`'s `alone`; Eric, Oct 18: Hardest was way too easy; docs/decisions/2026-10-18-boss-alone-difficulty.md).
-  Before a battle a boss has one number on screen: Boss alone's level at your difficulty, on the Boss raid screen's
+  Before a battle a boss has one number on screen: Boss alone's level at your difficulty, on the Solo Boss Mode screen's
   stage and in Boss alone's menu alike (`bossAloneElo` in `boss-difficulty.ts`; the raids show none:
   docs/decisions/2026-10-17-boss-sheet-fit.md).
 - **The brain (Oct 12: every boss on Maia; DECISIONS.md, "Every boss on Maia"):** every boss plays its normal moves
@@ -518,7 +518,7 @@ build): online, phase 1 won is the crowd's victory):
 - **The bars at the back, the ice on its square, the queen banners silent** (Eric, Oct 11): the move clock's bars above
   and below the board draw behind everything (squares' overlays, the boss, his effects and words, the God King), as the
   eval bar does. Ginger's ice is one block the square's shape on every square, whatever the piece, placed on
-  the board's own square (eighths of `--board-size`); her thin ice (due to thaw) is the same block, clearer and cracked
+  the board's own square (eighths of `--board-size`); his thin ice (due to thaw) is the same block, clearer and cracked
   (Oct 12). QUEEN DOWN! and QUEEN SLAIN! play no sound for now (the gasp is
   kept, unused: `queenGasp`).
 - **A boss's attack on a king** (Eric, Oct 10; Hollow's first, Alfil's Oct 17, Boingo's, Sawyer's and Wrangler's Oct 18;
@@ -568,7 +568,7 @@ build): online, phase 1 won is the crowd's victory):
     `BIGBOY_ATTACK`, `GINGER_ATTACK`, `GREX_ATTACK`. Big Boy drops in, stamps into a tantrum (his face red) and bonks
     the king with his giant lollipop ten times, overhead then sideways in turn, glaring at it (`bonkHit`, a
     candy-colored bonk; `bigboyBonk` and `bigboySwish` in turn), 1 square off, facing our left (his lollipop hand).
-    Ginger drops into a whirl of snow and jabs the king with her frosted, glowing cane ten times, high and low, glaring
+    Ginger drops into a whirl of snow and jabs the king with his frosted, glowing cane ten times, high and low, glaring
     at it (`frostHit`, a frost burst: ice shards and a white puff, never over or on the king's sprite;
     `gingerCrackle` and `gingerCrunch`), 1 square off. Jefferson drops in with his Roman candle, plants
     it, lights the fuse at 470 ms and fires one fireball a beat, each arcing over and popping on the king (`popHit`, a

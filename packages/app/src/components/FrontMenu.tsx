@@ -9,8 +9,10 @@ import { FriendsPanel, InviteToast } from "./Friends.tsx";
 /** Where the computer's side menu can take you. */
 export interface FrontNav {
   home: () => void;
-  /** The Boss raid screen (Boss alone is one of its choices; Eric, Oct 16). */
-  bossRaid: () => void;
+  /** Boss Arena: the town square (/town; Eric, Oct 26). */
+  bossArena: () => void;
+  /** Solo Boss Mode: the solo boss screen (the tiles, the stage, Boss alone; Eric, Oct 26). */
+  soloBoss: () => void;
   friends: () => void;
   shop: () => void;
   profile: () => void;
@@ -27,6 +29,13 @@ const Icon = ({ d, children }: { d?: string; children?: ComponentChildren }) => 
   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     {d ? <path d={d} /> : children}
   </svg>
+);
+
+/** The crown: the Boss Arena and Solo Boss Mode items' icon (Home.tsx's CrownArt draws the same path). */
+const crown = () => (
+  <Icon>
+    <path d="M5 20h14M6 20l-1.5-11 4.5 3.5L12 5l3 7.5L19.5 9 18 20" />
+  </Icon>
 );
 
 function Item({ label, icon, on, onClick }: { label: string; icon: ComponentChildren; on?: boolean; onClick: () => void }) {
@@ -46,16 +55,8 @@ export function SideMenu({ page, nav }: { page?: FrontPage; nav: FrontNav }) {
       <Logo onClick={nav.home} />
       <div class="fd-menu">
         <Item label="Play" on={page === "home" || page === "queue"} onClick={nav.home} icon={<Icon d="M7 4.5v15l12-7.5z" />} />
-        <Item
-          label="Boss raid"
-          on={page === "raid"}
-          onClick={nav.bossRaid}
-          icon={
-            <Icon>
-              <path d="M5 20h14M6 20l-1.5-11 4.5 3.5L12 5l3 7.5L19.5 9 18 20" />
-            </Icon>
-          }
-        />
+        <Item label="Boss Arena" onClick={nav.bossArena} icon={crown()} />
+        <Item label="Solo Boss Mode" on={page === "raid"} onClick={nav.soloBoss} icon={crown()} />
         <Item
           label="Play with friends"
           on={page === "lobby"}

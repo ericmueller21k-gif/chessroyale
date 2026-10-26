@@ -117,7 +117,7 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     `testSwitches` where the server has them on, `/api/me` says `admin`): all of the above, and `debug` (the match on
     `window`), `nolanding`, `boss=<id>` (skips the boss menu), `win`, `mate`, `phase`, `laststand`, `side`, `wip` and
     `kit`, a crate page's `fischer` and `shiny` and its "Testing:" boxes, and 1 v 1's `fewAfter=SECONDS` (the "Few players
-    online" choice sooner) and `clock` (the bot game's clock too), and `cardMs=MS` (home's Boss raid card turns to the
+    online" choice sooner) and `clock` (the bot game's clock too), and `cardMs=MS` (home's Boss Arena card turns to the
   next boss this often instead of every 30 s), and `barslot=1` (the boss bar's free room for a boss's own prop drawn with a
   dashed outline, so a screenshot shows it; nothing else changes), and `bannerplus=SECONDS` (0 to 3: the extra time on
   every banner over the board, and everything after a banner that much later, for the games on the device; online the

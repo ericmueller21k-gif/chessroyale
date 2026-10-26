@@ -235,12 +235,12 @@ function modes(src: FaqSources): FaqSection {
 ### Boss raid and Boss alone {#mode-boss}
 
 - **Boss raid:** up to ${R.lobbySize} players pick the crowd's moves together against a [boss](#boss-brain); the most popular pick is played. Every boss starts from the starting position.
-- **Where:** tap **Boss raid** on the home screen. The bosses are at the top: tap one to see it on the stage below (its name, and its difficulty when it isn't Normal), or **?** for a random one. Under them, every way to play: **Join a raid** (bots fill any empty seats after a short wait) and **People only** (no bots) always meet a random boss; **Raid with bots** (you and ${R.lobbySize - 1} bots, at once), **Boss alone** and **Play with friends** (make a raid and share its code) meet the one you picked.
+- **Where:** **Solo Boss Mode** on the home screen. The bosses are at the top: tap one to see it on the stage below (its name, and its difficulty when it isn't Normal), or **?** for a random one. Under them, **Boss alone** meets the one you picked. Raids with people (**Join a raid**, **People only**, **Raid with bots** and **Play with friends**) are moving to the Boss Arena's Coliseum and aren't on the home screen for now.
 - **Scoring:** the [50 v 50 way](#raid-scoring), its limit widening with the crowd's moves (Boss alone scores as before).
 - **The boss strikes:** every ${n(S.bossKillEvery, "crowd move")} it knocks out the player who gave away the most points since its last strike (as the judge counts them, before the [scoring's limit](#raid-scoring), after the [opening allowance](#opening-allowance); a missed move counts as ${n(S.finalMissLoss, "point")}, and a tie goes against the weaker player over the match), until half the raid is left${finalBoss ? "" : ` (in the Crowd's boss final, until ${S.bossMinSurvivors} are left)`}. If two are still tied for the worst, nobody is struck: it strikes after the next crowd move instead.
 - **The God King** fights on your side, with ${n(S.kingChargesMax, "charge")} ([more on him](#god-king)).
 - The battle ends in checkmate or a draw, or after ${n(S.bossMaxMoves, "crowd move")}, when the engine judges the position.
-- **Boss alone** (on the Boss raid screen): just you against the boss you picked there, at a difficulty from ${src.difficulty[0]?.label} to ${src.difficulty.at(-1)?.label}. You pick every move, and there's no clock: take as long as you like.
+- **Boss alone** (on the Solo Boss Mode screen): just you against the boss you picked there, at a difficulty from ${src.difficulty[0]?.label} to ${src.difficulty.at(-1)?.label}. You pick every move, and there's no clock: take as long as you like.
 - **The Crowd's boss final** is ${finalBoss ? `always ${finalFoe}, for` : "the same fight for"} the last ${left(src.crowdKnockouts.boss)} of a 50 v 50.${finalBoss ? " He's met nowhere else." : ""}
 
 ### Squads {#mode-squads}
@@ -598,7 +598,7 @@ ${offsets}
 
 **Worked example.** You're rated ${you}. The weakest tier above ${you} is ${tier}. ${ginger.name} at ${src.difficulty.find((d) => d.elo === 0)?.label ?? "Normal"}: ${tier} ${term(ginger.offset)} = **${gingerElo}**. ${bigBoy.name} at ${hard.label}: ${tier} ${term(bigBoy.offset)} ${term(hard.elo)} = **${bigBoyElo}**.
 
-The Boss raid screen shows the boss you picked by its name, with your difficulty's name under it (unless it's ${src.difficulty.find((d) => d.elo === 0)?.label ?? "Normal"}). Boss alone's menu shows the boss you picked at Boss alone's level, your difficulty's Maia rating, and how far it is from yours ("+200 vs you"); 1 to 5 skulls show how dangerous it is. A Solo raid (Raid with bots) has no difficulty on top.
+The Solo Boss Mode screen shows the boss you picked by its name, with your difficulty's name under it (unless it's ${src.difficulty.find((d) => d.elo === 0)?.label ?? "Normal"}). Boss alone's menu shows the boss you picked at Boss alone's level, your difficulty's Maia rating, and how far it is from yours ("+200 vs you"); 1 to 5 skulls show how dangerous it is. A Solo raid (Raid with bots) has no difficulty on top.
 
 ### Brain 1: Stockfish at a set strength {#stockfish-brain}
 
@@ -932,7 +932,7 @@ ${rows}
 
 **Worked example.** On the first move, from a level position, the crowd hangs its queen: that gives away 50 to 70 points, well over ${start}, so he saves it. Later, with the crowd down to ${pct(weak, 0)}, a move that throws away ${num(lastStandBar(weak, 0, 1, S), 1)} points (half of what was left) calls him too. A sacrifice the engine likes gives nothing away, so it never calls him: he judges the chances, not the material.
 
-**What you see:** a warning, everything freezes, he dives onto the piece's square with his cut-in, the piece slides back, he takes the blow (the boss drops in and attacks him: Hollow lashes him with his string of lights, Alfil jabs him with his ankus, Sawyer saws at him, Wrangler cracks his lasso at him, Boingo pies him, Big Boy bonks him with his lollipop, Ginger jabs him with her candy cane and Jefferson fires his Roman candle at him), staggers, falls and fades. Then the crowd picks again. He's gone for the rest of the battle, and the charges he fell with go to the crowd: everyone still in gets ${n(S.lastStandPowerUps, "power-up")} for each (a power-up shows the engine's top 3 moves). He never steps in when only one move was possible.
+**What you see:** a warning, everything freezes, he dives onto the piece's square with his cut-in, the piece slides back, he takes the blow (the boss drops in and attacks him: Hollow lashes him with his string of lights, Alfil jabs him with his ankus, Sawyer saws at him, Wrangler cracks his lasso at him, Boingo pies him, Big Boy bonks him with his lollipop, Ginger jabs him with his candy cane and Jefferson fires his Roman candle at him), staggers, falls and fades. Then the crowd picks again. He's gone for the rest of the battle, and the charges he fell with go to the crowd: everyone still in gets ${n(S.lastStandPowerUps, "power-up")} for each (a power-up shows the engine's top 3 moves). He never steps in when only one move was possible.
 
 He also sits out while a boss's power has changed the board (hoops, blocks, plants, frozen or hidden squares…): your move stands, nothing is spent, and once the board is back to normal he's ready again.
 `,

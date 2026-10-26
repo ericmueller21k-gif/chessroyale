@@ -76,7 +76,9 @@ jobs:
     needs: plan
     name: shard ${{ matrix.shard }} of ${{ needs.plan.outputs.total }}
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # A full run's shard tests for about 30 minutes; the system libraries' install (apt, below) has taken up to 16 on a
+    # slow runner (Oct 26), so 45 cut two shards off mid-run with every test still green.
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -104,6 +106,7 @@ jobs:
           key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}-chromium-shell
       # (The download is skipped when the cache has it; the system libraries are installed either way.)
       - name: Install Chromium
+        timeout-minutes: 20
         run: npx playwright install --with-deps --only-shell chromium
       - name: Build the app
         run: npm run build
@@ -182,6 +185,7 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}-chromium-shell
       - name: Install Chromium
+        timeout-minutes: 20
         run: npx playwright install --with-deps --only-shell chromium
       - name: Build the app
         run: npm run build

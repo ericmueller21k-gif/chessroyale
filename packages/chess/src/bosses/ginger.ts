@@ -1,18 +1,18 @@
 /**
- * Ginger, the Freeze boss (BOSS_ROSTER "gingerbread"): her rules. Her passive, the freeze, ices one of the crowd's
- * pieces that matters for a couple of turns, every few turns. Her ultimate, the blizzard, lasts three turns and thaws
+ * Ginger, the Freeze boss (BOSS_ROSTER "gingerbread"): his rules. His passive, the freeze, ices one of the crowd's
+ * pieces that matters for a couple of turns, every few turns. His ultimate, the blizzard, lasts three turns and thaws
  * (Eric, Oct 12: "1 unmelted piece turn 1, turn 2 about 4–5 pieces, then all"): it ices every crowd piece but one, a
  * random one with a move (Eric, Oct 11; it was the queen); the next turn four or five are free in all (that one and
  * more thawed, at random, those with a move first); the turn after, the ice is gone. The pieces that thaw next turn
  * are named the turn before (they show cracked, dripping ice). Numbers: BOSS_POWERS.freeze*, blizzardTurns,
- * blizzardFree. Her art and moments are the app's (characters/gingerbread.ts, the ice and the blizzard in
+ * blizzardFree. His art and moments are the app's (characters/gingerbread.ts, the ice and the blizzard in
  * characters/effects/).
  */
 import { BOSS_POWERS, type BossPowerSettings, type BossState } from "@chessroyale/core";
 import { legalMoves, pieceAt, sideToMove } from "../rules.ts";
 import { VALUE, bossPowers, from, powerRoll, to, turnOf, warnThenUnleash, type BossRules, type Side } from "./base.ts";
 
-/** How long each of her moments holds the screen (ms; POWER_FX in boss-timing.ts). */
+/** How long each of his moments holds the screen (ms; POWER_FX in boss-timing.ts). */
 export const GINGER_FX = { freeze: 2300, blizzard: 3600, thaw: 2200 } as const;
 
 /**
@@ -164,7 +164,7 @@ export function blizzardNow(boss: BossState | null | undefined): boolean {
   return b.iced ? b.iced.length > 0 : true;
 }
 
-/** Ginger: a frozen piece every few turns (the freeze); her blizzard ices all but one piece, then thaws over two turns. */
+/** Ginger: a frozen piece every few turns (the freeze); his blizzard ices all but one piece, then thaws over two turns. */
 export const GINGER: BossRules = {
   id: "gingerbread",
   wearOff(next, t) {

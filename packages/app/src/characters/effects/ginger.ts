@@ -386,7 +386,7 @@ export const BLIZZARD_SWEEP: Character = {
   },
 };
 
-// ---- Her attack on a king: a jab of the frosted cane.
+// ---- His attack on a king: a jab of the frosted cane.
 
 const FROST_PALETTE = { k: "#1d4e7a", F: "#ffffff", w: "#e8f8ff", W: "#bfe3f5", i: "#d6f6ff", I: "#7fd3ff", J: "#3a8fd8", f: "#a8e8ff" } as const;
 /**
@@ -404,7 +404,7 @@ function frostSpecks(y: number, step: 0 | 1 | 2): Speck[] {
       if (step === 2 && (dx + dy) % 2) continue;
       out.push([x + dx, y + dy, step === 0 ? (d < 0.4 ? "F" : "w") : d < 0.3 ? "w" : "W"]);
     }
-  // Ice shards: short slivers out of the puff, away from her (up, on, down).
+  // Ice shards: short slivers out of the puff, away from him (up, on, down).
   for (const [ux, uy] of [[1, -0.7], [1, 0], [0.8, 0.8], [0.2, -1], [0.3, 1]] as const) {
     const from = [3, 5, 8][step]!;
     const len = step === 2 ? 1 : 3;
@@ -415,9 +415,9 @@ function frostSpecks(y: number, step: 0 | 1 | 2): Speck[] {
 }
 
 /**
- * A jab of Ginger's frosted cane on a king (her attack on a king): `hit<H|L><L|R>`, at its head or its chest, from the
- * left or right edge: a white puff and ice shards flicking out, the puff thinning away. About 200 ms; ends empty. Her
- * cold, not her freeze: small and gone at once, it never covers or changes the king.
+ * A jab of Ginger's frosted cane on a king (his attack on a king): `hit<H|L><L|R>`, at its head or its chest, from the
+ * left or right edge: a white puff and ice shards flicking out, the puff thinning away. About 200 ms; ends empty. His
+ * cold, not his freeze: small and gone at once, it never covers or changes the king.
  */
 export const FROST_HIT: Character = {
   id: "frost-hit",

@@ -1,0 +1,196 @@
+import { describe, expect, it } from "vitest";
+import { N, wrapF, wrapI } from "../src/town/camera.ts";
+import { TOWN_FEEL } from "../src/town/feel.ts";
+import { APRON, COLISEUM, STATUES, Walker, createTown, destFor, findPath, onColiseum, statueAt, taken, tick, walkWalker, walkable, type Sq, type Town } from "../src/town/world.ts";
+
+/** One pawn a square (src/town/world.ts): where a walk ends, and rings of people round someone. */
+
+const king = (a: Sq, b: Sq) => Math.max(Math.abs(wrapF(a.c - b.c)), Math.abs(wrapF(a.r - b.r)));
+/** Open ground south of the plaza: no homes, bosses or bots within two squares. (The Coliseum's middle until slice 5 built it.) */
+const SPOT: Sq = { c: 24, r: 2 };
+
+/** A town with nobody wandering off on their own (the bots stay put; the bosses are far from the middle). */
+function still(): Town {
+  const t = createTown(0);
+  t.nextBotAt = Infinity;
+  return t;
+}
+/** Runs the town until nobody is walking (or a minute has passed). */
+function settle(t: Town, from = 0): number {
+  let now = from;
+  for (let i = 0; i < 4000; i++) {
+    now += 16;
+    tick(t, now);
+    if (!t.people.some((p) => p.walker.moving())) break;
+  }
+  return now;
+}
+/** Nobody shares a square. */
+function apart(t: Town) {
+  const seen = new Set<number>();
+  for (const w of t.all) {
+    const k = w.hereR() * N + w.hereC();
+    expect(seen.has(k), `two on (${w.hereC()}, ${w.hereR()})`).toBe(false);
+    seen.add(k);
+  }
+}
+
+describe("town square: one pawn a square", () => {
+  it("tapping a taken square ends you next to it, on a free square", () => {
+    const t = still();
+    const bot = t.bots[0]!.walker.here();
+    const to = destFor(t, t.you.walker, { kind: "square", c: bot.c, r: bot.r })!;
+    expect(king(to, bot)).toBe(1);
+    expect(walkable(to.c, to.r)).toBe(true);
+    expect(taken(t, to.c, to.r, t.you.walker)).toBe(false);
+    walkWalker(t.you.walker, to);
+    settle(t);
+    expect(t.you.walker.here()).toEqual(to);
+    apart(t);
+  });
+
+  it("a free square is its own end; tapping a person or a boss ends you beside them", () => {
+    const t = still();
+    expect(destFor(t, t.you.walker, { kind: "square", ...SPOT })).toEqual(SPOT);
+    const b = t.bosses[2]!.walker.here();
+    const to = destFor(t, t.you.walker, { kind: "beside", at: b })!;
+    expect(king(to, b)).toBe(1);
+  });
+
+  it("the end square is always free: tap after tap, nobody ever ends on someone else's square", () => {
+    const t = still();
+    let now = 0;
+    let seed = 7;
+    const rnd = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
+    for (let n = 0; n < 40; n++) {
+      // Somewhere near you, or right onto a bot.
+      const target: Sq = n % 3 === 0 ? t.bots[n % t.bots.length]!.walker.here() : { c: wrapI(t.you.walker.hereC() + Math.floor(rnd() * 9) - 4), r: wrapI(t.you.walker.hereR() + Math.floor(rnd() * 9) - 4) };
+      const to = destFor(t, t.you.walker, { kind: "square", ...target });
+      if (!to) continue;
+      expect(taken(t, to.c, to.r, t.you.walker)).toBe(false);
+      walkWalker(t.you.walker, to);
+      now = settle(t, now);
+      apart(t);
+    }
+  });
+
+  it("someone stepping onto your last square first: you stop on the nearest free square beside it", () => {
+    const t = still();
+    const bot = t.bots[0]!.walker;
+    // The bot claims the spot first (walks there), then your walk is sent to the very same square.
+    walkWalker(bot, SPOT);
+    walkWalker(t.you.walker, SPOT);
+    settle(t);
+    expect(bot.here()).toEqual(SPOT);
+    expect(king(t.you.walker.here(), SPOT)).toBe(1);
+    apart(t);
+  });
+
+  it("three bots sent to one spot ring round it, a square each", () => {
+    const t = still();
+    for (const p of t.bots.slice(0, 3)) walkWalker(p.walker, destFor(t, p.walker, { kind: "beside", at: SPOT })!);
+    settle(t);
+    const ring = t.bots.slice(0, 3).map((p) => p.walker.here());
+    for (const s of ring) expect(king(s, SPOT)).toBe(1);
+    expect(new Set(ring.map((s) => `${s.c},${s.r}`)).size).toBe(3);
+  });
+
+  it("a ring fills nearest first: the 8 squares round someone, then the next ring out", () => {
+    const t = still();
+    // Ten more people (and none of the bots), all sent beside the same spot.
+    t.all = [t.you.walker, ...t.bosses.map((b) => b.walker)];
+    const crowd: Walker[] = [];
+    for (let i = 0; i < 10; i++) {
+      const w = new Walker({ c: wrapI(SPOT.c - 6 + i), r: wrapI(SPOT.r - 7) }, TOWN_FEEL.botStepMs, true);
+      t.all.push(w);
+      crowd.push(w);
+    }
+    const ends = crowd.map((w) => {
+      const to = destFor(t, w, { kind: "beside", at: SPOT })!;
+      walkWalker(w, to);
+      return to;
+    });
+    expect(ends.slice(0, 8).every((s) => king(s, SPOT) === 1)).toBe(true);
+    expect(ends.slice(8).every((s) => king(s, SPOT) === 2)).toBe(true);
+    expect(new Set(ends.map((s) => `${s.c},${s.r}`)).size).toBe(10);
+  });
+});
+
+describe("town square: the Coliseum", () => {
+  const front = (s: Sq) => s.r === COLISEUM.r0 - 1 && (s.c === COLISEUM.c0 + 2 || s.c === COLISEUM.c0 + 3);
+
+  it("its 6 x 6 ground is solid, and a walk goes round it", () => {
+    for (let r = COLISEUM.r0; r < COLISEUM.r0 + COLISEUM.size; r++) for (let c = COLISEUM.c0; c < COLISEUM.c0 + COLISEUM.size; c++) expect(walkable(c, r)).toBe(false);
+    expect(walkable(COLISEUM.c0 - 1, COLISEUM.r0)).toBe(true);
+    // From the apron to the square behind its middle: round it, never across it.
+    const from = { c: COLISEUM.c0 + 2, r: COLISEUM.r0 - 1 };
+    const goal = { c: COLISEUM.c0 + 2, r: COLISEUM.r0 + COLISEUM.size };
+    const path = findPath(from, (c, r) => c === goal.c && r === goal.r, walkable)!;
+    expect(path.at(-1)).toEqual(goal);
+    for (const s of path) expect(onColiseum(s.c, s.r)).toBe(false);
+  });
+
+  it("the apron in front of its gate is open ground, nearest the gate first", () => {
+    for (const s of APRON) expect(walkable(s.c, s.r)).toBe(true);
+    expect(front(APRON[0]!) && front(APRON[1]!)).toBe(true);
+  });
+
+  it("a tap on it (or its ground) walks you to the apron, at the gate; people tapping it gather there, a square each", () => {
+    const t = still();
+    const to = destFor(t, t.you.walker, { kind: "coliseum" })!;
+    expect(front(to)).toBe(true);
+    expect(destFor(t, t.you.walker, { kind: "square", c: COLISEUM.c0 + 3, r: COLISEUM.r0 + 4 })).toEqual(to);
+    // Everyone sent there: the first two at the gate, the rest round them on the apron, nobody on anyone's square.
+    for (const p of t.people) {
+      const s = destFor(t, p.walker, { kind: "coliseum" })!;
+      expect(APRON.some((a) => a.c === s.c && a.r === s.r)).toBe(true);
+      walkWalker(p.walker, s);
+    }
+    settle(t);
+    apart(t);
+    expect(t.people.filter((p) => front(p.walker.here()))).toHaveLength(2);
+  });
+});
+
+describe("town square: the statues", () => {
+  it("each has its viewing square on the apron, right in front of the Coliseum ground's end columns, either side of the gate", () => {
+    const [marble, bronze] = STATUES;
+    expect(marble!.id).toBe("marble");
+    expect(bronze!.id).toBe("bronze");
+    for (const s of STATUES) {
+      expect(APRON.some((a) => a.c === s.c && a.r === s.r), `${s.id} on the apron`).toBe(true);
+      expect(onColiseum(s.c, s.r + 1), `${s.id} right in front of the Coliseum's ground`).toBe(true);
+      expect(statueAt(s.c, s.r)).toBe(s);
+    }
+    // Symmetric about the gate: the marble on its left (west), the bronze on its right.
+    expect(marble!.c).toBe(COLISEUM.c0);
+    expect(bronze!.c).toBe(COLISEUM.c0 + COLISEUM.size - 1);
+    expect(marble!.r).toBe(bronze!.r);
+  });
+
+  it("the quotes, word for word", () => {
+    expect(STATUES.map((s) => s.quote)).toEqual(["Nothing is so healing as the human touch", "Concrete considerations always take precedence over general principles"]);
+  });
+
+  it("a tap on a statue walks you to its square; someone on it, to the nearest free square beside it", () => {
+    const t = still();
+    const s = STATUES[1]!;
+    expect(destFor(t, t.you.walker, { kind: "statue", statue: s })).toEqual({ c: s.c, r: s.r });
+    const bot = t.bots[0]!;
+    walkWalker(bot.walker, { c: s.c, r: s.r });
+    settle(t);
+    const to = destFor(t, t.you.walker, { kind: "statue", statue: s })!;
+    expect(king(to, s)).toBe(1);
+    expect(taken(t, to.c, to.r, t.you.walker)).toBe(false);
+  });
+
+  it("the bots never stop on a statue's square (it's kept free to look from)", () => {
+    const t = createTown(0);
+    let now = 0;
+    for (let i = 0; i < 20000; i++) {
+      now += 50;
+      tick(t, now);
+      for (const b of t.bots) expect(statueAt(b.walker.goalC(), b.walker.goalR())).toBeNull();
+    }
+  });
+});
