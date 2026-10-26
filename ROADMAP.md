@@ -397,7 +397,7 @@ the building art and the names, which are wrong) and `chatgpt-town-square-overvi
 - **Every boss has a home** in its own corner of the world (13 now, plus a locked plot for the Hidden Boss). The bosses roam
   near home and sometimes say a line, in a new bubble style made for the square.
 - Small pawns, big bosses. You are your own small dressed pawn in the middle of the view; no big picture of you in a corner
-  (Eric, Oct 26: "it's fine if he's just the center on the map").
+  (Eric, Oct 25: "it's fine if he's just the center on the map").
 - **A shop** stands in the square. Which shop it is (Shop & crates, or a raid shop) is still open.
 
 **Moving and tapping**
