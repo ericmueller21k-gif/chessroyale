@@ -783,7 +783,7 @@ export function bonkItem(square: string, i: number, from: "L" | "R", since: numb
   return { square, name: "bonkHit", anim: `hit${i % 2 ? "L" : "H"}${from}`, since };
 }
 
-/** Ginger's i-th jab of her frosted cane on the king's square (high, then low, in turn), from her side. */
+/** Ginger's i-th jab of his frosted cane on the king's square (high, then low, in turn), from his side. */
 export function frostItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
   return { square, name: "frostHit", anim: `hit${i % 2 ? "L" : "H"}${from}`, since };
 }

@@ -28,7 +28,7 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   softened into a gradient: darker in the dark theme, lighter in the light); no names. The Hidden Boss is his figure as a violet-edged
   silhouette on a dark tile, "?" a plain tile. The picked one's frame is gold. Windows up to 800 px tall have the stage 210 px
   wide (not 280), up to 700 px 170 px, so the ways to play stay on screen where they can (a 320 x 568 phone scrolls to them). A tap drops it on (the 1 v 1
-  stage's drop), plays its sound once (`SELECT_SOUND`: Ginger `gingerCrackle`, her freeze; Boingo `clownSplat`, his
+  stage's drop), plays its sound once (`SELECT_SOUND`: Ginger `gingerCrackle`, his freeze; Boingo `clownSplat`, his
   pie; Jefferson `grexFizz`, his sparkler; Hollow `hollowCast`, his darkness; Big Boy `bigboyClack`, a toy block
   landing; Sawyer `sawyerRev`, his saw; Wrangler `pigWhirl`, his lasso; Alfil `alfilTrumpet`, his trumpet; Chub & Chirp
   `hopperChirp`, Chirp's chirp; Smudgy `smudgySplash`, paint landing; Moo & Moon `mooHappy`, a happy moo; Puddles `gardenerHello`, a hello in his quick made-up talk and a splash; Babur `tigerHello`, a bored yawn and a balloon squeak; the Hidden Boss `recluseHum`, his stare) and
@@ -518,7 +518,7 @@ build): online, phase 1 won is the crowd's victory):
 - **The bars at the back, the ice on its square, the queen banners silent** (Eric, Oct 11): the move clock's bars above
   and below the board draw behind everything (squares' overlays, the boss, his effects and words, the God King), as the
   eval bar does. Ginger's ice is one block the square's shape on every square, whatever the piece, placed on
-  the board's own square (eighths of `--board-size`); her thin ice (due to thaw) is the same block, clearer and cracked
+  the board's own square (eighths of `--board-size`); his thin ice (due to thaw) is the same block, clearer and cracked
   (Oct 12). QUEEN DOWN! and QUEEN SLAIN! play no sound for now (the gasp is
   kept, unused: `queenGasp`).
 - **A boss's attack on a king** (Eric, Oct 10; Hollow's first, Alfil's Oct 17, Boingo's, Sawyer's and Wrangler's Oct 18;
@@ -568,7 +568,7 @@ build): online, phase 1 won is the crowd's victory):
     `BIGBOY_ATTACK`, `GINGER_ATTACK`, `GREX_ATTACK`. Big Boy drops in, stamps into a tantrum (his face red) and bonks
     the king with his giant lollipop ten times, overhead then sideways in turn, glaring at it (`bonkHit`, a
     candy-colored bonk; `bigboyBonk` and `bigboySwish` in turn), 1 square off, facing our left (his lollipop hand).
-    Ginger drops into a whirl of snow and jabs the king with her frosted, glowing cane ten times, high and low, glaring
+    Ginger drops into a whirl of snow and jabs the king with his frosted, glowing cane ten times, high and low, glaring
     at it (`frostHit`, a frost burst: ice shards and a white puff, never over or on the king's sprite;
     `gingerCrackle` and `gingerCrunch`), 1 square off. Jefferson drops in with his Roman candle, plants
     it, lights the fuse at 470 ms and fires one fireball a beat, each arcing over and popping on the king (`popHit`, a

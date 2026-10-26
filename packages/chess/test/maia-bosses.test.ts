@@ -212,7 +212,7 @@ describe("the bridge band and the top, in a battle", () => {
 
   it("below the band: Maia, no guard; in it the light, then the strict guard (by the level) with a growing share of Stockfish (by the strength); Stockfish from its top", () => {
     const { bridgeFrom: from, bridgeStrictFrom: strict, bridgeShareFrom: shareFrom, stockfishFrom: top, crowdMargin: margin } = BOSS_BRAIN;
-    // (Ginger's offset is −100: her strength is the tier less 100. Alone, the level is the strength.)
+    // (Ginger's offset is −100: his strength is the tier less 100. Alone, the level is the strength.)
     expect(battle(from - 50).bossBrainPlan("", true)).toMatchObject({ brain: "maia-raw", stockfishShare: 0 });
     expect(battle(from + 100).bossBrainPlan("", true)).toMatchObject({ brain: "maia-light" });
     expect(battle(Math.min(shareFrom, from) + 100).bossBrainPlan("", true)!.stockfishShare).toBe(0);

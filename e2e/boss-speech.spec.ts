@@ -3,7 +3,7 @@ import { SPEECH } from "@chessroyale/core";
 import { engineTop, test, bossAloneFromHome } from "./helpers.ts";
 
 /**
- * Speech stays up long enough to read (Eric, Oct 10: Ginger froze his queen, and her text box came and went at once).
+ * Speech stays up long enough to read (Eric, Oct 10: Ginger froze his queen, and Ginger's text box came and went at once).
  * For one power moment of every boss, alone (solo) on a phone and a computer: the boss's line for it shows in its text
  * box beside it as the moment plays, and stays there, whole and in view, for its full time by the shared rule (2.7 s
  * plus 35 ms a character once typed, a second more past 30 characters, at most 6.5 s: SPEECH in settings.ts, read here,

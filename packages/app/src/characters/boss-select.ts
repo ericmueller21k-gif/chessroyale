@@ -11,7 +11,7 @@ import type { SoundName } from "../sound.ts";
 
 /** Each boss's sound as it steps onto the stage, by its roster id. */
 export const SELECT_SOUND: Readonly<Record<string, SoundName>> = {
-  // Her freeze (the ice cracking over a piece).
+  // His freeze (the ice cracking over a piece).
   gingerbread: "gingerCrackle",
   // His pie, splatting.
   clown: "clownSplat",

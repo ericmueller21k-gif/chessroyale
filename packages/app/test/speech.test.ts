@@ -17,7 +17,7 @@ describe("speech: every line's time, and lines taking turns (Eric, Oct 10: Ginge
     // line rests about 3 s once typed (2.5 before), a two-row one (50 characters) about 5.5 s (4 before), none over 6.5 s.
     expect(Math.abs(readMs("Freeze!") - 3000)).toBeLessThanOrEqual(100);
     expect(Math.abs(readMs("x".repeat(50)) - 5500)).toBeLessThanOrEqual(100);
-    // Ginger's shortest freeze line still stays up longer than her whole freeze moment did (2.3 s).
+    // Ginger's shortest freeze line still stays up longer than his whole freeze moment did (2.3 s).
     expect(holdMs("Freeze!")).toBeGreaterThan(2300);
   });
 
