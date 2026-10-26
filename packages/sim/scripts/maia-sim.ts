@@ -5,7 +5,7 @@
  *
  *   npx tsx packages/sim/scripts/maia-sim.ts positions                     a few positions per brain, ms per move
  *   npx tsx packages/sim/scripts/maia-sim.ts games <brain> <games> <seed> [tier] [club|casual|expert]
- *       Boss alone, plain chess (no powers): a bot player against Ginger at a tier (her offset, Normal), the boss on
+ *       Boss alone, plain chess (no powers): a bot player against Ginger at a tier (his offset, Normal), the boss on
  *       <brain>; every boss move scored by the judge. The same openings for every brain.
  *   npx tsx packages/sim/scripts/maia-sim.ts summary                       reports/maia-boss.md
  *
@@ -195,7 +195,7 @@ function summary() {
     "",
     "Written by `npx tsx packages/sim/scripts/maia-sim.ts summary` from `reports/maia-sim/*.jsonl`. Boss alone as plain chess",
     "(Ginger's powers and the God King left out): a bot player (boss-sim.ts's kind: a skill temperature and some random",
-    "moves) against Ginger at a tier (her offset, Normal), the boss on each brain (BOSS_BRAIN: Maia's draw at temperature",
+    "moves) against Ginger at a tier (his offset, Normal), the boss on each brain (BOSS_BRAIN: Maia's draw at temperature",
     `${BOSS_BRAIN.temperature}, top-p ${BOSS_BRAIN.topP}). The same openings and colors for every brain; 60 player moves at most, then the`,
     "engine's verdict (75% or more: a win). Every boss move is scored as the judge scores a pick (its loss against the best,",
     "in points, at engineNodes); the loss columns count only moves in a game still to be played (the boss's chances 15–85%",
