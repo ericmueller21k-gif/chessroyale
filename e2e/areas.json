@@ -487,6 +487,10 @@
       ],
       "specs": ["e2e/friends.spec.ts", "e2e/global-chat.spec.ts", "e2e/home-layout.spec.ts", "e2e/live-window.spec.ts"]
     },
+    "the town square (/town)": {
+      "paths": ["packages/app/src/town/**"],
+      "specs": ["e2e/town.spec.ts"]
+    },
     "Auto chess, the demo": {
       "paths": [
         "packages/app/src/autochess/**",

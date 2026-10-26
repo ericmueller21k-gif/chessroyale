@@ -381,6 +381,8 @@ Added Oct 14, 2026 (Eric; notes only, nothing built):
 
 ## Boss raid: the town square (Eric, Oct 25, 2026; a look-only prototype, nothing built yet)
 
+Slice 1 (the world, five homes, bots) is at `/town`.
+
 Eric's direction, from a day of mockups: Boss raid becomes a **town square**, a small round world where players hang out,
 walk around, and meet the bosses at their homes. The prototype he tested on his phone ("feels great") is
 `docs/mockups/town-square/prototype.html` (open it in a browser; its README has the camera numbers). His reference pictures
