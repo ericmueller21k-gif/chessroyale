@@ -379,20 +379,72 @@ Added Oct 14, 2026 (Eric; notes only, nothing built):
   - Test lanes: every logic change goes back to the full lane per PR (CLAUDE.md, "Test lanes": the targeted lane
     and batch full runs are pre-launch only).
 
-## Boss raid: where it's heading (Eric, Oct 25, 2026; ideas, nothing built yet)
+## Boss raid: the town square (Eric, Oct 25, 2026; a look-only prototype, nothing built yet)
 
-Eric: "I think we need to create some sort of lobby for boss raid that's sort of like an idle lobby… you can invite your
-friends… there might be some possible rewards… what you would expect from a normal sort of cool style lobby." Two rough
-mockups, as a starting point only ("not that we want to use this exactly"): `docs/mockups/boss-raid-lobby/gemini-lobby.png`
-(a lobby on a big board floor, the bosses standing about, "Players: 18/50", Invite friends, Ready, a game-mode box and the
-target boss) and `docs/mockups/boss-raid-lobby/eric-paint-crowd.png` (today's select screen with a pawn standing in for a
-crowd of 50).
+Eric's direction, from a day of mockups: Boss raid becomes a **town square**, a small round world where players hang out,
+walk around, and meet the bosses at their homes. The prototype he tested on his phone ("feels great") is
+`docs/mockups/town-square/prototype.html` (open it in a browser; its README has the camera numbers). His reference pictures
+are `docs/mockups/boss-raid-lobby/chatgpt-town-square.webp` (the view he wants: "this view of it, this is perfect", except
+the building art and the names, which are wrong) and `chatgpt-town-square-overview.webp`. The earlier tries
+(`gemini-lobby.png`, `eric-paint-crowd.png`) are kept for the record.
 
-- **A raid with people starts in an idle lobby:** players gather (up to 50), invite friends, ready up; the room shows who's
-  in and which boss comes first. Maybe rewards. It likely shares the party and invite system planned for home.
-- **A gauntlet of bosses:** a raid with people picks **3 bosses at random**, each harder than the last; beat one to face the
-  next. The first should feel winnable (he blunders); it should feel good. Maybe 4 later.
-- **Solo keeps the select screen:** today's Boss raid screen (pick a boss) becomes the solo mode, where you pick the boss you
-  want and fight it.
-- To settle when it's built: how the three are ordered, what losing mid-gauntlet means, scoring across bosses, whether the
-  God King's charges carry over, time per boss, the rewards, and what players do while they wait.
+**The world**
+- A chessboard world seen from a **low camera looking out to a curved horizon**, with sky and clouds behind it. The clouds
+  shift a little as you walk sideways. The far edge **dissolves into haze**, and things come into focus as you walk toward
+  them. A house, boss or pawn near the edge is never cut off by it (Eric, from his phone test): it shows whole, faded into
+  the haze, and the haze is drawn behind it. The world **loops**: walk one way long enough and you're back where you
+  started.
+- **Every boss has a home** in its own corner of the world (13 now, plus a locked plot for the Hidden Boss). The bosses roam
+  near home and sometimes say a line, in a new bubble style made for the square.
+- Small pawns, big bosses. Your own pawn is on the board, and your big dressed pawn with its name card sits at the lower
+  left of the view.
+- **A shop** stands in the square. Which shop it is (Shop & crates, or a raid shop) is still open.
+
+**Moving and tapping**
+- **Tap a square to walk there:** a quick hobble, about 90 ms a square, the camera following. Drag to look around; "Back to
+  me" returns. A **zoom toggle** (Eric: "love the zoom in and out") shows more of the world.
+- Small chips at the edge of the view point to bosses off screen; a tap glides the camera there.
+- **Tap a boss: "Challenge alone."** While you fight, you stand next to the boss in the square, labeled "[name] is battling
+  [boss]". This is one of the ways to play a boss solo.
+- **Tap a player: "Invite to party"**, and "Trade", shown greyed with "Coming soon" until trading exists.
+
+**Screens**
+- **Phone:** the world takes most of the screen, with a slim bar at the top (back) and a strip at the bottom whose content is
+  still to design. **Computer:** the world in the middle, the menus around it. Eric is drawing what sits around the world on
+  both.
+- **The world never assumes a screen size:** it fills whatever box it's given and works its camera out from that box, so the
+  panels around it can change without touching the world.
+- **Don't build the bottom panel yet** (party, options, Invite, Join, READY): Eric is still deciding how it looks.
+- **Loading:** no loading screen. The sky, ground and your pawn show at once; bosses and houses arrive nearest first, out of
+  the haze. A thin bar appears only if the square isn't ready after about half a second.
+- **"Simple map" in Settings:** the same world drawn flat and top-down (squares, labeled homes, players as named dots, the same
+  taps and cards), for slow phones. The game may suggest it when the frame rate drops.
+
+**The raid with people**
+- Being in the square doesn't queue you. A raid with people faces **3 bosses picked at random**, each harder than the last
+  (maybe 4 later); beat one to face the next. The first should feel winnable. ("The gauntlet" was a working name only; the
+  mode has no special name.)
+- Still to settle: how READY queues you, whether the square replaces today's pick-a-boss screen (Eric has ideas), how many
+  players share one square and whether bots wander in it, the shop, how the three bosses are ordered, what losing mid-way
+  means, scoring across bosses, whether the God King's charges carry over, time per boss, and the rewards.
+
+**Art**
+- One building per boss, in the game's pixel style, drawn in code like the bosses. **Opus draws all art:** Haiku was tested
+  twice (the tiger still, Oct 23; Babur's circus tent, Oct 25) and can't do it. A building took Opus about 6 minutes; the
+  circus tent test is the first. The reference pictures give the ideas; our style wins, and the names are written by the game
+  on each building's sign, never drawn into the art.
+
+## Auto chess: a TFT-style economy (Eric, Oct 25, 2026; for another day, needs testing)
+
+Eric: rework Auto chess's gold so it plays like Teamfight Tactics, with buying, rolling and leveling in small whole numbers.
+"Will need to test it a bit so it feels like TFT… not sure yet but this is for another day." His numbers, with today's in
+brackets (`AUTOCHESS` in `packages/core/src/settings.ts`; today's are on a ×10 scale):
+
+- **Piece prices:** pawn 1, bishop 3, knight 3, rook 5, queen 7, "unless 8 or 9 is more true to chess value" [today 10, 32,
+  30, 50, 90]. The usual chess values are pawn 1, knight 3, bishop 3, rook 5, queen 9 (today's prices are already those,
+  ×10); 7 would make the queen cheaper than her worth. Settle by testing.
+- **Leveling:** 4 gold buys 4 XP; level 10 is the top [today 20 gold for 4 XP, top 10].
+- **Income:** squeezed to TFT's size per round [today 100 the first round, +20 a round, up to 200].
+- **Interest:** +1 gold per 10 held, up to +5 at 50 gold [today 10 per 100, up to 30].
+- **Rolling:** maybe starts at 2 and rises 2, 3, 4, 5 within a round, capped at 5; not decided [today 5, +1 a roll, up to 10].
+- The win-streak gold, selling back, star-ups and every other gold number scale down with it.
