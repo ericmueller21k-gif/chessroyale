@@ -1,7 +1,7 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "preact/hooks";
 import { type MatchmakingType, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
-import { bossInUrl, bossTierFromUrl, chosenBoss, chosenHomeMode, chosenMode, lobbyModeOf, raidInUrl } from "./screens/Home.tsx";
+import { bossInUrl, bossTierFromUrl, chosenBoss, chosenHomeMode, chosenMode, lobbyModeOf, raidInUrl, rememberBossPick } from "./screens/Home.tsx";
 import { lastBoss } from "./boss-history.ts";
 import { unlockAudio } from "./components/Countdown.tsx";
 import { RaceTower } from "./components/RaceTower.tsx";
@@ -1203,6 +1203,15 @@ export function App() {
         onBack={() => {
           setShowTown(false);
           history.replaceState(null, "", "/");
+        }}
+        // A boss's "Challenge alone", confirmed: out of the town square to the Boss raid screen (as the side menu opens
+        // it), that boss's tile picked (the screen reads its pick from rememberBossPick as it opens).
+        onBossAlone={(id) => {
+          rememberBossPick(id);
+          setShowTown(false);
+          history.replaceState(null, "", "/");
+          setHomeIntent(null);
+          setRaidOpen(true);
         }}
       />
     );

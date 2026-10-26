@@ -31,7 +31,25 @@ address `/town` opens it directly too (`hunchess.com/town`, behind Cloudflare Ac
 - **The drawing** (`town/render.ts`): one canvas, one `requestAnimationFrame` loop (in `Town.tsx`), stopped when the screen
   closes or the tab is hidden; device pixel ratio capped at 2; nothing allocated per frame on the hot path (square colors,
   fonts, gradients, clouds, pawns and every boss and home frame are made once, the frames the first time they show).
-- **Taps.** A square: you walk there. A home, a boss or a bot: you walk to the nearest free square next to it. Drag to look
+- **Taps** (slice 4: `town/press.ts`). A finger down presses the square you'd walk to like a button: it sinks a little,
+  darkens, and lights up with a bold glowing gold border while the finger is down; up on the same thing releases it with
+  one short pulse of the border and you set off; moving past `dragPx` first lets it go (no pulse, no walk) and becomes a
+  look-around drag. No sound and no vibration (Eric). A small gold ring marks your destination until you arrive. As you
+  run you leave about three soft white droplets on the squares you leave, fading out in about half a second (yours only).
+  All their numbers are in `feel.ts`.
+- **One pawn a square, like chess** (`world.ts`): a walk may pass through people, but nobody ends on a square someone
+  stands on or is headed for (`taken`: a walker's goal). A free square is its own end; a taken one, a person or a boss
+  ends you on the nearest free square beside it (`spotNear`: the 8 squares round it, then the next ring out, and in a
+  ring the one fewest steps away), so several people going to one person ring round them; a home ends you on the ring
+  round its plot (`destFor`). If two walks end on one square, the later claim gives way to the nearest free square
+  beside it (`keepApart`, every tick). Bots and bosses pick their ends the same way.
+- **Cards** (the prototype's, inside the world's box, over the boss's head or above the home's name, placed every frame;
+  a tap anywhere else, or Escape, closes one). A boss: its name and **"Challenge alone"**, which asks **"Leave the town
+  square?"** / "You'll fight [boss] alone in Solo Boss Mode." / **Leave** / **Stay**; Leave closes the town square and
+  opens the Boss raid screen with that boss's tile picked (`rememberBossPick`, then the screen as the side menu opens
+  it); Stay closes the confirm and its card. A home: its name, **"Shop"** greyed (shown, not tappable) and "Coming
+  soon". The boss stays put while its card is open. Tapping something both opens its card and walks you next to it.
+- **Looking around.** Drag to look
   around; "Back to me" brings the camera back; − / + (and the mouse wheel) zoom. The chips at the box's edge show the
   bosses whose homes are off screen (the nearest few: `maxChips` in `feel.ts`, 4); a tap glides the camera there. A chip
   never covers a name tag, a home's floating name, the speech bubble, the −/+ and "Back to me" buttons or a nearer
@@ -81,8 +99,8 @@ noted wherever a slice changed one.
 
 ## Files
 
-- `packages/app/src/town/`: `TownPage.tsx` (the lazy load), `Town.tsx` (the screen, the loop, input, chips, the sky's
-  clock), `camera.ts`, `world.ts`, `render.ts`, `sky.ts`, `sky-draw.ts`, `sign-font.ts`, `feel.ts`, `town.css`, `houses/`
+- `packages/app/src/town/`: `TownPage.tsx` (the lazy load), `Town.tsx` (the screen, the loop, input, chips, cards, the sky's
+  clock), `press.ts` (a finger as a button), `camera.ts`, `world.ts`, `render.ts`, `sky.ts`, `sky-draw.ts`, `sign-font.ts`, `feel.ts`, `town.css`, `houses/`
   (one file per home, thirteen in all, the kit of shared pieces and the index).
 - References: `docs/mockups/town-square/` (the prototype Eric tested, and the pictures for the homes: Eric's for the
   igloo, the peak and the meadow, his suggestions for seven more). Alfil's Pyramid has no picture: it's our design.
@@ -95,12 +113,17 @@ noted wherever a slice changed one.
   start just south of it), the walk around a home, and the eased steps meeting the even ones at the same speed.
 - `packages/app/test/town-sky.test.ts`: which look shows when, the looks always adding up to 1 and blending over their
   half hour in order, `?sky=`, and the tint (none by day, softer at dawn than dusk, coolest and darkest at night).
+- `packages/app/test/town-world.test.ts`: one pawn a square (a taken square ends you next to it, the end is always free
+  tap after tap, a later claim gives way, three bots ring round one spot, a ring fills nearest first).
+- `packages/app/test/town-press.test.ts`: down presses, up on the same thing walks, a drag cancels, up elsewhere lets go.
 - `e2e/town.spec.ts` (phone and desktop; `e2e/areas.json`, "the town square"): the page loads, the world is drawn and
   fills its box, a tap ahead walks you there, the zoom pair works (it opens zoomed out), back goes home; `?sky=day` and
-  `?sky=night` draw different skies. Test hooks: the canvas's `data-you` (your square) and `data-ready` (a frame is
-  drawn).
+  `?sky=night` draw different skies; a boss's card, its confirm (Stay, then Leave to the Boss raid screen, his tile
+  picked); a home's card (Shop greyed, "Coming soon", closed by a tap elsewhere). Test hooks: the canvas's `data-you`
+  (your square) and `data-ready` (a frame is drawn); with the test switches on, `window.__townAt(kind, id)` (where to tap
+  a boss or a home) and `window.__townGather()` (the three nearest bots come and stand beside you).
 
 ## Not built yet
 
-The bottom strip, cards ("Challenge alone", "Invite to party"), the shop, the Coliseum, dressed pawns, the Simple map
+The bottom strip, a bot's or player's card ("Invite to party"), the shop itself, the Coliseum, dressed pawns, the Simple map
 setting, real players and rooms, sounds.

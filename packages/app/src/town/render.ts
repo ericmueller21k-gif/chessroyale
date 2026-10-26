@@ -255,8 +255,17 @@ export class Renderer {
   private readonly bubble = { on: false, text: "", x: 0, y: 0 };
   private bandGrad: CanvasGradient | null = null;
   private bandKey = "";
-  private readonly ripples = [0, 1, 2].map(() => ({ x: 0, y: 0, t0: -1e9 }));
-  private rippleNext = 0;
+  /** The pressed square (slice 4): where, when the finger went down, when it lifted (-1: still down), and whether it pulses. */
+  private readonly pressSq = { on: false, c: 0, r: 0, upAt: -1, pulse: false };
+  /** Your trail's droplets (squares, unwrapped near where they fell; t0 -1e9: none), and the square you were last on. */
+  private readonly drops = Array.from({ length: 8 }, () => ({ c: 0, r: 0, t0: -1e9 }));
+  private dropNext = 0;
+  private dropAt = -1e9;
+  private lastC = -1;
+  private lastR = -1;
+  /** The boss's items, by boss (for its card's place). */
+  private readonly bossItems: Item[];
+  private readonly q4 = new Float64Array(8);
   /** Tag widths by name and size; sign and bubble layouts by text. */
   private readonly tagW = new Map<string, number[]>();
   private readonly nameW = new Map<string, number[]>();
@@ -288,7 +297,8 @@ export class Renderer {
       const face = HOUSES[h.id].sign;
       return { ...layout(h.name, face.w, face.h), art: [] };
     });
-    this.items = [...this.houseItems, ...town.bosses.map((_, i) => newItem("boss", i))];
+    this.bossItems = town.bosses.map((_, i) => newItem("boss", i));
+    this.items = [...this.houseItems, ...this.bossItems];
     this.bossFrames = town.bosses.map((b) => new FrameCache(BOSS_ART[b.home.id]));
     this.houseFrames = homes.map((h) => new FrameCache(HOUSES[h.id].ch));
     // Each square is kept this frame (its corners, its face's corners, its color) and drawn with all the others of its
@@ -352,6 +362,7 @@ export class Renderer {
     this.nTags = 0;
     this.nClear = 0;
     this.bubble.on = false;
+    this.drawMarks(now); // on the ground, under everyone: the trail, your destination, the pressed square
     this.drawThings(now);
     // The light of the hour over the world and everything on it: one fill (none by day).
     if (this.tint) {
@@ -364,7 +375,6 @@ export class Renderer {
     }
     if (TOWN_FEEL.floatingNames) this.drawNames(now);
     if (this.bubble.on) this.drawBubble(this.bubble.text, this.bubble.x, this.bubble.y); // (over a home's name)
-    this.drawRipples(now);
     this.placeChips(now);
   }
 
@@ -903,32 +913,189 @@ export class Renderer {
     for (let i = 0; i < b.lines.length; i++) ctx.fillText(b.lines[i]!, bx + b.w / 2, by + 5 + lh / 2 + i * lh);
   }
 
-  // ---- Taps: a ripple where the finger landed; what it landed on.
+  // ---- Taps: the pressed square; what a finger landed on; where a card stands.
 
-  ripple(x: number, y: number, now: number): void {
-    const r = this.ripples[this.rippleNext++ % this.ripples.length]!;
-    r.x = x;
-    r.y = y;
-    r.t0 = now;
+  /** A finger went down: `c, r` (the square you'd walk to) presses in and lights up, until `release`. */
+  pressSquare(c: number, r: number): void {
+    const ps = this.pressSq;
+    ps.on = true;
+    ps.c = c;
+    ps.r = r;
+    ps.upAt = -1;
+    ps.pulse = false;
   }
 
-  private drawRipples(now: number): void {
-    const { ctx } = this;
-    for (const r of this.ripples) {
-      const a = (now - r.t0) / 700;
+  /** The finger lifted: the square releases, with one pulse of its border (`pulse`: you set off) or none (a drag). */
+  release(now: number, pulse: boolean): void {
+    const ps = this.pressSq;
+    if (!ps.on) return;
+    ps.upAt = now;
+    ps.pulse = pulse;
+    if (!pulse) ps.on = false;
+  }
+
+  /** Square (c, r)'s corners on the screen, into `q4` (far left, far right, near right, near left), scaled about its middle. */
+  private squareQuad(c: number, r: number, scale: number, drop: number): boolean {
+    const { view: v, p, q4 } = this;
+    const dx = wrapF(c - this.camX);
+    const dz = wrapF(r - this.camY);
+    if (radial(v, dx, dz) > v.rim) return false;
+    const h = 0.5 * scale;
+    for (let i = 0; i < 4; i++) {
+      if (!proj(v, dx + CORNERS[i * 2]! * h, dz + CORNERS[i * 2 + 1]! * h - drop, 0, p)) return false;
+      q4[i * 2] = p.x;
+      q4[i * 2 + 1] = p.y;
+    }
+    return true;
+  }
+
+  private quadPath(): void {
+    const { ctx, q4 } = this;
+    ctx.beginPath();
+    ctx.moveTo(q4[0]!, q4[1]!);
+    for (let i = 2; i < 8; i += 2) ctx.lineTo(q4[i]!, q4[i + 1]!);
+    ctx.closePath();
+  }
+
+  /** Pixels across one square at (c, r) (for line widths). */
+  private squarePx(c: number, r: number): number {
+    return proj(this.view, wrapF(c - this.camX), wrapF(r - this.camY), 0, this.p) ? this.p.k : 0;
+  }
+
+  /** Your trail's droplets, your destination's mark, and the pressed square: on the ground, before anyone stands on it. */
+  private drawMarks(now: number): void {
+    const { ctx, town } = this;
+    const f = TOWN_FEEL;
+    // A droplet on each square you leave as you run (one at most every trailEveryMs).
+    const w = town.you.walker;
+    const hc = w.hereC();
+    const hr = w.hereR();
+    if (hc !== this.lastC || hr !== this.lastR) {
+      if (this.lastC >= 0 && now - this.dropAt >= f.trailEveryMs) {
+        const d = this.drops[this.dropNext++ % this.drops.length]!;
+        d.c = this.lastC;
+        d.r = this.lastR;
+        d.t0 = now;
+        this.dropAt = now;
+      }
+      this.lastC = hc;
+      this.lastR = hr;
+    }
+    ctx.save();
+    for (const d of this.drops) {
+      const a = (now - d.t0) / f.trailLifeMs;
       if (a < 0 || a >= 1) continue;
-      ctx.globalAlpha = 1 - a;
-      ctx.strokeStyle = "#c9962a";
-      ctx.fillStyle = "#c9962a";
-      ctx.lineWidth = 3;
+      const dx = wrapF(d.c - this.camX);
+      const dz = wrapF(d.r - this.camY);
+      if (radial(this.view, dx, dz) > this.view.rim || !proj(this.view, dx, dz, 0, this.p)) continue;
+      const rx = this.p.k * f.trailSize * 0.5 * (1 - 0.6 * a);
+      ctx.globalAlpha = f.trailAlpha * (1 - a) * (1 - a) * enterOf(this.view, dx, dz);
+      ctx.fillStyle = "rgba(110,70,30,0.22)"; // a faint shadow under it (it shows on the light squares too)...
       ctx.beginPath();
-      ctx.arc(r.x, r.y, 8 + a * 22, 0, Math.PI * 2);
-      ctx.stroke();
+      ctx.ellipse(this.p.x, this.p.y + rx * 0.25, rx * 1.5, rx * 0.66, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.55)"; // a soft rim...
       ctx.beginPath();
-      ctx.arc(r.x, r.y, 4, 0, Math.PI * 2);
+      ctx.ellipse(this.p.x, this.p.y, rx * 1.4, rx * 0.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#ffffff"; // ...round a brighter middle
+      ctx.beginPath();
+      ctx.ellipse(this.p.x, this.p.y, rx, rx * 0.42, 0, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.globalAlpha = 1;
+    // Your destination: a small gold ring on its square, while you walk there.
+    if (w.moving()) {
+      const gc = w.goalC();
+      const gr = w.goalR();
+      const ps = this.pressSq;
+      if (!(ps.on && ps.c === gc && ps.r === gr) && proj(this.view, wrapF(gc - this.camX), wrapF(gr - this.camY), 0, this.p)) {
+        const k = this.p.k;
+        ctx.strokeStyle = f.pressEdge;
+        ctx.fillStyle = "rgba(255,215,106,.35)";
+        ctx.lineWidth = Math.max(1.5, k * 0.035);
+        ctx.beginPath();
+        ctx.ellipse(this.p.x, this.p.y, k * f.targetSize * 0.5, k * f.targetSize * 0.2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+    // The pressed square: in (darker, a little lower and smaller, its far wall in shadow) with a bold glowing gold border
+    // while the finger is down; then one pulse of the border, outward, as it lets go.
+    const ps = this.pressSq;
+    if (ps.on) {
+      const k = this.squarePx(ps.c, ps.r);
+      const bold = Math.max(f.pressBorderMinPx, k * f.pressBorder);
+      if (ps.upAt < 0) {
+        if (this.squareQuad(ps.c, ps.r, 1, 0)) {
+          this.quadPath();
+          ctx.fillStyle = `rgba(40,24,8,${(f.pressDarken * 2).toFixed(3)})`; // the hole, its far wall darkest
+          ctx.fill();
+        }
+        if (this.squareQuad(ps.c, ps.r, 1 - f.pressInset, f.pressDip)) {
+          this.quadPath();
+          ctx.fillStyle = `rgba(40,24,8,${f.pressDarken.toFixed(3)})`; // the face, sunk
+          ctx.fill();
+        }
+        if (this.squareQuad(ps.c, ps.r, 1, 0)) {
+          this.quadPath();
+          ctx.lineJoin = "round";
+          ctx.shadowColor = f.pressColor;
+          ctx.shadowBlur = f.pressGlowPx;
+          ctx.strokeStyle = f.pressColor;
+          ctx.lineWidth = bold;
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+          ctx.shadowColor = "transparent";
+          ctx.strokeStyle = f.pressEdge;
+          ctx.lineWidth = Math.max(1, bold * 0.3);
+          ctx.stroke();
+        }
+      } else {
+        const a = (now - ps.upAt) / f.pulseMs;
+        if (a >= 1) ps.on = false;
+        else if (this.squareQuad(ps.c, ps.r, 1 + f.pulseGrow * a, 0)) {
+          this.quadPath();
+          ctx.lineJoin = "round";
+          ctx.globalAlpha = 1 - a;
+          ctx.shadowColor = f.pressColor;
+          ctx.shadowBlur = f.pressGlowPx * (1 + a);
+          ctx.strokeStyle = f.pressColor;
+          ctx.lineWidth = bold * (1 - 0.5 * a);
+          ctx.stroke();
+        }
+      }
+    }
+    ctx.restore();
+  }
+
+  /** Where a card points: over a boss's head or a home's top, on screen (false: not drawn this frame). */
+  anchor(kind: "boss" | "home", i: number, out: { x: number; y: number }): boolean {
+    if (kind === "boss") {
+      const it = this.bossItems[i]!;
+      if (!it.on) return false;
+      // The top of its head (its chip's face box, in its picture), not the top of its picture's box.
+      const id = this.town.bosses[i]!.home.id;
+      out.x = it.fx;
+      out.y = it.y0 + (BOSS_FACE[id][1] / BOSS_ART[id].h) * (it.y1 - it.y0) - 4;
+      return out.y > 0 && out.y < this.H && out.x > 0 && out.x < this.W;
+    }
+    const it = this.houseItems[i]!;
+    const nm = this.names[i]!;
+    if (!it.on) return false;
+    // Over the home's floating name (it rises about this high over the building), so the card never covers it.
+    out.x = nm.x;
+    out.y = nm.y - (TOWN_FEEL.floatingNames ? TOWN_FEEL.cardOverName : 0);
+    return out.y > 0 && out.y < this.H && out.x > 0 && out.x < this.W;
+  }
+
+  /** A point to tap on a boss (its body's middle) or a home (low on its picture), on screen; false if it isn't drawn. */
+  tapPoint(kind: "boss" | "home", i: number, out: { x: number; y: number }): boolean {
+    const it = kind === "boss" ? this.bossItems[i]! : this.houseItems[i]!;
+    if (!it.on) return false;
+    out.x = kind === "boss" ? (it.x0 + it.x1) / 2 : it.fx;
+    out.y = kind === "boss" ? it.y0 + 0.6 * (it.y1 - it.y0) : it.y0 + 0.8 * (it.y1 - it.y0);
+    return out.x > 0 && out.x < this.W && out.y > 0 && out.y < this.H;
   }
 
   /** What's under (x, y) in the box: a home, a boss or a person (nearest first), else a square, else null (the sky). */
@@ -1039,6 +1206,8 @@ export class Renderer {
 }
 
 const SHADOW = "rgb(60,35,10)";
+/** A square's corners from its middle, in half-squares: far left, far right, near right, near left. */
+const CORNERS = [-1, 1, 1, 1, 1, -1, -1, -1] as const;
 const SCRATCH_ORDER: number[] = [];
 const byFarFirst = (a: Item, b: Item) => b.dz - a.dz;
 const dist2 = (h: Home, x: number, y: number) => wrapF(h.cx - x) ** 2 + wrapF(h.cy - y) ** 2;
