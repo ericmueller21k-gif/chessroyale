@@ -157,6 +157,28 @@ test("the select keeps quiet when sound is off, and holds still under reduced mo
   expect(await page.locator(".bs-fig").evaluate((e) => getComputedStyle(e).animationName)).toBe("none");
 });
 
+test("Big Boy stands in the middle of the platform: his feet centered on it (Eric, Oct 25)", async ({ page }) => {
+  test.skip(desktop(), "one run is enough: a phone");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/?mode=raid");
+  await tile(page, "Big Boy").click();
+  const sprite = page.locator(".bs-stage .bs-sprite");
+  await expect(sprite).toHaveAttribute("data-fx", "bigboy");
+  // (His feet: the lowest five rows the canvas paints, their middle on the page.)
+  const feet = await sprite.evaluate((c: HTMLCanvasElement) => {
+    const { data, width, height } = c.getContext("2d")!.getImageData(0, 0, c.width, c.height);
+    const painted = (x: number, y: number) => data[(y * width + x) * 4 + 3]! > 0;
+    let bottom = height - 1;
+    while (bottom > 0 && !Array.from({ length: width }, (_, x) => painted(x, bottom)).some(Boolean)) bottom--;
+    let a = width, b = -1;
+    for (let y = Math.max(0, bottom - 4); y <= bottom; y++) for (let x = 0; x < width; x++) if (painted(x, y)) (a = Math.min(a, x)), (b = Math.max(b, x));
+    const r = c.getBoundingClientRect();
+    return r.left + ((a + b + 1) / 2) * (r.width / width);
+  });
+  const plat = (await page.locator(".bs-spot .dv-st-plat").boundingBox())!;
+  expect(Math.abs(feet - (plat.x + plat.width / 2)), "his feet's middle from the platform's").toBeLessThan(4);
+});
+
 test("the pick reaches Boss alone, a Solo raid and a raid you make; the public queues are always a random boss", async ({ page }) => {
   test.skip(desktop(), "one run is enough: a phone");
   test.setTimeout(3 * 60_000);

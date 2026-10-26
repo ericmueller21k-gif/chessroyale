@@ -8,7 +8,7 @@ What it shows: tap a square to walk (about 90 ms a square, a little hop and tilt
 (and the mouse wheel); chips at the edge pointing to bosses off screen; a boss card with "Challenge alone" and the
 "Test2 is battling …" label; a player card with "Invite to party" and a greyed "Trade · Coming soon"; the 13 bosses roaming
 near their placeholder homes with their real idle animations and lines; a 40 × 40 world that loops; the far edge fading into
-haze. On a phone the map takes most of the screen above an empty strip; on a computer the menus and a static panel picture
+haze. You are your small pawn in the middle (the big pawn in the corner was dropped, Oct 26). On a phone the map takes most of the screen above an empty strip; on a computer the menus and a static panel picture
 sit around it. The houses, the pawns' look, the clouds and the bubbles are placeholders.
 
 ## The camera it settled on

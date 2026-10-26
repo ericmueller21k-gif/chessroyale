@@ -50,6 +50,11 @@ export function selectBosses(): { bosses: BossDef[]; hidden: BossDef[] } {
 const PX = 0.8;
 const TALLEST = 56;
 const FOOT_AT = 50;
+/**
+ * Where a boss's feet stand, in its own pixels, for one whose frame's `foot` point isn't between its feet (Eric, Oct 25:
+ * Big Boy stood off to one side of the platform). Big Boy's feet span x 33 to 66 in his idle; his `foot` is x 44.
+ */
+const STAGE_FOOT_X: Readonly<Record<string, number>> = { bigboy: 49.5 };
 const placed = new Map<string, { left: number; width: number }>();
 function placeOnStage(ch: Character, idle: string): { left: number; width: number } {
   let p = placed.get(ch.id);
@@ -59,7 +64,8 @@ function placeOnStage(ch: Character, idle: string): { left: number; width: numbe
     // (Never wider than the stage: a wide one, Wrangler's lasso out to one side, slides over to stay whole.)
     const px = Math.min(PX, TALLEST / Math.max(1, ch.foot[1] - top), 100 / ch.w);
     const width = ch.w * px;
-    placed.set(ch.id, (p = { left: Math.max(0, Math.min(100 - width, FOOT_AT - ch.foot[0] * px)), width }));
+    const footX = STAGE_FOOT_X[ch.id] ?? ch.foot[0];
+    placed.set(ch.id, (p = { left: Math.max(0, Math.min(100 - width, FOOT_AT - footX * px)), width }));
   }
   return p;
 }
