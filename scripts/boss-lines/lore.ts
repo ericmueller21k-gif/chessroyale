@@ -17,8 +17,8 @@ export const LORE: Readonly<Record<string, readonly LoreSource[]>> = {
   gingerbread: [
     {
       kind: "quote",
-      source: PR264,
-      text: "Ginger: Baked for a bakery's holiday window, then left in the walk-in freezer over the long weekend. She came out iced over, with a candy cane snapped off the display and a cold streak that never thawed. Anyone who gets close gets frozen.",
+      source: "Eric, Oct 25, 2026, his own words (they replace the PR #264 sketch; docs/decisions/2026-10-25-ginger-lore.md)",
+      text: "Ginger is a he. And he actually likes the cold because they tried to cook him in the oven and he realized that it was going to kill him. So he hates the heat. So that's why he likes the cold… he enjoys cold things. It doesn't have to be excessive though. And his powers are, because he escaped from being baked in Santa's workshop, and then he escaped through the North Pole, but fell down to the cold, but then infused with it, so now that's how he possesses the power of the cold. It's kind of basic, but I like it better. But he also is kind of silly clearly, but has these strong powers.",
     },
   ],
   clown: [
@@ -75,11 +75,10 @@ export const LORE: Readonly<Record<string, readonly LoreSource[]>> = {
 };
 
 /**
- * How to refer to a boss, where the repo settles it. Ginger isn't settled: the lore sketch, the FAQ and the area pages
- * say "she/her", the sprite file's comments say "his". The packs go with "she" (the majority) and the sample flags it.
+ * How to refer to a boss, where the repo settles it. Ginger is a he (Eric, Oct 25).
  */
 export const PRONOUNS: Readonly<Record<string, string>> = {
-  gingerbread: "she/her (lore sketch, FAQ and area pages; the sprite file's comments say \"his\": unsettled, flagged for Eric)",
+  gingerbread: "he/him (Eric, Oct 25)",
   hopper: "two friends drawn as one figure: Chub, a brown rabbit, riding Chirp, a grasshopper (Chub talks; Chirp chirps, as \"(Chirp!)\" in his lines)",
   moo: "two characters: Moo, a cow who only says \"Moo\" (with a feeling), and the Moon, who talks; \"they\" for the pair",
 };

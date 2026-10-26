@@ -19,7 +19,6 @@ const BANNED: readonly { re: RegExp; why: string }[] = [
   { re: /\brecluse\b/i, why: "the Hidden Boss's code name" },
   // Hollow's design (docs/history/bosses.md): no "Grinch"/"Grimch" in names or lines (someone else's trademark).
   { re: /\bgri[nm]ch/i, why: "no \"Grinch\"/\"Grimch\" in lines (Hollow's design: a trademark)" },
-  { re: /\bsanta\b/i, why: "no Santa (Hollow's design: an original creature, no Santa suit)" },
   // Original lines only: no famous catchphrases.
   { re: /to infinity and beyond|yabba dabba|i'll be back|hasta la vista|may the force|\bd'oh\b|cowabunga|i am groot|let it go|you shall not pass|why so serious|here's johnny|bazinga|it's-a me|that's all folks|what's up,? doc|show me the money|houston,? we have/i, why: "a famous catchphrase (lines must be original)" },
   // American English (CLAUDE.md, "Language").
@@ -32,13 +31,19 @@ export interface LineCheck {
 }
 
 /** Checks one line: its length and every rule above. `"..."` is read as the ellipsis character the game's lines use. */
-export function checkLine(text: string): LineCheck {
+/** Words only some bosses may not say, by roster id. */
+const BANNED_FOR: Readonly<Record<string, readonly { re: RegExp; why: string }[]>> = {
+  // Hollow's design (docs/history/bosses.md): an original creature, no Santa suit. (Ginger's lore has Santa's workshop: Eric, Oct 25.)
+  hollow: [{ re: /\bsanta\b/i, why: "no Santa in Hollow's lines (Hollow's design: an original creature, no Santa suit)" }],
+};
+
+export function checkLine(text: string, speaker = ""): LineCheck {
   const reasons: string[] = [];
   const t = text.trim();
   if (!t) reasons.push("empty");
   if ([...t].length > MAX_CHARS) reasons.push(`too long for a bubble: ${[...t].length} characters (at most ${MAX_CHARS})`);
   if (t.includes("\n")) reasons.push("more than one line");
-  for (const b of BANNED) if (b.re.test(t)) reasons.push(b.why);
+  for (const b of [...BANNED, ...(BANNED_FOR[speaker] ?? [])]) if (b.re.test(t)) reasons.push(b.why);
   return { ok: reasons.length === 0, reasons };
 }
 

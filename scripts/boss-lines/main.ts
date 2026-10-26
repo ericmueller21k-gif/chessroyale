@@ -99,7 +99,7 @@ async function run(plan: Plan, cap: number): Promise<void> {
       got.conversations.forEach((c, n) => c.lines.forEach((l, k) => draft.push({ id: `C${n + 1}-${k + 1}`, speaker: l.speaker, situation: `${c.where}: ${c.topic}`, first: tidy(l.text) })));
     }
     // Until the critique answers, every line stands as first written (and is checked as such).
-    result.lines = draft.map((d) => ({ ...d, text: d.first, verdict: "unreviewed", reason: "", ...verdictOf(d.first) }));
+    result.lines = draft.map((d) => ({ ...d, text: d.first, verdict: "unreviewed", reason: "", ...verdictOf(d.first, d.speaker) }));
     write();
 
     console.log("critique");
@@ -109,7 +109,7 @@ async function run(plan: Plan, cap: number): Promise<void> {
     result.lines = draft.map((d) => {
       const v = byId.get(d.id);
       const text = v ? tidy(v.text) : d.first;
-      return { ...d, text, verdict: v ? v.verdict : "unreviewed", reason: v?.reason ?? "the critique skipped this line", ...verdictOf(text) };
+      return { ...d, text, verdict: v ? v.verdict : "unreviewed", reason: v?.reason ?? "the critique skipped this line", ...verdictOf(text, d.speaker) };
     });
   } catch (e) {
     if (!(e instanceof SpendCapReached)) {
@@ -124,8 +124,8 @@ async function run(plan: Plan, cap: number): Promise<void> {
   console.log(`done: ${w.usage.calls} calls, ${w.usage.input} input + ${w.usage.output} output tokens, $${w.usage.usd.toFixed(4)}; ${result.lines.length} lines, ${bad} rejected by the check. ${join(plan.out, "sample.md")}`);
 }
 
-const verdictOf = (text: string) => {
-  const c = checkLine(text);
+const verdictOf = (text: string, speaker: string) => {
+  const c = checkLine(text, speaker);
   return { ok: c.ok, rejected: c.reasons };
 };
 

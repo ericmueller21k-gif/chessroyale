@@ -29,6 +29,8 @@ Rules for every line:
 - Original: no famous catchphrases, no quotes from films, shows, songs or games, no other company's characters or trademarks.
 - Playful and PG: teasing and rivalry are welcome, cruelty and swearing are not. Funny beats clever-for-its-own-sake.
 - In character: each boss sounds like itself (its words, rhythm and catchphrases), never like a generic villain.
+- Go easy on tics: a boss's catchphrases, pet words and verbal tics (a signature exclamation, a roar, a sound effect) flavor its lines; they don't fill them. At most about one line in five uses one, and no two lines in a row (Eric, Oct 25: "why does he keep saying snap?").
+- Every joke and pun lands on first read for any player: if it needs outside knowledge to get (a cookie's brand or type name, an idiom few know), drop it.
 - Facts come from the source pack: a boss's name, look, powers and lore are as the pack says. You may add small, consistent details (a habit, a fear, a favorite thing) to bring a character to life, and you list them where the schema asks, so Eric can see what's new.
 - The other bosses never mention the game's secret Hidden Boss.
 - A power is described as a player sees it (the FAQ's words in the pack), never with numbers or rules text.
@@ -190,7 +192,7 @@ export interface Verdict {
 export const critiquePrompt = (items: string, sheets: readonly Sheet[], rel: Relationship | null) => `You're the tough editor for these boss lines. Go through every line below (each has an id) and decide:
 
 - keep: it's in voice, fresh, funny or characterful, and follows every rule. text: the line unchanged.
-- rewrite: it's bland, generic, repeats another line's joke or shape, is out of voice, is over ${MAX_CHARS} characters, breaks a rule, or contradicts the sheets. text: your better line (same speaker, same situation; for a conversation line, it must still fit the lines around it). reason: what was wrong, in a few words.
+- rewrite: it's bland, generic, repeats another line's joke or shape, leans on the boss's catchphrase or tic when the lines around it already do (about one line in five at most), needs outside knowledge to get, is out of voice, is over ${MAX_CHARS} characters, breaks a rule, or contradicts the sheets. text: your better line (same speaker, same situation; for a conversation line, it must still fit the lines around it). reason: what was wrong, in a few words.
 
 Be strict: a line that any villain could say gets rewritten. Return every id, in order, exactly once.
 
