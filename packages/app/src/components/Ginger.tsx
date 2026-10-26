@@ -6,11 +6,11 @@ import { squareXY } from "./GodKing.tsx";
 import { Flight, PIECE_WORD, onSquare, type BossUi, type MomentProps } from "./PowerParts.tsx";
 
 /**
- * Ginger's powers on screen: the freeze (her cast, the ice bolt to the piece, the ice forming on it and shimmering
- * while it lasts) and the blizzard (the storm bursting from her cane and sweeping the board, every crowd piece but the
+ * Ginger's powers on screen: the freeze (his cast, the ice bolt to the piece, the ice forming on it and shimmering
+ * while it lasts) and the blizzard (the storm bursting from his cane and sweeping the board, every crowd piece but the
  * one still free icing over as it passes; Eric, Oct 12: three turns, thawing). The pieces due to thaw next turn crack
  * and thin to dripping, nearly clear ice; as each later turn begins, a thaw: its banner names the pieces freed, and
- * their ice melts away. Her rules: packages/chess/src/bosses/ginger.ts.
+ * their ice melts away. His rules: packages/chess/src/bosses/ginger.ts.
  */
 
 /** A freeze's beats: the banner, then (once it has gone) his cast, the ice bolt to the piece, the ice forming. */
@@ -22,7 +22,7 @@ export const FREEZE = { boltAt: 1500, iceAt: 1760 } as const;
 export const BLIZZARD = { sweepAt: 1300, sweepMs: animLength(EFFECTS.blizzardSweep.ch.anims.sweep!), lineAt: 2800, crackAt: 3050 } as const;
 /**
  * A thaw's beats (each later turn of the blizzard): its banner naming the pieces freed, gone as (`meltAt`) their ice
- * melts away and she has her say; the God King's line (`lineAt`); then the pieces due to thaw next turn crack
+ * melts away and he has his say; the God King's line (`lineAt`); then the pieces due to thaw next turn crack
  * (`crackAt`).
  */
 export const THAW = { meltAt: 1300, lineAt: 1700, crackAt: 1750 } as const;
@@ -93,7 +93,7 @@ function thawMoment({ boss, moment, banner }: MomentProps) {
 }
 
 let warmed = false;
-/** Her ice's frames drawn ahead (its crack, thin ice and thaw too), a slice a frame, as her battle starts. */
+/** His ice's frames drawn ahead (its crack, thin ice and thaw too), a slice a frame, as his battle starts. */
 export function prewarmGinger(): void {
   if (warmed) return;
   warmed = true;
@@ -107,7 +107,7 @@ export const GINGER_UI = {
     freeze: { order: 0, kit: "power", appearAt: (m, square) => (m.square === square ? m.at + FREEZE.iceAt : undefined), view: freezeMoment },
     // The blizzard's sweep crosses the board left to right; each piece ices over as it passes.
     blizzard: { order: 2, kit: "ultimate", appearAt: (m, square, orientation) => m.at + BLIZZARD.sweepAt + (squareXY(square, orientation).x / 800) * BLIZZARD.sweepMs, view: blizzardMoment },
-    // Each later turn of it: the pieces freed thaw (and she grumbles as their ice melts).
+    // Each later turn of it: the pieces freed thaw (and he grumbles as their ice melts).
     thaw: { order: 2, kit: "ultimateHit", lineAt: THAW.meltAt, view: thawMoment },
   },
   // Ice over iced pieces (the characters' iceOverlay: it forms, then shimmers while it lasts; due to thaw next turn, it
