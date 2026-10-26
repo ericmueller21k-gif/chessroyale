@@ -474,6 +474,13 @@ Coliseum's gate, with ten chess tables, and made the Coliseum about twice its si
 - **Quick chats** in the town (with real players in it): premade lines such as "Who wants to play?" for people idling in the
   square.
 
+**A new name and a first-visit tour** (Eric, Oct 26: "we've kind of outgrown boss arena… we're going to have this ability to
+challenge other players here, not just the bosses"). Not started; Eric is picking the name (maybe "Town square").
+- **Rename Boss Arena** on home's card and the computer's side menu once Eric has the name.
+- **A first-visit tour on home**: the rest of the page dims, and a pointer steps through it with Next: 50 v 50 first, then the
+  other modes, and last the town's card with a short pitch ("open world style": walk around, meet the bosses, play people at
+  the park). A flag on the player's account remembers they've seen it, so it shows once.
+
 **Rooms** (Eric, Oct 26: "we can't have 10,000 people in this little world")
 - Each town square is a **room**, its own copy of the world. Opening Boss Arena puts you in the busiest room that still has
   space, so rooms feel lively.

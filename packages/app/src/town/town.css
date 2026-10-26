@@ -55,10 +55,8 @@
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
-  cursor: grab;
-}
-.town-canvas:active {
-  cursor: grabbing;
+  /* The ordinary arrow, also while you drag the view (Eric, Oct 26: "just the normal default mouse"). */
+  cursor: default;
 }
 /* Off screen, for screen readers only: a statue's quote while you're up close to it. */
 .town-sr {
