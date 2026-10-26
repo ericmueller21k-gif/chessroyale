@@ -1,0 +1,1469 @@
+[
+  {
+    "id": "gingerbread",
+    "name": "Ginger",
+    "pronouns": "he/him (Eric, Oct 25)",
+    "powers": {
+      "passive": "freeze",
+      "ultimate": "blizzard",
+      "faq": "Plays from the game so far.\n\n- **Freeze** (passive): from turn 2, one of your pieces that matters (one of your three most valuable, mobile pieces; never the king) is iced and can't move for 2 turns. Then again every 4 to 6 turns.\n- **Blizzard** (ultimate): it lasts 3 turns. On its first turn, only one of your pieces may move, picked at random from those that have a move (never your king nor the frozen piece, unless nothing else can move); its banner names it. On its second, 4 or 5 may move in all: the pieces already free stay free, and more thaw, picked at random, those with a move first (never your king, unless it's the only piece that can move); the banner names them. On its third, the ice is gone and every piece moves again. The pieces that thaw next turn show cracked, dripping ice the turn before. A piece that can move is always free: in check, one that can get you out of it. The Freeze waits until the Blizzard is over."
+    },
+    "look": [
+      "Ginger, the Freeze boss: an angry gingerbread man with white icing trim, a green bow tie, red gumdrop buttons and a big candy cane he holds like a weapon, after Eric's reference picture, redrawn. He's the Freeze boss, so his icing glints like frost, his eyes go ice-blue and his cane glows when he casts. Drawn facing front, light from the top left. Rigging: the head, bow tie and torso are typed or painted once; the arms, legs and the cane are painted from their pose's points (a shoulder, an elbow, a fist; a hip and a foot; the cane's grip and direction), so a new pose is a handful of numbers. The cane hand (his right, on our left) always grips the cane; the other arm is free."
+    ],
+    "lore": [
+      {
+        "source": "Eric, Oct 25, 2026, his own words (they replace the PR #264 sketch; docs/decisions/2026-10-25-ginger-lore.md)",
+        "text": "Ginger is a he. And he actually likes the cold because they tried to cook him in the oven and he realized that it was going to kill him. So he hates the heat. So that's why he likes the cold… he enjoys cold things. It doesn't have to be excessive though. And his powers are, because he escaped from being baked in Santa's workshop, and then he escaped through the North Pole, but fell down to the cold, but then infused with it, so now that's how he possesses the power of the cold. It's kind of basic, but I like it better. But he also is kind of silly clearly, but has these strong powers."
+      }
+    ],
+    "selectLines": [
+      "Ginger is here!",
+      "You'll crumble!",
+      "Fresh out of the freezer!",
+      "Cool as ice."
+    ],
+    "kitLines": {
+      "entrance": [
+        "Ginger is here!",
+        "You'll crumble!",
+        "Fresh out of the freezer!"
+      ],
+      "move": [
+        "Snap!",
+        "Hmph!",
+        "Out of my way!",
+        "Cold move. Colder heart."
+      ],
+      "capture": [
+        "Crumbs to crumbs!",
+        "Into the cookie jar!",
+        "Snapped it up!",
+        "That one's iced!"
+      ],
+      "check": [
+        "Check! Feeling a chill?",
+        "Your king's on thin ice!",
+        "Snap! Check!"
+      ],
+      "hurt": [
+        "My icing!",
+        "Ow! I'm cracking!",
+        "You'll pay for that crumb!"
+      ],
+      "thinking": [
+        "Sugar and spite…",
+        "Let it simmer…",
+        "Cooling down… not."
+      ],
+      "smug": [
+        "Half-baked, all of you!",
+        "Stale! So stale!",
+        "Cool as ice."
+      ],
+      "rattled": [
+        "My gumdrops are sweating!",
+        "Stop! I'll melt!",
+        "Not my icing!"
+      ],
+      "defeat": [
+        "I… crumble…",
+        "Oh, snap…",
+        "Back to the oven…"
+      ],
+      "victory": [
+        "Snap! I win!",
+        "Sweet, sweet victory!",
+        "Iced you all! Ha!"
+      ],
+      "strike": [
+        "Snap! You're done!",
+        "Crumbled!"
+      ],
+      "power": [
+        "Chill out!",
+        "Stay frosty!",
+        "On ice you go!",
+        "Cold feet?"
+      ],
+      "ultimateWarn": [
+        "A storm is brewing…",
+        "Feel that chill?",
+        "Wrap up warm…",
+        "The frost is coming…"
+      ],
+      "ultimate": [
+        "Let it snow!",
+        "Freeze, all of you!",
+        "Snow day! Ha!"
+      ],
+      "kingAttack": [
+        "Frostbite, your majesty!",
+        "Snap! Snap! Snap!",
+        "Feeling a chill yet?"
+      ],
+      "ultimateHit": [
+        "Melting? Already?!",
+        "Hmph. Don't get comfy.",
+        "My lovely ice!",
+        "Drip, drip… bah!"
+      ]
+    }
+  },
+  {
+    "id": "clown",
+    "name": "Boingo the Clown",
+    "pronouns": null,
+    "powers": {
+      "passive": "pie",
+      "ultimate": "funhouse",
+      "faq": "Plays from the game so far.\n\n- **Pie** (passive): from turn 2, an empty square near the center (the one the fewest moves can reach) gets a pie for 3 turns: nobody, on either side, may move onto it. A new pie every 2 turns, up to 2 on the board at once, never two on one square.\n- **Funhouse** (ultimate): as it comes, the board turns upside down and he plays your move for you: a weak but recoverable one (giving away 10 to 25 points, never more than 1.6 in log-odds). Nobody is scored for it. Then he plays his own, and the board keeps turning, 4 turns a step (his move for you counts as the first): upside down, then a quarter turn to one side (left or right, at random), then a half turn to the other side, then back the right way up, where it stays. From then on you play your own moves (taps and drags work at every angle, and the coordinates name the real squares), scored as usual. Once the board is back, his meter fills again; each Funhouse after that plays your move once more."
+    },
+    "look": [
+      "Boingo the Clown (boss tier 2, from 1500): a grinning harlequin on a pogo stick, after Eric's reference picture, redrawn. Always bouncing. Drawn facing front, light from the top left. Rigging: the pogo's top (handlebar, shaft, foot bar) is one rigid piece; the spring tube and rubber tip slide on it. The gloves hold the handlebar and the shoes stand on the foot bar, so they ride with the pogo; the body, sleeves, head, hair and hat ride on top and can crouch or stretch against it. A pose is a handful of numbers."
+    ],
+    "lore": [
+      {
+        "source": "PR #264 (the boss select, Oct 16), \"DRAFTS FOR ERIC\" (not shipped; draft lore)",
+        "text": "Boingo the Clown: The circus left town without him. He kept the pogo stick, a cart of cream pies and the keys to the old funhouse, and he's been living there since. Nobody laughs at his act anymore, so he makes them laugh."
+      }
+    ],
+    "selectLines": [
+      "Honk honk! Showtime!",
+      "Step right up!",
+      "Who ordered a clown?"
+    ],
+    "kitLines": {
+      "entrance": [
+        "Honk honk! Showtime!",
+        "Step right up!",
+        "Who ordered a clown?"
+      ],
+      "move": [
+        "Boing!",
+        "Hee hee!",
+        "Your turn, chumps!",
+        "Watch my feet!"
+      ],
+      "capture": [
+        "Mine now! Honk!",
+        "Into the hat it goes!",
+        "Snatched it! Hee hee!",
+        "Whoopsie! For me!"
+      ],
+      "check": [
+        "Honk! Check!",
+        "Knock knock!",
+        "Peekaboo, king!"
+      ],
+      "hurt": [
+        "Hey! That was mine!",
+        "Ow! My nose!",
+        "No fair!"
+      ],
+      "thinking": [
+        "Eeny, meeny…",
+        "Hmm, hmm, hmm…",
+        "Spin the wheel…"
+      ],
+      "smug": [
+        "Too easy!",
+        "Is this chess or a circus?",
+        "Boingo's on a roll!"
+      ],
+      "rattled": [
+        "Not funny anymore…",
+        "Uh-oh…",
+        "Nobody laughs at Boingo!"
+      ],
+      "defeat": [
+        "Waaah! My pogo!",
+        "Show's over…",
+        "Not… funny…"
+      ],
+      "victory": [
+        "Ta-da! Honk honk!",
+        "Boingo wins! Hee hee!",
+        "Send in the next clowns!"
+      ],
+      "strike": [
+        "Pie in your face!",
+        "Hee hee! Gotcha!"
+      ],
+      "power": [
+        "Pie time!",
+        "Special delivery!",
+        "Extra cream for you!",
+        "Splat! Hee hee!"
+      ],
+      "ultimateWarn": [
+        "Something funny's coming…",
+        "Get ready to laugh…",
+        "Boingo's big finale…"
+      ],
+      "ultimate": [
+        "Welcome to the funhouse!",
+        "Topsy-turvy!",
+        "Round and round we go!"
+      ],
+      "kingAttack": [
+        "Pie, pie, and more pie!",
+        "Honk! Extra cream!",
+        "Say cheese… cake!"
+      ]
+    }
+  },
+  {
+    "id": "grex",
+    "name": "Jefferson",
+    "pronouns": null,
+    "powers": {
+      "passive": "sparkler",
+      "ultimate": "candle",
+      "faq": "Plays from the game so far.\n\n- **Sparkler** (passive): from turn 2, a square on your half catches fire and burns in 3 stages, one a turn. A piece of yours still on it after your move on the last stage burns (never your king, nor a piece whose loss would leave a king in check: then it fizzles). The judge counts a piece left to burn as already gone, so moving it off is never a mistake. The next Sparkler comes 1 turn after a fire goes out.\n- **Roman Candle** (ultimate): 24 fireballs in waves of 1, 2, 3, 4, 4, 4, 3, 2, 1, one wave a turn, from 3 turns after he fires. About 40% of each wave falls on his own half (his pieces never burn: the first time one stands in that fire, he laughs about it), the rest on yours. Each wave's squares show as growing shadows 3 turns ahead, and each fireball lands as a fresh fire (never on your king's square as it's picked; if your king stands there when it lands, it fizzles). A piece of yours left on any of his fires burns, wherever it is."
+    },
+    "look": [
+      "Jefferson (id \"grex\"; G-REX until Oct 10), the Fire boss: a cocky giraffe with a mischievous look and a fiery glint in his eyes, flames on his horn tips, down his mane and on the end of his tail, a cheeky grin, a sparkler in each hand and a wide fighting stance, after Eric's reference picture, redrawn. Yellow with orange-brown spots, light from the top left. A giraffe first (Eric, Oct 9): a long neck, so he stands taller than the other bosses (about the God King's height with his wings spread; his frame grows upward), and a typical giraffe face, no sunglasses. The head stays big for a phone, so his eyes, grin and flaming ossicones read. Drawn three-quarters, facing right (our right), as in the reference: the flames (mane, tail) on our left, the sparklers on our right, toward the board. Rigging: the head, torso and hooves are painted once per look; the neck, arms, legs and tail are painted from their pose's points (a shoulder, an elbow, a fist; a hip, a knee, an ankle), and the sparklers from the fist in the arm's direction, so a new pose is a handful of numbers. The flames (horn tips, mane, tail tuft) are small painted parts in three flicker shapes, picked per frame, and the sparklers spit sparks (seeded specks), so every frame crackles without anyone drawing it."
+    ],
+    "lore": [
+      {
+        "source": "PR #264 (the boss select, Oct 16), \"DRAFTS FOR ERIC\" (not shipped; draft lore)",
+        "text": "Jefferson: A giraffe who grew up sure he was a dinosaur (he answered to G-REX for years). He landed a job as the fireworks stand's mascot and has been lighting things he shouldn't ever since."
+      }
+    ],
+    "selectLines": [
+      "Jefferson in the house!",
+      "Feel the heat!",
+      "Rawr! I mean… hi.",
+      "Hot stuff coming through!"
+    ],
+    "kitLines": {
+      "entrance": [
+        "Jefferson in the house!",
+        "Feel the heat!",
+        "Rawr! I mean… hi.",
+        "Hot stuff coming through!"
+      ],
+      "move": [
+        "Sizzlin'!",
+        "Too hot to handle?",
+        "Smokin'!",
+        "Watch and learn."
+      ],
+      "capture": [
+        "Toast!",
+        "Extra crispy!",
+        "Burnt to a crisp!",
+        "Well done. Very well done."
+      ],
+      "check": [
+        "Check! Feeling warm?",
+        "Your king's toast!",
+        "Hot seat, your majesty!",
+        "Check! Getting hot?"
+      ],
+      "hurt": [
+        "Hey! Not the face!",
+        "Ow! That's hot!",
+        "You singed me!",
+        "Rude!"
+      ],
+      "thinking": [
+        "Let it simmer…",
+        "Slow roast…",
+        "Warming up…"
+      ],
+      "smug": [
+        "Too hot to handle?",
+        "Tiny arms? Not me!",
+        "Burn, baby, burn!",
+        "Neck and neck? Nope!"
+      ],
+      "rattled": [
+        "Is it hot in here?",
+        "My neck's sweating!",
+        "Not cool. Not cool!"
+      ],
+      "defeat": [
+        "Burnt out…",
+        "Extinct… again…",
+        "My flame… fizzled…"
+      ],
+      "victory": [
+        "Too hot for you!",
+        "Rawr! Champion!",
+        "Hottest neck in town!",
+        "Fire it up!"
+      ],
+      "strike": [
+        "Torched!",
+        "Flame on!"
+      ],
+      "power": [
+        "Catch!",
+        "Hot potato!",
+        "Light it up!",
+        "Heads up!",
+        "Spark it!"
+      ],
+      "powerHit": [
+        "Toasty!",
+        "Ashes to ashes!",
+        "Poof! Crispy!",
+        "Smells like victory!"
+      ],
+      "ultimateWarn": [
+        "Got a big one for you…",
+        "Wanna see a trick?",
+        "Lighting the fuse…",
+        "Big bang coming…"
+      ],
+      "ultimate": [
+        "Fireworks time!",
+        "Ooh! Aah! Ha!",
+        "Look up! Way up!"
+      ],
+      "ultimateHit": [
+        "Incoming!",
+        "It's raining fire!",
+        "Hot rain! Ha!",
+        "Here they come!"
+      ],
+      "kingAttack": [
+        "Fireworks, your majesty!",
+        "Ooh! Aah! Ouch!",
+        "Let's light up the king!"
+      ]
+    }
+  },
+  {
+    "id": "hollow",
+    "name": "Hollow",
+    "pronouns": null,
+    "powers": {
+      "passive": "dark",
+      "ultimate": "lightsout",
+      "faq": "Always plays Black, from the starting position: if you'd have been Black, he claims the dark side before move 1.\n\n- **The Dark** (passive): after his first move he covers the square of the piece he moved; then another square on every 3rd move of his (his 4th, 7th, 10th…), a random occupied square, never a king's. Each stays dark for 10 turns, and pieces there are hidden. A move that touches the dark goes through unchecked: if it turns out illegal, it costs 5 points and you pick again, and your 5th wrong try in a turn ends your turn as a missed move (a turn never costs more than a missed move).\n- **Lights Out** (ultimate): at the start of his turn, a memory test in 3 rounds: find 1, then 2, then 3 of his pieces (3 s, 4 s, 5 s; each tap adds 1 s). Each piece you miss costs 10 points. If the crowd finds under 70% of them, he plays an extra quiet move straight after his own (no capture, check or promotion, worth at most 3 points to him)."
+    },
+    "look": [
+      "Hollow, the Darkness boss: a lanky, shaggy creature of charcoal-black fur, after Eric's reference picture, redrawn as an original. The villagers tore him apart; the darkness brought him back and holds him together through the middle, so where his belly was there is a band of violet-black darkness with a void at its heart, slowly swirling. Torn seams across his shoulder, his cheek and his thigh are bound the same way. He carries a long strand of Christmas lights held in the middle, its two halves hanging with five bulbs each (Eric's reference: red, gold, blue in turn; since Oct 11 the battle's own colors, lights.ts), all ten lit in every pose (Eric, Oct 16: the countdown to his next cover of the dark is the strip of three by the boss bar alone). Glowing gold eyes, a thin violet edge glow (his halo) so he never vanishes on the dark ground. Drawn facing front, light from the top left. Rigging: the head (one per face), ruff, hips and the band of darkness are painted once; the void is painted per swirl phase and size; the arms and legs are painted from their pose's points (a shoulder, an elbow, a hand; a hip, a knee, an ankle) as shaggy strokes; the strand is painted from the hand that holds it. So a new pose is a few numbers. Each bulb has palette keys of its own (main, shade, glint, glow), drawn in its default color (lights.ts, DEFAULT_LIGHTS: red, yellow, blue in turn): the battle's lights swap them (HOLLOW.swap), and a look or a frame's palette (`bulbs2`, `bulbs1`, `bulbs0`; `bulbsOff`) puts a third of the strand out (bulbs 2, 5, 8 first, then 1, 4, 7, then the rest) without redrawing anything: his entrance lights them a third at a time and his defeat puts them out. His figure in battle wears no look (kits.ts). Their glints are specks in the same keys (an unlit bulb never glints)."
+    ],
+    "lore": [
+      {
+        "source": "PR #264 (the boss select, Oct 16), \"DRAFTS FOR ERIC\" (not shipped; draft lore). ERIC'S OWN LORE: keep it exactly",
+        "text": "Hollow (Eric's own lore): a Grinch-like figure who was killed somehow. The darkness kept him alive: his center is that darkness, it's his being now, and it holds him together (if it were ruptured…). He carries a strand of Christmas lights."
+      },
+      {
+        "source": "docs/history/bosses.md",
+        "text": "Eric's reference: a furry Christmas-thief creature, gone dark. Lore: the villagers tore him apart; the darkness brought him back and now holds him together through the middle, so there is a void in his chest. He carries a strand of Christmas lights. He is \"the dark boss\": a small change to the chess (a memory test), not a fog of war."
+      },
+      {
+        "source": "docs/history/bosses.md",
+        "text": "**Name: Hollow** (director's call; Eric didn't pick one, names aren't final). Kept an original creature, not a recolored Grinch, because that character is someone else's trademark: no \"Grinch\"/\"Grimch\" in names or lines, no green fur, no Santa suit or hat. His own look is charcoal-black fur, torn edges bound by violet-black darkness, the chest void, and the lights."
+      }
+    ],
+    "selectLines": [
+      "Hollow is here.",
+      "Did you leave a light on?",
+      "I was always here.",
+      "Hush now."
+    ],
+    "kitLines": {
+      "entrance": [
+        "Hollow is here.",
+        "Did you leave a light on?",
+        "I was always here.",
+        "Hush now."
+      ],
+      "move": [
+        "Mm.",
+        "Quietly…",
+        "Step by step.",
+        "Into the dark."
+      ],
+      "capture": [
+        "Gone. Like you'll forget.",
+        "Mine now.",
+        "Swallowed.",
+        "Into the void."
+      ],
+      "check": [
+        "Check. Look closer.",
+        "Your king can't hide.",
+        "Check. Feel the cold?"
+      ],
+      "hurt": [
+        "You'll pay for that.",
+        "That… stung.",
+        "I've been torn before."
+      ],
+      "thinking": [
+        "Let it get darker…",
+        "Shh…",
+        "Patience…"
+      ],
+      "smug": [
+        "How do you like the dark?",
+        "Lost already?",
+        "Can you still see it?"
+      ],
+      "rattled": [
+        "Too bright… too bright!",
+        "No… not the light!",
+        "I'm coming apart!"
+      ],
+      "defeat": [
+        "The light… again…",
+        "Remember me…",
+        "Torn… apart…"
+      ],
+      "victory": [
+        "Lights out. For good.",
+        "Darkness wins.",
+        "You forgot. They all do."
+      ],
+      "strike": [
+        "Forgotten.",
+        "Gone dark."
+      ],
+      "darkFirst": [
+        "Don't forget what's there. Forgetting costs."
+      ],
+      "power": [
+        "Can you still see it?",
+        "How do you like the dark?",
+        "Remember it?",
+        "Dark there now.",
+        "Forgetting yet?"
+      ],
+      "claim": [
+        "The dark side is mine.",
+        "I'll take the dark.",
+        "Black suits me."
+      ],
+      "ultimateWarn": [
+        "It's getting dark…",
+        "Feel it?"
+      ],
+      "ultimate": [
+        "It's time."
+      ],
+      "found": [
+        "Hmph. You remembered.",
+        "Lucky.",
+        "Not bad… for now."
+      ],
+      "missed": [
+        "Forgotten already?",
+        "Forgetting costs.",
+        "Wrong. So wrong."
+      ],
+      "lightsBack": [
+        "Remember that.",
+        "Lights on. For now.",
+        "Keep your eyes open."
+      ],
+      "lightsHeld": [
+        "The light holds. For now.",
+        "You remembered. This time.",
+        "Hmph. The light holds."
+      ],
+      "lightsFailed": [
+        "You forgot. The dark moves twice.",
+        "Forgotten. I move twice.",
+        "The dark moves twice."
+      ],
+      "kingAttack": [
+        "Shh. Sleep now, little king.",
+        "Into the dark with you.",
+        "Lights out, little king."
+      ]
+    }
+  },
+  {
+    "id": "bigboy",
+    "name": "Big Boy",
+    "pronouns": null,
+    "powers": {
+      "passive": "blocks",
+      "ultimate": "bounce",
+      "faq": "Plays from the starting position, less your d- or e-pawn, which he eats before move 1 (his snack). That pawn's head start is why he plays 250 under the usual strength.\n\n- **Toy Blocks** (passive): from turn 2, every 4 turns a block lands on an empty square in your half that one of your pieces could move to, for 3 turns: nothing, on either side, may move onto it or slide through it (a knight jumps it). It never stops an attack.\n- **Big Bounce** (ultimate): at the start of his turn, after the warning, 2 to 6 of your pieces (never the king) bounce to empty squares up to 2 squares away (pawns only sideways), into a position about 1 pawn worse for you (from 0.5 to 1.5 pawns)."
+    },
+    "look": [
+      "Big Boy, the baby boss: a chubby bald baby after Eric's reference picture, redrawn. A few hair tufts on top, big ears, half-lidded eyes and big pink lips; a teal crop shirt reading \"BIG BOY\", a light blue diaper, bare feet, and a swirly rainbow lollipop (his weapon) in his right hand, on our left. Drawn facing front, light from the top left. Rigging: the head (one per face), the shirt, belly, diaper and feet are painted once; the arms (each with its short sleeve) and legs are painted from their pose's points (a shoulder, an elbow, a hand; a hip and a foot), and the lollipop from where his fist holds it and where the candy is. So a new pose is a few numbers. His powers' moments (characters/power-art.ts): `snack` (he waddles over to one of the crowd's center pawns, grabs it and eats it: nom, nom), `toss` (a toy block thrown at the board), `bigBounce` (on the board: three bounces with squash and stretch, a giant fall, dazed, a giggle, and off again; timed to boss-timing's BOUNCE), and his reactions `lick` (a slurp of the lollipop), `giggle` and `wail` (the tantrum with its wail). Idle, swing and tantrum are as approved."
+    ],
+    "lore": [
+      {
+        "source": "PR #264 (the boss select, Oct 16), \"DRAFTS FOR ERIC\" (not shipped; draft lore)",
+        "text": "Big Boy: A baby who never stopped growing. Everything he can reach is a toy, and he can reach a lot: blocks, lollipops, your pieces. He only stops for a nap, and he never wants a nap."
+      }
+    ],
+    "selectLines": [
+      "Big boy here!",
+      "Wanna play?",
+      "Mine! All mine!"
+    ],
+    "kitLines": {
+      "entrance": [
+        "Big boy here!",
+        "Mine! All mine!",
+        "Wanna play?"
+      ],
+      "snack": [
+        "Nom nom.",
+        "Yummy pawn!",
+        "Snack time!"
+      ],
+      "move": [
+        "Mine!",
+        "Me go!",
+        "Hee hee!",
+        "Big boy move!"
+      ],
+      "capture": [
+        "Mine!",
+        "Gimme!",
+        "Nom nom.",
+        "My toy now!"
+      ],
+      "check": [
+        "Peekaboo!",
+        "Boo!",
+        "Got you!"
+      ],
+      "hurt": [
+        "Waaaah!",
+        "No fair!",
+        "Owie!",
+        "Mine! Give back!"
+      ],
+      "thinking": [
+        "Hmmm…",
+        "Goo?",
+        "Uhhh…"
+      ],
+      "smug": [
+        "Easy peasy!",
+        "Big boy winning!",
+        "Hee hee hee!"
+      ],
+      "rattled": [
+        "Uh-oh.",
+        "Mama?",
+        "No like this…"
+      ],
+      "defeat": [
+        "Waaaah!",
+        "Nap time…",
+        "Not fair…"
+      ],
+      "victory": [
+        "Big boy win!",
+        "Yay! All mine!",
+        "Again! Again!"
+      ],
+      "strike": [
+        "Bonk!",
+        "Time out!",
+        "Bad! Bonk!"
+      ],
+      "power": [
+        "Catch!",
+        "Blocky!",
+        "My toy!",
+        "Stack it!"
+      ],
+      "ultimateWarn": [
+        "Big boy mad!",
+        "Waaaah!"
+      ],
+      "ultimate": [
+        "Big boy BOUNCE!",
+        "Boing boing!",
+        "Bouncy bouncy!"
+      ],
+      "kingAttack": [
+        "Bonk, bonk, BONK!",
+        "Bad king! Time out!",
+        "Waaah! Mine! Mine!"
+      ]
+    }
+  },
+  {
+    "id": "sawyer",
+    "name": "Sawyer",
+    "pronouns": null,
+    "powers": {
+      "passive": "cuts",
+      "ultimate": "boardsaw",
+      "faq": "Plays from the game so far, and his first move is a pawn's. Then the **Split Pawn**: that pawn is sawn in two, giving him a second pawn on an empty square beside it (never one that attacks your pieces or gives check). That head start is why he plays 250 under the usual strength.\n\n- **Saw Cuts** (passive): from turn 3, every 4 turns he saws through the edge between two squares in your half that one of your moves would cross, for 3 turns: no straight move across it (a slide, a pawn's step, the king's step, castling), on either side. Knights and diagonal moves pass.\n- **Board Saw** (ultimate): once his meter is full, from turn 10, and while one half of the board (files a to d, or e to h) is his on material: the warning, then for 5 turns no move may cross between the d- and e-files, knights included, on either side. Then the halves rejoin."
+    },
+    "look": [
+      "Sawyer, the raccoon boss: after Eric's reference picture, redrawn. A raccoon in a wide, aggressive stance with a mischievous toothy grin, a yellow hard hat, a bold black bandit mask (no goggles: Eric wanted the mask to read), white gloves, a big striped tail, and a red-and-black reciprocating saw held in both hands (no brand marks). Drawn three-quarters on, facing our left as in the reference, light from the top left. Rigging: the head (one per face), the hat, the body and the feet are painted once; the legs and arms from their points (a hip and an ankle; a shoulder, an elbow and a hand), the tail from its swish, and the saw from its angle, where it's held and how far the blade has slid out. The gloves ride on the saw's grips, so moving the saw moves his hands. Every part is painted the first time a frame that uses it shows (sprite.ts lazyParts). His powers' moments (the split pawn, a saw cut, the board saw: components/Sawyer.tsx) reuse his `rev` and `sawDown`, with a `leap` (onto the board and back) and `boardSaw` (sawing his way up the board) added; his lines are SAWYER_LINES, his sounds characters/sawyer-sounds.ts."
+    ],
+    "lore": [
+      {
+        "source": "PR #264 (the boss select, Oct 16), \"DRAFTS FOR ERIC\" (not shipped; draft lore)",
+        "text": "Sawyer: A raccoon who learned carpentry from the dumpster behind a lumber yard. He wears the hard hat, carries the saw, never pulls a permit, and \"renovates\" whatever he finds, mostly the board you're playing on."
+      }
+    ],
+    "selectLines": [
+      "Measure twice, cut once.",
+      "Hard hat zone!",
+      "Let's get sawing."
+    ],
+    "kitLines": {
+      "entrance": [
+        "Measure twice, cut once.",
+        "Hard hat zone!",
+        "Let's get sawing."
+      ],
+      "split": [
+        "Two for one!",
+        "Half off!",
+        "Double trouble!"
+      ],
+      "move": [
+        "Snip.",
+        "Clean cut.",
+        "On the level."
+      ],
+      "capture": [
+        "Timber!",
+        "Sawed it.",
+        "That's lumber now."
+      ],
+      "check": [
+        "Cut off!",
+        "Nowhere to run.",
+        "Corner cut!"
+      ],
+      "hurt": [
+        "Splinters!",
+        "Ow! My thumb!",
+        "Not my good saw!"
+      ],
+      "thinking": [
+        "Measure twice…",
+        "Where's my pencil?",
+        "Hmm, level…"
+      ],
+      "smug": [
+        "Built to last.",
+        "Solid work.",
+        "Right on schedule."
+      ],
+      "rattled": [
+        "Not up to code…",
+        "Wobbly…",
+        "Structural damage!"
+      ],
+      "defeat": [
+        "Out of order…",
+        "Back to the shop…",
+        "Blunt blade…"
+      ],
+      "victory": [
+        "Job done!",
+        "Measure twice, win once.",
+        "Signed off!"
+      ],
+      "strike": [
+        "Timber!",
+        "You're fired!",
+        "Off the job!"
+      ],
+      "power": [
+        "Mind the gap.",
+        "Keep off the cut!",
+        "Snip snip.",
+        "Clean cut."
+      ],
+      "ultimateWarn": [
+        "This board's getting renovated.",
+        "Stand back…",
+        "Revving up…"
+      ],
+      "ultimate": [
+        "Timber!",
+        "Renovation time!",
+        "Down the middle!"
+      ],
+      "kingAttack": [
+        "Demolition time!",
+        "Cut it out? Never!",
+        "Timber, your majesty!"
+      ]
+    }
+  },
+  {
+    "id": "pig",
+    "name": "Wrangler",
+    "pronouns": null,
+    "powers": {
+      "passive": "drag",
+      "ultimate": "showdown",
+      "faq": "Plays from the starting position. His first move, after yours, is the **Long Pull**: a center pawn's double step, then he lassos it one square further, three squares in one move (d7 to d4 or e7 to e4; if you're Black, e2 to e5 or d2 to d5). The engine picks the pawn that suits the position; if neither would be safe there (it would just be taken, or its way is blocked), he plays an ordinary first move. It's worth about nothing either way: flavor. His lassos are why he plays 250 under the usual strength.\n\n- **Lasso Drag** (passive): from turn 3, every 10 turns, after his move he ropes one of your pieces (never your king or a bishop) and drags it one square up, down, left or right onto an empty square. It never leaves you in check or without a move, and a pawn never ends on the first or last rank. The engine picks a drag that costs you only a little: between 0.1 and 0.9 of a pawn. If none fits (or the game is already decided), there's no drag that turn and he tries again after his next move.\n- **SHOWDOWN!** (ultimate): Wrangler has a meter of his own instead of the rage meter. His moves fill it, 5 moves from empty to full, and nothing else adds to it. When it's full he says \"I've got you in my sights.\" and swings both ropes. From then on, after the first of his moves where he finds a line-up that suits him, he fires with no other warning: three pairs facing each other anywhere on the board off the back ranks, a rook against a rook, a bishop against a bishop and a knight against a knight (two pairs when three won't work; never queens). His pieces are always protected. **Your next move must be one of the duels**: one of your pieces takes the one facing it. The duels glow, and nothing else can be played. The engine sets it up so that even the right duel leaves the game about where it was or tips it his way (from 0.2 of a pawn your way to 1.5 his way), and a wrong one costs you 1.5 pawns or more on top, so look before you take. He answers your duel with the engine's best move, and keeps playing the engine's moves while pieces from the line-up can still be taken (up to 3 moves). Then his meter empties and fills again: at most 2 Showdowns a battle."
+    },
+    "look": [
+      "Wrangler, the cowboy pig who rounds up livestock (Eric named him, Oct 13, 2026; his code id stays `pig`, since \"wrangler\" is already Cloudflare's CLI in this repo), after Eric's reference picture, redrawn. A pink pig in a wide fighting crouch: a brown cowboy hat with a dark band and a gold star, pointy pink ears, angry brows, a big snout and a toothy, scheming grin; a brown vest with a fringe and a gold star, a belt with a big gold buckle, brown boots with gold spurs; one lasso spinning overhead in a big loop (his right hand, on our left) and a coil of rope in the other. Drawn facing front, turned a little to our left as in the reference, light from the top left. A playable boss since Oct 13, 2026 (his kit \"Wrangler\" in kits.ts; his powers on screen in components/Pig.tsx; his rules in packages/chess/src/bosses/pig.ts): his lasso throw's `CATCH` point lands on the piece he drags, he hops on and off the board (`leap`), winds up both loops for his showdown (`windup`) and hauls its pairs in (`haul`, the board drawing the ropes from his fists). His lines: PIG_LINES; his sounds: characters/pig-sounds.ts. Rigging: the head (one per face), the body and the boots are painted once; the legs and arms from their points (a hip, a knee and an ankle; a shoulder, an elbow and a fist); the hat from its tilt (so he can tip it); every rope (the spinning loop, the line to it, the coil, the slack) from its path: a loop is an ellipse (its center, radii and tilt), and the line runs from his fist to the loop's nearest point. So a lasso pose is a few numbers. Every part is painted the first time a frame that uses it shows (sprite.ts lazyParts)."
+    ],
+    "lore": [
+      {
+        "source": "PR #264 (the boss select, Oct 16), \"DRAFTS FOR ERIC\" (not shipped; draft lore)",
+        "text": "Wrangler: A rodeo pig who got tired of being chased around the ring, so he took the rope. Now he ropes anything that moves and waits for high noon to settle it."
+      }
+    ],
+    "selectLines": [
+      "Howdy, varmints.",
+      "Saddle up!",
+      "Yee-haw!"
+    ],
+    "kitLines": {
+      "entrance": [
+        "Howdy, varmints.",
+        "Saddle up!",
+        "Yee-haw!"
+      ],
+      "pull": [
+        "Giddy-up, pawn!",
+        "Yank!"
+      ],
+      "move": [
+        "Giddy-up.",
+        "Easy now.",
+        "Mosey on."
+      ],
+      "capture": [
+        "Roped!",
+        "Hog-tied!",
+        "Got 'im!"
+      ],
+      "check": [
+        "Reach for the sky!",
+        "Hands up!",
+        "Corralled!"
+      ],
+      "hurt": [
+        "Oink!",
+        "Dang varmints!",
+        "My hat!"
+      ],
+      "thinking": [
+        "Hmm, reckon…",
+        "Lemme think…",
+        "Snort…"
+      ],
+      "smug": [
+        "Heh heh. Snort.",
+        "Easy pickin's.",
+        "Like roping fence posts."
+      ],
+      "rattled": [
+        "Uh oh…",
+        "Rustlers!",
+        "This ain't good…"
+      ],
+      "defeat": [
+        "I'll be danged…",
+        "Back to the barn…",
+        "Outdrawn…"
+      ],
+      "victory": [
+        "Yee-haw!",
+        "Rodeo's over!",
+        "Snort snort!"
+      ],
+      "strike": [
+        "Git along!",
+        "Yer outta here!",
+        "Yee-haw!"
+      ],
+      "power": [
+        "Git over here!",
+        "C'mere, little doggie.",
+        "Yoink!"
+      ],
+      "tug": [
+        "Fine. Just a tug, then.",
+        "Yoink, anyhow.",
+        "A tug'll do."
+      ],
+      "ready": [
+        "I've got you in my sights."
+      ],
+      "ultimate": [
+        "This board ain't big enough for the six of us.",
+        "It's high noon!"
+      ],
+      "kingAttack": [
+        "Dance, little king!",
+        "Crack! Crack! Yee-haw!",
+        "Git along, your majesty!"
+      ]
+    }
+  },
+  {
+    "id": "alfil",
+    "name": "Alfil",
+    "pronouns": null,
+    "powers": {
+      "passive": "tusks",
+      "ultimate": "slam",
+      "faq": "Plays from the game so far. A woolly mammoth, the bishop's ancestor: in old Persian and Arabic chess, the bishop's square held an elephant, the *alfil*. His powers are why he plays 250 under the usual strength.\n\n- **Tusks** (passive): on his 3rd turn, then every 8 turns, he points his ankus at two of his pawns, anywhere on the board, and they glow; then he plays his move. Take either glowing pawn on your turn and the fusion fails. If you don't, his next turn is the fusion: both pawns lift off, meet in a white flash, and an **elephant** lands on one of their two squares (the one the engine likes best for him). It's a bishop in every way, drawn as an elephant, and the fusion is his whole move that turn. If he's in check when it's due, it waits until he isn't, the pawns still glowing. It waits the same way when spending his turn on it would cost him 2 pawns' worth or more (a piece of his left hanging, say): he moves instead, and it comes on a later turn. If the God King strikes him just before a fusion, the elephant lands on the worse of the two squares for him. At most 2 elephants a battle.\n- **Mammoth Slam** (ultimate): at the start of his turn, after the warning, he slams the board and 2 of your pawns and 1 of your knights or bishops fly up (never your queen, a rook or your king; fewer if you have fewer). They're gone for 3 of your turns, then land back on their own squares as the next one begins; a growing shadow on each square shows where and when. If its square is taken by then, a piece lands on the nearest empty square: a bishop on its own color, a pawn never on the first or last rank, never giving check, and never where it would just be taken when another square avoids that. The engine picks the pieces so the hit is real but capped: about 0.75 of a pawn (from 0.25 to 1.5), the turns they're up played out; if nothing fits, nothing flies, and he tries again at the start of his next turn. They never leave you mated in one: if he could mate only because they're up, they land at once. He sees them coming, though: on his move just before they land (his fusion too), his move still comes from the board as it is, but it's weighed with them back down, and a move that would give away more than [the blunder guard](#stockfish-brain) allows once they land gives way to his best one there, whichever brain picked it. The judge scores your moves on the board as it stands (it doesn't know they're coming back)."
+    },
+    "look": [
+      "Alfil, the woolly mammoth boss (the chess bishop's ancestor: in old Persian and Arabic chess the piece was the elephant, the alfil). After Eric's reference picture, redrawn: a shaggy brown mammoth up on his hind legs in a fighting stance, his front legs raised like fists (pale toenails), big curved ivory tusks, angry brows, his trunk curling at its tip, a tufted tail; a red and blue Nettipattam on his brow and a matching caparison over his back, diamond patterns, gold trim and gold tassels. In his far fist, held to his side, the ankus he took from his rider: a gold goad as long as a scepter, its spike and hook beside his head and its butt by his feet (Eric, Oct 17). Drawn three-quarters on, facing our left as in the reference, light from the top left. His still was approved (Oct 17) and is idle's first frame; his animation pack (the moments every boss has, his entrance, his attack on a king, and his own: Tusks' cast and fusion, Mammoth Slam) is drawn from poses below (docs/decisions/2026-10-17-alfil-animations.md). In the game (Oct 17): his kit (kits.ts), his lines (ALFIL_LINES), his sounds (alfil-sounds.ts) and his powers on the board (components/Alfil.tsx), timed by ALFIL_BEATS (docs/decisions/2026-10-17-alfil-wired.md). Rigging, as the other bosses: the head (with its Nettipattam), the ears, the body, the caparison, the feet and the shadow are painted once; the legs, the trunk, the tusks, the tail and the ankus from their points, so a new pose is a few numbers. Fur is shaggy: its locks hang a pixel or two below every lower edge and stick out along the sides."
+    ],
+    "lore": [
+      {
+        "source": "docs/decisions/2026-10-17-alfil-rules.md",
+        "text": "Eric approved Alfil's boss sheet on Oct 17 (Tusks revised the same day): a woolly mammoth, the chess bishop's ancestor. This builds his two powers in the rules, the protocol and the simulator. His art (sprite, animations, sounds, lines, select tile, FAQ words) is the art lane's, a later PR; until it ships he is **hidden from players**. How it works now: [docs/areas/bosses.md](../areas/bosses.md) (his row); the calibration: [reports/alfil-sim.md](../../reports/alfil-sim.md)."
+      }
+    ],
+    "selectLines": [
+      "Before your bishops, there was me.",
+      "The old piece is back.",
+      "Make room. Big guy coming through.",
+      "Old school wins."
+    ],
+    "kitLines": {
+      "entrance": [
+        "Before your bishops, there was me.",
+        "The old piece is back.",
+        "Make room. Big guy coming through."
+      ],
+      "move": [
+        "Stomp.",
+        "Heavy step.",
+        "Make way."
+      ],
+      "capture": [
+        "Trampled!",
+        "Squashed flat.",
+        "I never forget a piece."
+      ],
+      "check": [
+        "Check! Feel the ground shake?",
+        "Check. Stampede!",
+        "Small king. Big tusks."
+      ],
+      "hurt": [
+        "Hey! Mind the tusks!",
+        "Ow! My trunk!",
+        "That stung!"
+      ],
+      "thinking": [
+        "Elephants never rush.",
+        "Slow and heavy…",
+        "Let me chew on that…"
+      ],
+      "smug": [
+        "Old school wins.",
+        "Ten thousand years of practice.",
+        "Thick skin. Big plans."
+      ],
+      "rattled": [
+        "The ice age was easier…",
+        "My tusks are shaking…",
+        "Not my squares…"
+      ],
+      "defeat": [
+        "Back to the ice…",
+        "Replaced… again…",
+        "The bishops can have it…"
+      ],
+      "victory": [
+        "The board is mine again!",
+        "Who needs bishops?",
+        "Mammoth win!"
+      ],
+      "strike": [
+        "Trampled!",
+        "Out of my way!"
+      ],
+      "power": [
+        "Two little pawns make one big problem.",
+        "Glow, little ones.",
+        "Pawns today. Elephant tomorrow."
+      ],
+      "powerHit": [
+        "Worth the wait.",
+        "I'll skip my move. You'll wish I hadn't.",
+        "Patience. Something old is coming back."
+      ],
+      "ultimateWarn": [
+        "Hold on to something.",
+        "Feel that rumble?",
+        "Brace yourselves…"
+      ],
+      "ultimate": [
+        "What goes up…",
+        "Up you go!",
+        "Fly, little pieces!"
+      ],
+      "ultimateHit": [
+        "…must come down.",
+        "And down they come.",
+        "Welcome back. Miss me?"
+      ],
+      "kingAttack": [
+        "Poke! Poke! Poke!",
+        "Out of my way, little king!",
+        "Remember me now?"
+      ]
+    }
+  },
+  {
+    "id": "hopper",
+    "name": "Chub & Chirp",
+    "pronouns": "two friends drawn as one figure: Chub, a brown rabbit, riding Chirp, a grasshopper (Chub talks; Chirp chirps, as \"(Chirp!)\" in his lines)",
+    "powers": {
+      "passive": "leapfrog",
+      "ultimate": "carrotpatch",
+      "faq": "Plays from the game so far. Chub, a rabbit, riding his best friend Chirp, a grasshopper; Chub does the talking. Their powers are why they play 250 under the usual strength.\n\n- **Leapfrog** (passive): at the start of their turn, when one of their pawns stands nose to nose with one of yours (yours on the square in front of it) and the square beyond yours is empty, Chirp hops their pawn over yours onto it, and then they play their move as usual. Never onto your last two ranks, never with a pinned pawn, never while they're in check (it waits), and never a hop that gives check, frees a pawn of theirs to promote, leaves them without a move or hands them a mate in one they didn't already have. When more than one pawn can, the engine picks the hop best for them. At most 2 hops a battle, one a turn. A hop clears the en passant square and starts the fifty-move count again.\n- **Carrot Patch** (ultimate, **once a battle**): at the start of their turn, after the warning, Chub plants 5 carrots on empty squares (at least one on each half of the board, no two touching), and that's their whole turn, so you move first in the race. A piece pulls a carrot by ending its move on it: any piece, a capture there and a castling rook count, and so does their hop landing on one (but a hop never pulls their last carrot, nor brings one into reach of the move that follows). A pulled carrot stays pulled, and the dock counts them. Each side has 12 moves; the race ends when every carrot is pulled or both sides' moves are done, and carrots still in the ground count for nobody. **Their fifth carrot wins them the battle on the spot.** Otherwise, after their move, they spin a reel for a prize by how many carrots they pulled (you get no prize: every carrot you pull lowers theirs):\n\n| Their carrots | Their spin | Average (pawns) |\n|---|---|---|\n| 0 | nothing: every card on the reel is blank | 0 |\n| 1 | a pawn 60%, two pawns 40% | 1.4 |\n| 2 | two pawns 40%, a knight 30%, a bishop 30% | 2.6 |\n| 3 | a knight 25%, a bishop 25%, a rook 30%, a queen 15%, a queen and a rook 5% | 5.05 |\n| 4 | two queens, every time | 18 |\n| 5 | they win the battle on the spot |  |\n\nThe reel shows each prize as often as its odds and stops where the roll says (the server rolls it online, so everyone sees the same spin); it only ever comes from this power and has nothing to do with coins or anything you can buy. The prize pieces go on their side: pawns on their second row, then their third; other pieces on their back row, then their second, nearest the middle first; never giving check, a bishop on the color their bishops lack first. If the engines can't take a prize (more than 8 pawns a side, or more pieces than promotions could make), it steps down to the next one that fits. If the battle ends before the race does, there's no spin. The judge weighs the race too: a move that pulls a carrot, or gets to one first, can be your best move. After the Carrot Patch, their meter is gone for the rest of the battle."
+    },
+    "look": [
+      "Chub & Chirp (`hopper` in code): Chub, a brown rabbit, riding Chirp, a grasshopper, two friends drawn as one figure (Eric, Oct 18: \"a cute rabbit and grasshopper, they are friends. Just one sprite\"). After Eric's simple reference for the shapes: the rabbit, cream chest and cotton tail, sits up on the grasshopper's back holding brown reins tied to a gold ring at its cheek; the grasshopper has a big black eye, long antennae and jointed legs. From his detailed reference, flavor only: the rabbit's green scarf blowing back (a gold clasp) and a small brown satchel, and a small brown saddle. Drawn side on, facing our left (as Alfil and Sawyer), light from the top left. His animation pack (Oct 18: docs/decisions/2026-10-18-hopper-animations.md): every animation the other bosses have, his Leapfrog hop, his Carrot Patch cast, the carrot race won and lost, and his attack on a king (`HOPPER_ATTACK`: carrots pelted at the king). `idle` frame 1 is the approved still. His board art (the carrots) is in effects/hopper.ts. In the game (Oct 18): his kit (kits.ts), his lines (HOPPER_LINES), his sounds (hopper-sounds.ts) and his powers on the board (components/Hopper.tsx), timed by HOPPER_BEATS (docs/decisions/2026-10-18-hopper-wired.md). Rigging, as the other bosses: the grasshopper's body, wings, thorax and head and the rabbit's body and head are painted once; the legs (all six, from hip, knee and foot), the antennae, the rabbit's ears and arms, the reins, the scarf's tail and a carrot from their points, so his poses are numbers."
+    ],
+    "lore": [],
+    "selectLines": [
+      "Chub and Chirp! Best friends!",
+      "He's Chirp. I'm Chub. We hop.",
+      "Got any carrots?"
+    ],
+    "kitLines": {
+      "entrance": [
+        "Chub and Chirp, reporting for hops!",
+        "Ready, Chirp? (Chirp!)",
+        "Two friends. One saddle. Big plans."
+      ],
+      "move": [
+        "Hup!",
+        "Easy, Chirp. Easy.",
+        "Nice and springy.",
+        "Hop to it!"
+      ],
+      "capture": [
+        "Nibbled!",
+        "Into the satchel!",
+        "Chirp, look what I got!"
+      ],
+      "hurt": [
+        "Not the ears!",
+        "Chirp! You okay, buddy?",
+        "My scarf!"
+      ],
+      "strike": [
+        "Hop along now!",
+        "Bounced out!"
+      ],
+      "power": [
+        "Leapfrog!",
+        "Pardon us! Coming over!",
+        "Mind your head!",
+        "Up, over, and hello!",
+        "Chirp never walks around."
+      ],
+      "thinking": [
+        "Chirp? …Chirp. Good point.",
+        "Thinking with my ears…"
+      ],
+      "check": [
+        "Check! Thump, thump!",
+        "Check! Chirp says hi!"
+      ],
+      "smug": [
+        "Best team in the meadow!",
+        "High five, Chirp! Er, high six!"
+      ],
+      "rattled": [
+        "Chirp, hop faster!",
+        "Uh-oh. Ears down."
+      ],
+      "victory": [
+        "Victory lap, Chirp!",
+        "Carrots for everyone! Well, us."
+      ],
+      "defeat": [
+        "Chirp… carry me home…",
+        "Out of hops…"
+      ],
+      "ultimateWarn": [
+        "I smell carrots…",
+        "Chirp, start digging."
+      ],
+      "ultimate": [
+        "Carrot Patch! Race you!",
+        "Five carrots. Ready, set, HOP!",
+        "Dinner's planted. Hands off."
+      ],
+      "carrotHis": [
+        "Pulled one!",
+        "Ooh, a big one!",
+        "Count it, Chirp!",
+        "Crunchy! That's ours."
+      ],
+      "carrotYours": [
+        "Those are OUR carrots!",
+        "Carrot thief!",
+        "Put that back!",
+        "Chirp, they took one!"
+      ],
+      "spinBig": [
+        "Come on… come on… YES!",
+        "Look at that haul!"
+      ],
+      "spinSmall": [
+        "A little something. Thanks!",
+        "Small prize. Still a prize."
+      ],
+      "spinEmpty": [
+        "Nothing? Not even a pawn?",
+        "Empty reel. Empty tummy.",
+        "Well, it was fun to spin."
+      ],
+      "carrotsAll": [
+        "Five carrots! That's the game!",
+        "All five! Good game, everyone!"
+      ],
+      "kingAttack": [
+        "Eat your veggies, your majesty!",
+        "Carrots away! And away! And away!",
+        "Open wide, King!"
+      ]
+    }
+  },
+  {
+    "id": "smudgy",
+    "name": "Smudgy",
+    "pronouns": null,
+    "powers": {
+      "passive": "camouflage",
+      "ultimate": "repaint",
+      "faq": "Always plays from the starting position, whichever side he has. A chameleon who never could blend in, so he learned to paint. He plays at the usual strength: his forced opening costs him what his powers gain.\n\n- **Camouflage** (passive, once a battle): his first two moves are always the same: an end pawn (the a- or h-pawn) two squares, then the rook behind it out through the gap to its third rank. Before your move, paint covers his pawns and the rook swaps places with one of them: a real pawn now stands where the rook was, and the rook hides as one of his pawns. You don't know which. It moves like a pawn (one square forward, or two from its first row, never a capture) until his 3rd turn after the swap; from then on it can strike with any rook move, and the paint drips off. It's also revealed at once if it gives check, and if you take it, you've taken a rook. The board hides it only while the battle lasts: once it's over, the board shows the real position. A move of yours that the hidden rook makes illegal (your king into its line, a piece of yours it pins) is refused, and you pick again at no cost. The judge scores your moves on the real board, rook and all. If his first two moves can't be played (he's in check, a square is taken), they wait for a later turn; after 3 turns without them, there's no Camouflage that battle.\n- **Repaint** (ultimate, at most 2 times a battle): at the start of his turn, after the warning, he paints one of his pawns your color and one of your knights or bishops his, and that's his whole turn, so you move next. The engine picks the pair to leave you about 2 pawns worse (between 1.5 and 2.5), counting what you could take at once. Never your queen, rooks or king, never one of his pawns one step from promoting for you, never anything that puts either side in check or hands either a mate in one, and never a ninth pawn for anyone (so not while you still have all eight). A painted pawn marches the other way now, toward its new side's last row. If no pair fits, there's no Repaint that turn; he tries again on his next. After his last, his meter is gone for the rest of the battle."
+    },
+    "look": [
+      "Smudgy, the chameleon painter boss (Eric, Oct 19: \"he learned painting because he always struggled to blend in like the other chameleons\"). After Eric's reference picture, redrawn: a lime-green chameleon with a casque striped in orange, teal and green, the same patchy stripes on his arms, legs and his spiral tail (he never blends in); big amber eyes in turrets of skin, a friendly smirk; a painter's beret, deep plum, tipped on his casque; a cream apron splashed with paint on brown straps with gold buttons; in one hand a big brush with a silver ferrule, dripping yellow paint, in the other a wooden palette of paint. Drawn three-quarters on, facing our left (as Alfil, Sawyer and Chub & Chirp), light from the top left. His wide stance has the gripping toes, the brush held up and the palette held out in front of him. His still was approved (Oct 19) and is idle's first frame, pixel for pixel (docs/decisions/2026-10-19-smudgy-still.md); his animation pack (the moments every boss has, his attack on a king, and his own: Camouflage's splash, the strike's reveal, Repaint's cast) is drawn from poses below (docs/decisions/2026-10-19-smudgy-animations.md), his board art in effects/smudgy.ts. Nothing in the game draws him yet (he isn't in `CHARACTERS`, `BOSS_KITS` or the roster); the preview draws him with its `extra=` option. Rigging, as the other bosses: the head, the casque, the beret, the torso, the apron and its splats, the feet, the palette and its dabs are painted once; the tail, the legs, the arms, the straps, the brush, its paint and his eyes from numbers, so the poses that follow are numbers in `SmudgyPose`: - the tail, his main moving part: `curl` (1 the spiral, 0 a loose hook, its length never changing) and a ripple down it, `sway` and `swayPhase`; - the brush arm (`elbowF`, `fist`, `brushButt`, `brushTip`) and the palette arm (`elbowN`, `handN`); - the eyes (`gazeN`, `gazeF`: the pupils sweep on their own); - the casque and the beret, parts of their own (`casque`, `beret`, `beretTilt`); - the brush's paint, a part of its own in the palette keys `P`, `R` and `K` and no others, so a frame's `pal` recolors it alone."
+    ],
+    "lore": [
+      {
+        "source": "docs/decisions/2026-10-19-smudgy-still.md",
+        "text": "**Eric:** the boss is **Smudgy**, a chameleon painter (\"he learned painting because he always struggled to blend in like the other chameleons\"), after his reference picture. This step is his look only; his powers (Camouflage, Repaint) come later."
+      }
+    ],
+    "selectLines": [
+      "Every chameleon blends in. I'd rather stand out.",
+      "Smudgy, artist. Don't touch the wet parts.",
+      "A masterpiece, if I say so myself."
+    ],
+    "kitLines": {
+      "entrance": [
+        "Smudgy, artist. Don't touch the wet parts.",
+        "Every chameleon blends in. I'd rather stand out.",
+        "Hold still. I'm painting you into a corner."
+      ],
+      "move": [
+        "A little dab here…",
+        "Broad strokes.",
+        "Needs more yellow.",
+        "Light touch."
+      ],
+      "capture": [
+        "Painted over!",
+        "That one didn't go with the room.",
+        "Into the scrap pile!"
+      ],
+      "hurt": [
+        "My palette!",
+        "Hey! That was still drying!",
+        "Smudged!"
+      ],
+      "strike": [
+        "Brush stroke!",
+        "Splat!"
+      ],
+      "power": [
+        "Now you see it…",
+        "Which one's which? Even I forget.",
+        "Fresh coat for the boys."
+      ],
+      "camoStrike": [
+        "Surprise! A rook all along!",
+        "Ta-da! Nobody ever notices me. Until now."
+      ],
+      "rookTaken": [
+        "Hey! How did you know?!",
+        "My masterpiece!"
+      ],
+      "thinking": [
+        "Where does this one go…",
+        "An artist never rushes."
+      ],
+      "check": [
+        "Check! Hold that pose!",
+        "Check! Somebody frame this!"
+      ],
+      "smug": [
+        "A masterpiece, if I say so myself.",
+        "The other chameleons should see me now."
+      ],
+      "rattled": [
+        "This isn't the picture I had in mind!",
+        "Too many colors! Too many!"
+      ],
+      "victory": [
+        "Signed, Smudgy!",
+        "Hang it in a gallery!"
+      ],
+      "defeat": [
+        "Back to the drawing board…",
+        "I wanted to stand out. Not like this."
+      ],
+      "ultimateWarn": [
+        "My brush is getting itchy…",
+        "Time for a new color scheme."
+      ],
+      "ultimate": [
+        "Repaint! Your side, my side, who can tell?",
+        "A little white here, a little black there…",
+        "Let's switch things up."
+      ],
+      "kingAttack": [
+        "Hold still, your majesty. You need a touch-up.",
+        "Yellow's your color, King!",
+        "Splat! Splat! Splat!"
+      ]
+    }
+  },
+  {
+    "id": "moo",
+    "name": "Moo & Moon",
+    "pronouns": "two characters: Moo, a cow who only says \"Moo\" (with a feeling), and the Moon, who talks; \"they\" for the pair",
+    "powers": {
+      "passive": "moonbeam",
+      "ultimate": "fullmoon",
+      "faq": "Plays from the game so far. Moo is a cow who can't talk; the Moon, his best friend, talks for both of them. Their powers are why they play 240 under the usual strength.\n\n- **Moonbeam** (passive): after every 3rd move of his, at the end of his turn, a beam of moonlight lands on one of your pieces. That piece glows, with a crescent moon burned into its square, and can't move on your next turn (tap it and the dock tells you); then it's free. It still attacks and defends. The beam takes one of your pieces that can move, at random. Never your king, and never a beam that leaves you no move: then it takes another piece, or none that turn.\n- **Full Moon** (ultimate): at the start of his turn, after the warning, Moo takes in the moon's power (his fur turns gold and flames flare round him), then plays his move. For 5 moves of his, that one first, he plays the engine's best move at full strength. That first turn ends with a flurry: 5 moonbeams on 5 different pieces of yours, picked the same way, each stuck for your next turn (never your king, and fewer if you'd have no move left). It takes the place of that turn's Moonbeam. After his last move at full strength he's dazed and back to his usual strength. His meter stays empty while the Full Moon lasts."
+    },
+    "look": [
+      "Moo, the cow, and his friend the Moon (Eric, Oct 20): a lonely cow who always wanted a friend; the moon was always looking down, curious about the farm, and now they're buddies. The cow doesn't talk (he's a cow); the moon does, and Moo answers with moos. He's Moo because that's what the moon always heard him say. After Eric's three references, redrawn: a round, soft Holstein calf, cream with dark-brown patches (a big one over his near eye), a pink snout, big floppy brown ears with pink insides, small tan horns and a cream tuft between them, big brown eyes, dark hooves and a thin tail with a dark tuft, standing up on his hind legs and hugging a crescent moon (soft yellow, a darker rim, closed happy eyes, a small smile, pink cheeks) with his cheek on its tip. Drawn three-quarters on, facing our left (as Alfil, Sawyer, Chub & Chirp and Smudgy), the moon on the side toward the board, light from the top left. Three stills, approved by Eric (docs/decisions/2026-10-20-moo-still.md): `idle` (hugging the moon), `sit` (sitting on the moon as it floats under him like a little boat, its face on the front) and `power` (the idle drawn powered-up: he takes in the moon's power, so his cream turns yellow-gold, his eyes glow white under angry brows with a brown patch round the one on our left, his tuft becomes a spiky yellow crest, his ears stand up and a golden aura flickers round him; the moon stays happy). They are the first frames of `idle`, `sit` and `power`, pixel for pixel (the eye patch aside). Round them his animation pack and his board art (docs/decisions/2026-10-20-moo-animations.md, effects/moo.ts). Nothing in the game draws him yet (he isn't in `CHARACTERS`, `BOSS_KITS` or the roster); the preview draws him with its `extra=` option. Rigging, so the poses and animations that follow are numbers (`MooPose`): the moon is a part of its own (held, sat on, floating) and so are its eyes, mouth and cheeks (it talks and he moos back); his head, with his eyes, brows, horns and tuft riding on it, moves (`head`: it nuzzles the moon); his ears (`earN`, `earF`: they flop), his tail (`tail`: it swishes), both front legs (`armN`, `armF`: they hug), his eyes and brows (`eyes`, `brows`: the powered-up brows go angry) and the aura are parts of their own. The powered-up colors are a palette swap (`MOO_POWER_PALETTE`), so any frame can be drawn powered-up with `pal` (a pose's `power` also brings the crest, the angry brows, the glowing eyes, the raised ears and the aura)."
+    ],
+    "lore": [
+      {
+        "source": "docs/decisions/2026-10-20-moo-still.md",
+        "text": "**Eric:** the boss is **Moo**, a normal cow, with the **Moon** as his friend. Lore: he was a lonely cow who always wanted a friend; the moon was always looking down, curious about the farm animals, and now they're buddies. The cow doesn't talk (he's a cow); the moon does, and Moo answers with moos. He's called Moo because that's what the moon always heard him say. This step is the look only (three reference pictures); his powers and his animations come later."
+      }
+    ],
+    "selectLines": [
+      "Hi! This is Moo. He's my best friend. (Moo! {heart})",
+      "I watched your farm for ages. Let's play! (Moo? {question})",
+      "Best friends make the best moves! (Moo! {heart})"
+    ],
+    "kitLines": {
+      "entrance": [
+        "Hi! This is Moo. He's my best friend. (Moo! {heart})",
+        "I watched your farm for ages. Let's play! (Moo? {question})",
+        "Moo, look! Little horses! (Moooo… {sparkle})"
+      ],
+      "move": [
+        "Ooh, good one, Moo!",
+        "(Moo.)",
+        "Easy does it, buddy.",
+        "(Moo. {pawn})"
+      ],
+      "capture": [
+        "We got one! (MOO! {sparkle})",
+        "Sorry, little piece! (Moo.)",
+        "(Moo! {heart})"
+      ],
+      "hurt": [
+        "Hey! That one was ours! (Moo. {anger})",
+        "Moo! Are you okay?! (…moo.)",
+        "(MOO! {anger})"
+      ],
+      "strike": [
+        "Moonlight, coming down!",
+        "(Moo! {sparkle})"
+      ],
+      "power": [
+        "Moonbeam! Stay right there, please.",
+        "A little moonlight for you!",
+        "Shhh. That one's napping now. (Moo. {zzz})"
+      ],
+      "wax": [
+        "I'm getting fuller, Moo… I can feel it! (Mooo…)",
+        "Half a moon! Halfway there! (Moo! {moon})",
+        "Almost full! (Moo moo! {sparkle})"
+      ],
+      "thinking": [
+        "Hmm… which one, Moo? (Moo. {pawn})",
+        "Moo's chewing on it. (Moo. {grass})"
+      ],
+      "check": [
+        "Check! Did we do that? (MOO! {sparkle})",
+        "Your king looks worried! (Moo? {question})"
+      ],
+      "smug": [
+        "Best friends make the best moves! (Moo! {heart})",
+        "(Moo. {cowbell})"
+      ],
+      "rattled": [
+        "Uh-oh. Moo, hold me tighter. (Moo… {question})",
+        "So many pieces, Moo! (Moo?!)"
+      ],
+      "victory": [
+        "We did it, Moo! (MOOOO! {heart})",
+        "Best night ever! (Moo! {cowbell})"
+      ],
+      "defeat": [
+        "That's okay, Moo. We have each other. (…moo. {heart})",
+        "Time to go home… (Moo. {zzz})"
+      ],
+      "ultimateWarn": [
+        "Moo… I think I'm almost full… (Moo? {moon})",
+        "Look up, everyone! (Mooo… {sparkle})"
+      ],
+      "ultimate": [
+        "FULL MOON! Now, Moo! (MOOOOOO!!)",
+        "Take my light, buddy! (MOO! {sparkle})"
+      ],
+      "flurry": [
+        "Moonbeams, everywhere! (MOO MOO MOO!)",
+        "Lights out, little pieces!"
+      ],
+      "dazed": [
+        "Oh dear. Too much moon. (…moo. {zzz})",
+        "Easy, buddy. Easy. (Moo… {zzz})"
+      ],
+      "kingAttack": [
+        "Shine, shine, shine! (MOO! {sparkle})",
+        "Sorry, King. Moo really wants to win! (Moo!)",
+        "Moonbeam, moonbeam, moonbeam! (MOO!)"
+      ]
+    }
+  },
+  {
+    "id": "gardener",
+    "name": "Puddles",
+    "pronouns": null,
+    "powers": {
+      "passive": "seeds",
+      "ultimate": "water",
+      "faq": "Always plays from the starting position, whichever side he has. A hippo with a garden hose: he plants seeds as the clock runs and waters them when he's angry. His powers are why he plays 250 under the usual strength.\n\n- **Seeds** (passive): 5 seeds go in as the battle begins, then one more every 30 seconds of real time, whoever's turn it is, up to 10 waiting. His seed meter shows how many are waiting and fills toward the next. Where they are isn't decided until he waters, so there's nothing to spot: the seeds you see him toss and sink in are only for show. Online the server's clock counts; playing alone, it counts only while the game is on your screen. Take your time if you like, but every 30 seconds is another seed.\n- **Watering** (ultimate): at the start of his turn, after the warning, he waters the board, and that's his whole turn, so you move next. Every waiting seed comes up, and his seed meter starts again from none. Each seed is a roll: nothing (40%), a plain plant (30%), a killer plant (12%), a pawn for him (12%), a knight, bishop or rook for him (5%), or a queen for him (1%). A plain plant grows on an empty square and blocks it for 3 turns of yours (green, then fall colors, then dropping its leaves), then it's gone: nothing can move onto it or through it, his pieces included; a knight jumps it, and it never stops a check or an attack. A killer plant eats a piece, yours or his (never a king). A grown piece is his, on an empty square (a pawn never on the first or last row, and never a ninth). The engine decides where everything comes up, so that what he gains is about 1.5 pawns (at most 2.5); anything that can't come up without gaining him more than that comes up as nothing instead. A queen is his jackpot, and it has no cap: the engine puts it where it does him real good, and whatever else comes up with it takes his gain no further than 6 pawns, or than the queen alone did. While all eight of his pawns are on the board, he can't grow a piece he still has a full set of (a second queen, a third rook, bishop or knight): that seed comes up as nothing. Never anything that puts either side in check, hands either a mate in one, or leaves you without a move. If watering would cost him real material (a piece of his left hanging), it waits for his next turn."
+    },
+    "look": [
+      "The hippo gardener (Eric, Oct 20: \"a hippo who waters plants and plants seeds\"; no name yet, his id is `gardener`). After Eric's reference picture, redrawn: an upright hippo with intentionally realistic proportions (a heavy barrel body, short thick legs, a big square muzzle with two nostrils and a soft smile, small round ears, pinkish-grey skin with a pinker belly, throat and cheeks) and no clothes (Eric, second pass: the apron is gone, and the seeds will come from his hand). He holds a garden hose in both hands: the near hand on a brass-and-green spray nozzle with a spray of water coming out of it (toward the board), the other hand, out at his right side, on the hose where it hangs across his belly. The hose is one piece: from the nozzle it sags across his belly through that hand and goes behind him at his hip; the spare hose is looped behind his back, hidden by his body but for a short curve that shows past his hip (it feeds out from there when he pulls on it). Drawn three-quarters on, facing our left (as Alfil, Sawyer, Chub & Chirp, Smudgy and Moo), so he sprays toward the board; light from the top left. His still is the first frame of `idle` (docs/decisions/2026-10-20-gardener-still.md, approved by Eric: a test keeps its pixels), and his animation pack is below (docs/decisions/2026-10-21-gardener-animations.md): every animation the other bosses have, his own moments (planting, the watering, a cheer, a bigger cheer and a shrug for the lottery) and his attack on a king (`GARDENER_ATTACK`). He isn't in `CHARACTERS`, `BOSS_KITS` or the roster, and nothing in the game draws him yet; the preview draws him with its `extra=` option. His board art (the seeds, the watering, the sprout and what it turns into) is `effects/gardener.ts`. Rigging, so the poses that follow are numbers (`GardenerPose`), as the other bosses': - the nozzle hand (`fist`, `elbowN`, `nozzle`: it aims; `grab`: the hand open off the nozzle, which then hangs on its hose) and the water spray, a part of its own (`spray`: its length, droop and flicker: it turns on and off and arcs over the board, up from a raised nozzle and down from a lowered one); - the other arm (`hand`, `elbowF`: it holds the hose, hauls it out, lets go, shrugs; `lift`: both shoulders up), and the hose, which is redrawn from the nozzle through that hand to his hip wherever they go (`sag`: how far it hangs across his belly), with the spare behind him (`BACK_LOOP`, `loop`: how much of it is still looped there, the rest fed out); - the head moves as one (`head`), with the jaw a part of its own (`jaw`: degrees open, a great yawn or roar), the ears (`earN`, `earF`: they flick), the eyes (`eyes`) and the tail (`tail`); - his legs step (`stepN`, `stepF`) and he breathes (`bob`).",
+      "Puddles', the hippo gardener's, lines (the director's, Oct 21, used as written: scratchpad hippo/lines.md). A big, unhurried, proud gardener: patient and warm, a little smug about his garden, never mean. None says his name (GARDENER_NAME in core boss.ts is one constant, so nothing here needs an edit when it changes). \"…\" is the ellipsis character, as the other bosses' lines. Each set is the beat with the same meaning in his kit (kits.ts): his powers' moments (`plantMany`, `plant`, `ultimate`, `cheer`, `bigCheer`, `shrug`) say theirs from the screen (components/Gardener.tsx); `ownEaten` is said as a killer plant eats one of his own pieces. The one line the director also wrote for a crowd move a plant refuses (\"Keep off the grass.\") isn't here: the kit has no such beat, and none was added (the brief, Oct 23)."
+    ],
+    "lore": [
+      {
+        "source": "docs/decisions/2026-10-20-gardener-still.md",
+        "text": "**Eric:** a hippo who waters plants and plants seeds (no name yet; his code id is `gardener`, no clash in the roster or the code). His reference picture (ChatGPT's): an upright hippo with intentionally realistic proportions, a green apron with a daisy pocket, a brass-and-green spray nozzle with water coming out of it, a hose reel on the ground. This step is his look only: one still. His powers (hidden seeds on a timer, watering the board for his ultimate) and his animations come later."
+      }
+    ],
+    "selectLines": [
+      "Mind the flower beds.",
+      "Good soil here. Very good soil.",
+      "Everything's coming up roses."
+    ],
+    "kitLines": {
+      "entrance": [
+        "Mind the flower beds.",
+        "Big feet, gentle hands. Wipe yours.",
+        "Welcome to my garden. Stay as long as you like. Longer, ideally."
+      ],
+      "plantMany": [
+        "A few seeds to start…",
+        "Good soil here. Very good soil."
+      ],
+      "plant": [
+        "Another one.",
+        "Take your time. They grow either way.",
+        "Plop."
+      ],
+      "move": [
+        "Slow and steady.",
+        "One step at a time.",
+        "Easy does it.",
+        "Patience."
+      ],
+      "capture": [
+        "Weeded out.",
+        "Pulled it up by the roots.",
+        "That one was crowding the bed."
+      ],
+      "hurt": [
+        "My petunias!",
+        "Hey! I just watered that.",
+        "Ouch. That'll leave a mark on the lawn."
+      ],
+      "strike": [
+        "Spritz!",
+        "Little drink for you!"
+      ],
+      "thinking": [
+        "Hmm… let it grow.",
+        "Good things take time."
+      ],
+      "check": [
+        "Check. Feeling the heat?",
+        "Check. Nowhere to plant your feet."
+      ],
+      "smug": [
+        "Everything's coming up roses.",
+        "Green thumb. Both of them."
+      ],
+      "rattled": [
+        "Somebody's trampling my garden!",
+        "This was not in the seed catalog."
+      ],
+      "ultimateWarn": [
+        "Clouds are rolling in…",
+        "Feels like rain."
+      ],
+      "ultimate": [
+        "Watering time!",
+        "Let's see what comes up!",
+        "Drink up, little ones!"
+      ],
+      "cheer": [
+        "Look at that! A fine crop.",
+        "Grown it myself!"
+      ],
+      "bigCheer": [
+        "A queen! Prize of the county fair!",
+        "Now that's what I call a harvest!"
+      ],
+      "shrug": [
+        "Hm. Dry year.",
+        "Next season."
+      ],
+      "ownEaten": [
+        "Not that one! Bad plant!",
+        "Well… it was hungry."
+      ],
+      "victory": [
+        "Another fine harvest.",
+        "Everything in its season."
+      ],
+      "defeat": [
+        "Trampled… my whole garden…",
+        "I'll replant. I always do."
+      ],
+      "kingAttack": [
+        "Hold still, your majesty. You look thirsty.",
+        "Spritz! Spritz! Spritz!",
+        "A royal soaking!"
+      ]
+    }
+  },
+  {
+    "id": "tiger",
+    "name": "Babur",
+    "pronouns": null,
+    "powers": {
+      "passive": "balloons",
+      "ultimate": "hoops",
+      "faq": "Plays from the game so far. A circus tiger who hated his act (the roaring, the jumping through hoops): he'd rather blow up balloons shaped like chess pieces. His powers are why he plays 250 under the usual strength.\n\n- **Balloons** (passive): at the start of his turn, if his pump is empty, he puts a new balloon on it. It blows up in 4 stages of 12 seconds of real time, looking a little more like its piece at each, then waits, ready. Online the server's clock counts; playing alone, it counts only while the game is on your screen. At the end of his turn a ready balloon either flies onto the board as one of his pieces, or pops. Most are pawns (55%), then knights and bishops (13% and 13%), rooks (6%) and queens (13%), and many pop: a pawn 50% of the time, a knight, bishop or rook 65%. Most queen balloons are duds that always pop (10 in every 13), and you can't tell which until it pops or lands. In all, about 58% of his balloons pop, and he never lands more than 2 in a row: after 2 landings, the next one pops, unless it's a real queen. Where one lands, the engine decides: never a square you attack (you can't take it at once), never a check, never a mate in one for either side, never inside a hoop, never a position that leaves you without a move; of the squares left, the one that helps him least, about a piece's worth. If no square fits, it waits, ready, until the end of his next turn. A balloon he couldn't have in a real game pops instead: a ninth pawn, or an extra piece (a second queen, a third rook, bishop or knight) beyond what his missing pawns could have promoted into. So while all eight of his pawns are on the board, only a piece he has lost can come back.\n- **Hoops** (ultimate): on his turn after the warning, he plays his move as usual, then throws 3 burning hoops onto the board before your turn. Each hoop rings a block of 2×2 squares, never on the first or last row, with room between them. For your next 2 moves, and his move between them, nothing moves or captures across a hoop: no piece moves into a block, out of it or through it (a knight neither). Pieces inside can still move within their block. Attacks across a hoop still count for the kings: a king can't step onto a square attacked across one, a piece pinned across one stays pinned, and no move may give check across one. If the hoops would leave a side with no move at all, they stop nothing that turn. The engine picks where they land, the ones that hem you in the most, never leaving you without a move or handing either side a mate in one. As your second move lands, the hoops burn out. If his move puts your king in check, they wait until after his next move."
+    },
+    "look": [
+      "The circus tiger (Eric, Oct 23: \"a circus tiger who hated his role, the loud roaring and jumping through hoops, and wanted to make the silly balloon animals he saw someone making\"; no name yet, his id is `tiger`). After Eric's reference picture (the one \"where the balloons look like balloons\"), redrawn: a realistic big cat on all fours, a long body and heavy paws, orange with black stripes, a cream chest, muzzle and belly, amber eyes and whiskers; a small black top hat with a red band, tipped on his head; a red and gold ringmaster's vest (gold edging, buttons, an embroidered panel); one front paw raised, holding the strings of a bunch of four chess-piece balloons (a red queen, a blue knight, a green rook and a purple pawn: shiny, round, each with a highlight, drawn as the pump's balloons are, tiger-bar.ts; Eric's picture has six); his long striped tail curling up behind. Facing our left (as Alfil, Sawyer, Chub & Chirp, Smudgy, Moo and Puddles), so his balloons are toward the board; light from the top left. His still (docs/decisions/2026-10-23-tiger-still.md) is the first frame of `idle`; his animation pack, his own moments (hop, place, cheer, bigCheer, wince, hoops) and his attack on a king (`TIGER_ATTACK`) are docs/decisions/2026-10-23-tiger-animations.md. Look only: his powers' rules come later. He isn't in `CHARACTERS`, `BOSS_KITS` or the roster, and nothing in the game draws him; the preview draws him with its `extra=` option (`npm run preview:characters -- <dir> extra=packages/app/src/characters/tiger.ts only=tiger,tiger-attack`). Rigging, so the poses that follow are numbers (`TigerPose`), as the other bosses': - the raised paw (`paw`: the fist; the elbow bends by itself) and the strings, a part of their own, redrawn from each balloon's knot through one gathering point to the fist wherever they go; **each balloon is a part of its own** (`balloons`: where each hangs, so it bobs, or is handed over to the pump; a balloon that grows from a blob to a piece, or pops, is a different drawing of the same part); - the hat (`hat`: where it sits, and `hatTilt`: it tips and bounces), the head as one (`head`), with the jaw a part of its own (`jaw`: degrees open, a yawn or a grin), the ears (`earN`, `earF`: they flick), the eyes (`eyes`), the whiskers; - the tail (`tail`: it swishes), the legs (`stepHN`, `stepHF`, `stepFF`: each foot's lift), and he breathes (`bob`); - each leg is a tube through its joints (the pose already moves the feet and sinks the hips) and the body a tube through three spine points (constants for now), so a later pose that stands him up on his hind legs (Eric's second reference) is those points given as numbers (hips under the shoulders, forelegs hanging, head up), not a redraw of the art.",
+      "Babur's, the circus tiger's, lines (the director's draft, Oct 24, used as written: scratchpad tiger/lines.md). A circus tiger who hated the roaring and the burning hoops and only wants to make balloon animals: bored, dry, a little sour about the circus, proud and soft about his balloons; never mean, never scary. None says his name (TIGER_NAME in core boss.ts is one constant). \"…\" is the ellipsis character, as the other bosses' lines. Each set is the beat with the same meaning in his kit (kits.ts): `place` (a new balloon on the pump), `cheer` (a balloon landed as a piece: the rules' `balloonCheer`), `bigCheer` (a real queen landed: `balloonBigCheer`) and `wince` (a balloon popped) are said from the screen as they play (components/Tiger.tsx); `ultimate` as the hoops are thrown. The draft's line for a move a hoop refuses (\"Nobody goes through my hoops. Not anymore.\") isn't here: the kit has no such beat, and none was added (the brief)."
+    ],
+    "lore": [
+      {
+        "source": "docs/decisions/2026-10-23-tiger-still.md",
+        "text": "**Eric (Oct 23):** a circus tiger who hated his role (the loud roaring, jumping through hoops) and wanted to make the silly balloon animals he saw someone making. No name yet: his code id is `tiger` (no clash in the roster or the code). His powers come later (he blows up balloons on a pump nozzle in the boss bar, which become pieces; his ultimate throws three burning hoops onto the board: [2026-10-23-boss-bar.md](2026-10-23-boss-bar.md) has the room for the pump). His reference, \"the image to use is the one where the balloons look like balloons\": a realistic tiger on all fours in a small black top hat with a red band, a red and gold ringmaster's vest, one paw raised holding the strings of chess-piece balloons. The second picture (him standing on his hind legs) is only \"how we may alternate between standing and being on all 4\"."
+      }
+    ],
+    "selectLines": [
+      "No roaring tonight. Balloons only.",
+      "Another masterpiece.",
+      "Don't rush the artist."
+    ],
+    "kitLines": {
+      "entrance": [
+        "Ugh. Another crowd.",
+        "No roaring tonight. Balloons only.",
+        "Step right up. Or don't. I'm on break."
+      ],
+      "place": [
+        "Let's see what this one wants to be.",
+        "Just a little air…",
+        "Shh. Creative process."
+      ],
+      "move": [
+        "Fine. I'll move.",
+        "Padding along.",
+        "Quietly now.",
+        "No leaping. I'm retired."
+      ],
+      "capture": [
+        "Pop goes your piece.",
+        "That one didn't make the show.",
+        "Swat."
+      ],
+      "hurt": [
+        "Hey! Watch the whiskers.",
+        "Rude. I was concentrating.",
+        "That's coming out of your ticket."
+      ],
+      "strike": [
+        "Swat!",
+        "Claws out. Just this once."
+      ],
+      "thinking": [
+        "Thinking. Please hold your applause.",
+        "Don't rush the artist."
+      ],
+      "check": [
+        "Check. Ta-da.",
+        "Check. The crowd goes mild."
+      ],
+      "smug": [
+        "Now that's showmanship.",
+        "Balloon artist. Chess genius. Same paws."
+      ],
+      "rattled": [
+        "This was not in the act!",
+        "Somebody get the ringmaster!"
+      ],
+      "ultimateWarn": [
+        "Oh no. Not the hoops.",
+        "I swore I'd never do this again…"
+      ],
+      "ultimate": [
+        "Fine! The hoops! Happy now?",
+        "One last show. Burning hoops!",
+        "Through the hoops, everybody!"
+      ],
+      "cheer": [
+        "Ta-da! Fresh from the pump.",
+        "Balloon art. Very serious.",
+        "Another masterpiece."
+      ],
+      "bigCheer": [
+        "A queen! My finest work!",
+        "Look at her! She's perfect!"
+      ],
+      "wince": [
+        "…I meant to do that.",
+        "Too much air. Again.",
+        "That one was a rough draft."
+      ],
+      "victory": [
+        "Show's over. Exit through the gift shop.",
+        "Bow. Curtain. Nap."
+      ],
+      "defeat": [
+        "Back to the circus, I guess…",
+        "My balloons… all of them…"
+      ],
+      "kingAttack": [
+        "A balloon for your majesty. And another.",
+        "Bonk! Bonk! Bonk!",
+        "Hold still. This one's a crown."
+      ]
+    }
+  }
+]
