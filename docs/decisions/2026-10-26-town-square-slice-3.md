@@ -68,7 +68,7 @@ F...................   F Boingo's Funhouse (0, 39)
 - **The Coliseum's ground is only kept clear of homes**: you and the bots can walk across it until the Coliseum is built.
 - **Chips no longer stack.** With thirteen homes, the four nearest off-screen homes often point the same way, and their
   chips landed on top of each other. A chip that would overlap a nearer home's chip now slides along its edge until it's
-  clear (`CHIP_GAP`, 50 pixels); its arrow still points at its home. Still four chips at most, nearest to you first.
+  clear (`chipGap`, 50 pixels); its arrow still points at its home. (Refined in the review below.)
 - **Where each sign hangs:** in the funhouse's marquee arch (the picture's lettering was misspelled; ours is the game's),
   on the crib's bars, on posts by the woodshed and the pyramid, on the stall's and the grassland's front rails, among the
   gallery's vines and on the greenhouse's gable, so each stays in view and covers no doorway. Alfil's pyramid: six sandstone tiers lit from the left, a gold capstone, a stone lintel
@@ -81,3 +81,43 @@ F...................   F Boingo's Funhouse (0, 39)
 - **Frame rate**: only homes and bosses drawn inside the rim cost anything (a boss's frames are drawn the first time each
   shows; the rest is a little arithmetic a frame). With more homes in view on a wide computer box, its first seconds cost
   more while newly seen bosses draw their idle frames once; after that it's back near slice 2's. The numbers are in the PR.
+
+## The director's review (Oct 26), and what changed
+
+1. **Too many chips, over the name tags** ("Jefferson's chip sits on 'Castle Cass'"). At most **four** chips, for the
+   nearest homes off screen: `maxChips` in `feel.ts` (the four was in `render.ts` and `Town.tsx` before). A chip never
+   covers a pawn's name tag, a home's floating name, the speech bubble, the −/+ and "Back to me" buttons, or a nearer
+   home's chip: it slides along its edge, a few pixels at a time (`chipSlideStep`, 6), to the nearest clear spot
+   (`chipClear`, 27 pixels round its middle), and if the whole edge is taken it isn't shown that frame. Calls:
+   - Only the four nearest are thought of: one with no room is left out, not swapped for the fifth nearest, so the set
+     of chips doesn't flicker between homes as tags move past.
+   - The buttons count too ("nothing hidden"); bosses and homes in the world don't (a chip over the ground's edge is
+     what it's for).
+2. **Alfil's Pyramid was smaller than Alfil.** It's drawn half again as big (the pyramid 172 × 144 pixels, the picture
+   208 × 160), with the same six tiers (21 tall, a lit ledge, three courses of blocks), so it stands behind him as a
+   monument, as Hollow Peak stands taller. Its widest, lowest tier spills a little past its 3 × 3 plot at the sides
+   (about half a square tall); the plot and the walking around it are unchanged. Its sign is the same size as every
+   home's; its banners, doorway (now with two steps and stone jambs) and the carved elephant (now in his red caparison)
+   grew with it; a band of carved glyphs runs along its top tier.
+3. **More detail, closer to the pictures** (sizes, signs and idles kept):
+   - **The Grassland**: broad blades and cattails behind; the knoll in mossy scallops with blades along its top; the
+     burrow a round arch in its face with an earthen rim and moss hanging over it; the dirt path from it; grey boulders;
+     big shamrocks (drawn on the picture's three heart-shaped leaves) at its corners and over the log edge; daisies, pink
+     clover blossoms; clumps of broad blades at its front corners.
+   - **The Woodshed**: the logs' round cut ends at both corners; a ridge log; a roof of wooden shakes patched with two
+     bolted tin sheets and a red one; a stovepipe with a hat; inside, warm lantern light on a shelf of tins, hung tools
+     and a saw on the bench; the axe bigger, its red head bitten into a ringed stump with roots; split wood; the
+     woodpile taller (eleven logs); the lantern's glow on the wall (it flickers with the lantern); stones and grass.
+   - **The Stall**: the barrel moved in front of the fence (staves, three hoops, a lid); the pitchfork tall beside it,
+     its iron head and three tines above the rail; the lasso a big coil of rope on the back post, its end hanging; the
+     awning cream with two red stripes either side of a gold star and a red hem, worn through in two places; the lantern
+     on an iron bracket with a glow; straw in strands and drifts on the ground and spilled from the bales; stones, more
+     grass.
+   - **The Funhouse**: marquee bulbs round all three doorways too (their frames three pixels wide; the bulbs chase with
+     the big arch's, so the idle is the same, just bigger); the star columns now banded in red between gold stars, a
+     ball on each capital, a gold plinth; thin star columns between the doorways; two big gold stars flanking the sign;
+     red curtains drawn back in the tunnel's doorway; bunting in the other two; a purple band under the arch's trim.
+   - A quicker pass on the other four: the crib's posts turned, letters on the blocks, a roof block on the pile, stars
+     sewn on the rug, windows on the train; the gallery's cornerstones, a palette banner and a brush banner on arms, a
+     lit window in its door; the greenhouse's flower boxes along the glass, stepping stones to its door, more flowers in
+     its vines; the pyramid's (above).

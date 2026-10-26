@@ -72,6 +72,7 @@ const front = paint(L, ARCH_Y - ARCH_H, R - L, BASE - (ARCH_Y - ARCH_H), (x, y) 
   const inArch = Math.abs(X) < ARCH_HW && Y >= archTop(X);
   if (Y < TOP && !inArch) return null;
   if (inArch && Y < TOP && Y < archTop(X) + 2.2) return Y < archTop(X) + 1 ? "y" : "Y"; // the arch's gold edge
+  if (inArch && Y < TOP + 2 && Y < archTop(X) + 4.6) return "p"; // a purple band under it
   const red = Math.floor((x + y) / 6) % 2 === 0;
   const shade = X > 30 || Y > BASE - 3;
   return red ? (shade ? "R" : "r") : shade ? "I" : "i";
@@ -87,19 +88,44 @@ const bulbParts = bulbs.map(([x, y, k]) => paint(Math.round(x) - 1, Math.round(y
 
 // ---- Three arched doorways: a gate, a swirl tunnel on a red carpet, a wavy mirror.
 
+/** The bulbs on an arch's frame are this far apart along it. */
+const BULB_GAP = 5;
+/**
+ * An arched doorway: a blue frame three pixels wide with marquee bulbs along its middle (in the same three groups as the
+ * big arch's, so they chase together), filled by `fill`.
+ */
 function arch(cx: number, top: number, hw: number, fill: (X: number, Y: number) => string | null) {
-  return paint(cx - hw - 2, top - 2, 2 * hw + 4, BASE - top + 2, (x, y) => {
+  return paint(cx - hw - 3, top - 3, 2 * hw + 6, BASE - top + 3, (x, y) => {
     const X = x + 0.5 - cx;
     const Y = y + 0.5;
-    const half = Y < top + hw ? Math.sqrt(Math.max(0, hw * hw - (top + hw - Y) ** 2)) : hw;
-    const e = half + 2 - Math.abs(X);
-    if (e < 0 || Y > BASE) return null;
-    if (e < 2) return e < 1 ? "U" : "u"; // a blue frame
+    const r = hw + 1.5; // the frame's middle line
+    const round = Y < top + hw;
+    const d = round ? Math.hypot(X, Y - (top + hw)) : Math.abs(X);
+    const e = d - hw; // how far out from the opening
+    if (e > 3 || Y > BASE || (round && Y < top - 3)) return null;
+    if (e >= 0) {
+      // Along the frame from its top: round over the arch, then down its sides.
+      const along = round ? Math.abs(Math.atan2(X, top + hw - Y)) * r : (Math.PI / 2) * r + (Y - (top + hw));
+      if (e > 1 && e < 2.2 && along % BULB_GAP < 1.2) return String((Math.floor(along / BULB_GAP) % 3) + 1);
+      return e < 1 ? "u" : e > 2.2 ? "U" : "u"; // a blue frame
+    }
     return fill(X, Y);
   });
 }
-const gate = arch(40, 66, 10, (X, Y) => (Math.abs(X % 4) < 1 && Y > 70 ? "w" : Y < 74 ? "m" : "c"));
+/** Bunting across an arch's top: little flags in turn, gold, red, blue. */
+const bunting = (X: number, Y: number, top: number): string | null => {
+  const sag = top + 8 + (1 - (X / 10) ** 2) * 2;
+  const i = Math.floor((X + 12) / 4);
+  const fx = X + 12 - i * 4 - 2;
+  if (Y >= sag && Y < sag + 3.5 - Math.abs(fx) * 1.2) return "yru"[i % 3]!;
+  return Math.abs(Y - sag + 0.5) < 0.5 ? "t" : null;
+};
+const gate = arch(40, 66, 10, (X, Y) => bunting(X, Y, 66) ?? (Math.abs(X % 4) < 1 && Y > 70 ? "w" : Y < 74 ? "m" : Y > BASE - 6 ? "Q" : "c"));
 const tunnel = arch(CX, 58, 14, (X, Y) => {
+  // Red curtains drawn back to its sides, gold tie-backs.
+  const drape = 4.5 - 2.5 * Math.sin(Math.min(1, Math.max(0, (Y - 62) / 30)) * Math.PI);
+  if (14 - Math.abs(X) < drape + (Y < 64 ? 4 : 0)) return Math.abs(Y - 86) < 1.2 ? "y" : (Math.floor(Math.abs(X) * 1.4) % 2 ? "r" : "R");
+  if (Y < 64) return Math.floor(X / 3) % 2 ? "r" : "R"; // its valance
   const dy = Y - 84;
   const d = Math.hypot(X, dy * 1.2);
   const a = Math.atan2(dy, X) + d * 0.35;
@@ -107,6 +133,8 @@ const tunnel = arch(CX, 58, 14, (X, Y) => {
   return Math.floor(((a + Math.PI * 8) / (Math.PI / 3)) % 2) === 0 ? "p" : "P";
 });
 const mirror = arch(104, 66, 10, (X, Y) => {
+  const b = bunting(X, Y, 66);
+  if (b) return b;
   const wave = Math.sin(Y * 0.5) * 2;
   return X + wave < -3 ? "j" : X + wave < 3 ? "J" : "u";
 });
@@ -122,25 +150,46 @@ const carpet = paint(CX - 16, BASE - 4, 32, FOOT - BASE + 3, (x, y) => {
 
 // ---- Columns with gold stars, pennants on top; balloons; the pogo stick; grass; the shadow.
 
-const column = (cx: number) =>
-  paint(cx - 5, 28, 11, BASE - 28 + 2, (x, y) => {
+/**
+ * A column: blue, rounded by its light and shade, gold stars up it between red bands, a gold capital with a ball on top,
+ * a gold plinth at its foot. `half`: its half-width; `top`: its capital's top.
+ */
+const column = (cx: number, half: number, top: number) =>
+  paint(cx - half - 1, top - 2 * half, 2 * half + 3, BASE - top + 2 * half + 2, (x, y) => {
     const X = x + 0.5 - cx;
     const Y = y + 0.5;
-    if (Math.abs(X) > 5) return null;
-    if (Y < 32) return Math.abs(X) < 5 ? "y" : null; // its gold cap
-    if (Y > BASE - 2) return "Y";
-    // A gold star every 14 pixels.
-    const sy = Y - 40 - Math.round((Y - 40) / 14) * 14;
+    // The ball on top.
+    const ballR = half * 0.75;
+    if (Y < top) return Math.hypot(X, Y - (top - ballR)) < ballR ? (X + (Y - (top - ballR)) < -1 ? "w" : X > 1 ? "Y" : "y") : null;
+    if (Y < top + 4) return Math.abs(X) < half + 1 - (Y < top + 1 ? 1 : 0) ? (Y < top + 1.5 ? "y" : "Y") : null; // its capital
+    if (Y > BASE - 3) return Math.abs(X) < half + 1 ? (Y < BASE - 2 ? "y" : "Y") : null; // its plinth
+    if (Math.abs(X) > half) return null;
+    // Red bands every 14 pixels, a gold star between each two.
+    const sy = Y - (top + 13) - Math.round((Y - (top + 13)) / 14) * 14;
+    if (Math.abs(Math.abs(sy) - 7) < 1.2) return X < -half * 0.3 ? "r" : "R";
     const a = Math.atan2(sy, X) + Math.PI / 2;
     const t = Math.abs(((((a * 5) / (2 * Math.PI)) % 1) + 1) % 1 - 0.5) * 2;
-    if (Math.hypot(X, sy) < 3.6 - 1.8 * t) return "y";
-    return X < 1 ? "u" : "U";
+    const sr = Math.hypot(X, sy);
+    const star = half * 0.78 - half * 0.38 * t;
+    if (sr < star) return X + sy < -1 ? "y" : "Y";
+    if (sr < star + 0.9 && half > 3) return "U"; // its dark edge
+    return X < -half * 0.4 ? "l" : X < half * 0.3 ? "u" : "U";
+  });
+/** A big gold star with a light face, at (cx, cy). */
+const bigStar = (cx: number, cy: number, r: number) =>
+  paint(Math.floor(cx - r), Math.floor(cy - r), Math.ceil(2 * r) + 1, Math.ceil(2 * r) + 1, (x, y) => {
+    const X = x + 0.5 - cx;
+    const Y = y + 0.5 - cy;
+    const a = Math.atan2(Y, X) + Math.PI / 2;
+    const t = Math.abs(((((a * 5) / (2 * Math.PI)) % 1) + 1) % 1 - 0.5) * 2;
+    if (Math.hypot(X, Y) > r - r * 0.52 * t) return null;
+    return X + Y < -1 ? "y" : X > 1 ? "Y" : "y";
   });
 const pennant = (px: number, ramp: string, toward: 1 | -1) =>
-  paint(Math.min(px, px + toward * 11), 12, 13, 17, (x, y) => {
+  paint(Math.min(px, px + toward * 11), 8, 13, 17, (x, y) => {
     if (x === px) return "S"; // the pole
     const i = (x - px) * toward;
-    const j = y - 13;
+    const j = y - 9;
     if (i < 1 || j < 0 || j > 7) return null;
     return Math.abs(j - 3.5) < 4 - i * 0.36 ? (j < 3 ? ramp[0]! : ramp[1]!) : null;
   });
@@ -192,16 +241,20 @@ const at: Record<string, Pt> = {};
 const add = (name: string, p: { part: Part; at: Pt }) => ((parts[name] = p.part), (at[name] = p.at), name);
 const order = [
   add("shadow", shadow),
-  add("pennantL", pennant(16, "yY", 1)),
-  add("pennantR", pennant(128, "pP", -1)),
+  add("pennantL", pennant(18, "yY", 1)),
+  add("pennantR", pennant(126, "pP", -1)),
   add("front", front),
   add("gate", gate),
   add("tunnel", tunnel),
   add("mirror", mirror),
   add("carpet", carpet),
-  add("columnL", column(18)),
-  add("columnR", column(126)),
+  add("pilasterL", column(55, 2.5, 62)),
+  add("pilasterR", column(89, 2.5, 62)),
+  add("columnL", column(18, 5, 32)),
+  add("columnR", column(126, 5, 32)),
   ...bulbParts.map((p, i) => add(`bulb${i}`, p)),
+  add("starL", bigStar(CX - 42, 32, 6)),
+  add("starR", bigStar(CX + 42, 32, 6)),
   add("board", board),
   add("strings", strings),
   ...balloons.map((p, i) => add(`balloon${i}`, p)),

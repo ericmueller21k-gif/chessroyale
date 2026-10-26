@@ -18,7 +18,7 @@ import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts"
 import { HOMES, START, createTown, plotAt, plotDist, tdist, tick, walkNextTo, walkTo, type Home } from "./world.ts";
 import "./town.css";
 
-const CHIPS = 4;
+const CHIPS = TOWN_FEEL.maxChips;
 
 export function TownScreen({ onBack }: { onBack: () => void }) {
   const box = useRef<HTMLDivElement>(null);
@@ -120,6 +120,9 @@ function startTown(box: HTMLDivElement, cv: HTMLCanvasElement, chipEls: (HTMLDiv
     cv.style.width = `${W}px`;
     cv.style.height = `${H}px`;
     r.resize(W, H, DPR);
+    // The buttons' box, in the world's pixels: the chips keep off it.
+    const ctl = box.querySelector(".town-controls")?.getBoundingClientRect();
+    if (ctl) Object.assign(r.keepClear, { x: ctl.left - rc.left, y: ctl.top - rc.top, w: ctl.width, h: ctl.height });
     return true;
   };
   // A resize runs after the frame's drawing (before its paint) and clears the canvas: draw again at once, so no frame

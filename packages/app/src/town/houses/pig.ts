@@ -1,13 +1,13 @@
 /**
  * Wrangler's Stall: the cowboy pig's home on the town square (Eric's suggestion, docs/mockups/town-square/pig-stall.webp).
- * A rail-fence stall of rough posts under a torn cloth awning, a red stripe and a gold star on it; hay bales and a barrel
- * inside, a pitchfork leaning by it, a coiled lasso hung on a post, a lantern on the beam, straw and grass at its foot,
+ * A rail-fence stall of rough posts under a torn cloth awning, a red stripe and a gold star on it; hay bales inside, a barrel
+ * and a pitchfork in front, a big coiled lasso hung on a post, a lantern on the beam, straw and grass at its foot,
  * its blank sign board on the front rails (the game writes "Wrangler's Stall" on it). His colors (characters/pig.ts).
  * `idle`: the awning flutters and the lantern flickers.
  */
 import type { Anim, Character, Frame, Layer, Part } from "../../characters/sprite.ts";
 import { PIG_PALETTE } from "../../characters/pig.ts";
-import { groundShadow, lantern, paint, signBoard, signFace, tuft, type Pt } from "./kit.ts";
+import { grain, groundShadow, lantern, paint, signBoard, signFace, tuft, type Pt } from "./kit.ts";
 
 const P_ = PIG_PALETTE;
 const PALETTE: Record<string, string> = {
@@ -28,6 +28,8 @@ const PALETTE: Record<string, string> = {
   S: "#8e1c1c",
   i: "#8c9098", // iron: light, dark
   I: "#4a4d55",
+  "~": "#ffcf5a33", // the lantern's glow (see-through): its edge, its heart
+  "^": "#ffcf5a66",
   g: "#5c9a3a", // grass: lit, shaded
   G: "#3b6b26",
   w: "#fff3ad", // the lantern's glass: bright, warm
@@ -84,9 +86,15 @@ const awning = paint(AW_L, BEAM_Y + 4, AW_R - AW_L, 30, (x, y) => {
   if (j > hem) return null;
   const sa = Math.atan2(j - 9, X) + Math.PI / 2;
   const st = Math.abs(((((sa * 5) / (2 * Math.PI)) % 1) + 1) % 1 - 0.5) * 2;
-  if (Math.hypot(X, j - 9) < 7.6 - 4.2 * st) return X + (j - 9) < 0 ? "y" : "Y"; // the star
-  if (Math.abs(X) < 15) return j > hem - 2 || X > 9 ? "S" : "s"; // the red stripe
-  return j > hem - 2 || X > 36 ? "E" : "e";
+  if (Math.hypot(X + 30, j - 7) < 1.6 || Math.hypot(X - 44, j - 11) < 1.2) return null; // holes worn through it
+  const r = Math.hypot(X, j - 9);
+  if (r < 7.6 - 4.2 * st) return X + (j - 9) < 0 ? "y" : "Y"; // the star
+  if (r < 8.8 - 4.2 * st) return "O"; // its edge
+  // Two red stripes either side of the star, and a thin one along the hem; the cloth's folds.
+  if (Math.abs(Math.abs(X) - 14) < 2.5) return X > 0 || j > hem - 2 ? "S" : "s";
+  if (j > hem - 4 && j <= hem - 2) return "s";
+  if (j > hem - 2) return "E";
+  return X > 36 || (x % 12 === 0 && j > 4) ? "E" : "e";
 });
 
 // ---- Inside and about: hay bales, a barrel, a pitchfork, the lasso, the lantern, straw, grass, the shadow.
@@ -102,39 +110,86 @@ function bale(x0: number, y0: number, w: number, h: number) {
   });
 }
 const bales = [bale(64, 66, 24, 13), bale(84, 70, 20, 12), bale(74, 56, 20, 11)];
-const barrel = paint(30, 62, 18, 30, (x, y) => {
-  const X = x + 0.5 - 39;
-  const j = y - 62;
-  const half = 8 + 1.2 * Math.sin((j / 30) * Math.PI); // it bulges in the middle
+/** The barrel, in front of the fence on the left: staves bulging in the middle, iron hoops, its lid. */
+const BARREL: Pt = [30, 84]; // the middle of its top
+const BARREL_H = 28;
+const barrel = paint(BARREL[0] - 11, BARREL[1] - 3, 22, BARREL_H + 3, (x, y) => {
+  const X = x + 0.5 - BARREL[0];
+  const j = y - BARREL[1];
+  const half = 8.5 + 1.6 * Math.sin((Math.max(0, j) / BARREL_H) * Math.PI); // it bulges in the middle
+  if (j < 0) return Math.hypot(X / 8.5, (j + 0.5) / 3) < 1 ? (Math.hypot(X / 8.5, (j + 0.5) / 3) > 0.75 ? "j" : X < 2 ? "J" : "j") : null; // its lid
   if (Math.abs(X) > half) return null;
-  if (j < 2) return "j"; // its top
-  if (Math.abs(j - 7) < 1 || Math.abs(j - 23) < 1) return X < 0 ? "i" : "I"; // hoops
-  return X < -4 ? "J" : X < 3 ? "j" : "h";
+  if (j < 2) return "h"; // the lid's rim
+  if (Math.abs(j - 5) < 1.2 || Math.abs(j - BARREL_H + 6) < 1.2) return X < -3 ? "i" : X < 4 ? "i" : "I"; // hoops
+  if (Math.abs(j - BARREL_H / 2) < 0.8) return X < 0 ? "i" : "I"; // a thin one round its middle
+  if (Math.abs(X) % 4 < 0.8 && Math.abs(X) > 1) return "h"; // the staves' joints
+  return X < -5 ? "J" : X < 3 ? "j" : "h";
 });
-const pitchfork = paint(20, 46, 14, 66, (x, y) => {
-  // Leaning against the barrel: the handle from (22, 111) up to (30, 60), three tines above.
-  const t = (111 - y) / 51;
-  const px = 22 + 8 * t;
-  if (t >= 0 && t <= 1) return Math.abs(x + 0.5 - px) < 0.9 ? "J" : null;
-  if (t > 1 && t < 1.28) {
-    const tx = 30 + 8 * (t - 1);
-    for (const o of [-3, 0, 3]) if (Math.abs(x + 0.5 - (tx + o)) < 0.7) return "i";
-    if (t < 1.06 && Math.abs(x + 0.5 - tx) < 3.6) return "I";
+const pitchfork = paint(4, 34, 20, 80, (x, y) => {
+  // Leaning on the fence beside the barrel: the handle from (8, 112) up to (14, 52); its iron head above, three tines.
+  const t = (112 - y) / 60;
+  const px = 8 + 6 * t;
+  if (t >= 0 && t <= 1) return Math.abs(x + 0.5 - px) < 1 ? (x + 0.5 < px ? "j" : "J") : null;
+  const tx = 14 + 6 * (t - 1);
+  if (t > 1 && t < 1.06) return Math.abs(x + 0.5 - tx) < 1.4 ? "I" : null; // the socket
+  if (t >= 1.06 && t < 1.11) return Math.abs(x + 0.5 - tx) < 5 ? (y % 2 ? "I" : "i") : null; // the crosspiece
+  if (t >= 1.11 && t < 1.32) for (const o of [-4, 0, 4]) if (Math.abs(x + 0.5 - (tx + o * (1 + (t - 1.11) * 0.4))) < 0.8) return "i"; // tines
+  return null;
+});
+/** The lasso: a big coil of rope hung on the right back post, a few loops lying over each other, its end hanging. */
+const LASSO: Pt = [116, 58];
+const lasso = paint(LASSO[0] - 12, LASSO[1] - 14, 25, 36, (x, y) => {
+  const X = x + 0.5;
+  const Y = y + 0.5;
+  for (const [ox, oy, rx, ry] of [
+    [0, 0, 9, 12],
+    [-1, 1, 8, 11],
+    [1, 2, 7.5, 10.5],
+  ] as const) {
+    const d = Math.hypot((X - LASSO[0] - ox) / rx, (Y - LASSO[1] - oy) / ry);
+    if (Math.abs(d - 1) * Math.min(rx, ry) < 1.1) return (X - LASSO[0]) + (Y - LASSO[1]) * 0.6 < -2 ? "t" : (x + y) % 3 === 0 ? "r" : "R"; // twisted rope, lit top left
+  }
+  // Its end hanging down, a knot at the tip.
+  if (Math.abs(X - (LASSO[0] + 5 + Math.sin(Y * 0.4))) < 1 && Y > LASSO[1] + 10 && Y < LASSO[1] + 20) return Y > LASSO[1] + 18 ? "r" : "R";
+  // The peg it hangs on.
+  if (Y < LASSO[1] - 11 && Math.abs(X - LASSO[0]) < 2) return "H";
+  return null;
+});
+const lamp = lantern(124, 31, "I", "wW");
+/** Its iron bracket off the beam's end, and its glow (see-through; it flickers with it). */
+const bracket = paint(120, 26, 9, 6, (x, y) => (y === 26 ? (x < 128 ? "I" : null) : x === 127 && y < 31 ? "I" : x === 121 && y < 29 ? "I" : null), false);
+const halo = paint(115, 26, 26, 26, (x, y) => {
+  const d = Math.hypot(x + 0.5 - 128, y + 0.5 - 38);
+  return d < 6.5 ? "^" : d < 11 ? "~" : null;
+}, false);
+/** Straw on the ground: loose strands lying every which way, thicker in drifts. */
+const straw = paint(4, FOOT - 9, 136, 10, (x, y) => {
+  const d = ((x + 0.5 - 72) / 66) ** 2 + ((y + 0.5 - (FOOT - 4)) / 4.5) ** 2;
+  if (d > 1) return null;
+  const drift = Math.sin(x * 0.11) + Math.sin(x * 0.27 + 1) > 0.4; // where it's heaped
+  // Strands: short slanting lines, two ways.
+  const a = (x + y * 2) % 7 === 0;
+  const b = (x - y * 2 + 70) % 9 === 0;
+  if (drift ? grain(x, y, 4) < 0.7 : a || b) return grain(x, y, 2) < 0.3 ? "O" : grain(x, y, 3) < 0.5 ? "Y" : "y";
+  return null;
+});
+/** Straw spilled off the bales, inside the fence. */
+const spill = paint(58, 76, 52, 6, (x, y) => (grain(x, y, 6) < 0.5 - Math.abs(x + 0.5 - 84) / 60 ? (grain(x, y, 7) < 0.4 ? "O" : "Y") : null), false);
+/** Grey stones by its foot. */
+const stones = paint(0, FOOT - 6, W, 6, (x, y) => {
+  for (const [cx, rx] of [
+    [50, 3],
+    [108, 3.5],
+    [114, 2],
+    [140, 2.5],
+  ] as const) {
+    const dx = (x + 0.5 - cx) / rx;
+    const dy = (y + 0.5 - (FOOT - 2)) / (rx * 0.7);
+    if (dx * dx + dy * dy <= 1 && dy < 0.7) return dx + dy < -0.3 ? "i" : "I";
   }
   return null;
 });
-const lasso = paint(110, 64, 18, 18, (x, y) => {
-  const d = Math.hypot((x + 0.5 - 119) / 1.1, y + 0.5 - 73);
-  for (const r of [7.5, 5.5, 3.6]) if (Math.abs(d - r) < 0.8) return r > 6 ? "R" : r > 4 ? "r" : "t";
-  return null;
-});
-const lamp = lantern(124, 27, "I", "wW");
-const straw = paint(10, FOOT - 7, 124, 8, (x, y) => {
-  const d = ((x + 0.5 - 72) / 60) ** 2 + ((y + 0.5 - (FOOT - 3)) / 3.5) ** 2;
-  if (d > 1 || (x * 7 + y * 13) % 5 > 1) return null;
-  return (x + y) % 3 ? "Y" : "y";
-}, false);
-const grass = [tuft(12, FOOT - 2, 7, "gG"), tuft(132, FOOT - 3, 8, "gG"), tuft(54, FOOT, 5, "gG")];
+const grass = [tuft(4, FOOT - 1, 8, "gG"), tuft(42, FOOT, 6, "gG"), tuft(132, FOOT - 3, 9, "gG"), tuft(102, FOOT, 6, "gG"), tuft(138, FOOT, 7, "gG"), tuft(62, FOOT + 1, 5, "gG")];
 const shadow = groundShadow(CX, FOOT - 1.5, 66, 4.5);
 
 // ---- The sign on the front rails: blank; the game writes "Wrangler's Stall" on it.
@@ -155,17 +210,21 @@ const order = [
   add("postBL", post(26, BEAM_Y - 2, 100)),
   add("postBR", post(112, BEAM_Y - 2, 100)),
   ...bales.map((p, i) => add(`bale${i}`, p)),
-  add("barrel", barrel),
+  add("spill", spill),
+  add("lasso", lasso),
   add("beam", beam),
   "awning",
+  add("halo", halo),
+  add("bracket", bracket),
   add("lamp", lamp),
   add("postFL", post(16, 70, FOOT - 1)),
   add("postFM", post(69, 72, FOOT - 1)),
   add("postFR", post(122, 70, FOOT - 1)),
   add("rails", rails),
-  add("lasso", lasso),
   add("pitchfork", pitchfork),
+  add("barrel", barrel),
   add("board", board),
+  add("stones", stones),
   ...grass.map((p, i) => add(`grass${i}`, p)),
 ];
 parts.awning = awning.part;
@@ -177,7 +236,7 @@ const frames: Frame[] = [0, 1, 2, 3].map((f) => ({
   layers: order.map((part): Layer =>
     part === "awning" ? { part, x: at[part]![0], y: at[part]![1], wave: { along: "cols", amp: 1.4, len: 22, phase: (f * Math.PI) / 2, pin: "top" } } : { part, x: at[part]![0], y: at[part]![1] },
   ),
-  ...(f === 1 ? { pal: { w: "#ffe58a", W: "#e0a514" } } : f === 3 ? { pal: { w: "#fff8d0", W: "#ffd23a" } } : {}),
+  ...(f === 1 ? { pal: { w: "#ffe58a", W: "#e0a514", "~": "#ffcf5a22", "^": "#ffcf5a48" } } : f === 3 ? { pal: { w: "#fff8d0", W: "#ffd23a", "~": "#ffcf5a44", "^": "#ffcf5a80" } } : {}),
 }));
 
 const idle: Anim = { loop: true, frames };

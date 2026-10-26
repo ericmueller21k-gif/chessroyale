@@ -81,11 +81,63 @@ const door = paint(CX - 9, 76, 18, BASE - 76, (x, y) => {
   const half = j < 9 ? Math.sqrt(Math.max(0, 81 - (9 - j) ** 2)) : 9;
   if (Math.abs(X) > half) return null;
   if (Math.abs(X) > half - 1.5) return "L"; // its frame
-  if (j > 9 && j < 13 && Math.abs(X) < 6) return "h"; // a little lit window in it
+  if (j > 3 && j < 13 && Math.abs(X) < 5.5 && Math.hypot(X, j - 9) < 6.5) return Math.abs(X) < 0.6 || j === 9 ? "M" : "h"; // a little lit window in it, crossed by its bars
+  if (j === 22 || j === 23) return "L"; // a crosspiece
   if (Math.abs(X - 4) < 1 && Math.abs(j - 20) < 1) return "Y"; // the knob
   return Math.round(X) % 4 === 0 ? "M" : "N";
 });
-const lamp = paint(CX + 11, 70, 6, 9, (x, y) => (y === 70 ? (x === CX + 13 ? "L" : null) : y === 71 || y === 78 ? "L" : x === CX + 11 || x === CX + 16 ? "L" : "h"));
+/** A wall lamp: an iron bracket, a little cage round its warm glass. */
+const wallLamp = (x0: number) => paint(x0, 70, 6, 9, (x, y) => (y === 70 ? (x === x0 + 2 || x === x0 + 3 ? "L" : null) : y === 71 || y === 78 ? "L" : x === x0 || x === x0 + 5 ? "L" : y < 74 && x < x0 + 3 ? "w" : "h"));
+const lamp = wallLamp(CX + 11);
+/** Cornerstones up the walls' edges: bigger, paler blocks. */
+const corners = paint(GL - 1, TOP + 6, GR - GL + 2, BASE - TOP - 6, (x, y) => {
+  const j = y - (TOP + 6);
+  const long = Math.floor(j / 6) % 2 === 0;
+  const i = x - (GL - 1);
+  const fromR = GR - x;
+  if (j % 6 === 5) return i < (long ? 9 : 5) || fromR < (long ? 9 : 5) ? "s" : null;
+  if (i < (long ? 9 : 5)) return i === 0 ? "S" : j % 6 === 0 ? "U" : "T";
+  if (fromR < (long ? 9 : 5)) return fromR === 0 ? "s" : j % 6 === 0 ? "T" : "S";
+  return null;
+});
+/** Cloth banners on arms off the walls' tops: an artist's palette on the left, a brush on the right. */
+function banner(x0: number, art: "palette" | "brush") {
+  return paint(x0 - 2, 48, 16, 24, (x, y) => {
+    const i = x - x0;
+    const j = y - 48;
+    if (j === 0) return i >= -2 && i <= 13 ? "M" : null; // the arm
+    if (j < 2) return i === 0 || i === 11 ? "L" : null; // its rings
+    if (i < 0 || i > 11) return null;
+    const point = Math.abs(i - 5.5) * 0.6;
+    if (j > 21 - point) return null; // its foot cut in a point
+    if (i === 0 || i === 11 || j === 2) return "V"; // a purple hem
+    if (art === "palette") {
+      const X = i - 5.5;
+      const Y = j - 11;
+      if (Math.hypot(X + 1.2, Y - 1.6) < 1.3) return "U"; // the thumb hole
+      if (((X / 4.4) ** 2 + (Y / 5.2) ** 2) < 1) {
+        for (const [px, py, k] of [
+          [-2, -3, "e"],
+          [1.5, -3, "f"],
+          [2.6, 0.5, "Y"],
+          [1, 3, "u"],
+        ] as const)
+          if (Math.hypot(X - px, Y - py) < 1.2) return k;
+        return X + Y < -1 ? "Q" : "N";
+      }
+      return "U";
+    }
+    // A brush, slanting: its handle, its ferrule, its red tip.
+    const along = (i - 2) * 0.6 + (19 - j) * 0.8;
+    const across = Math.abs((i - 2) * 0.8 - (19 - j) * 0.6);
+    if (across < 1 && along > 0 && along < 9) return "N";
+    if (across < 1.2 && along >= 9 && along < 11) return "Y";
+    if (across < 1.6 - (along - 11) * 0.3 && along >= 11 && along < 15) return "e";
+    return "U";
+  });
+}
+const bannerL = banner(12, "palette");
+const bannerR = banner(120, "brush");
 /** A window: a wooden frame, a painting inside (a sky over a hill, or a big flower). */
 function frameWindow(x0: number, y0: number, w: number, h: number, art: "hills" | "flower") {
   return paint(x0, y0, w, h, (x, y) => {
@@ -228,6 +280,7 @@ const order = [
   add("splats", splats),
   add("walls", walls),
   add("step", step),
+  add("corners", corners),
   add("door", door),
   add("lamp", lamp),
   add("winL", winL),
@@ -238,6 +291,8 @@ const order = [
   add("vines", vines),
   ...flowers.map((p, i) => add(`flower${i}`, p)),
   add("board", board),
+  add("bannerL", bannerL),
+  add("bannerR", bannerR),
   add("easelL", easelL),
   add("easelR", easelR),
   ...pots.map((p, i) => add(`pot${i}`, p)),

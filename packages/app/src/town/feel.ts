@@ -305,4 +305,20 @@ export const TOWN_FEEL = {
    * game's Press Start 2P, a font twice as wide: the meadow's sign stayed blank at the zoomed-out view.)
    */
   signMinCap: 4.5,
+
+  // ---- The edge chips (a boss's face at the box's edge, pointing at its home off screen).
+  /**
+   * At most this many chips, for the nearest homes off screen. (Slice 3 review: with thirteen homes, more chips covered
+   * the pawns' name tags on a phone. The four was fixed in render.ts and Town.tsx before; now it's here.)
+   */
+  maxChips: 4,
+  /** Two chips' middles stay at least this many pixels apart (a chip is 46 across). (Was `CHIP_GAP` in render.ts.) */
+  chipGap: 50,
+  /**
+   * A chip keeps this many pixels clear around its middle of any name tag, home's name, speech bubble or the buttons
+   * (new in the slice 3 review; the face's ring is 23 across from its middle, its shadow a few more).
+   */
+  chipClear: 27,
+  /** A chip that would cover one slides along its edge in steps this many pixels long, nearest spot first; none: it's left out. */
+  chipSlideStep: 6,
 } as const;

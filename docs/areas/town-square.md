@@ -33,8 +33,10 @@ the time of day, the curved ground, all thirteen boss homes with their bosses ro
   fonts, gradients, clouds, pawns and every boss and home frame are made once, the frames the first time they show).
 - **Taps.** A square: you walk there. A home, a boss or a bot: you walk to the nearest free square next to it. Drag to look
   around; "Back to me" brings the camera back; − / + (and the mouse wheel) zoom. The chips at the box's edge show the
-  bosses whose homes are off screen (the four nearest you); a tap glides the camera there. A chip that would overlap a
-  nearer one slides along its edge until it's clear.
+  bosses whose homes are off screen (the nearest few: `maxChips` in `feel.ts`, 4); a tap glides the camera there. A chip
+  never covers a name tag, a home's floating name, the speech bubble, the −/+ and "Back to me" buttons or a nearer
+  home's chip: it slides along its edge to the nearest clear spot, and if there's none it isn't shown that frame (the
+  tags, names and bubble note their boxes as they're drawn; the chips are placed last, in `placeChips`).
 - **Names.** Each home's name is written by the game, never drawn into its art, both ways at once (Eric likes both; each
   one line in `feel.ts` to turn off): floating over the home, landmark style, as you come within a few squares
   (`floatingNames`), and on its sign board in the signs' own pixel capitals (`town/sign-font.ts`: 3 × 5 letters, drawn
@@ -68,7 +70,8 @@ noted wherever a slice changed one.
 ## Adding a home
 
 1. Draw it in `town/houses/<boss>.ts` like the others (the game's pixel art: `characters/sprite.ts` parts and frames,
-   painted with `houses/kit.ts`), about 144 × 120 pixels standing on its foot, with a blank sign board (`signBoard`) and
+   painted with `houses/kit.ts`), about 144 × 120 pixels standing on its foot (a landmark may stand bigger: Hollow Peak
+   is taller, Alfil's Pyramid is 208 × 160), with a blank sign board (`signBoard`) and
    an `idle` of a few frames. Export the `Character` and its sign's face (`signFace`).
 2. Add it to `HOUSES` in `houses/index.ts`, its boss's sprite to `BOSS_ART` and the box round its head to `BOSS_FACE` in
    `render.ts`, and a `Home` to `HOMES` in `world.ts` (its id, its boss's name, its name, its chip color and its plot's

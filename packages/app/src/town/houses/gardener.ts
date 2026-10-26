@@ -115,9 +115,10 @@ const vines = paint(GL - 10, PEAK - 4, GR - GL + 20, BASE - PEAK, (x, y) => {
   if (!along && !corner && !tumble) return null;
   if (Math.abs(X) > 50) return null;
   const g = grain(x, y, 11);
-  if (g < 0.06) return "h";
-  if (g < 0.1) return "L";
-  if (g < 0.13) return "w";
+  if (g < 0.07) return "h";
+  if (g < 0.11) return "L";
+  if (g < 0.15) return "w";
+  if (g < 0.17) return "g";
   return g < 0.45 ? "E" : g < 0.8 ? "F" : "G";
 });
 
@@ -136,6 +137,34 @@ const bench = paint(4, 92, 32, 22, (x, y) => {
     const X = x + 0.5 - cx;
     if (j >= 4 && j < 10 && Math.abs(X) < 3.5 - (j - 4) * 0.15) return j === 4 ? "c" : X > 1 ? "C" : "c";
     if (j < 4 && Math.abs(X) < 4 - j * 0.2 && grain(x, y, cx) < 0.75) return j < 2 && Math.abs(X) < 2 ? k : "G";
+  }
+  return null;
+});
+/** Flower boxes along the foot of the glass, either side of the door: wooden planters, flowers bunched in them. */
+const boxes = paint(GL, BASE - 12, GR - GL, 13, (x, y) => {
+  const X = x + 0.5 - CX;
+  if (Math.abs(X) < 15) return null; // the door
+  const j = y - (BASE - 12);
+  if (j >= 7) return j === 7 ? "Q" : j === 12 ? "N" : (x - GL) % 9 === 0 ? "N" : "O"; // the box: planks, lit on top
+  // Leaves and flowers above it.
+  const g = grain(x, y, 21);
+  const top = 2 + 3 * grain(x >> 1, 0, 22);
+  if (j < top) return null;
+  if (g < 0.16) return "h";
+  if (g < 0.26) return "L";
+  if (g < 0.32) return "w";
+  if (g < 0.38) return "g";
+  return g < 0.7 ? "F" : "G";
+});
+/** Stepping stones from the door out to the front. */
+const path = paint(CX - 9, BASE, 18, FOOT - BASE + 1, (x, y) => {
+  for (const [cx, cy] of [
+    [CX - 2, BASE + 2],
+    [CX + 2, BASE + 6],
+  ] as const) {
+    const dx = (x + 0.5 - cx) / 5;
+    const dy = (y + 0.5 - cy) / 1.8;
+    if (dx * dx + dy * dy <= 1) return dy < -0.2 ? "T" : dx > 0.4 ? "s" : "S";
   }
   return null;
 });
@@ -185,6 +214,8 @@ const order = [
   add("door", door),
   add("vines", vines),
   add("basket", basket),
+  add("boxes", boxes),
+  add("path", path),
   add("board", board),
   add("bench", bench),
   add("fountain", fountain),

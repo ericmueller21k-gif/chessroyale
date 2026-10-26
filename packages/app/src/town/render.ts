@@ -226,7 +226,12 @@ export class Renderer {
   DPR = 1;
   camX = 0;
   camY = 0;
-  readonly chips: Chip[] = [0, 1, 2, 3].map(() => ({ home: null, x: 0, y: 0, angle: 0 }));
+  readonly chips: Chip[] = Array.from({ length: TOWN_FEEL.maxChips }, () => ({ home: null, x: 0, y: 0, angle: 0 }));
+  /** The buttons' box over the world (set by Town.tsx): no chip covers it. */
+  readonly keepClear = { x: 0, y: 0, w: 0, h: 0 };
+  /** This frame's name tags, homes' names and bubble, as boxes (x, y, w, h each) that no chip may cover. */
+  private readonly clearBoxes = new Float32Array(4 * 96);
+  private nClear = 0;
   private items: Item[];
   /** The homes' items, by home (the items themselves are sorted every frame). */
   private readonly houseItems: Item[];
@@ -254,6 +259,7 @@ export class Renderer {
   private rippleNext = 0;
   /** Tag widths by name and size; sign and bubble layouts by text. */
   private readonly tagW = new Map<string, number[]>();
+  private readonly nameW = new Map<string, number[]>();
   /** Each home's sign lettering: laid out once, drawn once per size (in device pixels a font pixel). */
   private readonly signs: { lines: string[]; w: number; h: number; art: HTMLCanvasElement[] }[];
   /** Where each home's name floats this frame (drawn over everything, after the homes): x, the building's top, its fade. */
@@ -344,6 +350,7 @@ export class Renderer {
     this.drawHorizonHaze(); // on the ground, behind every home, boss and pawn
     if (TOWN_FEEL.rimLine) this.drawRimLine();
     this.nTags = 0;
+    this.nClear = 0;
     this.bubble.on = false;
     this.drawThings(now);
     // The light of the hour over the world and everything on it: one fill (none by day).
@@ -359,6 +366,34 @@ export class Renderer {
     if (this.bubble.on) this.drawBubble(this.bubble.text, this.bubble.x, this.bubble.y); // (over a home's name)
     this.drawRipples(now);
     this.placeChips(now);
+  }
+
+  /** A box on the screen no chip may cover this frame (a tag, a home's name, the bubble). */
+  private keepFree(x: number, y: number, w: number, h: number): void {
+    if (this.nClear * 4 >= this.clearBoxes.length) return;
+    const b = this.clearBoxes;
+    const k = this.nClear++ * 4;
+    b[k] = x;
+    b[k + 1] = y;
+    b[k + 2] = w;
+    b[k + 3] = h;
+  }
+
+  /** True if a chip with its middle at (x, y) would cover a box, the buttons, or one of the first `n` chips. */
+  private chipBlocked(x: number, y: number, n: number): boolean {
+    const r = TOWN_FEEL.chipClear;
+    const g = TOWN_FEEL.chipGap;
+    const b = this.clearBoxes;
+    for (let k = 0; k < this.nClear * 4; k += 4) {
+      if (x + r > b[k]! && x - r < b[k]! + b[k + 2]! && y + r > b[k + 1]! && y - r < b[k + 1]! + b[k + 3]!) return true;
+    }
+    const kc = this.keepClear;
+    if (kc.w > 0 && x + r > kc.x && x - r < kc.x + kc.w && y + r > kc.y && y - r < kc.y + kc.h) return true;
+    for (let m = 0; m < n; m++) {
+      const o = this.chips[m]!;
+      if (Math.abs(o.x - x) < g && Math.abs(o.y - y) < g) return true;
+    }
+    return false;
   }
 
   /** A name tag to draw after the world's tint (kept in a list this frame: nothing allocated once it has grown). */
@@ -615,6 +650,10 @@ export class Renderer {
       const y = nm.y - 6 + (1 - a) * f.nameRise;
       ctx.globalAlpha = a;
       ctx.font = NAME_FONT[size]!;
+      let widths = this.nameW.get(h.name);
+      if (!widths) this.nameW.set(h.name, (widths = []));
+      const tw = widths[size] ?? (widths[size] = ctx.measureText(h.name).width);
+      this.keepFree(nm.x - tw / 2 - 2, y - size - 2, tw + 4, size + 4);
       ctx.textAlign = "center";
       ctx.textBaseline = "bottom";
       ctx.lineJoin = "round";
@@ -801,6 +840,7 @@ export class Renderer {
     const tw = widths[s] ?? (widths[s] = ctx.measureText(text).width);
     const w = tw + s * 1.25;
     const h = s + (8 * s) / 11;
+    this.keepFree(ax - w / 2, ay - h, w, h);
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.fillStyle = gold ? "rgba(255,215,106,.96)" : "rgba(255,255,255,.92)";
@@ -840,6 +880,7 @@ export class Renderer {
     const h = b.lines.length * lh + 10;
     const bx = clamp(ax - b.w / 2, 6, W - b.w - 6);
     const by = Math.max(6, ay - h - 9);
+    this.keepFree(bx, by, b.w, h + 7);
     ctx.save();
     ctx.globalAlpha = 1;
     ctx.shadowColor = "rgba(0,0,0,.25)";
@@ -925,7 +966,7 @@ export class Renderer {
     const yy = you.y;
     let n = 0;
     for (const ch of chips) ch.home = null;
-    // Up to four, nearest first: a home is left out when its picture or its boss is on screen.
+    // Nearest first: a home is left out when its picture or its boss is on screen.
     const order = SCRATCH_ORDER;
     order.length = 0;
     for (let i = 0; i < this.homes.length; i++) {
@@ -938,8 +979,9 @@ export class Renderer {
     const M = 44;
     const ox = W / 2;
     const oy = clamp(v.fy, H * 0.4, H * 0.75);
-    for (const i of order) {
-      if (n >= chips.length) break;
+    // Only the nearest few are thought of (`maxChips`): one with no room is left out, not swapped for a farther one.
+    for (let o = 0; o < order.length && o < chips.length; o++) {
+      const i = order[o]!;
       const h = this.homes[i]!;
       const dx0 = wrapF(h.cx - this.camX);
       const dz0 = wrapF(h.cy - this.camY);
@@ -959,24 +1001,34 @@ export class Renderer {
       if (dy > 0) t = Math.min(t, (H - M - oy) / dy);
       else if (dy < 0) t = Math.min(t, (M - oy) / dy);
       if (!isFinite(t)) t = 1;
+      const x0 = ox + dx * t;
+      const y0 = oy + dy * t;
+      // Never over a name tag, a home's name, the bubble, the buttons or a nearer home's chip: slide along the edge it
+      // sits on to the nearest clear spot (its arrow still points home); no clear spot, no chip.
+      const side = x0 <= M + 1 || x0 >= W - M - 1; // on the left or right edge: slide up or down
+      const lo = M;
+      const end = side ? H - M : W - M;
+      const at0 = side ? y0 : x0;
+      const step = TOWN_FEEL.chipSlideStep;
+      let found = NaN;
+      for (let s = 0; at0 - s * step >= lo || at0 + s * step <= end; s++) {
+        const up = at0 + s * step;
+        const down = at0 - s * step;
+        if (up <= end && !this.chipBlocked(side ? x0 : up, side ? up : y0, n)) {
+          found = up;
+          break;
+        }
+        if (s > 0 && down >= lo && !this.chipBlocked(side ? x0 : down, side ? down : y0, n)) {
+          found = down;
+          break;
+        }
+      }
+      if (Number.isNaN(found)) continue;
       const c = chips[n++]!;
       c.home = h;
-      c.x = ox + dx * t;
-      c.y = oy + dy * t;
+      c.x = side ? x0 : found;
+      c.y = side ? found : y0;
       c.angle = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
-      // Never on top of a nearer home's chip: slide along the edge it sits on until it's clear (its arrow still points home).
-      for (let pass = 0; pass < 4; pass++) {
-        let moved = false;
-        for (let m = 0; m < n - 1; m++) {
-          const o = chips[m]!;
-          if (Math.abs(o.x - c.x) >= CHIP_GAP || Math.abs(o.y - c.y) >= CHIP_GAP) continue;
-          const side = c.x <= M + 1 || c.x >= W - M - 1; // on the left or right edge: slide up or down
-          if (side) c.y = c.y >= o.y ? (o.y + CHIP_GAP <= H - M ? o.y + CHIP_GAP : o.y - CHIP_GAP) : o.y - CHIP_GAP >= M ? o.y - CHIP_GAP : o.y + CHIP_GAP;
-          else c.x = c.x >= o.x ? (o.x + CHIP_GAP <= W - M ? o.x + CHIP_GAP : o.x - CHIP_GAP) : o.x - CHIP_GAP >= M ? o.x - CHIP_GAP : o.x + CHIP_GAP;
-          moved = true;
-        }
-        if (!moved) break;
-      }
     }
   }
 
@@ -988,8 +1040,6 @@ export class Renderer {
 
 const SHADOW = "rgb(60,35,10)";
 const SCRATCH_ORDER: number[] = [];
-/** Two chips' middles stay at least this far apart (a chip is 46 pixels across). */
-const CHIP_GAP = 50;
 const byFarFirst = (a: Item, b: Item) => b.dz - a.dz;
 const dist2 = (h: Home, x: number, y: number) => wrapF(h.cx - x) ** 2 + wrapF(h.cy - y) ** 2;
 

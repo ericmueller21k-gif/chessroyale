@@ -63,7 +63,8 @@ const RUG_Y = 106;
 const rug = paint(6, RUG_Y - 12, 132, 25, (x, y) => {
   const d = ((x + 0.5 - CX) / 65) ** 2 + ((y + 0.5 - RUG_Y) / 12) ** 2;
   if (d > 1) return null;
-  if (d > 0.82) return "P"; // its border
+  if (d > 0.82) return (x % 4 === 0 && d < 0.92) ? "Q" : "P"; // its border, stitched
+  if (d < 0.6 && (x * 5 + y * 11) % 23 === 0) return "F"; // little stars sewn on it
   return d > 0.7 ? "Q" : y < RUG_Y - 4 ? "q" : "p";
 }, false);
 const track = paint(16, RUG_Y - 9, 112, 19, (x, y) => {
@@ -84,6 +85,8 @@ const post = (px: number) =>
   paint(px, 26, 7, RAIL_LOW + 10 - 26, (x, y) => {
     const i = x - px;
     if (y < 33) return Math.hypot(i - 3, y - 29) < 3.6 ? (i < 3 && y < 29 ? "T" : "A") : null; // the knob
+    if (y === 34 || y === 46 || y === RAIL_LOW + 6) return i < 3 ? "T" : "A"; // turned rings
+    if (y === 35 || y === 47 || y === RAIL_LOW + 7) return "N";
     return i < 2 ? "A" : i > 4 ? "N" : "O";
   });
 const crib = paint(POST_L + 6, RAIL_TOP - 4, POST_R - POST_L - 5, RAIL_LOW - RAIL_TOP + 8, (x, y) => {
@@ -161,15 +164,29 @@ const beachBall = paint(36, 92, 15, 15, (x, y) => {
   return dx + dy > 4 ? (k === "1" ? "r" : k === "5" ? "b" : "W") : k;
 });
 /** A toy block (a cube seen from the front and a little above): `ramp` its face, top and side. */
-const block = (x0: number, y0: number, s: number, ramp: string) =>
+/** Letters on the blocks' faces, 3 x 5 (a pixel each), white. */
+const GLYPH: Record<string, string> = { A: "010101111101101", B: "110101110101110", C: "011100100100011", D: "110101101101110" };
+const block = (x0: number, y0: number, s: number, ramp: string, letter = "") =>
   paint(x0, y0 - 3, s + 3, s + 3, (x, y) => {
     const i = x - x0;
     const j = y - (y0 - 3);
     if (j < 3) return i >= 3 - j && i < s + 3 - j ? ramp[1]! : null; // the top
     if (i >= s) return i - s < 3 && j - 3 < s - (i - s) ? ramp[2]! : null; // the side
+    // Its letter, in the face's middle.
+    const gi = i - Math.floor((s - 3) / 2);
+    const gj = j - 3 - Math.floor((s - 5) / 2);
+    if (letter && gi >= 0 && gi < 3 && gj >= 0 && gj < 5 && GLYPH[letter]![gj * 3 + gi] === "1") return "F";
     return ramp[0]!;
   });
-const blocks = [block(104, 100, 9, "1r1"), block(115, 102, 8, "5b5"), block(108, 91, 8, "3y3"), block(124, 104, 7, "4g4")];
+const blocks = [block(104, 100, 9, "1r1", "A"), block(115, 102, 8, "5b5", "B"), block(108, 91, 8, "3y3", "C"), block(124, 104, 8, "4g4", "D")];
+/** A roof block on the top of the pile (a red triangle), as in the picture. */
+const roofBlock = paint(122, 84, 12, 9, (x, y) => {
+  const X = x + 0.5 - 129;
+  const j = y - 84;
+  if (Math.abs(X) > j * 0.75 + 0.5 || j > 7) return null;
+  return X < 0 ? "1" : "r";
+});
+const block5 = block(125, 94, 7, "5b5");
 const duck = paint(109, 79, 12, 10, (x, y) => {
   const body = ((x + 0.5 - 115) / 5) ** 2 + ((y + 0.5 - 86) / 3) ** 2 < 1;
   const head = Math.hypot(x + 0.5 - 117, y + 0.5 - 81.5) < 2.8;
@@ -188,7 +205,9 @@ const car = (x0: number, w: number, ramp: string, engine = false) =>
       if (j < 3) return i >= 2 && i <= 4 ? "s" : i >= w - 6 && i < w - 1 ? ramp[0]! : null; // the funnel, the cab's roof
       return j < 5 && i > w - 7 && i < w - 2 ? "q" : ramp[j > 5 ? 1 : 0]!;
     }
-    return j < 3 ? null : ramp[j > 5 ? 1 : 0]!;
+    if (j < 3) return null;
+    if (j === 4 && (i === 2 || i === w - 3)) return "q"; // its windows
+    return ramp[j > 5 ? 1 : 0]!;
   });
 const train = [car(42, 14, "1r", true), car(57, 10, "4g"), car(68, 10, "5b"), car(79, 10, "3y")];
 const shadow = groundShadow(CX, FOOT - 3, 68, 5);
@@ -218,6 +237,8 @@ const still = [
   add("teddy", teddy),
   add("beachBall", beachBall),
   ...blocks.map((p, i) => add(`block${i}`, p)),
+  add("block5", block5),
+  add("roofBlock", roofBlock),
   add("duck", duck),
   ...train.map((p, i) => add(`car${i}`, p)),
 ];
