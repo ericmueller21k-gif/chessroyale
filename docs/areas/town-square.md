@@ -1,8 +1,8 @@
 # The town square (/town)
 
 Boss raid's coming home: a small round world where players walk around and meet the bosses at their homes (the plan:
-`ROADMAP.md`, "Boss raid: the town square"). **Slices 1 and 2** are the world alone, on a hidden address: the sky by
-the time of day, the curved ground, five boss homes with their bosses roaming near them, six bots and you. Nothing links to it yet; open
+`ROADMAP.md`, "Boss raid: the town square"). **Slices 1 to 3** are the world alone, on a hidden address: the sky by
+the time of day, the curved ground, all thirteen boss homes with their bosses roaming near them, six bots and you. Nothing links to it yet; open
 `hunchess.com/town` (behind Cloudflare Access like the rest of the site). Phone and computer.
 
 ## How it works
@@ -19,6 +19,10 @@ the time of day, the curved ground, five boss homes with their bosses roaming ne
   pitches it down and lets the rim reach further; the page opens zoomed out (`startZoomedOut`). The world is 40 × 40 squares and wraps both ways. A tap picks the
   nearest drawn square under it (`pickSquare`). The far band of ground dissolves into the sky; things in it fade, haze
   and blur, and are drawn whole, never cut by the rim.
+- **The layout** (`town/world.ts`, `HOMES`): thirteen homes on the points of a lattice over the world that wraps, so
+  neighbors stand 8 to 10 squares apart; the Coliseum's 6 × 6 ground (`COLISEUM`, columns 17 to 22, rows 16 to 21) kept
+  clear in the middle, and your start (`START`, 20, 13) just south of it, facing it. Ginger Igloo and Jefferson's
+  Fireworks stand side by side, and so do Hollow Peak and Moo & Moon Meadow. The map: `docs/decisions/2026-10-26-town-square-slice-3.md`.
 - **The world** (`town/world.ts`): the homes (3 × 3 plots), the walk (square to square, around the homes, by
   breadth-first search), the bosses' roaming and their lines (their `SELECT_LINES`, one at a time, only from a boss on
   screen), and the bots. **Everyone in the square is a `Person`** (`{ id, name, look, you, walker }`) in one list,
@@ -29,7 +33,8 @@ the time of day, the curved ground, five boss homes with their bosses roaming ne
   fonts, gradients, clouds, pawns and every boss and home frame are made once, the frames the first time they show).
 - **Taps.** A square: you walk there. A home, a boss or a bot: you walk to the nearest free square next to it. Drag to look
   around; "Back to me" brings the camera back; − / + (and the mouse wheel) zoom. The chips at the box's edge show the
-  bosses whose homes are off screen (nearest first); a tap glides the camera there.
+  bosses whose homes are off screen (the four nearest you); a tap glides the camera there. A chip that would overlap a
+  nearer one slides along its edge until it's clear.
 - **Names.** Each home's name is written by the game, never drawn into its art, both ways at once (Eric likes both; each
   one line in `feel.ts` to turn off): floating over the home, landmark style, as you come within a few squares
   (`floatingNames`), and on its sign board in the signs' own pixel capitals (`town/sign-font.ts`: 3 × 5 letters, drawn
@@ -65,8 +70,9 @@ noted wherever a slice changed one.
 1. Draw it in `town/houses/<boss>.ts` like the others (the game's pixel art: `characters/sprite.ts` parts and frames,
    painted with `houses/kit.ts`), about 144 × 120 pixels standing on its foot, with a blank sign board (`signBoard`) and
    an `idle` of a few frames. Export the `Character` and its sign's face (`signFace`).
-2. Add it to `HOUSES` in `houses/index.ts`, its boss's sprite to `BOSS_ART` in `render.ts`, and a `Home` to `HOMES` in
-   `world.ts` (its id, its boss's name, its name, its chip color and its plot's middle square).
+2. Add it to `HOUSES` in `houses/index.ts`, its boss's sprite to `BOSS_ART` and the box round its head to `BOSS_FACE` in
+   `render.ts`, and a `Home` to `HOMES` in `world.ts` (its id, its boss's name, its name, its chip color and its plot's
+   middle square, clear of the Coliseum's ground and about 8 to 10 squares from its neighbors).
 3. Look at it at real size and at 2× (`npm run preview:characters -- <dir> extra=packages/app/src/town/houses/<boss>.ts
    only=house-<boss> looks=none`), and in the square.
 
@@ -74,15 +80,16 @@ noted wherever a slice changed one.
 
 - `packages/app/src/town/`: `TownPage.tsx` (the lazy load), `Town.tsx` (the screen, the loop, input, chips, the sky's
   clock), `camera.ts`, `world.ts`, `render.ts`, `sky.ts`, `sky-draw.ts`, `sign-font.ts`, `feel.ts`, `town.css`, `houses/`
-  (tiger, gingerbread, grex, hollow, moo, the kit and the index).
-- References: `docs/mockups/town-square/` (the prototype Eric tested, and his pictures for the igloo, the peak and the
-  meadow).
+  (one file per home, thirteen in all, the kit of shared pieces and the index).
+- References: `docs/mockups/town-square/` (the prototype Eric tested, and the pictures for the homes: Eric's for the
+  igloo, the peak and the meadow, his suggestions for seven more). Alfil's Pyramid has no picture: it's our design.
 
 ## Tests
 
 - `packages/app/test/town-camera.test.ts`: the projection (the focus in the middle column, wrapping both ways, a tap picks
-  the square drawn there, far squares shrink, zooming out shows more rows, the phone / computer blend), the walk around a
-  home, and the eased steps meeting the even ones at the same speed.
+  the square drawn there, far squares shrink, zooming out shows more rows, the phone / computer blend), the layout
+  (thirteen homes 8 to 10 squares from their nearest neighbors, none near the start, the Coliseum's ground clear and the
+  start just south of it), the walk around a home, and the eased steps meeting the even ones at the same speed.
 - `packages/app/test/town-sky.test.ts`: which look shows when, the looks always adding up to 1 and blending over their
   half hour in order, `?sky=`, and the tint (none by day, softer at dawn than dusk, coolest and darkest at night).
 - `e2e/town.spec.ts` (phone and desktop; `e2e/areas.json`, "the town square"): the page loads, the world is drawn and
@@ -92,5 +99,5 @@ noted wherever a slice changed one.
 
 ## Not built yet
 
-The bottom strip, cards ("Challenge alone", "Invite to party"), the shop, the Coliseum, the other bosses' homes, dressed
-pawns, the Simple map setting, real players and rooms, sounds.
+The bottom strip, cards ("Challenge alone", "Invite to party"), the shop, the Coliseum, dressed pawns, the Simple map
+setting, real players and rooms, sounds.

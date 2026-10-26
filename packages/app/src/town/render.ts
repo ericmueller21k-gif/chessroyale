@@ -14,6 +14,14 @@ import { GINGERBREAD } from "../characters/gingerbread.ts";
 import { GREX } from "../characters/grex.ts";
 import { HOLLOW } from "../characters/hollow.ts";
 import { MOO } from "../characters/moo.ts";
+import { ALFIL } from "../characters/alfil.ts";
+import { BIGBOY } from "../characters/bigboy.ts";
+import { CLOWN } from "../characters/clown.ts";
+import { GARDENER } from "../characters/gardener.ts";
+import { HOPPER } from "../characters/hopper.ts";
+import { PIG } from "../characters/pig.ts";
+import { SAWYER } from "../characters/sawyer.ts";
+import { SMUDGY } from "../characters/smudgy.ts";
 import { TIGER_FIGURE } from "../characters/tiger-figure.ts";
 import { N, bandOf, clamp, drawable, enterOf, farOf, forEachSquare, hazeMix, newPt, newView, pastCurve, pickSquare, proj, radial, rimYAt, setView, wrapF, type Quad, type View } from "./camera.ts";
 import { TOWN_FEEL } from "./feel.ts";
@@ -24,7 +32,21 @@ import { SkyPainter } from "./sky-draw.ts";
 import { plotAt, type Boss, type Home, type HomeId, type Person, type Pose, type Town } from "./world.ts";
 
 /** Each boss's sprite (its real one: its `idle` frames). */
-export const BOSS_ART: Record<HomeId, Character> = { tiger: TIGER_FIGURE, gingerbread: GINGERBREAD, grex: GREX, hollow: HOLLOW, moo: MOO };
+export const BOSS_ART: Record<HomeId, Character> = {
+  tiger: TIGER_FIGURE,
+  gingerbread: GINGERBREAD,
+  grex: GREX,
+  hollow: HOLLOW,
+  moo: MOO,
+  clown: CLOWN,
+  bigboy: BIGBOY,
+  sawyer: SAWYER,
+  pig: PIG,
+  smudgy: SMUDGY,
+  hopper: HOPPER,
+  gardener: GARDENER,
+  alfil: ALFIL,
+};
 /**
  * Each boss's head in its first idle frame (x, y and a side, in its pixels): what its edge chip shows. (Slice 1 cropped
  * the top of the frame, which showed Babur's balloons, not Babur.)
@@ -35,6 +57,14 @@ export const BOSS_FACE: Record<HomeId, readonly [x: number, y: number, size: num
   grex: [22, 29, 40],
   hollow: [28, 18, 44],
   moo: [9, 26, 50],
+  clown: [14, 24, 40],
+  bigboy: [24, 16, 42],
+  sawyer: [18, 0, 40],
+  pig: [26, 4, 46],
+  smudgy: [28, 8, 44],
+  hopper: [22, 4, 36],
+  gardener: [24, 22, 46],
+  alfil: [10, 16, 38],
 };
 
 // ---- Colors (the prototype's, sampled from Eric's reference picture).
@@ -934,6 +964,19 @@ export class Renderer {
       c.x = ox + dx * t;
       c.y = oy + dy * t;
       c.angle = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
+      // Never on top of a nearer home's chip: slide along the edge it sits on until it's clear (its arrow still points home).
+      for (let pass = 0; pass < 4; pass++) {
+        let moved = false;
+        for (let m = 0; m < n - 1; m++) {
+          const o = chips[m]!;
+          if (Math.abs(o.x - c.x) >= CHIP_GAP || Math.abs(o.y - c.y) >= CHIP_GAP) continue;
+          const side = c.x <= M + 1 || c.x >= W - M - 1; // on the left or right edge: slide up or down
+          if (side) c.y = c.y >= o.y ? (o.y + CHIP_GAP <= H - M ? o.y + CHIP_GAP : o.y - CHIP_GAP) : o.y - CHIP_GAP >= M ? o.y - CHIP_GAP : o.y + CHIP_GAP;
+          else c.x = c.x >= o.x ? (o.x + CHIP_GAP <= W - M ? o.x + CHIP_GAP : o.x - CHIP_GAP) : o.x - CHIP_GAP >= M ? o.x - CHIP_GAP : o.x + CHIP_GAP;
+          moved = true;
+        }
+        if (!moved) break;
+      }
     }
   }
 
@@ -945,6 +988,8 @@ export class Renderer {
 
 const SHADOW = "rgb(60,35,10)";
 const SCRATCH_ORDER: number[] = [];
+/** Two chips' middles stay at least this far apart (a chip is 46 pixels across). */
+const CHIP_GAP = 50;
 const byFarFirst = (a: Item, b: Item) => b.dz - a.dz;
 const dist2 = (h: Home, x: number, y: number) => wrapF(h.cx - x) ** 2 + wrapF(h.cy - y) ** 2;
 

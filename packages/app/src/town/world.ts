@@ -14,10 +14,16 @@ export interface Sq {
   r: number;
 }
 
-/** Your square when the page opens. */
-export const START: Sq = { c: 20, r: 10 };
+/**
+ * The Coliseum's ground in the world's middle (6 x 6 squares, kept clear for it: slice 3 builds nothing there yet). `c0`,
+ * `r0` its first column and row.
+ */
+export const COLISEUM = { c0: 17, r0: 16, size: 6 } as const;
 
-export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo";
+/** Your square when the page opens: just south of the Coliseum's ground, facing it (the camera looks north, r rising). */
+export const START: Sq = { c: 20, r: 13 };
+
+export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil";
 
 /** A boss's home: a 3 x 3 plot. (cx, cy) is its middle square. */
 export interface Home {
@@ -33,17 +39,26 @@ export interface Home {
 }
 
 /**
- * The five homes, about 8 squares from your start in five directions: Ginger's straight ahead, Babur's to the right,
- * Jefferson's to the left, Hollow's behind you on the right and Moo & Moon's behind you on the left (a chip points to
- * each one off screen). Names: "Ginger Igloo", "Hollow Peak" and "Moo & Moon Meadow" are Eric's; "Jefferson's
- * Fireworks" and "Babur's Circus" the director's.
+ * The thirteen homes, spread evenly over the world that wraps: the points of a lattice on the 40 x 40 torus (14 points,
+ * one of them the Coliseum's middle), so neighbors are about 8 to 10 squares apart and none stands in the plaza south of
+ * the Coliseum (docs/decisions/2026-10-26-town-square-slice-3.md has the map). Pairs that play off each other stand side
+ * by side: Ginger Igloo and Jefferson's Fireworks (ice and fire), Hollow Peak and Moo & Moon Meadow (dark and night).
+ * Names: "Ginger Igloo", "Hollow Peak" and "Moo & Moon Meadow" are Eric's; the rest the director's.
  */
 export const HOMES: readonly Home[] = [
-  { id: "gingerbread", boss: "Ginger", name: "Ginger Igloo", color: "#3fae4f", cx: START.c, cy: START.r + 8 },
-  { id: "tiger", boss: "Babur", name: "Babur's Circus", color: "#2f7fe0", cx: START.c + 8, cy: START.r + 2 },
-  { id: "grex", boss: "Jefferson", name: "Jefferson's Fireworks", color: "#e5566a", cx: START.c - 8, cy: START.r + 2 },
-  { id: "hollow", boss: "Hollow", name: "Hollow Peak", color: "#7a4fd0", cx: START.c + 5, cy: START.r - 6 },
-  { id: "moo", boss: "Moo & Moon", name: "Moo & Moon Meadow", color: "#5d7ad8", cx: START.c - 5, cy: START.r - 6 },
+  { id: "gingerbread", boss: "Ginger", name: "Ginger Igloo", color: "#3fae4f", cx: 11, cy: 16 },
+  { id: "grex", boss: "Jefferson", name: "Jefferson's Fireworks", color: "#e5566a", cx: 3, cy: 13 },
+  { id: "tiger", boss: "Babur", name: "Babur's Circus", color: "#2f7fe0", cx: 29, cy: 22 },
+  { id: "bigboy", boss: "Big Boy", name: "Big Boy's Crib", color: "#23a8a8", cx: 37, cy: 25 },
+  { id: "hollow", boss: "Hollow", name: "Hollow Peak", color: "#7a4fd0", cx: 6, cy: 28 },
+  { id: "moo", boss: "Moo & Moon", name: "Moo & Moon Meadow", color: "#5d7ad8", cx: 14, cy: 30 },
+  { id: "alfil", boss: "Alfil", name: "Alfil's Pyramid", color: "#b4840f", cx: 23, cy: 33 },
+  { id: "smudgy", boss: "Smudgy", name: "Smudgy's Art Gallery", color: "#f5832d", cx: 31, cy: 36 },
+  { id: "clown", boss: "Boingo", name: "Boingo's Funhouse", color: "#7d3b93", cx: 0, cy: 39 },
+  { id: "hopper", boss: "Chub & Chirp", name: "Chub & Chirp's Grassland", color: "#447a1f", cx: 9, cy: 2 },
+  { id: "gardener", boss: "Puddles", name: "Puddles' Botanical Garden", color: "#d6747b", cx: 17, cy: 5 },
+  { id: "sawyer", boss: "Sawyer", name: "Sawyer's Woodshed", color: "#d39a0b", cx: 26, cy: 8 },
+  { id: "pig", boss: "Wrangler", name: "Wrangler's Stall", color: "#8f5629", cx: 34, cy: 10 },
 ];
 
 /** How a person's pawn looks: its side (white or black), and a tint for a few. (Dressed pawns come later.) */
