@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { N, forEachSquare, newPt, newView, pickSquare, proj, rowsInView, setView, wrapF, wrapI } from "../src/town/camera.ts";
-import { HOMES, START, ease, findPath, walkable } from "../src/town/world.ts";
+import { COLISEUM, HOMES, START, ease, findPath, walkable } from "../src/town/world.ts";
 
 /** The town square's camera (src/town/camera.ts): pure projection math, on a phone's box and a computer's. */
 const BOXES = [
@@ -109,8 +109,25 @@ describe("town square camera", () => {
 });
 
 describe("town square walking", () => {
-  it("the four homes stand about 8 squares from your start, and a path walks around them", () => {
-    for (const h of HOMES) expect(Math.hypot(wrapF(h.cx - START.c), wrapF(h.cy - START.r))).toBeGreaterThanOrEqual(7.5);
+  it("thirteen homes spread over the world: neighbors 8 or more squares apart, none near your start, the Coliseum's ground clear", () => {
+    expect(HOMES).toHaveLength(13);
+    expect(new Set(HOMES.map((h) => h.id)).size).toBe(13);
+    const dist = (ax: number, ay: number, bx: number, by: number) => Math.hypot(wrapF(ax - bx), wrapF(ay - by));
+    for (const h of HOMES) {
+      expect(dist(h.cx, h.cy, START.c, START.r), `${h.id} from the start`).toBeGreaterThanOrEqual(7.5);
+      const near = Math.min(...HOMES.filter((o) => o !== h).map((o) => dist(h.cx, h.cy, o.cx, o.cy)));
+      expect(near, `${h.id}'s nearest neighbor`).toBeGreaterThanOrEqual(8);
+      expect(near, `${h.id}'s nearest neighbor`).toBeLessThanOrEqual(10);
+    }
+    // The Coliseum's 6 x 6 ground is walkable (no home on it), and you start just south of it.
+    for (let r = COLISEUM.r0; r < COLISEUM.r0 + COLISEUM.size; r++) for (let c = COLISEUM.c0; c < COLISEUM.c0 + COLISEUM.size; c++) expect(walkable(c, r)).toBe(true);
+    expect(START.r).toBeLessThan(COLISEUM.r0);
+    expect(COLISEUM.r0 - START.r).toBeLessThanOrEqual(3);
+    expect(START.c).toBeGreaterThanOrEqual(COLISEUM.c0);
+    expect(START.c).toBeLessThan(COLISEUM.c0 + COLISEUM.size);
+  });
+
+  it("a path walks around a home", () => {
     const ginger = HOMES.find((h) => h.id === "gingerbread")!;
     // From the start to the square behind Ginger's house: around it, never through it.
     const goal = { c: ginger.cx, r: ginger.cy + 2 };
