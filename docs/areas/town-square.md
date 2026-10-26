@@ -68,5 +68,5 @@ how often bots walk, the sizes, the names. The prototype's own value is noted wh
 
 ## Not built yet
 
-The bottom strip, cards ("Challenge alone", "Invite to party"), the shop, the Arena, the other bosses' homes, dressed
+The bottom strip, cards ("Challenge alone", "Invite to party"), the shop, the Coliseum, the other bosses' homes, dressed
 pawns, the Simple map setting, real players and rooms, sounds.
