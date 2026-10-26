@@ -7,12 +7,15 @@
  * square you'd walk to like a button (press.ts), one pawn a square (world.ts), your trail, and the cards: a boss's
  * ("Challenge alone", which leaves for the Boss raid screen, its tile picked, after a confirm) and a home's (its shop, greyed, "Coming soon").
  * Slice 5: the Coliseum in the middle (solid; a tap walks you to the apron at its gate and opens its card: "Raids with
- * people", greyed, "Coming soon": the menu Eric plans will live there), with an edge chip of its own.
+ * people", greyed, "Coming soon": the menu Eric plans will live there), with an edge chip of its own. Slice 6: the park
+ * in front of it; a tap on a chess table (or a stool) walks you to its nearest free stool, where you sit, and opens its
+ * card ("Chess table": "Casual" and "Ranked" greyed, "Coming soon"); a tap elsewhere closes it and you stand.
  *
  * One requestAnimationFrame loop draws everything on one canvas; it stops when the screen closes or the tab is hidden.
  * Test hooks (e2e only): the canvas carries `data-you="c,r"` (your square) and `data-ready="1"` once a frame is drawn;
- * with the test switches on, `window.__townAt("boss" | "home" | "coliseum", id)` gives where to tap a boss, a home or the
- * Coliseum (its gate) now, and
+ * with the test switches on, `window.__townAt("boss" | "home" | "coliseum" | "statue" | "table", id)` gives where to tap a
+ * boss, a home, the Coliseum (its gate), a statue or a chess table (by its index) now; the canvas's `data-sit="1"` while
+ * you sit at a table; and
  * `window.__townGather()` sends the three nearest bots to stand beside you.
  * docs/areas/town-square.md.
  */
@@ -24,18 +27,18 @@ import { TOWN_FEEL } from "./feel.ts";
 import { Press } from "./press.ts";
 import { PAWN_PX, Renderer, pawnImage, type Hit } from "./render.ts";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
-import { COLISEUM_PLACE, HOMES, START, STATUES, createTown, destFor, onColiseum, plotAt, statueAt, tdist, tick, walkWalker, type HomeId, type Place, type Sq, type StatueId, type Target } from "./world.ts";
+import { COLISEUM_PLACE, HOMES, START, STATUES, createTown, destFor, onColiseum, plotAt, seated, statueAt, stoolAt, tableAt, tdist, tick, walkWalker, type HomeId, type Place, type Sq, type StatueId, type Target } from "./world.ts";
 import { dressedPawn, lookKey } from "./you-look.ts";
 import "./town.css";
 
 const CHIPS = TOWN_FEEL.maxChips;
 
 /**
- * The card open over a boss, a home or the Coliseum (`i`: its index in HOMES, the bosses being in the same order; the
- * Coliseum's is HOMES.length), and its confirm.
+ * The card open over a boss, a home, the Coliseum or a chess table (`i`: its index in HOMES, the bosses being in the same
+ * order; the Coliseum's is HOMES.length; a table's, its index in TABLES), and its confirm.
  */
 export interface Card {
-  kind: "boss" | "home" | "coliseum";
+  kind: "boss" | "home" | "coliseum" | "table";
   i: number;
   confirm: boolean;
 }
@@ -58,8 +61,8 @@ export function TownScreen({ onBack, onBossAlone }: { onBack: () => void; onBoss
     ctl.current = t;
     return t.stop;
   }, []);
-  const home = card && card.kind !== "coliseum" ? HOMES[card.i]! : null;
-  const label = card?.kind === "coliseum" ? COLISEUM_PLACE.name : home ? (card!.confirm ? "Leave the town square?" : card!.kind === "boss" ? home.boss : home.name) : undefined;
+  const home = card && (card.kind === "boss" || card.kind === "home") ? HOMES[card.i]! : null;
+  const label = card?.kind === "coliseum" ? COLISEUM_PLACE.name : card?.kind === "table" ? "Chess table" : home ? (card!.confirm ? "Leave the town square?" : card!.kind === "boss" ? home.boss : home.name) : undefined;
 
   return (
     <div class="town-screen">
@@ -111,6 +114,19 @@ export function TownScreen({ onBack, onBossAlone }: { onBack: () => void; onBoss
                 <h2>{COLISEUM_PLACE.name}</h2>
                 <button type="button" class="town-btn" disabled>
                   Raids with people
+                </button>
+                <div class="town-soon">Coming soon</div>
+              </>
+            )}
+            {/* A chess table's: a casual or ranked game of normal chess will start here (matchmaking is the next job); shown greyed, not hidden. */}
+            {card?.kind === "table" && (
+              <>
+                <h2>Chess table</h2>
+                <button type="button" class="town-btn" disabled>
+                  Casual
+                </button>
+                <button type="button" class="town-btn" disabled>
+                  Ranked
                 </button>
                 <div class="town-soon">Coming soon</div>
               </>
@@ -319,6 +335,8 @@ function startTown(
     const h = town.you.walker.here();
     const key = `${h.c},${h.r}`;
     if (key !== youKey) cv.dataset.you = youKey = key;
+    const sit = seated(town.you) ? "1" : "0";
+    if (cv.dataset.sit !== sit) cv.dataset.sit = sit;
     if (!ready) cv.dataset.ready = String(+(ready = true));
   };
 
@@ -389,6 +407,8 @@ function startTown(
   // ---- The card: open, its confirm, closed; placed over what it's about every frame.
   function setCard(c: Card | null) {
     if (card?.kind === "boss") town.bosses[card.i]!.held = false;
+    // A table's card closing: you stand up (you stay on the stool's square).
+    if (card?.kind === "table" && c?.kind !== "table") town.you.sit = false;
     card = c;
     // (A boss stays where it is while its card is open, so you can walk up to it.)
     if (c?.kind === "boss") town.bosses[c.i]!.held = true;
@@ -403,7 +423,7 @@ function startTown(
       cardW = cardEl.offsetWidth;
       cardH = cardEl.offsetHeight;
     }
-    if (!r.anchor(card.kind === "boss" ? "boss" : "home", card.i, A)) {
+    if (!r.anchor(card.kind === "boss" ? "boss" : card.kind === "table" ? "table" : "home", card.i, A)) {
       cardEl.style.visibility = "hidden";
       return;
     }
@@ -447,6 +467,12 @@ function startTown(
       key = "coliseum";
       target = { kind: "coliseum" };
       c = { kind: "coliseum", i: HOMES.length, confirm: false };
+    } else if (hit.kind === "table" || (hit.kind === "square" && (tableAt(hit.c, hit.r) || stoolAt(hit.c, hit.r)))) {
+      // A chess table (or one of its stools): to its nearest free stool, to sit; and its card.
+      const table = hit.kind === "table" ? hit.table : (tableAt(hit.c, hit.r) ?? stoolAt(hit.c, hit.r))!;
+      key = `table:${table.i}`;
+      target = { kind: "table", table };
+      c = { kind: "table", i: table.i, confirm: false };
     } else if (hit.kind === "square") {
       key = `sq:${hit.c},${hit.r}`;
       const home = plotAt[hit.r * N + hit.c];
@@ -512,6 +538,8 @@ function startTown(
     r.release(now, true);
     // A tap on anything but the statue you're looking at walks you away from it: the camera glides back out.
     if (p.statue < 0 || p.statue !== closeOn) leaveClose();
+    // You sit when a tap on a table sent you to its stool; any other walk stands you up.
+    town.you.sit = p.card?.kind === "table";
     if (p.dest && walkWalker(town.you.walker, p.dest)) {
       follow = true;
       glide = null;
@@ -545,8 +573,9 @@ function startTown(
 
   // A test hook (e2e, with the test switches on: test-switches.ts): where to tap a boss, a home or the Coliseum (its gate)
   // now, in the box.
-  const hookAt = (kind: "boss" | "home" | "coliseum" | "statue", id?: HomeId | StatueId) => {
+  const hookAt = (kind: "boss" | "home" | "coliseum" | "statue" | "table", id?: HomeId | StatueId | number) => {
     const out = { x: 0, y: 0 };
+    if (kind === "table") return testSwitchesAllowed() && r.tapPoint("table", Number(id), out) ? out : null;
     if (kind === "statue") return testSwitchesAllowed() && r.tapPoint("statue", STATUES.findIndex((s) => s.id === id), out) ? out : null;
     const i = kind === "coliseum" ? HOMES.length : HOMES.findIndex((h) => h.id === id);
     return testSwitchesAllowed() && r.tapPoint(kind === "boss" ? "boss" : "home", i, out) ? out : null;

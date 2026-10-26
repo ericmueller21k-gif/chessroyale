@@ -274,6 +274,13 @@ export const TOWN_FEEL = {
   botGapMs: [2600, 4200] as const,
   /** To a free square this many steps away (at least, at most). */
   botWalk: [2, 4] as const,
+  /**
+   * Now and then a bot goes to sit at a chess table (slice 6): this share of its walks head for a free stool up to this
+   * many steps away; and a bot sitting stays put, when its turn to walk comes, this share of the time.
+   */
+  botSitChance: 0.3,
+  botSitReach: 7,
+  botStaySeated: 0.6,
 
   // ---- Sizes, in squares.
   /** A boss's picture is this many squares tall. */
@@ -294,6 +301,20 @@ export const TOWN_FEEL = {
   /** ...both shrinking (1 / (1 + this x the lift in squares)) and fading (1 - this x the lift) as the hop lifts it. */
   shadowLiftShrink: 4,
   shadowLiftFade: 4,
+  /**
+   * Sitting at a chess table (slice 6): a pawn on a stool shows from this share of its height up (the rest hidden behind
+   * the stool, as if sat), resting on the stool's seat this many squares above the ground: lower than standing.
+   */
+  sitCut: 0.34,
+  sitSeat: 0.3,
+  /**
+   * The Coliseum from afar (slice 6): seen up to this many squares past the rim, standing on the horizon, sunk this many
+   * squares behind the world's curve a square past the rim (its top looming over the horizon), and as hazy as this far
+   * into the far band (0 to 1).
+   */
+  farReach: 16,
+  farSink: 0.35,
+  farHaze: 0.7,
   /** A house's pixels per square (the tent, 144 pixels wide, is about 3.9 squares). */
   housePxPerSquare: 37,
   /** A square drawn less than this many pixels tall (far off) gets no seam: it's barely visible there, and it halves the work. */

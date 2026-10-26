@@ -7,7 +7,9 @@ import { test } from "./helpers.ts";
  * home, and `?sky=` picks the sky's look whatever the clock says.
  * Slice 4: a boss's card ("Challenge alone", its confirm, Leave to the Boss raid screen with that boss's tile picked)
  * and a home's (its shop greyed, "Coming soon"). Slice 5: the Coliseum's (a tap on its gate walks you to the apron in
- * front of it; "Raids with people" greyed, "Coming soon").
+ * front of it; "Raids with people" greyed, "Coming soon"). Slice 6: the park's chess tables (a tap on one walks you to a
+ * free stool, you sit, its card shows "Casual" and "Ranked" greyed and "Coming soon"; a tap elsewhere closes it and you
+ * stand), on the bigger map round the bigger Coliseum.
  * Test hooks: the canvas carries `data-you="c,r"` (your square) and `data-ready="1"` once its first frame is drawn;
  * `window.__townAt("boss" | "home" | "coliseum", id)` says where to tap a boss, a home or the Coliseum's gate (with the
  * test switches on, as here).
@@ -87,11 +89,21 @@ test("the town square at /town: the world is drawn and fills its box under the b
   expect(errors).toEqual([]);
 });
 
-/** The sky's average color across a strip at the top of the canvas, middle third (CSS pixels 2 to 8 down). */
+/**
+ * The sky's average color across a strip at the top of the canvas, its left and right sixths (CSS pixels 2 to 8 down).
+ * (Slices 1 to 5 sampled its middle third; slice 6's bigger Coliseum rises out of the box's top there on a computer, so
+ * the strip is either side of it, where the top is sky on a phone and a computer.)
+ */
 const skyTop = (p: Page) =>
   canvas(p).evaluate((cv: HTMLCanvasElement) => {
     const k = cv.width / cv.clientWidth;
-    const d = cv.getContext("2d")!.getImageData(Math.round(cv.width / 3), Math.round(2 * k), Math.round(cv.width / 3), Math.round(6 * k)).data;
+    const g2 = cv.getContext("2d")!;
+    const w = Math.round(cv.width / 6);
+    const left = g2.getImageData(0, Math.round(2 * k), w, Math.round(6 * k)).data;
+    const right = g2.getImageData(cv.width - w, Math.round(2 * k), w, Math.round(6 * k)).data;
+    const d = new Uint8ClampedArray(left.length + right.length);
+    d.set(left);
+    d.set(right, left.length);
     let r = 0;
     let g = 0;
     let b = 0;
@@ -207,8 +219,8 @@ test("the Coliseum: a tap on its gate walks you to the apron in front of it and 
   await expect(raids).toBeVisible();
   await expect(raids).toBeDisabled();
   await expect(card.getByText("Coming soon", { exact: true })).toBeVisible();
-  // You end on the apron at the gate: the row just in front of its ground (row 15), one of its two middle columns.
-  await expect.poll(async () => (await you(page)).join(","), { message: "you walk to the gate", timeout: 5000 }).toMatch(/^(19|20),15$/);
+  // You end on the apron at the gate: the row just in front of its ground (row 22), one of its two middle columns.
+  await expect.poll(async () => (await you(page)).join(","), { message: "you walk to the gate", timeout: 5000 }).toMatch(/^(22|23),22$/);
   // A tap on the world elsewhere (low on the left) closes it.
   await page.mouse.click(cv.x + cv.width * 0.3, cv.y + cv.height * 0.85);
   await expect(card).toBeHidden();
@@ -233,8 +245,8 @@ type Cam = {
 const cam = (p: Page) => p.evaluate(() => (window as unknown as { __townCam: () => Cam }).__townCam());
 
 for (const st of [
-  { id: "bronze", sq: [22, 15], quote: "Concrete considerations always take precedence over general principles", zoomIn: false },
-  { id: "marble", sq: [17, 15], quote: "Nothing is so healing as the human touch", zoomIn: true },
+  { id: "bronze", sq: [28, 22], quote: "Concrete considerations always take precedence over general principles", zoomIn: false },
+  { id: "marble", sq: [17, 22], quote: "Nothing is so healing as the human touch", zoomIn: true },
 ] as const) {
   test(`the ${st.id} statue: a tap on it walks you up to it, the camera glides in close on it and its quote shows word for word; a tap elsewhere glides back out to the zoom you had and clears it`, async ({ page }) => {
     const errors = watchErrors(page);
@@ -285,3 +297,33 @@ for (const st of [
     expect(errors).toEqual([]);
   });
 }
+
+test("a chess table in the park: a tap on one walks you to a free stool and you sit; its card shows 'Casual' and 'Ranked' greyed and 'Coming soon'; a tap elsewhere closes it and you stand", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/town");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-sit", "0");
+  // The table on your left as you start (the park's seventh, on your row: its square (19, 13), its stools (18, 13) and (20, 13)).
+  const at = await page.evaluate(() => (window as unknown as { __townAt: (k: string, id: number) => { x: number; y: number } | null }).__townAt("table", 6));
+  expect(at, "the table is drawn at the start").not.toBeNull();
+  const cv = (await canvas(page).boundingBox())!;
+  await page.mouse.click(cv.x + at!.x, cv.y + at!.y);
+  const card = page.getByRole("dialog", { name: "Chess table", exact: true });
+  await expect(card.getByRole("heading", { name: "Chess table" })).toBeVisible();
+  for (const name of ["Casual", "Ranked"]) {
+    const b = card.getByRole("button", { name, exact: true });
+    await expect(b).toBeVisible();
+    await expect(b).toBeDisabled();
+  }
+  await expect(card.getByText("Coming soon", { exact: true })).toBeVisible();
+  // You walk to its nearer stool (nobody on it at the start) and sit.
+  await expect.poll(async () => (await you(page)).join(","), { message: "you walk to a stool", timeout: 5000 }).toMatch(/^(18|20),13$/);
+  await expect(canvas(page)).toHaveAttribute("data-sit", "1");
+  const stool = (await you(page)).join(",");
+  // A tap on the world elsewhere (low on the left) closes it, and you stand up where you are.
+  await page.mouse.click(cv.x + cv.width * 0.3, cv.y + cv.height * 0.85);
+  await expect(card).toBeHidden();
+  await expect(canvas(page)).toHaveAttribute("data-sit", "0");
+  expect((await you(page)).join(","), "you stand on the stool's square").toBe(stool);
+  expect(errors).toEqual([]);
+});

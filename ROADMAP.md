@@ -463,6 +463,17 @@ the building art and the names, which are wrong) and `chatgpt-town-square-overvi
   how the three bosses are ordered, what losing mid-way means, scoring across bosses, whether the God King's charges carry
   over, time per boss, and the rewards.
 
+**The park** (Eric, Oct 26: "a little park… filled with chess boards on little tables where you can walk up and sit and
+challenge or wait for one for someone for a casual or ranked game of normal chess"). Slice 6 built it in front of the
+Coliseum's gate, with ten chess tables, and made the Coliseum about twice its size and the map bigger. A table's card shows
+"Casual" and "Ranked" greyed with "Coming soon" for now. Next:
+- **Sitting at a table queues you** (the next job; it needs a new casual queue): Casual or Ranked, for park players only for
+  30 seconds, then for anyone.
+- The game plays on the **normal game screen**; when it ends, you're back at your table.
+- Later, with real players in the town: **tap someone seated** to challenge them.
+- **Quick chats** in the town (with real players in it): premade lines such as "Who wants to play?" for people idling in the
+  square.
+
 **Rooms** (Eric, Oct 26: "we can't have 10,000 people in this little world")
 - Each town square is a **room**, its own copy of the world. Opening Boss Arena puts you in the busiest room that still has
   space, so rooms feel lively.

@@ -11,8 +11,8 @@
  */
 import { TOWN_FEEL, type CamSet } from "./feel.ts";
 
-/** The world is N x N squares and wraps on both axes. */
-export const N = 40;
+/** The world is N x N squares and wraps on both axes. (Slices 1 to 5: 40; slice 6 made room for the park and the bigger Coliseum.) */
+export const N = 46;
 
 /** Into [0, N). */
 export const wrapI = (v: number): number => ((v % N) + N) % N;
