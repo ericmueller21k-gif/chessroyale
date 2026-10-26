@@ -324,6 +324,35 @@ export const TOWN_FEEL = {
    */
   signMinCap: 4.5,
 
+  // ---- The statues (Eric, Oct 26: "when you walk up to their statue it zooms in close and on the statue their quote
+  // renders in on the structure supporting their statue").
+  /** The camera's glide in close on a statue, and back out to the zoom you had, this many ms (eased at both ends). */
+  closeGlideMs: 900,
+  /** Up close, the statue and its pedestal fill the box from this far down it... */
+  closeTop: 0.04,
+  /** ...to this far down (or, where they'd reach the − / + and "Back to me" buttons, this many pixels above them)... */
+  closeBottom: 0.95,
+  closeAboveButtons: 10,
+  /** ...and at most this share of its width. */
+  closeMaxWidth: 0.92,
+  /** The close-up drawing crossfades in from the world's figure over this stretch of the glide in (0 to 1). */
+  closeSwap: [0.45, 0.8] as const,
+  /** A close-up drawing finished while you're already up close fades in over this many ms (it's made ahead, so rarely). */
+  closeReadyFadeMs: 250,
+  /**
+   * Pawns standing in front of the statue (you, on its square) fade out as the camera comes in, by this much at the end
+   * of the glide (1: all the way): they'd stand between the camera and the statue.
+   */
+  closeNearFade: 1,
+  /** The close-up drawings are made this long after the page opens, a slice a frame (at most this many ms of work a frame). */
+  closeBuildAfterMs: 1500,
+  closeBuildBudgetMs: 4,
+  /** The quote renders in line by line once the camera arrives: each line fades in over this many ms, this long after the one above... */
+  quoteFadeMs: 320,
+  quoteLineMs: 140,
+  /** ...and fades out over this many ms when you leave. */
+  quoteOutMs: 200,
+
   // ---- The edge chips (a boss's face at the box's edge, pointing at its home off screen).
   /**
    * At most this many chips, for the nearest homes off screen. (Slice 3 review: with thirteen homes, more chips covered

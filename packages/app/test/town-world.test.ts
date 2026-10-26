@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { N, wrapF, wrapI } from "../src/town/camera.ts";
 import { TOWN_FEEL } from "../src/town/feel.ts";
-import { APRON, COLISEUM, Walker, createTown, destFor, findPath, onColiseum, taken, tick, walkWalker, walkable, type Sq, type Town } from "../src/town/world.ts";
+import { APRON, COLISEUM, STATUES, Walker, createTown, destFor, findPath, onColiseum, statueAt, taken, tick, walkWalker, walkable, type Sq, type Town } from "../src/town/world.ts";
 
 /** One pawn a square (src/town/world.ts): where a walk ends, and rings of people round someone. */
 
@@ -149,5 +149,48 @@ describe("town square: the Coliseum", () => {
     settle(t);
     apart(t);
     expect(t.people.filter((p) => front(p.walker.here()))).toHaveLength(2);
+  });
+});
+
+describe("town square: the statues", () => {
+  it("each has its viewing square on the apron, right in front of the Coliseum ground's end columns, either side of the gate", () => {
+    const [marble, bronze] = STATUES;
+    expect(marble!.id).toBe("marble");
+    expect(bronze!.id).toBe("bronze");
+    for (const s of STATUES) {
+      expect(APRON.some((a) => a.c === s.c && a.r === s.r), `${s.id} on the apron`).toBe(true);
+      expect(onColiseum(s.c, s.r + 1), `${s.id} right in front of the Coliseum's ground`).toBe(true);
+      expect(statueAt(s.c, s.r)).toBe(s);
+    }
+    // Symmetric about the gate: the marble on its left (west), the bronze on its right.
+    expect(marble!.c).toBe(COLISEUM.c0);
+    expect(bronze!.c).toBe(COLISEUM.c0 + COLISEUM.size - 1);
+    expect(marble!.r).toBe(bronze!.r);
+  });
+
+  it("the quotes, word for word", () => {
+    expect(STATUES.map((s) => s.quote)).toEqual(["Nothing is so healing as the human touch", "Concrete considerations always take precedence over general principles"]);
+  });
+
+  it("a tap on a statue walks you to its square; someone on it, to the nearest free square beside it", () => {
+    const t = still();
+    const s = STATUES[1]!;
+    expect(destFor(t, t.you.walker, { kind: "statue", statue: s })).toEqual({ c: s.c, r: s.r });
+    const bot = t.bots[0]!;
+    walkWalker(bot.walker, { c: s.c, r: s.r });
+    settle(t);
+    const to = destFor(t, t.you.walker, { kind: "statue", statue: s })!;
+    expect(king(to, s)).toBe(1);
+    expect(taken(t, to.c, to.r, t.you.walker)).toBe(false);
+  });
+
+  it("the bots never stop on a statue's square (it's kept free to look from)", () => {
+    const t = createTown(0);
+    let now = 0;
+    for (let i = 0; i < 20000; i++) {
+      now += 50;
+      tick(t, now);
+      for (const b of t.bots) expect(statueAt(b.walker.goalC(), b.walker.goalR())).toBeNull();
+    }
   });
 });

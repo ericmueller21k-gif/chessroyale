@@ -24,7 +24,7 @@ import { TOWN_FEEL } from "./feel.ts";
 import { Press } from "./press.ts";
 import { PAWN_PX, Renderer, pawnImage, type Hit } from "./render.ts";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
-import { COLISEUM_PLACE, HOMES, START, createTown, destFor, onColiseum, plotAt, tdist, tick, walkWalker, type HomeId, type Place, type Sq, type Target } from "./world.ts";
+import { COLISEUM_PLACE, HOMES, START, STATUES, createTown, destFor, onColiseum, plotAt, statueAt, tdist, tick, walkWalker, type HomeId, type Place, type Sq, type StatueId, type Target } from "./world.ts";
 import { dressedPawn, lookKey } from "./you-look.ts";
 import "./town.css";
 
@@ -47,13 +47,14 @@ export function TownScreen({ onBack, onBossAlone }: { onBack: () => void; onBoss
   const canvas = useRef<HTMLCanvasElement>(null);
   const chips = useRef<(HTMLDivElement | null)[]>([]);
   const cardEl = useRef<HTMLDivElement>(null);
+  const live = useRef<HTMLDivElement>(null);
   const ctl = useRef<Ctl | null>(null);
   const [zoomedOut, setZoomedOut] = useState<boolean>(TOWN_FEEL.startZoomedOut);
   const [card, setCard] = useState<Card | null>(null);
 
   // (A layout effect: the world's first frame is drawn before the screen first shows.)
   useLayoutEffect(() => {
-    const t = startTown(box.current!, canvas.current!, chips.current, cardEl.current!, setZoomedOut, setCard);
+    const t = startTown(box.current!, canvas.current!, chips.current, cardEl.current!, live.current!, setZoomedOut, setCard);
     ctl.current = t;
     return t.stop;
   }, []);
@@ -70,6 +71,8 @@ export function TownScreen({ onBack, onBossAlone }: { onBack: () => void; onBoss
       </header>
       <div class="town-box" ref={box}>
         <canvas class="town-canvas" ref={canvas} aria-label="The town square" />
+        {/* A statue's quote, for screen readers, while you stand up close to it (it's drawn on its pedestal). */}
+        <div class="town-sr" ref={live} aria-live="polite" />
         <div class="town-overlay">
           {/* The card: over the boss's head or the home's top, its tail pointing there (placed every frame). */}
           <div class="town-card" ref={cardEl} role="dialog" aria-label={label} style={{ display: card ? "" : "none" }}>
@@ -143,7 +146,15 @@ export function TownScreen({ onBack, onBossAlone }: { onBack: () => void; onBoss
 }
 
 /** Runs the world in `box` on `cv`: the loop, the camera, the input and the chips. Returns its controls and its stop. */
-function startTown(box: HTMLDivElement, cv: HTMLCanvasElement, chipEls: (HTMLDivElement | null)[], cardEl: HTMLDivElement, onZoom: (out: boolean) => void, onCard: (c: Card | null) => void) {
+function startTown(
+  box: HTMLDivElement,
+  cv: HTMLCanvasElement,
+  chipEls: (HTMLDivElement | null)[],
+  cardEl: HTMLDivElement,
+  liveEl: HTMLDivElement,
+  onZoom: (out: boolean) => void,
+  onCard: (c: Card | null) => void,
+) {
   const f = TOWN_FEEL;
   const ctx = cv.getContext("2d")!;
   const town = createTown(performance.now());
@@ -190,6 +201,62 @@ function startTown(box: HTMLDivElement, cv: HTMLCanvasElement, chipEls: (HTMLDiv
   let cardW = NaN;
   let cardH = NaN;
   const chipPlace: (Place | null)[] = chipEls.map(() => null);
+  // ---- The close-up on a statue: which (its index in STATUES; -1: none, also once the glide out ends), whether the
+  // camera is gliding in (or out), how far (0 to 1, linear in time), and a tap on a statue that sent you walking (the
+  // close-up comes when you stop). The quote: ms since it began to render in (-1: not showing), and how much is left as
+  // you leave. Only the world's camera moves: the HUD stays put.
+  let closeOn = -1;
+  let closeIn = false;
+  let closeT = 0;
+  let pending = -1;
+  let wasMoving = false;
+  let quoteMs = -1;
+  let quoteLeft = 1;
+  const enterClose = (i: number) => {
+    closeOn = i;
+    closeIn = true;
+    follow = true;
+    glide = null;
+  };
+  /** Back out to the zoom you had (− and + set their own as well). */
+  const leaveClose = () => {
+    pending = -1;
+    if (closeOn < 0 || !closeIn) return;
+    closeIn = false;
+    liveEl.textContent = "";
+  };
+  const stepClose = (dt: number) => {
+    const moving = town.you.walker.moving();
+    if (wasMoving && !moving) {
+      // You stopped: on a statue's square, or where a tap on a statue sent you.
+      const h = town.you.walker.here();
+      const st = statueAt(h.c, h.r);
+      const i = st ? STATUES.indexOf(st) : pending;
+      pending = -1;
+      if (i >= 0) enterClose(i);
+    }
+    wasMoving = moving;
+    if (closeOn >= 0) {
+      closeT = Math.max(0, Math.min(1, closeT + ((closeIn ? 1 : -1) * dt * 1000) / f.closeGlideMs));
+      if (!closeIn && closeT === 0) closeOn = -1;
+    }
+    // The quote renders in once the camera has arrived, and fades as you leave.
+    if (closeIn && closeT === 1) {
+      if (quoteMs < 0) {
+        quoteMs = 0;
+        liveEl.textContent = STATUES[closeOn]!.quote;
+      } else quoteMs += dt * 1000;
+      quoteLeft = 1;
+    } else if (quoteMs >= 0) {
+      quoteLeft -= (dt * 1000) / f.quoteOutMs;
+      if (quoteLeft <= 0) ((quoteMs = -1), (quoteLeft = 1));
+    }
+    const c = r.close;
+    c.i = closeOn;
+    c.e = closeT * closeT * (3 - 2 * closeT);
+    c.quoteMs = quoteMs;
+    c.quoteLeft = quoteLeft;
+  };
   const chipXY = chipEls.map(() => ({ x: NaN, y: NaN, a: NaN }));
 
   /** Sizes the canvas to its box; true if it changed. (Setting a canvas's size clears it, even to the same size.) */
@@ -224,8 +291,10 @@ function startTown(box: HTMLDivElement, cv: HTMLCanvasElement, chipEls: (HTMLDiv
       camY += wrapF(glide.y - camY) * k;
       if (Math.hypot(wrapF(glide.x - camX), wrapF(glide.y - camY)) < 0.03) glide = null;
     } else if (follow) {
-      // A critically damped spring toward your pawn, solved exactly for the frame (steady at any frame rate).
+      // A critically damped spring toward your pawn (or, up close, the statue's square), solved exactly for the frame
+      // (steady at any frame rate).
       const p = town.you.walker.pose(now, POSE);
+      if (closeOn >= 0 && closeIn) ((p.x = STATUES[closeOn]!.c), (p.y = STATUES[closeOn]!.r));
       const w = f.followSpring;
       const e = Math.exp(-w * dt);
       const x = wrapF(camX - p.x);
@@ -267,6 +336,7 @@ function startTown(box: HTMLDivElement, cv: HTMLCanvasElement, chipEls: (HTMLDiv
       if (!sameWeights(w, sky)) r.setSky((sky = w));
     }
     tick(town, now);
+    stepClose(dt);
     updateCamera(dt, now);
     draw(now, dt);
     raf = requestAnimationFrame(frame);
@@ -343,7 +413,11 @@ function startTown(box: HTMLDivElement, cv: HTMLCanvasElement, chipEls: (HTMLDiv
     cardEl.style.transform = `translate3d(${left.toFixed(1)}px, ${top.toFixed(1)}px, 0)`;
     cardEl.style.setProperty("--ax", `${Math.max(16, Math.min(cardW - 16, A.x - left)).toFixed(1)}px`);
   }
-  const onKey = (e: KeyboardEvent) => e.key === "Escape" && card && setCard(null);
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key !== "Escape") return;
+    if (card) setCard(null);
+    else leaveClose();
+  };
   addEventListener("keydown", onKey);
 
   // ---- Input: a finger presses the square you'd walk to (press.ts); one that moves is a drag (look around).
@@ -357,12 +431,18 @@ function startTown(box: HTMLDivElement, cv: HTMLCanvasElement, chipEls: (HTMLDiv
     return { x: e.clientX - rc.left, y: e.clientY - rc.top };
   };
   /** What a tap on `hit` means: its key (the same thing at down and up), where you'd walk, and the card it opens. */
-  const plan = (hit: Hit | null): { key: string; dest: Sq | null; card: Card | null } | null => {
+  const plan = (hit: Hit | null): { key: string; dest: Sq | null; card: Card | null; statue: number } | null => {
     if (!hit) return null;
     let target: Target;
     let key: string;
     let c: Card | null = null;
-    if (hit.kind === "coliseum" || (hit.kind === "square" && onColiseum(hit.c, hit.r))) {
+    let statue = -1;
+    if (hit.kind === "statue") {
+      // A statue: to its square (the close-up when you stop there). No card: its quote is on its pedestal.
+      key = `statue:${hit.statue.id}`;
+      target = { kind: "statue", statue: hit.statue };
+      statue = STATUES.indexOf(hit.statue);
+    } else if (hit.kind === "coliseum" || (hit.kind === "square" && onColiseum(hit.c, hit.r))) {
       // The Coliseum (its picture or its ground): to the apron at its gate, and its card.
       key = "coliseum";
       target = { kind: "coliseum" };
@@ -385,7 +465,7 @@ function startTown(box: HTMLDivElement, cv: HTMLCanvasElement, chipEls: (HTMLDiv
       key = `p:${hit.person.id}`;
       target = { kind: "beside", at: hit.person.walker.here() };
     }
-    return { key, dest: destFor(town, town.you.walker, target), card: c };
+    return { key, dest: destFor(town, town.you.walker, target), card: c, statue };
   };
   const onDown = (e: PointerEvent) => {
     cv.setPointerCapture?.(e.pointerId);
@@ -406,6 +486,7 @@ function startTown(box: HTMLDivElement, cv: HTMLCanvasElement, chipEls: (HTMLDiv
     if (!was) {
       // Past the threshold: the square lets go (no pulse, no walk) and you look around.
       r.release(performance.now(), false);
+      leaveClose();
       follow = false;
       glide = null;
     }
@@ -429,9 +510,15 @@ function startTown(box: HTMLDivElement, cv: HTMLCanvasElement, chipEls: (HTMLDiv
     }
     // Released on the same thing: the border pulses once and you set off (no sound, no vibration: Eric).
     r.release(now, true);
+    // A tap on anything but the statue you're looking at walks you away from it: the camera glides back out.
+    if (p.statue < 0 || p.statue !== closeOn) leaveClose();
     if (p.dest && walkWalker(town.you.walker, p.dest)) {
       follow = true;
       glide = null;
+      if (p.statue >= 0) {
+        if (town.you.walker.moving()) pending = p.statue;
+        else enterClose(p.statue); // (already standing there)
+      }
     }
     if (p.card) setCard(p.card);
   };
@@ -451,17 +538,37 @@ function startTown(box: HTMLDivElement, cv: HTMLCanvasElement, chipEls: (HTMLDiv
   cv.addEventListener("wheel", onWheel, { passive: false });
 
   function setZoom(out: boolean) {
+    leaveClose();
     zoomTarget = out ? 1 : 0;
     onZoom(out);
   }
 
   // A test hook (e2e, with the test switches on: test-switches.ts): where to tap a boss, a home or the Coliseum (its gate)
   // now, in the box.
-  const hookAt = (kind: "boss" | "home" | "coliseum", id?: HomeId) => {
+  const hookAt = (kind: "boss" | "home" | "coliseum" | "statue", id?: HomeId | StatueId) => {
     const out = { x: 0, y: 0 };
+    if (kind === "statue") return testSwitchesAllowed() && r.tapPoint("statue", STATUES.findIndex((s) => s.id === id), out) ? out : null;
     const i = kind === "coliseum" ? HOMES.length : HOMES.findIndex((h) => h.id === id);
     return testSwitchesAllowed() && r.tapPoint(kind === "boss" ? "boss" : "home", i, out) ? out : null;
   };
+  // ... `__townCam()`: the camera now: its zoom (0 in, 1 out), its lens (1: none; more up close), where it looks (the
+  // focus square), the statue it's close on (null: none), how far its glide has come, and its quote.
+  const hookCam = () =>
+    testSwitchesAllowed()
+      ? {
+          zoom: zoomCur,
+          zoomTarget,
+          mag: r.lensMag,
+          focus: [camX, camY],
+          statue: closeOn >= 0 ? STATUES[closeOn]!.id : null,
+          close: closeT,
+          closingIn: closeIn,
+          quote: quoteMs >= 0,
+          // The statue up close: its drawn box (top and bottom, as shares of the world's box) and its quote's letters' height.
+          box: closeOn >= 0 ? [r.statueBox[closeOn]!.y0 / r.H, r.statueBox[closeOn]!.y1 / r.H] : null,
+          cap: r.quoteCap,
+        }
+      : null;
   // ... and `__townGather()` sends the three bots nearest you to stand beside you (to see a ring form).
   const hookGather = () => {
     if (!testSwitchesAllowed()) return;
@@ -472,9 +579,10 @@ function startTown(box: HTMLDivElement, cv: HTMLCanvasElement, chipEls: (HTMLDiv
       if (to) walkWalker(b.walker, to);
     }
   };
-  const hooks = window as unknown as { __townAt?: typeof hookAt; __townGather?: typeof hookGather };
+  const hooks = window as unknown as { __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam };
   hooks.__townAt = hookAt;
   hooks.__townGather = hookGather;
+  hooks.__townCam = hookCam;
 
   run();
   draw(performance.now()); // the first frame, before the screen shows
@@ -482,6 +590,7 @@ function startTown(box: HTMLDivElement, cv: HTMLCanvasElement, chipEls: (HTMLDiv
   return {
     zoom: setZoom,
     recenter: () => {
+      leaveClose();
       follow = true;
       glide = null;
     },
@@ -491,6 +600,7 @@ function startTown(box: HTMLDivElement, cv: HTMLCanvasElement, chipEls: (HTMLDiv
       const h = chipPlace[i];
       if (!h) return;
       if (card) setCard(null);
+      leaveClose();
       follow = false;
       // To a few squares in front of its picture's foot (a home's: half a square in front of its plot's middle).
       const y = h.cy - h.foot + 0.5 - f.glideAhead;
@@ -505,6 +615,7 @@ function startTown(box: HTMLDivElement, cv: HTMLCanvasElement, chipEls: (HTMLDiv
       removeEventListener("keydown", onKey);
       delete hooks.__townAt;
       delete hooks.__townGather;
+      delete hooks.__townCam;
       if (card?.kind === "boss") town.bosses[card.i]!.held = false;
       cv.removeEventListener("pointerdown", onDown);
       cv.removeEventListener("pointermove", onMove);

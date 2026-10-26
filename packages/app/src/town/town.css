@@ -60,6 +60,15 @@
 .town-canvas:active {
   cursor: grabbing;
 }
+/* Off screen, for screen readers only: a statue's quote while you're up close to it. */
+.town-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 .town-overlay {
   position: absolute;
   inset: 0;

@@ -89,10 +89,21 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
   a gold crown over the board's squares (`COLISEUM_CHIP`, `houses/coliseum.ts`).
 - **The Coliseum** (`town/houses/coliseum.ts`, slice 5): a Roman amphitheater of warm stone, chess-themed (checkered
   bands, a chessboard arena, pieces carved over the gate, navy and gold banners, statues of the pieces on plinths round
-  it, and one empty plinth left of the gate for the Hidden Boss's statue, later), 320 × 246 pixels at the homes' scale;
+  it), 352 × 246 pixels at the homes' scale;
   its foot is the gate's sill on its ground's front edge. Its sign is a tablet over the gate. It's drawn like a home
   (frames made once, one image a frame, only when its foot is inside the rim; `drawable`'s `below` lets its top draw
   while its foot is under the box). The design and the calls: `docs/decisions/2026-10-26-town-square-slice-5.md`.
+
+- **The statues** (`town/houses/statues.ts`; Oct 26, `docs/decisions/2026-10-26-town-square-statues.md`): the marble
+  statue (the Hidden Boss in stone) on the gate's left and the bronze statue on its right, each on a pedestal of its own
+  before the Coliseum ground's end column, drawn by the game over the Coliseum's picture (not in it). No name on either.
+  Each has its square right in front (`STATUES` in `world.ts`, with its quote) where you stand to look at it; the bots
+  never stop there. **Walking up zooms in**: stopping on it (or where a tap on the statue sent you) glides the camera in
+  close (`closeGlideMs`) through a longer lens (`mag` and `oy` in `camera.ts`; the − / + zoom is untouched), the close-up
+  drawing (4 times finer, `CLOSE`, made ahead a slice a frame) crossfading in; the people in front of it fade. Once the
+  camera arrives the quote renders in, line by line, on the pedestal's panel in the signs' pixel capitals (engraved in
+  the marble, cast in the bronze plaque), and in an off-screen live region (`.town-sr`) for screen readers. A tap
+  elsewhere, a drag, a chip, −, + or "Back to me" glides back to the zoom you had and the quote fades.
 
 - **You** (slice 5): your pawn wears your profile's crate items (`town/you-look.ts`: `Avatar` drawn once into a canvas,
   again only when your look changes; plain when signed out or wearing nothing; bots stay plain). Every pawn's base stands
@@ -121,7 +132,7 @@ noted wherever a slice changed one.
 ## Files
 
 - `packages/app/src/town/`: `TownPage.tsx` (the lazy load), `Town.tsx` (the screen, the loop, input, chips, cards, the sky's
-  clock), `press.ts` (a finger as a button), `camera.ts`, `world.ts`, `render.ts`, `you-look.ts`, `sky.ts`, `sky-draw.ts`, `sign-font.ts`, `feel.ts`, `town.css`, `houses/`
+  clock, the statues' close-up), `press.ts` (a finger as a button), `camera.ts`, `world.ts`, `render.ts`, `you-look.ts`, `sky.ts`, `sky-draw.ts`, `sign-font.ts`, `feel.ts`, `town.css`, `houses/`
   (one file per home, thirteen in all, the Coliseum's `coliseum.ts`, the kit of shared pieces and the index).
 - References: `docs/mockups/town-square/` (the prototype Eric tested, and the pictures for the homes: Eric's for the
   igloo, the peak and the meadow, his suggestions for seven more). Alfil's Pyramid has no picture: it's our design.
@@ -138,16 +149,21 @@ noted wherever a slice changed one.
   tap after tap, a later claim gives way, three bots ring round one spot, a ring fills nearest first); the Coliseum (its
   ground solid and walked round, its apron open, a tap ends you at its gate and a crowd gathers on the apron).
 - `packages/app/test/town-press.test.ts`: down presses, up on the same thing walks, a drag cancels, up elsewhere lets go.
+- `packages/app/test/town-world.test.ts` also: the statues' squares (on the apron, in front of the ground's end columns,
+  symmetric), their quotes word for word, a tap on one walks you there (or beside it), the bots never stop there.
 - `e2e/town.spec.ts` (phone and desktop; `e2e/areas.json`, "the town square"): the page loads, the world is drawn and
-  fills its box, a tap ahead walks you there, the zoom pair works (it opens zoomed out), back goes home; `?sky=day` and
+  fills its box, a tap ahead walks you there, the zoom pair works (it opens zoomed out), back goes home; each statue (a
+  tap walks you up, the camera zooms in close on it, its quote word for word in the live region, its letters at least 14
+  pixels; a tap elsewhere glides back to the zoom you had, zoomed out or in, and clears it); `?sky=day` and
   `?sky=night` draw different skies; a boss's card, its confirm (Stay, then Leave to the Boss raid screen, his tile
   picked); a home's card (Shop greyed, "Coming soon", closed by a tap elsewhere); the Coliseum's (a tap on its gate walks
   you to the apron; "Raids with people" greyed, "Coming soon"). Test hooks: the canvas's `data-you` (your square) and
   `data-ready` (a frame is drawn); with the test switches on, `window.__townAt(kind, id)` (where to tap a boss, a home or
-  the Coliseum's gate) and `window.__townGather()` (the three nearest bots come and stand beside you).
+  the Coliseum's gate) and `window.__townGather()` (the three nearest bots come and stand beside you), `window.__townAt("statue", "bronze" | "marble")` and
+  `window.__townCam()` (the zoom, the lens, the focus, the statue up close, whether its quote shows and its letters' size).
 
 ## Not built yet
 
 The bottom strip, a bot's or player's card ("Invite to party"), the shop itself, the Coliseum's menu (raids with people,
-party), the Hidden Boss's statue on the empty plinth, other people's dressed pawns, the Simple map setting, real players and
+party), other people's dressed pawns, the Simple map setting, real players and
 rooms, sounds.
