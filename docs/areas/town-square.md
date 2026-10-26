@@ -3,7 +3,8 @@
 Boss raid's coming home: a small round world where players walk around and meet the bosses at their homes (the plan:
 `ROADMAP.md`, "Boss raid: the town square"). **Slices 1 to 3** are the world alone, on a hidden address: the sky by
 the time of day, the curved ground, all thirteen boss homes with their bosses roaming near them, six bots and you; slice 4
-added the press, the trail and the cards; **slice 5 the Coliseum** in the middle. Home's **Boss Arena** card (Oct 26, Eric)
+added the press, the trail and the cards; **slice 5 the Coliseum** in the middle; **slice 6** made the Coliseum about
+twice its size, the map bigger, and put **the park** with its ten chess tables in front of its gate. Home's **Boss Arena** card (Oct 26, Eric)
 opens it, and the computer's side menu's Boss Arena item; the address `/town` opens it directly too (`hunchess.com/town`,
 behind Cloudflare Access like the rest of the site). Phone and computer.
 
@@ -18,14 +19,16 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
 - **The camera** (`town/camera.ts`, pure math): a pitched pinhole camera over a ground that drops away from the focus
   point (a small round world), cut at a rim that forms the horizon. Two tuned sets, the phone's and the computer's,
   blended by the box's width / height (0.6 = all phone, 1.4 = all computer). Zooming out raises the camera, moves it back,
-  pitches it down and lets the rim reach further; the page opens zoomed out (`startZoomedOut`). The world is 40 × 40 squares and wraps both ways. A tap picks the
+  pitches it down and lets the rim reach further; the page opens zoomed out (`startZoomedOut`). The world is 46 × 46 squares (40 × 40 until slice 6) and wraps both ways. A tap picks the
   nearest drawn square under it (`pickSquare`). The far band of ground dissolves into the sky; things in it fade, haze
   and blur, and are drawn whole, never cut by the rim.
-- **The layout** (`town/world.ts`, `HOMES`): thirteen homes on the points of a lattice over the world that wraps, so
-  neighbors stand 8 to 10 squares apart; the Coliseum on its 6 × 6 ground in the middle (`COLISEUM`, columns 17 to 22,
-  rows 16 to 21), its gate facing south onto its apron (`APRON`: columns 17 to 22, rows 12 to 15, kept open for people to
-  gather), and your start (`START`, 20, 13) on the apron, facing it. Ginger Igloo and Jefferson's
-  Fireworks stand side by side, and so do Hollow Peak and Moo & Moon Meadow. The map: `docs/decisions/2026-10-26-town-square-slice-3.md`.
+- **The layout** (`town/world.ts`, `HOMES`): thirteen homes spread evenly round the middle over the world that wraps, so
+  neighbors stand 8 to 10 squares apart; the Coliseum on its 12 × 12 ground (`COLISEUM`, columns 17 to 28, rows 23 to 34),
+  its gate facing south onto its apron (`APRON`: columns 17 to 28, rows 20 to 22, paved, kept open for people to gather),
+  the park south of that (`PARK`, below), and your start (`START`, 22, 13) in the park on its promenade, just south of the
+  fountain, facing the Coliseum. Ginger Igloo and Jefferson's Fireworks stand side by side, and so do Hollow Peak and Moo &
+  Moon Meadow. The map: `docs/decisions/2026-10-26-town-square-slice-6.md` (slice 3's smaller one:
+  `docs/decisions/2026-10-26-town-square-slice-3.md`).
 - **The world** (`town/world.ts`): the homes (3 × 3 plots) and the Coliseum (`COLISEUM_PLACE`; homes and the Coliseum
   are `Place`s: a name, a chip color, a middle, a half-size and where the picture's foot stands), the walk (square to
   square, around the homes and the Coliseum, by breadth-first search), the bosses' roaming and their lines (their `SELECT_LINES`, one at a time, only from a boss on
@@ -87,12 +90,31 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
   color and width.
 - **The chips** show each boss's head (`BOSS_FACE` in `render.ts`: a box in its first idle frame), and the Coliseum's
   a gold crown over the board's squares (`COLISEUM_CHIP`, `houses/coliseum.ts`).
-- **The Coliseum** (`town/houses/coliseum.ts`, slice 5): a Roman amphitheater of warm stone, chess-themed (checkered
-  bands, a chessboard arena, pieces carved over the gate, navy and gold banners, statues of the pieces on plinths round
-  it), 360 × 246 pixels at the homes' scale;
+- **The Coliseum** (`town/houses/coliseum.ts`, slice 5; redrawn about twice the size in slice 6): a Roman amphitheater of
+  warm stone, chess-themed (checkered bands, a chessboard arena, marble pawns in the middle tier's arches, pieces carved over
+  the gate, navy and gold banners, statues of the pieces on plinths round it), 648 × 372 pixels at the homes' scale (twice as
+  wide as slice 5's, half as tall again: taller would never fit a computer's view from the park);
   its foot is the gate's sill on its ground's front edge. Its sign is a tablet over the gate. It's drawn like a home
   (frames made once, one image a frame, only when its foot is inside the rim; `drawable`'s `below` lets its top draw
-  while its foot is under the box). The design and the calls: `docs/decisions/2026-10-26-town-square-slice-5.md`.
+  while its foot is under the box). Past the rim (slice 6) it still stands on the horizon where it lies, up to `farReach`
+  squares further, smaller, sunk behind the world's curve and hazy, so it looms from across the world (`drawFarColiseum`;
+  not tapped, no chip while it shows). The design and the calls: `docs/decisions/2026-10-26-town-square-slice-5.md` and
+  `…-slice-6.md`.
+
+- **The park** (slice 6; `PARK` and `PARK_PLAN` in `world.ts`, the art in `town/houses/park.ts`): 20 × 10 squares in front
+  of the Coliseum's apron, laid out as a city park: a paved walk all round, a promenade up the middle from the plaza to the
+  gate round a stone fountain in the middle (2 × 2, its water moving), ten chess tables either side of it (`TABLES`: each a
+  solid square with a stool west and east, facing each other across it), lawns with trees and benches. The ground has two
+  more kinds of square (`groundAt`: paving and grass), drawn with the board's in the same color-sorted fills. Tables, trees,
+  benches and the fountain are solid (`walkable`); stools, paths and grass are walked on. Each picture is made once (a
+  `FrameCache` per kind) and drawn as one item sorted with the people, a little behind whoever stands on its row.
+- **Sitting at a table** (slice 6): a tap on a table or a stool walks you to its free stool nearer you (`destFor`'s
+  `table`; both taken: beside it) and opens its card: "Chess table", **"Casual"** and **"Ranked"** greyed, "Coming soon"
+  (matchmaking for the park is the next job). A person sits (`seated`) when stopped on a stool meaning to (`Person.sit`:
+  always for bots, for you while the table's card is open after a tap on it): drawn from `sitCut` of its height up, resting
+  on the stool's seat (`sitSeat`), facing the board, with no shadow of its own. Closing the card (a tap elsewhere) or walking
+  on stands you up. Bots head for a free stool now and then (`botSitChance`, `botSitReach`) and may stay a while
+  (`botStaySeated`).
 
 - **The statues** (`town/houses/statues.ts`; Oct 26, `docs/decisions/2026-10-26-town-square-statues.md`): the marble
   statue (the Hidden Boss in stone) on the gate's left and the bronze statue on its right, each on a pedestal of its own
@@ -134,7 +156,7 @@ noted wherever a slice changed one.
 
 - `packages/app/src/town/`: `TownPage.tsx` (the lazy load), `Town.tsx` (the screen, the loop, input, chips, cards, the sky's
   clock, the statues' close-up), `press.ts` (a finger as a button), `camera.ts`, `world.ts`, `render.ts`, `you-look.ts`, `sky.ts`, `sky-draw.ts`, `sign-font.ts`, `feel.ts`, `town.css`, `houses/`
-  (one file per home, thirteen in all, the Coliseum's `coliseum.ts`, the kit of shared pieces and the index).
+  (one file per home, thirteen in all, the Coliseum's `coliseum.ts`, the park's `park.ts`, the kit of shared pieces and the index).
 - References: `docs/mockups/town-square/` (the prototype Eric tested, and the pictures for the homes: Eric's for the
   igloo, the peak and the meadow, his suggestions for seven more). Alfil's Pyramid has no picture: it's our design.
 
@@ -142,14 +164,18 @@ noted wherever a slice changed one.
 
 - `packages/app/test/town-camera.test.ts`: the projection (the focus in the middle column, wrapping both ways, a tap picks
   the square drawn there, far squares shrink, zooming out shows more rows, the phone / computer blend), the layout
-  (thirteen homes 8 to 10 squares from their nearest neighbors, none near the start, the Coliseum's ground clear and the
-  start just south of it), the walk around a home, and the eased steps meeting the even ones at the same speed.
+  (thirteen homes 8 to 10 squares from their nearest neighbors, none near the start, the Coliseum's ground and the park
+  clear, and the start south of it on the park's promenade), the walk around a home, and the eased steps meeting the even ones at the same speed.
 - `packages/app/test/town-sky.test.ts`: which look shows when, the looks always adding up to 1 and blending over their
   half hour in order, `?sky=`, and the tint (none by day, softer at dawn than dusk, coolest and darkest at night).
 - `packages/app/test/town-world.test.ts`: one pawn a square (a taken square ends you next to it, the end is always free
   tap after tap, a later claim gives way, three bots ring round one spot, a ring fills nearest first); the Coliseum (its
   ground solid and walked round, its apron open, a tap ends you at its gate and a crowd gathers on the apron).
 - `packages/app/test/town-press.test.ts`: down presses, up on the same thing walks, a drag cancels, up elsewhere lets go.
+- `packages/app/test/town-world.test.ts` also, the park (slice 6): in front of the gate, paving and grass, no home's roaming
+  ground on it; ten tables, each solid with two stools facing each other; the fountain in its middle and the solid things
+  walked round; a paved way from the plaza past the fountain to the gate, and every stool reachable; a tap on a table ends
+  you on its nearer free stool, where you sit (both taken: beside it); bots sit now and then, a stool each.
 - `packages/app/test/town-world.test.ts` also: the statues' squares (on the apron, in front of the ground's end columns,
   symmetric), their quotes word for word, a tap on one walks you there (or beside it), the bots never stop there.
 - `e2e/town.spec.ts` (phone and desktop; `e2e/areas.json`, "the town square"): the page loads, the world is drawn and
@@ -158,13 +184,14 @@ noted wherever a slice changed one.
   pixels; a tap elsewhere glides back to the zoom you had, zoomed out or in, and clears it); `?sky=day` and
   `?sky=night` draw different skies; a boss's card, its confirm (Stay, then Leave to the Boss raid screen, his tile
   picked); a home's card (Shop greyed, "Coming soon", closed by a tap elsewhere); the Coliseum's (a tap on its gate walks
-  you to the apron; "Raids with people" greyed, "Coming soon"). Test hooks: the canvas's `data-you` (your square) and
-  `data-ready` (a frame is drawn); with the test switches on, `window.__townAt(kind, id)` (where to tap a boss, a home or
-  the Coliseum's gate) and `window.__townGather()` (the three nearest bots come and stand beside you), `window.__townAt("statue", "bronze" | "marble")` and
+  you to the apron; "Raids with people" greyed, "Coming soon"); a park table's (slice 6: a tap walks you to a stool and you
+sit, its card with "Casual" and "Ranked" greyed and "Coming soon"; a tap elsewhere closes it and you stand). Test hooks: the canvas's `data-you` (your square),
+  `data-ready` (a frame is drawn) and `data-sit` ("1" while you sit at a table); with the test switches on, `window.__townAt(kind, id)` (where to tap a boss, a home or
+  the Coliseum's gate) and `window.__townGather()` (the three nearest bots come and stand beside you), `window.__townAt("statue", "bronze" | "marble")`, `window.__townAt("table", i)` (a table by its index in `TABLES`) and
   `window.__townCam()` (the zoom, the lens, the focus, the statue up close, whether its quote shows and its letters' size).
 
 ## Not built yet
 
 The bottom strip, a bot's or player's card ("Invite to party"), the shop itself, the Coliseum's menu (raids with people,
-party), other people's dressed pawns, the Simple map setting, real players and
+party), the park's matchmaking (sitting at a table queues you: `ROADMAP.md`, "The park"), quick chats, other people's dressed pawns, the Simple map setting, real players and
 rooms, sounds.
