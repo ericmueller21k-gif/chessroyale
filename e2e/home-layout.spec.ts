@@ -113,9 +113,11 @@ test("computer: the play column in the phone's order (the RANKED row, its panel,
     await expect(menu.getByRole("button", { name: "Profile" })).toBeVisible();
     await expect(menu.getByRole("button", { name: "Play with friends" })).toBeVisible();
     // Top to bottom, as on a phone (Eric, Oct 19: chess first): the RANKED row, its panel (matchmaking), PLAY and its
-    // line, then "Other modes" (Oct 24), the Boss Arena card, Solo Boss Mode and Auto chess (full width) at the bottom.
+    // line, then "Other modes" (Oct 24), the Boss Arena card (full width), and Solo Boss Mode and Auto chess side by side
+    // at the bottom (Eric, Oct 26: half width each).
     const box = async (l: import("@playwright/test").Locator) => (await l.boundingBox())!;
     const boss = await box(main.getByRole("button", { name: /^Boss Arena/ }));
+    const solo = await box(main.getByRole("button", { name: /^Solo Boss Mode/ }));
     const auto = await box(main.getByRole("button", { name: /^Auto chess/ }));
     const other = await box(main.getByRole("heading", { name: "Other modes", exact: true }));
     const modes = await box(main.getByRole("radiogroup", { name: "RANKED" }));
@@ -130,8 +132,10 @@ test("computer: the play column in the phone's order (the RANKED row, its panel,
     expect(hint.y).toBeGreaterThanOrEqual(p.y + p.height);
     expect(other.y, `${w}: Other modes below PLAY's line`).toBeGreaterThanOrEqual(hint.y + hint.height);
     expect(boss.y, `${w}: the Boss Arena card under Other modes`).toBeGreaterThanOrEqual(other.y + other.height);
-    expect(auto.y, `${w}: Auto chess under the Boss Arena card`).toBeGreaterThanOrEqual(boss.y + boss.height);
-    expect(Math.abs(auto.width - boss.width), `${w}: the same width`).toBeLessThan(2);
+    expect(solo.y, `${w}: the pair under the Boss Arena card`).toBeGreaterThanOrEqual(boss.y + boss.height);
+    expect(Math.abs(solo.y - auto.y), `${w}: Solo Boss Mode and Auto chess side by side`).toBeLessThan(2);
+    expect(Math.abs(solo.width - auto.width), `${w}: the two half cards the same width`).toBeLessThan(2);
+    expect(Math.abs(solo.width * 2 + 10 - boss.width), `${w}: two half cards and their gap are Boss Arena's width`).toBeLessThan(2);
     await expect(page.locator(".fd-hint")).toHaveText(/Starts within|Usually about|Solo vs/);
     if (w >= 1280) {
       // Beside your card: the Boss raid card ends level with your card's bottom, and the room above is free (for a live
@@ -493,23 +497,24 @@ test("computer at a laptop's window (1280×600, 1366×768): no gear on home (Set
   }
 });
 
-test("Other modes: three equal cards in order (Boss Arena, Solo Boss Mode, Auto chess); Boss Arena opens the town square and Back is home; Solo Boss Mode opens its screen with one option, Boss alone; ?mode=raid opens the full Boss raid screen with all five (Eric, Oct 26)", async ({ page }) => {
+test("Other modes: Boss Arena full width, then Solo Boss Mode and Auto chess side by side at half width each; Boss Arena opens the town square and Back is home; Solo Boss Mode opens its screen with one option, Boss alone; ?mode=raid opens the full Boss raid screen with all five (Eric, Oct 26)", async ({ page }) => {
   await named(page, "Arena");
   await page.goto("/");
   const main = page.getByRole("main");
   const cards = main.locator(".rd-card");
   await expect(cards).toHaveCount(3);
-  await expect(cards.nth(0)).toHaveText(/^Boss ArenaParty up with friends and take on the bosses›$/);
-  await expect(cards.nth(1)).toHaveText(/^Solo Boss ModeTake on any boss alone›$/);
-  await expect(cards.nth(2)).toHaveText(/^Auto chessBuild an army, watch it fight›$/);
-  // One under the other, all the same size: the card's look and size, nothing shifts.
-  const sizes: { y: number; width: number; height: number }[] = [];
-  for (let i = 0; i < 3; i++) sizes.push((await cards.nth(i).boundingBox())!);
-  for (let i = 1; i < 3; i++) {
-    expect(sizes[i]!.y, `card ${i + 1} under card ${i}`).toBeGreaterThanOrEqual(sizes[i - 1]!.y + sizes[i - 1]!.height);
-    expect(Math.abs(sizes[i]!.width - sizes[0]!.width), `card ${i + 1}: the same width`).toBeLessThan(1);
-    expect(Math.abs(sizes[i]!.height - sizes[0]!.height), `card ${i + 1}: the same height`).toBeLessThan(1);
-  }
+  await expect(cards.nth(0)).toHaveText(/^Boss ArenaParty up and take on the bosses›$/);
+  await expect(cards.nth(1)).toHaveText(/^Solo Boss ModeAny boss, alone›$/);
+  await expect(cards.nth(2)).toHaveText(/^Auto chessBuild an army›$/);
+  // Boss Arena full width on top; Solo Boss Mode and Auto chess side by side below it, half width each, the same size.
+  const b = (await cards.nth(0).boundingBox())!;
+  const s = (await cards.nth(1).boundingBox())!;
+  const a = (await cards.nth(2).boundingBox())!;
+  expect(s.y, "the pair under Boss Arena").toBeGreaterThanOrEqual(b.y + b.height);
+  expect(Math.abs(s.y - a.y), "Solo Boss Mode and Auto chess side by side").toBeLessThan(1);
+  expect(Math.abs(s.width - a.width), "the two half cards the same width").toBeLessThan(1);
+  expect(Math.abs(s.height - a.height), "the two half cards the same height").toBeLessThan(1);
+  expect(Math.abs(s.width * 2 + 10 - b.width), "two half cards and their gap are Boss Arena's width").toBeLessThan(1);
   // Boss Arena: the town square (/town), drawn; Back is home.
   await cards.nth(0).click();
   await expect(page.locator("canvas.town-canvas")).toHaveAttribute("data-ready", "1");

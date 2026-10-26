@@ -34,19 +34,21 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     `startRanked1v1()`: its queue at once, at `/1v1` ([ranked.md](ranked.md)); resting (`PAUSE_RANKED1V1`), PLAY is
     off with its line, as the other modes.
   - **Other modes** (Oct 24, Eric: "a tiny text that says other modes, right below play"; Oct 26: three cards): an 11 px
-    muted label under PLAY, then the **Boss Arena card**, the **Solo Boss Mode card** and the **Auto chess** card (the same
-    look and size; "Auto chess", "Build an army,
-    watch it fight", a white knight from the board's own piece art; it opens `/autochess`, as Settings' Testing row
-    does, with its back button home). PLAY is a third shorter (43 px on a phone, 59 px on a computer).
-  - **The Boss Arena card** (Eric, Oct 26, replacing the Boss raid card; full width, "Boss Arena", "Party up with friends and
-    take on the bosses") opens the town square at `/town` (the same page the address opens; its back button is home).
+    muted label under PLAY, then the **Boss Arena card** full width, and under it the **Solo Boss Mode card** and the
+    **Auto chess** card side by side, half width each (`rd-pair`, Eric, Oct 26). The half cards stack the picture, the name
+    and one short line ("Any boss, alone", "Build an army") with the › in the top corner; the Auto chess picture is a
+    white knight from the board's own piece art. Auto chess opens `/autochess`, as Settings' Testing row does, with its back
+    button home. PLAY is a third shorter (43 px on a phone, 59 px on a computer). On a phone the pair is as tall as the two
+    cards it replaces (84 px each, 10 px apart), so home fits as before.
+  - **The Boss Arena card** (Eric, Oct 26, replacing the Boss raid card; full width, "Boss Arena", "Party up and take on the
+    bosses") opens the town square at `/town` (the same page the address opens; its back button is home).
     Its picture is a still of one boss you can meet, turning to the next every 30 s (`FRONT_DOOR.bossCardMs`) with a 0.6 s
     fade (`bossCardFadeMs`), never the Hidden Boss or a resting boss, the card's size fixed; it waits while the app is
     hidden, and under reduced motion there's no fade (`BossCardFace` in `components/BossSelect.tsx`; test switch
     `?cardMs=`). The animated card with lines is shelved (a later idea). The title is Archivo, not Archivo Black: that
     file's lowercase i has no dot, so "raid" read as "raId" (Oct 24). The side menu's **Boss Arena** item opens the same
     page (the town has no side menu, so it never shows as the open page).
-  - **The Solo Boss Mode card** (Eric, Oct 26; full width, "Solo Boss Mode", "Take on any boss alone") opens the **Solo Boss
+  - **The Solo Boss Mode card** (Eric, Oct 26; half width, "Solo Boss Mode", "Any boss, alone") opens the **Solo Boss
     Mode screen**, the Boss raid screen's solo form (below). Its picture is the crown from the side menu's old Boss raid
     item, drawn large in the card's gold (`CrownArt` in `screens/Home.tsx`): a placeholder until Opus draws one.
   - **The Boss raid screen: a character select** (Eric, Oct 16;
@@ -87,7 +89,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     of requests and invites), then a gear that opens Settings in one tap; a computer's are its side menu's, so none is
     there; [docs/decisions/2026-10-17-phone-settings-gear.md](../decisions/2026-10-17-phone-settings-gear.md),
     [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)), then one column: your card, the RANKED row, its panel, PLAY
-    and its line, then Other modes with the Boss Arena card, the Solo Boss Mode card and Auto chess at the bottom. Your pawn's card takes the room
+    and its line, then Other modes with the Boss Arena card, and Solo Boss Mode and Auto chess side by side under it, at the bottom. Your pawn's card takes the room
     left: your tag (icon, name, "Weighty · 1580") centered above your pawn's head, the pawn 75% bigger than before
     (170 × 154 → up to 298 × 270) and sized to the room the tag leaves (Oct 24). On a short card (under 190 px tall: a
     640 px phone, or a 740 px one (measured at 320, 375 and 430 px wide), since the options panel is there from the first view, Oct 25)
@@ -96,7 +98,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     ([docs/decisions/2026-10-18-phone-home-fits.md](../decisions/2026-10-18-phone-home-fits.md)). Big tap targets, no
     sideways scroll at 320–430 px; a long name on your home card ellipsizes.
   - **Computer** (1024 px+): a side menu, the play column in the center in the phone's order (Eric, Oct 18): the RANKED
-    row, its panel, PLAY and its line, then Other modes with the Boss Arena card, the Solo Boss Mode card and Auto chess (a little shorter) at the
+    row, its panel, PLAY and its line, then Other modes with the Boss Arena card, and Solo Boss Mode and Auto chess side by side under it (a little shorter) at the
     bottom; a side panel (playing now, global chat). The pawn hops on a computer too (Oct 24: the hop was phone-only).
     From 1280 px the play column starts with the **live window**: the featured real match (a matchmade one, most
     people, then newest) or, when none runs, bot-match replays played on a shared clock cycle so everyone sees the same

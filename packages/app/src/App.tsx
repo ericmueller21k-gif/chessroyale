@@ -1204,13 +1204,15 @@ export function App() {
           setShowTown(false);
           history.replaceState(null, "", "/");
         }}
-        // A boss's "Challenge alone", confirmed: out of the town square to the Boss raid screen (as the side menu opens
-        // it), that boss's tile picked (the screen reads its pick from rememberBossPick as it opens).
+        // A boss's "Challenge alone", confirmed: out of the town square to the Solo Boss Mode screen (the solo form, as the
+        // side menu opens it; Eric, Oct 26), that boss's tile picked (the screen reads its pick from rememberBossPick as it
+        // opens).
         onBossAlone={(id) => {
           rememberBossPick(id);
           setShowTown(false);
           history.replaceState(null, "", "/");
           setHomeIntent(null);
+          setRaidFull(false);
           setRaidOpen(true);
         }}
       />

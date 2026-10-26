@@ -24,7 +24,7 @@ test("the RANKED row: a label over 50 v 50, 1 v 1 and Squads, three equal button
     await expect(page.locator(".fd-ranked .fd-label")).toHaveText("RANKED");
     await expect(row.getByRole("radio")).toHaveText(["50 v 50Crowd chess", "1 v 1Classic chess", "Squads8 squads of 4"]);
     const card = page.getByRole("main").getByRole("button", { name: /^Boss Arena/ });
-    await expect(card).toHaveText(/^Boss ArenaParty up with friends and take on the bosses›$/);
+    await expect(card).toHaveText(/^Boss ArenaParty up and take on the bosses›$/);
     // The label sits right above the row; the three buttons are the same size, side by side, their words whole.
     const label = await box(page, ".fd-ranked .fd-label");
     const r = (await row.boundingBox())!;
@@ -192,23 +192,30 @@ test("the hidden /bosses opens the solo boss picker straight away (a player too)
   expect(new URL(page.url()).search).toBe("");
 });
 
-test("Other modes under PLAY: the label, then the Boss Arena card (and Solo Boss Mode), then Auto chess (a knight's picture, the card's look); Auto chess opens /autochess, and its back button is home", async ({ page }) => {
+test("Other modes under PLAY: the label, then the Boss Arena card full width, then Solo Boss Mode and Auto chess side by side at half width each (a knight's picture, the card's look); Auto chess opens /autochess, and its back button is home", async ({ page }) => {
   await named(page, "Knight");
   await page.goto("/");
   const main = page.getByRole("main");
   const label = main.getByRole("heading", { name: "Other modes", exact: true });
   const boss = main.getByRole("button", { name: /^Boss Arena/ });
+  const solo = main.getByRole("button", { name: /^Solo Boss Mode/ });
   const auto = main.getByRole("button", { name: /^Auto chess/ });
   await expect(label).toBeVisible();
-  await expect(auto).toHaveText(/^Auto chessBuild an army, watch it fight›$/);
+  await expect(auto).toHaveText(/^Auto chessBuild an army›$/);
   await expect(auto.locator("svg.fd-knight")).toBeVisible();
   const at = async (l: import("@playwright/test").Locator) => (await l.boundingBox())!;
   const play = await at(main.getByRole("button", { name: "PLAY", exact: true }));
-  const [l, b, a] = [await at(label), await at(boss), await at(auto)];
+  const [l, b, s, a] = [await at(label), await at(boss), await at(solo), await at(auto)];
   expect(l.y).toBeGreaterThanOrEqual(play.y + play.height);
   expect(b.y).toBeGreaterThanOrEqual(l.y + l.height);
-  expect(a.y).toBeGreaterThanOrEqual(b.y + b.height);
-  expect(Math.abs(a.width - b.width) + Math.abs(a.height - b.height), "the same size as the Boss Arena card").toBeLessThan(2);
+  // (Eric, Oct 26: Boss Arena is full width; Solo Boss Mode and Auto chess sit side by side, half width each, the same size.
+  // This replaces "the same size as the Boss Arena card": Auto chess is no longer full width.)
+  expect(Math.abs(b.width - (a.x + a.width - s.x)), "Boss Arena as wide as the pair").toBeLessThan(2);
+  expect(Math.abs(s.width - a.width), "the two half cards the same width").toBeLessThan(2);
+  expect(Math.abs(s.height - a.height), "the two half cards the same height").toBeLessThan(2);
+  expect(Math.abs(s.y - a.y), "the two half cards side by side").toBeLessThan(2);
+  expect(s.x + s.width, "Solo Boss Mode left of Auto chess").toBeLessThanOrEqual(a.x + 1);
+  expect(s.y, "the pair under Boss Arena").toBeGreaterThanOrEqual(b.y + b.height);
   await auto.click();
   await expect(page.locator(".ac-title strong")).toHaveText("Auto chess");
   expect(new URL(page.url()).pathname).toBe("/autochess");

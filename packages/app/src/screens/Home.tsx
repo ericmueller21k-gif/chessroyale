@@ -939,7 +939,7 @@ export function HomeScreen({
       </span>
       <span class="rd-card-text">
         <strong>Boss Arena</strong>
-        <span>Party up with friends and take on the bosses</span>
+        <span>Party up and take on the bosses</span>
       </span>
       <span class="rd-card-go" aria-hidden="true">
         ›
@@ -947,15 +947,16 @@ export function HomeScreen({
     </button>
   );
   // Solo Boss Mode's card (Eric, Oct 26): the crown from the side menu's Boss raid item, drawn large, its tap the solo
-  // screen (Boss alone's form of the Boss raid screen). A placeholder picture until one is drawn.
+  // screen (Boss alone's form of the Boss raid screen). A placeholder picture until one is drawn. A half card, side by side
+  // with Auto chess under Boss Arena (`rd-pair`, styles.css).
   const soloCard = (
-    <button type="button" class="rd-card" onClick={() => onRaid(true)}>
+    <button type="button" class="rd-card rd-half" onClick={() => onRaid(true)}>
       <span class="rd-face" aria-hidden="true">
         <CrownArt />
       </span>
       <span class="rd-card-text">
         <strong>Solo Boss Mode</strong>
-        <span>Take on any boss alone</span>
+        <span>Any boss, alone</span>
       </span>
       <span class="rd-card-go" aria-hidden="true">
         ›
@@ -965,13 +966,13 @@ export function HomeScreen({
   // Auto chess's card (Eric, Oct 24: "build an army, watch it fight"): the Boss raid card's look and size, its picture the
   // board's own white knight (KnightArt), its tap the screen /autochess opens.
   const autoCard = (
-    <button type="button" class="rd-card fd-auto-card" onClick={onAutoChess}>
+    <button type="button" class="rd-card rd-half fd-auto-card" onClick={onAutoChess}>
       <span class="rd-face" aria-hidden="true">
         <KnightArt />
       </span>
       <span class="rd-card-text">
         <strong>Auto chess</strong>
-        <span>Build an army, watch it fight</span>
+        <span>Build an army</span>
       </span>
       <span class="rd-card-go" aria-hidden="true">
         ›
@@ -1028,8 +1029,10 @@ export function HomeScreen({
           {go}
           <h2 class="fd-label fd-other-label">Other modes</h2>
           {bossArenaCard}
-          {soloCard}
-          {autoCard}
+          <div class="rd-pair">
+            {soloCard}
+            {autoCard}
+          </div>
         </div>
       </div>
       {overlays}

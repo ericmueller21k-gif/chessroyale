@@ -8844,7 +8844,7 @@ button.fd-logo {
     height: 1.3em;
     margin-bottom: 2.1px;
   }
-  .fd-play-col:has(> .fd-go > .fd-hint-line) > .fd-auto-card {
+  .fd-play-col:has(> .fd-go > .fd-hint-line) > .rd-pair {
     margin-bottom: 14.8px;
   }
 }
@@ -9318,6 +9318,52 @@ button.fd-logo {
   .fd-root.framed .fd-play-col .rd-card-text strong {
     font-size: 18px;
   }
+}
+
+/*
+ * Solo Boss Mode and Auto chess: two half cards side by side under Boss Arena (Eric, Oct 26; a phone and a computer alike).
+ * Each keeps the rd-card look (picture, name, one short line, the ›), stacked so a name fits half a 320 px phone: the
+ * picture on top, the › in its corner. On a phone the pair is 84 px tall, as the two cards it replaces, so home fits as
+ * before. The selectors carry .fd-root and .rd-card so they win over the computer's card rules above.
+ */
+.fd-root .rd-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.fd-root .rd-pair .rd-card.rd-half {
+  position: relative;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 4px;
+  min-width: 0;
+  min-height: 84px;
+  padding: 6px 8px;
+}
+.fd-root .rd-pair .rd-card.rd-half .rd-face {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+}
+.fd-root .rd-pair .rd-card.rd-half .rd-face svg {
+  width: 26px;
+  height: 26px;
+}
+.fd-root .rd-pair .rd-card.rd-half .rd-card-text {
+  width: 100%;
+}
+.fd-root .rd-pair .rd-card.rd-half .rd-card-text strong {
+  font-size: 13px;
+}
+.fd-root .rd-pair .rd-card.rd-half .rd-card-text span {
+  font-size: 12px;
+}
+.fd-root .rd-pair .rd-card.rd-half .rd-card-go {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 22px;
 }
 
 /* -- Sheets (Play with friends) -- */
