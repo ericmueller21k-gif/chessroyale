@@ -12,7 +12,7 @@
  * BOSS_LINES_CAP_USD (default 3) caps the run's spend: a call that could pass it isn't sent. Results go to the out folder
  * as JSON plus a readable sample.md. scripts/boss-lines/README.md has the details.
  */
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { MODEL, PRICE, SpendCapReached, Writer, hasKey } from "./api.ts";
 import { BOSS_IDS, packText, sourcePack, type BossId, type SourcePack } from "./packs.ts";
@@ -58,6 +58,14 @@ interface Plan {
   title: string;
 }
 
+/**
+ * The sheets Eric approved (an array of sheets, edited by hand from a sheets run's results.json). A boss with one here
+ * keeps it: no new sheet is written for it, and its lines are written from it.
+ */
+const APPROVED = "docs/boss-lines/approved-sheets.json";
+const approvedSheets = (): Map<string, Sheet> =>
+  new Map(existsSync(APPROVED) ? (JSON.parse(readFileSync(APPROVED, "utf8")) as Sheet[]).map((s) => [s.id, s]) : []);
+
 const asId = (s: string | undefined): BossId => {
   if (!s || !(BOSS_IDS as readonly string[]).includes(s)) throw new Error(`unknown boss "${s}": one of ${BOSS_IDS.join(", ")}`);
   return s as BossId;
@@ -77,8 +85,15 @@ async function run(plan: Plan, cap: number): Promise<void> {
     save("results.json", { model: MODEL, effort: "high", capUsd: cap, usage: w.usage, calls: w.log, ...result });
     writeFileSync(join(plan.out, "sample.md"), report(plan, packs, result, w));
   };
+  const approved = approvedSheets();
   try {
     for (const p of packs) {
+      const kept = approved.get(p.id);
+      if (kept) {
+        console.log(`${p.name}: approved sheet (${APPROVED})`);
+        result.sheets.push(kept);
+        continue;
+      }
       console.log(`${p.name}: character sheet`);
       result.sheets.push(await w.json<Sheet>(`sheet ${p.id}`, SYSTEM, sheetPrompt(packText(p)), SHEET_SCHEMA));
       write();

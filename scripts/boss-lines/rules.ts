@@ -30,13 +30,15 @@ export interface LineCheck {
   reasons: string[];
 }
 
-/** Checks one line: its length and every rule above. `"..."` is read as the ellipsis character the game's lines use. */
 /** Words only some bosses may not say, by roster id. */
 const BANNED_FOR: Readonly<Record<string, readonly { re: RegExp; why: string }[]>> = {
   // Hollow's design (docs/history/bosses.md): an original creature, no Santa suit. (Ginger's lore has Santa's workshop: Eric, Oct 25.)
   hollow: [{ re: /\bsanta\b/i, why: "no Santa in Hollow's lines (Hollow's design: an original creature, no Santa suit)" }],
+  // A ginger-snap pun that didn't land (Eric, Oct 25: "why does he keep saying snap?").
+  gingerbread: [{ re: /\bsnap/i, why: "no \"snap\" for Ginger (Eric, Oct 25: \"why does he keep saying snap?\")" }],
 };
 
+/** Checks one line: its length and every rule above. `"..."` is read as the ellipsis character the game's lines use. */
 export function checkLine(text: string, speaker = ""): LineCheck {
   const reasons: string[] = [];
   const t = text.trim();
