@@ -41,8 +41,9 @@ the time of day, the curved ground, five boss homes with their bosses roaming ne
   (`skyLooks` in `feel.ts`) sets the sky's gradient, its horizon color (which the far ground and the haze dissolve
   into, so the edge is one soft line in every look), a tint over the world (one fill a frame; name tags, bubbles and the
   homes' names are drawn after it, so they read as well at night), the sun (the moon at night: craters, stars, a few
-  twinkling) and the clouds' colors; dawn adds a low mist over the far ground and its sun rises on the other side of the
-  sky from dusk's. The sun and moon sit low over the horizon and shift only a little as you walk round the world.
+  twinkling) and the clouds' colors; dawn adds a morning mist (more haze over the far ground, into its own pale gold) and
+  its sun rises on the other side of the sky from dusk's. The prototype's far-band softening (a blurred copy laid over
+  the far ground) is off (`softenFarBand`): it ghosted the far squares. The sun and moon sit low over the horizon and shift only a little as you walk round the world.
 - **`?sky=dawn|day|dusk|night`** on `/town` holds one look whatever the clock says (for Eric and the tests; nothing else
   reads it).
 - **The clouds** are pixel art like the homes (`cloudPixel`): puffs on flat-ish bottoms, each puff shaded as a ball lit

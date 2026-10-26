@@ -211,8 +211,8 @@ export class Renderer {
   private readonly sky = new SkyPainter();
   /** The colors the sky's horizon sets, and the tint over the world (null: none), for the current look. */
   private colors: GroundColors = groundColors(look("day").sky[4]);
-  /** Dawn's low mist over the far ground: its lines' colors (null: none). */
-  private mist: string[] | null = null;
+  /** Dawn's mist: extra haze over the far ground, into the horizon's own color. */
+  private mist = 0;
   private tint: string | null = null;
   /** This frame's name tags and speech bubble, drawn after the world's tint so they stay as easy to read at night. */
   private readonly tags: { text: string; x: number; y: number; gold: boolean; size: number; alpha: number }[] = [];
@@ -260,7 +260,7 @@ export class Renderer {
     this.drawSquare = (c, r, cu, ru, q) => {
       const n = this.nSq;
       if (n >= SQ_MAX) return;
-      const m = Math.round(clamp(hazeMix(this.view, cu - this.camX, ru - this.camY), 0, 1) * MIX_STEPS);
+      const m = Math.round(clamp(hazeMix(this.view, cu - this.camX, ru - this.camY, this.mist), 0, 1) * MIX_STEPS);
       this.sqKey[n] = m * 4 + ((c + r) & 1) * 2 + (plotAt[r * N + c] ? 1 : 0);
       const o = n * 8;
       const cx = (q[0]! + q[2]! + q[4]! + q[6]!) / 4;
@@ -298,9 +298,7 @@ export class Renderer {
     this.colors = groundColors(mixRGB(w, (c) => c.sky[4]!));
     const t = mixTint(w);
     this.tint = t[3] > 0.004 ? `rgba(${t[0] | 0},${t[1] | 0},${t[2] | 0},${t[3].toFixed(3)})` : null;
-    const m = mixMist(w);
-    const [r, g, b] = TOWN_FEEL.mistColor;
-    this.mist = m > 0.01 ? Array.from({ length: HAZE_LINES }, (_, i) => `rgba(${r},${g},${b},${(0.55 * m * Math.sin((Math.PI * (i + 0.5)) / HAZE_LINES) ** 1.5).toFixed(3)})`) : null;
+    this.mist = mixMist(w);
   }
 
   /** Draws one frame. `zoom`: 0 normal, 1 zoomed out (and between, while it glides); `dt`: seconds since the last. */
@@ -384,7 +382,7 @@ export class Renderer {
     this.nSq = 0;
     forEachSquare(v, this.camX, this.camY, false, this.drawSquare);
     this.fillSquares();
-    this.softenBand();
+    if (TOWN_FEEL.softenFarBand) this.softenBand();
     ctx.restore();
   }
 
@@ -490,19 +488,6 @@ export class Renderer {
       ctx.moveTo(v.rimPx[0]!, v.rimPy[0]! + off);
       for (let j = 1; j < v.rimN; j++) ctx.lineTo(v.rimPx[j]!, v.rimPy[j]! + off);
       ctx.stroke();
-    }
-    // Dawn's mist: a soft band lying low over the far ground, a little below the rim, thickest in its middle.
-    if (this.mist) {
-      const m = H * TOWN_FEEL.mistDepth;
-      ctx.lineWidth = m / HAZE_LINES + 0.6;
-      for (let i = 0; i < HAZE_LINES; i++) {
-        const off = d * 0.4 + ((i + 0.5) * m) / HAZE_LINES;
-        ctx.strokeStyle = this.mist[i]!;
-        ctx.beginPath();
-        ctx.moveTo(v.rimPx[0]!, v.rimPy[0]! + off);
-        for (let j = 1; j < v.rimN; j++) ctx.lineTo(v.rimPx[j]!, v.rimPy[j]! + off);
-        ctx.stroke();
-      }
     }
     ctx.restore();
   }

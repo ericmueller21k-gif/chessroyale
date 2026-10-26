@@ -43,7 +43,10 @@ export interface SkyLook {
   sunGlow: RGB;
   sunGlowAlpha: number;
   sunX: number;
-  /** A low mist over the far ground (0: none; dawn's). */
+  /**
+   * Dawn's morning mist: how much more the far ground fades into the horizon's own color (added to `hazeNear`; 0: none).
+   * (Slice 2's first try drew it as light strokes over the ground: Eric saw a white smudge.)
+   */
   mist: number;
 }
 
@@ -107,6 +110,11 @@ export const TOWN_FEEL = {
   bandMix: 0.93,
   /** How much sprites fade at the rim (0 to 1). */
   bandFade: 0.7,
+  /**
+   * The far band of ground softened by a blurred copy of itself laid back over it (the prototype's). Off: its low-res copy
+   * ghosted the far squares (doubled, smeared), most at dawn (Eric, Oct 26); the haze alone fades them cleanly.
+   */
+  softenFarBand: false,
   /** How much sprites blur in the far band (a shrink, then a stretch back). */
   bandBlur: 2.6,
   /** A light haze with distance before the band (at the rim, before the band's own). */
@@ -160,7 +168,7 @@ export const TOWN_FEEL = {
       sunGlow: [255, 214, 190],
       sunGlowAlpha: 0.5,
       sunX: 0.3,
-      mist: 1,
+      mist: 0.22,
     },
     day: {
       sky: [
@@ -226,9 +234,6 @@ export const TOWN_FEEL = {
       mist: 0,
     },
   } satisfies Record<string, SkyLook> as Record<"dawn" | "day" | "dusk" | "night", SkyLook>,
-  /** Dawn's mist: how far down from the horizon it lies (a fraction of the box's height), and its color. */
-  mistDepth: 0.1,
-  mistColor: [255, 244, 246] as RGB,
   /** The clouds: how many in a strip of sky 1000 pixels wide (some big, some small, a few wisps). */
   cloudsPer1000: 6,
   /** Their pixel size (in CSS pixels): drawn in the game's pixel style, like the homes. */

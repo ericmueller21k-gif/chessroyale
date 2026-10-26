@@ -2,7 +2,7 @@
  * The town square's sky by the time of day (pure: no drawing). Four looks in order, dawn, day, dusk and night, each a
  * weight that blends smoothly into the next over the hours in feel.ts (`skyHours`, `skyBlendMinutes`); the looks' colors
  * are there too (`skyLooks`): the sky's gradient, the horizon (which the far ground and the haze dissolve into, so the
- * edge is one soft line), the tint over the world, the sun or moon, the clouds and dawn's mist.
+ * edge is one soft line), the tint over the world, the sun or moon, the clouds and dawn's mist (a stronger haze over the far ground).
  * `?sky=dawn|day|dusk|night` on /town picks one look whatever the clock says (Town.tsx reads it; nothing else does).
  */
 import { TOWN_FEEL, type SkyLook } from "./feel.ts";
@@ -63,7 +63,7 @@ export function mixTint(w: SkyWeights): [number, number, number, number] {
   return a > 0 ? [c[0]! / a, c[1]! / a, c[2]! / a, a] : [0, 0, 0, 0];
 }
 
-/** How much of dawn's low mist shows. */
+/** How much of dawn's mist shows (extra haze over the far ground). */
 export const mixMist = (w: SkyWeights): number => LOOKS.reduce((m, l) => m + w[l] * look(l).mist, 0);
 
 export const sameWeights = (a: SkyWeights, b: SkyWeights): boolean => LOOKS.every((l) => Math.abs(a[l] - b[l]) < 1e-3);

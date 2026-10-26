@@ -25,7 +25,7 @@ and cooler than dusk.
 
   | Look | From | Sky (top → horizon) | Sun / moon | Clouds | Tint over the world |
   | --- | --- | --- | --- | --- | --- |
-  | Dawn | 5:30 | light blue, lavender, pink, peach, pale gold | pale gold, on the left | lit soft pink | faint pink, 5% (and a low mist) |
+  | Dawn | 5:30 | light blue, lavender, pink, peach, pale gold | pale gold, on the left | lit soft pink | faint pink, 5% (and a morning mist) |
   | Day | 7:30 | slice 1's blue to pale blue | big soft sun, on the right | white | none |
   | Dusk | 17:30 | dark blue, purple, pink, red-orange, gold | big, low, orange, on the right | lavender, lit pink and orange from below | warm orange, 10% |
   | Night | 19:30 | deep navy | big pale moon with craters; stars, a few twinkling | few, faint | cool navy, 34% |
@@ -33,6 +33,13 @@ and cooler than dusk.
   The colors are in `feel.ts` (`skyLooks`). `?sky=dawn|day|dusk|night` on `/town` holds one look (for Eric and the tests).
 - **The horizon is one soft line**: the far ground, the haze strip and the skirt under the rim dissolve into the sky's
   own horizon color in every look, and the clouds are up in the sky, so nothing white sits between the haze and the sky.
+- **No more ghosting at the far edge** (Eric, on this PR's first stills: "this one [dawn] has a weird white blurring across
+  near the edge"). Two causes: dawn's mist was ten light strokes laid over the far ground, which read as white streaks;
+  and the prototype's far-band softening (a third-size blurred copy of that strip laid back over it) ghosted the far
+  squares in every look, most visibly at dawn. Now dawn's mist is extra haze into dawn's own pale gold horizon
+  (`mist` 0.22 added to `hazeNear`: per-square colors, nothing drawn over the ground), and the softening is off
+  (`softenFarBand`, a switch in `feel.ts`): the far squares fade cleanly into the haze and then the sky, in all four
+  looks, phone and computer (before and after stills in the PR).
 - **Clouds that look like clouds**, up in the sky, spread with gaps, drifting slowly and shifting a little as you walk.
 - **`rimLine`** in `feel.ts` (off): a dark line along the world's edge, its color `#1f2530` and width 2. Stills with it on,
   one per look, are in the PR for Eric to compare.
@@ -56,9 +63,9 @@ and cooler than dusk.
 - **Signs in capitals**, as on Eric's pictures; the floating names keep their case.
 - **The world's names over bubbles:** a boss's bubble is drawn over a home's floating name (they met over Ginger Igloo).
 - **Frame rate.** Measured headless (software rendering), 5 s while walking, the medians of four runs taken in turn:
-  zoomed in (slice 1's view), 59.4 fps on a phone and 57.0 on a computer (slice 1: 57.8 and 52.2), so the sky costs
-  nothing to speak of; at the zoomed-out default, 53.3 on a phone and 46.9 on a computer by day, 52.9 and 43.6 at night.
+  zoomed in (slice 1's view), 59.9 fps on a phone and 57.5 on a computer (slice 1: 57.8 and 52.2), so the sky costs
+  nothing to speak of; at the zoomed-out default, 55.4 on a phone and 49.6 on a computer by day, 55.2 and 47.8 at night.
   The difference is the zoomed-out view's ground: about twice as many squares (some 700 on a computer), each an
   antialiased polygon; without the squares the same frame runs at 60. Cheaper drawing taken on the way: the squares
   batched one fill per color, small far squares (under `seamMinPx`, 7 pixels) drawn once without a seam, the sky filled
-  only down to the rim, stars as single pixels rather than a sky-sized canvas.
+  only down to the rim, stars as single pixels rather than a sky-sized canvas, and the far-band softening off.
