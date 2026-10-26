@@ -38,8 +38,10 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     **Auto chess** card side by side, half width each (`rd-pair`, Eric, Oct 26). The half cards stack the picture, the name
     and one short line ("Any boss, alone", "Build an army") with the › in the top corner; the Auto chess picture is a
     white knight from the board's own piece art. Auto chess opens `/autochess`, as Settings' Testing row does, with its back
-    button home. PLAY is a third shorter (43 px on a phone, 59 px on a computer). On a phone the pair is as tall as the two
-    cards it replaces (84 px each, 10 px apart), so home fits as before.
+    button home. PLAY is 64 px tall on a phone and a computer, as tall as the Other modes cards (Oct 26, Eric: "the play
+    button is too small"; 48 px on a computer's short window, under 760 px tall; its label 30 px on a phone, 36 px on a
+    computer). On a phone the pair is as tall as the two cards it replaces (84 px each, 10 px apart), so home fits as before:
+    the phone column's gaps are 8 px, and its top and bottom padding are 10 px. "Other modes" is centered over the cards.
   - **The Boss Arena card** (Eric, Oct 26, replacing the Boss raid card; full width, "Boss Arena", "Party up and take on the
     bosses") opens the town square at `/town` (the same page the address opens; its back button is home).
     Its picture is a still of one boss you can meet, turning to the next every 30 s (`FRONT_DOOR.bossCardMs`) with a 0.6 s

@@ -8793,14 +8793,14 @@ button.fd-logo {
   align-items: center;
   justify-content: center;
   width: 100%;
-  /* (Oct 24: a third shorter than 64 px; its width and text are as they were.) */
-  height: 43px;
+  /* (Oct 26, Eric: "the play button is too small": as tall as the Other modes cards, 64 px, its label bigger to match.) */
+  height: 64px;
   border: 0;
   border-radius: 18px;
   background: var(--fd-gold);
   color: var(--fd-gold-ink);
   font-family: "Archivo Black", Archivo, sans-serif;
-  font-size: 24px;
+  font-size: 30px;
   letter-spacing: 1px;
   cursor: pointer;
   transition: transform 80ms;
@@ -8854,18 +8854,23 @@ button.fd-logo {
  * above it. On a very small screen the card stops shrinking and the page scrolls.
  */
 @media (max-width: 1023px) {
+  /* (Oct 26: 8 px gaps and tighter top and bottom padding, so a taller PLAY still fits: 24 px saved at every size.) */
   .fd-home:not(.queueing) {
-    gap: 10px;
-    padding-top: calc(env(safe-area-inset-top) + 12px);
-    padding-bottom: calc(env(safe-area-inset-bottom) + 14px);
+    gap: 8px;
+    padding-top: calc(env(safe-area-inset-top) + 10px);
+    padding-bottom: calc(env(safe-area-inset-bottom) + 10px);
   }
   .fd-home-main,
   .fd-play-col,
   .fd-go {
-    gap: 10px;
+    gap: 8px;
   }
   .fd-hint {
     margin-top: -4px;
+  }
+  /* (The column's gap is 8 px here, so the label gets 2 px back: it stays 14 px under the line, as Eric approved.) */
+  .fd-other-label {
+    margin-top: 2px;
   }
   .fd-hero {
     flex: 1 1 0;
@@ -8919,10 +8924,11 @@ button.fd-logo {
     }
   }
 }
-/* Under PLAY (Oct 24): "Other modes", the RANKED label's style at 11 px, over the Boss raid and Auto chess cards. */
+/* Under PLAY (Oct 24): "Other modes", the RANKED label's style at 11 px, over the Boss raid and Auto chess cards. Centered over
+   the cards (Oct 26, Eric). */
 .fd-other-label {
   font-size: 11px;
-  padding-left: 4px;
+  text-align: center;
 }
 /* The RANKED row (Eric, Oct 16): its small label right above the three ranked modes. */
 .fd-ranked {
@@ -9364,6 +9370,22 @@ button.fd-logo {
   top: 6px;
   right: 8px;
   font-size: 22px;
+}
+/*
+ * On a computer the half cards lie flat, picture beside the words, as tall as the Boss Arena card (64 px), so home is no
+ * taller than with the two cards they replace and the live window above keeps its size.
+ */
+@media (min-width: 1024px) {
+  .fd-root .rd-pair .rd-card.rd-half {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    min-height: 64px;
+  }
+  .fd-root .rd-pair .rd-card.rd-half .rd-card-text {
+    width: auto;
+    min-width: 0;
+  }
 }
 
 /* -- Sheets (Play with friends) -- */
@@ -10893,17 +10915,18 @@ button.fd-seat {
     gap: 12px;
   }
   .fd-root.framed .fd-play {
-    height: 59px;
-    font-size: 32px;
+    height: 64px;
+    font-size: 36px;
   }
-  /* (A short window, a laptop's: the column closer, so the live window keeps a board worth seeing.) */
+  /* (A short window, a laptop's: the column closer, so the live window keeps a board worth seeing. PLAY 48 px here, up from
+     43 (Oct 26), the most the live window's board can give up at 680 px tall.) */
   @media (max-height: 760px) {
     .fd-root.framed .fd-play-col {
       gap: 8px;
     }
     .fd-root.framed .fd-play {
-      height: 43px;
-      font-size: 26px;
+      height: 48px;
+      font-size: 28px;
     }
   }
   /* The queue: your card and the chat on the left, the lobby (the green area) on the right. */

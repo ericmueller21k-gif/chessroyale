@@ -56,3 +56,21 @@ when it's built (see `2026-10-26-boss-arena-and-rooms.md`).
 
 Until the Coliseum exists, players can't reach a raid from home: Join a raid, People only, Raid with bots and Play with
 friends are only on the full screen (`?mode=raid`). This is what Eric asked for.
+
+## PLAY and the "Other modes" label (Eric, Oct 26, second round)
+
+- **"The play button is too small."** PLAY is 64 px tall on a phone and a computer (was 43 px on a phone, 59 px on a
+  computer), as tall as the Other modes cards. Its label is 30 px on a phone (was 24 px) and 36 px on a computer (was 32).
+  It stays full width and dimmed until a mode is picked (Eric's home rule).
+- **Short screens:** on a computer's window under 760 px tall, PLAY is 48 px (was 43 px) with a 28 px label (was 26 px):
+  the most the live window's board can give up at 680 px tall (it must stay over 150 px). Nothing on a phone needed a
+  floor: the room came from spacing.
+- **Computer half cards** lie flat (picture beside the words) at the Boss Arena card's 64 px, so the computer's home is
+  no taller than with the two cards they replace, and the live window keeps its board (over 230 px at 1280 × 800).
+- **Room for it, on a phone:** the column gaps went from 10 px to 8 px, and the top and bottom padding from 12 px and 14 px
+  to 10 px each. That is 22 px saved; the label gets back 2 px of top margin so it stays 14 px under the hint line (Eric's
+  approved spacing). The fit test's sizes are unchanged: 360×640, 375×667, 390×664, 390×844 and 430×932 all scroll 0 in
+  every mode, and the pawn stays at 52 px or more.
+- **"Other modes":** centered over the cards (text-align: center; the 4 px left padding is gone).
+- **Not fitting:** 320×568 (not one of the fit test's sizes) still scrolls, by about 65 px (it was about 66 before).
+  A computer's 1024×768 scrolls by about 124 px; there is no fit check there.
