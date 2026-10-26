@@ -288,7 +288,7 @@ export interface Person {
   id: string;
   name: string;
   look: Look;
-  /** This device's player (a gold ring and tag; the camera follows them). */
+  /** This device's player (a gold tag; the camera follows them). */
   you: boolean;
   walker: Walker;
 }

@@ -282,10 +282,6 @@ export class Renderer {
   /** The boss's items, by boss (for its card's place). */
   private readonly bossItems: Item[];
   private readonly q4 = new Float64Array(8);
-  /** Your ring's points this frame, its fade and its line's width. */
-  private readonly ringPts = new Float64Array(RING_N * 2);
-  private ringAlpha = 1;
-  private ringLine = 1.5;
   /** Your dressed pawn (null: the plain pawn): set by Town.tsx when your look changes. */
   youArt: YouArt | null = null;
   /** Tag widths by name and size; sign and bubble layouts by text. */
@@ -652,14 +648,11 @@ export class Renderer {
         const w = person.walker;
         w.pose(now, pose);
         if (person.you) {
-          // Inside your ring: its back half on the ground behind you, its front half over your base.
-          const ring = this.ringAround(it);
-          if (ring) this.drawRingHalf(false);
+          // Your shadows are a bot's: sized from the pawn, not from the margin your look's items are drawn in.
           const art = this.youArt;
           const k = 1 + 2 * (art?.pad ?? 0);
           const pad = art?.pad ?? 0;
-          this.drawSprite(it, art?.img ?? pawnImage(person.look.side, person.look.tint), f.youSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.youHop, pose.tilt * f.hobbleTilt, w.facing, 0.6, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true);
-          if (ring) this.drawRingHalf(true);
+          this.drawSprite(it, art?.img ?? pawnImage(person.look.side, person.look.tint), f.youSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.youHop, pose.tilt * f.hobbleTilt, w.facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k);
           this.tag(person.name, it.fx, it.hy - 2, true, clamp((11 * this.p.k) / v.kf, 8, 12), 1);
         } else {
           this.drawSprite(it, pawnImage(person.look.side, person.look.tint), f.botSquares, 0.5, PAWN_FOOT, 1, pose.hop * f.botHop, pose.tilt * f.hobbleTilt, w.facing, 1, PAWN_HEAD, true);
@@ -709,59 +702,13 @@ export class Renderer {
   }
 
   /**
-   * Your gold ring, lying flat on the ground round your base in the ground's own perspective (a circle of `ringSize`
-   * squares across, projected point by point). Its points into `ringPts`; false if it isn't drawn.
-   */
-  private ringAround(it: Item): boolean {
-    const { view: v, p, ringPts } = this;
-    const r = TOWN_FEEL.ringSize / 2;
-    for (let i = 0; i < RING_N; i++) {
-      const a = (i / RING_N) * Math.PI * 2;
-      if (!proj(v, it.dx + r * Math.cos(a), it.dz + r * Math.sin(a), 0, p)) return false;
-      ringPts[i * 2] = p.x;
-      ringPts[i * 2 + 1] = p.y;
-    }
-    this.ringAlpha = enterOf(v, it.dx, it.dz);
-    proj(v, it.dx, it.dz, 0, p);
-    this.ringLine = Math.max(1.5, p.k * 0.06);
-    return true;
-  }
-
-  /** The ring's back half (with its fill, on the ground) or its front half (over your base). */
-  private drawRingHalf(front: boolean): void {
-    const { ctx, ringPts: q } = this;
-    ctx.save();
-    ctx.globalAlpha = this.ringAlpha;
-    ctx.lineWidth = this.ringLine;
-    ctx.lineCap = "round";
-    ctx.strokeStyle = TOWN_FEEL.pressEdge;
-    if (!front) {
-      ctx.fillStyle = "rgba(255,215,106,.45)";
-      ctx.beginPath();
-      ctx.moveTo(q[0]!, q[1]!);
-      for (let i = 1; i < RING_N; i++) ctx.lineTo(q[i * 2]!, q[i * 2 + 1]!);
-      ctx.closePath();
-      ctx.fill();
-    }
-    // The back half: the points from angle 0 round to half a turn (farther than its middle); the front half the rest.
-    ctx.beginPath();
-    const from = front ? RING_N / 2 : 0;
-    ctx.moveTo(q[from * 2]!, q[from * 2 + 1]!);
-    for (let j = 1; j <= RING_N / 2; j++) {
-      const i = (from + j) % RING_N;
-      ctx.lineTo(q[i * 2]!, q[i * 2 + 1]!);
-    }
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  /**
    * A sprite standing on the ground: its foot at (fx, fy) of its box, `sq` squares tall; lifted `lift` squares (the
    * hop), tilted `tilt` degrees, flipped to face its walk; a soft shadow under it and a contact shadow right under its
    * base (`pawn`: the base's width, else `shadow` sizes it), both tight and dark standing, smaller and lighter as it
-   * lifts. Fills the item's box; its head is `head` of the way down the box.
+   * lifts. Fills the item's box; its head is `head` of the way down the box; the pawn is `base` of the box's width (less
+   * than 1 when the box has a margin for items).
    */
-  private drawSprite(it: Item, img: CanvasImageSource, sq: number, fx: number, fy: number, aspect: number, lift: number, tilt: number, flip: number, shadow: number, head = 0, pawn = false): void {
+  private drawSprite(it: Item, img: CanvasImageSource, sq: number, fx: number, fy: number, aspect: number, lift: number, tilt: number, flip: number, shadow: number, head = 0, pawn = false, base = 1): void {
     const { ctx, view: v, p } = this;
     if (!proj(v, it.dx, it.dz, 0, p)) return;
     const h = sq * p.k;
@@ -780,9 +727,9 @@ export class Renderer {
     const soft = shadow;
     ctx.globalAlpha = alpha * F.shadowAlpha * (1 - s) * (0.5 + 0.5 * fade);
     ctx.beginPath();
-    ctx.ellipse(p.x, p.y, Math.min(w * 0.42, p.k * 0.42 * soft) * grow, p.k * 0.12 * soft * grow, 0, 0, Math.PI * 2);
+    ctx.ellipse(p.x, p.y, Math.min(w * base * 0.42, p.k * 0.42 * soft) * grow, p.k * 0.12 * soft * grow, 0, 0, Math.PI * 2);
     ctx.fill();
-    const cw = pawn ? w * F.contactShadowW : p.k * F.contactShadowW * 1.45 * Math.min(shadow, 1.2);
+    const cw = pawn ? w * base * F.contactShadowW : p.k * F.contactShadowW * 1.45 * Math.min(shadow, 1.2);
     ctx.globalAlpha = alpha * F.contactShadowAlpha * (1 - s) * fade;
     ctx.beginPath();
     ctx.ellipse(p.x, p.y, cw * grow, p.k * F.contactShadowDepth * grow, 0, 0, Math.PI * 2);
@@ -1310,7 +1257,6 @@ export class Renderer {
 
 const SHADOW = "rgb(60,35,10)";
 /** The ring's points round its circle. */
-const RING_N = 32;
 /** A square's corners from its middle, in half-squares: far left, far right, near right, near left. */
 const CORNERS = [-1, 1, 1, 1, 1, -1, -1, -1] as const;
 const SCRATCH_ORDER: number[] = [];
