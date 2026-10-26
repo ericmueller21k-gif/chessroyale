@@ -85,6 +85,10 @@ test("home → queue → match, then tap a name for that player's profile (phone
     // (A queue of its own, so other tests' players don't land in it.)
     await p.goto("/?debug&pool=profile");
     await openBossRaid(p);
+  }
+  // Both join back to back: here bots fill the raid 8 s after its first join (MATCH_FILL_SECONDS), and a page load in
+  // between can outlast that.
+  for (const p of [desk, phone]) {
     await p.getByRole("button", { name: /^Join a raid/ }).click();
     await expect(p.locator(".fd-seats")).toBeVisible();
   }
