@@ -12,10 +12,10 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 - **Where bosses are met:** the boss raid (up to 50 people, online; or a Solo raid with 49 bots), the Crowd 50 v 50's
   boss final (the top 4, always against the Hidden Boss since Oct 14), and solo's "Boss alone" (one of the Boss raid
   screen's choices, or `/bosses`; [hub.md](hub.md); you pick every move
-  against a boss you choose on the Boss raid screen's tiles, at a difficulty from Easy to Hardest, `BOSS_DIFFICULTY`). The Hidden Boss
+  against a boss you choose on the Solo Boss Mode screen's tiles (the Boss raid screen's since Oct 26, Eric), at a difficulty from Easy to Hardest, `BOSS_DIFFICULTY`). The Hidden Boss
   (below) is met by everyone in the Crowd's boss final, solo and online, and otherwise only by an admin, in Boss alone
-  from the `/bosses` picker (his tile on the Boss raid screen is dark and locked for everyone).
-- **The Boss raid screen's character select** (Eric, Oct 16; docs/decisions/2026-10-16-boss-character-select.md;
+  from the `/bosses` picker (his tile on the select screen is dark and locked for everyone).
+- **The Boss raid screen's character select** (Eric, Oct 16; now the Solo Boss Mode screen's, Oct 26; docs/decisions/2026-10-16-boss-character-select.md;
   `components/BossSelect.tsx`, `characters/boss-select.ts`): a tile per boss you can meet, the picked one on a stage in
   its idle (one sprite animating, on the shared loop; reduced motion: a still, no drop). **The grid** (Eric, Oct 21 to 23; from a Street Fighter 6 select;
   docs/decisions/2026-10-23-boss-select-sf.md): fourteen tiles since Puddles, all the very same tall slanted tile (visible
@@ -66,7 +66,7 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   [engine.md](engine.md)). **Boss alone** picks the boss's moves at its difficulty's Maia rating, whatever your
   rating: Easy 1000, Normal 1400, Hard 1800, Hardest 2200 (`BOSS_DIFFICULTY`'s `maia`, settings.bossAloneMaia,
   `bossBrainFor`'s `alone`; Eric, Oct 18: Hardest was way too easy; docs/decisions/2026-10-18-boss-alone-difficulty.md).
-  Before a battle a boss has one number on screen: Boss alone's level at your difficulty, on the Boss raid screen's
+  Before a battle a boss has one number on screen: Boss alone's level at your difficulty, on the Solo Boss Mode screen's
   stage and in Boss alone's menu alike (`bossAloneElo` in `boss-difficulty.ts`; the raids show none:
   docs/decisions/2026-10-17-boss-sheet-fit.md).
 - **The brain (Oct 12: every boss on Maia; DECISIONS.md, "Every boss on Maia"):** every boss plays its normal moves

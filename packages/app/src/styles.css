@@ -8974,6 +8974,10 @@ button.fd-logo {
 .rd-face .boss-portrait {
   width: 56px;
 }
+/* Solo Boss Mode's card picture: the crown, in the card's gold (CrownArt, Home.tsx). */
+.fd-crown {
+  color: var(--fd-gold-text);
+}
 /* The card's portrait: a still that moves on to the next boss (BossCardFace), the new one fading in over the last. */
 .rd-face-stack,
 .rd-face-one {

@@ -483,6 +483,7 @@ export function HomeScreen({
   side = true,
   intent,
   raid = false,
+  full = false,
   loading,
   error,
   joinCode,
@@ -497,6 +498,7 @@ export function HomeScreen({
   onSquads,
   onParty,
   onRaid,
+  onBossArena,
   onAutoChess,
   onProfile,
   onSettings,
@@ -511,8 +513,10 @@ export function HomeScreen({
   side?: boolean;
   /** The computer's side menu (or /bosses) asked for the boss menu or Play with friends. */
   intent?: { kind: "boss" | "friends"; n: number } | null;
-  /** The Boss raid screen is open (its card, the side menu's Boss raid, ?mode=raid). */
+  /** The Boss raid screen is open (the Solo Boss Mode card, the side menu's Solo Boss Mode, ?mode=raid). */
   raid?: boolean;
+  /** With `raid`: the full Boss raid screen (?mode=raid, the test link: every raid choice), not the Solo Boss Mode form. */
+  full?: boolean;
   loading: boolean;
   error?: string | null;
   /** An invite link's code: the join form opens with it. */
@@ -536,9 +540,11 @@ export function HomeScreen({
   onSquads: () => void;
   /** Squads' party: make one, or join by code. */
   onParty: () => void;
-  /** Open (true) or close the Boss raid screen. */
+  /** Open (true) or close the Solo Boss Mode screen. */
   onRaid: (open: boolean) => void;
-  /** Auto chess's card under the Boss raid card: the screen, as /autochess opens it. */
+  /** Boss Arena's card: the town square, as /town opens it. */
+  onBossArena: () => void;
+  /** Auto chess's card under the Boss Arena and Solo Boss Mode cards: the screen, as /autochess opens it. */
   onAutoChess: () => void;
   onProfile: () => void;
   /** The phone's gear in the top bar: Settings, as Profile → Settings opens it. */
@@ -761,9 +767,11 @@ export function HomeScreen({
       </div>
     );
   if (raid) {
-    // The Boss raid screen: every way to play a raid, each through its flow from before (Eric, Oct 16: "from there you
-    // can pick if you want to solo against bosses or play with bots or queue with other players").
-    const raidResting = rest("raid");
+    // The Boss raid screen (?mode=raid, the test link): every way to play a raid, each through its flow from before (Eric,
+    // Oct 16: "from there you can pick if you want to solo against bosses or play with bots or queue with other players").
+    // Solo Boss Mode (Eric, Oct 26) is the same screen without the raid choices: the tiles, the stage, Boss alone. Raids
+    // move to the Boss Arena's Coliseum, so they're left off this form (`full` tells the two apart).
+    const raidResting = full ? rest("raid") : null;
     const online = (sub: string) => (onlineLocked ? "Online: sign in to play" : sub);
     // (The Hidden Boss picked: every way to play locked.)
     const locked = hiddenPicked;
@@ -771,7 +779,7 @@ export function HomeScreen({
       <div class="fd-page rd-page">
         <header class="fd-page-head">
           <BackButton onClick={() => onRaid(false)} />
-          <h1>Boss raid</h1>
+          <h1>{full ? "Boss raid" : "Solo Boss Mode"}</h1>
           <span class="fd-head-spacer" />
         </header>
         {/* (Why you're here: a match that closed while this screen was where you'd come back to, as on home.) */}
@@ -780,25 +788,29 @@ export function HomeScreen({
         <BossSelect value={pick} difficulty={difficulty} onPick={pickTile} />
         <div class="rd-options">
           {/* (The public queues share their lobby: always a random boss.) */}
-          <RaidOption
-            label="Join a raid"
-            sub={online(`Random boss · up to ${RAID_SIZE} players · bots after ${fill} s`)}
-            disabled={loading || !!raidResting}
-            locked={locked}
-            onClick={() => (onlineLocked ? onSignIn() : onPlay("raid", "default"))}
-          />
-          <RaidOption
-            label="People only"
-            sub={online(`Random boss · no bots · starts at ${RAID_SIZE}, or ${MATCHMAKING.raidBotsOffMinPlayers} after ${fill} s`)}
-            disabled={loading || !!raidResting}
-            locked={locked}
-            onClick={() => (onlineLocked ? onSignIn() : onPlay("raid", "botsoff"))}
-          />
-          <RaidOption label="Raid with bots" sub={`You and ${RAID_SIZE - 1} bots · starts at once`} disabled={loading || !!soloResting} locked={locked} onClick={() => onSolo("raid", { fill: true })} />
+          {full && (
+            <RaidOption
+              label="Join a raid"
+              sub={online(`Random boss · up to ${RAID_SIZE} players · bots after ${fill} s`)}
+              disabled={loading || !!raidResting}
+              locked={locked}
+              onClick={() => (onlineLocked ? onSignIn() : onPlay("raid", "default"))}
+            />
+          )}
+          {full && (
+            <RaidOption
+              label="People only"
+              sub={online(`Random boss · no bots · starts at ${RAID_SIZE}, or ${MATCHMAKING.raidBotsOffMinPlayers} after ${fill} s`)}
+              disabled={loading || !!raidResting}
+              locked={locked}
+              onClick={() => (onlineLocked ? onSignIn() : onPlay("raid", "botsoff"))}
+            />
+          )}
+          {full && <RaidOption label="Raid with bots" sub={`You and ${RAID_SIZE - 1} bots · starts at once`} disabled={loading || !!soloResting} locked={locked} onClick={() => onSolo("raid", { fill: true })} />}
           <RaidOption label="Boss alone" sub={pick === RANDOM ? "Just you vs a random boss" : "Just you vs this boss"} disabled={loading || !!soloResting} locked={locked} onClick={bossAlone} />
-          <RaidOption label="Play with friends" sub="Make a raid and share its code, or join one" locked={locked} onClick={() => setFriends(true)} />
+          {full && <RaidOption label="Play with friends" sub="Make a raid and share its code, or join one" locked={locked} onClick={() => setFriends(true)} />}
         </div>
-        <p class="fd-sub rd-about">{`Up to ${RAID_SIZE} of you pick the crowd's moves together against a boss. The most popular pick is played.`}</p>
+        {full && <p class="fd-sub rd-about">{`Up to ${RAID_SIZE} of you pick the crowd's moves together against a boss. The most popular pick is played.`}</p>}
         {raidResting && <p class="fd-rest">{raidResting}</p>}
         {soloResting && soloResting !== raidResting && <p class="fd-rest">{soloResting}</p>}
         {loading && <p class="fd-hint">Loading the engine…</p>}
@@ -918,15 +930,32 @@ export function HomeScreen({
       {error && <p class="fd-error">{error}</p>}
     </div>
   );
-  // The Boss raid card (Eric, Oct 16: "I don't want it to just be brushed off to the side"): its screen.
-  const bossCard = (
-    <button type="button" class="rd-card" onClick={() => onRaid(true)}>
+  // Boss Arena's card (Eric, Oct 26: Boss raid becomes Boss Arena, the town square): the rotating boss faces, its tap the
+  // town square (/town). It replaces the Boss raid card (Eric, Oct 16: "I don't want it to just be brushed off to the side").
+  const bossArenaCard = (
+    <button type="button" class="rd-card" onClick={onBossArena}>
       <span class="rd-face" aria-hidden="true">
         <BossCardFace everyMs={cardEveryMs()} fadeMs={FRONT_DOOR.bossCardFadeMs} />
       </span>
       <span class="rd-card-text">
-        <strong>Boss raid</strong>
-        <span>{`Team up vs a boss · up to ${RAID_SIZE}`}</span>
+        <strong>Boss Arena</strong>
+        <span>Party up with friends and take on the bosses</span>
+      </span>
+      <span class="rd-card-go" aria-hidden="true">
+        ›
+      </span>
+    </button>
+  );
+  // Solo Boss Mode's card (Eric, Oct 26): the crown from the side menu's Boss raid item, drawn large, its tap the solo
+  // screen (Boss alone's form of the Boss raid screen). A placeholder picture until one is drawn.
+  const soloCard = (
+    <button type="button" class="rd-card" onClick={() => onRaid(true)}>
+      <span class="rd-face" aria-hidden="true">
+        <CrownArt />
+      </span>
+      <span class="rd-card-text">
+        <strong>Solo Boss Mode</strong>
+        <span>Take on any boss alone</span>
       </span>
       <span class="rd-card-go" aria-hidden="true">
         ›
@@ -988,8 +1017,8 @@ export function HomeScreen({
         {hero}
         <div class="fd-play-col">
           {/*
-           * The same order on a phone and a computer: the RANKED row, its panel, PLAY and its line, then the Boss raid card
-           * (full width) at the bottom (Eric, Oct 19: "chess focused at the heart"; until then the card was on top). A
+           * The same order on a phone and a computer: the RANKED row, its panel, PLAY and its line, then the Other modes cards
+           * (Boss Arena, Solo Boss Mode, Auto chess; full width) at the bottom (Eric, Oct 19: "chess focused at the heart"; until then the card was on top). A
            * computer has the live window above (from 1280 px). Every box keeps its size whatever is picked, so nothing
            * moves on a click.
            */}
@@ -998,12 +1027,25 @@ export function HomeScreen({
           {panel}
           {go}
           <h2 class="fd-label fd-other-label">Other modes</h2>
-          {bossCard}
+          {bossArenaCard}
+          {soloCard}
           {autoCard}
         </div>
       </div>
       {overlays}
     </div>
+  );
+}
+
+/**
+ * Solo Boss Mode's card picture: the crown from the side menu's Boss raid item (FrontMenu.tsx), drawn large in the card's
+ * gold (`.fd-crown`). A placeholder until Opus draws one (Eric, Oct 26).
+ */
+function CrownArt() {
+  return (
+    <svg class="fd-crown" viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+      <path d="M5 20h14M6 20l-1.5-11 4.5 3.5L12 5l3 7.5L19.5 9 18 20" />
+    </svg>
   );
 }
 

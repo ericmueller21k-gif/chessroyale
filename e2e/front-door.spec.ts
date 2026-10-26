@@ -45,7 +45,7 @@ test("home: the live line comes from the server, the RANKED row changes the line
   // (No buttons under PLAY: the shop, your profile and Play with friends are in a phone's top bar and a computer's side
   // menu, Eric, Oct 18.)
   await expect(page.getByRole("main").getByRole("button", { name: "Play with friends", exact: true })).toHaveCount(0);
-  expect((await page.getByRole("main").getByRole("button", { name: /^Boss raid/ }).boundingBox())!.height).toBeGreaterThanOrEqual(64);
+  expect((await page.getByRole("main").getByRole("button", { name: /^Boss Arena/ }).boundingBox())!.height).toBeGreaterThanOrEqual(64);
 });
 
 test("home: Play with friends offers lobbies (practice is Solo, on the home screen)", async ({ page }) => {
@@ -166,10 +166,10 @@ test("computer: a side menu, the center and a live panel; the phone keeps one co
   await expect(menu.getByRole("button", { name: "Settings" })).toHaveAttribute("aria-current", "page");
   await menu.getByRole("button", { name: "Profile" }).click();
   await expect(page.locator(".fd-card")).toBeVisible();
-  // Boss raid: its screen, the menu showing where you are; Play is home again.
-  await menu.getByRole("button", { name: "Boss raid" }).click();
-  await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
-  await expect(menu.getByRole("button", { name: "Boss raid" })).toHaveAttribute("aria-current", "page");
+  // Solo Boss Mode (was Boss raid, Oct 26): its screen, the menu showing where you are; Play is home again.
+  await menu.getByRole("button", { name: "Solo Boss Mode" }).click();
+  await expect(page.getByRole("heading", { name: "Solo Boss Mode", exact: true })).toBeVisible();
+  await expect(menu.getByRole("button", { name: "Solo Boss Mode" })).toHaveAttribute("aria-current", "page");
   await expect(menu.getByRole("button", { name: "Boss alone" })).toHaveCount(0);
   await menu.getByRole("button", { name: "Play", exact: true }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();

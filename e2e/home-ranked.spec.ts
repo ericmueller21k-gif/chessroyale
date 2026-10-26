@@ -12,7 +12,7 @@ const run = Date.now().toString(36).slice(-5);
 const sideways = (p: Page) => p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 const box = async (p: Page, sel: string) => (await p.locator(sel).first().boundingBox())!;
 
-test("the RANKED row: a label over 50 v 50, 1 v 1 and Squads, three equal buttons whole at every width; PLAY under it, then Other modes with the Boss raid card, full width (a phone and a computer alike)", async ({ page }) => {
+test("the RANKED row: a label over 50 v 50, 1 v 1 and Squads, three equal buttons whole at every width; PLAY under it, then Other modes with the Boss Arena card, full width (a phone and a computer alike)", async ({ page }) => {
   await named(page, "Ranked");
   const widths = desktop() ? [[1280, 800], [1024, 768]] : [[320, 640], [360, 740], [390, 844]];
   for (const [w, h] of widths) {
@@ -23,8 +23,8 @@ test("the RANKED row: a label over 50 v 50, 1 v 1 and Squads, three equal button
     // Every text, exactly.
     await expect(page.locator(".fd-ranked .fd-label")).toHaveText("RANKED");
     await expect(row.getByRole("radio")).toHaveText(["50 v 50Crowd chess", "1 v 1Classic chess", "Squads8 squads of 4"]);
-    const card = page.getByRole("main").getByRole("button", { name: /^Boss raid/ });
-    await expect(card).toHaveText(/^Boss raidTeam up vs a boss · up to 50›$/);
+    const card = page.getByRole("main").getByRole("button", { name: /^Boss Arena/ });
+    await expect(card).toHaveText(/^Boss ArenaParty up with friends and take on the bosses›$/);
     // The label sits right above the row; the three buttons are the same size, side by side, their words whole.
     const label = await box(page, ".fd-ranked .fd-label");
     const r = (await row.boundingBox())!;
@@ -119,8 +119,9 @@ test("1 v 1's rank line at its widest (an apex rank with four-digit points) stay
   }
 });
 
-test("the Boss raid card opens its screen; each choice reaches its flow (a raid's queue, people only, a Solo raid, Boss alone's menu, a raid with friends); Back is home", async ({ page }) => {
-  // (Its character select, the tiles and the stage: boss-select.spec.ts.)
+test("the Boss raid screen (?mode=raid, every choice): each choice reaches its flow (a raid's queue, people only, a Solo raid, Boss alone's menu, a raid with friends); Back is home", async ({ page }) => {
+  // (Its character select, the tiles and the stage: boss-select.spec.ts. Home's Solo Boss Mode card opens the solo form:
+  // home-layout.spec.ts.)
   test.setTimeout(2 * 60_000);
   await named(page, "Raider");
   const home = `/?debug&pool=raidscreen-${test.info().project.name}-${run}`;
@@ -191,12 +192,12 @@ test("the hidden /bosses opens the solo boss picker straight away (a player too)
   expect(new URL(page.url()).search).toBe("");
 });
 
-test("Other modes under PLAY: the label, then the Boss raid card, then Auto chess (a knight's picture, the card's look); Auto chess opens /autochess, and its back button is home", async ({ page }) => {
+test("Other modes under PLAY: the label, then the Boss Arena card (and Solo Boss Mode), then Auto chess (a knight's picture, the card's look); Auto chess opens /autochess, and its back button is home", async ({ page }) => {
   await named(page, "Knight");
   await page.goto("/");
   const main = page.getByRole("main");
   const label = main.getByRole("heading", { name: "Other modes", exact: true });
-  const boss = main.getByRole("button", { name: /^Boss raid/ });
+  const boss = main.getByRole("button", { name: /^Boss Arena/ });
   const auto = main.getByRole("button", { name: /^Auto chess/ });
   await expect(label).toBeVisible();
   await expect(auto).toHaveText(/^Auto chessBuild an army, watch it fight›$/);
@@ -207,7 +208,7 @@ test("Other modes under PLAY: the label, then the Boss raid card, then Auto ches
   expect(l.y).toBeGreaterThanOrEqual(play.y + play.height);
   expect(b.y).toBeGreaterThanOrEqual(l.y + l.height);
   expect(a.y).toBeGreaterThanOrEqual(b.y + b.height);
-  expect(Math.abs(a.width - b.width) + Math.abs(a.height - b.height), "the same size as the Boss raid card").toBeLessThan(2);
+  expect(Math.abs(a.width - b.width) + Math.abs(a.height - b.height), "the same size as the Boss Arena card").toBeLessThan(2);
   await auto.click();
   await expect(page.locator(".ac-title strong")).toHaveText("Auto chess");
   expect(new URL(page.url()).pathname).toBe("/autochess");

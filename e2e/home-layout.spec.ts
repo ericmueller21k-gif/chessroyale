@@ -83,7 +83,7 @@ test("light or dark lives in Settings (Match device / Light / Dark), not on home
   expect(await sideways(page)).toBe(0);
 });
 
-test("computer: the play column in the phone's order (the RANKED row, its panel, PLAY, Other modes with the Boss raid card and Auto chess at the bottom); the panel greyed (none selected, not tappable) and PLAY dimmed until a mode is picked; no Shop, Profile or Play with friends buttons", async ({ page }) => {
+test("computer: the play column in the phone's order (the RANKED row, its panel, PLAY, Other modes with the Boss Arena card and Auto chess at the bottom); the panel greyed (none selected, not tappable) and PLAY dimmed until a mode is picked; no Shop, Profile or Play with friends buttons", async ({ page }) => {
   test.skip(!desktop(), "the computer's layout");
   await named(page, "Columned");
   const main = page.getByRole("main");
@@ -113,9 +113,9 @@ test("computer: the play column in the phone's order (the RANKED row, its panel,
     await expect(menu.getByRole("button", { name: "Profile" })).toBeVisible();
     await expect(menu.getByRole("button", { name: "Play with friends" })).toBeVisible();
     // Top to bottom, as on a phone (Eric, Oct 19: chess first): the RANKED row, its panel (matchmaking), PLAY and its
-    // line, then "Other modes" (Oct 24), the Boss raid card and Auto chess (full width) at the bottom.
+    // line, then "Other modes" (Oct 24), the Boss Arena card, Solo Boss Mode and Auto chess (full width) at the bottom.
     const box = async (l: import("@playwright/test").Locator) => (await l.boundingBox())!;
-    const boss = await box(main.getByRole("button", { name: /^Boss raid/ }));
+    const boss = await box(main.getByRole("button", { name: /^Boss Arena/ }));
     const auto = await box(main.getByRole("button", { name: /^Auto chess/ }));
     const other = await box(main.getByRole("heading", { name: "Other modes", exact: true }));
     const modes = await box(main.getByRole("radiogroup", { name: "RANKED" }));
@@ -129,8 +129,8 @@ test("computer: the play column in the phone's order (the RANKED row, its panel,
     expect(p.y - (types.y + types.height)).toBeLessThan(30);
     expect(hint.y).toBeGreaterThanOrEqual(p.y + p.height);
     expect(other.y, `${w}: Other modes below PLAY's line`).toBeGreaterThanOrEqual(hint.y + hint.height);
-    expect(boss.y, `${w}: the Boss raid card under Other modes`).toBeGreaterThanOrEqual(other.y + other.height);
-    expect(auto.y, `${w}: Auto chess under the Boss raid card`).toBeGreaterThanOrEqual(boss.y + boss.height);
+    expect(boss.y, `${w}: the Boss Arena card under Other modes`).toBeGreaterThanOrEqual(other.y + other.height);
+    expect(auto.y, `${w}: Auto chess under the Boss Arena card`).toBeGreaterThanOrEqual(boss.y + boss.height);
     expect(Math.abs(auto.width - boss.width), `${w}: the same width`).toBeLessThan(2);
     await expect(page.locator(".fd-hint")).toHaveText(/Starts within|Usually about|Solo vs/);
     if (w >= 1280) {
@@ -376,7 +376,7 @@ test("phone: the queue takes the whole screen; the count, the grid and Cancel ar
   expect(await sideways(page)).toBe(0);
 });
 
-test("phone: home fits the screen with no scrolling from 360×640 up, in every mode, the Boss raid and Auto chess cards at the bottom under PLAY; the shop, your profile and Friends are in the top bar", async ({ page }) => {
+test("phone: home fits the screen with no scrolling from 360×640 up, in every mode, the Boss Arena, Solo Boss Mode and Auto chess cards at the bottom under PLAY; the shop, your profile and Friends are in the top bar", async ({ page }) => {
   test.skip(desktop(), "a phone's screen (Eric, Oct 18: \"should never have to be scrolling down on the phone\")");
   await named(page, LONG_NAME);
   for (const [width, height] of [[360, 640], [375, 667], [390, 664], [390, 844], [430, 932]] as const) {
@@ -490,5 +490,53 @@ test("computer at a laptop's window (1280×600, 1366×768): no gear on home (Set
     const p = (await play.boundingBox())!;
     expect(p.y + p.height, `${w}×${h}`).toBeLessThanOrEqual(h);
     expect(await sideways(page), `${w}×${h}`).toBe(0);
+  }
+});
+
+test("Other modes: three equal cards in order (Boss Arena, Solo Boss Mode, Auto chess); Boss Arena opens the town square and Back is home; Solo Boss Mode opens its screen with one option, Boss alone; ?mode=raid opens the full Boss raid screen with all five (Eric, Oct 26)", async ({ page }) => {
+  await named(page, "Arena");
+  await page.goto("/");
+  const main = page.getByRole("main");
+  const cards = main.locator(".rd-card");
+  await expect(cards).toHaveCount(3);
+  await expect(cards.nth(0)).toHaveText(/^Boss ArenaParty up with friends and take on the bosses›$/);
+  await expect(cards.nth(1)).toHaveText(/^Solo Boss ModeTake on any boss alone›$/);
+  await expect(cards.nth(2)).toHaveText(/^Auto chessBuild an army, watch it fight›$/);
+  // One under the other, all the same size: the card's look and size, nothing shifts.
+  const sizes: { y: number; width: number; height: number }[] = [];
+  for (let i = 0; i < 3; i++) sizes.push((await cards.nth(i).boundingBox())!);
+  for (let i = 1; i < 3; i++) {
+    expect(sizes[i]!.y, `card ${i + 1} under card ${i}`).toBeGreaterThanOrEqual(sizes[i - 1]!.y + sizes[i - 1]!.height);
+    expect(Math.abs(sizes[i]!.width - sizes[0]!.width), `card ${i + 1}: the same width`).toBeLessThan(1);
+    expect(Math.abs(sizes[i]!.height - sizes[0]!.height), `card ${i + 1}: the same height`).toBeLessThan(1);
+  }
+  // Boss Arena: the town square (/town), drawn; Back is home.
+  await cards.nth(0).click();
+  await expect(page.locator("canvas.town-canvas")).toHaveAttribute("data-ready", "1");
+  expect(new URL(page.url()).pathname).toBe("/town");
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+  expect(new URL(page.url()).pathname).toBe("/");
+  // Solo Boss Mode: its screen, titled so, with exactly one option: Boss alone. Back is home.
+  await cards.nth(1).click();
+  await expect(page.getByRole("heading", { name: "Solo Boss Mode", exact: true })).toBeVisible();
+  await expect(main.locator(".rd-option")).toHaveCount(1);
+  await expect(main.locator(".rd-option")).toHaveText(/^Boss alone/);
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(page.getByRole("radiogroup", { name: "RANKED" })).toBeVisible();
+  // ?mode=raid (the test link): the full Boss raid screen, all five choices.
+  await page.goto("/?mode=raid");
+  await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
+  await expect(main.locator(".rd-option")).toHaveCount(5);
+  // A computer's side menu: Solo Boss Mode opens its screen (highlighted there), Boss Arena the town square.
+  if (desktop()) {
+    await page.goto("/");
+    const menu = page.getByRole("navigation", { name: "Menu" });
+    await menu.getByRole("button", { name: "Solo Boss Mode" }).click();
+    await expect(page.getByRole("heading", { name: "Solo Boss Mode", exact: true })).toBeVisible();
+    await expect(menu.getByRole("button", { name: "Solo Boss Mode" })).toHaveAttribute("aria-current", "page");
+    await menu.getByRole("button", { name: "Boss Arena" }).click();
+    await expect(page.locator("canvas.town-canvas")).toHaveAttribute("data-ready", "1");
+    expect(new URL(page.url()).pathname).toBe("/town");
   }
 });
