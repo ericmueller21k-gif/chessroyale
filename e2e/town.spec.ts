@@ -6,9 +6,11 @@ import { test } from "./helpers.ts";
  * drawn (not blank), a tap a few rows ahead walks you toward it, the zoom pair works (it opens zoomed out), back goes
  * home, and `?sky=` picks the sky's look whatever the clock says.
  * Slice 4: a boss's card ("Challenge alone", its confirm, Leave to the Boss raid screen with that boss's tile picked)
- * and a home's (its shop greyed, "Coming soon").
+ * and a home's (its shop greyed, "Coming soon"). Slice 5: the Coliseum's (a tap on its gate walks you to the apron in
+ * front of it; "Raids with people" greyed, "Coming soon").
  * Test hooks: the canvas carries `data-you="c,r"` (your square) and `data-ready="1"` once its first frame is drawn;
- * `window.__townAt("boss" | "home", id)` says where to tap a boss or a home (with the test switches on, as here).
+ * `window.__townAt("boss" | "home" | "coliseum", id)` says where to tap a boss, a home or the Coliseum's gate (with the
+ * test switches on, as here).
  */
 test.use({ actionTimeout: 15_000 });
 
@@ -179,6 +181,29 @@ test("a home's card: its name, 'Shop' greyed (shown, not tappable) and 'Coming s
   await expect(card.getByText("Coming soon", { exact: true })).toBeVisible();
   // A tap on the world elsewhere (low in the middle) closes it.
   const cv = (await canvas(page).boundingBox())!;
+  await page.mouse.click(cv.x + cv.width * 0.3, cv.y + cv.height * 0.85);
+  await expect(card).toBeHidden();
+  expect(errors).toEqual([]);
+});
+
+test("the Coliseum: a tap on its gate walks you to the apron in front of it and opens its card ('Raids with people' greyed, 'Coming soon'); a tap elsewhere closes it", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/town");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  // It stands just ahead of your start, in view from the first frame on a phone and a computer.
+  const at = await page.evaluate(() => (window as unknown as { __townAt?: (k: string) => { x: number; y: number } | null }).__townAt?.("coliseum") ?? null);
+  expect(at, "the Coliseum is drawn at the start").not.toBeNull();
+  const cv = (await canvas(page).boundingBox())!;
+  await page.mouse.click(cv.x + at!.x, cv.y + at!.y);
+  const card = page.getByRole("dialog", { name: "The Coliseum", exact: true });
+  await expect(card.getByRole("heading", { name: "The Coliseum" })).toBeVisible();
+  const raids = card.getByRole("button", { name: "Raids with people" });
+  await expect(raids).toBeVisible();
+  await expect(raids).toBeDisabled();
+  await expect(card.getByText("Coming soon", { exact: true })).toBeVisible();
+  // You end on the apron at the gate: the row just in front of its ground (row 15), one of its two middle columns.
+  await expect.poll(async () => (await you(page)).join(","), { message: "you walk to the gate", timeout: 5000 }).toMatch(/^(19|20),15$/);
+  // A tap on the world elsewhere (low on the left) closes it.
   await page.mouse.click(cv.x + cv.width * 0.3, cv.y + cv.height * 0.85);
   await expect(card).toBeHidden();
   expect(errors).toEqual([]);

@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { N, wrapF, wrapI } from "../src/town/camera.ts";
 import { TOWN_FEEL } from "../src/town/feel.ts";
-import { COLISEUM, Walker, createTown, destFor, taken, tick, walkWalker, walkable, type Sq, type Town } from "../src/town/world.ts";
+import { APRON, COLISEUM, Walker, createTown, destFor, findPath, onColiseum, taken, tick, walkWalker, walkable, type Sq, type Town } from "../src/town/world.ts";
 
 /** One pawn a square (src/town/world.ts): where a walk ends, and rings of people round someone. */
 
 const king = (a: Sq, b: Sq) => Math.max(Math.abs(wrapF(a.c - b.c)), Math.abs(wrapF(a.r - b.r)));
-/** The Coliseum's middle: open ground, no homes near. */
-const SPOT: Sq = { c: COLISEUM.c0 + 3, r: COLISEUM.r0 + 3 };
+/** Open ground south of the plaza: no homes, bosses or bots within two squares. (The Coliseum's middle until slice 5 built it.) */
+const SPOT: Sq = { c: 24, r: 2 };
 
 /** A town with nobody wandering off on their own (the bots stay put; the bosses are far from the middle). */
 function still(): Town {
@@ -113,5 +113,41 @@ describe("town square: one pawn a square", () => {
     expect(ends.slice(0, 8).every((s) => king(s, SPOT) === 1)).toBe(true);
     expect(ends.slice(8).every((s) => king(s, SPOT) === 2)).toBe(true);
     expect(new Set(ends.map((s) => `${s.c},${s.r}`)).size).toBe(10);
+  });
+});
+
+describe("town square: the Coliseum", () => {
+  const front = (s: Sq) => s.r === COLISEUM.r0 - 1 && (s.c === COLISEUM.c0 + 2 || s.c === COLISEUM.c0 + 3);
+
+  it("its 6 x 6 ground is solid, and a walk goes round it", () => {
+    for (let r = COLISEUM.r0; r < COLISEUM.r0 + COLISEUM.size; r++) for (let c = COLISEUM.c0; c < COLISEUM.c0 + COLISEUM.size; c++) expect(walkable(c, r)).toBe(false);
+    expect(walkable(COLISEUM.c0 - 1, COLISEUM.r0)).toBe(true);
+    // From the apron to the square behind its middle: round it, never across it.
+    const from = { c: COLISEUM.c0 + 2, r: COLISEUM.r0 - 1 };
+    const goal = { c: COLISEUM.c0 + 2, r: COLISEUM.r0 + COLISEUM.size };
+    const path = findPath(from, (c, r) => c === goal.c && r === goal.r, walkable)!;
+    expect(path.at(-1)).toEqual(goal);
+    for (const s of path) expect(onColiseum(s.c, s.r)).toBe(false);
+  });
+
+  it("the apron in front of its gate is open ground, nearest the gate first", () => {
+    for (const s of APRON) expect(walkable(s.c, s.r)).toBe(true);
+    expect(front(APRON[0]!) && front(APRON[1]!)).toBe(true);
+  });
+
+  it("a tap on it (or its ground) walks you to the apron, at the gate; people tapping it gather there, a square each", () => {
+    const t = still();
+    const to = destFor(t, t.you.walker, { kind: "coliseum" })!;
+    expect(front(to)).toBe(true);
+    expect(destFor(t, t.you.walker, { kind: "square", c: COLISEUM.c0 + 3, r: COLISEUM.r0 + 4 })).toEqual(to);
+    // Everyone sent there: the first two at the gate, the rest round them on the apron, nobody on anyone's square.
+    for (const p of t.people) {
+      const s = destFor(t, p.walker, { kind: "coliseum" })!;
+      expect(APRON.some((a) => a.c === s.c && a.r === s.r)).toBe(true);
+      walkWalker(p.walker, s);
+    }
+    settle(t);
+    apart(t);
+    expect(t.people.filter((p) => front(p.walker.here()))).toHaveLength(2);
   });
 });

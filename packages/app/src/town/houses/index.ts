@@ -1,6 +1,7 @@
 /** Each boss's home: its picture (drawn like the bosses, characters/sprite.ts) and where its sign's blank face is. */
 import type { Character } from "../../characters/sprite.ts";
-import type { HomeId } from "../world.ts";
+import type { HomeId, Place } from "../world.ts";
+import { COLISEUM_CHIP, HOUSE_COLISEUM, HOUSE_COLISEUM_SIGN } from "./coliseum.ts";
 import { HOUSE_GINGER, HOUSE_GINGER_SIGN } from "./gingerbread.ts";
 import { HOUSE_GREX, HOUSE_GREX_SIGN } from "./grex.ts";
 import { HOUSE_HOLLOW, HOUSE_HOLLOW_SIGN } from "./hollow.ts";
@@ -36,3 +37,10 @@ export const HOUSES: Record<HomeId, HouseArt> = {
   gardener: { ch: HOUSE_GARDENER, sign: HOUSE_GARDENER_SIGN },
   alfil: { ch: HOUSE_ALFIL, sign: HOUSE_ALFIL_SIGN },
 };
+
+/** The Coliseum's picture (slice 5), and the icon on its edge chip (a crown over the board's squares, 24 x 24). */
+export const COLISEUM_ART: HouseArt = { ch: HOUSE_COLISEUM, sign: HOUSE_COLISEUM_SIGN };
+export { COLISEUM_CHIP };
+
+/** A place's picture: its home's, or the Coliseum's. */
+export const artOf = (p: Place): HouseArt => (p.id === "coliseum" ? COLISEUM_ART : HOUSES[p.id]);

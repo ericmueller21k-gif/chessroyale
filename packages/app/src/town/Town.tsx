@@ -6,10 +6,13 @@
  * the chips at the edge point to the homes off screen, and a tap glides the camera there. Slice 4: a finger presses the
  * square you'd walk to like a button (press.ts), one pawn a square (world.ts), your trail, and the cards: a boss's
  * ("Challenge alone", which leaves for the Boss raid screen, its tile picked, after a confirm) and a home's (its shop, greyed, "Coming soon").
+ * Slice 5: the Coliseum in the middle (solid; a tap walks you to the apron at its gate and opens its card: "Raids with
+ * people", greyed, "Coming soon": the menu Eric plans will live there), with an edge chip of its own.
  *
  * One requestAnimationFrame loop draws everything on one canvas; it stops when the screen closes or the tab is hidden.
  * Test hooks (e2e only): the canvas carries `data-you="c,r"` (your square) and `data-ready="1"` once a frame is drawn;
- * with the test switches on, `window.__townAt("boss" | "home", id)` gives where to tap a boss or a home now, and
+ * with the test switches on, `window.__townAt("boss" | "home" | "coliseum", id)` gives where to tap a boss, a home or the
+ * Coliseum (its gate) now, and
  * `window.__townGather()` sends the three nearest bots to stand beside you.
  * docs/areas/town-square.md.
  */
@@ -21,14 +24,17 @@ import { TOWN_FEEL } from "./feel.ts";
 import { Press } from "./press.ts";
 import { BOSS_FACE, Renderer, type Hit } from "./render.ts";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
-import { HOMES, START, createTown, destFor, plotAt, tdist, tick, walkWalker, type Home, type HomeId, type Sq, type Target } from "./world.ts";
+import { COLISEUM_PLACE, HOMES, START, createTown, destFor, onColiseum, plotAt, tdist, tick, walkWalker, type HomeId, type Place, type Sq, type Target } from "./world.ts";
 import "./town.css";
 
 const CHIPS = TOWN_FEEL.maxChips;
 
-/** The card open over a boss or a home (`i`: its index in HOMES; the bosses are in the same order), and its confirm. */
+/**
+ * The card open over a boss, a home or the Coliseum (`i`: its index in HOMES, the bosses being in the same order; the
+ * Coliseum's is HOMES.length), and its confirm.
+ */
 export interface Card {
-  kind: "boss" | "home";
+  kind: "boss" | "home" | "coliseum";
   i: number;
   confirm: boolean;
 }
@@ -50,7 +56,8 @@ export function TownScreen({ onBack, onBossAlone }: { onBack: () => void; onBoss
     ctl.current = t;
     return t.stop;
   }, []);
-  const home = card ? HOMES[card.i]! : null;
+  const home = card && card.kind !== "coliseum" ? HOMES[card.i]! : null;
+  const label = card?.kind === "coliseum" ? COLISEUM_PLACE.name : home ? (card!.confirm ? "Leave the town square?" : card!.kind === "boss" ? home.boss : home.name) : undefined;
 
   return (
     <div class="town-screen">
@@ -64,7 +71,7 @@ export function TownScreen({ onBack, onBossAlone }: { onBack: () => void; onBoss
         <canvas class="town-canvas" ref={canvas} aria-label="The town square" />
         <div class="town-overlay">
           {/* The card: over the boss's head or the home's top, its tail pointing there (placed every frame). */}
-          <div class="town-card" ref={cardEl} role="dialog" aria-label={home ? (card!.confirm ? "Leave the town square?" : card!.kind === "boss" ? home.boss : home.name) : undefined} style={{ display: card ? "" : "none" }}>
+          <div class="town-card" ref={cardEl} role="dialog" aria-label={label} style={{ display: card ? "" : "none" }}>
             {card && home && card.confirm && (
               <>
                 <h2>Leave the town square?</h2>
@@ -90,6 +97,16 @@ export function TownScreen({ onBack, onBossAlone }: { onBack: () => void; onBoss
                 <h2>{home.name}</h2>
                 <button type="button" class="town-btn" disabled>
                   Shop
+                </button>
+                <div class="town-soon">Coming soon</div>
+              </>
+            )}
+            {/* The Coliseum's: raids with people start here (Eric's menu for them comes later); shown greyed, not hidden. */}
+            {card?.kind === "coliseum" && (
+              <>
+                <h2>{COLISEUM_PLACE.name}</h2>
+                <button type="button" class="town-btn" disabled>
+                  Raids with people
                 </button>
                 <div class="town-soon">Coming soon</div>
               </>
@@ -159,7 +176,7 @@ function startTown(box: HTMLDivElement, cv: HTMLCanvasElement, chipEls: (HTMLDiv
   let card: Card | null = null;
   let cardW = NaN;
   let cardH = NaN;
-  const chipHome: (Home | null)[] = chipEls.map(() => null);
+  const chipPlace: (Place | null)[] = chipEls.map(() => null);
   const chipXY = chipEls.map(() => ({ x: NaN, y: NaN, a: NaN }));
 
   /** Sizes the canvas to its box; true if it changed. (Setting a canvas's size clears it, even to the same size.) */
@@ -259,19 +276,20 @@ function startTown(box: HTMLDivElement, cv: HTMLCanvasElement, chipEls: (HTMLDiv
       const el = chipEls[i];
       if (!el) continue;
       const c = r.chips[i]!;
-      if (c.home !== chipHome[i]) {
-        chipHome[i] = c.home;
-        el.style.display = c.home ? "" : "none";
-        if (!c.home) el.querySelector("button")!.removeAttribute("aria-label");
+      if (c.place !== chipPlace[i]) {
+        chipPlace[i] = c.place;
+        el.style.display = c.place ? "" : "none";
+        if (!c.place) el.querySelector("button")!.removeAttribute("aria-label");
         else {
-          el.style.setProperty("--town-chip", c.home.color);
+          el.style.setProperty("--town-chip", c.place.color);
           const face = el.querySelector("button")!;
-          face.setAttribute("aria-label", `Go to ${c.home.name}`);
-          drawFace(face.querySelector("canvas")!, r.bossFace(c.home.id), BOSS_FACE[c.home.id]);
+          face.setAttribute("aria-label", `Go to ${c.place.name}`);
+          const { img, box } = r.chipFace(c.place);
+          drawFace(face.querySelector("canvas")!, img, box);
           chipXY[i]!.x = chipXY[i]!.a = NaN; // (placed below: NaN is never "close enough")
         }
       }
-      if (!c.home) continue;
+      if (!c.place) continue;
       const xy = chipXY[i]!;
       if (!(Math.abs(xy.x - c.x) <= 0.3 && Math.abs(xy.y - c.y) <= 0.3)) {
         el.style.transform = `translate3d(${c.x.toFixed(1)}px, ${c.y.toFixed(1)}px, 0)`;
@@ -302,7 +320,7 @@ function startTown(box: HTMLDivElement, cv: HTMLCanvasElement, chipEls: (HTMLDiv
       cardW = cardEl.offsetWidth;
       cardH = cardEl.offsetHeight;
     }
-    if (!r.anchor(card.kind, card.i, A)) {
+    if (!r.anchor(card.kind === "boss" ? "boss" : "home", card.i, A)) {
       cardEl.style.visibility = "hidden";
       return;
     }
@@ -331,7 +349,12 @@ function startTown(box: HTMLDivElement, cv: HTMLCanvasElement, chipEls: (HTMLDiv
     let target: Target;
     let key: string;
     let c: Card | null = null;
-    if (hit.kind === "square") {
+    if (hit.kind === "coliseum" || (hit.kind === "square" && onColiseum(hit.c, hit.r))) {
+      // The Coliseum (its picture or its ground): to the apron at its gate, and its card.
+      key = "coliseum";
+      target = { kind: "coliseum" };
+      c = { kind: "coliseum", i: HOMES.length, confirm: false };
+    } else if (hit.kind === "square") {
       key = `sq:${hit.c},${hit.r}`;
       const home = plotAt[hit.r * N + hit.c];
       target = home ? { kind: "home", home } : { kind: "square", c: hit.c, r: hit.r };
@@ -419,10 +442,12 @@ function startTown(box: HTMLDivElement, cv: HTMLCanvasElement, chipEls: (HTMLDiv
     onZoom(out);
   }
 
-  // A test hook (e2e, with the test switches on: test-switches.ts): where to tap a boss or a home now, in the box.
-  const hookAt = (kind: "boss" | "home", id: HomeId) => {
+  // A test hook (e2e, with the test switches on: test-switches.ts): where to tap a boss, a home or the Coliseum (its gate)
+  // now, in the box.
+  const hookAt = (kind: "boss" | "home" | "coliseum", id?: HomeId) => {
     const out = { x: 0, y: 0 };
-    return testSwitchesAllowed() && r.tapPoint(kind, HOMES.findIndex((h) => h.id === id), out) ? out : null;
+    const i = kind === "coliseum" ? HOMES.length : HOMES.findIndex((h) => h.id === id);
+    return testSwitchesAllowed() && r.tapPoint(kind === "boss" ? "boss" : "home", i, out) ? out : null;
   };
   // ... and `__townGather()` sends the three bots nearest you to stand beside you (to see a ring form).
   const hookGather = () => {
@@ -450,11 +475,13 @@ function startTown(box: HTMLDivElement, cv: HTMLCanvasElement, chipEls: (HTMLDiv
     closeCard: () => setCard(null),
     confirm: () => card && setCard({ ...card, confirm: true }),
     chip: (i: number) => {
-      const h = chipHome[i];
+      const h = chipPlace[i];
       if (!h) return;
       if (card) setCard(null);
       follow = false;
-      glide = { x: camX + wrapF(h.cx - camX), y: camY + wrapF(h.cy - f.glideAhead - camY) };
+      // To a few squares in front of its picture's foot (a home's: half a square in front of its plot's middle).
+      const y = h.cy - h.foot + 0.5 - f.glideAhead;
+      glide = { x: camX + wrapF(h.cx - camX), y: camY + wrapF(y - camY) };
     },
     stop: () => {
       alive = false;
@@ -484,7 +511,7 @@ function rowSpan(r: Renderer): number {
   return proj(v, 0, -0.5, 0, PA) && proj(v, 0, 0.5, 0, PB) ? PA.y - PB.y : v.kf * 0.5;
 }
 
-/** A boss's face in its chip: its head (`box`, in its first idle frame's pixels) filling the round chip. */
+/** A chip's face: a boss's head (`box`, in its first idle frame's pixels), or the Coliseum's crown, filling the round chip. */
 function drawFace(c: HTMLCanvasElement, img: HTMLCanvasElement, box: readonly [x: number, y: number, size: number]) {
   const g = c.getContext("2d")!;
   g.clearRect(0, 0, c.width, c.height);
