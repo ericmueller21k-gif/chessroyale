@@ -424,9 +424,20 @@ the building art and the names, which are wrong) and `chatgpt-town-square-overvi
 - Being in the square doesn't queue you. A raid with people faces **3 bosses picked at random**, each harder than the last
   (maybe 4 later); beat one to face the next. The first should feel winnable. ("The gauntlet" was a working name only; the
   mode has no special name.)
-- Still to settle: how READY queues you, whether the square replaces today's pick-a-boss screen (Eric has ideas), how many
-  players share one square and whether bots wander in it, the shop, how the three bosses are ordered, what losing mid-way
-  means, scoring across bosses, whether the God King's charges carry over, time per boss, and the rewards.
+- **The Boss Arena** (Eric, Oct 25): a building in the middle of the town square, coliseum-like, where raids with people
+  start. Walk up to it (within a square) or tap it to open its menu. What the menu holds is still to brainstorm; Eric
+  thinks of something like the God King's strike menu.
+- **Then today's Boss raid screen becomes the arena's pre-fight screen.** Your team stands on the left, as in
+  `eric-paint-crowd.png`. The boss tiles shuffle, a highlight running across them, and three bosses are picked at random and
+  dropped onto the stage. A countdown starts the raid, and the screen may need a button or two.
+- **The bosses talk to each other.** The raid's three bosses are on a team, so they get lines for each other, and the
+  town square's bosses chat too: everyday lines, short conversations between pairs, nods to what they share or oppose
+  (fire and ice, dark and light), and silly questions. A line bank of 100+ lines per boss is being drafted with the Claude
+  API from a character sheet per boss and a relationship per pair. Eric reviews every line; only kept lines go in the
+  game, so nothing calls the API live.
+- Still to settle: the arena's menu and look, how many players share one square and whether bots wander in it, the shop,
+  how the three bosses are ordered, what losing mid-way means, scoring across bosses, whether the God King's charges carry
+  over, time per boss, and the rewards.
 
 **Art**
 - One building per boss, in the game's pixel style, drawn in code like the bosses. **Opus draws all art:** Haiku was tested
