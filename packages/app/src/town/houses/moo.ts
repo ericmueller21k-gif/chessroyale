@@ -190,9 +190,9 @@ const shadow = groundShadow(CX, FOOT - 2, 66, 4.5);
 
 // ---- The sign on the front fence: blank; the game writes "Moo & Moon Meadow" on it.
 
-const BOARD: Pt = [CX - 30, 91];
-const BW = 60;
-const BH = 20;
+const BOARD: Pt = [CX - 36, 89];
+const BW = 72;
+const BH = 24;
 const board = signBoard(BOARD[0], BOARD[1], BW, BH, "1234", "xXz", "a");
 
 // ---- Parts and frames.

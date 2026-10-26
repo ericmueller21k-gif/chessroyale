@@ -140,15 +140,15 @@ function candle(cx: number, top: number, foot: number) {
   });
 }
 const ROCKETS: readonly [number, number, string][] = [
-  [-35, -21, "RFF"],
-  [-26, -23, "Vvv"],
-  [-17, -20, "Ggg"],
-  [17, -22, "Eee"],
-  [26, -23, "RFF"],
-  [35, -20, "dCh"],
+  [-35, -18, "RFF"],
+  [-26, -20, "Vvv"],
+  [-17, -17, "Ggg"],
+  [17, -19, "Eee"],
+  [26, -20, "RFF"],
+  [35, -17, "dCh"],
 ];
 const rockets = ROCKETS.map(([X, top, ramp]) => rocket(CX + X, COUNTER + top, ramp, COUNTER));
-const candles = [-8, -3, 2, 7].map((X, i) => candle(CX + X, COUNTER - 19 + (i % 2) * 2, COUNTER));
+const candles = [-8, -3, 2, 7].map((X, i) => candle(CX + X, COUNTER - 16 + (i % 2) * 2, COUNTER));
 const candleBox = paint(CX - 11, COUNTER - 8, 22, 8, (x, y) => (y === COUNTER - 8 ? "4" : (x - CX + 11) % 7 === 0 ? "1" : "2"));
 
 // ---- The counter: a top plank over red and yellow stripes, a "boom" star painted in the middle.
@@ -213,7 +213,7 @@ const shadow = groundShadow(CX, FOOT - 1.5, 68, 4.5);
 
 const BOARD: Pt = [CX - 36, EAVE + 2];
 const BW = 72;
-const BH = 21;
+const BH = 24;
 const board = signBoard(BOARD[0], BOARD[1], BW, BH, WOOD, "STQ", "L");
 
 // ---- Parts and frames.

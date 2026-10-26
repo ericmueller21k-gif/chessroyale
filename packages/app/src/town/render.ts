@@ -18,17 +18,28 @@ import { TIGER_FIGURE } from "../characters/tiger-figure.ts";
 import { N, bandOf, clamp, drawable, enterOf, farOf, forEachSquare, hazeMix, newPt, newView, pastCurve, pickSquare, proj, radial, rimYAt, setView, wrapF, type Quad, type View } from "./camera.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { HOUSES } from "./houses/index.ts";
+import { CAP, layout, renderLines } from "./sign-font.ts";
+import { look, mixMist, mixRGB, mixTint, type SkyWeights } from "./sky.ts";
+import { SkyPainter } from "./sky-draw.ts";
 import { plotAt, type Boss, type Home, type HomeId, type Person, type Pose, type Town } from "./world.ts";
 
 /** Each boss's sprite (its real one: its `idle` frames). */
 export const BOSS_ART: Record<HomeId, Character> = { tiger: TIGER_FIGURE, gingerbread: GINGERBREAD, grex: GREX, hollow: HOLLOW, moo: MOO };
+/**
+ * Each boss's head in its first idle frame (x, y and a side, in its pixels): what its edge chip shows. (Slice 1 cropped
+ * the top of the frame, which showed Babur's balloons, not Babur.)
+ */
+export const BOSS_FACE: Record<HomeId, readonly [x: number, y: number, size: number]> = {
+  tiger: [7, 52, 36],
+  gingerbread: [29, 27, 32],
+  grex: [22, 29, 40],
+  hollow: [28, 18, 44],
+  moo: [9, 26, 50],
+};
 
 // ---- Colors (the prototype's, sampled from Eric's reference picture).
 const SQ_LIGHT = [238, 197, 139] as const;
 const SQ_DARK = [173, 128, 88] as const;
-/** The sky's color at the horizon (the bottom of the sky's gradient). */
-const SKYH = [214, 230, 246] as const;
-const SKYH_CSS = "#d6e6f6";
 const MIX_STEPS = 64;
 const INK = "#1f2530";
 const SIGN_INK = "#2a2118";
@@ -38,27 +49,43 @@ const FONT_BLACK = '"Archivo Black", Archivo, system-ui, sans-serif';
 const mix = (a: readonly number[], b: readonly number[], t: number) => [a[0]! + (b[0]! - a[0]!) * t, a[1]! + (b[1]! - a[1]!) * t, a[2]! + (b[2]! - a[2]!) * t];
 const rgb = (v: readonly number[]) => `rgb(${v[0]! | 0},${v[1]! | 0},${v[2]! | 0})`;
 
-/** A square's fill and seam, by (light or dark, on a plot or not, how far toward the sky): made once each. */
-const SQ_FILL: string[] = [];
-const SQ_SEAM: string[] = [];
-for (let i = 0; i <= MIX_STEPS; i++)
-  for (let alt = 0; alt < 2; alt++)
-    for (let plot = 0; plot < 2; plot++) {
-      let base: readonly number[] = alt ? SQ_DARK : SQ_LIGHT;
-      if (plot) base = base.map((x) => x * 0.9); // a faint darker tint under a home
-      const t = i / MIX_STEPS;
-      const f = mix(base, SKYH, t);
-      SQ_FILL[i * 4 + alt * 2 + plot] = rgb(f);
-      SQ_SEAM[i * 4 + alt * 2 + plot] = rgb(f.map((x) => x * (0.86 + 0.14 * t))); // the seam fades out too
-    }
-/** The haze strip's lines under the horizon, made once. */
+/** The haze strip's lines under the horizon. */
 const HAZE_LINES = 10;
-const HAZE_STROKE = Array.from({ length: HAZE_LINES }, (_, i) => `rgba(${SKYH[0]},${SKYH[1]},${SKYH[2]},${(0.75 * Math.pow(1 - i / HAZE_LINES, 1.7)).toFixed(3)})`);
+/** The squares' colors (65 steps toward the sky, light or dark, on a plot or not), and at most this many squares a frame. */
+const SQ_KEYS = (MIX_STEPS + 1) * 4;
+const SQ_MAX = 3000;
+
+/**
+ * Everything colored by the sky's horizon (the far ground, its seams, the haze, the skirt under the rim, the far
+ * sprites' haze): made again only when the sky's look changes (about once a minute at most), never per frame.
+ */
+interface GroundColors {
+  fill: string[];
+  seam: string[];
+  haze: string[];
+  skirt: string;
+  horizon: string;
+}
+function groundColors(skyh: readonly number[]): GroundColors {
+  const fill: string[] = [];
+  const seam: string[] = [];
+  for (let i = 0; i <= MIX_STEPS; i++)
+    for (let alt = 0; alt < 2; alt++)
+      for (let plot = 0; plot < 2; plot++) {
+        let base: readonly number[] = alt ? SQ_DARK : SQ_LIGHT;
+        if (plot) base = base.map((x) => x * 0.9); // a faint darker tint under a home
+        const t = i / MIX_STEPS;
+        const f = mix(base, skyh, t);
+        fill[i * 4 + alt * 2 + plot] = rgb(f);
+        seam[i * 4 + alt * 2 + plot] = rgb(f.map((x) => x * (0.86 + 0.14 * t))); // the seam fades out too
+      }
+  const haze = Array.from({ length: HAZE_LINES }, (_, i) => `rgba(${skyh[0]! | 0},${skyh[1]! | 0},${skyh[2]! | 0},${(0.75 * Math.pow(1 - i / HAZE_LINES, 1.7)).toFixed(3)})`);
+  return { fill, seam, haze, skirt: rgb(mix(SQ_LIGHT, skyh, 0.85)), horizon: rgb(skyh) };
+}
 /** Fonts by whole pixel size (tags, signs). */
 const TAG_FONT = Array.from({ length: 16 }, (_, s) => `600 ${s}px ${FONT}`);
-/** The homes' floating names (the game's display font) and their signs' (the game's pixel font), by whole pixel size. */
+/** The homes' floating names (the game's display font), by whole pixel size. */
 const NAME_FONT = Array.from({ length: 41 }, (_, s) => `400 ${s}px ${FONT_BLACK}`);
-const PIXEL_FONT = Array.from({ length: 41 }, (_, s) => `400 ${s}px "Press Start 2P", ui-monospace, monospace`);
 const BUBBLE_FONT = `500 12px ${FONT}`;
 
 // ---- The pawn (cburnett's, as on the boards: src/board/pieces/SOURCES.md), drawn once per look at a good size.
@@ -181,23 +208,37 @@ export class Renderer {
   private readonly sg = this.soft.getContext("2d")!;
   private readonly bandCv = document.createElement("canvas");
   private readonly bg = this.bandCv.getContext("2d")!;
-  private clouds: HTMLCanvasElement | null = null;
-  private cloudW = 0;
-  private cloudH = 0;
-  private sky: CanvasGradient | null = null;
-  private skyHy = NaN;
+  private readonly sky = new SkyPainter();
+  /** The colors the sky's horizon sets, and the tint over the world (null: none), for the current look. */
+  private colors: GroundColors = groundColors(look("day").sky[4]);
+  /** Dawn's low mist over the far ground: its lines' colors (null: none). */
+  private mist: string[] | null = null;
+  private tint: string | null = null;
+  /** This frame's name tags and speech bubble, drawn after the world's tint so they stay as easy to read at night. */
+  private readonly tags: { text: string; x: number; y: number; gold: boolean; size: number; alpha: number }[] = [];
+  private nTags = 0;
+  private readonly bubble = { on: false, text: "", x: 0, y: 0 };
   private bandGrad: CanvasGradient | null = null;
   private bandKey = "";
   private readonly ripples = [0, 1, 2].map(() => ({ x: 0, y: 0, t0: -1e9 }));
   private rippleNext = 0;
   /** Tag widths by name and size; sign and bubble layouts by text. */
   private readonly tagW = new Map<string, number[]>();
-  private readonly signLayout = new Map<string, { one: number; l1: string; l2: string; two: number }>();
+  /** Each home's sign lettering: laid out once, drawn once per size (in device pixels a font pixel). */
+  private readonly signs: { lines: string[]; w: number; h: number; art: HTMLCanvasElement[] }[];
   /** Where each home's name floats this frame (drawn over everything, after the homes): x, the building's top, its fade. */
   private readonly names: { x: number; y: number; a: number; k: number }[];
   private readonly tops: number[] = [];
   private readonly bubbles = new Map<string, { lines: string[]; w: number }>();
   private readonly drawSquare: (c: number, r: number, cu: number, ru: number, q: Quad) => void;
+  /** This frame's squares: corners, faces' corners, colors; and a counting sort of them by color. */
+  private readonly sqQuad = new Float64Array(SQ_MAX * 8);
+  private readonly sqFace = new Float64Array(SQ_MAX * 8);
+  private readonly sqKey = new Int16Array(SQ_MAX);
+  private readonly sqSeam = new Uint8Array(SQ_MAX);
+  private readonly sqOrder = new Int32Array(SQ_MAX);
+  private readonly keyStart = new Int32Array(SQ_KEYS + 1);
+  private nSq = 0;
   private seamHalf = 0.5;
 
   constructor(
@@ -207,37 +248,38 @@ export class Renderer {
   ) {
     this.houseItems = homes.map((_, i) => newItem("house", i));
     this.names = homes.map(() => ({ x: 0, y: 0, a: 0, k: 0 }));
+    this.signs = homes.map((h) => {
+      const face = HOUSES[h.id].sign;
+      return { ...layout(h.name, face.w, face.h), art: [] };
+    });
     this.items = [...this.houseItems, ...town.bosses.map((_, i) => newItem("boss", i))];
     this.bossFrames = town.bosses.map((b) => new FrameCache(BOSS_ART[b.home.id]));
     this.houseFrames = homes.map((h) => new FrameCache(HOUSES[h.id].ch));
+    // Each square is kept this frame (its corners, its face's corners, its color) and drawn with all the others of its
+    // color in one fill (drawGround): a few dozen fills a frame instead of two per square.
     this.drawSquare = (c, r, cu, ru, q) => {
-      const g = this.ctx;
+      const n = this.nSq;
+      if (n >= SQ_MAX) return;
       const m = Math.round(clamp(hazeMix(this.view, cu - this.camX, ru - this.camY), 0, 1) * MIX_STEPS);
-      const key = m * 4 + ((c + r) & 1) * 2 + (plotAt[r * N + c] ? 1 : 0);
-      // The square in its seam's color, then its face inset by half a seam: the seams without a stroke (strokes cost
-      // several times a fill on a phone's software path).
-      g.beginPath();
-      g.moveTo(q[0]!, q[1]!);
-      g.lineTo(q[2]!, q[3]!);
-      g.lineTo(q[4]!, q[5]!);
-      g.lineTo(q[6]!, q[7]!);
-      g.closePath();
-      g.fillStyle = SQ_SEAM[key]!;
-      g.fill();
+      this.sqKey[n] = m * 4 + ((c + r) & 1) * 2 + (plotAt[r * N + c] ? 1 : 0);
+      const o = n * 8;
       const cx = (q[0]! + q[2]! + q[4]! + q[6]!) / 4;
       const cy = (q[1]! + q[3]! + q[5]! + q[7]!) / 4;
-      const s = this.seamHalf;
-      g.beginPath();
+      // A far, small square shows no seam to speak of: it's drawn once, whole, in its own color (half the work).
+      const small = q[7]! - q[1]! < TOWN_FEEL.seamMinPx;
+      this.sqSeam[n] = small ? 0 : 1;
+      const s = small ? 0 : this.seamHalf;
       for (let i = 0; i < 8; i += 2) {
+        this.sqQuad[o + i] = q[i]!;
+        this.sqQuad[o + i + 1] = q[i + 1]!;
+        // The face: its corners pulled toward its middle by half a seam.
         const dx = cx - q[i]!;
         const dy = cy - q[i + 1]!;
         const t = Math.min(0.45, s / (Math.hypot(dx, dy) || 1));
-        if (i) g.lineTo(q[i]! + dx * t, q[i + 1]! + dy * t);
-        else g.moveTo(q[i]! + dx * t, q[i + 1]! + dy * t);
+        this.sqFace[o + i] = q[i]! + dx * t;
+        this.sqFace[o + i + 1] = q[i + 1]! + dy * t;
       }
-      g.closePath();
-      g.fillStyle = SQ_FILL[key]!;
-      g.fill();
+      this.nSq = n + 1;
     };
   }
 
@@ -246,85 +288,75 @@ export class Renderer {
     this.W = W;
     this.H = H;
     this.DPR = DPR;
-    this.clouds = null;
+    this.sky.resize(W, H, DPR);
+    for (const s of this.signs) s.art.length = 0;
   }
 
-  /** Draws one frame. `zoom`: 0 normal, 1 zoomed out (and between, while it glides). */
-  draw(now: number, camX: number, camY: number, zoom: number): void {
+  /** The sky's look changed (the clock, or `?sky=`): the sky, the horizon's colors and the world's tint follow. */
+  setSky(w: SkyWeights): void {
+    this.sky.setWeights(w);
+    this.colors = groundColors(mixRGB(w, (c) => c.sky[4]!));
+    const t = mixTint(w);
+    this.tint = t[3] > 0.004 ? `rgba(${t[0] | 0},${t[1] | 0},${t[2] | 0},${t[3].toFixed(3)})` : null;
+    const m = mixMist(w);
+    const [r, g, b] = TOWN_FEEL.mistColor;
+    this.mist = m > 0.01 ? Array.from({ length: HAZE_LINES }, (_, i) => `rgba(${r},${g},${b},${(0.55 * m * Math.sin((Math.PI * (i + 0.5)) / HAZE_LINES) ** 1.5).toFixed(3)})`) : null;
+  }
+
+  /** Draws one frame. `zoom`: 0 normal, 1 zoomed out (and between, while it glides); `dt`: seconds since the last. */
+  draw(now: number, camX: number, camY: number, zoom: number, dt = 0): void {
     const { ctx, W, H, DPR } = this;
     this.camX = camX;
     this.camY = camY;
     setView(this.view, W, H, zoom);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.globalAlpha = 1;
-    this.drawSky();
+    this.sky.draw(ctx, this.view, camX, camY, now, dt);
     this.drawGround();
     this.drawHorizonHaze(); // on the ground, behind every home, boss and pawn
+    if (TOWN_FEEL.rimLine) this.drawRimLine();
+    this.nTags = 0;
+    this.bubble.on = false;
     this.drawThings(now);
+    // The light of the hour over the world and everything on it: one fill (none by day).
+    if (this.tint) {
+      ctx.fillStyle = this.tint;
+      ctx.fillRect(0, 0, W, H);
+    }
+    for (let i = 0; i < this.nTags; i++) {
+      const t = this.tags[i]!;
+      this.drawTag(t.text, t.x, t.y, t.gold, t.size, t.alpha);
+    }
+    if (TOWN_FEEL.floatingNames) this.drawNames(now);
+    if (this.bubble.on) this.drawBubble(this.bubble.text, this.bubble.x, this.bubble.y); // (over a home's name)
     this.drawRipples(now);
     this.placeChips(now);
   }
 
-  // ---- The sky: a gradient, and a strip of clouds along the horizon that drifts as you walk (parallax).
-
-  private drawSky(): void {
-    const { ctx, W, H, view: v } = this;
-    if (!this.sky || Math.abs(this.skyHy - v.hy) > 0.5) {
-      const g = ctx.createLinearGradient(0, 0, 0, Math.max(10, v.hy));
-      g.addColorStop(0, "#68b2f6");
-      g.addColorStop(0.65, "#9fd0fb");
-      g.addColorStop(1, SKYH_CSS);
-      this.sky = g;
-      this.skyHy = v.hy;
-    }
-    ctx.fillStyle = this.sky;
-    ctx.fillRect(0, 0, W, H);
-    if (!this.clouds) this.buildClouds();
-    const w = this.cloudW;
-    const h = this.cloudH;
-    const off = (((-this.camX * v.kf * TOWN_FEEL.cloudParallax - this.camY * TOWN_FEEL.cloudParallaxAhead) % w) + w) % w;
-    const y = v.hy - h + h * 0.18; // the bank sits on the horizon, partly behind it
-    for (let x = off - w; x < W; x += w) ctx.drawImage(this.clouds!, x, y, w, h);
+  /** A name tag to draw after the world's tint (kept in a list this frame: nothing allocated once it has grown). */
+  private tag(text: string, x: number, y: number, gold: boolean, size: number, alpha: number): void {
+    let t = this.tags[this.nTags];
+    if (!t) this.tags.push((t = { text, x, y, gold, size, alpha }));
+    t.text = text;
+    t.x = x;
+    t.y = y;
+    t.gold = gold;
+    t.size = size;
+    t.alpha = alpha;
+    this.nTags++;
   }
 
-  private buildClouds(): void {
-    const { W, H, DPR } = this;
-    const cw = Math.max(900, Math.round(W * 1.7));
-    const ch = Math.round(clamp(Math.max(W * 0.15, H * 0.13), 80, 170));
-    const c = document.createElement("canvas");
-    c.width = Math.round(cw * DPR);
-    c.height = Math.round(ch * DPR);
-    const g = c.getContext("2d")!;
-    g.scale(DPR, DPR);
-    let s = 77;
-    const r = () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0), s / 4294967296);
-    const unit = ch / 2.8;
-    // A bank of puffs on the strip's bottom, taller in places, with lone clouds higher up.
-    const puffs: { x: number; y: number; rad: number }[] = [];
-    for (let x = -unit; x < cw + unit; x += unit * (0.6 + r() * 0.6)) {
-      const tall = 0.5 + 0.9 * Math.pow(r(), 1.6);
-      puffs.push({ x, y: ch - unit * 0.35, rad: unit * (0.55 + 0.35 * r()) * tall });
-      if (r() < 0.55) puffs.push({ x: x + unit * 0.3, y: ch - unit * (0.6 + 0.8 * tall), rad: unit * (0.35 + 0.3 * r()) * tall });
-    }
-    for (let i = 0; i < 6; i++) {
-      const x = r() * cw;
-      const y = ch * (0.18 + 0.3 * r());
-      const w = unit * (0.9 + r());
-      for (let j = 0; j < 4; j++) puffs.push({ x: x + (j - 1.5) * w * 0.35, y: y + (j % 2 ? -w * 0.12 : 0), rad: w * (0.22 + 0.12 * (j % 2)) });
-    }
-    // The strip wraps, so it tiles seamlessly.
-    const all = puffs.flatMap((p) => [p, { ...p, x: p.x - cw }, { ...p, x: p.x + cw }]);
-    // A soft blue-grey underside first, then the white tops, both a little soft.
-    if (BLUR_OK) g.filter = `blur(${(unit * 0.08).toFixed(1)}px)`;
-    g.fillStyle = "rgba(160,188,222,.6)";
-    for (const p of all) (g.beginPath(), g.arc(p.x + p.rad * 0.05, p.y + p.rad * 0.16, p.rad, 0, Math.PI * 2), g.fill());
-    if (BLUR_OK) g.filter = `blur(${(unit * 0.025).toFixed(1)}px)`;
-    g.fillStyle = "#ffffff";
-    for (const p of all) (g.beginPath(), g.arc(p.x - p.rad * 0.04, p.y - p.rad * 0.04, p.rad * 0.9, 0, Math.PI * 2), g.fill());
-    if (BLUR_OK) g.filter = "none";
-    this.clouds = c;
-    this.cloudW = cw;
-    this.cloudH = ch;
+  /** A dark line along the world's rim (`rimLine` in feel.ts; off by default). */
+  private drawRimLine(): void {
+    const { ctx, view: v } = this;
+    if (v.rimN < 2) return;
+    ctx.strokeStyle = TOWN_FEEL.rimLineColor;
+    ctx.lineWidth = TOWN_FEEL.rimLineWidth;
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(v.rimPx[0]!, v.rimPy[0]!);
+    for (let i = 1; i < v.rimN; i++) ctx.lineTo(v.rimPx[i]!, v.rimPy[i]!);
+    ctx.stroke();
   }
 
   // ---- The ground: rows of squares, far to near, clipped to the rim; its far band softened.
@@ -345,13 +377,52 @@ export class Renderer {
     ctx.save();
     this.clipToGround();
     // A sky-colored skirt under the rim, so any gap at the edge reads as haze.
-    ctx.fillStyle = SKY_SKIRT;
+    ctx.fillStyle = this.colors.skirt;
     ctx.fillRect(0, 0, W, H);
     // Half a seam's width, measured along a square's diagonal (the prototype's stroke: kf x 0.022, 0.5 to 1.4 px).
     this.seamHalf = 0.5 * Math.SQRT2 * clamp(v.kf * 0.022, 0.5, 1.4);
+    this.nSq = 0;
     forEachSquare(v, this.camX, this.camY, false, this.drawSquare);
+    this.fillSquares();
     this.softenBand();
     ctx.restore();
+  }
+
+  /**
+   * The squares, by color: all the seams (each square whole, in its seam's color), then all the faces (each inset by
+   * half a seam, in its own color). A face lies inside its own square, so the order between colors doesn't matter.
+   */
+  private fillSquares(): void {
+    const { sqKey: key, sqOrder: order, keyStart: start, nSq: n } = this;
+    start.fill(0);
+    for (let i = 0; i < n; i++) start[key[i]! + 1]!++;
+    for (let k = 0; k < SQ_KEYS; k++) start[k + 1]! += start[k]!;
+    for (let i = 0; i < n; i++) order[start[key[i]!]!++] = i;
+    // (`start[k]` now ends color k's run; it began where color k - 1's ended.)
+    this.fillRuns(this.sqQuad, this.colors.seam, true);
+    this.fillRuns(this.sqFace, this.colors.fill, false);
+  }
+
+  /** One fill per color: every square of that color's quad (from `pts`) in one path (`seams`: only squares with one). */
+  private fillRuns(pts: Float64Array, colors: readonly string[], seams: boolean): void {
+    const { ctx, sqOrder: order, keyStart: start, sqSeam: seam } = this;
+    let i = 0;
+    for (let k = 0; k < SQ_KEYS; k++) {
+      const end = start[k]!;
+      if (i === end) continue;
+      ctx.beginPath();
+      for (; i < end; i++) {
+        if (seams && !seam[order[i]!]) continue;
+        const o = order[i]! * 8;
+        ctx.moveTo(pts[o]!, pts[o + 1]!);
+        ctx.lineTo(pts[o + 2]!, pts[o + 3]!);
+        ctx.lineTo(pts[o + 4]!, pts[o + 5]!);
+        ctx.lineTo(pts[o + 6]!, pts[o + 7]!);
+        ctx.closePath();
+      }
+      ctx.fillStyle = colors[k]!;
+      ctx.fill();
+    }
   }
 
   /**
@@ -414,11 +485,24 @@ export class Renderer {
     ctx.lineWidth = d / HAZE_LINES + 0.6;
     for (let i = 0; i < HAZE_LINES; i++) {
       const off = ((i + 0.5) * d) / HAZE_LINES;
-      ctx.strokeStyle = HAZE_STROKE[i]!;
+      ctx.strokeStyle = this.colors.haze[i]!;
       ctx.beginPath();
       ctx.moveTo(v.rimPx[0]!, v.rimPy[0]! + off);
       for (let j = 1; j < v.rimN; j++) ctx.lineTo(v.rimPx[j]!, v.rimPy[j]! + off);
       ctx.stroke();
+    }
+    // Dawn's mist: a soft band lying low over the far ground, a little below the rim, thickest in its middle.
+    if (this.mist) {
+      const m = H * TOWN_FEEL.mistDepth;
+      ctx.lineWidth = m / HAZE_LINES + 0.6;
+      for (let i = 0; i < HAZE_LINES; i++) {
+        const off = d * 0.4 + ((i + 0.5) * m) / HAZE_LINES;
+        ctx.strokeStyle = this.mist[i]!;
+        ctx.beginPath();
+        ctx.moveTo(v.rimPx[0]!, v.rimPy[0]! + off);
+        for (let j = 1; j < v.rimN; j++) ctx.lineTo(v.rimPx[j]!, v.rimPy[j]! + off);
+        ctx.stroke();
+      }
     }
     ctx.restore();
   }
@@ -471,7 +555,12 @@ export class Renderer {
         b.walker.pose(now, pose);
         this.drawSprite(it, img, f.bossSquares, ch.foot[0] / ch.w, ch.foot[1] / ch.h, ch.w / ch.h, 0, 0, b.walker.facing, 1.6);
         b.onScreen = it.fx > -40 && it.fx < this.W + 40 && it.fy > 0 && it.hy < this.H && bandOf(v, it.dx, it.dz) < 0.6; // (a boss deep in the haze doesn't talk)
-        if (town.speech.boss === b) this.drawBubble(town.speech.line, it.fx, it.hy);
+        if (town.speech.boss === b) {
+          this.bubble.on = true;
+          this.bubble.text = town.speech.line;
+          this.bubble.x = it.fx;
+          this.bubble.y = it.hy;
+        }
       } else {
         const person = people[it.i]!;
         const w = person.walker;
@@ -479,16 +568,15 @@ export class Renderer {
         if (person.you) {
           this.drawRing(it);
           this.drawSprite(it, pawnImage(person.look.side, person.look.tint), f.youSquares, 0.5, 0.96, 1, pose.hop * f.youHop, pose.tilt * f.hobbleTilt, w.facing, 0.6, PAWN_HEAD);
-          this.drawTag(person.name, it.fx, it.hy - 2, true, clamp((11 * this.p.k) / v.kf, 8, 12), 1);
+          this.tag(person.name, it.fx, it.hy - 2, true, clamp((11 * this.p.k) / v.kf, 8, 12), 1);
         } else {
           this.drawSprite(it, pawnImage(person.look.side, person.look.tint), f.botSquares, 0.5, 0.96, 1, pose.hop * f.botHop, pose.tilt * f.hobbleTilt, w.facing, 1, PAWN_HEAD);
           // Name tags on the near ones only.
           const far = farOf(v, it.dz);
-          if (far < f.tagFar) this.drawTag(person.name, it.fx, it.hy - 2, false, clamp((11 * this.p.k) / v.kf, 8, 12), clamp((f.tagFar - far) / 0.12, 0, 1));
+          if (far < f.tagFar) this.tag(person.name, it.fx, it.hy - 2, false, clamp((11 * this.p.k) / v.kf, 8, 12), clamp((f.tagFar - far) / 0.12, 0, 1));
         }
       }
     }
-    if (f.floatingNames) this.drawNames(now);
   }
 
   /**
@@ -613,7 +701,7 @@ export class Renderer {
     if (haze > 0) {
       sg.globalCompositeOperation = "source-atop";
       sg.globalAlpha = haze;
-      sg.fillStyle = SKYH_CSS;
+      sg.fillStyle = this.colors.horizon;
       sg.fillRect(0, 0, pw, ph);
     }
     ctx.drawImage(soft, 0, 0, pw, ph, bx - 1 / k, by - 1 / k, pw / k, ph / k);
@@ -641,7 +729,7 @@ export class Renderer {
     else ctx.drawImage(img, x0, y0, w, h);
     // The name on the sign, written by the game (fading out in the far band, where it's too small to read anyway).
     const ta = alpha * clamp(1 - 2 * s, 0, 1);
-    if (TOWN_FEEL.signNames && ta > 0.02) this.writeSign(home.name, x0 + art.sign.x * px, y0 + art.sign.y * px, art.sign.w * px, art.sign.h * px, ta);
+    if (TOWN_FEEL.signNames && ta > 0.02) this.writeSign(it.i, x0 + art.sign.x * px, y0 + art.sign.y * px, art.sign.w * px, art.sign.h * px, ta);
     ctx.restore();
     const nm = this.names[it.i]!;
     nm.x = p.x;
@@ -669,42 +757,23 @@ export class Renderer {
   }
 
   /**
-   * Writes a home's name on its sign's face (fx, fy, fw, fh) in the game's pixel font, on one line or two, whichever is
-   * bigger; only when it's big enough to read (else the board stays blank). The font's letters are all 1 em wide, so
-   * nothing needs measuring.
+   * Writes a home's name on its sign's face (fx, fy, fw, fh) in the signs' pixel capitals (sign-font.ts), on one line
+   * or two, as big as fits in whole device pixels, and only when its letters are big enough to read (`signMinCap`);
+   * else the board stays blank. Each size is drawn once.
    */
-  private writeSign(text: string, fx: number, fy: number, fw: number, fh: number, alpha: number): void {
-    const { ctx } = this;
-    let lay = this.signLayout.get(text);
-    if (!lay) {
-      // The whole name in letters, and its best split into two lines (the longer line's letters).
-      const words = text.split(" ");
-      let best = { l1: text, l2: "", two: Infinity };
-      for (let i = 1; i < words.length; i++) {
-        const l1 = words.slice(0, i).join(" ");
-        const l2 = words.slice(i).join(" ");
-        const two = Math.max(l1.length, l2.length);
-        if (two < best.two) best = { l1, l2, two };
-      }
-      lay = { one: text.length, ...best };
-      this.signLayout.set(text, lay);
-    }
-    const one = Math.min(fh * 0.62, (fw * 0.94) / lay.one);
-    const two = Math.min(fh / 2.5, (fw * 0.94) / lay.two);
-    const size = Math.floor(Math.max(one, two));
-    if (size < TOWN_FEEL.signMinPx) return;
+  private writeSign(i: number, fx: number, fy: number, fw: number, fh: number, alpha: number): void {
+    const { ctx, DPR } = this;
+    const sg = this.signs[i]!;
+    const fit = Math.min(fw / sg.w, fh / sg.h) * 0.94; // CSS pixels a font pixel
+    const s = Math.floor(fit * DPR + 0.25); // device pixels a font pixel, whole, so the letters stay crisp
+    if (s < 1 || (s / DPR) * CAP < TOWN_FEEL.signMinCap) return;
+    let art = sg.art[s];
+    if (!art) art = sg.art[s] = renderLines(sg.lines, sg.w, sg.h, s, SIGN_INK);
+    const w = (sg.w * s) / DPR;
+    const h = (sg.h * s) / DPR;
     ctx.globalAlpha = alpha;
-    ctx.font = PIXEL_FONT[Math.min(40, size)]!;
-    ctx.fillStyle = SIGN_INK;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    const cx = Math.round(fx + fw / 2);
-    const cy = Math.round(fy + fh / 2);
-    if (one >= two) ctx.fillText(text, cx, cy);
-    else {
-      ctx.fillText(lay.l1, cx, cy - Math.round(size * 0.65));
-      ctx.fillText(lay.l2, cx, cy + Math.round(size * 0.65));
-    }
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(art, Math.round((fx + (fw - w) / 2) * DPR) / DPR, Math.round((fy + (fh - h) / 2) * DPR) / DPR, w, h);
   }
 
   /** A name tag over a pawn: white for the bots, gold for you; it shrinks with distance. */
@@ -889,7 +958,6 @@ export class Renderer {
   }
 }
 
-const SKY_SKIRT = rgb(mix(SQ_LIGHT, SKYH, 0.85));
 const SHADOW = "rgb(60,35,10)";
 const SCRATCH_ORDER: number[] = [];
 const byFarFirst = (a: Item, b: Item) => b.dz - a.dz;

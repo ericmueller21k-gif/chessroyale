@@ -13,7 +13,8 @@ import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import { playerName } from "../account.ts";
 import { N, proj, wrapF } from "./camera.ts";
 import { TOWN_FEEL } from "./feel.ts";
-import { Renderer } from "./render.ts";
+import { BOSS_FACE, Renderer } from "./render.ts";
+import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
 import { HOMES, START, createTown, plotAt, plotDist, tdist, tick, walkNextTo, walkTo, type Home } from "./world.ts";
 import "./town.css";
 
@@ -24,7 +25,7 @@ export function TownScreen({ onBack }: { onBack: () => void }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const chips = useRef<(HTMLDivElement | null)[]>([]);
   const ctl = useRef<{ zoom: (out: boolean) => void; recenter: () => void; chip: (i: number) => void } | null>(null);
-  const [zoomedOut, setZoomedOut] = useState(false);
+  const [zoomedOut, setZoomedOut] = useState<boolean>(TOWN_FEEL.startZoomedOut);
 
   // (A layout effect: the world's first frame is drawn before the screen first shows.)
   useLayoutEffect(() => {
@@ -88,8 +89,17 @@ function startTown(box: HTMLDivElement, cv: HTMLCanvasElement, chipEls: (HTMLDiv
   let vx = 0;
   let vy = 0;
   let glide: { x: number; y: number } | null = null;
-  let zoomCur = 0;
-  let zoomTarget = 0;
+  let zoomCur = f.startZoomedOut ? 1 : 0;
+  let zoomTarget = zoomCur;
+  // The sky by the device's clock, read about once a minute; `?sky=day|dawn|dusk|night` holds one look (for Eric, tests).
+  const pinned = skyOverride(new URLSearchParams(location.search).get("sky"));
+  const clock = (): SkyWeights => {
+    const d = new Date();
+    return skyWeights(d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60);
+  };
+  let sky = pinned ?? clock();
+  let skyAt = performance.now();
+  r.setSky(sky);
   let raf = 0;
   let last = performance.now();
   let alive = true;
@@ -146,8 +156,8 @@ function startTown(box: HTMLDivElement, cv: HTMLCanvasElement, chipEls: (HTMLDiv
     camY = START.r + wrapF(camY - START.r);
   };
 
-  const draw = (now: number) => {
-    r.draw(now, camX, camY, zoomCur);
+  const draw = (now: number, dt = 0) => {
+    r.draw(now, camX, camY, zoomCur, dt);
     placeChips();
     const h = town.you.walker.here();
     const key = `${h.c},${h.r}`;
@@ -163,9 +173,14 @@ function startTown(box: HTMLDivElement, cv: HTMLCanvasElement, chipEls: (HTMLDiv
     zoomCur += (zoomTarget - zoomCur) * (1 - Math.exp(-dt * f.zoomRate));
     if (Math.abs(zoomTarget - zoomCur) < 0.001) zoomCur = zoomTarget;
     town.you.name = playerName();
+    if (!pinned && now - skyAt > f.skyCheckMs) {
+      skyAt = now;
+      const w = clock();
+      if (!sameWeights(w, sky)) r.setSky((sky = w));
+    }
     tick(town, now);
     updateCamera(dt, now);
-    draw(now);
+    draw(now, dt);
     raf = requestAnimationFrame(frame);
   };
   const run = () => {
@@ -194,7 +209,7 @@ function startTown(box: HTMLDivElement, cv: HTMLCanvasElement, chipEls: (HTMLDiv
           el.style.setProperty("--town-chip", c.home.color);
           const face = el.querySelector("button")!;
           face.setAttribute("aria-label", `Go to ${c.home.name}`);
-          drawFace(face.querySelector("canvas")!, r.bossFace(c.home.id));
+          drawFace(face.querySelector("canvas")!, r.bossFace(c.home.id), BOSS_FACE[c.home.id]);
           chipXY[i]!.x = chipXY[i]!.a = NaN; // (placed below: NaN is never "close enough")
         }
       }
@@ -322,14 +337,11 @@ function rowSpan(r: Renderer): number {
   return proj(v, 0, -0.5, 0, PA) && proj(v, 0, 0.5, 0, PB) ? PA.y - PB.y : v.kf * 0.5;
 }
 
-/** A boss's face in its chip: the top of its first idle frame, filling the round chip. */
-function drawFace(c: HTMLCanvasElement, img: HTMLCanvasElement) {
+/** A boss's face in its chip: its head (`box`, in its first idle frame's pixels) filling the round chip. */
+function drawFace(c: HTMLCanvasElement, img: HTMLCanvasElement, box: readonly [x: number, y: number, size: number]) {
   const g = c.getContext("2d")!;
   g.clearRect(0, 0, c.width, c.height);
   g.imageSmoothingEnabled = false;
-  const side = Math.min(img.width, img.height) * 0.78;
-  const sx = (img.width - side) / 2;
-  const sy = img.height * 0.04;
-  g.drawImage(img, sx, sy, side, side, 0, 0, c.width, c.height);
+  g.drawImage(img, box[0], box[1], box[2], box[2], 0, 0, c.width, c.height);
 }
 

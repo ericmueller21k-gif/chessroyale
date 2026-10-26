@@ -194,9 +194,9 @@ const shadow = groundShadow(CX, FOOT - 1.5, 66, 4.5);
 
 // ---- The sign: a blank weathered board on two posts at its front left. The game writes "Hollow Peak" on it.
 
-const BOARD: Pt = [30, 121];
+const BOARD: Pt = [30, 118];
 const BW = 46;
-const BH = 19;
+const BH = 24;
 const board = signBoard(BOARD[0], BOARD[1], BW, BH, WOOD, "STZ", "L");
 const posts = [signPost(BOARD[0] + 5, BOARD[1] + BH - 4, FOOT, WOOD), signPost(BOARD[0] + BW - 8, BOARD[1] + BH - 4, FOOT, WOOD)];
 

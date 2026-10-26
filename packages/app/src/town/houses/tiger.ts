@@ -217,7 +217,7 @@ const bunting = (() => {
 
 const BOARD: Pt = [CX - 26, 86];
 const BW = 52;
-const BH = 22;
+const BH = 24;
 const board = signBoard(BOARD[0], BOARD[1], BW, BH);
 const post = (px: number) => signPost(px, BOARD[1] + BH - 4, FOOT);
 
