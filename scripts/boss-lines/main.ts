@@ -66,7 +66,7 @@ async function run(plan: Plan, cap: number): Promise<void> {
   const packs = plan.ids.map(sourcePack);
   const save = (file: string, data: unknown) => writeFileSync(join(plan.out, file), JSON.stringify(data, null, 2) + "\n");
   save("packs.json", packs);
-  if (!hasKey()) throw new Error("ANTHROPIC_API_KEY isn't set in this environment (the source packs were written; no call was made).");
+  if (!hasKey()) throw new Error("BOSS_LINES_API_KEY isn't set in this environment (the source packs were written; no call was made).");
 
   const w = new Writer(cap);
   const name = (id: string) => packs.find((p) => p.id === id)?.name ?? id;

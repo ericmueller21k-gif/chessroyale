@@ -3,7 +3,8 @@
  * and a spend guard that adds up the real usage of every response and refuses a call that could take the total past
  * the cap.
  *
- * The key is read from ANTHROPIC_API_KEY only, and only by the SDK: never printed, logged or written. The base URL is
+ * The key is read from BOSS_LINES_API_KEY only (the cloud environment keeps ANTHROPIC_API_KEY for signing
+ * Claude Code in, and doesn't pass it to sessions), and only by the SDK: never printed, logged or written. The base URL is
  * pinned to Anthropic's API, so the key never goes to another host a session may have set in ANTHROPIC_BASE_URL.
  */
 import Anthropic from "@anthropic-ai/sdk";
@@ -29,7 +30,7 @@ const usd = (u: Pick<Usage, "input" | "output" | "cacheWrite" | "cacheRead">): n
   (u.input * PRICE.input + u.output * PRICE.output + u.cacheWrite * PRICE.cacheWrite + u.cacheRead * PRICE.cacheRead) / 1e6;
 
 /** A key is there (yes or no only: its value is never read here). */
-export const hasKey = (): boolean => !!process.env.ANTHROPIC_API_KEY;
+export const hasKey = (): boolean => !!process.env.BOSS_LINES_API_KEY;
 
 export class Writer {
   readonly usage: Usage = { calls: 0, input: 0, output: 0, cacheWrite: 0, cacheRead: 0, usd: 0 };
@@ -39,8 +40,8 @@ export class Writer {
   constructor(readonly capUsd: number) {}
 
   private sdk(): Anthropic {
-    if (!hasKey()) throw new Error("ANTHROPIC_API_KEY isn't set in this environment: add it in the environment's settings and start a new session.");
-    this.client ??= new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, baseURL: "https://api.anthropic.com" });
+    if (!hasKey()) throw new Error("BOSS_LINES_API_KEY isn't set in this environment: add it in the environment's settings and start a new session.");
+    this.client ??= new Anthropic({ apiKey: process.env.BOSS_LINES_API_KEY, baseURL: "https://api.anthropic.com" });
     return this.client;
   }
 

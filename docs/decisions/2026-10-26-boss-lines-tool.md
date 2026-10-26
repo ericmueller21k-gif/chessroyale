@@ -8,4 +8,5 @@ Calls made:
 - **The check bans words in every line**, not only in the Hidden Boss's: "Soviet(s)", "Russian(s)", "Korchnoi", any mention of the Hidden Boss, "Grinch" and "Santa" (Hollow's design), famous catchphrases, and British spellings. It also caps lines at 70 characters. Every line already in the game passes it.
 - **No refusal fallback model.** A declined call stops the run, so the spend guard only ever prices Opus 5.5.
 - **The tool has its own tsconfig** (`npx tsc -p scripts/boss-lines --noEmit`). The root `typecheck` isn't changed: CI's check stays as it was.
-- **The sample didn't run:** this session had no `ANTHROPIC_API_KEY`. `docs/boss-lines/sample/` holds the source packs and a note saying so.
+- **The key is `BOSS_LINES_API_KEY`** (the director, Oct 26): the cloud environment keeps `ANTHROPIC_API_KEY` for Claude Code's own sign-in and doesn't pass it to sessions, so the tool reads its own name.
+- **The sample didn't run:** this session had no key. `docs/boss-lines/sample/` holds the source packs and a note saying so.
