@@ -25,11 +25,13 @@ import { SMUDGY } from "../characters/smudgy.ts";
 import { TIGER_FIGURE } from "../characters/tiger-figure.ts";
 import { N, bandOf, clamp, drawable, enterOf, farOf, forEachSquare, hazeMix, newPt, newView, pastCurve, pickSquare, proj, radial, rimYAt, setView, wrapF, type Quad, type View } from "./camera.ts";
 import { TOWN_FEEL } from "./feel.ts";
+import { statueSpot } from "./houses/coliseum.ts";
 import { COLISEUM_CHIP, artOf } from "./houses/index.ts";
-import { CAP, layout, renderLines } from "./sign-font.ts";
+import { CLOSE, QUOTE_INK, STATUE_W, quoteFace, statueArt, statueFrame, statueH, statueSteps } from "./houses/statues.ts";
+import { CAP, LEADING, layout, lineWidth, renderLines } from "./sign-font.ts";
 import { look, mixMist, mixRGB, mixTint, type SkyWeights } from "./sky.ts";
 import { SkyPainter } from "./sky-draw.ts";
-import { COLISEUM_PLACE, onColiseum, plotAt, type Boss, type Home, type HomeId, type Person, type Place, type Pose, type Town } from "./world.ts";
+import { COLISEUM_PLACE, STATUES, onColiseum, plotAt, type Boss, type Home, type HomeId, type Person, type Place, type Pose, type Statue, type Town } from "./world.ts";
 
 /** Each boss's sprite (its real one: its `idle` frames). */
 export const BOSS_ART: Record<HomeId, Character> = {
@@ -207,8 +209,10 @@ interface Item {
   fx: number;
   fy: number;
   hy: number;
+  /** Faded out in front of a statue up close: taps go through it. */
+  faded: boolean;
 }
-const newItem = (kind: Item["kind"], i: number): Item => ({ kind, i, dx: 0, dz: 0, on: false, depth: 0, x0: 0, y0: 0, x1: 0, y1: 0, fx: 0, fy: 0, hy: 0 });
+const newItem = (kind: Item["kind"], i: number): Item => ({ kind, i, dx: 0, dz: 0, on: false, depth: 0, x0: 0, y0: 0, x1: 0, y1: 0, fx: 0, fy: 0, hy: 0, faded: false });
 
 /** An edge chip this frame: which place (a home, or the Coliseum), where on the box's edge, which way its arrow points (degrees). */
 export interface Chip {
@@ -219,7 +223,53 @@ export interface Chip {
 }
 
 /** What a tap landed on. */
-export type Hit = { kind: "square"; c: number; r: number } | { kind: "house"; home: Home } | { kind: "coliseum" } | { kind: "boss"; boss: Boss } | { kind: "person"; person: Person };
+export type Hit =
+  | { kind: "square"; c: number; r: number }
+  | { kind: "house"; home: Home }
+  | { kind: "coliseum" }
+  | { kind: "statue"; statue: Statue }
+  | { kind: "boss"; boss: Boss }
+  | { kind: "person"; person: Person };
+
+/** A character's first idle frame on a canvas (and, `mask`, which of its pixels are drawn, for taps). */
+function canvasOf(ch: Character, mask?: Uint8Array[]): HTMLCanvasElement {
+  const { w, h, data } = renderFrame(ch, ch.anims.idle!.frames[0]!);
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  c.getContext("2d")!.putImageData(new ImageData(new Uint8ClampedArray(data), w, h), 0, 0);
+  if (mask) {
+    const m = new Uint8Array(w * h);
+    for (let i = 0; i < m.length; i++) m[i] = data[i * 4 + 3]! > 0 ? 1 : 0;
+    mask.push(m);
+  }
+  return c;
+}
+
+/** A quote's lettering at one size: its canvas, `s` device pixels a font pixel, its lines, their pitch and height. */
+interface QuoteArt {
+  cv: HTMLCanvasElement;
+  s: number;
+  n: number;
+  pitch: number;
+  lineH: number;
+}
+
+/** A quote wrapped into lines no wider than `maxW` font pixels (null: a word alone is wider). */
+function wrapQuote(text: string, maxW: number): string[] | null {
+  const lines: string[] = [];
+  let line = "";
+  for (const word of text.split(" ")) {
+    if (lineWidth(word) > maxW) return null;
+    const t = line ? `${line} ${word}` : word;
+    if (line && lineWidth(t) > maxW) {
+      lines.push(line);
+      line = word;
+    } else line = t;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
 
 // Can the canvas blur (not in older iOS Safari; there the shrink alone does the work)?
 const BLUR_OK = (() => {
@@ -260,6 +310,31 @@ export class Renderer {
   private readonly bandCv = document.createElement("canvas");
   private readonly bg = this.bandCv.getContext("2d")!;
   private readonly sky = new SkyPainter();
+  /**
+   * The close-up on a statue (Town.tsx sets it every frame): which (its index in STATUES; -1: none), how far the camera's
+   * glide in has come (0 to 1, eased), and its quote: ms since it began to render in (-1: not yet) and how much of it is
+   * left as you leave (1 to 0).
+   */
+  readonly close = { i: -1, e: 0, quoteMs: -1, quoteLeft: 1 };
+  /** This frame's lens (1: none), and the quote's letters' height (CSS pixels; 0: not drawn), for the test hook. */
+  lensMag = 1;
+  quoteCap = 0;
+  /** Where each statue was drawn this frame (screen pixels), for taps, chips and tests. */
+  readonly statueBox = STATUES.map(() => ({ on: false, x0: 0, y0: 0, x1: 0, y1: 0 }));
+  /** The statues at the world's scale; their close-ups (null until made, a slice a frame) and when each was ready. */
+  private readonly statueImg: HTMLCanvasElement[];
+  /** Which of each world's-scale statue's pixels are drawn (taps read this, never the canvas: a read-back stalls). */
+  private readonly statueMask: Uint8Array[] = [];
+  private readonly closeImg: (HTMLCanvasElement | null)[] = STATUES.map(() => null);
+  private readonly closeReady: number[] = STATUES.map(() => NaN);
+  private closeJob: { i: number; steps: ReturnType<typeof statueSteps>; layers: { part: import("../characters/sprite.ts").Part; at: readonly [number, number] }[] | null; next: number; cv: HTMLCanvasElement | null } | null = null;
+  private buildFrom = NaN;
+  /** The quotes' lettering, by statue and size (device pixels a font pixel): one canvas, its lines' pitch and height. */
+  private readonly quoteArt = new Map<string, QuoteArt>();
+  /** How deep (squares ahead of the camera) the statue in close-up stands: the people nearer than it fade. */
+  private statueDz = Infinity;
+  /** This sprite's fade (the people in front of a statue in close-up), multiplied into its alpha. */
+  private fade = 1;
   /** The colors the sky's horizon sets, and the tint over the world (null: none), for the current look. */
   private colors: GroundColors = groundColors(look("day").sky[4]);
   /** Dawn's mist: extra haze over the far ground, into the horizon's own color. */
@@ -321,6 +396,7 @@ export class Renderer {
     this.bossFrames = town.bosses.map((b) => new FrameCache(BOSS_ART[b.home.id]));
     this.houseFrames = this.places.map((h) => new FrameCache(artOf(h).ch));
     this.chipIcon = new FrameCache(COLISEUM_CHIP);
+    this.statueImg = STATUES.map((st) => canvasOf(statueArt(st.id, 1), this.statueMask));
     // Each square is kept this frame (its corners, its face's corners, its color) and drawn with all the others of its
     // color in one fill (drawGround): a few dozen fills a frame instead of two per square.
     this.drawSquare = (c, r, cu, ru, q) => {
@@ -373,6 +449,8 @@ export class Renderer {
     this.camX = camX;
     this.camY = camY;
     setView(this.view, W, H, zoom);
+    this.lens(zoom);
+    this.buildCloseUps(now);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.globalAlpha = 1;
     this.sky.draw(ctx, this.view, camX, camY, now, dt);
@@ -396,6 +474,198 @@ export class Renderer {
     if (TOWN_FEEL.floatingNames) this.drawNames(now);
     if (this.bubble.on) this.drawBubble(this.bubble.text, this.bubble.x, this.bubble.y); // (over a home's name)
     this.placeChips(now);
+  }
+
+  // ---- The close-up on a statue: the lens, the close-up drawings (made ahead), the statues, the quote.
+
+  /**
+   * The camera's lens for the close-up: the statue and its pedestal, as the plain camera shows them, magnified to fill the
+   * box from `closeTop` to `closeBottom` (above the buttons where they'd meet), a longer lens the further the glide has
+   * come (M to the power e, so the zoom's pace is even), its middle gliding to the box's.
+   */
+  private lens(zoom: number): void {
+    const { view: v, p, close: c, W, H } = this;
+    const f = TOWN_FEEL;
+    this.lensMag = 1;
+    this.quoteCap = 0;
+    this.statueDz = Infinity;
+    if (c.i < 0 || c.e <= 0) return;
+    const pl = COLISEUM_PLACE;
+    const dx = wrapF(pl.cx - this.camX);
+    const dz = wrapF(pl.cy - pl.foot - this.camY);
+    if (!proj(v, dx, dz, 0, p)) return;
+    const id = STATUES[c.i]!.id;
+    const ch = artOf(pl).ch;
+    const at = statueSpot(id);
+    const px = p.k / f.housePxPerSquare;
+    const x0 = p.x + (at[0] - ch.foot[0]) * px;
+    const y0 = p.y + (at[1] - ch.foot[1]) * px;
+    const w = STATUE_W * px;
+    const h = statueH(id) * px;
+    const T = H * f.closeTop;
+    let B = H * f.closeBottom;
+    let M = Math.min((B - T) / h, (W * f.closeMaxWidth) / w);
+    const kc = this.keepClear;
+    const xT = W / 2 + M * (x0 + w / 2 - W / 2);
+    if (kc.w > 0 && xT + (M * w) / 2 > kc.x && xT - (M * w) / 2 < kc.x + kc.w && B > kc.y - f.closeAboveButtons) {
+      B = kc.y - f.closeAboveButtons;
+      M = Math.min((B - T) / h, (W * f.closeMaxWidth) / w);
+    }
+    M = Math.max(1, M);
+    const mag = Math.pow(M, c.e);
+    const c1 = y0 + h / 2;
+    const cE = c1 + ((T + B) / 2 - c1) * c.e;
+    setView(v, W, H, zoom, mag, cE - v.cy - mag * (c1 - v.cy));
+    this.lensMag = mag;
+    this.statueDz = dz - 0.25;
+  }
+
+  /**
+   * Makes the statues' close-up drawings ahead, a slice a frame (`closeBuildBudgetMs` of painting, or one layer drawn):
+   * starting a little after the page opens, or at once for one the camera is coming in on.
+   */
+  private buildCloseUps(now: number): void {
+    if (!this.closeImg.includes(null)) return;
+    const f = TOWN_FEEL;
+    if (Number.isNaN(this.buildFrom)) this.buildFrom = now + f.closeBuildAfterMs;
+    const want = this.close.i >= 0 && !this.closeImg[this.close.i] ? this.close.i : -1;
+    if (now < this.buildFrom && want < 0) return;
+    const t0 = performance.now();
+    do {
+      let job = this.closeJob;
+      if (!job) {
+        const i = want >= 0 ? want : this.closeImg.indexOf(null);
+        job = this.closeJob = { i, steps: statueSteps(STATUES[i]!.id, CLOSE), layers: null, next: 0, cv: null };
+      }
+      if (!job.layers) {
+        const r = job.steps.next();
+        if (r.done) job.layers = r.value;
+        continue;
+      }
+      // One layer drawn (outlined and colored) at most a frame.
+      const id = STATUES[job.i]!.id;
+      if (!job.cv) {
+        job.cv = document.createElement("canvas");
+        job.cv.width = STATUE_W * CLOSE;
+        job.cv.height = statueH(id) * CLOSE;
+      }
+      job.cv.getContext("2d")!.drawImage(canvasOf(statueFrame(id, CLOSE, [job.layers[job.next]!])), 0, 0);
+      if (++job.next === job.layers.length) {
+        this.closeImg[job.i] = job.cv;
+        this.closeReady[job.i] = now;
+        this.closeJob = null;
+      }
+      return;
+    } while (performance.now() - t0 < f.closeBuildBudgetMs);
+  }
+
+  /**
+   * The statues over the Coliseum's picture (x0, y0 its top left, `px` screen pixels a picture pixel): the world's figure,
+   * or the close-up drawing crossfading in as the camera comes in on it (the world's figure fading only once the close-up
+   * covers it, so the wall never shows through), and its quote once the camera has arrived.
+   */
+  private drawStatues(x0: number, y0: number, px: number, alpha: number, soft: number, now: number): void {
+    const { ctx, close: c } = this;
+    const f = TOWN_FEEL;
+    for (let i = 0; i < STATUES.length; i++) {
+      const id = STATUES[i]!.id;
+      const at = statueSpot(id);
+      const sx = x0 + at[0] * px;
+      const sy = y0 + at[1] * px;
+      const sw = STATUE_W * px;
+      const sh = statueH(id) * px;
+      const b = this.statueBox[i]!;
+      b.on = true;
+      b.x0 = sx;
+      b.y0 = sy;
+      b.x1 = sx + sw;
+      b.y1 = sy + sh;
+      const close = this.closeImg[i];
+      let swap = 0;
+      if (c.i === i && close) {
+        const [a0, a1] = f.closeSwap;
+        const t = clamp((c.e - a0) / (a1 - a0), 0, 1);
+        swap = t * t * (3 - 2 * t) * clamp((now - this.closeReady[i]!) / f.closeReadyFadeMs, 0, 1);
+      }
+      const one = Math.min(1, 2 * (1 - swap));
+      const fine = Math.min(1, 2 * swap);
+      if (one > 0) {
+        ctx.globalAlpha = alpha * one;
+        ctx.imageSmoothingEnabled = px < 1.5;
+        if (soft > 0.02) this.blitSoft(this.statueImg[i]!, sx, sy, sw, sh, soft, 0.88 * soft);
+        else ctx.drawImage(this.statueImg[i]!, sx, sy, sw, sh);
+      }
+      if (fine > 0 && close) {
+        ctx.globalAlpha = alpha * fine;
+        ctx.imageSmoothingEnabled = px / CLOSE < 1.5;
+        ctx.drawImage(close, sx, sy, sw, sh);
+      }
+      if (c.i === i) {
+        if (c.e > 0.5) this.keepFree(sx, sy, sw, sh); // (no chip over the statue up close)
+        if (c.quoteMs >= 0 && c.quoteLeft > 0) this.drawQuote(i, sx, sy, px, alpha);
+      }
+    }
+    ctx.globalAlpha = alpha;
+  }
+
+  /**
+   * A statue's quote on its pedestal's panel, in the signs' pixel capitals as big as fits in whole device pixels (wrapped
+   * to the panel), engraved in the marble or cast in the bronze plaque: line by line, each fading in, all fading as you
+   * leave.
+   */
+  private drawQuote(i: number, sx: number, sy: number, px: number, alpha: number): void {
+    const { ctx, DPR, close: c } = this;
+    const f = TOWN_FEEL;
+    const face = quoteFace(STATUES[i]!.id);
+    const fx = sx + face.x * px;
+    const fy = sy + face.y * px;
+    const fw = face.w * px;
+    const fh = face.h * px;
+    const q = this.quoteFor(i, fw * DPR, fh * DPR);
+    if (!q) return;
+    this.quoteCap = (q.s / DPR) * CAP;
+    const w = q.cv.width / DPR;
+    const h = q.cv.height / DPR;
+    const ox = Math.round((fx + (fw - w) / 2) * DPR) / DPR;
+    const oy = Math.round((fy + (fh - h) / 2) * DPR) / DPR;
+    ctx.imageSmoothingEnabled = false;
+    for (let l = 0; l < q.n; l++) {
+      const a = clamp((c.quoteMs - l * f.quoteLineMs) / f.quoteFadeMs, 0, 1) * c.quoteLeft;
+      if (a <= 0) continue;
+      ctx.globalAlpha = alpha * a;
+      const y = l * q.pitch;
+      ctx.drawImage(q.cv, 0, y, q.cv.width, q.lineH, ox, oy + y / DPR, w, q.lineH / DPR);
+    }
+  }
+
+  /** The quote's lettering for a panel fw x fh device pixels: the biggest whole size whose wrapped lines fit; cached. */
+  private quoteFor(i: number, fw: number, fh: number): QuoteArt | null {
+    const st = STATUES[i]!;
+    for (let s = Math.floor(fh / CAP); s >= 1; s--) {
+      const key = `${i}:${s}`;
+      const done = this.quoteArt.get(key);
+      const e = Math.max(1, Math.round(s / 3)); // the lettering's lit (or shadowed) edge, down and right
+      if (done) {
+        if (done.cv.width <= fw && done.cv.height <= fh) return done;
+        continue;
+      }
+      const lines = wrapQuote(st.quote, (fw - e) / s);
+      if (!lines) continue;
+      const lh = lines.length * CAP + (lines.length - 1) * LEADING;
+      if (lh * s + e > fh) continue;
+      const lw = Math.max(...lines.map(lineWidth));
+      const ink = QUOTE_INK[st.id];
+      const cv = document.createElement("canvas");
+      cv.width = lw * s + e;
+      cv.height = lh * s + e;
+      const g = cv.getContext("2d")!;
+      g.drawImage(renderLines(lines, lw, lh, s, ink.edge), e, e);
+      g.drawImage(renderLines(lines, lw, lh, s, ink.ink), 0, 0);
+      const art = { cv, s, n: lines.length, pitch: (CAP + LEADING) * s, lineH: CAP * s + e };
+      this.quoteArt.set(key, art);
+      return art;
+    }
+    return null;
   }
 
   /** A box on the screen no chip may cover this frame (a tag, a home's name, the bubble). */
@@ -626,6 +896,7 @@ export class Renderer {
     }
     items.sort(byFarFirst);
     for (const b of town.bosses) b.onScreen = false;
+    for (const b of this.statueBox) b.on = false;
     for (const nm of this.names) nm.a = 0;
     for (const it of items) {
       if (!it.on) continue;
@@ -647,19 +918,23 @@ export class Renderer {
         const person = people[it.i]!;
         const w = person.walker;
         w.pose(now, pose);
+        // Up close on a statue, the people in front of it (you, on its square) fade: they'd stand between the camera and it.
+        this.fade = it.dz < this.statueDz ? 1 - f.closeNearFade * this.close.e : 1;
+        it.faded = this.fade < 0.5;
         if (person.you) {
           // Your shadows are a bot's: sized from the pawn, not from the margin your look's items are drawn in.
           const art = this.youArt;
           const k = 1 + 2 * (art?.pad ?? 0);
           const pad = art?.pad ?? 0;
           this.drawSprite(it, art?.img ?? pawnImage(person.look.side, person.look.tint), f.youSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.youHop, pose.tilt * f.hobbleTilt, w.facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k);
-          this.tag(person.name, it.fx, it.hy - 2, true, clamp((11 * this.p.k) / v.kf, 8, 12), 1);
+          if (this.fade > 0.02) this.tag(person.name, it.fx, it.hy - 2, true, clamp((11 * this.p.k) / v.kf, 8, 12), this.fade);
         } else {
           this.drawSprite(it, pawnImage(person.look.side, person.look.tint), f.botSquares, 0.5, PAWN_FOOT, 1, pose.hop * f.botHop, pose.tilt * f.hobbleTilt, w.facing, 1, PAWN_HEAD, true);
           // Name tags on the near ones only.
           const far = farOf(v, it.dz);
-          if (far < f.tagFar) this.tag(person.name, it.fx, it.hy - 2, false, clamp((11 * this.p.k) / v.kf, 8, 12), clamp((f.tagFar - far) / 0.12, 0, 1));
+          if (far < f.tagFar && this.fade > 0.02) this.tag(person.name, it.fx, it.hy - 2, false, clamp((11 * this.p.k) / v.kf, 8, 12), clamp((f.tagFar - far) / 0.12, 0, 1) * this.fade);
         }
+        this.fade = 1;
       }
     }
   }
@@ -716,7 +991,7 @@ export class Renderer {
     const x0 = p.x - fx * w;
     const y0 = p.y - fy * h - lift * p.k;
     const s = bandOf(v, it.dx, it.dz); // in the far band: fade, haze and blur
-    const alpha = (1 - TOWN_FEEL.bandFade * s) * enterOf(v, it.dx, it.dz);
+    const alpha = (1 - TOWN_FEEL.bandFade * s) * enterOf(v, it.dx, it.dz) * this.fade;
     ctx.save();
     // The shadows follow the height: the higher it is, the smaller and lighter they are; gone by the rim.
     const F = TOWN_FEEL;
@@ -815,6 +1090,7 @@ export class Renderer {
     // The name on the sign, written by the game (fading out in the far band, where it's too small to read anyway).
     const ta = alpha * clamp(1 - 2 * s, 0, 1);
     if (TOWN_FEEL.signNames && ta > 0.02) this.writeSign(it.i, x0 + art.sign.x * px, y0 + art.sign.y * px, art.sign.w * px, art.sign.h * px, ta);
+    if (it.i === this.homes.length) this.drawStatues(x0, y0, px, alpha, s, now);
     ctx.restore();
     const nm = this.names[it.i]!;
     nm.x = p.x;
@@ -1110,7 +1386,19 @@ export class Renderer {
    * tap lands on it: if something nearer stands over that point (a boss in front of its home, a bot at the gate), the
    * first point of a grid over its picture that a tap would hit. False if it isn't drawn or none is clear. (For tests.)
    */
-  tapPoint(kind: "boss" | "home", i: number, out: { x: number; y: number }): boolean {
+  tapPoint(kind: "boss" | "home" | "statue", i: number, out: { x: number; y: number }): boolean {
+    if (kind === "statue") {
+      // Its pedestal's middle, or higher up the figure if someone stands in front of that.
+      const b = this.statueBox[i];
+      if (!b?.on) return false;
+      for (const v of [0.82, 0.6, 0.4, 0.25]) {
+        out.x = (b.x0 + b.x1) / 2;
+        out.y = b.y0 + v * (b.y1 - b.y0);
+        const h = out.x > 0 && out.x < this.W && out.y > 0 && out.y < this.H ? this.pick(out.x, out.y) : null;
+        if (h?.kind === "statue" && h.statue === STATUES[i]) return true;
+      }
+      return false;
+    }
     const it = kind === "boss" ? this.bossItems[i]! : this.houseItems[i]!;
     if (!it.on) return false;
     const ok = (x: number, y: number) => {
@@ -1139,9 +1427,13 @@ export class Renderer {
   pick(x: number, y: number): Hit | null {
     for (let i = this.items.length - 1; i >= 0; i--) {
       const it = this.items[i]!;
-      if (!it.on || x < it.x0 || x > it.x1 || y < it.y0 || y > it.y1) continue;
+      if (!it.on || it.faded || x < it.x0 || x > it.x1 || y < it.y0 || y > it.y1) continue;
       if (it.kind === "house") {
         // A home's picture is wide: only its drawn part (not the sky around its roof) counts.
+        if (it.i >= this.homes.length) {
+          const st = this.statueHit(x, y);
+          if (st) return { kind: "statue", statue: st };
+        }
         if (!this.houseHit(it, x, y)) continue;
         if (it.i >= this.homes.length) return { kind: "coliseum" };
         return { kind: "house", home: this.homes[it.i]! };
@@ -1151,6 +1443,19 @@ export class Renderer {
     }
     const sq = pickSquare(this.view, this.camX, this.camY, x, y);
     return sq ? { kind: "square", c: sq.c, r: sq.r } : null;
+  }
+
+  /** The statue (its figure or its pedestal) drawn under (x, y), or null. */
+  private statueHit(x: number, y: number): Statue | null {
+    for (let i = 0; i < STATUES.length; i++) {
+      const b = this.statueBox[i]!;
+      if (!b.on || x < b.x0 || x >= b.x1 || y < b.y0 || y >= b.y1) continue;
+      const img = this.statueImg[i]!;
+      const px = Math.floor(((x - b.x0) / (b.x1 - b.x0)) * img.width);
+      const py = Math.floor(((y - b.y0) / (b.y1 - b.y0)) * img.height);
+      if (this.statueMask[i]![py * img.width + px]) return STATUES[i]!;
+    }
+    return null;
   }
 
   /** Is (x, y) on a drawn pixel of the home's first frame? */

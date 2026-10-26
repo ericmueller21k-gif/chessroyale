@@ -39,7 +39,7 @@ const GLYPHS: Record<string, readonly string[]> = {
 export const CAP = 5;
 const GAP = 1;
 const SPACE = 2;
-const LEADING = 2;
+export const LEADING = 2;
 
 const glyph = (ch: string) => GLYPHS[ch.toUpperCase()];
 

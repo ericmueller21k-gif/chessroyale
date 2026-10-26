@@ -37,6 +37,13 @@ export interface View {
   W: number;
   H: number;
   zoom: number;
+  /**
+   * The lens (the close-up on a statue): everything magnified `mag` times about the lens's middle (the box's middle
+   * column, `cy`), then shifted `oy` pixels down. 1 and 0: the plain camera. A longer lens, not a moved camera: the
+   * world keeps its shape, only the view narrows.
+   */
+  mag: number;
+  oy: number;
   /** The blended camera set for this box. */
   P: CamSet;
   h: number;
@@ -67,6 +74,8 @@ export function newView(): View {
     W: 0,
     H: 0,
     zoom: -1,
+    mag: 1,
+    oy: 0,
     P: { ...TOWN_FEEL.camTall },
     h: 1,
     back: 1,
@@ -90,12 +99,17 @@ export function newView(): View {
 const KEYS = ["h", "th", "back", "R", "kx", "fW", "cy", "rim", "rimX"] as const;
 const tmp = newPt();
 
-/** Works the camera out for a box of W x H CSS pixels at a zoom (0 = normal, 1 = zoomed out). Cheap when nothing changed. */
-export function setView(v: View, W: number, H: number, zoom: number): void {
-  if (v.W === W && v.H === H && v.zoom === zoom) return;
+/**
+ * Works the camera out for a box of W x H CSS pixels at a zoom (0 = normal, 1 = zoomed out), through a lens of `mag`
+ * shifted `oy` (the close-up; 1, 0: none). Cheap when nothing changed.
+ */
+export function setView(v: View, W: number, H: number, zoom: number, mag = 1, oy = 0): void {
+  if (v.W === W && v.H === H && v.zoom === zoom && v.mag === mag && v.oy === oy) return;
   v.W = W;
   v.H = H;
   v.zoom = zoom;
+  v.mag = mag;
+  v.oy = oy;
   const f = TOWN_FEEL;
   const t = clamp((W / H - f.aspectTall) / (f.aspectWide - f.aspectTall), 0, 1);
   const P = v.P;
@@ -105,7 +119,7 @@ export function setView(v: View, W: number, H: number, zoom: number): void {
   const th = ((P.th + f.zoomOutPitch * zoom) * Math.PI) / 180;
   v.cs = Math.cos(th);
   v.sn = Math.sin(th);
-  v.F = P.fW * W;
+  v.F = P.fW * W * mag;
   v.cy = P.cy * H;
   // The curve comes from the unzoomed height, so zooming keeps the world's shape.
   v.c = P.h / (P.R * P.R);
@@ -142,7 +156,7 @@ export function proj(v: View, dx: number, dz: number, lift: number, out: Pt): bo
   if (depth < 0.5) return false;
   const up = Y * v.cs + Z * v.sn;
   out.x = v.W / 2 + (v.F * dx) / depth;
-  out.y = v.cy - (v.F * up) / depth;
+  out.y = v.cy + v.oy - (v.F * up) / depth;
   out.k = v.F / depth;
   out.depth = depth;
   return true;

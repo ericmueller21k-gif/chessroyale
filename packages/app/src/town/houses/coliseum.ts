@@ -7,15 +7,19 @@
  * portcullis, the sunlit floor at the tunnel's end), a stone tablet over it (blank: the game writes "The Coliseum" on it)
  * and a panel of chess pieces carved in relief above; navy and gold banners (the game's colors) hung on its face, two
  * pennants on its far rim and a flag on a mast over it all. Statues of chess pieces on plinths stand round it: the bronze
- * queen and king either side of the gate, a marble bishop beyond the king, a marble rook and knight at its front corners,
- * two marble pawns at its back corners, and one empty plinth on the gate's left beyond the queen with a small brass plate
- * (the Hidden Boss's statue comes later). `idle`: the banners and pennants stir and the flag flutters.
+ * queen and king either side of the gate; beyond them, on pedestals of their own, the two statues (houses/statues.ts,
+ * drawn by the game over this picture, not in it: the marble statue on the gate's left, the bronze one on its right, each
+ * before its ground's end column); beyond those a marble bishop and rook on the left, a marble knight and pawn on the
+ * right, and one more marble pawn at its back left corner. `idle`: the banners and pennants stir and the flag flutters.
  *
  * It stands on its 6 x 6 ground (world.ts, COLISEUM), its foot (the gate's sill) on the ground's front edge; at the
  * homes' scale (37 pixels a square) it is about 8 squares across with its statues, twice a home's size.
  */
 import type { Anim, Character, Frame, Layer, Part } from "../../characters/sprite.ts";
+import { TOWN_FEEL } from "../feel.ts";
+import { COLISEUM } from "../world.ts";
 import { grain, groundShadow, paint, signBoard, signFace, type Pt } from "./kit.ts";
+import { PED_W, STATUE_W, statueH, type StatueId } from "./statues.ts";
 
 const PALETTE: Record<string, string> = {
   k: "#2a1c14", // outline
@@ -50,9 +54,17 @@ const PALETTE: Record<string, string> = {
 
 // ---- Where things are (frame pixels). Its axis is x = CX; the gate's sill on the ground at y FOOT.
 
-const W = 320;
+/**
+ * The two statues stand before its ground's first and last columns (their viewing squares right in front, world.ts
+ * STATUES): this far either side of its axis, from its ground's size (so they follow it if it grows).
+ */
+export const STATUE_OFF = Math.round((COLISEUM.size / 2 - 0.5) * TOWN_FEEL.housePxPerSquare);
+/** The chess pieces beyond the statues: the nearer pair just past a statue's pedestal, the outer pair past them. */
+const PIECE_1 = STATUE_OFF + PED_W / 2 + 14;
+const PIECE_2 = PIECE_1 + 27;
+const W = 2 * (PIECE_2 + 20);
 const H = 246;
-const CX = 160;
+const CX = W / 2;
 const FOOT = 236;
 /** The oval wall: half its width and half its depth as drawn (seen a little from above), its height. */
 const RX = 118;
@@ -382,17 +394,16 @@ const knight = (cx: number, fy: number, flip: boolean) =>
     if (!inPoly(X - L, j - 1.6, KNIGHT)) return "o";
     return "m";
   });
-/** A plinth under a statue: a cap, its block (lit on the left), a base. `plate`: a small brass plate on its face. */
+/** A plinth under a chess piece: a cap, its block (lit on the left), a base. */
 const PLINTH_W = 26;
 const PLINTH_H = 14;
-const plinth = (cx: number, fy: number, plate = false) =>
+const plinth = (cx: number, fy: number) =>
   paint(cx - PLINTH_W / 2, fy - PLINTH_H, PLINTH_W, PLINTH_H, (x, y) => {
     const X = x + 0.5 - cx;
     const j = fy - 1 - y;
     if (j >= PLINTH_H - 2) return j === PLINTH_H - 1 ? "1" : X < 6 ? "2" : "3";
     if (j < 2) return X < -6 ? "3" : X < 7 ? "4" : "5";
     if (Math.abs(X) > PLINTH_W / 2 - 1.5) return null;
-    if (plate && Math.abs(X) < 5 && j >= 5 && j <= 7) return j === 7 ? "y" : j === 6 ? "Y" : "O";
     return X < -7 ? "2" : X > 7 ? "4" : "3";
   });
 
@@ -417,21 +428,20 @@ const shadow = add("shadow", groundShadow(CX, BASE_CY + 8, RX + 22, RY + 10));
 const back = [
   add("plinthPL", plinth(CX - 140, BACK)),
   add("pawnL", pawn(CX - 140, BACK - PLINTH_H)),
-  add("plinthPR", plinth(CX + 140, BACK)),
-  add("pawnR", pawn(CX + 140, BACK - PLINTH_H)),
   add("mastL", mast(CX - MAST_X - 1, MAST_TOP, MAST_FOOT)),
   add("mastR", mast(CX + MAST_X - 1, MAST_TOP, MAST_FOOT)),
   add("flagMast", mast(CX - 1, FLAG_TOP, FLAG_FOOT)),
 ];
 const body = [add("bowl", bowl), add("wall", wall), add("tablet", tablet), add("relief", relief)];
 const front = [
-  add("plinthR", plinth(CX - 124, FRONT)),
-  add("rook", rook(CX - 124, STAND)),
-  add("plinthN", plinth(CX + 124, FRONT)),
-  add("knight", knight(CX + 124, STAND, false)),
-  add("plinthE", plinth(CX - 74, FRONT, true)), // empty: a statue comes later (the Hidden Boss); a brass plate for now
-  add("plinthB", plinth(CX + 74, FRONT)),
-  add("bishop", bishop(CX + 74, STAND)),
+  add("plinthR", plinth(CX - PIECE_2, FRONT)),
+  add("rook", rook(CX - PIECE_2, STAND)),
+  add("plinthB", plinth(CX - PIECE_1, FRONT)),
+  add("bishop", bishop(CX - PIECE_1, STAND)),
+  add("plinthN", plinth(CX + PIECE_1, FRONT)),
+  add("knight", knight(CX + PIECE_1, STAND, false)),
+  add("plinthPR", plinth(CX + PIECE_2, FRONT)),
+  add("pawnR", pawn(CX + PIECE_2, STAND)),
   add("plinthQ", plinth(CX - 42, FRONT)),
   add("queen", queen(CX - 42, STAND)),
   add("plinthK", plinth(CX + 42, FRONT)),
@@ -471,6 +481,12 @@ export const HOUSE_COLISEUM: Character = {
   parts,
   anims: { idle },
 };
+
+/**
+ * Where a statue's picture stands over this one (frame pixels: its top left; it is STATUE_W x statueH(id)), its
+ * pedestal's foot on the front row's line, either side of the gate.
+ */
+export const statueSpot = (id: StatueId): Pt => [CX + (id === "marble" ? -1 : 1) * STATUE_OFF - STATUE_W / 2, FRONT + 1 - statueH(id)];
 
 /** Where the tablet's blank face is (frame pixels), for the game to write "The Coliseum" on. */
 export const HOUSE_COLISEUM_SIGN = signFace(BOARD[0], BOARD[1], BW, BH);

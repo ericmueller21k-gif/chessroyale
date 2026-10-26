@@ -38,6 +38,31 @@ export const APRON: readonly Sq[] = Array.from({ length: COLISEUM.size * APRON_R
   (a, b) => Math.hypot(a.c - GATE_X, a.r - GATE_Y) - Math.hypot(b.c - GATE_X, b.r - GATE_Y),
 );
 
+/** The two statues on the Coliseum's front (houses/statues.ts draws them): the marble statue and the bronze statue. */
+export type StatueId = "marble" | "bronze";
+/**
+ * A statue, and the apron square right in front of it (c, r) where you stand to look at it: stopping there (or where a
+ * tap on the statue sent you) brings the camera in close on it, and its quote renders in on its pedestal.
+ */
+export interface Statue {
+  id: StatueId;
+  c: number;
+  r: number;
+  /** Its quote, word for word (no attribution: Eric). */
+  quote: string;
+}
+/**
+ * The marble statue (the Hidden Boss in stone) before the Coliseum ground's first column, on the gate's left; the bronze
+ * statue before its last, on the gate's right (from the ground's size, so they follow it if it grows). Quotes: Eric's,
+ * Oct 26.
+ */
+export const STATUES: readonly Statue[] = [
+  { id: "marble", c: COLISEUM.c0, r: COLISEUM.r0 - 1, quote: "Nothing is so healing as the human touch" },
+  { id: "bronze", c: COLISEUM.c0 + COLISEUM.size - 1, r: COLISEUM.r0 - 1, quote: "Concrete considerations always take precedence over general principles" },
+];
+/** The statue whose viewing square (c, r) is, or null. */
+export const statueAt = (c: number, r: number): Statue | null => STATUES.find((s) => s.c === wrapI(c) && s.r === wrapI(r)) ?? null;
+
 /** Your square when the page opens: just south of the Coliseum's ground, facing it (the camera looks north, r rising). */
 export const START: Sq = { c: 20, r: 13 };
 
@@ -344,7 +369,7 @@ export function createTown(now: number, seed = 20261025): Town {
       c = wrapI(START.c - 8 + Math.floor(rnd() * 16));
       r = wrapI(START.r - 4 + Math.floor(rnd() * 14));
       const sq = { c, r };
-      if (walkable(c, r) && tdist(sq, START) >= 3 && !HOMES.some((h) => plotDist(h, c, r) <= f.bossRoam) && !bots.some((o) => tdist(sq, o.walker.here()) < 3)) break;
+      if (walkable(c, r) && !statueAt(c, r) && tdist(sq, START) >= 3 && !HOMES.some((h) => plotDist(h, c, r) <= f.bossRoam) && !bots.some((o) => tdist(sq, o.walker.here()) < 3)) break;
     }
     bots.push({ id: `bot:${bots.length}`, name: b.name, look: { side: b.side, tint: b.tint }, you: false, walker: new Walker({ c, r }, f.botStepMs, true) });
   }
@@ -421,7 +446,7 @@ export function spotNear(t: Town, w: Walker, at: Sq, beside: boolean): Sq | null
 }
 
 /** What a tap asks for: a square, the squares beside someone, the ring around a home, or the Coliseum's apron. */
-export type Target = { kind: "square"; c: number; r: number } | { kind: "beside"; at: Sq } | { kind: "home"; home: Home } | { kind: "coliseum" };
+export type Target = { kind: "square"; c: number; r: number } | { kind: "beside"; at: Sq } | { kind: "home"; home: Home } | { kind: "coliseum" } | { kind: "statue"; statue: Statue };
 
 /**
  * The square `w` would end on for a target (null: none; where it stands already counts). A square: itself if free, else
@@ -451,6 +476,8 @@ export function destFor(t: Town, w: Walker, target: Target): Sq | null {
     return path ? path[path.length - 1]! : null;
   }
   if (target.kind === "beside") return spotNear(t, w, target.at, true);
+  // A statue: its viewing square, or (someone stands there) the nearest free square beside it.
+  if (target.kind === "statue") return spotNear(t, w, target.statue, false);
   if (plotAt[target.r * N + target.c]) {
     const h = plotAt[target.r * N + target.c]!;
     return destFor(t, w, { kind: "home", home: h });
@@ -541,7 +568,8 @@ function botsWander(t: Town, now: number): void {
   const w = bot.walker;
   const h = w.here();
   const [lo, hi] = f.botWalk;
-  const ok = (c: number, r: number) => walkable(c, r) && !taken(t, c, r, w) && !t.bosses.some((b) => plotDist(b.home, c, r) === 1);
+  // (Never on a statue's viewing square: it's kept free for whoever comes to look.)
+  const ok = (c: number, r: number) => walkable(c, r) && !taken(t, c, r, w) && !t.bosses.some((b) => plotDist(b.home, c, r) === 1) && !statueAt(c, r);
   const targets: Sq[] = [];
   for (let dc = -hi; dc <= hi; dc++)
     for (let dr = -hi; dr <= hi; dr++) {
