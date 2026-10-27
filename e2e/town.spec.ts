@@ -445,6 +445,10 @@ test("Folio's Folded House: a tap walks you there and opens its card with its na
     await visit();
     await expect(card.getByRole("heading", { name })).toBeVisible();
     await expect(card.getByText("Coming soon", { exact: true })).toBeVisible();
+    // Folio's paper crane steps round behind its house and stays: its picture's box is wide, and standing in front it
+    // covered the doorway for the whole wait (seen Oct 27, 1 run in 10 on a computer).
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __townBossBack: (id: string) => boolean }).__townBossBack("folio")), { timeout: 15_000 }).toBe(true);
+    await page.waitForTimeout(300);
     await expect(async () => {
       const c = await glowAt(page, "light", "folio");
       expect(c, "its doorway shows").not.toBeNull();

@@ -33,7 +33,7 @@ import { TOWN_FEEL } from "./feel.ts";
 import { Press } from "./press.ts";
 import { PAWN_PX, Renderer, pawnImage, type Hit } from "./render.ts";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
-import { BOTS, COLISEUM_PLACE, HOMES, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, createTown, destFor, holdBot, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingText, seated, statueAt, stoolAt, tableAt, tableFor, tableStates, tdist, tick, waitingBot, walkWalker, type HomeId, seatOf, seatText, type Person, type Place, type Seat, type Sq, type StatueId, type Target } from "./world.ts";
+import { BOTS, COLISEUM_PLACE, HOMES, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, createTown, destFor, holdBot, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingText, seated, statueAt, stoolAt, tableAt, tableFor, tableStates, tdist, tick, waitingBot, walkWalker, type HomeId, seatOf, seatText, type Person, type Place, type Seat, type Sq, type StatueId, type Target } from "./world.ts";
 import { dressedPawn, lookKey } from "./you-look.ts";
 import type { BotGameAsk } from "./TownPage.tsx";
 import "./town.css";
@@ -728,7 +728,21 @@ function startTown(
           return { name: p.name, at: `${h.c},${h.r}`, table: seated(p)?.i ?? -1, moving: p.walker.moving() };
         })
       : null;
-  const hooks = window as unknown as { __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots };
+  // ... `__townBossBack(id)`: that home's boss walks round behind its home (the square two rows past its middle, or the
+  // nearest free one) and stays there, so nothing of it stands in front of the home's doorway (its picture's box is wide).
+  // True once it stands there (call it again to ask).
+  const hookBossBack = (id: HomeId): boolean => {
+    if (!testSwitchesAllowed()) return false;
+    const b = town.bosses.find((x) => x.home.id === id);
+    if (!b) return false;
+    if (!b.held) {
+      b.held = true;
+      const to = spotNear(town, b.walker, { c: b.home.cx, r: b.home.cy + 2 }, false);
+      if (to) walkWalker(b.walker, to);
+    }
+    return !b.walker.moving();
+  };
+  const hooks = window as unknown as { __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack };
   hooks.__townAt = hookAt;
   hooks.__townGather = hookGather;
   hooks.__townCam = hookCam;
@@ -736,6 +750,7 @@ function startTown(
   hooks.__townTables = hookTables;
   hooks.__townCall = hookCall;
   hooks.__townBots = hookBots;
+  hooks.__townBossBack = hookBossBack;
 
   run();
   draw(performance.now()); // the first frame, before the screen shows
@@ -795,6 +810,7 @@ function startTown(
       delete hooks.__townTables;
       delete hooks.__townCall;
       delete hooks.__townBots;
+      delete hooks.__townBossBack;
       if (card?.kind === "boss") town.bosses[card.i]!.held = false;
       cv.removeEventListener("pointerdown", onDown);
       cv.removeEventListener("pointermove", onMove);
