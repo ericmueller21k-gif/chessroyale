@@ -339,8 +339,16 @@ export interface BossRules {
     rank(boss: BossState, top: readonly MoveScore[], fen: string): MoveScore[];
     evaluation<E extends JudgedEvaluation>(boss: BossState, evaluation: E, fen: string): E;
   };
-  /** In the match: what happens after any crowd move (G-REX's fire burns what was left on a tile ablaze). */
-  afterCrowdMove?(b: Battle, move: string | null): void;
+  /**
+   * In the match: what happens after any crowd move (G-REX's fire burns what was left on a tile ablaze). `judged`: the
+   * judge's numbers for it (a scored round's; none for a move a power played for the crowd), which Folio's Revision reads.
+   */
+  afterCrowdMove?(b: Battle, move: string | null, judged?: JudgedMove | null): void;
+  /**
+   * The crowd's move just played was crossed out (Folio's Revision: the board went back to before the boss's last move):
+   * its round doesn't count for fair play (the runner marks it `power` after the move).
+   */
+  crossedOut?(boss: BossState): boolean;
   /** In the match: a crowd turn has just been set up (prepareTurn): the Hidden Boss's bullet clock sets every bank as it comes. */
   turnBegun?(b: Battle): void;
   /**
@@ -428,6 +436,23 @@ export interface BossMoveExtras {
    */
   hoops?: string | null;
   hoopsGain?: number | null;
+  /**
+   * Folio's Crease, wanted with this move (the warning, or the trigger, as the crowd's next turn begins): its line after the
+   * move (creasePick; the host's answer online), checked as it's kept (creaseCheck), and what it costs the crowd by that
+   * engine (null: not known here).
+   */
+  crease?: string | null;
+  creaseLoss?: number | null;
+}
+
+/** What the judge said of the crowd's move just played (the runner's finishRound), for a boss's afterCrowdMove. */
+export interface JudgedMove {
+  /** The crowd's expected score with its best move (the round's highest scored). */
+  best: number;
+  /** Its expected score after the move it played. */
+  played: number;
+  /** The God King played it. */
+  king?: boolean;
 }
 
 /** A board's evaluation as the judge works it out: its best move, that move's expected score, and every move's. */
@@ -490,7 +515,7 @@ export function warnThenUnleash(next: BossPowerState, t: TurnContext): boolean {
 export type BossLastMove = { move: string; san: string; staggered?: boolean; captured?: string; through?: StopReason };
 
 /** The power fields `BossRules.stopReason` reads: the same in the match's state and in the screens' view. */
-export type StopFields = Partial<Pick<BossPowerState, "cut" | "boardSaw" | "pies" | "block">> & { camo?: { square: string | null } | null; garden?: { plants: readonly { square: string }[] } | null; hoops?: { blocks: readonly string[] } | null };
+export type StopFields = Partial<Pick<BossPowerState, "cut" | "boardSaw" | "pies" | "block" | "crease">> & { camo?: { square: string | null } | null; garden?: { plants: readonly { square: string }[] } | null; hoops?: { blocks: readonly string[] } | null };
 
 /**
  * What a boss's battle code (its moments in a match: the funhouse, Lights out, the bounce…) may use of the match

@@ -27,6 +27,7 @@
   "e2e/eval-bar.spec.ts": 82,
   "e2e/fairplay.spec.ts": 23,
   "e2e/faq.spec.ts": 16,
+  "e2e/folio.spec.ts": 150,
   "e2e/formats.spec.ts": 973,
   "e2e/friends.spec.ts": 67,
   "e2e/front-door.spec.ts": 68,

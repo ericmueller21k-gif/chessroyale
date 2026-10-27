@@ -15,8 +15,8 @@ import { stopReason, stunnedIn, type StopFields } from "@chessroyale/chess";
 /** How long a refused move's reason stays in the dock (unless the position changes first). */
 export const REFUSED_MS = 3000;
 
-/** Why a move of yours was refused: a power that stops it, your frozen or moonstruck piece, or the move the God King took back. */
-export const REFUSED: Record<StopReason | "frozen" | "stunned" | "barred", string> = {
+/** Why a move of yours was refused: a power that stops it, your frozen, folded or moonstruck piece, or the move the God King took back. */
+export const REFUSED: Record<StopReason | "frozen" | "folded" | "stunned" | "barred", string> = {
   boardsaw: "The board saw blocks that move.",
   cut: "The saw cut blocks that move.",
   pie: "A pie blocks that square.",
@@ -24,7 +24,10 @@ export const REFUSED: Record<StopReason | "frozen" | "stunned" | "barred", strin
   paint: "A painted piece stops that move.",
   plant: "A plant is in the way.",
   hoop: "A burning hoop is in the way.",
+  // (Folio's crease stops only your pieces: its own cross it.)
+  crease: "The crease stops your pieces.",
   frozen: "That piece is frozen.",
+  folded: "That piece is folded.",
   stunned: "Moonlight holds that piece.",
   barred: "The God King took that move back.",
 };
@@ -42,16 +45,20 @@ export const THROUGH: Record<StopReason, string> = {
   paint: "His only move: out of paint.",
   plant: "His only move: past the plant.",
   hoop: "His only move: through the hoop.",
+  // (Never said: the crease never stops Folio's own pieces, so its move is never "through" it.)
+  crease: "Its pieces cross the crease.",
 };
 
 /** The boss as the screens see it, as far as these words need. */
-type BossLike = { id?: string; barred?: string | null; powers?: (StopFields & { iced?: readonly string[]; stunned?: readonly string[] }) | null; lastMove?: { through?: StopReason } | null };
+type BossLike = { id?: string; barred?: string | null; powers?: (StopFields & { iced?: readonly string[]; folded?: readonly string[]; stunned?: readonly string[] }) | null; lastMove?: { through?: StopReason } | null };
 
 /** Why `move` (legal in chess, not allowed now) was refused, in the dock's words. */
 export function refusedLine(boss: BossLike, fen: string, move: string): string {
   if (boss.barred && boss.barred === move) return REFUSED.barred;
   // (Ginger's ice: the frozen piece's own move, or castling with a frozen rook.)
   if (boss.powers?.iced?.length && stunnedIn(fen, move, boss.powers.iced)) return REFUSED.frozen;
+  // (Folio's folded piece: its own move, or castling with a folded rook.)
+  if (boss.powers?.folded?.length && stunnedIn(fen, move, boss.powers.folded)) return REFUSED.folded;
   // (Moo's moonbeam: the stunned piece's own move, or castling with a stunned rook.)
   if (boss.powers?.stunned?.length && stunnedIn(fen, move, boss.powers.stunned)) return REFUSED.stunned;
   const why = stopReason(boss, fen, move);

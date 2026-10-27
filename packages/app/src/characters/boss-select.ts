@@ -60,6 +60,8 @@ export const SELECT_LINES: Readonly<Record<string, readonly string[]>> = {
   gardener: ["Mind the flower beds.", "Good soil here. Very good soil.", "Everything's coming up roses."],
   // The director's draft (Oct 24), as written: lines that read right outside a match.
   tiger: ["No roaring tonight. Balloons only.", "Another masterpiece.", "Don't rush the artist."],
+  // Folio (the director's, Oct 26): its select and intro line, the only one (its tile comes with the wiring lane).
+  folio: ["Every game is a draft. Shall we write one?"],
   // The Hidden Boss (Eric's own first line; never named on screen): the two in turn.
   recluse: ["Team up on me. It wouldn't be the first time anyone did that.", "You're not ready to fight me yet."],
 };

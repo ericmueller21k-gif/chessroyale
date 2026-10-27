@@ -37,6 +37,7 @@ import {
   type BossLastMove,
   type BossRules,
   type JudgedEvaluation,
+  type JudgedMove,
   type RageRates,
   type Side,
   type StopFields,
@@ -48,7 +49,7 @@ import { bossRules } from "./bosses/index.ts";
 export { bossPowers, materialOf, moveLoss, moveSquares, powerRoll, rageNow, ragePoints, rageSpeedOf, rageTick, topEach, unleashed };
 // (The pass guard: one rule for every power that spends his whole turn.)
 export { PASS_WAIT, passAnswer, passLoses, passScores, type PassScore } from "./bosses/base.ts";
-export type { Battle, BossAsks, BossLastMove, BossRules, JudgedEvaluation, RageRates, StopFields, TurnContext };
+export type { Battle, BossAsks, BossLastMove, BossRules, JudgedEvaluation, JudgedMove, RageRates, StopFields, TurnContext };
 export * from "./bosses/ginger.ts";
 export * from "./bosses/boingo.ts";
 export * from "./bosses/grex.ts";
@@ -65,6 +66,7 @@ export * from "./bosses/smudgy.ts";
 export * from "./bosses/gardener.ts";
 export * from "./bosses/tiger.ts";
 export * from "./bosses/moo.ts";
+export * from "./bosses/folio.ts";
 export * from "./bosses/index.ts";
 
 /** A battle's powers as it starts (nothing has happened yet; the first turn is set up by prepareTurn). */

@@ -14,6 +14,7 @@ import { SMUDGY_FX } from "./bosses/smudgy.ts";
 import { MOO_FX } from "./bosses/moo.ts";
 import { GARDENER_FX, waterMs } from "./bosses/gardener.ts";
 import { HOOPS_BEATS, TIGER_FX } from "./bosses/tiger.ts";
+import { FOLIO_FX } from "./bosses/folio.ts";
 
 /**
  * Boss battle timing shared by the lobby server and the solo game, so a screen
@@ -68,7 +69,7 @@ export function bossShowMs(lastMove: { captured?: string } | null | undefined, a
  * step, `spin`: its banner, then the board turns again); the Roman candle: G-REX drops onto the board, slams the candle down and fires
  * its 24 shots (see the app's PowerMoment for the beats).
  */
-export const POWER_FX = { warn: 1700, ...GINGER_FX, ...BOINGO_FX, ...GREX_FX, ...HOLLOW_FX, ...BIGBOY_FX, ...SAWYER_FX, ...PIG_FX, ...RECLUSE_FX, ...ALFIL_FX, ...HOPPER_FX, ...SMUDGY_FX, ...MOO_FX, ...GARDENER_FX, ...TIGER_FX } as const;
+export const POWER_FX = { warn: 1700, ...GINGER_FX, ...BOINGO_FX, ...GREX_FX, ...HOLLOW_FX, ...BIGBOY_FX, ...SAWYER_FX, ...PIG_FX, ...RECLUSE_FX, ...ALFIL_FX, ...HOPPER_FX, ...SMUDGY_FX, ...MOO_FX, ...GARDENER_FX, ...TIGER_FX, ...FOLIO_FX } as const;
 
 /** What a moment's length reads of its event: its kind, Hollow's first cover, the hippo gardener's watering's outcomes. */
 type FxEvent = { kind: keyof typeof POWER_FX; first?: boolean; growth?: readonly { kind: string }[] };
@@ -216,7 +217,7 @@ export const BOSS_MOVE_ALONE_MS = 450;
 export interface QueenSlainView {
   crowdSide: "w" | "b";
   crowdMoves: number;
-  powers?: { bounce?: { at: number } | null; hop?: { at: number } | null; events?: readonly { kind: string }[]; fusion?: { at: number; why?: string } | null } | null;
+  powers?: { bounce?: { at: number } | null; hop?: { at: number } | null; events?: readonly { kind: string }[]; fusion?: { at: number; why?: string } | null; revision?: { at: number } | null } | null;
   board: { history: readonly string[]; bases?: readonly Base[] | null };
 }
 
@@ -240,7 +241,8 @@ const hisStepPlayed = (boss: { crowdMoves: number; powers?: { events?: readonly 
 export function queenSlain(boss: QueenSlainView): boolean {
   const { history, bases } = boss.board;
   const m = history[history.length - 1];
-  if (!m || boss.powers?.bounce?.at === boss.crowdMoves || boss.powers?.hop?.at === boss.crowdMoves || hisStepPlayed(boss)) return false;
+  // (Folio's Revision crossed that move out: no queen was taken.)
+  if (!m || boss.powers?.bounce?.at === boss.crowdMoves || boss.powers?.hop?.at === boss.crowdMoves || boss.powers?.revision?.at === boss.crowdMoves || hisStepPlayed(boss)) return false;
   const taken = pieceAt(fenAtPly(history, history.length - 1, bases), m.slice(2, 4));
   return taken?.type === "q" && taken.color !== boss.crowdSide;
 }
@@ -260,6 +262,13 @@ export function bossThinkMs(boss: QueenSlainView, burnt = false, afterMs = 0): n
  */
 export const fullMoonMs = (boss: { powers?: { events?: readonly { kind: string }[] } | null } | null | undefined): number =>
   boss?.powers?.events?.some((e) => e.kind === "fullMoon") ? POWER_FX.fullMoon : 0;
+
+/**
+ * Folio's moments at the start of its turn (as the crowd's move just played landed: a `fold` or a `revision` among this
+ * turn's events): they play while it thinks, so its thinking lasts at least as long (the ms; 0: none).
+ */
+export const folioTurnMs = (boss: { powers?: { events?: readonly { kind: string }[] } | null } | null | undefined): number =>
+  powerMomentMs((boss?.powers?.events ?? []).filter((e): e is { kind: "fold" | "revision" } => e.kind === "fold" || e.kind === "revision"));
 
 /**
  * Alfil's Slam: its pieces came down early after the crowd's move just played (he had a mate in one only while they
