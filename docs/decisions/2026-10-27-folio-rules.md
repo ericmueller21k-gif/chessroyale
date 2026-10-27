@@ -179,4 +179,6 @@ lane's. Until then it stays **not playable** (`kit: null`): the test links `?bos
 
 None removed or loosened; none guards a rule of Eric's (`docs/rules/eric.md`). Added: Folio's row in
 `boss-power-legal.test.ts`'s powers and two `stopReason` checks; the parity test's host answers the Crease's ask (as the
-app's host does); `boss-smoke.spec.ts`'s `PASSIVE_EVENTS` has `draft`.
+app's host does); `boss-smoke.spec.ts`'s `PASSIVE_EVENTS` has `draft`; Folio in `king-save-altered.test.ts`'s `AUDIT` (a
+fold and the crease sit the Last Stand out) with a check that its mark doesn't. Changed: `pig.test.ts`'s "only Wrangler's
+and Moo's rules ask for `bestReply`" now names Folio's too (its Revision), the list it excludes one longer.
