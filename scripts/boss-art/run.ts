@@ -51,7 +51,7 @@ const DRAFT = join(OUT, `${id}.ts`);
 const LOOKS = join(OUT, "looks");
 mkdirSync(LOOKS, { recursive: true });
 /** What the model may read: the characters' code, the art guide and the boss area page (read only). */
-const READABLE = ["packages/app/src/characters", "packages/app/src/town/houses", ".claude/agents/characters.md", "docs/areas/bosses.md", "docs/areas/town-square.md", "scripts/boss-art/out/folio", "scripts/boss-art/briefs"].map((p) => resolve(p));
+const READABLE = ["packages/app/src/characters", "packages/app/src/town/houses", ".claude/agents/characters.md", "docs/areas/bosses.md", "docs/areas/town-square.md", "scripts/boss-art/out/folio", "scripts/boss-art/out/sidekick-jefferson-sonnet-2", "scripts/boss-art/briefs"].map((p) => resolve(p));
 const refs = refsDir ? readdirSync(refsDir).filter((f) => /\.(png|jpe?g|webp|gif)$/i.test(f)).sort() : [];
 const IMG_TYPE: Record<string, "image/png" | "image/jpeg" | "image/webp" | "image/gif"> = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif" };
 
