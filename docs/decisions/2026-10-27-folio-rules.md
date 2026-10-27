@@ -15,6 +15,10 @@ lane's. Until then it stays **not playable** (`kit: null`): the test links `?bos
 
 ## What was decided before this lane (the director's sheet)
 
+(As the sheet had it. After the first sim the director changed four things: the Crease stops the crowd's pieces only, in
+a band of 1 to 2.5 pawns; the Draft marks the most valuable piece; a fold lasts 4 turns; offset 0 and `rageSpeed` 1.3. See
+"The director's calls" below.)
+
 - **Opening:** the game so far.
 - **Draft (passive):** every `draftEvery` crowd turns from turn 3, at the end of its move, an ink mark under one crowd piece
   one of its pieces attacks (the attack's line shows faintly): one that matters and isn't simply hanging (defended, a
@@ -47,12 +51,12 @@ lane's. Until then it stays **not playable** (`kit: null`): the test links `?bos
 3. **The Draft's pick:** "defended (so Folio wouldn't just take it)" read as its reason says: the piece is defended **and
    no cheaper piece of Folio's attacks it** (a pawn attacking a defended knight would just take it). The attacker shown is
    the cheapest Folio piece attacking it, ties by square, a king last (it can't take a defended piece). The line's squares
-   are those between them for a bishop, rook or queen; none for a knight, pawn or king, or side by side. Pawns can be marked
-   but rank by value, so only when fewer than three pieces qualify. **Never the piece folded now** (it couldn't answer by
-   moving, so it would fold again and again). Ties by value go by square, then the seeded pick of the top three
-   (`powerRoll(seed, "draft", turn)`).
+   are those between them for a bishop, rook or queen; none for a knight, pawn or king, or side by side. Pawns can be marked,
+   but only when no piece qualifies. **Never the piece folded now** (it couldn't answer by moving, so it would fold again
+   and again). Of those, **the most valuable** (the director's call, below; it was the sheet's seeded pick of the top three),
+   seeded only among ties of value (`powerRoll(seed, "draft", turn)`).
 4. **The window counts crowd turns:** a mark set as crowd turn T begins (`until` T + 1) must be answered by the end of the
-   crowd's move on turn T + 1; after that move, if the attack still stands, the piece is folded for turns T + 2 to T + 4.
+   crowd's move on turn T + 1; after that move, if the attack still stands, the piece is folded for turns T + 2 to T + 5 (`foldTurns` 4).
    The checks run after every move (the crowd's: answered or folded; Folio's: its attacker moved away, or it took the piece)
    and, last, as each turn begins. "Answered in time" counts a mark cleared after a crowd move; one Folio cleared by moving
    its own piece doesn't count as answered.
@@ -65,11 +69,12 @@ lane's. Until then it stays **not playable** (`kit: null`): the test links `?bos
 6. **The crease's line** is written as its two neighbors: `"d|e"` (between the d and e files), `"4|5"` (between ranks 4 and
    5). **A move crosses it when a piece it moves ends on the other side** (any move, knights included: the board saw's rule).
    Where the saw's rule and a crease's could differ: castling. The saw only ever sat between d and e, which no castling rook
-   crosses; on a crease near a corner the rook can cross alone (h1 to f1 over "g|h"), so **castling is refused when its
-   king or its rook would cross** ("no piece of either side may move across it"). Everything else is the saw's: attacks,
-   checks and pins work across it; the dispatcher lifts it for a side it would leave no move (or no way out of check); his
-   only move across it is marked (`through`, "Its only move: across the crease."); a refused move of yours says "The crease
-   blocks that move."
+   crosses; on a crease near a corner the rook can cross alone (h1 to f1 over "g|h"), so **the crowd's castling is refused
+   when its king or its rook would cross** ("no piece may move across it"). Everything else is the saw's: attacks, checks
+   and pins work across it; the dispatcher lifts it for a turn it would leave the crowd no move (or no way out of check).
+   **Since the director's call (below), it stops the crowd's pieces only** (`Crease.side`): Folio's moves are never
+   stopped (no `bossStops`), so the saw's "his only move across it" can't come (its `THROUGH` words, required by the table,
+   are never said); a refused move of yours says "The crease stops your pieces."
 7. **When the engine picks the line:** with Folio's move whose next crowd turn would bring the warning: the meter full by
    then (worked out as `prepareTurn` will: this crowd move's rage and its material lost so far; a promotion of its own can
    only lower that, so a warning never comes without its line), the test switch, or the admins' trigger (`creaseDue`,
@@ -80,9 +85,10 @@ lane's. Until then it stays **not playable** (`kit: null`): the test links `?bos
 8. **The line's cost:** the crowd's best move with the crease against its best without (the same position, searchmoves at
    `creaseNodes`), in pawns of log-odds (`bouncePawnLogit`, as every engine-shaped band). Lines that take away the same moves
    share one search, and a line no move of the crowd crosses costs nothing without one: at most 15 searches. The engine sees
-   the crease at its root only (as Babur's walls). **The guard** (`creaseGuard`): the crowd keeps a move, Folio keeps one
-   were the crowd to pass (`passTurn`; in check, not asked), and neither side has a mate in one with the crease counted.
-   **The pick** (`pickCrease`): in the band, nearest its middle (0.9); none, the one nearest `creaseLossMin` from below;
+   the crease at its root only (as Babur's walls). **The guard** (`creaseGuard`): the crowd keeps a move and has no mate in
+   one with the crease counted, and Folio has none were the crowd to pass (`passTurn`; in check, not asked; its moves are
+   never limited, so a mate threat of its own means no crease that turn). **The pick** (`pickCrease`): in the band,
+   nearest its middle (1.75 since the director's band); none, the one nearest `creaseLossMin` from below;
    never one over `creaseLossMax` (none at all: no warning yet). Ties (lines taking away the same moves cost exactly the
    same) by the server's roll, sent as the ask's `order` (the battle's seed never leaves the server).
 9. **The trigger** (`triggerAtHisTurn`, as Wrangler's): kept until a line comes with Folio's move; then the crease lands as
@@ -129,6 +135,24 @@ lane's. Until then it stays **not playable** (`kit: null`): the test links `?bos
 17. **Its lines** (`characters/folio-lines.ts`, `FOLIO_LINES`, by the kit's beats: `entrance`, `power` (the mark), `fold`,
     `ultimateWarn`, `revision`, `victory`, `defeat`; two beats added to `Beat`, `fold` and `revision`) and its select line
     (`SELECT_LINES.folio`, its intro line). Nothing more than the sheet's seven.
+
+## The director's calls (Oct 27, after the first sim)
+
+The first sim put Folio at 0.40 to 0.58 for the crowd, the easiest boss in the pack, and it's meant to be a final boss. The
+director (not this lane) changed four things; the rules above are written as they now stand:
+
+1. **The Crease bites the crowd only.** Folio folds the board toward itself: the crowd's pieces may not cross the crease;
+   Folio's may. Everything else of the saw's stays for the crowd: the refused-move words, the only-move exception, never
+   leaving the crowd without a legal move or a way out of check. **Its band is 1 to 2.5 pawns** (`creaseLossMin`,
+   `creaseLossMax`; was 0.3 to 1.5), judged with the crowd to move, as other ultimates cost about 2; the fallback stays the
+   line nearest below the band.
+2. **The Draft marks the piece that matters most:** the most valuable qualifying piece, seeded only among ties (was a seeded
+   pick of the top three; `draftTop` is gone). **`foldTurns` 4** (was 3).
+3. **Offset 0** (was −250): Folio plays at the usual strength.
+4. **`rageSpeed` 1.3** (was 1).
+
+Then one run of 60 battles at this setting (a standard error of about 0.06); above 0.30, one more at offset +150; ship the
+nearer the aim; if neither is under 0.30, stop and report.
 
 ## The numbers and why
 
