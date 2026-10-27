@@ -1,15 +1,15 @@
 /**
- * The two statues on the Coliseum's front, one each side of its gate, each on a pedestal of its own (town square;
+ * The two statues on the Colosseum's front, one each side of its gate, each on a pedestal of its own (town square;
  * docs/decisions/2026-10-26-town-square-statues.md, -statues-2.md): the marble statue (`marble`, the Hidden Boss in
  * stone, on the gate's left) and the bronze statue (`bronze`, on its right). Each is drawn twice: at the world's scale
- * (1 picture pixel a Coliseum pixel) and as a close-up (`CLOSE` times finer, the same box), which the camera shows when
+ * (1 picture pixel a Colosseum pixel) and as a close-up (`CLOSE` times finer, the same box), which the camera shows when
  * it zooms in on it. The pedestals are about a piece's plinth's size; at the world's scale their panels carry only a few
  * squiggly lines, like writing too small to read. No name is written on either statue or pedestal: up close the game
  * writes only its quote on the pedestal's panel, at the screen's own resolution.
  *
  * The bronze statue is a stack of pieces (front to back), each a shape in statue units: X across from its middle (right
  * +), j up from its foot (the pedestal's top). `sculpt` paints it in one stuff (bronze, or the marble slab), lit from the
- * top left like the Coliseum's chess pieces: a piece is lit where it faces up and left, in shade where it faces down and
+ * top left like the Colosseum's chess pieces: a piece is lit where it faces up and left, in shade where it faces down and
  * right, and a piece in front casts a thin shadow down-right onto the pieces behind it. Drawn finer (s > 1), the pieces'
  * `mark`s add the detail the world's scale can't hold. At the world's scale its head is typed by hand, pixel by pixel.
  * The marble statue is the Hidden Boss's own picture (characters/recluse.ts) turned to marble (`bossFigure`).
@@ -494,19 +494,19 @@ const KNIGHT: Figure = {
 };
 
 // ---- The pedestals: a base course, a die with a panel on its face, a cornice, about a chess piece's plinth's size
-// (coliseum.ts, 38 x 20). The marble statue's is marble, its panel sunk; the bronze statue's is the Coliseum's stone with a
+// (coliseum.ts, 38 x 20). The marble statue's is marble, its panel sunk; the bronze statue's is the Colosseum's stone with a
 // bronze plaque. At the world's scale the panel holds no words, only a few short squiggly lines, like writing too small to
 // read; up close the game writes the quote over them (render.ts), engraved in the marble or cast in the bronze.
 
-/** The pedestal's size (Coliseum pixels): about a piece's plinth (Eric, Oct 26: "a normal size block"). */
+/** The pedestal's size (Colosseum pixels): about a piece's plinth (Eric, Oct 26: "a normal size block"). */
 export const PED_W = 40;
 export const PED_H = 24;
-/** Its panel's face, where the quote goes: across from its middle and up from its foot (Coliseum pixels), framed by a rim a pixel wide. */
+/** Its panel's face, where the quote goes: across from its middle and up from its foot (Colosseum pixels), framed by a rim a pixel wide. */
 const FACE = { x0: -17, x1: 17, j0: 4, j1: 19 } as const;
 /** The die (between the base course and the cornice): its half width, and where it runs. */
 const DIE = { half: 19, j0: 2, j1: 21 } as const;
 /**
- * The squiggles on the panel: a few short lines of "writing" (each a run of word lengths, in Coliseum pixels, two apart),
+ * The squiggles on the panel: a few short lines of "writing" (each a run of word lengths, in Colosseum pixels, two apart),
  * from the top line down, centered. They're as long as the panel's lines of text would be, give or take.
  */
 const SQUIGGLES: readonly (readonly number[])[] = [
@@ -515,7 +515,7 @@ const SQUIGGLES: readonly (readonly number[])[] = [
   [8, 4, 9],
   [6, 5],
 ];
-/** The squiggles' lines' rows (j of their middles) and how far they wave (Coliseum pixels). */
+/** The squiggles' lines' rows (j of their middles) and how far they wave (Colosseum pixels). */
 const SQUIGGLE_J = [16, 13, 10, 7] as const;
 const SQUIGGLE_AMP = 0.45;
 
@@ -581,7 +581,7 @@ function pedestal(cx: number, fy: number, s: number, kind: StatueId): Generator<
 
 const PALETTE: Record<string, string> = {
   k: "#2a1c14", // outline
-  "1": "#fbf0d8", // the Coliseum's stone (travertine), lightest to darkest
+  "1": "#fbf0d8", // the Colosseum's stone (travertine), lightest to darkest
   "2": "#ecd9b2",
   "3": "#d8bf93",
   "4": "#bb9e70",
@@ -606,7 +606,7 @@ const PALETTE: Record<string, string> = {
 
 /** A statue's figure's height over the pedestal (the world's pixels). */
 const figureH = (id: StatueId) => (id === "bronze" ? BRONZE.h : marbleH());
-/** A statue's picture: its box in the Coliseum's pixels (w x h, its pedestal's foot in the middle of its bottom). */
+/** A statue's picture: its box in the Colosseum's pixels (w x h, its pedestal's foot in the middle of its bottom). */
 export const STATUE_W = PED_W + 2;
 export const statueH = (id: StatueId) => figureH(id) + PED_H + 2;
 

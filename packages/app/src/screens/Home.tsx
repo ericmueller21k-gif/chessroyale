@@ -770,7 +770,7 @@ export function HomeScreen({
     // The Boss raid screen (?mode=raid, the test link): every way to play a raid, each through its flow from before (Eric,
     // Oct 16: "from there you can pick if you want to solo against bosses or play with bots or queue with other players").
     // Solo Boss Mode (Eric, Oct 26) is the same screen without the raid choices: the tiles, the stage, Boss alone. Raids
-    // move to the Boss Arena's Coliseum, so they're left off this form (`full` tells the two apart).
+    // move to the Boss Arena's Colosseum, so they're left off this form (`full` tells the two apart).
     const raidResting = full ? rest("raid") : null;
     const online = (sub: string) => (onlineLocked ? "Online: sign in to play" : sub);
     // (The Hidden Boss picked: every way to play locked.)

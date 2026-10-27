@@ -86,7 +86,7 @@ const rgb = (v: readonly number[]) => `rgb(${v[0]! | 0},${v[1]! | 0},${v[2]! | 0
 const HAZE_LINES = 10;
 /**
  * The squares' colors: 65 steps toward the sky, light or dark, and the ground (the board, the board under a home or the
- * Coliseum, the park's paving, its grass); and at most this many squares a frame.
+ * Colosseum, the park's paving, its grass); and at most this many squares a frame.
  */
 const GROUNDS = 4;
 const SQ_KEYS = (MIX_STEPS + 1) * GROUNDS * 2;
@@ -117,7 +117,7 @@ function groundColors(skyh: readonly number[]): GroundColors {
     for (let g = 0; g < GROUNDS; g++)
       for (let alt = 0; alt < 2; alt++) {
         let base: readonly number[] = g === 2 ? (alt ? PAVE_DARK : PAVE_LIGHT) : g === 3 ? (alt ? GRASS_DARK : GRASS_LIGHT) : alt ? SQ_DARK : SQ_LIGHT;
-        if (g === 1) base = base.map((x) => x * 0.9); // a faint darker tint under a home (and the Coliseum)
+        if (g === 1) base = base.map((x) => x * 0.9); // a faint darker tint under a home (and the Colosseum)
         const t = i / MIX_STEPS;
         const f = mix(base, skyh, t);
         const k = sqKeyOf(i, g, alt);
@@ -231,7 +231,7 @@ interface Item {
 }
 const newItem = (kind: Item["kind"], i: number): Item => ({ kind, i, dx: 0, dz: 0, sz: 0, on: false, depth: 0, x0: 0, y0: 0, x1: 0, y1: 0, fx: 0, fy: 0, hy: 0, faded: false });
 
-/** An edge chip this frame: which place (a home, or the Coliseum), where on the box's edge, which way its arrow points (degrees). */
+/** An edge chip this frame: which place (a home, or the Colosseum), where on the box's edge, which way its arrow points (degrees). */
 export interface Chip {
   place: Place | null;
   x: number;
@@ -328,7 +328,7 @@ export class Renderer {
   private readonly clearBoxes = new Float32Array(4 * 96);
   private nClear = 0;
   private items: Item[];
-  /** Every place the town names: the homes (in the bosses' order), then the Coliseum. */
+  /** Every place the town names: the homes (in the bosses' order), then the Colosseum. */
   private readonly places: readonly Place[];
   /** The places' items, by place (the items themselves are sorted every frame). */
   private readonly houseItems: Item[];
@@ -613,7 +613,7 @@ export class Renderer {
   }
 
   /**
-   * The statues over the Coliseum's picture (x0, y0 its top left, `px` screen pixels a picture pixel): the world's figure,
+   * The statues over the Colosseum's picture (x0, y0 its top left, `px` screen pixels a picture pixel): the world's figure,
    * or the close-up drawing crossfading in as the camera comes in on it (the world's figure fading only once the close-up
    * covers it, so the wall never shows through), and its quote once the camera has arrived.
    */
@@ -936,7 +936,7 @@ export class Renderer {
         const h = places[it.i]!;
         x = h.cx;
         y = h.cy - h.foot; // where the picture's foot stands (a home's: half a square in front of the plot's middle)
-        // (The Coliseum is wide and tall: its sides and top show while its foot is off to the side or well under the box.)
+        // (The Colosseum is wide and tall: its sides and top show while its foot is off to the side or well under the box.)
         margin = Math.max(h.half + 1, this.houseFrames[it.i]!.ch.w / 2 / f.housePxPerSquare + 0.5);
         below = h.half > 2 ? 10 : below;
       } else if (it.kind === "prop") {
@@ -960,7 +960,7 @@ export class Renderer {
     for (const b of town.bosses) b.onScreen = false;
     for (const b of this.statueBox) b.on = false;
     for (const nm of this.names) nm.a = 0;
-    // The Coliseum past the rim, its top over the horizon (slice 6: the landmark from anywhere), behind everything.
+    // The Colosseum past the rim, its top over the horizon (slice 6: the landmark from anywhere), behind everything.
     const col = this.houseItems[this.homes.length]!;
     this.farOn = false;
     if (!col.on) this.drawFarColiseum(col, now);
@@ -1012,7 +1012,7 @@ export class Renderer {
   }
 
   /**
-   * The Coliseum seen from afar (slice 6): when its foot is past the rim, but not more than `farReach` squares past it, its
+   * The Colosseum seen from afar (slice 6): when its foot is past the rim, but not more than `farReach` squares past it, its
    * picture stands on the horizon where it lies, smaller with distance, sunk behind the world's curve (`farSink` squares
    * a square past the rim), hazed like the far band. Only its top shows over the horizon, so it looms from across the
    * world. It isn't tapped (its chip is), and it has no floating name.
@@ -1047,7 +1047,7 @@ export class Renderer {
     ctx.restore();
     this.farOn = true;
   }
-  /** The Coliseum was drawn from afar this frame (so its chip isn't shown: it's in view). */
+  /** The Colosseum was drawn from afar this frame (so its chip isn't shown: it's in view). */
   private farOn = false;
 
   /** One of the park's things: its picture at the camera's scale (the fountain's water moving). */
@@ -1086,7 +1086,7 @@ export class Renderer {
       const it = this.houseItems[i]!;
       const nm = this.names[i]!;
       if (!it.on || nm.a <= 0.01) continue;
-      // How far you are from the edge of its ground (a home's plot is 3 squares across, the Coliseum's 6), in squares.
+      // How far you are from the edge of its ground (a home's plot is 3 squares across, the Colosseum's 6), in squares.
       const d = Math.max(0, Math.abs(wrapF(me.x - h.cx)) - h.half, Math.abs(wrapF(me.y - h.cy)) - h.half);
       const a = nm.a * clamp((f.nameShowFrom - d) / (f.nameShowFrom - f.nameFullAt), 0, 1);
       if (a <= 0.01) continue;
@@ -1506,7 +1506,7 @@ export class Renderer {
     ctx.restore();
   }
 
-  /** Where a card points: over a boss's head or a place's top (`i`: its index in the homes, then the Coliseum), on screen (false: not drawn this frame). */
+  /** Where a card points: over a boss's head or a place's top (`i`: its index in the homes, then the Colosseum), on screen (false: not drawn this frame). */
   anchor(kind: "boss" | "home" | "table", i: number, out: { x: number; y: number }): boolean {
     if (kind === "table") {
       // Over its board.
@@ -1531,14 +1531,14 @@ export class Renderer {
     // Over the home's floating name (it rises about this high over the building), so the card never covers it.
     out.x = nm.x;
     out.y = nm.y - (TOWN_FEEL.floatingNames ? TOWN_FEEL.cardOverName : 0);
-    // A building taller than the view (the Coliseum from the park on a computer): its top is above the box, so the card
+    // A building taller than the view (the Colosseum from the park on a computer): its top is above the box, so the card
     // stands at the box's top, over it.
     if (out.y <= 0 && it.y1 > 0) out.y = 1;
     return out.y > 0 && out.y < this.H && out.x > 0 && out.x < this.W;
   }
 
   /**
-   * A point to tap on a boss (its body's middle) or a place (low on its picture; the Coliseum's gate), on screen, where a
+   * A point to tap on a boss (its body's middle) or a place (low on its picture; the Colosseum's gate), on screen, where a
    * tap lands on it: if something nearer stands over that point (a boss in front of its home, a bot at the gate), the
    * first point of a grid over its picture that a tap would hit. False if it isn't drawn or none is clear. (For tests.)
    */
@@ -1660,8 +1660,8 @@ export class Renderer {
     return a > 0;
   }
 
-  // ---- The edge chips: the places off screen (the boss homes and the Coliseum), nearest to you first; a face (or the
-  // Coliseum's crown) at the box's edge pointing there.
+  // ---- The edge chips: the places off screen (the boss homes and the Colosseum), nearest to you first; a face (or the
+  // Colosseum's crown) at the box's edge pointing there.
 
   private placeChips(now: number): void {
     const { town, view: v, W, H, p, chips, places } = this;
@@ -1670,7 +1670,7 @@ export class Renderer {
     const yy = you.y;
     let n = 0;
     for (const ch of chips) ch.place = null;
-    // Nearest first: a home is left out when its picture or its boss is on screen; the Coliseum when any of it is.
+    // Nearest first: a home is left out when its picture or its boss is on screen; the Colosseum when any of it is.
     const order = SCRATCH_ORDER;
     order.length = 0;
     for (let i = 0; i < places.length; i++) {
@@ -1684,7 +1684,7 @@ export class Renderer {
       order.push(i);
     }
     order.sort((a, b) => dist2(places[a]!, yx, yy) - dist2(places[b]!, yx, yy));
-    // The Coliseum, when it's among the nearest few, is placed first: it takes its spot before the homes' chips.
+    // The Colosseum, when it's among the nearest few, is placed first: it takes its spot before the homes' chips.
     const col = order.indexOf(this.homes.length);
     if (col > 0 && col < chips.length) {
       for (let k = col; k > 0; k--) order[k] = order[k - 1]!;
@@ -1746,7 +1746,7 @@ export class Renderer {
     }
   }
 
-  /** What a place's chip shows: its boss's first idle frame and the box round the boss's head, or the Coliseum's crown. */
+  /** What a place's chip shows: its boss's first idle frame and the box round the boss's head, or the Colosseum's crown. */
   chipFace(place: Place): { img: HTMLCanvasElement; box: readonly [x: number, y: number, size: number] } {
     if (place.id === "coliseum") return { img: this.chipIcon.get(0), box: CHIP_ICON_BOX };
     return { img: this.bossFrames[this.town.bosses.findIndex((b) => b.home.id === place.id)]!.get(0), box: BOSS_FACE[place.id] };
@@ -1760,7 +1760,7 @@ const CORNERS = [-1, 1, 1, 1, 1, -1, -1, -1] as const;
 const SCRATCH_ORDER: number[] = [];
 const byFarFirst = (a: Item, b: Item) => b.sz - a.sz;
 const dist2 = (h: Place, x: number, y: number) => wrapF(h.cx - x) ** 2 + wrapF(h.cy - y) ** 2;
-/** The Coliseum's chip shows all of its icon. */
+/** The Colosseum's chip shows all of its icon. */
 const CHIP_ICON_BOX = [0, 0, COLISEUM_CHIP.w] as const;
 
 function roundRect(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {

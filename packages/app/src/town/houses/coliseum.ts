@@ -1,5 +1,5 @@
 /**
- * The Coliseum: the heart of the town square, where raids with people will start (Eric, Oct 26: "a much bigger building…
+ * The Colosseum: the heart of the town square, where raids with people will start (Eric, Oct 26: "a much bigger building…
  * a coliseum with chess theme, maybe even statues of chess pieces around it"; slice 6: "make the coliseum about twice the
  * size it is now so it's clearly standing out… looming over the park"). A Roman amphitheater seen from the front and a
  * little above, lit from the top left like everything in the square: an oval wall of warm stone in three tiers of arches
@@ -7,7 +7,7 @@
  * checkered attic band on top (the board's light and dark squares); its open top shows the seats inside, stepping down
  * in rows with dark doorways, to the podium's checkered wall and the arena's floor, a chessboard. In the middle of its
  * front a tall portal with a dark arched gate (a raised portcullis, the sunlit floor at the tunnel's end), a stone tablet
- * over it (blank: the game writes "The Coliseum" on it) and a panel of chess pieces carved in relief above; four navy and
+ * over it (blank: the game writes "The Colosseum" on it) and a panel of chess pieces carved in relief above; four navy and
  * gold banners (the game's colors) hung on its face, four pennants on its far rim and a flag on a mast over it all.
  * Statues of chess pieces on plinths stand round it: the bronze queen and king either side of the gate; beyond them, on
  * pedestals of their own, the two statues (houses/statues.ts, drawn by the game over this picture, not in it: the marble
@@ -63,7 +63,7 @@ const PALETTE: Record<string, string> = {
  * STATUES): this far either side of its axis, from its ground's size (so they follow it as it grows).
  */
 export const STATUE_OFF = Math.round((COLISEUM.size / 2 - 0.5) * TOWN_FEEL.housePxPerSquare);
-/** The chess pieces' size against the first Coliseum's (slice 5): half as big again, beside the bigger walls. */
+/** The chess pieces' size against the first Colosseum's (slice 5): half as big again, beside the bigger walls. */
 const PS = 1.5;
 /** A plinth under a chess piece. */
 const PLINTH_W = 38;
@@ -254,7 +254,7 @@ const bowl = paint(CX - RX, TOP_CY - RY, 2 * RX, 2 * RY + 1, (x, y) => {
 });
 
 // ---- The chess pieces, as profiles: each piece's half-width at each height j above its foot (<= 0: nothing there),
-// in the first Coliseum's units; and its cuts (a crenel, a coronet's gaps). The statues are turned on a lathe from these
+// in the first Colosseum's units; and its cuts (a crenel, a coronet's gaps). The statues are turned on a lathe from these
 // at PS times that size, and the relief over the gate carves them small.
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * Math.max(0, Math.min(1, t));
@@ -365,7 +365,7 @@ const plinth = (cx: number, fy: number) =>
     return X < -10 ? "2" : X > 10 ? "4" : "3";
   });
 
-// ---- The portal's tablet (blank: the game writes "The Coliseum" on it) and the relief of chess pieces over it.
+// ---- The portal's tablet (blank: the game writes "The Colosseum" on it) and the relief of chess pieces over it.
 
 const BW = 104;
 const BH = 34;
@@ -528,7 +528,7 @@ const idle: Anim = { loop: true, frames };
 
 export const HOUSE_COLISEUM: Character = {
   id: "house-coliseum",
-  name: "The Coliseum",
+  name: "The Colosseum",
   w: W,
   h: H,
   foot: [CX, FOOT],
@@ -543,7 +543,7 @@ export const HOUSE_COLISEUM: Character = {
  */
 export const statueSpot = (id: StatueId): Pt => [CX + (id === "marble" ? -1 : 1) * STATUE_OFF - STATUE_W / 2, FRONT + 1 - statueH(id)];
 
-/** Where the tablet's blank face is (frame pixels), for the game to write "The Coliseum" on. */
+/** Where the tablet's blank face is (frame pixels), for the game to write "The Colosseum" on. */
 export const HOUSE_COLISEUM_SIGN = signFace(BOARD[0], BOARD[1], BW, BH);
 
 // ---- Its edge chip: a gold crown over a band of the board's squares, on the chip's white (24 x 24).
@@ -561,7 +561,7 @@ const chipCrown = paint(2, 3, 20, 18, (x, y) => {
 });
 export const COLISEUM_CHIP: Character = {
   id: "chip-coliseum",
-  name: "The Coliseum",
+  name: "The Colosseum",
   w: 24,
   h: 24,
   foot: [12, 23],

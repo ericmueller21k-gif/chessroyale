@@ -7,12 +7,12 @@ import { test } from "./helpers.ts";
  * drawn (not blank), a tap a few rows ahead walks you toward it, the zoom pair works (it opens zoomed out), back goes
  * home, and `?sky=` picks the sky's look whatever the clock says.
  * Slice 4: a boss's card ("Challenge alone", its confirm, Leave to the Boss raid screen with that boss's tile picked)
- * and a home's (its shop greyed, "Coming soon"). Slice 5: the Coliseum's (a tap on its gate walks you to the apron in
+ * and a home's (its shop greyed, "Coming soon"). Slice 5: the Colosseum's (a tap on its gate walks you to the apron in
  * front of it; "Raids with people" greyed, "Coming soon"). Slice 6: the park's chess tables (a tap on one walks you to a
  * free stool, you sit, its card shows "Casual" and "Ranked" greyed and "Coming soon"; a tap elsewhere closes it and you
- * stand), on the bigger map round the bigger Coliseum.
+ * stand), on the bigger map round the bigger Colosseum.
  * Test hooks: the canvas carries `data-you="c,r"` (your square) and `data-ready="1"` once its first frame is drawn;
- * `window.__townAt("boss" | "home" | "coliseum", id)` says where to tap a boss, a home or the Coliseum's gate (with the
+ * `window.__townAt("boss" | "home" | "coliseum", id)` says where to tap a boss, a home or the Colosseum's gate (with the
  * test switches on, as here).
  */
 test.use({ actionTimeout: 15_000 });
@@ -92,7 +92,7 @@ test("the town square at /town: the world is drawn and fills its box under the b
 
 /**
  * The sky's average color across a strip at the top of the canvas, its left and right sixths (CSS pixels 2 to 8 down).
- * (Slices 1 to 5 sampled its middle third; slice 6's bigger Coliseum rises out of the box's top there on a computer, so
+ * (Slices 1 to 5 sampled its middle third; slice 6's bigger Colosseum rises out of the box's top there on a computer, so
  * the strip is either side of it, where the top is sky on a phone and a computer.)
  */
 const skyTop = (p: Page) =>
@@ -205,17 +205,17 @@ test("a home's card: its name, 'Shop' greyed (shown, not tappable) and 'Coming s
   expect(errors).toEqual([]);
 });
 
-test("the Coliseum: a tap on its gate walks you to the apron in front of it and opens its card ('Raids with people' greyed, 'Coming soon'); a tap elsewhere closes it", async ({ page }) => {
+test("the Colosseum: a tap on its gate walks you to the apron in front of it and opens its card ('Raids with people' greyed, 'Coming soon'); a tap elsewhere closes it", async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/town");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
   // It stands just ahead of your start, in view from the first frame on a phone and a computer.
   const at = await page.evaluate(() => (window as unknown as { __townAt?: (k: string) => { x: number; y: number } | null }).__townAt?.("coliseum") ?? null);
-  expect(at, "the Coliseum is drawn at the start").not.toBeNull();
+  expect(at, "the Colosseum is drawn at the start").not.toBeNull();
   const cv = (await canvas(page).boundingBox())!;
   await page.mouse.click(cv.x + at!.x, cv.y + at!.y);
-  const card = page.getByRole("dialog", { name: "The Coliseum", exact: true });
-  await expect(card.getByRole("heading", { name: "The Coliseum" })).toBeVisible();
+  const card = page.getByRole("dialog", { name: "The Colosseum", exact: true });
+  await expect(card.getByRole("heading", { name: "The Colosseum" })).toBeVisible();
   const raids = card.getByRole("button", { name: "Raids with people" });
   await expect(raids).toBeVisible();
   await expect(raids).toBeDisabled();
@@ -245,7 +245,7 @@ type Cam = {
 };
 const cam = (p: Page) => p.evaluate(() => (window as unknown as { __townCam: () => Cam }).__townCam());
 
-// (Their squares from the town's own layout, so they follow the Coliseum if it moves: in front of its ground's last and
+// (Their squares from the town's own layout, so they follow the Colosseum if it moves: in front of its ground's last and
 // first columns.)
 const statueSq = (id: "bronze" | "marble") => {
   const s = STATUES.find((x) => x.id === id)!;
@@ -270,7 +270,7 @@ for (const st of [
     expect(before.mag, "no close-up yet").toBe(1);
     expect(before.statue).toBeNull();
     const cv = (await canvas(page).boundingBox())!;
-    // Both statues stand on the Coliseum's front, in view from the start.
+    // Both statues stand on the Colosseum's front, in view from the start.
     const at = await page.evaluate((id) => (window as unknown as { __townAt: (k: string, id: string) => { x: number; y: number } | null }).__townAt("statue", id), st.id);
     expect(at, "the statue is drawn").not.toBeNull();
     await page.mouse.click(cv.x + at!.x, cv.y + at!.y);
@@ -292,7 +292,7 @@ for (const st of [
     expect(await live.textContent(), "the quote, word for word").toBe(st.quote);
     // The HUD stays put: the zoom pair and "Back to me" are where they were.
     await expect(page.getByRole("button", { name: "Back to me" })).toBeVisible();
-    // A tap elsewhere (high in the middle, over the statue's head: the Coliseum's wall) walks you away: the camera glides
+    // A tap elsewhere (high in the middle, over the statue's head: the Colosseum's wall) walks you away: the camera glides
     // back out to the zoom you had, and the quote is gone.
     await page.mouse.click(cv.x + cv.width / 2, cv.y + cv.height * 0.03);
     await expect(live).toHaveText("");

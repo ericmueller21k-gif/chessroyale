@@ -8,7 +8,7 @@ import { APRON, APRON_ROWS, COLISEUM, GRASS, HOMES, PARK, PAVING, PROPS, START, 
 const king = (a: Sq, b: Sq) => Math.max(Math.abs(wrapF(a.c - b.c)), Math.abs(wrapF(a.r - b.r)));
 /**
  * Open ground between Jefferson's Fireworks and Chub & Chirp's Grassland: no homes, bosses, bots or park things
- * within two squares. (The Coliseum's middle until slice 5 built it; (24, 2) until slice 6's bigger map.)
+ * within two squares. (The Colosseum's middle until slice 5 built it; (24, 2) until slice 6's bigger map.)
  */
 const SPOT: Sq = { c: 45, r: 6 };
 
@@ -119,7 +119,7 @@ describe("town square: one pawn a square", () => {
   });
 });
 
-describe("town square: the Coliseum", () => {
+describe("town square: the Colosseum", () => {
   const front = (s: Sq) => s.r === COLISEUM.r0 - 1 && (s.c === COLISEUM.c0 + COLISEUM.size / 2 - 1 || s.c === COLISEUM.c0 + COLISEUM.size / 2);
 
   it("its 12 x 12 ground is solid, and a walk goes round it", () => {
@@ -156,13 +156,13 @@ describe("town square: the Coliseum", () => {
 });
 
 describe("town square: the statues", () => {
-  it("each has its viewing square on the apron, right in front of the Coliseum ground's end columns, either side of the gate", () => {
+  it("each has its viewing square on the apron, right in front of the Colosseum ground's end columns, either side of the gate", () => {
     const [marble, bronze] = STATUES;
     expect(marble!.id).toBe("marble");
     expect(bronze!.id).toBe("bronze");
     for (const s of STATUES) {
       expect(APRON.some((a) => a.c === s.c && a.r === s.r), `${s.id} on the apron`).toBe(true);
-      expect(onColiseum(s.c, s.r + 1), `${s.id} right in front of the Coliseum's ground`).toBe(true);
+      expect(onColiseum(s.c, s.r + 1), `${s.id} right in front of the Colosseum's ground`).toBe(true);
       expect(statueAt(s.c, s.r)).toBe(s);
     }
     // Symmetric about the gate: the marble on its left (west), the bronze on its right.
@@ -201,7 +201,7 @@ describe("town square: the statues", () => {
 describe("town square: the park (slice 6)", () => {
   const inPark = (c: number, r: number) => c >= PARK.c0 && c < PARK.c0 + PARK.w && r <= PARK.r1 && r > PARK.r1 - PARK.d;
 
-  it("lies in front of the Coliseum's gate, back from it past its apron and a walk: paving and grass, no home's roaming ground on it", () => {
+  it("lies in front of the Colosseum's gate, back from it past its apron and a walk: paving and grass, no home's roaming ground on it", () => {
     // Eric, Oct 26: "It shouldn't literally be right next to it… 8 to 10 tiles away."
     expect(COLISEUM.r0 - PARK.r1).toBeGreaterThanOrEqual(8);
     expect(COLISEUM.r0 - PARK.r1).toBeLessThanOrEqual(10);
@@ -261,7 +261,7 @@ describe("town square: the park (slice 6)", () => {
     for (const p of PROPS) expect(walkable(p.c, p.r), `${p.kind} at ${p.c},${p.r}`).toBe(false);
   });
 
-  it("the paths lead in from the plaza, past the fountain, up to the Coliseum's gate, all on paving", () => {
+  it("the paths lead in from the plaza, past the fountain, up to the Colosseum's gate, all on paving", () => {
     // From the park's south walk, straight up the promenade to the apron at the gate.
     const from = { c: START.c, r: PARK.r1 - PARK.d + 1 };
     const gate = APRON[0]!;

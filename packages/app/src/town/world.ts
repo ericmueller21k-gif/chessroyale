@@ -15,37 +15,37 @@ export interface Sq {
 }
 
 /**
- * The Coliseum's ground in the world's middle (12 x 12 squares since slice 6, which made it about twice its size; slice 5
+ * The Colosseum's ground in the world's middle (12 x 12 squares since slice 6, which made it about twice its size; slice 5
  * built it on 6 x 6: solid, you walk round it). `c0`, `r0` its first column and row. Its gate faces south, over the park
  * toward your start. (Row 28 since the park moved away from it: `WALK_ROWS`.)
  */
 export const COLISEUM = { c0: 17, r0: 28, size: 12 } as const;
-/** Whether (c, r) is the Coliseum's ground. */
+/** Whether (c, r) is the Colosseum's ground. */
 export const onColiseum = (c: number, r: number): boolean => {
   const i = wrapI(c) - COLISEUM.c0;
   const j = wrapI(r) - COLISEUM.r0;
   return i >= 0 && i < COLISEUM.size && j >= 0 && j < COLISEUM.size;
 };
 /**
- * The apron: the open squares in front of the Coliseum's gate, as wide as the Coliseum and `APRON_ROWS` deep, where people
- * gather (nothing is built there; your start is on it). Nearest the gate first: a tap on the Coliseum ends you on the
+ * The apron: the open squares in front of the Colosseum's gate, as wide as the Colosseum and `APRON_ROWS` deep, where people
+ * gather (nothing is built there; your start is on it). Nearest the gate first: a tap on the Colosseum ends you on the
  * first free one (`destFor`), so a crowd at the gate grows outward from it in a half ring.
  */
 export const APRON_ROWS = 3;
 /**
  * Between the apron and the park's north walk, the promenade carries on across this many rows of the town's board, so
- * the park stands back from the Coliseum (Eric, Oct 26: "It shouldn't literally be right next to it… 8 to 10 tiles away";
+ * the park stands back from the Colosseum (Eric, Oct 26: "It shouldn't literally be right next to it… 8 to 10 tiles away";
  * its nearest tables are 8 rows from its wall).
  */
 export const WALK_ROWS = 4;
-/** The middle of the gate's sill, on the Coliseum's front edge (between its two middle columns). */
+/** The middle of the gate's sill, on the Colosseum's front edge (between its two middle columns). */
 const GATE_X = COLISEUM.c0 + (COLISEUM.size - 1) / 2;
 const GATE_Y = COLISEUM.r0 - 0.5;
 export const APRON: readonly Sq[] = Array.from({ length: COLISEUM.size * APRON_ROWS }, (_, i) => ({ c: COLISEUM.c0 + (i % COLISEUM.size), r: COLISEUM.r0 - 1 - Math.floor(i / COLISEUM.size) })).sort(
   (a, b) => Math.hypot(a.c - GATE_X, a.r - GATE_Y) - Math.hypot(b.c - GATE_X, b.r - GATE_Y),
 );
 
-/** The two statues on the Coliseum's front (houses/statues.ts draws them): the marble statue and the bronze statue. */
+/** The two statues on the Colosseum's front (houses/statues.ts draws them): the marble statue and the bronze statue. */
 export type StatueId = "marble" | "bronze";
 /**
  * A statue, and the apron square right in front of it (c, r) where you stand to look at it: stopping there (or where a
@@ -59,7 +59,7 @@ export interface Statue {
   quote: string;
 }
 /**
- * The marble statue (the Hidden Boss in stone) before the Coliseum ground's first column, on the gate's left; the bronze
+ * The marble statue (the Hidden Boss in stone) before the Colosseum ground's first column, on the gate's left; the bronze
  * statue before its last, on the gate's right (from the ground's size, so they follow it if it grows). Quotes: Eric's,
  * Oct 26.
  */
@@ -75,7 +75,7 @@ export const statueAt = (c: number, r: number): Statue | null => STATUES.find((s
 // boards to start with… open up the space in front of the coliseum and it can go there").
 
 /**
- * The park in front of the Coliseum's gate, south of its apron and the walk: 20 squares across (the Coliseum's 12 and 4
+ * The park in front of the Colosseum's gate, south of its apron and the walk: 20 squares across (the Colosseum's 12 and 4
  * more each side), 11 deep. `c0` its first column, `r1` its row nearest the gate (the camera looks north, r rising).
  */
 export const PARK = { c0: COLISEUM.c0 - 4, r1: COLISEUM.r0 - APRON_ROWS - WALK_ROWS - 1, w: 20, d: 11 } as const;
@@ -100,7 +100,7 @@ const PARK_PLAN = [
   "====================",
 ] as const;
 
-/** What a square of ground is: the town's board, paving (the park's walks, the Coliseum's apron) or the park's grass. */
+/** What a square of ground is: the town's board, paving (the park's walks, the Colosseum's apron) or the park's grass. */
 export const BOARD_GROUND = 0;
 export const PAVING = 1;
 export const GRASS = 2;
@@ -153,7 +153,7 @@ PARK_PLAN.forEach((line, v) => {
     }
   }
 });
-// The Coliseum's apron is paved too, and the promenade's 4 squares across the walk between them.
+// The Colosseum's apron is paved too, and the promenade's 4 squares across the walk between them.
 for (let r = COLISEUM.r0 - APRON_ROWS; r < COLISEUM.r0; r++) for (let c = COLISEUM.c0; c < COLISEUM.c0 + COLISEUM.size; c++) groundAt[r * N + c] = PAVING;
 for (let r = PARK.r1 + 1; r < COLISEUM.r0 - APRON_ROWS; r++) for (let c = PARK.c0 + 8; c < PARK.c0 + 12; c++) groundAt[r * N + c] = PAVING;
 /** The ten chess tables, in the plan's order (north to south, west to east). */
@@ -170,16 +170,16 @@ export const stoolAt = (c: number, r: number): Table | null => {
 export const tableAt = (c: number, r: number): Table | null => TABLES.find((t) => t.c === wrapI(c) && t.r === wrapI(r)) ?? null;
 
 /**
- * Your square when the page opens: in the park on its promenade, between its two rows of tables nearest the Coliseum,
+ * Your square when the page opens: in the park on its promenade, between its two rows of tables nearest the Colosseum,
  * facing it (the camera looks north, r rising): the tables round you, the fountain behind you, and the walk across to
- * the Coliseum looming beyond (near enough to stand inside the view's rim, not on its horizon).
+ * the Colosseum looming beyond (near enough to stand inside the view's rim, not on its horizon).
  */
 export const START: Sq = { c: PARK.c0 + 9, r: PARK.r1 - 3 };
 
 export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil";
 
 /**
- * A place with a picture, a name (floating over it and on its sign) and an edge chip: a boss's home, or the Coliseum.
+ * A place with a picture, a name (floating over it and on its sign) and an edge chip: a boss's home, or the Colosseum.
  * (cx, cy) is its ground's middle.
  */
 export interface Place {
@@ -204,15 +204,15 @@ export interface Home extends Place {
 }
 
 /**
- * The Coliseum as a place: its name, its chip's ring (the game's navy), its ground's middle; its picture's foot (the
+ * The Colosseum as a place: its name, its chip's ring (the game's navy), its ground's middle; its picture's foot (the
  * gate's sill) stands on its ground's front edge.
  */
-export const COLISEUM_PLACE: Place = { id: "coliseum", name: "The Coliseum", color: "#1f2530", cx: GATE_X, cy: COLISEUM.r0 + (COLISEUM.size - 1) / 2, half: COLISEUM.size / 2, foot: COLISEUM.size / 2 };
+export const COLISEUM_PLACE: Place = { id: "coliseum", name: "The Colosseum", color: "#1f2530", cx: GATE_X, cy: COLISEUM.r0 + (COLISEUM.size - 1) / 2, half: COLISEUM.size / 2, foot: COLISEUM.size / 2 };
 
 /**
- * The thirteen homes, spread evenly round the middle (the Coliseum and its park) over the 46 x 46 world that wraps: every
+ * The thirteen homes, spread evenly round the middle (the Colosseum and its park) over the 46 x 46 world that wraps: every
  * home's nearest neighbor is 8 to 10 squares away, as on slice 3's smaller map, and no home's roaming ground reaches the
- * park or the Coliseum (docs/decisions/2026-10-26-town-square-slice-6.md has the map). Pairs that play off each other
+ * park or the Colosseum (docs/decisions/2026-10-26-town-square-slice-6.md has the map). Pairs that play off each other
  * stand side by side: Ginger Igloo and Jefferson's Fireworks (ice and fire), Hollow Peak and Moo & Moon Meadow (dark and
  * night). Names: "Ginger Igloo", "Hollow Peak" and "Moo & Moon Meadow" are Eric's; the rest the director's.
  */
@@ -233,7 +233,7 @@ export const HOMES: readonly Home[] = (
     { id: "pig", boss: "Wrangler", name: "Wrangler's Stall", color: "#8f5629", cx: 4, cy: 17 },
   ] satisfies Omit<Home, "half" | "foot">[]
 ).map((h) => ({ ...h, half: 1.5, foot: 0.5 }));
-/** Every place: the homes (in the bosses' order), then the Coliseum. */
+/** Every place: the homes (in the bosses' order), then the Colosseum. */
 export const PLACES: readonly Place[] = [...HOMES, COLISEUM_PLACE];
 
 /** How a person's pawn looks: its side (white or black), and a tint for a few. (Dressed pawns come later.) */
@@ -256,7 +256,7 @@ export const BOTS: readonly ({ name: string } & Look)[] = [
 export const plotAt: (Home | null)[] = new Array(N * N).fill(null);
 for (const h of HOMES) for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) plotAt[wrapI(h.cy + dr) * N + wrapI(h.cx + dc)] = h;
 
-/** A square you can stand on: not a home's plot, not the Coliseum's ground, nothing in the park standing on it (a stool is a square you stand on). */
+/** A square you can stand on: not a home's plot, not the Colosseum's ground, nothing in the park standing on it (a stool is a square you stand on). */
 export const walkable = (c: number, r: number): boolean => {
   const k = wrapI(r) * N + wrapI(c);
   return plotAt[k] === null && !parkSolid[k] && !onColiseum(c, r);
@@ -569,13 +569,13 @@ export function spotNear(t: Town, w: Walker, at: Sq, beside: boolean): Sq | null
   return null;
 }
 
-/** What a tap asks for: a square, the squares beside someone, the ring around a home, the Coliseum's apron, a statue's square or a chess table's stool. */
+/** What a tap asks for: a square, the squares beside someone, the ring around a home, the Colosseum's apron, a statue's square or a chess table's stool. */
 export type Target = { kind: "square"; c: number; r: number } | { kind: "beside"; at: Sq } | { kind: "home"; home: Home } | { kind: "coliseum" } | { kind: "statue"; statue: Statue } | { kind: "table"; table: Table };
 
 /**
  * The square `w` would end on for a target (null: none; where it stands already counts). A square: itself if free, else
  * the nearest free one next to it. Someone: the nearest free square beside them. A home: the nearest free square on the
- * ring around its plot. The Coliseum (or its ground): the free square of its apron nearest the gate (of two as near, the
+ * ring around its plot. The Colosseum (or its ground): the free square of its apron nearest the gate (of two as near, the
  * one `w` reaches in fewer steps); a full apron, the nearest free square round the gate.
  */
 export function destFor(t: Town, w: Walker, target: Target): Sq | null {

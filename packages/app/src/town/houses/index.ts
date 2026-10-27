@@ -38,9 +38,9 @@ export const HOUSES: Record<HomeId, HouseArt> = {
   alfil: { ch: HOUSE_ALFIL, sign: HOUSE_ALFIL_SIGN },
 };
 
-/** The Coliseum's picture (slice 5), and the icon on its edge chip (a crown over the board's squares, 24 x 24). */
+/** The Colosseum's picture (slice 5), and the icon on its edge chip (a crown over the board's squares, 24 x 24). */
 export const COLISEUM_ART: HouseArt = { ch: HOUSE_COLISEUM, sign: HOUSE_COLISEUM_SIGN };
 export { COLISEUM_CHIP };
 
-/** A place's picture: its home's, or the Coliseum's. */
+/** A place's picture: its home's, or the Colosseum's. */
 export const artOf = (p: Place): HouseArt => (p.id === "coliseum" ? COLISEUM_ART : HOUSES[p.id]);
