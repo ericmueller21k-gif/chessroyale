@@ -23,13 +23,13 @@ export const FOLIO_PALETTE: Record<string, string> = {
   C: "#d3bd95",
   D: "#a58e69",
   E: "#76624c",
-  i: "#4f5d8e", // ink (blue-black): on lit paper, on mid paper, on shaded paper, ink run
-  j: "#36416b",
-  l: "#232a47",
-  s: "#8e98bb",
+  i: "#8a93b8", // ink (blue-black): on lit paper, on mid paper, on shaded paper, ink run
+  j: "#717898",
+  l: "#575c78",
+  s: "#b3b9d2",
   x: "#1c1620", // the eye and its brow
   U: "#7486c0", // an ink stroke off the page (the check's underline)
-  u: "#4f5d8e",
+  u: "#8a93b8",
   G: "#f2c14e", // gold: the gilt edge, a light glint, a deep edge, the gilt in shade
   H: "#fff0b4",
   g: "#b8862a",
@@ -38,13 +38,13 @@ export const FOLIO_PALETTE: Record<string, string> = {
   v: "#d8432a", // the seal: vermilion, pressed deeper
   w: "#a3301e",
   z: "#0c0d11", // ground shadow
-  "1": "#4f5d8e", // lines of handwriting that fade out and back in on the near wing (ink = there)
-  "2": "#4f5d8e",
-  "3": "#4f5d8e",
+  "1": "#8a93b8", // lines of handwriting that fade out and back in on the near wing (ink = there)
+  "2": "#8a93b8",
+  "3": "#8a93b8",
 };
 
 /** Fade levels for a line of ink on lit paper: 0 gone .. 3 full. */
-const INK = [PAPER_B, "#d3cbbc", "#9a9cad", "#4f5d8e"];
+const INK = [PAPER_B, "#d0cbc5", "#adafbf", "#8a93b8"];
 
 type Pt = readonly [number, number];
 const add2 = (a: Pt, b: Pt): Pt => [a[0] + b[0], a[1] + b[1]];
@@ -822,8 +822,8 @@ const DEFEAT: Frame[] = [
   pageFrame(240, page(6, 7), 46, 82, 21, { cue: "settle" }),
   pageFrame(500, page(6, 7), 46, 83, 23),
   // The writing fades from the page; the seal stays, the last thing there.
-  pageFrame(220, page(6, 7), 46, 83, 23, { pal: { i: "#858ba2", j: "#6a6a79" } }),
-  pageFrame(220, page(6, 7), 46, 83, 23, { pal: { i: "#bdb9b8", j: "#9f9487" } }),
+  pageFrame(220, page(6, 7), 46, 83, 23, { pal: { i: "#adafbf", j: "#928f97" } }),
+  pageFrame(220, page(6, 7), 46, 83, 23, { pal: { i: "#d0cbc5", j: "#b2a696" } }),
   pageFrame(1200, page(6, 7), 46, 83, 23, { pal: { i: PAPER_B, j: "#d3bd95" } }),
 ];
 
