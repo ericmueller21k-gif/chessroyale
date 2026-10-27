@@ -18,10 +18,10 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 - **The Boss raid screen's character select** (Eric, Oct 16; now the Solo Boss Mode screen's, Oct 26; docs/decisions/2026-10-16-boss-character-select.md;
   `components/BossSelect.tsx`, `characters/boss-select.ts`): a tile per boss you can meet, the picked one on a stage in
   its idle (one sprite animating, on the shared loop; reduced motion: a still, no drop). **The grid** (Eric, Oct 21 to 23; from a Street Fighter 6 select;
-  docs/decisions/2026-10-23-boss-select-sf.md): fourteen tiles since Puddles, all the very same tall slanted tile (visible
+  docs/decisions/2026-10-23-boss-select-sf.md): sixteen tiles since Folio, all the very same tall slanted tile (visible
   width 1 to 1.55 of its height, a slant of a fifth of its width), a 5 px gap between neighbors and rows, five to a row on a phone
-  and a computer alike (5, 5, 4: `rowSizes` in `characters/boss-select.ts` shares any number of tiles out evenly, so a new boss
-  never leaves one alone), a short row centered. On a phone the block is nearly the screen's width (a 10 px buffer top and
+  and a computer alike (5, 5, 5, 1: `rowSizes` in `characters/boss-select.ts` fills full rows of five and puts the rest on the
+  last, so a new tile moves none before it; docs/decisions/2026-10-27-folio-wired.md), a short row centered. On a phone the block is nearly the screen's width (a 10 px buffer top and
   sides); on a computer the tiles stop at 96 px and the block sits in the middle of the column. Each tile shows its boss's whole
   figure (`BossArt`: the portrait's frame at full size, placed by `SELECT_FRAMING`: the neck pinned `at` of the way down, `span`
   of the frame's pixels across the tile) cut off by the tile's corners, on a color from the boss's own palette (`SELECT_TINT`,

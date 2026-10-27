@@ -81,6 +81,10 @@ under the pieces the ink, the pencil and the crease; over them its paper and the
    full rows of five and the last the rest: 5, 5, 5, 1. Every boss's tile keeps its size and place; Folio takes the Hidden Boss's
    old place, which moves one along, and "?" sits centered on a row of its own. (The brief said "the last row 4": that would be
    fourteen tiles; with the Hidden Boss's and "?" there are sixteen.)
+   The fourth row moves the stage and the ways to play down a row (~80 px on a 390 px phone), so on Eric's 777 px iPhone the
+   first way to play is now just below the fold. **Kept as is (the director's call):** Eric chose five to a row and said he's
+   happy to scroll ("we have the space anyway to run down vertically", Oct 23); smaller tiles or "?" out of the grid would undo
+   one of those. Revisit if he asks.
 9. **Its select line is its one line, every tap** (the director's sheet gives it one; its seven lines aren't added to), so the
    select test's "two lines at least" and "never the same twice running" leave Folio out.
 10. **Its tile's color: its deep ink, #575c78** (its cream paper and red seal clear on it, dark and light). The select test now
