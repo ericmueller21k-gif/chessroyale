@@ -21,6 +21,7 @@ import {
   slamAhead,
   waterAnswer,
   hoopsAnswer,
+  creaseAnswer,
   applyMove,
   slamFrom,
   type BoardScore,
@@ -99,7 +100,9 @@ async function hostBoss(engine: EngineLike, s: Settings, m: Extract<Msg, { t: "b
   const beam = m.beam && !m.funhouse ? await beamLines(engine, m.fen, move, m.beam) : null;
   // (The circus tiger's hoops and balloon due after his move: the cast's blocks and where it lands go with the move.)
   const end = (m.balloon || m.hoops) && !m.funhouse ? await hoopsAnswer(engines, applyMove(m.fen, move), m.hoops ?? null, m.balloon ?? null) : null;
-  return { ...reply(move), ...(beam ? { beam } : {}), ...(end?.land ? { balloon: end.land.square } : {}), ...(end?.answer ? { hoops: end.answer } : {}) };
+  // (Folio's Crease wanted with its move: the line after it goes with the move.)
+  const crease = m.crease && !m.funhouse ? await creaseAnswer(engines, applyMove(m.fen, move), m.crease) : "";
+  return { ...reply(move), ...(beam ? { beam } : {}), ...(end?.land ? { balloon: end.land.square } : {}), ...(end?.answer ? { hoops: end.answer } : {}), ...(crease ? { crease } : {}) };
 }
 
 /** What a battle showed: each crowd turn's position and allowed moves, every power event, the result. */
