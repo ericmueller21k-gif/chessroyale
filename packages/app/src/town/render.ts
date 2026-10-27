@@ -9,7 +9,7 @@
  * Everything that can be made ahead is cached (square colors, fonts, the clouds, each boss's and home's frames, drawn
  * once with renderFrame the first time they show, the pawns), so a frame allocates nothing on its hot path.
  */
-import { renderFrame, type Character } from "../characters/sprite.ts";
+import { frameKeys, renderFrame, type Character } from "../characters/sprite.ts";
 import { GINGERBREAD } from "../characters/gingerbread.ts";
 import { GREX } from "../characters/grex.ts";
 import { HOLLOW } from "../characters/hollow.ts";
@@ -29,10 +29,11 @@ import { statueSpot } from "./houses/coliseum.ts";
 import { COLISEUM_CHIP, artOf } from "./houses/index.ts";
 import { CLOSE, QUOTE_INK, STATUE_W, quoteFace, statueArt, statueFrame, statueH, statueSteps } from "./houses/statues.ts";
 import { CAP, LEADING, layout, lineWidth, renderLines } from "./sign-font.ts";
-import { look, mixMist, mixRGB, mixTint, type SkyWeights } from "./sky.ts";
+import { look, mixLights, mixMist, mixRGB, mixTint, type SkyWeights } from "./sky.ts";
 import { SkyPainter } from "./sky-draw.ts";
-import { PARK_BENCH, PARK_FOUNTAIN, PARK_TABLE, PARK_TREES, TABLE_TOP } from "./houses/park.ts";
-import { COLISEUM_PLACE, GRASS, PAVING, PROPS, STATUES, TABLES, groundAt, onColiseum, plotAt, seated, type Boss, type Home, type HomeId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type Town } from "./world.ts";
+import type { LightPool, LightSpot } from "./houses/kit.ts";
+import { PARK_BENCH, PARK_FOUNTAIN, PARK_LAMP, PARK_LAMP_HEAD, PARK_LAMP_LIGHTS, PARK_LAMP_POOLS, PARK_TABLE, PARK_TREES, TABLE_TOP } from "./houses/park.ts";
+import { COLISEUM_PLACE, GRASS, LAMPS, PAVING, PROPS, STATUES, TABLES, groundAt, onColiseum, plotAt, seated, type Boss, type Home, type HomeId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type Town } from "./world.ts";
 
 /** Each boss's sprite (its real one: its `idle` frames). */
 export const BOSS_ART: Record<HomeId, Character> = {
@@ -303,6 +304,123 @@ function quoteArt(id: StatueId, lines: string[], s: number, e: number, lead: num
   return { cv, s, n: lines.length, pitch: (CAP + lead) * s, lineH: CAP * s + e };
 }
 
+/**
+ * A picture's lights (Oct 27), made once, the first time it's drawn lit: a small canvas for each of its lights (its lit
+ * pixels, the glow spilling round them, its halo) and for each pool of light on the ground, at the picture's own pixels,
+ * in pixel-art bands (feel.ts: `lightSpill`, `lightHalo`, `lightPool`), so they're drawn like the picture they sit on,
+ * each only as big as it needs (the light layer is touched only there); and which of its pixels are lit (the tests find
+ * a lit window by it). Each canvas holds the light to add, laid on with "lighter".
+ */
+/** A light layer: its canvas (the world's size), and which of its tiles (`lightTilePx` square, nx across, ny down) a light touched. */
+interface LightLayer {
+  cv: HTMLCanvasElement;
+  g: CanvasRenderingContext2D;
+  tiles: Uint8Array;
+  nx: number;
+  ny: number;
+}
+interface GlowPiece {
+  cv: HTMLCanvasElement;
+  /** Its top left, in the picture's pixels. */
+  x: number;
+  y: number;
+  flicker: boolean;
+}
+interface Glow {
+  pieces: GlowPiece[];
+  lit: Uint8Array;
+}
+const rgbOf = (hex: string) => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)] as const;
+const bandAt = (bands: readonly (readonly [number, number])[], d: number) => {
+  for (const [to, a] of bands) if (d <= to) return a;
+  return 0;
+};
+type AddLight = (x: number, y: number, rgb: readonly number[], a: number) => void;
+function bakeGlow(ch: Character, spots: readonly LightSpot[], pools: readonly LightPool[]): Glow {
+  const f = TOWN_FEEL;
+  const spill = Math.ceil(f.lightSpill[f.lightSpill.length - 1]![0]);
+  const keys = frameKeys(ch, ch.anims.idle!.frames[0]!);
+  const lit = new Uint8Array(ch.w * ch.h);
+  const pieces: GlowPiece[] = [];
+  /** A piece over (x0, y0, w, h), in the picture's pixels: `fill` adds its light, pixel by pixel (r, g, b, premultiplied). */
+  const piece = (x0: number, y0: number, w: number, h: number, flicker: boolean, fill: (add: AddLight) => void) => {
+    const A = new Float32Array(w * h * 3);
+    let any = false;
+    fill((x, y, rgb, a) => {
+      const X = x - x0;
+      const Y = y - y0;
+      if (a <= 0 || X < 0 || Y < 0 || X >= w || Y >= h) return;
+      const o = (Y * w + X) * 3;
+      A[o] = A[o]! + rgb[0]! * a;
+      A[o + 1] = A[o + 1]! + rgb[1]! * a;
+      A[o + 2] = A[o + 2]! + rgb[2]! * a;
+      any = true;
+    });
+    if (!any) return;
+    const img = new ImageData(w, h);
+    const d = img.data;
+    for (let i = 0; i < w * h; i++) {
+      const a = Math.min(255, Math.max(A[i * 3]!, A[i * 3 + 1]!, A[i * 3 + 2]!));
+      if (a <= 0) continue;
+      d[i * 4] = Math.min(255, (A[i * 3]! * 255) / a);
+      d[i * 4 + 1] = Math.min(255, (A[i * 3 + 1]! * 255) / a);
+      d[i * 4 + 2] = Math.min(255, (A[i * 3 + 2]! * 255) / a);
+      d[i * 4 + 3] = a;
+    }
+    const cv = document.createElement("canvas");
+    cv.width = w;
+    cv.height = h;
+    cv.getContext("2d")!.putImageData(img, 0, 0);
+    pieces.push({ cv, x: x0, y: y0, flicker });
+  };
+  for (const s of spots) {
+    const rgb = rgbOf(s.color);
+    // Its pixels (its keys in its box).
+    const m = new Uint8Array(s.w * s.h);
+    for (let y = 0; y < s.h; y++)
+      for (let x = 0; x < s.w; x++) {
+        const k = keys[s.y + y]?.[s.x + x];
+        if (!k || (s.keys !== undefined && !s.keys.includes(k))) continue;
+        m[y * s.w + x] = 1;
+        lit[(s.y + y) * ch.w + s.x + x] = 1;
+      }
+    const isLit = (x: number, y: number) => x >= s.x && y >= s.y && x < s.x + s.w && y < s.y + s.h && m[(y - s.y) * s.w + x - s.x] === 1;
+    const halo = s.halo ?? 0;
+    const cx = s.x + s.w / 2;
+    const cy = s.y + s.h / 2;
+    const x0 = Math.min(s.x - spill, Math.floor(cx - halo));
+    const y0 = Math.min(s.y - spill, Math.floor(cy - halo));
+    const x1 = Math.max(s.x + s.w + spill, Math.ceil(cx + halo) + 1);
+    const y1 = Math.max(s.y + s.h + spill, Math.ceil(cy + halo) + 1);
+    piece(x0, y0, x1 - x0, y1 - y0, !!s.flicker, (add) => {
+      for (let y = y0; y < y1; y++)
+        for (let x = x0; x < x1; x++) {
+          // Its lit pixels warm and bright; round them, the glow spilling, by how far the nearest lit one is; and its
+          // halo in the air (a lantern's, a lamp's), round its box's middle.
+          if (isLit(x, y)) {
+            add(x, y, rgb, s.strength);
+            continue;
+          }
+          let d2 = Infinity;
+          for (let v = y - spill; v <= y + spill; v++) for (let u = x - spill; u <= x + spill; u++) if (isLit(u, v)) d2 = Math.min(d2, (u - x) ** 2 + (v - y) ** 2);
+          if (d2 < Infinity) add(x, y, rgb, s.strength * bandAt(f.lightSpill, Math.sqrt(d2)));
+          if (halo) add(x, y, rgb, s.strength * bandAt(f.lightHalo, Math.hypot(x + 0.5 - cx, y + 0.5 - cy) / halo));
+        }
+    });
+  }
+  for (const p of pools) {
+    const rgb = rgbOf(p.color);
+    const x0 = Math.floor(p.x - p.rx);
+    const y0 = Math.floor(p.y - p.ry);
+    const x1 = Math.ceil(p.x + p.rx) + 1;
+    const y1 = Math.ceil(p.y + p.ry) + 1;
+    piece(x0, y0, x1 - x0, y1 - y0, false, (add) => {
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) add(x, y, rgb, p.strength * bandAt(f.lightPool, Math.hypot((x + 0.5 - p.x) / p.rx, (y + 0.5 - p.y) / p.ry)));
+    });
+  }
+  return { pieces, lit };
+}
+
 // Can the canvas blur (not in older iOS Safari; there the shrink alone does the work)?
 const BLUR_OK = (() => {
   try {
@@ -416,6 +534,21 @@ export class Renderer {
   private readonly keyStart = new Int32Array(SQ_KEYS + 1);
   private nSq = 0;
   private seamHalf = 0.5;
+  /**
+   * The lights at dusk and night (Oct 27): how strongly they shine now (0: off; nothing is made or drawn for them); each
+   * place's and the lamp's (made the first time each is drawn lit); and the light layer: the lights of this frame added
+   * up, far to near, each thing drawn in front of a light cutting its shape out of it, laid on the world after its tint
+   * with "lighter", tile by tile (only the tiles a light touched), and cleared when its turn comes again.
+   */
+  private lightK = 0;
+  private readonly placeGlow: (Glow | null)[];
+  private lampGlow: Glow | null = null;
+  /** Two light layers, used in turn (one is laid on the world while the other is cleared and drawn: no copying). */
+  private readonly layers: LightLayer[] = [];
+  private layer: LightLayer | null = null;
+  /** This frame's lights' boxes on the screen (x0, y0, x1, y1 each): what's drawn later over one cuts into it. */
+  private readonly litBox = new Float32Array(4 * 128);
+  private nLit = 0;
 
   constructor(
     private readonly ctx: CanvasRenderingContext2D,
@@ -436,10 +569,12 @@ export class Renderer {
     const bench = new FrameCache(PARK_BENCH);
     const table = new FrameCache(PARK_TABLE);
     const fountain = new FrameCache(PARK_FOUNTAIN);
-    this.propFrames = PROPS.map((p) => (p.kind === "tree" ? trees[p.v]! : p.kind === "bench" ? bench : p.kind === "table" ? table : fountain));
+    const lamp = new FrameCache(PARK_LAMP);
+    this.propFrames = PROPS.map((p) => (p.kind === "tree" ? trees[p.v]! : p.kind === "bench" ? bench : p.kind === "table" ? table : p.kind === "lamp" ? lamp : fountain));
     this.propTop = PROPS.map(() => 0);
     this.bossFrames = town.bosses.map((b) => new FrameCache(BOSS_ART[b.home.id]));
     this.houseFrames = this.places.map((h) => new FrameCache(artOf(h).ch));
+    this.placeGlow = this.places.map(() => null);
     this.chipIcon = new FrameCache(COLISEUM_CHIP);
     this.statueImg = STATUES.map((st) => canvasOf(statueArt(st.id, 1), this.statueMask));
     // Each square is kept this frame (its corners, its face's corners, its color) and drawn with all the others of its
@@ -487,6 +622,7 @@ export class Renderer {
     const t = mixTint(w);
     this.tint = t[3] > 0.004 ? `rgba(${t[0] | 0},${t[1] | 0},${t[2] | 0},${t[3].toFixed(3)})` : null;
     this.mist = mixMist(w);
+    this.lightK = mixLights(w);
   }
 
   /** Draws one frame. `zoom`: 0 normal, 1 zoomed out (and between, while it glides); `dt`: seconds since the last. */
@@ -507,12 +643,15 @@ export class Renderer {
     this.nClear = 0;
     this.bubble.on = false;
     this.drawMarks(now); // on the ground, under everyone: the trail, your destination, the pressed square
+    const lit = this.beginLights();
     this.drawThings(now);
     // The light of the hour over the world and everything on it: one fill (none by day).
     if (this.tint) {
       ctx.fillStyle = this.tint;
       ctx.fillRect(0, 0, W, H);
     }
+    // The lights at dusk and night, over the tint, so they really glow (under the tags, the names and the bubble).
+    if (lit) this.layLights();
     for (let i = 0; i < this.nTags; i++) {
       const t = this.tags[i]!;
       this.drawTag(t.text, t.x, t.y, t.gold, t.size, t.alpha);
@@ -1069,8 +1208,217 @@ export class Renderer {
     if (s > 0.02) this.blitSoft(img, x0, y0, w, h, s, 0.88 * s);
     else ctx.drawImage(img, x0, y0, w, h);
     ctx.globalAlpha = 1;
+    this.cover(img, x0, y0, w, h, alpha);
+    // A lamp, lit at dusk and night (fading and hazing in the far band as its picture does).
+    if (this.lightK > 0.01 && PROPS[it.i]!.kind === "lamp") this.lightUp((this.lampGlow ??= bakeGlow(PARK_LAMP, PARK_LAMP_LIGHTS, PARK_LAMP_POOLS)), x0, y0, px, alpha * (1 - 0.88 * s), now, it.i * 389);
     this.propTop[it.i] = p.y - (PROPS[it.i]!.kind === "table" ? TABLE_TOP * px : ch.foot[1] * px);
     this.box(it, p.depth, x0, y0, x0 + w, y0 + h, p.x, p.y, y0);
+  }
+
+  // ---- The lights at dusk and night (Oct 27): the park's lamps, the homes' windows and doorways, the Colosseum's torches.
+
+  /** Readies the light layer for a frame (false: the lights are off, by day and dawn: nothing to do). */
+  private beginLights(): boolean {
+    this.nLit = 0;
+    if (this.lightK <= 0.01) return false;
+    // The layer laid on two frames ago: the world's canvas is done with it by now, so clearing it copies nothing.
+    if (this.layers.length < 2) {
+      const cv = document.createElement("canvas");
+      this.layers.push({ cv, g: cv.getContext("2d")!, tiles: new Uint8Array(0), nx: 0, ny: 0 });
+    }
+    const L = (this.layer = this.layers[this.layer === this.layers[0] ? 1 : 0] ?? this.layers[0]!);
+    const { canvas } = this.ctx;
+    // (Sized like the world's canvas; a new size clears it.)
+    if (L.cv.width !== canvas.width || L.cv.height !== canvas.height) {
+      L.cv.width = canvas.width;
+      L.cv.height = canvas.height;
+      L.tiles.fill(0);
+    }
+    this.eachRun(L, this.clearRun, true);
+    const T = TOWN_FEEL.lightTilePx;
+    const nx = Math.ceil(this.W / T);
+    const ny = Math.ceil(this.H / T);
+    if (nx !== L.nx || ny !== L.ny) {
+      L.tiles = new Uint8Array(nx * ny);
+      L.nx = nx;
+      L.ny = ny;
+    }
+    L.g.setTransform(this.DPR, 0, 0, this.DPR, 0, 0);
+    return true;
+  }
+
+  private readonly clearRun = (x: number, y: number, w: number, h: number) => this.layer!.g.clearRect(x, y, w, h);
+  private readonly layRun = (x: number, y: number, w: number, h: number) => this.ctx.drawImage(this.layer!.cv, x, y, w, h, x, y, w, h);
+  /** Each run of a layer's touched tiles in a row, in its device pixels (`clear`: and unmark them). */
+  private eachRun(L: LightLayer, fn: (x: number, y: number, w: number, h: number) => void, clear = false): void {
+    const { cv, tiles, nx, ny } = L;
+    const T = TOWN_FEEL.lightTilePx * this.DPR;
+    L.g.setTransform(1, 0, 0, 1, 0, 0);
+    L.g.globalCompositeOperation = "source-over";
+    for (let ty = 0; ty < ny; ty++) {
+      const y = Math.floor(ty * T);
+      const h = Math.min(cv.height, ty === ny - 1 ? cv.height : Math.floor((ty + 1) * T)) - y;
+      for (let tx = 0; tx < nx; ) {
+        if (!tiles[ty * nx + tx]) {
+          tx++;
+          continue;
+        }
+        const t0 = tx;
+        while (tx < nx && tiles[ty * nx + tx]) {
+          if (clear) tiles[ty * nx + tx] = 0;
+          tx++;
+        }
+        const x = Math.floor(t0 * T);
+        const w = Math.min(cv.width, tx === nx ? cv.width : Math.floor(tx * T)) - x;
+        if (w > 0 && h > 0) fn(x, y, w, h);
+      }
+    }
+  }
+
+  /** A picture's lights (a place's: its index; made the first time it's drawn lit), or null when it has none. */
+  private glowOf(i: number): Glow | null {
+    let g = this.placeGlow[i];
+    if (g === null) {
+      const art = artOf(this.places[i]!);
+      if (!art.lights.length && !art.pools.length) return null;
+      g = this.placeGlow[i] = bakeGlow(art.ch, art.lights, art.pools);
+    }
+    return g ?? null;
+  }
+
+  /** The flicker of a candle's or a torch's light at `now` (1 at its brightest): two slow sways out of step, never a blink. */
+  private flicker(now: number, phase: number): number {
+    const f = TOWN_FEEL;
+    const t = (now + phase) / f.lightFlickerMs;
+    return 1 - f.lightFlicker * (0.5 + 0.3 * Math.sin(t * 2 * Math.PI) + 0.2 * Math.sin(t * 3.7 + phase));
+  }
+
+  /**
+   * A picture's lights, at its place on the screen (x0, y0 its top left, `px` screen pixels a picture pixel), `a` as
+   * strong as the picture shows (its fade and haze), times how strongly the lights shine now: each glow (the flickering
+   * ones swaying) and its pools on the ground, at its depth (whatever is drawn after, nearer, cuts its shape out of them).
+   */
+  private lightUp(g: Glow | null, x0: number, y0: number, px: number, a: number, now: number, phase: number): void {
+    const k = this.lightK * a;
+    if (!g || k <= 0.004) return;
+    const crisp = px >= 1.5;
+    const fl = this.flicker(now, phase);
+    for (let i = 0; i < g.pieces.length; i++) {
+      const p = g.pieces[i]!;
+      this.light(p.cv, x0 + p.x * px, y0 + p.y * px, p.cv.width * px, p.cv.height * px, p.flicker ? k * fl : k, crisp);
+    }
+  }
+
+  /** Adds a light to the layer: `img` over (x, y, w, h) on the screen, `a` strong. */
+  private light(img: HTMLCanvasElement, x: number, y: number, w: number, h: number, a: number, crisp: boolean): void {
+    const L = this.layer!;
+    const g = L.g;
+    if (a <= 0.004 || x > this.W || y > this.H || x + w < 0 || y + h < 0) return;
+    g.globalCompositeOperation = "lighter";
+    g.globalAlpha = Math.min(1, a);
+    g.imageSmoothingEnabled = !crisp;
+    g.drawImage(img, x, y, w, h);
+    if (this.nLit * 4 < this.litBox.length) {
+      const b = this.litBox;
+      const k = this.nLit++ * 4;
+      b[k] = x;
+      b[k + 1] = y;
+      b[k + 2] = x + w;
+      b[k + 3] = y + h;
+    }
+    const T = TOWN_FEEL.lightTilePx;
+    const tx1 = Math.min(L.nx - 1, Math.floor((x + w) / T));
+    const ty1 = Math.min(L.ny - 1, Math.floor((y + h) / T));
+    for (let ty = Math.max(0, Math.floor(y / T)); ty <= ty1; ty++) for (let tx = Math.max(0, Math.floor(x / T)); tx <= tx1; tx++) L.tiles[ty * L.nx + tx] = 1;
+  }
+
+  /**
+   * What was just drawn stands in front of the lights already in the layer: its shape is cut out of them where it
+   * overlaps one (`a` as strong as it was drawn; flipped, tilted round (px, py) and cut off below `cut` as it was).
+   */
+  private cover(img: CanvasImageSource, x: number, y: number, w: number, h: number, a: number, flip = 1, tilt = 0, px = 0, py = 0, cut = Infinity): void {
+    if (this.nLit === 0 || a <= 0.02) return;
+    const b = this.litBox;
+    let over = false;
+    for (let k = 0; k < this.nLit * 4 && !over; k += 4) over = x < b[k + 2]! && x + w > b[k]! && y < b[k + 3]! && y + h > b[k + 1]!;
+    if (!over) return;
+    const g = this.layer!.g;
+    g.save();
+    g.globalCompositeOperation = "destination-out";
+    g.globalAlpha = Math.min(1, a);
+    if (cut < Infinity) {
+      g.beginPath();
+      g.rect(x - w, y - h, 3 * w, cut - (y - h));
+      g.clip();
+    }
+    if (tilt) {
+      g.translate(px, py);
+      g.rotate((tilt * Math.PI) / 180);
+      g.translate(-px, -py);
+    }
+    if (flip < 0) {
+      g.translate(px, 0);
+      g.scale(-1, 1);
+      g.translate(-px, 0);
+    }
+    g.drawImage(img, x, y, w, h);
+    g.restore();
+  }
+
+  /** Lays the light layer on the world, added onto it, tile by tile where a light touched (cleared when its turn comes again). */
+  private layLights(): void {
+    const { ctx, layer } = this;
+    if (!layer || this.nLit === 0) return;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = 1;
+    this.eachRun(layer, this.layRun);
+    ctx.restore();
+  }
+
+  /** (Tests) Where lamp `i` (its index in LAMPS)'s glass is on the screen now; false when it isn't drawn, or something nearer stands over it. */
+  lampAt(i: number, out: { x: number; y: number }): boolean {
+    const l = LAMPS[i];
+    const k = PROPS.findIndex((p) => p.kind === "lamp" && l !== undefined && p.c === l.c && p.r === l.r);
+    const it = this.propItems[k];
+    if (!it?.on) return false;
+    out.x = it.x0 + (PARK_LAMP_HEAD[0] / PARK_LAMP.w) * (it.x1 - it.x0);
+    out.y = it.y0 + (PARK_LAMP_HEAD[1] / PARK_LAMP.h) * (it.y1 - it.y0);
+    if (!(out.x > 0 && out.x < this.W && out.y > 0 && out.y < this.H)) return false;
+    for (let j = this.items.indexOf(it) + 1; j < this.items.length; j++) {
+      const o = this.items[j]!;
+      if (o.on && !o.faded && out.x >= o.x0 && out.x <= o.x1 && out.y >= o.y0 && out.y <= o.y1) return false;
+    }
+    return true;
+  }
+
+  /**
+   * (Tests) A point on a place's first light (`i`: its index, the homes then the Colosseum) where it shows now: a lit
+   * pixel amid lit ones, nothing standing in front of it (the nearest such to the light's middle); false if none.
+   */
+  lightAt(i: number, out: { x: number; y: number }): boolean {
+    const it = this.houseItems[i];
+    const g = this.glowOf(i);
+    const s = artOf(this.places[i]!).lights[0];
+    if (!it?.on || !g || !s) return false;
+    const cw = this.houseFrames[i]!.ch.w;
+    const px = (it.x1 - it.x0) / cw;
+    const amid = (x: number, y: number) => {
+      for (let v = -1; v <= 1; v++) for (let u = -1; u <= 1; u++) if (!g.lit[(y + v) * cw + x + u]) return false;
+      return true;
+    };
+    const cands: [number, number][] = [];
+    for (let y = s.y + 1; y < s.y + s.h - 1; y++) for (let x = s.x + 1; x < s.x + s.w - 1; x++) if (amid(x, y)) cands.push([x, y]);
+    cands.sort((a, b) => Math.hypot(a[0] - s.x - s.w / 2, a[1] - s.y - s.h / 2) - Math.hypot(b[0] - s.x - s.w / 2, b[1] - s.y - s.h / 2));
+    for (const [x, y] of cands) {
+      out.x = it.x0 + (x + 0.5) * px;
+      out.y = it.y0 + (y + 0.5) * px;
+      if (!(out.x > 0 && out.x < this.W && out.y > 0 && out.y < this.H)) continue;
+      const h = this.pick(out.x, out.y);
+      if (i >= this.homes.length ? h?.kind === "coliseum" : h?.kind === "house" && h.home === this.homes[i]) return true;
+    }
+    return false;
   }
 
   /**
@@ -1170,6 +1518,7 @@ export class Renderer {
     if (s > 0.02) this.blitSoft(img, x0, y0, w, h, s, 0.75 * s);
     else ctx.drawImage(img, x0, y0, w, h);
     ctx.restore();
+    this.cover(img, x0, y0, w, h, alpha, flip, tilt, p.x, p.y, this.sitting ? seat : Infinity);
     this.box(it, p.depth, x0, y0, x0 + w, y0 + h, p.x, p.y, y0 + head * h);
   }
 
@@ -1237,6 +1586,9 @@ export class Renderer {
     if (TOWN_FEEL.signNames && ta > 0.02) this.writeSign(it.i, x0 + art.sign.x * px, y0 + art.sign.y * px, art.sign.w * px, art.sign.h * px, ta);
     if (it.i === this.homes.length) this.drawStatues(x0, y0, px, alpha, s, now);
     ctx.restore();
+    this.cover(img, x0, y0, w, h, alpha);
+    // Its lights at dusk and night (fading and hazing in the far band as its picture does).
+    if (this.lightK > 0.01) this.lightUp(this.glowOf(it.i), x0, y0, px, alpha * (1 - 0.88 * s), now, it.i * 613);
     const nm = this.names[it.i]!;
     nm.x = p.x;
     nm.y = y0 + this.houseTop(it.i) * px;

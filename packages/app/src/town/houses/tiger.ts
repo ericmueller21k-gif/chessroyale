@@ -9,7 +9,7 @@
  * Painted in frame pixels: each part is a function from a pixel to a palette key over its box.
  */
 import type { Anim, Character, Frame, Layer, Part } from "../../characters/sprite.ts";
-import { clamp, paint, signBoard, signFace, signPost, tone, type Pt } from "./kit.ts";
+import { clamp, paint, signBoard, signFace, signPost, tone, WARM, type LightPool, type LightSpot, type Pt } from "./kit.ts";
 
 const PALETTE: Record<string, string> = {
   k: "#1f1210", // outline (the tiger's)
@@ -354,3 +354,7 @@ export const HOUSE_TIGER: Character = {
 
 /** Where the sign's blank face is (frame pixels), for the game to write "Babur's Circus" on. */
 export const HOUSE_TIGER_SIGN = signFace(BOARD[0], BOARD[1], BW, BH);
+
+/** Its lights at dusk and night (Oct 27): the door's dark inside glows warm (the show going on in there), and a little of it falls on the ground in front. */
+export const HOUSE_TIGER_LIGHTS: readonly LightSpot[] = [{ x: CX - DOOR, y: DOOR_TOP, w: 2 * DOOR + 1, h: 16, keys: "VW", color: WARM, strength: 0.9 }];
+export const HOUSE_TIGER_POOLS: readonly LightPool[] = [{ x: CX, y: FOOT - 1, rx: 22, ry: 5, color: WARM, strength: 0.35 }];

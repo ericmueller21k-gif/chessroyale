@@ -10,10 +10,12 @@ import { test } from "./helpers.ts";
  * and a home's (its shop greyed, "Coming soon"). Slice 5: the Colosseum's (a tap on its gate walks you to the apron in
  * front of it; "Raids with people" greyed, "Coming soon"). Slice 6: the park's chess tables (a tap on one walks you to a
  * free stool, you sit, its card shows "Casual" and "Ranked" greyed and "Coming soon"; a tap elsewhere closes it and you
- * stand), on the bigger map round the bigger Colosseum.
+ * stand), on the bigger map round the bigger Colosseum. The lights (Oct 27): at `?sky=night` a park lamp's glass and Babur's
+ * Circus's lit doorway are clearly warmer and brighter than at `?sky=day`.
  * Test hooks: the canvas carries `data-you="c,r"` (your square) and `data-ready="1"` once its first frame is drawn;
  * `window.__townAt("boss" | "home" | "coliseum", id)` says where to tap a boss, a home or the Colosseum's gate (with the
- * test switches on, as here).
+ * test switches on, as here); `__townAt("lamp", i)` where a park lamp's glass is, `__townAt("light", id)` a lit pixel of a
+ * home's light with nothing in front of it.
  */
 test.use({ actionTimeout: 15_000 });
 
@@ -159,6 +161,60 @@ async function openCard(p: Page, kind: "boss" | "home", name: string) {
   }).toPass({ timeout: 20_000 });
   return card;
 }
+
+/**
+ * The average color of the canvas round a test hook's point (`__townAt(kind, id)`: a lamp's glass, a home's lit pixel),
+ * a CSS pixel each way, read in the same moment as the point; null while the hook has none (not drawn, or someone stands
+ * in front of it).
+ */
+const glowAt = (p: Page, kind: "lamp" | "light", id: number | string) =>
+  canvas(p).evaluate(
+    (cv: HTMLCanvasElement, [kind, id]) => {
+      const at = (window as unknown as { __townAt: (k: string, id: number | string) => { x: number; y: number } | null }).__townAt(kind, id);
+      if (!at) return null;
+      const k = cv.width / cv.clientWidth;
+      const n = Math.max(1, Math.round(2 * k));
+      const d = cv.getContext("2d")!.getImageData(Math.round((at.x - 1) * k), Math.round((at.y - 1) * k), n, n).data;
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      for (let i = 0; i < d.length; i += 4) ((r += d[i]!), (g += d[i + 1]!), (b += d[i + 2]!));
+      return [r / (n * n), g / (n * n), b / (n * n)];
+    },
+    [kind, id] as const,
+  );
+
+test("the lights at dusk and night: at ?sky=night a park lamp's glass and Babur's Circus's lit doorway are clearly warmer and brighter than at ?sky=day", async ({ page }) => {
+  const errors = watchErrors(page);
+  const lum = ([r, g, b]: number[]) => 0.3 * r! + 0.59 * g! + 0.11 * b!;
+  const warm = ([r, , b]: number[]) => r! - b!;
+  const look = async (sky: string) => {
+    await page.goto(`/town?sky=${sky}`);
+    await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+    // The lamp ahead on your left as the page opens (a bot may stroll in front of it a moment: wait till it's clear).
+    let lamp: number[] | null = null;
+    await expect(async () => {
+      lamp = await glowAt(page, "lamp", 0);
+      expect(lamp, "the lamp's glass shows").not.toBeNull();
+    }).toPass({ timeout: 20_000 });
+    // Babur's Circus: its doorway (Babur and his balloons may stand in front of it a moment).
+    await toBabur(page);
+    let door: number[] | null = null;
+    await expect(async () => {
+      door = await glowAt(page, "light", "tiger");
+      expect(door, "the circus's doorway shows").not.toBeNull();
+    }).toPass({ timeout: 20_000 });
+    return { lamp: lamp!, door: door! };
+  };
+  const day = await look("day");
+  const night = await look("night");
+  for (const k of ["lamp", "door"] as const) {
+    const msg = `${k}: day ${day[k].map(Math.round)}, night ${night[k].map(Math.round)}`;
+    expect(lum(night[k]) - lum(day[k]), `${msg}: brighter at night`).toBeGreaterThan(25);
+    expect(warm(night[k]) - warm(day[k]), `${msg}: warmer at night`).toBeGreaterThan(25);
+  }
+  expect(errors).toEqual([]);
+});
 
 test("a boss's card: 'Challenge alone', then 'Leave the town square?'; Stay keeps you, Leave opens the Boss raid screen with that boss's tile picked", async ({ page }) => {
   const errors = watchErrors(page);

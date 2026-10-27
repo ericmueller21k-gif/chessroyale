@@ -246,6 +246,39 @@ export const TOWN_FEEL = {
   stars: 70,
   twinkles: 8,
 
+  // ---- The lights at dusk and night (Oct 27, Eric: lamps in the park "so when it's night and also dusk that they turn
+  // on", and the homes glowing "from inside a little bit… so it clearly kind of shows… there's some liveliness in the
+  // town"). Where each light is, its color and its strength are data beside the art (houses/*.ts `…_LIGHTS` and
+  // `…_POOLS`, the lamp's in houses/park.ts); these shape how they all shine. Drawn after the world's tint, added onto it,
+  // so they really glow; nothing at all by day.
+  /** How strongly the lights shine in each look of the sky (0: off); as the sky blends between looks, so do they. */
+  lightsAt: { dawn: 0, day: 0, dusk: 0.7, night: 1 },
+  /**
+   * The glow spilling round a lit window or glass, in the picture's pixels: two bands, the inner out to this far at this
+   * share of the light's strength, the outer to this far at this share (pixel-art bands, like the lanterns' own glows).
+   */
+  lightSpill: [
+    [1.5, 0.5],
+    [3.2, 0.22],
+  ] as const,
+  /** A halo round a lantern's or a lamp's glass (its radius is the light's own `halo`): three bands, out to this share of it at this share of its strength. */
+  lightHalo: [
+    [0.42, 0.42],
+    [0.72, 0.22],
+    [1, 0.09],
+  ] as const,
+  /** A pool of light on the ground: three bands, out to this share of its size at this share of its strength. */
+  lightPool: [
+    [0.5, 1],
+    [0.78, 0.6],
+    [1, 0.28],
+  ] as const,
+  /** The flicker of the lights marked `flicker` (candles, lanterns, torches): how deep at most (0: none), and how slow (ms a sway). No blinking. */
+  lightFlicker: 0.16,
+  lightFlickerMs: 700,
+  /** The light layer is cleared and laid on the world in tiles this many CSS pixels square: only the tiles a light touches. */
+  lightTilePx: 64,
+
   // ---- The world's edge.
   /** A dark line along the world's rim instead of the haze alone (Eric was curious; off by default)... */
   rimLine: false,

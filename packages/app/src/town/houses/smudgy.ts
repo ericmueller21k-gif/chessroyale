@@ -8,7 +8,7 @@
  */
 import type { Anim, Character, Frame, Layer, Part, Speck } from "../../characters/sprite.ts";
 import { SMUDGY_PALETTE } from "../../characters/smudgy.ts";
-import { flower, grain, groundShadow, paint, signBoard, signFace, type Pt } from "./kit.ts";
+import { flower, grain, groundShadow, LANTERN_LIGHT, paint, signBoard, signFace, WARM, type LightPool, type LightSpot, type Pt } from "./kit.ts";
 
 const S_ = SMUDGY_PALETTE;
 const PALETTE: Record<string, string> = {
@@ -322,3 +322,12 @@ export const HOUSE_SMUDGY: Character = {
 
 /** Where the sign's blank face is (frame pixels), for the game to write "Smudgy's Art Gallery" on. */
 export const HOUSE_SMUDGY_SIGN = signFace(BOARD[0], BOARD[1], BW, BH);
+
+/** Its lights at dusk and night (Oct 27): the paintings in its two windows lit from inside, the door's little window, and the lamp over the door (flickering, a halo round it). */
+export const HOUSE_SMUDGY_LIGHTS: readonly LightSpot[] = [
+  { x: 39, y: 77, w: 16, h: 14, color: WARM, strength: 0.6 },
+  { x: 89, y: 77, w: 16, h: 14, color: WARM, strength: 0.6 },
+  { x: CX - 5, y: 80, w: 11, h: 9, keys: "h", color: WARM, strength: 0.9 },
+  { x: CX + 12, y: 72, w: 4, h: 6, keys: "wh", color: LANTERN_LIGHT, strength: 1, flicker: true, halo: 10 },
+];
+export const HOUSE_SMUDGY_POOLS: readonly LightPool[] = [{ x: CX, y: FOOT - 2, rx: 14, ry: 4, color: WARM, strength: 0.25 }];

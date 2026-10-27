@@ -8,7 +8,7 @@
  */
 import type { Anim, Character, Frame, Layer, Part, Speck } from "../../characters/sprite.ts";
 import { SAWYER_PALETTE } from "../../characters/sawyer.ts";
-import { grain, groundShadow, lantern, logEnd, paint, pine, signBoard, signFace, signPost, tuft, type Pt } from "./kit.ts";
+import { grain, groundShadow, lantern, LANTERN_LIGHT, logEnd, paint, pine, signBoard, signFace, signPost, tuft, WARM, type LightPool, type LightSpot, type Pt } from "./kit.ts";
 
 const S_ = SAWYER_PALETTE;
 const PALETTE: Record<string, string> = {
@@ -327,3 +327,10 @@ export const HOUSE_SAWYER: Character = {
 
 /** Where the sign's blank face is (frame pixels), for the game to write "Sawyer's Woodshed" on. */
 export const HOUSE_SAWYER_SIGN = signFace(BOARD[0], BOARD[1], BW, BH);
+
+/** Its lights at dusk and night (Oct 27): the open front's inside, lit by its lantern, glows warm; the lantern on its hook shines, a halo round it; both flicker. */
+export const HOUSE_SAWYER_LIGHTS: readonly LightSpot[] = [
+  { x: CX - 14, y: WALL_TOP + 7, w: 28, h: BASE - WALL_TOP - 7, keys: "Ehij", color: WARM, strength: 0.8, flicker: true },
+  { x: SL - 7, y: 67, w: 4, h: 9, keys: "wW", color: LANTERN_LIGHT, strength: 1, flicker: true, halo: 12 },
+];
+export const HOUSE_SAWYER_POOLS: readonly LightPool[] = [{ x: CX - 4, y: FOOT - 3, rx: 16, ry: 4, color: WARM, strength: 0.3 }];
