@@ -2,7 +2,7 @@ import { expect, type Page } from "@playwright/test";
 import { Chess, type Square } from "chess.js";
 import { BOSS_POWERS } from "@chessroyale/core";
 import { crossesCrease } from "@chessroyale/chess";
-import { BOARD_SEL, test, bossAloneFromHome, createLobbyFromHome, submitMove } from "./helpers.ts";
+import { BOARD_SEL, test, bossAloneFromHome, createLobbyFromHome, engineTop, submitMove } from "./helpers.ts";
 import { REFUSED } from "../packages/app/src/refused.ts";
 import { FOLIO_LINES } from "../packages/app/src/characters/folio-lines.ts";
 
@@ -142,11 +142,19 @@ test("Folio's Draft: the ink mark and its line, DRAFT and its line, a count of y
     // A move that leaves its attack standing (not the piece, not the line, not the attacker).
     const keeps = (mv: string) => {
       if (!mark) return true;
-      const c = new Chess(s.fen);
-      c.move({ from: mv.slice(0, 2), to: mv.slice(2, 4) });
-      return c.attackers(mark.square as Square, s.boss.crowdSide === "w" ? "b" : "w").includes(mark.attacker as Square);
+      try {
+        const c = new Chess(s.fen);
+        c.move({ from: mv.slice(0, 2), to: mv.slice(2, 4), promotion: mv[4] });
+        return c.attackers(mark.square as Square, s.boss.crowdSide === "w" ? "b" : "w").includes(mark.attacker as Square);
+      } catch {
+        return false;
+      }
     };
-    await play(page, quiet(s.fen, s.allowed, keeps), s.fen);
+    // The engine's best such move (Boss alone has no clock): a crowd that plays well while it leaves the mark standing, so the
+    // battle lasts until a piece is folded (a careless one was mated first now and then: CI, Oct 27). Else a quiet one.
+    const { top } = await engineTop(page).catch(() => ({ top: [] as { move: string }[] }));
+    const best = top.map((t) => t.move).find((mv) => (!s.allowed || s.allowed.includes(mv)) && keeps(mv));
+    await play(page, best ?? quiet(s.fen, s.allowed, keeps), s.fen);
   }
   expect(folded, "a fold within 30 moves").not.toBeNull();
   const r = await seen(page);
