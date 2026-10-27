@@ -742,7 +742,7 @@ export const BOSS_POWERS = {
    * hoops now come after his move): the raid sim's 10 s crowd, 2.55 casts a battle of 44 moves, 3.45 per 60 moves (1.1 gave
    * 1.80 a battle, under 2: his battles are shorter now he keeps his turn; reports/tiger-sim.md).
    */
-  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.3 } as Readonly<Record<string, number>>,
+  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.3, folio: 1 } as Readonly<Record<string, number>>,
   /**
    * The Hidden Boss's ultimate, the bullet clock (Eric, Oct 14: "Meter builds starting turn 1, about 7 turns in he says
    * something about how you're thinking too much and to just play pure chess etc, true to him, then for the rest of phase 1
@@ -1254,6 +1254,45 @@ export const BOSS_POWERS = {
   hoopsLooks: 8,
   hoopsNodes: 20_000,
   hoopsTimeMs: 8_000,
+  /**
+   * Folio's Draft (its passive; docs/decisions/2026-10-27-folio-rules.md): as the crowd's turn after its move begins, from
+   * crowd turn draftFirst, every draftEvery turns, an ink mark under one of the crowd's pieces that one of Folio's pieces
+   * attacks: a non-king piece that is defended and that no cheaper Folio piece attacks (Folio wouldn't just take it), a
+   * seeded pick among the draftTop most valuable. The crowd has draftWindow of its own moves to end that one attack (move
+   * the piece, block the line, take the attacker); if it still stands after them, the piece is folded: frozen for
+   * foldTurns crowd turns, by Ginger's freeze's rules. One mark at a time; none that qualifies (or a mark still up, or
+   * another of Folio's moments that turn): it tries again next turn, and the try doesn't count.
+   */
+  draftFirst: 3,
+  draftEvery: 4,
+  draftWindow: 2,
+  draftTop: 3,
+  foldTurns: 3,
+  /**
+   * Folio's Crease (its ultimate, the rage meter's): on the warning's turn its line shows (the engine's pick, made with
+   * Folio's move on the position after it, the crowd to move); as the next crowd turn begins the board is creased along
+   * it for creaseTurns crowd turns, and no move of either side crosses it (Sawyer's board saw's rules). The line: of the
+   * 14 inner lines, the one costing the crowd between creaseLossMin and creaseLossMax pawns (its best move with the crease
+   * against without, in pawns of log-odds: bouncePawnLogit) nearest the band's middle, seeded among ties; none there, the
+   * one nearest creaseLossMin below it, never one costing more than creaseLossMax. A line leaving either side no move, or
+   * handing either a mate in one, never counts. Each line's look: creaseNodes; the host gets creaseTimeMs more for the
+   * request that asks for it. How often: rageSpeed.folio.
+   */
+  creaseTurns: 4,
+  creaseLossMin: 0.3,
+  creaseLossMax: 1.5,
+  creaseNodes: 20_000,
+  creaseTimeMs: 6_000,
+  /**
+   * Folio's Revision (once a battle, revisionMax): right after a crowd move that punishes Folio's last move (that move
+   * cost it at least revisionDrop pawns against its best there, and after the crowd's reply its judged evaluation is at
+   * least revisionDrop worse than before that move), both are crossed out: the board goes back to before its move, it
+   * plays the engine's best move there, and the crowd moves again. Never after a crowd move that ends the battle, nor
+   * before crowd turn revisionFrom.
+   */
+  revisionDrop: 1.5,
+  revisionMax: 1,
+  revisionFrom: 5,
 } as const;
 
 /**

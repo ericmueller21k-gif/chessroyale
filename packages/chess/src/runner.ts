@@ -119,6 +119,10 @@ import {
   type WaterAsk,
   tigerBattle,
   hoopsAnswer,
+  folioBattle,
+  creasePick,
+  type CreaseAsk,
+  type JudgedMove,
   type BalloonAsk,
   type HoopsAsk,
   beamLines,
@@ -1200,19 +1204,22 @@ export class MatchRunner {
     }
     // (The bullet clock ran out on this move: the battle is lost on time, and no move is played for the crowd.)
     const outOfTime = this.bossOutOfTime();
+    // (Rounds whose move a power crossed out after it was played (Folio's Revision): fair play skips them.)
+    const crossed = new Set<number>();
     for (const r of results) {
       if (r.lastStand || outOfTime) continue;
       const board = this.boards.get(r.boardId)!;
       const moverExpected = r.scored.find((s) => s.move === r.result.playedMove)?.expected ?? board.expected;
       this.boards.set(r.boardId, playOnBoard(board, r.result.playedMove, moverExpected));
       // Boss battle: the judged eval feeds the ultimate's meter, and the boss's own after-move effect (G-REX's fire
-      // burns what was left on its tiles).
+      // burns what was left on its tiles; Folio's Revision reads the judge's numbers).
       if (this.state.boss?.powers) {
         this.state = { ...this.state, boss: { ...this.state.boss, powers: { ...this.state.boss.powers, judged: moverExpected } } };
-        this.afterCrowdMove(r.result.playedMove);
+        this.afterCrowdMove(r.result.playedMove, { best: Math.max(moverExpected, r.scored[0]?.expected ?? moverExpected), played: moverExpected, ...(r.king ? { king: true } : {}) });
+        if (bossRules(this.state.boss)?.crossedOut?.(this.state.boss!)) crossed.add(r.boardId);
       }
     }
-    return { stage: this.state.stage, round: this.state.round - 1, boards: [...results], retired: this.retiredThisRound };
+    return { stage: this.state.stage, round: this.state.round - 1, boards: results.map((r) => (crossed.has(r.boardId) ? { ...r, power: true } : r)), retired: this.retiredThisRound };
   }
 
   /** Records a bot's thinking time (when bot picks come from outside, e.g. the lobby host). */
@@ -1372,9 +1379,12 @@ export class MatchRunner {
     // hoops, if they're due after this move.)
     const balloon = this.balloonAsk();
     const hoops = this.hoopsAsk();
+    // (Folio's Crease, wanted with this move: its line on the position after it, on this device's engines, as the host's.)
+    const crease = this.creaseAsk();
     const move = await ordinary();
     const end = balloon || hoops ? await this.tigerTurnEnd(fen, move, hoops, balloon, engine) : {};
-    this.applyBossMove(move, kind === "stagger", { ...(beam ? { beam: await beamLines(engine, fen, move, beam) } : {}), ...end });
+    const line = crease ? await creasePick(this.opts.engines.length ? this.opts.engines : [engine], applyMove(fen, move), crease).catch(() => null) : null;
+    this.applyBossMove(move, kind === "stagger", { ...(beam ? { beam: await beamLines(engine, fen, move, beam) } : {}), ...end, ...(crease ? { crease: line?.line ?? null, creaseLoss: line?.loss ?? null } : {}) });
     return move;
   }
 
@@ -1463,10 +1473,18 @@ export class MatchRunner {
     return m;
   }
 
-  /** After the crowd's move: the boss's own effect, if it has one (G-REX's fire: what was left on a tile ablaze burns). */
-  private afterCrowdMove(move: string | null) {
+  /**
+   * After the crowd's move: the boss's own effect, if it has one (G-REX's fire: what was left on a tile ablaze burns).
+   * `judged`: the judge's numbers for it, when a scored round played it.
+   */
+  private afterCrowdMove(move: string | null, judged: JudgedMove | null = null) {
     const b = this.state.boss;
-    if (b) bossRules(b)?.afterCrowdMove?.(this.battle, move);
+    if (b) bossRules(b)?.afterCrowdMove?.(this.battle, move, judged);
+  }
+
+  /** Folio's Crease is wanted with the boss's move now: what the host's engines need to pick its line after it, or null. */
+  creaseAsk(): CreaseAsk | null {
+    return folioBattle.creaseAsk(this.battle);
   }
 
   /**

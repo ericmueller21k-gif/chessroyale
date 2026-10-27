@@ -37,6 +37,8 @@ import {
   repaintFrom,
   waterAnswer,
   hoopsAnswer,
+  creaseAnswer,
+  type CreaseAsk,
   type HoopsAsk,
   applyMove,
   type BalloonAsk,
@@ -746,7 +748,7 @@ export class NetMatch implements GameView {
         if (m.water) return void this.hostPick(m.key, async (engines) => (await waterAnswer(engines, m.fen, m.water!, !!m.waterAny)).answer);
         // (Chub & Chirp's Carrot Patch cast spends his whole turn: only the pass guard to ask.)
         if (m.pass) return void this.hostPick(m.key, (engines) => castAnswer(engines, m.fen));
-        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain, m.seed !== undefined ? { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) } : null, m.land ?? null, m.race ?? null, m.beam ?? null, m.balloon ?? null, m.hoops ?? null);
+        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain, m.seed !== undefined ? { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) } : null, m.land ?? null, m.race ?? null, m.beam ?? null, m.balloon ?? null, m.hoops ?? null, m.crease ?? null);
       case "bossBrain":
         // The battle is on the Maia brain and this device plays the boss: Maia loads during the intro.
         return void this.useBrain(m.brain);
@@ -839,9 +841,10 @@ export class NetMatch implements GameView {
    * that-many moves after it go with the move (beamLines). `hoops` (the circus tiger's hoops are due after this move): his
    * move, then the cast on the position after it (hoopsAnswer: its blocks go with the move as `hoops`). `balloon` (his
    * balloon is due at the end of this turn): where it lands after the move and the cast goes with it (landFrom, outside
-   * the hoops), the same whether it will pop or not.
+   * the hoops), the same whether it will pop or not. `crease` (Folio's Crease is wanted with this move): its line on the
+   * position after the move goes with it (creaseAnswer).
    */
-  private async hostBoss(key: string, fen: string, elo: number, nodes: number, kind: BossMoveKind, allowed: string[] | null = null, funhouse = false, brain?: NetBossBrain, asks: BossAsks | null = null, land: SlamPiece[] | null = null, race: CarrotRace | null = null, beam: number | null = null, balloon: BalloonAsk | null = null, hoops: HoopsAsk | null = null) {
+  private async hostBoss(key: string, fen: string, elo: number, nodes: number, kind: BossMoveKind, allowed: string[] | null = null, funhouse = false, brain?: NetBossBrain, asks: BossAsks | null = null, land: SlamPiece[] | null = null, race: CarrotRace | null = null, beam: number | null = null, balloon: BalloonAsk | null = null, hoops: HoopsAsk | null = null, crease: CreaseAsk | null = null) {
     try {
       const engines = await this.engines();
       const [engine] = engines;
@@ -865,7 +868,8 @@ export class NetMatch implements GameView {
       const move = funhouse ? await funhouseMoveFrom(engine!, fen, allowed) : await ordinary();
       const lines = beam && !funhouse ? await beamLines(engine!, fen, move, beam) : null;
       const end = (balloon || hoops) && !funhouse ? await (async () => hoopsAnswer(engines, applyMove(fen, move), hoops, balloon))().catch(() => null) : null;
-      this.send({ t: "bossMove", key, move, ...(lines ? { beam: lines } : {}), ...(end?.land ? { balloon: end.land.square } : {}), ...(end?.answer ? { hoops: end.answer } : {}) });
+      const line = crease && !funhouse ? await (async () => creaseAnswer(engines, applyMove(fen, move), crease))().catch(() => "") : "";
+      this.send({ t: "bossMove", key, move, ...(lines ? { beam: lines } : {}), ...(end?.land ? { balloon: end.land.square } : {}), ...(end?.answer ? { hoops: end.answer } : {}), ...(line ? { crease: line } : {}) });
       this.emit();
     } catch {
       // No engine here: the server asks someone else, or plays a random move.
