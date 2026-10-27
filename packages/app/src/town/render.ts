@@ -1338,14 +1338,28 @@ export class Renderer {
    */
   private cover(img: CanvasImageSource, x: number, y: number, w: number, h: number, a: number, flip = 1, tilt = 0, px = 0, py = 0, cut = Infinity): void {
     if (this.nLit === 0 || a <= 0.02) return;
+    // The lights it overlaps: only their boxes are cut (the clip below), so a big picture over a small light (the
+    // Colosseum over a far home's window) costs only that light's size.
     const b = this.litBox;
-    let over = false;
-    for (let k = 0; k < this.nLit * 4 && !over; k += 4) over = x < b[k + 2]! && x + w > b[k]! && y < b[k + 3]! && y + h > b[k + 1]!;
-    if (!over) return;
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (let k = 0; k < this.nLit * 4; k += 4)
+      if (x < b[k + 2]! && x + w > b[k]! && y < b[k + 3]! && y + h > b[k + 1]!) {
+        x0 = Math.min(x0, b[k]!);
+        y0 = Math.min(y0, b[k + 1]!);
+        x1 = Math.max(x1, b[k + 2]!);
+        y1 = Math.max(y1, b[k + 3]!);
+      }
+    if (x0 === Infinity) return;
     const g = this.layer!.g;
     g.save();
     g.globalCompositeOperation = "destination-out";
     g.globalAlpha = Math.min(1, a);
+    g.beginPath();
+    g.rect(x0, y0, x1 - x0, y1 - y0);
+    g.clip();
     if (cut < Infinity) {
       g.beginPath();
       g.rect(x - w, y - h, 3 * w, cut - (y - h));
