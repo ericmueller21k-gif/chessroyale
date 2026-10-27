@@ -12,7 +12,8 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
 
 - **The page.** `App.tsx` mounts it at `/town` the way it mounts `/autochess`; `town/TownPage.tsx` loads the rest with a
   dynamic `import()`, so none of its code, art or styles are in the main bundle. The back button goes home (and the
-  address back to `/`). Stockfish isn't warmed on this page.
+  address back to `/`). Stockfish isn't warmed on this page, and nothing of Maia's loads
+  while you walk round it (Eric's frame-rate rule, `docs/rules/eric.md`); a game with a bot loads it when it opens.
 - **Layout.** A slim bar (the back button and "Town square"), then the world fills the rest of the screen. The world never
   assumes a screen size: it fills its box and works its camera out from the box's shape, so the panels Eric designs
   around it can change without touching it. The back button, the zoom pair and "Back to me" stay put.
@@ -161,10 +162,35 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
   with their pictures; the tags, names and bubble are drawn after them. Nothing is made or drawn by day.
 
 - **You** (slice 5): your pawn wears your profile's crate items (`town/you-look.ts`: `Avatar` drawn once into a canvas,
-  again only when your look changes; plain when signed out or wearing nothing; bots stay plain). Every pawn's base stands
+  again only when your look changes; plain when signed out or wearing nothing). The bots wear theirs too (Oct 27: one or two
+  each, from `BOTS`; drawn the same way once as the page opens, never per frame; slice 5's "bots stay plain" is replaced). Every pawn's base stands
   on its square's middle, with a contact shadow under it that shrinks and fades as the hop lifts it. You have no ring
   under you (Oct 26, Eric: the ring and the shadow together "looks sloppy"); your gold name tag marks you, and your
   shadows are a bot's, sized from the pawn rather than the margin your items are drawn in.
+
+- **The bots and playing them** (Oct 27, Eric: "a few bots… with different skill level… if you tap them you can invite
+  them to a game and then you both run over to the chessboard"; `docs/decisions/2026-10-27-town-bots.md`). Six bots, one
+  table, `BOTS` in `world.ts`: a short name (8 to 10 characters), a fixed rating and a look (`Look`: side, tint and the crate
+  items worn, one field so a sprite can replace the pawn later): Pin Pete 800, Rook Rita 1000, Fork Frank 1200, Tempo Tess
+  1400, Bishop Bo 1700, Gambit Gus 2000. Shown everywhere as "<name> (bot)" (`botLabel`: their tags, cards and games).
+  - **A bot's card** (a tap on a bot; placed over its name tag like a boss's; the bot holds still while it's open, `hold`):
+    "<name> (bot)", "Rating 1400" and **Play**. Play: you both walk to the nearest table with both stools free (nearest to
+    the two of you, `tableFor`), you to the stool nearer you, the bot to the other (`meet`); once both sit (`meetReady`) the
+    game opens. Any other walk of yours calls it off. No table free: Play greyed and "Tables are full" (the line's room is
+    always kept, so the card never changes size; `anyTableFree`, checked only while the card is open).
+  - **A bot sitting alone at a table** (`waitingBot`): a tap on the table walks you to its free stool, as before, and its
+    card's first button is **"Play <name> (bot) · <rating>"**, Casual and Ranked greyed under it; the bot stays while the card
+    is open; the game opens once you sit.
+  - **The game** is the 1 v 1 bot game's (`BotDuel` in `duel.ts` with `town`, `screens/Duel.tsx`), on this device: the bot's
+    name and its rating on its strip, no versus moment; first Boss alone's loading step ("Loading the bot…": `MaiaGate`,
+    this device's Stockfish paused, Maia loaded alone, at most `loadGateMs`; the same `maiaAllowed` rule; Stockfish at the
+    bot's rating until Maia is ready, or if it can't run), then the bot game's vote (Bullet, Blitz or Rapid) and its clock;
+    Maia plays at the bot's rating. Colors at random. Casual: "Casual game", no rank change, no coins, nothing sent to the
+    server. The gear has Leave (before the first moves) or Resign.
+  - **Back to town**: the result's "Back to town", the back button, or a reload (the game's address is
+    `/town?at=<table>.<stool>.<bot>`, a step of its own in the history) open the town with you on your stool at that table
+    and the bot across, its card closed (`createTown`'s `seat`); the bot gets up and wanders off after
+    `botLeaveAfterGameMs` (4 s), unless its table's card holds it.
 
 ## The feel: `town/feel.ts`
 
@@ -211,6 +237,11 @@ noted wherever a slice changed one.
   you on its nearer free stool, where you sit (both taken: beside it); bots sit now and then, a stool each.
 - `packages/app/test/town-world.test.ts` also: the statues' squares (on the apron, in front of the ground's end columns,
   symmetric), their quotes word for word, a tap on one walks you there (or beside it), the bots never stop there.
+- `packages/app/test/town-bots.test.ts` (Oct 27): the bot table (six, 8 to 10 characters, 800 to 2000 spread, one or two
+  real crate items each), "<name> (bot)" everywhere, the walk to the nearest free table (your stool the nearer), sitting and
+  when the game opens, calling it off, every table taken (no table; Play greyed) and one freeing, a held bot staying put, the
+  bot waiting at a table, a seat in the address and back, and coming back to the table (the bot across, then wandering off).
+  `packages/app/test/town-bot-game.test.ts`: the game (its name and rating, the loading step before the vote, casual).
 - `packages/app/test/town-lights.test.ts`: the park's lamps (8 to 12, solid, on paving, off every path, every square and
   stool still reached, a pawn and a half tall, lit glass with a halo and a pool), every home's and the Colosseum's light
   spots inside its picture and off its sign (Hollow's green window untouched, none near the statues), and when they shine
@@ -228,10 +259,17 @@ title; a bot waiting, two playing (the board's pixels change), a tap on their ga
   the Colosseum's gate) and `window.__townGather()` (the three nearest bots come and stand beside you), `window.__townAt("statue", "bronze" | "marble")`, `window.__townAt("table", i)` (a table by its index in `TABLES`), `window.__townAt("lamp", i)` (a park lamp's glass, by its index in `LAMPS`), `window.__townAt("light", id)` (a lit pixel of a home's, or `"coliseum"`'s, first light with nothing in front of it) and
   `window.__townCam()` (the zoom, the lens, the focus, the statue up close, whether its quote shows and its letters' size),
   `window.__townSeat(i, n)` (the nearest free bots sit on table i's first n stools, and every bot holds still from then on)
-  and `window.__townTables()` (each table's state: "still", "waiting:<free stool>" or "playing").
+  and `window.__townTables()` (each table's state: "still", "waiting:<free stool>" or "playing"); the bots (Oct 27):
+  `window.__townAt("bot", i)` (where to tap BOTS[i]), `window.__townCall(i)` (BOTS[i] comes to stand beside you and every bot
+  holds still; -1: only the holding still) and `window.__townBots()` (each bot: its name, square, the table it sits at, whether
+  it walks). Playing a bot (Oct 27, phone and desktop): a tap on Tempo Tess opens her card ("Tempo Tess (bot)", "Rating
+  1400", Play), nothing of Maia's fetched yet; Play walks you both to a table, the game opens (the gear, her name and
+  rating on her strip, Maia's worker started), one move each, resign ("Casual game"), "Back to town": you on your stool, she
+  across, then she wanders off; a bot sitting alone at a table: its card's "Play <name> (bot) · <rating>" (Casual and
+  Ranked greyed), the game; a reload, then again and the back button, each lands you back at the table.
 
 ## Not built yet
 
-The bottom strip, a bot's or player's card ("Invite to party"), the shop itself, the Colosseum's menu (raids with people,
+The bottom strip, a player's card ("Invite to party"), bots as sidekick characters (a sprite for `look`), the shop itself, the Colosseum's menu (raids with people,
 party), the park's matchmaking (sitting at a table queues you: `ROADMAP.md`, "The park"), quick chats, other people's dressed pawns, the Simple map setting, real players and
 rooms, sounds.

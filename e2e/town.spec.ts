@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
-import { STATUES } from "../packages/app/src/town/world.ts";
-import { test } from "./helpers.ts";
+import { BOTS, STATUES, TABLES } from "../packages/app/src/town/world.ts";
+import { BOARD_SEL, test } from "./helpers.ts";
 
 /**
  * The town square (/town; hidden: docs/areas/town-square.md), on a phone and a computer: the page loads, its world is
@@ -491,5 +491,142 @@ test("the tables' boards (Eric, Oct 27): one bot sitting waits (a green ring und
   await expect(card.getByText("Coming soon", { exact: true })).toBeVisible();
   await expect(card.getByRole("button", { name: "Casual" })).toHaveCount(0);
   await expect(canvas(page)).toHaveAttribute("data-sit", "0");
+  expect(errors).toEqual([]);
+});
+
+// ---------------- Playing a town bot (Oct 27, Eric; docs/areas/town-square.md, "Playing a bot") ----------------
+
+type BotRow = { name: string; at: string; table: number; moving: boolean };
+const bots = (p: Page) => p.evaluate(() => (window as unknown as { __townBots: () => BotRow[] }).__townBots());
+const tapAt = async (p: Page, kind: string, id: number) => {
+  const at = await p.evaluate(([k, i]) => (window as unknown as { __townAt: (k: string, id: number) => { x: number; y: number } | null }).__townAt(k, i), [kind, id] as const);
+  expect(at, `${kind} ${id} is drawn`).not.toBeNull();
+  const cv = (await canvas(p).boundingBox())!;
+  await p.mouse.click(cv.x + at!.x, cv.y + at!.y);
+};
+const sideOf = async (p: Page) => (await p.locator(".dv-strip.dv-you").getAttribute("data-side")) as "w" | "b";
+/** A move by two taps on the game's board. */
+async function tapMove(p: Page, uci: string) {
+  const box = (await p.locator(`.board-area ${BOARD_SEL.squares}`).boundingBox())!;
+  const white = (await sideOf(p)) === "w";
+  const at = (sq: string) => {
+    const f = sq.charCodeAt(0) - 97;
+    const r = Number(sq[1]) - 1;
+    return { x: box.x + (((white ? f : 7 - f) + 0.5) * box.width) / 8, y: box.y + (((white ? 7 - r : r) + 0.5) * box.height) / 8 };
+  };
+  for (const sq of [uci.slice(0, 2), uci.slice(2, 4)]) await p.mouse.click(at(sq).x, at(sq).y);
+}
+/** The game against the town bot: past Maia's loading step and the vote, one move each, then resign (the gear). */
+async function playAndResign(p: Page, bot: string) {
+  const game = p.locator(".duel-screen");
+  await expect(game).toBeVisible({ timeout: 15_000 });
+  // The gear (Eric's rule: on every screen with a chessboard).
+  await expect(p.getByRole("button", { name: "Match options" })).toBeVisible();
+  await expect(p.locator(".dv-strip.dv-them .dv-name")).toHaveText(bot);
+  // Its rating on its pill (the number), and its whole name, never cut.
+  await expect(p.locator(".dv-strip.dv-them .dv-rank")).toHaveText(String(BOTS.find((b) => `${b.name} (bot)` === bot)!.rating));
+  expect(await p.locator(".dv-strip.dv-them .dv-name").evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(true);
+  await expect(p.locator(".dv-status")).toContainText(/first move/, { timeout: 60_000 });
+  if ((await sideOf(p)) === "b") await expect(p.locator(".dv-status")).toHaveText(/^Your first move/, { timeout: 30_000 });
+  await tapMove(p, (await sideOf(p)) === "w" ? "e2e4" : "e7e5");
+  await expect(p.locator(".dv-status")).toHaveText("Your move", { timeout: 30_000 });
+  await p.getByRole("button", { name: "Match options" }).click();
+  await p.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: /Resign/ }).click();
+  await p.getByRole("alertdialog").getByRole("button", { name: "Resign" }).click();
+  await expect(p.locator(".dv-result-title")).toHaveText("You lost");
+  await expect(p.locator(".dv-result-rank")).toHaveText("Casual game");
+}
+
+test("a town bot: a tap opens its card ('<name> (bot)', its rating, Play); Play walks you both to a free table; seated, the game against it opens; resign, then back at the table with the bot across", async ({ page }) => {
+  test.setTimeout(4 * 60_000);
+  const errors = watchErrors(page);
+  // Maia's files: never fetched while you walk round the town (Eric's frame-rate rule), only as the game opens.
+  const maia: string[] = [];
+  page.on("request", (r) => r.url().includes("/engine/maia/") && maia.push(new URL(r.url()).pathname));
+  await page.goto("/town?debug");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  // Tempo Tess (1400) comes to stand beside you, and every bot holds still.
+  const i = BOTS.findIndex((b) => b.name === "Tempo Tess");
+  await page.evaluate((i) => (window as unknown as { __townCall: (i: number) => void }).__townCall(i), i);
+  await expect.poll(async () => (await bots(page))[i]!.moving, { timeout: 10_000 }).toBe(false);
+  await page.waitForTimeout(400);
+  await tapAt(page, "bot", i);
+  const card = page.getByRole("dialog", { name: "Tempo Tess (bot)", exact: true });
+  await expect(card).toBeVisible();
+  await expect(card.getByRole("heading", { name: "Tempo Tess (bot)" })).toBeVisible();
+  await expect(card.getByText("Rating 1400", { exact: true })).toBeVisible();
+  const play = card.getByRole("button", { name: "Play", exact: true });
+  await expect(play).toBeEnabled();
+  // The bot holds still while its card is open.
+  const held = (await bots(page))[i]!.at;
+  await page.waitForTimeout(800);
+  expect((await bots(page))[i]!.at).toBe(held);
+  expect(maia, "nothing of Maia's in the town").toEqual([]);
+  await play.click();
+  await expect(card).toBeHidden();
+  // You both walk to a table and sit; then the game opens (the town closes).
+  await expect(page.locator(".duel-screen")).toBeVisible({ timeout: 20_000 });
+  // The loading step (Boss alone's): Maia's worker starts on this device, at the bot's rating.
+  await expect.poll(() => maia.some((f) => f.endsWith("maia-worker.js")), { timeout: 30_000 }).toBe(true);
+  await expect(page).toHaveURL(/\/town\?.*at=\d+\.[01]\.\d+/);
+  const seat = new URL(page.url()).searchParams.get("at")!.split(".").map(Number) as [number, number, number];
+  expect(seat[2]).toBe(i);
+  await playAndResign(page, "Tempo Tess (bot)");
+  // Back to town: at that table, on your stool, the bot across; its card closed.
+  await page.getByRole("button", { name: "Back to town" }).click();
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(page).toHaveURL(/\/town(\?debug)?$/);
+  const t = TABLES[seat[0]]!;
+  expect((await you(page)).join(",")).toBe(`${t.stools[seat[1]]!.c},${t.stools[seat[1]]!.r}`);
+  await expect(canvas(page)).toHaveAttribute("data-sit", "1");
+  const across = t.stools[1 - seat[1]]!;
+  expect((await bots(page))[i]).toMatchObject({ at: `${across.c},${across.r}`, table: t.i });
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  // After a short while the bot gets up and wanders off.
+  await expect.poll(async () => (await bots(page))[i]!.at, { timeout: 15_000 }).not.toBe(`${across.c},${across.r}`);
+  expect(errors).toEqual([]);
+});
+
+test("a bot sitting at a table: a tap on the table walks you to the free stool; its card's first button plays it ('Play <name> (bot) · <rating>', Casual and Ranked greyed under it); a reload or the back button from the game lands you back at the table", async ({ page }) => {
+  test.setTimeout(4 * 60_000);
+  const errors = watchErrors(page);
+  await page.goto("/town?debug");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await seat(page, 6, 1);
+  await expect.poll(async () => (await tables(page))[6], { message: "a bot sits and waits", timeout: 15_000 }).toBe("waiting:1");
+  const sitter = (await bots(page)).find((b) => b.table === 6)!;
+  const bot = BOTS.find((b) => `${b.name} (bot)` === sitter.name)!;
+  await tapAt(page, "table", 6);
+  const card = page.getByRole("dialog", { name: "Chess table", exact: true });
+  const play = card.getByRole("button").first();
+  await expect(play).toHaveText(`Play ${bot.name} (bot) · ${bot.rating}`);
+  await expect(play).toBeEnabled();
+  for (const name of ["Casual", "Ranked"]) await expect(card.getByRole("button", { name, exact: true })).toBeDisabled();
+  // You walk to the free (east) stool and sit, across from it; it stays while the card is open.
+  await expect.poll(async () => (await you(page)).join(","), { timeout: 5000 }).toBe("20,13");
+  await expect(canvas(page)).toHaveAttribute("data-sit", "1");
+  await page.waitForTimeout(600);
+  expect((await bots(page)).find((b) => b.name === sitter.name)!.table).toBe(6);
+  await play.click();
+  await expect(page.locator(".duel-screen")).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".dv-strip.dv-them .dv-name")).toHaveText(`${bot.name} (bot)`);
+  // A reload: back in the town at the table, the bot across.
+  await page.reload();
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  // (Every bot holds still from here, the one across too: it would get up after a while.)
+  await page.evaluate(() => (window as unknown as { __townCall: (i: number) => void }).__townCall(-1));
+  await expect(page).toHaveURL(/\/town(\?debug)?$/);
+  expect((await you(page)).join(",")).toBe("20,13");
+  await expect(canvas(page)).toHaveAttribute("data-sit", "1");
+  expect((await bots(page)).find((b) => b.name === sitter.name)).toMatchObject({ at: "18,13", table: 6 });
+  // Again (the bot still there), and this time the back button.
+  await tapAt(page, "table", 6);
+  await card.getByRole("button", { name: `Play ${bot.name} (bot) · ${bot.rating}` }).click();
+  await expect(page.locator(".duel-screen")).toBeVisible({ timeout: 15_000 });
+  await page.goBack();
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  expect((await you(page)).join(",")).toBe("20,13");
+  await expect(canvas(page)).toHaveAttribute("data-sit", "1");
+  expect((await bots(page)).find((b) => b.name === sitter.name)).toMatchObject({ at: "18,13", table: 6 });
   expect(errors).toEqual([]);
 });

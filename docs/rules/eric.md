@@ -41,6 +41,16 @@ removed (old → new) and says whether any of them guards a rule here.
 - **The gear is on every screen with a chessboard**, phone and computer, with Sound, Animations (and Motion trail in a crowd
   match), Resign or Leave, and Report a bug. (Eric, Oct 25.) Guard: `e2e/match-menu.spec.ts`.
 
+## The town square
+
+- **Keep the frame rate (Eric, Oct 27): "we don't want any frame drops from a clever programming solution… we can always
+  cut corners on this… if it keeps our FPS intact."** Nothing new per frame on the town's hot path and nothing allocated per
+  frame; anything heavy (Maia, an engine) never loads or warms while you walk round the town, only when a game opens (a
+  network prefetch on a tap is fine, no compiling). When a choice costs frames, cut the corner and say so.
+  - Guard: measured against main in every town PR (method: docs/decisions/2026-10-26-town-square-slice-2.md: headless, a
+    phone 390 × 844 and a computer 1440 × 900, 5 s walking, the medians of four runs taken in turn); not a CI test, CI frame
+    rates vary too much. `e2e/town.spec.ts` checks that nothing of Maia's is fetched in the town before a game opens.
+
 ## Writing
 
 - **The Hidden Boss's lines:** never "Soviet(s)" or "Russian(s)", nothing that implies Korchnoi threw games, and real quotes
