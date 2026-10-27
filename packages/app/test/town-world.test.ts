@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { N, wrapF, wrapI } from "../src/town/camera.ts";
 import { TOWN_FEEL } from "../src/town/feel.ts";
-import { APRON, APRON_ROWS, COLISEUM, GRASS, HOMES, PARK, PAVING, PROPS, START, STATUES, TABLES, Walker, createTown, destFor, findPath, groundAt, onColiseum, plotDist, seated, statueAt, stoolAt, tableAt, taken, tick, walkWalker, walkable, type Sq, type Town } from "../src/town/world.ts";
+import { APRON, APRON_ROWS, COLISEUM, GRASS, HOMES, PARK, PAVING, PROPS, START, STATUES, TABLES, Walker, createTown, destFor, findPath, groundAt, onColiseum, plotDist, seated, statueAt, stoolAt, tableAt, tableStates, taken, tick, walkWalker, walkable, type Sq, type Town } from "../src/town/world.ts";
 
 /** One pawn a square (src/town/world.ts): where a walk ends, and rings of people round someone. */
 
@@ -293,6 +293,37 @@ describe("town square: the park (slice 6)", () => {
     const beside = destFor(t2, t2.you.walker, { kind: "table", table })!;
     expect(king(beside, table)).toBe(1);
     expect(stoolAt(beside.c, beside.r)).toBeNull();
+  });
+
+  it("a table's state from who sits (Eric, Oct 27): two others play, one waits (the ring under the free stool), you at it: still", () => {
+    const table = TABLES.find((x) => x.r === START.r && x.c < START.c)!;
+    const t = still();
+    const [a, b] = t.bots;
+    expect(tableStates(t.people)[table.i]).toEqual({ kind: "still" });
+    // One bot on the west stool: waiting, the east one free.
+    walkWalker(a!.walker, table.stools[0]);
+    settle(t);
+    expect(tableStates(t.people)[table.i]).toEqual({ kind: "waiting", free: 1 });
+    // A second on the east stool: playing. Every other table: still.
+    walkWalker(b!.walker, table.stools[1]);
+    settle(t);
+    const states = tableStates(t.people);
+    expect(states[table.i]).toEqual({ kind: "playing" });
+    expect(states.filter((s) => s.kind !== "still")).toHaveLength(1);
+    // A bot standing on a stool isn't sitting: it doesn't count.
+    b!.sit = false;
+    expect(tableStates(t.people)[table.i]).toEqual({ kind: "waiting", free: 1 });
+    // You sitting across a bot: not a game yet (no matchmaking), no ring: its pieces stand set up.
+    const t2 = still();
+    walkWalker(t2.bots[0]!.walker, table.stools[0]);
+    walkWalker(t2.you.walker, table.stools[1]);
+    t2.you.sit = true;
+    settle(t2);
+    expect(seated(t2.you)).toBe(table);
+    expect(tableStates(t2.people)[table.i]).toEqual({ kind: "still" });
+    // You alone: still too (you aren't searching yet).
+    t2.bots[0]!.sit = false;
+    expect(tableStates(t2.people)[table.i]).toEqual({ kind: "still" });
   });
 
   it("bots sit at the tables now and then, a stool each", () => {

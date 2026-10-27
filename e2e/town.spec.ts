@@ -376,7 +376,7 @@ for (const st of [
   });
 }
 
-test("a chess table in the park: a tap on one walks you to a free stool and you sit; its card shows 'Casual' and 'Ranked' greyed and 'Coming soon'; a tap elsewhere closes it and you stand", async ({ page }) => {
+test("a chess table in the park: a tap on one walks you to a free stool and you sit; its card (no title: Eric, Oct 27) shows 'Casual' and 'Ranked' greyed and 'Coming soon'; a tap elsewhere closes it and you stand", async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/town");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
@@ -387,7 +387,8 @@ test("a chess table in the park: a tap on one walks you to a free stool and you 
   const cv = (await canvas(page).boundingBox())!;
   await page.mouse.click(cv.x + at!.x, cv.y + at!.y);
   const card = page.getByRole("dialog", { name: "Chess table", exact: true });
-  await expect(card.getByRole("heading", { name: "Chess table" })).toBeVisible();
+  await expect(card).toBeVisible();
+  await expect(card.getByRole("heading")).toHaveCount(0);
   for (const name of ["Casual", "Ranked"]) {
     const b = card.getByRole("button", { name, exact: true });
     await expect(b).toBeVisible();
@@ -456,5 +457,37 @@ test("Folio's Folded House: a tap walks you there and opens its card with its na
   expect(lum(door.night!), `${msg}: as bright at night`).toBeGreaterThanOrEqual(lum(door.day!) - 10);
   expect(lum(door.night!), `${msg}: bright`).toBeGreaterThan(190);
   expect(door.night![0]! - door.night![2]!, `${msg}: warm`).toBeGreaterThan(40);
+
+/** Each table's state now (the test hook): "still", "waiting:<free stool>" or "playing". */
+const tables = (p: Page) => p.evaluate(() => (window as unknown as { __townTables: () => string[] }).__townTables());
+const seat = (p: Page, i: number, n: 1 | 2) => p.evaluate(([i, n]) => (window as unknown as { __townSeat: (i: number, n: number) => void }).__townSeat(i, n), [i, n] as const);
+
+test("the tables' boards (Eric, Oct 27): one bot sitting waits (a green ring under the free stool); two play (the pieces move, a clock over the board); a tap on a game offers 'Spectate', greyed, 'Coming soon', and you don't sit", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/town");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  expect((await tables(page)).every((s) => s === "still" || s.startsWith("waiting") || s === "playing")).toBe(true);
+  // One bot on the west stool of the table on your left: it waits, the east stool free.
+  await seat(page, 6, 1);
+  await expect.poll(async () => (await tables(page))[6], { message: "a bot sits and waits", timeout: 15_000 }).toBe("waiting:1");
+  // A second on the east stool: a game.
+  await seat(page, 6, 2);
+  await expect.poll(async () => (await tables(page))[6], { message: "two bots play", timeout: 15_000 }).toBe("playing");
+  // The board changes as they play (its pixels over the table differ a couple of moves apart).
+  const at = await page.evaluate(() => (window as unknown as { __townAt: (k: string, id: number) => { x: number; y: number } | null }).__townAt("table", 6));
+  expect(at).not.toBeNull();
+  const cv = (await canvas(page).boundingBox())!;
+  const shot = async () => (await page.screenshot({ clip: { x: cv.x + at!.x - 40, y: cv.y + at!.y - 50, width: 80, height: 80 } })).toString("base64");
+  const before = await shot();
+  await expect.poll(shot, { message: "the pieces move", timeout: 5000 }).not.toBe(before);
+  // A tap on it: you walk beside it (both stools taken) and don't sit; its card offers to watch, greyed.
+  await page.mouse.click(cv.x + at!.x, cv.y + at!.y);
+  const card = page.getByRole("dialog", { name: "Chess table", exact: true });
+  const watch = card.getByRole("button", { name: "Spectate", exact: true });
+  await expect(watch).toBeVisible();
+  await expect(watch).toBeDisabled();
+  await expect(card.getByText("Coming soon", { exact: true })).toBeVisible();
+  await expect(card.getByRole("button", { name: "Casual" })).toHaveCount(0);
+  await expect(canvas(page)).toHaveAttribute("data-sit", "0");
   expect(errors).toEqual([]);
 });

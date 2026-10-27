@@ -10,7 +10,7 @@
  * measures every one), which "Your move." in front didn't leave room for.
  */
 import type { StopReason } from "@chessroyale/core";
-import { stopReason, stunnedIn, type StopFields } from "@chessroyale/chess";
+import { stopReason, heldIn, type StopFields } from "@chessroyale/chess";
 
 /** How long a refused move's reason stays in the dock (unless the position changes first). */
 export const REFUSED_MS = 3000;
@@ -56,11 +56,11 @@ type BossLike = { id?: string; barred?: string | null; powers?: (StopFields & { 
 export function refusedLine(boss: BossLike, fen: string, move: string): string {
   if (boss.barred && boss.barred === move) return REFUSED.barred;
   // (Ginger's ice: the frozen piece's own move, or castling with a frozen rook.)
-  if (boss.powers?.iced?.length && stunnedIn(fen, move, boss.powers.iced)) return REFUSED.frozen;
+  if (boss.powers?.iced?.length && heldIn(fen, move, boss.powers.iced)) return REFUSED.frozen;
   // (Folio's folded piece: its own move, or castling with a folded rook.)
-  if (boss.powers?.folded?.length && stunnedIn(fen, move, boss.powers.folded)) return REFUSED.folded;
+  if (boss.powers?.folded?.length && heldIn(fen, move, boss.powers.folded)) return REFUSED.folded;
   // (Moo's moonbeam: the stunned piece's own move, or castling with a stunned rook.)
-  if (boss.powers?.stunned?.length && stunnedIn(fen, move, boss.powers.stunned)) return REFUSED.stunned;
+  if (boss.powers?.stunned?.length && heldIn(fen, move, boss.powers.stunned)) return REFUSED.stunned;
   const why = stopReason(boss, fen, move);
   return why ? REFUSED[why] : REFUSED_OTHER;
 }

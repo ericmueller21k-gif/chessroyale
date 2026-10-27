@@ -281,42 +281,12 @@ const TH = 50;
 const TFOOT = TH - 6;
 const TCX = Math.floor(TW / 2);
 /**
- * The table's top, seen from a little above like the squares: its board's 8 x 8 squares, each this many pixels across,
- * its rows 2 and 1 pixels deep in turn (foreshortened); its stone frame round it; the top's front edge at this height.
+ * The table's top stands this many pixels over its foot. The top itself, its board and its pieces are drawn by the
+ * renderer as a flat slab through the camera (Eric, Oct 27: the board lies flat, the pieces stand up and move), so the
+ * picture holds only the leg and the two stools; `TABLE_BOARD` gives the renderer its sizes.
  */
-const SQW = 4;
-const ROWS_D = [2, 1, 2, 1, 2, 1, 2, 1] as const;
-const ROW_Y = ROWS_D.map((_, i) => ROWS_D.slice(0, i).reduce((a, b) => a + b, 0));
-const TOP_Y = TFOOT - 18;
-/** A game under way: a few pieces on the board (column, row from the far side, light or dark). */
-const GAME: readonly [number, number, boolean][] = [
-  [4, 0, false], [3, 1, false], [5, 1, false], [2, 2, false], [6, 3, false],
-  [4, 4, true], [3, 6, true], [2, 6, true], [5, 7, true], [4, 7, true], [1, 5, true],
-];
+const TOP_Y = TFOOT - 27;
 export const PARK_TABLE: Character = (() => {
-  const bw = 8 * SQW;
-  const bd = ROWS_D.reduce((a, b) => a + b, 0);
-  const x0 = TCX - bw / 2;
-  const by = TOP_Y - 3 - bd; // the board's far edge
-  const top = paint(x0 - 2, by - 1, bw + 4, bd + 5, (x, y) => {
-    const i = x - x0;
-    const j = y - by;
-    if (j >= bd + 1) return i < bw / 3 ? "3" : i < (2 * bw) / 3 ? "4" : "5"; // the top's front edge, its thickness
-    if (i < 0 || i >= bw || j < 0 || j >= bd) return j < 0 || i < 0 ? "1" : "2"; // the stone frame round the board, lit at the back and left
-    const ci = Math.floor(i / SQW);
-    let cj = 0;
-    while (cj < 7 && j >= ROW_Y[cj + 1]!) cj++;
-    return (ci + cj) % 2 ? "D" : "L";
-  });
-  // The pieces: each a little upright of a body and a head on its square.
-  const pieces = paint(x0, by - 3, bw, bd + 3, (x, y) => {
-    for (const [ci, cj, light] of GAME) {
-      const px = x0 + ci * SQW + 1;
-      const py = by + ROW_Y[cj]! + ROWS_D[cj]! - 1; // its square's near edge
-      if ((x === px || x === px + 1) && y <= py && y >= py - 2) return light ? "P" : "Q";
-    }
-    return null;
-  }, false);
   // Its leg: a thick stone pedestal on a broad foot.
   const leg = paint(TCX - 7, TOP_Y + 4, 15, TFOOT - TOP_Y - 4, (x, y) => {
     const X = x - TCX;
@@ -343,10 +313,44 @@ export const PARK_TABLE: Character = (() => {
   const shadow = groundShadow(TCX + 1, TFOOT, 14, 4);
   const shL = groundShadow(TCX - PX + 1, TFOOT, 8, 3);
   const shR = groundShadow(TCX + PX + 1, TFOOT, 8, 3);
-  return one("park-table", "A chess table", TW, TH, [TCX, TFOOT], [shadow, shL, shR, stool(TCX - PX), stool(TCX + PX), leg, top, pieces]);
+  return one("park-table", "A chess table", TW, TH, [TCX, TFOOT], [shadow, shL, shR, stool(TCX - PX), stool(TCX + PX), leg]);
 })();
 /** Where the board's top is in the table's picture (its height over the foot, pixels), for its card to point at. */
 export const TABLE_TOP = TFOOT - TOP_Y + 18;
+/**
+ * The board the renderer lays on the table (all in the table picture's pixels, or squares across): the slab's top over
+ * the foot and its thickness, the slab's half-width and the board's (in squares), each piece's pixel size (a fraction of
+ * a square's on-screen size), and the clock's: its height over the slab (squares) and its pixel size.
+ */
+/**
+ * The table's pieces in pixels (`#` filled, `x` a hole inside), the back rank's shapes from the a-file to the h-file
+ * (Eric, Oct 27: "you could make the back row look slightly different"), black's knight facing the other way. Light pieces
+ * in cream with a shaded right side, dark ones in charcoal; each outlined.
+ */
+export const TABLE_PIECES: Record<string, readonly string[]> = {
+  P: ["..###..", "..###..", "...#...", "..###..", "..###..", ".#####.", "#######"],
+  R: [".#.#.#.", ".#####.", "..###..", "..###..", "..###..", "..###..", ".#####.", "#######"],
+  N: ["..#....", "..###..", ".#####.", ".######", ".##x.##", "..##...", "..###..", ".#####.", "#######"],
+  B: ["...#...", "..###..", "..#x#..", "..###..", "...#...", "..###..", "..###..", ".#####.", "#######"],
+  Q: ["#.#.#.#", ".#####.", "..###..", "..###..", "...#...", "..###..", "..###..", ".#####.", "#######"],
+  K: ["...#...", "..###..", "...#...", ".#####.", "..###..", "..###..", "...#...", "..###..", "..###..", ".#####.", "#######"],
+};
+export const TABLE_BACK_RANK = ["R", "N", "B", "K", "Q", "B", "N", "R"] as const;
+export const TABLE_INK = { light: "#f6f1e6", lightShade: "#d3c9b6", lightLine: "#2b2622", dark: "#2d2c33", darkShade: "#57565f", darkLine: "#0c0c10" } as const;
+/**
+ * The clock floating over a game (Eric, Oct 27: "a black timer that floats above the board with nothing behind it … a
+ * slight 3D effect"): 3 x 5 pixel digits in black, their top edge a touch lighter, a dark grey side a pixel under them.
+ */
+export const TABLE_DIGITS: Record<string, readonly string[]> = {
+  "0": ["###", "#.#", "#.#", "#.#", "###"], "1": [".#.", "##.", ".#.", ".#.", "###"], "2": ["###", "..#", "###", "#..", "###"],
+  "3": ["###", "..#", ".##", "..#", "###"], "4": ["#.#", "#.#", "###", "..#", "..#"], "5": ["###", "#..", "###", "..#", "###"],
+  "6": ["###", "#..", "###", "#.#", "###"], "7": ["###", "..#", ".#.", ".#.", ".#."], "8": ["###", "#.#", "###", "#.#", "###"],
+  "9": ["###", "#.#", "###", "..#", "###"], ":": [".", "#", ".", "#", "."],
+};
+export const TABLE_CLOCK_INK = { face: "#141312", edge: "#3a3836", side: "#6b6866" } as const;
+/** The ring under a waiting table's free stool: its fill and its glowing edge (green, soft). */
+export const TABLE_RING = { fill: [90, 230, 140], edge: [150, 255, 190], glow: "rgba(90, 255, 150, 0.9)" } as const;
+export const TABLE_BOARD = { top: TFOOT - TOP_Y - 1, thick: 3, half: 0.4, board: 0.32, piecePx: 0.0105, clockLift: 0.55, clockPx: 0.03 } as const;
 /** (Each tree on its own, for the previews: `npm run preview:characters -- <dir> extra=…/park.ts`.) */
 export const [PARK_TREE_0, PARK_TREE_1, PARK_TREE_2] = PARK_TREES as [Character, Character, Character];
 

@@ -12,7 +12,7 @@
  *   solo: beamLines), then the next lines' pieces, then by value. Never the king, and always a move left for the crowd:
  *   if a piece would leave none, the next in that order. No piece fits: no beam that turn, and the count carries on (the
  *   next comes after his next moonbeamEvery-th move, as ever).
- * - How the crowd's moves leave the stunned pieces out is Ginger's freeze's way (crowdFilter): the allowed moves are the
+ * - How the crowd's moves leave the stunned pieces out is the held pieces' one rule (held), as Ginger's freeze's: the allowed moves are the
  *   only ones the judge scores, the bots pick and the God King plays, and a stunned turn doesn't count for fair play.
  *
  * His ultimate, the Full Moon (the rage meter, `rageSpeed.moo`):
@@ -30,7 +30,7 @@
 import { BOSS_POWERS, type BossPowerSettings, type BossPowerState, type MooState, type PowerEvent } from "@chessroyale/core";
 import { applyMove, legalMoves, pieceAt, sideToMove } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
-import { VALUE, from, meterFull, powerRoll, testSwitch, turnOf, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
+import { VALUE, from, heldIn, meterFull, powerRoll, testSwitch, turnOf, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
 
 /**
  * Each of his moments beat by beat (ms into it), from his animations (docs/decisions/2026-10-20-moo-animations.md), so
@@ -103,20 +103,6 @@ export function beamOrder(fen: string, crowd: Side, lines: readonly string[] | n
 }
 
 /**
- * A stunned piece can't take part in `move` (`fen`: before it): the piece moving is held, or the move is castling and
- * the rook it moves is held (its corner on the king's rank: the h-file for a king's step to the g-file, the a-file
- * for one to the c-file).
- */
-export function stunnedIn(fen: string, move: string, held: ReadonlySet<string> | readonly string[]): boolean {
-  const has = (sq: string) => ("has" in held ? held.has(sq) : held.includes(sq));
-  if (has(from(move))) return true;
-  const f0 = move.charCodeAt(0);
-  const f1 = move.charCodeAt(2);
-  if (Math.abs(f1 - f0) !== 2 || move[1] !== move[3] || pieceAt(fen, from(move))?.type !== "k") return false;
-  return has(`${f1 > f0 ? "h" : "a"}${move[1]}`);
-}
-
-/**
  * The squares `count` beams stun (beamOrder's, in turn), each kept only if the crowd still has a legal move with every
  * piece picked so far held: fewer when that runs out, none when no piece fits.
  */
@@ -127,7 +113,7 @@ export function chooseBeams(fen: string, crowd: Side, lines: readonly string[] |
   for (const sq of beamOrder(fen, crowd, lines, seed, at, target)) {
     if (picked.length >= count) break;
     const held = new Set([...picked, sq]);
-    if (legal.some((m) => !stunnedIn(fen, m, held))) picked.push(sq);
+    if (legal.some((m) => !heldIn(fen, m, held))) picked.push(sq);
   }
   return picked;
 }
@@ -205,11 +191,8 @@ export const MOO: BossRules = {
   },
   // (Moonbeam works through his moves: afterBossMove.)
   passive() {},
-  // Stunned pieces can't move this turn (Ginger's frozen piece's way), nor castle with a stunned rook (stunnedIn).
-  crowdFilter(allowed, boss, fen) {
-    const stun = stunOn(mooOf(boss.powers), turnOf(boss));
-    return stun ? allowed.filter((m) => !stunnedIn(fen, m, stun.squares)) : allowed;
-  },
+  // Stunned pieces can't move this turn, nor castle with a stunned rook (the held pieces' one rule: heldIn).
+  held: (boss) => stunOn(mooOf(boss.powers), turnOf(boss))?.squares ?? [],
   powerTurn: (boss) => !!stunOn(mooOf(boss.powers), turnOf(boss)),
   // The Full Moon: his moves are the engine's at full strength (the runner's "best").
   bestReply: (boss) => (boss.powers?.moo?.full?.left ?? 0) > 0,

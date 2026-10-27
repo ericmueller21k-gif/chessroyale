@@ -10,8 +10,7 @@
  */
 import { BOSS_POWERS, type BossPowerSettings, type BossState } from "@chessroyale/core";
 import { legalMoves, pieceAt, sideToMove } from "../rules.ts";
-import { VALUE, bossPowers, from, powerRoll, to, turnOf, warnThenUnleash, type BossRules, type Side } from "./base.ts";
-import { stunnedIn } from "./moo.ts";
+import { VALUE, bossPowers, from, heldIn, powerRoll, to, turnOf, warnThenUnleash, type BossRules, type Side } from "./base.ts";
 
 /** How long each of his moments holds the screen (ms; POWER_FX in boss-timing.ts). */
 export const GINGER_FX = { freeze: 2300, blizzard: 3600, thaw: 2200 } as const;
@@ -26,7 +25,7 @@ export function chooseFreeze(fen: string, crowdSide: Side, seed: number, turn: n
   for (const m of legal) moves.set(from(m), (moves.get(from(m)) ?? 0) + 1);
   const options = [...moves.entries()]
     .map(([square, n]) => ({ square, n, piece: pieceAt(fen, square) }))
-    .filter((o) => o.piece && o.piece.color === crowdSide && o.piece.type !== "k" && legal.some((m) => !stunnedIn(fen, m, [o.square])))
+    .filter((o) => o.piece && o.piece.color === crowdSide && o.piece.type !== "k" && legal.some((m) => !heldIn(fen, m, [o.square])))
     // Pieces before pawns; then the most valuable and mobile. Ties by square, so every device ranks alike.
     .map((o) => ({ ...o, score: (o.piece!.type === "p" ? 0 : 100) + VALUE[o.piece!.type]! * 3 + o.n }))
     .sort((a, b) => b.score - a.score || (a.square < b.square ? -1 : 1));
@@ -131,7 +130,7 @@ export function blizzardStep(
     thawing = [...thawing, ...more];
     const ice = new Set(iced);
     const legal = legalMoves(fen);
-    if (legal.length && legal.every((m) => stunnedIn(fen, m, ice))) {
+    if (legal.length && legal.every((m) => heldIn(fen, m, ice))) {
       const sq = chooseMover(fen, crowd, powerRoll(seed, "thawMercy", came, turn), held(turn), ice);
       if (sq) {
         iced = iced.filter((x) => x !== sq);
@@ -215,13 +214,13 @@ export const GINGER: BossRules = {
       next.nextPassive = t.turn + lo + Math.floor(powerRoll(t.seed, "every", t.turn) * (hi - lo + 1));
     } else next.nextPassive = t.turn + 1;
   },
-  // Frozen pieces can't move, nor castle with a frozen rook (stunnedIn); in the blizzard only its free pieces move
-  // (none can: everything, as the dispatcher lifts it).
-  crowdFilter(allowed, boss, fen) {
+  // Frozen pieces can't move, nor castle with a frozen rook (the held pieces' one rule: heldIn); in the blizzard only its
+  // free pieces move (none can: everything, as the dispatcher lifts it).
+  held(boss, fen) {
     const ice = blizzardIce(boss, turnOf(boss), fen);
-    if (ice) return allowed.filter((m) => !stunnedIn(fen, m, ice));
+    if (ice) return [...ice];
     const frozen = boss.powers!.frozen;
-    return frozen ? allowed.filter((m) => !stunnedIn(fen, m, [frozen.square])) : allowed;
+    return frozen ? [frozen.square] : [];
   },
   powerTurn: (boss) => !!boss.powers!.frozen || blizzardNow(boss),
   // The frozen piece; in the blizzard the pieces its ice holds, through the boss's turn after it too (none once its
@@ -232,7 +231,7 @@ export const GINGER: BossRules = {
     if (ice) {
       if (sideToMove(fen) === boss.crowdSide) {
         const legal = legalMoves(fen);
-        if (legal.length && legal.every((m) => stunnedIn(fen, m, ice))) return [];
+        if (legal.length && legal.every((m) => heldIn(fen, m, ice))) return [];
       }
       return [...ice].filter((sq) => pieceAt(fen, sq)?.color === boss.crowdSide).sort();
     }

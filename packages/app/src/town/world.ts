@@ -473,6 +473,35 @@ export function seated(p: Person): Table | null {
   return p.sit && !w.moving() ? stoolAt(w.c, w.r) : null;
 }
 
+/**
+ * A chess table's state, from who sits at it (Eric, Oct 27): two people, neither of them you, play (its pieces move, its
+ * clock above it runs); one, not you, waits for a game (a soft green ring under the free stool: `free`, the stool's index);
+ * otherwise its pieces stand set up. You at a table aren't playing or searching yet: Casual and Ranked come with the
+ * tables' matchmaking, and then you searching shows the ring too.
+ */
+export type TableState = { kind: "still" } | { kind: "waiting"; free: 0 | 1 } | { kind: "playing" };
+
+/** Every table's state now (TABLES' order), from the people sitting. */
+export function tableStates(people: readonly Person[]): TableState[] {
+  const seats = TABLES.map(() => [false, false]);
+  const yours = TABLES.map(() => false);
+  for (const p of people) {
+    const t = seated(p);
+    if (!t) continue;
+    const w = p.walker;
+    const k = t.stools.findIndex((s) => s.c === wrapI(w.c) && s.r === wrapI(w.r));
+    if (k < 0) continue;
+    seats[t.i]![k] = true;
+    if (p.you) yours[t.i] = true;
+  }
+  return seats.map(([a, b], i): TableState => {
+    if (yours[i]) return { kind: "still" };
+    if (a && b) return { kind: "playing" };
+    if (a !== b) return { kind: "waiting", free: a ? 1 : 0 };
+    return { kind: "still" };
+  });
+}
+
 export interface Boss {
   home: Home;
   walker: Walker;
