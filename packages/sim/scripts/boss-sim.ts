@@ -51,14 +51,15 @@
  * whether the walls took away the engine's best move.
  *
  * Folio (id folio): each row logs its Draft marks, folds and marks answered in time (the attack ended after a crowd move),
- * every Crease (as it landed, the line and what it cost the crowd by the engine that picked it) and its Revision (after
+ * every Crease (as it landed, the line and what it cost the crowd as it fell, and by the engine that picked it on the
+ * warning's position), the warned creases that didn't land (the guard refusing them as they fell) and its Revision (after
  * which crowd move, what its move cost it and what the crowd's reply found, in pawns).
  *
  * Results go to reports/boss-sim/*.jsonl; `summary` writes reports/boss-calibration.md.
  */
 import { BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, bossElo, bossStumbleChance, botPick, estimateRating, mulberry32, shuffle, type Rng, type Settings } from "@chessroyale/core";
 import { BOSS_POWERS } from "@chessroyale/core";
-import { MatchRunner, PASS_WAIT, powerMomentMs, waterAnswer, inCheck, materialOf, applyMove, bossMoveFrom, passScores, repaintPick, botRoster, carrotSpots, carrotsOf, carrotsOpen, castAnswer, chooseSplit, fenAfter, fuseFrom, gameEndWith, hopFrom, hopOptions, legalMoves, passAnswer, passTurn, pickSlam, pieceAt, raceOn, slamPawnsLost, slamScores, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type EngineLike, type Opening } from "@chessroyale/chess";
+import { MatchRunner, PASS_WAIT, creaseCost, powerMomentMs, waterAnswer, inCheck, materialOf, applyMove, bossMoveFrom, passScores, repaintPick, botRoster, carrotSpots, carrotsOf, carrotsOpen, castAnswer, chooseSplit, fenAfter, fuseFrom, gameEndWith, hopFrom, hopOptions, legalMoves, passAnswer, passTurn, pickSlam, pieceAt, raceOn, slamPawnsLost, slamScores, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type EngineLike, type Opening } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -308,15 +309,17 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       const pickSec = patch.pickSec ?? 10;
       const runner = new MatchRunner({ settings: s, rng, engines, library, entrants: botRoster(rng, s.lobbySize, s), clock: () => clockMs });
       const ults: { kind: string; turn: number }[] = [];
-      // (Folio: each Crease as it landed, its line and what it cost the crowd by the engine that picked it.)
-      const creases: { at: number; line: string; loss: number | null }[] = [];
+      // (Folio: each Crease as it landed, its line, what it cost the crowd as it fell (this engine, the position it fell on)
+      // and by the engine that picked it on the warning's position; and each warned crease that didn't land, the guard
+      // refusing it as it fell.)
+      const creases: { at: number; line: string; loss: number | null; warned: number | null }[] = [];
+      const creasesOff: number[] = [];
       let seen = -1;
       const look = () => {
         const p = runner.boss?.powers;
         if (!p || p.turn === seen) return;
         seen = p.turn;
         for (const e of p.events) if (ULT_EVENTS.has(e.kind)) ults.push({ kind: e.kind, turn: e.turn });
-        if (p.crease && p.events.some((e) => e.kind === "crease")) creases.push({ at: p.crease.at, line: p.crease.line, loss: p.crease.loss === null || p.crease.loss === undefined ? null : Math.round(p.crease.loss * 100) / 100 });
       };
       look();
       let struck = 0;
@@ -580,6 +583,13 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
           tiger.walled.turns++;
           if (best && allowed && !allowed.includes(best.move)) tiger.walled.changed++;
         }
+        if (bossId === "folio") {
+          const p = runner.boss!.powers!;
+          const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
+          const round = (x: number | null | undefined) => (x === null || x === undefined ? null : Math.round(x * 100) / 100);
+          if (p.crease && p.crease.at === p.turn && p.events.some((e) => e.kind === "crease")) creases.push({ at: p.turn, line: p.crease.line, loss: round(await creaseCost(engines[0]!, fen, p.crease.line)), warned: round(p.crease.loss) });
+          else if (!p.crease && p.ultAt === p.turn && p.events.some((e) => e.kind === "creaseEnd")) creasesOff.push(p.turn);
+        }
         const tusksBefore = runner.boss!.powers?.tusks;
         // (The sim's clock: this crowd turn's moments, the crowd's pick, the reveal, then his turn.)
         clockMs += powerMomentMs(runner.boss!.powers?.events) + (pickSec + (s.revealSeconds ?? 0) + GARDEN_TURN_SEC) * 1000;
@@ -595,7 +605,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       const camoRow = camo ? { side: camo.side, missed: camo.missed, off: !!camo.off, swap: camo.swap ?? null, reveal: camo.reveal ?? null, hidden: camo.square, strikeAfter: camo.swap && camo.reveal ? camo.reveal.at - camo.swap.at : null } : null;
       // (Folio: its marks, folds and marks answered in time; every Crease; its Revision, what its move cost it and what the crowd's reply would have won.)
       const fo = b.powers?.folio;
-      const folioRow = fo ? { drafts: fo.drafts, folds: fo.folds, answered: fo.answered, creases, revision: fo.revision ? { at: fo.revision.at, cost: fo.revision.cost, drop: fo.revision.drop } : null } : null;
+      const folioRow = fo ? { drafts: fo.drafts, folds: fo.folds, answered: fo.answered, creases, creasesOff, revision: fo.revision ? { at: fo.revision.at, cost: fo.revision.cost, drop: fo.revision.drop } : null } : null;
       const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}), ...(bossId === "moo" ? { moo } : {}), ...(bossId === "gardener" ? { garden } : {}), ...(bossId === "tiger" ? { tiger: { ...tiger, placed: b.powers?.balloon?.placed ?? 0 } } : {}), ...(bossId === "folio" ? { folio: folioRow } : {}) };
       appendFileSync(root + `reports/boss-sim/raid-${tag}.jsonl`, JSON.stringify(row) + "\n");
       console.log(JSON.stringify(row));

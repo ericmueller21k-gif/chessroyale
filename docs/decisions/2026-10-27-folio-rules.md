@@ -85,9 +85,10 @@ a band of 1 to 2.5 pawns; the Draft marks the most valuable piece; a fold lasts 
 8. **The line's cost:** the crowd's best move with the crease against its best without (the same position, searchmoves at
    `creaseNodes`), in pawns of log-odds (`bouncePawnLogit`, as every engine-shaped band). Lines that take away the same moves
    share one search, and a line no move of the crowd crosses costs nothing without one: at most 15 searches. The engine sees
-   the crease at its root only (as Babur's walls). **The guard** (`creaseGuard`): the crowd keeps a move and has no mate in
-   one with the crease counted, and Folio has none were the crowd to pass (`passTurn`; in check, not asked; its moves are
-   never limited, so a mate threat of its own means no crease that turn). **The pick** (`pickCrease`): in the band,
+   the crease at its root only (as Babur's walls). **The guard** (`creaseGuard`, as the review fixed it): the crowd keeps a
+   move, the line never takes away the crowd's mate in one (one of its mating moves stays open), and never hands Folio one
+   (when the crowd has a move after which Folio can't mate at once, one of those stays open); checked on the warning's
+   position and again as it falls. **The pick** (`pickCrease`): in the band,
    nearest its middle (1.75 since the director's band); none, the one nearest `creaseLossMin` from below;
    never one over `creaseLossMax` (none at all: no warning yet). Ties (lines taking away the same moves cost exactly the
    same) by the server's roll, sent as the ask's `order` (the battle's seed never leaves the server).
@@ -153,6 +154,24 @@ director (not this lane) changed four things; the rules above are written as the
 
 Then one run of 60 battles at this setting (a standard error of about 0.06); above 0.30, one more at offset +150; ship the
 nearer the aim; if neither is under 0.30, stop and report.
+
+## The review's fixes (Oct 27)
+
+1. **A folded rook can't castle** (castling is its move too): the fold's filter and the dock's words use Moo's
+   `stunnedIn`, so `e1g1` with the h1 rook folded is refused with "That piece is folded." (Ginger's freeze has the same gap;
+   the director fixes it in its own PR.)
+2. **The FAQ says what the band does:** the line costing you as close to 1 to 2.5 pawns as it can, never more than 2.5.
+3. **The crease is checked again as it falls**, on the position it falls on (the crowd to move). A warned line the guard
+   now refuses doesn't land: no other line (the crowd was shown this one), its line clears (`creaseEnd`), and the meter is
+   spent as if it had come (`ultAt` that turn, one more `ults`; it fills again from empty the turn after). While it holds,
+   only the saw's lifts (no move, or no way out of check), as before. The sims judge each crease's cost as it falls.
+4. **The guard's mate rules read as their words:** never take away the crowd's mate in one, never hand Folio one (above,
+   call 8). The earlier code refused a line that left the crowd's own mate open and passed one that blocked it.
+5. **Repetition across a Revision:** the God King's Last Stand never plays the move it takes back (no base), so it has no
+   such gap; this one is new to Revision. Its base now says which earlier ply it goes back to (`Base.from`), and
+   `gameEndWith` counts the game up to that ply, then from the base (the crossed-out moves' positions don't count). Only
+   Revision sets `from`, so no other boss's game changes.
+6. **"It" for Folio** in the code too (`afterItsMove`).
 
 ## The numbers and why
 

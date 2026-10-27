@@ -390,6 +390,12 @@ export function materialSlips(fen: string, best: string, moves: readonly string[
 export interface Base {
   ply: number;
   fen: string;
+  /**
+   * The base puts the game back to the position it had after this earlier ply (Folio's Revision: the board goes back to
+   * before its crossed-out move): repetition then counts the game up to that ply too, not only from here. Missing for every
+   * other base (a position no earlier ply had: a burn, a bounce, a split).
+   */
+  from?: number;
 }
 
 /** The latest base at or before `ply` (none: the starting position). */
@@ -405,10 +411,22 @@ export function fenAtPly(history: readonly string[], ply: number, bases?: readon
   return fenAfter(history.slice(b.ply, ply), b.fen);
 }
 
-/** Whether a game is over, with its bases (from the latest one: no position before it can come again). */
+/**
+ * Whether a game is over, with its bases (from the latest one: no position before it can come again). A base that puts the
+ * game back to an earlier ply (`from`: Folio's Revision) counts the game up to that ply too, so a repetition across it
+ * counts (the crossed-out moves between don't).
+ */
 export function gameEndWith(history: readonly string[], bases?: readonly Base[] | null): GameEnd {
-  const b = baseAt(history.length, bases);
-  return gameEnd(b.fen, history.slice(b.ply));
+  const line = lineTo(history, history.length, bases);
+  return gameEnd(line.start, line.moves);
+}
+
+/** The game up to `ply` as a start and the moves from it, through any base that goes back to an earlier ply (`from`). */
+function lineTo(history: readonly string[], ply: number, bases?: readonly Base[] | null): { start: string; moves: string[] } {
+  const b = baseAt(ply, bases);
+  if (b.from === undefined || b.from >= b.ply) return { start: b.fen, moves: history.slice(b.ply, ply) };
+  const before = lineTo(history, b.from, bases);
+  return { start: before.start, moves: [...before.moves, ...history.slice(b.ply, ply)] };
 }
 
 /**

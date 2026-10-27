@@ -71,5 +71,13 @@ describe("Moo & Moon's moonbeam in the dock's words", () => {
     expect(refusedLine(boss, fen, "e1g1")).toBe(REFUSED.stunned);
     expect(REFUSED.stunned).toBe("Moonlight holds that piece.");
   });
+
+  it("Folio's folded piece's own move, and castling with a folded rook: \"That piece is folded.\"", () => {
+    const fen = "k6r/8/8/8/8/8/5N2/4K2R w K - 0 20";
+    const boss = { id: "folio", powers: { folded: ["h1"] } };
+    expect(refusedLine(boss, fen, "h1h2")).toBe(REFUSED.folded);
+    expect(refusedLine(boss, fen, "e1g1")).toBe(REFUSED.folded);
+    expect(REFUSED.folded).toBe("That piece is folded.");
+  });
 });
 

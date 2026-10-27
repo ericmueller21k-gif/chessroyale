@@ -110,7 +110,8 @@ describe("the FAQ's contents", () => {
     expect(words).toContain(`for ${p.creaseTurns} turns: none of your pieces may move across it`);
     expect(words).toContain("its own pieces cross it freely");
     expect(words).toContain("The piece is the most valuable one");
-    expect(words).toContain(`between ${p.creaseLossMin} and ${p.creaseLossMax} pawns`);
+    expect(words).toContain(`as close to ${p.creaseLossMin} to ${p.creaseLossMax} pawns as it can, never more than ${p.creaseLossMax}`);
+    expect(words).toContain("The line is checked again when it falls");
     expect(words).toContain(`its move cost it ${p.revisionDrop} pawns or more`);
     expect(words).toContain(`Never before turn ${p.revisionFrom}`);
     expect(words).toContain(def.offset === 0 ? "at the usual strength" : `${Math.abs(def.offset)} ${def.offset < 0 ? "under" : "over"} the usual strength`);

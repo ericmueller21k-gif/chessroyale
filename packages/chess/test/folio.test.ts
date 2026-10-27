@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { Chess, type Square } from "chess.js";
 import { BOSS_POWERS, BOSS_ROSTER, DEFAULT_SETTINGS, POWER_IDS, RAID_SETTINGS, isPlayable, mulberry32, type BossPowerState, type BossState, type FolioState, type MatchState, type Settings } from "@chessroyale/core";
 import {
   BOSS_OPENING,
@@ -9,7 +10,9 @@ import {
   MatchRunner,
   POWER_FX,
   START_FEN,
+  applyMove,
   attackStands,
+  bestReplyFrom,
   bossAllowed,
   boardEnd,
   chooseDraft,
@@ -25,6 +28,10 @@ import {
   folioTurnMs,
   initPowers,
   legalMoves,
+  matingMoves,
+  gameEndWith,
+  rageNow,
+  rageSpeedOf,
   pickCrease,
   pieceAt,
   playOnBoard,
@@ -43,10 +50,10 @@ import {
 } from "../src/index.ts";
 
 /**
- * Folio, the paper crane (docs/decisions/2026-10-27-folio-rules.md): Draft (an ink mark, two of your moves to answer it,
- * then the piece folded for three turns), Crease (a line nothing crosses for four turns, shown the turn before, the
- * engine's pick in a band) and Revision (once a battle, its own punished blunder and your reply crossed out, the
- * engine's best in their place).
+ * Folio, the paper crane (docs/decisions/2026-10-27-folio-rules.md): Draft (an ink mark under your most valuable attacked,
+ * defended piece, two of your moves to answer it, then the piece folded for four turns), Crease (a line your pieces don't
+ * cross for four turns while its own do, shown the turn before, the engine's pick in a band, checked again as it falls) and
+ * Revision (once a battle, its own punished blunder and your reply crossed out, the engine's best in their place).
  */
 
 const S = BOSS_POWERS;
@@ -272,6 +279,16 @@ describe("Folio's Draft: two of your moves to answer it, then the fold", () => {
     // (A king is never marked, so never folded: chooseDraft skips it, above.)
   });
 
+  it("a folded rook doesn't castle either (castling is its move too)", () => {
+    const fen = "k6r/8/8/8/8/8/5N2/4K2R w K - 0 20";
+    expect(legalMoves(fen)).toContain("e1g1");
+    const b = stub(fen, { crowdMoves: 6, powers: { turn: 7, folio: { ...FOLIO_FRESH, folded: { square: "h1", piece: "r", at: 7, until: 10 } } } });
+    const allowed = crowdAllowed(bossOf(b), fen)!;
+    expect(allowed).not.toContain("e1g1");
+    expect(allowed.some((m) => m.startsWith("h1"))).toBe(false);
+    expect(allowed).toContain("e1d1");
+  });
+
   it("one mark at a time; a fold in place doesn't block the next mark (on another piece)", () => {
     const b = stub(SPREAD, { crowdMoves: 7, powers: { turn: 7, nextPassive: 8, folio: { ...FOLIO_FRESH, folded: { square: "a1", piece: "r", at: 7, until: 9 } } } });
     begin(b);
@@ -305,15 +322,19 @@ describe("Folio's Crease: the line", () => {
     expect(legalMoves(boxed)).toEqual(["a1b1"]);
     expect(creaseGuard(boxed, "a|b")).toBe(false);
     expect(creaseGuard(boxed, "4|5")).toBe(true);
-    // Your back-rank mate (Ra8#): a line between files leaves it, so it never counts; one between ranks stops it.
+    // Your back-rank mate (Ra8#): a line between ranks would take it away, so none of those counts; one between files leaves
+    // it, and counts.
     const mate = "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 30";
-    expect(creaseGuard(mate, "d|e")).toBe(false);
-    expect(creaseGuard(mate, "4|5")).toBe(true);
-    // Its own mate in one, were you to pass, counts too: its pieces cross the crease, so no line stops it, and none counts.
-    const his = "r5k1/5ppp/8/8/8/8/5PPP/6K1 w - - 0 30";
-    for (const l of CREASE_LINES) expect(creaseGuard(his, l), l).toBe(false);
-    expect(creaseCheck(mate, "4|5")).toBe("4|5");
-    expect(creaseCheck(mate, "d|e")).toBeNull();
+    for (const l of CREASE_LINES.filter((x) => /\d/.test(x[0]!))) expect(creaseGuard(mate, l), l).toBe(false);
+    for (const l of CREASE_LINES.filter((x) => /[a-h]/.test(x[0]!))) expect(creaseGuard(mate, l), l).toBe(true);
+    // Its mate in one: your only move that stops it (Nf3) crosses f|g, so that line would hand it the mate and never counts;
+    // a line that leaves Nf3 open does.
+    const threat = "4n1k1/1r6/1p1P1p2/q3p2p/3P3P/bp2p3/1P2P1P1/1RK2BNn w - - 0 35";
+    expect(legalMoves(threat).filter((m) => !matingMoves(applyMove(threat, m)).length)).toEqual(["g1f3"]);
+    expect(creaseGuard(threat, "f|g")).toBe(false);
+    expect(creaseGuard(threat, "4|5")).toBe(true);
+    expect(creaseCheck(mate, "d|e")).toBe("d|e");
+    expect(creaseCheck(mate, "4|5")).toBeNull();
     expect(creaseCheck(mate, "z|q")).toBeNull();
   });
 
@@ -434,6 +455,39 @@ describe("Folio's Crease: through a battle", () => {
   });
 });
 
+describe("Folio's Crease: checked again as it falls", () => {
+  /** A battle whose crease was warned as the last turn began (its line `line`), now on `fen` as the next turn begins. */
+  const falls = (fen: string, line: string) => {
+    const b = stub(fen, { crowdMoves: 5, powers: { turn: 5, warnAt: 5, charge: 100, folio: { ...FOLIO_FRESH, warned: { line, loss: 1.2 } } } });
+    begin(b);
+    return bossOf(b).powers!;
+  };
+
+  it("a line the guard allows lands as promised", () => {
+    const p = falls("8/8/8/8/8/p1k5/P7/K7 w - - 0 50", "4|5");
+    expect(p.crease).toMatchObject({ line: "4|5", at: 6, side: "w" });
+    expect(p.events.map((e) => e.kind)).toEqual(["crease"]);
+  });
+
+  it("a warned line that would now leave you no move doesn't land: no other line, its line cleared, the meter spent", () => {
+    const p = falls("8/8/8/8/8/p1k5/P7/K7 w - - 0 50", "a|b");
+    expect(p.crease ?? null).toBeNull();
+    expect(p.events).toEqual([{ kind: "creaseEnd", turn: 6, line: "a|b" }]);
+    expect(p.ultAt).toBe(6);
+    expect(p.ults).toBe(1);
+    expect(folioOf(p).warned).toBeNull();
+    expect(rageNow(p, rageSpeedOf("folio"))).toBe(0);
+  });
+
+  it("one that would now hand it a mate in one doesn't land either; the meter empties the same", () => {
+    const p = falls("4n1k1/1r6/1p1P1p2/q3p2p/3P3P/bp2p3/1P2P1P1/1RK2BNn w - - 0 35", "f|g");
+    expect(p.crease ?? null).toBeNull();
+    expect(p.events.map((e) => e.kind)).toEqual(["creaseEnd"]);
+    expect(p.ults).toBe(1);
+    expect(rageNow(p, rageSpeedOf("folio"))).toBe(0);
+  });
+});
+
 describe("Folio's Revision: when", () => {
   it("both conditions: its move cost it revisionDrop or more, and your reply found it", () => {
     // Before its move, your judged score 0.5. Your best reply 0.85 and you found it: it comes.
@@ -464,7 +518,7 @@ describe("Folio's Revision: when", () => {
     expect(board.history).toEqual(["g8h7", "a1a8"]);
     expect(board.fen).toBe("6k1/5pp1/7p/8/8/8/5PPP/R5K1 b - - 0 30");
     expect(fenAtPly(board.history, 2, board.bases)).toBe(board.fen);
-    expect(board.bases!.at(-1)).toEqual({ ply: 2, fen: board.fen });
+    expect(board.bases!.at(-1)).toEqual({ ply: 2, fen: board.fen, from: 0 });
     expect(before).not.toBe(board.fen);
     const r = folio(b).revision!;
     expect(r).toMatchObject({ at: 5, moves: ["g8h7", "a1a8"], sans: ["Kh7", "Ra8"], ply: 2 });
@@ -505,6 +559,23 @@ describe("Folio's Revision: when", () => {
     const cap = punished({ crowdMoves: 60 });
     crowd(cap, "a1a8", { best: 0.9, played: 0.9 });
     expect(folio(cap).revision).toBeNull();
+  });
+
+  it("the rewind goes back to an earlier ply (its base's `from`): a repetition across it counts, the crossed-out moves' positions don't", () => {
+    // The knights out and back (the start twice), out again (crossed out), then the base back at the start, and out and
+    // back once more: the start a third time in the game's line.
+    const out = ["g1f3", "g8f6", "f3g1", "f6g8"];
+    const history = [...out, "g1f3", "g8f6", ...out];
+    const back = [{ ply: 0, fen: START_FEN }, { ply: 6, fen: START_FEN }];
+    expect(gameEndWith(history, [back[0]!, { ...back[1]!, from: 4 }])).toBe("repetition");
+    // (A base that doesn't go back, every other boss's: counted from it, as before.)
+    expect(gameEndWith(history, back)).toBeNull();
+  });
+
+  it("its base goes back to the ply before its move", () => {
+    const b = punished();
+    crowd(b, "a1a8", { best: 0.9, played: 0.9 });
+    expect(b.boards.get(0)!.bases!.at(-1)).toEqual({ ply: 2, fen: b.boards.get(0)!.fen, from: 0 });
   });
 
   it("?power=revision: at the first crowd move it may follow, whatever the numbers", () => {
@@ -571,7 +642,8 @@ async function turn(r: MatchRunner, move?: string) {
 
 describe("Folio's Revision: through the match runner", () => {
   it("?power=revision: after your fifth move, crossed out with its own; its move the engine's best; fair play skips the turn; once", async () => {
-    const r = raid({ test: "revision" });
+    const eng = engine();
+    const r = raid({ test: "revision", eng });
     for (let i = 0; i < 4; i++) await turn(r);
     expect(folioOf(r.boss!.powers).revision).toBeNull();
     const plies = r.boards.get(0)!.history.length;
@@ -586,7 +658,10 @@ describe("Folio's Revision: through the match runner", () => {
     expect(r.bossMoveKind()).toBe("best");
     expect(r.bossView()!.powers!.revision).toMatchObject({ at: 5, move: null });
     expect(r.bossView()!.powers!.events.map((e) => e.kind)).toContain("revision");
+    // (The engine's best at full strength: bestReply's own pick, never the brain's.)
+    const best = await bestReplyFrom(eng, fenOfR(r), r.settings.bossNodes, r.bossAllowed());
     await r.playBoss();
+    expect(r.boards.get(0)!.history.at(-1)).toBe(best);
     expect(folioOf(r.boss!.powers).revision!.move).toBe(r.boards.get(0)!.history.at(-1));
     expect(r.boss!.crowdMoves).toBe(5);
     for (let i = 0; i < 6; i++) await turn(r);
@@ -645,6 +720,11 @@ describe("Folio: a small fuzz (seeded battles with every switch)", () => {
             expect(f.mark).not.toBeNull();
             expect(pieceAt(fen, f.mark!.square)?.color).toBe("w");
             expect(attackStands(fen, f.mark!, "w")).toBe(true);
+            // (Defended, and no cheaper piece of its attacks it.)
+            const c = new Chess(fen);
+            expect(c.attackers(f.mark!.square as Square, "w").length, `${seed}: ${f.mark!.square} defended`).toBeGreaterThan(0);
+            const worth = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 100 } as Record<string, number>;
+            for (const a of c.attackers(f.mark!.square as Square, "b")) expect(worth[c.get(a)!.type]!).toBeGreaterThanOrEqual(worth[f.mark!.piece]!);
           }
           // (Never two of its moments at the turn's start but the warning's pair.)
           const kinds = p.events.map((e) => e.kind).filter((k) => k !== "warn");

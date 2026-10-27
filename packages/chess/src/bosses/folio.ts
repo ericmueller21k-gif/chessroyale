@@ -23,9 +23,9 @@ import { BOSS_POWERS, mulberry32, type BossPowerSettings, type BossPowerState, t
 import { Chess, type Square } from "chess.js";
 import { boardEnd } from "../boards.ts";
 import { applyMove, baseAt, fenAtPly, legalMoves, matingMoves, pieceAt, toSan } from "../rules.ts";
+import { stunnedIn } from "./moo.ts";
 import type { EngineLike } from "../runner.ts";
 import { VALUE, eachOn, from, logit, materialOf, meterFull, other, powerRoll, rageNow, rageSpeedOf, rageTick, testSwitch, to, turnOf, type Battle, type BossRules, type JudgedMove, type Side } from "./base.ts";
-import { passTurn } from "./hollow.ts";
 
 /**
  * How long each of its moments holds the screen (ms; POWER_FX in boss-timing.ts). `fold` and `revision` play at the start
@@ -77,14 +77,14 @@ const worth = (type: string) => (type === "k" ? 100 : VALUE[type]!);
  * knight, a pawn or a king, or side by side). Null: none qualifies.
  */
 export function chooseDraft(fen: string, crowd: Side, seed: number, turn: number, skip: string | null = null): { square: string; piece: string; attacker: string; by: string; line: string[] } | null {
-  const his = other(crowd);
+  const folio = other(crowd);
   const options: { square: string; piece: string; attacker: string; by: string; value: number }[] = [];
   for (let f = 0; f < 8; f++)
     for (let r = 1; r <= 8; r++) {
       const sq = square(f, r);
       const pc = pieceAt(fen, sq);
       if (!pc || pc.color !== crowd || pc.type === "k" || sq === skip) continue;
-      const attackers = attackersOf(fen, sq, his);
+      const attackers = attackersOf(fen, sq, folio);
       if (!attackers.length || !attackersOf(fen, sq, crowd).length) continue;
       const value = VALUE[pc.type]!;
       const ranked = attackers.map((a) => ({ a, type: pieceAt(fen, a)!.type })).sort((x, y) => worth(x.type) - worth(y.type) || (x.a < y.a ? -1 : 1));
@@ -150,27 +150,41 @@ export function creaseMoves(fen: string, line: string | null | undefined): strin
   return line ? legal.filter((m) => !crossesCrease(m, line, fen)) : legal;
 }
 
-/**
- * The side to move has a mate in one with the crease up: a mating move it leaves (a crease leaving no move lifts for that
- * turn, as every power's limit does: then every legal move counts).
- */
-export function creaseMateInOne(fen: string, line: string): boolean {
-  const mates = matingMoves(fen);
-  if (!mates.length) return false;
-  const open = creaseMoves(fen, line);
-  return !open.length || mates.some((m) => open.includes(m));
+/** Remembered answers of safeAfter (the guard asks about the same position for each line): a few positions, newest last. */
+const SAFE = new Map<string, Map<string, boolean>>();
+
+/** After the crowd's move `m` (the crowd to move in `fen`), Folio has no mate in one. Remembered per position. */
+function safeAfter(fen: string, m: string): boolean {
+  let known = SAFE.get(fen);
+  if (!known) {
+    known = new Map();
+    SAFE.set(fen, known);
+    if (SAFE.size > 16) SAFE.delete(SAFE.keys().next().value!);
+  }
+  let safe = known.get(m);
+  if (safe === undefined) {
+    safe = !matingMoves(applyMove(fen, m)).length;
+    known.set(m, safe);
+  }
+  return safe;
 }
 
 /**
- * A line the Crease may take on this position (the crowd to move): it leaves the crowd a move, and hands neither side a
- * mate in one: the crowd's with the crease counted, Folio's (its moves never limited) were the crowd to pass (passTurn;
- * none: in check, not asked).
+ * A line the Crease may take on this position (the crowd to move): it leaves the crowd a move, never takes away the crowd's
+ * mate in one (one of its mating moves stays open), and never hands Folio one: when the crowd has a move after which Folio
+ * can't mate at once, one of those stays open. (Folio's own moves are never limited, so its side needs nothing more.) Its
+ * moves are looked at lazily: usually the first open move already leaves Folio no mate.
  */
 export function creaseGuard(fen: string, line: string): boolean {
   try {
-    if (!CREASE_LINES.includes(line) || !creaseMoves(fen, line).length || creaseMateInOne(fen, line)) return false;
-    const his = passTurn(fen);
-    return !his || !matingMoves(his).length;
+    if (!CREASE_LINES.includes(line)) return false;
+    const open = creaseMoves(fen, line);
+    if (!open.length) return false;
+    const mates = matingMoves(fen);
+    if (mates.length && !mates.some((m) => open.includes(m))) return false;
+    if (open.some((m) => safeAfter(fen, m))) return true;
+    // (No open move stops its mate: refused when a move the line takes away would have.)
+    return !legalMoves(fen).some((m) => !open.includes(m) && safeAfter(fen, m));
   } catch {
     return false;
   }
@@ -248,6 +262,18 @@ export async function creasePick(engines: readonly EngineLike[], fen: string, as
   return scores ? pickCrease(scores, ask.order, s) : null;
 }
 
+/**
+ * What a crease costs the crowd on `fen` (the crowd to move: as it falls), by this device's first engine: its best move with
+ * the line's crossings taken away against its best (the sims judge each crease where it's in force). Null: no answer.
+ */
+export async function creaseCost(engine: EngineLike, fen: string, line: string, s: Pick<BossPowerSettings, "creaseNodes" | "bouncePawnLogit"> = BOSS_POWERS): Promise<number | null> {
+  const open = creaseMoves(fen, line);
+  if (!open.length) return null;
+  const before = await sideBest(engine, fen, null, s.creaseNodes);
+  const after = open.length === legalMoves(fen).length ? before : await sideBest(engine, fen, open, s.creaseNodes);
+  return before === null || after === null ? null : creasePawns(before, after, s);
+}
+
 /** The host's answer: the line ("" none). */
 export async function creaseAnswer(engines: readonly EngineLike[], fen: string, ask: CreaseAsk): Promise<string> {
   return (await creasePick(engines, fen, ask))?.line ?? "";
@@ -289,7 +315,7 @@ const ULT_MOMENTS = new Set(["warn", "creaseWarn", "crease", "creaseEnd"]);
  */
 export const FOLIO: BossRules = {
   id: "folio",
-  // (The test trigger waits for his move: the line comes with it.)
+  // (The test trigger waits for its move: the line comes with it.)
   triggerAtHisTurn: true,
   wearOff(next, t) {
     const f = folioOf(next);
@@ -309,9 +335,9 @@ export const FOLIO: BossRules = {
       next.crease = null;
     }
   },
-  // The Crease: the meter full (or the test switch) and a line picked with his move for this turn: the warning, its line
-  // shown; as the next turn begins, it lands. No line (no engine, none allowed): the warning waits, and his next move asks
-  // again. The trigger: it lands now, with the line picked with his move (kept until one comes).
+  // The Crease: the meter full (or the test switch) and a line picked with its move for this turn: the warning, its line
+  // shown; as the next turn begins, it lands (checked again there). No line (no engine, none allowed): the warning waits,
+  // and its next move asks again. The trigger: it lands now, with the line picked with its move (kept until one comes).
   ultimate(next, t) {
     const f = folioOf(next);
     const fresh = f.next && f.next.turn === t.turn ? f.next : null;
@@ -323,7 +349,7 @@ export const FOLIO: BossRules = {
       t.events.push({ kind: "crease", turn: t.turn, line });
       return true;
     };
-    if (t.ultNext) return fresh ? land(fresh.line, fresh.loss) : false;
+    if (t.ultNext) return fresh && creaseGuard(t.fen, fresh.line) ? land(fresh.line, fresh.loss) : false;
     if (next.warnAt === undefined) {
       if (fresh && (meterFull(next, t) || testSwitch(t, next))) {
         next.warnAt = t.turn;
@@ -333,7 +359,15 @@ export const FOLIO: BossRules = {
       return false;
     }
     if (t.turn > next.warnAt) {
-      if (f.warned) return land(f.warned.line, f.warned.loss);
+      if (f.warned) {
+        // (Checked again as it falls, on the position it falls on: a line the guard now refuses doesn't land. No other line
+        // comes (the crowd was shown this one): its line clears (`creaseEnd`), and the meter is spent as if it had come.)
+        if (creaseGuard(t.fen, f.warned.line)) return land(f.warned.line, f.warned.loss);
+        next.ultAt = t.turn;
+        next.folio = { ...f, next: null, warned: null };
+        t.events.push({ kind: "creaseEnd", turn: t.turn, line: f.warned.line });
+        return true;
+      }
       // (A warning without its line, a state no rule leaves: withdrawn, so the meter can warn again.)
       delete next.warnAt;
     }
@@ -362,7 +396,8 @@ export const FOLIO: BossRules = {
     const folded = foldedOn(folioOf(boss.powers), turn);
     const line = creaseOn(boss.powers, turn);
     if (!folded && !line) return allowed;
-    return allowed.filter((m) => from(m) !== folded && !crossesCrease(m, line, fen));
+    // (Castling with a folded rook is its move too: stunnedIn, Moo's rule for a stunned rook.)
+    return allowed.filter((m) => !(folded && stunnedIn(fen, m, [folded])) && !crossesCrease(m, line, fen));
   },
   // (A move of the crowd's across it: the screens' words. Folio's cross it freely.)
   stopReason: (boss, fen, m) => {
@@ -381,7 +416,7 @@ export const FOLIO: BossRules = {
   },
   crossedOut: (boss) => crossedOut(boss),
   afterBossMove(b, move, extras) {
-    folioBattle.afterHisMove(b, move, extras?.crease ?? null, extras?.creaseLoss ?? null);
+    folioBattle.afterItsMove(b, move, extras?.crease ?? null, extras?.creaseLoss ?? null);
   },
   opening: { setUp: (b) => ({ nextPassive: b.settings.bossPowerTest === "draft" ? 2 : BOSS_POWERS.draftFirst, folio: FOLIO_FRESH }) },
   view: (p) => folioView(p),
@@ -427,8 +462,8 @@ export function folioView(p: BossPowerState): FolioView {
 
 export const folioBattle = {
   /**
-   * The Crease's line is wanted with his move now: as the crowd's next turn begins the warning would come (the meter full
-   * by then, worked out as prepareTurn will: this crowd move's rage and his material lost so far; or the test switch), or
+   * The Crease's line is wanted with its move now: as the crowd's next turn begins the warning would come (the meter full
+   * by then, worked out as prepareTurn will: this crowd move's rage and its material lost so far; or the test switch), or
    * the admins' trigger is pulled. Not while one is warned, holds or the meter is held.
    */
   creaseDue(b: Battle, s: BossPowerSettings = BOSS_POWERS): boolean {
@@ -445,7 +480,7 @@ export const folioBattle = {
     return rageNow({ charge, lost, rageUsed: p.rageUsed }, rageSpeedOf(boss.id, s), s) >= s.rageFull;
   },
 
-  /** What the host's engines need to pick the line after his move now (the boss request's `crease`), or null: none wanted. */
+  /** What the host's engines need to pick the line after its move now (the boss request's `crease`), or null: none wanted. */
   creaseAsk(b: Battle): CreaseAsk | null {
     if (!b.bossToMove() || !folioBattle.creaseDue(b)) return null;
     const boss = b.state.boss!;
@@ -453,9 +488,9 @@ export const folioBattle = {
   },
 
   /**
-   * After the crowd's move (the start of his turn; `judged`: the judge's numbers for it, none for a move the boss played
+   * After the crowd's move (the start of its turn; `judged`: the judge's numbers for it, none for a move the boss played
    * for the crowd): Revision first, when its move is punished (it comes, and nothing else does); else the mark: cleared if
-   * the attack has ended (answered), folded if it still stands after the crowd's last move to answer it (`fold`, while he
+   * the attack has ended (answered), folded if it still stands after the crowd's last move to answer it (`fold`, while it
    * thinks).
    */
   afterCrowdMove(b: Battle, move: string | null, judged: JudgedMove | null, s: BossPowerSettings = BOSS_POWERS): void {
@@ -520,7 +555,7 @@ export const folioBattle = {
     if (evals.length > ply) evals[ply] = expected;
     // (The move that led to the position it goes back to, unless that position began the board: a base of its own.)
     const lastMove = baseAt(ply - 2, board.bases).ply === ply - 2 ? null : (board.history[ply - 3] ?? null);
-    b.boards.set(board.id, { ...board, fen: last.fen, expected, lastMove, evals, bases: [...(board.bases ?? []).filter((x) => x.ply !== ply), { ply, fen: last.fen }] });
+    b.boards.set(board.id, { ...board, fen: last.fen, expected, lastMove, evals, bases: [...(board.bases ?? []).filter((x) => x.ply !== ply), { ply, fen: last.fen, from: ply - 2 }] });
     const at = boss.crowdMoves;
     const longer = <T extends { until: number } | null>(x: T): T => (x && x.until >= at ? { ...x, until: x.until + 1 } : x);
     const mark = f.mark && attackStands(last.fen, f.mark, boss.crowdSide) ? longer(f.mark) : null;
@@ -535,12 +570,12 @@ export const folioBattle = {
   },
 
   /**
-   * After his move: what Revision needs of it (its move, the position before it, the crowd's judged score then); Revision's
-   * own move filled in; the mark cleared if his move ended its attack (the attacker moved away, the marked piece taken), a
-   * fold whose piece he took gone; and the Crease's line for the crowd's next turn, when one came with the move (`crease`:
+   * After its move: what Revision needs of it (the move, the position before it, the crowd's judged score then); Revision's
+   * own move filled in; the mark cleared if the move ended its attack (the attacker moved away, the marked piece taken), a
+   * fold whose piece it took gone; and the Crease's line for the crowd's next turn, when one came with the move (`crease`:
    * the host's answer online, this device's in solo), checked here (creaseCheck).
    */
-  afterHisMove(b: Battle, move: string, crease: string | null, creaseLoss: number | null): void {
+  afterItsMove(b: Battle, move: string, crease: string | null, creaseLoss: number | null): void {
     const boss = b.state.boss;
     const p = boss?.powers;
     if (!boss || !p || boss.id !== "folio") return;
