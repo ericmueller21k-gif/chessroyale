@@ -34,6 +34,8 @@ import {
   type EngineLike,
   type JudgeJob,
   type Opening,
+  bossRules,
+  limitCrowd,
 } from "../src/index.ts";
 
 const hash = (s: string) => {
@@ -134,6 +136,25 @@ describe("boss powers: the ground rules", () => {
     expect(crowdAllowed(frozen, fen)).toBeNull(); // every legal move, i.e. both escapes
     // And the freeze itself would never pick it: freezing it leaves nothing else.
     expect(chooseFreeze(fen, "w", 1, 1)).toBeNull();
+  });
+
+  it("held pieces, one rule for every boss (Eric, Oct 27): a held piece doesn't move, nor castles with a held rook; the boss's other limits after", () => {
+    const fen = "4k3/8/8/8/8/8/5N2/R3K2R w KQ - 0 20";
+    const legal = legalMoves(fen);
+    expect(legal).toEqual(expect.arrayContaining(["e1g1", "e1c1"]));
+    const b = battle("gingerbread", fen);
+    // A stand-in boss holding the a1 rook: none of its moves and no castling long; castling short and the rest stay.
+    const long = limitCrowd({ held: () => ["a1"] }, b, fen, legal);
+    expect(long).toEqual(legal.filter((m) => m !== "e1c1" && !m.startsWith("a1")));
+    // Holding the h1 rook: no castling short.
+    expect(limitCrowd({ held: () => ["h1"] }, b, fen, legal)).toEqual(legal.filter((m) => m !== "e1g1" && !m.startsWith("h1")));
+    // Its other limits (crowdFilter) see only the moves the held pieces leave.
+    const seen: string[][] = [];
+    const both = limitCrowd({ held: () => ["a1"], crowdFilter: (a) => (seen.push([...a]), a.filter((m) => !m.startsWith("f2"))) }, b, fen, legal);
+    expect(seen).toEqual([long]);
+    expect(both).toEqual(long.filter((m) => !m.startsWith("f2")));
+    // Every boss whose powers hold pieces says so through `held`: the freeze and the blizzard, the moonbeam, the fold.
+    for (const id of ["gingerbread", "moo", "folio"]) expect(bossRules({ ...b, id })?.held, id).toBeTypeOf("function");
   });
 
   it("a frozen rook can't castle either (the king's step that moves it)", () => {
