@@ -4,7 +4,7 @@ import { FOLIO_FX, KING_ATTACK, KING_ATTACKERS, POWER_BANNERS, START_FEN, fenAft
 import { FOLIO, FOLIO_PALETTE } from "../src/characters/folio.ts";
 import { FOLIO_ATTACK } from "../src/characters/folio-attack.ts";
 import { FOLIO_LINES } from "../src/characters/folio-lines.ts";
-import { FOLIO_SOUNDS, folioSound, folioVoiceFor } from "../src/characters/folio-sounds.ts";
+import { FOLIO_SOUNDS, folioSound } from "../src/characters/folio-sounds.ts";
 import { MOVE_MEAN_DB, MOVE_PEAK } from "../src/characters/synth.ts";
 import { SELECT_LINES, SELECT_SOUND, SELECT_TINT } from "../src/characters/boss-select.ts";
 import { bossKit } from "../src/characters/kits.ts";
@@ -168,14 +168,12 @@ describe("its sounds and its voice", () => {
     expect(m.db).toBeLessThan(MOVE_MEAN_DB);
   });
 
-  it("speaks each of its lines in its own whisper, as long as the line, in the battle's voice only", () => {
-    for (const lines of Object.values(FOLIO_LINES)) for (const l of lines!) expect(lineSounds.get(l), l).toBe(folioVoiceFor(l));
-    expect(folioVoiceFor("Mind the crease.")).toBe("folioVoiceShort");
-    expect(folioVoiceFor("Let me write that again.")).toBe("folioVoiceMedium");
-    expect(folioVoiceFor("Beautifully written. I'll fold this one away.")).toBe("folioVoiceLong");
-    const l = (n: "voiceShort" | "voiceMedium" | "voiceLong") => folioSound(n, 44100).length;
-    expect(l("voiceShort")).toBeLessThan(l("voiceMedium"));
-    expect(l("voiceMedium")).toBeLessThan(l("voiceLong"));
+  it("speaks each of its lines with its chirp, one short sound whatever the line (Eric, Oct 27), in the battle's voice only", () => {
+    for (const lines of Object.values(FOLIO_LINES)) for (const l of lines!) expect(lineSounds.get(l), l).toBe("folioVoice");
+    // (Short: the whisper it replaced ran 0.6 to 1.6 s, as long as the line.)
+    expect(folioSound("voice", 44100).length / 44100).toBeLessThan(0.4);
+    // Its town sounds (a tap on it in the town square): a murmur and a soft "mm-hm", each under 0.6 s.
+    for (const n of ["murmur", "hum"] as const) expect(folioSound(n, 44100).length / 44100, n).toBeLessThan(0.6);
   });
 });
 

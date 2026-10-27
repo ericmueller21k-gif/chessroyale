@@ -28,6 +28,8 @@
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import { account, onAccountChange, playerName } from "../account.ts";
 import { testSwitchesAllowed } from "../test-switches.ts";
+import { play, warmSounds } from "../sound.ts";
+import { SELECT_SOUND, TOWN_SOUNDS, townSound } from "../characters/boss-select.ts";
 import { N, proj, wrapF } from "./camera.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { Press } from "./press.ts";
@@ -225,6 +227,10 @@ function startTown(
   const r = new Renderer(ctx, town, HOMES);
   // (The signs' pixel font is the game's own; it's loaded on first use, so ask for it now.)
   void document.fonts?.load('8px "Press Start 2P"').catch(() => {});
+  // The bosses' sounds for a tap on one, made ahead off the page's thread (the sound worker), so a tap never costs a frame.
+  warmSounds([...Object.values(SELECT_SOUND), ...Object.values(TOWN_SOUNDS).flat()]);
+  /** How often each boss has been tapped (its town sounds go in turn). */
+  const taps = new Map<string, number>();
   // (On you: back from a game with a bot, you're at its table.)
   let camX = town.you.walker.c;
   let camY = town.you.walker.r;
@@ -475,6 +481,14 @@ function startTown(
   /** The bot a card holds still: a bot's own, or the one waiting at a table's. */
   const heldBy = (c: Card | null): Person | null => (c?.kind === "bot" ? town.people[c.i]! : c?.kind === "table" && c.bot !== undefined ? town.people[c.bot]! : null);
   function setCard(c: Card | null) {
+    // A boss's card opening: it says something (Eric, Oct 27), once a tap (its confirm opening is the same card).
+    if (c?.kind === "boss" && !(card?.kind === "boss" && card.i === c.i)) {
+      const id = HOMES[c.i]!.id;
+      const n = taps.get(id) ?? 0;
+      taps.set(id, n + 1);
+      const sound = townSound(id, n);
+      if (sound) play(sound);
+    }
     if (card?.kind === "boss") town.bosses[card.i]!.held = false;
     const was = heldBy(card);
     if (was && town.hold === was && town.meet?.bot !== was) holdBot(town, null);

@@ -29,7 +29,6 @@ import { TIGER_CHANCE, TIGER_LINES } from "./tiger-lines.ts";
 import { FOLIO } from "./folio.ts";
 import { ATTACK_PER_SQUARE, ATTACK_STAND, FOLIO_ATTACK, FOLIO_PORTRAIT } from "./folio-attack.ts";
 import { FOLIO_LINES } from "./folio-lines.ts";
-import { folioVoiceFor } from "./folio-sounds.ts";
 import { lineSounds } from "../speech.tsx";
 import type { Stance } from "./stance.ts";
 import { mooPowered } from "./moo-state.ts";
@@ -812,8 +811,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
 };
 
-// Folio's voice (Oct 27): each of its lines heard as it starts, a whisper as long as the line (speech.tsx, `lineSounds`).
-for (const lines of Object.values(FOLIO_LINES)) for (const line of lines ?? []) lineSounds.set(line, folioVoiceFor(line));
+// Folio's voice (Eric, Oct 27): each of its lines heard as it starts, its chirp (speech.tsx, `lineSounds`).
+for (const lines of Object.values(FOLIO_LINES)) for (const line of lines ?? []) lineSounds.set(line, "folioVoice");
 
 /** Every moment a kit may name an animation for (and so every `anims` key a powered twin may replace). */
 const BEAT_NAMES = ["entrance", "idle", "thinking", "move", "capture", "hurt", "check", "smug", "rattled", "defeat", "victory", "strike", "power", "powerHit", "ultimateWarn", "ultimate", "ultimateHit", "wax", "flurry", "dazed", "plantMany", "plant", "cheer", "bigCheer", "shrug", "place", "wince", "fold", "revision", "kingAttack"] as const satisfies readonly Beat[];

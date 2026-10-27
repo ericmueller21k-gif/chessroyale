@@ -233,13 +233,18 @@ test("the lights at dusk and night: at ?sky=night a park lamp's glass and Babur'
 
 test("a boss's card: 'Challenge alone', then 'Leave the town square?'; Stay keeps you, Leave opens the Boss raid screen with that boss's tile picked", async ({ page }) => {
   const errors = watchErrors(page);
+  await page.addInitScript(() => ((window as any).__soundLog = []));
   await page.goto("/town");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
   await toBabur(page);
   let card = await openCard(page, "boss", "Babur");
+  // He says something as his card opens (Eric, Oct 27: his select sound), once: its confirm opening is the same card.
+  const said = () => page.evaluate(() => ((window as any).__soundLog as string[]).filter((l) => l.startsWith("tigerHello")).length);
+  await expect.poll(said).toBe(1);
   await card.getByRole("button", { name: "Challenge alone" }).click();
   let confirm = page.getByRole("dialog", { name: "Leave the town square?" });
   await expect(confirm.getByRole("heading", { name: "Leave the town square?" })).toBeVisible();
+  expect(await said()).toBe(1);
   await expect(confirm.getByText("You'll fight Babur alone in Solo Boss Mode.")).toBeVisible();
   // Stay: the confirm closes, and you're still in the town square.
   await confirm.getByRole("button", { name: "Stay" }).click();

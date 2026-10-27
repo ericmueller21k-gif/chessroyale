@@ -60,7 +60,9 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
   gate grows in a half ring. If two walks end on one square, the later claim gives way to the nearest free square
   beside it (`keepApart`, every tick). Bots and bosses pick their ends the same way.
 - **Cards** (the prototype's, inside the world's box, over the boss's head or above the home's name, placed every frame;
-  a tap anywhere else, or Escape, closes one). A boss: its name and **"Challenge alone"**, which asks **"Leave the town
+  a tap anywhere else, or Escape, closes one). A boss says something as its card opens (Eric, Oct 27): its select sound
+  (`SELECT_SOUND`), or its own town sounds in turn (`TOWN_SOUNDS`, `townSound` in `characters/boss-select.ts`: Folio's
+  murmur, then its "mm-hm"), made ahead in the sound worker as the town opens so a tap never costs a frame. Its card: its name and **"Challenge alone"**, which asks **"Leave the town
   square?"** / "You'll fight [boss] alone in Solo Boss Mode." / **Leave** / **Stay**; Leave closes the town square and
   opens the Boss raid screen with that boss's tile picked (`rememberBossPick`, then the screen as the side menu opens
   it); Stay closes the confirm and its card. A home: its name, **"Shop"** greyed (shown, not tappable) and "Coming
