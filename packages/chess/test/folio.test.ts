@@ -114,7 +114,7 @@ const SPREAD = "q2r2k1/5ppp/5b2/8/2n5/2N1B2P/1P3PP1/R2Q1RK1 w - - 0 20";
 describe("Folio: who it is", () => {
   it("is on the roster as folio (📜), Draft and Crease, its kit to come: not playable until the wiring lane", () => {
     const def = BOSS_ROSTER.find((b) => b.id === "folio")!;
-    expect(def).toMatchObject({ name: "Folio", icon: "📜", kit: null, offset: 0, powers: { passive: "draft", ultimate: "crease" } });
+    expect(def).toMatchObject({ name: "Folio", icon: "📜", kit: null, offset: 150, powers: { passive: "draft", ultimate: "crease" } });
     expect(isPlayable(def)).toBe(false);
     for (const id of ["draft", "crease", "revision"] as const) expect(POWER_IDS).toContain(id);
   });

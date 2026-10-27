@@ -227,9 +227,10 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // (its own do: it folds the board toward itself), shown the turn before; and once a battle, Revision: its own blunder
   // and the crowd's punishing reply crossed out, the engine's best move in its place (bosses/folio.ts; docs/decisions/2026-10-27-folio-rules.md). Not playable until its kit is wired (the wiring
   // lane sets `kit: "Folio"`): the test links `?boss=folio&wip=1`, `&power=draft`, `&power=crease`, `&power=revision`. Its
-  // offset: 0, at the usual strength (the director's call, Oct 27: a final boss; the first sim, at −250, put it among the
-  // easiest: reports/folio-sim.md).
-  { id: "folio", name: "Folio", icon: "📜", kit: null, offset: 0, powers: { passive: "draft", ultimate: "crease" } },
+  // offset: +150, over the usual strength, the only boss so: a final boss (the director's calls, Oct 27: offset 0 gave the
+  // crowd 0.33 in 60 battles, above 0.30; +150, 0.28 in 50 moves, nearer the aim of 0.10 to 0.25; the first sim, at −250
+  // and the sheet's rules, put it among the easiest: reports/folio-sim.md).
+  { id: "folio", name: "Folio", icon: "📜", kit: null, offset: 150, powers: { passive: "draft", ultimate: "crease" } },
   { id: "recluse", name: "Hidden Boss", icon: "📕", kit: "Hidden Boss", offset: 0, powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true, crowdFinal: true, the: true, levelUnknown: true },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },
   { id: "archer", name: "The Bone Archer", icon: "💀", kit: null, offset: 0, powers: null },

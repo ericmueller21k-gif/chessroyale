@@ -156,23 +156,22 @@ nearer the aim; if neither is under 0.30, stop and report.
 
 ## The numbers and why
 
-- **Offset −250, `rageSpeed` 1, `draftEvery` 4** (the usual offset, the brief's start, Sawyer's cuts' pace): the raid sim's
-  first run gave the crowd **0.52** (± 0.09) in **49** moves (26 battles), outside the aim (0.10 to 0.25). Four variants, as
-  the testing budget allows when a number lands outside: offset 0 (0.58), +200 (0.48), a Draft every 2 turns with
-  `rageSpeed` 2 at −250 (0.52) and at +200 (0.40), each 26 battles, all within about one standard error of one another.
-  Nothing measured beat the first, which is also the simplest, so it ships, and the sweep stopped there.
-  [reports/folio-sim.md](../../reports/folio-sim.md) has the tables.
-- **What the sim says of its powers** (folioA): 9.2 marks and 4.8 folds a battle (27% of marks answered in time by a crowd
-  that doesn't know about them, 52% folded); 2.5 Creases a battle costing the crowd 0.42 pawns on average (half of them
-  below the band: no line cost 0.3 there); Revision in 18 of 26 battles, worth 2.7 pawns on average (the crowd's punishing
-  reply it took back). Folio blunders often at these strengths, and Revision rewrites one; the battles with one went the
-  crowd's way more often (0.64 against 0.25), the sign of a boss that blunders again.
-- **For the director:** the levers that could move it are the sheet's own numbers (the fold's 3 turns, the 2-move window,
-  the crease's band and 4 turns, Revision once), not this lane's to change. Real players who answer the marks would score
-  higher still.
-- `creaseNodes` 20,000 (Babur's hoops' budget: at most 15 searches a warning), `creaseTimeMs` 6 s more for the host on
-  that request (the searches themselves take about a second or two on a phone); `draftTop` 3, `draftFirst` 3,
-  `revisionFrom` 5 are the sheet's.
+- **Offset +150, `rageSpeed` 1.3, `draftEvery` 4, `foldTurns` 4, the Crease's band 1 to 2.5** (the director's calls, and the
+  one further run they allowed). At the director's offset 0 the crowd scored **0.33** (± 0.05) in 50 moves over 60 battles,
+  above 0.30; at +150, **0.28** (± 0.05) in 50 moves over 60 battles, nearer the aim (0.10 to 0.25, just above its top),
+  so +150 ships and the sweep stopped there. Folio is the only boss that plays over the usual strength (1750 against the
+  1600 tier in the sim): a final boss. [reports/folio-sim.md](../../reports/folio-sim.md) has the tables.
+- **What the sim says of its powers** (folioG, shipped): 9.1 marks and 4.5 folds a battle (25% of marks answered in time by
+  bots that answer them only by chance, half folded); 2.8 Creases a battle, costing the crowd 0.52 pawns on average and
+  rarely in the band (37 of 170: most positions have no line taking 1 pawn off the crowd's best move; the rest take the
+  nearest below, none over the top); Revision in 38 of 60 battles, worth about 2 pawns (the punishing reply it took back).
+  Half the battles reach the 60-move cap.
+- **Before the director's calls**, as the sheet had the rules (the Crease both sides in 0.3 to 1.5, the Draft a pick of the
+  top three, folds of 3 turns): 0.40 to 0.58 over five runs of 26 battles (offset −250, 0 and +200; a Draft every 2 turns
+  with `rageSpeed` 2 at −250 and +200), none beyond the noise of the others: the easiest boss in the pack.
+- `draftEvery` 4 (this lane's number, Sawyer's cuts' pace; every 2 turns changed nothing measurable in the first runs);
+  `creaseNodes` 20,000 (Babur's hoops' budget: at most 15 searches a warning), `creaseTimeMs` 6 s more for the host on that
+  request; `draftFirst` 3, `revisionFrom` 5, `revisionDrop` 1.5 are the sheet's.
 
 ## What the wiring lane needs
 
@@ -186,8 +185,8 @@ nearer the aim; if neither is under 0.30, stop and report.
   `folded` holds its square (`refusedLine` already says "That piece is folded." on a tap). Banner FOLDED; "Folded. It'll keep."
 - **creaseWarn** (with `warn`; `line`): the line faintly over the board from the view's `creaseNext` until it lands. The RAGE
   warning is `warn`'s as for every boss; "Mind the crease." said once.
-- **crease** (as the next turn begins; `line`): the board folding along the line, drawn while the view's `crease` holds
-  (`line`, `at`, `until`); banner CREASE!. **creaseEnd** (`line`): it unfolds. The board, the dock and the HUD never move
+- **crease** (as the next turn begins; `line`): the board folding along the line toward Folio, drawn while the view's
+  `crease` holds (`line`, `at`, `until`, `side`: the side it stops, the crowd's; Folio's pieces cross it); banner CREASE!. **creaseEnd** (`line`): it unfolds. The board, the dock and the HUD never move
   (Eric's rule: nothing shifts).
 - **revision** (at the start of its turn, while it thinks; `moves`: its move, then the crowd's): both crossed out and the
   pieces back. The board the screens get is already the position before them (a base): draw the position after the
@@ -201,8 +200,9 @@ nearer the aim; if neither is under 0.30, stop and report.
 
 ## Test checks changed
 
-None removed or loosened; none guards a rule of Eric's (`docs/rules/eric.md`). Added: Folio's row in
-`boss-power-legal.test.ts`'s powers and two `stopReason` checks; the parity test's host answers the Crease's ask (as the
+None removed or loosened; none guards a rule of Eric's (`docs/rules/eric.md`). Added: three `stopReason` checks in
+`boss-power-legal.test.ts` (Folio's Crease stops only the side it's set against; its row in the powers that stop the
+boss's moves, added earlier in this PR, went with the director's call: the crease never stops Folio); the parity test's host answers the Crease's ask (as the
 app's host does); `boss-smoke.spec.ts`'s `PASSIVE_EVENTS` has `draft`; Folio in `king-save-altered.test.ts`'s `AUDIT` (a
 fold and the crease sit the Last Stand out) with a check that its mark doesn't. Changed: `pig.test.ts`'s "only Wrangler's
 and Moo's rules ask for `bestReply`" now names Folio's too (its Revision), the list it excludes one longer.
