@@ -17,9 +17,9 @@ export interface Sq {
 /**
  * The Coliseum's ground in the world's middle (12 x 12 squares since slice 6, which made it about twice its size; slice 5
  * built it on 6 x 6: solid, you walk round it). `c0`, `r0` its first column and row. Its gate faces south, over the park
- * toward your start.
+ * toward your start. (Row 28 since the park moved away from it: `WALK_ROWS`.)
  */
-export const COLISEUM = { c0: 17, r0: 23, size: 12 } as const;
+export const COLISEUM = { c0: 17, r0: 28, size: 12 } as const;
 /** Whether (c, r) is the Coliseum's ground. */
 export const onColiseum = (c: number, r: number): boolean => {
   const i = wrapI(c) - COLISEUM.c0;
@@ -32,6 +32,12 @@ export const onColiseum = (c: number, r: number): boolean => {
  * first free one (`destFor`), so a crowd at the gate grows outward from it in a half ring.
  */
 export const APRON_ROWS = 3;
+/**
+ * Between the apron and the park's north walk, the promenade carries on across this many rows of the town's board, so
+ * the park stands back from the Coliseum (Eric, Oct 26: "It shouldn't literally be right next to it… 8 to 10 tiles away";
+ * its nearest tables are 8 rows from its wall).
+ */
+export const WALK_ROWS = 4;
 /** The middle of the gate's sill, on the Coliseum's front edge (between its two middle columns). */
 const GATE_X = COLISEUM.c0 + (COLISEUM.size - 1) / 2;
 const GATE_Y = COLISEUM.r0 - 0.5;
@@ -69,10 +75,10 @@ export const statueAt = (c: number, r: number): Statue | null => STATUES.find((s
 // boards to start with… open up the space in front of the coliseum and it can go there").
 
 /**
- * The park in front of the Coliseum's gate, south of its apron: 20 squares across (the Coliseum's 12 and 4 more each
- * side), 10 deep. `c0` its first column, `r1` its row nearest the gate (the camera looks north, r rising).
+ * The park in front of the Coliseum's gate, south of its apron and the walk: 20 squares across (the Coliseum's 12 and 4
+ * more each side), 11 deep. `c0` its first column, `r1` its row nearest the gate (the camera looks north, r rising).
  */
-export const PARK = { c0: COLISEUM.c0 - 4, r1: COLISEUM.r0 - APRON_ROWS - 1, w: 20, d: 10 } as const;
+export const PARK = { c0: COLISEUM.c0 - 4, r1: COLISEUM.r0 - APRON_ROWS - WALK_ROWS - 1, w: 20, d: 11 } as const;
 /**
  * Its plan, a row a line from the gate's side (north) to the plaza's (south), a square a letter: `=` paving, `.` grass,
  * `t` a tree (on grass), `b` a bench (on grass, facing south), `B` a bench on paving, `T` a chess table (its two stools
@@ -81,6 +87,7 @@ export const PARK = { c0: COLISEUM.c0 - 4, r1: COLISEUM.r0 - APRON_ROWS - 1, w: 
  * middle; five tables either side of it; lawns with trees and benches outside them.
  */
 const PARK_PLAN = [
+  "====================",
   "=.t..sTs====sTs..t.=",
   "=...b...====...b...=",
   "=t...sTs====sTs...t=",
@@ -146,8 +153,9 @@ PARK_PLAN.forEach((line, v) => {
     }
   }
 });
-// The Coliseum's apron is paved too.
+// The Coliseum's apron is paved too, and the promenade's 4 squares across the walk between them.
 for (let r = COLISEUM.r0 - APRON_ROWS; r < COLISEUM.r0; r++) for (let c = COLISEUM.c0; c < COLISEUM.c0 + COLISEUM.size; c++) groundAt[r * N + c] = PAVING;
+for (let r = PARK.r1 + 1; r < COLISEUM.r0 - APRON_ROWS; r++) for (let c = PARK.c0 + 8; c < PARK.c0 + 12; c++) groundAt[r * N + c] = PAVING;
 /** The ten chess tables, in the plan's order (north to south, west to east). */
 export const TABLES: readonly Table[] = tables;
 /** Everything standing in the park. */
@@ -162,10 +170,11 @@ export const stoolAt = (c: number, r: number): Table | null => {
 export const tableAt = (c: number, r: number): Table | null => TABLES.find((t) => t.c === wrapI(c) && t.r === wrapI(r)) ?? null;
 
 /**
- * Your square when the page opens: in the park on its promenade, just south of the fountain, facing the Coliseum over it
- * (the camera looks north, r rising): the park around you and the Coliseum looming beyond it.
+ * Your square when the page opens: in the park on its promenade, between its two rows of tables nearest the Coliseum,
+ * facing it (the camera looks north, r rising): the tables round you, the fountain behind you, and the walk across to
+ * the Coliseum looming beyond (near enough to stand inside the view's rim, not on its horizon).
  */
-export const START: Sq = { c: PARK.c0 + 9, r: PARK.r1 - 6 };
+export const START: Sq = { c: PARK.c0 + 9, r: PARK.r1 - 3 };
 
 export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil";
 
@@ -215,7 +224,7 @@ export const HOMES: readonly Home[] = (
     { id: "bigboy", boss: "Big Boy", name: "Big Boy's Crib", color: "#23a8a8", cx: 43, cy: 31 },
     { id: "hollow", boss: "Hollow", name: "Hollow Peak", color: "#7a4fd0", cx: 0, cy: 43 },
     { id: "moo", boss: "Moo & Moon", name: "Moo & Moon Meadow", color: "#5d7ad8", cx: 8, cy: 40 },
-    { id: "alfil", boss: "Alfil", name: "Alfil's Pyramid", color: "#b4840f", cx: 22, cy: 42 },
+    { id: "alfil", boss: "Alfil", name: "Alfil's Pyramid", color: "#b4840f", cx: 23, cy: 43 },
     { id: "smudgy", boss: "Smudgy", name: "Smudgy's Art Gallery", color: "#f5832d", cx: 35, cy: 40 },
     { id: "clown", boss: "Boingo", name: "Boingo's Funhouse", color: "#7d3b93", cx: 5, cy: 27 },
     { id: "hopper", boss: "Chub & Chirp", name: "Chub & Chirp's Grassland", color: "#447a1f", cx: 6, cy: 8 },

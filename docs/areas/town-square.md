@@ -23,11 +23,13 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
   nearest drawn square under it (`pickSquare`). The far band of ground dissolves into the sky; things in it fade, haze
   and blur, and are drawn whole, never cut by the rim.
 - **The layout** (`town/world.ts`, `HOMES`): thirteen homes spread evenly round the middle over the world that wraps, so
-  neighbors stand 8 to 10 squares apart; the Coliseum on its 12 × 12 ground (`COLISEUM`, columns 17 to 28, rows 23 to 34),
-  its gate facing south onto its apron (`APRON`: columns 17 to 28, rows 20 to 22, paved, kept open for people to gather),
-  the park south of that (`PARK`, below), and your start (`START`, 22, 13) in the park on its promenade, just south of the
-  fountain, facing the Coliseum. Ginger Igloo and Jefferson's Fireworks stand side by side, and so do Hollow Peak and Moo &
-  Moon Meadow. The map: `docs/decisions/2026-10-26-town-square-slice-6.md` (slice 3's smaller one:
+  neighbors stand 8 to 10 squares apart; the Coliseum on its 12 × 12 ground (`COLISEUM`, columns 17 to 28, rows 28 to 39),
+  its gate facing south onto its apron (`APRON`: columns 17 to 28, rows 25 to 27, paved, kept open for people to gather),
+  then a walk of 4 rows (`WALK_ROWS`, the promenade paved across it), the park south of that (`PARK`, below; it stands back
+  from the Coliseum since Oct 26: `docs/decisions/2026-10-26-town-square-park-stands-back.md`), and your start (`START`,
+  22, 17) in the park on its promenade, between its two rows of tables nearest the Coliseum, facing it. Ginger Igloo and Jefferson's Fireworks stand side by side, and so do Hollow Peak and Moo &
+  Moon Meadow. Placement is free to change while the town is a prototype (Eric, Oct 26: "where things are on the map is
+  not an issue. If we need to move buildings around… It's all prototype"). The map: `docs/decisions/2026-10-26-town-square-slice-6.md` (slice 3's smaller one:
   `docs/decisions/2026-10-26-town-square-slice-3.md`).
 - **The world** (`town/world.ts`): the homes (3 × 3 plots) and the Coliseum (`COLISEUM_PLACE`; homes and the Coliseum
   are `Place`s: a name, a chip color, a middle, a half-size and where the picture's foot stands), the walk (square to
@@ -101,8 +103,8 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
   not tapped, no chip while it shows). The design and the calls: `docs/decisions/2026-10-26-town-square-slice-5.md` and
   `…-slice-6.md`.
 
-- **The park** (slice 6; `PARK` and `PARK_PLAN` in `world.ts`, the art in `town/houses/park.ts`): 20 × 10 squares in front
-  of the Coliseum's apron, laid out as a city park: a paved walk all round, a promenade up the middle from the plaza to the
+- **The park** (slice 6; `PARK` and `PARK_PLAN` in `world.ts`, the art in `town/houses/park.ts`): 20 × 11 squares in front
+  of the Coliseum, past its apron and the walk, laid out as a city park: a paved walk all round, a promenade up the middle from the plaza to the
   gate round a stone fountain in the middle (2 × 2, its water moving), ten chess tables either side of it (`TABLES`: each a
   solid square with a stool west and east, facing each other across it), lawns with trees and benches. The ground has two
   more kinds of square (`groundAt`: paving and grass), drawn with the board's in the same color-sorted fills. Tables, trees,

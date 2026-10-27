@@ -220,8 +220,8 @@ test("the Coliseum: a tap on its gate walks you to the apron in front of it and 
   await expect(raids).toBeVisible();
   await expect(raids).toBeDisabled();
   await expect(card.getByText("Coming soon", { exact: true })).toBeVisible();
-  // You end on the apron at the gate: the row just in front of its ground (row 22), one of its two middle columns.
-  await expect.poll(async () => (await you(page)).join(","), { message: "you walk to the gate", timeout: 5000 }).toMatch(/^(22|23),22$/);
+  // You end on the apron at the gate: the row just in front of its ground (row 27), one of its two middle columns.
+  await expect.poll(async () => (await you(page)).join(","), { message: "you walk to the gate", timeout: 5000 }).toMatch(/^(22|23),27$/);
   // A tap on the world elsewhere (low on the left) closes it.
   await page.mouse.click(cv.x + cv.width * 0.3, cv.y + cv.height * 0.85);
   await expect(card).toBeHidden();

@@ -120,11 +120,12 @@ describe("town square walking", () => {
       expect(near, `${h.id}'s nearest neighbor`).toBeLessThanOrEqual(10);
     }
     // No home stands on the Coliseum's 12 x 12 ground (slice 5 built the Coliseum there: solid; slice 6 made it twice the
-    // size), nor in its park, and you start south of it, in the park in front of its gate (slice 6: the park between).
+    // size), nor in its park, and you start south of it, in the park in front of its gate (slice 6: the park between; since
+    // the park stood back from it, 11 rows south, still inside the view's rim).
     for (let r = COLISEUM.r0; r < COLISEUM.r0 + COLISEUM.size; r++) for (let c = COLISEUM.c0; c < COLISEUM.c0 + COLISEUM.size; c++) expect(plotAt[r * N + c]).toBeNull();
     for (let r = PARK.r1 - PARK.d + 1; r <= PARK.r1; r++) for (let c = PARK.c0; c < PARK.c0 + PARK.w; c++) expect(plotAt[r * N + c]).toBeNull();
     expect(START.r).toBeLessThan(COLISEUM.r0);
-    expect(COLISEUM.r0 - START.r).toBeLessThanOrEqual(10);
+    expect(COLISEUM.r0 - START.r).toBeLessThanOrEqual(11);
     expect(START.c).toBeGreaterThanOrEqual(COLISEUM.c0);
     expect(START.c).toBeLessThan(COLISEUM.c0 + COLISEUM.size);
     expect(groundAt[START.r * N + START.c], "on the park's promenade").toBe(PAVING);
