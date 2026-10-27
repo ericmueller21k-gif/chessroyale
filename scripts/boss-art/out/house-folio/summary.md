@@ -1,37 +1,34 @@
 # Boss art: house-folio
 
-- Model claude-opus-5-5, effort high, adaptive thinking. 13 turns, 6 renders.
-- Spend: **$1.59** of the $20 cap (28 input, 117,592 cache-write, 508,054 cache-read, 44,941 output tokens).
+- Model claude-opus-5-5, effort high, adaptive thinking. 20 turns, 12 renders.
+- Spend: **$2.01** of the $20 cap (42 input, 119,086 cache-write, 1,228,686 cache-read, 58,658 output tokens).
 - Finished: it called done.
 - The drawing: scripts/boss-art/out/house-folio/house-folio.ts.
 - Previews: scripts/boss-art/out/house-folio/preview/ (GIFs, the frame sheet, the comparison). Each look it took: scripts/boss-art/out/house-folio/looks/.
 
 ## Its notes
 
-The house is drawn, in scripts/boss-art/out/house-folio/house-folio.ts. One thing to check first: I couldn't open Folio's own file (folio.ts) or its brief, because they're outside the folders the tools let me read. So I didn't import FOLIO_PALETTE; I picked the paper, outline and gilt colours myself. The only exact colours from Folio are the three ink blues you gave me. If Folio's real paper or gold is different, swap the values in the palette at the top of the file.
+I revised Folio's Folded House (house-folio) against all seven review points. The only animation is idle. I checked it at 3x to 8x on both backgrounds and at phone size beside house-gardener, house-smudgy and house-hollow, and the render tool gave no warnings.
 
-I looked at the idle frame by frame at 3x, 4x and 5x on both backgrounds, and at phone size beside Hollow Peak, the Botanical Garden, Smudgy's Gallery and the tiger.
+**Size:** the frame is now 144 x 136 (it was 128) so the crane on the roof fits, with the foot at (72, 132).
 
-The house
-- View and size: the frame is 144 x 128 with the foot at (72, 124). The pointed gable end faces you and the side runs back to the upper right. It's about the size of the Botanical Garden, and lighter in weight than the other homes because it's pale paper.
-- Folded paper: a fold runs down the middle of the gable, lit on the left half and mid on the right. The side wall is shaded. The roof face has a diagonal crease (one bright pixel line) splitting it into a lit and a mid half. The roof's front edge folds under in shade beside the gable, and the roof throws a darker band onto the top of the side wall. The front corner catches a line of light.
-- Handwriting: short broken lines in the three ink blues, with a letter rising here and there, about 2 to 5 lines per face. The lines on the roof and side wall slant back with the face. In an earlier try the lines were solid dashes and read like siding, so I broke them up and cut how many there are. At phone size they're a faint texture now, not lines.
-- Gilt runs along the ridge, with a few brighter glints, and down the roof's front edges.
-- Door: a pointed opening with an amber glow inside. The door is a folded flap hinged on the left and swung a little open toward you, with a gilt pull. A faint pool of lamplight lies on the ground in front.
-- Seal: a 9 x 9 vermilion stamp above the door, with the pawn knocked out to the paper.
-- Cranes: three small paper cranes hang from the side eave on thin threads, at different lengths. Each has a gold beak pixel, and the middle one faces the other way.
-- By the door: a stack of folded pages with a little folded tent on top, and a closed blue book with gilt corners.
-- Sign: a blank folded-card board in a wooden frame on two posts, front right, with gilt nails. It's exported as HOUSE_FOLIO_SIGN.
-- Not in the design: I added four small grass tufts to help it sit on the ground like the other homes.
+**What changed:**
+1. **Folio's colors:** the file has its own copy of Folio's colors, value for value: the paper A–E, the outline k, ink i/j/l, gilt G/H/g/o/q and the seal v/w. The cool whites and grey-lavender are gone, and the shaded side is Folio's D, with E in the eave's shadow and under the crease. The lamplight takes its brightest and gold tones from Folio's gilt, plus two warm ambers. The book cover is Folio's ink blue (j/l), and the threads are ink blue (l).
+2. **Folded paper:**
+   - **Gable:** a kite-shaped flap folded down over the wall like an envelope flap, with the seal on its point over the door. The left half is lit and the right half mid, with a lit fold down the middle, a crease where it bends at the eave, a darker pixel along its cut edge and its shadow on the wall below.
+   - **Roof:** a pleated sheet of three pleats, each a lit strip with a highlighted crest and a shaded strip with a dark valley. The pleats make a zigzag eave, with a thickness line under it.
+   - **Walls:** the shaded side has a diagonal crease with a lit edge, and the strip below it is darker. Both walls have a hem folded up along the bottom.
+   - **Uneven paper:** the front's right half sits 1 px higher, and the flap's point is half a pixel off center.
+3. **Crane on the roof:** about 20 x 16 px, drawn from Folio's own rest pose at a quarter size. It has a V of wings (the near wing with a gilt leading edge, the far wing behind and shaded), a long neck to a folded head with a gold beak, and a pointed tail with a gold tip. It perches on a short gilt pin on the ridge like a weathervane, and it reads as a crane even at 1x.
+4. **Hanging cranes:** 9 px wide, each with a V of wings, a head with a gold beak, a tail point and a dark keel. They still sway out of step, and the middle one faces the other way.
+5. **Writing:** 1-px cursive lines with rounded humps every 3–4 px and a rare taller loop. There are three lines on the flap's lit half, two on its mid half, three on the wall left of the door and two on the right. It uses #8a93b8 on lit paper and #717898 on mid, with none on the shaded side or the roof (on the narrow pleats it broke up into specks).
+6. **Weight:** stronger lit/mid/shaded contrast, a dark E shadow band under the eave on the side wall, the dark lower half of the side, and a ground shadow like the other homes'.
+7. **Kept:** the door flap with its gilt pull and the lamplight with its glow on the ground, the seal (now on the flap's point), the page stack and book, and the idle (cranes sway, and the lamp dims once in frame 3). The sign board is smaller (42 x 20, a folded-card face) so it covers less of the side wall; HOUSE_FOLIO_SIGN is updated to match. The grass tufts are gone, since the neighboring homes don't have them.
 
-Idle (6 frames x 320 ms, loops)
-- Frames 0-5: each crane sways sideways (0, +1, +1, 0, -1, -1 pixels), and the three move out of step with each other. Nothing else moves.
-- Frame 3: the lamplight and its glow on the ground dim once, then come back.
+**Idle, beat by beat:** 6 frames at 320 ms each, looping. The three hanging cranes step through 0, +1, +1, 0, −1, −1 px, each starting at a different point. In frame 3 the lamplight and its glow on the ground dim slightly. Nothing else moves.
 
-Choices you might want to change
-- Paper colours are guesses (see above).
-- The roof's lit half: the half of the roof by the ridge is lit, so the house reads very pale overall.
-- Sign placement: the sign sits front right and hides the bottom of the side wall.
-- Crane spot: the cranes hang from the side eave, not the front.
-- Grass tufts: delete them if they don't belong.
-- Lamp flicker: it's a single dimmer frame.
+**Choices you might want to change:**
+- **Ink:** at 3x the hump lines can still look a bit like little waves. Making them sparser or fainter is one setting.
+- **Pleats:** I used three wide ones because four looked like corrugated tin; it's one number (PLEATS).
+- **Side wall:** the dark lower triangle adds weight but is the darkest area on the house. Switching it back to D would lighten the house.
+- **Imports:** the file copies Folio's colors rather than importing them (Folio's file still sits in the scripts folder), so they would need re-syncing if Folio's palette changes. It also imports the shared home pieces from kit.ts as the home brief says, which goes beyond the two imports in the general instructions.
