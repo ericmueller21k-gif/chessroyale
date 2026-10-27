@@ -27,7 +27,7 @@
   "e2e/eval-bar.spec.ts": 82,
   "e2e/fairplay.spec.ts": 23,
   "e2e/faq.spec.ts": 16,
-  "e2e/folio.spec.ts": 150,
+  "e2e/folio.spec.ts": 405,
   "e2e/formats.spec.ts": 973,
   "e2e/friends.spec.ts": 67,
   "e2e/front-door.spec.ts": 68,
@@ -43,7 +43,7 @@
   "e2e/install.spec.ts": 5,
   "e2e/judges.spec.ts": 26,
   "e2e/kill-switches.spec.ts": 36,
-  "e2e/king-attack.spec.ts": 608,
+  "e2e/king-attack.spec.ts": 660,
   "e2e/king-save-altered.spec.ts": 98,
   "e2e/landing.spec.ts": 13,
   "e2e/legal.spec.ts": 17,
@@ -80,7 +80,7 @@
   "e2e/squads.spec.ts": 95,
   "e2e/test-switches.spec.ts": 6,
   "e2e/tiger.spec.ts": 419,
-  "e2e/town.spec.ts": 18,
+  "e2e/town.spec.ts": 53,
   "e2e/vote-hint.spec.ts": 91,
   "e2e/votes.spec.ts": 148
 }

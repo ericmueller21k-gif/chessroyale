@@ -204,7 +204,7 @@ export const tableAt = (c: number, r: number): Table | null => TABLES.find((t) =
  */
 export const START: Sq = { c: PARK.c0 + 9, r: PARK.r1 - 3 };
 
-export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil";
+export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil" | "folio";
 
 /**
  * A place with a picture, a name (floating over it and on its sign) and an edge chip: a boss's home, or the Colosseum.
@@ -238,7 +238,7 @@ export interface Home extends Place {
 export const COLISEUM_PLACE: Place = { id: "coliseum", name: "The Colosseum", color: "#1f2530", cx: GATE_X, cy: COLISEUM.r0 + (COLISEUM.size - 1) / 2, half: COLISEUM.size / 2, foot: COLISEUM.size / 2 };
 
 /**
- * The thirteen homes, spread evenly round the middle (the Colosseum and its park) over the 46 x 46 world that wraps: every
+ * The fourteen homes, spread evenly round the middle (the Colosseum and its park) over the 46 x 46 world that wraps: every
  * home's nearest neighbor is 8 to 10 squares away, as on slice 3's smaller map, and no home's roaming ground reaches the
  * park or the Colosseum (docs/decisions/2026-10-26-town-square-slice-6.md has the map). Pairs that play off each other
  * stand side by side: Ginger Igloo and Jefferson's Fireworks (ice and fire), Hollow Peak and Moo & Moon Meadow (dark and
@@ -259,6 +259,9 @@ export const HOMES: readonly Home[] = (
     { id: "gardener", boss: "Puddles", name: "Puddles' Botanical Garden", color: "#d6747b", cx: 16, cy: 2 },
     { id: "sawyer", boss: "Sawyer", name: "Sawyer's Woodshed", color: "#d39a0b", cx: 40, cy: 23 },
     { id: "pig", boss: "Wrangler", name: "Wrangler's Stall", color: "#8f5629", cx: 4, cy: 17 },
+    // (Oct 27: Folio's, east of the Colosseum, the gap between Big Boy's Crib, Sawyer's Woodshed and Smudgy's Gallery; its ring
+    // the vermilion of its seal. docs/decisions/2026-10-27-folio-wired.md.)
+    { id: "folio", boss: "Folio", name: "Folio's Folded House", color: "#d8432a", cx: 33, cy: 30 },
   ] satisfies Omit<Home, "half" | "foot">[]
 ).map((h) => ({ ...h, half: 1.5, foot: 0.5 }));
 /** Every place: the homes (in the bosses' order), then the Colosseum. */

@@ -26,12 +26,17 @@ import { GARDENER_CHANCE, GARDENER_LINES } from "./gardener-lines.ts";
 import { TIGER_ATTACK, TIGER_PORTRAIT } from "./tiger.ts";
 import { TIGER_FIGURE } from "./tiger-figure.ts";
 import { TIGER_CHANCE, TIGER_LINES } from "./tiger-lines.ts";
+import { FOLIO } from "./folio.ts";
+import { ATTACK_PER_SQUARE, ATTACK_STAND, FOLIO_ATTACK, FOLIO_PORTRAIT } from "./folio-attack.ts";
+import { FOLIO_LINES } from "./folio-lines.ts";
+import { folioVoiceFor } from "./folio-sounds.ts";
+import { lineSounds } from "../speech.tsx";
 import type { Stance } from "./stance.ts";
 import { mooPowered } from "./moo-state.ts";
 import { RECLUSE_LINES } from "./recluse-lines.ts";
 import type { BossView } from "../game.ts";
 import type { Character } from "./sprite.ts";
-import { ankusItem, balloonItem, bonkItem, carrotItem, frostItem, lashItem, lassoItem, moonItem, paintItem, pieItem, popItem, sawItem, waterItem, type SquareItem } from "./power-art.ts";
+import { ankusItem, balloonItem, bonkItem, inkItem, carrotItem, frostItem, lashItem, lassoItem, moonItem, paintItem, pieItem, popItem, sawItem, waterItem, type SquareItem } from "./power-art.ts";
 import { testSwitchesAllowed } from "../test-switches.ts";
 
 /**
@@ -117,6 +122,18 @@ export interface BossKit extends BeatLines {
    */
   engine?: boolean;
 }
+
+/**
+ * Folio in a phone's boss bar (its kit's `bar`): its drawing without the halo, its frame 5 px narrower on the left, so it stops at a 320 px
+ * screen's edge (the only pixels it loses are its victory's tiny crane's as it flies off past that edge).
+ */
+const FOLIO_BAR: Character = (() => {
+  const cut = 5;
+  const anims = Object.fromEntries(
+    Object.entries(FOLIO.anims).map(([k, a]) => [k, { ...a, frames: a.frames.map((f) => ({ ...f, layers: f.layers.map((l) => ({ ...l, x: l.x - cut })), ...(f.specks ? { specks: f.specks.map(([x, y, c]) => [x - cut, y, c] as const).filter(([x]) => x >= 0) } : {}) })) }]),
+  );
+  return { ...FOLIO, id: "folio-bar", halo: undefined, w: FOLIO.w - cut, foot: [FOLIO.foot[0] - cut, FOLIO.foot[1]], anims };
+})();
 
 export const BOSS_KITS: Record<string, BossKit> = {
   "Boingo the Clown": {
@@ -677,6 +694,60 @@ export const BOSS_KITS: Record<string, BossKit> = {
     // as Sawyer; 36 frame pixels a square, 1.8 off (the animation decision's suggested values).
     kingAttack: { ch: TIGER_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1.8, facesLeft: true, hit: balloonItem },
   },
+  // Folio, the paper crane (the director's, Oct 26; "it" everywhere): docs/decisions/2026-10-27-folio-wired.md.
+  "Folio": {
+    ch: FOLIO,
+    // (A phone's boss bar: the same drawing and animations without its faint halo, a pixel to the left, its frame stopping 5 px short
+    // on the left where a 320 px screen's edge is. With the halo its idle is 87 px across, the bar's room 85 at full size, and it's
+    // never drawn smaller; on the bar's dark ground the halo doesn't show.)
+    bar: FOLIO_BAR,
+    barShift: -1,
+    anims: {
+      // (Its periodic strike on a piece, the God King's: its capture, the piece folded into a paper pawn under its wing.)
+      strike: "capture",
+      // The Draft: it stretches tall, its near wing points at the board, and an ink underline draws itself (the ink lands on the
+      // mark at its `ink` cue).
+      power: "check",
+      // A piece folded: a small polite bow and the glint up its gilt edge (the paper folds over the piece at its `glint`).
+      fold: "smug",
+      // The Crease's warning: it cocks its head and lines of writing come up its wing (it's thinking where to fold).
+      ultimateWarn: "thinking",
+      // The Crease: its near wing sweeps across toward the board (the board folds at its `sweep`).
+      ultimate: "move",
+      // Revision: its wing edges curl, the ink runs (as its moves are struck out); its new move then plays as any move of its.
+      revision: "rattled",
+    },
+    sounds: {
+      // Its paper: drifting and settling, each fold, the unfold, a crumple when hurt and smoothed out after.
+      rustle: "folioRustle",
+      settle: "folioRustle",
+      flutter: "folioRustle",
+      pick: "folioRustle",
+      fold: "folioFold",
+      tuck: "folioFold",
+      unfold: "folioUnfold",
+      smooth: "folioUnfold",
+      crumple: "folioCrumple",
+      // Its wings: a gentle flap (the sweep toward the board, the stretch up, the launch of its tiny crane, its glide in and out).
+      sweep: "folioFlap",
+      stretch: "folioFlap",
+      launch: "folioFlap",
+      flap: "folioFlap",
+      // Its pen: the ink's scratch, and a shorter dab (its attack's strokes in turn); its gilt's small glint.
+      ink: "folioScratch",
+      dab: "folioDab",
+      glint: "folioGlint",
+      // (Not a cue of its figure's: Revision's page turning as the board goes back, components/Folio.tsx.)
+      page: "folioPage",
+    },
+    lines: FOLIO_LINES,
+    // (One line each, said every time: its seven, as written.)
+    chance: { entrance: 1, power: 1, fold: 1, ultimateWarn: 1, revision: 1, victory: 1, defeat: 1 },
+    portrait: { ...FOLIO_PORTRAIT, anim: "idle", frame: 0 },
+    // It glides in, points its wing at the king and flicks ink across it, ten strokes (folio-attack.ts: FOLIO_ATTACK), an ink
+    // splash on its square each one. Facing our left; 36 frame pixels a square, 1.7 off (its beak clear of the king's middle).
+    kingAttack: { ch: FOLIO_ATTACK, anim: "kingAttack", perSquare: ATTACK_PER_SQUARE, stand: ATTACK_STAND, facesLeft: true, hit: inkItem },
+  },
   "Hidden Boss": {
     ch: RECLUSE,
     // (A phone's boss bar: his bust, head and shoulders, the same animations.)
@@ -741,8 +812,11 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
 };
 
+// Folio's voice (Oct 27): each of its lines heard as it starts, a whisper as long as the line (speech.tsx, `lineSounds`).
+for (const lines of Object.values(FOLIO_LINES)) for (const line of lines ?? []) lineSounds.set(line, folioVoiceFor(line));
+
 /** Every moment a kit may name an animation for (and so every `anims` key a powered twin may replace). */
-const BEAT_NAMES = ["entrance", "idle", "thinking", "move", "capture", "hurt", "check", "smug", "rattled", "defeat", "victory", "strike", "power", "powerHit", "ultimateWarn", "ultimate", "ultimateHit", "wax", "flurry", "dazed", "plantMany", "plant", "cheer", "bigCheer", "shrug", "place", "wince", "kingAttack"] as const satisfies readonly Beat[];
+const BEAT_NAMES = ["entrance", "idle", "thinking", "move", "capture", "hurt", "check", "smug", "rattled", "defeat", "victory", "strike", "power", "powerHit", "ultimateWarn", "ultimate", "ultimateHit", "wax", "flurry", "dazed", "plantMany", "plant", "cheer", "bigCheer", "shrug", "place", "wince", "fold", "revision", "kingAttack"] as const satisfies readonly Beat[];
 const LOOP_NAMES = ["idle", "thinking", "smug", "rattled", "defeat", "victory"] as const satisfies readonly Loop[];
 const poweredKits = new WeakMap<BossKit, BossKit>();
 /**

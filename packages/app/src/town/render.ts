@@ -23,6 +23,7 @@ import { PIG } from "../characters/pig.ts";
 import { SAWYER } from "../characters/sawyer.ts";
 import { SMUDGY } from "../characters/smudgy.ts";
 import { TIGER_FIGURE } from "../characters/tiger-figure.ts";
+import { FOLIO } from "../characters/folio.ts";
 import { N, bandOf, clamp, drawable, enterOf, farOf, forEachSquare, hazeMix, newPt, newView, pastCurve, pickSquare, proj, radial, rimYAt, setView, wrapF, type Quad, type View } from "./camera.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { statueSpot } from "./houses/coliseum.ts";
@@ -50,6 +51,7 @@ export const BOSS_ART: Record<HomeId, Character> = {
   hopper: HOPPER,
   gardener: GARDENER,
   alfil: ALFIL,
+  folio: FOLIO,
 };
 /**
  * Each boss's head in its first idle frame (x, y and a side, in its pixels): what its edge chip shows. (Slice 1 cropped
@@ -69,6 +71,8 @@ export const BOSS_FACE: Record<HomeId, readonly [x: number, y: number, size: num
   hopper: [22, 4, 36],
   gardener: [24, 22, 46],
   alfil: [10, 16, 38],
+  // (Its head and beak, at its rest.)
+  folio: [3, 12, 28],
 };
 
 // ---- Colors (the prototype's, sampled from Eric's reference picture).

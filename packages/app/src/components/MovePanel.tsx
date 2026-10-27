@@ -2,6 +2,7 @@ import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { createPortal, memo } from "preact/compat";
 import { bossAlone, cutLabel, roundLive, scoreDp, towerView, type BossView, type GameView } from "../game.ts";
+import { crossedOut } from "./Folio.tsx";
 import { battleStartPly, moveNumber, moverOf, newPlyCache, noteTurns, pieceOn, plyRows, timeShown, turnBook, turnMs, type Mover, type PieceType, type PlyCache, type PlyRow } from "../move-list.ts";
 import { camoHidden, seenFen } from "../camo.ts";
 import { pawnLook } from "../looks.ts";
@@ -101,7 +102,7 @@ function Who({ mover, boss, alone }: { mover: Mover; boss: BossView; alone: bool
 
 const WHO_WORD: Record<Mover, string> = { boss: "Boss", crowd: "Crowd", king: "God King", opening: "Opening" };
 
-type RowProps = { s: Shown; boss: BossView; alone: boolean; hush: boolean };
+type RowProps = { s: Shown; boss: BossView; alone: boolean; hush: boolean; struck: boolean };
 /** (Drawn again only when what it shows changes: its PlyRow is the cache's, the same object from draw to draw.) */
 const sameRow = (a: RowProps, b: RowProps) =>
   a.s.row === b.s.row &&
@@ -112,19 +113,20 @@ const sameRow = (a: RowProps, b: RowProps) =>
   a.s.picks?.n === b.s.picks?.n &&
   a.s.picks?.of === b.s.picks?.of &&
   a.hush === b.hush &&
+  a.struck === b.struck &&
   a.alone === b.alone &&
   a.boss.name === b.boss.name &&
   a.boss.crowdSide === b.boss.crowdSide;
 
-const MoveRow = memo(function MoveRow({ s, boss, alone, hush }: RowProps) {
+const MoveRow = memo(function MoveRow({ s, boss, alone, hush, struck }: RowProps) {
   const { row } = s;
   const other = row.color === "w" ? "b" : "w";
   const who = s.mover === "crowd" && alone ? "You" : WHO_WORD[s.mover];
   const words = hush
     ? `${moveNumber(row.ply)} ${who}`
-    : `${moveNumber(row.ply)} ${who}: ${row.castle ?? `${PIECE[s.piece]} to ${row.to}`}${s.captured ? `, takes ${PIECE[s.captured]}` : ""}${s.ms !== null ? `, ${timeShown(s.ms)}` : ""}`;
+    : `${moveNumber(row.ply)} ${who}: ${row.castle ?? `${PIECE[s.piece]} to ${row.to}`}${s.captured ? `, takes ${PIECE[s.captured]}` : ""}${s.ms !== null ? `, ${timeShown(s.ms)}` : ""}${struck ? ", crossed out" : ""}`;
   return (
-    <li class={`mv-row mv-${s.mover}`} aria-label={words}>
+    <li class={`mv-row mv-${s.mover}${struck ? " mv-struck" : ""}`} aria-label={words}>
       <Who mover={s.mover} boss={boss} alone={alone} />
       <span class="mv-no">{moveNumber(row.ply)}</span>
       {hush ? (
@@ -165,6 +167,8 @@ export function MoveList({ match, hushLast = false, scroll = true, onOpen }: { m
   }, [n]);
   if (!boss || !data) return null;
   const alone = bossAlone(match);
+  // (Folio's Revision: the two moves it crossed out, struck through where they stand.)
+  const struck = crossedOut(boss.board.bases);
   // (Hollow's Lights out: the board's pieces are to be remembered, so the list waits until it's over.)
   const lights = match.phase.kind === "boss" && !!match.phase.lights;
   return (
@@ -190,7 +194,7 @@ export function MoveList({ match, hushLast = false, scroll = true, onOpen }: { m
             </li>
           )}
           {data.rows.map((s, i) => (
-            <MoveRow key={s.row.ply} s={s} boss={boss} alone={alone} hush={hushLast && i === data.rows.length - 1 && s.mover === "boss"} />
+            <MoveRow key={s.row.ply} s={s} boss={boss} alone={alone} hush={hushLast && i === data.rows.length - 1 && s.mover === "boss"} struck={struck.has(s.row.ply)} />
           ))}
           {!data.rows.length && <li class="mv-empty">No moves yet.</li>}
         </ol>

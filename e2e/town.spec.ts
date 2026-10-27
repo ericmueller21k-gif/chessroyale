@@ -405,3 +405,56 @@ test("a chess table in the park: a tap on one walks you to a free stool and you 
   expect((await you(page)).join(","), "you stand on the stool's square").toBe(stool);
   expect(errors).toEqual([]);
 });
+
+test("Folio's Folded House: a tap walks you there and opens its card with its name; at ?sky=night its doorway's lamplight keeps its brightness, warm, as the town darkens", async ({ page }) => {
+  const errors = watchErrors(page);
+  const name = "Folio's Folded House";
+  const at = async () => {
+    const xy = await page.evaluate(() => (window as unknown as { __townAt?: (k: string, id: string) => { x: number; y: number } | null }).__townAt?.("home", "folio") ?? null);
+    if (!xy) return null;
+    const cv = (await canvas(page).boundingBox())!;
+    return { x: cv.x + xy.x, y: cv.y + xy.y };
+  };
+  const card = page.getByRole("dialog", { name, exact: true });
+  /** Taps the house (its chip first when it's off screen) until its card opens: you walk to it, the camera with you, till you stop. */
+  const visit = async () => {
+    const chip = page.getByRole("button", { name: `Go to ${name}` });
+    if (!(await at()) && (await chip.count())) await chip.click({ force: true });
+    await expect(async () => {
+      if (await card.isVisible()) return;
+      if (await page.getByRole("dialog").isVisible()) await page.keyboard.press("Escape");
+      const p = await at();
+      expect(p, "drawn").not.toBeNull();
+      await page.mouse.click(p!.x, p!.y);
+      await expect(card).toBeVisible({ timeout: 1500 });
+    }).toPass({ timeout: 30_000 });
+    const you = () => canvas(page).getAttribute("data-you");
+    await expect(async () => {
+      const a = await you();
+      await page.waitForTimeout(600);
+      expect(await you()).toBe(a);
+    }).toPass({ timeout: 30_000 });
+    await page.waitForTimeout(800);
+  };
+  const lum = ([r, g, b]: number[]) => 0.3 * r! + 0.59 * g! + 0.11 * b!;
+  const door: Record<string, number[]> = {};
+  for (const sky of ["day", "night"]) {
+    await page.goto(`/town?sky=${sky}`);
+    await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+    await visit();
+    await expect(card.getByRole("heading", { name })).toBeVisible();
+    await expect(card.getByText("Coming soon", { exact: true })).toBeVisible();
+    await expect(async () => {
+      const c = await glowAt(page, "light", "folio");
+      expect(c, "its doorway shows").not.toBeNull();
+      door[sky] = c!;
+    }).toPass({ timeout: 20_000 });
+  }
+  // (Its doorway is lamplight in its art by day already. The night darkens every unlit pixel of the town by about a third (its tint,
+  // 34%); its doorway, lit, keeps its brightness and stays warm.)
+  const msg = `door day ${door.day}, night ${door.night}`;
+  expect(lum(door.night!), `${msg}: as bright at night`).toBeGreaterThanOrEqual(lum(door.day!) - 10);
+  expect(lum(door.night!), `${msg}: bright`).toBeGreaterThan(190);
+  expect(door.night![0]! - door.night![2]!, `${msg}: warm`).toBeGreaterThan(40);
+  expect(errors).toEqual([]);
+});
