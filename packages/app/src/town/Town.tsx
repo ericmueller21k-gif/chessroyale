@@ -9,7 +9,8 @@
  * Slice 5: the Colosseum in the middle (solid; a tap walks you to the apron at its gate and opens its card: "Raids with
  * people", greyed, "Coming soon": the menu Eric plans will live there), with an edge chip of its own. Slice 6: the park
  * in front of it; a tap on a chess table (or a stool) walks you to its nearest free stool, where you sit, and opens its
- * card ("Chess table": "Casual" and "Ranked" greyed, "Coming soon"); a tap elsewhere closes it and you stand.
+ * card ("Casual" and "Ranked" greyed, "Coming soon"; at a table where two others play, "Spectate" greyed); a tap elsewhere
+ * closes it and you stand. Each table's board shows who sits there (render.ts, `tableStates`).
  *
  * One requestAnimationFrame loop draws everything on one canvas; it stops when the screen closes or the tab is hidden.
  * Test hooks (e2e only): the canvas carries `data-you="c,r"` (your square) and `data-ready="1"` once a frame is drawn;
@@ -28,7 +29,7 @@ import { TOWN_FEEL } from "./feel.ts";
 import { Press } from "./press.ts";
 import { PAWN_PX, Renderer, pawnImage, type Hit } from "./render.ts";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
-import { COLISEUM_PLACE, HOMES, START, STATUES, createTown, destFor, onColiseum, plotAt, seated, statueAt, stoolAt, tableAt, tdist, tick, walkWalker, type HomeId, type Place, type Sq, type StatueId, type Target } from "./world.ts";
+import { COLISEUM_PLACE, HOMES, START, STATUES, TABLES, createTown, destFor, onColiseum, plotAt, seated, statueAt, stoolAt, tableAt, tableStates, tdist, tick, walkWalker, type HomeId, type Place, type Sq, type StatueId, type Target } from "./world.ts";
 import { dressedPawn, lookKey } from "./you-look.ts";
 import "./town.css";
 
@@ -42,6 +43,8 @@ export interface Card {
   kind: "boss" | "home" | "coliseum" | "table";
   i: number;
   confirm: boolean;
+  /** A table where two others are playing: its card offers to watch their game (Eric, Oct 27), not a seat. */
+  watch?: boolean;
 }
 
 type Ctl = ReturnType<typeof startTown>;
@@ -119,15 +122,23 @@ export function TownScreen({ onBack, onBossAlone }: { onBack: () => void; onBoss
                 <div class="town-soon">Coming soon</div>
               </>
             )}
-            {/* A chess table's: a casual or ranked game of normal chess will start here (matchmaking is the next job); shown greyed, not hidden. */}
-            {card?.kind === "table" && (
+            {/* A chess table's (no title: Eric, Oct 27): a casual or ranked game of normal chess will start here (the tables'
+                matchmaking is the next job); at a table where two others play, watching their game. Shown greyed, not hidden. */}
+            {card?.kind === "table" && !card.watch && (
               <>
-                <h2>Chess table</h2>
                 <button type="button" class="town-btn" disabled>
                   Casual
                 </button>
                 <button type="button" class="town-btn" disabled>
                   Ranked
+                </button>
+                <div class="town-soon">Coming soon</div>
+              </>
+            )}
+            {card?.kind === "table" && card.watch && (
+              <>
+                <button type="button" class="town-btn" disabled>
+                  Spectate
                 </button>
                 <div class="town-soon">Coming soon</div>
               </>
@@ -473,7 +484,7 @@ function startTown(
       const table = hit.kind === "table" ? hit.table : (tableAt(hit.c, hit.r) ?? stoolAt(hit.c, hit.r))!;
       key = `table:${table.i}`;
       target = { kind: "table", table };
-      c = { kind: "table", i: table.i, confirm: false };
+      c = { kind: "table", i: table.i, confirm: false, watch: tableStates(town.people)[table.i]!.kind === "playing" };
     } else if (hit.kind === "square") {
       key = `sq:${hit.c},${hit.r}`;
       const home = plotAt[hit.r * N + hit.c];
@@ -611,10 +622,33 @@ function startTown(
       if (to) walkWalker(b.walker, to);
     }
   };
-  const hooks = window as unknown as { __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam };
+  // ... `__townSeat(i, n)` sends the n (1 or 2) bots nearest table i to sit on its stools (the west one first) and holds
+  // every bot where it is from then on (a game or a wait that stays put for the test); `__townTables()` each table's state.
+  const hookSeat = (i: number, n: 1 | 2) => {
+    if (!testSwitchesAllowed()) return;
+    town.nextBotAt = Infinity;
+    const table = TABLES[i]!;
+    const on = (b: (typeof town.bots)[number], sq: Sq) => {
+      const h = b.walker.here();
+      return h.c === sq.c && h.r === sq.r;
+    };
+    // Its first n stools: each one nobody stands on gets the nearest bot not sitting anywhere.
+    const free = [...town.bots].filter((b) => !seated(b) && !b.walker.moving()).sort((a, b) => tdist(a.walker.here(), table) - tdist(b.walker.here(), table));
+    for (const sq of table.stools.slice(0, n)) {
+      if (town.bots.some((b) => on(b, sq))) continue;
+      const b = free.shift();
+      if (!b) return;
+      b.sit = true;
+      walkWalker(b.walker, sq);
+    }
+  };
+  const hookTables = () => (testSwitchesAllowed() ? tableStates(town.people).map((s) => (s.kind === "waiting" ? `waiting:${s.free}` : s.kind)) : null);
+  const hooks = window as unknown as { __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables };
   hooks.__townAt = hookAt;
   hooks.__townGather = hookGather;
   hooks.__townCam = hookCam;
+  hooks.__townSeat = hookSeat;
+  hooks.__townTables = hookTables;
 
   run();
   draw(performance.now()); // the first frame, before the screen shows

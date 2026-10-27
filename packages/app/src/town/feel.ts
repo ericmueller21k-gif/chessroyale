@@ -469,4 +469,20 @@ export const TOWN_FEEL = {
   /** ...this share of a square across when it lands, soft white at this opacity. */
   trailSize: 0.3,
   trailAlpha: 0.9,
+
+  // ---- The chess tables' games (Oct 27; Eric: "random moves back and forth … pieces disappearing … every 7 or 8 moves, it
+  // just resets the boards back"). Look only: no rules, white and black in turn, each piece a step or three forward.
+  /** A move every this many ms, sliding over this many ms (a small hop as it goes), a taken piece fading over this many. */
+  tableMoveMs: 1100,
+  tableSlideMs: 350,
+  tableHop: 0.05,
+  tableTakeMs: 260,
+  /** After this many moves the pieces go back to their start and, this many ms later, play again. */
+  tableMoves: 8,
+  tableResetMs: 1400,
+  /** A waiting table's ring under its free stool: this many squares across its radius, pulsing over this many ms. */
+  tableRingR: 0.36,
+  tableRingPulseMs: 420,
+  /** Its pieces and clock aren't drawn this far into the far band (0 to 1): there they'd be specks. */
+  tableFarCut: 0.5,
 } as const;
