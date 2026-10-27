@@ -88,7 +88,8 @@ strength (0 to 1, at night) and, for a lantern, a halo.
   pixel is 1.5 screen pixels or more. A frame adds this frame's lights into a layer canvas (with `lighter`) as it draws
   the world far to near, at each picture's depth: anything drawn later in front of a light (a pawn, a boss, a nearer
   home or tree) cuts its shape out of the layer (`destination-out`), so a pawn walking past a lit doorway stands dark
-  against it, not lit through. After the tint the layer is laid on the world with `lighter`. No per-pixel work in a frame.
+  against it, not lit through; the cut is clipped to the boxes of the lights it overlaps. After the tint the layer is laid
+  on the world with `lighter`. No per-pixel work in a frame.
 - **Only where a light touched.** The layer is cleared and laid on in 64 CSS-pixel tiles (`lightTilePx`), only the tiles
   a light touched; two layers are used in turn so clearing one never waits on the other. By day and at dawn nothing is
   made or drawn at all.
@@ -102,7 +103,30 @@ strength (0 to 1, at night) and, for a lantern, a halo.
 
 ## Frame rates
 
-FRAME_RATES
+Measured as slice 6 did: headless Chromium, the default view (the park and the Colosseum in sight), warmed 6 s, then 3 s
+still and 3 s walking (three taps a second apart); phone 390 × 844 at 3×, computer 1440 × 900; frames a second.
+
+**Today (Oct 27, a busy machine).** Main and this branch built and measured in turn (this branch, main, this branch, main),
+3 runs each, so each figure is the median of 6:
+
+| | Phone day | Phone night | Computer day | Computer night |
+| --- | --- | --- | --- | --- |
+| main, still / walking | 58.0 / 53.5 | 55.9 / 51.9 | 42.0 / 42.6 | 37.8 / 41.3 |
+| lights, still / walking | 58.0 / 55.0 | 52.0 / 48.9 | 43.2 / 46.7 | 35.2 / 37.5 |
+
+By day the lights cost nothing (nothing is made or drawn; the differences are the machine's noise, which ran to ±5 between
+runs of the same build). At night, on this loaded machine, they cost about 2.5 to 4 frames a second: the light layer's work
+is about 1 ms a frame on the phone and 1.25 ms on the computer (timed in the page), plus laying it on the world.
+
+**Earlier the same day, on a quieter machine** (the first build of this work, before the change below, which only removes
+work): main 60.0 / 59.0 phone night, 52.4 / 54.3 computer night; the lights 60.0 / 57.7 and 51.4 / 54.4: within 1.5.
+
+**What was trimmed:** a picture drawn in front of a light used to cut its whole shape out of the light layer, so the
+Colosseum standing in front of a far home's lit window cut a Colosseum-sized hole every frame; it now cuts only inside the
+boxes of the lights it overlaps (the layer's work on the computer: 2.2 → 1.25 ms a frame). The layer's tile size made no
+measurable difference (16, 32 or 64 px). What's left is about evenly the lights' own drawing, the cuts, and the layer's
+flush; the levers, if a phone ever needs them: smaller lamp halos and pools (they're the biggest pieces), or a
+half-resolution layer on phones.
 
 ## Tests
 
