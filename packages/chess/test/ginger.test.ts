@@ -226,6 +226,19 @@ describe("Ginger's blizzard: three turns, thawing", () => {
     }
   });
 
+  it("a free king can't castle with a rook the ice holds", () => {
+    // The king is the piece the blizzard left free; the rook on h1 is iced. (Found by the review of Folio's fold, Oct 27.)
+    const fen = "k7/8/8/8/8/8/P7/4K2R w K - 0 20";
+    expect(legalMoves(fen)).toContain("e1g1");
+    const b = battle(fen, 1);
+    const state = { ...b, crowdMoves: 2, powers: { ...b.powers!, turn: 3, ultAt: 2, blizzard: { turn: 2, square: "e1", at: 3, iced: ["a2", "h1"], next: [] } } };
+    const allowed = crowdAllowed(state, fen)!;
+    expect(allowed.length).toBeGreaterThan(0);
+    expect(allowed).not.toContain("e1g1");
+    expect(allowed.every((m) => from(m) === "e1")).toBe(true);
+    expect(icedSquares(state, fen)).toEqual(["a2", "h1"]);
+  });
+
   it("by the count, never the king, those with a move first; a free piece lost to the boss: another thaws in its place", () => {
     // White: king e1, knight b1, rook h1, pawns c2 d2, and pawns a2 h2 blocked by Black's on a3 h3 (no move).
     const fen = "4k3/8/8/8/8/p6p/P1PP3P/1N2K2R w - - 0 1";
