@@ -4,7 +4,7 @@ Boss raid's coming home: a small round world where players walk around and meet 
 `ROADMAP.md`, "Boss raid: the town square"). **Slices 1 to 3** are the world alone, on a hidden address: the sky by
 the time of day, the curved ground, all thirteen boss homes with their bosses roaming near them, six bots and you; slice 4
 added the press, the trail and the cards; **slice 5 the Colosseum** in the middle; **slice 6** made the Colosseum about
-twice its size, the map bigger, and put **the park** with its ten chess tables in front of its gate. Home's **Boss Arena** card (Oct 26, Eric)
+twice its size, the map bigger, and put **the park** with its ten chess tables in front of its gate; **the lights** (Oct 27) light the park's lamps and the homes' windows at dusk and night. Home's **Boss Arena** card (Oct 26, Eric)
 opens it, and the computer's side menu's Boss Arena item; the address `/town` opens it directly too (`hunchess.com/town`,
 behind Cloudflare Access like the rest of the site). Phone and computer.
 
@@ -135,6 +135,17 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
   plaque; 12.5 px or more on a 360 × 640 phone), and in an off-screen live region (`.town-sr`) for screen readers. A tap
   elsewhere, a drag, a chip, −, + or "Back to me" glides back to the zoom you had and the quote fades.
 
+- **The lights at dusk and night** (Oct 27, `docs/decisions/2026-10-27-town-square-lights.md`). Ten park lamps (`LAMPS`
+  in `world.ts`, the art `PARK_LAMP` in `houses/park.ts`): solid props on paving, a pair either end of the promenade, a
+  pair beside the fountain and one at each corner of the park's walk; unlit by day and dawn. Each home and the Colosseum
+  carries its light spots as data beside its art (`HouseArt.lights` and `.pools` in `houses/index.ts`: boxes in its
+  picture's pixels, the palette keys that light up, a color, a strength, a halo for a lantern; `LightSpot` in
+  `houses/kit.ts`): its windows, doorways and glass, the Colosseum's gate and a few arches. At dusk (0.7) and night (1)
+  (`lightsAt`; they follow the sky's blend, `mixLights`) each light, baked once into a small canvas the first time it's
+  drawn lit, is added into a light layer as the world is drawn far to near (anything drawn in front cuts its shape out),
+  and the layer is laid on after the tint with `lighter`, only in the 64 px tiles a light touched. Lights fade and haze
+  with their pictures; the tags, names and bubble are drawn after them. Nothing is made or drawn by day.
+
 - **You** (slice 5): your pawn wears your profile's crate items (`town/you-look.ts`: `Avatar` drawn once into a canvas,
   again only when your look changes; plain when signed out or wearing nothing; bots stay plain). Every pawn's base stands
   on its square's middle, with a contact shadow under it that shrinks and fades as the hop lifts it. You have no ring
@@ -145,7 +156,7 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
 
 Every number that shapes how it feels is in `TOWN_FEEL`, one line each: the walk (90 ms a square, the hobble), the camera
 sets, the zoom, the camera's follow and glide, the drag, the haze, the clouds' parallax, how often bosses roam and talk,
-how often bots walk, the sizes, the names, the sky's hours and its four looks' colors, the rim line. The earlier value is
+how often bots walk, the sizes, the names, the sky's hours and its four looks' colors, the lights at dusk and night (`lightsAt`, their glow's bands, the flicker), the rim line. The earlier value is
 noted wherever a slice changed one.
 
 ## Adding a home
@@ -186,6 +197,10 @@ noted wherever a slice changed one.
   you on its nearer free stool, where you sit (both taken: beside it); bots sit now and then, a stool each.
 - `packages/app/test/town-world.test.ts` also: the statues' squares (on the apron, in front of the ground's end columns,
   symmetric), their quotes word for word, a tap on one walks you there (or beside it), the bots never stop there.
+- `packages/app/test/town-lights.test.ts`: the park's lamps (8 to 12, solid, on paving, off every path, every square and
+  stool still reached, a pawn and a half tall, lit glass with a halo and a pool), every home's and the Colosseum's light
+  spots inside its picture and off its sign (Hollow's green window untouched, none near the statues), and when they shine
+  (off at dawn and day, on at dusk and night, following the blend).
 - `e2e/town.spec.ts` (phone and desktop; `e2e/areas.json`, "the town square"): the page loads, the world is drawn and
   fills its box, a tap ahead walks you there, the zoom pair works (it opens zoomed out), back goes home; each statue (a
   tap walks you up, the camera zooms in close on it, its quote word for word in the live region, its letters at least 12
@@ -193,9 +208,9 @@ noted wherever a slice changed one.
   `?sky=night` draw different skies; a boss's card, its confirm (Stay, then Leave to the Boss raid screen, his tile
   picked); a home's card (Shop greyed, "Coming soon", closed by a tap elsewhere); the Colosseum's (a tap on its gate walks
   you to the apron; "Raids with people" greyed, "Coming soon"); a park table's (slice 6: a tap walks you to a stool and you
-sit, its card with "Casual" and "Ranked" greyed and "Coming soon"; a tap elsewhere closes it and you stand). Test hooks: the canvas's `data-you` (your square),
+sit, its card with "Casual" and "Ranked" greyed and "Coming soon"; a tap elsewhere closes it and you stand); the lights (at `?sky=night` a park lamp's glass and Babur's Circus's lit doorway are clearly warmer and brighter than at `?sky=day`). Test hooks: the canvas's `data-you` (your square),
   `data-ready` (a frame is drawn) and `data-sit` ("1" while you sit at a table); with the test switches on, `window.__townAt(kind, id)` (where to tap a boss, a home or
-  the Colosseum's gate) and `window.__townGather()` (the three nearest bots come and stand beside you), `window.__townAt("statue", "bronze" | "marble")`, `window.__townAt("table", i)` (a table by its index in `TABLES`) and
+  the Colosseum's gate) and `window.__townGather()` (the three nearest bots come and stand beside you), `window.__townAt("statue", "bronze" | "marble")`, `window.__townAt("table", i)` (a table by its index in `TABLES`), `window.__townAt("lamp", i)` (a park lamp's glass, by its index in `LAMPS`), `window.__townAt("light", id)` (a lit pixel of a home's, or `"coliseum"`'s, first light with nothing in front of it) and
   `window.__townCam()` (the zoom, the lens, the focus, the statue up close, whether its quote shows and its letters' size).
 
 ## Not built yet

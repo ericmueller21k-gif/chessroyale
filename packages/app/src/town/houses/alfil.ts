@@ -8,7 +8,7 @@
  */
 import type { Anim, Character, Frame, Layer, Part, Speck } from "../../characters/sprite.ts";
 import { ALFIL_PALETTE } from "../../characters/alfil.ts";
-import { grain, groundShadow, paint, signBoard, signFace, signPost, type Pt } from "./kit.ts";
+import { grain, groundShadow, paint, signBoard, signFace, signPost, TORCH, type LightPool, type LightSpot, type Pt } from "./kit.ts";
 
 const A_ = ALFIL_PALETTE;
 const PALETTE: Record<string, string> = {
@@ -258,3 +258,7 @@ export const HOUSE_ALFIL: Character = {
 
 /** Where the sign's blank face is (frame pixels), for the game to write "Alfil's Pyramid" on. */
 export const HOUSE_ALFIL_SIGN = signFace(BOARD[0], BOARD[1], BW, BH);
+
+/** Its lights at dusk and night (Oct 27): the doorway's dark glows as of torches inside, flickering, and a little of it falls on the steps. */
+export const HOUSE_ALFIL_LIGHTS: readonly LightSpot[] = [{ x: CX - DOOR_HALF - 3, y: DOOR_TOP, w: 2 * DOOR_HALF + 7, h: BASE - DOOR_TOP, keys: "xX", color: TORCH, strength: 0.75, flicker: true }];
+export const HOUSE_ALFIL_POOLS: readonly LightPool[] = [{ x: CX, y: FOOT - 3, rx: 22, ry: 5, color: TORCH, strength: 0.3 }];

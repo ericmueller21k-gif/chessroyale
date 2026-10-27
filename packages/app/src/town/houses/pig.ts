@@ -7,7 +7,7 @@
  */
 import type { Anim, Character, Frame, Layer, Part } from "../../characters/sprite.ts";
 import { PIG_PALETTE } from "../../characters/pig.ts";
-import { grain, groundShadow, lantern, paint, signBoard, signFace, tuft, type Pt } from "./kit.ts";
+import { grain, groundShadow, lantern, LANTERN_LIGHT, paint, signBoard, signFace, tuft, WARM, type LightSpot, type Pt } from "./kit.ts";
 
 const P_ = PIG_PALETTE;
 const PALETTE: Record<string, string> = {
@@ -254,3 +254,9 @@ export const HOUSE_PIG: Character = {
 
 /** Where the sign's blank face is (frame pixels), for the game to write "Wrangler's Stall" on. */
 export const HOUSE_PIG_SIGN = signFace(BOARD[0], BOARD[1], BW, BH);
+
+/** Its lights at dusk and night (Oct 27): the lantern on the beam shines, a halo round it, and lights the hay in the stall warm; both flicker. */
+export const HOUSE_PIG_LIGHTS: readonly LightSpot[] = [
+  { x: 126, y: 33, w: 4, h: 9, keys: "wW", color: LANTERN_LIGHT, strength: 1, flicker: true, halo: 12 },
+  { x: 64, y: 53, w: 44, h: 30, keys: STRAW, color: WARM, strength: 0.35, flicker: true },
+];

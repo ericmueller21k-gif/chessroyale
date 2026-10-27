@@ -8,7 +8,7 @@
  */
 import type { Anim, Character, Frame, Layer, Part } from "../../characters/sprite.ts";
 import { HOLLOW_PALETTE } from "../../characters/hollow.ts";
-import { grain, groundShadow, paint, signBoard, signFace, signPost, type Pt } from "./kit.ts";
+import { grain, groundShadow, paint, signBoard, signFace, signPost, WARM, type LightSpot, type Pt } from "./kit.ts";
 
 const P_ = HOLLOW_PALETTE;
 const PALETTE: Record<string, string> = {
@@ -244,3 +244,6 @@ export const HOUSE_HOLLOW: Character = {
 
 /** Where the sign's blank face is (frame pixels), for the game to write "Hollow Peak" on. */
 export const HOUSE_HOLLOW_SIGN = signFace(BOARD[0], BOARD[1], BW, BH);
+
+/** Its lights at dusk and night (Oct 27): its own green window already glows (its idle); the doorway's void glows a dim warm. */
+export const HOUSE_HOLLOW_LIGHTS: readonly LightSpot[] = [{ x: DOOR_CX - DOOR, y: DOOR_TOP, w: 2 * DOOR + 1, h: BASE - DOOR_TOP + 1, keys: "oO", color: WARM, strength: 0.3 }];

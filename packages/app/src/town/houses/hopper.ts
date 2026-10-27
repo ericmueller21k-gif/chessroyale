@@ -7,7 +7,7 @@
  */
 import type { Anim, Character, Frame, Layer, Part } from "../../characters/sprite.ts";
 import { HOPPER_PALETTE } from "../../characters/hopper.ts";
-import { flower, grain, groundShadow, logEnd, paint, signBoard, signFace, type Pt } from "./kit.ts";
+import { flower, grain, groundShadow, logEnd, paint, signBoard, signFace, WARM, type LightSpot, type Pt } from "./kit.ts";
 
 const P_ = HOPPER_PALETTE;
 const PALETTE: Record<string, string> = {
@@ -364,3 +364,6 @@ export const HOUSE_HOPPER: Character = {
 
 /** Where the sign's blank face is (frame pixels), for the game to write "Chub & Chirp's Grassland" on. */
 export const HOUSE_HOPPER_SIGN = signFace(BOARD[0], BOARD[1], BW, BH);
+
+/** Its lights at dusk and night (Oct 27): a burrow, so a dim warm glow deep in its mouth, as of a fire inside, flickering. */
+export const HOUSE_HOPPER_LIGHTS: readonly LightSpot[] = [{ x: ARCH[0] - ARCH_HW, y: ARCH[1] - ARCH_H, w: 2 * ARCH_HW + 1, h: ARCH_H - 2, keys: "x", color: WARM, strength: 0.55, flicker: true }];

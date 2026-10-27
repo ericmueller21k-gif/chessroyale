@@ -11,10 +11,13 @@
  *   spouting a jet; the water spills from the bowl into the basin. `idle`: the jet, the falling water and the ripples move.
  * - A chess table: a square stone table on one leg with a chessboard set into its top (a game under way on it) and a
  *   round stone stool either side of it, the table's square in the middle of the picture's three.
+ * - A lamp (Oct 27): a classic park lamp post, dark iron on a stepped foot, a collar halfway up, a lantern on top (four
+ *   panes of glass under a pointed cap), about a pawn and a half tall. Its glass is pale by day; at dusk and night it's lit
+ *   (`PARK_LAMP_LIGHTS`, `PARK_LAMP_POOLS`: render.ts draws the glow, its halo and its pool after the world's tint).
  */
 import type { Anim, Character, Frame, Part } from "../../characters/sprite.ts";
 import { TOWN_FEEL } from "../feel.ts";
-import { grain, groundShadow, paint, type Pt } from "./kit.ts";
+import { LANTERN_LIGHT, grain, groundShadow, paint, type LightPool, type LightSpot, type Pt } from "./kit.ts";
 
 const PALETTE: Record<string, string> = {
   k: "#2a1c14", // outline
@@ -40,9 +43,13 @@ const PALETTE: Record<string, string> = {
   W: "#b98454",
   w: "#8a5a32",
   V: "#5e3b1e",
-  // Iron.
+  // Iron: lit, mid, dark.
+  J: "#6c707b",
   I: "#4a4d55",
   i: "#2c2e33",
+  // A lamp's glass, unlit: pale where the day lights it, darker in its shade (at dusk and night render.ts lights it).
+  y: "#c4ccd0",
+  Y: "#8d979e",
   // The board's squares, and its pieces.
   L: "#f4dcae",
   D: "#8e6440",
@@ -342,3 +349,58 @@ export const PARK_TABLE: Character = (() => {
 export const TABLE_TOP = TFOOT - TOP_Y + 18;
 /** (Each tree on its own, for the previews: `npm run preview:characters -- <dir> extra=…/park.ts`.) */
 export const [PARK_TREE_0, PARK_TREE_1, PARK_TREE_2] = PARK_TREES as [Character, Character, Character];
+
+// ---- A park lamp: a stepped iron foot, a post with a collar halfway up, a lantern on a little bracket at its top.
+
+const LW = 20;
+const LH = 62;
+const LFOOT = LH - 4;
+const LCX = 10;
+/** The lantern: its tray's row, its glass's rows above it (the panes widen upward), its cap's eave. */
+const TRAY = 23;
+const GLASS_TOP = TRAY - 10;
+const EAVE_Y = GLASS_TOP - 1;
+export const PARK_LAMP: Character = (() => {
+  const cx = LCX;
+  const f = LFOOT;
+  // Iron lit from the top left: its left column lit, its right in shade.
+  const iron = (x: number, lo: number, hi: number) => (x <= lo ? "J" : x >= hi ? "i" : "I");
+  const foot = paint(cx - 3, f - 4, 7, 4, (x, y) => {
+    const j = f - y; // 1 to 4, up from the ground
+    const half = j <= 2 ? 3 : 2;
+    if (Math.abs(x - cx) > half) return null;
+    return j === 2 || j === 4 ? (x < cx + half ? "J" : "I") : iron(x, cx - half, cx + half);
+  });
+  const post = paint(cx - 1, TRAY + 3, 3, f - 4 - TRAY - 3, (x) => iron(x, cx - 1, cx + 1));
+  const collar = paint(cx - 2, f - 24, 5, 3, (x, y) => (y === f - 24 ? "J" : iron(x, cx - 2, cx + 2)));
+  // Under the lantern: a little flared bracket.
+  const bracket = paint(cx - 3, TRAY + 1, 7, 2, (x, y) => (y === TRAY + 1 ? (x < cx ? "J" : x > cx ? "i" : "I") : Math.abs(x - cx) <= 1 ? iron(x, cx - 1, cx + 1) : null));
+  // The lantern: its tray, its four panes (two show, either side of a bar) widening upward, iron at its corners.
+  const lanternBody = paint(cx - 4, GLASS_TOP, 9, TRAY - GLASS_TOP + 1, (x, y) => {
+    const X = x - cx;
+    if (y === TRAY) return Math.abs(X) <= 3 ? (X < 0 ? "I" : "i") : null; // its tray
+    const half = 3 + (y < GLASS_TOP + 5 ? 1 : 0);
+    if (Math.abs(X) > half) return null;
+    if (Math.abs(X) === half || X === 0) return X < 0 ? "I" : "i"; // its corner posts and the bar between the panes
+    // The glass: pale where the day lights it (the left pane's upper part), darker in its shade.
+    return X < 0 && y < TRAY - 3 ? "y" : "Y";
+  });
+  // Its cap: a pointed iron roof over a wide eave, a ball on top.
+  const cap = paint(cx - 5, EAVE_Y - 7, 11, 8, (x, y) => {
+    const X = x - cx;
+    const j = EAVE_Y - y; // 0 the eave, up to its top
+    if (j <= 5) {
+      const half = 5 - j;
+      if (Math.abs(X) > half) return null;
+      return j === 0 ? (X < 2 ? "I" : "i") : X < 0 ? "J" : X > 0 ? "i" : "I";
+    }
+    return X === 0 ? (j === 6 ? "I" : "J") : null; // the ball
+  });
+  return one("park-lamp", "A lamp", LW, LH, [cx, f], [groundShadow(cx + 1, f, 6, 2), foot, post, collar, bracket, lanternBody, cap]);
+})();
+/** The middle of the lamp's left pane, low in its glass, in its picture's pixels (the tests look for its light there). */
+export const PARK_LAMP_HEAD: Pt = [LCX - 1, (GLASS_TOP + TRAY) / 2 + 1];
+/** The lamp's light at dusk and night: its glass, warm and bright, with a halo round it in the air. */
+export const PARK_LAMP_LIGHTS: readonly LightSpot[] = [{ x: LCX - 4, y: GLASS_TOP, w: 9, h: TRAY - GLASS_TOP, keys: "yY", color: LANTERN_LIGHT, strength: 1, halo: 26 }];
+/** ... and its pool on the ground under it (about two squares across). */
+export const PARK_LAMP_POOLS: readonly LightPool[] = [{ x: LCX, y: LFOOT, rx: 36, ry: 12, color: LANTERN_LIGHT, strength: 0.26 }];

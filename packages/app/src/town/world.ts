@@ -114,9 +114,9 @@ export interface Table {
   r: number;
   stools: readonly [Sq, Sq];
 }
-/** Something standing in the park: a tree, a bench, the fountain or a chess table (with its stools). */
+/** Something standing in the park: a tree, a bench, the fountain, a chess table (with its stools) or a lamp. */
 export interface Prop {
-  kind: "tree" | "bench" | "fountain" | "table";
+  kind: "tree" | "bench" | "fountain" | "table" | "lamp";
   /** Its square (the fountain's: its front left one). */
   c: number;
   r: number;
@@ -156,6 +156,34 @@ PARK_PLAN.forEach((line, v) => {
 // The Colosseum's apron is paved too, and the promenade's 4 squares across the walk between them.
 for (let r = COLISEUM.r0 - APRON_ROWS; r < COLISEUM.r0; r++) for (let c = COLISEUM.c0; c < COLISEUM.c0 + COLISEUM.size; c++) groundAt[r * N + c] = PAVING;
 for (let r = PARK.r1 + 1; r < COLISEUM.r0 - APRON_ROWS; r++) for (let c = PARK.c0 + 8; c < PARK.c0 + 12; c++) groundAt[r * N + c] = PAVING;
+
+/**
+ * The park's lamps (Oct 27, Eric: "street lamps or like park style lamps, so when it's night and also dusk that they turn
+ * on for the little park"): ten, each on a square of its own, solid (walked round) and on paving, where no path needs the
+ * square. A pair flanking the promenade where it leaves the park toward the Colosseum and where it comes in from the
+ * plaza (on the board's square just outside the park's walk either side of it, paved for its foot), a pair beside the
+ * fountain (on the paving either side of its front row, between the tables' stools), and one at each corner of the
+ * park's walk (a corner square: walking round it on the grass inside is no longer). The first is the one ahead on your
+ * left as the page opens (the e2e test finds it there).
+ */
+export const LAMPS: readonly Sq[] = [
+  { c: PARK.c0 + 7, r: PARK.r1 + 1 },
+  { c: PARK.c0 + 12, r: PARK.r1 + 1 },
+  { c: PARK.c0 + 7, r: PARK.r1 - 6 },
+  { c: PARK.c0 + 12, r: PARK.r1 - 6 },
+  { c: PARK.c0, r: PARK.r1 },
+  { c: PARK.c0 + PARK.w - 1, r: PARK.r1 },
+  { c: PARK.c0 + 7, r: PARK.r1 - PARK.d },
+  { c: PARK.c0 + 12, r: PARK.r1 - PARK.d },
+  { c: PARK.c0, r: PARK.r1 - PARK.d + 1 },
+  { c: PARK.c0 + PARK.w - 1, r: PARK.r1 - PARK.d + 1 },
+];
+for (const l of LAMPS) {
+  const k = l.r * N + l.c;
+  parkSolid[k] = 1;
+  groundAt[k] = PAVING;
+  props.push({ kind: "lamp", c: l.c, r: l.r, x: l.c, y: l.r, v: 0, table: -1 });
+}
 /** The ten chess tables, in the plan's order (north to south, west to east). */
 export const TABLES: readonly Table[] = tables;
 /** Everything standing in the park. */

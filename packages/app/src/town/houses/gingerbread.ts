@@ -9,7 +9,7 @@
  */
 import type { Anim, Character, Frame, Layer, Part, Speck } from "../../characters/sprite.ts";
 import { GINGER_PALETTE } from "../../characters/gingerbread.ts";
-import { grain, groundShadow, paint, signBoard, signFace, signPost, type Pt } from "./kit.ts";
+import { grain, groundShadow, ICE_LIGHT, paint, signBoard, signFace, signPost, type LightPool, type LightSpot, type Pt } from "./kit.ts";
 
 const G = GINGER_PALETTE;
 const PALETTE: Record<string, string> = {
@@ -299,3 +299,7 @@ export const HOUSE_GINGER: Character = {
 
 /** Where the sign's blank face is (frame pixels), for the game to write "Ginger Igloo" on. */
 export const HOUSE_GINGER_SIGN = signFace(BOARD[0], BOARD[1], BW, BH);
+
+/** Its lights at dusk and night (Oct 27): the doorway glows a cold ice-blue (he loves the cold), and a little of it falls on the snow in front. */
+export const HOUSE_GINGER_LIGHTS: readonly LightSpot[] = [{ x: CX - DOOR_IN, y: DOOR_CY - DOOR_IN, w: 2 * DOOR_IN, h: BASE - DOOR_CY + DOOR_IN + 4, keys: "mM", color: ICE_LIGHT, strength: 0.75 }];
+export const HOUSE_GINGER_POOLS: readonly LightPool[] = [{ x: CX, y: FOOT - 2, rx: 18, ry: 5, color: ICE_LIGHT, strength: 0.3 }];

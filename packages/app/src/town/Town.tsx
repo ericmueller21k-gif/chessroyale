@@ -14,8 +14,9 @@
  * One requestAnimationFrame loop draws everything on one canvas; it stops when the screen closes or the tab is hidden.
  * Test hooks (e2e only): the canvas carries `data-you="c,r"` (your square) and `data-ready="1"` once a frame is drawn;
  * with the test switches on, `window.__townAt("boss" | "home" | "coliseum" | "statue" | "table", id)` gives where to tap a
- * boss, a home, the Colosseum (its gate), a statue or a chess table (by its index) now; the canvas's `data-sit="1"` while
- * you sit at a table; and
+ * boss, a home, the Colosseum (its gate), a statue or a chess table (by its index) now, `__townAt("lamp", i)` where a
+ * park lamp's glass is (by its index in LAMPS) and `__townAt("light", id)` a lit pixel of a home's (or "coliseum") first
+ * light with nothing in front of it (the lights at dusk and night); the canvas's `data-sit="1"` while you sit at a table; and
  * `window.__townGather()` sends the three nearest bots to stand beside you.
  * docs/areas/town-square.md.
  */
@@ -573,9 +574,11 @@ function startTown(
 
   // A test hook (e2e, with the test switches on: test-switches.ts): where to tap a boss, a home or the Colosseum (its gate)
   // now, in the box.
-  const hookAt = (kind: "boss" | "home" | "coliseum" | "statue" | "table", id?: HomeId | StatueId | number) => {
+  const hookAt = (kind: "boss" | "home" | "coliseum" | "statue" | "table" | "lamp" | "light", id?: HomeId | StatueId | "coliseum" | number) => {
     const out = { x: 0, y: 0 };
     if (kind === "table") return testSwitchesAllowed() && r.tapPoint("table", Number(id), out) ? out : null;
+    if (kind === "lamp") return testSwitchesAllowed() && r.lampAt(Number(id), out) ? out : null;
+    if (kind === "light") return testSwitchesAllowed() && r.lightAt(id === "coliseum" ? HOMES.length : HOMES.findIndex((h) => h.id === id), out) ? out : null;
     if (kind === "statue") return testSwitchesAllowed() && r.tapPoint("statue", STATUES.findIndex((s) => s.id === id), out) ? out : null;
     const i = kind === "coliseum" ? HOMES.length : HOMES.findIndex((h) => h.id === id);
     return testSwitchesAllowed() && r.tapPoint(kind === "boss" ? "boss" : "home", i, out) ? out : null;

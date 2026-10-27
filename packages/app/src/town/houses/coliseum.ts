@@ -22,7 +22,7 @@
 import type { Anim, Character, Frame, Layer, Part } from "../../characters/sprite.ts";
 import { TOWN_FEEL } from "../feel.ts";
 import { COLISEUM } from "../world.ts";
-import { grain, groundShadow, paint, signBoard, signFace, type Pt } from "./kit.ts";
+import { grain, groundShadow, paint, signBoard, signFace, TORCH, type LightPool, type LightSpot, type Pt } from "./kit.ts";
 import { PED_W, STATUE_W, statueH, type StatueId } from "./statues.ts";
 
 const PALETTE: Record<string, string> = {
@@ -545,6 +545,31 @@ export const statueSpot = (id: StatueId): Pt => [CX + (id === "marble" ? -1 : 1)
 
 /** Where the tablet's blank face is (frame pixels), for the game to write "The Colosseum" on. */
 export const HOUSE_COLISEUM_SIGN = signFace(BOARD[0], BOARD[1], BW, BH);
+
+/** A bay's arch on a tier (the box round its opening, a little wider, in picture pixels): where its light shines. */
+function archBox(tier: number, i: number): { x: number; y: number; w: number; h: number } {
+  const t = TIERS[tier]!;
+  const th = (i + 0.5) * BAY - Math.PI / 2;
+  const c = Math.cos(th);
+  const r = 0.32 * RX * BAY * c;
+  const yb = BASE_CY + RY * c;
+  const x = Math.floor(CX + RX * Math.sin(th) - r - 2);
+  return { x, y: Math.floor(yb - t.h0 - t.arch - 3), w: Math.ceil(2 * r) + 5, h: t.arch + 6 };
+}
+/**
+ * Its lights at dusk and night (Oct 27): the gate's tunnel glows as if torches burn inside, and so do a scattered few of
+ * its arches (two of the lower tier's, one of the middle tier's without a marble pawn; none near the statues, the queen
+ * and the king, or under a banner), all flickering; a little of the gate's light falls on the apron in front.
+ */
+export const HOUSE_COLISEUM_LIGHTS: readonly LightSpot[] = [
+  { x: CX - GATE_R, y: FOOT - GATE_H, w: 2 * GATE_R + 1, h: GATE_H, keys: "zxXLD", color: TORCH, strength: 0.85, flicker: true },
+  ...([
+    [0, 7],
+    [1, 9],
+    [0, 18],
+  ] as const).map(([tier, i]) => ({ ...archBox(tier, i), keys: "xX", color: TORCH, strength: 0.75, flicker: true })),
+];
+export const HOUSE_COLISEUM_POOLS: readonly LightPool[] = [{ x: CX, y: FOOT - 1, rx: 34, ry: 8, color: TORCH, strength: 0.3 }];
 
 // ---- Its edge chip: a gold crown over a band of the board's squares, on the chip's white (24 x 24).
 

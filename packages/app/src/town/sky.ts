@@ -63,6 +63,9 @@ export function mixTint(w: SkyWeights): [number, number, number, number] {
   return a > 0 ? [c[0]! / a, c[1]! / a, c[2]! / a, a] : [0, 0, 0, 0];
 }
 
+/** How strongly the lights shine (the park's lamps, the homes' windows: 0 off, 1 at night's full), following the blend between looks. */
+export const mixLights = (w: SkyWeights): number => LOOKS.reduce((k, l) => k + w[l] * TOWN_FEEL.lightsAt[l], 0);
+
 /** How much of dawn's mist shows (extra haze over the far ground). */
 export const mixMist = (w: SkyWeights): number => LOOKS.reduce((m, l) => m + w[l] * look(l).mist, 0);
 
