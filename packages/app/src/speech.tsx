@@ -80,8 +80,8 @@ interface Waiting {
 }
 
 /**
- * The sound a line is heard with as it starts in the boss's voice, by its text (Folio's whisper, as long as the line:
- * characters/kits.ts fills it). Only the boss's voice plays these, so the select screen's line stays its select sound alone.
+ * The sound a line is heard with as it starts in the boss's voice, by its text (Folio's chirp: characters/kits.ts fills
+ * it). Only the boss's voice plays these, so the select screen's line stays its select sound alone.
  */
 export const lineSounds = new Map<string, SoundName>();
 

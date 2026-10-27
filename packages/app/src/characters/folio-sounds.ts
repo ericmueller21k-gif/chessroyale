@@ -4,11 +4,10 @@
  * unfold, a gentle wing flap, a pen's scratch for its ink (and a shorter dab), a page turning for its Revision, a crumple when
  * hurt, and its gilt's small glint (a soft high chime). Its select sound: a page turn and a flap.
  *
- * Its voice, for its lines (Oct 27, the wiring lane's): soft, papery and calm. Made-up syllables whispered rather than spoken: each
- * a breath of noise through the two formants of a vowel, a faint low hum under it, a dry paper crinkle at the start of most, at
- * an unhurried pace on a line that settles at its end. Not Babur's low grumble, Puddles' quick high chatter or Moo's moo: a
- * whisper, the loudest part of it the paper. Three lengths, by the line's: `voiceShort`, `voiceMedium`, `voiceLong`
- * (`folioVoiceFor`), played as a line of its starts (speech.tsx, `lineSounds`).
+ * Its voice, for its lines (Eric, Oct 27, from three he heard): a little crane's chirp, two quick soft rising bird notes after a
+ * paper crinkle, the same short sound for every line, played as a line of its starts (speech.tsx, `lineSounds`). (Its first
+ * voice, a whispered babble as long as the line, stood out from every other boss's sounds.) In the town square, a tap on it
+ * says a low, slow murmur or a soft "mm-hm", in turn (`murmur`, `hum`: boss-select.ts, TOWN_SOUNDS).
  *
  * Each is a pure function of the sample rate (its noise is seeded), so a test can measure it: every one stays quieter than a
  * piece's move (peak and loudness), and the ten strokes of its attack on a king together too.
@@ -17,7 +16,7 @@
  */
 import { bandpass, lowpass, noise, osc, render, rng, sine, soft, soundCache, type Voice } from "./synth.ts";
 
-export type FolioSound = "rustle" | "fold" | "unfold" | "flap" | "scratch" | "dab" | "page" | "crumple" | "glint" | "hello" | "voiceShort" | "voiceMedium" | "voiceLong";
+export type FolioSound = "rustle" | "fold" | "unfold" | "flap" | "scratch" | "dab" | "page" | "crumple" | "glint" | "hello" | "voice" | "murmur" | "hum";
 
 const clamp01 = (u: number) => Math.max(0, Math.min(1, u));
 const lerp = (a: number, b: number, u: number) => a + (b - a) * clamp01(u);
@@ -68,40 +67,33 @@ function crackle(rate: number, dur: number, clicks: number, centre: number, seed
   });
 }
 
-/** A vowel's first two formants (Hz), a small, light speaker's. */
-type Vowel = "ee" | "ih" | "eh" | "ah" | "oh" | "oo";
-const VOWEL: Record<Vowel, readonly [number, number]> = { ee: [330, 2500], ih: [440, 2100], eh: [580, 1900], ah: [760, 1300], oh: [500, 950], oo: [380, 900] };
-const SOFT: readonly Vowel[] = ["eh", "ah", "ih", "oh", "ee", "ah", "oo"];
+/**
+ * A short, soft bird note (it's a crane): a sine gliding from `f0` to `f1` Hz over `d` seconds, a quick start and a fall
+ * away after it.
+ */
+function note(rate: number, f0: number, f1: number, d: number): Float32Array {
+  const o = osc(rate, (t) => lerp(f0, f1, t / d), sine);
+  return render(rate, d + 0.02, (t) => Math.min(1, t / 0.008) * Math.exp(-Math.max(0, t - 0.02) / (d * 0.5)) * o(t));
+}
 
 /**
- * Its voice: `syllables` whispered syllables, each a breath of noise through its vowel's formants with a faint hum at about
- * 190 Hz under it (a breathy voice, not a sung one), most opening with a dry paper crinkle (an "s" or "f" made of paper), at
- * `pace` (1 its calm pace), the line easing down over its last two syllables.
+ * Hummed syllables (its town sounds): each a round voiced tone (a sine with a little of its second and third harmonics, never
+ * buzzy) through a vowel's two formants, its pitch gliding from `p0` to `p1` Hz, a faint paper crinkle as it starts.
  */
-function whisper(rate: number, syllables: number, pace: number, seed: number): Float32Array {
-  const r = rng(seed);
-  const plan: { at: number; d: number; v: readonly [number, number]; crinkle: boolean; tilt: number }[] = [];
-  let at = 0.02;
-  for (let i = 0; i < syllables; i++) {
-    const d = (0.1 + 0.05 * r()) * pace;
-    const last = i >= syllables - 2;
-    plan.push({ at, d, v: VOWEL[SOFT[Math.floor(r() * SOFT.length)]!], crinkle: r() < 0.6, tilt: last ? 0.9 - 0.08 * (i - syllables + 2) : 1 + 0.06 * Math.sin(i * 1.7) });
-    at += d + (0.03 + 0.03 * r()) * pace;
-  }
-  const out = new Float32Array(Math.ceil((at + 0.06) * rate));
-  plan.forEach((s, k) => {
-    const len = Math.ceil((s.d + 0.04) * rate);
-    const breath = murk(rate, 7000, seed * 13 + k);
-    const f1 = bandpass(rate, () => s.v[0] * s.tilt, 4, breath);
-    const f2 = bandpass(rate, () => s.v[1] * s.tilt, 6, murk(rate, 7000, seed * 29 + k));
-    const hum = lowpass(rate, 600, osc(rate, (t) => 190 * s.tilt * (1 - 0.05 * t), sine));
-    const paper = bandpass(rate, () => 5200, 1.6, noise(seed * 7 + k));
+function hum(rate: number, syllables: readonly { at: number; d: number; p0: number; p1: number; v: readonly [number, number] }[], seed: number): Float32Array {
+  const out = new Float32Array(Math.ceil((Math.max(...syllables.map((s) => s.at + s.d)) + 0.05) * rate));
+  syllables.forEach((s, k) => {
+    const src = osc(rate, (t) => lerp(s.p0, s.p1, t / s.d), (ph) => Math.sin(ph) + 0.25 * Math.sin(2 * ph) + 0.1 * Math.sin(3 * ph));
+    const f1 = bandpass(rate, () => s.v[0], 3, src);
+    const f2 = bandpass(rate, () => s.v[1], 5, src);
+    const crinkle = bandpass(rate, () => 5000, 1.6, noise(seed + k));
     const start = Math.round(s.at * rate);
+    const len = Math.ceil((s.d + 0.03) * rate);
     for (let i = 0; i < len && start + i < out.length; i++) {
       const t = i / rate;
-      const env = Math.min(1, t / 0.02) * Math.max(0, Math.min(1, (s.d + 0.03 - t) / 0.05));
-      const onset = s.crinkle && t < 0.035 ? (1 - t / 0.035) * 0.9 * paper(t) : 0;
-      out[start + i]! += env * (1.4 * f1(t) + 0.9 * f2(t) + 0.12 * hum(t)) + onset;
+      const env = Math.min(1, t / 0.015) * Math.max(0, Math.min(1, (s.d + 0.02 - t) / 0.06));
+      const c = t < 0.012 ? 0.25 * crinkle(t) * (1 - t / 0.012) : 0;
+      out[start + i]! += env * (f1(t) + 0.5 * f2(t) + 0.35 * src(t)) + c;
     }
   });
   return unit(out);
@@ -157,10 +149,21 @@ const SOUNDS: Record<FolioSound, (rate: number) => Float32Array> = {
   },
   // Its select sound: a page turning, then its wing's flap.
   hello: (rate) => unit(mix(rate, 0.8, [[0, SOUNDS.page(rate), 1], [0.46, SOUNDS.flap(rate), 0.9]])),
-  // Its voice, by the line's length.
-  voiceShort: (rate) => whisper(rate, 4, 1, 4131),
-  voiceMedium: (rate) => whisper(rate, 7, 1, 4133),
-  voiceLong: (rate) => whisper(rate, 10, 1, 4135),
+  // Its voice, for every line: a paper crinkle, then two quick soft rising chirps.
+  voice: (rate) =>
+    unit(mix(rate, 0.32, [[0, render(rate, 0.03, (t) => (1 - t / 0.03) * bandpass(rate, () => 4800, 1.4, noise(4131))(t)), 0.35], [0.02, note(rate, 1100, 1450, 0.07), 1], [0.14, note(rate, 1250, 1650, 0.09), 0.85]])),
+  // Its town sounds: a low, slow three-syllable murmur, and a soft "mm-hm".
+  murmur: (rate) =>
+    hum(rate, [
+      { at: 0.01, d: 0.1, p0: 330, p1: 350, v: [580, 1900] },
+      { at: 0.15, d: 0.1, p0: 360, p1: 340, v: [400, 900] },
+      { at: 0.29, d: 0.14, p0: 320, p1: 270, v: [500, 950] },
+    ], 4133),
+  hum: (rate) =>
+    hum(rate, [
+      { at: 0.01, d: 0.13, p0: 300, p1: 320, v: [400, 900] },
+      { at: 0.18, d: 0.16, p0: 290, p1: 245, v: [500, 950] },
+    ], 4135),
 };
 
 /** Each sound's level: all soft (a calm paper crane), every one under a move's loudness; a soft ceiling keeps the peaks well under. */
@@ -175,9 +178,9 @@ const LEVEL: Record<FolioSound, number> = {
   crumple: 0.04,
   glint: 0.035,
   hello: 0.045,
-  voiceShort: 0.04,
-  voiceMedium: 0.04,
-  voiceLong: 0.04,
+  voice: 0.04,
+  murmur: 0.04,
+  hum: 0.04,
 };
 
 const cache = soundCache("folio");
@@ -194,6 +197,3 @@ export function folioSound(name: FolioSound, rate: number): Float32Array {
 
 export const FOLIO_SOUNDS = Object.keys(SOUNDS) as FolioSound[];
 
-/** Its voice for a line: short, medium or long by the line's length (the seven lines run 16 to 45 characters). */
-export const folioVoiceFor = (text: string): "folioVoiceShort" | "folioVoiceMedium" | "folioVoiceLong" =>
-  text.length <= 20 ? "folioVoiceShort" : text.length <= 34 ? "folioVoiceMedium" : "folioVoiceLong";
