@@ -115,6 +115,21 @@ const skyTop = (p: Page) =>
     return [r / n, g / n, b / n];
   });
 
+test("a deploy landed while the page was open: the town square's files are gone, so the page loads again, once, and the town opens", async ({ page }) => {
+  // (After a deploy the old version's files are gone: the first ask for the town's styles fails as it would then.)
+  let asked = 0;
+  await page.route(/\/assets\/Town-[^/]*\.css$/, (route) => (asked++ === 0 ? route.fulfill({ status: 404, body: "" }) : route.continue()));
+  let loads = 0;
+  page.on("load", () => loads++);
+  await page.goto("/town");
+  await expect.poll(() => loads, { message: "the page loaded again" }).toBe(2);
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  // (The second time the app's service worker serves them: no route sees that ask.)
+  expect(asked, "the styles were refused").toBeGreaterThanOrEqual(1);
+  expect(loads, "the page loaded again, once").toBe(2);
+  expect(await colors(page), "the world is drawn, not blank").toBeGreaterThan(40);
+});
+
 test("the sky by the time of day: ?sky=day and ?sky=night draw different skies (a day's top is light blue, a night's deep navy)", async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/town?sky=day");
