@@ -132,7 +132,23 @@ lane's. Until then it stays **not playable** (`kit: null`): the test links `?bos
 
 ## The numbers and why
 
-TBD after the sim.
+- **Offset −250, `rageSpeed` 1, `draftEvery` 4** (the usual offset, the brief's start, Sawyer's cuts' pace): the raid sim's
+  first run gave the crowd **0.52** (± 0.09) in **49** moves (26 battles), outside the aim (0.10 to 0.25). Four variants, as
+  the testing budget allows when a number lands outside: offset 0 (0.58), +200 (0.48), a Draft every 2 turns with
+  `rageSpeed` 2 at −250 (0.52) and at +200 (0.40), each 26 battles, all within about one standard error of one another.
+  Nothing measured beat the first, which is also the simplest, so it ships, and the sweep stopped there.
+  [reports/folio-sim.md](../../reports/folio-sim.md) has the tables.
+- **What the sim says of its powers** (folioA): 9.2 marks and 4.8 folds a battle (27% of marks answered in time by a crowd
+  that doesn't know about them, 52% folded); 2.5 Creases a battle costing the crowd 0.42 pawns on average (half of them
+  below the band: no line cost 0.3 there); Revision in 18 of 26 battles, worth 2.7 pawns on average (the crowd's punishing
+  reply it took back). Folio blunders often at these strengths, and Revision rewrites one; the battles with one went the
+  crowd's way more often (0.64 against 0.25), the sign of a boss that blunders again.
+- **For the director:** the levers that could move it are the sheet's own numbers (the fold's 3 turns, the 2-move window,
+  the crease's band and 4 turns, Revision once), not this lane's to change. Real players who answer the marks would score
+  higher still.
+- `creaseNodes` 20,000 (Babur's hoops' budget: at most 15 searches a warning), `creaseTimeMs` 6 s more for the host on
+  that request (the searches themselves take about a second or two on a phone); `draftTop` 3, `draftFirst` 3,
+  `revisionFrom` 5 are the sheet's.
 
 ## What the wiring lane needs
 

@@ -227,7 +227,8 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // and once a battle, Revision: its own blunder and the crowd's punishing reply crossed out, the engine's best move in its
   // place (bosses/folio.ts; docs/decisions/2026-10-27-folio-rules.md). Not playable until its kit is wired (the wiring
   // lane sets `kit: "Folio"`): the test links `?boss=folio&wip=1`, `&power=draft`, `&power=crease`, `&power=revision`. Its
-  // offset from the raid sim (reports/folio-sim.md).
+  // offset: the usual −250. The raid sim put it on the crowd's side (0.52 in 49 moves) and neither its strength (−250 to
+  // +200) nor twice the Drafts and Creases moved that beyond the noise (reports/folio-sim.md): the director's call.
   { id: "folio", name: "Folio", icon: "📜", kit: null, offset: -250, powers: { passive: "draft", ultimate: "crease" } },
   { id: "recluse", name: "Hidden Boss", icon: "📕", kit: "Hidden Boss", offset: 0, powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true, crowdFinal: true, the: true, levelUnknown: true },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },

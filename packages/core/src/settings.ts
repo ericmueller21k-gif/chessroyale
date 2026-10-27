@@ -740,7 +740,9 @@ export const BOSS_POWERS = {
    * battle, so he gets about one and a half (two in a long battle): two full barrages would keep the crowd's half on
    * fire most of the game. Babur (tiger) 1.3 (Oct 24, was 1.6: Eric, "he's ulting so much… 2 to 4 times per game"; his
    * hoops now come after his move): the raid sim's 10 s crowd, 2.55 casts a battle of 44 moves, 3.45 per 60 moves (1.1 gave
-   * 1.80 a battle, under 2: his battles are shorter now he keeps his turn; reports/tiger-sim.md).
+   * 1.80 a battle, under 2: his battles are shorter now he keeps his turn; reports/tiger-sim.md). Folio 1 (the brief's start):
+   * 2.5 Creases a battle of 49 moves in the raid sim; 2 gave 4.0 and no measurable change in the crowd's score
+   * (reports/folio-sim.md).
    */
   rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.3, folio: 1 } as Readonly<Record<string, number>>,
   /**
@@ -1261,7 +1263,9 @@ export const BOSS_POWERS = {
    * seeded pick among the draftTop most valuable. The crowd has draftWindow of its own moves to end that one attack (move
    * the piece, block the line, take the attacker); if it still stands after them, the piece is folded: frozen for
    * foldTurns crowd turns, by Ginger's freeze's rules. One mark at a time; none that qualifies (or a mark still up, or
-   * another of Folio's moments that turn): it tries again next turn, and the try doesn't count.
+   * another of Folio's moments that turn): it tries again next turn, and the try doesn't count. draftEvery 4 (this lane's
+   * number; Sawyer's cuts' pace): about 9 marks and 5 folds a battle in the raid sim; every 2 turns changed the crowd's
+   * score by nothing measurable (reports/folio-sim.md).
    */
   draftFirst: 3,
   draftEvery: 4,
