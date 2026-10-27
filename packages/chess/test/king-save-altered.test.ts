@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BOSS_ROSTER, DEFAULT_SETTINGS, mulberry32, type BossPowerState, type BossState } from "@chessroyale/core";
-import { MatchRunner, applyMove, boardAltered, bossRules, legalMoves, pieceAt, type BossRules, type EngineLike } from "../src/index.ts";
+import { FOLIO_FRESH, MatchRunner, applyMove, boardAltered, bossRules, legalMoves, pieceAt, type BossRules, type EngineLike } from "../src/index.ts";
 import { KIT_OPENING, kitSettings } from "./boss-kit-lib.ts";
 
 /**
@@ -155,6 +155,13 @@ const AUDIT: Record<string, { on: Record<string, Patch>; off: Patch } | { none: 
     off: () => ({}),
   },
   tiger: { on: { "the burning hoops": () => ({ hoops: { blocks: ["d3"], at: 0, left: 2, gain: null } }) }, off: () => ({ hoops: null }) },
+  folio: {
+    on: {
+      "a folded piece": (f) => ({ folio: { ...FOLIO_FRESH, folded: { square: crowdPiece(f), piece: "n", at: 1, until: 3 } } }),
+      "the Crease": () => ({ crease: { line: "4|5", at: 1, until: 4 } }),
+    },
+    off: () => ({ crease: null, folio: FOLIO_FRESH }),
+  },
   recluse: { none: "his passive blocks the God King's help: the Last Stand never comes against him anyway" },
 };
 
@@ -173,8 +180,9 @@ describe("the God King's Last Stand on a board a boss has changed: every boss", 
       });
   }
 
-  it("what isn't a change to the board leaves him as he was: Alfil's elephants (bishops in every way), Moo's Full Moon", async () => {
+  it("what isn't a change to the board leaves him as he was: Alfil's elephants (bishops in every way), Moo's Full Moon, Folio's Draft mark (a warning, limiting nothing)", async () => {
     expect(await saves("alfil", () => ({ elephants: ["c8"] }))).toBe(true);
+    expect(await saves("folio", (f) => ({ folio: { ...FOLIO_FRESH, mark: { square: crowdPiece(f), piece: "n", attacker: "a6", by: "p", line: [], at: 1, until: 2 } } }))).toBe(true);
     expect(await saves("moo", () => ({ moo: { moves: 3, stun: null, full: { at: 0, left: 2 } } }))).toBe(true);
   });
 });

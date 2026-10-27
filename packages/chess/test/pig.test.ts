@@ -937,9 +937,9 @@ describe("Wrangler's showdown in the match", () => {
     expect(showdownLive("4k3/8/8/8/8/8/8/R3K3 b - - 0 1", { crowd: ["a1"], boss: [] }, "w")).toBe(false);
     expect(showdownLive("4k3/8/8/8/8/8/4K3/r6R b - - 0 1", { crowd: ["h1"], boss: [] }, "w")).toBe(true);
     expect(showdownLive("4k3/8/8/8/8/8/4K3/r6R b - - 0 1", { crowd: [], boss: ["a1"] }, "w")).toBe(true);
-    // Wrangler's rules ask for it, and Moo & Moon's for his Full Moon (moo.test.ts); no other boss's.
+    // Wrangler's rules ask for it, Moo & Moon's for his Full Moon (moo.test.ts) and Folio's for its Revision (folio.test.ts); no other boss's.
     expect(PIG.bestReply!(r.boss!, board)).toBe(true);
-    for (const def of BOSS_ROSTER.filter((b) => b.id !== "pig" && b.id !== "moo")) expect(bossRules({ id: def.id })?.bestReply).toBeUndefined();
+    for (const def of BOSS_ROSTER.filter((b) => b.id !== "pig" && b.id !== "moo" && b.id !== "folio")) expect(bossRules({ id: def.id })?.bestReply).toBeUndefined();
   }, 60_000);
 
   it("the King's strike still staggers it (the crowd's own power); the stumble's draw is still made, so nothing else moves", async () => {
