@@ -161,8 +161,10 @@ test("Folio's Draft: the ink mark and its line, DRAFT and its line, a count of y
   expect(r.kinds).toEqual(expect.arrayContaining(["draft", "fold"]));
   expect(r.banners).toEqual(expect.arrayContaining(["DRAFT", "FOLDED"]));
   expect(r.lines).toEqual(expect.arrayContaining([FOLIO_LINES.power![0], FOLIO_LINES.fold![0]]));
-  // (The piece that was folded counted 2, then 1.)
-  expect([...counts.values()].some((c) => c.join() === "2,1"), JSON.stringify([...counts])).toBe(true);
+  // (The piece that was folded counted 2, then 1. A turn can be read twice at one count, as when a Revision takes your move
+  // back: CI, Oct 27, [2, 1, 1] and [2, 2, 1]; so repeats in a row count once.)
+  const steps = (c: number[]) => c.filter((x, i) => i === 0 || x !== c[i - 1]).join();
+  expect([...counts.values()].some((c) => steps(c).includes("2,1")), JSON.stringify([...counts])).toBe(true);
   // The paper folded over it as its fold played, while it thought (before your turn, when the view's `folded` holds it).
   expect(r.marks.some((x) => x.folded === "" && x.over.split(" ").includes(`foldPaper@${folded!.square}`)), "the paper drawn in its fold's moment").toBe(true);
   // The paper is over the folded piece, and its mark gone.
@@ -188,6 +190,9 @@ test("Folio's Crease: its pencil line with the warning ('Mind the crease.' once)
   let line: string | null = null;
   let tried = false;
   let held = 0;
+  // The crease's turns as first seen and as last seen (a Revision while it holds adds one: the crossed-out turn isn't counted).
+  let first: number | null = null;
+  let last = 0;
   for (let i = 0; i < 10; i++) {
     await yourMove(page);
     const s = await state(page);
@@ -204,6 +209,8 @@ test("Folio's Crease: its pencil line with the warning ('Mind the crease.' once)
       // Drawn along both sides of its line, the whole length of the board: 16 squares.
       expect(m.under.split(" ").filter((x) => x.startsWith("creaseEdge@"))).toHaveLength(16);
       held++;
+      last = p.crease.until - p.crease.at + 1;
+      first ??= last;
       for (const mv of s.allowed ?? []) expect(crossesCrease(mv, p.crease.line, s.fen), mv).toBe(false);
       const across = new Chess(s.fen).moves({ verbose: true }).find((mv) => crossesCrease(mv.from + mv.to, p.crease.line, s.fen) && !mv.promotion);
       if (!tried && across && s.allowed) {
@@ -214,10 +221,14 @@ test("Folio's Crease: its pencil line with the warning ('Mind the crease.' once)
       expect(m.crease).toBe("");
       break;
     }
-    await play(page, quiet(s.fen, s.allowed), s.fen);
+    // The engine's best allowed move, else a quiet one: a careless crowd was mated before the crease lifted now and then (CI, Oct 27).
+    const { top } = await engineTop(page).catch(() => ({ top: [] as { move: string }[] }));
+    const best = top.map((t) => t.move).find((mv) => !s.allowed || s.allowed.includes(mv));
+    await play(page, best ?? quiet(s.fen, s.allowed), s.fen);
   }
   expect(line).not.toBeNull();
-  expect(held).toBe(BOSS_POWERS.creaseTurns);
+  expect(first).toBe(BOSS_POWERS.creaseTurns);
+  expect(held).toBe(last);
   expect(tried).toBe(true);
   await expect.poll(async () => (await seen(page)).kinds, { timeout: 10_000 }).toEqual(expect.arrayContaining(["warn", "creaseWarn", "crease", "creaseEnd"]));
   const r = await seen(page);
