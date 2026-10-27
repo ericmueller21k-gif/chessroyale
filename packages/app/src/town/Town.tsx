@@ -141,15 +141,15 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, seat = null }: { on
             {/* A chess table's (no title: Eric, Oct 27): a casual or ranked game of normal chess will start here (the tables'
                 matchmaking is the next job); at a table where two others play, watching their game. Shown greyed, not hidden. */}
             {/* A bot's (Oct 27, Eric): its name, "(bot)", its rating, and Play: you both walk to a free table and the game
-                opens when you sit. Every table taken: Play greyed and "Tables are full" (the line's room kept: nothing shifts). */}
+                opens when you sit. Every table taken: Play greyed, reading "Play · Tables are full" (in the button, so the
+                card hugs its content and nothing is added round it). */}
             {card?.kind === "bot" && bot && (
               <>
                 <h2>{botLabel(bot)}</h2>
                 <p class="town-card-text">{ratingText(bot)}</p>
                 <button type="button" class="town-btn primary" disabled={card.full} onClick={() => ctl.current?.play()}>
-                  Play
+                  {card.full ? "Play · Tables are full" : "Play"}
                 </button>
-                <div class="town-soon">{card.full ? "Tables are full" : "\u00a0"}</div>
               </>
             )}
             {card?.kind === "table" && !card.watch && (

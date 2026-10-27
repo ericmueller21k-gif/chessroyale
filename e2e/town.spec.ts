@@ -526,6 +526,9 @@ async function playAndResign(p: Page, bot: string) {
   // Its rating on its pill (the number), and its whole name, never cut.
   await expect(p.locator(".dv-strip.dv-them .dv-rank")).toHaveText(String(BOTS.find((b) => `${b.name} (bot)` === bot)!.rating));
   expect(await p.locator(".dv-strip.dv-them .dv-name").evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(true);
+  // Yours says the game is casual: no placement, rank or rating of yours.
+  await expect(p.locator(".dv-strip.dv-you .dv-rank")).toHaveText("Casual");
+  await expect(p.locator(".dv-strip.dv-you")).not.toContainText(/Placement|RP|Rating|\d{3,4}/);
   await expect(p.locator(".dv-status")).toContainText(/first move/, { timeout: 60_000 });
   if ((await sideOf(p)) === "b") await expect(p.locator(".dv-status")).toHaveText(/^Your first move/, { timeout: 30_000 });
   await tapMove(p, (await sideOf(p)) === "w" ? "e2e4" : "e7e5");
@@ -610,6 +613,7 @@ test("a bot sitting at a table: a tap on the table walks you to the free stool; 
   await play.click();
   await expect(page.locator(".duel-screen")).toBeVisible({ timeout: 15_000 });
   await expect(page.locator(".dv-strip.dv-them .dv-name")).toHaveText(`${bot.name} (bot)`);
+  await expect(page.locator(".dv-strip.dv-you .dv-rank")).toHaveText("Casual");
   // A reload: back in the town at the table, the bot across.
   await page.reload();
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");

@@ -500,7 +500,9 @@ export class BotDuel implements DuelSession {
     this.you = Math.random() < 0.5 ? "w" : "b";
     const look = town ? town.look : botLook(`bot-${Math.floor(Math.random() * 1e9)}`).look;
     const bot: DuelSide = { uid: null, name: town?.name ?? "Bot", look, rank: { ...rankView(null), placement: null, tier: "Bot", label: town ? String(rating) : "Unranked" }, bot: true };
-    this.players = this.you === "w" ? { w: yourSide(), b: bot } : { w: bot, b: yourSide() };
+    // (A town game is casual: your pill says so, not your 1 v 1 rank.)
+    const me = town ? { ...yourSide(), rank: { ...rankView(null), placement: null, tier: "Casual", label: "Casual" } } : yourSide();
+    this.players = this.you === "w" ? { w: me, b: bot } : { w: bot, b: me };
     this.versusAt = now;
     this.ticker = setInterval(() => this.tick(), 100);
     const maia = maiaAllowed() && rating >= RANKED_1V1.bot.maiaMin && rating <= RANKED_1V1.bot.maiaMax;

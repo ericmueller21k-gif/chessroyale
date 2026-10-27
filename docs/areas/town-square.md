@@ -176,13 +176,13 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
   - **A bot's card** (a tap on a bot; placed over its name tag like a boss's; the bot holds still while it's open, `hold`):
     "<name> (bot)", "Rating 1400" and **Play**. Play: you both walk to the nearest table with both stools free (nearest to
     the two of you, `tableFor`), you to the stool nearer you, the bot to the other (`meet`); once both sit (`meetReady`) the
-    game opens. Any other walk of yours calls it off. No table free: Play greyed and "Tables are full" (the line's room is
-    always kept, so the card never changes size; `anyTableFree`, checked only while the card is open).
+    game opens. Any other walk of yours calls it off. No table free: Play greyed, reading "Play · Tables are full" (in the
+    button: the card hugs its content and nothing is added round it; `anyTableFree`, checked only while the card is open).
   - **A bot sitting alone at a table** (`waitingBot`): a tap on the table walks you to its free stool, as before, and its
     card's first button is **"Play <name> (bot) · <rating>"**, Casual and Ranked greyed under it; the bot stays while the card
     is open; the game opens once you sit.
   - **The game** is the 1 v 1 bot game's (`BotDuel` in `duel.ts` with `town`, `screens/Duel.tsx`), on this device: the bot's
-    name and its rating on its strip, no versus moment; first Boss alone's loading step ("Loading the bot…": `MaiaGate`,
+    name and its rating on its strip, "Casual" on yours (not your 1 v 1 rank), no versus moment; first Boss alone's loading step ("Loading the bot…": `MaiaGate`,
     this device's Stockfish paused, Maia loaded alone, at most `loadGateMs`; the same `maiaAllowed` rule; Stockfish at the
     bot's rating until Maia is ready, or if it can't run), then the bot game's vote (Bullet, Blitz or Rapid) and its clock;
     Maia plays at the bot's rating. Colors at random. Casual: "Casual game", no rank change, no coins, nothing sent to the

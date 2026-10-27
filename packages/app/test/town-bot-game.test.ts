@@ -38,6 +38,8 @@ describe("a town bot's game", () => {
     expect(s.players[them]).toMatchObject({ name: "Tempo Tess (bot)", bot: true, rank: { label: "1400" } });
     expect(s.players[them].look?.head?.def).toBe("wizard-hat");
     expect(s.town).toBe(true);
+    // Yours: "Casual", not your 1 v 1 rank.
+    expect(s.players[s.you].rank.label).toBe("Casual");
     // The loading step: no versus moment, no vote yet; Stockfish paused while Maia loads alone, at the bot's rating.
     expect(s.loading).toBe(true);
     expect(s.phase).toBe("vote");
