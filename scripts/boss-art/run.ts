@@ -38,8 +38,12 @@ const EFFORT = (process.env.BOSS_ART_EFFORT ?? "high") as "low" | "medium" | "hi
 if (!["low", "medium", "high", "xhigh"].includes(EFFORT)) throw new Error("BOSS_ART_EFFORT: low, medium, high or xhigh");
 if (!(CAP > 0)) throw new Error("BOSS_ART_CAP_USD must be a positive number of dollars");
 const MAX_TURNS = Number(process.env.BOSS_ART_MAX_TURNS ?? 90);
-/** Each turn's output ceiling (thinking included): room for a whole drawing written at once. */
-const MAX_TOKENS = 48000;
+/**
+ * Each turn's output ceiling (thinking included): room for a whole drawing written at once. BOSS_ART_MAX_TOKENS raises it
+ * (Oct 27: Sonnet 5.5 at xhigh thought past 48,000 before writing; it allows 128,000).
+ */
+const MAX_TOKENS = Number(process.env.BOSS_ART_MAX_TOKENS ?? 48000);
+if (!(MAX_TOKENS >= 1000 && MAX_TOKENS <= 128000)) throw new Error("BOSS_ART_MAX_TOKENS: 1000 to 128000");
 
 const ROOT = resolve(".");
 const OUT = resolve(`scripts/boss-art/out/${id}`);
