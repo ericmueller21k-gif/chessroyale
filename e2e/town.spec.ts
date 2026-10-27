@@ -457,6 +457,8 @@ test("Folio's Folded House: a tap walks you there and opens its card with its na
   expect(lum(door.night!), `${msg}: as bright at night`).toBeGreaterThanOrEqual(lum(door.day!) - 10);
   expect(lum(door.night!), `${msg}: bright`).toBeGreaterThan(190);
   expect(door.night![0]! - door.night![2]!, `${msg}: warm`).toBeGreaterThan(40);
+  expect(errors).toEqual([]);
+});
 
 /** Each table's state now (the test hook): "still", "waiting:<free stool>" or "playing". */
 const tables = (p: Page) => p.evaluate(() => (window as unknown as { __townTables: () => string[] }).__townTables());
