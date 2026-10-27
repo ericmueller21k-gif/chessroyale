@@ -67,7 +67,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     plays its sound once and says one of its lines (the boss section, [bosses.md](bosses.md)). Under the stage the ways
     to play. **Solo Boss Mode** (Oct 26; the home card and the side menu's item) shows only **Boss alone**; the full
     screen (`?mode=raid`, the test link, titled "Boss raid") shows every choice below, as before, until the raids move to
-    the Boss Arena's Coliseum. Each choice goes through its flow: **Join a raid** and **People only** (the raid's queues, always a random boss:
+    the Boss Arena's Colosseum. Each choice goes through its flow: **Join a raid** and **People only** (the raid's queues, always a random boss:
     "Random boss · …"), **Raid with bots** (a Solo raid against the boss picked), **Boss alone** (its menu: the
     difficulty and the boss picked; a phone's sheet at the foot under 600 px wide, a dialog in the middle with room all
     round from 600 px at any height, its rows scrolling inside so it always fits) and **Play with friends** (a raid made

@@ -109,7 +109,7 @@ describe("town square camera", () => {
 });
 
 describe("town square walking", () => {
-  it("thirteen homes spread over the world: neighbors 8 or more squares apart, none near your start, the Coliseum's ground clear", () => {
+  it("thirteen homes spread over the world: neighbors 8 or more squares apart, none near your start, the Colosseum's ground clear", () => {
     expect(HOMES).toHaveLength(13);
     expect(new Set(HOMES.map((h) => h.id)).size).toBe(13);
     const dist = (ax: number, ay: number, bx: number, by: number) => Math.hypot(wrapF(ax - bx), wrapF(ay - by));
@@ -119,7 +119,7 @@ describe("town square walking", () => {
       expect(near, `${h.id}'s nearest neighbor`).toBeGreaterThanOrEqual(8);
       expect(near, `${h.id}'s nearest neighbor`).toBeLessThanOrEqual(10);
     }
-    // No home stands on the Coliseum's 12 x 12 ground (slice 5 built the Coliseum there: solid; slice 6 made it twice the
+    // No home stands on the Colosseum's 12 x 12 ground (slice 5 built the Colosseum there: solid; slice 6 made it twice the
     // size), nor in its park, and you start south of it, in the park in front of its gate (slice 6: the park between; since
     // the park stood back from it, 11 rows south, still inside the view's rim).
     for (let r = COLISEUM.r0; r < COLISEUM.r0 + COLISEUM.size; r++) for (let c = COLISEUM.c0; c < COLISEUM.c0 + COLISEUM.size; c++) expect(plotAt[r * N + c]).toBeNull();

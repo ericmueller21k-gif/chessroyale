@@ -313,7 +313,7 @@ export const TOWN_FEEL = {
   sitCut: 0.34,
   sitSeat: 0.3,
   /**
-   * The Coliseum from afar (slice 6): seen up to this many squares past the rim, standing on the horizon, sunk this many
+   * The Colosseum from afar (slice 6): seen up to this many squares past the rim, standing on the horizon, sunk this many
    * squares behind the world's curve a square past the rim (its top looming over the horizon), and as hazy as this far
    * into the far band (0 to 1).
    */
@@ -362,7 +362,7 @@ export const TOWN_FEEL = {
   closeAboveButtons: 10,
   closeBesideButtons: 8,
   closeSide: 6,
-  /** The quote keeps this far (Coliseum pixels) inside its panel's rim. */
+  /** The quote keeps this far (Colosseum pixels) inside its panel's rim. */
   quoteInset: 0.4,
   /** The close-up drawing crossfades in from the world's figure over this stretch of the glide in (0 to 1). */
   closeSwap: [0.45, 0.8] as const,

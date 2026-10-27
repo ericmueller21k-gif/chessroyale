@@ -1,5 +1,5 @@
 /**
- * The park in front of the Coliseum (town square, slice 6; world.ts PARK): its trees, benches, the stone fountain in its
+ * The park in front of the Colosseum (town square, slice 6; world.ts PARK): its trees, benches, the stone fountain in its
  * middle and its ten chess tables, drawn in code in the homes' pixel style (characters/sprite.ts parts, houses/kit.ts),
  * lit from the top left and outlined, at the homes' scale (37 pixels a square). Each picture's foot is the middle of the
  * square it stands on (the fountain's: the middle of its front edge).
