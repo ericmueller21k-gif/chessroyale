@@ -41,8 +41,10 @@ const PALETTE: Record<string, string> = {
   C: F_.C!,
   D: F_.D!,
   E: F_.E!,
-  i: F_.i!, // faded ink: on lit paper, on mid paper; deep ink (the book's cover, the threads)
-  j: F_.j!,
+  // Faded ink, fainter than Folio's own (#8a93b8, #717898) so the writing stays a texture on the walls: on lit paper, on mid
+  // paper; deep ink (the book's cover, the threads).
+  i: "#b0b4c8",
+  j: "#9497aa",
   l: F_.l!,
   G: F_.G!, // gilt: edge, glint, deep, in shade, warm
   H: F_.H!,
