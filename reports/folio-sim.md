@@ -13,6 +13,39 @@ moves.
 **50** crowd moves over 60 battles. At the director's offset 0 it scored 0.33 (± 0.05), above 0.30, so the one further
 run his calls allowed, at +150, was made; it lands nearer the aim (just above its top), and the sweep stopped there.
 
+**After the review's fixes** (the crease checked again as it falls, the guard's mate rules, a folded rook's castling;
+`folioH`, folioG's settings and seeds, run once): **0.33** (± 0.05, 20 of 60) in **48** moves. That is the top edge of the
+director's 0.20 to 0.33 window, within the noise of folioG (0.28; the difference is 0.05 against a standard error of about
+0.07 on it); nothing was re-tuned.
+
+## The re-run after the review's fixes (Oct 27): folioH
+
+The same settings (offset +150, `rageSpeed` 1.3) and seeds as folioG (seed 1, games 0 to 59, three processes of 20 games,
+rows joined), on the code with the review's fixes. Each crease's cost is now judged **as it falls** (the crowd to move, its
+four turns starting: `creaseCost` on that position), the cost when its warning showed kept beside it (`warned`); a warned
+crease that didn't fall is listed (`creasesOff`).
+
+| Run | Offset (its Elo) | Battles | Crowd wins / draws / boss wins | Crowd score (± 1 s.e.) | Games 1-30 / 31-60 | Crowd moves: mean (range), median | At the cap |
+|---|---|---|---|---|---|---|---|
+| folioG | +150 (1750) | 60 | 9 / 16 / 35 | 0.28 (± 0.05) | 0.28 / 0.28 | 50 (18-60), 56 | 26 |
+| **folioH** | **+150 (1750)** | 60 | 12 / 16 / 32 | **0.33** (± 0.05) | 0.27 / 0.40 | **48** (18-60), 55 | 26 |
+
+| Run | Marks a battle | Folds a battle | Marks answered in time | Marks folded | Creases a battle | Warned, didn't fall | Cost as it falls (mean, median; in 1 to 2.5; over 2.5) | Cost when warned (mean, median; in 1 to 2.5; over 2.5) | Battles with a Revision | Revision's worth (mean) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| folioG | 9.1 | 4.5 | 25% (137 of 544) | 50% | 2.8 | (not judged) | (not judged) | 0.52, 0.21; 37 of 170; 0 | 38 of 60 (63%) | 2.18 pawns |
+| **folioH** | 8.9 | 4.2 | 30% (158 of 532) | 47% | 2.8 | 1 (of 170) | **0.39, 0.00; 10 of 169; 9** | 0.55, 0.22; 43 of 169; 0 | 37 of 60 (62%) | 3.02 pawns |
+
+What it says:
+
+- **The score moved within the noise** (0.28 to 0.33, one standard error each); the fixes don't change what Folio does in
+  most battles: the re-check stopped one crease in 170 (a warned line that would now have failed the guard).
+- **The Crease costs less as it falls than when it's warned**: two moves come between (the crowd's, then Folio's), and
+  more than half the creases cost the crowd nothing by the time they fall (median 0.00, 10 of 169 in the band). Nine (about
+  1 in 19) cost more than 2.5 as they fall (3.2 to 7.7 pawns; their warnings 0 to 2.05): Folio's move made the line dear
+  (most often a recapture or an escape that now has to cross it). The guard checked again as it falls looks only at the
+  three rules (no move, the crowd's mate in one, Folio's), not the cost, as the review asked; the FAQ says so.
+- Revision came in 37 of 60 battles, worth 3.0 pawns on average.
+
 ## The director's runs (Oct 27): the Crease the crowd's only, the Draft on the top piece, folds of 4 turns
 
 After the first runs (below: 0.40 to 0.58, the easiest boss in the pack), the director changed four things: the Crease
@@ -58,7 +91,7 @@ The raid sim, as for Moo & Moon, Puddles and Babur: a Solo raid of 50 bots again
 per game of seed 1 (each game its own random draw), no strikes, its meter on. The director's runs, 60 games as three
 processes: `npx tsx packages/sim/scripts/boss-sim.ts raid folio 20 1 0 folioF1`, `... raid folio 40 1 0 folioF2 '{"skip":20}'`,
 `... raid folio 60 1 0 folioF3 '{"skip":40}'`, the rows joined into `reports/boss-sim/raid-folioF.jsonl` (`folioG` the same
-with `"offset":{"folio":150}`). The first runs, 26 games each, on the code before the director's calls (commit `923b169`):
+with `"offset":{"folio":150}`; `folioH` the same as `folioG`, on the code after the review's fixes). The first runs, 26 games each, on the code before the director's calls (commit `923b169`):
 `raid folio 26 1 0 <tag> [patch]` (`folioB`: `{"offset":{"folio":0}}`; `folioC`: `{"offset":{"folio":200}}`; `folioD`:
 `{"powers":{"draftEvery":2,"rageSpeed":{"folio":2}}}`; `folioE`: the same and `{"offset":{"folio":200}}`). Score: the
 crowd's result per battle (a win 1, a draw ½; at the 60-move cap the engine's verdict); ± is one standard error. The bots'
@@ -110,5 +143,7 @@ rewind takes back; its cost on Folio's own move was the same or more.)
 ## For the director
 
 Shipped at +150, the crowd at 0.28 (± 0.05), just above the aim's top (0.25) and under 0.30; offset 0 gave 0.33. By your
-rule the sweep stopped there. Folio is now the only boss that plays over the usual strength (1750 against the 1600 tier in
+rule the sweep stopped there. The re-run after the review's fixes (folioH) gave 0.33 (± 0.05) at the same settings: the top
+edge of your 0.20 to 0.33 window, within the noise of 0.28; not re-tuned, your call. As it falls a crease costs the crowd
+0.39 pawns on average (median 0), and about 1 in 19 costs more than 2.5 (its cost is judged only when warned). Folio is now the only boss that plays over the usual strength (1750 against the 1600 tier in
 these runs). Real players who answer the marks would score higher than these bots, who answer them only by chance.

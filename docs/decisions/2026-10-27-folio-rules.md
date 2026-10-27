@@ -160,11 +160,14 @@ nearer the aim; if neither is under 0.30, stop and report.
 1. **A folded rook can't castle** (castling is its move too): the fold's filter and the dock's words use Moo's
    `stunnedIn`, so `e1g1` with the h1 rook folded is refused with "That piece is folded." (Ginger's freeze has the same gap;
    the director fixes it in its own PR.)
-2. **The FAQ says what the band does:** the line costing you as close to 1 to 2.5 pawns as it can, never more than 2.5.
+2. **The FAQ says what the band does:** the line costing you as close to 1 to 2.5 pawns as it can, never more than 2.5,
+   judged when the warning shows; as it falls only the guard's three rules are checked again, not its cost (the final
+   sim found 9 creases in 169 costing more than 2.5 as they fell), and the FAQ says so.
 3. **The crease is checked again as it falls**, on the position it falls on (the crowd to move). A warned line the guard
    now refuses doesn't land: no other line (the crowd was shown this one), its line clears (`creaseEnd`), and the meter is
    spent as if it had come (`ultAt` that turn, one more `ults`; it fills again from empty the turn after). While it holds,
-   only the saw's lifts (no move, or no way out of check), as before. The sims judge each crease's cost as it falls.
+   only the saw's lifts (no move, or no way out of check), as before. The sims judge each crease's cost as it falls
+   (folioH: 1 warned crease in 170 didn't fall).
 4. **The guard's mate rules read as their words:** never take away the crowd's mate in one, never hand Folio one (above,
    call 8). The earlier code refused a line that left the crowd's own mate open and passed one that blocked it.
 5. **Repetition across a Revision:** the God King's Last Stand never plays the move it takes back (no base), so it has no
@@ -180,6 +183,12 @@ nearer the aim; if neither is under 0.30, stop and report.
   above 0.30; at +150, **0.28** (± 0.05) in 50 moves over 60 battles, nearer the aim (0.10 to 0.25, just above its top),
   so +150 ships and the sweep stopped there. Folio is the only boss that plays over the usual strength (1750 against the
   1600 tier in the sim): a final boss. [reports/folio-sim.md](../../reports/folio-sim.md) has the tables.
+- **After the review's fixes**, the one re-run at the same settings and seeds (folioH): **0.33** (± 0.05, 20 of 60) in 48
+  moves, the top edge of the director's 0.20 to 0.33 window and within the noise of folioG's 0.28 (the difference 0.05,
+  its standard error about 0.07). Not re-tuned: the director's call. Its creases, judged as they fall: 0.39 pawns on
+  average, median 0, 10 of 169 in the band and 9 over 2.5 (Folio's move between the warning and the fall makes the line
+  cheaper or, now and then, dearer); judged when warned, 0.55, 43 of 169 in the band, none over. Revision in 37 of 60
+  battles, worth 3.0 pawns.
 - **What the sim says of its powers** (folioG, shipped): 9.1 marks and 4.5 folds a battle (25% of marks answered in time by
   bots that answer them only by chance, half folded); 2.8 Creases a battle, costing the crowd 0.52 pawns on average and
   rarely in the band (37 of 170: most positions have no line taking 1 pawn off the crowd's best move; the rest take the
