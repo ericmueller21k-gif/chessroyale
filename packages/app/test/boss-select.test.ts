@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { BOSS_ROSTER, hiddenBosses, menuBosses } from "@chessroyale/core";
 import { readFileSync } from "node:fs";
-import { rowSizes, SELECT_FRAMING, SELECT_LINES, SELECT_SOUND, SELECT_TINT, selectLine, TILE_RATIO, TILES_PER_ROW } from "../src/characters/boss-select.ts";
+import { rowSizes, SELECT_FRAMING, SELECT_LINES, SELECT_SOUND, SELECT_TINT, selectLine, TILE_RATIO, TILES_PER_ROW, townSound } from "../src/characters/boss-select.ts";
 import { renderFrame } from "../src/characters/sprite.ts";
 import { bossKit } from "../src/characters/kits.ts";
+import { HOMES } from "../src/town/world.ts";
 
 /** The Boss raid screen's character select: each boss's sound and lines (docs/decisions/2026-10-16-boss-character-select.md). */
 describe("the boss select", () => {
@@ -160,5 +161,15 @@ describe("the boss select", () => {
         expect(near / own, `${b.id} in the ${theme} theme: the share of its figure close to its background`).toBeLessThan(0.2);
       }
     }
+  });
+});
+
+describe("a boss's sound when tapped in the town square (Eric, Oct 27)", () => {
+  it("is its select sound, or its own town sounds in turn (Folio: a murmur, then a soft mm-hm)", () => {
+    expect(townSound("tiger", 0)).toBe(SELECT_SOUND.tiger);
+    expect(townSound("tiger", 5)).toBe(SELECT_SOUND.tiger);
+    expect([0, 1, 2, 3].map((n) => townSound("folio", n))).toEqual(["folioMurmur", "folioHum", "folioMurmur", "folioHum"]);
+    // Every boss with a home in the town has one.
+    for (const h of HOMES) expect(townSound(h.id, 0), h.id).toBeTruthy();
   });
 });

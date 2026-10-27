@@ -43,6 +43,21 @@ export const SELECT_SOUND: Readonly<Record<string, SoundName>> = {
   recluse: "recluseHum",
 };
 
+/**
+ * What a boss says when you tap it in the town square (Eric, Oct 27: "when you click on a boss in the town, he should make
+ * a noise"): sounds of its own for the town, taken in turn, else its select sound.
+ */
+export const TOWN_SOUNDS: Readonly<Record<string, readonly SoundName[]>> = {
+  // A low, slow murmur, then a soft "mm-hm" (Eric's picks).
+  folio: ["folioMurmur", "folioHum"],
+};
+
+/** The sound for a boss's `n`th tap in the town square (from 0). */
+export const townSound = (id: string, n: number): SoundName | undefined => {
+  const own = TOWN_SOUNDS[id];
+  return own?.length ? own[n % own.length] : SELECT_SOUND[id];
+};
+
 /** Each boss's lines on the stage (one at random a tap, never the same twice running), by its roster id. */
 export const SELECT_LINES: Readonly<Record<string, readonly string[]>> = {
   gingerbread: ["Ginger is here!", "You'll crumble!", "Fresh out of the freezer!", "Cool as ice."],

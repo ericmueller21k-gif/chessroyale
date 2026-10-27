@@ -732,9 +732,9 @@ export type SoundName =
   | "folioCrumple"
   | "folioGlint"
   | "folioHello"
-  | "folioVoiceShort"
-  | "folioVoiceMedium"
-  | "folioVoiceLong"
+  | "folioVoice"
+  | "folioMurmur"
+  | "folioHum"
   | "kingCant"
   // Squads: a short tick in the last seconds of your free time, and the sting as a squad enters sudden death.
   | "sqTick"
@@ -984,9 +984,9 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   folioCrumple: folioBoss("crumple"),
   folioGlint: folioBoss("glint"),
   folioHello: folioBoss("hello"),
-  folioVoiceShort: folioBoss("voiceShort"),
-  folioVoiceMedium: folioBoss("voiceMedium"),
-  folioVoiceLong: folioBoss("voiceLong"),
+  folioVoice: folioBoss("voice"),
+  folioMurmur: folioBoss("murmur"),
+  folioHum: folioBoss("hum"),
   kingCant,
   sqTick: (t) => clockTick(t, 0.22),
   sqSting,
@@ -1191,9 +1191,9 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   folioCrumple: [["folio", "crumple"]],
   folioGlint: [["folio", "glint"]],
   folioHello: [["folio", "hello"]],
-  folioVoiceShort: [["folio", "voiceShort"]],
-  folioVoiceMedium: [["folio", "voiceMedium"]],
-  folioVoiceLong: [["folio", "voiceLong"]],
+  folioVoice: [["folio", "voice"]],
+  folioMurmur: [["folio", "murmur"]],
+  folioHum: [["folio", "hum"]],
   kingCant: [["godKing", "cant"]],
 };
 /** The sound worker (sound-worker.ts), started with the first warmSounds; null where there's none (or it failed). */
