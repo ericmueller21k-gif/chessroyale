@@ -1,4 +1,5 @@
 import { expect, type Page } from "@playwright/test";
+import { STATUES } from "../packages/app/src/town/world.ts";
 import { test } from "./helpers.ts";
 
 /**
@@ -244,9 +245,15 @@ type Cam = {
 };
 const cam = (p: Page) => p.evaluate(() => (window as unknown as { __townCam: () => Cam }).__townCam());
 
+// (Their squares from the town's own layout, so they follow the Coliseum if it moves: in front of its ground's last and
+// first columns.)
+const statueSq = (id: "bronze" | "marble") => {
+  const s = STATUES.find((x) => x.id === id)!;
+  return [s.c, s.r] as const;
+};
 for (const st of [
-  { id: "bronze", sq: [28, 27], quote: "Concrete considerations always take precedence over general principles", zoomIn: false },
-  { id: "marble", sq: [17, 27], quote: "Nothing is so healing as the human touch", zoomIn: true },
+  { id: "bronze", sq: statueSq("bronze"), quote: "Concrete considerations always take precedence over general principles", zoomIn: false },
+  { id: "marble", sq: statueSq("marble"), quote: "Nothing is so healing as the human touch", zoomIn: true },
 ] as const) {
   test(`the ${st.id} statue: a tap on it walks you up to it, the camera glides in close on it and its quote shows word for word; a tap elsewhere glides back out to the zoom you had and clears it`, async ({ page }) => {
     const errors = watchErrors(page);
@@ -278,7 +285,7 @@ for (const st of [
     expect(close.box![1] - close.box![0], `the statue fills the box (${close.box})`).toBeGreaterThan(0.7);
     expect(close.box![0], "its head in view").toBeGreaterThanOrEqual(0);
     expect(close.box![1], "its pedestal's foot in view").toBeLessThanOrEqual(1);
-    expect(close.cap, "the quote's letters readable on a phone (about 14 px or more)").toBeGreaterThanOrEqual(14);
+    expect(close.cap, "the quote's letters readable on a phone (12 px or more, on a pedestal of normal size)").toBeGreaterThanOrEqual(12);
     expect(Math.abs(close.focus[0] - st.sq[0]) + Math.abs(close.focus[1] - st.sq[1]), "the camera looks at the statue's square").toBeLessThan(0.1);
     expect(close.zoom, "the − / + zoom itself is untouched").toBe(before.zoom);
     await expect(live).toHaveText(st.quote, { useInnerText: true });

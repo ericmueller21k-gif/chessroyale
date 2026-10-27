@@ -350,11 +350,20 @@ export const TOWN_FEEL = {
   closeGlideMs: 900,
   /** Up close, the statue and its pedestal fill the box from this far down it... */
   closeTop: 0.04,
-  /** ...to this far down (or, where they'd reach the − / + and "Back to me" buttons, this many pixels above them)... */
+  /** ...to this far down... */
   closeBottom: 0.95,
-  closeAboveButtons: 10,
-  /** ...and at most this share of its width. */
+  /** ...and at most this share of its width, in the middle. */
   closeMaxWidth: 0.92,
+  /**
+   * Where the statue would reach the − / + and "Back to me" buttons (a phone), it goes round them whichever way lets it be
+   * bigger (so its pedestal's quote is bigger): ending this many pixels above them, or moved off the middle to end this
+   * many pixels left of them, at least `closeSide` pixels from the box's left edge.
+   */
+  closeAboveButtons: 10,
+  closeBesideButtons: 8,
+  closeSide: 6,
+  /** The quote keeps this far (Coliseum pixels) inside its panel's rim. */
+  quoteInset: 0.4,
   /** The close-up drawing crossfades in from the world's figure over this stretch of the glide in (0 to 1). */
   closeSwap: [0.45, 0.8] as const,
   /** A close-up drawing finished while you're already up close fades in over this many ms (it's made ahead, so rarely). */
@@ -367,7 +376,10 @@ export const TOWN_FEEL = {
   /** The close-up drawings are made this long after the page opens, a slice a frame (at most this many ms of work a frame). */
   closeBuildAfterMs: 1500,
   closeBuildBudgetMs: 4,
-  /** The quote renders in line by line once the camera arrives: each line fades in over this many ms, this long after the one above... */
+  /**
+   * The quote renders in line by line once the camera arrives (the panel's squiggles fading as the first line comes): each
+   * line fades in over this many ms, this long after the one above...
+   */
   quoteFadeMs: 320,
   quoteLineMs: 140,
   /** ...and fades out over this many ms when you leave. */

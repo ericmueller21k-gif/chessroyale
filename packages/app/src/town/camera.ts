@@ -39,10 +39,11 @@ export interface View {
   zoom: number;
   /**
    * The lens (the close-up on a statue): everything magnified `mag` times about the lens's middle (the box's middle
-   * column, `cy`), then shifted `oy` pixels down. 1 and 0: the plain camera. A longer lens, not a moved camera: the
-   * world keeps its shape, only the view narrows.
+   * column, `cy`), then shifted `ox` pixels right and `oy` down. 1, 0 and 0: the plain camera. A longer lens, not a
+   * moved camera: the world keeps its shape, only the view narrows.
    */
   mag: number;
+  ox: number;
   oy: number;
   /** The blended camera set for this box. */
   P: CamSet;
@@ -75,6 +76,7 @@ export function newView(): View {
     H: 0,
     zoom: -1,
     mag: 1,
+    ox: 0,
     oy: 0,
     P: { ...TOWN_FEEL.camTall },
     h: 1,
@@ -101,14 +103,15 @@ const tmp = newPt();
 
 /**
  * Works the camera out for a box of W x H CSS pixels at a zoom (0 = normal, 1 = zoomed out), through a lens of `mag`
- * shifted `oy` (the close-up; 1, 0: none). Cheap when nothing changed.
+ * shifted `oy` down and `ox` right (the close-up; 1, 0, 0: none). Cheap when nothing changed.
  */
-export function setView(v: View, W: number, H: number, zoom: number, mag = 1, oy = 0): void {
-  if (v.W === W && v.H === H && v.zoom === zoom && v.mag === mag && v.oy === oy) return;
+export function setView(v: View, W: number, H: number, zoom: number, mag = 1, oy = 0, ox = 0): void {
+  if (v.W === W && v.H === H && v.zoom === zoom && v.mag === mag && v.oy === oy && v.ox === ox) return;
   v.W = W;
   v.H = H;
   v.zoom = zoom;
   v.mag = mag;
+  v.ox = ox;
   v.oy = oy;
   const f = TOWN_FEEL;
   const t = clamp((W / H - f.aspectTall) / (f.aspectWide - f.aspectTall), 0, 1);
@@ -155,7 +158,7 @@ export function proj(v: View, dx: number, dz: number, lift: number, out: Pt): bo
   const depth = Z * v.cs - Y * v.sn;
   if (depth < 0.5) return false;
   const up = Y * v.cs + Z * v.sn;
-  out.x = v.W / 2 + (v.F * dx) / depth;
+  out.x = v.W / 2 + v.ox + (v.F * dx) / depth;
   out.y = v.cy + v.oy - (v.F * up) / depth;
   out.k = v.F / depth;
   out.depth = depth;
@@ -252,7 +255,7 @@ function scanRow(v: View, camX: number, camY: number, ru: number, visit: (c: num
   if (ta.y - 40 > v.H && proj(v, 0, zf, 0, tb) && tb.y > v.H) return false; // below the bottom of the box
   const zc = zn <= 0 && zf >= 0 ? 0 : Math.min(Math.abs(zn), Math.abs(zf));
   const Lrim = Math.sqrt(Math.max(0, v.rim * v.rim - zc * zc)) * v.rimX + 1.5;
-  const L = Math.min(N / 2 - 1, (v.W / 2 + 40) / kn + 1.5, Lrim);
+  const L = Math.min(N / 2 - 1, (v.W / 2 + Math.abs(v.ox) + 40) / kn + 1.5, Lrim);
   const c0 = Math.floor(camX - L);
   const c1 = Math.ceil(camX + L);
   const n = c1 - c0 + 2;

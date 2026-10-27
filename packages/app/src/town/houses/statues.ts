@@ -1,17 +1,21 @@
 /**
  * The two statues on the Coliseum's front, one each side of its gate, each on a pedestal of its own (town square;
- * docs/decisions/2026-10-26-town-square-statues.md): the marble statue (`marble`, the Hidden Boss in stone, on the gate's
- * left) and the bronze statue (`bronze`, on its right). Each is drawn twice: at the world's scale (1 picture pixel a
- * Coliseum pixel) and as a close-up (`CLOSE` times finer, the same box), which the camera shows when it zooms in on it.
- * No name is written on either, nor on its pedestal: the game writes only its quote on the pedestal's panel, up close.
+ * docs/decisions/2026-10-26-town-square-statues.md, -statues-2.md): the marble statue (`marble`, the Hidden Boss in
+ * stone, on the gate's left) and the bronze statue (`bronze`, on its right). Each is drawn twice: at the world's scale
+ * (1 picture pixel a Coliseum pixel) and as a close-up (`CLOSE` times finer, the same box), which the camera shows when
+ * it zooms in on it. The pedestals are about a piece's plinth's size; at the world's scale their panels carry only a few
+ * squiggly lines, like writing too small to read. No name is written on either statue or pedestal: up close the game
+ * writes only its quote on the pedestal's panel, at the screen's own resolution.
  *
- * A figure is a stack of pieces (front to back), each a shape in statue units: X across from its middle (right +), j up
- * from its foot (the pedestal's top). `sculpt` paints it in one stuff (marble or bronze), lit from the top left like the
- * Coliseum's chess pieces: a piece is lit where it faces up and left, in shade where it faces down and right, and a piece
- * in front casts a thin shadow down-right onto the pieces behind it. Drawn finer (s > 1), the pieces' `mark`s add the
- * detail the world's scale can't hold. At the world's scale each head is typed by hand, pixel by pixel.
+ * The bronze statue is a stack of pieces (front to back), each a shape in statue units: X across from its middle (right
+ * +), j up from its foot (the pedestal's top). `sculpt` paints it in one stuff (bronze, or the marble slab), lit from the
+ * top left like the Coliseum's chess pieces: a piece is lit where it faces up and left, in shade where it faces down and
+ * right, and a piece in front casts a thin shadow down-right onto the pieces behind it. Drawn finer (s > 1), the pieces'
+ * `mark`s add the detail the world's scale can't hold. At the world's scale its head is typed by hand, pixel by pixel.
+ * The marble statue is the Hidden Boss's own picture (characters/recluse.ts) turned to marble (`bossFigure`).
  */
-import type { Character, Part } from "../../characters/sprite.ts";
+import { RECLUSE, recluseLayers } from "../../characters/recluse.ts";
+import { renderFrame, type Character, type Part } from "../../characters/sprite.ts";
 import type { StatueId } from "../world.ts";
 import { grain, type Key, type Pt } from "./kit.ts";
 
@@ -177,113 +181,151 @@ function sculpt(fig: Figure, cx: number, fy: number, stuff: string, s: number): 
   });
 }
 
-// ---- The marble statue: the Hidden Boss (characters/recluse.ts at statue scale) in stone. Tall, narrow-shouldered,
-// the tie, the swept hair parted on our left with its lock to his brow, the book clutched at his side, his other arm
-// hanging.
+// ---- The marble statue: the Hidden Boss's own picture (characters/recluse.ts, his standing idle) in stone, so it reads
+// as the same man at a glance. His idle frame is drawn without the book (the book arm hanging as his other arm does, its
+// hand the free hand's mirror), and each of his colors becomes the marble shade of its lightness (his own light from the
+// top left and his outline kept); he stands on a marble slab. His picture is twice the world's scale and half the
+// close-up's: the world's figure takes his pixels two by two (its head touched up by hand), the close-up doubles each
+// (smoothed along its diagonals).
 
-const BOSS_TORSO = poly(mirrorPts([[-2.2, 51.4], [-5, 50], [-6.4, 47.6], [-6.1, 42], [-5.1, 36], [-4.9, 29.6]]));
-const BOSS_LEG_L = poly([[-5, 30.4], [0, 30.4], [0, 25.5], [-0.6, 4.2], [-4.3, 4.2], [-4.9, 18]]);
-const BOSS_LEG_R = bound((X, j) => BOSS_LEG_L(-X, j), 0, 5, 4.2, 30.4);
-/** His face: long, a narrow chin; the head bowed a touch (the chin tucked). */
-const bossFaceHalf = (j: number) => (j > 57.2 ? 3 * Math.sqrt(Math.max(0, 1 - ((j - 57.2) / 4.6) ** 2)) : j > 52.6 ? 1.15 + (1.85 * (j - 52.6)) / 4.6 : 0);
-const BOSS_FACE = bound((X, j) => Math.abs(X - 0.1) < bossFaceHalf(j), -3, 3.2, 52.6, 61.9);
-/** His hair: thick, swept from a part on our left across to our right, over the tops of his ears; a lock to his brow. */
-const BOSS_HAIR: Shape = any(
-  bound((X, j) => ell(0.5, 60.2, 4, 4.4)(X, j) && j > 59.6 - Math.max(0, X - 0.5) * 0.55 && !(X < -2.4 && j < 60), -3.5, 4.5, 55.8, 64.6),
-  capsule(-1.1, 61.2, -1.9, 58.9, 0.75, 0.5),
-);
-const BOSS_BOOK = box(-10.2, -2, 28.6, 41.6);
-/** His tie, its knot under the collar's points (wide enough to read at the world's scale: 3 pixels). */
-const BOSS_TIE = poly([[-1, 50], [1.1, 50], [0.7, 48.4], [1.5, 37.6], [0.1, 35.4], [-1.3, 37.6], [-0.6, 48.4]]);
+/** The marble's shades, lightest to darkest (palette keys), and the lightness (0 to 1) of each. */
+const MARBLE_KEYS = "wP6p7q8Q9";
+const MARBLE_L = [0.98, 0.945, 0.88, 0.81, 0.71, 0.61, 0.52, 0.43, 0.35] as const;
+/** How light his darkest color turns (marble is never dark: his navy trousers are a mid grey), and his outline's share in a two-by-two block. */
+const MARBLE_LO = 0.36;
+const MARBLE_LINE = 0.3;
+const nearestMarble = (m: number): string => {
+  let best = 0;
+  for (let i = 1; i < MARBLE_L.length; i++) if (Math.abs(MARBLE_L[i]! - m) < Math.abs(MARBLE_L[best]! - m)) best = i;
+  return MARBLE_KEYS[best]!;
+};
 
-const BOSS: Figure = {
-  half: 13,
-  h: 66,
-  top: 65.5,
+/**
+ * His idle frame without the book, as his own pixels in marble keys ('k' his outline, '.' none), from the first even row
+ * that shows him down to his feet (`RECLUSE.foot`), and where his feet are across it. Made once, the first time asked.
+ */
+let bossPix: { rows: string[]; footX: number } | null = null;
+function bossPixels(): { rows: string[]; footX: number } {
+  if (bossPix) return bossPix;
+  const layers = recluseLayers({ face: { eyes: "ahead", brows: "stern" }, hold: { loose: true, at: [0, 0], elbowR: [32, 60], wristR: [32, 81] } })
+    .filter((l) => !l.part.startsWith("book:") && l.part !== "shadow")
+    .map((l) => (l.part === "fist:a" ? { part: "hand:rest", x: l.x - 1, y: l.y, flipX: true } : l)); // (his free hand, mirrored)
+  const { halo: _halo, ...plain } = RECLUSE;
+  const img = renderFrame(plain, { ms: 0, layers });
+  const k = RECLUSE.palette.k!;
+  const [kr, kg, kb] = [1, 3, 5].map((i) => parseInt(k.slice(i, i + 2), 16));
+  const rows: string[] = [];
+  for (let y = 0; y < RECLUSE.foot[1]; y++) {
+    let row = "";
+    for (let x = 0; x < img.w; x++) {
+      const o = (y * img.w + x) * 4;
+      const r = img.data[o]!;
+      const g = img.data[o + 1]!;
+      const b = img.data[o + 2]!;
+      row += img.data[o + 3]! < 128 ? "." : r === kr && g === kg && b === kb ? "k" : nearestMarble(MARBLE_LO + ((1 - MARBLE_LO) * (0.299 * r + 0.587 * g + 0.114 * b)) / 255);
+    }
+    rows.push(row);
+  }
+  let top = rows.findIndex((row) => /[^.]/.test(row));
+  top -= (RECLUSE.foot[1] - top) % 2; // (whole pairs of rows down to his feet)
+  return (bossPix = { rows: rows.slice(top), footX: RECLUSE.foot[0] });
+}
+
+/** Scale2x: each pixel doubled, its corners taking a neighbor's key where two neighbors agree (smooth diagonals). */
+function scale2x(rows: readonly string[]): string[] {
+  const h = rows.length;
+  const w = rows[0]!.length;
+  const at = (x: number, y: number) => (x < 0 || y < 0 || x >= w || y >= h ? "." : rows[y]![x]!);
+  const out: string[] = [];
+  for (let y = 0; y < h; y++) {
+    let r0 = "";
+    let r1 = "";
+    for (let x = 0; x < w; x++) {
+      const p = at(x, y);
+      const A = at(x, y - 1);
+      const B = at(x + 1, y);
+      const C = at(x - 1, y);
+      const D = at(x, y + 1);
+      r0 += (C === A && C !== D && A !== B ? A : p) + (A === B && A !== C && B !== D ? B : p);
+      r1 += (D === C && D !== B && C !== A ? C : p) + (B === D && B !== A && D !== C ? D : p);
+    }
+    out.push(r0, r1);
+  }
+  return out;
+}
+
+/**
+ * His figure at scale `s` (the world's 1 or the close-up's), its feet on (cx, fy): at the world's scale each two-by-two
+ * block of his pixels is filled where most of it is him, in the marble shade of its mean lightness (his outline lines
+ * darkening it), and outlined anew; up close his pixels are doubled, his own outline kept.
+ */
+function bossFigure(cx: number, fy: number, s: number): Painted {
+  const { rows, footX } = bossPixels();
+  if (s > 1) {
+    let grid = rows;
+    for (let f = 2; f < s; f *= 2) grid = scale2x(grid);
+    return { part: { grid, outline: false }, at: [cx - (footX * s) / 2, fy - grid.length] };
+  }
+  const w = rows[0]!.length / 2;
+  const h = rows.length / 2;
+  const L = (c: string) => (c === "k" ? MARBLE_LINE : MARBLE_L[MARBLE_KEYS.indexOf(c)]!);
+  const grid: string[] = [];
+  for (let y = 0; y < h; y++) {
+    let row = "";
+    for (let x = 0; x < w; x++) {
+      const px = [rows[2 * y]![2 * x]!, rows[2 * y]![2 * x + 1]!, rows[2 * y + 1]![2 * x]!, rows[2 * y + 1]![2 * x + 1]!];
+      const body = px.filter((c) => c !== "." && c !== "k").length;
+      if (body < 2) {
+        row += ".";
+        continue;
+      }
+      const on = px.filter((c) => c !== ".");
+      row += nearestMarble(on.reduce((t, c) => t + L(c), 0) / on.length);
+    }
+    grid.push(row);
+  }
+  return { part: { grid: BOSS_TOUCH ? touchUp(grid, BOSS_TOUCH) : grid }, at: [cx - footX / 2, fy - h] };
+}
+
+/** The world's figure's head, touched up by hand over the two-by-two picture: rows from its top, '.' left as made. */
+const BOSS_TOUCH: { x: number; y: number; rows: readonly string[] } | null = {
+  x: 8,
+  y: 0,
   // prettier-ignore
-  head: [
-    "....mmm...", // his hair: thick, parted on our left, swept across to our right
-    "..lmmmmmm.",
-    ".lldlllmmd",
-    ".mldllmmmd",
-    ".mmdmmmddd",
-    ".mlldllmd.", // the lock falling from the part
-    ".mldllmmd.", // to his brow
-    ".lxdlxdxd.", // heavy brows; the ears set high
-    ".llmlmmdd.", // the eyes, rolled up at us from under them
-    "..llldmd..", // the long straight nose
-    "..llddmd..",
-    "..lllmdd..", // a thin half-smirk, up on our right
-    "...lddm...",
-    "...lmmd...", // the narrow chin
-    "....dd....", // his neck, in the head's shade
-  ],
-  pieces: [
-    { in: ell(-2.6, 32.4, 1.8, 1.7), mark: (X, j, s) => (s > 1 && j < 32.6 && j > 31.8 && X > -3.6 && X < -1.4 ? "d" : undefined) }, // his hand, on the book
-    { in: capsule(-8.3, 31.4, -3.6, 32, 1.35) }, // the forearm under the book
-    {
-      in: BOSS_BOOK,
-      deep: true,
-      // The cover's carved border and the pages' edge on top; at the close-up its one letter (as on his red book).
-      mark: (X, j, s) => {
-        if (s === 1) return j > 40.6 ? "l" : X < -9.2 ? "l" : undefined;
-        if (j > 41) return "l";
-        const inset = Math.min(X + 10.2, -2 - X, j - 28.6, 41.6 - j);
-        if (inset > 0.9 && inset < 1.2) return "x";
-        const u = X + 6.1;
-        const v = j - 35.1;
-        if (Math.abs(v) < 2 && (Math.abs(u + 1.6) < 0.3 || Math.abs(u) < 0.3 || Math.abs(u - 1.6) < 0.3)) return "x";
-        if (v > -2 && v < -1.6 && Math.abs(u) < 1.9) return "x";
-        return undefined;
-      },
-    },
-    { in: poly([[-2.2, 50.6], [-0.6, 51.3], [0.8, 51.3], [2.3, 50.6], [0.9, 49.1], [-0.8, 49.1]]) }, // the collar's points either side of the knot
-    // The tie (deep, so it reads against his shirt at the world's scale too), a clip across it.
-    { in: BOSS_TIE, deep: true, mark: (X, j, s) => (j > 41.2 && j < 41.2 + Math.max(1, 1.6 / s) ? "l" : s === 1 ? (X > 0 ? "x" : "d") : undefined) },
-    // His free arm, hanging: the sleeve rolled up to the elbow (a cuff), the bare forearm, the hand.
-    { in: ell(6.4, 27.4, 1.25, 2) },
-    { in: capsule(6.6, 37.6, 6.5, 29, 1.25, 1.1) },
-    { in: capsule(6.65, 39.4, 6.6, 37.2, 1.65) },
-    { in: capsule(5.5, 47.2, 6.6, 39, 1.55) },
-    {
-      in: BOSS_HAIR,
-      big: true,
-      deep: true,
-      // The part, and strands swept from it: across to our right, down to our left.
-      mark: (X, j) => {
-        if (Math.abs(X + 1.75) < 0.2 && j > 61.4) return "x";
-        const u = X > -1.75 ? j + (X + 1.75) * 0.45 : j - (X + 1.75) * 0.9;
-        const w = ((u % 1.1) + 1.1) % 1.1;
-        if (w < 0.22) return "x";
-        if (w > 0.85 && X < 1.5) return "l";
-        return undefined;
-      },
-    },
-    {
-      in: BOSS_FACE,
-      big: true,
-      // Heavy brows over deep-set eyes (looking up at us from under them), the long nose's shadow, a thin pressed mouth.
-      mark: (X, j) => {
-        const ax = Math.abs(X - 0.1);
-        if (j > 58.3 && j < 59.1 - ax * 0.12 && ax > 0.45 && ax < 2.6) return "x"; // the brows
-        if (j > 57.2 && j < 57.9 && ax > 0.8 && ax < 2) return ax > 1.2 && ax < 1.6 ? "x" : "m"; // the eyes, irises up
-        if (X > 0.35 && X < 0.75 && j > 55.2 && j < 58) return "d"; // the nose's shade
-        if (j > 54.8 && j < 55.3 && X > -0.6 && X < 0.9) return "d"; // its tip's shadow
-        if (j > 53.7 && j < 54.1 && X > -1 && X < 1.2) return "d"; // the mouth, a half-smirk
-        return undefined;
-      },
-    },
-    { in: any(ell(-3, 57.4, 0.75, 1.2), ell(3.2, 57.4, 0.75, 1.2)), big: true }, // ears
-    { in: box(-1.4, 1.6, 50, 53.5) }, // neck
-    { in: BOSS_TORSO, glint: (X, j) => j > 46 && X < -3 },
-    { in: capsule(-5.5, 47.2, -7.9, 32.5, 1.6) }, // the book arm's sleeve, behind the book
-    { in: box(-5, 5, 28.8, 30.6), mark: (X, _j, s) => (s > 1 && Math.abs(X) < 0.7 ? "l" : undefined) }, // the belt
-    { in: BOSS_LEG_L, deep: true },
-    { in: BOSS_LEG_R, deep: true },
-    { in: any(ell(-2.9, 3.3, 2.4, 1.6), ell(2.9, 3.3, 2.4, 1.6)) }, // shoes
-    { in: box(-8.5, 8.5, 0, 2.2) }, // the statue's own base
+  rows: [
+    "......_____......", // (his hair's crown, rounded off)
+    "...._q888888Q....", // his hair, lit on our left
+    "....qQqqq8888Q...", // the part, on our left
+    "...q8Q88888888Q..",
+    "..q8QQ7pp7p7q8Q..", // the lock, fallen to his brow
+    "..8q7QQQ7QQQq8Q..", // heavy brows
+    "...qpP9p7P9qq8...", // his eyes, up at us from under them
+    "...qpp7p7qqqq8...",
+    "...qppppq7qqq8...", // the long nose
+    "....pppp7qqq8....",
+    "....7ppqq7q8.....",
+    "....7pppp8q8.....", // the half-smirk, up on our right
+    ".....7888qq......",
+    ".....8p77q.......", // the narrow chin
+    "......8pq8.......",
   ],
 };
+function touchUp(grid: readonly string[], t: { x: number; y: number; rows: readonly string[] }): string[] {
+  return grid.map((row, y) => {
+    const tr = t.rows[y - t.y];
+    if (!tr) return row;
+    let out = "";
+    for (let x = 0; x < row.length; x++) {
+      const c = tr[x - t.x];
+      out += c && c !== "." ? (c === "_" ? "." : c) : row[x]!;
+    }
+    return out;
+  });
+}
+
+/** The slab he stands on (his own base on the pedestal), and his figure's height over it in the world's pixels. */
+const MARBLE_SLAB: Figure = { half: 13, h: 2, top: 0, head: [], pieces: [{ in: box(-8.5, 8.5, 0, 2) }] };
+const marbleH = () => MARBLE_SLAB.h + bossPixels().rows.length / 2;
 
 // ---- The bronze statue: tall and lanky, narrow sloping shoulders; a long narrow face, a strong straight brow, deep-set
 // eyes, a long straight nose, a warm closed smile; short curly hair, full and bushy on top, close at the sides; a
@@ -300,15 +342,21 @@ const bFaceHalf = (j: number) => {
   return 1.65 * Math.sqrt(Math.max(0, 1 - ((53.6 - j) / 0.9) ** 2)); // a rounded chin
 };
 const B_FACE = bound((X, j) => Math.abs(X) < bFaceHalf(j), -3.1, 3.1, 52.6, 63);
-/** His hair: short curls, full and rounded on top, close at the sides (above the ears); a curly edge. */
+/**
+ * His hair: short curls, full but close to his head (Eric, Oct 26: about half as bushy as it was, the top cut well down),
+ * a cap over his skull's curve, thicker on top than at the sides, coming down his sides to the tops of his ears (so his
+ * temples aren't bare) with short sideburns in front of them; a low, straight hairline over the forehead; a curly edge.
+ */
 const B_HAIR = bound((X: number, j: number) => {
-  const a = Math.atan2(j - 63.6, X);
-  const bump = 1 + 0.07 * Math.sin(a * 11 + 0.6);
-  const r = ((X - 0.1) / (3.9 * bump)) ** 2 + ((j - 63.6) / (3.7 * bump)) ** 2;
-  // Its front edge: a low, straight hairline over the forehead, the curls close down the temples to the tops of the ears.
-  const edge = 61.7 + 0.2 * Math.cos(X * 3.3 + 0.4) - Math.max(0, Math.abs(X) - 2.4) * 1.9;
-  return r < 1 && j > edge;
-}, -4.8, 5.1, 57, 67.6);
+  const a = Math.atan2(j - 59.3, X);
+  const bump = 1 + 0.035 * Math.sin(a * 13 + 0.6);
+  if (Math.abs(X / (3.75 * bump)) ** 2.6 + Math.abs((j - 59.3) / (5.3 * bump)) ** 2.6 >= 1) return false;
+  const ax = Math.abs(X);
+  // Its lower edge: over the forehead, then down the temples to the ears' tops; sideburns just in front of the ears.
+  if (ax < 2.1) return j > 61.6 + 0.15 * Math.cos(X * 3.3 + 0.4);
+  if (ax > 2.45 && ax < 2.95) return j > 58.4;
+  return j > Math.max(59.2, 61.6 - (ax - 2.1) * 4);
+}, -4, 4, 58, 64.9);
 /** Curls at the close-up: small rings on a jittered grid, their lower-right rims in shade, their upper-left lit. */
 function curls(X: number, j: number): Tone | undefined {
   const g = 0.95;
@@ -327,24 +375,21 @@ function curls(X: number, j: number): Tone | undefined {
   const lit = X - bx + (bj - j); // < 0 toward the top left
   if (best > 0.36 && best < 0.56) return lit > 0.05 ? "x" : undefined;
   // Each curl's lit crest: bright only on the side of the head the light falls on (top left), a step down elsewhere.
-  if (best < 0.26 && lit < -0.08) return X - 0.4 * (j - 63.6) < -0.8 ? "l" : "m";
+  if (best < 0.26 && lit < -0.08) return X - 0.4 * (j - 61.5) < -0.8 ? "l" : "m";
   return undefined;
 }
 
 const BRONZE: Figure = {
   half: 13,
-  h: 68,
-  top: 67.5,
+  h: 66,
+  top: 64.5,
   // prettier-ignore
   head: [
-    "...llmm...", // curls: a round, bushy crown, wider than his face
-    ".llmmmmdd.",
-    "llmmlmmdmd",
-    "lmmmdmmmdd",
-    "mmdmmdmddd",
-    ".mdmddmdd.", // the curls' edge, low over the forehead
-    ".dllllmmd.", // the forehead, the hair close at the temples
-    "mlxxlxxdmd", // the brows, straight and strong; the ears
+    "...lmmm...", // curls: a low crown, close to his head
+    "..lmmmmdd.",
+    ".lmdmdmdd.", // the curls' edge, low over the forehead
+    ".mmllllmd.", // the forehead; the hair down his sides
+    "mmxxlxxdmd", // the brows, straight and strong; the hair at his temples, the ears
     "mllmllmdmd", // the eyes, deep in the brows' shade
     ".lllddmdd.", // the long straight nose
     ".llldmmdd.",
@@ -448,68 +493,89 @@ const KNIGHT: Figure = {
   ],
 };
 
-// ---- The pedestals: a base, a tall die with a panel on its face (the quote's place), a cornice. The marble statue's is
-// marble, its panel sunk (the quote engraved there); the bronze statue's is the Coliseum's stone with a bronze plaque
-// (the quote cast in it).
+// ---- The pedestals: a base course, a die with a panel on its face, a cornice, about a chess piece's plinth's size
+// (coliseum.ts, 38 x 20). The marble statue's is marble, its panel sunk; the bronze statue's is the Coliseum's stone with a
+// bronze plaque. At the world's scale the panel holds no words, only a few short squiggly lines, like writing too small to
+// read; up close the game writes the quote over them (render.ts), engraved in the marble or cast in the bronze.
 
+/** The pedestal's size (Coliseum pixels): about a piece's plinth (Eric, Oct 26: "a normal size block"). */
+export const PED_W = 40;
+export const PED_H = 24;
+/** Its panel's face, where the quote goes: across from its middle and up from its foot (Coliseum pixels), framed by a rim a pixel wide. */
+const FACE = { x0: -17, x1: 17, j0: 4, j1: 19 } as const;
+/** The die (between the base course and the cornice): its half width, and where it runs. */
+const DIE = { half: 19, j0: 2, j1: 21 } as const;
 /**
- * The pedestal's size (Coliseum pixels): wider and taller than a chess piece's plinth (26 x 14), big enough that its
- * panel holds the longer quote in 15-pixel letters up close on a phone (a 390 x 664 box) and a short laptop window.
+ * The squiggles on the panel: a few short lines of "writing" (each a run of word lengths, in Coliseum pixels, two apart),
+ * from the top line down, centered. They're as long as the panel's lines of text would be, give or take.
  */
-export const PED_W = 52;
-export const PED_H = 44;
-/** Its panel's face, where the quote goes: across from its middle and up from its foot (Coliseum pixels). */
-const FACE = { x0: -23, x1: 23, j0: 4, j1: 37 } as const;
+const SQUIGGLES: readonly (readonly number[])[] = [
+  [7, 9, 5, 6],
+  [5, 10, 8, 4],
+  [8, 4, 9],
+  [6, 5],
+];
+/** The squiggles' lines' rows (j of their middles) and how far they wave (Coliseum pixels). */
+const SQUIGGLE_J = [16, 13, 10, 7] as const;
+const SQUIGGLE_AMP = 0.45;
+
+/** Is (X, j) on a squiggle, at scale s (1: a pixel wide, waving a row up and down; finer: a thin wavy stroke)? */
+function onSquiggle(X: number, j: number, s: number): boolean {
+  for (let l = 0; l < SQUIGGLES.length; l++) {
+    const jm = SQUIGGLE_J[l]!;
+    if (Math.abs(j - jm) > 1.2) continue;
+    const words = SQUIGGLES[l]!;
+    const total = words.reduce((t, w) => t + w, 0) + 2 * (words.length - 1);
+    let x = -total / 2;
+    for (const w of words) {
+      if (X >= x && X < x + w) {
+        const wave = Math.sin((X - x) * 1.9 + l * 2.1) + 0.35 * Math.sin((X - x) * 4.3 + l);
+        if (s === 1) return Math.floor(j) === Math.floor(jm) + (wave > 0.35 ? 1 : 0);
+        return Math.abs(j - jm - SQUIGGLE_AMP * 0.75 * wave) < 0.2;
+      }
+      x += w + 2;
+    }
+  }
+  return false;
+}
 
 function pedestal(cx: number, fy: number, s: number, kind: StatueId): Generator<void, Painted> {
   const marble = kind === "marble";
   const stone = marble ? "PPpqQ" : "12345"; // lightest to darkest
-  return paintSteps(cx - (PED_W / 2) * s, fy - PED_H * s, PED_W * s, PED_H * s, (x, y) => {
+  const half = PED_W / 2;
+  return paintSteps(cx - half * s, fy - PED_H * s, PED_W * s, PED_H * s, (x, y) => {
     const X = (x + 0.5 - cx) / s;
     const j = (fy - (y + 0.5)) / s;
     const u = 1 / s; // one picture pixel at this scale, in units
-    const lit = (X: number, half: number) => (X < -half + 2.5 ? 0 : X > half - 4 ? 3 : X > half * 0.3 ? 2 : 1);
-    // The base: a plinth course, its top lit.
-    if (j < 3) {
-      if (Math.abs(X) >= PED_W / 2) return null;
-      return j >= 3 - u ? stone[0]! : stone[Math.min(4, lit(X, PED_W / 2) + 1)]!;
-    }
-    // The cornice: a lit top, a band, a shadowed drip under it.
-    if (j >= PED_H - 5) {
-      if (Math.abs(X) >= PED_W / 2 - (j < PED_H - 4 ? 1 : 0)) return null;
+    const lit = (X: number, h: number) => (X < -h + 2.5 ? 0 : X > h - 4 ? 3 : X > h * 0.3 ? 2 : 1);
+    // The base course: its top lit.
+    if (j < DIE.j0) return j >= DIE.j0 - u ? stone[0]! : stone[Math.min(4, lit(X, half) + 1)]!;
+    // The cornice: a shadowed band, a lit face, a lit top.
+    if (j >= DIE.j1) {
       if (j >= PED_H - u) return stone[0]!;
-      if (j < PED_H - 4 + u) return stone[3]!;
-      if (fineLine(j, PED_H - 2, u)) return stone[2]!; // a groove
-      return stone[lit(X, PED_W / 2)]!;
+      if (j < DIE.j1 + 1) return stone[3]!;
+      return stone[lit(X, half)]!;
     }
     // The die.
-    if (Math.abs(X) >= PED_W / 2 - 2) return null;
-    if (j >= PED_H - 5 - u && j < PED_H - 5) return stone[3]!; // the cornice's shadow on the die
+    if (Math.abs(X) >= DIE.half) return null;
+    if (j >= DIE.j1 - u) return stone[3]!; // the cornice's shadow on it
     const inPanel = X >= FACE.x0 - 1 && X < FACE.x1 + 1 && j >= FACE.j0 - 1 && j < FACE.j1 + 1;
     if (!inPanel) {
-      // Speckled a little (the stone's grain, finer at the close-up).
-      const g = grain(Math.floor(X * 2), Math.floor(j * 2), marble ? 11 : 12);
-      const k = lit(X, PED_W / 2 - 2);
+      const g = grain(Math.floor(X * 2), Math.floor(j * 2), marble ? 11 : 12); // speckled a little (the stone's grain)
+      const k = lit(X, DIE.half);
       return stone[k === 1 && g > 0.93 ? 2 : k]!;
     }
+    const field = X >= FACE.x0 && X < FACE.x1 && j >= FACE.j0 && j < FACE.j1;
     if (marble) {
-      // A sunk panel: its top and left edges in shadow, its bottom and right lit; the field a step darker than the die.
-      if (j >= FACE.j1) return stone[3]!;
-      if (X < FACE.x0) return stone[3]!;
-      if (j < FACE.j0) return stone[0]!;
-      if (X >= FACE.x1) return stone[0]!;
-      if (j >= FACE.j1 - u) return stone[2]!;
-      return stone[1]!;
+      // A sunk panel: its top and left edges in shadow, its bottom and right lit; the field flat (the quote's place).
+      if (!field) return j >= FACE.j1 || X < FACE.x0 ? stone[3]! : stone[0]!;
+      return onSquiggle(X, j, s) ? stone[3]! : stone[1]!;
     }
-    // A bronze plaque, raised: its rim lit on the top and left, dark on the bottom and right, the field the mid bronze,
-    // a rivet in each corner.
-    if (j >= FACE.j1 || X < FACE.x0) return "c";
-    if (j < FACE.j0 || X >= FACE.x1) return "B";
-    if ((Math.abs(X - FACE.x0 - 1) < 0.4 || Math.abs(X - FACE.x1 + 1) < 0.4) && (Math.abs(j - FACE.j0 - 1) < 0.4 || Math.abs(j - FACE.j1 + 1) < 0.4)) return s > 1 ? "c" : "b";
-    return "b";
+    // A bronze plaque, raised: its rim lit on the top and left, dark on the bottom and right; the field flat.
+    if (!field) return j >= FACE.j1 || X < FACE.x0 ? "c" : "B";
+    return onSquiggle(X, j, s) ? "c" : "b";
   });
 }
-const fineLine = (j: number, at: number, u: number) => j >= at && j < at + u;
 
 // ---- The two statues as pictures: the pedestal and the figure, at the world's scale or finer.
 
@@ -525,29 +591,37 @@ const PALETTE: Record<string, string> = {
   B: "#5e3b1c",
   D: "#3e2511",
   v: "#fff2cc", // a glint
-  // The marble: a cool grey-white a step darker than the pieces' (so it stands out against the cream wall), and its
-  // pedestal's.
+  // The marble, lightest to darkest (MARBLE_KEYS): a cool grey-white, a step darker than the pieces' so it stands out
+  // against the cream wall. Its pedestal takes P, p, q and Q.
+  w: "#fbfaf7",
   P: "#f2f1ee",
+  "6": "#e3e0da",
   p: "#d2cec6",
+  "7": "#bbb6ad",
   q: "#a29b90",
+  "8": "#8b8479",
   Q: "#746d63",
-  w: "#ffffff",
+  "9": "#5f584f",
 };
 
+/** A statue's figure's height over the pedestal (the world's pixels). */
+const figureH = (id: StatueId) => (id === "bronze" ? BRONZE.h : marbleH());
 /** A statue's picture: its box in the Coliseum's pixels (w x h, its pedestal's foot in the middle of its bottom). */
 export const STATUE_W = PED_W + 2;
-export const statueH = (id: StatueId) => (id === "bronze" ? BRONZE : BOSS).h + PED_H + 2;
+export const statueH = (id: StatueId) => figureH(id) + PED_H + 2;
 
 /**
  * A statue's layers (its pedestal, its figure, and the bronze statue's knight at the close-up), drawn `s` times finer than
  * the world, in their frame of STATUE_W x statueH(id) picture pixels times `s`; made a few rows at a time.
  */
 export function* statueSteps(id: StatueId, s: number): Generator<void, Painted[]> {
-  const fig = id === "bronze" ? BRONZE : BOSS;
   const cx = (STATUE_W * s) / 2;
   const fy = statueH(id) * s - s; // the pedestal's foot (one picture pixel left under it for its outline)
-  const out = [yield* pedestal(cx, fy, s, id), yield* sculpt(fig, cx, fy - PED_H * s, id === "bronze" ? "cbBDv" : "PpqQw", s)];
-  if (id === "bronze" && s > 1) out.push(yield* sculpt(KNIGHT, cx, fy - PED_H * s, "vcbDv", s));
+  const top = fy - PED_H * s; // the figure's feet (on the pedestal's top)
+  const ped = yield* pedestal(cx, fy, s, id);
+  if (id === "marble") return [ped, yield* sculpt(MARBLE_SLAB, cx, top, "PpqQw", s), bossFigure(cx, top - MARBLE_SLAB.h * s, s)];
+  const out = [ped, yield* sculpt(BRONZE, cx, top, "cbBDv", s)];
+  if (s > 1) out.push(yield* sculpt(KNIGHT, cx, top, "vcbDv", s));
   return out;
 }
 
@@ -575,11 +649,14 @@ export const statueArt = (id: StatueId, s: number): Character => statueFrame(id,
 /** Where the quote goes on a statue's pedestal, in its picture's pixels at the world's scale (x, y from its top left). */
 export function quoteFace(id: StatueId): { x: number; y: number; w: number; h: number } {
   const fy = statueH(id) - 1;
-  return { x: STATUE_W / 2 + FACE.x0 + 1, y: fy - FACE.j1 + 1, w: FACE.x1 - FACE.x0 - 2, h: FACE.j1 - FACE.j0 - 2 };
+  return { x: STATUE_W / 2 + FACE.x0, y: fy - FACE.j1, w: FACE.x1 - FACE.x0, h: FACE.j1 - FACE.j0 };
 }
 
-/** The quote's lettering colors: engraved in the marble (dark, its lower edge lit) or cast in the bronze (light, shadowed). */
-export const QUOTE_INK: Record<StatueId, { ink: string; edge: string }> = {
-  marble: { ink: "#5f5850", edge: "#fbfaf7" },
-  bronze: { ink: "#f3c681", edge: "#3e2511" },
+/**
+ * The quote's lettering colors: engraved in the marble (dark, its lower edge lit) or cast in the bronze (light,
+ * shadowed); and the panel's flat field, laid over the squiggles as the quote renders in.
+ */
+export const QUOTE_INK: Record<StatueId, { ink: string; edge: string; field: string }> = {
+  marble: { ink: "#5f5850", edge: "#fbfaf7", field: PALETTE.P! },
+  bronze: { ink: "#f3c681", edge: "#3e2511", field: PALETTE.b! },
 };
