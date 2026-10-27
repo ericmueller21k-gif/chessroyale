@@ -435,7 +435,7 @@ export interface NetBossPowers {
    * Folio (missing for other bosses and from older servers; an older app ignores them): the Draft's mark (`draft`: the
    * crowd's piece, the Folio piece attacking it, the squares between, its last crowd turn to answer it), the folded piece
    * (`folded`: its square while it's folded: refused moves say so), the Crease holding (`crease`: its line, "d|e" between
-   * the d and e files or "4|5" between ranks 4 and 5, and its turns; no move of either side crosses it) or warned of
+   * the d and e files or "4|5" between ranks 4 and 5, and its turns; none of the crowd's pieces crosses it; `side`, the side it stops; Folio's cross it) or warned of
    * (`creaseNext`: its line, until it lands), and Revision once it has come (`revision`: the two moves crossed out and their
    * names, its move in their place once played).
    */

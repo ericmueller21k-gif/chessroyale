@@ -96,7 +96,7 @@ describe("Folio online: the Crease's line from the host", () => {
     expect(next.crease).toBeUndefined();
     L.answer((next.allowed ?? legalMoves(next.fen)).sort()[0]!);
     const landed = L.toRound();
-    expect(landed.boss!.powers!.crease).toEqual({ line: pick, at: landed.boss!.powers!.turn, until: landed.boss!.powers!.turn + BOSS_POWERS.creaseTurns - 1 });
+    expect(landed.boss!.powers!.crease).toEqual({ line: pick, at: landed.boss!.powers!.turn, until: landed.boss!.powers!.turn + BOSS_POWERS.creaseTurns - 1, side: landed.boss!.crowdSide });
     expect(landed.boss!.powers!.events.map((e) => e.kind)).toEqual(["crease"]);
   });
 });

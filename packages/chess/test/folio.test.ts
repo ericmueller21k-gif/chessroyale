@@ -114,16 +114,16 @@ const SPREAD = "q2r2k1/5ppp/5b2/8/2n5/2N1B2P/1P3PP1/R2Q1RK1 w - - 0 20";
 describe("Folio: who it is", () => {
   it("is on the roster as folio (📜), Draft and Crease, its kit to come: not playable until the wiring lane", () => {
     const def = BOSS_ROSTER.find((b) => b.id === "folio")!;
-    expect(def).toMatchObject({ name: "Folio", icon: "📜", kit: null, powers: { passive: "draft", ultimate: "crease" } });
+    expect(def).toMatchObject({ name: "Folio", icon: "📜", kit: null, offset: 0, powers: { passive: "draft", ultimate: "crease" } });
     expect(isPlayable(def)).toBe(false);
     for (const id of ["draft", "crease", "revision"] as const) expect(POWER_IDS).toContain(id);
   });
 
-  it("its numbers are the sheet's", () => {
-    expect([S.draftFirst, S.draftWindow, S.draftTop, S.foldTurns]).toEqual([3, 2, 3, 3]);
-    expect([S.creaseTurns, S.creaseLossMin, S.creaseLossMax]).toEqual([4, 0.3, 1.5]);
+  it("its numbers are the sheet's, with the director's calls of Oct 27 (a fold of 4 turns, the crease's band 1 to 2.5, rageSpeed 1.3)", () => {
+    expect([S.draftFirst, S.draftWindow, S.foldTurns]).toEqual([3, 2, 4]);
+    expect([S.creaseTurns, S.creaseLossMin, S.creaseLossMax]).toEqual([4, 1, 2.5]);
     expect([S.revisionDrop, S.revisionMax, S.revisionFrom]).toEqual([1.5, 1, 5]);
-    expect(S.rageSpeed.folio).toBeGreaterThan(0);
+    expect(S.rageSpeed.folio).toBe(1.3);
     expect(CREASE_LINES).toHaveLength(14);
   });
 
@@ -137,34 +137,25 @@ describe("Folio: who it is", () => {
 });
 
 describe("Folio's Draft: which piece", () => {
-  it("a piece of yours its pieces attack and you defend, none of its attackers cheaper: a seeded pick of the three most valuable", () => {
-    const seen = new Set<string>();
-    for (let seed = 0; seed < 60; seed++) {
-      const pick = chooseDraft(SPREAD, "w", seed, 3)!;
-      expect(chooseDraft(SPREAD, "w", seed, 3)).toEqual(pick);
-      seen.add(pick.square);
-    }
-    // (Your rook on a1, then your knight c3 and bishop e3; the g2 pawn is fourth; the queen is attacked by a cheaper rook,
-    // the b2 pawn is undefended.)
-    expect([...seen].sort()).toEqual(["a1", "c3", "e3"]);
-    const by = (sq: string) => Array.from({ length: 60 }, (_, s) => chooseDraft(SPREAD, "w", s, 3)!).find((p) => p.square === sq)!;
-    expect(by("a1")).toEqual({ square: "a1", piece: "r", attacker: "a8", by: "q", line: ["a7", "a6", "a5", "a4", "a3", "a2"] });
-    expect(by("c3")).toEqual({ square: "c3", piece: "n", attacker: "f6", by: "b", line: ["e5", "d4"] });
-    expect(by("e3")).toEqual({ square: "e3", piece: "b", attacker: "c4", by: "n", line: [] });
-    // (Another turn, another draw: the same three.)
-    expect(["a1", "c3", "e3"]).toContain(chooseDraft(SPREAD, "w", 7, 11)!.square);
+  it("a piece of yours its pieces attack and you defend, none of its attackers cheaper: the most valuable, seeded only among ties", () => {
+    // (Your rook on a1 is worth most; then your knight c3 and bishop e3, a tie; the g2 pawn last; your queen is attacked by a
+    // cheaper rook, the b2 pawn is undefended.)
+    for (let seed = 0; seed < 40; seed++) expect(chooseDraft(SPREAD, "w", seed, 3)).toEqual({ square: "a1", piece: "r", attacker: "a8", by: "q", line: ["a7", "a6", "a5", "a4", "a3", "a2"] });
+    // Without the rook (folded, skipped): the knight and the bishop tie, a seeded pick between them; never the pawn.
+    const tie = Array.from({ length: 60 }, (_, s) => chooseDraft(SPREAD, "w", s, 3, "a1")!);
+    for (let s = 0; s < 60; s++) expect(chooseDraft(SPREAD, "w", s, 3, "a1")).toEqual(tie[s]);
+    expect([...new Set(tie.map((p) => p.square))].sort()).toEqual(["c3", "e3"]);
+    expect(tie.find((p) => p.square === "c3")).toEqual({ square: "c3", piece: "n", attacker: "f6", by: "b", line: ["e5", "d4"] });
+    expect(tie.find((p) => p.square === "e3")).toEqual({ square: "e3", piece: "b", attacker: "c4", by: "n", line: [] });
   });
 
   it("never a piece simply hanging, one a cheaper piece of its attacks, your king, or the piece folded now", () => {
-    // Without b2, your knight on c3 is undefended: not marked.
+    // Without b2, your knight on c3 is undefended: not marked (the rook skipped, only the bishop is left at that value).
     const hanging = SPREAD.replace("1P3PP1", "5PP1");
-    for (let s = 0; s < 30; s++) expect(chooseDraft(hanging, "w", s, 3)!.square).not.toBe("c3");
+    for (let s = 0; s < 30; s++) expect(chooseDraft(hanging, "w", s, 3, "a1")!.square).toBe("e3");
     // A black pawn on b4 attacks the knight too (cheaper than it): not marked.
     const cheaper = SPREAD.replace("/8/2n5/", "/8/1pn5/");
-    for (let s = 0; s < 30; s++) expect(chooseDraft(cheaper, "w", s, 3)!.square).not.toBe("c3");
-    // The folded piece is skipped: the next in line comes in (the g2 pawn).
-    const skipped = new Set(Array.from({ length: 40 }, (_, s) => chooseDraft(SPREAD, "w", s, 3, S, "a1")!.square));
-    expect([...skipped].sort()).toEqual(["c3", "e3", "g2"]);
+    for (let s = 0; s < 30; s++) expect(chooseDraft(cheaper, "w", s, 3, "a1")!.square).toBe("e3");
     // A king attacked is check, never a mark; nothing attacked at the start: none.
     expect(chooseDraft(START_FEN, "w", 1, 3)).toBeNull();
   });
@@ -230,8 +221,8 @@ describe("Folio's Draft: two of your moves to answer it, then the fold", () => {
       const allowed = crowdAllowed(bossOf(b), fenOf(b))!;
       expect(allowed.some((m) => m.startsWith("a1"))).toBe(false);
       expect(powerTurn(bossOf(b))).toBe(true);
-      crowd(b, ["g1h2", "h2g1", "g1h2"][t - 7]!);
-      his(b, ["g8h8", "h8g8", "g8h8"][t - 7]!);
+      crowd(b, ["g1h2", "h2g1", "g1h2", "h2g1"][t - 7]!);
+      his(b, ["g8h8", "h8g8", "g8h8", "h8g8"][t - 7]!);
     }
     expect(folio(b).folded).toBeNull();
     expect((crowdAllowed(bossOf(b), fenOf(b)) ?? legalMoves(fenOf(b))).some((m) => m.startsWith("a1"))).toBe(true);
@@ -290,7 +281,7 @@ describe("Folio's Draft: two of your moves to answer it, then the fold", () => {
 });
 
 describe("Folio's Crease: the line", () => {
-  it("no move of either side crosses it: knights too, castling's king and its rook; never an attack", () => {
+  it("a move crosses it whenever a piece it moves ends on the other side: knights too, castling's king and its rook; never an attack", () => {
     expect(crossesCrease("e2e4", "d|e")).toBe(false);
     expect(crossesCrease("d4e5", "d|e")).toBe(true);
     expect(crossesCrease("d2f3", "d|e")).toBe(true);
@@ -308,7 +299,7 @@ describe("Folio's Crease: the line", () => {
     expect(creaseMoves(castle, "g|h")).not.toContain("e1g1");
   });
 
-  it("the guard: never a line leaving either side no move, or handing either a mate in one", () => {
+  it("the guard: never a line leaving you no move, or handing either side a mate in one", () => {
     // Your king's only move crosses a|b.
     const boxed = "8/8/8/8/8/p1k5/P7/K7 w - - 0 50";
     expect(legalMoves(boxed)).toEqual(["a1b1"]);
@@ -318,10 +309,9 @@ describe("Folio's Crease: the line", () => {
     const mate = "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 30";
     expect(creaseGuard(mate, "d|e")).toBe(false);
     expect(creaseGuard(mate, "4|5")).toBe(true);
-    // Its own mate in one, were you to pass, counts too.
+    // Its own mate in one, were you to pass, counts too: its pieces cross the crease, so no line stops it, and none counts.
     const his = "r5k1/5ppp/8/8/8/8/5PPP/6K1 w - - 0 30";
-    expect(creaseGuard(his, "d|e")).toBe(false);
-    expect(creaseGuard(his, "4|5")).toBe(true);
+    for (const l of CREASE_LINES) expect(creaseGuard(his, l), l).toBe(false);
     expect(creaseCheck(mate, "4|5")).toBe("4|5");
     expect(creaseCheck(mate, "d|e")).toBeNull();
     expect(creaseCheck(mate, "z|q")).toBeNull();
@@ -364,10 +354,11 @@ describe("Folio's Crease: the line", () => {
     };
     const scores = (await creaseScores([engine], START_FEN))!;
     const loss = (l: string) => scores.find((x) => x.line === l)?.loss;
-    // 2|3 leaves you no move at the start (every pawn and knight crosses it), 6|7 leaves it none were you to pass: never count.
+    // 2|3 leaves you no move at the start (every pawn and knight crosses it): never counts. (6|7 would stop every move of
+    // its, but its moves are never stopped: it counts.)
     expect(loss("2|3")).toBeUndefined();
-    expect(loss("6|7")).toBeUndefined();
-    expect(scores).toHaveLength(12);
+    expect(loss("6|7")).toBe(0);
+    expect(scores).toHaveLength(13);
     expect(searches).toBeLessThanOrEqual(15);
     // 3|4 takes away the double steps (your best): it costs; 1|2 takes the knights' moves only, and nothing crosses 5|6: free.
     expect(loss("3|4")).toBeGreaterThan(0);
@@ -378,7 +369,7 @@ describe("Folio's Crease: the line", () => {
 });
 
 describe("Folio's Crease: through a battle", () => {
-  it("?power=crease: its line shown with the warning as turn 2 begins, then four turns no move crosses it, either side; then it unfolds", async () => {
+  it("?power=crease: its line shown with the warning as turn 2 begins, then four turns none of your moves crosses it while its own may; then it unfolds", async () => {
     const r = raid({ test: "crease" });
     const kinds = new Map<number, string[]>();
     let line = "";
@@ -401,12 +392,9 @@ describe("Folio's Crease: through a battle", () => {
       const allowed = [...(r.crowdAllowed() ?? legalMoves(fenOfR(r)))].sort();
       await r.score(new Map([["h0", { move: allowed[0]!, thinkMs: 1000 }]]));
       if (r.stageComplete() || !r.bossToMove()) continue;
-      // His reply never crosses it while it holds (unless every move he has does).
-      const pre = fenOfR(r);
-      const his = r.bossAllowed();
+      // Its own moves are never stopped by it (it folds the board toward itself).
+      if (held) expect(r.bossAllowed()).toBeNull();
       await r.playBoss();
-      const m = r.boards.get(0)!.history.at(-1)!;
-      if (held && his) expect(crossesCrease(m, line, pre)).toBe(false);
     }
     expect(kinds.get(2)).toEqual(["warn", "creaseWarn"]);
     expect(kinds.get(3)).toEqual(["crease"]);
@@ -414,16 +402,23 @@ describe("Folio's Crease: through a battle", () => {
     expect(r.boss!.powers!.crease ?? null).toBeNull();
   });
 
-  it("a refused move across it says why; its only move across it lifts it for that turn", () => {
+  it("a refused move of yours across it says why; your only move across it lifts it for that turn; its own moves cross it freely", () => {
     const fen = "6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 30";
-    const boss = { id: "folio", crowdSide: "w", crowdMoves: 4, powers: { ...initPowers(1, fen, "w"), turn: 5, crease: { line: "4|5", at: 5, until: 8 }, folio: FOLIO_FRESH } } as unknown as BossState;
+    const boss = { id: "folio", crowdSide: "w", crowdMoves: 4, powers: { ...initPowers(1, fen, "w"), turn: 5, crease: { line: "4|5", at: 5, until: 8, side: "w" }, folio: FOLIO_FRESH } } as unknown as BossState;
     expect(stopReason(boss, fen, "a1a8")).toBe("crease");
     expect(crowdAllowed(boss, fen)).not.toContain("a1a8");
-    // His side: every move his king has crosses a|b here, so the crease lifts for him.
-    const boxed = "8/8/8/8/8/P1K5/p7/k7 b - - 0 50";
-    const his = { ...boss, crowdSide: "w", powers: { ...boss.powers, crease: { line: "a|b", at: 5, until: 8 } } } as unknown as BossState;
+    expect(powerTurn(boss)).toBe(true);
+    // Your king's only move crosses a|b: the crease lifts for your turn (never no move, never no way out of check).
+    const boxed = "8/8/8/8/8/p1k5/P7/K7 w - - 0 50";
+    const lifted = { ...boss, powers: { ...boss.powers, crease: { line: "a|b", at: 5, until: 8, side: "w" } } } as unknown as BossState;
     expect(legalMoves(boxed)).toEqual(["a1b1"]);
-    expect(bossAllowed(his, boxed)).toBeNull();
+    expect(crowdAllowed(lifted, boxed)).toBeNull();
+    // Its moves across it (Black's, here across d|e): never stopped, never named as stopped.
+    const open = "r3k2r/pppq1ppp/2n2n2/3pp3/3PP3/2N2N2/PPPQ1PPP/R3K2R b KQkq - 0 1";
+    const his = { ...boss, powers: { ...boss.powers, crease: { line: "d|e", at: 5, until: 8, side: "w" } } } as unknown as BossState;
+    expect(legalMoves(open).some((m) => crossesCrease(m, "d|e", open))).toBe(true);
+    expect(bossAllowed(his, open)).toBeNull();
+    expect(stopReason(his, open, "d7g4")).toBeNull();
   });
 
   it("the trigger: the line picked with his next move, then it lands without the warning; the meter held empty while it holds", async () => {
@@ -434,7 +429,7 @@ describe("Folio's Crease: through a battle", () => {
     const p = r.boss!.powers!;
     expect(p.events.map((e) => e.kind)).toEqual(["crease"]);
     expect(p.warnAt).toBeUndefined();
-    expect(p.crease).toMatchObject({ at: p.turn, until: p.turn + S.creaseTurns - 1 });
+    expect(p.crease).toMatchObject({ at: p.turn, until: p.turn + S.creaseTurns - 1, side: r.boss!.crowdSide });
     expect(r.triggerUltimate()).toBe(false);
   });
 });
@@ -526,7 +521,7 @@ describe("Folio's Revision: when", () => {
         ...bossOf(b),
         powers: {
           ...bossOf(b).powers!,
-          crease: { line: "c|d", at: 4, until: 6 },
+          crease: { line: "c|d", at: 4, until: 6, side: "w" },
           folio: { ...folio(b), folded: { square: "f2", piece: "p", at: 4, until: 6 }, mark: { square: "h2", piece: "p", attacker: "h7", by: "k", line: [], at: 5, until: 6 } },
         },
       },

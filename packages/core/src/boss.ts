@@ -222,14 +222,14 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // rageSpeed 1.6; reports/tiger-sim.md).
   { id: "tiger", name: TIGER_NAME, icon: "🐯", kit: "Tiger", offset: -250, powers: { passive: "balloons", ultimate: "hoops" } },
   // Folio, a paper crane folded from a page of handwriting (the director's boss, Oct 26; "it" everywhere): Draft, an ink
-  // mark under one of the crowd's pieces that one of its pieces attacks, folded for 3 turns unless the crowd answers it
-  // within 2 of its moves; Crease, the board folded along one line nothing crosses for 4 turns, shown the turn before;
-  // and once a battle, Revision: its own blunder and the crowd's punishing reply crossed out, the engine's best move in its
-  // place (bosses/folio.ts; docs/decisions/2026-10-27-folio-rules.md). Not playable until its kit is wired (the wiring
+  // mark under the most valuable of the crowd's pieces that one of its pieces attacks, folded for 4 turns unless the crowd
+  // answers it within 2 of its moves; Crease, the board folded along one line the crowd's pieces don't cross for 4 turns
+  // (its own do: it folds the board toward itself), shown the turn before; and once a battle, Revision: its own blunder
+  // and the crowd's punishing reply crossed out, the engine's best move in its place (bosses/folio.ts; docs/decisions/2026-10-27-folio-rules.md). Not playable until its kit is wired (the wiring
   // lane sets `kit: "Folio"`): the test links `?boss=folio&wip=1`, `&power=draft`, `&power=crease`, `&power=revision`. Its
-  // offset: the usual −250. The raid sim put it on the crowd's side (0.52 in 49 moves) and neither its strength (−250 to
-  // +200) nor twice the Drafts and Creases moved that beyond the noise (reports/folio-sim.md): the director's call.
-  { id: "folio", name: "Folio", icon: "📜", kit: null, offset: -250, powers: { passive: "draft", ultimate: "crease" } },
+  // offset: 0, at the usual strength (the director's call, Oct 27: a final boss; the first sim, at −250, put it among the
+  // easiest: reports/folio-sim.md).
+  { id: "folio", name: "Folio", icon: "📜", kit: null, offset: 0, powers: { passive: "draft", ultimate: "crease" } },
   { id: "recluse", name: "Hidden Boss", icon: "📕", kit: "Hidden Boss", offset: 0, powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true, crowdFinal: true, the: true, levelUnknown: true },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },
   { id: "archer", name: "The Bone Archer", icon: "💀", kit: null, offset: 0, powers: null },
@@ -629,8 +629,8 @@ export interface BossPowerState {
    */
   hoops?: HoopsState | null;
   /**
-   * Folio's Crease while it holds (its ultimate): the line nothing crosses (creaseLines' code: "d|e" between the d and e
-   * files, "4|5" between ranks 4 and 5), from crowd turn `at` through `until`. Kept here, as Sawyer's board saw, so the
+   * Folio's Crease while it holds (its ultimate): the line the crowd's pieces don't cross (creaseLines' code: "d|e" between
+   * the d and e files, "4|5" between ranks 4 and 5), from crowd turn `at` through `until`. Kept here, as Sawyer's board saw, so the
    * screens' stopReason reads the same field.
    */
   crease?: Crease | null;
@@ -788,11 +788,15 @@ export interface HoopsState {
   gain: number | null;
 }
 
-/** Folio's Crease in force: its line (creaseLines' code), from crowd turn `at` through `until`. */
+/**
+ * Folio's Crease in force: its line (creaseLines' code), from crowd turn `at` through `until`; `side`, the side whose pieces
+ * it stops (the crowd's: Folio's pieces cross it).
+ */
 export interface Crease {
   line: string;
   at: number;
   until: number;
+  side: "w" | "b";
   /** What it cost the crowd by the engine that picked it (pawns; null or missing: not known here, the host's online). */
   loss?: number | null;
 }
@@ -882,7 +886,7 @@ export interface SawCut {
  * (a limit that would leave no move lifts for that turn). `paint`: Smudgy's hidden rook makes a move of yours illegal
  * that the board as you see it allows (your king into its line, a piece it pins); never a move of his. `plant`: the hippo
  * gardener's plain plant, as a toy block (either side). `hoop`: the circus tiger's burning hoop, either side (nothing crosses its
- * wall, and no check across it). `crease`: Folio's Crease, either side (no move across its line, as Sawyer's board saw).
+ * wall, and no check across it). `crease`: Folio's Crease, the crowd's moves only (none across its line; Folio's pieces cross it).
  */
 export type StopReason = "boardsaw" | "cut" | "pie" | "block" | "paint" | "plant" | "hoop" | "crease";
 

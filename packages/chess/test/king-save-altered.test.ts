@@ -158,7 +158,7 @@ const AUDIT: Record<string, { on: Record<string, Patch>; off: Patch } | { none: 
   folio: {
     on: {
       "a folded piece": (f) => ({ folio: { ...FOLIO_FRESH, folded: { square: crowdPiece(f), piece: "n", at: 1, until: 3 } } }),
-      "the Crease": () => ({ crease: { line: "4|5", at: 1, until: 4 } }),
+      "the Crease": () => ({ crease: { line: "4|5", at: 1, until: 4, side: "w" } }),
     },
     off: () => ({ crease: null, folio: FOLIO_FRESH }),
   },

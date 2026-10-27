@@ -5,12 +5,13 @@
  *
  * - **Draft** (passive): every draftEvery crowd turns from draftFirst, as the crowd's turn after its move begins, an ink
  *   mark under one of the crowd's pieces that one of its pieces attacks (chooseDraft: defended, never one a cheaper piece
- *   of its attacks, a seeded pick of the draftTop most valuable). The crowd has draftWindow of its own moves to end that
+ *   of its attacks, the most valuable, seeded among ties). The crowd has draftWindow of its own moves to end that
  *   one attack; if it still stands after them, the piece is folded: frozen for foldTurns crowd turns (Ginger's freeze's
  *   rules: never the king, lifted for a turn it would leave no move). The mark clears as soon as the attack ends.
  * - **Crease** (ultimate, the rage meter's): the engine picks one of the 14 inner lines with Folio's move (creasePick, on
  *   the host's engines online), shown on the warning's turn; as the next crowd turn begins the board is creased along it
- *   for creaseTurns crowd turns, and no move of either side crosses it (Sawyer's board saw's rules: crossesCrease).
+ *   for creaseTurns crowd turns: none of the crowd's pieces crosses it, and Folio's may (it folds the board toward itself:
+ *   the director's call, Oct 27); for the crowd's moves, Sawyer's board saw's rules (crossesCrease).
  * - **Revision** (once a battle): right after a crowd move that punishes its last move (revisionDrop, by the judge's own
  *   numbers), both moves are crossed out: the board goes back to before its move (a base), it plays the engine's best
  *   there (bestReply), and the crowd moves again.
@@ -70,18 +71,12 @@ const worth = (type: string) => (type === "k" ? 100 : VALUE[type]!);
 /**
  * The Draft's mark (the crowd to move in `fen`): of the crowd's pieces (never the king, never the piece folded now:
  * `skip`) that a Folio piece attacks and that are defended, and that no cheaper Folio piece attacks (so Folio wouldn't
- * just take it: the brief's "isn't simply hanging"), a seeded pick among the `draftTop` most valuable (ties by square).
- * The attacker is the cheapest Folio piece attacking it (ties by square); `line`, the squares between them for a
- * bishop, rook or queen (none for a knight, a pawn or a king, or side by side). Null: none qualifies.
+ * just take it: the brief's "isn't simply hanging"), the most valuable: the piece that matters most (the director's call,
+ * Oct 27; it was a seeded pick of the top three), a seeded pick among those of that value. The attacker is the cheapest
+ * Folio piece attacking it (ties by square); `line`, the squares between them for a bishop, rook or queen (none for a
+ * knight, a pawn or a king, or side by side). Null: none qualifies.
  */
-export function chooseDraft(
-  fen: string,
-  crowd: Side,
-  seed: number,
-  turn: number,
-  s: Pick<BossPowerSettings, "draftTop"> = BOSS_POWERS,
-  skip: string | null = null,
-): { square: string; piece: string; attacker: string; by: string; line: string[] } | null {
+export function chooseDraft(fen: string, crowd: Side, seed: number, turn: number, skip: string | null = null): { square: string; piece: string; attacker: string; by: string; line: string[] } | null {
   const his = other(crowd);
   const options: { square: string; piece: string; attacker: string; by: string; value: number }[] = [];
   for (let f = 0; f < 8; f++)
@@ -98,7 +93,7 @@ export function chooseDraft(
     }
   if (!options.length) return null;
   options.sort((a, b) => b.value - a.value || (a.square < b.square ? -1 : 1));
-  const top = options.slice(0, Math.max(1, Math.round(s.draftTop)));
+  const top = options.filter((o) => o.value === options[0]!.value);
   const pick = top[Math.floor(powerRoll(seed, "draft", turn) * top.length)]!;
   const slider = pick.by === "b" || pick.by === "r" || pick.by === "q";
   return { square: pick.square, piece: pick.piece, attacker: pick.attacker, by: pick.by, line: slider ? between(pick.attacker, pick.square) : [] };
@@ -134,8 +129,8 @@ function sideOf(line: string, sq: string): 0 | 1 {
 /**
  * A move crosses the crease: a piece it moves ends on the other side of the line from where it started. Any move,
  * knights included (Sawyer's board saw's rule); castling's king, and its rook too (on a line between files the saw never
- * sat on, the rook can cross it alone: no piece may cross, so neither may). Never an attack: checks and pins work across
- * it as in ordinary chess.
+ * sat on, the rook can cross it alone: no piece of the crowd's may cross, so neither may). Never an attack: checks and
+ * pins work across it as in ordinary chess. It stops the crowd's moves only (Crease.side); Folio's pieces cross freely.
  */
 export function crossesCrease(move: string, line: string | null | undefined, fen?: string): boolean {
   if (!line) return false;
@@ -167,14 +162,15 @@ export function creaseMateInOne(fen: string, line: string): boolean {
 }
 
 /**
- * A line the Crease may take on this position (the crowd to move): it leaves the crowd a move, and Folio one were the
- * crowd to pass (passTurn; none: in check, not asked), and hands neither side a mate in one.
+ * A line the Crease may take on this position (the crowd to move): it leaves the crowd a move, and hands neither side a
+ * mate in one: the crowd's with the crease counted, Folio's (its moves never limited) were the crowd to pass (passTurn;
+ * none: in check, not asked).
  */
 export function creaseGuard(fen: string, line: string): boolean {
   try {
     if (!CREASE_LINES.includes(line) || !creaseMoves(fen, line).length || creaseMateInOne(fen, line)) return false;
     const his = passTurn(fen);
-    return !his || (creaseMoves(his, line).length > 0 && !creaseMateInOne(his, line));
+    return !his || !matingMoves(his).length;
   } catch {
     return false;
   }
@@ -322,7 +318,7 @@ export const FOLIO: BossRules = {
     const land = (line: string, loss: number | null): boolean => {
       next.ultAt = t.turn;
       delete next.ultNext;
-      next.crease = { line, at: t.turn, until: t.turn + Math.max(1, Math.round(t.s.creaseTurns)) - 1, loss };
+      next.crease = { line, at: t.turn, until: t.turn + Math.max(1, Math.round(t.s.creaseTurns)) - 1, side: t.crowd, loss };
       next.folio = { ...f, next: null, warned: null };
       t.events.push({ kind: "crease", turn: t.turn, line });
       return true;
@@ -350,7 +346,7 @@ export const FOLIO: BossRules = {
   passive(next, t) {
     if (t.turn < next.nextPassive) return;
     const f = folioOf(next);
-    const pick = f.mark || t.events.some((e) => ULT_MOMENTS.has(e.kind)) ? null : chooseDraft(t.fen, t.crowd, t.seed, t.turn, t.s, foldedOn(f, t.turn));
+    const pick = f.mark || t.events.some((e) => ULT_MOMENTS.has(e.kind)) ? null : chooseDraft(t.fen, t.crowd, t.seed, t.turn, foldedOn(f, t.turn));
     if (!pick) {
       next.nextPassive = t.turn + 1;
       return;
@@ -359,7 +355,8 @@ export const FOLIO: BossRules = {
     t.events.push({ kind: "draft", turn: t.turn, square: pick.square, squares: [pick.attacker, ...pick.line, pick.square] });
     next.nextPassive = t.turn + (t.test === "draft" ? 1 : Math.max(1, Math.round(t.s.draftEvery)));
   },
-  // A folded piece doesn't move; nothing crosses the crease (the dispatcher lifts both for a turn they'd leave no move).
+  // A folded piece doesn't move; none of the crowd's pieces crosses the crease (the dispatcher lifts both for a turn they'd
+  // leave no move, or no way out of check). Folio's own moves are never stopped: no bossStops.
   crowdFilter(allowed, boss, fen) {
     const turn = turnOf(boss);
     const folded = foldedOn(folioOf(boss.powers), turn);
@@ -367,11 +364,11 @@ export const FOLIO: BossRules = {
     if (!folded && !line) return allowed;
     return allowed.filter((m) => from(m) !== folded && !crossesCrease(m, line, fen));
   },
-  bossStops(boss) {
-    const line = boss.powers?.crease?.line;
-    return line ? (m, fen) => crossesCrease(m, line, fen) : null;
+  // (A move of the crowd's across it: the screens' words. Folio's cross it freely.)
+  stopReason: (boss, fen, m) => {
+    const c = boss.powers?.crease;
+    return c && crossesCrease(m, c.line, fen) && pieceAt(fen, from(m))?.color === c.side ? "crease" : null;
   },
-  stopReason: (boss, fen, m) => (crossesCrease(m, boss.powers?.crease?.line, fen) ? "crease" : null),
   // A turn with a folded piece or the crease doesn't count for fair play (the crossed-out turn: crossedOut).
   powerTurn: (boss) => !!creaseOn(boss.powers, turnOf(boss)) || !!foldedOn(folioOf(boss.powers), turnOf(boss)),
   // Revision's move: the engine's best at full strength.
@@ -405,8 +402,8 @@ export interface FolioView {
   draft: { square: string; attacker: string; line: string[]; until: number } | null;
   /** The folded piece's square, while it's folded (none: empty). */
   folded: string[];
-  /** The crease holding (its line, its turns), or null. */
-  crease: { line: string; at: number; until: number } | null;
+  /** The crease holding (its line, its turns, the side whose pieces it stops: the crowd's), or null. */
+  crease: { line: string; at: number; until: number; side: Side } | null;
   /** The warning's line (shown faintly until it lands), or null. */
   creaseNext: string | null;
   /** Revision, once it has come: the crowd move it followed, the two moves crossed out and their names, its move in their place once played. */
@@ -420,7 +417,7 @@ export function folioView(p: BossPowerState): FolioView {
   return {
     draft: f.mark ? { square: f.mark.square, attacker: f.mark.attacker, line: [...f.mark.line], until: f.mark.until } : null,
     folded: folded ? [folded] : [],
-    crease: p.crease ? { line: p.crease.line, at: p.crease.at, until: p.crease.until } : null,
+    crease: p.crease ? { line: p.crease.line, at: p.crease.at, until: p.crease.until, side: p.crease.side } : null,
     creaseNext: f.warned?.line ?? null,
     revision: r ? { at: r.at, moves: [r.moves[0], r.moves[1]], sans: [r.sans[0], r.sans[1]], move: r.move ?? null, san: r.san ?? null } : null,
   };

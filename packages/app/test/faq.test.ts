@@ -107,7 +107,9 @@ describe("the FAQ's contents", () => {
     expect(words).toContain(`from turn ${p.draftFirst}, every ${p.draftEvery} turns`);
     expect(words).toContain(`You have ${p.draftWindow} moves to end that attack`);
     expect(words).toContain(`it can't move for ${p.foldTurns} turns`);
-    expect(words).toContain(`for ${p.creaseTurns} turns: no piece of either side may move across it`);
+    expect(words).toContain(`for ${p.creaseTurns} turns: none of your pieces may move across it`);
+    expect(words).toContain("its own pieces cross it freely");
+    expect(words).toContain("The piece is the most valuable one");
     expect(words).toContain(`between ${p.creaseLossMin} and ${p.creaseLossMax} pawns`);
     expect(words).toContain(`its move cost it ${p.revisionDrop} pawns or more`);
     expect(words).toContain(`Never before turn ${p.revisionFrom}`);

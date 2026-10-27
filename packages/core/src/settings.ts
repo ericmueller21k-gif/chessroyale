@@ -740,11 +740,10 @@ export const BOSS_POWERS = {
    * battle, so he gets about one and a half (two in a long battle): two full barrages would keep the crowd's half on
    * fire most of the game. Babur (tiger) 1.3 (Oct 24, was 1.6: Eric, "he's ulting so much… 2 to 4 times per game"; his
    * hoops now come after his move): the raid sim's 10 s crowd, 2.55 casts a battle of 44 moves, 3.45 per 60 moves (1.1 gave
-   * 1.80 a battle, under 2: his battles are shorter now he keeps his turn; reports/tiger-sim.md). Folio 1 (the brief's start):
-   * 2.5 Creases a battle of 49 moves in the raid sim; 2 gave 4.0 and no measurable change in the crowd's score
-   * (reports/folio-sim.md).
+   * 1.80 a battle, under 2: his battles are shorter now he keeps his turn; reports/tiger-sim.md). Folio 1.3 (the director's call,
+   * Oct 27, after the first sim put it among the easiest; was the brief's start, 1: reports/folio-sim.md).
    */
-  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.3, folio: 1 } as Readonly<Record<string, number>>,
+  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.3, folio: 1.3 } as Readonly<Record<string, number>>,
   /**
    * The Hidden Boss's ultimate, the bullet clock (Eric, Oct 14: "Meter builds starting turn 1, about 7 turns in he says
    * something about how you're thinking too much and to just play pure chess etc, true to him, then for the rest of phase 1
@@ -1259,10 +1258,11 @@ export const BOSS_POWERS = {
   /**
    * Folio's Draft (its passive; docs/decisions/2026-10-27-folio-rules.md): as the crowd's turn after its move begins, from
    * crowd turn draftFirst, every draftEvery turns, an ink mark under one of the crowd's pieces that one of Folio's pieces
-   * attacks: a non-king piece that is defended and that no cheaper Folio piece attacks (Folio wouldn't just take it), a
-   * seeded pick among the draftTop most valuable. The crowd has draftWindow of its own moves to end that one attack (move
+   * attacks: a non-king piece that is defended and that no cheaper Folio piece attacks (Folio wouldn't just take it), the
+   * most valuable of them (the director's call, Oct 27: was a seeded pick of the top three; seeded among ties only). The
+   * crowd has draftWindow of its own moves to end that one attack (move
    * the piece, block the line, take the attacker); if it still stands after them, the piece is folded: frozen for
-   * foldTurns crowd turns, by Ginger's freeze's rules. One mark at a time; none that qualifies (or a mark still up, or
+   * foldTurns crowd turns, by Ginger's freeze's rules (4: the director's call, Oct 27; was 3). One mark at a time; none that qualifies (or a mark still up, or
    * another of Folio's moments that turn): it tries again next turn, and the try doesn't count. draftEvery 4 (this lane's
    * number; Sawyer's cuts' pace): about 9 marks and 5 folds a battle in the raid sim; every 2 turns changed the crowd's
    * score by nothing measurable (reports/folio-sim.md).
@@ -1270,21 +1270,22 @@ export const BOSS_POWERS = {
   draftFirst: 3,
   draftEvery: 4,
   draftWindow: 2,
-  draftTop: 3,
-  foldTurns: 3,
+  foldTurns: 4,
   /**
    * Folio's Crease (its ultimate, the rage meter's): on the warning's turn its line shows (the engine's pick, made with
    * Folio's move on the position after it, the crowd to move); as the next crowd turn begins the board is creased along
-   * it for creaseTurns crowd turns, and no move of either side crosses it (Sawyer's board saw's rules). The line: of the
+   * it for creaseTurns crowd turns, and none of the crowd's pieces crosses it; Folio's may (the director's call, Oct 27:
+   * it folds the board toward itself; otherwise Sawyer's board saw's rules for the crowd's moves). The line: of the
    * 14 inner lines, the one costing the crowd between creaseLossMin and creaseLossMax pawns (its best move with the crease
    * against without, in pawns of log-odds: bouncePawnLogit) nearest the band's middle, seeded among ties; none there, the
-   * one nearest creaseLossMin below it, never one costing more than creaseLossMax. A line leaving either side no move, or
-   * handing either a mate in one, never counts. Each line's look: creaseNodes; the host gets creaseTimeMs more for the
+   * one nearest creaseLossMin below it, never one costing more than creaseLossMax (1 to 2.5: the director's call, Oct 27,
+   * as other ultimates cost about 2; was 0.3 to 1.5). A line leaving the crowd no move, or handing either side a mate in
+   * one, never counts. Each line's look: creaseNodes; the host gets creaseTimeMs more for the
    * request that asks for it. How often: rageSpeed.folio.
    */
   creaseTurns: 4,
-  creaseLossMin: 0.3,
-  creaseLossMax: 1.5,
+  creaseLossMin: 1,
+  creaseLossMax: 2.5,
   creaseNodes: 20_000,
   creaseTimeMs: 6_000,
   /**
