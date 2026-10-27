@@ -120,6 +120,12 @@ export const POWER_BANNERS: Partial<Record<keyof typeof POWER_FX, readonly (read
   repaint: [[0, 1500]],
   // (Babur's HOOPS!, Oct 24: after his move, off the board as his first hoop leaves his paw.)
   hoops: [[0, HOOPS_BEATS.throwsAt[0]]],
+  // (Folio's DRAFT, FOLDED, CREASE! and REVISION, Oct 27: off the board as the ink lands, the paper folds over the piece, the board
+  // folds, the moves are struck out. Its creaseEnd has none.)
+  draft: [[0, 1500]],
+  fold: [[0, 1500]],
+  crease: [[0, 1500]],
+  revision: [[0, 1500]],
 };
 
 /** How long a moment's own clock holds at its start while its banner shows longer (ms; 0 without one from its start). */
@@ -403,9 +409,9 @@ export const lastStandAttackHits = (): number[] => kingAttackHits().map((t) => L
  * The bosses whose character has a `kingAttack` (the app's BOSS_KITS: a unit test keeps the two the same), by
  * BOSS_ROSTER id, in the kits' order. Hollow first (Eric, Oct 10: to try it before the others get theirs); Alfil's ankus
  * jabs (Oct 17); Boingo's pies, Sawyer's saw and Wrangler's lasso (Eric, Oct 18); Ginger's cane, Jefferson's Roman
- * candle and Big Boy's lollipop (Eric, Oct 18); Chub & Chirp's carrots (Oct 18); Smudgy's paint (Oct 19); Moo & Moon's moonbeams (Oct 20); Puddles' hose (Oct 23); Babur's balloons (Oct 24): every playable boss but the Hidden Boss.
+ * candle and Big Boy's lollipop (Eric, Oct 18); Chub & Chirp's carrots (Oct 18); Smudgy's paint (Oct 19); Moo & Moon's moonbeams (Oct 20); Puddles' hose (Oct 23); Babur's balloons (Oct 24); Folio's ink (Oct 27): every playable boss but the Hidden Boss.
  */
-export const KING_ATTACKERS: readonly string[] = ["clown", "gingerbread", "grex", "hollow", "bigboy", "sawyer", "pig", "alfil", "hopper", "smudgy", "moo", "gardener", "tiger"];
+export const KING_ATTACKERS: readonly string[] = ["clown", "gingerbread", "grex", "hollow", "bigboy", "sawyer", "pig", "alfil", "hopper", "smudgy", "moo", "gardener", "tiger", "folio"];
 export const hasKingAttack = (bossId: string | null | undefined): boolean => !!bossId && KING_ATTACKERS.includes(bossId);
 
 /** The crowd is checkmated on this board (the boss's move mated it). */

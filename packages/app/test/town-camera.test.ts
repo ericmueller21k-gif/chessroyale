@@ -109,9 +109,9 @@ describe("town square camera", () => {
 });
 
 describe("town square walking", () => {
-  it("thirteen homes spread over the world: neighbors 8 or more squares apart, none near your start, the Colosseum's ground clear", () => {
-    expect(HOMES).toHaveLength(13);
-    expect(new Set(HOMES.map((h) => h.id)).size).toBe(13);
+  it("fourteen homes spread over the world: neighbors 8 or more squares apart, none near your start, the Colosseum's ground clear", () => {
+    expect(HOMES).toHaveLength(14);
+    expect(new Set(HOMES.map((h) => h.id)).size).toBe(14);
     const dist = (ax: number, ay: number, bx: number, by: number) => Math.hypot(wrapF(ax - bx), wrapF(ay - by));
     for (const h of HOMES) {
       expect(dist(h.cx, h.cy, START.c, START.r), `${h.id} from the start`).toBeGreaterThanOrEqual(7.5);

@@ -34,14 +34,15 @@ test("the tiles and the stage: a tap drops the boss on, plays its sound once and
   await page.goto("/?mode=raid");
   await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
   const tiles = page.getByRole("radiogroup", { name: "Bosses" }).getByRole("radio");
-  // Thirteen bosses you can meet (Babur the last), the Hidden Boss's tile, then "?".
-  await expect(tiles).toHaveCount(15);
+  // Fourteen bosses you can meet (Folio the last), the Hidden Boss's tile, then "?".
+  await expect(tiles).toHaveCount(16);
   await expect(tiles.last()).toHaveAccessibleName("Random boss");
   await expect(tiles.nth(9)).toHaveAccessibleName("Smudgy");
   await expect(tiles.nth(10)).toHaveAccessibleName("Moo & Moon");
   await expect(tiles.nth(11)).toHaveAccessibleName("Puddles");
   await expect(tiles.nth(12)).toHaveAccessibleName("Babur");
-  await expect(tiles.nth(13)).toHaveAccessibleName("Locked boss");
+  await expect(tiles.nth(13)).toHaveAccessibleName("Folio");
+  await expect(tiles.nth(14)).toHaveAccessibleName("Locked boss");
 
   // Boingo: his idle on the stage, his name and strength, his pie's splat once, one of his lines in his bubble.
   await tile(page, "Boingo the Clown").click();
@@ -104,6 +105,16 @@ test("the tiles and the stage: a tap drops the boss on, plays its sound once and
   await expect(page.locator(".bs-rating")).not.toContainText(/Rating|💀|\d/u);
   await expect.poll(async () => (await sounds(page)).filter((s) => s.startsWith("tigerHello")).length).toBe(1);
   await expect.poll(async () => BABUR.includes((await bubble(page).getAttribute("aria-label")) ?? "")).toBe(true);
+
+  // Folio: its idle on the stage, a page turning and a flap of its wing once, its one line.
+  await tile(page, "Folio").click();
+  await expect(page.locator(".bs-stage .bs-sprite")).toHaveAttribute("data-fx", "folio");
+  await expect(page.locator(".bs-name")).toHaveText("Folio");
+  await expect(page.locator(".bs-rating")).toHaveText("");
+  await expect.poll(async () => (await sounds(page)).filter((s) => s.startsWith("folioHello")).length).toBe(1);
+  await expect.poll(() => bubble(page).getAttribute("aria-label")).toBe("Every game is a draft. Shall we write one?");
+  // (Its select line is said in the select's own voice: its whisper is the battle's, never heard here.)
+  expect((await sounds(page)).filter((s) => s.startsWith("folioVoice"))).toEqual([]);
 
   // "?": a question mark on the stage, a random boss; Boss alone says so.
   await tile(page, "Random boss").click();
@@ -233,7 +244,7 @@ test("a resting boss has no tile, and a pick of it reads as a random boss", asyn
   await page.addInitScript(() => localStorage.setItem("brc.bossId", "clown"));
   await page.goto("/?mode=raid");
   const tiles = page.getByRole("radiogroup", { name: "Bosses" }).getByRole("radio");
-  await expect(tiles).toHaveCount(14);
+  await expect(tiles).toHaveCount(15);
   await expect(tile(page, "Boingo the Clown")).toHaveCount(0);
   await expect(tile(page, "Random boss")).toHaveAttribute("aria-checked", "true");
   await expect(page.locator(".bs-name")).toHaveText("Random boss");
@@ -279,12 +290,12 @@ for (const scheme of ["light", "dark"] as const) {
       await page.setViewportSize({ width: w!, height: h! });
       await page.goto("/?mode=raid");
       await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
-      await expect(page.locator(".bs-tile")).toHaveCount(15);
+      await expect(page.locator(".bs-tile")).toHaveCount(16);
       await page.evaluate(() => document.fonts.ready);
       const g = await page.evaluate(measureGrid);
 
-      // Five to a row on a phone and a computer alike: 5, 5, 5 (fifteen tiles since Babur).
-      expect(g.rows.map((r) => r.tiles.length), at).toEqual([5, 5, 5]);
+      // Five to a row on a phone and a computer alike: 5, 5, 5 and "?" on its own (sixteen tiles since Folio, Oct 27).
+      expect(g.rows.map((r) => r.tiles.length), at).toEqual([5, 5, 5, 1]);
       const tiles = g.rows.flatMap((r) => r.tiles);
       const t0 = tiles[0]!;
 
@@ -362,8 +373,8 @@ for (const scheme of ["light", "dark"] as const) {
         expect(a.b, `${at} ${t.name}: figure on past the foot`).toBeGreaterThanOrEqual(t.inner.b - 0.5);
         if (t.name !== "Locked boss") fills.add(t.fill);
       }
-      // A color of its own for each boss with a character (the Hidden Boss's is dark, "?" plain): thirteen, no two the same.
-      expect(fills.size, `${at}: a color each`).toBe(13);
+      // A color of its own for each boss with a character (the Hidden Boss's is dark, "?" plain): fourteen, no two the same.
+      expect(fills.size, `${at}: a color each`).toBe(14);
 
       // Nothing spills past a tile's shape: the gaps are empty, art and all (on either side of each slanted edge, and between the rows).
       const gap = gaps[0]!;
@@ -387,7 +398,7 @@ test("every tile can be tapped, in its middle and either side of a gap; a press 
     const at = `${w}x${h}`;
     await page.setViewportSize({ width: w!, height: h! });
     await page.goto("/?mode=raid");
-    await expect(page.locator(".bs-tile")).toHaveCount(15);
+    await expect(page.locator(".bs-tile")).toHaveCount(16);
     const g = await page.evaluate(measureGrid);
     const slant = g.rows[0]!.tiles[0]!.slant;
     const names = g.rows.flatMap((r) => r.tiles.map((t) => t.name));
@@ -457,11 +468,17 @@ test("the layout: the stage under the tiles, the ways to play under the stage an
     expect(stage.y, `${w}`).toBeGreaterThan(block.y + block.height);
     expect(first.y, `${w}`).toBeGreaterThan(stage.y + stage.height);
     // The tall tiles take most of a small phone: the first way to play is whole in the window from 740 px tall (the stage is smaller up to
-    // 800 px tall for it), and at 568 px the boss's name is still in the window with the page scrolling on from there.
-    if (h! >= 740) expect(first.y + first.height, `${w}x${h}: the first way to play whole in the window`).toBeLessThanOrEqual(h!);
-    else expect((await page.locator(".bs-id").boundingBox())!.y + 48, `${w}x${h}: the boss's name in the window`).toBeLessThanOrEqual(h!);
+    // 800 px tall for it), and at 568 px the boss's name is still in the window with the page scrolling on from there. That's with three
+    // rows of tiles; each row past three (a fourth since Folio's tile, Oct 27: sixteen tiles, five to a row) moves both down by its
+    // own height and gap, and nothing more.
+    const rows = await page.locator(".bs-row").count();
+    const rowBoxes = await page.locator(".bs-row").evaluateAll((es) => es.map((e) => e.getBoundingClientRect().top));
+    const pitch = rows > 1 ? (rowBoxes.at(-1)! - rowBoxes[0]!) / (rows - 1) : 0;
+    const extra = Math.max(0, rows - 3) * pitch;
+    if (h! >= 740) expect(first.y + first.height, `${w}x${h}: the first way to play whole in the window (${rows} rows)`).toBeLessThanOrEqual(h! + extra);
+    else expect((await page.locator(".bs-id").boundingBox())!.y + 48, `${w}x${h}: the boss's name in the window (${rows} rows)`).toBeLessThanOrEqual(h! + extra);
     // Every boss whole inside the stage's width (Wrangler's lasso out to one side, the tallest the Hidden Boss).
-    for (const name of ["Ginger", "Boingo the Clown", "Jefferson", "Hollow", "Big Boy", "Sawyer", "Wrangler", "Alfil", "Chub & Chirp", "Smudgy", "Moo & Moon", "Puddles", "Babur", "Locked boss"]) {
+    for (const name of ["Ginger", "Boingo the Clown", "Jefferson", "Hollow", "Big Boy", "Sawyer", "Wrangler", "Alfil", "Chub & Chirp", "Smudgy", "Moo & Moon", "Puddles", "Babur", "Folio", "Locked boss"]) {
       await tile(page, name).click();
       // (After its drop, which squashes it a little wider for a moment.)
       await page.waitForTimeout(500);
@@ -566,7 +583,7 @@ test("Boss alone's menu and the /bosses picker fit any window: whole, or their r
     // The full picker (/bosses): every boss and a random one, for an admin the Hidden Boss too: the longest list.
     await page.goto("/bosses");
     const all = page.getByRole("dialog", { name: "Choose your boss" });
-    await expect(all.locator(".boss-row")).toHaveCount(15);
+    await expect(all.locator(".boss-row")).toHaveCount(16);
     await expectMenuFits(page, all, `${w}x${h} /bosses`);
     expect(await sideways(page), `${w}x${h}`).toBe(0);
   }

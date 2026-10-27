@@ -21119,3 +21119,38 @@ button.sq-tiny {
 .bp-tower .tower-mini .t-avg {
   display: none;
 }
+
+/* ---- Folio, the paper crane (components/Folio.tsx; fo- for Folio) ---- */
+/* It casts from the board's top-left corner, in its own frame's shape (97 x 92, its feet at 52, 86): its feet where the others',
+   17% down the board, its middle 10% across. */
+.pm-caster.pm-by-folio {
+  aspect-ratio: 97 / 92;
+  width: 28%;
+  left: -5%;
+  top: -8%;
+}
+/* Its banners: ruled lines of its ink-blue page, a vermilion edge (its seal). */
+.fight-banner.power-cut.folio .fb-band {
+  background: repeating-linear-gradient(180deg, #2f3860 0 3.2cqw, #3d4a7c 3.2cqw 3.6cqw);
+  border-color: #d8432a;
+}
+/* Its marks on the board: the ink, the pencil and the crease under the pieces (pw-shadow-board), its paper and its strokes over
+   them (pw-fire-board, inside the power layer): both exactly the board's squares. */
+.board-wrap > .fo-ink {
+  pointer-events: none;
+}
+/* A move its Revision crossed out, in the move list: struck through in its ink, where it stands (the row keeps its size). */
+.mv-row.mv-struck {
+  position: relative;
+  color: #8b93ad;
+}
+.mv-row.mv-struck::after {
+  content: "";
+  position: absolute;
+  left: 30px;
+  right: 8px;
+  top: calc(50% - 1px);
+  height: 2px;
+  background: #7486c0;
+  pointer-events: none;
+}

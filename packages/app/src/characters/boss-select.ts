@@ -37,6 +37,8 @@ export const SELECT_SOUND: Readonly<Record<string, SoundName>> = {
   gardener: "gardenerHello",
   // A big, bored yawn, then a balloon squeak.
   tiger: "tigerHello",
+  // A page turning, then a flap of its wing.
+  folio: "folioHello",
   // The Hidden Boss: his low, ominous hum (the stare).
   recluse: "recluseHum",
 };
@@ -92,16 +94,14 @@ export const TILES_PER_ROW = 5;
 export const TILE_RATIO = 1.24;
 
 /**
- * How many tiles go in each row for `n` tiles with at most `per` to a row: as few rows as that takes, then the tiles shared
- * out evenly, the longer rows first (fourteen: 5, 5, 4; fifteen: 5, 5, 5; sixteen: 4, 4, 4, 4). So a new boss never leaves
- * one tile alone on a row, and no row is more than one tile shorter than another. A short row is centered.
+ * How many tiles go in each row for `n` tiles with `per` to a row: full rows of `per`, the last the rest (fourteen: 5, 5, 4;
+ * fifteen: 5, 5, 5; sixteen: 5, 5, 5, 1). Five to a row always (Eric, Oct 23: "just 5 per row"), so a new boss's tile moves no
+ * other boss's tile (Oct 27, Folio's: sharing sixteen out as 4, 4, 4, 4 would have moved every tile; Eric's rule, nothing
+ * shifts). A short row is centered.
  */
 export function rowSizes(n: number, per: number): number[] {
   if (n <= 0) return [];
-  const rows = Math.ceil(n / per);
-  const base = Math.floor(n / rows);
-  const extra = n % rows;
-  return Array.from({ length: rows }, (_, i) => base + (i < extra ? 1 : 0));
+  return Array.from({ length: Math.ceil(n / per) }, (_, i) => Math.min(per, n - i * per));
 }
 
 /**
@@ -134,6 +134,8 @@ export const SELECT_FRAMING: Readonly<Record<string, Framing>> = {
   gardener: { neck: [48, 56], span: 57, at: 0.42 },
   // (His bunch of balloons rides high over his head: the neck low in the tile, so the balloons are in it too.)
   tiger: { neck: [31, 78], span: 56, at: 0.69 },
+  // (Its long neck: the point under its head, so its head, beak and the near wing's root are in the tile.)
+  folio: { neck: [30, 40], span: 58, at: 0.5 },
   recluse: { neck: [33, 47], span: 61, at: 0.5 },
 };
 
@@ -158,4 +160,6 @@ export const SELECT_TINT: Readonly<Record<string, string>> = {
   gardener: "#7fe0ae",
   // (His knight balloon's blue: across the wheel from his orange, so his stripes and his red vest stay clear on it.)
   tiger: "#2f7fe0",
+  // (Its deep ink: its cream paper and its vermilion seal stand clear on it, in the light theme's lighter wash too.)
+  folio: "#575c78",
 };

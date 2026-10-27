@@ -23,6 +23,9 @@
  *
  * A new boss gets all of this by saying its lines into `bossVoice` (the boss screen does it for every power moment
  * from its BossUi, the boss character for its reactions); its words show in its text box beside it, on every screen.
+ * - **A voice of its own** (Oct 27, Folio's): a boss whose lines have a sound (`lineSounds`, by the line's text) is heard as
+ *   each of those lines starts in the boss's voice, once, through the mute switch. No other boss has any: theirs speak in
+ *   their animations' cues.
  */
 import type { ComponentChildren, JSX } from "preact";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
@@ -32,6 +35,7 @@ import { useFrameNow } from "./components/Countdown.tsx";
 import { lineLength, plainLine, sliceLine, type LineSeg } from "./speech-icons.ts";
 import { mooIconSprite, type MooIconId } from "./characters/moo.ts";
 import { renderFrame } from "./characters/sprite.ts";
+import { play, type SoundName } from "./sound.ts";
 
 /** How much a line matters: only a critical line cuts in on another (and any line on chatter); the rest wait their turn. */
 export const CHATTER = -1;
@@ -75,8 +79,16 @@ interface Waiting {
   saidAt: number;
 }
 
+/**
+ * The sound a line is heard with as it starts in the boss's voice, by its text (Folio's whisper, as long as the line:
+ * characters/kits.ts fills it). Only the boss's voice plays these, so the select screen's line stays its select sound alone.
+ */
+export const lineSounds = new Map<string, SoundName>();
+
 /** One speaker's lines: one at a time, each for its time; see the top of this file. */
 export class Voice {
+  /** `heard`: its lines' sounds play as they start (`lineSounds`): the boss's voice. */
+  constructor(private readonly heard = false) {}
   private now: Spoken | null = null;
   private queue: Waiting[] = [];
   private said = new Set<string>();
@@ -136,6 +148,9 @@ export class Voice {
 
   private start(w: Waiting, at: number) {
     this.now = { text: w.text, key: w.key, priority: w.priority, at, until: at + holdMs(w.text), firm: at + typeMs(w.text) + SPEECH.minReadMs };
+    // (Its sound once, as it starts: a line is started once.)
+    const sound = this.heard ? lineSounds.get(w.text) : undefined;
+    if (sound) play(sound);
   }
 
   /**
@@ -158,7 +173,7 @@ export class Voice {
 const cutsIn = (priority: Priority, cur: Spoken) => (priority === CRITICAL && cur.priority < CRITICAL) || (cur.priority === CHATTER && priority > CHATTER);
 
 /** The boss's voice (one battle at a time on a device): its powers' lines, its reactions, its intro moments. */
-export const bossVoice = new Voice();
+export const bossVoice = new Voice(true);
 
 /**
  * The line a voice has up, kept current: the box redraws every frame while a line is up (it types and fades), and

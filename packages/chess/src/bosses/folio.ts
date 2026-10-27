@@ -30,8 +30,12 @@ import { VALUE, eachOn, from, logit, materialOf, meterFull, other, powerRoll, ra
  * How long each of its moments holds the screen (ms; POWER_FX in boss-timing.ts). `fold` and `revision` play at the start
  * of its turn, while it thinks (its move waits for them: folioTurnMs); the rest as the crowd's turn begins, before the
  * crowd's clock starts. `creaseWarn` comes with the RAGE warning (`warn`), whose time covers it: the line only shows.
+ * Measured against its art (the wiring lane, Oct 27; components/Folio.tsx, FOLIO_BEATS): each moment's own clock starts as
+ * its banner's window ends (1.5 s), then its animation plays out (the Draft's `check` from its `ink` cue, 1.04 s; the
+ * fold's `smug` from its `glint`, 0.8 s; the crease's `move` from its `sweep`, 0.96 s), and Revision's strikes and the
+ * take-back end inside its 2.8 s.
  */
-export const FOLIO_FX = { draft: 1800, fold: 1600, creaseWarn: 0, crease: 2400, creaseEnd: 900, revision: 2800 } as const;
+export const FOLIO_FX = { draft: 2600, fold: 2300, creaseWarn: 0, crease: 2500, creaseEnd: 900, revision: 2800 } as const;
 
 const FILES = "abcdefgh";
 const file = (sq: string) => sq.charCodeAt(0) - 97;

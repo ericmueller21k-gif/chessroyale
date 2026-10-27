@@ -314,9 +314,10 @@
       "paths": [
         "packages/chess/src/bosses/folio.ts",
         "packages/app/src/characters/folio*.ts",
+        "packages/app/src/characters/effects/folio.ts",
         "packages/app/src/components/Folio.tsx"
       ],
-      "specs": ["e2e/folio.spec.ts"]
+      "specs": ["e2e/folio.spec.ts", "e2e/king-attack.spec.ts"]
     },
     "The circus tiger (tiger)": {
       "paths": [

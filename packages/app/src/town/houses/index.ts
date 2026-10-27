@@ -16,6 +16,7 @@ import { HOUSE_PIG, HOUSE_PIG_SIGN, HOUSE_PIG_LIGHTS } from "./pig.ts";
 import { HOUSE_SAWYER, HOUSE_SAWYER_SIGN, HOUSE_SAWYER_LIGHTS, HOUSE_SAWYER_POOLS } from "./sawyer.ts";
 import { HOUSE_SMUDGY, HOUSE_SMUDGY_SIGN, HOUSE_SMUDGY_LIGHTS, HOUSE_SMUDGY_POOLS } from "./smudgy.ts";
 import { HOUSE_TIGER, HOUSE_TIGER_SIGN, HOUSE_TIGER_LIGHTS, HOUSE_TIGER_POOLS } from "./tiger.ts";
+import { HOUSE_FOLIO, HOUSE_FOLIO_SIGN, HOUSE_FOLIO_LIGHTS, HOUSE_FOLIO_POOLS } from "./folio.ts";
 
 export interface HouseArt {
   ch: Character;
@@ -41,6 +42,7 @@ export const HOUSES: Record<HomeId, HouseArt> = {
   hopper: { ch: HOUSE_HOPPER, sign: HOUSE_HOPPER_SIGN, lights: HOUSE_HOPPER_LIGHTS, pools: [] },
   gardener: { ch: HOUSE_GARDENER, sign: HOUSE_GARDENER_SIGN, lights: HOUSE_GARDENER_LIGHTS, pools: HOUSE_GARDENER_POOLS },
   alfil: { ch: HOUSE_ALFIL, sign: HOUSE_ALFIL_SIGN, lights: HOUSE_ALFIL_LIGHTS, pools: HOUSE_ALFIL_POOLS },
+  folio: { ch: HOUSE_FOLIO, sign: HOUSE_FOLIO_SIGN, lights: HOUSE_FOLIO_LIGHTS, pools: HOUSE_FOLIO_POOLS },
 };
 
 /** The Colosseum's picture (slice 5), and the icon on its edge chip (a crown over the board's squares, 24 x 24). */

@@ -23,6 +23,7 @@ import { smudgySound, type SmudgySound } from "./characters/smudgy-sounds.ts";
 import { mooSound, type MooSound } from "./characters/moo-sounds.ts";
 import { gardenerSound, type GardenerSound } from "./characters/gardener-sounds.ts";
 import { tigerSound, type TigerSound } from "./characters/tiger-sounds.ts";
+import { folioSound, type FolioSound } from "./characters/folio-sounds.ts";
 import { godKingSound } from "./characters/god-king-sounds.ts";
 import { captureWorkerError } from "./problems.ts";
 import { makeBossSound, type BossSound } from "./characters/boss-sounds.ts";
@@ -250,6 +251,7 @@ const smudgy = (name: SmudgySound) => (t: number) => buffer(smudgySound(name, ct
 const mooBoss = (name: MooSound) => (t: number) => buffer(mooSound(name, ctx!.sampleRate), t);
 const gardenerBoss = (name: GardenerSound) => (t: number) => buffer(gardenerSound(name, ctx!.sampleRate), t);
 const tigerBoss = (name: TigerSound) => (t: number) => buffer(tigerSound(name, ctx!.sampleRate), t);
+const folioBoss = (name: FolioSound) => (t: number) => buffer(folioSound(name, ctx!.sampleRate), t);
 /** The God King tapped with no charges left: his soft "can't" (god-king-sounds.ts). */
 const kingCant = (t: number) => buffer(godKingSound("cant", ctx!.sampleRate), t);
 /** One of the Roman candle's shots: a whistle (one of three, its pitch a little either way), now and then a crackle at its top. */
@@ -719,6 +721,20 @@ export type SoundName =
   | "tigerWhoop"
   | "tigerWince"
   | "tigerHello"
+  // Folio, the paper crane (a raid boss): synthesized, see characters/folio-sounds.ts (its voice for its lines too).
+  | "folioRustle"
+  | "folioFold"
+  | "folioUnfold"
+  | "folioFlap"
+  | "folioScratch"
+  | "folioDab"
+  | "folioPage"
+  | "folioCrumple"
+  | "folioGlint"
+  | "folioHello"
+  | "folioVoiceShort"
+  | "folioVoiceMedium"
+  | "folioVoiceLong"
   | "kingCant"
   // Squads: a short tick in the last seconds of your free time, and the sting as a squad enters sudden death.
   | "sqTick"
@@ -958,6 +974,19 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   tigerWhoop: tigerBoss("whoop"),
   tigerWince: tigerBoss("wince"),
   tigerHello: tigerBoss("hello"),
+  folioRustle: folioBoss("rustle"),
+  folioFold: folioBoss("fold"),
+  folioUnfold: folioBoss("unfold"),
+  folioFlap: folioBoss("flap"),
+  folioScratch: folioBoss("scratch"),
+  folioDab: folioBoss("dab"),
+  folioPage: folioBoss("page"),
+  folioCrumple: folioBoss("crumple"),
+  folioGlint: folioBoss("glint"),
+  folioHello: folioBoss("hello"),
+  folioVoiceShort: folioBoss("voiceShort"),
+  folioVoiceMedium: folioBoss("voiceMedium"),
+  folioVoiceLong: folioBoss("voiceLong"),
   kingCant,
   sqTick: (t) => clockTick(t, 0.22),
   sqSting,
@@ -1152,6 +1181,19 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   tigerWhoop: [["tiger", "whoop"]],
   tigerWince: [["tiger", "wince"]],
   tigerHello: [["tiger", "hello"]],
+  folioRustle: [["folio", "rustle"]],
+  folioFold: [["folio", "fold"]],
+  folioUnfold: [["folio", "unfold"]],
+  folioFlap: [["folio", "flap"]],
+  folioScratch: [["folio", "scratch"]],
+  folioDab: [["folio", "dab"]],
+  folioPage: [["folio", "page"]],
+  folioCrumple: [["folio", "crumple"]],
+  folioGlint: [["folio", "glint"]],
+  folioHello: [["folio", "hello"]],
+  folioVoiceShort: [["folio", "voiceShort"]],
+  folioVoiceMedium: [["folio", "voiceMedium"]],
+  folioVoiceLong: [["folio", "voiceLong"]],
   kingCant: [["godKing", "cant"]],
 };
 /** The sound worker (sound-worker.ts), started with the first warmSounds; null where there's none (or it failed). */

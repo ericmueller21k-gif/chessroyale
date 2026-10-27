@@ -188,8 +188,11 @@ export function bossBeat(cfg: BeatLines, s: BeatState): BeatResult {
   if (s.stage === "intro") return out("entrance", "idle", `intro:${ply}`);
   if (s.stage === "strike") return out("strike", now, `strike:${ply}:${s.victim ?? ""}`);
   if (s.stage === "thinking") {
-    // The crowd just moved: did it take one of the boss's pieces?
-    const prev = before(s.history, 1, s.bases);
+    // The crowd just moved: did it take one of the boss's pieces? (Not when the board has just gone back past it: Folio's
+    // Revision crossed out its own move and the crowd's, a base that goes back, `from`; the board it compares would be its move's,
+    // a promotion of its own crossed out reading as a piece it lost.)
+    const rewound = !!s.bases?.some((b) => b.ply === ply && b.from !== undefined);
+    const prev = rewound ? null : before(s.history, 1, s.bases);
     const took = prev !== null && material(fen, bossSide) < material(see(prev), bossSide);
     return took ? out("hurt", "thinking", `hurt:${ply}`) : out("thinking", "thinking", `think:${ply}`);
   }

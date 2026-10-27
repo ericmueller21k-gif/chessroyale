@@ -46,7 +46,7 @@ export interface Moment {
 }
 
 /** Which of a boss kit's moments a power's moment is (its animation and lines: characters/power-art.ts). */
-export type KitMoment = "power" | "powerHit" | "ultimateWarn" | "ultimate" | "ultimateHit" | "plantMany" | "plant" | "cheer" | "bigCheer" | "shrug" | "place" | "wince";
+export type KitMoment = "power" | "powerHit" | "ultimateWarn" | "ultimate" | "ultimateHit" | "plantMany" | "plant" | "cheer" | "bigCheer" | "shrug" | "place" | "wince" | "fold" | "revision";
 
 /** What a moment's view gets: the moment, the clock, and the helpers every moment uses. */
 export interface MomentProps {
