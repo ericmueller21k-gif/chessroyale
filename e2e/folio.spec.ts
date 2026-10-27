@@ -31,7 +31,9 @@ function quiet(fen: string, allowed: string[] | null, keep: (m: string) => boole
   const legal = new Chess(fen).moves({ verbose: true }).filter((m) => !m.captured && !m.promotion && !m.san.includes("+")).map((m) => ({ uci: m.from + m.to, piece: m.piece }));
   const ok = legal.filter((m) => (!allowed || allowed.includes(m.uci)) && keep(m.uci));
   const any = legal.filter((m) => !allowed || allowed.includes(m.uci));
-  return (ok.find((m) => m.piece === "n") ?? ok[0] ?? any[0] ?? legal[0])!.uci;
+  // (None quiet: a capture or a check, whatever is allowed.)
+  const all = new Chess(fen).moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? "")).filter((m) => !allowed || allowed.includes(m));
+  return (ok.find((m) => m.piece === "n") ?? ok[0] ?? any[0])?.uci ?? all[0]!;
 }
 
 async function play(page: Page, move: string, fen: string) {
