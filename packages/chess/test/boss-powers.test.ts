@@ -136,6 +136,18 @@ describe("boss powers: the ground rules", () => {
     expect(chooseFreeze(fen, "w", 1, 1)).toBeNull();
   });
 
+  it("a frozen rook can't castle either (the king's step that moves it)", () => {
+    // White can castle short; the rook on h1 is frozen. (Found by the review of Folio's fold, Oct 27.)
+    const fen = "k6r/8/8/8/8/8/5N2/4K2R w K - 0 20";
+    expect(legalMoves(fen)).toContain("e1g1");
+    const b = battle("gingerbread", fen);
+    const frozen = { ...b, powers: { ...b.powers!, frozen: { square: "h1", piece: "r", until: 3 } } };
+    const allowed = crowdAllowed(frozen, fen)!;
+    expect(allowed).not.toContain("e1g1");
+    expect(allowed.some((m) => m.startsWith("h1"))).toBe(false);
+    expect(allowed).toEqual(expect.arrayContaining(["e1f1", "e1d1", "f2g4"]));
+  });
+
   it("in check, a pie lifts when the only escape lands on it", () => {
     // The king on h1 is checked by the rook on h8; its only move is to g1... a pie there would leave none.
     const fen = "6kr/8/8/8/8/8/6PP/7K w - - 0 1";
