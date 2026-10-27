@@ -78,6 +78,9 @@ export type Beat =
   // Babur's, the circus tiger's: a new balloon on his pump, and a balloon popped (a landing's reactions are `cheer` and `bigCheer`).
   | "place"
   | "wince"
+  // Folio's: a marked piece folded, and its Revision (its Draft's mark is `power`, the Crease's warning `ultimateWarn`).
+  | "fold"
+  | "revision"
   // A boss's attack on a king (its kit's `kingAttack`): the God King in his Last Stand, the crowd's king at its mate.
   | "kingAttack";
 /** The loops it rests in between moments (`ready`: Wrangler's, his meter full). */

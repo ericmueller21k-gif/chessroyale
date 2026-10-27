@@ -108,6 +108,7 @@ const POWERS: { name: string; boss: BossState; fen: string; favorites: string[];
   { name: "Sawyer's first move (a pawn's)", boss: bossWith("sawyer", AFTER_E4, {}, 0), fen: AFTER_E4, favorites: ["g8f6", "b8c6"], why: null },
   { name: "Boingo's pie", boss: bossWith("clown", AFTER_E4, { pies: [{ square: "e5", until: 3 }] }, 0), fen: AFTER_E4, favorites: ["e7e5"], why: "pie" },
   { name: "Big Boy's toy block", boss: bossWith("bigboy", AFTER_E4, { block: { square: "f6", at: 1, until: 3 } }, 0), fen: AFTER_E4, favorites: ["g8f6"], why: "block" },
+  { name: "Folio's Crease", boss: bossWith("folio", OPEN, { crease: { line: "d|e", at: 4, until: 7 } }), fen: OPEN, favorites: ["d7g4", "c6e7"], why: "crease" },
 ];
 
 describe("Eric's position (Oct 17): the boss's queen across the board saw was his only move", () => {
@@ -267,6 +268,8 @@ describe("which power stops a move (the screens' words)", () => {
     // (Slides through a block too.)
     const slide = "rnbqkbnr/ppp2ppp/8/3pp3/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
     expect(stopReason({ id: "bigboy", powers: { block: { square: "e7", at: 1, until: 3 } } }, slide, "f8d6")).toBe("block");
+    expect(stopReason({ id: "folio", powers: { crease: { line: "5|6", at: 4, until: 7 } } }, AFTER_E4, "e7e5")).toBe("crease");
+    expect(stopReason({ id: "folio", powers: { crease: { line: "4|5", at: 4, until: 7 } } }, AFTER_E4, "e7e5")).toBeNull();
     expect(stopReason({ id: "gingerbread", powers: {} }, AFTER_E4, "e7e5")).toBeNull();
     expect(stopReason(null, AFTER_E4, "e7e5")).toBeNull();
   });

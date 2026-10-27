@@ -50,6 +50,10 @@
  * fitted), and each crowd turn with hoops standing:
  * whether the walls took away the engine's best move.
  *
+ * Folio (id folio): each row logs its Draft marks, folds and marks answered in time (the attack ended after a crowd move),
+ * every Crease (as it landed, the line and what it cost the crowd by the engine that picked it) and its Revision (after
+ * which crowd move, what its move cost it and what the crowd's reply found, in pawns).
+ *
  * Results go to reports/boss-sim/*.jsonl; `summary` writes reports/boss-calibration.md.
  */
 import { BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, bossElo, bossStumbleChance, botPick, estimateRating, mulberry32, shuffle, type Rng, type Settings } from "@chessroyale/core";
@@ -232,7 +236,7 @@ function summary() {
 /** The judge's and the boss's search in the raid sims (a little under the game's 250,000, for time). */
 const RAID_NODES = 120_000;
 /** Each boss's ultimate, as the raid sim sees it come: a moment as a turn begins, or one the match runner plays. */
-const ULT_EVENTS = new Set(["blizzard", "candle", "boardsaw"]);
+const ULT_EVENTS = new Set(["blizzard", "candle", "boardsaw", "crease"]);
 
 /**
  * A Solo raid with every power, as solo plays one with nobody watching (simulateRest): 50 bots (the Solo raid's own
@@ -304,12 +308,15 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       const pickSec = patch.pickSec ?? 10;
       const runner = new MatchRunner({ settings: s, rng, engines, library, entrants: botRoster(rng, s.lobbySize, s), clock: () => clockMs });
       const ults: { kind: string; turn: number }[] = [];
+      // (Folio: each Crease as it landed, its line and what it cost the crowd by the engine that picked it.)
+      const creases: { at: number; line: string; loss: number | null }[] = [];
       let seen = -1;
       const look = () => {
         const p = runner.boss?.powers;
         if (!p || p.turn === seen) return;
         seen = p.turn;
         for (const e of p.events) if (ULT_EVENTS.has(e.kind)) ults.push({ kind: e.kind, turn: e.turn });
+        if (p.crease && p.events.some((e) => e.kind === "crease")) creases.push({ at: p.crease.at, line: p.crease.line, loss: p.crease.loss === null || p.crease.loss === undefined ? null : Math.round(p.crease.loss * 100) / 100 });
       };
       look();
       let struck = 0;
@@ -586,7 +593,10 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       if (pc) Object.assign(carrots, { pulls: pc.pulls, over: pc.over ?? null, his: carrotsOf(pc, "boss"), crowd: carrotsOf(pc, "crowd"), spin: pc.spin ?? null });
       const camo = b.powers?.camo;
       const camoRow = camo ? { side: camo.side, missed: camo.missed, off: !!camo.off, swap: camo.swap ?? null, reveal: camo.reveal ?? null, hidden: camo.square, strikeAfter: camo.swap && camo.reveal ? camo.reveal.at - camo.swap.at : null } : null;
-      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}), ...(bossId === "moo" ? { moo } : {}), ...(bossId === "gardener" ? { garden } : {}), ...(bossId === "tiger" ? { tiger: { ...tiger, placed: b.powers?.balloon?.placed ?? 0 } } : {}) };
+      // (Folio: its marks, folds and marks answered in time; every Crease; its Revision, what its move cost it and what the crowd's reply would have won.)
+      const fo = b.powers?.folio;
+      const folioRow = fo ? { drafts: fo.drafts, folds: fo.folds, answered: fo.answered, creases, revision: fo.revision ? { at: fo.revision.at, cost: fo.revision.cost, drop: fo.revision.drop } : null } : null;
+      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}), ...(bossId === "moo" ? { moo } : {}), ...(bossId === "gardener" ? { garden } : {}), ...(bossId === "tiger" ? { tiger: { ...tiger, placed: b.powers?.balloon?.placed ?? 0 } } : {}), ...(bossId === "folio" ? { folio: folioRow } : {}) };
       appendFileSync(root + `reports/boss-sim/raid-${tag}.jsonl`, JSON.stringify(row) + "\n");
       console.log(JSON.stringify(row));
     }

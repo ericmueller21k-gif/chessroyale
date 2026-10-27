@@ -99,6 +99,23 @@ describe("the FAQ's contents", () => {
     expect(words).not.toMatch(/undefined|NaN|\$\{/);
   });
 
+  it("Folio's block (Draft, Crease and Revision) is ready for when its art is wired: every number from the settings, \"it\" throughout", () => {
+    const def = BOSS_ROSTER.find((b) => b.id === "folio")!;
+    const words = BOSS_BLOCKS.folio!(BOSS_POWERS, def);
+    const p = BOSS_POWERS;
+    expect(words).toContain("game so far");
+    expect(words).toContain(`from turn ${p.draftFirst}, every ${p.draftEvery} turns`);
+    expect(words).toContain(`You have ${p.draftWindow} moves to end that attack`);
+    expect(words).toContain(`it can't move for ${p.foldTurns} turns`);
+    expect(words).toContain(`for ${p.creaseTurns} turns: no piece of either side may move across it`);
+    expect(words).toContain(`between ${p.creaseLossMin} and ${p.creaseLossMax} pawns`);
+    expect(words).toContain(`its move cost it ${p.revisionDrop} pawns or more`);
+    expect(words).toContain(`Never before turn ${p.revisionFrom}`);
+    expect(words).toContain(def.offset === 0 ? "at the usual strength" : `${Math.abs(def.offset)} ${def.offset < 0 ? "under" : "over"} the usual strength`);
+    expect(words).not.toMatch(/\b(he|his|him)\b/i);
+    expect(words).not.toMatch(/undefined|NaN|\$\{/);
+  });
+
   it("the hippo gardener's block (Seeds and Watering) is ready for when his art is wired, every number from the settings", () => {
     const def = BOSS_ROSTER.find((b) => b.id === "gardener")!;
     const words = BOSS_BLOCKS.gardener!(BOSS_POWERS, def);
