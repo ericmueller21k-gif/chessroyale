@@ -35,6 +35,8 @@ interface Img {
 
 /** The anims every boss needs (the kit's moments). */
 export const REQUIRED = ["idle", "entrance", "thinking", "move", "capture", "hurt", "check", "smug", "rattled", "defeat", "victory"] as const;
+/** A boss's sidekick's anims (Oct 27: a town bot you can play, no powers): standing, walking, sitting at a table, a wave. */
+export const SIDEKICK = ["idle", "walk", "sit", "wave"] as const;
 const GROUND = { dark: "#14161b", light: "#f3f1ec" } as const;
 const MAX_W = 1500;
 
@@ -104,8 +106,10 @@ async function main(req: Req): Promise<object> {
   const warnings: string[] = [];
   if (ch.id !== req.id) warnings.push(`its id is "${ch.id}", not "${req.id}"`);
   if (!ch.palette.k) warnings.push(`no outline color: the palette needs "k"`);
-  // A home on the town square (an id starting "house-") needs only its idle.
-  const missing = (req.id.startsWith("house-") ? (["idle"] as const) : REQUIRED).filter((a) => !ch.anims[a]);
+  // A home on the town square (an id starting "house-") needs only its idle; a boss's sidekick (a town bot, "sidekick-")
+  // its idle, walk, sit and wave.
+  const need: readonly string[] = req.id.startsWith("house-") ? ["idle"] : req.id.startsWith("sidekick-") ? SIDEKICK : REQUIRED;
+  const missing = need.filter((a) => !ch.anims[a]);
   if (missing.length) warnings.push(`animations still to draw: ${missing.join(", ")}`);
   const anim = ch.anims[req.anim];
   const facts = {

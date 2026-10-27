@@ -15,7 +15,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { execFileSync } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { extname, join, relative, resolve, sep } from "node:path";
-import { MODEL, PRICE, hasKey } from "../boss-lines/api.ts";
+import { MODEL as OPUS, PRICE as OPUS_PRICE, hasKey } from "../boss-lines/api.ts";
 
 const [id, briefPath, refsDir] = process.argv.slice(2);
 if (!id || !/^[a-z][a-z0-9-]{1,30}$/.test(id) || !briefPath) {
@@ -23,6 +23,19 @@ if (!id || !/^[a-z][a-z0-9-]{1,30}$/.test(id) || !briefPath) {
   process.exit(2);
 }
 const CAP = Number(process.env.BOSS_ART_CAP_USD ?? 20);
+/**
+ * The model and its effort (Oct 27, Eric: compare Sonnet and Opus on the same drawing): BOSS_ART_MODEL (default Opus 5.5)
+ * and BOSS_ART_EFFORT (default high). Each model's prices, dollars per million tokens (cache writes at 1.25x input).
+ */
+const MODEL = process.env.BOSS_ART_MODEL ?? OPUS;
+const PRICES: Record<string, { input: number; output: number; cacheWrite: number; cacheRead: number }> = {
+  [OPUS]: OPUS_PRICE,
+  "claude-sonnet-5-5": { input: 2, output: 10, cacheWrite: 2.5, cacheRead: 0.2 },
+};
+const PRICE = PRICES[MODEL]!;
+if (!PRICES[MODEL]) throw new Error(`BOSS_ART_MODEL: no prices for ${MODEL} (${Object.keys(PRICES).join(", ")})`);
+const EFFORT = (process.env.BOSS_ART_EFFORT ?? "high") as "low" | "medium" | "high" | "xhigh";
+if (!["low", "medium", "high", "xhigh"].includes(EFFORT)) throw new Error("BOSS_ART_EFFORT: low, medium, high or xhigh");
 if (!(CAP > 0)) throw new Error("BOSS_ART_CAP_USD must be a positive number of dollars");
 const MAX_TURNS = Number(process.env.BOSS_ART_MAX_TURNS ?? 90);
 /** Each turn's output ceiling (thinking included): room for a whole drawing written at once. */
@@ -105,7 +118,7 @@ const TOOLS: Anthropic.Tool[] = [
   },
 ];
 
-// ---- Spend: the real usage of every turn, at Opus 5.5's prices.
+// ---- Spend: the real usage of every turn, at the model's prices.
 const spent = { usd: 0, input: 0, output: 0, cacheWrite: 0, cacheRead: 0, turns: 0 };
 const dollars = (u: Anthropic.Usage) =>
   (u.input_tokens * PRICE.input + u.output_tokens * PRICE.output + (u.cache_creation_input_tokens ?? 0) * PRICE.cacheWrite + (u.cache_read_input_tokens ?? 0) * PRICE.cacheRead) / 1e6;
@@ -246,7 +259,7 @@ async function main(): Promise<void> {
           model: MODEL,
           max_tokens: MAX_TOKENS,
           thinking: { type: "adaptive" },
-          output_config: { effort: "high" },
+          output_config: { effort: EFFORT },
           system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
           tools: TOOLS,
           messages,
@@ -314,7 +327,7 @@ async function main(): Promise<void> {
   const summary = [
     `# Boss art: ${id}`,
     "",
-    `- Model ${MODEL}, effort high, adaptive thinking. ${spent.turns} turns, ${looks} renders.`,
+    `- Model ${MODEL}, effort ${EFFORT}, adaptive thinking. ${spent.turns} turns, ${looks} renders.`,
     `- Spend: **$${spent.usd.toFixed(2)}** of the $${CAP} cap (${spent.input.toLocaleString("en-US")} input, ${spent.cacheWrite.toLocaleString("en-US")} cache-write, ${spent.cacheRead.toLocaleString("en-US")} cache-read, ${spent.output.toLocaleString("en-US")} output tokens).`,
     stopped ? `- **Stopped early:** ${stopped}.` : "- Finished: it called done.",
     `- The drawing: ${relative(ROOT, DRAFT)}${existsSync(DRAFT) ? "" : " (none written)"}.`,
