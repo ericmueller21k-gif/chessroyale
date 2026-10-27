@@ -1,41 +1,28 @@
 # Boss art: folio
 
-- Model claude-opus-5-5, effort high, adaptive thinking. 35 turns, 19 renders.
-- Spend: **$1.94** of the $20 cap (74 input, 110,341 cache-write, 2,441,394 cache-read, 45,114 output tokens).
+- Model claude-opus-5-5, effort high, adaptive thinking. 47 turns, 31 renders.
+- Spend: **$2.97** of the $20 cap (96 input, 148,198 cache-write, 4,509,200 cache-read, 66,176 output tokens).
 - Finished: it called done.
 - The drawing: scripts/boss-art/out/folio/folio.ts.
 - Previews: scripts/boss-art/out/folio/preview/ (GIFs, the frame sheet, the comparison). Each look it took: scripts/boss-art/out/folio/looks/.
 
 ## Its notes
 
-I revised Folio and looked at all 11 animations again: the idle at phone size beside the gingerbread man, the tiger and moo, and the others at 3–5x. The fold geometry, the pose rig, the palette, the light, the outline, the timings and the stories of the entrance, defeat and victory are unchanged.
+Folio, third pass. I edited the second pass in place. The fold geometry, the pose rig, the outline, the paper pawn, the four eye settings, every animation's story and all timings are the same, except two changes to how the fading ink lines behave and a longer defeat ending (see below). I rendered every animation at 3–6x on dark and light backgrounds, and the idle at phone size beside tiger, gingerbread and moo.
 
-The four fixes:
-1. Handwriting. The dashes are gone. Each face now has thin 1-px cursive strokes, 3 px apart, in long lines running along the face. The stroke lifts a pixel every 2–3 px for small humps, with an occasional loop, and joins up within a word. There are 2-px gaps between words and now and then a longer blank, so lines end at different lengths. The ink is a faint sepia in three tones (lit, mid and shaded paper), so it stays faint everywhere. At 1x it's a soft lined texture; up close it reads as scribbled script, though the humps lean a bit zigzag. The loose page in the entrance and defeat shows it best. The lines that fade in and out (sepia in the idle, ink-blue in thinking) now run along the near wing's front face.
-2. Volume. The body diamond is bigger and hangs lower. Both wings bow out along one edge, so they're broad flaps with more room for writing; the near wing has a third, shaded face. The neck and tail are 3 px at the tip and wide at the base. Still 97×92. At phone size it holds its own beside the gingerbread man, the tiger and moo.
-3. Captured piece. It's now a 6×7 paper pawn with outline: round head, neck, collar and a wide base, with a crease down its shaded side. At 5x it clearly reads as a pawn.
-4. Face. The head is 1–2 px bigger and the eye is 2×2, dark with a 1-px glint. A new eye setting gives four looks:
-- open: the normal eye.
-- wide: taller; used in hurt while it's being crumpled and in rattled while it shivers.
-- happy: a closed ∩ arc; used through the smug bow and glint and at the end of victory.
-- narrow: a slit; used for a one-frame blink in the idle (frame 19), as it steadies after hurt and rattled, and as defeat begins.
+What changed:
+1. **Handwriting in ink.** The ink is now blue-black in three tones: #4f5d8e on lit faces, #36416b on mid faces, #232a47 on shaded ones. Each face gets a paragraph of 3–4 lines, 4 px apart: 3 on the body and far wing, 4 on the near wing, 6 on the loose page. The paragraph sits where the face is widest. The strokes are 1 px with rounded humps every 3–4 px, now and then a taller loop, 2 px gaps between words with a few longer ones, and each line stops short of the edge by its own amount. At 1x they read as lines of writing. When the crane is rattled, the smear runs in a lighter blue.
+2. **Gilt edges.** A 1-px gold line (#e5ad45) runs along the near wing's leading edge, a deeper gold (#c9973c) along the far wing's, and gold along the outer half of the tail's lit edge. The glint in the entrance and smug now runs along that line: the gold brightens over about 5 px, spills onto the outline, and a small star flares off the edge.
+3. **The seal.** A 6x6 vermilion stamp with clipped corners and a pressed-dark lower right. The pawn is knocked out in cream. It sits on the near wing's lit face and moves and folds with the wing; the writing keeps a 1-px margin clear around it. It's also on the loose page, the creased square and the bird base, so it's there from the first frame of the entrance. Defeat now ends with three new frames after the page lands: the writing fades off the page and only the seal is left. That makes defeat 15 frames and 4.8 s instead of 12 frames and 4.1 s.
+4. **More contrast.** The mid, shaded and crease tones are a step darker (C #d3bd95, D #a58e69, E #76624c); the lit faces are still cream. Every fold now reads at 1x next to the tiger.
+5. **The tiny crane in victory** is redrawn as a 9-px-wide cream crane with its outline and a gold wing tip. It flaps between a tall V of wings and a shallow glide, with a head to the left, a tail to the right and the body coming to a point. At 1x it reads as a little bird flying off.
+6. **Brows.** Each eye setting now has a 1-px ink line above it, and the head's crown is 2 px taller to make room. Open is level, wide is lifted a row, narrow is lowered and slants down toward the beak, and happy is an arc sitting just over the closed arc eye.
 
-Each animation, beat by beat:
-- Idle: two slow breaths with the wings rising, one head dip, one blink, two lines of writing fading in and out.
-- Entrance: a bigger page drifts down rocking, then folds into a creased square, the bird base and the petal fold. The neck and tail swing up, the head folds, the wings open and a gold glint runs up the wing edge.
-- Thinking: the head cocks up and three ink-blue lines write themselves along the near wing, then fade together.
-- Move: the near wing sweeps forward, points at the board and sweeps back with a rustle.
-- Capture: it dips its beak, comes up with the paper pawn and tucks it under the lifted wing.
-- Hurt: the trailing edge crumples, the tip folds over and the crane shudders wide-eyed, then smooths out.
-- Check: the neck stretches tall, the wing points and a blue underline draws itself under it.
-- Smug: a happy-eyed bow while a glint runs up the wing edge.
-- Rattled: the wing edges curl, the ink runs and the eye goes wide, then it steadies.
-- Defeat: it unfolds through the bird base and the square to a flat page, which tips and settles on the ground.
-- Victory: it folds a tiny crane at its beak (square, kite, crane), launches it, watches it go and bows, happy-eyed.
+Ink fades: the fading lines are now ink by default, not invisible. In the idle, a line on the near wing fades out and back in, then a second one does. Thinking keeps its story (three lines appear one after another, then fade together as the head comes down), but in the same ink instead of the old light blue.
 
 Choices you might want to change:
-- When the fading lines are out, the near wing's front face has a little less writing. That's on purpose, so the writing visibly comes and goes.
-- In move and check, the pointing wing bows into a broad blade rather than a thin point.
-- The pawn is 7 px tall, one more than the brief's "about 6"; that row is for the collar.
-- The open eye is small at 1x. It reads at 2x and up.
-- The humps in the handwriting lean a little zigzag. Spacing them every 3–4 px would give smoother cursive.
+- **Seal shape.** It isn't drawn rotated; the tilt is only suggested by the clipped top-left and bottom-right corners, since a truly rotated 5–6 px square broke up badly when I tried it. The pawn knockout is very simple (a stem on a 3-px base).
+- **Seal in some poses.** When the near wing points at the board (move, check), its lit face is too thin for the seal. The seal and that face's writing drop out for those frames and come back when the wing returns.
+- **Seal on the flat page.** On the page seen flat, in defeat and the entrance, the seal is a squashed 6x3 version so the perspective holds. Its red reads clearly, but the pawn shape barely does.
+- **Happy face.** The happy brow and the arc eye stack into a small "^ over ^" shape on the dipped head. If it looks busy, the brow could be dropped for happy only.
+- **Check underline.** It's still a lighter blue (#7486c0) than the writing, so it shows up on the dark ground.
