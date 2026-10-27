@@ -310,6 +310,14 @@
       ],
       "specs": ["e2e/gardener.spec.ts", "e2e/king-attack.spec.ts"]
     },
+    "Folio (folio)": {
+      "paths": [
+        "packages/chess/src/bosses/folio.ts",
+        "packages/app/src/characters/folio*.ts",
+        "packages/app/src/components/Folio.tsx"
+      ],
+      "specs": ["e2e/folio.spec.ts"]
+    },
     "The circus tiger (tiger)": {
       "paths": [
         "packages/chess/src/bosses/tiger.ts",
