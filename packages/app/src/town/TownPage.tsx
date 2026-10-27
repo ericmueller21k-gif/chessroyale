@@ -13,7 +13,8 @@ export function TownPage({ onBack, onBossAlone }: Props) {
   const [Town, setTown] = useState<Screen | null>(null);
   useEffect(() => {
     let live = true;
-    void import("./Town.tsx").then((m) => live && setTown(() => m.TownScreen));
+    // (No module when its chunk was gone after a deploy: the page is loading again, stale.ts.)
+    void import("./Town.tsx").then((m) => live && m && setTown(() => m.TownScreen));
     return () => void (live = false);
   }, []);
   return Town ? <Town onBack={onBack} onBossAlone={onBossAlone} /> : <div class="screen" />;
