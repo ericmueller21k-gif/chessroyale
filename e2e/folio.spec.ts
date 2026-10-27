@@ -264,7 +264,8 @@ test("Folio's Revision: the board holds your move, both moves are struck out, th
   expect(before.length, "frames before the page turns").toBeGreaterThan(10);
   for (const x of before) expect(x.board, "the position after your move, held").toBe(piecesOf(held.fen()));
   const struck = before.at(-1)!.over.split(" ").filter((x) => x.startsWith("inkStrike@")).sort();
-  expect(struck).toEqual([...new Set([r.moves[0].slice(0, 2), r.moves[0].slice(2, 4), r.moves[1].slice(0, 2), r.moves[1].slice(2, 4)])].map((sq) => `inkStrike@${sq}`).sort());
+  // (A stroke on each move's two squares: a square both moves touch gets two.)
+  expect(struck).toEqual([r.moves[0].slice(0, 2), r.moves[0].slice(2, 4), r.moves[1].slice(0, 2), r.moves[1].slice(2, 4)].map((sq) => `inkStrike@${sq}`).sort());
   // (The pieces slide back in 220 ms: the last frames of the moment show the position before its move.)
   expect(later.length).toBeGreaterThan(5);
   expect(later.at(-1)!.board, "the position before its move").toBe(piecesOf(back));
