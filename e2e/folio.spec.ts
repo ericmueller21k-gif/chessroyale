@@ -11,7 +11,7 @@ import { REFUSED } from "../packages/app/src/refused.ts";
  * (the ink, the fold, the crease, the crossing out) and its own visual e2e.
  * - Draft (`&power=draft`: from turn 2, again every turn once a mark is gone): a mark you leave standing for your two moves
  *   folds the piece; its moves are refused, and the dock says why.
- * - Crease (`&power=crease`): its line shown with the warning, then four turns no move crosses it; yours refused with why.
+ * - Crease (`&power=crease`): its line shown with the warning, then four turns none of your moves crosses it (its own may), refused with why.
  * - Revision (`&power=revision`): after your fifth move, both moves crossed out, the board back, its move in their place.
  */
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
@@ -107,7 +107,7 @@ test("Folio's Draft: a mark left standing for your two moves folds the piece; it
   expect(errors).toEqual([]);
 });
 
-test("Folio's Crease: its line shown with the warning, then for four turns no move crosses it; yours refused with why; then it unfolds", async ({ page }) => {
+test("Folio's Crease: its line shown with the warning, then for four turns none of your moves crosses it, refused with why; then it unfolds", async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
