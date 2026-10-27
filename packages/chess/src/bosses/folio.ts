@@ -303,8 +303,8 @@ export const FOLIO: BossRules = {
       const pc = pieceAt(t.fen, g.folded.square);
       if (g.folded.until < t.turn || pc?.color !== t.crowd || pc.type !== g.folded.piece) g = { ...g, folded: null };
     }
-    // (A mark whose attack ended on his move: the after-move checks clear it; this is the last look.)
-    if (g.mark && !attackStands(t.fen, g.mark, t.crowd)) g = { ...g, mark: null };
+    // (A mark whose attack ended, or whose last turn passed with the battle's end: the after-move checks clear it; this is the last look.)
+    if (g.mark && (g.mark.until < t.turn || !attackStands(t.fen, g.mark, t.crowd))) g = { ...g, mark: null };
     if (g.next && g.next.turn < t.turn) g = { ...g, next: null };
     if (g !== f) next.folio = g;
     // The crease unfolds after its turns.
