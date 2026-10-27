@@ -110,9 +110,19 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
   more kinds of square (`groundAt`: paving and grass), drawn with the board's in the same color-sorted fills. Tables, trees,
   benches and the fountain are solid (`walkable`); stools, paths and grass are walked on. Each picture is made once (a
   `FrameCache` per kind) and drawn as one item sorted with the people, a little behind whoever stands on its row.
+- **The tables' boards** (Oct 27; docs/decisions/2026-10-27-park-tables-live.md): each table's top is a flat slab drawn
+  through the camera (`drawBoard` in `render.ts`; sizes `TABLE_BOARD`, pieces `TABLE_PIECES`, the clock's digits
+  `TABLE_DIGITS` in `houses/park.ts`; timings in `TOWN_FEEL`'s `table*`), its 8 x 8 board lying flat between the stools and
+  tiny pieces standing on it (the back ranks' shapes, the pawns in front). Who sits decides what it shows (`tableStates` in
+  `world.ts`): **two people, not you, play** (white and black in turn, a step or three forward each, captures fading out,
+  back to the start after `tableMoves` moves; a black clock floating over the board counts the game's time); **one, not
+  you, waits** (a soft green ring pulses on the ground under the free stool); otherwise the pieces stand set up. You at a
+  table aren't playing or searching yet (Casual and Ranked come with the tables' matchmaking). While nothing on a board
+  moves and the camera holds still, its slab, board and pieces are one cached picture (`boardCache`): frame rates as main.
 - **Sitting at a table** (slice 6): a tap on a table or a stool walks you to its free stool nearer you (`destFor`'s
-  `table`; both taken: beside it) and opens its card: "Chess table", **"Casual"** and **"Ranked"** greyed, "Coming soon"
-  (matchmaking for the park is the next job). A person sits (`seated`) when stopped on a stool meaning to (`Person.sit`:
+  `table`; both taken: beside it) and opens its card (no title, Eric, Oct 27): **"Casual"** and **"Ranked"** greyed,
+  "Coming soon" (matchmaking for the park is the next job); at a table where two others play, **"Spectate"** greyed,
+  "Coming soon" (Eric, Oct 27: watching their game, once real games are played there). A person sits (`seated`) when stopped on a stool meaning to (`Person.sit`:
   always for bots, for you while the table's card is open after a tap on it): drawn from `sitCut` of its height up, resting
   on the stool's seat (`sitSeat`), facing the board, with no shadow of its own. Closing the card (a tap elsewhere) or walking
   on stands you up. Bots head for a free stool now and then (`botSitChance`, `botSitReach`) and may stay a while
@@ -208,10 +218,13 @@ noted wherever a slice changed one.
   `?sky=night` draw different skies; a boss's card, its confirm (Stay, then Leave to the Boss raid screen, his tile
   picked); a home's card (Shop greyed, "Coming soon", closed by a tap elsewhere); the Colosseum's (a tap on its gate walks
   you to the apron; "Raids with people" greyed, "Coming soon"); a park table's (slice 6: a tap walks you to a stool and you
-sit, its card with "Casual" and "Ranked" greyed and "Coming soon"; a tap elsewhere closes it and you stand); the lights (at `?sky=night` a park lamp's glass and Babur's Circus's lit doorway are clearly warmer and brighter than at `?sky=day`). Test hooks: the canvas's `data-you` (your square),
+sit, its card with "Casual" and "Ranked" greyed and "Coming soon"; a tap elsewhere closes it and you stand; Oct 27: no
+title; a bot waiting, two playing (the board's pixels change), a tap on their game: "Spectate" greyed, and you don't sit); the lights (at `?sky=night` a park lamp's glass and Babur's Circus's lit doorway are clearly warmer and brighter than at `?sky=day`). Test hooks: the canvas's `data-you` (your square),
   `data-ready` (a frame is drawn) and `data-sit` ("1" while you sit at a table); with the test switches on, `window.__townAt(kind, id)` (where to tap a boss, a home or
   the Colosseum's gate) and `window.__townGather()` (the three nearest bots come and stand beside you), `window.__townAt("statue", "bronze" | "marble")`, `window.__townAt("table", i)` (a table by its index in `TABLES`), `window.__townAt("lamp", i)` (a park lamp's glass, by its index in `LAMPS`), `window.__townAt("light", id)` (a lit pixel of a home's, or `"coliseum"`'s, first light with nothing in front of it) and
-  `window.__townCam()` (the zoom, the lens, the focus, the statue up close, whether its quote shows and its letters' size).
+  `window.__townCam()` (the zoom, the lens, the focus, the statue up close, whether its quote shows and its letters' size),
+  `window.__townSeat(i, n)` (the nearest free bots sit on table i's first n stools, and every bot holds still from then on)
+  and `window.__townTables()` (each table's state: "still", "waiting:<free stool>" or "playing").
 
 ## Not built yet
 

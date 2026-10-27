@@ -32,8 +32,8 @@ import { CAP, LEADING, layout, lineWidth, renderLines } from "./sign-font.ts";
 import { look, mixLights, mixMist, mixRGB, mixTint, type SkyWeights } from "./sky.ts";
 import { SkyPainter } from "./sky-draw.ts";
 import type { LightPool, LightSpot } from "./houses/kit.ts";
-import { PARK_BENCH, PARK_FOUNTAIN, PARK_LAMP, PARK_LAMP_HEAD, PARK_LAMP_LIGHTS, PARK_LAMP_POOLS, PARK_TABLE, PARK_TREES, TABLE_TOP } from "./houses/park.ts";
-import { COLISEUM_PLACE, GRASS, LAMPS, PAVING, PROPS, STATUES, TABLES, groundAt, onColiseum, plotAt, seated, type Boss, type Home, type HomeId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type Town } from "./world.ts";
+import { PARK_BENCH, PARK_FOUNTAIN, PARK_LAMP, PARK_LAMP_HEAD, PARK_LAMP_LIGHTS, PARK_LAMP_POOLS, PARK_TABLE, PARK_TREES, TABLE_BACK_RANK, TABLE_BOARD, TABLE_CLOCK_INK, TABLE_DIGITS, TABLE_INK, TABLE_PIECES, TABLE_RING, TABLE_TOP } from "./houses/park.ts";
+import { COLISEUM_PLACE, GRASS, LAMPS, PAVING, PROPS, STATUES, TABLES, groundAt, onColiseum, plotAt, seated, tableStates, type Boss, type Home, type HomeId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town } from "./world.ts";
 
 /** Each boss's sprite (its real one: its `idle` frames). */
 export const BOSS_ART: Record<HomeId, Character> = {
@@ -432,6 +432,27 @@ const BLUR_OK = (() => {
   }
 })();
 
+/** A piece on a table's board: its square (f: rank from white's side, g: file), where it slid from, when, and when it's gone. */
+interface TablePiece {
+  f: number;
+  g: number;
+  light: boolean;
+  kind: string;
+  fx: number;
+  fg: number;
+  t0: number;
+  gone: number;
+}
+/** A table's pieces as a game starts: white's on its two ranks, black's on theirs, the back ranks' shapes from the a-file. */
+function setUp(): TablePiece[] {
+  const pcs: TablePiece[] = [];
+  for (let g = 0; g < 8; g++) {
+    const kind = TABLE_BACK_RANK[g]!;
+    for (const [f, light, k] of [[0, true, kind], [1, true, "P"], [7, false, kind], [6, false, "P"]] as const) pcs.push({ f, g, light, kind: k, fx: f, fg: g, t0: 0, gone: 0 });
+  }
+  return pcs;
+}
+
 export class Renderer {
   readonly view: View = newView();
   W = 1;
@@ -626,8 +647,11 @@ export class Renderer {
   }
 
   /** Draws one frame. `zoom`: 0 normal, 1 zoomed out (and between, while it glides); `dt`: seconds since the last. */
+  /** Frames drawn so far (what's worked out once a frame keys on it). */
+  private frameNo = 0;
   draw(now: number, camX: number, camY: number, zoom: number, dt = 0): void {
     const { ctx, W, H, DPR } = this;
+    this.frameNo++;
     this.camX = camX;
     this.camY = camY;
     setView(this.view, W, H, zoom);
@@ -1203,6 +1227,10 @@ export class Renderer {
     const s = bandOf(v, it.dx, it.dz);
     const alpha = (1 - 0.6 * s) * enterOf(v, it.dx, it.dz);
     const img = fc.at(now, it.i * 211);
+    const prop = PROPS[it.i]!;
+    // A table waiting for a game: the ring under its free stool, on the ground under the picture.
+    const ts = prop.kind === "table" ? this.tableAt(prop.table) : null;
+    if (ts?.kind === "waiting") this.drawRing(it, ts.free, now, alpha * (1 - 0.88 * s));
     ctx.globalAlpha = alpha;
     ctx.imageSmoothingEnabled = px < 1.5;
     if (s > 0.02) this.blitSoft(img, x0, y0, w, h, s, 0.88 * s);
@@ -1213,6 +1241,314 @@ export class Renderer {
     if (this.lightK > 0.01 && PROPS[it.i]!.kind === "lamp") this.lightUp((this.lampGlow ??= bakeGlow(PARK_LAMP, PARK_LAMP_LIGHTS, PARK_LAMP_POOLS)), x0, y0, px, alpha * (1 - 0.88 * s), now, it.i * 389);
     this.propTop[it.i] = p.y - (PROPS[it.i]!.kind === "table" ? TABLE_TOP * px : ch.foot[1] * px);
     this.box(it, p.depth, x0, y0, x0 + w, y0 + h, p.x, p.y, y0);
+    if (prop.kind === "table") this.drawBoard(it, prop.table, ts!, now, alpha * (1 - 0.88 * s), s);
+  }
+
+  // ---- The chess tables' boards (Oct 27; Eric: "even tiny little pieces that look like pieces … facing the right way …
+  // random moves back and forth … pieces disappearing … every 7 or 8 moves, it just resets"). Each table's top is a flat
+  // slab drawn through the camera with its board, its pieces standing on it, and over a game its clock. Who sits decides
+  // what it shows (`tableStates`): two playing, its pieces move and its clock runs; one waiting, a ring under the free stool;
+  // otherwise its pieces stand set up. The moves are look only: white and black in turn, a step or three forward each.
+  private tables: TableState[] = [];
+  private tablesAt = -1;
+  private games: ({ pcs: TablePiece[]; moves: number; next: number; since: number } | null)[] = [];
+  private pieceImgs = new Map<string, HTMLCanvasElement>();
+  private clockImgs = new Map<string, HTMLCanvasElement>();
+  private bp = newPt();
+  private bq = newPt();
+  private grid = Array.from({ length: 81 }, () => newPt());
+
+  /** Table `i`'s state this frame (worked out once a frame, from the people sitting). */
+  private tableAt(i: number): TableState {
+    if (this.tablesAt !== this.frameNo) {
+      this.tables = tableStates(this.town.people);
+      this.tablesAt = this.frameNo;
+    }
+    return this.tables[i] ?? { kind: "still" };
+  }
+
+  /** Table `ti`'s game now: started when its two players sat down, gone when they get up. */
+  private gameFor(ti: number, playing: boolean, now: number) {
+    const f = TOWN_FEEL;
+    let game = this.games[ti] ?? null;
+    if (!playing) return (this.games[ti] = null);
+    if (!game) this.games[ti] = game = { pcs: setUp(), moves: 0, next: now + f.tableMoveMs, since: now };
+    if (now < game.next) return game;
+    if (game.moves >= f.tableMoves) {
+      game.pcs = setUp();
+      game.moves = 0;
+      game.next = now + f.tableResetMs;
+      return game;
+    }
+    const light = game.moves % 2 === 0;
+    const dir = light ? 1 : -1;
+    const mine = game.pcs.filter((q) => q.light === light && !q.gone);
+    for (let tries = 0; tries < 40 && mine.length; tries++) {
+      const q = mine[Math.floor(Math.random() * mine.length)]!;
+      const f2 = q.f + dir * (1 + Math.floor(Math.random() * 3));
+      const g = q.g + Math.floor(Math.random() * 3) - 1;
+      if (f2 < 0 || f2 > 7 || g < 0 || g > 7) continue;
+      const there = game.pcs.find((o) => !o.gone && o.f === f2 && o.g === g);
+      if (there?.light === light) continue;
+      if (there) there.gone = now + f.tableTakeMs;
+      q.fx = q.f;
+      q.fg = q.g;
+      q.f = f2;
+      q.g = g;
+      q.t0 = now;
+      break;
+    }
+    game.moves++;
+    game.next = now + f.tableMoveMs;
+    return game;
+  }
+
+  /** A piece in pixels (TABLE_PIECES: its fill shaded on the right, an outline round it), made once. */
+  private pieceImg(kind: string, light: boolean): HTMLCanvasElement {
+    const key = kind + (light ? "l" : "d");
+    let c = this.pieceImgs.get(key);
+    if (c) return c;
+    let rows = TABLE_PIECES[kind]!;
+    if (!light && kind === "N") rows = rows.map((r) => [...r].reverse().join("")); // black's knight faces white
+    const w = rows[0]!.length + 2;
+    const h = rows.length + 2;
+    c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    const g = c.getContext("2d")!;
+    const ink = TABLE_INK;
+    const fill = (x: number, y: number) => rows[y - 1]?.[x - 1] === "#";
+    const inside = (x: number, y: number) => fill(x, y) || rows[y - 1]?.[x - 1] === "x";
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        let col: string | null = null;
+        if (fill(x, y)) col = light ? (fill(x + 1, y) ? ink.light : ink.lightShade) : fill(x - 1, y) ? ink.dark : ink.darkShade;
+        else if (inside(x, y) || inside(x - 1, y) || inside(x + 1, y) || inside(x, y - 1) || inside(x, y + 1)) col = light ? ink.lightLine : ink.darkLine;
+        if (col) {
+          g.fillStyle = col;
+          g.fillRect(x, y, 1, 1);
+        }
+      }
+    this.pieceImgs.set(key, c);
+    return c;
+  }
+
+  /** The clock's face for `text` (TABLE_DIGITS: black digits, their top edge lighter, a grey side under), made once. */
+  private clockImg(text: string): HTMLCanvasElement {
+    let c = this.clockImgs.get(text);
+    if (c) return c;
+    const glyphs = [...text].map((ch) => TABLE_DIGITS[ch]!);
+    c = document.createElement("canvas");
+    c.width = glyphs.reduce((n, gl) => n + gl[0]!.length + 1, 0) + 1;
+    c.height = 7;
+    const g = c.getContext("2d")!;
+    const ink = TABLE_CLOCK_INK;
+    // The side first (a pixel under each lit one), then the face over it.
+    for (const side of [true, false]) {
+      let x = 0;
+      for (const gl of glyphs) {
+        gl.forEach((row, j) => {
+          for (let i = 0; i < row.length; i++) {
+            if (row[i] !== "#") continue;
+            g.fillStyle = side ? ink.side : j === 0 || gl[j - 1]![i] !== "#" ? ink.edge : ink.face;
+            g.fillRect(x + i, j + (side ? 1 : 0), 1, 1);
+          }
+        });
+        x += gl[0]!.length + 1;
+      }
+    }
+    // (A minute's worth of faces at most: the old ones go.)
+    if (this.clockImgs.size > 64) this.clockImgs.clear();
+    this.clockImgs.set(text, c);
+    return c;
+  }
+
+  /** The soft green ring on the ground under a waiting table's free stool (`free`: its index, west 0, east 1). */
+  private drawRing(it: Item, free: 0 | 1, now: number, alpha: number): void {
+    const { ctx, view: v } = this;
+    const f = TOWN_FEEL;
+    const a = this.bp;
+    const pulse = 0.75 + 0.25 * Math.sin(now / f.tableRingPulseMs);
+    const sx = it.dx + (free === 0 ? -1 : 1);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    for (let n = 0; n <= 32; n++) {
+      const an = (n / 32) * Math.PI * 2;
+      if (!proj(v, sx + f.tableRingR * Math.cos(an), it.dz + f.tableRingR * Math.sin(an), 0, a)) {
+        ctx.restore();
+        return;
+      }
+      if (n === 0) ctx.moveTo(a.x, a.y);
+      else ctx.lineTo(a.x, a.y);
+    }
+    ctx.closePath();
+    const [fr, fg, fb] = TABLE_RING.fill;
+    const [er, eg, eb] = TABLE_RING.edge;
+    ctx.fillStyle = `rgba(${fr}, ${fg}, ${fb}, ${0.22 * pulse})`;
+    ctx.fill();
+    ctx.shadowColor = TABLE_RING.glow;
+    ctx.shadowBlur = 0.25 * a.k;
+    ctx.lineWidth = Math.max(1.5, 0.05 * a.k);
+    ctx.strokeStyle = `rgba(${er}, ${eg}, ${eb}, ${0.85 * pulse})`;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /**
+   * Table `ti`'s top: the slab (its front face, its stone top), the board's 8 x 8 squares lying flat (two fills over one
+   * 9 x 9 grid of points), its pieces standing up (far ones first), and over a game its clock. `s`: how far into the far
+   * band it stands (its pieces and clock are left out far off). While nothing on it moves and the camera holds still, the
+   * slab, board and pieces are one picture, made on the second frame alike and reused (`boardCache`): one draw a frame.
+   */
+  private drawBoard(it: Item, ti: number, state: TableState, now: number, alpha: number, s: number): void {
+    const { ctx, view: v } = this;
+    const B = TABLE_BOARD;
+    const a = this.bp;
+    const b = this.bq;
+    if (!proj(v, it.dx, it.dz, 0, a) || !proj(v, it.dx, it.dz, 1, b)) return;
+    // The top's height in the camera's lift: the picture's pixels over its foot, through its scale.
+    const perLift = a.y - b.y;
+    const spx = a.k / TOWN_FEEL.housePxPerSquare;
+    const top = (B.top * spx) / perLift;
+    const thick = (B.thick * spx) / perLift;
+    // The world's pictures stand like cut-outs (no lean): the top stays straight over its leg.
+    const footX = a.x;
+    if (!proj(v, it.dx, it.dz, top, b)) return;
+    const shift = b.x - footX;
+    const hb = B.board;
+    const sq = (2 * hb) / 8;
+    for (let gi = 0; gi < 9; gi++)
+      for (let fi = 0; fi < 9; fi++) if (!proj(v, it.dx - hb + fi * sq, it.dz - hb + gi * sq, top, this.grid[gi * 9 + fi]!)) return;
+    const near = s <= TOWN_FEEL.tableFarCut;
+    const game = near ? this.gameFor(ti, state.kind === "playing", now) : null;
+    const pcs = near ? (game?.pcs ?? (this.stillSet ??= setUp())) : [];
+    const f = TOWN_FEEL;
+    const moving = !!game && pcs.some((q) => now - q.t0 < f.tableSlideMs || (q.gone > 0 && now < q.gone));
+    const paint = (g: CanvasRenderingContext2D) => this.paintBoard(g, it, top, thick, shift, pcs, game ? now : -1);
+    // The same picture as the last frame (camera, alpha and pieces alike): once seen twice, it's kept and reused.
+    const c0 = this.grid[0]!;
+    const c8 = this.grid[80]!;
+    const key = `${Math.round(c0.x * 8)},${Math.round(c0.y * 8)},${Math.round(c8.x * 8)},${Math.round(c8.y * 8)},${Math.round(shift * 8)},${pcs.length},${game?.moves ?? -1},${game ? game.since : 0},${this.DPR}`;
+    const cache = (this.boardCache[ti] ??= { key: "", seen: "", cv: null, x: 0, y: 0, w: 0, h: 0 });
+    ctx.globalAlpha = alpha;
+    if (moving || key !== cache.seen) {
+      cache.seen = moving ? "" : key;
+      cache.key = "";
+      paint(ctx);
+    } else {
+      if (cache.key !== key) this.cacheBoard(cache, key, it, top, thick, shift, b.k * B.piecePx, paint);
+      if (cache.cv) ctx.drawImage(cache.cv, cache.x, cache.y, cache.w, cache.h);
+      else paint(ctx);
+    }
+    // The game's clock, floating over the middle of the board, straight above the leg.
+    if (game && proj(v, it.dx, it.dz, top + B.clockLift, a)) {
+      const secs = Math.floor((now - game.since) / 1000);
+      const img = this.clockImg(`${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`);
+      const ps = a.k * B.clockPx;
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, footX - (img.width * ps) / 2, a.y - img.height * ps, img.width * ps, img.height * ps);
+    }
+    ctx.globalAlpha = 1;
+  }
+  private stillSet: TablePiece[] | null = null;
+  private boardCache: { key: string; seen: string; cv: HTMLCanvasElement | null; x: number; y: number; w: number; h: number }[] = [];
+
+  /** Paints table's slab, board and pieces into `cache` (its box: the slab's corners and the tallest piece over them). */
+  private cacheBoard(cache: (typeof this.boardCache)[number], key: string, it: Item, top: number, thick: number, shift: number, ps: number, paint: (g: CanvasRenderingContext2D) => void): void {
+    const { view: v, DPR } = this;
+    const a = this.bp;
+    const h = TABLE_BOARD.half;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const [x, z, l] of [[-h, -h, top], [h, -h, top], [h, h, top], [-h, h, top], [-h, -h, top - thick], [h, -h, top - thick]] as const) {
+      if (!proj(v, it.dx + x, it.dz + z, l, a)) return void (cache.cv = null);
+      x0 = Math.min(x0, a.x - shift);
+      x1 = Math.max(x1, a.x - shift);
+      y0 = Math.min(y0, a.y);
+      y1 = Math.max(y1, a.y);
+    }
+    // (The tallest piece, the king, stands 13 of its pixels over its square.)
+    const m = 13 * ps + 2;
+    x0 = Math.floor((x0 - 2) * DPR) / DPR;
+    y0 = Math.floor((y0 - m) * DPR) / DPR;
+    const w = Math.ceil((x1 + 2 - x0) * DPR);
+    const hh = Math.ceil((y1 + 2 - y0) * DPR);
+    if (w <= 0 || hh <= 0 || w * hh > 4_000_000) return void (cache.cv = null);
+    const cv = cache.cv ?? document.createElement("canvas");
+    if (cv.width !== w || cv.height !== hh) {
+      cv.width = w;
+      cv.height = hh;
+    }
+    const g = cv.getContext("2d")!;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, w, hh);
+    g.setTransform(DPR, 0, 0, DPR, -x0 * DPR, -y0 * DPR);
+    paint(g);
+    Object.assign(cache, { key, cv, x: x0, y: y0, w: w / DPR, h: hh / DPR });
+  }
+
+  /** The slab, the board and `pcs` on it, into `g` in the screen's coordinates (`now` < 0: the pieces at rest). */
+  private paintBoard(g: CanvasRenderingContext2D, it: Item, top: number, thick: number, shift: number, pcs: readonly TablePiece[], now: number): void {
+    const { view: v } = this;
+    const B = TABLE_BOARD;
+    const pal = PARK_TABLE.palette;
+    const a = this.bp;
+    const b = this.bq;
+    const quad = (pts: readonly (readonly [number, number, number])[], fill: string) => {
+      g.beginPath();
+      for (let n = 0; n < pts.length; n++) {
+        const [x, z, l] = pts[n]!;
+        if (!proj(v, it.dx + x, it.dz + z, l, a)) return;
+        if (n === 0) g.moveTo(a.x - shift, a.y);
+        else g.lineTo(a.x - shift, a.y);
+      }
+      g.closePath();
+      g.fillStyle = fill;
+      g.fill();
+    };
+    const h = B.half;
+    const base = g.globalAlpha;
+    quad([[-h, -h, top], [h, -h, top], [h, -h, top - thick], [-h, -h, top - thick]], pal["4"]!);
+    quad([[-h, -h, top], [h, -h, top], [h, h, top], [-h, h, top]], pal["2"]!);
+    quad([[-h, h, top], [h, h, top], [h, h - 0.03, top], [-h, h - 0.03, top]], pal["1"]!);
+    // The board: the light squares in one fill and the dark in another, over the grid's points.
+    for (const dark of [false, true]) {
+      g.beginPath();
+      for (let f = 0; f < 8; f++)
+        for (let r = 0; r < 8; r++) {
+          if (((f + r) % 2 === 1) !== dark) continue;
+          const p0 = this.grid[r * 9 + f]!;
+          const p1 = this.grid[r * 9 + f + 1]!;
+          const p2 = this.grid[(r + 1) * 9 + f + 1]!;
+          const p3 = this.grid[(r + 1) * 9 + f]!;
+          g.moveTo(p0.x - shift, p0.y);
+          g.lineTo(p1.x - shift, p1.y);
+          g.lineTo(p2.x - shift, p2.y);
+          g.lineTo(p3.x - shift, p3.y);
+          g.closePath();
+        }
+      g.fillStyle = dark ? pal.D! : pal.L!;
+      g.fill();
+    }
+    // The pieces, far ones first; a move slides with a small hop, a taken piece fades.
+    const f = TOWN_FEEL;
+    const hb = B.board;
+    const sq = (2 * hb) / 8;
+    const live = (now < 0 ? [...pcs] : pcs.filter((q) => !q.gone || now < q.gone)).sort((p1, p2) => p2.g - p1.g);
+    g.imageSmoothingEnabled = false;
+    for (const q of live) {
+      const t = now < 0 ? 1 : clamp((now - q.t0) / f.tableSlideMs, 0, 1);
+      const e = t * t * (3 - 2 * t);
+      const pf = q.fx + (q.f - q.fx) * e;
+      const pg = q.fg + (q.g - q.fg) * e;
+      const lift = t < 1 ? f.tableHop * Math.sin(Math.PI * t) : 0;
+      if (!proj(v, it.dx - hb + (pf + 0.5) * sq, it.dz - hb + (pg + 0.5) * sq, top + lift, b)) continue;
+      const img = this.pieceImg(q.kind, q.light);
+      const ps = b.k * B.piecePx;
+      g.globalAlpha = base * (q.gone && now >= 0 ? clamp((q.gone - now) / f.tableTakeMs, 0, 1) : 1);
+      g.drawImage(img, b.x - shift - (img.width * ps) / 2, b.y - (img.height - 1) * ps, img.width * ps, img.height * ps);
+    }
+    g.globalAlpha = base;
   }
 
   // ---- The lights at dusk and night (Oct 27): the park's lamps, the homes' windows and doorways, the Colosseum's torches.
