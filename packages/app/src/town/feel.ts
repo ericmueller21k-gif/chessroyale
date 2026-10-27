@@ -314,6 +314,11 @@ export const TOWN_FEEL = {
   botSitChance: 0.3,
   botSitReach: 7,
   botStaySeated: 0.6,
+  /**
+   * Back in the town after a game with a bot (Oct 27): you on your stool, the bot across; it gets up and wanders off
+   * after this long (unless you've opened its table's card, which holds it).
+   */
+  botLeaveAfterGameMs: 4000,
 
   // ---- Sizes, in squares.
   /** A boss's picture is this many squares tall. */

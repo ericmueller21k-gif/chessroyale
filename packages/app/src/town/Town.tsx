@@ -10,7 +10,10 @@
  * people", greyed, "Coming soon": the menu Eric plans will live there), with an edge chip of its own. Slice 6: the park
  * in front of it; a tap on a chess table (or a stool) walks you to its nearest free stool, where you sit, and opens its
  * card ("Casual" and "Ranked" greyed, "Coming soon"; at a table where two others play, "Spectate" greyed); a tap elsewhere
- * closes it and you stand. Each table's board shows who sits there (render.ts, `tableStates`).
+ * closes it and you stand. Each table's board shows who sits there (render.ts, `tableStates`). Oct 27: the bots (`BOTS`,
+ * dressed in their crate items): a tap on one opens its card ("<name> (bot)", its rating, Play: you both walk to a free
+ * table and the game opens once you sit, `onPlayBot`); a table where a bot waits offers "Play <name> (bot) · <rating>".
+ * Back from the game (`seat`), you sit at that table, the bot across.
  *
  * One requestAnimationFrame loop draws everything on one canvas; it stops when the screen closes or the tab is hidden.
  * Test hooks (e2e only): the canvas carries `data-you="c,r"` (your square) and `data-ready="1"` once a frame is drawn;
@@ -18,7 +21,8 @@
  * boss, a home, the Colosseum (its gate), a statue or a chess table (by its index) now, `__townAt("lamp", i)` where a
  * park lamp's glass is (by its index in LAMPS) and `__townAt("light", id)` a lit pixel of a home's (or "coliseum") first
  * light with nothing in front of it (the lights at dusk and night); the canvas's `data-sit="1"` while you sit at a table; and
- * `window.__townGather()` sends the three nearest bots to stand beside you.
+ * `window.__townGather()` sends the three nearest bots to stand beside you; `__townAt("bot", i)`, `__townCall(i)` and
+ * `__townBots()` for the bots (docs/areas/town-square.md).
  * docs/areas/town-square.md.
  */
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
@@ -31,8 +35,9 @@ import { TOWN_FEEL } from "./feel.ts";
 import { Press } from "./press.ts";
 import { PAWN_PX, Renderer, pawnImage, type Hit } from "./render.ts";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
-import { COLISEUM_PLACE, HOMES, START, STATUES, TABLES, createTown, destFor, onColiseum, plotAt, seated, statueAt, stoolAt, tableAt, tableStates, tdist, tick, walkWalker, type HomeId, type Place, type Sq, type StatueId, type Target } from "./world.ts";
+import { BOTS, COLISEUM_PLACE, HOMES, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, createTown, destFor, holdBot, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingText, seated, statueAt, stoolAt, tableAt, tableFor, tableStates, tdist, tick, waitingBot, walkWalker, type HomeId, seatOf, seatText, type Person, type Place, type Seat, type Sq, type StatueId, type Target } from "./world.ts";
 import { dressedPawn, lookKey } from "./you-look.ts";
+import type { BotGameAsk } from "./TownPage.tsx";
 import "./town.css";
 
 const CHIPS = TOWN_FEEL.maxChips;
@@ -42,16 +47,21 @@ const CHIPS = TOWN_FEEL.maxChips;
  * order; the Colosseum's is HOMES.length; a table's, its index in TABLES), and its confirm.
  */
 export interface Card {
-  kind: "boss" | "home" | "coliseum" | "table";
+  kind: "boss" | "home" | "coliseum" | "table" | "bot";
+  /** (A bot's: its index in the town's people.) */
   i: number;
   confirm: boolean;
   /** A table where two others are playing: its card offers to watch their game (Eric, Oct 27), not a seat. */
   watch?: boolean;
+  /** A table where a bot waits alone: its index in the people (its card's first button plays it). */
+  bot?: number;
+  /** A bot's card: no table has both stools free (Play greyed, "Tables are full"). */
+  full?: boolean;
 }
 
 type Ctl = ReturnType<typeof startTown>;
 
-export function TownScreen({ onBack, onBossAlone }: { onBack: () => void; onBossAlone?: (id: HomeId) => void }) {
+export function TownScreen({ onBack, onBossAlone, onPlayBot, seat = null }: { onBack: () => void; onBossAlone?: (id: HomeId) => void; onPlayBot?: (game: BotGameAsk) => void; seat?: string | null }) {
   const box = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const chips = useRef<(HTMLDivElement | null)[]>([]);
@@ -63,12 +73,18 @@ export function TownScreen({ onBack, onBossAlone }: { onBack: () => void; onBoss
 
   // (A layout effect: the world's first frame is drawn before the screen first shows.)
   useLayoutEffect(() => {
-    const t = startTown(box.current!, canvas.current!, chips.current, cardEl.current!, live.current!, setZoomedOut, setCard);
+    const t = startTown(box.current!, canvas.current!, chips.current, cardEl.current!, live.current!, setZoomedOut, setCard, seatOf(seat), (s) => {
+      const b = BOTS[s.bot]!;
+      onPlayBot?.({ seat: seatText(s), name: botLabel(b), rating: b.rating, look: b.look.wear });
+    });
     ctl.current = t;
     return t.stop;
   }, []);
   const home = card && (card.kind === "boss" || card.kind === "home") ? HOMES[card.i]! : null;
-  const label = card?.kind === "coliseum" ? COLISEUM_PLACE.name : card?.kind === "table" ? "Chess table" : home ? (card!.confirm ? "Leave the town square?" : card!.kind === "boss" ? home.boss : home.name) : undefined;
+  const people = ctl.current?.town.people;
+  // A bot's card, or the bot waiting at a table's (from BOTS: its name and rating).
+  const bot = card?.kind === "bot" ? people?.[card.i]?.bot : card?.kind === "table" && card.bot !== undefined ? people?.[card.bot]?.bot : null;
+  const label = card?.kind === "coliseum" ? COLISEUM_PLACE.name : card?.kind === "table" ? "Chess table" : card?.kind === "bot" && bot ? botLabel(bot) : home ? (card!.confirm ? "Leave the town square?" : card!.kind === "boss" ? home.boss : home.name) : undefined;
 
   return (
     <div class="town-screen">
@@ -126,8 +142,26 @@ export function TownScreen({ onBack, onBossAlone }: { onBack: () => void; onBoss
             )}
             {/* A chess table's (no title: Eric, Oct 27): a casual or ranked game of normal chess will start here (the tables'
                 matchmaking is the next job); at a table where two others play, watching their game. Shown greyed, not hidden. */}
+            {/* A bot's (Oct 27, Eric): its name, "(bot)", its rating, and Play: you both walk to a free table and the game
+                opens when you sit. Every table taken: Play greyed, reading "Play · Tables are full" (in the button, so the
+                card hugs its content and nothing is added round it). */}
+            {card?.kind === "bot" && bot && (
+              <>
+                <h2>{botLabel(bot)}</h2>
+                <p class="town-card-text">{ratingText(bot)}</p>
+                <button type="button" class="town-btn primary" disabled={card.full} onClick={() => ctl.current?.play()}>
+                  {card.full ? "Play · Tables are full" : "Play"}
+                </button>
+              </>
+            )}
             {card?.kind === "table" && !card.watch && (
               <>
+                {/* A bot waiting alone here: play it, first (Casual and Ranked, the tables' matchmaking, still to come). */}
+                {bot && (
+                  <button type="button" class="town-btn primary" onClick={() => ctl.current?.playSeated()}>
+                    {playAtTableText(bot)}
+                  </button>
+                )}
                 <button type="button" class="town-btn" disabled>
                   Casual
                 </button>
@@ -184,10 +218,12 @@ function startTown(
   liveEl: HTMLDivElement,
   onZoom: (out: boolean) => void,
   onCard: (c: Card | null) => void,
+  seat: Seat | null,
+  onPlay: (seat: Seat) => void,
 ) {
   const f = TOWN_FEEL;
   const ctx = cv.getContext("2d")!;
-  const town = createTown(performance.now());
+  const town = createTown(performance.now(), undefined, seat);
   const r = new Renderer(ctx, town, HOMES);
   // (The signs' pixel font is the game's own; it's loaded on first use, so ask for it now.)
   void document.fonts?.load('8px "Press Start 2P"').catch(() => {});
@@ -195,8 +231,9 @@ function startTown(
   warmSounds([...Object.values(SELECT_SOUND), ...Object.values(TOWN_SOUNDS).flat()]);
   /** How often each boss has been tapped (its town sounds go in turn). */
   const taps = new Map<string, number>();
-  let camX = START.c;
-  let camY = START.r;
+  // (On you: back from a game with a bot, you're at its table.)
+  let camX = town.you.walker.c;
+  let camY = town.you.walker.r;
   let follow = true;
   /** The camera's speed while it follows you (squares a second): the spring's state. */
   let vx = 0;
@@ -225,6 +262,11 @@ function startTown(
   };
   const offAccount = onAccountChange(dress);
   dress();
+  // The bots' dressed pawns, drawn once now (their crate items over their pawns), never per frame; plain meanwhile.
+  for (const p of town.bots)
+    if (p.look.wear) void dressedPawn(p.look.wear, pawnImage(p.look.side, p.look.tint), PAWN_PX).then((art) => art && alive && r.botArt.set(p.id, art));
+  /** The game with a bot has been asked for (once). */
+  let opened = false;
   let raf = 0;
   let last = performance.now();
   let alive = true;
@@ -372,6 +414,19 @@ function startTown(
       if (!sameWeights(w, sky)) r.setSky((sky = w));
     }
     tick(town, now);
+    // A bot's card: whether a table is free for you both, to grey its Play (checked only while one is open: no search).
+    if (card?.kind === "bot") {
+      const full = !anyTableFree(town, town.people[card.i]!);
+      if (full !== !!card.full) setCard({ ...card, full });
+    }
+    // You and the bot both sit at the table: the game opens (the town closes).
+    if (town.meet && !opened && meetReady(town)) {
+      const s = meetSeat(town);
+      if (s) {
+        opened = true;
+        onPlay(s);
+      }
+    }
     stepClose(dt);
     updateCamera(dt, now);
     draw(now, dt);
@@ -423,6 +478,8 @@ function startTown(
   }
 
   // ---- The card: open, its confirm, closed; placed over what it's about every frame.
+  /** The bot a card holds still: a bot's own, or the one waiting at a table's. */
+  const heldBy = (c: Card | null): Person | null => (c?.kind === "bot" ? town.people[c.i]! : c?.kind === "table" && c.bot !== undefined ? town.people[c.bot]! : null);
   function setCard(c: Card | null) {
     // A boss's card opening: it says something (Eric, Oct 27), once a tap (its confirm opening is the same card).
     if (c?.kind === "boss" && !(card?.kind === "boss" && card.i === c.i)) {
@@ -433,6 +490,10 @@ function startTown(
       if (sound) play(sound);
     }
     if (card?.kind === "boss") town.bosses[card.i]!.held = false;
+    const was = heldBy(card);
+    if (was && town.hold === was && town.meet?.bot !== was) holdBot(town, null);
+    const holds = heldBy(c);
+    if (holds) holdBot(town, holds);
     // A table's card closing: you stand up (you stay on the stool's square).
     if (card?.kind === "table" && c?.kind !== "table") town.you.sit = false;
     card = c;
@@ -449,7 +510,7 @@ function startTown(
       cardW = cardEl.offsetWidth;
       cardH = cardEl.offsetHeight;
     }
-    if (!r.anchor(card.kind === "boss" ? "boss" : card.kind === "table" ? "table" : "home", card.i, A)) {
+    if (!r.anchor(card.kind === "boss" ? "boss" : card.kind === "table" ? "table" : card.kind === "bot" ? "person" : "home", card.i, A)) {
       cardEl.style.visibility = "hidden";
       return;
     }
@@ -498,7 +559,8 @@ function startTown(
       const table = hit.kind === "table" ? hit.table : (tableAt(hit.c, hit.r) ?? stoolAt(hit.c, hit.r))!;
       key = `table:${table.i}`;
       target = { kind: "table", table };
-      c = { kind: "table", i: table.i, confirm: false, watch: tableStates(town.people)[table.i]!.kind === "playing" };
+      const wb = waitingBot(town, table);
+      c = { kind: "table", i: table.i, confirm: false, watch: tableStates(town.people)[table.i]!.kind === "playing", ...(wb ? { bot: town.people.indexOf(wb) } : {}) };
     } else if (hit.kind === "square") {
       key = `sq:${hit.c},${hit.r}`;
       const home = plotAt[hit.r * N + hit.c];
@@ -516,6 +578,8 @@ function startTown(
       if (hit.person.you) return null;
       key = `p:${hit.person.id}`;
       target = { kind: "beside", at: hit.person.walker.here() };
+      // A bot: its card (its name, rating and Play), and it stops while it's open.
+      if (hit.person.bot) c = { kind: "bot", i: town.people.indexOf(hit.person), confirm: false, full: !anyTableFree(town, hit.person) };
     }
     return { key, dest: destFor(town, town.you.walker, target), card: c, statue };
   };
@@ -564,7 +628,9 @@ function startTown(
     r.release(now, true);
     // A tap on anything but the statue you're looking at walks you away from it: the camera glides back out.
     if (p.statue < 0 || p.statue !== closeOn) leaveClose();
-    // You sit when a tap on a table sent you to its stool; any other walk stands you up.
+    // You sit when a tap on a table sent you to its stool; any other walk stands you up (and calls off a game you were
+    // walking to with a bot).
+    cancelMeet(town);
     town.you.sit = p.card?.kind === "table";
     if (p.dest && walkWalker(town.you.walker, p.dest)) {
       follow = true;
@@ -599,8 +665,9 @@ function startTown(
 
   // A test hook (e2e, with the test switches on: test-switches.ts): where to tap a boss, a home or the Colosseum (its gate)
   // now, in the box.
-  const hookAt = (kind: "boss" | "home" | "coliseum" | "statue" | "table" | "lamp" | "light", id?: HomeId | StatueId | "coliseum" | number) => {
+  const hookAt = (kind: "boss" | "home" | "coliseum" | "statue" | "table" | "lamp" | "light" | "bot", id?: HomeId | StatueId | "coliseum" | number) => {
     const out = { x: 0, y: 0 };
+    if (kind === "bot") return testSwitchesAllowed() && r.tapPoint("person", town.people.findIndex((p) => p.bot === BOTS[Number(id)]), out) ? out : null;
     if (kind === "table") return testSwitchesAllowed() && r.tapPoint("table", Number(id), out) ? out : null;
     if (kind === "lamp") return testSwitchesAllowed() && r.lampAt(Number(id), out) ? out : null;
     if (kind === "light") return testSwitchesAllowed() && r.lightAt(id === "coliseum" ? HOMES.length : HOMES.findIndex((h) => h.id === id), out) ? out : null;
@@ -657,12 +724,47 @@ function startTown(
     }
   };
   const hookTables = () => (testSwitchesAllowed() ? tableStates(town.people).map((s) => (s.kind === "waiting" ? `waiting:${s.free}` : s.kind)) : null);
-  const hooks = window as unknown as { __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables };
+  // ... `__townCall(i)`: the bot BOTS[i] walks to stand beside you, and every bot holds still from then on (to tap it);
+  // `__townBots()`: each bot (BOTS' order): its name, its square ("c,r"), the table it sits at (-1: none), whether it walks.
+  const hookCall = (i: number) => {
+    if (!testSwitchesAllowed()) return;
+    town.nextBotAt = Infinity;
+    town.leave = null;
+    const b = town.bots.find((p) => p.bot === BOTS[i]);
+    const to = b && destFor(town, b.walker, { kind: "beside", at: town.you.walker.here() });
+    if (b && to) walkWalker(b.walker, to);
+  };
+  const hookBots = () =>
+    testSwitchesAllowed()
+      ? BOTS.map((bt) => {
+          const p = town.bots.find((q) => q.bot === bt)!;
+          const h = p.walker.here();
+          return { name: p.name, at: `${h.c},${h.r}`, table: seated(p)?.i ?? -1, moving: p.walker.moving() };
+        })
+      : null;
+  // ... `__townBossBack(id)`: that home's boss walks round behind its home (the square two rows past its middle, or the
+  // nearest free one) and stays there, so nothing of it stands in front of the home's doorway (its picture's box is wide).
+  // True once it stands there (call it again to ask).
+  const hookBossBack = (id: HomeId): boolean => {
+    if (!testSwitchesAllowed()) return false;
+    const b = town.bosses.find((x) => x.home.id === id);
+    if (!b) return false;
+    if (!b.held) {
+      b.held = true;
+      const to = spotNear(town, b.walker, { c: b.home.cx, r: b.home.cy + 2 }, false);
+      if (to) walkWalker(b.walker, to);
+    }
+    return !b.walker.moving();
+  };
+  const hooks = window as unknown as { __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack };
   hooks.__townAt = hookAt;
   hooks.__townGather = hookGather;
   hooks.__townCam = hookCam;
   hooks.__townSeat = hookSeat;
   hooks.__townTables = hookTables;
+  hooks.__townCall = hookCall;
+  hooks.__townBots = hookBots;
+  hooks.__townBossBack = hookBossBack;
 
   run();
   draw(performance.now()); // the first frame, before the screen shows
@@ -674,7 +776,29 @@ function startTown(
       follow = true;
       glide = null;
     },
+    town,
     closeCard: () => setCard(null),
+    /** A bot's card's Play: you both walk to the nearest table free for you, to sit; the game opens when you both do. */
+    play: () => {
+      if (card?.kind !== "bot") return;
+      const m = tableFor(town, town.people[card.i]!);
+      if (!m) return;
+      setCard(null);
+      leaveClose();
+      meet(town, m);
+      follow = true;
+      glide = null;
+    },
+    /** A table's "Play <bot>": you sit across from the bot waiting there (on your way, or there already); then the game. */
+    playSeated: () => {
+      if (card?.kind !== "table" || card.bot === undefined) return;
+      const bot = town.people[card.bot]!;
+      const table = TABLES[card.i]!;
+      const g = town.you.walker.goal();
+      const yours = table.stools.find((s) => s.c === g.c && s.r === g.r);
+      if (!yours || seated(bot) !== table) return;
+      meet(town, { bot, table, yours, theirs: bot.walker.here() });
+    },
     confirm: () => card && setCard({ ...card, confirm: true }),
     chip: (i: number) => {
       const h = chipPlace[i];
@@ -696,6 +820,11 @@ function startTown(
       delete hooks.__townAt;
       delete hooks.__townGather;
       delete hooks.__townCam;
+      delete hooks.__townSeat;
+      delete hooks.__townTables;
+      delete hooks.__townCall;
+      delete hooks.__townBots;
+      delete hooks.__townBossBack;
       if (card?.kind === "boss") town.bosses[card.i]!.held = false;
       cv.removeEventListener("pointerdown", onDown);
       cv.removeEventListener("pointermove", onMove);

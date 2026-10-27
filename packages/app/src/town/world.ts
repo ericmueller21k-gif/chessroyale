@@ -5,6 +5,7 @@
  * bots without touching either. The bots are one source that moves its people. Ported from the prototype Eric tested (docs/mockups/town-square/prototype.html): the same
  * square-to-square walk, the same hobble, the same pauses. Every number that shapes the feel is in feel.ts.
  */
+import type { ItemLook } from "@chessroyale/core";
 import { SELECT_LINES } from "../characters/boss-select.ts";
 import { N, wrapF, wrapI } from "./camera.ts";
 import { TOWN_FEEL } from "./feel.ts";
@@ -267,21 +268,46 @@ export const HOMES: readonly Home[] = (
 /** Every place: the homes (in the bosses' order), then the Colosseum. */
 export const PLACES: readonly Place[] = [...HOMES, COLISEUM_PLACE];
 
-/** How a person's pawn looks: its side (white or black), and a tint for a few. (Dressed pawns come later.) */
+/**
+ * How a person's pawn looks: its side (white or black), a tint for a few, and what it wears (crate items, as your own
+ * pawn wears them: null, nothing). One field on a person, so a sprite can replace the pawn later (a bot as a sidekick
+ * character) without touching anything that reads people.
+ */
 export interface Look {
   side: "light" | "dark";
   tint: string | null;
+  wear: ItemLook | null;
 }
 
-/** The bots' names (six of the prototype's) and their pawns' looks. */
-export const BOTS: readonly ({ name: string } & Look)[] = [
-  { name: "Berlin Wally", side: "light", tint: null },
-  { name: "Castle Cass", side: "light", tint: "#ffb3c6" },
-  { name: "Gambit Gwen", side: "dark", tint: null },
-  { name: "Fork Frank", side: "light", tint: "#9fd3ff" },
-  { name: "Tempo Tess", side: "dark", tint: "#3c6e5a" },
-  { name: "Pin Pete", side: "dark", tint: null },
+/** A crate item a bot wears (a color from the crates' palette, clean: no blemish, never shiny). */
+const item = (def: string, color: string, seed: number, color2?: string) => ({ def, color, ...(color2 ? { color2 } : {}), blemish: 0, seed });
+
+/** A town bot: its short name, its fixed rating (Maia plays it at this rating) and its look. */
+export interface TownBot {
+  name: string;
+  rating: number;
+  look: Look;
+}
+
+/**
+ * The town's bots (Eric, Oct 27: "a few bots… with different skill level… their names could just be like a little
+ * shorter… eight to ten characters", each with one or two pieces of clothing). Names and ratings live here and nowhere
+ * else: the tags, the cards and the game all read this table. Shown everywhere as "<name> (bot)" (`botLabel`).
+ */
+export const BOTS: readonly TownBot[] = [
+  { name: "Pin Pete", rating: 800, look: { side: "dark", tint: null, wear: { head: item("beanie", "red", 11) } } },
+  { name: "Rook Rita", rating: 1000, look: { side: "light", tint: "#ffb3c6", wear: { head: item("party-hat", "cobalt", 12), face: item("scarf", "yellow", 13) } } },
+  { name: "Fork Frank", rating: 1200, look: { side: "light", tint: "#9fd3ff", wear: { head: item("bandana", "red", 14), face: item("fake-mustache", "midnight", 15) } } },
+  { name: "Tempo Tess", rating: 1400, look: { side: "dark", tint: "#3c6e5a", wear: { head: item("wizard-hat", "sage", 16) } } },
+  { name: "Bishop Bo", rating: 1700, look: { side: "light", tint: null, wear: { head: item("fedora", "midnight", 17), face: item("dark-shades", "midnight", 18) } } },
+  { name: "Gambit Gus", rating: 2000, look: { side: "dark", tint: null, wear: { head: item("little-crown", "yellow", 19) } } },
 ];
+/** A bot's name as the town and the game show it: "Pin Pete (bot)" (Eric: "in parentheses like bot after their name"). */
+export const botLabel = (b: TownBot): string => `${b.name} (bot)`;
+/** A bot's rating as its card says it. */
+export const ratingText = (b: TownBot): string => `Rating ${b.rating}`;
+/** The first button of a table's card where a bot waits: "Play Tempo Tess (bot) · 1400". */
+export const playAtTableText = (b: TownBot): string => `Play ${botLabel(b)} · ${b.rating}`;
 
 /** Which home stands on each square (index r * N + c), or null. */
 export const plotAt: (Home | null)[] = new Array(N * N).fill(null);
@@ -465,6 +491,8 @@ export interface Person {
    * there, until you walk on or its card closes.
    */
   sit: boolean;
+  /** A town bot's entry in BOTS (its name, rating and look); null for you (and, later, real players). */
+  bot: TownBot | null;
 }
 
 /** Whether a person sits at a chess table now: stopped on one of its stools, meaning to sit. Its table, or null. */
@@ -526,6 +554,12 @@ export interface Town {
   /** The line being said now: who, what, until when; and when the next may start. */
   speech: { boss: Boss | null; line: string; until: number; next: number };
   nextBotAt: number;
+  /** A bot held where it is (its card is open, or its table's card with you across): it doesn't wander off. */
+  hold: Person | null;
+  /** You and a bot on your way to a table for a game (its card's Play); the game opens once both sit (`meetReady`). */
+  meet: Meeting | null;
+  /** Back from a game: the bot across gets up and wanders off at `at`. */
+  leave: { bot: Person; at: number } | null;
 }
 
 /** A small seeded generator (the prototype's), in [0, 1). */
@@ -537,11 +571,36 @@ function lcg(seed: number): () => number {
   };
 }
 
-/** The town as the page opens. `now`: the clock the loop runs on (performance.now). */
-export function createTown(now: number, seed = 20261025): Town {
+/**
+ * Where you land back in the town after a game with a bot: the table (its index in TABLES), your stool (0 west, 1
+ * east) and the bot (its index in BOTS), who sits on the other.
+ */
+export interface Seat {
+  table: number;
+  stool: 0 | 1;
+  bot: number;
+}
+/** A seat as the address carries it ("6.0.3"), and back (null: not one). */
+export const seatText = (s: Seat): string => `${s.table}.${s.stool}.${s.bot}`;
+export function seatOf(text: string | null | undefined): Seat | null {
+  const m = /^(\d+)\.([01])\.(\d+)$/.exec(text ?? "");
+  if (!m) return null;
+  const table = Number(m[1]);
+  const bot = Number(m[3]);
+  return table < TABLES.length && bot < BOTS.length ? { table, stool: Number(m[2]) as 0 | 1, bot } : null;
+}
+
+/**
+ * The town as the page opens. `now`: the clock the loop runs on (performance.now). `seat`: back from a game with a bot,
+ * you sit on your stool at that table and the bot across (it gets up after `botLeaveAfterGameMs`).
+ */
+export function createTown(now: number, seed = 20261025, seat: Seat | null = null): Town {
   const rnd = lcg(seed);
   const f = TOWN_FEEL;
-  const you: Person = { id: "you", name: "", look: { side: "light", tint: null }, you: true, walker: new Walker(START, f.youStepMs, true, f.walkEase), sit: false };
+  const table = seat ? TABLES[seat.table]! : null;
+  const yours = table ? table.stools[seat!.stool]! : START;
+  const theirs = table ? table.stools[1 - seat!.stool]! : null;
+  const you: Person = { id: "you", name: "", look: { side: "light", tint: null, wear: null }, you: true, walker: new Walker(yours, f.youStepMs, true, f.walkEase), sit: !!seat, bot: null };
   // Each boss starts on the square in front of its home's middle (toward the camera).
   const bosses: Boss[] = HOMES.map((home) => ({ home, walker: new Walker({ c: home.cx, r: wrapI(home.cy - 2) }, f.bossStepMs, false), nextAt: null, onScreen: false, held: false, lastLine: null }));
   // The bots stand around you in the park (16 x 14 squares round you), apart, off the bosses' roaming ground.
@@ -549,14 +608,18 @@ export function createTown(now: number, seed = 20261025): Town {
   for (const b of BOTS) {
     let c = 0;
     let r = 0;
-    for (let tries = 0; tries < 800; tries++) {
-      c = wrapI(START.c - 8 + Math.floor(rnd() * 16));
-      r = wrapI(START.r - 4 + Math.floor(rnd() * 14));
-      const sq = { c, r };
-      if (walkable(c, r) && !statueAt(c, r) && tdist(sq, START) >= 3 && !HOMES.some((h) => plotDist(h, c, r) <= f.bossRoam) && !bots.some((o) => tdist(sq, o.walker.here()) < 3)) break;
-    }
-    bots.push({ id: `bot:${bots.length}`, name: b.name, look: { side: b.side, tint: b.tint }, you: false, walker: new Walker({ c, r }, f.botStepMs, true), sit: true });
+    // (Back from a game: the bot you played sits across from you.)
+    if (seat && b === BOTS[seat.bot]) ((c = theirs!.c), (r = theirs!.r));
+    else
+      for (let tries = 0; tries < 800; tries++) {
+        c = wrapI(START.c - 8 + Math.floor(rnd() * 16));
+        r = wrapI(START.r - 4 + Math.floor(rnd() * 14));
+        const sq = { c, r };
+        if (walkable(c, r) && !statueAt(c, r) && tdist(sq, yours) >= 3 && (!theirs || tdist(sq, theirs) >= 2) && !HOMES.some((h) => plotDist(h, c, r) <= f.bossRoam) && !bots.some((o) => tdist(sq, o.walker.here()) < 3)) break;
+      }
+    bots.push({ id: `bot:${bots.length}`, name: botLabel(b), look: b.look, you: false, walker: new Walker({ c, r }, f.botStepMs, true), sit: true, bot: b });
   }
+  const met = seat ? bots[seat.bot]! : null;
   return {
     people: [you, ...bots],
     you,
@@ -566,6 +629,9 @@ export function createTown(now: number, seed = 20261025): Town {
     rnd,
     speech: { boss: null, line: "", until: 0, next: now + f.speechFirstMs },
     nextBotAt: now + f.botFirstMs,
+    hold: null,
+    meet: null,
+    leave: met ? { bot: met, at: now + f.botLeaveAfterGameMs } : null,
   };
 }
 
@@ -755,20 +821,32 @@ function bossesRoam(t: Town, now: number): void {
 
 function botsWander(t: Town, now: number): void {
   const f = TOWN_FEEL;
+  // Back from a game: the bot you played gets up and goes (not while held: its table's card is open with you across).
+  const lv = t.leave;
+  if (lv && now >= lv.at && t.hold !== lv.bot && t.meet?.bot !== lv.bot) {
+    t.leave = null;
+    if (!lv.bot.walker.moving()) wander(t, lv.bot, false);
+  }
   if (now < t.nextBotAt) return;
   t.nextBotAt = now + between(t, f.botGapMs);
-  const free = t.bots.filter((b) => !b.walker.moving());
+  // (Not one that's held, or on its way to a game with you.)
+  const free = t.bots.filter((b) => !b.walker.moving() && b !== t.hold && b !== t.meet?.bot);
   if (!free.length) return;
   const bot = pick(t, free);
+  // Now and then one goes to sit at a chess table nearby (a free stool), and one sitting may stay a while longer.
+  if (seated(bot) && t.rnd() < f.botStaySeated) return;
+  wander(t, bot, t.rnd() < f.botSitChance);
+}
+
+/** A bot walks a few squares, or (`sitting`) to a free stool nearby. */
+function wander(t: Town, bot: Person, sitting: boolean): void {
+  const f = TOWN_FEEL;
   const w = bot.walker;
   const h = w.here();
   const [lo, hi] = f.botWalk;
   // (Never on a statue's viewing square: it's kept free for whoever comes to look.)
   const ok = (c: number, r: number) => walkable(c, r) && !taken(t, c, r, w) && !t.bosses.some((b) => plotDist(b.home, c, r) === 1) && !statueAt(c, r);
   const targets: Sq[] = [];
-  // Now and then one goes to sit at a chess table nearby (a free stool), and one sitting may stay a while longer.
-  if (seated(bot) && t.rnd() < f.botStaySeated) return;
-  const sitting = t.rnd() < f.botSitChance;
   const reach = sitting ? f.botSitReach : hi;
   for (let dc = -reach; dc <= reach; dc++)
     for (let dr = -reach; dr <= reach; dr++) {
@@ -808,4 +886,100 @@ function updateSpeech(t: Town, now: number): void {
 export function walkYou(t: Town, target: Target): boolean {
   const to = destFor(t, t.you.walker, target);
   return !!to && walkWalker(t.you.walker, to);
+}
+
+// ---- Playing a town bot (Oct 27, Eric: "if you tap them you can invite them to a game and then you both run over to the
+// chessboard"). Pure: Town.tsx opens the cards and the game; this says where everyone goes and when both sit.
+
+/** You and a bot on your way to a table: its stools, yours and theirs. */
+export interface Meeting {
+  bot: Person;
+  table: Table;
+  yours: Sq;
+  theirs: Sq;
+}
+
+/** Holds a bot where it is (its card is open): it stops at the square it's stepping onto and doesn't wander off. Null lets it go. */
+export function holdBot(t: Town, bot: Person | null): void {
+  t.hold = bot;
+  if (bot?.walker.moving()) bot.walker.go([]);
+}
+
+/** Whether nobody but `a` or `b` stands on or is headed for square `s`. */
+function freeFor(t: Town, s: Sq, a: Walker, b: Walker): boolean {
+  for (const w of t.all) if (w !== a && w !== b && w.goalC() === s.c && w.goalR() === s.r) return false;
+  return true;
+}
+
+/** Whether some table has both stools free for you and `bot` (its card's Play; greyed with "Tables are full" when not). Cheap: no search. */
+export function anyTableFree(t: Town, bot: Person): boolean {
+  for (const tb of TABLES) if (freeFor(t, tb.stools[0], t.you.walker, bot.walker) && freeFor(t, tb.stools[1], t.you.walker, bot.walker)) return true;
+  return false;
+}
+
+/**
+ * The table you and `bot` play at: of the tables with both stools free (nobody else on them or headed there), the
+ * nearest to the two of you (your steps to your stool plus its steps to its own); you take the stool nearer you, the bot
+ * the other. Null: every table is taken.
+ */
+export function tableFor(t: Town, bot: Person): Meeting | null {
+  const dy = stepsFrom(t.you.walker.here());
+  const db = stepsFrom(bot.walker.here());
+  let best: Meeting | null = null;
+  let bestD = Infinity;
+  for (const tb of TABLES) {
+    const [s0, s1] = tb.stools;
+    if (!freeFor(t, s0, t.you.walker, bot.walker) || !freeFor(t, s1, t.you.walker, bot.walker)) continue;
+    const y0 = dy[s0.r * N + s0.c]!;
+    const y1 = dy[s1.r * N + s1.c]!;
+    const [yours, theirs] = y1 >= 0 && (y0 < 0 || y1 < y0) ? [s1, s0] : [s0, s1];
+    const a = dy[yours.r * N + yours.c]!;
+    const b = db[theirs.r * N + theirs.c]!;
+    if (a < 0 || b < 0 || a + b >= bestD) continue;
+    bestD = a + b;
+    best = { bot, table: tb, yours, theirs };
+  }
+  return best;
+}
+
+/** You and the bot set off for the meeting's stools, to sit (the bot held on its way). */
+export function meet(t: Town, m: Meeting): void {
+  t.meet = m;
+  holdBot(t, m.bot);
+  t.you.sit = true;
+  m.bot.sit = true;
+  walkWalker(t.you.walker, m.yours);
+  walkWalker(m.bot.walker, m.theirs);
+}
+
+/** Calls the meeting off (you walked elsewhere): the bot is free again. */
+export function cancelMeet(t: Town): void {
+  if (t.meet && t.hold === t.meet.bot) t.hold = null;
+  t.meet = null;
+}
+
+/** Whether you and the bot both sit at the meeting's table: the game opens. */
+export function meetReady(t: Town): boolean {
+  const m = t.meet;
+  return !!m && seated(t.you) === m.table && seated(m.bot) === m.table;
+}
+
+/** The meeting as a seat to come back to after the game (null: none, or not seated yet). */
+export function meetSeat(t: Town): Seat | null {
+  const m = t.meet;
+  if (!m || !m.bot.bot) return null;
+  const h = t.you.walker.here();
+  const stool = m.table.stools.findIndex((s) => s.c === h.c && s.r === h.r);
+  return stool < 0 ? null : { table: m.table.i, stool: stool as 0 | 1, bot: BOTS.indexOf(m.bot.bot) };
+}
+
+/** The bot sitting at a table with nobody else there (but you, across from it), or null. */
+export function waitingBot(t: Town, table: Table): Person | null {
+  let found: Person | null = null;
+  for (const p of t.people) {
+    if (p.you || seated(p) !== table) continue;
+    if (!p.bot || found) return null;
+    found = p;
+  }
+  return found;
 }

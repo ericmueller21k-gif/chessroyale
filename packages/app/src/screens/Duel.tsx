@@ -4,6 +4,7 @@ import { controlLabel, duelControl } from "@chessroyale/core";
 import { other, type Color, type DuelEnd } from "@chessroyale/chess/duel";
 import { Board } from "../components/Board.tsx";
 import { Avatar } from "../components/Items.tsx";
+import { BrainLoadingCard } from "../components/BrainLoading.tsx";
 import { MatchMenu, type MatchExit } from "../components/MatchMenu.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
 import { COMPUTER_LAYOUT } from "../components/MatchMenu.tsx";
@@ -169,6 +170,7 @@ export function resultReason(end: DuelEnd, you: Color, them: string): string {
 
 /** Your rank's change, in a line ("Gold 2 · 45 RP (+18)", "Placement 2/5", "Placed: Gold 4 · 25 RP"). */
 function rankLine(snap: DuelSnapshot): string | null {
+  if (snap.town) return "Casual game";
   if (snap.bot) return "Unranked game";
   if (!snap.end || snap.end.result === "aborted") return null;
   const o = snap.outcome;
@@ -293,7 +295,7 @@ function DuelBoard({ session, snap, now, onHome, onAgain }: { session: DuelSessi
     isYou: (id) => id === you,
     who: (id) => (id === "w" || id === "b" ? { uid: snap.players[id].uid ?? undefined, isBot: !!snap.players[id].bot, team: null } : undefined),
   };
-  const status = over
+  const status = over || snap.loading
     ? null
     : snap.phase === "vote"
       ? "Drag your pawn: Bullet, Blitz or Rapid"
@@ -309,7 +311,19 @@ function DuelBoard({ session, snap, now, onHome, onAgain }: { session: DuelSessi
   // Your move shown at once on the board; a move the board can't make (not your turn) is never sent.
   const board = (
     <Board fen={snap.fen} orientation={orientation} lastMove={snap.lastMove} interactive={myTurn} onMove={(m) => session.move(m)}>
-      {snap.phase === "vote" && snap.voteAt !== null && snap.voteEndsAt !== null && (
+      {/* A town bot's game: Maia's loading step over the board first (Boss alone's; its Leave goes back to the town). */}
+      {snap.loading && (
+        <BrainLoadingCard
+          icon={
+            <span style={{ display: "block", width: "64px", height: "64px" }}>
+              <Avatar look={snap.players[them].look ?? undefined} side={them} />
+            </span>
+          }
+          title="Loading the bot…"
+          onLeave={onHome}
+        />
+      )}
+      {snap.phase === "vote" && !snap.loading && snap.voteAt !== null && snap.voteEndsAt !== null && (
         <DuelVote
           you={you}
           picks={snap.picks}
@@ -390,12 +404,21 @@ function DuelResult({ snap, onHome, onAgain }: { snap: DuelSnapshot; onHome: () 
         </span>
       )}
       <div class="dv-result-actions">
-        <button type="button" class="btn btn-primary" onClick={onAgain}>
-          {snap.bot ? "Find a person" : "Play again"}
-        </button>
-        <button type="button" class="btn btn-secondary" onClick={onHome}>
-          Home
-        </button>
+        {/* A town bot's game: back to the town, at the table, the bot across. */}
+        {snap.town ? (
+          <button type="button" class="btn btn-primary" onClick={onHome}>
+            Back to town
+          </button>
+        ) : (
+          <>
+            <button type="button" class="btn btn-primary" onClick={onAgain}>
+              {snap.bot ? "Find a person" : "Play again"}
+            </button>
+            <button type="button" class="btn btn-secondary" onClick={onHome}>
+              Home
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

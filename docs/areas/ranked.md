@@ -136,7 +136,9 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   queue answer's `botRating`; the bosses' human-like engine, its own draw, `BOSS_BRAIN` temperature and top-p) when
   that's within `bot.maiaMin`-`maiaMax` and Maia may run here, else (and while Maia loads) Stockfish at that strength
   (`playAtElo`, 1320-3190). It thinks within `bot.thinkMs`, never more than `clockShare` of its clock; it takes a draw
-  only when clearly behind on material. No chat, no rank, no coins, nothing recorded.
+  only when clearly behind on material. No chat, no rank, no coins, nothing recorded. The town square's bots play the
+  same game (`town`: the bot's name and rating, no versus moment, Maia's loading step before the vote, "Casual game",
+  "Back to town"; [town-square.md](town-square.md), "The bots and playing them").
 - **Fair play** ([fairplay.md](fairplay.md), "1 v 1"): reports from the profile, as everywhere (opened from the game,
   a report names it); the case page's engine check covers the player's kept 1 v 1 games, reported ones first, each move
   against every legal move in near-equal groups of at most 8 (the engine server's limit), within the deep re-check's

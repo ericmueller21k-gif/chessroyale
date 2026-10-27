@@ -540,6 +540,8 @@ export class Renderer {
   private readonly q4 = new Float64Array(8);
   /** Your dressed pawn (null: the plain pawn): set by Town.tsx when your look changes. */
   youArt: YouArt | null = null;
+  /** Each bot's dressed pawn (its crate items, drawn once when the page opens: Town.tsx), by person id; none: plain. */
+  readonly botArt = new Map<string, YouArt>();
   /** Tag widths by name and size; sign and bubble layouts by text. */
   private readonly tagW = new Map<string, number[]>();
   private readonly nameW = new Map<string, number[]>();
@@ -1167,7 +1169,11 @@ export class Renderer {
           this.drawSprite(it, art?.img ?? pawnImage(person.look.side, person.look.tint), f.youSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.youHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.youSquares);
           if (this.fade > 0.02) this.tag(person.name, it.fx, it.hy - 2, true, clamp((11 * this.p.k) / v.kf, 8, 12), this.fade);
         } else {
-          this.drawSprite(it, pawnImage(person.look.side, person.look.tint), f.botSquares, 0.5, PAWN_FOOT, 1, pose.hop * f.botHop, pose.tilt * f.hobbleTilt, facing, 1, PAWN_HEAD, true, 1, f.botSquares);
+          // A bot's dressed pawn (its one or two crate items, made once), drawn as yours is.
+          const art = this.botArt.get(person.id);
+          const k = 1 + 2 * (art?.pad ?? 0);
+          const pad = art?.pad ?? 0;
+          this.drawSprite(it, art?.img ?? pawnImage(person.look.side, person.look.tint), f.botSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.botHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.botSquares);
           // Name tags on the near ones only.
           const far = farOf(v, it.dz);
           if (far < f.tagFar && this.fade > 0.02) this.tag(person.name, it.fx, it.hy - 2, false, clamp((11 * this.p.k) / v.kf, 8, 12), clamp((f.tagFar - far) / 0.12, 0, 1) * this.fade);
@@ -2213,7 +2219,15 @@ export class Renderer {
   }
 
   /** Where a card points: over a boss's head or a place's top (`i`: its index in the homes, then the Colosseum), on screen (false: not drawn this frame). */
-  anchor(kind: "boss" | "home" | "table", i: number, out: { x: number; y: number }): boolean {
+  anchor(kind: "boss" | "home" | "table" | "person", i: number, out: { x: number; y: number }): boolean {
+    if (kind === "person") {
+      // Over its name tag (`i`: its index in the people).
+      const it = this.personItem(i);
+      if (!it?.on) return false;
+      out.x = it.fx;
+      out.y = it.hy - 18;
+      return out.y > 0 && out.y < this.H && out.x > 0 && out.x < this.W;
+    }
     if (kind === "table") {
       // Over its board.
       const it = this.propItems[PROPS.findIndex((p) => p.table === i)]!;
@@ -2248,7 +2262,19 @@ export class Renderer {
    * tap lands on it: if something nearer stands over that point (a boss in front of its home, a bot at the gate), the
    * first point of a grid over its picture that a tap would hit. False if it isn't drawn or none is clear. (For tests.)
    */
-  tapPoint(kind: "boss" | "home" | "statue" | "table", i: number, out: { x: number; y: number }): boolean {
+  tapPoint(kind: "boss" | "home" | "statue" | "table" | "person", i: number, out: { x: number; y: number }): boolean {
+    if (kind === "person") {
+      // Its body's middle, or higher or lower on it if something nearer stands in front.
+      const it = this.personItem(i);
+      if (!it?.on || it.faded) return false;
+      for (const v of [0.6, 0.45, 0.75, 0.3]) {
+        out.x = (it.x0 + it.x1) / 2;
+        out.y = it.y0 + v * (it.y1 - it.y0);
+        const h = out.x > 0 && out.x < this.W && out.y > 0 && out.y < this.H ? this.pick(out.x, out.y) : null;
+        if (h?.kind === "person" && h.person === this.town.people[i]) return true;
+      }
+      return false;
+    }
     if (kind === "table") {
       // Its board's middle, or a point on its leg or a stool if someone stands in front of that.
       const it = this.propItems[PROPS.findIndex((p) => p.table === i)];
@@ -2296,6 +2322,12 @@ export class Renderer {
         }
       }
     return false;
+  }
+
+  /** A person's item this frame (`i`: its index in the people), or null. */
+  private personItem(i: number): Item | null {
+    for (const it of this.items) if (it.kind === "person" && it.i === i) return it;
+    return null;
   }
 
   /** What's under (x, y) in the box: a home, a boss or a person (nearest first), else a square, else null (the sky). */

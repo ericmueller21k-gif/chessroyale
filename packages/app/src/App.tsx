@@ -35,7 +35,7 @@ import { setInviteHost } from "./friends.ts";
 import { FriendsScreen } from "./screens/Friends.tsx";
 import { SettingsScreen } from "./screens/Settings.tsx";
 import { AutoChessScreen } from "./screens/AutoChess.tsx";
-import { TownPage } from "./town/TownPage.tsx";
+import { TownPage, type BotGameAsk } from "./town/TownPage.tsx";
 import { FaqScreen } from "./screens/Faq.tsx";
 import { Logo } from "./components/FrontDoor.tsx";
 import { FrontFrame, type FrontNav } from "./components/FrontMenu.tsx";
@@ -200,6 +200,9 @@ const squadsRejoin = (() => {
   return currentSquads();
 })();
 
+/** This address's query without a town game's seat (`at=`), as it was written ("?debug", not "?debug="), or "". */
+const searchWithoutSeat = () => location.search.replace(/([?&])at=[^&]*(&|$)/, "$1").replace(/[?&]$/, "");
+
 /**
  * Ranked 1 v 1's links: /1v1 queues at once (the home screen's 1 v 1 button does the same: startRanked1v1, duel.ts),
  * /1v1/CODE is a game you're in (a reload goes back to it).
@@ -285,6 +288,11 @@ export function App() {
   const [showAutoChess, setShowAutoChess] = useState(() => location.pathname === "/autochess");
   /** The town square (/town; hidden, nothing links to it yet: slice 1 of Boss raid's town square, docs/areas/town-square.md). */
   const [showTown, setShowTown] = useState(() => location.pathname === "/town");
+  /**
+   * Where the town opens you, back from a game with a town bot: its seat ("6.0.3": the table, your stool, the bot; the
+   * town reads it). A reload during that game lands there too: its address carries it (`/town?at=6.0.3`).
+   */
+  const [townSeat, setTownSeat] = useState<string | null>(() => (location.pathname === "/town" ? new URLSearchParams(location.search).get("at") : null));
   // Chose "play vs bots as a guest" on the landing page (this device remembers).
   const [guest, setGuest] = useState(storedGuest);
   const [inviteSkipped, setInviteSkipped] = useState(false);
@@ -612,6 +620,49 @@ export function App() {
     if (location.pathname !== "/") history.replaceState(null, "", `/${location.search}`);
   };
   setRanked1v1Starter(() => startDuel());
+
+  // ---------------- A town bot's game (docs/areas/town-square.md, "Playing a bot") ----------------
+
+  /** The game with a town bot on now: its seat to come back to (null: none). */
+  const townGame = useRef<string | null>(null);
+  /**
+   * You and a bot sat down at a table in the town: the game, on this device (the bot game's, with Maia's loading step
+   * first). Its address is a step of its own in the history, so the back button (or a reload) lands back at the table.
+   */
+  const playTownBot = (g: BotGameAsk) => {
+    unlockAudio();
+    townGame.current = g.seat;
+    setDuel((old) => {
+      old?.dispose();
+      return new BotDuel(g.rating, { name: g.name, look: g.look });
+    });
+    const rest = searchWithoutSeat();
+    history.pushState({ townGame: g.seat }, "", `/town${rest ? `${rest}&` : "?"}at=${g.seat}`);
+  };
+  /** Out of the game, back to the town at its table (its result's "Back to town", or the back button: `popped`). */
+  const backToTown = (popped = false) => {
+    const seat = townGame.current;
+    if (!seat) return;
+    townGame.current = null;
+    setDuel((old) => {
+      old?.dispose();
+      return null;
+    });
+    setTownSeat(seat);
+    if (!popped && (history.state as { townGame?: string } | null)?.townGame) history.back();
+  };
+  const backToTownRef = useRef(backToTown);
+  backToTownRef.current = backToTown;
+  useEffect(() => {
+    const onPop = () => backToTownRef.current(true);
+    addEventListener("popstate", onPop);
+    return () => removeEventListener("popstate", onPop);
+  }, []);
+  // In the town, its address without the seat (it's been read).
+  useEffect(() => {
+    if (!showTown || duel || !new URLSearchParams(location.search).has("at")) return;
+    history.replaceState(null, "", `/town${searchWithoutSeat()}`);
+  }, [showTown, duel]);
   /**
    * A link: /1v1/CODE goes back into that game; /1v1 queues once your account has loaded (the queue needs it). A
    * reload during a search carries on with it (`savedDuelQueue`: its ticket and its wait): on the stage from /1v1, else
@@ -1144,11 +1195,15 @@ export function App() {
           onCancel={leaveDuel}
           onBot={botDuel}
           onAway={duelGoAway}
-          onHome={leaveDuel}
-          onAgain={() => {
-            leaveDuel();
-            startDuel();
-          }}
+          onHome={townGame.current ? () => backToTown() : leaveDuel}
+          onAgain={
+            townGame.current
+              ? () => backToTown()
+              : () => {
+                  leaveDuel();
+                  startDuel();
+                }
+          }
         />
         {overlayD}
       </>
@@ -1200,8 +1255,11 @@ export function App() {
   if (!match && showTown) {
     return (
       <TownPage
+        seat={townSeat}
+        onPlayBot={playTownBot}
         onBack={() => {
           setShowTown(false);
+          setTownSeat(null);
           history.replaceState(null, "", "/");
         }}
         // A boss's "Challenge alone", confirmed: out of the town square to the Solo Boss Mode screen (the solo form, as the
@@ -1210,6 +1268,7 @@ export function App() {
         onBossAlone={(id) => {
           rememberBossPick(id);
           setShowTown(false);
+          setTownSeat(null);
           history.replaceState(null, "", "/");
           setHomeIntent(null);
           setRaidFull(false);
