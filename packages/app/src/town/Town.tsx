@@ -32,6 +32,7 @@ import { play, warmSounds } from "../sound.ts";
 import { SELECT_SOUND, TOWN_SOUNDS, townSound } from "../characters/boss-select.ts";
 import { N, proj, wrapF } from "./camera.ts";
 import { TOWN_FEEL } from "./feel.ts";
+import { TownChat } from "./TownChat.tsx";
 import { Press } from "./press.ts";
 import { PAWN_PX, Renderer, pawnImage, type Hit } from "./render.ts";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
@@ -99,6 +100,8 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, seat = null }: { on
         {/* A statue's quote, for screen readers, while you stand up close to it (it's drawn on its pedestal). */}
         <div class="town-sr" ref={live} aria-live="polite" />
         <div class="town-overlay">
+          {/* The chat log, top left (its own file): under the cards, taking no taps; the chips keep off its box (CHAT_BOX). */}
+          <TownChat />
           {/* The card: over the boss's head or the home's top, its tail pointing there (placed every frame). */}
           <div class="town-card" ref={cardEl} role="dialog" aria-label={label} style={{ display: card ? "" : "none" }}>
             {card && home && card.confirm && (

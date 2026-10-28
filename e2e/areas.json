@@ -498,7 +498,7 @@
     },
     "the town square (/town)": {
       "paths": ["packages/app/src/town/**", "packages/app/src/stale.ts"],
-      "specs": ["e2e/town.spec.ts"]
+      "specs": ["e2e/town.spec.ts", "e2e/town-chat.spec.ts"]
     },
     "Auto chess, the demo": {
       "paths": [
