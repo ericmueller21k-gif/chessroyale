@@ -606,6 +606,14 @@ test("test rank and level (Eric, Oct 28): an admin's home reads \"Opal III · <r
       const card = (await page.locator(".fd-hero").boundingBox())!;
       const top = (await level.boundingBox())!.y;
       expect(top - card.y, `LVL 38 clear of the card's top at ${size.width}×${size.height}`).toBeGreaterThanOrEqual(4);
+      // (With the tag over the pawn: "squeeze it closer to the top of the pawn". It takes some of the room over the pawn's
+      // head that a hat may use, and is drawn in front of the pawn.)
+      if ((await page.locator(".fd-hero-in").evaluate((e) => getComputedStyle(e).flexDirection)) === "column") {
+        const tag = (await page.locator(".fd-hero-id").boundingBox())!;
+        const pawn = (await page.locator(".fd-pawn-hero").boundingBox())!;
+        expect(tag.y + tag.height - pawn.y, `the tag over the top of the pawn's box at ${size.width}×${size.height}`).toBeGreaterThanOrEqual(4);
+        expect(await page.locator(".fd-hero-id").evaluate((e) => Number(getComputedStyle(e).zIndex)), "the tag in front of the pawn").toBeGreaterThan(1);
+      }
     }
   }
 });
