@@ -30,7 +30,8 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
     squares are drawn under the screen's highlights (`<square class="uh uh-red">`, first in the board), your arrows over
     the pieces and under the screen's arrows (`svg.hb-user-arrows`, before `svg.hb-shapes`), each arrow see-through at
     0.8 as chess.com's. The browser's menu never opens over the board or what a screen draws on it (`contextmenu` turned
-    down on `.board-wrap`, every board).
+    down on `.board-wrap`, every board). On Green, Shift's green is deeper; on Gold, Ctrl's yellow square and the plain
+    arrow are deeper oranges (each read on that scheme's squares).
   - **Premoves** (`premove={{ key, side }}`, each screen opts in): while `side` isn't to move, move its pieces ahead by
     drag or tap-tap, anywhere their own pattern reaches (a slider through pieces, a pawn's diagonal with nothing there yet,
     your own piece's square; castling while the FEN's rights hold: `premoveDests`, chessground's). Each shows on its new

@@ -118,4 +118,13 @@ Settings → Board: **Premoves** (on) and **Arrows and highlights** (on; greyed 
 ## Board colors
 
 Every new color was looked at on Classic, Green and Gold, in light and dark (the board's squares don't change with the
-theme, only what's around it).
+theme, only what's around it), in stills of every arrow and square color and of two premoves on each. Classic reads with
+chess.com's colors as they are. Two collided with a scheme's own squares and got their own rule under it (styles.css,
+"Your arrows, highlights and premoves"), as Alfil's glow did:
+
+- **Green:** Shift's green square and arrow were close to the green squares: a deeper green there (`rgba(64, 140, 36,
+  .8)`, `#3f9a22`).
+- **Gold:** Ctrl's yellow square and the plain arrow's yellow-orange were close to the gold squares: a deeper orange there
+  (`rgba(240, 118, 0, .8)`, `#f07a00`).
+
+The premove red reads on all three as it is.
