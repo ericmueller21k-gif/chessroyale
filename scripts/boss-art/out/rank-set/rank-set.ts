@@ -7,8 +7,9 @@
  * keys (the bezel's metal "0".."5", the table "p".."t", the piece "a".."f", the glow "z","Z") and each tier's frames
  * swap them for its own colors, so one badge, one set of studs, wings and crest serve every tier.
  *
- * Divisions, the same steps in every tier: d4 the badge and the piece; d3 adds four studs on the cut corners; d2 adds
- * a pair of wings (carved leaves for Wood); d1 adds a crest at the top, a glint on the piece and a glow round the badge.
+ * Divisions, the same steps in every tier: d5 the badge and the piece; d4 adds four studs on the cut corners; d3 adds
+ * a pair of wings (carved leaves for Wood); d2 adds a small crest at the top; d1 trades it for a big crown set with a gem
+ * in the piece's color, with a wide glow round the badge and a glint on the piece (Eric, Oct 28: "option C").
  * Pearlescent and Transcendent are d1 and more, each a 2 s loop: the emblem still, its light moving.
  */
 import { canvas, edge, inPoly, poly, toGrid } from "../../../../packages/app/src/characters/paint.ts";
@@ -400,6 +401,17 @@ const STUDS: readonly Pt[] = [
   [BX + BW - 7, BY + BW - 7],
 ];
 
+/** Division 1's crown: three points, a band, and a gem in the tier's piece color. */
+const CROWN: Part = (() => {
+  const cv = canvas(18, 11);
+  poly(cv, [[1, 10], [1, 3], [5, 6.5], [9, 0.5], [13, 6.5], [17, 3], [17, 10]], "1");
+  poly(cv, [[1, 10], [1, 8], [17, 8], [17, 10]], "3");
+  poly(cv, [[9.5, 0.5], [13, 6.5], [17, 3], [17, 8], [9.5, 8]], "2");
+  poly(cv, [[9, 4], [11, 6], [9, 8], [7, 6]], "b");
+  poly(cv, [[9, 4], [9, 6], [7, 6]], "a");
+  return { grid: toGrid(cv) };
+})();
+
 const CREST: Part = {
   grid: [
     ".....01.....",
@@ -469,6 +481,7 @@ Object.assign(PARTS, {
   rays: makeRays(),
   stud: STUD,
   crest: CREST,
+  crown: CROWN,
   pawn: shadePiece(PAWN, PAWN_BALL),
   pawnWood: shadePiece(PAWN, PAWN_BALL, true),
   knight: shadePiece(KNIGHT, [{ cx: 9, cy: 6.5, rx: 10, ry: 7 }]),
@@ -522,14 +535,15 @@ const TIERS: readonly Tier[] = [
 
 function emblem(t: Tier, d: number): Frame {
   const layers: Layer[] = [];
-  if (d <= 1) layers.push({ part: "glow", x: BX - 3, y: BY - 3 });
+  if (d <= 1) layers.push({ part: "glowWide", x: BX - 4, y: BY - 4 });
   if (t.rays) layers.push({ part: "rays", x: 0, y: 0 });
   if (d <= 3) layers.push(...(t.leaves ? WINGS_PIECE : WINGS_METAL));
   layers.push({ part: t.badge, x: BX, y: BY });
   if (d <= 4) for (const [x, y] of STUDS) layers.push({ part: "stud", x, y });
-  if (d <= 2) layers.push({ part: "crest", x: CX - 6, y: 2 });
+  if (d === 2) layers.push({ part: "crest", x: CX - 6, y: 2 });
+  if (d <= 1) layers.push({ part: "crown", x: CX - 9, y: 0 });
   layers.push(pieceAt(t.piece));
-  return { layers, ms: 1000, pal: pal(t.colors), specks: d <= 1 ? glint(t.glint[0], t.glint[1]) : undefined };
+  return { layers, ms: 1000, pal: pal(t.colors), specks: d <= 1 ? glint(t.glint[0], t.glint[1], 3) : undefined };
 }
 
 // ---- Color mixing for the two loops.

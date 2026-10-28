@@ -58,3 +58,6 @@ I've drawn the whole ladder in one file, scripts/boss-art/out/rank-set/rank-set.
 - **Pearlescent in the 3-star Auto chess piece's colors (Eric):** the sheen is AcStarArt's PRISM stops (teal, cyan,
   blue, violet, magenta, coral, orange), there and back round the facets as the 3-star's gradient reflects; the rim
   takes more of it (0.8), and the studs catch it too.
+- **Division 1 redone (Eric, Oct 28: d1 and d2 "look basically identical"; he picked option C of three):** d1 trades
+  d2's small crest for a big crown set with a gem in the piece's color, a wide glow round the badge (glowWide, as
+  Pearlescent's) and a bigger glint on the piece.
