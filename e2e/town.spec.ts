@@ -19,6 +19,19 @@ import { BOARD_SEL, test } from "./helpers.ts";
  */
 test.use({ actionTimeout: 15_000 });
 
+// The chat log's text field (Oct 28; shown where the test switches are on, as here) lies over a corner of the map and takes taps
+// there; on the phone project's short screen that corner holds the Colosseum's gate and the marble statue. These tests aim at the
+// map, so the field lets taps through (e2e/town-chat.spec.ts tests the field itself). No check changed.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    document.addEventListener("DOMContentLoaded", () => {
+      const s = document.createElement("style");
+      s.textContent = ".tc-form{pointer-events:none!important}";
+      document.head.append(s);
+    });
+  });
+});
+
 /** Every page error and console error of a test: none may happen. */
 function watchErrors(page: Page) {
   const errors: string[] = [];
