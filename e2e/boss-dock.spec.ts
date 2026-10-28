@@ -336,6 +336,7 @@ test("the admins' ⚡ and 🐟: on a phone, tiny icons beside the God King's hea
         ult: r(".boss-dock > .ult-test.gk-tool"),
         fish: r(".boss-dock > .engine-move.gk-tool"),
         king: r(".boss-dock .gk-unit-btn"),
+        pawn: r(".boss-dock .you-pawn"),
         status: r(".boss-dock-status"),
         view: { w: innerWidth, h: innerHeight },
         opacity: getComputedStyle(document.querySelector(".boss-dock > .ult-test.gk-tool")!).opacity,
@@ -344,6 +345,8 @@ test("the admins' ⚡ and 🐟: on a phone, tiny icons beside the God King's hea
   const g = await box();
   expect(g.ult && g.fish && g.king && g.status, "the icons and the God King are on the screen").toBeTruthy();
   const { ult: u, fish: f, king: k, status: s } = { ult: g.ult!, fish: g.fish!, king: g.king!, status: g.status! };
+  // (Your pawn stands between him and them since Oct 28: they stay left of it, over no part of it.)
+  expect(g.pawn, "your pawn is in the strip").toBeTruthy();
   for (const [name, t] of [["⚡", u], ["🐟", f]] as const) {
     expect(t.r - t.l, `${name} tap target`).toBeGreaterThanOrEqual(28);
     expect(t.b - t.t, `${name} tap target`).toBeGreaterThanOrEqual(28);
@@ -351,6 +354,7 @@ test("the admins' ⚡ and 🐟: on a phone, tiny icons beside the God King's hea
     expect(t.r, `${name} inside the viewport`).toBeLessThanOrEqual(g.view.w);
     expect(t.t, `${name} below the status box, never over the board`).toBeGreaterThanOrEqual(s.b - 1);
     expect(t.r, `${name} beside his head, on his left`).toBeLessThanOrEqual(k.l + 1);
+    expect(t.r, `${name} clear of your pawn`).toBeLessThanOrEqual(g.pawn!.l + 1);
     expect((t.t + t.b) / 2, `${name} level with his head`).toBeLessThanOrEqual(k.t + (k.b - k.t) / 2);
   }
   expect(f.r, "the 🐟 beside the ⚡, not over it").toBeLessThanOrEqual(u.l + 1);
