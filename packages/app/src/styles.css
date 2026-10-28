@@ -8962,6 +8962,10 @@ button.fd-logo {
     padding: 0;
     container: fd-hero / size;
   }
+  /*
+   * (12 px more at the top, Eric, Oct 28: "LVL 38" over your icon sat against the card's top edge; the pawn gives the 12 px
+   * back, so the card's size is the same. Everyone's tag sits there, so nothing moves when an admin's account loads.)
+   */
   .fd-hero-in {
     flex: 1 1 auto;
     display: flex;
@@ -8969,16 +8973,16 @@ button.fd-logo {
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 12px;
+    padding: 24px 12px 12px;
     min-height: 0;
   }
   /*
    * Your pawn (Oct 24: 75% bigger than 170 × 154, up to 298 × 270), as big as the room under the tag allows: the tag, its
-   * 6 px gap and the card's padding take 72 px of the card's height.
+   * 6 px gap and the card's padding take 84 px of the card's height.
    */
   .fd-hero .fd-pawn-hero {
     width: auto;
-    height: clamp(48px, calc(100cqh - 72px), 270px);
+    height: clamp(48px, calc(100cqh - 84px), 270px);
     aspect-ratio: 170 / 154;
   }
   /*
@@ -8990,10 +8994,10 @@ button.fd-logo {
     .fd-hero-in {
       flex-direction: row;
       gap: 14px;
-      padding: 8px;
+      padding: 14px 8px 8px;
     }
     .fd-hero .fd-pawn-hero {
-      height: clamp(48px, calc(100cqh - 16px), 130px);
+      height: clamp(48px, calc(100cqh - 22px), 130px);
     }
     .fd-home:not(.queueing) .fd-hero-id {
       order: 0;

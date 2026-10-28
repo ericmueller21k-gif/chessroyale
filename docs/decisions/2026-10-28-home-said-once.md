@@ -161,3 +161,15 @@ box still, through every pick), and it measures one box more.
 
 - His real phone: the "LVL 38" label's room at the top of the pawn's card (above), and whether 97 px is the PLAY he wants.
 - The real ranks and levels (Opal III and level 38 are placeholders).
+
+## Later, Oct 28: room for "LVL 38" (Eric: "there's a little space below the pawn anyway, so we can bring down everything")
+
+- On his phone the label was cut off at the pawn card's top edge. At 390 × 844 it sat 0 px under the card's top.
+- On a phone, the card's inner box gets 12 px more at the top (24 px, was 12), and the pawn gives the same 12 px back
+  (`100cqh - 84px`, was 72). The card keeps its size; the tag and the pawn move down. The short card (the tag beside the pawn)
+  gets 6 px more at the top, from the pawn too.
+- It's the same for everyone, not only admins, so nothing moves when an account loads.
+- The label's room under the card's top, after (before): 390 × 844, 12 px (0); 430 × 932, 15 px (9); 390 × 664, 16 px (13);
+  360 × 640, 4 px (1). The computer is unchanged.
+- Guard: `home-ranked.spec.ts`, "test rank and level", now checks at least 4 px of room at those four phone sizes. It fails
+  on the old layout.

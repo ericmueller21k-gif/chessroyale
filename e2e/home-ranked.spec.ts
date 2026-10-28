@@ -597,4 +597,15 @@ test("test rank and level (Eric, Oct 28): an admin's home reads \"Opal III · <r
   expect(geo.fillStroke && geo.trackStroke, "green").toBe(true);
   expect(geo.trackOpacity, "a faint track").toBeLessThan(0.4);
   expect(geo.width, "thin").toBeLessThanOrEqual(3);
+
+  // Room for the level under the card's top edge (Eric, Oct 28: it was cut off there on his phone), on phones tall and short.
+  if (!desktop()) {
+    for (const size of [{ width: 390, height: 844 }, { width: 430, height: 932 }, { width: 390, height: 664 }, { width: 360, height: 640 }]) {
+      await page.setViewportSize(size);
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+      const card = (await page.locator(".fd-hero").boundingBox())!;
+      const top = (await level.boundingBox())!.y;
+      expect(top - card.y, `LVL 38 clear of the card's top at ${size.width}×${size.height}`).toBeGreaterThanOrEqual(4);
+    }
+  }
 });
