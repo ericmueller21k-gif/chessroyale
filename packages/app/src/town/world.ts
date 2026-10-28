@@ -9,6 +9,7 @@ import type { ItemLook } from "@chessroyale/core";
 import { SELECT_LINES } from "../characters/boss-select.ts";
 import { N, wrapF, wrapI } from "./camera.ts";
 import { TOWN_FEEL } from "./feel.ts";
+import { SIDEKICK_SHEETS, type SidekickSheet } from "./sidekick-sheets.ts";
 
 export interface Sq {
   c: number;
@@ -269,45 +270,111 @@ export const HOMES: readonly Home[] = (
 export const PLACES: readonly Place[] = [...HOMES, COLISEUM_PLACE];
 
 /**
- * How a person's pawn looks: its side (white or black), a tint for a few, and what it wears (crate items, as your own
- * pawn wears them: null, nothing). One field on a person, so a sprite can replace the pawn later (a bot as a sidekick
- * character) without touching anything that reads people.
+ * What a home's card says, in turn, the next line each time it opens (a tap on the boss or on its home). Only Hollow's
+ * (Eric, Oct 28: his sidekick is stronger than he is, "his boss says something about it … something eerie"; these three
+ * approved word for word, "lol perfect").
  */
-export interface Look {
+export const TOWN_LINES: Readonly<Partial<Record<HomeId, readonly string[]>>> = {
+  hollow: [
+    "The little one plays in the dark. Even I don't sit across from him.",
+    "Don't let the eyes fool you. He's stronger than I ever was.",
+    "I found him in the dark. The dark had been teaching him.",
+  ],
+};
+/** The line a home's card shows the `n`th time it opens (from 0), or null: none for this home. */
+export const townLine = (id: HomeId, n: number): string | null => {
+  const own = TOWN_LINES[id];
+  return own?.length ? own[n % own.length]! : null;
+};
+
+/**
+ * How a person looks: a pawn (its side, white or black, a tint for a few, and what it wears: crate items, as your own
+ * pawn wears them; null, nothing), or a sprite (a boss's sidekick: its `idle`, `walk`, `sit` and `wave`, baked from its
+ * art into a sheet: `scripts/bake-sidekicks.ts`). One field on a person, so anything that reads people never asks which.
+ */
+export type Look = PawnLook | SpriteLook;
+export interface PawnLook {
   side: "light" | "dark";
   tint: string | null;
   wear: ItemLook | null;
 }
+export interface SpriteLook {
+  sprite: SidekickSheet;
+}
+/** Whether a look is a sprite's (a sidekick), not a pawn's. */
+export const isSprite = (l: Look): l is SpriteLook => "sprite" in l;
 
 /** A crate item a bot wears (a color from the crates' palette, clean: no blemish, never shiny). */
 const item = (def: string, color: string, seed: number, color2?: string) => ({ def, color, ...(color2 ? { color2 } : {}), blemish: 0, seed });
 
-/** A town bot: its short name, its fixed rating (Maia plays it at this rating) and its look. */
+/** A town bot: its short name, its fixed rating (Maia plays it at this rating), its look and, a sidekick, whose. */
 export interface TownBot {
   name: string;
   rating: number;
   look: Look;
+  /** A boss's sidekick: that boss's home (its card says "<Boss>'s sidekick"). */
+  boss?: HomeId;
 }
 
 /**
- * The town's bots (Eric, Oct 27: "a few bots… with different skill level… their names could just be like a little
- * shorter… eight to ten characters", each with one or two pieces of clothing). Names and ratings live here and nowhere
- * else: the tags, the cards and the game all read this table. Shown everywhere as "<name> (bot)" (`botLabel`).
+ * The town's bots: a ladder from 600 to 2500 in steps of 100 (Eric, Oct 28: "from the lowest to the highest and just up
+ * each … bot by 100"). The six pawns of Oct 27 keep their names and clothes, one every three rungs; the bosses' fourteen
+ * sidekicks take the rest, an easier boss's kid lower (the crowd's score against its boss in that boss's latest sim:
+ * docs/decisions/2026-10-28-sidekicks-in-town.md), and Hollow's on top, stronger than Hollow (Eric's twist). Names and
+ * ratings live here and nowhere else: the tags, the cards and the game all read this table. Names at most 10
+ * characters. Shown everywhere as "<name> (bot)" (`botLabel`).
  */
 export const BOTS: readonly TownBot[] = [
-  { name: "Pin Pete", rating: 800, look: { side: "dark", tint: null, wear: { head: item("beanie", "red", 11) } } },
-  { name: "Rook Rita", rating: 1000, look: { side: "light", tint: "#ffb3c6", wear: { head: item("party-hat", "cobalt", 12), face: item("scarf", "yellow", 13) } } },
+  { name: "Pin Pete", rating: 600, look: { side: "dark", tint: null, wear: { head: item("beanie", "red", 11) } } },
+  { name: "Squirt", rating: 700, look: { sprite: SIDEKICK_SHEETS.boingo }, boss: "clown" },
+  { name: "Tex", rating: 800, look: { sprite: SIDEKICK_SHEETS.wrangler }, boss: "pig" },
+  { name: "Rook Rita", rating: 900, look: { side: "light", tint: "#ffb3c6", wear: { head: item("party-hat", "cobalt", 12), face: item("scarf", "yellow", 13) } } },
+  { name: "Dabble", rating: 1000, look: { sprite: SIDEKICK_SHEETS.smudgy }, boss: "smudgy" },
+  { name: "Blocky", rating: 1100, look: { sprite: SIDEKICK_SHEETS.bigboy }, boss: "bigboy" },
   { name: "Fork Frank", rating: 1200, look: { side: "light", tint: "#9fd3ff", wear: { head: item("bandana", "red", 14), face: item("fake-mustache", "midnight", 15) } } },
-  { name: "Tempo Tess", rating: 1400, look: { side: "dark", tint: "#3c6e5a", wear: { head: item("wizard-hat", "sage", 16) } } },
-  { name: "Bishop Bo", rating: 1700, look: { side: "light", tint: null, wear: { head: item("fedora", "midnight", 17), face: item("dark-shades", "midnight", 18) } } },
-  { name: "Gambit Gus", rating: 2000, look: { side: "dark", tint: null, wear: { head: item("little-crown", "yellow", 19) } } },
+  { name: "Bun & Bug", rating: 1300, look: { sprite: SIDEKICK_SHEETS.chubchirp }, boss: "hopper" },
+  { name: "Pleat", rating: 1400, look: { sprite: SIDEKICK_SHEETS.folio }, boss: "folio" },
+  { name: "Tempo Tess", rating: 1500, look: { side: "dark", tint: "#3c6e5a", wear: { head: item("wizard-hat", "sage", 16) } } },
+  { name: "Twinkle", rating: 1600, look: { sprite: SIDEKICK_SHEETS.moo }, boss: "moo" },
+  { name: "Drizzle", rating: 1700, look: { sprite: SIDEKICK_SHEETS.puddles }, boss: "gardener" },
+  { name: "Bishop Bo", rating: 1800, look: { side: "light", tint: null, wear: { head: item("fedora", "midnight", 17), face: item("dark-shades", "midnight", 18) } } },
+  { name: "Chip", rating: 1900, look: { sprite: SIDEKICK_SHEETS.sawyer }, boss: "sawyer" },
+  { name: "Stripes", rating: 2000, look: { sprite: SIDEKICK_SHEETS.babur }, boss: "tiger" },
+  { name: "Gambit Gus", rating: 2100, look: { side: "dark", tint: null, wear: { head: item("little-crown", "yellow", 19) } } },
+  { name: "Woolly", rating: 2200, look: { sprite: SIDEKICK_SHEETS.alfil }, boss: "alfil" },
+  { name: "Crumb", rating: 2300, look: { sprite: SIDEKICK_SHEETS.ginger }, boss: "gingerbread" },
+  { name: "Sparky", rating: 2400, look: { sprite: SIDEKICK_SHEETS.jefferson }, boss: "grex" },
+  { name: "Glim", rating: 2500, look: { sprite: SIDEKICK_SHEETS.hollow }, boss: "hollow" },
 ];
 /** A bot's name as the town and the game show it: "Pin Pete (bot)" (Eric: "in parentheses like bot after their name"). */
 export const botLabel = (b: TownBot): string => `${b.name} (bot)`;
 /** A bot's rating as its card says it. */
 export const ratingText = (b: TownBot): string => `Rating ${b.rating}`;
-/** The first button of a table's card where a bot waits: "Play Tempo Tess (bot) · 1400". */
+/** The first button of a table's card where a bot waits: "Play Tempo Tess (bot) · 1500". */
 export const playAtTableText = (b: TownBot): string => `Play ${botLabel(b)} · ${b.rating}`;
+/** A sidekick's line on its card, under its name: "Hollow's sidekick" ("Puddles' sidekick", as his home's sign has it); null for a pawn. */
+export const sidekickText = (b: TownBot): string | null => {
+  const boss = b.boss && HOMES.find((h) => h.id === b.boss)?.boss;
+  return boss ? `${boss}${boss.endsWith("s") ? "'" : "'s"} sidekick` : null;
+};
+
+/** What a sidekick shows now: sitting at a table, its wave (once, from a tap), walking, or standing. */
+export type SpriteAnim = "idle" | "walk" | "sit" | "wave";
+/** How long a sprite's wave lasts (ms: its frames once through). */
+export function waveMs(sheet: SidekickSheet): number {
+  let t = 0;
+  for (const ms of sheet.ms.wave) t += Math.max(16, ms);
+  return t;
+}
+/**
+ * Which of its animations a sidekick plays at `now`: `sit` on a stool, else its `wave` for one time through after a tap
+ * (`Person.waved`), else `walk` while it walks, else `idle`. (Sitting wins: it waves on its feet, not off its stool.)
+ */
+export function spriteAnim(p: Person, now: number): SpriteAnim {
+  if (seated(p)) return "sit";
+  if (isSprite(p.look) && now - p.waved < waveMs(p.look.sprite)) return "wave";
+  return p.walker.moving() ? "walk" : "idle";
+}
 
 /** Which home stands on each square (index r * N + c), or null. */
 export const plotAt: (Home | null)[] = new Array(N * N).fill(null);
@@ -493,6 +560,16 @@ export interface Person {
   sit: boolean;
   /** A town bot's entry in BOTS (its name, rating and look); null for you (and, later, real players). */
   bot: TownBot | null;
+  /** When it last waved (a sidekick, as you tap it: its `wave` plays once from then); -Infinity: never. */
+  waved: number;
+  /**
+   * A bot at home (Oct 28: `botsOut` are in the square at once, the others take turns): not drawn, not tapped, on no
+   * square (its walker isn't among the town's). `came`: when it last came out (it fades in); `leaves`: when it goes home
+   * (it fades out until then; Infinity: it stays).
+   */
+  home: boolean;
+  came: number;
+  leaves: number;
 }
 
 /** Whether a person sits at a chess table now: stopped on one of its stools, meaning to sit. Its table, or null. */
@@ -560,6 +637,8 @@ export interface Town {
   meet: Meeting | null;
   /** Back from a game: the bot across gets up and wanders off at `at`. */
   leave: { bot: Person; at: number } | null;
+  /** When a bot out next goes home and another comes out (`botTurnMs`). */
+  nextTurnAt: number;
 }
 
 /** A small seeded generator (the prototype's), in [0, 1). */
@@ -592,32 +671,33 @@ export function seatOf(text: string | null | undefined): Seat | null {
 
 /**
  * The town as the page opens. `now`: the clock the loop runs on (performance.now). `seat`: back from a game with a bot,
- * you sit on your stool at that table and the bot across (it gets up after `botLeaveAfterGameMs`).
+ * you sit on your stool at that table and the bot across (it gets up after `botLeaveAfterGameMs`). `outN`: how many bots
+ * are out in the square (`botsOut`; the tests may have them all out).
  */
-export function createTown(now: number, seed = 20261025, seat: Seat | null = null): Town {
+export function createTown(now: number, seed = 20261025, seat: Seat | null = null, outN = TOWN_FEEL.botsOut): Town {
   const rnd = lcg(seed);
   const f = TOWN_FEEL;
   const table = seat ? TABLES[seat.table]! : null;
   const yours = table ? table.stools[seat!.stool]! : START;
   const theirs = table ? table.stools[1 - seat!.stool]! : null;
-  const you: Person = { id: "you", name: "", look: { side: "light", tint: null, wear: null }, you: true, walker: new Walker(yours, f.youStepMs, true, f.walkEase), sit: !!seat, bot: null };
+  const you: Person = { id: "you", name: "", look: { side: "light", tint: null, wear: null }, you: true, walker: new Walker(yours, f.youStepMs, true, f.walkEase), sit: !!seat, bot: null, waved: -Infinity, home: false, came: -Infinity, leaves: Infinity };
   // Each boss starts on the square in front of its home's middle (toward the camera).
   const bosses: Boss[] = HOMES.map((home) => ({ home, walker: new Walker({ c: home.cx, r: wrapI(home.cy - 2) }, f.bossStepMs, false), nextAt: null, onScreen: false, held: false, lastLine: null }));
-  // The bots stand around you in the park (16 x 14 squares round you), apart, off the bosses' roaming ground.
+  // Who's out (`botsOut` of them, shuffled by the town's seed, so the town opens the same way every time, as the tests
+  // need; back from a game, the bot you played among them); the others are at home, and the turns change who's out.
+  const order = BOTS.map((_, i) => i);
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    [order[i], order[j]] = [order[j]!, order[i]!];
+  }
+  if (seat) order.unshift(...order.splice(order.indexOf(seat.bot), 1));
+  const out = new Set(order.slice(0, outN));
+  // The bots out stand around you in the park, apart (`freeSpot`).
   const bots: Person[] = [];
-  for (const b of BOTS) {
-    let c = 0;
-    let r = 0;
+  for (const [i, b] of BOTS.entries()) {
     // (Back from a game: the bot you played sits across from you.)
-    if (seat && b === BOTS[seat.bot]) ((c = theirs!.c), (r = theirs!.r));
-    else
-      for (let tries = 0; tries < 800; tries++) {
-        c = wrapI(START.c - 8 + Math.floor(rnd() * 16));
-        r = wrapI(START.r - 4 + Math.floor(rnd() * 14));
-        const sq = { c, r };
-        if (walkable(c, r) && !statueAt(c, r) && tdist(sq, yours) >= 3 && (!theirs || tdist(sq, theirs) >= 2) && !HOMES.some((h) => plotDist(h, c, r) <= f.bossRoam) && !bots.some((o) => tdist(sq, o.walker.here()) < 3)) break;
-      }
-    bots.push({ id: `bot:${bots.length}`, name: botLabel(b), look: b.look, you: false, walker: new Walker({ c, r }, f.botStepMs, true), sit: true, bot: b });
+    const sq = seat && i === seat.bot ? theirs! : out.has(i) ? freeSpot(rnd, yours, 3, [...(theirs ? [theirs] : []), ...bots.filter((o) => !o.home).map((o) => o.walker.here())]) : START;
+    bots.push({ id: `bot:${bots.length}`, name: botLabel(b), look: b.look, you: false, walker: new Walker(sq, f.botStepMs, true), sit: true, bot: b, waved: -Infinity, home: !out.has(i), came: -Infinity, leaves: Infinity });
   }
   const met = seat ? bots[seat.bot]! : null;
   return {
@@ -625,14 +705,32 @@ export function createTown(now: number, seed = 20261025, seat: Seat | null = nul
     you,
     bots,
     bosses,
-    all: [you.walker, ...bots.map((b) => b.walker), ...bosses.map((b) => b.walker)],
+    all: [you.walker, ...bots.filter((b) => !b.home).map((b) => b.walker), ...bosses.map((b) => b.walker)],
     rnd,
     speech: { boss: null, line: "", until: 0, next: now + f.speechFirstMs },
     nextBotAt: now + f.botFirstMs,
     hold: null,
     meet: null,
     leave: met ? { bot: met, at: now + f.botLeaveAfterGameMs } : null,
+    nextTurnAt: now + f.botTurnMs[0],
   };
+}
+
+/**
+ * A square for a bot to stand on in the park (16 x 14 squares round your start): walkable, off the statues' squares and
+ * the tables' stools (bots sit down as they wander), off the bosses' roaming ground, at least `fromYou` steps from you and
+ * 3 from anyone in `others`, and (`t`) on no one's square.
+ */
+function freeSpot(rnd: () => number, you: Sq, fromYou: number, others: readonly Sq[], t: Town | null = null): Sq {
+  let c = 0;
+  let r = 0;
+  for (let tries = 0; tries < 800; tries++) {
+    c = wrapI(START.c - 8 + Math.floor(rnd() * 16));
+    r = wrapI(START.r - 4 + Math.floor(rnd() * 14));
+    const sq = { c, r };
+    if (walkable(c, r) && !statueAt(c, r) && !stoolAt(c, r) && tdist(sq, you) >= fromYou && !HOMES.some((h) => plotDist(h, c, r) <= TOWN_FEEL.bossRoam) && !others.some((o) => tdist(sq, o) < 3) && !(t && taken(t, c, r, null))) break;
+  }
+  return { c, r };
 }
 
 const between = (t: Town, [a, b]: readonly [number, number]) => a + t.rnd() * (b - a);
@@ -827,15 +925,51 @@ function botsWander(t: Town, now: number): void {
     t.leave = null;
     if (!lv.bot.walker.moving()) wander(t, lv.bot, false);
   }
+  // A bot fading out goes home (its walker leaves the town's: it stands on no square).
+  for (const b of t.bots)
+    if (!b.home && now >= b.leaves) {
+      b.home = true;
+      b.leaves = Infinity;
+      t.all.splice(t.all.indexOf(b.walker), 1);
+    }
   if (now < t.nextBotAt) return;
   t.nextBotAt = now + between(t, f.botGapMs);
+  if (now >= t.nextTurnAt) return takeTurns(t, now);
   // (Not one that's held, or on its way to a game with you.)
-  const free = t.bots.filter((b) => !b.walker.moving() && b !== t.hold && b !== t.meet?.bot);
+  const free = t.bots.filter((b) => !b.home && b.leaves === Infinity && !b.walker.moving() && b !== t.hold && b !== t.meet?.bot);
   if (!free.length) return;
   const bot = pick(t, free);
   // Now and then one goes to sit at a chess table nearby (a free stool), and one sitting may stay a while longer.
   if (seated(bot) && t.rnd() < f.botStaySeated) return;
   wander(t, bot, t.rnd() < f.botSitChance);
+}
+
+/**
+ * Bots take turns in the square (Oct 28: `botsOut` out at once, Eric's frame-rate rule): one out, standing, free (not
+ * held, not on its way to a game, not the one you just played) and a few steps from you, starts home (it fades out over
+ * `botFadeMs`), and one from home comes out on a free square in the park away from you (it fades in).
+ */
+function takeTurns(t: Town, now: number): void {
+  const f = TOWN_FEEL;
+  t.nextTurnAt = now + between(t, f.botTurnMs);
+  const me = t.you.walker.here();
+  const going = t.bots.filter((b) => !b.home && b.leaves === Infinity && !b.walker.moving() && !seated(b) && b !== t.hold && b !== t.meet?.bot && b !== t.leave?.bot && tdist(b.walker.here(), me) >= f.botTurnAway);
+  const coming = t.bots.filter((b) => b.home);
+  if (!going.length || !coming.length) return;
+  pick(t, going).leaves = now + f.botFadeMs;
+  comeOut(t, pick(t, coming), now, f.botTurnAway);
+}
+
+/** A bot at home comes out on a free square in the park, at least `fromYou` steps from you (it fades in). */
+export function comeOut(t: Town, b: Person, now: number, fromYou: number): void {
+  if (!b.home) return;
+  const at = freeSpot(t.rnd, t.you.walker.here(), fromYou, t.bots.filter((o) => !o.home).map((o) => o.walker.goal()), t);
+  b.walker = new Walker(at, TOWN_FEEL.botStepMs, true);
+  b.walker.go([]); // (its claim the newest: anyone headed there already keeps it)
+  b.home = false;
+  b.came = now;
+  b.leaves = Infinity;
+  t.all.push(b.walker);
 }
 
 /** A bot walks a few squares, or (`sitting`) to a free stool nearby. */
@@ -902,6 +1036,8 @@ export interface Meeting {
 /** Holds a bot where it is (its card is open): it stops at the square it's stepping onto and doesn't wander off. Null lets it go. */
 export function holdBot(t: Town, bot: Person | null): void {
   t.hold = bot;
+  // (A bot fading out on its way home stays: its card is open.)
+  if (bot && bot.leaves < Infinity) bot.leaves = Infinity;
   if (bot?.walker.moving()) bot.walker.go([]);
 }
 

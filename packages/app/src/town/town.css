@@ -230,3 +230,8 @@
   color: #6d6558;
   text-align: center;
 }
+/* A home's line (Oct 28: only Hollow's has lines, one each time its card opens), in his voice. */
+.town-card-line {
+  margin-bottom: 8px;
+  font-style: italic;
+}

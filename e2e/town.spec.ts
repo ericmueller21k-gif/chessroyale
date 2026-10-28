@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { BOTS, STATUES, TABLES } from "../packages/app/src/town/world.ts";
+import { BOTS, STATUES, TABLES, TOWN_LINES } from "../packages/app/src/town/world.ts";
 import { BOARD_SEL, test } from "./helpers.ts";
 
 /**
@@ -251,6 +251,8 @@ test("a boss's card: 'Challenge alone', then 'Leave the town square?'; Stay keep
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
   await toBabur(page);
   let card = await openCard(page, "boss", "Babur");
+  // No line on his card (only Hollow's has lines: Oct 28).
+  await expect(card.locator(".town-card-line")).toHaveCount(0);
   // He says something as his card opens (Eric, Oct 27: his select sound), once: its confirm opening is the same card.
   const said = () => page.evaluate(() => ((window as any).__soundLog as string[]).filter((l) => l.startsWith("tigerHello")).length);
   await expect.poll(said).toBe(1);
@@ -518,7 +520,7 @@ test("the tables' boards (Eric, Oct 27): one bot sitting waits (a green ring und
 
 // ---------------- Playing a town bot (Oct 27, Eric; docs/areas/town-square.md, "Playing a bot") ----------------
 
-type BotRow = { name: string; at: string; table: number; moving: boolean };
+type BotRow = { name: string; at: string; table: number; moving: boolean; home: boolean; anim: "idle" | "walk" | "sit" | "wave" | null };
 const bots = (p: Page) => p.evaluate(() => (window as unknown as { __townBots: () => BotRow[] }).__townBots());
 const tapAt = async (p: Page, kind: string, id: number) => {
   const at = await p.evaluate(([k, i]) => (window as unknown as { __townAt: (k: string, id: number) => { x: number; y: number } | null }).__townAt(k, i), [kind, id] as const);
@@ -570,7 +572,7 @@ test("a town bot: a tap opens its card ('<name> (bot)', its rating, Play); Play 
   page.on("request", (r) => r.url().includes("/engine/maia/") && maia.push(new URL(r.url()).pathname));
   await page.goto("/town?debug");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
-  // Tempo Tess (1400) comes to stand beside you, and every bot holds still.
+  // Tempo Tess comes to stand beside you, and every bot holds still.
   const i = BOTS.findIndex((b) => b.name === "Tempo Tess");
   await page.evaluate((i) => (window as unknown as { __townCall: (i: number) => void }).__townCall(i), i);
   await expect.poll(async () => (await bots(page))[i]!.moving, { timeout: 10_000 }).toBe(false);
@@ -579,7 +581,9 @@ test("a town bot: a tap opens its card ('<name> (bot)', its rating, Play); Play 
   const card = page.getByRole("dialog", { name: "Tempo Tess (bot)", exact: true });
   await expect(card).toBeVisible();
   await expect(card.getByRole("heading", { name: "Tempo Tess (bot)" })).toBeVisible();
-  await expect(card.getByText("Rating 1400", { exact: true })).toBeVisible();
+  await expect(card.getByText(`Rating ${BOTS[i]!.rating}`, { exact: true })).toBeVisible();
+  // A pawn's card says nothing more (a sidekick's says whose it is).
+  await expect(card.getByText(/sidekick/)).toHaveCount(0);
   const play = card.getByRole("button", { name: "Play", exact: true });
   await expect(play).toBeEnabled();
   // The bot holds still while its card is open.
@@ -654,5 +658,100 @@ test("a bot sitting at a table: a tap on the table walks you to the free stool; 
   expect((await you(page)).join(",")).toBe("20,13");
   await expect(canvas(page)).toHaveAttribute("data-sit", "1");
   expect((await bots(page)).find((b) => b.name === sitter.name)).toMatchObject({ at: "18,13", table: 6 });
+  expect(errors).toEqual([]);
+});
+
+// ---------------- The bosses' sidekicks (Oct 28, Eric; docs/decisions/2026-10-28-sidekicks-in-town.md) ----------------
+
+test("a sidekick: a tap and it waves, then stands while its card is open ('Glim (bot)', 'Hollow's sidekick', its rating, Play); Play: both seated, the game against it with its face on its strip; resign, back at the table", async ({ page }) => {
+  test.setTimeout(4 * 60_000);
+  const errors = watchErrors(page);
+  await page.goto("/town?debug");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  // Glim, Hollow's critter (the top rung), comes to stand beside you, and every bot holds still.
+  const i = BOTS.findIndex((b) => b.name === "Glim");
+  await page.evaluate((i) => (window as unknown as { __townCall: (i: number) => void }).__townCall(i), i);
+  await expect.poll(async () => (await bots(page))[i]!.moving, { timeout: 10_000 }).toBe(false);
+  await page.waitForTimeout(400);
+  expect((await bots(page))[i]!.anim).toBe("idle");
+  await tapAt(page, "bot", i);
+  // It waves (once), then stands again while its card stays open.
+  await expect.poll(async () => (await bots(page))[i]!.anim, { timeout: 2000, intervals: [50] }).toBe("wave");
+  const card = page.getByRole("dialog", { name: "Glim (bot)", exact: true });
+  await expect(card).toBeVisible();
+  await expect(card.getByRole("heading", { name: "Glim (bot)" })).toBeVisible();
+  await expect(card.getByText("Hollow's sidekick", { exact: true })).toBeVisible();
+  await expect(card.getByText("Rating 2500", { exact: true })).toBeVisible();
+  await expect.poll(async () => (await bots(page))[i]!.anim, { timeout: 5000 }).toBe("idle");
+  await expect(card).toBeVisible();
+  const play = card.getByRole("button", { name: "Play", exact: true });
+  await expect(play).toBeEnabled();
+  await play.click();
+  // You both walk to a table and sit (it in its sit); then the game opens.
+  await expect(page.locator(".duel-screen")).toBeVisible({ timeout: 20_000 });
+  await expect(page).toHaveURL(/\/town\?.*at=\d+\.[01]\.\d+/);
+  const seat = new URL(page.url()).searchParams.get("at")!.split(".").map(Number) as [number, number, number];
+  expect(seat[2]).toBe(i);
+  // Its strip shows its face (its idle's first frame) in place of the pawn.
+  const face = page.locator(".dv-strip.dv-them img.dv-face");
+  await expect(face).toBeVisible();
+  expect(await face.getAttribute("src")).toMatch(/^data:image\/png/);
+  expect(await face.evaluate((img: HTMLImageElement) => img.naturalWidth > 10 && img.naturalHeight > 10)).toBe(true);
+  await playAndResign(page, "Glim (bot)");
+  // Back to town: at that table, on your stool, Glim across in its sit.
+  await page.getByRole("button", { name: "Back to town" }).click();
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  const t = TABLES[seat[0]]!;
+  expect((await you(page)).join(",")).toBe(`${t.stools[seat[1]]!.c},${t.stools[seat[1]]!.r}`);
+  await expect(canvas(page)).toHaveAttribute("data-sit", "1");
+  const across = t.stools[1 - seat[1]]!;
+  expect((await bots(page))[i]).toMatchObject({ at: `${across.c},${across.r}`, table: t.i, anim: "sit" });
+  expect(errors).toEqual([]);
+});
+
+test("Hollow's card: one of his three lines (Eric's words), the next one each time it opens", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/town");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  const lines = TOWN_LINES.hollow!;
+  const at = async () => {
+    const xy = await page.evaluate(() => (window as unknown as { __townAt?: (k: string, id: string) => { x: number; y: number } | null }).__townAt?.("home", "hollow") ?? null);
+    if (!xy) return null;
+    const cv = (await canvas(page).boundingBox())!;
+    return { x: cv.x + xy.x, y: cv.y + xy.y };
+  };
+  // The camera glides to Hollow Peak (as its chip would), far across the world.
+  await page.evaluate(() => (window as unknown as { __townGlide: (id: string) => void }).__townGlide("hollow"));
+  await expect.poll(at, { message: "Hollow Peak comes into view", timeout: 10_000 }).not.toBeNull();
+  // Hollow walks round behind his home and stays: a tap meant for the home that lands on him would open his card, which
+  // says the next line too (his card and his home's take turns together).
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { __townBossBack: (id: string) => boolean }).__townBossBack("hollow")), { message: "Hollow stands behind his home", timeout: 20_000 })
+    .toBe(true);
+  const card = page.getByRole("dialog", { name: "Hollow Peak", exact: true });
+  /** Which card is open now, shown or not (a card stays hidden while its home is off screen: you walk there first). */
+  const openCardName = () => page.locator(".town-card").evaluate((e: HTMLElement) => (e.style.display === "none" ? null : e.getAttribute("aria-label")));
+  /** Taps the home until its card is open (only then: each opening says the next line), then waits for you to get there. */
+  const open = async () => {
+    await expect(async () => {
+      const name = await openCardName();
+      if (name === "Hollow Peak") return;
+      if (name) await page.keyboard.press("Escape");
+      const p = await at();
+      expect(p, "drawn").not.toBeNull();
+      await page.mouse.click(p!.x, p!.y);
+      await expect.poll(openCardName, { timeout: 1500 }).toBe("Hollow Peak");
+    }).toPass({ timeout: 30_000 });
+    await expect(card).toBeVisible({ timeout: 20_000 });
+  };
+  await open();
+  await expect(card.getByText(lines[0]!, { exact: true })).toBeVisible();
+  // Its shop greyed as before, under the line.
+  await expect(card.getByRole("button", { name: "Shop" })).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await expect(card).toBeHidden();
+  await open();
+  await expect(card.getByText(lines[1]!, { exact: true })).toBeVisible();
+  await expect(card.getByText(lines[0]!, { exact: true })).toHaveCount(0);
   expect(errors).toEqual([]);
 });

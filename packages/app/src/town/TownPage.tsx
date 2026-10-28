@@ -4,7 +4,8 @@ import type { ItemLook } from "@chessroyale/core";
 
 /**
  * A game with a town bot, asked for as you both sit down: the seat to come back to ("6.0.3": the table, your stool, the
- * bot; world.ts `seatText`), the bot's name as shown ("Tempo Tess (bot)"), its rating and its crate items. (Plain data:
+ * bot; world.ts `seatText`), the bot's name as shown ("Tempo Tess (bot)"), its rating and its crate items (or a
+ * sidekick's face). (Plain data:
  * the main bundle never loads the town's code.)
  */
 export interface BotGameAsk {
@@ -12,6 +13,8 @@ export interface BotGameAsk {
   name: string;
   rating: number;
   look: ItemLook | null;
+  /** A sidekick's face (its idle's first frame, an image's address) for its strip, in place of the pawn; null: a pawn. */
+  face: string | null;
 }
 
 type Props = { onBack: () => void; onBossAlone: (id: string) => void; onPlayBot: (game: BotGameAsk) => void; seat: string | null };

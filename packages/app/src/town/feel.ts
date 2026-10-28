@@ -319,6 +319,15 @@ export const TOWN_FEEL = {
    * after this long (unless you've opened its table's card, which holds it).
    */
   botLeaveAfterGameMs: 4000,
+  /**
+   * How many bots are out in the square at once (Oct 28: twenty bots cost frames, Eric's frame-rate rule; the others are
+   * at home; six, as many as before the sidekicks, so the frame rate is as before), and how often one goes home and another comes out (ms, a random time between the two), at least
+   * `botTurnAway` steps from you, fading out and in over `botFadeMs`.
+   */
+  botsOut: 6,
+  botTurnMs: [10000, 20000] as const,
+  botTurnAway: 5,
+  botFadeMs: 500,
 
   // ---- Sizes, in squares.
   /** A boss's picture is this many squares tall. */
@@ -330,6 +339,12 @@ export const TOWN_FEEL = {
   bossScale: { sawyer: 0.7, pig: 0.7, smudgy: 0.7 } as Readonly<Record<string, number>>,
   /** A bot's pawn. */
   botSquares: 1.25,
+  /**
+   * A sidekick (Oct 28) stands this many squares tall from its idle's top to its feet: a bot's pawn's height (its body is
+   * 0.69 of its box: botSquares x 0.69). Its shadows are about a pawn's (`sidekickShadow`, the size a boss's are given).
+   */
+  sidekickSquares: 0.87,
+  sidekickShadow: 0.9,
   /** Your pawn. */
   youSquares: 1.45,
   /**
