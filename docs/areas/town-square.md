@@ -30,7 +30,10 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
   blended by the box's width / height (0.6 = all phone, 1.4 = all computer). Zooming out raises the camera, moves it back,
   pitches it down and lets the rim reach further; the page opens zoomed out (`startZoomedOut`). The world is 46 × 46 squares (40 × 40 until slice 6) and wraps both ways. A tap picks the
   nearest drawn square under it (`pickSquare`). The far band of ground dissolves into the sky; things in it fade, haze
-  and blur, and are drawn whole, never cut by the rim.
+  and blur, and are drawn whole, never cut by the rim. (Each is softened through a scratch canvas of its own that frame,
+  cleared only where it's used: `blitSoft`. Oct 28: one shared canvas, the size of the biggest picture it ever held,
+  cleared and copied whole for each thing, cost the frames south of the park, where the whole park and the Colosseum
+  are in the far band. docs/decisions/2026-10-28-bots-rotation.md.)
 - **The layout** (`town/world.ts`, `HOMES`): fourteen homes spread evenly round the middle over the world that wraps, so
   neighbors stand 8 to 10 squares apart; the Colosseum on its 12 × 12 ground (`COLISEUM`, columns 17 to 28, rows 28 to 39),
   its gate facing south onto its apron (`APRON`: columns 17 to 28, rows 25 to 27, paved, kept open for people to gather),
@@ -130,6 +133,10 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
   more kinds of square (`groundAt`: paving and grass), drawn with the board's in the same color-sorted fills. Tables, trees,
   benches and the fountain are solid (`walkable`); stools, paths and grass are walked on. Each picture is made once (a
   `FrameCache` per kind) and drawn as one item sorted with the people, a little behind whoever stands on its row.
+- **Name tags** (Oct 28): each drawn once per name, size and color (its pill, its soft shadow and its name, at the
+  device's pixels) and stamped each frame (`drawTag`, `tagArtOf` in `render.ts`; about 64 kept, the least lately used
+  making way; drawn again when a web font loads); a fading tag stamps its shadow, pill and name one over the other, as
+  they were drawn before. The things are sorted far to near in place (`sortFarFirst`, nothing allocated).
 - **The tables' boards** (Oct 27; docs/decisions/2026-10-27-park-tables-live.md): each table's top is a flat slab drawn
   through the camera (`drawBoard` in `render.ts`; sizes `TABLE_BOARD`, pieces `TABLE_PIECES`, the clock's digits
   `TABLE_DIGITS` in `houses/park.ts`; timings in `TOWN_FEEL`'s `table*`), its 8 x 8 board lying flat between the stools and
@@ -139,6 +146,10 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
   you, waits** (a soft green ring pulses on the ground under the free stool); otherwise the pieces stand set up. You at a
   table aren't playing or searching yet (Casual and Ranked come with the tables' matchmaking). While nothing on a board
   moves and the camera holds still, its slab, board and pieces are one cached picture (`boardCache`): frame rates as main.
+  Its top is lifted onto the table's picture in the camera's true perspective (`tableLift` in `camera.ts`); low on the
+  phone's screen, where that would draw it more than `tableBoardGrow` (1.2) times its foot's scale (Oct 28, Eric's warped
+  boards: twice the table and more, skewed), it's worked out a little farther off and drawn at the picture's place and
+  scale.
 - **Sitting at a table** (slice 6): a tap on a table or a stool walks you to its free stool nearer you (`destFor`'s
   `table`; both taken: beside it) and opens its card (no title, Eric, Oct 27): **"Casual"** and **"Ranked"** greyed,
   "Coming soon" (matchmaking for the park is the next job); at a table where two others play, **"Spectate"** greyed,
@@ -372,7 +383,9 @@ noted wherever a slice changed one.
 ## Tests
 
 - `packages/app/test/town-camera.test.ts`: the projection (the focus in the middle column, wrapping both ways, a tap picks
-  the square drawn there, far squares shrink, zooming out shows more rows, the phone / computer blend), the layout
+  the square drawn there, far squares shrink, zooming out shows more rows, the phone / computer blend, a table's board
+  fitting its picture on every row of the screen: never more than `tableBoardGrow` its foot's scale, unchanged where it
+  always fit), the layout
   (fourteen homes 8 to 10 squares from their nearest neighbors, none near the start, the Colosseum's ground and the park
   clear, and the start south of it on the park's promenade), the walk around a home, and the eased steps meeting the even ones at the same speed.
 - `packages/app/test/town-sky.test.ts`: which look shows when, the looks always adding up to 1 and blending over their
@@ -480,7 +493,8 @@ title; a bot waiting, two playing (the board's pixels change), a tap on their ga
   Ranked greyed), the game; a reload, then again and the back button, each lands you back at the table. The sidekicks
   (Oct 28): a tap on Glim, it waves, then stands while its card is open ("Glim (bot)", "Hollow's sidekick", "Rating
   2500", Play); Play, the game with its face on its strip, resign, back at the table with Glim across in its sit; Hollow
-  Peak's card shows his first line, closed and opened again the second (`__townGlide("hollow")` takes the camera there,
+  Peak's card shows his first line, closed and opened again the second (`__townGlide("hollow")` takes the camera there;
+  `__townGlide([c, r])` to any square, to measure a spot's frame rate,
   `__townBossBack("hollow")` keeps Hollow behind his home); Babur's card has no line. `__townBots()` also gives each bot's
   animation (`anim`: a sidekick's, null for a pawn).
   The chat log's hooks (the test switches on): `window.__townSay()` (someone from `CHATTER` talks now), `__townSay(name, text, kind,
