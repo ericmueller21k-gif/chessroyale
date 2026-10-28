@@ -44,7 +44,7 @@ vi.mock("../src/live.ts", async (orig) => ({
 }));
 
 import type { TownLine } from "../src/town/chat-net.ts";
-const { openTownFeed, takeTownSlice, sendTownChat, townSendWaitMs, townChatOff, reportTownLine, removeTownLine } = await import("../src/town/chat-net.ts");
+const { openTownFeed, takeTownSlice, sendTownChat, townSendWaitMs, townChatOff, reportTownLine, removeTownLine, townChars, cutTownText } = await import("../src/town/chat-net.ts");
 const { mutes, setChatBlock } = await import("../src/chat-mod.ts");
 
 const T0 = 1_800_000_000_000;
@@ -231,5 +231,22 @@ describe("town chat in the app, after the review", () => {
     who.signedIn = true;
     who.young = true;
     expect(townChatOff()).toBe("Chat with other players is for accounts 13 and older.");
+  });
+});
+
+describe("town chat in the app: counting as the server does (the re-review's R4)", () => {
+  it("an emoji is one, with its skin tone or joined into one; a huge one counts its parts; the field cuts at 80", () => {
+    expect(townChars("👍🏽")).toBe(1);
+    expect(townChars("👨\u200D👩\u200D👧\u200D👦")).toBe(1);
+    expect(townChars(`👍${"🏽".repeat(300)}`)).toBe(301);
+    expect(townChars("😀".repeat(80))).toBe(80);
+    expect(cutTownText("😀".repeat(85))).toBe("😀".repeat(80));
+    expect(cutTownText("x".repeat(90))).toBe("x".repeat(80));
+    // (The tones join the "b": one "character" of 101 parts, which doesn't fit.)
+    expect(cutTownText(`ab${"🏽".repeat(100)}`)).toBe("a");
+    // At most 240 code points in all: 80 family emoji are cut to 34 (7 parts each).
+    const family = "👨\u200D👩\u200D👧\u200D👦";
+    expect(cutTownText(family.repeat(80))).toBe(family.repeat(34));
+    expect(cutTownText("👍🏽".repeat(80))).toBe("👍🏽".repeat(80));
   });
 });

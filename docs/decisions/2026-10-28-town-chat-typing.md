@@ -78,44 +78,63 @@ Later the same day, through the director:
 3. **A device marked too young gets nothing, even with someone signed in on it** (a tab from before the answer). The
    age gate's own call 10 lets such an adult keep their name and notes; the brief says every such device sees only the
    bosses' chatter, so the town follows the brief.
-4. **What counts as contact details** (after the review):
+4. **What counts as contact details** (after the review and the re-review):
    - web addresses: `http`, `www.`, a common ending (`.com`, `.ly`, `.io`…), an address with a path ("t.me/x",
-     "discord.gg/x"), a dot with a space before it ("example . io", never prose), "dot com";
+     "discord.gg/x"), a dot with a space before it ("example . io", never prose), a dot in brackets ("example(.)com",
+     "example [.] com", "example{.}net"), "dot com";
    - email addresses, mail services' names ("my gmail"), and one spelled out ("at yahoo", "@ gmail");
-   - phone numbers: seven digits or more in one run, in any script's digits, with spaces, commas and phone marks between
-     (a letter, a colon or a slash ends a run). **Rating talk passes**: a run made only of four-digit groups or round
-     hundreds ("rated 1200-1400", "1500 1600 1700", "800-1200", "2000/2100", "1,500 vs 1,600", "the 2025-2026 season").
-     The cost: a phone number written in fours ("2345 6789") passes; reports and a moderator handle that;
    - messaging apps and games with their own chat ("add me on discord", snapchat, instagram, whatsapp, telegram, tiktok,
-     facebook, skype, wechat, roblox, kik): "add me on …" is how a conversation leaves the game.
+     facebook, skype, wechat, roblox, kik): "add me on …" is how a conversation leaves the game;
+   - **phone numbers, by the director's rule after the third review: a message with 7 or more digits in all is refused**
+     ("No links or contact details in chat."), any script's digits (`\p{Nd}`), counted across the whole message, however
+     they're spaced or split. The rating exceptions, the run shapes and the "number talk" words are gone: each round of
+     shapes opened new holes ("5 5 5 1 2 3 4", "12 34 56 78", "555 12 34"), and "#" is checkmate in chess.
+   - **So these are refused:** every phone form from the three reviews ("555 1234", "555 123 4567", "555/123/4567",
+     "9123 4567", "0800 1000 2000", "06 12 34 56 78", "+44 20 7946 0958", "5 5 5 1 2 3 4 5 6 7", "dm 9 1 2 3 4 5 6 7",
+     "12 34 56 78", "123-45-67", card numbers…), and, accepted, rating ranges ("rated 1200-1400"), long score lists
+     ("Nf7# 1-0 2-0 3-0"), long move lists and full dates ("2026-10-28").
+   - **And these pass:** a short message's numbers, six digits or fewer: "I'm 1500", "1200 or so", "gg 1-0", "3+2",
+     "Nf7#", "e4 e5", "1. e4 e5 2. Nf3", "12:30", "game 3 of 5".
    Endings that start sentences when someone skips a space ("me", "to", "be", "in", "us") aren't web addresses without
-   a path. Chess notation, scores, times and dates pass.
+   a path.
+   - **Known gaps:** a number spelled in words ("five five five…"), an address spelled out in other ways, a phone number
+     split over several messages. The report button is the backstop: a moderator reads the reported line.
 5. **Swear words:** a short list of our own, ROT13 in the file like the slurs: long ones found inside any word, short
    ones only as whole words, the masked spellings ("f*ck" reads as "fck") as whole words with an ending ("f*cking",
    "sh*tty", "fukin"). Mild words (damn, hell, crap) are left off. The ordinary words with one inside are let through
    (Scunthorpe, shiitake, Japanese names ending "-shita"; "who're" is "who are"). Checked after the review against the
    60,000 commonest English words (only swear words and the apps and mail services refused) and 2.2 million pairs of the
    commonest 1,500: 11 refused, a real hate phrase, "s hit" and "t its" (split on purpose), and pairs the word list makes
-   of contractions ("'s hit", "'t its", "as 's") or that nobody types ("go ok", "shh it", "c until").
+   of contractions ("'s hit", "'t its", "as 's") or that nobody types ("go ok", "shh it", "c until"). The same after the
+   re-review, which added the v-for-u and ph-for-f spellings (Phuket let through).
 6. **Short words in a row in a sentence** (the names' rule joins them, so spaced letters are read as a word): in chat a
    run of single letters ("f u c k", "u f u c k") is read as one word; a run with a two-letter word in it ("go f u c k",
    "oh s h i t") is searched from where each typed piece starts, so a swear word split among them is caught while the
    little words of a sentence don't spell one by chance ("is it up or no", "say hi to him"). A word split once, with
    one side short ("f uck", "fuc k", "bi tch"), is read across the two. A two-letter word that ends a sentence or clause
    ends its run ("go. ok"). Names are read exactly as before.
-6a. **Look-alike letters** (the review's blocking finding): the filter reads Cyrillic, Greek, Armenian and Coptic letters,
-   Latin's small capitals and variants (dotless ı, ɡ, ʀ, ꜰ…) as the Latin letters they pass for, from Unicode's
-   confusables for single Latin letters, in names and in chat. In chat a word mixing Latin letters with a letter from
-   another alphabet that isn't a known look-alike is refused ("That message isn't allowed."), so a new one can't carry
-   a word past the list. Names don't get that backstop: real names in other alphabets still work, and so do messages
-   wholly in another alphabet ("Привет всем").
+6a. **Look-alike letters** (the review's blocking finding, and the re-review): the filter reads Cyrillic, Greek, Armenian
+   and Coptic letters, Latin's small capitals and variants (dotless ı, ɡ, ʀ, ꜰ, ə, ɔ…) as the Latin letters they pass for,
+   from Unicode's confusables for single Latin letters, in names and in chat. In chat a word as typed that has real Latin
+   letters (a to z) and a letter from an alphabet with Latin look-alikes (Cyrillic, Greek, Armenian, Cherokee, Coptic,
+   Lisu, Latin's extensions) that the map doesn't fold is refused ("That message isn't allowed."), so a look-alike the
+   list doesn't have yet can't carry a word past it. So is a word made only of look-alikes from two or more of those
+   alphabets when one of its letters isn't on the map (Cyrillic п, е, г beside a Cherokee letter; the third review);
+   Cherokee ꭵ and Cyrillic ꙇ are on the map now. Words wholly in another alphabet pass ("дела", "как дела",
+   "добрый вечер", "καλημέρα", "дякую"), and so does another script beside Latin ("gg楽しかった", "ok你好"), and
+   Azerbaijani's ə ("Bakı gözəldir"). Names don't get the backstop: real names in other alphabets still work.
 7. **The same message** is the same letters and digits, whatever the case, spaces, accents or punctuation ("gg!!" is
    "GG"). A refused message doesn't start the 15 s wait; a repeat says "You said that a moment ago."
 8. **Tidying before the length check:** control and invisible characters out (including direction overrides), and the
    fillers that show as nothing (Hangul fillers, the blank braille cell), so a message of only them is empty; a joiner
    stays only inside an emoji (👩‍💻, 🏳️‍🌈); a pile of accents on one letter cut to two; spaces run together, trimmed. 80
-   counts what shows as one character (an emoji with its skin tone, or joined into one, is one).
-8a. **The room keeps nothing past a minute** (the review): the hub's alarm rings at the next line's minute and sweeps it
+   counts what shows as one character as one (an emoji with its skin tone, or joined into one, as a family of four), up to
+   8 code points; a "character" made of more counts every code point (a 200-emoji chain, a pile of skin tones, a run of
+   jamo), so 80 can't be beaten with one huge one; and at most 240 code points in all (3 × 80: the third review), so 80
+   medium characters can't carry hundreds of emoji (a family emoji and 80 skin-toned ones still fit). The app counts the
+   same way, and the field stops at 80 and at 240 as you type (no `maxlength`, which counts UTF-16 units: 80 emoji fit).
+8a. **The room keeps nothing past a minute** (the review; the re-review made a reader ahead of an instance's copy read
+   the room again at most every 250 ms, a Remove keep the copy's timer too): the hub's alarm rings at the next line's minute and sweeps it
    out, visitors or not; the wait and the repeat keep when and a hash of the words, for a minute; each Worker instance's
    2 s copy of the room goes on that instance's next request after it. A restart gives the room a new id, and an app
    seeing a new one drops its players' lines first (a Remove or a Report never reaches another line by an old number).
@@ -140,8 +159,9 @@ Later the same day, through the director:
     "Chat with other players is for accounts 13 and older." for a young device (it answered too young, so the cutoff may
     show). Players' lines leave the log at once when access ends: signed out, the device marked too young, the chat
     paused, or a player blocked. Only someone who may read the chat can report a line (a guest or a young device can't
-    probe who spoke). The automated fair-play reviewer gets a chat report without its words, can't clear such a case, and
-    its guide lists "Offensive chat" among the reasons it never decides.
+    probe who spoke). The automated fair-play reviewer gets a chat report without its words, can't clear a case with a
+    chat report newer than a person's last decision on it (its own "review" doesn't count), and its guide lists
+    "Offensive chat" among the reasons it never decides.
 14. **A refusal's reason over the field, 4 s, your words kept**, so you can change a word and send again; the 15 s wait
     shows in the field as the UI built it. While the switch is off or your chat is banned, the reason is the field's
     placeholder (13 px so it fits on a phone; a greyed field can't take focus, so iPhone Safari never zooms).
@@ -219,6 +239,10 @@ whole log instead of one a line), the UI's to weigh; a real GPU composites these
   review" (a new room dropping the lines shown, lines leaving at once on a block, the switch, signing out and a young
   device, the field's reasons); `faq.test.ts` (the chat entry and its reported-message exception); `e2e/town-chat.spec.ts`
   (a guest's greyed field, the privacy page's and the terms' sentences).
+- After the re-review: `text-filter.test.ts`, "the filter after the re-review" (phone shapes refused and ordinary numbers
+  passing, a bracketed dot, the v-for-u and ph-for-f spellings) and the other-alphabet chat that must pass;
+  `town-chat.test.ts` (a huge "character" counting its parts, a forced re-read at most every 250 ms, a Remove's timer,
+  the reviewer's review-then-clear refused); `town-chat-net.test.ts` (the app counting and cutting as the server does).
 - `packages/server/test/account-data.test.ts`: the schema pin gains `reports.line` and `reports.line_at`.
 - `packages/app/test/town-chat.test.ts`: players' lines carry who said them and their number, `unsay` takes them out by
   number or by player, a tap reaches the menu; the UI's numbers are the server's.
@@ -252,3 +276,29 @@ None guards a rule in `docs/rules/eric.md`.
   → equals `{ room, n: 2, lines: [], gone: [2] }` (the slice now names its room).
 - `e2e/helpers.ts`: `asServerAdmin`'s database write moved into `withEmail`, shared with the new `asSignedIn`. Same
   behavior.
+- After the re-review:
+  - `e2e/town-chat.spec.ts`, the UI's text field test: `toHaveAttribute("maxlength", "80")` → removed (the field has no
+    `maxlength` now; its own check that typing stops at 80 is unchanged). My server-decides test: the same check →
+    filling 90 letters leaves 80, and 85 emoji leave 80.
+  - `text-filter.test.ts`, "in chat, refuses a word mixing…": "sh漢t happens" and "gg" + a hiragana letter refused →
+    "sh" + Cyrillic ж + "t", "g" + ф + "od game" and "hi" + ξ refused, and kana or CJK beside Latin passing (the
+    re-review's R1: other scripts beside Latin are fine).
+  - `town-chat.test.ts`, the reviewer's test: one "clear" refused → the sequence clear refused, review, clear refused,
+    a person's clear, the reviewer's clear, a new report, review, clear refused.
+- After the third review (the 7-digit rule):
+  - `text-filter.test.ts`, "lets ordinary chat through": "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6" → "1. e4 e5 2. Nf3", "I'm 1800 vs
+    your 2000" → "I'm 1800, you?", "meet at 12:30 or 13:45" → "meet at 12:30" (the long ones now have 7 digits or more).
+  - `text-filter.test.ts`, "lets rating talk, years, scores and times through" (expected null for "rated 1200-1400",
+    "1500 1600 1700", "2000/2100", "800-1200 is a good range", "1,500 vs 1,600", "the 2025-2026 season", "I'm 1800 vs
+    your 2000", "meet at 12:30 or 13:45", "10/28/2026") → "lets a short message's numbers through" ("I'm 1500", "1200 or
+    so", "I'm 1800, you?", "meet at 12:30", "won 3-0 then 1-0", and the rest unchanged). "rated 1200-1400" is now
+    expected refused.
+  - `text-filter.test.ts`, "refuses phone numbers in fours… (R2)" → "refuses any message with seven digits or more…":
+    the same forms, plus the third review's ("5 5 5 1 2 3 4 5 6 7", "12 34 56 78", "555 12 34", "2812 3456"…) and,
+    expected refused now, "rated 1200-1400", "10 20 30 40 moves", "2026-10-28", "Nf7# 1-0 2-0 3-0".
+  - `text-filter.test.ts`, "lets ordinary numbers through… (R2)" (expected null for "10 20 30 40 moves", "games 12 13 14
+    15", "3+2 5+0 10+0", "won 3-0, 2-1, 1-0, 2-2", "2026-10-28", "28.10.2026", "10/28/2026", "rated 1200-1400", "1500 1600
+    1700", "2000/2100", "800-1200", "1,500 vs 1,600", "the 2025-2026 season") → "lets a message with six digits or fewer
+    through" ("I'm 1500", "1200 or so", "gg 1-0", "3+2", "Nf7#", "Qxf7# gg", "e4 e5", "game 3 of 5", "12:30", "1. e4 e5
+    2. Nf3").
+  - `town-chat.test.ts`, "…rating talk goes": "rated 1200-1400" ok → "I'm 1500, rated 1-0 there" ok.

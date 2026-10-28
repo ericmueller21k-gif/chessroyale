@@ -7,7 +7,7 @@ import { CHAT_OFF, decideChat } from "../src/chat-mod.ts";
 import { LINE_GONE } from "../src/fairplay.ts";
 import { LiveHub } from "../src/live-hub.ts";
 import { CHAT_NOT_ALLOWED, CHAT_NO_CONTACT, rot13 } from "../src/text-filter.ts";
-import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, TOWN_CHAT_PAUSED, expireTownCache, forgetTownCache, townSlice, type TownHub } from "../src/town-chat-api.ts";
+import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, TOWN_CHAT_PAUSED, expireTownCache, forgetTownCache, townRemoveResponse, townSlice, type TownHub } from "../src/town-chat-api.ts";
 import { TOWN_EMPTY, TOWN_REPEAT, TOWN_TOO_LONG, TownChat, charCount, tidyMessage, townSince, townWait, type TownSender } from "../src/town-chat.ts";
 import { caseDetail } from "../src/admin.ts";
 import { decide } from "../src/fairplay.ts";
@@ -394,7 +394,7 @@ describe("town chat: after the review", () => {
     expect(c.post(ann, rot13("s*pxvat"), T0)).toMatchObject({ message: CHAT_NOT_ALLOWED });
     expect(c.post(ann, "t.me/someone", T0)).toMatchObject({ message: CHAT_NO_CONTACT });
     expect(c.post(ann, "555,123,4567", T0)).toMatchObject({ message: CHAT_NO_CONTACT });
-    expect(c.post(ann, "rated 1200-1400", T0)).toMatchObject({ ok: true });
+    expect(c.post(ann, "I'm 1500, rated 1-0 there", T0)).toMatchObject({ ok: true });
   });
 
   it("fillers that show as nothing are taken out: a message of only them is empty (finding 3, and a nit)", () => {
@@ -412,6 +412,22 @@ describe("town chat: after the review", () => {
     expect(charCount("👩\u200D💻")).toBe(1);
     expect(new TownChat().post(ann, "👍🏽".repeat(TOWN_CHAT.maxChars), T0)).toMatchObject({ ok: true });
     expect(new TownChat().post(ann, "👍🏽".repeat(TOWN_CHAT.maxChars + 1), T0)).toMatchObject({ ok: false, message: TOWN_TOO_LONG });
+  });
+
+  it("one huge \"character\" can't beat the 80: a long joined chain, a pile of skin tones, a run of jamo count their parts (R4)", () => {
+    const chain = Array.from({ length: 200 }, () => "👩").join("\u200D");
+    const tones = `👍${"🏽".repeat(300)}`;
+    const jamo = "\u1100".repeat(300) + "\u1161".repeat(300);
+    for (const t of [chain, tones, jamo]) {
+      expect(charCount(t), t.slice(0, 8)).toBeGreaterThan(TOWN_CHAT.maxChars);
+      expect(new TownChat().post(ann, t, T0)).toMatchObject({ ok: false, message: TOWN_TOO_LONG });
+    }
+    // At most 240 code points in all: 80 family emoji (7 each) are 80 characters but too many parts; 80 skin-toned ones fit.
+    const family = "👨\u200D👩\u200D👧\u200D👦";
+    expect(new TownChat().post(ann, family.repeat(TOWN_CHAT.maxChars), T0)).toMatchObject({ ok: false, message: TOWN_TOO_LONG });
+    expect(new TownChat().post(ann, `${family} ${"👍🏽".repeat(TOWN_CHAT.maxChars - 2)}`, T0)).toMatchObject({ ok: true });
+    // Ordinary emoji still count as one each: a skin tone, a family of four, a flag.
+    expect(charCount("👍🏽👨\u200D👩\u200D👧\u200D👦🏳\uFE0F\u200D🌈")).toBe(3);
   });
 
   it("an instance's stale copy never makes a reader start over: it reads the room again when the reader is ahead (finding 4)", async () => {
@@ -434,6 +450,32 @@ describe("town chat: after the review", () => {
     forgetTownCache();
     expect(await townSlice(hub2, 1, now + 600, room.room)).toMatchObject({ room: restarted.room, reset: true, lines: [{ text: "after" }] });
     expect(restarted.room).not.toBe(room.room);
+  });
+
+  it("a reader ahead of the copy makes it read the room again at most every 250 ms; meanwhile it hears nothing new (N1)", async () => {
+    const room = new TownChat();
+    room.post(ann, "one", T0);
+    let reads = 0;
+    const hub = { townRead: async () => (reads++, room.snapshot(T0)) } as unknown as TownHub;
+    await townSlice(hub, 0, T0);
+    expect(await townSlice(hub, 99, T0 + 10)).toMatchObject({ n: 1, reset: true });
+    expect(reads).toBe(2);
+    // Again within 250 ms, with a bogus count or room: no read of the hub, and nothing that makes the reader start over.
+    expect(await townSlice(hub, 99, T0 + 100)).toEqual({ room: room.room, n: 99, lines: [] });
+    expect(await townSlice(hub, 1, T0 + 200, "not-a-room")).toEqual({ room: "not-a-room", n: 1, lines: [] });
+    expect(reads).toBe(2);
+    await townSlice(hub, 99, T0 + 300);
+    expect(reads).toBe(3);
+  });
+
+  it("a moderator's Remove keeps the instance's copy on the same timer (N2)", async () => {
+    const room = new TownChat();
+    room.post(ann, "rude", T0);
+    const hub = { townRemove: async (n: number) => ({ removed: room.remove(n, T0), town: room.snapshot(T0) }) } as unknown as TownHub;
+    const kept: Promise<unknown>[] = [];
+    const r = await townRemoveResponse(new Request("https://x", { method: "POST", body: JSON.stringify({ n: 1 }) }), hub, true, T0, (p) => kept.push(p));
+    expect(r.status).toBe(200);
+    expect(kept).toHaveLength(1);
   });
 
   it("nothing outlives its minute: the wait and the repeat keep a hash, not the words, and the hub's alarm sweeps an empty town (finding 5)", async () => {
@@ -536,8 +578,16 @@ describe("town chat: the API after the review", () => {
     const body = await api!.text();
     expect(body).toContain("Offensive chat");
     expect(body).not.toContain("potato");
-    // The reviewer can't clear that case; a person can.
-    expect(await decide(sql, troll.user.id, "clear", "reviewer", "nothing unusual here", Date.now())).toMatchObject({ ok: false, status: 409 });
-    expect(await decide(sql, troll.user.id, "clear", "admin:mod@example.com", "read the line: a joke", Date.now())).toMatchObject({ ok: true });
+    // The reviewer can't clear that case, not even after moving it itself (review, then clear); a person can.
+    const t = Date.now();
+    expect(await decide(sql, troll.user.id, "clear", "reviewer", "nothing unusual here", t + 1)).toMatchObject({ ok: false, status: 409 });
+    expect(await decide(sql, troll.user.id, "review", "reviewer", "a person should look", t + 2)).toMatchObject({ ok: true });
+    expect(await decide(sql, troll.user.id, "clear", "reviewer", "nothing unusual here", t + 3)).toMatchObject({ ok: false, status: 409 });
+    expect(await decide(sql, troll.user.id, "clear", "admin:mod@example.com", "read the line: a joke", t + 4)).toMatchObject({ ok: true });
+    // After a person's decision the reviewer may clear again, until a newer chat report: clear → review → clear refused.
+    expect(await decide(sql, troll.user.id, "clear", "reviewer", "nothing unusual here", t + 5)).toMatchObject({ ok: true });
+    await sql.run("INSERT INTO reports (reporter, target, reason, at, match, line, line_at) VALUES (?, ?, ?, ?, NULL, ?, ?)", ann.user.id, troll.user.id, "Offensive chat", t + 6, "again", t + 6);
+    expect(await decide(sql, troll.user.id, "review", "reviewer", "a new report", t + 7)).toMatchObject({ ok: true });
+    expect(await decide(sql, troll.user.id, "clear", "reviewer", "nothing unusual here", t + 8)).toMatchObject({ ok: false, status: 409 });
   });
 });

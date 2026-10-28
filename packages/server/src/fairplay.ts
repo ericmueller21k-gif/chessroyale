@@ -249,9 +249,13 @@ export async function decide(
     // (A deleted account's kept case has no evidence left to weigh: account-data.ts.)
     if (!user) return { ok: false, status: 409, message: "the account was deleted; its case is for a person" };
     if ((await latestAppeal(sql, userId))?.status === "open") return { ok: false, status: 409, message: "this player has an open appeal: a person decides" };
-    // (A reported town chat line is for a moderator to read: the reviewer never clears that case first.)
-    if (status === "cleared" && (await sql.first("SELECT id FROM reports WHERE target = ? AND reason = ? AND at > ?", userId, FAIRPLAY.reports.chatReason, before?.decided_at ?? 0)))
-      return { ok: false, status: 409, message: "a reported chat line is for a person to read" };
+    // (A reported town chat line is for a moderator to read: the reviewer never clears a case with one newer than a
+    // person's last decision on it; its own decisions, a "review" say, don't count.)
+    if (status === "cleared") {
+      const person = (await sql.first<{ at: number | null }>("SELECT MAX(at) AS at FROM fairplay_log WHERE user_id = ? AND by LIKE 'admin:%'", userId))?.at ?? 0;
+      if (await sql.first("SELECT id FROM reports WHERE target = ? AND reason = ? AND at > ?", userId, FAIRPLAY.reports.chatReason, person))
+        return { ok: false, status: 409, message: "a reported chat line is for a person to read" };
+    }
   }
   await setCase(sql, userId, status, by, why, now);
   const notice = typeof opts.notice === "string" && opts.notice.trim() ? opts.notice.trim().slice(0, 1000) : null;

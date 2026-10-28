@@ -91,14 +91,21 @@ export function tidyMessage(text: unknown): string | null {
 }
 
 const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+/** A character made of more code points than this counts as its code points (a long joined chain, a pile of skin tones). */
+export const CHAR_MAX_PARTS = 8;
+/** At most this many code points in all (3 × maxChars), so 80 medium characters can't carry hundreds of emoji. */
+export const TOWN_MAX_PARTS = 3 * TOWN_CHAT.maxChars;
 /**
- * Its length as people count it: what shows as one character is one (an emoji, with its skin tone or joined into one, is
- * one). Infinity for text far longer in code units than it looks (a long chain joined into one character).
+ * Its length as people count it: what shows as one character is one (an emoji with its skin tone, or joined into one, as
+ * 👩‍💻), up to CHAR_MAX_PARTS code points; a "character" longer than that counts every code point, so 80 can't be beaten
+ * with one huge one. The app counts the same way (chat-net.ts, `townChars`).
  */
 export function charCount(text: string): number {
-  if (text.length > TOWN_CHAT.maxChars * 8) return Infinity;
   let n = 0;
-  for (const _ of graphemes.segment(text)) n++;
+  for (const { segment } of graphemes.segment(text)) {
+    const parts = [...segment].length;
+    n += parts <= CHAR_MAX_PARTS ? 1 : parts;
+  }
   return n;
 }
 
@@ -145,7 +152,7 @@ export class TownChat {
   post(sender: TownSender, raw: unknown, now: number): TownPost {
     const text = tidyMessage(raw);
     if (!text) return { ok: false, reason: "text", message: TOWN_EMPTY };
-    if (charCount(text) > this.o.maxChars) return { ok: false, reason: "text", message: TOWN_TOO_LONG };
+    if (charCount(text) > this.o.maxChars || [...text].length > TOWN_MAX_PARTS) return { ok: false, reason: "text", message: TOWN_TOO_LONG };
     const refused = chatRefusal(text);
     if (refused) return { ok: false, reason: "text", message: refused };
     const ready = this.readyAt(sender.id, now);

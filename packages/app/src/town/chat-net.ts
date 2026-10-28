@@ -147,9 +147,33 @@ export function townChatOff(now = Date.now()): string | null {
 /** How long until you may send again (ms; 0: now). */
 export const townSendWaitMs = (now = Date.now()): number => Math.max(0, feed.waitUntil - now);
 
-/** A message as the server tidies it (spaces run together and trimmed), and its length in characters (an emoji is one). */
+/** A message as the server tidies it (spaces run together and trimmed). */
 export const tidyTownText = (text: string) => text.replace(/\s+/g, " ").trim();
-export const townChars = (text: string) => [...text].length;
+/** What shows as one character, as the server cuts it (a browser without Intl.Segmenter: each code point). */
+const graphemes = typeof Intl !== "undefined" && "Segmenter" in Intl ? new Intl.Segmenter(undefined, { granularity: "grapheme" }) : null;
+const pieces = (text: string): string[] => (graphemes ? [...graphemes.segment(text)].map((s) => s.segment) : [...text]);
+/** A character's weight: one, or its code points when it's made of more than 8 (the server's `charCount`). */
+const weight = (c: string) => {
+  const parts = [...c].length;
+  return parts <= 8 ? 1 : parts;
+};
+/** Its length as the server counts it: an emoji (with its skin tone, or joined into one) is one. */
+export const townChars = (text: string): number => pieces(text).reduce((n, c) => n + weight(c), 0);
+/** At most this many code points in all (3 × maxChars), as the server caps it. */
+export const TOWN_MAX_PARTS = 3 * TOWN_CHAT.maxChars;
+/** The text cut to `max` characters as the server counts them, and to TOWN_MAX_PARTS code points (the field stops there). */
+export function cutTownText(text: string, max: number = TOWN_CHAT.maxChars): string {
+  let n = 0;
+  let parts = 0;
+  let out = "";
+  for (const c of pieces(text)) {
+    n += weight(c);
+    parts += [...c].length;
+    if (n > max || parts > TOWN_MAX_PARTS) break;
+    out += c;
+  }
+  return out;
+}
 
 export type TownSendResult = { ok: true } | { ok: false; reason: "empty" | "wait" | "refused"; waitMs: number; message?: string };
 
@@ -163,7 +187,7 @@ export async function sendTownChat(raw: string, fetcher: typeof fetch = fetch): 
   if (!text) return { ok: false, reason: "empty", waitMs: 0 };
   const off = townChatOff();
   if (off) return { ok: false, reason: "refused", waitMs: 0, message: off };
-  if (townChars(text) > TOWN_CHAT.maxChars) return { ok: false, reason: "refused", waitMs: 0, message: `Messages are at most ${TOWN_CHAT.maxChars} characters.` };
+  if (townChars(text) > TOWN_CHAT.maxChars || [...text].length > TOWN_MAX_PARTS) return { ok: false, reason: "refused", waitMs: 0, message: `Messages are at most ${TOWN_CHAT.maxChars} characters.` };
   const waitMs = townSendWaitMs();
   if (waitMs > 0) return { ok: false, reason: "wait", waitMs };
   try {
