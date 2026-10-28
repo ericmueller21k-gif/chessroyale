@@ -50,3 +50,11 @@ I've drawn the whole ladder in one file, scripts/boss-art/out/rank-set/rank-set.
 - **Pieces stay recognisable:** the queen is the Sublime sample's queen on the shared base. Sparkles sit on the piece's top-left edge. I kept them off the queen's orb, because there they looked like a king's cross.
 - **What 24 px looks like:** my check used plain every-other-pixel shrinking, which loses some outlines. Each tier's color still reads there, and the d4/d3 studs are the subtlest step. If the game shrinks the images with smoothing, they'll look cleaner than in my check.
 - **Placement:** everything is drawn 1 px lower so the crest's outline clears the top edge.
+
+## The director's edits (Oct 28), no API run
+
+- **Five divisions a tier (Eric):** d1's three additions split in two, so each step adds one thing: d5 the badge and
+  the piece; d4 the studs; d3 the wings; d2 the crown crest; d1 the glow and the sparkle. 35 stills, the loops as before.
+- **Pearlescent in the 3-star Auto chess piece's colors (Eric):** the sheen is AcStarArt's PRISM stops (teal, cyan,
+  blue, violet, magenta, coral, orange), there and back round the facets as the 3-star's gradient reflects; the rim
+  takes more of it (0.8), and the studs catch it too.

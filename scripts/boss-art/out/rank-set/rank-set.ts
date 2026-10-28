@@ -524,10 +524,10 @@ function emblem(t: Tier, d: number): Frame {
   const layers: Layer[] = [];
   if (d <= 1) layers.push({ part: "glow", x: BX - 3, y: BY - 3 });
   if (t.rays) layers.push({ part: "rays", x: 0, y: 0 });
-  if (d <= 2) layers.push(...(t.leaves ? WINGS_PIECE : WINGS_METAL));
+  if (d <= 3) layers.push(...(t.leaves ? WINGS_PIECE : WINGS_METAL));
   layers.push({ part: t.badge, x: BX, y: BY });
-  if (d <= 3) for (const [x, y] of STUDS) layers.push({ part: "stud", x, y });
-  if (d <= 1) layers.push({ part: "crest", x: CX - 6, y: 2 });
+  if (d <= 4) for (const [x, y] of STUDS) layers.push({ part: "stud", x, y });
+  if (d <= 2) layers.push({ part: "crest", x: CX - 6, y: 2 });
   layers.push(pieceAt(t.piece));
   return { layers, ms: 1000, pal: pal(t.colors), specks: d <= 1 ? glint(t.glint[0], t.glint[1]) : undefined };
 }
@@ -548,13 +548,21 @@ const mix = (a: string, b: string, t: number): string => {
 
 const N = 8; // frames in each loop, 250 ms each
 
-// ---- Pearlescent: a king of pearl; a pink, gold and blue sheen runs round the facets and over the king.
+// ---- Pearlescent: a king of pearl; the 3-star Auto chess piece's prismatic sheen (AcStarArt's PRISM, Eric: the same
+// colors) runs round the facets and over the king, there and back as the 3-star's gradient reflects.
 
-const SHEEN = ["#ffb8d8", "#ffe08c", "#a8d4ff"];
+const SHEEN: readonly (readonly [number, string])[] = [
+  [0, "#22bfa9"], [0.16, "#1fb6cf"], [0.3, "#2fa3e6"], [0.44, "#5b84f0"], [0.56, "#8d68e6"],
+  [0.67, "#d25ccb"], [0.78, "#ff6f73"], [0.88, "#ff9a5c"], [1, "#ff6f73"],
+];
 const sheen = (t: number): string => {
-  const f = (((t % 1) + 1) % 1) * 3;
-  const i = Math.floor(f);
-  return mix(SHEEN[i]!, SHEEN[(i + 1) % 3]!, f - i);
+  const f = ((t % 1) + 1) % 1;
+  const u = f < 0.5 ? 2 * f : 2 - 2 * f;
+  const k = SHEEN.findIndex(([at]) => at >= u);
+  if (k <= 0) return SHEEN[0]![1];
+  const [a, ca] = SHEEN[k - 1]!;
+  const [b, cb] = SHEEN[k]!;
+  return mix(ca, cb, (u - a) / (b - a));
 };
 const PEARL_BEZEL = ["#f2edf6", "#d8d1e4", "#bdb6d2", "#9f99bc", "#b8b1cf", "#d3cce1", "#ebe5f1", "#ffffff"];
 const PEARL_TABLE = ["#4a4274", "#3e3666", "#332c58", "#29234a", "#322b56", "#3c3464", "#484072", "#564e82"];
@@ -571,12 +579,15 @@ const PEARL: Colors = {
 function pearlFrame(i: number): Frame {
   const p = pal(PEARL);
   for (let j = 0; j < 8; j++) {
-    p["ABCDEFGH"[j]!] = mix(PEARL_BEZEL[j]!, sheen((j - i) / 8), 0.6);
+    p["ABCDEFGH"[j]!] = mix(PEARL_BEZEL[j]!, sheen((j - i) / 8), 0.8);
     p["IJKLMNOP"[j]!] = mix(PEARL_TABLE[j]!, mix(sheen((j - i) / 8 + 0.5), "#2e2850", 0.3), 0.4);
   }
   p.b = mix("#f8f2f6", sheen(-i / 8), 0.3);
   p.c = mix("#e6dcec", sheen(-i / 8 + 0.33), 0.38);
   p.d = mix("#c8bed8", sheen(-i / 8 + 0.66), 0.3);
+  // The studs catch the sheen too, all one color a frame.
+  const st = sheen(-i / 8 + 0.25);
+  [p.u, p.v, p.x] = [mix(st, "#ffffff", 0.55), st, mix(st, "#1a1430", 0.45)];
 
   const glowT = 0.5 + 0.5 * Math.sin((2 * Math.PI * i) / N);
   p.z = mix(sheen(-i / 8) + "ff", "#ffffffff", 0.45).slice(0, 7) + Math.round(170 + 60 * glowT).toString(16);
@@ -704,7 +715,7 @@ const drop = (f: Frame): Frame => ({
   specks: f.specks?.map(([x, y, k]): Speck => [x, y + 1, k]),
 });
 const anims: Record<string, Anim> = {};
-for (const t of TIERS) for (const d of [4, 3, 2, 1]) anims[`${t.id}-d${d}`] = { loop: false, frames: [emblem(t, d)] };
+for (const t of TIERS) for (const d of [5, 4, 3, 2, 1]) anims[`${t.id}-d${d}`] = { loop: false, frames: [emblem(t, d)] };
 anims.pearlescent = { loop: true, frames: Array.from({ length: N }, (_, i) => pearlFrame(i)) };
 anims.transcendent = { loop: true, frames: Array.from({ length: N }, (_, i) => transFrame(i)) };
 
