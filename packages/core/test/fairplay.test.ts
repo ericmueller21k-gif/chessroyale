@@ -128,6 +128,28 @@ describe("signals", () => {
     expect(h.score).toBe(0);
   });
 
+  it("a premove's time is left out of timing (fast hard finds, the time-difficulty correlation); it counts for everything else", () => {
+    // Hard finds premoved (a fraction of a second, as a premove plays): judged as finds, never as fast ones.
+    const positions = Array.from({ length: 20 }, (_, i) => ({ ply: 14 + 2 * i, hard: i % 4 === 0 }));
+    const moves = positions.map((p, i) => mv({ ply: p.ply, loss: 0, crowdFound: p.hard ? 2 : 24, thinkMs: p.hard ? 150 : 9000 + ((i * 911) % 2000), ...(p.hard ? { premove: true } : {}) }));
+    const s = matchSignals(moves, null);
+    expect(s.counted).toBe(20);
+    expect(s.hard).toBe(5);
+    expect(s.hardFinds).toBe(5);
+    expect(s.fastHard).toBe(0);
+    expect(s.parts.time).toBe(0);
+    // The same picks unmarked (fast moves, not premoves): five fast hard finds.
+    const unmarked = matchSignals(moves.map((m) => ({ ...m, premove: undefined })), null);
+    expect(unmarked.fastHard).toBe(5);
+    expect(unmarked.parts.time).toBeGreaterThan(0);
+    // Strength and evidence are the same either way: only timing leaves premoves out.
+    expect(s.perf).toBe(unmarked.perf);
+    expect(s.evidence).toBe(unmarked.evidence);
+    // Nothing but premoves: nothing timed, so no correlation is drawn from them.
+    const fewTimed = matchSignals(moves.slice(0, 9).map((m) => ({ ...m, premove: true })), null);
+    expect(fewTimed.timeCorr).toBeNull();
+  });
+
   it("a strong player measured against their own strength: finds at their level are less evidence", () => {
     // Six hard finds with a so-so match around them: measured against a new player's strength, and a 2700's.
     const moves = Array.from({ length: 12 }, (_, i) => mv({ ply: 14 + 2 * i, loss: i % 2 === 0 ? 0 : 12, crowdFound: i % 2 === 0 ? 2 : 30 }));

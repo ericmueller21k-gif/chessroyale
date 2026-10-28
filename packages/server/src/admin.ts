@@ -152,6 +152,8 @@ export interface EvidenceMove {
   near: number;
   gap: number | null;
   thinkS: number;
+  /** A premove (its time left out of timing: core's FairMove.premove). */
+  premove: boolean;
   away: number;
   /** The deep re-check: its best move (SAN) and the pick's rank among the candidates (1: its best), or null. */
   deepBest: string | null;
@@ -184,6 +186,7 @@ function evidenceMove(m: FairMove): EvidenceMove {
     near: m.near,
     gap: m.gap,
     thinkS: Math.round(m.thinkMs / 100) / 10,
+    premove: !!m.premove,
     away: m.away,
     deepBest: m.deep ? san(m.deep.best) : null,
     deepRank: m.deep?.rank ?? null,
@@ -486,7 +489,7 @@ function casePage(d: CaseDetail, note: string | null, chat: { block: ChatBlock |
       ? `<div class="scroll"><table><tr><th>Move</th><th>Pick</th><th>Best</th><th>Loss</th><th>Crowd found</th><th>Near best</th><th>Think</th><th>Away</th><th>Deep</th><th>Counts</th></tr>${m.moves
           .map(
             (x) =>
-              `<tr class="${x.counted ? (x.crowdRate !== null && x.crowdRate < FAIRPLAY.signals.hardShare ? "hard" : "") : "skip"}"><td>${esc(x.moveNo)}</td><td>${esc(x.pick)}</td><td>${esc(x.best)}</td><td>${x.loss}</td><td>${x.crowdRate === null ? `– (${x.crowd})` : `${Math.round(x.crowdRate * 100)}% of ${x.crowd}`}</td><td>${x.near}</td><td>${x.thinkS} s</td><td>${x.away || ""}</td><td>${x.deepRank === null ? "" : x.deepRank === 1 ? "= engine" : `#${x.deepRank} (${esc(x.deepBest)})`}</td><td>${x.counted ? "yes" : esc(x.skip)}</td></tr>`,
+              `<tr class="${x.counted ? (x.crowdRate !== null && x.crowdRate < FAIRPLAY.signals.hardShare ? "hard" : "") : "skip"}"><td>${esc(x.moveNo)}</td><td>${esc(x.pick)}</td><td>${esc(x.best)}</td><td>${x.loss}</td><td>${x.crowdRate === null ? `– (${x.crowd})` : `${Math.round(x.crowdRate * 100)}% of ${x.crowd}`}</td><td>${x.near}</td><td>${x.thinkS} s${x.premove ? " (premove)" : ""}</td><td>${x.away || ""}</td><td>${x.deepRank === null ? "" : x.deepRank === 1 ? "= engine" : `#${x.deepRank} (${esc(x.deepBest)})`}</td><td>${x.counted ? "yes" : esc(x.skip)}</td></tr>`,
           )
           .join("")}</table></div>`
       : `<p class="muted">Moves deleted (kept ${FAIRPLAY.evidenceDays} days for flagged or reported players).</p>`;

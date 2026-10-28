@@ -18,7 +18,44 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
   chess allows but `moves` doesn't (`onRefused`: a boss power stops it, so the screen can say why; `refusedMove` in
   logic.ts, worked out only when the board has an `onRefused`; Oct 17), a knock for every move that appears (`components/Board.tsx` plays it), and
   what a screen draws on its pieces as part of each (`decor`, a `PieceDecor`: for the piece on a square a class and what goes inside its element, so it slides, is dragged and
-  follows like the piece: Auto chess's stars and their outline, Oct 22; not on a piece fading away).
+  follows like the piece: Auto chess's stars and their outline, Oct 22; not on a piece fading away), and premoves for a
+  screen that opts in (`premove`: below).
+- **Arrows, highlights and premoves** (chess.com's, Oct 28; docs/decisions/2026-10-28-arrows-and-premoves.md; Eric: "we
+  want it to look and feel like the chess.com"):
+  - **Your arrows and squares** (a mouse; every board drawn big, any screen, interactive or not: replays and the history
+    view included): right-drag from one square to another for an arrow, as many as you like (the same arrow again takes it
+    away); plain yellow-orange, Ctrl (or ⌘) red, Alt blue, Shift green; a knight's move is an L (its longer leg first).
+    Right-click a square to color it: plain red, Ctrl yellow, Alt blue, Shift green; again, off. A left-click anywhere on
+    the board clears them all (a move made with the mouse starts with one). Yours only, on this device, never sent. Your
+    squares are drawn under the screen's highlights (`<square class="uh uh-red">`, first in the board), your arrows over
+    the pieces and under the screen's arrows (`svg.hb-user-arrows`, before `svg.hb-shapes`), each arrow see-through at
+    0.8 as chess.com's. The browser's menu never opens over the board or what a screen draws on it (`contextmenu` turned
+    down on `.board-wrap`, every board).
+  - **Premoves** (`premove={{ key, side }}`, each screen opts in): while `side` isn't to move, move its pieces ahead by
+    drag or tap-tap, anywhere their own pattern reaches (a slider through pieces, a pawn's diagonal with nothing there yet,
+    your own piece's square; castling while the FEN's rights hold: `premoveDests`, chessground's). Each shows on its new
+    square (`premovePieces`) with its from and to squares in the premove red (`square.premove`). A computer (a mouse)
+    lines up several, each from where the earlier ones leave the pieces; a phone holds one (a new one takes its place).
+    When the board is `interactive` with `side` to move, the first plays at once through `onMove(uci, { premove: true })`,
+    a normal move from then on; one the game doesn't allow then (illegal, a power's limit, Smudgy's painted piece, Hollow's
+    dark) is cancelled with every one after it, the pieces back at once, and a power's refusal goes to `onRefused` as a
+    move you tried would (`premoveQueueTurn`). Cancel: a right-click anywhere on the board, or on a phone a tap anywhere
+    (but the second tap of a new premove). A pawn premoved to its last rank gets the promotion picker then.
+  - **Kept by the game** (`board/yours.ts`): your premoves, arrows and squares live under the board's `premove.key` (a
+    game, a board and your side: `seatKey`), so they stay through every screen of that game that passes it (a raid's
+    turn, the boss's, the reveal); a board without one keeps its own, dropped as it goes. `watch: true` only shows them (a
+    crowd's reveal, which a tap skips).
+  - **Switches:** Settings → Board, "Premoves" and "Arrows and highlights" (on; per device, `prefs.ts`; the second greyed
+    on a device without a mouse). Switching Premoves off cancels every premove waiting.
+  - **Which screens premove:** 1 v 1 (ranked, the bot game, the town's bots: `Duel.tsx`, in play); a crowd's pick in a
+    raid, Boss alone, a solo raid and the Crowd (`Play.tsx` plays them; made on `Boss.tsx` while the boss thinks and
+    moves, on the Crowd's `WatchScreen` while the other team chooses, shown on `CrowdReveal`). Not Classic's rounds (you
+    move every round, then on another board), a final, Squads or the Hidden Boss's four boards. Not while the opening
+    plays out: one made then waits for the first real turn (`interactive` is off until then).
+  - **Fair play:** online, a crowd match tells the server its first premove ahead (`premove`), and a pick that plays it says
+    so; the server marks it only when it had it before the round opened and the pick came within
+    `FAIRPLAY.signals.premoveMs`, and fair play leaves only its time out of timing ([fairplay.md](fairplay.md)). 1 v 1 sends
+    nothing new: no timing signal there, and its clock charges each move what the server measures (a premove: a round trip).
 - **Board colors** (Settings → Board, Oct 18; docs/decisions/2026-10-18-board-colors.md): Classic (the board as it always
   was), Green or Gold for the dark squares, picked per device (`brc.boardColors`; `boardColors()` in `prefs.ts`, never
   sent anywhere, other players see their own). `<html data-board-colors>` carries it (set at start-up, `main.tsx`, and by
@@ -63,6 +100,8 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
   - **Its elements and stacking:** `<piece class="white pawn">` (z-index 2; sliding `anim` 8; `dragging` 11; a
     captured one `fading` 1), `<square>` highlights (`last-move`, `selected`, `move-dest`, `oc`, and each `marks` class), arrows in `svg.hb-shapes`
     (see-through, z-index 2) and their labels (`svg.hb-labels`, 9), the coordinates (`.hb-coords`) under the pieces.
+    Your own (above): `square.uh` with `uh-red`, `-yellow`, `-blue`, `-green` (first, under the rest), `square.premove`,
+    `svg.hb-user-arrows` (z-index 2, before `svg.hb-shapes`).
     The board's own boxes: `.board.hb` (with `orientation-white`/`-black`), `.hb-container` (exactly the board),
     `.hb-board` (the squares). Nothing in it makes a stacking layer of its own.
 - **Chess960's castling** (DECISIONS.md, "Chess960's rules"), only for a Chess960 position (its FEN names castling
@@ -96,10 +135,13 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
 | Its colors (Classic, Green, Gold) and the Settings choice | `styles.css`, "Board colors" (before `.hb-board`); `prefs.ts` (`boardColors`, `setBoardColors`, `applyBoardColors`); `screens/Settings.tsx` (`BoardColorsChoice`) |
 | A turned board's squares and coordinates | `packages/app/src/board-view.ts` |
 | What overlays look up | `packages/app/src/board/dom.ts` |
+| Your arrows, squares and premoves: the logic | `board/logic.ts` ("Your own arrows and highlights", "Premoves"); kept by key in `board/yours.ts`; the switches in `prefs.ts` and `screens/Settings.tsx`; colors in `styles.css`, "Your arrows, highlights and premoves" |
 
 ## Settings
 
-`BOARD` (`checkHighlight`) in settings.ts. The board colors are per-device prefs, not game settings (`prefs.ts`).
+`BOARD` (`checkHighlight`) in settings.ts. The board colors, Premoves and Arrows and highlights are per-device prefs, not
+game settings (`prefs.ts`). Your arrows' size: `USER_ARROW` (logic.ts); their colors and the premove red: `--ua-*`,
+`--uh-*`, `--sq-premove` (styles.css). Fair play's premove window: `FAIRPLAY.signals.premoveMs`.
 
 ## Tests and tools
 
@@ -114,6 +156,12 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
 - Board colors: `packages/app/test/board-colors.test.ts` (Classic by default, remembered, unknown values ignored, on `<html>`,
   nothing sent); `e2e/board-colors.spec.ts` (pick Green: a match's dark squares are green, computed and painted; a reload keeps
   it; Classic gives today's colors back).
+- Arrows, highlights and premoves: `packages/app/test/board-tools.test.ts` (colors by the key held, drawing and taking
+  away, the knight's L, premove destinations, the pieces with premoves made, the queue playing, a premove made illegal
+  cancelling it and those after, a power's refusal, the phone's one, kept by key); `e2e/board-tools.spec.ts` (a 1 v 1
+  game: on a computer arrows in four colors, squares, a left-click clearing them, the browser's menu never opening, two
+  premoves playing out, one a reply makes illegal cancelled, a right-click cancelling; on a phone a premove by tap-tap
+  and by a finger's drag, played, and one cancelled by a tap).
 - e2e: every test that touches the board finds its parts through `BOARD_SEL` in `e2e/helpers.ts`. `e2e/perf.spec.ts`
   checks the board isn't drawn every frame while Jefferson's Roman candle plays over it (`hbDraws`).
   `e2e/castling.spec.ts` castles by tap-tap and drag, normal chess and Chess960 (both gestures).

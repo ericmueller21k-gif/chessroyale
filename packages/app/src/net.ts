@@ -85,6 +85,8 @@ import { bossVoice } from "./speech.tsx";
 import { prefetchMaia, startMaia } from "./maia.ts";
 import { setGardenSource } from "./garden-clock.ts";
 import { timingOnDevice } from "./test-switches.ts";
+import { gameKey, onYours, yours } from "./board/yours.ts";
+import { premoveUci } from "./board/logic.ts";
 
 /** Your result in a lobby's match (once it's over), from the server: for "See your result". */
 export interface LobbyResult {
@@ -254,6 +256,24 @@ export class NetMatch implements GameView {
     setGardenSource(() => Date.now() + this.offset);
     // (Online the server's times rule: the banners' default extra, whatever a tester's ?bannerplus= says.)
     timingOnDevice(false);
+    this.unPremoves = onYours((key) => this.tellPremove(key));
+  }
+
+  /**
+   * Your first premove on this match's boards, as the server was last told it (null: none). Fair play leaves a premove's
+   * think time out of its timing only when the server had it before your turn opened, so the server hears each change
+   * of it ahead (`premove`), and a pick that plays it says so (`pick`'s `premove`). Nothing else of it is sent.
+   */
+  private premoveTold: string | null = null;
+  private unPremoves: () => void;
+
+  private tellPremove(key: string) {
+    if (!key.startsWith(`${gameKey(this)}:`)) return;
+    const head = yours(key).queue[0];
+    const move = head ? premoveUci(head) : null;
+    if (move === this.premoveTold) return;
+    this.premoveTold = move;
+    this.send({ t: "premove", move });
   }
 
   get totalPlayers() {
@@ -482,6 +502,7 @@ export class NetMatch implements GameView {
 
   dispose() {
     this.closed = true;
+    this.unPremoves();
     setGardenSource(null);
     if (this.resignTimer) clearTimeout(this.resignTimer);
     this.freeBrain();
@@ -515,6 +536,8 @@ export class NetMatch implements GameView {
         if (this.phase.kind === "loading") this.setPhase({ kind: "lobby" });
         // (A resign sent while the connection was down: again, now it's back.)
         if (this.resigning) this.send({ t: "resign" });
+        // (A premove the server may have missed while the connection was down: again.)
+        if (this.premoveTold) this.send({ t: "premove", move: this.premoveTold });
         this.chat.onWelcome();
         // This device's engine speed, so the lobby can share out the judging (once per page; sent again on reconnect).
         void this.reportSpeed();
@@ -1187,7 +1210,7 @@ export class NetMatch implements GameView {
     this.showLights();
   }
 
-  submit(move: string | null) {
+  submit(move: string | null, premove = false) {
     if (this.phase.kind !== "play" || !this.key || !move) return;
     // Boss battle: only a move allowed this turn (a power's limits; the move the God King took back).
     if (move === this.boss?.barred || (this.boss?.powers?.allowed && !this.boss.powers.allowed.includes(move))) return;
@@ -1195,7 +1218,7 @@ export class NetMatch implements GameView {
     if (this.phase.strike?.until && Date.now() < this.phase.strike.until) return; // While the King strikes.
     this.myPick = move;
     const away = this.lookAways.stop();
-    this.send({ t: "pick", key: this.key, move, ...(away ? { away } : {}) });
+    this.send({ t: "pick", key: this.key, move, ...(away ? { away } : {}), ...(premove ? { premove: true as const } : {}) });
     crumb(`move ${move}`);
     if (this.myId) this.progress.mark(this.myId);
     this.setPhase({ kind: "scoring", board: this.phase.board, move, strike: this.phase.strike });

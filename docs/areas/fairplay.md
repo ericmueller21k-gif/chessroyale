@@ -19,6 +19,16 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   engine's moves on screen that the game showed: a power-up (`powerUp`), or Squads Mercenary's Stockfish token
   (`engineToken`: sanctioned help, skip reason "engineToken"). Squads isn't recorded yet; its matches log which
   choices had a token's lines on screen (`assists`, `isAssisted`), so when it is, they go in with `engineToken`.
+- **Premoves** (chess.com's, Oct 28; [docs/decisions/2026-10-28-arrows-and-premoves.md](../decisions/2026-10-28-arrows-and-premoves.md)):
+  a premove plays the moment the turn opens, so its think time is a round trip, not thinking, and a premoved hard find
+  would read as a fast one. The app tells the lobby its first premove ahead (`premove`, kept only while the player can't
+  pick: no round open in which they still have to), the round they next pick in takes it as it opens (`premoved`), and a
+  pick that plays it, says so (`pick`'s `premove`) and comes within `FAIRPLAY.signals.premoveMs` (2 s) of the clock's start
+  is marked (`FairMove.premove`). A marked move is left out of timing only (fast hard finds, the time-difficulty
+  correlation); strength, evidence, streaks and the deep re-check count it as any pick. Nothing rests on the app's word:
+  the mark needs the move to have reached the server before the position it's played in existed, so a fast engine move
+  can't be passed off as one (a guess made ahead is all a premove can be). The review page shows "(premove)" by its time.
+  1 v 1 has no timing signal, so nothing there is marked.
 - **Someone who resigns mid-match** (or is gone too long) has their match's signals recorded with their result as
   they leave (`takeLeftResults`, the Durable Object's `saveResults`), as everyone's are at the end.
 - **The suspicion score** turns a player's evidence into a level; every threshold is in `FAIRPLAY`.
@@ -73,7 +83,7 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
 | What | Where |
 | --- | --- |
 | Signals, the suspicion score, levels (pure) | `packages/core/src/fairplay.ts`; thresholds `FAIRPLAY` in settings.ts |
-| Recording each human pick's signals | `packages/server/src/lobby.ts` (`noteFair`, the `fair` record only) |
+| Recording each human pick's signals | `packages/server/src/lobby.ts` (`noteFair`, the `fair` record only; premoves told ahead: `premoveAhead`, `takePremoves`) |
 | Reports, cases, bans, appeals, device markers, `eligibleForRanked` | `packages/server/src/fairplay.ts`, tables `fairplay-schema.ts`, emails `fairplay-mail.ts` |
 | The deep re-check | `packages/server/src/fairplay-deep.ts`, `fairplay-engine.ts`; the cron in `wrangler.jsonc`, `scheduled()` in `index.ts` |
 | Enforcing bans | small checks in `index.ts` (PLAY, lobbies) and `lobby-do.ts` (the lobby's hello) |

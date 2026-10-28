@@ -530,8 +530,16 @@ export type ClientMessage =
   /** No rating: the lobby reads the one stored on the player's account (one an older app still sends is ignored). */
   | { t: "hello"; token?: string; name?: string; device?: "phone" | "computer"; practice?: boolean; look?: unknown; lastBoss?: string | null; evalBar?: boolean }
   | { t: "start" }
-  /** `away`: times the page was hidden or lost focus during this move's clock before the pick (fair play). */
-  | { t: "pick"; key: string; move: string; away?: number }
+  /**
+   * `away`: times the page was hidden or lost focus during this move's clock before the pick (fair play). `premove`: a
+   * premove played as the turn opened (fair play leaves its time out only if `premove` named it before the turn opened).
+   */
+  | { t: "pick"; key: string; move: string; away?: number; premove?: true }
+  /**
+   * Your first premove (chess.com's: a move made ahead while it isn't your turn; null: none now), sent as it changes. The
+   * server keeps it only while you can't pick (no turn of yours open, or you've picked in it), for your next turn.
+   */
+  | { t: "premove"; move: string | null }
   | { t: "powerUp"; key: string }
   | { t: "scores"; key: string; boards: BoardScore[] }
   | { t: "crossCheck"; key: string; boardId: number; ok: boolean; detail?: string }

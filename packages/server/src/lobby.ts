@@ -245,8 +245,13 @@ export interface LobbyRecord {
     deadline: number;
     deadlines: Record<string, number>;
     startedAt: number;
-    /** `away`: look-aways during the clock before the pick, as the app counted them (fair play's one device signal). */
-    picks: Record<string, { move: string; thinkMs: number; away?: number }>;
+    /**
+     * `away`: look-aways during the clock before the pick, as the app counted them (fair play's one device signal).
+     * `premove`: a premove the server had before the round opened (`premoved`), played at once (see premoveAhead).
+     */
+    picks: Record<string, { move: string; thinkMs: number; away?: number; premove?: true }>;
+    /** Premoves told ahead by those picking this round (premoveAhead), taken as it opened: player → move. */
+    premoved?: Record<string, string>;
     powerUps: Record<string, true>;
     /** Boss battle: players who called the King this move, and who called for his strike. */
     kingCalls?: Record<string, true>;
@@ -376,6 +381,8 @@ export interface LobbyRecord {
    */
   fair?: Record<string, FairMove[]>;
   fairV?: number;
+  /** Fair play: each person's first premove, told ahead of their next turn (premoveAhead): player → move. */
+  premoves?: Record<string, string>;
   /** People who left the match (resigned, gone too long, before move 1 or once out): see LeftHuman and LEAVING. */
   left?: LeftHuman[];
   /** A private lobby nobody had started: when the last person in it pressed Leave (it closes then; LOBBY_LIFE). */
@@ -1098,7 +1105,9 @@ export class LobbyCore {
       case "start":
         return this.start(playerId);
       case "pick":
-        return this.pick(playerId, msg.key, msg.move, msg.away);
+        return this.pick(playerId, msg.key, msg.move, msg.away, msg.premove);
+      case "premove":
+        return this.premoveAhead(playerId, msg.move);
       case "powerUp":
         return this.powerUp(playerId, msg.key);
       case "scores":
@@ -1844,7 +1853,8 @@ export class LobbyCore {
     const playing = this.roundHumans();
     for (const h of playing) deadlines[h.id] = now + runner.allowedMsFor(h.id);
     const deadline = Math.max(now, ...Object.values(deadlines));
-    this.r.round = { key, deadline, deadlines, startedAt: now, picks: {}, powerUps: {}, ...(final ? {} : { botsDoneIn: runner.botThinkTimes() }) };
+    const premoved = this.takePremoves(playing.map((h) => h.id));
+    this.r.round = { key, deadline, deadlines, startedAt: now, picks: {}, powerUps: {}, ...(final ? {} : { botsDoneIn: runner.botThinkTimes() }), ...(premoved ? { premoved } : {}) };
     this.r.phase = "play";
     const st = this.standings();
     const cutoff = this.cutoff();
@@ -1980,7 +1990,39 @@ export class LobbyCore {
     return Math.max(0, upTo - round.startedAt - frozen);
   }
 
-  private pick(playerId: string, key: string, move: string, away?: unknown) {
+  /**
+   * A player's first premove (chess.com's: a move made ahead on their board while it isn't their turn), told ahead of
+   * their next turn so fair play can tell a premove from a fast move without trusting the app: kept only while they
+   * can't pick (no round open in which they still have to), so it was made before they saw the position it's played in.
+   * The round they next pick in takes it as it opens (`takePremoves`); a pick that plays it, says so, and comes within
+   * FAIRPLAY.signals.premoveMs of the clock's start is marked a premove, and fair play leaves its time out of its timing
+   * (nothing else: it's judged as any pick). Null: no premove now.
+   */
+  private premoveAhead(playerId: string, move: unknown) {
+    if (!this.human(playerId) || this.r.phase === "results") return;
+    if (move !== null && (typeof move !== "string" || !/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move))) return;
+    const round = this.r.round;
+    if (this.r.phase === "play" && round && round.deadlines[playerId] !== undefined && !this.doneThisRound(playerId)) return;
+    const kept = { ...this.r.premoves };
+    if (move === null) delete kept[playerId];
+    else kept[playerId] = move;
+    this.r.premoves = Object.keys(kept).length ? kept : undefined;
+  }
+
+  /** The premoves told ahead by those picking in the round now opening (the others' wait for their own turn). */
+  private takePremoves(ids: readonly string[]): Record<string, string> | null {
+    const kept = { ...this.r.premoves };
+    const taken: Record<string, string> = {};
+    for (const id of ids) {
+      if (kept[id] === undefined) continue;
+      taken[id] = kept[id]!;
+      delete kept[id];
+    }
+    this.r.premoves = Object.keys(kept).length ? kept : undefined;
+    return Object.keys(taken).length ? taken : null;
+  }
+
+  private pick(playerId: string, key: string, move: string, away?: unknown, premove?: unknown) {
     const round = this.r.round;
     if (this.r.phase !== "play" || !round || round.key !== key || this.doneThisRound(playerId)) return;
     const now = this.io.now();
@@ -1992,10 +2034,14 @@ export class LobbyCore {
     // Boss battle: only a move allowed this turn (a power's limits; the move the God King took back can't be picked).
     const allowed = this.runner?.boss ? this.runner.crowdAllowed() : null;
     if (allowed && !allowed.includes(move)) return;
+    const thinkMs = Math.min(this.thinkTime(round, now), this.thinkTime(round, deadline));
+    // (A premove: told before the round opened, this very move, and made at once. See premoveAhead.)
+    const premoved = premove === true && round.premoved?.[playerId] === move && thinkMs <= FAIRPLAY.signals.premoveMs;
     round.picks[playerId] = {
       move,
-      thinkMs: Math.min(this.thinkTime(round, now), this.thinkTime(round, deadline)),
+      thinkMs,
       ...(typeof away === "number" && away > 0 ? { away: Math.min(50, Math.round(away)) } : {}),
+      ...(premoved ? { premove: true as const } : {}),
     };
     for (const h of this.r.humans) this.send(h.id, { t: "moved", key, playerId }, false);
     this.sendTally();
@@ -3025,6 +3071,7 @@ export class LobbyCore {
           picks,
           thinkMs: pick?.thinkMs ?? 0,
           away: pick?.away ?? 0,
+          ...(pick?.premove ? { premove: true } : {}),
           legal,
           top: scored.slice(0, FAIRPLAY.deep.candidates).map((x) => x.move),
           ...(p.usedPowerUp ? { powerUp: true } : {}),

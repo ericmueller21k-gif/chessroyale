@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS, modeSettings, mulberry32 } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, FAIRPLAY, modeSettings, mulberry32 } from "@chessroyale/core";
 import { legalMoves, type BoardScore, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
@@ -119,5 +119,71 @@ describe("fair play in the lobby", () => {
     ]);
     expect(L.core.fairMoves("p2").map((m) => [m.ply, m.best, !!m.recapture])).toEqual([[1, "d7d5", false]]);
     expect(L.core.record.fairV).toBe(3);
+  });
+
+  it("a premove counts as one only when the server had it before the turn opened and it came at once; then only its time is left out", () => {
+    // p1 on White, p2 on Black.
+    const L = crowd(2, (w) => w.length === 1 && w[0] === "p1");
+    let key = "";
+    const round = () => {
+      for (let i = 0; i < 60 && L.last("p1", "round")?.key === key; i++) L.advance(1000);
+      const r = L.last("p1", "round")!;
+      key = r.key;
+      L.advance(Math.max(0, r.startsAt - L.now));
+      return r;
+    };
+    // White's turn. p1 can't tell a premove while its own pick is open (it has seen the position); p2, watching, can.
+    let r = round();
+    L.core.message("p1", { t: "premove", move: "g1f3" });
+    L.core.message("p2", { t: "premove", move: "d7d5" });
+    expect(L.core.record.premoves).toEqual({ p2: "d7d5" });
+    L.advance(3000);
+    L.core.message("p1", { t: "pick", key: r.key, move: "e2e4" });
+    // Picked: now p1 may tell one for its next turn (a computer's queue: the next premove after the one just played).
+    L.core.message("p1", { t: "premove", move: "g1f3" });
+    expect(L.core.record.premoves).toEqual({ p1: "g1f3", p2: "d7d5" });
+    L.hostScores(L.core.record.hostId!, "e2e4", "a2a3");
+
+    // Black's turn: p2's premove is taken as it opens (p1's waits for White's), and played at once: marked.
+    r = round();
+    expect(L.core.record.round!.premoved).toEqual({ p2: "d7d5" });
+    expect(L.core.record.premoves).toEqual({ p1: "g1f3" });
+    L.advance(300);
+    L.core.message("p2", { t: "pick", key: r.key, move: "d7d5", premove: true });
+    expect(L.core.record.round!.picks.p2).toEqual({ move: "d7d5", thinkMs: 300, premove: true });
+    L.hostScores(L.core.record.hostId!, "d7d5", "a7a6");
+
+    // White's turn again: p1's premove came too late to be one (timed as any pick), and a flag on a move never told
+    // ahead, or another move than the one told, counts for nothing.
+    r = round();
+    L.advance(FAIRPLAY.signals.premoveMs + 1);
+    L.core.message("p1", { t: "pick", key: r.key, move: "g1f3", premove: true });
+    expect(L.core.record.round!.picks.p1!.premove).toBeUndefined();
+    L.hostScores(L.core.record.hostId!, "g1f3", "a2a3");
+    r = round();
+    L.core.message("p2", { t: "pick", key: r.key, move: "b8c6", premove: true });
+    expect(L.core.record.round!.picks.p2!.premove).toBeUndefined();
+    L.hostScores(L.core.record.hostId!, "b8c6", "a7a6");
+    r = round();
+    L.core.message("p2", { t: "premove", move: "a7a6" });
+    L.core.message("p1", { t: "pick", key: r.key, move: "f1c4" });
+    L.hostScores(L.core.record.hostId!, "f1c4", "a2a3");
+    r = round();
+    L.core.message("p2", { t: "pick", key: r.key, move: "g8f6", premove: true });
+    expect(L.core.record.round!.picks.p2!.premove).toBeUndefined();
+    // (A premove withdrawn, null: nothing kept. Junk: ignored.)
+    L.core.message("p1", { t: "premove", move: "e1g1" });
+    L.core.message("p1", { t: "premove", move: null });
+    L.core.message("p1", { t: "premove", move: "castle!" as string });
+    expect(L.core.record.premoves).toBeUndefined();
+    L.hostScores(L.core.record.hostId!, "g8f6", "a7a6");
+
+    // Fair play: the one premove is marked, and it's judged as any pick.
+    expect(L.core.fairMoves("p2").map((m) => [m.move, !!m.premove])).toEqual([
+      ["d7d5", true],
+      ["b8c6", false],
+      ["g8f6", false],
+    ]);
+    expect(L.core.fairMoves("p1").every((m) => !m.premove)).toBe(true);
   });
 });
