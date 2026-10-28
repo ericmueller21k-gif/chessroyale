@@ -2,7 +2,7 @@
  * The town square (hidden page /town; slice 1: the world, five homes, their bosses and a few bots, nothing else). A slim
  * bar with the back button and the title; the world fills the rest of the screen, on a phone and a computer alike, and
  * works its camera out from its box's shape (camera.ts). Tap a square to walk there (around the homes, a square at a
- * time); tap a home, a boss or a bot to walk next to it; drag to look around; "Back to me"; −/+ (and the wheel) zoom;
+ * time); tap a home, a boss or a bot to walk next to it; drag to look around; "Back to me" (the focus button); −/+ (and the wheel) zoom;
  * the chips at the edge point to the homes off screen, and a tap glides the camera there. Slice 4: a finger presses the
  * square you'd walk to like a button (press.ts), one pawn a square (world.ts), your trail, and the cards: a boss's
  * ("Challenge alone", which leaves for the Boss raid screen, its tile picked, after a confirm) and a home's (its shop, greyed, "Coming soon").
@@ -212,8 +212,14 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, seat = null }: { on
               +
             </button>
           </div>
-          <button type="button" class="town-recenter" onClick={() => ctl.current?.recenter()}>
-            Back to me
+          {/* The focus button (Eric, Oct 28: "replace with circular focus icon"): a ring, four ticks and a dot, a map's locate-me;
+              still named "Back to me", and still brings the camera back to you. */}
+          <button type="button" class="town-recenter" aria-label="Back to me" onClick={() => ctl.current?.recenter()}>
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+              <circle cx="12" cy="12" r="6.2" fill="none" stroke="currentColor" stroke-width="2" />
+              <path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              <circle cx="12" cy="12" r="2.1" fill="currentColor" />
+            </svg>
           </button>
         </div>
       </div>

@@ -96,7 +96,40 @@ test("the town square at /town: the world is drawn and fills its box under the b
   await zoomOut.click();
   await expect(zoomOut).toHaveAttribute("aria-pressed", "true");
   // The controls stay put whatever the zoom (nothing shifts).
-  await expect(page.getByRole("button", { name: "Back to me" })).toBeVisible();
+  const focus = page.getByRole("button", { name: "Back to me" });
+  await expect(focus).toBeVisible();
+
+  // The buttons (Eric, Oct 28): one row in the map's bottom right corner, the −/+ pair on the left and the round focus button to its
+  // right (an icon, no words; its name, "Back to me", is for screen readers), 14 px in from the corner, as high as the pair.
+  const mapBox = (await page.locator(".town-box").boundingBox())!;
+  const pair = (await page.locator(".town-zoom").boundingBox())!;
+  const fb = (await focus.boundingBox())!;
+  expect(pair.x + pair.width, "the pair is left of the focus button").toBeLessThanOrEqual(fb.x);
+  expect(Math.abs(pair.y + pair.height / 2 - (fb.y + fb.height / 2)), "one row").toBeLessThanOrEqual(1.5);
+  expect(mapBox.x + mapBox.width - (fb.x + fb.width), "14 px from the right edge").toBeCloseTo(14, 0);
+  expect(mapBox.y + mapBox.height - (fb.y + fb.height), "14 px from the foot").toBeCloseTo(14, 0);
+  expect(fb.width, "round").toBeCloseTo(fb.height, 0);
+  expect(fb.height, "as high as the −/+ buttons").toBeCloseTo(pair.height, 0);
+  expect(await focus.evaluate((el) => getComputedStyle(el).borderRadius)).toBe("50%");
+  await expect(focus, "an icon, no words").toHaveText("");
+  await expect(focus.locator("svg")).toHaveCount(1);
+  // It does what "Back to me" did: after a look around, the camera comes back to you.
+  const lookAt = () => page.evaluate(() => (window as unknown as { __townCam: () => { focus: number[] } }).__townCam().focus);
+  const home = await lookAt();
+  await page.mouse.move(cv.x + cv.width / 2, cv.y + cv.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(cv.x + cv.width / 2 + 120, cv.y + cv.height / 2 + 160, { steps: 8 });
+  await page.mouse.up();
+  const away = await lookAt();
+  expect(Math.hypot(away[0]! - home[0]!, away[1]! - home[1]!), "you looked around").toBeGreaterThan(1);
+  await focus.click();
+  await expect
+    .poll(async () => {
+      const f = await lookAt();
+      const [c, r] = await you(page);
+      return Math.hypot(f[0]! - c, f[1]! - r);
+    }, { message: "the camera is back on you", timeout: 6000 })
+    .toBeLessThan(2.5);
 
   // Back goes home, and the address back to /.
   await page.getByRole("button", { name: "Back", exact: true }).click();
@@ -381,7 +414,7 @@ for (const st of [
     expect(close.zoom, "the − / + zoom itself is untouched").toBe(before.zoom);
     await expect(live).toHaveText(st.quote, { useInnerText: true });
     expect(await live.textContent(), "the quote, word for word").toBe(st.quote);
-    // The HUD stays put: the zoom pair and "Back to me" are where they were.
+    // The HUD stays put: the zoom pair and the focus button ("Back to me") are where they were.
     await expect(page.getByRole("button", { name: "Back to me" })).toBeVisible();
     // A tap elsewhere (high in the middle, over the statue's head: the Colosseum's wall) walks you away: the camera glides
     // back out to the zoom you had, and the quote is gone.

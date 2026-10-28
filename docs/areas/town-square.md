@@ -15,9 +15,16 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
   dynamic `import()`, so none of its code, art or styles are in the main bundle. The back button goes home (and the
   address back to `/`). Stockfish isn't warmed on this page, and nothing of Maia's loads
   while you walk round it (Eric's frame-rate rule, `docs/rules/eric.md`); a game with a bot loads it when it opens.
-- **Layout.** A slim bar (the back button and "Town square"), then the world fills the rest of the screen. The world never
-  assumes a screen size: it fills its box and works its camera out from the box's shape, so the panels Eric designs
-  around it can change without touching it. The back button, the zoom pair and "Back to me" stay put.
+- **Layout.** A slim bar (the back button, "Town square", and at its right end the chat icon and the gear: "The chat log"),
+  then the world fills the rest of the screen. The world never assumes a screen size: it fills its box and works its camera out
+  from the box's shape, so the panels Eric designs around it can change without touching it. The back button, the chat icon, the
+  gear and the buttons stay put. **The buttons** (Eric, Oct 28: "remove the 'Back to me' button … replace with circular focus
+  icon … zoom button on left, focus button to right but are in the bottom right corner") are one row in the map's bottom right
+  corner, 14 px in: the −/+ pair, then the **focus button**, a round white button as high as the pair (36 px) with a ring, four
+  ticks and a dot (a map's locate-me, our own inline SVG) and no words; its accessible name is still "Back to me" and it does what
+  "Back to me" did (the camera comes back to you). `.town-controls` is the row's box: the edge chips, the statue close-up and the
+  chat box (`clampBox`) keep clear of it (`keepClear`, `buttons()`), so they follow it to its new place; the town card has never
+  been kept clear of them (the buttons draw over a card), and a row 36 px high covers less of it than the stack did.
 - **The camera** (`town/camera.ts`, pure math): a pitched pinhole camera over a ground that drops away from the focus
   point (a small round world), cut at a rim that forms the horizon. Two tuned sets, the phone's and the computer's,
   blended by the box's width / height (0.6 = all phone, 1.4 = all computer). Zooming out raises the camera, moves it back,
@@ -76,7 +83,7 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
   raids with people will live there). The boss stays put while its card is open. Tapping something both opens its card
   and walks you next to it.
 - **Looking around.** Drag to look
-  around; "Back to me" brings the camera back; − / + (and the mouse wheel) zoom. The chips at the box's edge show the
+  around; the focus button ("Back to me") brings the camera back; − / + (and the mouse wheel) zoom. The chips at the box's edge show the
   bosses whose homes are off screen (the nearest few: `maxChips` in `feel.ts`, 4), and the Colosseum's crown when none of
   it is on screen (among the nearest four, it's placed first, so it always shows); a tap glides the camera there. A chip
   never covers a name tag, a home's floating name, the speech bubble, the −/+ and "Back to me" buttons or a nearer
@@ -401,7 +408,8 @@ noted wherever a slice changed one.
   blocked players' lines never reach the log; a removal and the switch reach it; sending mirrors the limits and shows the
   server's reasons; Report and Remove.
 - `e2e/town.spec.ts` (phone and desktop; `e2e/areas.json`, "the town square"): the page loads, the world is drawn and
-  fills its box, a tap ahead walks you there, the zoom pair works (it opens zoomed out), back goes home; each statue (a
+  fills its box, a tap ahead walks you there, the zoom pair works (it opens zoomed out) and sits in one row with the round focus
+  button ("Back to me": no words, 14 px from the bottom right corner, bringing the camera back to you), back goes home; each statue (a
   tap walks you up, the camera zooms in close on it, its quote word for word in the live region, its letters at least 12
   pixels; a tap elsewhere glides back to the zoom you had, zoomed out or in, and clears it); `?sky=day` and
   `?sky=night` draw different skies; a boss's card, its confirm (Stay, then Leave to the Boss raid screen, his tile
