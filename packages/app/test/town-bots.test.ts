@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
+import { readdirSync } from "node:fs";
 import { itemDef } from "@chessroyale/core";
+import { sheetHash } from "../../../scripts/bake-sidekicks.ts";
+import type { Character } from "../src/characters/sprite.ts";
+import { SIDEKICK_SHEETS } from "../src/town/sidekick-sheets.ts";
 import { N } from "../src/town/camera.ts";
 import { TOWN_FEEL } from "../src/town/feel.ts";
-import { BOTS, START, TABLES, Walker, anyTableFree, botLabel, cancelMeet, createTown, holdBot, meet, meetReady, meetSeat, playAtTableText, ratingText, seatOf, seatText, seated, stepsFrom, tableFor, tableStates, tick, waitingBot, walkWalker, type Person, type Sq, type Town } from "../src/town/world.ts";
+import { BOTS, HOMES, START, TABLES, Walker, anyTableFree, botLabel, cancelMeet, comeOut, createTown, tdist, walkable, holdBot, isSprite, meet, meetReady, meetSeat, playAtTableText, ratingText, seatOf, seatText, seated, sidekickText, spriteAnim, stepsFrom, tableFor, tableStates, tick, townLine, waitingBot, waveMs, walkWalker, type HomeId, type Person, type Sq, type Town } from "../src/town/world.ts";
+
+/** Each sidekick's sprite file (and its id, `sidekick-<file>`), by its boss's home. */
+const HOME_FILE: Record<HomeId, string> = { clown: "boingo", pig: "wrangler", smudgy: "smudgy", bigboy: "bigboy", hopper: "chubchirp", folio: "folio", moo: "moo", gardener: "puddles", sawyer: "sawyer", tiger: "babur", alfil: "alfil", gingerbread: "ginger", grex: "jefferson", hollow: "hollow" };
 
 /**
  * Playing a town bot (Oct 27, Eric): the bot table (short names, a rating each, one or two crate items), its card's
@@ -12,7 +19,7 @@ import { BOTS, START, TABLES, Walker, anyTableFree, botLabel, cancelMeet, create
 
 /** A town with nobody wandering off on their own. */
 function still(seat: Parameters<typeof createTown>[2] = null): Town {
-  const t = createTown(0, undefined, seat);
+  const t = createTown(0, undefined, seat, BOTS.length);
   t.nextBotAt = Infinity;
   return t;
 }
@@ -32,32 +39,119 @@ const same = (a: Sq, b: Sq) => a.c === b.c && a.r === b.r;
 const occupy = (t: Town, s: Sq) => t.all.push(new Walker(s, 100, false));
 
 describe("town square: the bots (Oct 27)", () => {
-  it("six bots, names of 8 to 10 characters, ratings spread from 800 to 2000, each in one or two crate items", () => {
-    expect(BOTS).toHaveLength(6);
-    for (const b of BOTS) {
-      expect(b.name.length, b.name).toBeGreaterThanOrEqual(8);
-      expect(b.name.length, b.name).toBeLessThanOrEqual(10);
+  it("twenty bots, a ladder from 600 to 2500 by 100 (each rung once), names of at most 10 characters (Oct 28)", () => {
+    expect(BOTS).toHaveLength(20);
+    expect(BOTS.map((b) => b.rating)).toEqual(Array.from({ length: 20 }, (_, i) => 600 + 100 * i));
+    for (const b of BOTS) expect(b.name.length, b.name).toBeLessThanOrEqual(10);
+    expect(new Set(BOTS.map((b) => b.name)).size).toBe(20);
+    // Hollow's critter on top, stronger than Hollow (Eric's twist).
+    const top = BOTS[BOTS.length - 1]!;
+    expect(top.boss).toBe("hollow");
+    expect(top.rating).toBe(2500);
+  });
+
+  it("the six pawns keep their names and clothes, one or two crate items each, at 600, 900, 1200, 1500, 1800 and 2100", () => {
+    const pawns = BOTS.filter((b) => !isSprite(b.look));
+    expect(pawns.map((b) => [b.name, b.rating])).toEqual([
+      ["Pin Pete", 600],
+      ["Rook Rita", 900],
+      ["Fork Frank", 1200],
+      ["Tempo Tess", 1500],
+      ["Bishop Bo", 1800],
+      ["Gambit Gus", 2100],
+    ]);
+    for (const b of pawns) {
+      if (isSprite(b.look)) continue;
+      expect(b.boss, b.name).toBeUndefined();
       const worn = Object.entries(b.look.wear ?? {});
       expect(worn.length, b.name).toBeGreaterThanOrEqual(1);
       expect(worn.length, b.name).toBeLessThanOrEqual(2);
       // Real crate items, each in its own slot, in a palette color.
       for (const [slot, it] of worn) expect(itemDef(it!.def)?.slot, `${b.name}: ${it!.def}`).toBe(slot);
     }
-    const ratings = BOTS.map((b) => b.rating);
-    expect(Math.min(...ratings)).toBe(800);
-    expect(Math.max(...ratings)).toBe(2000);
-    expect(new Set(ratings).size).toBe(6);
-    const sorted = [...ratings].sort((a, b) => a - b);
-    for (let i = 1; i < sorted.length; i++) expect(sorted[i]! - sorted[i - 1]!).toBeGreaterThanOrEqual(150);
-    expect(new Set(BOTS.map((b) => b.name)).size).toBe(6);
+  });
+
+  it("the fourteen sidekicks, one a boss, each its sprite with idle, walk, sit and wave; easier bosses' kids lower", () => {
+    const kids = BOTS.filter((b) => isSprite(b.look));
+    expect(kids).toHaveLength(14);
+    expect(new Set(kids.map((b) => b.boss)).size).toBe(14);
+    for (const h of HOMES) expect(kids.some((b) => b.boss === h.id), h.id).toBe(true);
+    for (const b of kids) {
+      if (!isSprite(b.look)) continue;
+      expect(b.look.sprite.id).toBe(`sidekick-${HOME_FILE[b.boss!]}`);
+      for (const a of ["idle", "walk", "sit", "wave"] as const) expect(b.look.sprite.ms[a].length, `${b.name}: ${a}`).toBeGreaterThan(0);
+    }
+    // The ladder's order: the crowd's score against each boss in its latest sim, highest (easiest boss) lowest; Hollow on top.
+    expect(kids.map((b) => b.boss)).toEqual(["clown", "pig", "smudgy", "bigboy", "hopper", "folio", "moo", "gardener", "sawyer", "tiger", "alfil", "gingerbread", "grex", "hollow"]);
+  });
+
+  it("each sidekick's baked sheet is its sprite as drawn (scripts/bake-sidekicks.ts): idle, walk, sit, wave, every pixel", async () => {
+    const files = readdirSync(new URL("../src/characters/sidekicks/", import.meta.url)).filter((f) => f.endsWith(".ts"));
+    expect(files).toHaveLength(14);
+    for (const file of files) {
+      const name = file.replace(/\.ts$/, "") as keyof typeof SIDEKICK_SHEETS;
+      const mod = (await import(`../src/characters/sidekicks/${file}`)) as Record<string, unknown>;
+      const ch = Object.values(mod).find((v): v is Character => !!v && typeof v === "object" && "anims" in v && "palette" in v)!;
+      const sheet = SIDEKICK_SHEETS[name];
+      expect(ch.id, file).toBe(`sidekick-${name}`);
+      expect(sheet.id).toBe(ch.id);
+      for (const a of ["idle", "walk", "sit", "wave"] as const) expect(sheet.ms[a], `${file}: ${a}`).toEqual(ch.anims[a]!.frames.map((f) => f.ms));
+      expect([sheet.w, sheet.h, ...sheet.foot]).toEqual([ch.w, ch.h, ...ch.foot]);
+      // Stale after a change to the art: npx tsx scripts/bake-sidekicks.ts.
+      expect(sheet.hash, `${file}: run npx tsx scripts/bake-sidekicks.ts`).toBe(sheetHash(ch));
+    }
+  }, 60_000);
+
+  it("a sidekick's card says whose it is ('Hollow's sidekick'); a pawn's says nothing more", () => {
+    const named = (n: string) => BOTS.find((b) => b.name === n)!;
+    expect(sidekickText(named("Glim"))).toBe("Hollow's sidekick");
+    expect(sidekickText(named("Bun & Bug"))).toBe("Chub & Chirp's sidekick");
+    expect(sidekickText(named("Twinkle"))).toBe("Moo & Moon's sidekick");
+    expect(sidekickText(named("Drizzle"))).toBe("Puddles' sidekick");
+    expect(sidekickText(named("Sparky"))).toBe("Jefferson's sidekick");
+    expect(sidekickText(named("Tempo Tess"))).toBeNull();
+    expect(botLabel(named("Glim"))).toBe("Glim (bot)");
+    expect(ratingText(named("Glim"))).toBe("Rating 2500");
+  });
+
+  it("Hollow's card: Eric's three lines, the next each time it opens; no other home has lines", () => {
+    expect([0, 1, 2, 3].map((n) => townLine("hollow", n))).toEqual([
+      "The little one plays in the dark. Even I don't sit across from him.",
+      "Don't let the eyes fool you. He's stronger than I ever was.",
+      "I found him in the dark. The dark had been teaching him.",
+      "The little one plays in the dark. Even I don't sit across from him.",
+    ]);
+    for (const h of HOMES) if (h.id !== "hollow") expect(townLine(h.id, 0), h.id).toBeNull();
+  });
+
+  it("a sidekick walks, stands, sits at a table and waves once when tapped (then stands again)", () => {
+    const t = still();
+    const glim = botNamed(t, "Glim");
+    expect(spriteAnim(glim, 0)).toBe("idle");
+    // Tapped: its wave, once through, then idle.
+    glim.waved = 1000;
+    if (!isSprite(glim.look)) throw new Error("Glim is a sidekick");
+    const ms = waveMs(glim.look.sprite);
+    expect(ms).toBeGreaterThan(500);
+    expect(spriteAnim(glim, 1000)).toBe("wave");
+    expect(spriteAnim(glim, 1000 + ms - 1)).toBe("wave");
+    expect(spriteAnim(glim, 1000 + ms)).toBe("idle");
+    // Walking: its walk; on a stool: its sit (sitting wins over a wave).
+    const tb = TABLES.find((x) => [0, 1].every((k) => !t.people.some((p) => same(p.walker.here(), x.stools[k]!))))!;
+    walkWalker(glim.walker, tb.stools[0]);
+    expect(spriteAnim(glim, 1000 + ms)).toBe("walk");
+    settle(t);
+    expect(seated(glim)).toBe(tb);
+    glim.waved = 0;
+    expect(spriteAnim(glim, 1)).toBe("sit");
   });
 
   it("shown as '<name> (bot)' everywhere: their tags in the town, their cards, the table's Play", () => {
     const t = still();
     const tess = BOTS.find((b) => b.name === "Tempo Tess")!;
     expect(botLabel(tess)).toBe("Tempo Tess (bot)");
-    expect(ratingText(tess)).toBe("Rating 1400");
-    expect(playAtTableText(tess)).toBe("Play Tempo Tess (bot) · 1400");
+    expect(ratingText(tess)).toBe("Rating 1500");
+    expect(playAtTableText(tess)).toBe("Play Tempo Tess (bot) · 1500");
     // Each bot in the square: its name tag, its entry in BOTS and its look (one field, BOTS' own).
     expect(t.bots.map((p) => p.name)).toEqual(BOTS.map(botLabel));
     t.bots.forEach((p, i) => {
@@ -143,7 +237,7 @@ describe("town square: playing a bot (its card's Play)", () => {
   });
 
   it("a bot whose card is open holds still: it stops at the square it steps onto and doesn't wander off", () => {
-    const t = createTown(0);
+    const t = createTown(0, undefined, null, BOTS.length);
     const bot = botNamed(t, "Gambit Gus");
     walkWalker(bot.walker, { c: bot.walker.c, r: bot.walker.r + 3 });
     tick(t, 1);
@@ -182,15 +276,59 @@ describe("town square: playing a bot (its card's Play)", () => {
   });
 });
 
+describe("town square: the bots take turns in the square (Oct 28: twenty cost frames)", () => {
+  it("botsOut are out at once, the others at home (on no square); now and then one goes home and another comes out", () => {
+    const t = createTown(0);
+    const out = () => t.bots.filter((b) => !b.home);
+    expect(out()).toHaveLength(TOWN_FEEL.botsOut);
+    for (const b of t.bots) expect(t.all.includes(b.walker), b.name).toBe(!b.home);
+    const first = new Set(out());
+    const held = out()[0]!;
+    holdBot(t, held);
+    let now = 0;
+    const seen = new Set(out());
+    for (let i = 0; i < 20 * 60 * 120; i += 1) {
+      now += 50;
+      tick(t, now);
+      if (i % 20) continue;
+      // Never more out than botsOut (one fading out as another fades in: at most one more), a walker each, apart.
+      expect(out().length).toBeLessThanOrEqual(TOWN_FEEL.botsOut + 1);
+      for (const b of t.bots) expect(t.all.includes(b.walker), b.name).toBe(!b.home);
+      const goals = out().map((b) => `${b.walker.goalC()},${b.walker.goalR()}`);
+      expect(new Set(goals).size).toBe(goals.length);
+      expect(held.home).toBe(false);
+      for (const b of out()) seen.add(b);
+    }
+    // Over two hours every bot has been out, and the ones out now aren't the first ones.
+    expect(seen.size).toBe(BOTS.length);
+    expect([...first].every((b) => !b.home)).toBe(false);
+  });
+
+  it("back from a game, the bot you played is out (across from you); one called from home comes out", () => {
+    for (let k = 0; k < BOTS.length; k++) {
+      const t = createTown(0, undefined, { table: 2, stool: 0, bot: k });
+      expect(t.bots[k]!.home).toBe(false);
+      expect(t.bots.filter((b) => !b.home)).toHaveLength(TOWN_FEEL.botsOut);
+    }
+    const t = createTown(0);
+    const b = t.bots.find((x) => x.home)!;
+    comeOut(t, b, 100, 3);
+    expect(b.home).toBe(false);
+    expect(t.all.includes(b.walker)).toBe(true);
+    expect(tdist(b.walker.here(), t.you.walker.here())).toBeGreaterThanOrEqual(3);
+    expect(walkable(b.walker.c, b.walker.r)).toBe(true);
+  });
+});
+
 describe("town square: back from a game with a bot", () => {
   it("a seat as the address carries it, and back; anything else is none", () => {
     for (const s of [{ table: 0, stool: 0, bot: 0 }, { table: 9, stool: 1, bot: 5 }] as const) expect(seatOf(seatText(s))).toEqual(s);
-    for (const bad of [null, "", "6.2.1", "10.0.1", "1.0.6", "a.b.c", "1.0"]) expect(seatOf(bad)).toBeNull();
+    for (const bad of [null, "", "6.2.1", "10.0.1", "1.0.20", "a.b.c", "1.0"]) expect(seatOf(bad)).toBeNull();
   });
 
   it("you sit on your stool at that table, the bot across, its card closed; after a short while it gets up and wanders off", () => {
     const seat = { table: 3, stool: 1, bot: 2 } as const;
-    const t = createTown(0, undefined, seat);
+    const t = createTown(0, undefined, seat, BOTS.length);
     const tb = TABLES[3]!;
     const bot = t.bots[2]!;
     expect(t.you.walker.here()).toEqual(tb.stools[1]);
@@ -211,7 +349,7 @@ describe("town square: back from a game with a bot", () => {
   });
 
   it("held while its table's card is open with you across: it stays until you close it", () => {
-    const t = createTown(0, undefined, { table: 5, stool: 0, bot: 4 });
+    const t = createTown(0, undefined, { table: 5, stool: 0, bot: 4 }, BOTS.length);
     const bot = t.bots[4]!;
     holdBot(t, bot);
     let now = 0;

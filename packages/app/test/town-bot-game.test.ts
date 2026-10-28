@@ -38,6 +38,8 @@ describe("a town bot's game", () => {
     expect(s.players[them]).toMatchObject({ name: "Tempo Tess (bot)", bot: true, rank: { label: "1400" } });
     expect(s.players[them].look?.head?.def).toBe("wizard-hat");
     expect(s.town).toBe(true);
+    // A pawn's strip shows its pawn, no face.
+    expect(s.players[them].face).toBeUndefined();
     // Yours: "Casual", not your 1 v 1 rank.
     expect(s.players[s.you].rank.label).toBe("Casual");
     // The loading step: no versus moment, no vote yet; Stockfish paused while Maia loads alone, at the bot's rating.
@@ -79,5 +81,15 @@ describe("a town bot's game", () => {
     expect(s.town).toBe(false);
     expect(s.loading).toBe(false);
     g.dispose();
+  });
+
+  it("a sidekick's strip shows its face in place of the pawn (Oct 28), at its rating (Glim: 2500, Maia's top)", async () => {
+    vi.stubGlobal("Worker", class {});
+    const { BotDuel } = await import("../src/duel.ts");
+    const k = new BotDuel(2500, { name: "Glim (bot)", look: null, face: "data:image/png;base64,AAAA" });
+    const s = k.snapshot();
+    expect(s.players[s.you === "w" ? "b" : "w"]).toMatchObject({ name: "Glim (bot)", face: "data:image/png;base64,AAAA", rank: { label: "2500" } });
+    expect(s.loading).toBe(true);
+    k.dispose();
   });
 });

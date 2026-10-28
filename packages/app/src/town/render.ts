@@ -35,7 +35,8 @@ import { look, mixLights, mixMist, mixRGB, mixTint, type SkyWeights } from "./sk
 import { SkyPainter } from "./sky-draw.ts";
 import type { LightPool, LightSpot } from "./houses/kit.ts";
 import { PARK_BENCH, PARK_FOUNTAIN, PARK_LAMP, PARK_LAMP_HEAD, PARK_LAMP_LIGHTS, PARK_LAMP_POOLS, PARK_TABLE, PARK_TREES, TABLE_BACK_RANK, TABLE_BOARD, TABLE_CLOCK_INK, TABLE_DIGITS, TABLE_INK, TABLE_PIECES, TABLE_RING, TABLE_TOP } from "./houses/park.ts";
-import { COLISEUM_PLACE, GRASS, LAMPS, PAVING, PROPS, STATUES, TABLES, groundAt, onColiseum, plotAt, seated, tableStates, type Boss, type Home, type HomeId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town } from "./world.ts";
+import type { SidekickSheet } from "./sidekick-sheets.ts";
+import { COLISEUM_PLACE, GRASS, LAMPS, PAVING, PROPS, STATUES, TABLES, groundAt, isSprite, onColiseum, plotAt, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town } from "./world.ts";
 
 /** Each boss's sprite (its real one: its `idle` frames). */
 export const BOSS_ART: Record<HomeId, Character> = {
@@ -210,6 +211,77 @@ class FrameCache {
     c.getContext("2d")!.putImageData(new ImageData(new Uint8ClampedArray(data), w, h), 0, 0);
     this.frames[i] = c;
     return c;
+  }
+}
+
+const SPRITE_ANIMS: readonly SpriteAnim[] = ["idle", "walk", "sit", "wave"];
+/** Each sidekick's sheet (scripts/bake-sidekicks.ts), by its sprite's file name: its picture's address. */
+const SHEET_URL: Record<string, string> = Object.fromEntries(
+  Object.entries(import.meta.glob<string>("./sidekicks/*.png", { eager: true, query: "?url", import: "default" })).map(([path, url]) => [path.replace(/^.*\/|\.png$/g, ""), url]),
+);
+/**
+ * A sidekick's four animations (Oct 28), every frame cut once from its baked sheet into a canvas of its own as the town
+ * opens (as soon as the picture has loaded, a moment after; until then it isn't drawn), never per frame (Eric's
+ * frame-rate rule); when each frame ends; how tall it stands (its frame's height in squares, so it's a pawn's height from
+ * its idle's top to its feet); and where its head is in each animation (its name tag sits there).
+ */
+class SpriteFrames {
+  readonly frames: Record<SpriteAnim, HTMLCanvasElement[]> = { idle: [], walk: [], sit: [], wave: [] };
+  readonly ends = {} as Record<SpriteAnim, number[]>;
+  readonly top: Record<SpriteAnim, number>;
+  readonly squares: number;
+  ready = false;
+  constructor(readonly sheet: SidekickSheet) {
+    for (const a of SPRITE_ANIMS) {
+      let t = 0;
+      this.ends[a] = sheet.ms[a].map((ms) => (t += Math.max(16, ms)));
+    }
+    // (Walking and waving, its head is where it is standing: the tag doesn't jump.)
+    const idle = sheet.top.idle / sheet.h;
+    this.top = { idle, walk: idle, wave: idle, sit: sheet.top.sit / sheet.h };
+    this.squares = TOWN_FEEL.sidekickSquares / (sheet.foot[1] / sheet.h - idle);
+    const img = new Image();
+    img.onload = () => {
+      SPRITE_ANIMS.forEach((a, row) => {
+        this.frames[a] = sheet.ms[a].map((_, col) => {
+          const c = document.createElement("canvas");
+          c.width = sheet.w;
+          c.height = sheet.h;
+          c.getContext("2d")!.drawImage(img, col * sheet.w, row * sheet.h, sheet.w, sheet.h, 0, 0, sheet.w, sheet.h);
+          return c;
+        });
+      });
+      this.ready = true;
+    };
+    img.src = SHEET_URL[sheet.id.replace(/^sidekick-/, "")]!;
+  }
+  /** Its frame `t` ms into `anim` (looping; the wave holds its last frame). */
+  at(anim: SpriteAnim, t: number): HTMLCanvasElement {
+    const ends = this.ends[anim];
+    const loop = ends[ends.length - 1]!;
+    const u = anim === "wave" ? Math.min(t, loop - 1) : ((t % loop) + loop) % loop;
+    let i = 0;
+    while (i < ends.length - 1 && u >= ends[i]!) i++;
+    return this.frames[anim][i]!;
+  }
+  /** Its idle's first frame cut to what's drawn, as an image's address (the game's strip shows it): made when asked. */
+  face(): string | null {
+    const c = this.frames.idle[0];
+    if (!c) return null;
+    const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
+    let x0 = c.width;
+    let y0 = c.height;
+    let x1 = -1;
+    let y1 = -1;
+    for (let y = 0; y < c.height; y++)
+      for (let x = 0; x < c.width; x++)
+        if (d[(y * c.width + x) * 4 + 3]! > 0) ((x0 = Math.min(x0, x)), (y0 = Math.min(y0, y)), (x1 = Math.max(x1, x)), (y1 = Math.max(y1, y)));
+    // Square, the figure standing on its bottom in the middle, so it sits in the strip's round spot like a pawn.
+    const size = Math.max(x1 - x0, y1 - y0) + 1;
+    const out = document.createElement("canvas");
+    out.width = out.height = size;
+    out.getContext("2d")!.drawImage(c, x0, y0, x1 - x0 + 1, y1 - y0 + 1, Math.floor((size - (x1 - x0 + 1)) / 2), size - (y1 - y0 + 1), x1 - x0 + 1, y1 - y0 + 1);
+    return out.toDataURL();
   }
 }
 
@@ -543,6 +615,8 @@ export class Renderer {
   youArt: YouArt | null = null;
   /** Each bot's dressed pawn (its crate items, drawn once when the page opens: Town.tsx), by person id; none: plain. */
   readonly botArt = new Map<string, YouArt>();
+  /** Each sidekick's frames, by its sheet: every one cut from it as the town opens (the constructor), never per frame. */
+  private readonly spriteArt = new Map<SidekickSheet, SpriteFrames>();
   /** Tag widths by name and size; sign and bubble layouts by text. */
   private readonly tagW = new Map<string, number[]>();
   private readonly nameW = new Map<string, number[]>();
@@ -601,6 +675,7 @@ export class Renderer {
     this.propFrames = PROPS.map((p) => (p.kind === "tree" ? trees[p.v]! : p.kind === "bench" ? bench : p.kind === "table" ? table : p.kind === "lamp" ? lamp : fountain));
     this.propTop = PROPS.map(() => 0);
     this.bossFrames = town.bosses.map((b) => new FrameCache(BOSS_ART[b.home.id]));
+    for (const p of town.people) if (isSprite(p.look) && !this.spriteArt.has(p.look.sprite)) this.spriteArt.set(p.look.sprite, new SpriteFrames(p.look.sprite));
     this.houseFrames = this.places.map((h) => new FrameCache(artOf(h).ch));
     this.placeGlow = this.places.map(() => null);
     this.chipIcon = new FrameCache(COLISEUM_CHIP);
@@ -904,6 +979,13 @@ export class Renderer {
     b[k + 3] = h;
   }
 
+  /** (Tests) Whether a name tag, a home's name or the bubble drawn this frame covers (x, y), or a pixel round it. */
+  private labelOver(x: number, y: number): boolean {
+    const b = this.clearBoxes;
+    for (let k = 0; k < this.nClear * 4; k += 4) if (x + 2 > b[k]! && x - 2 < b[k]! + b[k + 2]! && y + 2 > b[k + 1]! && y - 2 < b[k + 1]! + b[k + 3]!) return true;
+    return false;
+  }
+
   /** True if a chip with its middle at (x, y) would cover a box, the buttons, or one of the first `n` chips. */
   private chipBlocked(x: number, y: number, n: number): boolean {
     const r = TOWN_FEEL.chipClear;
@@ -1127,7 +1209,7 @@ export class Renderer {
       it.dx = wrapF(x - this.camX);
       it.dz = wrapF(y - this.camY);
       it.sz = it.kind === "prop" ? it.dz + 0.05 : it.dz;
-      it.on = drawable(v, it.dx, it.dz, margin, below);
+      it.on = drawable(v, it.dx, it.dz, margin, below) && !(it.kind === "person" && people[it.i]!.home);
     }
     items.sort(byFarFirst);
     for (const b of town.bosses) b.onScreen = false;
@@ -1163,24 +1245,38 @@ export class Renderer {
         this.sitting = !!table;
         const facing = table ? (w.c < table.c ? 1 : -1) : w.facing;
         // Up close on a statue, the people in front of it (you, on its square) fade: they'd stand between the camera and it.
-        this.fade = it.dz < this.statueDz ? 1 - f.closeNearFade * this.close.e : 1;
+        // A bot coming out from home fades in, one going home fades out (Oct 28: they take turns in the square).
+        this.fade = (it.dz < this.statueDz ? 1 - f.closeNearFade * this.close.e : 1) * clamp(Math.min(now - person.came, person.leaves - now) / f.botFadeMs, 0, 1);
         it.faded = this.fade < 0.5;
         if (person.you) {
           // Your shadows are a bot's: sized from the pawn, not from the margin your look's items are drawn in.
           const art = this.youArt;
           const k = 1 + 2 * (art?.pad ?? 0);
           const pad = art?.pad ?? 0;
-          this.drawSprite(it, art?.img ?? pawnImage(person.look.side, person.look.tint), f.youSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.youHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.youSquares);
+          this.drawSprite(it, art?.img ?? (isSprite(person.look) ? pawnImage("light", null) : pawnImage(person.look.side, person.look.tint)), f.youSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.youHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.youSquares);
           if (this.fade > 0.02) this.tag(person.name, it.fx, it.hy - 2, true, clamp((11 * this.p.k) / v.kf, 8, 12), this.fade);
         } else {
-          // A bot's dressed pawn (its one or two crate items, made once), drawn as yours is.
-          const art = this.botArt.get(person.id);
-          const k = 1 + 2 * (art?.pad ?? 0);
-          const pad = art?.pad ?? 0;
-          this.drawSprite(it, art?.img ?? pawnImage(person.look.side, person.look.tint), f.botSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.botHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.botSquares);
+          const lk = person.look;
+          if (isSprite(lk)) {
+            // A sidekick (Oct 28): its own frames, cut from its sheet as the town opened. It walks, stands, sits (its sit has its own
+            // stool, drawn over the table's: not lowered, no shadow) and waves once when tapped. No hop: its walk steps.
+            const sp = this.spriteArt.get(lk.sprite)!;
+            this.sitting = false;
+            if (sp.ready) {
+              const anim = spriteAnim(person, now);
+              const sh = sp.sheet;
+              this.drawSprite(it, sp.at(anim, anim === "wave" ? now - person.waved : now + it.i * 613), sp.squares, sh.foot[0] / sh.w, sh.foot[1] / sh.h, sh.w / sh.h, 0, 0, facing, table ? 0 : f.sidekickShadow, sp.top[anim]);
+            } else it.on = false; // (its sheet still loading: not drawn, not tapped)
+          } else {
+            // A bot's dressed pawn (its one or two crate items, made once), drawn as yours is.
+            const art = this.botArt.get(person.id);
+            const k = 1 + 2 * (art?.pad ?? 0);
+            const pad = art?.pad ?? 0;
+            this.drawSprite(it, art?.img ?? pawnImage(lk.side, lk.tint), f.botSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.botHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.botSquares);
+          }
           // Name tags on the near ones only.
           const far = farOf(v, it.dz);
-          if (far < f.tagFar && this.fade > 0.02) this.tag(person.name, it.fx, it.hy - 2, false, clamp((11 * this.p.k) / v.kf, 8, 12), clamp((f.tagFar - far) / 0.12, 0, 1) * this.fade);
+          if (it.on && far < f.tagFar && this.fade > 0.02) this.tag(person.name, it.fx, it.hy - 2, false, clamp((11 * this.p.k) / v.kf, 8, 12), clamp((f.tagFar - far) / 0.12, 0, 1) * this.fade);
         }
         this.fade = 1;
         this.sitting = false;
@@ -1741,7 +1837,7 @@ export class Renderer {
     ctx.restore();
   }
 
-  /** (Tests) Where lamp `i` (its index in LAMPS)'s glass is on the screen now; false when it isn't drawn, or something nearer stands over it. */
+  /** (Tests) Where lamp `i` (its index in LAMPS)'s glass is on the screen now; false when it isn't drawn, or something nearer stands (or a name tag lies) over it. */
   lampAt(i: number, out: { x: number; y: number }): boolean {
     const l = LAMPS[i];
     const k = PROPS.findIndex((p) => p.kind === "lamp" && l !== undefined && p.c === l.c && p.r === l.r);
@@ -1754,12 +1850,14 @@ export class Renderer {
       const o = this.items[j]!;
       if (o.on && !o.faded && out.x >= o.x0 && out.x <= o.x1 && out.y >= o.y0 && out.y <= o.y1) return false;
     }
-    return true;
+    // (Nor a name tag over it: they're drawn over everything.)
+    return !this.labelOver(out.x, out.y);
   }
 
   /**
    * (Tests) A point on a place's first light (`i`: its index, the homes then the Colosseum) where it shows now: a lit
-   * pixel amid lit ones, nothing standing in front of it (the nearest such to the light's middle); false if none.
+   * pixel amid lit ones, nothing standing in front of it and no name tag over it (the nearest such to the light's middle);
+   * false if none.
    */
   lightAt(i: number, out: { x: number; y: number }): boolean {
     const it = this.houseItems[i];
@@ -1778,7 +1876,7 @@ export class Renderer {
     for (const [x, y] of cands) {
       out.x = it.x0 + (x + 0.5) * px;
       out.y = it.y0 + (y + 0.5) * px;
-      if (!(out.x > 0 && out.x < this.W && out.y > 0 && out.y < this.H)) continue;
+      if (!(out.x > 0 && out.x < this.W && out.y > 0 && out.y < this.H) || this.labelOver(out.x, out.y)) continue;
       const h = this.pick(out.x, out.y);
       if (i >= this.homes.length ? h?.kind === "coliseum" : h?.kind === "house" && h.home === this.homes[i]) return true;
     }
@@ -2326,6 +2424,11 @@ export class Renderer {
         }
       }
     return false;
+  }
+
+  /** A sidekick's face for the game's strip (its idle's first frame, an image's address), or null for a pawn. */
+  spriteFace(p: Person): string | null {
+    return isSprite(p.look) ? (this.spriteArt.get(p.look.sprite)?.face() ?? null) : null;
   }
 
   /** A person's item this frame (`i`: its index in the people), or null. */

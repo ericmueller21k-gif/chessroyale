@@ -18106,6 +18106,14 @@ button.sq-tiny {
   width: 28px;
   height: 28px;
 }
+/* A town sidekick's face (Oct 28): its idle's first frame in the pawn's place, crisp pixel art. */
+.dv-face {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
 .dv-strip-who {
   flex: 1 1 auto;
   min-width: 0;
