@@ -22,7 +22,7 @@
  * park lamp's glass is (by its index in LAMPS) and `__townAt("light", id)` a lit pixel of a home's (or "coliseum") first
  * light with nothing in front of it (the lights at dusk and night); the canvas's `data-sit="1"` while you sit at a table; and
  * `window.__townGather()` sends the three nearest bots to stand beside you; `__townAt("bot", i)`, `__townCall(i)` and
- * `__townBots()` for the bots (docs/areas/town-square.md).
+ * `__townBots()` for the bots (docs/areas/town-square.md); `__townGlide(id)` glides the camera to a home, as its chip does.
  * docs/areas/town-square.md.
  */
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
@@ -35,7 +35,7 @@ import { TOWN_FEEL } from "./feel.ts";
 import { Press } from "./press.ts";
 import { PAWN_PX, Renderer, pawnImage, type Hit } from "./render.ts";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
-import { BOTS, COLISEUM_PLACE, HOMES, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, createTown, destFor, holdBot, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingText, seated, statueAt, stoolAt, tableAt, tableFor, tableStates, tdist, tick, waitingBot, walkWalker, type HomeId, seatOf, seatText, type Person, type Place, type Seat, type Sq, type StatueId, type Target } from "./world.ts";
+import { BOTS, COLISEUM_PLACE, HOMES, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, tdist, tick, townLine, waitingBot, walkWalker, type HomeId, seatOf, seatText, type Person, type Place, type Seat, type Sq, type StatueId, type Target } from "./world.ts";
 import { dressedPawn, lookKey } from "./you-look.ts";
 import type { BotGameAsk } from "./TownPage.tsx";
 import "./town.css";
@@ -57,6 +57,8 @@ export interface Card {
   bot?: number;
   /** A bot's card: no table has both stools free (Play greyed, "Tables are full"). */
   full?: boolean;
+  /** A boss's or a home's card: its line this time (`townLine`: only Hollow's has lines, the next one each time it opens). */
+  line?: string | null;
 }
 
 type Ctl = ReturnType<typeof startTown>;
@@ -73,9 +75,9 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, seat = null }: { on
 
   // (A layout effect: the world's first frame is drawn before the screen first shows.)
   useLayoutEffect(() => {
-    const t = startTown(box.current!, canvas.current!, chips.current, cardEl.current!, live.current!, setZoomedOut, setCard, seatOf(seat), (s) => {
+    const t = startTown(box.current!, canvas.current!, chips.current, cardEl.current!, live.current!, setZoomedOut, setCard, seatOf(seat), (s, face) => {
       const b = BOTS[s.bot]!;
-      onPlayBot?.({ seat: seatText(s), name: botLabel(b), rating: b.rating, look: b.look.wear });
+      onPlayBot?.({ seat: seatText(s), name: botLabel(b), rating: b.rating, look: isSprite(b.look) ? null : b.look.wear, face });
     });
     ctl.current = t;
     return t.stop;
@@ -116,6 +118,7 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, seat = null }: { on
             {card && home && !card.confirm && card.kind === "boss" && (
               <>
                 <h2>{home.boss}</h2>
+                {card.line && <p class="town-card-text town-card-line">{card.line}</p>}
                 <button type="button" class="town-btn primary" onClick={() => ctl.current?.confirm()}>
                   Challenge alone
                 </button>
@@ -124,6 +127,7 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, seat = null }: { on
             {card && home && !card.confirm && card.kind === "home" && (
               <>
                 <h2>{home.name}</h2>
+                {card.line && <p class="town-card-text town-card-line">{card.line}</p>}
                 <button type="button" class="town-btn" disabled>
                   Shop
                 </button>
@@ -148,6 +152,8 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, seat = null }: { on
             {card?.kind === "bot" && bot && (
               <>
                 <h2>{botLabel(bot)}</h2>
+                {/* A boss's sidekick (Oct 28): whose, under its name. The pawns' cards stay as they were. */}
+                {sidekickText(bot) && <p class="town-card-text">{sidekickText(bot)}</p>}
                 <p class="town-card-text">{ratingText(bot)}</p>
                 <button type="button" class="town-btn primary" disabled={card.full} onClick={() => ctl.current?.play()}>
                   {card.full ? "Play · Tables are full" : "Play"}
@@ -219,7 +225,7 @@ function startTown(
   onZoom: (out: boolean) => void,
   onCard: (c: Card | null) => void,
   seat: Seat | null,
-  onPlay: (seat: Seat) => void,
+  onPlay: (seat: Seat, face: string | null) => void,
 ) {
   const f = TOWN_FEEL;
   const ctx = cv.getContext("2d")!;
@@ -229,8 +235,9 @@ function startTown(
   void document.fonts?.load('8px "Press Start 2P"').catch(() => {});
   // The bosses' sounds for a tap on one, made ahead off the page's thread (the sound worker), so a tap never costs a frame.
   warmSounds([...Object.values(SELECT_SOUND), ...Object.values(TOWN_SOUNDS).flat()]);
-  /** How often each boss has been tapped (its town sounds go in turn). */
+  /** How often each boss has been tapped (its town sounds go in turn); how often each home's card (its boss's or its own) has opened (its lines go in turn). */
   const taps = new Map<string, number>();
+  const opens = new Map<string, number>();
   // (On you: back from a game with a bot, you're at its table.)
   let camX = town.you.walker.c;
   let camY = town.you.walker.r;
@@ -262,9 +269,12 @@ function startTown(
   };
   const offAccount = onAccountChange(dress);
   dress();
-  // The bots' dressed pawns, drawn once now (their crate items over their pawns), never per frame; plain meanwhile.
-  for (const p of town.bots)
-    if (p.look.wear) void dressedPawn(p.look.wear, pawnImage(p.look.side, p.look.tint), PAWN_PX).then((art) => art && alive && r.botArt.set(p.id, art));
+  // The bots' dressed pawns, drawn once now (their crate items over their pawns), never per frame; plain meanwhile. (The
+  // sidekicks' frames are cut from their sheets as the renderer is made.)
+  for (const p of town.bots) {
+    const lk = p.look;
+    if (!isSprite(lk) && lk.wear) void dressedPawn(lk.wear, pawnImage(lk.side, lk.tint), PAWN_PX).then((art) => art && alive && r.botArt.set(p.id, art));
+  }
   /** The game with a bot has been asked for (once). */
   let opened = false;
   let raf = 0;
@@ -424,7 +434,7 @@ function startTown(
       const s = meetSeat(town);
       if (s) {
         opened = true;
-        onPlay(s);
+        onPlay(s, r.spriteFace(town.meet.bot));
       }
     }
     stepClose(dt);
@@ -489,6 +499,15 @@ function startTown(
       const sound = townSound(id, n);
       if (sound) play(sound);
     }
+    // A boss's or a home's card opening (not its confirm): its line this time, the next in turn (only Hollow's has lines).
+    if (c && (c.kind === "boss" || c.kind === "home") && !(card && card.kind === c.kind && card.i === c.i)) {
+      const id = HOMES[c.i]!.id;
+      const n = opens.get(id) ?? 0;
+      const line = townLine(id, n);
+      if (line) ((c = { ...c, line }), opens.set(id, n + 1));
+    } else if (c && card && c.kind === card.kind && c.i === card.i && card.line) c = { ...c, line: card.line };
+    // A bot's card opening: a sidekick waves, once (Oct 28).
+    if (c?.kind === "bot" && !(card?.kind === "bot" && card.i === c.i)) town.people[c.i]!.waved = performance.now();
     if (card?.kind === "boss") town.bosses[card.i]!.held = false;
     const was = heldBy(card);
     if (was && town.hold === was && town.meet?.bot !== was) holdBot(town, null);
@@ -697,7 +716,7 @@ function startTown(
   const hookGather = () => {
     if (!testSwitchesAllowed()) return;
     const me = town.you.walker.here();
-    const near = [...town.bots].sort((a, b) => tdist(a.walker.here(), me) - tdist(b.walker.here(), me)).slice(0, 3);
+    const near = town.bots.filter((b) => !b.home).sort((a, b) => tdist(a.walker.here(), me) - tdist(b.walker.here(), me)).slice(0, 3);
     for (const b of near) {
       const to = destFor(town, b.walker, { kind: "beside", at: me });
       if (to) walkWalker(b.walker, to);
@@ -714,7 +733,7 @@ function startTown(
       return h.c === sq.c && h.r === sq.r;
     };
     // Its first n stools: each one nobody stands on gets the nearest bot not sitting anywhere.
-    const free = [...town.bots].filter((b) => !seated(b) && !b.walker.moving()).sort((a, b) => tdist(a.walker.here(), table) - tdist(b.walker.here(), table));
+    const free = town.bots.filter((b) => !b.home && !seated(b) && !b.walker.moving()).sort((a, b) => tdist(a.walker.here(), table) - tdist(b.walker.here(), table));
     for (const sq of table.stools.slice(0, n)) {
       if (town.bots.some((b) => on(b, sq))) continue;
       const b = free.shift();
@@ -724,13 +743,16 @@ function startTown(
     }
   };
   const hookTables = () => (testSwitchesAllowed() ? tableStates(town.people).map((s) => (s.kind === "waiting" ? `waiting:${s.free}` : s.kind)) : null);
-  // ... `__townCall(i)`: the bot BOTS[i] walks to stand beside you, and every bot holds still from then on (to tap it);
+  // ... `__townCall(i)`: the bot BOTS[i] walks to stand beside you (out from home first, if it's there), and every bot holds
+  // still from then on (to tap it);
   // `__townBots()`: each bot (BOTS' order): its name, its square ("c,r"), the table it sits at (-1: none), whether it walks.
   const hookCall = (i: number) => {
     if (!testSwitchesAllowed()) return;
     town.nextBotAt = Infinity;
     town.leave = null;
     const b = town.bots.find((p) => p.bot === BOTS[i]);
+    if (b?.home) comeOut(town, b, performance.now(), 3);
+    if (b) b.leaves = Infinity;
     const to = b && destFor(town, b.walker, { kind: "beside", at: town.you.walker.here() });
     if (b && to) walkWalker(b.walker, to);
   };
@@ -739,7 +761,7 @@ function startTown(
       ? BOTS.map((bt) => {
           const p = town.bots.find((q) => q.bot === bt)!;
           const h = p.walker.here();
-          return { name: p.name, at: `${h.c},${h.r}`, table: seated(p)?.i ?? -1, moving: p.walker.moving() };
+          return { name: p.name, at: `${h.c},${h.r}`, table: seated(p)?.i ?? -1, moving: p.walker.moving(), home: p.home, anim: isSprite(p.look) ? spriteAnim(p, performance.now()) : null };
         })
       : null;
   // ... `__townBossBack(id)`: that home's boss walks round behind its home (the square two rows past its middle, or the
@@ -756,8 +778,16 @@ function startTown(
     }
     return !b.walker.moving();
   };
-  const hooks = window as unknown as { __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack };
+  // ... `__townGlide(id)`: the camera glides to a home as its chip would glide it (to tap a home far off: Hollow Peak).
+  const hookGlide = (id: HomeId) => {
+    const h = HOMES.find((x) => x.id === id);
+    if (!testSwitchesAllowed() || !h) return;
+    follow = false;
+    glide = { x: camX + wrapF(h.cx - camX), y: camY + wrapF(h.cy - h.foot + 0.5 - f.glideAhead - camY) };
+  };
+  const hooks = window as unknown as { __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack };
   hooks.__townAt = hookAt;
+  hooks.__townGlide = hookGlide;
   hooks.__townGather = hookGather;
   hooks.__townCam = hookCam;
   hooks.__townSeat = hookSeat;
@@ -818,6 +848,7 @@ function startTown(
       document.removeEventListener("visibilitychange", onVisibility);
       removeEventListener("keydown", onKey);
       delete hooks.__townAt;
+      delete hooks.__townGlide;
       delete hooks.__townGather;
       delete hooks.__townCam;
       delete hooks.__townSeat;

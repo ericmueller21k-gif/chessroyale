@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { N, wrapF, wrapI } from "../src/town/camera.ts";
 import { TOWN_FEEL } from "../src/town/feel.ts";
-import { APRON, APRON_ROWS, COLISEUM, GRASS, HOMES, PARK, PAVING, PROPS, START, STATUES, TABLES, Walker, createTown, destFor, findPath, groundAt, onColiseum, plotDist, seated, statueAt, stoolAt, tableAt, tableStates, taken, tick, walkWalker, walkable, type Sq, type Town } from "../src/town/world.ts";
+import { APRON, BOTS, APRON_ROWS, COLISEUM, GRASS, HOMES, PARK, PAVING, PROPS, START, STATUES, TABLES, Walker, createTown, destFor, findPath, groundAt, onColiseum, plotDist, seated, statueAt, stoolAt, tableAt, tableStates, taken, tick, walkWalker, walkable, type Sq, type Town } from "../src/town/world.ts";
 
 /** One pawn a square (src/town/world.ts): where a walk ends, and rings of people round someone. */
 
@@ -14,7 +14,7 @@ const SPOT: Sq = { c: 45, r: 6 };
 
 /** A town with nobody wandering off on their own (the bots stay put; the bosses are far from the middle). */
 function still(): Town {
-  const t = createTown(0);
+  const t = createTown(0, undefined, null, BOTS.length);
   t.nextBotAt = Infinity;
   return t;
 }

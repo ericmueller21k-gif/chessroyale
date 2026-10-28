@@ -189,7 +189,7 @@ function DuelStrip({ p, c, you, ms, running, clockShownNow, away }: { p: DuelSid
   return (
     <div class={`dv-strip${you ? " dv-you" : " dv-them"}`} data-side={c}>
       <span class="dv-strip-pawn" aria-hidden="true">
-        <Avatar look={p.look ?? undefined} side={c} />
+        {p.face ? <img class="dv-face" src={p.face} alt="" /> : <Avatar look={p.look ?? undefined} side={c} />}
       </span>
       <span class="dv-strip-who">
         <PlayerName name={p.name} uid={p.uid ?? undefined} you={you} bot={p.bot} class="dv-name" />
@@ -316,7 +316,7 @@ function DuelBoard({ session, snap, now, onHome, onAgain }: { session: DuelSessi
         <BrainLoadingCard
           icon={
             <span style={{ display: "block", width: "64px", height: "64px" }}>
-              <Avatar look={snap.players[them].look ?? undefined} side={them} />
+              {snap.players[them].face ? <img class="dv-face" src={snap.players[them].face!} alt="" /> : <Avatar look={snap.players[them].look ?? undefined} side={them} />}
             </span>
           }
           title="Loading the bot…"

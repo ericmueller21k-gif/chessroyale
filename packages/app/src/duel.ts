@@ -49,6 +49,8 @@ export interface DuelSide {
   look: ItemLook | null;
   rank: RankView;
   bot?: boolean;
+  /** A town sidekick's face (an image's address), shown in place of the pawn. */
+  face?: string | null;
 }
 
 /** Everything a 1 v 1 screen draws, in this device's time. */
@@ -499,7 +501,7 @@ export class BotDuel implements DuelSession {
     this.town = town;
     this.you = Math.random() < 0.5 ? "w" : "b";
     const look = town ? town.look : botLook(`bot-${Math.floor(Math.random() * 1e9)}`).look;
-    const bot: DuelSide = { uid: null, name: town?.name ?? "Bot", look, rank: { ...rankView(null), placement: null, tier: "Bot", label: town ? String(rating) : "Unranked" }, bot: true };
+    const bot: DuelSide = { uid: null, name: town?.name ?? "Bot", look, rank: { ...rankView(null), placement: null, tier: "Bot", label: town ? String(rating) : "Unranked" }, bot: true, ...(town?.face ? { face: town.face } : {}) };
     // (A town game is casual: your pill says so, not your 1 v 1 rank.)
     const me = town ? { ...yourSide(), rank: { ...rankView(null), placement: null, tier: "Casual", label: "Casual" } } : yourSide();
     this.players = this.you === "w" ? { w: me, b: bot } : { w: bot, b: me };
@@ -720,10 +722,11 @@ function materialFor(fen: string, c: Color): number {
   return n;
 }
 
-/** A town bot's game: the bot's name ("Tempo Tess (bot)") and its crate items. */
+/** A town bot's game: the bot's name ("Tempo Tess (bot)") and its crate items, or a sidekick's face (an image's address). */
 export interface TownBotGame {
   name: string;
   look: ItemLook | null;
+  face?: string | null;
 }
 
 // ---------------- The queue ----------------

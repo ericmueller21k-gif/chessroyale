@@ -634,7 +634,7 @@ export function App() {
     townGame.current = g.seat;
     setDuel((old) => {
       old?.dispose();
-      return new BotDuel(g.rating, { name: g.name, look: g.look });
+      return new BotDuel(g.rating, { name: g.name, look: g.look, face: g.face });
     });
     const rest = searchWithoutSeat();
     history.pushState({ townGame: g.seat }, "", `/town${rest ? `${rest}&` : "?"}at=${g.seat}`);

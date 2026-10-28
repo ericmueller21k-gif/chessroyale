@@ -2,7 +2,8 @@
 
 Boss raid's coming home: a small round world where players walk around and meet the bosses at their homes (the plan:
 `ROADMAP.md`, "Boss raid: the town square"). **Slices 1 to 3** are the world alone, on a hidden address: the sky by
-the time of day, the curved ground, all fourteen boss homes with their bosses roaming near them, six bots and you; slice 4
+the time of day, the curved ground, all fourteen boss homes with their bosses roaming near them, the bots (twenty since Oct
+28: six pawns and the bosses' fourteen sidekicks) and you; slice 4
 added the press, the trail and the cards; **slice 5 the Colosseum** in the middle; **slice 6** made the Colosseum about
 twice its size, the map bigger, and put **the park** with its ten chess tables in front of its gate; **the lights** (Oct 27) light the park's lamps and the homes' windows at dusk and night. Home's **Boss Arena** card (Oct 26, Eric)
 opens it, and the computer's side menu's Boss Arena item; the address `/town` opens it directly too (`hunchess.com/town`,
@@ -62,7 +63,10 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
 - **Cards** (the prototype's, inside the world's box, over the boss's head or above the home's name, placed every frame;
   a tap anywhere else, or Escape, closes one). A boss says something as its card opens (Eric, Oct 27): its select sound
   (`SELECT_SOUND`), or its own town sounds in turn (`TOWN_SOUNDS`, `townSound` in `characters/boss-select.ts`: Folio's
-  murmur, then its "mm-hm"), made ahead in the sound worker as the town opens so a tap never costs a frame. Its card: its name and **"Challenge alone"**, which asks **"Leave the town
+  murmur, then its "mm-hm"), made ahead in the sound worker as the town opens so a tap never costs a frame. **Hollow's card
+  says a line** (Oct 28, Eric's three, word for word, about his sidekick: `TOWN_LINES`, `townLine` in `world.ts`), under
+  its title, the next in turn each time his card or Hollow Peak's opens (its confirm is the same card); no other card has
+  a line. Its card: its name and **"Challenge alone"**, which asks **"Leave the town
   square?"** / "You'll fight [boss] alone in Solo Boss Mode." / **Leave** / **Stay**; Leave closes the town square and
   opens the Boss raid screen with that boss's tile picked (`rememberBossPick`, then the screen as the side menu opens
   it); Stay closes the confirm and its card. A home: its name, **"Shop"** greyed (shown, not tappable) and "Coming
@@ -164,19 +168,45 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
   with their pictures; the tags, names and bubble are drawn after them. Nothing is made or drawn by day.
 
 - **You** (slice 5): your pawn wears your profile's crate items (`town/you-look.ts`: `Avatar` drawn once into a canvas,
-  again only when your look changes; plain when signed out or wearing nothing). The bots wear theirs too (Oct 27: one or two
+  again only when your look changes; plain when signed out or wearing nothing). The pawn bots wear theirs too (Oct 27: one or two
   each, from `BOTS`; drawn the same way once as the page opens, never per frame; slice 5's "bots stay plain" is replaced). Every pawn's base stands
   on its square's middle, with a contact shadow under it that shrinks and fades as the hop lifts it. You have no ring
   under you (Oct 26, Eric: the ring and the shadow together "looks sloppy"); your gold name tag marks you, and your
   shadows are a bot's, sized from the pawn rather than the margin your items are drawn in.
 
 - **The bots and playing them** (Oct 27, Eric: "a few bots… with different skill level… if you tap them you can invite
-  them to a game and then you both run over to the chessboard"; `docs/decisions/2026-10-27-town-bots.md`). Six bots, one
-  table, `BOTS` in `world.ts`: a short name (8 to 10 characters), a fixed rating and a look (`Look`: side, tint and the crate
-  items worn, one field so a sprite can replace the pawn later): Pin Pete 800, Rook Rita 1000, Fork Frank 1200, Tempo Tess
-  1400, Bishop Bo 1700, Gambit Gus 2000. Shown everywhere as "<name> (bot)" (`botLabel`: their tags, cards and games).
+  them to a game and then you both run over to the chessboard"; `docs/decisions/2026-10-27-town-bots.md`). **Twenty bots
+  since Oct 28** (`docs/decisions/2026-10-28-sidekicks-in-town.md`), one table, `BOTS` in `world.ts` (names and ratings
+  live there and nowhere else): a ladder from 600 to 2500 in steps of 100, each rung once. The six pawns keep their names
+  and clothes, one every three rungs: Pin Pete 600, Rook Rita 900, Fork Frank 1200, Tempo Tess 1500, Bishop Bo 1800,
+  Gambit Gus 2100. The bosses' fourteen **sidekicks** (little kid versions of the bosses, Eric's approved art) take the other
+  rungs, an easier boss's kid lower: Squirt (Boingo's) 700, Tex (Wrangler's) 800, Dabble (Smudgy's) 1000, Blocky (Big
+  Boy's) 1100, Bun & Bug (Chub & Chirp's) 1300, Pleat (Folio's) 1400, Twinkle (Moo & Moon's) 1600, Drizzle (Puddles')
+  1700, Chip (Sawyer's) 1900, Stripes (Babur's) 2000, Woolly (Alfil's) 2200, Crumb (Ginger's) 2300, Sparky (Jefferson's)
+  2400, and **Glim (Hollow's) 2500**, the top, stronger than Hollow (Eric's twist). Names at most 10 characters. Each bot
+  has a look (`Look`, one field): a pawn's (side, tint and the crate items worn) or a sprite's (`{ sprite }`: a sidekick's
+  baked sheet), and a sidekick its boss (`boss`). Shown everywhere as "<name> (bot)" (`botLabel`: their tags, cards and
+  games). The bots start off the tables' stools (every table free as the town opens) and sit as they wander.
+  - **Ten out at once, the others at home, taking turns** (Oct 28: twenty in the square cost about 3 frames a second,
+    Eric's frame-rate rule: the decision's numbers). `botsOut` (10) are in the square, picked at random as the town opens
+    (back from a game, the bot you played among them); the rest are at home (`Person.home`: not drawn, not tapped, on no
+    square: its walker leaves the town's `all`). Every `botTurnMs` (15 to 30 s) one out, standing, free and at least
+    `botTurnAway` (5) steps from you starts home, fading out over `botFadeMs`, and one from home comes out on a free
+    square in the park as far from you, fading in (`takeTurns`, `comeOut`). A bot whose card opens stays.
+  - **A sidekick in the square** (Oct 28): its own animations, `idle` standing, `walk` walking (no hop: its walk steps),
+    `sit` on a table's stool (its sit has its own little stool, drawn over the table's, facing the board; no shadow, not
+    lowered like a pawn), and `wave` once when you tap it, then `idle` while its card is open (`spriteAnim` in `world.ts`;
+    sitting wins: it never waves off its stool). Mirrored when it walks or sits facing our left, as pawns are. As tall as a
+    bot's pawn from its idle's top to its feet (`sidekickSquares`, 0.87), its feet where a pawn's base stands; its name
+    tag over its head, as a pawn's. **Its frames are baked** (`scripts/bake-sidekicks.ts`, run after changing a sidekick's
+    art): one PNG a sidekick (`town/sidekicks/<boss>.png`: rows idle, walk, sit, wave) and their times, feet and heads in
+    `town/sidekick-sheets.ts`; the town loads the fourteen pictures as it opens and cuts every frame into a canvas once
+    (`SpriteFrames` in `render.ts`), never per frame; a sidekick isn't drawn (or tapped) until its picture has loaded (a
+    moment). No art code runs in the town: the sprites' own code paints for about 3 s as it loads, which would hold the
+    town's first frame back (measured: the decision).
   - **A bot's card** (a tap on a bot; placed over its name tag like a boss's; the bot holds still while it's open, `hold`):
-    "<name> (bot)", "Rating 1400" and **Play**. Play: you both walk to the nearest table with both stools free (nearest to
+    "<name> (bot)", for a sidekick **"<Boss>'s sidekick"** under it (`sidekickText`: "Hollow's sidekick", "Puddles'
+    sidekick"), "Rating 1400" and **Play**. Play: you both walk to the nearest table with both stools free (nearest to
     the two of you, `tableFor`), you to the stool nearer you, the bot to the other (`meet`); once both sit (`meetReady`) the
     game opens. Any other walk of yours calls it off. No table free: Play greyed, reading "Play · Tables are full" (in the
     button: the card hugs its content and nothing is added round it; `anyTableFree`, checked only while the card is open).
@@ -184,7 +214,8 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
     card's first button is **"Play <name> (bot) · <rating>"**, Casual and Ranked greyed under it; the bot stays while the card
     is open; the game opens once you sit.
   - **The game** is the 1 v 1 bot game's (`BotDuel` in `duel.ts` with `town`, `screens/Duel.tsx`), on this device: the bot's
-    name and its rating on its strip, "Casual" on yours (not your 1 v 1 rank), no versus moment; first Boss alone's loading step ("Loading the bot…": `MaiaGate`,
+    name and its rating on its strip (a sidekick's face, its idle's first frame, in place of the pawn there and on the
+    loading step: `face`, an image made as you both sit), "Casual" on yours (not your 1 v 1 rank), no versus moment; first Boss alone's loading step ("Loading the bot…": `MaiaGate`,
     this device's Stockfish paused, Maia loaded alone, at most `loadGateMs`; the same `maiaAllowed` rule; Stockfish at the
     bot's rating until Maia is ready, or if it can't run), then the bot game's vote (Bullet, Blitz or Rapid) and its clock;
     Maia plays at the bot's rating. Colors at random. Casual: "Casual game", no rank change, no coins, nothing sent to the
@@ -217,7 +248,10 @@ noted wherever a slice changed one.
 
 - `packages/app/src/town/`: `TownPage.tsx` (the lazy load), `Town.tsx` (the screen, the loop, input, chips, cards, the sky's
   clock, the statues' close-up), `press.ts` (a finger as a button), `camera.ts`, `world.ts`, `render.ts`, `you-look.ts`, `sky.ts`, `sky-draw.ts`, `sign-font.ts`, `feel.ts`, `town.css`, `houses/`
-  (one file per home, fourteen in all, the Colosseum's `coliseum.ts`, the park's `park.ts`, the kit of shared pieces and the index).
+  (one file per home, fourteen in all, the Colosseum's `coliseum.ts`, the park's `park.ts`, the kit of shared pieces and the index),
+  `sidekick-sheets.ts` and `sidekicks/*.png` (the sidekicks' baked frames, generated).
+- The sidekicks' art: `packages/app/src/characters/sidekicks/<boss>.ts` (one `Character` each, `sidekick-<boss>`, copied
+  as drawn from `claude/boss-art`), baked by `scripts/bake-sidekicks.ts` (`npx tsx scripts/bake-sidekicks.ts`).
 - References: `docs/mockups/town-square/` (the prototype Eric tested, and the pictures for the homes: Eric's for the
   igloo, the peak and the meadow, his suggestions for seven more). Alfil's Pyramid has no picture: it's our design.
 
@@ -239,11 +273,15 @@ noted wherever a slice changed one.
   you on its nearer free stool, where you sit (both taken: beside it); bots sit now and then, a stool each.
 - `packages/app/test/town-world.test.ts` also: the statues' squares (on the apron, in front of the ground's end columns,
   symmetric), their quotes word for word, a tap on one walks you there (or beside it), the bots never stop there.
-- `packages/app/test/town-bots.test.ts` (Oct 27): the bot table (six, 8 to 10 characters, 800 to 2000 spread, one or two
-  real crate items each), "<name> (bot)" everywhere, the walk to the nearest free table (your stool the nearer), sitting and
+- `packages/app/test/town-bots.test.ts` (Oct 27; Oct 28): the bot table (twenty, 600 to 2500 by 100, each rung once,
+  names at most 10 characters, Glim (Hollow's) on top; the six pawns' names, rungs and one or two real crate items each; the
+  fourteen sidekicks, one a boss, in the ladder's order, each sheet with idle, walk, sit and wave and its hash matching its
+  sprite, so a sheet can't go stale), a sidekick's card line ("Hollow's sidekick"), Hollow's three lines in turn, a sidekick's
+  animation (wave once after a tap, walk, sit), "<name> (bot)" everywhere, the walk to the nearest free table (your stool the nearer), sitting and
   when the game opens, calling it off, every table taken (no table; Play greyed) and one freeing, a held bot staying put, the
   bot waiting at a table, a seat in the address and back, and coming back to the table (the bot across, then wandering off).
-  `packages/app/test/town-bot-game.test.ts`: the game (its name and rating, the loading step before the vote, casual).
+  `packages/app/test/town-bot-game.test.ts`: the game (its name and rating, the loading step before the vote, casual; a
+  sidekick's face on its strip).
 - `packages/app/test/town-lights.test.ts`: the park's lamps (8 to 12, solid, on paving, off every path, every square and
   stool still reached, a pawn and a half tall, lit glass with a halo and a pool), every home's and the Colosseum's light
   spots inside its picture and off its sign (Hollow's green window untouched, none near the statues), and when they shine
@@ -262,16 +300,20 @@ title; a bot waiting, two playing (the board's pixels change), a tap on their ga
   `window.__townCam()` (the zoom, the lens, the focus, the statue up close, whether its quote shows and its letters' size),
   `window.__townSeat(i, n)` (the nearest free bots sit on table i's first n stools, and every bot holds still from then on)
   and `window.__townTables()` (each table's state: "still", "waiting:<free stool>" or "playing"); the bots (Oct 27):
-  `window.__townAt("bot", i)` (where to tap BOTS[i]), `window.__townCall(i)` (BOTS[i] comes to stand beside you and every bot
+  `window.__townAt("bot", i)` (where to tap BOTS[i]), `window.__townCall(i)` (BOTS[i] comes to stand beside you, out from home first if it's there, and every bot
   holds still; -1: only the holding still) and `window.__townBots()` (each bot: its name, square, the table it sits at, whether
-  it walks). Playing a bot (Oct 27, phone and desktop): a tap on Tempo Tess opens her card ("Tempo Tess (bot)", "Rating
-  1400", Play), nothing of Maia's fetched yet; Play walks you both to a table, the game opens (the gear, her name and
+  it walks, whether it's at home, a sidekick's animation). Playing a bot (Oct 27, phone and desktop): a tap on Tempo Tess opens her card ("Tempo Tess (bot)", "Rating
+  1500", Play), nothing of Maia's fetched yet; Play walks you both to a table, the game opens (the gear, her name and
   rating on her strip, Maia's worker started), one move each, resign ("Casual game"), "Back to town": you on your stool, she
   across, then she wanders off; a bot sitting alone at a table: its card's "Play <name> (bot) · <rating>" (Casual and
-  Ranked greyed), the game; a reload, then again and the back button, each lands you back at the table.
+  Ranked greyed), the game; a reload, then again and the back button, each lands you back at the table. The sidekicks
+  (Oct 28): a tap on Glim, it waves, then stands while its card is open ("Glim (bot)", "Hollow's sidekick", "Rating
+  2500", Play); Play, the game with its face on its strip, resign, back at the table with Glim across in its sit; Hollow
+  Peak's card shows his first line, closed and opened again the second (`__townGlide("hollow")` takes the camera there);
+  Babur's card has no line. `__townBots()` also gives each bot's animation (`anim`: a sidekick's, null for a pawn).
 
 ## Not built yet
 
-The bottom strip, a player's card ("Invite to party"), bots as sidekick characters (a sprite for `look`), the shop itself, the Colosseum's menu (raids with people,
+The bottom strip, a player's card ("Invite to party"), the shop itself, the Colosseum's menu (raids with people,
 party), the park's matchmaking (sitting at a table queues you: `ROADMAP.md`, "The park"), quick chats, other people's dressed pawns, the Simple map setting, real players and
 rooms, sounds.
