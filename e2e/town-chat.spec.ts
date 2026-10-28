@@ -341,14 +341,15 @@ test("the edge chips keep off the chat box, shown or not and wherever it's put",
   expect(proved, "the box lay over a chip's old place, and the chip gave way").toBe(true);
 
   // A chip by the box never jumps when the log appears or fades: its place is reserved always. (Only the chips round the box
-  // are compared: a boss's or bot's name tag passing an edge nudges the others now and then.)
+  // are compared, and a slide of a step or two is let go: a boss's or bot's name tag passing an edge nudges a chip by `chipSlideStep`
+  // (6 px) now and then. A chip let back under the box would jump at least its radius, 27 px, as the box was put over its place.)
   const moved = await rectOf(page, ".town-chat");
   const round = { x: moved.x - 90, y: moved.y - 90, w: moved.w + 180, h: moved.h + 180 };
   const byTheBox = async () => (await chips(page)).filter((c) => meets(c, round));
   const stay = (a: Awaited<ReturnType<typeof chips>>, b: Awaited<ReturnType<typeof chips>>, when: string) => {
     for (const c of a) {
       const d = b.find((o) => o.name === c.name);
-      if (d) expect(Math.hypot(c.x - d.x, c.y - d.y), `${c.name} stays put ${when}`).toBeLessThan(3);
+      if (d) expect(Math.hypot(c.x - d.x, c.y - d.y), `${c.name} stays put ${when}`).toBeLessThan(15);
     }
   };
   await page.waitForTimeout(300);
