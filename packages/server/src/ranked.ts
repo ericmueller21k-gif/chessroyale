@@ -5,10 +5,11 @@
  * the game, never from anything an app sends. The tables, a guest's merge and the profile's read are in
  * ranked-schema.ts (accounts.ts includes them; this file needs accounts.ts).
  */
-import { RANKED_1V1, duelCoins, newRankedRecord, rankView, rankedGame, ratingNow, type RankChange, type RankedRecord } from "@chessroyale/core";
+import { RANKED_1V1, duelCoins, newRankedRecord, rankedGame, ratingNow, type RankChange, type RankedRecord } from "@chessroyale/core";
 import type { Color, DuelOutcome, DuelPlayerView, DuelResult, DuelReason } from "@chessroyale/chess/duel";
 import { DELETED_ID, randomToken, stmt, type Sql, type Stmt, type User } from "./accounts.ts";
 import { lockerState } from "./locker.ts";
+import { rankOf } from "./ranked-schema.ts";
 import { seatName } from "./text-filter.ts";
 
 export interface RankedRow {
@@ -64,7 +65,7 @@ export async function duelEntrant(sql: Sql, user: Pick<User, "id" | "name">, now
     .then((l) => l.look)
     .catch(() => ({}));
   const { rating, rd } = ratingNow(record, now);
-  return { player: { uid: user.id, name: seatName(user.name, "Player"), look, rank: rankView(record) }, rating, rd: Math.round(rd) };
+  return { player: { uid: user.id, name: seatName(user.name, "Player"), look, rank: await rankOf(sql, record) }, rating, rd: Math.round(rd) };
 }
 
 /** A finished game, as the game's object hands it over to be recorded. */
@@ -111,6 +112,11 @@ export async function recordDuel(sql: Sql, g: FinishedDuel, held: (userId: strin
     const nonce = randomToken(9);
     const outcome = {} as Record<Color, DuelOutcome>;
     const writes: Stmt[] = [];
+    // (Each player's record after the game, for their rank's place among the top ladders once it's in.)
+    const after: Partial<Record<Color, RankedRecord>> = {};
+    // The top tiers go by place among the top ladders, which core's rankedGame can't know: before the game as it stands
+    // now (counted before this game's write), after it once it's in.
+    const shown = { w: await rankOf(sql, before.w.record), b: await rankOf(sql, before.b.record) };
     const mine = `EXISTS (SELECT 1 FROM ranked_1v1_games WHERE id = ? AND nonce = ?)`;
     for (const c of ["w", "b"] as const) {
       const me = before[c].record;
@@ -125,6 +131,7 @@ export async function recordDuel(sql: Sql, g: FinishedDuel, held: (userId: strin
         const r = rankedGame(me, opp, score, now);
         change = r.change;
         const n = r.next;
+        after[c] = n;
         writes.push(
           stmt(
             `INSERT INTO ranked_1v1 (user_id, rating, rd, games, wins, losses, draws, ladder, last_game, last_at, coin_day, coin_games)
@@ -193,15 +200,22 @@ export async function recordDuel(sql: Sql, g: FinishedDuel, held: (userId: strin
       ...writes,
     ]);
     const row = await sql.first<{ nonce: string }>("SELECT nonce FROM ranked_1v1_games WHERE id = ?", g.id);
-    if (row?.nonce === nonce) return outcome;
+    if (row?.nonce === nonce) {
+      for (const c of ["w", "b"] as const) {
+        const ch = outcome[c].change;
+        const n = after[c];
+        if (ch && n) outcome[c] = { ...outcome[c], change: { ...ch, before: shown[c], after: await rankOf(sql, n) } };
+      }
+      return outcome;
+    }
     // Recorded before (a try whose answer was lost): nothing more to do; each player hears their rank as it stands.
     if (row) {
       const now2 = { w: await rankedRecordOf(sql, g.players.w), b: await rankedRecordOf(sql, g.players.b) };
-      const asItStands = (c: Color): DuelOutcome => {
-        const v = rankView(now2[c].record);
+      const asItStands = async (c: Color): Promise<DuelOutcome> => {
+        const v = await rankOf(sql, now2[c].record);
         return { change: isHeld[c] ? null : { before: v, after: v, points: null, placed: false }, coins: 0 };
       };
-      return { w: asItStands("w"), b: asItStands("b") };
+      return { w: await asItStands("w"), b: await asItStands("b") };
     }
   }
   throw new Error(`ranked 1 v 1: game ${g.id} couldn't be recorded (its players' records kept changing)`);

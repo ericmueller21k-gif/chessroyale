@@ -3,7 +3,7 @@
  * nothing from the server's own files at run time, so accounts.ts can include it without a cycle (ranked.ts has the
  * rest).
  */
-import { rankView, type RankView } from "@chessroyale/core";
+import { mayBeTop, rankView, type RankView } from "@chessroyale/core";
 import type { Sql, Stmt } from "./accounts.ts";
 
 const stmt = (sql: string, ...params: unknown[]): Stmt => ({ sql, params });
@@ -43,6 +43,8 @@ export const RANKED_SCHEMA = [
     checked TEXT,
     nonce TEXT NOT NULL
   )`,
+  // (The top tiers' place, topPlace below: the ladders above one counted from this index, never the table. Oct 28, 2026.)
+  `CREATE INDEX IF NOT EXISTS ranked_1v1_ladder ON ranked_1v1 (ladder)`,
   `CREATE INDEX IF NOT EXISTS ranked_1v1_games_white ON ranked_1v1_games (white_id, ended_at)`,
   `CREATE INDEX IF NOT EXISTS ranked_1v1_games_black ON ranked_1v1_games (black_id, ended_at)`,
   `CREATE INDEX IF NOT EXISTS ranked_1v1_games_ended ON ranked_1v1_games (ended_at)`,
@@ -55,6 +57,39 @@ export const RANKED_COLUMNS: { table: string; column: string; type: string }[] =
   { table: "ranked_1v1", column: "coin_games", type: "INTEGER NOT NULL DEFAULT 0" },
 ];
 
+/** How long a ladder's place among the top ladders is kept (in this Worker instance) before it's counted again. */
+export const TOP_PLACE_MS = 60_000;
+/** At most this many ladders' places kept at once (the oldest go first). */
+const TOP_PLACES_KEPT = 2_000;
+const topPlaces = new Map<number, { place: number; at: number }>();
+
+/**
+ * Where a ladder stands among the top ladders (Pearlescent, Transcendent: RANKED_1V1.topTiers): 1 + how many ladders
+ * are higher. Equal ladders share a place (the same ladder is always the same tier). Asked only at
+ * RANKED_1V1.topFloor or above (null below: no top tier there), as one count on the ladder's index (ranked_1v1_ladder:
+ * the entries above it, never the table), and kept a minute per ladder in this Worker instance (`TOP_PLACE_MS`), so a
+ * busy profile or queue costs one count a minute per ladder.
+ */
+export async function topPlace(sql: Sql, ladder: number | null | undefined, now = Date.now()): Promise<number | null> {
+  if (!mayBeTop(ladder)) return null;
+  const kept = topPlaces.get(ladder);
+  if (kept && now - kept.at < TOP_PLACE_MS) return kept.place;
+  const above = (await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM ranked_1v1 WHERE ladder > ?", ladder))?.n ?? 0;
+  const place = above + 1;
+  topPlaces.delete(ladder);
+  if (topPlaces.size >= TOP_PLACES_KEPT) topPlaces.delete(topPlaces.keys().next().value!);
+  topPlaces.set(ladder, { place, at: now });
+  return place;
+}
+
+/** Forgets every kept place (tests). */
+export const forgetTopPlaces = () => topPlaces.clear();
+
+/** A record's rank as it shows, its place among the top ladders counted where it may be in a top tier. */
+export async function rankOf(sql: Sql, row: { games: number; ladder: number | null } | null | undefined, now = Date.now()): Promise<RankView> {
+  return rankView(row ? { ...row, place: await topPlace(sql, row.ladder, now) } : row);
+}
+
 /** What a profile shows of a player's 1 v 1: the rank and the record. */
 export interface RankedSummary {
   rank: RankView;
@@ -66,7 +101,7 @@ export interface RankedSummary {
 
 export async function rankedSummary(sql: Sql, userId: string): Promise<RankedSummary> {
   const row = await sql.first<{ games: number; wins: number; losses: number; draws: number; ladder: number | null }>("SELECT games, wins, losses, draws, ladder FROM ranked_1v1 WHERE user_id = ?", userId);
-  return { rank: rankView(row), games: row?.games ?? 0, wins: row?.wins ?? 0, losses: row?.losses ?? 0, draws: row?.draws ?? 0 };
+  return { rank: await rankOf(sql, row), games: row?.games ?? 0, wins: row?.wins ?? 0, losses: row?.losses ?? 0, draws: row?.draws ?? 0 };
 }
 
 /**

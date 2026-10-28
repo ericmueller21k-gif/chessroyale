@@ -2024,7 +2024,8 @@ export interface RankTierDef {
 /**
  * Ranked 1 v 1 ("1 v 1 · Classic chess"; Eric, Oct 16, 2026; docs/areas/ranked.md and
  * docs/decisions/2026-10-16-ranked-1v1.md): normal chess between two signed-in players, matched by a hidden rating,
- * with League of Legends style ranks. Every number of the mode is here; core/ranked.ts does the math.
+ * with ranks of tiers and divisions (Wood 5 … Radiant 1, then Pearlescent and Transcendent; Eric, Oct 28). Every number
+ * of the mode is here; core/ranked.ts does the math.
  */
 export const RANKED_1V1 = {
   /**
@@ -2071,29 +2072,41 @@ export const RANKED_1V1 = {
    */
   rating: { start: 1500, seedMin: 800, seedMax: 2400, startRd: 350, minRd: 60, rdPerDay: 18 },
   /**
-   * The ladder (LoL's tiers, Eric: "we can even like take from there exactly"): each tier has divisions 4 → 1 of
-   * `pointsPerDivision` points; past the last tier's division 1 come the apex tiers, with no divisions, each from its
-   * points above Master's start. One number places a player: ladder = division index × 100 + points (Iron 4 0 = 0).
+   * The ladder (Eric, Oct 28: "Maybe we can do puzzle pirates for some actually, wood, silver, gold, paragon, illustrious,
+   * sublime, radiant, pearlescent (top500), transcendent (top 100)"; "each tier has numbers 1-5 within it wood 5 being the
+   * lowest"; "yes 80 per division"). Each tier has divisions 5 → 1 of `pointsPerDivision` points; one number places a
+   * player: ladder = division index × 80 + points (Wood 5 0 = 0, Radiant 1 79 = 2799). 7 × 5 × 80 = 2800 = 7 × 4 × 100,
+   * the old ladder's (Iron … Diamond) length, so a stored ladder keeps its meaning: each tier spans the same 400 points
+   * the old tier in its place did (docs/decisions/2026-10-28-ranked-tiers.md). Each color is its emblem's main color,
+   * readable as a pill on both themes (4.5:1; packages/core/test/ranked.test.ts).
    */
   tiers: [
-    { name: "Iron", color: "#8b8580" },
-    { name: "Bronze", color: "#c08457" },
-    { name: "Silver", color: "#aeb6c2" },
-    { name: "Gold", color: "#f2c14e" },
-    { name: "Platinum", color: "#4fd1c5" },
-    { name: "Emerald", color: "#4ade80" },
-    { name: "Diamond", color: "#7aa7ff" },
+    { name: "Wood", color: "#dcaa66" },
+    { name: "Silver", color: "#b9c3cf" },
+    { name: "Gold", color: "#f0b020" },
+    { name: "Paragon", color: "#56c682" },
+    { name: "Illustrious", color: "#86aeff" },
+    { name: "Sublime", color: "#c096ff" },
+    { name: "Radiant", color: "#ff7e68" },
   ] as readonly RankTierDef[],
-  divisions: 4,
-  pointsPerDivision: 100,
-  apex: [
-    { name: "Master", color: "#c084fc", from: 0 },
-    { name: "Grandmaster", color: "#f87171", from: 200 },
-    { name: "Champion", color: "#fbbf24", from: 500 },
-  ] as readonly (RankTierDef & { from: number })[],
+  divisions: 5,
+  pointsPerDivision: 80,
   /**
-   * Where the ladder sits on the hidden rating: Iron 4 0 points is `baseRating`, each point `ratingPerPoint` more (so
-   * Master's start, 2800 points, is 2400).
+   * The top two tiers, no divisions, by place among the highest ladders: Pearlescent among the `top` 500, Transcendent
+   * among the 100, and only from `topFloor` ladder points (the director's call, Oct 28: with few players the top 100
+   * would otherwise be everyone). Your place is 1 + how many ladders are higher than yours (equal ladders share a
+   * place). At `topFloor` or more but outside the top 500 you stay Radiant 1, your RP counting on past 80 ("Radiant 1 ·
+   * 95 RP"). Where both hold, the smaller `top` (Transcendent) is the one shown.
+   */
+  topTiers: [
+    { name: "Pearlescent", color: "#c8bed8", top: 500 },
+    { name: "Transcendent", color: "#ab90ff", top: 100 },
+  ] as readonly (RankTierDef & { top: number })[],
+  /** The ladder points the top tiers need (Radiant 1's 80 RP: the end of the divisions). */
+  topFloor: 2800,
+  /**
+   * Where the ladder sits on the hidden rating: Wood 5 0 points is `baseRating`, each point `ratingPerPoint` more (so
+   * the top tiers' floor, 2800 points, is 2400). Unchanged by the Oct 28 tiers: a stored ladder means the same rating.
    */
   baseRating: 800,
   ratingPerPoint: 1600 / 2800,
@@ -2103,11 +2116,14 @@ export const RANKED_1V1 = {
    * the ladder's rating) after the game, the adjustment at most ±`maxAdjust` (a draw: half): so a player whose rank is
    * below their play climbs faster, and ranks settle where the hidden rating says. A win never takes points, a loss
    * never gives them. (Without the expected result, a player who keeps beating weaker ones climbed past their rating
-   * for good, and two accounts trading wins reached Champion: reports/ranked-1v1.md.) No promotion series and no
-   * demotion shields: crossing 100 points is the next division, falling below 0 the one before. Never below Iron 4 0.
+   * for good, and two accounts trading wins reached the top tier, then Champion: reports/ranked-1v1.md.) No promotion
+   * series and no demotion shields: crossing 80 points is the next division, falling below 0 the one before. Never below Wood 5 0.
    */
   points: { perGame: 20, perRating: 0.05, maxAdjust: 10 },
-  /** The first `games` rated games are placements ("Placement 2/5"), then the ladder starts from the hidden rating, at most `maxLadder` (Diamond 4 0). */
+  /**
+   * The first `games` rated games are placements ("Placement 2/5"), then the ladder starts from the hidden rating, at most
+   * `maxLadder`: Radiant 5 0 RP (2400; it was Diamond 4 0 before the Oct 28 tiers, the same number).
+   */
   placements: { games: 5, maxLadder: 2400 },
   /**
    * Coins (as Squads pays them), lined up with what a Squads lobby pays per minute played (about 1.8 a minute:

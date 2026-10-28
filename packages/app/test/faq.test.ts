@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BOSS_BRAIN, BOSS_DIFFICULTY, BOSS_POWERS, BOSS_ROSTER, BOSS_TIERS, CROWD_KNOCKOUTS, CROWD_START, DEFAULT_SETTINGS, LEAVING, RANKED_1V1, RECLUSE_PHASE2, crowdFinalBoss, crowdFinalists, fixedLevel, isPlayable, maiaRatingFor, maiaTopRating } from "@chessroyale/core";
-import { BOSS_BLOCKS, FAQ_DEFAULTS, eloExpected, faqAnchors, faqPage, faqPlainText, faqSections, type FaqSources } from "../src/faq/content.ts";
+import { BOSS_BLOCKS, FAQ_DEFAULTS, eloExpected, faqAnchors, faqPage, faqPlainText, faqSections, ranked1v1, type FaqSources } from "../src/faq/content.ts";
 import { inlineText, linksOf, parse, plainText } from "../src/faq/markdown.ts";
 
 /** The FAQ's text, built from these sources. */
@@ -620,6 +620,12 @@ describe("the FAQ's text format", () => {
     expect(inlineText(blocks[1]!.kind === "para" ? blocks[1]!.inlines : [])).toBe("Some bold and a link.");
   });
 
+  it("a row of rank emblems by id, each captioned with its tier and division", () => {
+    const [b] = parse("!emblems gold-d3 transcendent");
+    expect(b).toEqual({ kind: "emblems", items: [{ id: "gold-d3", caption: "Gold 3" }, { id: "transcendent", caption: "Transcendent" }] });
+    expect(plainText([b!])).toBe("[Emblems: Gold 3, Transcendent]");
+  });
+
   it("a heading without an id gets one from its words", () => {
     expect(parse("### The God King's save")[0]).toEqual({ kind: "heading", id: "the-god-king-s-save", text: "The God King's save" });
   });
@@ -633,9 +639,17 @@ describe("the FAQ: 1 v 1", () => {
     expect(t).toContain("Bullet and Blitz make Bullet 2+1, Blitz and Rapid Blitz 5+3. Bullet against Rapid makes Blitz 3+2.");
     expect(t).toContain(`you both have ${RANKED_1V1.voteSeconds} seconds to drag your pawn`);
     expect(t).toContain(`Each side has ${RANKED_1V1.firstMoveSeconds} seconds for its first move`);
-    expect(t).toContain("Iron, Bronze, Silver, Gold, Platinum, Emerald and Diamond");
+    expect(t).toContain("Wood, Silver, Gold, Paragon, Illustrious, Sublime and Radiant, each with divisions 5 (the lowest) to 1. A division is 80 rank points (RP)");
+    expect(t).toContain("nobody goes below Wood 5 with 0 RP");
+    expect(t).toContain("Pearlescent, the 500 highest ranks, and above it Transcendent, the 100 highest, both from 80 RP in Radiant 1");
+    expect(t).toContain("outside the top 500, you stay Radiant 1 and your RP keeps counting past 80");
+    expect(ranked1v1(RANKED_1V1)).not.toMatch(/\b(Iron|Bronze|Platinum|Emerald|Diamond|Master|Grandmaster|Champion)\b/);
+    // Each tier's emblem, a division's steps, and the top two's.
+    expect(t).toContain("[Emblems: Wood 5, Silver 5, Gold 5, Paragon 5, Illustrious 5, Sublime 5, Radiant 5]");
+    expect(t).toContain("[Emblems: Gold 5, Gold 4, Gold 3, Gold 2, Gold 1]");
+    expect(t).toContain("[Emblems: Pearlescent, Transcendent]");
     expect(t).toContain(`your first ${RANKED_1V1.placements.games} games show "Placement 1/${RANKED_1V1.placements.games}"`);
-    expect(t).toContain("at most Diamond 4.");
+    expect(t).toContain("at most Radiant 5.");
     expect(t).toContain(`about +${RANKED_1V1.points.perGame} for a win and −${RANKED_1V1.points.perGame} for a loss against a player at your level`);
     expect(t).toContain(`${RANKED_1V1.coins.perMinute.win} coins a minute for a win`);
     expect(t).toContain(`Up to ${RANKED_1V1.coins.perDay} games a day pay coins`);

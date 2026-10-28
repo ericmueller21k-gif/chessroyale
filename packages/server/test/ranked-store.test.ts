@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { RANKED_1V1, duelCoins, placeLadder, rankView } from "@chessroyale/core";
 import { DELETED_ID, createGuest, ensureSchema, profile, publicProfile, signInWithIdentity, type Sql } from "../src/accounts.ts";
 import { accountDownload, deleteAccount } from "../src/account-data.ts";
 import { appeal, setCase } from "../src/fairplay.ts";
 import { coinCount, duelEntrant, duelGamesOf, purgeDuelGames, rankedRecordOf, recordDuel, type FinishedDuel } from "../src/ranked.ts";
+import { TOP_PLACE_MS, forgetTopPlaces, rankOf, rankedSummary, topPlace } from "../src/ranked-schema.ts";
 import { memoryDb } from "./memory-db.ts";
 
 /**
@@ -16,11 +17,11 @@ const T0 = 1_800_000_000_000;
 const MIN = 60_000;
 
 async function setup() {
-  const { sql } = memoryDb();
+  const { sql, db } = memoryDb();
   await ensureSchema(sql);
   const a = (await createGuest(sql, T0, "Ann")).user;
   const b = (await createGuest(sql, T0, "Bob")).user;
-  return { sql, a, b };
+  return { sql, db, a, b };
 }
 
 let n = 0;
@@ -38,6 +39,111 @@ const game = (w: string, b: string, result: FinishedDuel["result"], patch: Parti
   ...patch,
 });
 const notHeld = async () => false;
+
+beforeEach(() => forgetTopPlaces());
+
+/** Players straight onto the ladder at these ladders (40 games each; ids "t0", "t1", …). */
+async function ladders(sql: Sql, ls: readonly number[], from = 0): Promise<void> {
+  for (const [i, l] of ls.entries())
+    await sql.run(
+      "INSERT INTO ranked_1v1 (user_id, rating, rd, games, wins, losses, draws, ladder, last_at) VALUES (?, 2400, 60, 40, 20, 20, 0, ?, ?)",
+      `t${from + i}`,
+      l,
+      T0,
+    );
+}
+
+/** The SQL a database is asked, counted (the place's count). */
+function counting(sql: Sql) {
+  const asked: string[] = [];
+  const spy: Sql = { ...sql, first: (q, ...p) => (asked.push(q), sql.first(q, ...p)) };
+  return { spy, counts: () => asked.filter((q) => q.includes("COUNT(*)")).length };
+}
+
+describe("the top tiers: place among the top ladders (Oct 28, 2026)", () => {
+  it("Transcendent in the top 100, Pearlescent in the top 500, only from 2800; outside them Radiant 1, its RP counting on", async () => {
+    const { sql } = await setup();
+    // 600 ladders from 3400 down, a point apart (3400 … 2801), and a few below the floor.
+    await ladders(sql, Array.from({ length: 600 }, (_, i) => 3400 - i));
+    await ladders(sql, [2799, 2500, 100], 600);
+    const label = async (ladder: number) => (await rankOf(sql, { games: 40, ladder })).label;
+    expect(await label(3400)).toBe("Transcendent · 600 RP");
+    expect(await label(3301)).toBe("Transcendent · 501 RP"); // 100th
+    expect(await label(3300)).toBe("Pearlescent · 500 RP"); // 101st
+    expect(await label(2901)).toBe("Pearlescent · 101 RP"); // 500th
+    expect(await label(2900)).toBe("Radiant 1 · 180 RP"); // 501st
+    expect(await label(2815)).toBe("Radiant 1 · 95 RP");
+    // Below the floor nobody is counted: the divisions as ever.
+    expect(await label(2799)).toBe("Radiant 1 · 79 RP");
+    expect(await label(2500)).toBe("Radiant 4 · 20 RP");
+    expect(await topPlace(sql, 2799)).toBeNull();
+  });
+
+  it("the floor: with few players everyone at 2800 or more is in the top 100, and nobody below it", async () => {
+    const { sql } = await setup();
+    await ladders(sql, [2800, 2799, 1500]);
+    expect((await rankOf(sql, { games: 40, ladder: 2800 })).label).toBe("Transcendent · 0 RP");
+    expect((await rankOf(sql, { games: 40, ladder: 2799 })).label).toBe("Radiant 1 · 79 RP");
+  });
+
+  it("ties share the better place: equal ladders are the same tier", async () => {
+    const { sql } = await setup();
+    // 99 above, then three at 3000: all three are 100th (Transcendent), the next below is 103rd.
+    await ladders(sql, [...Array.from({ length: 99 }, (_, i) => 3200 - i), 3000, 3000, 3000, 2950]);
+    expect(await topPlace(sql, 3000)).toBe(100);
+    expect((await rankOf(sql, { games: 40, ladder: 3000 })).tier).toBe("Transcendent");
+    expect(await topPlace(sql, 2950)).toBe(103);
+    expect((await rankOf(sql, { games: 40, ladder: 2950 })).tier).toBe("Pearlescent");
+  });
+
+  it("the count is one query on the ladder's index, kept a minute per ladder, never asked below the floor", async () => {
+    const { sql, db } = await setup();
+    await ladders(sql, [3000, 2900, 2850]);
+    const { spy, counts } = counting(sql);
+    expect(await topPlace(spy, 2900, T0)).toBe(2);
+    expect(counts()).toBe(1);
+    // Kept: the same ladder within the minute asks nothing; another player at that ladder neither.
+    await ladders(sql, [2950], 10);
+    expect(await topPlace(spy, 2900, T0 + TOP_PLACE_MS - 1)).toBe(2);
+    expect(counts()).toBe(1);
+    // A minute on, counted again (the new ladder above it now counts).
+    expect(await topPlace(spy, 2900, T0 + TOP_PLACE_MS)).toBe(3);
+    expect(counts()).toBe(2);
+    // Another ladder is its own count.
+    expect(await topPlace(spy, 2850, T0 + TOP_PLACE_MS)).toBe(4);
+    expect(counts()).toBe(3);
+    // Below the floor, and in placements: no query.
+    await rankOf(spy, { games: 40, ladder: 2799 });
+    await rankOf(spy, { games: 2, ladder: null });
+    await rankOf(spy, null);
+    expect(counts()).toBe(3);
+    // The plan: the ladder index, covering (its entries above the ladder), never a scan of the table.
+    const plan = db.prepare("EXPLAIN QUERY PLAN SELECT COUNT(*) AS n FROM ranked_1v1 WHERE ladder > ?").all(2900) as { detail: string }[];
+    expect(plan.map((r) => r.detail).join(" | ")).toMatch(/SEARCH ranked_1v1 USING COVERING INDEX ranked_1v1_ladder \(ladder>\?\)/);
+  });
+
+  it("the profile, the queue and a game's result show the top tier", async () => {
+    const { sql, a, b } = await setup();
+    await ladders(sql, [3500, 3400]);
+    await sql.run("INSERT INTO ranked_1v1 (user_id, rating, rd, games, wins, losses, draws, ladder, last_at) VALUES (?, 2450, 60, 40, 20, 20, 0, 2805, ?)", a.id, T0);
+    await sql.run("INSERT INTO ranked_1v1 (user_id, rating, rd, games, wins, losses, draws, ladder, last_at) VALUES (?, 2450, 60, 40, 20, 20, 0, 2790, ?)", b.id, T0);
+    expect((await rankedSummary(sql, a.id)).rank.label).toBe("Transcendent · 5 RP");
+    expect((await duelEntrant(sql, a)).player.rank.label).toBe("Transcendent · 5 RP");
+    expect((await duelEntrant(sql, b)).player.rank.label).toBe("Radiant 1 · 70 RP");
+    // Bob beats Ann: he crosses the floor (a place counted with the game in), she may drop under it.
+    const out = await recordDuel(sql, game(b.id, a.id, "1-0"), notHeld);
+    const bob = out!.w.change!;
+    expect(bob.before.label).toBe("Radiant 1 · 70 RP");
+    const bobNow = (await rankedRecordOf(sql, b.id)).record.ladder!;
+    expect(bobNow).toBeGreaterThanOrEqual(2800);
+    expect(bob.after.label).toBe(`Transcendent · ${bobNow - 2800} RP`);
+    expect(bob.after.emblem).toBe("transcendent");
+    const ann = out!.b.change!;
+    expect(ann.before.label).toBe("Transcendent · 5 RP");
+    const annNow = (await rankedRecordOf(sql, a.id)).record.ladder!;
+    expect(ann.after.label).toBe((await rankOf(sql, { games: 41, ladder: annNow })).label);
+  });
+});
 
 describe("recording a ranked game", () => {
   it("both players' records, coins by the minute, and the game kept", async () => {

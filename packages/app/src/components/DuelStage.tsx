@@ -2,6 +2,11 @@ import type { ComponentChildren } from "preact";
 import type { ItemLook, RankView } from "@chessroyale/core";
 import { DressedPawn } from "./FrontDoor.tsx";
 import { DuelRankPill } from "./DuelRankPill.tsx";
+import { RankEmblem } from "./RankEmblem.tsx";
+import { useMedia } from "./QuickChat.tsx";
+
+/** A computer's stage (styles.css, the stage's own 1024 px): the emblems at 2×. */
+const BIG_STAGE = "(min-width: 1024px)";
 
 /**
  * Ranked 1 v 1's stage (Eric, Oct 16: "your character's sitting there, and then there's like kind of this empty
@@ -20,7 +25,7 @@ export interface StageSide {
 }
 
 /** One side: the pawn standing on its platform, and under it the name and rank (or what the empty side says). */
-function Spot({ who, side, waiting }: { who: StageSide | null; side: "you" | "them"; waiting?: ComponentChildren }) {
+function Spot({ who, side, waiting, big }: { who: StageSide | null; side: "you" | "them"; waiting?: ComponentChildren; big: boolean }) {
   return (
     <div class={`dv-st-side dv-st-${side}${who ? " on" : ""}`}>
       <div class="dv-st-spot">
@@ -31,6 +36,8 @@ function Spot({ who, side, waiting }: { who: StageSide | null; side: "you" | "th
             <span class="dv-st-idle">
               <DressedPawn look={who.look ?? undefined} size="stage" />
             </span>
+            {/* Their rank's emblem at the pawn's outer top corner (absolute: it arrives with the pawn and moves nothing). */}
+            <RankEmblem rank={who.rank} scale={big ? 2 : 1} class="dv-st-emblem" />
           </span>
         ) : (
           <span class="dv-st-empty" key="empty" aria-hidden="true">
@@ -61,18 +68,19 @@ function Spot({ who, side, waiting }: { who: StageSide | null; side: "you" | "th
  * `waiting`: what the empty side says. `head` above, `children` under it (the line, the choices, Cancel).
  */
 export function DuelStage({ you, them, waiting, head, children, label }: { you: StageSide; them: StageSide | null; waiting: ComponentChildren; head?: ComponentChildren; children?: ComponentChildren; label: string }) {
+  const big = useMedia(BIG_STAGE);
   return (
     <section class={`dv-stage${them ? " dv-versus" : " dv-search"}`} aria-label={label}>
       {head && <header class="dv-st-head">{head}</header>}
       <div class="dv-st-row">
         <div class="dv-st-pair">
-          <Spot who={you} side="you" />
+          <Spot who={you} side="you" big={big} />
           {them && (
             <span class="dv-st-vs" aria-hidden="true">
               VS
             </span>
           )}
-          <Spot who={them} side="them" waiting={waiting} />
+          <Spot who={them} side="them" waiting={waiting} big={big} />
         </div>
       </div>
       <div class="dv-st-foot">{children}</div>

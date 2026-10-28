@@ -1,4 +1,5 @@
 import { expect, type Page } from "@playwright/test";
+import { RANKED_1V1, rankView } from "@chessroyale/core";
 import { named, openBossRaid, switchesOff, test, watchFor, pickMode } from "./helpers.ts";
 
 /**
@@ -81,7 +82,7 @@ test("1 v 1: picked, your rank and what it is in the panel under the row, kept u
   await expect(page.getByRole("radiogroup", { name: "Matchmaking" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^Party/ })).toHaveCount(0);
   // Your rank (the server's: a new account is in its placements) and what 1 v 1 is, in the panel under the row.
-  await expect(page.locator(".fd-mode-panel")).toHaveText(/^Your rank: Placement 0\/5Ranked chess vs one player near your level$/);
+  await expect(page.locator(".fd-mode-panel")).toHaveText(/^Your rank: Placement 0\/5Chess vs one player near your level$/);
   await expect(page.locator(".fd-hint")).toHaveText("");
   const row = (await page.getByRole("radiogroup", { name: "RANKED" }).boundingBox())!;
   const rank = (await page.locator(".fd-rank1v1").boundingBox())!;
@@ -101,13 +102,13 @@ test("1 v 1: picked, your rank and what it is in the panel under the row, kept u
   await expect(page.getByRole("radio", { name: /^1 v 1/ })).toHaveAttribute("aria-checked", "true");
 });
 
-test("1 v 1's rank line at its widest (an apex rank with four-digit points) stays one whole line from 320 px", async ({ page }) => {
+test("1 v 1's rank line at its widest (a top tier with four-digit points, its emblem beside it) stays one whole line from 320 px", async ({ page }) => {
   test.skip(desktop(), "the phone's widths");
   await named(page, "Apex");
   await page.route("**/api/me*", async (route) => {
     const res = await route.fetch();
     const body = await res.json();
-    const rank = { placement: null, tier: "Grandmaster", division: null, points: 1234, ladder: 9999, color: "#e05d5d", label: "Grandmaster · 1234 RP" };
+    const rank = rankView({ games: 40, ladder: RANKED_1V1.topFloor + 1234, place: 1 });
     if (body?.user) body.ranked1v1 = { ...(body.ranked1v1 ?? {}), rank };
     await route.fulfill({ response: res, json: body });
   });
@@ -115,7 +116,8 @@ test("1 v 1's rank line at its widest (an apex rank with four-digit points) stay
     await page.setViewportSize({ width, height: 740 });
     await page.goto("/?mode=1v1");
     const line = page.locator(".fd-rank1v1");
-    await expect(line).toHaveText("Your rank: Grandmaster · 1234 RP");
+    await expect(line).toHaveText("Your rank: Transcendent · 1234 RP");
+    await expect(page.locator(".fd-rank-words .re-box")).toHaveAttribute("data-emblem", "transcendent");
     expect(await line.evaluate((e) => e.scrollWidth - e.clientWidth), `${width}`).toBeLessThanOrEqual(0);
     expect((await line.boundingBox())!.height, `${width}: one line`).toBeLessThan(26);
     expect(await sideways(page), `${width}`).toBe(0);

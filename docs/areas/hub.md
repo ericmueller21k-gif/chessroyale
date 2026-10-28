@@ -26,9 +26,11 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     buttons filling the row; Oct 28, Eric: "3 times in this screen it says the same thing", so the sub-labels and the ⓘ
     with its pop-up are gone: what each does is the line above PLAY, and the ranking rule is in the FAQ's "Your rating");
     Squads' **Solo queue** or **Party** ([squads.md](squads.md); Party opens the party sheet at
-    once, and PLAY opens it again while Party is picked); for 1 v 1 (always people) your rank in it, "Your rank: Gold 2 ·
-    45 RP" or "Your rank: Placement 2/5" (`ranked1v1Label`, from your profile; whole on one line at 320 px at its
-    widest), over "Ranked chess vs one player near your level". Then **the line above PLAY** (Oct 28, Eric: "swap the line
+    once, and PLAY opens it again while Party is picked); for 1 v 1 (always people) your rank's emblem (48 px, its box
+    there before your profile loads; none in placements) beside your rank, "Your rank: Gold 2 · 45 RP" or "Your rank:
+    Placement 2/5" (`ranked1v1Rank`, from your profile; whole on one line at 320 px at its widest, "Your rank:
+    Transcendent · 1234 RP"), over "Chess vs one player near your level" (Oct 28: "Ranked" dropped so it fits beside
+    the emblem; RANKED heads the row; [2026-10-28-ranked-tiers.md](../decisions/2026-10-28-ranked-tiers.md)). Then **the line above PLAY** (Oct 28, Eric: "swap the line
     of text below Play and put it above play") and PLAY. The line is a fixed height whatever it says (two lines' room on a
     phone, one line on a computer), its text bottom-aligned so it sits on PLAY, and empty with no mode picked. After the
     first pick no click on home moves or resizes anything (a mode, an option). The first pick wakes the greyed options (their default selected) and moves nothing: the

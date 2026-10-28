@@ -9026,7 +9026,26 @@ button.fd-logo {
   text-align: center;
 }
 
-/* Home, 1 v 1 picked: your rank in it, in the panel. */
+/* Home, 1 v 1 picked: your rank's emblem (48 px, 1×) beside your rank and what 1 v 1 is, in the panel. */
+.fd-panel-words.fd-rank-words {
+  flex-direction: row;
+  gap: 6px;
+  /* (The emblem's own picture has a few clear pixels round it: it can sit on the panel's edge.) */
+  padding: 0 8px 0 2px;
+}
+/* (A narrow phone: the widest rank, "Your rank: Transcendent · 1234 RP", still one line beside the emblem.) */
+@media (max-width: 359px) {
+  .fd-rank-words .fd-rank1v1 {
+    font-size: 13px;
+  }
+}
+.fd-rank-lines {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
 .fd-rank1v1 {
   font-size: 14px;
   font-weight: 700;
@@ -17770,6 +17789,21 @@ button.sq-tiny {
   inset: 0 0 auto;
   z-index: 1;
 }
+/*
+ * A rank's emblem at the pawn's inner top corner (1× on a phone, 2× on a computer): the two face each other above "VS",
+ * clear of the pawns, within each side's own half (the pawn's box reaches `--dv-over` past it).
+ */
+.dv-st-emblem.re-box {
+  position: absolute;
+  top: 0;
+  z-index: 1;
+}
+.dv-st-you .dv-st-emblem {
+  right: var(--dv-over);
+}
+.dv-st-them .dv-st-emblem {
+  left: var(--dv-over);
+}
 /* The platform: a disc seen from a little above (its top, and its edge under it), the pawn's shadow on it. */
 .dv-st-plat {
   position: absolute;
@@ -18058,8 +18092,12 @@ button.sq-tiny {
   min-width: 160px;
 }
 
-/* A rank: a small pill in the tier's color. */
+/*
+ * A rank: a small pill in the tier's color. Its colors as RATING_RANKS' pills (.fd-pill.tier), so each tier reads at 4.5:1
+ * on both themes (packages/core/test/ranked.test.ts): a 20% tint of the panel; in light, the ink darkened (55% with black).
+ */
 .dv-rank {
+  --dv-rank-ink: var(--rank, var(--muted));
   display: inline-block;
   padding: 1px 8px;
   border-radius: 999px;
@@ -18067,9 +18105,64 @@ button.sq-tiny {
   font-weight: 800;
   line-height: 18px;
   white-space: nowrap;
-  color: var(--rank, var(--muted));
+  color: var(--dv-rank-ink);
   border: 1px solid color-mix(in srgb, var(--rank, var(--muted)) 55%, transparent);
-  background: color-mix(in srgb, var(--rank, var(--muted)) 12%, transparent);
+  background: color-mix(in srgb, var(--rank, var(--muted)) 20%, var(--fd-panel));
+}
+:root[data-theme="light"] .dv-rank {
+  --dv-rank-ink: color-mix(in srgb, var(--rank, var(--muted)) 55%, #000);
+}
+
+/* The FAQ's row of emblems, each at 1× with its tier under it. */
+.faq-emblems {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 6px;
+  margin: 4px 0 12px;
+}
+.faq-emblem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin: 0;
+  width: 64px;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--fd-sub);
+}
+/*
+ * A rank's emblem (components/RankEmblem.tsx; re- for rank emblem): a whole-step cut of the baked sheet, smoothing off.
+ * Its box keeps its size with or without the picture. The top tiers' loops step along their row: a transform, so no
+ * repaint per frame; held on their first frame under reduced motion.
+ */
+.re-box {
+  display: inline-block;
+  flex: none;
+  position: relative;
+  overflow: hidden;
+  vertical-align: middle;
+}
+.re-art {
+  position: absolute;
+  left: 0;
+  top: 0;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+.re-art.re-loop {
+  animation: re-loop var(--re-ms, 2s) steps(var(--re-steps, 8)) infinite;
+}
+@keyframes re-loop {
+  to {
+    transform: translateX(-100%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .re-art.re-loop {
+    animation: none;
+  }
 }
 
 /* The game: the board between the two players' strips, the same width as the board. */
@@ -18234,6 +18327,16 @@ button.sq-tiny {
 .dv-result-rank {
   font-weight: 800;
 }
+/* A ranked game's line: your rank's emblem (after the game: a division or tier up shows the new one), then the words. */
+.dv-result-line.dv-result-ranked {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.dv-result-words {
+  min-width: 0;
+}
 .dv-result-coins {
   font-weight: 800;
   color: var(--accent);
@@ -18396,6 +18499,19 @@ button.sq-tiny {
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
+}
+/* (The emblem at 2×, 96 px, beside the pill and the record.) */
+.dv-profile-row:has(.dv-profile-emblem) {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 12px;
+}
+.dv-profile-words {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
 }
 .dv-rank.dv-rank-big {
   font-size: 15px;

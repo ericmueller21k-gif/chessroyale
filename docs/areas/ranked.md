@@ -103,25 +103,55 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   owns goes to both), the limits of `QUICK_CHAT`, mute by account on the device (`chat-mod.ts` in the app) and on the
   server (`chatPrefs`), and #252's chat bans (read as each player connects, again at most every `CHAT_MOD.recheckMs` as
   they chat: "mod" refusals).
-- **Ranks** (core's `ranked.ts`; LoL's, Eric: "we can even like take from there exactly"):
+- **Ranks** (core's `ranked.ts`; Eric, Oct 28: Puzzle Pirates' names, "each tier has numbers 1-5 within it wood 5 being
+  the lowest", "80 per division"; [2026-10-28-ranked-tiers.md](../decisions/2026-10-28-ranked-tiers.md)):
   - **The hidden rating:** Glicko-1, each game its own period; a new player starts at their account's rating from
     other modes (`users.rating`, clamped 800-2400) or 1500, deviation 350, down to 60 with games, back up with idle days.
-  - **The ladder:** one integer per player: division index × 100 + rank points (Iron 4 0 = 0). Iron, Bronze, Silver,
-    Gold, Platinum, Emerald and Diamond, divisions 4 → 1 (0-2799); then Master (2800+), Grandmaster from 200 RP above
-    Master's start, Champion from 500 (no divisions, no leaderboard rule). Crossing 100 points is the next division
-    (the extra carried), below 0 the one before; no promotion series, no demotion shields; never below Iron 4 0.
+  - **The ladder:** one integer per player: division index × 80 + rank points (Wood 5 0 = 0). Wood, Silver, Gold,
+    Paragon, Illustrious, Sublime and Radiant, divisions 5 → 1 of 80 RP (0-2799; each tier 400 points, as the old
+    Iron … Diamond were, so a stored ladder kept its meaning on Oct 28). Crossing 80 points is the next division (the
+    extra carried), below 0 the one before; no promotion series, no demotion shields; never below Wood 5 0.
+  - **The top two tiers** (`topTiers`, `topFloor`), no divisions: **Pearlescent** at `topFloor` (2800, Radiant 1's 80 RP)
+    or more and among the 500 highest ladders, **Transcendent** among the 100 highest; their RP count from the floor
+    ("Transcendent · 120 RP"). At the floor or more but outside the top 500 a player stays Radiant 1, the RP counting on
+    past 80 ("Radiant 1 · 95 RP"). The place is 1 + how many ladders are higher (equal ladders share a place), counted
+    by the server (`topPlace` in `ranked-schema.ts`): only for a ladder at the floor or more, one `COUNT(*)` on the
+    `ranked_1v1_ladder` index (the entries above it, never the table), kept a minute per ladder in each Worker
+    instance. Falling below the floor is Radiant 1 again.
   - **Rank points a game:** 2 × 20 × (the result − the expected result from the two hidden ratings): ±20 between
     equals, more for beating someone stronger, less for beating someone weaker; plus 0.05 × (hidden rating − the
     ladder's rating), that adjustment within ±10 (a draw: half). A win never takes points, a loss never gives them.
-    The ladder's rating: 800 at Iron 4 0, +1600/2800 a point (2400 at Master's start).
+    The ladder's rating: 800 at Wood 5 0, +1600/2800 a point (2400 at the top tiers' floor).
   - **Placements:** the first 5 rated games show "Placement N/5"; the fifth places the player from the hidden rating,
-    at most Diamond 4 0. Aborted games don't count.
+    at most Radiant 5 0 (2400). Aborted games don't count.
   - **Fair play's hold:** a player in review keeps their rank as it is (their games don't move it); their opponent's
     game counts as usual.
-  - **Shown as** `RankView.label`: "Gold 2 · 45 RP", "Master · 120 RP", "Placement 2/5"; on the profile (yours and
-    anyone's: a "1 V 1" section, null for a banned player), in the game's strips and the versus moment, and on the
-    result card ("Gold 2 · 45 RP (+18)", "Placed: Gold 4 · 25 RP"). With 1 v 1 picked, the home screen's
-    line under its RANKED row reads `ranked1v1Label()` (`packages/app/src/ranked.ts`): "Your rank: Gold 2 · 45 RP".
+  - **Shown as** `RankView.label` and its emblem (`RankView.emblem`, below): "Gold 2 · 45 RP", "Radiant 1 · 95 RP",
+    "Transcendent · 120 RP", "Placement 2/5"; on the profile (yours and anyone's: a "1 V 1" section, null for a banned
+    player), in the game's strips (the pill only) and the versus moment, and on the result card ("Gold 2 · 45 RP
+    (+18)", "Placed: Gold 4 · 25 RP"). With 1 v 1 picked, the home screen's panel under its RANKED row reads
+    `ranked1v1Rank()` (`packages/app/src/ranked.ts`): "Your rank: Gold 2 · 45 RP". Each tier's pill color is its
+    emblem's main color, 4.5:1 or better on both themes.
+- **The emblems** (Eric's set, approved Oct 28: a chess piece in a cut-gem badge; d5 plain, d4 studs, d3 wings, d2 a
+  crest, d1 a gem crown and a wide glow; Pearlescent and Transcendent 2 s loops):
+  - **The drawing** is `packages/app/src/characters/rank-set.ts` (as drawn on `claude/boss-art`, a8d5aa57; only its
+    imports changed). `npx tsx scripts/bake-emblems.ts` bakes it into one picture, `packages/app/src/emblems/rank-emblems.png`
+    (384 × 432, 22 KB: a row per tier, its divisions 5 → 1; a row per top tier, its 8 frames), with
+    `rank-emblems.ts` (each emblem's cell, its frames and times, a hash the test checks against the drawing). No art
+    code runs on a device.
+  - **Shown by** `components/RankEmblem.tsx`: a cut of the picture in a box of 48 × `scale` px (whole steps, smoothing
+    off), always that size with or without an emblem (placements, a bot) and before the picture loads. The loops
+    step along their row by a CSS transform (8 steps in 2 s: no script, no repaint per frame), still on their first
+    frame under reduced motion. Nothing of them in the town's frame loop (the town shows no rank).
+  - **Where:** the stage (each pawn's inner top corner, facing each other above "VS": 48 px on a phone, 96 on a
+    computer; it lands with its pawn), the result card (your rank after the game: a division or tier up shows the new
+    one; its room kept from "Updating your rank…"), home's 1 v 1 panel (48), the profile's 1 V 1 section (96), and the
+    FAQ's ranks entry (each tier's division 5, Gold's five divisions, the top two). The in-game strips keep the pill
+    alone (the board's room).
+  - **An admin's `?rank=`** (`rankFromSwitch` in `ranked.ts`): `?rank=gold-3`, `?rank=wood-5`, `?rank=pearlescent`,
+    `?rank=transcendent` shows that rank (45 RP into a division; 120 RP for a top tier) in place of your own on your own
+    screens (home, the stage, your strip, the result, your profile, even before a game), only where
+    `testSwitchesAllowed()`; read once as the page opens. A player's is ignored.
 - **Coins** (`duelCoins`): per minute of the game's length by result (win 2.4, draw 1.6, loss 0.8), at least 1, at
   most 70, only when both sides made 10 moves; none for an aborted or a bot game, nor for a player fair play holds (in
   review). At most `coins.perDay` (20) paying games a UTC day per account (`coin_day`, `coin_games` on their
@@ -165,7 +195,7 @@ by the clock (`voteAt`); everything else comes as a message.
 
 | Table / column | What | Kept |
 | --- | --- | --- |
-| `ranked_1v1` (user_id, rating, rd, games, wins, losses, draws, ladder, last_game, last_at, coin_day, coin_games) | A player's hidden rating, record and ladder place; the UTC day of their last paying game and how many paid that day | With the account; deleted with it; in the download; a guest's moves to an account without one on sign-in |
+| `ranked_1v1` (user_id, rating, rd, games, wins, losses, draws, ladder, last_game, last_at, coin_day, coin_games; index `ranked_1v1_ladder` on ladder, Oct 28) | A player's hidden rating, record and ladder place; the UTC day of their last paying game and how many paid that day | With the account; deleted with it; in the download; a guest's moves to an account without one on sign-in |
 | `ranked_1v1_games` (id, white_id, black_id, control, result, reason, moves, times, started_at, ended_at, checked, nonce) | Each ranked game (never an aborted one): moves (UCI), think times (ms), how it ended; fair play's engine check by side | `gamesKeepDays` (30) after it ends (the 15-minute cron, `purgeDuelGames`); longer only while a player in it has a fair-play case open (watch or review) or an appeal of a ban waiting (`purgeEvidence`'s rule); on account deletion that player becomes "deleted" in it; the download has a player's games (opponent by name, not the check) |
 
 No `results` rows for 1 v 1 (Crowd's stats and `users.rating` stay as they were). The privacy policy's "1 v 1 (ranked)"
@@ -183,16 +213,18 @@ entry says the same.
 | Routes, the cron's purge | `packages/server/src/index.ts` (`duelRoute`, `scheduled`) |
 | Fair play's engine check of 1 v 1 games | `packages/server/src/fairplay-duel.ts`; the case page in `admin.ts` |
 | The app: queue, online game, bot game, the way in | `packages/app/src/duel.ts` |
-| The screens (`DuelFront`: the stage, then the board); the stage; the vote on the board; the hint; the rank pill | `packages/app/src/screens/Duel.tsx`, `components/DuelStage.tsx`, `DuelVote.tsx`, `VoteHint.tsx`, `DuelRankPill.tsx`; styles `dv-` in `styles.css` |
+| The screens (`DuelFront`: the stage, then the board); the stage; the vote on the board; the hint; the rank pill; the emblem | `packages/app/src/screens/Duel.tsx`, `components/DuelStage.tsx`, `DuelVote.tsx`, `VoteHint.tsx`, `DuelRankPill.tsx`, `RankEmblem.tsx`; styles `dv-` and `re-` in `styles.css` |
+| The emblems: the drawing, its bake, the baked picture | `packages/app/src/characters/rank-set.ts`, `scripts/bake-emblems.ts`, `packages/app/src/emblems/` |
+| The top tiers' place (the count and its minute's cache), a rank with it | `packages/server/src/ranked-schema.ts` (`topPlace`, `rankOf`) |
 | The stage, recorded (GIFs and stills, light and dark, 320-1280 px) | `scripts/frames-versus.mjs` |
 | Browsing while queued: the bar, the leave confirm, the found alert; App's `duelAway` | `packages/app/src/components/DuelQueueBar.tsx` (mounted in `main.tsx`), `App.tsx`; recorded by `scripts/frames-queue-browse.mjs` |
-| The home screen's helper | `packages/app/src/ranked.ts` (`ranked1v1Label`, `ranked1v1Rank`) |
+| The home screen's helper; an admin's `?rank=` | `packages/app/src/ranked.ts` (`ranked1v1Label`, `ranked1v1Rank`, `rankFromSwitch`, `yourRankShown`) |
 | Wiring (`/1v1`, `/1v1/CODE`) | `packages/app/src/App.tsx` |
 
 ## Settings
 
-`RANKED_1V1` (controls, the vote and the game's timings, pairing, the hidden rating, tiers and apex tiers, rank
-points, placements, coins, games kept, the bot); `CAPACITY.queue` (the queue's asks); `QUICK_CHAT`, `CHAT_MOD`; the
+`RANKED_1V1` (controls, the vote and the game's timings, pairing, the hidden rating, tiers, the top tiers and their
+floor, rank points, placements, coins, games kept, the bot); `CAPACITY.queue` (the queue's asks); `QUICK_CHAT`, `CHAT_MOD`; the
 kill switch `PAUSE_RANKED1V1`.
 
 ## Tests and tools
@@ -220,6 +252,13 @@ kill switch `PAUSE_RANKED1V1`.
   `packages/app/test/duel.test.ts` (the hint once per device, an expired ticket, the clock sample, a move resent after
   a reconnect, clocks, the result's words, the home screen's label), `faq.test.ts` (1 v 1's words follow the
   settings).
+- Tiers and emblems (Oct 28): `packages/core/test/ranked.test.ts` (every ladder to its tier, division and RP at the
+  edges; the top tiers' floor, top 500 and top 100; stored ladders 0-4000 keep their hidden rating; each pill's
+  contrast), `packages/server/test/ranked-store.test.ts` ("the top tiers": the place counted, ties sharing it, the
+  count's plan on the index and its minute's cache, the profile, the queue and a result), `packages/app/test/rank-emblems.test.ts`
+  (the baked picture is the drawing, every rank's emblem in it, `?rank=`'s values), `e2e/ranked-tiers.spec.ts` (the
+  versus screen's emblems, a division up's result, home's panel and the profile, `?rank=` for an admin and not a
+  player, the loops still under reduced motion), and the stills: `npx tsx scripts/frames-ranked-tiers.ts <dir> [url]`.
 - Simulation: `npx tsx packages/sim/scripts/ranked-1v1-sim.ts` → `reports/ranked-1v1.md` (synthetic players with a
   known strength through core's own functions: convergence, the rank distribution, the scale, waits and gaps,
   sandbagging, trading wins). Run it again after changing `RANKED_1V1`'s rating, points, placements or pairing.
