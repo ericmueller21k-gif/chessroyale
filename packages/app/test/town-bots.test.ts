@@ -305,9 +305,9 @@ describe("town square: the bots take turns in the square (Oct 28: twenty cost fr
   });
 
   it("back from a game, the bot you played is out (across from you); one called from home comes out", () => {
-    for (let k = 0; k < 10; k++) {
-      const t = createTown(0, undefined, { table: 2, stool: 0, bot: 19 });
-      expect(t.bots[19]!.home).toBe(false);
+    for (let k = 0; k < BOTS.length; k++) {
+      const t = createTown(0, undefined, { table: 2, stool: 0, bot: k });
+      expect(t.bots[k]!.home).toBe(false);
       expect(t.bots.filter((b) => !b.home)).toHaveLength(TOWN_FEEL.botsOut);
     }
     const t = createTown(0);

@@ -729,15 +729,21 @@ test("Hollow's card: one of his three lines (Eric's words), the next one each ti
     .poll(() => page.evaluate(() => (window as unknown as { __townBossBack: (id: string) => boolean }).__townBossBack("hollow")), { message: "Hollow stands behind his home", timeout: 20_000 })
     .toBe(true);
   const card = page.getByRole("dialog", { name: "Hollow Peak", exact: true });
-  const open = async () =>
-    expect(async () => {
-      if (await card.isVisible()) return;
-      if (await page.getByRole("dialog").isVisible()) await page.keyboard.press("Escape");
+  /** Which card is open now, shown or not (a card stays hidden while its home is off screen: you walk there first). */
+  const openCardName = () => page.locator(".town-card").evaluate((e: HTMLElement) => (e.style.display === "none" ? null : e.getAttribute("aria-label")));
+  /** Taps the home until its card is open (only then: each opening says the next line), then waits for you to get there. */
+  const open = async () => {
+    await expect(async () => {
+      const name = await openCardName();
+      if (name === "Hollow Peak") return;
+      if (name) await page.keyboard.press("Escape");
       const p = await at();
       expect(p, "drawn").not.toBeNull();
       await page.mouse.click(p!.x, p!.y);
-      await expect(card).toBeVisible({ timeout: 1500 });
+      await expect.poll(openCardName, { timeout: 1500 }).toBe("Hollow Peak");
     }).toPass({ timeout: 30_000 });
+    await expect(card).toBeVisible({ timeout: 20_000 });
+  };
   await open();
   await expect(card.getByText(lines[0]!, { exact: true })).toBeVisible();
   // Its shop greyed as before, under the line.

@@ -138,8 +138,9 @@ the page's navigation to the town's first frame drawn (its chunk, the world and,
   apart. Six is main's count of figures in the square, each drawn the same way (one image made once), so its frame rate
   is main's by construction; ten is one number away (`botsOut` in `feel.ts`) once Eric's phone shows the room. Every 10 to
   20 s one bot out (standing, free, at least 5 steps from you) goes home, fading out, and one from home comes out on a
-  free square in the park as far from you, fading in. Back from a game, the bot you played is out; a bot whose card is open stays. Who's out first is picked
-  at random each time the town opens, so a visit sees different faces.
+  free square in the park as far from you, fading in. Back from a game, the bot you played is out; a bot whose card is open stays. Who's out first is a
+  shuffle by the town's seed (the same each time the town opens, so the tests see the same town); the turns change it
+  within seconds.
 - **What's new on the hot path**: for each bot out, a sidekick's frame picked from its canvases (a short loop over its
   frames' end times, nothing allocated) instead of its dressed pawn; its fade (one multiply). The turns run between
   frames' work only when the bots' timer fires (an array of the free ones then, as the wander already did). Maia never

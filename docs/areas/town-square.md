@@ -226,7 +226,7 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
   games). The bots start off the tables' stools (every table free as the town opens) and sit as they wander.
   - **Six out at once, the others at home, taking turns** (Oct 28: twenty in the square cost about 3 frames a second,
     Eric's frame-rate rule: the decision's numbers; six, as many as before the sidekicks). `botsOut` (6) are in the
-    square, picked at random as the town opens (back from a game, the bot you played among them); the rest are at home
+    square, shuffled by the town's seed as it opens (the same each time) (back from a game, the bot you played among them); the rest are at home
     (`Person.home`: not drawn, not tapped, on no square: its walker leaves the town's `all`). Every `botTurnMs` (10 to
     20 s) one out, standing, free and at least
     `botTurnAway` (5) steps from you starts home, fading out over `botFadeMs`, and one from home comes out on a free

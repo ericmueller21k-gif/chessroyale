@@ -979,6 +979,13 @@ export class Renderer {
     b[k + 3] = h;
   }
 
+  /** (Tests) Whether a name tag, a home's name or the bubble drawn this frame covers (x, y), or a pixel round it. */
+  private labelOver(x: number, y: number): boolean {
+    const b = this.clearBoxes;
+    for (let k = 0; k < this.nClear * 4; k += 4) if (x + 2 > b[k]! && x - 2 < b[k]! + b[k + 2]! && y + 2 > b[k + 1]! && y - 2 < b[k + 1]! + b[k + 3]!) return true;
+    return false;
+  }
+
   /** True if a chip with its middle at (x, y) would cover a box, the buttons, or one of the first `n` chips. */
   private chipBlocked(x: number, y: number, n: number): boolean {
     const r = TOWN_FEEL.chipClear;
@@ -1830,7 +1837,7 @@ export class Renderer {
     ctx.restore();
   }
 
-  /** (Tests) Where lamp `i` (its index in LAMPS)'s glass is on the screen now; false when it isn't drawn, or something nearer stands over it. */
+  /** (Tests) Where lamp `i` (its index in LAMPS)'s glass is on the screen now; false when it isn't drawn, or something nearer stands (or a name tag lies) over it. */
   lampAt(i: number, out: { x: number; y: number }): boolean {
     const l = LAMPS[i];
     const k = PROPS.findIndex((p) => p.kind === "lamp" && l !== undefined && p.c === l.c && p.r === l.r);
@@ -1843,12 +1850,14 @@ export class Renderer {
       const o = this.items[j]!;
       if (o.on && !o.faded && out.x >= o.x0 && out.x <= o.x1 && out.y >= o.y0 && out.y <= o.y1) return false;
     }
-    return true;
+    // (Nor a name tag over it: they're drawn over everything.)
+    return !this.labelOver(out.x, out.y);
   }
 
   /**
    * (Tests) A point on a place's first light (`i`: its index, the homes then the Colosseum) where it shows now: a lit
-   * pixel amid lit ones, nothing standing in front of it (the nearest such to the light's middle); false if none.
+   * pixel amid lit ones, nothing standing in front of it and no name tag over it (the nearest such to the light's middle);
+   * false if none.
    */
   lightAt(i: number, out: { x: number; y: number }): boolean {
     const it = this.houseItems[i];
@@ -1867,7 +1876,7 @@ export class Renderer {
     for (const [x, y] of cands) {
       out.x = it.x0 + (x + 0.5) * px;
       out.y = it.y0 + (y + 0.5) * px;
-      if (!(out.x > 0 && out.x < this.W && out.y > 0 && out.y < this.H)) continue;
+      if (!(out.x > 0 && out.x < this.W && out.y > 0 && out.y < this.H) || this.labelOver(out.x, out.y)) continue;
       const h = this.pick(out.x, out.y);
       if (i >= this.homes.length ? h?.kind === "coliseum" : h?.kind === "house" && h.home === this.homes[i]) return true;
     }

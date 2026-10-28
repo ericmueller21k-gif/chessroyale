@@ -683,8 +683,13 @@ export function createTown(now: number, seed = 20261025, seat: Seat | null = nul
   const you: Person = { id: "you", name: "", look: { side: "light", tint: null, wear: null }, you: true, walker: new Walker(yours, f.youStepMs, true, f.walkEase), sit: !!seat, bot: null, waved: -Infinity, home: false, came: -Infinity, leaves: Infinity };
   // Each boss starts on the square in front of its home's middle (toward the camera).
   const bosses: Boss[] = HOMES.map((home) => ({ home, walker: new Walker({ c: home.cx, r: wrapI(home.cy - 2) }, f.bossStepMs, false), nextAt: null, onScreen: false, held: false, lastLine: null }));
-  // Who's out (`botsOut` of them, at random; back from a game, the bot you played among them); the others are at home.
-  const order = BOTS.map((_, i) => i).sort(() => Math.random() - 0.5);
+  // Who's out (`botsOut` of them, shuffled by the town's seed, so the town opens the same way every time, as the tests
+  // need; back from a game, the bot you played among them); the others are at home, and the turns change who's out.
+  const order = BOTS.map((_, i) => i);
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    [order[i], order[j]] = [order[j]!, order[i]!];
+  }
   if (seat) order.unshift(...order.splice(order.indexOf(seat.bot), 1));
   const out = new Set(order.slice(0, outN));
   // The bots out stand around you in the park, apart (`freeSpot`).
