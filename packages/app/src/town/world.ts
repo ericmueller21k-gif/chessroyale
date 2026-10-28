@@ -566,13 +566,21 @@ export interface Person {
   /** When it last waved (a sidekick, as you tap it: its `wave` plays once from then); -Infinity: never. */
   waved: number;
   /**
-   * A bot at home (Oct 28: `botsOut` are in the square at once, the others take turns): not drawn, not tapped, on no
-   * square (its walker isn't among the town's). `came`: when it last came out (it fades in); `leaves`: when it goes home
-   * (it fades out until then; Infinity: it stays).
+   * A bot at home (Oct 28: `botsOut` are in the world at once, the others take turns): not drawn, not tapped, on no
+   * square (its walker isn't among the town's). `came`: when it last came out (it fades in at its door); `leaves`: when
+   * it's home (it fades out at its door until then; Infinity: it stays).
    */
   home: boolean;
   came: number;
   leaves: number;
+  /**
+   * The bots' turns (Oct 28, `takeTurns`): `going`, it's on its way home (to its door: `homeDoor`); `trip`, the square it's
+   * walking to, its door or (just out) its spot in the square (null: none, it wanders); `due`, it's still to go home in
+   * this round of turns (every bot out goes once before any goes twice).
+   */
+  going: boolean;
+  trip: Sq | null;
+  due: boolean;
 }
 
 /** Whether a person sits at a chess table now: stopped on one of its stools, meaning to sit. Its table, or null. */
@@ -640,8 +648,15 @@ export interface Town {
   meet: Meeting | null;
   /** Back from a game: the bot across gets up and wanders off at `at`. */
   leave: { bot: Person; at: number } | null;
-  /** When a bot out next goes home and another comes out (`botTurnMs`). */
+  /** When a bot out next goes home (every `turnMs`: `botTurnMs`, a test hook may speed it). */
   nextTurnAt: number;
+  turnMs: number;
+  /** How many bots are out (in the world, near the square or on their way: `botsOut`). */
+  outN: number;
+  /** The bots at home, the one home longest first: the next to come out. */
+  homeQueue: Person[];
+  /** Extra figures for measuring the frame rate only (the testers' `?crowd=N`): pawns with names that wander the square. */
+  crowd: Person[];
 }
 
 /** A small seeded generator (the prototype's), in [0, 1). */
@@ -683,7 +698,7 @@ export function createTown(now: number, seed = 20261025, seat: Seat | null = nul
   const table = seat ? TABLES[seat.table]! : null;
   const yours = table ? table.stools[seat!.stool]! : START;
   const theirs = table ? table.stools[1 - seat!.stool]! : null;
-  const you: Person = { id: "you", name: "", look: { side: "light", tint: null, wear: null }, you: true, walker: new Walker(yours, f.youStepMs, true, f.walkEase), sit: !!seat, bot: null, waved: -Infinity, home: false, came: -Infinity, leaves: Infinity };
+  const you: Person = { id: "you", name: "", look: { side: "light", tint: null, wear: null }, you: true, walker: new Walker(yours, f.youStepMs, true, f.walkEase), sit: !!seat, bot: null, waved: -Infinity, home: false, came: -Infinity, leaves: Infinity, going: false, trip: null, due: false };
   // Each boss starts on the square in front of its home's middle (toward the camera).
   const bosses: Boss[] = HOMES.map((home) => ({ home, walker: new Walker({ c: home.cx, r: wrapI(home.cy - 2) }, f.bossStepMs, false), nextAt: null, onScreen: false, held: false, lastLine: null }));
   // Who's out (`botsOut` of them, shuffled by the town's seed, so the town opens the same way every time, as the tests
@@ -700,10 +715,10 @@ export function createTown(now: number, seed = 20261025, seat: Seat | null = nul
   for (const [i, b] of BOTS.entries()) {
     // (Back from a game: the bot you played sits across from you.)
     const sq = seat && i === seat.bot ? theirs! : out.has(i) ? freeSpot(rnd, yours, 3, [...(theirs ? [theirs] : []), ...bots.filter((o) => !o.home).map((o) => o.walker.here())]) : START;
-    bots.push({ id: `bot:${bots.length}`, name: botLabel(b), look: b.look, you: false, walker: new Walker(sq, f.botStepMs, true), sit: true, bot: b, waved: -Infinity, home: !out.has(i), came: -Infinity, leaves: Infinity });
+    bots.push({ id: `bot:${bots.length}`, name: botLabel(b), look: b.look, you: false, walker: new Walker(sq, f.botStepMs, true), sit: true, bot: b, waved: -Infinity, home: !out.has(i), came: -Infinity, leaves: Infinity, going: false, trip: null, due: false });
   }
   const met = seat ? bots[seat.bot]! : null;
-  return {
+  const t: Town = {
     people: [you, ...bots],
     you,
     bots,
@@ -715,8 +730,31 @@ export function createTown(now: number, seed = 20261025, seat: Seat | null = nul
     hold: null,
     meet: null,
     leave: met ? { bot: met, at: now + f.botLeaveAfterGameMs } : null,
-    nextTurnAt: now + f.botTurnMs[0],
+    nextTurnAt: now + f.botTurnMs,
+    turnMs: f.botTurnMs,
+    outN,
+    // (The ones at home in the shuffle's order: the first comes out first.)
+    homeQueue: order.filter((i) => !out.has(i)).map((i) => bots[i]!),
+    crowd: [],
   };
+  return t;
+}
+
+/** At most this many in the testers' crowd (`?crowd=N`). */
+export const CROWD_MAX = 100;
+/**
+ * The testers' crowd (Oct 28, for measuring the frame rate with many figures, as real players will be one day; the
+ * `?crowd=N` test switch, admins only): `n` plain pawns with names ("Guest 1"…) on free squares near the square, which
+ * wander it like the bots. Never for players.
+ */
+export function addCrowd(t: Town, n: number): void {
+  const at = t.you.walker.here();
+  for (let i = t.crowd.length; i < Math.min(n, CROWD_MAX); i++) {
+    const p: Person = { id: `crowd:${i}`, name: `Guest ${i + 1}`, look: { side: i % 2 ? "dark" : "light", tint: null, wear: null }, you: false, walker: new Walker(freeSpot(t.rnd, at, 2, [], t, 1), TOWN_FEEL.botStepMs, true), sit: false, bot: null, waved: -Infinity, home: false, came: -Infinity, leaves: Infinity, going: false, trip: null, due: false };
+    t.crowd.push(p);
+    t.people.push(p);
+    t.all.push(p.walker);
+  }
 }
 
 /**
@@ -724,14 +762,14 @@ export function createTown(now: number, seed = 20261025, seat: Seat | null = nul
  * the tables' stools (bots sit down as they wander), off the bosses' roaming ground, at least `fromYou` steps from you and
  * 3 from anyone in `others`, and (`t`) on no one's square.
  */
-function freeSpot(rnd: () => number, you: Sq, fromYou: number, others: readonly Sq[], t: Town | null = null): Sq {
+function freeSpot(rnd: () => number, you: Sq, fromYou: number, others: readonly Sq[], t: Town | null = null, apart = 3): Sq {
   let c = 0;
   let r = 0;
   for (let tries = 0; tries < 800; tries++) {
     c = wrapI(START.c - 8 + Math.floor(rnd() * 16));
     r = wrapI(START.r - 4 + Math.floor(rnd() * 14));
     const sq = { c, r };
-    if (walkable(c, r) && !statueAt(c, r) && !stoolAt(c, r) && tdist(sq, you) >= fromYou && !HOMES.some((h) => plotDist(h, c, r) <= TOWN_FEEL.bossRoam) && !others.some((o) => tdist(sq, o) < 3) && !(t && taken(t, c, r, null))) break;
+    if (walkable(c, r) && !statueAt(c, r) && !stoolAt(c, r) && tdist(sq, you) >= fromYou && !HOMES.some((h) => plotDist(h, c, r) <= TOWN_FEEL.bossRoam) && !others.some((o) => tdist(sq, o) < apart) && !(t && taken(t, c, r, null))) break;
   }
   return { c, r };
 }
@@ -928,51 +966,202 @@ function botsWander(t: Town, now: number): void {
     t.leave = null;
     if (!lv.bot.walker.moving()) wander(t, lv.bot, false);
   }
-  // A bot fading out goes home (its walker leaves the town's: it stands on no square).
-  for (const b of t.bots)
-    if (!b.home && now >= b.leaves) {
-      b.home = true;
-      b.leaves = Infinity;
-      t.all.splice(t.all.indexOf(b.walker), 1);
-    }
+  // The bots on their way home or out (nothing allocated: a look at a few fields each, until one arrives).
+  for (const b of t.bots) {
+    if (b.home) continue;
+    if (now >= b.leaves) reachHome(t, b, now);
+    else if (b.trip && b.leaves === Infinity && b !== t.hold && b.walker.goalC() === b.walker.hereC() && b.walker.goalR() === b.walker.hereR()) arrive(t, b, now);
+  }
+  // (A paused bot source, `nextBotAt` Infinity: the test hooks' and the tests' still towns, pauses the turns too.)
+  if (t.nextBotAt === Infinity) return;
+  if (now >= t.nextTurnAt) takeTurns(t, now);
   if (now < t.nextBotAt) return;
   t.nextBotAt = now + between(t, f.botGapMs);
-  if (now >= t.nextTurnAt) return takeTurns(t, now);
-  // (Not one that's held, or on its way to a game with you.)
-  const free = t.bots.filter((b) => !b.home && b.leaves === Infinity && !b.walker.moving() && b !== t.hold && b !== t.meet?.bot);
-  if (!free.length) return;
-  const bot = pick(t, free);
-  // Now and then one goes to sit at a chess table nearby (a free stool), and one sitting may stay a while longer.
-  if (seated(bot) && t.rnd() < f.botStaySeated) return;
-  wander(t, bot, t.rnd() < f.botSitChance);
+  // (Not one that's held, on its way to a game with you, or on its way home or out.)
+  const free = t.bots.filter((b) => !b.home && !b.trip && b.leaves === Infinity && !b.walker.moving() && b !== t.hold && b !== t.meet?.bot);
+  if (free.length) {
+    const bot = pick(t, free);
+    // Now and then one goes to sit at a chess table nearby (a free stool), and one sitting may stay a while longer.
+    if (!(seated(bot) && t.rnd() < f.botStaySeated)) wander(t, bot, t.rnd() < f.botSitChance);
+  }
+  // The testers' crowd (`?crowd=N`): about one in ten of them walks each time.
+  for (let k = Math.ceil(t.crowd.length / 10); k > 0; k--) {
+    const p = pick(t, t.crowd);
+    if (p && !p.walker.moving()) wander(t, p, false);
+  }
 }
 
 /**
- * Bots take turns in the square (Oct 28: `botsOut` out at once, Eric's frame-rate rule): one out, standing, free (not
- * held, not on its way to a game, not the one you just played) and a few steps from you, starts home (it fades out over
- * `botFadeMs`), and one from home comes out on a free square in the park away from you (it fades in).
+ * The square in the middle of town where the bots out stay (Oct 28, Eric: "They all walk near the town square area and
+ * persist there"): the park with its tables, the walk and the Colosseum's apron, as wide as the park, off the bosses'
+ * roaming ground.
  */
-function takeTurns(t: Town, now: number): void {
-  const f = TOWN_FEEL;
-  t.nextTurnAt = now + between(t, f.botTurnMs);
-  const me = t.you.walker.here();
-  const going = t.bots.filter((b) => !b.home && b.leaves === Infinity && !b.walker.moving() && !seated(b) && b !== t.hold && b !== t.meet?.bot && b !== t.leave?.bot && tdist(b.walker.here(), me) >= f.botTurnAway);
-  const coming = t.bots.filter((b) => b.home);
-  if (!going.length || !coming.length) return;
-  pick(t, going).leaves = now + f.botFadeMs;
-  comeOut(t, pick(t, coming), now, f.botTurnAway);
+export const inSquare = (c: number, r: number): boolean => SQUARE_AREA[wrapI(r) * N + wrapI(c)] === 1;
+const SQUARE_AREA = new Uint8Array(N * N);
+for (let r = PARK.r1 - PARK.d + 1; r < COLISEUM.r0; r++)
+  for (let c = PARK.c0; c < PARK.c0 + PARK.w; c++) if (!HOMES.some((h) => plotDist(h, c, r) <= TOWN_FEEL.bossRoam)) SQUARE_AREA[r * N + c] = 1;
+
+/**
+ * A bot's door: a sidekick's is its boss's home's (the middle of its front: its plot's front row, where the bosses start
+ * in front of it); a pawn has no house, so the Colosseum's gate (the apron's square nearest it). Where it fades out going
+ * home and in coming out.
+ */
+export function homeDoor(b: TownBot): Sq {
+  const h = b.boss ? HOMES.find((x) => x.id === b.boss) : undefined;
+  return h ? { c: h.cx, r: wrapI(h.cy - 1) } : APRON[0]!;
 }
 
-/** A bot at home comes out on a free square in the park, at least `fromYou` steps from you (it fades in). */
-export function comeOut(t: Town, b: Person, now: number, fromYou: number): void {
+/**
+ * Where a bot steps into its home or out of it (one pawn a square): a sidekick, its door's square, or one of the plot's
+ * front row either side of it, whichever has the square in front free (the boss may stand there); a pawn, the apron's
+ * free square nearest the gate. Null: none free.
+ */
+function doorway(t: Town, b: TownBot, w: Walker | null): Sq | null {
+  const door = homeDoor(b);
+  if (!b.boss) {
+    for (const s of APRON) if (!taken(t, s.c, s.r, w)) return s;
+    return null;
+  }
+  for (const dc of [0, -1, 1]) {
+    const c = wrapI(door.c + dc);
+    if (!taken(t, c, wrapI(door.r - 1), w)) return { c, r: door.r };
+  }
+  return null;
+}
+
+/** The way from `from` to `to` round the squares others stand on or are headed for (one pawn a square), else through them; [] already there; null no way. */
+function routeAround(t: Town, w: Walker | null, from: Sq, to: Sq): Sq[] | null {
+  if (from.c === to.c && from.r === to.r) return [];
+  const goal = (c: number, r: number) => c === to.c && r === to.r;
+  return findPath(from, goal, (c, r) => walkable(c, r) && (!taken(t, c, r, w) || goal(c, r))) ?? findPath(from, goal, walkable);
+}
+
+/** Whether a bot can be sent home now (Oct 28): not in a game, not seated, not held, not on its way to or from a game with you, not near you, not just out. */
+export function canGoHome(t: Town, b: Person, now: number): boolean {
+  const me = t.you.walker;
+  return !b.home && !b.going && !seated(b) && b !== t.hold && b !== t.meet?.bot && b !== t.leave?.bot && tdist(b.walker.here(), { c: me.hereC(), r: me.hereR() }) >= TOWN_FEEL.botTurnAway && now - b.came >= TOWN_FEEL.botOutAtLeastMs;
+}
+
+/**
+ * The bots take turns (Oct 28, Eric: "10 out at a time, randomly one each minute starts to head home, is replaced by
+ * another and then that same one can't be replaced again until all the others have been"). Once a minute (`turnMs`) one
+ * of the bots out that are still due this round, picked at random among those free (`canGoHome`), starts home; a busy one
+ * is passed over and stays due (none free: the minute is skipped). When none out is due, a new round starts with every
+ * bot out. The one that replaces it comes out when it's home (`reachHome`).
+ */
+function takeTurns(t: Town, now: number): void {
+  t.nextTurnAt = now + t.turnMs;
+  const out = t.bots.filter((b) => !b.home && !b.going);
+  if (!out.some((b) => b.due)) for (const b of out) b.due = true;
+  const free = out.filter((b) => b.due && canGoHome(t, b, now));
+  if (free.length) sendHome(t, pick(t, free), now);
+}
+
+/** A bot starts home: it walks to its door (`homeDoor`), the town's own way round, and fades out there. */
+export function sendHome(t: Town, b: Person, now: number): void {
+  b.due = false;
+  b.going = true;
+  b.trip = null;
+  headHome(t, b, now);
+}
+
+/**
+ * A bot on its way home walks (on) to its door, the town's own way round: a sidekick to the square in front of its
+ * doorway (`doorway`), then onto it; a pawn to the gate.
+ */
+function headHome(t: Town, b: Person, now: number): void {
+  const w = b.walker;
+  const at = doorway(t, b.bot!, w);
+  // (A sidekick: to the square in front of its doorway, then onto it.)
+  const to = at && b.bot!.boss ? { c: at.c, r: wrapI(at.r - 1) } : at;
+  const path = to && routeAround(t, w, w.here(), to);
+  if (at && path) {
+    if (to !== at) path.push(at);
+    w.go(path);
+    b.trip = at;
+    return;
+  }
+  // (No way there: it fades out where it stands.)
+  b.leaves = now + TOWN_FEEL.botFadeMs;
+}
+
+/**
+ * A bot on a trip has stepped onto its last square (or stopped). Going home: at its door (or beside it: someone was at the
+ * gate first) it fades out (`botFadeMs`); stopped short (it was held while its card was open), it carries on. Just out:
+ * at its spot it's back to wandering the square; stopped short, it carries on there.
+ */
+function arrive(t: Town, b: Person, now: number): void {
+  const w = b.walker;
+  const c = w.hereC();
+  const r = w.hereR();
+  const to = b.trip!;
+  if (b.going) {
+    const door = homeDoor(b.bot!);
+    if ((c === to.c && r === to.r) || (Math.abs(wrapF(c - door.c)) <= 1 && Math.abs(wrapF(r - door.r)) <= 1)) b.leaves = now + TOWN_FEEL.botFadeMs;
+    else headHome(t, b, now);
+    return;
+  }
+  b.trip = null;
+  if ((c !== to.c || r !== to.r) && !taken(t, to.c, to.r, w)) walkWalker(w, to);
+}
+
+/** A bot has faded out at its door: it's home (on no square). The bot home longest comes out in its place (never the same one). */
+function reachHome(t: Town, b: Person, now: number): void {
+  b.home = true;
+  b.going = false;
+  b.trip = null;
+  b.leaves = Infinity;
+  t.all.splice(t.all.indexOf(b.walker), 1);
+  t.homeQueue.push(b);
+  let out = 0;
+  for (const o of t.bots) if (!o.home) out++;
+  const next = t.homeQueue.find((o) => o !== b);
+  if (out < t.outN && next) walkOut(t, next, now);
+}
+
+/**
+ * A bot at home comes out (Oct 28): it fades in at its door (`homeDoor`) and walks to a free spot in the square, at
+ * least `botTurnAway` steps from you.
+ */
+export function walkOut(t: Town, b: Person, now: number): void {
   if (!b.home) return;
-  const at = freeSpot(t.rnd, t.you.walker.here(), fromYou, t.bots.filter((o) => !o.home).map((o) => o.walker.goal()), t);
-  b.walker = new Walker(at, TOWN_FEEL.botStepMs, true);
-  b.walker.go([]); // (its claim the newest: anyone headed there already keeps it)
+  const start = doorway(t, b.bot!, null) ?? homeDoor(b.bot!);
+  const spot = freeSpot(t.rnd, t.you.walker.here(), TOWN_FEEL.botTurnAway, t.bots.filter((o) => !o.home).map((o) => o.walker.goal()), t);
+  const w = new Walker(start, TOWN_FEEL.botStepMs, true);
+  const path = routeAround(t, w, start, spot);
+  w.go(path ?? []);
+  bringOut(t, b, w, now);
+  b.trip = path ? spot : null;
+  t.homeQueue.splice(t.homeQueue.indexOf(b), 1);
+}
+
+function bringOut(t: Town, b: Person, w: Walker, now: number): void {
+  b.walker = w;
   b.home = false;
   b.came = now;
   b.leaves = Infinity;
-  t.all.push(b.walker);
+  b.going = false;
+  b.trip = null;
+  b.due = false;
+  t.all.push(w);
+}
+
+/** A bot at home comes out on a free square in the park, at least `fromYou` steps from you (it fades in): the test hooks' quick way out. */
+export function comeOut(t: Town, b: Person, now: number, fromYou: number): void {
+  if (!b.home) return;
+  const at = freeSpot(t.rnd, t.you.walker.here(), fromYou, t.bots.filter((o) => !o.home).map((o) => o.walker.goal()), t);
+  const w = new Walker(at, TOWN_FEEL.botStepMs, true);
+  w.go([]); // (its claim the newest: anyone headed there already keeps it)
+  bringOut(t, b, w, now);
+  const k = t.homeQueue.indexOf(b);
+  if (k >= 0) t.homeQueue.splice(k, 1);
+}
+
+/** A bot stays out (a test hook calls it to you): not on its way home, not fading. */
+export function stayOut(b: Person): void {
+  b.going = false;
+  b.trip = null;
+  b.leaves = Infinity;
 }
 
 /** A bot walks a few squares, or (`sitting`) to a free stool nearby. */
@@ -981,8 +1170,13 @@ function wander(t: Town, bot: Person, sitting: boolean): void {
   const w = bot.walker;
   const h = w.here();
   const [lo, hi] = f.botWalk;
-  // (Never on a statue's viewing square: it's kept free for whoever comes to look.)
-  const ok = (c: number, r: number) => walkable(c, r) && !taken(t, c, r, w) && !t.bosses.some((b) => plotDist(b.home, c, r) === 1) && !statueAt(c, r);
+  // Away from the square (a test hook called it elsewhere): back to a free spot in it.
+  if (!inSquare(h.c, h.r)) {
+    walkWalker(w, freeSpot(t.rnd, t.you.walker.here(), 2, [], t, 1));
+    return;
+  }
+  // (Only in the square, Oct 28; never on a statue's viewing square: it's kept free for whoever comes to look.)
+  const ok = (c: number, r: number) => inSquare(c, r) && walkable(c, r) && !taken(t, c, r, w) && !t.bosses.some((b) => plotDist(b.home, c, r) === 1) && !statueAt(c, r);
   const targets: Sq[] = [];
   const reach = sitting ? f.botSitReach : hi;
   for (let dc = -reach; dc <= reach; dc++)
@@ -1084,6 +1278,8 @@ export function tableFor(t: Town, bot: Person): Meeting | null {
 /** You and the bot set off for the meeting's stools, to sit (the bot held on its way). */
 export function meet(t: Town, m: Meeting): void {
   t.meet = m;
+  // (A bot on its way home or out stays for the game: it's never sent home mid-game.)
+  stayOut(m.bot);
   holdBot(t, m.bot);
   t.you.sit = true;
   m.bot.sit = true;

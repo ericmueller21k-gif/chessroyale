@@ -4,9 +4,9 @@ import { itemDef } from "@chessroyale/core";
 import { sheetHash } from "../../../scripts/bake-sidekicks.ts";
 import type { Character } from "../src/characters/sprite.ts";
 import { SIDEKICK_SHEETS } from "../src/town/sidekick-sheets.ts";
-import { N } from "../src/town/camera.ts";
+import { N, wrapF, wrapI } from "../src/town/camera.ts";
 import { TOWN_FEEL } from "../src/town/feel.ts";
-import { BOTS, HOMES, START, TABLES, Walker, anyTableFree, botLabel, cancelMeet, comeOut, createTown, tdist, walkable, holdBot, isSprite, meet, meetReady, meetSeat, playAtTableText, ratingText, seatOf, seatText, seated, sidekickText, spriteAnim, stepsFrom, tableFor, tableStates, tick, townLine, waitingBot, waveMs, walkWalker, type HomeId, type Person, type Sq, type Town } from "../src/town/world.ts";
+import { APRON, BOTS, CROWD_MAX, HOMES, addCrowd, START, TABLES, Walker, anyTableFree, canGoHome, homeDoor, inSquare, plotDist, sendHome, botLabel, cancelMeet, comeOut, createTown, tdist, walkable, holdBot, isSprite, meet, meetReady, meetSeat, playAtTableText, ratingText, seatOf, seatText, seated, sidekickText, spriteAnim, stepsFrom, tableFor, tableStates, tick, townLine, waitingBot, waveMs, walkWalker, type HomeId, type Person, type Sq, type Town } from "../src/town/world.ts";
 
 /** Each sidekick's sprite file (and its id, `sidekick-<file>`), by its boss's home. */
 const HOME_FILE: Record<HomeId, string> = { clown: "boingo", pig: "wrangler", smudgy: "smudgy", bigboy: "bigboy", hopper: "chubchirp", folio: "folio", moo: "moo", gardener: "puddles", sawyer: "sawyer", tiger: "babur", alfil: "alfil", gingerbread: "ginger", grex: "jefferson", hollow: "hollow" };
@@ -276,32 +276,271 @@ describe("town square: playing a bot (its card's Play)", () => {
   });
 });
 
-describe("town square: the bots take turns in the square (Oct 28: twenty cost frames)", () => {
-  it("botsOut are out at once, the others at home (on no square); now and then one goes home and another comes out", () => {
+/** What the turns did: who was sent home (and who was out, not on its way home, just before), who came out, who got home. */
+interface TurnLog {
+  sent: { bot: Person; at: number; out: Set<Person> }[];
+  came: { bot: Person; at: number; from: Sq }[];
+  home: { bot: Person; at: number }[];
+}
+/** Runs the town `ms` from `from` in steps of `step`, logging the turns (and calling `each` after every tick). */
+function run(t: Town, from: number, ms: number, log: TurnLog = { sent: [], came: [], home: [] }, step = 100, each?: (now: number) => void): number {
+  let now = from;
+  const going = new Map(t.bots.map((b) => [b, b.going]));
+  const home = new Map(t.bots.map((b) => [b, b.home]));
+  let staying = new Set(t.bots.filter((b) => !b.home && !b.going));
+  while (now < from + ms) {
+    now += step;
+    tick(t, now);
+    for (const b of t.bots) {
+      if (b.going && !going.get(b)) log.sent.push({ bot: b, at: now, out: staying });
+      if (!b.home && home.get(b)) log.came.push({ bot: b, at: now, from: b.walker.here() });
+      if (b.home && !home.get(b)) log.home.push({ bot: b, at: now });
+      going.set(b, b.going);
+      home.set(b, b.home);
+    }
+    staying = new Set(t.bots.filter((b) => !b.home && !b.going));
+    each?.(now);
+  }
+  return now;
+}
+/** You stand far from the square (so no bot is passed over for being near you). */
+function away(t: Town): void {
+  for (let r = 0; r < N; r++)
+    for (let c = 0; c < N; c++)
+      if (walkable(c, r) && !inSquare(c, r) && tdist({ c, r }, START) >= 18 && HOMES.every((h) => plotDist(h, c, r) > 3)) {
+        t.you.walker.c = c;
+        t.you.walker.r = r;
+        return;
+      }
+}
+const MIN = TOWN_FEEL.botTurnMs;
+
+describe("town square: the bots take turns (Oct 28, Eric: ten out, one goes home each minute and another walks out of its own home)", () => {
+  it("ten out, the others at home (on no square); ten in the world all along, the ones out staying in the square", () => {
+    expect(TOWN_FEEL.botsOut).toBe(10);
     const t = createTown(0);
     const out = () => t.bots.filter((b) => !b.home);
-    expect(out()).toHaveLength(TOWN_FEEL.botsOut);
+    expect(out()).toHaveLength(10);
     for (const b of t.bots) expect(t.all.includes(b.walker), b.name).toBe(!b.home);
-    const first = new Set(out());
-    const held = out()[0]!;
-    holdBot(t, held);
-    let now = 0;
-    const seen = new Set(out());
-    for (let i = 0; i < 20 * 60 * 120; i += 1) {
-      now += 50;
-      tick(t, now);
-      if (i % 20) continue;
-      // Never more out than botsOut (one fading out as another fades in: at most one more), a walker each, apart.
-      expect(out().length).toBeLessThanOrEqual(TOWN_FEEL.botsOut + 1);
+    expect(t.homeQueue).toHaveLength(10);
+    expect(t.homeQueue.every((b) => b.home)).toBe(true);
+    const log = run(t, 0, 30 * MIN, undefined, 100, () => {
+      // Ten in the world (near the square or on their way), a walker each, apart where they stop.
+      expect(out()).toHaveLength(10);
       for (const b of t.bots) expect(t.all.includes(b.walker), b.name).toBe(!b.home);
       const goals = out().map((b) => `${b.walker.goalC()},${b.walker.goalR()}`);
       expect(new Set(goals).size).toBe(goals.length);
-      expect(held.home).toBe(false);
-      for (const b of out()) seen.add(b);
+      // A bot out and not on its way home or out stands in the square (the park, the walk, the apron).
+      for (const b of out()) if (!b.trip && !b.going && !b.walker.moving()) expect(inSquare(b.walker.c, b.walker.r), `${b.name} at ${b.walker.c},${b.walker.r}`).toBe(true);
+    });
+    expect(log).toBeGreaterThan(0);
+  });
+
+  it("one change a minute: a bot sent home only on the minute, at most one a minute", () => {
+    expect(TOWN_FEEL.botTurnMs).toBe(60000);
+    const t = createTown(0);
+    away(t);
+    const log: TurnLog = { sent: [], came: [], home: [] };
+    run(t, 0, 20 * MIN + 500, log);
+    const minutes = log.sent.map((s) => Math.floor(s.at / MIN));
+    for (const s of log.sent) expect(s.at % MIN, s.bot.name).toBeLessThanOrEqual(100);
+    expect(new Set(minutes).size).toBe(minutes.length);
+    expect(Math.min(...minutes)).toBe(1);
+    expect(log.sent.length).toBeGreaterThanOrEqual(15);
+    // And one came out for each that got home.
+    expect(log.came.length).toBe(log.home.length);
+  });
+
+  it("the rounds: every bot out goes home once before any goes twice (a bot that came out is safe until the others have gone)", () => {
+    const t = createTown(0);
+    away(t);
+    const log: TurnLog = { sent: [], came: [], home: [] };
+    run(t, 0, 62 * MIN, log);
+    // (Fewer than one a minute: a bot due that sits at a table waits its turn, and the minute passes.)
+    expect(log.sent.length).toBeGreaterThanOrEqual(30);
+    // In rounds of ten: the ten out as the round starts, each once.
+    for (let k = 0; k + 10 <= log.sent.length; k += 10) {
+      const round = log.sent.slice(k, k + 10).map((s) => s.bot);
+      expect(new Set(round).size, `round ${k / 10}`).toBe(10);
+      expect(new Set(round), `round ${k / 10}`).toEqual(log.sent[k]!.out);
     }
-    // Over two hours every bot has been out, and the ones out now aren't the first ones.
-    expect(seen.size).toBe(BOTS.length);
-    expect([...first].every((b) => !b.home)).toBe(false);
+    // Never sent home within a minute and a half of coming out.
+    for (const s of log.sent) {
+      const came = log.came.filter((c) => c.bot === s.bot && c.at < s.at).pop();
+      if (came) expect(s.at - came.at).toBeGreaterThanOrEqual(TOWN_FEEL.botOutAtLeastMs);
+    }
+  });
+
+  it("busy bots are passed over and stay in the round: held, seated, on its way to or from a game, near you, just out; rechecked each minute", () => {
+    const t = createTown(0);
+    away(t);
+    const log: TurnLog = { sent: [], came: [], home: [] };
+    let now = run(t, 0, MIN + 200, log);
+    expect(log.sent).toHaveLength(1);
+    // Hold one still due (its card is open): the others go, then the minutes are skipped until it's free.
+    const x = t.bots.find((b) => b.due && !b.home && !b.going)!;
+    holdBot(t, x);
+    for (let m = 0; m < 40 && t.bots.some((b) => b.due && b !== x); m++) now = run(t, now, MIN, log);
+    // (The round's other nine have gone.)
+    expect(log.sent).toHaveLength(9);
+    // Only it is due: the minutes pass with nobody sent.
+    now = run(t, now, 3 * MIN, log);
+    expect(log.sent).toHaveLength(9);
+    expect(log.sent.some((s) => s.bot === x)).toBe(false);
+    expect(x.due).toBe(true);
+    // Free again, it's the next sent home (once it isn't busy otherwise: it may sit at a table a while first).
+    holdBot(t, null);
+    for (let m = 0; m < 20 && log.sent.length === 9; m++) now = run(t, now, MIN, log);
+    expect(log.sent).toHaveLength(10);
+    expect(log.sent[9]!.bot).toBe(x);
+    // Each kind of busy, one by one.
+    const u = createTown(0);
+    away(u);
+    const b = u.bots.find((p) => !p.home && !seated(p))!;
+    expect(canGoHome(u, b, 0)).toBe(true);
+    u.hold = b;
+    expect(canGoHome(u, b, 0)).toBe(false);
+    u.hold = null;
+    u.meet = { bot: b, table: TABLES[0]!, yours: TABLES[0]!.stools[0], theirs: TABLES[0]!.stools[1] };
+    expect(canGoHome(u, b, 0)).toBe(false);
+    u.meet = null;
+    u.leave = { bot: b, at: 1000 };
+    expect(canGoHome(u, b, 0)).toBe(false);
+    u.leave = null;
+    b.came = -1000;
+    expect(canGoHome(u, b, 0)).toBe(false);
+    b.came = -TOWN_FEEL.botOutAtLeastMs;
+    expect(canGoHome(u, b, 0)).toBe(true);
+    const near = { ...b.walker.here() };
+    u.you.walker.c = near.c;
+    u.you.walker.r = wrapI(near.r + TOWN_FEEL.botTurnAway - 1);
+    expect(canGoHome(u, b, 0)).toBe(false);
+    away(u);
+    walkWalker(b.walker, TABLES[4]!.stools[0]);
+    settle(u);
+    expect(seated(b)).toBe(TABLES[4]);
+    expect(canGoHome(u, b, 0)).toBe(false);
+  });
+
+  it("the one home longest comes out next (first in, first out), never the one that just went home", () => {
+    const t = createTown(0);
+    away(t);
+    const first = [...t.homeQueue];
+    const log: TurnLog = { sent: [], came: [], home: [] };
+    run(t, 0, 25 * MIN, log);
+    expect(log.came.length).toBeGreaterThanOrEqual(15);
+    const expected = [...first, ...log.home.map((h) => h.bot)];
+    expect(log.came.map((c) => c.bot.name)).toEqual(expected.slice(0, log.came.length).map((b) => b.name));
+    // Each comes out as the one before it gets home, and it's another.
+    for (let i = 0; i < log.came.length; i++) {
+      expect(log.came[i]!.at).toBe(log.home[i]!.at);
+      expect(log.came[i]!.bot).not.toBe(log.home[i]!.bot);
+    }
+  });
+
+  it("going home: a sidekick walks to its boss's door and a pawn to the Colosseum's gate, and fades out there; coming out, the same the other way", () => {
+    const t = createTown(0);
+    away(t);
+    t.nextTurnAt = Infinity;
+    for (const kid of [true, false]) {
+      const b = t.bots.find((p) => !p.home && !p.going && !!p.bot!.boss === kid)!;
+      sendHome(t, b, 0);
+      expect(b.going).toBe(true);
+      let fadeAt: Sq | null = null;
+      let fadeLeft = 0;
+      let next: Person | null = null;
+      const log: TurnLog = { sent: [], came: [], home: [] };
+      run(t, 0, MIN, log, 20, (now) => {
+        if (!b.home && b.leaves < Infinity && !fadeAt) {
+          fadeAt = b.walker.here();
+          fadeLeft = b.leaves - now;
+        }
+        // On its way it's drawn and tappable as any bot (not home), on walkable squares but the doorway's.
+        if (!b.home && !fadeAt) expect(walkable(b.walker.hereC(), b.walker.hereR()) || same(b.walker.here(), b.trip!), b.name).toBe(true);
+        if (log.came.length && !next) next = log.came[0]!.bot;
+      });
+      expect(b.home, b.name).toBe(true);
+      expect(t.all.includes(b.walker)).toBe(false);
+      expect(fadeAt).not.toBeNull();
+      expect(fadeLeft).toBeGreaterThan(TOWN_FEEL.botFadeMs - 40);
+      expect(fadeLeft).toBeLessThanOrEqual(TOWN_FEEL.botFadeMs);
+      const at = fadeAt! as Sq;
+      if (kid) {
+        // Its boss's home's door: the plot's front row, by the middle.
+        const h = HOMES.find((x) => x.id === b.bot!.boss)!;
+        expect(at.r).toBe(wrapI(h.cy - 1));
+        expect(Math.abs(at.c - h.cx)).toBeLessThanOrEqual(1);
+        expect(same(homeDoor(b.bot!), { c: h.cx, r: wrapI(h.cy - 1) })).toBe(true);
+      } else {
+        // The gate: the apron's squares nearest it.
+        expect(APRON.slice(0, 4).some((s) => same(s, at)), `${at.c},${at.r}`).toBe(true);
+      }
+      // The one home longest came out at its own door, faded in, and walked to the square.
+      expect(next).not.toBeNull();
+      const c = log.came[0]!;
+      const n = c.bot;
+      const door = homeDoor(n.bot!);
+      expect(Math.abs(wrapF(c.from.c - door.c)) <= 1 && Math.abs(wrapF(c.from.r - door.r)) <= (n.bot!.boss ? 0 : 1), `${n.name} from ${c.from.c},${c.from.r}`).toBe(true);
+      expect(n.came).toBe(c.at);
+      settle(t, c.at + 20);
+      expect(n.trip).toBeNull();
+      expect(inSquare(n.walker.c, n.walker.r), n.name).toBe(true);
+    }
+    // Every sidekick's door has a square in front to walk to; each home's door leads to the square.
+    for (const b of BOTS.filter((x) => x.boss)) {
+      const d = homeDoor(b);
+      expect(walkable(d.c, wrapI(d.r - 1)), b.name).toBe(true);
+      expect(stepsFrom({ c: d.c, r: wrapI(d.r - 1) })[START.r * N + START.c]!, b.name).toBeGreaterThan(0);
+    }
+  });
+
+  it("a bot on its way home holds while its card is open, then carries on; one you play stays (nobody leaves mid-game)", () => {
+    const t = createTown(0);
+    away(t);
+    t.nextTurnAt = Infinity;
+    const b = t.bots.find((p) => !p.home && p.bot!.boss)!;
+    sendHome(t, b, 0);
+    let now = run(t, 0, 600);
+    holdBot(t, b);
+    const here = b.walker.here();
+    now = run(t, now, 5000);
+    expect(b.home).toBe(false);
+    expect(same(b.walker.here(), here)).toBe(true);
+    holdBot(t, null);
+    now = run(t, now, MIN);
+    expect(b.home).toBe(true);
+    // Played on its way home: it stays for the game.
+    const u = createTown(0);
+    u.nextTurnAt = Infinity;
+    const g = u.bots.find((p) => !p.home && !seated(p))!;
+    sendHome(u, g, 0);
+    run(u, 0, 300);
+    meet(u, tableFor(u, g)!);
+    expect(g.going).toBe(false);
+    settle(u, 300);
+    expect(meetReady(u)).toBe(true);
+    // Seated across from you for many minutes: never sent home, while the others take their turns.
+    u.nextTurnAt = 0;
+    const log: TurnLog = { sent: [], came: [], home: [] };
+    run(u, 0, 15 * MIN, log);
+    expect(g.home).toBe(false);
+    expect(log.sent.some((s) => s.bot === g)).toBe(false);
+    expect(log.sent.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it("the testers' crowd (?crowd=N, measuring only): N more named pawns, at most 100, wandering the square; the bots' turns don't count them", () => {
+    const t = createTown(0);
+    addCrowd(t, 150);
+    expect(t.crowd).toHaveLength(CROWD_MAX);
+    expect(CROWD_MAX).toBe(100);
+    expect(t.crowd.map((p) => p.name).slice(0, 2)).toEqual(["Guest 1", "Guest 2"]);
+    for (const p of t.crowd) {
+      expect(p.bot).toBeNull();
+      expect(t.people.includes(p) && t.all.includes(p.walker)).toBe(true);
+    }
+    const at = new Map(t.crowd.map((p) => [p, `${p.walker.c},${p.walker.r}`]));
+    run(t, 0, 2 * MIN, undefined, 100, () => expect(t.bots.filter((b) => !b.home)).toHaveLength(10));
+    expect(t.crowd.filter((p) => at.get(p) !== `${p.walker.c},${p.walker.r}`).length).toBeGreaterThan(50);
   });
 
   it("back from a game, the bot you played is out (across from you); one called from home comes out", () => {

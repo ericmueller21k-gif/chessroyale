@@ -167,6 +167,41 @@ export function proj(v: View, dx: number, dz: number, lift: number, out: Pt): bo
 
 const ta = newPt();
 const tb = newPt();
+
+/** A table's top (`tableLift`): where it's worked out (`dz`), its height and its slab's in the camera's lift, how much bigger it's drawn there than at its foot. */
+export interface TableLift {
+  dz: number;
+  top: number;
+  thick: number;
+  grow: number;
+}
+/**
+ * A chess table's top over its foot at (dx, dz): `topPx` and `thickPx` pixels of its picture (drawn `housePxPerSquare` a
+ * square) as heights in the camera's lift, through the lift's pixels a unit there. Lifted that high in the camera's true
+ * perspective, a board is drawn `grow` times as big as at the foot: 1.04 to 1.17 over the screen's usual rows, but near
+ * the camera (low on the phone's screen) lifting brings a point toward the camera more than up the screen, so the lift
+ * that reaches the picture's top, and the board with it, grow without bound (Oct 28, Eric's warped boards: twice the
+ * table and more, skewed). The table's picture is a cut-out, the same shape anywhere. So where `grow` would pass
+ * `tableBoardGrow`, the top is worked out at the nearest place farther off (an eighth of a square at a time) where it
+ * doesn't (or where lifting reaches it at all); the renderer draws it from there at the picture's own place and scale.
+ * False: off the view.
+ */
+export function tableLift(v: View, dx: number, dz: number, topPx: number, thickPx: number, out: TableLift): boolean {
+  for (let k = 0; k <= 64; k++) {
+    const z = dz + k / 8;
+    if (!proj(v, dx, z, 0, ta)) return false;
+    if (!proj(v, dx, z, 1, tb)) continue;
+    const perLift = ta.y - tb.y;
+    const spx = ta.k / TOWN_FEEL.housePxPerSquare;
+    out.dz = z;
+    out.top = (topPx * spx) / perLift;
+    out.thick = (thickPx * spx) / perLift;
+    if (!(perLift > 0) || !proj(v, dx, z, out.top, tb)) continue;
+    out.grow = tb.k / ta.k;
+    if (out.grow <= TOWN_FEEL.tableBoardGrow) return true;
+  }
+  return false;
+}
 /** Is a ground point past the curve (hidden behind the bulge)? There the ground faces away: farther projects lower. */
 export function pastCurve(v: View, dx: number, dz: number): boolean {
   return !proj(v, dx, dz, 0, ta) || !proj(v, dx, dz + 0.25, 0, tb) || tb.y >= ta.y;

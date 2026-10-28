@@ -30,7 +30,10 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
   blended by the box's width / height (0.6 = all phone, 1.4 = all computer). Zooming out raises the camera, moves it back,
   pitches it down and lets the rim reach further; the page opens zoomed out (`startZoomedOut`). The world is 46 × 46 squares (40 × 40 until slice 6) and wraps both ways. A tap picks the
   nearest drawn square under it (`pickSquare`). The far band of ground dissolves into the sky; things in it fade, haze
-  and blur, and are drawn whole, never cut by the rim.
+  and blur, and are drawn whole, never cut by the rim. (Each is softened through a scratch canvas of its own that frame,
+  cleared only where it's used: `blitSoft`. Oct 28: one shared canvas, the size of the biggest picture it ever held,
+  cleared and copied whole for each thing, cost the frames south of the park, where the whole park and the Colosseum
+  are in the far band. docs/decisions/2026-10-28-bots-rotation.md.)
 - **The layout** (`town/world.ts`, `HOMES`): fourteen homes spread evenly round the middle over the world that wraps, so
   neighbors stand 8 to 10 squares apart; the Colosseum on its 12 × 12 ground (`COLISEUM`, columns 17 to 28, rows 28 to 39),
   its gate facing south onto its apron (`APRON`: columns 17 to 28, rows 25 to 27, paved, kept open for people to gather),
@@ -130,6 +133,10 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
   more kinds of square (`groundAt`: paving and grass), drawn with the board's in the same color-sorted fills. Tables, trees,
   benches and the fountain are solid (`walkable`); stools, paths and grass are walked on. Each picture is made once (a
   `FrameCache` per kind) and drawn as one item sorted with the people, a little behind whoever stands on its row.
+- **Name tags** (Oct 28): each drawn once per name, size and color (its pill, its soft shadow and its name, at the
+  device's pixels) and stamped each frame (`drawTag`, `tagArtOf` in `render.ts`; about 64 kept, the least lately used
+  making way; drawn again when a web font loads); a fading tag stamps its shadow, pill and name one over the other, as
+  they were drawn before. The things are sorted far to near in place (`sortFarFirst`, nothing allocated).
 - **The tables' boards** (Oct 27; docs/decisions/2026-10-27-park-tables-live.md): each table's top is a flat slab drawn
   through the camera (`drawBoard` in `render.ts`; sizes `TABLE_BOARD`, pieces `TABLE_PIECES`, the clock's digits
   `TABLE_DIGITS` in `houses/park.ts`; timings in `TOWN_FEEL`'s `table*`), its 8 x 8 board lying flat between the stools and
@@ -139,6 +146,10 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
   you, waits** (a soft green ring pulses on the ground under the free stool); otherwise the pieces stand set up. You at a
   table aren't playing or searching yet (Casual and Ranked come with the tables' matchmaking). While nothing on a board
   moves and the camera holds still, its slab, board and pieces are one cached picture (`boardCache`): frame rates as main.
+  Its top is lifted onto the table's picture in the camera's true perspective (`tableLift` in `camera.ts`); low on the
+  phone's screen, where that would draw it more than `tableBoardGrow` (1.2) times its foot's scale (Oct 28, Eric's warped
+  boards: twice the table and more, skewed), it's worked out a little farther off and drawn at the picture's place and
+  scale.
 - **Sitting at a table** (slice 6): a tap on a table or a stool walks you to its free stool nearer you (`destFor`'s
   `table`; both taken: beside it) and opens its card (no title, Eric, Oct 27): **"Casual"** and **"Ranked"** greyed,
   "Coming soon" (matchmaking for the park is the next job); at a table where two others play, **"Spectate"** greyed,
@@ -288,13 +299,25 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
   has a look (`Look`, one field): a pawn's (side, tint and the crate items worn) or a sprite's (`{ sprite }`: a sidekick's
   baked sheet), and a sidekick its boss (`boss`). Shown everywhere as "<name> (bot)" (`botLabel`: their tags, cards and
   games). The bots start off the tables' stools (every table free as the town opens) and sit as they wander.
-  - **Six out at once, the others at home, taking turns** (Oct 28: twenty in the square cost about 3 frames a second,
-    Eric's frame-rate rule: the decision's numbers; six, as many as before the sidekicks). `botsOut` (6) are in the
-    square, shuffled by the town's seed as it opens (the same each time) (back from a game, the bot you played among them); the rest are at home
-    (`Person.home`: not drawn, not tapped, on no square: its walker leaves the town's `all`). Every `botTurnMs` (10 to
-    20 s) one out, standing, free and at least
-    `botTurnAway` (5) steps from you starts home, fading out over `botFadeMs`, and one from home comes out on a free
-    square in the park as far from you, fading in (`takeTurns`, `comeOut`). A bot whose card opens stays.
+  - **Ten out at once, one goes home each minute and another walks out of its own home** (Oct 28, Eric: "they work on 1
+    minute timer, 10 out at a time, randomly one each minute starts to head home, is replaced by another…";
+    `docs/decisions/2026-10-28-bots-rotation.md`). `botsOut` (10) are in the world, shuffled by the town's seed as it opens
+    (the same each time; back from a game, the bot you played among them); the rest are at home (`Person.home`: not drawn,
+    not tapped, on no square: its walker leaves the town's `all`), queued in the order they got home (`homeQueue`). Every
+    `botTurnMs` (60 s, a timer in the town's tick, `takeTurns`) one bot out is sent home (`sendHome`), picked at random
+    among those still **due** this round and free (`canGoHome`: not seated, not held by its card or its table's, not on
+    its way to or from a game with you, at least `botTurnAway` (5) steps from you, out at least `botOutAtLeastMs` (90 s));
+    a busy one is passed over and stays due; none free, the minute is skipped. When no bot out is due, a new round starts
+    with every bot out: none goes twice before all the others have gone once. **Going home** it walks the town's way round
+    (`routeAround`: round the squares others stand on) to its **door** (`homeDoor`: a sidekick's is its boss's home's,
+    the plot's front row by its middle, `doorway` taking the square beside it when the boss stands in front; a pawn has no
+    house, so the Colosseum's gate, the apron's free square nearest it) and fades out there over `botFadeMs` (`arrive`);
+    then it's home (`reachHome`) and **the bot home longest** (first in, first out, never the one that just got home)
+    fades in at its own door and walks to a free spot in the square (`walkOut`). So ten are in the world all along, near
+    the square or on their way. A bot walking home or out can be tapped like any other: its card holds it, and it carries
+    on when the card closes; Play keeps it out (`meet` → `stayOut`). **The bots out stay in the square** (`inSquare`: the
+    park, the walk and the Colosseum's apron, off the bosses' roaming ground): they wander only there, and one that finds
+    itself elsewhere walks back. (Before: six out, a turn every 10 to 20 s, fading out and in where they stood.)
   - **A sidekick in the square** (Oct 28): its own animations, `idle` standing, `walk` walking (no hop: its walk steps),
     `sit` on a table's stool (its sit has its own little stool, drawn over the table's, facing the board; no shadow, not
     lowered like a pawn), and `wave` once when you tap it, then `idle` while its card is open (`spriteAnim` in `world.ts`;
@@ -360,7 +383,9 @@ noted wherever a slice changed one.
 ## Tests
 
 - `packages/app/test/town-camera.test.ts`: the projection (the focus in the middle column, wrapping both ways, a tap picks
-  the square drawn there, far squares shrink, zooming out shows more rows, the phone / computer blend), the layout
+  the square drawn there, far squares shrink, zooming out shows more rows, the phone / computer blend, a table's board
+  fitting its picture on every row of the screen: never more than `tableBoardGrow` its foot's scale, unchanged where it
+  always fit), the layout
   (fourteen homes 8 to 10 squares from their nearest neighbors, none near the start, the Colosseum's ground and the park
   clear, and the start south of it on the park's promenade), the walk around a home, and the eased steps meeting the even ones at the same speed.
 - `packages/app/test/town-sky.test.ts`: which look shows when, the looks always adding up to 1 and blending over their
@@ -382,6 +407,13 @@ noted wherever a slice changed one.
   animation (wave once after a tap, walk, sit), "<name> (bot)" everywhere, the walk to the nearest free table (your stool the nearer), sitting and
   when the game opens, calling it off, every table taken (no table; Play greyed) and one freeing, a held bot staying put, the
   bot waiting at a table, a seat in the address and back, and coming back to the table (the bot across, then wandering off).
+  The turns (Oct 28): ten out, ten in the world all along, the ones out standing in the square; one sent home a minute,
+  only on the minute; rounds of ten (every bot out once before any twice), never sent within 90 s of coming out; busy bots
+  (held, seated, on their way to or from a game, near you, just out) passed over and still due, the held one next once
+  free; the one home longest comes out next, as the other gets home, never the same; a sidekick to its boss's door and a
+  pawn to the gate, fading out there over `botFadeMs`, and the next fading in at its own door and walking to the square;
+  a bot going home held by its card and carrying on; one you play stays, and never goes while seated across from you.
+  The testers' crowd (`addCrowd`: at most 100, named, wandering, not counted in the turns).
   `packages/app/test/town-bot-game.test.ts`: the game (its name and rating, the loading step before the vote, casual; a
   sidekick's face on its strip).
 - `packages/app/test/town-lights.test.ts`: the park's lamps (8 to 12, solid, on paving, off every path, every square and
@@ -451,14 +483,18 @@ title; a bot waiting, two playing (the board's pixels change), a tap on their ga
   and `window.__townTables()` (each table's state: "still", "waiting:<free stool>" or "playing"); the bots (Oct 27):
   `window.__townAt("bot", i)` (where to tap BOTS[i]), `window.__townCall(i)` (BOTS[i] comes to stand beside you, out from home first if it's there, and every bot
   holds still; -1: only the holding still) and `window.__townBots()` (each bot: its name, square, the table it sits at, whether
-  it walks, whether it's at home, a sidekick's animation). Playing a bot (Oct 27, phone and desktop): a tap on Tempo Tess opens her card ("Tempo Tess (bot)", "Rating
+  it walks, whether it's at home, a sidekick's animation; since Oct 28 whether it's going home, where it's headed, `fading`
+  "out" or "in", its door, whether it stands in the square, its place in the queue home) and `window.__townTurns(ms)` (the
+  bots' turns every `ms`, the next one now). The turns (Oct 28, phone and desktop): ten out; one walks home and fades out
+  at its door, gone; the one home longest fades in at its own door, ten in the world all along, and walks to the square. Playing a bot (Oct 27, phone and desktop): a tap on Tempo Tess opens her card ("Tempo Tess (bot)", "Rating
   1500", Play), nothing of Maia's fetched yet; Play walks you both to a table, the game opens (the gear, her name and
   rating on her strip, Maia's worker started), one move each, resign ("Casual game"), "Back to town": you on your stool, she
   across, then she wanders off; a bot sitting alone at a table: its card's "Play <name> (bot) · <rating>" (Casual and
   Ranked greyed), the game; a reload, then again and the back button, each lands you back at the table. The sidekicks
   (Oct 28): a tap on Glim, it waves, then stands while its card is open ("Glim (bot)", "Hollow's sidekick", "Rating
   2500", Play); Play, the game with its face on its strip, resign, back at the table with Glim across in its sit; Hollow
-  Peak's card shows his first line, closed and opened again the second (`__townGlide("hollow")` takes the camera there,
+  Peak's card shows his first line, closed and opened again the second (`__townGlide("hollow")` takes the camera there;
+  `__townGlide([c, r])` to any square, to measure a spot's frame rate,
   `__townBossBack("hollow")` keeps Hollow behind his home); Babur's card has no line. `__townBots()` also gives each bot's
   animation (`anim`: a sidekick's, null for a pawn).
   The chat log's hooks (the test switches on): `window.__townSay()` (someone from `CHATTER` talks now), `__townSay(name, text, kind,

@@ -24,7 +24,7 @@ import { SAWYER } from "../characters/sawyer.ts";
 import { SMUDGY } from "../characters/smudgy.ts";
 import { TIGER_FIGURE } from "../characters/tiger-figure.ts";
 import { FOLIO } from "../characters/folio.ts";
-import { N, bandOf, clamp, drawable, enterOf, farOf, forEachSquare, hazeMix, newPt, newView, pastCurve, pickSquare, proj, radial, rimYAt, setView, wrapF, type Quad, type View } from "./camera.ts";
+import { N, bandOf, clamp, drawable, enterOf, farOf, forEachSquare, hazeMix, newPt, newView, pastCurve, pickSquare, proj, radial, rimYAt, setView, tableLift, wrapF, type Quad, type TableLift, type View } from "./camera.ts";
 import { CHAT_BOX } from "./chat.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { statueSpot } from "./houses/coliseum.ts";
@@ -138,6 +138,32 @@ function groundColors(skyh: readonly number[]): GroundColors {
 }
 /** Fonts by whole pixel size (tags, signs). */
 const TAG_FONT = Array.from({ length: 16 }, (_, s) => `600 ${s}px ${FONT}`);
+/**
+ * A name tag drawn once (`Renderer.tagArtOf`): its canvas (four rows, each `rh` device pixels high, TAG_PAD device pixels
+ * round the pill for its shadow's blur, 4), the pill's size, its size and color, the frame it was last drawn.
+ */
+interface TagArt {
+  cv: HTMLCanvasElement;
+  w: number;
+  h: number;
+  rh: number;
+  s: number;
+  gold: boolean;
+  used: number;
+  /** `fontsLoaded` when it was drawn: a tag drawn before its font came is drawn again. */
+  fonts: number;
+}
+const TAG_PAD = 8;
+/** Counts the web fonts' loads finished (a tag's font, Archivo, may come after the town opens). */
+let fontsLoaded = 0;
+if (typeof document !== "undefined" && document.fonts) {
+  const loaded = () => void fontsLoaded++;
+  document.fonts.addEventListener?.("loadingdone", loaded);
+  void document.fonts.ready.then(loaded);
+}
+/** How far off its canvas a tag's pill is drawn to throw its shadow alone onto it (CSS pixels). */
+const TAG_THROW = 1000;
+const TAG_ART_MAX = 64;
 /** The homes' floating names (the game's display font), by whole pixel size. */
 const NAME_FONT = Array.from({ length: 41 }, (_, s) => `400 ${s}px ${FONT_BLACK}`);
 const BUBBLE_FONT = `500 12px ${FONT}`;
@@ -559,8 +585,15 @@ export class Renderer {
   private sitting = false;
   private readonly pose: Pose = { x: 0, y: 0, hop: 0, tilt: 0 };
   private readonly p = newPt();
-  private readonly soft = document.createElement("canvas");
-  private readonly sg = this.soft.getContext("2d")!;
+  /**
+   * The scratch canvases for softening things in the far band (`blitSoft`): one for each softened this frame, in turn
+   * (`nSoft`), each as big as the biggest it has held. (Oct 28: one shared canvas, rewritten for each thing while the
+   * world's canvas still held the last one drawn from it, was copied whole each time, at the size of the biggest
+   * picture it ever held, such as the far Colosseum: 3.3 million device pixels a frame south of the park, where fifteen
+   * or so things are softened, the frames Eric saw drop there.)
+   */
+  private readonly softs: { cv: HTMLCanvasElement; g: CanvasRenderingContext2D }[] = [];
+  private nSoft = 0;
   private readonly bandCv = document.createElement("canvas");
   private readonly bg = this.bandCv.getContext("2d")!;
   private readonly sky = new SkyPainter();
@@ -618,7 +651,14 @@ export class Renderer {
   /** Each sidekick's frames, by its sheet: every one cut from it as the town opens (the constructor), never per frame. */
   private readonly spriteArt = new Map<SidekickSheet, SpriteFrames>();
   /** Tag widths by name and size; sign and bubble layouts by text. */
-  private readonly tagW = new Map<string, number[]>();
+  /**
+   * The name tags, each drawn once (its pill, its shadow and its name) at the device's pixels and stamped every frame
+   * (Oct 28: a tag's shadow blur and its text, redrawn each frame, were the costliest part of a figure): by name, one
+   * per size and color; about TAG_ART_MAX in all, the least lately used making way (its canvas reused).
+   */
+  private readonly tagArt = new Map<string, TagArt[]>();
+  private nTagArt = 0;
+  private tagDpr = 0;
   private readonly nameW = new Map<string, number[]>();
   /** Each home's sign lettering: laid out once, drawn once per size (in device pixels a font pixel). */
   private readonly signs: { lines: string[]; w: number; h: number; art: HTMLCanvasElement[] }[];
@@ -729,11 +769,12 @@ export class Renderer {
   }
 
   /** Draws one frame. `zoom`: 0 normal, 1 zoomed out (and between, while it glides); `dt`: seconds since the last. */
-  /** Frames drawn so far (what's worked out once a frame keys on it). */
+  /** Frames drawn so far (what's worked out once a frame keys on it; the tags drawn once remember when each was last used). */
   private frameNo = 0;
   draw(now: number, camX: number, camY: number, zoom: number, dt = 0): void {
     const { ctx, W, H, DPR } = this;
     this.frameNo++;
+    this.nSoft = 0;
     this.camX = camX;
     this.camY = camY;
     setView(this.view, W, H, zoom);
@@ -762,6 +803,7 @@ export class Renderer {
       const t = this.tags[i]!;
       this.drawTag(t.text, t.x, t.y, t.gold, t.size, t.alpha);
     }
+    ctx.globalAlpha = 1;
     if (TOWN_FEEL.floatingNames) this.drawNames(now);
     if (this.bubble.on) this.drawBubble(this.bubble.text, this.bubble.x, this.bubble.y); // (over a home's name)
     this.placeChips(now);
@@ -1211,7 +1253,7 @@ export class Renderer {
       it.sz = it.kind === "prop" ? it.dz + 0.05 : it.dz;
       it.on = drawable(v, it.dx, it.dz, margin, below) && !(it.kind === "person" && people[it.i]!.home);
     }
-    items.sort(byFarFirst);
+    sortFarFirst(items);
     for (const b of town.bosses) b.onScreen = false;
     for (const b of this.statueBox) b.on = false;
     for (const nm of this.names) nm.a = 0;
@@ -1512,34 +1554,50 @@ export class Renderer {
    * slab, board and pieces are one picture, made on the second frame alike and reused (`boardCache`): one draw a frame.
    */
   private drawBoard(it: Item, ti: number, state: TableState, now: number, alpha: number, s: number): void {
-    const { ctx, view: v } = this;
+    const { ctx, view: v, DPR } = this;
     const B = TABLE_BOARD;
     const a = this.bp;
     const b = this.bq;
-    if (!proj(v, it.dx, it.dz, 0, a) || !proj(v, it.dx, it.dz, 1, b)) return;
-    // The top's height in the camera's lift: the picture's pixels over its foot, through its scale.
-    const perLift = a.y - b.y;
-    const spx = a.k / TOWN_FEEL.housePxPerSquare;
-    const top = (B.top * spx) / perLift;
-    const thick = (B.thick * spx) / perLift;
+    // Where the table's picture stands (its foot), and its top (`tableLift`).
+    if (!proj(v, it.dx, it.dz, 0, a)) return;
+    const fx = a.x;
+    const fy = a.y;
+    const fk = a.k;
+    // Low on the screen, near the camera, the board is worked out a little farther off and drawn at the picture's own
+    // place and scale (`tableLift`: lifted in the camera's true perspective there, it would warp).
+    const lift = this.lift;
+    if (!tableLift(v, it.dx, it.dz, B.top, B.thick, lift)) return;
+    const dz = lift.dz;
+    if (dz !== it.dz && !proj(v, it.dx, dz, 0, a)) return;
+    // (Screen x and y from where it's worked out: x * m + tx.)
+    const m = fk / a.k;
+    const tx = fx - a.x * m;
+    const ty = fy - a.y * m;
+    const { top, thick } = lift;
     // The world's pictures stand like cut-outs (no lean): the top stays straight over its leg.
     const footX = a.x;
-    if (!proj(v, it.dx, it.dz, top, b)) return;
+    if (!proj(v, it.dx, dz, top, b)) return;
     const shift = b.x - footX;
     const hb = B.board;
     const sq = (2 * hb) / 8;
     for (let gi = 0; gi < 9; gi++)
-      for (let fi = 0; fi < 9; fi++) if (!proj(v, it.dx - hb + fi * sq, it.dz - hb + gi * sq, top, this.grid[gi * 9 + fi]!)) return;
+      for (let fi = 0; fi < 9; fi++) if (!proj(v, it.dx - hb + fi * sq, dz - hb + gi * sq, top, this.grid[gi * 9 + fi]!)) return;
     const near = s <= TOWN_FEEL.tableFarCut;
     const game = near ? this.gameFor(ti, state.kind === "playing", now) : null;
     const pcs = near ? (game?.pcs ?? (this.stillSet ??= setUp())) : [];
     const f = TOWN_FEEL;
     const moving = !!game && pcs.some((q) => now - q.t0 < f.tableSlideMs || (q.gone > 0 && now < q.gone));
-    const paint = (g: CanvasRenderingContext2D) => this.paintBoard(g, it, top, thick, shift, pcs, game ? now : -1);
+    const paint = (g: CanvasRenderingContext2D) => {
+      if (m === 1) return this.paintBoard(g, it.dx, dz, top, thick, shift, pcs, game ? now : -1);
+      g.save();
+      g.transform(m, 0, 0, m, tx, ty);
+      this.paintBoard(g, it.dx, dz, top, thick, shift, pcs, game ? now : -1);
+      g.restore();
+    };
     // The same picture as the last frame (camera, alpha and pieces alike): once seen twice, it's kept and reused.
     const c0 = this.grid[0]!;
     const c8 = this.grid[80]!;
-    const key = `${Math.round(c0.x * 8)},${Math.round(c0.y * 8)},${Math.round(c8.x * 8)},${Math.round(c8.y * 8)},${Math.round(shift * 8)},${pcs.length},${game?.moves ?? -1},${game ? game.since : 0},${this.DPR}`;
+    const key = `${Math.round((c0.x * m + tx) * 8)},${Math.round((c0.y * m + ty) * 8)},${Math.round((c8.x * m + tx) * 8)},${Math.round((c8.y * m + ty) * 8)},${Math.round(shift * m * 8)},${pcs.length},${game?.moves ?? -1},${game ? game.since : 0},${DPR}`;
     const cache = (this.boardCache[ti] ??= { key: "", seen: "", cv: null, x: 0, y: 0, w: 0, h: 0 });
     ctx.globalAlpha = alpha;
     if (moving || key !== cache.seen) {
@@ -1547,40 +1605,45 @@ export class Renderer {
       cache.key = "";
       paint(ctx);
     } else {
-      if (cache.key !== key) this.cacheBoard(cache, key, it, top, thick, shift, b.k * B.piecePx, paint);
+      if (cache.key !== key) this.cacheBoard(cache, key, it.dx, dz, top, thick, shift, b.k * B.piecePx * m, m, tx, ty, paint);
       if (cache.cv) ctx.drawImage(cache.cv, cache.x, cache.y, cache.w, cache.h);
       else paint(ctx);
     }
     // The game's clock, floating over the middle of the board, straight above the leg.
-    if (game && proj(v, it.dx, it.dz, top + B.clockLift, a)) {
+    if (game && proj(v, it.dx, dz, top + B.clockLift, a)) {
       const secs = Math.floor((now - game.since) / 1000);
       const img = this.clockImg(`${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`);
-      const ps = a.k * B.clockPx;
+      const ps = a.k * m * B.clockPx;
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(img, footX - (img.width * ps) / 2, a.y - img.height * ps, img.width * ps, img.height * ps);
+      ctx.drawImage(img, footX * m + tx - (img.width * ps) / 2, a.y * m + ty - img.height * ps, img.width * ps, img.height * ps);
     }
     ctx.globalAlpha = 1;
   }
+
+  private readonly lift: TableLift = { dz: 0, top: 0, thick: 0, grow: 1 };
   private stillSet: TablePiece[] | null = null;
   private boardCache: { key: string; seen: string; cv: HTMLCanvasElement | null; x: number; y: number; w: number; h: number }[] = [];
 
-  /** Paints table's slab, board and pieces into `cache` (its box: the slab's corners and the tallest piece over them). */
-  private cacheBoard(cache: (typeof this.boardCache)[number], key: string, it: Item, top: number, thick: number, shift: number, ps: number, paint: (g: CanvasRenderingContext2D) => void): void {
+  /**
+   * Paints table's slab, board and pieces into `cache` (its box: the slab's corners and the tallest piece over them),
+   * worked out at (dx, dz) and drawn at x * m + tx, y * m + ty (drawBoard).
+   */
+  private cacheBoard(cache: (typeof this.boardCache)[number], key: string, dx: number, dz: number, top: number, thick: number, shift: number, ps: number, m: number, tx: number, ty: number, paint: (g: CanvasRenderingContext2D) => void): void {
     const { view: v, DPR } = this;
     const a = this.bp;
     const h = TABLE_BOARD.half;
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (const [x, z, l] of [[-h, -h, top], [h, -h, top], [h, h, top], [-h, h, top], [-h, -h, top - thick], [h, -h, top - thick]] as const) {
-      if (!proj(v, it.dx + x, it.dz + z, l, a)) return void (cache.cv = null);
-      x0 = Math.min(x0, a.x - shift);
-      x1 = Math.max(x1, a.x - shift);
-      y0 = Math.min(y0, a.y);
-      y1 = Math.max(y1, a.y);
+      if (!proj(v, dx + x, dz + z, l, a)) return void (cache.cv = null);
+      x0 = Math.min(x0, (a.x - shift) * m + tx);
+      x1 = Math.max(x1, (a.x - shift) * m + tx);
+      y0 = Math.min(y0, a.y * m + ty);
+      y1 = Math.max(y1, a.y * m + ty);
     }
     // (The tallest piece, the king, stands 13 of its pixels over its square.)
-    const m = 13 * ps + 2;
+    const king = 13 * ps + 2;
     x0 = Math.floor((x0 - 2) * DPR) / DPR;
-    y0 = Math.floor((y0 - m) * DPR) / DPR;
+    y0 = Math.floor((y0 - king) * DPR) / DPR;
     const w = Math.ceil((x1 + 2 - x0) * DPR);
     const hh = Math.ceil((y1 + 2 - y0) * DPR);
     if (w <= 0 || hh <= 0 || w * hh > 4_000_000) return void (cache.cv = null);
@@ -1598,7 +1661,7 @@ export class Renderer {
   }
 
   /** The slab, the board and `pcs` on it, into `g` in the screen's coordinates (`now` < 0: the pieces at rest). */
-  private paintBoard(g: CanvasRenderingContext2D, it: Item, top: number, thick: number, shift: number, pcs: readonly TablePiece[], now: number): void {
+  private paintBoard(g: CanvasRenderingContext2D, dx: number, dz: number, top: number, thick: number, shift: number, pcs: readonly TablePiece[], now: number): void {
     const { view: v } = this;
     const B = TABLE_BOARD;
     const pal = PARK_TABLE.palette;
@@ -1608,7 +1671,7 @@ export class Renderer {
       g.beginPath();
       for (let n = 0; n < pts.length; n++) {
         const [x, z, l] = pts[n]!;
-        if (!proj(v, it.dx + x, it.dz + z, l, a)) return;
+        if (!proj(v, dx + x, dz + z, l, a)) return;
         if (n === 0) g.moveTo(a.x - shift, a.y);
         else g.lineTo(a.x - shift, a.y);
       }
@@ -1652,7 +1715,7 @@ export class Renderer {
       const pf = q.fx + (q.f - q.fx) * e;
       const pg = q.fg + (q.g - q.fg) * e;
       const lift = t < 1 ? f.tableHop * Math.sin(Math.PI * t) : 0;
-      if (!proj(v, it.dx - hb + (pf + 0.5) * sq, it.dz - hb + (pg + 0.5) * sq, top + lift, b)) continue;
+      if (!proj(v, dx - hb + (pf + 0.5) * sq, dz - hb + (pg + 0.5) * sq, top + lift, b)) continue;
       const img = this.pieceImg(q.kind, q.light);
       const ps = b.k * B.piecePx;
       g.globalAlpha = base * (q.gone && now >= 0 ? clamp((q.gone - now) / f.tableTakeMs, 0, 1) : 1);
@@ -2000,11 +2063,17 @@ export class Renderer {
    * The shrink is the blur: it works without ctx.filter, and costs two image draws instead of a filter pass.
    */
   private blitSoft(img: CanvasImageSource, bx: number, by: number, bw: number, bh: number, s: number, haze: number): void {
-    const { ctx, sg, soft, DPR } = this;
+    const { ctx, DPR } = this;
     const f = 1 / (1 + 0.9 * TOWN_FEEL.bandBlur * s);
     const k = DPR * f;
     const pw = Math.ceil(bw * k) + 2;
     const ph = Math.ceil(bh * k) + 2;
+    let sc = this.softs[this.nSoft++];
+    if (!sc) {
+      const cv = document.createElement("canvas");
+      this.softs.push((sc = { cv, g: cv.getContext("2d")! }));
+    }
+    const { cv: soft, g: sg } = sc;
     if (soft.width < pw || soft.height < ph) {
       soft.width = Math.max(soft.width, pw);
       soft.height = Math.max(soft.height, ph);
@@ -2012,7 +2081,9 @@ export class Renderer {
     sg.setTransform(1, 0, 0, 1, 0, 0);
     sg.globalCompositeOperation = "source-over";
     sg.globalAlpha = 1;
-    sg.clearRect(0, 0, soft.width, soft.height); // all of it: the scaled draw samples a pixel past its edges
+    // Only the part this picture uses, and two pixels round it: the scaled draws sample a pixel past their edges, and
+    // the rest is never read.
+    sg.clearRect(0, 0, Math.min(soft.width, pw + 2), Math.min(soft.height, ph + 2));
     sg.imageSmoothingEnabled = true;
     sg.drawImage(img, 1, 1, bw * k, bh * k);
     if (haze > 0) {
@@ -2096,30 +2167,98 @@ export class Renderer {
     ctx.drawImage(art, Math.round((fx + (fw - w) / 2) * DPR) / DPR, Math.round((fy + (fh - h) / 2) * DPR) / DPR, w, h);
   }
 
-  /** A name tag over a pawn: white for the bots, gold for you; it shrinks with distance. */
+  /** A name tag over a pawn: white for the bots, gold for you; it shrinks with distance. Stamped from its drawing (`tagArtOf`). */
   private drawTag(text: string, ax: number, ay: number, gold: boolean, size: number, alpha: number): void {
-    const { ctx } = this;
-    const s = Math.round(size);
-    let widths = this.tagW.get(text);
-    if (!widths) this.tagW.set(text, (widths = []));
-    ctx.font = TAG_FONT[s]!;
-    const tw = widths[s] ?? (widths[s] = ctx.measureText(text).width);
-    const w = tw + s * 1.25;
-    const h = s + (8 * s) / 11;
-    this.keepFree(ax - w / 2, ay - h, w, h);
-    ctx.save();
+    const { ctx, DPR } = this;
+    const a = this.tagArtOf(text, Math.round(size), gold);
+    if (a.fonts !== fontsLoaded) this.paintTag(a, text);
+    a.used = this.frameNo;
+    this.keepFree(ax - a.w / 2, ay - a.h, a.w, a.h);
+    // (On the device's pixel grid, so the drawing lands pixel for pixel.)
+    const cw = a.cv.width;
+    const x = (Math.round((ax - a.w / 2) * DPR) - TAG_PAD) / DPR;
+    const y = (Math.round((ay - a.h) * DPR) - TAG_PAD) / DPR;
     ctx.globalAlpha = alpha;
-    ctx.fillStyle = gold ? "rgba(255,215,106,.96)" : "rgba(255,255,255,.92)";
-    ctx.shadowColor = "rgba(0,0,0,.25)";
-    ctx.shadowBlur = 4;
-    roundRect(ctx, ax - w / 2, ay - h, w, h, h / 2);
-    ctx.fill();
-    ctx.shadowColor = "transparent";
-    ctx.fillStyle = INK;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(text, ax, ay - h / 2);
-    ctx.restore();
+    if (alpha >= 1) ctx.drawImage(a.cv, 0, 0, cw, a.rh, x, y, cw / DPR, a.rh / DPR);
+    // Fading: its shadow, its pill and its name each at that alpha, one over the other, as they were drawn before (the
+    // whole tag at that alpha would show less of the pill through the name).
+    else for (let r = 1; r < 4; r++) ctx.drawImage(a.cv, 0, r * a.rh, cw, a.rh, x, y, cw / DPR, a.rh / DPR);
+  }
+
+  /**
+   * A name tag's drawing at size `s` (drawn by paintTag, as drawTag drew it each frame before): its pill (white, gold for
+   * you) with its soft shadow and its name; in four rows of its canvas, each `rh` device pixels high: the whole tag, then
+   * its shadow alone, its pill alone and its name alone (for a fading tag).
+   */
+  private tagArtOf(text: string, s: number, gold: boolean): TagArt {
+    const { DPR } = this;
+    if (this.tagDpr !== DPR) {
+      this.tagArt.clear();
+      this.nTagArt = 0;
+      this.tagDpr = DPR;
+    }
+    let list = this.tagArt.get(text);
+    if (list) for (const a of list) if (a.s === s && a.gold === gold) return a;
+    // A new one: a canvas of its own, or the least lately used one's (never one drawn this frame or the last, which
+    // this frame may still draw: a crowd of more names than TAG_ART_MAX on screen keeps them all).
+    let cv: HTMLCanvasElement | null = null;
+    if (this.nTagArt >= TAG_ART_MAX) {
+      let old: TagArt | null = null;
+      let oldText = "";
+      for (const [k, l] of this.tagArt) for (const a of l) if (!old || a.used < old.used) ((old = a), (oldText = k));
+      if (old && old.used < this.frameNo - 1) {
+        const l = this.tagArt.get(oldText)!;
+        l.splice(l.indexOf(old), 1);
+        if (!l.length) this.tagArt.delete(oldText);
+        this.nTagArt--;
+        cv = old.cv;
+      }
+    }
+    const a: TagArt = { cv: cv ?? document.createElement("canvas"), w: 0, h: 0, rh: 0, s, gold, used: this.frameNo, fonts: -1 };
+    if (!list) this.tagArt.set(text, (list = []));
+    list.push(a);
+    this.nTagArt++;
+    return a;
+  }
+
+  /** Draws a tag's four rows (`tagArtOf`) into its canvas, sized to its name in its font. */
+  private paintTag(a: TagArt, text: string): void {
+    const { DPR } = this;
+    const { cv, s } = a;
+    a.fonts = fontsLoaded;
+    const g = cv.getContext("2d")!;
+    g.font = TAG_FONT[s]!;
+    const w = (a.w = g.measureText(text).width + s * 1.25);
+    const h = (a.h = s + (8 * s) / 11);
+    const rh = (a.rh = Math.ceil(h * DPR) + 2 * TAG_PAD);
+    cv.width = Math.ceil(w * DPR) + 2 * TAG_PAD;
+    cv.height = 4 * rh;
+    const pill = a.gold ? "rgba(255,215,106,.96)" : "rgba(255,255,255,.92)";
+    g.font = TAG_FONT[s]!;
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    for (let r = 0; r < 4; r++) {
+      g.setTransform(DPR, 0, 0, DPR, TAG_PAD, TAG_PAD + r * rh);
+      if (r <= 1) {
+        g.shadowColor = "rgba(0,0,0,.25)";
+        g.shadowBlur = 4;
+      }
+      // (Its shadow alone: the pill drawn far off the canvas, its shadow thrown back onto it. Shadows' offsets are in
+      // the canvas's pixels, whatever the transform.)
+      if (r === 1) g.shadowOffsetX = TAG_THROW * DPR;
+      if (r <= 2) {
+        g.fillStyle = pill;
+        roundRect(g, r === 1 ? -TAG_THROW : 0, 0, w, h, h / 2);
+        g.fill();
+      }
+      g.shadowColor = "transparent";
+      g.shadowBlur = 0;
+      g.shadowOffsetX = 0;
+      if (r === 0 || r === 3) {
+        g.fillStyle = INK;
+        g.fillText(text, w / 2, h / 2);
+      }
+    }
   }
 
   /** The speech bubble: white, rounded, its tail pointing down at the speaker's head. */
@@ -2603,7 +2742,22 @@ const SHADOW = "rgb(60,35,10)";
 /** A square's corners from its middle, in half-squares: far left, far right, near right, near left. */
 const CORNERS = [-1, 1, 1, 1, 1, -1, -1, -1] as const;
 const SCRATCH_ORDER: number[] = [];
-const byFarFirst = (a: Item, b: Item) => b.sz - a.sz;
+/**
+ * The things far to near, in place (Oct 28): an insertion sort, stable like Array.prototype.sort (the same order), and
+ * nothing allocated (the engine's sort copies the array each time); the list is nearly in order from the last frame, so
+ * it's a pass or so.
+ */
+function sortFarFirst(a: Item[]): void {
+  for (let i = 1; i < a.length; i++) {
+    const it = a[i]!;
+    let j = i - 1;
+    while (j >= 0 && a[j]!.sz < it.sz) {
+      a[j + 1] = a[j]!;
+      j--;
+    }
+    a[j + 1] = it;
+  }
+}
 const dist2 = (h: Place, x: number, y: number) => wrapF(h.cx - x) ** 2 + wrapF(h.cy - y) ** 2;
 /** The Colosseum's chip shows all of its icon. */
 const CHIP_ICON_BOX = [0, 0, COLISEUM_CHIP.w] as const;

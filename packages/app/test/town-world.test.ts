@@ -28,10 +28,11 @@ function settle(t: Town, from = 0): number {
   }
   return now;
 }
-/** Nobody shares a square. */
-function apart(t: Town) {
+/** Nobody shares a square (`passing`: but a walker passing through on its way, which people may: only where they stop counts). */
+function apart(t: Town, passing: (w: Walker) => boolean = () => false) {
   const seen = new Set<number>();
   for (const w of t.all) {
+    if (passing(w)) continue;
     const k = w.hereR() * N + w.hereC();
     expect(seen.has(k), `two on (${w.hereC()}, ${w.hereR()})`).toBe(false);
     seen.add(k);
@@ -330,11 +331,13 @@ describe("town square: the park (slice 6)", () => {
     const t = createTown(0);
     let now = 0;
     let sat = 0;
+    // (Oct 28: a bot walking home or out passes the bosses' grounds, and may pass through a boss on its way, as people do.)
+    const tripping = (w: Walker) => w.moving() && t.bots.some((b) => b.walker === w && (b.going || b.trip));
     for (let i = 0; i < 6000; i++) {
       now += 50;
       tick(t, now);
       for (const b of t.bots) if (seated(b)) sat++;
-      apart(t);
+      apart(t, tripping);
     }
     expect(sat).toBeGreaterThan(0);
   });

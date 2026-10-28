@@ -122,7 +122,9 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   dashed outline, so a screenshot shows it; nothing else changes), and `bannerplus=SECONDS` (0 to 3: the extra time on
   every banner over the board, and everything after a banner that much later, for the games on the device; online the
   server's default) and `talkplus=SECONDS` (0 to 3: added to every speech line's read time), both read from the address
-  once as the page opens, so they hold for the page (Oct 24). The `sayBoss(text)` hook (speech.tsx: a boss's voice says
+  once as the page opens, so they hold for the page (Oct 24), and the town square's `crowd=N` (Oct 28: N more pawns with
+  names, up to 100, wandering the square, to measure the frame rate with many figures; added once the account says the
+  switches count, so an admin's `hunchess.com/town?crowd=50` shows them a moment after the page opens). The `sayBoss(text)` hook (speech.tsx: a boss's voice says
   any line at once, for e2e/boss-bar-same.spec.ts).
   - **Kept for everyone** (the home screen's own choices): `mode` and a raid's boss picked from the menu; preferences
     and pages (`anim`, `trail`, `crates`). Gone on Oct 15: `turns` (Crowd is always team turns), `moves` (Classic plays
