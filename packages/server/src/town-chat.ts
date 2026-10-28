@@ -1,5 +1,5 @@
 import { TOWN_CHAT } from "@chessroyale/core";
-import { chatRefusal } from "./text-filter.ts";
+import { FILLERS, chatRefusal } from "./text-filter.ts";
 
 /**
  * The town square's chat room, as pure logic (the live hub, live-hub.ts, keeps one). The one chat with typed messages
@@ -8,9 +8,12 @@ import { chatRefusal } from "./text-filter.ts";
  * TOWN_CHAT.repeatMs, and through the filter (slurs, hate terms and swear words refused alike; links and contact details
  * refused with their own reason: text-filter.ts).
  *
- * Nothing is stored: the lines live in this object's memory for TOWN_CHAT.lineMs each, and a restart forgets them. A
- * newcomer gets the last TOWN_CHAT.keep. A moderator can take one line out (`remove`); its number is kept for the same
- * minute so every reader's log drops it too. See docs/decisions/2026-10-28-town-chat-typing.md.
+ * Nothing is stored: the lines live in this object's memory for TOWN_CHAT.lineMs each, and a restart forgets them (a new
+ * `room`, so every app starts its players' lines afresh). The live hub sweeps it on an alarm at the next line's minute
+ * (`sweep`, `nextExpiry`), so nothing stays past it even in an empty town; what's kept for the wait and the repeat is
+ * when and a hash of the words, never the words. A newcomer gets the last TOWN_CHAT.keep. A moderator can take one line
+ * out (`remove`); its number is kept for the same minute so every reader's log drops it too.
+ * See docs/decisions/2026-10-28-town-chat-typing.md.
  */
 
 export interface TownLine {
@@ -38,6 +41,8 @@ export type TownPost =
   | { ok: false; reason: "rate" | "repeat"; message: string; retryMs: number };
 
 export interface TownSnapshot {
+  /** This room's id: a new one after a restart, so an app knows its line numbers start over. */
+  room: string;
   /** The newest line's number (0 for none yet). */
   n: number;
   /** The lines held (said within TOWN_CHAT.lineMs), oldest first. */
@@ -48,10 +53,11 @@ export interface TownSnapshot {
 
 /** What a reader gets: the lines after the last one it has (at most TOWN_CHAT.keep, the newest), and lines taken out. */
 export interface TownSlice {
+  room: string;
   n: number;
   lines: TownLine[];
   gone?: number[];
-  /** The count went back (a restart): the app forgets what it had from players and takes these instead. */
+  /** A new room (a restart), or the reader's count is ahead of it: the app forgets its players' lines and takes these. */
   reset?: true;
 }
 
@@ -62,37 +68,66 @@ export const TOWN_EMPTY = "Type a message first.";
 export const TOWN_REPEAT = "You said that a moment ago.";
 export const townWait = (gapMs: number) => `One message every ${Math.round(gapMs / 1000)} s.`;
 
+/** The most of a message the Worker passes on to the room (the rest is cut before it leaves the Worker). */
+export const TOWN_INPUT_MAX = 1024;
+
 /**
- * A message as it's shown: invisible and control characters out, a pile of accents on one letter cut to two, spaces
- * tidied and trimmed. Null when it isn't text.
+ * A message as it's shown: invisible and control characters out (a zero-width joiner stays between two emoji, so 👩‍💻
+ * and 🏳️‍🌈 hold together), fillers that show as nothing out, a pile of accents on one letter cut to two, spaces tidied and
+ * trimmed. Null when it isn't text.
  */
 export function tidyMessage(text: unknown): string | null {
   if (typeof text !== "string") return null;
   return text
-    .slice(0, 4096)
+    .slice(0, TOWN_INPUT_MAX)
     .normalize("NFC")
     .replace(/[\p{Cc}\p{Zl}\p{Zp}]/gu, " ")
-    .replace(/\p{Cf}/gu, "")
+    .replace(/(?!\u200D)\p{Cf}/gu, "")
+    .replace(/(?<![\p{Extended_Pictographic}\uFE0F\u{1F3FB}-\u{1F3FF}])\u200D|\u200D(?!\p{Extended_Pictographic})/gu, "")
+    .replace(FILLERS, "")
     .replace(/(\p{M}{2})\p{M}+/gu, "$1")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-/** Its length as people count it: characters, not UTF-16 units (an emoji is one). */
-export const charCount = (text: string) => [...text].length;
+const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+/**
+ * Its length as people count it: what shows as one character is one (an emoji, with its skin tone or joined into one, is
+ * one). Infinity for text far longer in code units than it looks (a long chain joined into one character).
+ */
+export function charCount(text: string): number {
+  if (text.length > TOWN_CHAT.maxChars * 8) return Infinity;
+  let n = 0;
+  for (const _ of graphemes.segment(text)) n++;
+  return n;
+}
 
-/** The same message, whatever its case, spacing, accents or punctuation ("gg!!" is "GG"). */
-export function sameKey(text: string): string {
-  const key = text.normalize("NFKD").replace(/[\p{M}\p{Cf}]/gu, "").toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
-  return key || text;
+/**
+ * The same message, whatever its case, spacing, accents or punctuation ("gg!!" is "GG"), as a hash (53 bits): what the
+ * room keeps to spot a repeat, never the words.
+ */
+export function sameKey(text: string): number {
+  const key = text.normalize("NFKD").replace(/[\p{M}\p{Cf}]/gu, "").toLowerCase().replace(/[^\p{L}\p{N}]/gu, "") || text;
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < key.length; i++) {
+    const c = key.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 2654435761);
+    h2 = Math.imul(h2 ^ c, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return 4294967296 * (2097151 & h2) + (h1 >>> 0);
 }
 
 export class TownChat {
+  /** This room's id (a new one with every start). */
+  readonly room = crypto.randomUUID().slice(0, 8);
   private held: TownLine[] = [];
   private n = 0;
   private gone: { n: number; at: number }[] = [];
-  /** Each account's messages within TOWN_CHAT.repeatMs (when, and what as `sameKey`), for the gap and the repeat. */
-  private sent = new Map<string, { at: number; key: string }[]>();
+  /** Each account's messages within TOWN_CHAT.repeatMs: when, and a hash of what (`sameKey`), for the wait and the repeat. */
+  private sent = new Map<string, { at: number; key: number }[]>();
 
   constructor(private o: TownChatOptions = TOWN_CHAT) {}
 
@@ -115,13 +150,13 @@ export class TownChat {
     if (refused) return { ok: false, reason: "text", message: refused };
     const ready = this.readyAt(sender.id, now);
     if (ready > now) return { ok: false, reason: "rate", message: townWait(this.o.gapMs), retryMs: ready - now };
+    this.sweep(now);
     const key = sameKey(text);
-    const mine = (this.sent.get(sender.id) ?? []).filter((s) => now - s.at < this.o.repeatMs);
+    const mine = this.sent.get(sender.id) ?? [];
     const same = mine.find((s) => s.key === key);
     if (same) return { ok: false, reason: "repeat", message: TOWN_REPEAT, retryMs: same.at + this.o.repeatMs - now };
     mine.push({ at: now, key });
     this.sent.set(sender.id, mine);
-    this.prune(now);
     const line: TownLine = { n: ++this.n, at: now, from: sender.id, name: sender.name, text };
     this.held.push(line);
     if (this.held.length > this.o.holdMax) this.held.splice(0, this.held.length - this.o.holdMax);
@@ -130,13 +165,13 @@ export class TownChat {
 
   /** The room now: the lines held and the ones taken out, each within TOWN_CHAT.lineMs. */
   snapshot(now: number): TownSnapshot {
-    this.prune(now);
-    return { n: this.n, lines: this.held.slice(), gone: this.gone.map((g) => g.n) };
+    this.sweep(now);
+    return { room: this.room, n: this.n, lines: this.held.slice(), gone: this.gone.map((g) => g.n) };
   }
 
   /** One line still held, by its number (a report reads what was said from here, never from the reporter). */
   line(n: number, now: number): TownLine | null {
-    this.prune(now);
+    this.sweep(now);
     return this.held.find((l) => l.n === n) ?? null;
   }
 
@@ -160,18 +195,44 @@ export class TownChat {
     return mine.length > 0;
   }
 
-  /** Lines past their minute go, and so do old removals and old sends. */
-  private prune(now: number) {
+  /**
+   * Lines past their minute go, and so do old removals, and sends past the wait and the repeat (TOWN_CHAT.repeatMs). The
+   * live hub calls it on its alarm too, at `nextExpiry`.
+   */
+  sweep(now: number) {
     const old = (at: number) => now - at >= this.o.lineMs;
     if (this.held.length && old(this.held[0]!.at)) this.held = this.held.filter((l) => !old(l.at));
     if (this.gone.length && old(this.gone[0]!.at)) this.gone = this.gone.filter((g) => !old(g.at));
-    if (this.sent.size > 500) for (const [id, s] of this.sent) if (now - (s.at(-1)?.at ?? 0) >= Math.max(this.o.repeatMs, this.o.gapMs)) this.sent.delete(id);
+    const keep = Math.max(this.o.repeatMs, this.o.gapMs);
+    for (const [id, s] of this.sent) {
+      const recent = s.filter((x) => now - x.at < keep);
+      if (!recent.length) this.sent.delete(id);
+      else if (recent.length !== s.length) this.sent.set(id, recent);
+    }
+  }
+
+  /** When the next thing held goes (a line, a removal or a send), or null when the room holds nothing. */
+  nextExpiry(): number | null {
+    let at = Infinity;
+    if (this.held.length) at = Math.min(at, this.held[0]!.at + this.o.lineMs);
+    if (this.gone.length) at = Math.min(at, this.gone[0]!.at + this.o.lineMs);
+    const keep = Math.max(this.o.repeatMs, this.o.gapMs);
+    for (const s of this.sent.values()) if (s.length) at = Math.min(at, s[0]!.at + keep);
+    return at === Infinity ? null : at;
+  }
+
+  /** Whether it holds anything at all (tests: nothing outlives its minute). */
+  get empty(): boolean {
+    return !this.held.length && !this.gone.length && !this.sent.size;
   }
 }
 
-/** The lines after `since`, the newest TOWN_CHAT.keep at most (all of them again if `since` is ahead: a restart). */
-export function townSince(snap: TownSnapshot, since: number, keep: number = TOWN_CHAT.keep): TownSlice {
-  const reset = !(since >= 0) || since > snap.n;
+/**
+ * The lines after `since`, the newest TOWN_CHAT.keep at most. All of them again, marked `reset`, when the reader's room
+ * isn't this one (a restart) or its count is ahead of it.
+ */
+export function townSince(snap: TownSnapshot, since: number, keep: number = TOWN_CHAT.keep, room?: string | null): TownSlice {
+  const reset = !(since >= 0) || since > snap.n || (!!room && room !== snap.room);
   const lines = (reset ? snap.lines : snap.lines.filter((l) => l.n > since)).slice(-keep);
-  return { n: snap.n, lines, ...(snap.gone.length ? { gone: snap.gone } : {}), ...(reset ? { reset: true as const } : {}) };
+  return { room: snap.room, n: snap.n, lines, ...(snap.gone.length ? { gone: snap.gone } : {}), ...(reset ? { reset: true as const } : {}) };
 }

@@ -5,7 +5,7 @@ import { CHAT_OFF, chatBlock } from "./chat-mod.ts";
 import { isBlockedText } from "./text-filter.ts";
 import { cachedUserId } from "./presence.ts";
 import { BANNED_FROM_CHAT } from "./global-chat-api.ts";
-import { townSince, type TownLine, type TownPost, type TownSender, type TownSlice, type TownSnapshot } from "./town-chat.ts";
+import { TOWN_INPUT_MAX, TOWN_TOO_LONG, townSince, type TownLine, type TownPost, type TownSender, type TownSlice, type TownSnapshot } from "./town-chat.ts";
 import type { LiveHub } from "./live-hub.ts";
 
 /**
@@ -37,6 +37,21 @@ export const forgetTownCache = () => {
   cache = null;
   signed.clear();
 };
+/**
+ * Lets go of this instance's copy of the room once it's older than TOWN_CHAT.readCacheMs: called on every request the
+ * Worker handles (index.ts), and by a timer set when the copy is made (`keep`), so the copy's lines never stay in an
+ * instance's memory past a moment.
+ */
+export function expireTownCache(now: number) {
+  if (cache && now - cache.at > TOWN_CHAT.readCacheMs) cache = null;
+}
+/** Keeps a fresh copy of the room, and lets it go TOWN_CHAT.readCacheMs later (the request's waitUntil keeps the timer). */
+function keep(snap: TownSnapshot, now: number, waitUntil?: (p: Promise<unknown>) => void) {
+  cache = { at: now, snap };
+  waitUntil?.(new Promise((r) => setTimeout(r, TOWN_CHAT.readCacheMs + 50)).then(() => expireTownCache(Date.now())));
+}
+/** The most a send's body may be (bytes): an 80-character message is far less; anything bigger never reaches the hub. */
+export const TOWN_BODY_MAX = 8192;
 
 /** Whether this user may chat in the town: signed in (an email or Google). */
 export const mayTownChat = (user: Pick<User, "email" | "google_sub"> | null) => !!(user && (user.email || user.google_sub));
@@ -53,10 +68,15 @@ export async function signedInReader(sql: Sql, token: string | null | undefined,
   return id;
 }
 
-/** The room's lines after `since` (this instance's copy, read again from the hub every TOWN_CHAT.readCacheMs). */
-export async function townSlice(hub: TownHub, since: number, now: number): Promise<TownSlice> {
-  if (!cache || now - cache.at > TOWN_CHAT.readCacheMs) cache = { at: now, snap: await hub.townRead() };
-  return townSince(cache.snap, since);
+/**
+ * The room's lines after `since` in the reader's `room` (this instance's copy, read again from the hub every
+ * TOWN_CHAT.readCacheMs, and at once when the reader is ahead of the copy: it saw a newer one, from its own send or another
+ * instance, so the copy is stale, not the room reset).
+ */
+export async function townSlice(hub: TownHub, since: number, now: number, room?: string | null, waitUntil?: (p: Promise<unknown>) => void): Promise<TownSlice> {
+  const stale = (c: typeof cache) => !c || now - c.at > TOWN_CHAT.readCacheMs || since > c.snap.n || (!!room && room !== c.snap.room);
+  if (stale(cache)) keep(await hub.townRead(), now, waitUntil);
+  return townSince(cache!.snap, since, TOWN_CHAT.keep, room);
 }
 
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
@@ -82,10 +102,20 @@ function refusal(a: TownAsker): Response | null {
  * filter refuses goes out as "Player"), never from the request; the room checks the message and the limits. The answer
  * carries the room after it (the lines after `since`), so the sender's log has it at once.
  */
-export async function townPostResponse(request: Request, sql: Sql, hub: TownHub, a: TownAsker, now: number): Promise<Response> {
+export async function townPostResponse(request: Request, sql: Sql, hub: TownHub, a: TownAsker, now: number, waitUntil?: (p: Promise<unknown>) => void): Promise<Response> {
   const refused = refusal(a);
   if (refused) return refused;
-  const body = (await request.json().catch(() => ({}))) as { text?: unknown; since?: unknown };
+  // (A huge body never reaches the shared hub: refused by its size, and the text cut to TOWN_INPUT_MAX before it goes.)
+  if (Number(request.headers.get("content-length")) > TOWN_BODY_MAX) return json({ message: TOWN_TOO_LONG }, 413);
+  const raw = await request.text().catch(() => "");
+  if (raw.length > TOWN_BODY_MAX) return json({ message: TOWN_TOO_LONG }, 413);
+  const body = ((): { text?: unknown; since?: unknown; room?: unknown } => {
+    try {
+      return JSON.parse(raw) ?? {};
+    } catch {
+      return {};
+    }
+  })();
   if ((await caseOf(sql, a.user.id))?.status === "banned") return json({ message: BANNED_FROM_CHAT, banned: true }, 403);
   // A moderator's chat ban (chat-mod.ts) stops the town's typing too.
   const block = await chatBlock(sql, a.user.id, now);
@@ -93,10 +123,10 @@ export async function townPostResponse(request: Request, sql: Sql, hub: TownHub,
   const row = await sql.first<{ name: string }>("SELECT name FROM users WHERE id = ?", a.user.id);
   const name = row?.name ?? a.user.name;
   const sender: TownSender = { id: a.user.id, name: isBlockedText(name) ? "Player" : name };
-  const { post, town } = (await hub.townPost(sender, typeof body.text === "string" ? body.text : "")) as { post: TownPost; town: TownSnapshot };
-  cache = { at: now, snap: town };
+  const { post, town } = (await hub.townPost(sender, typeof body.text === "string" ? body.text.slice(0, TOWN_INPUT_MAX) : "")) as { post: TownPost; town: TownSnapshot };
+  keep(town, now, waitUntil);
   const since = Number(body.since);
-  const slice = townSince(town, Number.isFinite(since) ? since : 0);
+  const slice = townSince(town, Number.isFinite(since) ? since : 0, TOWN_CHAT.keep, typeof body.room === "string" ? body.room : null);
   if (post.ok) return json({ ok: true, line: post.line, town: slice, waitMs: TOWN_CHAT.gapMs });
   if (post.reason === "text") return json({ ok: false, reason: post.reason, message: post.message, town: slice }, 400);
   return json({ ok: false, reason: post.reason, message: post.message, retryMs: post.retryMs, town: slice }, 429, { "retry-after": String(Math.ceil(post.retryMs / 1000)) });
@@ -109,7 +139,7 @@ export async function townRemoveResponse(request: Request, hub: TownHub, admin: 
   const n = Number(body.n);
   if (!Number.isSafeInteger(n) || n < 1) return json({ message: "No such line." }, 400);
   const { removed, town } = (await hub.townRemove(n)) as { removed: boolean; town: TownSnapshot };
-  cache = { at: now, snap: town };
+  keep(town, now);
   return removed ? json({ ok: true }) : json({ message: "That line has already gone." }, 404);
 }
 

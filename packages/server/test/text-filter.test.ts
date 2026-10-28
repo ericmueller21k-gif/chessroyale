@@ -256,3 +256,103 @@ describe("the chat filter", () => {
     }
   });
 });
+
+/**
+ * The review's findings (Oct 28): look-alike letters, swear words split or masked with an ending, contact details in
+ * other shapes, and rating talk that must pass. Slurs and swear words are written ROT13, as in the list.
+ */
+describe("the filter after the review", () => {
+  const swear = (w: string) => rot13(w);
+
+  it("reads look-alike letters as the Latin ones they pass for, in names and in chat (dotless i, small capitals, Cyrillic, Armenian)", () => {
+    const n = rot13("avttre"); // (the n-word)
+    for (const text of [
+      n.replace("i", "ı"), // dotless i
+      n.replace("i", "ɪ").replace("gg", "ɢɢ").replace("r", "ʀ"), // small capitals
+      n.replace("r", "г"), // Cyrillic ghe
+      n.replace("n", "ո"), // Armenian vo
+      n.replace("n", "п").replace("e", "є"),
+      n.replace("g", "ɡ").replace("g", "ց"),
+    ]) {
+      expect(isBlockedText(text), text).toBe(true);
+      expect(chatRefusal(`you ${text}`), text).toBe(CHAT_NOT_ALLOWED);
+    }
+    for (const text of [swear("fuvg").replace("h", "һ"), swear("ovgpu").replace("b", "ʙ"), swear("shpx").replace("f", "ꜰ"), swear("shpx").replace("u", "ᴜ")]) {
+      expect(chatRefusal(text), text).toBe(CHAT_NOT_ALLOWED);
+    }
+  });
+
+  it("in chat, refuses a word mixing Latin letters with an unknown letter from another alphabet; names in other alphabets still work", () => {
+    expect(chatRefusal("sh\u6f22t happens")).toBe(CHAT_NOT_ALLOWED);
+    expect(chatRefusal("gg\u3042")).toBe(CHAT_NOT_ALLOWED);
+    for (const text of ["Привет всем", "李小龙 加油", "Straße und Grüße", "naïve café", "Ærø"]) expect(chatRefusal(text), text).toBeNull();
+    for (const name of ["Даниил", "李小龙", "Ünal", "Søren", "Straße", "Αλέξης"]) expect(isBlockedText(name), name).toBe(false);
+  });
+
+  it("catches a swear word split into letters inside a sentence, split once, or masked with an ending", () => {
+    for (const text of [
+      `u ${swear("shpx").split("").join(" ")}`,
+      `go ${swear("shpx").split("").join(" ")} yourself`,
+      `oh ${swear("fuvg").split("").join(" ")}`,
+      `ur a ${swear("ovgpu").split("").join(" ")}`,
+      `${swear("s")} ${swear("hpx")}`, // 1+3
+      `${swear("f")} ${swear("uvg")}`,
+      `${swear("shp")} ${swear("x")}`, // 3+1
+      `${swear("ov")} ${swear("gpu")}`, // 2+3
+      `go ${swear("s")} ${swear("hpx")} off`,
+      swear("s*pxvat"),
+      swear("spxvat"),
+      swear("sxvat"),
+      swear("shxva"),
+      swear("fu*ggl"),
+    ]) {
+      expect(chatRefusal(text), text).toBe(CHAT_NOT_ALLOWED);
+    }
+    // Short words in a row still don't spell one by chance.
+    for (const text of ["is it up or no", "say hi to him", "go. ok", "as is", "a pin", "is hit by it", "of course", "who're you?", "that's hit or miss"]) expect(chatRefusal(text), text).toBeNull();
+  });
+
+  it("refuses contact details in more shapes: a path, a spaced dot, commas, other digits, fillers, more services", () => {
+    for (const text of [
+      "t.me/someone",
+      "discord.gg/abc",
+      "example . io",
+      "bit . ly/x",
+      "example dot io",
+      "555,123,4567",
+      "call ٥٥٥١٢٣٤٥٦٧",
+      "555 1234",
+      "exam\u3164ple.com",
+      "example\u2800.\u2800com",
+      "add me on roblox",
+      "my kik is ann",
+      "ann at yahoo",
+      "ann @ gmail",
+      "+44 20 7946 0958",
+      "06 12 34 56 78",
+    ]) {
+      expect(chatRefusal(text), text).toBe(CHAT_NO_CONTACT);
+    }
+  });
+
+  it("lets rating talk, years, scores and times through", () => {
+    for (const text of [
+      "rated 1200-1400",
+      "1500 1600 1700",
+      "2000/2100",
+      "800-1200 is a good range",
+      "1,500 vs 1,600",
+      "the 2025-2026 season",
+      "I'm 1800 vs your 2000",
+      "meet at 12:30 or 13:45",
+      "won 3-0 then 1-0",
+      "10/28/2026",
+      "e4 e5 Nf3 Nc6",
+      "I am at the park.",
+      "polka dot top",
+      "the dot to the left",
+    ]) {
+      expect(chatRefusal(text), text).toBeNull();
+    }
+  });
+});

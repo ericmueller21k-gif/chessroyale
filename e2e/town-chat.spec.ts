@@ -264,12 +264,15 @@ test("the text field (a signed-in player's): 80 characters, a count near the end
   await expect(mine.last()).toHaveText(new RegExp(`second one ${run}$`));
 });
 
-test("a guest has no text field, and without the test switches no hooks either: the log only", async ({ page }) => {
+test("a guest's field is there, greyed, saying how to chat (nothing hidden); without the test switches no hooks either", async ({ page }) => {
   await page.route("**/api/auth/config", (route) => route.fulfill({ json: { accounts: false, google: false, email: false } }));
   await page.goto("/town?sky=day");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
   await expect(page.locator(".town-chat")).toHaveCount(1);
-  await expect(page.locator(".tc-form")).toHaveCount(0);
+  const field = page.locator(".tc-form input");
+  await expect(field).toBeVisible();
+  await expect(field).toBeDisabled();
+  await expect(field).toHaveAttribute("placeholder", "Sign in to chat with other players.");
   await page.evaluate(() => (window as any).__townSay?.("Hollow", "hello", "boss"));
   await page.waitForTimeout(400);
   await expect(page.locator(".tc-line"), "the hooks are off too").toHaveCount(0);
@@ -430,7 +433,7 @@ const lineOf = (p: Page, text: string) => p.locator(".tc-player").filter({ hasTe
 /** Brings the log back if it has faded (8 s after the last message): the field taking focus holds it shown. */
 const showLog = (p: Page) => p.locator(".tc-form input").focus();
 
-test("two signed-in players see each other's lines within a few seconds; a guest sees none, has no field and never asks for them", async ({ page, browser }, info) => {
+test("two signed-in players see each other's lines within a few seconds; a guest sees none, its field greyed, and never asks for them", async ({ page, browser }, info) => {
   test.setTimeout(150_000);
   const phone = info.project.name === "phone";
   await openSignedIn(page);
@@ -440,7 +443,8 @@ test("two signed-in players see each other's lines within a few seconds; a guest
   const asked: string[] = [];
   guest.on("request", (r: Request) => void (r.url().includes("town=") && asked.push(r.url())));
   await open(guest);
-  await expect(guest.locator(".tc-form"), "a guest has no field").toHaveCount(0);
+  await expect(guest.locator(".tc-form input"), "a guest's field: greyed, saying how").toBeDisabled();
+  await expect(guest.locator(".tc-form input")).toHaveAttribute("placeholder", "Sign in to chat with other players.");
 
   await send(page, `hello from Ann ${run}`);
   // Mine, from the server's answer at once; Bo's within a few seconds (the live poll every 5 s).
@@ -576,4 +580,16 @@ test("the switch off (PAUSE_TOWN_CHAT): the field says \"Chat is paused.\" and c
   await say(page, "Hollow", "The park gets quiet after dark.");
   await expect(page.locator(".tc-boss")).toHaveCount(1);
   await expect(log(page)).toHaveCSS("opacity", "1");
+});
+
+test("the privacy page and the terms say what the town square's chat is: typed, filtered, reportable, not stored", async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough");
+  await page.goto("/privacy");
+  const privacy = page.locator("main, .legal, body").first();
+  await expect(privacy).toContainText("Chat is preset lines and emoji, except in the town square, where signed-in players type.");
+  await expect(privacy).toContainText("It isn't stored: the server holds each message in memory for 60 seconds, and then it's gone.");
+  await expect(privacy).toContainText("If someone reports a message, the report keeps its words and when it was said, for a moderator to read.");
+  await expect(privacy).toContainText("A report you made of a town square message is in it without the message's words: they're the other player's.");
+  await page.goto("/terms");
+  await expect(page.locator("body")).toContainText("In the town square: no slurs, hate, swearing, links or contact details.");
 });

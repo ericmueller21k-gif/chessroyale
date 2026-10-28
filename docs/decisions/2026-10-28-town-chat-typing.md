@@ -78,25 +78,51 @@ Later the same day, through the director:
 3. **A device marked too young gets nothing, even with someone signed in on it** (a tab from before the answer). The
    age gate's own call 10 lets such an adult keep their name and notes; the brief says every such device sees only the
    bosses' chatter, so the town follows the brief.
-4. **What counts as contact details:** web addresses (with `http`, `www.`, a common ending such as `.com` or `.ly`, or
-   spelled "dot com"), email addresses and mail services' names ("at gmail"), phone numbers (seven digits or more in one
-   run, spaces and phone marks allowed between them; a letter or a colon ends a run, so "1800 vs 2000" and "12:30"
-   pass), and the main messaging apps ("add me on discord", snapchat, instagram, whatsapp, telegram, tiktok, facebook,
-   skype, wechat): "add me on …" is how a conversation leaves the game. Endings that start sentences when someone skips
-   a space ("me", "to", "be", "in", "us") aren't treated as web addresses. Chess notation, scores and ratings pass.
+4. **What counts as contact details** (after the review):
+   - web addresses: `http`, `www.`, a common ending (`.com`, `.ly`, `.io`…), an address with a path ("t.me/x",
+     "discord.gg/x"), a dot with a space before it ("example . io", never prose), "dot com";
+   - email addresses, mail services' names ("my gmail"), and one spelled out ("at yahoo", "@ gmail");
+   - phone numbers: seven digits or more in one run, in any script's digits, with spaces, commas and phone marks between
+     (a letter, a colon or a slash ends a run). **Rating talk passes**: a run made only of four-digit groups or round
+     hundreds ("rated 1200-1400", "1500 1600 1700", "800-1200", "2000/2100", "1,500 vs 1,600", "the 2025-2026 season").
+     The cost: a phone number written in fours ("2345 6789") passes; reports and a moderator handle that;
+   - messaging apps and games with their own chat ("add me on discord", snapchat, instagram, whatsapp, telegram, tiktok,
+     facebook, skype, wechat, roblox, kik): "add me on …" is how a conversation leaves the game.
+   Endings that start sentences when someone skips a space ("me", "to", "be", "in", "us") aren't web addresses without
+   a path. Chess notation, scores, times and dates pass.
 5. **Swear words:** a short list of our own, ROT13 in the file like the slurs: long ones found inside any word, short
-   ones and masked spellings ("f*ck" reads as "fck") only as whole words. Mild words (damn, hell, crap) are left off.
-   The ordinary words with one inside are let through (Scunthorpe, shiitake, Japanese names ending "-shita").
-   Checked against the 60,000 commonest English words and 2.2 million pairs of the commonest 1,500: in the pairs, only
-   "go ok" and "as s" (the names' rule for short words in a row) and a real hate phrase are refused.
+   ones only as whole words, the masked spellings ("f*ck" reads as "fck") as whole words with an ending ("f*cking",
+   "sh*tty", "fukin"). Mild words (damn, hell, crap) are left off. The ordinary words with one inside are let through
+   (Scunthorpe, shiitake, Japanese names ending "-shita"; "who're" is "who are"). Checked after the review against the
+   60,000 commonest English words (only swear words and the apps and mail services refused) and 2.2 million pairs of the
+   commonest 1,500: 11 refused, a real hate phrase, "s hit" and "t its" (split on purpose), and pairs the word list makes
+   of contractions ("'s hit", "'t its", "as 's") or that nobody types ("go ok", "shh it", "c until").
 6. **Short words in a row in a sentence** (the names' rule joins them, so spaced letters are read as a word): in chat a
-   swear word is looked for only from the start of such a run ("sh it", "f u c k" are caught; "is it up or no" and "say
-   hi to him" aren't read as one), and a two-letter word that ends a sentence or clause ends its run ("go. ok"). Names
-   are read exactly as before.
+   run of single letters ("f u c k", "u f u c k") is read as one word; a run with a two-letter word in it ("go f u c k",
+   "oh s h i t") is searched from where each typed piece starts, so a swear word split among them is caught while the
+   little words of a sentence don't spell one by chance ("is it up or no", "say hi to him"). A word split once, with
+   one side short ("f uck", "fuc k", "bi tch"), is read across the two. A two-letter word that ends a sentence or clause
+   ends its run ("go. ok"). Names are read exactly as before.
+6a. **Look-alike letters** (the review's blocking finding): the filter reads Cyrillic, Greek, Armenian and Coptic letters,
+   Latin's small capitals and variants (dotless ı, ɡ, ʀ, ꜰ…) as the Latin letters they pass for, from Unicode's
+   confusables for single Latin letters, in names and in chat. In chat a word mixing Latin letters with a letter from
+   another alphabet that isn't a known look-alike is refused ("That message isn't allowed."), so a new one can't carry
+   a word past the list. Names don't get that backstop: real names in other alphabets still work, and so do messages
+   wholly in another alphabet ("Привет всем").
 7. **The same message** is the same letters and digits, whatever the case, spaces, accents or punctuation ("gg!!" is
    "GG"). A refused message doesn't start the 15 s wait; a repeat says "You said that a moment ago."
-8. **Tidying before the length check:** control and invisible characters out (including direction overrides), a pile of
-   accents on one letter cut to two, spaces run together, trimmed; 80 counts characters, an emoji as one.
+8. **Tidying before the length check:** control and invisible characters out (including direction overrides), and the
+   fillers that show as nothing (Hangul fillers, the blank braille cell), so a message of only them is empty; a joiner
+   stays only inside an emoji (👩‍💻, 🏳️‍🌈); a pile of accents on one letter cut to two; spaces run together, trimmed. 80
+   counts what shows as one character (an emoji with its skin tone, or joined into one, is one).
+8a. **The room keeps nothing past a minute** (the review): the hub's alarm rings at the next line's minute and sweeps it
+   out, visitors or not; the wait and the repeat keep when and a hash of the words, for a minute; each Worker instance's
+   2 s copy of the room goes on that instance's next request after it. A restart gives the room a new id, and an app
+   seeing a new one drops its players' lines first (a Remove or a Report never reaches another line by an old number).
+   An instance whose copy is older than what the reader has seen reads the room again rather than telling it to start
+   over (lines shown twice).
+8b. **A huge message never reaches the shared hub:** a body over 8 KB is refused in the Worker, and the text is cut to
+   1,024 characters before it goes; the global chat's line id is cut to 64.
 9. **"Offensive chat" isn't one of the profile sheet's buttons** (`FAIRPLAY.reports.chatReason` beside `reasons`): a
    report of a line needs the line. The server finds it in the room by its number and the reported player's id, so a
    report can only carry words the player really sent; a line that's gone (each lasts a minute) is refused with "That
@@ -109,8 +135,13 @@ Later the same day, through the director:
     minute; fair play's page would only ever see it gone). The room keeps the removed numbers for a minute so every
     reader's log drops it.
 12. **A name reset and a deleted account** take the player's town lines out too (as they do the global chat's).
-13. **The field for signed-in players only** (the director): a guest sees the log, never a field asking them to sign in.
-    A device marked too young has no field either.
+13. **The field for everyone, greyed with why when it can't send** (the review, after the director's first call to hide it:
+    Eric's rule is "nothing hidden", and it tells guests how to join): "Sign in to chat with other players." for a guest,
+    "Chat with other players is for accounts 13 and older." for a young device (it answered too young, so the cutoff may
+    show). Players' lines leave the log at once when access ends: signed out, the device marked too young, the chat
+    paused, or a player blocked. Only someone who may read the chat can report a line (a guest or a young device can't
+    probe who spoke). The automated fair-play reviewer gets a chat report without its words, can't clear such a case, and
+    its guide lists "Offensive chat" among the reasons it never decides.
 14. **A refusal's reason over the field, 4 s, your words kept**, so you can change a word and send again; the 15 s wait
     shows in the field as the UI built it. While the switch is off or your chat is banned, the reason is the field's
     placeholder (13 px so it fits on a phone; a greyed field can't take focus, so iPhone Safari never zooms).
@@ -178,6 +209,16 @@ whole log instead of one a line), the UI's to weigh; a real GPU composites these
 - `packages/app/test/town-chat-net.test.ts`: a guest or a young device never asks; lines ride on the live poll, only
   what's new; muted and blocked players' lines never reach the log; a removal and the switch reach it; sending mirrors
   the limits and shows the server's reasons; Report and Remove.
+- After the independent review, a test for each finding: `text-filter.test.ts`, "the filter after the review" (look-alike
+  letters in names and chat, the mixed-alphabet backstop, swear words split or masked with an ending, contact details in
+  more shapes, rating talk passing); `town-chat.test.ts`, "after the review" (look-alikes into the room, fillers-only
+  messages, a joined emoji and its count, a stale instance copy never resetting a reader and a new room resetting it,
+  nothing outliving its minute: hashes not words, the hub's alarm sweeping, the instance copy going) and "the API after
+  the review" (a huge body never reaching the hub, the global chat's id cut, a guest's or young device's report
+  refused, the reviewer's API without the words and unable to clear a chat report); `town-chat-net.test.ts`, "after the
+  review" (a new room dropping the lines shown, lines leaving at once on a block, the switch, signing out and a young
+  device, the field's reasons); `faq.test.ts` (the chat entry and its reported-message exception); `e2e/town-chat.spec.ts`
+  (a guest's greyed field, the privacy page's and the terms' sentences).
 - `packages/server/test/account-data.test.ts`: the schema pin gains `reports.line` and `reports.line_at`.
 - `packages/app/test/town-chat.test.ts`: players' lines carry who said them and their number, `unsay` takes them out by
   number or by player, a tap reaches the menu; the UI's numbers are the server's.
@@ -200,9 +241,14 @@ None guards a rule in `docs/rules/eric.md`.
   - "the text field (where the test switches are on): …" → "the text field (a signed-in player's): …". It opens the
     town signed in; the lines it counts are its own (`.tc-player` → `.tc-player` with this run's mark, "hello town" →
     "hello town <run>", "second one" → "second one <run>"), since other tests' players share the room.
-  - "without the test switches there is no text field: players see the log only" → "a guest has no text field, and
-    without the test switches no hooks either: the log only". Same checks.
-  - "the edge chips keep off the chat box…" and "the keyboard opening…": they open the town signed in (the field is a
-    signed-in player's now; a faded box without a field can't be picked up). Same checks.
+  - "without the test switches there is no text field: players see the log only" → "a guest's field is there, greyed,
+    saying how to chat (nothing hidden); without the test switches no hooks either". Its check `.tc-form` count 0 →
+    the field visible, disabled, its placeholder "Sign in to chat with other players."; the hooks' check is the same.
+  - "the edge chips keep off the chat box…" and "the keyboard opening…": they open the town signed in (the keyboard test
+    needs a field that types). Same checks.
+- `packages/app/test/town-chat-net.test.ts` (mine, after the review): the slices it feeds may carry a room; its first
+  tests' checks are the same.
+- `packages/server/test/town-chat.test.ts` (mine, after the review): "a moderator takes one line out…": `townSince(snap, 2)`
+  → equals `{ room, n: 2, lines: [], gone: [2] }` (the slice now names its room).
 - `e2e/helpers.ts`: `asServerAdmin`'s database write moved into `withEmail`, shared with the new `asSignedIn`. Same
   behavior.

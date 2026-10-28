@@ -51,6 +51,7 @@ export async function chatPostResponse(request: Request, sql: Sql, hub: ChatHub,
   if (!mayPost) return json({ message: SIGN_IN_TO_CHAT }, 401);
   const body = (await request.json().catch(() => ({}))) as { say?: unknown; since?: unknown };
   if (typeof body.say !== "string") return json({ message: "Only the preset lines can go in the chat." }, 400);
+  const say = body.say.slice(0, 64); // (A line's id is short: nothing bigger goes on to the shared hub.)
   if ((await caseOf(sql, user.id))?.status === "banned") return json({ message: BANNED_FROM_CHAT, banned: true }, 403);
   // A moderator's chat ban (chat-mod.ts): reading only.
   const block = await chatBlock(sql, user.id, now);
@@ -65,7 +66,7 @@ export async function chatPostResponse(request: Request, sql: Sql, hub: ChatHub,
     icon: row?.icon ?? null,
     owned: (await shopState(sql, user.id)).owned,
   };
-  const { post, chat } = (await hub.chatPost(sender, body.say)) as { post: GlobalPost; chat: GlobalChatSnapshot };
+  const { post, chat } = (await hub.chatPost(sender, say)) as { post: GlobalPost; chat: GlobalChatSnapshot };
   cache = { at: now, snap: chat };
   const since = Number(body.since);
   const slice = linesSince(chat, Number.isFinite(since) ? since : 0);

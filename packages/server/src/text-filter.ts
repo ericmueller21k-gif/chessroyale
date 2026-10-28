@@ -43,14 +43,49 @@ const MAX = 64;
 
 /** Digits and symbols used for letters. */
 const LEET: Record<string, string> = { "0": "o", "1": "i", "!": "i", "|": "i", "3": "e", "€": "e", "4": "a", "@": "a", "5": "s", $: "s", "7": "t", "+": "t", "8": "b", "6": "g", "9": "g" };
-/** Letters from other alphabets that look like Latin ones (Cyrillic, Greek). */
+/**
+ * Letters that look like Latin ones, by the Latin letter they pass for (lower case, as `base` leaves them): Cyrillic,
+ * Greek, Armenian, Coptic, Latin's own small capitals and variants (dotless ı, ɡ, ʀ…), from Unicode's confusables for
+ * single Latin letters. Accented letters need none: `base` takes the accents off.
+ */
+const LIKE: Record<string, string> = {
+  a: "аαɑᴀ⍺ɐ",
+  b: "вьбʙƅɓβᖯ",
+  c: "сϲᴄҫςƈꮯ",
+  d: "ԁժᴅɗđðдδ",
+  e: "еєэɛᴇҽɘεǝ",
+  f: "ꜰƒғϝ",
+  g: "ɡɢցǥɠԍ",
+  h: "нһʜհħɦђћ",
+  i: "іιıɪɩ¡",
+  j: "јʝϳ",
+  k: "кκᴋҝқƙⱪ",
+  l: "ӏʟłɫɭǀ",
+  m: "мᴍɱ",
+  n: "ոռпиɴηπƞŋɲɳ",
+  o: "оοσᴏօøɵѳⲟθ",
+  p: "рρᴘⲣ",
+  q: "ԛɋ",
+  r: "гяʀɾɼɽꭇᴦ",
+  s: "ѕꜱʂ",
+  t: "тτᴛŧƭʈ",
+  u: "υᴜսμʋц",
+  v: "νᴠѵ",
+  w: "ԝᴡωшѡɯ",
+  x: "хχҳ",
+  y: "уʏγүɣ",
+  z: "ᴢʐƶȥ",
+};
 const LOOKALIKE: Record<string, string> = {
-  а: "a", в: "b", е: "e", к: "k", м: "m", н: "h", о: "o", р: "p", с: "c", т: "t", у: "y", х: "x", і: "i", ј: "j", ѕ: "s", ԁ: "d", ӏ: "l", ɡ: "g",
-  α: "a", β: "b", ε: "e", ι: "i", κ: "k", ν: "v", ο: "o", ρ: "p", τ: "t", υ: "u", χ: "x",
+  ...Object.fromEntries(Object.entries(LIKE).flatMap(([latin, like]) => [...like].map((c) => [c, latin]))),
+  // (Letters that stand for two.)
+  ß: "ss", æ: "ae", œ: "oe", þ: "th",
 };
 
-/** Lower case, no accents or invisible characters. */
-const base = (text: string) => text.normalize("NFKD").replace(/[\p{M}\p{Cf}]/gu, "").toLowerCase();
+/** Fillers that show as nothing (Hangul fillers, the blank braille cell): taken out like invisible characters. */
+export const FILLERS = /[\u115F\u1160\u3164\uFFA0\u2800]/gu;
+/** Lower case, no accents, invisible characters or fillers. */
+const base = (text: string) => text.normalize("NFKD").replace(/[\p{M}\p{Cf}]/gu, "").replace(FILLERS, "").toLowerCase();
 /** Look-alikes and leetspeak as the letters they stand for; letters only. */
 const letters = (word: string) => word.replace(/./gsu, (c) => LOOKALIKE[c] ?? LEET[c] ?? c).replace(/[^a-z]/g, "");
 
@@ -60,23 +95,36 @@ const letters = (word: string) => word.replace(/./gsu, (c) => LOOKALIKE[c] ?? LE
  */
 const READINGS = [(w: string) => w, (w: string) => w.replace(/[_.-]*\d+$/, ""), (w: string) => w.replace(/(?<=\d)\d+$/, "")];
 
+/** For a chat message, how each word was made: where each typed piece starts in it, and whether a piece had two letters. */
+interface Pieces {
+  starts: number[];
+  pair: boolean;
+}
+
 /**
  * The name's words, one reading of its digits: letters only within each, and a run of two or more short words (two
- * letters or fewer each) as one word. For a chat message (`joined` given), a two-letter word that ends a sentence or a
- * clause ("go. ok") ends its run, and `joined` gets each word's index whose run has a two-letter word in it (ordinary
- * short words in a row, "is hi to", rather than letters spaced out, "f u n").
+ * letters or fewer each) as one word. For a chat message (`pieces` given), a two-letter word that ends a sentence or a
+ * clause ("go. ok") ends its run, and `pieces` gets, for each word, where its typed pieces start and whether one had two
+ * letters (ordinary short words in a row, "is hi to", rather than letters spaced out, "f u n").
  */
-function words(text: string, reading: (word: string) => string, joined?: Set<number>): string[] {
+function words(text: string, reading: (word: string) => string, pieces?: Pieces[]): string[] {
   const out: string[] = [];
   let short = false;
   for (const token of base(text).split(/\s+/)) {
     const w = letters(reading(token));
     if (!w) continue;
     if (w.length <= 2 && short) {
-      out[out.length - 1] += w;
-      if (w.length === 2 || out[out.length - 1]!.length - w.length === 2) joined?.add(out.length - 1);
-    } else out.push(w);
-    short = w.length <= 2 && !(joined && w.length === 2 && /[.,!?;:]$/.test(token));
+      const i = out.length - 1;
+      if (pieces) {
+        pieces[i]!.starts.push(out[i]!.length);
+        if (w.length === 2) pieces[i]!.pair = true;
+      }
+      out[i] += w;
+    } else {
+      out.push(w);
+      pieces?.push({ starts: [0], pair: w.length === 2 });
+    }
+    short = w.length <= 2 && !(pieces && w.length === 2 && /[.,!?;:]$/.test(token));
   }
   return out;
 }
@@ -115,8 +163,10 @@ const SWEARS_ANYWHERE = [
   "shpx", "cuhpx", "sphx", "fuvg", "ovgpu", "ovngpu", "phag", "nffubyr", "nefrubyr", "onfgneq", "fyhg", "juber", "jnaxre", "obyybpxf", "qvpxurnq", "wnpxnff",
   "qhzonff", "cvff", "cbea",
 ];
-/** Swear words found only as a whole word, exactly (or plural): short ones inside ordinary words, and the masked spellings. */
-const SWEARS_WORDS = ["nff", "nefr", "qvpx", "pbpx", "chffl", "gjng", "jnax", "cevpx", "gvgf", "shx", "shd", "spx", "sx", "fug", "ogpu", "pag", "qpx", "jgs", "fgsh", "tgsb"];
+/** Swear words found only as a whole word, exactly (or plural): short ones that are parts of ordinary words. */
+const SWEARS_WORDS = ["nff", "nefr", "qvpx", "pbpx", "chffl", "gjng", "jnax", "cevpx", "gvgf", "jgs", "fgsh", "tgsb"];
+/** The masked spellings ("f*ck" reads as "fck"), as whole words with their endings ("f*cking", "sh*tty", "fukin"). */
+const SWEARS_MASKED = ["shx", "shd", "spx", "sx", "fug", "ogpu", "pag", "qpx"];
 /** Ordinary words with a swear word inside. */
 const SWEARS_ALLOW = ["fphagubecr", "fuvvgnxr", "fuvgnxr", "fuvgn", "cvffneeb", "cbbea"];
 /** How much of a chat message is read (a message is at most TOWN_CHAT.maxChars; this bounds the work for any caller). */
@@ -124,38 +174,85 @@ const CHAT_READ = 256;
 
 const SWEAR_ANY_RE = new RegExp(entries(SWEARS_ANYWHERE).map(repeats).join("|"));
 const SWEAR_START_RE = new RegExp(`^(?:${SWEAR_ANY_RE.source})`);
-const SWEAR_WORD_RE = new RegExp(`^(?:${entries(SWEARS_WORDS).join("|")})s?$`);
+const SWEAR_WORD_RE = new RegExp(`^(?:(?:${entries(SWEARS_WORDS).join("|")})s?|(?:${entries(SWEARS_MASKED).join("|")})(?:ing|in|ed|er|s|ty|y)?)$`);
 const SWEAR_ALLOW_RE = new RegExp(entries(SWEARS_ALLOW).map(repeats).join("|"), "g");
+/** A swear word starting `at` in this word: inside it from there, or as the whole rest of it. */
+const swearFrom = (w: string, at: number) => {
+  const rest = w.slice(at);
+  return SWEAR_WORD_RE.test(rest) || SWEAR_START_RE.test(rest.replace(SWEAR_ALLOW_RE, ""));
+};
 /**
- * Whether these words (one reading of a message) hold a swear word. In a run of ordinary short words read as one
- * (`joined`: "up or no", "is hi to") only from the run's start, so a sentence's little words don't spell one by chance;
- * a word split into pieces ("sh it", "f u c k") still starts its run.
+ * Whether these words (one reading of a message) hold a swear word:
+ *   - inside a word as typed, or one made of letters spaced out ("f u c k", "u f u c k");
+ *   - in a run of ordinary short words read as one ("is hi to", "go f u c k"), only from where one of its typed pieces
+ *     starts, so a sentence's little words don't spell one by chance ("up or no") while one split among them is caught;
+ *   - across two neighbors when one is short ("f uck", "fuc k", "bi tch", "go f uck"), from where a piece of the first starts.
  */
-const swears = (ws: string[], joined: Set<number>) =>
-  ws.some((w, i) => SWEAR_WORD_RE.test(w) || (joined.has(i) ? SWEAR_START_RE : SWEAR_ANY_RE).test(w.replace(SWEAR_ALLOW_RE, "")));
+function swears(ws: string[], pieces: Pieces[]): boolean {
+  return ws.some((w, i) => {
+    const p = pieces[i]!;
+    if (p.starts.length === 1 || !p.pair ? SWEAR_WORD_RE.test(w) || SWEAR_ANY_RE.test(w.replace(SWEAR_ALLOW_RE, "")) : p.starts.some((at) => swearFrom(w, at))) return true;
+    // (Its last typed piece, or the next word, short: "f uck", "go f uck", "fuc k".)
+    const next = ws[i + 1];
+    return next !== undefined && Math.min(w.length - p.starts.at(-1)!, next.length) <= 2 && p.starts.some((at) => swearFrom(w + next, at));
+  });
+}
 
 /**
- * Runs of digits with only spaces and phone-number marks between them ("555 123-4567", "+1 (555) 123 4567", "14 88"):
- * a letter or other punctuation ends a run, so "1800 vs 2000" or "12:30" are separate numbers.
+ * A word that mixes Latin letters with letters from another alphabet that aren't known look-alikes ("sһit" with a letter
+ * the list doesn't know yet): in chat it's refused, so a new look-alike can't carry a word past the filter. (Names don't
+ * get this: real names in other alphabets still work.)
  */
-const digitRuns = (text: string) => (text.normalize("NFKC").match(/(?:\d[\s.\-_()+/]*)+/g) ?? []).map((r) => r.replace(/\D/g, ""));
+const mixedScript = (text: string) =>
+  base(text)
+    .split(/\s+/)
+    .some((t) => {
+      const w = t.replace(/./gsu, (c) => LOOKALIKE[c] ?? c);
+      return /[a-z]/.test(w) && /[^\P{L}a-z]/u.test(w);
+    });
+
+/**
+ * Runs of digits (any script's) with only spaces and phone-number marks between them ("555 123-4567", "+1 (555) 123 4567",
+ * "555,123,4567", "14 88"), each as its groups of digits. A letter, a slash or other punctuation ends a run, so "1800 vs
+ * 2000", "2000/2100" or "12:30" are separate numbers. A number written with thousands commas ("1,500") is one group.
+ */
+const digitRuns = (text: string): string[][] =>
+  (text
+    .normalize("NFKC")
+    .replace(/(?<!\p{Nd})(\p{Nd}{1,3})((?:,\p{Nd}{3})+)(?![\p{Nd},])/gu, (_, a: string, b: string) => a + b.replace(/,/g, ""))
+    .match(/\p{Nd}+(?:[\s.\-_()+,]+\p{Nd}+)*/gu) ?? []).map((r) => r.split(/[^\p{Nd}]+/u).filter(Boolean));
 /** A phone number: seven digits or more in one run. */
 const PHONE_DIGITS = 7;
+/**
+ * A group that reads as a chess rating (or a year): four digits, or three that are a round number (800, 950). A run made
+ * only of these is rating talk ("rated 1200-1400", "1500 1600 1700", "800-1200"), not a phone number. (So a number written
+ * in fours, "2345 6789", passes: reports and a moderator handle that.)
+ */
+const ratingLike = (g: string) => /^[0-9]{4}$/.test(g) || /^[1-9](?:00|50)$/.test(g);
+const isPhone = (groups: string[]) => groups.join("").length >= PHONE_DIGITS && !groups.every(ratingLike);
 /** The endings of web addresses people paste (not short ones that start sentences when someone skips a space: "me", "to"). */
-const TLDS = "com|net|org|io|co|ly|tv|app|xyz|info|biz|uk|ru|de|fr|ca|au|link|site|online|club|shop|live|top|dev|cc|ws|tk|gl|page|store|chat";
+const TLDS = "com|net|org|io|co|ly|tv|app|xyz|info|biz|uk|ru|de|fr|ca|au|link|site|online|club|shop|live|top|dev|cc|ws|tk|gl|page|store|chat|gg|me";
+/** The same, without the ones that are everyday words ("polka dot top"), for an address spelled with "dot". */
+const DOT_TLDS = "com|net|org|io|co|ly|tv|xyz|uk|ru|de|fr|ca|au|gg";
 const LINK_RE = new RegExp(
   [
     "https?\\b", // http, https, http://
     "www\\s*[.。｡]",
     "://",
-    `\\b[a-z0-9-]+[.。｡](?:${TLDS})\\b`, // example.com, bit.ly
-    "\\b[a-z0-9-]+\\s*[([{]?\\s*(?:[.。｡]|dot)\\s*[)\\]}]?\\s*(?:com|net|org)\\b", // example . com, example (dot) com
+    // example.com, bit.ly (no space after the dot; "me" and "gg" only with a path: "t.me/x", "discord.gg/x")
+    `\\b[a-z0-9-]+[.。｡](?:${TLDS.replace("|gg|me", "")})\\b`,
+    "\\b[a-z0-9-]+(?:[.。｡][a-z0-9-]+)*[.。｡][a-z]{2,}/\\S", // t.me/someone, example.co.uk/page
+    `\\b[a-z0-9-]+\\s+[.。｡]\\s*(?:${TLDS})\\b`, // example . io, bit . ly/x (a space before the dot: never prose)
+    "\\b[a-z0-9-]+\\s*[.。｡]\\s*(?:com|net|org)\\b", // example. com
+    `\\b[a-z0-9-]+\\s*[([{]?\\s*dot\\s*[)\\]}]?\\s*(?:${DOT_TLDS})\\b`, // example dot com, example (dot) io
   ].join("|"),
 );
-/** An email address, or a mail service's name ("at gmail"). */
-const EMAIL_RE = /[\w.+-]+\s*@\s*[\w-]+[.。｡][a-z]{2,}|\b(?:gmail|hotmail|icloud|protonmail|ymail)\b/;
-/** Messaging apps, where "add me on …" moves a conversation off the game. */
-const APPS_RE = /\b(?:discord|snapchat|snap\s+chat|instagram|whatsapp|telegram|tiktok|facebook|skype|wechat)\b/;
+/** Mail services. */
+const MAIL = "gmail|googlemail|hotmail|outlook|yahoo|ymail|icloud|aol|proton|protonmail|gmx|msn";
+/** An email address, a mail service's name ("my gmail"), or one spelled out ("at yahoo", "@ gmail"). */
+const EMAIL_RE = new RegExp(`[\\w.+-]+\\s*@\\s*[\\w-]+[.。｡][a-z]{2,}|\\b(?:gmail|googlemail|hotmail|icloud|protonmail|ymail)\\b|(?:\\bat|@)\\s*(?:${MAIL})\\b`);
+/** Messaging apps and games with their own chat, where "add me on …" moves a conversation off the game. */
+const APPS_RE = /\b(?:discord|snapchat|snap\s+chat|instagram|whatsapp|telegram|tiktok|facebook|skype|wechat|roblox|kik)\b/;
 
 /** What a refused chat message hears: a slur, a hate term or a swear word… */
 export const CHAT_NOT_ALLOWED = "That message isn't allowed.";
@@ -165,17 +262,18 @@ export const CHAT_NO_CONTACT = "No links or contact details in chat.";
 /** Why a chat message (the town square's) is refused, or null when it may go. */
 export function chatRefusal(text: string): string | null {
   if (typeof text !== "string" || !text) return null;
-  const said = text.slice(0, CHAT_READ);
+  // ("who're" is "who are", not a word inside it.)
+  const said = text.slice(0, CHAT_READ).replace(/\bwho['’]re\b/gi, "who are");
   const runs = digitRuns(said);
   const refused = (reading: (word: string) => string) => {
-    const joined = new Set<number>();
-    const ws = words(said, reading, joined);
-    return listed(ws) || swears(ws, joined);
+    const pieces: Pieces[] = [];
+    const ws = words(said, reading, pieces);
+    return listed(ws) || swears(ws, pieces);
   };
-  if (READINGS.some(refused) || runs.some((d) => NUMBERS.some((n) => d.includes(n)))) return CHAT_NOT_ALLOWED;
+  if (READINGS.some(refused) || mixedScript(said) || runs.some((g) => NUMBERS.some((n) => g.join("").includes(n)))) return CHAT_NOT_ALLOWED;
   // (Look-alike letters read as Latin ones, so a Cyrillic "о" can't hide a ".com"; digits and symbols stay as typed.)
   const plain = base(said).replace(/./gsu, (c) => LOOKALIKE[c] ?? c);
-  if (LINK_RE.test(plain) || EMAIL_RE.test(plain) || APPS_RE.test(plain) || runs.some((d) => d.length >= PHONE_DIGITS)) return CHAT_NO_CONTACT;
+  if (LINK_RE.test(plain) || EMAIL_RE.test(plain) || APPS_RE.test(plain) || runs.some(isPhone)) return CHAT_NO_CONTACT;
   return null;
 }
 

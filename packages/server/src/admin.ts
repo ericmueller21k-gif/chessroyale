@@ -209,7 +209,11 @@ export interface CaseDetail {
 }
 
 /** Everything about one case: the player, reports, each match's signals and judged picks, the log and appeals. */
-export async function caseDetail(sql: Sql, userId: string, opts: { email: boolean; limit?: number } = { email: false }): Promise<CaseDetail | null> {
+/**
+ * `email` and `lines`: for an admin only. The automated reviewer (its token) gets neither: no email, and no reported
+ * town chat line (the words are for a moderator to read; the reviewer leaves those cases to a person anyway).
+ */
+export async function caseDetail(sql: Sql, userId: string, opts: { email: boolean; lines?: boolean; limit?: number } = { email: false }): Promise<CaseDetail | null> {
   const found = await sql.first<{ id: string; name: string; created_at: number; email: string | null; google_sub: string | null }>(
     "SELECT id, name, created_at, email, google_sub FROM users WHERE id = ?",
     userId,
@@ -252,7 +256,7 @@ export async function caseDetail(sql: Sql, userId: string, opts: { email: boolea
       at: r.at,
       reason: r.reason,
       match: r.match,
-      ...(r.line !== null && r.line_at !== null ? { line: { text: r.line, at: r.line_at } } : {}),
+      ...(opts.lines && r.line !== null && r.line_at !== null ? { line: { text: r.line, at: r.line_at } } : {}),
       reporter: { id: r.id, name: r.name, signedIn: !!(r.email || r.google_sub) },
     })),
     matches: matches.map((m) => ({
@@ -315,7 +319,7 @@ export async function handleAdmin(
     }
     const m = url.pathname.match(/^\/api\/admin\/fairplay\/cases\/([A-Za-z0-9_-]{1,64})(\/decision)?$/);
     if (m && !m[2] && request.method === "GET") {
-      const d = await caseDetail(sql, m[1]!, { email: admin });
+      const d = await caseDetail(sql, m[1]!, { email: admin, lines: admin });
       return d ? json(d) : json({ message: "no such player" }, 404);
     }
     // POST /api/admin/fairplay/cases/ID/decision {decision: ban|clear|watch|review, reason, notice?}
@@ -366,7 +370,7 @@ export async function handleAdmin(
   }
   const cm = url.pathname.match(/^\/admin\/fairplay\/case\/([A-Za-z0-9_-]{1,64})$/);
   if (cm) {
-    const d = await caseDetail(sql, cm[1]!, { email: true });
+    const d = await caseDetail(sql, cm[1]!, { email: true, lines: true });
     return d ? adminPage("Fair play", casePage(d, url.searchParams.get("note"), await chatModDetail(sql, cm[1]!, now))) : notFound();
   }
   // Any player's page by their id or their profile's link (to act on a name, an icon or their chat).

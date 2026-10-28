@@ -8,16 +8,27 @@ import { TOWN_CHAT } from "@chessroyale/core";
  * server's numbers and shows its reasons.
  */
 
-const who = vi.hoisted(() => ({ signedIn: true, young: false, reports: [] as unknown[][] }));
+const who = vi.hoisted(() => ({ signedIn: true, young: false, reports: [] as unknown[][], accountHeard: [] as (() => void)[], friendsHeard: new Set<() => void>(), blocked: new Set<string>() }));
 const live = vi.hoisted(() => ({ rider: null as null | { query(): string; take(b: unknown): void }, watching: 0 }));
 
 vi.mock("../src/account.ts", async (orig) => ({
   ...(await orig<typeof import("../src/account.ts")>()),
   account: () => ({ profile: { user: { id: "me", name: "Me", signedIn: who.signedIn } } }),
   tooYoung: () => who.young,
+  onAccountChange: (fn: () => void) => {
+    who.accountHeard.push(fn);
+    return () => void (who.accountHeard = who.accountHeard.filter((f) => f !== fn));
+  },
   reportPlayer: async (...args: unknown[]) => {
     who.reports.push(args);
     return "Thanks, we'll look into it.";
+  },
+}));
+vi.mock("../src/friends.ts", () => ({
+  isBlocked: (uid: string | null | undefined) => !!uid && who.blocked.has(uid),
+  onFriendsChange: (fn: () => void) => {
+    who.friendsHeard.add(fn);
+    return () => void who.friendsHeard.delete(fn);
   },
 }));
 vi.mock("../src/live.ts", async (orig) => ({
@@ -60,6 +71,7 @@ describe("town chat in the app", () => {
     who.signedIn = true;
     who.young = false;
     who.reports = [];
+    who.blocked.clear();
     mutes.clear();
     setChatBlock(null);
   });
@@ -163,5 +175,61 @@ describe("town chat in the app", () => {
     expect(await removeTownLine(1, answer(200, { ok: true }))).toBe("Removed for everyone.");
     expect(lines.map((l) => l.n)).toEqual([2]);
     expect(await removeTownLine(2, answer(403, { message: "Only a moderator can do that." }))).toBe("Only a moderator can do that.");
+  });
+});
+
+describe("town chat in the app, after the review", () => {
+  let close: () => void = () => undefined;
+  beforeEach(() => {
+    who.signedIn = true;
+    who.young = false;
+    who.blocked.clear();
+    mutes.clear();
+  });
+  afterEach(() => close());
+
+  it("a new room (the server restarted) or a reset: the players' lines shown go before the new ones come (finding 4)", () => {
+    const { lines, sink } = log();
+    close = openTownFeed(sink);
+    takeTownSlice({ room: "r1", n: 2, lines: [line(1, "ann"), line(2, "bo")] });
+    expect(live.rider!.query()).toBe("town=2&room=r1");
+    // The restarted room's own line 1: never mistaken for the old line 1 (Remove and Report go by number).
+    takeTownSlice({ room: "r2", n: 1, lines: [line(1, "cy", "new room")] });
+    expect(lines.map((l) => [l.n, l.from])).toEqual([[1, "cy"]]);
+    takeTownSlice({ room: "r2", n: 2, reset: true, lines: [line(1, "cy", "new room"), line(2, "di")] });
+    expect(lines.map((l) => l.from)).toEqual(["cy", "di"]);
+  });
+
+  it("players' lines leave at once when access ends: signed out, a device marked too young, the chat paused, or a block (a nit)", () => {
+    const { lines, sink } = log();
+    close = openTownFeed(sink);
+    const fill = (from: number) => takeTownSlice({ room: "r", n: from + 1, lines: [line(from, "ann"), line(from + 1, "troll")] });
+    fill(1);
+    who.blocked.add("troll");
+    who.friendsHeard.forEach((f) => f());
+    expect(lines.map((l) => l.from)).toEqual(["ann"]);
+    who.blocked.clear();
+    fill(3);
+    takeTownSlice({ paused: true });
+    expect(lines).toEqual([]);
+    takeTownSlice({ room: "r", n: 4, lines: [] });
+    fill(5);
+    expect(lines).toHaveLength(2);
+    who.signedIn = false;
+    who.accountHeard.at(-1)!();
+    expect(lines).toEqual([]);
+    who.signedIn = true;
+    fill(7);
+    who.young = true;
+    who.accountHeard.at(-1)!();
+    expect(lines).toEqual([]);
+  });
+
+  it("the field's reason for a guest and for a young device (a nit: the field shows to everyone, greyed)", () => {
+    who.signedIn = false;
+    expect(townChatOff()).toBe("Sign in to chat with other players.");
+    who.signedIn = true;
+    who.young = true;
+    expect(townChatOff()).toBe("Chat with other players is for accounts 13 and older.");
   });
 });

@@ -383,7 +383,8 @@ function Privacy() {
           <strong>See it, or get a copy:</strong> Settings → Download my data gives you a file (JSON) of everything we keep about your
           account, your bug reports and the error records with your account included. Fair play's detection records aren't in
           it, as they'd show how cheating is found, nor the reasons and names behind moderators' decisions about your chat (the
-          decisions and their notes to you are in it): email <Mail /> for those, and a person answers.
+          decisions and their notes to you are in it): email <Mail /> for those, and a person answers. A report you made of a
+          town square message is in it without the message's words: they're the other player's.
         </li>
         <li>
           <strong>Correct it:</strong> change your name and icon in your profile, or email us.

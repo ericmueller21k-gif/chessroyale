@@ -199,7 +199,17 @@ export class LiveHub extends DurableObject<Env> {
   async townPost(sender: TownSender, text: string): Promise<{ post: TownPost; town: TownSnapshot }> {
     countCall("hub.townPost");
     const now = Date.now();
-    return { post: this.town.post(sender, text, now), town: this.town.snapshot(now) };
+    const post = this.town.post(sender, text, now);
+    if (post.ok) await this.townAlarm();
+    return { post, town: this.town.snapshot(now) };
+  }
+
+  /** The alarm rings by the time the town's next line (or kept send) is a minute old, so it goes then, visitors or not. */
+  private async townAlarm() {
+    const at = this.town.nextExpiry();
+    if (at === null) return;
+    const cur = await this.ctx.storage.getAlarm();
+    if (cur === null || cur > at) await this.ctx.storage.setAlarm(at);
   }
 
   /** One line still in the town's room (a report reads what was said from here). */
@@ -244,7 +254,10 @@ export class LiveHub extends DurableObject<Env> {
     }
     const gone = this.board.prune(now);
     if (gone.length) await this.ctx.storage.delete(gone.map((c) => `lobby:${c}`));
+    // The town's chat: what's a minute old goes now; the next ring is the sooner of the presence's and the town's.
+    this.town.sweep(now);
     const { seen, lobbies } = this.board.size;
-    if (seen || lobbies) await this.ctx.storage.setAlarm(now + CAPACITY.presence.lastSeenWriteMs);
+    const next = Math.min(seen || lobbies ? now + CAPACITY.presence.lastSeenWriteMs : Infinity, this.town.nextExpiry() ?? Infinity);
+    if (next !== Infinity) await this.ctx.storage.setAlarm(Math.max(next, now + 1));
   }
 }

@@ -8,7 +8,7 @@ import { chatNoticeSeen } from "./chat-mod.ts";
 import { isAdmin, testSwitchesOn, type AdminEnv } from "./admin.ts";
 import { isPaused, pausedResponse } from "./kill-switches.ts";
 import { chatIconResponse, chatPostResponse, chatSlice } from "./global-chat-api.ts";
-import { reportedLine, signedInReader, townPostResponse, townRemoveResponse, townSlice } from "./town-chat-api.ts";
+import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, mayTownChat, reportedLine, signedInReader, townPostResponse, townRemoveResponse, townSlice } from "./town-chat-api.ts";
 import { accountDownload, deleteAccount } from "./account-data.ts";
 import { AGE_GATE, ASK_AGE_LINE, FAIRPLAY, TOO_YOUNG_LINE } from "@chessroyale/core";
 import {
@@ -247,7 +247,9 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const townSince = url.searchParams.get("town");
     let town: unknown = null;
     if (townSince !== null && env.LIVE && ageAnswer(request) !== "under" && (await signedInReader(sql, token, now).catch(() => null))) {
-      town = isPaused(env, "town-chat", now) ? { paused: true } : await townSlice(liveHub(env as Required<Pick<AccountEnv, "LIVE">>), Number(townSince), now).catch(() => null);
+      town = isPaused(env, "town-chat", now)
+        ? { paused: true }
+        : await townSlice(liveHub(env as Required<Pick<AccountEnv, "LIVE">>), Number(townSince), now, url.searchParams.get("room"), waitUntil).catch(() => null);
     }
     return json({
       ...liveCache.body,
@@ -418,8 +420,11 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   // code when made during a match). One per player per match (outside a match, one a day); see fairplay.ts.
   if (path === "/api/report" && request.method === "POST") {
     const b = (await request.json().catch(() => ({}))) as { target?: unknown; reason?: unknown; match?: unknown; line?: unknown };
-    // A line of the town's chat (`line`: its number): the words are read from the room, never taken from the request.
-    const line = b.reason === FAIRPLAY.reports.chatReason && env.LIVE ? await reportedLine(liveHub(env as Required<Pick<AccountEnv, "LIVE">>), b.line, b.target) : null;
+    // A line of the town's chat (`line`: its number): the words are read from the room, never taken from the request; only
+    // someone who may read the town's chat can report a line of it (a guest or a young device can't probe who spoke).
+    const chatReport = b.reason === FAIRPLAY.reports.chatReason;
+    if (chatReport && (!mayTownChat(current) || ageAnswer(request) === "under")) return json({ message: mayTownChat(current) ? TOWN_CHAT_AGE : SIGN_IN_TO_TOWN_CHAT }, 403);
+    const line = chatReport && env.LIVE ? await reportedLine(liveHub(env as Required<Pick<AccountEnv, "LIVE">>), b.line, b.target) : null;
     const r = await reportPlayer(sql, current, b.target, b.reason, b.match, now, line);
     if (!r.ok) return json({ message: r.message }, 400);
     const already = typeof b.match === "string" ? "You've already reported this player in this match." : "You've already reported this player today.";
@@ -452,7 +457,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     if (!env.LIVE) return json({ message: "The chat isn't set up here." }, 503);
     const hub = liveHub(env as Required<Pick<AccountEnv, "LIVE">>);
     if (path === "/api/town/chat/remove") return townRemoveResponse(request, hub, isAdmin(env as AdminEnv, current), now);
-    return townPostResponse(request, sql, hub, { user: current, tooYoung: ageAnswer(request) === "under", paused: isPaused(env, "town-chat", now) }, now);
+    return townPostResponse(request, sql, hub, { user: current, tooYoung: ageAnswer(request) === "under", paused: isPaused(env, "town-chat", now) }, now, waitUntil);
   }
 
   // POST /api/results: a solo match's result, from the browser.

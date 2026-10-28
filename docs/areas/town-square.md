@@ -187,8 +187,8 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
     Hollow's kid only eerie; anyone but who spoke last). The kids' names are the sidekicks brief's, kept in `CHATTER` until
     the sidekicks are in `BOTS`.
   - **Your own line** (Oct 28, Eric): a text field at the box's foot, **for a signed-in player on a device the age gate
-    didn't mark too young** (`mayTownChat`; guests see the log alone, and the field's strip is kept for everyone so the box
-    never changes): at most `maxChars` (80) characters (a count, "7 left", only for the last `nearEnd` (10)), the keyboard's
+    didn't mark too young** (`mayTownChat`). Everyone else sees it greyed with why (nothing hidden): "Sign in to chat with
+    other players." for a guest, "Chat with other players is for accounts 13 and older." for a young device: at most `maxChars` (80) characters (a count, "7 left", only for the last `nearEnd` (10)), the keyboard's
     Send or Enter sends (`enterkeyhint="send"`, no button), one message per `sendEveryMs` (15 s; the field shows "Wait 12 s"
     and is greyed until then), 16 px type so iPhone Safari doesn't zoom. The numbers are the server's (`TOWN_CHAT`), which
     decides. **The keyboard** opening must not resize or move the town: while the field has focus the screen keeps its
@@ -200,8 +200,9 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
     message isn't allowed.", "No links or contact details in chat.", "You said that a moment ago.", …); the server's wait
     shows in the field as the count. Other players' lines ride on the live line's poll (`openTownFeed`: `?town=N` every 5 s
     while the town is open and the tab visible; nobody else asks) and come in through `say(name, text, "player", {uid, n})`;
-    `unsay` takes lines out by number (a moderator's Remove, the room's `gone`) or by player (Mute). Muted and blocked
-    players' lines never reach the log. While the switch is off (`PAUSE_TOWN_CHAT`) the field is greyed and says "Chat is
+    `unsay` takes lines out by number (a moderator's Remove, the room's `gone`) or by player (Mute, a block), and every
+    player's line at once when access ends (signed out, a young device, the chat paused) or the room restarted (a new
+    `room`). Muted and blocked players' lines never reach the log. While the switch is off (`PAUSE_TOWN_CHAT`) the field is greyed and says "Chat is
     paused."; while your chat is banned it says why ("Your chat is off: a moderator's decision."). The log keeps the bosses'
     and kids' chatter either way. Nothing here runs in the frame loop: an answer is parsed in the request's callback.
   - **A line's menu**: a tap on a player's line, name or text (`onTownChatLineTap`; lines said by the test hook have no one

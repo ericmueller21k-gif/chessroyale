@@ -1,8 +1,8 @@
 import { FAIRPLAY, TOWN_CHAT } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
-import { account, reportPlayer, tooYoung } from "../account.ts";
+import { account, onAccountChange, reportPlayer, tooYoung } from "../account.ts";
 import { chatBlockNow, chatBlockText, mutes, setChatBlock } from "../chat-mod.ts";
-import { isBlocked } from "../friends.ts";
+import { isBlocked, onFriendsChange } from "../friends.ts";
 import { rideLive, watchLive } from "../live.ts";
 import { isPaused } from "../status.ts";
 
@@ -30,6 +30,8 @@ export interface TownLine {
 }
 
 interface Slice {
+  /** The room's id: a new one after the server's room restarted. */
+  room?: string;
   n: number;
   lines: TownLine[];
   gone?: number[];
@@ -57,8 +59,9 @@ const isSlice = (x: unknown): x is Slice => !!x && typeof x === "object" && type
 
 /** The one feed (the town is open at most once). */
 class TownFeed {
-  /** The last line's number taken (the next ask is for lines after it). */
+  /** The last line's number taken (the next ask is for lines after it), in this room. */
   last = 0;
+  room: string | null = null;
   /** Whether the server last said the chat is paused. */
   pausedSaid = false;
   /** When (this device's clock) the server lets you send again, as far as the app knows. */
@@ -72,13 +75,18 @@ class TownFeed {
     if (slice && typeof slice === "object" && (slice as { paused?: unknown }).paused === true) return this.setPaused(true);
     if (!isSlice(slice)) return;
     this.setPaused(false);
+    // A new room (the server's restarted) or a reset: its numbers start over, so the players' lines shown go first (a
+    // Remove or a Report must never reach another line by an old number).
+    const fresh = !!slice.reset || (!!slice.room && !!this.room && slice.room !== this.room);
+    if (fresh) sink.drop(() => true);
+    if (slice.room) this.room = slice.room;
     if (slice.gone?.length) {
       const gone = new Set(slice.gone);
       sink.drop((l) => gone.has(l.n));
     }
-    const after = slice.reset ? 0 : this.last;
+    const after = fresh ? 0 : this.last;
     for (const l of slice.lines) if (isLine(l) && l.n > after && !mutes.has(l.from) && !isBlocked(l.from)) sink.line(l);
-    this.last = slice.reset ? slice.n : Math.max(this.last, slice.n);
+    this.last = fresh ? slice.n : Math.max(this.last, slice.n);
   }
 
   /** The town opened its log: players' lines flow into `sink` until the returned function is called. */
@@ -86,22 +94,32 @@ class TownFeed {
     if (!mayTownChat()) return () => undefined;
     this.sink = sink;
     this.last = 0;
+    this.room = null;
     this.pausedSaid = false;
-    const unride = rideLive({ query: () => `town=${this.last}`, take: (b) => this.take((b as { town?: unknown }).town) });
+    const unride = rideLive({ query: () => `town=${this.last}${this.room ? `&room=${this.room}` : ""}`, take: (b) => this.take((b as { town?: unknown }).town) });
     const unwatch = watchLive();
-    // (Someone muted, here or in another chat: their lines leave the log.)
+    // (Someone muted, here or in another chat, or blocked: their lines leave the log at once.)
     const unmute = mutes.on(() => sink.drop((l) => mutes.has(l.from)));
+    const unblock = onFriendsChange(() => sink.drop((l) => isBlocked(l.from)));
+    // (Signed out, or the device marked too young: every player's line leaves the log at once.)
+    const unaccount = onAccountChange(() => {
+      if (!mayTownChat()) sink.drop(() => true);
+    });
     return () => {
       unride();
       unwatch();
       unmute();
+      unblock();
+      unaccount();
       if (this.sink === sink) this.sink = null;
     };
   }
 
+  /** The switch: while it's off, players' lines leave the log at once (the bosses' chatter stays). */
   private setPaused(on: boolean) {
     if (this.pausedSaid === on) return;
     this.pausedSaid = on;
+    if (on) this.sink?.drop(() => true);
     this.sink?.paused?.(on);
   }
 }
@@ -153,7 +171,7 @@ export async function sendTownChat(raw: string, fetcher: typeof fetch = fetch): 
       method: "POST",
       credentials: "same-origin",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text, since: feed.last }),
+      body: JSON.stringify({ text, since: feed.last, ...(feed.room ? { room: feed.room } : {}) }),
     });
     const body = (await res.json().catch(() => ({}))) as { town?: unknown; waitMs?: number; retryMs?: number; reason?: string; message?: string; block?: ChatBlock; paused?: string };
     feed.take(body.town);

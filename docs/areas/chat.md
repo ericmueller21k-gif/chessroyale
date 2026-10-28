@@ -45,21 +45,33 @@ Lane: `social`.
     signed in), never ask for or get players' lines, and can't send: their log has the bosses' and kids' chatter alone.
   - **The room** (`server/src/town-chat.ts`, kept by the live hub beside the global chat, **in memory only**): each line
     `{n, at, from, name, text}` for `TOWN_CHAT.lineMs` (60 s), at most `holdMax`; a newcomer gets the last `keep` (12).
-    A restart forgets it (the app's `reset`). The name comes from the account (one the name filter refuses goes out as
-    "Player").
-  - **Reading** rides on the live line's poll: `GET /api/live?town=N` (`town-chat-api.ts`: a signed-in reader, checked
-    with this instance's caches; `{paused: true}` while the switch is off). While the town is open (and the tab
+    The hub's alarm rings at the next line's minute and sweeps it (`sweep`, `nextExpiry`), so nothing outlives its minute
+    even in an empty town; for the wait and the repeat it keeps when and a hash of the words, never the words, for a
+    minute. A restart forgets it and gives the room a new id (`room`): an app seeing a new room drops its players' lines
+    before taking the new ones, so a Remove or a Report never reaches another line by an old number. The name comes from
+    the account (one the name filter refuses goes out as "Player").
+  - **Reading** rides on the live line's poll: `GET /api/live?town=N&room=R` (`town-chat-api.ts`: a signed-in reader,
+    checked with this instance's caches; `{paused: true}` while the switch is off). While the town is open (and the tab
     visible) the app polls every `FRONT_DOOR.livePollMs` (5 s) instead of the 30 s heartbeat; each Worker instance asks
-    the hub at most every `TOWN_CHAT.readCacheMs` (2 s) whoever reads. No socket.
-  - **Sending:** `POST /api/town/chat {text, since}` → the line and the room after it, or why not. The server's limits
-    (the app mirrors them): at most `maxChars` (80) characters after tidying (invisible and control characters out, a
-    pile of accents cut to two, spaces run together, trimmed; an emoji is one), one message per account every `gapMs`
+    the hub at most every `TOWN_CHAT.readCacheMs` (2 s) whoever reads, and at once when the reader is ahead of its copy
+    (it saw a newer line in its own send's answer), so a stale copy never tells a reader to start over. The copy goes
+    from the instance's memory on its next request after those 2 s (`expireTownCache`). No socket.
+  - **Sending:** `POST /api/town/chat {text, since, room}` → the line and the room after it, or why not. A body over 8 KB
+    is refused in the Worker and the text cut to 1,024 characters before it goes to the shared hub. The server's limits
+    (the app mirrors them): at most `maxChars` (80) characters after tidying (invisible and control characters and
+    fillers that show as nothing out, a joiner kept only inside an emoji, a pile of accents cut to two, spaces run
+    together, trimmed; what shows as one character is one: an emoji with its skin tone, 👩‍💻), one message per account every `gapMs`
     (15 s; "One message every 15 s."), not the same message again (case, spaces and punctuation aside) within `repeatMs`
     (60 s; "You said that a moment ago."). A refused message doesn't start the wait.
   - **The filter** (`chatRefusal` in `text-filter.ts`): the names' list plus common swear words, refused alike ("That
-    message isn't allowed."; Eric, Oct 28: family-friendly, so not masked); links, web addresses (also "dot com"),
-    email addresses and mail services, phone numbers (seven digits or more in one run) and the main messaging apps
-    ("add me on discord") refused with "No links or contact details in chat."
+    message isn't allowed."; Eric, Oct 28: family-friendly, so not masked). Look-alike letters (Cyrillic, Greek,
+    Armenian, small capitals, dotless ı…) read as the Latin ones they pass for, in names too; in chat a word mixing Latin
+    letters with an unknown letter from another alphabet is refused. Swear words split into letters anywhere in a
+    sentence, split once ("f uck"), or masked with an ending ("f*cking") are caught. Links (also with a path, "t.me/x",
+    a spaced dot or "dot com"), email addresses and mail services ("at yahoo"), phone numbers (seven digits or more in
+    one run, in any script's digits, commas and phone marks between; rating talk passes: groups of four digits or
+    round hundreds, "rated 1200-1400", "800-1200") and messaging apps ("add me on discord", roblox, kik) are refused
+    with "No links or contact details in chat."
   - **A chat ban** stops typing here too (403, `CHAT_OFF` and the `block`), and so does a fair-play ban; they still read.
   - **The kill switch** `PAUSE_TOWN_CHAT` (core's `pauses.ts`, "town-chat"; on unless set): nobody sends (503,
     "Chat is paused."), readers get `{paused: true}` and no players' lines; the field says "Chat is paused." and the
@@ -68,8 +80,11 @@ Lane: `social`.
     `sendTownChat(text)` (async: the field waits for the answer and shows a refusal's reason over it for 4 s),
     `townChatOff()` (why the field can't send), `reportTownLine`, `removeTownLine`. Lines go into the log through
     `say(name, text, "player", {uid, n})` and out through `unsay` (by number or by player). Muted and blocked players' lines
-    never reach the log; muting someone takes theirs out. The field shows only for a signed-in player on a device not
-    marked too young. A tap on a player's line opens its menu (Profile / Mute / Report, Remove for a moderator).
+    never reach the log; muting or blocking someone takes theirs out, and every player's line leaves at once when you may
+    no longer see them (signed out, the device marked too young, the chat paused). The field is there for everyone,
+    greyed with why for a guest ("Sign in to chat with other players."), a young device ("Chat with other players is
+    for accounts 13 and older."), the switch or a chat ban. A tap on a player's line opens its menu (Profile / Mute /
+    Report, Remove for a moderator).
 
 ## Moderation
 
@@ -90,7 +105,9 @@ The preset lines are all friendly, so what can offend is a player's name and dra
   (`FAIRPLAY.reports.chatReason`, not one of the profile sheet's buttons) and the line's number; the server reads the
   line's text and time from the room (never from the reporter: a line that's gone, or isn't the player's, is refused,
   "That message has gone from the chat. You can still report the player from their profile."), one report per line,
-  and fair play's case page shows it under Reports. It opens a watch case as reports do.
+  and fair play's case page shows it under Reports. It opens a watch case as reports do. Only someone who may read the
+  town's chat can report a line of it (a guest or a young device can't probe who spoke). The automated reviewer's API
+  gets the report without the words and can't clear a case with one ([docs/fairplay-reviewer.md](../fairplay-reviewer.md)).
 - **Moderators** take one town square line down from its menu in the town ("Remove", for an admin: `POST
   /api/town/chat/remove {n}`): it leaves the room and every reader's log (the room lists it as `gone` for a minute).
   Nothing is logged or stored. A reset of a player's name and icon, and a deleted account, take their town lines out

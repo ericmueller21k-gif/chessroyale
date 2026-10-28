@@ -7,10 +7,12 @@
  * wherever you drop it, remembered on this device. Plain DOM, drawn only when a message comes; nothing in the town's frame
  * loop. The rules and the numbers are in chat.ts; docs/areas/town-square.md, "The chat log".
  *
- * Players' messages (chat-net.ts; docs/decisions/2026-10-28-town-chat-typing.md): the field shows for a signed-in player on a
- * device the age gate didn't mark too young, and only they get other players' lines (riding on the live poll); a guest's log
- * has the bosses' and kids' chatter alone. The field waits for the server's answer; a refusal's reason shows over it for
- * `noteMs`. While the chat is paused (the switch) or your chat is off (a moderator), the field says so instead.
+ * Players' messages (chat-net.ts; docs/decisions/2026-10-28-town-chat-typing.md): only a signed-in player on a device the
+ * age gate didn't mark too young types and gets other players' lines (riding on the live poll); a guest's log has the
+ * bosses' and kids' chatter alone. The field is there for everyone (nothing hidden): greyed with why for a guest ("Sign in
+ * to chat with other players."), a young device, while the chat is paused (the switch) or your chat is off (a
+ * moderator). It waits for the server's answer; a refusal's reason shows over it for `noteMs`. Players' lines leave the
+ * log at once when you may no longer see them (signed out, paused) or mute or block their player.
  *
  * Test hooks (e2e, with the test switches on): `window.__townSay()` makes someone from the table talk now;
  * `__townSay(name, text, kind)` says that line (on this device only); `__townChatter(false)` stops the bosses' and kids'
@@ -66,9 +68,13 @@ export function TownChat() {
   }, [log]);
 
   // Other players' lines, for a signed-in player (nothing is asked for anyone else): into the log as players' lines with who
-  // said them; out again when a moderator removes one or you mute its player; the switch redraws the field.
+  // said them; out again when a moderator removes one or you mute or block its player, and all of them when you may no
+  // longer see them (signed out, a device marked too young, the chat paused); the switch redraws the field.
   useEffect(() => {
-    if (!typing) return;
+    if (!typing) {
+      log.drop((l) => l.uid !== undefined);
+      return;
+    }
     return openTownFeed({
       line: (l) => log.say(l.name, l.text, "player", Date.now(), { uid: l.from, n: l.n }),
       drop: (test) => log.drop((l) => l.uid !== undefined && l.n !== undefined && test({ n: l.n, from: l.uid })),
@@ -213,7 +219,7 @@ export function TownChat() {
     pinned.current = null;
     log.hold(false);
   };
-  // (The field going away while it has focus lets go too.)
+  // (The field greyed while it has focus, a guest signed out say, lets go too.)
   useEffect(() => {
     if (!typing) blur();
   }, [typing]);
@@ -243,8 +249,8 @@ export function TownChat() {
     else if (r.reason === "refused") setNote(r.message ?? null);
   };
   const left = CHAT.maxChars - text.length;
-  // Why the field can't send right now (the switch, your chat ban), shown in its place.
-  const off = typing ? townChatOff() : null;
+  // Why the field can't send right now (a guest, a young device, the switch, your chat ban), shown in its place.
+  const off = townChatOff();
 
   return (
     <div class="town-chat" ref={wrap} data-size={computer ? "computer" : "phone"}>
@@ -257,34 +263,32 @@ export function TownChat() {
           </div>
         ))}
       </div>
-      {typing && note && (
+      {note && (
         <div class="tc-note" role="status">
           {note}
         </div>
       )}
-      {typing && (
-        <form class="tc-form" onSubmit={submit}>
-          <input
-            ref={field}
-            type="text"
-            value={text}
-            maxLength={CHAT.maxChars}
-            placeholder={off ?? (wait > 0 ? `Wait ${wait} s` : "Say something…")}
-            title={off ?? undefined}
-            disabled={!!off || wait > 0}
-            readOnly={sending}
-            enterkeyhint="send"
-            autocomplete="off"
-            autocapitalize="sentences"
-            spellcheck={false}
-            aria-label="Say something in the town chat"
-            onInput={(e) => setText((e.target as HTMLInputElement).value)}
-            onFocus={focus}
-            onBlur={blur}
-          />
-          {left <= CHAT.nearEnd && wait <= 0 && !off && <span class="tc-left">{left} left</span>}
-        </form>
-      )}
+      <form class="tc-form" onSubmit={submit}>
+        <input
+          ref={field}
+          type="text"
+          value={text}
+          maxLength={CHAT.maxChars}
+          placeholder={off ?? (wait > 0 ? `Wait ${wait} s` : "Say something…")}
+          title={off ?? undefined}
+          disabled={!!off || wait > 0}
+          readOnly={sending}
+          enterkeyhint="send"
+          autocomplete="off"
+          autocapitalize="sentences"
+          spellcheck={false}
+          aria-label="Say something in the town chat"
+          onInput={(e) => setText((e.target as HTMLInputElement).value)}
+          onFocus={focus}
+          onBlur={blur}
+        />
+        {left <= CHAT.nearEnd && wait <= 0 && !off && <span class="tc-left">{left} left</span>}
+      </form>
       <LineMenu box={wrap} />
     </div>
   );
