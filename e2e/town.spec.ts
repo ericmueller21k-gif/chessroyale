@@ -710,6 +710,11 @@ test("Hollow's card: one of his three lines (Eric's words), the next one each ti
   // The camera glides to Hollow Peak (as its chip would), far across the world.
   await page.evaluate(() => (window as unknown as { __townGlide: (id: string) => void }).__townGlide("hollow"));
   await expect.poll(at, { message: "Hollow Peak comes into view", timeout: 10_000 }).not.toBeNull();
+  // Hollow walks round behind his home and stays: a tap meant for the home that lands on him would open his card, which
+  // says the next line too (his card and his home's take turns together).
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { __townBossBack: (id: string) => boolean }).__townBossBack("hollow")), { message: "Hollow stands behind his home", timeout: 20_000 })
+    .toBe(true);
   const card = page.getByRole("dialog", { name: "Hollow Peak", exact: true });
   const open = async () =>
     expect(async () => {
