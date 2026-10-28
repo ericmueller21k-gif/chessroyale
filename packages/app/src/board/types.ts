@@ -33,7 +33,8 @@ export interface BoardProps {
   interactive?: boolean;
   /** Only these moves may be played (default: every legal move). */
   moves?: readonly string[];
-  onMove?: (uci: string) => void;
+  /** A move made on the board; `how.premove`: one made ahead (`premove`), played the moment your turn came. */
+  onMove?: (uci: string, how?: { premove?: boolean }) => void;
   /**
    * A move tried (a tap on a square, or a drop) that's legal in chess but not one of `moves` (a boss power stops it):
    * the piece stays where it was, and the screen can say why.
@@ -75,6 +76,26 @@ export interface BoardProps {
   elephants?: readonly string[];
   /** Drawn on each piece, inside its element (see `PieceDecor`). Not on a piece that is fading away. */
   decor?: PieceDecor;
+  /**
+   * Premoves (chess.com's), for a screen that opts in (docs/areas/board.md, "Arrows, highlights and premoves"). While
+   * `side` isn't to move on the board you may move its pieces ahead (drag or tap-tap; a computer lines up several, a
+   * phone one), and the first plays the moment the board is `interactive` with `side` to move (through `onMove`, marked
+   * as a premove); one the game doesn't allow then is cancelled with every one after it (`onRefused` when a power stops
+   * it). `key`: the game and your seat in it: your premoves, arrows and highlights stay through every screen of the game
+   * that passes the same key (a raid's turn and the boss's), and a board with another key starts clean.
+   */
+  premove?: PremoveSeat;
+}
+
+/** A board's premoves: whose they are (see BoardProps.premove). */
+export interface PremoveSeat {
+  key: string;
+  side: "w" | "b";
+  /**
+   * Only show the premoves waiting (a right-click still cancels them): a screen where a tap on the board means something
+   * else (a crowd's reveal, which a tap skips).
+   */
+  watch?: boolean;
 }
 
 // The board's own elements: a piece (also drawn over the board, and in the promotion picker) and a square's highlight.

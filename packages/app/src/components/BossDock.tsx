@@ -1,14 +1,16 @@
 import type { ComponentChildren } from "preact";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { memo } from "preact/compat";
-import { BOSS_POWERS } from "@chessroyale/core";
+import { BOSS_POWERS, type ItemLook } from "@chessroyale/core";
 import { bossRules } from "@chessroyale/chess";
 import { account } from "../account.ts";
-import type { GameView, StrikeState } from "../game.ts";
+import { bossAlone, type GameView, type StrikeState } from "../game.ts";
+import { pawnLook } from "../looks.ts";
 import { kingSay, kingVoice, setKingFallen, type KingCue } from "../godKing.ts";
 import { play, warmSounds } from "../sound.ts";
 import { TICK_FROM_SECONDS, useFrameNow } from "./Countdown.tsx";
 import { GodKingFallen, GodKingSprite, kingCommandAct } from "./GodKing.tsx";
+import { Avatar } from "./Items.tsx";
 import type { GodKingAnim } from "../characters/god-king.ts";
 import { Chevrons, type useHistoryView } from "./HistoryNav.tsx";
 import { COMPUTER_LAYOUT } from "./MatchMenu.tsx";
@@ -40,6 +42,9 @@ import { RaceBadge } from "./Hopper.tsx";
  * On a computer (styles.css, .boss-dock) the God King stands by the board's
  * bottom-right corner instead, facing the boss across the board (Eric, Oct 11);
  * his words and menu open outwards there.
+ *
+ * Boss alone also has your own pawn, as your profile wears it, at his size and on his line: left of him in a phone's strip,
+ * by the board's corner with him to its right on a computer (Eric, Oct 28; YourPawn).
  */
 export function BossDock({
   match,
@@ -132,6 +137,9 @@ export function BossDock({
   // Chub & Chirp's carrot race count: in the status box where it has the room (a computer, or the God King beside the
   // row), else at the left of the God King's line under the row (a phone: the box keeps the room for its words).
   const strip = !!panel;
+  // Your pawn, in Boss alone's own screens only (not the Hidden Boss's phase change or phase 2, which pass `king`), and where
+  // there's a strip or a computer's corner for it.
+  const pawn = !king && !!boss && bossAlone(match) && (strip || computer);
   const raceInBox = computer || (beside && !strip);
   const view = nav?.view;
   const moveNo = (p: number) => `${Math.ceil(p / 2)}${p % 2 === 1 ? "" : "…"}`;
@@ -152,7 +160,7 @@ export function BossDock({
   useEffect(() => warmSounds(["kingCant"]), []);
   return (
     <>
-    <div class={`boss-dock${strip ? " dk-strip" : ""}`} ref={dockRef}>
+    <div class={`boss-dock${strip ? " dk-strip" : ""}${pawn ? " dk-pawn" : ""}`} ref={dockRef}>
       <div class={`history-nav boss-dock-main${view?.browsing ? " browsing" : ""}${wide ? " wide" : ""}`}>
         {!wide && (
           <button type="button" class="nav-btn" aria-label="Previous move" disabled={!view || view.ply === 0} onClick={() => view?.go(view.ply - 1)}>
@@ -182,6 +190,7 @@ export function BossDock({
       </div>
       {!wide && !raceInBox && <RaceBadge boss={boss} below />}
       {strip && <div class="dk-panel">{panel}</div>}
+      {pawn && <YourPawn look={pawnLook({ id: "", isYou: true, isBot: false }).look} side={boss.crowdSide} hopAt={hopAt(match)} />}
       <GodKingUnit
         show={king}
         side={side}
@@ -220,6 +229,53 @@ export function BossDock({
     </>
   );
 }
+
+/** How long your pawn's idle bob takes (ms): the God King's own breath, 24 frames of 100 ms. */
+const BOB_MS = 2400;
+/** How long its hop takes as your move lands (ms; styles.css, .you-pawn-hop). */
+const HOP_MS = 600;
+
+/** Which move of yours went in last, per match (a key), and when (a Date.now() value). */
+const landed = new WeakMap<object, { key: string; at: number }>();
+
+/**
+ * When your last move went in (a Date.now() value, 0 before): it shows on the board at once (the "scoring" phase, Boss alone's
+ * own move, with its move; a time-out has none), noted as each screen's dock draws. The boss's replies never count.
+ */
+function hopAt(match: GameView): number {
+  const p = match.phase;
+  let h = landed.get(match);
+  if (!h) landed.set(match, (h = { key: "", at: 0 }));
+  if (p.kind === "scoring" && p.move) {
+    const key = `${p.board.id}:${p.board.ply}:${p.move}`;
+    if (key !== h.key) {
+      h.key = key;
+      h.at = Date.now();
+    }
+  }
+  return h.at;
+}
+
+/**
+ * Your pawn beside the God King (Boss alone), dressed as your profile has it (`Avatar`, as the move list's rows and the town
+ * draw it): a slow, slight bob like his breathing, and one small hop as your move goes in. CSS transforms only; it's drawn once
+ * (memo) and again only for a hop, never per frame. It doesn't react to the King's save, a boss's power or the result.
+ */
+const YourPawn = memo(function YourPawn({ look, side, hopAt }: { look: ItemLook | undefined; side: "w" | "b"; hopAt: number }) {
+  // (The bob keeps the clock's phase, so a screen's new dock carries on where the last one was.)
+  const [phase] = useState(() => Date.now() % BOB_MS);
+  const age = Date.now() - hopAt;
+  const hop = hopAt > 0 && age < HOP_MS;
+  return (
+    <div class="you-pawn" aria-hidden="true">
+      <span class="you-pawn-bob" style={{ animationDelay: `-${phase}ms` }}>
+        <span key={hop ? hopAt : 0} class={`you-pawn-hop${hop ? " hop" : ""}`} style={hop ? { animationDelay: `-${age}ms` } : undefined}>
+          <Avatar look={look} side={side} />
+        </span>
+      </span>
+    </div>
+  );
+});
 
 /** The room right of the board the God King needs to stand beside the dock's row on a phone: his 58 px and a gap. */
 export const KING_BESIDE_PX = 66;
