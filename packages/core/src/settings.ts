@@ -2300,6 +2300,32 @@ export const GLOBAL_CHAT = {
 } as const;
 
 /**
+ * The town square's chat (Eric, Oct 28: "I think it actually is totally fine to allow typing"): the one chat with typed
+ * messages; every other chat stays preset lines. Signed-in players only (accounts are 13 and older); the server enforces
+ * every number here and the app mirrors them. The room holds its lines in memory only (the live hub), never stored.
+ * The kill switch is the Worker variable PAUSE_TOWN_CHAT (pauses.ts). docs/decisions/2026-10-28-town-chat-typing.md.
+ */
+export const TOWN_CHAT = {
+  /** The most characters in a message, after trimming. */
+  maxChars: 80,
+  /** One message per account every this long. */
+  gapMs: 15_000,
+  /** The same message (case, spaces and punctuation aside) not again from the same account within this long. */
+  repeatMs: 60_000,
+  /** A line leaves the room this long after it was said (and the app's log drops it then too). */
+  lineMs: 60_000,
+  /** A newcomer gets at most this many of the latest lines. */
+  keep: 12,
+  /** The most lines the room holds at once (all said within `lineMs`); the oldest go first past it. */
+  holdMax: 300,
+  /**
+   * Each Worker instance reuses the room as it last read it for this long (the live poll's `?town=N`), so the live hub
+   * is asked at most this often per instance however many players read.
+   */
+  readCacheMs: 2_000,
+} as const;
+
+/**
  * Chat moderation (docs/decisions/2026-10-16-chat-moderation.md; docs/areas/chat.md): a moderator's chat bans and how
  * long their decisions are kept. Chat is preset lines only; the free text players see is display names, which the
  * server's filter checks (server/src/text-filter.ts).
@@ -2487,6 +2513,11 @@ export const FAIRPLAY = {
   reports: {
     /** What a report can be about (the sheet's buttons, in order). Only "cheating" counts toward an automatic review. */
     reasons: ["Cheating", "Offensive name or icon", "Something else"] as const,
+    /**
+     * A report from a line in the town square's chat (its menu's Report): it carries the line's text and time, which the
+     * server reads from the room itself. Not one of the profile sheet's buttons: a report of a line needs the line.
+     */
+    chatReason: "Offensive chat",
     /** Reports one account can make a day (one per player per match; outside a match one per player a day). */
     perDay: 20,
     /** Cheating reports from this many different signed-in accounts within `reviewDays` put a player in review. */

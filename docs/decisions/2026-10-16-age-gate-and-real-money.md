@@ -92,13 +92,16 @@
 
 ## Guest audit (where sign-in is set up, as on hunchess.com)
 
-Nothing in the game takes free text from one player to another: chat is preset lines and emoji everywhere.
+Nothing in the game takes free text from one player to another: chat is preset lines and emoji everywhere. (Since
+Oct 28 one exception: the town square's typed chat, for signed-in accounts only, never a guest's or a too-young
+device's: [2026-10-28-town-chat-typing.md](2026-10-28-town-chat-typing.md).)
 
 | What | A guest today | A guest under the gate |
 | --- | --- | --- |
 | Online play: PLAY online, lobbies, raids, Squads, invite links | Refused by the server ("Sign in to play online"; `mayPlay` in `index.ts`, `lobby-do.ts`, `squads-do.ts`) | Same |
 | Solo against bots, Boss alone, a solo raid | Yes | Yes |
 | Global chat (preset lines) | Read only: posting needs sign-in (`chatPostResponse`) | Same |
+| The town square's typed chat (Oct 28) | Neither types nor sees players' messages, nor reports one: signed-in accounts only (`town-chat-api.ts`), even where sign-in isn't set up; the log has the bosses' and kids' chatter alone, the field greyed ("Sign in to chat with other players.") | Same, and a too-young device gets none even with someone signed in on it (the field: "Chat with other players is for accounts 13 and older.") |
 | Quick chat in matches (fixed lines) | Online matches only, so none | None |
 | Friends, requests, invites | Refused (`friends-api.ts`) | Same |
 | Others' profiles, Report (preset reasons only) | Yes | Yes: nothing typed |

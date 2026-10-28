@@ -4,6 +4,7 @@ import { d1Sql, ensureSchema } from "./accounts.ts";
 import { LiveBoard, pruneLive, typicalWait, writeLastSeen, type LiveCounts, type LiveHealth, type LobbySummary } from "./live.ts";
 import { countCall } from "./ops.ts";
 import { GlobalChat, type GlobalChatSnapshot, type GlobalLine, type GlobalPost, type GlobalSender } from "./global-chat.ts";
+import { TownChat, type TownLine, type TownPost, type TownSender, type TownSnapshot } from "./town-chat.ts";
 import { pruneFriends, recentNews } from "./friends.ts";
 import type { Env } from "./index.ts";
 
@@ -26,6 +27,8 @@ export class LiveHub extends DurableObject<Env> {
   private prunedAt = 0;
   /** The home page's global chat (global-chat.ts), kept in this object's storage too ("chat", and its drawn icons). */
   private chat = new GlobalChat();
+  /** The town square's typed chat (town-chat.ts): in memory only, never in storage (a restart forgets it). */
+  private town = new TownChat();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -170,9 +173,10 @@ export class LiveHub extends DurableObject<Env> {
     return { globalChat: this.chat.linesOf(id) };
   }
 
-  /** A deleted account (account-data.ts): no longer online, and its lines leave the global chat. */
+  /** A deleted account (account-data.ts): no longer online, and its lines leave the global chat and the town's. */
   async forgetAccount(id: string): Promise<void> {
     this.board.forgetSeen(id);
+    this.town.dropAccount(id, Date.now(), true);
     if (this.chat.forgetAccount(id)) await this.saveChat();
   }
 
@@ -181,7 +185,42 @@ export class LiveHub extends DurableObject<Env> {
    * Nothing else about them changes (online, in a match, their friends' news, their wait to post again).
    */
   async dropChatLines(id: string): Promise<void> {
+    this.town.dropAccount(id, Date.now());
     if (this.chat.dropLines(id)) await this.saveChat();
+  }
+
+  /** The town square's chat for a signed-in reader (each Worker instance asks at most every TOWN_CHAT.readCacheMs). */
+  async townRead(): Promise<TownSnapshot> {
+    countCall("hub.town");
+    return this.town.snapshot(Date.now());
+  }
+
+  /** Someone signed in sends a message in the town (the Worker has checked their account); the room as it is after it. */
+  async townPost(sender: TownSender, text: string): Promise<{ post: TownPost; town: TownSnapshot }> {
+    countCall("hub.townPost");
+    const now = Date.now();
+    const post = this.town.post(sender, text, now);
+    if (post.ok) await this.townAlarm();
+    return { post, town: this.town.snapshot(now) };
+  }
+
+  /** The alarm rings by the time the town's next line (or kept send) is a minute old, so it goes then, visitors or not. */
+  private async townAlarm() {
+    const at = this.town.nextExpiry();
+    if (at === null) return;
+    const cur = await this.ctx.storage.getAlarm();
+    if (cur === null || cur > at) await this.ctx.storage.setAlarm(at);
+  }
+
+  /** One line still in the town's room (a report reads what was said from here). */
+  async townLine(n: number): Promise<TownLine | null> {
+    return this.town.line(n, Date.now());
+  }
+
+  /** A moderator takes a line out of the town's chat; the room as it is after it. */
+  async townRemove(n: number): Promise<{ removed: boolean; town: TownSnapshot }> {
+    const now = Date.now();
+    return { removed: this.town.remove(n, now), town: this.town.snapshot(now) };
   }
 
   /** A drawn icon on a line still in the chat (null for any other key). */
@@ -215,7 +254,10 @@ export class LiveHub extends DurableObject<Env> {
     }
     const gone = this.board.prune(now);
     if (gone.length) await this.ctx.storage.delete(gone.map((c) => `lobby:${c}`));
+    // The town's chat: what's a minute old goes now; the next ring is the sooner of the presence's and the town's.
+    this.town.sweep(now);
     const { seen, lobbies } = this.board.size;
-    if (seen || lobbies) await this.ctx.storage.setAlarm(now + CAPACITY.presence.lastSeenWriteMs);
+    const next = Math.min(seen || lobbies ? now + CAPACITY.presence.lastSeenWriteMs : Infinity, this.town.nextExpiry() ?? Infinity);
+    if (next !== Infinity) await this.ctx.storage.setAlarm(Math.max(next, now + 1));
   }
 }

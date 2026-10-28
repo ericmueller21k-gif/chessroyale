@@ -595,9 +595,11 @@
         "packages/server/src/chat-mod.ts",
         "packages/server/src/global-chat.ts",
         "packages/server/src/global-chat-api.ts",
-        "packages/server/src/text-filter.ts"
+        "packages/server/src/text-filter.ts",
+        "packages/server/src/town-chat.ts",
+        "packages/server/src/town-chat-api.ts"
       ],
-      "specs": ["e2e/chat.spec.ts", "e2e/chat-mod.spec.ts", "e2e/global-chat.spec.ts", "e2e/panel.spec.ts"]
+      "specs": ["e2e/chat.spec.ts", "e2e/chat-mod.spec.ts", "e2e/global-chat.spec.ts", "e2e/panel.spec.ts", "e2e/town-chat.spec.ts"]
     },
     "Squads": {
       "paths": [

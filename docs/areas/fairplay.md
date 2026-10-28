@@ -53,7 +53,10 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   one open. Its case does too if it's open or a ban and stricter than the account's (a cleared or closed one stays
   behind), with what opening it does (evidence kept, holds, a ban's identities). A guest's decision never becomes the
   account's (unless it's a ban). Signing in never sheds a case.
-- **Reports** never ban anyone: they raise a player's review priority and record their moves.
+- **Reports** never ban anyone: they raise a player's review priority and record their moves. A report of a line in
+  the town square's chat ("Offensive chat", Oct 28: [chat.md](chat.md)) carries the line's text and time, read from the
+  server's room, and the case page shows it under Reports. The automated reviewer's API gets that report without the
+  words and refuses to let it clear such a case: a moderator reads the line first.
 - **Deleting an account never gets around fair play** (`account-data.ts`; [accounts.md](accounts.md)). A banned or
   in-review account's case, log, hashed identities and device markers stay under its old id; its judged moves, match
   summaries and appeals go. A new account with one of its identities is banned again, or goes to review (`banCheck`).

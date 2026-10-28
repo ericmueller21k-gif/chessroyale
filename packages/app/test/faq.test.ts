@@ -646,3 +646,12 @@ describe("the FAQ: 1 v 1", () => {
     expect(changed).toContain("Blitz and Rapid Blitz 4+3");
   });
 });
+
+describe("the FAQ's chat entry (the town square's typed chat, Oct 28)", () => {
+  it("says what the town square allows, from the settings, and that a reported message is the one thing kept", () => {
+    const s = section("fair-play");
+    expect(s).toContain("except in the town square, where signed-in players type: up to 80 characters, one message every 15 seconds");
+    expect(s).toContain("messages aren't kept (if someone reports one, the report keeps its words and when it was said, for a moderator to read)");
+    expect(s).toContain("tap a message in the town square to report it");
+  });
+});

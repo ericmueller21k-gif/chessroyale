@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CHAT, CHATTER, ChatLog, clampBox, chatterDelay, clockText, loadChatPos, pickChatter, saveChatPos, say, sendTownChat, sendWaitMs, startChatter, type ChatKind } from "../src/town/chat.ts";
+import { TOWN_CHAT } from "@chessroyale/core";
+import { CHAT, CHATTER, ChatLog, clampBox, chatterDelay, clockText, loadChatPos, onTownChatLineTap, pickChatter, saveChatPos, say, setTownChatLineTap, startChatter, unsay, type ChatKind } from "../src/town/chat.ts";
 import { HOMES } from "../src/town/world.ts";
 
 /** The town square's chat log (Eric, Oct 28): the time's format, the cap per platform, the fade and the way back, a line's life,
- * `say` from any kind, the chatter table, your own line's wait, and the box's place. */
+ * `say` from any kind, the chatter table, players' lines (who said them, taken out again, a tap's menu), the server's numbers,
+ * and the box's place. */
 
 describe("the time as the log shows it", () => {
   it("is hours and minutes, 12-hour, no am/pm", () => {
@@ -191,34 +193,45 @@ describe("the chatter table (placeholders until real players chat)", () => {
   });
 });
 
-describe("your own line (this device only)", () => {
-  const T0 = 5_000_000_000;
-  it("shows in the log as a player, trimmed and cut to 80 characters", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(T0);
-    const log = new ChatLog(12, () => {});
+describe("players' lines (from the server: chat-net.ts)", () => {
+  it("carry who said them and their number; unsay takes them out by number or by player, and a tap reaches the menu", () => {
+    const changes = vi.fn();
+    const log = new ChatLog(12, changes);
     const close = log.open();
-    expect(sendTownChat("   ", T0)).toEqual({ ok: false, reason: "empty", waitMs: 0 });
-    expect(log.lines).toHaveLength(0);
-    expect(sendTownChat(`  hello   there ${"x".repeat(100)}`, T0)).toEqual({ ok: true });
-    expect(log.lines).toHaveLength(1);
-    expect(log.lines[0]!.kind).toBe("player");
-    expect(log.lines[0]!.name).toBe("Player"); // (no profile in a unit test: playerName's fallback)
-    expect(log.lines[0]!.text.length).toBe(CHAT.maxChars);
-    expect(log.lines[0]!.text.startsWith("hello there xxx")).toBe(true);
+    say("Ann", "hello town", "player", { uid: "ann", n: 1 });
+    say("Bo", "hi Ann", "player", { uid: "bo", n: 2 });
+    say("Ann", "rematch?", "player", { uid: "ann", n: 3 });
+    say("Hollow", "The park gets quiet after dark.", "boss");
+    expect(log.lines.map((l) => [l.name, l.uid, l.n])).toEqual([
+      ["Ann", "ann", 1],
+      ["Bo", "bo", 2],
+      ["Ann", "ann", 3],
+      ["Hollow", undefined, undefined],
+    ]);
+    // A moderator's Remove (by number), then a player muted (by account): only their lines go.
+    unsay((l) => l.n === 2);
+    expect(log.lines.map((l) => l.text)).toEqual(["hello town", "rematch?", "The park gets quiet after dark."]);
+    unsay((l) => l.uid === "ann");
+    expect(log.lines.map((l) => l.name)).toEqual(["Hollow"]);
+    // Nothing picked: nothing changes, nothing is drawn.
+    const before = changes.mock.calls.length;
+    unsay((l) => l.uid === "nobody");
+    expect(changes.mock.calls.length).toBe(before);
+    // A tap on a player's line goes to whatever the menu set; nothing once it's let go.
+    const tapped = vi.fn();
+    const release = setTownChatLineTap(tapped);
+    const line = { ...log.lines[0]!, uid: "bo", n: 9 };
+    onTownChatLineTap(line, { x: 1, y: 2, w: 3, h: 4 });
+    expect(tapped).toHaveBeenCalledWith(line, { x: 1, y: 2, w: 3, h: 4 });
+    release();
+    onTownChatLineTap(line, { x: 1, y: 2, w: 3, h: 4 });
+    expect(tapped).toHaveBeenCalledTimes(1);
     close();
-    vi.useRealTimers();
   });
 
-  it("allows one message per 15 seconds and says how long is left", () => {
-    expect(CHAT.sendEveryMs).toBe(15_000);
-    const t = T0 + 100_000; // (after the test above sent)
-    expect(sendTownChat("one", t)).toEqual({ ok: true });
-    expect(sendWaitMs(t + 3_000)).toBe(12_000);
-    expect(sendTownChat("two", t + 3_000)).toEqual({ ok: false, reason: "wait", waitMs: 12_000 });
-    expect(sendTownChat("two", t + 14_999)).toEqual({ ok: false, reason: "wait", waitMs: 1 });
-    expect(sendWaitMs(t + 15_000)).toBe(0);
-    expect(sendTownChat("two", t + 15_000)).toEqual({ ok: true });
+  it("keeps the server's numbers: 80 characters, one message per 15 seconds, a line's minute", () => {
+    expect([CHAT.maxChars, CHAT.sendEveryMs, CHAT.lifeMs]).toEqual([TOWN_CHAT.maxChars, TOWN_CHAT.gapMs, TOWN_CHAT.lineMs]);
+    expect([CHAT.maxChars, CHAT.sendEveryMs, CHAT.lifeMs]).toEqual([80, 15_000, 60_000]);
   });
 });
 

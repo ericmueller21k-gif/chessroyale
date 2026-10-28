@@ -1253,28 +1253,39 @@ export function App() {
     );
   }
   if (!match && showTown) {
+    // A player's profile from the town chat's menu: over the town, which stays as it was underneath (Back closes it).
+    const overlayT = profileOpen && (
+      <div class="fd-overlay">
+        <FrontFrame>
+          <PlayerProfileScreen target={profileOpen} onBack={closeProfile} />
+        </FrontFrame>
+      </div>
+    );
     return (
-      <TownPage
-        seat={townSeat}
-        onPlayBot={playTownBot}
-        onBack={() => {
-          setShowTown(false);
-          setTownSeat(null);
-          history.replaceState(null, "", "/");
-        }}
-        // A boss's "Challenge alone", confirmed: out of the town square to the Solo Boss Mode screen (the solo form, as the
-        // side menu opens it; Eric, Oct 26), that boss's tile picked (the screen reads its pick from rememberBossPick as it
-        // opens).
-        onBossAlone={(id) => {
-          rememberBossPick(id);
-          setShowTown(false);
-          setTownSeat(null);
-          history.replaceState(null, "", "/");
-          setHomeIntent(null);
-          setRaidFull(false);
-          setRaidOpen(true);
-        }}
-      />
+      <>
+        <TownPage
+          seat={townSeat}
+          onPlayBot={playTownBot}
+          onBack={() => {
+            setShowTown(false);
+            setTownSeat(null);
+            history.replaceState(null, "", "/");
+          }}
+          // A boss's "Challenge alone", confirmed: out of the town square to the Solo Boss Mode screen (the solo form, as the
+          // side menu opens it; Eric, Oct 26), that boss's tile picked (the screen reads its pick from rememberBossPick as it
+          // opens).
+          onBossAlone={(id) => {
+            rememberBossPick(id);
+            setShowTown(false);
+            setTownSeat(null);
+            history.replaceState(null, "", "/");
+            setHomeIntent(null);
+            setRaidFull(false);
+            setRaidOpen(true);
+          }}
+        />
+        {overlayT}
+      </>
     );
   }
   if (!match && legal) {
