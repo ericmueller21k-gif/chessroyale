@@ -50,6 +50,12 @@ removed (old → new) and says whether any of them guards a rule here.
   - Guard: measured against main in every town PR (method: docs/decisions/2026-10-26-town-square-slice-2.md: headless, a
     phone 390 × 844 and a computer 1440 × 900, 5 s walking, the medians of four runs taken in turn); not a CI test, CI frame
     rates vary too much. `e2e/town.spec.ts` checks that nothing of Maia's is fetched in the town before a game opens.
+- **The chat's field ("Say something…") is in "Always on" only (Eric, Oct 28, from his phone): "the 'SAY something' is only ever
+  visible for the double green chat setting, for the medium one it's impossible to chat you have to be in double green mode."** The
+  one exception Eric has named to "nothing hidden": in New messages there is no field and you can't chat there; Off shows no chat at all.
+  In Always on the field is always there (greyed, with why, for a guest or a paused chat). The box keeps its place and size in every mode.
+  - Guard: `e2e/town-chat.spec.ts`, "the field is in always on and nowhere else: new messages and off have none…", phone and computer.
+  - Decision: [2026-10-28-town-chat-v2.md](../decisions/2026-10-28-town-chat-v2.md), "Oct 28, Eric's phone".
 
 ## Writing
 

@@ -1,5 +1,6 @@
 import { devices, expect, type Browser, type Page, type Request } from "@playwright/test";
-import { CHAT } from "../packages/app/src/town/chat.ts";
+import { CHAT, tooSoonText } from "../packages/app/src/town/chat.ts";
+import { NAME_COLORS } from "../packages/app/src/town/names.ts";
 import { asServerAdmin, asSignedIn, test } from "./helpers.ts";
 
 /**
@@ -14,6 +15,12 @@ import { asServerAdmin, asSignedIn, test } from "./helpers.ts";
  * none; the server's limits and reasons in the field; a line's menu (Profile, Mute, Report, a moderator's Remove); the switch off.
  * Test hooks (the test switches on): `__townSay()` (someone from the table talks now) or `__townSay(name, text, kind, agoMs)`,
  * `__townChatter(false)` (no chatter of its own while a test looks), `__townTapped` (taps on player lines).
+ *
+ * Oct 28, Eric's phone (docs/decisions/2026-10-28-town-chat-v2.md, "Oct 28, Eric's phone"): the field is in always on and nowhere
+ * else (new messages has none: you can't chat there); the icon's bubbles (always on both green, new messages the top one, off none);
+ * nothing drawn behind or round the text (no backing, border, bar, box-shadow or text-shadow: computed styles); no "Wait N s": a
+ * try inside the 15 s gets a gray line only you see and nothing goes to the server, and so does every refusal; players' names bold in
+ * a palette color, the same on every screen; the text black by day and white by night, following the town's sky (`?sky=`).
  */
 test.use({ actionTimeout: 15_000 });
 
@@ -54,6 +61,38 @@ async function goMode(p: Page, mode: keyof typeof LABEL) {
 /** The alpha of a computed color ("rgba(14, 18, 26, 0)" is 0; "rgb(...)" is 1). */
 const alphaOf = (css: string) => (css.startsWith("rgba") ? Number(css.slice(css.lastIndexOf(",") + 1, -1)) : css === "transparent" ? 0 : 1);
 const bg = (p: Page, sel: string) => p.locator(sel).first().evaluate((el) => getComputedStyle(el).backgroundColor);
+/** A palette color as the browser gives it: "#880b0b" is "rgb(136, 11, 11)". */
+const rgb = (hex: string) => `rgb(${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(", ")})`;
+/** The chat text's colors by the town's sky (town-chat.css): ink by day (and dawn and dusk), white by night. */
+const INK = { day: "rgb(29, 31, 36)", night: "rgb(255, 255, 255)" } as const;
+const GRAY = { day: rgb("#4f5561"), night: rgb("#c8ccd2") } as const;
+const GOLD = { day: rgb("#7a5600"), night: rgb("#ffd479") } as const;
+const MINT = { day: rgb("#0a5f36"), night: rgb("#9be8c0") } as const;
+/** The computed color of `sel`'s `pseudo` (or the element). */
+const colorOf = (p: Page, sel: string, pseudo?: string) => p.locator(sel).first().evaluate((el, ps) => getComputedStyle(el, ps ?? null).color, pseudo);
+/**
+ * Nothing is drawn behind or round `sel` (or its `pseudo`): no background color or image, no border, no outline, no box-shadow, no
+ * text-shadow, no backdrop, no mask or gradient (Eric, Oct 28: "clearly a container still showing behind the text"; "I don't want the
+ * shadow text period"). Computed styles. (The box's own `--chat-back` backing is a color with alpha 0.)
+ */
+async function expectBare(p: Page, sel: string, pseudo?: string) {
+  const what = `${sel}${pseudo ?? ""}`;
+  const c = await p.locator(sel).first().evaluate((el, ps) => {
+    const s = getComputedStyle(el, ps ?? null);
+    return { bg: s.backgroundColor, img: s.backgroundImage, border: [s.borderTopWidth, s.borderRightWidth, s.borderBottomWidth, s.borderLeftWidth], outline: s.outlineStyle, box: s.boxShadow, text: s.textShadow, backdrop: s.backdropFilter, mask: s.maskImage, filter: s.filter };
+  }, pseudo);
+  expect(alphaOf(c.bg), `${what}: no background color`).toBe(0);
+  expect(c.img, `${what}: no background image or gradient`).toBe("none");
+  expect(c.border, `${what}: no border`).toEqual(["0px", "0px", "0px", "0px"]);
+  expect(c.outline, `${what}: no outline`).toBe("none");
+  expect(c.box, `${what}: no box-shadow`).toBe("none");
+  expect(c.text, `${what}: no text-shadow`).toBe("none");
+  expect(c.backdrop, `${what}: no backdrop`).toBe("none");
+  expect(c.mask, `${what}: no mask`).toBe("none");
+  expect(c.filter, `${what}: no filter`).toBe("none");
+}
+/** The private "Sorry…" or refusal lines (gray system lines only you see). */
+const hush = (p: Page) => p.locator(".tc-line.tc-system");
 /** The camera now (the test hook): the zoom and where it looks. */
 const cam = (p: Page) => p.evaluate(() => { const c = (window as any).__townCam(); return { zoom: c.zoom as number, focus: c.focus as number[] }; });
 /**
@@ -74,9 +113,12 @@ async function swipe(p: Page, x: number, y: number, dy: number) {
 /** The log's scroll now: how far from its foot (0: at it) and how far it can go. */
 const scrollOf = (p: Page) => p.locator(".tc-log").evaluate((el) => ({ top: el.scrollTop, fromFoot: el.scrollHeight - el.scrollTop - el.clientHeight, room: el.scrollHeight - el.clientHeight }));
 
-/** The town, open, with the bosses' and kids' own chatter stopped (it speaks every 20 to 45 s: a test looks at its own lines). */
-async function open(page: Page, query = "") {
-  await page.goto(`/town?sky=day${query}`);
+/**
+ * The town, open, with the bosses' and kids' own chatter stopped (it speaks every 20 to 45 s: a test looks at its own lines). By day
+ * unless told (`sky`: the town's own `?sky=` override: day, dawn, dusk or night).
+ */
+async function open(page: Page, query = "", sky = "day") {
+  await page.goto(`/town?sky=${sky}${query}`);
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
   await page.waitForFunction(() => typeof (window as any).__townSay === "function");
   await page.evaluate(() => (window as any).__townChatter(false));
@@ -130,7 +172,7 @@ async function carry(page: Page, from: { x: number; y: number }, to: { x: number
 /** Where to press on the box: on its first line (the lines start at the box's top), away from the text field's strip. */
 const grip = (b: Box) => ({ x: b.x + 24, y: b.y + 8 });
 
-test("the chat box (always on, the default): one see-through box flush in the map's top left, the lines from its top, newest last above the field; no backing, light text with a shadow; no send button", async ({ page }, info) => {
+test("the chat box (always on, the default): one see-through box flush in the map's top left, the lines from its top, newest last above the field; nothing behind or round the text (no backing, border, bar or shadow), ink by day; no send button", async ({ page }, info) => {
   const phone = info.project.name === "phone";
   await open(page);
   await expect(icon(page)).toHaveAttribute("aria-label", LABEL.always);
@@ -171,20 +213,26 @@ test("the chat box (always on, the default): one see-through box flush in the ma
   const shown = (await first.locator(".tc-time").textContent())!;
   const clocks = await page.evaluate(() => [0, -1].map((m) => { const d = new Date(Date.now() + m * 60000); return `[${d.getHours() % 12 || 12}:${String(d.getMinutes()).padStart(2, "0")}]`; }));
   expect(clocks, "this device's time").toContain(shown);
-  // Names keep their colors by kind: a boss's gold, a kid's mint, a player's light blue.
+  // Names keep their colors by kind: a boss's gold and a kid's mint (deeper shades by day), a player's from the palette (bold).
   await say(page, "Sparky", "Ooh, sparkly!", "kid");
   await say(page, "Ann", "hello town", "player");
-  const color = (sel: string) => page.locator(sel).first().evaluate((el) => getComputedStyle(el).color);
-  expect(await color(".tc-boss .tc-name")).toBe("rgb(255, 212, 121)");
-  expect(await color(".tc-kid .tc-name")).toBe("rgb(155, 232, 192)");
-  expect(await color(".tc-player .tc-name")).toBe("rgb(191, 224, 255)");
+  expect(await colorOf(page, ".tc-boss .tc-name")).toBe(GOLD.day);
+  expect(await colorOf(page, ".tc-kid .tc-name")).toBe(MINT.day);
+  const ann = page.locator(".tc-player .tc-name");
+  const pick = Number(await ann.getAttribute("data-c"));
+  expect(pick, "a place in the palette").toBeGreaterThanOrEqual(0);
+  expect(pick).toBeLessThan(NAME_COLORS.length);
+  expect(await colorOf(page, ".tc-player .tc-name"), "the day shade of its palette color").toBe(rgb(NAME_COLORS[pick]!.day));
+  expect(Number(await ann.evaluate((el) => getComputedStyle(el).fontWeight)), "a player's name is bold").toBeGreaterThanOrEqual(700);
 
-  // No backing, on the box or on a line (one CSS variable, 0, is there to raise it later); light text with a soft dark shadow.
-  for (const sel of [".town-chat", ".tc-log", ".tc-line", ".tc-form input"]) expect(alphaOf(await bg(page, sel)), `${sel} has no backing`).toBe(0);
+  // Nothing behind or round the text, anywhere (Eric, Oct 28: "clearly a container still showing behind the text", "no shadow"):
+  // the box, the stream, a line, a name, the field and its placeholder (a guest's, greyed, here). The one dial for a backing,
+  // `--chat-back`, is an opacity at 0. The text is our ink by day.
+  for (const sel of [".town-chat", ".tc-log", ".tc-line", ".tc-time", ".tc-name", ".tc-form", ".tc-form input"]) await expectBare(page, sel);
+  await expectBare(page, ".tc-form input", "::placeholder");
   expect(await page.locator(".town-chat").evaluate((el) => getComputedStyle(el).getPropertyValue("--chat-back").trim())).toBe("0");
-  const text = await page.locator(".tc-line").first().evaluate((el) => ({ c: getComputedStyle(el).color, s: getComputedStyle(el).textShadow }));
-  expect(text.c, "light text").toBe("rgb(255, 255, 255)");
-  expect(text.s, "a soft dark shadow").toMatch(/rgba?\(0, 0, 0/);
+  expect(await colorOf(page, ".tc-line"), "near-black ink by day").toBe(INK.day);
+  await expect(page.locator(".town-chat")).toHaveAttribute("data-tone", "day");
 
   // The lines start at the box's top (the corner); the newest is last, above the text field's strip.
   const lb = await rectOf(page, ".tc-line");
@@ -194,10 +242,12 @@ test("the chat box (always on, the default): one see-through box flush in the ma
   const last = await rectOf(page, ".tc-line:last-child");
   expect(last.y, "newest last").toBeGreaterThan(lb.y);
   expect(last.y + last.h, "above the text field's strip").toBeLessThanOrEqual(b0.y + b0.h - 30);
-  // The field is a plain line at the foot: no box round it, no send button anywhere in the box (the keyboard's Send or Enter only).
+  // The field is its placeholder and your words on nothing: no box round it, no bar under it (the old rule is gone), no send button
+  // anywhere in the box (the keyboard's Send or Enter only).
   const field = await page.locator(".tc-form input").evaluate((el) => { const c = getComputedStyle(el); return { w: [c.borderTopWidth, c.borderLeftWidth, c.borderRightWidth, c.borderBottomWidth], radius: c.borderTopLeftRadius }; });
   expect(field.w, "no box round the field").toEqual(["0px", "0px", "0px", "0px"]);
-  await expect(page.locator(".tc-rule"), "its one line").toHaveCount(1);
+  await expect(page.locator(".tc-rule"), "no bar under the field").toHaveCount(0);
+  await expect(page.locator(".tc-form > *"), "nothing in the field's strip but the field (and its count)").toHaveCount(1);
   await expect(page.locator(".town-chat button"), "no send button").toHaveCount(0);
   await expect(page.locator(".town-chat [type=submit], .town-chat svg"), "no send icon").toHaveCount(0);
 
@@ -370,27 +420,32 @@ test("a tap on the box away from any line reaches the map; a line takes the fing
   expect(await page.getByRole("dialog").count()).toBe(dialogs);
 });
 
-test("new messages: the lines show when a message comes and fade after the wait, the field with them; a faded box takes no taps and keeps its place; the next message brings back only the new ones; a tap on a line brings back every line of the last minute, scrollable, until it fades again", async ({ page }) => {
+test("new messages: the lines show when a message comes and fade after the wait; there is no field at all (you can't chat here); a faded box takes no taps and keeps its place; the next message brings back only the new ones; a tap on a line brings back every line of the last minute, scrollable, until it fades again", async ({ page }) => {
   test.setTimeout(120_000);
   await open(page);
   const b0 = await rectOf(page, ".town-chat");
+  await expect(page.locator(".tc-form input"), "always on has the field").toBeVisible();
   await goMode(page, "new");
-  // Nothing said yet: nothing shows, the field fades with the lines (it can't be seen or tabbed to), the box is where it was.
+  // Nothing said yet: nothing shows, there is no field (not faded: not there), the box is where it was.
   await expect(log(page)).toHaveCSS("opacity", "0");
-  await expect(page.locator(".tc-form input")).toBeHidden();
+  await expect(page.locator(".tc-form"), "no field in new messages").toHaveCount(0);
+  await expect(page.locator(".town-chat input")).toHaveCount(0);
   expect(await rectOf(page, ".town-chat"), "the same place and size, faded").toEqual(b0);
 
   await say(page, "Hollow", "first thing said", "boss");
   await say(page, "Glim", "second thing said", "kid");
   const said = Date.now();
   await expect(log(page)).toHaveCSS("opacity", "1");
-  await expect(page.locator(".tc-form input"), "the field shows with the lines").toBeVisible();
-  // It fades `fadeAfterMs` after the last message, not before (its lines are still kept); the field fades with it.
+  await expect(page.locator(".tc-form"), "still no field with the lines showing").toHaveCount(0);
+  // The stream has the field's strip too: its last line can lie where the field was in always on.
+  const lg = await rectOf(page, ".tc-log");
+  expect(lg.y + lg.h, "the stream runs to the box's foot").toBeGreaterThanOrEqual(b0.y + b0.h - 1);
+  // It fades `fadeAfterMs` after the last message, not before (its lines are still kept).
   await page.waitForTimeout(CHAT.fadeAfterMs - 2500);
   await expect(log(page)).toHaveCSS("opacity", "1");
   await expect(log(page)).toHaveCSS("opacity", "0", { timeout: 15_000 });
   expect(Date.now() - said, "not before the wait").toBeGreaterThanOrEqual(CHAT.fadeAfterMs);
-  await expect(page.locator(".tc-form input")).toBeHidden();
+  await expect(page.locator(".tc-form")).toHaveCount(0);
   expect(await rectOf(page, ".town-chat"), "the same place and size, faded").toEqual(b0);
   const gone = await rectOf(page, ".tc-line");
   expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.tagName, { x: gone.x + 20, y: gone.y + gone.h / 2 }), "a faded line takes no taps: the map's").toBe("CANVAS");
@@ -425,7 +480,7 @@ test("new messages: the lines show when a message comes and fade after the wait,
   await expect(page.locator(".tc-line")).toHaveCount(2);
 });
 
-test("the header's chat icon cycles always on, new messages only, off (top bubble green then bottom green then both gray) and the gear's sheet sets the mode; off shows no box and no field, and the lines that came meanwhile show when it's on again; the mode is remembered; the icons never cover the title", async ({ page }) => {
+test("the header's chat icon cycles always on, new messages only, off (both bubbles green, then just the top one, then both gray) and the gear's sheet sets the mode; off shows no box and no field, and the lines that came meanwhile show when it's on again; the mode is remembered; the icons never cover the title", async ({ page }) => {
   await open(page);
   // At the right end of the title's line, never over the title.
   const title = await rectOf(page, ".town-bar h1");
@@ -443,14 +498,15 @@ test("the header's chat icon cycles always on, new messages only, off (top bubbl
   const green = await probe.evaluate(() => { const d = document.createElement("i"); d.style.color = "var(--good)"; document.body.append(d); const c = getComputedStyle(d).color; d.remove(); return c; });
   const bubbles = () => page.locator("button.tc-mode .tc-bub").evaluateAll((els) => els.map((e) => getComputedStyle(e).fill));
   const tops = async () => { const [t, b] = await bubbles(); return { top: t === green ? "green" : "gray", bottom: b === green ? "green" : "gray", same: t === b }; };
+  // (Eric, Oct 28: "make both icons green for the always on chat option, then just one for the middle option".)
   await expect(icon(page)).toHaveAttribute("aria-label", LABEL.always);
-  expect(await tops()).toMatchObject({ top: "green", bottom: "gray" });
+  expect(await tops(), "always on: both bubbles green").toMatchObject({ top: "green", bottom: "green", same: true });
   await icon(page).click();
   await expect(icon(page)).toHaveAttribute("aria-label", LABEL.new);
-  expect(await tops()).toMatchObject({ top: "gray", bottom: "green" });
+  expect(await tops(), "new messages: the top bubble green, the bottom gray").toMatchObject({ top: "green", bottom: "gray", same: false });
   await icon(page).click();
   await expect(icon(page)).toHaveAttribute("aria-label", LABEL.off);
-  expect(await tops()).toMatchObject({ top: "gray", bottom: "gray", same: true });
+  expect(await tops(), "off: both gray").toMatchObject({ top: "gray", bottom: "gray", same: true });
   // Off: no box, no field. The lines still arrive.
   await expect(page.locator(".town-chat")).toBeHidden();
   await expect(page.locator(".tc-form input")).toBeHidden();
@@ -508,7 +564,84 @@ test("the header's chat icon cycles always on, new messages only, off (top bubbl
   await expect(page.locator(".town-chat")).toBeHidden();
 });
 
-test("the text field (a signed-in player's): 80 characters, a count near the end, one message per 15 seconds with the wait in the field, your line in the log as a player", async ({ page }) => {
+test("the field is in always on and nowhere else: new messages and off have none, so you can only chat in always on; the box keeps its place and size throughout", async ({ page }) => {
+  await openSignedIn(page);
+  const b0 = await rectOf(page, ".town-chat");
+  const field = page.locator(".tc-form input");
+  await expect(field, "always on: the field, with its words").toBeVisible();
+  await expect(field).toBeEnabled();
+  await expect(field).toHaveAttribute("placeholder", "Say something…");
+  await field.fill("half a thought");
+  for (const mode of ["new", "off"] as const) {
+    await goMode(page, mode);
+    await expect(page.locator(".tc-form"), `${mode}: no field`).toHaveCount(0);
+    await expect(page.locator(".town-chat input"), `${mode}: nothing to type in`).toHaveCount(0);
+    await expect(page.getByPlaceholder("Say something…")).toHaveCount(0);
+  }
+  await goMode(page, "always");
+  await expect(field, "back in always on: the field").toBeVisible();
+  expect(await rectOf(page, ".town-chat"), "the box has the same place and size").toEqual(b0);
+  // With a line showing in new messages there is still nothing to type in, and the box is where it was.
+  await goMode(page, "new");
+  await say(page, "Hollow", "The park gets quiet after dark.");
+  await expect(log(page)).toHaveCSS("opacity", "1");
+  await expect(page.locator(".town-chat input, .town-chat textarea, .town-chat [contenteditable]")).toHaveCount(0);
+  expect(await rectOf(page, ".town-chat"), "the same place and size in new messages").toEqual(b0);
+});
+
+test("the chat text follows the town's sky: near-black ink by day, dawn and dusk, white by night, and the names and gray lines in a deeper or a lighter shade of the same colors", async ({ page }) => {
+  const lines = async () => {
+    await say(page, "Hollow", "The park gets quiet after dark.", "boss");
+    await say(page, "Sparky", "Ooh, sparkly!", "kid");
+    await say(page, "Ann", "hello town", "player");
+    await say(page, "", "A line only you see.", "system");
+  };
+  for (const [sky, tone] of [["day", "day"], ["dawn", "day"], ["dusk", "day"], ["night", "night"]] as const) {
+    await open(page, "", sky);
+    await lines();
+    const box = page.locator(".town-chat");
+    await expect(box, `${sky}: the tone`).toHaveAttribute("data-tone", tone);
+    expect(await colorOf(page, ".tc-boss"), `${sky}: a line's text`).toBe(INK[tone]);
+    expect(await colorOf(page, ".tc-time"), `${sky}: the time`).toBe(INK[tone]);
+    expect(await colorOf(page, ".tc-boss .tc-name"), `${sky}: a boss's name (gold)`).toBe(GOLD[tone]);
+    expect(await colorOf(page, ".tc-kid .tc-name"), `${sky}: a kid's name (mint)`).toBe(MINT[tone]);
+    expect(await colorOf(page, ".tc-system"), `${sky}: a gray line`).toBe(GRAY[tone]);
+    const c = Number(await page.locator(".tc-player .tc-name").getAttribute("data-c"));
+    expect(await colorOf(page, ".tc-player .tc-name"), `${sky}: a player's name, the same palette color's ${tone} shade`).toBe(rgb(NAME_COLORS[c]![tone]));
+    expect(await colorOf(page, ".tc-form input", "::placeholder"), `${sky}: the placeholder`).toMatch(tone === "day" ? /^rgba\(29, 31, 36, 0\.6\d*\)$/ : /^rgba\(255, 255, 255, 0\.8\d*\)$/);
+    await expect(page.locator(".tc-form input")).toHaveCSS("-webkit-text-fill-color", tone === "day" ? /^rgba\(29, 31, 36, 0\.6\d*\)$/ : /^rgba\(255, 255, 255, 0\.8\d*\)$/); // (a guest's field is greyed)
+    // Still nothing behind or round it, in either tone.
+    for (const sel of [".town-chat", ".tc-log", ".tc-line", ".tc-name", ".tc-form input"]) await expectBare(page, sel);
+  }
+});
+
+test("the text's tone flips with the clock when the sky does: ink before 19:30 and white after, ink again from 5:30 (the town's own blend), changing one attribute on the box, once a minute", async ({ page }) => {
+  // The device's clock: just before dusk's blend is half through; the town reads the sky from it (no ?sky=).
+  await page.clock.install({ time: new Date(2026, 9, 28, 19, 28, 0) });
+  await page.goto("/town");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  const box = page.locator(".town-chat");
+  await expect(box).toHaveAttribute("data-tone", "day");
+  await page.waitForFunction(() => typeof (window as any).__townSay === "function");
+  await page.evaluate(() => (window as any).__townChatter(false));
+  await say(page, "Hollow", "The park gets quiet after dark.", "boss");
+  expect(await colorOf(page, ".tc-boss"), "ink").toBe(INK.day);
+  // It's read about once a minute: three minutes on, past the threshold at 19:30, it is night (one tick, due timers fire once).
+  await page.clock.fastForward("03:00");
+  await expect(box).toHaveAttribute("data-tone", "night");
+  await say(page, "Hollow", "The park gets quiet after dark.", "boss"); // (the first line's minute is long gone)
+  expect(await colorOf(page, ".tc-boss"), "white").toBe(INK.night);
+  expect(await colorOf(page, ".tc-boss .tc-name")).toBe(GOLD.night);
+  // And back to ink in the morning, once dawn's blend is half through (5:30).
+  await page.clock.fastForward("09:30:00");
+  await expect(box).toHaveAttribute("data-tone", "night"); // (about 5:01: still night)
+  await page.clock.fastForward("01:00:00");
+  await expect(box).toHaveAttribute("data-tone", "day");
+  await say(page, "Hollow", "The park gets quiet after dark.", "boss");
+  expect(await colorOf(page, ".tc-boss")).toBe(INK.day);
+});
+
+test("the text field (a signed-in player's): 80 characters, a count near the end shown whole, one message per 15 seconds: a try inside the wait gets a gray line only you see and nothing goes to the server, no \"Wait N s\"; your line in the log as a player in a palette color", async ({ page }) => {
   test.setTimeout(120_000);
   await openSignedIn(page);
   const field = page.locator(".tc-form input");
@@ -522,37 +655,94 @@ test("the text field (a signed-in player's): 80 characters, a count near the end
   const f = await rectOf(page, ".tc-form");
   expect(f.y + f.h).toBeLessThanOrEqual(b.y + b.h + 1);
   expect(f.y).toBeGreaterThan(b.y + b.h / 2);
+  // Nothing behind or round the field, enabled or focused: no box, no bar, no background, no shadow (the placeholder neither).
+  await expectBare(page, ".tc-form input");
+  await expectBare(page, ".tc-form input", "::placeholder");
+  expect(await colorOf(page, ".tc-form input", "::placeholder"), "the placeholder is ink, softer").toMatch(/^rgba\(29, 31, 36, 0\.6\d*\)$/);
 
   await field.click();
+  await expect(field).toBeFocused();
+  await expectBare(page, ".tc-form input");
   await page.keyboard.type("a".repeat(69));
   await expect(page.locator(".tc-left"), "no count until near the end").toHaveCount(0);
   await page.keyboard.type("bcdef");
   await expect(page.locator(".tc-left")).toHaveText("6 left");
+  // The count shows whole (not clipped by the field, the strip or the box) and has no shadow or backing.
+  const count = await page.locator(".tc-left").evaluate((el) => { const r = el.getBoundingClientRect(); const p = el.closest(".tc-form")!.getBoundingClientRect(); const box = el.closest(".town-chat")!.getBoundingClientRect(); return { r: [r.left, r.top, r.right, r.bottom], p: [p.left, p.top, p.right, p.bottom], box: [box.left, box.top, box.right, box.bottom], clipped: el.scrollWidth > el.clientWidth + 1 }; });
+  expect(count.r[0]).toBeGreaterThanOrEqual(count.p[0]!);
+  expect(count.r[2]).toBeLessThanOrEqual(count.p[2]! + 0.5);
+  expect(count.r[1]).toBeGreaterThanOrEqual(count.p[1]!);
+  expect(count.r[3]).toBeLessThanOrEqual(count.p[3]!);
+  expect(count.r[2]).toBeLessThanOrEqual(count.box[2]!);
+  expect(count.clipped, "the count isn't cut off").toBe(false);
+  await expectBare(page, ".tc-left");
   await page.keyboard.type("x".repeat(30)); // (the field stops at 80)
   await expect(field).toHaveValue(/^a{69}bcdefxxxxxx$/);
   await expect(page.locator(".tc-left")).toHaveText("0 left");
+  const asked: string[] = [];
+  page.on("request", (r: Request) => void (r.method() === "POST" && r.url().includes("/api/town/chat") && asked.push(r.url())));
   await field.fill(`hello town ${run}`);
   await page.keyboard.press("Enter");
 
-  // Your line, back from the server: your name, kind "player"; the field empties, lets go, and shows the wait. (Only this
-  // test's lines are counted: other tests' players, in the same room, may be talking too.)
+  // Your line, back from the server: your name, kind "player", bold, in a palette color; the field empties and lets go, and it
+  // reads "Say something…" again (no "Wait N s" any more). (Only this test's lines are counted: other tests' players, in the same
+  // room, may be talking too.)
+  const sentAt = Date.now();
   const mine = page.locator(".tc-player").filter({ hasText: run });
   await expect(mine).toHaveCount(1);
   await expect(mine).toHaveText(new RegExp(`^\\[\\d{1,2}:\\d{2}\\] .+: hello town ${run}$`));
   await expect(mine.locator("b.tc-name")).not.toHaveText("");
+  const c1 = Number(await mine.locator("b.tc-name").getAttribute("data-c"));
+  expect(await mine.locator("b.tc-name").evaluate((el) => getComputedStyle(el).color), "a palette color (the day shade)").toBe(rgb(NAME_COLORS[c1]!.day));
   await expect(field).toHaveValue("");
-  await expect(field).toBeDisabled();
-  await expect(field).toHaveAttribute("placeholder", /^Wait (1[0-5]|[1-9]) s$/);
+  await expect(field).toBeEnabled();
+  await expect(field).toHaveAttribute("placeholder", "Say something…");
   await expect(field).not.toBeFocused();
   expect(await rectOf(page, ".town-chat"), "the box didn't change").toEqual(b);
-  // It counts down and gives the field back after 15 seconds.
-  await expect(field).toBeEnabled({ timeout: 17_000 });
+  expect(asked, "one message went").toHaveLength(1);
+
+  // A try inside the 15 s: a gray line in the stream that only you see, "Sorry, you can't send another message for N seconds."
+  // (N rounded up), with this device's time; your words stay; nothing goes to the server.
+  await field.fill(`too soon ${run}`);
+  await field.press("Enter");
+  const sorry = hush(page);
+  await expect(sorry).toHaveCount(1);
+  const sorryText = /^\[(1[0-2]|[1-9]):[0-5]\d\] Sorry, you can't send another message for (1[0-5]|[1-9]) seconds?\.$/;
+  await expect(sorry).toHaveText(sorryText);
+  const n1 = Number((await sorry.textContent())!.match(/for (\d+) second/)![1]);
+  expect((await sorry.textContent())!.replace(/^\[[^\]]*\] /, ""), "the words, with N rounded up").toBe(tooSoonText(n1 * 1000));
+  expect(n1, "about what's left of the 15 s").toBeGreaterThanOrEqual(Math.ceil((15_000 - (Date.now() - sentAt)) / 1000));
+  expect(n1).toBeLessThanOrEqual(15);
+  expect(await colorOf(page, ".tc-line.tc-system"), "gray, by day a darker one").toBe(GRAY.day);
+  expect(await sorry.evaluate((el) => getComputedStyle(el).fontStyle)).toBe("italic");
+  await expectBare(page, ".tc-line.tc-system");
+  await expect(sorry.locator(".tc-name"), "no one behind it").toHaveCount(0);
+  await expect(field, "your words stay").toHaveValue(`too soon ${run}`);
+  await expect(field).toBeEnabled();
   await expect(field).toHaveAttribute("placeholder", "Say something…");
-  await field.click();
-  await page.keyboard.type(`second one ${run}`);
-  await page.keyboard.press("Enter");
+  // Another try replaces it (one at a time); the stream is scrolled to it; it isn't sent either.
+  await page.waitForTimeout(2200);
+  await field.press("Enter");
+  await expect(sorry).toHaveCount(1);
+  const n2 = Number((await sorry.textContent())!.match(/for (\d+) second/)![1]);
+  expect(n2, "less left").toBeLessThan(n1);
+  expect((await scrollOf(page)).fromFoot, "at the foot, in view").toBeLessThanOrEqual(2);
+  expect(await rectOf(page, ".town-chat"), "the box didn't change").toEqual(b);
+  expect(asked, "nothing went to the server inside the wait").toHaveLength(1);
+  // A tap on it is no one's menu.
+  await sorry.click();
+  await page.waitForTimeout(300);
+  await expect(page.locator(".tc-menu")).toHaveCount(0);
+
+  // Past the 15 s the same words go, and the line you got goes after the next one comes (or its minute).
+  await page.waitForTimeout(Math.max(0, 15_500 - (Date.now() - sentAt)));
+  await field.press("Enter");
+  await expect(lineOf(page, `too soon ${run}`)).toHaveCount(1);
+  expect(asked, "the second message went once the wait was up").toHaveLength(2);
+  await expect(field).toHaveValue("");
+  // Both lines are this player's: the same color for the whole visit.
   await expect(mine).toHaveCount(2);
-  await expect(mine.last()).toHaveText(new RegExp(`second one ${run}$`));
+  expect(await mine.nth(1).locator("b.tc-name").getAttribute("data-c"), "the same color all session").toBe(String(c1));
 });
 
 test("a guest's field is there, greyed, saying how to chat (nothing hidden); without the test switches no hooks either", async ({ page }) => {
@@ -760,6 +950,25 @@ test("two signed-in players see each other's lines within a few seconds; a guest
   await expect(lineOf(page, `hi back from Bo ${run}`)).toHaveCount(1, { timeout: 10_000 });
   // A line from the server is a player's: the name bold, and it takes a tap.
   await expect(lineOf(page, `hi back from Bo ${run}`).locator("b.tc-name")).not.toHaveText("");
+  // Names: bold, in a palette color, the same color on both screens (Eric, Oct 28: "random color from a palette each time you join",
+  // "name can be bolded"): Ann's on her own screen and on Bo's, Bo's on his and on hers. Each is the palette's day shade for its place.
+  const look = async (p: Page, text: string) => {
+    const name = lineOf(p, text).locator("b.tc-name");
+    const c = Number(await name.getAttribute("data-c"));
+    return { c, color: await name.evaluate((el) => getComputedStyle(el).color), weight: Number(await name.evaluate((el) => getComputedStyle(el).fontWeight)) };
+  };
+  const annOnAnn = await look(page, `hello from Ann ${run}`);
+  const annOnBo = await look(bo, `hello from Ann ${run}`);
+  const boOnBo = await look(bo, `hi back from Bo ${run}`);
+  const boOnAnn = await look(page, `hi back from Bo ${run}`);
+  for (const l of [annOnAnn, annOnBo, boOnBo, boOnAnn]) {
+    expect(l.c).toBeGreaterThanOrEqual(0);
+    expect(l.c).toBeLessThan(NAME_COLORS.length);
+    expect(l.weight, "bold").toBeGreaterThanOrEqual(700);
+    expect(l.color, "the palette's day shade").toBe(rgb(NAME_COLORS[l.c]!.day));
+  }
+  expect(annOnBo, "Ann looks the same on Bo's screen").toEqual(annOnAnn);
+  expect(boOnAnn, "Bo looks the same on Ann's screen").toEqual(boOnBo);
 
   // The guest: none of it, ever asked for, and only the bosses' chatter in the log.
   await guest.waitForTimeout(6_000);
@@ -769,22 +978,29 @@ test("two signed-in players see each other's lines within a few seconds; a guest
   await expect(guest.locator(".tc-boss")).toHaveCount(1);
 });
 
-test("the server decides: a refused message says why over the field and keeps your words; 80 characters; the 15 s wait", async ({ page }) => {
+test("the server decides: a refused message says why in a gray line only you see, in the stream (one at a time) and keeps your words; 80 characters; the 15 s wait is the server's too", async ({ page }) => {
   test.setTimeout(120_000);
   await openSignedIn(page);
   const field = page.locator(".tc-form input");
-  const note = page.locator(".tc-note");
+  const note = hush(page);
+  const b = await rectOf(page, ".town-chat");
+  const asked: string[] = [];
+  page.on("request", (r: Request) => void (r.method() === "POST" && r.url().includes("/api/town/chat") && asked.push(r.url())));
   await send(page, `oh ${rot13("shpx")} this`);
-  await expect(note).toHaveText("That message isn't allowed.");
+  await expect(note).toHaveText(/^\[\d{1,2}:\d{2}\] That message isn't allowed\.$/);
+  await expect(page.locator(".tc-note"), "nothing over the field any more").toHaveCount(0);
   await expect(field, "your words stay, to change them").toHaveValue(`oh ${rot13("shpx")} this`);
   await expect(field).toBeEnabled();
+  expect(asked.length, "this one did go to the server, which refused it").toBe(1);
   await expect(page.locator(".tc-player").filter({ hasText: rot13("shpx") })).toHaveCount(0);
+  expect(await colorOf(page, ".tc-line.tc-system"), "gray").toBe(GRAY.day);
   await send(page, "find me at example.com");
-  await expect(note).toHaveText("No links or contact details in chat.");
+  await expect(note).toHaveCount(1);
+  await expect(note).toHaveText(/No links or contact details in chat\.$/);
   await send(page, "call me 555 123 4567");
-  await expect(note).toHaveText("No links or contact details in chat.");
-  // The note goes after a few seconds.
-  await expect(note).toHaveCount(0, { timeout: CHAT.noteMs + 3000 });
+  await expect(note).toHaveCount(1);
+  await expect(note).toHaveText(/No links or contact details in chat\.$/);
+  expect(await rectOf(page, ".town-chat"), "the box didn't change").toEqual(b);
   // 80 characters, counted as the server counts them (an emoji is one): the field stops there, and the server refuses more
   // from anyone who gets past it.
   await field.fill("x".repeat(90));
@@ -795,11 +1011,11 @@ test("the server decides: a refused message says why over the field and keeps yo
   const long = await page.request.post("/api/town/chat", { data: { text: "x".repeat(81) } });
   expect(long.status()).toBe(400);
   expect(((await long.json()) as { message: string }).message).toBe("Messages are at most 80 characters.");
-  // A message goes; then the wait shows in the field, and the server keeps it whatever the app does.
+  // A message goes; then, inside the wait, the app says so itself and the server keeps it whatever the app does.
   await send(page, `all good ${run}`);
   await expect(lineOf(page, `all good ${run}`)).toHaveCount(1);
-  await expect(field).toBeDisabled();
-  await expect(field).toHaveAttribute("placeholder", /^Wait (1[0-5]|[1-9]) s$/);
+  await expect(field).toBeEnabled();
+  await expect(field).toHaveAttribute("placeholder", "Say something…");
   const again = await page.request.post("/api/town/chat", { data: { text: "and again" } });
   expect(again.status()).toBe(429);
   expect(((await again.json()) as { message: string }).message).toBe("One message every 15 s.");

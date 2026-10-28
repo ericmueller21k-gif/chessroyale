@@ -1,15 +1,17 @@
 /**
  * The town square's chat log (Eric, Oct 28): one see-through box in the map's top left corner, a continuous stream of lines
- * ("[9:41] Name: message", the name bold and colored by kind), newest at the bottom, with the field "Say something…" at its
- * foot (a plain line, no box, no send button: the keyboard's Send or Enter sends). No backing on the box or on a line
- * (`--chat-back`, 0, is there to raise later); light text with a soft dark shadow reads over the map. The box holds every line
- * of the last minute (`lifeMs`, each removed for good then) and scrolls: a finger on a phone, the wheel on a computer; new
- * lines keep it at its foot unless you've scrolled up, then a "↓ new" marker says so (`Stick`).
+ * ("[9:41] Name: message", the name bold, colored by kind: a player's from a palette, picked at random each time they join),
+ * newest at the bottom, with the field "Say something…" at its foot, in always on only (nothing but its placeholder and your
+ * words: no box, no bar, no send button: the keyboard's Send or Enter sends). No backing, border or shadow on anything (`--chat-back`,
+ * 0, is there to raise later). The text is near-black by day and white by night, following the town's own sky (`data-tone`,
+ * read about once a minute, set only when it flips). The box holds every line of the last minute (`lifeMs`, each removed for good
+ * then) and scrolls: a finger on a phone, the wheel on a computer; new lines keep it at its foot unless you've scrolled up, then a
+ * "↓ new" marker says so (`Stick`).
  *
- * Three modes, set by the header's chat icon or the gear's sheet (TownChatTools.tsx), remembered on this device: always on; new
- * messages only (the lines show when a message comes and fade `fadeAfterMs` after the last, the field with them; a tap on a line
- * brings back every line of the last minute, scrollable, until the wait runs out again); off (no box, no field: the lines still
- * arrive, so turning it on shows the last minute).
+ * Three modes, set by the header's chat icon or the gear's sheet (TownChatTools.tsx), remembered on this device: always on (the
+ * field is here and nowhere else: you can only chat in this mode); new messages only (the lines show when a message comes and
+ * fade `fadeAfterMs` after the last; no field; a tap on a line brings back every line of the last minute, scrollable, until the
+ * wait runs out again); off (no box, no field: the lines still arrive, so turning it on shows the last minute).
  *
  * The box takes no taps except on a line and on its field, so a tap on it anywhere else reaches the map; a wheel over it
  * scrolls it, never the map. A tap on a player's name opens its menu (Profile / Mute / Report, and Remove for a moderator;
@@ -21,8 +23,9 @@
  * age gate didn't mark too young types and gets other players' lines (riding on the live poll); a guest's log has the
  * bosses' and kids' chatter alone. The field is there for everyone (nothing hidden): greyed with why for a guest ("Sign in
  * to chat with other players."), a young device, while the chat is paused (the switch) or your chat is off (a
- * moderator). It waits for the server's answer; a refusal's reason shows over it for `noteMs`. Players' lines leave the
- * log at once when you may no longer see them (signed out, paused) or mute or block their player.
+ * moderator). It waits for the server's answer. Too soon after your last message, or refused (the server's reasons), you get a gray
+ * line in the stream that only you see (`whisper`: "Sorry, you can't send another message for 12 seconds."); nothing is sent for
+ * the wait. Players' lines leave the log at once when you may no longer see them (signed out, paused) or mute or block their player.
  *
  * Test hooks (e2e, with the test switches on): `window.__townSay()` makes someone from the table talk now;
  * `__townSay(name, text, kind, agoMs)` says that line (on this device only; `agoMs`: it was said that long ago, to scroll back
@@ -35,8 +38,10 @@ import { mutes } from "../chat-mod.ts";
 import { openProfile } from "../profile-nav.ts";
 import { useServerStatus } from "../status.ts";
 import { testSwitchesAllowed } from "../test-switches.ts";
-import { CHAT, CHAT_BOX, ChatLog, Stick, clampBox, loadChatPos, onTownChatLineTap, saveChatPos, say, setTownChatLineTap, startChatter, type ChatKind, type ChatLine, type Rect } from "./chat.ts";
-import { cutTownText, mayTownChat, openTownFeed, removeTownLine, reportTownLine, sendTownChat, townChars, townChatOff, townSendWaitMs } from "./chat-net.ts";
+import { CHAT, CHAT_BOX, ChatLog, Stick, clampBox, loadChatPos, onTownChatLineTap, saveChatPos, say, setTownChatLineTap, startChatter, tooSoonText, townTone, type ChatKind, type ChatLine, type Rect } from "./chat.ts";
+import { cutTownText, mayTownChat, openTownFeed, removeTownLine, reportTownLine, sendTownChat, townChars, townChatOff } from "./chat-net.ts";
+import { NAME_COLORS, nameColorIndex } from "./names.ts";
+import { TOWN_FEEL } from "./feel.ts";
 import { useChatMode } from "./TownChatTools.tsx";
 import "./town-chat.css";
 
@@ -52,10 +57,9 @@ export function TownChat() {
   const [computer, setComputer] = useState(() => matchMedia(CHAT.computerQuery).matches);
   const [typing, setTyping] = useState(mayTownChat);
   const [text, setText] = useState("");
-  const [wait, setWait] = useState(() => Math.ceil(townSendWaitMs() / 1000));
   const [sending, setSending] = useState(false);
-  /** A refusal's reason, over the field for `noteMs`. */
-  const [note, setNote] = useState<string | null>(null);
+  /** The text's tone: dark ink by day, white by night (the town's sky; read once a minute, redrawn only when it flips). */
+  const [tone, setTone] = useState(townTone);
   const [, redraw] = useState(0);
   const log = useMemo(() => new ChatLog(() => redraw((n) => n + 1)), []);
   // Scrolled up from the foot: the lines that came since are counted for the "↓ new" marker.
@@ -98,7 +102,7 @@ export function TownChat() {
       return;
     }
     return openTownFeed({
-      line: (l) => log.say(l.name, l.text, "player", Date.now(), { uid: l.from, n: l.n }),
+      line: (l) => log.say(l.name, l.text, "player", Date.now(), { uid: l.from, n: l.n, color: l.color }),
       drop: (test) => log.drop((l) => l.uid !== undefined && l.n !== undefined && test({ n: l.n, from: l.uid })),
       paused: () => redraw((n) => n + 1),
     });
@@ -117,12 +121,11 @@ export function TownChat() {
     };
   }, []);
 
-  // The wait after your message, counting down in the field.
+  // The sky by day or night, once a minute like the town's own (never per frame): the text's tone follows it.
   useEffect(() => {
-    if (wait <= 0) return;
-    const t = setInterval(() => setWait(Math.ceil(townSendWaitMs() / 1000)), 250);
+    const t = setInterval(() => setTone(townTone()), TOWN_FEEL.skyCheckMs);
     return () => clearInterval(t);
-  }, [wait > 0]);
+  }, []);
 
   // The lines on show now. After every draw: at the foot if it was (a new line, or one gone, or the mode turned on), where it is if
   // you've scrolled up (the new ones counted); a box with nothing to scroll is at its foot by itself.
@@ -294,21 +297,19 @@ export function TownChat() {
     pinned.current = null;
     log.hold(false);
   };
-  // (The field greyed while it has focus, a guest signed out say, lets go too; so does the chat turned off.)
+  // (The field greyed while it has focus, a guest signed out say, lets go too; so does the chat turned off, or new messages: no field there.)
   useEffect(() => {
-    if (!typing || mode === "off") blur();
+    if (!typing || mode !== "always") blur();
   }, [typing, mode]);
   useEffect(() => blur, []);
 
-  // A refusal's reason, for a few seconds.
-  useEffect(() => {
-    if (!note) return;
-    const t = setTimeout(() => setNote(null), CHAT.noteMs);
-    return () => clearTimeout(t);
-  }, [note]);
-
   // Sending waits for the server's answer (the field keeps your words and the keyboard meanwhile); your line comes back into
-  // the log with everyone's. A refusal keeps your words, to change them, and says why.
+  // the log with everyone's. Too soon (nothing is sent) or refused, you keep your words, to change them or to try again, and a
+  // gray line only you see says why, at the foot of the stream.
+  const sorry = (why: string) => {
+    stick.toFoot();
+    log.whisper(why);
+  };
   const submit = async (e: Event) => {
     e.preventDefault();
     if (sending) return;
@@ -317,66 +318,65 @@ export function TownChat() {
     setSending(false);
     if (r.ok) {
       setText("");
-      setNote(null);
-      setWait(Math.ceil(CHAT.sendEveryMs / 1000));
       field.current?.blur();
-    } else if (r.reason === "wait") setWait(Math.ceil(r.waitMs / 1000));
-    else if (r.reason === "refused") setNote(r.message ?? null);
+    } else if (r.reason === "wait") sorry(tooSoonText(r.waitMs));
+    else if (r.reason === "refused" && r.message) sorry(r.message);
   };
   const left = CHAT.maxChars - townChars(text);
   // Why the field can't send right now (a guest, a young device, the switch, your chat ban), shown in its place.
   const off = townChatOff();
-  // Shown: always (always on), or from a message until the wait runs out (new messages: the field fades with the lines).
+  // Shown: always (always on), or from a message until the wait runs out (new messages).
   const on = mode === "always" || (mode === "new" && log.shown);
 
   return (
-    <div class="town-chat" ref={wrap} hidden={mode === "off"} data-size={computer ? "computer" : "phone"} data-mode={mode} data-on={on ? "1" : "0"} style={`--chat-out:${CHAT.fadeMs}ms;--chat-in:${CHAT.fadeInMs}ms`}>
+    <div class="town-chat" ref={wrap} hidden={mode === "off"} data-size={computer ? "computer" : "phone"} data-mode={mode} data-on={on ? "1" : "0"} data-tone={tone} style={`--chat-out:${CHAT.fadeMs}ms;--chat-in:${CHAT.fadeInMs}ms`}>
       <div class="tc-log" ref={scroller} role="log" aria-label="Town chat" onScroll={scrolled}>
-        {lines.map((l) => (
-          <div class={`tc-line tc-${l.kind}`} key={l.id} data-id={l.id}>
-            <span class="tc-time">[{l.time}]</span> {l.name && <b class="tc-name">{l.name}</b>}
-            {l.name && ": "}
-            {l.text}
-          </div>
-        ))}
+        {lines.map((l) => {
+          // A player's name is bold in a palette color: both shades are on the name (the box's tone picks one), `data-c` is its place in the palette.
+          const c = l.kind === "player" ? nameColorIndex(l) : -1;
+          const shade = NAME_COLORS[c];
+          return (
+            <div class={`tc-line tc-${l.kind}`} key={l.id} data-id={l.id}>
+              <span class="tc-time">[{l.time}]</span> {l.name && <b class="tc-name" data-c={shade ? c : undefined} style={shade ? `--nd:${shade.day};--nn:${shade.night}` : undefined}>{l.name}</b>}
+              {l.name && ": "}
+              {l.text}
+            </div>
+          );
+        })}
       </div>
       {unseen > 0 && (
         <button type="button" class="tc-new" aria-label="Jump to the newest messages" onClick={toFoot}>
           ↓ new
         </button>
       )}
-      {note && (
-        <div class="tc-note" role="status">
-          {note}
-        </div>
+      {mode === "always" && (
+        <form class="tc-form" onSubmit={submit}>
+          <input
+            ref={field}
+            type="text"
+            value={text}
+            placeholder={off ?? "Say something…"}
+            title={off ?? undefined}
+            disabled={!!off}
+            readOnly={sending}
+            enterkeyhint="send"
+            autocomplete="off"
+            autocapitalize="sentences"
+            spellcheck={false}
+            aria-label="Say something in the town chat"
+            onInput={(e) => {
+              // (The field stops at maxChars as the server counts them, an emoji as one: no maxLength, which counts UTF-16.)
+              const el = e.target as HTMLInputElement;
+              const cut = cutTownText(el.value);
+              if (cut !== el.value) el.value = cut;
+              setText(cut);
+            }}
+            onFocus={focus}
+            onBlur={blur}
+          />
+          {left <= CHAT.nearEnd && !off && <span class="tc-left">{left} left</span>}
+        </form>
       )}
-      <form class="tc-form" onSubmit={submit}>
-        <input
-          ref={field}
-          type="text"
-          value={text}
-          placeholder={off ?? (wait > 0 ? `Wait ${wait} s` : "Say something…")}
-          title={off ?? undefined}
-          disabled={!!off || wait > 0}
-          readOnly={sending}
-          enterkeyhint="send"
-          autocomplete="off"
-          autocapitalize="sentences"
-          spellcheck={false}
-          aria-label="Say something in the town chat"
-          onInput={(e) => {
-            // (The field stops at maxChars as the server counts them, an emoji as one: no maxLength, which counts UTF-16.)
-            const el = e.target as HTMLInputElement;
-            const cut = cutTownText(el.value);
-            if (cut !== el.value) el.value = cut;
-            setText(cut);
-          }}
-          onFocus={focus}
-          onBlur={blur}
-        />
-        <i class="tc-rule" aria-hidden="true" />
-        {left <= CHAT.nearEnd && wait <= 0 && !off && <span class="tc-left">{left} left</span>}
-      </form>
       <LineMenu box={wrap} log={log} />
     </div>
   );

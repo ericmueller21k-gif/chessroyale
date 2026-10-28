@@ -44,7 +44,8 @@ vi.mock("../src/live.ts", async (orig) => ({
 }));
 
 import type { TownLine } from "../src/town/chat-net.ts";
-const { openTownFeed, takeTownSlice, sendTownChat, townSendWaitMs, townChatOff, reportTownLine, removeTownLine, townChars, cutTownText } = await import("../src/town/chat-net.ts");
+const { openTownFeed, takeTownSlice, sendTownChat, townColor, townSendWaitMs, townChatOff, reportTownLine, removeTownLine, townChars, cutTownText } = await import("../src/town/chat-net.ts");
+const { NAME_COLORS } = await import("../src/town/names.ts");
 const { mutes, setChatBlock } = await import("../src/chat-mod.ts");
 
 const T0 = 1_800_000_000_000;
@@ -148,7 +149,12 @@ describe("town chat in the app", () => {
     expect(await sendTownChat("  hello   town ", answer(200, { ok: true, line: mine, town: { n: 1, lines: [mine] }, waitMs: 15_000 }))).toEqual({ ok: true });
     expect(lines).toEqual([mine]);
     expect(townSendWaitMs()).toBe(15_000);
-    expect(await sendTownChat("again")).toEqual({ ok: false, reason: "wait", waitMs: 15_000 });
+    // Too soon: answered at once, nothing goes to the server (the screen says so in a line only you see).
+    const never = vi.fn();
+    expect(await sendTownChat("again", never as unknown as typeof fetch)).toEqual({ ok: false, reason: "wait", waitMs: 15_000 });
+    vi.setSystemTime(T0 + 6_000);
+    expect(await sendTownChat("again", never as unknown as typeof fetch)).toEqual({ ok: false, reason: "wait", waitMs: 9_000 });
+    expect(never, "a message inside the wait never reaches the server").not.toHaveBeenCalled();
     vi.setSystemTime(T0 + 15_000);
     // The server's reasons, as it gives them.
     expect(await sendTownChat("bad", answer(400, { ok: false, reason: "text", message: "That message isn't allowed." }))).toMatchObject({ reason: "refused", message: "That message isn't allowed." });
@@ -164,6 +170,36 @@ describe("town chat in the app", () => {
     setChatBlock(null);
     expect(await sendTownChat("hi", answer(503, { message: "Chat is paused.", paused: "town-chat" }))).toMatchObject({ reason: "refused", message: "Chat is paused." });
     expect(townChatOff()).toBe("Chat is paused.");
+  });
+
+  it("sends the name color picked when the town opened with every message, a new one at random each time it opens; a line's color reaches the log (Oct 28, Eric's phone)", async () => {
+    vi.useFakeTimers({ now: T0 + 1_000_000 }); // (well past any wait an earlier test left)
+    const { lines, sink } = log();
+    const rand = vi.spyOn(Math, "random");
+    rand.mockReturnValue(0.35);
+    close = openTownFeed(sink);
+    expect(townColor()).toBe(Math.floor(0.35 * NAME_COLORS.length));
+    const bodies: { color?: number; text?: string }[] = [];
+    const spy = (async (_url: string, init: RequestInit) => {
+      bodies.push(JSON.parse(String(init.body)));
+      return new Response(JSON.stringify({ ok: true, waitMs: 15_000, town: { n: 0, lines: [] } }), { status: 200 });
+    }) as unknown as typeof fetch;
+    await sendTownChat("one", spy);
+    vi.setSystemTime(T0 + 1_015_000);
+    await sendTownChat("two", spy);
+    expect(bodies.map((b) => b.color), "the same all session").toEqual([3, 3]);
+    // The town opens again (a new visit): a new pick.
+    close();
+    rand.mockReturnValue(0.95);
+    close = openTownFeed(sink);
+    expect(townColor()).toBe(NAME_COLORS.length - 1);
+    vi.setSystemTime(T0 + 1_030_000);
+    await sendTownChat("three", spy);
+    expect(bodies.at(-1)!.color).toBe(NAME_COLORS.length - 1);
+    rand.mockRestore();
+    // A line from the server carries its sender's color through to the log; an older app's line has none.
+    takeTownSlice({ n: 2, lines: [{ ...line(1, "ann"), color: 5 }, line(2, "bo")] });
+    expect(lines.map((l) => l.color)).toEqual([5, undefined]);
   });
 
   it("Report sends fair play's report with the line's number; a moderator's Remove takes it out of the log at once", async () => {

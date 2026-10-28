@@ -27,13 +27,25 @@ export interface TownLine {
   name: string;
   /** What they typed, tidied (the filter has passed it). */
   text: string;
+  /**
+   * The name color their device picked when it joined the town (Eric, Oct 28: a random color from a palette each time you
+   * join): a small whole number the app reads into its palette. Absent when the sender's app sent none. Cosmetic only.
+   */
+  color?: number;
 }
 
 /** What the server knows of someone sending, from their account (never from the request). */
 export interface TownSender {
   id: string;
   name: string;
+  /** The color number the sender's device sent (already checked with `tidyColor`), if any. */
+  color?: number;
 }
+
+/** A color number is a whole number below this (the app's palette is smaller and reads it modulo its size). */
+export const TOWN_COLOR_LIMIT = 32;
+/** The color number a request carried, or undefined when it isn't a whole number from 0 to TOWN_COLOR_LIMIT - 1 (nothing is refused for it). */
+export const tidyColor = (c: unknown): number | undefined => (typeof c === "number" && Number.isInteger(c) && c >= 0 && c < TOWN_COLOR_LIMIT ? c : undefined);
 
 export type TownPost =
   | { ok: true; line: TownLine }
@@ -164,7 +176,8 @@ export class TownChat {
     if (same) return { ok: false, reason: "repeat", message: TOWN_REPEAT, retryMs: same.at + this.o.repeatMs - now };
     mine.push({ at: now, key });
     this.sent.set(sender.id, mine);
-    const line: TownLine = { n: ++this.n, at: now, from: sender.id, name: sender.name, text };
+    const color = tidyColor(sender.color);
+    const line: TownLine = { n: ++this.n, at: now, from: sender.id, name: sender.name, text, ...(color !== undefined ? { color } : {}) };
     this.held.push(line);
     if (this.held.length > this.o.holdMax) this.held.splice(0, this.held.length - this.o.holdMax);
     return { ok: true, line };

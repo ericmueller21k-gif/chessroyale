@@ -2,15 +2,25 @@
  * The town square's chat log (TownChat.tsx; docs/areas/town-square.md, "The chat log"): one see-through box in the map's top left
  * corner, over the map and under the cards. The box keeps one place and size whatever it holds (Eric's rule: nothing hidden,
  * nothing shifts): the stream starts at its top, newest at the bottom and scrolling when it's longer than the box, and the text
- * field's strip is fixed at its foot. No backing on the box or on a line: light text with a soft dark shadow reads over the map;
- * `--chat-back` (an opacity, 0 now) is there to raise later. The box takes no taps, so everything under it still answers one;
- * only a line, the field and the "↓ new" marker do. Its own file, loaded with the town's code.
+ * field's strip (always on only) is fixed at its foot. Nothing is drawn behind or round the text: no backing, border, bar, shadow
+ * or gradient on the box, the stream, a line or the field (Eric, Oct 28: "I don't want the shadow text period"; "there's clearly a
+ * container still showing behind the text"). `--chat-back` (an opacity, 0 now) is the one dial to raise a backing later. The text's
+ * color follows the town's sky, by one attribute on the box (`data-tone`: day or night, TownChat.tsx), not by frame: near-black by
+ * day, white by night, and the names' and gray lines' shades with it. The box takes no taps, so everything under it still
+ * answers one; only a line, the field and the "↓ new" marker do. Its own file, loaded with the town's code.
  */
 .town-chat {
   /* The box's backing, as an opacity: none (Eric, Oct 28: "do away with it entirely… we can always slightly up the opacity later"). */
   --chat-back: 0;
-  /* What makes the light text read over sky, sand and grass without a backing. */
-  --chat-shadow: 0 0 2px #000, 0 0 2px #000, 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 8px rgba(0, 0, 0, 0.6);
+  /* By day (and dawn and dusk): our ink on the bright sky and sand. */
+  --chat-ink: #1d1f24;
+  /* The softer ink: the placeholder, a greyed field, the scroll bar. */
+  --chat-soft: rgba(29, 31, 36, 0.68);
+  /* A line only you see ("Sorry, you can't send another message for 12 seconds."): gray. */
+  --chat-system: #4f5561;
+  /* A boss's name and a kid's (gold and mint, deeper by day), and the count of characters left. */
+  --chat-boss: #7a5600;
+  --chat-kid: #0a5f36;
   position: absolute;
   top: 8px;
   left: calc(8px + env(safe-area-inset-left));
@@ -30,6 +40,14 @@
   font-size: 12px;
   line-height: 14px;
 }
+/* By night: white, and the lighter shades. */
+.town-chat[data-tone="night"] {
+  --chat-ink: #fff;
+  --chat-soft: rgba(255, 255, 255, 0.8);
+  --chat-system: #c8ccd2;
+  --chat-boss: #ffd479;
+  --chat-kid: #9be8c0;
+}
 .town-chat[hidden] {
   display: none;
 }
@@ -41,11 +59,10 @@
   font-size: 14px;
   line-height: 17px;
 }
-/* While it's picked up: an outline, so you can see where it is even with nothing in it. */
+/* While it's picked up: an outline, so you can see where it is even with nothing in it (only while you carry it). */
 .town-chat.grab {
-  outline: 2px dashed rgba(255, 255, 255, 0.85);
+  outline: 2px dashed var(--chat-ink);
   outline-offset: 2px;
-  background-color: rgba(14, 18, 26, 0.2);
 }
 /* The stream: one box of lines from the top, newest last; longer than the box, it scrolls (a finger, the wheel). It takes no
    taps itself (a tap on the empty box is the map's); its lines do, and a finger on one scrolls it. */
@@ -59,27 +76,19 @@
   overflow-y: scroll;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.55) transparent;
+  scrollbar-color: var(--chat-soft) transparent;
   pointer-events: none;
 }
-/* Scrolled up from the top: the line at the edge slips off softly, not cut in half. */
-.tc-log.up {
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14px);
-  mask-image: linear-gradient(to bottom, transparent 0, #000 14px);
-}
-/* Shown, or faded out (new messages: the lines and the field fade together, and a faded box takes no taps and can't be tabbed to). */
+/* Shown, or faded out (new messages: the lines fade, and a faded box takes no taps and can't be tabbed to). */
 .tc-log,
-.tc-form,
 .tc-new {
   opacity: 0;
   visibility: hidden;
   transition: opacity var(--chat-out, 1000ms) ease-in, visibility 0s linear var(--chat-out, 1000ms);
 }
 .town-chat[data-on="1"] .tc-log,
-.town-chat[data-on="1"] .tc-form,
 .town-chat[data-on="1"] .tc-new,
-.town-chat.grab .tc-log,
-.town-chat.grab .tc-form {
+.town-chat.grab .tc-log {
   opacity: 1;
   visibility: visible;
   transition: opacity var(--chat-in, 200ms) ease-out, visibility 0s;
@@ -88,10 +97,8 @@
   flex: none;
   box-sizing: border-box;
   max-width: 100%;
-  /* (A little room each side: the shadow isn't cut off by the line's edge.) */
   padding: 1px 4px 1px 3px;
-  color: #fff;
-  text-shadow: var(--chat-shadow);
+  color: var(--chat-ink);
   overflow: hidden;
   overflow-wrap: anywhere;
   /* At most two lines, then "…". */
@@ -112,26 +119,31 @@
   font-weight: 700;
 }
 .tc-boss .tc-name {
-  color: #ffd479;
+  color: var(--chat-boss);
 }
 .tc-kid .tc-name {
-  color: #9be8c0;
+  color: var(--chat-kid);
 }
+/* A player's name: bold, in the palette color their device picked when they joined (names.ts; both shades are on the name). */
 .tc-player .tc-name {
-  color: #bfe0ff;
+  color: var(--nd, var(--chat-ink));
   /* (A bigger place to put a finger: a name is a few letters wide.) */
   padding: 5px 3px;
   margin: -5px -3px;
   cursor: pointer;
 }
+.town-chat[data-tone="night"] .tc-player .tc-name {
+  color: var(--nn, var(--chat-ink));
+}
+/* A line only you see (a gray system line): the "too soon" and every refusal. */
 .tc-system {
   font-style: italic;
-  color: #e6e9f0;
+  color: var(--chat-system);
 }
 .tc-player {
   cursor: pointer;
 }
-/* The "↓ new" marker: you've scrolled up and lines came since; a tap goes to the newest. */
+/* The "↓ new" marker: you've scrolled up and lines came since; a tap goes to the newest. A control, it keeps its small dark pill. */
 .tc-new {
   position: absolute;
   right: 14px;
@@ -142,11 +154,15 @@
   background: rgba(14, 18, 26, 0.7);
   color: #fff;
   font: 700 12px/16px Archivo, system-ui, sans-serif;
-  text-shadow: none;
   cursor: pointer;
   pointer-events: auto;
 }
-/* The text field: a plain line at the box's foot (its strip is there for everyone, so the box never changes size). */
+/* (No field in new messages: the marker sits at the stream's foot.) */
+.town-chat[data-mode="new"] .tc-new {
+  bottom: 8px;
+}
+/* The text field (always on only): your words and its placeholder, on nothing: no box, no bar, no background, even in iPhone
+   Safari (its own look for a text field is switched off: appearance, border, background, shadow), greyed or not. */
 .tc-form {
   position: relative;
   flex: none;
@@ -163,9 +179,12 @@
   padding: 0 58px 0 3px;
   border: 0;
   border-radius: 0;
-  background: transparent;
-  color: #fff;
-  text-shadow: var(--chat-shadow);
+  outline: none;
+  box-shadow: none;
+  background: none;
+  background-color: transparent;
+  color: var(--chat-ink);
+  caret-color: var(--chat-ink);
   /* 16 px or more, so iPhone Safari doesn't zoom in when it gets focus. */
   font: 500 16px Archivo, system-ui, sans-serif;
   user-select: text;
@@ -174,33 +193,14 @@
   appearance: none;
 }
 .tc-form input::placeholder {
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--chat-soft);
+  opacity: 1;
 }
-/* The line under the field (its only mark: no box round it), with the same soft shadow as the text. */
-.tc-rule {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 2px;
-  background: rgba(255, 255, 255, 0.8);
-  box-shadow: 0 0 2px #000, 0 1px 3px rgba(0, 0, 0, 0.7);
-  pointer-events: none;
-}
-/* Greyed (a guest, a young device, the wait, the switch): dimmer, and nothing to count. */
+/* Greyed (a guest, a young device, the switch): dimmer, and nothing to count. */
 .tc-form input:disabled {
   opacity: 1;
   padding-right: 3px;
-  -webkit-text-fill-color: rgba(255, 255, 255, 0.7);
-}
-.tc-form input:disabled ~ .tc-rule {
-  opacity: 0.45;
-}
-.tc-form input:focus {
-  outline: none;
-}
-.tc-form input:focus ~ .tc-rule {
-  background: #ffd479;
+  -webkit-text-fill-color: var(--chat-soft);
 }
 .tc-left {
   position: absolute;
@@ -208,13 +208,11 @@
   top: 50%;
   transform: translateY(-50%);
   font: 600 11px Archivo, system-ui, sans-serif;
-  color: #ffd479;
-  text-shadow: var(--chat-shadow);
+  color: var(--chat-boss);
   pointer-events: none;
 }
 @media (prefers-reduced-motion: reduce) {
   .tc-log,
-  .tc-form,
   .tc-new {
     transition: none;
   }
@@ -277,20 +275,6 @@
   text-align: center;
   color: var(--good);
   font-weight: 900;
-}
-/* A refusal's reason ("That message isn't allowed."), just over the field for a few seconds (TownChat.tsx: CHAT.noteMs). */
-.tc-note {
-  position: absolute;
-  left: 0;
-  bottom: 38px;
-  max-width: 100%;
-  box-sizing: border-box;
-  padding: 3px 8px;
-  border-radius: 6px;
-  background: rgba(70, 18, 18, 0.88);
-  color: #ffe1c2;
-  font: 600 12px/15px Archivo, system-ui, sans-serif;
-  pointer-events: none;
 }
 /* While the chat is paused or your chat is off, the field says why in its place, smaller so it fits (it can't take focus, so
    iPhone Safari never zooms in on it). */
