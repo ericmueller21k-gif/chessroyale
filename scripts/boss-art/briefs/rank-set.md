@@ -38,11 +38,12 @@ four divisions, made consistent across every tier.
 | Illustrious | a **rook** of sapphire | deep sapphire blue, set in silver-white metal |
 | Sublime | a **queen** of amethyst | amethyst purple, set in gold |
 | Radiant | a **queen** of ruby with a sunburst behind her | ruby red and warm orange light, gold rays |
-| Pearlescent (the top 500) | a **king** of pearl | iridescent pearl white with a soft pink, blue and gold sheen that shifts across it (a slow shimmer in its idle) |
+| Pearlescent (the top 500) | a **king** of pearl | pearl white with **the prismatic sheen of a 3-star piece in Auto chess** (its outline's gradient, `components/AcStarArt.tsx`: teal `#22bfa9`, cyan `#1fb6cf`, sky `#2fa3e6`, blue `#5b84f0`, violet `#8d68e6`, magenta `#d25ccb`, coral `#ff6f73`, orange `#ff9a5c`) running across it and round its rim, shifting slowly in its idle (Eric: Pearlescent matches the pearlescent 3-star piece) |
 | Transcendent (the top 100) | a **king** of starlight with a halo | deep cosmic violet and indigo, tiny stars, a glowing white-gold halo (stars twinkle and the halo glows softly) |
 
 - The two top tiers have no divisions: draw each at the grandest level of the steps above, and then a little more.
   Transcendent is the rarest emblem in the game and should feel beyond the others, yet plainly part of the set.
+- **Every tier its own color scheme (Eric):** no two tiers share a main color; Pearlescent's prismatic sheen is its alone.
 - **One family:** the same badge shape, outline weight, lighting and division steps in every tier; each tier's color and
   piece unmistakable; the ladder's climb visible at a glance (Wood humble, Radiant shining, the top two beyond).
 

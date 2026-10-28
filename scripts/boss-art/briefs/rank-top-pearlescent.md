@@ -23,7 +23,7 @@ light moves). The id is `rank-top-pearlescent`. It's held by the **top 500** pla
 - **No divisions:** draw it at the grandest level of the steps above (studs, side wings or leaves, a crest, the glint and
   glow), and then a little more.
 - **Its piece:** a **king** of pearl.
-- **Its colors:** iridescent pearl white with a soft pink, blue and gold sheen that shifts across it (a slow shimmer in its idle).
+- **Its colors:** pearl white with **the prismatic sheen of a 3-star piece in Auto chess** (its outline's gradient, `components/AcStarArt.tsx`: teal `#22bfa9`, cyan `#1fb6cf`, sky `#2fa3e6`, blue `#5b84f0`, violet `#8d68e6`, magenta `#d25ccb`, coral `#ff6f73`, orange `#ff9a5c`) running across it and round its rim, shifting slowly in its idle (Eric: Pearlescent matches the pearlescent 3-star piece).
 - **Its feel:** Rare: only the top 500 hold it.
 
 ## Quality bar
