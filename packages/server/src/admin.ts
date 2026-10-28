@@ -194,7 +194,8 @@ export interface CaseDetail {
   /** (joinedAt null: the account was deleted and its fair-play file kept.) */
   player: { id: string; name: string; joinedAt: number | null; signedIn: boolean; email: string | null; onlineMatches: number };
   case: Case | null;
-  reports: { at: number; reason: string; match: string | null; reporter: { id: string; name: string; signedIn: boolean } }[];
+  /** `line`: a report of a line in the town's chat carries what was said and when (town-chat-api.ts). */
+  reports: { at: number; reason: string; match: string | null; line?: { text: string; at: number }; reporter: { id: string; name: string; signedIn: boolean } }[];
   matches: { lobby: string | null; mode: string; playedAt: number; counted: number; perf: number | null; score: number; level: string; summary: FairSummary; moves: EvidenceMove[] | null; keepUntil: number | null }[];
   log: { at: number; action: string; by: string; reason: string | null }[];
   appeals: Appeal[];
@@ -216,8 +217,8 @@ export async function caseDetail(sql: Sql, userId: string, opts: { email: boolea
   if (!found && !kept) return null;
   const u = found ?? { id: userId, name: DELETED_NAME, created_at: null, email: null, google_sub: null };
   const online = (await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM results WHERE user_id = ? AND online = 1", userId))?.n ?? 0;
-  const reports = await sql.all<{ at: number; reason: string; match: string | null; id: string; name: string; email: string | null; google_sub: string | null }>(
-    `SELECT r.at, r.reason, r.match, u.id, u.name, u.email, u.google_sub FROM reports r JOIN users u ON u.id = r.reporter
+  const reports = await sql.all<{ at: number; reason: string; match: string | null; line: string | null; line_at: number | null; id: string; name: string; email: string | null; google_sub: string | null }>(
+    `SELECT r.at, r.reason, r.match, r.line, r.line_at, u.id, u.name, u.email, u.google_sub FROM reports r JOIN users u ON u.id = r.reporter
      WHERE r.target = ? ORDER BY r.at DESC LIMIT 100`,
     userId,
   );
@@ -244,7 +245,13 @@ export async function caseDetail(sql: Sql, userId: string, opts: { email: boolea
   return {
     player: { id: u.id, name: u.name, joinedAt: u.created_at, signedIn: !!(u.email || u.google_sub), email: opts.email ? u.email : null, onlineMatches: online },
     case: await caseOf(sql, userId),
-    reports: reports.map((r) => ({ at: r.at, reason: r.reason, match: r.match, reporter: { id: r.id, name: r.name, signedIn: !!(r.email || r.google_sub) } })),
+    reports: reports.map((r) => ({
+      at: r.at,
+      reason: r.reason,
+      match: r.match,
+      ...(r.line !== null && r.line_at !== null ? { line: { text: r.line, at: r.line_at } } : {}),
+      reporter: { id: r.id, name: r.name, signedIn: !!(r.email || r.google_sub) },
+    })),
     matches: matches.map((m) => ({
       lobby: m.lobby,
       mode: m.mode,
@@ -504,7 +511,7 @@ ${appealForm}
 ${chatSection(d.player.id, chat)}
 ${d.sameDevice.length ? `<h2>Same device</h2><p>${d.sameDevice.map((u) => `<a href="/admin/fairplay/case/${esc(u.id)}">${esc(u.name)}</a> (${esc(u.status ?? "no case")})`).join(", ")}</p>` : ""}
 <h2>Reports (${d.reports.length})</h2>${d.reports.length ? `<div class="card scroll"><table><tr><th>When</th><th>Reason</th><th>Match</th><th>By</th></tr>${d.reports
-    .map((r) => `<tr><td>${when(r.at)}</td><td>${esc(r.reason)}</td><td>${esc(r.match ?? "profile")}</td><td><a href="/admin/fairplay/case/${esc(r.reporter.id)}">${esc(r.reporter.name)}</a>${r.reporter.signedIn ? "" : " (guest)"}</td></tr>`)
+    .map((r) => `<tr><td>${when(r.at)}</td><td>${esc(r.reason)}${r.line ? `<div class="wrap">“${esc(r.line.text)}” <span class="muted">(said ${when(r.line.at)} in the town square)</span></div>` : ""}</td><td>${esc(r.match ?? (r.line ? "town chat" : "profile"))}</td><td><a href="/admin/fairplay/case/${esc(r.reporter.id)}">${esc(r.reporter.name)}</a>${r.reporter.signedIn ? "" : " (guest)"}</td></tr>`)
     .join("")}</table></div>` : '<p class="muted">None.</p>'}
 <h2>Matches (${d.matches.length})</h2>${d.matches.map(match).join("") || '<p class="muted">No online matches recorded.</p>'}
 <h2>1 v 1 games (${d.duels.length})</h2>${d.duels.map(duelCard).join("") || '<p class="muted">None kept.</p>'}

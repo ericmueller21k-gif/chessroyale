@@ -1,7 +1,9 @@
 /**
- * The server's filter for the free text players type that others see. Chat is preset lines only, so that's display
- * names: a profile's name, and the name a device sends when it joins a lobby or a Squads party. A name with a slur or
- * a hate term in it is refused (a profile) or replaced (a lobby seat). See docs/decisions/2026-10-16-chat-moderation.md.
+ * The server's filter for the free text players type that others see: display names (a profile's name, and the name a
+ * device sends when it joins a lobby or a Squads party) and, since Oct 28, the town square's typed chat (`chatRefusal`).
+ * A name with a slur or a hate term in it is refused (a profile) or replaced (a lobby seat); a chat message with one, or
+ * with a common swear word, or with a link or contact details, is refused. See docs/decisions/2026-10-16-chat-moderation.md
+ * and docs/decisions/2026-10-28-town-chat-typing.md.
  *
  * A small list of our own, slurs and hate terms only (not swearing), ROT13-encoded so the words don't turn up in
  * searches, diffs or screenshots of the code: `rot13("word")` gives a new entry. Matching folds what people use to get
@@ -60,17 +62,21 @@ const READINGS = [(w: string) => w, (w: string) => w.replace(/[_.-]*\d+$/, ""), 
 
 /**
  * The name's words, one reading of its digits: letters only within each, and a run of two or more short words (two
- * letters or fewer each) as one word.
+ * letters or fewer each) as one word. For a chat message (`joined` given), a two-letter word that ends a sentence or a
+ * clause ("go. ok") ends its run, and `joined` gets each word's index whose run has a two-letter word in it (ordinary
+ * short words in a row, "is hi to", rather than letters spaced out, "f u n").
  */
-function words(text: string, reading: (word: string) => string): string[] {
+function words(text: string, reading: (word: string) => string, joined?: Set<number>): string[] {
   const out: string[] = [];
   let short = false;
   for (const token of base(text).split(/\s+/)) {
     const w = letters(reading(token));
     if (!w) continue;
-    if (w.length <= 2 && short) out[out.length - 1] += w;
-    else out.push(w);
-    short = w.length <= 2;
+    if (w.length <= 2 && short) {
+      out[out.length - 1] += w;
+      if (w.length === 2 || out[out.length - 1]!.length - w.length === 2) joined?.add(out.length - 1);
+    } else out.push(w);
+    short = w.length <= 2 && !(joined && w.length === 2 && /[.,!?;:]$/.test(token));
   }
   return out;
 }
@@ -98,6 +104,79 @@ export function isBlockedText(text: string): boolean {
   if (READINGS.some((reading) => listed(words(name, reading)))) return true;
   const digits = name.normalize("NFKD").replace(/\D/g, "");
   return NUMBERS.some((n) => digits.includes(n));
+}
+
+// ---- Chat: the town square's typed messages (Eric, Oct 28). The names' list, plus common swear words, refused alike
+// (Eric: "it's family-friendly chat", so a word that isn't allowed just isn't allowed); links and contact details refused
+// with a reason of their own. Read the same way as a name (case, accents, look-alikes, leetspeak, spacing folded).
+
+/** Swear words found inside any one word (letters may repeat), as ANYWHERE above but without q for g. */
+const SWEARS_ANYWHERE = [
+  "shpx", "cuhpx", "sphx", "fuvg", "ovgpu", "ovngpu", "phag", "nffubyr", "nefrubyr", "onfgneq", "fyhg", "juber", "jnaxre", "obyybpxf", "qvpxurnq", "wnpxnff",
+  "qhzonff", "cvff", "cbea",
+];
+/** Swear words found only as a whole word, exactly (or plural): short ones inside ordinary words, and the masked spellings. */
+const SWEARS_WORDS = ["nff", "nefr", "qvpx", "pbpx", "chffl", "gjng", "jnax", "cevpx", "gvgf", "shx", "shd", "spx", "sx", "fug", "ogpu", "pag", "qpx", "jgs", "fgsh", "tgsb"];
+/** Ordinary words with a swear word inside. */
+const SWEARS_ALLOW = ["fphagubecr", "fuvvgnxr", "fuvgnxr", "fuvgn", "cvffneeb", "cbbea"];
+/** How much of a chat message is read (a message is at most TOWN_CHAT.maxChars; this bounds the work for any caller). */
+const CHAT_READ = 256;
+
+const SWEAR_ANY_RE = new RegExp(entries(SWEARS_ANYWHERE).map(repeats).join("|"));
+const SWEAR_START_RE = new RegExp(`^(?:${SWEAR_ANY_RE.source})`);
+const SWEAR_WORD_RE = new RegExp(`^(?:${entries(SWEARS_WORDS).join("|")})s?$`);
+const SWEAR_ALLOW_RE = new RegExp(entries(SWEARS_ALLOW).map(repeats).join("|"), "g");
+/**
+ * Whether these words (one reading of a message) hold a swear word. In a run of ordinary short words read as one
+ * (`joined`: "up or no", "is hi to") only from the run's start, so a sentence's little words don't spell one by chance;
+ * a word split into pieces ("sh it", "f u c k") still starts its run.
+ */
+const swears = (ws: string[], joined: Set<number>) =>
+  ws.some((w, i) => SWEAR_WORD_RE.test(w) || (joined.has(i) ? SWEAR_START_RE : SWEAR_ANY_RE).test(w.replace(SWEAR_ALLOW_RE, "")));
+
+/**
+ * Runs of digits with only spaces and phone-number marks between them ("555 123-4567", "+1 (555) 123 4567", "14 88"):
+ * a letter or other punctuation ends a run, so "1800 vs 2000" or "12:30" are separate numbers.
+ */
+const digitRuns = (text: string) => (text.normalize("NFKC").match(/(?:\d[\s.\-_()+/]*)+/g) ?? []).map((r) => r.replace(/\D/g, ""));
+/** A phone number: seven digits or more in one run. */
+const PHONE_DIGITS = 7;
+/** The endings of web addresses people paste (not short ones that start sentences when someone skips a space: "me", "to"). */
+const TLDS = "com|net|org|io|co|ly|tv|app|xyz|info|biz|uk|ru|de|fr|ca|au|link|site|online|club|shop|live|top|dev|cc|ws|tk|gl|page|store|chat";
+const LINK_RE = new RegExp(
+  [
+    "https?\\b", // http, https, http://
+    "www\\s*[.。｡]",
+    "://",
+    `\\b[a-z0-9-]+[.。｡](?:${TLDS})\\b`, // example.com, bit.ly
+    "\\b[a-z0-9-]+\\s*[([{]?\\s*(?:[.。｡]|dot)\\s*[)\\]}]?\\s*(?:com|net|org)\\b", // example . com, example (dot) com
+  ].join("|"),
+);
+/** An email address, or a mail service's name ("at gmail"). */
+const EMAIL_RE = /[\w.+-]+\s*@\s*[\w-]+[.。｡][a-z]{2,}|\b(?:gmail|hotmail|icloud|protonmail|ymail)\b/;
+/** Messaging apps, where "add me on …" moves a conversation off the game. */
+const APPS_RE = /\b(?:discord|snapchat|snap\s+chat|instagram|whatsapp|telegram|tiktok|facebook|skype|wechat)\b/;
+
+/** What a refused chat message hears: a slur, a hate term or a swear word… */
+export const CHAT_NOT_ALLOWED = "That message isn't allowed.";
+/** …and a link, an email address or a phone number. */
+export const CHAT_NO_CONTACT = "No links or contact details in chat.";
+
+/** Why a chat message (the town square's) is refused, or null when it may go. */
+export function chatRefusal(text: string): string | null {
+  if (typeof text !== "string" || !text) return null;
+  const said = text.slice(0, CHAT_READ);
+  const runs = digitRuns(said);
+  const refused = (reading: (word: string) => string) => {
+    const joined = new Set<number>();
+    const ws = words(said, reading, joined);
+    return listed(ws) || swears(ws, joined);
+  };
+  if (READINGS.some(refused) || runs.some((d) => NUMBERS.some((n) => d.includes(n)))) return CHAT_NOT_ALLOWED;
+  // (Look-alike letters read as Latin ones, so a Cyrillic "о" can't hide a ".com"; digits and symbols stay as typed.)
+  const plain = base(said).replace(/./gsu, (c) => LOOKALIKE[c] ?? c);
+  if (LINK_RE.test(plain) || EMAIL_RE.test(plain) || APPS_RE.test(plain) || runs.some((d) => d.length >= PHONE_DIGITS)) return CHAT_NO_CONTACT;
+  return null;
 }
 
 /**

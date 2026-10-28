@@ -404,11 +404,12 @@ export interface PublicProfile {
 }
 
 /**
- * Reports a player (a profile's Report button; `match`: the lobby's code when it's made during a match). Answers with
- * what to tell the reporter ("Thanks, we'll look into it.", or that they already reported them).
+ * Reports a player (a profile's Report button; `match`: the lobby's code when it's made during a match; `line`: the
+ * number of their line in the town square's chat, whose words the server reads from its room). Answers with what to
+ * tell the reporter ("Thanks, we'll look into it.", or that they already reported them).
  */
-export async function reportPlayer(target: string, reason: string, match?: string): Promise<string> {
-  const r = await api<{ message?: string }>("/api/report", { method: "POST", body: JSON.stringify({ target, reason, ...(match ? { match } : {}) }) });
+export async function reportPlayer(target: string, reason: string, match?: string, line?: number): Promise<string> {
+  const r = await api<{ message?: string }>("/api/report", { method: "POST", body: JSON.stringify({ target, reason, ...(match ? { match } : {}), ...(line ? { line } : {}) }) });
   return r.message ?? "Thanks, we'll look into it.";
 }
 

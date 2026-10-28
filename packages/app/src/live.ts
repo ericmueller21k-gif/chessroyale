@@ -121,6 +121,21 @@ export function startLive() {
 
 export const liveNow = () => current;
 
+/**
+ * Asks every few seconds (FRONT_DOOR.livePollMs), as a front-door screen does, until the returned function is called:
+ * for a screen with a rider but no numbers (the town square's chat). Nothing is asked while the tab is hidden.
+ */
+export function watchLive(): () => void {
+  watchers++;
+  if (started) void poll();
+  let done = false;
+  return () => {
+    if (done) return;
+    done = true;
+    watchers--;
+  };
+}
+
 /** The live numbers, refreshed every few seconds while the calling screen is open (null until known). */
 export function useLive(): LiveCounts | null {
   const [, set] = useState(0);

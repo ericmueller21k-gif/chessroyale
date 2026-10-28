@@ -71,6 +71,8 @@ message, without a code change: each is a Worker variable (docs/areas/ops.md, "K
    - `PAUSE_SOLO`: Solo and Boss alone.
    - `PAUSE_SHOP`: getting shop items and opening crates (the locker stays).
    - `PAUSE_FRIENDS`: friends and invites.
+   - `PAUSE_TOWN_CHAT`: typing in the town square's chat, everywhere at once (the field says "Chat is paused."; players'
+     messages stop showing, the bosses' chatter goes on).
    - One boss, never met while it's set (its id, from `BOSS_ROSTER` in `packages/core/src/boss.ts`, isn't always its
      name): Ginger `PAUSE_BOSS_GINGERBREAD`, Boingo the Clown `PAUSE_BOSS_CLOWN`, Jefferson `PAUSE_BOSS_GREX`, Hollow
      `PAUSE_BOSS_HOLLOW`, Big Boy `PAUSE_BOSS_BIGBOY`, Sawyer `PAUSE_BOSS_SAWYER`, Wrangler `PAUSE_BOSS_PIG`, the

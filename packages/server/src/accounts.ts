@@ -221,6 +221,10 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   { table: "results", column: "eval_bar", type: "INTEGER" },
   // A report made during a match: that match's lobby code (one report per reporter, player and match).
   { table: "reports", column: "match", type: "TEXT" },
+  // A report of a line in the town square's chat (Oct 28, 2026): the line's text and when it was said, from the server's
+  // room (never from the reporter), so a moderator sees what was said. Kept as the report is.
+  { table: "reports", column: "line", type: "TEXT" },
+  { table: "reports", column: "line_at", type: "INTEGER" },
   // Fair play's deep re-check (fairplay-deep.ts): 1 while a match waits for it, and 1 once its counted moves have all
   // been searched again.
   { table: "fairplay_matches", column: "deep_queued", type: "INTEGER" },

@@ -141,6 +141,7 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   of the game, set in the dashboard (how: `DEPLOY.md`, "Kill switches and the maintenance banner"). `PAUSE_<NAME>` =
   "1" rests it, deleting it brings it back: `PAUSE_CLASSIC`, `PAUSE_CROWD`, `PAUSE_RAID`, `PAUSE_SQUADS`, `PAUSE_RANKED1V1`,
   `PAUSE_SOLO` (Solo and Boss alone), `PAUSE_SHOP` (buying and crates; the locker stays), `PAUSE_FRIENDS`,
+  `PAUSE_TOWN_CHAT` (typing in the town square; its line is "Chat is paused."),
   `PAUSE_BOSS_<ID>` (one boss by its roster id, e.g. `PAUSE_BOSS_PIG` for Wrangler; DEPLOY.md lists them all).
   - **While resting:** the app disables the way in with the part's line ("Squads is resting for a bit. Back soon.";
     `pausedLine`, core's `pauses.ts`), and the server refuses anything new for it with the same line (503,

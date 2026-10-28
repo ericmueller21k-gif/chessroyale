@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isBlockedText, rot13, seatName } from "../src/text-filter.ts";
+import { CHAT_NOT_ALLOWED, CHAT_NO_CONTACT, chatRefusal, isBlockedText, rot13, seatName } from "../src/text-filter.ts";
 
 /**
  * The name filter (text-filter.ts). The words under test are written ROT13-encoded, as in the list, so no slur is
@@ -122,5 +122,137 @@ describe("the name filter", () => {
     expect(seatName("", "Player 2")).toBe("Player 2");
     expect(seatName(undefined, "Player 3")).toBe("Player 3");
     expect(seatName(`${slur}99`, "Player 4")).toBe("Player 4");
+  });
+});
+
+/**
+ * The town square's chat (chatRefusal; docs/decisions/2026-10-28-town-chat-typing.md): the names' list plus common swear
+ * words, refused alike (Eric, Oct 28: family-friendly); links, emails and phone numbers refused with their own reason.
+ * Swear words are written ROT13 here too.
+ */
+describe("the chat filter", () => {
+  const swear = rot13("shpx");
+  const shortSwear = rot13("nff");
+
+  it("refuses a slur or a hate term in a message, as in a name, however it's dressed up", () => {
+    for (const text of [
+      `you ${slur}`,
+      `${slur.toUpperCase()}!!!`,
+      `what a ${slur.split("").join(" ")} move`,
+      `${slur.replace("i", "1").replace("e", "3")} lol`,
+      `hey ${slur.replace("e", "е")}`,
+      `${short} move`,
+      `go ${hate}`,
+      `${rot13("juvgr cbjre")} forever`,
+      "Bob1488",
+      "nice 14 88",
+    ]) {
+      expect(chatRefusal(text), text).toBe(CHAT_NOT_ALLOWED);
+    }
+  });
+
+  it("refuses common swear words too, the same way (not masked): inside words, spaced, in leetspeak, look-alikes, masked", () => {
+    for (const text of [
+      swear,
+      `${swear}ing hell`,
+      `WHAT THE ${swear.toUpperCase()}`,
+      `${swear.split("").join(" ")} this`,
+      `${swear.split("").join(".")}`,
+      `${swear.replace("u", "ü")} off`,
+      `${swear.replace("u", "uuu")}`,
+      `${rot13("fuvg")} game`,
+      `${rot13("fuvg").replace("i", "1")} move`,
+      `${rot13("fuvg").replace("s", "$")}`,
+      `${rot13("fuvg").replace("i", "і")}`, // a Cyrillic i
+      `you ${rot13("ovgpu")}`,
+      `you ${shortSwear}`,
+      `kiss my ${shortSwear.replace("s", "$").replace("s", "$")}`,
+      `${rot13("s*px")} you`,
+      `${rot13("f*ug")}`,
+      `${rot13("jgs")} was that`,
+      `${rot13("cvffrq")} off`,
+      `${rot13("qvpxurnq")}`,
+    ]) {
+      expect(chatRefusal(text), text).toBe(CHAT_NOT_ALLOWED);
+    }
+  });
+
+  it("refuses links, emails and phone numbers, with their own reason", () => {
+    for (const text of [
+      "go to https://example.org",
+      "http stuff",
+      "www.example.org",
+      "example.com is cool",
+      "EXAMPLE.COM",
+      "bit.ly/abc",
+      "hunchess.io",
+      "example dot com",
+      "example (dot) com",
+      "example . net",
+      "example．com", // a fullwidth dot
+      "examplе.com", // a Cyrillic e
+      "mail me at ann@example.org",
+      "ann @ example.org",
+      "ann at gmail",
+      "my hotmail is ann",
+      "call 555 123 4567",
+      "5551234",
+      "+1 (555) 123-4567",
+      "555.123.4567",
+      "add me on discord",
+      "my snapchat is ann",
+      "whatsapp me",
+    ]) {
+      expect(chatRefusal(text), text).toBe(CHAT_NO_CONTACT);
+    }
+  });
+
+  it("a message with both is refused as not allowed", () => {
+    expect(chatRefusal(`${swear} example.com`)).toBe(CHAT_NOT_ALLOWED);
+  });
+
+  it("lets ordinary chat through: chess talk, numbers, punctuation, and words with a listed word inside", () => {
+    for (const text of [
+      "gg",
+      "Good game! Rematch at the park?",
+      "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6",
+      "I'm 1800 vs your 2000",
+      "meet at 12:30 or 13:45",
+      "1-0, well played",
+      "Good game.Thanks",
+      "ok.me too",
+      "wait...what",
+      "e.g. the Sicilian",
+      "tit for tat",
+      "class act, pass the cocktail",
+      "assassin's mate",
+      "Scunthorpe United",
+      "shiitake soup",
+      "Dickens wrote it",
+      "Hancock and Peacock",
+      "Mississippi",
+      "Niger and Nigeria",
+      "the outlook is good",
+      "snap, I missed it",
+      "insta resign lol",
+      "you're @Tess, right?",
+      // Short words in a row don't spell a swear word by chance, and a short word ending a sentence ends its run.
+      "is it up or no",
+      "say hi to him",
+      "Should I go? Ok",
+      "😀 ♞ ✨",
+      "Magnus2009 rocks",
+      "",
+    ]) {
+      expect(chatRefusal(text), text).toBeNull();
+    }
+  });
+
+  it("reads a message fast, whatever comes in", () => {
+    for (const c of ["n", "f", "5", "a.", "n i ", "1 "]) {
+      const t = performance.now();
+      expect([null, CHAT_NO_CONTACT]).toContain(chatRefusal(c.repeat(160_000)));
+      expect(performance.now() - t).toBeLessThan(50);
+    }
   });
 });

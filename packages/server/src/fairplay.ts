@@ -300,27 +300,53 @@ export async function raiseCase(sql: Sql, userId: string, status: "watch" | "rev
 
 export type ReportOutcome = { ok: true; already?: boolean } | { ok: false; message: string };
 
+/** A line of the town square's chat a report carries: what was said and when, as the server's room held it. */
+export interface ReportedLine {
+  text: string;
+  at: number;
+}
+
+/** A report of a line that has left the town's chat (each lasts a minute), or isn't the reported player's. */
+export const LINE_GONE = "That message has gone from the chat. You can still report the player from their profile.";
+
 /**
  * A report about a player (a profile's Report button, or a name tapped in a match), for fair play to weigh and a
  * person to read. One per reporter, player and match (`match`: the lobby code when made in a match); outside a match
- * one per player a day; FAIRPLAY.reports.perDay a day per reporter.
+ * one per player a day; FAIRPLAY.reports.perDay a day per reporter. A report of a line in the town's chat (`line`, read
+ * from the room by the caller: the reporter never supplies the words) is one per line, and keeps the line's text and
+ * time with the report for the moderator, as long as the report is kept.
  *
  * Reports never ban anyone. Every report opens a watch case (the player's matches are then kept as evidence), and
  * cheating reports from enough different signed-in accounts within a week put the player in review (fewer for a new
  * account). A guest's report is stored and read, but doesn't count toward a review.
  */
-export async function reportPlayer(sql: Sql, reporter: User, target: unknown, reason: unknown, match: unknown, now: number): Promise<ReportOutcome> {
+export async function reportPlayer(sql: Sql, reporter: User, target: unknown, reason: unknown, match: unknown, now: number, line?: ReportedLine | null): Promise<ReportOutcome> {
   if (typeof target !== "string" || target === reporter.id || !(await sql.first("SELECT id FROM users WHERE id = ?", target))) return { ok: false, message: "No such player." };
-  const why = FAIRPLAY.reports.reasons.find((r) => r === reason);
+  // A line of the town's chat goes with its own reason (FAIRPLAY.reports.chatReason), and that reason needs the line.
+  const chat = reason === FAIRPLAY.reports.chatReason;
+  const why = chat ? FAIRPLAY.reports.chatReason : FAIRPLAY.reports.reasons.find((r) => r === reason);
   if (!why) return { ok: false, message: "Pick a reason." };
-  const code = typeof match === "string" && /^[A-Z2-9]{5}$/.test(match) ? match : null;
-  const dup = code
-    ? await sql.first("SELECT id FROM reports WHERE reporter = ? AND target = ? AND match = ?", reporter.id, target, code)
-    : await sql.first("SELECT id FROM reports WHERE reporter = ? AND target = ? AND match IS NULL AND at > ?", reporter.id, target, now - DAY);
+  if (chat && !line) return { ok: false, message: LINE_GONE };
+  const code = !chat && typeof match === "string" && /^[A-Z2-9]{5}$/.test(match) ? match : null;
+  // (One report per line; otherwise one per player and match, or per player a day outside a match.)
+  const dup = chat
+    ? await sql.first("SELECT id FROM reports WHERE reporter = ? AND target = ? AND line_at = ?", reporter.id, target, line!.at)
+    : code
+      ? await sql.first("SELECT id FROM reports WHERE reporter = ? AND target = ? AND match = ?", reporter.id, target, code)
+      : await sql.first("SELECT id FROM reports WHERE reporter = ? AND target = ? AND match IS NULL AND line_at IS NULL AND at > ?", reporter.id, target, now - DAY);
   if (dup) return { ok: true, already: true };
   const n = (await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM reports WHERE reporter = ? AND at > ?", reporter.id, now - DAY))?.n ?? 0;
   if (n >= FAIRPLAY.reports.perDay) return { ok: false, message: "That's a lot of reports today. Try again tomorrow." };
-  await sql.run("INSERT INTO reports (reporter, target, reason, at, match) VALUES (?, ?, ?, ?, ?)", reporter.id, target, why, now, code);
+  await sql.run(
+    "INSERT INTO reports (reporter, target, reason, at, match, line, line_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    reporter.id,
+    target,
+    why,
+    now,
+    code,
+    chat ? line!.text : null,
+    chat ? line!.at : null,
+  );
   await raiseCase(sql, target, "watch", "reports", `reported: ${why}`, now);
   if (why === "Cheating") await reviewIfReported(sql, target, now);
   return { ok: true };
