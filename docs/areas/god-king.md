@@ -6,7 +6,8 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
 
 - **Who he is.** The crowd's champion in every boss battle (the raid, the Crowd's boss final, solo's "Boss alone"). He
   stands in the dock under the board (a computer: by the board's bottom-right corner, mirroring the boss by its
-  bottom-left, his words and menu opening outwards; Eric, Oct 11; a phone upright: at the far right of the strip under the
+  bottom-left, his words and menu opening outwards; Eric, Oct 11; in Boss alone, **your own pawn** stands there and he
+  to its right, a phone's strip has it just left of him, Oct 28: see [bosses.md](bosses.md), "Your pawn"; a phone upright: at the far right of the strip under the
   dock's row, the scoreboard / move list panel to his left, his menu opening above the row and his words to his left,
   Eric, Oct 25; a phone on its side: beside the row where the screen's column has room right of the board, Eric, Oct 15:
   see [bosses.md](bosses.md), "The dock under the board"), talks now and then, and can be called to act. He is
