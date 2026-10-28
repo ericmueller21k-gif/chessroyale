@@ -25,6 +25,7 @@ import { SMUDGY } from "../characters/smudgy.ts";
 import { TIGER_FIGURE } from "../characters/tiger-figure.ts";
 import { FOLIO } from "../characters/folio.ts";
 import { N, bandOf, clamp, drawable, enterOf, farOf, forEachSquare, hazeMix, newPt, newView, pastCurve, pickSquare, proj, radial, rimYAt, setView, wrapF, type Quad, type View } from "./camera.ts";
+import { CHAT_BOX } from "./chat.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { statueSpot } from "./houses/coliseum.ts";
 import { COLISEUM_CHIP, artOf } from "./houses/index.ts";
@@ -913,6 +914,9 @@ export class Renderer {
     }
     const kc = this.keepClear;
     if (kc.w > 0 && x + r > kc.x && x - r < kc.x + kc.w && y + r > kc.y && y - r < kc.y + kc.h) return true;
+    // The chat log's box (chat.ts), always: shown or faded, wherever it has been put, so a chip never jumps when it comes or goes.
+    const cb = CHAT_BOX;
+    if (cb.w > 0 && x + r > cb.x && x - r < cb.x + cb.w && y + r > cb.y && y - r < cb.y + cb.h) return true;
     for (let m = 0; m < n; m++) {
       const o = this.chips[m]!;
       if (Math.abs(o.x - x) < g && Math.abs(o.y - y) < g) return true;

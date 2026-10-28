@@ -177,6 +177,7 @@
         "e2e/boss-character.spec.ts",
         "e2e/boss-powers.spec.ts",
         "e2e/boss-select.spec.ts",
+        "e2e/boss-side.spec.ts",
         "e2e/boss-speech.spec.ts",
         "e2e/king-attack.spec.ts"
       ]
@@ -198,6 +199,7 @@
         "e2e/boss-character.spec.ts",
         "e2e/boss-dock.spec.ts",
         "e2e/boss-powers.spec.ts",
+        "e2e/boss-side.spec.ts",
         "e2e/crowd-hidden.spec.ts",
         "e2e/recluse.spec.ts"
       ]
@@ -460,6 +462,7 @@
         "e2e/boss-bar-same.spec.ts",
         "e2e/boss-dock.spec.ts",
         "e2e/boss-select.spec.ts",
+        "e2e/boss-side.spec.ts",
         "e2e/eval-bar.spec.ts",
         "e2e/home-layout.spec.ts",
         "e2e/match-screen.spec.ts",
@@ -498,7 +501,7 @@
     },
     "the town square (/town)": {
       "paths": ["packages/app/src/town/**", "packages/app/src/stale.ts"],
-      "specs": ["e2e/town.spec.ts"]
+      "specs": ["e2e/town.spec.ts", "e2e/town-chat.spec.ts"]
     },
     "Auto chess, the demo": {
       "paths": [

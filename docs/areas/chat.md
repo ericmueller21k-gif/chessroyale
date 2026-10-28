@@ -17,6 +17,7 @@ Lane: `social`.
   scoreboard and chat (one view at a time, never an empty box). In the split, the Team / All switch takes the chat
   header's title place, tighter, with 28 px buttons beside it, so both labels fit whole down to 320 px
   (`e2e/panel.spec.ts`).
+- **The town square's chat log** is its own thing (a fading log in the top left of `/town`, free-text lines, bosses' and kids' chatter now, a typed line only where the test switches are on): [town-square.md](town-square.md), "The chat log".
 - **Your picks.** Each player's profile chooses which lines they see in their games: up to `QUICK_CHAT.maxLines`
   phrases and `maxEmoji` emoji (the defaults until they choose). Bots use the whole list.
 - **Packs.** Free packs everyone has; more are sold in the shop (`QUICK_CHAT.packPrices`; `core/shop.ts` lists them

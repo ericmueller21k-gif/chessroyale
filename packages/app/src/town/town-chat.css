@@ -1,0 +1,160 @@
+/*
+ * The town square's chat log (TownChat.tsx; docs/areas/town-square.md, "The chat log"): a fixed box in the map's top left
+ * corner, over the map and under the cards. The box keeps one place and size whatever it holds (Eric's rule: nothing hidden,
+ * nothing shifts): the lines sit at its foot, just above the text field's strip, and the oldest slip off its top. It takes no
+ * taps, so everything under it still answers one; only the text field and a player's line do. Its own file, loaded with the
+ * town's code.
+ */
+.town-chat {
+  position: absolute;
+  top: 8px;
+  left: calc(8px + env(safe-area-inset-left));
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  font-family: Archivo, system-ui, sans-serif;
+  /* The phone's: from the map's left edge to about two thirds of its width, down about a fifth to a quarter of it. */
+  width: clamp(200px, calc(66% - 8px), 300px);
+  height: clamp(150px, 23%, 230px);
+  font-size: 12px;
+  line-height: 14px;
+}
+/* The computer's: the same corner, wider and taller, for about a dozen lines (and no taller than the map allows). */
+.town-chat[data-size="computer"] {
+  width: 500px;
+  max-width: calc(100% - 16px);
+  height: min(340px, calc(100% - 16px));
+  font-size: 14px;
+  line-height: 17px;
+}
+/* While it's picked up: an outline, so you can see where it is even with nothing in it. */
+.town-chat.grab {
+  outline: 2px dashed rgba(255, 255, 255, 0.85);
+  outline-offset: 2px;
+  border-radius: 8px;
+  background: rgba(14, 18, 26, 0.2);
+}
+.tc-log {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-start;
+  gap: 2px;
+  overflow: hidden;
+  /* The oldest line slips off the top softly, not cut in half. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 16px);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 16px);
+  opacity: 0;
+  transition: opacity var(--chat-out, 1000ms) ease-in;
+}
+.tc-log.on,
+.town-chat.grab .tc-log {
+  opacity: 1;
+  transition-duration: var(--chat-in, 200ms);
+}
+.tc-line {
+  flex: none;
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: rgba(14, 18, 26, 0.66);
+  color: #fff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  /* At most two lines, then "…". */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+.tc-time {
+  opacity: 0.65;
+  font-variant-numeric: tabular-nums;
+}
+.tc-name {
+  font-weight: 700;
+}
+.tc-boss .tc-name {
+  color: #ffd479;
+}
+.tc-kid .tc-name {
+  color: #9be8c0;
+}
+.tc-player .tc-name {
+  color: #bfe0ff;
+}
+.tc-system {
+  font-style: italic;
+  color: #d8dce6;
+}
+/* A player's line takes taps (to report it, later) while the log shows; a faded one lets them through to the map. */
+.tc-log.on .tc-player {
+  pointer-events: auto;
+  cursor: pointer;
+  touch-action: none;
+}
+/* The text field (only where the test switches are allowed): its strip is there for everyone, so the box never changes size. */
+.town-chat::after {
+  content: "";
+  flex: none;
+  height: 38px;
+}
+.tc-form {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 34px;
+  pointer-events: auto;
+}
+.tc-form input {
+  display: block;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0 58px 0 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(14, 18, 26, 0.72);
+  color: #fff;
+  /* 16 px or more, so iPhone Safari doesn't zoom in when it gets focus. */
+  font: 500 16px Archivo, system-ui, sans-serif;
+  user-select: text;
+  -webkit-user-select: text;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.tc-form input::placeholder {
+  color: rgba(255, 255, 255, 0.68);
+}
+.tc-form input:disabled {
+  opacity: 1;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.7);
+}
+.tc-form input:focus-visible {
+  outline: 2px solid #ffd479;
+  outline-offset: 0;
+}
+.tc-left {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font: 600 11px Archivo, system-ui, sans-serif;
+  color: #ffd479;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tc-log {
+    transition: none;
+  }
+}
