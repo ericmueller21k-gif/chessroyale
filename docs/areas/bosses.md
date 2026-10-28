@@ -178,7 +178,8 @@ build): online, phase 1 won is the crowd's victory):
   perfect, but it happens way too fast"; docs/decisions/2026-10-17-phase-change-pace.md): about 10 s more from the mate
   to the split, the animations unchanged, every added time a setting (`RECLUSE_PHASE2.change`): his words before the
   seize (`talkMs`, 4.5 s), a hold as the power lands (`absorbHoldMs`, 1.5 s), a longer cast (`castHoldMs`, 4 s); then
-  a 5-4-3-2-1 on every board before phase 2's clocks run (`countdownSeconds`):
+  a 5-4-3-2-1 on every board before phase 2's clocks run (`countdownSeconds`), counted from the boards' first frame on
+  screen so the 5 is up a whole second (`afterFirstFrame` in solo.ts; docs/decisions/2026-10-28-two-flaky-tests.md):
   - **The absorption** (Eric, Oct 14: he plays with an engine in phase 2, so he takes the God King's; DECISIONS.md, "The
     Hidden Boss absorbs the God King"): in his place in the dock (BossDock's `king`, from `absorbKing`) the God King
     raises his sword, his golden aura swelling (`.gk-aura`), and gloats (`KING_VS_RECLUSE.triumph`, a `lead` cue: whole

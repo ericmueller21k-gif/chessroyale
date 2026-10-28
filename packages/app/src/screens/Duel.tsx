@@ -24,16 +24,22 @@ import { clockShown } from "../clock-text.ts";
  * and the game, whose board loads once and stays put from the vote to the result. Classes are `dv-`.
  */
 
-/** Redraws when the session (or queue) changes, and `ms` apart while `running` (the clocks). */
+/**
+ * Redraws when the session (or queue) changes, and `ms` apart while `running` (the clocks); returns the time of the draw.
+ * A count, never the time, is what changes: Preact skips a state set to the value it already holds, so with `Date.now()`
+ * a change in the same millisecond as the last draw was never drawn. The game's result and then its outcome landing in
+ * the same millisecond as the clock's last tick left "Updating your rank…" up for good (the clocks stop at the end, so
+ * nothing drew again). docs/decisions/2026-10-28-two-flaky-tests.md.
+ */
 function useSession(s: { subscribe(fn: () => void): () => void }, running: boolean, ms = 100): number {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => s.subscribe(() => setNow(Date.now())), [s]);
+  const [, redraw] = useState(0);
+  useEffect(() => s.subscribe(() => redraw((n) => n + 1)), [s]);
   useEffect(() => {
     if (!running) return;
-    const t = setInterval(() => setNow(Date.now()), ms);
+    const t = setInterval(() => redraw((n) => n + 1), ms);
     return () => clearInterval(t);
   }, [running, ms]);
-  return now;
+  return Date.now();
 }
 
 // ---------------- The stage: the search, then the versus moment ----------------
