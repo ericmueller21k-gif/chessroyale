@@ -2573,6 +2573,12 @@ export const FAIRPLAY = {
     minTimed: 8,
     /** Timing: think time this little correlated with difficulty (Spearman) is "the same whatever the difficulty". */
     flatCorr: 0.1,
+    /**
+     * Timing: a pick marked a premove (told to the server before any browser could know its position, the same move)
+     * counts as one only when it comes within this long of the clock's start (a premove plays at once: about a round
+     * trip); later, it's timed as any pick. A premove's time is left out of timing (fastHard, timeCorr), nothing else.
+     */
+    premoveMs: 2_000,
   },
   /** The suspicion score: points per signal (each capped), from one match's signals. */
   score: {

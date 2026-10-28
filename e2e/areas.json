@@ -637,7 +637,7 @@
         "packages/server/src/duel-do.ts",
         "packages/server/src/duel-room.ts"
       ],
-      "specs": ["e2e/home-ranked.spec.ts", "e2e/ranked-1v1.spec.ts", "e2e/ranked-1v1-browse.spec.ts", "e2e/town.spec.ts", "e2e/vote-hint.spec.ts"]
+      "specs": ["e2e/board-tools.spec.ts", "e2e/home-ranked.spec.ts", "e2e/ranked-1v1.spec.ts", "e2e/ranked-1v1-browse.spec.ts", "e2e/town.spec.ts", "e2e/vote-hint.spec.ts"]
     },
     "errors, reports, kill switches and capacity": {
       "paths": [

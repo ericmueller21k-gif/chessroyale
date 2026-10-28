@@ -5,6 +5,7 @@ import { seenFen, seenSan } from "../camo.ts";
 import { blunderWords, capitalised, crowdMoveCues, type KingCue } from "../godKing.ts";
 import { brilliance, type Augment } from "@chessroyale/core";
 import { Board } from "../components/Board.tsx";
+import { seatKey } from "../board/yours.ts";
 import { TimerBar, useFrameNow } from "../components/Countdown.tsx";
 import { BoardClock } from "../components/BoardClock.tsx";
 import { EvalBar } from "../components/EvalBar.tsx";
@@ -103,7 +104,7 @@ export function WatchScreen({
         </div>
         <div class="board-row">
           <EvalBar fen={board.fen} orientation={team} evaluate={(f) => match.evaluate(f)} />
-          <Board fen={shown.fen} orientation={team === "w" ? "white" : "black"} lastMove={shown.lastMove}>
+          <Board fen={shown.fen} orientation={team === "w" ? "white" : "black"} lastMove={shown.lastMove} premove={{ key: seatKey(match, board.id, team), side: team }}>
             {!counting && deadline > 0 && <TimerBar startsAt={startsAt} deadline={deadline} total={Math.max(1, deadline - startsAt)} />}
             <BoardClock match={match} you={standings.find((s) => s.isYou)} turn={!counting && deadline > 0 ? { startsAt, deadline, yours: false } : null} />
             {/* (The picks come in over the board as it stands, once its replay is done.) */}
@@ -535,7 +536,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
           evaluate={(f) => match.evaluate(f)}
           override={plunge}
         />
-        <Board fen={onBoard.fen} orientation={orientation} turn={view.turn} lastMove={onBoard.lastMove} marks={stand && played && ts < LAST_STAND.crashAt ? { [mine.result.playedMove.slice(2, 4)]: "ls-blunder" } : undefined}>
+        <Board fen={onBoard.fen} orientation={orientation} turn={view.turn} lastMove={onBoard.lastMove} marks={stand && played && ts < LAST_STAND.crashAt ? { [mine.result.playedMove.slice(2, 4)]: "ls-blunder" } : undefined} premove={{ key: seatKey(match, board.id, team ?? sideToMove(fen)), side: team ?? sideToMove(fen), watch: true }}>
           {match.boss?.powers && <PowerBoard boss={match.boss} orientation={orientation} fen={onBoard.fen} />}
           {!played && (
             <CrowdGhosts

@@ -586,6 +586,82 @@ p {
   overflow: visible;
   z-index: 9;
 }
+/* Your arrows, highlights and premoves (chess.com's; board/OwnBoard.tsx, docs/decisions/2026-10-28-arrows-and-premoves.md):
+   a right-click's square (red; Ctrl yellow, Alt blue, Shift green) under the pieces and under the screen's own
+   highlights; a right-drag's arrow (yellow-orange; Ctrl red, Alt blue, Shift green), see-through as chess.com's (0.8),
+   over the pieces and under the screen's arrows; a premove's from and to squares in chess.com's premove red. Each is
+   checked on Classic, Green and Gold (the squares don't change with the theme); a scheme gives its own where one doesn't
+   read (Gold, below). */
+:root {
+  --uh-red: rgba(235, 97, 80, 0.8);
+  --uh-yellow: rgba(255, 170, 0, 0.8);
+  --uh-blue: rgba(82, 176, 220, 0.8);
+  --uh-green: rgba(172, 206, 89, 0.8);
+  --ua-orange: #ffaa00;
+  --ua-red: #f8553f;
+  --ua-blue: #48c1f9;
+  --ua-green: #9fcf3f;
+  --sq-premove: rgba(244, 42, 50, 0.55);
+}
+/* (Green: Shift's green is deeper, so it reads on the green squares. Gold: Ctrl's yellow square and the plain arrow's
+   yellow-orange are deeper oranges, so they read on the gold squares.) */
+:root[data-board-colors="green"] {
+  --uh-green: rgba(64, 140, 36, 0.8);
+  --ua-green: #3f9a22;
+}
+:root[data-board-colors="gold"] {
+  --uh-yellow: rgba(240, 118, 0, 0.8);
+  --ua-orange: #f07a00;
+}
+.hb square.uh-red {
+  background-color: var(--uh-red);
+}
+.hb square.uh-yellow {
+  background-color: var(--uh-yellow);
+}
+.hb square.uh-blue {
+  background-color: var(--uh-blue);
+}
+.hb square.uh-green {
+  background-color: var(--uh-green);
+}
+.hb square.premove {
+  background-color: var(--sq-premove);
+}
+.hb-user-arrows {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 2;
+}
+.hb-user-arrows g {
+  opacity: 0.8;
+}
+.hb-user-arrows polyline {
+  fill: none;
+  stroke: currentColor;
+  stroke-linejoin: miter;
+  stroke-linecap: butt;
+}
+.hb-user-arrows polygon {
+  fill: currentColor;
+}
+.hb-user-arrows .ua-orange {
+  color: var(--ua-orange);
+}
+.hb-user-arrows .ua-red {
+  color: var(--ua-red);
+}
+.hb-user-arrows .ua-blue {
+  color: var(--ua-blue);
+}
+.hb-user-arrows .ua-green {
+  color: var(--ua-green);
+}
 /* The coordinates, inside their edge squares (DECISIONS.md, Oct 11): each rank's number at the top left of its square in
    the left column, each file's letter at the bottom right of its square in the bottom row, either way up and turned;
    painted on the board, under the pieces, tucked into the corners where the pieces have the least ink; white on dark

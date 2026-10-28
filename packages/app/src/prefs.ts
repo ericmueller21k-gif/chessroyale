@@ -132,6 +132,51 @@ export function setBoardColors(c: BoardColors) {
   listeners.forEach((l) => l());
 }
 
+const PREMOVES_KEY = "brc.premoves";
+const BOARD_MARKS_KEY = "brc.boardMarks";
+
+/**
+ * Settings → Board, "Premoves" (chess.com's; on unless switched off): moving ahead while it's the other side's turn
+ * (docs/areas/board.md, "Arrows, highlights and premoves"). Per device.
+ */
+export function premovesOn(): boolean {
+  try {
+    return localStorage.getItem(PREMOVES_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+export function setPremovesOn(on: boolean) {
+  try {
+    localStorage.setItem(PREMOVES_KEY, on ? "1" : "0");
+  } catch {
+    // Not important.
+  }
+  listeners.forEach((l) => l());
+}
+
+/**
+ * Settings → Board, "Arrows and highlights" (chess.com's right-click arrows and squares, with a mouse; on unless switched
+ * off). Per device; what you draw is never sent anywhere.
+ */
+export function boardMarksOn(): boolean {
+  try {
+    return localStorage.getItem(BOARD_MARKS_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+export function setBoardMarksOn(on: boolean) {
+  try {
+    localStorage.setItem(BOARD_MARKS_KEY, on ? "1" : "0");
+  } catch {
+    // Not important.
+  }
+  listeners.forEach((l) => l());
+}
+
 const EVAL_BAR_KEY = "brc.evalBar";
 const PRACTICE_KEY = "brc.practice";
 
