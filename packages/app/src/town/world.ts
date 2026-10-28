@@ -262,8 +262,11 @@ export const HOMES: readonly Home[] = (
     { id: "sawyer", boss: "Sawyer", name: "Sawyer's Woodshed", color: "#d39a0b", cx: 40, cy: 23 },
     { id: "pig", boss: "Wrangler", name: "Wrangler's Stall", color: "#8f5629", cx: 4, cy: 17 },
     // (Oct 27: Folio's, east of the Colosseum, the gap between Big Boy's Crib, Sawyer's Woodshed and Smudgy's Gallery; its ring
-    // the vermilion of its seal. docs/decisions/2026-10-27-folio-wired.md.)
-    { id: "folio", boss: "Folio", name: "Folio's Folded House", color: "#d8432a", cx: 33, cy: 30 },
+    // the vermilion of its seal. docs/decisions/2026-10-27-folio-wired.md. Oct 28: two squares further east, from 33 to 35, so
+    // 5 squares of open ground lie between it and the Colosseum, as between Smudgy's Gallery and the Colosseum (Eric: "2 inches
+    // from the colosseum it's gotta get moved a bit"); 35 is as far as the 8 to 10 squares between neighbors allows, Big Boy's
+    // Crib being at 43. docs/decisions/2026-10-28-town-chat-v2.md.)
+    { id: "folio", boss: "Folio", name: "Folio's Folded House", color: "#d8432a", cx: 35, cy: 30 },
   ] satisfies Omit<Home, "half" | "foot">[]
 ).map((h) => ({ ...h, half: 1.5, foot: 0.5 }));
 /** Every place: the homes (in the bosses' order), then the Colosseum. */

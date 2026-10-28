@@ -1,11 +1,21 @@
 /**
- * The town square's chat log (Eric, Oct 28), in the map's top left corner: one line a message ("[9:41] Name: message", the
- * name bold), newest at the bottom, each line on its own soft dark backing. The lines fade out `fadeAfterMs` after the last
- * one and come back with the next; a line is gone for good after `lifeMs`. The box takes no taps (the map under it answers
- * them) except its text field and a player's line: a tap on one, name or text, opens its menu (Profile / Mute / Report, and
- * Remove for a moderator; `onTownChatLineTap`). Press and hold on the box (`holdMs`) and it comes off the map to move
- * wherever you drop it, remembered on this device. Plain DOM, drawn only when a message comes; nothing in the town's frame
- * loop. The rules and the numbers are in chat.ts; docs/areas/town-square.md, "The chat log".
+ * The town square's chat log (Eric, Oct 28): one see-through box in the map's top left corner, a continuous stream of lines
+ * ("[9:41] Name: message", the name bold and colored by kind), newest at the bottom, with the field "Say something…" at its
+ * foot (a plain line, no box, no send button: the keyboard's Send or Enter sends). No backing on the box or on a line
+ * (`--chat-back`, 0, is there to raise later); light text with a soft dark shadow reads over the map. The box holds every line
+ * of the last minute (`lifeMs`, each removed for good then) and scrolls: a finger on a phone, the wheel on a computer; new
+ * lines keep it at its foot unless you've scrolled up, then a "↓ new" marker says so (`Stick`).
+ *
+ * Three modes, set by the header's chat icon or the gear's sheet (TownChatTools.tsx), remembered on this device: always on; new
+ * messages only (the lines show when a message comes and fade `fadeAfterMs` after the last, the field with them; a tap on a line
+ * brings back every line of the last minute, scrollable, until the wait runs out again); off (no box, no field: the lines still
+ * arrive, so turning it on shows the last minute).
+ *
+ * The box takes no taps except on a line and on its field, so a tap on it anywhere else reaches the map; a wheel over it
+ * scrolls it, never the map. A tap on a player's name opens its menu (Profile / Mute / Report, and Remove for a moderator;
+ * `onTownChatLineTap`), and so does a tap on their line's text when the chat is always on. Press and hold on the box (`holdMs`)
+ * and it comes off the map to move wherever you drop it, remembered on this device. Plain DOM, drawn only when a line comes or
+ * goes; nothing in the town's frame loop. The rules and the numbers are in chat.ts; docs/areas/town-square.md, "The chat log".
  *
  * Players' messages (chat-net.ts; docs/decisions/2026-10-28-town-chat-typing.md): only a signed-in player on a device the
  * age gate didn't mark too young types and gets other players' lines (riding on the live poll); a guest's log has the
@@ -15,8 +25,9 @@
  * log at once when you may no longer see them (signed out, paused) or mute or block their player.
  *
  * Test hooks (e2e, with the test switches on): `window.__townSay()` makes someone from the table talk now;
- * `__townSay(name, text, kind)` says that line (on this device only); `__townChatter(false)` stops the bosses' and kids'
- * chatter (true starts it again); `window.__townTapped` lists the taps on player lines.
+ * `__townSay(name, text, kind, agoMs)` says that line (on this device only; `agoMs`: it was said that long ago, to scroll back
+ * to); `__townChatter(false)` stops the bosses' and kids' chatter (true starts it again); `window.__townTapped` lists the taps
+ * on player lines.
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { account, onAccountChange } from "../account.ts";
@@ -24,14 +35,20 @@ import { mutes } from "../chat-mod.ts";
 import { openProfile } from "../profile-nav.ts";
 import { useServerStatus } from "../status.ts";
 import { testSwitchesAllowed } from "../test-switches.ts";
-import { CHAT, CHAT_BOX, ChatLog, clampBox, loadChatPos, onTownChatLineTap, saveChatPos, say, setTownChatLineTap, startChatter, type ChatKind, type ChatLine, type Rect } from "./chat.ts";
+import { CHAT, CHAT_BOX, ChatLog, Stick, clampBox, loadChatPos, onTownChatLineTap, saveChatPos, say, setTownChatLineTap, startChatter, type ChatKind, type ChatLine, type Rect } from "./chat.ts";
 import { cutTownText, mayTownChat, openTownFeed, removeTownLine, reportTownLine, sendTownChat, townChars, townChatOff, townSendWaitMs } from "./chat-net.ts";
+import { useChatMode } from "./TownChatTools.tsx";
 import "./town-chat.css";
 
 export function TownChat() {
   const wrap = useRef<HTMLDivElement>(null);
+  const scroller = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLInputElement>(null);
   const pinned = useRef<(() => void) | null>(null);
+  const mode = useChatMode();
+  // (The handlers below are set up once and read the mode as it is when a press comes.)
+  const modeNow = useRef(mode);
+  modeNow.current = mode;
   const [computer, setComputer] = useState(() => matchMedia(CHAT.computerQuery).matches);
   const [typing, setTyping] = useState(mayTownChat);
   const [text, setText] = useState("");
@@ -40,7 +57,11 @@ export function TownChat() {
   /** A refusal's reason, over the field for `noteMs`. */
   const [note, setNote] = useState<string | null>(null);
   const [, redraw] = useState(0);
-  const log = useMemo(() => new ChatLog(computer ? CHAT.capComputer : CHAT.capPhone, () => redraw((n) => n + 1)), []);
+  const log = useMemo(() => new ChatLog(() => redraw((n) => n + 1)), []);
+  // Scrolled up from the foot: the lines that came since are counted for the "↓ new" marker.
+  const stick = useMemo(() => new Stick(), []);
+  const [unseen, setUnseen] = useState(0);
+  const seen = useRef({ id: 0, mode });
   // (The switch, as /api/status says it: the field reads townChatOff() each time it's drawn.)
   useServerStatus();
 
@@ -48,11 +69,11 @@ export function TownChat() {
   useEffect(() => {
     const close = log.open();
     let chatter = startChatter();
-    const hooks = window as unknown as { __townSay?: (name?: string, text?: string, kind?: ChatKind) => void; __townChatter?: (on: boolean) => void };
-    hooks.__townSay = (name, line, kind = "player") => {
+    const hooks = window as unknown as { __townSay?: (name?: string, text?: string, kind?: ChatKind, agoMs?: number) => void; __townChatter?: (on: boolean) => void };
+    hooks.__townSay = (name, line, kind = "player", agoMs = 0) => {
       if (!testSwitchesAllowed()) return;
       if (name === undefined) chatter.now();
-      else say(name, line ?? "", kind);
+      else say(name, line ?? "", kind, undefined, Date.now() - agoMs);
     };
     hooks.__townChatter = (on) => {
       if (!testSwitchesAllowed()) return;
@@ -69,7 +90,8 @@ export function TownChat() {
 
   // Other players' lines, for a signed-in player (nothing is asked for anyone else): into the log as players' lines with who
   // said them; out again when a moderator removes one or you mute or block its player, and all of them when you may no
-  // longer see them (signed out, a device marked too young, the chat paused); the switch redraws the field.
+  // longer see them (signed out, a device marked too young, the chat paused); the switch redraws the field. They keep coming
+  // whatever the mode (off too: no extra requests, and turning it on shows the last minute).
   useEffect(() => {
     if (!typing) {
       log.drop((l) => l.uid !== undefined);
@@ -82,7 +104,7 @@ export function TownChat() {
     });
   }, [log, typing]);
 
-  // The computer's size (a window crossing it) changes how many lines it keeps; the test switches can turn on late (the
+  // The computer's size (a window crossing it) changes the box's size and type; the test switches can turn on late (the
   // account loads after the town opens), which is when the field appears.
   useEffect(() => {
     const mq = matchMedia(CHAT.computerQuery);
@@ -94,7 +116,6 @@ export function TownChat() {
       off();
     };
   }, []);
-  useEffect(() => log.setCap(computer ? CHAT.capComputer : CHAT.capPhone), [log, computer]);
 
   // The wait after your message, counting down in the field.
   useEffect(() => {
@@ -103,11 +124,43 @@ export function TownChat() {
     return () => clearInterval(t);
   }, [wait > 0]);
 
+  // The lines on show now. After every draw: at the foot if it was (a new line, or one gone, or the mode turned on), where it is if
+  // you've scrolled up (the new ones counted); a box with nothing to scroll is at its foot by itself.
+  const lines = log.visible(mode);
+  useLayoutEffect(() => {
+    const box = scroller.current;
+    if (!box || mode === "off") {
+      seen.current.mode = mode;
+      return;
+    }
+    if (seen.current.mode !== mode) stick.toFoot();
+    const fresh = lines.filter((l) => l.id > seen.current.id).length;
+    seen.current = { id: Math.max(seen.current.id, lines.at(-1)?.id ?? 0), mode };
+    if (box.scrollHeight - box.clientHeight <= CHAT.pinSlopPx) stick.toFoot();
+    if (stick.added(fresh)) box.scrollTop = box.scrollHeight;
+    box.classList.toggle("up", box.scrollTop > 2);
+    if (stick.unseen !== unseen) setUnseen(stick.unseen);
+  });
+  const scrolled = () => {
+    const box = scroller.current!;
+    stick.scrolled(box);
+    box.classList.toggle("up", box.scrollTop > 2);
+    if (stick.unseen !== unseen) setUnseen(stick.unseen);
+    log.poke();
+  };
+  const toFoot = () => {
+    const box = scroller.current!;
+    stick.toFoot();
+    box.scrollTop = box.scrollHeight;
+    setUnseen(0);
+  };
+
   // Where the box is: the remembered place (else the corner, in CSS), kept inside the map and off the buttons; picked up by a
-  // press and hold and put down where you let go. `CHAT_BOX` tells the edge chips (render.ts) where it is, shown or not.
+  // press and hold and put down where you let go. `CHAT_BOX` tells the edge chips (render.ts) where it is, shown or not
+  // (and nowhere while the chat is off). A wheel over the log scrolls it, never the map under it.
   useLayoutEffect(() => {
     const el = wrap.current!;
-    const ov = el.offsetParent as HTMLElement; // (the overlay: the map's box)
+    const ov = el.parentElement as HTMLElement; // (the overlay: the map's box; not offsetParent: that's null while the chat is off)
     const area = ov.parentElement!;
     const cv = area.querySelector("canvas")!;
     let pos = loadChatPos();
@@ -124,17 +177,21 @@ export function TownChat() {
     };
     const measure = () => Object.assign(CHAT_BOX, { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight });
     const fit = () => {
-      if (pos) put(clampBox(pos.x, pos.y, size(), map(), buttons()));
+      if (pos && el.offsetWidth > 0) put(clampBox(pos.x, pos.y, size(), map(), buttons()));
       measure();
     };
     fit();
     const ro = new ResizeObserver(fit);
     ro.observe(ov);
     ro.observe(el);
+    /** Whether the box can be seen and pressed now (faded in "new messages", or off: a press there is the map's). */
+    const seeable = () => modeNow.current !== "off" && (el.dataset.on === "1" || el.classList.contains("grab"));
 
-    // `row`: the player's line the press began on (a tap on it reports it, later); none: it began on the map.
-    let hold: { id: number; x: number; y: number; row: HTMLElement | null; timer: ReturnType<typeof setTimeout> } | null = null;
+    // `row`: the line the press began on (a tap on it is that line's, later); none: it began on the map. `name`: on a name.
+    let hold: { id: number; x: number; y: number; row: HTMLElement | null; name: boolean; timer: ReturnType<typeof setTimeout> } | null = null;
     let drag: { id: number; dx: number; dy: number; hud: Rect | null } | null = null;
+    // (A finger moving the held box must not also start the log's own scroll: the browser's pan is called off while it's carried.)
+    const noPan = (e: TouchEvent) => e.cancelable && e.preventDefault();
     const pickUp = () => {
       const h = hold;
       if (!h) return;
@@ -143,24 +200,25 @@ export function TownChat() {
       drag = { id: h.id, dx: h.x - b.left, dy: h.y - b.top, hud: buttons() };
       el.classList.add("grab");
       log.hold(true);
+      area.addEventListener("touchmove", noPan, { passive: false });
       // The map saw the finger go down and pressed a square: that press is called off (the box's now).
       if (!h.row) cv.dispatchEvent(new PointerEvent("pointercancel", { pointerId: h.id }));
     };
     const onDown = (e: PointerEvent) => {
       // A press on the map lets the field go (the keyboard closes).
       if (e.target !== field.current && document.activeElement === field.current) field.current?.blur();
-      if (!e.isPrimary) return;
-      // (Faded and with no field, the box can't be seen: a press there is the map's, however long.)
-      if (!log.shown && !field.current) return;
-      const row = e.target === cv ? null : (e.target as Element).closest<HTMLElement>(".tc-player");
-      if (e.target !== cv && !(row && el.contains(row))) return;
+      if (!e.isPrimary || !seeable()) return;
+      const target = e.target as Element;
+      const row = target === cv ? null : target.closest<HTMLElement>(".tc-line");
+      if (target !== cv && !(row && el.contains(row))) return;
       const b = el.getBoundingClientRect();
       if (!row && (e.clientX < b.left || e.clientX > b.right || e.clientY < b.top || e.clientY > b.bottom)) return;
+      if (row) log.poke(); // (reading: the wait before the fade starts over)
       row?.setPointerCapture?.(e.pointerId);
-      hold = { id: e.pointerId, x: e.clientX, y: e.clientY, row, timer: setTimeout(pickUp, CHAT.holdMs) };
+      hold = { id: e.pointerId, x: e.clientX, y: e.clientY, row, name: !!target.closest(".tc-name"), timer: setTimeout(pickUp, CHAT.holdMs) };
     };
     const onMove = (e: PointerEvent) => {
-      // Moving before the hold is up is a drag of the map's, which goes on as it was.
+      // Moving before the hold is up is a drag of the map's, which goes on as it was (or, on a line, the log's own scroll).
       if (hold && e.pointerId === hold.id && Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > CHAT.holdSlopPx) {
         clearTimeout(hold.timer);
         hold = null;
@@ -171,34 +229,51 @@ export function TownChat() {
       put(pos);
       measure();
     };
+    /** A tap on a line (no hold, no scroll): a player's name opens its menu (so does their text when the chat is always on; a line said by the test hook has no one behind it: the menu ignores it); in "new messages" the text brings back every line. */
+    const tapLine = (line: ChatLine, row: HTMLElement, name: boolean) => {
+      if (line.kind === "player" && (name || modeNow.current === "always")) {
+        const r = row.getBoundingClientRect();
+        onTownChatLineTap(line, { x: r.left, y: r.top, w: r.width, h: r.height });
+        if (testSwitchesAllowed()) ((window as unknown as { __townTapped?: string[] }).__townTapped ??= []).push(line.text);
+      } else if (modeNow.current === "new") log.expand();
+    };
     const onEnd = (e: PointerEvent) => {
       if (hold && e.pointerId === hold.id) {
-        // Let go before the hold, without moving: a tap. On a player's line it's that line's.
+        // Let go before the hold, without moving: a tap.
         const h = hold;
         clearTimeout(h.timer);
         hold = null;
         const line = h.row && e.type === "pointerup" ? log.lines.find((l) => l.id === Number(h.row!.dataset.id)) : null;
-        if (line) {
-          const r = h.row!.getBoundingClientRect();
-          onTownChatLineTap(line, { x: r.left, y: r.top, w: r.width, h: r.height });
-          if (testSwitchesAllowed()) ((window as unknown as { __townTapped?: string[] }).__townTapped ??= []).push(line.text);
-        }
+        if (line) tapLine(line, h.row!, h.name);
       }
       if (!drag || e.pointerId !== drag.id) return;
       drag = null;
       el.classList.remove("grab");
+      area.removeEventListener("touchmove", noPan);
       log.hold(false);
       if (pos) saveChatPos(pos);
+    };
+    const onWheel = (e: WheelEvent) => {
+      const box = scroller.current;
+      if (!box || !seeable() || box.scrollHeight <= box.clientHeight) return;
+      const r = box.getBoundingClientRect();
+      if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return;
+      e.preventDefault();
+      e.stopPropagation();
+      box.scrollTop += e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
     };
     area.addEventListener("pointerdown", onDown, true);
     area.addEventListener("pointermove", onMove);
     area.addEventListener("pointerup", onEnd);
     area.addEventListener("pointercancel", onEnd);
+    area.addEventListener("wheel", onWheel, { capture: true, passive: false });
     return () => {
       area.removeEventListener("pointerdown", onDown, true);
       area.removeEventListener("pointermove", onMove);
       area.removeEventListener("pointerup", onEnd);
       area.removeEventListener("pointercancel", onEnd);
+      area.removeEventListener("wheel", onWheel, true);
+      area.removeEventListener("touchmove", noPan);
       ro.disconnect();
       if (hold) clearTimeout(hold.timer);
       if (drag) log.hold(false);
@@ -219,10 +294,10 @@ export function TownChat() {
     pinned.current = null;
     log.hold(false);
   };
-  // (The field greyed while it has focus, a guest signed out say, lets go too.)
+  // (The field greyed while it has focus, a guest signed out say, lets go too; so does the chat turned off.)
   useEffect(() => {
-    if (!typing) blur();
-  }, [typing]);
+    if (!typing || mode === "off") blur();
+  }, [typing, mode]);
   useEffect(() => blur, []);
 
   // A refusal's reason, for a few seconds.
@@ -251,11 +326,13 @@ export function TownChat() {
   const left = CHAT.maxChars - townChars(text);
   // Why the field can't send right now (a guest, a young device, the switch, your chat ban), shown in its place.
   const off = townChatOff();
+  // Shown: always (always on), or from a message until the wait runs out (new messages: the field fades with the lines).
+  const on = mode === "always" || (mode === "new" && log.shown);
 
   return (
-    <div class="town-chat" ref={wrap} data-size={computer ? "computer" : "phone"}>
-      <div class={`tc-log${log.shown ? " on" : ""}`} role="log" aria-label="Town chat" style={`--chat-out:${CHAT.fadeMs}ms;--chat-in:${CHAT.fadeInMs}ms`}>
-        {log.lines.map((l) => (
+    <div class="town-chat" ref={wrap} hidden={mode === "off"} data-size={computer ? "computer" : "phone"} data-mode={mode} data-on={on ? "1" : "0"} style={`--chat-out:${CHAT.fadeMs}ms;--chat-in:${CHAT.fadeInMs}ms`}>
+      <div class="tc-log" ref={scroller} role="log" aria-label="Town chat" onScroll={scrolled}>
+        {lines.map((l) => (
           <div class={`tc-line tc-${l.kind}`} key={l.id} data-id={l.id}>
             <span class="tc-time">[{l.time}]</span> {l.name && <b class="tc-name">{l.name}</b>}
             {l.name && ": "}
@@ -263,6 +340,11 @@ export function TownChat() {
           </div>
         ))}
       </div>
+      {unseen > 0 && (
+        <button type="button" class="tc-new" aria-label="Jump to the newest messages" onClick={toFoot}>
+          ↓ new
+        </button>
+      )}
       {note && (
         <div class="tc-note" role="status">
           {note}
@@ -292,19 +374,20 @@ export function TownChat() {
           onFocus={focus}
           onBlur={blur}
         />
+        <i class="tc-rule" aria-hidden="true" />
         {left <= CHAT.nearEnd && wait <= 0 && !off && <span class="tc-left">{left} left</span>}
       </form>
-      <LineMenu box={wrap} />
+      <LineMenu box={wrap} log={log} />
     </div>
   );
 }
 
 /**
- * A player's line's menu, opened by a tap on the line (name or text): Profile, Mute, Report, and Remove for a moderator.
+ * A player's line's menu, opened by a tap on the name (or, with the chat always on, the text): Profile, Mute, Report, and Remove for a moderator.
  * Your own line's Mute and Report are greyed. Report is fair play's report with "Offensive chat" and the line (the server
  * reads its words); the answer shows in the menu, which then closes. A tap anywhere else, or Escape, closes it.
  */
-function LineMenu({ box }: { box: { current: HTMLDivElement | null } }) {
+function LineMenu({ box, log }: { box: { current: HTMLDivElement | null }; log: ChatLog }) {
   /** The line, and where its menu goes in the box's pixels (`above`: the line's top, should the menu not fit below it). */
   const [open, setOpen] = useState<{ line: ChatLine; at: { x: number; y: number }; above: number } | null>(null);
   const [said, setSaid] = useState<string | null>(null);
@@ -325,6 +408,12 @@ function LineMenu({ box }: { box: { current: HTMLDivElement | null } }) {
       }),
     [],
   );
+  // The box stays on show (it doesn't fade under the menu) while the menu is open.
+  useEffect(() => {
+    if (!open) return;
+    log.hold(true);
+    return () => log.hold(false);
+  }, [!!open]);
   // A tap anywhere else, or Escape, closes it; so does a report's answer, after a moment.
   useEffect(() => {
     if (!open) return;
