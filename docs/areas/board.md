@@ -53,8 +53,9 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
     move every round, then on another board), a final, Squads or the Hidden Boss's four boards. Not while the opening
     plays out: one made then waits for the first real turn (`interactive` is off until then).
   - **Fair play:** online, a crowd match tells the server its first premove ahead (`premove`), and a pick that plays it says
-    so; the server marks it only when it had it before the round opened and the pick came within
-    `FAIRPLAY.signals.premoveMs`, and fair play leaves only its time out of timing ([fairplay.md](fairplay.md)). 1 v 1 sends
+    so; the server marks it only when it had it before any browser could know the position (its premove seal) and the
+    pick came within `FAIRPLAY.signals.premoveMs`, and fair play leaves only its time out of timing; any other is timed as
+    before ([fairplay.md](fairplay.md)). 1 v 1 sends
     nothing new: no timing signal there, and its clock charges each move what the server measures (a premove: a round trip).
 - **Board colors** (Settings → Board, Oct 18; docs/decisions/2026-10-18-board-colors.md): Classic (the board as it always
   was), Green or Gold for the dark squares, picked per device (`brc.boardColors`; `boardColors()` in `prefs.ts`, never

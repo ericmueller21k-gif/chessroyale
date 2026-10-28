@@ -247,10 +247,11 @@ export interface LobbyRecord {
     startedAt: number;
     /**
      * `away`: look-aways during the clock before the pick, as the app counted them (fair play's one device signal).
-     * `premove`: a premove the server had before the round opened (`premoved`), played at once (see premoveAhead).
+     * `premove`: a premove the server had before any browser could know this position (`premoved`), played at once (see
+     * premoveAhead).
      */
     picks: Record<string, { move: string; thinkMs: number; away?: number; premove?: true }>;
-    /** Premoves told ahead by those picking this round (premoveAhead), taken as it opened: player → move. */
+    /** Premoves told ahead by those picking this round, in time to count (premoveAhead), taken as it opened: player → move. */
     premoved?: Record<string, string>;
     powerUps: Record<string, true>;
     /** Boss battle: players who called the King this move, and who called for his strike. */
@@ -381,8 +382,17 @@ export interface LobbyRecord {
    */
   fair?: Record<string, FairMove[]>;
   fairV?: number;
-  /** Fair play: each person's first premove, told ahead of their next turn (premoveAhead): player → move. */
-  premoves?: Record<string, string>;
+  /**
+   * Fair play: each person's first premove, told ahead of their next turn (premoveAhead), with the seal it was told under
+   * (`premoveSeal` then): player → move.
+   */
+  premoves?: Record<string, { move: string; seal: number }>;
+  /**
+   * Fair play's premove seal: goes up each time the next position starts to be knowable to a browser (a round opening, its
+   * picks showing live to the watching team; a boss step asked of the host or played). A premove counts only if it was
+   * told under an older seal than the round it's played in opens with (takePremoves).
+   */
+  premoveSeal?: number;
   /** People who left the match (resigned, gone too long, before move 1 or once out): see LeftHuman and LEAVING. */
   left?: LeftHuman[];
   /** A private lobby nobody had started: when the last person in it pressed Leave (it closes then; LOBBY_LIFE). */
@@ -1406,6 +1416,7 @@ export class LobbyCore {
 
   /** The boss's turn: everyone sees it thinking while the host's engine plays its move. */
   private requestBoss() {
+    this.sealPremoves();
     this.r.phase = "boss";
     this.r.bossKey = `b-${++this.r.counter}`;
     this.r.bossKind = this.runner!.bossMoveKind();
@@ -1513,6 +1524,7 @@ export class LobbyCore {
    * bounce plays for everyone, and he plays his move. No host engine anywhere: the bounces play and nothing moves.
    */
   private requestBounce() {
+    this.sealPremoves();
     this.r.phase = "boss";
     this.r.bossKey = `y-${++this.r.counter}`;
     this.r.bossKind = "bounce";
@@ -1535,6 +1547,7 @@ export class LobbyCore {
    */
   private requestAlfil() {
     const runner = this.runner!;
+    this.sealPremoves();
     this.r.phase = "boss";
     this.r.bossKey = `a-${++this.r.counter}`;
     this.r.bossKind = runner.alfilStep()!;
@@ -1556,6 +1569,7 @@ export class LobbyCore {
    */
   private requestHop() {
     const runner = this.runner!;
+    this.sealPremoves();
     this.r.phase = "boss";
     this.r.bossKey = `h-${++this.r.counter}`;
     this.r.bossKind = "hop";
@@ -1578,6 +1592,7 @@ export class LobbyCore {
    * asked for. Any other answer, or no host engine anywhere: the cast.
    */
   private requestCarrots() {
+    this.sealPremoves();
     this.r.phase = "boss";
     this.r.bossKey = `c-${++this.r.counter}`;
     this.r.bossKind = "carrots";
@@ -1598,6 +1613,7 @@ export class LobbyCore {
    */
   private requestRepaint() {
     const runner = this.runner!;
+    this.sealPremoves();
     this.r.phase = "boss";
     this.r.bossKey = `r-${++this.r.counter}`;
     this.r.bossKind = "repaint";
@@ -1619,6 +1635,7 @@ export class LobbyCore {
    * anything else, or no host engine anywhere: no watering this turn (it waits for his next), and his move is asked for.
    */
   private requestWater() {
+    this.sealPremoves();
     this.r.phase = "boss";
     this.r.bossKey = `r-${++this.r.counter}`;
     this.r.bossKind = "water";
@@ -1637,6 +1654,7 @@ export class LobbyCore {
    * crowd's turn. No such move (or no engine anywhere): he skips it.
    */
   private requestExtra() {
+    this.sealPremoves();
     this.r.phase = "boss";
     this.r.bossKey = `x-${++this.r.counter}`;
     this.r.bossKind = "extra";
@@ -1654,6 +1672,7 @@ export class LobbyCore {
    * replies.
    */
   private requestFunhouse() {
+    this.sealPremoves();
     this.r.phase = "boss";
     this.r.bossKey = `f-${++this.r.counter}`;
     this.r.bossKind = "funhouse";
@@ -1854,6 +1873,8 @@ export class LobbyCore {
     for (const h of playing) deadlines[h.id] = now + runner.allowedMsFor(h.id);
     const deadline = Math.max(now, ...Object.values(deadlines));
     const premoved = this.takePremoves(playing.map((h) => h.id));
+    // (From here this round's position is out, and the watching team sees its picks live: a seal.)
+    this.sealPremoves();
     this.r.round = { key, deadline, deadlines, startedAt: now, picks: {}, powerUps: {}, ...(final ? {} : { botsDoneIn: runner.botThinkTimes() }), ...(premoved ? { premoved } : {}) };
     this.r.phase = "play";
     const st = this.standings();
@@ -1992,11 +2013,14 @@ export class LobbyCore {
 
   /**
    * A player's first premove (chess.com's: a move made ahead on their board while it isn't their turn), told ahead of
-   * their next turn so fair play can tell a premove from a fast move without trusting the app: kept only while they
-   * can't pick (no round open in which they still have to), so it was made before they saw the position it's played in.
-   * The round they next pick in takes it as it opens (`takePremoves`); a pick that plays it, says so, and comes within
-   * FAIRPLAY.signals.premoveMs of the clock's start is marked a premove, and fair play leaves its time out of its timing
-   * (nothing else: it's judged as any pick). Null: no premove now.
+   * their next turn so fair play can tell a premove from a fast move without trusting the app. Fair play's rule: a pick is
+   * marked a premove only if the server had that move before any browser could know the position it's played in. So
+   * it's kept only while they can't pick (no round open in which they still have to), under the seal of the moment
+   * (`premoveSeal`); the round they next pick in takes it as it opens only if a seal has come since (`takePremoves`): told
+   * before the step that decided the last of that position (the boss's step asked of the host, the other team's or
+   * mover's round opening, its picks live to watchers). Then a pick that plays it, says so, and comes within
+   * FAIRPLAY.signals.premoveMs of the clock's start is marked, and fair play leaves only its time out of timing. One that
+   * misses any of that is timed as any pick, never held against anyone. Null: no premove now.
    */
   private premoveAhead(playerId: string, move: unknown) {
     if (!this.human(playerId) || this.r.phase === "results") return;
@@ -2005,17 +2029,31 @@ export class LobbyCore {
     if (this.r.phase === "play" && round && round.deadlines[playerId] !== undefined && !this.doneThisRound(playerId)) return;
     const kept = { ...this.r.premoves };
     if (move === null) delete kept[playerId];
-    else kept[playerId] = move;
+    else kept[playerId] = { move, seal: this.r.premoveSeal ?? 0 };
     this.r.premoves = Object.keys(kept).length ? kept : undefined;
   }
 
-  /** The premoves told ahead by those picking in the round now opening (the others' wait for their own turn). */
+  /**
+   * Fair play's premove seal goes up: the next position starts to be knowable to a browser from now (a round opening, a
+   * boss step asked of the host or played). A premove told from now on can't count for that position (takePremoves).
+   */
+  private sealPremoves() {
+    this.r.premoveSeal = (this.r.premoveSeal ?? 0) + 1;
+  }
+
+  /**
+   * The premoves told ahead by those picking in the round now opening: each counts if it was told under an older seal
+   * than now, before the last of this position was knowable (premoveAhead); the rest are dropped. The others' wait for
+   * their own turn.
+   */
   private takePremoves(ids: readonly string[]): Record<string, string> | null {
     const kept = { ...this.r.premoves };
+    const seal = this.r.premoveSeal ?? 0;
     const taken: Record<string, string> = {};
     for (const id of ids) {
-      if (kept[id] === undefined) continue;
-      taken[id] = kept[id]!;
+      const p = kept[id];
+      if (p === undefined) continue;
+      if (p.seal < seal) taken[id] = p.move;
       delete kept[id];
     }
     this.r.premoves = Object.keys(kept).length ? kept : undefined;
@@ -2035,7 +2073,7 @@ export class LobbyCore {
     const allowed = this.runner?.boss ? this.runner.crowdAllowed() : null;
     if (allowed && !allowed.includes(move)) return;
     const thinkMs = Math.min(this.thinkTime(round, now), this.thinkTime(round, deadline));
-    // (A premove: told before the round opened, this very move, and made at once. See premoveAhead.)
+    // (A premove: told before any browser could know this position, this very move, and made at once. See premoveAhead.)
     const premoved = premove === true && round.premoved?.[playerId] === move && thinkMs <= FAIRPLAY.signals.premoveMs;
     round.picks[playerId] = {
       move,

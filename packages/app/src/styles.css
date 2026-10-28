@@ -603,6 +603,16 @@ p {
   --ua-green: #9fcf3f;
   --sq-premove: rgba(244, 42, 50, 0.55);
 }
+/* (Green: Shift's green is deeper, so it reads on the green squares. Gold: Ctrl's yellow square and the plain arrow's
+   yellow-orange are deeper oranges, so they read on the gold squares.) */
+:root[data-board-colors="green"] {
+  --uh-green: rgba(64, 140, 36, 0.8);
+  --ua-green: #3f9a22;
+}
+:root[data-board-colors="gold"] {
+  --uh-yellow: rgba(240, 118, 0, 0.8);
+  --ua-orange: #f07a00;
+}
 .hb square.uh-red {
   background-color: var(--uh-red);
 }

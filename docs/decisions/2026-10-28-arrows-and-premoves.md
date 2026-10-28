@@ -79,14 +79,32 @@ Each screen opts in (`premove={{ key, side }}` on the board):
   a premoved hard find (a recapture you saw coming, say, in a position the crowd found hard) would count as a fast one.
   Its rules are "signals come from the server's own judged data, never numbers a browser makes up", so a plain "this was
   a premove" flag from the app would let a cheat flag every fast engine move and dodge the timing signals.
+- **The rule** (the director's review of the PR, Oct 28): a pick is marked a premove only if the server had that move
+  **before any browser could know the position it's played in**; a pick that misses this isn't punished, it's timed as
+  every pick was before premoves.
 - **What we did:** the app tells the lobby its first premove ahead (`premove`, as it changes), and the lobby keeps it only
-  while the player can't pick (no round open in which they still have to). The round they next pick in takes it as it
-  opens. A pick that plays that very move, says it's a premove and comes within `FAIRPLAY.signals.premoveMs` (2 s) of the
-  clock's start is marked (`FairMove.premove`), and fair play leaves only its time out of timing; strength, evidence,
-  streaks and the deep re-check judge it as any pick. The mark needs the move to have reached the server before the
-  position it's played in existed, so it can't be put on an engine's answer to that position: nothing rests on the app's
-  word, and nothing a premove does helps a cheat. No other change to how a game is judged. The review page shows
-  "(premove)" by its time.
+  while the player can't pick (no round open in which they still have to), with the lobby's **premove seal** of the
+  moment. The seal goes up each time the next position starts to be knowable to a browser: as a **round opens** (its
+  position is out, and the watching team sees its picks live, the most popular one played) and at **every boss step**
+  (`requestBoss` and the bounce, Alfil, hop, carrots, repaint, water, extra move and funhouse steps: the host's browser
+  decides it, or the server does and shows it). The round a player next picks in takes their premove as it opens only if
+  it was told under an older seal: before the last step that decided its position. A pick that plays that very move,
+  says it's a premove and comes within `FAIRPLAY.signals.premoveMs` (2 s) of the clock's start is marked
+  (`FairMove.premove`), and fair play leaves only its time out of timing; strength, evidence, streaks and the deep
+  re-check judge it as any pick. No other change to how a game is judged. The review page shows "(premove)" by its time.
+- **What that marks:** in a raid, a premove told before the host is asked for the boss's step (after your own pick, or
+  during the crowd's reveal: the crowd's move is out, the boss's reply isn't decided); not one told while the boss thinks
+  or while his move shows. In the Crowd 50 v 50, one told after your own pick, before the other team's turn opens (a
+  computer's queue); not one told while they choose (their picks show live) or during their reveal. In a final, one told
+  before the other finalist's turn opens; not one between movers. In Classic's rounds, none (the next round opens with
+  nothing between). So most premoves made on the screen while the boss thinks, or while the other team chooses, are timed
+  as any pick: the cost of never trusting the app, and no worse than before premoves.
+- **Why not "a seal at the lock" (the review's first suggestion):** with seals at the lock and at the boss steps and "told
+  before the latest seal", a premove told while the other team chooses in the Crowd would come before their lock and
+  count, yet their picks show live to the watching team and the most popular is played, so the position is all but known
+  then. Sealing as each round opens closes that; in a raid it changes nothing (the boss step is the latest seal either
+  way). A seal is never added for a step that reveals nothing new (a boss request sent again to a new host), since a
+  later seal lets through what was told before it.
 - **1 v 1:** no judged picks, so no timing signal; nothing marks a premove there (a field nobody reads). The clock is
   unchanged: the server charges each move the time from the opponent's move reaching it to yours reaching it, so a
   premove costs about a round trip (chess.com charges 0.1 s); the bot game, on the device, about a frame. Ranked's rules

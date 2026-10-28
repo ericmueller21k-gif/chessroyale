@@ -44,9 +44,9 @@ export interface FairMove {
   /** Look-aways during the move's clock, before the pick: the page hidden or the window unfocused (the app's count). */
   away: number;
   /**
-   * A premove (chess.com's: made ahead, before the position was there to see, and played as the turn opened), as the
-   * server saw it: told before the round opened, then played at once (the lobby's premoveAhead). Its time measures no
-   * thinking, so it's left out of timing; everything else counts it as any pick.
+   * A premove (chess.com's: made ahead, and played as the turn opened), as the server saw it: told to the server before
+   * any browser could know the position it's played in, then played at once (the lobby's premoveAhead). Its time
+   * measures no thinking, so it's left out of timing; everything else counts it as any pick.
    */
   premove?: boolean;
   /** Used a power-up (saw the engine's top moves): never counted. */

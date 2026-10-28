@@ -537,7 +537,8 @@ export type ClientMessage =
   | { t: "pick"; key: string; move: string; away?: number; premove?: true }
   /**
    * Your first premove (chess.com's: a move made ahead while it isn't your turn; null: none now), sent as it changes. The
-   * server keeps it only while you can't pick (no turn of yours open, or you've picked in it), for your next turn.
+   * server keeps it only while you can't pick (no turn of yours open, or you've picked in it), for your next turn, and
+   * counts it only if it came before any browser could know that turn's position (the lobby's premoveAhead).
    */
   | { t: "premove"; move: string | null }
   | { t: "powerUp"; key: string }
