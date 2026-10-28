@@ -225,7 +225,7 @@ kill switch `PAUSE_RANKED1V1`.
   sandbagging, trading wins). Run it again after changing `RANKED_1V1`'s rating, points, placements or pairing.
 - e2e: `e2e/ranked-1v1.spec.ts` (two players on phones and computers: the queue, the vote on the board by drag and by
   tap, the overlay, the board unmoved from the vote to the game, checkmate by taps, ranks moving; resigning, then a
-  flag after Play again; an aborted game; a reload mid-game back into the same game with its clocks running, a
+  flag after Play again; every change drawn with the page's clock held still (the result, then the rank); an aborted game; a reload mid-game back into the same game with its clocks running, a
   declined draw offer then a draw both agree to; Leave before the first moves; the search's Cancel, "Few players
   online", Keep waiting, a bot game arriving on the same stage; the stage: your pawn on the left platform while
   searching, the opponent's pawn, name and rank on the right when found, your pawn's element kept and nothing on the
@@ -257,6 +257,9 @@ kill switch `PAUSE_RANKED1V1`.
 - 1 v 1's CSS classes start with `dv-` (the shared hint's is `first-vote-hint`): a generic name can already be someone
   else's. (`.vote-hint` was Crowd's line above its vote board; styling it moved that board 12 px, caught by
   `votes.spec.ts`.)
+- The game screen redraws by a count, never by setting the time as state: Preact skips a state set to the value it
+  holds, so a change in the same millisecond as the last draw was lost ("Updating your rank…" for good;
+  [2026-10-28-two-flaky-tests.md](../decisions/2026-10-28-two-flaky-tests.md)).
 - A phone's game screen is locked (nothing scrolls) while the game is played; once it's over it scrolls, so the result
   card never clips the chat (which never gets less than 140 px).
 - The board never moves from the vote to the result: anything new for the vote or the game is drawn over it, in

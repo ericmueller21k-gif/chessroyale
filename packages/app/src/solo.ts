@@ -1047,7 +1047,14 @@ export class SoloMatch implements GameView {
   private startSimul() {
     if (!this.phase2 || this.stopped) return;
     this.set({ kind: "simul", at: Date.now() + PHASE_CHANGE.countdownMs });
-    this.timer = setTimeout(() => this.startClocks(), PHASE_CHANGE.countdownMs);
+    // The countdown counts from the boards' first frame on screen: the four boards' first draw is one long frame (50 to
+    // 120 ms on a busy computer), and counted from before it the 5 was up short of its second (889 to 974 ms measured).
+    // docs/decisions/2026-10-28-two-flaky-tests.md.
+    afterFirstFrame(() => {
+      if (!this.phase2 || this.stopped || this.phase.kind !== "simul" || this.phase2Playing) return;
+      this.set({ kind: "simul", at: Date.now() + PHASE_CHANGE.countdownMs });
+      this.timer = setTimeout(() => this.startClocks(), PHASE_CHANGE.countdownMs);
+    });
   }
 
   /** Phase 2's play: every clock starts. His line (the God King is gone: absorbed in the phase change). */
@@ -1498,4 +1505,20 @@ export class SoloMatch implements GameView {
       ...(this.runner.bossCarrotWin ? { carrots: true } : {}),
     });
   }
+}
+
+/**
+ * Calls `fn` once, after the frame that draws what was just set is on screen (two animation frames on), or after `maxMs`
+ * when no frames come (a hidden tab, or no page at all: the unit tests).
+ */
+function afterFirstFrame(fn: () => void, maxMs = 250) {
+  let done = false;
+  const go = () => {
+    if (done) return;
+    done = true;
+    fn();
+  };
+  const raf = typeof requestAnimationFrame === "function" ? requestAnimationFrame : null;
+  if (raf) raf(() => raf(go));
+  setTimeout(go, raf ? maxMs : 0);
 }
