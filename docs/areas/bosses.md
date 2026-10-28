@@ -493,12 +493,29 @@ build): online, phase 1 won is the crowd's victory):
   `move-list.ts`): one row per move of the battle (who moved, the move number, the piece and its square, a capture, a
   raid's picks, the time it took as this device saw it), from the match's own history. A phone upright: the panel left of
   the God King, "Players" / "Moves" (and "Chat" with chat on) with other players, the moves alone in Boss alone; a tap
-  opens it full size over the board (✕, Escape, a tap outside close it). A computer: right of the board, above the God
-  King; a raid's scoreboard stays on the left. Boss alone has no scoreboard anywhere. Tests: `e2e/board-layout.spec.ts`,
-  `packages/app/test/move-list.test.ts`.
+  opens it full size over the board (✕, Escape, a tap outside close it). A computer (`.mv-side`, 900 px and up): right of
+  the board, its top level with the board's, **half the height it had** (`--mv-h`: half of the board's less 146 px, at
+  least 120 px), the column's width, **13 to 15 px off the board** (it's shifted in with a `translate` from `--gk-column`
+  and `--board-px`; the column's own 28 px gap and the board's slack go), Boss alone's pawn and the God King below it; a
+  raid's scoreboard stays on the left, what the column held under the list (an online raid's chat, the scoreboard from
+  900 to 1099 px) starts 12 px under the shorter list and keeps its left edge (Oct 28). Boss alone has no scoreboard
+  anywhere. Tests: `e2e/board-layout.spec.ts`, `packages/app/test/move-list.test.ts`.
+- **Your pawn on the board screen** (Eric, Oct 28; docs/decisions/2026-10-28-your-pawn-on-board.md;
+  `YourPawn` in `components/BossDock.tsx`): in **Boss alone** only (a raid, Boss Arena, 1 v 1 not yet), your own pawn as
+  your profile wears it (`Avatar`, the crowd's color, as the list's rows draw it), about the God King's size, on his line.
+  A phone upright: in the strip, just left of him (a 58 px column; the panel gives up that width, and its rows tighten
+  where it's narrow: a container query on `.dk-panel`); a computer: right of the board, as far from it as the boss is on
+  the other side (`--gk-off`, plus `--bs-out` without the eval bar), **he to its right** (his old place moved over by its
+  width; the "he mirrors the boss" rule is the pawn's now). A slow, slight bob (CSS transform, the God King's own 2.4 s
+  breath) and one small hop as your move lands (home's hero pawn's `fd-hop`, 0.6 s); nothing else, it never reacts to
+  his save, a power or the result. Drawn once and again only for a hop (memo). His ⚡ and 🐟 (admins) and Chub & Chirp's
+  carrot count sit just left of it on a phone; his words open over it for their few seconds there (above him on a
+  computer, clear of it). Not drawn where the dock has no panel or computer corner: the Hidden Boss's phase change and
+  phase 2, a phone on its side, a short window. Tests: `e2e/board-layout.spec.ts`, `e2e/boss-dock.spec.ts`,
+  `e2e/hopper.spec.ts`, `e2e/boss-character.spec.ts`.
 - **The boss screen on a computer** (Eric, Oct 11): the boss by the board's bottom-left corner, the God King by its
-  bottom-right, mirroring him (feet level, as far from the board); the status box under the board at its width; the
-  column beside the board starts after the God King. The eval bar draws behind them both. A phone is unchanged.
+  bottom-right, mirroring him (feet level, as far from the board; in Boss alone, since Oct 28, your pawn stands there and
+  he stands to its right); the status box under the board at its width; the column beside the board starts after the God King. The eval bar draws behind them both. A phone is unchanged.
   From 900 to 1099 px the boss is drawn at 1× by the eval bar, so he's whole in the window; the board makes room only
   if it must (`--bs-reach`, `--bs-need` in styles.css; Oct 14). From 1100 px he's 2× (2 screen px a sprite px).
   With no eval bar (every player's board: the board takes its 24 px) he stands 24 px further out (`--bs-out`), as far

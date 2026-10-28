@@ -95,7 +95,10 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   flag at the moment the clock reached zero), and the object's alarm is the next deadline. A move after the flag is
   never played. Moves carry their ply, so a move resent after a reconnect is never played twice; a refused move
   answers with the game, and the app's board goes back to it. No lag compensation: the server times each move as it
-  arrives.
+  arrives. **Premoves** (chess.com's, the board's own: [board.md](board.md), "Arrows, highlights and premoves"): sent as
+  an ordinary move the moment your turn shows, so the clock charges one the time from your opponent's move reaching the
+  server to yours reaching it, about a round trip (chess.com charges 0.1 s); the bot game, on the device, about a frame.
+  Nothing marks a premove for the server (1 v 1 has no timing signal), so nothing a premove does changes a rank.
 - **Quick chat** as in other online matches (`MatchChat`, `ChatPanel`), one channel (no teams: every line a player
   owns goes to both), the limits of `QUICK_CHAT`, mute by account on the device (`chat-mod.ts` in the app) and on the
   server (`chatPrefs`), and #252's chat bans (read as each player connects, again at most every `CHAT_MOD.recheckMs` as

@@ -11,6 +11,14 @@ import { BOARD_SEL, bossAloneFromHome, engineTop, openBossRaid, submitMove, test
  *   the God King;
  * - both: one row per move with its piece, square and capture; the "Your move" row one line tall.
  * (Babur's pump against the move list: tiger.spec.ts, which counts `.mv-side` among what the pump must stay off.)
+ *
+ * Eric, Oct 28 (docs/decisions/2026-10-28-your-pawn-on-board.md):
+ * - Boss alone: your own pawn beside the God King, about his size, on his line: left of him in a phone's strip (the panel gives
+ *   up its width), by the board's corner on a computer with him to its right; it bobs, and hops as your move lands; a raid has
+ *   none (not yet);
+ * - a computer's move list: its top level with the board's, half its old height, the same width, 12 to 16 px from the board;
+ *   what's under it in the column moves up with it;
+ * - the board's box is main's at every size.
  */
 
 /** Measured on main before this change (3cf8aba0), Boss alone and a Solo raid alike: the board's width on a phone. */
@@ -23,6 +31,16 @@ const MAIN_TOWER: Record<string, { x: number; y: number; w: number }> = {
 };
 /** …and the "Your move" row's height (two lines' room). */
 const MAIN_ROW_H = 62;
+/** Measured on main before the pawn (b9712062), Boss alone: the board's box on a computer (x, y, width = height). */
+const MAIN_BOARD_BOX: Record<string, { x: number; y: number; w: number }> = {
+  "1280x800": { x: 408, y: 121.3, w: 456 },
+  "1440x900": { x: 438, y: 121.3, w: 552 },
+  "1536x864": { x: 486, y: 121.3, w: 552 },
+  "1920x1080": { x: 678, y: 121.3, w: 552 },
+  "1024x768": { x: 96, y: 121.3, w: 464 },
+};
+/** …and the move list's height there then: the board's less 146 px (at least 160 px). */
+const mainSideH = (board: number) => Math.max(160, board - 146);
 
 const SHOTS = process.env.LAYOUT_SHOTS;
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
@@ -75,6 +93,7 @@ const boxes = (page: Page) =>
       row: r(".boss-dock-main"),
       text: r(".boss-dock-status .dk-text"),
       king: r(".boss-dock .gk-unit"),
+      pawn: r(".boss-dock .you-pawn"),
       panel: r(".boss-dock .dk-panel"),
       side: r(".mv-side"),
       tower: r(".tower-side"),
@@ -146,6 +165,23 @@ test("a phone: the God King at the strip's right edge, the panel to his left, th
       expect(overlap(panel, king), at).toBe(false);
       expect(panel.b - panel.y, `${at}: the panel at least his height`).toBeGreaterThanOrEqual(king.b - king.y);
       expect(panel.b, `${at}: inside the screen`).toBeLessThanOrEqual(h);
+      // Your pawn (Boss alone only, Oct 28): between the panel and him, his size, on his line, nothing over it; a raid has none yet.
+      if (raid) expect(b.pawn, `${at}: no pawn in a raid`).toBeNull();
+      else {
+        const pawn = b.pawn!;
+        expect(pawn, `${at}: your pawn`).toBeTruthy();
+        expect(Math.abs(pawn.r - king.x), `${at}: just left of him`).toBeLessThanOrEqual(1);
+        expect(Math.abs(pawn.r - pawn.x - (king.r - king.x)), `${at}: his width`).toBeLessThanOrEqual(1);
+        expect(Math.abs(pawn.b - pawn.y - (king.b - king.y)), `${at}: his height`).toBeLessThanOrEqual(1);
+        expect(Math.abs(pawn.y - king.y), `${at}: on his line`).toBeLessThanOrEqual(1);
+        expect(panel.r, `${at}: the panel left of your pawn`).toBeLessThanOrEqual(pawn.x + 1);
+        expect(overlap(panel, pawn) || overlap(pawn, king) || overlap(pawn, row), `${at}: your pawn over nothing`).toBe(false);
+        expect(pawn.y, `${at}: under the row`).toBeGreaterThanOrEqual(row.b);
+        expect(pawn.x, `${at}: inside the screen`).toBeGreaterThanOrEqual(0);
+        // (Drawn in the crowd's color, as the list's rows are.)
+        const side = await page.evaluate(() => (window as any).match.boss.crowdSide as string);
+        await expect(page.locator(".you-pawn piece")).toHaveClass(new RegExp(side === "w" ? "white" : "black"));
+      }
       // The page never scrolls; no scoreboard under the board but the panel's.
       expect(b.scroll, `${at}: no scrolling`).toBeLessThanOrEqual(0);
       expect(b.sideways, at).toBeLessThanOrEqual(0);
@@ -192,43 +228,166 @@ test("a phone: the God King at the strip's right edge, the panel to his left, th
   }
 });
 
-test("a computer: Boss alone has no scoreboard; a raid's is where it was; the moves right of the board, off the board and the God King", async ({ browser }) => {
+test("a computer: Boss alone has no scoreboard and your pawn left of the God King by the board's corner; a raid's is where it was; the moves right of the board, from its top, half as tall, a small gap off it; the board's box main's", async ({ browser }) => {
   test.skip(test.info().project.name !== "desktop", "it opens its own windows");
-  test.setTimeout(12 * 60_000);
-  for (const raid of [false, true]) {
-    for (const size of ["1280x800", "1440x900", "1920x1080"]) {
-      const [w, h] = size.split("x").map(Number) as [number, number];
-      const at = `${raid ? "raid" : "alone"} ${size}`;
-      const { ctx, page } = await open(browser, w, h);
-      await into(page, raid);
-      const b = await boxes(page);
-      expect(b.board && b.king && b.side, at).toBeTruthy();
-      if (raid) {
-        // The scoreboard on the left, the same box as on main.
+  test.setTimeout(15 * 60_000);
+  const runs = [
+    ...["1280x800", "1440x900", "1536x864", "1920x1080", "1024x768"].map((size) => ({ raid: false, size })),
+    ...["1280x800", "1920x1080", "1024x768"].map((size) => ({ raid: true, size })),
+  ];
+  for (const { raid, size } of runs) {
+    const [w, h] = size.split("x").map(Number) as [number, number];
+    const at = `${raid ? "raid" : "alone"} ${size}`;
+    const { ctx, page } = await open(browser, w, h);
+    await into(page, raid);
+    const b = await boxes(page);
+    expect(b.board && b.king && b.side, at).toBeTruthy();
+    if (raid) {
+      // The scoreboard on the left (a column beside the board from 900 to 1099 px), the same box as on main.
+      if (size !== "1024x768") {
         const t = b.tower!;
         expect(t, `${at}: the scoreboard`).toBeTruthy();
         const m = MAIN_TOWER[size]!;
         for (const [k, v] of [["x", t.x - m.x], ["y", t.y - m.y], ["width", t.r - t.x - m.w], ["height", t.b - t.y - h]] as const) expect(Math.abs(v), `${at}: the scoreboard's ${k}`).toBeLessThanOrEqual(1);
-      } else {
-        expect(b.tower, `${at}: no scoreboard on the left`).toBeNull();
-        expect(b.mini, `${at}: nor in the column`).toBeNull();
-      }
-      // The moves: right of the board, from its top, above the God King, over neither.
-      const { board, king, side } = { board: b.board!, king: b.king!, side: b.side! };
-      expect(side.x, `${at}: right of the board`).toBeGreaterThanOrEqual(board.r);
-      expect(Math.abs(side.y - board.y), `${at}: from the board's top`).toBeLessThanOrEqual(30);
-      expect(side.b, `${at}: above the God King`).toBeLessThanOrEqual(king.y);
-      expect(overlap(side, board), at).toBe(false);
-      expect(overlap(side, king), at).toBe(false);
-      expect(side.r, `${at}: inside the window`).toBeLessThanOrEqual(w);
-      expect(side.b - side.y, `${at}: room for rows`).toBeGreaterThanOrEqual(150);
-      expect(b.scroll, at).toBeLessThanOrEqual(0);
-      if (SHOTS && size === "1280x800") {
-        await play(page, 2);
-        await page.screenshot({ path: `${SHOTS}/computer-${raid ? "raid" : "alone"}.png` });
-      }
-      await ctx.close();
+      } else expect(b.mini, `${at}: the scoreboard under the moves`).toBeTruthy();
+      expect(b.pawn, `${at}: no pawn in a raid`).toBeNull();
+    } else {
+      expect(b.tower, `${at}: no scoreboard on the left`).toBeNull();
+      expect(b.mini, `${at}: nor in the column`).toBeNull();
     }
+    const { board, king, side } = { board: b.board!, king: b.king!, side: b.side! };
+    // The board is exactly where and as big as on main.
+    const main = MAIN_BOARD_BOX[size]!;
+    if (!raid || size === "1280x800") for (const [k, v] of [["x", board.x - main.x], ["y", board.y - main.y], ["width", board.r - board.x - main.w], ["height", board.b - board.y - main.w]] as const) expect(Math.abs(v), `${at}: the board's ${k}`).toBeLessThanOrEqual(1);
+    // The moves: from the board's top, half as tall as they were, the column's width, a small gap off the board; over nothing.
+    expect(Math.abs(side.y - board.y), `${at}: level with the board's top`).toBeLessThanOrEqual(1);
+    expect(side.x - board.r, `${at}: a small gap off the board`).toBeGreaterThanOrEqual(12);
+    expect(side.x - board.r, `${at}: a small gap off the board`).toBeLessThanOrEqual(16.5);
+    expect(Math.abs(side.r - side.x - 340), `${at}: the same width`).toBeLessThanOrEqual(1);
+    expect(Math.abs(side.b - side.y - mainSideH(board.r - board.x) / 2), `${at}: half the height`).toBeLessThanOrEqual(2);
+    expect(side.b - side.y, `${at}: room for rows`).toBeGreaterThanOrEqual(120);
+    expect(side.b, `${at}: above the God King`).toBeLessThanOrEqual(king.y);
+    expect(overlap(side, board), at).toBe(false);
+    expect(overlap(side, king), at).toBe(false);
+    expect(side.r, `${at}: inside the window`).toBeLessThanOrEqual(w);
+    // What's under the moves in the column moves up with them (a raid's scoreboard from 900 to 1099 px).
+    if (b.mini) expect(Math.abs(b.mini.y - side.b - 12), `${at}: the scoreboard under the moves`).toBeLessThanOrEqual(1);
+    if (!raid) {
+      // Your pawn: right of the board, by it, standing on the God King's line, he to its right, about his size. (As far from the
+      // board as the boss is on its other side: 26 px, the director's --bs-out keeps that without the eval bar too.)
+      const pawn = b.pawn!;
+      expect(pawn, `${at}: your pawn`).toBeTruthy();
+      expect(pawn.x - board.r, `${at}: clear of the board as the boss is`).toBeGreaterThanOrEqual(24);
+      expect(pawn.x - board.r, `${at}: by the board`).toBeLessThanOrEqual(32);
+      expect(Math.abs(pawn.b - king.b), `${at}: on his line`).toBeLessThanOrEqual(1);
+      expect(Math.abs(pawn.r - pawn.x - (king.r - king.x)), `${at}: his width`).toBeLessThanOrEqual(1);
+      expect(Math.abs(pawn.b - pawn.y - (king.b - king.y)), `${at}: his height`).toBeLessThanOrEqual(1);
+      expect(king.x, `${at}: the God King to its right`).toBeGreaterThanOrEqual(pawn.r - 1);
+      expect(king.x - pawn.r, `${at}: beside it`).toBeLessThanOrEqual(8);
+      expect(pawn.b, `${at}: the board's bottom line`).toBeLessThanOrEqual(b.row!.b);
+      expect(king.r, `${at}: inside the window`).toBeLessThanOrEqual(w);
+      expect(side.b, `${at}: the moves above your pawn`).toBeLessThanOrEqual(pawn.y);
+      expect(overlap(pawn, board) || overlap(pawn, side) || overlap(pawn, king) || overlap(pawn, b.row!), `${at}: your pawn over nothing`).toBe(false);
+      // His words open above him: clear of your pawn and of the board (they can reach up over the end of the list, never the other way).
+      const words = page.locator(".boss-dock .gk-bubble:not(.leaving)");
+      if (await words.isVisible()) {
+        const v = (await words.boundingBox())!;
+        expect(v.y + v.height, `${at}: his words above him`).toBeLessThanOrEqual(king.y + 8);
+        expect(overlap({ x: v.x, y: v.y, r: v.x + v.width, b: v.y + v.height }, pawn), `${at}: his words clear of your pawn`).toBe(false);
+        expect(v.x, `${at}: his words right of the board`).toBeGreaterThanOrEqual(board.r);
+      }
+    } else expect(king.x - board.r, `${at}: the God King where he was`).toBeLessThanOrEqual(30);
+    expect(b.scroll, at).toBeLessThanOrEqual(0);
+    if (SHOTS && size === "1280x800") {
+      await play(page, 2);
+      await page.screenshot({ path: `${SHOTS}/computer-${raid ? "raid" : "alone"}.png` });
+    }
+    await ctx.close();
+  }
+});
+
+test("no eval bar (every player's board): your pawn is as far from the board as the boss is on its other side, and the list is still a small gap off the board", async ({ browser }) => {
+  test.skip(test.info().project.name !== "desktop", "it opens its own windows");
+  test.setTimeout(6 * 60_000);
+  for (const size of ["1280x800", "1920x1080"]) {
+    const [w, h] = size.split("x").map(Number) as [number, number];
+    const { ctx, page } = await open(browser, w, h);
+    await page.addInitScript(() => localStorage.setItem("brc.evalBar", "0"));
+    await into(page, false);
+    await expect(page.locator(".eval-bar")).toHaveCount(0);
+    const g = await page.evaluate(() => {
+      const r = (s: string) => {
+        const b = document.querySelector(s)!.getBoundingClientRect();
+        return { x: b.left, r: b.right, w: b.width };
+      };
+      return { wrap: r(".board-area .board-row > .board-wrap"), board: r(".board-area .board-row > .board-wrap .hb-container"), pawn: r(".boss-dock .you-pawn"), boss: r(".boss-char.place-side"), king: r(".boss-dock .gk-unit"), side: r(".mv-side") };
+    });
+    const at = `no eval bar ${size}`;
+    // (The mirror, middle to middle, as boss-character.spec.ts checks it with the eval bar: the boss stands 24 px further out then.)
+    expect(Math.abs(g.pawn.x + g.pawn.w / 2 - g.wrap.r - (g.wrap.x - (g.boss.x + g.boss.w / 2))), `${at}: your pawn's middle as far from the board as the boss's`).toBeLessThanOrEqual(2);
+    expect(g.pawn.x - g.board.r, `${at}: as clear of the board as with the bar`).toBeGreaterThanOrEqual(24);
+    expect(g.pawn.x - g.board.r, `${at}: as clear of the board as with the bar`).toBeLessThanOrEqual(32);
+    expect(g.king.x, `${at}: the God King to its right`).toBeGreaterThanOrEqual(g.pawn.r - 1);
+    expect(g.side.x - g.board.r, `${at}: the list a small gap off the board`).toBeGreaterThanOrEqual(12);
+    expect(g.side.x - g.board.r, `${at}: the list a small gap off the board`).toBeLessThanOrEqual(16.5);
+    await ctx.close();
+  }
+});
+
+test("your pawn: it bobs all the time (a transform), hops once as your move lands and not for the boss's, and keeps still under reduced motion", async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough");
+  test.setTimeout(5 * 60_000);
+  await into(page, false);
+  const pawn = page.locator(".you-pawn");
+  await expect(pawn).toBeVisible();
+  const names = (sel: string) => page.evaluate((s) => document.querySelector(s)!.getAnimations().map((a) => (a as CSSAnimation).animationName), sel);
+  // The idle: a running animation, and its transform really changes.
+  expect(await names(".you-pawn-bob")).toEqual(["you-bob"]);
+  const seen = new Set<string>();
+  for (let i = 0; i < 12; i++) {
+    seen.add(await page.evaluate(() => getComputedStyle(document.querySelector(".you-pawn-bob")!).transform));
+    await page.waitForTimeout(200);
+  }
+  expect(seen.size, "the bob moves").toBeGreaterThan(2);
+  // No hop before your move. Then your move lands: the hop, once, on whichever screen's dock stands then.
+  expect(await names(".you-pawn-hop")).toEqual([]);
+  const { fen, top } = await engineTop(page);
+  // (As the move goes in and shows on the board, not later when the boss answers.)
+  const hop = page.waitForFunction(() => document.querySelector(".you-pawn-hop.hop")?.getAnimations().map((a) => (a as CSSAnimation).animationName).join() === "fd-hop", null, { polling: "raf", timeout: 3000 });
+  await submitMove(page, top[0]?.move, fen);
+  await hop;
+  await expect.poll(() => names(".you-pawn-hop"), { timeout: 5000, message: "the hop ends" }).toEqual([]);
+  // The boss's reply doesn't hop it: your next move comes, a good second after your last one landed, and it's still.
+  await yourMove(page);
+  await page.waitForTimeout(800);
+  expect(await names(".you-pawn-hop"), "no hop for the boss's move").toEqual([]);
+  expect(await names(".you-pawn-bob"), "still bobbing").toEqual(["you-bob"]);
+  // Reduced motion: no bob, no hop.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  expect(await names(".you-pawn-bob"), "no bob under reduced motion").toEqual([]);
+});
+
+test("a narrow phone: the list's rows fit the panel, their times showing", async ({ browser }) => {
+  test.skip(test.info().project.name !== "phone", "it opens its own phones");
+  test.setTimeout(5 * 60_000);
+  for (const size of ["320x640", "360x640"]) {
+    const [w, h] = size.split("x").map(Number) as [number, number];
+    const { ctx, page } = await open(browser, w, h);
+    await into(page, false);
+    await play(page, 3);
+    const rows = await page.evaluate(() =>
+      [...document.querySelectorAll(".dk-panel .mv-row:not(.mv-opening)")].map((r) => {
+        const panel = document.querySelector(".dk-panel")!.getBoundingClientRect();
+        const t = r.querySelector(".mv-time")?.getBoundingClientRect();
+        return { over: r.scrollWidth - r.clientWidth, timeShown: !!t && t.right <= panel.right + 0.5 && t.width > 0, label: r.getAttribute("aria-label") };
+      }),
+    );
+    expect(rows.length, size).toBeGreaterThanOrEqual(6);
+    for (const r of rows) {
+      expect(r.over, `${size}: ${r.label}`).toBeLessThanOrEqual(0);
+      expect(r.timeShown, `${size}: ${r.label}`).toBe(true);
+    }
+    await ctx.close();
   }
 });
 

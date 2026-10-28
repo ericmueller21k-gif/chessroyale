@@ -307,6 +307,9 @@ test("their tile and stage, their figure by the board and the dock's count: whol
     expect(badge.x).toBeGreaterThanOrEqual(status.x - 50);
     expect(badge.x).toBeGreaterThanOrEqual(0);
     expect(badge.x + badge.width).toBeLessThanOrEqual(king.x);
+    // (Beside your pawn, which stands just left of him in Boss alone since Oct 28: the count is left of it, over no part of it.)
+    const pawn = (await page.locator(".boss-dock > .you-pawn").boundingBox())!;
+    expect(badge.x + badge.width).toBeLessThanOrEqual(pawn.x + 1);
     expect(badge.y).toBeGreaterThanOrEqual(status.y + status.height);
     expect(badge.y).toBeGreaterThanOrEqual(king.y - 1);
     expect(badge.y + badge.height).toBeLessThanOrEqual(king.y + king.height + 1);

@@ -290,7 +290,8 @@ export interface GameView {
   nameOf(id: string): string;
   isYou(id: string): boolean;
   subscribe(fn: () => void): () => void;
-  submit(move: string | null): void;
+  /** Your pick (null: none). `premove`: a premove played as your turn opened (online, the server is told: fair play). */
+  submit(move: string | null, premove?: boolean): void;
   skipReveal(): void;
   continueFromBreak(): void;
   /** The 2v2 final once it has started (also during your own turn in it). */

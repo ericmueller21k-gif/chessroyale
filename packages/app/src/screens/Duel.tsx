@@ -3,6 +3,7 @@ import { useEffect, useState } from "preact/hooks";
 import { controlLabel, duelControl } from "@chessroyale/core";
 import { other, type Color, type DuelEnd } from "@chessroyale/chess/duel";
 import { Board } from "../components/Board.tsx";
+import { seatKey } from "../board/yours.ts";
 import { Avatar } from "../components/Items.tsx";
 import { BrainLoadingCard } from "../components/BrainLoading.tsx";
 import { MatchMenu, type MatchExit } from "../components/MatchMenu.tsx";
@@ -308,9 +309,12 @@ function DuelBoard({ session, snap, now, onHome, onAgain }: { session: DuelSessi
           : myTurn
             ? "Your move"
             : `${theirName} is thinking`;
-  // Your move shown at once on the board; a move the board can't make (not your turn) is never sent.
+  // Your move shown at once on the board; a move the board can't make (not your turn) is never sent. Premoves (chess.com's)
+  // while it's the other side's move in play: the first plays the moment your turn comes (docs/areas/board.md). Nothing
+  // marks them for the server: 1 v 1 has no timing signal, and its clock charges what it measures (a round trip).
+  const premove = snap.phase === "play" && !over && !snap.loading ? { key: seatKey(session, "duel", you), side: you } : undefined;
   const board = (
-    <Board fen={snap.fen} orientation={orientation} lastMove={snap.lastMove} interactive={myTurn} onMove={(m) => session.move(m)}>
+    <Board fen={snap.fen} orientation={orientation} lastMove={snap.lastMove} interactive={myTurn} onMove={(m) => session.move(m)} premove={premove}>
       {/* A town bot's game: Maia's loading step over the board first (Boss alone's; its Leave goes back to the town). */}
       {snap.loading && (
         <BrainLoadingCard

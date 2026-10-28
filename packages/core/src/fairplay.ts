@@ -43,6 +43,12 @@ export interface FairMove {
   thinkMs: number;
   /** Look-aways during the move's clock, before the pick: the page hidden or the window unfocused (the app's count). */
   away: number;
+  /**
+   * A premove (chess.com's: made ahead, and played as the turn opened), as the server saw it: told to the server before
+   * any browser could know the position it's played in, then played at once (the lobby's premoveAhead). Its time
+   * measures no thinking, so it's left out of timing; everything else counts it as any pick.
+   */
+  premove?: boolean;
   /** Used a power-up (saw the engine's top moves): never counted. */
   powerUp?: boolean;
   /**
@@ -274,13 +280,16 @@ export function matchSignals(moves: readonly FairMove[], ref: number | null, s: 
     evidence += moveEvidence(m, strength, s).evidence;
     const rate = crowdRate(m, s);
     if (rate === null) continue;
-    times.push(m.thinkMs);
-    difficulty.push(1 - rate);
+    // (A premove's time measures no thinking: it's left out of timing, and counts for everything else.)
+    if (!m.premove) {
+      times.push(m.thinkMs);
+      difficulty.push(1 - rate);
+    }
     if (rate < s.hardShare) {
       hard++;
       if (f) {
         hardFinds++;
-        if (m.thinkMs < s.fastHardMs) fastHard++;
+        if (!m.premove && m.thinkMs < s.fastHardMs) fastHard++;
       }
       hardRun = f ? hardRun + 1 : 0;
       hardStreak = Math.max(hardStreak, hardRun);

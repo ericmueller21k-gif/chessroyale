@@ -371,6 +371,240 @@ export function drawArrows(arrows: readonly ArrowShape[], orientation: Orientati
   });
 }
 
+// ---------------- Your own arrows and highlights (chess.com's) ----------------
+
+/**
+ * A color of your own arrows and square highlights (chess.com's: docs/decisions/2026-10-28-arrows-and-premoves.md). The
+ * colors themselves are the stylesheet's (`--ua-*`, styles.css, "Your arrows, highlights and premoves"), so a board
+ * color can have its own.
+ */
+export type MarkColor = "orange" | "red" | "blue" | "green" | "yellow";
+
+/** The keys held as you right-click (a mouse event has these). */
+export interface Mods {
+  ctrlKey?: boolean;
+  metaKey?: boolean;
+  altKey?: boolean;
+  shiftKey?: boolean;
+}
+
+/** An arrow's color, by the key held: none, chess.com's yellow-orange; Ctrl (or ⌘) red; Alt blue; Shift green. */
+export function arrowColor(m: Mods): MarkColor {
+  if (m.shiftKey) return "green";
+  if (m.ctrlKey || m.metaKey) return "red";
+  if (m.altKey) return "blue";
+  return "orange";
+}
+
+/** A square's color, by the key held: none, red; Ctrl (or ⌘) yellow; Alt blue; Shift green. */
+export function highlightColor(m: Mods): MarkColor {
+  if (m.shiftKey) return "green";
+  if (m.ctrlKey || m.metaKey) return "yellow";
+  if (m.altKey) return "blue";
+  return "red";
+}
+
+export interface UserArrow {
+  from: string;
+  to: string;
+  color: MarkColor;
+}
+
+/** Your arrows and highlighted squares on a board. */
+export interface UserMarks {
+  arrows: readonly UserArrow[];
+  squares: Readonly<Record<string, MarkColor>>;
+}
+
+export const NO_MARKS: UserMarks = { arrows: [], squares: {} };
+
+export const marksEmpty = (m: UserMarks) => !m.arrows.length && !Object.keys(m.squares).length;
+
+/**
+ * A right-drag from one square to another: that arrow drawn; the same arrow again (same color) taken away; the same
+ * squares in another color, recolored.
+ */
+export function toggleArrow(m: UserMarks, a: UserArrow): UserMarks {
+  const i = m.arrows.findIndex((x) => x.from === a.from && x.to === a.to);
+  if (i < 0) return { ...m, arrows: [...m.arrows, a] };
+  const arrows = m.arrows.filter((_, j) => j !== i);
+  return { ...m, arrows: m.arrows[i]!.color === a.color ? arrows : [...arrows, a] };
+}
+
+/** A right-click on a square: it fills with the color; again in the same color, it's cleared; another color, recolored. */
+export function toggleSquare(m: UserMarks, square: string, color: MarkColor): UserMarks {
+  const squares = { ...m.squares };
+  if (squares[square] === color) delete squares[square];
+  else squares[square] = color;
+  return { ...m, squares };
+}
+
+/**
+ * Your arrows' size, in squares (matched to chess.com's by eye: a shaft a little under a quarter of a square wide, a head
+ * just over half a square wide, the tail starting a little way out from the piece's center, the tip on the target
+ * square's center). See-through: the stylesheet's `.hb-user-arrows g` (0.8, as chess.com's).
+ */
+export const USER_ARROW = { width: 0.22, headWidth: 0.6, headLength: 0.42, tail: 0.25 } as const;
+
+/** Whether two squares are a knight's move apart (its arrow is an L, as chess.com draws it). */
+export function knightApart(from: string, to: string): boolean {
+  const df = Math.abs(from.charCodeAt(0) - to.charCodeAt(0));
+  const dr = Math.abs(Number(from[1]) - Number(to[1]));
+  return (df === 1 && dr === 2) || (df === 2 && dr === 1);
+}
+
+/** An arrow of yours as drawn: its shaft (a line, or an L for a knight's move) and its head, in squares from the board's center. */
+export interface UserArrowShape {
+  key: string;
+  color: MarkColor;
+  /** The shaft's points ("x,y x,y …"), a polyline drawn `USER_ARROW.width` wide. */
+  shaft: string;
+  /** The head, a triangle ("x,y x,y x,y"). */
+  head: string;
+}
+
+const pt = (x: number, y: number) => `${Math.round(x * 1000) / 1000},${Math.round(y * 1000) / 1000}`;
+
+/**
+ * Where an arrow of yours is drawn, either way up and turned: from just out of its square's center to the target's
+ * center; a knight's arrow goes along its longer leg first, then turns (chess.com's L).
+ */
+export function userArrowShape(a: UserArrow, orientation: Orientation, turn: QuarterTurn = 0): UserArrowShape {
+  const at = (sq: string) => {
+    const { col, row } = cellOf(sq, orientation, turn);
+    return { x: col - 3.5, y: row - 3.5 };
+  };
+  const f = at(a.from);
+  const t = at(a.to);
+  const unit = (dx: number, dy: number) => {
+    const l = Math.hypot(dx, dy) || 1;
+    return { x: dx / l, y: dy / l };
+  };
+  // (A knight's L turns at the end of its longer leg.)
+  const corner = knightApart(a.from, a.to) ? (Math.abs(t.y - f.y) > Math.abs(t.x - f.x) ? { x: f.x, y: t.y } : { x: t.x, y: f.y }) : null;
+  const first = corner ?? t;
+  const d1 = unit(first.x - f.x, first.y - f.y);
+  const d2 = corner ? unit(t.x - corner.x, t.y - corner.y) : d1;
+  const { width, headWidth, headLength, tail } = USER_ARROW;
+  const start = { x: f.x + d1.x * tail, y: f.y + d1.y * tail };
+  const base = { x: t.x - d2.x * headLength, y: t.y - d2.y * headLength };
+  // (The shaft runs a hair into the head, so no seam shows between them; an L's first leg runs half its width past the
+  // corner, so the turn is square.)
+  const end = { x: base.x + d2.x * 0.02, y: base.y + d2.y * 0.02 };
+  const shaft = (corner ? [start, { x: corner.x + d1.x * (width / 2), y: corner.y + d1.y * (width / 2) }, corner, end] : [start, end]).map((p) => pt(p.x, p.y)).join(" ");
+  const n = { x: -d2.y * (headWidth / 2), y: d2.x * (headWidth / 2) };
+  const head = [pt(base.x + n.x, base.y + n.y), pt(t.x, t.y), pt(base.x - n.x, base.y - n.y)].join(" ");
+  return { key: `${a.from}${a.to}`, color: a.color, shaft, head };
+}
+
+// ---------------- Premoves (chess.com's) ----------------
+
+/** A move made ahead, while it was the other side's turn: from, to, and the piece a pawn promotes to. */
+export interface Premove {
+  from: string;
+  to: string;
+  promo?: string;
+}
+
+export const premoveUci = (p: Premove) => p.from + p.to + (p.promo ?? "");
+
+/**
+ * Where a piece may be moved ahead (chessground's premove destinations, as chess.com allows): anywhere its own pattern
+ * reaches, whatever stands between or on the square (a slider through pieces; a pawn's diagonal with nothing there to
+ * take yet; a square your own piece stands on, which may be taken by then). A king also to g1 or c1 (g8, c8) while the
+ * FEN's `castling` rights let it castle that way and it and its rook are home. (No castling premove in a Chess960
+ * position: pass "" for its rights.)
+ */
+export function premoveDests(pieces: ReadonlyMap<string, PieceCode>, from: string, castling = ""): string[] {
+  const p = pieces.get(from);
+  if (!p) return [];
+  const white = p[0] === "w";
+  const x1 = from.charCodeAt(0) - 97;
+  const y1 = Number(from[1]) - 1;
+  const role = p[1];
+  const reach = (x2: number, y2: number): boolean => {
+    const dx = Math.abs(x2 - x1);
+    const dy = Math.abs(y2 - y1);
+    switch (role) {
+      case "p":
+        return white ? dx < 2 && (y2 === y1 + 1 || (y1 === 1 && y2 === 3 && dx === 0)) : dx < 2 && (y2 === y1 - 1 || (y1 === 6 && y2 === 4 && dx === 0));
+      case "n":
+        return (dx === 1 && dy === 2) || (dx === 2 && dy === 1);
+      case "b":
+        return dx === dy;
+      case "r":
+        return dx === 0 || dy === 0;
+      case "q":
+        return dx === dy || dx === 0 || dy === 0;
+      default: {
+        if (dx < 2 && dy < 2) return true;
+        // Castling: from the e-file of its home rank, two files over, the rook home and the right still held.
+        const home = white ? 0 : 7;
+        if (y1 !== home || y2 !== home || x1 !== 4 || dx !== 2) return false;
+        const short = x2 === 6;
+        const right = white ? (short ? "K" : "Q") : short ? "k" : "q";
+        return castling.includes(right) && pieces.get(`${short ? "h" : "a"}${home + 1}`) === `${p[0]}r`;
+      }
+    }
+  };
+  const out: string[] = [];
+  for (const sq of ALL_SQUARES) {
+    if (sq === from) continue;
+    if (reach(sq.charCodeAt(0) - 97, Number(sq[1]) - 1)) out.push(sq);
+  }
+  return out;
+}
+
+/**
+ * The pieces as they'd stand with your premoves made, one after another: each piece on its new square (whatever stood
+ * there is gone), a promoting pawn as its piece, castling's rook beside its king.
+ */
+export function premovePieces(pieces: ReadonlyMap<string, PieceCode>, queue: readonly Premove[]): Map<string, PieceCode> {
+  let out = new Map(pieces);
+  for (const p of queue) {
+    const code = out.get(p.from);
+    if (!code) continue;
+    const castle = code[1] === "k" && p.from[0] === "e" && p.from[1] === p.to[1] && Math.abs(p.to.charCodeAt(0) - p.from.charCodeAt(0)) === 2;
+    out = slidePiece(out, p.from, p.to);
+    if (p.promo) out.set(p.to, code[0] + p.promo);
+    if (castle) {
+      const rank = p.from[1]!;
+      out = p.to[0] === "g" ? slidePiece(out, `h${rank}`, `f${rank}`) : slidePiece(out, `a${rank}`, `d${rank}`);
+    }
+  }
+  return out;
+}
+
+/** The squares your premoves color (chess.com's premove red): each one's from and to squares. */
+export const premoveSquares = (queue: readonly Premove[]) => [...new Set(queue.flatMap((p) => [p.from, p.to]))];
+
+/**
+ * Your turn has come with premoves waiting: what the first does. It's played if it's one of the moves allowed now (and
+ * the game doesn't stop it), a normal move from then on. Else it's cancelled, with every premove after it: `refused`
+ * when chess allows it but the game doesn't (a boss power stops it, or Smudgy's painted piece), so the screen can say
+ * why, as for a move you tried. Anything touching Hollow's dark is cancelled (no move goes into the dark unseen).
+ */
+export function premoveTurn(fen: string, moves: readonly string[] | undefined, p: Premove, opts: { dark?: readonly string[]; stopped?: (uci: string) => boolean } = {}): { play: string } | { cancel: true; refused?: string } {
+  if (opts.dark?.length && touchesDark(p.from + p.to, opts.dark, fen)) return { cancel: true };
+  const pick = (list: readonly string[]) => (p.promo ? list.find((m) => m[4] === p.promo) : list.find((m) => !m[4] || m[4] === "q"));
+  const allowed = pick(gestureMoves(fen, moves, p.from, p.to));
+  if (allowed) return opts.stopped?.(allowed) ? { cancel: true, refused: allowed } : { play: allowed };
+  const legal = moves ? pick(gestureMoves(fen, undefined, p.from, p.to)) : undefined;
+  return legal ? { cancel: true, refused: legal } : { cancel: true };
+}
+
+/**
+ * Your turn has come with `queue` waiting (premoveTurn on its first): the move to play now (null: none), the premoves
+ * still waiting after it (each for a later turn of yours), and a refusal for the screen to explain. One that isn't legal
+ * cancels itself and every one after it.
+ */
+export function premoveQueueTurn(fen: string, moves: readonly string[] | undefined, queue: readonly Premove[], opts: { dark?: readonly string[]; stopped?: (uci: string) => boolean } = {}): { play: string | null; rest: readonly Premove[]; refused?: string } {
+  if (!queue.length) return { play: null, rest: queue };
+  const r = premoveTurn(fen, moves, queue[0]!, opts);
+  if ("play" in r) return { play: r.play, rest: queue.slice(1) };
+  return r.refused ? { play: null, rest: [], refused: r.refused } : { play: null, rest: [] };
+}
+
 // ---------------- When the board draws again ----------------
 
 /**
@@ -397,5 +631,6 @@ export function boardInputs(p: Omit<BoardProps, "children" | "silent" | "onMove"
     p.turn ?? 0,
     p.elephants?.length ? p.elephants.join() : null,
     p.decor?.key ?? null,
+    p.premove ? `${p.premove.key}:${p.premove.side}${p.premove.watch ? ":watch" : ""}` : null,
   ];
 }
