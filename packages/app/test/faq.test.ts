@@ -655,3 +655,10 @@ describe("the FAQ's chat entry (the town square's typed chat, Oct 28)", () => {
     expect(s).toContain("tap a message in the town square to report it");
   });
 });
+
+describe("the FAQ's rating entry (Eric, Oct 28)", () => {
+  it("Your rating says when your ranking changes, from the settings: 30 real players (15 in a raid), or the share's own counts (the sentence home's ⓘ carried until Oct 28)", () => {
+    expect(text()).toContain("Your ranking changes only in a match with at least 30 real players (15 in a raid). Solo games never change it.");
+    expect(text({ ...FAQ_DEFAULTS, rankedShare: 0.2 })).toContain("Your ranking changes only in a match with at least 20 real players (10 in a raid).");
+  });
+});

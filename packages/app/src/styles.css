@@ -8681,21 +8681,65 @@ button.fd-logo {
  * and the rating's 16 px on a phone, 28 and 16 on a computer, and the icon is 38 px or 44 px to match.)
  */
 .fd-hero-icon {
+  position: relative;
   flex: none;
   width: 38px;
   height: 38px;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
   border-radius: 10px;
   background: var(--fd-panel-2);
   font-size: 30px;
   line-height: 1;
 }
+/* (The icon's own corners are cut here, not by the box: the ring and the level sit outside the box.) */
 .fd-hero-icon .user-icon.pixel {
   width: 100%;
   height: 100%;
+  border-radius: inherit;
+}
+/*
+ * An admin's test level (Eric, Oct 28; PLACEHOLDERS until the real levels exist, FrontDoor.tsx `LevelRing`): a thin green
+ * ring round the icon, filled clockwise from the top, and "LVL 38" as wide as the icon just above it, in the rating's gray.
+ * Both are drawn outside the icon's box and take no room, so the tag, the card and the page are the same with or without
+ * them (home never moves when the account loads).
+ */
+.fd-level {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 4px);
+  text-align: center;
+  /* (As wide as the icon: about 37 px of text over its 38 px.) */
+  font: 700 10px/10px Archivo, system-ui, sans-serif;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  color: var(--fd-sub);
+  pointer-events: none;
+}
+@media (min-width: 1024px) {
+  .fd-root.framed .fd-level {
+    font-size: 11.5px;
+    line-height: 11.5px;
+  }
+}
+.fd-level-ring {
+  position: absolute;
+  inset: -4px;
+  width: calc(100% + 8px);
+  height: calc(100% + 8px);
+  fill: none;
+  stroke-width: 2px;
+  pointer-events: none;
+}
+.fd-level-ring .track {
+  stroke: var(--fd-green);
+  opacity: 0.22;
+}
+.fd-level-ring .fill {
+  stroke: var(--fd-green);
+  stroke-linecap: round;
 }
 /* Home: the tag above your pawn's head, centered (the DOM has the pawn first; the queue's small card keeps that order). */
 .fd-home:not(.queueing) .fd-hero-id {
@@ -8753,8 +8797,8 @@ button.fd-logo {
   opacity: 0.8;
 }
 /*
- * Matchmaking (Default, Bots off, Solo): the mode picker's shape, quieter when picked (a gold edge, not a gold fill),
- * so the mode stays the main choice. The ⓘ beside it says what each does.
+ * Matchmaking (Default, Bots off, Solo): the mode picker's shape, each its title only (Oct 28), quieter when picked (a gold
+ * edge, not a gold fill), so the mode stays the main choice. The line above PLAY says what each does.
  */
 /*
  * The panel under the RANKED row (Eric, Oct 18: "it should never change size"): one fixed box for every mode, holding
@@ -8762,10 +8806,11 @@ button.fd-logo {
  */
 .fd-mode-panel {
   position: relative;
-  height: 58px;
+  /* (Oct 28: the options are titles only, so 44 px buttons and 5 px around them: 54 px, down from 58.) */
+  height: 54px;
   flex: none;
 }
-.fd-mode-panel > :not(.fd-types-info) {
+.fd-mode-panel > * {
   box-sizing: border-box;
   height: 100%;
 }
@@ -8786,17 +8831,11 @@ button.fd-logo {
   color: var(--fd-sub);
   line-height: 1.25;
 }
-.fd-types-row {
-  display: flex;
-  align-items: stretch;
-  gap: 6px;
-}
 .fd-types {
-  flex: 1 1 auto;
   min-width: 0;
 }
 .fd-modes.fd-types button {
-  min-height: 48px;
+  min-height: 44px;
   font-size: 14px;
 }
 .fd-modes.fd-types button.on {
@@ -8812,71 +8851,31 @@ button.fd-logo {
  * No mode picked (Eric, Oct 25): the options show, none selected, a little greyer than the mode row, and not tappable
  * (aria-disabled; no press effect either). The first pick wakes them with their usual default selected.
  */
-.fd-mode-panel.idle .fd-modes.fd-types button,
-.fd-mode-panel.idle .fd-info-btn {
+.fd-mode-panel.idle .fd-modes.fd-types button {
   opacity: 0.6;
   cursor: default;
 }
 .fd-mode-panel.idle button:active {
   transform: none;
 }
-.fd-info-btn {
-  flex: none;
-  width: 44px;
-  align-self: center;
-  height: 44px;
-  border-radius: 50%;
-  border: 2px solid var(--fd-line);
-  background: var(--fd-panel);
-  color: var(--fd-sub);
-  font: italic 800 18px Georgia, "Times New Roman", serif;
-  cursor: pointer;
-}
-.fd-info-btn.open {
-  border-color: var(--fd-gold);
-  color: var(--fd-gold-text);
-}
-/* (The ⓘ's words float over the RANKED row, so opening them moves nothing: Eric, Oct 18.) */
-.fd-types-info {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: calc(100% + 6px);
-  z-index: 5;
-  background: var(--fd-panel);
-  border: 1px solid var(--fd-line);
-  border-radius: 14px;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
-  padding: 10px 14px;
-  font-size: 14px;
-  color: var(--fd-sub);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.fd-types-info p {
-  margin: 0;
-}
-.fd-types-info strong {
-  color: var(--fd-text);
-}
-.fd-types-info .fd-types-rank {
-  color: var(--fd-muted);
-  font-size: 13px;
-}
 .fd-play {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
-  /* (Oct 26, Eric: "the play button is too small": as tall as the Other modes cards, 64 px, its label bigger to match.) */
-  height: 64px;
+  /*
+   * (Oct 26, Eric: "the play button is too small": 64 px. Oct 28: "make the play button bigger with the space we gain": the
+   * room the compact Other modes cards and the shorter options give back is PLAY's, so the pawn's card, the page and
+   * everything under PLAY keep their size and place. 97 px = 64 + 4 (options) + 20 (Boss Arena) + 28 (the pair) - 15 (the
+   * room under the last card, kept: below) - 4 (the label's room under PLAY).)
+   */
+  height: 97px;
   border: 0;
   border-radius: 18px;
   background: var(--fd-gold);
   color: var(--fd-gold-ink);
   font-family: "Archivo Black", Archivo, sans-serif;
-  font-size: 30px;
+  font-size: 44px;
   letter-spacing: 1px;
   cursor: pointer;
   transition: transform 80ms;
@@ -8909,19 +8908,22 @@ button.fd-logo {
   }
 }
 /*
- * Phones: the Boss raid card comes up under the one-line hint (Eric: "slide boss button up a bit so it's closer to the
- * text bar above it"). A plain hint is one line (each fits a 320 px column), so its box is one line; a paused line may wrap,
- * so it keeps the two-line box and a longer line never moves what's under it. The 2.1 px puts the card 14 px under the
- * line's text. The card's bottom margin takes back the room the box gave up, in the same states only, so the column, the
- * hero and PLAY keep their size and place, and nothing moves on a click (home keeps still).
+ * Home's line is above PLAY (Eric, Oct 28: "swap the line of text below Play and put it above play"), bottom-aligned in its
+ * box so a one-line text sits right on PLAY. The box never changes: two lines' room on a phone (a paused line or a sign-in
+ * line may wrap), one on a computer, so no pick or load moves PLAY or anything under it.
  */
+.fd-go > .fd-hint {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  margin-top: 0;
+  margin-bottom: -8px;
+}
+/* A phone keeps the 15 px of room under its last card that the page has always had (the old one-line hint's), so nothing under
+   PLAY ends lower than it did. */
 @media (max-width: 899px) {
-  .fd-hint.fd-hint-line {
-    height: 1.3em;
-    margin-bottom: 2.1px;
-  }
-  .fd-play-col:has(> .fd-go > .fd-hint-line) > .rd-pair {
-    margin-bottom: 14.8px;
+  .fd-play-col > .rd-pair {
+    margin-bottom: 15px;
   }
 }
 /*
@@ -8944,9 +8946,13 @@ button.fd-logo {
   .fd-hint {
     margin-top: -4px;
   }
-  /* (The column's gap is 8 px here, so the label gets 2 px back: it stays 14 px under the line, as Eric approved.) */
+  .fd-go > .fd-hint {
+    margin-top: 0;
+    margin-bottom: -4px;
+  }
+  /* (The column's gap is 8 px here, so the label gets 6 px back: 14 px under PLAY, the spacing Eric approved under the line.) */
   .fd-other-label {
-    margin-top: 2px;
+    margin-top: 6px;
   }
   .fd-hero {
     flex: 1 1 0;
@@ -9004,6 +9010,8 @@ button.fd-logo {
    the cards (Oct 26, Eric). */
 .fd-other-label {
   font-size: 11px;
+  /* (12 px, what Archivo's own "normal" comes to: the fallback font's is 13, which moved the column above it for a moment while Archivo loaded.) */
+  line-height: 12px;
   text-align: center;
 }
 /* The RANKED row (Eric, Oct 16): its small label right above the three ranked modes. */
@@ -9383,45 +9391,44 @@ button.fd-logo {
 .rd-option:active:not(:disabled) {
   transform: scale(0.98);
 }
-/* A computer: the Boss raid card a little shorter (the live window above keeps its room). */
-@media (min-width: 1024px) {
-  .fd-root.framed .fd-play-col .rd-card {
-    min-height: 64px;
-    padding: 8px 12px 8px 8px;
-  }
-  .fd-root.framed .fd-play-col .rd-face {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
-  }
-  .fd-root.framed .fd-play-col .rd-face .boss-portrait {
-    width: 42px;
-  }
-  .fd-root.framed .fd-play-col .rd-card-text strong {
-    font-size: 18px;
-  }
-}
-
 /*
- * Solo Boss Mode and Auto chess: two half cards side by side under Boss Arena (Eric, Oct 26; a phone and a computer alike).
- * Each keeps the rd-card look (picture, name, one short line, the ›), stacked so a name fits half a 320 px phone: the
- * picture on top, the › in its corner. On a phone the pair is 84 px tall, as the two cards it replaces, so home fits as
- * before. The selectors carry .fd-root and .rd-card so they win over the computer's card rules above.
+ * Home's Other modes cards are compact, on a phone as on a computer (Eric, Oct 28: "shrink those down vertically and make the
+ * play button bigger with the space we gain"): Boss Arena 64 px (its picture 48 px beside the words; it was 84 px on a
+ * phone), and under it Solo Boss Mode and Auto chess side by side (Eric, Oct 26; half width each), each with its picture to
+ * the left of the words, 56 px tall (they were 84 px on a phone, with the picture above the words, and 64 px on a computer).
+ * No › on the half cards: "Solo Boss Mode" and its picture fill a 172 px card at 390 px with no room for it.
+ * The selectors carry .fd-root and .rd-card so they win over the card's base rules above.
  */
+.fd-root .fd-play-col .rd-card {
+  min-height: 64px;
+  padding: 8px 12px 8px 8px;
+}
+.fd-root .fd-play-col .rd-face {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+}
+.fd-root .fd-play-col .rd-face .boss-portrait {
+  width: 42px;
+}
+.fd-root .fd-play-col .rd-card-text strong {
+  font-size: 18px;
+}
+/* (One line each, whatever font is showing: in the fallback font, while Archivo loads, "Solo Boss Mode" wrapped in a half card at
+   1280 px, which made the pair 3 px taller for a moment and moved the whole column above it. Home never moves: Eric, Oct 18.) */
+.fd-root .fd-play-col .rd-card-text > * {
+  white-space: nowrap;
+}
 .fd-root .rd-pair {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
 .fd-root .rd-pair .rd-card.rd-half {
-  position: relative;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: flex-start;
-  gap: 4px;
+  gap: 6px;
   min-width: 0;
-  min-height: 84px;
-  padding: 6px 8px;
+  min-height: 56px;
+  padding: 6px;
 }
 .fd-root .rd-pair .rd-card.rd-half .rd-face {
   width: 32px;
@@ -9432,35 +9439,32 @@ button.fd-logo {
   width: 26px;
   height: 26px;
 }
-.fd-root .rd-pair .rd-card.rd-half .rd-card-text {
-  width: 100%;
-}
 .fd-root .rd-pair .rd-card.rd-half .rd-card-text strong {
   font-size: 13px;
 }
 .fd-root .rd-pair .rd-card.rd-half .rd-card-text span {
   font-size: 12px;
 }
-.fd-root .rd-pair .rd-card.rd-half .rd-card-go {
-  position: absolute;
-  top: 6px;
-  right: 8px;
-  font-size: 22px;
-}
-/*
- * On a computer the half cards lie flat, picture beside the words, as tall as the Boss Arena card (64 px), so home is no
- * taller than with the two cards they replace and the live window above keeps its size.
- */
-@media (min-width: 1024px) {
-  .fd-root .rd-pair .rd-card.rd-half {
-    flex-direction: row;
-    align-items: center;
-    gap: 8px;
-    min-height: 64px;
+/* (A 320 px phone: the half card is 137 px wide, so a smaller picture and words keep "Solo Boss Mode" on one line, and Boss Arena's
+   line stays on one line too, so no card grows.) */
+@media (max-width: 359px) {
+  .fd-root .fd-play-col .rd-card {
+    gap: 10px;
   }
-  .fd-root .rd-pair .rd-card.rd-half .rd-card-text {
-    width: auto;
-    min-width: 0;
+  .fd-root .fd-play-col .rd-card-text span {
+    font-size: 12px;
+  }
+  .fd-root .rd-pair .rd-card.rd-half .rd-face {
+    width: 28px;
+    height: 28px;
+  }
+  .fd-root .rd-pair .rd-card.rd-half .rd-face svg {
+    width: 22px;
+    height: 22px;
+  }
+  .fd-root .rd-pair .rd-card.rd-half .rd-card-text strong,
+  .fd-root .rd-pair .rd-card.rd-half .rd-card-text span {
+    font-size: 11px;
   }
 }
 
@@ -10953,6 +10957,12 @@ button.fd-seat {
     height: auto;
     aspect-ratio: 170 / 154;
   }
+  /* (Oct 28, Eric: "make the play button bigger with the space we gain": 76 px = 64 + 4 (the options) + 8 (the pair's cards),
+     so the live window's board and the page keep their size.) */
+  .fd-root.framed .fd-play {
+    height: 76px;
+    font-size: 40px;
+  }
 }
 @media (min-width: 1280px) {
   .fd-root.framed .fd-home-main {
@@ -10990,19 +11000,15 @@ button.fd-seat {
     justify-content: flex-end;
     gap: 12px;
   }
-  .fd-root.framed .fd-play {
-    height: 64px;
-    font-size: 36px;
-  }
-  /* (A short window, a laptop's: the column closer, so the live window keeps a board worth seeing. PLAY 48 px here, up from
-     43 (Oct 26), the most the live window's board can give up at 680 px tall.) */
+  /* (A short window, a laptop's: the column closer, so the live window keeps a board worth seeing. PLAY 60 px here, up from
+     48 (Oct 28; 43 before Oct 26): the board keeps the size it had at 680 px tall.) */
   @media (max-height: 760px) {
     .fd-root.framed .fd-play-col {
       gap: 8px;
     }
     .fd-root.framed .fd-play {
-      height: 48px;
-      font-size: 28px;
+      height: 60px;
+      font-size: 32px;
     }
   }
   /* The queue: your card and the chat on the left, the lobby (the green area) on the right. */
