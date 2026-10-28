@@ -241,13 +241,25 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
   has a look (`Look`, one field): a pawn's (side, tint and the crate items worn) or a sprite's (`{ sprite }`: a sidekick's
   baked sheet), and a sidekick its boss (`boss`). Shown everywhere as "<name> (bot)" (`botLabel`: their tags, cards and
   games). The bots start off the tables' stools (every table free as the town opens) and sit as they wander.
-  - **Six out at once, the others at home, taking turns** (Oct 28: twenty in the square cost about 3 frames a second,
-    Eric's frame-rate rule: the decision's numbers; six, as many as before the sidekicks). `botsOut` (6) are in the
-    square, shuffled by the town's seed as it opens (the same each time) (back from a game, the bot you played among them); the rest are at home
-    (`Person.home`: not drawn, not tapped, on no square: its walker leaves the town's `all`). Every `botTurnMs` (10 to
-    20 s) one out, standing, free and at least
-    `botTurnAway` (5) steps from you starts home, fading out over `botFadeMs`, and one from home comes out on a free
-    square in the park as far from you, fading in (`takeTurns`, `comeOut`). A bot whose card opens stays.
+  - **Ten out at once, one goes home each minute and another walks out of its own home** (Oct 28, Eric: "they work on 1
+    minute timer, 10 out at a time, randomly one each minute starts to head home, is replaced by another…";
+    `docs/decisions/2026-10-28-bots-rotation.md`). `botsOut` (10) are in the world, shuffled by the town's seed as it opens
+    (the same each time; back from a game, the bot you played among them); the rest are at home (`Person.home`: not drawn,
+    not tapped, on no square: its walker leaves the town's `all`), queued in the order they got home (`homeQueue`). Every
+    `botTurnMs` (60 s, a timer in the town's tick, `takeTurns`) one bot out is sent home (`sendHome`), picked at random
+    among those still **due** this round and free (`canGoHome`: not seated, not held by its card or its table's, not on
+    its way to or from a game with you, at least `botTurnAway` (5) steps from you, out at least `botOutAtLeastMs` (90 s));
+    a busy one is passed over and stays due; none free, the minute is skipped. When no bot out is due, a new round starts
+    with every bot out: none goes twice before all the others have gone once. **Going home** it walks the town's way round
+    (`routeAround`: round the squares others stand on) to its **door** (`homeDoor`: a sidekick's is its boss's home's,
+    the plot's front row by its middle, `doorway` taking the square beside it when the boss stands in front; a pawn has no
+    house, so the Colosseum's gate, the apron's free square nearest it) and fades out there over `botFadeMs` (`arrive`);
+    then it's home (`reachHome`) and **the bot home longest** (first in, first out, never the one that just got home)
+    fades in at its own door and walks to a free spot in the square (`walkOut`). So ten are in the world all along, near
+    the square or on their way. A bot walking home or out can be tapped like any other: its card holds it, and it carries
+    on when the card closes; Play keeps it out (`meet` → `stayOut`). **The bots out stay in the square** (`inSquare`: the
+    park, the walk and the Colosseum's apron, off the bosses' roaming ground): they wander only there, and one that finds
+    itself elsewhere walks back. (Before: six out, a turn every 10 to 20 s, fading out and in where they stood.)
   - **A sidekick in the square** (Oct 28): its own animations, `idle` standing, `walk` walking (no hop: its walk steps),
     `sit` on a table's stool (its sit has its own little stool, drawn over the table's, facing the board; no shadow, not
     lowered like a pawn), and `wave` once when you tap it, then `idle` while its card is open (`spriteAnim` in `world.ts`;
@@ -335,6 +347,12 @@ noted wherever a slice changed one.
   animation (wave once after a tap, walk, sit), "<name> (bot)" everywhere, the walk to the nearest free table (your stool the nearer), sitting and
   when the game opens, calling it off, every table taken (no table; Play greyed) and one freeing, a held bot staying put, the
   bot waiting at a table, a seat in the address and back, and coming back to the table (the bot across, then wandering off).
+  The turns (Oct 28): ten out, ten in the world all along, the ones out standing in the square; one sent home a minute,
+  only on the minute; rounds of ten (every bot out once before any twice), never sent within 90 s of coming out; busy bots
+  (held, seated, on their way to or from a game, near you, just out) passed over and still due, the held one next once
+  free; the one home longest comes out next, as the other gets home, never the same; a sidekick to its boss's door and a
+  pawn to the gate, fading out there over `botFadeMs`, and the next fading in at its own door and walking to the square;
+  a bot going home held by its card and carrying on; one you play stays, and never goes while seated across from you.
   `packages/app/test/town-bot-game.test.ts`: the game (its name and rating, the loading step before the vote, casual; a
   sidekick's face on its strip).
 - `packages/app/test/town-lights.test.ts`: the park's lamps (8 to 12, solid, on paving, off every path, every square and
@@ -379,7 +397,10 @@ title; a bot waiting, two playing (the board's pixels change), a tap on their ga
   and `window.__townTables()` (each table's state: "still", "waiting:<free stool>" or "playing"); the bots (Oct 27):
   `window.__townAt("bot", i)` (where to tap BOTS[i]), `window.__townCall(i)` (BOTS[i] comes to stand beside you, out from home first if it's there, and every bot
   holds still; -1: only the holding still) and `window.__townBots()` (each bot: its name, square, the table it sits at, whether
-  it walks, whether it's at home, a sidekick's animation). Playing a bot (Oct 27, phone and desktop): a tap on Tempo Tess opens her card ("Tempo Tess (bot)", "Rating
+  it walks, whether it's at home, a sidekick's animation; since Oct 28 whether it's going home, where it's headed, `fading`
+  "out" or "in", its door, whether it stands in the square, its place in the queue home) and `window.__townTurns(ms)` (the
+  bots' turns every `ms`, the next one now). The turns (Oct 28, phone and desktop): ten out; one walks home and fades out
+  at its door, gone; the one home longest fades in at its own door, ten in the world all along, and walks to the square. Playing a bot (Oct 27, phone and desktop): a tap on Tempo Tess opens her card ("Tempo Tess (bot)", "Rating
   1500", Play), nothing of Maia's fetched yet; Play walks you both to a table, the game opens (the gear, her name and
   rating on her strip, Maia's worker started), one move each, resign ("Casual game"), "Back to town": you on your stool, she
   across, then she wanders off; a bot sitting alone at a table: its card's "Play <name> (bot) · <rating>" (Casual and

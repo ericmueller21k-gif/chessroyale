@@ -320,14 +320,19 @@ export const TOWN_FEEL = {
    */
   botLeaveAfterGameMs: 4000,
   /**
-   * How many bots are out in the square at once (Oct 28: twenty bots cost frames, Eric's frame-rate rule; the others are
-   * at home; six, as many as before the sidekicks, so the frame rate is as before), and how often one goes home and another comes out (ms, a random time between the two), at least
-   * `botTurnAway` steps from you, fading out and in over `botFadeMs`.
+   * The bots take turns (Oct 28, Eric: "they work on 1 minute timer, 10 out at a time, randomly one each minute starts to
+   * head home, is replaced by another"; docs/decisions/2026-10-28-bots-rotation.md). `botsOut` are in the world at once
+   * (six before Oct 28's turns; ten measured against main: the decision), the others at home. Every `botTurnMs` one out (free, and at
+   * least `botTurnAway` steps from you) walks home and fades into its door over `botFadeMs`; then the bot home longest
+   * fades in at its own door and walks to the square. A bot that came out less than `botOutAtLeastMs` ago isn't sent
+   * home yet (so the last of one round never turns straight back at the next round's first minute). (Before: six out, a
+   * turn every 10 to 20 s, fading out and in where they stood.)
    */
-  botsOut: 6,
-  botTurnMs: [10000, 20000] as const,
+  botsOut: 10,
+  botTurnMs: 60000,
   botTurnAway: 5,
   botFadeMs: 500,
+  botOutAtLeastMs: 90000,
 
   // ---- Sizes, in squares.
   /** A boss's picture is this many squares tall. */

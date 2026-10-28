@@ -36,7 +36,7 @@ import { TownChat } from "./TownChat.tsx";
 import { Press } from "./press.ts";
 import { PAWN_PX, Renderer, pawnImage, type Hit } from "./render.ts";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
-import { BOTS, COLISEUM_PLACE, HOMES, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, tdist, tick, townLine, waitingBot, walkWalker, type HomeId, seatOf, seatText, type Person, type Place, type Seat, type Sq, type StatueId, type Target } from "./world.ts";
+import { BOTS, COLISEUM_PLACE, HOMES, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, tdist, tick, townLine, waitingBot, walkWalker, type HomeId, seatOf, seatText, type Person, type Place, type Seat, type Sq, type StatueId, type Target } from "./world.ts";
 import { dressedPawn, lookKey } from "./you-look.ts";
 import type { BotGameAsk } from "./TownPage.tsx";
 import "./town.css";
@@ -755,7 +755,7 @@ function startTown(
     town.leave = null;
     const b = town.bots.find((p) => p.bot === BOTS[i]);
     if (b?.home) comeOut(town, b, performance.now(), 3);
-    if (b) b.leaves = Infinity;
+    if (b) stayOut(b);
     const to = b && destFor(town, b.walker, { kind: "beside", at: town.you.walker.here() });
     if (b && to) walkWalker(b.walker, to);
   };
@@ -764,7 +764,11 @@ function startTown(
       ? BOTS.map((bt) => {
           const p = town.bots.find((q) => q.bot === bt)!;
           const h = p.walker.here();
-          return { name: p.name, at: `${h.c},${h.r}`, table: seated(p)?.i ?? -1, moving: p.walker.moving(), home: p.home, anim: isSprite(p.look) ? spriteAnim(p, performance.now()) : null };
+          const now = performance.now();
+          const d = homeDoor(bt);
+          // (The turns, Oct 28: on its way home, where it's headed, fading out or in, its door, whether it stands in the square, its place in the queue home.)
+          const fading = p.home ? null : p.leaves < Infinity ? "out" : now - p.came < f.botFadeMs ? "in" : null;
+          return { name: p.name, at: `${h.c},${h.r}`, table: seated(p)?.i ?? -1, moving: p.walker.moving(), home: p.home, anim: isSprite(p.look) ? spriteAnim(p, now) : null, going: p.going, trip: p.trip && `${p.trip.c},${p.trip.r}`, fading, door: `${d.c},${d.r}`, inSquare: inSquare(h.c, h.r), queue: town.homeQueue.indexOf(p) };
         })
       : null;
   // ... `__townBossBack(id)`: that home's boss walks round behind its home (the square two rows past its middle, or the
@@ -788,7 +792,13 @@ function startTown(
     follow = false;
     glide = { x: camX + wrapF(h.cx - camX), y: camY + wrapF(h.cy - h.foot + 0.5 - f.glideAhead - camY) };
   };
-  const hooks = window as unknown as { __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack };
+  // ... `__townTurns(ms)`: the bots' turns every `ms` instead of a minute, the next one now (to watch one go home and another come out).
+  const hookTurns = (ms: number) => {
+    if (!testSwitchesAllowed()) return;
+    town.turnMs = ms;
+    town.nextTurnAt = 0;
+  };
+  const hooks = window as unknown as { __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack };
   hooks.__townAt = hookAt;
   hooks.__townGlide = hookGlide;
   hooks.__townGather = hookGather;
@@ -797,6 +807,7 @@ function startTown(
   hooks.__townTables = hookTables;
   hooks.__townCall = hookCall;
   hooks.__townBots = hookBots;
+  hooks.__townTurns = hookTurns;
   hooks.__townBossBack = hookBossBack;
 
   run();
@@ -858,6 +869,7 @@ function startTown(
       delete hooks.__townTables;
       delete hooks.__townCall;
       delete hooks.__townBots;
+      delete hooks.__townTurns;
       delete hooks.__townBossBack;
       if (card?.kind === "boss") town.bosses[card.i]!.held = false;
       cv.removeEventListener("pointerdown", onDown);

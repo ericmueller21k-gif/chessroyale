@@ -755,3 +755,62 @@ test("Hollow's card: one of his three lines (Eric's words), the next one each ti
   await expect(card.getByText(lines[0]!, { exact: true })).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+/**
+ * The bots' turns (Oct 28, Eric: "10 out at a time, randomly one each minute starts to head home, is replaced by another…
+ * they walk and fade into their respective house and then the new one walks out from their home"). A test hook speeds the
+ * minute (`__townTurns(ms)`: the next turn now, then every `ms`); `__townBots()` says who's going home, where to, fading.
+ */
+test("the bots' turns: ten out; one walks home and fades out at its door, gone; the one home longest fades in at its own door and walks to the square", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+  await page.goto("/town?sky=day");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  type Bot = { name: string; at: string; moving: boolean; home: boolean; going: boolean; trip: string | null; fading: "in" | "out" | null; door: string; inSquare: boolean; queue: number };
+  const bots = () => page.evaluate(() => (window as unknown as { __townBots: () => Bot[] }).__townBots());
+  expect((await bots()).filter((b) => !b.home)).toHaveLength(10);
+  const next = (await bots()).find((b) => b.queue === 0)!;
+  // Watch every frame from now: what the one going home and the one coming out do.
+  await page.evaluate(() => {
+    const w = window as unknown as { __townBots: () => Bot[]; __townTurns: (ms: number) => void; __rot: { going: string | null; fadedAt: string | null; trip: string | null; gone: boolean; came: string | null; cameAt: string | null; fadedIn: boolean; out: number[] } };
+    const r = (w.__rot = { going: null, fadedAt: null, trip: null, gone: false, came: null, cameAt: null, fadedIn: false, out: [] });
+    const was = new Map(w.__townBots().map((b) => [b.name, b.home]));
+    const look = () => {
+      const all = w.__townBots();
+      r.out.push(all.filter((b) => !b.home).length);
+      for (const b of all) {
+        if (!r.going && b.going) ((r.going = b.name), (r.trip = b.trip));
+        if (b.name === r.going && b.fading === "out" && !r.fadedAt) r.fadedAt = b.at;
+        if (b.name === r.going && b.home) r.gone = true;
+        if (was.get(b.name) && !b.home && !r.came) ((r.came = b.name), (r.cameAt = b.at), (r.fadedIn = b.fading === "in"));
+        was.set(b.name, b.home);
+      }
+      if (!r.gone || !r.came) requestAnimationFrame(look);
+    };
+    requestAnimationFrame(look);
+    // One turn now, then none for ten minutes.
+    w.__townTurns(600_000);
+  });
+  const rot = () => page.evaluate(() => (window as unknown as { __rot: { going: string | null; fadedAt: string | null; trip: string | null; gone: boolean; came: string | null; cameAt: string | null; fadedIn: boolean; out: number[] } }).__rot);
+  await expect.poll(async () => (await rot()).going, { message: "one starts home", timeout: 5000 }).not.toBeNull();
+  await expect.poll(async () => (await rot()).gone && !!(await rot()).came, { message: "it gets home and another comes out", timeout: 60_000 }).toBe(true);
+  const r = await rot();
+  const all = await bots();
+  const goer = all.find((b) => b.name === r.going)!;
+  // It faded out at its door (a sidekick's boss's home, a pawn's the Colosseum's gate: where it was headed), and it's gone.
+  expect(r.fadedAt, "it fades where it was headed").toBe(r.trip);
+  const [dc, dr] = goer.door.split(",").map(Number) as [number, number];
+  const [fc, fr] = r.fadedAt!.split(",").map(Number) as [number, number];
+  expect(Math.abs(fc - dc) <= 1 && Math.abs(fr - dr) <= 1, `${goer.name} faded at ${r.fadedAt}, its door ${goer.door}`).toBe(true);
+  expect(goer.home).toBe(true);
+  // The one home longest came out, fading in at its own door, as the other got home; ten in the world all along.
+  expect(r.came).toBe(next.name);
+  expect(r.fadedIn).toBe(true);
+  const [cc, cr] = r.cameAt!.split(",").map(Number) as [number, number];
+  const [nc, nr] = next.door.split(",").map(Number) as [number, number];
+  expect(Math.abs(cc - nc) <= 1 && Math.abs(cr - nr) <= 1, `${next.name} came out at ${r.cameAt}, its door ${next.door}`).toBe(true);
+  expect(new Set(r.out)).toEqual(new Set([10]));
+  // It walks to the square and stays there.
+  await expect.poll(async () => (await bots()).find((b) => b.name === next.name)!, { message: "it reaches the square", timeout: 40_000 }).toMatchObject({ trip: null, moving: false, inSquare: true });
+  expect(errors).toEqual([]);
+});
