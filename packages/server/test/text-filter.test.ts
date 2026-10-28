@@ -282,11 +282,27 @@ describe("the filter after the review", () => {
     }
   });
 
-  it("in chat, refuses a word mixing Latin letters with an unknown letter from another alphabet; names in other alphabets still work", () => {
-    expect(chatRefusal("sh\u6f22t happens")).toBe(CHAT_NOT_ALLOWED);
-    expect(chatRefusal("gg\u3042")).toBe(CHAT_NOT_ALLOWED);
+  it("in chat, refuses a word mixing Latin letters with a letter from a look-alike alphabet the map doesn't fold; names in other alphabets still work", () => {
+    // ж, ћ-like letters the map doesn't fold, beside real Latin letters.
+    expect(chatRefusal("sh\u0436t happens")).toBe(CHAT_NOT_ALLOWED);
+    expect(chatRefusal("g\u0444od game")).toBe(CHAT_NOT_ALLOWED);
+    expect(chatRefusal("hi\u03be")).toBe(CHAT_NOT_ALLOWED);
     for (const text of ["Привет всем", "李小龙 加油", "Straße und Grüße", "naïve café", "Ærø"]) expect(chatRefusal(text), text).toBeNull();
     for (const name of ["Даниил", "李小龙", "Ünal", "Søren", "Straße", "Αλέξης"]) expect(isBlockedText(name), name).toBe(false);
+  });
+
+  it("ordinary chat wholly in another alphabet, or another script beside Latin, passes (the re-review's R1)", () => {
+    for (const text of [
+      "дела", "шахматы", "король", "слон", "ничья", "удачи", "молодец", "καλό", "βασιλιάς", "как дела", "добрый вечер", "дякую", "καλημέρα",
+      "gg楽しかった", "ok你好", "Bakı gözəldir", "gg あそぼう", "ɔkɔ",
+    ]) {
+      expect(chatRefusal(text), text).toBeNull();
+    }
+    // The look-alike slurs and swear words are still refused.
+    const n = rot13("avttre");
+    for (const text of [n.replace("i", "ı"), n.replace("r", "г"), n.replace("n", "ո"), rot13("fuvg").replace("h", "һ"), rot13("ovgpu").replace("b", "ʙ"), rot13("shpx").replace("f", "ꜰ")]) {
+      expect(chatRefusal(text), text).toBe(CHAT_NOT_ALLOWED);
+    }
   });
 
   it("catches a swear word split into letters inside a sentence, split once, or masked with an ending", () => {
@@ -354,5 +370,57 @@ describe("the filter after the review", () => {
     ]) {
       expect(chatRefusal(text), text).toBeNull();
     }
+  });
+});
+
+/** The re-review's findings (R2, R3, N3): phone shapes both ways, a bracketed dot, two more spellings. */
+describe("the filter after the re-review", () => {
+  it("refuses phone numbers in fours, after a leading zero, with a slash, a card number, or with number talk (R2)", () => {
+    for (const text of [
+      "9123 4567",
+      "call 9123-4567",
+      "5551 2345",
+      "0207 9460 0000",
+      "0800 1000 2000",
+      "my number 1500 2000 3000",
+      "4111 1111 1111 1111",
+      "1111 2222 3333 4444",
+      "4111111111111111",
+      "555/123/4567",
+      "555 / 123 / 4567",
+      "555 1234",
+      "06 12 34 56 78",
+    ]) {
+      expect(chatRefusal(text), text).toBe(CHAT_NO_CONTACT);
+    }
+  });
+
+  it("lets ordinary numbers through: move numbers, time controls, scores, dates, ratings (R2)", () => {
+    for (const text of [
+      "10 20 30 40 moves",
+      "games 12 13 14 15",
+      "3+2 5+0 10+0",
+      "won 3-0, 2-1, 1-0, 2-2",
+      "2026-10-28",
+      "28.10.2026",
+      "10/28/2026",
+      "rated 1200-1400",
+      "1500 1600 1700",
+      "2000/2100",
+      "800-1200",
+      "1,500 vs 1,600",
+      "the 2025-2026 season",
+    ]) {
+      expect(chatRefusal(text), text).toBeNull();
+    }
+  });
+
+  it("refuses an address with its dot in brackets (R3)", () => {
+    for (const text of ["example(.)com", "example [.] com", "example{.}net", "bit (.) ly"]) expect(chatRefusal(text), text).toBe(CHAT_NO_CONTACT);
+  });
+
+  it("catches the v-for-u and ph-for-f spellings, and lets Phuket through (N3)", () => {
+    for (const text of [rot13("sipx"), `${rot13("sipx")}ing`, rot13("cuhx"), `${rot13("cuhx")} off`]) expect(chatRefusal(text), text).toBe(CHAT_NOT_ALLOWED);
+    expect(chatRefusal("holiday in Phuket")).toBeNull();
   });
 });

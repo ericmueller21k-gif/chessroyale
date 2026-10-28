@@ -35,6 +35,7 @@ const SIGNED_MAX = 20_000;
 /** Forgets the cached room and sign-ins (tests). */
 export const forgetTownCache = () => {
   cache = null;
+  forcedAt = -Infinity;
   signed.clear();
 };
 /**
@@ -50,6 +51,12 @@ function keep(snap: TownSnapshot, now: number, waitUntil?: (p: Promise<unknown>)
   cache = { at: now, snap };
   waitUntil?.(new Promise((r) => setTimeout(r, TOWN_CHAT.readCacheMs + 50)).then(() => expireTownCache(Date.now())));
 }
+/**
+ * A reader ahead of this instance's copy makes it read the room again, at most this often (a bogus `since` or `room` can't
+ * turn every poll into a read of the hub).
+ */
+const FORCE_MS = 250;
+let forcedAt = -Infinity;
 /** The most a send's body may be (bytes): an 80-character message is far less; anything bigger never reaches the hub. */
 export const TOWN_BODY_MAX = 8192;
 
@@ -74,9 +81,17 @@ export async function signedInReader(sql: Sql, token: string | null | undefined,
  * instance, so the copy is stale, not the room reset).
  */
 export async function townSlice(hub: TownHub, since: number, now: number, room?: string | null, waitUntil?: (p: Promise<unknown>) => void): Promise<TownSlice> {
-  const stale = (c: typeof cache) => !c || now - c.at > TOWN_CHAT.readCacheMs || since > c.snap.n || (!!room && room !== c.snap.room);
-  if (stale(cache)) keep(await hub.townRead(), now, waitUntil);
-  return townSince(cache!.snap, since, TOWN_CHAT.keep, room);
+  const old = !cache || now - cache.at > TOWN_CHAT.readCacheMs;
+  const ahead = !!cache && (since > cache.snap.n || (!!room && room !== cache.snap.room));
+  if (old || (ahead && now - forcedAt >= FORCE_MS)) {
+    if (!old) forcedAt = now;
+    keep(await hub.townRead(), now, waitUntil);
+  } else if (ahead) {
+    // (Asked again within FORCE_MS, a bogus `since` or `room` say: nothing new, and the reader keeps what it has.)
+    return { room: room || cache!.snap.room, n: since, lines: [] };
+  }
+  const snap = cache!.snap;
+  return townSince(snap, since, TOWN_CHAT.keep, room);
 }
 
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
@@ -133,13 +148,13 @@ export async function townPostResponse(request: Request, sql: Sql, hub: TownHub,
 }
 
 /** POST /api/town/chat/remove {n}: a moderator (`admin`: ADMIN_EMAILS) takes one line out of everyone's log. */
-export async function townRemoveResponse(request: Request, hub: TownHub, admin: boolean, now: number): Promise<Response> {
+export async function townRemoveResponse(request: Request, hub: TownHub, admin: boolean, now: number, waitUntil?: (p: Promise<unknown>) => void): Promise<Response> {
   if (!admin) return json({ message: "Only a moderator can do that." }, 403);
   const body = (await request.json().catch(() => ({}))) as { n?: unknown };
   const n = Number(body.n);
   if (!Number.isSafeInteger(n) || n < 1) return json({ message: "No such line." }, 400);
   const { removed, town } = (await hub.townRemove(n)) as { removed: boolean; town: TownSnapshot };
-  keep(town, now);
+  keep(town, now, waitUntil);
   return removed ? json({ ok: true }) : json({ message: "That line has already gone." }, 404);
 }
 

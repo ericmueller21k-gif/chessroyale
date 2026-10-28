@@ -91,14 +91,19 @@ export function tidyMessage(text: unknown): string | null {
 }
 
 const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+/** A character made of more code points than this counts as its code points (a long joined chain, a pile of skin tones). */
+export const CHAR_MAX_PARTS = 8;
 /**
- * Its length as people count it: what shows as one character is one (an emoji, with its skin tone or joined into one, is
- * one). Infinity for text far longer in code units than it looks (a long chain joined into one character).
+ * Its length as people count it: what shows as one character is one (an emoji with its skin tone, or joined into one, as
+ * 👩‍💻), up to CHAR_MAX_PARTS code points; a "character" longer than that counts every code point, so 80 can't be beaten
+ * with one huge one. The app counts the same way (chat-net.ts, `townChars`).
  */
 export function charCount(text: string): number {
-  if (text.length > TOWN_CHAT.maxChars * 8) return Infinity;
   let n = 0;
-  for (const _ of graphemes.segment(text)) n++;
+  for (const { segment } of graphemes.segment(text)) {
+    const parts = [...segment].length;
+    n += parts <= CHAR_MAX_PARTS ? 1 : parts;
+  }
   return n;
 }
 

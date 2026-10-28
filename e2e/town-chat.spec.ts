@@ -223,7 +223,6 @@ test("the text field (a signed-in player's): 80 characters, a count near the end
   await expect(field).toBeVisible();
   await expect(field).toHaveAttribute("placeholder", "Say something…");
   await expect(field).toHaveAttribute("enterkeyhint", "send");
-  await expect(field).toHaveAttribute("maxlength", "80");
   expect(await field.evaluate((el) => parseFloat(getComputedStyle(el).fontSize)), "16 px or more: iPhone Safari doesn't zoom in").toBeGreaterThanOrEqual(16);
   await expect(page.locator(".tc-form button"), "no send button in the box").toHaveCount(0);
   // Inside the box, at its foot, the same size with or without it.
@@ -481,8 +480,13 @@ test("the server decides: a refused message says why over the field and keeps yo
   await expect(note).toHaveText("No links or contact details in chat.");
   // The note goes after a few seconds.
   await expect(note).toHaveCount(0, { timeout: CHAT.noteMs + 3000 });
-  // 80 characters: the field stops there, and the server refuses more from anyone who gets past it.
-  await expect(field).toHaveAttribute("maxlength", "80");
+  // 80 characters, counted as the server counts them (an emoji is one): the field stops there, and the server refuses more
+  // from anyone who gets past it.
+  await field.fill("x".repeat(90));
+  await expect(field).toHaveValue("x".repeat(80));
+  await field.fill("😀".repeat(85));
+  await expect(field).toHaveValue("😀".repeat(80));
+  await field.fill("");
   const long = await page.request.post("/api/town/chat", { data: { text: "x".repeat(81) } });
   expect(long.status()).toBe(400);
   expect(((await long.json()) as { message: string }).message).toBe("Messages are at most 80 characters.");

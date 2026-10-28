@@ -25,7 +25,7 @@ import { openProfile } from "../profile-nav.ts";
 import { useServerStatus } from "../status.ts";
 import { testSwitchesAllowed } from "../test-switches.ts";
 import { CHAT, CHAT_BOX, ChatLog, clampBox, loadChatPos, onTownChatLineTap, saveChatPos, say, setTownChatLineTap, startChatter, type ChatKind, type ChatLine, type Rect } from "./chat.ts";
-import { mayTownChat, openTownFeed, removeTownLine, reportTownLine, sendTownChat, townChatOff, townSendWaitMs } from "./chat-net.ts";
+import { cutTownText, mayTownChat, openTownFeed, removeTownLine, reportTownLine, sendTownChat, townChars, townChatOff, townSendWaitMs } from "./chat-net.ts";
 import "./town-chat.css";
 
 export function TownChat() {
@@ -248,7 +248,7 @@ export function TownChat() {
     } else if (r.reason === "wait") setWait(Math.ceil(r.waitMs / 1000));
     else if (r.reason === "refused") setNote(r.message ?? null);
   };
-  const left = CHAT.maxChars - text.length;
+  const left = CHAT.maxChars - townChars(text);
   // Why the field can't send right now (a guest, a young device, the switch, your chat ban), shown in its place.
   const off = townChatOff();
 
@@ -273,7 +273,6 @@ export function TownChat() {
           ref={field}
           type="text"
           value={text}
-          maxLength={CHAT.maxChars}
           placeholder={off ?? (wait > 0 ? `Wait ${wait} s` : "Say something…")}
           title={off ?? undefined}
           disabled={!!off || wait > 0}
@@ -283,7 +282,13 @@ export function TownChat() {
           autocapitalize="sentences"
           spellcheck={false}
           aria-label="Say something in the town chat"
-          onInput={(e) => setText((e.target as HTMLInputElement).value)}
+          onInput={(e) => {
+            // (The field stops at maxChars as the server counts them, an emoji as one: no maxLength, which counts UTF-16.)
+            const el = e.target as HTMLInputElement;
+            const cut = cutTownText(el.value);
+            if (cut !== el.value) el.value = cut;
+            setText(cut);
+          }}
           onFocus={focus}
           onBlur={blur}
         />

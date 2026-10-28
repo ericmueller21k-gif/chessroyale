@@ -456,7 +456,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   if ((path === "/api/town/chat" || path === "/api/town/chat/remove") && request.method === "POST") {
     if (!env.LIVE) return json({ message: "The chat isn't set up here." }, 503);
     const hub = liveHub(env as Required<Pick<AccountEnv, "LIVE">>);
-    if (path === "/api/town/chat/remove") return townRemoveResponse(request, hub, isAdmin(env as AdminEnv, current), now);
+    if (path === "/api/town/chat/remove") return townRemoveResponse(request, hub, isAdmin(env as AdminEnv, current), now, waitUntil);
     return townPostResponse(request, sql, hub, { user: current, tooYoung: ageAnswer(request) === "under", paused: isPaused(env, "town-chat", now) }, now, waitUntil);
   }
 

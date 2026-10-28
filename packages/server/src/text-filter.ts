@@ -53,7 +53,7 @@ const LIKE: Record<string, string> = {
   b: "вьбʙƅɓβᖯ",
   c: "сϲᴄҫςƈꮯ",
   d: "ԁժᴅɗđðдδ",
-  e: "еєэɛᴇҽɘεǝ",
+  e: "еєэɛᴇҽɘεǝə",
   f: "ꜰƒғϝ",
   g: "ɡɢցǥɠԍ",
   h: "нһʜհħɦђћ",
@@ -63,7 +63,7 @@ const LIKE: Record<string, string> = {
   l: "ӏʟłɫɭǀ",
   m: "мᴍɱ",
   n: "ոռпиɴηπƞŋɲɳ",
-  o: "оοσᴏօøɵѳⲟθ",
+  o: "оοσᴏօøɵѳⲟθɔ",
   p: "рρᴘⲣ",
   q: "ԛɋ",
   r: "гяʀɾɼɽꭇᴦ",
@@ -160,15 +160,15 @@ export function isBlockedText(text: string): boolean {
 
 /** Swear words found inside any one word (letters may repeat), as ANYWHERE above but without q for g. */
 const SWEARS_ANYWHERE = [
-  "shpx", "cuhpx", "sphx", "fuvg", "ovgpu", "ovngpu", "phag", "nffubyr", "nefrubyr", "onfgneq", "fyhg", "juber", "jnaxre", "obyybpxf", "qvpxurnq", "wnpxnff",
-  "qhzonff", "cvff", "cbea",
+  "shpx", "cuhpx", "sphx", "sipx", "cuhx", "fuvg", "ovgpu", "ovngpu", "phag", "nffubyr", "nefrubyr", "onfgneq", "fyhg", "juber", "jnaxre", "obyybpxf",
+  "qvpxurnq", "wnpxnff", "qhzonff", "cvff", "cbea",
 ];
 /** Swear words found only as a whole word, exactly (or plural): short ones that are parts of ordinary words. */
 const SWEARS_WORDS = ["nff", "nefr", "qvpx", "pbpx", "chffl", "gjng", "jnax", "cevpx", "gvgf", "jgs", "fgsh", "tgsb"];
 /** The masked spellings ("f*ck" reads as "fck"), as whole words with their endings ("f*cking", "sh*tty", "fukin"). */
 const SWEARS_MASKED = ["shx", "shd", "spx", "sx", "fug", "ogpu", "pag", "qpx"];
 /** Ordinary words with a swear word inside. */
-const SWEARS_ALLOW = ["fphagubecr", "fuvvgnxr", "fuvgnxr", "fuvgn", "cvffneeb", "cbbea"];
+const SWEARS_ALLOW = ["fphagubecr", "fuvvgnxr", "fuvgnxr", "fuvgn", "cvffneeb", "cbbea", "cuhxrg"];
 /** How much of a chat message is read (a message is at most TOWN_CHAT.maxChars; this bounds the work for any caller). */
 const CHAT_READ = 256;
 
@@ -198,38 +198,75 @@ function swears(ws: string[], pieces: Pieces[]): boolean {
   });
 }
 
+/** Alphabets with letters that pass for Latin ones (and Latin's own extensions: small capitals, IPA letters…). */
+const LOOKALIKE_SCRIPTS = /[\p{Script=Cyrillic}\p{Script=Greek}\p{Script=Armenian}\p{Script=Cherokee}\p{Script=Coptic}\p{Script=Lisu}\p{Script=Latin}]/u;
 /**
- * A word that mixes Latin letters with letters from another alphabet that aren't known look-alikes ("sһit" with a letter
- * the list doesn't know yet): in chat it's refused, so a new look-alike can't carry a word past the filter. (Names don't
- * get this: real names in other alphabets still work.)
+ * A word, as typed, with real Latin letters (a to z) and a letter from an alphabet with Latin look-alikes that the map
+ * doesn't know ("sh" + a new look-alike + "t"): in chat it's refused, so a look-alike the list doesn't have yet can't carry
+ * a word past the filter. A known look-alike is read as its Latin letter instead (the lists catch the word). Words wholly
+ * in another alphabet ("дела", "καλημέρα") and other scripts beside Latin ("gg楽しかった", "ok你好") are left alone. (Names
+ * don't get this: real names still work.)
  */
 const mixedScript = (text: string) =>
   base(text)
     .split(/\s+/)
-    .some((t) => {
-      const w = t.replace(/./gsu, (c) => LOOKALIKE[c] ?? c);
-      return /[a-z]/.test(w) && /[^\P{L}a-z]/u.test(w);
-    });
+    .some((t) => /[a-z]/.test(t) && [...t].some((c) => c > "\x7f" && /\p{L}/u.test(c) && LOOKALIKE_SCRIPTS.test(c) && LOOKALIKE[c] === undefined));
 
+/** A run of digits: its groups, and whether it starts as a phone number does (with "+", or a group starting with 0). */
+interface DigitRun {
+  groups: string[];
+  lead: boolean;
+}
+/**
+ * A group that reads as a chess rating or a year: four digits from 1000 to 3500, or three that are a round number from
+ * 100 to 950 (people say "800", not "837"). No leading zero.
+ */
+const ratingLike = (g: string) => (/^[1-3][0-9]{3}$/.test(g) && Number(g) <= 3500) || /^[1-9](?:00|50)$/.test(g);
 /**
  * Runs of digits (any script's) with only spaces and phone-number marks between them ("555 123-4567", "+1 (555) 123 4567",
- * "555,123,4567", "14 88"), each as its groups of digits. A letter, a slash or other punctuation ends a run, so "1800 vs
- * 2000", "2000/2100" or "12:30" are separate numbers. A number written with thousands commas ("1,500") is one group.
+ * "555/123/4567", "14 88"), each as its groups of digits. A comma joins two groups only bare ("555,123,4567"; "3-0, 2-1"
+ * are separate), and a number written with thousands commas ("1,500") is one group. A slash joins them unless both sides
+ * read as ratings or years ("2000/2100" are two). A letter, a colon or other punctuation ends a run ("1800 vs 2000", "12:30").
  */
-const digitRuns = (text: string): string[][] =>
-  (text
-    .normalize("NFKC")
-    .replace(/(?<!\p{Nd})(\p{Nd}{1,3})((?:,\p{Nd}{3})+)(?![\p{Nd},])/gu, (_, a: string, b: string) => a + b.replace(/,/g, ""))
-    .match(/\p{Nd}+(?:[\s.\-_()+,]+\p{Nd}+)*/gu) ?? []).map((r) => r.split(/[^\p{Nd}]+/u).filter(Boolean));
-/** A phone number: seven digits or more in one run. */
+function digitRuns(text: string): DigitRun[] {
+  const t = text.normalize("NFKC").replace(/(?<!\p{Nd})(\p{Nd}{1,3})((?:,\p{Nd}{3})+)(?![\p{Nd},])/gu, (_, a: string, b: string) => a + b.replace(/,/g, ""));
+  const out: DigitRun[] = [];
+  for (const m of t.matchAll(/(\+\s*)?\p{Nd}+(?:(?:[\s.\-_()+/]+|,(?=\p{Nd}))\p{Nd}+)*/gu)) {
+    // (Groups and what's between them, in turn: a slash between two ratings or years splits the run.)
+    const parts = m[0].split(/(\p{Nd}+)/u);
+    let run: DigitRun = { groups: [], lead: !!m[1] };
+    for (let i = 1; i < parts.length; i += 2) {
+      const g = parts[i]!;
+      const prev = run.groups.at(-1);
+      if (prev !== undefined && parts[i - 1]!.includes("/") && ratingLike(prev) && ratingLike(g)) {
+        out.push(run);
+        run = { groups: [], lead: false };
+      }
+      if (!run.groups.length && g.startsWith("0")) run.lead = true;
+      run.groups.push(g);
+    }
+    out.push(run);
+  }
+  return out;
+}
+/** A phone number has seven digits or more. */
 const PHONE_DIGITS = 7;
+/** Words that say a number is a phone number ("my number", "call me", "text"). */
+const NUMBER_TALK = /\b(?:call|phone|number|num|cell|mobile|txt|text|tel|dial|ring\s+me|reach\s+me|contact)\b|#/;
 /**
- * A group that reads as a chess rating (or a year): four digits, or three that are a round number (800, 950). A run made
- * only of these is rating talk ("rated 1200-1400", "1500 1600 1700", "800-1200"), not a phone number. (So a number written
- * in fours, "2345 6789", passes: reports and a moderator handle that.)
+ * Whether a run is a phone number. Seven digits or more together always are (a card number too). Otherwise its groups
+ * of three digits or more are counted (short ones, "10 20 30 40" or "3+2 5+0", never make one), all of them when it
+ * starts as a phone number does ("06 12 34 56 78", "+44 20 …") or the message talks of a number: seven or more is a phone
+ * number, unless it's rating talk, at most three groups that each read as a rating or a year ("rated 1200-1400", "1500
+ * 1600 1700", "800-1200", "the 2025-2026 season").
  */
-const ratingLike = (g: string) => /^[0-9]{4}$/.test(g) || /^[1-9](?:00|50)$/.test(g);
-const isPhone = (groups: string[]) => groups.join("").length >= PHONE_DIGITS && !groups.every(ratingLike);
+function isPhone(run: DigitRun, numberTalk: boolean): boolean {
+  if (run.groups.some((g) => g.length >= PHONE_DIGITS)) return true;
+  const all = run.lead || numberTalk;
+  const counted = run.groups.filter((g) => all || g.length >= 3);
+  if (counted.join("").length < PHONE_DIGITS) return false;
+  return all || counted.length > 3 || !counted.every(ratingLike);
+}
 /** The endings of web addresses people paste (not short ones that start sentences when someone skips a space: "me", "to"). */
 const TLDS = "com|net|org|io|co|ly|tv|app|xyz|info|biz|uk|ru|de|fr|ca|au|link|site|online|club|shop|live|top|dev|cc|ws|tk|gl|page|store|chat|gg|me";
 /** The same, without the ones that are everyday words ("polka dot top"), for an address spelled with "dot". */
@@ -243,6 +280,7 @@ const LINK_RE = new RegExp(
     `\\b[a-z0-9-]+[.。｡](?:${TLDS.replace("|gg|me", "")})\\b`,
     "\\b[a-z0-9-]+(?:[.。｡][a-z0-9-]+)*[.。｡][a-z]{2,}/\\S", // t.me/someone, example.co.uk/page
     `\\b[a-z0-9-]+\\s+[.。｡]\\s*(?:${TLDS})\\b`, // example . io, bit . ly/x (a space before the dot: never prose)
+    `\\b[a-z0-9-]+\\s*[([{]\\s*[.。｡]\\s*[)\\]}]\\s*(?:${TLDS})\\b`, // example(.)com, example [.] com, example{.}net
     "\\b[a-z0-9-]+\\s*[.。｡]\\s*(?:com|net|org)\\b", // example. com
     `\\b[a-z0-9-]+\\s*[([{]?\\s*dot\\s*[)\\]}]?\\s*(?:${DOT_TLDS})\\b`, // example dot com, example (dot) io
   ].join("|"),
@@ -270,10 +308,11 @@ export function chatRefusal(text: string): string | null {
     const ws = words(said, reading, pieces);
     return listed(ws) || swears(ws, pieces);
   };
-  if (READINGS.some(refused) || mixedScript(said) || runs.some((g) => NUMBERS.some((n) => g.join("").includes(n)))) return CHAT_NOT_ALLOWED;
+  if (READINGS.some(refused) || mixedScript(said) || runs.some((r) => NUMBERS.some((n) => r.groups.join("").includes(n)))) return CHAT_NOT_ALLOWED;
   // (Look-alike letters read as Latin ones, so a Cyrillic "о" can't hide a ".com"; digits and symbols stay as typed.)
   const plain = base(said).replace(/./gsu, (c) => LOOKALIKE[c] ?? c);
-  if (LINK_RE.test(plain) || EMAIL_RE.test(plain) || APPS_RE.test(plain) || runs.some(isPhone)) return CHAT_NO_CONTACT;
+  const numberTalk = NUMBER_TALK.test(plain);
+  if (LINK_RE.test(plain) || EMAIL_RE.test(plain) || APPS_RE.test(plain) || runs.some((r) => isPhone(r, numberTalk))) return CHAT_NO_CONTACT;
   return null;
 }
 
