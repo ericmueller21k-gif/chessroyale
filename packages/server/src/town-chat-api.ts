@@ -5,7 +5,7 @@ import { CHAT_OFF, chatBlock } from "./chat-mod.ts";
 import { isBlockedText } from "./text-filter.ts";
 import { cachedUserId } from "./presence.ts";
 import { BANNED_FROM_CHAT } from "./global-chat-api.ts";
-import { TOWN_INPUT_MAX, TOWN_TOO_LONG, townSince, type TownLine, type TownPost, type TownSender, type TownSlice, type TownSnapshot } from "./town-chat.ts";
+import { TOWN_INPUT_MAX, TOWN_TOO_LONG, tidyColor, townSince, type TownLine, type TownPost, type TownSender, type TownSlice, type TownSnapshot } from "./town-chat.ts";
 import type { LiveHub } from "./live-hub.ts";
 
 /**
@@ -113,8 +113,9 @@ function refusal(a: TownAsker): Response | null {
 }
 
 /**
- * POST /api/town/chat {text, since?}: a signed-in player sends a message. The name comes from the account (a name the
- * filter refuses goes out as "Player"), never from the request; the room checks the message and the limits. The answer
+ * POST /api/town/chat {text, since?, room?, color?}: a signed-in player sends a message. The name comes from the account (a name the
+ * filter refuses goes out as "Player"), never from the request; `color` is only the name color their device picked when it joined
+ * the town (a whole number below TOWN_COLOR_LIMIT, else ignored); the room checks the message and the limits. The answer
  * carries the room after it (the lines after `since`), so the sender's log has it at once.
  */
 export async function townPostResponse(request: Request, sql: Sql, hub: TownHub, a: TownAsker, now: number, waitUntil?: (p: Promise<unknown>) => void): Promise<Response> {
@@ -124,7 +125,7 @@ export async function townPostResponse(request: Request, sql: Sql, hub: TownHub,
   if (Number(request.headers.get("content-length")) > TOWN_BODY_MAX) return json({ message: TOWN_TOO_LONG }, 413);
   const raw = await request.text().catch(() => "");
   if (raw.length > TOWN_BODY_MAX) return json({ message: TOWN_TOO_LONG }, 413);
-  const body = ((): { text?: unknown; since?: unknown; room?: unknown } => {
+  const body = ((): { text?: unknown; since?: unknown; room?: unknown; color?: unknown } => {
     try {
       return JSON.parse(raw) ?? {};
     } catch {
@@ -137,7 +138,8 @@ export async function townPostResponse(request: Request, sql: Sql, hub: TownHub,
   if (block) return json({ message: CHAT_OFF, block }, 403);
   const row = await sql.first<{ name: string }>("SELECT name FROM users WHERE id = ?", a.user.id);
   const name = row?.name ?? a.user.name;
-  const sender: TownSender = { id: a.user.id, name: isBlockedText(name) ? "Player" : name };
+  const color = tidyColor(body.color);
+  const sender: TownSender = { id: a.user.id, name: isBlockedText(name) ? "Player" : name, ...(color !== undefined ? { color } : {}) };
   const { post, town } = (await hub.townPost(sender, typeof body.text === "string" ? body.text.slice(0, TOWN_INPUT_MAX) : "")) as { post: TownPost; town: TownSnapshot };
   keep(town, now, waitUntil);
   const since = Number(body.since);

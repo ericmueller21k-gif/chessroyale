@@ -8,7 +8,7 @@ import { LINE_GONE } from "../src/fairplay.ts";
 import { LiveHub } from "../src/live-hub.ts";
 import { CHAT_NOT_ALLOWED, CHAT_NO_CONTACT, rot13 } from "../src/text-filter.ts";
 import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, TOWN_CHAT_PAUSED, expireTownCache, forgetTownCache, townRemoveResponse, townSlice, type TownHub } from "../src/town-chat-api.ts";
-import { TOWN_EMPTY, TOWN_REPEAT, TOWN_TOO_LONG, TownChat, charCount, tidyMessage, townSince, townWait, type TownSender } from "../src/town-chat.ts";
+import { TOWN_COLOR_LIMIT, TOWN_EMPTY, TOWN_REPEAT, TOWN_TOO_LONG, TownChat, charCount, tidyColor, tidyMessage, townSince, townWait, type TownSender } from "../src/town-chat.ts";
 import { caseDetail } from "../src/admin.ts";
 import { decide } from "../src/fairplay.ts";
 import { memoryDb } from "./memory-db.ts";
@@ -69,6 +69,20 @@ describe("town chat: the room", () => {
     expect(c.post(ann, "rematch?", T0 + 15_000)).toMatchObject({ ok: true });
     expect(c.post(ann, "g g", T0 + 59_999)).toMatchObject({ ok: false, reason: "repeat", retryMs: 1 });
     expect(c.post(ann, "gg", T0 + 60_000)).toMatchObject({ ok: true });
+  });
+
+  it("carries the name color a sender's device picked (a small whole number) on the line, and ignores anything else; no color, none on the line (Oct 28, Eric's phone)", () => {
+    const c = new TownChat();
+    expect(TOWN_COLOR_LIMIT).toBe(32);
+    expect(c.post({ ...ann, color: 7 }, "gg", T0)).toMatchObject({ ok: true, line: { name: "Ann", text: "gg", color: 7 } });
+    for (const good of [0, 9, 31]) expect(tidyColor(good)).toBe(good);
+    for (const bad of [-1, 32, 1.5, Number.NaN, Infinity, "3", null, undefined, {}, [3], true]) expect(tidyColor(bad)).toBeUndefined();
+    const refused = c.post({ ...bo, color: 99 }, "hi", T0 + 1);
+    expect(refused.ok && "color" in refused.line, "a bad number is dropped, the message still goes").toBe(false);
+    const none = c.post({ id: "cy", name: "Cy" }, "yo", T0 + 2);
+    expect(none.ok && "color" in none.line).toBe(false);
+    // Readers get it with the line.
+    expect(townSince(c.snapshot(T0 + 3), 0).lines.map((l) => l.color)).toEqual([7, undefined, undefined]);
   });
 
   it("holds each line a minute; a newcomer gets the last 12; readers get only what's new; a restart starts over", () => {
@@ -235,6 +249,19 @@ describe("town chat: the API", () => {
     expect(SIGN_IN_TO_TOWN_CHAT).toBe("Sign in to chat with other players.");
     // Without ?town, nothing of the town's.
     expect("town" in (await live(await call("/api/live", b.token)))).toBe(false);
+  });
+
+  it("a message carries the name color its device sent, to every reader; a bad one is ignored, not refused (Oct 28, Eric's phone)", async () => {
+    const { call, signedIn } = await setup();
+    const a = await signedIn("Ann");
+    const b = await signedIn("Bo");
+    const sent = await call("/api/town/chat", a.token, { text: "hello town", since: 0, color: 4 });
+    expect(sent.status).toBe(200);
+    expect(((await sent.json()) as { line: { color?: number } }).line.color).toBe(4);
+    expect((await live(await call("/api/live?town=0", b.token))).town!.lines).toMatchObject([{ name: "Ann", text: "hello town", color: 4 }]);
+    const bad = await call("/api/town/chat", b.token, { text: "hi Ann", since: 1, color: -3 });
+    expect(bad.status).toBe(200);
+    expect("color" in ((await bad.json()) as { line: object }).line).toBe(false);
   });
 
   it("a guest gets none even where signing in isn't set up (local runs): the town's chat is for accounts", async () => {

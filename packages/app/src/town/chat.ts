@@ -6,6 +6,8 @@
  *
  * v2 (Eric, Oct 28, docs/decisions/2026-10-28-town-chat-v2.md): one see-through box that holds every line of the last minute and
  * scrolls; three modes from a header icon (`ChatMode`: always on, new messages only, off), remembered on this device.
+ * v3 (Eric's phone, the same day; the decision's "Oct 28, Eric's phone"): the field only in always on; no shadows or backings; a
+ * line only you see for "too soon" and every refusal (`whisper`); players' names colored; the text black by day, white by night.
  *
  * One way in: `say(name, text, kind, who)`. The bosses and their kids say a line now and then (`CHATTER`, placeholders);
  * players' messages come from the server (chat-net.ts: signed-in players only), each with who said it and its number in the
@@ -14,6 +16,7 @@
  * server's, TOWN_CHAT. docs/decisions/2026-10-28-town-chat-typing.md.
  */
 import { TOWN_CHAT } from "@chessroyale/core";
+import { skyOverride, skyTone, skyWeights, type SkyTone } from "./sky.ts";
 import { HOMES, type HomeId } from "./world.ts";
 
 /** Every number of the chat, in one place (the CSS reads none of them: the component hands it the fade times). */
@@ -34,8 +37,6 @@ export const CHAT = {
   /** What you may type, and the wait between two of your messages (the server's numbers: it enforces them). */
   maxChars: TOWN_CHAT.maxChars,
   sendEveryMs: TOWN_CHAT.gapMs,
-  /** A refusal's reason shows over the field this long. */
-  noteMs: 4000,
   /** The "N left" count shows from this many characters left. */
   nearEnd: 10,
   /** Press and hold this long on the box (without moving more than `holdSlopPx`) to pick it up. */
@@ -65,10 +66,11 @@ export const nextChatMode = (m: ChatMode): ChatMode => CHAT_MODES[(CHAT_MODES.in
 
 export type ChatKind = "boss" | "kid" | "player" | "system";
 
-/** Who said a player's line, from the server: their account id and the line's number in its room. */
+/** Who said a player's line, from the server: their account id and the line's number in its room, and the name color their device picked (names.ts). */
 export interface ChatWho {
   uid: string;
   n: number;
+  color?: number;
 }
 
 export interface ChatLine extends Partial<ChatWho> {
@@ -80,6 +82,24 @@ export interface ChatLine extends Partial<ChatWho> {
   name: string;
   text: string;
   kind: ChatKind;
+  /** A line only you see (`whisper`): "Sorry, you can't send another message for 12 seconds.", a refusal's reason. Never from the server. */
+  private?: true;
+}
+
+/** The text of the line you get when you try to send before your wait is up: the seconds rounded up, "1 second" singular. */
+export function tooSoonText(waitMs: number): string {
+  const s = Math.max(1, Math.ceil(waitMs / 1000));
+  return `Sorry, you can't send another message for ${s} ${s === 1 ? "second" : "seconds"}.`;
+}
+
+/**
+ * Which tone the chat text has now (Eric, Oct 28: "during daytime background it defaults to black"): dark ink by day, white by night,
+ * from the town's own sky: `?sky=` where it holds one look, else the device's clock as the town reads it (sky.ts, `skyTone`).
+ * Read about once a minute by the screen (never per frame), which changes one attribute only when the tone flips.
+ */
+export function townTone(now: Date = new Date(), search: string = typeof location === "undefined" ? "" : location.search): SkyTone {
+  const w = skyOverride(new URLSearchParams(search).get("sky")) ?? skyWeights(now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60);
+  return skyTone(w);
 }
 
 /** The time of day as the log shows it: hours and minutes, 12-hour, no am/pm ("9:41", "12:05"). */
@@ -206,8 +226,32 @@ export class ChatLog {
   }
 
   say(name: string, text: string, kind: ChatKind, at = Date.now(), who?: ChatWho): void {
+    this.add({ name, text, kind, at, who });
+  }
+
+  /**
+   * A line only you see (Eric, Oct 28): "Sorry, you can't send another message for 12 seconds.", or a refusal's reason. A gray system
+   * line with this device's time; never sent anywhere. One at a time: the next one takes the last one's place; otherwise it goes
+   * after `lifeMs` like any line.
+   */
+  whisper(text: string, at = Date.now()): void {
+    this.add({ name: "", text, kind: "system", at, mine: true });
+  }
+
+  private add(l: { name: string; text: string; kind: ChatKind; at: number; who?: ChatWho; mine?: true }): void {
+    const { name, text, kind, at, who } = l;
+    if (l.mine) this.lines = this.lines.filter((x) => !x.private);
     const id = this.nextId++;
-    this.lines.push({ id, at, time: clockText(new Date(at)), name, text, kind, ...(who ? { uid: who.uid, n: who.n } : {}) });
+    this.lines.push({
+      id,
+      at,
+      time: clockText(new Date(at)),
+      name,
+      text,
+      kind,
+      ...(who ? { uid: who.uid, n: who.n, ...(who.color !== undefined ? { color: who.color } : {}) } : {}),
+      ...(l.mine ? { private: true as const } : {}),
+    });
     // A message after the box had faded starts a new burst: only the new lines show in "new messages", until a tap brings back the rest.
     if (!this.shown) {
       this.freshFrom = id;

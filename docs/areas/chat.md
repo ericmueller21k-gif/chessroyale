@@ -44,7 +44,11 @@ Lane: `social`.
     isn't set up (local runs). Guests, and any device the age gate marked too young (`hc_age=under`, even with someone
     signed in), never ask for or get players' lines, and can't send: their log has the bosses' and kids' chatter alone.
   - **The room** (`server/src/town-chat.ts`, kept by the live hub beside the global chat, **in memory only**): each line
-    `{n, at, from, name, text}` for `TOWN_CHAT.lineMs` (60 s), at most `holdMax`; a newcomer gets the last `keep` (12).
+    `{n, at, from, name, text, color?}` for `TOWN_CHAT.lineMs` (60 s), at most `holdMax`; a newcomer gets the last `keep` (12).
+    `color` (Oct 28, Eric's phone) is only the name color the sender's device picked when it opened the town (a whole number
+    below `TOWN_COLOR_LIMIT`, 32; the app has ten and reads it modulo its palette): `POST /api/town/chat` takes it, `tidyColor`
+    drops anything else without refusing the message, the line carries it to every reader so everyone sees the same color for
+    that player's visit. Cosmetic: nothing is decided by it.
     The hub's alarm rings at the next line's minute and sweeps it (`sweep`, `nextExpiry`), so nothing outlives its minute
     even in an empty town; for the wait and the repeat it keeps when and a hash of the words, never the words, for a
     minute. A restart forgets it and gives the room a new id (`room`): an app seeing a new room drops its players' lines
@@ -56,7 +60,7 @@ Lane: `social`.
     the hub at most every `TOWN_CHAT.readCacheMs` (2 s) whoever reads, and at once when the reader is ahead of its copy
     (it saw a newer line in its own send's answer), so a stale copy never tells a reader to start over. The copy goes
     from the instance's memory on its next request after those 2 s (`expireTownCache`). No socket.
-  - **Sending:** `POST /api/town/chat {text, since, room}` → the line and the room after it, or why not. A body over 8 KB
+  - **Sending:** `POST /api/town/chat {text, since, room, color?}` → the line and the room after it, or why not. A body over 8 KB
     is refused in the Worker and the text cut to 1,024 characters before it goes to the shared hub. The server's limits
     (the app mirrors them): at most `maxChars` (80) characters after tidying (invisible and control characters and
     fillers that show as nothing out, a joiner kept only inside an emoji, a pile of accents cut to two, spaces run
