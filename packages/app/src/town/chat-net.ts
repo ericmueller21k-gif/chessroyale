@@ -159,13 +159,17 @@ const weight = (c: string) => {
 };
 /** Its length as the server counts it: an emoji (with its skin tone, or joined into one) is one. */
 export const townChars = (text: string): number => pieces(text).reduce((n, c) => n + weight(c), 0);
-/** The text cut to `max` characters as the server counts them (the field stops there as you type). */
+/** At most this many code points in all (3 × maxChars), as the server caps it. */
+export const TOWN_MAX_PARTS = 3 * TOWN_CHAT.maxChars;
+/** The text cut to `max` characters as the server counts them, and to TOWN_MAX_PARTS code points (the field stops there). */
 export function cutTownText(text: string, max: number = TOWN_CHAT.maxChars): string {
   let n = 0;
+  let parts = 0;
   let out = "";
   for (const c of pieces(text)) {
     n += weight(c);
-    if (n > max) break;
+    parts += [...c].length;
+    if (n > max || parts > TOWN_MAX_PARTS) break;
     out += c;
   }
   return out;
@@ -183,7 +187,7 @@ export async function sendTownChat(raw: string, fetcher: typeof fetch = fetch): 
   if (!text) return { ok: false, reason: "empty", waitMs: 0 };
   const off = townChatOff();
   if (off) return { ok: false, reason: "refused", waitMs: 0, message: off };
-  if (townChars(text) > TOWN_CHAT.maxChars) return { ok: false, reason: "refused", waitMs: 0, message: `Messages are at most ${TOWN_CHAT.maxChars} characters.` };
+  if (townChars(text) > TOWN_CHAT.maxChars || [...text].length > TOWN_MAX_PARTS) return { ok: false, reason: "refused", waitMs: 0, message: `Messages are at most ${TOWN_CHAT.maxChars} characters.` };
   const waitMs = townSendWaitMs();
   if (waitMs > 0) return { ok: false, reason: "wait", waitMs };
   try {

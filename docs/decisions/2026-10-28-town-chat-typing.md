@@ -85,25 +85,20 @@ Later the same day, through the director:
    - email addresses, mail services' names ("my gmail"), and one spelled out ("at yahoo", "@ gmail");
    - messaging apps and games with their own chat ("add me on discord", snapchat, instagram, whatsapp, telegram, tiktok,
      facebook, skype, wechat, roblox, kik): "add me on …" is how a conversation leaves the game;
-   - phone numbers, read run by run. A run is digits (any script's) with spaces and phone marks between them (`.` `-` `_`
-     `(` `)` `+`), a bare comma ("555,123,4567"; "3-0, 2-1" are separate), or a slash, unless both sides of the slash
-     read as ratings or years ("2000/2100" are two numbers). A letter, a colon or other punctuation ends a run. Thousands
-     commas ("1,500") make one group. A run is a phone number when:
-     - it has seven digits or more in one group ("5551234", a card number), or
-     - its groups of three digits or more add up to seven or more digits, unless it's rating talk: at most three groups,
-       each a rating or a year (four digits from 1000 to 3500, or a round hundred or fifty from 100 to 950, no leading
-       zero), or
-     - it starts as a phone number does (with "+", or a group starting with 0) or the message talks of a number ("call",
-       "phone", "number", "text", "cell", "mobile", "#"…): then every digit counts and rating talk is no excuse.
-   - **So these are refused:** "555 1234", "555 123 4567", "555/123/4567", "9123 4567", "5551 2345", "0207 9460 0000",
-     "0800 1000 2000", "06 12 34 56 78", "+44 20 7946 0958", "my number 1500 2000 3000", "4111 1111 1111 1111", "555,123,4567".
-   - **And these pass:** "rated 1200-1400", "1500 1600 1700", "800-1200", "2000/2100", "1,500 vs 1,600", "the 2025-2026
-     season", "10 20 30 40 moves", "games 12 13 14 15", "3+2 5+0 10+0", "won 3-0, 2-1, 1-0, 2-2", "2026-10-28",
-     "28.10.2026", "10/28/2026", "12:30", chess notation.
-   - **The cost:** four or more rating-like numbers in a row ("1200 1300 1400 1500", "100 200 300 400 500") read as a phone
-     number; reports and a moderator handle anything that slips the other way.
+   - **phone numbers, by the director's rule after the third review: a message with 7 or more digits in all is refused**
+     ("No links or contact details in chat."), any script's digits (`\p{Nd}`), counted across the whole message, however
+     they're spaced or split. The rating exceptions, the run shapes and the "number talk" words are gone: each round of
+     shapes opened new holes ("5 5 5 1 2 3 4", "12 34 56 78", "555 12 34"), and "#" is checkmate in chess.
+   - **So these are refused:** every phone form from the three reviews ("555 1234", "555 123 4567", "555/123/4567",
+     "9123 4567", "0800 1000 2000", "06 12 34 56 78", "+44 20 7946 0958", "5 5 5 1 2 3 4 5 6 7", "dm 9 1 2 3 4 5 6 7",
+     "12 34 56 78", "123-45-67", card numbers…), and, accepted, rating ranges ("rated 1200-1400"), long score lists
+     ("Nf7# 1-0 2-0 3-0"), long move lists and full dates ("2026-10-28").
+   - **And these pass:** a short message's numbers, six digits or fewer: "I'm 1500", "1200 or so", "gg 1-0", "3+2",
+     "Nf7#", "e4 e5", "1. e4 e5 2. Nf3", "12:30", "game 3 of 5".
    Endings that start sentences when someone skips a space ("me", "to", "be", "in", "us") aren't web addresses without
    a path.
+   - **Known gaps:** a number spelled in words ("five five five…"), an address spelled out in other ways, a phone number
+     split over several messages. The report button is the backstop: a moderator reads the reported line.
 5. **Swear words:** a short list of our own, ROT13 in the file like the slurs: long ones found inside any word, short
    ones only as whole words, the masked spellings ("f*ck" reads as "fck") as whole words with an ending ("f*cking",
    "sh*tty", "fukin"). Mild words (damn, hell, crap) are left off. The ordinary words with one inside are let through
@@ -123,7 +118,9 @@ Later the same day, through the director:
    from Unicode's confusables for single Latin letters, in names and in chat. In chat a word as typed that has real Latin
    letters (a to z) and a letter from an alphabet with Latin look-alikes (Cyrillic, Greek, Armenian, Cherokee, Coptic,
    Lisu, Latin's extensions) that the map doesn't fold is refused ("That message isn't allowed."), so a look-alike the
-   list doesn't have yet can't carry a word past it. Words wholly in another alphabet pass ("дела", "как дела",
+   list doesn't have yet can't carry a word past it. So is a word made only of look-alikes from two or more of those
+   alphabets when one of its letters isn't on the map (Cyrillic п, е, г beside a Cherokee letter; the third review);
+   Cherokee ꭵ and Cyrillic ꙇ are on the map now. Words wholly in another alphabet pass ("дела", "как дела",
    "добрый вечер", "καλημέρα", "дякую"), and so does another script beside Latin ("gg楽しかった", "ok你好"), and
    Azerbaijani's ə ("Bakı gözəldir"). Names don't get the backstop: real names in other alphabets still work.
 7. **The same message** is the same letters and digits, whatever the case, spaces, accents or punctuation ("gg!!" is
@@ -133,8 +130,9 @@ Later the same day, through the director:
    stays only inside an emoji (👩‍💻, 🏳️‍🌈); a pile of accents on one letter cut to two; spaces run together, trimmed. 80
    counts what shows as one character as one (an emoji with its skin tone, or joined into one, as a family of four), up to
    8 code points; a "character" made of more counts every code point (a 200-emoji chain, a pile of skin tones, a run of
-   jamo), so 80 can't be beaten with one huge one. The app counts the same way, and the field stops at 80 as you type
-   (no `maxlength`, which counts UTF-16 units: 80 emoji fit).
+   jamo), so 80 can't be beaten with one huge one; and at most 240 code points in all (3 × 80: the third review), so 80
+   medium characters can't carry hundreds of emoji (a family emoji and 80 skin-toned ones still fit). The app counts the
+   same way, and the field stops at 80 and at 240 as you type (no `maxlength`, which counts UTF-16 units: 80 emoji fit).
 8a. **The room keeps nothing past a minute** (the review; the re-review made a reader ahead of an instance's copy read
    the room again at most every 250 ms, a Remove keep the copy's timer too): the hub's alarm rings at the next line's minute and sweeps it
    out, visitors or not; the wait and the repeat keep when and a hash of the words, for a minute; each Worker instance's
@@ -287,3 +285,20 @@ None guards a rule in `docs/rules/eric.md`.
     re-review's R1: other scripts beside Latin are fine).
   - `town-chat.test.ts`, the reviewer's test: one "clear" refused → the sequence clear refused, review, clear refused,
     a person's clear, the reviewer's clear, a new report, review, clear refused.
+- After the third review (the 7-digit rule):
+  - `text-filter.test.ts`, "lets ordinary chat through": "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6" → "1. e4 e5 2. Nf3", "I'm 1800 vs
+    your 2000" → "I'm 1800, you?", "meet at 12:30 or 13:45" → "meet at 12:30" (the long ones now have 7 digits or more).
+  - `text-filter.test.ts`, "lets rating talk, years, scores and times through" (expected null for "rated 1200-1400",
+    "1500 1600 1700", "2000/2100", "800-1200 is a good range", "1,500 vs 1,600", "the 2025-2026 season", "I'm 1800 vs
+    your 2000", "meet at 12:30 or 13:45", "10/28/2026") → "lets a short message's numbers through" ("I'm 1500", "1200 or
+    so", "I'm 1800, you?", "meet at 12:30", "won 3-0 then 1-0", and the rest unchanged). "rated 1200-1400" is now
+    expected refused.
+  - `text-filter.test.ts`, "refuses phone numbers in fours… (R2)" → "refuses any message with seven digits or more…":
+    the same forms, plus the third review's ("5 5 5 1 2 3 4 5 6 7", "12 34 56 78", "555 12 34", "2812 3456"…) and,
+    expected refused now, "rated 1200-1400", "10 20 30 40 moves", "2026-10-28", "Nf7# 1-0 2-0 3-0".
+  - `text-filter.test.ts`, "lets ordinary numbers through… (R2)" (expected null for "10 20 30 40 moves", "games 12 13 14
+    15", "3+2 5+0 10+0", "won 3-0, 2-1, 1-0, 2-2", "2026-10-28", "28.10.2026", "10/28/2026", "rated 1200-1400", "1500 1600
+    1700", "2000/2100", "800-1200", "1,500 vs 1,600", "the 2025-2026 season") → "lets a message with six digits or fewer
+    through" ("I'm 1500", "1200 or so", "gg 1-0", "3+2", "Nf7#", "Qxf7# gg", "e4 e5", "game 3 of 5", "12:30", "1. e4 e5
+    2. Nf3").
+  - `town-chat.test.ts`, "…rating talk goes": "rated 1200-1400" ok → "I'm 1500, rated 1-0 there" ok.

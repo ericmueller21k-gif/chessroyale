@@ -215,9 +215,9 @@ describe("the chat filter", () => {
     for (const text of [
       "gg",
       "Good game! Rematch at the park?",
-      "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6",
-      "I'm 1800 vs your 2000",
-      "meet at 12:30 or 13:45",
+      "1. e4 e5 2. Nf3",
+      "I'm 1800, you?",
+      "meet at 12:30",
       "1-0, well played",
       "Good game.Thanks",
       "ok.me too",
@@ -291,6 +291,18 @@ describe("the filter after the review", () => {
     for (const name of ["Даниил", "李小龙", "Ünal", "Søren", "Straße", "Αλέξης"]) expect(isBlockedText(name), name).toBe(false);
   });
 
+  it("refuses a word made only of look-alikes from two alphabets when one of them isn't on the map (the third review's B)", () => {
+    // Cyrillic п, е, г with an unmapped Cherokee or Cyrillic letter; and the two that are mapped now read as "i".
+    expect(chatRefusal("\u043f\u0435\u0433\uab9a")).toBe(CHAT_NOT_ALLOWED);
+    expect(chatRefusal("\u043f\u0435\u0433\u0435\u0433\u03be")).toBe(CHAT_NOT_ALLOWED);
+    const n = rot13("avttre");
+    expect(chatRefusal(n.replace("i", "\uab75"))).toBe(CHAT_NOT_ALLOWED);
+    expect(chatRefusal(n.replace("i", "\ua647"))).toBe(CHAT_NOT_ALLOWED);
+    expect(isBlockedText(n.replace("i", "\uab75"))).toBe(true);
+    // Wholly Russian or Greek words still pass.
+    for (const text of ["как дела", "добрый вечер", "καλημέρα", "βασιλιάς"]) expect(chatRefusal(text), text).toBeNull();
+  });
+
   it("ordinary chat wholly in another alphabet, or another script beside Latin, passes (the re-review's R1)", () => {
     for (const text of [
       "дела", "шахматы", "король", "слон", "ничья", "удачи", "молодец", "καλό", "βασιλιάς", "как дела", "добрый вечер", "дякую", "καλημέρα",
@@ -351,23 +363,8 @@ describe("the filter after the review", () => {
     }
   });
 
-  it("lets rating talk, years, scores and times through", () => {
-    for (const text of [
-      "rated 1200-1400",
-      "1500 1600 1700",
-      "2000/2100",
-      "800-1200 is a good range",
-      "1,500 vs 1,600",
-      "the 2025-2026 season",
-      "I'm 1800 vs your 2000",
-      "meet at 12:30 or 13:45",
-      "won 3-0 then 1-0",
-      "10/28/2026",
-      "e4 e5 Nf3 Nc6",
-      "I am at the park.",
-      "polka dot top",
-      "the dot to the left",
-    ]) {
+  it("lets a short message's numbers through: a rating or two, scores, times, notation", () => {
+    for (const text of ["I'm 1500", "1200 or so", "I'm 1800, you?", "meet at 12:30", "won 3-0 then 1-0", "e4 e5 Nf3 Nc6", "I am at the park.", "polka dot top", "the dot to the left"]) {
       expect(chatRefusal(text), text).toBeNull();
     }
   });
@@ -375,7 +372,7 @@ describe("the filter after the review", () => {
 
 /** The re-review's findings (R2, R3, N3): phone shapes both ways, a bracketed dot, two more spellings. */
 describe("the filter after the re-review", () => {
-  it("refuses phone numbers in fours, after a leading zero, with a slash, a card number, or with number talk (R2)", () => {
+  it("refuses any message with seven digits or more, however they're spaced or split: every phone form from the three reviews (the director's rule)", () => {
     for (const text of [
       "9123 4567",
       "call 9123-4567",
@@ -390,27 +387,28 @@ describe("the filter after the re-review", () => {
       "555 / 123 / 4567",
       "555 1234",
       "06 12 34 56 78",
+      "+44 20 7946 0958",
+      "555,123,4567",
+      "call ٥٥٥١٢٣٤٥٦٧",
+      "5 5 5 1 2 3 4 5 6 7",
+      "5-5-5-1-2-3-4-5-6-7",
+      "dm 9 1 2 3 4 5 6 7",
+      "12 34 56 78",
+      "123-45-67",
+      "555 12 34",
+      "2812 3456",
+      // (Accepted: rating ranges, long score lists and full dates go with them.)
+      "rated 1200-1400",
+      "10 20 30 40 moves",
+      "2026-10-28",
+      "Nf7# 1-0 2-0 3-0",
     ]) {
       expect(chatRefusal(text), text).toBe(CHAT_NO_CONTACT);
     }
   });
 
-  it("lets ordinary numbers through: move numbers, time controls, scores, dates, ratings (R2)", () => {
-    for (const text of [
-      "10 20 30 40 moves",
-      "games 12 13 14 15",
-      "3+2 5+0 10+0",
-      "won 3-0, 2-1, 1-0, 2-2",
-      "2026-10-28",
-      "28.10.2026",
-      "10/28/2026",
-      "rated 1200-1400",
-      "1500 1600 1700",
-      "2000/2100",
-      "800-1200",
-      "1,500 vs 1,600",
-      "the 2025-2026 season",
-    ]) {
+  it("lets a message with six digits or fewer through: a rating, a score, a time control, checkmate, notation", () => {
+    for (const text of ["I'm 1500", "1200 or so", "gg 1-0", "3+2", "Nf7#", "Qxf7# gg", "e4 e5", "game 3 of 5", "12:30", "1. e4 e5 2. Nf3"]) {
       expect(chatRefusal(text), text).toBeNull();
     }
   });

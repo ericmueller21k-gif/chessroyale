@@ -244,5 +244,9 @@ describe("town chat in the app: counting as the server does (the re-review's R4)
     expect(cutTownText("x".repeat(90))).toBe("x".repeat(80));
     // (The tones join the "b": one "character" of 101 parts, which doesn't fit.)
     expect(cutTownText(`ab${"🏽".repeat(100)}`)).toBe("a");
+    // At most 240 code points in all: 80 family emoji are cut to 34 (7 parts each).
+    const family = "👨\u200D👩\u200D👧\u200D👦";
+    expect(cutTownText(family.repeat(80))).toBe(family.repeat(34));
+    expect(cutTownText("👍🏽".repeat(80))).toBe("👍🏽".repeat(80));
   });
 });

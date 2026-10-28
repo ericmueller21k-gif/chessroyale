@@ -61,22 +61,19 @@ Lane: `social`.
     (the app mirrors them): at most `maxChars` (80) characters after tidying (invisible and control characters and
     fillers that show as nothing out, a joiner kept only inside an emoji, a pile of accents cut to two, spaces run
     together, trimmed; what shows as one character is one, an emoji with its skin tone or 👩‍💻, up to 8 code points, and a
-    longer one counts its code points), one message per account every `gapMs`
+    longer one counts its code points; at most 240 code points in all), one message per account every `gapMs`
     (15 s; "One message every 15 s."), not the same message again (case, spaces and punctuation aside) within `repeatMs`
     (60 s; "You said that a moment ago."). A refused message doesn't start the wait.
   - **The filter** (`chatRefusal` in `text-filter.ts`): the names' list plus common swear words, refused alike ("That
     message isn't allowed."; Eric, Oct 28: family-friendly, so not masked). Look-alike letters (Cyrillic, Greek,
     Armenian, small capitals, dotless ı…) read as the Latin ones they pass for, in names too; in chat a word with real
-    Latin letters and a letter from a look-alike alphabet the map doesn't fold is refused (words wholly in another
-    alphabet, or CJK beside Latin, pass). Swear words split into letters anywhere in a
+    Latin letters and a letter from a look-alike alphabet the map doesn't fold is refused, and so is one drawing on two
+    look-alike alphabets with a letter the map doesn't fold (words wholly in another alphabet, or CJK beside Latin, pass). Swear words split into letters anywhere in a
     sentence, split once ("f uck"), or masked with an ending ("f*cking") are caught. Links (also with a path, "t.me/x",
     a spaced or bracketed dot or "dot com"), email addresses and mail services ("at yahoo"), phone numbers and messaging
-    apps ("add me on discord", roblox, kik) are refused with "No links or contact details in chat." A phone number is a
-    run of digits (any script's; spaces, phone marks, a bare comma or a slash between) with seven or more in one group,
-    or seven or more in its groups of three digits or more, unless it's rating talk (at most three groups, each a rating
-    1000-3500, a round 100-950 or a year: "rated 1200-1400", "800-1200", "2000/2100"); every digit counts when it starts
-    with "+" or 0 or the message talks of a number ("my number 1500 2000 3000"). Move numbers, time controls, scores and
-    dates pass ("10 20 30 40", "3+2 5+0", "3-0, 2-1", "2026-10-28"). Every case: the decision file, call 4.
+    apps ("add me on discord", roblox, kik) are refused with "No links or contact details in chat." A message with 7 digits or more in
+    all (any script's, however spaced) is refused as contact details: rating ranges, long score lists and full dates go
+    with them; one or two numbers pass ("I'm 1500", "gg 1-0", "3+2", "Nf7#"). The decision file, call 4.
   - **A chat ban** stops typing here too (403, `CHAT_OFF` and the `block`), and so does a fair-play ban; they still read.
   - **The kill switch** `PAUSE_TOWN_CHAT` (core's `pauses.ts`, "town-chat"; on unless set): nobody sends (503,
     "Chat is paused."), readers get `{paused: true}` and no players' lines; the field says "Chat is paused." and the

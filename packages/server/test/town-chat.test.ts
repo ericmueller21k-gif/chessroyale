@@ -394,7 +394,7 @@ describe("town chat: after the review", () => {
     expect(c.post(ann, rot13("s*pxvat"), T0)).toMatchObject({ message: CHAT_NOT_ALLOWED });
     expect(c.post(ann, "t.me/someone", T0)).toMatchObject({ message: CHAT_NO_CONTACT });
     expect(c.post(ann, "555,123,4567", T0)).toMatchObject({ message: CHAT_NO_CONTACT });
-    expect(c.post(ann, "rated 1200-1400", T0)).toMatchObject({ ok: true });
+    expect(c.post(ann, "I'm 1500, rated 1-0 there", T0)).toMatchObject({ ok: true });
   });
 
   it("fillers that show as nothing are taken out: a message of only them is empty (finding 3, and a nit)", () => {
@@ -422,6 +422,10 @@ describe("town chat: after the review", () => {
       expect(charCount(t), t.slice(0, 8)).toBeGreaterThan(TOWN_CHAT.maxChars);
       expect(new TownChat().post(ann, t, T0)).toMatchObject({ ok: false, message: TOWN_TOO_LONG });
     }
+    // At most 240 code points in all: 80 family emoji (7 each) are 80 characters but too many parts; 80 skin-toned ones fit.
+    const family = "👨\u200D👩\u200D👧\u200D👦";
+    expect(new TownChat().post(ann, family.repeat(TOWN_CHAT.maxChars), T0)).toMatchObject({ ok: false, message: TOWN_TOO_LONG });
+    expect(new TownChat().post(ann, `${family} ${"👍🏽".repeat(TOWN_CHAT.maxChars - 2)}`, T0)).toMatchObject({ ok: true });
     // Ordinary emoji still count as one each: a skin tone, a family of four, a flag.
     expect(charCount("👍🏽👨\u200D👩\u200D👧\u200D👦🏳\uFE0F\u200D🌈")).toBe(3);
   });
