@@ -37,8 +37,8 @@ interface Img {
 export const REQUIRED = ["idle", "entrance", "thinking", "move", "capture", "hurt", "check", "smug", "rattled", "defeat", "victory"] as const;
 /** A boss's sidekick's anims (Oct 27: a town bot you can play, no powers): standing, walking, sitting at a table, a wave. */
 export const SIDEKICK = ["idle", "walk", "sit", "wave"] as const;
-/** A ranked tier's emblem ("rank-"): one still per division, 4 the plainest to 1 the grandest. The top tiers ("rank-top-") have no divisions: one idle. */
-export const RANK = ["d4", "d3", "d2", "d1"] as const;
+/** A ranked tier's emblem ("rank-"): one still per division, 5 the plainest to 1 the grandest. The top tiers ("rank-top-") have no divisions: one idle. */
+export const RANK = ["d5", "d4", "d3", "d2", "d1"] as const;
 const GROUND = { dark: "#14161b", light: "#f3f1ec" } as const;
 const MAX_W = 1500;
 
