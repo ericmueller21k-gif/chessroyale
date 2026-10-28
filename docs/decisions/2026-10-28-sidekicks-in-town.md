@@ -173,3 +173,5 @@ the page's navigation to the town's first frame drawn (its chunk, the world and,
   - `e2e/town.spec.ts`, Tempo Tess's card: "Rating 1400" → her rating from `BOTS` ("Rating 1500"), and her card has no
     "sidekick" line. Babur's card: no line (added).
   - `e2e/areas.json`: the sidekicks' art (`packages/app/src/characters/sidekicks/**`) runs the town's spec.
+  - Test hooks (not checks): the lights' `lampAt` and `lightAt` treat a point under a name tag, a home's name or the
+    bubble as covered, as they did someone standing in front (a bot's tag over the lamp read white).
