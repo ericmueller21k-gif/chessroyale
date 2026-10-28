@@ -510,4 +510,12 @@ export const TOWN_FEEL = {
   tableRingPulseMs: 420,
   /** Its pieces and clock aren't drawn this far into the far band (0 to 1): there they'd be specks. */
   tableFarCut: 0.5,
+  /**
+   * A table's board is lifted onto its picture in the camera's true perspective, which near the camera (low on the
+   * screen) makes it grow without bound against the picture, a cut-out (Oct 28: Eric's warped boards). Where lifting
+   * would draw it more than this much bigger than at the table's foot, it's worked out a little farther off, where it
+   * still fits, and drawn at the picture's place and scale. Up to this, nothing changes (1.08 to 1.17 over the screen's
+   * usual rows).
+   */
+  tableBoardGrow: 1.2,
 } as const;

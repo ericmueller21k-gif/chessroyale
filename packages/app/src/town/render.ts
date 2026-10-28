@@ -24,7 +24,7 @@ import { SAWYER } from "../characters/sawyer.ts";
 import { SMUDGY } from "../characters/smudgy.ts";
 import { TIGER_FIGURE } from "../characters/tiger-figure.ts";
 import { FOLIO } from "../characters/folio.ts";
-import { N, bandOf, clamp, drawable, enterOf, farOf, forEachSquare, hazeMix, newPt, newView, pastCurve, pickSquare, proj, radial, rimYAt, setView, wrapF, type Quad, type View } from "./camera.ts";
+import { N, bandOf, clamp, drawable, enterOf, farOf, forEachSquare, hazeMix, newPt, newView, pastCurve, pickSquare, proj, radial, rimYAt, setView, tableLift, wrapF, type Quad, type TableLift, type View } from "./camera.ts";
 import { CHAT_BOX } from "./chat.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { statueSpot } from "./houses/coliseum.ts";
@@ -1546,34 +1546,50 @@ export class Renderer {
    * slab, board and pieces are one picture, made on the second frame alike and reused (`boardCache`): one draw a frame.
    */
   private drawBoard(it: Item, ti: number, state: TableState, now: number, alpha: number, s: number): void {
-    const { ctx, view: v } = this;
+    const { ctx, view: v, DPR } = this;
     const B = TABLE_BOARD;
     const a = this.bp;
     const b = this.bq;
-    if (!proj(v, it.dx, it.dz, 0, a) || !proj(v, it.dx, it.dz, 1, b)) return;
-    // The top's height in the camera's lift: the picture's pixels over its foot, through its scale.
-    const perLift = a.y - b.y;
-    const spx = a.k / TOWN_FEEL.housePxPerSquare;
-    const top = (B.top * spx) / perLift;
-    const thick = (B.thick * spx) / perLift;
+    // Where the table's picture stands (its foot), and its top (`tableLift`).
+    if (!proj(v, it.dx, it.dz, 0, a)) return;
+    const fx = a.x;
+    const fy = a.y;
+    const fk = a.k;
+    // Low on the screen, near the camera, the board is worked out a little farther off and drawn at the picture's own
+    // place and scale (`tableLift`: lifted in the camera's true perspective there, it would warp).
+    const lift = this.lift;
+    if (!tableLift(v, it.dx, it.dz, B.top, B.thick, lift)) return;
+    const dz = lift.dz;
+    if (dz !== it.dz && !proj(v, it.dx, dz, 0, a)) return;
+    // (Screen x and y from where it's worked out: x * m + tx.)
+    const m = fk / a.k;
+    const tx = fx - a.x * m;
+    const ty = fy - a.y * m;
+    const { top, thick } = lift;
     // The world's pictures stand like cut-outs (no lean): the top stays straight over its leg.
     const footX = a.x;
-    if (!proj(v, it.dx, it.dz, top, b)) return;
+    if (!proj(v, it.dx, dz, top, b)) return;
     const shift = b.x - footX;
     const hb = B.board;
     const sq = (2 * hb) / 8;
     for (let gi = 0; gi < 9; gi++)
-      for (let fi = 0; fi < 9; fi++) if (!proj(v, it.dx - hb + fi * sq, it.dz - hb + gi * sq, top, this.grid[gi * 9 + fi]!)) return;
+      for (let fi = 0; fi < 9; fi++) if (!proj(v, it.dx - hb + fi * sq, dz - hb + gi * sq, top, this.grid[gi * 9 + fi]!)) return;
     const near = s <= TOWN_FEEL.tableFarCut;
     const game = near ? this.gameFor(ti, state.kind === "playing", now) : null;
     const pcs = near ? (game?.pcs ?? (this.stillSet ??= setUp())) : [];
     const f = TOWN_FEEL;
     const moving = !!game && pcs.some((q) => now - q.t0 < f.tableSlideMs || (q.gone > 0 && now < q.gone));
-    const paint = (g: CanvasRenderingContext2D) => this.paintBoard(g, it, top, thick, shift, pcs, game ? now : -1);
+    const paint = (g: CanvasRenderingContext2D) => {
+      if (m === 1) return this.paintBoard(g, it.dx, dz, top, thick, shift, pcs, game ? now : -1);
+      g.save();
+      g.transform(m, 0, 0, m, tx, ty);
+      this.paintBoard(g, it.dx, dz, top, thick, shift, pcs, game ? now : -1);
+      g.restore();
+    };
     // The same picture as the last frame (camera, alpha and pieces alike): once seen twice, it's kept and reused.
     const c0 = this.grid[0]!;
     const c8 = this.grid[80]!;
-    const key = `${Math.round(c0.x * 8)},${Math.round(c0.y * 8)},${Math.round(c8.x * 8)},${Math.round(c8.y * 8)},${Math.round(shift * 8)},${pcs.length},${game?.moves ?? -1},${game ? game.since : 0},${this.DPR}`;
+    const key = `${Math.round((c0.x * m + tx) * 8)},${Math.round((c0.y * m + ty) * 8)},${Math.round((c8.x * m + tx) * 8)},${Math.round((c8.y * m + ty) * 8)},${Math.round(shift * m * 8)},${pcs.length},${game?.moves ?? -1},${game ? game.since : 0},${DPR}`;
     const cache = (this.boardCache[ti] ??= { key: "", seen: "", cv: null, x: 0, y: 0, w: 0, h: 0 });
     ctx.globalAlpha = alpha;
     if (moving || key !== cache.seen) {
@@ -1581,40 +1597,45 @@ export class Renderer {
       cache.key = "";
       paint(ctx);
     } else {
-      if (cache.key !== key) this.cacheBoard(cache, key, it, top, thick, shift, b.k * B.piecePx, paint);
+      if (cache.key !== key) this.cacheBoard(cache, key, it.dx, dz, top, thick, shift, b.k * B.piecePx * m, m, tx, ty, paint);
       if (cache.cv) ctx.drawImage(cache.cv, cache.x, cache.y, cache.w, cache.h);
       else paint(ctx);
     }
     // The game's clock, floating over the middle of the board, straight above the leg.
-    if (game && proj(v, it.dx, it.dz, top + B.clockLift, a)) {
+    if (game && proj(v, it.dx, dz, top + B.clockLift, a)) {
       const secs = Math.floor((now - game.since) / 1000);
       const img = this.clockImg(`${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`);
-      const ps = a.k * B.clockPx;
+      const ps = a.k * m * B.clockPx;
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(img, footX - (img.width * ps) / 2, a.y - img.height * ps, img.width * ps, img.height * ps);
+      ctx.drawImage(img, footX * m + tx - (img.width * ps) / 2, a.y * m + ty - img.height * ps, img.width * ps, img.height * ps);
     }
     ctx.globalAlpha = 1;
   }
+
+  private readonly lift: TableLift = { dz: 0, top: 0, thick: 0, grow: 1 };
   private stillSet: TablePiece[] | null = null;
   private boardCache: { key: string; seen: string; cv: HTMLCanvasElement | null; x: number; y: number; w: number; h: number }[] = [];
 
-  /** Paints table's slab, board and pieces into `cache` (its box: the slab's corners and the tallest piece over them). */
-  private cacheBoard(cache: (typeof this.boardCache)[number], key: string, it: Item, top: number, thick: number, shift: number, ps: number, paint: (g: CanvasRenderingContext2D) => void): void {
+  /**
+   * Paints table's slab, board and pieces into `cache` (its box: the slab's corners and the tallest piece over them),
+   * worked out at (dx, dz) and drawn at x * m + tx, y * m + ty (drawBoard).
+   */
+  private cacheBoard(cache: (typeof this.boardCache)[number], key: string, dx: number, dz: number, top: number, thick: number, shift: number, ps: number, m: number, tx: number, ty: number, paint: (g: CanvasRenderingContext2D) => void): void {
     const { view: v, DPR } = this;
     const a = this.bp;
     const h = TABLE_BOARD.half;
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (const [x, z, l] of [[-h, -h, top], [h, -h, top], [h, h, top], [-h, h, top], [-h, -h, top - thick], [h, -h, top - thick]] as const) {
-      if (!proj(v, it.dx + x, it.dz + z, l, a)) return void (cache.cv = null);
-      x0 = Math.min(x0, a.x - shift);
-      x1 = Math.max(x1, a.x - shift);
-      y0 = Math.min(y0, a.y);
-      y1 = Math.max(y1, a.y);
+      if (!proj(v, dx + x, dz + z, l, a)) return void (cache.cv = null);
+      x0 = Math.min(x0, (a.x - shift) * m + tx);
+      x1 = Math.max(x1, (a.x - shift) * m + tx);
+      y0 = Math.min(y0, a.y * m + ty);
+      y1 = Math.max(y1, a.y * m + ty);
     }
     // (The tallest piece, the king, stands 13 of its pixels over its square.)
-    const m = 13 * ps + 2;
+    const king = 13 * ps + 2;
     x0 = Math.floor((x0 - 2) * DPR) / DPR;
-    y0 = Math.floor((y0 - m) * DPR) / DPR;
+    y0 = Math.floor((y0 - king) * DPR) / DPR;
     const w = Math.ceil((x1 + 2 - x0) * DPR);
     const hh = Math.ceil((y1 + 2 - y0) * DPR);
     if (w <= 0 || hh <= 0 || w * hh > 4_000_000) return void (cache.cv = null);
@@ -1632,7 +1653,7 @@ export class Renderer {
   }
 
   /** The slab, the board and `pcs` on it, into `g` in the screen's coordinates (`now` < 0: the pieces at rest). */
-  private paintBoard(g: CanvasRenderingContext2D, it: Item, top: number, thick: number, shift: number, pcs: readonly TablePiece[], now: number): void {
+  private paintBoard(g: CanvasRenderingContext2D, dx: number, dz: number, top: number, thick: number, shift: number, pcs: readonly TablePiece[], now: number): void {
     const { view: v } = this;
     const B = TABLE_BOARD;
     const pal = PARK_TABLE.palette;
@@ -1642,7 +1663,7 @@ export class Renderer {
       g.beginPath();
       for (let n = 0; n < pts.length; n++) {
         const [x, z, l] = pts[n]!;
-        if (!proj(v, it.dx + x, it.dz + z, l, a)) return;
+        if (!proj(v, dx + x, dz + z, l, a)) return;
         if (n === 0) g.moveTo(a.x - shift, a.y);
         else g.lineTo(a.x - shift, a.y);
       }
@@ -1686,7 +1707,7 @@ export class Renderer {
       const pf = q.fx + (q.f - q.fx) * e;
       const pg = q.fg + (q.g - q.fg) * e;
       const lift = t < 1 ? f.tableHop * Math.sin(Math.PI * t) : 0;
-      if (!proj(v, it.dx - hb + (pf + 0.5) * sq, it.dz - hb + (pg + 0.5) * sq, top + lift, b)) continue;
+      if (!proj(v, dx - hb + (pf + 0.5) * sq, dz - hb + (pg + 0.5) * sq, top + lift, b)) continue;
       const img = this.pieceImg(q.kind, q.light);
       const ps = b.k * B.piecePx;
       g.globalAlpha = base * (q.gone && now >= 0 ? clamp((q.gone - now) / f.tableTakeMs, 0, 1) : 1);
