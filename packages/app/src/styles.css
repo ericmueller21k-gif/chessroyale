@@ -12490,7 +12490,7 @@ img.qicon {
   .boss-char.place-side {
     --bc-scale: 2;
     position: absolute;
-    right: 14px;
+    right: calc(14px + var(--bs-out, 0px));
     bottom: 0;
     width: 96px;
     height: 120px;
@@ -12498,8 +12498,14 @@ img.qicon {
   /* (How far he can reach left of the board's row: his box's middle 62 px out, Sawyer's 44 sprite px past it, at 2
      screen px each; see .boss-dock.) */
   .screen.game:has(.board-row > .boss-side) {
-    --bs-reach: 152px;
+    --bs-reach: calc(152px + var(--bs-out, 0px) + 2 * var(--bs-head, 0px));
   }
+}
+/* With no eval bar (every player's board: the board takes the bar's 24 px) the boss stands 24 px further out, as far from
+   the board as beside the bar; placed with the bar showing (testers), the wide ones went up to 14 px under the board
+   (Eric, Oct 28: Folio "behind the board when idling"; docs/decisions/2026-10-28-folio-desktop-fixes.md). */
+.screen.game:not(:has(.board-row > .eval-bar)) {
+  --bs-out: 24px;
 }
 /* From 900 to 1099 px the window has no room for him at 2× (Eric, Oct 14: Ginger was half off it at 1024 px), so he's
    drawn at 1× (one screen px a sprite px, as in the boss bar on a phone), nearer the eval bar: his box's middle 26 px
@@ -12508,12 +12514,12 @@ img.qicon {
 @media (min-width: 900px) and (max-width: 1099px) and (min-height: 600px) {
   .boss-char.place-side {
     --bc-scale: 1;
-    right: 2px;
+    right: calc(2px + var(--bs-out, 0px));
     width: 48px;
     height: 60px;
   }
   .screen.game:has(.board-row > .boss-side) {
-    --bs-reach: 72px;
+    --bs-reach: calc(72px + var(--bs-out, 0px) + var(--bs-head, 0px));
   }
 }
 /* Beside the leaderboard (1100 px and up) he stands over its edge, as before: the window's edge is far off. */
@@ -12871,6 +12877,12 @@ img.qicon {
 }
 .pc-king .gk-portrait {
   width: 118%;
+}
+/* A long line under the word wraps to two (Eric, Oct 28: Folio's "Your pieces can't cross it for 4 turns" on one line pushed
+   its portrait off the board's left and the God King's off its right; docs/decisions/2026-10-28-folio-desktop-fixes.md). */
+.fight-banner.power-cut .fb-sub {
+  max-width: 46cqw;
+  text-wrap: balance;
 }
 .fight-banner.power-cut .fb-band {
   background: linear-gradient(90deg, #12040a, #6b1023 22%, #3b0b2e 50%, #6b1023 78%, #12040a);
@@ -21136,6 +21148,15 @@ button.sq-tiny {
   width: 28%;
   left: -5%;
   top: -8%;
+}
+/* Beside the board on a computer its wing reaches 45 sprite px toward the board (its frame 97 wide, its feet at 52), the most
+   of any boss: it stands 6 sprite px further out than its feet would put it, so its tip clears the board as the others do.
+   Its head then reaches 58 sprite px out, 14 past Sawyer's 44 that the window's room is sized for (--bs-head). */
+.boss-char.place-side.ch-folio {
+  --bc-shift: calc(-6 * var(--bc-scale));
+}
+.screen.game:has(.board-row > .boss-side .ch-folio) {
+  --bs-head: 14px;
 }
 /* Its banners: ruled lines of its ink-blue page, a vermilion edge (its seal). */
 .fight-banner.power-cut.folio .fb-band {
