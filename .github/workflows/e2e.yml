@@ -47,11 +47,14 @@ env:
   WRANGLER_SEND_METRICS: "false"
 
 jobs:
+  # Every job runs on ubuntu-24.04, pinned (Oct 28, 2026): ubuntu-latest became 26.04, where Playwright 1.56.1 can't
+  # install chromium-headless-shell's dependencies ("does not support chromium-headless-shell on ubuntu26.04-x64").
+  # Unpin when Playwright supports 26.04.
   # Which spec files this run tests and on how many shards (e2e/ci-select.mjs: plain Node, so no install). A pull
   # request's checkout is its merge commit; its first parent is main as it is now, so the diff is what the PR changes.
   plan:
     if: ${{ !inputs.perf }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       specs: ${{ steps.plan.outputs.specs }}
@@ -75,7 +78,7 @@ jobs:
   shard:
     needs: plan
     name: shard ${{ matrix.shard }} of ${{ needs.plan.outputs.total }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # A full run's shard tests for about 30 minutes; the system libraries' install (apt, below) has taken up to 16 on a
     # slow runner (Oct 26), so 45 cut two shards off mid-run with every test still green.
     timeout-minutes: 60
@@ -143,7 +146,7 @@ jobs:
   result:
     if: ${{ !cancelled() && !inputs.perf }}
     needs: [plan, shard]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     env:
       NOTE: ${{ needs.plan.outputs.note }}
@@ -167,7 +170,7 @@ jobs:
 
   perf:
     if: ${{ inputs.perf }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
