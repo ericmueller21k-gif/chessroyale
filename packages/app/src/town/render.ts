@@ -585,8 +585,15 @@ export class Renderer {
   private sitting = false;
   private readonly pose: Pose = { x: 0, y: 0, hop: 0, tilt: 0 };
   private readonly p = newPt();
-  private readonly soft = document.createElement("canvas");
-  private readonly sg = this.soft.getContext("2d")!;
+  /**
+   * The scratch canvases for softening things in the far band (`blitSoft`): one for each softened this frame, in turn
+   * (`nSoft`), each as big as the biggest it has held. (Oct 28: one shared canvas, rewritten for each thing while the
+   * world's canvas still held the last one drawn from it, was copied whole each time, at the size of the biggest
+   * picture it ever held, such as the far Colosseum: 3.3 million device pixels a frame south of the park, where fifteen
+   * or so things are softened, the frames Eric saw drop there.)
+   */
+  private readonly softs: { cv: HTMLCanvasElement; g: CanvasRenderingContext2D }[] = [];
+  private nSoft = 0;
   private readonly bandCv = document.createElement("canvas");
   private readonly bg = this.bandCv.getContext("2d")!;
   private readonly sky = new SkyPainter();
@@ -767,6 +774,7 @@ export class Renderer {
   draw(now: number, camX: number, camY: number, zoom: number, dt = 0): void {
     const { ctx, W, H, DPR } = this;
     this.frameNo++;
+    this.nSoft = 0;
     this.camX = camX;
     this.camY = camY;
     setView(this.view, W, H, zoom);
@@ -2055,11 +2063,17 @@ export class Renderer {
    * The shrink is the blur: it works without ctx.filter, and costs two image draws instead of a filter pass.
    */
   private blitSoft(img: CanvasImageSource, bx: number, by: number, bw: number, bh: number, s: number, haze: number): void {
-    const { ctx, sg, soft, DPR } = this;
+    const { ctx, DPR } = this;
     const f = 1 / (1 + 0.9 * TOWN_FEEL.bandBlur * s);
     const k = DPR * f;
     const pw = Math.ceil(bw * k) + 2;
     const ph = Math.ceil(bh * k) + 2;
+    let sc = this.softs[this.nSoft++];
+    if (!sc) {
+      const cv = document.createElement("canvas");
+      this.softs.push((sc = { cv, g: cv.getContext("2d")! }));
+    }
+    const { cv: soft, g: sg } = sc;
     if (soft.width < pw || soft.height < ph) {
       soft.width = Math.max(soft.width, pw);
       soft.height = Math.max(soft.height, ph);
@@ -2067,7 +2081,9 @@ export class Renderer {
     sg.setTransform(1, 0, 0, 1, 0, 0);
     sg.globalCompositeOperation = "source-over";
     sg.globalAlpha = 1;
-    sg.clearRect(0, 0, soft.width, soft.height); // all of it: the scaled draw samples a pixel past its edges
+    // Only the part this picture uses, and two pixels round it: the scaled draws sample a pixel past their edges, and
+    // the rest is never read.
+    sg.clearRect(0, 0, Math.min(soft.width, pw + 2), Math.min(soft.height, ph + 2));
     sg.imageSmoothingEnabled = true;
     sg.drawImage(img, 1, 1, bw * k, bh * k);
     if (haze > 0) {

@@ -802,10 +802,17 @@ function startTown(
     }
     return !b.walker.moving();
   };
-  // ... `__townGlide(id)`: the camera glides to a home as its chip would glide it (to tap a home far off: Hollow Peak).
-  const hookGlide = (id: HomeId) => {
+  // ... `__townGlide(id)`: the camera glides to a home as its chip would glide it (to tap a home far off: Hollow Peak);
+  // `__townGlide([c, r])`: to look at that square (to measure the frame rate at a spot).
+  const hookGlide = (id: HomeId | readonly [number, number]) => {
+    if (!testSwitchesAllowed()) return;
+    if (typeof id !== "string") {
+      follow = false;
+      glide = { x: camX + wrapF(id[0] - camX), y: camY + wrapF(id[1] - camY) };
+      return;
+    }
     const h = HOMES.find((x) => x.id === id);
-    if (!testSwitchesAllowed() || !h) return;
+    if (!h) return;
     follow = false;
     glide = { x: camX + wrapF(h.cx - camX), y: camY + wrapF(h.cy - h.foot + 0.5 - f.glideAhead - camY) };
   };
