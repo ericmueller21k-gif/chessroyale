@@ -177,6 +177,7 @@
         "e2e/boss-character.spec.ts",
         "e2e/boss-powers.spec.ts",
         "e2e/boss-select.spec.ts",
+        "e2e/boss-side.spec.ts",
         "e2e/boss-speech.spec.ts",
         "e2e/king-attack.spec.ts"
       ]
@@ -198,6 +199,7 @@
         "e2e/boss-character.spec.ts",
         "e2e/boss-dock.spec.ts",
         "e2e/boss-powers.spec.ts",
+        "e2e/boss-side.spec.ts",
         "e2e/crowd-hidden.spec.ts",
         "e2e/recluse.spec.ts"
       ]
@@ -460,6 +462,7 @@
         "e2e/boss-bar-same.spec.ts",
         "e2e/boss-dock.spec.ts",
         "e2e/boss-select.spec.ts",
+        "e2e/boss-side.spec.ts",
         "e2e/eval-bar.spec.ts",
         "e2e/home-layout.spec.ts",
         "e2e/match-screen.spec.ts",
