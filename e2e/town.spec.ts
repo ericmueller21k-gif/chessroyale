@@ -96,7 +96,40 @@ test("the town square at /town: the world is drawn and fills its box under the b
   await zoomOut.click();
   await expect(zoomOut).toHaveAttribute("aria-pressed", "true");
   // The controls stay put whatever the zoom (nothing shifts).
-  await expect(page.getByRole("button", { name: "Back to me" })).toBeVisible();
+  const focus = page.getByRole("button", { name: "Back to me" });
+  await expect(focus).toBeVisible();
+
+  // The buttons (Eric, Oct 28): one row in the map's bottom right corner, the −/+ pair on the left and the round focus button to its
+  // right (an icon, no words; its name, "Back to me", is for screen readers), 14 px in from the corner, as high as the pair.
+  const mapBox = (await page.locator(".town-box").boundingBox())!;
+  const pair = (await page.locator(".town-zoom").boundingBox())!;
+  const fb = (await focus.boundingBox())!;
+  expect(pair.x + pair.width, "the pair is left of the focus button").toBeLessThanOrEqual(fb.x);
+  expect(Math.abs(pair.y + pair.height / 2 - (fb.y + fb.height / 2)), "one row").toBeLessThanOrEqual(1.5);
+  expect(mapBox.x + mapBox.width - (fb.x + fb.width), "14 px from the right edge").toBeCloseTo(14, 0);
+  expect(mapBox.y + mapBox.height - (fb.y + fb.height), "14 px from the foot").toBeCloseTo(14, 0);
+  expect(fb.width, "round").toBeCloseTo(fb.height, 0);
+  expect(fb.height, "as high as the −/+ buttons").toBeCloseTo(pair.height, 0);
+  expect(await focus.evaluate((el) => getComputedStyle(el).borderRadius)).toBe("50%");
+  await expect(focus, "an icon, no words").toHaveText("");
+  await expect(focus.locator("svg")).toHaveCount(1);
+  // It does what "Back to me" did: after a look around, the camera comes back to you.
+  const lookAt = () => page.evaluate(() => (window as unknown as { __townCam: () => { focus: number[] } }).__townCam().focus);
+  const home = await lookAt();
+  await page.mouse.move(cv.x + cv.width / 2, cv.y + cv.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(cv.x + cv.width / 2 + 120, cv.y + cv.height / 2 + 160, { steps: 8 });
+  await page.mouse.up();
+  const away = await lookAt();
+  expect(Math.hypot(away[0]! - home[0]!, away[1]! - home[1]!), "you looked around").toBeGreaterThan(1);
+  await focus.click();
+  await expect
+    .poll(async () => {
+      const f = await lookAt();
+      const [c, r] = await you(page);
+      return Math.hypot(f[0]! - c, f[1]! - r);
+    }, { message: "the camera is back on you", timeout: 6000 })
+    .toBeLessThan(2.5);
 
   // Back goes home, and the address back to /.
   await page.getByRole("button", { name: "Back", exact: true }).click();
@@ -381,7 +414,7 @@ for (const st of [
     expect(close.zoom, "the − / + zoom itself is untouched").toBe(before.zoom);
     await expect(live).toHaveText(st.quote, { useInnerText: true });
     expect(await live.textContent(), "the quote, word for word").toBe(st.quote);
-    // The HUD stays put: the zoom pair and "Back to me" are where they were.
+    // The HUD stays put: the zoom pair and the focus button ("Back to me") are where they were.
     await expect(page.getByRole("button", { name: "Back to me" })).toBeVisible();
     // A tap elsewhere (high in the middle, over the statue's head: the Colosseum's wall) walks you away: the camera glides
     // back out to the zoom you had, and the quote is gone.
@@ -440,7 +473,12 @@ test("Folio's Folded House: a tap walks you there and opens its card with its na
   /** Taps the house (its chip first when it's off screen) until its card opens: you walk to it, the camera with you, till you stop. */
   const visit = async () => {
     const chip = page.getByRole("button", { name: `Go to ${name}` });
-    if (!(await at()) && (await chip.count())) await chip.click({ force: true });
+    // (Off screen: its chip, if it has one; only the nearest four places get chips (`maxChips`), and from your start Folio's house
+    // is the fifth since Oct 28, so otherwise the camera glides there, as a chip's tap would.)
+    if (!(await at())) {
+      if (await chip.count()) await chip.click({ force: true });
+      else await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("folio"));
+    }
     await expect(async () => {
       if (await card.isVisible()) return;
       if (await page.getByRole("dialog").isVisible()) await page.keyboard.press("Escape");
@@ -465,6 +503,12 @@ test("Folio's Folded House: a tap walks you there and opens its card with its na
     await visit();
     await expect(card.getByRole("heading", { name })).toBeVisible();
     await expect(card.getByText("Coming soon", { exact: true })).toBeVisible();
+    // Its place (Eric, Oct 28: "folio's house is like 2 inches from the colosseum it's gotta get moved a bit"): its plot is columns
+    // 34 to 36 now (it was 32 to 34), so you stop on the ring round it, column 33 or further east; the Colosseum's ground ends at
+    // column 28 (5 open squares between them, 3 before).
+    const [col] = await you(page);
+    expect(col, "you stand beside Folio's house, east of the Colosseum's 5 open squares").toBeGreaterThanOrEqual(33);
+    expect(col).toBeLessThanOrEqual(37);
     // Folio's paper crane steps round behind its house and stays: its picture's box is wide, and standing in front it
     // covered the doorway for the whole wait (seen Oct 27, 1 run in 10 on a computer).
     await expect.poll(() => page.evaluate(() => (window as unknown as { __townBossBack: (id: string) => boolean }).__townBossBack("folio")), { timeout: 15_000 }).toBe(true);

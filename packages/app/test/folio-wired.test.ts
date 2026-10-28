@@ -17,7 +17,7 @@ import type { Moment } from "../src/components/PowerParts.tsx";
 import type { BossView } from "../src/game.ts";
 import { lineSounds } from "../src/speech.tsx";
 import { HOUSES } from "../src/town/houses/index.ts";
-import { HOMES } from "../src/town/world.ts";
+import { COLISEUM, HOMES } from "../src/town/world.ts";
 import { SLIDE_MS } from "../src/board/logic.ts";
 
 /**
@@ -282,7 +282,7 @@ describe("Revision on the board and in the move list", () => {
 describe("its home: Folio's Folded House", () => {
   it("stands on the town square with its name, its picture in Folio's own colors (its faded ink its own), its lights in its picture", () => {
     const home = HOMES.find((h) => h.id === "folio")!;
-    expect(home).toMatchObject({ boss: "Folio", name: "Folio's Folded House", cx: 33, cy: 30 });
+    expect(home).toMatchObject({ boss: "Folio", name: "Folio's Folded House", cx: 35, cy: 30 });
     const art = HOUSES.folio;
     expect([art.ch.w, art.ch.h, art.ch.foot]).toEqual([144, 136, [72, 132]]);
     for (const [k, c] of Object.entries(FOLIO_PALETTE)) if (k in art.ch.palette && !"ij123".includes(k)) expect(art.ch.palette[k], k).toBe(c);
@@ -290,5 +290,11 @@ describe("its home: Folio's Folded House", () => {
     expect(art.lights.length).toBeGreaterThan(0);
     for (const l of art.lights) expect(l.x >= 0 && l.y >= 0 && l.x + l.w <= art.ch.w && l.y + l.h <= art.ch.h).toBe(true);
     expect(art.pools).toHaveLength(1);
+  });
+
+  it("stands well clear of the Colosseum: at least 5 open squares between its plot and the Colosseum's ground (Eric, Oct 28: \"like 2 inches from the colosseum\", it was 3 squares)", () => {
+    const home = HOMES.find((h) => h.id === "folio")!;
+    const gap = home.cx - 1 - (COLISEUM.c0 + COLISEUM.size);
+    expect(gap).toBeGreaterThanOrEqual(5);
   });
 });

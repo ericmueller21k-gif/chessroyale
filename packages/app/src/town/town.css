@@ -1,6 +1,7 @@
 /*
  * The town square (/town): a slim bar, then the world filling the rest of the screen, phone and computer alike. The
- * bar's back button, the zoom pair and "Back to me" stay put (Eric's rule: nothing hidden, nothing shifts). Its own
+ * bar's back button (and, at its right end, the chat icon and the gear), the zoom pair and the focus button ("Back to me") stay put
+ * (Eric's rule: nothing hidden, nothing shifts). Its own
  * file, loaded with the page's code (so none of it is in the main bundle). docs/areas/town-square.md.
  */
 .town-screen {
@@ -120,14 +121,15 @@
   image-rendering: pixelated;
   pointer-events: none;
 }
+/* The buttons, one row in the map's bottom right corner (Eric, Oct 28): the −/+ pair on the left, the focus button to its right. */
 .town-controls {
   position: absolute;
   right: calc(14px + env(safe-area-inset-right));
   bottom: calc(14px + env(safe-area-inset-bottom));
   z-index: 6;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  flex-direction: row;
+  align-items: center;
   gap: 10px;
 }
 .town-zoom {
@@ -150,16 +152,23 @@
   background: #1f2530;
   color: #fff;
 }
+/* The focus button: round, as high as the −/+ buttons, an icon and no words (its name, "Back to me", is its aria-label). */
 .town-recenter {
+  flex: none;
+  width: 36px;
   height: 36px;
-  padding: 0 14px;
-  border-radius: 999px;
-  border: 1px solid #d8ccb6;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 0;
   background: #fff;
   color: #1f2530;
-  font: 700 13px Archivo, sans-serif;
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+.town-recenter svg {
+  display: block;
 }
 /*
  * A card over a boss or a home (slice 4; the prototype's card): its name, its one button (a boss's "Challenge alone"; a
