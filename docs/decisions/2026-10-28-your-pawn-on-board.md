@@ -20,8 +20,9 @@ God King" and ".mv-side"; tests in `e2e/board-layout.spec.ts`.
 - **Your pawn** (Boss alone's battle screens): your own pawn as your profile wears it (`Avatar`, the same as the move list's
   rows and the town), in the crowd's color (a side `b` game draws it black, as the rows do). Drawn once; CSS transforms only.
   - **A computer:** right of the board, on the line of the God King's feet (the board's bottom edge), as far from the board as
-    the boss is on its other side (its middle 86 px out: `--gk-off`, and `--bs-out` for the no-eval-bar board, the director's
-    note of Oct 28), **the God King to its right**, his old place moved over by the pawn's width.
+    the boss is on its other side (its box 26 px off the board, its middle 86 px out: `--gk-off` with the eval bar, and with none
+    `--gk-off` plus `--bs-out`, the 24 px the boss stands further out then: the director's note of Oct 28, #390), **the God King to
+    its right**, his old place moved over by the pawn's width.
   - **A phone upright:** in the strip under the "Your move" row, just left of the God King, the same 58 px column and height as
     his. The panel gives up that width (it ran up to his column minus 8 px, now up to the pawn's column).
   - **Idle:** a slow bob up and down (2 px on a phone, 3 px on a computer), 2.4 s a round, the God King's own breath
@@ -85,6 +86,8 @@ None of these guards a rule in `docs/rules/eric.md` (the gear's guard, `e2e/matc
   board's box is main's at 1280, 1440, 1536, 1920 and 1024 (1 px), the pawn's place, size and line, the God King to its right,
   his words clear of it, the scoreboard from 900 to 1099 px 12 px under the list. Its sizes grew (alone at five sizes; a raid at
   1280, 1920 and 1024).
+- `board-layout.spec.ts`: new, with no eval bar (every player's board, `brc.evalBar` 0) the pawn's middle is as far from the board as the
+  boss's (2 px), 26 px off it, and the list is still 12 to 16.5 px off the board (1280 and 1920).
 - `board-layout.spec.ts`, the phone test: new, the pawn between the panel and him, his size and line, in the crowd's color,
   none in a raid. New tests: the pawn's bob and hop (and none under reduced motion), a narrow phone's rows fit.
 - `boss-character.spec.ts`: "the God King's middle is as far from the board as the boss's" → **your pawn's** middle is, and he

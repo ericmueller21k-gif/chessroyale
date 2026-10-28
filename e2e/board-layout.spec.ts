@@ -306,6 +306,34 @@ test("a computer: Boss alone has no scoreboard and your pawn left of the God Kin
   }
 });
 
+test("no eval bar (every player's board): your pawn is as far from the board as the boss is on its other side, and the list is still a small gap off the board", async ({ browser }) => {
+  test.skip(test.info().project.name !== "desktop", "it opens its own windows");
+  test.setTimeout(6 * 60_000);
+  for (const size of ["1280x800", "1920x1080"]) {
+    const [w, h] = size.split("x").map(Number) as [number, number];
+    const { ctx, page } = await open(browser, w, h);
+    await page.addInitScript(() => localStorage.setItem("brc.evalBar", "0"));
+    await into(page, false);
+    await expect(page.locator(".eval-bar")).toHaveCount(0);
+    const g = await page.evaluate(() => {
+      const r = (s: string) => {
+        const b = document.querySelector(s)!.getBoundingClientRect();
+        return { x: b.left, r: b.right, w: b.width };
+      };
+      return { wrap: r(".board-area .board-row > .board-wrap"), board: r(".board-area .board-row > .board-wrap .hb-container"), pawn: r(".boss-dock .you-pawn"), boss: r(".boss-char.place-side"), king: r(".boss-dock .gk-unit"), side: r(".mv-side") };
+    });
+    const at = `no eval bar ${size}`;
+    // (The mirror, middle to middle, as boss-character.spec.ts checks it with the eval bar: the boss stands 24 px further out then.)
+    expect(Math.abs(g.pawn.x + g.pawn.w / 2 - g.wrap.r - (g.wrap.x - (g.boss.x + g.boss.w / 2))), `${at}: your pawn's middle as far from the board as the boss's`).toBeLessThanOrEqual(2);
+    expect(g.pawn.x - g.board.r, `${at}: as clear of the board as with the bar`).toBeGreaterThanOrEqual(24);
+    expect(g.pawn.x - g.board.r, `${at}: as clear of the board as with the bar`).toBeLessThanOrEqual(32);
+    expect(g.king.x, `${at}: the God King to its right`).toBeGreaterThanOrEqual(g.pawn.r - 1);
+    expect(g.side.x - g.board.r, `${at}: the list a small gap off the board`).toBeGreaterThanOrEqual(12);
+    expect(g.side.x - g.board.r, `${at}: the list a small gap off the board`).toBeLessThanOrEqual(16.5);
+    await ctx.close();
+  }
+});
+
 test("your pawn: it bobs all the time (a transform), hops once as your move lands and not for the boss's, and keeps still under reduced motion", async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough");
   test.setTimeout(5 * 60_000);
