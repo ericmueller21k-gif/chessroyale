@@ -8973,6 +8973,22 @@ button.fd-logo {
     min-height: 0;
   }
   /*
+   * Home (Eric, Oct 28: "LVL 38" over your icon was cut off at the card's top edge; "just squeeze it closer to the top of
+   * the pawn", and the pawn "a few pixels" lower): your tag sits 16 px lower and your pawn 4 px lower, at the same size.
+   * The tag takes 12 px of the room over the pawn's head that a hat may use (the tallest, the fire and ice crown, still
+   * clears it standing); it's drawn over the pawn, so a hop's hat goes behind your name. The same for every account, so
+   * nothing moves when an admin's account loads. (The padding and the tag's overlap add up as before: the pawn's size is
+   * unchanged.)
+   */
+  .fd-home:not(.queueing) .fd-hero-in {
+    padding: 28px 12px 8px;
+  }
+  .fd-home:not(.queueing) .fd-hero-id {
+    position: relative;
+    z-index: 2;
+    margin-bottom: -12px;
+  }
+  /*
    * Your pawn (Oct 24: 75% bigger than 170 × 154, up to 298 × 270), as big as the room under the tag allows: the tag, its
    * 6 px gap and the card's padding take 72 px of the card's height.
    */
@@ -8987,13 +9003,17 @@ button.fd-logo {
    * than a 640 px phone has (the Auto chess card, the panel), so home would scroll.
    */
   @container fd-hero (max-height: 189px) {
-    .fd-hero-in {
+    .fd-hero-in,
+    .fd-home:not(.queueing) .fd-hero-in {
       flex-direction: row;
       gap: 14px;
-      padding: 8px;
+      padding: 14px 8px 8px;
+    }
+    .fd-home:not(.queueing) .fd-hero-id {
+      margin-bottom: 0;
     }
     .fd-hero .fd-pawn-hero {
-      height: clamp(48px, calc(100cqh - 16px), 130px);
+      height: clamp(48px, calc(100cqh - 22px), 130px);
     }
     .fd-home:not(.queueing) .fd-hero-id {
       order: 0;
