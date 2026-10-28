@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TOWN_CHAT } from "@chessroyale/core";
-import { CHAT, CHATTER, CHAT_MODES, CHAT_MODE_CHOICE, CHAT_MODE_LABEL, ChatLog, Stick, chatMode, clampBox, chatterDelay, clockText, loadChatMode, loadChatPos, nextChatMode, onChatMode, onTownChatLineTap, pickChatter, saveChatMode, saveChatPos, say, setChatMode, setTownChatLineTap, startChatter, unsay, type ChatKind } from "../src/town/chat.ts";
+import { CHAT, CHATTER, CHAT_MODES, CHAT_MODE_CHOICE, CHAT_MODE_LABEL, ChatLog, Stick, chatMode, clampBox, chatterDelay, clockText, loadChatMode, loadChatPos, nextChatMode, onChatMode, onTownChatLineTap, pickChatter, saveChatMode, saveChatPos, say, setChatMode, setTownChatLineTap, startChatter, tooSoonText, townTone, unsay, type ChatKind } from "../src/town/chat.ts";
+import { NAME_COLORS, NAME_COLOR_LIMIT, nameColorIndex, pickNameColor } from "../src/town/names.ts";
+import { skyTone, skyWeights } from "../src/town/sky.ts";
 import { HOMES } from "../src/town/world.ts";
 
 /** The town square's chat log (Eric, Oct 28): the time's format, the three modes (their cycle, what each shows, remembered on
  * this device), the fade and the way back, the tap that brings the faded lines back, the stream pinned to its foot unless scrolled
  * up, a line's minute of life, `say` from any kind, the chatter table, players' lines (who said them, taken out again, a tap's
- * menu), the server's numbers, and the box's place. */
+ * menu), the server's numbers, and the box's place. And Eric's phone (Oct 28, later): the line only you see (too soon, a refusal),
+ * the players' name colors, and the text's tone following the sky. */
 
 describe("the time as the log shows it", () => {
   it("is hours and minutes, 12-hour, no am/pm", () => {
@@ -404,6 +407,153 @@ describe("players' lines (from the server: chat-net.ts)", () => {
   it("keeps the server's numbers: 80 characters, one message per 15 seconds, a line's minute", () => {
     expect([CHAT.maxChars, CHAT.sendEveryMs, CHAT.lifeMs]).toEqual([TOWN_CHAT.maxChars, TOWN_CHAT.gapMs, TOWN_CHAT.lineMs]);
     expect([CHAT.maxChars, CHAT.sendEveryMs, CHAT.lifeMs]).toEqual([80, 15_000, 60_000]);
+  });
+});
+
+describe("the line only you see (Oct 28, Eric's phone): too soon after your last message, or a refusal", () => {
+  it("says how long, the seconds rounded up, \"1 second\" in the singular", () => {
+    expect(tooSoonText(15_000)).toBe("Sorry, you can't send another message for 15 seconds.");
+    expect(tooSoonText(14_001)).toBe("Sorry, you can't send another message for 15 seconds.");
+    expect(tooSoonText(9_000)).toBe("Sorry, you can't send another message for 9 seconds.");
+    expect(tooSoonText(2_000)).toBe("Sorry, you can't send another message for 2 seconds.");
+    expect(tooSoonText(1_001)).toBe("Sorry, you can't send another message for 2 seconds.");
+    expect(tooSoonText(1_000)).toBe("Sorry, you can't send another message for 1 second.");
+    expect(tooSoonText(1)).toBe("Sorry, you can't send another message for 1 second.");
+    expect(tooSoonText(0), "never \"0 seconds\"").toBe("Sorry, you can't send another message for 1 second.");
+  });
+
+  it("is a gray system line with this device's time, nobody behind it, in the stream with the rest", () => {
+    const log = new ChatLog(() => undefined);
+    const close = log.open();
+    say("Hollow", "The park gets quiet after dark.", "boss");
+    log.whisper(tooSoonText(12_000));
+    expect(log.lines).toHaveLength(2);
+    const l = log.lines[1]!;
+    expect(l).toMatchObject({ kind: "system", name: "", text: "Sorry, you can't send another message for 12 seconds.", private: true });
+    expect(l.time).toBe(clockText(new Date(l.at)));
+    expect(l.uid, "no one behind it: no menu").toBeUndefined();
+    expect(log.visible("always").map((x) => x.id)).toEqual(log.lines.map((x) => x.id));
+    close();
+  });
+
+  it("is one at a time: the next takes its place, the others stay; it goes after a minute like any line", () => {
+    vi.useFakeTimers({ now: 1_800_000_000_000 });
+    const log = new ChatLog(() => undefined);
+    const close = log.open();
+    say("Hollow", "The park gets quiet after dark.", "boss");
+    log.whisper(tooSoonText(15_000));
+    vi.advanceTimersByTime(5_000);
+    log.whisper(tooSoonText(10_000));
+    expect(log.lines.map((l) => l.text)).toEqual(["The park gets quiet after dark.", "Sorry, you can't send another message for 10 seconds."]);
+    log.whisper("That message isn't allowed.");
+    expect(log.lines.map((l) => l.text)).toEqual(["The park gets quiet after dark.", "That message isn't allowed."]);
+    // Players' lines leaving (a mute, the switch) leave it be; its minute takes it, and the boss's line goes first.
+    log.drop((l) => l.uid !== undefined);
+    expect(log.lines.filter((l) => l.private)).toHaveLength(1);
+    vi.advanceTimersByTime(CHAT.lifeMs - 5_000 + 1);
+    expect(log.lines.map((l) => l.text)).toEqual(["That message isn't allowed."]);
+    vi.advanceTimersByTime(5_000);
+    expect(log.lines).toEqual([]);
+    close();
+    vi.useRealTimers();
+  });
+});
+
+describe("players' name colors (Oct 28, Eric's phone): a palette, picked at random each time a player joins the town", () => {
+  it("is ten to twelve colors, each a deeper shade for the day and a lighter one for the night, all different", () => {
+    expect(NAME_COLORS.length).toBeGreaterThanOrEqual(10);
+    expect(NAME_COLORS.length).toBeLessThanOrEqual(12);
+    expect(NAME_COLORS.length).toBeLessThan(NAME_COLOR_LIMIT);
+    const hex = /^#[0-9a-f]{6}$/;
+    const lum = (h: string) => {
+      const c = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+      return 0.2126 * c[0]! + 0.7152 * c[1]! + 0.0722 * c[2]!;
+    };
+    for (const c of NAME_COLORS) {
+      expect(c.day).toMatch(hex);
+      expect(c.night).toMatch(hex);
+      expect(lum(c.day), `${c.day} is a deep shade`).toBeLessThan(0.12);
+      expect(lum(c.night), `${c.night} is a light shade`).toBeGreaterThan(0.3);
+    }
+    expect(new Set(NAME_COLORS.map((c) => c.day)).size).toBe(NAME_COLORS.length);
+    expect(new Set(NAME_COLORS.map((c) => c.night)).size).toBe(NAME_COLORS.length);
+  });
+
+  it("is picked at random: every color can come up, none outside the palette", () => {
+    const n = NAME_COLORS.length;
+    expect(pickNameColor(() => 0)).toBe(0);
+    expect(pickNameColor(() => 0.999999)).toBe(n - 1);
+    expect(pickNameColor(() => 1), "even a rand that reaches 1 stays in the palette").toBe(n - 1);
+    const seen = new Set<number>();
+    for (let i = 0; i < n; i++) seen.add(pickNameColor(() => (i + 0.5) / n));
+    expect(seen.size).toBe(n);
+    for (let i = 0; i < 200; i++) expect(pickNameColor()).toBeGreaterThanOrEqual(0);
+  });
+
+  it("is the number the player's device sent (the same for everyone reading it), or a steady one from who they are when there is none", () => {
+    expect(nameColorIndex({ color: 3, uid: "ann", name: "Ann" })).toBe(3);
+    expect(nameColorIndex({ color: 0, name: "Ann" })).toBe(0);
+    expect(nameColorIndex({ color: NAME_COLORS.length + 2, name: "Ann" }), "a bigger number from a bigger palette still lands in this one").toBe(2);
+    // Nothing, or nothing usable: a steady color from their account (else their name), the same every time.
+    for (const color of [undefined, -1, 1.5, Number.NaN, NAME_COLOR_LIMIT, "4", null]) {
+      const i = nameColorIndex({ color, uid: "acc-42", name: "Ann" });
+      expect(i).toBeGreaterThanOrEqual(0);
+      expect(i).toBeLessThan(NAME_COLORS.length);
+      expect(nameColorIndex({ color, uid: "acc-42", name: "Someone else" }), "from the account, not the name").toBe(i);
+    }
+    expect(nameColorIndex({ name: "Ann" })).toBe(nameColorIndex({ name: "Ann" }));
+    expect(new Set(["ann", "bo", "cy", "di", "ed", "flo", "gus", "hal", "ida", "jo"].map((uid) => nameColorIndex({ uid, name: uid }))).size, "spread over the palette").toBeGreaterThan(4);
+  });
+
+  it("rides on the line: a player's line keeps the color the server carried; a boss's or kid's has none", () => {
+    const log = new ChatLog(() => undefined);
+    const close = log.open();
+    say("Ann", "hello town", "player", { uid: "ann", n: 1, color: 6 });
+    say("Bo", "hi Ann", "player", { uid: "bo", n: 2 });
+    say("Hollow", "The park gets quiet after dark.", "boss");
+    expect(log.lines.map((l) => l.color)).toEqual([6, undefined, undefined]);
+    expect(log.lines.map((l) => "color" in l)).toEqual([true, false, false]);
+    close();
+  });
+});
+
+describe("the chat text follows the town's sky (Oct 28, Eric: \"during daytime background it defaults to black\")", () => {
+  const at = (h: number, m = 0, s = 0) => new Date(2026, 9, 28, h, m, s);
+
+  it("is dark ink by day, dawn and dusk and white by night, flipping in the middle of each blend (5:30 and 19:30)", () => {
+    expect(townTone(at(12), "")).toBe("day");
+    expect(townTone(at(8), "")).toBe("day");
+    expect(townTone(at(17, 45), "")).toBe("day");
+    expect(townTone(at(19, 0), "")).toBe("day");
+    expect(townTone(at(2), "")).toBe("night");
+    expect(townTone(at(22), "")).toBe("night");
+    expect(townTone(at(5, 29), ""), "still night a minute before dawn's blend is half through").toBe("night");
+    expect(townTone(at(5, 31), "")).toBe("day");
+    expect(townTone(at(19, 29, 59), "")).toBe("day");
+    expect(townTone(at(19, 30), "")).toBe("night");
+  });
+
+  it("reads ?sky= where the town does: one look whatever the clock says; anything else leaves it to the clock", () => {
+    for (const sky of ["day", "dawn", "dusk"]) expect(townTone(at(2), `?sky=${sky}`), sky).toBe("day");
+    expect(townTone(at(12), "?sky=night")).toBe("night");
+    expect(townTone(at(12), "?sky=midnight")).toBe("day");
+    expect(townTone(at(2), "?x=1&sky=")).toBe("night");
+  });
+
+  it("is night's weight against one threshold, so the four looks and every blend between them sort cleanly", () => {
+    expect(skyTone({ dawn: 1, day: 0, dusk: 0, night: 0 })).toBe("day");
+    expect(skyTone({ dawn: 0, day: 1, dusk: 0, night: 0 })).toBe("day");
+    expect(skyTone({ dawn: 0, day: 0, dusk: 1, night: 0 })).toBe("day");
+    expect(skyTone({ dawn: 0, day: 0, dusk: 0, night: 1 })).toBe("night");
+    // Over a whole day it flips exactly twice (a minute's steps): into night and out of it.
+    let flips = 0;
+    let last = skyTone(skyWeights(0));
+    for (let m = 1; m <= 1440; m++) {
+      const t = skyTone(skyWeights(m));
+      if (t !== last) flips++;
+      last = t;
+    }
+    expect(flips).toBe(2);
   });
 });
 

@@ -19,20 +19,18 @@ const path = (p: Page) => new URL(p.url()).pathname;
 const run = Date.now().toString(36).slice(-5);
 const pool = (name: string) => `${name}-${test.info().project.name[0]}${run}`;
 
-test("home: Default, Bots off and Solo; the ⓘ says what they do; Bots off warns; Solo fills its seats fast and starts", async ({ page }) => {
+test("home: Default, Bots off and Solo, each its title only; the line above PLAY says what each does; Solo fills its seats fast and starts", async ({ page }) => {
   await named(page, "Typer");
   await page.goto("/?debug");
   await pickMode(page, "50 v 50");
   const types = page.getByRole("radiogroup", { name: "Matchmaking" });
   await expect(types.getByRole("radio")).toHaveCount(3);
+  await expect(types.getByRole("radio")).toHaveText(["Default", "Bots off", "Solo"]);
   await expect(types.getByRole("radio", { name: /^Default/ })).toHaveAttribute("aria-checked", "true");
-  // The ⓘ: Default adds bots after the server's fill time (8 s on the test server).
-  await page.getByRole("button", { name: "About matchmaking" }).click();
-  await expect(page.locator(".fd-types-info")).toContainText("Default adds bots after 8 s to keep the wait short.");
-  await expect(page.locator(".fd-types-info")).toContainText("Your ranking changes only in a match with at least 30 real players (15 in a raid).");
-  await page.getByRole("button", { name: "About matchmaking" }).click();
-  await expect(page.locator(".fd-types-info")).toHaveCount(0);
-  // Bots off: no warning box (Eric, Oct 18: the ⓘ explains it, and the box moved the page), the line under PLAY says it.
+  // Default: bots after the server's fill time (8 s on the test server), said by the line above PLAY (the ⓘ is gone, Oct 28).
+  await expect(page.locator(".fd-hint")).toHaveText(/^(Starts within 8 s; bots fill any empty seats|Usually about \d+ s to find a match)$/);
+  await expect(page.getByRole("button", { name: "About matchmaking" })).toHaveCount(0);
+  // Bots off: no warning box (Eric, Oct 18: the box moved the page), the line above PLAY says it.
   await types.getByRole("radio", { name: /^Bots off/ }).click();
   await expect(page.getByRole("note")).toHaveCount(0);
   await expect(page.locator(".fd-hint")).toHaveText("People only: starts when 100 have joined");
@@ -46,7 +44,6 @@ test("home: Default, Bots off and Solo; the ⓘ says what they do; Bots off warn
   await page.getByRole("button", { name: "Close" }).click();
   // Big enough to tap, and nothing wider than the screen.
   for (const r of await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio").all()) expect((await r.boundingBox())!.height).toBeGreaterThanOrEqual(44);
-  expect((await page.getByRole("button", { name: "About matchmaking" }).boundingBox())!.width).toBeGreaterThanOrEqual(44);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0);
 
   // Solo: the queue screen, your bots fill the 100 seats in a couple of seconds, then the match begins.

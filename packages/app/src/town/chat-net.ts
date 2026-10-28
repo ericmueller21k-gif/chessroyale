@@ -5,6 +5,7 @@ import { chatBlockNow, chatBlockText, mutes, setChatBlock } from "../chat-mod.ts
 import { isBlocked, onFriendsChange } from "../friends.ts";
 import { rideLive, watchLive } from "../live.ts";
 import { isPaused } from "../status.ts";
+import { pickNameColor } from "./names.ts";
 
 /**
  * The town square's typed chat, the app's side of the server (the log's look is chat.ts and TownChat.tsx; the server's
@@ -27,6 +28,8 @@ export interface TownLine {
   from: string;
   name: string;
   text: string;
+  /** The name color their device picked when it joined the town (a number into the palette: names.ts); absent from an older app. */
+  color?: number;
 }
 
 interface Slice {
@@ -66,6 +69,8 @@ class TownFeed {
   pausedSaid = false;
   /** When (this device's clock) the server lets you send again, as far as the app knows. */
   waitUntil = 0;
+  /** Your name color for this visit to the town: picked at random when it opens, sent with each message, the same all session. */
+  color = pickNameColor();
   private sink: TownSink | null = null;
 
   /** The server's answer: the live line's `town`, or a send's. Lines from muted or blocked players never reach the log. */
@@ -93,6 +98,7 @@ class TownFeed {
   open(sink: TownSink): () => void {
     if (!mayTownChat()) return () => undefined;
     this.sink = sink;
+    this.color = pickNameColor();
     this.last = 0;
     this.room = null;
     this.pausedSaid = false;
@@ -144,6 +150,9 @@ export function townChatOff(now = Date.now()): string | null {
   return block ? chatBlockText(block) : null;
 }
 
+/** Your name color for this visit to the town (a number into names.ts' palette), as it goes out with your messages. */
+export const townColor = (): number => feed.color;
+
 /** How long until you may send again (ms; 0: now). */
 export const townSendWaitMs = (now = Date.now()): number => Math.max(0, feed.waitUntil - now);
 
@@ -178,9 +187,10 @@ export function cutTownText(text: string, max: number = TOWN_CHAT.maxChars): str
 export type TownSendResult = { ok: true } | { ok: false; reason: "empty" | "wait" | "refused"; waitMs: number; message?: string };
 
 /**
- * Sends a message as you. The app mirrors the server's numbers (TOWN_CHAT: at most `maxChars`, one every `gapMs`); the
- * server decides, and its reason comes back as `message` ("That message isn't allowed.", "No links or contact details
- * in chat.", …). Your line comes back in the answer and goes into the log like everyone's.
+ * Sends a message as you. The app mirrors the server's numbers (TOWN_CHAT: at most `maxChars`, one every `gapMs`): within the wait
+ * it answers `wait` without asking the server at all (the screen says so in a line only you see). Otherwise the server decides,
+ * and its reason comes back as `message` ("That message isn't allowed.", "No links or contact details in chat.", …). Your line
+ * comes back in the answer and goes into the log like everyone's.
  */
 export async function sendTownChat(raw: string, fetcher: typeof fetch = fetch): Promise<TownSendResult> {
   const text = tidyTownText(raw);
@@ -195,7 +205,7 @@ export async function sendTownChat(raw: string, fetcher: typeof fetch = fetch): 
       method: "POST",
       credentials: "same-origin",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text, since: feed.last, ...(feed.room ? { room: feed.room } : {}) }),
+      body: JSON.stringify({ text, since: feed.last, color: feed.color, ...(feed.room ? { room: feed.room } : {}) }),
     });
     const body = (await res.json().catch(() => ({}))) as { town?: unknown; waitMs?: number; retryMs?: number; reason?: string; message?: string; block?: ChatBlock; paused?: string };
     feed.take(body.town);
@@ -206,7 +216,7 @@ export async function sendTownChat(raw: string, fetcher: typeof fetch = fetch): 
     }
     if (body.block) setChatBlock(body.block);
     if (body.paused === "town-chat") feed.take({ paused: true });
-    // (The 15 s wait shows in the field as the count; a repeat or anything else says why.)
+    // (The 15 s wait and anything else the server refuses come back to the log as a line only you see: TownChat.tsx.)
     if (body.reason === "rate" && typeof body.retryMs === "number") {
       feed.waitUntil = Date.now() + body.retryMs;
       return { ok: false, reason: "wait", waitMs: body.retryMs };

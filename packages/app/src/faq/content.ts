@@ -53,6 +53,7 @@ import {
   fixedLevel,
   isPlayable,
   maiaTopRating,
+  rankedMinHumans,
   kingCharges,
   lastStandBar,
   liveStrip,
@@ -485,7 +486,7 @@ A move is **brilliant** when it separated the field: among at least ${B.minPicke
 
 ### Your rating {#rating}
 
-Your rating comes from your moves, not from wins: from the average number of points your moves give away, matched against how many Stockfish gives away at each of its own strength settings (so it's on Stockfish's rating scale). It shows after ${n(src.ratingMinMoves, "move")}, starts near ${src.priorRating} and firms up as your moves come in. A match counts toward your ranking only when at least ${pct(src.rankedShare, 0)} of its seats are real players; solo games and practice mode never count.
+Your rating comes from your moves, not from wins: from the average number of points your moves give away, matched against how many Stockfish gives away at each of its own strength settings (so it's on Stockfish's rating scale). It shows after ${n(src.ratingMinMoves, "move")}, starts near ${src.priorRating} and firms up as your moves come in. A match counts toward your ranking only when at least ${pct(src.rankedShare, 0)} of its seats are real players; solo games and practice mode never count. Your ranking changes only in a match with at least ${rankedMinHumans(src.crowd.lobbySize, src.rankedShare)} real players (${rankedMinHumans(src.raid.lobbySize, src.rankedShare)} in a raid). Solo games never change it.
 `,
   };
 }

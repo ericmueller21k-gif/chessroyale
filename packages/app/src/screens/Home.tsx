@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import { BOSS_TIERS, FRONT_DOOR, adminPlayable, bossDef, bossIdFromLink, bossThreat, isPlayable, menuBosses, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, PRIOR_RATING, RAID_SETTINGS, SQUADS, rankedMinHumans, pausedLine, type BossDifficultyId, type MatchmakingType, type ModeChoiceId, type Pausable } from "@chessroyale/core";
+import { BOSS_TIERS, FRONT_DOOR, adminPlayable, bossDef, bossIdFromLink, bossThreat, isPlayable, menuBosses, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, PRIOR_RATING, RAID_SETTINGS, SQUADS, pausedLine, type BossDifficultyId, type MatchmakingType, type ModeChoiceId, type Pausable } from "@chessroyale/core";
 import { useAccount } from "./Profile.tsx";
 import { bossAloneElo, chosenDifficulty, rememberDifficulty } from "../boss-difficulty.ts";
 import { powersLine } from "../power-words.ts";
@@ -7,7 +7,7 @@ import { BossDifficulty } from "../components/BossDifficulty.tsx";
 import { isAdmin, maiaAllowed, maiaLikely } from "../boss-brain.ts";
 import { prefetchMaia } from "../maia.ts";
 import type { ComponentChildren } from "preact";
-import { AccountBar, BackButton, DressedPawn, FdButton, FriendsIcon, GearIcon, LiveLine, Logo, RankLine, ShopIcon } from "../components/FrontDoor.tsx";
+import { AccountBar, BackButton, DressedPawn, FdButton, FriendsIcon, GearIcon, LevelRing, LiveLine, Logo, RankLine, ShopIcon } from "../components/FrontDoor.tsx";
 import { useLive } from "../live.ts";
 import { BossCardFace, BossSelect, RANDOM, selectBosses } from "../components/BossSelect.tsx";
 import { BossFace } from "../components/BossCharacter.tsx";
@@ -18,7 +18,7 @@ import { LIVE_WINDOW_MEDIA } from "../bot-replays.ts";
 import { friendsBadge, useFriends } from "../friends.ts";
 import { FriendsBadge } from "../components/Friends.tsx";
 import { noteLinkCopied } from "./Lobby.tsx";
-import { testParams } from "../test-switches.ts";
+import { testParams, testSwitchesAllowed } from "../test-switches.ts";
 import { isPaused, useServerStatus } from "../status.ts";
 import { ChatNotice } from "../components/ChatNotice.tsx";
 import { ranked1v1Label } from "../ranked.ts";
@@ -378,35 +378,15 @@ function FriendsSheet({
   );
 }
 
-/** The Matchmaking choices: a word or two under each (the ⓘ says more). `fill`: the server's wait before bots fill (s). */
-const types = (fill: number): { id: MatchmakingType; label: string; sub: string }[] => [
-  { id: "default", label: "Default", sub: `bots at ${fill} s` },
-  { id: "botsoff", label: "Bots off", sub: "people only" },
-  { id: "solo", label: "Solo", sub: "you + bots" },
+/**
+ * The Matchmaking choices, each its title only (Eric, Oct 28: "3 times in this screen it says the same thing"): what each
+ * does is the line above PLAY, and the ranking rule is in the FAQ ("Your rating").
+ */
+const types: { id: MatchmakingType; label: string }[] = [
+  { id: "default", label: "Default" },
+  { id: "botsoff", label: "Bots off" },
+  { id: "solo", label: "Solo" },
 ];
-
-/** What each way of being matched does, for the ⓘ. */
-function TypesInfo({ fill }: { fill: number }) {
-  // (The real players a match needs to count: 30 of a 50 v 50's 100, 15 of a raid's 50.)
-  const crowdMin = rankedMinHumans(CROWD_SIZE);
-  const raidMin = rankedMinHumans(RAID_SIZE);
-  return (
-    <div class="fd-types-info" id="fd-types-info">
-      <p>
-        <strong>Default</strong> adds bots after {fill} s to keep the wait short.
-      </p>
-      <p>
-        <strong>Bots off</strong> plays real people only: it waits until the lobby is full.
-      </p>
-      <p>
-        <strong>Solo</strong> is you and bots, starting at once.
-      </p>
-      <p class="fd-types-rank">
-        Your ranking changes only in a match with at least {crowdMin} real players ({raidMin} in a raid). Solo games never change it.
-      </p>
-    </div>
-  );
-}
 
 /** A short note at the top of the home screen ("That match has ended"), with "See your result" when there is one. */
 export interface HomeNotice {
@@ -568,7 +548,6 @@ export function HomeScreen({
   const pickMode = (m: HomeMode) => {
     sessionPick = m;
     setModeState(m);
-    setInfo(false);
     if (m === "squads" || m === "1v1") {
       try {
         localStorage.setItem(MODE_KEY, m);
@@ -587,7 +566,6 @@ export function HomeScreen({
     setPicked(t);
     saveMatchmaking(t);
   };
-  const [info, setInfo] = useState(false);
   // Squads: Solo queue (false) or Party (true), the panel's pick; PLAY then queues alone or opens the party.
   const [party, setParty] = useState(false);
   const [friends, setFriends] = useState(!!joinCode);
@@ -641,7 +619,7 @@ export function HomeScreen({
   const fill = live?.fillSeconds ?? 60;
   const wait = mode === "crowd" ? live?.waits.crowd : null;
   const bots = (mode === "classic" ? S.lobbySize : CROWD_SIZE) - 1;
-  // The line under PLAY: what PLAY does, for this pick and way of being matched.
+  // The line above PLAY: what PLAY does, for this pick and way of being matched.
   const soloLine = `Solo vs ${bots} bots`;
   const signIn = (what: string) => (
     <>
@@ -706,6 +684,8 @@ export function HomeScreen({
       <div class="fd-hero-id">
         <span class="fd-hero-icon">
           <UserIcon icon={profile?.user.icon ?? "♟"} />
+          {/* (An admin's test level: a ring round the icon and "LVL 38" above it. Placeholders: FrontDoor.tsx, TEST_LEVEL.) */}
+          {testSwitchesAllowed() && <LevelRing />}
         </span>
         <div class="fd-hero-text">
           <div class="fd-hero-name">{name}</div>
@@ -838,9 +818,9 @@ export function HomeScreen({
   );
   // The panel under the row (Eric, Oct 18: "it should never change size, and it should be dedicated to whatever text we
   // need there to explain what that is, or if there needs to be options for it"): one box, the same size for every
-  // mode, holding the pick's options or words. 50 v 50: Matchmaking (Default, Bots off, Solo) and its ⓘ. 1 v 1 (always
+  // mode, holding the pick's options or words. 50 v 50: Matchmaking (Default, Bots off, Solo). 1 v 1 (always
   // people, one tap to queue): your rank in it and what it is. Squads: Solo queue or Party. Nothing in it changes the
-  // page's layout: the ⓘ's words float over it. Always there (Eric, Oct 25: "the menu buttons should never be like invisible"):
+  // page's layout. Always there (Eric, Oct 25: "the menu buttons should never be like invisible"):
   // with no mode picked it shows 50 v 50's options greyed, none selected and none tappable; the first pick wakes them.
   const rank1v1 = mode === "1v1" ? ranked1v1Label() : null;
   const panel = (
@@ -877,56 +857,40 @@ export function HomeScreen({
           <span>Ranked chess vs one player near your level</span>
         </div>
       ) : (
-        <div class="fd-types-row">
-          <div class="fd-modes fd-types" role="radiogroup" aria-label="Matchmaking">
-            {types(fill).map((t) => {
-              const off = soloOnly && t.id !== "solo";
-              const idle = !mode;
-              return (
-                <button
-                  type="button"
-                  role="radio"
-                  key={t.id}
-                  aria-checked={!idle && type === t.id}
-                  aria-disabled={idle || off || undefined}
-                  class={`${type === t.id && !idle ? "on" : ""}${off ? " off" : ""}`}
-                  title={off ? "Online: sign in to play" : undefined}
-                  onClick={() => pickType(t.id)}
-                >
-                  {t.label}
-                  <br />
-                  <span>{t.sub}</span>
-                </button>
-              );
-            })}
-          </div>
-          <button
-            type="button"
-            class={`fd-info-btn${info ? " open" : ""}`}
-            aria-label="About matchmaking"
-            aria-expanded={info}
-            aria-controls="fd-types-info"
-            aria-disabled={!mode || undefined}
-            onClick={() => mode && setInfo(!info)}
-          >
-            i
-          </button>
+        <div class="fd-modes fd-types" role="radiogroup" aria-label="Matchmaking">
+          {types.map((t) => {
+            const off = soloOnly && t.id !== "solo";
+            const idle = !mode;
+            return (
+              <button
+                type="button"
+                role="radio"
+                key={t.id}
+                aria-checked={!idle && type === t.id}
+                aria-disabled={idle || off || undefined}
+                class={`${type === t.id && !idle ? "on" : ""}${off ? " off" : ""}`}
+                title={off ? "Online: sign in to play" : undefined}
+                onClick={() => pickType(t.id)}
+              >
+                {t.label}
+              </button>
+            );
+          })}
         </div>
       )}
-      {info && (mode === "crowd" || mode === "classic") && <TypesInfo fill={fill} />}
     </div>
   );
-  // PLAY and the line under it (and an error, if any).
+  // The line above PLAY (what PLAY does, for this pick) and PLAY (and an error, if any). Eric, Oct 28: the line moved from under
+  // PLAY to just above it. It has one place and one height whatever is picked (styles.css, `fd-hint`).
   const go = (
     <div class="fd-go">
+      <div class="fd-hint" aria-live="polite">
+        <span>{loading ? "Loading the engine…" : hint}</span>
+      </div>
       {/* (Dimmed until a mode is picked: Eric, Oct 18.) */}
       <button type="button" class="fd-play" disabled={!mode || loading || !!resting || (mode === "classic" && type !== "solo")} onClick={play}>
         PLAY
       </button>
-      {/* (A plain line is one line on a phone, so the Boss raid card comes up under it: styles.css, `fd-hint-line`. A paused line may wrap.) */}
-      <div class={typeof hint === "string" && !resting ? "fd-hint fd-hint-line" : "fd-hint"} aria-live="polite">
-        {loading ? "Loading the engine…" : hint}
-      </div>
       {error && <p class="fd-error">{error}</p>}
     </div>
   );
@@ -958,9 +922,6 @@ export function HomeScreen({
         <strong>Solo Boss Mode</strong>
         <span>Any boss, alone</span>
       </span>
-      <span class="rd-card-go" aria-hidden="true">
-        ›
-      </span>
     </button>
   );
   // Auto chess's card (Eric, Oct 24: "build an army, watch it fight"): the Boss raid card's look and size, its picture the
@@ -973,9 +934,6 @@ export function HomeScreen({
       <span class="rd-card-text">
         <strong>Auto chess</strong>
         <span>Build an army</span>
-      </span>
-      <span class="rd-card-go" aria-hidden="true">
-        ›
       </span>
     </button>
   );

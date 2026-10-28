@@ -135,6 +135,8 @@ export const TOWN_FEEL = {
   skyBlendMinutes: 30,
   /** How often the clock is read, in ms (not every frame). */
   skyCheckMs: 60_000,
+  /** The chat text is white once night's weight reaches this, dark ink before it (sky.ts `skyTone`; Eric, Oct 28). */
+  chatNightAt: 0.5,
   /** The sun or the moon (where it stands across the box is each look's `sunX`): its radius (a fraction of the box's smaller side)... */
   sunSize: 0.085,
   /** ...how far below the horizon its middle sits (a fraction of its radius: it rests low, partly behind the world)... */

@@ -22,26 +22,33 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     text). One box of one fixed size for every mode (Eric, Oct 18:
     "it should never change size";
     [docs/decisions/2026-10-18-home-steady-layout.md](../decisions/2026-10-18-home-steady-layout.md)), holding the
-    pick's options or words: 50 v 50's Matchmaking (Default, Bots off, Solo) with its ⓘ (its words float over the RANKED
-    row, moving nothing); Squads' **Solo queue** or **Party** ([squads.md](squads.md); Party opens the party sheet at
+    pick's options or words: 50 v 50's Matchmaking (**Default**, **Bots off**, **Solo**: each its title only, 44 px
+    buttons filling the row; Oct 28, Eric: "3 times in this screen it says the same thing", so the sub-labels and the ⓘ
+    with its pop-up are gone: what each does is the line above PLAY, and the ranking rule is in the FAQ's "Your rating");
+    Squads' **Solo queue** or **Party** ([squads.md](squads.md); Party opens the party sheet at
     once, and PLAY opens it again while Party is picked); for 1 v 1 (always people) your rank in it, "Your rank: Gold 2 ·
     45 RP" or "Your rank: Placement 2/5" (`ranked1v1Label`, from your profile; whole on one line at 320 px at its
-    widest), over "Ranked chess vs one player near your level". Then PLAY and its line, a fixed height whatever it says
-    (two lines' room on a phone, one line on a computer). After the first pick no click on home moves or resizes anything
-    (a mode, an option, the ⓘ). The first pick wakes the greyed options (their default selected) and moves nothing: the
+    widest), over "Ranked chess vs one player near your level". Then **the line above PLAY** (Oct 28, Eric: "swap the line
+    of text below Play and put it above play") and PLAY. The line is a fixed height whatever it says (two lines' room on a
+    phone, one line on a computer), its text bottom-aligned so it sits on PLAY, and empty with no mode picked. After the
+    first pick no click on home moves or resizes anything (a mode, an option). The first pick wakes the greyed options (their default selected) and moves nothing: the
     panel was there from the first view (Oct 25; it used to come in with the first pick, Oct 24, which raised the RANKED
     row and the board). PLAY, the cards and the line stay put. 1 v 1's PLAY is
     `startRanked1v1()`: its queue at once, at `/1v1` ([ranked.md](ranked.md)); resting (`PAUSE_RANKED1V1`), PLAY is
     off with its line, as the other modes.
   - **Other modes** (Oct 24, Eric: "a tiny text that says other modes, right below play"; Oct 26: three cards): an 11 px
-    muted label under PLAY, then the **Boss Arena card** full width, and under it the **Solo Boss Mode card** and the
-    **Auto chess** card side by side, half width each (`rd-pair`, Eric, Oct 26). The half cards stack the picture, the name
-    and one short line ("Any boss, alone", "Build an army") with the › in the top corner; the Auto chess picture is a
-    white knight from the board's own piece art. Auto chess opens `/autochess`, as Settings' Testing row does, with its back
-    button home. PLAY is 64 px tall on a phone and a computer, as tall as the Other modes cards (Oct 26, Eric: "the play
-    button is too small"; 48 px on a computer's short window, under 760 px tall; its label 30 px on a phone, 36 px on a
-    computer). On a phone the pair is as tall as the two cards it replaces (84 px each, 10 px apart), so home fits as before:
-    the phone column's gaps are 8 px, and its top and bottom padding are 10 px. "Other modes" is centered over the cards.
+    muted label under PLAY (14 px under it on a phone), then the **Boss Arena card** full width, and under it the **Solo Boss
+    Mode card** and the **Auto chess** card side by side, half width each (`rd-pair`, Eric, Oct 26). Every card has its picture to the left
+    of its words (Oct 28, Eric: "there's plenty of space for them to sit to the left of the text"): Boss Arena 64 px tall with a 48 px
+    picture (84 px on a phone before), the half cards 56 px with a 32 px picture (28 px at 320 px wide), the name and one short line
+    ("Any boss, alone", "Build an army") beside it, and no › on the half cards (no room for it beside the picture at 390 px). The
+    Auto chess picture is a white knight from the board's own piece art. Auto chess opens `/autochess`, as Settings' Testing row does, with its back
+    button home. PLAY takes the room the shorter options and cards gave back (Oct 26, Eric: "the play button is too small", 64 px;
+    Oct 28: "make the play button bigger with the space we gain"): **97 px on a phone** (label 44 px), **76 px on a computer** (label
+    40 px), 60 px in a computer's short window, under 760 px tall (was 48; label 32 px). The pawn's card, the page's height, the
+    live window's board and the last card's foot keep their size and place (measured at every size the fit test uses, to
+    the pixel), so on a phone home fits as before: the column's gaps are 8 px, its top and bottom padding are 10 px and the last
+    card keeps the 15 px of room under it. "Other modes" is centered over the cards.
   - **The Boss Arena card** (Eric, Oct 26, replacing the Boss raid card; full width, "Boss Arena", "Party up and take on the
     bosses") opens the town square at `/town` (the same page the address opens; its back button is home).
     Its picture is a still of one boss you can meet, turning to the next every 30 s (`FRONT_DOOR.bossCardMs`) with a 0.6 s
@@ -78,21 +85,29 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   - **`/bosses`** (unlisted, not admin-gated; Eric's shortcut): opens the solo boss picker at once ("Choose your boss":
     every boss you can meet and a random one, and for an admin the Hidden Boss after them; the difficulty), over home.
   - Your icon (no coins at the top: the shop and your own profile show them, Eric, Oct 18), and the live line ("214 online · 9 matches running · 31 in queue") with the typical
-    wait under PLAY. The shop, your profile and Play with friends are in a phone's top bar and a computer's side menu,
+    wait above PLAY. The shop, your profile and Play with friends are in a phone's top bar and a computer's side menu,
     not on home's column (Eric, Oct 18; [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)).
   - **Play with friends** (a phone's **Friends** in the top bar, a computer's side menu): **Get friend code** makes a
     lobby in the row's pick (50 v 50 if none, or with 1 v 1 or Squads picked) and copies its invite link as it opens
     (the lobby screen says "Invite link copied: paste it to your friends"); join one by its code; **Your friends ›**
     (with "N new") opens the friends list. The full Boss raid screen's Play with friends makes a raid, as before (the
     Solo Boss Mode form has none).
+  - **An admin's test rank and level** (Oct 28, Eric: "Opal III for me as a random test rank", "lvl - 38 … show it at 3/4 like I'm
+    3/4 to level 39"; only where `testSwitchesAllowed()`: an admin, or a server with `TEST_SWITCHES` on; a player sees home as
+    before). The rank line under your name reads **"Opal III · 1580"** (`TEST_RANK` for the rank's name, your real rating after
+    it, still "No rating yet" until you have one), and your icon has a thin **green ring** filled clockwise from the top to
+    **3/4** over a faint track, with a tiny **"LVL 38"** (the rating's gray) centered above it, as wide as the icon
+    (`LevelRing`, `TEST_LEVEL` in `components/FrontDoor.tsx`). **All three are placeholders** until the real ranks and levels
+    exist: the real level system replaces those three values. The ring and the level are drawn outside the icon's box and take
+    no room, so home is the same size and shape with or without them (and doesn't move when the account loads).
   - A screen that replaces home (a phone's queue, the Boss raid screen, home again) starts at its top. A match's Home
     and a closed lobby's note land on home itself; Cancel in a raid's queue goes back to the Boss raid screen (the full one).
   - **Phone:** a top bar (the logo, your pawn (your profile), the shop, **Friends** (with a count
     of requests and invites), then a gear that opens Settings in one tap; a computer's are its side menu's, so none is
     there; [docs/decisions/2026-10-17-phone-settings-gear.md](../decisions/2026-10-17-phone-settings-gear.md),
-    [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)), then one column: your card, the RANKED row, its panel, PLAY
-    and its line, then Other modes with the Boss Arena card, and Solo Boss Mode and Auto chess side by side under it, at the bottom. Your pawn's card takes the room
-    left: your tag (icon, name, "Weighty · 1580") centered above your pawn's head, the pawn 75% bigger than before
+    [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)), then one column: your card, the RANKED row, its panel, the line
+    above PLAY and PLAY (Oct 28), then Other modes with the Boss Arena card, and Solo Boss Mode and Auto chess side by side under it, at the bottom. Your pawn's card takes the room
+    left: your tag (icon, name, "Weighty · 1580"; an admin's test version below) centered above your pawn's head, the pawn 75% bigger than before
     (170 × 154 → up to 298 × 270) and sized to the room the tag leaves (Oct 24). On a short card (under 190 px tall: a
     640 px phone, or a 740 px one (measured at 320, 375 and 430 px wide), since the options panel is there from the first view, Oct 25)
     the tag stands beside the pawn instead, as it did when the room was short (Oct 18), so home fits with no scrolling
@@ -100,7 +115,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     ([docs/decisions/2026-10-18-phone-home-fits.md](../decisions/2026-10-18-phone-home-fits.md)). Big tap targets, no
     sideways scroll at 320–430 px; a long name on your home card ellipsizes.
   - **Computer** (1024 px+): a side menu, the play column in the center in the phone's order (Eric, Oct 18): the RANKED
-    row, its panel, PLAY and its line, then Other modes with the Boss Arena card, and Solo Boss Mode and Auto chess side by side under it (a little shorter) at the
+    row, its panel, the line above PLAY and PLAY (Oct 28), then Other modes with the Boss Arena card, and Solo Boss Mode and Auto chess side by side under it (a little shorter) at the
     bottom; a side panel (playing now, global chat). The pawn hops on a computer too (Oct 24: the hop was phone-only).
     From 1280 px the play column starts with the **live window**: the featured real match (a matchmade one, most
     people, then newest) or, when none runs, bot-match replays played on a shared clock cycle so everyone sees the same
@@ -253,7 +268,9 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   eval bar: testers only), `faq.test.ts` (the FAQ: contents against sections, links, every boss, numbers following the
   settings); `packages/server/test/lobby-do-practice.test.ts` (online practice: testers only).
 - e2e: `e2e/front-door.spec.ts`, `home-ranked.spec.ts` (the RANKED row at 320-390 px and on a computer, home keeping still through every click
-  (PLAY, the board preview, the Boss Arena card and the panel within 1 px, at 320 and 390 px and 1280-1920 px), 1 v 1's PLAY,
+  (PLAY, the line above it, the board preview, the Boss Arena card and the panel within 1 px, at 320 and 390 px and 1280-1920 px), "home, said
+  once" (Oct 28: no ⓘ, titles only, the line above PLAY, the cards' pictures beside their words, PLAY's height, a phone fits) and "test rank
+  and level" (an admin's Opal III, ring and LVL 38; a player sees neither), 1 v 1's PLAY,
   the Boss raid screen (`?mode=raid`) and each of its choices, `/bosses`), `boss-select.spec.ts` (the character select: a
   tap's drop, sound and line, "?", the Hidden Boss dark and locked and never named, the pick reaching Boss alone, a Solo
   raid and a raid you make, resting bosses, the layout at 320-1280 px, the card turning; Boss alone's menu and
@@ -282,3 +299,8 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 - Give state classes a prefix (`ub-board`, not `board`); test every control from every state.
 - Server pieces stay on the Durable Objects and D1 Eric already pays for; ask before anything that costs more.
 - The FAQ (`faq/content.ts`) is updated in the same PR as any rule it explains; its numbers come from settings.
+- Home's boxes get their heights from fixed sizes, never from the font showing (Oct 28): the play column is anchored to the
+  bottom, so a card that is 3 px taller for the moment Archivo loads moves everything above it. Short names get
+  `white-space: nowrap`, and a text whose `normal` line height differs between Archivo and the fallback font gets a px one. Run
+  the guard (`home-ranked.spec.ts`, "Eric's rule") with `--repeat-each=16 --workers=4`: one run in five failing means something
+  moves late. A `PerformanceObserver` of type `layout-shift` in the page names what moved and when.
