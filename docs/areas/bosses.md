@@ -518,6 +518,9 @@ build): online, phase 1 won is the crowd's victory):
   he stands to its right); the status box under the board at its width; the column beside the board starts after the God King. The eval bar draws behind them both. A phone is unchanged.
   From 900 to 1099 px the boss is drawn at 1× by the eval bar, so he's whole in the window; the board makes room only
   if it must (`--bs-reach`, `--bs-need` in styles.css; Oct 14). From 1100 px he's 2× (2 screen px a sprite px).
+  With no eval bar (every player's board: the board takes its 24 px) he stands 24 px further out (`--bs-out`), as far
+  from the board as beside the bar, so no boss's drawing goes under the board; Folio, the widest toward the board, stands
+  6 sprite px further still (`--bs-head` adds its head's reach). `e2e/boss-side.spec.ts`; docs/decisions/2026-10-28-folio-desktop-fixes.md.
 - **What a boss screen draws each frame** (Oct 15; DECISIONS.md, "The boss screen draws only what changed"): the boss
   screen (`Boss.tsx`) and the Hidden Boss's phase change and phase 2 (`Recluse2.tsx`) keep a clock that ticks every
   frame for what moves with it: the board and everything drawn over it (moments, effects, banners, Lights out), the
