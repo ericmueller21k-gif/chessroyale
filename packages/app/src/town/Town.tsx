@@ -27,7 +27,7 @@
  */
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import { account, onAccountChange, playerName } from "../account.ts";
-import { testSwitchesAllowed } from "../test-switches.ts";
+import { testParams, testSwitchesAllowed } from "../test-switches.ts";
 import { play, warmSounds } from "../sound.ts";
 import { SELECT_SOUND, TOWN_SOUNDS, townSound } from "../characters/boss-select.ts";
 import { N, proj, wrapF } from "./camera.ts";
@@ -37,7 +37,7 @@ import { TownChatTools } from "./TownChatTools.tsx";
 import { Press } from "./press.ts";
 import { PAWN_PX, Renderer, pawnImage, type Hit } from "./render.ts";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
-import { BOTS, COLISEUM_PLACE, HOMES, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, tdist, tick, townLine, waitingBot, walkWalker, type HomeId, seatOf, seatText, type Person, type Place, type Seat, type Sq, type StatueId, type Target } from "./world.ts";
+import { BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, tdist, tick, townLine, waitingBot, walkWalker, type HomeId, seatOf, seatText, type Person, type Place, type Seat, type Sq, type StatueId, type Target } from "./world.ts";
 import { dressedPawn, lookKey } from "./you-look.ts";
 import type { BotGameAsk } from "./TownPage.tsx";
 import "./town.css";
@@ -281,6 +281,14 @@ function startTown(
   };
   const offAccount = onAccountChange(dress);
   dress();
+  // The testers' crowd (`?crowd=N`, up to CROWD_MAX: N more pawns with names wandering the square, to measure the frame
+  // rate with many figures; admins only, so it comes in once the account says so).
+  const crowdIn = () => {
+    const n = Math.min(CROWD_MAX, Math.floor(Number(testParams().get("crowd"))) || 0);
+    if (n > 0 && !town.crowd.length) addCrowd(town, n);
+  };
+  const offCrowd = onAccountChange(crowdIn);
+  crowdIn();
   // The bots' dressed pawns, drawn once now (their crate items over their pawns), never per frame; plain meanwhile. (The
   // sidekicks' frames are cut from their sheets as the renderer is made.)
   for (const p of town.bots) {
@@ -866,6 +874,7 @@ function startTown(
     stop: () => {
       alive = false;
       offAccount();
+      offCrowd();
       halt();
       ro.disconnect();
       document.removeEventListener("visibilitychange", onVisibility);

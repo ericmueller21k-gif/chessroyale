@@ -6,7 +6,7 @@ import type { Character } from "../src/characters/sprite.ts";
 import { SIDEKICK_SHEETS } from "../src/town/sidekick-sheets.ts";
 import { N, wrapF, wrapI } from "../src/town/camera.ts";
 import { TOWN_FEEL } from "../src/town/feel.ts";
-import { APRON, BOTS, HOMES, START, TABLES, Walker, anyTableFree, canGoHome, homeDoor, inSquare, plotDist, sendHome, botLabel, cancelMeet, comeOut, createTown, tdist, walkable, holdBot, isSprite, meet, meetReady, meetSeat, playAtTableText, ratingText, seatOf, seatText, seated, sidekickText, spriteAnim, stepsFrom, tableFor, tableStates, tick, townLine, waitingBot, waveMs, walkWalker, type HomeId, type Person, type Sq, type Town } from "../src/town/world.ts";
+import { APRON, BOTS, CROWD_MAX, HOMES, addCrowd, START, TABLES, Walker, anyTableFree, canGoHome, homeDoor, inSquare, plotDist, sendHome, botLabel, cancelMeet, comeOut, createTown, tdist, walkable, holdBot, isSprite, meet, meetReady, meetSeat, playAtTableText, ratingText, seatOf, seatText, seated, sidekickText, spriteAnim, stepsFrom, tableFor, tableStates, tick, townLine, waitingBot, waveMs, walkWalker, type HomeId, type Person, type Sq, type Town } from "../src/town/world.ts";
 
 /** Each sidekick's sprite file (and its id, `sidekick-<file>`), by its boss's home. */
 const HOME_FILE: Record<HomeId, string> = { clown: "boingo", pig: "wrangler", smudgy: "smudgy", bigboy: "bigboy", hopper: "chubchirp", folio: "folio", moo: "moo", gardener: "puddles", sawyer: "sawyer", tiger: "babur", alfil: "alfil", gingerbread: "ginger", grex: "jefferson", hollow: "hollow" };
@@ -526,6 +526,21 @@ describe("town square: the bots take turns (Oct 28, Eric: ten out, one goes home
     expect(g.home).toBe(false);
     expect(log.sent.some((s) => s.bot === g)).toBe(false);
     expect(log.sent.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it("the testers' crowd (?crowd=N, measuring only): N more named pawns, at most 100, wandering the square; the bots' turns don't count them", () => {
+    const t = createTown(0);
+    addCrowd(t, 150);
+    expect(t.crowd).toHaveLength(CROWD_MAX);
+    expect(CROWD_MAX).toBe(100);
+    expect(t.crowd.map((p) => p.name).slice(0, 2)).toEqual(["Guest 1", "Guest 2"]);
+    for (const p of t.crowd) {
+      expect(p.bot).toBeNull();
+      expect(t.people.includes(p) && t.all.includes(p.walker)).toBe(true);
+    }
+    const at = new Map(t.crowd.map((p) => [p, `${p.walker.c},${p.walker.r}`]));
+    run(t, 0, 2 * MIN, undefined, 100, () => expect(t.bots.filter((b) => !b.home)).toHaveLength(10));
+    expect(t.crowd.filter((p) => at.get(p) !== `${p.walker.c},${p.walker.r}`).length).toBeGreaterThan(50);
   });
 
   it("back from a game, the bot you played is out (across from you); one called from home comes out", () => {

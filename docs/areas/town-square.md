@@ -383,6 +383,7 @@ noted wherever a slice changed one.
   free; the one home longest comes out next, as the other gets home, never the same; a sidekick to its boss's door and a
   pawn to the gate, fading out there over `botFadeMs`, and the next fading in at its own door and walking to the square;
   a bot going home held by its card and carrying on; one you play stays, and never goes while seated across from you.
+  The testers' crowd (`addCrowd`: at most 100, named, wandering, not counted in the turns).
   `packages/app/test/town-bot-game.test.ts`: the game (its name and rating, the loading step before the vote, casual; a
   sidekick's face on its strip).
 - `packages/app/test/town-lights.test.ts`: the park's lamps (8 to 12, solid, on paving, off every path, every square and

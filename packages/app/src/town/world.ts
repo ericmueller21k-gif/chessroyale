@@ -655,6 +655,8 @@ export interface Town {
   outN: number;
   /** The bots at home, the one home longest first: the next to come out. */
   homeQueue: Person[];
+  /** Extra figures for measuring the frame rate only (the testers' `?crowd=N`): pawns with names that wander the square. */
+  crowd: Person[];
 }
 
 /** A small seeded generator (the prototype's), in [0, 1). */
@@ -733,8 +735,26 @@ export function createTown(now: number, seed = 20261025, seat: Seat | null = nul
     outN,
     // (The ones at home in the shuffle's order: the first comes out first.)
     homeQueue: order.filter((i) => !out.has(i)).map((i) => bots[i]!),
+    crowd: [],
   };
   return t;
+}
+
+/** At most this many in the testers' crowd (`?crowd=N`). */
+export const CROWD_MAX = 100;
+/**
+ * The testers' crowd (Oct 28, for measuring the frame rate with many figures, as real players will be one day; the
+ * `?crowd=N` test switch, admins only): `n` plain pawns with names ("Guest 1"…) on free squares near the square, which
+ * wander it like the bots. Never for players.
+ */
+export function addCrowd(t: Town, n: number): void {
+  const at = t.you.walker.here();
+  for (let i = t.crowd.length; i < Math.min(n, CROWD_MAX); i++) {
+    const p: Person = { id: `crowd:${i}`, name: `Guest ${i + 1}`, look: { side: i % 2 ? "dark" : "light", tint: null, wear: null }, you: false, walker: new Walker(freeSpot(t.rnd, at, 2, [], t, 1), TOWN_FEEL.botStepMs, true), sit: false, bot: null, waved: -Infinity, home: false, came: -Infinity, leaves: Infinity, going: false, trip: null, due: false };
+    t.crowd.push(p);
+    t.people.push(p);
+    t.all.push(p.walker);
+  }
 }
 
 /**
@@ -963,6 +983,11 @@ function botsWander(t: Town, now: number): void {
     const bot = pick(t, free);
     // Now and then one goes to sit at a chess table nearby (a free stool), and one sitting may stay a while longer.
     if (!(seated(bot) && t.rnd() < f.botStaySeated)) wander(t, bot, t.rnd() < f.botSitChance);
+  }
+  // The testers' crowd (`?crowd=N`): about one in ten of them walks each time.
+  for (let k = Math.ceil(t.crowd.length / 10); k > 0; k--) {
+    const p = pick(t, t.crowd);
+    if (p && !p.walker.moving()) wander(t, p, false);
   }
 }
 

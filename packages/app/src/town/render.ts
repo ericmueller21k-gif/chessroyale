@@ -138,6 +138,32 @@ function groundColors(skyh: readonly number[]): GroundColors {
 }
 /** Fonts by whole pixel size (tags, signs). */
 const TAG_FONT = Array.from({ length: 16 }, (_, s) => `600 ${s}px ${FONT}`);
+/**
+ * A name tag drawn once (`Renderer.tagArtOf`): its canvas (four rows, each `rh` device pixels high, TAG_PAD device pixels
+ * round the pill for its shadow's blur, 4), the pill's size, its size and color, the frame it was last drawn.
+ */
+interface TagArt {
+  cv: HTMLCanvasElement;
+  w: number;
+  h: number;
+  rh: number;
+  s: number;
+  gold: boolean;
+  used: number;
+  /** `fontsLoaded` when it was drawn: a tag drawn before its font came is drawn again. */
+  fonts: number;
+}
+const TAG_PAD = 8;
+/** Counts the web fonts' loads finished (a tag's font, Archivo, may come after the town opens). */
+let fontsLoaded = 0;
+if (typeof document !== "undefined" && document.fonts) {
+  const loaded = () => void fontsLoaded++;
+  document.fonts.addEventListener?.("loadingdone", loaded);
+  void document.fonts.ready.then(loaded);
+}
+/** How far off its canvas a tag's pill is drawn to throw its shadow alone onto it (CSS pixels). */
+const TAG_THROW = 1000;
+const TAG_ART_MAX = 64;
 /** The homes' floating names (the game's display font), by whole pixel size. */
 const NAME_FONT = Array.from({ length: 41 }, (_, s) => `400 ${s}px ${FONT_BLACK}`);
 const BUBBLE_FONT = `500 12px ${FONT}`;
@@ -618,7 +644,14 @@ export class Renderer {
   /** Each sidekick's frames, by its sheet: every one cut from it as the town opens (the constructor), never per frame. */
   private readonly spriteArt = new Map<SidekickSheet, SpriteFrames>();
   /** Tag widths by name and size; sign and bubble layouts by text. */
-  private readonly tagW = new Map<string, number[]>();
+  /**
+   * The name tags, each drawn once (its pill, its shadow and its name) at the device's pixels and stamped every frame
+   * (Oct 28: a tag's shadow blur and its text, redrawn each frame, were the costliest part of a figure): by name, one
+   * per size and color; about TAG_ART_MAX in all, the least lately used making way (its canvas reused).
+   */
+  private readonly tagArt = new Map<string, TagArt[]>();
+  private nTagArt = 0;
+  private tagDpr = 0;
   private readonly nameW = new Map<string, number[]>();
   /** Each home's sign lettering: laid out once, drawn once per size (in device pixels a font pixel). */
   private readonly signs: { lines: string[]; w: number; h: number; art: HTMLCanvasElement[] }[];
@@ -729,7 +762,7 @@ export class Renderer {
   }
 
   /** Draws one frame. `zoom`: 0 normal, 1 zoomed out (and between, while it glides); `dt`: seconds since the last. */
-  /** Frames drawn so far (what's worked out once a frame keys on it). */
+  /** Frames drawn so far (what's worked out once a frame keys on it; the tags drawn once remember when each was last used). */
   private frameNo = 0;
   draw(now: number, camX: number, camY: number, zoom: number, dt = 0): void {
     const { ctx, W, H, DPR } = this;
@@ -762,6 +795,7 @@ export class Renderer {
       const t = this.tags[i]!;
       this.drawTag(t.text, t.x, t.y, t.gold, t.size, t.alpha);
     }
+    ctx.globalAlpha = 1;
     if (TOWN_FEEL.floatingNames) this.drawNames(now);
     if (this.bubble.on) this.drawBubble(this.bubble.text, this.bubble.x, this.bubble.y); // (over a home's name)
     this.placeChips(now);
@@ -1211,7 +1245,7 @@ export class Renderer {
       it.sz = it.kind === "prop" ? it.dz + 0.05 : it.dz;
       it.on = drawable(v, it.dx, it.dz, margin, below) && !(it.kind === "person" && people[it.i]!.home);
     }
-    items.sort(byFarFirst);
+    sortFarFirst(items);
     for (const b of town.bosses) b.onScreen = false;
     for (const b of this.statueBox) b.on = false;
     for (const nm of this.names) nm.a = 0;
@@ -2096,30 +2130,98 @@ export class Renderer {
     ctx.drawImage(art, Math.round((fx + (fw - w) / 2) * DPR) / DPR, Math.round((fy + (fh - h) / 2) * DPR) / DPR, w, h);
   }
 
-  /** A name tag over a pawn: white for the bots, gold for you; it shrinks with distance. */
+  /** A name tag over a pawn: white for the bots, gold for you; it shrinks with distance. Stamped from its drawing (`tagArtOf`). */
   private drawTag(text: string, ax: number, ay: number, gold: boolean, size: number, alpha: number): void {
-    const { ctx } = this;
-    const s = Math.round(size);
-    let widths = this.tagW.get(text);
-    if (!widths) this.tagW.set(text, (widths = []));
-    ctx.font = TAG_FONT[s]!;
-    const tw = widths[s] ?? (widths[s] = ctx.measureText(text).width);
-    const w = tw + s * 1.25;
-    const h = s + (8 * s) / 11;
-    this.keepFree(ax - w / 2, ay - h, w, h);
-    ctx.save();
+    const { ctx, DPR } = this;
+    const a = this.tagArtOf(text, Math.round(size), gold);
+    if (a.fonts !== fontsLoaded) this.paintTag(a, text);
+    a.used = this.frameNo;
+    this.keepFree(ax - a.w / 2, ay - a.h, a.w, a.h);
+    // (On the device's pixel grid, so the drawing lands pixel for pixel.)
+    const cw = a.cv.width;
+    const x = (Math.round((ax - a.w / 2) * DPR) - TAG_PAD) / DPR;
+    const y = (Math.round((ay - a.h) * DPR) - TAG_PAD) / DPR;
     ctx.globalAlpha = alpha;
-    ctx.fillStyle = gold ? "rgba(255,215,106,.96)" : "rgba(255,255,255,.92)";
-    ctx.shadowColor = "rgba(0,0,0,.25)";
-    ctx.shadowBlur = 4;
-    roundRect(ctx, ax - w / 2, ay - h, w, h, h / 2);
-    ctx.fill();
-    ctx.shadowColor = "transparent";
-    ctx.fillStyle = INK;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(text, ax, ay - h / 2);
-    ctx.restore();
+    if (alpha >= 1) ctx.drawImage(a.cv, 0, 0, cw, a.rh, x, y, cw / DPR, a.rh / DPR);
+    // Fading: its shadow, its pill and its name each at that alpha, one over the other, as they were drawn before (the
+    // whole tag at that alpha would show less of the pill through the name).
+    else for (let r = 1; r < 4; r++) ctx.drawImage(a.cv, 0, r * a.rh, cw, a.rh, x, y, cw / DPR, a.rh / DPR);
+  }
+
+  /**
+   * A name tag's drawing at size `s` (drawn by paintTag, as drawTag drew it each frame before): its pill (white, gold for
+   * you) with its soft shadow and its name; in four rows of its canvas, each `rh` device pixels high: the whole tag, then
+   * its shadow alone, its pill alone and its name alone (for a fading tag).
+   */
+  private tagArtOf(text: string, s: number, gold: boolean): TagArt {
+    const { DPR } = this;
+    if (this.tagDpr !== DPR) {
+      this.tagArt.clear();
+      this.nTagArt = 0;
+      this.tagDpr = DPR;
+    }
+    let list = this.tagArt.get(text);
+    if (list) for (const a of list) if (a.s === s && a.gold === gold) return a;
+    // A new one: a canvas of its own, or the least lately used one's (never one drawn this frame or the last, which
+    // this frame may still draw: a crowd of more names than TAG_ART_MAX on screen keeps them all).
+    let cv: HTMLCanvasElement | null = null;
+    if (this.nTagArt >= TAG_ART_MAX) {
+      let old: TagArt | null = null;
+      let oldText = "";
+      for (const [k, l] of this.tagArt) for (const a of l) if (!old || a.used < old.used) ((old = a), (oldText = k));
+      if (old && old.used < this.frameNo - 1) {
+        const l = this.tagArt.get(oldText)!;
+        l.splice(l.indexOf(old), 1);
+        if (!l.length) this.tagArt.delete(oldText);
+        this.nTagArt--;
+        cv = old.cv;
+      }
+    }
+    const a: TagArt = { cv: cv ?? document.createElement("canvas"), w: 0, h: 0, rh: 0, s, gold, used: this.frameNo, fonts: -1 };
+    if (!list) this.tagArt.set(text, (list = []));
+    list.push(a);
+    this.nTagArt++;
+    return a;
+  }
+
+  /** Draws a tag's four rows (`tagArtOf`) into its canvas, sized to its name in its font. */
+  private paintTag(a: TagArt, text: string): void {
+    const { DPR } = this;
+    const { cv, s } = a;
+    a.fonts = fontsLoaded;
+    const g = cv.getContext("2d")!;
+    g.font = TAG_FONT[s]!;
+    const w = (a.w = g.measureText(text).width + s * 1.25);
+    const h = (a.h = s + (8 * s) / 11);
+    const rh = (a.rh = Math.ceil(h * DPR) + 2 * TAG_PAD);
+    cv.width = Math.ceil(w * DPR) + 2 * TAG_PAD;
+    cv.height = 4 * rh;
+    const pill = a.gold ? "rgba(255,215,106,.96)" : "rgba(255,255,255,.92)";
+    g.font = TAG_FONT[s]!;
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    for (let r = 0; r < 4; r++) {
+      g.setTransform(DPR, 0, 0, DPR, TAG_PAD, TAG_PAD + r * rh);
+      if (r <= 1) {
+        g.shadowColor = "rgba(0,0,0,.25)";
+        g.shadowBlur = 4;
+      }
+      // (Its shadow alone: the pill drawn far off the canvas, its shadow thrown back onto it. Shadows' offsets are in
+      // the canvas's pixels, whatever the transform.)
+      if (r === 1) g.shadowOffsetX = TAG_THROW * DPR;
+      if (r <= 2) {
+        g.fillStyle = pill;
+        roundRect(g, r === 1 ? -TAG_THROW : 0, 0, w, h, h / 2);
+        g.fill();
+      }
+      g.shadowColor = "transparent";
+      g.shadowBlur = 0;
+      g.shadowOffsetX = 0;
+      if (r === 0 || r === 3) {
+        g.fillStyle = INK;
+        g.fillText(text, w / 2, h / 2);
+      }
+    }
   }
 
   /** The speech bubble: white, rounded, its tail pointing down at the speaker's head. */
@@ -2603,7 +2705,22 @@ const SHADOW = "rgb(60,35,10)";
 /** A square's corners from its middle, in half-squares: far left, far right, near right, near left. */
 const CORNERS = [-1, 1, 1, 1, 1, -1, -1, -1] as const;
 const SCRATCH_ORDER: number[] = [];
-const byFarFirst = (a: Item, b: Item) => b.sz - a.sz;
+/**
+ * The things far to near, in place (Oct 28): an insertion sort, stable like Array.prototype.sort (the same order), and
+ * nothing allocated (the engine's sort copies the array each time); the list is nearly in order from the last frame, so
+ * it's a pass or so.
+ */
+function sortFarFirst(a: Item[]): void {
+  for (let i = 1; i < a.length; i++) {
+    const it = a[i]!;
+    let j = i - 1;
+    while (j >= 0 && a[j]!.sz < it.sz) {
+      a[j + 1] = a[j]!;
+      j--;
+    }
+    a[j + 1] = it;
+  }
+}
 const dist2 = (h: Place, x: number, y: number) => wrapF(h.cx - x) ** 2 + wrapF(h.cy - y) ** 2;
 /** The Colosseum's chip shows all of its icon. */
 const CHIP_ICON_BOX = [0, 0, COLISEUM_CHIP.w] as const;
