@@ -1,11 +1,14 @@
 import { devices, expect, type Page } from "@playwright/test";
 import { ratingTier } from "@chessroyale/core";
-import { named, soloFromHome, test, openBossRaid } from "./helpers.ts";
+import { named, soloFromHome, switchesOff, test, openBossRaid } from "./helpers.ts";
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
 
 test("your profile: tap your pawn; the same structure as anyone's, with your own actions", async ({ page }) => {
   await named(page, "Eric");
+  // A player (this server has TEST_SWITCHES on, which gives home an admin's placeholder rank, "Opal III": the app is told
+  // otherwise, as hunchess.com tells a player), so home shows the rank line a player sees.
+  await switchesOff(page);
   await page.goto("/");
   // (Once this device's account exists.)
   await expect(page.locator(".fd-hero-name")).toHaveText("Eric");

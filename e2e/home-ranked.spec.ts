@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { named, openBossRaid, test, watchFor, pickMode } from "./helpers.ts";
+import { named, openBossRaid, switchesOff, test, watchFor, pickMode } from "./helpers.ts";
 
 /**
  * Home's RANKED row and the Boss raid's own card and screen (Eric, Oct 16;
@@ -57,6 +57,9 @@ test("the RANKED row: a label over 50 v 50, 1 v 1 and Squads, three equal button
     const c = (await card.boundingBox())!;
     expect(c.height).toBeGreaterThanOrEqual(desktop() ? 60 : 64);
     expect(Math.abs(c.width - r.width), `${w}: full width`).toBeLessThan(2);
+    // (Whole in the page's own font: the cards' words never wrap since Oct 28, so for the moment Archivo is loading, the fallback
+    // font's wider words can run past their box.)
+    await page.evaluate(() => document.fonts.ready);
     expect(await card.evaluate((e) => [...e.querySelectorAll(".rd-card-text > *")].every((x) => x.scrollWidth <= x.clientWidth + 0.5)), `${w}`).toBe(true);
     const play = (await page.getByRole("button", { name: "PLAY", exact: true }).boundingBox())!;
     // The row, then PLAY, then "Other modes" and the card (Eric, Oct 19: chess first; Oct 24: Auto chess under it), on a
@@ -201,7 +204,7 @@ test("Other modes under PLAY: the label, then the Boss Arena card full width, th
   const solo = main.getByRole("button", { name: /^Solo Boss Mode/ });
   const auto = main.getByRole("button", { name: /^Auto chess/ });
   await expect(label).toBeVisible();
-  await expect(auto).toHaveText(/^Auto chessBuild an army›$/);
+  await expect(auto).toHaveText(/^Auto chessBuild an army$/);
   await expect(auto.locator("svg.fd-knight")).toBeVisible();
   const at = async (l: import("@playwright/test").Locator) => (await l.boundingBox())!;
   const play = await at(main.getByRole("button", { name: "PLAY", exact: true }));
@@ -224,7 +227,7 @@ test("Other modes under PLAY: the label, then the Boss Arena card full width, th
   expect(new URL(page.url()).pathname).toBe("/");
 });
 
-test("home keeps still: no click on a mode, an option or the ⓘ moves or resizes the board preview, PLAY, the panel or the Boss raid card (phone and computer)", async ({ page }) => {
+test("home keeps still: no click on a mode or an option moves or resizes the board preview, the line above PLAY, PLAY, the panel or the Boss raid card (phone and computer)", async ({ page }) => {
   // (Eric, Oct 18: "nothing should actually be forced moving around the size of the board or where the play button
   // is"; docs/decisions/2026-10-18-home-steady-layout.md.)
   await named(page, "Still");
@@ -233,9 +236,7 @@ test("home keeps still: no click on a mode, an option or the ⓘ moves or resize
   const steps: [string, () => Promise<unknown>][] = [
     ["Default", () => radio(/^Default/).click()],
     ["Bots off", () => radio(/^Bots off/).click()],
-    ["Solo", () => radio(/^Solo you/).click()],
-    ["ⓘ open", () => page.getByRole("button", { name: "About matchmaking" }).click()],
-    ["ⓘ closed", () => page.getByRole("button", { name: "About matchmaking" }).click()],
+    ["Solo", () => radio(/^Solo$/).click()],
     ["Default again", () => radio(/^Default/).click()],
     ["1 v 1", () => radio(/^1 v 1/).click()],
     ["Squads", () => radio(/^Squads/).click()],
@@ -249,7 +250,7 @@ test("home keeps still: no click on a mode, an option or the ⓘ moves or resize
     ["50 v 50", () => radio(/^50 v 50/).click()],
   ];
   // (The panel last: what moves is checked before what's new.)
-  const parts = { board: ".fd-livewin", ranked: ".fd-ranked", play: ".fd-play", boss: ".rd-card", panel: ".fd-mode-panel" };
+  const parts = { board: ".fd-livewin", ranked: ".fd-ranked", hint: ".fd-hint", play: ".fd-play", boss: ".rd-card", panel: ".fd-mode-panel" };
   const measure = async () => {
     const out: Record<string, { x: number; y: number; width: number; height: number }> = {};
     for (const [k, s] of Object.entries(parts)) if ((k !== "board" || desktop()) && (await page.locator(s).count())) out[k] = await box(page, s);
@@ -281,18 +282,18 @@ test("home keeps still: no click on a mode, an option or the ⓘ moves or resize
         now[k] = await box(page, sel);
         for (const d of ["x", "y", "width", "height"] as const) expect(Math.abs(now[k]![d] - first[k]![d]), `${w}×${h}, after ${step}: ${k}'s ${d}`).toBeLessThanOrEqual(1);
       }
-      // What the panel holds, every box in it, fits inside it (the ⓘ's words float above it). (Squads' choices once hung
-      // out of its foot while their own box fitted: Eric's phone, Oct 18.)
+      // What the panel holds, every box in it, fits inside it. (Squads' choices once hung out of its foot while their own box
+      // fitted: Eric's phone, Oct 18.)
       const spill = await page.evaluate(() => {
         const e = document.querySelector(".fd-mode-panel");
         if (!e) return 0;
         const p = e.getBoundingClientRect();
-        const boxes = [...e.querySelectorAll("*")].filter((c) => !c.closest(".fd-types-info")).map((c) => c.getBoundingClientRect());
+        const boxes = [...e.querySelectorAll("*")].map((c) => c.getBoundingClientRect());
         return Math.max(0, ...boxes.map((c) => Math.max(c.bottom - p.bottom, p.top - c.top, c.right - p.right, p.left - c.left)));
       });
       expect(spill, `${w}×${h}, after ${step}: inside the panel`).toBeLessThanOrEqual(0.5);
-      // The line under PLAY fits its fixed room (one line on a computer, two on a phone), whatever it says.
-      expect(await page.locator(".fd-hint").evaluate((e) => e.scrollHeight - e.clientHeight), `${w}×${h}, after ${step}: the line under PLAY`).toBeLessThanOrEqual(1);
+      // The line above PLAY fits its fixed room (one line on a computer, two on a phone), whatever it says.
+      expect(await page.locator(".fd-hint").evaluate((e) => e.scrollHeight - e.clientHeight), `${w}×${h}, after ${step}: the line above PLAY`).toBeLessThanOrEqual(1);
     }
     // (The panel: there all along.)
     expect(Object.keys(first), `${w}`).toContain("panel");
@@ -314,10 +315,9 @@ test("Eric's rule (Oct 18, Oct 25): home's options panel is always there, greyed
   ];
   const ranked = page.getByRole("radiogroup", { name: "RANKED" });
   const matchmaking = page.getByRole("radiogroup", { name: "Matchmaking" });
-  const info = page.getByRole("button", { name: "About matchmaking" });
   const play = page.getByRole("button", { name: "PLAY", exact: true });
-  const options = [/^Default/, /^Bots off/, /^Solo you/];
-  const parts: Record<string, string> = { board: ".fd-livewin", play: ".fd-play", label: ".fd-other-label", boss: ".rd-card", auto: ".fd-auto-card", panel: ".fd-mode-panel" };
+  const options = [/^Default/, /^Bots off/, /^Solo$/];
+  const parts: Record<string, string> = { board: ".fd-livewin", hint: ".fd-hint", play: ".fd-play", label: ".fd-other-label", boss: ".rd-card", auto: ".fd-auto-card", panel: ".fd-mode-panel" };
   const measure = async () => {
     const out: Record<string, { x: number; y: number; width: number; height: number }> = {};
     for (const [k, s] of Object.entries(parts)) if (await page.locator(s).count()) out[k] = await box(page, s);
@@ -341,25 +341,20 @@ test("Eric's rule (Oct 18, Oct 25): home's options panel is always there, greyed
       await expect(option, `${w}×${h}: ${name} not tappable`).toBeDisabled();
       await expect(option, `${w}×${h}: ${name} not selected`).toHaveAttribute("aria-checked", "false");
     }
-    await expect(info, `${w}×${h}: the ⓘ shown and not tappable`).toBeDisabled();
     await expect(matchmaking.getByRole("radio", { checked: true }), `${w}×${h}: nothing in the options row selected`).toHaveCount(0);
     await expect(page.locator(".fd-mode-panel .on"), `${w}×${h}: no selected look in the panel`).toHaveCount(0);
     const before = await measure();
     expect(before.panel, `${w}×${h}: the panel has its box`).toBeDefined();
     // Tapping one does nothing: a forced tap reaches the handler, which ignores it.
     for (const name of options) await matchmaking.getByRole("radio", { name }).click({ force: true });
-    await info.click({ force: true });
-    await expect(page.locator(".fd-types-info"), `${w}×${h}: the ⓘ's words stay shut`).toHaveCount(0);
     await expect(matchmaking.getByRole("radio", { checked: true }), `${w}×${h}: still nothing selected`).toHaveCount(0);
     await expect(page.locator(".fd-mode-panel.idle")).toBeVisible();
     await expect(play).toBeDisabled();
     same(before, await measure(), `${w}×${h}, after the taps on the greyed options`);
-    // The first pick wakes the options with their usual default selected, and moves nothing: PLAY, the label, both cards,
-    // the panel and (computer) the board stay put after each mode and after the ⓘ opens.
+    // The first pick wakes the options with their usual default selected, and moves nothing: the line above PLAY, PLAY, the
+    // label, both cards, the panel and (computer) the board stay put after each mode.
     const steps: [string, () => Promise<unknown>][] = [
       ["50 v 50", () => ranked.getByRole("radio", { name: /^50 v 50/ }).click()],
-      ["ⓘ open", () => info.click()],
-      ["ⓘ closed", () => info.click()],
       ["1 v 1", () => ranked.getByRole("radio", { name: /^1 v 1/ }).click()],
       ["Squads", () => ranked.getByRole("radio", { name: /^Squads/ }).click()],
     ];
@@ -374,4 +369,232 @@ test("Eric's rule (Oct 18, Oct 25): home's options panel is always there, greyed
     }
     expect(await sideways(page), `${w}×${h}`).toBe(0);
   }
+});
+
+type Rect = { x: number; y: number; width: number; height: number };
+
+test("home, said once (Eric, Oct 28): no ⓘ; the three options are titles only and fill the row; the line above PLAY keeps its box through every pick; the cards' pictures sit left of their words, the cards are shorter and PLAY is taller; home still fits", async ({ page }) => {
+  // ("3 times in this screen it says the same thing": docs/decisions/2026-10-28-home-said-once.md.)
+  await named(page, "Once");
+  const sizes: [number, number, number][] = desktop()
+    ? [[1280, 800, 72], [1440, 900, 72], [1280, 680, 56]]
+    : [[390, 844, 90], [320, 640, 90]];
+  for (const [w, h, playMin] of sizes) {
+    const at = `${w}×${h}`;
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto("/");
+    const play = page.getByRole("button", { name: "PLAY", exact: true });
+    await expect(play).toBeVisible();
+    // (The page's fonts in: a line of text is a pixel taller in the fallback font, and the card above gives it back.)
+    await page.evaluate(() => document.fonts.ready);
+    // The ⓘ is gone, with its pop-up.
+    await expect(page.getByRole("button", { name: "About matchmaking" }), `${at}: no ⓘ`).toHaveCount(0);
+    await expect(page.locator(".fd-info-btn, .fd-types-info"), `${at}: no ⓘ`).toHaveCount(0);
+    // The line above PLAY: its box is there from the first view, empty with nothing picked, and the same box through every pick.
+    const rect = async (sel: string): Promise<Rect> => (await page.locator(sel).first().boundingBox())!;
+    // (The computer's live window: on screen, waited for as in the keeps-still test, so the boxes below are the settled ones.)
+    if (desktop()) await expect(page.locator(".fd-livewin-sq").first()).toBeVisible();
+    const hint0 = await rect(".fd-hint");
+    await expect(page.locator(".fd-hint"), `${at}: nothing picked, nothing said`).toHaveText("");
+    await pickMode(page, "50 v 50");
+    const group = page.getByRole("radiogroup", { name: "Matchmaking" });
+    // Titles only, side by side, equal, whole, tappable, and filling the row: the group is as wide as the RANKED row, with the
+    // buttons' margins even on both sides.
+    await expect(group.getByRole("radio"), `${at}: titles only`).toHaveText(["Default", "Bots off", "Solo"]);
+    const g = (await group.boundingBox())!;
+    const ranked = await rect(".fd-ranked");
+    expect(Math.abs(g.x - ranked.x), `${at}: the group as wide as the RANKED row`).toBeLessThanOrEqual(1);
+    expect(Math.abs(g.width - ranked.width), `${at}: the group as wide as the RANKED row`).toBeLessThanOrEqual(1);
+    const radios: Rect[] = [];
+    for (const r of await group.getByRole("radio").all()) radios.push((await r.boundingBox())!);
+    for (const r of radios) {
+      expect(r.height, `${at}: a tap target`).toBeGreaterThanOrEqual(44);
+      expect(Math.abs(r.width - radios[0]!.width), `${at}: equal widths`).toBeLessThanOrEqual(1);
+    }
+    expect(radios[0]!.x + radios[0]!.width, `${at}: side by side`).toBeLessThanOrEqual(radios[1]!.x + 0.5);
+    expect(radios[1]!.x + radios[1]!.width, `${at}: side by side`).toBeLessThanOrEqual(radios[2]!.x + 0.5);
+    const left = radios[0]!.x - g.x;
+    const right = g.x + g.width - (radios[2]!.x + radios[2]!.width);
+    expect(Math.abs(left - right), `${at}: the buttons fill the row`).toBeLessThanOrEqual(1);
+    expect(left, `${at}: the buttons fill the row (their margin is the group's 5 px)`).toBeLessThanOrEqual(6);
+    // Every pick says what PLAY does, in the one box above PLAY; nothing is said under PLAY.
+    const says: [string, RegExp][] = [
+      ["Default", /^(Starts within \d+ s; bots fill any empty seats|Usually about \d+ s to find a match)$/],
+      ["Bots off", /^People only: starts when 100 have joined$/],
+      ["Solo", /^Solo vs 99 bots · starts at once$/],
+    ];
+    for (const [pick, line] of says) {
+      await group.getByRole("radio", { name: new RegExp(`^${pick}`) }).click();
+      await expect(page.locator(".fd-hint"), `${at}: ${pick}`).toHaveText(line);
+    }
+    await page.getByRole("radio", { name: /^Squads/ }).click();
+    await expect(page.locator(".fd-hint"), `${at}: Squads`).toHaveText(/^Solo queue: bots fill any empty seat after \d+ s$/);
+    await page.getByRole("radio", { name: /^1 v 1/ }).click();
+    await expect(page.locator(".fd-hint"), `${at}: 1 v 1`).toHaveText("");
+    await page.getByRole("radio", { name: /^50 v 50/ }).click();
+    const hint = await rect(".fd-hint");
+    const playBox = (await play.boundingBox())!;
+    for (const d of ["x", "y", "width", "height"] as const) expect(Math.abs(hint[d] - hint0[d]), `${at}: the line's ${d} after the picks`).toBeLessThanOrEqual(1);
+    expect(hint.y + hint.height, `${at}: the line above PLAY`).toBeLessThanOrEqual(playBox.y);
+    expect(playBox.y - (hint.y + hint.height), `${at}: the line just above PLAY`).toBeLessThan(12);
+    const other = await rect(".fd-other-label");
+    expect(other.y, `${at}: nothing between PLAY and Other modes`).toBeLessThan(playBox.y + playBox.height + 20);
+    // (One line for what PLAY does, and it's the one above.)
+    await expect(page.locator(".fd-hint")).toHaveCount(1);
+
+    // The Other modes cards: the picture left of the words, vertically level with the card's middle, the words whole and on one
+    // line, and the cards shorter (Boss Arena was 84 px on a phone, the pair 84 px on a phone and 64 px on a computer).
+    const cards = page.getByRole("main").locator(".rd-card");
+    await expect(cards).toHaveCount(3);
+    const heights: number[] = [];
+    for (let i = 0; i < 3; i++) {
+      const card = cards.nth(i);
+      const c = (await card.boundingBox())!;
+      const face = (await card.locator(".rd-face").boundingBox())!;
+      const text = (await card.locator(".rd-card-text").boundingBox())!;
+      expect(face.x + face.width, `${at}: card ${i}: the picture left of the words`).toBeLessThanOrEqual(text.x + 0.5);
+      expect(Math.abs(face.y + face.height / 2 - (c.y + c.height / 2)), `${at}: card ${i}: the picture level with the card's middle`).toBeLessThanOrEqual(1.5);
+      expect(Math.abs(text.y + text.height / 2 - (c.y + c.height / 2)), `${at}: card ${i}: the words level with the card's middle`).toBeLessThanOrEqual(3);
+      const whole = await card.evaluate((e) => [...e.querySelectorAll(".rd-card-text > *")].every((x) => x.scrollWidth <= x.clientWidth + 0.5 && x.getBoundingClientRect().height < 24));
+      expect(whole, `${at}: card ${i}: the words whole, each on one line`).toBe(true);
+      heights.push(c.height);
+    }
+    expect(heights[0]!, `${at}: Boss Arena no taller than before on a computer (64), shorter on a phone (was 84)`).toBeLessThanOrEqual(64.5);
+    expect(heights[1]!, `${at}: the pair shorter (was 84 on a phone, 64 on a computer)`).toBeLessThanOrEqual(57);
+    expect(heights[2]!, `${at}: the pair shorter`).toBeLessThanOrEqual(57);
+
+    // PLAY: taller than it was (64 px on a phone and on a computer; 48 px in a short window), and home as before: a phone
+    // still fits with no scrolling and keeps its last card's foot where it was (25 px up from the screen's edge); a
+    // computer's board keeps its size.
+    expect(playBox.height, `${at}: PLAY taller (was ${h < 760 && w >= 1024 ? 48 : 64})`).toBeGreaterThanOrEqual(playMin);
+    expect(await sideways(page), `${at}`).toBe(0);
+    if (!desktop()) {
+      const fit = await page.evaluate(() => ({ scroll: document.documentElement.scrollHeight - innerHeight, foot: innerHeight - [...document.querySelectorAll(".rd-card")].pop()!.getBoundingClientRect().bottom }));
+      expect(fit.scroll, `${at}: home fits, no scrolling`).toBeLessThanOrEqual(0);
+      expect(fit.foot, `${at}: the last card's foot no lower than it was`).toBeGreaterThanOrEqual(24);
+    } else {
+      await expect(page.locator(".fd-livewin-sq").first()).toBeVisible();
+      expect((await rect(".fd-livewin-sq")).width, `${at}: the live window's board`).toBeGreaterThan(h >= 800 ? 230 : 150);
+    }
+  }
+});
+
+test("test rank and level (Eric, Oct 28): an admin's home reads \"Opal III · <rating>\" with a green ring at 3/4 round the icon and LVL 38 over it; a player sees their real rank and neither, and nothing moves", async ({ page }) => {
+  await named(page, "Leveled");
+  // A rated account (a rating takes a ranked match, which an e2e can't seat: the server's answer carries one), an admin once
+  // `admin` is set (as /api/me says for an email in ADMIN_EMAILS).
+  let isAdmin = false;
+  await page.route(/\/api\/me(\?|$)/, async (route) => {
+    const res = await route.fetch();
+    await route.fulfill({ response: res, json: { ...(await res.json()), rating: 1580, ...(isAdmin ? { admin: true } : {}) } });
+  });
+  // (This server has TEST_SWITCHES on, which lets everyone use the test switches: the app is told otherwise, as hunchess.com
+  // tells a player.)
+  await switchesOff(page);
+  const parts = [".fd-hero", ".fd-hero-id", ".fd-hero-icon", ".fd-hero-text", ".fd-pawn-hero", ".fd-ranked", ".fd-mode-panel", ".fd-hint", ".fd-play", ".rd-card"];
+  const measure = async () => {
+    const out: Record<string, Rect> = {};
+    for (const sel of parts) out[sel] = (await page.locator(sel).first().boundingBox())!;
+    return out;
+  };
+  const sub = page.locator(".fd-hero-sub");
+  // (The computer's live window: on screen before the boxes are read, as in the keeps-still test.)
+  const settled = async () => {
+    if (desktop()) await expect(page.locator(".fd-livewin-sq").first()).toBeVisible();
+    // (And the page's fonts in: a line of text is a pixel taller in the fallback font, and the pawn's card gives it back.)
+    await page.evaluate(() => document.fonts.ready);
+  };
+
+  // A player: their real rank ("Weighty" at 1580), no ring and no level.
+  await page.goto("/");
+  await expect(sub).toHaveText("Weighty · 1580");
+  await settled();
+  await expect(page.locator(".fd-hero-sub .fd-rank")).toHaveText("Weighty");
+  await expect(page.locator(".fd-level, .fd-level-ring")).toHaveCount(0);
+  const player = await measure();
+
+  // An admin: the same page, the test rank in the rank's place, the ring and the level; every box where it was.
+  isAdmin = true;
+  await page.reload();
+  await expect(sub).toHaveText("Opal III · 1580");
+  await settled();
+  await expect(page.locator(".fd-level")).toHaveCount(1);
+  await expect(page.locator(".fd-level-ring")).toHaveCount(1);
+  await expect(page.locator(".fd-hero-sub .fd-rank")).toHaveText("Opal III");
+  const admin = await measure();
+  // (The tag is as wide as its words and centered, so a different rank name ("Opal III" for "Weighty") moves it sideways by half
+  // the difference, and your pawn too when it stands beside the tag on a short card: those sideways boxes aren't compared,
+  // everything else is, the tag's height and top included.)
+  const byWords = new Set([".fd-hero-id", ".fd-hero-icon", ".fd-hero-text", ".fd-pawn-hero"]);
+  for (const sel of parts) for (const d of ["x", "y", "width", "height"] as const) if (!(byWords.has(sel) && (d === "x" || (d === "width" && sel !== ".fd-pawn-hero")))) expect(Math.abs(admin[sel]![d] - player[sel]![d]), `${sel}'s ${d}: the same for an admin and a player`).toBeLessThanOrEqual(1);
+
+  // The level above the icon: "LVL 38", as wide as the icon, centered, in the rating's gray, tiny.
+  const icon = (await page.locator(".fd-hero-icon").boundingBox())!;
+  const level = page.locator(".fd-level");
+  await expect(level).toHaveText("LVL 38");
+  const lv = (await level.boundingBox())!;
+  expect(Math.abs(lv.width - icon.width), "as wide as the icon").toBeLessThanOrEqual(1);
+  const textWidth = await level.evaluate((e) => {
+    const r = document.createRange();
+    r.selectNodeContents(e);
+    return r.getBoundingClientRect().width;
+  });
+  expect(textWidth / icon.width, "the words span the icon's width").toBeGreaterThan(0.85);
+  expect(textWidth / icon.width, "the words no wider than the icon").toBeLessThan(1.03);
+  expect(Math.abs(lv.x + lv.width / 2 - (icon.x + icon.width / 2)), "centered over the icon").toBeLessThanOrEqual(1);
+  expect(lv.y + lv.height, "above the icon").toBeLessThanOrEqual(icon.y + 1);
+  expect(icon.y - (lv.y + lv.height), "just above the icon").toBeLessThan(8);
+  const look = await page.evaluate(() => {
+    const l = getComputedStyle(document.querySelector(".fd-level")!);
+    return { size: parseFloat(l.fontSize), color: l.color, rating: getComputedStyle(document.querySelector(".fd-hero-sub")!).color };
+  });
+  expect(look.size, "tiny").toBeLessThanOrEqual(12);
+  expect(look.color, "the rating's gray").toBe(look.rating);
+
+  // The ring: green, thin, round the icon, from the top clockwise, filled to 3/4 over a faint track.
+  const ring = page.locator(".fd-level-ring");
+  const rb = (await ring.boundingBox())!;
+  expect(Math.abs(rb.x + rb.width / 2 - (icon.x + icon.width / 2)), "the ring round the icon").toBeLessThanOrEqual(1);
+  expect(Math.abs(rb.y + rb.height / 2 - (icon.y + icon.height / 2)), "the ring round the icon").toBeLessThanOrEqual(1);
+  expect(rb.width - icon.width, "the ring just outside the icon").toBeGreaterThanOrEqual(4);
+  expect(rb.width - icon.width, "the ring just outside the icon").toBeLessThanOrEqual(12);
+  const geo = await page.evaluate(() => {
+    const svg = document.querySelector(".fd-level-ring") as SVGSVGElement;
+    const fill = svg.querySelector(".fill") as SVGPathElement;
+    const track = svg.querySelector(".track") as SVGPathElement;
+    const len = fill.getTotalLength();
+    const vb = svg.viewBox.baseVal;
+    // (The path's points as fractions of the ring's box, from its start: the top's middle, then clockwise.)
+    const at = (f: number) => {
+      const p = fill.getPointAtLength(len * f);
+      return [(p.x - vb.x) / vb.width, (p.y - vb.y) / vb.height].map((v) => Math.round(v * 100) / 100);
+    };
+    const dash = getComputedStyle(fill).strokeDasharray.split(/[ ,]+/).map(parseFloat);
+    const green = (c: string) => {
+      const [r, g, b] = c.match(/\d+(\.\d+)?/g)!.map(Number);
+      return g! > r! + 40 && g! > b! + 40;
+    };
+    return {
+      start: at(0),
+      quarter: at(0.25),
+      half: at(0.5),
+      threeQuarters: at(0.75),
+      filled: dash[0]! / len,
+      sameLength: Math.abs(track.getTotalLength() - len) < 0.01,
+      trackFilled: getComputedStyle(track).strokeDasharray,
+      fillStroke: green(getComputedStyle(fill).stroke),
+      trackStroke: green(getComputedStyle(track).stroke),
+      trackOpacity: Number(getComputedStyle(track).opacity),
+      width: parseFloat(getComputedStyle(svg).strokeWidth) * (svg.getBoundingClientRect().width / vb.width),
+    };
+  });
+  expect(geo.start, "starts at the top, in the middle").toEqual([0.5, 0.02]);
+  expect(geo.quarter, "a quarter of the way: the right").toEqual([0.98, 0.5]);
+  expect(geo.half, "half: the bottom").toEqual([0.5, 0.98]);
+  expect(geo.threeQuarters, "three quarters: the left (clockwise)").toEqual([0.02, 0.5]);
+  expect(Math.abs(geo.filled - 0.75), "filled to 3/4").toBeLessThan(0.005);
+  expect(geo.sameLength && geo.trackFilled === "none", "the faint track is the whole ring").toBe(true);
+  expect(geo.fillStroke && geo.trackStroke, "green").toBe(true);
+  expect(geo.trackOpacity, "a faint track").toBeLessThan(0.4);
+  expect(geo.width, "thin").toBeLessThanOrEqual(3);
 });

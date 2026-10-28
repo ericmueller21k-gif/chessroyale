@@ -1,6 +1,6 @@
 // Frame-by-frame check of matchmaking (see .claude/LESSONS.md and DECISIONS.md, "Matchmaking types"), with real taps
 // on a phone-sized screen:
-//   1. home: tapping Default / Bots off / Solo and the ⓘ;
+//   1. home: tapping Default / Bots off / Solo (the ⓘ went on Oct 28);
 //   2. Solo: PLAY, the seats fill with bots, then the pre-game vote;
 //   3. Bots off: PLAY, wait, then "Switch to Default" (the queue changes lobby, bots fill, the vote);
 //   4. the app closed during a live match and opened again at /: back in the match.
@@ -137,7 +137,7 @@ const tap = async (p, locator) => {
 };
 const types = (p) => p.getByRole("radiogroup", { name: "Matchmaking" });
 
-// 1. Home: the three types and the ⓘ.
+// 1. Home: the three types (the ⓘ is gone since Oct 28; the line above PLAY says what each does).
 const home = await ctx.newPage();
 home.on("pageerror", (e) => log(`pageerror ${e.message}`));
 await home.goto(`${base}/?debug&pool=${pool}`);
@@ -147,8 +147,6 @@ await record(home, "1-home-types", async (mark) => {
   for (const [what, loc] of [
     ["tap Bots off", types(home).getByRole("radio", { name: /^Bots off/ })],
     ["tap Solo", types(home).getByRole("radio", { name: /^Solo/ })],
-    ["tap ⓘ", home.getByRole("button", { name: "About matchmaking" })],
-    ["tap ⓘ", home.getByRole("button", { name: "About matchmaking" })],
     ["tap Default", types(home).getByRole("radio", { name: /^Default/ })],
   ]) {
     mark(what);
@@ -156,10 +154,6 @@ await record(home, "1-home-types", async (mark) => {
     await home.waitForTimeout(500);
   }
 });
-await tap(home, home.getByRole("button", { name: "About matchmaking" }));
-await home.waitForTimeout(400);
-await home.screenshot({ path: `${out}/home-info.png` });
-await tap(home, home.getByRole("button", { name: "About matchmaking" }));
 await tap(home, types(home).getByRole("radio", { name: /^Bots off/ }));
 await home.waitForTimeout(400);
 await home.screenshot({ path: `${out}/home-botsoff-warning.png` });
