@@ -17,7 +17,8 @@ Lane: `social`.
   scoreboard and chat (one view at a time, never an empty box). In the split, the Team / All switch takes the chat
   header's title place, tighter, with 28 px buttons beside it, so both labels fit whole down to 320 px
   (`e2e/panel.spec.ts`).
-- **The town square's chat log** is its own thing (a fading log in the top left of `/town`, free-text lines, bosses' and kids' chatter now, a typed line only where the test switches are on): [town-square.md](town-square.md), "The chat log".
+- **The town square's chat log** is its own thing (a fading log in the top left of `/town`: the bosses' and kids' chatter,
+  and signed-in players' typed messages, below): its look in [town-square.md](town-square.md), "The chat log".
 - **Your picks.** Each player's profile chooses which lines they see in their games: up to `QUICK_CHAT.maxLines`
   phrases and `maxEmoji` emoji (the defaults until they choose). Bots use the whole list.
 - **Packs.** Free packs everyone has; more are sold in the shop (`QUICK_CHAT.packPrices`; `core/shop.ts` lists them
@@ -64,8 +65,11 @@ Lane: `social`.
     "Chat is paused."), readers get `{paused: true}` and no players' lines; the field says "Chat is paused." and the
     log keeps the bosses' chatter.
   - **In the app** (`packages/app/src/town/chat-net.ts`): `openTownFeed(sink)` (nothing for a guest or a young device),
-    `sendTownChat(text)`, `townChatOff()` (why the field can't send), `reportTownLine`, `removeTownLine`. Muted and
-    blocked players' lines never reach the log; muting someone takes theirs out.
+    `sendTownChat(text)` (async: the field waits for the answer and shows a refusal's reason over it for 4 s),
+    `townChatOff()` (why the field can't send), `reportTownLine`, `removeTownLine`. Lines go into the log through
+    `say(name, text, "player", {uid, n})` and out through `unsay` (by number or by player). Muted and blocked players' lines
+    never reach the log; muting someone takes theirs out. The field shows only for a signed-in player on a device not
+    marked too young. A tap on a player's line opens its menu (Profile / Mute / Report, Remove for a moderator).
 
 ## Moderation
 

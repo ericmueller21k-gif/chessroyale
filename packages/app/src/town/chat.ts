@@ -4,11 +4,13 @@
  * closer to a dozen"). The lines, the numbers and the log's rules, with no DOM and no drawing: `TownChat.tsx` shows it and
  * `town-chat.css` styles it. docs/areas/town-square.md, "The chat log".
  *
- * One way in: `say(name, text, kind)`. Today the bosses and their kids say a line now and then (`CHATTER`, placeholders),
- * and, where the test switches are allowed, your own typed line (`sendTownChat`, this device only). Real players' messages
- * come in the same way later. Nothing here is sent to a server or read from one.
+ * One way in: `say(name, text, kind, who)`. The bosses and their kids say a line now and then (`CHATTER`, placeholders);
+ * players' messages come from the server (chat-net.ts: signed-in players only), each with who said it and its number in the
+ * server's room (`who`), so a tap on it can open Profile / Mute / Report, and `unsay` can take it out again (a moderator's
+ * Remove, a player you mute). The numbers a player sees (80 characters, one message every 15 s, a line's minute) are the
+ * server's, TOWN_CHAT. docs/decisions/2026-10-28-town-chat-typing.md.
  */
-import { playerName } from "../account.ts";
+import { TOWN_CHAT } from "@chessroyale/core";
 import { HOMES, type HomeId } from "./world.ts";
 
 /** Every number of the chat, in one place (the CSS reads none of them: the component hands it the fade times). */
@@ -19,7 +21,7 @@ export const CHAT = {
   fadeMs: 1000,
   fadeInMs: 200,
   /** A line is gone for good this long after it was said (Eric: it keeps the DOM small); it also goes when pushed past the cap. */
-  lifeMs: 60_000,
+  lifeMs: TOWN_CHAT.lineMs,
   /** A boss or a kid speaks every this many ms, at random between the two. */
   everyMs: [20_000, 45_000] as readonly [number, number],
   /** Most lines shown: a phone's, a computer's. */
@@ -27,9 +29,11 @@ export const CHAT = {
   capComputer: 12,
   /** The computer's frame (styles.css' "computer"); anything else is a phone. */
   computerQuery: "(min-width: 900px) and (min-height: 600px)",
-  /** What you may type, and the wait between two of your messages. */
-  maxChars: 80,
-  sendEveryMs: 15_000,
+  /** What you may type, and the wait between two of your messages (the server's numbers: it enforces them). */
+  maxChars: TOWN_CHAT.maxChars,
+  sendEveryMs: TOWN_CHAT.gapMs,
+  /** A refusal's reason shows over the field this long. */
+  noteMs: 4000,
   /** The "N left" count shows from this many characters left. */
   nearEnd: 10,
   /** Press and hold this long on the box (without moving more than `holdSlopPx`) to pick it up. */
@@ -43,7 +47,13 @@ export const CHAT = {
 
 export type ChatKind = "boss" | "kid" | "player" | "system";
 
-export interface ChatLine {
+/** Who said a player's line, from the server: their account id and the line's number in its room. */
+export interface ChatWho {
+  uid: string;
+  n: number;
+}
+
+export interface ChatLine extends Partial<ChatWho> {
   id: number;
   /** When it was said (ms since 1970, this device's clock). */
   at: number;
@@ -63,9 +73,17 @@ export function clockText(d: Date): string {
 
 let current: ChatLog | null = null;
 
-/** The one way in for a message (a boss's, a kid's, a player's, the town's own): dropped when no town is open. */
-export function say(name: string, text: string, kind: ChatKind): void {
-  current?.say(name, text, kind);
+/**
+ * The one way in for a message (a boss's, a kid's, a player's, the town's own): dropped when no town is open. `who`: a
+ * player's line from the server (their account and the line's number).
+ */
+export function say(name: string, text: string, kind: ChatKind, who?: ChatWho): void {
+  current?.say(name, text, kind, Date.now(), who);
+}
+
+/** Takes the lines `test` picks out of the open log (a moderator's Remove, a player you mute, a name reset). */
+export function unsay(test: (l: ChatLine) => boolean): void {
+  current?.drop(test);
 }
 
 export class ChatLog {
@@ -93,11 +111,20 @@ export class ChatLog {
     };
   }
 
-  say(name: string, text: string, kind: ChatKind, at = Date.now()): void {
-    this.lines.push({ id: this.nextId++, at, time: clockText(new Date(at)), name, text, kind });
+  say(name: string, text: string, kind: ChatKind, at = Date.now(), who?: ChatWho): void {
+    this.lines.push({ id: this.nextId++, at, time: clockText(new Date(at)), name, text, kind, ...(who ? { uid: who.uid, n: who.n } : {}) });
     this.trim();
     this.shown = true;
     this.arm();
+    this.watch();
+    this.changed();
+  }
+
+  /** Takes out the lines `test` picks (nothing changes, and nothing is drawn, when it picks none). */
+  drop(test: (l: ChatLine) => boolean): void {
+    const keep = this.lines.filter((l) => !test(l));
+    if (keep.length === this.lines.length) return;
+    this.lines = keep;
     this.watch();
     this.changed();
   }
@@ -227,33 +254,25 @@ export function startChatter(rand: () => number = Math.random): { now: () => voi
   return { now: speak, stop: () => clearTimeout(timer) };
 }
 
-// ---- Your own line (this device only, where the test switches are allowed: Eric, Oct 28). The server lane swaps this
-// function's inside; its callers only see "ok" or the reason.
-
-export type SendResult = { ok: true } | { ok: false; reason: "empty" | "wait"; waitMs: number };
-
-let lastSentAt = -Infinity;
-
-/** How long until you may send again (ms; 0: now). */
-export const sendWaitMs = (now = Date.now()): number => Math.max(0, lastSentAt + CHAT.sendEveryMs - now);
-
-/** Sends a line as you: the log shows it with your name, kind "player". One message per `sendEveryMs`, at most `maxChars`. */
-export function sendTownChat(text: string, now = Date.now()): SendResult {
-  const clean = text.replace(/\s+/g, " ").trim().slice(0, CHAT.maxChars);
-  if (!clean) return { ok: false, reason: "empty", waitMs: 0 };
-  const waitMs = sendWaitMs(now);
-  if (waitMs > 0) return { ok: false, reason: "wait", waitMs };
-  lastSentAt = now;
-  say(playerName(), clean, "player");
-  return { ok: true };
-}
+// ---- Your own line goes to the server (chat-net.ts: `sendTownChat`), and comes back into the log like everyone's.
 
 /**
- * A tap on a player's line (the only lines that take taps; the bosses' and kids' pass them to the map). `anchor` is the line's
- * box in the page's pixels, for a menu to open beside. Does nothing yet: the server lane fills it with a Profile / Mute /
- * Report menu (Eric, Oct 28: players will report a message by tapping it).
+ * A tap on a player's line, name or text (the only lines that take taps; the bosses' and kids' pass them to the map).
+ * `anchor` is the line's box in the page's pixels, for the menu to open beside: Profile / Mute / Report, and Remove for a
+ * moderator (TownChat.tsx's menu, set with `setTownChatLineTap`; Eric, Oct 28: players report a message by tapping it).
  */
-export function onTownChatLineTap(_line: ChatLine, _anchor: Rect): void {}
+export function onTownChatLineTap(line: ChatLine, anchor: Rect): void {
+  tapped?.(line, anchor);
+}
+
+let tapped: ((line: ChatLine, anchor: Rect) => void) | null = null;
+/** What a tap on a player's line does (the menu); returns the release. */
+export function setTownChatLineTap(fn: (line: ChatLine, anchor: Rect) => void): () => void {
+  tapped = fn;
+  return () => {
+    if (tapped === fn) tapped = null;
+  };
+}
 
 // ---- Where the box is: the map's pixels. The edge chips keep off it (render.ts), shown or not.
 

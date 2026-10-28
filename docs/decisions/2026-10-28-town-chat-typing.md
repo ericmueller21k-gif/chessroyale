@@ -52,6 +52,18 @@ Later the same day, through the director:
 - **Reports:** `POST /api/report {target, reason: "Offensive chat", line: n}`. The server reads the line from the room;
   the reporter never supplies the words.
 - **The kill switch** is `PAUSE_TOWN_CHAT` on the existing kill-switch mechanism ("town-chat" in core's `pauses.ts`).
+- **In the town** (the log's look is the UI's, `docs/decisions/2026-10-28-town-chat.md`; wired here):
+  - The field shows for a signed-in player on a device the age gate didn't mark too young (`mayTownChat`); a guest sees the
+    log alone (its strip is kept, so the box never changes).
+  - `sendTownChat(text)` is async: the field waits for the server's answer (keeping your words and the keyboard). Your line
+    comes back in the answer and goes into the log like everyone's. A refusal keeps your words and shows the reason over
+    the field for 4 s (`CHAT.noteMs`); the server's wait shows as the field's count.
+  - Players' lines come in through `say(name, text, "player", {uid, n})` and go out through `unsay` (by number: a
+    moderator's Remove; by player: Mute). Muted and blocked players' lines never reach the log.
+  - While the switch is off the field is greyed and says "Chat is paused."; while your chat is banned, why.
+  - A tap on a player's line (name or text) opens its menu under it: Profile (over the town), Mute, Report, and Remove for
+    a moderator. On your own line Mute and Report are greyed.
+  - The UI's 80 characters, 15 s and 60 s are now read from `TOWN_CHAT` (one source of numbers).
 
 ## My calls
 
@@ -97,7 +109,21 @@ Later the same day, through the director:
     minute; fair play's page would only ever see it gone). The room keeps the removed numbers for a minute so every
     reader's log drops it.
 12. **A name reset and a deleted account** take the player's town lines out too (as they do the global chat's).
-13. **Reading cost over freshness:** the poll every 5 s (the front door's `livePollMs`) and each instance's 2 s copy put a
+13. **The field for signed-in players only** (the director): a guest sees the log, never a field asking them to sign in.
+    A device marked too young has no field either.
+14. **A refusal's reason over the field, 4 s, your words kept**, so you can change a word and send again; the 15 s wait
+    shows in the field as the UI built it. While the switch is off or your chat is banned, the reason is the field's
+    placeholder (13 px so it fits on a phone; a greyed field can't take focus, so iPhone Safari never zooms).
+15. **The menu's label is "Report"** (the director left it to me: "Report player" was fine). Short enough for a phone's
+    card, and the menu is the line's. It sends at once (no second confirm): the card shows the server's answer ("Thanks,
+    we'll look into it.") and closes. **Profile** opens the profile over the town (App's town branch shows it as a
+    match does), so Back returns to the town as it was.
+16. **A line's 60 s** counts from when it reached this device, as the UI built it; the server holds it 60 s from when it
+    was sent, so a report on a line in its last few seconds can find it gone ("That message has gone from the chat. You
+    can still report the player from their profile.").
+17. **Lines said by the test hook** (`__townSay`) have no account behind them: a tap on one is still recorded
+    (`__townTapped`) but opens no menu. Every test hook works as before.
+18. **Reading cost over freshness:** the poll every 5 s (the front door's `livePollMs`) and each instance's 2 s copy put a
     line on another screen in about 3 s on average, 7 s at worst. No socket.
 
 ## What it costs (Worker requests per player per hour)
@@ -114,9 +140,28 @@ Later the same day, through the director:
 
 ## Frame rates
 
-To come with the log's wiring (the UI's branch, `claude/town-chat`, isn't on main yet): measured against main by
-eric.md's method, with messages arriving. The poll and the log are not in the frame loop: an answer is parsed in the
-request's callback, and a line reaches the log through `say()`.
+Measured headless (software rendering) by the method of `2026-10-26-town-square-slice-2.md`, with the UI's script
+(`2026-10-28-town-chat.md`): a phone 390 × 844 and a computer 1440 × 900, warm 4 s, then 5 s walking (a tap ahead every
+1.2 s) or standing still; builds served statically, the runs taken in turn; each case run twice over as a noise control
+and pooled (ten runs a case; medians). Main is `cf5417c` (the log's UI). The stand-in server signs the page in and answers
+every live poll with three new players' lines, so on the branch the poll runs every 5 s and lines arrive through it (124
+polls answered over the runs; none on main, which never asks); the chatter's own three lines arrive in both.
+
+| Case | Phone | Computer |
+| --- | --- | --- |
+| main, walking | 51.9 fps (19.2 ms) | 40.2 fps (25.0 ms) |
+| this branch, walking, the poll every 5 s and players' lines arriving | 52.5 fps (18.9 ms) | 37.5 fps (26.8 ms) |
+| main, walking, **as many lines on show** (six players' lines said by the hook, then the chatter's three) | 51.9 fps (19.1 ms) | 37.8 fps (26.5 ms) |
+| main, standing still | 53.2 fps (18.7 ms) | 36.4 fps (27.5 ms) |
+| this branch, standing still, the field focused and typing, lines arriving | 52.5 fps (19.0 ms) | 34.3 fps (29.2 ms) |
+
+(Milliseconds: the page's main thread per frame.) A phone shows no cost. On a computer the branch walks at 37.5 against
+main's 40.2, but main with as many lines on show walks at 37.8: the difference is the log's own drawing of more lines (up to
+12 on a computer, each a translucent backing over the moving map, which headless Chrome composites in software), not the
+poll or the wiring. Runs of one build differ by up to 2 to 4 fps on a computer (main still: 38.1 and 35.8). The poll and the
+log stay out of the frame loop: an answer is parsed in the request's callback, and a line reaches the log through `say()`.
+No corner was cut. Should a real computer show the drop, the corner to cut is the line's backing (one backing for the
+whole log instead of one a line), the UI's to weigh; a real GPU composites these layers without the main thread.
 
 ## Tests
 
@@ -134,3 +179,30 @@ request's callback, and a line reaches the log through `say()`.
   what's new; muted and blocked players' lines never reach the log; a removal and the switch reach it; sending mirrors
   the limits and shows the server's reasons; Report and Remove.
 - `packages/server/test/account-data.test.ts`: the schema pin gains `reports.line` and `reports.line_at`.
+- `packages/app/test/town-chat.test.ts`: players' lines carry who said them and their number, `unsay` takes them out by
+  number or by player, a tap reaches the menu; the UI's numbers are the server's.
+- `e2e/town-chat.spec.ts` (phone and desktop): two signed-in players see each other's lines within a few seconds, and a
+  guest none (no field, and it never asks); a refused message's reason over the field (a swear word, a link, a phone
+  number) with the words kept, 80 characters and the 15 s wait on the server; a line's menu (your own: Mute and Report
+  greyed; Report reaching fair play's case page with the line; a moderator's Remove leaving every log; Profile over the
+  town and back; Mute hiding the player); the switch off. Its players are made signed in through the local database
+  (`asSignedIn` in `e2e/helpers.ts`). Only each test's own lines are counted: other tests' players share the room.
+
+## Test checks changed (old → new)
+
+None guards a rule in `docs/rules/eric.md`.
+- `packages/server/test/account-data.test.ts`, the schema pin: `reports: "id reporter target reason at match"` →
+  `"id reporter target reason at match line line_at"` (a schema change is meant to update it).
+- `packages/app/test/town-chat.test.ts`: "your own line (this device only)" (two tests: echoed on this device, trimmed and
+  cut to 80; one per 15 s, counted on this device) → removed with the echo itself. Sending is the server's now, tested in
+  `town-chat-net.test.ts` (80 characters, the 15 s wait, the server's reasons) and `town-chat.test.ts` on the server.
+- `e2e/town-chat.spec.ts` (the UI's tests):
+  - "the text field (where the test switches are on): …" → "the text field (a signed-in player's): …". It opens the
+    town signed in; the lines it counts are its own (`.tc-player` → `.tc-player` with this run's mark, "hello town" →
+    "hello town <run>", "second one" → "second one <run>"), since other tests' players share the room.
+  - "without the test switches there is no text field: players see the log only" → "a guest has no text field, and
+    without the test switches no hooks either: the log only". Same checks.
+  - "the edge chips keep off the chat box…" and "the keyboard opening…": they open the town signed in (the field is a
+    signed-in player's now; a faded box without a field can't be picked up). Same checks.
+- `e2e/helpers.ts`: `asServerAdmin`'s database write moved into `withEmail`, shared with the new `asSignedIn`. Same
+  behavior.

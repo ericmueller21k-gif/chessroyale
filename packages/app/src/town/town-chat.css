@@ -158,3 +158,56 @@
     transition: none;
   }
 }
+/* A refusal's reason ("That message isn't allowed."), just over the field for a few seconds (TownChat.tsx: CHAT.noteMs). */
+.tc-note {
+  position: absolute;
+  left: 0;
+  bottom: 38px;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(70, 18, 18, 0.88);
+  color: #ffe1c2;
+  font: 600 12px/15px Archivo, system-ui, sans-serif;
+  pointer-events: none;
+}
+/* While the chat is paused or your chat is off, the field says why in its place, smaller so it fits (it can't take focus, so
+   iPhone Safari never zooms in on it). */
+.tc-form input:disabled::placeholder {
+  font-size: 13px;
+}
+.tc-form input:disabled {
+  text-overflow: ellipsis;
+}
+/* A player's line's menu (Profile / Mute / Report, and Remove for a moderator): a small card beside the line. */
+.tc-menu {
+  position: absolute;
+  z-index: 3;
+  width: 180px;
+  box-sizing: border-box;
+  padding: 8px 10px 10px;
+  border-radius: 12px;
+  background: #fffdf8;
+  color: #1f2530;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.06);
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.tc-menu strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 14px/1.2 "Archivo Black", Archivo, sans-serif;
+}
+.tc-menu .town-btn {
+  min-height: 36px;
+  padding: 6px 10px;
+}
+.tc-menu-said {
+  margin: 8px 0 0;
+  font: 600 13px/1.35 Archivo, sans-serif;
+  color: #4a4438;
+}

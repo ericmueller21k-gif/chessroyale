@@ -1,17 +1,22 @@
-import { expect, type Page } from "@playwright/test";
+import { devices, expect, type Browser, type Page, type Request } from "@playwright/test";
 import { CHAT } from "../packages/app/src/town/chat.ts";
-import { test } from "./helpers.ts";
+import { asServerAdmin, asSignedIn, test } from "./helpers.ts";
 
 /**
  * The town square's chat log (Oct 28; docs/areas/town-square.md, "The chat log"), on a phone and a computer: the log in the map's
  * top left corner, a line a message ("[9:41] Name: message"), at most 5 lines on a phone and 12 on a computer, fading after
  * `fadeAfterMs` and coming back with the next message; the box takes no taps (a tap through it reaches the map) except a
- * player's line; the text field (only where the test switches are allowed: here they are); press and hold to move the box,
- * remembered; the edge chips keep off its box, shown or not, wherever it is; the keyboard doesn't resize or move the town.
- * Test hooks (the test switches on): `__townSay()` (someone from the table talks now) or `__townSay(name, text, kind)`,
- * `__townChatter(false)` (no chatter of its own while a test looks), `__townTapped` (taps on player lines).
+ * player's line; the text field (a signed-in player's only); press and hold to move the box, remembered; the edge chips
+ * keep off its box, shown or not, wherever it is; the keyboard doesn't resize or move the town. And players' messages
+ * (docs/decisions/2026-10-28-town-chat-typing.md): two signed-in players see each other's lines within a few seconds and a
+ * guest none; the server's limits and reasons in the field; a line's menu (Profile, Mute, Report, a moderator's Remove); the
+ * switch off. Test hooks (the test switches on): `__townSay()` (someone from the table talks now) or `__townSay(name, text,
+ * kind)`, `__townChatter(false)` (no chatter of its own while a test looks), `__townTapped` (taps on player lines).
  */
 test.use({ actionTimeout: 15_000 });
+
+/** This run's mark in the messages it sends (players in other tests share the room). */
+const run = Date.now().toString(36).slice(-5);
 
 type Box = { x: number; y: number; w: number; h: number };
 const canvas = (p: Page) => p.locator("canvas.town-canvas");
@@ -43,6 +48,32 @@ async function open(page: Page, query = "") {
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
   await page.waitForFunction(() => typeof (window as any).__townSay === "function");
   await page.evaluate(() => (window as any).__townChatter(false));
+}
+
+/**
+ * The town, open, as a signed-in player (the field and other players' lines are theirs only): the account gets an email in
+ * the local database (`asSignedIn`), then the page loads again. `admin`: the chat moderator's address instead
+ * (playwright.config.ts' ADMIN_EMAILS). Answers the account's id.
+ */
+async function openSignedIn(page: Page, admin = false) {
+  await open(page);
+  const id = admin ? await asServerAdmin(page, "chat") : await asSignedIn(page, "town");
+  await open(page);
+  await expect(page.locator(".tc-form input")).toBeVisible();
+  return id;
+}
+
+/** Another player on a device like this project's (a phone or a computer). */
+async function another(browser: Browser, phone: boolean) {
+  const ctx = await browser.newContext(phone ? { ...devices["iPhone 13"] } : { viewport: { width: 1280, height: 800 } });
+  return ctx.newPage();
+}
+
+/** Types a message in the field and sends it with the keyboard's own Send (Enter). */
+async function send(page: Page, text: string) {
+  const field = page.locator(".tc-form input");
+  await field.fill(text);
+  await field.press("Enter");
 }
 
 /** Every chip showing: its face's box, and what it points to. */
@@ -185,8 +216,9 @@ test("a tap through the box reaches the map (a boss's or kid's line takes none);
   expect(await page.getByRole("dialog").count()).toBe(dialogs);
 });
 
-test("the text field (where the test switches are on): 80 characters, a count near the end, one message per 15 seconds with the wait in the field, your line in the log as a player", async ({ page }) => {
-  await open(page);
+test("the text field (a signed-in player's): 80 characters, a count near the end, one message per 15 seconds with the wait in the field, your line in the log as a player", async ({ page }) => {
+  test.setTimeout(120_000);
+  await openSignedIn(page);
   const field = page.locator(".tc-form input");
   await expect(field).toBeVisible();
   await expect(field).toHaveAttribute("placeholder", "Say something…");
@@ -208,13 +240,14 @@ test("the text field (where the test switches are on): 80 characters, a count ne
   await page.keyboard.type("x".repeat(30)); // (the field stops at 80)
   await expect(field).toHaveValue(/^a{69}bcdefxxxxxx$/);
   await expect(page.locator(".tc-left")).toHaveText("0 left");
-  await field.fill("hello town");
+  await field.fill(`hello town ${run}`);
   await page.keyboard.press("Enter");
 
-  // Your line: your name, kind "player"; the field empties, lets go, and shows the wait.
-  const mine = page.locator(".tc-player");
+  // Your line, back from the server: your name, kind "player"; the field empties, lets go, and shows the wait. (Only this
+  // test's lines are counted: other tests' players, in the same room, may be talking too.)
+  const mine = page.locator(".tc-player").filter({ hasText: run });
   await expect(mine).toHaveCount(1);
-  await expect(mine).toHaveText(/^\[\d{1,2}:\d{2}\] .+: hello town$/);
+  await expect(mine).toHaveText(new RegExp(`^\\[\\d{1,2}:\\d{2}\\] .+: hello town ${run}$`));
   await expect(mine.locator("b.tc-name")).not.toHaveText("");
   await expect(field).toHaveValue("");
   await expect(field).toBeDisabled();
@@ -225,13 +258,13 @@ test("the text field (where the test switches are on): 80 characters, a count ne
   await expect(field).toBeEnabled({ timeout: 17_000 });
   await expect(field).toHaveAttribute("placeholder", "Say something…");
   await field.click();
-  await page.keyboard.type("second one");
+  await page.keyboard.type(`second one ${run}`);
   await page.keyboard.press("Enter");
-  await expect(page.locator(".tc-player")).toHaveCount(2);
-  await expect(page.locator(".tc-player").last()).toHaveText(/second one$/);
+  await expect(mine).toHaveCount(2);
+  await expect(mine.last()).toHaveText(new RegExp(`second one ${run}$`));
 });
 
-test("without the test switches there is no text field: players see the log only", async ({ page }) => {
+test("a guest has no text field, and without the test switches no hooks either: the log only", async ({ page }) => {
   await page.route("**/api/auth/config", (route) => route.fulfill({ json: { accounts: false, google: false, email: false } }));
   await page.goto("/town?sky=day");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
@@ -312,7 +345,8 @@ test("press and hold on the box and drag it anywhere on the map; it stays, is re
 });
 
 test("the edge chips keep off the chat box, shown or not and wherever it's put", async ({ page }) => {
-  await open(page);
+  // (Signed in, so the box has its field: faded and without one, the box can't be seen, and a press there is the map's.)
+  await openSignedIn(page);
   const quiet = await chips(page);
   expect(quiet.length, "some chips show").toBeGreaterThan(0);
   const box = await rectOf(page, ".town-chat");
@@ -366,7 +400,7 @@ test("the edge chips keep off the chat box, shown or not and wherever it's put",
 });
 
 test("the keyboard opening doesn't resize or move the town: while the field has focus the screen keeps its height and follows the visual viewport", async ({ page }) => {
-  await open(page);
+  await openSignedIn(page);
   const screen = page.locator(".town-screen");
   const field = page.locator(".tc-form input");
   const cv0 = await rectOf(page, "canvas.town-canvas");
@@ -386,4 +420,160 @@ test("the keyboard opening doesn't resize or move the town: while the field has 
   await expect(field).not.toBeFocused();
   await expect(screen).not.toHaveAttribute("style", /height|transform/);
   expect(await rectOf(page, "canvas.town-canvas")).toEqual(cv0);
+});
+
+// ---- Players' messages (the server: docs/decisions/2026-10-28-town-chat-typing.md).
+
+/** A swear word, written ROT13 as in the server's list (no swearing spelled out in the tests either). */
+const rot13 = (t: string) => t.replace(/[a-z]/gi, (c) => String.fromCharCode(((c.charCodeAt(0) - (c <= "Z" ? 65 : 97) + 13) % 26) + (c <= "Z" ? 65 : 97)));
+const lineOf = (p: Page, text: string) => p.locator(".tc-player").filter({ hasText: text });
+/** Brings the log back if it has faded (8 s after the last message): the field taking focus holds it shown. */
+const showLog = (p: Page) => p.locator(".tc-form input").focus();
+
+test("two signed-in players see each other's lines within a few seconds; a guest sees none, has no field and never asks for them", async ({ page, browser }, info) => {
+  test.setTimeout(150_000);
+  const phone = info.project.name === "phone";
+  await openSignedIn(page);
+  const bo = await another(browser, phone);
+  await openSignedIn(bo);
+  const guest = await another(browser, phone);
+  const asked: string[] = [];
+  guest.on("request", (r: Request) => void (r.url().includes("town=") && asked.push(r.url())));
+  await open(guest);
+  await expect(guest.locator(".tc-form"), "a guest has no field").toHaveCount(0);
+
+  await send(page, `hello from Ann ${run}`);
+  // Mine, from the server's answer at once; Bo's within a few seconds (the live poll every 5 s).
+  await expect(lineOf(page, `hello from Ann ${run}`)).toHaveCount(1);
+  const t0 = Date.now();
+  await expect(lineOf(bo, `hello from Ann ${run}`)).toHaveCount(1, { timeout: 10_000 });
+  expect(Date.now() - t0, "within a few seconds").toBeLessThan(10_000);
+  await send(bo, `hi back from Bo ${run}`);
+  await expect(lineOf(page, `hi back from Bo ${run}`)).toHaveCount(1, { timeout: 10_000 });
+  // A line from the server is a player's: the name bold, and it takes a tap.
+  await expect(lineOf(page, `hi back from Bo ${run}`).locator("b.tc-name")).not.toHaveText("");
+
+  // The guest: none of it, ever asked for, and only the bosses' chatter in the log.
+  await guest.waitForTimeout(6_000);
+  await expect(guest.locator(".tc-player")).toHaveCount(0);
+  expect(asked, "a guest never asks for players' lines").toEqual([]);
+  await guest.evaluate(() => (window as any).__townSay("Hollow", "The park gets quiet after dark.", "boss"));
+  await expect(guest.locator(".tc-boss")).toHaveCount(1);
+});
+
+test("the server decides: a refused message says why over the field and keeps your words; 80 characters; the 15 s wait", async ({ page }) => {
+  test.setTimeout(120_000);
+  await openSignedIn(page);
+  const field = page.locator(".tc-form input");
+  const note = page.locator(".tc-note");
+  await send(page, `oh ${rot13("shpx")} this`);
+  await expect(note).toHaveText("That message isn't allowed.");
+  await expect(field, "your words stay, to change them").toHaveValue(`oh ${rot13("shpx")} this`);
+  await expect(field).toBeEnabled();
+  await expect(page.locator(".tc-player").filter({ hasText: rot13("shpx") })).toHaveCount(0);
+  await send(page, "find me at example.com");
+  await expect(note).toHaveText("No links or contact details in chat.");
+  await send(page, "call me 555 123 4567");
+  await expect(note).toHaveText("No links or contact details in chat.");
+  // The note goes after a few seconds.
+  await expect(note).toHaveCount(0, { timeout: CHAT.noteMs + 3000 });
+  // 80 characters: the field stops there, and the server refuses more from anyone who gets past it.
+  await expect(field).toHaveAttribute("maxlength", "80");
+  const long = await page.request.post("/api/town/chat", { data: { text: "x".repeat(81) } });
+  expect(long.status()).toBe(400);
+  expect(((await long.json()) as { message: string }).message).toBe("Messages are at most 80 characters.");
+  // A message goes; then the wait shows in the field, and the server keeps it whatever the app does.
+  await send(page, `all good ${run}`);
+  await expect(lineOf(page, `all good ${run}`)).toHaveCount(1);
+  await expect(field).toBeDisabled();
+  await expect(field).toHaveAttribute("placeholder", /^Wait (1[0-5]|[1-9]) s$/);
+  const again = await page.request.post("/api/town/chat", { data: { text: "and again" } });
+  expect(again.status()).toBe(429);
+  expect(((await again.json()) as { message: string }).message).toBe("One message every 15 s.");
+});
+
+test("a tap on a player's line: Profile, Mute and Report (a moderator also Remove); Report reaches fair play with the line; Remove takes it from everyone's log; Mute hides the player", async ({ page, browser }, info) => {
+  test.setTimeout(180_000);
+  const phone = info.project.name === "phone";
+  // The moderator (a chat admin's address), and two players.
+  await openSignedIn(page, true);
+  const bo = await another(browser, phone);
+  const boId = await openSignedIn(bo);
+  const cy = await another(browser, phone);
+  await openSignedIn(cy);
+  await send(bo, `Bo says something rude ${run}`);
+  await send(cy, `Cy says hello ${run}`);
+  const boLine = lineOf(page, `Bo says something rude ${run}`);
+  const cyLine = lineOf(page, `Cy says hello ${run}`);
+  await expect(boLine).toHaveCount(1, { timeout: 10_000 });
+  await expect(cyLine).toHaveCount(1, { timeout: 10_000 });
+
+  // A player's own menu: Mute and Report greyed (nothing hidden), no Remove.
+  await expect(lineOf(cy, `Cy says hello ${run}`)).toHaveCount(1);
+  await lineOf(cy, `Cy says hello ${run}`).click();
+  const own = cy.locator(".tc-menu");
+  await expect(own.locator("strong")).toHaveText("You");
+  await expect(own.getByRole("button", { name: "Profile" })).toBeEnabled();
+  await expect(own.getByRole("button", { name: "Mute" })).toBeDisabled();
+  await expect(own.getByRole("button", { name: "Report" })).toBeDisabled();
+  await expect(own.getByRole("button", { name: "Remove" })).toHaveCount(0);
+  await cy.keyboard.press("Escape");
+  await expect(own).toHaveCount(0);
+
+  // Report: fair play's report with the line; the answer in the menu, which closes.
+  await showLog(page);
+  await boLine.click();
+  const menu = page.locator(".tc-menu");
+  await expect(menu).toBeVisible();
+  for (const b of ["Profile", "Mute", "Report", "Remove"]) await expect(menu.getByRole("button", { name: b })).toBeEnabled();
+  await menu.getByRole("button", { name: "Report" }).click();
+  await expect(menu.locator(".tc-menu-said")).toHaveText(/Thanks|already/);
+  await expect(menu).toHaveCount(0, { timeout: 5000 });
+  const casePage = await (await page.request.get(`/admin/fairplay/case/${boId}`)).text();
+  expect(casePage).toContain("Offensive chat");
+  expect(casePage).toContain(`Bo says something rude ${run}`);
+
+  // Remove (a moderator's): the line leaves this log at once, and Bo's and Cy's within a few seconds.
+  await showLog(page);
+  await boLine.click();
+  await menu.getByRole("button", { name: "Remove" }).click();
+  await expect(boLine).toHaveCount(0);
+  await expect(lineOf(cy, `Bo says something rude ${run}`)).toHaveCount(0, { timeout: 10_000 });
+  await expect(lineOf(bo, `Bo says something rude ${run}`)).toHaveCount(0, { timeout: 10_000 });
+  await expect(menu).toHaveCount(0, { timeout: 5000 });
+
+  // Profile: Cy's, over the town; Back, and the town is as it was.
+  const cyName = (await cyLine.locator("b.tc-name").textContent())!;
+  await showLog(page);
+  await cyLine.click();
+  await menu.getByRole("button", { name: "Profile" }).click();
+  await expect(page.locator(".fd-overlay")).toBeVisible();
+  await expect(page.locator(".fd-overlay")).toContainText(cyName);
+  await page.locator(".fd-overlay").getByRole("button", { name: "Back" }).first().click();
+  await expect(page.locator(".fd-overlay")).toHaveCount(0);
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+
+  // Mute: Cy's lines leave this log, and a new one never shows.
+  await showLog(page);
+  await cyLine.click();
+  await menu.getByRole("button", { name: "Mute" }).click();
+  await expect(cyLine).toHaveCount(0);
+  await cy.waitForTimeout(15_500);
+  await send(cy, `Cy again ${run}`);
+  await expect(lineOf(bo, `Cy again ${run}`), "others still see Cy").toHaveCount(1, { timeout: 10_000 });
+  await expect(lineOf(page, `Cy again ${run}`), "muted here").toHaveCount(0);
+});
+
+test("the switch off (PAUSE_TOWN_CHAT): the field says \"Chat is paused.\" and can't send; the bosses' chatter goes on", async ({ page }) => {
+  await openSignedIn(page);
+  // (The Worker's variable can't change under a running test: the server's answers say it's off, as they would.)
+  await page.route("**/api/status", (route) => route.fulfill({ json: { paused: ["town-chat"], banner: null } }));
+  await page.route("**/api/town/chat", (route) => route.fulfill({ status: 503, json: { message: "Chat is paused.", paused: "town-chat" } }));
+  await open(page);
+  const field = page.locator(".tc-form input");
+  await expect(field).toBeDisabled();
+  await expect(field).toHaveAttribute("placeholder", "Chat is paused.");
+  await say(page, "Hollow", "The park gets quiet after dark.");
+  await expect(page.locator(".tc-boss")).toHaveCount(1);
+  await expect(log(page)).toHaveCSS("opacity", "1");
 });

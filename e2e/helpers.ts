@@ -330,7 +330,20 @@ export async function asAdmin(page: Page) {
  * with its message (docs/decisions/2026-10-15-flaky-e2e-batch.md). Answers the account's id.
  */
 export async function asServerAdmin(page: Page, who: "ops" | "chat" = "ops") {
-  const email = `${who}-admin-${test.info().project.name}@e2e.test`;
+  return withEmail(page, `${who}-admin-${test.info().project.name}@e2e.test`);
+}
+
+/**
+ * Makes this page's account a signed-in one (an email on it, given straight in the local database, as `asServerAdmin` does:
+ * no sign-in is set up in tests), e.g. for the town square's chat, which is for signed-in accounts only. A fresh email each
+ * time. Reload the page after it for the app to see it. Answers the account's id.
+ */
+export async function asSignedIn(page: Page, label = "player") {
+  return withEmail(page, `${label}-${test.info().project.name}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}@e2e.test`);
+}
+
+/** Puts `email` on this page's account in the local database (taking it off any other account first). Answers the id. */
+async function withEmail(page: Page, email: string) {
   const id = ((await (await page.request.get("/api/me")).json()) as { user: { id: string } }).user.id;
   const sql = `UPDATE users SET email = NULL WHERE email = '${email}'; UPDATE users SET email = '${email}' WHERE id = '${id}'`;
   for (let attempt = 1; ; attempt++) {

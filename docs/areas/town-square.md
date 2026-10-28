@@ -182,21 +182,37 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
     (placeholders until real players chat: two a boss, one or two a kid, under 60 characters; never the Hidden Boss;
     Hollow's kid only eerie; anyone but who spoke last). The kids' names are the sidekicks brief's, kept in `CHATTER` until
     the sidekicks are in `BOTS`.
-  - **Your own line** (Oct 28, Eric): a text field at the box's foot, **only where `testSwitchesAllowed()`** (admins, the test
-    server, dev; players see the log alone, and the field's strip is kept for everyone so the box never changes): at most
-    `maxChars` (80) characters (a count, "7 left", only for the last `nearEnd` (10)), the keyboard's Send or Enter sends
-    (`enterkeyhint="send"`, no button), one message per `sendEveryMs` (15 s; the field shows "Wait 12 s" and is greyed
-    until then), 16 px type so iPhone Safari doesn't zoom. `sendTownChat(text)` returns ok or the reason it refused and, for
-    now, only echoes on this device (kind "player", your profile's name); the server lane swaps its inside. **The
-    keyboard** opening must not resize or move the town: while the field has focus the screen keeps its height and follows
-    `visualViewport` (`pinTown`); a press on the map lets the field go.
+  - **Your own line** (Oct 28, Eric): a text field at the box's foot, **for a signed-in player on a device the age gate
+    didn't mark too young** (`mayTownChat`; guests see the log alone, and the field's strip is kept for everyone so the box
+    never changes): at most `maxChars` (80) characters (a count, "7 left", only for the last `nearEnd` (10)), the keyboard's
+    Send or Enter sends (`enterkeyhint="send"`, no button), one message per `sendEveryMs` (15 s; the field shows "Wait 12 s"
+    and is greyed until then), 16 px type so iPhone Safari doesn't zoom. The numbers are the server's (`TOWN_CHAT`), which
+    decides. **The keyboard** opening must not resize or move the town: while the field has focus the screen keeps its
+    height and follows `visualViewport` (`pinTown`); a press on the map lets the field go.
+  - **Players' messages** (Oct 28; `town/chat-net.ts`; the server and every rule: [chat.md](chat.md), "The town square's
+    typed chat", and `docs/decisions/2026-10-28-town-chat-typing.md`). Sending is `sendTownChat(text)` (async): the field
+    waits for the server's answer, keeping your words and the keyboard; your line comes back in the answer and goes into the
+    log like everyone's. A refusal keeps your words and shows the server's reason over the field for `noteMs` (4 s; "That
+    message isn't allowed.", "No links or contact details in chat.", "You said that a moment ago.", …); the server's wait
+    shows in the field as the count. Other players' lines ride on the live line's poll (`openTownFeed`: `?town=N` every 5 s
+    while the town is open and the tab visible; nobody else asks) and come in through `say(name, text, "player", {uid, n})`;
+    `unsay` takes lines out by number (a moderator's Remove, the room's `gone`) or by player (Mute). Muted and blocked
+    players' lines never reach the log. While the switch is off (`PAUSE_TOWN_CHAT`) the field is greyed and says "Chat is
+    paused."; while your chat is banned it says why ("Your chat is off: a moderator's decision."). The log keeps the bosses'
+    and kids' chatter either way. Nothing here runs in the frame loop: an answer is parsed in the request's callback.
+  - **A line's menu**: a tap on a player's line, name or text (`onTownChatLineTap`; lines said by the test hook have no one
+    behind them and open nothing) opens a small card under the line (above it when it wouldn't fit): **Profile** (over the
+    town, which stays as it was: Back closes it), **Mute** (by account, on this device, every chat), **Report** (fair play's
+    report with "Offensive chat"; the server reads the line's words from its room; the answer shows in the card, which then
+    closes), and for a moderator (`profile.admin`) **Remove** (the line leaves everyone's log). On your own line Mute and
+    Report are greyed. A tap anywhere else or Escape closes it.
   - **Moving it**: press and hold on the box (`holdMs`, 400 ms; not on the field), then drag it anywhere on the map and let
     go; it's remembered on this device (localStorage `brc.townChat`, in a try/catch) and kept inside the map and off the
     buttons (`clampBox`). A plain tap, or a drag that starts without the hold, is the map's: the box takes no taps (the
     listener sits on the map's box, sees the press and, once the hold is up, calls off the map's press with a `pointercancel`).
-  - **Taps**: `pointer-events: none` all over, except the text field and a **player's line** while it shows (Eric, Oct 28:
-    players will report a message by tapping it): a tap on one (a quick press and release; a hold still moves the box) calls
-    `onTownChatLineTap(line, anchor)`, which does nothing yet (the server lane's Profile / Mute / Report menu).
+  - **Taps**: `pointer-events: none` all over, except the text field, a line's menu and a **player's line** while it shows
+    (Eric, Oct 28: players report a message by tapping it): a tap on one (a quick press and release; a hold still moves the
+    box) calls `onTownChatLineTap(line, anchor)`, which opens its menu (above).
   - **The edge chips** keep off the box always, shown or faded, wherever it's put: `CHAT_BOX` (chat.ts; `TownChat` writes
     it, `chipBlocked` in `render.ts` reads it), so a chip never jumps when the log appears or fades.
 
@@ -288,16 +304,25 @@ noted wherever a slice changed one.
 - `packages/app/test/town-chat.test.ts` (Oct 28): the time's format (12-hour, no am/pm), 5 lines a phone and 12 a computer (the
   newest last; a shrinking cap drops the oldest), the fade after `fadeAfterMs` and a message bringing the lines back, a line
   gone after `lifeMs`, `say` from every kind, the chatter table (every boss with a home: two lines, its kid one or two, all
-  under 60 characters, never the Hidden Boss, anyone but who spoke last, all 28 reached, every 20 to 45 s), your own line
-  (trimmed, 80 characters, one per 15 s), the box's place (`clampBox`: inside the map, off the buttons; stored and read in a
+  under 60 characters, never the Hidden Boss, anyone but who spoke last, all 28 reached, every 20 to 45 s), players' lines
+  (who said them and their number, `unsay` by number or by player, a tap reaching the menu; the server's numbers), the box's place (`clampBox`: inside the map, off the buttons; stored and read in a
   try/catch).
 - `e2e/town-chat.spec.ts` (phone and desktop; the chat log): the box in the top left with its size per platform, a line's
   time and bold name, at most 5 / 12 lines, two lines then "…", the fade after the wait (not before) and the way back, the box
   unchanged throughout; a tap through a boss's or kid's line reaches the map, a player's line takes its own tap
-  (`__townTapped`); the text field (80 characters, the count, one every 15 s, the wait in the field, your line as a
-  player); no field without the test switches; press and hold moves the box (remembered across a reload, never over the buttons
+  (`__townTapped`); the text field for a signed-in player (80 characters, the count, one every 15 s, the wait in the field,
+  your line back from the server as a player); no field for a guest; press and hold moves the box (remembered across a reload, never over the buttons
   or off the map), a tap or a drag without the hold is the map's; the chips keep off the box, shown, faded or moved over one of
-  their places; the keyboard doesn't resize or move the town (the visual viewport's offset stood in).
+  their places; the keyboard doesn't resize or move the town (the visual viewport's offset stood in). Players' messages (its
+  players are made signed in in the local database, `asSignedIn` in `e2e/helpers.ts`): two signed-in players see each
+  other's lines within a few seconds, a guest none (no field, never asks); a refused message's reason over the field (a swear
+  word, a link, a phone number), 80 characters and the 15 s wait on the server; a line's menu (your own: Mute and Report
+  greyed; Report reaching fair play's case page with the line; a moderator's Remove leaving every log; Profile over the town
+  and back; Mute hiding the player); the switch off ("Chat is paused.", the chatter going on). Only each test's own lines
+  are counted: other tests' players share the room.
+- `packages/app/test/town-chat-net.test.ts`: a guest or a young device never asks; lines ride on the live poll; muted and
+  blocked players' lines never reach the log; a removal and the switch reach it; sending mirrors the limits and shows the
+  server's reasons; Report and Remove.
 - `e2e/town.spec.ts` (phone and desktop; `e2e/areas.json`, "the town square"): the page loads, the world is drawn and
   fills its box, a tap ahead walks you there, the zoom pair works (it opens zoomed out), back goes home; each statue (a
   tap walks you up, the camera zooms in close on it, its quote word for word in the live region, its letters at least 12
@@ -325,6 +350,6 @@ title; a bot waiting, two playing (the board's pixels change), a tap on their ga
 
 ## Not built yet
 
-The bottom strip, a player's card ("Invite to party"), bots as sidekick characters (a sprite for `look`), the chat log's server (other players' messages, moderation and the tap-to-report menu: `onTownChatLineTap`; the typed line only echoes on this device and only where the test switches are on), the shop itself, the Colosseum's menu (raids with people,
+The bottom strip, a player's card ("Invite to party"), bots as sidekick characters (a sprite for `look`), the shop itself, the Colosseum's menu (raids with people,
 party), the park's matchmaking (sitting at a table queues you: `ROADMAP.md`, "The park"), quick chats, other people's dressed pawns, the Simple map setting, real players and
 rooms, sounds.

@@ -2,19 +2,28 @@
  * The town square's chat log (Eric, Oct 28), in the map's top left corner: one line a message ("[9:41] Name: message", the
  * name bold), newest at the bottom, each line on its own soft dark backing. The lines fade out `fadeAfterMs` after the last
  * one and come back with the next; a line is gone for good after `lifeMs`. The box takes no taps (the map under it answers
- * them) except its text field, shown only where the test switches are allowed, and a player's line (a tap on it is
- * `onTownChatLineTap`, for reporting it later); press and hold on it (`holdMs`) and it comes off the map to move wherever you
- * drop it, remembered on this device. Plain DOM, drawn only when a message comes; nothing
- * in the town's frame loop. The rules and the numbers are in chat.ts; docs/areas/town-square.md, "The chat log".
+ * them) except its text field and a player's line: a tap on one, name or text, opens its menu (Profile / Mute / Report, and
+ * Remove for a moderator; `onTownChatLineTap`). Press and hold on the box (`holdMs`) and it comes off the map to move
+ * wherever you drop it, remembered on this device. Plain DOM, drawn only when a message comes; nothing in the town's frame
+ * loop. The rules and the numbers are in chat.ts; docs/areas/town-square.md, "The chat log".
+ *
+ * Players' messages (chat-net.ts; docs/decisions/2026-10-28-town-chat-typing.md): the field shows for a signed-in player on a
+ * device the age gate didn't mark too young, and only they get other players' lines (riding on the live poll); a guest's log
+ * has the bosses' and kids' chatter alone. The field waits for the server's answer; a refusal's reason shows over it for
+ * `noteMs`. While the chat is paused (the switch) or your chat is off (a moderator), the field says so instead.
  *
  * Test hooks (e2e, with the test switches on): `window.__townSay()` makes someone from the table talk now;
- * `__townSay(name, text, kind)` says that line; `__townChatter(false)` stops the bosses' and kids' chatter (true starts it
- * again); `window.__townTapped` lists the taps on player lines (`onTownChatLineTap` itself does nothing yet).
+ * `__townSay(name, text, kind)` says that line (on this device only); `__townChatter(false)` stops the bosses' and kids'
+ * chatter (true starts it again); `window.__townTapped` lists the taps on player lines.
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
-import { onAccountChange } from "../account.ts";
+import { account, onAccountChange } from "../account.ts";
+import { mutes } from "../chat-mod.ts";
+import { openProfile } from "../profile-nav.ts";
+import { useServerStatus } from "../status.ts";
 import { testSwitchesAllowed } from "../test-switches.ts";
-import { CHAT, CHAT_BOX, ChatLog, clampBox, loadChatPos, onTownChatLineTap, saveChatPos, say, sendTownChat, sendWaitMs, startChatter, type ChatKind, type Rect } from "./chat.ts";
+import { CHAT, CHAT_BOX, ChatLog, clampBox, loadChatPos, onTownChatLineTap, saveChatPos, say, setTownChatLineTap, startChatter, type ChatKind, type ChatLine, type Rect } from "./chat.ts";
+import { mayTownChat, openTownFeed, removeTownLine, reportTownLine, sendTownChat, townChatOff, townSendWaitMs } from "./chat-net.ts";
 import "./town-chat.css";
 
 export function TownChat() {
@@ -22,11 +31,16 @@ export function TownChat() {
   const field = useRef<HTMLInputElement>(null);
   const pinned = useRef<(() => void) | null>(null);
   const [computer, setComputer] = useState(() => matchMedia(CHAT.computerQuery).matches);
-  const [typing, setTyping] = useState(testSwitchesAllowed);
+  const [typing, setTyping] = useState(mayTownChat);
   const [text, setText] = useState("");
-  const [wait, setWait] = useState(() => Math.ceil(sendWaitMs() / 1000));
+  const [wait, setWait] = useState(() => Math.ceil(townSendWaitMs() / 1000));
+  const [sending, setSending] = useState(false);
+  /** A refusal's reason, over the field for `noteMs`. */
+  const [note, setNote] = useState<string | null>(null);
   const [, redraw] = useState(0);
   const log = useMemo(() => new ChatLog(computer ? CHAT.capComputer : CHAT.capPhone, () => redraw((n) => n + 1)), []);
+  // (The switch, as /api/status says it: the field reads townChatOff() each time it's drawn.)
+  useServerStatus();
 
   // Who's talking: the log opens for `say`, the bosses and kids start their chatter, and the test hooks.
   useEffect(() => {
@@ -51,13 +65,24 @@ export function TownChat() {
     };
   }, [log]);
 
+  // Other players' lines, for a signed-in player (nothing is asked for anyone else): into the log as players' lines with who
+  // said them; out again when a moderator removes one or you mute its player; the switch redraws the field.
+  useEffect(() => {
+    if (!typing) return;
+    return openTownFeed({
+      line: (l) => log.say(l.name, l.text, "player", Date.now(), { uid: l.from, n: l.n }),
+      drop: (test) => log.drop((l) => l.uid !== undefined && l.n !== undefined && test({ n: l.n, from: l.uid })),
+      paused: () => redraw((n) => n + 1),
+    });
+  }, [log, typing]);
+
   // The computer's size (a window crossing it) changes how many lines it keeps; the test switches can turn on late (the
   // account loads after the town opens), which is when the field appears.
   useEffect(() => {
     const mq = matchMedia(CHAT.computerQuery);
     const on = () => setComputer(mq.matches);
     mq.addEventListener("change", on);
-    const off = onAccountChange(() => setTyping(testSwitchesAllowed()));
+    const off = onAccountChange(() => setTyping(mayTownChat()));
     return () => {
       mq.removeEventListener("change", on);
       off();
@@ -68,7 +93,7 @@ export function TownChat() {
   // The wait after your message, counting down in the field.
   useEffect(() => {
     if (wait <= 0) return;
-    const t = setInterval(() => setWait(Math.ceil(sendWaitMs() / 1000)), 250);
+    const t = setInterval(() => setWait(Math.ceil(townSendWaitMs() / 1000)), 250);
     return () => clearInterval(t);
   }, [wait > 0]);
 
@@ -194,16 +219,32 @@ export function TownChat() {
   }, [typing]);
   useEffect(() => blur, []);
 
-  const submit = (e: Event) => {
+  // A refusal's reason, for a few seconds.
+  useEffect(() => {
+    if (!note) return;
+    const t = setTimeout(() => setNote(null), CHAT.noteMs);
+    return () => clearTimeout(t);
+  }, [note]);
+
+  // Sending waits for the server's answer (the field keeps your words and the keyboard meanwhile); your line comes back into
+  // the log with everyone's. A refusal keeps your words, to change them, and says why.
+  const submit = async (e: Event) => {
     e.preventDefault();
-    const r = sendTownChat(text);
+    if (sending) return;
+    setSending(true);
+    const r = await sendTownChat(text);
+    setSending(false);
     if (r.ok) {
       setText("");
+      setNote(null);
       setWait(Math.ceil(CHAT.sendEveryMs / 1000));
       field.current?.blur();
     } else if (r.reason === "wait") setWait(Math.ceil(r.waitMs / 1000));
+    else if (r.reason === "refused") setNote(r.message ?? null);
   };
   const left = CHAT.maxChars - text.length;
+  // Why the field can't send right now (the switch, your chat ban), shown in its place.
+  const off = typing ? townChatOff() : null;
 
   return (
     <div class="town-chat" ref={wrap} data-size={computer ? "computer" : "phone"}>
@@ -216,6 +257,11 @@ export function TownChat() {
           </div>
         ))}
       </div>
+      {typing && note && (
+        <div class="tc-note" role="status">
+          {note}
+        </div>
+      )}
       {typing && (
         <form class="tc-form" onSubmit={submit}>
           <input
@@ -223,8 +269,10 @@ export function TownChat() {
             type="text"
             value={text}
             maxLength={CHAT.maxChars}
-            placeholder={wait > 0 ? `Wait ${wait} s` : "Say something…"}
-            disabled={wait > 0}
+            placeholder={off ?? (wait > 0 ? `Wait ${wait} s` : "Say something…")}
+            title={off ?? undefined}
+            disabled={!!off || wait > 0}
+            readOnly={sending}
             enterkeyhint="send"
             autocomplete="off"
             autocapitalize="sentences"
@@ -234,8 +282,113 @@ export function TownChat() {
             onFocus={focus}
             onBlur={blur}
           />
-          {left <= CHAT.nearEnd && wait <= 0 && <span class="tc-left">{left} left</span>}
+          {left <= CHAT.nearEnd && wait <= 0 && !off && <span class="tc-left">{left} left</span>}
         </form>
+      )}
+      <LineMenu box={wrap} />
+    </div>
+  );
+}
+
+/**
+ * A player's line's menu, opened by a tap on the line (name or text): Profile, Mute, Report, and Remove for a moderator.
+ * Your own line's Mute and Report are greyed. Report is fair play's report with "Offensive chat" and the line (the server
+ * reads its words); the answer shows in the menu, which then closes. A tap anywhere else, or Escape, closes it.
+ */
+function LineMenu({ box }: { box: { current: HTMLDivElement | null } }) {
+  /** The line, and where its menu goes in the box's pixels (`above`: the line's top, should the menu not fit below it). */
+  const [open, setOpen] = useState<{ line: ChatLine; at: { x: number; y: number }; above: number } | null>(null);
+  const [said, setSaid] = useState<string | null>(null);
+  const menu = useRef<HTMLDivElement>(null);
+
+  useEffect(
+    () =>
+      setTownChatLineTap((line, anchor) => {
+        // (A line said on this device by the test hook has no one behind it: nothing to open.)
+        const el = box.current;
+        if (!line.uid || !el) return;
+        const b = el.getBoundingClientRect();
+        const map = (el.offsetParent as HTMLElement | null)?.getBoundingClientRect();
+        const width = 180;
+        const x = Math.max(0, Math.min(anchor.x - b.left, (map ? map.right - b.left : b.width) - width - 8));
+        setSaid(null);
+        setOpen({ line, at: { x, y: anchor.y - b.top + anchor.h + 4 }, above: anchor.y - b.top });
+      }),
+    [],
+  );
+  // A tap anywhere else, or Escape, closes it; so does a report's answer, after a moment.
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => {
+      if (!menu.current?.contains(e.target as Node)) setOpen(null);
+    };
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(null);
+    document.addEventListener("pointerdown", away, true);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("pointerdown", away, true);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+  // Below the line, or above it when it wouldn't fit on the map there.
+  useLayoutEffect(() => {
+    const el = menu.current;
+    const map = (box.current?.offsetParent as HTMLElement | null)?.getBoundingClientRect();
+    if (!el || !map || !open) return;
+    const r = el.getBoundingClientRect();
+    if (r.bottom > map.bottom - 4) el.style.top = `${Math.max(open.above - r.height - 4, map.top - box.current!.getBoundingClientRect().top + 4)}px`;
+  }, [open]);
+  useEffect(() => {
+    if (!said) return;
+    const t = setTimeout(() => setOpen(null), 2500);
+    return () => clearTimeout(t);
+  }, [said]);
+  if (!open) return null;
+
+  const { line } = open;
+  const uid = line.uid!;
+  const me = account().profile;
+  const you = me?.user.id === uid;
+  const act = async (what: () => Promise<string>) => setSaid(await what());
+  return (
+    <div class="tc-menu" ref={menu} role="group" aria-label={`${line.name}'s message`} style={{ left: `${open.at.x}px`, top: `${open.at.y}px` }}>
+      <strong>{you ? "You" : line.name}</strong>
+      {said ? (
+        <p class="tc-menu-said" role="status">
+          {said}
+        </p>
+      ) : (
+        <>
+          <button
+            type="button"
+            class="town-btn"
+            onClick={() => {
+              setOpen(null);
+              openProfile({ uid, name: line.name, you });
+            }}
+          >
+            Profile
+          </button>
+          <button
+            type="button"
+            class="town-btn"
+            disabled={you}
+            onClick={() => {
+              mutes.set(uid, true);
+              setOpen(null);
+            }}
+          >
+            Mute
+          </button>
+          <button type="button" class="town-btn" disabled={you} onClick={() => void act(() => reportTownLine({ from: uid, n: line.n! }).catch((e: Error) => e.message))}>
+            Report
+          </button>
+          {me?.admin && (
+            <button type="button" class="town-btn" onClick={() => void act(() => removeTownLine(line.n!))}>
+              Remove
+            </button>
+          )}
+        </>
       )}
     </div>
   );
