@@ -33,6 +33,7 @@ import { SELECT_SOUND, TOWN_SOUNDS, townSound } from "../characters/boss-select.
 import { N, proj, wrapF } from "./camera.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { TownChat } from "./TownChat.tsx";
+import { TownChatTools } from "./TownChatTools.tsx";
 import { Press } from "./press.ts";
 import { PAWN_PX, Renderer, pawnImage, type Hit } from "./render.ts";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
@@ -96,6 +97,8 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, seat = null }: { on
           ‹
         </button>
         <h1>Town square</h1>
+        {/* The chat's icon (its three modes) and the gear (Town settings), at the right end of the same line. */}
+        <TownChatTools />
       </header>
       <div class="town-box" ref={box}>
         <canvas class="town-canvas" ref={canvas} aria-label="The town square" />

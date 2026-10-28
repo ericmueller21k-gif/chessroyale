@@ -440,7 +440,12 @@ test("Folio's Folded House: a tap walks you there and opens its card with its na
   /** Taps the house (its chip first when it's off screen) until its card opens: you walk to it, the camera with you, till you stop. */
   const visit = async () => {
     const chip = page.getByRole("button", { name: `Go to ${name}` });
-    if (!(await at()) && (await chip.count())) await chip.click({ force: true });
+    // (Off screen: its chip, if it has one; only the nearest four places get chips (`maxChips`), and from your start Folio's house
+    // is the fifth since Oct 28, so otherwise the camera glides there, as a chip's tap would.)
+    if (!(await at())) {
+      if (await chip.count()) await chip.click({ force: true });
+      else await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("folio"));
+    }
     await expect(async () => {
       if (await card.isVisible()) return;
       if (await page.getByRole("dialog").isVisible()) await page.keyboard.press("Escape");
@@ -465,6 +470,12 @@ test("Folio's Folded House: a tap walks you there and opens its card with its na
     await visit();
     await expect(card.getByRole("heading", { name })).toBeVisible();
     await expect(card.getByText("Coming soon", { exact: true })).toBeVisible();
+    // Its place (Eric, Oct 28: "folio's house is like 2 inches from the colosseum it's gotta get moved a bit"): its plot is columns
+    // 34 to 36 now (it was 32 to 34), so you stop on the ring round it, column 33 or further east; the Colosseum's ground ends at
+    // column 28 (5 open squares between them, 3 before).
+    const [col] = await you(page);
+    expect(col, "you stand beside Folio's house, east of the Colosseum's 5 open squares").toBeGreaterThanOrEqual(33);
+    expect(col).toBeLessThanOrEqual(37);
     // Folio's paper crane steps round behind its house and stays: its picture's box is wide, and standing in front it
     // covered the doorway for the whole wait (seen Oct 27, 1 run in 10 on a computer).
     await expect.poll(() => page.evaluate(() => (window as unknown as { __townBossBack: (id: string) => boolean }).__townBossBack("folio")), { timeout: 15_000 }).toBe(true);

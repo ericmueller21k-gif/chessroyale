@@ -4,6 +4,9 @@
  * closer to a dozen"). The lines, the numbers and the log's rules, with no DOM and no drawing: `TownChat.tsx` shows it and
  * `town-chat.css` styles it. docs/areas/town-square.md, "The chat log".
  *
+ * v2 (Eric, Oct 28, docs/decisions/2026-10-28-town-chat-v2.md): one see-through box that holds every line of the last minute and
+ * scrolls; three modes from a header icon (`ChatMode`: always on, new messages only, off), remembered on this device.
+ *
  * One way in: `say(name, text, kind, who)`. The bosses and their kids say a line now and then (`CHATTER`, placeholders);
  * players' messages come from the server (chat-net.ts: signed-in players only), each with who said it and its number in the
  * server's room (`who`), so a tap on it can open Profile / Mute / Report, and `unsay` can take it out again (a moderator's
@@ -24,11 +27,10 @@ export const CHAT = {
   lifeMs: TOWN_CHAT.lineMs,
   /** A boss or a kid speaks every this many ms, at random between the two. */
   everyMs: [20_000, 45_000] as readonly [number, number],
-  /** Most lines shown: a phone's, a computer's. */
-  capPhone: 5,
-  capComputer: 12,
-  /** The computer's frame (styles.css' "computer"); anything else is a phone. */
+  /** The computer's frame (styles.css' "computer"); anything else is a phone. (The box's size is in town-chat.css: about 5 lines on a phone, 12 on a computer.) */
   computerQuery: "(min-width: 900px) and (min-height: 600px)",
+  /** Scrolled this near the foot (px) still counts as at the foot: new lines keep it there. */
+  pinSlopPx: 4,
   /** What you may type, and the wait between two of your messages (the server's numbers: it enforces them). */
   maxChars: TOWN_CHAT.maxChars,
   sendEveryMs: TOWN_CHAT.gapMs,
@@ -41,9 +43,25 @@ export const CHAT = {
   holdSlopPx: 8,
   /** The box's gap from the map's edges, and from the buttons. */
   margin: 8,
-  /** Where the box's place is remembered on this device. */
+  /** Where the box's place, and its mode, are remembered on this device. */
   storageKey: "brc.townChat",
+  modeKey: "brc.townChatMode",
 } as const;
+
+/**
+ * The chat's three modes, in the order the header icon's tap goes through them (Eric, Oct 28). "always": the box and its field
+ * always show. "new": the lines show when a message comes and fade after `fadeAfterMs`, the field with them; a tap on a line
+ * brings back every line of the last minute. "off": no box, no field (the lines still arrive, so turning it on shows the last
+ * minute).
+ */
+export type ChatMode = "always" | "new" | "off";
+export const CHAT_MODES: readonly ChatMode[] = ["always", "new", "off"];
+/** What the header icon is called, by mode (its accessible name). */
+export const CHAT_MODE_LABEL: Readonly<Record<ChatMode, string>> = { always: "Chat: always on", new: "Chat: new messages only", off: "Chat: off" };
+/** What each choice is called in the town's settings sheet. */
+export const CHAT_MODE_CHOICE: Readonly<Record<ChatMode, string>> = { always: "Always on", new: "New messages", off: "Off" };
+/** The mode a tap on the icon goes to: always on, new messages, off, and round again. */
+export const nextChatMode = (m: ChatMode): ChatMode => CHAT_MODES[(CHAT_MODES.indexOf(m) + 1) % CHAT_MODES.length]!;
 
 export type ChatKind = "boss" | "kid" | "player" | "system";
 
@@ -75,10 +93,11 @@ let current: ChatLog | null = null;
 
 /**
  * The one way in for a message (a boss's, a kid's, a player's, the town's own): dropped when no town is open. `who`: a
- * player's line from the server (their account and the line's number).
+ * player's line from the server (their account and the line's number). `at`: when it was said (the test hook says a line was said a
+ * while ago, to scroll back to).
  */
-export function say(name: string, text: string, kind: ChatKind, who?: ChatWho): void {
-  current?.say(name, text, kind, Date.now(), who);
+export function say(name: string, text: string, kind: ChatKind, who?: ChatWho, at = Date.now()): void {
+  current?.say(name, text, kind, at, who);
 }
 
 /** Takes the lines `test` picks out of the open log (a moderator's Remove, a player you mute, a name reset). */
@@ -86,20 +105,88 @@ export function unsay(test: (l: ChatLine) => boolean): void {
   current?.drop(test);
 }
 
+/** The mode now: the one remembered on this device (the first time it's asked), else always on. */
+let mode: ChatMode | null = null;
+const modeSeen = new Set<() => void>();
+export function chatMode(): ChatMode {
+  return (mode ??= loadChatMode());
+}
+/** Sets the mode, remembers it on this device, and tells everyone showing it (the header icon, the settings sheet, the box). */
+export function setChatMode(m: ChatMode): void {
+  if (m === mode) return;
+  mode = m;
+  saveChatMode(m);
+  for (const f of modeSeen) f();
+}
+export function onChatMode(fn: () => void): () => void {
+  modeSeen.add(fn);
+  return () => void modeSeen.delete(fn);
+}
+
+/** The mode remembered on this device, or "always" (nothing stored, something else stored, or a storage that won't answer). */
+export function loadChatMode(): ChatMode {
+  try {
+    const v = localStorage.getItem(CHAT.modeKey);
+    return CHAT_MODES.find((m) => m === v) ?? "always";
+  } catch {
+    return "always";
+  }
+}
+
+export function saveChatMode(m: ChatMode): void {
+  try {
+    localStorage.setItem(CHAT.modeKey, m);
+  } catch {
+    // (private mode, storage full: it lasts until a reload)
+  }
+}
+
+/**
+ * Whether a scrolling box keeps up with its newest line (Eric, Oct 28: "new lines keep it pinned to the bottom unless you've
+ * scrolled up; then it stays where you are until you scroll back down"). Pinned until the box is scrolled up from its foot;
+ * while it isn't, the lines that come are counted (the "↓ new" marker) and the box stays put.
+ */
+export class Stick {
+  pinned = true;
+  /** Lines that came while the box was scrolled up and not yet seen. */
+  unseen = 0;
+
+  /** The box was scrolled (a finger, the wheel, a jump): pinned again once it's back at its foot. */
+  scrolled(box: { scrollTop: number; scrollHeight: number; clientHeight: number }): void {
+    this.pinned = box.scrollHeight - box.scrollTop - box.clientHeight <= CHAT.pinSlopPx;
+    if (this.pinned) this.unseen = 0;
+  }
+
+  /** `n` lines came: true if the box should go to its foot (it's pinned); false if it stays where it is (they're counted). */
+  added(n: number): boolean {
+    if (this.pinned) return true;
+    this.unseen += n;
+    return false;
+  }
+
+  /** The box was put back at its foot (the marker's tap, or it came back on screen). */
+  toFoot(): void {
+    this.pinned = true;
+    this.unseen = 0;
+  }
+}
+
 export class ChatLog {
+  /** Every line of the last `lifeMs`, oldest first (each is removed for good at its minute). */
   lines: ChatLine[] = [];
-  /** True from a message until `fadeAfterMs` after it (and while the box is held or typed in). */
+  /** True from a message until `fadeAfterMs` after it (and while the box is held, typed in, or being read). */
   shown = false;
+  /** "New messages": a tap brought back every line, not just the ones said since the box last came back; until it fades. */
+  expanded = false;
+  /** The first line of the burst on show: "new messages" shows these (and, once a tap has `expanded` it, all of them). */
+  private freshFrom = 0;
   private nextId = 1;
   private holds = 0;
   private fadeTimer: ReturnType<typeof setTimeout> | undefined;
   private lifeTimer: ReturnType<typeof setTimeout> | undefined;
 
   /** `changed` runs when the lines or `shown` change (a few times a minute: the component draws then). */
-  constructor(
-    public cap: number,
-    private readonly changed: () => void,
-  ) {}
+  constructor(private readonly changed: () => void) {}
 
   /** Makes this the log `say` reaches. Returns the close: it stops this log's timers and `say` goes nowhere. */
   open(): () => void {
@@ -111,9 +198,21 @@ export class ChatLog {
     };
   }
 
+  /** The lines the box shows in `m`: all of them always on, the burst on show (all of them once a tap `expanded` it) in new messages, none off. */
+  visible(m: ChatMode): readonly ChatLine[] {
+    if (m === "off") return [];
+    if (m === "always" || this.expanded) return this.lines;
+    return this.lines.filter((l) => l.id >= this.freshFrom);
+  }
+
   say(name: string, text: string, kind: ChatKind, at = Date.now(), who?: ChatWho): void {
-    this.lines.push({ id: this.nextId++, at, time: clockText(new Date(at)), name, text, kind, ...(who ? { uid: who.uid, n: who.n } : {}) });
-    this.trim();
+    const id = this.nextId++;
+    this.lines.push({ id, at, time: clockText(new Date(at)), name, text, kind, ...(who ? { uid: who.uid, n: who.n } : {}) });
+    // A message after the box had faded starts a new burst: only the new lines show in "new messages", until a tap brings back the rest.
+    if (!this.shown) {
+      this.freshFrom = id;
+      this.expanded = false;
+    }
     this.shown = true;
     this.arm();
     this.watch();
@@ -129,28 +228,31 @@ export class ChatLog {
     this.changed();
   }
 
-  /** The cap changed (the window crossed the computer's size). */
-  setCap(cap: number): void {
-    this.cap = cap;
-    if (this.trim()) this.changed();
+  /** A tap on a line in "new messages": every line of the last minute comes back, the faded ones too, and the wait starts over. */
+  expand(): void {
+    this.expanded = true;
+    this.shown = true;
+    this.arm();
+    this.changed();
   }
 
-  /** Keeps the lines showing while something holds the box (it's picked up, or you're typing in it). */
+  /** Someone is reading (scrolling): the wait before the fade starts over. */
+  poke(): void {
+    if (this.shown) this.arm();
+  }
+
+  /** Keeps the lines showing while something holds the box (it's picked up, typed in, or its menu is open). */
   hold(on: boolean): void {
     this.holds = Math.max(0, this.holds + (on ? 1 : -1));
     if (on) {
       clearTimeout(this.fadeTimer);
       if (!this.shown) {
         this.shown = true;
+        this.freshFrom = this.nextId; // (no message: nothing new to show, only what a tap brings back)
+        this.expanded = false;
         this.changed();
       }
     } else this.arm();
-  }
-
-  private trim(): boolean {
-    const extra = this.lines.length - this.cap;
-    if (extra > 0) this.lines.splice(0, extra);
-    return extra > 0;
   }
 
   /** (Re)starts the wait before the fade. */
