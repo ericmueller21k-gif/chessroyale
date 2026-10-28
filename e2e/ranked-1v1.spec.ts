@@ -186,6 +186,27 @@ test("resigning, then a flag: Play again queues both again; each game counts", a
   for (const p of [white, black]) await expect(p.locator(".dv-result-rank")).toHaveText("Placement 2/5", { timeout: 15_000 });
 });
 
+test("every change is drawn, even in the same millisecond as the last draw (the clock held still from the last move): the result, then the rank", async ({ browser }) => {
+  // (The game screen once redrew by setting the time as its state, and Preact skips a state set to the value it holds: a
+  // change in the same millisecond as the clocks' last tick wasn't drawn, and "Updating your rank…" stayed up for good.
+  // A held clock makes every change land in the same millisecond. docs/decisions/2026-10-28-two-flaky-tests.md.)
+  test.setTimeout(2 * 60_000);
+  const a = await player(browser, "Ann Still");
+  const b = await player(browser, "Bo Still");
+  await meet(a, b, poolName(), "&clock=6");
+  await waitForPlay(a, b);
+  const { white, black } = await bySide(a, b);
+  await tapMove(white, "e2e4");
+  await expect(black.locator(".dv-status")).toContainText("Your first move", { timeout: 10_000 });
+  await tapMove(black, "e7e5");
+  await expect(white.locator(".dv-status")).toHaveText("Your move", { timeout: 10_000 });
+  for (const p of [white, black]) await p.clock.setFixedTime(await p.evaluate(() => Date.now()));
+  await resign(white);
+  await expect(black.locator(".dv-result-title")).toHaveText("You won");
+  await expect(white.locator(".dv-result-why")).toHaveText("You resigned.");
+  for (const p of [white, black]) await expect(p.locator(".dv-result-rank")).toHaveText("Placement 1/5", { timeout: 15_000 });
+});
+
 test("a first move that never comes: the game is aborted, nobody's rank moves", async ({ browser }) => {
   test.setTimeout(2 * 60_000);
   const a = await player(browser, "Ann Abort");

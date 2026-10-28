@@ -336,6 +336,41 @@ test("a player in Boss alone never sees Engine move", async ({ page }) => {
 /** Your phase 2 board: big on a phone, at the bottom left of the four on a computer. */
 const myBoard = (page: Page) => page.locator(".rc-simul .rc-q2 .hb-board, .rc-simul .board-row > .board-wrap:not(.rc-stage) .hb-board").first();
 const simulNow = (p: Page) => p.evaluate(() => (window as any).match?.simul ?? null);
+/**
+ * When the app first put each of these in the page (performance.now, from a MutationObserver: the moment it happens, not
+ * the next frame a sampler gets to run, which under load is a long frame later), and when phase 2's clocks were due to
+ * start as it did (the match's `phase.at` then, in the same time): the countdown's own schedule. Null: never.
+ */
+async function watchShown<K extends string>(page: Page, what: Record<K, { selector: string; text?: RegExp }>) {
+  const tag = Math.random().toString(36).slice(2);
+  await page.evaluate(
+    ({ tag, what }) => {
+      const w = window as unknown as { __shown?: Record<string, Record<string, { at: number; clocksAt: number | null } | null>>; match?: { phase: { kind: string; at?: number } } };
+      const at: Record<string, { at: number; clocksAt: number | null } | null> = Object.fromEntries(Object.keys(what).map((k) => [k, null]));
+      (w.__shown ??= {})[tag] = at;
+      const check = () => {
+        const now = performance.now();
+        const ph = w.match?.phase;
+        const clocksAt = ph?.kind === "simul" && typeof ph.at === "number" ? ph.at - (Date.now() - now) : null;
+        for (const [k, { selector, text }] of Object.entries(what as Record<string, { selector: string; text?: { source: string; flags: string } }>)) {
+          if (at[k] !== null) continue;
+          if ([...document.querySelectorAll(selector)].some((e) => !text || new RegExp(text.source, text.flags).test(e.textContent ?? ""))) at[k] = { at: now, clocksAt };
+        }
+      };
+      check();
+      const obs = new MutationObserver(check);
+      obs.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true });
+      setTimeout(() => obs.disconnect(), 180_000);
+    },
+    { tag, what: Object.fromEntries(Object.entries(what as Record<string, { selector: string; text?: RegExp }>).map(([k, v]) => [k, { selector: v.selector, text: v.text ? { source: v.text.source, flags: v.text.flags } : undefined }])) as never },
+  );
+  return {
+    times: () =>
+      page.evaluate((t) => (window as unknown as { __shown: Record<string, Record<string, { at: number; clocksAt: number | null } | null>> }).__shown[t]!, tag) as Promise<
+        Record<K, { at: number; clocksAt: number | null } | null>
+      >,
+  };
+}
 /** A move on your phase 2 board with real taps (White's side down), until it's taken. */
 async function simulPlay(page: Page, move: string) {
   await expect.poll(async () => (await simulNow(page))?.boards[0].toMove, { timeout: 60_000 }).toBe("crowd");
@@ -482,6 +517,16 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
     c1: count(1),
     ready: { selector: ".rc-simul .cc-banner", text: /^Get ready$/ },
   });
+  // The countdown's own times: the moment the app puts each number (and then a running clock) in the page, as it does it
+  // (each number is a new element). The frame sampler above reads them a frame or more late, by however long the frame
+  // took: under load that alone made a step look 50 to 225 ms short (docs/decisions/2026-10-28-two-flaky-tests.md).
+  const shown = await watchShown(page, {
+    c5: count(5),
+    c4: count(4),
+    c3: count(3),
+    c2: count(2),
+    c1: count(1),
+  });
   await play(page, "h5f7");
   // The board holds while he falls, then (no result screen) the phase change, then phase 2's four boards.
   await expect.poll(() => page.evaluate(() => !!(window as any).match.phase.fall), { timeout: 60_000 }).toBe(true);
@@ -489,6 +534,7 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("phaseChange");
   // (No clock runs from here until the countdown is over: neither the dock's nor any board's.)
   const clocks = await watchSpans(page, { running: { selector: ".dk-clock.running, .rc-tag.running" } });
+  const clockShown = await watchShown(page, { running: { selector: ".dk-clock.running, .rc-tag.running" } });
   // Nothing said twice at once in the phase change (Eric, Oct 15): the dock never repeats his line or the banner, the
   // boss bar never repeats the title's "phase 2", and the dock never says he's beaten as he rises (it did during his
   // fall, on the boss screen, where it's true; there's no line above the board now, Eric, Oct 24).
@@ -528,11 +574,20 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
   expect(first("rage") - first("ignite")).toBeGreaterThanOrEqual(P.absorbHoldMs);
   expect(s.held!.last - s.held!.first).toBeGreaterThanOrEqual(P.absorbHoldMs);
   expect(first("crack") - first("chant")).toBeGreaterThanOrEqual(P.castHoldMs);
-  // (A second each, less a frame either side.)
-  for (const [a, b] of [["c5", "c4"], ["c4", "c3"], ["c3", "c2"], ["c2", "c1"]] as const) expect(first(b) - first(a), `${a} to ${b}`).toBeGreaterThanOrEqual(1000 - 50);
+  // A second each, by the countdown's own schedule (`shown`: when the app put each number in the page, against when the
+  // clocks were due): the 5 is up before its second begins (the count starts once the boards are on screen), each of 4,
+  // 3, 2, 1 comes no sooner than its second and within a quarter second of it, and the clocks likewise at the end.
+  const t = { ...(await shown.times()), ...(await clockShown.times()) };
+  for (const k of ["c5", "c4", "c3", "c2", "c1", "running"] as const) expect(t[k], `${k} shown`).not.toBeNull();
+  // (The clocks' time as the 4 came: the count's own, final by then.)
+  const due = t.c4!.clocksAt!;
+  expect(t.c5!.at, "the 5 is up before its second begins").toBeLessThanOrEqual(due - 5000);
+  for (const [k, n] of [["c4", 4], ["c3", 3], ["c2", 2], ["c1", 1], ["running", 0]] as const) {
+    expect(t[k]!.at - (due - n * 1000), `${k}: not before its second`).toBeGreaterThanOrEqual(-2);
+    expect(t[k]!.at - (due - n * 1000), `${k}: within a quarter second of it`).toBeLessThanOrEqual(250);
+  }
   expect(first("c5")).toBeGreaterThanOrEqual(s.banner!.last);
   expect(c.running, "a clock running once play starts").not.toBeNull();
-  expect(c.running!.first).toBeGreaterThanOrEqual(first("c1") + 1000 - 50);
   expect(await change.seen()).toMatchObject({
     triumph: true,
     triumphLine: true,
