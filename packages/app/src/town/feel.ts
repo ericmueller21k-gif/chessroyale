@@ -321,11 +321,11 @@ export const TOWN_FEEL = {
   botLeaveAfterGameMs: 4000,
   /**
    * How many bots are out in the square at once (Oct 28: twenty bots cost frames, Eric's frame-rate rule; the others are
-   * at home), and how often one goes home and another comes out (ms, a random time between the two), at least
+   * at home; six, as many as before the sidekicks, so the frame rate is as before), and how often one goes home and another comes out (ms, a random time between the two), at least
    * `botTurnAway` steps from you, fading out and in over `botFadeMs`.
    */
-  botsOut: 10,
-  botTurnMs: [15000, 30000] as const,
+  botsOut: 6,
+  botTurnMs: [10000, 20000] as const,
   botTurnAway: 5,
   botFadeMs: 500,
 

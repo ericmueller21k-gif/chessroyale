@@ -187,10 +187,11 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
   has a look (`Look`, one field): a pawn's (side, tint and the crate items worn) or a sprite's (`{ sprite }`: a sidekick's
   baked sheet), and a sidekick its boss (`boss`). Shown everywhere as "<name> (bot)" (`botLabel`: their tags, cards and
   games). The bots start off the tables' stools (every table free as the town opens) and sit as they wander.
-  - **Ten out at once, the others at home, taking turns** (Oct 28: twenty in the square cost about 3 frames a second,
-    Eric's frame-rate rule: the decision's numbers). `botsOut` (10) are in the square, picked at random as the town opens
-    (back from a game, the bot you played among them); the rest are at home (`Person.home`: not drawn, not tapped, on no
-    square: its walker leaves the town's `all`). Every `botTurnMs` (15 to 30 s) one out, standing, free and at least
+  - **Six out at once, the others at home, taking turns** (Oct 28: twenty in the square cost about 3 frames a second,
+    Eric's frame-rate rule: the decision's numbers; six, as many as before the sidekicks). `botsOut` (6) are in the
+    square, picked at random as the town opens (back from a game, the bot you played among them); the rest are at home
+    (`Person.home`: not drawn, not tapped, on no square: its walker leaves the town's `all`). Every `botTurnMs` (10 to
+    20 s) one out, standing, free and at least
     `botTurnAway` (5) steps from you starts home, fading out over `botFadeMs`, and one from home comes out on a free
     square in the park as far from you, fading in (`takeTurns`, `comeOut`). A bot whose card opens stays.
   - **A sidekick in the square** (Oct 28): its own animations, `idle` standing, `walk` walking (no hop: its walk steps),

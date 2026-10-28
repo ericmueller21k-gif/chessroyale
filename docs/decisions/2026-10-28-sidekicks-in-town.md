@@ -19,8 +19,8 @@ for Hollow ("lol perfect"), word for word:
 
 - **Twenty bots, a ladder from 600 to 2500 in steps of 100**, each rung once (`BOTS` in `town/world.ts`, the one table;
   names and ratings live there and nowhere else). Shown everywhere as "<name> (bot)", as before.
-- **Ten of them in the square at once**, the others at home, taking turns (twenty cost about 3 frames a second: Eric's
-  frame-rate rule, the numbers below).
+- **Six of them in the square at once** (as many as before), the others at home, taking turns (twenty cost about 3 frames
+  a second: Eric's frame-rate rule, the numbers below).
   - **The six pawns** keep their names and clothes, one every three rungs (the director's call: the ladder never has a
     long run without a familiar face): Pin Pete 600, Rook Rita 900, Fork Frank 1200, Tempo Tess 1500, Bishop Bo 1800,
     Gambit Gus 2100.
@@ -96,7 +96,7 @@ as his whole turn. The pack's older numbers (Ginger, Boingo, Jefferson, Wrangler
 - **"Puddles' sidekick"**, as his home's sign has it ("Puddles' Botanical Garden"), not "Puddles's".
 - **Hollow's line**: one counter for Hollow (his card and his home's share it); his confirm doesn't move it on. In italics
   under the title, Eric's words exactly, no quotation marks.
-- **Ten out at once** (`botsOut`; the numbers below): the brief's own corner to cut. Pawns and sidekicks take turns
+- **Six out at once** (`botsOut`; the numbers below): the brief's own corner to cut. Pawns and sidekicks take turns
   alike. The turns never take the bot you just played, one held by its card or one sitting at a table.
 - **The face on the strip**: made once as you both sit (the idle's first frame cut to what's drawn, square, as an
   image's address), passed with the game's name and rating; the main bundle never loads the sidekicks' art.
@@ -121,7 +121,9 @@ the page's navigation to the town's first frame drawn (its chunk, the world and,
 | main | 7 / 6 | 51.7 | 40.3 | 2817 ms | 2792 ms |
 | ten out, baked | 6 | 51.2 | 40.8 | 3053 ms | 2630 ms |
 | eight out, baked (tried) | 6 | 51.5 | 40.3 | 2713 ms | 2762 ms |
-FINAL_ROWS
+| main / ten out (a busy machine) | 6 | 45.8 / 42.8 | 35.8 / 32.9 | 4165 / 4130 ms | 4496 / 4020 ms |
+| main / ten out (busier) | 8 | 43.0 / 42.2 | 32.1 / 29.4 | 4685 / 4769 ms | 4671 / 4628 ms |
+| main / six out / ten out (busiest: main's computer runs from 21 to 37 fps) | 6 | 41.4 / 40.0 / 38.6 | 31.5 / 27.9 / 30.1 | 4266 / 4388 / 4307 ms | 4759 / 5043 / 4844 ms |
 
 - **The art drawn in the town cost the start**: about 2.8 s more before the first frame, on both. Baked, the start is
   main's.
@@ -130,10 +132,13 @@ FINAL_ROWS
   computer: the fourteen more figures, their shadows and name tags drawn each frame (the JavaScript's own share is small;
   most is the drawing). Two tries told no single culprit (no sidekicks' tags: 51.2 / 38.4; no sidekicks drawn: 49.8 /
   40.0; main 53.1 / 38.6 in that round).
-- **So the corner is cut, as the brief says: ten out at once, the rest at home, taking turns** (`botsOut` 10). Ten cost
-  nothing measurable (51.2 / 40.8 to main's 51.7 / 40.3), and eight no less. Every 15 to 30 s one bot out (standing, free,
-  at least 5 steps from you) goes home, fading out, and one from home comes out on a free square in the park as far from
-  you, fading in. Back from a game, the bot you played is out; a bot whose card is open stays. Who's out first is picked
+- **So the corner is cut, as the brief says: six out at once, the rest at home, taking turns** (`botsOut` 6). In the one
+  calm round ten out cost nothing measurable (51.2 / 40.8 to main's 51.7 / 40.3), and eight no less; the later rounds ran
+  on a much busier machine, where even six out (main's own count) read lower than main, so they can't tell a fps or two
+  apart. Six is main's count of figures in the square, each drawn the same way (one image made once), so its frame rate
+  is main's by construction; ten is one number away (`botsOut` in `feel.ts`) once Eric's phone shows the room. Every 10 to
+  20 s one bot out (standing, free, at least 5 steps from you) goes home, fading out, and one from home comes out on a
+  free square in the park as far from you, fading in. Back from a game, the bot you played is out; a bot whose card is open stays. Who's out first is picked
   at random each time the town opens, so a visit sees different faces.
 - **What's new on the hot path**: for each bot out, a sidekick's frame picked from its canvases (a short loop over its
   frames' end times, nothing allocated) instead of its dressed pawn; its fade (one multiply). The turns run between
@@ -146,7 +151,7 @@ FINAL_ROWS
   characters, Glim (Hollow's) 2500); the six pawns' names, rungs and clothes; the fourteen sidekicks (one a boss, in the
   ladder's order, each with idle, walk, sit and wave); every sheet against its sprite (times, size, feet and a hash of
   every frame); the card's line ("Hollow's sidekick", "Puddles' sidekick", none for a pawn); Hollow's three lines in
-  turn (no other home has lines); a sidekick's animation (idle, wave once after a tap, walk, sit); the turns (ten out,
+  turn (no other home has lines); a sidekick's animation (idle, wave once after a tap, walk, sit); the turns (six out,
   the rest at home on no square, never more than one extra out while one fades, apart, a held bot staying, every bot out
   in time; back from a game the bot you played is out; one called from home comes out).
 - `packages/app/test/town-bot-game.test.ts`: a sidekick's face on its strip, at its rating.
