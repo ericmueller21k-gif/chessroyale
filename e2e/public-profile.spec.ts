@@ -11,7 +11,8 @@ import { rankView } from "@chessroyale/core";
  * e2e can't play dozens of ranked games); the buttons are tried with two real players.
  *
  * Eric's rules (docs/rules/eric.md, "Nothing hidden, nothing shifts"): the page takes the same room while it loads and after, the
- * Ranked card is one height in every mode of its menu, the empty level line keeps its height.
+ * Ranked card is one height in every mode of its menu, and a note takes none (it's a toast). Every size and space on the page is
+ * Eric's mockup's, measured from the image (docs/decisions/2026-10-29-public-profile-fit.md): "the blocks' sizes and spaces" below pins them.
  */
 
 const isComputer = () => test.info().project.name === "desktop";
@@ -36,7 +37,7 @@ const noSideScroll = (page: Page) => page.evaluate(() => document.documentElemen
 const box = async (page: Page, selector: string) => (await page.locator(selector).first().boundingBox())!;
 /**
  * Where each part of the page is (page coordinates), to compare one moment with another: a box's left, top, width and height; a
- * line of text that centers itself (the name, the line under it, the level, the note) by its top and height only, since its width is its words'.
+ * line of text that centers itself (the name, the line under it) by its top and height only, since its width is its words'.
  */
 const layout = (page: Page) =>
   page.evaluate(() => {
@@ -47,7 +48,7 @@ const layout = (page: Page) =>
     };
     return {
       ...Object.fromEntries([".pp-head", ".pp-avatar", ".pp-actions", ".pp-ranked", ".pp-recent", ".pp-cosmetics"].map((s) => [s, at(s, true)])),
-      ...Object.fromEntries([".pp-name", ".pp-seen", ".pp-level", ".pp-note"].map((s) => [s, at(s, false)])),
+      ...Object.fromEntries([".pp-name", ".pp-seen"].map((s) => [s, at(s, false)])),
     } as Record<string, number[]>;
   });
 
@@ -92,10 +93,11 @@ test("every card's content, as in the mockup: the header, Ranked Standing, Recen
   await expect(ranked.locator(".pp-stat span")).toHaveText(["Win rate", "W / L", "Win streak"]);
   // Their rating is never shown: the 1v1 rating stays hidden.
   await expect(ranked).not.toContainText(/rating/i);
-  // The emblem is the ranked tiers' own (Gold 3), 96 px on a phone and 144 on a computer.
+  // The emblem is the ranked tiers' own (Gold 3), drawn in whole steps of its 48 px (96 on a phone, 144 on a computer) and shown at
+  // the mockup's size: 109 px on a phone, 141 on a computer (was 96 and 144, as drawn).
   const emblem = ranked.locator('[data-emblem="gold-d3"]');
   await expect(emblem).toHaveCount(1);
-  expect((await emblem.boundingBox())!.width).toBe(isComputer() ? 144 : 96);
+  expect(Math.abs((await emblem.boundingBox())!.width - (isComputer() ? 141 : 109))).toBeLessThan(1);
 
   // Recent Matches: the last five, newest first, both lists merged (the 1 v 1 games and the raid and the 50 v 50 among them).
   const recent = page.locator(".pp-recent");
@@ -145,11 +147,11 @@ test("the layout: a phone is one column; a computer has the header card, Ranked 
     const [card, ranked, recent, cosmetics] = [await box(page, ".pp-card"), await box(page, ".pp-ranked"), await box(page, ".pp-recent"), await box(page, ".pp-cosmetics")];
     const right = (b: { x: number; width: number }) => b.x + b.width;
     if (isComputer()) {
-      // Side by side, the same top, equal columns; the header card and Cosmetics across both.
+      // Side by side, the same top and height, the columns the mockup's 466 to 490 (was equal); the header card and Cosmetics across both.
       expect(Math.abs(ranked.y - recent.y), `${vp.width}: same top`).toBeLessThan(1);
       expect(Math.abs(ranked.height - recent.height), `${vp.width}: same height`).toBeLessThan(1);
       expect(right(ranked)).toBeLessThanOrEqual(recent.x);
-      expect(Math.abs(ranked.width - recent.width)).toBeLessThan(1);
+      expect(Math.abs(ranked.width / recent.width - 466 / 490), `${vp.width}: the mockup's columns`).toBeLessThan(0.01);
       expect(cosmetics.y).toBeGreaterThanOrEqual(ranked.y + ranked.height);
       for (const wide of [card, cosmetics]) {
         expect(Math.abs(wide.x - ranked.x)).toBeLessThan(1);
@@ -161,16 +163,128 @@ test("the layout: a phone is one column; a computer has the header card, Ranked 
       const back = await box(page, ".fd-back");
       expect(title.x).toBeLessThan(back.x + 200);
     } else {
-      // One column, in order, the width of the screen less 12 px each side.
+      // One column, in order, the width of the screen less the mockup's 10.7 px each side (was 12).
       expect(card.y).toBeLessThan(ranked.y);
       expect(ranked.y + ranked.height).toBeLessThanOrEqual(recent.y);
       expect(recent.y + recent.height).toBeLessThanOrEqual(cosmetics.y);
       for (const b of [ranked, recent, cosmetics]) {
-        expect(b.x).toBe(12);
-        expect(b.width).toBe(vp.width - 24);
+        expect(Math.abs(b.x - 10.7)).toBeLessThan(1);
+        expect(Math.abs(b.width - (vp.width - 21.4))).toBeLessThan(1);
       }
     }
     expect(await noSideScroll(page), `${vp.width}: no sideways scroll`).toBe(0);
+  }
+});
+
+/**
+ * Eric: "no spacing of our own": every size and space on the page is his mockup's, measured from the image (1.028 image px to a css
+ * px; docs/decisions/2026-10-29-public-profile-fit.md has the whole table). The numbers below are the mockup's, each with the
+ * tolerance the decision gives it (±2 px for a space, ±4 for a card's height).
+ */
+test("the blocks' sizes and spaces are the mockup's: each card's height, the gaps between them, the padding inside", async ({ page }) => {
+  await openDemo(page);
+  await loaded(page);
+  const near = (name: string, got: number, want: number, tol: number) => expect(Math.abs(got - want), `${name}: ${Math.round(got * 10) / 10}, the mockup's ${want}`).toBeLessThanOrEqual(tol);
+  for (const vp of sizes()) {
+    await page.setViewportSize(vp);
+    // (Every number is one the page can't fake: a box's own edges, page coordinates.)
+    const m = await page.evaluate(() => {
+      const R = (s: string, i = 0) => {
+        const r = document.querySelectorAll(s)[i]!.getBoundingClientRect();
+        return { l: r.left, r: r.right, t: r.top + scrollY, b: r.bottom + scrollY, w: r.width, h: r.height };
+      };
+      const wide = !!document.querySelector(".pp-wide");
+      const root = R(".pp");
+      const [card, ranked, recent, cos, actions, avatar] = [R(".pp-card"), R(".pp-ranked"), R(".pp-recent"), R(".pp-cosmetics"), R(".pp-actions"), R(".pp-avatar")];
+      const rows = document.querySelectorAll(".pp-recent .pp-row").length;
+      const lastRow = R(".pp-recent .pp-row", rows - 1);
+      const tiles = [...document.querySelectorAll(".pp-tile")].map((_, i) => R(".pp-tile", i));
+      const mid = (r: { t: number; b: number }) => (r.t + r.b) / 2;
+      return {
+        side: ranked.l - root.l,
+        card, ranked, recent, cos,
+        headToCard: card.t - R(".pp-head").b,
+        cardToAvatar: avatar.t - card.t,
+        avatarW: avatar.w,
+        buttonsW: R(".pp-actions .fd-btn").w,
+        buttonsH: R(".pp-actions .fd-btn").h,
+        buttonGap: R(".pp-actions .fd-btn", 1).l - R(".pp-actions .fd-btn").r,
+        buttonsToCardBottom: card.b - actions.b,
+        buttonsToRanked: ranked.t - actions.b,
+        cardToCols: ranked.t - card.b,
+        rankedToRecent: wide ? recent.l - ranked.r : recent.t - ranked.b,
+        colsToCos: cos.t - Math.max(ranked.b, recent.b),
+        rankedTitleMid: mid(R(".pp-ranked .pp-panel-head")) - ranked.t,
+        recentTitleMid: mid(R(".pp-recent .pp-panel-head")) - recent.t,
+        cosTitleMid: mid(R(".pp-cosmetics .pp-panel-head")) - cos.t,
+        recentFirstRow: R(".pp-recent .pp-row").t - recent.t,
+        recentRowPitch: R(".pp-recent .pp-row", 1).t - R(".pp-recent .pp-row").t,
+        recentLastToBottom: recent.b - lastRow.b,
+        cosToTiles: tiles[0]!.t - cos.t,
+        tileH: tiles[0]!.h,
+        tileLeft: tiles[0]!.l - cos.l,
+        tileGap: tiles[1]!.l - tiles[0]!.r,
+        tilesToBottom: cos.b - tiles[0]!.b,
+        pageH: document.documentElement.scrollHeight,
+      };
+    });
+    const at = (s: string) => `${vp.width}, ${s}`;
+    // The mockup's three items fit whole, "Weapon · Cobalt & Sage" too (no ellipsis; the tiles aren't equal: the longer line has more room).
+    const cutLines = await page.locator(".pp-tile-text > span:not(.pp-rarity)").evaluateAll((es) => es.filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent));
+    expect(cutLines, `${vp.width}: no color line cut`).toEqual([]);
+    if (isComputer()) {
+      near(at("the header card's height (no level line)"), m.card.h, 257.7, 3);
+      near(at("Ranked's height"), m.ranked.h, 312.7, 4);
+      near(at("Recent's height"), m.recent.h, 312.7, 4);
+      near(at("Cosmetics' height"), m.cos.h, 175.1, 4);
+      near(at("the page's side margin"), m.side, 15.5, 2);
+      near(at("the header to its card"), m.headToCard, 12.6, 2);
+      near(at("the card's top to the picture"), m.cardToAvatar, 2.9, 2);
+      near(at("the picture"), m.avatarW, 113.5, 2);
+      near(at("a button's width"), m.buttonsW, 205, 2);
+      near(at("a button's height"), m.buttonsH, 51.5, 2);
+      near(at("the gap between the buttons"), m.buttonGap, 14.6, 2);
+      near(at("the buttons to the card's bottom"), m.buttonsToCardBottom, 14.6, 2);
+      near(at("the header card to the two cards"), m.cardToCols, 12.6, 2);
+      near(at("between Ranked and Recent"), m.rankedToRecent, 12.6, 2);
+      near(at("the two cards to Cosmetics"), m.colsToCos, 12.6, 2);
+      near(at("Ranked's top to its title's middle"), m.rankedTitleMid, 31.1, 2);
+      near(at("Recent's top to its title's middle"), m.recentTitleMid, 27.2, 2);
+      near(at("Cosmetics' top to its title's middle"), m.cosTitleMid, 23.3, 2);
+      near(at("Recent's top to its first row"), m.recentFirstRow, 54, 2);
+      near(at("a row's pitch"), m.recentRowPitch, 50.6, 1);
+      near(at("the last row to Recent's bottom"), m.recentLastToBottom, 4.9, 2);
+      near(at("Cosmetics' top to the tiles"), m.cosToTiles, 46.2, 2);
+      near(at("a tile's height"), m.tileH, 113.8, 2);
+      near(at("Cosmetics' left to the first tile"), m.tileLeft, 16, 2);
+      near(at("the gap between tiles"), m.tileGap, 8, 2);
+      near(at("the last tile to Cosmetics' bottom"), m.tilesToBottom, 15.1, 2);
+    } else {
+      near("Ranked's height", m.ranked.h, 218.9, 4);
+      near("Recent's height", m.recent.h, 243.2, 4);
+      near("Cosmetics' height", m.cos.h, 94, 4);
+      near("the page's side margin", m.side, 10.7, 2);
+      near("the header to the picture", m.cardToAvatar + m.headToCard, 3.9, 2);
+      near("the picture", m.avatarW, 120.6, 2);
+      near("a button's height", m.buttonsH, 49.6, 2);
+      near("the gap between the buttons", m.buttonGap, 11.7, 2);
+      near("the buttons to Ranked Standing", m.buttonsToRanked, 13.6, 2);
+      near("between Ranked and Recent", m.rankedToRecent, 8.8, 2);
+      near("between Recent and Cosmetics", m.colsToCos, 8.8, 2);
+      near("Ranked's top to its title's middle", m.rankedTitleMid, 21.9, 2);
+      near("Recent's top to its title's middle", m.recentTitleMid, 18.5, 2);
+      near("Cosmetics' top to its title's middle", m.cosTitleMid, 15.6, 2);
+      near("Recent's top to its first row", m.recentFirstRow, 34, 2);
+      near("a row's pitch", m.recentRowPitch, 41.3, 1);
+      near("the last row to Recent's bottom", m.recentLastToBottom, 2.4, 2);
+      near("Cosmetics' top to the tiles", m.cosToTiles, 33.1, 2);
+      near("a tile's height (the brief's 58)", m.tileH, 57, 3);
+      near("Cosmetics' left to the first tile", m.tileLeft, 8.8, 2);
+      near("the gap between tiles", m.tileGap, 5.8, 2);
+      near("the last tile to Cosmetics' bottom", m.tilesToBottom, 4.5, 2);
+      // The whole page at 390 × 844 with five matches and three items: about 950 (the director's), and no more.
+      near("the page's height", m.pageH, 950, 20);
+    }
   }
 });
 
@@ -302,8 +416,8 @@ test("every mode's row in Recent Matches: a raid, 50 v 50, Squads", async ({ pag
   await expect(rows.nth(0).locator(".pp-face-boss canvas.bs-art")).toHaveCount(1);
   for (const row of [rows.nth(1), rows.nth(2)]) await expect(row.locator(".pp-face-mode svg")).toHaveCount(1);
   await expect(rows.nth(0).locator(".pp-row-text span")).toHaveText(/^Casual · /);
-  // Three games: still the room of five.
-  expect((await box(page, ".pp-rows")).height).toBeGreaterThanOrEqual(5 * 42);
+  // Three games: still the room of five rows (41.3 px a row on a phone, 50.6 on a computer; was 42).
+  expect((await box(page, ".pp-rows")).height).toBeGreaterThanOrEqual(5 * (isComputer() ? 50.6 : 41.3) - 1);
 });
 
 test("View all: the full list of matches and each worn item's details open in sheets; with nothing, they're greyed", async ({ page }) => {
@@ -351,7 +465,8 @@ test("four worn items all fit, nothing cut", async ({ page }) => {
     await expect(tiles).toHaveCount(4);
     await expect(tiles.locator("strong")).toHaveText(["Suit and Tie", "Pirate Hat", "Smiley Face", "Gift-Wrap Tube"]);
     const card = await box(page, ".pp-cosmetics");
-    // (Its words and pill, whole: inside the tile and none cut by its own box; the picture's box inside it too.)
+    // (Its words and pill, whole: inside the tile and none cut by its own box; the picture's box inside it too. The one allowance, as
+    // the brief gave it: the color line, "Weapon · Cobalt & Sage", may end in an ellipsis when it's too long for the tile.)
     const fits = await page.evaluate(() =>
       [...document.querySelectorAll<HTMLElement>(".pp-tile")].map((t) => {
         const r = t.getBoundingClientRect();
@@ -360,7 +475,8 @@ test("four worn items all fit, nothing cut", async ({ page }) => {
           return b.left >= r.left - 0.5 && b.right <= r.right + 0.5 && b.top >= r.top - 0.5 && b.bottom <= r.bottom + 0.5;
         };
         const parts = [...t.querySelectorAll<HTMLElement>(".pp-tile-art, .pp-tile-text, .pp-tile-text > *")];
-        return parts.length === 5 && parts.every((c) => inside(c) && (c.matches(".pp-tile-art") || (c.scrollWidth <= c.clientWidth + 1 && c.scrollHeight <= c.clientHeight + 1)));
+        const line = ".pp-tile-text > span:not(.pp-rarity)";
+        return parts.length === 5 && parts.every((c) => inside(c) && (c.matches(".pp-tile-art") || (c.scrollHeight <= c.clientHeight + 1 && (c.matches(line) || c.scrollWidth <= c.clientWidth + 1))));
       }),
     );
     expect(fits, `${vp.width}: nothing cut`).toEqual([true, true, true, true]);
@@ -370,9 +486,12 @@ test("four worn items all fit, nothing cut", async ({ page }) => {
       expect(t.x + t.width).toBeLessThanOrEqual(card.x + card.width);
       expect(t.y + t.height).toBeLessThanOrEqual(card.y + card.height);
     }
-    // Four tiles in two rows of two on a phone, one row of four on a computer.
+    // Four tiles in one row of four on a phone and on a computer (was two rows of two on a phone), each the height of the three-up tile.
     const ys = new Set(await tiles.evaluateAll((ts) => ts.map((t) => Math.round(t.getBoundingClientRect().top))));
-    expect(ys.size).toBe(isComputer() ? 1 : 2);
+    expect(ys.size).toBe(1);
+    const th = isComputer() ? 113.8 : 56.4;
+    for (let i = 0; i < 4; i++) expect(Math.abs((await tiles.nth(i).boundingBox())!.height - th), `${vp.width}: the tile's height`).toBeLessThan(1);
+    expect(Math.abs(card.height - (isComputer() ? 175.1 : 95.5)), `${vp.width}: the card's height`).toBeLessThan(4);
   }
 });
 
@@ -454,7 +573,7 @@ test("online: a dot at the picture's lower right and 'Online now'; last seen wit
   }
 });
 
-test("the level: an admin sees Level 38; a player sees an empty line that keeps its height", async ({ page, browser }) => {
+test("the level: an admin sees Level 38; a player's page has no level line, and no room kept for one", async ({ page, browser }) => {
   await openDemo(page, demoProfile(), { admin: true });
   await loaded(page);
   await expect(page.locator(".pp-level")).toHaveText("Level 38");
@@ -462,9 +581,18 @@ test("the level: an admin sees Level 38; a player sees an empty line that keeps 
   const player2 = await (await browser.newContext({ ...test.info().project.use })).newPage();
   await openDemo(player2);
   await loaded(player2);
-  await expect(player2.locator(".pp-level")).toHaveText("");
-  expect((await box(player2, ".pp-level")).height).toBe(22);
-  expect(await layout(player2)).toEqual(admin);
+  // (Was an empty line of 22 px, kept for every player.)
+  await expect(player2.locator(".pp-level")).toHaveCount(0);
+  const mine = await layout(player2);
+  // The admin's buttons and everything under them sit one line lower (23.8 to 24.4 px: the line's 20 and its space); the cards are the same size.
+  const shift = admin[".pp-actions"]![1]! - mine[".pp-actions"]![1]!;
+  expect(shift).toBeGreaterThan(22);
+  expect(shift).toBeLessThan(26);
+  for (const s of [".pp-ranked", ".pp-recent", ".pp-cosmetics"]) {
+    expect(mine[s]![3], s).toBe(admin[s]![3]);
+    expect(admin[s]![1]! - mine[s]![1]!, s).toBe(shift);
+  }
+  await player2.context().close();
 });
 
 test("nothing shifts while it loads: every part is where it will be, at the size it will be", async ({ page }) => {
@@ -479,7 +607,7 @@ test("nothing shifts while it loads: every part is where it will be, at the size
     await expect(page.getByRole("button", { name: "Challenge" })).toBeDisabled();
     await expect(page.getByRole("button", { name: "Add Friend" })).toBeDisabled();
     await expect(page.getByRole("button", { name: "More options" })).toBeDisabled();
-    await expect(page.locator(".pp-tile")).toHaveCount(4);
+    await expect(page.locator(".pp-tile")).toHaveCount(3);
     await expect(page.locator(".pp-row")).toHaveCount(5);
     if (vp === sizes().at(-1)) {
       await loaded(page);
@@ -490,16 +618,21 @@ test("nothing shifts while it loads: every part is where it will be, at the size
   }
 });
 
-test("nothing shifts when a note appears: the note line is always there", async ({ page }) => {
+test("nothing shifts when a note appears: it's a toast over the page's bottom, in no card's room", async ({ page }) => {
   await openDemo(page);
   await loaded(page);
   const before = await layout(page);
-  expect(before[".pp-note"]![1]).toBeGreaterThanOrEqual(20);
+  const height = await page.evaluate(() => document.documentElement.scrollHeight);
+  // (Was a line kept under the buttons, 20 px or more, empty or not.)
+  await expect(page.locator(".pp-note")).toHaveCount(0);
   // A refusal, as the server would say it.
   await page.route("**/api/friends/request", (route) => route.fulfill({ status: 400, json: { message: "This is a note." } }));
   await page.getByRole("button", { name: "Add Friend" }).click();
   await expect(page.locator(".fr-note")).toHaveText(/\S/);
+  await expect(page.locator(".pp-note")).toBeVisible();
+  expect(await page.locator(".pp-note").evaluate((e) => getComputedStyle(e).position)).toBe("fixed");
   expect(await layout(page)).toEqual(before);
+  expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(height);
 });
 
 test("your own page: from your pawn, today's profile with View public profile at its top; it opens yours with Challenge, Add Friend and ••• greyed", async ({ page }) => {
@@ -530,7 +663,7 @@ test("your own page: from your pawn, today's profile with View public profile at
   await expect(page.getByRole("button", { name: "Add Friend" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "More options" })).toBeDisabled();
   await expect(page.locator(".pp-seen")).toContainText("Online now · Joined");
-  await expect(page.locator(".pp-level")).toHaveText("");
+  await expect(page.locator(".pp-level")).toHaveCount(0);
   // Nothing from today's profile (your coins, edit, locker) leaks onto it.
   await expect(page.locator(".pp")).not.toContainText(/coins|Edit name|locker/i);
   // Back is to your profile.

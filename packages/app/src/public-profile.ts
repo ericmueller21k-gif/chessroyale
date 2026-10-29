@@ -69,6 +69,9 @@ export function tierTitle(rank: RankView): string {
   return rank.division === null ? rank.tier : `${rank.tier} ${rank.division}`;
 }
 
+/** A worn item's tile's share of the row: the mockup's tiles are 115 : 110 : 121 across, not equal, the longer color line with more room ("Weapon · Cobalt & Sage" fits whole). */
+export const tileWeight = (line: string): number => line.length + 110;
+
 /** "Peak rank: Gold 3", or "Peak rank: —" when there's none yet (a player who hasn't finished their placements). */
 export const peakLine = (peak: RankView | null | undefined): string => `Peak rank: ${peak && !peak.placement ? tierTitle(peak) : "—"}`;
 

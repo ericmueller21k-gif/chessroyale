@@ -150,8 +150,8 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
     frame under reduced motion. Nothing of them in the town's frame loop (the town shows no rank).
   - **Where:** the stage (each pawn's inner top corner, facing each other above "VS": 48 px on a phone, 96 on a
     computer; it lands with its pawn), the result card (your rank after the game: a division or tier up shows the new
-    one; its room kept from "Updating your rank…"), home's 1 v 1 panel (48), the profile's 1 V 1 section (96), the public profile's Ranked Standing card (96 on a phone, 144 on a
-    computer), and the
+    one; its room kept from "Updating your rank…"), home's 1 v 1 panel (48), the profile's 1 V 1 section (96), the public profile's Ranked Standing card (drawn at 96 on a phone, 144 on a
+    computer; shown at the mockup's 109 and 141), and the
     FAQ's ranks entry (each tier's division 5, Gold's five divisions, the top two). The in-game strips keep the pill
     alone (the board's room).
   - **An admin's `?rank=`** (`rankFromSwitch` in `ranked.ts`): `?rank=gold-3`, `?rank=wood-5`, `?rank=pearlescent`,

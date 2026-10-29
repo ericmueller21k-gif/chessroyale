@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { RANKED_1V1, rankView, type ItemLook, type RankedRecentGame } from "@chessroyale/core";
 import type { PublicProfile } from "../src/account.ts";
 import { WORN_ORDER } from "../src/components/FrontDoor.tsx";
-import { RANKED_MODES, RECENT_SHOWN, ago, hasOwnIcon, joinedText, levelLine, nth, peakLine, rankedState, recentRows, recordText, rpChange, seenLine, streakText, tierTitle, winRate, wornTiles } from "../src/public-profile.ts";
+import { RANKED_MODES, RECENT_SHOWN, ago, hasOwnIcon, joinedText, levelLine, nth, peakLine, rankedState, recentRows, recordText, rpChange, seenLine, streakText, tierTitle, tileWeight, winRate, wornTiles } from "../src/public-profile.ts";
 
 /** The public profile's words and numbers (docs/decisions/2026-10-28-public-profile.md). */
 
@@ -44,7 +44,7 @@ describe("the line under the name", () => {
     expect(ago(Date.UTC(2026, 9, 25, 12), NOW)).toBe("Oct 25");
     expect(joinedText(Date.UTC(2026, 9, 2, 12))).toBe("Oct 2026");
   });
-  it("the level line is Level N where the test switches count, else empty (and always a line)", () => {
+  it("the level line is Level N where the test switches count, else empty (the page then shows no line, and keeps no room for one)", () => {
     expect(levelLine(true, 38)).toBe("Level 38");
     expect(levelLine(false, 38)).toBe("");
   });
@@ -230,6 +230,17 @@ describe("Equipped Cosmetics", () => {
     expect(lines["Pirate Hat"]).toBe("Head · Opal");
     // (The tube's second color comes from its seed: seed 3 gives Sage.)
     expect(lines["Gift-Wrap Tube"]).toBe("Weapon · Cobalt & Sage");
+  });
+  it("a tile's share of the row grows with its color line, to the mockup's 115 : 110 : 121 across", () => {
+    const share = wornTiles(look).map((t) => tileWeight(t.line));
+    const sum = share.reduce((a, b) => a + b, 0);
+    // (The suit, the hat, the tube; 337 px of row on a 390 px phone.)
+    const widths = Object.fromEntries(wornTiles(look).map((t) => [t.name, (337.4 * tileWeight(t.line)) / sum]));
+    expect(widths["Suit and Tie"]).toBeCloseTo(112, -1);
+    expect(widths["Pirate Hat"]).toBeLessThan(widths["Suit and Tie"]!);
+    expect(widths["Gift-Wrap Tube"]).toBeGreaterThan(widths["Suit and Tie"]!);
+    expect(Math.abs(widths["Gift-Wrap Tube"]! - 117.7)).toBeLessThan(2);
+    expect(Math.abs(widths["Pirate Hat"]! - 107)).toBeLessThan(2);
   });
   it("the rarity pill is the tier's name in the tier's color, as the shop colors it", () => {
     const tiers = Object.fromEntries(wornTiles(look).map((t) => [t.name, t.tier]));
