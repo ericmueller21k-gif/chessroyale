@@ -19,13 +19,11 @@ import {
   chatPicksAfterGetting,
   cleanChatPickList,
   ownedChatPacks,
-  ratingTier,
   shopItem,
   starterItem,
   topPercent,
   type ChatPickKind,
   type ItemLook,
-  type RankEffect,
   type EquipSlot,
   type ShopState,
   type StoredChatPicks,
@@ -810,13 +808,11 @@ export interface PublicProfile {
   /** They hide when they're online (Settings → Friends): `online` false and `lastSeen` null, whatever the truth. */
   hidden?: boolean;
   rating: number | null;
-  /** The rank ("Weighty"), its place on the ladder (0 = Novice), its color and a top rank's pill effect. */
-  tier: { label: string; level: number; color: string; effect: RankEffect | null } | null;
   /** "Top 18%" among rated players (null until enough players have a rating). */
   topPercent: number | null;
   /** Banned for fair play (the profile says "Banned"; nothing else about a fair-play case is ever shown). */
   banned: boolean;
-  /** Ranked 1 v 1: the rank and the record (null when banned, as the rating). */
+  /** Ranked 1 v 1: the rank (the rank shown everywhere since Oct 28), the record, the peak, the streak and the recent games (null when banned, as the rating). */
   ranked1v1: RankedSummary | null;
   crowd: CrowdStats;
   boss: RaidStats;
@@ -922,7 +918,6 @@ export async function publicProfile(sql: Sql, userId: string, now: number): Prom
   }
   const raids = rows.filter((r) => r.mode === "boss");
   const banned = (await sql.first<{ status: string }>("SELECT status FROM fairplay_cases WHERE user_id = ?", userId))?.status === "banned";
-  const tier = ratingTier(banned ? null : rating);
   return {
     id: u.id,
     name: u.name,
@@ -932,7 +927,6 @@ export async function publicProfile(sql: Sql, userId: string, now: number): Prom
     online: !u.hide_online && u.last_seen !== null && now - u.last_seen < FRONT_DOOR.onlineWindowMs,
     ...(u.hide_online ? { hidden: true } : {}),
     rating: banned ? null : rating,
-    tier: tier ? { label: tier.label, level: tier.level, color: tier.color, effect: tier.effect } : null,
     topPercent: banned ? null : top,
     banned,
     ranked1v1: banned ? null : await rankedSummary(sql, u.id),

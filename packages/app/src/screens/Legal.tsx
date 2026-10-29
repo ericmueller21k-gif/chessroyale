@@ -151,20 +151,20 @@ function Privacy() {
         what={
           <>
             <p>
-              Your 1 v 1 rank: your tier, division and rank points (or how many placement games you've played), your wins, losses
-              and draws, when you last played, and a hidden rating of how well you play (a number and how sure it is) that
+              Your 1 v 1 rank: your tier, division and rank points (or how many placement games you've played), the highest you've
+              reached, your wins, losses and draws, your current run of wins, when you last played, and a hidden rating of how well you play (a number and how sure it is) that
               decides your rank points and whom you're matched with; and how many of today's games paid you coins (at most{" "}
               {RANKED_1V1.coins.perDay} a day do).
             </p>
             <p>
-              Each ranked game: the two players, the time control, the result and how it ended, every move, how long each move
-              took, and when it started and ended. If fair play checks a reported player's games, the engine's view of each of
+              Each ranked game: the two players, the time control, the result and how it ended, the rank points it moved for each
+              player, every move, how long each move took, and when it started and ended. If fair play checks a reported player's games, the engine's view of each of
               their moves is kept with the game. A game called off before both first moves keeps nothing, and neither does a game
               against a bot (it's played on your device).
             </p>
           </>
         }
-        why="your rank and record, matching you with players near your strength, and checking reported games for fair play."
+        why="your rank and record (on your profile, for anyone: your rank, your highest, your run of wins, and your last five games with whom you played and the rank points; never the hidden rating), matching you with players near your strength, and checking reported games for fair play."
         kept={
           <>
             your rank with your account. A game usually {RANKED_1V1.gamesKeepDays} days after it ends; longer only while a

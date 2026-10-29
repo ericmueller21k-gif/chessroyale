@@ -1,30 +1,9 @@
 import type { BossState, PlayerState } from "./match.ts";
-import { FRONT_DOOR, type RankDef, type RankEffect } from "./settings.ts";
 
 /**
  * What a profile shows that's worked out from a match or a rating, shared by the server (online matches, profiles)
  * and the app (solo matches it records itself). Nothing here is stored; see the server's accounts.ts.
  */
-
-export interface RatingTier {
-  /** The rank's name, which is also its whole label: e.g. "Weighty". */
-  name: string;
-  label: string;
-  /** Its place on the ladder, 0 (Novice) up. */
-  level: number;
-  color: string;
-  /** A top rank's pill treatment, or null. */
-  effect: RankEffect | null;
-}
-
-/** The rank a rating falls in (FRONT_DOOR.ratingRanks), or null without a rating. */
-export function ratingTier(rating: number | null | undefined, ranks: readonly RankDef[] = FRONT_DOOR.ratingRanks): RatingTier | null {
-  if (rating === null || rating === undefined || !Number.isFinite(rating) || ranks.length === 0) return null;
-  let i = 0;
-  while (i + 1 < ranks.length && rating >= ranks[i + 1]!.from) i++;
-  const r = ranks[i]!;
-  return { name: r.name, label: r.name, level: i, color: r.color, effect: r.effect ?? null };
-}
 
 /** "Top 18%": the share of rated players at or above `rating`'s place (1 = the best), rounded up, at least 1. */
 export function topPercent(rank: number, total: number): number {

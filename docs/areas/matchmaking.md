@@ -73,7 +73,7 @@ Lanes: `hub` (joining and filling a lobby, the queue screen), `ranked` (the matc
 | Lobby codes | `packages/server/src/codes.ts` |
 | Squads: parties, the Squads lobby and its queue | `packages/server/src/squads-party.ts`, `squads-lobby.ts`, `squads-do.ts`; `matchmaker.ts` (`seatSquads`) |
 | Joining, filling, the lobby's life, results | `packages/server/src/lobby.ts` (pure), `lobby-do.ts` (Durable Object), routes in `index.ts` |
-| The rating estimate and its curve | `packages/core/src/rating.ts`, `rating-curve.ts`; ranks in `profile.ts` and `RATING_RANKS` |
+| The rating estimate and its curve | `packages/core/src/rating.ts`, `rating-curve.ts` (the rating's own rank names, `RATING_RANKS`, were retired on Oct 28, 2026: the rank shown is 1 v 1's) |
 | App side: the queue screen, connecting | `packages/app/src/screens/Queue.tsx`, `Lobby.tsx`, `net.ts` |
 
 ## Settings

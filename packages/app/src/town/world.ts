@@ -351,8 +351,10 @@ export const BOTS: readonly TownBot[] = [
 ];
 /** A bot's name as the town and the game show it: "Pin Pete (bot)" (Eric: "in parentheses like bot after their name"). */
 export const botLabel = (b: TownBot): string => `${b.name} (bot)`;
+/** A rating as a card's line says it ("Rating 2200"). */
+export const ratingLine = (rating: number): string => `Rating ${rating}`;
 /** A bot's rating as its card says it. */
-export const ratingText = (b: TownBot): string => `Rating ${b.rating}`;
+export const ratingText = (b: TownBot): string => ratingLine(b.rating);
 /** The first button of a table's card where a bot waits: "Play Tempo Tess (bot) · 1500". */
 export const playAtTableText = (b: TownBot): string => `Play ${botLabel(b)} · ${b.rating}`;
 /** A sidekick's line on its card, under its name: "Hollow's sidekick" ("Puddles' sidekick", as his home's sign has it); null for a pawn. */
@@ -581,6 +583,16 @@ export interface Person {
   going: boolean;
   trip: Sq | null;
   due: boolean;
+  /**
+   * A real player's account id (Oct 28: no real players walk in the town yet; only the e2e test player, `addTestPlayer`, has one).
+   * A person with one gets the player's card: its picture is their profile icon (`icon`), a button for their profile.
+   * Absent for you, the bots and the testers' crowd.
+   */
+  uid?: string;
+  /** A real player's profile icon (the drawing's data address, or an emoji of an older account), as `UserIcon` draws it. */
+  icon?: string;
+  /** A real player's rating, as their card shows it. */
+  rating?: number;
 }
 
 /** Whether a person sits at a chess table now: stopped on one of its stools, meaning to sit. Its table, or null. */
@@ -755,6 +767,51 @@ export function addCrowd(t: Town, n: number): void {
     t.people.push(p);
     t.all.push(p.walker);
   }
+}
+
+/**
+ * A test player (the `__townPlayer` e2e hook, test switches only; never in the real town): a pawn with a name, an account
+ * id, a profile icon and a rating, standing still on the free square nearest you, so a test can tap it and see the card a
+ * real player will get (its picture opens their profile). Kept out of the crowd, which wanders. Answers its index in the people.
+ */
+export function addTestPlayer(t: Town, who: { uid: string; name: string; icon?: string; rating?: number }): number {
+  const at = t.you.walker.here();
+  const sq = spotNear(t, t.you.walker, at, true) ?? freeSpot(t.rnd, at, 2, [], t, 1);
+  const p: Person = {
+    id: `player:${who.uid}`,
+    name: who.name,
+    look: { side: "light", tint: null, wear: null },
+    you: false,
+    walker: new Walker(sq, TOWN_FEEL.botStepMs, true),
+    sit: false,
+    bot: null,
+    waved: -Infinity,
+    home: false,
+    came: -Infinity,
+    leaves: Infinity,
+    going: false,
+    trip: null,
+    due: false,
+    uid: who.uid,
+    ...(who.icon ? { icon: who.icon } : {}),
+    rating: who.rating ?? 1500,
+  };
+  t.people.push(p);
+  t.all.push(p.walker);
+  return t.people.length - 1;
+}
+
+/** The unseen walkers `fillTables` put on the stools, by town. */
+const fillers = new WeakMap<Town, Walker[]>();
+/**
+ * A test hook's (`__townFull`, test switches only): `on`, someone unseen stands on the west stool of every table, so no table is free
+ * for you and a bot (a bot's card greys its Play: "Tables are full"); off, they leave.
+ */
+export function fillTables(t: Town, on: boolean): void {
+  for (const w of fillers.get(t) ?? []) t.all.splice(t.all.indexOf(w), 1);
+  const ws = on ? TABLES.map((tb) => new Walker(tb.stools[0], 100, false)) : [];
+  fillers.set(t, ws);
+  t.all.push(...ws);
 }
 
 /**

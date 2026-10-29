@@ -1,6 +1,6 @@
 import type { ComponentChildren, VNode } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import { controlLabel, duelControl } from "@chessroyale/core";
+import { controlLabel, duelControl, type RankView } from "@chessroyale/core";
 import { other, type Color, type DuelEnd } from "@chessroyale/chess/duel";
 import { Board } from "../components/Board.tsx";
 import { seatKey } from "../board/yours.ts";
@@ -15,7 +15,8 @@ import { DuelRankPill } from "../components/DuelRankPill.tsx";
 import { DuelStage, type StageSide } from "../components/DuelStage.tsx";
 import { clockAt, type DuelQueue, type DuelSession, type DuelSide, type DuelSnapshot } from "../duel.ts";
 import { account } from "../account.ts";
-import { ranked1v1Rank } from "../ranked.ts";
+import { ranked1v1Rank, yourRankShown } from "../ranked.ts";
+import { RankEmblem } from "../components/RankEmblem.tsx";
 import { clockShown } from "../clock-text.ts";
 
 /**
@@ -115,7 +116,7 @@ function searchStage(queue: DuelQueue, now: number, few: boolean, onKeep: () => 
  */
 export function versusStage(snap: DuelSnapshot) {
   const you = snap.you;
-  const side = (c: Color): StageSide => ({ name: snap.players[c].name, look: snap.players[c].look, rank: snap.players[c].rank });
+  const side = (c: Color): StageSide => ({ name: snap.players[c].name, look: snap.players[c].look, rank: c === you ? yourRankShown(snap.players[c].rank) : snap.players[c].rank });
   const there = snap.phase === "versus";
   return (
     <DuelStage
@@ -175,6 +176,12 @@ export function resultReason(end: DuelEnd, you: Color, them: string): string {
   }
 }
 
+/** Your rank after the game (an admin's `?rank=` in its place), or null: none to show (yet). */
+function rankAfter(snap: DuelSnapshot): RankView | null {
+  const c = !snap.town && !snap.bot && snap.outcome && !snap.outcome.unranked ? snap.outcome.change : null;
+  return c ? yourRankShown(c.after) : null;
+}
+
 /** Your rank's change, in a line ("Gold 2 · 45 RP (+18)", "Placement 2/5", "Placed: Gold 4 · 25 RP"). */
 function rankLine(snap: DuelSnapshot): string | null {
   if (snap.town) return "Casual game";
@@ -185,9 +192,10 @@ function rankLine(snap: DuelSnapshot): string | null {
   if (o.unranked) return "Unranked game";
   const c = o.change;
   if (!c) return null;
-  if (c.placed) return `Placed: ${c.after.label}`;
-  if (c.points === null) return c.after.label;
-  return `${c.after.label} (${c.points >= 0 ? "+" : "−"}${Math.abs(c.points)})`;
+  const after = yourRankShown(c.after);
+  if (c.placed) return `Placed: ${after.label}`;
+  if (c.points === null) return after.label;
+  return `${after.label} (${c.points >= 0 ? "+" : "−"}${Math.abs(c.points)})`;
 }
 
 /** A player's strip: pawn, name, rank, and their clock (always in the same place, readable at a glance). */
@@ -200,7 +208,7 @@ function DuelStrip({ p, c, you, ms, running, clockShownNow, away }: { p: DuelSid
       </span>
       <span class="dv-strip-who">
         <PlayerName name={p.name} uid={p.uid ?? undefined} you={you} bot={p.bot} class="dv-name" />
-        <DuelRankPill rank={p.rank} />
+        <DuelRankPill rank={you ? yourRankShown(p.rank) : p.rank} />
         {away && <span class="dv-away">away</span>}
       </span>
       <span class={`dv-clock${running ? " on" : ""}${low ? " low" : ""}`} aria-label={`${you ? "Your" : `${p.name}'s`} clock: ${clockShownNow ? clockShown(ms, { tenths: true }) : "not set"}`}>
@@ -402,15 +410,21 @@ function DuelResult({ snap, onHome, onAgain }: { snap: DuelSnapshot; onHome: () 
   const line = rankLine(snap);
   const coins = snap.outcome?.coins ?? 0;
   const title = resultTitle(end, you);
+  // (A ranked game's line keeps its emblem's room from "Updating your rank…" on, so nothing moves when it arrives; the
+  // new emblem after a division or tier up.)
+  const ranked = !snap.town && !snap.bot && end.result !== "aborted";
   return (
     <div class={`dv-result${title === "You won" ? " won" : title === "You lost" ? " lost" : ""}`} role="status">
       <strong class="dv-result-title">{title}</strong>
       <p class="dv-result-why">{resultReason(end, you, snap.players[other(you)].name)}</p>
       {(line || coins > 0) && (
-        <span class="dv-result-line">
-          {line && <span class="dv-result-rank">{line}</span>}
-          {line && coins > 0 && " · "}
-          {coins > 0 && <span class="dv-result-coins">+{coins} coins</span>}
+        <span class={`dv-result-line${ranked ? " dv-result-ranked" : ""}`}>
+          {ranked && <RankEmblem rank={rankAfter(snap)} class="dv-result-emblem" />}
+          <span class="dv-result-words">
+            {line && <span class="dv-result-rank">{line}</span>}
+            {line && coins > 0 && " · "}
+            {coins > 0 && <span class="dv-result-coins">+{coins} coins</span>}
+          </span>
         </span>
       )}
       <div class="dv-result-actions">

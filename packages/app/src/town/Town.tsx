@@ -14,6 +14,10 @@
  * dressed in their crate items): a tap on one opens its card ("<name> (bot)", its rating, Play: you both walk to a free
  * table and the game opens once you sit, `onPlayBot`); a table where a bot waits offers "Play <name> (bot) · <rating>".
  * Back from the game (`seat`), you sit at that table, the bot across.
+ * Oct 28 (Eric's mockup): every card is dark with a gold border; a person's card (a bot's, and a real player's when they come) is
+ * one row at one size: their picture in a round ring, their name ("(bot)" in gray), a sidekick's line, the rating and, under it, "Tables are
+ * full" when they are (that row always there), and Play with crossed swords. A real player's picture is a button for their
+ * profile; a bot's isn't.
  *
  * One requestAnimationFrame loop draws everything on one canvas; it stops when the screen closes or the tab is hidden.
  * Test hooks (e2e only): the canvas carries `data-you="c,r"` (your square) and `data-ready="1"` once a frame is drawn;
@@ -23,22 +27,27 @@
  * light with nothing in front of it (the lights at dusk and night); the canvas's `data-sit="1"` while you sit at a table; and
  * `window.__townGather()` sends the three nearest bots to stand beside you; `__townAt("bot", i)`, `__townCall(i)` and
  * `__townBots()` for the bots (docs/areas/town-square.md); `__townGlide(id)` glides the camera to a home, as its chip does;
- * `__townTags()` the name tags drawn in the last frame.
+ * `__townPlayer(uid, name, icon?, rating?)` stands a test player (a pawn with an account id) beside you, and
+ * `__townAt("player", uid)` says where to tap it (the real town has no players yet); `__townFull(on)` fills every table's west stool
+ * with someone unseen (no table is free for a game: a bot's card greys its Play); `__townTags()` the name tags drawn in the last frame.
  * docs/areas/town-square.md.
  */
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
+import { UserIcon } from "../components/PixelIcon.tsx";
+import { openProfile } from "../profile-nav.ts";
 import { account, onAccountChange, playerName } from "../account.ts";
 import { testParams, testSwitchesAllowed } from "../test-switches.ts";
 import { play, warmSounds } from "../sound.ts";
 import { SELECT_SOUND, TOWN_SOUNDS, townSound } from "../characters/boss-select.ts";
 import { N, proj, wrapF } from "./camera.ts";
 import { TOWN_FEEL } from "./feel.ts";
+import { BarsIcon, SwordsIcon } from "./CardIcons.tsx";
 import { TownChat } from "./TownChat.tsx";
 import { TownChatTools } from "./TownChatTools.tsx";
 import { Press } from "./press.ts";
 import { PAWN_PX, Renderer, pawnImage, type Hit } from "./render.ts";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
-import { BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, tdist, tick, townLine, waitingBot, walkWalker, type HomeId, seatOf, seatText, type Person, type Place, type Seat, type Sq, type StatueId, type Target } from "./world.ts";
+import { BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, tdist, tick, townLine, waitingBot, walkWalker, type HomeId, seatOf, seatText, type Person, type Place, type Seat, type Sq, type StatueId, type Target } from "./world.ts";
 import { dressedPawn, lookKey } from "./you-look.ts";
 import type { BotGameAsk } from "./TownPage.tsx";
 import "./town.css";
@@ -46,12 +55,12 @@ import "./town.css";
 const CHIPS = TOWN_FEEL.maxChips;
 
 /**
- * The card open over a boss, a home, the Colosseum or a chess table (`i`: its index in HOMES, the bosses being in the same
- * order; the Colosseum's is HOMES.length; a table's, its index in TABLES), and its confirm.
+ * The card open over a boss, a home, the Colosseum, a chess table or a person (`i`: its index in HOMES, the bosses being in
+ * the same order; the Colosseum's is HOMES.length; a table's, its index in TABLES; a person's, its index in the town's
+ * people), and its confirm.
  */
 export interface Card {
-  kind: "boss" | "home" | "coliseum" | "table" | "bot";
-  /** (A bot's: its index in the town's people.) */
+  kind: "boss" | "home" | "coliseum" | "table" | "person";
   i: number;
   confirm: boolean;
   /** A table where two others are playing: its card offers to watch their game (Eric, Oct 27), not a seat. */
@@ -62,6 +71,8 @@ export interface Card {
   full?: boolean;
   /** A boss's or a home's card: its line this time (`townLine`: only Hollow's has lines, the next one each time it opens). */
   line?: string | null;
+  /** A bot's card: its picture, made once as the card opens (a sidekick's face, a pawn's look as it's dressed; an image's address). */
+  face?: string | null;
 }
 
 type Ctl = ReturnType<typeof startTown>;
@@ -87,9 +98,10 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, seat = null }: { on
   }, []);
   const home = card && (card.kind === "boss" || card.kind === "home") ? HOMES[card.i]! : null;
   const people = ctl.current?.town.people;
-  // A bot's card, or the bot waiting at a table's (from BOTS: its name and rating).
-  const bot = card?.kind === "bot" ? people?.[card.i]?.bot : card?.kind === "table" && card.bot !== undefined ? people?.[card.bot]?.bot : null;
-  const label = card?.kind === "coliseum" ? COLISEUM_PLACE.name : card?.kind === "table" ? "Chess table" : card?.kind === "bot" && bot ? botLabel(bot) : home ? (card!.confirm ? "Leave the town square?" : card!.kind === "boss" ? home.boss : home.name) : undefined;
+  // A person's card (a bot's; a real player's), or the bot waiting at a table's (a bot from BOTS: its name and rating).
+  const person = card?.kind === "person" ? (people?.[card.i] ?? null) : null;
+  const bot = person ? person.bot : card?.kind === "table" && card.bot !== undefined ? people?.[card.bot]?.bot : null;
+  const label = card?.kind === "coliseum" ? COLISEUM_PLACE.name : card?.kind === "table" ? "Chess table" : person ? (bot ? botLabel(bot) : person.name) : home ? (card!.confirm ? "Leave the town square?" : card!.kind === "boss" ? home.boss : home.name) : undefined;
 
   return (
     <div class="town-screen">
@@ -108,8 +120,9 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, seat = null }: { on
         <div class="town-overlay">
           {/* The chat log, top left (its own file): under the cards; while it shows it takes every touch on its own area (the map under it gets none), faded none; the chips keep off its box (CHAT_BOX). */}
           <TownChat />
-          {/* The card: over the boss's head or the home's top, its tail pointing there (placed every frame). */}
-          <div class="town-card" ref={cardEl} role="dialog" aria-label={label} style={{ display: card ? "" : "none" }}>
+          {/* The card: over the boss's head or the home's top, its tail pointing there (placed every frame). Dark, with a gold border
+              (Eric's mockup, Oct 28); a person's is one row at one size (`town-person`). */}
+          <div class={card?.kind === "person" ? "town-card town-person" : "town-card"} ref={cardEl} role="dialog" aria-label={label} style={{ display: card ? "" : "none" }}>
             {card && home && card.confirm && (
               <>
                 <h2>Leave the town square?</h2>
@@ -153,17 +166,41 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, seat = null }: { on
             )}
             {/* A chess table's (no title: Eric, Oct 27): a casual or ranked game of normal chess will start here (the tables'
                 matchmaking is the next job); at a table where two others play, watching their game. Shown greyed, not hidden. */}
-            {/* A bot's (Oct 27, Eric): its name, "(bot)", its rating, and Play: you both walk to a free table and the game
-                opens when you sit. Every table taken: Play greyed, reading "Play · Tables are full" (in the button, so the
-                card hugs its content and nothing is added round it). */}
-            {card?.kind === "bot" && bot && (
+            {/* A person's (Oct 27, Eric; Oct 28, his mockup): one row at one size, whoever it is. Their picture in a round ring (a
+                sidekick's face in blue, a pawn's own look in ivory; a real player's profile icon, in ivory, a button for their
+                profile: a bot's picture is no button), their name ("(bot)" in gray after a bot's), a sidekick's line, the rating
+                with its bars and, always its own row so nothing moves, "Tables are full" (or, for a real player, whom you can't
+                challenge yet: "Coming soon"); and Play with crossed swords: you both walk to a free table and the game opens when
+                you sit. Every table taken: Play greyed. */}
+            {card?.kind === "person" && person && (
               <>
-                <h2>{botLabel(bot)}</h2>
-                {/* A boss's sidekick (Oct 28): whose, under its name. The pawns' cards stay as they were. */}
-                {sidekickText(bot) && <p class="town-card-text">{sidekickText(bot)}</p>}
-                <p class="town-card-text">{ratingText(bot)}</p>
-                <button type="button" class="town-btn primary" disabled={card.full} onClick={() => ctl.current?.play()}>
-                  {card.full ? "Play · Tables are full" : "Play"}
+                {person.uid ? (
+                  <button type="button" class="town-pic player" aria-label={`View ${person.name}'s profile`} onClick={() => openProfile({ uid: person.uid, name: person.name, you: person.uid === account().profile?.user.id })}>
+                    <UserIcon icon={person.icon ?? "♟"} />
+                  </button>
+                ) : (
+                  <div class={bot?.boss ? "town-pic sidekick" : "town-pic pawn"} aria-hidden="true">
+                    {card.face && <img src={card.face} alt="" draggable={false} />}
+                  </div>
+                )}
+                <div class="town-who">
+                  <h2>
+                    <span class="town-name">{bot ? bot.name : person.name}</span>
+                    {bot && <span class="town-bot"> (bot)</span>}
+                  </h2>
+                  {/* A boss's sidekick (Oct 28): whose, under its name; the row is there for a pawn too (empty). */}
+                  <p class="town-sub">{bot ? sidekickText(bot) : null}</p>
+                  <p class="town-rate">
+                    <BarsIcon />
+                    <span>{bot ? ratingText(bot) : ratingLine(person.rating ?? 0)}</span>
+                  </p>
+                  <p class="town-note" id="town-card-note">
+                    {card.full ? "Tables are full" : bot ? null : "Coming soon"}
+                  </p>
+                </div>
+                <button type="button" class="town-btn primary town-play" disabled={!bot || card.full} aria-describedby={!bot || card.full ? "town-card-note" : undefined} onClick={() => ctl.current?.play()}>
+                  <SwordsIcon />
+                  Play
                 </button>
               </>
             )}
@@ -307,6 +344,10 @@ function startTown(
   let card: Card | null = null;
   let cardW = NaN;
   let cardH = NaN;
+  /** Where the card was last placed (its corner, its tail's place; NaN: write them): written only when they move, as the chips' are. */
+  let cardX = NaN;
+  let cardY = NaN;
+  let cardA = NaN;
   const chipPlace: (Place | null)[] = chipEls.map(() => null);
   // ---- The close-up on a statue: which (its index in STATUES; -1: none, also once the glide out ends), whether the
   // camera is gliding in (or out), how far (0 to 1, linear in time), and a tap on a statue that sent you walking (the
@@ -446,7 +487,7 @@ function startTown(
     }
     tick(town, now);
     // A bot's card: whether a table is free for you both, to grey its Play (checked only while one is open: no search).
-    if (card?.kind === "bot") {
+    if (card?.kind === "person" && town.people[card.i]!.bot) {
       const full = !anyTableFree(town, town.people[card.i]!);
       if (full !== !!card.full) setCard({ ...card, full });
     }
@@ -509,8 +550,14 @@ function startTown(
   }
 
   // ---- The card: open, its confirm, closed; placed over what it's about every frame.
-  /** The bot a card holds still: a bot's own, or the one waiting at a table's. */
-  const heldBy = (c: Card | null): Person | null => (c?.kind === "bot" ? town.people[c.i]! : c?.kind === "table" && c.bot !== undefined ? town.people[c.bot]! : null);
+  /**
+   * A bot's picture for its card, made once as the card opens (never in the frame loop): a sidekick's face (`spriteFace`, its idle's
+   * first frame), a pawn's own look as it stands in the square (its crate items on, the dressed art `botArt`; the plain pawn until that's
+   * made), cut to what's drawn.
+   */
+  const faceOf = (p: Person): string | null => (isSprite(p.look) ? r.spriteFace(p) : pawnFace(r.botArt.get(p.id)?.img ?? pawnImage(p.look.side, p.look.tint)));
+  /** The person a card holds still: a person's own, or the bot waiting at a table's. */
+  const heldBy = (c: Card | null): Person | null => (c?.kind === "person" ? town.people[c.i]! : c?.kind === "table" && c.bot !== undefined ? town.people[c.bot]! : null);
   function setCard(c: Card | null) {
     // A boss's card opening: it says something (Eric, Oct 27), once a tap (its confirm opening is the same card).
     if (c?.kind === "boss" && !(card?.kind === "boss" && card.i === c.i)) {
@@ -527,8 +574,13 @@ function startTown(
       const line = townLine(id, n);
       if (line) ((c = { ...c, line }), opens.set(id, n + 1));
     } else if (c && card && c.kind === card.kind && c.i === card.i && card.line) c = { ...c, line: card.line };
-    // A bot's card opening: a sidekick waves, once (Oct 28).
-    if (c?.kind === "bot" && !(card?.kind === "bot" && card.i === c.i)) town.people[c.i]!.waved = performance.now();
+    // A person's card opening: a sidekick waves, once (Oct 28), and its picture is made, once (kept while the card stays: `full` changing
+    // sets the card again).
+    if (c?.kind === "person" && !(card?.kind === "person" && card.i === c.i)) {
+      const who = town.people[c.i]!;
+      who.waved = performance.now();
+      if (who.bot) c = { ...c, face: faceOf(who) };
+    } else if (c?.kind === "person" && card?.kind === "person" && card.face !== undefined) c = { ...c, face: card.face };
     if (card?.kind === "boss") town.bosses[card.i]!.held = false;
     const was = heldBy(card);
     if (was && town.hold === was && town.meet?.bot !== was) holdBot(town, null);
@@ -539,7 +591,7 @@ function startTown(
     card = c;
     // (A boss stays where it is while its card is open, so you can walk up to it.)
     if (c?.kind === "boss") town.bosses[c.i]!.held = true;
-    cardW = cardH = NaN;
+    cardW = cardH = cardX = cardY = cardA = NaN;
     onCard(c);
   }
   const A = { x: 0, y: 0 };
@@ -550,15 +602,26 @@ function startTown(
       cardW = cardEl.offsetWidth;
       cardH = cardEl.offsetHeight;
     }
-    if (!r.anchor(card.kind === "boss" ? "boss" : card.kind === "table" ? "table" : card.kind === "bot" ? "person" : "home", card.i, A)) {
+    if (!r.anchor(card.kind === "boss" ? "boss" : card.kind === "table" ? "table" : card.kind === "person" ? "person" : "home", card.i, A)) {
       cardEl.style.visibility = "hidden";
       return;
     }
     cardEl.style.visibility = "";
     const left = Math.max(8, Math.min(r.W - cardW - 8, A.x - cardW / 2));
     const top = Math.max(8, Math.min(r.H - cardH - 8, A.y - cardH - 14));
-    cardEl.style.transform = `translate3d(${left.toFixed(1)}px, ${top.toFixed(1)}px, 0)`;
-    cardEl.style.setProperty("--ax", `${Math.max(16, Math.min(cardW - 16, A.x - left)).toFixed(1)}px`);
+    // (Written only when it has moved: a card over someone standing still writes nothing, and a change to `--ax`, which every
+    // part of the card inherits, would make the browser work out the card's styles again every frame.)
+    if (!(Math.abs(left - cardX) < 0.05 && Math.abs(top - cardY) < 0.05)) {
+      cardEl.style.transform = `translate3d(${left.toFixed(1)}px, ${top.toFixed(1)}px, 0)`;
+      cardX = left;
+      cardY = top;
+    }
+    // (The tail keeps 20 px from the card's ends: its point is 14 px wide at the base, the corners round at 14.)
+    const ax = Math.max(20, Math.min(cardW - 20, A.x - left));
+    if (!(Math.abs(ax - cardA) < 0.05)) {
+      cardEl.style.setProperty("--ax", `${ax.toFixed(1)}px`);
+      cardA = ax;
+    }
   }
   const onKey = (e: KeyboardEvent) => {
     if (e.key !== "Escape") return;
@@ -618,8 +681,9 @@ function startTown(
       if (hit.person.you) return null;
       key = `p:${hit.person.id}`;
       target = { kind: "beside", at: hit.person.walker.here() };
-      // A bot: its card (its name, rating and Play), and it stops while it's open.
-      if (hit.person.bot) c = { kind: "bot", i: town.people.indexOf(hit.person), confirm: false, full: !anyTableFree(town, hit.person) };
+      // A bot: its card (its picture, name, rating and Play), and it stops while it's open.
+      // (A real player's too, once they walk in the town: Oct 28, only the test player has an account id.)
+      if (hit.person.bot || hit.person.uid) c = { kind: "person", i: town.people.indexOf(hit.person), confirm: false, full: !!hit.person.bot && !anyTableFree(town, hit.person) };
     }
     return { key, dest: destFor(town, town.you.walker, target), card: c, statue };
   };
@@ -705,8 +769,9 @@ function startTown(
 
   // A test hook (e2e, with the test switches on: test-switches.ts): where to tap a boss, a home or the Colosseum (its gate)
   // now, in the box.
-  const hookAt = (kind: "boss" | "home" | "coliseum" | "statue" | "table" | "lamp" | "light" | "bot", id?: HomeId | StatueId | "coliseum" | number) => {
+  const hookAt = (kind: "boss" | "home" | "coliseum" | "statue" | "table" | "lamp" | "light" | "bot" | "player", id?: HomeId | StatueId | "coliseum" | number | string) => {
     const out = { x: 0, y: 0 };
+    if (kind === "player") return testSwitchesAllowed() && r.tapPoint("person", town.people.findIndex((p) => p.uid === id), out) ? out : null;
     if (kind === "bot") return testSwitchesAllowed() && r.tapPoint("person", town.people.findIndex((p) => p.bot === BOTS[Number(id)]), out) ? out : null;
     if (kind === "table") return testSwitchesAllowed() && r.tapPoint("table", Number(id), out) ? out : null;
     if (kind === "lamp") return testSwitchesAllowed() && r.lampAt(Number(id), out) ? out : null;
@@ -826,7 +891,12 @@ function startTown(
     town.turnMs = ms;
     town.nextTurnAt = 0;
   };
-  const hooks = window as unknown as { __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags };
+  // ... `__townPlayer(uid, name, icon?, rating?)`: a test player (a pawn with an account id: a real player's card, whose picture opens
+  // their profile) stands still beside you; answers its index in the people. The real town has no players yet.
+  const hookPlayer = (uid: string, name: string, icon?: string, rating?: number): number => (testSwitchesAllowed() ? addTestPlayer(town, { uid, name, icon, rating }) : -1);
+  // ... `__townFull(on)`: someone unseen on one stool of every table (no table free for you and a bot: its card's Play greys), or not.
+  const hookFull = (on: boolean) => testSwitchesAllowed() && fillTables(town, on);
+  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags };
   hooks.__townAt = hookAt;
   hooks.__townGlide = hookGlide;
   hooks.__townGather = hookGather;
@@ -836,6 +906,8 @@ function startTown(
   hooks.__townCall = hookCall;
   hooks.__townBots = hookBots;
   hooks.__townTurns = hookTurns;
+  hooks.__townPlayer = hookPlayer;
+  hooks.__townFull = hookFull;
   hooks.__townBossBack = hookBossBack;
   hooks.__townTags = hookTags;
 
@@ -853,7 +925,7 @@ function startTown(
     closeCard: () => setCard(null),
     /** A bot's card's Play: you both walk to the nearest table free for you, to sit; the game opens when you both do. */
     play: () => {
-      if (card?.kind !== "bot") return;
+      if (card?.kind !== "person" || !town.people[card.i]!.bot) return;
       const m = tableFor(town, town.people[card.i]!);
       if (!m) return;
       setCard(null);
@@ -900,6 +972,8 @@ function startTown(
       delete hooks.__townCall;
       delete hooks.__townBots;
       delete hooks.__townTurns;
+      delete hooks.__townPlayer;
+      delete hooks.__townFull;
       delete hooks.__townBossBack;
       delete hooks.__townTags;
       if (card?.kind === "boss") town.bosses[card.i]!.held = false;
@@ -930,3 +1004,31 @@ function drawFace(c: HTMLCanvasElement, img: HTMLCanvasElement, box: readonly [x
   g.drawImage(img, box[0], box[1], box[2], box[2], 0, 0, c.width, c.height);
 }
 
+/**
+ * A pawn's picture for its card (Oct 28): its art (the pawn as it stands in the square, items and tint on) cut to what's drawn and set
+ * in the middle of a square with a little room round it (the ring is round: a pawn's wide foot would be cut at the corners), as an
+ * image's address. Made once as a card opens. Null if there's nothing drawn.
+ */
+function pawnFace(art: HTMLCanvasElement): string | null {
+  const g = art.getContext("2d")!;
+  const d = g.getImageData(0, 0, art.width, art.height).data;
+  let x0 = art.width;
+  let y0 = art.height;
+  let x1 = -1;
+  let y1 = -1;
+  for (let y = 0; y < art.height; y++)
+    for (let x = 0; x < art.width; x++)
+      if (d[(y * art.width + x) * 4 + 3]! > 24) ((x0 = Math.min(x0, x)), (y0 = Math.min(y0, y)), (x1 = Math.max(x1, x)), (y1 = Math.max(y1, y)));
+  if (x1 < 0) return null;
+  const w = x1 - x0 + 1;
+  const h = y1 - y0 + 1;
+  // The figure fills 84% of the square's side, the biggest side of it; the picture is 128 px: crisp on a phone's screen, light to hold.
+  const S = 128;
+  const k = (S * 0.84) / Math.max(w, h);
+  const out = document.createElement("canvas");
+  out.width = out.height = S;
+  const o = out.getContext("2d")!;
+  o.imageSmoothingQuality = "high";
+  o.drawImage(art, x0, y0, w, h, (S - w * k) / 2, (S - h * k) / 2, w * k, h * k);
+  return out.toDataURL();
+}
