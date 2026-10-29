@@ -244,4 +244,4 @@ tile's share of the row (`tileWeight`) gives the mockup's 112 : 107 : 117.7 on a
 ## Tests
 
 Unit: `packages/app/test/public-profile.test.ts`. e2e: `e2e/public-profile.spec.ts` (phone 390 × 844; computer 1280 × 800 and
-1440 × 900). The side-by-sides (the mockup beside the built page, whole page, light and dark, phone, 1280 and 1440) are in the PR.
+1440 × 900).
