@@ -15,6 +15,8 @@ import { applyBoardColors } from "./prefs.ts";
 import { setBannerPlusSource } from "@chessroyale/core";
 import { bannerPlusAsked } from "./test-switches.ts";
 import "./styles.css";
+// (A computer's board as big as the window's height: after styles.css, whose computer sizes it takes over.)
+import "./board-size.css";
 
 // Errors on this device are reported (problems.ts), from the start.
 watchErrors();

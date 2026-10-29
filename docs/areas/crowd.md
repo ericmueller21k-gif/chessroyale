@@ -5,6 +5,10 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 
 ## How it works today
 
+- **The board on a computer** (Oct 29; docs/decisions/2026-10-29-desktop-board-size.md, [board.md](board.md)): the window's height
+  less 170 px (the title line, the line over the board, the row under it), never wider than its column: 904 px at 1920 × 1080
+  (the scoreboard 360 px on the left, the column 340 on the right); width-bound from about 1440 px wide down (456 at
+  1280 × 800, as before). The opening vote's board is the same size, so the game starts with the board where it was.
 - **A mode is a preset over one engine.** `modeSettings()` and `CROWD_SETTINGS` / `RAID_SETTINGS` in settings.ts
   patch `DEFAULT_SETTINGS`. Two are played on these screens:
   - **Crowd 50 v 50** (the main mode): 100 players, one board, two teams of 50, each playing one side all game. Every

@@ -7,6 +7,9 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
 
 ## How it works today
 
+- **The board on a computer** (Oct 29; docs/decisions/2026-10-29-desktop-board-size.md, [board.md](board.md)): the window's height
+  less 170 px (the title, the two players' strips), never wider than its column: 904 px at 1920 × 1080, 624 at 1280 × 800
+  (was 704 and 544). Its vote happens on the same board.
 - **The mode** (Eric, Oct 16): "1 v 1 · Classic chess". Normal chess between two signed-in players: checkmate wins, real
   clocks, no power-ups, no engine scoring. One tap queues (`/1v1`, or `startRanked1v1()` from any screen); no
   settings. Online needs an account wherever sign-in is set up (`mayPlay`, as every mode), so guests and under-13

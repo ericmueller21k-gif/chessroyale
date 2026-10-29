@@ -496,7 +496,7 @@ build): online, phase 1 won is the crowd's victory):
   the God King, "Players" / "Moves" (and "Chat" with chat on) with other players, the moves alone in Boss alone; a tap
   opens it full size over the board (✕, Escape, a tap outside close it). A computer (`.mv-side`, 900 px and up): right of
   the board, its top level with the board's, **half the height it had** (`--mv-h`: half of the board's less 146 px, at
-  least 120 px), the column's width, **13 to 15 px off the board** (it's shifted in with a `translate` from `--gk-column`
+  least 120 px; it grows with the board, 367 px tall by an 880 px board since Oct 29), the column's width, **13 to 15 px off the board** (it's shifted in with a `translate` from `--gk-column`
   and `--board-px`; the column's own 28 px gap and the board's slack go), Boss alone's pawn and the God King below it; a
   raid's scoreboard stays on the left, what the column held under the list (an online raid's chat, the scoreboard from
   900 to 1099 px) starts 12 px under the shorter list and keeps its left edge (Oct 28). Boss alone has no scoreboard
@@ -517,6 +517,13 @@ build): online, phase 1 won is the crowd's victory):
 - **The boss screen on a computer** (Eric, Oct 11): the boss by the board's bottom-left corner, the God King by its
   bottom-right, mirroring him (feet level, as far from the board; in Boss alone, since Oct 28, your pawn stands there and
   he stands to its right); the status box under the board at its width; the column beside the board starts after the God King. The eval bar draws behind them both. A phone is unchanged.
+  **The board's size** (Eric, Oct 29, as chess.com's; docs/decisions/2026-10-29-desktop-board-size.md, `board-size.css`): the
+  window's height less 200 px (the title line, the boss bar up to Puddles' 61 px, the dock's row), never wider than its
+  column: 880 px at 1920 × 1080, 600 at 1280 × 800 in Boss alone (a raid's scoreboard leaves 456 there). The list, the
+  dock, your pawn, the God King, the boss and Babur's pump follow it (they're placed from the board). Boss alone's empty
+  left column is 200 px (was the scoreboard's 360); Babur's is `170 + 0.175 × (the window's height − 200)` px, so his pump,
+  which grows with the board, keeps its place beside him at every size (`pumpPlace` sizes it for the board this layout
+  draws: the board's own element, not the squares' last size, which flipped it between there and the taller bar).
   From 900 to 1099 px the boss is drawn at 1× by the eval bar, so he's whole in the window; the board makes room only
   if it must (`--bs-reach`, `--bs-need` in styles.css; Oct 14). From 1100 px he's 2× (2 screen px a sprite px).
   With no eval bar (every player's board: the board takes its 24 px) he stands 24 px further out (`--bs-out`), as far

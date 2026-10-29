@@ -88,6 +88,16 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
     measured without transforms (a board in a turning or jolting row keeps its size) and written on the wrap as
     `--board-width` (read as `--board-size`, styles.css): **everything drawn over the squares sizes and places itself
     in eighths of `--board-size`**, never in % of the wrap.
+  - **How big a screen makes it on a computer** (Eric, Oct 29: "the way that they do the large chessboard" on chess.com;
+    docs/decisions/2026-10-29-desktop-board-size.md; `packages/app/src/board-size.css`, loaded after styles.css): every game
+    screen with a chessboard sizes it by the **window's height less the room the screen needs above and below it**
+    (`--bd-room`: a boss battle 200 px, a crowd's screens and 1 v 1 170, Squads 230, its relay 250), never wider than its
+    column; the screen grows to hold it (`--scr`), at least its old width, never past the window. So it grows and shrinks
+    live with the window and with nothing else (every screen of a game has the same room). Where the window is too narrow
+    (a scoreboard's 360 px and the 340 px column beside the board), the board is width-bound instead, never overlapping
+    them. Boss alone's empty left column is 200 px (Babur's grows with the board, for his pump). A computer is a window
+    900 × 600 and up **with a mouse** (`pointer: fine`): phones and tablets, a tablet on its side included, keep their
+    sizes to the pixel. Auto chess has its own board and frame: not changed. Tests: `e2e/desktop-board.spec.ts`.
   - **When it draws** (Oct 14, 2026; DECISIONS.md, "The board draws its pieces only when they change"): the board is
     two parts. `OwnBoard` is the wrap, what the screen draws over the board (`children`, under the `BoardTurn`
     context) and the promotion picker; it's drawn again whenever the screen is (a boss screen draws every frame while an
@@ -133,6 +143,7 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
 | The board, and the knock for each move | `packages/app/src/components/Board.tsx`, `board/OwnBoard.tsx` |
 | Its logic (squares, the size, taps and drags, which piece slides where, the dots, arrows) | `packages/app/src/board/logic.ts`; props `board/types.ts` |
 | The pieces, and the base for anything drawn with them | `packages/app/src/board/pieces/` (files, license, sources), `board/pieces.css` |
+| How big each game screen makes it on a computer (by the window's height) | `packages/app/src/board-size.css` |
 | Its styles | `styles.css`, "The board" (after `.board-wrap`) |
 | Its colors (Classic, Green, Gold) and the Settings choice | `styles.css`, "Board colors" (before `.hb-board`); `prefs.ts` (`boardColors`, `setBoardColors`, `applyBoardColors`); `screens/Settings.tsx` (`BoardColorsChoice`) |
 | A turned board's squares and coordinates | `packages/app/src/board-view.ts` |

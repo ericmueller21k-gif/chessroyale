@@ -123,7 +123,9 @@ describe("a boss's banners a second shorter", () => {
     expect(css).toMatch(/animation:\s*fb-band-in var\(--fb-in, 330ms\)[^;]*,\s*fb-band-out var\(--fb-out, 240ms\)[^;]*calc\(var\(--fb-ms, 2\.5s\) - var\(--fb-out, 240ms\)\) forwards;/);
     expect(css).not.toMatch(/animation: fb-band /);
     // (The entrances inside it come in its first 0.6 s, whatever its length.)
-    for (const name of ["fb-flash", "fb-face", "fb-slam", "fb-sub", "kc-portrait", "kc-target"]) expect(css).toMatch(new RegExp(`animation: ${name} 2\\.5s`));
+    for (const name of ["fb-flash", "fb-face", "fb-sub", "kc-portrait", "kc-target"]) expect(css).toMatch(new RegExp(`animation: ${name} 2\\.5s`));
+    // (The slam: its own 0.48 s, the first 19.2% of those 2.5 s, where its motion was; it ends there and holds. Oct 29.)
+    expect(css).toMatch(/animation: fb-slam 0\.48s/);
     expect(bannerLength(BOSS_BANNER.ms)).toEqual({ "--fb-ms": "1500ms" });
     expect(bannerLength(undefined)).toBeUndefined();
     expect(BOSS_BANNER.ms).toBe(1500);

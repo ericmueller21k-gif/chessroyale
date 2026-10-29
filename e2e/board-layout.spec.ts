@@ -18,25 +18,35 @@ import { BOARD_SEL, bossAloneFromHome, engineTop, openBossRaid, submitMove, test
  *   none (not yet);
  * - a computer's move list: its top level with the board's, half its old height, the same width, 12 to 16 px from the board;
  *   what's under it in the column moves up with it;
- * - the board's box is main's at every size.
+ * - the board's box is main's at every size (Oct 29: the new sizes by the window's height; desktop-board.spec.ts checks every
+ *   board screen).
  */
 
 /** Measured on main before this change (3cf8aba0), Boss alone and a Solo raid alike: the board's width on a phone. */
 const MAIN_BOARD: Record<string, number> = { "390x844": 312, "360x640": 282.7, "320x568": 237.3 };
-/** …the raid's scoreboard beside the board on a computer (x, y, width; its height the window's). */
+/**
+ * …the raid's scoreboard beside the board on a computer (x, y, width; its height the window's). Since Oct 29 the screen beside it
+ * grows with the board (docs/decisions/2026-10-29-desktop-board-size.md), so the two together sit further left where the board
+ * is bigger: 1440 × 900 x 40 → 10, 1920 × 1080 x 280 → 118; 1280 × 800 as before.
+ */
 const MAIN_TOWER: Record<string, { x: number; y: number; w: number }> = {
   "1280x800": { x: 10, y: 0, w: 360 },
-  "1440x900": { x: 40, y: 0, w: 360 },
-  "1920x1080": { x: 280, y: 0, w: 360 },
+  "1440x900": { x: 10, y: 0, w: 360 },
+  "1920x1080": { x: 118, y: 0, w: 360 },
 };
 /** …and the "Your move" row's height (two lines' room). */
 const MAIN_ROW_H = 62;
-/** Measured on main before the pawn (b9712062), Boss alone: the board's box on a computer (x, y, width = height). */
+/**
+ * Boss alone: the board's box on a computer (x, y, width = height). Measured on main before the pawn (b9712062); since Oct 29
+ * sized by the window's height (the window's less 200 px: docs/decisions/2026-10-29-desktop-board-size.md), old → new:
+ * 1280 × 800 408, 456 → 256, 600; 1440 × 900 438, 552 → 286, 696; 1536 × 864 486, 552 → 352, 664; 1920 × 1080 678, 552 → 436,
+ * 880; 1024 × 768 unchanged (width-bound).
+ */
 const MAIN_BOARD_BOX: Record<string, { x: number; y: number; w: number }> = {
-  "1280x800": { x: 408, y: 121.3, w: 456 },
-  "1440x900": { x: 438, y: 121.3, w: 552 },
-  "1536x864": { x: 486, y: 121.3, w: 552 },
-  "1920x1080": { x: 678, y: 121.3, w: 552 },
+  "1280x800": { x: 256, y: 121.3, w: 600 },
+  "1440x900": { x: 286, y: 121.3, w: 696 },
+  "1536x864": { x: 352, y: 121.3, w: 664 },
+  "1920x1080": { x: 436, y: 121.3, w: 880 },
   "1024x768": { x: 96, y: 121.3, w: 464 },
 };
 /** …and the move list's height there then: the board's less 146 px (at least 160 px). */
