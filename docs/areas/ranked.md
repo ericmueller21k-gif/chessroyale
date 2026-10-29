@@ -127,8 +127,8 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   - **Fair play's hold:** a player in review keeps their rank as it is (their games don't move it); their opponent's
     game counts as usual.
   - **Shown as** `RankView.label` and its emblem (`RankView.emblem`, below): "Gold 2 · 45 RP", "Radiant 1 · 95 RP",
-    "Transcendent · 120 RP", "Placement 2/5"; on the profile (yours and anyone's: a "1 V 1" section, null for a banned
-    player), in the game's strips (the pill only) and the versus moment, and on the result card ("Gold 2 · 45 RP
+    "Transcendent · 120 RP", "Placement 2/5"; on the profile (your own: a "1 V 1" section; anyone's, yours as others see it
+    included: the public profile's Ranked Standing card, [hub.md](hub.md), "Profiles"; null for a banned player), in the game's strips (the pill only) and the versus moment, and on the result card ("Gold 2 · 45 RP
     (+18)", "Placed: Gold 4 · 25 RP"). With 1 v 1 picked, the home screen's panel under its RANKED row reads
     `ranked1v1Rank()` (`packages/app/src/ranked.ts`): "Your rank: Gold 2 · 45 RP". Each tier's pill color is its
     emblem's main color, 4.5:1 or better on both themes.
@@ -145,7 +145,8 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
     frame under reduced motion. Nothing of them in the town's frame loop (the town shows no rank).
   - **Where:** the stage (each pawn's inner top corner, facing each other above "VS": 48 px on a phone, 96 on a
     computer; it lands with its pawn), the result card (your rank after the game: a division or tier up shows the new
-    one; its room kept from "Updating your rank…"), home's 1 v 1 panel (48), the profile's 1 V 1 section (96), and the
+    one; its room kept from "Updating your rank…"), home's 1 v 1 panel (48), the profile's 1 V 1 section (96), the public profile's Ranked Standing card (96 on a phone, 144 on a
+    computer), and the
     FAQ's ranks entry (each tier's division 5, Gold's five divisions, the top two). The in-game strips keep the pill
     alone (the board's room).
   - **An admin's `?rank=`** (`rankFromSwitch` in `ranked.ts`): `?rank=gold-3`, `?rank=wood-5`, `?rank=pearlescent`,

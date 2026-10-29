@@ -149,7 +149,8 @@ function Menu({
     setOpen(false);
     button.current?.focus();
   };
-  useEffect(() => {
+  // (A layout effect: the keys work from the very frame the menu shows in.)
+  useLayoutEffect(() => {
     if (!open) return;
     const items = () => [...(list.current?.querySelectorAll<HTMLElement>('[role^="menuitem"]:not(:disabled)') ?? [])];
     items()[0]?.focus();

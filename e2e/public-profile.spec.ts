@@ -34,16 +34,22 @@ async function openDemo(page: Page, profile = demoProfile(), opts: Opts = {}) {
 const loaded = (page: Page, name = "HunChess") => expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
 const noSideScroll = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 const box = async (page: Page, selector: string) => (await page.locator(selector).first().boundingBox())!;
-/** Where each part of the page is (page coordinates), to compare one moment with another. */
+/**
+ * Where each part of the page is (page coordinates), to compare one moment with another: a box's left, top, width and height; a
+ * line of text that centers itself (the name, the line under it, the level) by its top and height only, since its width is its words'.
+ */
 const layout = (page: Page) =>
-  page.evaluate(() =>
-    Object.fromEntries(
-      [".pp-head", ".pp-avatar", ".pp-name", ".pp-seen", ".pp-level", ".pp-actions", ".pp-note", ".pp-ranked", ".pp-recent", ".pp-cosmetics"].map((s) => {
-        const r = document.querySelector(s)!.getBoundingClientRect();
-        return [s, [r.x, r.y + scrollY, r.width, r.height].map((n) => Math.round(n * 10) / 10)];
-      }),
-    ) as Record<string, number[]>,
-  );
+  page.evaluate(() => {
+    const at = (s: string, whole: boolean) => {
+      const r = document.querySelector(s)!.getBoundingClientRect();
+      const n = (v: number) => Math.round(v * 10) / 10;
+      return whole ? [n(r.x), n(r.y + scrollY), n(r.width), n(r.height)] : [n(r.y + scrollY), n(r.height)];
+    };
+    return {
+      ...Object.fromEntries([".pp-head", ".pp-avatar", ".pp-actions", ".pp-note", ".pp-ranked", ".pp-recent", ".pp-cosmetics"].map((s) => [s, at(s, true)])),
+      ...Object.fromEntries([".pp-name", ".pp-seen", ".pp-level"].map((s) => [s, at(s, false)])),
+    } as Record<string, number[]>;
+  });
 
 async function player(browser: Browser, name: string): Promise<{ page: Page; id: string }> {
   const page = await (await browser.newContext({ ...test.info().project.use })).newPage();
@@ -336,14 +342,16 @@ test("four worn items all fit, nothing cut", async ({ page }) => {
     await expect(tiles).toHaveCount(4);
     await expect(tiles.locator("strong")).toHaveText(["Suit and Tie", "Pirate Hat", "Smiley Face", "Gift-Wrap Tube"]);
     const card = await box(page, ".pp-cosmetics");
+    // (Its words and pill, whole: inside the tile and none cut by its own box; the picture's box inside it too.)
     const fits = await page.evaluate(() =>
       [...document.querySelectorAll<HTMLElement>(".pp-tile")].map((t) => {
         const r = t.getBoundingClientRect();
-        // Every part of a tile inside the tile, and no text cut by its own box.
-        return [...t.querySelectorAll<HTMLElement>("*")].every((c) => {
+        const inside = (c: Element) => {
           const b = c.getBoundingClientRect();
-          return b.left >= r.left - 0.5 && b.right <= r.right + 0.5 && b.top >= r.top - 0.5 && b.bottom <= r.bottom + 0.5 && c.scrollWidth <= c.clientWidth + 1 && c.scrollHeight <= c.clientHeight + 1;
-        });
+          return b.left >= r.left - 0.5 && b.right <= r.right + 0.5 && b.top >= r.top - 0.5 && b.bottom <= r.bottom + 0.5;
+        };
+        const parts = [...t.querySelectorAll<HTMLElement>(".pp-tile-art, .pp-tile-text, .pp-tile-text > *")];
+        return parts.length === 5 && parts.every((c) => inside(c) && (c.matches(".pp-tile-art") || (c.scrollWidth <= c.clientWidth + 1 && c.scrollHeight <= c.clientHeight + 1)));
       }),
     );
     expect(fits, `${vp.width}: nothing cut`).toEqual([true, true, true, true]);
@@ -521,7 +529,7 @@ test("your own page: from your pawn, today's profile with View public profile at
   await expect(page.getByRole("button", { name: "Edit name & icon" })).toBeVisible();
   await expect(page).toHaveURL(/\/profile$/);
   // (Your own, loaded again from the address, is the public page too: the link others use.)
-  await page.goto(`/profile/${id}`);
+  await page.goto(`/profile/${id}?nolanding`);
   await expect(page.getByRole("heading", { name: "Player Profile", level: 1 })).toBeVisible();
   await expect(page.getByRole("button", { name: "Challenge" })).toBeDisabled();
 });

@@ -87,9 +87,11 @@ His mockup: an iPhone 14 (390 × 844) beside a computer in two columns. "I prett
   greyed). 50 v 50 and Squads: "Coming soon" in the middle. **One cell holds all of it**, so the card is as tall as 1v1's in
   every mode, and the menu floats over the page: nothing moves. The 1v1 rating is never shown.
 - **Equipped Cosmetics.** A tile each in `WORN_ORDER`: picture (the item as it looks on them), name, "<Slot> · <colors>", and the
-  rarity pill in the shop's tier color (`tierInfo`). **Phone:** two across, two rows, text wrapping rather than cut; the card
-  always has the room of four, so a player with fewer doesn't change its size. **Computer:** four across from the 1440 frame, two
-  at 1280. "Nothing equipped" when none.
+  rarity pill in the shop's tier color (`tierInfo`). **Phone:** two across, two rows, picture left of its words, the words
+  wrapping rather than cut. **Computer:** four across in one row, each tile's picture over its words (a quarter of the width is too
+  narrow for the mockup's side-by-side tile). Rows are one fixed height (112 px; 140 px on a computer), tall enough for a name and
+  a color line that each wrap to two lines, and the grid always has the room of four, so a player with fewer (or none:
+  "Nothing equipped") doesn't change the card's size.
 - **Layout.** One column on a phone; from 744 px wide (the page's own width, measured, so it holds in the computer's frame from
   about 1216 px and in no narrower one: an overlay over a match stays one column) the header card is full width, Ranked Standing and
   Recent Matches side by side, Cosmetics full width. The title sits left by Back there, centered on a phone (the mockup's).

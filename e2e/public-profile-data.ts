@@ -25,13 +25,27 @@ export const MOCKUP_LOOK: ItemLook = {
 };
 
 const hoursAgo = (h: number) => Date.now() - h * 3_600_000;
+/** Yesterday (the viewer's) at `min` minutes past midnight: "Yesterday", whatever the time of day now (after the first few minutes of it). */
+const yesterday = (min: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  d.setHours(0, min, 0, 0);
+  return d.getTime();
+};
+/** `n` days back at noon: always a date ("Oct 25"). */
+const daysBack = (n: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  d.setHours(12, 0, 0, 0);
+  return d.getTime();
+};
 
 /** The 1 v 1 games and other games in the mockup's list (the 1 v 1 ones as RankedSummary.recent will carry them). */
 export const MOCKUP_RANKED_GAMES = [
   { opponent: { id: "g43", name: "Guest 43", look: { head: { def: "wizard-hat", color: "red", blemish: 10, seed: 1 } } }, result: "win", rp: 18, at: hoursAgo(2) },
-  { opponent: { id: "woolly", name: "Woolly", look: { head: { def: "party-hat", color: "cobalt", blemish: 30, seed: 2 } } }, result: "loss", rp: -14, at: hoursAgo(30) },
-  { opponent: { id: "g21", name: "Guest 21", look: {} }, result: "win", rp: 22, at: hoursAgo(31) },
-  { opponent: { id: "g49", name: "Guest 49", look: { skin: { def: "ninja-gi", color: "midnight", blemish: 0, seed: 4 } } }, result: "loss", rp: -11, at: hoursAgo(96) },
+  { opponent: { id: "woolly", name: "Woolly", look: { head: { def: "party-hat", color: "cobalt", blemish: 30, seed: 2 } } }, result: "loss", rp: -14, at: yesterday(20) },
+  { opponent: { id: "g21", name: "Guest 21", look: {} }, result: "win", rp: 22, at: yesterday(10) },
+  { opponent: { id: "g49", name: "Guest 49", look: { skin: { def: "ninja-gi", color: "midnight", blemish: 0, seed: 4 } } }, result: "loss", rp: -11, at: daysBack(5) },
 ] as const;
 
 export function demoProfile(over: Record<string, unknown> = {}) {
@@ -64,9 +78,9 @@ export function demoProfile(over: Record<string, unknown> = {}) {
     bossesBeaten: [],
     recent: [
       // A raid the boss lost in, a 50 v 50 the team won, and a Squads match placed 3rd.
-      { mode: "boss", online: true, placement: 1, players: 100, team: "w", won: true, survived: true, bestMove: null, bossElo: 1500, bossId: "gingerbread", playedAt: hoursAgo(50), ranked: false },
-      { mode: "crowd", online: true, placement: 4, players: 100, team: "b", won: true, survived: null, bestMove: "Nxe5", bossElo: null, playedAt: hoursAgo(75), ranked: false },
-      { mode: "squads", online: true, placement: 3, players: 32, team: null, won: false, survived: null, bestMove: null, bossElo: null, playedAt: hoursAgo(120), ranked: false },
+      { mode: "boss", online: true, placement: 1, players: 100, team: "w", won: true, survived: true, bestMove: null, bossElo: 1500, bossId: "gingerbread", playedAt: daysBack(3), ranked: false },
+      { mode: "crowd", online: true, placement: 4, players: 100, team: "b", won: true, survived: null, bestMove: "Nxe5", bossElo: null, playedAt: daysBack(4), ranked: false },
+      { mode: "squads", online: true, placement: 3, players: 32, team: null, won: false, survived: null, bestMove: null, bossElo: null, playedAt: daysBack(6), ranked: false },
     ],
     ...over,
   };
