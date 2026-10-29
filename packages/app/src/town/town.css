@@ -284,22 +284,22 @@
 }
 
 /*
- * A person's card (Eric's mockup, Oct 28): one row, one size whoever it is ("(bot)", the sidekick's line and "Tables are full" don't
- * resize it; the width fits the longest bot's name and sidekick line, "Chub & Chirp's sidekick", with room to spare): the picture in a
- * round ring on the left, the words (the name, the sidekick's line, the rating, a note) in the middle, Play with its crossed swords on
- * the right. Its type, ring and button are the mockup's measured against its name tags (the tags are drawn 11 to 12 px high in the
- * game); the same size on a phone and a computer. docs/decisions/2026-10-28-town-card.md.
+ * A person's card (Eric's mockup, Oct 28): one row, one size whoever it is: the picture in a round ring on the left, the words (the
+ * name, the sidekick's line, the rating) in the middle, Play with its crossed swords on the right. Its type, ring and button are the
+ * mockup's measured against its name tags (the tags are drawn 11 to 12 px high in the game); the same size on a phone and a computer.
+ * (Oct 29, Eric: the card near his mockup's 189 × 53, not grown to fit the longest name; a name or line too long for its row shrinks its
+ * own words instead, Town.tsx's fitRows, down to its --fit-min.) docs/decisions/2026-10-28-town-card.md.
  */
 .town-card.town-person {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) auto;
+  grid-template-columns: 38px minmax(0, 1fr) 53px;
   align-items: center;
   column-gap: 6px;
-  width: 232px;
+  width: 210px;
   min-width: 0;
   max-width: none;
-  height: 60px;
-  padding: 0 5px;
+  height: 53px;
+  padding: 0 7px 0 6px;
 }
 /* The picture: a round ring in the kind's color on a white disc. A sidekick's is blue (the blue of the sidekicks' name tags), a pawn's and a
    real player's ivory (the white of theirs): both read on the dark card (ivory 12:1). A real player's is a button for their profile; a bot's
@@ -309,8 +309,8 @@
   box-sizing: border-box;
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   margin: 0;
   padding: 0;
   border: 3px solid var(--ring);
@@ -349,6 +349,8 @@ button.town-pic.player {
   min-width: 0;
 }
 .town-person h2 {
+  --fit-min: 10px;
+  height: 15px;
   margin: 0;
   overflow: hidden;
   color: #fff;
@@ -358,13 +360,14 @@ button.town-pic.player {
 }
 .town-bot {
   color: #a5a4aa;
-  font-size: 12px;
+  /* (12 px beside a 13 px name, and smaller with it when a long name shrinks.) */
+  font-size: 0.923em;
   font-weight: 500;
 }
-/* The three rows under the name are always there, each its own height (nothing moves when one is empty or fills). */
+/* The two rows under the name are always there, each its own height (nothing moves when one is empty or a long one shrinks). */
 .town-sub,
-.town-rate,
-.town-note {
+.town-rate {
+  --fit-min: 7.5px;
   height: 11px;
   margin: 1px 0 0;
   overflow: hidden;
@@ -385,29 +388,25 @@ button.town-pic.player {
   flex: none;
   color: #e0b46e;
 }
-.town-note {
-  margin-top: 0;
-  color: #aeb2bd;
-}
 .town-card .town-btn.town-play {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  width: auto;
+  width: 53px;
   min-height: 0;
-  height: 28px;
+  height: 26px;
   margin: 0;
-  padding: 0 7px;
+  padding: 0;
   border-radius: 8px;
   font: 800 12px/1 Archivo, sans-serif;
 }
-/* The drawn button is 28 px high; its tap area, 44 (over the card's own padding: the card is 60 high). */
+/* The drawn button is 26 px high and one width whether it reads "Play" or "Full"; its tap area, 44 high (over the card's padding). */
 .town-play::before {
   content: "";
   position: absolute;
-  inset: -8px -4px;
+  inset: -9px -5px;
 }
 .town-ico-swords {
   flex: none;
