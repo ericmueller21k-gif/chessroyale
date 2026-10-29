@@ -43,7 +43,7 @@ export function DressedPawn({
   side = "w",
 }: {
   look?: ItemLook;
-  size: "hero" | "profile" | "ring" | "card" | "seat" | "side" | "stage";
+  size: "hero" | "profile" | "ring" | "card" | "seat" | "side" | "stage" | "avatar";
   shadow?: boolean;
   side?: "w" | "b";
 }) {
@@ -138,6 +138,7 @@ export function FdButton({
   disabled,
   onClick,
   label,
+  title,
   class: cls,
 }: {
   children: ComponentChildren;
@@ -146,6 +147,8 @@ export function FdButton({
   disabled?: boolean;
   onClick?: () => void;
   label?: string;
+  /** A tooltip on a computer. */
+  title?: string;
   class?: string;
 }) {
   return (
@@ -154,6 +157,7 @@ export function FdButton({
       class={`fd-btn${primary ? " primary" : ""}${danger ? " danger" : ""}${cls ? ` ${cls}` : ""}`}
       disabled={disabled}
       aria-label={label}
+      title={title}
       onClick={onClick}
     >
       {children}

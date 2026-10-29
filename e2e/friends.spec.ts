@@ -45,9 +45,9 @@ test("two players: a request accepted, online in each other's list, the invites 
 
   // Ann opens Bo's profile (as from a name anywhere) and adds him.
   await ann.page.goto(`/profile/${bo.id}?nolanding`);
-  await ann.page.getByRole("button", { name: "Add friend" }).click();
+  await ann.page.getByRole("button", { name: "Add Friend" }).click();
   await expect(ann.page.locator(".fr-note")).toHaveText("Request sent.");
-  await expect(ann.page.getByRole("button", { name: "Cancel request" })).toBeVisible();
+  await expect(ann.page.getByRole("button", { name: "Cancel Request" })).toBeVisible();
   await ann.page.locator(".fr-note").scrollIntoViewIfNeeded();
   await shot(ann.page, "profile");
   await ann.page.emulateMedia({ colorScheme: "dark" });
@@ -110,16 +110,21 @@ test("two players: a request accepted, online in each other's list, the invites 
   // Both leave. Bo blocks Ann from her profile (a second tap confirms).
   for (const p of [ann.page, bo.page]) await p.getByRole("button", { name: "Leave" }).click();
   await bo.page.goto(`/profile/${ann.id}?nolanding`);
-  await bo.page.getByRole("button", { name: "Block", exact: true }).click();
-  await bo.page.getByRole("button", { name: "Tap again to block" }).click();
-  await expect(bo.page.getByRole("button", { name: "Unblock" })).toBeVisible();
-  await expect(bo.page.getByRole("button", { name: "Invite to play" })).toHaveCount(0);
+  // (Oct 28: Block is in the public profile's ••• menu, still a first tap that asks and a second that blocks.)
+  await bo.page.getByRole("button", { name: "More options" }).click();
+  await bo.page.getByRole("menuitem", { name: "Block", exact: true }).click();
+  await bo.page.getByRole("menuitem", { name: "Tap again to block" }).click();
+  await bo.page.getByRole("button", { name: "More options" }).click();
+  await expect(bo.page.getByRole("menuitem", { name: "Unblock" })).toBeVisible();
+  await bo.page.keyboard.press("Escape");
+  // (A blocked player can't be challenged: Challenge is greyed, not gone.)
+  await expect(bo.page.getByRole("button", { name: "Challenge" })).toBeDisabled();
   // Ann: no longer friends; her invite gets the same answer as any setting; her request looks sent but never reaches him.
   await ann.page.goto(`/profile/${bo.id}?nolanding`);
-  await expect(ann.page.getByRole("button", { name: "Add friend" })).toBeVisible();
-  await ann.page.getByRole("button", { name: "Invite to play" }).click();
+  await expect(ann.page.getByRole("button", { name: "Add Friend" })).toBeVisible();
+  await ann.page.getByRole("button", { name: "Challenge" }).click();
   await expect(ann.page.locator(".fr-note")).toHaveText("This player isn't taking invites right now.");
-  await ann.page.getByRole("button", { name: "Add friend" }).click();
+  await ann.page.getByRole("button", { name: "Add Friend" }).click();
   await expect(ann.page.locator(".fr-note")).toHaveText("Request sent.");
   await bo.page.goto("/friends?nolanding");
   await expect(bo.page.locator(".fr-page .fr-row", { hasText: "Ann Friend" })).toContainText("Unblock");

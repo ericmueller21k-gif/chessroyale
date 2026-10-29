@@ -11,6 +11,8 @@ export interface ProfileTarget {
   name: string;
   /** Your own profile. */
   you?: boolean;
+  /** With `you`: your public profile, the page others see ("View public profile" on yours), not your own page. */
+  public?: boolean;
   bot?: boolean;
   /** Your own profile, opened at a section (the shop's "Pick these in your profile": Quick chat and emoji). */
   section?: "chat";

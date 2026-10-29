@@ -363,6 +363,8 @@ export function playerName(): string {
 export interface PublicProfile {
   id: string;
   name: string;
+  /** Their icon: a drawing (a PNG data URL), an older account's emoji, or the default pawn "♟" (missing from an older server). */
+  icon?: string;
   look: ItemLook;
   joinedAt: number;
   lastSeen: number | null;
