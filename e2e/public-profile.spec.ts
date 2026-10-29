@@ -36,7 +36,7 @@ const noSideScroll = (page: Page) => page.evaluate(() => document.documentElemen
 const box = async (page: Page, selector: string) => (await page.locator(selector).first().boundingBox())!;
 /**
  * Where each part of the page is (page coordinates), to compare one moment with another: a box's left, top, width and height; a
- * line of text that centers itself (the name, the line under it, the level) by its top and height only, since its width is its words'.
+ * line of text that centers itself (the name, the line under it, the level, the note) by its top and height only, since its width is its words'.
  */
 const layout = (page: Page) =>
   page.evaluate(() => {
@@ -46,8 +46,8 @@ const layout = (page: Page) =>
       return whole ? [n(r.x), n(r.y + scrollY), n(r.width), n(r.height)] : [n(r.y + scrollY), n(r.height)];
     };
     return {
-      ...Object.fromEntries([".pp-head", ".pp-avatar", ".pp-actions", ".pp-note", ".pp-ranked", ".pp-recent", ".pp-cosmetics"].map((s) => [s, at(s, true)])),
-      ...Object.fromEntries([".pp-name", ".pp-seen", ".pp-level"].map((s) => [s, at(s, false)])),
+      ...Object.fromEntries([".pp-head", ".pp-avatar", ".pp-actions", ".pp-ranked", ".pp-recent", ".pp-cosmetics"].map((s) => [s, at(s, true)])),
+      ...Object.fromEntries([".pp-name", ".pp-seen", ".pp-level", ".pp-note"].map((s) => [s, at(s, false)])),
     } as Record<string, number[]>;
   });
 
@@ -225,12 +225,13 @@ test("placements, no games and a ban: the card says so, in the same room", async
   const variants: [string, Record<string, unknown>, () => Promise<void>][] = [
     [
       "placements",
-      { ranked1v1: { rank: rankView({ games: 2, ladder: null }), games: 2, wins: 1, losses: 1, draws: 0 } },
+      { ranked1v1: { rank: rankView({ games: 2, ladder: null }), games: 2, wins: 1, losses: 1, draws: 0, peak: null, streak: 0, recent: [] } },
       async () => {
         await expect(ranked.locator(".pp-tier")).toHaveText("Placement 2/5");
         await expect(ranked.locator(".pp-badge")).toHaveText("2/5");
         await expect(ranked.locator("[data-emblem]")).toHaveCount(0);
-        await expect(ranked.locator(".pp-stat strong")).toHaveText(["50%", "1 – 1", "—"]);
+        await expect(ranked.locator(".pp-stat strong")).toHaveText(["50%", "1 – 1", "0"]);
+        await expect(ranked.locator(".pp-peak")).toHaveText("Peak rank: —");
       },
     ],
     [
@@ -369,9 +370,9 @@ test("four worn items all fit, nothing cut", async ({ page }) => {
       expect(t.x + t.width).toBeLessThanOrEqual(card.x + card.width);
       expect(t.y + t.height).toBeLessThanOrEqual(card.y + card.height);
     }
-    // Four tiles in two rows of two on a phone (and a narrower computer), one row of four on a wider one.
+    // Four tiles in two rows of two on a phone, one row of four on a computer.
     const ys = new Set(await tiles.evaluateAll((ts) => ts.map((t) => Math.round(t.getBoundingClientRect().top))));
-    expect(ys.size).toBe(vp.width >= 1440 ? 1 : 2);
+    expect(ys.size).toBe(isComputer() ? 1 : 2);
   }
 });
 
@@ -493,7 +494,7 @@ test("nothing shifts when a note appears: the note line is always there", async 
   await openDemo(page);
   await loaded(page);
   const before = await layout(page);
-  expect(before[".pp-note"]![3]).toBeGreaterThanOrEqual(20);
+  expect(before[".pp-note"]![1]).toBeGreaterThanOrEqual(20);
   // A refusal, as the server would say it.
   await page.route("**/api/friends/request", (route) => route.fulfill({ status: 400, json: { message: "This is a note." } }));
   await page.getByRole("button", { name: "Add Friend" }).click();
