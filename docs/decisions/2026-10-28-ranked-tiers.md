@@ -103,8 +103,56 @@ ink in the light theme as RATING_RANKS' pills do (before, a light tier's pill wa
 your strip, the result, your profile (shown there even before a game). Only where `testSwitchesAllowed()`; read once as
 the page opens, as `?bannerplus=`. Anything else is ignored; a player's is ignored.
 
+## RATING_RANKS retired (Eric, Oct 28, later)
+
+Eric: "get rid of the novice weighty … we're going with the new ranking system." The rank shown everywhere is the ranked
+1 v 1 tier; the rating's own names (Novice … Weighty … Transcendent, `RATING_RANKS`, `ratingTier`, their pill effects
+and their tests) are gone.
+
+- **Home's line under your name:** your 1 v 1 rank, the tier and division in the tier's color, then the RP ("Gold 3 ·
+  45 RP"); "Placement 2/5"; "Unranked" before your first ranked game; a blank line of the same height while your account
+  loads (was "Weighty · 1580", "No rating yet"). The admin placeholder "Opal III" (`TEST_RANK`) is replaced by `?rank=`;
+  `TEST_LEVEL` (the ring and "LVL 38") stays, and #400's place for the tag is unchanged.
+- **The profile card:** their 1 v 1 rank's pill (once they've played a ranked game; your own shows `?rank=`), then
+  "Rating 1612" (the crowd rating's number, no rank name; "No rating yet" as before), then "Top 18%". My call: "Top N%"
+  stays, as it's the rating's percentile, not a rank name. The 1 V 1 section keeps the emblem at 2×. The rating chart is
+  unchanged.
+- **The server:** `PublicProfile.tier` is gone. An app still open from before the deploy reads no tier and shows "No
+  rating yet" in that pill until it reloads (pre-launch, as other API changes).
+- `rankOf` in the director's note: the old system's lookup is `ratingTier` (core), removed. The server's `rankOf`
+  (ranked-schema.ts) is the new system's (a record's rank with its top-tier place) and stays.
+
+## The public profile's numbers (Oct 28, later; additive)
+
+`RankedSummary` (core's `ranked.ts`, shared by the server and the app), as `/api/me` and `/api/profile/:id` give it:
+
+```ts
+interface RankedSummary {
+  rank: RankView;
+  games: number; wins: number; losses: number; draws: number;
+  peak: RankView | null;        // the highest ladder reached, as a rank (its top-tier place as it stands now); null in placements
+  streak: number;               // the current run of ranked wins (a loss or a draw ends it)
+  recent: RankedRecentGame[];   // the last 5 kept games, newest first
+}
+interface RankedRecentGame {
+  at: number;                                                   // when it ended (ms)
+  opponent: { id: string; name: string; look: ItemLook | null }; // "deleted", "Deleted account", null for a deleted account
+  result: "win" | "loss" | "draw";
+  points: number | null;                                        // null in placements, for a held side, and before Oct 28
+}
+```
+
+- **Stored** (the repo's usual migration: `RANKED_COLUMNS`, each column added once; additive, nothing existing changes
+  meaning): `ranked_1v1.peak` (filled once with each player's ladder then), `ranked_1v1.streak` (0), and
+  `ranked_1v1_games.white_points` / `black_points` (null for older games). Written in the game's one batch:
+  the peak only ever up, the streak +1 on a win and 0 on a loss or a draw (placements count; a held player's row isn't
+  written, as before), each side's points (null in placements and for a held side). In the download, the guest merge,
+  the pinned columns and the privacy policy ("the highest you've reached", "your current run of wins", "the rank points it
+  moved for each player"; and that a profile shows these and the last five games to anyone, never the hidden rating).
+- **Read** (`rankedSummary`): the row, the last 5 games (the existing white/black indexes), and the opponents' looks in one
+  read (`looksOf`, locker.ts). A banned player's summary is null, as before. Games go after 30 days
+  (`gamesKeepDays`), so `recent` holds at most the kept ones.
+
 ## Left alone
 
-`RATING_RANKS` (Novice … Transcendent, the rating's names on home's line under your name and the profile's pill) is a
-separate system and unchanged; it shares Paragon, Illustrious, Sublime and Transcendent with the new tiers. The
-director is asking Eric what to do. Home's `TEST_RANK` / `TEST_LEVEL` placeholders are untouched.
+Home's `TEST_LEVEL` and its ring.

@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { RANKED_1V1, duelCoins, placeLadder, rankView } from "@chessroyale/core";
+import { RANKED_1V1, duelCoins, itemDef, placeLadder, rankView } from "@chessroyale/core";
 import { DELETED_ID, createGuest, ensureSchema, profile, publicProfile, signInWithIdentity, type Sql } from "../src/accounts.ts";
 import { accountDownload, deleteAccount } from "../src/account-data.ts";
+import { equipLocker, lockerState, openCrate } from "../src/locker.ts";
 import { appeal, setCase } from "../src/fairplay.ts";
 import { coinCount, duelEntrant, duelGamesOf, purgeDuelGames, rankedRecordOf, recordDuel, type FinishedDuel } from "../src/ranked.ts";
 import { TOP_PLACE_MS, forgetTopPlaces, rankOf, rankedSummary, topPlace } from "../src/ranked-schema.ts";
@@ -294,7 +295,140 @@ describe("recording a ranked game", () => {
   });
 });
 
+/** A settled player straight onto the ladder (40 games, a hidden rating at that ladder's). */
+async function settledAt(sql: Sql, id: string, ladder: number, extra = "") {
+  await sql.run(`INSERT INTO ranked_1v1 (user_id, rating, rd, games, wins, losses, draws, ladder, last_at${extra ? ", peak" : ""}) VALUES (?, ?, 60, 40, 20, 20, 0, ?, ?${extra ? ", ?" : ""})`, id, 800 + (ladder * 1600) / 2800, ladder, T0, ...(extra ? [Number(extra)] : []));
+}
+
+describe("the public profile's numbers (Oct 28, 2026): peak, streak, each game's points, the recent games", () => {
+  it("the peak: the highest ladder reached, only ever up; null until placed", async () => {
+    const { sql, a, b } = await setup();
+    await settledAt(sql, a.id, 1270);
+    await settledAt(sql, b.id, 1270);
+    expect((await rankedSummary(sql, a.id)).peak!.label).toBe("Paragon 5 · 70 RP");
+    await recordDuel(sql, game(a.id, b.id, "1-0"), notHeld);
+    const up = (await rankedRecordOf(sql, a.id)).record.ladder!;
+    expect(up).toBeGreaterThan(1270);
+    expect((await sql.first<{ peak: number }>("SELECT peak FROM ranked_1v1 WHERE user_id = ?", a.id))!.peak).toBe(up);
+    expect((await rankedSummary(sql, a.id)).peak!.label).toBe(rankView({ games: 41, ladder: up }).label);
+    // A loss: the ladder down, the peak where it was; Bo's peak (he lost first) stays at his start.
+    await recordDuel(sql, game(a.id, b.id, "0-1"), notHeld);
+    expect((await rankedRecordOf(sql, a.id)).record.ladder!).toBeLessThan(up);
+    expect((await sql.first<{ peak: number }>("SELECT peak FROM ranked_1v1 WHERE user_id = ?", a.id))!.peak).toBe(up);
+    expect((await sql.first<{ peak: number }>("SELECT peak FROM ranked_1v1 WHERE user_id = ?", b.id))!.peak).toBe(Math.max(1270, (await rankedRecordOf(sql, b.id)).record.ladder!));
+    // In placements: none (the fifth game places the peak at the ladder).
+    const c = (await createGuest(sql, T0, "Cy")).user;
+    await recordDuel(sql, game(c.id, b.id, "1-0"), notHeld);
+    expect((await rankedSummary(sql, c.id)).peak).toBeNull();
+    for (let i = 0; i < 4; i++) await recordDuel(sql, game(c.id, b.id, "1-0"), notHeld);
+    const placed = (await rankedRecordOf(sql, c.id)).record.ladder!;
+    expect((await rankedSummary(sql, c.id)).peak!.ladder).toBe(placed);
+  });
+
+  it("the streak: one more for each win, back to 0 on a loss or a draw (placements count; a held game changes nothing)", async () => {
+    const { sql, a, b } = await setup();
+    const streak = async () => (await rankedSummary(sql, a.id)).streak;
+    for (const [r, want] of [["1-0", 1], ["1-0", 2], ["1-0", 3], ["1/2-1/2", 0], ["1-0", 1], ["0-1", 0], ["1-0", 1]] as const) {
+      await recordDuel(sql, game(a.id, b.id, r), notHeld);
+      expect(await streak(), r).toBe(want);
+    }
+    await recordDuel(sql, game(a.id, b.id, "1-0"), async (uid) => uid === a.id);
+    expect(await streak()).toBe(1);
+    expect((await rankedSummary(sql, b.id)).streak).toBe(0);
+  });
+
+  it("each game keeps the points it moved for each side: null in placements and for a held side", async () => {
+    const { sql, a, b } = await setup();
+    await recordDuel(sql, game(a.id, b.id, "1-0", { id: "placing" }), notHeld);
+    expect(await sql.first("SELECT white_points, black_points FROM ranked_1v1_games WHERE id = 'placing'")).toEqual({ white_points: null, black_points: null });
+    await sql.run("DELETE FROM ranked_1v1");
+    await settledAt(sql, a.id, 1500);
+    await settledAt(sql, b.id, 1500);
+    const out = await recordDuel(sql, game(a.id, b.id, "0-1", { id: "ranked" }), notHeld);
+    const row = await sql.first<{ white_points: number; black_points: number }>("SELECT white_points, black_points FROM ranked_1v1_games WHERE id = 'ranked'");
+    expect(row).toEqual({ white_points: out!.w.change!.points, black_points: out!.b.change!.points });
+    expect(row!.white_points).toBeLessThan(0);
+    expect(row!.black_points).toBeGreaterThan(0);
+    await recordDuel(sql, game(a.id, b.id, "1-0", { id: "held" }), async (uid) => uid === b.id);
+    const held = await sql.first<{ white_points: number | null; black_points: number | null }>("SELECT white_points, black_points FROM ranked_1v1_games WHERE id = 'held'");
+    expect(held!.white_points).toBeGreaterThan(0);
+    expect(held!.black_points).toBeNull();
+  });
+
+  it("the recent games: the last 5, newest first, from this player's side (the opponent by id, name and look; never the hidden rating)", async () => {
+    const { sql, a, b } = await setup();
+    const c = (await createGuest(sql, T0, "Cy")).user;
+    await settledAt(sql, a.id, 1500);
+    await settledAt(sql, b.id, 1500);
+    await settledAt(sql, c.id, 1500);
+    // Bob wears a crate item (its look as his locker has it); Cy nothing.
+    const opened = await openCrate(sql, b.id, "winter-1", {}, T0);
+    if (!opened.ok) throw new Error(opened.message);
+    const slot = itemDef(opened.item.def)!.slot;
+    expect((await equipLocker(sql, b.id, slot, opened.item.id)).ok).toBe(true);
+    const plays: [string, string, FinishedDuel["result"]][] = [
+      [a.id, b.id, "1-0"],
+      [c.id, a.id, "1-0"],
+      [a.id, c.id, "1/2-1/2"],
+      [b.id, a.id, "0-1"],
+      [a.id, b.id, "0-1"],
+      [a.id, c.id, "1-0"],
+    ];
+    const outs: Awaited<ReturnType<typeof recordDuel>>[] = [];
+    for (const [i, [w, k, r]] of plays.entries()) outs.push(await recordDuel(sql, game(w, k, r, { id: `r${i}`, endedAt: T0 + (i + 1) * MIN }), notHeld));
+    const s = await rankedSummary(sql, a.id);
+    expect(s.recent).toHaveLength(5);
+    expect(s.recent.map((g) => g.at)).toEqual([6, 5, 4, 3, 2].map((i) => T0 + i * MIN));
+    expect(s.recent.map((g) => [g.opponent.name, g.result])).toEqual([["Cy", "win"], ["Bob", "loss"], ["Bob", "win"], ["Cy", "draw"], ["Cy", "loss"]]);
+    expect(s.recent[0]!.opponent.id).toBe(c.id);
+    expect(s.recent[0]!.opponent.look).toEqual({});
+    // Ann's own points in each (white or black): the game's outcome for her.
+    const mine = (i: number) => (plays[i]![0] === a.id ? outs[i]!.w : outs[i]!.b).change!.points;
+    expect(s.recent.map((g) => g.points)).toEqual([5, 4, 3, 2, 1].map(mine));
+    expect(s.recent[1]!.opponent.look).toEqual((await lockerState(sql, b.id)).look);
+    expect(Object.keys(s.recent[1]!.opponent.look ?? {})).toEqual([slot]);
+    expect(JSON.stringify(s)).not.toMatch(/"rating"|"rd"/);
+    // A deleted opponent: the shared "deleted" account, by that name, with no look.
+    await deleteAccount(sql, c, T0 + 10 * MIN);
+    const after = await rankedSummary(sql, a.id);
+    expect(after.recent[0]!.opponent).toEqual({ id: "deleted", name: "Deleted account", look: null });
+  });
+
+  it("the shape the public profile builds on: RankedSummary's fields, exactly", async () => {
+    const { sql, a, b } = await setup();
+    await settledAt(sql, a.id, 1500);
+    await settledAt(sql, b.id, 1500);
+    await recordDuel(sql, game(a.id, b.id, "1-0"), notHeld);
+    const s = await rankedSummary(sql, a.id);
+    expect(Object.keys(s).sort()).toEqual(["draws", "games", "losses", "peak", "rank", "recent", "streak", "wins"]);
+    expect(Object.keys(s.recent[0]!).sort()).toEqual(["at", "opponent", "points", "result"]);
+    expect(Object.keys(s.recent[0]!.opponent).sort()).toEqual(["id", "look", "name"]);
+  });
+});
+
 describe("the tables", () => {
+  it("tables made before Oct 28 get the peak (at each ladder then), the streak (0) and each game's points (null)", async () => {
+    const { sql } = memoryDb();
+    await sql.run(
+      "CREATE TABLE ranked_1v1 (user_id TEXT PRIMARY KEY, rating REAL NOT NULL, rd REAL NOT NULL, games INTEGER NOT NULL, wins INTEGER NOT NULL, losses INTEGER NOT NULL, draws INTEGER NOT NULL, ladder INTEGER, last_game TEXT, last_at INTEGER, coin_day INTEGER, coin_games INTEGER NOT NULL DEFAULT 0)",
+    );
+    await sql.run("INSERT INTO ranked_1v1 VALUES ('placed', 1700, 80, 30, 18, 12, 0, 1650, 'g', 0, NULL, 0)");
+    await sql.run("INSERT INTO ranked_1v1 VALUES ('placing', 1500, 300, 2, 1, 1, 0, NULL, 'g', 0, NULL, 0)");
+    await sql.run(
+      "CREATE TABLE ranked_1v1_games (id TEXT PRIMARY KEY, white_id TEXT NOT NULL, black_id TEXT NOT NULL, control TEXT NOT NULL, result TEXT NOT NULL, reason TEXT NOT NULL, moves TEXT NOT NULL, times TEXT NOT NULL, started_at INTEGER NOT NULL, ended_at INTEGER NOT NULL, checked TEXT, nonce TEXT NOT NULL)",
+    );
+    await sql.run("INSERT INTO ranked_1v1_games VALUES ('old', 'placed', 'placing', 'blitz', '1-0', 'resign', '', '', 0, 1, NULL, 'n')");
+    await ensureSchema(sql);
+    expect(await sql.all("SELECT user_id, ladder, peak, streak FROM ranked_1v1 ORDER BY user_id")).toEqual([
+      { user_id: "placed", ladder: 1650, peak: 1650, streak: 0 },
+      { user_id: "placing", ladder: null, peak: null, streak: 0 },
+    ]);
+    expect(await sql.first("SELECT white_points, black_points FROM ranked_1v1_games WHERE id = 'old'")).toEqual({ white_points: null, black_points: null });
+    // Nothing that was there changed meaning: the rank as before.
+    expect((await rankedSummary(sql, "placed")).rank.label).toBe(rankView({ games: 30, ladder: 1650 }).label);
+    expect((await rankedSummary(sql, "placed")).recent[0]).toMatchObject({ result: "win", points: null });
+  });
+
   it("a ranked_1v1 table made before the daily cap (a test server's) gets its columns", async () => {
     const { sql } = memoryDb();
     await sql.run("CREATE TABLE ranked_1v1 (user_id TEXT PRIMARY KEY, rating REAL NOT NULL, rd REAL NOT NULL, games INTEGER NOT NULL, wins INTEGER NOT NULL, losses INTEGER NOT NULL, draws INTEGER NOT NULL, ladder INTEGER, last_game TEXT, last_at INTEGER)");
@@ -331,7 +465,7 @@ describe("keeping, the profile and the account", () => {
 
   it("the profile (yours and anyone's) shows the rank and the record; a banned player's shows none", async () => {
     const { sql, a, b } = await setup();
-    expect((await profile(sql, a)).ranked1v1).toEqual({ rank: rankView(null), games: 0, wins: 0, losses: 0, draws: 0 });
+    expect((await profile(sql, a)).ranked1v1).toEqual({ rank: rankView(null), games: 0, wins: 0, losses: 0, draws: 0, peak: null, streak: 0, recent: [] });
     await recordDuel(sql, game(a.id, b.id, "1/2-1/2"), notHeld);
     expect((await profile(sql, a)).ranked1v1).toMatchObject({ games: 1, draws: 1, rank: { label: "Placement 1/5" } });
     expect((await publicProfile(sql, b.id, T0))!.ranked1v1).toMatchObject({ games: 1, draws: 1 });

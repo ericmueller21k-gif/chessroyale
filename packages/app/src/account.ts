@@ -1,5 +1,5 @@
 import { ASK_AGE_LINE, CHAT_MOD, oldEnough, type ChatPicks, type ShopState } from "@chessroyale/core";
-import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, RankView } from "@chessroyale/core";
+import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, RankedSummary } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
 
 /**
@@ -18,14 +18,8 @@ export interface ModeStats {
   teamWins: number;
 }
 
-/** A player's ranked 1 v 1: the rank (core's RankView) and the record. */
-export interface RankedSummary {
-  rank: RankView;
-  games: number;
-  wins: number;
-  losses: number;
-  draws: number;
-}
+/** A player's ranked 1 v 1 (core's RankedSummary: the rank, the record, the peak, the streak and the recent games). */
+export type { RankedSummary };
 
 export interface Profile {
   user: { id: string; name: string; icon: string; signedIn: boolean; email: string | null; google: boolean };
@@ -379,7 +373,7 @@ export interface PublicProfile {
   topPercent: number | null;
   /** Banned for fair play (the profile says so; nothing else about fair play is shown). */
   banned?: boolean;
-  /** Ranked 1 v 1: the rank and the record (null when banned; missing from an older server). */
+  /** Ranked 1 v 1: the rank shown everywhere, the record, the peak, the streak and the recent games (null when banned; missing from an older server). */
   ranked1v1?: RankedSummary | null;
   crowd: { games: number; wins: number; avgPlace: number | null; best: number | null; cutsSurvivedPct: number | null; brilliant: number | null };
   boss: { raids: number; bossesBeaten: number; strikesSurvived: number | null; lastStands: number | null; survivedPct: number | null; brilliant: number | null };
