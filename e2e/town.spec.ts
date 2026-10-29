@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { BOTS, STATUES, TABLES, TOWN_LINES } from "../packages/app/src/town/world.ts";
+import { BOTS, STATUES, TABLES, TOWN_LINES, sidekickText } from "../packages/app/src/town/world.ts";
 import { BOARD_SEL, test } from "./helpers.ts";
 
 /**
@@ -856,5 +856,356 @@ test("the bots' turns: ten out; one walks home and fades out at its door, gone; 
   expect(new Set(r.out)).toEqual(new Set([10]));
   // It walks to the square and stays there.
   await expect.poll(async () => (await bots()).find((b) => b.name === next.name)!, { message: "it reaches the square", timeout: 40_000 }).toMatchObject({ trip: null, moving: false, inSquare: true });
+  expect(errors).toEqual([]);
+});
+
+// ---------------- The person card (Oct 28, Eric's mockup; docs/decisions/2026-10-28-town-card.md) ----------------
+//
+// Every card is dark with a gold border; a person's (a bot's, and a real player's when they come) is one row at one size: their picture in
+// a round ring, their name ("(bot)" in gray), a sidekick's line, the rating with its bars and a row for "Tables are full", and Play with
+// crossed swords (no triangle). Eric's rule (nothing hidden, nothing shifts): the card is one size whoever it is.
+
+/** The card's colors (town.css) as the browser computes them. */
+const CARD = { bg: "rgb(32, 33, 42)", gold: "rgb(217, 187, 140)", white: "rgb(255, 255, 255)", gray: "rgb(165, 164, 170)", blue: "rgb(69, 117, 250)", ivory: "rgb(234, 223, 198)", bars: "rgb(224, 180, 110)" };
+/** The card's size: 232 × 60 CSS pixels, on a phone and a computer alike (Eric's mockup, measured against its name tags). */
+const CARD_SIZE = { w: 232, h: 60 };
+
+type Rect = { x: number; y: number; w: number; h: number };
+const rectIn = (p: Page, sel: string): Promise<Rect> =>
+  p.locator(sel).first().evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    return { x: r.left, y: r.top, w: r.width, h: r.height };
+  });
+/** The same rectangle, to a hundredth of a pixel. */
+const sameRect = (a: Rect, b: Rect, what: string) => expect([a.x, a.y, a.w, a.h].map((v) => Math.round(v * 100)), what).toEqual([b.x, b.y, b.w, b.h].map((v) => Math.round(v * 100)));
+
+/** A color of `rgb(r, g, b)` or `rgba(…)` as [r, g, b]. */
+const channels = (css: string): [number, number, number] => (css.match(/[\d.]+/g)!.slice(0, 3).map(Number) as [number, number, number]);
+/** WCAG's contrast ratio of two colors. */
+function contrast(a: string, b: string): number {
+  const lum = ([r, g, bl]: [number, number, number]) => {
+    const f = (v: number) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(bl);
+  };
+  const [x, y] = [lum(channels(a)), lum(channels(b))];
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+}
+/**
+ * The text color of `sel` against the card's own color (or, `on`, against the color of another element: a button's background; a
+ * gradient counts at each of its stops, the worst of them), and the first element's text color too.
+ */
+async function contrastOf(p: Page, sel: string, on?: string): Promise<number> {
+  const got = await p.locator(sel).first().evaluate((el, onSel) => {
+    const fg = getComputedStyle(el).color;
+    const back = onSel ? getComputedStyle(document.querySelector(onSel)!) : getComputedStyle(document.querySelector(".town-card")!);
+    const stops = back.backgroundImage.startsWith("linear-gradient") ? (back.backgroundImage.match(/rgb\([^)]*\)/g) ?? []) : [];
+    return { fg, bgs: stops.length ? stops : [back.backgroundColor] };
+  }, on ?? null);
+  return Math.min(...got.bgs.map((bg) => contrast(got.fg, bg)));
+}
+const WCAG_TEXT = 4.5;
+
+/** A bot comes to stand beside you and holds still; a tap on it opens its card. */
+async function openBotCard(p: Page, name: string) {
+  const i = BOTS.findIndex((b) => b.name === name);
+  await p.evaluate((i) => (window as unknown as { __townCall: (i: number) => void }).__townCall(i), i);
+  await expect.poll(async () => (await bots(p))[i]!.moving, { timeout: 10_000 }).toBe(false);
+  await p.waitForTimeout(400);
+  await tapAt(p, "bot", i);
+  const card = p.getByRole("dialog", { name: `${name} (bot)`, exact: true });
+  await expect(card).toBeVisible();
+  return card;
+}
+const fillTables = (p: Page, on: boolean) => p.evaluate((on) => (window as unknown as { __townFull: (on: boolean) => void }).__townFull(on), on);
+
+test("a person's card (Eric's mockup, Oct 28): a sidekick's has its picture in a blue ring (no button), its name in bold white with '(bot)' gray, its line, its rating with bars and Play with crossed swords; a pawn's has an ivory ring, the same size and places", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+  await page.goto("/town");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  // ---- A sidekick: Glim, Hollow's.
+  let card = await openBotCard(page, "Glim");
+  // Dark, with a thin warm-gold border and rounded corners.
+  const look = await card.evaluate((el) => {
+    const s = getComputedStyle(el);
+    return { bg: s.backgroundColor, border: s.borderTopColor, width: parseFloat(s.borderTopWidth), radius: parseFloat(s.borderTopLeftRadius) };
+  });
+  expect(look.bg).toBe(CARD.bg);
+  expect(look.border).toBe(CARD.gold);
+  expect(look.width, "a thin border").toBeGreaterThanOrEqual(1);
+  expect(look.width).toBeLessThanOrEqual(2);
+  expect(look.radius).toBeGreaterThanOrEqual(12);
+  // One size, on a phone and a computer alike.
+  const size = await rectIn(page, ".town-card");
+  expect([size.w, size.h].map((v) => Math.round(v * 10) / 10)).toEqual([CARD_SIZE.w, CARD_SIZE.h]);
+  // Its picture: a sidekick's face (an image of its idle's first frame) in a blue ring, round; not a button.
+  const pic = card.locator(".town-pic");
+  await expect(pic).toHaveClass(/sidekick/);
+  const ring = await pic.evaluate((el) => {
+    const s = getComputedStyle(el);
+    return { tag: el.tagName, tabIndex: (el as HTMLElement).tabIndex, role: el.getAttribute("role"), hidden: el.getAttribute("aria-hidden"), cursor: s.cursor, border: s.borderTopColor, width: parseFloat(s.borderTopWidth), radius: s.borderTopLeftRadius, w: el.getBoundingClientRect().width, h: el.getBoundingClientRect().height };
+  });
+  expect(ring).toMatchObject({ tag: "DIV", tabIndex: -1, role: null, hidden: "true", cursor: "default", border: CARD.blue, width: 3, radius: "50%" });
+  expect(Math.abs(ring.w - ring.h), "a round").toBeLessThan(0.01);
+  expect(ring.w).toBeCloseTo(40, 1);
+  const face = pic.locator("img");
+  await expect(face).toBeVisible();
+  expect(await face.getAttribute("src")).toMatch(/^data:image\/png/);
+  expect(await face.evaluate((img: HTMLImageElement) => img.naturalWidth > 10 && img.naturalHeight > 10)).toBe(true);
+  // Its words: the name bold white, "(bot)" gray after it (the heading still reads "Glim (bot)"), the line, the rating with its bars.
+  await expect(card.getByRole("heading", { name: "Glim (bot)", exact: true })).toBeVisible();
+  const name = await card.locator(".town-name").evaluate((el) => ({ text: el.textContent, color: getComputedStyle(el).color, weight: getComputedStyle(el).fontWeight }));
+  expect(name).toEqual({ text: "Glim", color: CARD.white, weight: "700" });
+  expect(await card.locator(".town-bot").evaluate((el) => ({ text: el.textContent, color: getComputedStyle(el).color }))).toEqual({ text: " (bot)", color: CARD.gray });
+  await expect(card.getByText("Hollow's sidekick", { exact: true })).toBeVisible();
+  await expect(card.getByText("Rating 2500", { exact: true })).toBeVisible();
+  const bars = card.locator(".town-rate svg.town-ico-bars");
+  await expect(bars).toBeVisible();
+  expect(await bars.evaluate((el) => getComputedStyle(el).color), "the bars are gold").toBe(CARD.bars);
+  // Play, with a plain crossed-swords icon (SVG, hidden from screen readers) and no triangle; its name is still "Play".
+  const playBtn = card.getByRole("button", { name: "Play", exact: true });
+  await expect(playBtn).toBeEnabled();
+  const swords = playBtn.locator("svg.town-ico-swords");
+  await expect(swords).toHaveCount(1);
+  await expect(swords).toHaveAttribute("aria-hidden", "true");
+  expect(await swords.evaluate((el) => getComputedStyle(el).color), "the icon is the button's text color").toBe(await playBtn.evaluate((el) => getComputedStyle(el).color));
+  expect(await card.innerText()).not.toMatch(/[▶►▸⏵▷⯈]/);
+  // The picture is the only other thing in the row, and the only button is Play: a bot's picture opens nothing.
+  await expect(card.getByRole("button")).toHaveCount(1);
+  await pic.click();
+  await page.waitForTimeout(400);
+  await expect(card).toBeVisible();
+  await expect(page.locator(".fd-overlay")).toHaveCount(0);
+  expect(new URL(page.url()).pathname).toBe("/town");
+  // Where each part sits (for the pawn's card to match).
+  const parts = async () => ({ card: await rectIn(page, ".town-card"), pic: await rectIn(page, ".town-card .town-pic"), name: await rectIn(page, ".town-card h2"), sub: await rectIn(page, ".town-card .town-sub"), rate: await rectIn(page, ".town-card .town-rate"), note: await rectIn(page, ".town-card .town-note"), play: await rectIn(page, ".town-card .town-play") });
+  const kid = await parts();
+  // The words on the dark card, 4.5:1 or better (WCAG's number for text): white, gray, the line, the rating, Play on its gold (at each end of the gradient).
+  for (const sel of [".town-name", ".town-bot", ".town-sub", ".town-rate span"]) expect(await contrastOf(page, `.town-card ${sel}`), sel).toBeGreaterThanOrEqual(WCAG_TEXT);
+  expect(await contrastOf(page, ".town-card .town-play", ".town-card .town-play"), "Play on its gold").toBeGreaterThanOrEqual(WCAG_TEXT);
+  expect(await contrastOf(page, ".town-card .town-ico-bars"), "the bars (a picture: 3:1)").toBeGreaterThanOrEqual(3);
+  expect(contrast(CARD.blue, CARD.bg), "the blue ring reads on the card (a picture: 3:1)").toBeGreaterThanOrEqual(3);
+  await page.keyboard.press("Escape");
+  await expect(card).toBeHidden();
+
+  // ---- A pawn: Tempo Tess. An ivory ring, her own picture (the pawn as dressed), no line; every part where the sidekick's was.
+  card = await openBotCard(page, "Tempo Tess");
+  await expect(card.locator(".town-pic")).toHaveClass(/pawn/);
+  expect(await card.locator(".town-pic").evaluate((el) => getComputedStyle(el).borderTopColor), "an ivory ring").toBe(CARD.ivory);
+  expect(contrast(CARD.ivory, CARD.bg), "the ivory ring reads on the card (a picture: 3:1)").toBeGreaterThanOrEqual(3);
+  const pawn = card.locator(".town-pic img");
+  await expect(pawn).toBeVisible();
+  expect(await pawn.evaluate((img: HTMLImageElement) => img.naturalWidth > 20 && img.naturalHeight > 20)).toBe(true);
+  await expect(card.getByText(/sidekick/)).toHaveCount(0);
+  expect(await card.locator(".town-sub").innerText(), "the line's row is there, empty").toBe("");
+  await expect(card.getByText("Rating 1500", { exact: true })).toBeVisible();
+  await expect(card.getByRole("button")).toHaveCount(1);
+  const pawnParts = await parts();
+  for (const k of ["card", "pic", "name", "sub", "rate", "note", "play"] as const) sameRect({ ...pawnParts[k], x: pawnParts[k].x - pawnParts.card.x, y: pawnParts[k].y - pawnParts.card.y }, { ...kid[k], x: kid[k].x - kid.card.x, y: kid[k].y - kid.card.y }, `${k} sits where the sidekick's did`);
+  expect(errors).toEqual([]);
+});
+
+test("tables full: a bot's Play is greyed (not tappable) and 'Tables are full' shows in small gray text under the rating; the card, its rating and its Play don't move or change size (sidekick and pawn)", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+  await page.goto("/town");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  for (const name of ["Glim", "Tempo Tess"]) {
+    const card = await openBotCard(page, name);
+    const play = card.getByRole("button", { name: "Play", exact: true });
+    await expect(play).toBeEnabled();
+    await expect(card.getByText("Tables are full")).toHaveCount(0);
+    const rects = async () => ({ card: await rectIn(page, ".town-card"), pic: await rectIn(page, ".town-card .town-pic"), name: await rectIn(page, ".town-card h2"), rate: await rectIn(page, ".town-card .town-rate"), note: await rectIn(page, ".town-card .town-note"), play: await rectIn(page, ".town-card .town-play") });
+    const before = await rects();
+    expect(before.note.h, "the note's row is there before it says anything").toBeGreaterThan(8);
+    await fillTables(page, true);
+    // Greyed and not tappable; the words in the button are still "Play" (the old "Play · Tables are full" is gone).
+    await expect(play).toBeDisabled();
+    await expect(card.getByRole("button", { name: "Play · Tables are full" })).toHaveCount(0);
+    const note = card.getByText("Tables are full", { exact: true });
+    await expect(note).toBeVisible();
+    expect(await note.evaluate((el) => getComputedStyle(el).color), "small gray text").toBe("rgb(174, 178, 189)");
+    expect(await note.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))).toBeLessThanOrEqual(11);
+    await expect(play).toHaveAttribute("aria-describedby", "town-card-note");
+    const full = await rects();
+    // Under the rating, and nothing else moved: the same card (place and size), picture, name, rating and button.
+    expect(full.note.y, "under the rating").toBeGreaterThanOrEqual(full.rate.y + full.rate.h - 0.5);
+    for (const k of ["card", "pic", "name", "rate", "note", "play"] as const) sameRect(full[k], before[k], `${name}: ${k} stays put`);
+    // The words on the dark card, 4.5:1; the greyed Play too (against its own grey).
+    expect(await contrastOf(page, ".town-card .town-note"), "Tables are full").toBeGreaterThanOrEqual(WCAG_TEXT);
+    expect(await contrastOf(page, ".town-card .town-play", ".town-card .town-play"), "the greyed Play on its grey").toBeGreaterThanOrEqual(WCAG_TEXT);
+    // A tap on the greyed Play does nothing: the card stays and no game starts.
+    await play.click({ force: true });
+    await page.waitForTimeout(400);
+    await expect(card).toBeVisible();
+    await expect(page.locator(".duel-screen")).toHaveCount(0);
+    // A table frees: Play is back, the note's row empty, nothing moved.
+    await fillTables(page, false);
+    await expect(play).toBeEnabled();
+    await expect(card.getByText("Tables are full")).toHaveCount(0);
+    for (const k of ["card", "pic", "name", "rate", "note", "play"] as const) sameRect(await rectIn(page, `.town-card ${k === "card" ? "" : { pic: ".town-pic", name: "h2", rate: ".town-rate", note: ".town-note", play: ".town-play" }[k]}`.trim()), before[k], `${name}: ${k} is back where it was`);
+    await page.keyboard.press("Escape");
+    await expect(card).toBeHidden();
+  }
+  expect(errors).toEqual([]);
+});
+
+test("every bot's name, its line and its rating fit the card whole, in the font the card uses (nothing cut, nothing resizes it)", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/town");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  const card = await openBotCard(page, "Tempo Tess");
+  // The room the card has for words, and the widest of every bot's, measured in the card's own fonts (with 4 px to spare for another browser's).
+  const room = await card.evaluate(async (el, bots) => {
+    await document.fonts.load("700 13px Archivo");
+    await document.fonts.load("500 12px Archivo");
+    await document.fonts.load("500 9.5px Archivo");
+    const g = document.createElement("canvas").getContext("2d")!;
+    const w = (font: string, text: string) => ((g.font = font), g.measureText(text).width);
+    const nameRoom = el.querySelector("h2")!.getBoundingClientRect().width;
+    const lineRoom = el.querySelector(".town-sub")!.getBoundingClientRect().width;
+    const rateRow = el.querySelector(".town-rate")!;
+    const rateRoom = rateRow.getBoundingClientRect().width - el.querySelector(".town-rate svg")!.getBoundingClientRect().width - parseFloat(getComputedStyle(rateRow).columnGap);
+    return {
+      nameRoom,
+      lineRoom,
+      rateRoom,
+      names: bots.map((b) => ({ b: b.label, w: w("700 13px Archivo", b.name) + w("500 12px Archivo", " (bot)") })),
+      lines: bots.filter((b) => b.line).map((b) => ({ b: b.line, w: w("500 9.5px Archivo", b.line!) })),
+      rates: bots.map((b) => ({ b: b.rating, w: w("500 9.5px Archivo", b.rating) })),
+    };
+  }, BOTS.map((b) => ({ name: b.name, label: `${b.name} (bot)`, line: sidekickText(b), rating: `Rating ${b.rating}` })));
+  for (const n of room.names) expect(n.w + 4, `${n.b} fits its row`).toBeLessThanOrEqual(room.nameRoom);
+  for (const n of room.lines) expect(n.w + 4, `${n.b} fits its row`).toBeLessThanOrEqual(room.lineRoom);
+  for (const n of room.rates) expect(n.w + 4, `${n.b} fits its row`).toBeLessThanOrEqual(room.rateRoom);
+  // And the card that's open: nothing of it is cut.
+  for (const sel of ["h2", ".town-sub", ".town-rate", ".town-note"]) expect(await card.locator(sel).evaluate((el) => el.scrollWidth <= el.clientWidth), `${sel} is whole`).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test("the other cards on the same dark look: the boss's, the home's, the Colosseum's, a table's and 'Leave the town square?' keep their words and buttons; gold primary buttons, greyed ones and 'Coming soon' read on the dark (4.5:1)", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+  await page.goto("/town");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  /** The open card is dark with a gold border, white words, a gold primary button, greyed ones and "Coming soon" that read. */
+  const onDark = async (what: string, texts: string[]) => {
+    const look = await page.locator(".town-card").evaluate((el) => {
+      const s = getComputedStyle(el);
+      return { bg: s.backgroundColor, border: s.borderTopColor, color: s.color };
+    });
+    expect(look, what).toMatchObject({ bg: CARD.bg, border: CARD.gold, color: CARD.white });
+    for (const sel of texts) expect(await contrastOf(page, `.town-card ${sel}`), `${what}: ${sel}`).toBeGreaterThanOrEqual(WCAG_TEXT);
+    const primary = page.locator(".town-card .town-btn.primary");
+    if (await primary.count()) {
+      expect(await primary.first().evaluate((el) => getComputedStyle(el).backgroundImage), `${what}: a gold primary button`).toContain("linear-gradient");
+      expect(await contrastOf(page, ".town-card .town-btn.primary", ".town-card .town-btn.primary"), `${what}: its words on the gold`).toBeGreaterThanOrEqual(WCAG_TEXT);
+    }
+    const grey = page.locator(".town-card .town-btn:disabled");
+    if (await grey.count()) {
+      expect(await contrastOf(page, ".town-card .town-btn:disabled", ".town-card .town-btn:disabled"), `${what}: a greyed button's words on it`).toBeGreaterThanOrEqual(WCAG_TEXT);
+      expect(await contrastOf(page, ".town-card .town-soon"), `${what}: Coming soon`).toBeGreaterThanOrEqual(WCAG_TEXT);
+    }
+  };
+  // The Colosseum's (a tap on its gate; it's in view at the start).
+  const gate = (await page.evaluate(() => (window as unknown as { __townAt: (k: string) => { x: number; y: number } | null }).__townAt("coliseum")))!;
+  expect(gate, "the Colosseum is drawn at the start").not.toBeNull();
+  const cv = (await canvas(page).boundingBox())!;
+  await page.mouse.click(cv.x + gate.x, cv.y + gate.y);
+  let card = page.getByRole("dialog", { name: "The Colosseum", exact: true });
+  await expect(card.getByRole("button", { name: "Raids with people" })).toBeDisabled();
+  await expect(card.getByText("Coming soon", { exact: true })).toBeVisible();
+  await onDark("the Colosseum's card", ["h2"]);
+  await page.keyboard.press("Escape");
+  // A chess table's (no title): the camera goes to the park's seventh table, which is out of view from the Colosseum's gate.
+  await page.evaluate(() => (window as unknown as { __townGlide: (to: [number, number]) => void }).__townGlide([19, 14]));
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __townAt: (k: string, i: number) => unknown }).__townAt("table", 6)), { message: "the table is in view" }).not.toBeNull();
+  await page.waitForTimeout(600);
+  await tapAt(page, "table", 6);
+  card = page.getByRole("dialog", { name: "Chess table", exact: true });
+  for (const b of ["Casual", "Ranked"]) await expect(card.getByRole("button", { name: b, exact: true })).toBeDisabled();
+  await expect(card.getByText("Coming soon", { exact: true })).toBeVisible();
+  await onDark("a table's card", []);
+  await page.keyboard.press("Escape");
+  // A boss's (Babur's) and its confirm.
+  await toBabur(page);
+  card = await openCard(page, "boss", "Babur");
+  await expect(card.getByRole("heading", { name: "Babur" })).toBeVisible();
+  await expect(card.getByRole("button", { name: "Challenge alone" })).toBeEnabled();
+  await onDark("the boss's card", ["h2"]);
+  await card.getByRole("button", { name: "Challenge alone" }).click();
+  const confirm = page.getByRole("dialog", { name: "Leave the town square?" });
+  await expect(confirm.getByText("You'll fight Babur alone in Solo Boss Mode.")).toBeVisible();
+  await expect(confirm.getByRole("button", { name: "Leave", exact: true })).toBeEnabled();
+  await expect(confirm.getByRole("button", { name: "Stay", exact: true })).toBeEnabled();
+  await onDark("the confirm", ["h2", ".town-card-text"]);
+  expect(await contrastOf(page, ".town-card .town-btn:not(.primary)", ".town-card .town-btn:not(.primary)"), "the confirm's plain button").toBeGreaterThanOrEqual(WCAG_TEXT);
+  await confirm.getByRole("button", { name: "Stay" }).click();
+  await expect(confirm).toBeHidden();
+  // His home's.
+  card = await openCard(page, "home", "Babur's Circus");
+  await expect(card.getByRole("button", { name: "Shop" })).toBeDisabled();
+  await expect(card.getByText("Coming soon", { exact: true })).toBeVisible();
+  await onDark("the home's card", ["h2"]);
+  await page.keyboard.press("Escape");
+  expect(errors).toEqual([]);
+});
+
+test("a real player's card (a test player; no real players walk in the town yet): the same row and size, a ring in ivory and their profile icon, which is a button named 'View <name>'s profile' that opens their profile, as a tap on a name does elsewhere", async ({ page, browser }) => {
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+  // Another player's account (a guest, named), to have a real profile to open.
+  const other = await (await browser.newContext()).newPage();
+  await other.goto("/");
+  await expect(other.getByRole("button", { name: "Your profile" })).toBeVisible();
+  await other.evaluate(() => fetch("/api/me", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "Cyrus" }) }));
+  const uid = ((await (await other.request.get("/api/me")).json()) as { user: { id: string; name: string } }).user.id;
+  expect(((await (await other.request.get("/api/me")).json()) as { user: { name: string } }).user.name).toBe("Cyrus");
+  await page.goto("/town");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  // The test player: a pawn with that account's id, a drawn icon and a rating, beside you.
+  await page.evaluate(
+    ([id]) => {
+      const c = document.createElement("canvas");
+      c.width = c.height = 48;
+      const g = c.getContext("2d")!;
+      g.fillStyle = "#3f48cc";
+      g.fillRect(0, 0, 48, 48);
+      g.fillStyle = "#ffc90e";
+      g.fillRect(12, 12, 24, 24);
+      (window as unknown as { __townPlayer: (uid: string, name: string, icon: string, rating: number) => number }).__townPlayer(id!, "Cyrus", c.toDataURL("image/png"), 1432);
+    },
+    [uid],
+  );
+  await expect.poll(() => page.evaluate((id) => (window as unknown as { __townAt: (k: string, id: string) => unknown }).__townAt("player", id), uid), { message: "the test player is drawn" }).not.toBeNull();
+  const at = (await page.evaluate((id) => (window as unknown as { __townAt: (k: string, id: string) => { x: number; y: number } }).__townAt("player", id), uid))!;
+  const cv = (await canvas(page).boundingBox())!;
+  await page.mouse.click(cv.x + at.x, cv.y + at.y);
+  const card = page.getByRole("dialog", { name: "Cyrus", exact: true });
+  await expect(card).toBeVisible();
+  // The same size and row as a bot's; no "(bot)", no line; their rating; Play greyed (challenging a player isn't built yet), with its note.
+  const size = await rectIn(page, ".town-card");
+  expect([size.w, size.h].map((v) => Math.round(v * 10) / 10)).toEqual([CARD_SIZE.w, CARD_SIZE.h]);
+  await expect(card.getByRole("heading", { name: "Cyrus", exact: true })).toBeVisible();
+  await expect(card.getByText("(bot)")).toHaveCount(0);
+  await expect(card.getByText("Rating 1432", { exact: true })).toBeVisible();
+  await expect(card.getByRole("button", { name: "Play", exact: true })).toBeDisabled();
+  await expect(card.locator("svg.town-ico-swords")).toHaveAttribute("aria-hidden", "true");
+  await expect(card.getByText("Coming soon", { exact: true })).toBeVisible();
+  // The picture is their profile icon, in an ivory ring, and a button.
+  const pic = card.getByRole("button", { name: "View Cyrus's profile", exact: true });
+  await expect(pic).toBeVisible();
+  expect(await pic.evaluate((el) => ({ tag: el.tagName, cursor: getComputedStyle(el).cursor, border: getComputedStyle(el).borderTopColor, radius: getComputedStyle(el).borderTopLeftRadius }))).toEqual({ tag: "BUTTON", cursor: "pointer", border: CARD.ivory, radius: "50%" });
+  const icon = pic.locator("img.user-icon");
+  await expect(icon).toBeVisible();
+  expect(await icon.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(48);
+  // A tap on it opens that player's profile (the same one a name opens), over the town; Back, and the town is as it was.
+  await pic.click();
+  const sheet = page.locator(".fd-overlay");
+  await expect(sheet.getByRole("heading", { name: "Cyrus" })).toBeVisible({ timeout: 15_000 });
+  await sheet.getByRole("button", { name: "Back", exact: true }).first().click();
+  await expect(sheet).toHaveCount(0);
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(card).toBeVisible();
   expect(errors).toEqual([]);
 });
