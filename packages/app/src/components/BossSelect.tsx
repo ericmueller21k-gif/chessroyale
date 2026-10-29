@@ -168,7 +168,7 @@ export function BossSelect({ value, difficulty, name, look, onPick, onDifficulty
                 <DressedPawn look={look} size="stage" />
               </span>
             </div>
-            <strong class="bs-name">{name}</strong>
+            <strong class="bs-you-name">{name}</strong>
           </div>
           <span class="bs-vs">VS</span>
           <div class="bs-side" aria-label="Your boss" role="group">

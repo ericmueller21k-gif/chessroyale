@@ -74,8 +74,8 @@ describe("the boss template: who can be met", () => {
     expect([1400, 1600, 1800, 2000, 2200, 2400, 2600, 2800, 3000, 3190].map(bossThreat)).toEqual([1, 1, 2, 2, 3, 3, 4, 4, 5, 5]);
   });
 
-  it("solo's difficulty: Easy −300, Normal your strength, Hard +250, Hardest +500, never past the engine's strongest", () => {
-    expect(BOSS_DIFFICULTY.map((d) => [d.id, d.elo])).toEqual([["easy", -300], ["normal", 0], ["hard", 250], ["hardest", 500]]);
+  it("solo's difficulty: Very easy −500, Easy −300, Medium your strength, Hard +250, Very hard +500, never past the engine's strongest", () => {
+    expect(BOSS_DIFFICULTY.map((d) => [d.id, d.elo])).toEqual([["very-easy", -500], ["easy", -300], ["normal", 0], ["hard", 250], ["hardest", 500]]);
     const at = (base: number, id: string) => bossStrength(base, { offset: -100 }, BOSS_DIFFICULTY.find((d) => d.id === id)!.elo);
     expect([at(1600, "easy"), at(1600, "normal"), at(1600, "hard"), at(1600, "hardest")]).toEqual([1200, 1500, 1750, 2000]);
     expect(at(3000, "hardest")).toBe(ENGINE_MAX_ELO);

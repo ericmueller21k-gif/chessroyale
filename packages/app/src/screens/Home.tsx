@@ -595,6 +595,13 @@ export function HomeScreen({
   };
   // (Not while Solo and Boss alone rest: the hidden /bosses lands here too, and the Boss raid screen says why.)
   const bossAlone = () => (rest("solo") ? undefined : bossInUrl() ? onSolo("raid") : setBossMenu("solo"));
+  // Boss Battle's START: Maia's files fetched ahead as the old Boss alone menu did when it opened, then the battle.
+  const start = () => {
+    if (rest("solo")) return;
+    const bosses = menuBosses({ admin: isAdmin(), raid: false }).filter((b) => !isPaused(`boss:${b.id}`) && (pick === RANDOM || b.id === pick));
+    if (maiaLikely(bosses.map((b) => bossAloneElo(profile?.rating ?? null, b, difficulty)))) prefetchMaia();
+    onSolo("raid");
+  };
   const pickBoss = (id: string) => {
     rememberBossPick(id);
     setBossMenu(null);
@@ -793,7 +800,7 @@ export function HomeScreen({
             <RaidOption label="Boss alone" sub={pick === RANDOM ? "Just you vs a random boss" : "Just you vs this boss"} disabled={loading || !!soloResting} locked={locked} onClick={bossAlone} />
           ) : (
             // (Boss Battle's START: straight into the battle with the picked boss at the screen's difficulty; the old Boss alone menu is skipped.)
-            <button type="button" class="bs-start" disabled={loading || !!soloResting || locked} onClick={() => onSolo("raid")}>
+            <button type="button" class="bs-start" disabled={loading || !!soloResting || locked} onClick={start}>
               <SwordsIcon />
               START
             </button>

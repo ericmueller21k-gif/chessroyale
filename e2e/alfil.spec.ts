@@ -335,7 +335,7 @@ test("Alfil's tile and stage, and his figure by the board: whole on a phone (320
   await expect(page.locator(".bs-stage .bs-sprite")).toHaveAttribute("data-fx", "alfil");
   await expect(page.locator(".bs-name")).toHaveText("Alfil");
   await page.waitForTimeout(500);
-  const stage = (await page.locator(".bs-spot").boundingBox())!;
+  const stage = (await page.locator(".bs-spot:not(.bs-mine)").boundingBox())!;
   const fig = (await page.locator(".bs-sprite").boundingBox())!;
   expect(fig.x).toBeGreaterThanOrEqual(stage.x - 1);
   expect(fig.x + fig.width).toBeLessThanOrEqual(stage.x + stage.width + 1);

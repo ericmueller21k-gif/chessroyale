@@ -360,7 +360,7 @@ async function withEmail(page: Page, email: string) {
 
 /**
  * The full Boss raid screen, every raid choice (Eric, Oct 16; Oct 26: the test link ?mode=raid). It's added to the page's own
- * address, so the switches it was opened with stay. Home's Solo Boss Mode card opens the solo form instead: openSoloBoss.
+ * address, so the switches it was opened with stay. Home's Boss Battle card opens the solo form instead: openSoloBoss.
  */
 export async function openBossRaid(page: Page) {
   const to = new URL(page.url());
@@ -369,18 +369,18 @@ export async function openBossRaid(page: Page) {
   await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
 }
 
-/** Home → Solo Boss Mode's card → its screen: the tiles, the stage and Boss alone (Eric, Oct 26). */
+/** Home → Boss Battle's card → its screen: the tiles, the stage and START (Eric, Oct 26; renamed Oct 29). */
 export async function openSoloBoss(page: Page) {
-  await page.getByRole("main").getByRole("button", { name: /^Solo Boss Mode/ }).click();
-  await expect(page.getByRole("heading", { name: "Solo Boss Mode", exact: true })).toBeVisible();
+  await page.getByRole("main").getByRole("button", { name: /^Boss Battle/ }).click();
+  await expect(page.getByRole("heading", { name: "Boss Battle", exact: true })).toBeVisible();
 }
 
 /**
- * Home → Solo Boss Mode → (the boss's tile, `boss`: its name, as its tile is named) → Boss alone: its menu, the difficulty and
- * that boss, or a random one without `boss` (with ?boss= in the address, the battle at once).
+ * Home → Boss Battle → (the boss's tile, `boss`: its name, as its tile is named) → START: the battle at once, with that boss, or a
+ * random one without `boss`, at the screen's difficulty (Oct 29: START skips the old Boss alone menu).
  */
 export async function bossAloneFromHome(page: Page, boss?: string) {
   await openSoloBoss(page);
   if (boss) await page.getByRole("radiogroup", { name: "Bosses" }).getByRole("radio", { name: boss, exact: true }).click();
-  await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
+  await page.getByRole("main").getByRole("button", { name: "START" }).click();
 }

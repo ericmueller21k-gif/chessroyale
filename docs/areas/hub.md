@@ -59,8 +59,8 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     `?cardMs=`). The animated card with lines is shelved (a later idea). The title is Archivo, not Archivo Black: that
     file's lowercase i has no dot, so "raid" read as "raId" (Oct 24). The side menu's **Boss Arena** item opens the same
     page (the town has no side menu, so it never shows as the open page).
-  - **The Solo Boss Mode card** (Eric, Oct 26; half width, "Solo Boss Mode", "Any boss, alone") opens the **Solo Boss
-    Mode screen**, the Boss raid screen's solo form (below). Its picture is the crown from the side menu's old Boss raid
+  - **The Solo Boss Mode card** (Eric, Oct 26; half width; "Boss Battle", "Any boss, up to 3" since Oct 29) opens the **Boss Battle
+    screen**, the Boss raid screen's solo form (below). Its picture is the crown from the side menu's old Boss raid
     item, drawn large in the card's gold (`CrownArt` in `screens/Home.tsx`): a placeholder until Opus draws one.
   - **The Boss raid screen: a character select** (Eric, Oct 16;
     [docs/decisions/2026-10-16-boss-character-select.md](../decisions/2026-10-16-boss-character-select.md);
@@ -74,7 +74,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     boss: the raids show none
     ([docs/decisions/2026-10-17-boss-sheet-fit.md](../decisions/2026-10-17-boss-sheet-fit.md)). A tap drops the boss on,
     plays its sound once and says one of its lines (the boss section, [bosses.md](bosses.md)). Under the stage the ways
-    to play. **Solo Boss Mode** (Oct 26; the home card and the side menu's item) shows only **Boss alone**; the full
+    to play. **Boss Battle** (Oct 26 as Solo Boss Mode; the home card and the side menu's item) shows **START** (Oct 29; it was the Boss alone button); the full
     screen (`?mode=raid`, the test link, titled "Boss raid") shows every choice below, as before, until the raids move to
     the Boss Arena's Colosseum. Each choice goes through its flow: **Join a raid** and **People only** (the raid's queues, always a random boss:
     "Random boss · …"), **Raid with bots** (a Solo raid against the boss picked), **Boss alone** (its menu: the
@@ -93,7 +93,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     lobby in the row's pick (50 v 50 if none, or with 1 v 1 or Squads picked) and copies its invite link as it opens
     (the lobby screen says "Invite link copied: paste it to your friends"); join one by its code; **Your friends ›**
     (with "N new") opens the friends list. The full Boss raid screen's Play with friends makes a raid, as before (the
-    Solo Boss Mode form has none).
+    Boss Battle form has none).
   - **The rank line under your name** (Oct 28, Eric: "get rid of the novice weighty … we're going with the new ranking
     system"): your ranked 1 v 1 rank (`RankLine`, `homeRankLine()` in `ranked.ts`): the tier and division in the tier's
     color, then the RP ("Gold 3 · 45 RP"), "Placement 2/5", or "Unranked" before your first ranked game (a blank line of the
@@ -112,7 +112,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     of requests and invites), then a gear that opens Settings in one tap; a computer's are its side menu's, so none is
     there; [docs/decisions/2026-10-17-phone-settings-gear.md](../decisions/2026-10-17-phone-settings-gear.md),
     [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)), then one column: your card, the RANKED row, its panel, the line
-    above PLAY and PLAY (Oct 28), then Other modes with the Boss Arena card, and Solo Boss Mode and Auto chess side by side under it, at the bottom. Your pawn's card takes the room
+    above PLAY and PLAY (Oct 28), then Other modes with the Boss Arena card, and Boss Battle and Auto chess side by side under it, at the bottom. Your pawn's card takes the room
     left: your tag (icon, name, "Gold 3 · 45 RP"; an admin's test version below) centered above your pawn's head, the pawn 75% bigger than before
     (170 × 154 → up to 298 × 270) and sized to the room the tag leaves (Oct 24). On a short card (under 190 px tall: a
     640 px phone, or a 740 px one (measured at 320, 375 and 430 px wide), since the options panel is there from the first view, Oct 25)
@@ -121,7 +121,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     ([docs/decisions/2026-10-18-phone-home-fits.md](../decisions/2026-10-18-phone-home-fits.md)). Big tap targets, no
     sideways scroll at 320–430 px; a long name on your home card ellipsizes.
   - **Computer** (1024 px+): a side menu, the play column in the center in the phone's order (Eric, Oct 18): the RANKED
-    row, its panel, the line above PLAY and PLAY (Oct 28), then Other modes with the Boss Arena card, and Solo Boss Mode and Auto chess side by side under it (a little shorter) at the
+    row, its panel, the line above PLAY and PLAY (Oct 28), then Other modes with the Boss Arena card, and Boss Battle and Auto chess side by side under it (a little shorter) at the
     bottom; a side panel (playing now, global chat). The pawn hops on a computer too (Oct 24: the hop was phone-only).
     From 1280 px the play column starts with the **live window**: the featured real match (a matchmade one, most
     people, then newest) or, when none runs, bot-match replays played on a shared clock cycle so everyone sees the same
@@ -265,7 +265,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 
 | What | Where |
 | --- | --- |
-| Screens | `packages/app/src/screens/Home.tsx` (home, the RANKED row, the Other modes cards (Boss Arena, Solo Boss Mode), the Boss raid screen and its Solo Boss Mode form), `Landing.tsx`, `Queue.tsx`, `Profile.tsx`, `PlayerProfile.tsx` (yours), `PublicProfile.tsx` (everyone's), `Settings.tsx`, `Lobby.tsx`, `Legal.tsx`, `Friends.tsx` |
+| Screens | `packages/app/src/screens/Home.tsx` (home, the RANKED row, the Other modes cards (Boss Arena, Boss Battle), the Boss raid screen and its Solo Boss Mode form), `Landing.tsx`, `Queue.tsx`, `Profile.tsx`, `PlayerProfile.tsx` (yours), `PublicProfile.tsx` (everyone's), `Settings.tsx`, `Lobby.tsx`, `Legal.tsx`, `Friends.tsx` |
 | Friends' pieces (rows, the live panel's section, the toast, Invite friends, the settings, a profile's buttons) | `packages/app/src/components/Friends.tsx`; the list and actions `friends.ts` |
 | The computer's frame and menus | `components/FrontDoor.tsx`, `FrontMenu.tsx`, `LiveWindow.tsx`, `LiveNumber.tsx`, `MiniBoard.tsx`, `TinyBoard.tsx`, `LeaderboardSheet.tsx` |
 | Names and icons everywhere | `components/PlayerName.tsx`, `PixelIcon.tsx` (`UserIcon`), `profile-nav.ts` |

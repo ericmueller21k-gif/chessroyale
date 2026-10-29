@@ -9470,15 +9470,21 @@ button.fd-logo {
   line-height: 1;
   color: var(--fd-dim);
 }
-.bs-name {
+.bs-name,
+.bs-you-name {
   margin-top: 6px;
   font-family: "Archivo Black", Archivo, sans-serif;
   font-size: 19px;
   font-weight: 400;
   line-height: 1.15;
-  max-width: 100%;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
   text-align: center;
+}
+/* (One line whatever the name, so picking a boss moves nothing: a long boss name runs a little past its half; yours is cut short.) */
+.bs-you-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 /* The difficulty: five levels, each in its own color (darker on the light page, so the name reads on it: 3 to 1 at least). */
 .bs-stage {
@@ -9518,6 +9524,7 @@ button.fd-logo {
 }
 .bs-level {
   min-width: 76px;
+  white-space: nowrap;
   text-align: center;
   font-size: 16px;
   font-weight: 800;

@@ -70,7 +70,6 @@ test("players never see the eval bar: no bar on the board and no switch, even on
   // Boss alone, the boss picked from the menu: the board, and no bar beside it.
   await page.goto("/");
   await bossAloneFromHome(page, "Boingo the Clown");
-  await page.getByRole("dialog", { name: "Boss alone" }).getByRole("button", { name: /Boingo/ }).click();
   await expect(page.locator(".board-row")).toBeVisible({ timeout: 90_000 });
   await expect(page.locator(BOARD_SEL.squares)).toBeVisible();
   await page.waitForTimeout(1000);
