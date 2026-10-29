@@ -1699,7 +1699,8 @@ function ProfilePage({
   onFriends: () => void;
 }) {
   useEffect(() => {
-    const path = target.you ? "/profile" : target.uid ? `/profile/${target.uid}` : null;
+    // (Yours is /profile; anyone's public profile, yours as others see it included, is /profile/ID.)
+    const path = target.you && !target.public ? "/profile" : target.uid ? `/profile/${target.uid}` : null;
     if (path && location.pathname !== path) history.replaceState(null, "", path);
   }, [target]);
   return (

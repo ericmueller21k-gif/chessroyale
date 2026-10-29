@@ -556,11 +556,16 @@
       "paths": [
         "packages/app/src/screens/Profile.tsx",
         "packages/app/src/screens/PlayerProfile.tsx",
+        "packages/app/src/screens/PublicProfile.tsx",
         "packages/app/src/profile-nav.ts",
+        "packages/app/src/public-profile.ts",
+        "packages/app/src/public-profile.css",
         "packages/app/src/components/PlayerName.tsx",
-        "packages/app/src/components/ChatPicks.tsx"
+        "packages/app/src/components/ProfileParts.tsx",
+        "packages/app/src/components/ChatPicks.tsx",
+        "e2e/public-profile-data.ts"
       ],
-      "specs": ["e2e/chat-mod.spec.ts", "e2e/friends.spec.ts", "e2e/profile.spec.ts", "e2e/ranked-1v1.spec.ts"]
+      "specs": ["e2e/chat-mod.spec.ts", "e2e/fairplay.spec.ts", "e2e/friends.spec.ts", "e2e/profile.spec.ts", "e2e/public-profile.spec.ts", "e2e/ranked-1v1.spec.ts"]
     },
     "friends": {
       "paths": [

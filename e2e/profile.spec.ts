@@ -114,10 +114,11 @@ test("home → queue → match, then tap a name for that player's profile (phone
   await desk.locator(".tower-side").getByRole("button", { name: "Phoney's profile" }).click();
   const sheet = desk.locator(".fd-overlay");
   await expect(sheet.getByRole("heading", { name: "Phoney" })).toBeVisible();
-  await expect(sheet.getByRole("button", { name: "Report", exact: true })).toBeVisible();
-  await expect(sheet.getByRole("button", { name: "Add friend" })).toBeEnabled();
-  // (Mid-match there's no game of yours to invite them to: no Invite to play.)
-  await expect(sheet.getByRole("button", { name: "Invite to play" })).toHaveCount(0);
+  // (Oct 28: another player's page is the public profile: Block and Report are in its ••• menu.)
+  await expect(sheet.getByRole("button", { name: "More options" })).toBeEnabled();
+  await expect(sheet.getByRole("button", { name: "Add Friend" })).toBeEnabled();
+  // (Mid-match there's no game of yours to invite them to: Challenge is greyed, not gone.)
+  await expect(sheet.getByRole("button", { name: "Challenge" })).toBeDisabled();
   await expect(sheet.getByRole("button", { name: "Edit name & icon" })).toHaveCount(0);
   await expect(sheet).not.toContainText(/@|Google|email/i);
   await sheet.getByRole("button", { name: "Back", exact: true }).click();
@@ -129,13 +130,15 @@ test("home → queue → match, then tap a name for that player's profile (phone
   await phone.getByRole("dialog", { name: "Leaderboard" }).getByRole("button", { name: "Desky's profile" }).click();
   await expect(phone.locator(".fd-overlay").getByRole("heading", { name: "Desky" })).toBeVisible();
   await expect(phone.locator(".fd-overlay")).toContainText("Online now");
-  // Report them: a reason, then the thanks. The report is about this match: a second one in it isn't counted again.
-  await phone.locator(".fd-overlay").getByRole("button", { name: "Report", exact: true }).click();
+  // Report them (from the ••• menu): a reason, then the thanks. The report is about this match: a second one in it isn't counted again.
+  await phone.locator(".fd-overlay").getByRole("button", { name: "More options" }).click();
+  await phone.getByRole("menuitem", { name: "Report", exact: true }).click();
   for (const reason of ["Cheating", "Offensive name or icon", "Something else"]) await expect(phone.getByRole("button", { name: reason, exact: true })).toBeVisible();
   await phone.getByRole("button", { name: "Cheating", exact: true }).click();
   await expect(phone.getByText("Thanks, we'll look into it.")).toBeVisible();
   await phone.getByRole("dialog", { name: "Report Desky" }).getByRole("button", { name: "Close" }).click();
-  await phone.locator(".fd-overlay").getByRole("button", { name: "Report", exact: true }).click();
+  await phone.locator(".fd-overlay").getByRole("button", { name: "More options" }).click();
+  await phone.getByRole("menuitem", { name: "Report", exact: true }).click();
   await phone.getByRole("button", { name: "Something else", exact: true }).click();
   await expect(phone.getByText("You've already reported this player in this match.")).toBeVisible();
 });
