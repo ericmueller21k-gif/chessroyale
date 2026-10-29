@@ -541,6 +541,8 @@ test("your own page: from your pawn, today's profile with View public profile at
   await page.goto(`/profile/${id}?nolanding`);
   await expect(page.getByRole("heading", { name: "Player Profile", level: 1 })).toBeVisible();
   await expect(page.getByRole("button", { name: "Challenge" })).toBeDisabled();
+  // (A request the page made while loading may still be in the config's route when the test ends.)
+  await page.unrouteAll({ behavior: "ignoreErrors" });
 });
 
 test("an admin's ?rank= shows on their own public page, as on their profile", async ({ page }) => {
