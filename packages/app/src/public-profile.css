@@ -1,8 +1,13 @@
 /*
- * The public profile (screens/PublicProfile.tsx; docs/decisions/2026-10-28-public-profile.md; Eric's mockup, Oct 28). Spacing,
- * radii and type sizes are measured from the mockup (390 × 844 phone, two-column computer); colors are the front door's tokens,
- * so both themes follow. A phone is one column; from 744 px wide (the page's own width: the computer's frame at 1216 px and
- * up) it's two: the header card full width, Ranked Standing beside Recent Matches, Cosmetics full width (`pp-wide`).
+ * The public profile (screens/PublicProfile.tsx; docs/decisions/2026-10-28-public-profile.md, 2026-10-29-public-profile-fit.md).
+ *
+ * EVERY PADDING AND GAP HERE IS MEASURED FROM ERIC'S MOCKUP (Oct 28): no spacing of our own (Eric, Oct 29: "the padding is out of
+ * control"). The mockup is drawn at 401 image px for a 390 px phone (1.028 per CSS px, the same on its computer panel, whose name
+ * is the same 28 px); each number below is the image's, divided by 1.028, to the edge of the card's border. The table of every
+ * one, mockup against built, is in the decision file; e2e/public-profile.spec.ts holds the built page to it (±2 px).
+ *
+ * A phone is one column; from 744 px wide (the page's own width) it's the computer's two: the header card, Ranked Standing beside
+ * Recent Matches, Cosmetics across (`pp-wide`). Colors are the front door's tokens, so both themes follow.
  */
 .fd-page.pp {
   --pp-gain: #4ade80;
@@ -12,8 +17,9 @@
   --pp-loss-ink: #ff9b93;
   --pp-loss-bg: rgba(255, 138, 128, 0.14);
   --pp-sk: var(--fd-panel-2);
-  gap: 12px;
-  padding: calc(env(safe-area-inset-top) + 12px) calc(12px + env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 24px) calc(12px + env(safe-area-inset-left));
+  gap: 0;
+  /* The page's side margin 10.7 (card edge to screen edge); its top is the mockup's 34 under the status bar, or the real one's room. */
+  padding: max(34px, calc(env(safe-area-inset-top) + 12px)) calc(10.7px + env(safe-area-inset-right)) 16px calc(10.7px + env(safe-area-inset-left));
 }
 :root[data-theme="light"] .fd-page.pp {
   --pp-gain: #15803d;
@@ -23,13 +29,17 @@
   --pp-loss-ink: #c4281c;
   --pp-loss-bg: #fbe0dd;
 }
-.pp.pp-wide {
-  gap: 16px;
+/* The computer's frame (1024 px and up) gives pages its own padding: this page's is the mockup panel's (16 on its top, 15.5 each side). */
+@media (min-width: 1024px) {
+  .fd-root.framed .fd-page.pp {
+    padding: 15px 15.5px 16px;
+  }
 }
 
-/* -- The header: back, the title, ••• -- */
+/* -- The header: back, the title, ••• (the buttons stay 44 px: a tap target; the mockup draws them 40 × 32) -- */
 .pp-head {
-  min-height: 44px;
+  height: 44px;
+  min-height: 0;
 }
 .pp-title {
   flex: 1;
@@ -110,18 +120,13 @@
   cursor: default;
 }
 
-/* -- Who they are -- */
+/* -- Who they are. Phone: no card (the mockup's header sits on the page); the header's bottom to the picture 3.9. -- */
 .pp-card {
   display: flex;
   flex-direction: column;
   align-items: center;
+  margin-top: 3.9px;
   text-align: center;
-}
-.pp-wide .pp-card {
-  padding: 22px 20px 12px;
-  border-radius: 22px;
-  border: 1px solid var(--fd-line);
-  background: var(--fd-panel);
 }
 .pp-avatar {
   position: relative;
@@ -184,9 +189,12 @@
 .pp-wide .pp-online {
   border-color: var(--fd-panel);
 }
+/* The lines under the picture: each one's gap is from the line above's baseline to its own cap top, as the mockup has it
+   (picture to name 11.7, name to seen 13.6, seen to level 13.6, last line to the buttons 18.5). The margins are the gap less what
+   the line's own box puts above its cap (Archivo: its half-leading and ascent less the cap's height). */
 .pp-name {
   max-width: 100%;
-  margin: 8px 0 0;
+  margin: 5.6px 0 0;
   font-size: 28px;
   font-weight: 800;
   line-height: 1.15;
@@ -198,35 +206,30 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 22px;
   font-size: 16px;
-  line-height: 22px;
+  line-height: 20px;
   color: var(--fd-sub);
 }
 .pp-seen {
-  margin-top: 4px;
+  margin-top: 2.6px;
 }
 .pp-level {
+  margin-top: 4.8px;
   white-space: pre;
 }
 .pp-actions {
   display: grid;
   grid-template-columns: 6fr 5fr;
-  gap: 12px;
+  gap: 11.7px;
   width: 100%;
-  margin-top: 10px;
-}
-.pp-wide .pp-actions {
-  grid-template-columns: 210px 210px;
-  gap: 14px;
-  width: auto;
+  margin-top: 13.9px;
 }
 .pp-actions .fd-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  min-height: 52px;
+  min-height: 50px;
   padding: 0 12px;
   border-radius: 14px;
   font-size: 16px;
@@ -236,34 +239,52 @@
 .pp-actions .fd-btn svg {
   flex: none;
 }
+/* What just happened ("Request sent.", "Invited…", a refusal): over the bottom of the screen for a few seconds, out of the page's flow. */
 .pp-note {
-  min-height: 20px;
-  margin: 6px 0 0;
-  line-height: 20px;
+  position: fixed;
+  left: 50%;
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  z-index: 50;
+  width: max-content;
+  max-width: min(92vw, 380px);
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--fd-line);
+  border-radius: 12px;
+  background: var(--fd-panel);
+  color: var(--fd-text);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  font-size: 14px;
+  line-height: 1.3;
   text-align: center;
+  transform: translateX(-50%);
+  pointer-events: none;
+  animation: pp-note-out 300ms 6s both;
+}
+@keyframes pp-note-out {
+  0%,
+  0.001% {
+    opacity: 1;
+    visibility: visible;
+  }
+  100% {
+    opacity: 0;
+    visibility: hidden;
+  }
 }
 
-/* -- The cards -- */
+/* -- The cards: the buttons' bottom to Ranked 13.6, then 9 between cards (border to border, as the mockup's 8.8) -- */
 .pp-cols {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-}
-.pp-wide .pp-cols {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  align-items: stretch;
-}
-.pp-wide .pp-cosmetics {
-  grid-column: 1 / -1;
+  gap: 9px;
+  margin-top: 13.6px;
 }
 .pp-panel {
   display: flex;
   flex-direction: column;
-  gap: 8px;
   min-width: 0;
-  padding: 12px;
+  box-sizing: border-box;
   border-radius: 16px;
   border: 1px solid var(--fd-line);
   background: var(--fd-panel);
@@ -272,13 +293,14 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 32px;
+  height: 24px;
 }
 .pp-ico {
   display: grid;
   flex: none;
   place-items: center;
-  width: 24px;
+  width: 22px;
+  margin-right: 5.6px;
   color: var(--fd-text);
 }
 .pp-h {
@@ -292,7 +314,7 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  min-height: 40px;
+  height: 24px;
   border: 0;
   background: none;
   color: var(--fd-sub);
@@ -302,7 +324,7 @@
 }
 .pp-all {
   margin-left: auto;
-  padding: 0 0 0 8px;
+  padding: 0;
 }
 .pp-mode {
   padding: 0 6px;
@@ -323,7 +345,15 @@
   white-space: nowrap;
 }
 
-/* -- Ranked Standing: 1 v 1, "Coming soon" and "Banned" in one cell, so the card is one height in every mode -- */
+/* -- Ranked Standing (218.9 tall). From its top edge: the title's middle 21.9; the emblem 48.6 down, 109 square, 24.3 in; its words
+   from 161 in; the rule 160; the numbers' middles 177.5 and 199. 1v1, "Coming soon" and "Banned" share one cell, so the card is
+   one height in every mode. -- */
+.pp-ranked {
+  padding: 9px 12px 0;
+}
+.pp-ranked .pp-panel-head {
+  padding-right: 1.6px;
+}
 .pp-body {
   display: grid;
 }
@@ -337,77 +367,91 @@
 .pp-one {
   display: flex;
   flex-direction: column;
-  gap: 12px;
 }
 .pp-rk-main {
   display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 2px 4px 0;
+  align-items: flex-start;
+  gap: 27.7px;
+  margin-top: 14.6px;
+  padding-left: 11.3px;
 }
 .pp-emblem {
   display: grid;
   flex: none;
   place-items: center;
+  width: 109px;
+  height: 109px;
+}
+/* (The art's 96 px shown at the mockup's 109.) */
+.pp-emblem .re-box {
+  transform: scale(1.1354);
 }
 .pp-rk-words {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  gap: 2px;
 }
 .pp-cap {
+  margin-top: 3.3px;
   color: var(--fd-muted);
   font-size: 11px;
   font-weight: 700;
+  line-height: 14px;
   letter-spacing: 0.6px;
 }
 .pp-tier {
-  font-size: 26px;
+  margin-top: 2.3px;
+  font-size: 24px;
   font-weight: 800;
-  line-height: 1.15;
+  line-height: 28px;
   overflow-wrap: anywhere;
 }
 .pp-rp {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 26px;
+  height: 26px;
+  margin-top: 3px;
   color: var(--fd-sub);
-  font-size: 19px;
+  font-size: 18px;
 }
 .pp-rp b {
   color: var(--fd-text);
   font-weight: 800;
 }
 .pp-peak {
+  margin-top: 4.4px;
   color: var(--fd-sub);
-  font-size: 15px;
+  font-size: 13.5px;
+  line-height: 17px;
 }
 .pp-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  padding-top: 10px;
+  margin-top: 2px;
+  padding-top: 7.5px;
+  padding-bottom: 9.9px;
   border-top: 1px solid var(--fd-line);
 }
 .pp-stat {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 2px 4px;
   text-align: center;
 }
 .pp-stat + .pp-stat {
   border-left: 1px solid var(--fd-line);
 }
 .pp-stat strong {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 800;
+  line-height: 20px;
 }
 .pp-stat span {
+  margin-top: 3.9px;
   color: var(--fd-sub);
-  font-size: 14px;
+  font-size: 13.5px;
+  line-height: 16px;
 }
 .pp-center {
   display: grid;
@@ -424,10 +468,14 @@
   position: relative;
   display: grid;
   place-items: center;
+  width: 86px;
+  height: 86px;
 }
 .pp-badge svg {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
   fill: var(--fd-panel-2);
   stroke: var(--fd-line);
   stroke-width: 1.5;
@@ -440,30 +488,37 @@
   font-weight: 800;
 }
 
-/* -- Recent Matches: five rows, always the room of five -- */
+/* -- Recent Matches (243.2 tall): the title's middle 18.5 down, the first row's top 34, a row 41.3, 2.4 under the last. A row from
+   the left: the pill 12.6 in and 61 wide, 20.4 to the face (36.5), 13 to the words; the RP change ends 15.6 in. -- */
+.pp-recent {
+  padding: 5.5px 12px 2px;
+}
+.pp-recent .pp-panel-head {
+  padding-right: 2.6px;
+}
 .pp-rows {
   display: flex;
   flex-direction: column;
-  min-height: calc(5 * 42px);
-  margin: 0;
+  min-height: calc(5 * 41.3px);
+  margin: 3.5px 0 0;
   padding: 0;
   list-style: none;
 }
 .pp-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 42px;
   box-sizing: border-box;
-  padding: 2px 0;
+  height: 41.3px;
+  padding-right: 2.6px;
   border-top: 1px solid var(--fd-line);
 }
 .pp-pill {
   display: grid;
   flex: none;
   place-items: center;
-  width: 64px;
-  height: 26px;
+  width: 61px;
+  height: 22.4px;
+  margin-right: 20.4px;
   border-radius: 999px;
   font-size: 14px;
   font-weight: 800;
@@ -487,8 +542,9 @@
   display: grid;
   flex: none;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: 36.5px;
+  height: 36.5px;
+  margin-right: 13px;
   overflow: hidden;
   border-radius: 50%;
   background: var(--fd-panel-2);
@@ -516,7 +572,7 @@
   flex: 1;
   flex-direction: column;
   min-width: 0;
-  line-height: 1.25;
+  line-height: 1.2;
 }
 .pp-row-text strong,
 .pp-row-text span {
@@ -525,18 +581,18 @@
   white-space: nowrap;
 }
 .pp-row-text strong {
-  font-size: 15px;
+  font-size: 14.5px;
   font-weight: 700;
 }
 .pp-row-text span {
   color: var(--fd-sub);
-  font-size: 14px;
+  font-size: 13px;
 }
 .pp-rpchange {
   flex: none;
   min-width: 34px;
   text-align: right;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 800;
 }
 .pp-rpchange.gain {
@@ -557,81 +613,380 @@
   font-size: 14px;
 }
 
-/* -- Equipped Cosmetics: a tile each, the room of four whatever is worn -- */
-/* (Rows of one fixed height, tall enough for a name and a color line that each wrap to two lines: the same room for any four.) */
+/* -- Equipped Cosmetics (95.5 tall): the title's middle 15.6, the tiles 33.1 down and 56.4 tall, 8.8 in from the edge, 5.8 apart;
+   a tile's picture left, then its name, "Skin · Opal & Opal" and the pill. Three across; four when four are worn (the words a step
+   smaller). -- */
+.pp-cosmetics {
+  padding: 2.6px 7.8px 5px;
+}
+.pp-cosmetics .pp-panel-head {
+  padding: 0 6.8px 0 3px;
+}
 .pp-tiles {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-rows: 112px;
-  gap: 8px;
-  min-height: calc(2 * 112px + 8px);
-  align-content: start;
+  display: flex;
+  gap: 5.8px;
+  height: 56.4px;
+  margin-top: 5.5px;
 }
-.pp-wide .pp-tiles {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-auto-rows: 140px;
-  min-height: 140px;
-}
-/* A computer: four across in one row, each tile's picture over its words (the width is a quarter, not half). */
-.pp-wide .pp-tile {
-  flex-direction: column;
-  justify-content: center;
-  gap: 6px;
-  padding: 10px 8px;
-  text-align: center;
-}
-.pp-wide .pp-tile-text {
-  align-items: center;
-}
+/* (The mockup's three tiles aren't one width, 115 : 110 : 121 across: a longer color line has more room, by --w from the page. The
+   loading bars, with no words yet, are equal.) */
 .pp-tile {
   display: flex;
+  flex: var(--w, 1) 1 0px;
   align-items: center;
-  gap: 8px;
   min-width: 0;
-  padding: 10px;
-  border-radius: 12px;
+  padding: 0 3px 0 2px;
+  border-radius: 10px;
   background: var(--fd-panel-2);
 }
+/* (The mockup draws a picture 39 to 44 px tall, and no wider than 31 for a suit or a tube: the picture's own square is 42 over a slot of
+   32, so a tall one doesn't take the words' room.) */
 .pp-tile-art {
-  display: grid;
+  display: flex;
   flex: none;
-  place-items: center;
-  width: 44px;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
   height: 44px;
+  margin-right: 4px;
+}
+.pp-tile-art > .item-art {
+  flex: none;
+  width: 42px;
+  height: 42px;
 }
 .pp-tile-text {
   display: flex;
+  flex: 1;
   flex-direction: column;
   align-items: flex-start;
-  gap: 3px;
+  justify-content: center;
   min-width: 0;
+  padding-top: 3px;
 }
 .pp-tile-text strong {
-  font-size: 13px;
+  display: -webkit-box;
+  overflow: hidden;
+  margin-bottom: 1.5px;
+  font-size: 9.5px;
   font-weight: 800;
-  line-height: 1.2;
+  line-height: 11px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 .pp-tile-text > span:not(.pp-rarity) {
+  max-width: 100%;
+  margin-bottom: 5px;
+  overflow: hidden;
   color: var(--fd-sub);
-  font-size: 11.5px;
-  line-height: 1.25;
+  font-size: 7.5px;
+  letter-spacing: -0.04em;
+  line-height: 9.4px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .pp-rarity {
-  padding: 3px 9px;
+  padding: 0 7px;
   border-radius: 999px;
   background: var(--fd-panel);
   color: #14161b;
-  font-size: 11px;
+  font-size: 8.5px;
   font-weight: 800;
-  line-height: 1.2;
+  line-height: 17px;
+}
+.pp-tiles.n4 .pp-tile {
+  padding: 0 2px 0 3px;
+}
+.pp-tiles.n4 .pp-tile-art {
+  width: 24px;
+  height: 30px;
+  margin-right: 3px;
+}
+.pp-tiles.n4 .pp-tile-art > .item-art {
+  width: 30px;
+  height: 30px;
+}
+.pp-tiles.n4 .pp-tile-text strong {
+  font-size: 8px;
+  line-height: 9.5px;
+}
+.pp-tiles.n4 .pp-tile-text > span:not(.pp-rarity) {
+  font-size: 6.5px;
+  line-height: 8px;
+}
+.pp-tiles.n4 .pp-rarity {
+  padding: 0 3px;
+  font-size: 7.2px;
+  line-height: 14px;
 }
 .pp-nothing {
-  grid-column: 1 / -1;
+  flex: 1;
   align-self: center;
   margin: 0;
   color: var(--fd-muted);
   font-size: 14px;
   text-align: center;
+}
+
+/* -- The computer's (the page 744 px wide or more): the mockup's panel, which draws every card's insides 1.21 times the phone's. -- */
+.pp-wide .pp-head + .pp-card {
+  margin-top: 12.6px;
+}
+/* The header card: 281 tall in the mockup; the picture 2.9 under its top, 114 across, the buttons 205 × 51.5 and 14.6 from its bottom. */
+.pp-wide .pp-card {
+  padding: 1.9px 16px 13.6px;
+  border-radius: 20px;
+  border: 1px solid var(--fd-line);
+  background: var(--fd-panel);
+}
+.pp-wide .pp-avatar {
+  width: 113.5px;
+  height: 113.5px;
+}
+.pp-wide .pp-name {
+  margin-top: 6.9px;
+}
+.pp-wide .pp-seen {
+  margin-top: 2.6px;
+}
+.pp-wide .pp-level {
+  margin-top: 3.8px;
+}
+.pp-wide .pp-actions {
+  grid-template-columns: 205px 205px;
+  gap: 14.6px;
+  width: auto;
+  margin-top: 14.2px;
+}
+.pp-wide .pp-actions .fd-btn {
+  min-height: 51.5px;
+}
+.pp-wide .pp-cols {
+  display: grid;
+  grid-template-columns: 466fr 490fr;
+  gap: 12.6px 12.6px;
+  margin-top: 12.6px;
+  align-items: stretch;
+}
+.pp-wide .pp-cosmetics {
+  grid-column: 1 / -1;
+}
+.pp-wide .pp-h {
+  font-size: 20.5px;
+}
+.pp-wide .pp-all,
+.pp-wide .pp-mode,
+.pp-wide .pp-season {
+  font-size: 17px;
+}
+.pp-wide .pp-panel-head {
+  height: 28px;
+}
+.pp-wide .pp-all,
+.pp-wide .pp-mode {
+  height: 28px;
+}
+/* Ranked Standing: the title's middle 31.1 down, the emblem 68.1 down and 23.3 in (141 square), its words 202 in, the rule 218.4. */
+.pp-wide .pp-ranked {
+  padding: 16.1px 17.5px 0;
+}
+.pp-wide .pp-ranked .pp-panel-head {
+  padding-right: 1.5px;
+}
+.pp-wide .pp-rk-main {
+  margin-top: 21.5px;
+  padding-left: 2.3px;
+}
+.pp-wide .pp-emblem {
+  width: 141px;
+  height: 141px;
+}
+.pp-wide .pp-emblem .re-box {
+  transform: scale(0.979);
+}
+.pp-wide .pp-badge {
+  width: 112px;
+  height: 112px;
+}
+.pp-wide .pp-cap {
+  margin-top: 4px;
+  font-size: 13.3px;
+  line-height: 17px;
+}
+.pp-wide .pp-tier {
+  margin-top: 4px;
+  font-size: 29px;
+  line-height: 34px;
+}
+.pp-wide .pp-rp {
+  height: 26px;
+  margin-top: 10.2px;
+  font-size: 22px;
+}
+.pp-wide .pp-peak {
+  margin-top: 9.8px;
+  font-size: 16.3px;
+  line-height: 21px;
+}
+/* The frame's center column is 768 px wide at 1280 (menu and side panel take the rest), 888 at 1440, so the two cards are 353 and
+   412 px wide where the mockup's are 453: the title, the gap between the emblem and its words and the pill's margin give way
+   (never the heights), and the tier and peak lines stay on one line (an ellipsis, rather than a line that shifts the rows). */
+.pp-wide .pp-ranked,
+.pp-wide .pp-recent {
+  container-type: inline-size;
+}
+.pp-wide .pp-ranked .pp-h,
+.pp-wide .pp-recent .pp-h {
+  font-size: min(20.5px, 6.2cqw);
+  white-space: nowrap;
+}
+.pp-wide .pp-rk-main {
+  gap: clamp(14px, calc(100cqw - 335.5px), 39.5px);
+}
+.pp-wide .pp-tier,
+.pp-wide .pp-peak {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.pp-wide .pp-stats {
+  margin-top: 10.8px;
+  padding-top: 13.4px;
+}
+.pp-wide .pp-stat strong {
+  font-size: 19.5px;
+  line-height: 24px;
+}
+.pp-wide .pp-stat span {
+  margin-top: 7.2px;
+  font-size: 16.3px;
+  line-height: 20px;
+}
+/* Recent Matches: the title's middle 27.2 down, the first row 54 down, a row 50.6, 4.9 under the last; the pill 82 × 31 and 16.5 in,
+   21.4 to the face (46.7), 12.6 to the words; the RP change ends 23.4 in. */
+.pp-wide .pp-recent {
+  padding: 12.2px 16.5px 3.9px 15.5px;
+}
+.pp-wide .pp-recent .pp-panel-head {
+  padding-right: 5.9px;
+}
+.pp-wide .pp-rows {
+  margin-top: 12.8px;
+}
+.pp-wide .pp-row {
+  height: 50.6px;
+  padding-right: 6.9px;
+}
+.pp-wide .pp-pill {
+  width: 82px;
+  height: 31px;
+  margin-right: clamp(10px, calc(100cqw - 377.6px), 21.4px);
+  font-size: 17px;
+}
+.pp-wide .pp-face {
+  width: 45.7px;
+  height: 45.7px;
+  margin-right: 12.6px;
+}
+.pp-wide .pp-row-text strong {
+  font-size: 17.5px;
+}
+.pp-wide .pp-row-text span {
+  font-size: 15.7px;
+}
+.pp-wide .pp-rpchange {
+  min-width: 40px;
+  font-size: 19.5px;
+}
+.pp-wide .pp-rows {
+  min-height: calc(5 * 50.6px);
+}
+/* Equipped Cosmetics (175.1 tall, measured again from the mockup's pixels): the title's middle 23.3, the tiles 46.2 down and 113.8
+   tall, 16 in, 8 apart, 15.1 above the bottom; a tile's picture left, a rule, then its words (14, 12 and 12 px: the mockup's tiles are
+   306 px wide, ours 232 to 272, and a longer color line has more room, as on a phone). */
+.pp-wide .pp-cosmetics {
+  padding: 8.3px 14.6px 14.1px;
+}
+.pp-wide .pp-cosmetics .pp-panel-head {
+  padding: 0 7.8px 0 1px;
+}
+.pp-wide .pp-tiles {
+  gap: 8px;
+  height: 113.8px;
+  margin-top: 8.9px;
+  container-type: inline-size;
+}
+.pp-wide .pp-tile,
+.pp-wide .pp-tiles.n4 .pp-tile {
+  padding: 0 12px 0 0;
+  border-radius: 12px;
+}
+.pp-wide .pp-tile-art,
+.pp-wide .pp-tiles.n4 .pp-tile-art {
+  align-self: stretch;
+  width: 36%;
+  height: auto;
+  margin: 10px 7.1% 10px 0;
+  border-right: 1px solid var(--fd-line);
+  padding: 0 6px 0 6px;
+}
+.pp-wide .pp-tile-art > .item-art {
+  width: 90px;
+  height: 90px;
+}
+.pp-wide .pp-tiles.n4 .pp-tile-art > .item-art {
+  width: 66px;
+  height: 66px;
+}
+.pp-wide .pp-tile-text {
+  padding-top: 0;
+}
+.pp-wide .pp-tile-text strong {
+  margin-bottom: 3.2px;
+  font-size: 14px;
+  line-height: 17px;
+}
+.pp-wide .pp-tile-text > span:not(.pp-rarity) {
+  margin-bottom: 8.5px;
+  font-size: 12px;
+  letter-spacing: -0.02em;
+  line-height: 17px;
+}
+.pp-wide .pp-rarity {
+  padding: 0 12px;
+  font-size: 12px;
+  line-height: 32px;
+}
+/* A narrow row (the frame's 768 px column at 1280, down to the 744 px where this layout starts; 826 px at 1440): the picture takes
+   a little less of each tile and the color line a little less tracking, so "Weapon · Cobalt & Sage" is whole in the longest tile. */
+@container (max-width: 760px) {
+  .pp-wide .pp-tile-art {
+    width: 32%;
+    margin-right: 6%;
+  }
+  .pp-wide .pp-tile-art > .item-art {
+    width: 72px;
+    height: 72px;
+  }
+  .pp-wide .pp-tile-text > span:not(.pp-rarity) {
+    letter-spacing: -0.04em;
+  }
+}
+/* Four worn: the same tile, its words a step smaller. */
+.pp-wide .pp-tiles.n4 .pp-tile-text strong {
+  margin-bottom: 3px;
+  font-size: 12px;
+  line-height: 15px;
+}
+.pp-wide .pp-tiles.n4 .pp-tile-text > span:not(.pp-rarity) {
+  margin-bottom: 7px;
+  font-size: 10.5px;
+  line-height: 13px;
+}
+.pp-wide .pp-tiles.n4 .pp-rarity {
+  padding: 0 9px;
+  font-size: 11px;
+  line-height: 26px;
 }
 
 /* -- Loading: the same page, its text clear on gray bars, so nothing moves when it arrives -- */

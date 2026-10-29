@@ -61,3 +61,16 @@ removed (old → new) and says whether any of them guards a rule here.
 
 - **The Hidden Boss's lines:** never "Soviet(s)" or "Russian(s)", nothing that implies Korchnoi threw games, and real quotes
   only word for word.
+
+## Working habits (not rules)
+
+How Eric likes design work run (Eric, Oct 29). These are habits, not hard rules; no test guards them.
+
+- **"Do it like I have it" vs "similar, open to ideas."** When Eric says he likes how his mockup does something, or to do
+  it like he has it, match the mockup closely, spacing and padding included, and compare full-page side-by-sides (not
+  crops) before merging. When he says "similar" or "open to ideas", our ideas are welcome. If it's unclear which he
+  means, ask. Eric: "sometimes good ideas come from what we do… if I say hey this thing do it exactly like I have it versus
+  let's keep it similar to this but I'm open to ideas…"
+- **Mockup first for new screens and big mockup work.** Before building, send Eric a quick static mockup or picture so he
+  can catch problems early. Eric: "just draw up a… non-program sketch or… fake mock-up… before we start and then I would
+  have caught these things."

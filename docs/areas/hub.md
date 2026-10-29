@@ -134,21 +134,23 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   hub too (Oct 15) but stay off this line: they count for the overload limit and the ops health view only.
 - **The queue screen:** the lobby's seats fill on screen (people, then bots popping in after the fill time), the wait
   so far, "Switch to Default" in Bots off. The match starts in place.
-- **Profiles** ([docs/decisions/2026-10-28-public-profile.md](../decisions/2026-10-28-public-profile.md)). Two screens:
+- **Profiles** ([docs/decisions/2026-10-28-public-profile.md](../decisions/2026-10-28-public-profile.md), [2026-10-29-public-profile-fit.md](../decisions/2026-10-29-public-profile-fit.md)). Two screens:
   - **The public profile** (`screens/PublicProfile.tsx`, Eric's mockup of Oct 28): the one page every player has, the same for every
     viewer, opened by a tap on another player's name or face anywhere (`PlayerName`, the queue's pawns, the town card, a lobby; the
     address `/profile/<id>`). Back, "Player Profile", ••• (Block, Report); their dressed pawn in a circle over their icon (blurred and
     faded; the theme's light yellow with the default pawn) with a green dot while they're online; their name; "Online now · Joined
     Oct 2026" (or "Last seen 2h ago · …", or just "Joined …" if they hide it); "Level 38" (an admin's `TEST_LEVEL` placeholder only,
-    else an empty line of the same height); **Challenge** (today's invite) and **Add Friend** (today's request), both greyed on your
+    else no line, and no room kept for one); **Challenge** (today's invite) and **Add Friend** (today's request), both greyed on your
     own page, for a guest, while loading and for someone you blocked; then three cards: **Ranked Standing** (1v1 / 50 v 50 /
     Squads menu, "Season 1": the 1v1 emblem, tier and division, RP, peak rank, win rate, W / L, win streak; "Placement 2/5",
     "Unranked", "Banned" and "Coming soon" in the same room), **Recent Matches** (the last five games in any mode, a ranked 1 v 1's
-    RP change; "View all" opens today's list) and **Equipped Cosmetics** (a tile each, rarity pill, "View all" opens each item's
-    purity and Shiny). One column on a phone; from 744 px wide two (header, Ranked beside Recent, Cosmetics). Nothing private: no
+    RP change; "View all" opens today's list) and **Equipped Cosmetics** (one row of compact tiles, three or four, each a picture, name, "<Slot> · <colors>" and a rarity pill; "View all" opens each
+    item's purity and Shiny). One column on a phone; from 744 px wide two (header, Ranked beside Recent, Cosmetics). Nothing private: no
     email, sign-in method, age, the hidden 1 v 1 rating or fair-play details; the icon is public since Oct 28. Its words are in
-    `public-profile.ts` (tested), its styles `public-profile.css`. Nothing hidden, nothing shifts: it loads as the same markup on
-    gray bars, the Ranked card is one height in every mode, and every list keeps its room.
+    `public-profile.ts` (tested), its styles `public-profile.css`. **Every size and space is Eric's mockup's, measured from the image**
+    (Oct 29, [the fit decision](../decisions/2026-10-29-public-profile-fit.md): its tables hold every padding and gap; a change to the page
+    keeps them, and a number is never set by eye). Nothing hidden, nothing shifts: it loads as the same markup on gray bars, the Ranked
+    card is one height in every mode, every list keeps its room, and a note is a toast over the page's bottom.
   - **Your own profile** (`screens/PlayerProfile.tsx`, from your own pawn; what a profile showed before the public one, Oct 28):
     your 1 v 1 rank's pill once you've played a ranked game (Oct 28: the rank shown everywhere), "Rating 1612" (the crowd
     rating's number, no rank name) and "Top N%" (once `percentileMinPlayers` have ratings), your coins, Edit name & icon, locker,

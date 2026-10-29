@@ -5,6 +5,9 @@ and numbers, pure: `packages/app/src/public-profile.ts`; its styles: `packages/a
 the ranked tiers (PR #401, merged: Wood 5 … Radiant 1, Pearlescent, Transcendent, their emblems, `?rank=`, the peak, the streak
 and the last five games).
 
+**Oct 29: sizes, spaces, the Cosmetics tile, the level line and the note line were redone from the mockup's pixels**
+([2026-10-29-public-profile-fit.md](2026-10-29-public-profile-fit.md)); where this file says otherwise on those, that one holds.
+
 ## Eric's words (Oct 28, on his mockup)
 
 His mockup: an iPhone 14 (390 × 844) beside a computer in two columns. "I pretty much want it exactly as it shows here", with:
@@ -44,9 +47,9 @@ His mockup: an iPhone 14 (390 × 844) beside a computer in two columns. "I prett
 *Where the brief or the mockup left room, each with its reason.*
 
 - **Colors are the front door's tokens, not the mockup's.** The mockup is light with cream cards on white; the app's light theme is
-  white cards on cream (`--fd-panel`, `--fd-bg`). Spacing, radii and type sizes are measured from the mockup (390 px = 401 px
-  in the image: a 12 px page gutter, 12 px between cards, 16 px card radius, a 120 px picture, a 28 px name, 16 px lines, 26 px tier);
-  the colors follow whichever theme is on, as the other front-door pages do.
+  white cards on cream (`--fd-panel`, `--fd-bg`). Spacing, radii and type sizes were measured from the mockup (390 px = 401 px
+  in the image) and, Oct 29, measured again padding by padding (the 12 px gutter is 10.7, the 12 px between cards 8.8, and so on:
+  the fit decision's tables); the colors follow whichever theme is on, as the other front-door pages do.
 - **1v1 is spelled "1v1" in the card's menu** (the brief's, Eric's words); home's row says "1 v 1". One constant (`RANKED_MODES`).
 - **The stat under "34 – 25" reads "W / L"** as the mockup has it (the brief wrote "W – L").
 - **Peak rank shows the tier and its division** ("Peak rank: Paragon 4"), as the mockup's "Diamond IV", not the tier alone.
@@ -73,33 +76,33 @@ His mockup: an iPhone 14 (390 × 844) beside a computer in two columns. "I prett
 - **Add Friend** is today's: "Add Friend", "Cancel Request" (sent), "Accept Friend" (received), "Remove Friend" (then "Tap again to
   remove"); its notes on the same line. Greyed for a guest or a young device where friends are off, while the list loads, and for
   someone you blocked.
-- **The note line** ("Request sent.", "Invited…", a refusal, "You blocked Ann. Unblock is in the ••• menu.") is always there, one
-  line high, so a note moves nothing.
-- **The level line** shows "Level 38" (`TEST_LEVEL`) only where `testSwitchesAllowed()`, as home does; for everyone else it's empty and
-  keeps its 22 px (the director's call).
+- **The note** ("Request sent.", "Invited…", a refusal, "You blocked Ann. Unblock is in the ••• menu.") *(Oct 29: a toast fixed over
+  the page's bottom, gone after 6 seconds; it was a line kept under the buttons, which is spacing the mockup doesn't have)*, so a
+  note moves nothing.
+- **The level line** shows "Level 38" (`TEST_LEVEL`) only where `testSwitchesAllowed()`, as home does; *(Oct 29: for everyone else
+  there is no line and no room kept for one; it was an empty 22 px)*.
 - **The icon behind the pawn:** the drawing scaled to fill the circle (a little over, so the blur's edge never shows), blurred 9 px
   and faded to 80% over the panel's gray; an older account's emoji is drawn the same way; the default pawn "♟", or none, gets
   `--fd-gold-soft`, the theme's light yellow (a dark gold in the dark theme). The green dot is at the circle's lower right while
   they're online and not hiding it. No ring.
 - **Ranked Standing.** Title row: "Ranked Standing" (no icon), the gray "1v1 ⌄" menu (1v1, 50 v 50, Squads), "Season 1" on the right
-  with no dropdown. 1v1 has the emblem (96 px on a phone, 144 px on a computer: whole steps of the 48 px art), "CURRENT TIER", the
+  with no dropdown. 1v1 has the emblem (drawn at 96 px on a phone, 144 px on a computer: whole steps of the 48 px art; shown at
+  109 and 141, the mockup's), "CURRENT TIER", the
   tier and division ("Gold 3"; no division for Pearlescent and Transcendent), the trophy and the RP ("45 RP": a top tier's RP counts
   above its floor), "Peak rank", and Win rate, W / L, Win streak. In placements: "Placement 2/5" with a plain shield badge
   ("2/5") where the emblem goes. No games: "Unranked", the same badge ("?"). A banned player: "Banned" and nothing else (the menu
   greyed). 50 v 50 and Squads: "Coming soon" in the middle. **One cell holds all of it**, so the card is as tall as 1v1's in
   every mode, and the menu floats over the page: nothing moves. The 1v1 rating is never shown.
 - **Equipped Cosmetics.** A tile each in `WORN_ORDER`: picture (the item as it looks on them), name, "<Slot> · <colors>", and the
-  rarity pill in the shop's tier color (`tierInfo`). **Phone:** two across, two rows, picture left of its words, the words
-  wrapping rather than cut. **Computer:** four across in one row, each tile's picture over its words (a quarter of the width is too
-  narrow for the mockup's side-by-side tile). Rows are one fixed height (112 px; 140 px on a computer), tall enough for a name and
-  a color line that each wrap to two lines, and the grid always has the room of four, so a player with fewer (or none:
-  "Nothing equipped") doesn't change the card's size.
+  rarity pill in the shop's tier color (`tierInfo`). *(Oct 29, redone: one row of three compact tiles on a phone and on a
+  computer, the picture left of its words, a fourth sharing the row; the mockup's tile sizes. The first build's two rows of two and
+  its four-across tiles with the picture over the words were wrong.)* The card is one size whatever is worn ("Nothing equipped"
+  takes the same room).
 - **Layout.** One column on a phone; from 744 px wide (the page's own width, measured, so it holds in the computer's frame from
   about 1216 px and in no narrower one: an overlay over a match stays one column) the header card is full width, Ranked Standing and
   Recent Matches side by side, Cosmetics full width. The title sits left by Back there, centered on a phone (the mockup's).
 - **Nothing hidden, nothing shifts.** The page loads as the same markup with its text clear on gray bars (`pp-loading`), so every
-  part is where it will be, at the size it will be: the five rows, four tiles, the emblem's box, the note line and the level line
-  keep their room. The ••• and the two buttons are there, greyed, while it loads. (The ••• opens a menu: a tap to reach Block and
+  part is where it will be, at the size it will be: the five rows, the tiles, the emblem's box keep their room. The ••• and the two buttons are there, greyed, while it loads. (The ••• opens a menu: a tap to reach Block and
   Report is Eric's own design in the mockup.)
 
 ## Changed test checks (old → new)
