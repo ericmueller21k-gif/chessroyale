@@ -77,6 +77,24 @@ export interface Card {
 
 type Ctl = ReturnType<typeof startTown>;
 
+/**
+ * Each `.town-fit` row of a card at its stylesheet size, or smaller until its words fit the row (Eric, Oct 29: a long name
+ * makes its own words smaller, not the card bigger), never below its `--fit-min`. Its height is the row's line height, so
+ * nothing moves. Run as a card opens (never per frame).
+ */
+function fitRows(card: HTMLElement): void {
+  for (const row of card.querySelectorAll<HTMLElement>(".town-fit")) {
+    row.style.fontSize = "";
+    const cs = getComputedStyle(row);
+    const min = parseFloat(cs.getPropertyValue("--fit-min")) || parseFloat(cs.fontSize);
+    let size = parseFloat(cs.fontSize);
+    while (row.scrollWidth > row.clientWidth + 0.5 && size > min) {
+      size = Math.max(min, Math.floor(((size * row.clientWidth) / row.scrollWidth) * 4) / 4);
+      row.style.fontSize = `${size}px`;
+    }
+  }
+}
+
 export function TownScreen({ onBack, onBossAlone, onPlayBot, seat = null }: { onBack: () => void; onBossAlone?: (id: HomeId) => void; onPlayBot?: (game: BotGameAsk) => void; seat?: string | null }) {
   const box = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -101,6 +119,16 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, seat = null }: { on
   // A person's card (a bot's; a real player's), or the bot waiting at a table's (a bot from BOTS: its name and rating).
   const person = card?.kind === "person" ? (people?.[card.i] ?? null) : null;
   const bot = person ? person.bot : card?.kind === "table" && card.bot !== undefined ? people?.[card.bot]?.bot : null;
+  // A person's card: a long name or sidekick's line shrinks to fit its row (as the card opens, and again once the web font is in).
+  const fitKey = card?.kind === "person" ? card.i : -1;
+  useLayoutEffect(() => {
+    if (fitKey < 0) return;
+    const el = cardEl.current!;
+    fitRows(el);
+    let live = true;
+    void document.fonts?.ready.then(() => live && fitRows(el));
+    return () => void (live = false);
+  }, [fitKey]);
   const label = card?.kind === "coliseum" ? COLISEUM_PLACE.name : card?.kind === "table" ? "Chess table" : person ? (bot ? botLabel(bot) : person.name) : home ? (card!.confirm ? "Leave the town square?" : card!.kind === "boss" ? home.boss : home.name) : undefined;
 
   return (
@@ -168,10 +196,10 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, seat = null }: { on
                 matchmaking is the next job); at a table where two others play, watching their game. Shown greyed, not hidden. */}
             {/* A person's (Oct 27, Eric; Oct 28, his mockup): one row at one size, whoever it is. Their picture in a round ring (a
                 sidekick's face in blue, a pawn's own look in ivory; a real player's profile icon, in ivory, a button for their
-                profile: a bot's picture is no button), their name ("(bot)" in gray after a bot's), a sidekick's line, the rating
-                with its bars and, always its own row so nothing moves, "Tables are full" (or, for a real player, whom you can't
-                challenge yet: "Coming soon"); and Play with crossed swords: you both walk to a free table and the game opens when
-                you sit. Every table taken: Play greyed. */}
+                profile: a bot's picture is no button), their name ("(bot)" in gray after a bot's), a sidekick's line (for a real
+                player, whom you can't challenge yet: "Coming soon"), the rating with its bars; and Play with crossed swords: you
+                both walk to a free table and the game opens when you sit. Every table taken: Play greyed, reading "Full" (Oct 29,
+                Eric: the card his mockup's size; a long name or line shrinks to fit its row, `fitRows`). */}
             {card?.kind === "person" && person && (
               <>
                 {person.uid ? (
@@ -184,23 +212,26 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, seat = null }: { on
                   </div>
                 )}
                 <div class="town-who">
-                  <h2>
+                  <h2 class="town-fit">
                     <span class="town-name">{bot ? bot.name : person.name}</span>
                     {bot && <span class="town-bot"> (bot)</span>}
                   </h2>
                   {/* A boss's sidekick (Oct 28): whose, under its name; the row is there for a pawn too (empty). */}
-                  <p class="town-sub">{bot ? sidekickText(bot) : null}</p>
+                  <p class="town-sub town-fit">{bot ? sidekickText(bot) : "Coming soon"}</p>
                   <p class="town-rate">
                     <BarsIcon />
                     <span>{bot ? ratingText(bot) : ratingLine(person.rating ?? 0)}</span>
                   </p>
-                  <p class="town-note" id="town-card-note">
-                    {card.full ? "Tables are full" : bot ? null : "Coming soon"}
-                  </p>
                 </div>
-                <button type="button" class="town-btn primary town-play" disabled={!bot || card.full} aria-describedby={!bot || card.full ? "town-card-note" : undefined} onClick={() => ctl.current?.play()}>
+                <button
+                  type="button"
+                  class="town-btn primary town-play"
+                  disabled={!bot || card.full}
+                  aria-label={card.full ? "Play: tables are full" : undefined}
+                  onClick={() => ctl.current?.play()}
+                >
                   <SwordsIcon />
-                  Play
+                  {card.full ? "Full" : "Play"}
                 </button>
               </>
             )}

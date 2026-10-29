@@ -862,13 +862,14 @@ test("the bots' turns: ten out; one walks home and fades out at its door, gone; 
 // ---------------- The person card (Oct 28, Eric's mockup; docs/decisions/2026-10-28-town-card.md) ----------------
 //
 // Every card is dark with a gold border; a person's (a bot's, and a real player's when they come) is one row at one size: their picture in
-// a round ring, their name ("(bot)" in gray), a sidekick's line, the rating with its bars and a row for "Tables are full", and Play with
-// crossed swords (no triangle). Eric's rule (nothing hidden, nothing shifts): the card is one size whoever it is.
+// a round ring, their name ("(bot)" in gray), a sidekick's line and the rating with its bars, and Play with crossed swords (no triangle),
+// greyed and reading "Full" when every table is taken. Eric's rule (nothing hidden, nothing shifts): the card is one size whoever it is;
+// a name or line too long for its row shrinks its own words (Oct 29, Eric), never the card.
 
 /** The card's colors (town.css) as the browser computes them. */
 const CARD = { bg: "rgb(32, 33, 42)", gold: "rgb(217, 187, 140)", white: "rgb(255, 255, 255)", gray: "rgb(165, 164, 170)", blue: "rgb(69, 117, 250)", ivory: "rgb(234, 223, 198)", bars: "rgb(224, 180, 110)" };
-/** The card's size: 232 × 60 CSS pixels, on a phone and a computer alike (Eric's mockup, measured against its name tags). */
-const CARD_SIZE = { w: 232, h: 60 };
+/** The card's size: 210 × 53 CSS pixels, on a phone and a computer alike (Eric's mockup, about 189 × 53 measured against its name tags; Oct 29). */
+const CARD_SIZE = { w: 210, h: 53 };
 
 type Rect = { x: number; y: number; w: number; h: number };
 const rectIn = (p: Page, sel: string): Promise<Rect> =>
@@ -947,7 +948,7 @@ test("a person's card (Eric's mockup, Oct 28): a sidekick's has its picture in a
   });
   expect(ring).toMatchObject({ tag: "DIV", tabIndex: -1, role: null, hidden: "true", cursor: "default", border: CARD.blue, width: 3, radius: "50%" });
   expect(Math.abs(ring.w - ring.h), "a round").toBeLessThan(0.01);
-  expect(ring.w).toBeCloseTo(40, 1);
+  expect(ring.w).toBeCloseTo(38, 1);
   const face = pic.locator("img");
   await expect(face).toBeVisible();
   expect(await face.getAttribute("src")).toMatch(/^data:image\/png/);
@@ -978,7 +979,7 @@ test("a person's card (Eric's mockup, Oct 28): a sidekick's has its picture in a
   await expect(page.locator(".fd-overlay")).toHaveCount(0);
   expect(new URL(page.url()).pathname).toBe("/town");
   // Where each part sits (for the pawn's card to match).
-  const parts = async () => ({ card: await rectIn(page, ".town-card"), pic: await rectIn(page, ".town-card .town-pic"), name: await rectIn(page, ".town-card h2"), sub: await rectIn(page, ".town-card .town-sub"), rate: await rectIn(page, ".town-card .town-rate"), note: await rectIn(page, ".town-card .town-note"), play: await rectIn(page, ".town-card .town-play") });
+  const parts = async () => ({ card: await rectIn(page, ".town-card"), pic: await rectIn(page, ".town-card .town-pic"), name: await rectIn(page, ".town-card h2"), sub: await rectIn(page, ".town-card .town-sub"), rate: await rectIn(page, ".town-card .town-rate"), play: await rectIn(page, ".town-card .town-play") });
   const kid = await parts();
   // The words on the dark card, 4.5:1 or better (WCAG's number for text): white, gray, the line, the rating, Play on its gold (at each end of the gradient).
   for (const sel of [".town-name", ".town-bot", ".town-sub", ".town-rate span"]) expect(await contrastOf(page, `.town-card ${sel}`), sel).toBeGreaterThanOrEqual(WCAG_TEXT);
@@ -1001,85 +1002,119 @@ test("a person's card (Eric's mockup, Oct 28): a sidekick's has its picture in a
   await expect(card.getByText("Rating 1500", { exact: true })).toBeVisible();
   await expect(card.getByRole("button")).toHaveCount(1);
   const pawnParts = await parts();
-  for (const k of ["card", "pic", "name", "sub", "rate", "note", "play"] as const) sameRect({ ...pawnParts[k], x: pawnParts[k].x - pawnParts.card.x, y: pawnParts[k].y - pawnParts.card.y }, { ...kid[k], x: kid[k].x - kid.card.x, y: kid[k].y - kid.card.y }, `${k} sits where the sidekick's did`);
+  for (const k of ["card", "pic", "name", "sub", "rate", "play"] as const) sameRect({ ...pawnParts[k], x: pawnParts[k].x - pawnParts.card.x, y: pawnParts[k].y - pawnParts.card.y }, { ...kid[k], x: kid[k].x - kid.card.x, y: kid[k].y - kid.card.y }, `${k} sits where the sidekick's did`);
   expect(errors).toEqual([]);
 });
 
-test("tables full: a bot's Play is greyed (not tappable) and 'Tables are full' shows in small gray text under the rating; the card, its rating and its Play don't move or change size (sidekick and pawn)", async ({ page }) => {
+test("tables full: a bot's Play is greyed (not tappable) and reads 'Full'; the card, its words and its Play don't move or change size (sidekick and pawn)", async ({ page }) => {
   test.setTimeout(120_000);
   const errors = watchErrors(page);
   await page.goto("/town");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
   for (const name of ["Glim", "Tempo Tess"]) {
     const card = await openBotCard(page, name);
-    const play = card.getByRole("button", { name: "Play", exact: true });
+    const play = card.locator(".town-play");
     await expect(play).toBeEnabled();
-    await expect(card.getByText("Tables are full")).toHaveCount(0);
-    const rects = async () => ({ card: await rectIn(page, ".town-card"), pic: await rectIn(page, ".town-card .town-pic"), name: await rectIn(page, ".town-card h2"), rate: await rectIn(page, ".town-card .town-rate"), note: await rectIn(page, ".town-card .town-note"), play: await rectIn(page, ".town-card .town-play") });
+    await expect(play).toHaveText("Play");
+    const rects = async () => ({ card: await rectIn(page, ".town-card"), pic: await rectIn(page, ".town-card .town-pic"), name: await rectIn(page, ".town-card h2"), sub: await rectIn(page, ".town-card .town-sub"), rate: await rectIn(page, ".town-card .town-rate"), play: await rectIn(page, ".town-card .town-play") });
     const before = await rects();
-    expect(before.note.h, "the note's row is there before it says anything").toBeGreaterThan(8);
     await fillTables(page, true);
-    // Greyed and not tappable; the words in the button are still "Play" (the old "Play · Tables are full" is gone).
+    // Greyed and not tappable, reading "Full" (its name says why: "Play: tables are full"); the old "Play · Tables are full" is gone.
     await expect(play).toBeDisabled();
+    await expect(play).toHaveText("Full");
+    await expect(card.getByRole("button", { name: "Play: tables are full", exact: true })).toBeVisible();
     await expect(card.getByRole("button", { name: "Play · Tables are full" })).toHaveCount(0);
-    const note = card.getByText("Tables are full", { exact: true });
-    await expect(note).toBeVisible();
-    expect(await note.evaluate((el) => getComputedStyle(el).color), "small gray text").toBe("rgb(174, 178, 189)");
-    expect(await note.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))).toBeLessThanOrEqual(11);
-    await expect(play).toHaveAttribute("aria-describedby", "town-card-note");
+    // Nothing moved: the same card (place and size), picture, words and button.
     const full = await rects();
-    // Under the rating, and nothing else moved: the same card (place and size), picture, name, rating and button.
-    expect(full.note.y, "under the rating").toBeGreaterThanOrEqual(full.rate.y + full.rate.h - 0.5);
-    for (const k of ["card", "pic", "name", "rate", "note", "play"] as const) sameRect(full[k], before[k], `${name}: ${k} stays put`);
-    // The words on the dark card, 4.5:1; the greyed Play too (against its own grey).
-    expect(await contrastOf(page, ".town-card .town-note"), "Tables are full").toBeGreaterThanOrEqual(WCAG_TEXT);
-    expect(await contrastOf(page, ".town-card .town-play", ".town-card .town-play"), "the greyed Play on its grey").toBeGreaterThanOrEqual(WCAG_TEXT);
-    // A tap on the greyed Play does nothing: the card stays and no game starts.
+    for (const k of ["card", "pic", "name", "sub", "rate", "play"] as const) sameRect(full[k], before[k], `${name}: ${k} stays put`);
+    expect(await contrastOf(page, ".town-card .town-play", ".town-card .town-play"), "the greyed Full on its grey").toBeGreaterThanOrEqual(WCAG_TEXT);
+    // A tap on the greyed button does nothing: the card stays and no game starts.
     await play.click({ force: true });
     await page.waitForTimeout(400);
     await expect(card).toBeVisible();
     await expect(page.locator(".duel-screen")).toHaveCount(0);
-    // A table frees: Play is back, the note's row empty, nothing moved.
+    // A table frees: Play is back, nothing moved.
     await fillTables(page, false);
     await expect(play).toBeEnabled();
-    await expect(card.getByText("Tables are full")).toHaveCount(0);
-    for (const k of ["card", "pic", "name", "rate", "note", "play"] as const) sameRect(await rectIn(page, `.town-card ${k === "card" ? "" : { pic: ".town-pic", name: "h2", rate: ".town-rate", note: ".town-note", play: ".town-play" }[k]}`.trim()), before[k], `${name}: ${k} is back where it was`);
+    await expect(play).toHaveText("Play");
+    for (const k of ["card", "pic", "name", "sub", "rate", "play"] as const) sameRect(await rectIn(page, `.town-card ${k === "card" ? "" : { pic: ".town-pic", name: "h2", sub: ".town-sub", rate: ".town-rate", play: ".town-play" }[k]}`.trim()), before[k], `${name}: ${k} is back where it was`);
     await page.keyboard.press("Escape");
     await expect(card).toBeHidden();
   }
   expect(errors).toEqual([]);
 });
 
-test("every bot's name, its line and its rating fit the card whole, in the font the card uses (nothing cut, nothing resizes it)", async ({ page }) => {
+test("a long name or line shrinks its own words to fit its row (Eric, Oct 29), never below its floor, and never the card: every bot's name, line and rating fit", async ({ page }) => {
+  test.setTimeout(120_000);
   const errors = watchErrors(page);
   await page.goto("/town");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
-  const card = await openBotCard(page, "Tempo Tess");
-  // The room the card has for words, and the widest of every bot's, measured in the card's own fonts (with 4 px to spare for another browser's).
+  let card = await openBotCard(page, "Tempo Tess");
+  // Every bot's words, measured in the card's own fonts against its rows: the size each would shrink to is at or above its floor.
   const room = await card.evaluate(async (el, bots) => {
     await document.fonts.load("700 13px Archivo");
     await document.fonts.load("500 12px Archivo");
     await document.fonts.load("500 9.5px Archivo");
     const g = document.createElement("canvas").getContext("2d")!;
     const w = (font: string, text: string) => ((g.font = font), g.measureText(text).width);
-    const nameRoom = el.querySelector("h2")!.getBoundingClientRect().width;
-    const lineRoom = el.querySelector(".town-sub")!.getBoundingClientRect().width;
+    const h2 = el.querySelector("h2")!;
+    const sub = el.querySelector<HTMLElement>(".town-sub")!;
     const rateRow = el.querySelector(".town-rate")!;
-    const rateRoom = rateRow.getBoundingClientRect().width - el.querySelector(".town-rate svg")!.getBoundingClientRect().width - parseFloat(getComputedStyle(rateRow).columnGap);
     return {
-      nameRoom,
-      lineRoom,
-      rateRoom,
+      nameRoom: h2.clientWidth,
+      lineRoom: sub.clientWidth,
+      rateRoom: rateRow.getBoundingClientRect().width - el.querySelector(".town-rate svg")!.getBoundingClientRect().width - parseFloat(getComputedStyle(rateRow).columnGap),
+      nameMin: parseFloat(getComputedStyle(h2).getPropertyValue("--fit-min")),
+      lineMin: parseFloat(getComputedStyle(sub).getPropertyValue("--fit-min")),
       names: bots.map((b) => ({ b: b.label, w: w("700 13px Archivo", b.name) + w("500 12px Archivo", " (bot)") })),
-      lines: bots.filter((b) => b.line).map((b) => ({ b: b.line, w: w("500 9.5px Archivo", b.line!) })),
+      lines: bots.filter((b) => b.line).map((b) => ({ b: b.line!, w: w("500 9.5px Archivo", b.line!) })),
       rates: bots.map((b) => ({ b: b.rating, w: w("500 9.5px Archivo", b.rating) })),
     };
   }, BOTS.map((b) => ({ name: b.name, label: `${b.name} (bot)`, line: sidekickText(b), rating: `Rating ${b.rating}` })));
-  for (const n of room.names) expect(n.w + 4, `${n.b} fits its row`).toBeLessThanOrEqual(room.nameRoom);
-  for (const n of room.lines) expect(n.w + 4, `${n.b} fits its row`).toBeLessThanOrEqual(room.lineRoom);
-  for (const n of room.rates) expect(n.w + 4, `${n.b} fits its row`).toBeLessThanOrEqual(room.rateRoom);
-  // And the card that's open: nothing of it is cut.
-  for (const sel of ["h2", ".town-sub", ".town-rate", ".town-note"]) expect(await card.locator(sel).evaluate((el) => el.scrollWidth <= el.clientWidth), `${sel} is whole`).toBe(true);
+  expect(room.nameMin).toBe(10);
+  expect(room.lineMin).toBe(7.5);
+  for (const n of room.names) expect((13 * room.nameRoom) / n.w, `${n.b}: the size it shrinks to`).toBeGreaterThanOrEqual(room.nameMin + 0.25);
+  for (const n of room.lines) expect((9.5 * room.lineRoom) / n.w, `${n.b}: the size it shrinks to`).toBeGreaterThanOrEqual(room.lineMin + 0.25);
+  for (const n of room.rates) expect(n.w + 4, `${n.b} fits its row at full size`).toBeLessThanOrEqual(room.rateRoom);
+  // On the card itself: Tempo Tess's name (the widest) is smaller than 13 px and whole; nothing of the card is cut; the card's size is the same.
+  const sizeOf = (sel: string) => card.locator(sel).evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+  const whole = async () => {
+    for (const sel of ["h2", ".town-sub", ".town-rate"]) expect(await card.locator(sel).evaluate((el) => el.scrollWidth <= el.clientWidth + 0.5), `${sel} is whole`).toBe(true);
+  };
+  const tess = await sizeOf("h2");
+  expect(tess).toBeLessThan(13);
+  expect(tess).toBeGreaterThanOrEqual(10);
+  await whole();
+  const tessSize = await rectIn(page, ".town-card");
+  expect([tessSize.w, tessSize.h].map((v) => Math.round(v * 10) / 10)).toEqual([CARD_SIZE.w, CARD_SIZE.h]);
+  await page.keyboard.press("Escape");
+  await expect(card).toBeHidden();
+  // Bun & Bug (Chub & Chirp's sidekick, the widest line): the line shrinks, the rating doesn't, all whole; same rows, same card.
+  card = await openBotCard(page, "Bun & Bug");
+  const line = await sizeOf(".town-sub");
+  expect(line).toBeLessThan(9.5);
+  expect(line).toBeGreaterThanOrEqual(7.5);
+  expect(await sizeOf(".town-rate")).toBe(9.5);
+  await whole();
+  /** Each row's place in the card and height, to a hundredth of a pixel. */
+  const rows = async () => {
+    const c = await rectIn(page, ".town-card");
+    const out: Record<string, number[]> = {};
+    for (const [k, sel] of [["name", "h2"], ["sub", ".town-sub"], ["rate", ".town-rate"]] as const) {
+      const r = await rectIn(page, `.town-card ${sel}`);
+      out[k] = [r.x - c.x, r.y - c.y, r.w, r.h].map((v) => Math.round(v * 100));
+    }
+    return out;
+  };
+  const bunRows = await rows();
+  await page.keyboard.press("Escape");
+  await expect(card).toBeHidden();
+  // Glim (a short name and line): full size, and its rows exactly where Bun & Bug's were (a shrunk row keeps its height).
+  card = await openBotCard(page, "Glim");
+  expect(await sizeOf("h2")).toBe(13);
+  expect(await sizeOf(".town-sub")).toBe(9.5);
+  await whole();
+  expect(await rows(), "every row where Bun & Bug's was, the same size").toEqual(bunRows);
   expect(errors).toEqual([]);
 });
 
