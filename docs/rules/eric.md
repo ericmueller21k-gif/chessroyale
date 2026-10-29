@@ -47,9 +47,10 @@ removed (old → new) and says whether any of them guards a rule here.
   cut corners on this… if it keeps our FPS intact."** Nothing new per frame on the town's hot path and nothing allocated per
   frame; anything heavy (Maia, an engine) never loads or warms while you walk round the town, only when a game opens (a
   network prefetch on a tap is fine, no compiling). When a choice costs frames, cut the corner and say so.
-  - Guard: measured against main in every town PR (method: docs/decisions/2026-10-26-town-square-slice-2.md: headless, a
-    phone 390 × 844 and a computer 1440 × 900, 5 s walking, the medians of four runs taken in turn); not a CI test, CI frame
-    rates vary too much. `e2e/town.spec.ts` checks that nothing of Maia's is fetched in the town before a game opens.
+  - Guard: measured against main in every PR that changes what the town draws or does each frame (`render.ts`, the canvas,
+    sprites and effects, anything on the frame loop; Eric, Oct 29: only then, not for layout, CSS or markup around the world)
+    (method: docs/decisions/2026-10-26-town-square-slice-2.md: headless, a phone 390 × 844 and a computer 1440 × 900, 5 s
+    walking, the medians of four runs taken in turn, one pass); not a CI test, CI frame rates vary too much. `e2e/town.spec.ts` checks that nothing of Maia's is fetched in the town before a game opens.
 - **Typing works wherever the chat box shows (Eric, Oct 28, from his phone; replaces "the field is in Always on only").** You chat by
   tapping the box anywhere but a player's name; the typing line is an input with no placeholder, border or backing and shows only while
   you're typing (a strip at the box's foot, reserved so nothing moves), and there is no "Say something…" anywhere. In Always on the box
