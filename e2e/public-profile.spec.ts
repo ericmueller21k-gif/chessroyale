@@ -229,9 +229,6 @@ test("the blocks' sizes and spaces are the mockup's: each card's height, the gap
       };
     });
     const at = (s: string) => `${vp.width}, ${s}`;
-    // The mockup's three items fit whole, "Weapon · Cobalt & Sage" too (no ellipsis; the tiles aren't equal: the longer line has more room).
-    const cutLines = await page.locator(".pp-tile-text > span:not(.pp-rarity)").evaluateAll((es) => es.filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent));
-    expect(cutLines, `${vp.width}: no color line cut`).toEqual([]);
     if (isComputer()) {
       near(at("the header card's height (no level line)"), m.card.h, 257.7, 3);
       near(at("Ranked's height"), m.ranked.h, 312.7, 4);
@@ -285,6 +282,29 @@ test("the blocks' sizes and spaces are the mockup's: each card's height, the gap
       // The whole page at 390 × 844 with five matches and three items: about 950 (the director's), and no more.
       near("the page's height", m.pageH, 950, 20);
     }
+  }
+});
+
+test("the mockup's three items fit whole, the color line too: a phone, and a computer from the narrowest two-column page (744) up", async ({ page }) => {
+  await openDemo(page);
+  await loaded(page);
+  // (A computer's page is its center column: 744 at a 1256 px window, 768 at 1280, 888 at 1440. Was checked with a pixel of slack,
+  // which let "Weapon · Cobalt & Sa…" through at 1280; now any overflow at all is a cut.)
+  for (const vp of isComputer() ? [{ width: 1256, height: 800 }, ...sizes()] : sizes()) {
+    await page.setViewportSize(vp);
+    if (isComputer()) {
+      await expect(page.locator(".pp")).toHaveClass(/pp-wide/);
+      expect(Math.round((await box(page, ".pp")).width), `${vp.width}: the page's own width`).toBe(vp.width === 1256 ? 744 : vp.width === 1280 ? 768 : 888);
+    }
+    const cut = await page.locator(".pp-tile-text, .pp-tile-text > *").evaluateAll((es) => es.filter((e) => e.scrollWidth > e.clientWidth || e.scrollHeight > e.clientHeight).map((e) => e.textContent));
+    expect(cut, `${vp.width}: nothing cut, no ellipsis`).toEqual([]);
+    const tile3 = await page.locator(".pp-tile-text > span:not(.pp-rarity)").nth(2).evaluate((e) => {
+      const r = document.createRange();
+      r.selectNodeContents(e);
+      return { text: e.textContent, natural: r.getBoundingClientRect().width, room: (e.parentElement as HTMLElement).getBoundingClientRect().width };
+    });
+    expect(tile3.text).toBe("Weapon · Cobalt & Sage");
+    expect(tile3.room, `${vp.width}: room for the longest line, whole`).toBeGreaterThanOrEqual(tile3.natural);
   }
 });
 

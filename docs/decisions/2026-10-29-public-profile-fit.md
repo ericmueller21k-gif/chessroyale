@@ -191,6 +191,10 @@ on one line (an ellipsis rather than a wrapped line that moves the rows). At 144
 - **The words in the tiles are width-matched, not height-matched.** The mockup's face is narrower than Archivo, so at the director's 11 and
   8 px (by their heights) "Weapon · Cobalt & Sage" does not fit its tile. Phone: 9.5 px name, 7.5 px color line (tracking
   −0.04em), 8.5 px pill. Computer: 14, 12 and 12 px.
+- **A narrow row gives the picture less** (Oct 29, the director's review of #407: at 1280 "Weapon · Cobalt & Sage" ended in an ellipsis).
+  When the tile row is 760 px wide or less (the frame's 768 px column at 1280, down to the 744 px page where two columns start), a
+  tile's picture slot is 32% of it, not 36%, its picture 72 px, and the color line's tracking −0.04em: the longest line has 135 px
+  at 744 for its 125, 140 at 1280. Nothing changes at 1440 (the row is 826 px) or on a phone.
 - **Tile widths follow the color line on a phone.** The mockup's three are 115 : 110 : 121 across, not equal; the page gives each
   tile a share of the row by its color line's length (`tileWeight`, the length plus 110), so the longest fits whole. On a computer
   they are equal.
@@ -235,8 +239,11 @@ that call is the director's to reverse and was reversed in this task's brief (se
   line's height `≥ 20` → no `.pp-note` before; after a refusal it's visible, `position: fixed`, and the layout and page height equal.
 - "your own page": `.pp-level` text `""` → count 0.
 - New: "the blocks' sizes and spaces are the mockup's": each card's height, the gaps, the padding inside, the tile, on a phone and at
-  1280 and 1440 (the numbers in the tables above, ±2 px for a space, ±4 for a card's height), and that the mockup's three items fit
-  whole (no color line cut).
+  1280 and 1440 (the numbers in the tables above, ±2 px for a space, ±4 for a card's height).
+- New: "the mockup's three items fit whole, the color line too": on a phone, and on a computer at a 1256 px window (the page's 744, the
+  narrowest two-column one), 1280 and 1440, nothing in a tile's words overflows at all (`scrollWidth > clientWidth` on the words and
+  their column: no ellipsis, no clipped line) and the longest color line has room for its whole width. (The first version of this check
+  allowed a pixel of slack and missed "Weapon · Cobalt & Sa…" at 1280.)
 
 `packages/app/test/public-profile.test.ts`: the level line's title ("…and always a line") → "(the page then shows no line…)"; new: a
 tile's share of the row (`tileWeight`) gives the mockup's 112 : 107 : 117.7 on a phone.

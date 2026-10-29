@@ -914,6 +914,7 @@
   gap: 8px;
   height: 113.8px;
   margin-top: 8.9px;
+  container-type: inline-size;
 }
 .pp-wide .pp-tile,
 .pp-wide .pp-tiles.n4 .pp-tile {
@@ -955,6 +956,21 @@
   padding: 0 12px;
   font-size: 12px;
   line-height: 32px;
+}
+/* A narrow row (the frame's 768 px column at 1280, down to the 744 px where this layout starts; 826 px at 1440): the picture takes
+   a little less of each tile and the color line a little less tracking, so "Weapon · Cobalt & Sage" is whole in the longest tile. */
+@container (max-width: 760px) {
+  .pp-wide .pp-tile-art {
+    width: 32%;
+    margin-right: 6%;
+  }
+  .pp-wide .pp-tile-art > .item-art {
+    width: 72px;
+    height: 72px;
+  }
+  .pp-wide .pp-tile-text > span:not(.pp-rarity) {
+    letter-spacing: -0.04em;
+  }
 }
 /* Four worn: the same tile, its words a step smaller. */
 .pp-wide .pp-tiles.n4 .pp-tile-text strong {
