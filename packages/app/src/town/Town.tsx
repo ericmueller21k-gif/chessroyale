@@ -105,7 +105,7 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, seat = null }: { on
         {/* A statue's quote, for screen readers, while you stand up close to it (it's drawn on its pedestal). */}
         <div class="town-sr" ref={live} aria-live="polite" />
         <div class="town-overlay">
-          {/* The chat log, top left (its own file): under the cards, taking no taps; the chips keep off its box (CHAT_BOX). */}
+          {/* The chat log, top left (its own file): under the cards; while it shows it takes every touch on its own area (the map under it gets none), faded none; the chips keep off its box (CHAT_BOX). */}
           <TownChat />
           {/* The card: over the boss's head or the home's top, its tail pointing there (placed every frame). */}
           <div class="town-card" ref={cardEl} role="dialog" aria-label={label} style={{ display: card ? "" : "none" }}>

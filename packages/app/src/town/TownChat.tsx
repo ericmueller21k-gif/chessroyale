@@ -1,27 +1,36 @@
 /**
- * The town square's chat log (Eric, Oct 28): one see-through box in the map's top left corner, a continuous stream of lines
- * ("[9:41] Name: message", the name bold, colored by kind: a player's from a palette, picked at random each time they join),
- * newest at the bottom, with the field "Say something…" at its foot, in always on only (nothing but its placeholder and your
- * words: no box, no bar, no send button: the keyboard's Send or Enter sends). No backing, border or shadow on anything (`--chat-back`,
- * 0, is there to raise later). The text is near-black by day and white by night, following the town's own sky (`data-tone`,
- * read about once a minute, set only when it flips). The box holds every line of the last minute (`lifeMs`, each removed for good
- * then) and scrolls: a finger on a phone, the wheel on a computer; new lines keep it at its foot unless you've scrolled up, then a
- * "↓ new" marker says so (`Stick`).
+ * The town square's chat log (Eric, Oct 28): one box in the map's top left corner, a continuous stream of lines ("[9:41] Name:
+ * message", the name bold, colored by kind: a player's from a palette, picked at random each time they join), newest at the bottom.
+ * No backing, border or shadow on any line (the text is near-black by day and white by night, following the town's own sky:
+ * `data-tone`, read about once a minute, set only when it flips). The box holds every line of the last 5 minutes (`lifeMs`), at most
+ * 100 (`keepLines`), and scrolls: a finger on a phone, the wheel on a computer; new lines keep it at its foot unless you've scrolled
+ * up, then a "↓ new" marker says so (`Stick`).
  *
- * Three modes, set by the header's chat icon or the gear's sheet (TownChatTools.tsx), remembered on this device: always on (the
- * field is here and nowhere else: you can only chat in this mode); new messages only (the lines show when a message comes and
- * fade `fadeAfterMs` after the last; no field; a tap on a line brings back every line of the last minute, scrollable, until the
- * wait runs out again); off (no box, no field: the lines still arrive, so turning it on shows the last minute).
+ * v4 (Eric's phone, Oct 28): **you chat by tapping the box anywhere but a player's name.** That opens typing: a slight blur behind
+ * the whole box (`.tc-back`: one rounded rectangle, a faint tint and, while you type, a `backdrop-filter` blur), the typing line in the strip at the box's
+ * foot (an input with no placeholder, no border and no backing; reserved by the stream, so nothing moves when it shows), focused (the
+ * keyboard opens on a phone, the cursor goes in on a computer). Enter or the keyboard's Send sends and closes it; a press on the map,
+ * or Escape, closes it (the words stay for the next tap); the blur goes with it, and the tint with it unless "Chat background" (Town
+ * settings) is on, which keeps the tint behind the box whenever the box shows (the blur only while you type: the frame rate's corner,
+ * town-chat.css). A guest, a device marked too young, a paused chat or a chat ban opens the same
+ * greyed line with the reason in it.
  *
- * The box takes no taps except on a line and on its field, so a tap on it anywhere else reaches the map; a wheel over it
- * scrolls it, never the map. A tap on a player's name opens its menu (Profile / Mute / Report, and Remove for a moderator;
- * `onTownChatLineTap`), and so does a tap on their line's text when the chat is always on. Press and hold on the box (`holdMs`)
- * and it comes off the map to move wherever you drop it, remembered on this device. Plain DOM, drawn only when a line comes or
- * goes; nothing in the town's frame loop. The rules and the numbers are in chat.ts; docs/areas/town-square.md, "The chat log".
+ * Three modes, set by the header's chat icon or the gear's sheet (TownChatTools.tsx), remembered on this device: always on (the box
+ * always shows and never fades); new messages (the same box: the lines show when a message comes and fade `fadeAfterMs` after the
+ * last; a tap while they show opens typing and is "always on" until you finish: every line, no fade, `ChatLog.talk`); off (no box:
+ * the lines still arrive, so turning it on shows them). While the box shows it takes every touch on its own area (the map under it
+ * gets none); faded, it takes none. The stream itself is hit-testable and scrolls (`pointer-events: auto`, `touch-action: pan-y`):
+ * iPhone Safari scrolls a scroller only when it is.
+ *
+ * A tap is a press under `holdMs` that moves under `holdSlopPx`. On a player's name it opens its menu (Profile / Mute / Report, and
+ * Remove for a moderator; `onTownChatLineTap`); anywhere else on the box it opens typing. Press and hold on the box (`holdMs`) and it
+ * comes off the map to move wherever you drop it, remembered on this device; a finger that moves scrolls the stream. Plain DOM, drawn
+ * only when a line comes or goes or typing opens or closes; nothing in the town's frame loop. The rules and the numbers are in
+ * chat.ts; docs/areas/town-square.md, "The chat log".
  *
  * Players' messages (chat-net.ts; docs/decisions/2026-10-28-town-chat-typing.md): only a signed-in player on a device the
  * age gate didn't mark too young types and gets other players' lines (riding on the live poll); a guest's log has the
- * bosses' and kids' chatter alone. The field is there for everyone (nothing hidden): greyed with why for a guest ("Sign in
+ * bosses' and kids' chatter alone. The typing line opens for everyone on a tap (nothing hidden): greyed with why for a guest ("Sign in
  * to chat with other players."), a young device, while the chat is paused (the switch) or your chat is off (a
  * moderator). It waits for the server's answer. Too soon after your last message, or refused (the server's reasons), you get a gray
  * line in the stream that only you see (`whisper`: "Sorry, you can't send another message for 12 seconds."); nothing is sent for
@@ -29,7 +38,7 @@
  *
  * Test hooks (e2e, with the test switches on): `window.__townSay()` makes someone from the table talk now;
  * `__townSay(name, text, kind, agoMs)` says that line (on this device only; `agoMs`: it was said that long ago, to scroll back
- * to); `__townChatter(false)` stops the bosses' and kids' chatter (true starts it again); `window.__townTapped` lists the taps
+ * to: up to 5 minutes); `__townChatter(false)` stops the bosses' and kids' chatter (true starts it again); `window.__townTapped` lists the taps
  * on player lines.
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
@@ -38,24 +47,30 @@ import { mutes } from "../chat-mod.ts";
 import { openProfile } from "../profile-nav.ts";
 import { useServerStatus } from "../status.ts";
 import { testSwitchesAllowed } from "../test-switches.ts";
-import { CHAT, CHAT_BOX, ChatLog, Stick, clampBox, loadChatPos, onTownChatLineTap, saveChatPos, say, setTownChatLineTap, startChatter, tooSoonText, townTone, type ChatKind, type ChatLine, type Rect } from "./chat.ts";
+import { CHAT, CHAT_BOX, ChatLog, Stick, chatBlurs, chatShows, clampBox, loadChatPos, onTownChatLineTap, saveChatPos, say, setTownChatLineTap, startChatter, tooSoonText, townTone, type ChatKind, type ChatLine, type Rect } from "./chat.ts";
 import { cutTownText, mayTownChat, openTownFeed, removeTownLine, reportTownLine, sendTownChat, townChars, townChatOff } from "./chat-net.ts";
 import { NAME_COLORS, nameColorIndex } from "./names.ts";
 import { TOWN_FEEL } from "./feel.ts";
-import { useChatMode } from "./TownChatTools.tsx";
+import { useChatBackground, useChatMode } from "./TownChatTools.tsx";
 import "./town-chat.css";
 
 export function TownChat() {
   const wrap = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLInputElement>(null);
+  const form = useRef<HTMLFormElement>(null);
   const pinned = useRef<(() => void) | null>(null);
   const mode = useChatMode();
+  const background = useChatBackground();
   // (The handlers below are set up once and read the mode as it is when a press comes.)
   const modeNow = useRef(mode);
   modeNow.current = mode;
   const [computer, setComputer] = useState(() => matchMedia(CHAT.computerQuery).matches);
-  const [typing, setTyping] = useState(mayTownChat);
+  /** Whether this device chats with other players (a signed-in account, not marked too young): players' lines come in. */
+  const [mayChat, setMayChat] = useState(mayTownChat);
+  /** Typing is open: a tap on the box opened it; a send, a press on the map or Escape closes it. (`typingNow`: the same, for the handlers set up once.) */
+  const [typing, setTyping] = useState(false);
+  const typingNow = useRef(false);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   /** The text's tone: dark ink by day, white by night (the town's sky; read once a minute, redrawn only when it flips). */
@@ -97,7 +112,7 @@ export function TownChat() {
   // longer see them (signed out, a device marked too young, the chat paused); the switch redraws the field. They keep coming
   // whatever the mode (off too: no extra requests, and turning it on shows the last minute).
   useEffect(() => {
-    if (!typing) {
+    if (!mayChat) {
       log.drop((l) => l.uid !== undefined);
       return;
     }
@@ -106,7 +121,7 @@ export function TownChat() {
       drop: (test) => log.drop((l) => l.uid !== undefined && l.n !== undefined && test({ n: l.n, from: l.uid })),
       paused: () => redraw((n) => n + 1),
     });
-  }, [log, typing]);
+  }, [log, mayChat]);
 
   // The computer's size (a window crossing it) changes the box's size and type; the test switches can turn on late (the
   // account loads after the town opens), which is when the field appears.
@@ -114,7 +129,7 @@ export function TownChat() {
     const mq = matchMedia(CHAT.computerQuery);
     const on = () => setComputer(mq.matches);
     mq.addEventListener("change", on);
-    const off = onAccountChange(() => setTyping(mayTownChat()));
+    const off = onAccountChange(() => setMayChat(mayTownChat()));
     return () => {
       mq.removeEventListener("change", on);
       off();
@@ -158,14 +173,37 @@ export function TownChat() {
     setUnseen(0);
   };
 
+  // Typing (Eric, Oct 28, v4: "to chat you tap the chat box anywhere that isn't someone's name"): a tap on the box opens it (the blur behind
+  // the box, the typing line at its foot, focused: the keyboard on a phone, the cursor on a computer); a send, a press on the map or
+  // Escape closes it (the words stay for the next tap). In "new messages" it holds the lines on show and every line shows ("high text")
+  // until it closes (`ChatLog.talk`). These read refs and setters only, so the handlers set up once may call them.
+  const openTyping = () => {
+    // (Straight away, inside the tap's own handler: iPhone opens the keyboard only for a focus() made while a tap is being handled, and
+    // the line is hidden until it's typing: its visibility is switched here, not on the next draw.)
+    if (form.current) form.current.dataset.open = "1";
+    if (!typingNow.current) {
+      typingNow.current = true;
+      setTyping(true);
+      log.talk(true);
+    }
+    field.current?.focus({ preventScroll: true });
+  };
+  const closeTyping = () => {
+    if (!typingNow.current) return;
+    typingNow.current = false;
+    setTyping(false);
+    field.current?.blur();
+    log.talk(false);
+  };
+
   // Where the box is: the remembered place (else the corner, in CSS), kept inside the map and off the buttons; picked up by a
   // press and hold and put down where you let go. `CHAT_BOX` tells the edge chips (render.ts) where it is, shown or not
-  // (and nowhere while the chat is off). A wheel over the log scrolls it, never the map under it.
+  // (and nowhere while the chat is off). A wheel over the log scrolls it, never the map under it. A press on the box that lets go
+  // before the hold with almost no movement is a tap (opens typing, or a player's name's menu); one that moves scrolls the stream.
   useLayoutEffect(() => {
     const el = wrap.current!;
     const ov = el.parentElement as HTMLElement; // (the overlay: the map's box; not offsetParent: that's null while the chat is off)
     const area = ov.parentElement!;
-    const cv = area.querySelector("canvas")!;
     let pos = loadChatPos();
     const buttons = (): Rect | null => {
       const c = area.querySelector(".town-controls")?.getBoundingClientRect();
@@ -190,9 +228,11 @@ export function TownChat() {
     /** Whether the box can be seen and pressed now (faded in "new messages", or off: a press there is the map's). */
     const seeable = () => modeNow.current !== "off" && (el.dataset.on === "1" || el.classList.contains("grab"));
 
-    // `row`: the line the press began on (a tap on it is that line's, later); none: it began on the map. `name`: on a name.
-    let hold: { id: number; x: number; y: number; row: HTMLElement | null; name: boolean; timer: ReturnType<typeof setTimeout> } | null = null;
+    // `row`: the line the press began on (none: the box's empty part); `name`: on a name; `menu`: a line's menu was open (this tap only dismisses it).
+    let hold: { id: number; x: number; y: number; row: HTMLElement | null; name: boolean; menu: boolean; timer: ReturnType<typeof setTimeout> } | null = null;
     let drag: { id: number; dx: number; dy: number; hud: Rect | null } | null = null;
+    /** When the last tap on the box was (a click right after it is part of it: iPhone's own gesture for the keyboard). */
+    let tappedAt = -1e9;
     // (A finger moving the held box must not also start the log's own scroll: the browser's pan is called off while it's carried.)
     const noPan = (e: TouchEvent) => e.cancelable && e.preventDefault();
     const pickUp = () => {
@@ -204,24 +244,25 @@ export function TownChat() {
       el.classList.add("grab");
       log.hold(true);
       area.addEventListener("touchmove", noPan, { passive: false });
-      // The map saw the finger go down and pressed a square: that press is called off (the box's now).
-      if (!h.row) cv.dispatchEvent(new PointerEvent("pointercancel", { pointerId: h.id }));
     };
     const onDown = (e: PointerEvent) => {
-      // A press on the map lets the field go (the keyboard closes).
-      if (e.target !== field.current && document.activeElement === field.current) field.current?.blur();
-      if (!e.isPrimary || !seeable()) return;
       const target = e.target as Element;
-      const row = target === cv ? null : target.closest<HTMLElement>(".tc-line");
-      if (target !== cv && !(row && el.contains(row))) return;
-      const b = el.getBoundingClientRect();
-      if (!row && (e.clientX < b.left || e.clientX > b.right || e.clientY < b.top || e.clientY > b.bottom)) return;
-      if (row) log.poke(); // (reading: the wait before the fade starts over)
-      row?.setPointerCapture?.(e.pointerId);
-      hold = { id: e.pointerId, x: e.clientX, y: e.clientY, row, name: !!target.closest(".tc-name"), timer: setTimeout(pickUp, CHAT.holdMs) };
+      // A press on the map (anything on it but the box) closes typing: the line hides, the keyboard goes, the blur goes (unless the setting holds it).
+      if (!el.contains(target)) {
+        closeTyping();
+        return;
+      }
+      if (!e.isPrimary || !seeable()) return;
+      // The typing line, the "↓ new" marker and a line's menu are their own: a press there isn't the box's.
+      if (target.closest(".tc-form, .tc-new, .tc-menu")) return;
+      log.poke(); // (reading: the wait before the fade starts over)
+      // (A mouse's up may come off the box: it's captured. A finger is captured by its own touch, and the browser's scroll of the stream isn't touched.)
+      if (e.pointerType === "mouse") el.setPointerCapture?.(e.pointerId);
+      const row = target.closest<HTMLElement>(".tc-line");
+      hold = { id: e.pointerId, x: e.clientX, y: e.clientY, row: row && el.contains(row) ? row : null, name: !!target.closest(".tc-name"), menu: !!el.querySelector(".tc-menu"), timer: setTimeout(pickUp, CHAT.holdMs) };
     };
     const onMove = (e: PointerEvent) => {
-      // Moving before the hold is up is a drag of the map's, which goes on as it was (or, on a line, the log's own scroll).
+      // Moving before the hold is up is a scroll of the stream's (the browser's own, for a finger).
       if (hold && e.pointerId === hold.id && Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > CHAT.holdSlopPx) {
         clearTimeout(hold.timer);
         hold = null;
@@ -232,22 +273,25 @@ export function TownChat() {
       put(pos);
       measure();
     };
-    /** A tap on a line (no hold, no scroll): a player's name opens its menu (so does their text when the chat is always on; a line said by the test hook has no one behind it: the menu ignores it); in "new messages" the text brings back every line. */
-    const tapLine = (line: ChatLine, row: HTMLElement, name: boolean) => {
-      if (line.kind === "player" && (name || modeNow.current === "always")) {
-        const r = row.getBoundingClientRect();
+    /** A tap on the box (no hold, no scroll): a player's name opens its menu (a line said by the test hook has no one behind it: the menu ignores it); anywhere else opens typing. */
+    const tap = (h: NonNullable<typeof hold>) => {
+      const line = h.row ? log.lines.find((l) => l.id === Number(h.row!.dataset.id)) : undefined;
+      if (h.name && line?.kind === "player") {
+        const r = h.row!.getBoundingClientRect();
         onTownChatLineTap(line, { x: r.left, y: r.top, w: r.width, h: r.height });
         if (testSwitchesAllowed()) ((window as unknown as { __townTapped?: string[] }).__townTapped ??= []).push(line.text);
-      } else if (modeNow.current === "new") log.expand();
+        return;
+      }
+      tappedAt = performance.now();
+      openTyping();
     };
     const onEnd = (e: PointerEvent) => {
       if (hold && e.pointerId === hold.id) {
-        // Let go before the hold, without moving: a tap.
+        // Let go before the hold, without moving: a tap (unless it only put a menu away).
         const h = hold;
         clearTimeout(h.timer);
         hold = null;
-        const line = h.row && e.type === "pointerup" ? log.lines.find((l) => l.id === Number(h.row!.dataset.id)) : null;
-        if (line) tapLine(line, h.row!, h.name);
+        if (e.type === "pointerup" && !h.menu) tap(h);
       }
       if (!drag || e.pointerId !== drag.id) return;
       drag = null;
@@ -255,6 +299,10 @@ export function TownChat() {
       area.removeEventListener("touchmove", noPan);
       log.hold(false);
       if (pos) saveChatPos(pos);
+    };
+    // (If the browser didn't take the focus() in the pointer's own handler, the click that follows a tap does: a tap's own gesture.)
+    const onClick = () => {
+      if (typingNow.current && performance.now() - tappedAt < 700 && document.activeElement !== field.current) field.current?.focus({ preventScroll: true });
     };
     const onWheel = (e: WheelEvent) => {
       const box = scroller.current;
@@ -269,12 +317,14 @@ export function TownChat() {
     area.addEventListener("pointermove", onMove);
     area.addEventListener("pointerup", onEnd);
     area.addEventListener("pointercancel", onEnd);
+    area.addEventListener("click", onClick);
     area.addEventListener("wheel", onWheel, { capture: true, passive: false });
     return () => {
       area.removeEventListener("pointerdown", onDown, true);
       area.removeEventListener("pointermove", onMove);
       area.removeEventListener("pointerup", onEnd);
       area.removeEventListener("pointercancel", onEnd);
+      area.removeEventListener("click", onClick);
       area.removeEventListener("wheel", onWheel, true);
       area.removeEventListener("touchmove", noPan);
       ro.disconnect();
@@ -284,24 +334,32 @@ export function TownChat() {
     };
   }, [log]);
 
+  // Escape closes typing (a computer's way to; the map press is the phone's). A line's menu or the settings sheet that is open take their own Escape first.
+  useEffect(() => {
+    if (!typing) return;
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || wrap.current?.querySelector(".tc-menu") || document.querySelector(".mm-scrim")) return;
+      e.stopPropagation(); // (the town's own Escape, which closes a card, isn't also pressed)
+      closeTyping();
+    };
+    document.addEventListener("keydown", esc);
+    return () => document.removeEventListener("keydown", esc);
+  }, [typing]);
+  // The chat turned off closes typing: off stays off.
+  useEffect(() => {
+    if (mode === "off") closeTyping();
+  }, [mode]);
+
   // The keyboard opening must not resize or move the town: while the field has focus, the screen keeps the height it had
   // and follows the visual viewport if the browser pans it to show the field (visualViewport).
-  const focus = () => {
-    if (pinned.current) return;
-    pinned.current = pinTown(wrap.current!.closest<HTMLElement>(".town-screen")!);
-    log.hold(true);
+  const pin = () => {
+    if (!pinned.current) pinned.current = pinTown(wrap.current!.closest<HTMLElement>(".town-screen")!);
   };
-  const blur = () => {
-    if (!pinned.current) return;
-    pinned.current();
+  const unpin = () => {
+    pinned.current?.();
     pinned.current = null;
-    log.hold(false);
   };
-  // (The field greyed while it has focus, a guest signed out say, lets go too; so does the chat turned off, or new messages: no field there.)
-  useEffect(() => {
-    if (!typing || mode !== "always") blur();
-  }, [typing, mode]);
-  useEffect(() => blur, []);
+  useEffect(() => unpin, []);
 
   // Sending waits for the server's answer (the field keeps your words and the keyboard meanwhile); your line comes back into
   // the log with everyone's. Too soon (nothing is sent) or refused, you keep your words, to change them or to try again, and a
@@ -317,20 +375,25 @@ export function TownChat() {
     const r = await sendTownChat(text);
     setSending(false);
     if (r.ok) {
+      // Sent: typing is finished (the keyboard goes, the blur goes unless the setting holds it).
       setText("");
-      field.current?.blur();
+      closeTyping();
     } else if (r.reason === "wait") sorry(tooSoonText(r.waitMs));
     else if (r.reason === "refused" && r.message) sorry(r.message);
   };
   const left = CHAT.maxChars - townChars(text);
-  // Why the field can't send right now (a guest, a young device, the switch, your chat ban), shown in its place.
+  // Why the typing line can't send right now (a guest, a young device, the switch, your chat ban), shown in its place: greyed.
   const off = townChatOff();
-  // Shown: always (always on), or from a message until the wait runs out (new messages).
-  const on = mode === "always" || (mode === "new" && log.shown);
+  // Shown: always (always on), or from a message until the wait runs out (new messages; typing holds it). The blur: while it shows and you're typing, or whenever it shows with the setting on.
+  const on = chatShows(mode, log.shown);
+  const blur = chatBlurs(mode, log.shown, typing, background);
 
   return (
-    <div class="town-chat" ref={wrap} hidden={mode === "off"} data-size={computer ? "computer" : "phone"} data-mode={mode} data-on={on ? "1" : "0"} data-tone={tone} style={`--chat-out:${CHAT.fadeMs}ms;--chat-in:${CHAT.fadeInMs}ms`}>
-      <div class="tc-log" ref={scroller} role="log" aria-label="Town chat" onScroll={scrolled}>
+    <div class="town-chat" ref={wrap} hidden={mode === "off"} data-size={computer ? "computer" : "phone"} data-mode={mode} data-on={on ? "1" : "0"} data-blur={blur ? "1" : "0"} data-typing={typing ? "1" : "0"} data-tone={tone} style={`--chat-out:${CHAT.fadeMs}ms;--chat-in:${CHAT.fadeInMs}ms`}>
+      {/* The slight blur behind the whole box, the stream and the typing line together: one rounded rectangle (town-chat.css). */}
+      <div class="tc-back" aria-hidden="true" />
+      {/* (Focusable, so a keyboard gets to the box: Enter opens typing, as a tap does.) */}
+      <div class="tc-log" ref={scroller} role="log" aria-label="Town chat" tabIndex={0} onScroll={scrolled} onKeyDown={(e) => e.key === "Enter" && e.target === e.currentTarget && openTyping()}>
         {lines.map((l) => {
           // A player's name is bold in a palette color: both shades are on the name (the box's tone picks one), `data-c` is its place in the palette.
           const c = l.kind === "player" ? nameColorIndex(l) : -1;
@@ -349,34 +412,34 @@ export function TownChat() {
           ↓ new
         </button>
       )}
-      {mode === "always" && (
-        <form class="tc-form" onSubmit={submit}>
-          <input
-            ref={field}
-            type="text"
-            value={text}
-            placeholder={off ?? "Say something…"}
-            title={off ?? undefined}
-            disabled={!!off}
-            readOnly={sending}
-            enterkeyhint="send"
-            autocomplete="off"
-            autocapitalize="sentences"
-            spellcheck={false}
-            aria-label="Say something in the town chat"
-            onInput={(e) => {
-              // (The field stops at maxChars as the server counts them, an emoji as one: no maxLength, which counts UTF-16.)
-              const el = e.target as HTMLInputElement;
-              const cut = cutTownText(el.value);
-              if (cut !== el.value) el.value = cut;
-              setText(cut);
-            }}
-            onFocus={focus}
-            onBlur={blur}
-          />
-          {left <= CHAT.nearEnd && !off && <span class="tc-left">{left} left</span>}
-        </form>
-      )}
+      {/* The typing line: in the strip at the box's foot, which the stream keeps free whether it shows or not, so nothing moves when it does.
+          No placeholder (a guest's, a paused chat's and a ban's reason is the placeholder of the greyed line), no border, no backing. */}
+      <form class="tc-form" ref={form} data-open={typing ? "1" : "0"} onSubmit={submit}>
+        <input
+          ref={field}
+          type="text"
+          value={text}
+          placeholder={off ?? undefined}
+          title={off ?? undefined}
+          disabled={!!off}
+          readOnly={sending}
+          enterkeyhint="send"
+          autocomplete="off"
+          autocapitalize="sentences"
+          spellcheck={false}
+          aria-label="Message to the town chat"
+          onInput={(e) => {
+            // (The field stops at maxChars as the server counts them, an emoji as one: no maxLength, which counts UTF-16.)
+            const el = e.target as HTMLInputElement;
+            const cut = cutTownText(el.value);
+            if (cut !== el.value) el.value = cut;
+            setText(cut);
+          }}
+          onFocus={pin}
+          onBlur={unpin}
+        />
+        {left <= CHAT.nearEnd && !off && <span class="tc-left">{left} left</span>}
+      </form>
       <LineMenu box={wrap} log={log} />
     </div>
   );
