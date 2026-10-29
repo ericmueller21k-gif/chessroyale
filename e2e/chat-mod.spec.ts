@@ -62,7 +62,9 @@ test("chat moderation: mute from a name, a report from the profile, a moderator'
   await boLine.getByRole("button", { name: `${boName}: profile or mute`, exact: true }).click();
   await menu.getByRole("button", { name: "Profile", exact: true }).click();
   const profile = ann.locator(".fd-overlay");
-  await profile.getByRole("button", { name: "Report", exact: true }).click();
+  // (Oct 28: Report is in the public profile's ••• menu.)
+  await profile.getByRole("button", { name: "More options" }).click();
+  await ann.getByRole("menuitem", { name: "Report", exact: true }).click();
   await ann.getByRole("button", { name: "Offensive name or icon", exact: true }).click();
   await expect(ann.getByText("Thanks, we'll look into it.")).toBeVisible();
   await ann.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).click();

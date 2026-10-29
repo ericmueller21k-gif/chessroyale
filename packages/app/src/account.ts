@@ -18,13 +18,34 @@ export interface ModeStats {
   teamWins: number;
 }
 
-/** A player's ranked 1 v 1: the rank (core's RankView) and the record. */
+/**
+ * A ranked 1 v 1 game on a profile (RankedSummary.recent: the last five, newest first). The opponent's `look` is how the
+ * server dresses their pawn; no account (a bot, or one since deleted): `id` null.
+ */
+export interface RankedGame {
+  opponent: { id: string | null; name: string; look?: ItemLook };
+  result: "win" | "loss" | "draw";
+  /** Rank points gained or lost by the game (null: a placement game, or unknown). */
+  rp: number | null;
+  /** When the game ended. */
+  at: number;
+}
+
+/**
+ * A player's ranked 1 v 1: the rank (core's RankView) and the record, and (from the ranked tiers' later commits; missing
+ * from a server that doesn't send them yet, shown as "—") their peak rank, their win streak and their last games.
+ */
 export interface RankedSummary {
   rank: RankView;
   games: number;
   wins: number;
   losses: number;
   draws: number;
+  /** The best rank they've reached (null: none yet). */
+  peak?: RankView | null;
+  /** Wins in a row now (0: their last game wasn't one). */
+  streak?: number;
+  recent?: RankedGame[];
 }
 
 export interface Profile {
@@ -369,6 +390,8 @@ export function playerName(): string {
 export interface PublicProfile {
   id: string;
   name: string;
+  /** Their icon: a drawing (a PNG data URL), an older account's emoji, or the default pawn "♟" (missing from an older server). */
+  icon?: string;
   look: ItemLook;
   joinedAt: number;
   lastSeen: number | null;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createRequire } from "node:module";
 import { FRONT_DOOR, itemDef } from "@chessroyale/core";
-import { createGuest, ensureSchema, lobbyResult, profile, publicProfile, recordResult, signInWithIdentity, touchSession, userFromToken, type Sql } from "../src/accounts.ts";
+import { createGuest, ensureSchema, lobbyResult, profile, publicProfile, recordResult, signInWithIdentity, touchSession, updateProfile, userFromToken, type Sql } from "../src/accounts.ts";
 import { handleAccountApi } from "../src/api.ts";
 import { equipLocker, openCrate } from "../src/locker.ts";
 import { liveCounts, recordWait, reportLobby, typicalWait, type LobbySummary } from "../src/live.ts";
@@ -158,7 +158,7 @@ describe("profiles", () => {
     expect(p.online).toBe(true);
   });
 
-  it("nothing private: no email, no sign-in method, no icon; and the percentile once enough players are rated", async () => {
+  it("nothing private: no email, no sign-in method; and the percentile once enough players are rated", async () => {
     const { sql } = memoryDb();
     await ensureSchema(sql);
     const { user } = await createGuest(sql, 1000, "Eric");
@@ -174,11 +174,26 @@ describe("profiles", () => {
     const p = (await publicProfile(sql, signed.id, 5000))!;
     const text = JSON.stringify(p);
     expect(text).not.toContain("eric@example.com");
-    expect(text).not.toMatch(/email|google|signedIn|icon/i);
+    // (The icon is public since Oct 28, 2026: Eric put it behind the pawn on the public profile; it was in this list before.)
+    expect(text).not.toMatch(/email|google|signedIn/i);
     expect(Object.keys(p.look)).toHaveLength(1);
     // 13 rated; 2 above (2000, 2100): 3rd of 13 = top 24%.
     expect(p.topPercent).toBe(24);
     expect(await publicProfile(sql, "nobody", 5000)).toBeNull();
+  });
+
+  it("the icon is public (Eric, Oct 28): the default pawn, an older account's emoji, a drawing", async () => {
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    const { user } = await createGuest(sql, 1000, "Ann");
+    expect((await publicProfile(sql, user.id, 2000))!.icon).toBe("♟");
+    await updateProfile(sql, user.id, { icon: "🦁" });
+    expect((await publicProfile(sql, user.id, 2000))!.icon).toBe("🦁");
+    // A 48 x 48 PNG (the header's size is what's checked).
+    const head = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 0, 48, 0, 0, 0, 48, 8, 6, 0, 0, 0];
+    const png = "data:image/png;base64," + btoa(String.fromCharCode(...head));
+    await updateProfile(sql, user.id, { icon: png });
+    expect((await publicProfile(sql, user.id, 2000))!.icon).toBe(png);
   });
 
   it("GET /api/profile/ID: anyone's, by id; 404 for no such player", async () => {

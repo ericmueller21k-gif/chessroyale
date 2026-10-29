@@ -130,13 +130,24 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   hub too (Oct 15) but stay off this line: they count for the overload limit and the ops health view only.
 - **The queue screen:** the lobby's seats fill on screen (people, then bots popping in after the fill time), the wait
   so far, "Switch to Default" in Bots off. The match starts in place.
-- **Profiles** (yours and anyone's, by tapping a name): icon, name, rank (from the rating, `RATING_RANKS`; "Top N%"
-  once `percentileMinPlayers` have ratings), the rating chart, stats (All, Classic, Crowd), "Boss tiers beaten"
-  (online raids only: a solo win is the browser's word), recent matches, what
-  they're wearing (drawn with the real item art), their quick-chat picks. A profile others see never shows an email,
-  a sign-in method or anything not on the approved list; a banned player's says "Banned". A "1 V 1" section shows
-  their ranked rank (tier, division and RP, or "Placement N/5") and record, once they've played one (none for a banned
-  player).
+- **Profiles** ([docs/decisions/2026-10-28-public-profile.md](../decisions/2026-10-28-public-profile.md)). Two screens:
+  - **The public profile** (`screens/PublicProfile.tsx`, Eric's mockup of Oct 28): the one page every player has, the same for every
+    viewer, opened by a tap on another player's name or face anywhere (`PlayerName`, the queue's pawns, the town card, a lobby; the
+    address `/profile/<id>`). Back, "Player Profile", ••• (Block, Report); their dressed pawn in a circle over their icon (blurred and
+    faded; the theme's light yellow with the default pawn) with a green dot while they're online; their name; "Online now · Joined
+    Oct 2026" (or "Last seen 2h ago · …", or just "Joined …" if they hide it); "Level 38" (an admin's `TEST_LEVEL` placeholder only,
+    else an empty line of the same height); **Challenge** (today's invite) and **Add Friend** (today's request), both greyed on your
+    own page, for a guest, while loading and for someone you blocked; then three cards: **Ranked Standing** (1v1 / 50 v 50 /
+    Squads menu, "Season 1": the 1v1 emblem, tier and division, RP, peak rank, win rate, W / L, win streak; "Placement 2/5",
+    "Unranked", "Banned" and "Coming soon" in the same room), **Recent Matches** (the last five games in any mode, a ranked 1 v 1's
+    RP change; "View all" opens today's list) and **Equipped Cosmetics** (a tile each, rarity pill, "View all" opens each item's
+    purity and Shiny). One column on a phone; from 744 px wide two (header, Ranked beside Recent, Cosmetics). Nothing private: no
+    email, sign-in method, age, the hidden 1 v 1 rating or fair-play details; the icon is public since Oct 28. Its words are in
+    `public-profile.ts` (tested), its styles `public-profile.css`. Nothing hidden, nothing shifts: it loads as the same markup on
+    gray bars, the Ranked card is one height in every mode, and every list keeps its room.
+  - **Your own profile** (`screens/PlayerProfile.tsx`, from your own pawn): your coins, Edit name & icon, locker, Friends, the
+    rating chart, stats (Crowd, Boss raid), "Boss tiers beaten", recent matches, what you wear, Quick chat, Settings; **View public
+    profile** at its top opens yours as others see it. A bot or someone with no account gets a card that says so.
 - **Ranked 1 v 1's way in** ([ranked.md](ranked.md)): `/1v1` queues in one tap; the home screen's button (not built
   yet) calls `startRanked1v1()` (`packages/app/src/duel.ts`) and shows `ranked1v1Label()` (`packages/app/src/ranked.ts`:
   the rank's label from the profile, null until it loads). The first-time pawn-vote hint is `VoteHint`
@@ -244,10 +255,11 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 
 | What | Where |
 | --- | --- |
-| Screens | `packages/app/src/screens/Home.tsx` (home, the RANKED row, the Other modes cards (Boss Arena, Solo Boss Mode), the Boss raid screen and its Solo Boss Mode form), `Landing.tsx`, `Queue.tsx`, `Profile.tsx`, `PlayerProfile.tsx`, `Settings.tsx`, `Lobby.tsx`, `Legal.tsx`, `Friends.tsx` |
+| Screens | `packages/app/src/screens/Home.tsx` (home, the RANKED row, the Other modes cards (Boss Arena, Solo Boss Mode), the Boss raid screen and its Solo Boss Mode form), `Landing.tsx`, `Queue.tsx`, `Profile.tsx`, `PlayerProfile.tsx` (yours), `PublicProfile.tsx` (everyone's), `Settings.tsx`, `Lobby.tsx`, `Legal.tsx`, `Friends.tsx` |
 | Friends' pieces (rows, the live panel's section, the toast, Invite friends, the settings, a profile's buttons) | `packages/app/src/components/Friends.tsx`; the list and actions `friends.ts` |
 | The computer's frame and menus | `components/FrontDoor.tsx`, `FrontMenu.tsx`, `LiveWindow.tsx`, `LiveNumber.tsx`, `MiniBoard.tsx`, `TinyBoard.tsx`, `LeaderboardSheet.tsx` |
 | Names and icons everywhere | `components/PlayerName.tsx`, `PixelIcon.tsx` (`UserIcon`), `profile-nav.ts` |
+| The public profile's words and numbers, shared pieces | `packages/app/src/public-profile.ts` (+ `test/public-profile.test.ts`), `components/ProfileParts.tsx` (what they wear, recent matches, the report sheet), `public-profile.css` |
 | The live line, app side | `packages/app/src/live.ts` |
 | The FAQ (its words and numbers; the format; the screen) | `packages/app/src/faq/content.ts`, `faq/markdown.ts`, `screens/Faq.tsx` |
 | Light and dark | `packages/app/src/theme.ts` |
@@ -264,7 +276,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 
 ## Tests and tools
 
-- Unit: `packages/server/test/accounts.test.ts`, `live.test.ts`, `packages/core/test/profile.test.ts`,
+- Unit: `packages/server/test/accounts.test.ts`, `live.test.ts`, `packages/core/test/profile.test.ts`, `packages/app/test/public-profile.test.ts` (the public profile: the online line's forms, the merged recent list, the rarity and color text, the stats),
   `packages/app/test/theme.test.ts`, `under-board.test.ts`, `king-attack.test.ts` (the eval bar's setting),
   `piece-sounds.test.ts` (the piece-sound picks: storage, fallback, files), `testers.test.ts` (practice mode and the
   eval bar: testers only), `faq.test.ts` (the FAQ: contents against sections, links, every boss, numbers following the
@@ -277,7 +289,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   tap's drop, sound and line, "?", the Hidden Boss dark and locked and never named, the pick reaching Boss alone, a Solo
   raid and a raid you make, resting bosses, the layout at 320-1280 px, the card turning; Boss alone's menu and
   `/bosses` fitting 1280×600 to 1920×1080 and phones at 320-390 px, its last row reachable; one number per boss, the
-  stage's and the menu's and the battle's), `landing.spec.ts`, `home-layout.spec.ts`, `live-window.spec.ts`, `profile.spec.ts`,
+  stage's and the menu's and the battle's), `landing.spec.ts`, `home-layout.spec.ts`, `live-window.spec.ts`, `profile.spec.ts`, `public-profile.spec.ts` (the public profile on a phone and a computer at 1280 and 1440: every card, the 1v1 menu with the card the same height in every mode, the icon behind the pawn, the level line, nothing shifting while it loads, your own page greyed, Challenge, Add Friend, Block and Report),
   `install.spec.ts`, `crate-banner.spec.ts`, `friends.spec.ts` (two players: request, accept, online, the invites
   setting, an invite joined from its toast, a block; the phone's line at 320 px), `eval-bar.spec.ts` (testers: the
   switch in Settings only, the board's room, phone and computer; players: no bar, no switch), `piece-sounds.spec.ts`

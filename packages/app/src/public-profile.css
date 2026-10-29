@@ -1,0 +1,691 @@
+/*
+ * The public profile (screens/PublicProfile.tsx; docs/decisions/2026-10-28-public-profile.md; Eric's mockup, Oct 28). Spacing,
+ * radii and type sizes are measured from the mockup (390 × 844 phone, two-column computer); colors are the front door's tokens,
+ * so both themes follow. A phone is one column; from 744 px wide (the page's own width: the computer's frame at 1216 px and
+ * up) it's two: the header card full width, Ranked Standing beside Recent Matches, Cosmetics full width (`pp-wide`).
+ */
+.fd-page.pp {
+  --pp-gain: #4ade80;
+  --pp-loss: #ff8a80;
+  --pp-win-ink: #6ee59a;
+  --pp-win-bg: rgba(74, 222, 128, 0.14);
+  --pp-loss-ink: #ff9b93;
+  --pp-loss-bg: rgba(255, 138, 128, 0.14);
+  --pp-sk: var(--fd-panel-2);
+  gap: 12px;
+  padding: calc(env(safe-area-inset-top) + 12px) calc(12px + env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 24px) calc(12px + env(safe-area-inset-left));
+}
+:root[data-theme="light"] .fd-page.pp {
+  --pp-gain: #15803d;
+  --pp-loss: #c4281c;
+  --pp-win-ink: #167a3a;
+  --pp-win-bg: #dff3e4;
+  --pp-loss-ink: #c4281c;
+  --pp-loss-bg: #fbe0dd;
+}
+.pp.pp-wide {
+  gap: 16px;
+}
+
+/* -- The header: back, the title, ••• -- */
+.pp-head {
+  min-height: 44px;
+}
+.pp-title {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+.pp-wide .pp-title {
+  text-align: left;
+  padding-left: 8px;
+}
+.pp-menu-wrap {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+.pp-dots {
+  font-size: 0;
+}
+.pp-dots:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.pp-menu-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+.pp-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  z-index: 41;
+  min-width: 172px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid var(--fd-line);
+  background: var(--fd-panel);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+}
+.pp-menu.left {
+  left: 0;
+}
+.pp-menu.right {
+  right: 0;
+}
+.pp-menu-item {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--fd-text);
+  font: 600 15px Archivo, system-ui, sans-serif;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.pp-menu-item:hover:not(:disabled),
+.pp-menu-item:focus-visible {
+  background: var(--fd-panel-2);
+  outline: none;
+}
+.pp-menu-item[aria-checked="true"]::after {
+  content: "✓";
+  margin-left: auto;
+  padding-left: 14px;
+  color: var(--fd-gold-text);
+}
+.pp-menu-item.danger {
+  color: var(--fd-danger);
+}
+.pp-menu-item:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* -- Who they are -- */
+.pp-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.pp-wide .pp-card {
+  padding: 22px 20px 12px;
+  border-radius: 22px;
+  border: 1px solid var(--fd-line);
+  background: var(--fd-panel);
+}
+.pp-avatar {
+  position: relative;
+  flex: none;
+  width: 120px;
+  height: 120px;
+}
+/* The circle: the theme's light yellow with no icon of their own; their icon, blurred and faded, with one. */
+.pp-circle {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--fd-gold-soft);
+  isolation: isolate;
+}
+.pp-circle[data-backdrop="icon"],
+.pp-circle[data-backdrop="loading"] {
+  background: var(--fd-panel-2);
+}
+.pp-backdrop {
+  position: absolute;
+  left: -12%;
+  top: -12%;
+  width: 124%;
+  height: 124%;
+  object-fit: cover;
+  filter: blur(9px);
+  opacity: 0.8;
+  pointer-events: none;
+  user-select: none;
+}
+.pp-backdrop-emoji {
+  display: grid;
+  place-items: center;
+  font-size: 140px;
+  line-height: 1;
+}
+.fd-pawn-avatar {
+  width: 142px;
+  height: 129px;
+}
+.pp-circle .fd-pawn-avatar {
+  position: absolute;
+  left: 50%;
+  bottom: -12px;
+  transform: translateX(-50%);
+}
+.pp-online {
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
+  width: 22px;
+  height: 22px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 3px solid var(--fd-bg);
+  background: var(--fd-green);
+}
+.pp-wide .pp-online {
+  border-color: var(--fd-panel);
+}
+.pp-name {
+  max-width: 100%;
+  margin: 8px 0 0;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.pp-seen,
+.pp-level {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 22px;
+  font-size: 16px;
+  line-height: 22px;
+  color: var(--fd-sub);
+}
+.pp-seen {
+  margin-top: 4px;
+}
+.pp-level {
+  white-space: pre;
+}
+.pp-actions {
+  display: grid;
+  grid-template-columns: 6fr 5fr;
+  gap: 12px;
+  width: 100%;
+  margin-top: 10px;
+}
+.pp-wide .pp-actions {
+  grid-template-columns: 210px 210px;
+  gap: 14px;
+  width: auto;
+}
+.pp-actions .fd-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 12px;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+.pp-actions .fd-btn svg {
+  flex: none;
+}
+.pp-note {
+  min-height: 20px;
+  margin: 6px 0 0;
+  line-height: 20px;
+  text-align: center;
+}
+
+/* -- The cards -- */
+.pp-cols {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pp-wide .pp-cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+.pp-wide .pp-cosmetics {
+  grid-column: 1 / -1;
+}
+.pp-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--fd-line);
+  background: var(--fd-panel);
+}
+.pp-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+}
+.pp-ico {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  color: var(--fd-text);
+}
+.pp-h {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.pp-all,
+.pp-mode {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 40px;
+  border: 0;
+  background: none;
+  color: var(--fd-sub);
+  font: 500 14px Archivo, system-ui, sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.pp-all {
+  margin-left: auto;
+  padding: 0 0 0 8px;
+}
+.pp-mode {
+  padding: 0 6px;
+  border-radius: 10px;
+}
+.pp-mode[aria-expanded="true"] {
+  background: var(--fd-panel-2);
+}
+.pp-all:disabled,
+.pp-mode:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.pp-season {
+  margin-left: auto;
+  color: var(--fd-sub);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+/* -- Ranked Standing: 1 v 1, "Coming soon" and "Banned" in one cell, so the card is one height in every mode -- */
+.pp-body {
+  display: grid;
+}
+.pp-layer {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+.pp-layer.off {
+  visibility: hidden;
+}
+.pp-one {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pp-rk-main {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 2px 4px 0;
+}
+.pp-emblem {
+  display: grid;
+  flex: none;
+  place-items: center;
+}
+.pp-rk-words {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+.pp-cap {
+  color: var(--fd-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+}
+.pp-tier {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.pp-rp {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+  color: var(--fd-sub);
+  font-size: 19px;
+}
+.pp-rp b {
+  color: var(--fd-text);
+  font-weight: 800;
+}
+.pp-peak {
+  color: var(--fd-sub);
+  font-size: 15px;
+}
+.pp-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding-top: 10px;
+  border-top: 1px solid var(--fd-line);
+}
+.pp-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px;
+  text-align: center;
+}
+.pp-stat + .pp-stat {
+  border-left: 1px solid var(--fd-line);
+}
+.pp-stat strong {
+  font-size: 18px;
+  font-weight: 800;
+}
+.pp-stat span {
+  color: var(--fd-sub);
+  font-size: 14px;
+}
+.pp-center {
+  display: grid;
+  place-items: center;
+}
+.pp-soon {
+  margin: 0;
+  color: var(--fd-muted);
+  font-size: 20px;
+  font-weight: 800;
+}
+/* The plain badge where an emblem would be (in placements, or before a first game). */
+.pp-badge {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+.pp-badge svg {
+  position: absolute;
+  inset: 0;
+  fill: var(--fd-panel-2);
+  stroke: var(--fd-line);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+.pp-badge span {
+  position: relative;
+  color: var(--fd-muted);
+  font-size: 22px;
+  font-weight: 800;
+}
+
+/* -- Recent Matches: five rows, always the room of five -- */
+.pp-rows {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(5 * 42px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pp-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  box-sizing: border-box;
+  padding: 2px 0;
+  border-top: 1px solid var(--fd-line);
+}
+.pp-pill {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 64px;
+  height: 26px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+}
+.pp-pill.win {
+  color: var(--pp-win-ink);
+  background: var(--pp-win-bg);
+}
+.pp-pill.loss {
+  color: var(--pp-loss-ink);
+  background: var(--pp-loss-bg);
+}
+.pp-pill.draw,
+.pp-pill.place {
+  color: var(--fd-sub);
+  background: var(--fd-panel-2);
+}
+.pp-face {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--fd-panel-2);
+}
+.pp-face .fd-pawn-seat {
+  transform: scale(1.7);
+  transform-origin: 50% 22%;
+}
+/* A boss's face: its select tile's figure, on a color from its palette (BossArt places it by --bs-w: the circle's width). */
+.pp-face-boss {
+  --bs-w: 40px;
+  background: color-mix(in srgb, var(--bs-tint) 45%, var(--fd-panel-2));
+  font-size: 20px;
+  line-height: 1;
+}
+.pp-face-mode {
+  color: var(--fd-text);
+}
+.pp-glyph {
+  font-size: 20px;
+  line-height: 1;
+}
+.pp-row-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+.pp-row-text strong,
+.pp-row-text span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pp-row-text strong {
+  font-size: 15px;
+  font-weight: 700;
+}
+.pp-row-text span {
+  color: var(--fd-sub);
+  font-size: 14px;
+}
+.pp-rpchange {
+  flex: none;
+  min-width: 34px;
+  text-align: right;
+  font-size: 17px;
+  font-weight: 800;
+}
+.pp-rpchange.gain {
+  color: var(--pp-gain);
+}
+.pp-rpchange.loss {
+  color: var(--pp-loss);
+}
+.pp-rpchange.none {
+  color: var(--fd-muted);
+}
+.pp-empty {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  border-top: 1px solid var(--fd-line);
+  color: var(--fd-muted);
+  font-size: 14px;
+}
+
+/* -- Equipped Cosmetics: a tile each, the room of four whatever is worn -- */
+.pp-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(92px, auto);
+  gap: 8px;
+  min-height: calc(2 * 92px + 8px);
+  align-content: start;
+}
+.pp-wide .pp-tiles {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: minmax(128px, auto);
+  min-height: 128px;
+}
+/* A computer: four across in one row, each tile's picture over its words (the width is a quarter, not half). */
+.pp-wide .pp-tile {
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 8px;
+  text-align: center;
+}
+.pp-wide .pp-tile-text {
+  align-items: center;
+}
+.pp-tile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--fd-panel-2);
+}
+.pp-tile-art {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+}
+.pp-tile-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+}
+.pp-tile-text strong {
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.pp-tile-text > span:not(.pp-rarity) {
+  color: var(--fd-sub);
+  font-size: 11.5px;
+  line-height: 1.25;
+}
+.pp-rarity {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--fd-panel);
+  color: #14161b;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.pp-nothing {
+  grid-column: 1 / -1;
+  align-self: center;
+  margin: 0;
+  color: var(--fd-muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+/* -- Loading: the same page, its text clear on gray bars, so nothing moves when it arrives -- */
+.pp-loading :is(.sk, .pp-circle, .pp-emblem, .sk-row .pp-pill, .sk-row .pp-face, .sk-row .pp-row-text > *, .sk-row .pp-rpchange, .sk-tile .pp-tile-art, .sk-tile .pp-tile-text > *) {
+  background: var(--pp-sk);
+  color: transparent;
+  border-radius: 8px;
+}
+.pp.pp-loading .pp-circle,
+.pp.pp-loading .sk-row .pp-face {
+  border-radius: 50%;
+}
+.pp.pp-loading .sk-row .pp-pill {
+  border-radius: 999px;
+}
+.pp-loading .pp-rp b {
+  color: transparent;
+}
+.pp-loading .sk-tile {
+  --pp-sk: var(--fd-line);
+}
+.pp-loading .sk-row .pp-row-text > * {
+  align-self: flex-start;
+}
+.pp-loading .pp-rp svg,
+.pp-loading .pp-cap {
+  opacity: 0.4;
+}
+.pp-loading .pp-emblem {
+  border-radius: 20px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pp-loading :is(.sk, .pp-circle, .pp-emblem, .sk-row .pp-pill, .sk-row .pp-face, .sk-row .pp-row-text > *, .sk-row .pp-rpchange, .sk-tile .pp-tile-art, .sk-tile .pp-tile-text > *) {
+    animation: pp-pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pp-pulse {
+    50% {
+      opacity: 0.55;
+    }
+  }
+}
+
+/* -- Your own profile's one new line: View public profile -- */
+.fd-view-public {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+.fd-view-public::after {
+  content: "›";
+  font-size: 20px;
+}
+@media (min-width: 1280px) {
+  .fd-root.framed .fd-profile > .fd-view-public {
+    grid-column: 1 / -1;
+  }
+}

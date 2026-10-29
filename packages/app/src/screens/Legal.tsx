@@ -290,9 +290,10 @@ function Privacy() {
 
       <h2>What other players see</h2>
       <p>
-        Your profile: your name, the items you wear, when you joined, "Online now" or when you were last seen (unless you hide it in
-        Settings), your rating, rank and "Top %", your 1 v 1 rank and record, your stats and last 10 matches (only their day
-        while you hide when you're online), and "Banned" if you are. Your friends also see whether you're online or in a match, unless you hide it. Nobody
+        Your profile: your name, your icon (the drawing you made, shown blurred behind your pawn), the items you wear, when you
+        joined, "Online now" or when you were last seen (unless you hide it in Settings), your rating, rank and "Top %", your 1 v 1
+        rank and record, your stats and last 10 matches (only their day while you hide when you're online), and "Banned" if you are.
+        Your friends also see whether you're online or in a match, unless you hide it. Nobody
         sees who you've blocked. Never your email or how you sign in. In matches and chat,
         players see your name, icon, look and rating, and your picks.
       </p>

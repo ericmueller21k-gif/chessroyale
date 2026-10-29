@@ -40,17 +40,45 @@ function Dot({ f }: { f: FriendEntry }) {
   return <span class={`fr-dot${f.hidden ? " hidden" : f.busy ? " busy" : f.online ? "" : " off"}`} aria-hidden="true" />;
 }
 
-/** "Invite": to your game (or a new one at the front door); "Invited" for a moment after. What happened goes to `onNote`. */
-export function InviteButton({ uid, onNote, label = "Invite", small = true }: { uid: string; onNote: (text: string, error?: boolean) => void; label?: string; small?: boolean }) {
+/**
+ * "Invite": to your game (or a new one at the front door); "Invited" for a moment after. What happened goes to `onNote`.
+ * With nothing to invite to (in a match) it's gone, or with `greyed` (the public profile's Challenge: nothing hidden) it
+ * stays, greyed and not tappable; `disabled` greys it for another reason (your own page, someone you blocked).
+ */
+export function InviteButton({
+  uid,
+  onNote,
+  label = "Invite",
+  small = true,
+  primary,
+  icon,
+  greyed,
+  disabled,
+  title,
+}: {
+  uid: string;
+  onNote: (text: string, error?: boolean) => void;
+  label?: string;
+  small?: boolean;
+  primary?: boolean;
+  /** Drawn before the label. */
+  icon?: ComponentChildren;
+  greyed?: boolean;
+  disabled?: boolean;
+  title?: string;
+}) {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => () => clearTimeout(timer.current), []);
-  if (!inviteMode()) return null;
+  const mode = inviteMode();
+  if (!mode && !greyed) return null;
   return (
     <FdButton
       class={`${small ? "small " : ""}fr-invite`}
-      disabled={busy || done}
+      primary={primary}
+      title={title}
+      disabled={!mode || !!disabled || busy || done}
       onClick={() => {
         setBusy(true);
         invitePlayer(uid)
@@ -63,6 +91,7 @@ export function InviteButton({ uid, onNote, label = "Invite", small = true }: { 
           .finally(() => setBusy(false));
       }}
     >
+      {icon}
       {done ? "Invited" : label}
     </FdButton>
   );
@@ -271,10 +300,12 @@ export function FriendSettings() {
 }
 
 /**
- * Someone else's profile: Add friend (or where you stand with them), Invite to play, Block and Report, in one grid. A
- * button that ends something (remove, block) asks for a second tap.
+ * What you can do about another player from their profile, and where you stand with them: add them as a friend (or accept
+ * theirs, cancel yours, remove them), block or unblock, the note that says what happened ("Request sent."), and whether
+ * the buttons are on. A button that ends something (remove, block) asks for a second tap, within 3 s. Used by the public
+ * profile (screens/PublicProfile.tsx); the invite is `InviteButton`'s own.
  */
-export function ProfileFriendActions({ uid, name, onReport }: { uid: string; name: string; onReport: () => void }) {
+export function useProfileActions(uid: string, name: string) {
   const { status } = useFriends();
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -282,12 +313,6 @@ export function ProfileFriendActions({ uid, name, onReport }: { uid: string; nam
   const timer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => () => clearTimeout(timer.current), []);
   useEffect(() => setNote(null), [uid]);
-  const report = (
-    <FdButton danger onClick={onReport}>
-      Report
-    </FdButton>
-  );
-  if (status === "off" || status === "signIn") return <div class="fd-actions">{report}</div>;
   const rel = relationTo(uid);
   const run = (fn: () => Promise<unknown>, done?: string) => {
     setBusy(true);
@@ -304,49 +329,20 @@ export function ProfileFriendActions({ uid, name, onReport }: { uid: string; nam
     clearTimeout(timer.current);
     timer.current = setTimeout(() => setConfirm(null), 3000);
   };
-  const off = busy || status !== "on";
-  const friendBtn =
-    rel === "friend" ? (
-      <FdButton disabled={off} onClick={() => twice("remove", () => run(() => removeFriend(uid), `You and ${name} are no longer friends.`))}>
-        {confirm === "remove" ? "Tap again to remove" : "Remove friend"}
-      </FdButton>
-    ) : rel === "sent" ? (
-      <FdButton disabled={off} onClick={() => run(() => cancelFriendRequest(uid))}>
-        Cancel request
-      </FdButton>
-    ) : rel === "received" ? (
-      <FdButton primary disabled={off} onClick={() => run(() => answerFriend(uid, true), `You and ${name} are friends.`)}>
-        Accept friend
-      </FdButton>
-    ) : (
-      <FdButton primary disabled={off} onClick={() => run(() => addFriend(uid), "Request sent.")}>
-        Add friend
-      </FdButton>
-    );
-  return (
-    <>
-      {rel === "blocked" ? (
-        <div class="fd-actions">
-          <FdButton disabled={off} onClick={() => run(() => unblockPlayer(uid), `${name} is unblocked.`)}>
-            Unblock
-          </FdButton>
-          {report}
-        </div>
-      ) : (
-        <div class="fd-actions">
-          {friendBtn}
-          {inviteMode() ? <InviteButton uid={uid} onNote={setNote} label="Invite to play" small={false} /> : <span class="fr-gap" />}
-          <FdButton disabled={off} onClick={() => twice("block", () => run(() => blockPlayer(uid), `${name} is blocked: no requests, invites or chat from them.`))}>
-            {confirm === "block" ? "Tap again to block" : "Block"}
-          </FdButton>
-          {report}
-        </div>
-      )}
-      {note && (
-        <p class="fd-note fr-note" role="status">
-          {note}
-        </p>
-      )}
-    </>
-  );
+  return {
+    status,
+    rel,
+    busy,
+    note,
+    setNote,
+    confirm,
+    /** The friend buttons work: the list is here (not switched off, not a guest who must sign in) and nothing is in flight. */
+    on: status === "on" && !busy,
+    add: () => run(() => addFriend(uid), "Request sent."),
+    accept: () => run(() => answerFriend(uid, true), `You and ${name} are friends.`),
+    cancel: () => run(() => cancelFriendRequest(uid)),
+    remove: () => twice("remove", () => run(() => removeFriend(uid), `You and ${name} are no longer friends.`)),
+    block: () => twice("block", () => run(() => blockPlayer(uid), `${name} is blocked: no requests, invites or chat from them.`)),
+    unblock: () => run(() => unblockPlayer(uid), `${name} is unblocked.`),
+  };
 }
