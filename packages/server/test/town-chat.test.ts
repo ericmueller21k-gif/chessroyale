@@ -85,7 +85,7 @@ describe("town chat: the room", () => {
     expect(townSince(c.snapshot(T0 + 3), 0).lines.map((l) => l.color)).toEqual([7, undefined, undefined]);
   });
 
-  it("holds each line a minute; a newcomer gets the last 12; readers get only what's new; a restart starts over", () => {
+  it("holds each line 5 minutes (Eric, Oct 28); a newcomer gets the last 12; readers get only what's new; a restart starts over", () => {
     const c = new TownChat();
     for (let i = 0; i < 20; i++) expect(c.post({ id: `p${i}`, name: `P${i}` }, `hello ${i}`, T0 + i * 1_000)).toMatchObject({ ok: true });
     const snap = c.snapshot(T0 + 20_000);
@@ -97,12 +97,38 @@ describe("town chat: the room", () => {
     expect(townSince(snap, 20).lines).toEqual([]);
     // The room counted fewer than the reader has: it restarted, so the reader takes what's there afresh.
     expect(townSince(new TownChat().snapshot(T0), 20)).toMatchObject({ n: 0, lines: [], reset: true });
-    // A minute after each was said, it's gone.
-    expect(c.snapshot(T0 + 60_000).lines.map((l) => l.n)).toEqual(Array.from({ length: 19 }, (_, i) => i + 2));
-    expect(c.snapshot(T0 + 78_999).lines.map((l) => l.n)).toEqual([20]);
-    expect(c.line(20, T0 + 78_999)).toMatchObject({ text: "hello 19" });
-    expect(c.snapshot(T0 + 79_000).lines).toEqual([]);
-    expect(c.line(20, T0 + 79_000)).toBeNull();
+    // Five minutes after each was said, it's gone (a minute after it, it's still there).
+    expect(TOWN_CHAT.lineMs).toBe(300_000);
+    expect(c.snapshot(T0 + 60_000).lines).toHaveLength(20);
+    expect(c.snapshot(T0 + 300_000).lines.map((l) => l.n)).toEqual(Array.from({ length: 19 }, (_, i) => i + 2));
+    expect(c.snapshot(T0 + 318_999).lines.map((l) => l.n)).toEqual([20]);
+    expect(c.line(20, T0 + 318_999)).toMatchObject({ text: "hello 19" });
+    expect(c.snapshot(T0 + 319_000).lines).toEqual([]);
+    expect(c.line(20, T0 + 319_000)).toBeNull();
+  });
+
+  it("a line said 4 minutes ago is still held and can be read back (a report reads it from here); gone at 5 minutes (Eric, Oct 28)", () => {
+    const c = new TownChat();
+    c.post(ann, "four minutes ago", T0);
+    c.post(bo, "a minute ago", T0 + 180_000);
+    const at4 = T0 + 240_000;
+    expect(c.line(1, at4)).toMatchObject({ n: 1, from: "ann", text: "four minutes ago" });
+    expect(townSince(c.snapshot(at4), 0).lines.map((l) => l.text)).toEqual(["four minutes ago", "a minute ago"]);
+    expect(c.line(1, T0 + 299_999)).not.toBeNull();
+    expect(c.line(1, T0 + 300_000)).toBeNull();
+    expect(c.line(2, T0 + 300_000)).toMatchObject({ text: "a minute ago" });
+  });
+
+  it("holds at most the newest 300 lines in a 5-minute window, and the device's 100 are within them", () => {
+    expect(TOWN_CHAT.holdMax).toBe(300);
+    expect(TOWN_CHAT.deviceMax).toBe(100);
+    expect(TOWN_CHAT.holdMax).toBeGreaterThan(TOWN_CHAT.deviceMax);
+    const c = new TownChat();
+    for (let i = 0; i < 350; i++) c.post({ id: `p${i}`, name: `P${i}` }, `line ${i}`, T0 + i * 100);
+    const lines = c.snapshot(T0 + 40_000).lines;
+    expect(lines).toHaveLength(300);
+    expect(lines[0]!.text).toBe("line 50");
+    expect(lines.at(-1)!.text).toBe("line 349");
   });
 
   it("holds at most TOWN_CHAT.holdMax lines, the oldest going first", () => {
@@ -111,7 +137,7 @@ describe("town chat: the room", () => {
     expect(c.snapshot(T0).lines.map((l) => l.n)).toEqual([4, 5, 6, 7, 8]);
   });
 
-  it("a moderator takes one line out: it leaves the room, and every reader's log is told for a minute", () => {
+  it("a moderator takes one line out: it leaves the room, and every reader's log is told for 5 minutes", () => {
     const c = new TownChat();
     c.post(ann, "hello", T0);
     c.post(bo, "rude thing", T0 + 1_000);
@@ -122,7 +148,9 @@ describe("town chat: the room", () => {
     expect(snap.lines.map((l) => l.n)).toEqual([1]);
     expect(townSince(snap, 2)).toEqual({ room: c.room, n: 2, lines: [], gone: [2] });
     expect(c.line(2, T0 + 3_000)).toBeNull();
-    expect(c.snapshot(T0 + 62_000).gone).toEqual([]);
+    expect(c.snapshot(T0 + 62_000).gone).toEqual([2]);
+    expect(c.snapshot(T0 + 2_000 + TOWN_CHAT.lineMs - 1).gone).toEqual([2]);
+    expect(c.snapshot(T0 + 2_000 + TOWN_CHAT.lineMs).gone).toEqual([]);
   });
 
   it("a player's lines leave together (a name reset, a deleted account); a reset keeps their wait, a deletion doesn't", () => {
@@ -398,6 +426,36 @@ describe("town chat: the API", () => {
     expect(page).toContain("in the town square");
     // Deleting either account deletes the report, line and all (account-data.ts, as before).
   });
+
+  it("Report and a moderator's Remove work on a line 4 minutes old (Eric, Oct 28: the app scrolls back 5 minutes); at 5 minutes it has gone", async () => {
+    vi.useFakeTimers({ now: Date.now(), toFake: ["Date"] });
+    const { sql, call, signedIn } = await setup();
+    const a = await signedIn("Ann");
+    const troll = await signedIn("Troll");
+    const bo = await signedIn("Bo");
+    const mod = await signedIn("Mod");
+    await sql.run("UPDATE users SET email = ? WHERE id = ?", "mod@example.com", mod.user.id);
+    const t0 = Date.now();
+    const one = ((await (await call("/api/town/chat", troll.token, { text: "an old rude line" })).json()) as { line: { n: number } }).line;
+    const two = ((await (await call("/api/town/chat", bo.token, { text: "an old fine line" })).json()) as { line: { n: number } }).line;
+    const reason = FAIRPLAY.reports.chatReason;
+    // Four minutes on, a reader still gets both lines (a newcomer: the last 12), the report finds the line, and so does Remove.
+    vi.setSystemTime(t0 + 4 * 60_000);
+    forgetTownCache();
+    expect((await live(await call("/api/live?town=0", a.token))).town!.lines.map((l) => l.text)).toEqual(["an old rude line", "an old fine line"]);
+    const r = await call("/api/report", a.token, { target: troll.user.id, reason, line: one.n });
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ ok: true });
+    expect(await sql.first("SELECT line FROM reports WHERE target = ?", troll.user.id)).toEqual({ line: "an old rude line" });
+    expect((await call("/api/town/chat/remove", mod.token, { n: one.n })).status).toBe(200);
+    // Five minutes after it was said it's gone from the room: a report is refused as a line that has gone, as before.
+    vi.setSystemTime(t0 + TOWN_CHAT.lineMs + 1_000);
+    forgetTownCache();
+    expect((await live(await call("/api/live?town=0", a.token))).town!.lines).toEqual([]);
+    const gone = await call("/api/report", a.token, { target: bo.user.id, reason, line: two.n });
+    expect(gone.status).toBe(400);
+    expect(((await gone.json()) as { message: string }).message).toBe(LINE_GONE);
+  });
 });
 
 /** The independent review's findings (Oct 28), one test each. */
@@ -505,18 +563,26 @@ describe("town chat: after the review", () => {
     expect(kept).toHaveLength(1);
   });
 
-  it("nothing outlives its minute: the wait and the repeat keep a hash, not the words, and the hub's alarm sweeps an empty town (finding 5)", async () => {
+  it("nothing outlives its 5 minutes: the wait and the repeat keep a hash, not the words, and the hub's alarm sweeps an empty town (finding 5)", async () => {
     const c = new TownChat();
     c.post(ann, "a secret message", T0);
     expect(JSON.stringify([...(c as unknown as { sent: Map<string, unknown> }).sent])).not.toContain("secret");
+    // (The wait and the repeat's hash goes first, at the repeat's minute; the words themselves at their 5 minutes.)
+    expect(c.nextExpiry()).toBe(T0 + TOWN_CHAT.repeatMs);
+    c.sweep(T0 + TOWN_CHAT.repeatMs);
     expect(c.nextExpiry()).toBe(T0 + TOWN_CHAT.lineMs);
+    expect(c.empty).toBe(false);
     c.sweep(T0 + TOWN_CHAT.lineMs);
     expect(c.empty).toBe(true);
-    // The hub: a post sets the alarm for the line's minute, and the alarm takes it out with nobody reading.
+    // The hub: a post sets the alarm for the hash's minute and then the line's 5 minutes, and the alarm takes it out with nobody reading.
     vi.useFakeTimers({ now: T0 });
     const { hub, alarm, ready } = hubWith();
     await ready();
-    await hub.townPost(ann, "gone in a minute");
+    await hub.townPost(ann, "gone in five minutes");
+    expect(alarm.at).toBe(T0 + TOWN_CHAT.repeatMs);
+    vi.setSystemTime(T0 + TOWN_CHAT.repeatMs);
+    await hub.alarm();
+    expect((hub as unknown as { town: TownChat }).town.empty).toBe(false);
     expect(alarm.at).toBe(T0 + TOWN_CHAT.lineMs);
     vi.setSystemTime(T0 + TOWN_CHAT.lineMs);
     await hub.alarm();

@@ -404,9 +404,9 @@ describe("players' lines (from the server: chat-net.ts)", () => {
     close();
   });
 
-  it("keeps the server's numbers: 80 characters, one message per 15 seconds, a line's minute", () => {
+  it("keeps the server's numbers: 80 characters, one message per 15 seconds, a line's 5 minutes", () => {
     expect([CHAT.maxChars, CHAT.sendEveryMs, CHAT.lifeMs]).toEqual([TOWN_CHAT.maxChars, TOWN_CHAT.gapMs, TOWN_CHAT.lineMs]);
-    expect([CHAT.maxChars, CHAT.sendEveryMs, CHAT.lifeMs]).toEqual([80, 15_000, 60_000]);
+    expect([CHAT.maxChars, CHAT.sendEveryMs, CHAT.lifeMs]).toEqual([80, 15_000, 300_000]);
   });
 });
 

@@ -2312,11 +2312,24 @@ export const TOWN_CHAT = {
   gapMs: 15_000,
   /** The same message (case, spaces and punctuation aside) not again from the same account within this long. */
   repeatMs: 60_000,
-  /** A line leaves the room this long after it was said (and the app's log drops it then too). */
-  lineMs: 60_000,
+  /**
+   * A line leaves the room this long after it was said, and the app's log drops it then too (Eric, Oct 28: "keep up to 5 minutes of
+   * chat actually"): so Report and a moderator's Remove work on any line a player can still scroll back to. Was 60 s.
+   */
+  lineMs: 300_000,
   /** A newcomer gets at most this many of the latest lines. */
   keep: 12,
-  /** The most lines the room holds at once (all said within `lineMs`); the oldest go first past it. */
+  /**
+   * The most lines a device keeps (Eric, Oct 28: "5 minutes, or 100 messages, whichever it hits first"): the oldest go first. The
+   * server's own cap is `holdMax`.
+   */
+  deviceMax: 100,
+  /**
+   * The most lines the room holds at once (all said within `lineMs`); the oldest go first past it. Kept at 300 when `lineMs`
+   * went from 1 to 5 minutes: a device keeps `deviceMax` (100) of the newest, so the room needs only more than that to cover
+   * every line one can show, and the hub hands its whole room to each Worker instance every `readCacheMs`, so a bigger one costs
+   * every read.
+   */
   holdMax: 300,
   /**
    * Each Worker instance reuses the room as it last read it for this long (the live poll's `?town=N`), so the live hub

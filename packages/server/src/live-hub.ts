@@ -204,7 +204,7 @@ export class LiveHub extends DurableObject<Env> {
     return { post, town: this.town.snapshot(now) };
   }
 
-  /** The alarm rings by the time the town's next line (or kept send) is a minute old, so it goes then, visitors or not. */
+  /** The alarm rings by the time the town's next line (or kept send) is `TOWN_CHAT.lineMs` (5 minutes) old, so it goes then, visitors or not. */
   private async townAlarm() {
     const at = this.town.nextExpiry();
     if (at === null) return;
@@ -254,7 +254,7 @@ export class LiveHub extends DurableObject<Env> {
     }
     const gone = this.board.prune(now);
     if (gone.length) await this.ctx.storage.delete(gone.map((c) => `lobby:${c}`));
-    // The town's chat: what's a minute old goes now; the next ring is the sooner of the presence's and the town's.
+    // The town's chat: what's 5 minutes old goes now; the next ring is the sooner of the presence's and the town's.
     this.town.sweep(now);
     const { seen, lobbies } = this.board.size;
     const next = Math.min(seen || lobbies ? now + CAPACITY.presence.lastSeenWriteMs : Infinity, this.town.nextExpiry() ?? Infinity);

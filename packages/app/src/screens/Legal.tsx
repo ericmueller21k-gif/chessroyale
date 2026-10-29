@@ -202,7 +202,7 @@ function Privacy() {
             <p>
               What you type in the town square goes to the signed-in players there, with your name. A filter checks it first and
               refuses slurs, swearing, links and contact details. It isn't stored: the server holds each message in memory for{" "}
-              {TOWN_CHAT.lineMs / 1000} seconds, and then it's gone. If someone reports a message, the report keeps its words and when it
+              {TOWN_CHAT.lineMs / 60_000} minutes, and then it's gone. If someone reports a message, the report keeps its words and when it
               was said, for a moderator to read.
             </p>
             <p>
@@ -217,7 +217,7 @@ function Privacy() {
         kept={
           <>
             global chat keeps its last {GLOBAL_CHAT.keep} lines and shows none older than {hours(GLOBAL_CHAT.maxAgeMs)} hours. A town
-            square message: {TOWN_CHAT.lineMs / 1000} seconds in memory, never stored (a reported one: its words with the report). A
+            square message: {TOWN_CHAT.lineMs / 60_000} minutes in memory, never stored (a reported one: its words with the report). A
             moderator's decision: {CHAT_MOD.keepDecisionsDays} days after it ends (a chat ban with no end, while it lasts). A mute: on
             your device until you unmute.
           </>
