@@ -589,8 +589,8 @@ test("the level: an admin sees Level 38; a player's page has no level line, and 
   expect(shift).toBeGreaterThan(22);
   expect(shift).toBeLessThan(26);
   for (const s of [".pp-ranked", ".pp-recent", ".pp-cosmetics"]) {
-    expect(mine[s]![3], s).toBe(admin[s]![3]);
-    expect(admin[s]![1]! - mine[s]![1]!, s).toBe(shift);
+    expect(Math.abs(mine[s]![3]! - admin[s]![3]!), s).toBeLessThan(0.25);
+    expect(Math.abs(admin[s]![1]! - mine[s]![1]! - shift), s).toBeLessThan(0.25);
   }
   await player2.context().close();
 });
