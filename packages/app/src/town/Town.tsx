@@ -22,7 +22,8 @@
  * park lamp's glass is (by its index in LAMPS) and `__townAt("light", id)` a lit pixel of a home's (or "coliseum") first
  * light with nothing in front of it (the lights at dusk and night); the canvas's `data-sit="1"` while you sit at a table; and
  * `window.__townGather()` sends the three nearest bots to stand beside you; `__townAt("bot", i)`, `__townCall(i)` and
- * `__townBots()` for the bots (docs/areas/town-square.md); `__townGlide(id)` glides the camera to a home, as its chip does.
+ * `__townBots()` for the bots (docs/areas/town-square.md); `__townGlide(id)` glides the camera to a home, as its chip does;
+ * `__townTags()` the name tags drawn in the last frame.
  * docs/areas/town-square.md.
  */
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
@@ -816,13 +817,16 @@ function startTown(
     follow = false;
     glide = { x: camX + wrapF(h.cx - camX), y: camY + wrapF(h.cy - h.foot + 0.5 - f.glideAhead - camY) };
   };
+  // ... `__townTags()`: the name tags drawn in the last frame: name, kind ("you", "bot", "sidekick"), alpha, pill and ink colors, and
+  // where the pill is on the screen (Oct 28: they show only near you unless Town settings says "Everyone"; a sidekick's is blue).
+  const hookTags = () => (testSwitchesAllowed() ? r.tagList() : null);
   // ... `__townTurns(ms)`: the bots' turns every `ms` instead of a minute, the next one now (to watch one go home and another come out).
   const hookTurns = (ms: number) => {
     if (!testSwitchesAllowed()) return;
     town.turnMs = ms;
     town.nextTurnAt = 0;
   };
-  const hooks = window as unknown as { __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack };
+  const hooks = window as unknown as { __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags };
   hooks.__townAt = hookAt;
   hooks.__townGlide = hookGlide;
   hooks.__townGather = hookGather;
@@ -833,6 +837,7 @@ function startTown(
   hooks.__townBots = hookBots;
   hooks.__townTurns = hookTurns;
   hooks.__townBossBack = hookBossBack;
+  hooks.__townTags = hookTags;
 
   run();
   draw(performance.now()); // the first frame, before the screen shows
@@ -896,6 +901,7 @@ function startTown(
       delete hooks.__townBots;
       delete hooks.__townTurns;
       delete hooks.__townBossBack;
+      delete hooks.__townTags;
       if (card?.kind === "boss") town.bosses[card.i]!.held = false;
       cv.removeEventListener("pointerdown", onDown);
       cv.removeEventListener("pointermove", onMove);

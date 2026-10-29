@@ -4,11 +4,13 @@
  * to the next of the chat's three modes: always on, new messages only, off) and a gear opening "Town settings" over the town, where the chat's mode is one of three choices,
  * and under it "Chat background" (Eric, Oct 28: a switch for the slight blur behind the chat, always on while the chat shows; off by default).
  * The mode and the background (and their memory on this device) are chat.ts'; the box that shows them is TownChat.tsx.
- * docs/areas/town-square.md, "The chat log".
+ * Under them, "Names" (Eric, Oct 28): two choices for who shows a name tag, "Near you" (the default) and "Everyone" (tags.ts; the town's
+ * drawing reads it). docs/areas/town-square.md, "The chat log" and "Name tags".
  */
 import { useEffect, useLayoutEffect, useState } from "preact/hooks";
 import { GearIcon } from "../components/MatchMenu.tsx";
 import { CHAT_BACKGROUND_LABEL, CHAT_BACKGROUND_NOTE, CHAT_MODES, CHAT_MODE_CHOICE, CHAT_MODE_LABEL, chatBackground, chatMode, nextChatMode, onChatBackground, onChatMode, setChatBackground, setChatMode, type ChatMode } from "./chat.ts";
+import { NAMES_CHOICE, NAMES_LABEL, NAMES_MODES, namesMode, namesNote, onNamesMode, setNamesMode, type NamesMode } from "./tags.ts";
 import "./town-chat.css";
 
 /** The chat's mode now, redrawing when it changes (the icon, the sheet and the box all read it here). */
@@ -17,6 +19,16 @@ export function useChatMode(): ChatMode {
   useEffect(() => {
     set(chatMode());
     return onChatMode(() => set(chatMode()));
+  }, []);
+  return m;
+}
+
+/** The names setting now, redrawing when it changes (the settings sheet reads it here; the town's drawing reads `namesMode()` as it draws). */
+export function useNamesMode(): NamesMode {
+  const [m, set] = useState(namesMode);
+  useEffect(() => {
+    set(namesMode());
+    return onNamesMode(() => set(namesMode()));
   }, []);
   return m;
 }
@@ -69,9 +81,10 @@ export function TownChatTools() {
   );
 }
 
-/** "Town settings": a small sheet over the town (the match options' look): the chat's mode as three choices and "Chat background", a switch. A tap outside it, its X or Escape closes it. */
+/** "Town settings": a small sheet over the town (the match options' look): the chat's mode as three choices, "Chat background", a switch, and "Names", two choices. A tap outside it, its X or Escape closes it. */
 function Settings({ mode, onClose }: { mode: ChatMode; onClose: () => void }) {
   const background = useChatBackground();
+  const names = useNamesMode();
   // (A layout effect: an Escape pressed straight after the open is heard.)
   useLayoutEffect(() => {
     const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -107,6 +120,20 @@ function Settings({ mode, onClose }: { mode: ChatMode; onClose: () => void }) {
           </button>
           <p class="town-set-note" id="town-bg-note">
             {CHAT_BACKGROUND_NOTE}
+          </p>
+        </div>
+        {/* Names (Oct 28): who shows a name tag, under Chat. */}
+        <div class="mm-list" role="radiogroup" aria-label={NAMES_LABEL} aria-describedby="town-names-note">
+          <p class="town-set-head" aria-hidden="true">
+            {NAMES_LABEL}
+          </p>
+          {NAMES_MODES.map((m) => (
+            <button key={m} type="button" class="mm-item town-set-row" role="radio" aria-checked={m === names} onClick={() => setNamesMode(m)}>
+              <span class="mm-item-label">{NAMES_CHOICE[m]}</span>
+            </button>
+          ))}
+          <p class="town-set-note" id="town-names-note">
+            {namesNote()}
           </p>
         </div>
       </div>

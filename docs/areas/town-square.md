@@ -5,7 +5,7 @@ Boss raid's coming home: a small round world where players walk around and meet 
 the time of day, the curved ground, all fourteen boss homes with their bosses roaming near them, the bots (twenty since Oct
 28: six pawns and the bosses' fourteen sidekicks) and you; slice 4
 added the press, the trail and the cards; **slice 5 the Colosseum** in the middle; **slice 6** made the Colosseum about
-twice its size, the map bigger, and put **the park** with its ten chess tables in front of its gate; **the lights** (Oct 27) light the park's lamps and the homes' windows at dusk and night; **the chat log** (Oct 28; v2, v3 and v4 the same day) is one box in the top left corner, with a chat icon and a gear in the header, where the bosses and their kids say a line now and then and signed-in players type (tap the box to type). Home's **Boss Arena** card (Oct 26, Eric)
+twice its size, the map bigger, and put **the park** with its ten chess tables in front of its gate; **the lights** (Oct 27) light the park's lamps and the homes' windows at dusk and night; **the chat log** (Oct 28; v2, v3 and v4 the same day) is one box in the top left corner, with a chat icon and a gear in the header, where the bosses and their kids say a line now and then and signed-in players type (tap the box to type); **name tags** (Oct 28) show only near you by default, a boss's sidekick's in blue. Home's **Boss Arena** card (Oct 26, Eric)
 opens it, and the computer's side menu's Boss Arena item; the address `/town` opens it directly too (`hunchess.com/town`,
 behind Cloudflare Access like the rest of the site). Phone and computer.
 
@@ -133,10 +133,25 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
   more kinds of square (`groundAt`: paving and grass), drawn with the board's in the same color-sorted fills. Tables, trees,
   benches and the fountain are solid (`walkable`); stools, paths and grass are walked on. Each picture is made once (a
   `FrameCache` per kind) and drawn as one item sorted with the people, a little behind whoever stands on its row.
-- **Name tags** (Oct 28): each drawn once per name, size and color (its pill, its soft shadow and its name, at the
-  device's pixels) and stamped each frame (`drawTag`, `tagArtOf` in `render.ts`; about 64 kept, the least lately used
+- **Name tags** (Oct 28): each drawn once per name, size and **kind** (`TagKind`: you, a pawn's "bot", a boss's "sidekick"; its pill, its soft
+  shadow and its name, at the device's pixels; `TagCache` in `tags.ts` is the cache's keyed lookup and its least-lately-used eviction, tested
+  without a canvas) and stamped each frame (`drawTag`, `tagArtOf` in `render.ts`; about 64 kept, the least lately used
   making way; drawn again when a web font loads); a fading tag stamps its shadow, pill and name one over the other, as
   they were drawn before. The things are sorted far to near in place (`sortFarFirst`, nothing allocated).
+  - **Colors** (`TAG_STYLE`): a pawn's pill white (`rgba(255,255,255,.92)`) with dark ink, yours gold (`rgba(255,215,106,.96)`), **the 14 boss
+    sidekicks' blue** (`rgba(29,78,216,.96)`, `#1d4ed8`) **with white text**: 6.7:1 with white, still over 6 over the lightest backdrop (WCAG AA is
+    4.5:1), and clear of the day sky, the sand, the grass and the night sky (the measurements: docs/decisions/2026-10-28-name-tags-near-you.md). A sidekick is a bot whose look is a sprite (`isSprite`). White and gold are drawn pixel for pixel as before (#399's check: at most
+    3/255 against the old per-frame drawing).
+  - **Names near you** (Eric, Oct 28: "only people in the radius around you have names shown and as you walk they fade in and out, the people are
+    always visible but the name tags no"; `town/tags.ts`, `TOWN_FEEL.nameRadius` 5 and `nameFadeSquares` 1): by default (`near`) a figure's
+    tag shows only while the figure is within **5 squares of you in both directions** (|dc| ≤ 5 and |dr| ≤ 5, about a 10 × 10 area, from the
+    fractional positions the walkers are drawn at), **fading** over the last square at the edge (alpha 1 up to 4.5, linearly to 0 at 5.5:
+    `nameAlpha`; stateless, from positions each frame, nothing allocated). It takes the smaller alpha of that and today's far-distance fade
+    toward the rim (`tagFar`; `tagAlpha`). **Always shown, whatever the distance**: your own tag; a figure whose card is open (`town.hold`);
+    one seated at a table with you; one walking to or from a game with you (`town.meet`, `town.leave`). The figures are always drawn; only the
+    tags go. **"Everyone"** (Town settings, under Chat: "Names", the choices "Near you" and "Everyone", the line "Near you: names show within 5
+    squares of you.") is exactly the old behavior. Remembered on this device (localStorage `brc.townNames`, `near` or `everyone`, in a try/catch).
+    Test hook: `__townTags()` lists the tags drawn in the last frame.
 - **The tables' boards** (Oct 27; docs/decisions/2026-10-27-park-tables-live.md): each table's top is a flat slab drawn
   through the camera (`drawBoard` in `render.ts`; sizes `TABLE_BOARD`, pieces `TABLE_PIECES`, the clock's digits
   `TABLE_DIGITS` in `houses/park.ts`; timings in `TOWN_FEEL`'s `table*`), its 8 x 8 board lying flat between the stools and
@@ -233,7 +248,7 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
     the bottom gray, off both gray; named "Chat: always on", "Chat: new messages only", "Chat: off") goes to the next mode on a tap. The **gear**
     beside it opens "Town settings", a small sheet over the town (the match options' look): the chat's mode as three choices (Always on, New
     messages, Off), under them **"Chat background"** (a switch, off by default; its line: "A soft blur behind the chat, always on while the chat
-    shows.": the tint always, the blur while you type). Both icons sit at the right end of the "Town
+    shows.": the tint always, the blur while you type), and under Chat **"Names"** (two choices, "Near you" and "Everyone"; "Name tags", below). Both icons sit at the right end of the "Town
     square" bar's line, a phone's and a computer's alike, never over the title. The box's place and size are the same in every mode; off takes
     it away (the box is hidden and the edge chips may use its space).
   - **A line**: "[9:41] Name: message" (this device's clock, 12-hour, no am/pm; the name bold: gold for a boss and mint for a kid,
@@ -500,6 +515,15 @@ noted wherever a slice changed one.
   paused.", the chatter going on); the privacy page's two 5-minute sentences. Only each test's own lines are counted: other tests' players share the room.
 - `e2e/town-chat-history.spec.ts` (phone and desktop; real time, its own file so it runs beside the others): a line another player said is still on
   the screen 4 minutes later, Report reaches fair play with it and a moderator's Remove takes it out of every log (the room holds 5 minutes).
+- `packages/app/test/town-tags.test.ts` (Oct 28, name tags): the near rule's alpha at 4, 4.5, 5, 5.5 and 6 squares (1, 1, 0.5, 0, 0; a straight line between, never rising with
+  distance; its numbers are `feel.ts`'), the smaller of it and the far fade, your tag / an open card's figure / a table partner always shown (at any distance), "Everyone"
+  taking no near rule; the "Names" setting (its words, near to begin with, remembered and read back after a reload, a stranger or a blocked storage meaning near); the
+  kinds' colors (white and gold as they were; the sidekick's blue with white text at 4.5:1 or more, over white, black, sand, grass and a night backdrop) and the cache keyed
+  by name, size and kind (a sidekick's blue and a pawn's white of one name and size are two drawings; the least lately used goes, never one drawn this frame or the last).
+- `e2e/town-tags.spec.ts` (phone and desktop; `?crowd=50`, `__townTags()`): a far figure has no tag in Near you and has one in Everyone (the near ones keep theirs), a near one
+  has one, yours is always there; a sidekick's tag is blue with white text, in `__townTags()` and in the pixels on the canvas; the sheet's "Names" under Chat with its two choices and
+  its line; the setting survives a reload; a tag fades (frames between 1 and 0, never rising) as you walk away from a held figure and is gone past the radius, and a figure whose
+  card is open keeps its tag wherever it is.
 - `packages/app/test/town-chat-net.test.ts`: a guest or a young device never asks; lines ride on the live poll; muted and
   blocked players' lines never reach the log; a removal and the switch reach it; sending mirrors the limits and shows the
   server's reasons, a try inside the 15 s never reaching the server, and the name color picked when the town opens (a new one
