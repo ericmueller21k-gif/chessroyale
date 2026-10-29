@@ -493,6 +493,8 @@ test("a tap on the box anywhere but a player's name opens typing: the blur behin
   await expect(field).toBeHidden();
   await settle(page);
   const here = await you(page);
+  // (That press walked you to the map's square, and may have opened a card, if a figure stood there: count the cards from here.)
+  const cards = await page.getByRole("dialog").count();
 
   // A tap on a player's name is its menu's (listed by the test hook), not typing's; on its text, typing's.
   const mine = page.locator(".tc-player").last();
@@ -505,7 +507,7 @@ test("a tap on the box anywhere but a player's name opens typing: the blur behin
   expect(await page.evaluate(() => (window as any).__townTapped), "a tap on its text isn't a name's").toEqual(["please check this line"]);
   await page.waitForTimeout(700);
   expect(await you(page), "the map didn't see these").toBe(here);
-  expect(await page.getByRole("dialog").count()).toBe(dialogs);
+  expect(await page.getByRole("dialog").count(), "no card opened by these taps").toBe(cards);
 });
 
 test("a tap on the box opens a focused typing line for a signed-in player: no placeholder; your words stay when Escape or a press on the map closes it; Enter sends and closes it (the blur and the keyboard go)", async ({ page }) => {
@@ -991,7 +993,7 @@ test("the typing line (a signed-in player's): no placeholder, 80 characters, a c
   // line hides, the blur goes; no "Wait N s" any more). (Only this test's lines are counted: other tests' players, in the same
   // room, may be talking too.)
   const sentAt = Date.now();
-  const mine = page.locator(".tc-player").filter({ hasText: run });
+  const mine = page.locator(".tc-player").filter({ hasText: `hello town ${run}` });
   await expect(mine).toHaveCount(1);
   await expect(mine).toHaveText(new RegExp(`^\\[\\d{1,2}:\\d{2}\\] .+: hello town ${run}$`));
   await expect(mine.locator("b.tc-name")).not.toHaveText("");
