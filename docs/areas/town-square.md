@@ -73,7 +73,11 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
   gate grows in a half ring. If two walks end on one square, the later claim gives way to the nearest free square
   beside it (`keepApart`, every tick). Bots and bosses pick their ends the same way.
 - **Cards** (the prototype's, inside the world's box, over the boss's head or above the home's name, placed every frame;
-  a tap anywhere else, or Escape, closes one). A boss says something as its card opens (Eric, Oct 27): its select sound
+  a tap anywhere else, or Escape, closes one). **Every card is dark** (Eric's mockup, Oct 28: "dark card" with a "thin warm-gold
+  border"): `#20212a`, a 1.5 px `#d9bb8c` border, rounded corners, a tail with the same border pointing at what it's about, white
+  words, gold primary buttons (a gradient, dark words), plain buttons dark gray with white words, greyed ones dimmer and flat,
+  "Coming soon" gray; every word on it 4.5:1 or better (`town.css`, `.town-card`; the chat's menu keeps the light `.town-btn`).
+  Their content, buttons and layout are as they were; only a person's has the picture row (below). A boss says something as its card opens (Eric, Oct 27): its select sound
   (`SELECT_SOUND`), or its own town sounds in turn (`TOWN_SOUNDS`, `townSound` in `characters/boss-select.ts`: Folio's
   murmur, then its "mm-hm"), made ahead in the sound worker as the town opens so a tap never costs a frame. **Hollow's card
   says a line** (Oct 28, Eric's three, word for word, about his sidekick: `TOWN_LINES`, `townLine` in `world.ts`), under
@@ -329,12 +333,31 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
     (`SpriteFrames` in `render.ts`), never per frame; a sidekick isn't drawn (or tapped) until its picture has loaded (a
     moment). No art code runs in the town: the sprites' own code paints for about 3 s as it loads, which would hold the
     town's first frame back (measured: the decision).
-  - **A bot's card** (a tap on a bot; placed over its name tag like a boss's; the bot holds still while it's open, `hold`):
-    "<name> (bot)", for a sidekick **"<Boss>'s sidekick"** under it (`sidekickText`: "Hollow's sidekick", "Puddles'
-    sidekick"), "Rating 1400" and **Play**. Play: you both walk to the nearest table with both stools free (nearest to
-    the two of you, `tableFor`), you to the stool nearer you, the bot to the other (`meet`); once both sit (`meetReady`) the
-    game opens. Any other walk of yours calls it off. No table free: Play greyed, reading "Play · Tables are full" (in the
-    button: the card hugs its content and nothing is added round it; `anyTableFree`, checked only while the card is open).
+  - **A person's card** (a tap on a bot, or on a real player once they walk in the town: `Card` kind `"person"`; placed over its
+    name tag like a boss's, as before; the bot holds still while it's open, `hold`). **One row, one size, 232 × 60 px on a phone and
+    a computer alike** (Eric's mockup, Oct 28; `.town-person` in `town.css`), whoever it is: the picture, the words, Play.
+    - **The picture** (a 40 px round, a 3 px ring, `.town-pic`): a sidekick's face (`spriteFace`, its idle's first frame) in a
+      **blue** ring (`#4575fa`, the blue of the sidekicks' name tags); a pawn's own picture, as it stands in the square (its crate
+      items on, cut to what's drawn, `pawnFace` in `Town.tsx`), in an **ivory** ring (`#eadfc6`, the white of a pawn's tag); a
+      real player's profile icon (`UserIcon`), also ivory. Made once as the card opens (`faceOf`), never in the frame loop. **A bot's
+      picture is no button** (a plain box: no button cursor, no focus, a tap does nothing); **a real player's is a button**,
+      "View <name>'s profile", opening their profile as a tap on a name does elsewhere (`openProfile({ uid })`, over the town; Back
+      and the town is as it was).
+    - **The words**: "<name>" bold white with " (bot)" gray after a bot's; for a sidekick **"<Boss>'s sidekick"** under it
+      (`sidekickText`: "Hollow's sidekick", "Puddles' sidekick"); "Rating 1400" with a small gold bars icon; and a row for a note
+      (**"Tables are full"**, small gray text under the rating). Every row is always there, so nothing moves or resizes the card:
+      a pawn's line row and a free table's note row are empty. The width fits the longest bot's name and sidekick line ("Chub &
+      Chirp's sidekick") with room to spare (an e2e check measures every bot in the card's fonts); a longer real player's name
+      would end in an ellipsis (their profile shows it whole).
+    - **Play**, gold, on the right, with a plain crossed-swords icon (inline SVG in the button's text color, `aria-hidden`; the
+      button's name is still "Play") to its left, no triangle. The drawn button is 28 px high with a 44 px tap area.
+      You both walk to the nearest table with both stools free (nearest to the two of you, `tableFor`), you to the stool nearer
+      you, the bot to the other (`meet`); once both sit (`meetReady`) the game opens. Any other walk of yours calls it off. No
+      table free: Play greyed and not tappable, "Tables are full" in the note row (`anyTableFree`, checked only while the card is
+      open; before Oct 28 the words were in the button, "Play · Tables are full").
+    - **A real player's card** is the same row: no "(bot)", no line, their rating, Play greyed with "Coming soon" in the note row
+      (challenging a player isn't built). Only the e2e test player has one (`addTestPlayer`, the `__townPlayer` hook): `Person.uid`
+      (their account id), `icon` and `rating`; no real players walk in the town yet.
   - **A bot sitting alone at a table** (`waitingBot`): a tap on the table walks you to its free stool, as before, and its
     card's first button is **"Play <name> (bot) · <rating>"**, Casual and Ranked greyed under it; the bot stays while the card
     is open; the game opens once you sit.
@@ -374,7 +397,8 @@ noted wherever a slice changed one.
 - `packages/app/src/town/`: `TownPage.tsx` (the lazy load), `Town.tsx` (the screen, the loop, input, chips, cards, the sky's
   clock, the statues' close-up), `press.ts` (a finger as a button), `camera.ts`, `world.ts`, `render.ts`, `you-look.ts`, `sky.ts`, `sky-draw.ts`, `sign-font.ts`, `feel.ts`, `town.css`, `chat.ts`, `TownChat.tsx` and `town-chat.css` (the chat log), `houses/`
   (one file per home, fourteen in all, the Colosseum's `coliseum.ts`, the park's `park.ts`, the kit of shared pieces and the index),
-  `sidekick-sheets.ts` and `sidekicks/*.png` (the sidekicks' baked frames, generated).
+  `sidekick-sheets.ts` and `sidekicks/*.png` (the sidekicks' baked frames, generated), `CardIcons.tsx` (the card's crossed swords and
+  rating bars, inline SVG).
 - The sidekicks' art: `packages/app/src/characters/sidekicks/<boss>.ts` (one `Character` each, `sidekick-<boss>`, copied
   as drawn from `claude/boss-art`), baked by `scripts/bake-sidekicks.ts` (`npx tsx scripts/bake-sidekicks.ts`).
 - References: `docs/mockups/town-square/` (the prototype Eric tested, and the pictures for the homes: Eric's for the
@@ -497,12 +521,27 @@ title; a bot waiting, two playing (the board's pixels change), a tap on their ga
   `__townGlide([c, r])` to any square, to measure a spot's frame rate,
   `__townBossBack("hollow")` keeps Hollow behind his home); Babur's card has no line. `__townBots()` also gives each bot's
   animation (`anim`: a sidekick's, null for a pawn).
+  The person card (Oct 28, Eric's mockup, phone and desktop; `town.spec.ts`, "a person's card" and after): `window.__townPlayer(uid, name,
+  icon?, rating?)` stands a test player (a pawn with an account id: a real player's card) beside you and answers its index,
+  `window.__townAt("player", uid)` says where to tap it, and `window.__townFull(on)` puts someone unseen on one stool of every table
+  (no table is free: a bot's Play greys). A sidekick's card (Glim): dark (`#20212a`, a gold border), 232 × 60 px, the picture a
+  face in a blue ring that is no button (a `div`, no tab stop, the ordinary cursor, a tap does nothing), the name bold white
+  and " (bot)" gray (the heading still reads "Glim (bot)"), its line, the rating with its gold bars, Play with a crossed-swords
+  SVG (`aria-hidden`, the button's text color) and no triangle, Play the only button; a pawn's (Tempo Tess): an ivory ring, her
+  own picture, no line, every part where the sidekick's was; tables full (`__townFull`): Play greyed, "Tables are full" under
+  the rating in small gray text, the card, the picture, the name, the rating and Play not moved a hundredth of a pixel, and back
+  when a table frees; every bot's label and sidekick line and rating fit the card in its fonts with 4 px to spare; the boss's,
+  home's, Colosseum's, table's and confirm cards dark, with their words and buttons, a gold primary, greyed buttons and "Coming
+  soon" all 4.5:1 or better (computed from the page's colors); a test player: the same row and size, an ivory ring, no "(bot)",
+  Play greyed with "Coming soon", its picture a button "View Cyrus's profile" with the pointer cursor that opens that account's
+  profile over the town (Back: the town and its card as they were). `packages/app/test/town-card.test.ts`: the test player (beside
+  you, out of the crowd, the only one with an id), the table-filling hook and the rating's words.
   The chat log's hooks (the test switches on): `window.__townSay()` (someone from `CHATTER` talks now), `__townSay(name, text, kind,
   agoMs)` (that line, said `agoMs` ago: a line 50 s old to scroll back to), `__townChatter(false)` (no chatter of its own; true
   starts it again) and `window.__townTapped` (the text of each tapped player's line).
 
 ## Not built yet
 
-The bottom strip, a player's card ("Invite to party"), the shop itself, the Colosseum's menu (raids with people,
+The bottom strip, a player's card's Play and "Invite to party" (their card has the row, with Play greyed: Oct 28), the shop itself, the Colosseum's menu (raids with people,
 party), the park's matchmaking (sitting at a table queues you: `ROADMAP.md`, "The park"), quick chats, other people's dressed pawns, the Simple map setting, real players and
 rooms, sounds.
