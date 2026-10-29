@@ -1,4 +1,5 @@
 import { RANKED_1V1, type DuelControl } from "./settings.ts";
+import type { ItemLook } from "./crates.ts";
 
 /**
  * Ranked 1 v 1's math (pure; shared by the server, which alone decides ranks, and the app, which shows them):
@@ -87,58 +88,78 @@ export function seedRating(accountRating: number | null | undefined, s: Settings
 
 // ---------------- The ladder ----------------
 
-/** The ladder's points below the first apex tier (Master): tiers × divisions × points a division (2800). */
-export const apexStart = (s: Settings = RANKED_1V1) => s.tiers.length * s.divisions * s.pointsPerDivision;
+/** The ladder's points in the tiers with divisions (Wood 5 0 to Radiant 1 79): tiers × divisions × points a division (2800). */
+export const divisionsEnd = (s: Settings = RANKED_1V1) => s.tiers.length * s.divisions * s.pointsPerDivision;
 
 /** The hidden rating a place on the ladder stands for. */
 export const ladderRating = (ladder: number, s: Settings = RANKED_1V1) => s.baseRating + ladder * s.ratingPerPoint;
 
-/** Where the placements put a hidden rating on the ladder: from Iron 4 0 up to placements.maxLadder (Diamond 4 0). */
+/** Where the placements put a hidden rating on the ladder: from Wood 5 0 up to placements.maxLadder (Radiant 5 0). */
 export function placeLadder(rating: number, s: Settings = RANKED_1V1): number {
   return Math.max(0, Math.min(s.placements.maxLadder, Math.floor((rating - s.baseRating) / s.ratingPerPoint)));
 }
 
-/** A player's rank as it shows: in placements, or a tier (and its division, below the apex) with its rank points. */
+/**
+ * A ladder that might be in a top tier (Pearlescent, Transcendent): at the floor or above. Only these need a place
+ * among the top ladders (the server counts it; below the floor nobody asks).
+ */
+export const mayBeTop = (ladder: number | null | undefined, s: Settings = RANKED_1V1): ladder is number => typeof ladder === "number" && ladder >= s.topFloor;
+
+/** A player's rank as it shows: in placements, or a tier (and its division, below the top tiers) with its rank points. */
 export interface RankView {
   /** Still in placements: games played of the placements' count. */
   placement: { played: number; of: number } | null;
-  /** The tier's name ("Gold", "Master"), or "Placement". */
+  /** The tier's name ("Gold", "Transcendent"), or "Placement". */
   tier: string;
-  /** 4 (lowest) to 1 in a tier below the apex; null at the apex and in placements. */
+  /** 5 (lowest) to 1 in a tier with divisions; null in a top tier and in placements. */
   division: number | null;
-  /** Rank points: within the division (0-99), or above Master's start at the apex. */
+  /** Rank points: within the division (0-79; Radiant 1's count on past 79 at the floor and above), or above the floor in a top tier. */
   points: number;
   /** The ladder (null in placements). */
   ladder: number | null;
   color: string;
-  /** "Gold 2 · 45 RP", "Master · 120 RP", "Placement 2/5". */
+  /** The emblem's id in the baked set ("gold-d3", "transcendent"); null in placements (and for a bot). */
+  emblem: string | null;
+  /** "Gold 2 · 45 RP", "Radiant 1 · 95 RP", "Transcendent · 120 RP", "Placement 2/5". */
   label: string;
 }
 
 const PLACEMENT_COLOR = "#9aa0aa";
 
-/** The rank a player's record shows (no record: placements not started). */
-export function rankView(row: { games: number; ladder: number | null } | null | undefined, s: Settings = RANKED_1V1): RankView {
+/** A tier's emblem id: "gold-d3" (a tier with divisions), "transcendent" (a top tier). */
+export const emblemId = (tier: string, division: number | null) => (division === null ? tier.toLowerCase() : `${tier.toLowerCase()}-d${division}`);
+
+/**
+ * The rank a player's record shows (no record: placements not started). `place`: where their ladder stands among the
+ * top ladders (1 + how many are higher), which only the server knows; it counts only at `topFloor` or above. Without
+ * it (or outside every top tier's `top`), a ladder at the floor or above is Radiant 1 with its RP counting on past 80.
+ */
+export function rankView(row: { games: number; ladder: number | null; place?: number | null } | null | undefined, s: Settings = RANKED_1V1): RankView {
   const games = Math.max(0, row?.games ?? 0);
   const of = s.placements.games;
   if (!row || row.ladder === null || row.ladder === undefined || games < of) {
     const played = Math.min(games, of);
-    return { placement: { played, of }, tier: "Placement", division: null, points: 0, ladder: null, color: PLACEMENT_COLOR, label: `Placement ${played}/${of}` };
+    return { placement: { played, of }, tier: "Placement", division: null, points: 0, ladder: null, color: PLACEMENT_COLOR, emblem: null, label: `Placement ${played}/${of}` };
   }
   const ladder = Math.max(0, Math.floor(row.ladder));
-  const top = apexStart(s);
-  if (ladder >= top) {
-    const points = ladder - top;
-    const apex = [...s.apex].reverse().find((a) => points >= a.from) ?? s.apex[0]!;
-    return { placement: null, tier: apex.name, division: null, points, ladder, color: apex.color, label: `${apex.name} · ${points} RP` };
+  const place = row.place;
+  if (ladder >= s.topFloor && typeof place === "number") {
+    const top = [...s.topTiers].sort((a, b) => a.top - b.top).find((t) => place <= t.top);
+    if (top) {
+      const points = ladder - s.topFloor;
+      return { placement: null, tier: top.name, division: null, points, ladder, color: top.color, emblem: emblemId(top.name, null), label: `${top.name} · ${points} RP` };
+    }
   }
   const perTier = s.divisions * s.pointsPerDivision;
-  const t = Math.floor(ladder / perTier);
-  const within = ladder - t * perTier;
+  // (Past the divisions' end: Radiant 1, the RP counting on.)
+  const last = divisionsEnd(s) - 1;
+  const at = Math.min(ladder, last);
+  const t = Math.floor(at / perTier);
+  const within = at - t * perTier;
   const division = s.divisions - Math.floor(within / s.pointsPerDivision);
-  const points = within % s.pointsPerDivision;
+  const points = within % s.pointsPerDivision + (ladder - at);
   const tier = s.tiers[t]!;
-  return { placement: null, tier: tier.name, division, points, ladder, color: tier.color, label: `${tier.name} ${division} · ${points} RP` };
+  return { placement: null, tier: tier.name, division, points, ladder, color: tier.color, emblem: emblemId(tier.name, division), label: `${tier.name} ${division} · ${points} RP` };
 }
 
 /**
@@ -154,6 +175,33 @@ export function pointsFor(score: number, expected: number, ratingAfter: number, 
   const draw = score > 0 && score < 1;
   const points = Math.round(2 * p.perGame * (score - expected) + (draw ? adjust / 2 : adjust));
   return score >= 1 ? Math.max(0, points) : score <= 0 ? Math.min(0, points) : points;
+}
+
+/** One of a player's recent ranked games, from their side (never the hidden rating). */
+export interface RankedRecentGame {
+  /** When it ended (ms since 1970). */
+  at: number;
+  /** The other player: their account's id ("deleted" for a deleted account), name and look (null when gone). */
+  opponent: { id: string; name: string; look: ItemLook | null };
+  result: "win" | "loss" | "draw";
+  /** The rank points it moved for this player: null in placements, for a game fair play held, and for games before Oct 28, 2026. */
+  points: number | null;
+}
+
+/**
+ * What a profile shows of a player's ranked 1 v 1 (the server's rankedSummary; /api/me and /api/profile/:id): the rank
+ * shown everywhere, the record, the highest rank reached (`peak`: kept from Oct 28, 2026; null before a ladder), the
+ * current run of wins (`streak`: a loss or a draw ends it; counted from Oct 28), and the last 5 games kept, newest first.
+ */
+export interface RankedSummary {
+  rank: RankView;
+  games: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  peak: RankView | null;
+  streak: number;
+  recent: RankedRecentGame[];
 }
 
 /** A player's ranked record (one row of ranked_1v1). */
@@ -196,7 +244,7 @@ export const ratingNow = (r: RankedRecord, now: number, s: Settings = RANKED_1V1
 /**
  * One rated game for one player: `score` 1, ½ or 0 against `opp` (the opponent's record before the game). The hidden
  * rating moves (Glicko-1), then the ladder: in placements nothing shows until the last of them places the player from
- * the hidden rating; after them, the game's rank points, never below Iron 4 0.
+ * the hidden rating; after them, the game's rank points, never below Wood 5 0.
  */
 export function rankedGame(me: RankedRecord, opp: RankedRecord, score: number, now: number, s: Settings = RANKED_1V1): { next: RankedRecord; change: RankChange } {
   const mine = ratingNow(me, now, s);

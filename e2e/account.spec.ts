@@ -10,7 +10,8 @@ test("a guest profile: icon and name stick, a solo match goes on it", async ({ p
   // A guest account is made on the first visit.
   const chip = page.getByRole("button", { name: "Your profile" });
   await expect(chip).toBeVisible();
-  await expect(page.locator(".fd-hero")).toContainText("No rating yet");
+  // (Home's line under your name: your 1 v 1 rank; a new account hasn't played one. Oct 28.)
+  await expect(page.locator(".fd-hero-sub")).toHaveText("Unranked");
   await chip.click();
   // Your profile: Edit name & icon. Draw an icon: fill the canvas with a color, add a stroke, save.
   await expect(page.locator(".fd-card")).toContainText("No rating yet");

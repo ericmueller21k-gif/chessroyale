@@ -1,4 +1,5 @@
 import { expect, type Page } from "@playwright/test";
+import { RANKED_1V1, rankView } from "@chessroyale/core";
 import { named, openBossRaid, switchesOff, test, watchFor, pickMode } from "./helpers.ts";
 
 /**
@@ -81,7 +82,7 @@ test("1 v 1: picked, your rank and what it is in the panel under the row, kept u
   await expect(page.getByRole("radiogroup", { name: "Matchmaking" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^Party/ })).toHaveCount(0);
   // Your rank (the server's: a new account is in its placements) and what 1 v 1 is, in the panel under the row.
-  await expect(page.locator(".fd-mode-panel")).toHaveText(/^Your rank: Placement 0\/5Ranked chess vs one player near your level$/);
+  await expect(page.locator(".fd-mode-panel")).toHaveText(/^Your rank: Placement 0\/5Chess vs one player near your level$/);
   await expect(page.locator(".fd-hint")).toHaveText("");
   const row = (await page.getByRole("radiogroup", { name: "RANKED" }).boundingBox())!;
   const rank = (await page.locator(".fd-rank1v1").boundingBox())!;
@@ -101,13 +102,13 @@ test("1 v 1: picked, your rank and what it is in the panel under the row, kept u
   await expect(page.getByRole("radio", { name: /^1 v 1/ })).toHaveAttribute("aria-checked", "true");
 });
 
-test("1 v 1's rank line at its widest (an apex rank with four-digit points) stays one whole line from 320 px", async ({ page }) => {
+test("1 v 1's rank line at its widest (a top tier with four-digit points, its emblem beside it) stays one whole line from 320 px", async ({ page }) => {
   test.skip(desktop(), "the phone's widths");
   await named(page, "Apex");
   await page.route("**/api/me*", async (route) => {
     const res = await route.fetch();
     const body = await res.json();
-    const rank = { placement: null, tier: "Grandmaster", division: null, points: 1234, ladder: 9999, color: "#e05d5d", label: "Grandmaster · 1234 RP" };
+    const rank = rankView({ games: 40, ladder: RANKED_1V1.topFloor + 1234, place: 1 });
     if (body?.user) body.ranked1v1 = { ...(body.ranked1v1 ?? {}), rank };
     await route.fulfill({ response: res, json: body });
   });
@@ -115,7 +116,8 @@ test("1 v 1's rank line at its widest (an apex rank with four-digit points) stay
     await page.setViewportSize({ width, height: 740 });
     await page.goto("/?mode=1v1");
     const line = page.locator(".fd-rank1v1");
-    await expect(line).toHaveText("Your rank: Grandmaster · 1234 RP");
+    await expect(line).toHaveText("Your rank: Transcendent · 1234 RP");
+    await expect(page.locator(".fd-rank-words .re-box")).toHaveAttribute("data-emblem", "transcendent");
     expect(await line.evaluate((e) => e.scrollWidth - e.clientWidth), `${width}`).toBeLessThanOrEqual(0);
     expect((await line.boundingBox())!.height, `${width}: one line`).toBeLessThan(26);
     expect(await sideways(page), `${width}`).toBe(0);
@@ -479,14 +481,16 @@ test("home, said once (Eric, Oct 28): no ⓘ; the three options are titles only 
   }
 });
 
-test("test rank and level (Eric, Oct 28): an admin's home reads \"Opal III · <rating>\" with a green ring at 3/4 round the icon and LVL 38 over it; a player sees their real rank and neither, and nothing moves", async ({ page }) => {
+test("test rank and level (Eric, Oct 28): an admin's home reads their ?rank= (\"Gold 3 · 45 RP\") with a green ring at 3/4 round the icon and LVL 38 over it; a player sees their real rank and neither, and nothing moves", async ({ page }) => {
   await named(page, "Leveled");
-  // A rated account (a rating takes a ranked match, which an e2e can't seat: the server's answer carries one), an admin once
-  // `admin` is set (as /api/me says for an email in ADMIN_EMAILS).
+  // A ranked account (Paragon 4 · 30 RP: reaching it takes many games, so the server's answer carries it), an admin once
+  // `admin` is set (as /api/me says for an email in ADMIN_EMAILS). The admin's address asks for Gold 3.
   let isAdmin = false;
+  const real = rankView({ games: 40, ladder: 3 * 400 + 80 + 30 });
   await page.route(/\/api\/me(\?|$)/, async (route) => {
     const res = await route.fetch();
-    await route.fulfill({ response: res, json: { ...(await res.json()), rating: 1580, ...(isAdmin ? { admin: true } : {}) } });
+    const body = await res.json();
+    await route.fulfill({ response: res, json: { ...body, rating: 1580, ranked1v1: { ...(body.ranked1v1 ?? {}), rank: real, games: 40, wins: 20, losses: 20, draws: 0 }, ...(isAdmin ? { admin: true } : {}) } });
   });
   // (This server has TEST_SWITCHES on, which lets everyone use the test switches: the app is told otherwise, as hunchess.com
   // tells a player.)
@@ -505,24 +509,24 @@ test("test rank and level (Eric, Oct 28): an admin's home reads \"Opal III · <r
     await page.evaluate(() => document.fonts.ready);
   };
 
-  // A player: their real rank ("Weighty" at 1580), no ring and no level.
-  await page.goto("/");
-  await expect(sub).toHaveText("Weighty · 1580");
+  // A player: their real rank (the ?rank= ignored), no ring and no level; no rating rank's name (retired Oct 28).
+  await page.goto("/?rank=gold-3");
+  await expect(sub).toHaveText("Paragon 4 · 30 RP");
   await settled();
-  await expect(page.locator(".fd-hero-sub .fd-rank")).toHaveText("Weighty");
+  await expect(page.locator(".fd-hero-sub .fd-rank")).toHaveText("Paragon 4");
   await expect(page.locator(".fd-level, .fd-level-ring")).toHaveCount(0);
   const player = await measure();
 
   // An admin: the same page, the test rank in the rank's place, the ring and the level; every box where it was.
   isAdmin = true;
   await page.reload();
-  await expect(sub).toHaveText("Opal III · 1580");
+  await expect(sub).toHaveText("Gold 3 · 45 RP");
   await settled();
   await expect(page.locator(".fd-level")).toHaveCount(1);
   await expect(page.locator(".fd-level-ring")).toHaveCount(1);
-  await expect(page.locator(".fd-hero-sub .fd-rank")).toHaveText("Opal III");
+  await expect(page.locator(".fd-hero-sub .fd-rank")).toHaveText("Gold 3");
   const admin = await measure();
-  // (The tag is as wide as its words and centered, so a different rank name ("Opal III" for "Weighty") moves it sideways by half
+  // (The tag is as wide as its words and centered, so a different rank ("Gold 3" for "Paragon 4") moves it sideways by half
   // the difference, and your pawn too when it stands beside the tag on a short card: those sideways boxes aren't compared,
   // everything else is, the tag's height and top included.)
   const byWords = new Set([".fd-hero-id", ".fd-hero-icon", ".fd-hero-text", ".fd-pawn-hero"]);
