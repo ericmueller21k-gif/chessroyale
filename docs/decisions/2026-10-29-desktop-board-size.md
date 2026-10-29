@@ -92,7 +92,32 @@ above and below it**, never wider than its column:
 
 ## Frame rate (eric.md's method)
 
-FRAME_RATE_PLACEHOLDER
+Measured as `docs/rules/eric.md` says (headless Chromium, the medians of four runs taken in turn, main and this branch one after
+the other): Boss alone with the busiest powers forced (`?power=`: Puddles' water, Babur's hoops with a queen balloon on the pump,
+Smudgy's camouflage and repaint), 20 s from your first move through his turns; the Crowd's 50 v 50 and 1 v 1, 8 s. At 1920 × 1080
+and 1280 × 800. Frames per second (main → this branch), and frames over 25 ms in brackets:
+
+| | 1920 × 1080 | 1280 × 800 |
+| --- | --- | --- |
+| Puddles | 59.8 (4.5) → 59.5 (8) | 59.7 (4.5) → 59.6 (6.5) |
+| Babur | 59.5 (9.5) → 59.5 (8) | 59.4 (10.5) → 59.5 (10.5) |
+| Smudgy | 58.8 (16.5) → 58.7 (15.5) | 59.2 (8.5) → 59.3 (7) |
+| Crowd 50 v 50 | 60 (0) → 60 (1) | 60 (0) → 59.9 (0.5) |
+| 1 v 1 | 60 (0) → 60 (0) | 60 (0) → 60 (0) |
+
+**No slower** (the differences are within what two runs of the same build differ by: an earlier set had Puddles at 1920 × 1080
+59.8 → 59.8).
+
+**The problem it found, and the fix.** Before the last two changes Smudgy was slower at 1920 × 1080 (58.9 → 57.3 fps, 16 → 27
+frames over 25 ms) and at 1280 × 800: a dozen 33 to 117 ms frames through his REPAINT! banner, none on main. Hiding parts of the
+banner one at a time found it: the banner's words (10 to 16 % of the board's width, so 88 px type on an 880 px board) with their
+24 px glow, drawn again on every frame of the words' slam. So:
+- **The slam ends when its motion ends** (`fb-slam`: 0.48 s, the same keyframes; it ran 2.5 s and changed nothing after its first
+  19.2 %). Every banner, phone and computer; nothing looks different.
+- **On a computer the words' glow is 12 px instead of 24** (`--fb-glow`; a phone keeps 24). eric.md's frame-rate rule: cut the corner
+  and say so. With both, Smudgy is level with main (above).
+- Tried and not kept (no gain): the banner's streaks moved on the compositor, layer hints (`will-change`) on the words, a plain band
+  behind them, the God King's portrait glow stopped.
 
 ## Tests (changed checks, old → new)
 
