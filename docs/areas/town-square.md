@@ -251,7 +251,7 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
     scroll back. The header's **chat icon** (two speech bubbles in our own drawing: always on both green, new messages the top one green and
     the bottom gray, off both gray; named "Chat: always on", "Chat: new messages only", "Chat: off") goes to the next mode on a tap. The **gear**
     beside it opens "Town settings", a small sheet over the town (the match options' look): the chat's mode as three choices (Always on, New
-    messages, Off), under them **"Chat background"** (a switch, off by default; its line: "A soft blur behind the chat, always on while the chat
+    messages, Off), under them **"Chat background"** (a switch, off by default; its line: "A soft tint behind the chat, always on while the chat
     shows.": the tint always, the blur while you type), and under Chat **"Names"** (two choices, "Near you" and "Everyone"; "Name tags", below). Both icons sit at the right end of the "Town
     square" bar's line, a phone's and a computer's alike, never over the title. The box's place and size are the same in every mode; off takes
     it away (the box is hidden and the edge chips may use its space).

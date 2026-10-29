@@ -104,7 +104,7 @@ describe("\"Chat background\" (Eric, Oct 28: a switch in Town settings for the b
 
   it("is named and explained in Eric's words", () => {
     expect(CHAT_BACKGROUND_LABEL).toBe("Chat background");
-    expect(CHAT_BACKGROUND_NOTE).toBe("A soft blur behind the chat, always on while the chat shows.");
+    expect(CHAT_BACKGROUND_NOTE).toBe("A soft tint behind the chat, always on while the chat shows.");
   });
 
   it("is off to begin with, and remembered on this device once set: a reload asks again and gets the one stored; a stranger or a storage that won't answer is off", async () => {

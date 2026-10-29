@@ -72,7 +72,7 @@ export const CHAT_MODE_LABEL: Readonly<Record<ChatMode, string>> = { always: "Ch
 export const CHAT_MODE_CHOICE: Readonly<Record<ChatMode, string>> = { always: "Always on", new: "New messages", off: "Off" };
 /** "Chat background", in Town settings (Eric approved the name, Oct 28), and its line under it. */
 export const CHAT_BACKGROUND_LABEL = "Chat background";
-export const CHAT_BACKGROUND_NOTE = "A soft blur behind the chat, always on while the chat shows.";
+export const CHAT_BACKGROUND_NOTE = "A soft tint behind the chat, always on while the chat shows.";
 /** The mode a tap on the icon goes to: always on, new messages, off, and round again. */
 export const nextChatMode = (m: ChatMode): ChatMode => CHAT_MODES[(CHAT_MODES.indexOf(m) + 1) % CHAT_MODES.length]!;
 

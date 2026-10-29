@@ -706,7 +706,7 @@ test("the header's chat icon cycles always on, new messages only, off (both bubb
   await expect(sw).toBeVisible();
   await expect(sw).toHaveAttribute("aria-checked", "false");
   await expect(sw).toContainText("Off");
-  await expect(sheet.getByText("A soft blur behind the chat, always on while the chat shows.")).toBeVisible();
+  await expect(sheet.getByText("A soft tint behind the chat, always on while the chat shows.")).toBeVisible();
   const lastRadio = (await radios.nth(2).boundingBox())!;
   expect((await sw.boundingBox())!.y, "under the three choices").toBeGreaterThan(lastRadio.y + lastRadio.height - 1);
   await expect(radios.nth(0)).toHaveAttribute("aria-checked", "true");
