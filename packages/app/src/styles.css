@@ -10400,66 +10400,25 @@ a.fd-row-link {
   font-weight: 600;
   font-size: 14px;
 }
+/* Their 1 v 1 rank in the profile card's pills: the 1 v 1 pill's colors at the card's pill size. */
+.fd-pills .dv-rank.fd-card-rank {
+  padding: 5px 12px;
+  font-size: 14px;
+  line-height: 18px;
+}
 /* Your coins on your own profile: gold, as the coin. */
 .fd-pill.fp-coins {
   color: var(--fd-gold-text);
 }
-/* A rank: its color on a tint of it (dark), or darkened on a tint of white (light). core's profile test checks each
-   rank's color stays 4.5:1 through these mixes, so change them together. */
-.fd-pill.tier,
+/* Your 1 v 1 rank under your name on home: its tier's color, darkened in light (as the 1 v 1 pill: core's ranked test
+   checks each tier's color stays 4.5:1 through these mixes, so change them together). */
 .fd-rank {
   --fd-tier-ink: var(--tier);
-  --fd-prism: linear-gradient(100deg, #ff9a9a, #fcd34d, #86efac, #7dd3fc, #c4b5fd, #f9a8d4, #ff9a9a);
-  --fd-prism-ink: linear-gradient(100deg, #e0607a, #f2c14e, #4ade80, #38bdf8, #a78bfa, #f472b6);
-}
-.fd-pill.tier {
-  background: color-mix(in srgb, var(--tier) 20%, var(--fd-panel));
-  color: var(--fd-tier-ink);
-  font-weight: 800;
-}
-.fd-rank {
   color: var(--fd-tier-ink);
   font-weight: 700;
 }
-:root[data-theme="light"] :is(.fd-pill.tier, .fd-rank) {
+:root[data-theme="light"] .fd-rank {
   --fd-tier-ink: color-mix(in srgb, var(--tier) 55%, #000);
-  --fd-prism-ink: linear-gradient(100deg, #be123c, #854d0e, #15803d, #0369a1, #6d28d9, #be185d);
-}
-/* The top three ranks. Revered: a gold ring and a sheen. Exalted: a ring and a glow. Transcendent: a rainbow. */
-.fd-pill.rank-gilt {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--tier) 24%, var(--fd-panel)), color-mix(in srgb, var(--tier) 12%, var(--fd-panel)));
-  box-shadow: inset 0 0 0 1.5px var(--tier);
-}
-.fd-pill.rank-glow {
-  box-shadow:
-    inset 0 0 0 1.5px var(--tier),
-    0 0 14px color-mix(in srgb, var(--tier) 55%, transparent);
-}
-.fd-pill.rank-prism {
-  background: var(--fd-prism);
-  background-size: 200% 100%;
-  color: #14161b;
-  box-shadow: 0 0 16px color-mix(in srgb, #f472b6 45%, transparent);
-  animation: fd-prism 6s linear infinite;
-}
-.fd-rank.rank-prism {
-  background: var(--fd-prism-ink);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-.fd-rank.rank-glow {
-  text-shadow: 0 0 10px color-mix(in srgb, var(--tier) 60%, transparent);
-}
-@keyframes fd-prism {
-  to {
-    background-position: 200% 0;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .fd-pill.rank-prism {
-    animation: none;
-  }
 }
 .fd-center-text {
   text-align: center;
@@ -18113,7 +18072,7 @@ button.sq-tiny {
 }
 
 /*
- * A rank: a small pill in the tier's color. Its colors as RATING_RANKS' pills (.fd-pill.tier), so each tier reads at 4.5:1
+ * A rank: a small pill in the tier's color. Its colors as the rating ranks' pills had them, so each tier reads at 4.5:1
  * on both themes (packages/core/test/ranked.test.ts): a 20% tint of the panel; in light, the ink darkened (55% with black).
  */
 .dv-rank {

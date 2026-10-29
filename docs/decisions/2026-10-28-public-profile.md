@@ -2,7 +2,8 @@
 
 How it works now: [docs/areas/hub.md](../areas/hub.md), "Profiles". The page: `packages/app/src/screens/PublicProfile.tsx`; its words
 and numbers, pure: `packages/app/src/public-profile.ts`; its styles: `packages/app/src/public-profile.css` (`pp-`). It builds on
-the ranked tiers (PR #401: Wood 5 … Radiant 1, Pearlescent, Transcendent, their emblems, `?rank=`).
+the ranked tiers (PR #401, merged: Wood 5 … Radiant 1, Pearlescent, Transcendent, their emblems, `?rank=`, the peak, the streak
+and the last five games).
 
 ## Eric's words (Oct 28, on his mockup)
 
@@ -115,11 +116,13 @@ None of them guards a rule in `docs/rules/eric.md`.
   `Invite to play` count 0 → `Challenge` disabled.
 - `e2e/areas.json`: the new files are in "profiles and names" (and fairplay's spec joins it).
 
-## What needs PR #401's later commits
+## PR #401's shape (merged, Oct 29)
 
-`RankedSummary.peak`, `.streak` and `.recent` (its last 5 ranked games). Until they land the card shows "Peak rank: —" and "—" for
-the streak, and Recent Matches lists the other games alone. The shape the page reads is `RankedGame` and `RankedSummary` in
-`packages/app/src/account.ts`; if #401's differs, `public-profile.ts` is the one place to adapt.
+The page reads core's `RankedSummary` as shipped: `peak` (null before a ladder: "Peak rank: —"), `streak`, and `recent` (the last 5
+games, `RankedRecentGame`: `at`, `opponent {id, name, look}`, `result`, `points`). A game's `points` is null in placements, for a game
+fair play held and for games from before Oct 28 (a dash beside it); a deleted account's `look` is null (the default pawn) and its
+name "Deleted account". The public profile's server answer is #401's `rankedSummary` plus this PR's `icon`: no other server change.
+The privacy page lists the new things others can see (best rank, win streak, the last five 1 v 1 games and who you played).
 
 ## Tests
 

@@ -94,13 +94,17 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     (the lobby screen says "Invite link copied: paste it to your friends"); join one by its code; **Your friends ›**
     (with "N new") opens the friends list. The full Boss raid screen's Play with friends makes a raid, as before (the
     Solo Boss Mode form has none).
-  - **An admin's test rank and level** (Oct 28, Eric: "Opal III for me as a random test rank", "lvl - 38 … show it at 3/4 like I'm
-    3/4 to level 39"; only where `testSwitchesAllowed()`: an admin, or a server with `TEST_SWITCHES` on; a player sees home as
-    before). The rank line under your name reads **"Opal III · 1580"** (`TEST_RANK` for the rank's name, your real rating after
-    it, still "No rating yet" until you have one), and your icon has a thin **green ring** filled clockwise from the top to
-    **3/4** over a faint track, with a tiny **"LVL 38"** (the rating's gray) centered above it, as wide as the icon
-    (`LevelRing`, `TEST_LEVEL` in `components/FrontDoor.tsx`). **All three are placeholders** until the real ranks and levels
-    exist: the real level system replaces those three values. The ring and the level are drawn outside the icon's box and take
+  - **The rank line under your name** (Oct 28, Eric: "get rid of the novice weighty … we're going with the new ranking
+    system"): your ranked 1 v 1 rank (`RankLine`, `homeRankLine()` in `ranked.ts`): the tier and division in the tier's
+    color, then the RP ("Gold 3 · 45 RP"), "Placement 2/5", or "Unranked" before your first ranked game (a blank line of the
+    same height while your account loads). No rating rank's name: `RATING_RANKS` is retired
+    ([2026-10-28-ranked-tiers.md](../decisions/2026-10-28-ranked-tiers.md)).
+  - **An admin's test rank and level** (Oct 28, Eric: "lvl - 38 … show it at 3/4 like I'm 3/4 to level 39"; only where
+    `testSwitchesAllowed()`: an admin, or a server with `TEST_SWITCHES` on; a player sees home as before). The rank line shows
+    the address's `?rank=` (`?rank=gold-3`, `?rank=transcendent`; it replaced the first placeholder, "Opal III"), and your icon
+    has a thin **green ring** filled clockwise from the top to **3/4** over a faint track, with a tiny **"LVL 38"** (the line's
+    gray) centered above it, as wide as the icon (`LevelRing`, `TEST_LEVEL` in `components/FrontDoor.tsx`). **The level is a
+    placeholder** until the real levels exist. The ring and the level are drawn outside the icon's box and take
     no room, so home is the same size and shape with or without them (and doesn't move when the account loads).
   - A screen that replaces home (a phone's queue, the Boss raid screen, home again) starts at its top. A match's Home
     and a closed lobby's note land on home itself; Cancel in a raid's queue goes back to the Boss raid screen (the full one).
@@ -109,7 +113,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     there; [docs/decisions/2026-10-17-phone-settings-gear.md](../decisions/2026-10-17-phone-settings-gear.md),
     [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)), then one column: your card, the RANKED row, its panel, the line
     above PLAY and PLAY (Oct 28), then Other modes with the Boss Arena card, and Solo Boss Mode and Auto chess side by side under it, at the bottom. Your pawn's card takes the room
-    left: your tag (icon, name, "Weighty · 1580"; an admin's test version below) centered above your pawn's head, the pawn 75% bigger than before
+    left: your tag (icon, name, "Gold 3 · 45 RP"; an admin's test version below) centered above your pawn's head, the pawn 75% bigger than before
     (170 × 154 → up to 298 × 270) and sized to the room the tag leaves (Oct 24). On a short card (under 190 px tall: a
     640 px phone, or a 740 px one (measured at 320, 375 and 430 px wide), since the options panel is there from the first view, Oct 25)
     the tag stands beside the pawn instead, as it did when the room was short (Oct 18), so home fits with no scrolling
@@ -145,9 +149,13 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     email, sign-in method, age, the hidden 1 v 1 rating or fair-play details; the icon is public since Oct 28. Its words are in
     `public-profile.ts` (tested), its styles `public-profile.css`. Nothing hidden, nothing shifts: it loads as the same markup on
     gray bars, the Ranked card is one height in every mode, and every list keeps its room.
-  - **Your own profile** (`screens/PlayerProfile.tsx`, from your own pawn): your coins, Edit name & icon, locker, Friends, the
-    rating chart, stats (Crowd, Boss raid), "Boss tiers beaten", recent matches, what you wear, Quick chat, Settings; **View public
-    profile** at its top opens yours as others see it. A bot or someone with no account gets a card that says so.
+  - **Your own profile** (`screens/PlayerProfile.tsx`, from your own pawn; what a profile showed before the public one, Oct 28):
+    your 1 v 1 rank's pill once you've played a ranked game (Oct 28: the rank shown everywhere), "Rating 1612" (the crowd
+    rating's number, no rank name) and "Top N%" (once `percentileMinPlayers` have ratings), your coins, Edit name & icon, locker,
+    Friends, the rating chart, stats (Crowd, Boss raid), "Boss tiers beaten" (online raids only: a solo win is the browser's word),
+    recent matches, what you wear, a "1 V 1" section (your rank, tier, division and RP, or "Placement N/5", and your record), Quick
+    chat, Settings; **View public profile** at its top opens yours as others see it. A bot or someone with no account gets a card
+    that says so.
 - **Ranked 1 v 1's way in** ([ranked.md](ranked.md)): `/1v1` queues in one tap; the home screen's button (not built
   yet) calls `startRanked1v1()` (`packages/app/src/duel.ts`) and shows `ranked1v1Label()` (`packages/app/src/ranked.ts`:
   the rank's label from the profile, null until it loads). The first-time pawn-vote hint is `VoteHint`
@@ -272,7 +280,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 
 ## Settings
 
-`FRONT_DOOR`, `LIVE_WINDOW`, `RATING_RANKS`, and the matchmaking settings on [matchmaking.md](matchmaking.md).
+`FRONT_DOOR`, `LIVE_WINDOW`, and the matchmaking settings on [matchmaking.md](matchmaking.md).
 
 ## Tests and tools
 
@@ -284,7 +292,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 - e2e: `e2e/front-door.spec.ts`, `home-ranked.spec.ts` (the RANKED row at 320-390 px and on a computer, home keeping still through every click
   (PLAY, the line above it, the board preview, the Boss Arena card and the panel within 1 px, at 320 and 390 px and 1280-1920 px), "home, said
   once" (Oct 28: no ⓘ, titles only, the line above PLAY, the cards' pictures beside their words, PLAY's height, a phone fits) and "test rank
-  and level" (an admin's Opal III, ring and LVL 38; a player sees neither), 1 v 1's PLAY,
+  and level" (an admin's `?rank=`, ring and LVL 38; a player sees neither, and their real 1 v 1 rank), 1 v 1's PLAY,
   the Boss raid screen (`?mode=raid`) and each of its choices, `/bosses`), `boss-select.spec.ts` (the character select: a
   tap's drop, sound and line, "?", the Hidden Boss dark and locked and never named, the pick reaching Boss alone, a Solo
   raid and a raid you make, resting bosses, the layout at 320-1280 px, the card turning; Boss alone's menu and

@@ -1,5 +1,5 @@
-import { CROWD_SETTINGS, DEFAULT_SETTINGS, SLOT_NAMES, bossDef, bossInfo, itemColor, itemDef, secondColor, tierInfo, type ItemLook, type ItemSlot, type RankView } from "@chessroyale/core";
-import type { PublicProfile, RankedGame } from "./account.ts";
+import { CROWD_SETTINGS, DEFAULT_SETTINGS, SLOT_NAMES, bossDef, bossInfo, itemColor, itemDef, secondColor, tierInfo, type ItemLook, type ItemSlot, type RankedRecentGame, type RankView } from "@chessroyale/core";
+import type { PublicProfile } from "./account.ts";
 
 /**
  * The public profile's words and numbers (docs/decisions/2026-10-28-public-profile.md), pure so a test can read each one:
@@ -69,7 +69,7 @@ export function tierTitle(rank: RankView): string {
   return rank.division === null ? rank.tier : `${rank.tier} ${rank.division}`;
 }
 
-/** "Peak rank: Gold 3", or "Peak rank: —" when there's none (or the server doesn't say yet). */
+/** "Peak rank: Gold 3", or "Peak rank: —" when there's none yet (a player who hasn't finished their placements). */
 export const peakLine = (peak: RankView | null | undefined): string => `Peak rank: ${peak && !peak.placement ? tierTitle(peak) : "—"}`;
 
 /** Wins over games, whole percent ("58%"); "—" before a first game. */
@@ -78,8 +78,8 @@ export const winRate = (wins: number, games: number): string => (games > 0 ? `${
 /** "34 – 25". */
 export const recordText = (wins: number, losses: number): string => `${wins} – ${losses}`;
 
-/** The win streak as a number, "—" when the server doesn't say. */
-export const streakText = (streak: number | undefined): string => (typeof streak === "number" ? String(streak) : "—");
+/** The win streak: wins in a row now (0: their last game wasn't a win). */
+export const streakText = (streak: number): string => String(streak);
 
 /**
  * Which of the card's states their 1 v 1 is in: banned (nothing but that), never played, still in placements, or ranked. From
@@ -124,7 +124,7 @@ export function rpChange(rp: number | null | undefined): { text: string; tone: R
   return { text: "0", tone: "none" };
 }
 
-const RESULT_PILL: Record<RankedGame["result"], { text: string; tone: PillTone }> = {
+const RESULT_PILL: Record<RankedRecentGame["result"], { text: string; tone: PillTone }> = {
   win: { text: "WIN", tone: "win" },
   loss: { text: "LOSS", tone: "loss" },
   draw: { text: "DRAW", tone: "draw" },
@@ -163,15 +163,17 @@ function resultRow(r: PublicProfile["recent"][number], i: number, now: number): 
 const CROWD_TITLE = RANKED_MODES[1].label;
 
 /** A ranked 1 v 1 game as a row. */
-function duelRow(g: RankedGame, i: number, now: number): RecentRow {
+function duelRow(g: RankedRecentGame, i: number, now: number): RecentRow {
   return {
     key: `d${g.at}-${i}`,
     at: g.at,
-    face: { kind: "pawn", look: g.opponent.look },
+    // (An account since deleted has no look: the default pawn.)
+    face: { kind: "pawn", look: g.opponent.look ?? undefined },
     pill: RESULT_PILL[g.result],
     title: `vs. ${g.opponent.name || "Player"}`,
     sub: `Ranked · ${ago(g.at, now)}`,
-    rp: rpChange(g.rp),
+    // (Points: null in placements, for a game fair play held, and for games from before Oct 28, 2026: "—".)
+    rp: rpChange(g.points),
   };
 }
 
@@ -179,11 +181,11 @@ function duelRow(g: RankedGame, i: number, now: number): RecentRow {
 export const RECENT_SHOWN = 5;
 
 /**
- * The card's rows: the last `RECENT_SHOWN` games in any mode, newest first. The ranked 1 v 1 games (`RankedSummary.recent`)
- * and the profile's `recent` (crowd, raids, Squads, Classic) merged by time; a tie keeps the 1 v 1 game first.
+ * The card's rows: the last `RECENT_SHOWN` games in any mode, newest first. The ranked 1 v 1 games (`RankedSummary.recent`, the
+ * last five) and the profile's `recent` (crowd, raids, Squads, Classic) merged by time; a tie keeps the 1 v 1 game first.
  */
-export function recentRows(ranked: RankedGame[] | undefined, recent: PublicProfile["recent"], now: number, limit = RECENT_SHOWN): RecentRow[] {
-  return [...(ranked ?? []).map((g, i) => duelRow(g, i, now)), ...recent.map((r, i) => resultRow(r, i, now))].sort((a, b) => b.at - a.at).slice(0, limit);
+export function recentRows(ranked: RankedRecentGame[], recent: PublicProfile["recent"], now: number, limit = RECENT_SHOWN): RecentRow[] {
+  return [...ranked.map((g, i) => duelRow(g, i, now)), ...recent.map((r, i) => resultRow(r, i, now))].sort((a, b) => b.at - a.at).slice(0, limit);
 }
 
 // ---------------- Equipped Cosmetics ----------------

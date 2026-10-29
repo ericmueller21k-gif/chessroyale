@@ -273,13 +273,21 @@ test("placements, no games and a ban: the card says so, in the same room", async
   await expect(ranked.locator('[data-emblem="transcendent"]')).toHaveCount(1);
 });
 
-test("an older server that sends no peak, streak or recent 1 v 1 games: a dash in their place, the other games still listed", async ({ page }) => {
-  const { peak: _p, streak: _s, recent: _r, ...older } = demoProfile().ranked1v1;
-  await openDemo(page, demoProfile({ ranked1v1: older }));
+test("1 v 1 games with no points (placements, one fair play held, one before the points were kept) show a dash; a deleted opponent's game still lists", async ({ page }) => {
+  const hour = 3_600_000;
+  const recent = [
+    { opponent: { id: "deleted", name: "Deleted account", look: null }, result: "win", points: null, at: Date.now() - hour },
+    { opponent: { id: "zed", name: "Zed", look: {} }, result: "draw", points: null, at: Date.now() - 2 * hour },
+    { opponent: { id: "yan", name: "Yan", look: {} }, result: "loss", points: -9, at: Date.now() - 3 * hour },
+  ];
+  await openDemo(page, demoProfile({ ranked1v1: { ...demoProfile().ranked1v1, recent } }));
   await loaded(page);
-  await expect(page.locator(".pp-peak")).toHaveText("Peak rank: —");
-  await expect(page.locator(".pp-stat strong").nth(2)).toHaveText("—");
-  await expect(page.locator(".pp-row .pp-row-text strong")).toHaveText(["vs. Ginger", "50 v 50", "Squads"]);
+  const rows = page.locator(".pp-row");
+  await expect(rows.locator(".pp-row-text strong")).toHaveText(["vs. Deleted account", "vs. Zed", "vs. Yan", "vs. Ginger", "50 v 50"]);
+  await expect(rows.locator(".pp-pill")).toHaveText(["WIN", "DRAW", "LOSS", "WIN", "WIN"]);
+  await expect(rows.locator(".pp-rpchange")).toHaveText(["—", "—", "−9", "—", "—"]);
+  // (A deleted account has no look: the default pawn.)
+  await expect(rows.nth(0).locator(".pp-face .avatar")).toHaveCount(1);
 });
 
 test("every mode's row in Recent Matches: a raid, 50 v 50, Squads", async ({ page }) => {

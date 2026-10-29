@@ -40,12 +40,12 @@ const daysBack = (n: number) => {
   return d.getTime();
 };
 
-/** The 1 v 1 games and other games in the mockup's list (the 1 v 1 ones as RankedSummary.recent will carry them). */
+/** The 1 v 1 games in the mockup's list, as the server's RankedSummary.recent carries them (core's RankedRecentGame: `points`, not RP). */
 export const MOCKUP_RANKED_GAMES = [
-  { opponent: { id: "g43", name: "Guest 43", look: { head: { def: "wizard-hat", color: "red", blemish: 10, seed: 1 } } }, result: "win", rp: 18, at: hoursAgo(2) },
-  { opponent: { id: "woolly", name: "Woolly", look: { head: { def: "party-hat", color: "cobalt", blemish: 30, seed: 2 } } }, result: "loss", rp: -14, at: yesterday(20) },
-  { opponent: { id: "g21", name: "Guest 21", look: {} }, result: "win", rp: 22, at: yesterday(10) },
-  { opponent: { id: "g49", name: "Guest 49", look: { skin: { def: "ninja-gi", color: "midnight", blemish: 0, seed: 4 } } }, result: "loss", rp: -11, at: daysBack(5) },
+  { opponent: { id: "g43", name: "Guest 43", look: { head: { def: "wizard-hat", color: "red", blemish: 10, seed: 1 } } }, result: "win", points: 18, at: hoursAgo(2) },
+  { opponent: { id: "woolly", name: "Woolly", look: { head: { def: "party-hat", color: "cobalt", blemish: 30, seed: 2 } } }, result: "loss", points: -14, at: yesterday(20) },
+  { opponent: { id: "g21", name: "Guest 21", look: {} }, result: "win", points: 22, at: yesterday(10) },
+  { opponent: { id: "g49", name: "Guest 49", look: { skin: { def: "ninja-gi", color: "midnight", blemish: 0, seed: 4 } } }, result: "loss", points: -11, at: daysBack(5) },
 ] as const;
 
 export function demoProfile(over: Record<string, unknown> = {}) {

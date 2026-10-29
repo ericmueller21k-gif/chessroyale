@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { RANKED_1V1, rankView, type ItemLook } from "@chessroyale/core";
-import type { PublicProfile, RankedGame } from "../src/account.ts";
+import { RANKED_1V1, rankView, type ItemLook, type RankedRecentGame } from "@chessroyale/core";
+import type { PublicProfile } from "../src/account.ts";
 import { WORN_ORDER } from "../src/components/FrontDoor.tsx";
 import { RANKED_MODES, RECENT_SHOWN, ago, hasOwnIcon, joinedText, levelLine, nth, peakLine, rankedState, recentRows, recordText, rpChange, seenLine, streakText, tierTitle, winRate, wornTiles } from "../src/public-profile.ts";
 
@@ -74,10 +74,9 @@ describe("Ranked Standing", () => {
     expect(top.points).toBe(120);
     expect(top.division).toBeNull();
   });
-  it("peak rank: the tier and division, or a dash when there's none (or the server doesn't say yet)", () => {
+  it("peak rank: the tier and division, or a dash when there's none yet (placements not done)", () => {
     expect(peakLine(rankAt("paragon", 4))).toBe("Peak rank: Paragon 4");
     expect(peakLine(null)).toBe("Peak rank: —");
-    expect(peakLine(undefined)).toBe("Peak rank: —");
     expect(peakLine(rankView({ games: 2, ladder: null }, RANKED_1V1))).toBe("Peak rank: —");
   });
   it("win rate is wins over games, a whole percent; a dash before a first game", () => {
@@ -94,7 +93,6 @@ describe("Ranked Standing", () => {
     expect(recordText(0, 0)).toBe("0 – 0");
     expect(streakText(3)).toBe("3");
     expect(streakText(0)).toBe("0");
-    expect(streakText(undefined)).toBe("—");
   });
   it("which state the card is in: banned (nothing else), never played, placements, ranked", () => {
     expect(rankedState(rankAt("gold", 3), true)).toBe("banned");
@@ -102,16 +100,16 @@ describe("Ranked Standing", () => {
     expect(rankedState(rankView({ games: 0, ladder: null }, RANKED_1V1), false)).toBe("unranked");
     expect(rankedState(rankView({ games: 2, ladder: null }, RANKED_1V1), false)).toBe("placement");
     expect(rankedState(rankAt("gold", 3), false)).toBe("ranked");
-    expect(rankedState(undefined, false)).toBe("unranked");
   });
 });
 
 describe("Recent Matches", () => {
-  const duels: RankedGame[] = [
-    { opponent: { id: "a", name: "Guest 43" }, result: "win", rp: 18, at: before(2) },
-    { opponent: { id: "b", name: "Woolly" }, result: "loss", rp: -14, at: before(30) },
-    { opponent: { id: null, name: "Bot" }, result: "draw", rp: 0, at: before(60) },
-    { opponent: { id: "c", name: "Guest 21" }, result: "win", rp: null, at: before(200) },
+  // (As the server's RankedSummary.recent has them: core's RankedRecentGame; a deleted account's id is "deleted", its look null.)
+  const duels: RankedRecentGame[] = [
+    { opponent: { id: "a", name: "Guest 43", look: {} }, result: "win", points: 18, at: before(2) },
+    { opponent: { id: "b", name: "Woolly", look: {} }, result: "loss", points: -14, at: before(30) },
+    { opponent: { id: "deleted", name: "Deleted account", look: null }, result: "draw", points: 0, at: before(60) },
+    { opponent: { id: "c", name: "Guest 21", look: {} }, result: "win", points: null, at: before(200) },
   ];
   const other = (patch: Partial<PublicProfile["recent"][number]>): PublicProfile["recent"][number] => ({
     mode: "crowd",
@@ -133,12 +131,12 @@ describe("Recent Matches", () => {
     expect(win).toMatchObject({ pill: { text: "WIN", tone: "win" }, title: "vs. Guest 43", sub: "Ranked · 2h ago", rp: { text: "+18", tone: "gain" }, face: { kind: "pawn" } });
     expect(loss).toMatchObject({ pill: { text: "LOSS", tone: "loss" }, title: "vs. Woolly", sub: "Ranked · Yesterday", rp: { text: "−14", tone: "loss" } });
     expect(draw).toMatchObject({ pill: { text: "DRAW", tone: "draw" }, rp: { text: "0", tone: "none" } });
-    // (A placement game, or one the server doesn't say: no RP, "—".)
+    // (A placement game, one fair play held, or one from before the points were kept: no RP, "—".)
     expect(noRp).toMatchObject({ pill: { text: "WIN" }, sub: "Ranked · Oct 20", rp: { text: "—", tone: "none" } });
   });
 
   it("a raid: WIN if the boss fell, else LOSS; 'vs. <boss>' with the boss's face; Casual", () => {
-    const [won, lost] = recentRows(undefined, [other({ mode: "boss", bossId: "gingerbread", bossElo: 1500, won: true, playedAt: before(5) }), other({ mode: "boss", bossId: "clown", bossElo: 1900, won: false, survived: true, playedAt: before(6) })], NOW);
+    const [won, lost] = recentRows([], [other({ mode: "boss", bossId: "gingerbread", bossElo: 1500, won: true, playedAt: before(5) }), other({ mode: "boss", bossId: "clown", bossElo: 1900, won: false, survived: true, playedAt: before(6) })], NOW);
     expect(won).toMatchObject({ pill: { text: "WIN", tone: "win" }, title: "vs. Ginger", sub: "Casual · 5h ago", rp: { text: "—" }, face: { kind: "boss", id: "gingerbread" } });
     expect(lost).toMatchObject({ pill: { text: "LOSS", tone: "loss" }, face: { kind: "boss", id: "clown" } });
     // (Standing at the end isn't a win: the boss has to fall.)
@@ -146,23 +144,23 @@ describe("Recent Matches", () => {
   });
 
   it("a raid from before bosses had identities keeps the tier's old name; one with nothing says 'Boss raid'", () => {
-    const [old, none] = recentRows(undefined, [other({ mode: "boss", bossId: null, bossElo: 1500, won: true, playedAt: before(1) }), other({ mode: "boss", bossId: null, bossElo: null, won: null, playedAt: before(2) })], NOW);
+    const [old, none] = recentRows([], [other({ mode: "boss", bossId: null, bossElo: 1500, won: true, playedAt: before(1) }), other({ mode: "boss", bossId: null, bossElo: null, won: null, playedAt: before(2) })], NOW);
     expect(old!.title).toMatch(/^vs\. /);
     expect(old!.face).toMatchObject({ kind: "boss", id: null });
     expect(none).toMatchObject({ title: "Boss raid", pill: { text: "LOSS" } });
   });
 
   it("50 v 50: WIN or LOSS by its team's result, titled '50 v 50' with a mode icon", () => {
-    const [win, loss, old] = recentRows(undefined, [other({ won: true, playedAt: before(1) }), other({ won: false, playedAt: before(2) }), other({ won: null, team: null, placement: 1, playedAt: before(3) })], NOW);
+    const [win, loss, old] = recentRows([], [other({ won: true, playedAt: before(1) }), other({ won: false, playedAt: before(2) }), other({ won: null, team: null, placement: 1, playedAt: before(3) })], NOW);
     expect(win).toMatchObject({ pill: { text: "WIN", tone: "win" }, title: "50 v 50", sub: "Casual · 1h ago", face: { kind: "mode", mode: "crowd" }, rp: { text: "—" } });
     expect(loss).toMatchObject({ pill: { text: "LOSS", tone: "loss" } });
     // (An older match with no team: everyone moved, so the one who placed 1st won.)
     expect(old).toMatchObject({ pill: { text: "WIN" } });
-    expect(recentRows(undefined, [other({ won: null, team: null, placement: 7 })], NOW)[0]!.pill.text).toBe("LOSS");
+    expect(recentRows([], [other({ won: null, team: null, placement: 7 })], NOW)[0]!.pill.text).toBe("LOSS");
   });
 
   it("Squads: their place ('3rd'), titled 'Squads'; Classic the same", () => {
-    const [third, first, classic] = recentRows(undefined, [other({ mode: "squads", placement: 3, playedAt: before(1) }), other({ mode: "squads", placement: 1, playedAt: before(2) }), other({ mode: "classic", placement: 12, playedAt: before(3) })], NOW);
+    const [third, first, classic] = recentRows([], [other({ mode: "squads", placement: 3, playedAt: before(1) }), other({ mode: "squads", placement: 1, playedAt: before(2) }), other({ mode: "classic", placement: 12, playedAt: before(3) })], NOW);
     expect(third).toMatchObject({ pill: { text: "3rd", tone: "place" }, title: "Squads", face: { kind: "mode", mode: "squads" } });
     expect(first).toMatchObject({ pill: { text: "1st", tone: "win" } });
     expect(classic).toMatchObject({ pill: { text: "12th" }, title: "Classic", face: { kind: "mode", mode: "classic" } });
@@ -170,12 +168,12 @@ describe("Recent Matches", () => {
 
   it("the two lists merge by time, newest first, whatever list a game came from", () => {
     const rows = recentRows(duels, [other({ playedAt: before(1) }), other({ mode: "squads", placement: 2, playedAt: before(45) }), other({ playedAt: before(500) })], NOW);
-    expect(rows.map((r) => r.title)).toEqual(["50 v 50", "vs. Guest 43", "vs. Woolly", "Squads", "vs. Bot"]);
+    expect(rows.map((r) => r.title)).toEqual(["50 v 50", "vs. Guest 43", "vs. Woolly", "Squads", "vs. Deleted account"]);
     expect(rows.map((r) => r.at)).toEqual([...rows.map((r) => r.at)].sort((a, b) => b - a));
   });
 
   it("only the last five", () => {
-    const many = Array.from({ length: 8 }, (_, i): RankedGame => ({ opponent: { id: `p${i}`, name: `P${i}` }, result: "win", rp: 10, at: before(i + 1) }));
+    const many = Array.from({ length: 8 }, (_, i): RankedRecentGame => ({ opponent: { id: `p${i}`, name: `P${i}`, look: {} }, result: "win", points: 10, at: before(i + 1) }));
     const rows = recentRows(many, [other({ playedAt: before(0.5) }), other({ playedAt: before(100) })], NOW);
     expect(RECENT_SHOWN).toBe(5);
     expect(rows).toHaveLength(5);
@@ -183,10 +181,14 @@ describe("Recent Matches", () => {
     expect(rows.map((r) => r.title)).toEqual(["50 v 50", "vs. P0", "vs. P1", "vs. P2", "vs. P3"]);
   });
 
-  it("with nothing yet: no rows; with an older server that sends no 1 v 1 list: the other games alone", () => {
-    expect(recentRows(undefined, [], NOW)).toEqual([]);
+  it("with nothing yet: no rows; no 1 v 1 games yet: the other games alone", () => {
     expect(recentRows([], [], NOW)).toEqual([]);
-    expect(recentRows(undefined, [other({})], NOW)).toHaveLength(1);
+    expect(recentRows([], [other({})], NOW)).toHaveLength(1);
+  });
+
+  it("a deleted opponent's game still lists, with the default pawn", () => {
+    const [row] = recentRows([duels[2]!], [], NOW);
+    expect(row).toMatchObject({ title: "vs. Deleted account", face: { kind: "pawn", look: undefined } });
   });
 
   it("RP change: green plus, red minus (a real minus sign), a dash when unknown", () => {

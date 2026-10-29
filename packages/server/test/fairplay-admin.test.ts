@@ -37,7 +37,7 @@ describe("bans", () => {
     expect(await decide(sql, p.id, "ban", "admin:eric@example.com", "engine moves, 2 matches", 41 * DAY, { mail })).toEqual({ ok: true, status: "banned" });
     expect(sent).toEqual([{ to: "pat@example.com", kind: "banned", notice: null }]);
     const prof = (await publicProfile(sql, p.id, 41 * DAY))!;
-    expect(prof).toMatchObject({ banned: true, rating: null, topPercent: null, tier: null });
+    expect(prof).toMatchObject({ banned: true, rating: null, topPercent: null, ranked1v1: null });
     expect((await sql.all<{ held: number }>("SELECT held FROM results WHERE user_id = ?", p.id)).map((r) => r.held)).toEqual([1, 1]);
     expect(await eligibleForRanked(sql, p.id)).toBe(false);
     expect(await fairStatus(sql, p.id)).toEqual({ banned: true, appeal: null });

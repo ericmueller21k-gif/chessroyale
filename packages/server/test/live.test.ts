@@ -149,7 +149,8 @@ describe("profiles", () => {
     // The rating chart: ranked matches only (the solo game's 1560 isn't one).
     expect(p.ratingHistory).toEqual([1500, 1612]);
     expect(p.rating).toBe(1612);
-    expect(p.tier).toEqual({ label: "Weighty", level: 6, color: "#3fc28e", effect: null });
+    // (No rating's rank name since Oct 28: the rank a profile shows is ranked 1 v 1's.)
+    expect(p).not.toHaveProperty("tier");
     expect(p.recent[0]).toMatchObject({ mode: "boss", bestMove: null, bossElo: null, won: true, survived: null });
     expect(p.recent[1]).toMatchObject({ mode: "boss", won: null, survived: false });
     expect(p.recent[2]).toMatchObject({ mode: "boss", bestMove: "Qh5", bossElo: 2000, survived: true });

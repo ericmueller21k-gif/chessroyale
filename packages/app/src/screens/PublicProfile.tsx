@@ -515,7 +515,7 @@ export function PublicProfileScreen({ target, onBack, match }: { target: Profile
   const name = p?.name ?? target.name;
   const seen = p ? seenLine(p, now) : null;
   const level = levelLine(testSwitchesAllowed(), TEST_LEVEL.level);
-  const rows = p ? recentRows(p.ranked1v1?.recent, p.recent, now) : [];
+  const rows = p ? recentRows(p.ranked1v1?.recent ?? [], p.recent, now) : [];
   const blocked = act.rel === "blocked";
   // The buttons: greyed (never gone) on your own page, with a guest or a young device where friends are off, while loading, and for someone you blocked.
   const idle = loading || own;

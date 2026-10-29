@@ -126,6 +126,11 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
     at most Radiant 5 0 (2400). Aborted games don't count.
   - **Fair play's hold:** a player in review keeps their rank as it is (their games don't move it); their opponent's
     game counts as usual.
+  - **The rank shown everywhere** (Oct 28: `RATING_RANKS` retired): home's line under your name, the profile card's pill.
+  - **Kept for the public profile** (Oct 28; `RankedSummary` in core: the decision file has its exact shape): the peak
+    (`ranked_1v1.peak`, only ever up), the current win streak (`ranked_1v1.streak`), each game's points by side
+    (`ranked_1v1_games.white_points`, `black_points`), and the last 5 kept games (`recent`: when, the opponent by id, name
+    and look, the result, your points). Never the hidden rating.
   - **Shown as** `RankView.label` and its emblem (`RankView.emblem`, below): "Gold 2 · 45 RP", "Radiant 1 · 95 RP",
     "Transcendent · 120 RP", "Placement 2/5"; on the profile (your own: a "1 V 1" section; anyone's, yours as others see it
     included: the public profile's Ranked Standing card, [hub.md](hub.md), "Profiles"; null for a banned player), in the game's strips (the pill only) and the versus moment, and on the result card ("Gold 2 · 45 RP
@@ -196,8 +201,8 @@ by the clock (`voteAt`); everything else comes as a message.
 
 | Table / column | What | Kept |
 | --- | --- | --- |
-| `ranked_1v1` (user_id, rating, rd, games, wins, losses, draws, ladder, last_game, last_at, coin_day, coin_games; index `ranked_1v1_ladder` on ladder, Oct 28) | A player's hidden rating, record and ladder place; the UTC day of their last paying game and how many paid that day | With the account; deleted with it; in the download; a guest's moves to an account without one on sign-in |
-| `ranked_1v1_games` (id, white_id, black_id, control, result, reason, moves, times, started_at, ended_at, checked, nonce) | Each ranked game (never an aborted one): moves (UCI), think times (ms), how it ended; fair play's engine check by side | `gamesKeepDays` (30) after it ends (the 15-minute cron, `purgeDuelGames`); longer only while a player in it has a fair-play case open (watch or review) or an appeal of a ban waiting (`purgeEvidence`'s rule); on account deletion that player becomes "deleted" in it; the download has a player's games (opponent by name, not the check) |
+| `ranked_1v1` (user_id, rating, rd, games, wins, losses, draws, ladder, last_game, last_at, coin_day, coin_games, peak, streak; index `ranked_1v1_ladder` on ladder, Oct 28) | A player's hidden rating, record and ladder place; the UTC day of their last paying game and how many paid that day; the highest ladder reached and the current run of wins (from Oct 28) | With the account; deleted with it; in the download; a guest's moves to an account without one on sign-in |
+| `ranked_1v1_games` (id, white_id, black_id, control, result, reason, moves, times, started_at, ended_at, checked, nonce, white_points, black_points) | Each ranked game (never an aborted one): moves (UCI), think times (ms), how it ended; fair play's engine check by side; the rank points it moved for each side (from Oct 28) | `gamesKeepDays` (30) after it ends (the 15-minute cron, `purgeDuelGames`); longer only while a player in it has a fair-play case open (watch or review) or an appeal of a ban waiting (`purgeEvidence`'s rule); on account deletion that player becomes "deleted" in it; the download has a player's games (opponent by name, not the check) |
 
 No `results` rows for 1 v 1 (Crowd's stats and `users.rating` stay as they were). The privacy policy's "1 v 1 (ranked)"
 entry says the same.

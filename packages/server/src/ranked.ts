@@ -23,6 +23,8 @@ export interface RankedRow {
   last_at: number | null;
   coin_day: number | null;
   coin_games: number;
+  peak: number | null;
+  streak: number | null;
 }
 
 const DAY = 86_400_000;
@@ -35,12 +37,21 @@ const fromRow = (r: RankedRow): RankedRecord => ({ rating: r.rating, rd: r.rd, g
  * A player's ranked record, or a new one (seeded from their account's rating from other modes) if they have none; and
  * the daily coin cap's count as stored (`coins`: the UTC day of their last paying game and how many paid that day).
  */
-export async function rankedRecordOf(sql: Sql, userId: string): Promise<{ record: RankedRecord; stored: boolean; coins: { day: number | null; games: number } }> {
-  const row = await sql.first<RankedRow>("SELECT rating, rd, games, wins, losses, draws, ladder, last_at, coin_day, coin_games FROM ranked_1v1 WHERE user_id = ?", userId);
-  if (row) return { record: fromRow(row), stored: true, coins: { day: row.coin_day, games: row.coin_games ?? 0 } };
+export async function rankedRecordOf(
+  sql: Sql,
+  userId: string,
+): Promise<{ record: RankedRecord; stored: boolean; coins: { day: number | null; games: number }; peak: number | null; streak: number }> {
+  const row = await sql.first<RankedRow>("SELECT rating, rd, games, wins, losses, draws, ladder, last_at, coin_day, coin_games, peak, streak FROM ranked_1v1 WHERE user_id = ?", userId);
+  if (row) return { record: fromRow(row), stored: true, coins: { day: row.coin_day, games: row.coin_games ?? 0 }, peak: row.peak ?? row.ladder, streak: row.streak ?? 0 };
   const u = await sql.first<{ rating: number | null }>("SELECT rating FROM users WHERE id = ?", userId);
-  return { record: newRankedRecord(u?.rating ?? null), stored: false, coins: { day: null, games: 0 } };
+  return { record: newRankedRecord(u?.rating ?? null), stored: false, coins: { day: null, games: 0 }, peak: null, streak: 0 };
 }
+
+/** The highest ladder reached after a game: the stored peak (or, from before peaks were kept, the ladder), or the new ladder if higher. */
+export const peakAfter = (peak: number | null, ladder: number | null): number | null => (ladder === null ? peak : peak === null ? ladder : Math.max(peak, ladder));
+
+/** The run of wins after a game: one more after a win; a loss or a draw ends it. */
+export const streakAfter = (streak: number, score: number): number => (score >= 1 ? streak + 1 : 0);
 
 /**
  * The daily coin cap for a game that ended on `day`, against the stored count: the paying games so far that day, and
@@ -134,11 +145,11 @@ export async function recordDuel(sql: Sql, g: FinishedDuel, held: (userId: strin
         after[c] = n;
         writes.push(
           stmt(
-            `INSERT INTO ranked_1v1 (user_id, rating, rd, games, wins, losses, draws, ladder, last_game, last_at, coin_day, coin_games)
-             SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM users WHERE id = ?) AND ${mine}
+            `INSERT INTO ranked_1v1 (user_id, rating, rd, games, wins, losses, draws, ladder, last_game, last_at, coin_day, coin_games, peak, streak)
+             SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM users WHERE id = ?) AND ${mine}
              ON CONFLICT (user_id) DO UPDATE SET rating = excluded.rating, rd = excluded.rd, games = excluded.games, wins = excluded.wins,
                losses = excluded.losses, draws = excluded.draws, ladder = excluded.ladder, last_game = excluded.last_game, last_at = excluded.last_at,
-               coin_day = excluded.coin_day, coin_games = excluded.coin_games`,
+               coin_day = excluded.coin_day, coin_games = excluded.coin_games, peak = excluded.peak, streak = excluded.streak`,
             g.players[c],
             n.rating,
             n.rd,
@@ -151,6 +162,8 @@ export async function recordDuel(sql: Sql, g: FinishedDuel, held: (userId: strin
             n.lastAt,
             count.store.day,
             count.store.games,
+            peakAfter(before[c].peak, n.ladder),
+            streakAfter(before[c].streak, score),
             g.players[c],
             g.id,
             nonce,
@@ -177,8 +190,8 @@ export async function recordDuel(sql: Sql, g: FinishedDuel, held: (userId: strin
     const gamesNow = "COALESCE((SELECT games FROM ranked_1v1 WHERE user_id = ?), 0)";
     await sql.batch([
       stmt(
-        `INSERT OR IGNORE INTO ranked_1v1_games (id, white_id, black_id, control, result, reason, moves, times, started_at, ended_at, nonce)
-         SELECT ?, ${who}, ${who}, ?, ?, ?, ?, ?, ?, ?, ? WHERE ${gamesNow} = ? AND ${gamesNow} = ?`,
+        `INSERT OR IGNORE INTO ranked_1v1_games (id, white_id, black_id, control, result, reason, moves, times, started_at, ended_at, nonce, white_points, black_points)
+         SELECT ?, ${who}, ${who}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ${gamesNow} = ? AND ${gamesNow} = ?`,
         g.id,
         g.players.w,
         g.players.w,
@@ -192,6 +205,9 @@ export async function recordDuel(sql: Sql, g: FinishedDuel, held: (userId: strin
         g.startedAt,
         g.endedAt,
         nonce,
+        // (Each side's rank points: null in placements and for a side fair play holds.)
+        outcome.w.change?.points ?? null,
+        outcome.b.change?.points ?? null,
         g.players.w,
         before.w.record.games,
         g.players.b,
@@ -262,10 +278,10 @@ export function duelGamesOf(sql: Sql, userId: string, limit = 50): Promise<DuelG
 /** The account's part of "Download my data": its rank and its kept games (the opponent by name; not fair play's check). */
 export async function rankedDownload(sql: Sql, userId: string): Promise<unknown> {
   return {
-    rank: await sql.first("SELECT rating, rd, games, wins, losses, draws, ladder, last_at, coin_day, coin_games FROM ranked_1v1 WHERE user_id = ?", userId),
+    rank: await sql.first("SELECT rating, rd, games, wins, losses, draws, ladder, last_at, coin_day, coin_games, peak, streak FROM ranked_1v1 WHERE user_id = ?", userId),
     games: await sql.all(
       `SELECT CASE WHEN g.white_id = ?1 THEN 'white' ELSE 'black' END AS color, u.name AS opponent, g.control, g.result, g.reason, g.moves, g.times,
-         g.started_at, g.ended_at
+         g.started_at, g.ended_at, CASE WHEN g.white_id = ?1 THEN g.white_points ELSE g.black_points END AS points
        FROM ranked_1v1_games g LEFT JOIN users u ON u.id = CASE WHEN g.white_id = ?1 THEN g.black_id ELSE g.white_id END
        WHERE g.white_id = ?1 OR g.black_id = ?1 ORDER BY g.ended_at`,
       userId,

@@ -1,5 +1,5 @@
 import { ASK_AGE_LINE, CHAT_MOD, oldEnough, type ChatPicks, type ShopState } from "@chessroyale/core";
-import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, RankEffect, RankView } from "@chessroyale/core";
+import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, RankedSummary } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
 
 /**
@@ -18,35 +18,8 @@ export interface ModeStats {
   teamWins: number;
 }
 
-/**
- * A ranked 1 v 1 game on a profile (RankedSummary.recent: the last five, newest first). The opponent's `look` is how the
- * server dresses their pawn; no account (a bot, or one since deleted): `id` null.
- */
-export interface RankedGame {
-  opponent: { id: string | null; name: string; look?: ItemLook };
-  result: "win" | "loss" | "draw";
-  /** Rank points gained or lost by the game (null: a placement game, or unknown). */
-  rp: number | null;
-  /** When the game ended. */
-  at: number;
-}
-
-/**
- * A player's ranked 1 v 1: the rank (core's RankView) and the record, and (from the ranked tiers' later commits; missing
- * from a server that doesn't send them yet, shown as "—") their peak rank, their win streak and their last games.
- */
-export interface RankedSummary {
-  rank: RankView;
-  games: number;
-  wins: number;
-  losses: number;
-  draws: number;
-  /** The best rank they've reached (null: none yet). */
-  peak?: RankView | null;
-  /** Wins in a row now (0: their last game wasn't one). */
-  streak?: number;
-  recent?: RankedGame[];
-}
+/** A player's ranked 1 v 1 (core's RankedSummary: the rank, the record, the peak, the streak and the recent games). */
+export type { RankedSummary };
 
 export interface Profile {
   user: { id: string; name: string; icon: string; signedIn: boolean; email: string | null; google: boolean };
@@ -399,11 +372,10 @@ export interface PublicProfile {
   /** They hide when they're online (Settings → Friends): `online` false and `lastSeen` null. */
   hidden?: boolean;
   rating: number | null;
-  tier: { label: string; level: number; color: string; effect: RankEffect | null } | null;
   topPercent: number | null;
   /** Banned for fair play (the profile says so; nothing else about fair play is shown). */
   banned?: boolean;
-  /** Ranked 1 v 1: the rank and the record (null when banned; missing from an older server). */
+  /** Ranked 1 v 1: the rank shown everywhere, the record, the peak, the streak and the recent games (null when banned; missing from an older server). */
   ranked1v1?: RankedSummary | null;
   crowd: { games: number; wins: number; avgPlace: number | null; best: number | null; cutsSurvivedPct: number | null; brilliant: number | null };
   boss: { raids: number; bossesBeaten: number; strikesSurvived: number | null; lastStands: number | null; survivedPct: number | null; brilliant: number | null };

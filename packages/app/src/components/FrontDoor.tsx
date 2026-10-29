@@ -1,6 +1,7 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useRef } from "preact/hooks";
-import { FRONT_DOOR, ratingTier, type ItemLook, type ItemSlot, type RankEffect } from "@chessroyale/core";
+import { FRONT_DOOR, type ItemLook, type ItemSlot } from "@chessroyale/core";
+import type { HomeRankLine } from "../ranked.ts";
 import { Avatar } from "./Items.tsx";
 import { account } from "../account.ts";
 import type { LiveCounts } from "../live.ts";
@@ -200,39 +201,34 @@ export function LiveLine({ live, stacked }: { live: LiveCounts | null; stacked?:
   );
 }
 
-/** What a rank needs to be drawn: its name, color and (the top ranks) effect. */
-export type RankLook = { label: string; color: string; effect: RankEffect | null };
-
-const rankClass = (t: RankLook) => `tier${t.effect ? ` rank-${t.effect}` : ""}`;
-
-/** The rank pill on a profile: "Weighty · 1612" in the rank's color (the top three dressed up), or "No rating yet". */
-export function RankPill({ tier, rating }: { tier: RankLook | null; rating: number | null }) {
-  if (!tier || rating === null) return <span class="fd-pill">No rating yet</span>;
-  return (
-    <span class={`fd-pill ${rankClass(tier)}`} style={{ "--tier": tier.color }}>
-      {`${tier.label} · ${Math.round(rating)}`}
-    </span>
-  );
+/** A profile's rating pill: the crowd rating's number ("Rating 1612"), or "No rating yet". (No rank name: since Oct 28 the rank shown is 1 v 1's.) */
+export function RatingPill({ rating }: { rating: number | null }) {
+  return <span class="fd-pill">{rating === null ? "No rating yet" : `Rating ${Math.round(rating)}`}</span>;
 }
 
 /**
- * PLACEHOLDERS for an admin's home, until the real ranks and levels exist (Eric, Oct 28: "Delete 'weighty' and replace with
- * Opal III for me as a random test rank"; the level "lvl - 38", "show it at 3/4 like I'm 3/4 to level 39"). Shown only where
- * testSwitchesAllowed(); a player sees their real rank and no level. The real level system replaces these three values.
+ * PLACEHOLDER for an admin's home, until the real levels exist (Eric, Oct 28: the level "lvl - 38", "show it at 3/4 like I'm
+ * 3/4 to level 39"). Shown only where testSwitchesAllowed(); a player sees no level. The real level system replaces it. (The
+ * test rank "Opal III" it came with is now any rank by `?rank=`: ranked.ts, rankFromSwitch.)
  */
-export const TEST_RANK = "Opal III";
 export const TEST_LEVEL = { level: 38, progress: 0.75 } as const;
 
-/** The rank line under your name on home: the rank's name in its color, then the rating ("Weighty · 1612"). An admin sees TEST_RANK's name. */
-export function RankLine({ rating }: { rating: number | null }) {
-  const t = ratingTier(rating);
-  if (!t || rating === null) return <>No rating yet</>;
+/**
+ * The rank line under your name on home (Eric, Oct 28: "we're going with the new ranking system"): your ranked 1 v 1 rank,
+ * the tier and division in the tier's color ("Gold 3 · 45 RP"), "Placement 2/5", or "Unranked" before your first ranked
+ * game; a non-breaking space while your account loads (the line keeps its height). An admin's `?rank=` shows that rank.
+ */
+export function RankLine({ line }: { line: HomeRankLine }) {
+  if (!line) return <>{"\u00a0"}</>;
+  if (line === "unranked") return <>Unranked</>;
+  if (line.placement) return <>{line.label}</>;
+  const i = line.label.indexOf(" · ");
   return (
     <>
-      <span class={`fd-rank ${rankClass(t)}`} style={{ "--tier": t.color }}>
-        {testSwitchesAllowed() ? TEST_RANK : t.label}
+      <span class="fd-rank" style={{ "--tier": line.color }}>
+        {line.label.slice(0, i)}
       </span>
-      {` · ${Math.round(rating)}`}
+      {line.label.slice(i)}
     </>
   );
 }

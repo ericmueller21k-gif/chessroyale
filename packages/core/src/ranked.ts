@@ -1,4 +1,5 @@
 import { RANKED_1V1, type DuelControl } from "./settings.ts";
+import type { ItemLook } from "./crates.ts";
 
 /**
  * Ranked 1 v 1's math (pure; shared by the server, which alone decides ranks, and the app, which shows them):
@@ -174,6 +175,33 @@ export function pointsFor(score: number, expected: number, ratingAfter: number, 
   const draw = score > 0 && score < 1;
   const points = Math.round(2 * p.perGame * (score - expected) + (draw ? adjust / 2 : adjust));
   return score >= 1 ? Math.max(0, points) : score <= 0 ? Math.min(0, points) : points;
+}
+
+/** One of a player's recent ranked games, from their side (never the hidden rating). */
+export interface RankedRecentGame {
+  /** When it ended (ms since 1970). */
+  at: number;
+  /** The other player: their account's id ("deleted" for a deleted account), name and look (null when gone). */
+  opponent: { id: string; name: string; look: ItemLook | null };
+  result: "win" | "loss" | "draw";
+  /** The rank points it moved for this player: null in placements, for a game fair play held, and for games before Oct 28, 2026. */
+  points: number | null;
+}
+
+/**
+ * What a profile shows of a player's ranked 1 v 1 (the server's rankedSummary; /api/me and /api/profile/:id): the rank
+ * shown everywhere, the record, the highest rank reached (`peak`: kept from Oct 28, 2026; null before a ladder), the
+ * current run of wins (`streak`: a loss or a draw ends it; counted from Oct 28), and the last 5 games kept, newest first.
+ */
+export interface RankedSummary {
+  rank: RankView;
+  games: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  peak: RankView | null;
+  streak: number;
+  recent: RankedRecentGame[];
 }
 
 /** A player's ranked record (one row of ranked_1v1). */
