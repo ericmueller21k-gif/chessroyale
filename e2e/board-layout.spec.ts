@@ -39,16 +39,18 @@ const MAIN_ROW_H = 62;
 /**
  * Boss alone: the board's box on a computer (x, y, width = height). Measured on main before the pawn (b9712062); since Oct 29
  * sized by the window's height (the window's less 200 px: docs/decisions/2026-10-29-desktop-board-size.md), old → new:
- * 1280 × 800 408, 456 → 256, 600; 1440 × 900 438, 552 → 286, 696; 1536 × 864 486, 552 → 352, 664; 1920 × 1080 678, 552 → 436,
+ * 1280 × 800 408, 456 → 264, 600; 1440 × 900 438, 552 → 294, 696; 1536 × 864 486, 552 → 360, 664; 1920 × 1080 678, 552 → 444,
  * 880; 1024 × 768 unchanged (width-bound).
  */
 const MAIN_BOARD_BOX: Record<string, { x: number; y: number; w: number }> = {
-  "1280x800": { x: 256, y: 121.3, w: 600 },
-  "1440x900": { x: 286, y: 121.3, w: 696 },
-  "1536x864": { x: 352, y: 121.3, w: 664 },
-  "1920x1080": { x: 436, y: 121.3, w: 880 },
+  "1280x800": { x: 264, y: 121.3, w: 600 },
+  "1440x900": { x: 294, y: 121.3, w: 696 },
+  "1536x864": { x: 360, y: 121.3, w: 664 },
+  "1920x1080": { x: 444, y: 121.3, w: 880 },
   "1024x768": { x: 96, y: 121.3, w: 464 },
 };
+/** A raid's board box at 1280 × 800 (its scoreboard beside it keeps the board width-bound there: main's, before and after Oct 29). */
+const RAID_BOARD_BOX: Record<string, { x: number; y: number; w: number }> = { "1280x800": { x: 408, y: 121.3, w: 456 } };
 /** …and the move list's height there then: the board's less 146 px (at least 160 px). */
 const mainSideH = (board: number) => Math.max(160, board - 146);
 
@@ -267,7 +269,9 @@ test("a computer: Boss alone has no scoreboard and your pawn left of the God Kin
     }
     const { board, king, side } = { board: b.board!, king: b.king!, side: b.side! };
     // The board is exactly where and as big as on main.
-    const main = MAIN_BOARD_BOX[size]!;
+    // (A raid at 1280 × 800: its own box, main's, unchanged since its scoreboard leaves the board width-bound. It was checked
+    // against Boss alone's, the same box until Oct 29, when Boss alone's grew.)
+    const main = raid ? RAID_BOARD_BOX[size]! : MAIN_BOARD_BOX[size]!;
     if (!raid || size === "1280x800") for (const [k, v] of [["x", board.x - main.x], ["y", board.y - main.y], ["width", board.r - board.x - main.w], ["height", board.b - board.y - main.w]] as const) expect(Math.abs(v), `${at}: the board's ${k}`).toBeLessThanOrEqual(1);
     // The moves: from the board's top, half as tall as they were, the column's width, a small gap off the board; over nothing.
     expect(Math.abs(side.y - board.y), `${at}: level with the board's top`).toBeLessThanOrEqual(1);

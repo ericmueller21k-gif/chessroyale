@@ -65,9 +65,13 @@ above and below it**, never wider than its column:
 3. **Computers only, by the pointer.** The desktop layout starts at 900 × 600, which an iPad on its side also is. "Mobile,
    everything's totally fine": a touch screen keeps the old sizes (a new check pins 1024 × 768 and 1180 × 820 with touch to main).
    A touch laptop's mouse is its main pointer, so it gets the new sizes.
-4. **Boss alone's empty left column: 200 px (was 360).** It was kept for the boss and Babur's pump (docs/decisions/2026-10-25-board-
-   layout.md); 200 px holds the widest boss (Folio's head included) with the board as big as 1280 × 800 lets it. A raid's
-   scoreboard keeps its 360 px.
+4. **Boss alone's empty left column: 216 px (was 360), 240 px without the eval bar.** It was kept for the boss and Babur's pump
+   (docs/decisions/2026-10-25-board-layout.md); now it's sized for the boss **and his words**: his text box (up to 244 px wide,
+   right-aligned on him) ends 258 px left of the board, so at 216 px it stays in the window at every width from 1100 px (with no
+   eval bar the board takes the bar's 24 px and he stands 24 px further out, hence 240). A first try at 200 px put it 2 px off the
+   window at 1280 × 800 (CI: `gardener.spec.ts`'s "whole and in view", and Hollow's DARKNESS! line in `boss-speech.spec.ts`
+   short of its full time while SpeechBox moved it back in); the board keeps its 600 px there either way. A raid's scoreboard keeps
+   its 360 px.
 5. **Babur's column grows with the board** (`170 + 0.175 × (the window's height − 200)` px). His pump is a stage-4 queen as tall
    as her piece (docs/decisions/2026-10-24-babur-desktop-pump.md), so it's about 0.17 of the board wide: at 200 px it no longer
    fitted beside him at 1280 × 800 (and for players, without the eval bar, at 1440 × 900) and went to the taller bar. With his
@@ -104,9 +108,14 @@ test is untouched).
   turn, a crowd's reveal) one size. Babur: the pump beside him at every size, one board size over time and through his game.
   Phones and tablets: the board's box (x, y, side) is main's at 390 × 844, 430 × 932, 768 × 1024, 844 × 390 and a tablet on its side
   (1024 × 768, 1180 × 820, touch), Boss alone, the Crowd and 1 v 1.
-- `e2e/board-layout.spec.ts`, the computer test: "the board's box is main's" (Boss alone) → the new sizes: 1280 × 800 x 408, 456 → 256,
-  600; 1440 × 900 438, 552 → 286, 696; 1536 × 864 486, 552 → 352, 664; 1920 × 1080 678, 552 → 436, 880; 1024 × 768 unchanged.
-  "A raid's scoreboard where it was": 1440 × 900 x 40 → 10, 1920 × 1080 x 280 → 118 (the screen beside it is wider), 1280 × 800
-  unchanged.
+- `e2e/board-layout.spec.ts`, the computer test: "the board's box is main's" (Boss alone) → the new sizes: 1280 × 800 x 408, 456 → 264,
+  600; 1440 × 900 438, 552 → 294, 696; 1536 × 864 486, 552 → 360, 664; 1920 × 1080 678, 552 → 444, 880; 1024 × 768 unchanged. A raid
+  at 1280 × 800 was checked against Boss alone's box (the same box until now): it has its own, main's 408, 456, unchanged (its
+  scoreboard keeps the board width-bound there). "A raid's scoreboard where it was": 1440 × 900 x 40 → 10, 1920 × 1080 x 280 → 118
+  (the screen beside it is wider), 1280 × 800 unchanged.
+- `packages/app/test/banners.test.ts`: the slam's `animation: fb-slam 2.5s` → `fb-slam 0.48s` (the same motion, its keyframes rescaled:
+  7.2 / 12 / 15.6 / 19.2% of 2.5 s → 37.5 / 62.5 / 81.25 / 100% of 0.48 s; the Last Stand's 3.1 s stretch → 0.5952 s).
+- Unchanged and passing: `gardener.spec.ts`'s and `boss-speech.spec.ts`'s "whole and in view" checks for the boss's lines (they
+  caught the 200 px column; the layout was fixed, not the checks).
 - `packages/app/test/tiger-wired.test.ts`: the pump never needs more than the taller bar keeps, now up to a 1600 px board (was 1000),
   and board-size.css' taller-bar budget uses the same share.

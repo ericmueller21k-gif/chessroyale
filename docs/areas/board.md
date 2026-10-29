@@ -95,7 +95,7 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
     column; the screen grows to hold it (`--scr`), at least its old width, never past the window. So it grows and shrinks
     live with the window and with nothing else (every screen of a game has the same room). Where the window is too narrow
     (a scoreboard's 360 px and the 340 px column beside the board), the board is width-bound instead, never overlapping
-    them. Boss alone's empty left column is 200 px (Babur's grows with the board, for his pump). A computer is a window
+    them. Boss alone's empty left column is 216 px, 240 without the eval bar (room for the boss and his words; Babur's grows with the board, for his pump). A computer is a window
     900 × 600 and up **with a mouse** (`pointer: fine`): phones and tablets, a tablet on its side included, keep their
     sizes to the pixel. Auto chess has its own board and frame: not changed. Tests: `e2e/desktop-board.spec.ts`.
   - **When it draws** (Oct 14, 2026; DECISIONS.md, "The board draws its pieces only when they change"): the board is

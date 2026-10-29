@@ -10,8 +10,9 @@
  *   it, the gutters), never past the window: where the window is too narrow, the board shrinks to its column (width-bound)
  *   rather than anything overlapping. At least the old width (1000 px beside a leaderboard, 1100 px without), so a short window
  *   keeps the old layout.
- * - Boss alone's empty left column (`.tower-space`, kept for the boss and Babur's pump) is 200 px instead of the leaderboard's
- *   360: room for the widest boss beside the board, the rest to the board. Babur's grows with the board, for his pump.
+ * - Boss alone's empty left column (`.tower-space`, kept for the boss and Babur's pump) is 216 px instead of the leaderboard's
+ *   360: room for the widest boss beside the board and for his words (his text box, up to 244 px, right-aligned on him, ends
+ *   258 px left of the board: in the window at every width), the rest to the board. Babur's grows with the board, for his pump.
  * - A computer is a window 900 × 600 and up with a mouse (`pointer: fine`): a tablet on its side (a touch screen as wide) keeps
  *   its layout exactly as before.
  * - Everything beside and on the board already follows its size: the move list (`--board-px`), the God King, your pawn and the
@@ -83,10 +84,15 @@
     --scr: min(100vw - 380px, max(1000px, var(--scr-need)));
   }
   .tower-space {
-    flex-basis: var(--ts-w, 200px);
+    flex-basis: var(--ts-w, 216px);
   }
   .arena:has(> .tower-space) .screen.game {
-    --scr: min(100vw - var(--ts-w, 200px) - 20px, max(1000px, var(--scr-need)));
+    --scr: min(100vw - var(--ts-w, 216px) - 20px, max(1000px, var(--scr-need)));
+  }
+  /* (With no eval bar, every player's board, the board takes the bar's 24 px and the boss stands 24 px further out: his column is
+     24 px wider, so his words keep their room.) */
+  .arena:not(:has(.board-row > .eval-bar)) {
+    --ts-w: 240px;
   }
   /* Babur: his pump stands beside him (docs/decisions/2026-10-24-babur-desktop-pump.md) and grows with the board (a stage-4 queen
      on it as tall as her piece: up to 0.177 of the board wide), so his column grows with the board's height bound too: room for
