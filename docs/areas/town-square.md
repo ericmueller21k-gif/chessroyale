@@ -376,7 +376,7 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
     name tag like a boss's, as before; the bot holds still while it's open, `hold`). **One row, one size, 232 × 60 px on a phone and
     a computer alike** (Eric's mockup, Oct 28; `.town-person` in `town.css`), whoever it is: the picture, the words, Play.
     - **The picture** (a 40 px round, a 3 px ring, `.town-pic`): a sidekick's face (`spriteFace`, its idle's first frame) in a
-      **blue** ring (`#4575fa`, the blue of the sidekicks' name tags); a pawn's own picture, as it stands in the square (its crate
+      **blue** ring (`#4575fa`: lighter than the sidekicks' name tags' `#1d4ed8`, because the ring needs 3:1 on the dark card and the tag needs white text on it at 4.5:1); a pawn's own picture, as it stands in the square (its crate
       items on, cut to what's drawn, `pawnFace` in `Town.tsx`), in an **ivory** ring (`#eadfc6`, the white of a pawn's tag); a
       real player's profile icon (`UserIcon`), also ivory. Made once as the card opens (`faceOf`), never in the frame loop. **A bot's
       picture is no button** (a plain box: no button cursor, no focus, a tap does nothing); **a real player's is a button**,

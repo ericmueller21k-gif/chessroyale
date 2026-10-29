@@ -301,8 +301,8 @@
   height: 60px;
   padding: 0 5px;
 }
-/* The picture: a round ring in the kind's color on a white disc. A sidekick's is blue (the blue of the sidekicks' name tags), a pawn's and a
-   real player's ivory (the white of theirs): both read on the dark card (ivory 12:1). A real player's is a button for their profile; a bot's
+/* The picture: a round ring in the kind's color on a white disc. A sidekick's is blue (`#4575fa`, the same family as the sidekicks' name tags but lighter: the ring needs 3:1 on this
+   dark card, the tag's `#1d4ed8` needs white text on it at 4.5:1), a pawn's and a real player's ivory (the white of theirs): both read on the dark card (ivory 12:1). A real player's is a button for their profile; a bot's
    is a plain box (no button cursor, no focus). */
 .town-pic {
   --ring: #eadfc6;
