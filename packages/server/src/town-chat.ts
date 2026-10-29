@@ -8,11 +8,12 @@ import { FILLERS, chatRefusal } from "./text-filter.ts";
  * TOWN_CHAT.repeatMs, and through the filter (slurs, hate terms and swear words refused alike; links and contact details
  * refused with their own reason: text-filter.ts).
  *
- * Nothing is stored: the lines live in this object's memory for TOWN_CHAT.lineMs each, and a restart forgets them (a new
- * `room`, so every app starts its players' lines afresh). The live hub sweeps it on an alarm at the next line's minute
- * (`sweep`, `nextExpiry`), so nothing stays past it even in an empty town; what's kept for the wait and the repeat is
- * when and a hash of the words, never the words. A newcomer gets the last TOWN_CHAT.keep. A moderator can take one line
- * out (`remove`); its number is kept for the same minute so every reader's log drops it too.
+ * Nothing is stored: the lines live in this object's memory for TOWN_CHAT.lineMs each (5 minutes since Oct 28: the app's log
+ * scrolls back that far, and Report and Remove work on any line it shows), and a restart forgets them (a new `room`, so every
+ * app starts its players' lines afresh). The live hub sweeps it on an alarm when the next line is due to go (`sweep`,
+ * `nextExpiry`), so nothing stays past it even in an empty town; what's kept for the wait and the repeat is when and a hash of
+ * the words, never the words. A newcomer gets the last TOWN_CHAT.keep. A moderator can take one line out (`remove`); its number
+ * is kept for the same time so every reader's log drops it too.
  * See docs/decisions/2026-10-28-town-chat-typing.md.
  */
 

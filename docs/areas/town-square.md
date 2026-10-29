@@ -5,7 +5,7 @@ Boss raid's coming home: a small round world where players walk around and meet 
 the time of day, the curved ground, all fourteen boss homes with their bosses roaming near them, the bots (twenty since Oct
 28: six pawns and the bosses' fourteen sidekicks) and you; slice 4
 added the press, the trail and the cards; **slice 5 the Colosseum** in the middle; **slice 6** made the Colosseum about
-twice its size, the map bigger, and put **the park** with its ten chess tables in front of its gate; **the lights** (Oct 27) light the park's lamps and the homes' windows at dusk and night; **the chat log** (Oct 28; v2 the same day) is one see-through box in the top left corner, with a chat icon and a gear in the header, where the bosses and their kids say a line now and then and signed-in players type. Home's **Boss Arena** card (Oct 26, Eric)
+twice its size, the map bigger, and put **the park** with its ten chess tables in front of its gate; **the lights** (Oct 27) light the park's lamps and the homes' windows at dusk and night; **the chat log** (Oct 28; v2, v3 and v4 the same day) is one box in the top left corner, with a chat icon and a gear in the header, where the bosses and their kids say a line now and then and signed-in players type (tap the box to type); **name tags** (Oct 28) show only near you by default, a boss's sidekick's in blue. Home's **Boss Arena** card (Oct 26, Eric)
 opens it, and the computer's side menu's Boss Arena item; the address `/town` opens it directly too (`hunchess.com/town`,
 behind Cloudflare Access like the rest of the site). Phone and computer.
 
@@ -137,10 +137,25 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
   more kinds of square (`groundAt`: paving and grass), drawn with the board's in the same color-sorted fills. Tables, trees,
   benches and the fountain are solid (`walkable`); stools, paths and grass are walked on. Each picture is made once (a
   `FrameCache` per kind) and drawn as one item sorted with the people, a little behind whoever stands on its row.
-- **Name tags** (Oct 28): each drawn once per name, size and color (its pill, its soft shadow and its name, at the
-  device's pixels) and stamped each frame (`drawTag`, `tagArtOf` in `render.ts`; about 64 kept, the least lately used
+- **Name tags** (Oct 28): each drawn once per name, size and **kind** (`TagKind`: you, a pawn's "bot", a boss's "sidekick"; its pill, its soft
+  shadow and its name, at the device's pixels; `TagCache` in `tags.ts` is the cache's keyed lookup and its least-lately-used eviction, tested
+  without a canvas) and stamped each frame (`drawTag`, `tagArtOf` in `render.ts`; about 64 kept, the least lately used
   making way; drawn again when a web font loads); a fading tag stamps its shadow, pill and name one over the other, as
   they were drawn before. The things are sorted far to near in place (`sortFarFirst`, nothing allocated).
+  - **Colors** (`TAG_STYLE`): a pawn's pill white (`rgba(255,255,255,.92)`) with dark ink, yours gold (`rgba(255,215,106,.96)`), **the 14 boss
+    sidekicks' blue** (`rgba(29,78,216,.96)`, `#1d4ed8`) **with white text**: 6.7:1 with white, still over 6 over the lightest backdrop (WCAG AA is
+    4.5:1), and clear of the day sky, the sand, the grass and the night sky (the measurements: docs/decisions/2026-10-28-name-tags-near-you.md). A sidekick is a bot whose look is a sprite (`isSprite`). White and gold are drawn pixel for pixel as before (#399's check: at most
+    3/255 against the old per-frame drawing).
+  - **Names near you** (Eric, Oct 28: "only people in the radius around you have names shown and as you walk they fade in and out, the people are
+    always visible but the name tags no"; `town/tags.ts`, `TOWN_FEEL.nameRadius` 5 and `nameFadeSquares` 1): by default (`near`) a figure's
+    tag shows only while the figure is within **5 squares of you in both directions** (|dc| ≤ 5 and |dr| ≤ 5, about a 10 × 10 area, from the
+    fractional positions the walkers are drawn at), **fading** over the last square at the edge (alpha 1 up to 4.5, linearly to 0 at 5.5:
+    `nameAlpha`; stateless, from positions each frame, nothing allocated). It takes the smaller alpha of that and today's far-distance fade
+    toward the rim (`tagFar`; `tagAlpha`). **Always shown, whatever the distance**: your own tag; a figure whose card is open (`town.hold`);
+    one seated at a table with you; one walking to or from a game with you (`town.meet`, `town.leave`). The figures are always drawn; only the
+    tags go. **"Everyone"** (Town settings, under Chat: "Names", the choices "Near you" and "Everyone", the line "Near you: names show within 5
+    squares of you.") is exactly the old behavior. Remembered on this device (localStorage `brc.townNames`, `near` or `everyone`, in a try/catch).
+    Test hook: `__townTags()` lists the tags drawn in the last frame.
 - **The tables' boards** (Oct 27; docs/decisions/2026-10-27-park-tables-live.md): each table's top is a flat slab drawn
   through the camera (`drawBoard` in `render.ts`; sizes `TABLE_BOARD`, pieces `TABLE_PIECES`, the clock's digits
   `TABLE_DIGITS` in `houses/park.ts`; timings in `TOWN_FEEL`'s `table*`), its 8 x 8 board lying flat between the stools and
@@ -195,53 +210,77 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
   fade… and when somebody says something again, it appears again"; `docs/decisions/2026-10-28-town-chat.md`, then redesigned the
   same day: `docs/decisions/2026-10-28-town-chat-v2.md`; the lines, the modes and every number in `town/chat.ts`, the screen in
   `town/TownChat.tsx`, the header's icons in `town/TownChatTools.tsx`, its styles in `town/town-chat.css`; one mount each in
-  `Town.tsx`). **One see-through box** in the map's **top left corner** (flush, 8 px in), over the map and under the cards: a
-  phone's from the left edge to about two thirds across and a bit under a quarter down (about 5 messages), a computer's 500 × 340
+  `Town.tsx`). **One box** in the map's **top left corner** (flush, 8 px in), over the map and under the cards: a
+  phone's from the left edge to about two thirds across and a bit under a quarter down (about 7 messages), a computer's 500 × 340
   with a bigger font (about 12 lines; `CHAT.computerQuery` is styles.css' computer). It keeps one place and size whatever it
-  holds. **Nothing is drawn behind or round the text** (Eric, Oct 28, from his phone: "clearly a container still showing behind the
-  text"; "I don't want the shadow text period"): no backing, border, bar, box-shadow, text-shadow, backdrop or gradient on the box,
-  the stream, a line or the field (its own look in iPhone Safari switched off too); `--chat-back` (an opacity, 0) is the one dial
-  to raise a backing later. **The text follows the town's sky** ("during daytime background it defaults to black"): our near-black
+  holds, **and in every mode**: the stream ends above a **30 px strip at its foot that is reserved for the typing line** whether it shows
+  or not (v4), so the line appearing moves nothing. **Nothing is drawn behind or round the text** (Eric, Oct 28, from his phone:
+  "clearly a container still showing behind the text"; "I don't want the shadow text period"): no backing, border, bar, box-shadow,
+  text-shadow, backdrop or gradient on the box, the stream, a line or the typing line (its own look in iPhone Safari switched off
+  too) **except the one the v4 background gives**: `.tc-back`, one rounded rectangle behind the whole box (the stream and the typing line
+  together) with a faint tint (white at 26% by day, a dark `rgb(8 12 24)` at 34% by night, so the white night text reads) and, **while you
+  type**, a slight `backdrop-filter: blur(3px)`, measured off Eric's mockup. It shows while you're typing, or whenever the box shows when
+  **"Chat background"** (Town settings, off by default, remembered on this device: `brc.townChatBackground`) is on (`chatBlurs`: while the box
+  shows and typing or the setting); with the setting on and nothing typed it is **the tint alone**: **the blur only while typing is the
+  frame rate's corner cut** (measured by eric.md's method it cost a phone about 0.3 ms a frame when it showed all the time: [the decision's
+  v4 section](../decisions/2026-10-28-town-chat-v2.md); one more CSS selector puts it back). It is nothing until then: no backdrop is asked
+  of the frame. `--chat-back` (the v3 dial) is gone. **The
+  text follows the town's sky** ("during daytime background it defaults to black"): our near-black
   ink by day, dawn and dusk, white by night, by one attribute on the box (`data-tone`, `day` or `night`; `skyTone` in `sky.ts`: night's
   weight against `TOWN_FEEL.chatNightAt`, 0.5, so it flips mid-blend at 5:30 and 19:30; read from `?sky=` or the clock about once a
-  minute by the screen itself, never per frame, and only a flip redraws). Plain DOM, drawn only when a line comes or goes
-  (a few a minute); the fade is a CSS opacity transition; nothing in the frame loop.
+  minute by the screen itself, never per frame, and only a flip redraws). Plain DOM, drawn only when a line comes or goes or typing opens
+  or closes (a few a minute); the fade is a CSS opacity transition; nothing in the frame loop.
+  - **To chat, tap the box** (v4; Eric: "to chat you tap the chat box anywhere that isn't someone's name"). **Anywhere on it but a player's
+    name** opens typing: the blur behind the box, the typing line in the strip at its foot (an `<input>` with **no placeholder**, no border
+    and no backing, `visibility: hidden` until typing: the instant a tap lands it is switched on and `focus()`ed in the tap's own handler, which
+    iPhone needs to open the keyboard, with the `click` that follows as a backstop), focused (the keyboard on a phone, the cursor on a
+    computer). **Enter or the keyboard's Send sends** and closes it; **a press on the map or Escape closes it** (the line hides, the keyboard goes,
+    the blur goes unless the setting holds it); the words you typed stay for the next tap. A guest, a young device, a paused chat or a chat
+    ban gets the same line **greyed with the reason in it** ("Sign in to chat with other players.", …): the reason is the disabled input's
+    placeholder, so no "Say something…" is anywhere. A tap is a press under `holdMs` (400 ms) that moves under `holdSlopPx` (8 px); a finger that
+    moves scrolls the stream, and press and hold picks the box up, as before. While typing, in new messages, the lines are held and every
+    line shows ("high text", below). A keyboard reaches the box with Tab (the stream takes focus) and Enter opens typing.
   - **The modes** (`ChatMode`, remembered on this device: localStorage `brc.townChatMode`, in a try/catch; "always on" until one
-    is set): **always on** (the default: the box and **its field** always show; **the field is here and nowhere else**, so you can
-    only chat in this mode), **new messages only** (the lines show when a message comes and fade `fadeAfterMs` after the last;
-    **no field at all**, and the stream runs to the box's foot; each burst shows only its own new lines, and a tap on a
-    line's text brings back every line of the last minute, scrollable, until it fades again after `fadeAfterMs` with nothing new:
-    Eric's "tap a message and then you see the faded ones"), **off** (no box, no field: the lines, the chatter and other players'
-    lines still arrive, with no extra request, so turning it on shows the last minute). The header's **chat icon** (two speech
-    bubbles in our own drawing: always on both green, new messages the top one green and the bottom gray, off both gray; named
-    "Chat: always on", "Chat: new messages only", "Chat: off") goes to the next mode on a tap. The **gear** beside
-    it opens "Town settings", a small sheet over the town (the match options' look) with the chat's mode as three choices (Always
-    on, New messages, Off) and nothing else yet. Both sit at the right end of the "Town square" bar's line, a phone's and a
-    computer's alike, never over the title. The box's place and size are the same in always on and new messages; off takes
+    is set): **always on** (the default: the box always shows, never fades, and keeps **every line of the last 5 minutes, at most 100**,
+    to scroll back through), **new messages only** (**the same box, differing only in that the lines fade**: they show when a message comes
+    and fade `fadeAfterMs` after the last; each burst shows only its own new lines; **a tap while they show opens typing and behaves as
+    always on until you finish**, "temporarily making it 'high text'" (Eric): every line of the history, no fade, scrollable, until you
+    send, tap the map or press Escape, and then it fades after the wait as usual; **the icon stays one bubble green throughout**; faded, the
+    box takes no touches and the map under it gets them), **off** (no box: the lines, the chatter and other players' lines still arrive, with
+    no extra request, so turning it on shows the history; off stays off: nothing to type in). Switching to always on shows the whole history to
+    scroll back. The header's **chat icon** (two speech bubbles in our own drawing: always on both green, new messages the top one green and
+    the bottom gray, off both gray; named "Chat: always on", "Chat: new messages only", "Chat: off") goes to the next mode on a tap. The **gear**
+    beside it opens "Town settings", a small sheet over the town (the match options' look): the chat's mode as three choices (Always on, New
+    messages, Off), under them **"Chat background"** (a switch, off by default; its line: "A soft tint behind the chat, always on while the chat
+    shows.": the tint always, the blur while you type), and under Chat **"Names"** (two choices, "Near you" and "Everyone"; "Name tags", below). Both icons sit at the right end of the "Town
+    square" bar's line, a phone's and a computer's alike, never over the title. The box's place and size are the same in every mode; off takes
     it away (the box is hidden and the edge chips may use its space).
   - **A line**: "[9:41] Name: message" (this device's clock, 12-hour, no am/pm; the name bold: gold for a boss and mint for a kid,
     each deeper by day and as it was by night; **a player's in a palette color**, below), newest at the bottom, at most two lines
     then "…". The stream **starts at the box's top** and the
-    field's strip is fixed at its foot. The box holds **every line of the last minute**: **removed for good** `lifeMs` (60 s)
-    after it was said. Longer than the box, it **scrolls**: a finger on a phone (native touch scroll: `touch-action: pan-y` on
-    the lines), the wheel on a computer (the wheel over the box scrolls it and never zooms the map); a thin scrollbar shows where
-    you are. New lines keep it at its foot unless you've scrolled up (`Stick`); then it stays where you are and a small "↓ new"
+    typing line's strip is below it. The box holds **every line of the last 5 minutes** (`lifeMs`, the server's `TOWN_CHAT.lineMs`;
+    **removed for good** that long after it was said) **and at most 100** (`keepLines`, `TOWN_CHAT.deviceMax`; the oldest first), the
+    lines only you see too. Longer than the box, it **scrolls**: a finger on a phone, the wheel on a computer (the wheel over the box
+    scrolls it and never zooms the map); a thin scrollbar shows where you are. **The stream itself takes the touches** (v4, the iPhone
+    scroll fix: `pointer-events: auto`, `overflow-y: auto`, `-webkit-overflow-scrolling: touch`, `touch-action: pan-y`): iPhone Safari
+    scrolls a scroll container only when that container is hit-testable, and the v2 stream was `pointer-events: none` with only its lines
+    taking touches; Chromium and desktop scroll either way, which is why no test caught it. New lines keep it at its foot unless you've scrolled up (`Stick`); then it stays where you are and a small "↓ new"
     marker (a tap goes to the newest) says lines came. **Fading** (new messages only): `fadeAfterMs` (8 s) after the last
-    message the lines and the field fade out (`fadeMs`, 1 s; the faded box takes no taps and can't be tabbed to); the next
-    message brings them back (0.2 s).
+    message the lines fade out (`fadeMs`, 1 s; the faded box takes no taps and can't be tabbed to) and the next message brings them back
+    (0.2 s). Always on has no fade path at all: the box shows by `chatShows(mode, shown)`, which reads the timer only in new messages.
   - **One way in**: `say(name, text, kind)` (kind: boss, kid, player, system), dropped when no town is open. **Who talks for
     now**: every `everyMs` (20 to 45 s, at random) one of the 14 bosses with a home, or its kid, says a line from `CHATTER`
     (placeholders until real players chat: two a boss, one or two a kid, under 60 characters; never the Hidden Boss;
     Hollow's kid only eerie; anyone but who spoke last). The kids' names are the sidekicks brief's, kept in `CHATTER` until
     the sidekicks are in `BOTS`.
-  - **Your own line** (Oct 28, Eric): the field at the box's foot, **in always on only**, just its placeholder "Say something…"
-    and your words on nothing (no box, no bar under it, no shadow, no send button), **for a signed-in player on a device the age
+  - **Your own line** (Oct 28, Eric): the typing line in the strip at the box's foot, **opened by a tap on the box** (above), just your words
+    on nothing (no box, no bar under it, no shadow, no send button, no placeholder), **for a signed-in player on a device the age
     gate didn't mark too young** (`mayTownChat`). Everyone else sees it greyed with why (nothing hidden): "Sign in to chat with
     other players." for a guest, "Chat with other players is for accounts 13 and older." for a young device: at most `maxChars` (80) characters (a count, "7 left", only for the last `nearEnd` (10), shown whole), the keyboard's
     Send or Enter sends (`enterkeyhint="send"`, no button), one message per `sendEveryMs` (15 s; **no "Wait 12 s" in the field any
-    more**: the field stays as it is and a try inside the 15 s gets a line only you see, below), 16 px type so iPhone Safari doesn't zoom. The numbers are the server's (`TOWN_CHAT`), which
-    decides. **The keyboard** opening must not resize or move the town: while the field has focus the screen keeps its
-    height and follows `visualViewport` (`pinTown`); a press on the map lets the field go.
+    more**: the line stays as it is and a try inside the 15 s gets a line only you see, below), 16 px type so iPhone Safari doesn't zoom. The numbers are the server's (`TOWN_CHAT`), which
+    decides. **The keyboard** opening must not resize or move the town: while the line has focus the screen keeps its
+    height and follows `visualViewport` (`pinTown`); a press on the map closes typing and lets the keyboard go.
   - **Players' messages** (Oct 28; `town/chat-net.ts`; the server and every rule: [chat.md](chat.md), "The town square's
     typed chat", and `docs/decisions/2026-10-28-town-chat-typing.md`). Sending is `sendTownChat(text)` (async): the field
     waits for the server's answer, keeping your words and the keyboard; your line comes back in the answer and goes into the
@@ -264,21 +303,21 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
     it's a whole number below 32 and carries it on the line), and every reader draws that line's name in it, so everyone sees the
     same color for that player's visit; a line with none (an older app, a test-hook line) gets a steady color from the account (else
     the name). Your own name too. A boss's name stays gold and a kid's mint.
-  - **A line's menu**: a tap on a player's **name** (or, with the chat always on, on their line's text; `onTownChatLineTap`;
+  - **A line's menu**: a tap on a player's **name** (v4: the name only; a tap on their text opens typing like the rest of the box; `onTownChatLineTap`;
     lines said by the test hook have no one behind them and open nothing) opens a small card under the line (above it when it
     wouldn't fit): **Profile** (over the town, which stays as it was: Back closes it), **Mute** (by account, on this device, every
     chat), **Report** (fair play's report with "Offensive chat"; the server reads the line's words from its room; the answer shows
     in the card, which then closes), and for a moderator (`profile.admin`) **Remove** (the line leaves everyone's log). On your own
-    line Mute and Report are greyed. A tap anywhere else or Escape closes it; the box stays on show while it's open.
-  - **Moving it**: press and hold on the box (`holdMs`, 400 ms; on a line or on the box away from them, not on the field), then
-    drag it anywhere on the map and let go; it's remembered on this device (localStorage `brc.townChat`, in a try/catch; it starts
-    in the corner, and a place remembered from before carries over) and kept inside the map and off the buttons (`clampBox`). A
-    plain tap, or a drag that starts without the hold, is the map's (on a line, a finger drag is the stream's scroll): the listener
-    sits on the map's box, sees the press and, once the hold is up, calls off the map's press with a `pointercancel` (and the
-    browser's pan with a `touchmove`'s `preventDefault` while the box is carried).
-  - **Taps**: the box has `pointer-events: none`, except a **line**, the text field, the "↓ new" marker and a line's menu. So **a tap
-    on the box away from any line reaches the map** (always on and new messages alike). A tap on a boss's or kid's line does nothing
-    (always on) or, in new messages, brings back every line of the last minute (above); on a player's line, see its menu.
+    line Mute and Report are greyed. A tap anywhere else or Escape closes it (a tap away from the menu only closes it; it doesn't also open
+    typing); the box stays on show while it's open.
+  - **Moving it**: press and hold on the box (`holdMs`, 400 ms; anywhere on it but the typing line), then drag it anywhere on the map and
+    let go; it's remembered on this device (localStorage `brc.townChat`, in a try/catch; it starts in the corner, and a place remembered from
+    before carries over) and kept inside the map and off the buttons (`clampBox`). While it is carried the browser's pan is called off with a
+    `touchmove`'s `preventDefault`.
+  - **Taps** (v4): **while the box shows it takes every touch on its own area** (Eric's design: the map under it doesn't get them): the
+    stream scrolls by finger and wheel; a tap on a player's name opens its menu, anywhere else opens typing; a drag that starts without
+    the hold is the stream's scroll (a mouse drag does nothing). **Faded** (new messages), it takes none and the map gets them. The
+    listener sits on the map's box: a press outside the box closes typing (the map still gets that tap).
   - **The edge chips** keep off the box always in always on and new messages, shown or faded, wherever it's put: `CHAT_BOX`
     (chat.ts; `TownChat` writes it, `chipBlocked` in `render.ts` reads it), so a chip never jumps when the log appears or fades;
     with the chat off the box has no size and the chips may use its space.
@@ -338,7 +377,7 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
     a computer alike** (Eric's mockup, Oct 28, about 189 × 53; Oct 29, Eric: near the mockup's size, a long name shrinking its own
     words rather than the card growing; `.town-person` in `town.css`), whoever it is: the picture, the words, Play.
     - **The picture** (a 38 px round, a 3 px ring, `.town-pic`): a sidekick's face (`spriteFace`, its idle's first frame) in a
-      **blue** ring (`#4575fa`, the blue of the sidekicks' name tags); a pawn's own picture, as it stands in the square (its crate
+      **blue** ring (`#4575fa`: lighter than the sidekicks' name tags' `#1d4ed8`, because the ring needs 3:1 on the dark card and the tag needs white text on it at 4.5:1); a pawn's own picture, as it stands in the square (its crate
       items on, cut to what's drawn, `pawnFace` in `Town.tsx`), in an **ivory** ring (`#eadfc6`, the white of a pawn's tag); a
       real player's profile icon (`UserIcon`), also ivory. Made once as the card opens (`faceOf`), never in the frame loop. **A bot's
       picture is no button** (a plain box: no button cursor, no focus, a tap does nothing); **a real player's is a button**,
@@ -448,48 +487,71 @@ noted wherever a slice changed one.
   stool still reached, a pawn and a half tall, lit glass with a halo and a pool), every home's and the Colosseum's light
   spots inside its picture and off its sign (Hollow's green window untouched, none near the statues), and when they shine
   (off at dawn and day, on at dusk and night, following the blend).
-- `packages/app/test/town-chat.test.ts` (Oct 28; v2 and v3 the same day): the line only you see (`tooSoonText`'s seconds rounded up, "1 second";
-  `whisper`: gray system line, one at a time, gone after its minute), the name palette (ten to twelve deep/light pairs, random picks, the
+- `packages/app/test/town-chat.test.ts` (Oct 28; v2, v3 and v4 the same day): the line only you see (`tooSoonText`'s seconds rounded up, "1 second";
+  `whisper`: gray system line, one at a time, gone after its time), the name palette (ten to twelve deep/light pairs, random picks, the
   device's number or a steady one, riding on the line) and the sky's tone (`townTone`: day, dawn, dusk ink and night white, flipping at 5:30 and 19:30,
   `?sky=`); the time's format (12-hour, no am/pm); the three modes (their
   order and cycle, always on, new messages and off; the icon's and the sheet's words; remembered on this device and read back after
-  a reload, a stranger or a blocked storage meaning always on); the log (every line of the last minute kept, no cap; the fade after
-  `fadeAfterMs` and a message bringing the box back; always on showing every line, new messages the burst on show, off none; a tap
-  bringing back every line, a poke while reading, the fade again, the next burst only its own; a line gone after `lifeMs`, one 50 s
-  old still there; held; `say` from every kind; when it tells the screen); the stream pinned to its foot unless scrolled up (`Stick`:
+  a reload, a stranger or a blocked storage meaning always on); **"Chat background"** (its words, off to begin with, remembered and read
+  back after a reload, a stranger or a blocked storage meaning off, told to whoever shows it); **what each mode does** (always on never
+  fades, after the wait or minutes on; new messages fades `fadeAfterMs` after a message, not before; typing in new messages, `talk`: every
+  line and no fade until you finish, then the fade, the next burst only its own; `chatBlurs` over every mode, shown, typing and setting);
+  **the history** (5 minutes and 100 lines, the server's and the device's numbers in one place; a line 4 minutes old still there and gone at
+  5; the oldest dropped first past 100, the private lines counting; the next line's time timed after one goes to the cap); the log
+  (the fade after `fadeAfterMs` and a message bringing the box back; always on showing every line, new messages the burst on show, off
+  none; a tap bringing back every line, a poke while reading, the fade again, the next burst only its own; held; `say` from every kind; when
+  it tells the screen); the stream pinned to its foot unless scrolled up (`Stick`:
   the "↓ new" count, back at the foot); the chatter table (every boss with a home: two lines, its kid one or two, all under 60
   characters, never the Hidden Boss, anyone but who spoke last, all 28 reached, every 20 to 45 s); players' lines (who said them and
   their number, `unsay` by number or by player, a tap reaching the menu; the server's numbers); the box's place (`clampBox`: inside
   the map, off the buttons; stored and read in a try/catch).
 - `e2e/town-chat.spec.ts` (phone and desktop; the chat log): the box flush in the top left (8 px in) with its size per platform, a
-  line's time and bold name colored by kind (a player's from the palette), nothing behind or round the text (computed: no background
-  color, image or gradient, border, outline, box-shadow, text-shadow, backdrop, mask or filter on the box, the stream, a line, a name,
-  the field and its placeholder, enabled, greyed or focused), ink by day, the lines from the box's top and the newest last above the
-  field, a field with no box round it, no bar under it and no send button, two lines then "…", the box unchanged and never fading always on;
-  **the field in always on and nowhere else** (new messages and off have none, the box keeping its place and size); the text's colors
-  by sky (ink by day, dawn and dusk, white by night, the names' and gray lines' shades, no backing in either) and flipping with the
-  device's clock (`page.clock`, 19:30 and 5:30); the stream scrolling back to a line
-  50 s old by finger (a phone) and by wheel (a computer) with the map under it not panning or zooming, the line gone after its
-  minute, the wheel off the box still zooming the map; the stream pinned to its foot, staying put when scrolled up with "↓ new" (its
-  tap, and the foot by hand, giving it up); a tap on the box away from a line reaching the map, a boss's or kid's line taking the
-  finger, a player's name or text (always on) taking its own tap (`__townTapped`); new messages (the lines and the field showing
-  with a message and fading after the wait, not before, the box unchanged, a faded box taking no taps, the next burst only its
-  own lines, a tap on a line's text bringing back every line, scrollable, until it fades again, a name's tap the menu's); the
-  header's icon (never over the title, on its line at the right end; always on (both bubbles green), new messages only (the top one), off (none) with the bubbles' colors and
-  the accessible names; off hiding the box and the field and the lines that came meanwhile showing when it's on again; remembered
-  across a reload) and the gear's "Town settings" sheet (three radios, nothing else, setting the mode, closed by Escape, its X
-  and a tap outside); the text field for a signed-in player (80 characters, the count shown whole, one every 15 s, a try inside the wait
-  giving the gray "Sorry, you can't send another message for N seconds." line and nothing sent to the server, your line back from the
-  server as a player in a palette color, the same all visit, Enter sending); a greyed field for a guest; press and hold moves the box (remembered across a
-  reload, never over the buttons or off the map), a tap or a drag without the hold is the map's; the chips keep off the box (always
+  line's time and bold name colored by kind (a player's from the palette), nothing behind or round the text until you type (computed: no
+  background color, image or gradient, border, outline, box-shadow, text-shadow, backdrop, mask or filter on the box, the blur's `.tc-back`,
+  the stream, a line, a name, the typing line and its placeholder), ink by day, the lines from the box's top and the newest last above the
+  strip, no box round the typing line, no bar under it and no send button, no "Say something…" anywhere, two lines then "…", the box unchanged
+  and never fading always on; **the stream taking touches itself** (`pointer-events: auto`, `overflow-y: auto`, `touch-action: pan-y`; the
+  point over its empty part is the stream's) and scrolling back to a line 4 minutes old by finger (a phone, CDP touch events) and by wheel (a
+  computer) with the map under it not panning or zooming, a line 5 minutes old gone, the wheel off the box still zooming the map; 100 lines
+  at most; **a tap on the box anywhere but a name opening typing** (the blur behind the whole box with a slight blur and a faint light tint,
+  a focused typing line with no placeholder at the box's foot, no line moved, the box unchanged, the map not seeing the tap; Escape and a press
+  on the map closing it and keeping the words; a name's tap the menu's, a text tap typing's; Enter sending and closing it); **typing works wherever the
+  box shows** (always on; new messages while the lines show; off has none; Off stays off; no "Say something…" in the page); "Chat background"
+  (off by default; on, the blur stays behind the box with nothing typed, in always on and new messages while they show, remembered across a
+  reload, a faint dark tint by night); **always on never fading** (`page.clock`: after the wait, minutes on, the lines still taking touches, a 4
+  minute line there, a 5 minute one gone); the text's colors by sky (ink by day, dawn and dusk, white by night, the names' and gray lines' shades,
+  no backing in either) and flipping with the device's clock (`page.clock`, 19:30 and 5:30); the stream pinned to its foot, staying put when
+  scrolled up with "↓ new" (its tap, and the foot by hand, giving it up); new messages (the lines showing with a message and fading after
+  the wait, not before, the stream the same as always on's, the box unchanged, a faded box taking no taps, the next burst only its own lines, a
+  tap on a line opening typing as "high text": every line, no fade, scrollable, the icon unchanged, fading after Escape; sending from there;
+  a name's tap the menu's); the header's icon (never over the title, on its line at the right end; always on (both bubbles green), new messages
+  only (the top one), off (none) with the bubbles' colors and
+  the accessible names; off hiding the box and the lines that came meanwhile showing when it's on again; remembered
+  across a reload) and the gear's "Town settings" sheet (the chat's three radios, "Chat background" as a switch with its line under them, setting
+  the mode, closed by Escape, its X and a tap outside); the typing line for a signed-in player (80 characters, the count shown whole, one every
+  15 s, a try inside the wait giving the gray "Sorry, you can't send another message for N seconds." line and nothing sent to the server, your line
+  back from the server as a player in a palette color, the same all visit, Enter sending and closing typing); a greyed line with the reason for a guest
+  on a tap; press and hold moves the box (remembered across a reload, never over the buttons or off the map), a tap on it opens typing and a drag
+  without the hold neither moves the box nor the map; the chips keep off the box (always
   on and new messages, shown, faded or moved over one of their places) and use its space with the chat off; the keyboard doesn't
   resize or move the town (the visual viewport's offset stood in). Players' messages (its players are made signed in in the local
   database, `asSignedIn` in `e2e/helpers.ts`): two signed-in players see each other's lines within a few seconds, with each name bold
-  in the same palette color on both screens, a guest none (greyed field, never asks); a refused message's reason as a gray line only you
+  in the same palette color on both screens, a guest none (greyed line, never asks); a refused message's reason as a gray line only you
   see (a swear word, a link, a phone number; one at a time, your words kept), 80 characters and the 15 s
   wait on the server; a line's menu (your own: Mute and Report greyed; Report reaching fair play's case page with the line; a
   moderator's Remove leaving every log; Profile over the town and back; Mute hiding the player); the switch off ("Chat is
-  paused.", the chatter going on). Only each test's own lines are counted: other tests' players share the room.
+  paused.", the chatter going on); the privacy page's two 5-minute sentences. Only each test's own lines are counted: other tests' players share the room.
+- `e2e/town-chat-history.spec.ts` (phone and desktop; real time, its own file so it runs beside the others): a line another player said is still on
+  the screen 4 minutes later, Report reaches fair play with it and a moderator's Remove takes it out of every log (the room holds 5 minutes).
+- `packages/app/test/town-tags.test.ts` (Oct 28, name tags): the near rule's alpha at 4, 4.5, 5, 5.5 and 6 squares (1, 1, 0.5, 0, 0; a straight line between, never rising with
+  distance; its numbers are `feel.ts`'), the smaller of it and the far fade, your tag / an open card's figure / a table partner always shown (at any distance), "Everyone"
+  taking no near rule; the "Names" setting (its words, near to begin with, remembered and read back after a reload, a stranger or a blocked storage meaning near); the
+  kinds' colors (white and gold as they were; the sidekick's blue with white text at 4.5:1 or more, over white, black, sand, grass and a night backdrop) and the cache keyed
+  by name, size and kind (a sidekick's blue and a pawn's white of one name and size are two drawings; the least lately used goes, never one drawn this frame or the last).
+- `e2e/town-tags.spec.ts` (phone and desktop; `?crowd=50`, `__townTags()`): a far figure has no tag in Near you and has one in Everyone (the near ones keep theirs), a near one
+  has one, yours is always there; a sidekick's tag is blue with white text, in `__townTags()` and in the pixels on the canvas; the sheet's "Names" under Chat with its two choices and
+  its line; the setting survives a reload; a tag fades (frames between 1 and 0, never rising) as you walk away from a held figure and is gone past the radius, and a figure whose
+  card is open keeps its tag wherever it is.
 - `packages/app/test/town-chat-net.test.ts`: a guest or a young device never asks; lines ride on the live poll; muted and
   blocked players' lines never reach the log; a removal and the switch reach it; sending mirrors the limits and shows the
   server's reasons, a try inside the 15 s never reaching the server, and the name color picked when the town opens (a new one
@@ -542,7 +604,7 @@ title; a bot waiting, two playing (the board's pixels change), a tap on their ga
   profile over the town (Back: the town and its card as they were). `packages/app/test/town-card.test.ts`: the test player (beside
   you, out of the crowd, the only one with an id), the table-filling hook and the rating's words.
   The chat log's hooks (the test switches on): `window.__townSay()` (someone from `CHATTER` talks now), `__townSay(name, text, kind,
-  agoMs)` (that line, said `agoMs` ago: a line 50 s old to scroll back to), `__townChatter(false)` (no chatter of its own; true
+  agoMs)` (that line, said `agoMs` ago: a line 4 minutes old to scroll back to), `__townChatter(false)` (no chatter of its own; true
   starts it again) and `window.__townTapped` (the text of each tapped player's line).
 
 ## Not built yet

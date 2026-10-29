@@ -37,6 +37,7 @@ import type { LightPool, LightSpot } from "./houses/kit.ts";
 import { PARK_BENCH, PARK_FOUNTAIN, PARK_LAMP, PARK_LAMP_HEAD, PARK_LAMP_LIGHTS, PARK_LAMP_POOLS, PARK_TABLE, PARK_TREES, TABLE_BACK_RANK, TABLE_BOARD, TABLE_CLOCK_INK, TABLE_DIGITS, TABLE_INK, TABLE_PIECES, TABLE_RING, TABLE_TOP } from "./houses/park.ts";
 import type { SidekickSheet } from "./sidekick-sheets.ts";
 import { COLISEUM_PLACE, GRASS, LAMPS, PAVING, PROPS, STATUES, TABLES, groundAt, isSprite, onColiseum, plotAt, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town } from "./world.ts";
+import { TAG_STYLE, TagCache, namesMode, tagAlpha, type NamesMode, type TagKind } from "./tags.ts";
 
 /** Each boss's sprite (its real one: its `idle` frames). */
 export const BOSS_ART: Record<HomeId, Character> = {
@@ -140,7 +141,7 @@ function groundColors(skyh: readonly number[]): GroundColors {
 const TAG_FONT = Array.from({ length: 16 }, (_, s) => `600 ${s}px ${FONT}`);
 /**
  * A name tag drawn once (`Renderer.tagArtOf`): its canvas (four rows, each `rh` device pixels high, TAG_PAD device pixels
- * round the pill for its shadow's blur, 4), the pill's size, its size and color, the frame it was last drawn.
+ * round the pill for its shadow's blur, 4), the pill's size, its size and kind (yours, a pawn's or a sidekick's: its colors), the frame it was last drawn.
  */
 interface TagArt {
   cv: HTMLCanvasElement;
@@ -148,7 +149,7 @@ interface TagArt {
   h: number;
   rh: number;
   s: number;
-  gold: boolean;
+  kind: TagKind;
   used: number;
   /** `fontsLoaded` when it was drawn: a tag drawn before its font came is drawn again. */
   fonts: number;
@@ -628,8 +629,13 @@ export class Renderer {
   private mist = 0;
   private tint: string | null = null;
   /** This frame's name tags and speech bubble, drawn after the world's tint so they stay as easy to read at night. */
-  private readonly tags: { text: string; x: number; y: number; gold: boolean; size: number; alpha: number }[] = [];
+  private readonly tags: { text: string; x: number; y: number; kind: TagKind; size: number; alpha: number }[] = [];
   private nTags = 0;
+  /** Where you stand, in squares from the camera's focus, this frame (the name tags' near rule, tags.ts), the setting as this frame reads it, and the table you sit at. */
+  private youDx = 0;
+  private youDz = 0;
+  private tagNames: NamesMode = "near";
+  private youTable: Table | null = null;
   private readonly bubble = { on: false, text: "", x: 0, y: 0 };
   private bandGrad: CanvasGradient | null = null;
   private bandKey = "";
@@ -656,8 +662,7 @@ export class Renderer {
    * (Oct 28: a tag's shadow blur and its text, redrawn each frame, were the costliest part of a figure): by name, one
    * per size and color; about TAG_ART_MAX in all, the least lately used making way (its canvas reused).
    */
-  private readonly tagArt = new Map<string, TagArt[]>();
-  private nTagArt = 0;
+  private readonly tagArt = new TagCache<TagArt>(TAG_ART_MAX);
   private tagDpr = 0;
   private readonly nameW = new Map<string, number[]>();
   /** Each home's sign lettering: laid out once, drawn once per size (in device pixels a font pixel). */
@@ -801,7 +806,7 @@ export class Renderer {
     if (lit) this.layLights();
     for (let i = 0; i < this.nTags; i++) {
       const t = this.tags[i]!;
-      this.drawTag(t.text, t.x, t.y, t.gold, t.size, t.alpha);
+      this.drawTag(t.text, t.x, t.y, t.kind, t.size, t.alpha);
     }
     ctx.globalAlpha = 1;
     if (TOWN_FEEL.floatingNames) this.drawNames(now);
@@ -1048,14 +1053,30 @@ export class Renderer {
     return false;
   }
 
+  /**
+   * (Tests, `__townTags`) The name tags drawn in the last frame: each one's name, kind, alpha, pill and ink (`TAG_STYLE`) and where its
+   * pill is on the screen (CSS pixels in the world's box). Allocates its answer, so it's asked only by a test, never in the frame.
+   */
+  tagList(): { text: string; kind: TagKind; alpha: number; pill: string; ink: string; x: number; y: number; w: number; h: number }[] {
+    const out = [];
+    for (let i = 0; i < this.nTags; i++) {
+      const t = this.tags[i]!;
+      const a = this.tagArt.find(t.text, Math.round(t.size), t.kind);
+      const w = a?.w ?? 0;
+      const h = a?.h ?? 0;
+      out.push({ text: t.text, kind: t.kind, alpha: t.alpha, ...TAG_STYLE[t.kind], x: t.x - w / 2, y: t.y - h, w, h });
+    }
+    return out;
+  }
+
   /** A name tag to draw after the world's tint (kept in a list this frame: nothing allocated once it has grown). */
-  private tag(text: string, x: number, y: number, gold: boolean, size: number, alpha: number): void {
+  private tag(text: string, x: number, y: number, kind: TagKind, size: number, alpha: number): void {
     let t = this.tags[this.nTags];
-    if (!t) this.tags.push((t = { text, x, y, gold, size, alpha }));
+    if (!t) this.tags.push((t = { text, x, y, kind, size, alpha }));
     t.text = text;
     t.x = x;
     t.y = y;
-    t.gold = gold;
+    t.kind = kind;
     t.size = size;
     t.alpha = alpha;
     this.nTags++;
@@ -1216,6 +1237,8 @@ export class Renderer {
     const f = TOWN_FEEL;
     // One item per person in the square (the list can change: people come and go).
     const people = town.people;
+    this.tagNames = namesMode();
+    this.youTable = seated(town.you);
     let np = 0;
     for (const it of this.items) if (it.kind === "person") np++;
     if (np !== people.length) {
@@ -1250,6 +1273,11 @@ export class Renderer {
       }
       it.dx = wrapF(x - this.camX);
       it.dz = wrapF(y - this.camY);
+      if (it.kind === "person" && people[it.i]!.you) {
+        // (Where you stand, from the camera: the name tags near you show, the far ones don't.)
+        this.youDx = it.dx;
+        this.youDz = it.dz;
+      }
       it.sz = it.kind === "prop" ? it.dz + 0.05 : it.dz;
       it.on = drawable(v, it.dx, it.dz, margin, below) && !(it.kind === "person" && people[it.i]!.home);
     }
@@ -1296,7 +1324,7 @@ export class Renderer {
           const k = 1 + 2 * (art?.pad ?? 0);
           const pad = art?.pad ?? 0;
           this.drawSprite(it, art?.img ?? (isSprite(person.look) ? pawnImage("light", null) : pawnImage(person.look.side, person.look.tint)), f.youSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.youHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.youSquares);
-          if (this.fade > 0.02) this.tag(person.name, it.fx, it.hy - 2, true, clamp((11 * this.p.k) / v.kf, 8, 12), this.fade);
+          if (this.fade > 0.02) this.tag(person.name, it.fx, it.hy - 2, "you", clamp((11 * this.p.k) / v.kf, 8, 12), this.fade);
         } else {
           const lk = person.look;
           if (isSprite(lk)) {
@@ -1316,9 +1344,16 @@ export class Renderer {
             const pad = art?.pad ?? 0;
             this.drawSprite(it, art?.img ?? pawnImage(lk.side, lk.tint), f.botSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.botHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.botSquares);
           }
-          // Name tags on the near ones only.
+          // Name tags on the near ones only: not far toward the rim (as before), and (Oct 28, Eric) not far from you either, by default: within
+          // `nameRadius` squares of you in both directions, fading over the last square (tags.ts; "Everyone" in Town settings: no near rule).
+          // A figure whose card is open, one at a table with you and one walking to or from a game with you keep theirs wherever they are.
           const far = farOf(v, it.dz);
-          if (it.on && far < f.tagFar && this.fade > 0.02) this.tag(person.name, it.fx, it.hy - 2, false, clamp((11 * this.p.k) / v.kf, 8, 12), clamp((f.tagFar - far) / 0.12, 0, 1) * this.fade);
+          if (it.on && far < f.tagFar && this.fade > 0.02) {
+            const always = person === town.hold || person === town.meet?.bot || person === town.leave?.bot || (!!table && table === this.youTable);
+            const dist = Math.max(Math.abs(wrapF(it.dx - this.youDx)), Math.abs(wrapF(it.dz - this.youDz)));
+            const a = tagAlpha(this.tagNames, dist, always, clamp((f.tagFar - far) / 0.12, 0, 1));
+            if (a > 0.004) this.tag(person.name, it.fx, it.hy - 2, isSprite(lk) ? "sidekick" : "bot", clamp((11 * this.p.k) / v.kf, 8, 12), a * this.fade);
+          }
         }
         this.fade = 1;
         this.sitting = false;
@@ -2167,10 +2202,10 @@ export class Renderer {
     ctx.drawImage(art, Math.round((fx + (fw - w) / 2) * DPR) / DPR, Math.round((fy + (fh - h) / 2) * DPR) / DPR, w, h);
   }
 
-  /** A name tag over a pawn: white for the bots, gold for you; it shrinks with distance. Stamped from its drawing (`tagArtOf`). */
-  private drawTag(text: string, ax: number, ay: number, gold: boolean, size: number, alpha: number): void {
+  /** A name tag over a figure: white for the pawns, gold for you, blue for a boss's sidekick; it shrinks with distance. Stamped from its drawing (`tagArtOf`). */
+  private drawTag(text: string, ax: number, ay: number, kind: TagKind, size: number, alpha: number): void {
     const { ctx, DPR } = this;
-    const a = this.tagArtOf(text, Math.round(size), gold);
+    const a = this.tagArtOf(text, Math.round(size), kind);
     if (a.fonts !== fontsLoaded) this.paintTag(a, text);
     a.used = this.frameNo;
     this.keepFree(ax - a.w / 2, ay - a.h, a.w, a.h);
@@ -2186,38 +2221,23 @@ export class Renderer {
   }
 
   /**
-   * A name tag's drawing at size `s` (drawn by paintTag, as drawTag drew it each frame before): its pill (white, gold for
-   * you) with its soft shadow and its name; in four rows of its canvas, each `rh` device pixels high: the whole tag, then
-   * its shadow alone, its pill alone and its name alone (for a fading tag).
+   * A name tag's drawing at size `s` of a kind (drawn by paintTag, as drawTag drew it each frame before): its pill (white, gold for
+   * you, blue for a sidekick: `TAG_STYLE`) with its soft shadow and its name; in four rows of its canvas, each `rh` device pixels high:
+   * the whole tag, then its shadow alone, its pill alone and its name alone (for a fading tag). One per name, size and kind.
    */
-  private tagArtOf(text: string, s: number, gold: boolean): TagArt {
+  private tagArtOf(text: string, s: number, kind: TagKind): TagArt {
     const { DPR } = this;
     if (this.tagDpr !== DPR) {
       this.tagArt.clear();
-      this.nTagArt = 0;
       this.tagDpr = DPR;
     }
-    let list = this.tagArt.get(text);
-    if (list) for (const a of list) if (a.s === s && a.gold === gold) return a;
+    const had = this.tagArt.find(text, s, kind);
+    if (had) return had;
     // A new one: a canvas of its own, or the least lately used one's (never one drawn this frame or the last, which
     // this frame may still draw: a crowd of more names than TAG_ART_MAX on screen keeps them all).
-    let cv: HTMLCanvasElement | null = null;
-    if (this.nTagArt >= TAG_ART_MAX) {
-      let old: TagArt | null = null;
-      let oldText = "";
-      for (const [k, l] of this.tagArt) for (const a of l) if (!old || a.used < old.used) ((old = a), (oldText = k));
-      if (old && old.used < this.frameNo - 1) {
-        const l = this.tagArt.get(oldText)!;
-        l.splice(l.indexOf(old), 1);
-        if (!l.length) this.tagArt.delete(oldText);
-        this.nTagArt--;
-        cv = old.cv;
-      }
-    }
-    const a: TagArt = { cv: cv ?? document.createElement("canvas"), w: 0, h: 0, rh: 0, s, gold, used: this.frameNo, fonts: -1 };
-    if (!list) this.tagArt.set(text, (list = []));
-    list.push(a);
-    this.nTagArt++;
+    const old = this.tagArt.evict(this.frameNo);
+    const a: TagArt = { cv: old?.cv ?? document.createElement("canvas"), w: 0, h: 0, rh: 0, s, kind, used: this.frameNo, fonts: -1 };
+    this.tagArt.add(text, a);
     return a;
   }
 
@@ -2233,7 +2253,7 @@ export class Renderer {
     const rh = (a.rh = Math.ceil(h * DPR) + 2 * TAG_PAD);
     cv.width = Math.ceil(w * DPR) + 2 * TAG_PAD;
     cv.height = 4 * rh;
-    const pill = a.gold ? "rgba(255,215,106,.96)" : "rgba(255,255,255,.92)";
+    const { pill, ink } = TAG_STYLE[a.kind];
     g.font = TAG_FONT[s]!;
     g.textAlign = "center";
     g.textBaseline = "middle";
@@ -2255,7 +2275,7 @@ export class Renderer {
       g.shadowBlur = 0;
       g.shadowOffsetX = 0;
       if (r === 0 || r === 3) {
-        g.fillStyle = INK;
+        g.fillStyle = ink;
         g.fillText(text, w / 2, h / 2);
       }
     }

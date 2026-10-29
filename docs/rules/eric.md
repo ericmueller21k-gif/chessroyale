@@ -50,12 +50,24 @@ removed (old → new) and says whether any of them guards a rule here.
   - Guard: measured against main in every town PR (method: docs/decisions/2026-10-26-town-square-slice-2.md: headless, a
     phone 390 × 844 and a computer 1440 × 900, 5 s walking, the medians of four runs taken in turn); not a CI test, CI frame
     rates vary too much. `e2e/town.spec.ts` checks that nothing of Maia's is fetched in the town before a game opens.
-- **The chat's field ("Say something…") is in "Always on" only (Eric, Oct 28, from his phone): "the 'SAY something' is only ever
-  visible for the double green chat setting, for the medium one it's impossible to chat you have to be in double green mode."** The
-  one exception Eric has named to "nothing hidden": in New messages there is no field and you can't chat there; Off shows no chat at all.
-  In Always on the field is always there (greyed, with why, for a guest or a paused chat). The box keeps its place and size in every mode.
-  - Guard: `e2e/town-chat.spec.ts`, "the field is in always on and nowhere else: new messages and off have none…", phone and computer.
-  - Decision: [2026-10-28-town-chat-v2.md](../decisions/2026-10-28-town-chat-v2.md), "Oct 28, Eric's phone".
+- **Typing works wherever the chat box shows (Eric, Oct 28, from his phone; replaces "the field is in Always on only").** You chat by
+  tapping the box anywhere but a player's name; the typing line is an input with no placeholder, border or backing and shows only while
+  you're typing (a strip at the box's foot, reserved so nothing moves), and there is no "Say something…" anywhere. In Always on the box
+  always shows; in New messages it shows when a message comes and fades, and **while its lines show a tap opens typing and is "high text"
+  (every line, no fade) until you finish** (you send, tap the map, or press Escape), the icon staying one bubble green: "while lines are
+  showing you can tap and it will open the chat still, temporarily making it 'high text' mode until you finish, but don't change the text
+  icon to be double green, it's just a temp thing." **Off stays off** (no box, nothing to type in). The box keeps its place and size in every
+  mode (v3's "no field in New messages", which this replaces, was the one exception Eric had named to "nothing hidden" for the chat; the
+  typing line being visible only while you type is the exception now).
+  - Guard: `e2e/town-chat.spec.ts`, "typing works wherever the box shows: always on, and new messages while its lines show (a tap opens it);
+    off shows no box, so nothing to type in (Off stays off); no \"Say something…\" anywhere; the box keeps its place and size throughout",
+    phone and computer. Its unit side: `packages/app/test/town-chat.test.ts`, "what each mode does".
+  - Decision: [2026-10-28-town-chat-v2.md](../decisions/2026-10-28-town-chat-v2.md), "v4".
+- **Name tags show only near you by default (Eric, Oct 28); "Everyone" in Town settings shows them all.** The figures are always drawn;
+  a tag shows within 5 squares of you (|dc| and |dr|, so about a 10 × 10 area), fading over the last square; your own tag, an open card's
+  figure and a table partner always show. The one more named exception to "nothing hidden".
+  - Guard: `e2e/town-tags.spec.ts`, "name tags show only near you by default…", phone and computer; unit: `packages/app/test/town-tags.test.ts`.
+  - Decision: [2026-10-28-name-tags-near-you.md](../decisions/2026-10-28-name-tags-near-you.md).
 
 ## Writing
 

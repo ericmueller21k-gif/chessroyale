@@ -29,7 +29,7 @@
  * `__townBots()` for the bots (docs/areas/town-square.md); `__townGlide(id)` glides the camera to a home, as its chip does;
  * `__townPlayer(uid, name, icon?, rating?)` stands a test player (a pawn with an account id) beside you, and
  * `__townAt("player", uid)` says where to tap it (the real town has no players yet); `__townFull(on)` fills every table's west stool
- * with someone unseen (no table is free for a game: a bot's card greys its Play).
+ * with someone unseen (no table is free for a game: a bot's card greys its Play); `__townTags()` the name tags drawn in the last frame.
  * docs/areas/town-square.md.
  */
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
@@ -146,7 +146,7 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, seat = null }: { on
         {/* A statue's quote, for screen readers, while you stand up close to it (it's drawn on its pedestal). */}
         <div class="town-sr" ref={live} aria-live="polite" />
         <div class="town-overlay">
-          {/* The chat log, top left (its own file): under the cards, taking no taps; the chips keep off its box (CHAT_BOX). */}
+          {/* The chat log, top left (its own file): under the cards; while it shows it takes every touch on its own area (the map under it gets none), faded none; the chips keep off its box (CHAT_BOX). */}
           <TownChat />
           {/* The card: over the boss's head or the home's top, its tail pointing there (placed every frame). Dark, with a gold border
               (Eric's mockup, Oct 28); a person's is one row at one size (`town-person`). */}
@@ -913,6 +913,9 @@ function startTown(
     follow = false;
     glide = { x: camX + wrapF(h.cx - camX), y: camY + wrapF(h.cy - h.foot + 0.5 - f.glideAhead - camY) };
   };
+  // ... `__townTags()`: the name tags drawn in the last frame: name, kind ("you", "bot", "sidekick"), alpha, pill and ink colors, and
+  // where the pill is on the screen (Oct 28: they show only near you unless Town settings says "Everyone"; a sidekick's is blue).
+  const hookTags = () => (testSwitchesAllowed() ? r.tagList() : null);
   // ... `__townTurns(ms)`: the bots' turns every `ms` instead of a minute, the next one now (to watch one go home and another come out).
   const hookTurns = (ms: number) => {
     if (!testSwitchesAllowed()) return;
@@ -924,7 +927,7 @@ function startTown(
   const hookPlayer = (uid: string, name: string, icon?: string, rating?: number): number => (testSwitchesAllowed() ? addTestPlayer(town, { uid, name, icon, rating }) : -1);
   // ... `__townFull(on)`: someone unseen on one stool of every table (no table free for you and a bot: its card's Play greys), or not.
   const hookFull = (on: boolean) => testSwitchesAllowed() && fillTables(town, on);
-  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack };
+  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags };
   hooks.__townAt = hookAt;
   hooks.__townGlide = hookGlide;
   hooks.__townGather = hookGather;
@@ -937,6 +940,7 @@ function startTown(
   hooks.__townPlayer = hookPlayer;
   hooks.__townFull = hookFull;
   hooks.__townBossBack = hookBossBack;
+  hooks.__townTags = hookTags;
 
   run();
   draw(performance.now()); // the first frame, before the screen shows
@@ -1002,6 +1006,7 @@ function startTown(
       delete hooks.__townPlayer;
       delete hooks.__townFull;
       delete hooks.__townBossBack;
+      delete hooks.__townTags;
       if (card?.kind === "boss") town.bosses[card.i]!.held = false;
       cv.removeEventListener("pointerdown", onDown);
       cv.removeEventListener("pointermove", onMove);

@@ -3,6 +3,10 @@
 How it works now: [`docs/areas/chat.md`](../areas/chat.md), "The town square's typed chat"; the log's look:
 [`docs/areas/town-square.md`](../areas/town-square.md).
 
+> **Changed later the same day (Eric, Oct 28, "keep up to 5 minutes of chat actually"):** the room holds each line **5 minutes**, not 60 s
+> (`TOWN_CHAT.lineMs`), and the privacy page says so; every "60 s" and "a minute" below about how long a line lives is 5 minutes now
+> (the repeat check's minute, `repeatMs`, is unchanged). [2026-10-28-town-chat-v2.md](2026-10-28-town-chat-v2.md), "v4".
+
 ## What Eric decided
 
 Players type in the town square's chat log. Eric: "I don't see why in this kind of town mode we can't just open up people

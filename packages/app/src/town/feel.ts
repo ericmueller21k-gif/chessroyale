@@ -386,6 +386,14 @@ export const TOWN_FEEL = {
   seamMinPx: 7,
   /** Name tags hide past this fraction of the way to the rim. */
   tagFar: 2 / 3,
+  /**
+   * Name tags show only near you by default (Eric, Oct 28: "only people in the radius around you have names shown and as you walk they fade
+   * in and out … about an 8x8 area of squares maybe 10x10"): a figure's tag shows while it is within this many squares of you in both
+   * directions (about a 10 × 10 area), fading over the last `nameFadeSquares` at the edge (full at radius − fade / 2, gone at radius + fade / 2;
+   * tags.ts, `nameAlpha`). The figures themselves are always drawn. "Everyone" in Town settings turns this off.
+   */
+  nameRadius: 5,
+  nameFadeSquares: 1,
 
   // ---- The homes' names (two styles, for Eric to compare: either can be turned off here).
   /** Each home's name floats over it, white with a dark outline, as you come near. */
