@@ -515,7 +515,7 @@
     },
     "the town square (/town)": {
       "paths": ["packages/app/src/town/**", "packages/app/src/stale.ts", "packages/app/src/characters/sidekicks/**"],
-      "specs": ["e2e/town.spec.ts", "e2e/town-chat.spec.ts"]
+      "specs": ["e2e/town.spec.ts", "e2e/town-chat.spec.ts", "e2e/town-chat-history.spec.ts", "e2e/town-tags.spec.ts"]
     },
     "Auto chess, the demo": {
       "paths": [
@@ -618,7 +618,7 @@
         "packages/server/src/town-chat.ts",
         "packages/server/src/town-chat-api.ts"
       ],
-      "specs": ["e2e/chat.spec.ts", "e2e/chat-mod.spec.ts", "e2e/global-chat.spec.ts", "e2e/panel.spec.ts", "e2e/town-chat.spec.ts"]
+      "specs": ["e2e/chat.spec.ts", "e2e/chat-mod.spec.ts", "e2e/global-chat.spec.ts", "e2e/panel.spec.ts", "e2e/town-chat.spec.ts", "e2e/town-chat-history.spec.ts"]
     },
     "Squads": {
       "paths": [

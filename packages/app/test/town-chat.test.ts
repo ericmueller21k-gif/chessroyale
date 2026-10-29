@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TOWN_CHAT } from "@chessroyale/core";
-import { CHAT, CHATTER, CHAT_MODES, CHAT_MODE_CHOICE, CHAT_MODE_LABEL, ChatLog, Stick, chatMode, clampBox, chatterDelay, clockText, loadChatMode, loadChatPos, nextChatMode, onChatMode, onTownChatLineTap, pickChatter, saveChatMode, saveChatPos, say, setChatMode, setTownChatLineTap, startChatter, tooSoonText, townTone, unsay, type ChatKind } from "../src/town/chat.ts";
+import { CHAT, CHATTER, CHAT_BACKGROUND_LABEL, CHAT_BACKGROUND_NOTE, CHAT_MODES, CHAT_MODE_CHOICE, CHAT_MODE_LABEL, ChatLog, Stick, chatBackground, chatBlurs, chatMode, chatShows, clampBox, chatterDelay, clockText, loadChatBackground, loadChatMode, loadChatPos, nextChatMode, onChatBackground, onChatMode, onTownChatLineTap, pickChatter, saveChatBackground, saveChatMode, saveChatPos, say, setChatBackground, setChatMode, setTownChatLineTap, startChatter, tooSoonText, townTone, unsay, type ChatKind } from "../src/town/chat.ts";
 import { NAME_COLORS, NAME_COLOR_LIMIT, nameColorIndex, pickNameColor } from "../src/town/names.ts";
 import { skyTone, skyWeights } from "../src/town/sky.ts";
 import { HOMES } from "../src/town/world.ts";
@@ -9,7 +9,9 @@ import { HOMES } from "../src/town/world.ts";
  * this device), the fade and the way back, the tap that brings the faded lines back, the stream pinned to its foot unless scrolled
  * up, a line's minute of life, `say` from any kind, the chatter table, players' lines (who said them, taken out again, a tap's
  * menu), the server's numbers, and the box's place. And Eric's phone (Oct 28, later): the line only you see (too soon, a refusal),
- * the players' name colors, and the text's tone following the sky. */
+ * the players' name colors, and the text's tone following the sky. And v4 (the same evening): 5 minutes or 100 lines kept, the
+ * "Chat background" setting remembered, what each mode does (no fade in always on, the fade in new messages, typing as temporary
+ * "high text" there), and when the blur shows. */
 
 describe("the time as the log shows it", () => {
   it("is hours and minutes, 12-hour, no am/pm", () => {
@@ -93,6 +95,275 @@ describe("the chat's three modes (Eric, Oct 28: the header icon goes from one to
     expect(seen).toHaveBeenCalledTimes(1);
     setChatMode("always");
     off();
+  });
+});
+
+describe("\"Chat background\" (Eric, Oct 28: a switch in Town settings for the blur behind the chat; off by default; remembered on this device)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const stub = (store: Map<string, string>) => vi.stubGlobal("localStorage", { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) });
+
+  it("is named and explained in Eric's words", () => {
+    expect(CHAT_BACKGROUND_LABEL).toBe("Chat background");
+    expect(CHAT_BACKGROUND_NOTE).toBe("A soft tint behind the chat, always on while the chat shows.");
+  });
+
+  it("is off to begin with, and remembered on this device once set: a reload asks again and gets the one stored; a stranger or a storage that won't answer is off", async () => {
+    const store = new Map<string, string>();
+    stub(store);
+    vi.resetModules();
+    const first = await import("../src/town/chat.ts");
+    expect(first.chatBackground()).toBe(false);
+    const seen = vi.fn();
+    const off = first.onChatBackground(seen);
+    first.setChatBackground(true);
+    first.setChatBackground(true); // (nothing changed: nobody is told twice)
+    expect(first.chatBackground()).toBe(true);
+    expect(seen).toHaveBeenCalledTimes(1);
+    expect(store.get(CHAT.backgroundKey)).toBe("1");
+    off();
+    first.setChatBackground(false);
+    expect(seen).toHaveBeenCalledTimes(1); // (let go: not told)
+    expect(store.get(CHAT.backgroundKey)).toBe("0");
+    first.setChatBackground(true);
+    // A reload: the page asks again and gets the one stored.
+    vi.resetModules();
+    const again = await import("../src/town/chat.ts");
+    expect(again.chatBackground()).toBe(true);
+    store.set(CHAT.backgroundKey, "yes please");
+    expect(loadChatBackground()).toBe(false);
+    store.delete(CHAT.backgroundKey);
+    expect(loadChatBackground()).toBe(false);
+    for (const on of [true, false, true]) {
+      saveChatBackground(on);
+      expect(loadChatBackground()).toBe(on);
+    }
+    vi.stubGlobal("localStorage", {
+      getItem: () => {
+        throw new Error("blocked");
+      },
+      setItem: () => {
+        throw new Error("blocked");
+      },
+    });
+    expect(loadChatBackground()).toBe(false);
+    expect(() => saveChatBackground(true)).not.toThrow();
+    // ... and it still works, for as long as the page lives.
+    vi.resetModules();
+    const blocked = await import("../src/town/chat.ts");
+    blocked.setChatBackground(true);
+    expect(blocked.chatBackground()).toBe(true);
+  });
+
+  it("the module's setting starts off and tells the screen when it changes", () => {
+    setChatBackground(false);
+    const seen = vi.fn();
+    const off = onChatBackground(seen);
+    setChatBackground(true);
+    expect(chatBackground()).toBe(true);
+    expect(seen).toHaveBeenCalledTimes(1);
+    setChatBackground(false);
+    off();
+  });
+
+  it("is a separate key from the mode's and the box's place", () => {
+    expect(new Set([CHAT.backgroundKey, CHAT.modeKey, CHAT.storageKey]).size).toBe(3);
+  });
+});
+
+describe("what each mode does (Eric, Oct 28, v4: new messages differs from always on only in that the lines fade)", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+  const make = () => {
+    const log = new ChatLog(() => undefined);
+    return { log, close: log.open() };
+  };
+  const texts = (lines: readonly { text: string }[]) => lines.map((l) => l.text);
+
+  it("always on never fades: after the wait, after minutes, the box still shows and every line is there; only new messages fades", () => {
+    const { log, close } = make();
+    log.say("Hollow", "one", "boss");
+    log.say("Glim", "two", "kid");
+    expect(chatShows("always", log.shown)).toBe(true);
+    expect(chatShows("new", log.shown)).toBe(true);
+    for (const ms of [CHAT.fadeAfterMs - 1, 1, 60_000, 200_000]) {
+      vi.advanceTimersByTime(ms);
+      expect(chatShows("always", log.shown), `always on, ${ms} ms on`).toBe(true);
+      expect(texts(log.visible("always"))).toEqual(["one", "two"]);
+    }
+    // (Over 4 minutes later the lines are still there; the fade timer ran long ago, and always on never read it.)
+    expect(log.shown).toBe(false);
+    expect(chatShows("new", log.shown), "new messages faded").toBe(false);
+    expect(chatShows("off", true), "off shows nothing").toBe(false);
+    expect(chatShows("off", false)).toBe(false);
+    close();
+  });
+
+  it("new messages fades fadeAfterMs after a message, not before; always on shows what new messages has faded", () => {
+    const { log, close } = make();
+    log.say("Hollow", "one", "boss");
+    vi.advanceTimersByTime(CHAT.fadeAfterMs - 1);
+    expect(chatShows("new", log.shown)).toBe(true);
+    vi.advanceTimersByTime(1);
+    expect(chatShows("new", log.shown)).toBe(false);
+    // Switching to always on shows the whole history to scroll back.
+    log.say("Glim", "two", "kid");
+    vi.advanceTimersByTime(CHAT.fadeAfterMs);
+    log.say("Sparky", "three", "kid");
+    expect(texts(log.visible("new"))).toEqual(["three"]);
+    expect(texts(log.visible("always"))).toEqual(["one", "two", "three"]);
+    close();
+  });
+
+  it("a tap while new messages shows opens typing: \"high text\" (every line, no fade) until you finish, then it fades as usual; the next burst shows only itself", () => {
+    const { log, close } = make();
+    log.say("Hollow", "one", "boss");
+    log.say("Glim", "two", "kid");
+    vi.advanceTimersByTime(CHAT.fadeAfterMs + 20_000); // (faded, 28 s on)
+    log.say("Sparky", "three", "kid");
+    expect(texts(log.visible("new"))).toEqual(["three"]);
+    log.talk(true);
+    expect(log.talking).toBe(true);
+    expect(texts(log.visible("new")), "the whole history, like always on").toEqual(["one", "two", "three"]);
+    // Nothing fades while it's open, however long.
+    vi.advanceTimersByTime(CHAT.fadeAfterMs * 5);
+    expect(chatShows("new", log.shown)).toBe(true);
+    expect(texts(log.visible("new"))).toEqual(["one", "two", "three"]);
+    log.say("Chip", "four", "kid"); // (a message while you type keeps every line)
+    vi.advanceTimersByTime(CHAT.fadeAfterMs * 5);
+    expect(chatShows("new", log.shown)).toBe(true);
+    expect(texts(log.visible("new"))).toEqual(["one", "two", "three", "four"]);
+    // Finished: the wait starts, and it fades fadeAfterMs later, the lines staying while it does (nothing jumps).
+    log.talk(false);
+    expect(log.talking).toBe(false);
+    vi.advanceTimersByTime(CHAT.fadeAfterMs - 1);
+    expect(chatShows("new", log.shown)).toBe(true);
+    vi.advanceTimersByTime(1);
+    expect(chatShows("new", log.shown)).toBe(false);
+    expect(texts(log.visible("new"))).toEqual(["one", "two", "three", "four"]);
+    log.say("Tex", "five", "kid");
+    expect(texts(log.visible("new")), "back to new messages: only the new burst").toEqual(["five"]);
+    // Opening and closing twice over is the same as once.
+    log.talk(true);
+    log.talk(true);
+    log.talk(false);
+    vi.advanceTimersByTime(CHAT.fadeAfterMs);
+    expect(chatShows("new", log.shown)).toBe(false);
+    close();
+  });
+
+  it("typing in always on holds the box too, and closing it changes nothing there (it never fades)", () => {
+    const { log, close } = make();
+    log.say("Hollow", "one", "boss");
+    log.talk(true);
+    vi.advanceTimersByTime(CHAT.fadeAfterMs * 3);
+    expect(chatShows("always", log.shown)).toBe(true);
+    log.talk(false);
+    vi.advanceTimersByTime(CHAT.fadeAfterMs * 3);
+    expect(chatShows("always", log.shown)).toBe(true);
+    expect(texts(log.visible("always"))).toEqual(["one"]);
+    close();
+  });
+
+  it("the blur shows while the box does and you're typing, or whenever the box does with the setting on; never when the box doesn't show", () => {
+    for (const mode of ["always", "new", "off"] as const) {
+      for (const shown of [true, false]) {
+        for (const typing of [true, false]) {
+          for (const background of [true, false]) {
+            const shows = chatShows(mode, shown);
+            expect(chatBlurs(mode, shown, typing, background), `${mode} shown=${shown} typing=${typing} setting=${background}`).toBe(shows && (typing || background));
+          }
+        }
+      }
+    }
+    expect(chatBlurs("always", false, false, false), "always on, nothing typed, setting off: none").toBe(false);
+    expect(chatBlurs("always", false, true, false), "always on, typing: the blur").toBe(true);
+    expect(chatBlurs("always", false, false, true), "always on, setting on: the blur, typing or not").toBe(true);
+    expect(chatBlurs("new", true, false, true), "new messages showing, setting on: the blur").toBe(true);
+    expect(chatBlurs("new", false, false, true), "new messages faded: none, whatever the setting").toBe(false);
+    expect(chatBlurs("off", true, true, true), "off: none").toBe(false);
+  });
+});
+
+describe("the history (Eric, Oct 28: \"keep up to 5 minutes of chat actually, or 100 messages whichever it hits first\")", () => {
+  beforeEach(() => vi.useFakeTimers({ now: 1_800_000_000_000 }));
+  afterEach(() => vi.useRealTimers());
+  const make = () => {
+    const log = new ChatLog(() => undefined);
+    return { log, close: log.open() };
+  };
+  const texts = (lines: readonly { text: string }[]) => lines.map((l) => l.text);
+
+  it("is 5 minutes and 100 lines, the server's and the device's numbers in one place", () => {
+    expect(CHAT.lifeMs).toBe(300_000);
+    expect(CHAT.lifeMs).toBe(TOWN_CHAT.lineMs);
+    expect(CHAT.keepLines).toBe(100);
+    expect(CHAT.keepLines).toBe(TOWN_CHAT.deviceMax);
+  });
+
+  it("keeps every line for 5 minutes: one said 4 minutes ago is still there, and goes at 5", () => {
+    const { log, close } = make();
+    log.say("Hollow", "four minutes old", "boss", Date.now() - 240_000);
+    log.say("Glim", "just now", "kid");
+    expect(texts(log.visible("always"))).toEqual(["four minutes old", "just now"]);
+    vi.advanceTimersByTime(59_999);
+    expect(texts(log.lines)).toEqual(["four minutes old", "just now"]);
+    vi.advanceTimersByTime(1);
+    expect(texts(log.lines), "5 minutes after it was said").toEqual(["just now"]);
+    vi.advanceTimersByTime(240_000 - 1);
+    expect(texts(log.lines)).toEqual(["just now"]);
+    vi.advanceTimersByTime(1);
+    expect(log.lines).toEqual([]);
+    close();
+  });
+
+  it("a line said more than 5 minutes ago goes at once (it can't be scrolled back to)", () => {
+    const { log, close } = make();
+    log.say("Hollow", "too old", "boss", Date.now() - 301_000);
+    vi.advanceTimersByTime(1);
+    expect(log.lines).toEqual([]);
+    close();
+  });
+
+  it("keeps at most 100 lines, the oldest going first, within the 5 minutes", () => {
+    const { log, close } = make();
+    for (let i = 1; i <= 120; i++) {
+      log.say("Hollow", `line ${i}`, "boss");
+      vi.advanceTimersByTime(1_000); // (120 lines in 2 minutes: all inside the 5)
+    }
+    expect(log.lines).toHaveLength(100);
+    expect(log.lines[0]!.text).toBe("line 21");
+    expect(log.lines.at(-1)!.text).toBe("line 120");
+    expect(log.visible("always")).toHaveLength(100);
+    // The first of the hundred (said at 20 s; it is 120 s now) goes with its own 5 minutes, at 320 s, not before.
+    vi.advanceTimersByTime(199_999);
+    expect(log.lines).toHaveLength(100);
+    vi.advanceTimersByTime(1);
+    expect(log.lines).toHaveLength(99);
+    expect(log.lines[0]!.text).toBe("line 22");
+    expect(log.lines.at(-1)!.text).toBe("line 120");
+    close();
+  });
+
+  it("a line only you see counts among the 100 like any line; a hundred and one of any kind drops the oldest", () => {
+    const { log, close } = make();
+    for (let i = 1; i <= 99; i++) log.say("Sparky", `kid ${i}`, "kid");
+    log.whisper("Sorry, you can't send another message for 9 seconds.");
+    expect(log.lines).toHaveLength(100);
+    log.say("Tex", "kid 100", "kid");
+    expect(log.lines).toHaveLength(100);
+    expect(log.lines[0]!.text).toBe("kid 2");
+    expect(log.lines.some((l) => l.private)).toBe(true);
+    close();
+  });
+
+  it("when the oldest line goes to the cap, the next one's 5 minutes is what's timed (nothing is kept past its time)", () => {
+    const { log, close } = make();
+    log.say("Hollow", "first", "boss", Date.now() - 200_000);
+    for (let i = 1; i <= 100; i++) log.say("Sparky", `kid ${i}`, "kid");
+    expect(log.lines[0]!.text).toBe("kid 1");
+    vi.advanceTimersByTime(300_001);
+    expect(log.lines).toEqual([]);
+    close();
   });
 });
 
@@ -404,9 +675,9 @@ describe("players' lines (from the server: chat-net.ts)", () => {
     close();
   });
 
-  it("keeps the server's numbers: 80 characters, one message per 15 seconds, a line's minute", () => {
+  it("keeps the server's numbers: 80 characters, one message per 15 seconds, a line's 5 minutes", () => {
     expect([CHAT.maxChars, CHAT.sendEveryMs, CHAT.lifeMs]).toEqual([TOWN_CHAT.maxChars, TOWN_CHAT.gapMs, TOWN_CHAT.lineMs]);
-    expect([CHAT.maxChars, CHAT.sendEveryMs, CHAT.lifeMs]).toEqual([80, 15_000, 60_000]);
+    expect([CHAT.maxChars, CHAT.sendEveryMs, CHAT.lifeMs]).toEqual([80, 15_000, 300_000]);
   });
 });
 

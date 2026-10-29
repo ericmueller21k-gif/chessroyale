@@ -313,7 +313,7 @@ export interface ReportedLine {
   at: number;
 }
 
-/** A report of a line that has left the town's chat (each lasts a minute), or isn't the reported player's. */
+/** A report of a line that has left the town's chat (each lasts 5 minutes), or isn't the reported player's. */
 export const LINE_GONE = "That message has gone from the chat. You can still report the player from their profile.";
 
 /**

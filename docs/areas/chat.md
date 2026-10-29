@@ -44,14 +44,17 @@ Lane: `social`.
     isn't set up (local runs). Guests, and any device the age gate marked too young (`hc_age=under`, even with someone
     signed in), never ask for or get players' lines, and can't send: their log has the bosses' and kids' chatter alone.
   - **The room** (`server/src/town-chat.ts`, kept by the live hub beside the global chat, **in memory only**): each line
-    `{n, at, from, name, text, color?}` for `TOWN_CHAT.lineMs` (60 s), at most `holdMax`; a newcomer gets the last `keep` (12).
+    `{n, at, from, name, text, color?}` for `TOWN_CHAT.lineMs` (**5 minutes** since Oct 28, Eric: "keep up to 5 minutes of chat actually"; it was 60 s: the app's
+    log scrolls back that far, and Report and a moderator's Remove work on any line it shows), at most `holdMax` (300: kept
+    when the time went from 1 to 5 minutes; a device keeps `deviceMax`, 100, of the newest, so the room needs only more
+    than that, and the hub hands its whole room to each Worker instance every `readCacheMs`); a newcomer still gets the last `keep` (12).
     `color` (Oct 28, Eric's phone) is only the name color the sender's device picked when it opened the town (a whole number
     below `TOWN_COLOR_LIMIT`, 32; the app has ten and reads it modulo its palette): `POST /api/town/chat` takes it, `tidyColor`
     drops anything else without refusing the message, the line carries it to every reader so everyone sees the same color for
     that player's visit. Cosmetic: nothing is decided by it.
-    The hub's alarm rings at the next line's minute and sweeps it (`sweep`, `nextExpiry`), so nothing outlives its minute
-    even in an empty town; for the wait and the repeat it keeps when and a hash of the words, never the words, for a
-    minute. A restart forgets it and gives the room a new id (`room`): an app seeing a new room drops its players' lines
+    The hub's alarm rings when the next line is due to go and sweeps it (`sweep`, `nextExpiry`), so nothing outlives its
+    5 minutes even in an empty town; for the wait and the repeat it keeps when and a hash of the words, never the words, for a
+    minute (`repeatMs`, which is why the alarm rings at the minute too). A restart forgets it and gives the room a new id (`room`): an app seeing a new room drops its players' lines
     before taking the new ones, so a Remove or a Report never reaches another line by an old number. The name comes from
     the account (one the name filter refuses goes out as "Player").
   - **Reading** rides on the live line's poll: `GET /api/live?town=N&room=R` (`town-chat-api.ts`: a signed-in reader,
@@ -115,7 +118,7 @@ The preset lines are all friendly, so what can offend is a player's name and dra
   town's chat can report a line of it (a guest or a young device can't probe who spoke). The automated reviewer's API
   gets the report without the words and can't clear a case with one ([docs/fairplay-reviewer.md](../fairplay-reviewer.md)).
 - **Moderators** take one town square line down from its menu in the town ("Remove", for an admin: `POST
-  /api/town/chat/remove {n}`): it leaves the room and every reader's log (the room lists it as `gone` for a minute).
+  /api/town/chat/remove {n}`): it leaves the room and every reader's log (the room lists it as `gone` for `lineMs`, 5 minutes).
   Nothing is logged or stored. A reset of a player's name and icon, and a deleted account, take their town lines out
   too.
 - **Moderators** (admins, `ADMIN_EMAILS`) act from a player's page on fair play's review page (`/admin/fairplay`,
@@ -158,7 +161,7 @@ The preset lines are all friendly, so what can offend is a player's name and dra
 - **Mutes** stay on the player's device only. Nothing about who muted whom reaches the server beyond a match's own
   `chatPrefs` (gone with the lobby).
 - **The name filter** keeps nothing: a refused name isn't stored, nor a refused message.
-- **The town square's messages** aren't stored: the live hub holds each in memory for `TOWN_CHAT.lineMs` (60 s), never
+- **The town square's messages** aren't stored: the live hub holds each in memory for `TOWN_CHAT.lineMs` (5 minutes; the privacy page says so), never
   in its storage or D1, and a restart forgets them. There's no table of chat lines. Not in "Download my data" (nothing
   is kept to download).
 - **A report of a town square line** (D1 `reports`, columns `line` and `line_at`): the line's text and when it was

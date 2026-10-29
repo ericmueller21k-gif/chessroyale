@@ -162,7 +162,7 @@ export async function townRemoveResponse(request: Request, hub: TownHub, admin: 
 
 /**
  * A report of a line (fair play's report with TOWN_CHAT's reason): the line as the room holds it, said by the reported
- * player. Null when it has gone (each lasts a minute) or isn't theirs: the report is refused, so a report can only ever
+ * player. Null when it has gone (each lasts TOWN_CHAT.lineMs, 5 minutes) or isn't theirs: the report is refused, so a report can only ever
  * carry words the player really sent.
  */
 export async function reportedLine(hub: TownHub, n: unknown, target: unknown): Promise<TownLine | null> {

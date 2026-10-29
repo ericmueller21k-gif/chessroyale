@@ -19,14 +19,15 @@ import { BOARD_SEL, test } from "./helpers.ts";
  */
 test.use({ actionTimeout: 15_000 });
 
-// The chat log's text field (Oct 28; shown where the test switches are on, as here) lies over a corner of the map and takes taps
-// there; on the phone project's short screen that corner holds the Colosseum's gate and the marble statue. These tests aim at the
-// map, so the field lets taps through (e2e/town-chat.spec.ts tests the field itself). No check changed.
+// The chat log's box (Oct 28; shown where the test switches are on, as here) lies over a corner of the map and takes taps there (v4: every
+// touch on its own area while it shows, the empty part too; before, its text field only); on the phone project's short screen that corner
+// holds the Colosseum's gate and the marble statue. These tests aim at the map, so the box lets taps through (e2e/town-chat.spec.ts tests the
+// box itself). The helper's rule widened from the field (`.tc-form`) to the whole box; no check changed.
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     document.addEventListener("DOMContentLoaded", () => {
       const s = document.createElement("style");
-      s.textContent = ".tc-form{pointer-events:none!important}";
+      s.textContent = ".town-chat,.town-chat *{pointer-events:none!important}";
       document.head.append(s);
     });
   });

@@ -8,6 +8,9 @@
  * scrolls; three modes from a header icon (`ChatMode`: always on, new messages only, off), remembered on this device.
  * v3 (Eric's phone, the same day; the decision's "Oct 28, Eric's phone"): the field only in always on; no shadows or backings; a
  * line only you see for "too soon" and every refusal (`whisper`); players' names colored; the text black by day, white by night.
+ * v4 (Eric's phone, the same evening; the decision's "v4"): a tap on the box (not on a name) is how you chat, with a slight blur behind
+ * the box while you do (`chatBlurs`); every line of 5 minutes, at most 100, is kept; new messages differs from always on only in the
+ * fade (a tap while the lines show is "high text" until you finish: `talk`); a setting keeps the blur on (`chatBackground`).
  *
  * One way in: `say(name, text, kind, who)`. The bosses and their kids say a line now and then (`CHATTER`, placeholders);
  * players' messages come from the server (chat-net.ts: signed-in players only), each with who said it and its number in the
@@ -26,8 +29,12 @@ export const CHAT = {
   /** ... over this long; they fade back in over `fadeInMs` when something is said. */
   fadeMs: 1000,
   fadeInMs: 200,
-  /** A line is gone for good this long after it was said (Eric: it keeps the DOM small); it also goes when pushed past the cap. */
+  /**
+   * A line is gone for good this long after it was said: 5 minutes, the server's (Eric, Oct 28: "keep up to 5 minutes of chat actually
+   * I think, or 100 messages whichever it hits first"); and the oldest goes first when more than `keepLines` are kept (it keeps the DOM small).
+   */
   lifeMs: TOWN_CHAT.lineMs,
+  keepLines: TOWN_CHAT.deviceMax,
   /** A boss or a kid speaks every this many ms, at random between the two. */
   everyMs: [20_000, 45_000] as readonly [number, number],
   /** The computer's frame (styles.css' "computer"); anything else is a phone. (The box's size is in town-chat.css: about 5 lines on a phone, 12 on a computer.) */
@@ -47,13 +54,15 @@ export const CHAT = {
   /** Where the box's place, and its mode, are remembered on this device. */
   storageKey: "brc.townChat",
   modeKey: "brc.townChatMode",
+  /** Whether the blur stays behind the box while the chat shows ("Chat background" in Town settings), remembered on this device. */
+  backgroundKey: "brc.townChatBackground",
 } as const;
 
 /**
- * The chat's three modes, in the order the header icon's tap goes through them (Eric, Oct 28). "always": the box and its field
- * always show. "new": the lines show when a message comes and fade after `fadeAfterMs`, the field with them; a tap on a line
- * brings back every line of the last minute. "off": no box, no field (the lines still arrive, so turning it on shows the last
- * minute).
+ * The chat's three modes, in the order the header icon's tap goes through them (Eric, Oct 28). "always": the box always shows, every
+ * line of the last 5 minutes (at most 100) to scroll back through, and it never fades. "new": the same box differing only in that the
+ * lines show when a message comes and fade after `fadeAfterMs`; a tap while they show opens typing and is "always" (nothing fades,
+ * the whole history scrolls) until you finish (`ChatLog.talk`). "off": no box (the lines still arrive, so turning it on shows them).
  */
 export type ChatMode = "always" | "new" | "off";
 export const CHAT_MODES: readonly ChatMode[] = ["always", "new", "off"];
@@ -61,6 +70,9 @@ export const CHAT_MODES: readonly ChatMode[] = ["always", "new", "off"];
 export const CHAT_MODE_LABEL: Readonly<Record<ChatMode, string>> = { always: "Chat: always on", new: "Chat: new messages only", off: "Chat: off" };
 /** What each choice is called in the town's settings sheet. */
 export const CHAT_MODE_CHOICE: Readonly<Record<ChatMode, string>> = { always: "Always on", new: "New messages", off: "Off" };
+/** "Chat background", in Town settings (Eric approved the name, Oct 28), and its line under it. */
+export const CHAT_BACKGROUND_LABEL = "Chat background";
+export const CHAT_BACKGROUND_NOTE = "A soft tint behind the chat, always on while the chat shows.";
 /** The mode a tap on the icon goes to: always on, new messages, off, and round again. */
 export const nextChatMode = (m: ChatMode): ChatMode => CHAT_MODES[(CHAT_MODES.indexOf(m) + 1) % CHAT_MODES.length]!;
 
@@ -162,6 +174,54 @@ export function saveChatMode(m: ChatMode): void {
 }
 
 /**
+ * Whether the box shows now (its lines are seen and it takes the touches on its own area): always in "always on"; in "new messages"
+ * from a message until the wait runs out (`shown`, which typing holds); never when the chat is off. The one place that says who fades:
+ * only "new messages" does.
+ */
+export const chatShows = (m: ChatMode, shown: boolean): boolean => m === "always" || (m === "new" && shown);
+
+/**
+ * Whether the background (a faint tint, and while you type a slight blur) is behind the box now (Eric, Oct 28): while it shows and
+ * you're typing (a tap on it), or whenever it shows when the "Chat background" setting is on. The blur itself runs only while typing.
+ */
+export const chatBlurs = (m: ChatMode, shown: boolean, typing: boolean, background: boolean): boolean => chatShows(m, shown) && (typing || background);
+
+/** "Chat background" now: the one remembered on this device (the first time it's asked), else off. */
+let background: boolean | null = null;
+const backgroundSeen = new Set<() => void>();
+export function chatBackground(): boolean {
+  return (background ??= loadChatBackground());
+}
+/** Sets it, remembers it on this device, and tells everyone showing it (the settings sheet, the box). */
+export function setChatBackground(on: boolean): void {
+  if (on === background) return;
+  background = on;
+  saveChatBackground(on);
+  for (const f of backgroundSeen) f();
+}
+export function onChatBackground(fn: () => void): () => void {
+  backgroundSeen.add(fn);
+  return () => void backgroundSeen.delete(fn);
+}
+
+/** The setting remembered on this device, or off (nothing stored, something else stored, or a storage that won't answer). */
+export function loadChatBackground(): boolean {
+  try {
+    return localStorage.getItem(CHAT.backgroundKey) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function saveChatBackground(on: boolean): void {
+  try {
+    localStorage.setItem(CHAT.backgroundKey, on ? "1" : "0");
+  } catch {
+    // (private mode, storage full: it lasts until a reload)
+  }
+}
+
+/**
  * Whether a scrolling box keeps up with its newest line (Eric, Oct 28: "new lines keep it pinned to the bottom unless you've
  * scrolled up; then it stays where you are until you scroll back down"). Pinned until the box is scrolled up from its foot;
  * while it isn't, the lines that come are counted (the "↓ new" marker) and the box stays put.
@@ -192,12 +252,14 @@ export class Stick {
 }
 
 export class ChatLog {
-  /** Every line of the last `lifeMs`, oldest first (each is removed for good at its minute). */
+  /** Every line of the last `lifeMs` (5 minutes), at most `keepLines` (100), oldest first: each is removed for good at its time, the oldest first past the cap. */
   lines: ChatLine[] = [];
-  /** True from a message until `fadeAfterMs` after it (and while the box is held, typed in, or being read). */
+  /** True from a message until `fadeAfterMs` after it (and while the box is held, typed in, or being read). Only "new messages" fades on it (`chatShows`). */
   shown = false;
   /** "New messages": a tap brought back every line, not just the ones said since the box last came back; until it fades. */
   expanded = false;
+  /** Typing is open (a tap on the box): in "new messages" the lines stay and every line shows until `talk(false)`. */
+  talking = false;
   /** The first line of the burst on show: "new messages" shows these (and, once a tap has `expanded` it, all of them). */
   private freshFrom = 0;
   private nextId = 1;
@@ -218,7 +280,7 @@ export class ChatLog {
     };
   }
 
-  /** The lines the box shows in `m`: all of them always on, the burst on show (all of them once a tap `expanded` it) in new messages, none off. */
+  /** The lines the box shows in `m`: all of them always on, the burst on show (all of them once typing `expanded` it) in new messages, none off. */
   visible(m: ChatMode): readonly ChatLine[] {
     if (m === "off") return [];
     if (m === "always" || this.expanded) return this.lines;
@@ -252,6 +314,8 @@ export class ChatLog {
       ...(who ? { uid: who.uid, n: who.n, ...(who.color !== undefined ? { color: who.color } : {}) } : {}),
       ...(l.mine ? { private: true as const } : {}),
     });
+    // At most `keepLines`: the oldest go first.
+    if (this.lines.length > CHAT.keepLines) this.lines.splice(0, this.lines.length - CHAT.keepLines);
     // A message after the box had faded starts a new burst: only the new lines show in "new messages", until a tap brings back the rest.
     if (!this.shown) {
       this.freshFrom = id;
@@ -272,12 +336,26 @@ export class ChatLog {
     this.changed();
   }
 
-  /** A tap on a line in "new messages": every line of the last minute comes back, the faded ones too, and the wait starts over. */
+  /** In "new messages": every line of the last 5 minutes comes back, the faded ones too, and the wait starts over. (Typing does this: `talk`.) */
   expand(): void {
     this.expanded = true;
     this.shown = true;
     this.arm();
     this.changed();
+  }
+
+  /**
+   * Typing opens (a tap on the box) or closes (a send, a tap on the map, Escape). While it's open the box is "always on" even in "new
+   * messages" (Eric, Oct 28: "temporarily making it 'high text' mode until you finish"): every line shows, nothing fades. When it
+   * closes the wait starts and the lines fade as usual.
+   */
+  talk(on: boolean): void {
+    if (on === this.talking) return;
+    this.talking = on;
+    if (on) {
+      this.hold(true); // (first: expand's wait must see it held)
+      this.expand();
+    } else this.hold(false);
   }
 
   /** Someone is reading (scrolling): the wait before the fade starts over. */
