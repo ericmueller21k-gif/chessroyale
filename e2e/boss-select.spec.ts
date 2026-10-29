@@ -648,14 +648,14 @@ test("the stage shows no number (Eric, Oct 25), the difficulty's name (Medium by
 
 test("Boss Battle (Eric, Oct 29): home's card and the screen's header say so; five difficulty levels, the arrows stepping through them and stopping at the ends (greyed there, not hidden); your two invite circles are there, named, and nothing moves", async ({ page }) => {
   await named(page, "Party");
-  await page.addInitScript(() => localStorage.removeItem("brc.bossDifficulty"));
   await page.goto("/");
   await expect(page.getByRole("main").locator(".rd-card").filter({ hasText: /^Boss BattleAny boss, up to 3$/ })).toBeVisible();
   await openSoloBoss(page);
   const level = page.locator(".bs-level");
   const easier = page.getByRole("button", { name: "Easier" });
   const harder = page.getByRole("button", { name: "Harder" });
-  const frame = async () => [await page.locator(".bs-stage").boundingBox(), await page.getByRole("button", { name: "START" }).boundingBox(), await page.locator(".bs-diff").boundingBox()];
+  // (Boxes on the page, not the window: a tap may scroll the page a little, which moves nothing in it.)
+  const frame = () => page.evaluate(() => [".bs-stage", ".bs-start", ".bs-diff", ".bs-dots", ".bs-back.bs-l", ".bs-back.bs-r"].map((q) => { const r = document.querySelector(q)!.getBoundingClientRect(); return [r.x + scrollX, r.y + scrollY, r.width, r.height]; }));
   await expect(page.locator(".bs-dot")).toHaveCount(5);
   await expect(page.getByRole("img", { name: "Invite a friend (coming soon)" })).toHaveCount(2);
   await expect(page.locator(".bs-back")).toHaveCount(2);
@@ -687,5 +687,6 @@ test("Boss Battle (Eric, Oct 29): home's card and the screen's header say so; fi
   expect(colors.size, "each level its own color").toBe(5);
   // Remembered by its stored id: a reload keeps it.
   await page.reload();
+  await openSoloBoss(page);
   await expect(page.locator(".bs-level")).toHaveText("Very hard");
 });
