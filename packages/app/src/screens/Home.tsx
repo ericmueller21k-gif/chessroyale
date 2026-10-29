@@ -23,6 +23,7 @@ import { isPaused, useServerStatus } from "../status.ts";
 import { ChatNotice } from "../components/ChatNotice.tsx";
 import { homeRankLine, ranked1v1Rank } from "../ranked.ts";
 import { RankEmblem } from "../components/RankEmblem.tsx";
+import { SwordsIcon } from "../town/CardIcons.tsx";
 import { PIECE_SHAPES, type PieceShape } from "../autochess/pieceShapes.ts";
 
 const MODE_KEY = "brc.mode";
@@ -760,13 +761,13 @@ export function HomeScreen({
       <div class="fd-page rd-page">
         <header class="fd-page-head">
           <BackButton onClick={() => onRaid(false)} />
-          <h1>{full ? "Boss raid" : "Solo Boss Mode"}</h1>
+          <h1>{full ? "Boss raid" : "Boss Battle"}</h1>
           <span class="fd-head-spacer" />
         </header>
         {/* (Why you're here: a match that closed while this screen was where you'd come back to, as on home.) */}
         {notice && <Notice notice={notice} />}
         {/* The character select (Eric, Oct 16): the tiles, the stage; the ways to play under it. */}
-        <BossSelect value={pick} difficulty={difficulty} onPick={pickTile} />
+        <BossSelect value={pick} difficulty={difficulty} name={name} look={look} onPick={pickTile} onDifficulty={pickDifficulty} />
         <div class="rd-options">
           {/* (The public queues share their lobby: always a random boss.) */}
           {full && (
@@ -788,7 +789,15 @@ export function HomeScreen({
             />
           )}
           {full && <RaidOption label="Raid with bots" sub={`You and ${RAID_SIZE - 1} bots · starts at once`} disabled={loading || !!soloResting} locked={locked} onClick={() => onSolo("raid", { fill: true })} />}
-          <RaidOption label="Boss alone" sub={pick === RANDOM ? "Just you vs a random boss" : "Just you vs this boss"} disabled={loading || !!soloResting} locked={locked} onClick={bossAlone} />
+          {full ? (
+            <RaidOption label="Boss alone" sub={pick === RANDOM ? "Just you vs a random boss" : "Just you vs this boss"} disabled={loading || !!soloResting} locked={locked} onClick={bossAlone} />
+          ) : (
+            // (Boss Battle's START: straight into the battle with the picked boss at the screen's difficulty; the old Boss alone menu is skipped.)
+            <button type="button" class="bs-start" disabled={loading || !!soloResting || locked} onClick={() => onSolo("raid")}>
+              <SwordsIcon />
+              START
+            </button>
+          )}
           {full && <RaidOption label="Play with friends" sub="Make a raid and share its code, or join one" locked={locked} onClick={() => setFriends(true)} />}
         </div>
         {full && <p class="fd-sub rd-about">{`Up to ${RAID_SIZE} of you pick the crowd's moves together against a boss. The most popular pick is played.`}</p>}
@@ -925,8 +934,8 @@ export function HomeScreen({
         <CrownArt />
       </span>
       <span class="rd-card-text">
-        <strong>Solo Boss Mode</strong>
-        <span>Any boss, alone</span>
+        <strong>Boss Battle</strong>
+        <span>Any boss, up to 3</span>
       </span>
     </button>
   );

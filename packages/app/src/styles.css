@@ -9277,6 +9277,19 @@ button.fd-logo {
 .bs-tile .bs-q {
   font-size: calc(var(--bs-w) * 0.5);
 }
+/* The "?" tile: smaller than a boss's (Eric, Oct 29: "I have shrunk the question mark box"), in a row of its own as short as it is. */
+.bs-tile.bs-random {
+  width: calc(var(--bs-w) * 0.82);
+  height: calc(var(--bs-h) * 0.5);
+  flex-basis: auto;
+  --bs-slant: calc(var(--bs-w) * 0.14);
+}
+.bs-tile.bs-random .bs-q {
+  font-size: calc(var(--bs-w) * 0.34);
+}
+.bs-row:has(> .bs-random:only-child) {
+  height: calc(var(--bs-h) * 0.5);
+}
 :root {
   --bs-edge: #3d4453;
   --bs-fill: #1b1e25;
@@ -9296,30 +9309,36 @@ button.fd-logo {
   --bs-mix-hi: 34%;
   --bs-mix-lo: 52%;
 }
-/* The stage: the picked boss on the 1 v 1 stage's platform (dv-st-plat), in his idle; his name and strength under it. */
+/* The stage (Eric, Oct 29, from his mockup): you on a platform at the left with two smaller ones behind you (invite circles, greyed
+   until a live party exists), "VS", the picked boss on the 1 v 1 stage's platform (dv-st-plat) at the right in its idle; each
+   one's name under it, and under the boss's the difficulty: arrows, its name and five dots. --bs-sw: a platform's room. */
 .bs-stage {
+  --bs-sw: 156px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.bs-row-stage {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: start;
+  /* (Takes back the page's padding, as the tiles do, so the two sides sit as far out as the picture's.) */
+  margin: 0 -9px;
+}
+.bs-side {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  min-width: 0;
 }
 .bs-spot {
   position: relative;
-  width: min(100%, 280px);
+  width: var(--bs-sw);
   aspect-ratio: 124 / 96;
   container-type: inline-size;
 }
-/* A short screen: the stage smaller, so the tall tiles above it leave the ways to play under it on the screen where they can (the page
-   scrolls from there): 210 px wide, not 280, up to 800 px tall (Eric's iPhone is 777), 170 px up to 700 (the small phones). */
-@media (max-height: 800px) {
-  .bs-spot {
-    width: min(100%, 210px);
-  }
-}
-@media (max-height: 700px) {
-  .bs-spot {
-    width: min(100%, 170px);
-  }
+.bs-mine {
+  aspect-ratio: 124 / 96;
 }
 .bs-spot::before {
   content: "";
@@ -9330,6 +9349,14 @@ button.fd-logo {
 }
 .bs-stage .dv-st-plat::after {
   opacity: var(--fd-shadow, 0.35);
+}
+/* (Eric's picture: each platform a thin ellipse with a rim under its top face and a soft shadow; yours and his the same, 18 px tall.) */
+.bs-spot > .dv-st-plat {
+  top: 80%;
+  height: 15%;
+}
+.bs-stage .dv-st-plat {
+  box-shadow: 0 3px 7px rgba(0, 0, 0, 0.2);
 }
 .bs-spot .bs-fig {
   bottom: 12%;
@@ -9348,7 +9375,7 @@ button.fd-logo {
   image-rendering: pixelated;
 }
 .bs-q-big {
-  font-size: 120px;
+  font-size: 90px;
   color: var(--fd-sub);
   opacity: 0.5;
 }
@@ -9356,39 +9383,225 @@ button.fd-logo {
 .bs-dark .bs-sprite {
   filter: brightness(0) drop-shadow(0 0 3px rgba(122, 79, 208, 0.9));
 }
-/* Its words: a room over the stage (three lines of the bubble), the bubble at its foot, centered, over the stage's empty
-   top a little. */
+/* Your pawn: in the middle of your platform, its feet on it. */
+.bs-me {
+  position: absolute;
+  left: 10%;
+  width: 80%;
+  bottom: 12%;
+  pointer-events: none;
+}
+.bs-me .fd-pawn-stage {
+  display: block;
+}
+/* The two platforms behind you, smaller and a little higher, each with its invite circle over it: dashed, a person-plus, muted. */
+.bs-back {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 32%;
+}
+.bs-back.bs-l {
+  left: -2.6%;
+}
+.bs-back.bs-r {
+  right: -2.6%;
+}
+/* (Eric's picture: their centers 16 px higher than yours, yours drawn over their inner ends; the circle's center 36 px above its platform's.) */
+.bs-back .dv-st-plat {
+  left: 0;
+  width: 100%;
+  top: 69.6%;
+  height: 10%;
+}
+.bs-stage .bs-back .dv-st-plat::after {
+  opacity: 0;
+}
+.bs-inv {
+  position: absolute;
+  left: 50%;
+  top: 28.7%;
+  display: grid;
+  place-items: center;
+  width: calc(var(--bs-sw) * 0.2564);
+  height: calc(var(--bs-sw) * 0.2564);
+  margin-left: calc(var(--bs-sw) * -0.1282);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--fd-text) 3%, transparent);
+  color: var(--fd-muted);
+}
+.bs-inv > svg {
+  display: block;
+}
+.bs-inv-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: var(--fd-dim);
+  stroke-width: 1.6;
+  stroke-dasharray: 4.38 3.42;
+}
+.bs-inv-icon {
+  position: relative;
+  width: 62%;
+  height: 62%;
+}
+/* Its words: a room over the stage (three lines of the bubble), the bubble at its foot, over the boss's side. */
 .bs-say {
   position: relative;
   z-index: 2;
-  width: 100%;
-  height: 62px;
-  margin-bottom: -26px;
+  height: 40px;
+  margin-bottom: -6px;
 }
 .bs-say .bs-bubble {
   bottom: 0;
-  left: 0;
+  left: auto;
   right: 0;
-  margin: 0 auto;
-  max-width: min(100%, 300px);
+  max-width: min(100%, 260px);
 }
-.bs-id {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  min-height: 48px;
+.bs-vs {
+  align-self: start;
+  margin-top: calc(var(--bs-sw) * 0.5);
+  padding: 0 4px;
+  font-family: "Archivo Black", Archivo, sans-serif;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--fd-dim);
 }
 .bs-name {
+  margin-top: 6px;
   font-family: "Archivo Black", Archivo, sans-serif;
-  font-size: 22px;
+  font-size: 19px;
   font-weight: 400;
   line-height: 1.15;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: center;
 }
-.bs-rating {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--fd-sub);
+/* The difficulty: five levels, each in its own color (darker on the light page, so the name reads on it: 3 to 1 at least). */
+.bs-stage {
+  --bd-very-easy: #15803d;
+  --bd-easy: #22c55e;
+  --bd-normal: #d97706;
+  --bd-hard: #ef4444;
+  --bd-hardest: #c22222;
+}
+:root[data-theme="light"] .bs-stage {
+  --bd-easy: #179a45;
+  --bd-normal: #c2670a;
+  --bd-hard: #dc2626;
+  --bd-hardest: #7f1d1d;
+}
+.bs-diff {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+.bs-arrow {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fd-text);
+  cursor: pointer;
+}
+.bs-arrow[aria-disabled="true"] {
+  opacity: 0.3;
+  cursor: default;
+}
+.bs-level {
+  min-width: 76px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.bs-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 14px;
+}
+.bs-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--fd-dim);
+}
+.bs-dot.on {
+  width: 9px;
+  height: 9px;
+}
+[data-level="very-easy"] {
+  --bd: var(--bd-very-easy);
+}
+[data-level="easy"] {
+  --bd: var(--bd-easy);
+}
+[data-level="normal"] {
+  --bd: var(--bd-normal);
+}
+[data-level="hard"] {
+  --bd: var(--bd-hard);
+}
+[data-level="hardest"] {
+  --bd: var(--bd-hardest);
+}
+.bs-level {
+  color: var(--bd);
+}
+.bs-dot.on {
+  background: var(--bd);
+}
+/* START: the picture's slanted gold button, trimmed on the left and right (85% of the old width). */
+.bs-start {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 231px;
+  max-width: 100%;
+  height: 48px;
+  margin: 0 auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fd-gold-ink);
+  font-family: "Archivo Black", Archivo, sans-serif;
+  font-size: 22px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  position: relative;
+  z-index: 0;
+}
+.bs-start::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--fd-gold);
+  border: 3px solid #1a1406;
+  transform: skewX(-18deg);
+  box-shadow: 6px 6px 0 rgba(120, 120, 120, 0.35);
+}
+.bs-start svg {
+  width: 28px;
+  height: 28px;
+}
+.bs-start:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.bs-start:active:not(:disabled) {
+  transform: scale(0.97);
 }
 @media (prefers-reduced-motion: reduce) {
   .bs-fig,
@@ -21329,7 +21542,8 @@ button.sq-tiny {
   --pw: 68px;
   /* (How high its feet stand above the unit's foot: the God King's crowns' row. A pawn's base is 10% up its square.) */
   --feet: 12px;
-  --bob: 2px;
+  /* (Eric, Oct 29: "almost hard to see that it's moving": 1 px.) */
+  --bob: 1px;
   position: relative;
   width: 58px;
   height: 62px;
@@ -21383,6 +21597,8 @@ button.sq-tiny {
     grid-column: 4;
   }
   .boss-dock.dk-strip > .you-pawn {
+    /* (Eric, Oct 29: a phone's pawn sat a little high: its art 6 px lower; the box stays.) */
+    --feet: 6px;
     grid-column: 3;
     grid-row: 2;
     align-self: start;
@@ -21451,7 +21667,7 @@ button.sq-tiny {
   .screen.game > .boss-dock.dk-pawn > .you-pawn {
     --pw: 168px;
     --feet: 14px;
-    --bob: 3px;
+    --bob: 1px;
     position: absolute;
     left: calc(100% + var(--gk-off, 2px) + var(--bs-out, 0px));
     bottom: calc(100% + 10px - 14px);
@@ -21515,4 +21731,16 @@ button.sq-tiny {
   height: 2px;
   background: #7486c0;
   pointer-events: none;
+}
+/* A computer: the stage and START a bit bigger, the same idea (Eric, Oct 29). */
+@media (min-width: 1024px) {
+  .bs-stage {
+    --bs-sw: 200px;
+  }
+  .bs-start {
+    width: 280px;
+  }
+  .bs-vs {
+    font-size: 32px;
+  }
 }

@@ -154,7 +154,7 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, seat = null, framed
             {card && home && card.confirm && (
               <>
                 <h2>Leave the town square?</h2>
-                <p class="town-card-text">You'll fight {home.boss} alone in Solo Boss Mode.</p>
+                <p class="town-card-text">You'll fight {home.boss} in Boss Battle.</p>
                 <button type="button" class="town-btn primary" onClick={() => onBossAlone?.(home.id)}>
                   Leave
                 </button>

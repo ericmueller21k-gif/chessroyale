@@ -56,7 +56,7 @@ export function SideMenu({ page, nav }: { page?: FrontPage; nav: FrontNav }) {
       <div class="fd-menu">
         <Item label="Play" on={page === "home" || page === "queue"} onClick={nav.home} icon={<Icon d="M7 4.5v15l12-7.5z" />} />
         <Item label="Boss Arena" on={page === "town"} onClick={nav.bossArena} icon={crown()} />
-        <Item label="Solo Boss Mode" on={page === "raid"} onClick={nav.soloBoss} icon={crown()} />
+        <Item label="Boss Battle" on={page === "raid"} onClick={nav.soloBoss} icon={crown()} />
         <Item
           label="Play with friends"
           on={page === "lobby"}

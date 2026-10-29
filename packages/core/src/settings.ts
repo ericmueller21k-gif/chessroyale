@@ -1552,10 +1552,11 @@ export const KING_SPEECH = {
  *   offered ("better they are a bit harder rn"); a too easy / too hard button on the results screen will tune it.
  */
 export const BOSS_DIFFICULTY = [
-  { id: "easy", label: "Easy", elo: -300, maia: 1000 },
-  { id: "normal", label: "Normal", elo: 0, maia: 1400 },
-  { id: "hard", label: "Hard", elo: 250, maia: 1800 },
-  { id: "hardest", label: "Hardest", elo: 500, maia: 2200 },
+  { id: "very-easy", label: "Very easy", elo: -500, maia: 700 },
+  { id: "easy", label: "Easy", elo: -300, maia: 1150 },
+  { id: "normal", label: "Medium", elo: 0, maia: 1600 },
+  { id: "hard", label: "Hard", elo: 250, maia: 2050 },
+  { id: "hardest", label: "Very hard", elo: 500, maia: 2500 },
 ] as const;
 export type BossDifficultyId = (typeof BOSS_DIFFICULTY)[number]["id"];
 

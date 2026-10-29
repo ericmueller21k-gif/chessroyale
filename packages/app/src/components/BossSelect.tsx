@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import { hiddenBosses, menuBosses, type BossDef, type BossDifficultyId } from "@chessroyale/core";
-import { difficultyLabel } from "../boss-difficulty.ts";
+import { BOSS_DIFFICULTY, hiddenBosses, menuBosses, type BossDef, type BossDifficultyId, type ItemLook } from "@chessroyale/core";
+import { DressedPawn } from "./FrontDoor.tsx";
 import { bossKit } from "../characters/kits.ts";
 import { frameKeys, type Character } from "../characters/sprite.ts";
 import { rowSizes, SELECT_SOUND, SELECT_TINT, selectLine, TILES_PER_ROW } from "../characters/boss-select.ts";
@@ -73,7 +73,26 @@ function placeOnStage(ch: Character, idle: string): { left: number; width: numbe
 /** The "?" tile's value, and the stage's when a random boss is picked. */
 export const RANDOM = "";
 
-export function BossSelect({ value, difficulty, onPick }: { value: string; difficulty: BossDifficultyId; onPick: (id: string) => void }) {
+/** An invite circle: a crisp dashed ring, a very light fill and a person-plus, as in Eric's picture. */
+const InviteCircle = () => (
+  <span class="bs-inv" role="img" aria-label="Invite a friend (coming soon)">
+    <svg class="bs-inv-ring" viewBox="0 0 40 40" aria-hidden="true" focusable="false">
+      <circle cx="20" cy="20" r="19.2" />
+    </svg>
+    <svg class="bs-inv-icon" viewBox="0 0 28 22" fill="currentColor" aria-hidden="true" focusable="false">
+      <circle cx="9" cy="5.6" r="4.6" />
+      <path d="M0 21.5c0-5.600 3.800-8.600 9-8.600s9 3 9 8.600z" />
+      <path d="M22 4.200v8M18 8.200h8" stroke="currentColor" stroke-width="2.600" stroke-linecap="round" fill="none" />
+    </svg>
+  </span>
+);
+const Arrow = ({ left }: { left?: boolean }) => (
+  <svg viewBox="0 0 10 14" width="10" height="14" aria-hidden="true" focusable="false">
+    <path d={left ? "M8 1.5 2 7l6 5.5z" : "M2 1.5 8 7l-6 5.5z"} fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+  </svg>
+);
+
+export function BossSelect({ value, difficulty, name, look, onPick, onDifficulty }: { value: string; difficulty: BossDifficultyId; name: string; look?: ItemLook; onPick: (id: string) => void; onDifficulty: (id: BossDifficultyId) => void }) {
   useServerStatus();
   const { bosses, hidden } = selectBosses();
   const still = useMedia("(prefers-reduced-motion: reduce)");
@@ -100,6 +119,11 @@ export function BossSelect({ value, difficulty, onPick }: { value: string; diffi
       selectVoice.say(line, `select:${id}:${Date.now()}`, NORMAL);
     }
   };
+  const at = Math.max(0, BOSS_DIFFICULTY.findIndex((d) => d.id === difficulty));
+  const step = (by: number) => {
+    const next = BOSS_DIFFICULTY[at + by];
+    if (next) onDifficulty(next.id);
+  };
   const kit = def ? bossKit(def.name) : null;
   const idle = kit ? (kit.anims.idle ?? "idle") : null;
   const tile = (id: string, label: string, body: preact.ComponentChildren, cls = "", tint?: string) => (
@@ -125,30 +149,63 @@ export function BossSelect({ value, difficulty, onPick }: { value: string; diffi
           </div>
         ))}
       </div>
-      <section class={`bs-stage${dark ? " bs-dark" : ""}`} aria-label="Your boss">
-        {/* (Its words over its head, in a room of their own: never over the boss.) */}
+      <section class={`bs-stage${dark ? " bs-dark" : ""}`} aria-label="Your stage">
         <div class="bs-say">
           <VoiceBubble voice={selectVoice} class="bc-bubble bs-bubble" />
         </div>
-        <div class="bs-spot">
-          <span class="dv-st-plat" aria-hidden="true" />
-          {/* (Its own key each tap: the drop plays again, from the top.) */}
-          <span class="dv-st-pawn bs-fig" key={drop.n}>
-            {kit && idle ? (
-              <SpriteAnim ch={kit.ch} anim={idle} since={drop.at} still={still} class="bs-sprite" style={(({ left, width }) => ({ left: `${left}cqi`, width: `${width}cqi` }))(placeOnStage(kit.ch, idle))} />
-            ) : (
-              <span class="bs-q bs-q-big" aria-hidden="true">
-                ?
+        <div class="bs-row-stage">
+          <div class="bs-side">
+            {/* Your pawn in front, two smaller platforms behind you with an invite circle over each (greyed: no live party yet). */}
+            <div class="bs-spot bs-mine">
+              {(["l", "r"] as const).map((k) => (
+                <span class={`bs-back bs-${k}`} key={k}>
+                  <InviteCircle />
+                  <span class="dv-st-plat" aria-hidden="true" />
+                </span>
+              ))}
+              <span class="dv-st-plat" aria-hidden="true" />
+              <span class="bs-me" aria-hidden="true">
+                <DressedPawn look={look} size="stage" />
               </span>
-            )}
-          </span>
-        </div>
-        <div class="bs-id" aria-live="polite">
-          <strong class="bs-name">{dark ? "???" : (def?.name ?? "Random boss")}</strong>
-          <span class="bs-rating">
-            {/* (Eric, Oct 25: no skulls, no rating, no number under the boss for now; only the difficulty's name when it isn't Normal.) */}
-            {dark ? "Locked" : def ? (difficulty === "normal" ? "" : difficultyLabel(difficulty)) : "A different boss from last time"}
-          </span>
+            </div>
+            <strong class="bs-name">{name}</strong>
+          </div>
+          <span class="bs-vs">VS</span>
+          <div class="bs-side" aria-label="Your boss" role="group">
+            <div class="bs-spot">
+              <span class="dv-st-plat" aria-hidden="true" />
+              {/* (Its own key each tap: the drop plays again, from the top.) */}
+              <span class="dv-st-pawn bs-fig" key={drop.n}>
+                {kit && idle ? (
+                  <SpriteAnim ch={kit.ch} anim={idle} since={drop.at} still={still} class="bs-sprite" style={(({ left, width }) => ({ left: `${left}cqi`, width: `${width}cqi` }))(placeOnStage(kit.ch, idle))} />
+                ) : (
+                  <span class="bs-q bs-q-big" aria-hidden="true">
+                    ?
+                  </span>
+                )}
+              </span>
+            </div>
+            <strong class="bs-name" aria-live="polite">
+              {dark ? "???" : (def?.name ?? "Random boss")}
+            </strong>
+            {/* The difficulty: arrows step through the five levels and stop at the ends (greyed there); the dots show where you are. */}
+            <div class="bs-diff" role="group" aria-label="Difficulty">
+              <button type="button" class="bs-arrow" aria-label="Easier" aria-disabled={at === 0 || undefined} onClick={() => step(-1)}>
+                <Arrow left />
+              </button>
+              <span class="bs-level" data-level={difficulty} aria-live="polite">
+                {BOSS_DIFFICULTY[at]!.label}
+              </span>
+              <button type="button" class="bs-arrow" aria-label="Harder" aria-disabled={at === BOSS_DIFFICULTY.length - 1 || undefined} onClick={() => step(1)}>
+                <Arrow />
+              </button>
+            </div>
+            <div class="bs-dots" aria-hidden="true">
+              {BOSS_DIFFICULTY.map((d, i) => (
+                <span class={`bs-dot${i === at ? " on" : ""}`} data-level={d.id} key={d.id} />
+              ))}
+            </div>
+          </div>
         </div>
       </section>
     </div>
