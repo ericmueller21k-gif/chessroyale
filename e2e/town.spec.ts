@@ -69,12 +69,14 @@ test("the town square at /town: the world is drawn and fills its box under the b
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
   expect(await colors(page), "the world is drawn, not blank").toBeGreaterThan(40);
 
-  // The world fills the rest of the screen under the bar, phone or computer.
+  // The world fills the rest of the screen under the bar: the whole screen's width on a phone, the front door's center column's on a
+  // computer (Oct 29: the town sits in the frame, between the menu and the live panel; its box is tested in town-desktop.spec.ts).
   const vp = page.viewportSize()!;
   const bar = (await page.locator(".town-bar").boundingBox())!;
   const cv = (await canvas(page).boundingBox())!;
+  const wide = test.info().project.name === "desktop" ? (await page.locator(".fd-center").boundingBox())!.width : vp.width;
   expect(Math.abs(cv.y - (bar.y + bar.height)), "the world starts right under the bar").toBeLessThanOrEqual(1.5);
-  expect(Math.abs(cv.width - vp.width), "as wide as the screen").toBeLessThanOrEqual(1);
+  expect(Math.abs(cv.width - wide), "as wide as the screen (a computer's: its center column)").toBeLessThanOrEqual(1);
   expect(Math.abs(cv.y + cv.height - vp.height), "down to the screen's foot").toBeLessThanOrEqual(1);
 
   // A tap straight ahead, a third of the way down the world (several rows up from your pawn on either shape of box),
