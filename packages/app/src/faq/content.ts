@@ -70,6 +70,8 @@ import {
   type SquadsSettings,
   controlLabel,
   rankView,
+  divisionsEnd,
+  emblemId,
   votedControl,
   zoneControl,
 } from "@chessroyale/core";
@@ -300,7 +302,12 @@ export function ranked1v1(R: typeof RANKED_1V1): string {
   const blitz = zoneControl("blitz", R);
   const tiers = R.tiers.map((t) => t.name);
   const top = rankView({ games: R.placements.games, ladder: R.placements.maxLadder }, R);
-  const apex = R.apex;
+  const [lowTop, highTop] = [...R.topTiers].sort((a, b) => b.top - a.top);
+  const last = tiers.at(-1)!;
+  // (Where the top tiers' floor sits in the last division: Radiant 1's 80 RP.)
+  const floorRp = R.topFloor - (divisionsEnd(R) - R.pointsPerDivision);
+  const emblems = (ids: readonly string[]) => `!emblems ${ids.join(" ")}`;
+  const example = R.tiers[Math.min(2, R.tiers.length - 1)]!.name;
   const C = R.coins;
   return `### 1 v 1 · Classic chess {#mode-1v1}
 
@@ -309,7 +316,15 @@ export function ranked1v1(R: typeof RANKED_1V1): string {
 - **The clocks:** "${controlLabel(blitz)}" means ${n(blitz.baseSeconds / 60, "minute")} each, plus ${n(blitz.incrementSeconds, "second")} after every move. They start after Black's first move. Each side has ${n(R.firstMoveSeconds, "second")} for its first move, or the game is called off (no result, no rank change).
 - **How a game ends:** checkmate; resigning; running out of time, a loss (but a draw if the other player has only a king, or a king and one knight or one bishop, so they couldn't mate); or a draw, by stalemate, threefold repetition, the 50-move rule, too little material for either side to mate, or agreement. **Offer a draw** is under the board: the other player accepts or declines, and after a decline you can offer again once you've made ${n(R.drawOfferEveryMoves, "more move")}.
 - **Lost your connection?** Your clock keeps running: open the app again (or reload) and you're straight back in the game.
-- **Ranks**, as in League of Legends: ${tiers.slice(0, -1).join(", ")} and ${tiers.at(-1)}, each with divisions 4 (the lowest) to 1, then ${apex.map((a) => a.name).slice(0, -1).join(", ")} and ${apex.at(-1)!.name}, with no divisions. A division is ${n(R.pointsPerDivision, "rank point")} (RP): reach ${num(R.pointsPerDivision)} and you go up a division, the extra carried over; drop below 0 and you go down one. There are no promotion series, and nobody goes below ${tiers[0]} 4 with 0 RP. ${apex[1]!.name} starts ${num(apex[1]!.from)} RP into ${apex[0]!.name}, ${apex[2]!.name} ${num(apex[2]!.from)}.
+- **Ranks:** ${tiers.slice(0, -1).join(", ")} and ${last}, each with divisions ${R.divisions} (the lowest) to 1. A division is ${n(R.pointsPerDivision, "rank point")} (RP): reach ${num(R.pointsPerDivision)} and you go up a division, the extra carried over; drop below 0 and you go down one. There are no promotion series, and nobody goes below ${tiers[0]} ${R.divisions} with 0 RP. Each tier has its emblem, and each division up adds to it, up to a crown and a glow in division 1:
+
+${emblems(R.tiers.map((t) => emblemId(t.name, R.divisions)))}
+${emblems(Array.from({ length: R.divisions }, (_, i) => emblemId(example, R.divisions - i)))}
+
+- **The top two tiers,** with no divisions: **${lowTop!.name}**, the ${num(lowTop!.top)} highest ranks, and above it **${highTop!.name}**, the ${num(highTop!.top)} highest, both from ${floorRp} RP in ${last} 1 (their RP count from there). Equal ranks share a place, and your place is brought up to date within a minute. At ${floorRp} RP or more in ${last} 1 but outside the top ${num(lowTop!.top)}, you stay ${last} 1 and your RP keeps counting past ${floorRp}. Their emblems shimmer:
+
+${emblems([emblemId(lowTop!.name, null), emblemId(highTop!.name, null)])}
+
 - **Rank points:** about +${num(R.points.perGame)} for a win and −${num(R.points.perGame)} for a loss against a player at your level, about 0 for a draw; more for beating someone stronger, less for beating someone weaker. Behind them is a hidden rating, worked out from your results and whom you played them against: when your rank is lower than it, you gain more and lose less (up to ${n(R.points.maxAdjust, "RP", "RP")} more or less), so your rank settles where your play is. A win never costs you points.
 - **Placements:** your first ${n(R.placements.games, "game")} show "Placement 1/${R.placements.games}", "2/${R.placements.games}" and so on; after the last of them you're placed by your hidden rating, at most ${top.label.replace(/ · .*/, "")}.
 - **Coins:** a game pays ${num(C.perMinute.win)} coins a minute for a win, ${num(C.perMinute.draw)} for a draw and ${num(C.perMinute.loss)} for a loss, at least 1 and at most ${num(C.maxPerGame)}, once both sides have made ${n(C.minMoves, "move")}. Up to ${n(C.perDay, "game")} a day pay coins; after that they still count for your rank. A called-off game and a bot game pay nothing.

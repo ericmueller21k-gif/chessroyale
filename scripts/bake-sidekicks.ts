@@ -47,7 +47,7 @@ const chunk = (type: string, body: Uint8Array) => {
   out.writeUInt32BE(crc32(out.subarray(4, 8 + body.length)), 8 + body.length);
   return out;
 };
-function png(w: number, h: number, data: Uint8Array): Buffer {
+export function png(w: number, h: number, data: Uint8Array): Buffer {
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(w, 0);
   ihdr.writeUInt32BE(h, 4);

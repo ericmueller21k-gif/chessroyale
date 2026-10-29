@@ -197,7 +197,7 @@ test("your tag sits above your pawn's head, centered over it: the icon left of y
       const tagRight = Math.max(name.x + name.width, sub.x + sub.width);
       expect(Math.abs((tagLeft + tagRight) / 2 - (pawn.x + pawn.width / 2)), `${width}: the tag centered over the pawn`).toBeLessThanOrEqual(3);
     }
-    await expect(hero.locator(".fd-hero-sub")).toContainText(/No rating yet|·/);
+    await expect(hero.locator(".fd-hero-sub")).toContainText(/Unranked|Placement|·/);
     // (No outfit line: the names of what you wear are gone from home.)
     await expect(hero.locator(".fd-hero-sub")).not.toContainText(",");
     expect(await sideways(page), `${width}`).toBe(0);

@@ -21,7 +21,8 @@ import { noteLinkCopied } from "./Lobby.tsx";
 import { testParams, testSwitchesAllowed } from "../test-switches.ts";
 import { isPaused, useServerStatus } from "../status.ts";
 import { ChatNotice } from "../components/ChatNotice.tsx";
-import { ranked1v1Label } from "../ranked.ts";
+import { homeRankLine, ranked1v1Rank } from "../ranked.ts";
+import { RankEmblem } from "../components/RankEmblem.tsx";
 import { PIECE_SHAPES, type PieceShape } from "../autochess/pieceShapes.ts";
 
 const MODE_KEY = "brc.mode";
@@ -690,7 +691,7 @@ export function HomeScreen({
         <div class="fd-hero-text">
           <div class="fd-hero-name">{name}</div>
           <div class="fd-hero-sub">
-            <RankLine rating={profile?.rating ?? null} />
+            <RankLine line={homeRankLine()} />
           </div>
         </div>
       </div>
@@ -822,7 +823,7 @@ export function HomeScreen({
   // people, one tap to queue): your rank in it and what it is. Squads: Solo queue or Party. Nothing in it changes the
   // page's layout. Always there (Eric, Oct 25: "the menu buttons should never be like invisible"):
   // with no mode picked it shows 50 v 50's options greyed, none selected and none tappable; the first pick wakes them.
-  const rank1v1 = mode === "1v1" ? ranked1v1Label() : null;
+  const rank1v1 = mode === "1v1" ? ranked1v1Rank() : null;
   const panel = (
     <div class={`fd-mode-panel${mode ? "" : " idle"}`}>
       {mode === "squads" ? (
@@ -852,9 +853,14 @@ export function HomeScreen({
           ))}
         </div>
       ) : mode === "1v1" ? (
-        <div class="fd-panel-words">
-          {rank1v1 && <strong class="fd-rank1v1">Your rank: {rank1v1}</strong>}
-          <span>Ranked chess vs one player near your level</span>
+        <div class="fd-panel-words fd-rank-words">
+          {/* (Your rank's emblem: its box is there before the profile loads, so nothing moves when it does.) */}
+          <RankEmblem rank={rank1v1} class="fd-rank-emblem" />
+          <span class="fd-rank-lines">
+            {rank1v1 && <strong class="fd-rank1v1">Your rank: {rank1v1.label}</strong>}
+            {/* (Not "Ranked chess vs…": RANKED heads the row, and the line fits beside the emblem at 320 px.) */}
+            <span>Chess vs one player near your level</span>
+          </span>
         </div>
       ) : (
         <div class="fd-modes fd-types" role="radiogroup" aria-label="Matchmaking">
