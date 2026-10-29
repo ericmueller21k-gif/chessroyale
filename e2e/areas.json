@@ -458,6 +458,7 @@
       "paths": ["packages/app/src/styles.css"],
       "specs": [
         "e2e/board-layout.spec.ts",
+        "e2e/desktop-board.spec.ts",
         "e2e/boss-bar.spec.ts",
         "e2e/boss-bar-same.spec.ts",
         "e2e/boss-dock.spec.ts",
@@ -467,6 +468,19 @@
         "e2e/home-layout.spec.ts",
         "e2e/match-screen.spec.ts",
         "e2e/panel.spec.ts"
+      ]
+    },
+    "a computer's board size, every game screen (board-size.css)": {
+      "paths": ["packages/app/src/board-size.css"],
+      "specs": [
+        "e2e/desktop-board.spec.ts",
+        "e2e/board-layout.spec.ts",
+        "e2e/boss-bar.spec.ts",
+        "e2e/boss-side.spec.ts",
+        "e2e/eval-bar.spec.ts",
+        "e2e/match-screen.spec.ts",
+        "e2e/recluse.spec.ts",
+        "e2e/tiger.spec.ts"
       ]
     },
     "the queue and lobbies": {

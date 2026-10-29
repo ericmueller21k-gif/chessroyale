@@ -18,27 +18,39 @@ import { BOARD_SEL, bossAloneFromHome, engineTop, openBossRaid, submitMove, test
  *   none (not yet);
  * - a computer's move list: its top level with the board's, half its old height, the same width, 12 to 16 px from the board;
  *   what's under it in the column moves up with it;
- * - the board's box is main's at every size.
+ * - the board's box is main's at every size (Oct 29: the new sizes by the window's height; desktop-board.spec.ts checks every
+ *   board screen).
  */
 
 /** Measured on main before this change (3cf8aba0), Boss alone and a Solo raid alike: the board's width on a phone. */
 const MAIN_BOARD: Record<string, number> = { "390x844": 312, "360x640": 282.7, "320x568": 237.3 };
-/** …the raid's scoreboard beside the board on a computer (x, y, width; its height the window's). */
+/**
+ * …the raid's scoreboard beside the board on a computer (x, y, width; its height the window's). Since Oct 29 the screen beside it
+ * grows with the board (docs/decisions/2026-10-29-desktop-board-size.md), so the two together sit further left where the board
+ * is bigger: 1440 × 900 x 40 → 10, 1920 × 1080 x 280 → 118; 1280 × 800 as before.
+ */
 const MAIN_TOWER: Record<string, { x: number; y: number; w: number }> = {
   "1280x800": { x: 10, y: 0, w: 360 },
-  "1440x900": { x: 40, y: 0, w: 360 },
-  "1920x1080": { x: 280, y: 0, w: 360 },
+  "1440x900": { x: 10, y: 0, w: 360 },
+  "1920x1080": { x: 118, y: 0, w: 360 },
 };
 /** …and the "Your move" row's height (two lines' room). */
 const MAIN_ROW_H = 62;
-/** Measured on main before the pawn (b9712062), Boss alone: the board's box on a computer (x, y, width = height). */
+/**
+ * Boss alone: the board's box on a computer (x, y, width = height). Measured on main before the pawn (b9712062); since Oct 29
+ * sized by the window's height (the window's less 200 px: docs/decisions/2026-10-29-desktop-board-size.md), old → new:
+ * 1280 × 800 408, 456 → 264, 600; 1440 × 900 438, 552 → 294, 696; 1536 × 864 486, 552 → 360, 664; 1920 × 1080 678, 552 → 444,
+ * 880; 1024 × 768 unchanged (width-bound).
+ */
 const MAIN_BOARD_BOX: Record<string, { x: number; y: number; w: number }> = {
-  "1280x800": { x: 408, y: 121.3, w: 456 },
-  "1440x900": { x: 438, y: 121.3, w: 552 },
-  "1536x864": { x: 486, y: 121.3, w: 552 },
-  "1920x1080": { x: 678, y: 121.3, w: 552 },
+  "1280x800": { x: 264, y: 121.3, w: 600 },
+  "1440x900": { x: 294, y: 121.3, w: 696 },
+  "1536x864": { x: 360, y: 121.3, w: 664 },
+  "1920x1080": { x: 444, y: 121.3, w: 880 },
   "1024x768": { x: 96, y: 121.3, w: 464 },
 };
+/** A raid's board box at 1280 × 800 (its scoreboard beside it keeps the board width-bound there: main's, before and after Oct 29). */
+const RAID_BOARD_BOX: Record<string, { x: number; y: number; w: number }> = { "1280x800": { x: 408, y: 121.3, w: 456 } };
 /** …and the move list's height there then: the board's less 146 px (at least 160 px). */
 const mainSideH = (board: number) => Math.max(160, board - 146);
 
@@ -257,7 +269,9 @@ test("a computer: Boss alone has no scoreboard and your pawn left of the God Kin
     }
     const { board, king, side } = { board: b.board!, king: b.king!, side: b.side! };
     // The board is exactly where and as big as on main.
-    const main = MAIN_BOARD_BOX[size]!;
+    // (A raid at 1280 × 800: its own box, main's, unchanged since its scoreboard leaves the board width-bound. It was checked
+    // against Boss alone's, the same box until Oct 29, when Boss alone's grew.)
+    const main = raid ? RAID_BOARD_BOX[size]! : MAIN_BOARD_BOX[size]!;
     if (!raid || size === "1280x800") for (const [k, v] of [["x", board.x - main.x], ["y", board.y - main.y], ["width", board.r - board.x - main.w], ["height", board.b - board.y - main.w]] as const) expect(Math.abs(v), `${at}: the board's ${k}`).toBeLessThanOrEqual(1);
     // The moves: from the board's top, half as tall as they were, the column's width, a small gap off the board; over nothing.
     expect(Math.abs(side.y - board.y), `${at}: level with the board's top`).toBeLessThanOrEqual(1);
