@@ -1264,6 +1264,7 @@ export function App() {
     return (
       <>
         <TownPage
+          nav={nav}
           seat={townSeat}
           onPlayBot={playTownBot}
           onBack={() => {

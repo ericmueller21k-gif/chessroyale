@@ -280,6 +280,14 @@
   align-items: center;
   gap: 8px;
 }
+/* On a computer (in the frame) the chat icon sits at the bar's left, right after the title (it was hard to see where the chat is), and the
+   gear stays at the right end (Eric, Oct 29). A phone's and a tablet's keep both at the right. */
+.town-screen.in-frame .town-tools {
+  display: contents;
+}
+.town-screen.in-frame .town-tool:not(.tc-mode) {
+  margin-left: auto;
+}
 .town-tool {
   flex: none;
   width: 36px;

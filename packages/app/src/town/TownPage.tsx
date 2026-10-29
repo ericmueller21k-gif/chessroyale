@@ -1,6 +1,8 @@
 import type { FunctionComponent } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import type { ItemLook } from "@chessroyale/core";
+import { FrontFrame, type FrontNav } from "../components/FrontMenu.tsx";
+import { useMedia } from "../components/QuickChat.tsx";
 
 /**
  * A game with a town bot, asked for as you both sit down: the seat to come back to ("6.0.3": the table, your stool, the
@@ -18,7 +20,14 @@ export interface BotGameAsk {
 }
 
 type Props = { onBack: () => void; onBossAlone: (id: string) => void; onPlayBot: (game: BotGameAsk) => void; seat: string | null };
-type Screen = FunctionComponent<Props>;
+type Screen = FunctionComponent<Props & { framed: boolean }>;
+
+/**
+ * A computer: 1024 px wide or more with a mouse. The town sits in the front door's frame there (Eric, Oct 29), in the center
+ * column's box, between the side menu and the live panel. A phone or a tablet (a tablet on its side included: touch) has the
+ * whole screen, as it always had.
+ */
+const COMPUTER = "(min-width: 1024px) and (hover: hover) and (pointer: fine)";
 
 /**
  * The town square's page (/town), loaded when it opens: its code, art and styles are their own chunk, never in the main
@@ -27,7 +36,8 @@ type Screen = FunctionComponent<Props>;
  * you and a bot sit down at a table, and the game opens; `seat`: back from that game, you sit at that table again, the
  * bot across.
  */
-export function TownPage(props: Props) {
+export function TownPage({ nav, ...props }: Props & { nav: FrontNav }) {
+  const framed = useMedia(COMPUTER);
   const [Town, setTown] = useState<Screen | null>(null);
   useEffect(() => {
     let live = true;
@@ -35,5 +45,12 @@ export function TownPage(props: Props) {
     void import("./Town.tsx").then((m) => live && m && setTown(() => m.TownScreen));
     return () => void (live = false);
   }, []);
-  return Town ? <Town {...props} /> : <div class="screen" />;
+  const screen = Town ? <Town {...props} framed={framed} /> : <div class="screen" />;
+  return framed ? (
+    <FrontFrame page="town" nav={nav}>
+      {screen}
+    </FrontFrame>
+  ) : (
+    screen
+  );
 }

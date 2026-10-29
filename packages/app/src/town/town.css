@@ -14,6 +14,13 @@
   overflow: hidden;
   font-family: Archivo, system-ui, sans-serif;
 }
+/* On a computer the town sits in the front door's frame (TownPage.tsx; Eric, Oct 29): in the center column's box, in the page's flow, the
+   window's height (the page doesn't scroll), with the side menu and the live panel as on home. */
+.town-screen.in-frame {
+  position: relative;
+  inset: auto;
+  height: var(--app-h);
+}
 .town-bar {
   flex: none;
   display: flex;
