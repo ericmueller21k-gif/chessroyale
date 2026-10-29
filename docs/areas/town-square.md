@@ -7,7 +7,7 @@ the time of day, the curved ground, all fourteen boss homes with their bosses ro
 added the press, the trail and the cards; **slice 5 the Colosseum** in the middle; **slice 6** made the Colosseum about
 twice its size, the map bigger, and put **the park** with its ten chess tables in front of its gate; **the lights** (Oct 27) light the park's lamps and the homes' windows at dusk and night; **the chat log** (Oct 28; v2, v3 and v4 the same day) is one box in the top left corner, with a chat icon and a gear in the header, where the bosses and their kids say a line now and then and signed-in players type (tap the box to type); **name tags** (Oct 28) show only near you by default, a boss's sidekick's in blue. Home's **Boss Arena** card (Oct 26, Eric)
 opens it, and the computer's side menu's Boss Arena item; the address `/town` opens it directly too (`hunchess.com/town`,
-behind Cloudflare Access like the rest of the site). Phone and computer.
+behind Cloudflare Access like the rest of the site). Phone and computer; **on a computer it sits in the front door's frame** (Oct 29, below).
 
 ## How it works
 
@@ -16,7 +16,20 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
   address back to `/`). Stockfish isn't warmed on this page, and nothing of Maia's loads
   while you walk round it (Eric's frame-rate rule, `docs/rules/eric.md`); a game with a bot loads it when it opens.
 - **Layout.** A slim bar (the back button, "Town square", and at its right end the chat icon and the gear: "The chat log"),
-  then the world fills the rest of the screen. The world never assumes a screen size: it fills its box and works its camera out
+  then the world fills the rest of the screen. **On a computer (Oct 29, Eric) the town sits in the front door's frame:** the side
+  menu on the left (Boss Arena marked as where you are) and the live panel with the global chat on the right, as on home, and the
+  town filling the center column's box, edge to edge (`.fd-center`, which is home's middle box: the same left, top, width and
+  height at every size from 1024 px up; the box is as high as the window, so at 1024 to 1279 px, where home's own box grows
+  taller than the window and scrolls, it's the window's height). Its bar is the box's top line, and the buttons, the chips,
+  the cards and the chat box are all inside the box. A computer is a window 1024 px wide or more **with a mouse** (`(hover: hover)
+  and (pointer: fine)`, `COMPUTER` in `TownPage.tsx`, the same test the desktop board uses): phones, tablets (a tablet on its side
+  included: touch) and a mouse window narrower than 1024 px have the whole screen and both icons at the right, as before.
+  `TownPage` wraps the town in `FrontFrame page="town"` there (`fd-on-town`, 1080 px at most, as home's), and the town adds
+  `in-frame` to its screen (`town.css`: in the page's flow, the window's height, not fixed). On a computer **the chat icon sits right
+  after the "Town square" title and the gear alone at the right end** (`town-chat.css`: the tools' box `display: contents`, the gear
+  `margin-left: auto`): the chat's place was hard to see at the far right. Every side-menu item leaves the town (`goHome` in
+  `App.tsx` closes it), Boss Arena opens it again. Known limit: resizing a mouse window across 1024 px adds or takes away the
+  frame, which starts the town again at its start square. The world never assumes a screen size: it fills its box and works its camera out
   from the box's shape, so the panels Eric designs around it can change without touching it. The back button, the chat icon, the
   gear and the buttons stay put. **The buttons** (Eric, Oct 28: "remove the 'Back to me' button … replace with circular focus
   icon … zoom button on left, focus button to right but are in the bottom right corner") are one row in the map's bottom right
@@ -252,8 +265,8 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
     the bottom gray, off both gray; named "Chat: always on", "Chat: new messages only", "Chat: off") goes to the next mode on a tap. The **gear**
     beside it opens "Town settings", a small sheet over the town (the match options' look): the chat's mode as three choices (Always on, New
     messages, Off), under them **"Chat background"** (a switch, off by default; its line: "A soft tint behind the chat, always on while the chat
-    shows.": the tint always, the blur while you type), and under Chat **"Names"** (two choices, "Near you" and "Everyone"; "Name tags", below). Both icons sit at the right end of the "Town
-    square" bar's line, a phone's and a computer's alike, never over the title. The box's place and size are the same in every mode; off takes
+    shows.": the tint always, the blur while you type), and under Chat **"Names"** (two choices, "Near you" and "Everyone"; "Name tags", below). On a phone (and a tablet) both icons sit at the right end of the "Town
+    square" bar's line; on a computer (in the frame) the chat icon sits right after the title and the gear alone at the right end; never over the title. The box's place and size are the same in every mode; off takes
     it away (the box is hidden and the edge chips may use its space).
   - **A line**: "[9:41] Name: message" (this device's clock, 12-hour, no am/pm; the name bold: gold for a boss and mint for a kid,
     each deeper by day and as it was by night; **a player's in a palette color**, below), newest at the bottom, at most two lines
@@ -437,7 +450,7 @@ noted wherever a slice changed one.
 
 ## Files
 
-- `packages/app/src/town/`: `TownPage.tsx` (the lazy load), `Town.tsx` (the screen, the loop, input, chips, cards, the sky's
+- `packages/app/src/town/`: `TownPage.tsx` (the lazy load, and on a computer the frame round it), `Town.tsx` (the screen, the loop, input, chips, cards, the sky's
   clock, the statues' close-up), `press.ts` (a finger as a button), `camera.ts`, `world.ts`, `render.ts`, `you-look.ts`, `sky.ts`, `sky-draw.ts`, `sign-font.ts`, `feel.ts`, `town.css`, `chat.ts`, `TownChat.tsx` and `town-chat.css` (the chat log), `houses/`
   (one file per home, fourteen in all, the Colosseum's `coliseum.ts`, the park's `park.ts`, the kit of shared pieces and the index),
   `sidekick-sheets.ts` and `sidekicks/*.png` (the sidekicks' baked frames, generated), `CardIcons.tsx` (the card's crossed swords and
@@ -449,6 +462,13 @@ noted wherever a slice changed one.
 
 ## Tests
 
+- `e2e/town-desktop.spec.ts` (Oct 29, the town on a computer): at 1280 × 800, 1440 × 900 and 1920 × 1080 the town's box is home's `.fd-center`
+  (within a pixel), the menu and the right column are home's with the global chat showing, Boss Arena is marked, the chat icon is in the bar's
+  left part after the title, the gear at its right end and neither over the title, the world fills the box under a 52 px bar, the buttons keep
+  their corner and the chat box its place, the chips and an open card are inside the box and the page doesn't scroll; the side menu's Play and
+  Boss Arena go home and back; the center column, the menu and the right column keep one box each while the town loads; a 900 × 700 mouse
+  window has the whole screen and both icons at the right; and phones (390 × 844, 430 × 932) and tablets (768 × 1024, 1024 × 768 touch) have
+  main's boxes (taken at 5e70aeed) for the screen, the bar, its four buttons, the world, the controls and the chat box, and no frame.
 - `packages/app/test/town-camera.test.ts`: the projection (the focus in the middle column, wrapping both ways, a tap picks
   the square drawn there, far squares shrink, zooming out shows more rows, the phone / computer blend, a table's board
   fitting its picture on every row of the screen: never more than `tableBoardGrow` its foot's scale, unchanged where it
@@ -524,7 +544,7 @@ noted wherever a slice changed one.
   scrolled up with "↓ new" (its tap, and the foot by hand, giving it up); new messages (the lines showing with a message and fading after
   the wait, not before, the stream the same as always on's, the box unchanged, a faded box taking no taps, the next burst only its own lines, a
   tap on a line opening typing as "high text": every line, no fade, scrollable, the icon unchanged, fading after Escape; sending from there;
-  a name's tap the menu's); the header's icon (never over the title, on its line at the right end; always on (both bubbles green), new messages
+  a name's tap the menu's); the header's icon (never over the title, on its line: at the right end on a phone, right after the title on a computer; always on (both bubbles green), new messages
   only (the top one), off (none) with the bubbles' colors and
   the accessible names; off hiding the box and the lines that came meanwhile showing when it's on again; remembered
   across a reload) and the gear's "Town settings" sheet (the chat's three radios, "Chat background" as a switch with its line under them, setting

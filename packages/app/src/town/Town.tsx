@@ -95,7 +95,7 @@ function fitRows(card: HTMLElement): void {
   }
 }
 
-export function TownScreen({ onBack, onBossAlone, onPlayBot, seat = null }: { onBack: () => void; onBossAlone?: (id: HomeId) => void; onPlayBot?: (game: BotGameAsk) => void; seat?: string | null }) {
+export function TownScreen({ onBack, onBossAlone, onPlayBot, seat = null, framed = false }: { onBack: () => void; onBossAlone?: (id: HomeId) => void; onPlayBot?: (game: BotGameAsk) => void; seat?: string | null; framed?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const chips = useRef<(HTMLDivElement | null)[]>([]);
@@ -132,13 +132,13 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, seat = null }: { on
   const label = card?.kind === "coliseum" ? COLISEUM_PLACE.name : card?.kind === "table" ? "Chess table" : person ? (bot ? botLabel(bot) : person.name) : home ? (card!.confirm ? "Leave the town square?" : card!.kind === "boss" ? home.boss : home.name) : undefined;
 
   return (
-    <div class="town-screen">
+    <div class={framed ? "town-screen in-frame" : "town-screen"}>
       <header class="town-bar">
         <button type="button" class="town-back" aria-label="Back" onClick={onBack}>
           ‹
         </button>
         <h1>Town square</h1>
-        {/* The chat's icon (its three modes) and the gear (Town settings), at the right end of the same line. */}
+        {/* The chat's icon (its three modes) and the gear (Town settings), at the right end of the same line (on a computer, in the frame: the chat icon beside the title, the gear at the right end). */}
         <TownChatTools />
       </header>
       <div class="town-box" ref={box}>

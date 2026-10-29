@@ -1047,8 +1047,11 @@ export function App() {
     history.replaceState(null, "", "/");
   };
 
-  /** Where the computer's side menu goes (front-door pages only, outside a match). */
+  /** Where the computer's side menu goes (front-door pages and, since Oct 29, the town square, outside a match). */
   const goHome = () => {
+    // (The town square is in the frame on a computer: every menu item leaves it; Boss Arena sets it again.)
+    setShowTown(false);
+    setTownSeat(null);
     closeProfile();
     setShowSettings(false);
     setShowFaq(false);
@@ -1264,6 +1267,7 @@ export function App() {
     return (
       <>
         <TownPage
+          nav={nav}
           seat={townSeat}
           onPlayBot={playTownBot}
           onBack={() => {

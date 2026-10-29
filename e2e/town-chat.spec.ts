@@ -1180,7 +1180,9 @@ test("the edge chips keep off the chat box (always on and new messages, shown or
     if (want.x > moved.x && want.x < moved.x + moved.w && want.y > moved.y && want.y < moved.y + moved.h) {
       const same = (await chips(page)).find((c) => c.name === target.name);
       if (same) expect(Math.hypot(same.x - target.x, same.y - target.y), "that chip slid to a clear spot").toBeGreaterThan(10);
-      slid = { name: target.name, x: target.x, y: target.y };
+      // (Its own place is where it lay before any box was put over it: an earlier try may already have nudged it.)
+      const own = quiet.find((c) => c.name === target.name) ?? target;
+      slid = { name: target.name, x: own.x, y: own.y };
       proved = true;
     }
   }

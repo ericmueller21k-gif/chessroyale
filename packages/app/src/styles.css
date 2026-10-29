@@ -10833,6 +10833,7 @@ button.fd-seat {
  */
 @media (min-width: 1024px) {
   .fd-root.framed.fd-on-home .fd-center,
+  .fd-root.framed.fd-on-town .fd-center,
   .fd-root.framed.fd-on-queue .fd-center {
     max-width: 1080px;
   }
