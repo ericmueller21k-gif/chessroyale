@@ -57,3 +57,14 @@ export function ranked1v1Rank(): RankView | null {
   const p = account().profile;
   return p ? yourRankShown(p.ranked1v1?.rank ?? rankView(null)) : null;
 }
+
+/** What home's line under your name says: your rank, "unranked" before your first ranked game, null while loading. */
+export type HomeRankLine = RankView | "unranked" | null;
+
+/** Home's line under your name (Oct 28: the rank shown everywhere is ranked 1 v 1's). */
+export function homeRankLine(): HomeRankLine {
+  const p = account().profile;
+  if (!p) return null;
+  const shown = ranked1v1Rank()!;
+  return shown.placement && !(p.ranked1v1?.games ?? 0) ? "unranked" : shown;
+}

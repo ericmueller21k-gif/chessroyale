@@ -1,5 +1,5 @@
 import { ASK_AGE_LINE, CHAT_MOD, oldEnough, type ChatPicks, type ShopState } from "@chessroyale/core";
-import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, RankEffect, RankView } from "@chessroyale/core";
+import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, RankView } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
 
 /**
@@ -376,7 +376,6 @@ export interface PublicProfile {
   /** They hide when they're online (Settings → Friends): `online` false and `lastSeen` null. */
   hidden?: boolean;
   rating: number | null;
-  tier: { label: string; level: number; color: string; effect: RankEffect | null } | null;
   topPercent: number | null;
   /** Banned for fair play (the profile says so; nothing else about fair play is shown). */
   banned?: boolean;

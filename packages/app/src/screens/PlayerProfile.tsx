@@ -1,7 +1,7 @@
 import { Fragment } from "preact";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { BOSS_TIERS, FAIRPLAY, SLOT_NAMES, bossInfo, isShiny, itemColor, itemDef, purity, rankView, secondColor, tierInfo, type ItemLook } from "@chessroyale/core";
-import { BackButton, DressedPawn, FdButton, GearIcon, RankPill, WORN_ORDER } from "../components/FrontDoor.tsx";
+import { BackButton, DressedPawn, FdButton, GearIcon, RatingPill, WORN_ORDER } from "../components/FrontDoor.tsx";
 import { ItemArt } from "../components/Items.tsx";
 import { DuelRankPill } from "../components/DuelRankPill.tsx";
 import { RankEmblem } from "../components/RankEmblem.tsx";
@@ -141,6 +141,15 @@ function Ranked1v1({ p, own }: { p: PublicProfile; own: boolean }) {
       </div>
     </section>
   );
+}
+
+/** The profile card's rank pill: their 1 v 1 rank once they've played a ranked game (your own: an admin's `?rank=`), else nothing. */
+function HeaderRank({ p, own }: { p: PublicProfile; own: boolean }) {
+  const r = p.ranked1v1;
+  const real = r?.rank ?? rankView(null);
+  const rank = own ? yourRankShown(real) : real;
+  if (!r || (r.games === 0 && rank === real)) return null;
+  return <DuelRankPill rank={rank} class="fd-card-rank" />;
 }
 
 function Stats({ p, own }: { p: PublicProfile; own: boolean }) {
@@ -466,7 +475,9 @@ export function PlayerProfileScreen({
           {seenLine(p)} · joined {joined}
         </div>
         <div class="fd-pills">
-          {p.banned ? <span class="fd-pill fp-banned">Banned</span> : <RankPill tier={p.tier} rating={p.rating} />}
+          {/* (The rank shown is 1 v 1's since Oct 28, once they've played one; the crowd rating's number beside it, no rank name.) */}
+          {p.banned ? <span class="fd-pill fp-banned">Banned</span> : <HeaderRank p={p} own={own} />}
+          {!p.banned && <RatingPill rating={p.rating} />}
           {p.topPercent !== null && <span class="fd-pill">Top {p.topPercent}%</span>}
           {/* (Your coins: on your profile and in the shop, not in home's top bar, Eric, Oct 18.) */}
           {own && me?.shop && <span class="fd-pill fp-coins">● {me.shop.coins.toLocaleString("en-US")} coins</span>}

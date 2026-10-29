@@ -1,8 +1,7 @@
 // Ranked 1 v 1's tiers and emblems (Oct 28), recorded the way Eric reviews them: on a phone (390 x 844), light and dark,
 // the versus screen (Gold 3 against a Transcendent), the result of a division up (Gold 3 → Gold 2, the new emblem), home's
 // ranked row (1 v 1 picked: your rank's emblem and words) and your profile's 1 V 1 section; a sheet of every emblem as the
-// game shows it (its own CSS and picture, 1× and 2×, both themes); and where the other rank system (RATING_RANKS: "Weighty
-// · 1612") shows, home's line under your name and the profile's pill.
+// game shows it (its own CSS and picture, 1× and 2×, both themes); and home's line under your name (your 1 v 1 rank).
 //   npx tsx scripts/frames-ranked-tiers.ts <out-dir> [base url, default http://localhost:8788]
 // Needs the Worker running with the test switches (npx wrangler dev --port 8788 --enable-containers=false
 // --var TEST_SWITCHES:1 --var ENGINE_OFF:1). Ranks are put in the server's answers (as the e2e does): reaching them for
@@ -10,7 +9,7 @@
 import { chromium, devices, type Browser, type BrowserContextOptions, type Page } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { RANKED_1V1, ratingTier, rankView, type RankView } from "../packages/core/src/index.ts";
+import { RANKED_1V1, rankView, type RankView } from "../packages/core/src/index.ts";
 
 const [out = "ranked-tiers-frames", base = "http://localhost:8788"] = process.argv.slice(2);
 mkdirSync(out, { recursive: true });
@@ -191,28 +190,12 @@ async function emblemRows(page: Page) {
   });
 }
 
-/** The other ranks (RATING_RANKS, "Weighty · 1612"): home's line under your name, and the profile's pill. */
-async function ratingRanks(scheme: "light" | "dark") {
-  const t = ratingTier(1612)!;
-  const page = await player(scheme, "Ann", GOLD3, { rating: 1612, tier: { label: t.label, level: t.level, color: t.color, effect: t.effect } });
-  await page.locator(".fd-hero-sub .fd-rank").waitFor();
-  await sleep(300);
-  const hero = (await page.locator(".fd-hero").boundingBox())!;
-  await page.screenshot({ path: join(out, `rating-rank-home-${scheme}.png`), clip: { x: 0, y: Math.max(0, hero.y - 8), width: 390, height: hero.height + 16 } });
-  await page.getByRole("button", { name: "Your profile" }).click();
-  await page.locator(".fd-pill.tier").waitFor();
-  await sleep(300);
-  await page.screenshot({ path: join(out, `rating-rank-profile-${scheme}.png`) });
-  await page.context().close();
-}
-
 const only = process.env.ONLY?.split(",");
 const want = (k: string) => !only || only.includes(k);
 for (const scheme of ["light", "dark"] as const) {
   if (want("home")) await home(scheme);
   if (want("profile")) await profile(scheme);
   if (want("versus")) await versusAndResult(scheme);
-  if (want("rating")) await ratingRanks(scheme);
 }
 if (want("sheet")) await sheet();
 await browser.close();

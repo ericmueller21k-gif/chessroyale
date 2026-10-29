@@ -21,7 +21,7 @@ import { noteLinkCopied } from "./Lobby.tsx";
 import { testParams, testSwitchesAllowed } from "../test-switches.ts";
 import { isPaused, useServerStatus } from "../status.ts";
 import { ChatNotice } from "../components/ChatNotice.tsx";
-import { ranked1v1Rank } from "../ranked.ts";
+import { homeRankLine, ranked1v1Rank } from "../ranked.ts";
 import { RankEmblem } from "../components/RankEmblem.tsx";
 import { PIECE_SHAPES, type PieceShape } from "../autochess/pieceShapes.ts";
 
@@ -691,7 +691,7 @@ export function HomeScreen({
         <div class="fd-hero-text">
           <div class="fd-hero-name">{name}</div>
           <div class="fd-hero-sub">
-            <RankLine rating={profile?.rating ?? null} />
+            <RankLine line={homeRankLine()} />
           </div>
         </div>
       </div>
