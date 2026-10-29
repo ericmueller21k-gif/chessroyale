@@ -1049,8 +1049,9 @@ test("the typing line (a signed-in player's): no placeholder, 80 characters, a c
   expect(asked, "the second message went once the wait was up").toHaveLength(2);
   await expect(field).toHaveValue("");
   // Both lines are this player's: the same color for the whole visit.
-  await expect(mine).toHaveCount(2);
-  expect(await mine.nth(1).locator("b.tc-name").getAttribute("data-c"), "the same color all session").toBe(String(c1));
+  const both = page.locator(".tc-player").filter({ hasText: new RegExp(`(hello town|too soon) ${run}`) });
+  await expect(both).toHaveCount(2);
+  expect(await both.nth(1).locator("b.tc-name").getAttribute("data-c"), "the same color all session").toBe(String(c1));
 });
 
 test("a guest taps the box and gets the typing line greyed, saying how to chat (nothing hidden); the box and the blur are the same; without the test switches no hooks either", async ({ page }) => {
