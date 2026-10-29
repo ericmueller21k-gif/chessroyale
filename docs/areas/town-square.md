@@ -334,9 +334,10 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
     moment). No art code runs in the town: the sprites' own code paints for about 3 s as it loads, which would hold the
     town's first frame back (measured: the decision).
   - **A person's card** (a tap on a bot, or on a real player once they walk in the town: `Card` kind `"person"`; placed over its
-    name tag like a boss's, as before; the bot holds still while it's open, `hold`). **One row, one size, 232 × 60 px on a phone and
-    a computer alike** (Eric's mockup, Oct 28; `.town-person` in `town.css`), whoever it is: the picture, the words, Play.
-    - **The picture** (a 40 px round, a 3 px ring, `.town-pic`): a sidekick's face (`spriteFace`, its idle's first frame) in a
+    name tag like a boss's, as before; the bot holds still while it's open, `hold`). **One row, one size, 210 × 53 px on a phone and
+    a computer alike** (Eric's mockup, Oct 28, about 189 × 53; Oct 29, Eric: near the mockup's size, a long name shrinking its own
+    words rather than the card growing; `.town-person` in `town.css`), whoever it is: the picture, the words, Play.
+    - **The picture** (a 38 px round, a 3 px ring, `.town-pic`): a sidekick's face (`spriteFace`, its idle's first frame) in a
       **blue** ring (`#4575fa`, the blue of the sidekicks' name tags); a pawn's own picture, as it stands in the square (its crate
       items on, cut to what's drawn, `pawnFace` in `Town.tsx`), in an **ivory** ring (`#eadfc6`, the white of a pawn's tag); a
       real player's profile icon (`UserIcon`), also ivory. Made once as the card opens (`faceOf`), never in the frame loop. **A bot's
@@ -344,19 +345,22 @@ behind Cloudflare Access like the rest of the site). Phone and computer.
       "View <name>'s profile", opening their profile as a tap on a name does elsewhere (`openProfile({ uid })`, over the town; Back
       and the town is as it was).
     - **The words**: "<name>" bold white with " (bot)" gray after a bot's; for a sidekick **"<Boss>'s sidekick"** under it
-      (`sidekickText`: "Hollow's sidekick", "Puddles' sidekick"); "Rating 1400" with a small gold bars icon; and a row for a note
-      (**"Tables are full"**, small gray text under the rating). Every row is always there, so nothing moves or resizes the card:
-      a pawn's line row and a free table's note row are empty. The width fits the longest bot's name and sidekick line ("Chub &
-      Chirp's sidekick") with room to spare (an e2e check measures every bot in the card's fonts); a longer real player's name
-      would end in an ellipsis (their profile shows it whole).
+      (`sidekickText`: "Hollow's sidekick", "Puddles' sidekick"); "Rating 1400" with a small gold bars icon. Every row is always there, so nothing moves or resizes the card: a pawn's
+      line row is empty. **A name or line too long for its row shrinks its own words** (`fitRows` in `Town.tsx`, as the card opens
+      and again when the web font is in; never per frame): the name from 13 px to at least 10, the line from 9.5 px to at least
+      7.5, the row's height the same. At 210 px, two names (Tempo Tess, Gambit Gus: about 12 px) and two lines ("Chub & Chirp's
+      sidekick", "Moo & Moon's sidekick": about 9 px) shrink; an e2e check measures every bot in the card's fonts. A longer real
+      player's name would end in an ellipsis at 10 px (their profile shows it whole).
     - **Play**, gold, on the right, with a plain crossed-swords icon (inline SVG in the button's text color, `aria-hidden`; the
-      button's name is still "Play") to its left, no triangle. The drawn button is 28 px high with a 44 px tap area.
+      button's name is still "Play") to its left, no triangle. The drawn button is 53 × 26 px, one width whether it reads "Play" or "Full", with a
+      44 px-high tap area.
       You both walk to the nearest table with both stools free (nearest to the two of you, `tableFor`), you to the stool nearer
       you, the bot to the other (`meet`); once both sit (`meetReady`) the game opens. Any other walk of yours calls it off. No
-      table free: Play greyed and not tappable, "Tables are full" in the note row (`anyTableFree`, checked only while the card is
-      open; before Oct 28 the words were in the button, "Play · Tables are full").
-    - **A real player's card** is the same row: no "(bot)", no line, their rating, Play greyed with "Coming soon" in the note row
-      (challenging a player isn't built). Only the e2e test player has one (`addTestPlayer`, the `__townPlayer` hook): `Person.uid`
+      table free: Play greyed, not tappable and reading **"Full"** (its name "Play: tables are full"; `anyTableFree`, checked only
+      while the card is open). (Oct 28 it was "Play · Tables are full" in the button, then a fourth row "Tables are full", dropped
+      Oct 29 with the card's size.)
+    - **A real player's card** is the same row: no "(bot)", "Coming soon" in the line's row (challenging a player isn't built), their
+      rating, Play greyed. Only the e2e test player has one (`addTestPlayer`, the `__townPlayer` hook): `Person.uid`
       (their account id), `icon` and `rating`; no real players walk in the town yet.
   - **A bot sitting alone at a table** (`waitingBot`): a tap on the table walks you to its free stool, as before, and its
     card's first button is **"Play <name> (bot) · <rating>"**, Casual and Ranked greyed under it; the bot stays while the card
@@ -524,13 +528,14 @@ title; a bot waiting, two playing (the board's pixels change), a tap on their ga
   The person card (Oct 28, Eric's mockup, phone and desktop; `town.spec.ts`, "a person's card" and after): `window.__townPlayer(uid, name,
   icon?, rating?)` stands a test player (a pawn with an account id: a real player's card) beside you and answers its index,
   `window.__townAt("player", uid)` says where to tap it, and `window.__townFull(on)` puts someone unseen on one stool of every table
-  (no table is free: a bot's Play greys). A sidekick's card (Glim): dark (`#20212a`, a gold border), 232 × 60 px, the picture a
+  (no table is free: a bot's Play greys). A sidekick's card (Glim): dark (`#20212a`, a gold border), 210 × 53 px, the picture a
   face in a blue ring that is no button (a `div`, no tab stop, the ordinary cursor, a tap does nothing), the name bold white
   and " (bot)" gray (the heading still reads "Glim (bot)"), its line, the rating with its gold bars, Play with a crossed-swords
   SVG (`aria-hidden`, the button's text color) and no triangle, Play the only button; a pawn's (Tempo Tess): an ivory ring, her
-  own picture, no line, every part where the sidekick's was; tables full (`__townFull`): Play greyed, "Tables are full" under
-  the rating in small gray text, the card, the picture, the name, the rating and Play not moved a hundredth of a pixel, and back
-  when a table frees; every bot's label and sidekick line and rating fit the card in its fonts with 4 px to spare; the boss's,
+  own picture, no line, every part where the sidekick's was; tables full (`__townFull`): Play greyed reading "Full" (named
+  "Play: tables are full"), the card, the picture, the words and Play not moved a hundredth of a pixel, and back when a table
+  frees; every bot's name and line shrinks to fit its row at or above its floor (10 px, 7.5 px), Tempo Tess's name and Bun &
+  Bug's line shrunk on the card and whole, Glim's at full size with every row where Bun & Bug's was; the boss's,
   home's, Colosseum's, table's and confirm cards dark, with their words and buttons, a gold primary, greyed buttons and "Coming
   soon" all 4.5:1 or better (computed from the page's colors); a test player: the same row and size, an ivory ring, no "(bot)",
   Play greyed with "Coming soon", its picture a button "View Cyrus's profile" with the pointer cursor that opens that account's

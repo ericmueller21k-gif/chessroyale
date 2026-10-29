@@ -794,12 +794,16 @@ export interface RaidStats {
 }
 
 /**
- * What anyone can see of a player: no email, no sign-in method, no icon, nothing about the account itself.
- * The same structure for your own profile and everyone else's.
+ * What anyone can see of a player: their name, their icon and what they wear and have played; no email, no sign-in
+ * method, nothing about the account itself. The icon became public on Oct 28, 2026 (Eric: it's the picture behind the
+ * pawn on the public profile; icons are reportable and a moderator can reset one, so it was never a secret to
+ * moderate). The same structure for your own profile and everyone else's.
  */
 export interface PublicProfile {
   id: string;
   name: string;
+  /** Their drawn icon (a 48 × 48 PNG data URL), or an older account's emoji; "♟" is the default (none of their own). */
+  icon: string;
   /** What they wear: crate items. */
   look: ItemLook;
   joinedAt: number;
@@ -896,8 +900,8 @@ export function raidStats(rows: ResultRow[]): RaidStats {
 
 /** Anyone's profile by account id (null if there's no such account). */
 export async function publicProfile(sql: Sql, userId: string, now: number): Promise<PublicProfile | null> {
-  const u = await sql.first<{ id: string; name: string; created_at: number; last_seen: number | null; rating: number | null; hide_online: number | null }>(
-    "SELECT id, name, created_at, last_seen, rating, hide_online FROM users WHERE id = ?",
+  const u = await sql.first<{ id: string; name: string; icon: string; created_at: number; last_seen: number | null; rating: number | null; hide_online: number | null }>(
+    "SELECT id, name, icon, created_at, last_seen, rating, hide_online FROM users WHERE id = ?",
     userId,
   );
   if (!u) return null;
@@ -921,6 +925,7 @@ export async function publicProfile(sql: Sql, userId: string, now: number): Prom
   return {
     id: u.id,
     name: u.name,
+    icon: u.icon,
     look: (await lockerState(sql, u.id)).look,
     joinedAt: u.created_at,
     lastSeen: u.hide_online ? null : u.last_seen,
