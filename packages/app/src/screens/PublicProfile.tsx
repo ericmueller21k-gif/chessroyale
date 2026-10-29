@@ -24,6 +24,7 @@ import {
   seenLine,
   streakText,
   tierTitle,
+  tileWeight,
   winRate,
   wornTiles,
   type RankedModeId,
@@ -219,11 +220,11 @@ function Picture({ p, loading }: { p: PublicProfile | null; loading: boolean }) 
 
 // ---------------- Ranked Standing ----------------
 
-/** A plain badge where the emblem goes (placements, or no games yet): a shield, with what it says inside. */
-function PlainBadge({ size, text }: { size: number; text: string }) {
+/** A plain badge where the emblem goes (placements, or no games yet): a shield, with what it says inside. It fills the emblem's box. */
+function PlainBadge({ text }: { text: string }) {
   return (
-    <span class="pp-badge" style={{ width: `${size}px`, height: `${size}px` }} aria-hidden="true">
-      <svg viewBox="0 0 48 48" width={size} height={size}>
+    <span class="pp-badge" aria-hidden="true">
+      <svg viewBox="0 0 48 48" preserveAspectRatio="xMidYMid meet">
         <path d="M24 4l17 6v12c0 10-7 17-17 22C14 39 7 32 7 22V10z" />
       </svg>
       <span>{text}</span>
@@ -242,7 +243,6 @@ function RankedCard({ p, own, loading, wide }: { p: PublicProfile | null; own: b
   const state = loading ? "ranked" : rankedState(rank, banned);
   const one = mode === "1v1" && state !== "banned";
   const soon = mode !== "1v1" && state !== "banned";
-  const size = wide ? 144 : 96;
   const title = state === "unranked" ? "Unranked" : tierTitle(rank);
   // (Rank points: none in placements or before a first game.)
   const rp = loading ? "00" : rank.placement ? null : String(rank.points);
@@ -278,9 +278,8 @@ function RankedCard({ p, own, loading, wide }: { p: PublicProfile | null; own: b
       <div class="pp-body">
         <div class={`pp-layer pp-one${one ? "" : " off"}`} aria-hidden={one ? undefined : "true"}>
           <div class="pp-rk-main">
-            <span class="pp-emblem" style={{ width: `${size}px`, height: `${size}px` }}>
-              {loading ? null : state === "ranked" ? <RankEmblem rank={rank} scale={wide ? 3 : 2} /> : <PlainBadge size={size * 0.8} text={state === "placement" ? `${rank.placement!.played}/${rank.placement!.of}` : "?"} />}
-            </span>
+            {/* (The emblem's art in whole steps of its 48 px: 96 on a phone, 144 on a computer; the card's CSS shows it at the mockup's size.) */}
+            <span class="pp-emblem">{loading ? null : state === "ranked" ? <RankEmblem rank={rank} scale={wide ? 3 : 2} /> : <PlainBadge text={state === "placement" ? `${rank.placement!.played}/${rank.placement!.of}` : "?"} />}</span>
             <div class="pp-rk-words">
               <span class="pp-cap">CURRENT TIER</span>
               <strong class={`pp-tier${sk}`}>{loading ? "Platinum 3" : title}</strong>
@@ -410,9 +409,10 @@ function CosmeticsCard({ p, loading, onAll }: { p: PublicProfile | null; loading
           View all <ChevronRight />
         </button>
       </div>
-      <div class="pp-tiles">
+      {/* (One row of three tiles, or of four when four are worn: the card is one size whatever is worn.) */}
+      <div class={`pp-tiles n${Math.max(3, tiles.length)}`}>
         {loading &&
-          [0, 1, 2, 3].map((i) => (
+          [0, 1, 2].map((i) => (
             <div key={i} class="pp-tile sk-tile">
               <span class="pp-tile-art" />
               <span class="pp-tile-text">
@@ -423,7 +423,7 @@ function CosmeticsCard({ p, loading, onAll }: { p: PublicProfile | null; loading
             </div>
           ))}
         {tiles.map((t) => (
-          <div key={t.slot} class="pp-tile">
+          <div key={t.slot} class="pp-tile" style={`--w:${tileWeight(t.line)}`}>
             <span class="pp-tile-art" aria-hidden="true">
               <ItemArt def={t.def} finish={t.finish} />
             </span>
@@ -580,8 +580,8 @@ export function PublicProfileScreen({ target, onBack, match }: { target: Profile
           {seen?.dot && <span class="fd-dot small" aria-hidden="true" />}
           <span class={loading ? "sk" : undefined}>{seen?.text ?? "Online now · Joined Oct 2026"}</span>
         </div>
-        {/* (The level line is always there: empty, it keeps its height. Levels aren't built yet: an admin sees the placeholder.) */}
-        <div class="pp-level">{level || " "}</div>
+        {/* (Levels aren't built yet: only an admin's placeholder shows. For everyone else there is no line, so nothing is ever added later.) */}
+        {level && <div class="pp-level">{level}</div>}
         <div class="pp-actions">
           <InviteButton uid={uid ?? ""} onNote={act.setNote} label="Challenge" small={false} primary greyed disabled={idle || blocked} icon={<Swords />} title="Invite to play" />
           <button type="button" class="fd-btn pp-friend" disabled={friendOff} onClick={friend.go}>
@@ -589,10 +589,6 @@ export function PublicProfileScreen({ target, onBack, match }: { target: Profile
             {friend.label}
           </button>
         </div>
-        {/* (What just happened: "Request sent.", "Invited…", a refusal. Its line is always there, so a note moves nothing.) */}
-        <p class="fd-note fr-note pp-note" role="status">
-          {note ?? (blocked ? `You blocked ${name}. Unblock is in the ••• menu.` : "")}
-        </p>
       </section>
 
       <div class="pp-cols">
@@ -600,6 +596,13 @@ export function PublicProfileScreen({ target, onBack, match }: { target: Profile
         <RecentCard rows={rows} loading={loading} none={!rows.length} onAll={() => setSheet("matches")} />
         <CosmeticsCard p={p} loading={loading} onAll={() => setSheet("cosmetics")} />
       </div>
+
+      {/* (What just happened: "Request sent.", "Invited…", a refusal. A note over the bottom of the screen for a few seconds, never in the page's flow, so it moves nothing.) */}
+      {(note ?? (blocked ? `You blocked ${name}. Unblock is in the ••• menu.` : "")) && (
+        <p key={note ?? "blocked"} class="fd-note fr-note pp-note" role="status">
+          {note ?? `You blocked ${name}. Unblock is in the ••• menu.`}
+        </p>
+      )}
 
       {sheet === "report" && p && <ReportSheet p={p} match={match} onClose={() => setSheet(null)} />}
       {sheet === "matches" && p && (
