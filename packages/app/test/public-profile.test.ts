@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { RANKED_1V1, rankView, type ItemLook } from "@chessroyale/core";
 import type { PublicProfile, RankedGame } from "../src/account.ts";
+import { WORN_ORDER } from "../src/components/FrontDoor.tsx";
 import { RANKED_MODES, RECENT_SHOWN, ago, hasOwnIcon, joinedText, levelLine, nth, peakLine, rankedState, recentRows, recordText, rpChange, seenLine, streakText, tierTitle, winRate, wornTiles } from "../src/public-profile.ts";
 
 /** The public profile's words and numbers (docs/decisions/2026-10-28-public-profile.md). */
@@ -209,7 +210,10 @@ describe("Equipped Cosmetics", () => {
   };
   it("a tile for each worn item, in the order skin, head, face, weapon", () => {
     expect(wornTiles(look).map((t) => t.name)).toEqual(["Suit and Tie", "Pirate Hat", "Gift-Wrap Tube"]);
-    expect(wornTiles({ ...look, face: { def: "smiley-face", color: "yellow", blemish: 0, seed: 1 } }).map((t) => t.slot)).toEqual(["skin", "head", "face", "weapon"]);
+    const four = wornTiles({ ...look, face: { def: "smiley-face", color: "yellow", blemish: 0, seed: 1 } }).map((t) => t.slot);
+    expect(four).toEqual(["skin", "head", "face", "weapon"]);
+    // (The same order as today's profile's list: FrontDoor's WORN_ORDER.)
+    expect(four).toEqual([...WORN_ORDER]);
   });
   it("'<Slot> · <colors>': two colors with an &, one color alone", () => {
     const lines = Object.fromEntries(wornTiles(look).map((t) => [t.name, t.line]));

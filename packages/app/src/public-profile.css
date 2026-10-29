@@ -663,7 +663,7 @@
   border-radius: 20px;
 }
 @media (prefers-reduced-motion: no-preference) {
-  .pp-loading :is(.sk, .pp-circle, .pp-emblem, .sk-row .pp-pill, .sk-row .pp-face, .sk-row .pp-row-text > *, .sk-row .pp-rpchange, .sk-tile .pp-tile-art, .sk-tile .pp-tile-text > *) {
+  .pp-loading:not(.pp-failed) :is(.sk, .pp-circle, .pp-emblem, .sk-row .pp-pill, .sk-row .pp-face, .sk-row .pp-row-text > *, .sk-row .pp-rpchange, .sk-tile .pp-tile-art, .sk-tile .pp-tile-text > *) {
     animation: pp-pulse 1.4s ease-in-out infinite;
   }
   @keyframes pp-pulse {

@@ -531,7 +531,7 @@ export function PublicProfileScreen({ target, onBack, match }: { target: Profile
   const note = loading ? error : act.note;
 
   return (
-    <div ref={root} class={`fd-page pp${wide ? " pp-wide" : ""}${loading ? " pp-loading" : ""}`} aria-busy={loading}>
+    <div ref={root} class={`fd-page pp${wide ? " pp-wide" : ""}${loading ? " pp-loading" : ""}${loading && error ? " pp-failed" : ""}`} aria-busy={loading && !error}>
       <header class="fd-page-head pp-head">
         <BackButton onClick={onBack} />
         <h1 class="pp-title">Player Profile</h1>
