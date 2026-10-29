@@ -130,9 +130,13 @@ const RESULT_PILL: Record<RankedRecentGame["result"], { text: string; tone: Pill
   draw: { text: "DRAW", tone: "draw" },
 };
 
-/** One of the profile's other games (crowd, a raid, Squads, Classic) as a row. Only a ranked 1 v 1 is "Ranked" or has RP. */
+/**
+ * One of the profile's other games (crowd, a raid, Squads, Classic) as a row. "Ranked" when it counted toward their rating (the
+ * game's own flag: online, enough real players; the director's review, Oct 29: a 50 v 50 that moved your rating isn't casual),
+ * else "Casual". Only a ranked 1 v 1 has RP.
+ */
 function resultRow(r: PublicProfile["recent"][number], i: number, now: number): RecentRow {
-  const sub = `Casual · ${ago(r.playedAt, now)}`;
+  const sub = `${r.ranked === true ? "Ranked" : "Casual"} · ${ago(r.playedAt, now)}`;
   const base = { key: `r${r.playedAt}-${i}`, at: r.playedAt, sub, rp: rpChange(null) };
   if (r.mode === "boss") {
     const def = bossDef(r.bossId);

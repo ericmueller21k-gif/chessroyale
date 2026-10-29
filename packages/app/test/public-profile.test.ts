@@ -159,6 +159,13 @@ describe("Recent Matches", () => {
     expect(recentRows([], [other({ won: null, team: null, placement: 7 })], NOW)[0]!.pill.text).toBe("LOSS");
   });
 
+  it("a game that counted toward their rating (its ranked flag) reads 'Ranked', still with no RP; one that didn't, or from before the flag, 'Casual'", () => {
+    const [counted, notCounted, older] = recentRows([], [other({ ranked: true, playedAt: before(1) }), other({ ranked: false, playedAt: before(2) }), other({ ranked: null, mode: "squads", placement: 2, playedAt: before(3) })], NOW);
+    expect(counted).toMatchObject({ title: "50 v 50", sub: "Ranked · 1h ago", rp: { text: "—" } });
+    expect(notCounted).toMatchObject({ sub: "Casual · 2h ago" });
+    expect(older).toMatchObject({ title: "Squads", sub: "Casual · 3h ago" });
+  });
+
   it("Squads: their place ('3rd'), titled 'Squads'; Classic the same", () => {
     const [third, first, classic] = recentRows([], [other({ mode: "squads", placement: 3, playedAt: before(1) }), other({ mode: "squads", placement: 1, playedAt: before(2) }), other({ mode: "classic", placement: 12, playedAt: before(3) })], NOW);
     expect(third).toMatchObject({ pill: { text: "3rd", tone: "place" }, title: "Squads", face: { kind: "mode", mode: "squads" } });

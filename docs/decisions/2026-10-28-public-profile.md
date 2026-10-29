@@ -50,9 +50,10 @@ His mockup: an iPhone 14 (390 × 844) beside a computer in two columns. "I prett
 - **1v1 is spelled "1v1" in the card's menu** (the brief's, Eric's words); home's row says "1 v 1". One constant (`RANKED_MODES`).
 - **The stat under "34 – 25" reads "W / L"** as the mockup has it (the brief wrote "W – L").
 - **Peak rank shows the tier and its division** ("Peak rank: Paragon 4"), as the mockup's "Diamond IV", not the tier alone.
-- **"Ranked" is only a ranked 1 v 1.** The gray line reads "Ranked · 2h ago" for a ranked 1 v 1 and "Casual · Oct 25" for every other
-  game. The profile's old `ranked` flag (counted for the old rating) is being retired with the rating ranks, and 50 v 50 and
-  Squads have no ranks yet.
+- **"Ranked" or "Casual".** The gray line reads "Ranked · 2h ago" for a ranked 1 v 1, and for any other game that counted toward
+  the player's rating (the game's own `ranked` flag: online, enough real players; that rating still moves after #401, only its
+  rank names were retired). Everything else reads "Casual · Oct 25". (The director's review, Oct 29: a 50 v 50 that moved your
+  rating isn't casual. The first build called every non-1 v 1 game "Casual".) Only a ranked 1 v 1 shows RP.
 - **The rows' time** is "2h ago" inside a day, "Yesterday", then the date ("Oct 25"): the mockup's. "Last seen" uses the same words.
 - **Result pills.** A 1 v 1: WIN, LOSS, DRAW. A raid: WIN if the boss fell (`won`), else LOSS. 50 v 50: WIN or LOSS by its team's
   result (an older match with no team: 1st place is a win). Squads and Classic: their place, "3rd" (1st green, the rest gray).
