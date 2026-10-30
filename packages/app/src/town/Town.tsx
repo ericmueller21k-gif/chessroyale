@@ -48,6 +48,8 @@ import { Press } from "./press.ts";
 import { PAWN_PX, Renderer, pawnImage, type Hit } from "./render.ts";
 import { painter2d, type Backend, type Painter } from "./paint.ts";
 import { painterGL } from "./paint-gl.ts";
+import { reportTownFallback } from "../problems.ts";
+import type { TownGlFallback } from "@chessroyale/core";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
 import { BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, tdist, tick, townLine, waitingBot, walkWalker, type HomeId, seatOf, seatText, type Person, type Place, type Seat, type Sq, type StatueId, type Target } from "./world.ts";
 import { dressedPawn, lookKey } from "./you-look.ts";
@@ -324,19 +326,24 @@ function startTown(
   const f = TOWN_FEEL;
   /** The world's canvas: a new one if the drawing changes backend (a canvas keeps the first kind of context it gave). */
   let cv = cv0;
-  // The drawing (paint.ts): Canvas 2D, or WebGL 2 with `?gl=1` (anyone; read once as the page opened). No WebGL 2, or no
-  // context: Canvas 2D, silently. A lost context: nothing is drawn until it's back; lost twice within a minute, Canvas 2D
-  // for the rest of the page.
+  // The drawing (paint.ts): Canvas 2D, or WebGL 2 with `?gl=1` (anyone; read once as the page opened). No WebGL 2, no
+  // context, or its shader fails: Canvas 2D, silently. A lost context: nothing is drawn until it's back; lost twice within a
+  // minute, or not back within LOST_WAIT_MS, Canvas 2D for the rest of the page. Each of these falls back once and is
+  // reported once a page with its reason (problems.ts, `reportTownFallback`: nothing shows; never on the frame loop).
   const losses: number[] = [];
   let lostWait = 0;
+  const fallBack = (why: TownGlFallback) => {
+    reportTownFallback(why);
+    useBackend("2d");
+  };
   const onLost = (lost: boolean) => {
     clearTimeout(lostWait);
     if (!lost) return void (alive && draw(performance.now()));
     const now = performance.now();
     losses.push(now);
     // (And one that isn't back within a few seconds: the browser isn't giving it back.)
-    if (losses.length >= 2 && now - losses[losses.length - 2]! < 60_000) setTimeout(() => alive && useBackend("2d"));
-    else lostWait = window.setTimeout(() => alive && painter.lost && useBackend("2d"), LOST_WAIT_MS);
+    if (losses.length >= 2 && now - losses[losses.length - 2]! < 60_000) setTimeout(() => alive && fallBack("lost-twice"));
+    else lostWait = window.setTimeout(() => alive && painter.lost && fallBack("not-back"), LOST_WAIT_MS);
   };
   let attached = false;
   /** A new canvas in the old one's place (its class, label, size and data), the input moved over. */
@@ -356,7 +363,8 @@ function startTown(
   const makePainter = (kind: Backend): Painter => {
     if (kind === "webgl") {
       const p = painterGL(cv, onLost);
-      if (p) return shim(p);
+      if (typeof p !== "string") return shim(p);
+      reportTownFallback(p);
       swapCanvas(); // (in case it gave a WebGL context before failing)
     }
     return painter2d(cv);

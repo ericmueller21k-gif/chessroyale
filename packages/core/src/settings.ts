@@ -2490,6 +2490,19 @@ export const OPS = {
 } as const;
 
 /**
+ * The town's WebGL fallbacks (Oct 30; docs/areas/ops.md, "Health"): a page whose town asked for WebGL and drew with Canvas 2D
+ * instead says so once, through the error reporting (the app's problems.ts, `reportTownFallback`), as this kind with its
+ * reason as the message. The health view counts them by reason, apart from the errors. The reasons: no WebGL 2 in the
+ * browser; it has it, but no context could be made; the shader didn't compile or link; the context was lost twice within a
+ * minute; or it was lost and not given back within 5 s.
+ */
+export const TOWN_GL_FALLBACK = {
+  kind: "town-gl-fallback",
+  reasons: ["no-webgl2", "no-context", "shader", "lost-twice", "not-back"],
+} as const;
+export type TownGlFallback = (typeof TOWN_GL_FALLBACK.reasons)[number];
+
+/**
  * Fair play (the `fairplay` delegate): reports, cases and what each level does. See DECISIONS.md, "Fair play".
  *   - watch: recorded only (the player's moves are kept as evidence);
  *   - review: a person (or the automated reviewer) looks; meanwhile their results are held off ranking (the rating,

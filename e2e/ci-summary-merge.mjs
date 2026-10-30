@@ -1,16 +1,20 @@
 // CI's e2e summary (.github/workflows/e2e.yml, the `result` job): every shard's record (e2e/ci-summary.ts writes
 // shard-N.json) as one Markdown page for the run: flaky tests first (failed, then passed on the retry: kept in view
 // until they're fixed), then failed tests, both with their shard; then each shard's counts and time; then the test
-// time by file as a ready-made e2e/ci-timings.json. A shard with no record stopped before its tests ended. NOTE, if
-// given, goes under the heading (the plan's one line: what this run tests and why).
+// time by file as a ready-made e2e/ci-timings.json (the shards'; not the town's WebGL jobs'). A shard with no record
+// stopped before its tests ended. NOTE, if given, goes under the heading (the plan's one line: what this run tests and
+// why).
 // Usage: node e2e/ci-summary-merge.mjs SHARDS DIR [NOTE] >> "$GITHUB_STEP_SUMMARY"
+// SHARDS: how many (1 to N), or the plan's list as JSON ([1, 2, "webgl-phone", "webgl-desktop"]: the town's WebGL jobs,
+// shard-webgl-phone.json and shard-webgl-desktop.json).
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const [total, dir, note] = [Number(process.argv[2]), process.argv[3], process.argv[4]];
-const shards = Array.from({ length: total }, (_, i) => {
-  const path = join(dir, `shard-${i + 1}.json`);
-  return { n: i + 1, record: existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : null };
+const [arg, dir, note] = [process.argv[2], process.argv[3], process.argv[4]];
+const names = arg.trim().startsWith("[") ? JSON.parse(arg) : Array.from({ length: Number(arg) }, (_, i) => i + 1);
+const shards = names.map((n) => {
+  const path = join(dir, `shard-${n}.json`);
+  return { n, record: existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : null };
 });
 const cell = (s) => String(s).replace(/\|/g, "\\|").replace(/\n/g, " ");
 const time = (s) => `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
@@ -37,8 +41,10 @@ for (const { n, record: r } of shards) {
   else out.push(`| ${n} | ${r.status === "passed" ? "✅" : "❌"} ${r.status} | ${r.counts.passed} | ${r.counts.failed} | ${r.counts.flaky} | ${r.counts.skipped}${r.counts.notRun ? ` (+${r.counts.notRun} not run)` : ""} | ${time(r.seconds)} |`);
 }
 out.push("", "A failed or flaky shard's report, with the retried tests' traces: the run's artifacts (`e2e-report-shard-N`); open it with `npx playwright show-report <folder>`.", "");
+// (The WebGL jobs' times are for the same files on another build: not the shards' table.)
 const timings = Object.fromEntries(
   shards
+    .filter((s) => !String(s.n).startsWith("webgl"))
     .flatMap((s) => Object.entries(s.record?.timings ?? {}))
     .sort(([a], [b]) => a.localeCompare(b)),
 );
