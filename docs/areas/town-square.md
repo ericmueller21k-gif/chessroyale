@@ -431,8 +431,8 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
     `botLeaveAfterGameMs` (4 s), unless its table's card holds it.
 
 ## Frame-rate pill (`?fps`)
-`/town?fps` shows an admin (profile `admin`) a pill in the world's top-right corner, "60 fps · 16.7 ms": frames over the last second and their mean time, text set twice a second from plain counters in the frame loop. Nobody else sees it.
-`?fps` and `?crowd=N` are read once as the page opens (`TOWN_ASKED`, test-switches.ts), so a later replaceState can't lose them; they apply when the account arrives.
+`/town?fps` shows anyone (Eric, Oct 30: no admin needed, the site is behind Cloudflare Access) a pill in the world's top-right corner, "60 fps · 16.7 ms": frames over the last second and their mean time, text set twice a second from plain counters in the frame loop. Without `?fps` there is none. `?crowd=N` is anyone's too (only that device draws the pawns).
+`?fps` and `?crowd=N` are read once as the page opens (`TOWN_ASKED`, test-switches.ts), so a later replaceState can't lose them; they apply as the town opens.
 
 ## The feel: `town/feel.ts`
 
