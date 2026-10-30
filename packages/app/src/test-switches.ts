@@ -42,6 +42,15 @@ const TIMING_ASKED = (() => {
     return { banner: null, talk: null };
   }
 })();
+/** `?crowd=N` and `?fps` as the page opened (the town reads them once, so a later replaceState that drops the query can't lose them). */
+export const TOWN_ASKED = (() => {
+  try {
+    const q = new URLSearchParams(globalThis.location?.search ?? "");
+    return { crowd: Number(q.get("crowd")), fps: q.has("fps") };
+  } catch {
+    return { crowd: 0, fps: false };
+  }
+})();
 let gameOnDevice = true;
 /** The game now is played on this device (a solo game), or online (false: the server's times, the default extra). */
 export function timingOnDevice(on: boolean): void {

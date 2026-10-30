@@ -194,6 +194,29 @@ test("the sky by the time of day: ?sky=day and ?sky=night draw different skies (
   expect(errors).toEqual([]);
 });
 
+test("/town?fps: an admin sees the frame-rate pill with a number; a player with ?fps does not; without ?fps nobody does", async ({ page }) => {
+  const admin = async (on: boolean) =>
+    page.route("**/api/me*", async (route) => {
+      if (!on || route.request().method() !== "GET") return route.continue();
+      const res = await route.fetch();
+      const body = await res.json().catch(() => null);
+      await route.fulfill({ response: res, json: body ? { ...body, admin: true } : body });
+    });
+  const pill = page.locator(".town-fps");
+  await page.goto("/town?sky=day&fps");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await page.waitForTimeout(1500);
+  await expect(pill).toHaveCount(0);
+  await admin(true);
+  await page.goto("/town?sky=day");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await page.waitForTimeout(1500);
+  await expect(pill).toHaveCount(0);
+  await page.goto("/town?sky=day&fps&crowd=50");
+  await expect(canvas(page)).toHaveAttribute("data-crowd", "50", { timeout: 10_000 });
+  await expect(pill).toHaveText(/^\d+ fps · \d+\.\d ms$/, { timeout: 10_000 });
+});
+
 /** Where to tap Babur (or his circus) now, in the page; null while he isn't drawn. */
 async function tapPoint(p: Page, kind: "boss" | "home") {
   const xy = await p.evaluate((k) => (window as unknown as { __townAt?: (k: string, id: string) => { x: number; y: number } | null }).__townAt?.(k, "tiger") ?? null, kind);
