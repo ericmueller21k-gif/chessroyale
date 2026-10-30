@@ -20,6 +20,7 @@ interface Req {
   colors?: Record<string, string>;
   extra?: { def: string; label: string; color?: string }[];
   title?: string;
+  looks?: { id: string; color: string; over?: string; label: string }[];
   mode: "item" | "rider" | "sheet";
   frames?: number[];
   anim?: "idle" | "move";
@@ -78,7 +79,7 @@ async function main(req: Req): Promise<object> {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
-    const reqJson = JSON.stringify({ mode: req.mode, frames: req.frames, anim: req.anim, side: req.side, color: req.color, all: req.all, colors: req.colors, extra: req.extra, title: req.title }).replace(/</g, "\\u003c");
+    const reqJson = JSON.stringify({ mode: req.mode, frames: req.frames, anim: req.anim, side: req.side, color: req.color, all: req.all, colors: req.colors, extra: req.extra, title: req.title, looks: req.looks }).replace(/</g, "\\u003c");
     await page.setContent(`<!doctype html><html><head><meta charset="utf-8"><style>${CSS}</style></head><body><div id="app"></div><script>window.__REQ=${reqJson}</script><script type="module">${js.replace(/<\/script/gi, "<\\/script")}</script></body></html>`);
     await page.waitForFunction(() => (window as unknown as { __DONE?: object }).__DONE, null, { timeout: 30_000 }).catch(() => undefined);
     const done = (await page.evaluate(() => (window as unknown as { __DONE?: object }).__DONE)) as { error?: string; facts?: object; warnings?: string[] } | undefined;

@@ -99,7 +99,7 @@ export function DraftLayer({ d, finish, side, f }: { d: ItemDraft; finish: Finis
 }
 
 /** The draft worn on a pawn, as Avatar draws it: behind or in front of the pawn, shifted to its anchor, capped. */
-export function OnPawn({ d, finish, side, f, px, ground = true }: { d: ItemDraft; finish: Finish; side: "w" | "b"; f: number; px: number; ground?: boolean }) {
+export function OnPawn({ d, finish, side, f, px, ground = true, over }: { d: ItemDraft; finish: Finish; side: "w" | "b"; f: number; px: number; ground?: boolean; over?: string }) {
   const shift = ANCHOR[d.slot] !== undefined && d.attach !== undefined ? ANCHOR[d.slot]! - d.attach : 0;
   const art = (
     <g clip-path="url(#cap)" transform={`translate(0 ${shift})`}>
@@ -120,6 +120,8 @@ export function OnPawn({ d, finish, side, f, px, ground = true }: { d: ItemDraft
           {d.layer === "back" && art}
           <Pawn side={side} />
           {d.layer !== "back" && art}
+          {/* (An existing face item worn over it: goggles and shades go over a hat, crates.ts's faceLayer "above".) */}
+          {over && <ItemLayer def={over} finish={fin("cobalt", 25)} side={side} />}
         </>
       )}
     </svg>
@@ -181,6 +183,12 @@ function ItemPage({ d }: { d: ItemDraft }) {
             <DraftLayer d={d} finish={fin(color, 25)} side="w" f={0} />
           </Tile>
         </Cell>
+        {d.slot === "head" &&
+          ["ski-goggles", "dark-shades"].map((o) => (
+            <Cell key={o} label={`${o} on top`}>
+              <OnPawn d={d} finish={fin(color, 25)} side="w" f={0} px={130} over={o} />
+            </Cell>
+          ))}
         {refs.map((r) => (
           <Cell key={r} label={r}>
             <RefOnPawn def={r} px={60} />

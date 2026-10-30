@@ -13,6 +13,8 @@ interface Req {
   /** Existing items shown too, by id, with a label. */
   extra?: { def: string; label: string; color?: string }[];
   title?: string;
+  /** More looks of a drawing, after the pieces: its id, a color, an existing item worn over it, a label. */
+  looks?: { id: string; color: string; over?: string; label: string }[];
 }
 const req = (window as unknown as { __REQ: Req }).__REQ;
 const mods = Object.values(SHEET as Record<string, Record<string, unknown>>);
@@ -73,6 +75,21 @@ render(
       {pieces.map((d) => (
         <Piece key={d.id} d={d} />
       ))}
+      {req.looks?.length ? (
+        <div style={{ background: "#1f2228", borderRadius: "12px", padding: "8px" }}>
+          <div style={{ display: "flex", gap: "8px", alignItems: "flex-end" }}>
+            {req.looks.map((l) => {
+              const d = pieces.find((p) => p.id === l.id);
+              return d && !isRider(d) ? (
+                <div key={l.label}>
+                  <OnPawn d={d} finish={fin(l.color, 15, 777)} side="w" f={0} px={130} over={l.over} />
+                  <Label>{l.label}</Label>
+                </div>
+              ) : null;
+            })}
+          </div>
+        </div>
+      ) : null}
       {(req.extra ?? []).map((x) => (
         <div key={x.def} style={{ background: "#1f2228", borderRadius: "12px", padding: "8px" }}>
           <div style={{ font: "bold 14px sans-serif", color: "#f2c14e", marginBottom: "6px" }}>{x.label}</div>
