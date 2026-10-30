@@ -48,7 +48,12 @@ const TIMING_ASKED = (() => {
  * the default (`VITE_TOWN_GL=1 npm run build`), to run the town's specs on it unchanged (docs/areas/town-square.md, "WebGL").
  */
 export const TOWN_ASKED = (() => {
-  const glBuild = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_TOWN_GL === "1";
+  let glBuild = false;
+  try {
+    glBuild = import.meta.env.VITE_TOWN_GL === "1";
+  } catch {
+    // (No import.meta.env outside Vite: Node's tests.)
+  }
   try {
     const q = new URLSearchParams(globalThis.location?.search ?? "");
     return { crowd: Number(q.get("crowd")), fps: q.has("fps"), gl: q.get("gl") === "1" || glBuild };
