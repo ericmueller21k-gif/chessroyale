@@ -27,8 +27,9 @@ type Hooks = {
     sample: () => { sky: number; hash: number } | null;
   };
 };
-const state = (p: Page) => p.evaluate(() => (window as unknown as Hooks).__colosseum.state());
-const sample = (p: Page) => p.evaluate(() => (window as unknown as Hooks).__colosseum.sample());
+// (Before the page's chunk has loaded there's no hook yet: an empty state, and the polls wait.)
+const state = (p: Page) => p.evaluate(() => (window as unknown as Partial<Hooks>).__colosseum?.state() ?? ({} as ReturnType<Hooks["__colosseum"]["state"]>));
+const sample = (p: Page) => p.evaluate(() => (window as unknown as Partial<Hooks>).__colosseum?.sample() ?? null);
 
 function watchErrors(page: Page) {
   const errors: string[] = [];

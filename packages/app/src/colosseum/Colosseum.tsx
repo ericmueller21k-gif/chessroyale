@@ -329,7 +329,7 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
   const white = s?.eval ?? 0.5;
   const evalNow = s ? evalText(s.eval, s.mate) : "";
   const lastMove = s?.moves.length ? s.moves[s.moves.length - 1]! : null;
-  const status = !s ? "" : s.status === "over" ? `${resultText(s)}. Next game soon.` : `Game ${s.game} · 3+2`;
+  const status = !s ? "" : s.status === "over" ? `${resultText(s)}. Next game soon.` : `Game ${Math.max(1, s.game)} · 3+2`;
 
   return (
     <div class="col-screen">
