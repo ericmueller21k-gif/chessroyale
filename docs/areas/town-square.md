@@ -71,6 +71,19 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
 - **The drawing** (`town/render.ts`): one canvas, one `requestAnimationFrame` loop (in `Town.tsx`), stopped when the screen
   closes or the tab is hidden; device pixel ratio capped at 2; nothing allocated per frame on the hot path (square colors,
   fonts, gradients, clouds, pawns and every boss and home frame are made once, the frames the first time they show).
+  It draws through a **drawing layer** (`town/paint.ts`, Oct 30) with two backends: Canvas 2D (the default: the canvas's own
+  context, the same calls as before) and WebGL 2 (`?gl=1`, `town/paint-gl.ts`; below, "WebGL").
+- **WebGL (`?gl=1`, Oct 30; docs/decisions/2026-10-30-town-webgl.md).** Anyone's `/town?gl=1` (read once as the page opens,
+  `TOWN_ASKED.gl`) draws the same picture with WebGL 2 in a few draw calls a frame (about 12 by day, 13 at night, 20 to 35
+  zoomed in or with the far band full) instead of hundreds of canvas calls. `paint-gl.ts` stands in for the part of the 2D
+  context render.ts uses (state, transforms, save and restore, paths, clips, strokes, shadows, text, images) and batches the
+  frame into textured and solid triangles: textures from the canvases render.ts already makes, packed into 2048 px atlas
+  pages and uploaded again only when render.ts calls `changed` (a tag or a table's board drawn again); clips that are upright
+  rectangles cut on the CPU, other shapes in the stencil; a stroke's shadow (the table's ring, the pressed square's glow)
+  worked out per pixel; the far band's softening in one shader pass (no scratch canvases); lights and their cuts in one
+  blend; text and the bubble drawn once into canvases. No WebGL 2, or no context: Canvas 2D, silently. Context lost: nothing
+  drawn until it's back (textures made again); lost twice within a minute, or not back within 5 s: Canvas 2D for the page. Without `?gl=1`, Canvas 2D
+  exactly as before. The canvas says which (`data-backend`).
 - **Taps** (slice 4: `town/press.ts`; cleaned up in slice 5). A finger down presses the square you'd walk to like a
   button: its face dims a little and one bold gold border lies on its edge, glowing outside only, while the finger is
   down; up on the same thing releases it with one short pulse of that border (brighter, a little wider, fading) and you
@@ -431,8 +444,8 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
     `botLeaveAfterGameMs` (4 s), unless its table's card holds it.
 
 ## Frame-rate pill (`?fps`)
-`/town?fps` shows anyone (Eric, Oct 30: no admin needed, the site is behind Cloudflare Access) a pill in the world's top-right corner, "60 fps · 16.7 ms": frames over the last second and their mean time, text set twice a second from plain counters in the frame loop. Without `?fps` there is none. `?crowd=N` is anyone's too (only that device draws the pawns).
-`?fps` and `?crowd=N` are read once as the page opens (`TOWN_ASKED`, test-switches.ts), so a later replaceState can't lose them; they apply as the town opens.
+`/town?fps` shows anyone (Eric, Oct 30: no admin needed, the site is behind Cloudflare Access) a pill in the world's top-right corner, "60 fps · 16.7 ms · 2D": frames over the last second and their mean time, text set twice a second from plain counters in the frame loop, then the drawing's backend ("· WebGL" with `?gl=1`; added by town.css from `data-backend`, so the pill's text stays the numbers). Without `?fps` there is none. `?crowd=N` is anyone's too (only that device draws the pawns).
+`?fps`, `?crowd=N` and `?gl=1` are read once as the page opens (`TOWN_ASKED`, test-switches.ts), so a later replaceState can't lose them; they apply as the town opens.
 
 ## The feel: `town/feel.ts`
 
@@ -456,7 +469,8 @@ noted wherever a slice changed one.
 ## Files
 
 - `packages/app/src/town/`: `TownPage.tsx` (the lazy load, and on a computer the frame round it), `Town.tsx` (the screen, the loop, input, chips, cards, the sky's
-  clock, the statues' close-up), `press.ts` (a finger as a button), `camera.ts`, `world.ts`, `render.ts`, `you-look.ts`, `sky.ts`, `sky-draw.ts`, `sign-font.ts`, `feel.ts`, `town.css`, `chat.ts`, `TownChat.tsx` and `town-chat.css` (the chat log), `houses/`
+  clock, the statues' close-up, the backend and its fallbacks), `press.ts` (a finger as a button), `camera.ts`, `world.ts`, `render.ts`, `paint.ts` (the drawing layer; Canvas 2D),
+  `paint-gl.ts` (its WebGL 2 backend), `you-look.ts`, `sky.ts`, `sky-draw.ts`, `sign-font.ts`, `feel.ts`, `town.css`, `chat.ts`, `TownChat.tsx` and `town-chat.css` (the chat log), `houses/`
   (one file per home, fourteen in all, the Colosseum's `coliseum.ts`, the park's `park.ts`, the kit of shared pieces and the index),
   `sidekick-sheets.ts` and `sidekicks/*.png` (the sidekicks' baked frames, generated), `CardIcons.tsx` (the card's crossed swords and
   rating bars, inline SVG).
@@ -466,6 +480,17 @@ noted wherever a slice changed one.
   igloo, the peak and the meadow, his suggestions for seven more). Alfil's Pyramid has no picture: it's our design.
 
 ## Tests
+
+- `e2e/town-webgl.spec.ts` (Oct 30, WebGL): the same held frame drawn by both backends in one page (`__townHold`, `__townBackend`),
+  compared pixel by pixel, phone and computer: the park by day, the park at night (the lights), a statue up close at night;
+  it reports the largest difference and where. Then a lost context (drawn again when it's back; lost twice, Canvas 2D), and
+  Canvas 2D without `?gl=1`. Measured Oct 30: the largest single difference 35 to 102 (edge pixels: the GPU's 4x multisampling
+  against the 2D canvas's antialiasing, or a nearest texel picked across a tie), the mean about 1 of 255, under 2.5% of
+  pixels more than 8 apart. `TOWN_GL_STILLS=<dir>` saves full-page stills of both.
+- **Every town spec on WebGL:** build with `VITE_TOWN_GL=1 npm run build` (WebGL the default, as `?gl=1`) and run them as usual;
+  their pixel reads (`colors`, `skyTop`, the tags' and the lights' reads) work on both backends because a WebGL canvas's
+  `getContext("2d")` gives the last frame's pixels under the test switches (Town.tsx's `shim`: the frame drawn again at once
+  and read right after the draw). Not in CI yet.
 
 - `e2e/town-desktop.spec.ts` (Oct 29, the town on a computer): at 1280 × 800, 1440 × 900 and 1920 × 1080 the town's box is home's `.fd-center`
   (within a pixel), the menu and the right column are home's with the global chat showing, Boss Arena is marked, the chat icon is in the bar's

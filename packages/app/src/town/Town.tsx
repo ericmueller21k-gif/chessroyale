@@ -317,11 +317,15 @@ function startTown(
   // context: Canvas 2D, silently. A lost context: nothing is drawn until it's back; lost twice within a minute, Canvas 2D
   // for the rest of the page.
   const losses: number[] = [];
+  let lostWait = 0;
   const onLost = (lost: boolean) => {
+    clearTimeout(lostWait);
     if (!lost) return void (alive && draw(performance.now()));
     const now = performance.now();
     losses.push(now);
+    // (And one that isn't back within a few seconds: the browser isn't giving it back.)
     if (losses.length >= 2 && now - losses[losses.length - 2]! < 60_000) setTimeout(() => alive && useBackend("2d"));
+    else lostWait = window.setTimeout(() => alive && painter.lost && useBackend("2d"), LOST_WAIT_MS);
   };
   let attached = false;
   /** A new canvas in the old one's place (its class, label, size and data), the input moved over. */
@@ -1116,6 +1120,7 @@ function startTown(
     },
     stop: () => {
       alive = false;
+      clearTimeout(lostWait);
       offAccount();
       fpsEl?.remove();
       halt();
@@ -1146,6 +1151,8 @@ function startTown(
 }
 
 const POSE = { x: 0, y: 0, hop: 0, tilt: 0 };
+/** How long a lost WebGL context may stay lost before the town goes back to Canvas 2D (it's usually back within a second). */
+const LOST_WAIT_MS = 5000;
 /** The frame-rate pill's name for each backend. */
 const BACKEND_LABEL: Record<Backend, string> = { "2d": "2D", webgl: "WebGL" };
 const PA = { x: 0, y: 0, k: 0, depth: 0 };

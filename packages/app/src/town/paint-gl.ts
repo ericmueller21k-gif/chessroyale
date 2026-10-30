@@ -364,6 +364,8 @@ class GLPainter implements Painter {
   private pages: Page[] = [];
   /** The light layers' textures, by the stand-in each one's `src` is. */
   private readonly layers = new Map<object, { tex: Tex; fb: WebGLFramebuffer | null; stream: Stream; g: GLCtx }>();
+  /** The same, as a list (walked every frame: no iterator made). */
+  private readonly layerList: { tex: Tex; fb: WebGLFramebuffer | null; stream: Stream; g: GLCtx }[] = [];
   private disposed = false;
   private readonly onLostEv = (e: Event) => {
     e.preventDefault();
@@ -376,7 +378,7 @@ class GLPainter implements Painter {
     this.pages = [];
     this.init();
     // (The layers' textures and framebuffers, made again at their sizes, clear.)
-    for (const l of this.layers.values()) {
+    for (const l of this.layerList) {
       l.tex.t = null;
       l.fb = null;
       this.layerTex(l);
@@ -481,7 +483,7 @@ class GLPainter implements Painter {
 
   done(): void {
     if (this.lost) return;
-    for (const l of this.layers.values()) this.flush(l.stream);
+    for (let i = 0; i < this.layerList.length; i++) this.flush(this.layerList[i]!.stream);
     this.flush(this.main);
     this.drawCalls = this.calls;
     if (this.frameNo % 300 === 0) this.sweep();
@@ -496,6 +498,7 @@ class GLPainter implements Painter {
     const g = new GLCtx(this, stream, { width: 0, height: 0 } as HTMLCanvasElement);
     const l = { tex, fb: null as WebGLFramebuffer | null, stream, g };
     this.layers.set(src, l);
+    this.layerList.push(l);
     const self = this;
     return {
       g: g as unknown as Ctx,
@@ -671,7 +674,7 @@ class GLPainter implements Painter {
   /** Draws what's pending that reads `tex` (before its pixels change). */
   private flushUsing(tex: Tex): void {
     this.flushIfUses(this.main, tex);
-    for (const l of this.layers.values()) this.flushIfUses(l.stream, tex);
+    for (let i = 0; i < this.layerList.length; i++) this.flushIfUses(this.layerList[i]!.stream, tex);
   }
   private flushIfUses(st: Stream, tex: Tex): void {
     for (let i = 0; i < st.nSlots; i++) if (st.slots[i] === tex) return this.flush(st);
@@ -691,8 +694,9 @@ class GLPainter implements Painter {
     gl.bindVertexArray(this.vao);
     gl.uniform2f(this.uSize, st.w, st.h);
     gl.uniform1f(this.uFlip, st.flip);
-    for (let i = 0; i < st.nSlots; i++) {
-      const t = st.slots[i]!.t;
+    // (Every unit: one left holding a layer's texture while that layer is drawn into would be a feedback loop.)
+    for (let i = 0; i < SLOTS; i++) {
+      const t = i < st.nSlots ? st.slots[i]!.t : null;
       gl.activeTexture(gl.TEXTURE0 + i);
       gl.bindTexture(gl.TEXTURE_2D, t);
       gl.activeTexture(gl.TEXTURE0 + SLOTS + i);
@@ -818,6 +822,8 @@ class GLPainter implements Painter {
     this.disposed = true;
     this.cv.removeEventListener("webglcontextlost", this.onLostEv);
     this.cv.removeEventListener("webglcontextrestored", this.onRestoredEv);
+    // (Its canvas is gone from the page: its GPU memory goes now, not when the page's garbage is collected.)
+    this.gl.getExtension("WEBGL_lose_context")?.loseContext();
   }
 }
 
