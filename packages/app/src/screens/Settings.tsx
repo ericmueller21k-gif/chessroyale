@@ -7,7 +7,8 @@ import { SignIn } from "../components/SignIn.tsx";
 import { AccountData } from "../components/AccountData.tsx";
 import { BackButton } from "../components/FrontDoor.tsx";
 import { signOut, tooYoung } from "../account.ts";
-import { BOARD_COLORS, boardColors, chatBubbles, chatOff, crowdAnimations, crowdTrail, evalBarOn, onPrefsChange, practiceOn, setBoardColors, setChatBubbles, setChatOff, setCrowdAnimations, setCrowdTrail, setEvalBarOn, setPracticeOn, type BoardColors } from "../prefs.ts";
+import { BOARD_COLORS, boardColors, boardMarksOn, chatBubbles, chatOff, crowdAnimations, crowdTrail, evalBarOn, onPrefsChange, practiceOn, premovesOn, setBoardColors, setBoardMarksOn, setChatBubbles, setChatOff, setCrowdAnimations, setCrowdTrail, setEvalBarOn, setPracticeOn, setPremovesOn, type BoardColors } from "../prefs.ts";
+import { clearAllPremoves } from "../board/yours.ts";
 import { REEL_VOICES, getReelVoice, isMuted, onMuteChange, previewPieceSound, previewReel, setMuted, setReelVoice, unlockAudio, type ReelVoice } from "../sound.ts";
 import { PIECE_SOUNDS, pieceSound, setPieceSound } from "../piece-sounds.ts";
 import { useAccount } from "./Profile.tsx";
@@ -158,9 +159,9 @@ function BoardColorsChoice() {
 
 /**
  * Settings (Eric, Oct 15: "smoothness, quickness, with some variety offered"): the theme, sound (the move, capture and
- * reveal sounds), the board (animations, motion trail), quick chat, friends, how to play (and the FAQ), help (the
- * feedback sheet: bugs, feedback, ideas), installing, your sign-in, privacy and terms; and for admins, testing
- * (practice mode, the eval bar, and the shelved Auto chess demo).
+ * reveal sounds), the board (its colors, animations, motion trail, premoves, arrows and highlights), quick chat,
+ * friends, how to play (and the FAQ), help (the feedback sheet: bugs, feedback, ideas), installing, your sign-in, privacy
+ * and terms; and for admins, testing (practice mode, the eval bar, and the shelved Auto chess demo).
  */
 export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => void; onFaq?: (section?: string) => void; onAutoChess?: () => void }) {
   const { config, profile } = useAccount();
@@ -173,6 +174,8 @@ export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => v
   const [chatOn, setChatOn] = useState(() => !chatOff());
   const [bubbles, setBubbles] = useState(chatBubbles);
   const [busy, setBusy] = useState(false);
+  // (Arrows and highlights are drawn with a mouse: greyed on a device without one.)
+  const [mouse] = useState(() => typeof matchMedia === "function" && matchMedia("(any-pointer: fine)").matches);
   const u = profile?.user;
   return (
     <div class="fd-page fd-settings">
@@ -242,6 +245,21 @@ export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => v
           }}
         >
           Watch every pick fly from its piece to its square.
+        </Toggle>
+        <Toggle
+          title="Premoves"
+          checked={premovesOn()}
+          onChange={(on) => {
+            setPremovesOn(on);
+            if (!on) clearAllPremoves();
+          }}
+        >
+          Move ahead while it's the other side's turn: your move plays the moment your turn comes. A phone holds one (a tap
+          cancels it); a computer lines up several (a right-click cancels them).
+        </Toggle>
+        <Toggle title="Arrows and highlights" checked={boardMarksOn()} disabled={!mouse} onChange={setBoardMarksOn}>
+          With a mouse: right-drag for an arrow, right-click to color a square (hold Ctrl, Alt or Shift for other colors). A
+          left-click clears them. Only you see them.
         </Toggle>
       </section>
 

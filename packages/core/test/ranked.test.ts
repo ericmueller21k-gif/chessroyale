@@ -2,13 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   DUEL_ZONES,
   RANKED_1V1,
-  apexStart,
+  divisionsEnd,
   controlLabel,
   duelCoins,
   duelControl,
   expectedScore,
   glickoUpdate,
   ladderRating,
+  mayBeTop,
   newRankedRecord,
   pairRange,
   pairUp,
@@ -106,40 +107,103 @@ describe("the hidden rating (Glicko-1)", () => {
 });
 
 describe("the ladder", () => {
-  it("tiers 4 → 1, then Master, Grandmaster and Champion with no divisions", () => {
-    expect(rankView({ games: 9, ladder: 0 }).label).toBe("Iron 4 · 0 RP");
-    expect(rankView({ games: 9, ladder: 99 }).label).toBe("Iron 4 · 99 RP");
-    expect(rankView({ games: 9, ladder: 100 }).label).toBe("Iron 3 · 0 RP");
-    expect(rankView({ games: 9, ladder: 399 }).label).toBe("Iron 1 · 99 RP");
-    expect(rankView({ games: 9, ladder: 400 }).label).toBe("Bronze 4 · 0 RP");
-    expect(rankView({ games: 9, ladder: 1245 }).label).toBe("Gold 4 · 45 RP");
-    expect(rankView({ games: 9, ladder: 2799 }).label).toBe("Diamond 1 · 99 RP");
-    expect(apexStart()).toBe(2800);
-    expect(rankView({ games: 9, ladder: 2800 }).label).toBe("Master · 0 RP");
-    expect(rankView({ games: 9, ladder: 2999 }).label).toBe("Master · 199 RP");
-    expect(rankView({ games: 9, ladder: 3000 }).label).toBe("Grandmaster · 200 RP");
-    expect(rankView({ games: 9, ladder: 3300 }).label).toBe("Champion · 500 RP");
-    expect(rankView({ games: 9, ladder: 9999 }).tier).toBe("Champion");
+  it("tiers with divisions 5 → 1 of 80 RP (Wood 5 the lowest), at every edge", () => {
+    const at = (ladder: number) => {
+      const v = rankView({ games: 9, ladder });
+      return [v.tier, v.division, v.points, v.label, v.emblem];
+    };
+    expect(at(0)).toEqual(["Wood", 5, 0, "Wood 5 · 0 RP", "wood-d5"]);
+    expect(at(79)).toEqual(["Wood", 5, 79, "Wood 5 · 79 RP", "wood-d5"]);
+    expect(at(80)).toEqual(["Wood", 4, 0, "Wood 4 · 0 RP", "wood-d4"]);
+    expect(at(399)).toEqual(["Wood", 1, 79, "Wood 1 · 79 RP", "wood-d1"]);
+    expect(at(400)).toEqual(["Silver", 5, 0, "Silver 5 · 0 RP", "silver-d5"]);
+    expect(at(1245)).toEqual(["Paragon", 5, 45, "Paragon 5 · 45 RP", "paragon-d5"]);
+    expect(at(2399)).toEqual(["Sublime", 1, 79, "Sublime 1 · 79 RP", "sublime-d1"]);
+    expect(at(2400)).toEqual(["Radiant", 5, 0, "Radiant 5 · 0 RP", "radiant-d5"]);
+    expect(at(2799)).toEqual(["Radiant", 1, 79, "Radiant 1 · 79 RP", "radiant-d1"]);
+    // (No place known: the top tiers need one. Radiant 1, the RP counting on past 79.)
+    expect(at(2800)).toEqual(["Radiant", 1, 80, "Radiant 1 · 80 RP", "radiant-d1"]);
+    expect(divisionsEnd()).toBe(2800);
+    expect(RANKED_1V1.topFloor).toBe(divisionsEnd());
     const tiers = new Set<string>();
-    for (let l = 0; l < 2800; l += 100) tiers.add(rankView({ games: 9, ladder: l }).tier);
-    expect([...tiers]).toEqual(["Iron", "Bronze", "Silver", "Gold", "Platinum", "Emerald", "Diamond"]);
+    for (let l = 0; l < 2800; l += 80) tiers.add(rankView({ games: 9, ladder: l }).tier);
+    expect([...tiers]).toEqual(["Wood", "Silver", "Gold", "Paragon", "Illustrious", "Sublime", "Radiant"]);
+    // Every division of every tier, in order, each 80 RP wide.
+    for (let l = 0; l < 2800; l++) {
+      const v = rankView({ games: 9, ladder: l });
+      expect(v.division).toBe(5 - (Math.floor(l / 80) % 5));
+      expect(v.points).toBe(l % 80);
+    }
+  });
+
+  it("the top tiers: from 2800 ladder points, Pearlescent in the top 500, Transcendent in the top 100", () => {
+    const top = (ladder: number, place: number | null) => rankView({ games: 9, ladder, place }).label;
+    // The floor: below 2800 no place counts.
+    expect(top(2799, 1)).toBe("Radiant 1 · 79 RP");
+    expect(top(2800, 1)).toBe("Transcendent · 0 RP");
+    expect(top(3120, 100)).toBe("Transcendent · 320 RP");
+    expect(top(3120, 101)).toBe("Pearlescent · 320 RP");
+    expect(top(2900, 500)).toBe("Pearlescent · 100 RP");
+    // Outside the top 500: Radiant 1, the RP counting on past 80.
+    expect(top(2815, 501)).toBe("Radiant 1 · 95 RP");
+    expect(top(4000, 501)).toBe("Radiant 1 · 1280 RP");
+    expect(top(2815, null)).toBe("Radiant 1 · 95 RP");
+    const t = rankView({ games: 9, ladder: 3000, place: 7 });
+    expect([t.tier, t.division, t.points, t.emblem, t.color]).toEqual(["Transcendent", null, 200, "transcendent", RANKED_1V1.topTiers[1]!.color]);
+    expect(rankView({ games: 9, ladder: 3000, place: 300 }).emblem).toBe("pearlescent");
+    expect(mayBeTop(2799)).toBe(false);
+    expect(mayBeTop(2800)).toBe(true);
+    expect(mayBeTop(null)).toBe(false);
+    // (Placements never show a top tier, whatever the place.)
+    expect(rankView({ games: 3, ladder: 3000, place: 1 }).label).toBe("Placement 3/5");
+  });
+
+  it("stored data keeps its meaning: every ladder from 0 to 4000 stands for the same hidden rating as before Oct 28", () => {
+    // Before Oct 28 (Iron 4 … Diamond 1 of 100 RP, then Master): 800 at 0, +1600/2800 a point; placed at most 2400; each
+    // tier 400 points wide. Written out here, not read from settings, so a settings change can't move it unseen.
+    const before = (ladder: number) => 800 + ladder * (1600 / 2800);
+    for (let l = 0; l <= 4000; l++) {
+      expect(ladderRating(l)).toBe(before(l));
+      // The same 400-point band per tier: Iron's is Wood's, Bronze's Silver's … Diamond's Radiant's.
+      if (l < 2800) expect(RANKED_1V1.tiers.findIndex((t) => t.name === rankView({ games: 9, ladder: l }).tier)).toBe(Math.floor(l / 400));
+    }
+    for (let r = 0; r <= 4000; r += 0.5) expect(placeLadder(r)).toBe(Math.max(0, Math.min(2400, Math.floor((r - 800) / (1600 / 2800)))));
+    expect([RANKED_1V1.baseRating, RANKED_1V1.ratingPerPoint, RANKED_1V1.placements.maxLadder, RANKED_1V1.points.perGame]).toEqual([800, 1600 / 2800, 2400, 20]);
+    expect(RANKED_1V1.tiers.length * RANKED_1V1.divisions * RANKED_1V1.pointsPerDivision).toBe(7 * 4 * 100);
+  });
+
+  it("every tier's pill reads at 4.5:1 or better on both themes (styles.css, .dv-rank)", () => {
+    const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    const mix = (a: number[], b: number[], t: number) => a.map((v, i) => v * t + b[i]! * (1 - t));
+    const lum = (c: number[]) => {
+      const [r, g, b] = c.map((v) => (v / 255 <= 0.03928 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4));
+      return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+    };
+    const contrast = (a: number[], b: number[]) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
+    for (const t of [...RANKED_1V1.tiers, ...RANKED_1V1.topTiers]) {
+      const c = rgb(t.color);
+      // As RATING_RANKS: dark, the color on a 20% tint of the panel (#1b1e25); light, the color darkened (55% with black) on a 20% tint of white.
+      expect(contrast(c, mix(c, rgb("#1b1e25"), 0.2)), `${t.name} dark`).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(mix(c, [0, 0, 0], 0.55), mix(c, [255, 255, 255], 0.2)), `${t.name} light`).toBeGreaterThanOrEqual(4.5);
+    }
   });
 
   it("placements: Placement N/5 until the fifth game, whatever the ladder", () => {
     expect(rankView(null).label).toBe("Placement 0/5");
+    expect(rankView(null).emblem).toBeNull();
     expect(rankView({ games: 2, ladder: null }).label).toBe("Placement 2/5");
     expect(rankView({ games: 4, ladder: null }).placement).toEqual({ played: 4, of: 5 });
     expect(rankView({ games: 5, ladder: null }).label).toBe("Placement 5/5");
   });
 
-  it("the ladder and the hidden rating: Iron 4 is 800, Master 2400; placing caps at Diamond 4", () => {
+  it("the ladder and the hidden rating: Wood 5 is 800, the top tiers' floor 2400; placing caps at Radiant 5", () => {
     expect(ladderRating(0)).toBe(800);
     expect(ladderRating(2800)).toBeCloseTo(2400, 9);
     expect(placeLadder(1500)).toBe(1225);
-    expect(rankView({ games: 5, ladder: placeLadder(1500) }).label).toBe("Gold 4 · 25 RP");
+    expect(rankView({ games: 5, ladder: placeLadder(1500) }).label).toBe("Paragon 5 · 25 RP");
     expect(placeLadder(500)).toBe(0);
     expect(placeLadder(2390)).toBe(2400);
-    expect(rankView({ games: 5, ladder: placeLadder(3000) }).label).toBe("Diamond 4 · 0 RP");
+    expect(rankView({ games: 5, ladder: placeLadder(3000) }).label).toBe("Radiant 5 · 0 RP");
   });
 
   it("rank points: ±20 between equals at par; more when the hidden rating is above the rank (within ±10)", () => {
@@ -218,24 +282,27 @@ describe("a rated game", () => {
     expect(sixth.next.ladder).toBe(me.ladder! + sixth.change.points!);
   });
 
-  it("promotion and demotion are the 100s crossed, the excess carried", () => {
-    const up = rankedGame(settled(1290), settled(1290), 1, DAY);
-    expect(up.change.before.label).toBe("Gold 4 · 90 RP");
-    expect(up.change.after.label).toBe(`Gold 3 · ${90 + up.change.points! - 100} RP`);
+  it("promotion and demotion are the 80s crossed, the excess carried", () => {
+    const up = rankedGame(settled(1270), settled(1270), 1, DAY);
+    expect(up.change.before.label).toBe("Paragon 5 · 70 RP");
+    expect(up.change.after.label).toBe(`Paragon 4 · ${70 + up.change.points! - 80} RP`);
+    expect(up.change.after.emblem).toBe("paragon-d4");
     const down = rankedGame(settled(1205), settled(1205), 0, DAY);
-    expect(down.change.after.tier).toBe("Silver");
+    expect(down.change.after.tier).toBe("Gold");
     expect(down.change.after.division).toBe(1);
     expect(down.next.ladder).toBe(1205 + down.change.points!);
-    // Into Master and out of it.
-    expect(rankedGame(settled(2795), settled(2795), 1, DAY).change.after.tier).toBe("Master");
-    expect(rankedGame(settled(2805), settled(2805), 0, DAY).change.after.label).toMatch(/^Diamond 1 · \d+ RP$/);
+    // Past the divisions' end (no place known in core: the server adds it) and back.
+    const past = rankedGame(settled(2795), settled(2795), 1, DAY).change.after;
+    expect([past.tier, past.division]).toEqual(["Radiant", 1]);
+    expect(past.points).toBeGreaterThan(79);
+    expect(rankedGame(settled(2805), settled(2805), 0, DAY).change.after.label).toMatch(/^Radiant 1 · \d+ RP$/);
   });
 
-  it("the floor: never below Iron 4 0", () => {
+  it("the floor: never below Wood 5 0", () => {
     const r = rankedGame(settled(5), settled(5), 0, DAY);
     expect(r.change.points).toBeLessThan(-5);
     expect(r.next.ladder).toBe(0);
-    expect(r.change.after.label).toBe("Iron 4 · 0 RP");
+    expect(r.change.after.label).toBe("Wood 5 · 0 RP");
     expect(rankedGame(r.next, settled(0), 0, DAY).next.ladder).toBe(0);
   });
 

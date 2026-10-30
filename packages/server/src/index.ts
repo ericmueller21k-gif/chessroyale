@@ -19,6 +19,7 @@ import { deepCheckRun } from "./fairplay-deep.ts";
 import { containerSearch } from "./fairplay-engine.ts";
 import { REGION_HINT, queueName, regionOf } from "./queue.ts";
 import { TOO_MANY, rateLimited } from "./limits.ts";
+import { expireTownCache } from "./town-chat-api.ts";
 import { handleFriendsApi } from "./friends-api.ts";
 import { countRoute, opsStats, routeOf } from "./ops.ts";
 import { codeInPath, guardEntries, handleProblems, pruneProblems, serverError } from "./problems.ts";
@@ -123,6 +124,8 @@ async function handle(request: Request, rawEnv: Env, ctx: ExecutionContext): Pro
     return json(opsStats(url.searchParams.get("reset") === "1"));
   }
   const t = Date.now();
+  // (This instance's copy of the town's chat goes once it's a moment old: town-chat-api.ts.)
+  expireTownCache(t);
   // Rate limits (limits.ts): a friendly 429 with when to try again.
   const wait = rateLimited(
     {

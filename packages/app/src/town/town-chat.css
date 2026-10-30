@@ -1,0 +1,394 @@
+/*
+ * The town square's chat log (TownChat.tsx; docs/areas/town-square.md, "The chat log"): one box in the map's top left corner, over the
+ * map and under the cards. The box keeps one place and size whatever it holds (Eric's rule: nothing hidden, nothing shifts): the
+ * stream starts at its top, newest at the bottom and scrolling when it's longer than the box, and a strip at its foot is reserved for
+ * the typing line, which is only visible while you're typing (so it appearing moves nothing). Nothing is drawn behind or round a line,
+ * the stream or the typing line (Eric, Oct 28: "I don't want the shadow text period"). The one thing behind the text is `.tc-back`
+ * (v4, Eric's mockup): a single rounded rectangle behind the whole box with a faint tint, shown while you type, or always while the box
+ * shows when "Chat background" is on (`data-blur`), and a slight `backdrop-filter` blur **while you type** (`data-typing`: it is the
+ * frame-rate rule's corner cut, below). The text's color follows the town's sky by
+ * one attribute on the box (`data-tone`: day or night): near-black by day, white by night, with the names' and gray lines' shades,
+ * and the tint (a faint light one by day, a faint dark one by night, so the white text reads). While the box shows it takes every
+ * touch on its own area (the stream scrolls by finger and wheel; a tap anywhere on it but a player's name opens typing); faded, it
+ * takes none and the map under it gets them. Its own file, loaded with the town's code.
+ */
+.town-chat {
+  /* The slight blur and its faint tint (measured off Eric's mockup: about a quarter white over the day sky, the clouds' steps smoothed). */
+  --chat-blur: 3px;
+  --chat-tint: rgba(255, 255, 255, 0.26);
+  /* The typing line's strip at the box's foot, reserved always. */
+  --tc-strip: 30px;
+  /* By day (and dawn and dusk): our ink on the bright sky and sand. */
+  --chat-ink: #1d1f24;
+  /* The softer ink: the placeholder (the reason on a greyed line), the scroll bar. */
+  --chat-soft: rgba(29, 31, 36, 0.68);
+  /* A line only you see ("Sorry, you can't send another message for 12 seconds."): gray. */
+  --chat-system: #4f5561;
+  /* A boss's name and a kid's (gold and mint, deeper by day), and the count of characters left. */
+  --chat-boss: #7a5600;
+  --chat-kid: #0a5f36;
+  position: absolute;
+  top: 8px;
+  left: calc(8px + env(safe-area-inset-left));
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  border-radius: 6px;
+  /* No touches while it's faded (below): the map under it gets them. */
+  pointer-events: none;
+  /* A finger that moves on the box's edge or its strip isn't a page scroll; the stream itself scrolls (`pan-y`, below). */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  font-family: Archivo, system-ui, sans-serif;
+  /* The phone's: from the map's left edge to about two thirds of its width, down about a fifth to a quarter of it. */
+  width: clamp(200px, calc(66% - 8px), 300px);
+  height: clamp(150px, 23%, 230px);
+  font-size: 12px;
+  line-height: 14px;
+}
+/* By night: white, the lighter shades, and a faint dark tint (white text on a white tint wouldn't read). */
+.town-chat[data-tone="night"] {
+  --chat-tint: rgba(8, 12, 24, 0.34);
+  --chat-ink: #fff;
+  --chat-soft: rgba(255, 255, 255, 0.8);
+  --chat-system: #c8ccd2;
+  --chat-boss: #ffd479;
+  --chat-kid: #9be8c0;
+}
+.town-chat[hidden] {
+  display: none;
+}
+/* While it shows (or is carried) it takes every touch on its own area. */
+.town-chat[data-on="1"],
+.town-chat.grab {
+  pointer-events: auto;
+}
+/* The computer's: the same corner, wider and taller, for about a dozen lines (and no taller than the map allows). */
+.town-chat[data-size="computer"] {
+  width: 500px;
+  max-width: calc(100% - 16px);
+  height: min(340px, calc(100% - 16px));
+  font-size: 14px;
+  line-height: 17px;
+}
+/* On a computer in the frame, a third as tall: about 4 lines (Eric, Oct 30: "it's so easy to click on it when running around … about
+   4-5 lines of text"). A tablet's, and a mouse window under 1024 px (no frame), keep the 340. */
+.town-screen.in-frame .town-chat[data-size="computer"] {
+  height: 120px;
+}
+/* While it's picked up: an outline, so you can see where it is even with nothing in it (only while you carry it). */
+.town-chat.grab {
+  outline: 2px dashed var(--chat-ink);
+  outline-offset: 2px;
+}
+/* The background: one rounded rectangle behind the whole box, the stream and the typing line together: a faint tint (always, while the box shows
+   and "Chat background" is on) and, **while you're typing**, a slight blur of what is behind it. Nothing here until `data-blur` (so the town's frame
+   is never asked for a backdrop it doesn't show); it fades in and out. The blur is over the canvas, which redraws every frame, and measured
+   against main by eric.md's method it cost a phone a little when it showed all the time (about 0.3 ms a frame, 0.3 to 1 fps, inside this machine's
+   noise but on one side of it; docs/decisions/2026-10-28-town-chat-v2.md, "v4"): so the setting's always-on background is the tint alone, and the
+   blur comes with typing, a few seconds at a time. To put the blur back for the setting, give `.town-chat[data-blur="1"] .tc-back` the same two
+   `backdrop-filter` lines. */
+.tc-back {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-color: rgba(255, 255, 255, 0);
+  pointer-events: none;
+  transition: background-color 160ms ease, backdrop-filter 160ms ease, -webkit-backdrop-filter 160ms ease;
+}
+.town-chat[data-blur="1"] .tc-back {
+  background-color: var(--chat-tint);
+}
+.town-chat[data-blur="1"][data-typing="1"] .tc-back {
+  -webkit-backdrop-filter: blur(var(--chat-blur));
+  backdrop-filter: blur(var(--chat-blur));
+}
+/* The stream: one box of lines from the top, newest last; longer than the box, it scrolls (a finger, the wheel). It is itself
+   hit-testable and scrolls by finger: iPhone Safari scrolls a scroller only when it takes the touch (it did not when this was
+   `pointer-events: none` and only its lines took them). The strip below it is the typing line's. */
+.tc-log {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  margin-bottom: var(--tc-strip);
+  padding: 6px 4px 4px 5px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--chat-soft) transparent;
+  pointer-events: auto;
+  touch-action: pan-y;
+  cursor: text;
+}
+/* (A keyboard reaches the stream with Tab and opens typing with Enter; a mouse or a finger leaves it no ring.) */
+.tc-log:focus {
+  outline: none;
+}
+.tc-log:focus-visible {
+  outline: 2px solid var(--chat-ink);
+  outline-offset: -2px;
+}
+/* Shown, or faded out (new messages: the lines fade, and a faded box takes no taps and can't be tabbed to). */
+.tc-log,
+.tc-new {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--chat-out, 1000ms) ease-in, visibility 0s linear var(--chat-out, 1000ms);
+}
+.town-chat[data-on="1"] .tc-log,
+.town-chat[data-on="1"] .tc-new,
+.town-chat.grab .tc-log {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity var(--chat-in, 200ms) ease-out, visibility 0s;
+}
+/* Faded: no touches at all (the map under it gets them). */
+.town-chat[data-on="0"]:not(.grab) .tc-log {
+  pointer-events: none;
+}
+.tc-line {
+  flex: none;
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: 1px 4px 1px 3px;
+  color: var(--chat-ink);
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  /* At most two lines, then "…". */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  cursor: text;
+}
+.tc-time {
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+}
+.tc-name {
+  font-weight: 700;
+}
+.tc-boss .tc-name {
+  color: var(--chat-boss);
+}
+.tc-kid .tc-name {
+  color: var(--chat-kid);
+}
+/* A player's name: bold, in the palette color their device picked when they joined (names.ts; both shades are on the name). The one
+   thing on a line that isn't "tap to type": its tap opens the line's menu. */
+.tc-player .tc-name {
+  color: var(--nd, var(--chat-ink));
+  /* (A bigger place to put a finger: a name is a few letters wide.) */
+  padding: 5px 3px;
+  margin: -5px -3px;
+  cursor: pointer;
+}
+.town-chat[data-tone="night"] .tc-player .tc-name {
+  color: var(--nn, var(--chat-ink));
+}
+/* A line only you see (a gray system line): the "too soon" and every refusal. */
+.tc-system {
+  font-style: italic;
+  color: var(--chat-system);
+}
+/* The "↓ new" marker: you've scrolled up and lines came since; a tap goes to the newest. A control, it keeps its small dark pill. */
+.tc-new {
+  position: absolute;
+  right: 14px;
+  bottom: calc(var(--tc-strip) + 8px);
+  padding: 2px 9px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(14, 18, 26, 0.7);
+  color: #fff;
+  font: 700 12px/16px Archivo, system-ui, sans-serif;
+  cursor: pointer;
+  pointer-events: auto;
+}
+/* The typing line: in the strip at the box's foot, only while you're typing (`data-open`, set the instant a tap lands). An input and
+   nothing else: no placeholder (a greyed one's reason is its placeholder), no box, no bar, no background, no shadow, even in iPhone
+   Safari (its own look for a text field is switched off: appearance, border, background, shadow). */
+.tc-form {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--tc-strip);
+  margin: 0;
+  visibility: hidden;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+.tc-form[data-open="1"] {
+  visibility: visible;
+}
+.tc-form input {
+  display: block;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0 58px 0 8px;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  box-shadow: none;
+  background: none;
+  background-color: transparent;
+  color: var(--chat-ink);
+  caret-color: var(--chat-ink);
+  /* 16 px or more, so iPhone Safari doesn't zoom in when it gets focus. */
+  font: 500 16px Archivo, system-ui, sans-serif;
+  user-select: text;
+  -webkit-user-select: text;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.tc-form input::placeholder {
+  color: var(--chat-soft);
+  opacity: 1;
+}
+/* Greyed (a guest, a young device, the switch): dimmer, and nothing to count. */
+.tc-form input:disabled {
+  opacity: 1;
+  padding-right: 8px;
+  -webkit-text-fill-color: var(--chat-soft);
+}
+.tc-left {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font: 600 11px Archivo, system-ui, sans-serif;
+  color: var(--chat-boss);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tc-log,
+  .tc-new,
+  .tc-back {
+    transition: none;
+  }
+}
+/* ---- The header's tools (TownChatTools.tsx): the chat icon and the gear, at the bar's right end ---- */
+.town-tools {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* On a computer (in the frame) the chat icon sits at the bar's left, right after the title (it was hard to see where the chat is), and the
+   gear right after it (Eric, Oct 29 and 30: the bar is the right column's top row, the buttons 44 px). A phone's and a tablet's keep both at the right. */
+.town-screen.in-frame .town-tools {
+  display: contents;
+}
+.town-screen.in-frame .town-tool {
+  width: 44px;
+  height: 44px;
+}
+.town-tool {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  /* The chat icon's gray bubble (lighter in the light theme). */
+  --bub-off: #a8aeb9;
+}
+:root[data-theme="dark"] .town-tool {
+  --bub-off: #6d7483;
+}
+.tc-icon {
+  display: block;
+}
+.tc-icon .tc-bub {
+  fill: var(--bub-off);
+  stroke: var(--surface);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}
+.tc-icon .tc-bub.lit {
+  fill: var(--good);
+}
+.tc-icon .tc-dots circle {
+  fill: #fff;
+}
+/* "Town settings" (the match options' sheet, reused): a small heading over the chat's three choices, a tick by the one in use. */
+.town-set-head {
+  margin: 0;
+  padding: 8px 16px 6px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font: 800 12px/1 Archivo, system-ui, sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+/* The line under "Chat background" in Town settings. */
+.town-set-note {
+  margin: 0;
+  padding: 0 16px 12px;
+  color: var(--muted);
+  font: 500 13px/1.35 Archivo, system-ui, sans-serif;
+}
+/* (The tick is drawn, not text: a radio's name is its words alone.) */
+.town-set-row[aria-checked="true"]::after {
+  content: "✓";
+  flex: none;
+  width: 20px;
+  text-align: center;
+  color: var(--good);
+  font-weight: 900;
+}
+/* While the chat is paused or your chat is off, the field says why in its place, smaller so it fits (it can't take focus, so
+   iPhone Safari never zooms in on it). */
+.tc-form input:disabled::placeholder {
+  font-size: 13px;
+}
+.tc-form input:disabled {
+  text-overflow: ellipsis;
+}
+/* A player's line's menu (Profile / Mute / Report, and Remove for a moderator): a small card beside the line. */
+.tc-menu {
+  position: absolute;
+  z-index: 3;
+  width: 180px;
+  box-sizing: border-box;
+  padding: 8px 10px 10px;
+  border-radius: 12px;
+  background: #fffdf8;
+  color: #1f2530;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.06);
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.tc-menu strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 14px/1.2 "Archivo Black", Archivo, sans-serif;
+}
+.tc-menu .town-btn {
+  min-height: 36px;
+  padding: 6px 10px;
+}
+.tc-menu-said {
+  margin: 8px 0 0;
+  font: 600 13px/1.35 Archivo, sans-serif;
+  color: #4a4438;
+}

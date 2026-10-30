@@ -8,7 +8,7 @@
  */
 import type { Anim, Character, Frame, Layer, Part, Speck } from "../../characters/sprite.ts";
 import { GREX_PALETTE } from "../../characters/grex.ts";
-import { grain, groundShadow, paint, signBoard, signFace, tone, type Pt } from "./kit.ts";
+import { grain, groundShadow, paint, signBoard, signFace, tone, WARM, type LightSpot, type Pt } from "./kit.ts";
 
 const X_ = GREX_PALETTE;
 const PALETTE: Record<string, string> = {
@@ -274,3 +274,6 @@ export const HOUSE_GREX: Character = {
 
 /** Where the header board's blank face is (frame pixels), for the game to write "Jefferson's Fireworks" on. */
 export const HOUSE_GREX_SIGN = signFace(BOARD[0], BOARD[1], BW, BH);
+
+/** Its lights at dusk and night (Oct 27): the stand's dark inside glows warm behind the rockets on their rack. */
+export const HOUSE_GREX_LIGHTS: readonly LightSpot[] = [{ x: CX - STAND + 4, y: EAVE + 2, w: 2 * STAND - 8, h: COUNTER - EAVE - 2, keys: "Bb", color: WARM, strength: 0.75 }];

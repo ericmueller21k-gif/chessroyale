@@ -586,6 +586,82 @@ p {
   overflow: visible;
   z-index: 9;
 }
+/* Your arrows, highlights and premoves (chess.com's; board/OwnBoard.tsx, docs/decisions/2026-10-28-arrows-and-premoves.md):
+   a right-click's square (red; Ctrl yellow, Alt blue, Shift green) under the pieces and under the screen's own
+   highlights; a right-drag's arrow (yellow-orange; Ctrl red, Alt blue, Shift green), see-through as chess.com's (0.8),
+   over the pieces and under the screen's arrows; a premove's from and to squares in chess.com's premove red. Each is
+   checked on Classic, Green and Gold (the squares don't change with the theme); a scheme gives its own where one doesn't
+   read (Gold, below). */
+:root {
+  --uh-red: rgba(235, 97, 80, 0.8);
+  --uh-yellow: rgba(255, 170, 0, 0.8);
+  --uh-blue: rgba(82, 176, 220, 0.8);
+  --uh-green: rgba(172, 206, 89, 0.8);
+  --ua-orange: #ffaa00;
+  --ua-red: #f8553f;
+  --ua-blue: #48c1f9;
+  --ua-green: #9fcf3f;
+  --sq-premove: rgba(244, 42, 50, 0.55);
+}
+/* (Green: Shift's green is deeper, so it reads on the green squares. Gold: Ctrl's yellow square and the plain arrow's
+   yellow-orange are deeper oranges, so they read on the gold squares.) */
+:root[data-board-colors="green"] {
+  --uh-green: rgba(64, 140, 36, 0.8);
+  --ua-green: #3f9a22;
+}
+:root[data-board-colors="gold"] {
+  --uh-yellow: rgba(240, 118, 0, 0.8);
+  --ua-orange: #f07a00;
+}
+.hb square.uh-red {
+  background-color: var(--uh-red);
+}
+.hb square.uh-yellow {
+  background-color: var(--uh-yellow);
+}
+.hb square.uh-blue {
+  background-color: var(--uh-blue);
+}
+.hb square.uh-green {
+  background-color: var(--uh-green);
+}
+.hb square.premove {
+  background-color: var(--sq-premove);
+}
+.hb-user-arrows {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 2;
+}
+.hb-user-arrows g {
+  opacity: 0.8;
+}
+.hb-user-arrows polyline {
+  fill: none;
+  stroke: currentColor;
+  stroke-linejoin: miter;
+  stroke-linecap: butt;
+}
+.hb-user-arrows polygon {
+  fill: currentColor;
+}
+.hb-user-arrows .ua-orange {
+  color: var(--ua-orange);
+}
+.hb-user-arrows .ua-red {
+  color: var(--ua-red);
+}
+.hb-user-arrows .ua-blue {
+  color: var(--ua-blue);
+}
+.hb-user-arrows .ua-green {
+  color: var(--ua-green);
+}
 /* The coordinates, inside their edge squares (DECISIONS.md, Oct 11): each rank's number at the top left of its square in
    the left column, each file's letter at the bottom right of its square in the bottom row, either way up and turned;
    painted on the board, under the pieces, tucked into the corners where the pieces have the least ink; white on dark
@@ -5783,9 +5859,12 @@ button.history-label {
   paint-order: stroke fill;
   text-shadow:
     5px 5px 0 #1a0a00,
-    0 0 24px rgba(255, 200, 80, 0.85);
+    0 0 var(--fb-glow, 24px) rgba(255, 200, 80, 0.85);
   white-space: nowrap;
-  animation: fb-slam 2.5s cubic-bezier(0.3, 1.4, 0.5, 1) both;
+  /* (Its slam is over by 0.48 s, the 1.5 s banner's entrance: the animation ends there and holds, so the words, their glow
+     the costliest thing on the board to draw, are drawn once, not again every frame of a 2.5 s run that changes nothing after
+     its first fifth. The same motion as the 2.5 s keyframes it had; Oct 29, docs/decisions/2026-10-29-desktop-board-size.md.) */
+  animation: fb-slam 0.48s cubic-bezier(0.3, 1.4, 0.5, 1) both;
 }
 .fight-banner.boss .fb-text {
   font-size: 8.4cqw;
@@ -5793,7 +5872,7 @@ button.history-label {
   color: #fee2e2;
   text-shadow:
     5px 5px 0 #1a0a00,
-    0 0 24px rgba(248, 113, 113, 0.9);
+    0 0 var(--fb-glow, 24px) rgba(248, 113, 113, 0.9);
 }
 .fb-sub {
   margin-top: 2px;
@@ -5808,7 +5887,7 @@ button.history-label {
 /* A banner's length is its band's: in, held, and off by --fb-ms (a boss's 1.5 s, Eric, Oct 16: "Do 1 second less"; the
    God King's cut-in and FISCHER RANDOM! 2.5 s, Oct 15). The entrances inside it (the slam, the face, the line, the
    flash, the God King's portrait and target) all come in its first 0.6 s and then hold, whatever its length: their 2.5 s
-   keyframes are the 1.5 s banner's entrance times, scaled to 2.5 s. */
+   keyframes are the 1.5 s banner's entrance times, scaled to 2.5 s (the slam's are its first 0.48 s alone: it ends there). */
 @keyframes fb-band-in {
   0% {
     translate: -110% 0;
@@ -5833,18 +5912,17 @@ button.history-label {
 }
 @keyframes fb-slam {
   0%,
-  7.2% {
+  37.5% {
     opacity: 0;
     scale: 2.6;
   }
-  12% {
+  62.5% {
     opacity: 1;
     scale: 0.9;
   }
-  15.6% {
+  81.25% {
     scale: 1.06;
   }
-  19.2%,
   100% {
     scale: 1;
     opacity: 1;
@@ -6011,7 +6089,7 @@ button.history-label {
   color: #fff7d6;
   text-shadow:
     5px 5px 0 #0b0b1a,
-    0 0 24px rgba(147, 197, 253, 0.9);
+    0 0 var(--fb-glow, 24px) rgba(147, 197, 253, 0.9);
 }
 .kc-target {
   position: relative;
@@ -6516,7 +6594,7 @@ button.history-label {
   color: #fffbeb;
   text-shadow:
     5px 5px 0 #0b1020,
-    0 0 24px rgba(253, 224, 71, 0.9);
+    0 0 var(--fb-glow, 24px) rgba(253, 224, 71, 0.9);
 }
 
 /* Motion trail: a pick flying in (from --dx/--dy squares away), two echoes behind it; it fades as it lands. */
@@ -7688,9 +7766,12 @@ button.history-label {
   background: #3b0309;
 }
 .fight-banner.last-stand-cut .fb-flash,
-.fight-banner.last-stand-cut .fb-text,
 .fight-banner.last-stand-cut .kc-portrait {
   animation-duration: 3.1s;
+}
+/* (The slam's 0.48 s of 2.5 s, stretched the same way: 0.192 of 3.1 s.) */
+.fight-banner.last-stand-cut .fb-text {
+  animation-duration: 0.5952s;
 }
 /* (Its band: in and out stretched the same way, 3.1 s in all.) */
 .fight-banner.last-stand-cut {
@@ -7709,7 +7790,7 @@ button.history-label {
   color: #fff7d6;
   text-shadow:
     5px 5px 0 #0b0b1a,
-    0 0 24px rgba(248, 113, 113, 0.9);
+    0 0 var(--fb-glow, 24px) rgba(248, 113, 113, 0.9);
 }
 .ls-line {
   margin-top: 1.6cqw;
@@ -8605,21 +8686,65 @@ button.fd-logo {
  * and the rating's 16 px on a phone, 28 and 16 on a computer, and the icon is 38 px or 44 px to match.)
  */
 .fd-hero-icon {
+  position: relative;
   flex: none;
   width: 38px;
   height: 38px;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
   border-radius: 10px;
   background: var(--fd-panel-2);
   font-size: 30px;
   line-height: 1;
 }
+/* (The icon's own corners are cut here, not by the box: the ring and the level sit outside the box.) */
 .fd-hero-icon .user-icon.pixel {
   width: 100%;
   height: 100%;
+  border-radius: inherit;
+}
+/*
+ * An admin's test level (Eric, Oct 28; PLACEHOLDERS until the real levels exist, FrontDoor.tsx `LevelRing`): a thin green
+ * ring round the icon, filled clockwise from the top, and "LVL 38" as wide as the icon just above it, in the rating's gray.
+ * Both are drawn outside the icon's box and take no room, so the tag, the card and the page are the same with or without
+ * them (home never moves when the account loads).
+ */
+.fd-level {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 4px);
+  text-align: center;
+  /* (As wide as the icon: about 37 px of text over its 38 px.) */
+  font: 700 10px/10px Archivo, system-ui, sans-serif;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  color: var(--fd-sub);
+  pointer-events: none;
+}
+@media (min-width: 1024px) {
+  .fd-root.framed .fd-level {
+    font-size: 11.5px;
+    line-height: 11.5px;
+  }
+}
+.fd-level-ring {
+  position: absolute;
+  inset: -4px;
+  width: calc(100% + 8px);
+  height: calc(100% + 8px);
+  fill: none;
+  stroke-width: 2px;
+  pointer-events: none;
+}
+.fd-level-ring .track {
+  stroke: var(--fd-green);
+  opacity: 0.22;
+}
+.fd-level-ring .fill {
+  stroke: var(--fd-green);
+  stroke-linecap: round;
 }
 /* Home: the tag above your pawn's head, centered (the DOM has the pawn first; the queue's small card keeps that order). */
 .fd-home:not(.queueing) .fd-hero-id {
@@ -8677,8 +8802,8 @@ button.fd-logo {
   opacity: 0.8;
 }
 /*
- * Matchmaking (Default, Bots off, Solo): the mode picker's shape, quieter when picked (a gold edge, not a gold fill),
- * so the mode stays the main choice. The ⓘ beside it says what each does.
+ * Matchmaking (Default, Bots off, Solo): the mode picker's shape, each its title only (Oct 28), quieter when picked (a gold
+ * edge, not a gold fill), so the mode stays the main choice. The line above PLAY says what each does.
  */
 /*
  * The panel under the RANKED row (Eric, Oct 18: "it should never change size"): one fixed box for every mode, holding
@@ -8686,10 +8811,11 @@ button.fd-logo {
  */
 .fd-mode-panel {
   position: relative;
-  height: 58px;
+  /* (Oct 28: the options are titles only, so 44 px buttons and 5 px around them: 54 px, down from 58.) */
+  height: 54px;
   flex: none;
 }
-.fd-mode-panel > :not(.fd-types-info) {
+.fd-mode-panel > * {
   box-sizing: border-box;
   height: 100%;
 }
@@ -8710,17 +8836,11 @@ button.fd-logo {
   color: var(--fd-sub);
   line-height: 1.25;
 }
-.fd-types-row {
-  display: flex;
-  align-items: stretch;
-  gap: 6px;
-}
 .fd-types {
-  flex: 1 1 auto;
   min-width: 0;
 }
 .fd-modes.fd-types button {
-  min-height: 48px;
+  min-height: 44px;
   font-size: 14px;
 }
 .fd-modes.fd-types button.on {
@@ -8736,71 +8856,31 @@ button.fd-logo {
  * No mode picked (Eric, Oct 25): the options show, none selected, a little greyer than the mode row, and not tappable
  * (aria-disabled; no press effect either). The first pick wakes them with their usual default selected.
  */
-.fd-mode-panel.idle .fd-modes.fd-types button,
-.fd-mode-panel.idle .fd-info-btn {
+.fd-mode-panel.idle .fd-modes.fd-types button {
   opacity: 0.6;
   cursor: default;
 }
 .fd-mode-panel.idle button:active {
   transform: none;
 }
-.fd-info-btn {
-  flex: none;
-  width: 44px;
-  align-self: center;
-  height: 44px;
-  border-radius: 50%;
-  border: 2px solid var(--fd-line);
-  background: var(--fd-panel);
-  color: var(--fd-sub);
-  font: italic 800 18px Georgia, "Times New Roman", serif;
-  cursor: pointer;
-}
-.fd-info-btn.open {
-  border-color: var(--fd-gold);
-  color: var(--fd-gold-text);
-}
-/* (The ⓘ's words float over the RANKED row, so opening them moves nothing: Eric, Oct 18.) */
-.fd-types-info {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: calc(100% + 6px);
-  z-index: 5;
-  background: var(--fd-panel);
-  border: 1px solid var(--fd-line);
-  border-radius: 14px;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
-  padding: 10px 14px;
-  font-size: 14px;
-  color: var(--fd-sub);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.fd-types-info p {
-  margin: 0;
-}
-.fd-types-info strong {
-  color: var(--fd-text);
-}
-.fd-types-info .fd-types-rank {
-  color: var(--fd-muted);
-  font-size: 13px;
-}
 .fd-play {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
-  /* (Oct 26, Eric: "the play button is too small": as tall as the Other modes cards, 64 px, its label bigger to match.) */
-  height: 64px;
+  /*
+   * (Oct 26, Eric: "the play button is too small": 64 px. Oct 28: "make the play button bigger with the space we gain": the
+   * room the compact Other modes cards and the shorter options give back is PLAY's, so the pawn's card, the page and
+   * everything under PLAY keep their size and place. 97 px = 64 + 4 (options) + 20 (Boss Arena) + 28 (the pair) - 15 (the
+   * room under the last card, kept: below) - 4 (the label's room under PLAY).)
+   */
+  height: 97px;
   border: 0;
   border-radius: 18px;
   background: var(--fd-gold);
   color: var(--fd-gold-ink);
   font-family: "Archivo Black", Archivo, sans-serif;
-  font-size: 30px;
+  font-size: 44px;
   letter-spacing: 1px;
   cursor: pointer;
   transition: transform 80ms;
@@ -8833,19 +8913,22 @@ button.fd-logo {
   }
 }
 /*
- * Phones: the Boss raid card comes up under the one-line hint (Eric: "slide boss button up a bit so it's closer to the
- * text bar above it"). A plain hint is one line (each fits a 320 px column), so its box is one line; a paused line may wrap,
- * so it keeps the two-line box and a longer line never moves what's under it. The 2.1 px puts the card 14 px under the
- * line's text. The card's bottom margin takes back the room the box gave up, in the same states only, so the column, the
- * hero and PLAY keep their size and place, and nothing moves on a click (home keeps still).
+ * Home's line is above PLAY (Eric, Oct 28: "swap the line of text below Play and put it above play"), bottom-aligned in its
+ * box so a one-line text sits right on PLAY. The box never changes: two lines' room on a phone (a paused line or a sign-in
+ * line may wrap), one on a computer, so no pick or load moves PLAY or anything under it.
  */
+.fd-go > .fd-hint {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  margin-top: 0;
+  margin-bottom: -8px;
+}
+/* A phone keeps the 15 px of room under its last card that the page has always had (the old one-line hint's), so nothing under
+   PLAY ends lower than it did. */
 @media (max-width: 899px) {
-  .fd-hint.fd-hint-line {
-    height: 1.3em;
-    margin-bottom: 2.1px;
-  }
-  .fd-play-col:has(> .fd-go > .fd-hint-line) > .rd-pair {
-    margin-bottom: 14.8px;
+  .fd-play-col > .rd-pair {
+    margin-bottom: 15px;
   }
 }
 /*
@@ -8868,9 +8951,13 @@ button.fd-logo {
   .fd-hint {
     margin-top: -4px;
   }
-  /* (The column's gap is 8 px here, so the label gets 2 px back: it stays 14 px under the line, as Eric approved.) */
+  .fd-go > .fd-hint {
+    margin-top: 0;
+    margin-bottom: -4px;
+  }
+  /* (The column's gap is 8 px here, so the label gets 6 px back: 14 px under PLAY, the spacing Eric approved under the line.) */
   .fd-other-label {
-    margin-top: 2px;
+    margin-top: 6px;
   }
   .fd-hero {
     flex: 1 1 0;
@@ -8891,6 +8978,22 @@ button.fd-logo {
     min-height: 0;
   }
   /*
+   * Home (Eric, Oct 28: "LVL 38" over your icon was cut off at the card's top edge; "just squeeze it closer to the top of
+   * the pawn", and the pawn "a few pixels" lower): your tag sits 16 px lower and your pawn 4 px lower, at the same size.
+   * The tag takes 12 px of the room over the pawn's head that a hat may use (the tallest, the fire and ice crown, still
+   * clears it standing); it's drawn over the pawn, so a hop's hat goes behind your name. The same for every account, so
+   * nothing moves when an admin's account loads. (The padding and the tag's overlap add up as before: the pawn's size is
+   * unchanged.)
+   */
+  .fd-home:not(.queueing) .fd-hero-in {
+    padding: 28px 12px 8px;
+  }
+  .fd-home:not(.queueing) .fd-hero-id {
+    position: relative;
+    z-index: 2;
+    margin-bottom: -12px;
+  }
+  /*
    * Your pawn (Oct 24: 75% bigger than 170 × 154, up to 298 × 270), as big as the room under the tag allows: the tag, its
    * 6 px gap and the card's padding take 72 px of the card's height.
    */
@@ -8905,13 +9008,17 @@ button.fd-logo {
    * than a 640 px phone has (the Auto chess card, the panel), so home would scroll.
    */
   @container fd-hero (max-height: 189px) {
-    .fd-hero-in {
+    .fd-hero-in,
+    .fd-home:not(.queueing) .fd-hero-in {
       flex-direction: row;
       gap: 14px;
-      padding: 8px;
+      padding: 14px 8px 8px;
+    }
+    .fd-home:not(.queueing) .fd-hero-id {
+      margin-bottom: 0;
     }
     .fd-hero .fd-pawn-hero {
-      height: clamp(48px, calc(100cqh - 16px), 130px);
+      height: clamp(48px, calc(100cqh - 22px), 130px);
     }
     .fd-home:not(.queueing) .fd-hero-id {
       order: 0;
@@ -8928,6 +9035,8 @@ button.fd-logo {
    the cards (Oct 26, Eric). */
 .fd-other-label {
   font-size: 11px;
+  /* (12 px, what Archivo's own "normal" comes to: the fallback font's is 13, which moved the column above it for a moment while Archivo loaded.) */
+  line-height: 12px;
   text-align: center;
 }
 /* The RANKED row (Eric, Oct 16): its small label right above the three ranked modes. */
@@ -8942,7 +9051,26 @@ button.fd-logo {
   text-align: center;
 }
 
-/* Home, 1 v 1 picked: your rank in it, in the panel. */
+/* Home, 1 v 1 picked: your rank's emblem (48 px, 1×) beside your rank and what 1 v 1 is, in the panel. */
+.fd-panel-words.fd-rank-words {
+  flex-direction: row;
+  gap: 6px;
+  /* (The emblem's own picture has a few clear pixels round it: it can sit on the panel's edge.) */
+  padding: 0 8px 0 2px;
+}
+/* (A narrow phone: the widest rank, "Your rank: Transcendent · 1234 RP", still one line beside the emblem.) */
+@media (max-width: 359px) {
+  .fd-rank-words .fd-rank1v1 {
+    font-size: 13px;
+  }
+}
+.fd-rank-lines {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
 .fd-rank1v1 {
   font-size: 14px;
   font-weight: 700;
@@ -9149,6 +9277,19 @@ button.fd-logo {
 .bs-tile .bs-q {
   font-size: calc(var(--bs-w) * 0.5);
 }
+/* The "?" tile: smaller than a boss's (Eric, Oct 29: "I have shrunk the question mark box"), in a row of its own as short as it is. */
+.bs-tile.bs-random {
+  width: calc(var(--bs-w) * 0.82);
+  height: calc(var(--bs-h) * 0.5);
+  flex-basis: auto;
+  --bs-slant: calc(var(--bs-w) * 0.14);
+}
+.bs-tile.bs-random .bs-q {
+  font-size: calc(var(--bs-w) * 0.34);
+}
+.bs-row:has(> .bs-random:only-child) {
+  height: calc(var(--bs-h) * 0.5);
+}
 :root {
   --bs-edge: #3d4453;
   --bs-fill: #1b1e25;
@@ -9168,30 +9309,38 @@ button.fd-logo {
   --bs-mix-hi: 34%;
   --bs-mix-lo: 52%;
 }
-/* The stage: the picked boss on the 1 v 1 stage's platform (dv-st-plat), in his idle; his name and strength under it. */
+/* The stage (Eric, Oct 29, from his mockup): you on a platform at the left with two smaller ones behind you (invite circles, greyed
+   until a live party exists), "VS", the picked boss on the 1 v 1 stage's platform (dv-st-plat) at the right in its idle; each
+   one's name under it, and under the boss's the difficulty: arrows, its name and five dots. --bs-sw: a platform's room. */
 .bs-stage {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.bs-row-stage {
+  /* (A platform's room: 156 px on a phone, less on a narrow one so the two sides never run past the screen.) */
+  --bs-sw: min(156px, 46cqi);
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: start;
+  /* (Takes back the page's padding, as the tiles do, so the two sides sit as far out as the picture's.) */
+  margin: 0 -9px;
+}
+.bs-side {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  min-width: 0;
 }
 .bs-spot {
   position: relative;
-  width: min(100%, 280px);
+  width: var(--bs-sw);
   aspect-ratio: 124 / 96;
   container-type: inline-size;
 }
-/* A short screen: the stage smaller, so the tall tiles above it leave the ways to play under it on the screen where they can (the page
-   scrolls from there): 210 px wide, not 280, up to 800 px tall (Eric's iPhone is 777), 170 px up to 700 (the small phones). */
-@media (max-height: 800px) {
-  .bs-spot {
-    width: min(100%, 210px);
-  }
-}
-@media (max-height: 700px) {
-  .bs-spot {
-    width: min(100%, 170px);
-  }
+.bs-mine {
+  aspect-ratio: 124 / 96;
 }
 .bs-spot::before {
   content: "";
@@ -9202,6 +9351,14 @@ button.fd-logo {
 }
 .bs-stage .dv-st-plat::after {
   opacity: var(--fd-shadow, 0.35);
+}
+/* (Eric's picture: each platform a thin ellipse with a rim under its top face and a soft shadow; yours and his the same, 18 px tall.) */
+.bs-spot > .dv-st-plat {
+  top: 80%;
+  height: 15%;
+}
+.bs-stage .dv-st-plat {
+  box-shadow: 0 3px 7px rgba(0, 0, 0, 0.2);
 }
 .bs-spot .bs-fig {
   bottom: 12%;
@@ -9220,7 +9377,7 @@ button.fd-logo {
   image-rendering: pixelated;
 }
 .bs-q-big {
-  font-size: 120px;
+  font-size: 90px;
   color: var(--fd-sub);
   opacity: 0.5;
 }
@@ -9228,39 +9385,234 @@ button.fd-logo {
 .bs-dark .bs-sprite {
   filter: brightness(0) drop-shadow(0 0 3px rgba(122, 79, 208, 0.9));
 }
-/* Its words: a room over the stage (three lines of the bubble), the bubble at its foot, centered, over the stage's empty
-   top a little. */
+/* Your pawn: in the middle of your platform, its feet on it. */
+.bs-me {
+  position: absolute;
+  left: 10%;
+  width: 80%;
+  bottom: 12%;
+  pointer-events: none;
+}
+.bs-me .fd-pawn-stage {
+  display: block;
+}
+/* The two platforms behind you, smaller and a little higher, each with its invite circle over it: dashed, a person-plus, muted. */
+.bs-back {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 32%;
+}
+.bs-back.bs-l {
+  left: -2.6%;
+}
+.bs-back.bs-r {
+  right: -2.6%;
+}
+/* (Eric's picture: their centers 16 px higher than yours, yours drawn over their inner ends; the circle's center 36 px above its platform's.) */
+.bs-back .dv-st-plat {
+  left: 0;
+  width: 100%;
+  top: 69.6%;
+  height: 10%;
+}
+.bs-stage .bs-back .dv-st-plat::after {
+  opacity: 0;
+}
+.bs-inv {
+  position: absolute;
+  left: 50%;
+  top: 28.7%;
+  display: grid;
+  place-items: center;
+  /* (cqi: the platform's room, .bs-spot, the nearest container.) */
+  width: 25.64cqi;
+  height: 25.64cqi;
+  margin-left: -12.82cqi;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--fd-text) 3%, transparent);
+  color: var(--fd-muted);
+}
+.bs-inv > svg {
+  display: block;
+}
+.bs-inv-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: var(--fd-dim);
+  stroke-width: 1.6;
+  stroke-dasharray: 4.38 3.42;
+}
+.bs-inv-icon {
+  position: relative;
+  width: 62%;
+  height: 62%;
+}
+/* Its words: a room over the stage (three lines of the bubble), the bubble at its foot, over the boss's side. */
 .bs-say {
   position: relative;
   z-index: 2;
-  width: 100%;
-  height: 62px;
-  margin-bottom: -26px;
+  height: 40px;
+  margin-bottom: -6px;
 }
 .bs-say .bs-bubble {
   bottom: 0;
-  left: 0;
+  left: auto;
   right: 0;
-  margin: 0 auto;
-  max-width: min(100%, 300px);
+  max-width: min(100%, 260px);
 }
-.bs-id {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  min-height: 48px;
-}
-.bs-name {
+.bs-vs {
+  align-self: start;
+  margin-top: calc(var(--bs-sw) * 0.5);
+  padding: 0 4px;
   font-family: "Archivo Black", Archivo, sans-serif;
-  font-size: 22px;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--fd-dim);
+}
+.bs-name,
+.bs-you-name {
+  margin-top: 6px;
+  font-family: "Archivo Black", Archivo, sans-serif;
+  font-size: min(19px, 4.9cqi);
   font-weight: 400;
   line-height: 1.15;
+  white-space: nowrap;
+  text-align: center;
 }
-.bs-rating {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--fd-sub);
+/* (One line whatever the name, so picking a boss moves nothing: a long boss name runs a little past its half; yours is cut short.) */
+.bs-you-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The difficulty: five levels, each in its own color (darker on the light page, so the name reads on it: 3 to 1 at least). */
+.bs-stage {
+  --bd-very-easy: #15803d;
+  --bd-easy: #22c55e;
+  --bd-normal: #d97706;
+  --bd-hard: #ef4444;
+  --bd-hardest: #c22222;
+}
+:root[data-theme="light"] .bs-stage {
+  --bd-easy: #179a45;
+  --bd-normal: #c2670a;
+  --bd-hard: #dc2626;
+  --bd-hardest: #7f1d1d;
+}
+.bs-diff {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  margin-top: 2px;
+}
+.bs-arrow {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fd-text);
+  cursor: pointer;
+}
+.bs-arrow[aria-disabled="true"] {
+  opacity: 0.3;
+  cursor: default;
+}
+.bs-level {
+  /* (One width for every level's name, so stepping moves nothing; its text shrinks a little on a narrow phone.) */
+  width: 5.6em;
+  white-space: nowrap;
+  text-align: center;
+  font-size: clamp(13px, 4.6cqi, 16px);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.bs-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 14px;
+}
+.bs-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--fd-dim);
+}
+.bs-dot.on {
+  width: 9px;
+  height: 9px;
+}
+[data-level="very-easy"] {
+  --bd: var(--bd-very-easy);
+}
+[data-level="easy"] {
+  --bd: var(--bd-easy);
+}
+[data-level="normal"] {
+  --bd: var(--bd-normal);
+}
+[data-level="hard"] {
+  --bd: var(--bd-hard);
+}
+[data-level="hardest"] {
+  --bd: var(--bd-hardest);
+}
+.bs-level {
+  color: var(--bd);
+}
+.bs-dot.on {
+  background: var(--bd);
+}
+/* START: the picture's slanted gold button, trimmed on the left and right (85% of the old width). */
+.bs-start {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 231px;
+  max-width: 100%;
+  height: 48px;
+  margin: 0 auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fd-gold-ink);
+  font-family: "Archivo Black", Archivo, sans-serif;
+  font-size: 22px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  position: relative;
+  z-index: 0;
+}
+.bs-start::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--fd-gold);
+  border: 3px solid #1a1406;
+  transform: skewX(-18deg);
+  box-shadow: 6px 6px 0 rgba(120, 120, 120, 0.35);
+}
+.bs-start svg {
+  width: 28px;
+  height: 28px;
+}
+.bs-start:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.bs-start:active:not(:disabled) {
+  transform: scale(0.97);
 }
 @media (prefers-reduced-motion: reduce) {
   .bs-fig,
@@ -9307,45 +9659,44 @@ button.fd-logo {
 .rd-option:active:not(:disabled) {
   transform: scale(0.98);
 }
-/* A computer: the Boss raid card a little shorter (the live window above keeps its room). */
-@media (min-width: 1024px) {
-  .fd-root.framed .fd-play-col .rd-card {
-    min-height: 64px;
-    padding: 8px 12px 8px 8px;
-  }
-  .fd-root.framed .fd-play-col .rd-face {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
-  }
-  .fd-root.framed .fd-play-col .rd-face .boss-portrait {
-    width: 42px;
-  }
-  .fd-root.framed .fd-play-col .rd-card-text strong {
-    font-size: 18px;
-  }
-}
-
 /*
- * Solo Boss Mode and Auto chess: two half cards side by side under Boss Arena (Eric, Oct 26; a phone and a computer alike).
- * Each keeps the rd-card look (picture, name, one short line, the ›), stacked so a name fits half a 320 px phone: the
- * picture on top, the › in its corner. On a phone the pair is 84 px tall, as the two cards it replaces, so home fits as
- * before. The selectors carry .fd-root and .rd-card so they win over the computer's card rules above.
+ * Home's Other modes cards are compact, on a phone as on a computer (Eric, Oct 28: "shrink those down vertically and make the
+ * play button bigger with the space we gain"): Boss Arena 64 px (its picture 48 px beside the words; it was 84 px on a
+ * phone), and under it Solo Boss Mode and Auto chess side by side (Eric, Oct 26; half width each), each with its picture to
+ * the left of the words, 56 px tall (they were 84 px on a phone, with the picture above the words, and 64 px on a computer).
+ * No › on the half cards: "Solo Boss Mode" and its picture fill a 172 px card at 390 px with no room for it.
+ * The selectors carry .fd-root and .rd-card so they win over the card's base rules above.
  */
+.fd-root .fd-play-col .rd-card {
+  min-height: 64px;
+  padding: 8px 12px 8px 8px;
+}
+.fd-root .fd-play-col .rd-face {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+}
+.fd-root .fd-play-col .rd-face .boss-portrait {
+  width: 42px;
+}
+.fd-root .fd-play-col .rd-card-text strong {
+  font-size: 18px;
+}
+/* (One line each, whatever font is showing: in the fallback font, while Archivo loads, "Solo Boss Mode" wrapped in a half card at
+   1280 px, which made the pair 3 px taller for a moment and moved the whole column above it. Home never moves: Eric, Oct 18.) */
+.fd-root .fd-play-col .rd-card-text > * {
+  white-space: nowrap;
+}
 .fd-root .rd-pair {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
 .fd-root .rd-pair .rd-card.rd-half {
-  position: relative;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: flex-start;
-  gap: 4px;
+  gap: 6px;
   min-width: 0;
-  min-height: 84px;
-  padding: 6px 8px;
+  min-height: 56px;
+  padding: 6px;
 }
 .fd-root .rd-pair .rd-card.rd-half .rd-face {
   width: 32px;
@@ -9356,35 +9707,32 @@ button.fd-logo {
   width: 26px;
   height: 26px;
 }
-.fd-root .rd-pair .rd-card.rd-half .rd-card-text {
-  width: 100%;
-}
 .fd-root .rd-pair .rd-card.rd-half .rd-card-text strong {
   font-size: 13px;
 }
 .fd-root .rd-pair .rd-card.rd-half .rd-card-text span {
   font-size: 12px;
 }
-.fd-root .rd-pair .rd-card.rd-half .rd-card-go {
-  position: absolute;
-  top: 6px;
-  right: 8px;
-  font-size: 22px;
-}
-/*
- * On a computer the half cards lie flat, picture beside the words, as tall as the Boss Arena card (64 px), so home is no
- * taller than with the two cards they replace and the live window above keeps its size.
- */
-@media (min-width: 1024px) {
-  .fd-root .rd-pair .rd-card.rd-half {
-    flex-direction: row;
-    align-items: center;
-    gap: 8px;
-    min-height: 64px;
+/* (A 320 px phone: the half card is 137 px wide, so a smaller picture and words keep "Solo Boss Mode" on one line, and Boss Arena's
+   line stays on one line too, so no card grows.) */
+@media (max-width: 359px) {
+  .fd-root .fd-play-col .rd-card {
+    gap: 10px;
   }
-  .fd-root .rd-pair .rd-card.rd-half .rd-card-text {
-    width: auto;
-    min-width: 0;
+  .fd-root .fd-play-col .rd-card-text span {
+    font-size: 12px;
+  }
+  .fd-root .rd-pair .rd-card.rd-half .rd-face {
+    width: 28px;
+    height: 28px;
+  }
+  .fd-root .rd-pair .rd-card.rd-half .rd-face svg {
+    width: 22px;
+    height: 22px;
+  }
+  .fd-root .rd-pair .rd-card.rd-half .rd-card-text strong,
+  .fd-root .rd-pair .rd-card.rd-half .rd-card-text span {
+    font-size: 11px;
   }
 }
 
@@ -10281,66 +10629,25 @@ a.fd-row-link {
   font-weight: 600;
   font-size: 14px;
 }
+/* Their 1 v 1 rank in the profile card's pills: the 1 v 1 pill's colors at the card's pill size. */
+.fd-pills .dv-rank.fd-card-rank {
+  padding: 5px 12px;
+  font-size: 14px;
+  line-height: 18px;
+}
 /* Your coins on your own profile: gold, as the coin. */
 .fd-pill.fp-coins {
   color: var(--fd-gold-text);
 }
-/* A rank: its color on a tint of it (dark), or darkened on a tint of white (light). core's profile test checks each
-   rank's color stays 4.5:1 through these mixes, so change them together. */
-.fd-pill.tier,
+/* Your 1 v 1 rank under your name on home: its tier's color, darkened in light (as the 1 v 1 pill: core's ranked test
+   checks each tier's color stays 4.5:1 through these mixes, so change them together). */
 .fd-rank {
   --fd-tier-ink: var(--tier);
-  --fd-prism: linear-gradient(100deg, #ff9a9a, #fcd34d, #86efac, #7dd3fc, #c4b5fd, #f9a8d4, #ff9a9a);
-  --fd-prism-ink: linear-gradient(100deg, #e0607a, #f2c14e, #4ade80, #38bdf8, #a78bfa, #f472b6);
-}
-.fd-pill.tier {
-  background: color-mix(in srgb, var(--tier) 20%, var(--fd-panel));
-  color: var(--fd-tier-ink);
-  font-weight: 800;
-}
-.fd-rank {
   color: var(--fd-tier-ink);
   font-weight: 700;
 }
-:root[data-theme="light"] :is(.fd-pill.tier, .fd-rank) {
+:root[data-theme="light"] .fd-rank {
   --fd-tier-ink: color-mix(in srgb, var(--tier) 55%, #000);
-  --fd-prism-ink: linear-gradient(100deg, #be123c, #854d0e, #15803d, #0369a1, #6d28d9, #be185d);
-}
-/* The top three ranks. Revered: a gold ring and a sheen. Exalted: a ring and a glow. Transcendent: a rainbow. */
-.fd-pill.rank-gilt {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--tier) 24%, var(--fd-panel)), color-mix(in srgb, var(--tier) 12%, var(--fd-panel)));
-  box-shadow: inset 0 0 0 1.5px var(--tier);
-}
-.fd-pill.rank-glow {
-  box-shadow:
-    inset 0 0 0 1.5px var(--tier),
-    0 0 14px color-mix(in srgb, var(--tier) 55%, transparent);
-}
-.fd-pill.rank-prism {
-  background: var(--fd-prism);
-  background-size: 200% 100%;
-  color: #14161b;
-  box-shadow: 0 0 16px color-mix(in srgb, #f472b6 45%, transparent);
-  animation: fd-prism 6s linear infinite;
-}
-.fd-rank.rank-prism {
-  background: var(--fd-prism-ink);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-.fd-rank.rank-glow {
-  text-shadow: 0 0 10px color-mix(in srgb, var(--tier) 60%, transparent);
-}
-@keyframes fd-prism {
-  to {
-    background-position: 200% 0;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .fd-pill.rank-prism {
-    animation: none;
-  }
 }
 .fd-center-text {
   text-align: center;
@@ -10753,6 +11060,14 @@ button.fd-seat {
   .fd-root.framed.fd-on-queue .fd-center {
     max-width: 1080px;
   }
+  /* The town fills everything between the menu and the right column, top to bottom (Eric, Oct 30). Its bar is the right column's top row, where
+     the profile button is on other pages (that row keeps its height here, the button not shown: Profile is in the menu). */
+  .fd-root.framed.fd-on-town .fd-center {
+    max-width: none;
+  }
+  .fd-root.framed.fd-on-town .fd-right > .fd-top-right {
+    visibility: hidden;
+  }
   .fd-root.framed .fd-home {
     padding: 24px 24px 28px;
     min-height: var(--app-h);
@@ -10877,6 +11192,12 @@ button.fd-seat {
     height: auto;
     aspect-ratio: 170 / 154;
   }
+  /* (Oct 28, Eric: "make the play button bigger with the space we gain": 76 px = 64 + 4 (the options) + 8 (the pair's cards),
+     so the live window's board and the page keep their size.) */
+  .fd-root.framed .fd-play {
+    height: 76px;
+    font-size: 40px;
+  }
 }
 @media (min-width: 1280px) {
   .fd-root.framed .fd-home-main {
@@ -10914,19 +11235,15 @@ button.fd-seat {
     justify-content: flex-end;
     gap: 12px;
   }
-  .fd-root.framed .fd-play {
-    height: 64px;
-    font-size: 36px;
-  }
-  /* (A short window, a laptop's: the column closer, so the live window keeps a board worth seeing. PLAY 48 px here, up from
-     43 (Oct 26), the most the live window's board can give up at 680 px tall.) */
+  /* (A short window, a laptop's: the column closer, so the live window keeps a board worth seeing. PLAY 60 px here, up from
+     48 (Oct 28; 43 before Oct 26): the board keeps the size it had at 680 px tall.) */
   @media (max-height: 760px) {
     .fd-root.framed .fd-play-col {
       gap: 8px;
     }
     .fd-root.framed .fd-play {
-      height: 48px;
-      font-size: 28px;
+      height: 60px;
+      font-size: 32px;
     }
   }
   /* The queue: your card and the chat on the left, the lobby (the green area) on the right. */
@@ -12490,7 +12807,7 @@ img.qicon {
   .boss-char.place-side {
     --bc-scale: 2;
     position: absolute;
-    right: 14px;
+    right: calc(14px + var(--bs-out, 0px));
     bottom: 0;
     width: 96px;
     height: 120px;
@@ -12498,8 +12815,14 @@ img.qicon {
   /* (How far he can reach left of the board's row: his box's middle 62 px out, Sawyer's 44 sprite px past it, at 2
      screen px each; see .boss-dock.) */
   .screen.game:has(.board-row > .boss-side) {
-    --bs-reach: 152px;
+    --bs-reach: calc(152px + var(--bs-out, 0px) + 2 * var(--bs-head, 0px));
   }
+}
+/* With no eval bar (every player's board: the board takes the bar's 24 px) the boss stands 24 px further out, as far from
+   the board as beside the bar; placed with the bar showing (testers), the wide ones went up to 14 px under the board
+   (Eric, Oct 28: Folio "behind the board when idling"; docs/decisions/2026-10-28-folio-desktop-fixes.md). */
+.screen.game:not(:has(.board-row > .eval-bar)) {
+  --bs-out: 24px;
 }
 /* From 900 to 1099 px the window has no room for him at 2× (Eric, Oct 14: Ginger was half off it at 1024 px), so he's
    drawn at 1× (one screen px a sprite px, as in the boss bar on a phone), nearer the eval bar: his box's middle 26 px
@@ -12508,12 +12831,12 @@ img.qicon {
 @media (min-width: 900px) and (max-width: 1099px) and (min-height: 600px) {
   .boss-char.place-side {
     --bc-scale: 1;
-    right: 2px;
+    right: calc(2px + var(--bs-out, 0px));
     width: 48px;
     height: 60px;
   }
   .screen.game:has(.board-row > .boss-side) {
-    --bs-reach: 72px;
+    --bs-reach: calc(72px + var(--bs-out, 0px) + var(--bs-head, 0px));
   }
 }
 /* Beside the leaderboard (1100 px and up) he stands over its edge, as before: the window's edge is far off. */
@@ -12872,6 +13195,12 @@ img.qicon {
 .pc-king .gk-portrait {
   width: 118%;
 }
+/* A long line under the word wraps to two (Eric, Oct 28: Folio's "Your pieces can't cross it for 4 turns" on one line pushed
+   its portrait off the board's left and the God King's off its right; docs/decisions/2026-10-28-folio-desktop-fixes.md). */
+.fight-banner.power-cut .fb-sub {
+  max-width: 46cqw;
+  text-wrap: balance;
+}
 .fight-banner.power-cut .fb-band {
   background: linear-gradient(90deg, #12040a, #6b1023 22%, #3b0b2e 50%, #6b1023 78%, #12040a);
   border-color: #fca5a5;
@@ -12896,12 +13225,12 @@ img.qicon {
   font-size: 10cqw;
   text-shadow:
     5px 5px 0 #0b0b1a,
-    0 0 24px rgba(252, 165, 165, 0.9);
+    0 0 var(--fb-glow, 24px) rgba(252, 165, 165, 0.9);
 }
 .fight-banner.power-cut.cold .kc-text {
   text-shadow:
     5px 5px 0 #0b0b1a,
-    0 0 24px rgba(186, 230, 253, 0.95);
+    0 0 var(--fb-glow, 24px) rgba(186, 230, 253, 0.95);
 }
 .fight-banner.power-cut .fb-sub {
   font-size: 3.4cqw;
@@ -13135,7 +13464,7 @@ img.qicon {
 .fight-banner.power-cut.fire .kc-text {
   text-shadow:
     5px 5px 0 #0b0b1a,
-    0 0 24px rgba(253, 186, 116, 0.95);
+    0 0 var(--fb-glow, 24px) rgba(253, 186, 116, 0.95);
 }
 
 /* Nearly full: it glows (then the warning, then the ultimate). */
@@ -13560,7 +13889,7 @@ img.qicon {
 .fight-banner.power-cut.dark .kc-text {
   text-shadow:
     5px 5px 0 #0b0b1a,
-    0 0 24px rgba(167, 139, 250, 0.95);
+    0 0 var(--fb-glow, 24px) rgba(167, 139, 250, 0.95);
 }
 /* Lights out: the night on one canvas over everything on the board; his spot above the board's top edge; his words
    above the board's top-left; every square takes a tap while a round is open. */
@@ -17676,6 +18005,21 @@ button.sq-tiny {
   inset: 0 0 auto;
   z-index: 1;
 }
+/*
+ * A rank's emblem at the pawn's inner top corner (1× on a phone, 2× on a computer): the two face each other above "VS",
+ * clear of the pawns, within each side's own half (the pawn's box reaches `--dv-over` past it).
+ */
+.dv-st-emblem.re-box {
+  position: absolute;
+  top: 0;
+  z-index: 1;
+}
+.dv-st-you .dv-st-emblem {
+  right: var(--dv-over);
+}
+.dv-st-them .dv-st-emblem {
+  left: var(--dv-over);
+}
 /* The platform: a disc seen from a little above (its top, and its edge under it), the pawn's shadow on it. */
 .dv-st-plat {
   position: absolute;
@@ -17964,8 +18308,12 @@ button.sq-tiny {
   min-width: 160px;
 }
 
-/* A rank: a small pill in the tier's color. */
+/*
+ * A rank: a small pill in the tier's color. Its colors as the rating ranks' pills had them, so each tier reads at 4.5:1
+ * on both themes (packages/core/test/ranked.test.ts): a 20% tint of the panel; in light, the ink darkened (55% with black).
+ */
 .dv-rank {
+  --dv-rank-ink: var(--rank, var(--muted));
   display: inline-block;
   padding: 1px 8px;
   border-radius: 999px;
@@ -17973,9 +18321,64 @@ button.sq-tiny {
   font-weight: 800;
   line-height: 18px;
   white-space: nowrap;
-  color: var(--rank, var(--muted));
+  color: var(--dv-rank-ink);
   border: 1px solid color-mix(in srgb, var(--rank, var(--muted)) 55%, transparent);
-  background: color-mix(in srgb, var(--rank, var(--muted)) 12%, transparent);
+  background: color-mix(in srgb, var(--rank, var(--muted)) 20%, var(--fd-panel));
+}
+:root[data-theme="light"] .dv-rank {
+  --dv-rank-ink: color-mix(in srgb, var(--rank, var(--muted)) 55%, #000);
+}
+
+/* The FAQ's row of emblems, each at 1× with its tier under it. */
+.faq-emblems {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 6px;
+  margin: 4px 0 12px;
+}
+.faq-emblem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin: 0;
+  width: 64px;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--fd-sub);
+}
+/*
+ * A rank's emblem (components/RankEmblem.tsx; re- for rank emblem): a whole-step cut of the baked sheet, smoothing off.
+ * Its box keeps its size with or without the picture. The top tiers' loops step along their row: a transform, so no
+ * repaint per frame; held on their first frame under reduced motion.
+ */
+.re-box {
+  display: inline-block;
+  flex: none;
+  position: relative;
+  overflow: hidden;
+  vertical-align: middle;
+}
+.re-art {
+  position: absolute;
+  left: 0;
+  top: 0;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+.re-art.re-loop {
+  animation: re-loop var(--re-ms, 2s) steps(var(--re-steps, 8)) infinite;
+}
+@keyframes re-loop {
+  to {
+    transform: translateX(-100%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .re-art.re-loop {
+    animation: none;
+  }
 }
 
 /* The game: the board between the two players' strips, the same width as the board. */
@@ -18017,6 +18420,14 @@ button.sq-tiny {
   flex: none;
   width: 28px;
   height: 28px;
+}
+/* A town sidekick's face (Oct 28): its idle's first frame in the pawn's place, crisp pixel art. */
+.dv-face {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
 }
 .dv-strip-who {
   flex: 1 1 auto;
@@ -18131,6 +18542,16 @@ button.sq-tiny {
 }
 .dv-result-rank {
   font-weight: 800;
+}
+/* A ranked game's line: your rank's emblem (after the game: a division or tier up shows the new one), then the words. */
+.dv-result-line.dv-result-ranked {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.dv-result-words {
+  min-width: 0;
 }
 .dv-result-coins {
   font-weight: 800;
@@ -18294,6 +18715,19 @@ button.sq-tiny {
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
+}
+/* (The emblem at 2×, 96 px, beside the pill and the record.) */
+.dv-profile-row:has(.dv-profile-emblem) {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 12px;
+}
+.dv-profile-words {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
 }
 .dv-rank.dv-rank-big {
   font-size: 15px;
@@ -21070,9 +21504,12 @@ button.sq-tiny {
   }
 }
 
-/* A computer: the moves in the column right of the board, from the board's top to above the God King's head (his 134 px
-   and a gap; BossDock writes the board's size as --board-px on the screen). What the column had before (chat, or from 900
-   to 1099 px the scoreboard) starts under it. */
+/* A computer: the moves in the column right of the board, from the board's top, half as tall as it was (Eric, Oct 28: "slice
+   it in half vertically… flush with the top of the board… a little buffer between the board"), its left edge 13 to 15 px from
+   the board's right edge, the same width: the column's own gap (28 px) and the board's slack in its column move out of the way
+   (BossDock writes the board's size as --board-px on the screen; --gk-column is the column's width). Under it, Boss alone's
+   pawn and the God King stand on the board's bottom line. What the column had before (chat, or from 900 to 1099 px the
+   scoreboard) starts under it. */
 .mv-side {
   display: flex;
   flex-direction: column;
@@ -21097,16 +21534,166 @@ button.sq-tiny {
   flex: 1 1 0;
 }
 @media (min-width: 900px) and (min-height: 600px) {
+  .screen.game:has(> .mv-side) {
+    /* (Half of what it was: the board's less 146 px, at least 160 px; a short window keeps room for a few rows.) */
+    --mv-h: max(120px, calc(var(--board-px, 456px) / 2 - 73px));
+  }
   .screen.game > .mv-side {
     grid-column: 2;
     grid-row: 3;
     align-self: start;
-    height: max(160px, calc(var(--board-px, 456px) - 146px));
+    height: var(--mv-h);
     max-height: none;
+    translate: calc(13px - 28px - (var(--gk-column) - var(--board-px, 456px)) / 2) 0;
   }
   .screen.game:has(> .mv-side) > .under-board,
   .screen.game:has(> .mv-side) > .mini-tower {
-    margin-top: calc(max(160px, var(--board-px, 456px) - 146px) + 12px);
+    margin-top: calc(var(--mv-h) + 12px);
+  }
+}
+/* ---- Boss alone: your pawn beside the God King (Eric, Oct 28; components/BossDock.tsx, YourPawn) ----
+   Your own pawn as your profile wears it, about his size and standing on his line, still apart from a slow slight bob (his
+   breath's own 2.4 s) and one small hop as your move lands (home's hero pawn's hop, quicker). Transforms only. The pawn's art
+   box (--pw) is a little bigger than his so the two look as big as each other: a pawn fills less of its square than he does;
+   its base sits on his feet's line. */
+.you-pawn {
+  --pw: 68px;
+  /* (How high its feet stand above the unit's foot: the God King's crowns' row. A pawn's base is 10% up its square.) */
+  --feet: 12px;
+  /* (Eric, Oct 29: "almost hard to see that it's moving": 1 px.) */
+  --bob: 1px;
+  position: relative;
+  width: 58px;
+  height: 62px;
+  pointer-events: none;
+}
+.you-pawn-bob {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--feet) - var(--pw) * 0.1);
+  display: block;
+  width: var(--pw);
+  height: var(--pw);
+  margin-left: calc(var(--pw) / -2);
+  animation: you-bob 2.4s ease-in-out infinite;
+}
+.you-pawn-hop {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 88%;
+}
+.you-pawn-hop.hop {
+  animation: fd-hop 0.6s linear 1;
+}
+@keyframes you-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(calc(var(--bob) * -1));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .you-pawn-bob,
+  .you-pawn-hop.hop {
+    animation: none;
+  }
+}
+/* A phone's strip: panel, your pawn, the God King (each a column, the pawn's and his 58 px). The panel gives up the pawn's
+   width; his ⚡ and 🐟 and Chub & Chirp's carrot count, which stood just left of him, stand just left of your pawn. His words
+   still open left from him, over the pawn for their few seconds as over the panel. */
+@media (max-width: 899px) and (min-height: 520px) {
+  .screen.game > .boss-dock.dk-strip.dk-pawn {
+    grid-template-columns: var(--dk-left, 0px) minmax(0, 1fr) 58px 58px minmax(0, calc(100% - var(--dk-left, 0px) - var(--dk-w, 100%)));
+  }
+  .boss-dock.dk-strip.dk-pawn > .boss-dock-main {
+    grid-column: 2 / 5;
+  }
+  .boss-dock.dk-strip.dk-pawn > .gk-unit {
+    grid-column: 4;
+  }
+  .boss-dock.dk-strip > .you-pawn {
+    /* (Eric, Oct 29: a phone's pawn sat a little high: its art 6 px lower; the box stays.) */
+    --feet: 6px;
+    grid-column: 3;
+    grid-row: 2;
+    align-self: start;
+  }
+  /* (The pawn's art leaves 10 px free each side of its column, so the panel runs up to it. A row of the list narrower than
+     it was takes less: the container query below, by the panel's own width.) */
+  .boss-dock.dk-strip.dk-pawn > .dk-panel {
+    margin-right: 0;
+    container-type: inline-size;
+  }
+  .boss-dock.dk-strip.dk-pawn > .ult-test.gk-tool {
+    left: calc(var(--dk-left, 0px) + var(--dk-w, 100%) - 116px - 34px);
+  }
+  .boss-dock.dk-strip.dk-pawn > .engine-move.gk-tool {
+    left: calc(var(--dk-left, 0px) + var(--dk-w, 100%) - 116px - 64px);
+  }
+  .boss-dock.dk-strip.dk-pawn > .dk-race-below {
+    right: calc(100% - var(--dk-left, 0px) - var(--dk-w, 100%) + 124px);
+  }
+  .boss-dock.dk-strip.dk-pawn:has(> .gk-tool) > .dk-race-below {
+    right: calc(100% - var(--dk-left, 0px) - var(--dk-w, 100%) + 186px);
+  }
+}
+/* Where the panel is narrower than a capture's row (with its time) needs, the row tightens (320 to 390 px wide phones). */
+@container (max-width: 190px) {
+  .bp .mv-row {
+    gap: 3px;
+    padding: 0 4px;
+  }
+  .bp .mv-who,
+  .bp .mv-who img,
+  .bp .mv-who .avatar {
+    width: 18px;
+    height: 18px;
+  }
+  .bp .mv-no {
+    min-width: 20px;
+  }
+  .bp .mv-time {
+    min-width: 0;
+  }
+}
+@container (max-width: 139px) {
+  .bp .mv-row {
+    gap: 2px;
+    font-size: 11px;
+  }
+  .bp .mv-who,
+  .bp .mv-who img,
+  .bp .mv-who .avatar {
+    width: 16px;
+    height: 16px;
+  }
+  .bp .mv-no {
+    min-width: 18px;
+  }
+  .bp .mv-pc {
+    width: 14px;
+    height: 14px;
+  }
+}
+/* A computer: by the board's corner, on the God King's line (his feet on the board's bottom edge), as far from the board as the
+   boss is on its other side (--gk-off: 26 px with the eval bar, 2 px without plus --bs-out, the boss's 24 px further out then);
+   he stands to its right. */
+@media (min-width: 900px) and (min-height: 600px) {
+  .screen.game > .boss-dock.dk-pawn > .you-pawn {
+    --pw: 168px;
+    --feet: 14px;
+    --bob: 1px;
+    position: absolute;
+    left: calc(100% + var(--gk-off, 2px) + var(--bs-out, 0px));
+    bottom: calc(100% + 10px - 14px);
+    width: 120px;
+    height: 134px;
+  }
+  .screen.game > .boss-dock.dk-pawn > .gk-unit {
+    left: calc(100% + var(--gk-off, 2px) + var(--bs-out, 0px) + 120px);
   }
 }
 /* (The panel beside the God King is narrower than the old table: the average goes, so the names keep their room; the
@@ -21118,4 +21705,60 @@ button.sq-tiny {
 .bp-tower .tower-mini .tower-head span:nth-child(4),
 .bp-tower .tower-mini .t-avg {
   display: none;
+}
+
+/* ---- Folio, the paper crane (components/Folio.tsx; fo- for Folio) ---- */
+/* It casts from the board's top-left corner, in its own frame's shape (97 x 92, its feet at 52, 86): its feet where the others',
+   17% down the board, its middle 10% across. */
+.pm-caster.pm-by-folio {
+  aspect-ratio: 97 / 92;
+  width: 28%;
+  left: -5%;
+  top: -8%;
+}
+/* Beside the board on a computer its wing reaches 45 sprite px toward the board (its frame 97 wide, its feet at 52), the most
+   of any boss: it stands 6 sprite px further out than its feet would put it, so its tip clears the board as the others do.
+   Its head then reaches 58 sprite px out, 14 past Sawyer's 44 that the window's room is sized for (--bs-head). */
+.boss-char.place-side.ch-folio {
+  --bc-shift: calc(-6 * var(--bc-scale));
+}
+.screen.game:has(.board-row > .boss-side .ch-folio) {
+  --bs-head: 14px;
+}
+/* Its banners: ruled lines of its ink-blue page, a vermilion edge (its seal). */
+.fight-banner.power-cut.folio .fb-band {
+  background: repeating-linear-gradient(180deg, #2f3860 0 3.2cqw, #3d4a7c 3.2cqw 3.6cqw);
+  border-color: #d8432a;
+}
+/* Its marks on the board: the ink, the pencil and the crease under the pieces (pw-shadow-board), its paper and its strokes over
+   them (pw-fire-board, inside the power layer): both exactly the board's squares. */
+.board-wrap > .fo-ink {
+  pointer-events: none;
+}
+/* A move its Revision crossed out, in the move list: struck through in its ink, where it stands (the row keeps its size). */
+.mv-row.mv-struck {
+  position: relative;
+  color: #8b93ad;
+}
+.mv-row.mv-struck::after {
+  content: "";
+  position: absolute;
+  left: 30px;
+  right: 8px;
+  top: calc(50% - 1px);
+  height: 2px;
+  background: #7486c0;
+  pointer-events: none;
+}
+/* A computer: the stage and START a bit bigger, the same idea (Eric, Oct 29). */
+@media (min-width: 1024px) {
+  .bs-row-stage {
+    --bs-sw: min(200px, 46cqi);
+  }
+  .bs-start {
+    width: 280px;
+  }
+  .bs-vs {
+    font-size: 32px;
+  }
 }

@@ -25,7 +25,7 @@ import {
   rageOf,
   ragePaused,
   sideToMove,
-  stunnedIn,
+  heldIn,
   triggerUltimate,
   type Battle,
   type EngineLike,
@@ -179,14 +179,14 @@ describe("Moonbeam: its target, \"best\" (the engine-best move's piece)", () => 
   it("a stunned rook can't castle either: the king's castling move with it is left out, and counted out of the moves left", () => {
     const fen = "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4";
     expect(legalMoves(fen)).toContain("e1g1");
-    expect(stunnedIn(fen, "e1g1", ["h1"])).toBe(true);
-    expect(stunnedIn(fen, "e1f1", ["h1"])).toBe(false);
-    expect(stunnedIn(fen, "e1g1", ["a1"])).toBe(false);
-    expect(stunnedIn(fen, "h1g1", new Set(["h1"]))).toBe(true);
+    expect(heldIn(fen, "e1g1", ["h1"])).toBe(true);
+    expect(heldIn(fen, "e1f1", ["h1"])).toBe(false);
+    expect(heldIn(fen, "e1g1", ["a1"])).toBe(false);
+    expect(heldIn(fen, "h1g1", new Set(["h1"]))).toBe(true);
     // (Black's too: a8 for the c-file, h8 for the g-file.)
     const black = "r3k2r/8/8/8/8/8/8/4K3 b kq - 0 1";
-    expect(stunnedIn(black, "e8c8", ["a8"])).toBe(true);
-    expect(stunnedIn(black, "e8g8", ["a8"])).toBe(false);
+    expect(heldIn(black, "e8c8", ["a8"])).toBe(true);
+    expect(heldIn(black, "e8g8", ["a8"])).toBe(false);
     const boss = { id: "moo", crowdSide: "w", crowdMoves: 3, powers: { ...initPowers(1, fen, "w"), turn: 4, moo: { moves: 3, stun: { turn: 4, squares: ["h1"] }, full: null } } } as unknown as BossState;
     const allowed = crowdAllowed(boss, fen)!;
     expect(allowed).not.toContain("e1g1");

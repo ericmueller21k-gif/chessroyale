@@ -9,7 +9,9 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   never numbers a browser makes up: strength, hard finds measured against the crowd, timing. The one exception is the
   look-away count (only the browser can see the page hidden), weak evidence that can add a few points, never ban.
 - **Recording.** During a match the lobby records each human pick's signals (`noteFair`, the `fair` record). Turns a
-  boss power touches (`powerTurn`) don't count. Where a boss's judge changes the numbers (Chub & Chirp's carrot race),
+  boss power touches (`powerTurn`) don't count, nor a crowd move a power crossed out after it was played (Folio's
+  Revision: the runner asks `BossRules.crossedOut` after the move and marks that round `power` in its report;
+  [docs/decisions/2026-10-27-folio-rules.md](../decisions/2026-10-27-folio-rules.md)). Where a boss's judge changes the numbers (Chub & Chirp's carrot race),
   a turn counts only when the engine's best move is also the race's best move, and is then recorded with the engine's
   own numbers, as any turn without the race (the runner's `resolveBoard` and its `fairScored`); the other race turns
   don't count (about 4 in 5 of those not already decided, in the review's sample:
@@ -17,6 +19,18 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   engine's moves on screen that the game showed: a power-up (`powerUp`), or Squads Mercenary's Stockfish token
   (`engineToken`: sanctioned help, skip reason "engineToken"). Squads isn't recorded yet; its matches log which
   choices had a token's lines on screen (`assists`, `isAssisted`), so when it is, they go in with `engineToken`.
+- **Premoves** (chess.com's, Oct 28; [docs/decisions/2026-10-28-arrows-and-premoves.md](../decisions/2026-10-28-arrows-and-premoves.md)):
+  a premove plays the moment the turn opens, so its think time is a round trip, not thinking, and a premoved hard find
+  would read as a fast one. The rule: a pick is marked a premove only if the server had that move before any browser
+  could know the position it's played in. The app tells the lobby its first premove ahead (`premove`), kept only while
+  the player can't pick, under the lobby's premove seal (`premoveSeal`: up as each round opens, its picks live to the
+  watching team, and at every boss step, which the host's browser decides); the round they next pick in takes it as it
+  opens only if it was told under an older seal (`takePremoves`). A pick that plays it, says so (`pick`'s `premove`) and
+  comes within `FAIRPLAY.signals.premoveMs` (2 s) of the clock's start is marked (`FairMove.premove`), and left out of
+  timing only (fast hard finds, the time-difficulty correlation); strength, evidence, streaks and the deep re-check count
+  it as any pick. Anything else is timed as every pick was before premoves (a premove made while the boss thinks, or
+  while the other team chooses, is). The review page shows "(premove)" by its time. 1 v 1 has no timing signal, so
+  nothing there is marked.
 - **Someone who resigns mid-match** (or is gone too long) has their match's signals recorded with their result as
   they leave (`takeLeftResults`, the Durable Object's `saveResults`), as everyone's are at the end.
 - **The suspicion score** turns a player's evidence into a level; every threshold is in `FAIRPLAY`.
@@ -39,7 +53,10 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   one open. Its case does too if it's open or a ban and stricter than the account's (a cleared or closed one stays
   behind), with what opening it does (evidence kept, holds, a ban's identities). A guest's decision never becomes the
   account's (unless it's a ban). Signing in never sheds a case.
-- **Reports** never ban anyone: they raise a player's review priority and record their moves.
+- **Reports** never ban anyone: they raise a player's review priority and record their moves. A report of a line in
+  the town square's chat ("Offensive chat", Oct 28: [chat.md](chat.md)) carries the line's text and time, read from the
+  server's room, and the case page shows it under Reports. The automated reviewer's API gets that report without the
+  words and refuses to let it clear such a case: a moderator reads the line first.
 - **Deleting an account never gets around fair play** (`account-data.ts`; [accounts.md](accounts.md)). A banned or
   in-review account's case, log, hashed identities and device markers stay under its old id; its judged moves, match
   summaries and appeals go. A new account with one of its identities is banned again, or goes to review (`banCheck`).
@@ -71,7 +88,7 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
 | What | Where |
 | --- | --- |
 | Signals, the suspicion score, levels (pure) | `packages/core/src/fairplay.ts`; thresholds `FAIRPLAY` in settings.ts |
-| Recording each human pick's signals | `packages/server/src/lobby.ts` (`noteFair`, the `fair` record only) |
+| Recording each human pick's signals | `packages/server/src/lobby.ts` (`noteFair`, the `fair` record only; premoves told ahead: `premoveAhead`, `sealPremoves`, `takePremoves`) |
 | Reports, cases, bans, appeals, device markers, `eligibleForRanked` | `packages/server/src/fairplay.ts`, tables `fairplay-schema.ts`, emails `fairplay-mail.ts` |
 | The deep re-check | `packages/server/src/fairplay-deep.ts`, `fairplay-engine.ts`; the cron in `wrangler.jsonc`, `scheduled()` in `index.ts` |
 | Enforcing bans | small checks in `index.ts` (PLAY, lobbies) and `lobby-do.ts` (the lobby's hello) |

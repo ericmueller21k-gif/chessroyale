@@ -409,6 +409,39 @@ describe("phase 2 without the God King (Eric, Oct 14: absorbed in the phase chan
     (m as unknown as { stop(): void }).stop?.();
   });
 
+  it("the countdown counts from the boards' first frame on screen, so the 5 is up a whole second however long that frame takes", () => {
+    // (Frames by hand: the boards' first draw takes 120 ms, then the next frame. Counted from before it, the 5 was short.)
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (f: FrameRequestCallback) => frames.push(f));
+    type Solo = Record<string, (...a: unknown[]) => unknown> & { phase2: unknown; phase: { kind: string; at: number } };
+    const pretend = (count: () => void) => ({ start: count, stop() {}, move() {}, outcome: { beaten: false, won: 0, of: 4, decided: false }, state: { boards: [], slow: 0, ultAt: null } });
+    const m = new SoloMatch([], "Ann", { ...DEFAULT_SETTINGS, ...RAID_SETTINGS }) as unknown as Solo;
+    let started = 0;
+    m.phase2 = pretend(() => started++);
+    const t0 = Date.now();
+    m.startSimul!();
+    expect(m.phase).toEqual({ kind: "simul", at: t0 + PHASE_CHANGE.countdownMs });
+    vi.advanceTimersByTime(120);
+    frames.shift()!(0);
+    vi.advanceTimersByTime(16);
+    frames.shift()!(0);
+    expect(m.phase).toEqual({ kind: "simul", at: t0 + 136 + PHASE_CHANGE.countdownMs });
+    vi.advanceTimersByTime(PHASE_CHANGE.countdownMs - 1);
+    expect(started).toBe(0);
+    vi.advanceTimersByTime(1);
+    expect(started).toBe(1);
+    // (No frames at all, a hidden tab: it starts a moment later all the same, never waits for the tab.)
+    const n = new SoloMatch([], "Ann", { ...DEFAULT_SETTINGS, ...RAID_SETTINGS }) as unknown as Solo;
+    let nStarted = 0;
+    n.phase2 = pretend(() => nStarted++);
+    const t1 = Date.now();
+    n.startSimul!();
+    vi.advanceTimersByTime(250 + PHASE_CHANGE.countdownMs);
+    expect(nStarted).toBe(1);
+    expect(n.phase).toEqual({ kind: "simul", at: t1 + 250 + PHASE_CHANGE.countdownMs });
+    for (const x of [m, n]) (x as unknown as { stop(): void }).stop?.();
+  });
+
   it("says nothing as phase 2 begins, as a board is won or lost, or as all four are won; the boss still has his words", () => {
     // (White-box: the moments of SoloMatch's phase 2 that had the God King speak, driven with a pretend Phase2Game.)
     const m = new SoloMatch([], "Ann", { ...DEFAULT_SETTINGS, ...RAID_SETTINGS }) as unknown as Record<string, (...a: unknown[]) => unknown> & { phase2: unknown };

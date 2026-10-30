@@ -10,6 +10,8 @@
  * - `| a | b |` lines: a table, its first row the header (a `|---|` line under it is optional and skipped).
  * - `$ formula`: a formula line, shown on its own in a fixed-width font (consecutive lines make one block).
  * - `> text`: a note, set apart (for "Being tested" and "Planned").
+ * - `!emblems gold-d5 gold-d4 transcendent`: a row of 1 v 1's rank emblems by id (the baked set's), each captioned with its
+ *   tier and division ("Gold 5", "Transcendent").
  * - Inline: `**bold**`, `*italic*`, `[words](#anchor)` or `[words](https://…)`.
  */
 
@@ -21,7 +23,14 @@ export type Block =
   | { kind: "list"; ordered: boolean; items: Inline[][] }
   | { kind: "table"; head: Inline[][]; rows: Inline[][][] }
   | { kind: "formula"; lines: string[] }
-  | { kind: "note"; inlines: Inline[] };
+  | { kind: "note"; inlines: Inline[] }
+  | { kind: "emblems"; items: { id: string; caption: string }[] };
+
+/** An emblem's caption from its id: "gold-d3" → "Gold 3", "transcendent" → "Transcendent". */
+export const emblemCaption = (id: string) => {
+  const [tier = "", d] = id.split("-d");
+  return `${tier.charAt(0).toUpperCase()}${tier.slice(1)}${d ? ` ${d}` : ""}`;
+};
 
 /** An anchor from words: lower case, letters and digits, dashes between. */
 export const slug = (s: string) =>
@@ -103,6 +112,11 @@ export function parse(md: string): Block[] {
       else blocks.push({ kind: "formula", lines: [text] });
       continue;
     }
+    if (line.startsWith("!emblems ")) {
+      flush();
+      blocks.push({ kind: "emblems", items: line.slice(9).trim().split(/\s+/).map((id) => ({ id, caption: emblemCaption(id) })) });
+      continue;
+    }
     if (line.startsWith(">")) {
       flush();
       const text = line.replace(/^>\s?/, "");
@@ -140,6 +154,7 @@ export function plainText(blocks: readonly Block[]): string {
     else if (b.kind === "note") out.push(`[${inlineText(b.inlines)}]`);
     else if (b.kind === "formula") out.push(b.lines.map((l) => `    ${l}`).join("\n"));
     else if (b.kind === "list") out.push(b.items.map((it, n) => `${b.ordered ? `${n + 1}.` : "-"} ${inlineText(it)}`).join("\n"));
+    else if (b.kind === "emblems") out.push(`[Emblems: ${b.items.map((i) => i.caption).join(", ")}]`);
     else {
       const rows = [b.head, ...b.rows].map((r) => r.map(inlineText));
       const widths = rows[0]!.map((_, c) => Math.max(...rows.map((r) => (r[c] ?? "").length)));

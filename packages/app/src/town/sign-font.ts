@@ -65,8 +65,8 @@ export function layout(text: string, fw: number, fh: number): { lines: string[];
   return best;
 }
 
-/** Draws laid-out lines into a new canvas, `s` device pixels a font pixel, centered line by line, in `ink`. */
-export function renderLines(lines: readonly string[], w: number, h: number, s: number, ink: string): HTMLCanvasElement {
+/** Draws laid-out lines into a new canvas, `s` device pixels a font pixel, centered line by line, in `ink` (`lead` font pixels between lines). */
+export function renderLines(lines: readonly string[], w: number, h: number, s: number, ink: string, lead = LEADING): HTMLCanvasElement {
   const c = document.createElement("canvas");
   c.width = w * s;
   c.height = h * s;
@@ -74,7 +74,7 @@ export function renderLines(lines: readonly string[], w: number, h: number, s: n
   g.fillStyle = ink;
   lines.forEach((line, li) => {
     let x = Math.floor((w - lineWidth(line)) / 2);
-    const y = li * (CAP + LEADING);
+    const y = li * (CAP + lead);
     for (const ch of line) {
       if (ch === " ") {
         x += SPACE;

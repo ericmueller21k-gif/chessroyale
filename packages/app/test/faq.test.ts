@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BOSS_BRAIN, BOSS_DIFFICULTY, BOSS_POWERS, BOSS_ROSTER, BOSS_TIERS, CROWD_KNOCKOUTS, CROWD_START, DEFAULT_SETTINGS, LEAVING, RANKED_1V1, RECLUSE_PHASE2, crowdFinalBoss, crowdFinalists, fixedLevel, isPlayable, maiaRatingFor, maiaTopRating } from "@chessroyale/core";
-import { BOSS_BLOCKS, FAQ_DEFAULTS, eloExpected, faqAnchors, faqPage, faqPlainText, faqSections, type FaqSources } from "../src/faq/content.ts";
+import { BOSS_BLOCKS, FAQ_DEFAULTS, eloExpected, faqAnchors, faqPage, faqPlainText, faqSections, ranked1v1, type FaqSources } from "../src/faq/content.ts";
 import { inlineText, linksOf, parse, plainText } from "../src/faq/markdown.ts";
 
 /** The FAQ's text, built from these sources. */
@@ -96,6 +96,26 @@ describe("the FAQ's contents", () => {
     expect(words).not.toMatch(/fake|about 1\.5/i);
     expect(Object.values(o).reduce((a, b) => a + b, 0)).toBe(100);
     expect(words).toContain(def.offset === 0 ? "at the usual strength" : `${Math.abs(def.offset)} ${def.offset < 0 ? "under" : "over"} the usual strength`);
+    expect(words).not.toMatch(/undefined|NaN|\$\{/);
+  });
+
+  it("Folio's block (Draft, Crease and Revision) is ready for when its art is wired: every number from the settings, \"it\" throughout", () => {
+    const def = BOSS_ROSTER.find((b) => b.id === "folio")!;
+    const words = BOSS_BLOCKS.folio!(BOSS_POWERS, def);
+    const p = BOSS_POWERS;
+    expect(words).toContain("game so far");
+    expect(words).toContain(`from turn ${p.draftFirst}, every ${p.draftEvery} turns`);
+    expect(words).toContain(`You have ${p.draftWindow} moves to end that attack`);
+    expect(words).toContain(`it can't move for ${p.foldTurns} turns`);
+    expect(words).toContain(`for ${p.creaseTurns} turns: none of your pieces may move across it`);
+    expect(words).toContain("its own pieces cross it freely");
+    expect(words).toContain("The piece is the most valuable one");
+    expect(words).toContain(`nearest ${p.creaseLossMin} to ${p.creaseLossMax} pawns as the board stands then, never more`);
+    expect(words).toContain("it checks that again as the crease falls: if the board has changed so that it would, the crease doesn't fall");
+    expect(words).toContain(`its move cost it ${p.revisionDrop} pawns or more`);
+    expect(words).toContain(`Never before turn ${p.revisionFrom}`);
+    expect(words).toContain(def.offset === 0 ? "at the usual strength" : `${Math.abs(def.offset)} ${def.offset < 0 ? "under" : "over"} the usual strength`);
+    expect(words).not.toMatch(/\b(he|his|him)\b/i);
     expect(words).not.toMatch(/undefined|NaN|\$\{/);
   });
 
@@ -600,6 +620,12 @@ describe("the FAQ's text format", () => {
     expect(inlineText(blocks[1]!.kind === "para" ? blocks[1]!.inlines : [])).toBe("Some bold and a link.");
   });
 
+  it("a row of rank emblems by id, each captioned with its tier and division", () => {
+    const [b] = parse("!emblems gold-d3 transcendent");
+    expect(b).toEqual({ kind: "emblems", items: [{ id: "gold-d3", caption: "Gold 3" }, { id: "transcendent", caption: "Transcendent" }] });
+    expect(plainText([b!])).toBe("[Emblems: Gold 3, Transcendent]");
+  });
+
   it("a heading without an id gets one from its words", () => {
     expect(parse("### The God King's save")[0]).toEqual({ kind: "heading", id: "the-god-king-s-save", text: "The God King's save" });
   });
@@ -613,9 +639,17 @@ describe("the FAQ: 1 v 1", () => {
     expect(t).toContain("Bullet and Blitz make Bullet 2+1, Blitz and Rapid Blitz 5+3. Bullet against Rapid makes Blitz 3+2.");
     expect(t).toContain(`you both have ${RANKED_1V1.voteSeconds} seconds to drag your pawn`);
     expect(t).toContain(`Each side has ${RANKED_1V1.firstMoveSeconds} seconds for its first move`);
-    expect(t).toContain("Iron, Bronze, Silver, Gold, Platinum, Emerald and Diamond");
+    expect(t).toContain("Wood, Silver, Gold, Paragon, Illustrious, Sublime and Radiant, each with divisions 5 (the lowest) to 1. A division is 80 rank points (RP)");
+    expect(t).toContain("nobody goes below Wood 5 with 0 RP");
+    expect(t).toContain("Pearlescent, the 500 highest ranks, and above it Transcendent, the 100 highest, both from 80 RP in Radiant 1");
+    expect(t).toContain("outside the top 500, you stay Radiant 1 and your RP keeps counting past 80");
+    expect(ranked1v1(RANKED_1V1)).not.toMatch(/\b(Iron|Bronze|Platinum|Emerald|Diamond|Master|Grandmaster|Champion)\b/);
+    // Each tier's emblem, a division's steps, and the top two's.
+    expect(t).toContain("[Emblems: Wood 5, Silver 5, Gold 5, Paragon 5, Illustrious 5, Sublime 5, Radiant 5]");
+    expect(t).toContain("[Emblems: Gold 5, Gold 4, Gold 3, Gold 2, Gold 1]");
+    expect(t).toContain("[Emblems: Pearlescent, Transcendent]");
     expect(t).toContain(`your first ${RANKED_1V1.placements.games} games show "Placement 1/${RANKED_1V1.placements.games}"`);
-    expect(t).toContain("at most Diamond 4.");
+    expect(t).toContain("at most Radiant 5.");
     expect(t).toContain(`about +${RANKED_1V1.points.perGame} for a win and −${RANKED_1V1.points.perGame} for a loss against a player at your level`);
     expect(t).toContain(`${RANKED_1V1.coins.perMinute.win} coins a minute for a win`);
     expect(t).toContain(`Up to ${RANKED_1V1.coins.perDay} games a day pay coins`);
@@ -624,5 +658,21 @@ describe("the FAQ: 1 v 1", () => {
     const changed = text({ ...FAQ_DEFAULTS, ranked: R });
     expect(changed).toContain("you both have 7 seconds");
     expect(changed).toContain("Blitz and Rapid Blitz 4+3");
+  });
+});
+
+describe("the FAQ's chat entry (the town square's typed chat, Oct 28)", () => {
+  it("says what the town square allows, from the settings, and that a reported message is the one thing kept", () => {
+    const s = section("fair-play");
+    expect(s).toContain("except in the town square, where signed-in players type: up to 80 characters, one message every 15 seconds");
+    expect(s).toContain("messages aren't kept (if someone reports one, the report keeps its words and when it was said, for a moderator to read)");
+    expect(s).toContain("tap a message in the town square to report it");
+  });
+});
+
+describe("the FAQ's rating entry (Eric, Oct 28)", () => {
+  it("Your rating says when your ranking changes, from the settings: 30 real players (15 in a raid), or the share's own counts (the sentence home's ⓘ carried until Oct 28)", () => {
+    expect(text()).toContain("Your ranking changes only in a match with at least 30 real players (15 in a raid). Solo games never change it.");
+    expect(text({ ...FAQ_DEFAULTS, rankedShare: 0.2 })).toContain("Your ranking changes only in a match with at least 20 real players (10 in a raid).");
   });
 });

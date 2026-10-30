@@ -36,6 +36,20 @@ export const other = (s: Side): Side => (s === "w" ? "b" : "w");
 export const from = (m: string) => m.slice(0, 2);
 export const to = (m: string) => m.slice(2, 4);
 
+/**
+ * A held piece (`held`: a square of it) takes no part in `move` (`fen`: before it): the piece moving is held, or the move
+ * is castling and the rook it moves is held (its corner on the king's rank: the h-file for a king's step to the g-file,
+ * the a-file for one to the c-file). One rule for every power that holds the crowd's pieces (`BossRules.held`).
+ */
+export function heldIn(fen: string, move: string, held: ReadonlySet<string> | readonly string[]): boolean {
+  const has = (sq: string) => ("has" in held ? held.has(sq) : held.includes(sq));
+  if (has(from(move))) return true;
+  const f0 = move.charCodeAt(0);
+  const f1 = move.charCodeAt(2);
+  if (Math.abs(f1 - f0) !== 2 || move[1] !== move[3] || pieceAt(fen, from(move))?.type !== "k") return false;
+  return has(`${f1 > f0 ? "h" : "a"}${move[1]}`);
+}
+
 /** Material on the board for one side (pawns 1, knights and bishops 3, rooks 5, queens 9). */
 export function materialOf(fen: string, side: Side): number {
   let total = 0;
@@ -307,7 +321,14 @@ export interface BossRules {
   everyTurn?(next: BossPowerState, t: TurnContext): void;
   /** The passive's step. */
   passive(next: BossPowerState, t: TurnContext): void;
-  /** Its limits on the crowd's moves this turn (the dispatcher lifts them for the turn if none are left). */
+  /**
+   * The crowd's pieces its powers hold this crowd turn (`fen`: the crowd to move), by square: Ginger's frozen piece and
+   * his blizzard's ice, Moo's stunned pieces, Folio's folded piece. One rule for all of them (Eric, Oct 27): the
+   * dispatcher leaves out a held piece's moves and castling with a held rook (`heldIn`), and lifts it for the turn with
+   * the other limits if no move is left. A power that holds pieces says so here, never in `crowdFilter`.
+   */
+  held?(boss: BossState, fen: string): readonly string[];
+  /** Its other limits on the crowd's moves this turn (the dispatcher lifts them for the turn if none are left). */
   crowdFilter?(allowed: string[], boss: BossState, fen: string): string[];
   /** What stops the boss's own moves now (a pie, a toy block), or null: nothing does. */
   bossStops?(boss: BossState): ((move: string, fen: string) => boolean) | null;
@@ -339,8 +360,16 @@ export interface BossRules {
     rank(boss: BossState, top: readonly MoveScore[], fen: string): MoveScore[];
     evaluation<E extends JudgedEvaluation>(boss: BossState, evaluation: E, fen: string): E;
   };
-  /** In the match: what happens after any crowd move (G-REX's fire burns what was left on a tile ablaze). */
-  afterCrowdMove?(b: Battle, move: string | null): void;
+  /**
+   * In the match: what happens after any crowd move (G-REX's fire burns what was left on a tile ablaze). `judged`: the
+   * judge's numbers for it (a scored round's; none for a move a power played for the crowd), which Folio's Revision reads.
+   */
+  afterCrowdMove?(b: Battle, move: string | null, judged?: JudgedMove | null): void;
+  /**
+   * The crowd's move just played was crossed out (Folio's Revision: the board went back to before the boss's last move):
+   * its round doesn't count for fair play (the runner marks it `power` after the move).
+   */
+  crossedOut?(boss: BossState): boolean;
   /** In the match: a crowd turn has just been set up (prepareTurn): the Hidden Boss's bullet clock sets every bank as it comes. */
   turnBegun?(b: Battle): void;
   /**
@@ -428,6 +457,23 @@ export interface BossMoveExtras {
    */
   hoops?: string | null;
   hoopsGain?: number | null;
+  /**
+   * Folio's Crease, wanted with this move (the warning, or the trigger, as the crowd's next turn begins): its line after the
+   * move (creasePick; the host's answer online), checked as it's kept (creaseCheck), and what it costs the crowd by that
+   * engine (null: not known here).
+   */
+  crease?: string | null;
+  creaseLoss?: number | null;
+}
+
+/** What the judge said of the crowd's move just played (the runner's finishRound), for a boss's afterCrowdMove. */
+export interface JudgedMove {
+  /** The crowd's expected score with its best move (the round's highest scored). */
+  best: number;
+  /** Its expected score after the move it played. */
+  played: number;
+  /** The God King played it. */
+  king?: boolean;
 }
 
 /** A board's evaluation as the judge works it out: its best move, that move's expected score, and every move's. */
@@ -490,7 +536,7 @@ export function warnThenUnleash(next: BossPowerState, t: TurnContext): boolean {
 export type BossLastMove = { move: string; san: string; staggered?: boolean; captured?: string; through?: StopReason };
 
 /** The power fields `BossRules.stopReason` reads: the same in the match's state and in the screens' view. */
-export type StopFields = Partial<Pick<BossPowerState, "cut" | "boardSaw" | "pies" | "block">> & { camo?: { square: string | null } | null; garden?: { plants: readonly { square: string }[] } | null; hoops?: { blocks: readonly string[] } | null };
+export type StopFields = Partial<Pick<BossPowerState, "cut" | "boardSaw" | "pies" | "block" | "crease">> & { camo?: { square: string | null } | null; garden?: { plants: readonly { square: string }[] } | null; hoops?: { blocks: readonly string[] } | null };
 
 /**
  * What a boss's battle code (its moments in a match: the funhouse, Lights out, the bounce…) may use of the match

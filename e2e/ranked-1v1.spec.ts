@@ -1,5 +1,5 @@
 import { expect, type Browser, type Page } from "@playwright/test";
-import { RANKED_1V1 } from "@chessroyale/core";
+import { RANKED_1V1, rankView } from "@chessroyale/core";
 import { BOARD_SEL, named, test, watchFor, watchSpans } from "./helpers.ts";
 
 /**
@@ -184,6 +184,27 @@ test("resigning, then a flag: Play again queues both again; each game counts", a
   await expect(black.locator(".dv-result-why")).toHaveText(/ ran out of time\.$/);
   await expect(white.locator(".dv-clock.low").first()).toBeVisible();
   for (const p of [white, black]) await expect(p.locator(".dv-result-rank")).toHaveText("Placement 2/5", { timeout: 15_000 });
+});
+
+test("every change is drawn, even in the same millisecond as the last draw (the clock held still from the last move): the result, then the rank", async ({ browser }) => {
+  // (The game screen once redrew by setting the time as its state, and Preact skips a state set to the value it holds: a
+  // change in the same millisecond as the clocks' last tick wasn't drawn, and "Updating your rank…" stayed up for good.
+  // A held clock makes every change land in the same millisecond. docs/decisions/2026-10-28-two-flaky-tests.md.)
+  test.setTimeout(2 * 60_000);
+  const a = await player(browser, "Ann Still");
+  const b = await player(browser, "Bo Still");
+  await meet(a, b, poolName(), "&clock=6");
+  await waitForPlay(a, b);
+  const { white, black } = await bySide(a, b);
+  await tapMove(white, "e2e4");
+  await expect(black.locator(".dv-status")).toContainText("Your first move", { timeout: 10_000 });
+  await tapMove(black, "e7e5");
+  await expect(white.locator(".dv-status")).toHaveText("Your move", { timeout: 10_000 });
+  for (const p of [white, black]) await p.clock.setFixedTime(await p.evaluate(() => Date.now()));
+  await resign(white);
+  await expect(black.locator(".dv-result-title")).toHaveText("You won");
+  await expect(white.locator(".dv-result-why")).toHaveText("You resigned.");
+  for (const p of [white, black]) await expect(p.locator(".dv-result-rank")).toHaveText("Placement 1/5", { timeout: 15_000 });
 });
 
 test("a first move that never comes: the game is aborted, nobody's rank moves", async ({ browser }) => {
@@ -374,10 +395,11 @@ test("the stage: your pawn on the left platform while searching; the opponent's 
 
 test("the stage fits: 320, 360 and 390 px phones (a computer at 1280), the longest names and ranks, no sideways scroll", async ({ browser }) => {
   test.setTimeout(2 * 60_000);
-  // The widest a name (16 characters) and a rank can be ("Grandmaster · 499 RP"), for both players: your own from
-  // the server's answer, the opponent's (and the game's timing, held in the versus moment) from the game's.
+  // The widest a name (16 characters) and a rank can be ("Transcendent · 1199 RP", with its emblem), for both players:
+  // your own from the server's answer, the opponent's (and the game's timing, held in the versus moment) from the game's.
   const WIDE = "WWWWWWWWWWWWWWWW";
-  const gm = { placement: null, tier: "Grandmaster", division: null, points: 499, ladder: 2299, color: "#f87171", label: "Grandmaster · 499 RP" };
+  const gm = rankView({ games: 40, ladder: RANKED_1V1.topFloor + 1199, place: 1 });
+  expect(gm.label).toBe("Transcendent · 1199 RP");
   const a = await player(browser, "Ann Fit");
   const b = await player(browser, "Bo Fit");
   await a.route(/\/api\/me(\?|$)/, async (route) => {
@@ -418,18 +440,18 @@ test("the stage fits: 320, 360 and 390 px phones (a computer at 1280), the longe
               const vw = document.documentElement.clientWidth;
               const vh = document.documentElement.clientHeight;
               const bad: string[] = [];
-              const sel = ".dv-st-head h2, .dv-st-spot, .dv-st-name, .dv-st-rank, .dv-st-finding, .dv-st-vs, .dv-st-line, .dv-few, .dv-few .btn, .dv-cancel";
+              const sel = ".dv-st-head h2, .dv-st-spot, .dv-st-emblem, .dv-st-name, .dv-st-rank, .dv-st-finding, .dv-st-vs, .dv-st-line, .dv-few, .dv-few .btn, .dv-cancel";
               for (const e of document.querySelectorAll<HTMLElement>(sel)) {
                 const r = e.getBoundingClientRect();
                 const name = `${e.className} "${e.textContent?.slice(0, 20)}"`;
                 if (r.left < -0.5 || r.right > vw + 0.5) bad.push(`${name}: sideways ${Math.round(r.left)}-${Math.round(r.right)} of ${vw}`);
                 if (r.top < -0.5 || r.bottom > vh + 0.5) bad.push(`${name}: below ${Math.round(r.bottom)} of ${vh}`);
-                if (e.scrollWidth > e.clientWidth + 1 && !e.classList.contains("dv-st-spot")) bad.push(`${name}: cut ${e.scrollWidth} > ${e.clientWidth}`);
+                if (e.scrollWidth > e.clientWidth + 1 && !e.classList.contains("dv-st-spot") && !e.classList.contains("re-box")) bad.push(`${name}: cut ${e.scrollWidth} > ${e.clientWidth}`);
               }
-              // The names and ranks never under "VS".
+              // The names, ranks and emblems never under "VS".
               const vs = document.querySelector(".dv-st-vs")?.getBoundingClientRect();
               if (vs)
-                for (const e of document.querySelectorAll(".dv-st-name, .dv-st-rank")) {
+                for (const e of document.querySelectorAll(".dv-st-name, .dv-st-rank, .dv-st-emblem")) {
                   const r = e.getBoundingClientRect();
                   if (r.left < vs.right && r.right > vs.left && r.top < vs.bottom && r.bottom > vs.top) bad.push(`"VS" over ${e.className}`);
                 }
@@ -446,7 +468,7 @@ test("the stage fits: 320, 360 and 390 px phones (a computer at 1280), the longe
   // Searching, with "Few players online right now" (after 1 s here) above Cancel: the tallest the search gets.
   await a.goto(`/1v1?nolanding&pool=${pool}&fewAfter=1`);
   await expect(a.locator(".dv-st-you .dv-st-name")).toHaveText(WIDE);
-  await expect(a.locator(".dv-st-you .dv-st-rank")).toHaveText("Grandmaster · 499 RP");
+  await expect(a.locator(".dv-st-you .dv-st-rank")).toHaveText("Transcendent · 1199 RP");
   await expect(a.locator(".dv-few")).toBeVisible({ timeout: 10_000 });
   await fits("searching");
   // Found (held in the versus moment): both pawns, names and ranks at their widest, VS between.

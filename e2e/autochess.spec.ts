@@ -865,11 +865,17 @@ test("each custom pawn hops once, then waits a random 7 to 10 s (its own draws, 
   const errors = watchErrors(page);
   // (A fake clock: seven to ten seconds take no time. The screen's own steps run on it too: the buy step is 30 s, so what follows stays inside it.)
   await recordHops(page);
+  // Paused before the page loads, then stepped: every timer, the pawns' first hops included, fires at its own time. (Pausing
+  // after the screen was up jumped the clock a second, and Playwright fires every timer due in a jump at its end: two first
+  // hops drawn inside that second both landed on its last tick, measured as one moment. docs/decisions/2026-10-28-two-flaky-tests.md.)
   await page.clock.install();
+  await page.clock.pauseAt(Date.now() + 1000);
   await page.goto("/autochess?seed=9&intro=0");
+  for (let i = 0; i < 200 && (await root(page).getAttribute("data-phase", { timeout: 100 }).catch(() => null)) !== "buy"; i++) await page.clock.runFor(50);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  // (Once the screen's effects have run, so the pawns' first waits have started by then.)
+  await page.clock.runFor(200);
   const mountedAt = await page.evaluate(() => performance.now());
-  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
   let posed = false;
   let idle = 0;
   const pose = async (who: string, ms: number) =>

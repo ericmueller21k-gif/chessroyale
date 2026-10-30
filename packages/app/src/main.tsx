@@ -8,15 +8,20 @@ import { DuelQueueBar } from "./components/DuelQueueBar.tsx";
 import { startStatus } from "./status.ts";
 import { setUpInstall } from "./install.ts";
 import { watchErrors } from "./problems.ts";
+import { watchStaleChunks } from "./stale.ts";
 import { audioUnlocked, prepareAudio, unlockAudio } from "./sound.ts";
 import { watchTheme } from "./theme.ts";
 import { applyBoardColors } from "./prefs.ts";
 import { setBannerPlusSource } from "@chessroyale/core";
 import { bannerPlusAsked } from "./test-switches.ts";
 import "./styles.css";
+// (A computer's board as big as the window's height: after styles.css, whose computer sizes it takes over.)
+import "./board-size.css";
 
 // Errors on this device are reported (problems.ts), from the start.
 watchErrors();
+// A chunk of an older version gone after a deploy (opening the town square): the page loads again (stale.ts).
+watchStaleChunks();
 setUpInstall();
 // Light or dark: the page already shows the right one (index.html's script); from here on it follows the device
 // while nothing is picked.

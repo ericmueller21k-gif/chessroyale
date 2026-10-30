@@ -77,7 +77,7 @@ export interface BossInfo {
 }
 
 /** The boss powers there are: a passive (or opening) and an ultimate per boss. */
-export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint" | "moonbeam" | "fullmoon" | "seeds" | "water" | "balloons" | "hoops";
+export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint" | "moonbeam" | "fullmoon" | "seeds" | "water" | "balloons" | "hoops" | "draft" | "crease" | "revision";
 /**
  * Every power, for the test switch (?power=<id>: a boss's ultimate comes early; its passive as usual, but for Wrangler's
  * drag and Alfil's Tusks, which come sooner and more often, the hopper's Leapfrog, whose battle starts with a hop due
@@ -87,9 +87,12 @@ export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | 
  * begins (the Full Moon at the start of his turn after it). The hippo gardener's Seeds count from the battle's start whatever
  * the switch says; ?power=water warns as the second turn begins (the watering at the start of his turn after it; ?seeds=N for
  * a set count). The circus tiger's Balloons come whatever the switch says (?balloon=<shape> and ?stage=N force his balloons);
- * ?power=hoops warns as the second turn begins (the cast after his move on his turn after it).
+ * ?power=hoops warns as the second turn begins (the cast after his move on his turn after it). Folio's ?power=draft brings its
+ * Draft from turn 2 and tries again every turn once a mark is gone; ?power=crease warns as the second turn begins (the
+ * crease lands as the third does); ?power=revision, its once-a-battle third power (not on its BOSS_ROSTER line), comes at
+ * the first crowd move it may follow (turn 5 on), whatever the evaluation says.
  */
-export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops"];
+export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops", "draft", "crease", "revision"];
 
 /**
  * A raid boss: the base template every boss fills in. Its powers' rules (which moves are allowed, what happens after
@@ -218,6 +221,16 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // scores 0.12 in 44 moves at a 10 s pick with 2.55 casts a battle (Oct 24; 0.35 when the hoops were his whole turn, at
   // rageSpeed 1.6; reports/tiger-sim.md).
   { id: "tiger", name: TIGER_NAME, icon: "🐯", kit: "Tiger", offset: -250, powers: { passive: "balloons", ultimate: "hoops" } },
+  // Folio, a paper crane folded from a page of handwriting (the director's boss, Oct 26; "it" everywhere): Draft, an ink
+  // mark under the most valuable of the crowd's pieces that one of its pieces attacks, folded for 4 turns unless the crowd
+  // answers it within 2 of its moves; Crease, the board folded along one line the crowd's pieces don't cross for 4 turns
+  // (its own do: it folds the board toward itself), shown the turn before; and once a battle, Revision: its own blunder
+  // and the crowd's punishing reply crossed out, the engine's best move in its place (bosses/folio.ts; docs/decisions/2026-10-27-folio-rules.md). Live with its art
+  // (docs/decisions/2026-10-27-folio-wired.md; the test links `?boss=folio`, `&power=draft`, `&power=crease`, `&power=revision`). Its
+  // offset: +150, over the usual strength, the only boss so: a final boss (the director's calls, Oct 27: offset 0 gave the
+  // crowd 0.33 in 60 battles, above 0.30; +150, 0.28 in 50 moves, nearer the aim of 0.10 to 0.25; the first sim, at −250
+  // and the sheet's rules, put it among the easiest: reports/folio-sim.md).
+  { id: "folio", name: "Folio", icon: "📜", kit: "Folio", offset: 150, powers: { passive: "draft", ultimate: "crease" } },
   { id: "recluse", name: "Hidden Boss", icon: "📕", kit: "Hidden Boss", offset: 0, powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true, crowdFinal: true, the: true, levelUnknown: true },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },
   { id: "archer", name: "The Bone Archer", icon: "💀", kit: null, offset: 0, powers: null },
@@ -616,6 +629,14 @@ export interface BossPowerState {
    * crowd move after which they were thrown, the crowd moves they still stand for, and what the cast gained him.
    */
   hoops?: HoopsState | null;
+  /**
+   * Folio's Crease while it holds (its ultimate): the line the crowd's pieces don't cross (creaseLines' code: "d|e" between
+   * the d and e files, "4|5" between ranks 4 and 5), from crowd turn `at` through `until`. Kept here, as Sawyer's board saw, so the
+   * screens' stopReason reads the same field.
+   */
+  crease?: Crease | null;
+  /** Folio's other powers (its Draft marks and folds, the Crease's line on its way, Revision). */
+  folio?: FolioState | null;
   /** What happened as this turn began, for the screens' moments (the same for everyone). */
   events: PowerEvent[];
 }
@@ -769,6 +790,52 @@ export interface HoopsState {
 }
 
 /**
+ * Folio's Crease in force: its line (creaseLines' code), from crowd turn `at` through `until`; `side`, the side whose pieces
+ * it stops (the crowd's: Folio's pieces cross it).
+ */
+export interface Crease {
+  line: string;
+  at: number;
+  until: number;
+  side: "w" | "b";
+  /** What it cost the crowd by the engine that picked it (pawns; null or missing: not known here, the host's online). */
+  loss?: number | null;
+}
+
+/**
+ * Folio's powers in a battle (id folio; the chess package's bosses/folio.ts):
+ * - `mark`: the Draft's ink mark, set as crowd turn `at` began: the crowd's piece (`square`, its kind `piece`), the
+ *   Folio piece attacking it (`attacker`, its kind `by`) and the squares between them (`line`, none for a knight, a pawn
+ *   or a king next to it); the crowd answers it by the end of crowd turn `until` (draftWindow of its own moves), or the
+ *   piece is folded. Null: none.
+ * - `folded`: the piece folded (frozen) after the crowd's last move left the attack standing: its square and kind,
+ *   folded through crowd turn `until` (foldTurns of them), as crowd turn `at` began. Null: none.
+ * - `next`: the Crease's line the engine picked with Folio's move for crowd turn `turn` (the warning comes then if the
+ *   meter is full), and what it costs the crowd by that engine (pawns; null: not known here). `warned`: the line the
+ *   warning showed, which lands as the next crowd turn begins.
+ * - `last`: Folio's last move as it played it, for Revision: the move, the position before it, its ply, the crowd turn
+ *   it came after (crowdMoves then), the crowd's judged expected score before it (its `judged` then), and whether the
+ *   God King's strike staggered it.
+ * - `revision`: Revision, once it has come: the crowd move it followed (`at`: crowdMoves after it), the two moves crossed
+ *   out (Folio's, then the crowd's) and their names, the position it went back to and its ply on the board (a base), the
+ *   judged numbers it came on (Folio's loss on its move and after the crowd's reply, in pawns; null: the test switch),
+ *   and Folio's move in their place once played (`move`, `san`); `revisions`, how many this battle (revisionMax).
+ * - Counts for the sims and the screens: marks made, folds, marks answered (the attack ended after a crowd move).
+ */
+export interface FolioState {
+  mark: { square: string; piece: string; attacker: string; by: string; line: string[]; at: number; until: number } | null;
+  folded: { square: string; piece: string; at: number; until: number } | null;
+  next: { turn: number; line: string; loss: number | null } | null;
+  warned: { line: string; loss: number | null } | null;
+  last: { move: string; fen: string; ply: number; at: number; before: number | null; staggered: boolean } | null;
+  revision: { at: number; moves: [string, string]; sans: [string, string]; fen: string; ply: number; cost: number | null; drop: number | null; move?: string; san?: string } | null;
+  revisions: number;
+  drafts: number;
+  folds: number;
+  answered: number;
+}
+
+/**
  * The Big Bounce, once it has happened: after which crowd move (crowdMoves), the position before it (the crowd's move
  * just played, him to move), the crowd's pieces it moved (each from its square to an empty one; none: nothing moved),
  * where his three bounces landed (each a 2x2 block, by its lower-left square from White's side), and the crowd's loss
@@ -820,9 +887,9 @@ export interface SawCut {
  * (a limit that would leave no move lifts for that turn). `paint`: Smudgy's hidden rook makes a move of yours illegal
  * that the board as you see it allows (your king into its line, a piece it pins); never a move of his. `plant`: the hippo
  * gardener's plain plant, as a toy block (either side). `hoop`: the circus tiger's burning hoop, either side (nothing crosses its
- * wall, and no check across it).
+ * wall, and no check across it). `crease`: Folio's Crease, the crowd's moves only (none across its line; Folio's pieces cross it).
  */
-export type StopReason = "boardsaw" | "cut" | "pie" | "block" | "paint" | "plant" | "hoop";
+export type StopReason = "boardsaw" | "cut" | "pie" | "block" | "paint" | "plant" | "hoop" | "crease";
 
 /** Wrangler's long pull: his center pawn's double step (`from` to `via`), lassoed on to `to`, as crowd turn `turn` begins. */
 export interface LongPull {
@@ -1146,6 +1213,14 @@ export interface BurnEvent {
  * for their length, and a kind has one length and one view.) `hoops`, his cast (after his move: as the crowd's turn after
  * it begins, after his move shows; `blocks` in throw order), the one the server waits for; `hoopsOut`, the hoops gone, as the crowd's second
  * move after the cast lands (while he thinks; `blocks`).
+ * Folio's (one at a time: the Draft waits a turn rather than share one): `draft`, its ink mark as the crowd's turn after
+ * its move begins (`square`: the crowd's piece; `squares`: the attack's line, the Folio piece first and the marked piece
+ * last); `fold`, the marked piece folded, at the start of its turn as the crowd's move that left the attack standing
+ * lands (while it thinks; `square`); `creaseWarn`, the Crease's line shown on the warning's turn (with `warn`; `line`);
+ * `crease`, the Crease landing as the crowd's next turn begins (`line`); `creaseEnd`, unfolded as the crowd's turn after
+ * its last begins (`line`); `revision`, at the start of its turn as the crowd's punishing move lands (while it thinks:
+ * the board goes back; `moves`: its move and the crowd's, crossed out; its new move is its next, the view's `revision`).
+ * The brief's `crease-warn` and `crease-end` are written as one word here, as every kind is.
  */
 export type PowerEventKind =
   | "freeze"
@@ -1201,7 +1276,13 @@ export type PowerEventKind =
   | "balloonBigCheer"
   | "wince"
   | "hoops"
-  | "hoopsOut";
+  | "hoopsOut"
+  | "draft"
+  | "fold"
+  | "creaseWarn"
+  | "crease"
+  | "creaseEnd"
+  | "revision";
 export interface PowerEvent {
   kind: PowerEventKind;
   turn: number;
@@ -1236,6 +1317,10 @@ export interface PowerEvent {
   color?: number;
   /** His hoops: each block by its corner, in throw order. */
   blocks?: string[];
+  /** Folio's Crease: its line (creaseLines' code, "d|e" or "4|5"). */
+  line?: string;
+  /** Folio's Revision: the two moves crossed out, its own and then the crowd's (UCI). */
+  moves?: string[];
 }
 
 /** The settings behind the God King's Last Stand. */

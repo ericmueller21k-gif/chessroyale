@@ -11,7 +11,6 @@ test("Boingo the Clown: a raid boss as a character, across the board from the Go
   const phone = info.project.name === "phone";
   await page.goto("/?debug&pace=quick&clock=20&bossMoves=3");
   await bossAloneFromHome(page, "Boingo the Clown");
-  await page.getByRole("dialog", { name: "Boss alone" }).getByRole("button", { name: /Boingo the Clown/ }).click();
 
   // His entrance, with his portrait on the card instead of an emoji.
   await expect(page.locator(".boss-intro .boss-portrait")).toBeVisible({ timeout: 30_000 });
@@ -39,11 +38,16 @@ test("Boingo the Clown: a raid boss as a character, across the board from the Go
   } else {
     expect(box.x + box.width).toBeLessThanOrEqual(board.x);
     expect(box.y + box.height).toBeGreaterThan(board.y + board.height / 2);
-    // His figure (the button): right of the board, his middle as far from it as the boss's, their feet level.
+    // His figure (the button): right of the board, with your pawn between it and him since Oct 28 (Eric: "the king stands to the
+    // right of you, your piece"; docs/decisions/2026-10-28-your-pawn-on-board.md), their feet level with the boss's. (The mirror
+    // of the boss's distance from the board, which was his, is your pawn's now.)
     const fig = (await page.locator(".gk-unit .gk-unit-btn").first().boundingBox())!;
+    const pawn = (await page.locator(".you-pawn").boundingBox())!;
     const wrap = (await page.locator(".board-wrap").first().boundingBox())!;
-    expect(fig.x).toBeGreaterThanOrEqual(board.x + board.width);
-    expect(Math.abs(fig.x + fig.width / 2 - (wrap.x + wrap.width) - (wrap.x - (box.x + box.width / 2)))).toBeLessThanOrEqual(2);
+    expect(pawn.x, "your pawn by the board's corner").toBeGreaterThanOrEqual(board.x + board.width);
+    // (Your pawn now mirrors the boss: its middle as far from the board as his, as the God King's was, the director's note, Oct 28.)
+    expect(Math.abs(pawn.x + pawn.width / 2 - (wrap.x + wrap.width) - (wrap.x - (box.x + box.width / 2))), "your pawn's middle as far from the board as the boss's").toBeLessThanOrEqual(2);
+    expect(fig.x, "the God King right of your pawn").toBeGreaterThanOrEqual(pawn.x + pawn.width - 1);
     expect(Math.abs(fig.y + fig.height - (box.y + box.height))).toBeLessThanOrEqual(2);
     const status = (await page.locator(".boss-dock-main").boundingBox())!;
     expect(status.y).toBeGreaterThanOrEqual(wrap.y + wrap.height);

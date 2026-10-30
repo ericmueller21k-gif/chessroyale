@@ -27,8 +27,9 @@ import {
 import { MatchChat } from "./chat.ts";
 import { account } from "./account.ts";
 import { maiaAllowed } from "./boss-brain.ts";
-import { ownEngine } from "./engine.ts";
-import { startMaia } from "./maia.ts";
+import { ownEngine, pauseEngines } from "./engine.ts";
+import { prefetchMaia, startMaia } from "./maia.ts";
+import { MaiaGate } from "./maia-gate.ts";
 import { crumb } from "./problems.ts";
 import { testParams, testSwitchesAllowed } from "./test-switches.ts";
 
@@ -48,6 +49,8 @@ export interface DuelSide {
   look: ItemLook | null;
   rank: RankView;
   bot?: boolean;
+  /** A town sidekick's face (an image's address), shown in place of the pawn. */
+  face?: string | null;
 }
 
 /** Everything a 1 v 1 screen draws, in this device's time. */
@@ -82,6 +85,10 @@ export interface DuelSnapshot {
   outcome: DuelOutcome | null;
   /** The game can't be shown (refused, ended before you got there), and why. */
   gone: string | null;
+  /** A town bot's game: Maia's loading step is on (the board under its card; the vote after). */
+  loading?: boolean;
+  /** A game with a town bot (casual: no rank, no coins, nothing recorded); its result goes back to the town. */
+  town?: boolean;
 }
 
 /** A side's time left at `now` (only the side to move's runs, and only once the clocks run). */
@@ -476,23 +483,70 @@ export class BotDuel implements DuelSession {
   private thinking: number | null = null;
   private maia: HumanUciEngine | null = null;
   private disposed = false;
+  /** A town bot's game: Maia's loading step (Boss alone's: this device's Stockfish paused, Maia loaded alone). */
+  private gate: MaiaGate | null = null;
+  private readonly town: TownBotGame | null;
 
-  constructor(private readonly rating: number) {
+  /**
+   * `town`: a game with a town bot (docs/areas/town-square.md, "The bots and playing them"): its name and look, its
+   * rating on its pill (the number alone: "Tempo Tess (bot)" and "Rating 1400" don't fit a phone's strip together); no
+   * versus moment; Maia's loading step first, as Boss alone's (the same rule for who may run it, the same Stockfish
+   * fallback), then the vote and the game as the bot game's.
+   */
+  constructor(
+    private readonly rating: number,
+    town: TownBotGame | null = null,
+  ) {
     const now = Date.now();
+    this.town = town;
     this.you = Math.random() < 0.5 ? "w" : "b";
-    const look = botLook(`bot-${Math.floor(Math.random() * 1e9)}`).look;
-    const bot: DuelSide = { uid: null, name: "Bot", look, rank: { ...rankView(null), placement: null, tier: "Bot", label: "Unranked" }, bot: true };
-    this.players = this.you === "w" ? { w: yourSide(), b: bot } : { w: bot, b: yourSide() };
+    const look = town ? town.look : botLook(`bot-${Math.floor(Math.random() * 1e9)}`).look;
+    const bot: DuelSide = { uid: null, name: town?.name ?? "Bot", look, rank: { ...rankView(null), placement: null, tier: "Bot", label: town ? String(rating) : "Unranked" }, bot: true, ...(town?.face ? { face: town.face } : {}) };
+    // (A town game is casual: your pill says so, not your 1 v 1 rank.)
+    const me = town ? { ...yourSide(), rank: { ...rankView(null), placement: null, tier: "Casual", label: "Casual" } } : yourSide();
+    this.players = this.you === "w" ? { w: me, b: bot } : { w: bot, b: me };
     this.versusAt = now;
-    const test = Number(testParams().get("clock"));
-    this.state = newDuel(now + RANKED_1V1.versusMs, { testSeconds: Number.isFinite(test) && test > 0 ? test : null });
-    // The bot's pick: a zone at random, 0.8-3.5 s into the vote.
-    const voteAt = this.state.voteAt;
-    const zones: DuelZone[] = ["bullet", "blitz", "rapid"];
-    setTimeout(() => this.botPick(zones[Math.floor(Math.random() * 3)]!), voteAt - now + rnd(800, 3500));
     this.ticker = setInterval(() => this.tick(), 100);
-    // Maia loads during the versus moment and the vote (from the service worker's cache after the first time).
-    if (maiaAllowed() && rating >= RANKED_1V1.bot.maiaMin && rating <= RANKED_1V1.bot.maiaMax) this.maia = startMaia(BOSS_BRAIN.loadTimeoutMs);
+    const maia = maiaAllowed() && rating >= RANKED_1V1.bot.maiaMin && rating <= RANKED_1V1.bot.maiaMax;
+    if (!town) {
+      this.state = this.begin(now + RANKED_1V1.versusMs);
+      // Maia loads during the versus moment and the vote (from the service worker's cache after the first time).
+      if (maia) this.maia = startMaia(BOSS_BRAIN.loadTimeoutMs);
+      return;
+    }
+    // A town bot: its game waits (no vote yet) while Maia loads alone, at most BOSS_BRAIN.loadGateMs; then the vote.
+    this.state = newDuel(Infinity);
+    if (!maia || typeof Worker === "undefined") {
+      this.state = this.begin(now);
+      return;
+    }
+    prefetchMaia();
+    const gate = new MaiaGate({
+      start: (after) => (this.maia = startMaia(BOSS_BRAIN.loadTimeoutMs, after)),
+      pause: (until) => pauseEngines(until, () => this.dropMaia(), BOSS_BRAIN.stockfishBackMs),
+      gateMs: BOSS_BRAIN.loadGateMs,
+    });
+    this.gate = gate;
+    void gate.done.then(() => {
+      if (this.gate !== gate) return;
+      this.gate = null;
+      if (this.disposed || this.state.end) return;
+      this.set(this.begin(Date.now()));
+    });
+  }
+
+  /** A new game whose vote opens at `voteAt`, and the bot's pick in it: a zone at random, 0.8-3.5 s into the vote. */
+  private begin(voteAt: number): DuelState {
+    const test = Number(testParams().get("clock"));
+    const zones: DuelZone[] = ["bullet", "blitz", "rapid"];
+    setTimeout(() => this.botPick(zones[Math.floor(Math.random() * 3)]!), voteAt - Date.now() + rnd(800, 3500));
+    return newDuel(voteAt, { testSeconds: Number.isFinite(test) && test > 0 ? test : null });
+  }
+
+  /** This device's Stockfish didn't answer again beside Maia (short of memory): Maia goes, the bot plays Stockfish. */
+  private dropMaia() {
+    this.maia?.close();
+    this.maia = null;
   }
 
   subscribe(fn: () => void): () => void {
@@ -534,6 +588,8 @@ export class BotDuel implements DuelSession {
   private stopTicker() {
     if (this.ticker) clearInterval(this.ticker);
     this.ticker = null;
+    this.gate?.stop();
+    this.gate = null;
     this.maia?.close();
     this.maia = null;
   }
@@ -574,7 +630,8 @@ export class BotDuel implements DuelSession {
     const s = this.state;
     const now = Date.now();
     const ctl = s.control ? gameControl(s) : null;
-    const phase: DuelGamePhase = s.end ? "over" : s.phase === "vote" && now < s.voteAt ? "versus" : s.phase;
+    const loading = !!this.town && !s.end && s.voteAt === Infinity;
+    const phase: DuelGamePhase = s.end ? "over" : loading ? "vote" : s.phase === "vote" && now < s.voteAt ? "versus" : s.phase;
     return {
       code: null,
       bot: true,
@@ -602,6 +659,8 @@ export class BotDuel implements DuelSession {
       end: s.end,
       outcome: s.end ? { change: null, coins: 0 } : null,
       gone: null,
+      loading,
+      town: !!this.town,
     };
   }
 
@@ -661,6 +720,13 @@ function materialFor(fen: string, c: Color): number {
     if ((ch === low) === (c === "b")) n += worth[low]!;
   }
   return n;
+}
+
+/** A town bot's game: the bot's name ("Tempo Tess (bot)") and its crate items, or a sidekick's face (an image's address). */
+export interface TownBotGame {
+  name: string;
+  look: ItemLook | null;
+  face?: string | null;
 }
 
 // ---------------- The queue ----------------

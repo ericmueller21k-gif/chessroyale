@@ -11,8 +11,8 @@
  */
 import { TOWN_FEEL, type CamSet } from "./feel.ts";
 
-/** The world is N x N squares and wraps on both axes. */
-export const N = 40;
+/** The world is N x N squares and wraps on both axes. (Slices 1 to 5: 40; slice 6 made room for the park and the bigger Colosseum.) */
+export const N = 46;
 
 /** Into [0, N). */
 export const wrapI = (v: number): number => ((v % N) + N) % N;
@@ -39,10 +39,11 @@ export interface View {
   zoom: number;
   /**
    * The lens (the close-up on a statue): everything magnified `mag` times about the lens's middle (the box's middle
-   * column, `cy`), then shifted `oy` pixels down. 1 and 0: the plain camera. A longer lens, not a moved camera: the
-   * world keeps its shape, only the view narrows.
+   * column, `cy`), then shifted `ox` pixels right and `oy` down. 1, 0 and 0: the plain camera. A longer lens, not a
+   * moved camera: the world keeps its shape, only the view narrows.
    */
   mag: number;
+  ox: number;
   oy: number;
   /** The blended camera set for this box. */
   P: CamSet;
@@ -75,6 +76,7 @@ export function newView(): View {
     H: 0,
     zoom: -1,
     mag: 1,
+    ox: 0,
     oy: 0,
     P: { ...TOWN_FEEL.camTall },
     h: 1,
@@ -101,14 +103,15 @@ const tmp = newPt();
 
 /**
  * Works the camera out for a box of W x H CSS pixels at a zoom (0 = normal, 1 = zoomed out), through a lens of `mag`
- * shifted `oy` (the close-up; 1, 0: none). Cheap when nothing changed.
+ * shifted `oy` down and `ox` right (the close-up; 1, 0, 0: none). Cheap when nothing changed.
  */
-export function setView(v: View, W: number, H: number, zoom: number, mag = 1, oy = 0): void {
-  if (v.W === W && v.H === H && v.zoom === zoom && v.mag === mag && v.oy === oy) return;
+export function setView(v: View, W: number, H: number, zoom: number, mag = 1, oy = 0, ox = 0): void {
+  if (v.W === W && v.H === H && v.zoom === zoom && v.mag === mag && v.oy === oy && v.ox === ox) return;
   v.W = W;
   v.H = H;
   v.zoom = zoom;
   v.mag = mag;
+  v.ox = ox;
   v.oy = oy;
   const f = TOWN_FEEL;
   const t = clamp((W / H - f.aspectTall) / (f.aspectWide - f.aspectTall), 0, 1);
@@ -155,7 +158,7 @@ export function proj(v: View, dx: number, dz: number, lift: number, out: Pt): bo
   const depth = Z * v.cs - Y * v.sn;
   if (depth < 0.5) return false;
   const up = Y * v.cs + Z * v.sn;
-  out.x = v.W / 2 + (v.F * dx) / depth;
+  out.x = v.W / 2 + v.ox + (v.F * dx) / depth;
   out.y = v.cy + v.oy - (v.F * up) / depth;
   out.k = v.F / depth;
   out.depth = depth;
@@ -164,6 +167,41 @@ export function proj(v: View, dx: number, dz: number, lift: number, out: Pt): bo
 
 const ta = newPt();
 const tb = newPt();
+
+/** A table's top (`tableLift`): where it's worked out (`dz`), its height and its slab's in the camera's lift, how much bigger it's drawn there than at its foot. */
+export interface TableLift {
+  dz: number;
+  top: number;
+  thick: number;
+  grow: number;
+}
+/**
+ * A chess table's top over its foot at (dx, dz): `topPx` and `thickPx` pixels of its picture (drawn `housePxPerSquare` a
+ * square) as heights in the camera's lift, through the lift's pixels a unit there. Lifted that high in the camera's true
+ * perspective, a board is drawn `grow` times as big as at the foot: 1.04 to 1.17 over the screen's usual rows, but near
+ * the camera (low on the phone's screen) lifting brings a point toward the camera more than up the screen, so the lift
+ * that reaches the picture's top, and the board with it, grow without bound (Oct 28, Eric's warped boards: twice the
+ * table and more, skewed). The table's picture is a cut-out, the same shape anywhere. So where `grow` would pass
+ * `tableBoardGrow`, the top is worked out at the nearest place farther off (an eighth of a square at a time) where it
+ * doesn't (or where lifting reaches it at all); the renderer draws it from there at the picture's own place and scale.
+ * False: off the view.
+ */
+export function tableLift(v: View, dx: number, dz: number, topPx: number, thickPx: number, out: TableLift): boolean {
+  for (let k = 0; k <= 64; k++) {
+    const z = dz + k / 8;
+    if (!proj(v, dx, z, 0, ta)) return false;
+    if (!proj(v, dx, z, 1, tb)) continue;
+    const perLift = ta.y - tb.y;
+    const spx = ta.k / TOWN_FEEL.housePxPerSquare;
+    out.dz = z;
+    out.top = (topPx * spx) / perLift;
+    out.thick = (thickPx * spx) / perLift;
+    if (!(perLift > 0) || !proj(v, dx, z, out.top, tb)) continue;
+    out.grow = tb.k / ta.k;
+    if (out.grow <= TOWN_FEEL.tableBoardGrow) return true;
+  }
+  return false;
+}
 /** Is a ground point past the curve (hidden behind the bulge)? There the ground faces away: farther projects lower. */
 export function pastCurve(v: View, dx: number, dz: number): boolean {
   return !proj(v, dx, dz, 0, ta) || !proj(v, dx, dz + 0.25, 0, tb) || tb.y >= ta.y;
@@ -252,7 +290,7 @@ function scanRow(v: View, camX: number, camY: number, ru: number, visit: (c: num
   if (ta.y - 40 > v.H && proj(v, 0, zf, 0, tb) && tb.y > v.H) return false; // below the bottom of the box
   const zc = zn <= 0 && zf >= 0 ? 0 : Math.min(Math.abs(zn), Math.abs(zf));
   const Lrim = Math.sqrt(Math.max(0, v.rim * v.rim - zc * zc)) * v.rimX + 1.5;
-  const L = Math.min(N / 2 - 1, (v.W / 2 + 40) / kn + 1.5, Lrim);
+  const L = Math.min(N / 2 - 1, (v.W / 2 + Math.abs(v.ox) + 40) / kn + 1.5, Lrim);
   const c0 = Math.floor(camX - L);
   const c1 = Math.ceil(camX + L);
   const n = c1 - c0 + 2;

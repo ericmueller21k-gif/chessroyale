@@ -3,7 +3,7 @@ import { BOSS_ROSTER, bossBrainFor } from "@chessroyale/core";
 import { bossAloneElo, chosenDifficulty, difficultyElo, difficultyMaia, rememberDifficulty } from "../src/boss-difficulty.ts";
 
 describe("solo's difficulty against a boss", () => {
-  it("starts at Normal, remembers the last choice, and gives its Elo on top of the boss's strength", () => {
+  it("starts at Medium (normal), remembers the last choice, and gives its Elo on top of the boss's strength", () => {
     expect(chosenDifficulty()).toBe("normal");
     expect(difficultyElo()).toBe(0);
     rememberDifficulty("hardest");
@@ -17,11 +17,11 @@ describe("solo's difficulty against a boss", () => {
   });
 
   it("in Boss alone sets the rating the boss picks its moves at, whatever your rating (Eric, Oct 18: Hardest was way too easy)", () => {
-    expect(["easy", "normal", "hard", "hardest"].map((d) => difficultyMaia(d as never))).toEqual([1000, 1400, 1800, 2200]);
+    expect(["very-easy", "easy", "normal", "hard", "hardest"].map((d) => difficultyMaia(d as never))).toEqual([700, 1150, 1600, 2050, 2500]);
     const hopper = BOSS_ROSTER.find((b) => b.id === "hopper")!;
     // (Shown as the boss's level, the same for a 900 and a 2000 player.)
-    expect(bossAloneElo(900, hopper, "hardest")).toBe(2200);
-    expect(bossAloneElo(2000, hopper, "easy")).toBe(1000);
+    expect(bossAloneElo(900, hopper, "hardest")).toBe(2500);
+    expect(bossAloneElo(2000, hopper, "easy")).toBe(1150);
     // The brain: the boss's own (Maia) at that rating, no bridge share, even where the strength alone would mean Stockfish.
     expect(bossBrainFor("hopper", 1830, "", true, { alone: 2200 })).toEqual({ brain: "maia-raw", rating: 2200, stockfishShare: 0 });
     expect(bossBrainFor("hopper", 3100, "", true, { alone: 1000 })).toEqual({ brain: "maia-raw", rating: 1000, stockfishShare: 0 });

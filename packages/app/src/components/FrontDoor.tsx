@@ -1,9 +1,11 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useRef } from "preact/hooks";
-import { FRONT_DOOR, ratingTier, type ItemLook, type ItemSlot, type RankEffect } from "@chessroyale/core";
+import { FRONT_DOOR, type ItemLook, type ItemSlot } from "@chessroyale/core";
+import type { HomeRankLine } from "../ranked.ts";
 import { Avatar } from "./Items.tsx";
 import { account } from "../account.ts";
 import type { LiveCounts } from "../live.ts";
+import { testSwitchesAllowed } from "../test-switches.ts";
 
 /**
  * The front door's shared pieces (home, queue, profiles, the desktop frame), in the approved look: dark ground,
@@ -41,7 +43,7 @@ export function DressedPawn({
   side = "w",
 }: {
   look?: ItemLook;
-  size: "hero" | "profile" | "ring" | "card" | "seat" | "side" | "stage";
+  size: "hero" | "profile" | "ring" | "card" | "seat" | "side" | "stage" | "avatar";
   shadow?: boolean;
   side?: "w" | "b";
 }) {
@@ -136,6 +138,7 @@ export function FdButton({
   disabled,
   onClick,
   label,
+  title,
   class: cls,
 }: {
   children: ComponentChildren;
@@ -144,6 +147,8 @@ export function FdButton({
   disabled?: boolean;
   onClick?: () => void;
   label?: string;
+  /** A tooltip on a computer. */
+  title?: string;
   class?: string;
 }) {
   return (
@@ -152,6 +157,7 @@ export function FdButton({
       class={`fd-btn${primary ? " primary" : ""}${danger ? " danger" : ""}${cls ? ` ${cls}` : ""}`}
       disabled={disabled}
       aria-label={label}
+      title={title}
       onClick={onClick}
     >
       {children}
@@ -195,31 +201,58 @@ export function LiveLine({ live, stacked }: { live: LiveCounts | null; stacked?:
   );
 }
 
-/** What a rank needs to be drawn: its name, color and (the top ranks) effect. */
-export type RankLook = { label: string; color: string; effect: RankEffect | null };
+/** A profile's rating pill: the crowd rating's number ("Rating 1612"), or "No rating yet". (No rank name: since Oct 28 the rank shown is 1 v 1's.) */
+export function RatingPill({ rating }: { rating: number | null }) {
+  return <span class="fd-pill">{rating === null ? "No rating yet" : `Rating ${Math.round(rating)}`}</span>;
+}
 
-const rankClass = (t: RankLook) => `tier${t.effect ? ` rank-${t.effect}` : ""}`;
+/**
+ * PLACEHOLDER for an admin's home, until the real levels exist (Eric, Oct 28: the level "lvl - 38", "show it at 3/4 like I'm
+ * 3/4 to level 39"). Shown only where testSwitchesAllowed(); a player sees no level. The real level system replaces it. (The
+ * test rank "Opal III" it came with is now any rank by `?rank=`: ranked.ts, rankFromSwitch.)
+ */
+export const TEST_LEVEL = { level: 38, progress: 0.75 } as const;
 
-/** The rank pill on a profile: "Weighty · 1612" in the rank's color (the top three dressed up), or "No rating yet". */
-export function RankPill({ tier, rating }: { tier: RankLook | null; rating: number | null }) {
-  if (!tier || rating === null) return <span class="fd-pill">No rating yet</span>;
+/**
+ * The rank line under your name on home (Eric, Oct 28: "we're going with the new ranking system"): your ranked 1 v 1 rank,
+ * the tier and division in the tier's color ("Gold 3 · 45 RP"), "Placement 2/5", or "Unranked" before your first ranked
+ * game; a non-breaking space while your account loads (the line keeps its height). An admin's `?rank=` shows that rank.
+ */
+export function RankLine({ line }: { line: HomeRankLine }) {
+  if (!line) return <>{"\u00a0"}</>;
+  if (line === "unranked") return <>Unranked</>;
+  if (line.placement) return <>{line.label}</>;
+  const i = line.label.indexOf(" · ");
   return (
-    <span class={`fd-pill ${rankClass(tier)}`} style={{ "--tier": tier.color }}>
-      {`${tier.label} · ${Math.round(rating)}`}
-    </span>
+    <>
+      <span class="fd-rank" style={{ "--tier": line.color }}>
+        {line.label.slice(0, i)}
+      </span>
+      {line.label.slice(i)}
+    </>
   );
 }
 
-/** The rank line under your name on home: the rank's name in its color, then the rating ("Weighty · 1612"). */
-export function RankLine({ rating }: { rating: number | null }) {
-  const t = ratingTier(rating);
-  if (!t || rating === null) return <>No rating yet</>;
+// The ring round your icon, in the viewBox's own units: the icon's 38 px, a 2 px gap and the 2 px ring, so the ring's middle
+// is 3 px out from the icon (a 13 radius round the icon's 10). Its length is worked out here so the fill needs no pathLength.
+const RING = 46;
+const RING_R = 13;
+const RING_LEN = 4 * (RING - 2 - 2 * RING_R) + 2 * Math.PI * RING_R;
+const RING_PATH = `M${RING / 2} 1H${RING - 1 - RING_R}A${RING_R} ${RING_R} 0 0 1 ${RING - 1} ${1 + RING_R}V${RING - 1 - RING_R}A${RING_R} ${RING_R} 0 0 1 ${RING - 1 - RING_R} ${RING - 1}H${1 + RING_R}A${RING_R} ${RING_R} 0 0 1 1 ${RING - 1 - RING_R}V${1 + RING_R}A${RING_R} ${RING_R} 0 0 1 ${1 + RING_R} 1H${RING / 2}`;
+
+/**
+ * An admin's test level on home (TEST_LEVEL, a placeholder): a thin green ring round your icon, filled clockwise from the top
+ * to `progress` over a faint track, and "LVL 38" above it. Both sit outside the icon's box (styles.css, `fd-level`).
+ */
+export function LevelRing() {
+  const { level, progress } = TEST_LEVEL;
   return (
     <>
-      <span class={`fd-rank ${rankClass(t)}`} style={{ "--tier": t.color }}>
-        {t.label}
-      </span>
-      {` · ${Math.round(rating)}`}
+      <span class="fd-level">{`LVL ${level}`}</span>
+      <svg class="fd-level-ring" viewBox={`0 0 ${RING} ${RING}`} aria-hidden="true" focusable="false">
+        <path class="track" d={RING_PATH} />
+        <path class="fill" d={RING_PATH} stroke-dasharray={`${(progress * RING_LEN).toFixed(2)} ${RING_LEN.toFixed(2)}`} />
+      </svg>
     </>
   );
 }

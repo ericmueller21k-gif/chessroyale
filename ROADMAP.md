@@ -387,7 +387,7 @@ good to run around in this kind of world"), then the next slice. The numbers tha
 `packages/app/src/town/feel.ts`.
 
 **The name** (Eric, Oct 26): Boss raid will become **Boss Arena**, the mode and its world ("that more implies… an arena or…
-a world"). The building in the middle, called the Boss Arena below until now, is **the Coliseum**. The game keeps saying
+a world"). The building in the middle, called the Boss Arena below until now, is **the Colosseum**. The game keeps saying
 "Boss raid" until Eric says to switch.
 
 Eric's direction, from a day of mockups: Boss raid becomes a **town square**, a small round world where players hang out,
@@ -443,14 +443,14 @@ the building art and the names, which are wrong) and `chatgpt-town-square-overvi
 - Being in the square doesn't queue you. A raid with people faces **3 bosses picked at random**, each harder than the last
   (maybe 4 later); beat one to face the next. The first should feel winnable. ("The gauntlet" was a working name only; the
   mode has no special name.)
-- **The Coliseum** (Eric, Oct 25; named Oct 26): a building in the middle of the town square, where raids with people
+- **The Colosseum** (Eric, Oct 25; named Oct 26): a building in the middle of the town square, where raids with people
   start. Walk up to it (within a square) or tap it to open its menu. What the menu holds is still to brainstorm; Eric
   thinks of something like the God King's strike menu.
-- **Idea: gather your three bosses** (Eric, Oct 26; not in the menus yet). Each boss gets "Challenge at the Coliseum".
+- **Idea: gather your three bosses** (Eric, Oct 26; not in the menus yet). Each boss gets "Challenge at the Colosseum".
   Tapping it, the boss names a partner it won't come without (Boingo: "I'm not bouncing anywhere without Babur"); you go
-  and ask that boss, who asks for a random third; once you have all three, you challenge them at the Coliseum. A way to
+  and ask that boss, who asks for a random third; once you have all three, you challenge them at the Colosseum. A way to
   choose the raid's three instead of the random pick below; which one wins is open.
-- **Then today's Boss raid screen becomes the Coliseum's pre-fight screen.** (Boss alone keeps its own select screen as it
+- **Then today's Boss raid screen becomes the Colosseum's pre-fight screen.** (Boss alone keeps its own select screen as it
   is, Eric, Oct 26.) Your team stands on the left, as in
   `eric-paint-crowd.png`. The boss tiles shuffle, a highlight running across them, and three bosses are picked at random and
   dropped onto the stage. A countdown starts the raid, and the screen may need a button or two.
@@ -459,9 +459,27 @@ the building art and the names, which are wrong) and `chatgpt-town-square-overvi
   (fire and ice, dark and light), and silly questions. A line bank of 100+ lines per boss is being drafted with the Claude
   API from a character sheet per boss and a relationship per pair. Eric reviews every line; only kept lines go in the
   game, so nothing calls the API live.
-- Still to settle: the Coliseum's menu and look, whether bots wander in a square, the shop,
+- Still to settle: the Colosseum's menu and look, whether bots wander in a square, the shop,
   how the three bosses are ordered, what losing mid-way means, scoring across bosses, whether the God King's charges carry
   over, time per boss, and the rewards.
+
+**The park** (Eric, Oct 26: "a little park… filled with chess boards on little tables where you can walk up and sit and
+challenge or wait for one for someone for a casual or ranked game of normal chess"). Slice 6 built it in front of the
+Colosseum's gate, with ten chess tables, and made the Colosseum about twice its size and the map bigger. A table's card shows
+"Casual" and "Ranked" greyed with "Coming soon" for now. Next:
+- **Sitting at a table queues you** (the next job; it needs a new casual queue): Casual or Ranked, for park players only for
+  30 seconds, then for anyone.
+- The game plays on the **normal game screen**; when it ends, you're back at your table.
+- Later, with real players in the town: **tap someone seated** to challenge them.
+- **Quick chats** in the town (with real players in it): premade lines such as "Who wants to play?" for people idling in the
+  square.
+
+**A new name and a first-visit tour** (Eric, Oct 26: "we've kind of outgrown boss arena… we're going to have this ability to
+challenge other players here, not just the bosses"). Not started; Eric is picking the name (maybe "Town square").
+- **Rename Boss Arena** on home's card and the computer's side menu once Eric has the name.
+- **A first-visit tour on home**: the rest of the page dims, and a pointer steps through it with Next: 50 v 50 first, then the
+  other modes, and last the town's card with a short pitch ("open world style": walk around, meet the bosses, play people at
+  the park). A flag on the player's account remembers they've seen it, so it shows once.
 
 **Rooms** (Eric, Oct 26: "we can't have 10,000 people in this little world")
 - Each town square is a **room**, its own copy of the world. Opening Boss Arena puts you in the busiest room that still has

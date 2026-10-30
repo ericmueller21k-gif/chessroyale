@@ -20,6 +20,7 @@ import { BRUSH_STROKE, PAINT_DRIP, PAINT_FLY, PAINT_HIT, PAINT_SPLASH } from "./
 import { MOONBEAM, MOON_HIT, MOON_SCORCH } from "./effects/moo.ts";
 import { GARDEN_PLANT, SEED_FLY, SEED_PLOP, WATER_HIT, WATER_SWEEP } from "./effects/gardener.ts";
 import { BALLOON_FLY, BALLOON_HIT, BALLOON_LAND, HOOP_FLY, HOOP_RING } from "./effects/tiger.ts";
+import { CREASE_EDGE, CREASE_PENCIL, FOLD_PAPER, INK_HIT, INK_LINE, INK_MARK, INK_STRIKE } from "./effects/folio.ts";
 
 // Each boss's effects are drawn in its own file (effects/<boss>.ts); what they share is in effects/common.ts.
 export { BOARD_CELL, SQUARE } from "./effects/common.ts";
@@ -85,4 +86,11 @@ export const EFFECT_SPRITES = {
   hoopFly: HOOP_FLY,
   hoopRing: HOOP_RING,
   balloonHit: BALLOON_HIT,
+  inkMark: INK_MARK,
+  inkLine: INK_LINE,
+  foldPaper: FOLD_PAPER,
+  creaseEdge: CREASE_EDGE,
+  creasePencil: CREASE_PENCIL,
+  inkStrike: INK_STRIKE,
+  inkHit: INK_HIT,
 } as const satisfies Record<string, Character>;

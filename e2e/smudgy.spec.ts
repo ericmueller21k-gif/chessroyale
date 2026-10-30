@@ -195,8 +195,6 @@ test("Smudgy: his tile picks him, his two forced moves, then the splash covers h
   await page.addInitScript(() => ((window as any).__soundLog = []));
   await page.goto("/?debug&pace=quick&clock=60&laststand=0&brain=stockfish");
   await bossAloneFromHome(page, "Smudgy");
-  // (Boss alone's menu, for the boss picked: his row starts the battle.)
-  await page.getByRole("dialog", { name: "Boss alone" }).getByRole("button", { name: /^Smudgy/ }).click();
   await yourMove(page);
   await record(page);
   await page.evaluate(() => {

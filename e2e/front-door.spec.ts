@@ -3,7 +3,7 @@ import { asAdmin, named, openBossRaid, switchesOff, test, openPlayWithFriends, p
 
 const live = (p: import("@playwright/test").Page) => p.evaluate(() => fetch("/api/live").then((r) => r.json()));
 
-test("home: the live line comes from the server, the RANKED row changes the line under PLAY", async ({ page, browser }) => {
+test("home: the live line comes from the server, the RANKED row changes the line above PLAY", async ({ page, browser }) => {
   await named(page, "Eric");
   await page.goto("/");
   // The logo you can see: the top bar's on a phone, the side menu's on a computer (both are in the page).
@@ -28,7 +28,7 @@ test("home: the live line comes from the server, the RANKED row changes the line
   await expect.poll(async () => (await live(page)).queue, { timeout: 10_000 }).toBeGreaterThanOrEqual(1);
   await expect(line).toContainText(/[1-9]\d* in queue/, { timeout: 10_000 });
   await other.close();
-  // The line under PLAY follows the RANKED row's pick (50 v 50 · 1 v 1 · Squads; Eric, Oct 16). Squads: PLAY is its
+  // The line above PLAY (it was under it until Oct 28) follows the RANKED row's pick (50 v 50 · 1 v 1 · Squads; Eric, Oct 16). Squads: PLAY is its
   // solo queue or a party, picked in the panel in the Matchmaking row's place.
   await expect(page.getByRole("radiogroup", { name: "RANKED" }).getByRole("radio")).toHaveText([/^50 v 50/, /^1 v 1/, /^Squads/]);
   await page.getByRole("radio", { name: /Squads/ }).click();
@@ -166,10 +166,10 @@ test("computer: a side menu, the center and a live panel; the phone keeps one co
   await expect(menu.getByRole("button", { name: "Settings" })).toHaveAttribute("aria-current", "page");
   await menu.getByRole("button", { name: "Profile" }).click();
   await expect(page.locator(".fd-card")).toBeVisible();
-  // Solo Boss Mode (was Boss raid, Oct 26): its screen, the menu showing where you are; Play is home again.
-  await menu.getByRole("button", { name: "Solo Boss Mode" }).click();
-  await expect(page.getByRole("heading", { name: "Solo Boss Mode", exact: true })).toBeVisible();
-  await expect(menu.getByRole("button", { name: "Solo Boss Mode" })).toHaveAttribute("aria-current", "page");
+  // Boss Battle (was Boss raid, Oct 26): its screen, the menu showing where you are; Play is home again.
+  await menu.getByRole("button", { name: "Boss Battle" }).click();
+  await expect(page.getByRole("heading", { name: "Boss Battle", exact: true })).toBeVisible();
+  await expect(menu.getByRole("button", { name: "Boss Battle" })).toHaveAttribute("aria-current", "page");
   await expect(menu.getByRole("button", { name: "Boss alone" })).toHaveCount(0);
   await menu.getByRole("button", { name: "Play", exact: true }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();

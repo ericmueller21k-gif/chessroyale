@@ -125,7 +125,9 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   once as the page opens, so they hold for the page (Oct 24). The `sayBoss(text)` hook (speech.tsx: a boss's voice says
   any line at once, for e2e/boss-bar-same.spec.ts).
   - **Kept for everyone** (the home screen's own choices): `mode` and a raid's boss picked from the menu; preferences
-    and pages (`anim`, `trail`, `crates`). Gone on Oct 15: `turns` (Crowd is always team turns), `moves` (Classic plays
+    and pages (`anim`, `trail`, `crates`); the town square's `crowd=N` (N more pawns with names, up to 100, wandering the
+    square, drawn on this device only) and `fps` (a frame-rate pill), to measure the frame rate: switches until Oct 30, then
+    anyone's (Eric: no admin needed, the site is behind Cloudflare Access). Gone on Oct 15: `turns` (Crowd is always team turns), `moves` (Classic plays
     its default opening moves) and `soundlab` (its choice is Settings' Reveal sound).
   - **Testers' options** (Settings → Testing, admins): practice mode and the eval bar count only where the switches do
     (`practiceOn` and `evalBarOn` in `prefs.ts`); online the lobby takes a `hello`'s practice only from an admin's
@@ -141,6 +143,7 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   of the game, set in the dashboard (how: `DEPLOY.md`, "Kill switches and the maintenance banner"). `PAUSE_<NAME>` =
   "1" rests it, deleting it brings it back: `PAUSE_CLASSIC`, `PAUSE_CROWD`, `PAUSE_RAID`, `PAUSE_SQUADS`, `PAUSE_RANKED1V1`,
   `PAUSE_SOLO` (Solo and Boss alone), `PAUSE_SHOP` (buying and crates; the locker stays), `PAUSE_FRIENDS`,
+  `PAUSE_TOWN_CHAT` (typing in the town square; its line is "Chat is paused."),
   `PAUSE_BOSS_<ID>` (one boss by its roster id, e.g. `PAUSE_BOSS_PIG` for Wrangler; DEPLOY.md lists them all).
   - **While resting:** the app disables the way in with the part's line ("Squads is resting for a bit. Back soon.";
     `pausedLine`, core's `pauses.ts`), and the server refuses anything new for it with the same line (503,

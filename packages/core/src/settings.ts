@@ -740,9 +740,11 @@ export const BOSS_POWERS = {
    * battle, so he gets about one and a half (two in a long battle): two full barrages would keep the crowd's half on
    * fire most of the game. Babur (tiger) 1.3 (Oct 24, was 1.6: Eric, "he's ulting so much… 2 to 4 times per game"; his
    * hoops now come after his move): the raid sim's 10 s crowd, 2.55 casts a battle of 44 moves, 3.45 per 60 moves (1.1 gave
-   * 1.80 a battle, under 2: his battles are shorter now he keeps his turn; reports/tiger-sim.md).
+   * 1.80 a battle, under 2: his battles are shorter now he keeps his turn; reports/tiger-sim.md). Folio 1.3 (the director's call,
+   * Oct 27, after the first sim put it among the easiest; was the brief's start, 1): 2.8 Creases a battle of 50 moves in
+   * the raid sim (reports/folio-sim.md).
    */
-  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.3 } as Readonly<Record<string, number>>,
+  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.3, folio: 1.3 } as Readonly<Record<string, number>>,
   /**
    * The Hidden Boss's ultimate, the bullet clock (Eric, Oct 14: "Meter builds starting turn 1, about 7 turns in he says
    * something about how you're thinking too much and to just play pure chess etc, true to him, then for the rest of phase 1
@@ -1254,6 +1256,49 @@ export const BOSS_POWERS = {
   hoopsLooks: 8,
   hoopsNodes: 20_000,
   hoopsTimeMs: 8_000,
+  /**
+   * Folio's Draft (its passive; docs/decisions/2026-10-27-folio-rules.md): as the crowd's turn after its move begins, from
+   * crowd turn draftFirst, every draftEvery turns, an ink mark under one of the crowd's pieces that one of Folio's pieces
+   * attacks: a non-king piece that is defended and that no cheaper Folio piece attacks (Folio wouldn't just take it), the
+   * most valuable of them (the director's call, Oct 27: was a seeded pick of the top three; seeded among ties only). The
+   * crowd has draftWindow of its own moves to end that one attack (move
+   * the piece, block the line, take the attacker); if it still stands after them, the piece is folded: frozen for
+   * foldTurns crowd turns, by Ginger's freeze's rules (4: the director's call, Oct 27; was 3). One mark at a time; none that qualifies (or a mark still up, or
+   * another of Folio's moments that turn): it tries again next turn, and the try doesn't count. draftEvery 4 (this lane's
+   * number; Sawyer's cuts' pace): about 9 marks and 5 folds a battle in the raid sim; every 2 turns changed the crowd's
+   * score by nothing measurable (reports/folio-sim.md).
+   */
+  draftFirst: 3,
+  draftEvery: 4,
+  draftWindow: 2,
+  foldTurns: 4,
+  /**
+   * Folio's Crease (its ultimate, the rage meter's): on the warning's turn its line shows (the engine's pick, made with
+   * Folio's move on the position after it, the crowd to move); as the next crowd turn begins the board is creased along
+   * it for creaseTurns crowd turns, and none of the crowd's pieces crosses it; Folio's may (the director's call, Oct 27:
+   * it folds the board toward itself; otherwise Sawyer's board saw's rules for the crowd's moves). The line: of the
+   * 14 inner lines, the one costing the crowd between creaseLossMin and creaseLossMax pawns (its best move with the crease
+   * against without, in pawns of log-odds: bouncePawnLogit) nearest the band's middle, seeded among ties; none there, the
+   * one nearest creaseLossMin below it, never one costing more than creaseLossMax (1 to 2.5: the director's call, Oct 27,
+   * as other ultimates cost about 2; was 0.3 to 1.5). A line leaving the crowd no move, or handing either side a mate in
+   * one, never counts. Each line's look: creaseNodes; the host gets creaseTimeMs more for the
+   * request that asks for it. How often: rageSpeed.folio.
+   */
+  creaseTurns: 4,
+  creaseLossMin: 1,
+  creaseLossMax: 2.5,
+  creaseNodes: 20_000,
+  creaseTimeMs: 6_000,
+  /**
+   * Folio's Revision (once a battle, revisionMax): right after a crowd move that punishes Folio's last move (that move
+   * cost it at least revisionDrop pawns against its best there, and after the crowd's reply its judged evaluation is at
+   * least revisionDrop worse than before that move), both are crossed out: the board goes back to before its move, it
+   * plays the engine's best move there, and the crowd moves again. Never after a crowd move that ends the battle, nor
+   * before crowd turn revisionFrom.
+   */
+  revisionDrop: 1.5,
+  revisionMax: 1,
+  revisionFrom: 5,
 } as const;
 
 /**
@@ -1507,10 +1552,11 @@ export const KING_SPEECH = {
  *   offered ("better they are a bit harder rn"); a too easy / too hard button on the results screen will tune it.
  */
 export const BOSS_DIFFICULTY = [
-  { id: "easy", label: "Easy", elo: -300, maia: 1000 },
-  { id: "normal", label: "Normal", elo: 0, maia: 1400 },
-  { id: "hard", label: "Hard", elo: 250, maia: 1800 },
-  { id: "hardest", label: "Hardest", elo: 500, maia: 2200 },
+  { id: "very-easy", label: "Very easy", elo: -500, maia: 700 },
+  { id: "easy", label: "Easy", elo: -300, maia: 1150 },
+  { id: "normal", label: "Medium", elo: 0, maia: 1600 },
+  { id: "hard", label: "Hard", elo: 250, maia: 2050 },
+  { id: "hardest", label: "Very hard", elo: 500, maia: 2500 },
 ] as const;
 export type BossDifficultyId = (typeof BOSS_DIFFICULTY)[number]["id"];
 
@@ -1669,44 +1715,9 @@ export function clockAfterVote(clock: number, votes: readonly Augment[], s: Pick
   return Math.max(s.clockRange[0], Math.min(s.clockRange[1], clock + step));
 }
 
-/** How a top rank's pill stands out: a gold ring and sheen, a glow, or a prismatic fill. */
-export type RankEffect = "gilt" | "glow" | "prism";
-
-export interface RankDef {
-  name: string;
-  /** The lowest rating in this rank (on the engine rating's scale). */
-  from: number;
-  /** Its pill color (a prism pill paints a rainbow instead; this is its color elsewhere). */
-  color: string;
-  effect?: RankEffect;
-}
-
 /**
- * The player ranks, lowest first. The names honor Puzzle Pirates, whose skill ladder they are (Eric, Oct 6, 2026).
- * Cutoffs are fixed and rounded to 50, set so a chess-like spread of ratings (center 1500, SD 350) lands about
- * 5 / 7 / 9 / 10 / 11 / 12 / 11 / 10 / 9 / 7 / 5 / 2.5 / 1.2 / 0.3 % in each, lowest first; the shares these cutoffs
- * actually give are in DECISIONS.md ("The rank ladder"). Colors climb from dull gray through earth, green and sky to
- * violet, and the top three are special. Each color keeps its pill readable on both themes (4.5:1 or better).
- */
-export const RATING_RANKS: readonly RankDef[] = [
-  { name: "Novice", from: 0, color: "#a2a6ad" },
-  { name: "Neophyte", from: 950, color: "#b0a590" },
-  { name: "Apprentice", from: 1100, color: "#c0a180" },
-  { name: "Narrow", from: 1250, color: "#d3996f" },
-  { name: "Broad", from: 1350, color: "#a3b053" },
-  { name: "Solid", from: 1450, color: "#6cbd5e" },
-  { name: "Weighty", from: 1550, color: "#3fc28e" },
-  { name: "Expert", from: 1650, color: "#35bfc6" },
-  { name: "Paragon", from: 1750, color: "#52abf1" },
-  { name: "Illustrious", from: 1850, color: "#91a1fa" },
-  { name: "Sublime", from: 1950, color: "#bc93f8" },
-  { name: "Revered", from: 2100, color: "#f2c14e", effect: "gilt" },
-  { name: "Exalted", from: 2250, color: "#ff7e4a", effect: "glow" },
-  { name: "Transcendent", from: 2450, color: "#f472b6", effect: "prism" },
-];
-
-/**
- * The front door (home, queue, profiles): the live line's timing, the queue's show, and the rank ladder.
+ * The front door (home, queue, profiles): the live line's timing and the queue's show. (A rating's own names, RATING_RANKS
+ * "Novice … Transcendent", were retired on Oct 28, 2026: the rank shown everywhere is ranked 1 v 1's tier, RANKED_1V1.)
  * See DECISIONS.md, "The front door".
  */
 export const FRONT_DOOR = {
@@ -1724,8 +1735,6 @@ export const FRONT_DOOR = {
   waitSamples: 20,
   /** Players with a rating needed before a profile shows its percentile ("Top 18%"). */
   percentileMinPlayers: 10,
-  /** The rank ladder (RATING_RANKS) a rating is named by. */
-  ratingRanks: RATING_RANKS,
   /**
    * Home's Boss raid card (Eric, Oct 16): its still portrait moves on to the next playable boss this often (never the
    * Hidden Boss), with a fade of `bossCardFadeMs` (none under reduced motion). Test switch `?cardMs=` (ms) for a quicker
@@ -1979,7 +1988,8 @@ export interface RankTierDef {
 /**
  * Ranked 1 v 1 ("1 v 1 · Classic chess"; Eric, Oct 16, 2026; docs/areas/ranked.md and
  * docs/decisions/2026-10-16-ranked-1v1.md): normal chess between two signed-in players, matched by a hidden rating,
- * with League of Legends style ranks. Every number of the mode is here; core/ranked.ts does the math.
+ * with ranks of tiers and divisions (Wood 5 … Radiant 1, then Pearlescent and Transcendent; Eric, Oct 28). Every number
+ * of the mode is here; core/ranked.ts does the math.
  */
 export const RANKED_1V1 = {
   /**
@@ -2026,29 +2036,41 @@ export const RANKED_1V1 = {
    */
   rating: { start: 1500, seedMin: 800, seedMax: 2400, startRd: 350, minRd: 60, rdPerDay: 18 },
   /**
-   * The ladder (LoL's tiers, Eric: "we can even like take from there exactly"): each tier has divisions 4 → 1 of
-   * `pointsPerDivision` points; past the last tier's division 1 come the apex tiers, with no divisions, each from its
-   * points above Master's start. One number places a player: ladder = division index × 100 + points (Iron 4 0 = 0).
+   * The ladder (Eric, Oct 28: "Maybe we can do puzzle pirates for some actually, wood, silver, gold, paragon, illustrious,
+   * sublime, radiant, pearlescent (top500), transcendent (top 100)"; "each tier has numbers 1-5 within it wood 5 being the
+   * lowest"; "yes 80 per division"). Each tier has divisions 5 → 1 of `pointsPerDivision` points; one number places a
+   * player: ladder = division index × 80 + points (Wood 5 0 = 0, Radiant 1 79 = 2799). 7 × 5 × 80 = 2800 = 7 × 4 × 100,
+   * the old ladder's (Iron … Diamond) length, so a stored ladder keeps its meaning: each tier spans the same 400 points
+   * the old tier in its place did (docs/decisions/2026-10-28-ranked-tiers.md). Each color is its emblem's main color,
+   * readable as a pill on both themes (4.5:1; packages/core/test/ranked.test.ts).
    */
   tiers: [
-    { name: "Iron", color: "#8b8580" },
-    { name: "Bronze", color: "#c08457" },
-    { name: "Silver", color: "#aeb6c2" },
-    { name: "Gold", color: "#f2c14e" },
-    { name: "Platinum", color: "#4fd1c5" },
-    { name: "Emerald", color: "#4ade80" },
-    { name: "Diamond", color: "#7aa7ff" },
+    { name: "Wood", color: "#dcaa66" },
+    { name: "Silver", color: "#b9c3cf" },
+    { name: "Gold", color: "#f0b020" },
+    { name: "Paragon", color: "#56c682" },
+    { name: "Illustrious", color: "#86aeff" },
+    { name: "Sublime", color: "#c096ff" },
+    { name: "Radiant", color: "#ff7e68" },
   ] as readonly RankTierDef[],
-  divisions: 4,
-  pointsPerDivision: 100,
-  apex: [
-    { name: "Master", color: "#c084fc", from: 0 },
-    { name: "Grandmaster", color: "#f87171", from: 200 },
-    { name: "Champion", color: "#fbbf24", from: 500 },
-  ] as readonly (RankTierDef & { from: number })[],
+  divisions: 5,
+  pointsPerDivision: 80,
   /**
-   * Where the ladder sits on the hidden rating: Iron 4 0 points is `baseRating`, each point `ratingPerPoint` more (so
-   * Master's start, 2800 points, is 2400).
+   * The top two tiers, no divisions, by place among the highest ladders: Pearlescent among the `top` 500, Transcendent
+   * among the 100, and only from `topFloor` ladder points (the director's call, Oct 28: with few players the top 100
+   * would otherwise be everyone). Your place is 1 + how many ladders are higher than yours (equal ladders share a
+   * place). At `topFloor` or more but outside the top 500 you stay Radiant 1, your RP counting on past 80 ("Radiant 1 ·
+   * 95 RP"). Where both hold, the smaller `top` (Transcendent) is the one shown.
+   */
+  topTiers: [
+    { name: "Pearlescent", color: "#c8bed8", top: 500 },
+    { name: "Transcendent", color: "#ab90ff", top: 100 },
+  ] as readonly (RankTierDef & { top: number })[],
+  /** The ladder points the top tiers need (Radiant 1's 80 RP: the end of the divisions). */
+  topFloor: 2800,
+  /**
+   * Where the ladder sits on the hidden rating: Wood 5 0 points is `baseRating`, each point `ratingPerPoint` more (so
+   * the top tiers' floor, 2800 points, is 2400). Unchanged by the Oct 28 tiers: a stored ladder means the same rating.
    */
   baseRating: 800,
   ratingPerPoint: 1600 / 2800,
@@ -2058,11 +2080,14 @@ export const RANKED_1V1 = {
    * the ladder's rating) after the game, the adjustment at most ±`maxAdjust` (a draw: half): so a player whose rank is
    * below their play climbs faster, and ranks settle where the hidden rating says. A win never takes points, a loss
    * never gives them. (Without the expected result, a player who keeps beating weaker ones climbed past their rating
-   * for good, and two accounts trading wins reached Champion: reports/ranked-1v1.md.) No promotion series and no
-   * demotion shields: crossing 100 points is the next division, falling below 0 the one before. Never below Iron 4 0.
+   * for good, and two accounts trading wins reached the top tier, then Champion: reports/ranked-1v1.md.) No promotion
+   * series and no demotion shields: crossing 80 points is the next division, falling below 0 the one before. Never below Wood 5 0.
    */
   points: { perGame: 20, perRating: 0.05, maxAdjust: 10 },
-  /** The first `games` rated games are placements ("Placement 2/5"), then the ladder starts from the hidden rating, at most `maxLadder` (Diamond 4 0). */
+  /**
+   * The first `games` rated games are placements ("Placement 2/5"), then the ladder starts from the hidden rating, at most
+   * `maxLadder`: Radiant 5 0 RP (2400; it was Diamond 4 0 before the Oct 28 tiers, the same number).
+   */
   placements: { games: 5, maxLadder: 2400 },
   /**
    * Coins (as Squads pays them), lined up with what a Squads lobby pays per minute played (about 1.8 a minute:
@@ -2255,6 +2280,45 @@ export const GLOBAL_CHAT = {
 } as const;
 
 /**
+ * The town square's chat (Eric, Oct 28: "I think it actually is totally fine to allow typing"): the one chat with typed
+ * messages; every other chat stays preset lines. Signed-in players only (accounts are 13 and older); the server enforces
+ * every number here and the app mirrors them. The room holds its lines in memory only (the live hub), never stored.
+ * The kill switch is the Worker variable PAUSE_TOWN_CHAT (pauses.ts). docs/decisions/2026-10-28-town-chat-typing.md.
+ */
+export const TOWN_CHAT = {
+  /** The most characters in a message, after trimming. */
+  maxChars: 80,
+  /** One message per account every this long. */
+  gapMs: 15_000,
+  /** The same message (case, spaces and punctuation aside) not again from the same account within this long. */
+  repeatMs: 60_000,
+  /**
+   * A line leaves the room this long after it was said, and the app's log drops it then too (Eric, Oct 28: "keep up to 5 minutes of
+   * chat actually"): so Report and a moderator's Remove work on any line a player can still scroll back to. Was 60 s.
+   */
+  lineMs: 300_000,
+  /** A newcomer gets at most this many of the latest lines. */
+  keep: 12,
+  /**
+   * The most lines a device keeps (Eric, Oct 28: "5 minutes, or 100 messages, whichever it hits first"): the oldest go first. The
+   * server's own cap is `holdMax`.
+   */
+  deviceMax: 100,
+  /**
+   * The most lines the room holds at once (all said within `lineMs`); the oldest go first past it. Kept at 300 when `lineMs`
+   * went from 1 to 5 minutes: a device keeps `deviceMax` (100) of the newest, so the room needs only more than that to cover
+   * every line one can show, and the hub hands its whole room to each Worker instance every `readCacheMs`, so a bigger one costs
+   * every read.
+   */
+  holdMax: 300,
+  /**
+   * Each Worker instance reuses the room as it last read it for this long (the live poll's `?town=N`), so the live hub
+   * is asked at most this often per instance however many players read.
+   */
+  readCacheMs: 2_000,
+} as const;
+
+/**
  * Chat moderation (docs/decisions/2026-10-16-chat-moderation.md; docs/areas/chat.md): a moderator's chat bans and how
  * long their decisions are kept. Chat is preset lines only; the free text players see is display names, which the
  * server's filter checks (server/src/text-filter.ts).
@@ -2442,6 +2506,11 @@ export const FAIRPLAY = {
   reports: {
     /** What a report can be about (the sheet's buttons, in order). Only "cheating" counts toward an automatic review. */
     reasons: ["Cheating", "Offensive name or icon", "Something else"] as const,
+    /**
+     * A report from a line in the town square's chat (its menu's Report): it carries the line's text and time, which the
+     * server reads from the room itself. Not one of the profile sheet's buttons: a report of a line needs the line.
+     */
+    chatReason: "Offensive chat",
     /** Reports one account can make a day (one per player per match; outside a match one per player a day). */
     perDay: 20,
     /** Cheating reports from this many different signed-in accounts within `reviewDays` put a player in review. */
@@ -2528,6 +2597,12 @@ export const FAIRPLAY = {
     minTimed: 8,
     /** Timing: think time this little correlated with difficulty (Spearman) is "the same whatever the difficulty". */
     flatCorr: 0.1,
+    /**
+     * Timing: a pick marked a premove (told to the server before any browser could know its position, the same move)
+     * counts as one only when it comes within this long of the clock's start (a premove plays at once: about a round
+     * trip); later, it's timed as any pick. A premove's time is left out of timing (fastHard, timeCorr), nothing else.
+     */
+    premoveMs: 2_000,
   },
   /** The suspicion score: points per signal (each capped), from one match's signals. */
   score: {

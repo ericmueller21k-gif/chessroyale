@@ -606,6 +606,15 @@ export const EFFECTS: Record<EffectName, Effect> = {
   hoopFly: { ch: EFFECT_SPRITES.hoopFly, covers: "square", loop: "fly", sounds: {} },
   hoopRing: { ch: EFFECT_SPRITES.hoopRing, covers: "strip", start: "land", loop: "burn", end: "out", sounds: { whoosh: "tigerWhoosh", thump: "tigerThump", flame: "tigerFlame", puff: "tigerPoof" } },
   balloonHit: { ch: EFFECT_SPRITES.balloonHit, covers: "square", start: "hitHL", sounds: {} },
+  // Folio's (Oct 27): its ink mark and the attack's line under the piece, its paper over a folded one, the crease and the pencil
+  // line warning of it, Revision's strike-through, the ink on a king (effects/folio.ts).
+  inkMark: { ch: EFFECT_SPRITES.inkMark, covers: "square", start: "blot", loop: "mark", end: "fade", sounds: { ink: "folioScratch" } },
+  inkLine: { ch: EFFECT_SPRITES.inkLine, covers: "square", loop: "h", sounds: {} },
+  foldPaper: { ch: EFFECT_SPRITES.foldPaper, covers: "square", start: "fold", loop: "folded", end: "unfold", sounds: { fold: "folioFold", unfold: "folioUnfold" } },
+  creaseEdge: { ch: EFFECT_SPRITES.creaseEdge, covers: "square", start: "inE", loop: "heldE", end: "outE", sounds: { crease: "folioFold", unfold: "folioUnfold" } },
+  creasePencil: { ch: EFFECT_SPRITES.creasePencil, covers: "square", loop: "E", sounds: {} },
+  inkStrike: { ch: EFFECT_SPRITES.inkStrike, covers: "square", start: "strike", loop: "struck", sounds: { strike: "folioScratch" } },
+  inkHit: { ch: EFFECT_SPRITES.inkHit, covers: "square", start: "hitHL", sounds: {} },
 };
 
 // ---------------- Big Boy's toy block, for the board ----------------
@@ -811,6 +820,11 @@ export function waterItem(square: string, i: number, from: "L" | "R", since: num
 /** Babur's i-th balloon bonking on the king's square (on its head, then a little lower, in turn), from his side, and popping. */
 export function balloonItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
   return { square, name: "balloonHit", anim: `hit${i % 2 ? "L" : "H"}${from}`, since };
+}
+
+/** Folio's i-th flick of ink splashing on the king's square (on its head, then a little lower, in turn), from its side. */
+export function inkItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
+  return { square, name: "inkHit", anim: `hit${i % 2 ? "L" : "H"}${from}`, since };
 }
 
 /** Smudgy's i-th blob of paint splatting on the king's square (on its head, then a little lower, in turn), from his side. */

@@ -9,6 +9,7 @@ import type { CarrotView } from "./bosses/hopper.ts";
 import type { CamoView } from "./bosses/smudgy.ts";
 import type { GardenView, WaterAsk } from "./bosses/gardener.ts";
 import type { BalloonAsk, HoopsAsk, TigerView } from "./bosses/tiger.ts";
+import type { CreaseAsk, FolioView } from "./bosses/folio.ts";
 import type { MoveScore } from "./uci.ts";
 /**
  * Messages between the browser and the lobby server (one Durable Object per
@@ -430,6 +431,19 @@ export interface NetBossPowers {
   balloonLast?: TigerView["balloonLast"];
   balloons?: TigerView["balloons"];
   hoops?: TigerView["hoops"];
+  /**
+   * Folio (missing for other bosses and from older servers; an older app ignores them): the Draft's mark (`draft`: the
+   * crowd's piece, the Folio piece attacking it, the squares between, its last crowd turn to answer it), the folded piece
+   * (`folded`: its square while it's folded: refused moves say so), the Crease holding (`crease`: its line, "d|e" between
+   * the d and e files or "4|5" between ranks 4 and 5, and its turns; none of the crowd's pieces crosses it; `side`, the side it stops; Folio's cross it) or warned of
+   * (`creaseNext`: its line, until it lands), and Revision once it has come (`revision`: the two moves crossed out and their
+   * names, its move in their place once played).
+   */
+  draft?: FolioView["draft"];
+  folded?: FolioView["folded"];
+  crease?: FolioView["crease"];
+  creaseNext?: FolioView["creaseNext"];
+  revision?: FolioView["revision"];
 }
 
 /**
@@ -516,8 +530,17 @@ export type ClientMessage =
   /** No rating: the lobby reads the one stored on the player's account (one an older app still sends is ignored). */
   | { t: "hello"; token?: string; name?: string; device?: "phone" | "computer"; practice?: boolean; look?: unknown; lastBoss?: string | null; evalBar?: boolean }
   | { t: "start" }
-  /** `away`: times the page was hidden or lost focus during this move's clock before the pick (fair play). */
-  | { t: "pick"; key: string; move: string; away?: number }
+  /**
+   * `away`: times the page was hidden or lost focus during this move's clock before the pick (fair play). `premove`: a
+   * premove played as the turn opened (fair play leaves its time out only if `premove` named it before the turn opened).
+   */
+  | { t: "pick"; key: string; move: string; away?: number; premove?: true }
+  /**
+   * Your first premove (chess.com's: a move made ahead while it isn't your turn; null: none now), sent as it changes. The
+   * server keeps it only while you can't pick (no turn of yours open, or you've picked in it), for your next turn, and
+   * counts it only if it came before any browser could know that turn's position (the lobby's premoveAhead).
+   */
+  | { t: "premove"; move: string | null }
   | { t: "powerUp"; key: string }
   | { t: "scores"; key: string; boards: BoardScore[] }
   | { t: "crossCheck"; key: string; boardId: number; ok: boolean; detail?: string }
@@ -539,9 +562,10 @@ export type ClientMessage =
    * `beam`): the crowd's top moves after his move, best first (beamLines); the server checks each. `balloon` (the circus
    * tiger's, asked with `balloon`): the square his balloon lands on after his move (landFrom); the server checks it. `hoops`
    * (the circus tiger's, asked with `hoops`): the cast after his move, its blocks by their corners in throw order
-   * (hoopsAnswer's, "c3 f5 b6"; "" none); the server checks it (hoopsCheck).
+   * (hoopsAnswer's, "c3 f5 b6"; "" none); the server checks it (hoopsCheck). `crease` (Folio's, asked with `crease`): the
+   * Crease's line after his move (creaseAnswer's, "d|e" or "4|5"; "" none); the server checks it (creaseCheck).
    */
-  | { t: "bossMove"; key: string; move: string; drag?: string; showdown?: string; outside?: boolean; beam?: string[]; balloon?: string; hoops?: string }
+  | { t: "bossMove"; key: string; move: string; drag?: string; showdown?: string; outside?: boolean; beam?: string[]; balloon?: string; hoops?: string; crease?: string }
   /** Leaving before the match starts (Cancel in the queue): the seat is freed. */
   | { t: "leave" }
   /**
@@ -873,6 +897,14 @@ export type ServerMessage = { now: number } & (
        * (hoopsCheck). An older app ignores it and sends his move alone: the hoops wait for his next move.
        */
       hoops?: HoopsAsk;
+      /**
+       * Folio's Crease is wanted with this move (its warning, or the admins' trigger, as the crowd's next turn begins): the
+       * order ties are broken in. Play its move as ever, then answer the line as the move's `crease` (creaseAnswer, on the
+       * position after the move: the line costing the crowd nearest the band's middle; "" with no engine or none allowed).
+       * The server checks it (creaseCheck). An older app ignores it and sends the move alone: the warning waits for its
+       * next move.
+       */
+      crease?: CreaseAsk;
       /**
        * The circus tiger's balloon is due at the end of this turn: where it lands (landFrom, on the position after his move,
        * with the cast's hoops when `hoops` is asked too: hoopsAnswer), answered as the move's `balloon`. Asked the same for a

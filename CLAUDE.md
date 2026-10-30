@@ -83,8 +83,15 @@ spelling in names too; older names (e.g. `colour`) stay until touched.
     `npx playwright test --grep @perf --project phone`), under the shared e2e lock.
   - **The director checks main's full run after every merge** and fixes red forward right away, before the next merge
     (or reverts). A red spec: re-run it once; if it's real, find the PR that caused it and fix it forward.
-  - **Light lane** (numbers or data in settings or vote data, copy, CSS-only, docs): `check` and the PR's e2e run, plus
-    the live check after the deploy. No sims: estimate instead.
+  - **Light lane** (numbers or data in settings or vote data, copy, CSS-only, docs, and small UI and layout moves:
+    markup and CSS that move or resize things, no new logic): `check` and the PR's e2e run, plus the live check after the
+    deploy. No sims: estimate instead. Eric, Oct 29 (a 30-line layout move cost a helper about 470k tokens, nearly all of
+    it process): "Yea absolutely" to keeping these jobs small:
+    - frame rate measured only when the drawing or the frame loop changes (eric.md, the town square);
+    - a decision note of about five lines (Eric's words, what changed, any call made), not a long file;
+    - one focused check added to an existing spec, not a new spec file, unless the director asks;
+    - a short PR body (what changed, player-visible changes, changed checks old → new);
+    - one still for Eric (a full screen per platform touched), not a set; mockup first for anything new.
   - **Targeted lane** (pre-launch default for logic: rules, the board, shared components, screens): `check` and the
     PR's e2e run (the touched areas' specs: the PR lists them and why), plus the live check. Eric, Oct 14: "if an agent
     is confident in its code we can reduce token usage and testing to a minimum". What a change touches decides its

@@ -7,7 +7,7 @@
  */
 import type { Anim, Character, Frame, Layer, Part } from "../../characters/sprite.ts";
 import { GARDENER_PALETTE } from "../../characters/gardener.ts";
-import { flower, grain, groundShadow, paint, signBoard, signFace, type Pt } from "./kit.ts";
+import { flower, grain, groundShadow, paint, signBoard, signFace, WARM, type LightPool, type LightSpot, type Pt } from "./kit.ts";
 
 const G_ = GARDENER_PALETTE;
 const PALETTE: Record<string, string> = {
@@ -242,3 +242,11 @@ export const HOUSE_GARDENER: Character = {
 
 /** Where the sign's blank face is (frame pixels), for the game to write "Puddles' Botanical Garden" on. */
 export const HOUSE_GARDENER_SIGN = signFace(BOARD[0], BOARD[1], BW, BH);
+
+/** Its lights at dusk and night (Oct 27): the greenhouse glows through its glass (walls and gable, the plants behind it), and its open door's leafy inside. */
+export const HOUSE_GARDENER_LIGHTS: readonly LightSpot[] = [
+  { x: GL, y: TOP, w: GR - GL, h: BASE - TOP, keys: "qrtFG", color: WARM, strength: 0.45 },
+  { x: GL - 4, y: PEAK, w: GR - GL + 8, h: TOP - PEAK, keys: "qrt", color: WARM, strength: 0.4 },
+  { x: CX - 12, y: 66, w: 24, h: 37, keys: "FGgE", color: WARM, strength: 0.6 },
+];
+export const HOUSE_GARDENER_POOLS: readonly LightPool[] = [{ x: CX, y: FOOT - 2, rx: 16, ry: 4, color: WARM, strength: 0.25 }];

@@ -26,6 +26,7 @@ const PASSIVE_EVENTS: Partial<Record<PowerId, PowerEventKind[]>> = {
   moonbeam: ["moonbeam"],
   seeds: ["plantMany"],
   balloons: ["place"],
+  draft: ["draft"],
 };
 
 const PLAYABLE = BOSS_ROSTER.filter(isPlayable);

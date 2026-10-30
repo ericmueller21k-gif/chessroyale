@@ -195,7 +195,7 @@ describe("the 1 v 1 screens' words and clocks", () => {
     expect(ranked1v1Label()).toBeNull();
     const state = acc.account() as { profile: unknown };
     state.profile = { user: { id: "u", name: "Ann" }, ranked1v1: { rank: rankView({ games: 9, ladder: 1245 }), games: 9, wins: 5, losses: 4, draws: 0 } };
-    expect(ranked1v1Label()).toBe("Gold 4 · 45 RP");
+    expect(ranked1v1Label()).toBe("Paragon 5 · 45 RP");
     state.profile = { user: { id: "u", name: "Ann" } };
     expect(ranked1v1Label()).toBe("Placement 0/5");
   });

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "preact/hooks";
 import { BOSS_POWERS } from "@chessroyale/core";
 import { applyMove, fenAtPly, legalMoves, sideToMove } from "@chessroyale/chess";
 import { Board, type Arrow } from "../components/Board.tsx";
+import { seatKey } from "../board/yours.ts";
 import { seenFen, seenSan } from "../camo.ts";
 import { COUNT_FROM_SECONDS, CenterCount, TimerBar, useTicks } from "../components/Countdown.tsx";
 import { BoardClock } from "../components/BoardClock.tsx";
@@ -161,6 +162,11 @@ export function PlayScreen({
   const dark = useMemo(() => (match.boss?.powers?.dark ?? []).map((d) => d.square), [match.boss?.powers?.dark?.map((d) => d.square).join()]);
   const note = match.darkNote;
   const canMove = !waiting && !intro && !shown.replaying && !history.browsing && !striking && !note?.pending;
+  // Premoves (chess.com's; docs/areas/board.md): kept by the match, this board and your side through the boss's and the
+  // other team's screens; the first plays as soon as you can move (after the opening and the countdown). Not in Classic's
+  // rounds (you move every round, then on another board: there's no turn of the other side's to move ahead of) nor in a
+  // final (its turns go round the team), nor while you look back through the moves.
+  const premove = !history.browsing && !match.final && match.settings.mode === "crowd" ? { key: seatKey(match, board.id, side), side } : undefined;
   // A move a boss power refuses (legal in chess: across Sawyer's saw, onto a pie…) stays put: why, in the dock, for a
   // few seconds (refused.ts; Eric, Oct 17: it "glitched"). And the boss's last move, if it went through a power (his
   // only move: the limit lifted for it), says so through your turn.
@@ -243,7 +249,7 @@ export function PlayScreen({
         <div class="board-row">
           {match.boss && <BossSide match={match} />}
           <EvalBar fen={history.fen ?? board.fen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
-          <Board fen={fen} unmasked={drawnTrue} orientation={orientation} turn={view.turn} lastMove={lastMove} interactive={canMove} moves={offeredMoves} stopped={stoppedMove} onMove={(m) => match.submit(m)} onRefused={match.boss ? (m) => setRefused({ line: refusedLine(match.boss!, board.fen, m), fen: board.fen, at: Date.now() }) : undefined} arrows={arrows} dark={dark} onDarkTry={(m) => match.darkTry(m)} elephants={history.browsing ? undefined : match.boss?.powers?.elephants}>
+          <Board fen={fen} unmasked={drawnTrue} orientation={orientation} turn={view.turn} lastMove={lastMove} interactive={canMove} moves={offeredMoves} stopped={stoppedMove} onMove={(m, how) => match.submit(m, how?.premove)} premove={premove} onRefused={match.boss ? (m) => setRefused({ line: refusedLine(match.boss!, board.fen, m), fen: board.fen, at: Date.now() }) : undefined} arrows={arrows} dark={dark} onDarkTry={(m) => match.darkTry(m)} elephants={history.browsing ? undefined : match.boss?.powers?.elephants}>
             {/* (Stepping back through the game keeps the dark on its squares: it belongs to the square.) */}
             {match.boss?.powers && (!history.browsing || dark.length > 0) && <PowerBoard boss={match.boss} orientation={orientation} fen={fen} />}
             {note && !note.pending && <DarkCost square={note.move.slice(2, 4)} since={note.at} now={now} orientation={orientation} />}

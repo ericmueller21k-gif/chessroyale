@@ -1,19 +1,19 @@
-import { Fragment } from "preact";
-import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import { BOSS_TIERS, FAIRPLAY, SLOT_NAMES, bossInfo, isShiny, itemColor, itemDef, purity, secondColor, tierInfo, type ItemLook } from "@chessroyale/core";
-import { BackButton, DressedPawn, FdButton, GearIcon, RankPill, WORN_ORDER } from "../components/FrontDoor.tsx";
-import { ItemArt } from "../components/Items.tsx";
+import { useEffect, useState } from "preact/hooks";
+import { BOSS_TIERS, rankView } from "@chessroyale/core";
+import { BackButton, DressedPawn, FdButton, GearIcon, RatingPill } from "../components/FrontDoor.tsx";
 import { DuelRankPill } from "../components/DuelRankPill.tsx";
+import { RankEmblem } from "../components/RankEmblem.tsx";
+import { yourRankShown } from "../ranked.ts";
 import { IconEditor, UserIcon } from "../components/PixelIcon.tsx";
 import { SignIn } from "../components/SignIn.tsx";
 import { QuickChatPicks } from "../components/ChatPicks.tsx";
-import { FriendsBadge, ProfileFriendActions } from "../components/Friends.tsx";
+import { FriendsBadge } from "../components/Friends.tsx";
+import { Recent, Wearing } from "../components/ProfileParts.tsx";
 import { friendsBadge, useFriends } from "../friends.ts";
-import { account, fetchProfile, onAccountChange, reportPlayer, tooYoung, updateProfile, youngGuest, type PublicProfile } from "../account.ts";
-import type { ProfileTarget } from "../profile-nav.ts";
-import { ordinal } from "./StageBreak.tsx";
-
-const nth = (n: number) => `${n}${ordinal(n)}`;
+import { account, fetchProfile, onAccountChange, tooYoung, updateProfile, youngGuest, type PublicProfile } from "../account.ts";
+import { openProfile, type ProfileTarget } from "../profile-nav.ts";
+import { nth } from "../public-profile.ts";
+import { PublicProfileScreen } from "./PublicProfile.tsx";
 
 /** "Online now", or when they were last seen. */
 function seenLine(p: PublicProfile, now = Date.now()): string {
@@ -26,61 +26,6 @@ function seenLine(p: PublicProfile, now = Date.now()): string {
   if (h < 24) return `Last seen ${h} h ago`;
   const d = Math.round(h / 24);
   return d === 1 ? "Last seen yesterday" : d < 7 ? `Last seen ${d} days ago` : `Last seen ${new Date(p.lastSeen).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
-}
-
-/** "today", "yesterday", "3 days ago", else the date. */
-function when(at: number, now = Date.now()): string {
-  const day = (t: number) => Math.floor((t - new Date(t).getTimezoneOffset() * 60_000) / 86_400_000);
-  const d = day(now) - day(at);
-  if (d <= 0) return "today";
-  if (d === 1) return "yesterday";
-  if (d < 7) return `${d} days ago`;
-  return new Date(at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
-/** What they wear, one row per item: the item itself (as it looks on them), slot, color, purity and tier. */
-function Wearing({ look, own }: { look: ItemLook; own: boolean }) {
-  const rows = WORN_ORDER.flatMap((slot) => {
-    const it = look[slot];
-    const d = it && itemDef(it.def);
-    return it && d ? [{ slot, it, d }] : [];
-  });
-  return (
-    <section class="fd-section" aria-labelledby="wearing-label">
-      <h2 class="fd-label" id="wearing-label">
-        WEARING
-      </h2>
-      {!rows.length && <p class="fd-note">{own ? "Nothing yet. Open a crate in the shop, then wear it from your locker." : "Nothing yet."}</p>}
-      {rows.map(({ slot, it, d }) => {
-        const c = itemColor(it.color);
-        const second = secondColor(it);
-        const c2 = second ? itemColor(second) : null;
-        const tier = tierInfo(d.tier);
-        return (
-          <div key={slot} class="fd-item">
-            <span class="fd-thumb" aria-hidden="true">
-              <ItemArt def={it.def} finish={it} />
-            </span>
-            <span class="fd-item-text">
-              <strong>{d.name}</strong>
-              <span>
-                {/* Each detail stays whole; a narrow row breaks between them. */}
-                {[SLOT_NAMES[slot], c2 ? `${c.name} & ${c2.name}` : c.name, `${purity(it.blemish)}% pure`, ...(isShiny(it.blemish) ? ["Shiny"] : [])].map((t, i) => (
-                  <Fragment key={i}>
-                    {i > 0 && " · "}
-                    <span class="fd-nowrap">{t}</span>
-                  </Fragment>
-                ))}
-              </span>
-            </span>
-            <span class="fd-tier" style={{ background: tier.color }}>
-              {tier.name}
-            </span>
-          </div>
-        );
-      })}
-    </section>
-  );
 }
 
 /** The rating after each of the last 30 rated matches, as a line. */
@@ -119,20 +64,35 @@ const pct = (v: number | null) => (v === null ? "—" : `${v}%`);
  * Ranked 1 v 1: their rank (or placements) and their record, once they've played a ranked game. Nothing for a banned
  * player (as the rating), nor for one who never played.
  */
-function Ranked1v1({ p }: { p: PublicProfile }) {
+function Ranked1v1({ p, own }: { p: PublicProfile; own: boolean }) {
   const r = p.ranked1v1;
-  if (!r || r.games === 0) return null;
+  const real = r?.rank ?? rankView(null);
+  // (Your own: an admin's `?rank=` in its place, shown even before a game, so every emblem can be seen.)
+  const rank = own ? yourRankShown(real) : real;
+  if (!r || (r.games === 0 && rank === real)) return null;
   return (
     <section class="fd-section dv-profile" aria-label="1 v 1 rank">
       <h2 class="fd-label">1 V 1</h2>
       <div class="fd-panel dv-profile-row">
-        <DuelRankPill rank={r.rank} class="dv-rank-big" />
-        <span class="dv-record">
-          {r.wins} won · {r.losses} lost · {r.draws} drawn
+        <RankEmblem rank={rank} scale={2} class="dv-profile-emblem" />
+        <span class="dv-profile-words">
+          <DuelRankPill rank={rank} class="dv-rank-big" />
+          <span class="dv-record">
+            {r.wins} won · {r.losses} lost · {r.draws} drawn
+          </span>
         </span>
       </div>
     </section>
   );
+}
+
+/** The profile card's rank pill: their 1 v 1 rank once they've played a ranked game (your own: an admin's `?rank=`), else nothing. */
+function HeaderRank({ p, own }: { p: PublicProfile; own: boolean }) {
+  const r = p.ranked1v1;
+  const real = r?.rank ?? rankView(null);
+  const rank = own ? yourRankShown(real) : real;
+  if (!r || (r.games === 0 && rank === real)) return null;
+  return <DuelRankPill rank={rank} class="fd-card-rank" />;
 }
 
 function Stats({ p, own }: { p: PublicProfile; own: boolean }) {
@@ -199,47 +159,6 @@ function Bosses({ beaten }: { beaten: number[] }) {
           );
         })}
       </div>
-    </section>
-  );
-}
-
-/** `mark`: one match to point out (when it was played), scrolled to: "See your result" for a lobby that has closed. */
-function Recent({ p, mark }: { p: PublicProfile; mark?: number }) {
-  const marked = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => marked.current?.scrollIntoView({ block: "center" }), [p, mark]);
-  return (
-    <section class="fd-section">
-      <h2 class="fd-label">RECENT MATCHES</h2>
-      {!p.recent.length && <p class="fd-note">No matches yet.</p>}
-      {p.recent.map((r, i) => {
-        const boss = r.mode === "boss";
-        const place = boss ? (r.won === true ? "Won" : r.won === false ? "Lost" : r.survived === false ? "Out" : r.survived === true ? "Draw" : nth(r.placement)) : nth(r.placement);
-        const gold = boss ? r.won === true : r.placement === 1;
-        // (A Crowd match with no team: everyone moves, a choice until Oct 15, 2026. Older records keep saying so.)
-        const mode =
-          r.mode === "crowd"
-            ? `Crowd · ${r.team ? "50 v 50" : "everyone moves"}`
-            : boss
-              ? `Boss raid · ${r.bossElo ? `${bossInfo(r.bossElo, r.bossId).name} ${r.bossElo}` : "a boss"}`
-              : `Classic · ${r.players} players`;
-        return (
-          <div
-            key={`${r.playedAt}-${i}`}
-            class={`fd-match${mark !== undefined && r.playedAt === mark ? " marked" : ""}`}
-            ref={mark !== undefined && r.playedAt === mark ? marked : undefined}
-            aria-current={mark !== undefined && r.playedAt === mark ? "true" : undefined}
-          >
-            <span class={`fd-place${gold ? " gold" : ""}`}>{place}</span>
-            <span class="fd-match-text">
-              <strong>
-                {mode}
-                {r.online ? (r.ranked === false ? " · unranked" : "") : " · solo"}
-              </strong>
-              <span>{[r.bestMove ? `Best move ${r.bestMove}` : null, when(r.playedAt)].filter(Boolean).join(" · ")}</span>
-            </span>
-          </div>
-        );
-      })}
     </section>
   );
 }
@@ -311,50 +230,11 @@ function EditSheet({ onClose }: { onClose: () => void }) {
   );
 }
 
-/** The report sheet: a reason, then the server's answer. `match`: the lobby's code when it's opened during a match. */
-function ReportSheet({ p, match, onClose }: { p: PublicProfile; match?: string; onClose: () => void }) {
-  const [sent, setSent] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  return (
-    <div class="fd-sheet-scrim" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div class="fd-sheet" role="dialog" aria-modal="true" aria-labelledby="report-title">
-        <div class="fd-sheet-head">
-          <h2 id="report-title">Report {p.name}</h2>
-          <button type="button" class="fd-icon-btn" aria-label="Close" onClick={onClose}>
-            ✕
-          </button>
-        </div>
-        {sent ? (
-          <p class="fd-sub">{sent}</p>
-        ) : (
-          <>
-            <p class="fd-sub">What's wrong? Reports are read by a person; nobody else sees them.</p>
-            {FAIRPLAY.reports.reasons.map((r) => (
-              <FdButton
-                key={r}
-                disabled={busy}
-                onClick={() => {
-                  setBusy(true);
-                  void reportPlayer(p.id, r, match)
-                    .then((m) => setSent(m))
-                    .catch((e: Error) => setSent(e.message))
-                    .finally(() => setBusy(false));
-                }}
-              >
-                {r}
-              </FdButton>
-            ))}
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
 /**
- * A profile (docs/mockups/front-door/Profile.dc.html): one structure for everyone. Yours adds Edit name & icon,
- * Open locker and settings; someone else's adds Add friend, Invite to play, Block and Report. Nothing private is ever shown:
- * the server's public profile has no email, sign-in method or icon in it.
+ * A profile screen (docs/decisions/2026-10-28-public-profile.md). Another player's name or face opens the public profile
+ * (PublicProfile.tsx: the same page for everyone, Eric, Oct 28). Your own pawn opens this one, today's, which has your
+ * coins, Edit name & icon, the locker, Friends, Quick chat and Settings, and "View public profile" at its top (that page,
+ * as others see yours). A bot, or someone with no account, gets a card saying so.
  */
 export function PlayerProfileScreen({
   target,
@@ -366,7 +246,7 @@ export function PlayerProfileScreen({
   match,
 }: {
   target: ProfileTarget;
-  /** Opened during an online match: its lobby's code (a report made here is about this match). */
+  /** Opened during an online match: its lobby's code (a report made on the public profile is about this match). */
   match?: string;
   onBack: () => void;
   onLocker?: () => void;
@@ -374,6 +254,37 @@ export function PlayerProfileScreen({
   /** The shop's chat packs (a locked line in Quick chat and emoji). */
   onShop?: () => void;
   /** Your friends list (a phone's way there: Eric, Oct 18, off home). */
+  onFriends?: () => void;
+}) {
+  // (Yours from your own pawn, a name of yours, a bot or someone with no account: this screen. Everyone else's, and yours as
+  // others see it: the public profile.)
+  const mine = !!target.you && !target.public;
+  if (!target.bot && !mine && (target.uid || target.you)) {
+    return (
+      <PublicProfileScreen
+        target={target}
+        match={match}
+        // (Your own public page goes back to your profile, where you pressed "View public profile".)
+        onBack={target.you ? () => openProfile({ you: true, name: target.name }) : onBack}
+      />
+    );
+  }
+  return <OwnProfileScreen target={target} onBack={onBack} onLocker={onLocker} onSettings={onSettings} onShop={onShop} onFriends={onFriends} />;
+}
+
+function OwnProfileScreen({
+  target,
+  onBack,
+  onLocker,
+  onSettings,
+  onShop,
+  onFriends,
+}: {
+  target: ProfileTarget;
+  onBack: () => void;
+  onLocker?: () => void;
+  onSettings?: () => void;
+  onShop?: () => void;
   onFriends?: () => void;
 }) {
   const [, rerender] = useState(0);
@@ -384,7 +295,7 @@ export function PlayerProfileScreen({
   const uid = own ? me?.user.id : target.uid;
   const [p, setP] = useState<PublicProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [sheet, setSheet] = useState<null | "edit" | "report">(null);
+  const [sheet, setSheet] = useState<null | "edit">(null);
   // Your own reloads when your account changes (a new name, something new to wear).
   const version = own ? `${me?.user.name}|${JSON.stringify(me?.locker?.look ?? {})}` : "";
   useEffect(() => {
@@ -412,6 +323,14 @@ export function PlayerProfileScreen({
     </header>
   );
 
+  // (Your own page for others: the one line at the top that's new, Oct 28. It's the public profile, as it shows you to others.)
+  const viewPublic =
+    own && uid ? (
+      <button type="button" class="fd-row-link fd-view-public" onClick={() => openProfile({ uid, name: me?.user.name ?? target.name, you: true, public: true })}>
+        View public profile
+      </button>
+    ) : null;
+
   // A bot: no profile, just who it is.
   if (target.bot || (!uid && !own)) {
     return (
@@ -435,6 +354,7 @@ export function PlayerProfileScreen({
     return (
       <div class="fd-page fd-profile">
         {head}
+        {viewPublic}
         <div class="fd-card">
           <DressedPawn size="profile" shadow look={own ? me?.locker?.look : undefined} />
           <div class="fd-card-name">{own ? (me?.user.name ?? target.name) : target.name}</div>
@@ -448,6 +368,7 @@ export function PlayerProfileScreen({
   return (
     <div class="fd-page fd-profile">
       {head}
+      {viewPublic}
       {/* Two columns on a computer: who they are and what they wear; then their numbers. One column on a phone. */}
       <div class="fd-profile-col">
       <div class="fd-card">
@@ -458,7 +379,9 @@ export function PlayerProfileScreen({
           {seenLine(p)} · joined {joined}
         </div>
         <div class="fd-pills">
-          {p.banned ? <span class="fd-pill fp-banned">Banned</span> : <RankPill tier={p.tier} rating={p.rating} />}
+          {/* (The rank shown is 1 v 1's since Oct 28, once they've played one; the crowd rating's number beside it, no rank name.) */}
+          {p.banned ? <span class="fd-pill fp-banned">Banned</span> : <HeaderRank p={p} own={own} />}
+          {!p.banned && <RatingPill rating={p.rating} />}
           {p.topPercent !== null && <span class="fd-pill">Top {p.topPercent}%</span>}
           {/* (Your coins: on your profile and in the shop, not in home's top bar, Eric, Oct 18.) */}
           {own && me?.shop && <span class="fd-pill fp-coins">● {me.shop.coins.toLocaleString("en-US")} coins</span>}
@@ -489,7 +412,7 @@ export function PlayerProfileScreen({
       {own && <QuickChatPicks onShop={onShop} focus={target.section === "chat"} />}
       </div>
       <div class="fd-profile-col">
-      <Ranked1v1 p={p} />
+      <Ranked1v1 p={p} own={own} />
       <Stats p={p} own={own} />
       <Bosses beaten={p.bossesBeaten} />
       <Recent p={p} mark={own ? target.match : undefined} />
@@ -510,12 +433,9 @@ export function PlayerProfileScreen({
             </button>
           )}
         </>
-      ) : (
-        <ProfileFriendActions uid={p.id} name={p.name} onReport={() => setSheet("report")} />
-      )}
+      ) : null}
       </div>
       {sheet === "edit" && <EditSheet onClose={() => setSheet(null)} />}
-      {sheet === "report" && <ReportSheet p={p} match={match} onClose={() => setSheet(null)} />}
     </div>
   );
 }

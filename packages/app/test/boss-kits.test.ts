@@ -6,7 +6,7 @@ import type { Beat } from "../src/characters/boss-beats.ts";
 /** Every moment a boss character plays (characters/boss-beats.ts). */
 const BEATS: Beat[] = ["entrance", "idle", "thinking", "move", "capture", "hurt", "check", "smug", "rattled", "defeat", "victory", "strike"];
 /** The animation each power's moment plays (BossPowers.tsx). */
-const POWER_ANIMS: Record<string, string> = { freeze: "freezeCast", blizzard: "blizzard", pie: "pieThrow", funhouse: "funhouse", sparkler: "ignite", candle: "romanCandle", dark: "darkCast", lightsout: "lightsOut", blocks: "toss", bounce: "bigBounce", cuts: "sawDown", boardsaw: "boardSaw", drag: "lasso", showdown: "windup", tusks: "tusksCast", slam: "mammothSlam", leapfrog: "leapfrog", carrotpatch: "carrotPatch", camouflage: "camouflage", repaint: "repaint", moonbeam: "moonbeam", fullmoon: "fullMoon", seeds: "plant", water: "water", balloons: "place", hoops: "hoops" };
+const POWER_ANIMS: Record<string, string> = { freeze: "freezeCast", blizzard: "blizzard", pie: "pieThrow", funhouse: "funhouse", sparkler: "ignite", candle: "romanCandle", dark: "darkCast", lightsout: "lightsOut", blocks: "toss", bounce: "bigBounce", cuts: "sawDown", boardsaw: "boardSaw", drag: "lasso", showdown: "windup", tusks: "tusksCast", slam: "mammothSlam", leapfrog: "leapfrog", carrotpatch: "carrotPatch", camouflage: "camouflage", repaint: "repaint", moonbeam: "moonbeam", fullmoon: "fullMoon", seeds: "plant", water: "water", balloons: "place", hoops: "hoops", draft: "check", crease: "move" };
 
 describe("the playable rule: a complete character and its powers", () => {
   it("every boss that can be met has a complete character kit: every moment, its powers' moments, lines and a portrait", () => {

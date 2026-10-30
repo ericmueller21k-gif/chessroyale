@@ -3,6 +3,7 @@ import type { ComponentChildren } from "preact";
 import { BackButton } from "../components/FrontDoor.tsx";
 import { FAQ_INTRO, faqPage } from "../faq/content.ts";
 import type { Block, Inline } from "../faq/markdown.ts";
+import { RankEmblem } from "../components/RankEmblem.tsx";
 
 /**
  * The FAQ, "How HunChess works" (Settings → FAQ · How it works; Eric, Oct 11). Its words and numbers are in
@@ -79,6 +80,17 @@ function BlockView({ b }: { b: Block }) {
         <div class="faq-formula">
           {b.lines.map((l, i) => (
             <div key={i}>{l}</div>
+          ))}
+        </div>
+      );
+    case "emblems":
+      return (
+        <div class="faq-emblems">
+          {b.items.map((it) => (
+            <figure key={it.id} class="faq-emblem">
+              <RankEmblem id={it.id} />
+              <figcaption>{it.caption}</figcaption>
+            </figure>
           ))}
         </div>
       );
