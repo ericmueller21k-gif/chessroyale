@@ -20,8 +20,11 @@ links Eric's notes); this page is what's built.
   eight at random. Drag (or swipe) the arena to turn your view a little: never so far the board's middle leaves the screen
   (`turnLimits`). On a computer the lens is shifted so the board sits in the middle of what the overlay leaves.
 - **The crowd.** Every seat filled (about 2,100 people): the town's pawns in their tints, pawns in crate items seeded the
-  way every bot's look is (`botLook`), the town's bots in their own looks, the bosses' sidekicks (about 6%) and now and then a
-  boss (about 1%, never just in front of a view's seat). One instanced draw call, uploaded once; each turns round its
+  way every bot's look is (`botLook`), the town's pawn bots in their own looks. **The bosses** (Eric, Oct 30): every boss with a
+  sidekick sits exactly once, across two seats with its sidekick in the next, in rows 1 to 3, spread round the ring, at seats
+  that never change (`arena.ts` `bossSeats`: the same in every view and on every load), never where one would cover the board
+  from any of the ten views (`coversBoard`); bosses stand 1.4 m (1.15 before), sidekicks as they were; no other boss or
+  sidekick in the stands, and never the Hidden Boss. One instanced draw call, uploaded once; each turns round its
   upright axis to face you. **Seen from behind** (the rows in front of your seat): no item has back art, so a person
   whose front faces away from you is drawn as its own picture mirrored and darkened toward a shadow; hats and outlines
   read, no face looks back at you. Of the rows below your seat only the one just in front is drawn, smaller and a
@@ -70,7 +73,8 @@ drawn yet: the railing in front of your seat, pawn backs (done by the shader), f
 
 ## Tests
 
-- `packages/app/test/colosseum.test.ts`: the seats and aisles, the ten views (eight angles, lower and higher; the player
+- `packages/app/test/colosseum.test.ts`: the bosses in the crowd (each with a sidekick once, side by side, rows 1 to 3, the
+  same seats every build, none covering the board), the seats and aisles, the ten views (eight angles, lower and higher; the player
   views 6 m up), no pillar or statue between a seat and the board, the whole board in every view turned as far as it may
   go (phone and computer), Change seat never the same seat, a move's pieces (slide, capture, castling, en passant), the
   overlay's words, a game played to its end and the next one started, a flag.
