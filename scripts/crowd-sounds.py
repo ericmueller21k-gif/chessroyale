@@ -1,30 +1,28 @@
 """
-The Colosseum's crowd (Eric, Oct 30: "crowd cheer, crowd shocked, crowd boo, and crowd ambient noise ... steady
-background layered chatter like you'd hear watching a FIFA World Cup game"). Step 1: candidates for Eric to hear,
-each made two ways, so he can compare; nothing here is wired into the game yet.
+The Colosseum's crowd (Eric, Oct 30: "steady background layered chatter like you'd hear watching a FIFA World Cup
+game", "sword clanging once in a while, and maybe shield blocking"). Not wired into the game yet.
 
-- A: built from free recordings (CC0 or public domain first; CC BY only where nothing CC0 was good: Gregor
-  Quendel's crowd, for the ambient and the cheer), trimmed, layered into a bigger crowd, EQ'd and leveled here. Each
-  recording's URL, author and license are in SOURCES (below); the CREDITS.md handed over with the files repeats them.
-- B: made here from nothing: many detuned "voices" (a buzzing glottal source through moving vowel formants, with
-  breath and consonant noise) talking, cheering, gasping or booing, layered near and far, with a synthetic stadium
-  echo. Ours: no third-party rights.
+What Eric kept from the first candidates (Oct 30): ambient B (his favorite, "a little faint": now more chatter, cleaner)
+and cheer A. Shocked, boo and cheer B were dropped (in git history: commit 7ae46b82).
 
-The four, each as A and B:
-- ambient: a seamless loop (24 s): a big stadium's steady murmur, layered chatter far and near, no clear words, nothing
-  that pops out.
-- cheer (3.5 s): a crowd erupting and settling.
-- shocked (1.6 s): a crowd's sharp "ooh!".
-- boo (2.6 s): a crowd booing, good-natured.
+- The bed: two seamless loops of different lengths (24 s and 31 s) played together, each at -3 dB, so the pair only
+  repeats every 744 s (12.4 minutes; LCM of 24 and 31) and neither loop's seam is heard on its own. B: made here from
+  nothing (~250 voices talking with no words, near and far, with a synthetic stadium echo); A: Gregor Quendel's
+  recorded crowd (CC BY 4.0), 24 s and 29 s (its steady part is only 27 s long).
+- The clangs: 8 one-shots from the arena floor, made here (modal synthesis: inharmonic partials with a noise
+  transient, then a stadium echo): 5 sword on sword (bright, ringing) and 3 sword on shield (a duller body knock).
+  The game plays one every 3 to 7 s at random: a random one (never the same twice running), -4 to 0 dB, panned a
+  little left or right.
+- cheer-A: Quendel's strong cheering with Sandermotions' applause (CC0), erupting and settling (3.5 s).
+- ambient-mix-A, ambient-mix-B: 90 s previews of that scheme (stereo), for Eric to hear what the game would play.
 
 Leveled as the game levels its sounds (piece-sounds.py's `loudness`: the loudest 30 ms through a phone speaker's
-200 Hz high-pass and the game's 6 kHz low-pass): the reactions at a move's loudness (sounds/move.mp3); the ambient
-LEVELS["ambient"] dB under it, so it sits well under a move and you can talk over it. mp3, mono, 96 kb/s.
+200 Hz high-pass and the game's 6 kHz low-pass), relative to a move (sounds/move.mp3): LEVELS. mp3, mono, 96 kb/s.
 
     # the recordings for the A files, in one folder (each file's URL is in SOURCES below):
-    python3 scripts/crowd-sounds.py --out <dir> --sources <src dir> [name ...]   # A and B
-    python3 scripts/crowd-sounds.py --out <dir> [name ...]                       # B only (no download needed)
-    # names: ambient-A, ambient-B, cheer-A, ... (default: all). Needs numpy, scipy and ffmpeg.
+    python3 scripts/crowd-sounds.py --out <dir> --sources <src dir> [name ...]   # everything
+    python3 scripts/crowd-sounds.py --out <dir> [name ...]                       # ours only (no download needed)
+    # names: ambient-B, ambient-B-2, clang-sword-1, ..., ambient-mix-B (default: all). Needs numpy, scipy and ffmpeg.
 """
 import argparse, glob, math, os, subprocess, sys
 import numpy as np
@@ -35,8 +33,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SOUNDS = os.path.join(HERE, "../packages/app/public/sounds")
 
 # dB relative to a move's loudness (the loudest 30 ms, as `loudness` measures it).
-LEVELS = {"ambient": -15.0, "cheer": 0.0, "shocked": 0.0, "boo": -1.0}
-LENGTHS = {"ambient": 24.0, "cheer": 3.5, "shocked": 1.6, "boo": 2.6}
+LEVELS = {"ambient": -12.0, "cheer": 0.0, "clang": -3.0}
+LENGTHS = {"cheer": 3.5}
+BEDS = {"": 24.0, "-2": 31.0}  # the two loops of a bed (file suffix: seconds); A's second is 29 s (see ambient_A)
 
 
 # --- Shared tools (the measure is piece-sounds.py's, the filters RBJ's) -----------------------------------------
@@ -140,14 +139,10 @@ def reverb_ir(rt60, seed, length=None, damp_hz=3000, predelay=0.02):
 
 
 BANDS = (250, 500, 1000, 2000, 4000, 8000)
-# Long-term spectra (dB an octave band, the loudest band 0) a crowd's sound should have, from the textbook shapes of
-# speech and shouting heard at a distance: talk peaks near 500 Hz to 1 kHz and falls off above; cheering is brighter;
-# "oo" and "boo" are darker.
+# The long-term spectrum (dB an octave band, the loudest band 0) a crowd's murmur should have, from the textbook
+# shape of speech heard at a distance: it peaks near 500 Hz to 1 kHz and falls off above.
 TILTS = {
     "crowd": (-12, -2, 0, -5, -14, -24),
-    "cheer": (-14, -4, 0, -3, -11, -20),
-    "ooh": (-4, 0, -3, -8, -16, -26),
-    "boo": (-5, 0, -2, -7, -15, -25),
 }
 
 
@@ -217,17 +212,20 @@ def resonate(x, freqs, bws):
     return y
 
 
-def glottal(f0, rng, breath=0.08, bright=0.0):
+def glottal(f0, rng, breath=0.08):
     """A voice's buzz at f0 (one value a sample): a sawtooth (falls 6 dB an octave, as a voice's source and lips do),
-    a little jitter and shimmer, and breath noise pulsing with it. `bright` (0-1) sharpens it, as shouting does."""
-    jitter = 1 + 0.01 * filt(rng.standard_normal(len(f0)), "lowpass", 30) * 3
-    phase = np.cumsum(f0 * jitter / SR)
-    frac = phase % 1.0
-    saw = 1 - 2 * frac
-    if bright:
-        saw = (1 - bright) * saw + bright * np.where(frac < 0.15, 1 - frac / 0.15, 0.0) * 2 - bright * 0.15
+    band-limited (polyBLEP: no aliasing hiss), a little jitter, and breath noise pulsing with it."""
+    jitter = 1 + 0.03 * filt(rng.standard_normal(len(f0)), "lowpass", 30)
+    dt = f0 * jitter / SR
+    frac = np.cumsum(dt) % 1.0
+    saw = 2 * frac - 1
+    lo, hi = frac < dt, frac > 1 - dt
+    x = np.where(lo, frac / dt, 0.0)
+    saw -= np.where(lo, 2 * x - x * x - 1, 0.0)
+    x = np.where(hi, (frac - 1) / dt, 0.0)
+    saw -= np.where(hi, x * x + 2 * x + 1, 0.0)
     noise = rng.standard_normal(len(f0)) * (0.6 + 0.4 * np.cos(2 * math.pi * frac))
-    return saw + breath * filt(noise, "highpass", 1200)
+    return -saw + breath * filt(noise, "highpass", 1200)
 
 
 def per_block(track):
@@ -235,7 +233,7 @@ def per_block(track):
     return track[::BLOCK]
 
 
-def voice(rng, dur, plan, female, bright=0.0, breath=0.08):
+def voice(rng, dur, plan, female, breath=0.08):
     """
     One voice: `plan` lists syllables as (start s, length s, vowel or (vowel, vowel) for a glide, f0 start, f0 end,
     level, consonant: None, "s" (a hiss), "t" (a tick), "b" (a soft lip thump), "h" (breathy)).
@@ -284,7 +282,7 @@ def voice(rng, dur, plan, female, bright=0.0, breath=0.08):
         np.maximum.accumulate(idx, out=idx)
         fm[k] = fm[k][idx]
     f0s = f0[np.maximum.accumulate(np.where(env > 0, np.arange(n), 0))]
-    src = glottal(f0s, rng, breath, bright)
+    src = glottal(f0s, rng, breath)
     bws = [b * (1.1 if female else 1.0) for b in BANDWIDTHS]
     y = resonate(src * env, [per_block(f) for f in fm], bws)
     # F4 and F5 as a fixed presence lift, then the consonants.
@@ -322,21 +320,6 @@ def babble(rng, dur, voices, level=1.0):
     return out
 
 
-def applause(rng, dur, rate, clappers_color=8):
-    """Many people clapping: `rate(t)` claps a second (a numpy function of t), each a short burst of filtered noise."""
-    n = int(dur * SR)
-    t = np.arange(n) / SR
-    lam = rate(t) / SR
-    out = np.zeros(n)
-    for c in range(clappers_color):
-        hits = (rng.random(n) < lam / clappers_color) * rng.uniform(0.3, 1.0, n)
-        k = int(0.012 * SR)
-        kern = rng.standard_normal(k) * np.exp(-np.arange(k) / (0.0025 * SR))
-        kern = filt(kern, "bandpass", rng.uniform(900, 2600), rng.uniform(1.2, 2.2))
-        out += fft_convolve(hits, kern)[:n]
-    return out
-
-
 def place(n, parts):
     out = np.zeros(n)
     for at, x, gain in parts:
@@ -355,29 +338,29 @@ def distance(x, far, seed):
     return (1 - far) * dull + (0.35 + 0.9 * far) * wet
 
 
-def ambient_B():
-    """About 200 voices talking with no words, far (a 40-voice babble laid four times), middle and near, over a soft
-    roar; slow swells evened out; looped."""
-    rng = np.random.default_rng(11)
-    dur, xf = LENGTHS["ambient"], 3.0
+def ambient_B(dur, seed):
+    """
+    About 250 voices talking with no words over a faint roar; a loop `dur` s long. Far: a 40-voice babble laid four
+    times at different offsets, dull and echoing (the stadium's wash); middle: 36 voices; near: 14 a few rows round
+    you, low-passed so no word is clear. Since Eric's "a little faint" (Oct 30): the middle and near chatter up
+    against the wash and the roar, less echo on them, the roar halved, a band-limited buzz (cleaner), and the
+    leveling gentler.
+    """
+    rng = np.random.default_rng(seed)
+    xf = 3.0
     total = dur + xf + 0.5
     n = int(total * SR)
-    # Far: many voices, dull and echoing: the stadium's wash. Made of a 40-voice babble laid four times at
-    # different offsets (circularly), each a little differently colored: about 160 voices.
     base = babble(rng, total, 40, 0.8)
     far = np.zeros(n)
-    for k, (shift, lp) in enumerate([(0.0, 1500), (5.3, 1300), (11.1, 1700), (17.7, 1200)]):
+    for shift, lp in [(0.0, 1500), (5.3, 1300), (11.1, 1700), (17.7, 1200)]:
         far += filt(np.roll(base, int(shift * SR)), "lowpass", lp)
-    far = distance(far, 0.95, 3)
-    # Middle: 24 voices a little nearer.
-    mid = distance(babble(rng, total, 24, 0.8), 0.6, 4)
-    # Near: 10 voices a few rows round you, still under the rest, and low-passed so no word is clear.
-    near = distance(filt(babble(rng, total, 10, 0.7), "lowpass", 2600), 0.3, 5)
-    # The bowl's air: a soft, slowly breathing roar under the voices.
+    far = distance(far, 0.95, seed + 3)
+    mid = distance(babble(rng, total, 36, 0.8), 0.45, seed + 4)
+    near = distance(filt(babble(rng, total, 14, 0.7), "lowpass", 2600), 0.2, seed + 5)
     air = filt(filt(rng.standard_normal(n), "lowpass", 900), "highpass", 120)
     air *= 1 + 0.15 * np.sin(2 * math.pi * np.arange(n) / SR / 7.3)
-    mix = (far / rms(far)) * 1.0 + (mid / rms(mid)) * 0.55 + (near / rms(near)) * 0.3 + (air / rms(air)) * 0.35
-    mix = steady(tilt(filt(mix, "highpass", 110), "crowd"), 1.2, 0.8)
+    mix = (far / rms(far)) * 0.7 + (mid / rms(mid)) * 1.0 + (near / rms(near)) * 0.55 + (air / rms(air)) * 0.15
+    mix = steady(tilt(filt(mix, "highpass", 110), "crowd"), 1.5, 0.6)
     return loop_wrap(mix, dur, xf)
 
 
@@ -385,101 +368,106 @@ def rms(x):
     return math.sqrt(np.mean(x * x)) + 1e-12
 
 
-def cheer_B():
-    """70 voices shouting "yeaaah", "woooo" and "hey! hey!", synthesized applause, and talk coming back as it settles."""
-    rng = np.random.default_rng(21)
-    dur = LENGTHS["cheer"]
-    n = int(dur * SR)
-    parts = []
-    for i in range(70):
-        female = rng.random() < 0.4
-        f0 = speaker(rng, female) * rng.uniform(1.5, 2.1)  # a cheer is pitched well above talk
-        at = rng.gamma(2.0, 0.07)
-        plan = []
-        if rng.random() < 0.6:  # one long "yeaaah" / "woooo"
-            v = [("i", "a"), ("u", "o"), ("e", "ae"), ("a", "a"), ("u", "u"), ("o", "a")][int(rng.integers(6))]
-            length = rng.uniform(1.0, 2.2)
-            plan.append((0.0, length, v, f0, f0 * rng.uniform(0.7, 0.9), 1.0, rng.choice([None, "h", "b"])))
-        else:  # "hey! hey!" bursts
-            t = 0.0
-            for _ in range(int(rng.integers(2, 4))):
-                length = rng.uniform(0.25, 0.45)
-                plan.append((t, length, ("e", "ae"), f0 * 1.05, f0 * 0.9, 1.0, "h"))
-                t += length + rng.uniform(0.08, 0.2)
-        x = voice(rng, 2.6, plan, female, bright=rng.uniform(0.2, 0.5), breath=0.18)
-        parts.append((at, x, rng.uniform(0.4, 1.0)))
-    voices = place(n, parts)
+# --- The clangs: made here --------------------------------------------------------------------------------------
+
+def modes(n, parts, rng):
+    """A struck body: `parts` are (frequency Hz, level, seconds to fall 60 dB); each sounds as a pair a few Hz apart,
+    so it beats a little as real metal does."""
     t = np.arange(n) / SR
-    claps = applause(rng, dur, lambda t: 1600 * np.clip(t / 0.35, 0, 1) * np.exp(-np.clip(t - 0.9, 0, None) / 1.1))
-    # The settle: talk rising back under it as the cheer dies.
-    talk = babble(rng, dur, 16, 0.6) * np.clip((t - 1.4) / 1.2, 0, 1)
-    mix = voices / rms(voices) + 0.5 * claps / rms(claps) + 0.25 * talk / (rms(talk) + 1e-9)
-    mix = distance(mix, 0.45, 7)
-    mix *= np.exp(-np.clip(t - 1.2, 0, None) / 1.3)  # erupts, then settles
-    return fade(tilt(filt(mix, "highpass", 160), "cheer"), 0.005, 0.4)
+    y = np.zeros(n)
+    for f, a, t60 in parts:
+        if f > SR / 2 - 500:
+            continue
+        d = rng.uniform(0.5, 4.0)
+        ph = rng.uniform(0, 2 * math.pi, 2)
+        y += a * (np.sin(2 * math.pi * f * t + ph[0]) + 0.6 * np.sin(2 * math.pi * (f + d) * t + ph[1])) * np.exp(-6.91 * t / t60)
+    return y
 
 
-def shocked_B():
-    """A quick shared breath in, then 60 voices going "oh-ooh!" together, up a little and falling away."""
-    rng = np.random.default_rng(31)
-    dur = LENGTHS["shocked"]
-    n = int(dur * SR)
+def blade(rng, n, ring=1.0, damp=1.0):
+    """A sword blade's ring: a free bar's inharmonic modes (1 : 2.76 : 5.40 : 8.93 : 13.34) and a few random high
+    partials, the higher ones dying sooner. `damp` < 1 shortens it (a blade pressed against a shield)."""
+    f1 = rng.uniform(330, 560)
     parts = []
-    for i in range(60):
-        female = rng.random() < 0.45
-        f0 = speaker(rng, female) * rng.uniform(1.25, 1.6)
-        at = 0.05 + rng.gamma(2.0, 0.025)  # a reaction: everyone within about a tenth of a second
-        length = rng.uniform(0.7, 1.15)
-        # "ooh!": from "oh" to "oo", up a little then falling away.
-        plan = [(0.0, 0.22, ("o", "u"), f0 * 0.97, f0 * 1.12, 1.0, "h"),
-                (0.2, length - 0.2, "u", f0 * 1.12, f0 * rng.uniform(0.68, 0.8), 0.9, None)]
-        x = voice(rng, 1.4, plan, female, bright=0.15, breath=0.2)
-        parts.append((at, x, rng.uniform(0.4, 1.0)))
-    voices = place(n, parts)
-    # A sharp breath in, just before.
-    t = np.arange(n) / SR
-    gasp = filt(rng.standard_normal(n), "bandpass", 1800, 0.6) * np.exp(-((t - 0.05) / 0.045) ** 2)
-    mix = voices / rms(voices) + 0.6 * gasp / rms(gasp) * 0.25
-    mix = distance(mix, 0.45, 8)
-    mix *= np.exp(-np.clip(t - 0.55, 0, None) / 0.45)
-    return fade(tilt(filt(mix, "highpass", 140), "ooh"), 0.003, 0.25)
+    for k, r in enumerate((1.0, 2.756, 5.404, 8.933, 13.344)):
+        f = f1 * r * rng.uniform(0.985, 1.015)
+        parts.append((f, rng.uniform(0.3, 1.0) * (1.0 if 1500 < f < 5000 else 0.45), damp * ring * 1.7 * (f1 / f) ** 0.35))
+    for _ in range(4):
+        f = rng.uniform(2400, 7500)
+        parts.append((f, rng.uniform(0.15, 0.45), damp * ring * rng.uniform(0.25, 0.7)))
+    return modes(n, parts, rng)
 
 
-def boo_B():
-    """60 voices booing, low and not harsh ("booooo", some "boo, booooo"), sagging in pitch."""
-    rng = np.random.default_rng(41)
-    dur = LENGTHS["boo"]
-    n = int(dur * SR)
-    parts = []
-    for i in range(60):
-        female = rng.random() < 0.35
-        f0 = speaker(rng, female) * rng.uniform(1.0, 1.25)
-        at = rng.gamma(2.0, 0.1)
-        plan = []
-        t = 0.0
-        for _ in range(1 if rng.random() < 0.6 else 2):  # "booooo" or "boo, booooo"
-            length = rng.uniform(0.5, 0.8) if not plan and rng.random() < 0.4 else rng.uniform(1.1, 1.9)
-            plan.append((t, length, ("oo", "u"), f0 * 1.04, f0 * rng.uniform(0.82, 0.95), 1.0, "b"))
-            t += length + rng.uniform(0.1, 0.25)
-        x = voice(rng, 2.6, plan, female, bright=0.05, breath=0.12)
-        parts.append((at, x, rng.uniform(0.4, 1.0)))
-    voices = place(n, parts)
+def hit(rng, n, bright=1.0):
+    """The strike itself: a 2 ms click and a short scrape of filtered noise."""
     t = np.arange(n) / SR
-    mix = distance(voices / rms(voices), 0.5, 9)
-    mix *= np.clip(1.15 - 0.35 * t / dur, 0, None)
-    return fade(tilt(filt(mix, "highpass", 120), "boo"), 0.01, 0.45)
+    click = filt(rng.standard_normal(n), "highpass", 2000) * np.exp(-t / 0.0015)
+    scrape = filt(rng.standard_normal(n), "bandpass", rng.uniform(3000, 5500) * bright, 0.9) * np.exp(-t / rng.uniform(0.012, 0.03))
+    return 1.4 * click + 0.8 * scrape
+
+
+def arena(x, seed, far=0.4):
+    """From the arena floor: a little dulled and quieter than it's echo, in the stadium's bowl."""
+    dry = filt(x, "lowpass", 6500 - 2500 * far)
+    wet = fft_convolve(dry, reverb_ir(2.2, seed, damp_hz=2500, predelay=0.035))[:len(x)]
+    return (1 - far) * dry + (0.5 + 1.2 * far) * wet * rms(dry) / (rms(wet[: len(dry)]) + 1e-12) * 0.6
+
+
+def sword(seed, double=False, scrape=False):
+    """Sword on sword: a bright, ringing clash (`double`: two blows 0.1 to 0.2 s apart; `scrape`: the blades slide
+    off each other, a rising hiss)."""
+    rng = np.random.default_rng(seed)
+    length = 1.8
+    n = int(length * SR)
+    x = hit(rng, n) + 0.5 * blade(rng, n) + 0.35 * blade(rng, n, ring=0.8)
+    if double:
+        k = int(rng.uniform(0.1, 0.2) * SR)
+        y = hit(rng, n, 1.1) + 0.45 * blade(rng, n, 0.9) + 0.3 * blade(rng, n, 0.7)
+        x[k:] += 0.8 * y[: n - k]
+    if scrape:
+        m = int(0.25 * SR)
+        t = np.arange(m) / SR
+        hiss = rng.standard_normal(m) * np.sin(math.pi * t / t[-1]) ** 2
+        hiss = filt(hiss, "bandpass", 4200, 1.5) + 0.5 * filt(hiss, "bandpass", 6200, 2.0)
+        k = int(0.03 * SR)
+        x[k:k + m] += 0.25 * hiss
+    return fade(arena(x, seed + 100, 0.4), 0.0005, 0.3)
+
+
+def shield(seed, heavy=False):
+    """Sword on shield: a dull knock of the shield's wooden body (low modes dying fast, a thump of noise), with the
+    blade's ring short and quieter (pressed against the shield). `heavy`: a bigger, lower shield."""
+    rng = np.random.default_rng(seed)
+    length = 1.4
+    n = int(length * SR)
+    t = np.arange(n) / SR
+    low = rng.uniform(0.7, 0.85) if heavy else 1.0
+    body = modes(n, [(f * low * rng.uniform(0.95, 1.05), a, d) for f, a, d in
+                     ((210, 0.8, 0.16), (340, 1.0, 0.12), (520, 0.8, 0.09), (780, 0.5, 0.07), (1150, 0.3, 0.05))], rng)
+    thump = filt(rng.standard_normal(n), "lowpass", 1000 * low) * np.exp(-t / 0.018)
+    boss = modes(n, [(rng.uniform(1100, 1600) * r, 0.3, 0.35) for r in (1.0, 2.31, 3.9)], rng)  # the metal rim/boss
+    x = 1.1 * body + 1.4 * thump + 0.5 * boss + 0.5 * hit(rng, n, 0.7) + 0.22 * blade(rng, n, damp=0.3)
+    return fade(arena(filt(x, "highpass", 120), seed + 200, 0.4), 0.0005, 0.25)
+
+
+CLANGS = {
+    "clang-sword-1": lambda: sword(1),
+    "clang-sword-2": lambda: sword(2, double=True),
+    "clang-sword-3": lambda: sword(3, scrape=True),
+    "clang-sword-4": lambda: sword(4),
+    "clang-sword-5": lambda: sword(5, double=True, scrape=True),
+    "clang-shield-1": lambda: shield(6),
+    "clang-shield-2": lambda: shield(7, heavy=True),
+    "clang-shield-3": lambda: shield(8),
+}
 
 
 # --- A: built from recordings -----------------------------------------------------------------------------------
 
-# Every recording an A file uses: file name (as downloaded) -> where it is, who made it, its license. Looked at and
-# left out: Wikimedia Commons' "Soundgoats - Audience Booing" (its page claims both CC BY-SA 4.0 and public domain,
-# by an uploader who isn't Soundgoats: unclear), AuraVoice's "Cheers" (one voice; it may say a word).
+# Every recording an A file uses: file name (as downloaded) -> where it is, who made it, its license.
 OGA = "https://opengameart.org/content/"
 QUENDEL = "Gregor Quendel - Crowd Cheering Sounds - "
 SOURCES = {
-    "oooooooooo.ogg": dict(
-        title="OoOoOoOoOoOoOo", url=OGA + "oooooooooooooo", author="AuraVoice (posted by Nocturnal_Vanguard)", license="CC0 1.0"),
     "277021_sandermotions_applause-2.wav": dict(
         title="applause-2", url="https://freesound.org/people/Sandermotions/sounds/277021/ (copy: "
         "https://commons.wikimedia.org/wiki/File:277021_sandermotions_applause-2.wav)", author="Sandermotions", license="CC0 1.0"),
@@ -506,73 +494,6 @@ def cut(x, start, length):
     return fit(x[int(start * SR):], length)
 
 
-def bend(x, semis):
-    """Play `x` with its pitch following `semis` (a function of the output's time in seconds), length changing with it."""
-    t = np.arange(int(len(x) * 2)) / SR
-    pos = np.concatenate([[0], np.cumsum(2 ** (semis(t) / 12))])[:-1]
-    pos = pos[pos < len(x) - 1]
-    return np.interp(pos, np.arange(len(x)), x)
-
-
-def shocked_A():
-    """
-    AuraVoice's one sung "oooo" made into a crowd's "ooh!": 36 copies of its steady middle, each its own voice
-    (pitched -6 to +6 semitones), each bent as a gasped "ooh" goes (up a little, then falling away), all starting within
-    about a tenth of a second, some farther off than others, with the stadium echo, EQ'd brighter (one sung "oo" is darker than a crowd's "ooh").
-    """
-    rng = np.random.default_rng(51)
-    dur = LENGTHS["shocked"]
-    n = int(dur * SR)
-    oo = cut(src("oooooooooo.ogg"), 0.15, 1.3)
-    copies = []
-    for i in range(36):
-        base = rng.uniform(-6, 6)
-        rise, fall = rng.uniform(1.0, 2.5), rng.uniform(4.0, 7.0)
-        semis = lambda t, b=base, r=rise, f=fall: b + r * np.clip(t / 0.18, 0, 1) - f * np.clip((t - 0.18) / 0.9, 0, 1)
-        x = bend(oo, semis)[: int(1.2 * SR)]
-        m = len(x)
-        tt = np.arange(m) / SR
-        env = np.clip(tt / rng.uniform(0.03, 0.07), 0, 1) * np.exp(-np.clip(tt - 0.2, 0, None) / rng.uniform(0.25, 0.45))
-        x = filt(x * env, "lowpass", rng.uniform(2500, 6000))
-        copies.append((0.03 + rng.gamma(2.0, 0.025), x, rng.uniform(0.35, 1.0)))
-    mix = place(n, copies)
-    mix = distance(mix / rms(mix), 0.45, 8)
-    t = np.arange(n) / SR
-    mix *= np.exp(-np.clip(t - 0.6, 0, None) / 0.45)
-    return fade(tilt(filt(mix, "highpass", 140), "ooh"), 0.003, 0.25)
-
-
-def boo_A():
-    """
-    The same sung "oooo" made into a crowd's long "booo": 40 copies, lower than the gasp (-9 to +2 semitones), each
-    swelling in over about a tenth of a second and sagging in pitch as a boo does, started over the first half second
-    (some booing twice: a short "boo" then a long one), some farther off, with the stadium echo and boo-B's EQ.
-    """
-    rng = np.random.default_rng(52)
-    dur = LENGTHS["boo"]
-    n = int(dur * SR)
-    oo = cut(src("oooooooooo.ogg"), 0.15, 1.75)
-    copies = []
-    for i in range(40):
-        base = rng.uniform(-9, 2)
-        at = rng.gamma(2.0, 0.1)
-        for length in ([rng.uniform(0.35, 0.55), rng.uniform(1.1, 1.6)] if rng.random() < 0.3 else [rng.uniform(1.3, 2.1)]):
-            sag = rng.uniform(1.5, 3.5)
-            semis = lambda t, b=base, s=sag, L=length: b + 0.6 * np.clip(t / 0.1, 0, 1) - s * np.clip(t / L, 0, 1)
-            x = bend(oo, semis)[: int(length * SR)]
-            m = len(x)
-            tt = np.arange(m) / SR
-            env = np.clip(tt / rng.uniform(0.06, 0.14), 0, 1) * np.clip((m / SR - tt) / 0.25, 0, 1)
-            x = filt(x * env, "lowpass", rng.uniform(2000, 5000))
-            copies.append((at, x, rng.uniform(0.35, 1.0)))
-            at += length + rng.uniform(0.08, 0.2)
-    mix = place(n, copies)
-    mix = distance(mix / rms(mix), 0.5, 9)
-    t = np.arange(n) / SR
-    mix *= np.clip(1.15 - 0.35 * t / dur, 0, None)
-    return fade(tilt(filt(mix, "highpass", 120), "boo"), 0.01, 0.45)
-
-
 def cheer_A():
     """
     Gregor Quendel's strong cheering (a big crowd; CC BY 4.0): track 04 from just before its loudest, made to burst in
@@ -590,33 +511,34 @@ def cheer_A():
     return fade(filt(mix, "highpass", 150), 0.12, 0.4)
 
 
-def ambient_A():
+def ambient_A(dur, speed):
     """
-    Gregor Quendel's crowd ambience (CC BY 4.0): its steady 27 s (3 to 30 s, between its fades), with a second layer
-    of itself played 8% slower (a little lower: other people), farther off, so the crowd is bigger and nothing
-    repeats in step; slow swells evened out, EQ'd to a stadium's murmur, and its last 3 s crossfaded into its start
-    so it loops with no seam.
+    Gregor Quendel's crowd ambience (CC BY 4.0): its steady 27 s (3 to 30 s, between its fades) played at `speed`
+    (the second loop slower and a little lower, so it isn't the first one again), with a second layer of itself
+    another 8% slower and farther off, so the crowd is bigger and nothing repeats in step; slow swells evened out,
+    EQ'd to a stadium's murmur, and its last 2.5 s crossfaded into its start so it loops with no seam.
     """
-    dur, xf = LENGTHS["ambient"], 3.0
+    xf = 2.5
     n = int((dur + xf) * SR)
-    a = cut(src(QUENDEL + "10 - Ambience.mp3"), 3.0, dur + xf)
-    b = filt(fit(resample(cut(src(QUENDEL + "10 - Ambience.mp3"), 3.0, 27.0), 0.92)[int(1.3 * SR):], dur + xf), "lowpass", 1800)
+    raw = cut(src(QUENDEL + "10 - Ambience.mp3"), 3.0, 27.0)
+    a = fit(resample(raw, speed), dur + xf)
+    b = filt(fit(resample(raw, speed * 0.92)[int(1.3 * SR):], dur + xf), "lowpass", 1800)
     mix = place(n, [(0.0, a / rms(a), 1.0), (0.0, b / rms(b), 0.5)])
     mix = distance(mix, 0.25, 6)
     mix = steady(tilt(filt(mix, "highpass", 110), "crowd"), 1.2, 0.8)
     return loop_wrap(mix, dur, xf)
 
 
-MAKERS_A = {"ambient-A": ambient_A, "cheer-A": cheer_A, "shocked-A": shocked_A, "boo-A": boo_A}
-MAKERS_B = {"ambient-B": ambient_B, "cheer-B": cheer_B, "shocked-B": shocked_B, "boo-B": boo_B}
+MAKERS_A = {"ambient-A": lambda: ambient_A(24.0, 1.0), "ambient-A-2": lambda: ambient_A(29.0, 0.85), "cheer-A": cheer_A}
+MAKERS_B = {"ambient-B": lambda: ambient_B(BEDS[""], 11), "ambient-B-2": lambda: ambient_B(BEDS["-2"], 12), **CLANGS}
 
 
 # --- Out --------------------------------------------------------------------------------------------------------
 
-def encode(x, path):
+def encode(x, path, channels=1):
     pcm = np.clip(x, -1, 1).astype("<f4").tobytes()
     subprocess.run(
-        ["ffmpeg", "-v", "error", "-y", "-f", "f32le", "-ar", str(SR), "-ac", "1", "-i", "-", "-c:a", "libmp3lame", "-b:a", "96k", path],
+        ["ffmpeg", "-v", "error", "-y", "-f", "f32le", "-ar", str(SR), "-ac", str(channels), "-i", "-", "-c:a", "libmp3lame", "-b:a", "96k", path],
         input=pcm, check=True,
     )
 
@@ -629,6 +551,41 @@ def level(name, x, target):
     if peak > -1:
         sys.exit(f"{name}: peak {peak:.1f} dBFS after leveling (would clip)")
     return x, want
+
+
+PREVIEW = 90.0
+
+
+def preview(bed, seed=7):
+    """
+    What the game would play, for PREVIEW s, in stereo: the bed's two loops at once (each at -3 dB; the second from a
+    random point), and a clang every 3 to 7 s: a random one, never the same twice running, -4 to 0 dB, panned up to
+    0.4 left or right (equal power, as Web Audio's StereoPannerNode).
+    """
+    rng = np.random.default_rng(seed)
+    n = int(PREVIEW * SR)
+    loops = [load(os.path.join(ARGS.out, f"ambient-{bed}{k}.mp3")) for k in BEDS]
+    mono = np.zeros(n)
+    for i, x in enumerate(loops):
+        start = int(rng.uniform(0, len(x))) if i else 0
+        mono += 10 ** (-3 / 20) * np.resize(np.roll(x, -start), n)
+    out = np.stack([mono, mono], axis=1)
+    clangs = {k: load(os.path.join(ARGS.out, f"{k}.mp3")) for k in CLANGS}
+    t, last = rng.uniform(1.0, 3.0), None
+    while t < PREVIEW - 2:
+        name = str(rng.choice([k for k in clangs if k != last]))
+        x = clangs[name] * 10 ** (rng.uniform(-4, 0) / 20)
+        pan = rng.uniform(-0.4, 0.4)
+        a = (pan + 1) * math.pi / 4
+        i = int(t * SR)
+        m = min(len(x), n - i)
+        out[i:i + m, 0] += math.cos(a) * x[:m]
+        out[i:i + m, 1] += math.sin(a) * x[:m]
+        last = name
+        t += rng.uniform(3.0, 7.0)
+    out[:, 0] = fade(out[:, 0], 1.0, 2.0)
+    out[:, 1] = fade(out[:, 1], 1.0, 2.0)
+    return out
 
 
 def main():
@@ -649,8 +606,15 @@ def main():
             x *= 10 ** (miss / 20)
             encode(x, path)
         got = load(path)
-        print(f"{name:11s} {len(x) / SR:5.2f} s  peak {20 * math.log10(np.abs(got).max()):5.1f} dBFS  loudest 30 ms {loudness(got):5.1f} dB"
+        print(f"{name:14s} {len(x) / SR:5.2f} s  peak {20 * math.log10(np.abs(got).max()):5.1f} dBFS  loudest 30 ms {loudness(got):5.1f} dB"
               f" (move {target:.1f})  mean {mean_loudness(got):5.1f} dB  {os.path.getsize(path) // 1024} KB")
+    for bed in ("A", "B") if ARGS.sources else ("B",):
+        name = f"ambient-mix-{bed}"
+        if ARGS.names and name not in ARGS.names:
+            continue
+        path = os.path.join(ARGS.out, f"{name}.mp3")
+        encode(preview(bed).reshape(-1), path, channels=2)
+        print(f"{name:14s} {PREVIEW:5.2f} s  stereo preview  {os.path.getsize(path) // 1024} KB")
 
 
 if __name__ == "__main__":
