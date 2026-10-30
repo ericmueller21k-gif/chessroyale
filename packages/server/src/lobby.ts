@@ -473,7 +473,11 @@ export interface PartyLobby {
   members?: Record<string, string>;
   /** The party's code (its AFK kicks are told to it: kickedMembers, which the Durable Object passes on). */
   partyCode: string;
+  /** The party's START this battle is from: a revoke for another START (a reused code) is ignored. */
+  startId: number;
   kickedMembers?: string[];
+  /** The party has been told this battle is over (takePartyOver). */
+  overTold?: true;
 }
 
 export function newLobbyRecord(code: string, now: number, overrides?: LobbyRecord["overrides"], party?: PartyLobby): LobbyRecord {
@@ -884,8 +888,9 @@ export class LobbyCore {
       this.r.accounts = rest;
     }
     if (this.r.hostId === playerId) this.r.hostId = this.pickHost(playerId);
-    // A private lobby's last person has gone: it closes now (lobbyClosing), and its code stops working.
-    if (!this.r.auto && !this.r.humans.length) this.r.emptiedAt = this.io.now();
+    // A private lobby's last person has gone: it closes now (lobbyClosing), and its code stops working. (Not a party's
+    // battle: the others may still be on their way; it starts with whoever comes, or closes when nothing happens.)
+    if (!this.r.auto && !this.r.party && !this.r.humans.length) this.r.emptiedAt = this.io.now();
     this.broadcast(this.lobbyMessage(), false);
   }
 
@@ -1056,6 +1061,14 @@ export class LobbyCore {
     this.nobodyToWaitFor();
   }
 
+  /** A party's battle is over: once, for its Durable Object to tell the party (its passes then go). */
+  takePartyOver(): { party: string; start: number } | null {
+    const pl = this.r.party;
+    if (!pl || pl.overTold || this.r.phase !== "results") return null;
+    pl.overTold = true;
+    return { party: pl.partyCode, start: pl.startId };
+  }
+
   /** A party's AFK kicks since last asked (by seat), for its Durable Object to tell the party. */
   takePartyKicks(): { party: string; members: string[] } | null {
     const pl = this.r.party;
@@ -1069,9 +1082,10 @@ export class LobbyCore {
    * The party kicked `member` at its stage after START: their pass no longer gets in, and if they're in the battle
    * already, they're out of it as from the AFK kick (home, told so).
    */
-  revokePartyMember(member: string) {
+  revokePartyMember(member: string, party?: { code: string; start: number }) {
     const pl = this.r.party;
-    if (!pl) return;
+    // (Another party's or another START's battle under a reused code, or one that's over: nothing to revoke here.)
+    if (!pl || (party && (party.code !== pl.partyCode || party.start !== pl.startId)) || this.r.phase === "results") return;
     for (const [pass, a] of Object.entries(pl.admits)) if (a.member === member) delete pl.admits[pass];
     if (this.r.phase === "lobby") pl.size = Math.max(1, Object.keys(pl.admits).length);
     const id = Object.entries(pl.members ?? {}).find(([, m]) => m === member)?.[0];
