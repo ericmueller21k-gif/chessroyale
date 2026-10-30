@@ -55,7 +55,7 @@ room to grow. Only the town's canvas changes.
   (which `town.spec.ts` reads with an anchored pattern) stays the numbers and that spec is unedited.
 - **Test hooks** (test switches only): `__townHold(on)` holds the frame loop; `__townBackend("2d" | "webgl")` swaps the
   backend on a new canvas and draws the held frame again; `__townPaint()` gives the backend and the last frame's draw
-  calls. And a WebGL canvas's `getContext("2d")` returns a reader whose `getImageData` draws the last frame again (same
+  calls (and uploads); `__townBench(n)` draws the held frame n times and gives the ms a draw. And a WebGL canvas's `getContext("2d")` returns a reader whose `getImageData` draws the last frame again (same
   moment, same camera) and reads it right after the draw, so the specs' pixel reads work on both backends **without
   editing them** (the tags' guard test in `town-tags.spec.ts` reads pixels, and a guard test isn't to be edited without
   Eric).
@@ -83,24 +83,64 @@ room to grow. Only the town's canvas changes.
 One page, one frame held, drawn by each backend in turn, compared pixel by pixel (each pixel's largest channel
 difference, 0 to 255), phone (780 x 1224 device pixels) and computer (768 x 800, inside the front door's frame):
 
-RESULTS_TABLE
+| Scene | Largest difference (where) | Mean | Over 8 | Over 32 | WebGL draw calls |
+| --- | --- | --- | --- | --- | --- |
+| phone, the park by day | 62 at (674, 643) | 0.99 | 2.11% | 0.133% | 5 |
+| phone, the park at night (the lights) | 33 at (187, 456) | 1.41 | 1.66% | 0.000% | 6 |
+| phone, a statue up close at night | 138 at (344, 209) | 1.09 | 0.17% | 0.011% | 5 |
+| computer, the park by day | 60 at (229, 444) | 1.02 | 2.34% | 0.126% | 15 |
+| computer, the park at night | 123 at (542, 694) | 1.45 | 1.92% | 0.007% | 6 |
+| computer, a statue up close at night | 150 at (317, 259) | 1.00 | 0.14% | 0.016% | 6 |
+
+The spec passes when the mean is under 3, under 5% of pixels are more than 8 apart and under 0.4% more than 32.
 
 The differences are edges (multisampled against the canvas's antialiasing) and pixel-art columns where a nearest texel is
 picked across a tie: nothing shifted, nothing missing (a pixel out of place everywhere would put tens of percent over 32).
 Full-page stills of both, phone and computer, day and night, are with the PR.
 
-## Frame rate (eric.md's method)
+## Frame rate (eric.md's method, and two closer looks)
 
-Headless (software WebGL: no GPU here, so these fps say little; Eric's laptop recording decides), `?crowd=50`, 5 s walking,
-the medians of four runs taken in turn, one pass; JS = the main thread's script time a frame (CDP `ScriptDuration`), task =
-all its work a frame. Draw calls: WebGL's a frame; for Canvas 2D the canvas calls a frame (fill, stroke, fillRect,
-clearRect, drawImage, fillText, strokeText) on every 2D context (the town's canvas in brackets: the rest are the scratch
-canvases and the light layer).
+This machine has no GPU: headless WebGL runs on SwiftShader, the CPU pretending to be a GPU, so WebGL's fps here say
+little (Eric's laptop recording decides). `?crowd=50` by day, the medians of four runs taken in turn, one pass; `main` is
+d66eafc3.
 
-PERF_TABLE
+**1. eric.md's method** (5 s walking): fps; JS = the main thread's script time a frame (CDP `ScriptDuration`); task = all
+its work a frame. Calls a frame: for Canvas 2D the canvas calls (fill, stroke, fillRect, clearRect, drawImage, fillText,
+strokeText) on every 2D context, the town's canvas in brackets; for WebGL its draw calls.
+
+| | main | branch, Canvas 2D | branch, `?gl=1` |
+| --- | --- | --- | --- |
+| phone 390 x 844 | 42.9 fps, JS 3.94 ms, task 23.1 ms, 714 calls (689) | 44.8 fps, JS 3.77 ms, task 22.1 ms, 719 calls (692) | 4.3 fps, JS 15.4 ms, task 226 ms, 11 draw calls (39 canvas calls: tags, text) |
+| computer 1440 x 900 | 49.9 fps, JS 3.48 ms, task 19.8 ms, 719 (699) | 50.7 fps, JS 3.48 ms, task 19.5 ms, 728 (707) | 6.2 fps, JS 12.4 ms, task 156 ms, 10 draw calls |
+| computer 1885 x 940 | 38.8 fps, JS 3.98 ms, task 25.5 ms, 776 (751) | 36.5 fps, JS 4.29 ms, task 27.2 ms, 770 (745) | 4.0 fps, JS 17.4 ms, task 239 ms, 10 draw calls |
+
+The branch without `?gl` is level with main (inside the run-to-run spread): the same calls, as built. WebGL's headless
+fps are SwiftShader's fill (about four screens of pixels a frame on the CPU). Its JS a frame is inflated at 4 to 6 fps:
+everything that happens per second (tags redrawn as people move, and uploaded again; the page's chat and panels) falls on
+a few frames.
+
+**2. The renderer's `draw()` a frame** (inclusive, from a CPU profile while walking, same runs' setup): Canvas 2D 3.7 ms
+(phone), 2.9 (1440), 4.0 (1885), on main and the branch alike; WebGL about 9.7 ms on the phone, of which about 2.5 ms is
+those per-second costs (tags redrawn and uploaded) landing on few frames. Canvas 2D's `draw()` only records: its pixels
+are painted after it, outside this number (in headless, on the CPU; on Eric's laptop, by the GPU).
+
+**3. The same held frame drawn again 40 times** (`__townBench`; nothing moves, nothing new: each backend's whole cost of
+drawing the frame on the main thread, the 2D canvas's painting included):
+
+| `?crowd=50` | phone | computer 1440 | computer 1885 |
+| --- | --- | --- | --- |
+| day: Canvas 2D / WebGL | 11.1 / 3.6 ms | 15.2 / 4.0 ms | 22.9 / 4.7 ms |
+| night: Canvas 2D / WebGL | 22.9 / 4.4 ms | 19.7 / 4.7 ms | 31.4 / 4.5 ms |
+
+WebGL's main-thread cost is its recording (the 2D calls turned into triangles: about 3.5 to 4.7 ms here, on a slow
+machine) plus handing them to the GPU; the painting goes to the GPU in 5 or 6 draw calls, whatever the frame holds (the
+night's lights add none). Canvas 2D's recording is a little cheaper (about 3 to 4 ms here), but then hundreds of separate
+paths, images and blurs have to be painted: the GPU work that drops frames when another game shares the chip.
 
 ## What's left
 
+- The recording's JS could shrink further (indexed quads instead of six vertices a square; a leaner vertex): about 3.5 to
+  4.7 ms a frame here against Canvas 2D's 3 to 4 ms of recording.
 - Eric's laptop recording (Edge, Iris Xe, a game sharing the chip) with `?gl=1&fps` against without, to decide whether
   WebGL becomes the default; then the specs on a `VITE_TOWN_GL=1` build in CI.
 - Real phones (iPhone Safari has WebGL 2 since iOS 15): a look on Eric's phone with `?gl=1`.

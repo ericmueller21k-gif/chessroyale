@@ -480,12 +480,13 @@ noted wherever a slice changed one.
 
 ## Tests
 
-- `e2e/town-webgl.spec.ts` (Oct 30, WebGL): the same held frame drawn by both backends in one page (`__townHold`, `__townBackend`),
+- `e2e/town-webgl.spec.ts` (Oct 30, WebGL): the same held frame drawn by both backends in one page (`__townHold`, `__townBackend`;
+  `__townPaint()` gives the backend and the last frame's draw calls, `__townBench(n)` the ms a draw of the held frame),
   compared pixel by pixel, phone and computer: the park by day, the park at night (the lights), a statue up close at night;
   it reports the largest difference and where. Then a lost context (drawn again when it's back; lost twice, Canvas 2D), and
-  Canvas 2D without `?gl=1`. Measured Oct 30: the largest single difference 35 to 102 (edge pixels: the GPU's 4x multisampling
-  against the 2D canvas's antialiasing, or a nearest texel picked across a tie), the mean about 1 of 255, under 2.5% of
-  pixels more than 8 apart. `TOWN_GL_STILLS=<dir>` saves full-page stills of both.
+  Canvas 2D without `?gl=1`. Measured Oct 30: the largest single difference 33 to 150 (single edge pixels: the GPU's 4x
+  multisampling against the 2D canvas's antialiasing, or a nearest texel picked across a tie), the mean about 1 of 255,
+  under 2.5% of pixels more than 8 apart, at most 0.13% more than 32. `TOWN_GL_STILLS=<dir>` saves full-page stills of both.
 - **Every town spec on WebGL:** build with `VITE_TOWN_GL=1 npm run build` (WebGL the default, as `?gl=1`) and run them as usual;
   their pixel reads (`colors`, `skyTop`, the tags' and the lights' reads) work on both backends because a WebGL canvas's
   `getContext("2d")` gives the last frame's pixels under the test switches (Town.tsx's `shim`: the frame drawn again at once
