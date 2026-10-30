@@ -4,12 +4,13 @@
  * `GLCtx` stands in for the part of CanvasRenderingContext2D the town draws with (paint.ts, `Ctx`), with the same state
  * (alpha, the composite, the transform, save and restore, clips, smoothing, shadows, fonts) carried from call to call and
  * frame to frame as a 2D context carries it. It records each frame as triangles in one vertex stream per target (the
- * canvas, each light layer) and draws a stream in one call when something forces it: a clip that needs the stencil, a
- * ninth texture, the frame's end. One shader does everything:
+ * canvas, each light layer) and draws a stream in one call when something forces it: a new clip shape for the stencil,
+ * a second texture of its own in one draw, the frame's end (about 5 draw calls a frame). One shader does everything:
  *
  * - **solid** fills (premultiplied colors; paths fanned, each subpath convex as all the town's are; MSAA smooths edges);
- * - **textured** quads, any four corners, from up to 8 textures a draw, each sampled nearest or smooth per quad (two
- *   samplers on the same texture) as `imageSmoothingEnabled` said when it was drawn;
+ * - **textured** quads, any four corners, from the atlas (one array texture, a page a layer) and one texture of its own
+ *   a draw (a light layer, a picture over 1024 px), each sampled nearest or smooth per quad as `imageSmoothingEnabled` said
+ *   when it was drawn (nearest: the texel's middle, sampled smooth, so the two never break a batch);
  * - **soft lines**: a stroke's shadow (the table's ring, the pressed square's glow) as the stroke blurred, worked out per
  *   pixel (a Gaussian across a line has a closed form), not a blur pass;
  * - **soft pictures**: the far band's softening (render.ts's `blitSoft`: shrunk, hazed, stretched back), the two
@@ -18,9 +19,13 @@
  * The composites the town uses all blend as premultiplied source-over (ONE, ONE_MINUS_SRC_ALPHA): "lighter" adds its
  * color with no alpha, "destination-out" (and clearRect) cuts with no color, so lights and the cuts out of them batch
  * together. Textures come from the canvases render.ts already makes: kept by their source (a WeakMap), packed into 2048 px
- * atlas pages (big ones on their own), and uploaded again only when render.ts says a canvas changed (`changed`). Text is
+ * atlas pages (layers of one array texture; big ones on their own), and uploaded again only when render.ts says a canvas changed (`changed`). Text is
  * drawn once into a canvas per string and style (the tags already are; the homes' names and the bubble's lines become so
  * here). A fill with a shadow (the bubble) is drawn once into a canvas by the 2D context itself, shadow and all.
+ *
+ * Clips: an upright rectangle is cut on the CPU; any other shape takes a stencil bit (a bit a clip level: one pass a
+ * clip, nothing to let it go, and the same shape again is still there). Kept lean for software WebGL too (SwiftShader,
+ * the headless tests' renderer, runs every branch of a shader: so one or two texture reads a pixel, not sixteen).
  *
  * Nothing is allocated per frame on the hot path: the streams, the path, the state stack and the scratch vertices are
  * typed arrays and objects that grow and are reused.
@@ -1223,24 +1228,57 @@ class GLCtx {
   }
 
   private emitPoly(n: number, flags: number): void {
-    if (this.clipOn) {
+    if (this.clipOn && !this.insideClip(n)) {
       n = this.clipPoly(n);
       if (n < 3) return;
     }
     const st = this.st;
     this.P.room(st, (n - 2) * 3);
+    // Each vertex's color packed once (most polygons are one color: packed once for all).
+    const src = this.poly;
+    if (this.packed.length < n) this.packed = new Uint32Array(n * 2);
+    const pk = this.packed;
+    pk[0] = this.pack(0);
+    for (let k = 1; k < n; k++) {
+      const s = k * RF;
+      pk[k] = src[s + 4] === src[4] && src[s + 5] === src[5] && src[s + 6] === src[6] && src[s + 7] === src[7] ? pk[0]! : this.pack(k);
+    }
     let o = st.n * VF;
     for (let t = 1; t < n - 1; t++) {
-      this.put(o, 0, flags);
-      this.put(o + VF, t, flags);
-      this.put(o + 2 * VF, t + 1, flags);
+      this.put(o, 0, flags, pk[0]!);
+      this.put(o + VF, t, flags, pk[t]!);
+      this.put(o + 2 * VF, t + 1, flags, pk[t + 1]!);
       o += 3 * VF;
     }
     st.n += (n - 2) * 3;
   }
+  private packed = new Uint32Array(64);
 
-  /** Vertex `k` of `poly` into the stream at float `o` (its color packed into bytes). */
-  private put(o: number, k: number, flags: number): void {
+  /** Whether the polygon lies wholly inside the clip's rectangle (nothing to cut). */
+  private insideClip(n: number): boolean {
+    const P = this.poly;
+    const c = this.clipR;
+    for (let k = 0; k < n; k++) {
+      const x = P[k * RF]!;
+      const y = P[k * RF + 1]!;
+      if (x < c[0]! || x > c[2]! || y < c[1]! || y > c[3]!) return false;
+    }
+    return true;
+  }
+
+  /** Vertex `k`'s color (premultiplied, 0 to 1) as four bytes. */
+  private pack(k: number): number {
+    const src = this.poly;
+    const s = k * RF + 4;
+    const r = Math.round(Math.min(1, Math.max(0, src[s]!)) * 255);
+    const g = Math.round(Math.min(1, Math.max(0, src[s + 1]!)) * 255);
+    const b = Math.round(Math.min(1, Math.max(0, src[s + 2]!)) * 255);
+    const a = Math.round(Math.min(1, Math.max(0, src[s + 3]!)) * 255);
+    return ((a << 24) | (b << 16) | (g << 8) | r) >>> 0;
+  }
+
+  /** Vertex `k` of `poly` into the stream at float `o`, with its packed color. */
+  private put(o: number, k: number, flags: number, color: number): void {
     const { f, u } = this.st;
     const src = this.poly;
     const s = k * RF;
@@ -1248,11 +1286,7 @@ class GLCtx {
     f[o + 1] = src[s + 1]!;
     f[o + 2] = src[s + 2]!;
     f[o + 3] = src[s + 3]!;
-    const r = Math.round(Math.min(1, Math.max(0, src[s + 4]!)) * 255);
-    const g = Math.round(Math.min(1, Math.max(0, src[s + 5]!)) * 255);
-    const b = Math.round(Math.min(1, Math.max(0, src[s + 6]!)) * 255);
-    const a = Math.round(Math.min(1, Math.max(0, src[s + 7]!)) * 255);
-    u[o + 4] = ((a << 24) | (b << 16) | (g << 8) | r) >>> 0;
+    u[o + 4] = color;
     u[o + 5] = flags;
     f[o + 6] = src[s + 8]!;
     f[o + 7] = src[s + 9]!;

@@ -15,14 +15,15 @@ room to grow. Only the town's canvas changes.
   render.ts and sky-draw.ts draw through it; everything that decides what to draw stays where it was.
 - **Canvas 2D backend:** `ctx` *is* the canvas's own 2D context, so the default draws with exactly the calls it made
   before (the only additions are no-op calls: `frame`, `done`, `changed`). Default, unchanged.
-- **WebGL 2 backend** (`town/paint-gl.ts`, about 1,900 lines, no dependency): a stand-in for that 2D subset, with the same
+- **WebGL 2 backend** (`town/paint-gl.ts`, about 2,000 lines, no dependency): a stand-in for that 2D subset, with the same
   state carried call to call and frame to frame (the town relies on that: e.g. image smoothing set by the last prop drawn
   is still set when the next frame's clouds are drawn). It records triangles into one vertex stream per target (the
-  canvas, each light layer) and draws a stream in one call when it must: a clip that needs the stencil, a ninth texture,
-  the frame's end. One shader:
+  canvas, each light layer) and draws a stream in one call when it must: a new clip shape for the stencil, a second
+  texture of its own in one draw, the frame's end: **5 or 6 draw calls a frame**, day or night. One shader:
   - solid fills (premultiplied; each subpath fanned, as all the town's are convex), smoothed by 4x multisampling;
-  - textured quads, any four corners, up to 8 textures a draw, nearest or smooth per quad (two samplers bound to the same
-    texture, so `imageSmoothingEnabled` never breaks a batch);
+  - textured quads, any four corners, from the atlas (one array texture, a page a layer) and one texture of its own a draw
+    (a light layer, a picture over 1024 px), nearest or smooth per quad (nearest reads the texel's middle smoothly, so
+    `imageSmoothingEnabled` never breaks a batch);
   - **soft lines** for a stroke's shadow (the table's ring, the pressed square's glow): a Gaussian across a line has a
     closed form, worked out per pixel (Chrome's canvas uses sigma = shadowBlur / 2 device pixels, which it matches);
   - **soft pictures** for the far band (render.ts's `blitSoft`: shrink, haze, stretch back): both resamplings done per
@@ -31,12 +32,17 @@ room to grow. Only the town's canvas changes.
   color with no alpha, "destination-out" and clearRect cut with no color. So the night's lights and the cuts out of them
   batch together, and the light layer costs one draw call however many lights and covers there are.
 - **Textures** from the canvases render.ts already makes, found by their source (a WeakMap), packed into 2048 px atlas
-  pages with 2 transparent pixels round each (a picture over 1024 px gets its own texture); uploaded once, and again only
+  pages (layers of one array texture, grown two pages at a time and copied on the GPU) with 2 transparent pixels round each (a picture over 1024 px gets its own texture); uploaded once, and again only
   when render.ts says a canvas was drawn on again (`changed`: a tag repainted, a table's board cached anew). Six pages at
   most; when full, the page least lately drawn from starts again. Pictures not drawn for 600 frames are let go.
 - **Clips:** an upright rectangle (a sitting pawn, a light's cut) is kept as numbers and everything drawn is cut to it on
   the CPU (no state change, so no extra draw call); any other shape (the ground under the rim, the far Colosseum, the
-  pressed square's glow) goes into the stencil, even-odd.
+  pressed square's glow) takes a stencil bit (a bit a clip level, even-odd): one pass a clip, nothing to let it go, and the
+  same shape again (the ground's clip, then the haze's) is still there. What's drawn inside is also cut to the clip's box.
+- **Software WebGL** (SwiftShader: the headless tests' renderer, and any machine without a GPU) runs every branch of a
+  shader for every pixel. A first version read 8 textures twice over a pixel plus 32 reads for the soft path and ran at
+  2 fps headless; with the array atlas and the leaner stencil, 6 fps at 2 to 6 draw calls (Canvas 2D: 55 to 60), the floor being
+  SwiftShader's fill of about four screens of pixels a frame. Real GPUs do this in well under a millisecond.
 - **Text** (the homes' names, the bubble's lines; the tags already were) is drawn once per string, font and style into a
   canvas and laid on at the nearest device pixel; a web font arriving draws them again. A fill with a shadow (the bubble)
   is drawn once into a canvas by a 2D context, shadow and all, kept by its shape and colors.
@@ -57,7 +63,7 @@ room to grow. Only the town's canvas changes.
 ## Judgment calls
 
 - **Our own layer, no library.** PixiJS or similar would be 100 kB+ gzipped, retained-mode (a scene graph), and would mean
-  rewriting render.ts's drawing; ours is about 1,900 lines in the same immediate-mode style as render.ts, speaks the same
+  rewriting render.ts's drawing; ours is about 2,000 lines in the same immediate-mode style as render.ts, speaks the same
   calls, and adds nothing to the main bundle (it's in the town's lazy chunk).
 - **A 2D-context stand-in, not new drawing calls in render.ts.** render.ts's code stays exactly what draws the Canvas 2D
   picture, so the two backends can't drift apart in what they draw, only in how; and the default is untouched.

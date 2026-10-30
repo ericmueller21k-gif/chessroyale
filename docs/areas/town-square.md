@@ -74,12 +74,11 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   It draws through a **drawing layer** (`town/paint.ts`, Oct 30) with two backends: Canvas 2D (the default: the canvas's own
   context, the same calls as before) and WebGL 2 (`?gl=1`, `town/paint-gl.ts`; below, "WebGL").
 - **WebGL (`?gl=1`, Oct 30; docs/decisions/2026-10-30-town-webgl.md).** Anyone's `/town?gl=1` (read once as the page opens,
-  `TOWN_ASKED.gl`) draws the same picture with WebGL 2 in a few draw calls a frame (about 12 by day, 13 at night, 20 to 35
-  zoomed in or with the far band full) instead of hundreds of canvas calls. `paint-gl.ts` stands in for the part of the 2D
+  `TOWN_ASKED.gl`) draws the same picture with WebGL 2 in about 5 draw calls a frame instead of hundreds of canvas calls. `paint-gl.ts` stands in for the part of the 2D
   context render.ts uses (state, transforms, save and restore, paths, clips, strokes, shadows, text, images) and batches the
   frame into textured and solid triangles: textures from the canvases render.ts already makes, packed into 2048 px atlas
-  pages and uploaded again only when render.ts calls `changed` (a tag or a table's board drawn again); clips that are upright
-  rectangles cut on the CPU, other shapes in the stencil; a stroke's shadow (the table's ring, the pressed square's glow)
+  pages (layers of one array texture) and uploaded again only when render.ts calls `changed` (a tag or a table's board drawn again); clips that are upright
+  rectangles cut on the CPU, other shapes a stencil bit each; a stroke's shadow (the table's ring, the pressed square's glow)
   worked out per pixel; the far band's softening in one shader pass (no scratch canvases); lights and their cuts in one
   blend; text and the bubble drawn once into canvases. No WebGL 2, or no context: Canvas 2D, silently. Context lost: nothing
   drawn until it's back (textures made again); lost twice within a minute, or not back within 5 s: Canvas 2D for the page. Without `?gl=1`, Canvas 2D

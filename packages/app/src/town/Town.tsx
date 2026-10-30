@@ -1055,12 +1055,21 @@ function startTown(
     useBackend(kind);
     return painter.kind;
   };
+  // ... `__townBench(n)`: the held frame drawn again n times in a row, in ms a draw (the drawing's own cost, the same frame for
+  // either backend: nothing moves, nothing new to make).
+  const hookBench = (n: number) => {
+    if (!testSwitchesAllowed() || painter.lost) return null;
+    r.draw(drawnAt, camX, camY, zoomCur, 0);
+    const t0 = performance.now();
+    for (let i = 0; i < n; i++) r.draw(drawnAt, camX, camY, zoomCur, 0);
+    return (performance.now() - t0) / n;
+  };
   const hookPaint = () => {
     if (!testSwitchesAllowed()) return null;
     const p = painter as Painter & { uploads?: number; resets?: number };
     return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0 };
   };
-  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townBackend?: typeof hookBackend; __townPaint?: typeof hookPaint };
+  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townBackend?: typeof hookBackend; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench };
   hooks.__townAt = hookAt;
   hooks.__townGlide = hookGlide;
   hooks.__townGather = hookGather;
@@ -1077,6 +1086,7 @@ function startTown(
   hooks.__townHold = hookHold;
   hooks.__townBackend = hookBackend;
   hooks.__townPaint = hookPaint;
+  hooks.__townBench = hookBench;
 
   run();
   draw(performance.now()); // the first frame, before the screen shows
@@ -1147,6 +1157,7 @@ function startTown(
       delete hooks.__townHold;
       delete hooks.__townBackend;
       delete hooks.__townPaint;
+      delete hooks.__townBench;
       painter.dispose();
       if (card?.kind === "boss") town.bosses[card.i]!.held = false;
       detach();
