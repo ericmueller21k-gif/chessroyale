@@ -36,7 +36,7 @@ import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import { UserIcon } from "../components/PixelIcon.tsx";
 import { openProfile } from "../profile-nav.ts";
 import { account, onAccountChange, playerName } from "../account.ts";
-import { testParams, testSwitchesAllowed } from "../test-switches.ts";
+import { TOWN_ASKED, testSwitchesAllowed } from "../test-switches.ts";
 import { play, warmSounds } from "../sound.ts";
 import { SELECT_SOUND, TOWN_SOUNDS, townSound } from "../characters/boss-select.ts";
 import { N, proj, wrapF } from "./camera.ts";
@@ -353,8 +353,11 @@ function startTown(
   // The testers' crowd (`?crowd=N`, up to CROWD_MAX: N more pawns with names wandering the square, to measure the frame
   // rate with many figures; admins only, so it comes in once the account says so).
   const crowdIn = () => {
-    const n = Math.min(CROWD_MAX, Math.floor(Number(testParams().get("crowd"))) || 0);
-    if (n > 0 && !town.crowd.length) addCrowd(town, n);
+    const n = Math.min(CROWD_MAX, Math.floor(TOWN_ASKED.crowd) || 0);
+    if (n > 0 && testSwitchesAllowed() && !town.crowd.length) {
+      addCrowd(town, n);
+      cv.dataset.crowd = String(n);
+    }
   };
   const offCrowd = onAccountChange(crowdIn);
   crowdIn();
@@ -364,6 +367,22 @@ function startTown(
     const lk = p.look;
     if (!isSprite(lk) && lk.wear) void dressedPawn(lk.wear, pawnImage(lk.side, lk.tint), PAWN_PX).then((art) => art && alive && r.botArt.set(p.id, art));
   }
+  // `/town?fps`, admins only (their profile says so, as the crowd's does): a pill in the world's top-right corner, "60 fps · 16.7 ms",
+  // frames over the last second and their mean time, the text set twice a second. Plain counters in the frame loop, nothing else.
+  let fpsEl: HTMLElement | null = null;
+  let fpsN = 0;
+  let fpsPrev = 0;
+  let fpsAt = 0;
+  let fpsPrevAt = 0;
+  const fpsIn = () => {
+    if (fpsEl || !account().profile?.admin || !TOWN_ASKED.fps) return;
+    fpsEl = document.createElement("div");
+    fpsEl.className = "town-fps";
+    fpsEl.dataset.fps = "";
+    cv.parentElement?.append(fpsEl);
+  };
+  const offFps = onAccountChange(fpsIn);
+  fpsIn();
   /** The game with a bot has been asked for (once). */
   let opened = false;
   let raf = 0;
@@ -533,6 +552,20 @@ function startTown(
     stepClose(dt);
     updateCamera(dt, now);
     draw(now, dt);
+    if (fpsEl) {
+      fpsN++;
+      if (!fpsAt) fpsAt = fpsPrevAt = now;
+      else if (now - fpsAt >= 500) {
+        const n = fpsN + fpsPrev;
+        const ms = now - fpsPrevAt;
+        fpsEl.textContent = `${Math.round((n * 1000) / ms)} fps · ${(ms / n).toFixed(1)} ms`;
+        fpsEl.dataset.fps = String(Math.round((n * 1000) / ms));
+        fpsPrev = fpsN;
+        fpsN = 0;
+        fpsPrevAt = fpsAt;
+        fpsAt = now;
+      }
+    }
     raf = requestAnimationFrame(frame);
   };
   const run = () => {
@@ -990,6 +1023,8 @@ function startTown(
       alive = false;
       offAccount();
       offCrowd();
+      offFps();
+      fpsEl?.remove();
       halt();
       ro.disconnect();
       document.removeEventListener("visibilitychange", onVisibility);

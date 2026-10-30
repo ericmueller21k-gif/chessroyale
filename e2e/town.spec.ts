@@ -170,8 +170,10 @@ test("a deploy landed while the page was open: the town square's files are gone,
   // (After a deploy the old version's files are gone: the first ask for the town's styles fails as it would then.)
   let asked = 0;
   await page.route(/\/assets\/Town-[^/]*\.css$/, (route) => (asked++ === 0 ? route.fulfill({ status: 404, body: "" }) : route.continue()));
+  // (Counted as the page's documents arrive, not by "load": on a slow run the town's chunk is asked for, refused and the page
+  // loads again before the first page's own "load" ever fires, Oct 30.)
   let loads = 0;
-  page.on("load", () => loads++);
+  page.on("framenavigated", (frame) => frame === page.mainFrame() && loads++);
   await page.goto("/town");
   await expect.poll(() => loads, { message: "the page loaded again" }).toBe(2);
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
@@ -194,6 +196,29 @@ test("the sky by the time of day: ?sky=day and ?sky=night draw different skies (
   expect(lum(night), `night's sky is dark: ${night.map(Math.round)}`).toBeLessThan(40);
   expect(lum(day) - lum(night), "day is far lighter than night").toBeGreaterThan(100);
   expect(errors).toEqual([]);
+});
+
+test("/town?fps: an admin sees the frame-rate pill with a number; a player with ?fps does not; without ?fps nobody does", async ({ page }) => {
+  const admin = async (on: boolean) =>
+    page.route("**/api/me*", async (route) => {
+      if (!on || route.request().method() !== "GET") return route.continue();
+      const res = await route.fetch();
+      const body = await res.json().catch(() => null);
+      await route.fulfill({ response: res, json: body ? { ...body, admin: true } : body });
+    });
+  const pill = page.locator(".town-fps");
+  await page.goto("/town?sky=day&fps");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await page.waitForTimeout(1500);
+  await expect(pill).toHaveCount(0);
+  await admin(true);
+  await page.goto("/town?sky=day");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await page.waitForTimeout(1500);
+  await expect(pill).toHaveCount(0);
+  await page.goto("/town?sky=day&fps&crowd=50");
+  await expect(canvas(page)).toHaveAttribute("data-crowd", "50", { timeout: 10_000 });
+  await expect(pill).toHaveText(/^\d+ fps · \d+\.\d ms$/, { timeout: 10_000 });
 });
 
 /** Where to tap Babur (or his circus) now, in the page; null while he isn't drawn. */

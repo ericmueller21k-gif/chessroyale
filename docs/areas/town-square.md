@@ -429,6 +429,10 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
     and the bot across, its card closed (`createTown`'s `seat`); the bot gets up and wanders off after
     `botLeaveAfterGameMs` (4 s), unless its table's card holds it.
 
+## Frame-rate pill (`?fps`)
+`/town?fps` shows an admin (profile `admin`) a pill in the world's top-right corner, "60 fps · 16.7 ms": frames over the last second and their mean time, text set twice a second from plain counters in the frame loop. Nobody else sees it.
+`?fps` and `?crowd=N` are read once as the page opens (`TOWN_ASKED`, test-switches.ts), so a later replaceState can't lose them; they apply when the account arrives.
+
 ## The feel: `town/feel.ts`
 
 Every number that shapes how it feels is in `TOWN_FEEL`, one line each: the walk (90 ms a square, the hobble), the camera
