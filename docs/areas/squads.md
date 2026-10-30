@@ -261,7 +261,9 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   the party asks the matchmaker for seats for everyone connected under a fresh pass (again every
   `partyRetryMs` while busy), then tells everyone `placed { lobby, pass }`. Each joins the lobby with
   `hello { party: pass }` and sits in one squad. The leader can queue again after a lobby. A party closes after
-  `partyIdleMinutes` with nobody in it.
+  `partyIdleMinutes` with nobody in it. **Boss Battle's party** (Oct 30) is the same `PartyCore` and Durable Object with kind
+  "boss" (`/api/boss/party`): up to 3 in seats, READY, the leader's boss and difficulty, Kick, Promote, admins' bot
+  members, and START making a private raid lobby instead of queueing (docs/decisions/2026-10-30-boss-party.md).
 - **A lobby's life.** waiting (people join until the fill time, MATCH_FILL_SECONDS as for Crowd, or 32 people) →
   filled (`formSquads`: parties whole, bots in every empty seat; the full grid for FRONT_DOOR.fillShowMs) → vote (Start,
   then Clock, on Crowd's vote machinery; bots vote; each result shows `voteResultSeconds`, 4.2 s since Oct 15, the

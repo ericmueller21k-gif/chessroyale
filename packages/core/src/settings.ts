@@ -12,8 +12,8 @@ export type ScoreCarry = "reset" | "carry";
  * - best: the best move picked (a tie is drawn)
  * - weighted: a draw where better moves get more tickets (see drawWeightPoints)
  */
-export type DrawRule = "random" | "popular" | "best" | "weighted";
-export const DRAW_RULES: readonly DrawRule[] = ["random", "popular", "best", "weighted"];
+export type DrawRule = "random" | "popular" | "best" | "weighted" | "party";
+export const DRAW_RULES: readonly DrawRule[] = ["random", "popular", "best", "weighted", "party"];
 
 /** Game modes: Classic (many boards, players rotate) and Crowd (everyone on one board, the most popular move is played). */
 export type GameMode = "classic" | "crowd";
@@ -244,6 +244,11 @@ export interface Settings {
    * wins on time, as under the Hidden Boss's bullet clock. Set with the bank by bossClockSettings, never alone.
    */
   bossClock?: boolean;
+  /**
+   * A Boss Battle party (part 2): any one member's call for the God King acts for the team (his move, his strike), as
+   * the charges are the team's; a raid needs more than half the crowd.
+   */
+  kingAnyCall?: boolean;
   /** Pre-game votes: whether a player may move their pawn to another zone after voting (Eric: one vote each, for now). */
   voteChangeAllowed: boolean;
   /**
@@ -686,6 +691,25 @@ export const RAID_SETTINGS: Partial<Settings> = {
  * the team's one bank. Out of time loses. docs/decisions/2026-10-30-boss-battle-clock.md.
  */
 export const BOSS_CLOCK = { bankSeconds: 600, incrementSeconds: 10 } as const;
+
+/**
+ * Boss Battle's live party (Eric, Oct 29 and 30; docs/decisions/2026-10-30-boss-party.md):
+ * - `max`: you and two on the platforms behind you;
+ * - `closeCp`: with no majority, the engine's best pick is played unless another is within this many centipawns of it,
+ *   then one of those at random (Eric, Oct 30: 30);
+ * - `afkKickSec`: a turn's first pick, then this long, and whoever may kick can kick someone who hasn't picked;
+ * - `joinWaitSec`: after START, how long the battle waits for every member to arrive before it begins without them.
+ */
+export const BOSS_PARTY = { max: 3, closeCp: 30, afkKickSec: 60, joinWaitSec: 30 } as const;
+
+/**
+ * A move's centipawns from the mover's expected score (0 to 1), by Lichess's win-chance curve (expected = 1 / (1 +
+ * e^(-0.00368208 cp))), as the judge measures expected scores, not centipawns. Kept inside +-2000 (a decided position).
+ */
+export function cpFromExpected(expected: number): number {
+  const e = Math.min(0.9994, Math.max(0.0006, expected));
+  return Math.log(e / (1 - e)) / 0.00368208;
+}
 
 /**
  * The settings for a battle on BOSS_CLOCK: the bank and its increment, and a move clock no bank can reach (the bank plus

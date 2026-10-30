@@ -131,7 +131,7 @@ async function handle(request: Request, rawEnv: Env, ctx: ExecutionContext): Pro
     {
       ip: request.headers.get("cf-connecting-ip"),
       session: readCookie(request, SESSION_COOKIE),
-      play: request.method === "POST" && (url.pathname === "/api/play" || url.pathname === "/api/lobby" || url.pathname === "/api/1v1/play" || /^\/api\/squads\/(play|party|lobby)$/.test(url.pathname)),
+      play: request.method === "POST" && (url.pathname === "/api/play" || url.pathname === "/api/lobby" || url.pathname === "/api/1v1/play" || /^\/api\/squads\/(play|party|lobby)$/.test(url.pathname) || url.pathname === "/api/boss/party"),
       friends: request.method === "POST" && url.pathname.startsWith("/api/friends/"),
     },
     t,
@@ -237,6 +237,23 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
       const { overrides, keepMs } = lobbyOptions(url.searchParams, test);
       const code = await openLobbyCode(async (c) => (await env.LOBBIES.get(env.LOBBIES.idFromName(c)).create(c, overrides, undefined, keepMs)) !== false);
       return code ? json({ code }) : json({ message: "Couldn't create a lobby. Try again." }, 500);
+    }
+    // Boss Battle's party (boss-party.ts; docs/decisions/2026-10-30-boss-party.md): POST /api/boss/party → { code } (the
+    // invite link is /boss/party/CODE); GET /api/boss/party/CODE → { open, members, state } | 404; …/ws: its WebSocket.
+    // One Durable Object per party, Squads' (PARTIES, SquadsParty) with kind "boss". Online: a raid's kill switch rests it.
+    if (url.pathname === "/api/boss/party" && request.method === "POST") {
+      if (isPaused(rawEnv, "raid")) return pausedResponse("raid");
+      const refused = await mayPlay(request, env, waitUntil);
+      if (refused) return refused;
+      const code = await openLobbyCode(async (c) => env.PARTIES.get(env.PARTIES.idFromName(c)).create(c, "", 0, "boss"));
+      return code ? json({ code }) : json({ message: "Couldn't make a party. Try again." }, 500);
+    }
+    const bp = url.pathname.match(/^\/api\/boss\/party\/([A-Z2-9]{5})(\/ws)?$/i);
+    if (bp) {
+      const stub = env.PARTIES.get(env.PARTIES.idFromName(bp[1]!.toUpperCase()));
+      if (bp[2]) return (await stub.status()) ? stub.fetch(request) : json({ message: "We couldn't find that party." }, 404);
+      const status = request.method === "GET" ? await stub.status() : null;
+      return status ? json({ open: true, ...status }) : json({ open: false, message: "That party has closed." }, 404);
     }
     // Squads (docs/areas/squads.md, "The server"): its queue, parties and lobbies, and the test lobby.
     const squads = await squadsRoute(request, env, url, waitUntil);

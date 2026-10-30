@@ -5,6 +5,8 @@ import type { PartyClientMessage, SquadsClientMessage } from "@chessroyale/chess
 import openings from "@chessroyale/chess/data/openings.json";
 import { SquadsCore, newSquadsRecord, squadsClosing, squadsLiveKey, squadsLiveSummary, type LiveMatch, type SquadsRecord, type SquadsReward, type SquadsServerRequest } from "./squads-lobby.ts";
 import { PartyCore, newPartyRecord, partyClosing, type PartyRecord } from "./squads-party.ts";
+import { bossPartyOverrides, partyLobby } from "./boss-party.ts";
+import { openLobbyCode } from "./codes.ts";
 import { DEVICE_COOKIE, SIGN_IN_TO_PLAY, accountOf, isSignedIn, readCookie, signInRequired, withSecrets } from "./api.ts";
 import { d1Sql, ensureSchema, grantReward, recordResult } from "./accounts.ts";
 import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
@@ -385,10 +387,13 @@ export class SquadsParty extends DurableObject<Env> {
     return true;
   }
 
-  /** A new party under this code (false: the code is in use), queueing on `queueName` (lobbies fill after `fillMs`). */
-  async create(code: string, queueName: string, fillMs: number): Promise<boolean> {
+  /**
+   * A new party under this code (false: the code is in use), queueing on `queueName` (lobbies fill after `fillMs`). A
+   * Boss Battle party (`kind` "boss", boss-party.ts) has no queue: its START makes the battle.
+   */
+  async create(code: string, queueName: string, fillMs: number, kind?: "boss"): Promise<boolean> {
     if (this.record && !(await this.closeIfDue())) return false;
-    this.record = { ...newPartyRecord(code, Date.now()), queueName, fillMs };
+    this.record = { ...newPartyRecord(code, Date.now(), kind), queueName, fillMs };
     await this.persist(this.core());
     return true;
   }
@@ -430,7 +435,7 @@ export class SquadsParty extends DurableObject<Env> {
       const token = typeof msg.token === "string" ? msg.token : undefined;
       const known = token ? this.record.members.find((m) => m.token === token) : undefined;
       if (known) ws.serializeAttachment({ ...attached, playerId: known.id });
-      const result = core.connect(token, { name: attached.name ?? (typeof msg.name === "string" ? msg.name : undefined), device: msg.device === "phone" ? "phone" : "computer", v: msg.v });
+      const result = core.connect(token, { name: attached.name ?? (typeof msg.name === "string" ? msg.name : undefined), device: msg.device === "phone" ? "phone" : "computer", v: msg.v, look: msg.look });
       if (!result.ok) return refuse(result.message);
       if (!known) {
         ws.serializeAttachment({ ...attached, playerId: result.memberId });
@@ -441,10 +446,31 @@ export class SquadsParty extends DurableObject<Env> {
     }
     const memberId = attached.playerId;
     if (!memberId) return;
-    core.message(memberId, msg);
+    core.message(memberId, msg, { test: !!attached.test });
     if (msg.t === "leave") ws.close(4001, "Left the party");
     await this.persist(core, msg.t === "leave" ? ws : undefined);
+    if (this.record.kind === "boss") return this.makeBattle();
     await this.askMatchmaker();
+  }
+
+  /** A Boss Battle party's START: its battle, a private lobby only its members may join (boss-party.ts). */
+  private async makeBattle() {
+    const want = this.core().takeStart();
+    if (!want || !this.record) return;
+    const code = this.record.code;
+    const lobby = await openLobbyCode(async (c) => (await this.env.LOBBIES.get(this.env.LOBBIES.idFromName(c)).create(c, bossPartyOverrides(want), undefined, undefined, partyLobby(want, code, Date.now()))) !== false).catch(() => null);
+    if (!this.record) return;
+    const core = this.core();
+    core.placedIn(lobby ?? null);
+    await this.persist(core);
+  }
+
+  /** Its battle kicked someone (the AFK kick): out of the party too, never back in. */
+  async kickSeat(seat: number): Promise<void> {
+    if (!this.record || this.record.kind !== "boss") return;
+    const core = this.core();
+    core.kickSeat(seat);
+    await this.persist(core);
   }
 
   async webSocketClose(ws: WebSocket) {
