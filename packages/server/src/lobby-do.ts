@@ -500,21 +500,34 @@ export class Lobby extends DurableObject<Env> {
     if (msg.t === "ultimate") core.ultimateTrigger(playerId, !!attached?.admin);
     else core.message(playerId, msg);
     await this.persist(core);
-    // A Boss Battle party's AFK kick: out of the party too (boss-party.ts).
-    const kicks = core.takePartyKicks();
-    if (kicks) {
-      await this.persist(core);
-      const party = this.env.PARTIES.get(this.env.PARTIES.idFromName(kicks.party));
-      for (const m of kicks.members) await party.kickMember(m).catch((e: unknown) => console.log(`party ${kicks.party}: kick ${m}: ${String(e)}`));
-    }
+    await this.tellParty(core);
   }
 
-  /** Its party kicked `member` at the stage after START: their pass no longer gets in (and they're out if in). */
-  async revokePartyMember(member: string): Promise<void> {
+  /**
+   * A Boss Battle party's battle tells its party: an AFK kick (out of the party too), and, once, that the battle is over
+   * (its passes go, so a later kick at the stage revokes nothing here). boss-party.ts.
+   */
+  private async tellParty(core: LobbyCore) {
+    const kicks = core.takePartyKicks();
+    const over = core.takePartyOver();
+    if (!kicks && !over) return;
+    await this.persist(core);
+    const code = (kicks ?? over)!.party;
+    const party = this.env.PARTIES.get(this.env.PARTIES.idFromName(code));
+    for (const m of kicks?.members ?? []) await party.kickMember(m).catch((e: unknown) => console.log(`party ${code}: kick ${m}: ${String(e)}`));
+    if (over) await party.battleOver(over.start).catch((e: unknown) => console.log(`party ${code}: battle over: ${String(e)}`));
+  }
+
+  /**
+   * Its party kicked `member` at the stage after START `start`: their pass no longer gets in (and they're out if in).
+   * For another party's or another START's battle (a reused code), or one that's over: nothing.
+   */
+  async revokePartyMember(member: string, party?: { code: string; start: number }): Promise<void> {
     if (!this.record || (await this.closeIfDue())) return;
     const core = this.core(this.record.code);
-    core.revokePartyMember(member);
+    core.revokePartyMember(member, party);
     await this.persist(core);
+    await this.tellParty(core);
   }
 
   async webSocketClose(ws: WebSocket) {
@@ -532,5 +545,6 @@ export class Lobby extends DurableObject<Env> {
     const core = this.core(this.record.code);
     core.alarm();
     await this.persist(core);
+    await this.tellParty(core);
   }
 }

@@ -20,5 +20,5 @@ export function bossPartyOverrides(s: Pick<BossStart, "boss" | "difficulty">): N
 /** The battle's party record (LobbyRecord.party) from START, its members given until `startBy` to arrive. */
 export function partyLobby(s: BossStart, partyCode: string, now: number): PartyLobby {
   const admits = Object.fromEntries(s.members.map((m) => [m.pass, { seat: m.seat, member: m.id, ...(m.userId ? { userId: m.userId } : {}) }]));
-  return { admits, size: s.members.length, bots: s.bots, leaderSeat: s.leaderSeat, startBy: now + BOSS_PARTY.joinWaitSec * 1000, seats: {}, partyCode };
+  return { admits, size: s.members.length, bots: s.bots, leaderSeat: s.leaderSeat, startBy: now + BOSS_PARTY.joinWaitSec * 1000, seats: {}, partyCode, startId: s.id };
 }

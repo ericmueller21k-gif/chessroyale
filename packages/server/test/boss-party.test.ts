@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BOSS_PARTY, DEFAULT_SETTINGS, mulberry32, type Settings } from "@chessroyale/core";
 import { legalMoves, type BoardScore, type MatchRunner, type ServerMessage } from "@chessroyale/chess";
 import { SQUADS_PROTOCOL, type PartyServerMessage } from "@chessroyale/chess/squads";
-import { LobbyCore, PARTY_ONLY, newLobbyRecord } from "../src/lobby.ts";
+import { LobbyCore, PARTY_ONLY, lobbyClosing, newLobbyRecord } from "../src/lobby.ts";
 import { bossPartyOverrides, partyLobby } from "../src/boss-party.ts";
 import { KICKED, PartyCore, newPartyRecord, type BossStart } from "../src/squads-party.ts";
 import { library } from "./lobby-fixture.ts";
@@ -329,7 +329,7 @@ describe("Boss Battle party: the review's fixes (#420)", () => {
     P.core.placedIn("BATTL", want.id);
     expect(P.core.takeRevokes()).toBeNull();
     P.core.message("m1", { t: "kick", id: "m2" });
-    expect(P.core.takeRevokes()).toEqual({ lobby: "BATTL", members: ["m2"] });
+    expect(P.core.takeRevokes()).toEqual({ lobby: "BATTL", start: want.id, members: ["m2"] });
     // Kicked while the battle was being made: revoked in it once it's there.
     const Q = party();
     Q.join("Eric");
@@ -339,7 +339,7 @@ describe("Boss Battle party: the review's fixes (#420)", () => {
     const w = Q.core.takeStart()!;
     Q.core.message("m1", { t: "kick", id: "m2" });
     Q.core.placedIn("BATTL", w.id);
-    expect(Q.core.takeRevokes()).toEqual({ lobby: "BATTL", members: ["m2"] });
+    expect(Q.core.takeRevokes()).toEqual({ lobby: "BATTL", start: w.id, members: ["m2"] });
   });
 
   it("2: in the battle, a pass takes only its own seat, once, from its own account; a revoked pass doesn't get in, and one already in is out", () => {
@@ -412,5 +412,71 @@ describe("Boss Battle party: the review's fixes (#420)", () => {
     expect(B.core.record.round!.picks.p2).toBeUndefined();
     B.hostScores();
     expect(B.last("p1", "reveal")!.king).toBe(true);
+  });
+});
+
+describe("Boss Battle party: the re-review's fixes (#420)", () => {
+  function party() {
+    let n = 0;
+    const core = new PartyCore(newPartyRecord("PARTY", 5_000_000, "boss"), { now: () => 5_000_000, send: () => undefined, random: () => `r${++n}`, close: () => undefined });
+    for (const name of ["Eric", "Sam", "Maya"]) core.connect(undefined, { name, v: SQUADS_PROTOCOL, userId: `u-${name}` });
+    core.message("m2", { t: "ready", on: true });
+    core.message("m3", { t: "ready", on: true });
+    core.message("m1", { t: "start" });
+    const want = core.takeStart()!;
+    core.placedIn("BATTL", want.id);
+    return { core, want };
+  }
+
+  it("1: a kick in the join window never closes the battle on the others (the kicked one was the only one in yet)", () => {
+    const B = battle(3);
+    expect(B.join(2).ok).toBe(true);
+    B.core.revokePartyMember("m2", { code: "PARTY", start: 1 });
+    expect(B.core.record.humans).toHaveLength(0);
+    expect(B.core.record.emptiedAt).toBeUndefined();
+    expect(lobbyClosing(B.core.record, false)?.at ?? Infinity).toBeGreaterThan(B.now);
+    // The others still get in, and it begins with them.
+    expect(B.join(0).ok).toBe(true);
+    expect(B.join(1).ok).toBe(true);
+    expect(B.core.record.phase).not.toBe("lobby");
+  });
+
+  it("2: a revoke for another party or another START (a reused code), or once the battle is over, changes nothing", () => {
+    const B = inPlay(2);
+    B.core.revokePartyMember("m1", { code: "OTHER", start: 1 });
+    B.core.revokePartyMember("m1", { code: "PARTY", start: 2 });
+    expect(B.core.record.humans.map((h) => h.id)).toEqual(["p1", "p2"]);
+    expect(B.core.takePartyOver()).toBeNull();
+    // Over: told once; a revoke then boots nobody off the results.
+    for (let i = 0; i < 40 && B.core.record.phase !== "results"; i++) {
+      B.hostBoss();
+      const rr = B.last("p1", "round");
+      if (rr && B.core.record.phase === "play") B.advance(rr.deadline - B.now + DEFAULT_SETTINGS.lateGraceMs + 10);
+      B.hostScores();
+      B.advance(30_000);
+    }
+    expect(B.core.record.phase).toBe("results");
+    expect(B.core.takePartyOver()).toEqual({ party: "PARTY", start: 1 });
+    expect(B.core.takePartyOver()).toBeNull();
+    B.core.revokePartyMember("m1", { code: "PARTY", start: 1 });
+    expect(B.core.record.humans.map((h) => h.id)).toEqual(["p1", "p2"]);
+  });
+
+  it("2: once the party hears its battle is over, a kick at the stage has nothing to revoke there", () => {
+    const { core, want } = party();
+    core.battleOver(want.id + 1);
+    core.message("m1", { t: "kick", id: "m2" });
+    expect(core.takeRevokes()).toEqual({ lobby: "BATTL", start: want.id, members: ["m2"] });
+    core.battleOver(want.id);
+    core.message("m1", { t: "kick", id: "m3" });
+    expect(core.takeRevokes()).toBeNull();
+  });
+
+  it("3: the battle's AFK kick leaves every other pending revoke alone", () => {
+    const { core, want } = party();
+    core.message("m1", { t: "kick", id: "m2" });
+    core.kickMember("m3");
+    expect(core.record.members.map((m) => m.name)).toEqual(["Eric"]);
+    expect(core.takeRevokes()).toEqual({ lobby: "BATTL", start: want.id, members: ["m2"] });
   });
 });
