@@ -31,6 +31,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   Crates are opened on the server, so nobody can make themselves a Pearl crown. `CRATES_FREE` is on while testing.
 - **Items** have a slot (head, face, skin, weapon), are drawn on the pawn's 100 × 100 square, and fit by anchors
   (head, face, eyes, neck, mouth: each piece's own lines; a mustache sits at the mouth, under a snowman's carrot).
+  Every face item is tagged above or below a hat (`faceLayer` in crates.ts; Eric, Oct 30): goggles and shades are drawn
+  over a hat, every other face item under it (a smiley under a pirate hat's brim). A new face item must say which.
   Weapons don't move with the piece: they're drawn where every piece's side (or shoulder) is. Your
   pawn wears your equipped items on the vote board, the cut screen and your profile; other players' looks come with
   them into a lobby; bots wear simple seeded outfits (`BOT_LOOKS`).

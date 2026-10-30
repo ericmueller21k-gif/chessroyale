@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useRef } from "preact/hooks";
-import { behindPiece, isShiny, itemColor, mulberry32, secondColor, type ItemLook, type ItemSlot } from "@chessroyale/core";
+import { aboveHat, behindPiece, isShiny, itemColor, mulberry32, secondColor, type ItemLook, type ItemSlot } from "@chessroyale/core";
 
 /**
  * Crate items, drawn. Every item is drawn once, on a pawn's 100 × 100 square (head centered at 50, 20), with its
@@ -1402,8 +1402,6 @@ const ATTACH_TO: Record<string, keyof Anchors> = {
   // (The hood's eye slit meets the piece's own eyes: a snowman's coal, a gingerbread man's icing.)
   "ninja-hood": "eyes",
 };
-/** Face items worn over a hat (goggles, shades); other face items go under it (a beard under a present's box). */
-const OVER_HAT = new Set(["ski-goggles", "dark-shades"]);
 /** A piece's anchors (a skin's, or the pawn's). */
 const anchorsFor = (skin?: string) => (skin && SKIN_ANCHORS[skin]) || PAWN_ANCHORS;
 
@@ -1446,9 +1444,9 @@ export function ItemArt({ def, finish, side = "w", class: cls }: { def: string; 
 export function Avatar({ look, side = "w" }: { look?: ItemLook; side?: "w" | "b" }) {
   const at = (slot: ItemSlot) => look?.[slot];
   const skin = at("skin");
-  // Worn items in drawing order (face, head, then a weapon; goggles go over a hat), split by layer: behind the
-  // piece or in front of it.
-  const order = (slot: ItemSlot, def: string) => (slot === "face" ? (OVER_HAT.has(def) ? 2 : 0) : slot === "head" ? 1 : 3);
+  // Worn items in drawing order (face, head, then a weapon; a face item tagged "above" goes over a hat: goggles, shades;
+  // crates.ts's `faceLayer`), split by layer: behind the piece or in front of it.
+  const order = (slot: ItemSlot, def: string) => (slot === "face" ? (aboveHat(def) ? 2 : 0) : slot === "head" ? 1 : 3);
   const worn = (["face", "head", "weapon"] as const)
     .flatMap((slot) => {
       const it = at(slot);
