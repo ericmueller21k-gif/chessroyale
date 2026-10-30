@@ -221,7 +221,8 @@ test("the chat box (always on, the default): one see-through box flush in the ma
   }
   expect(meets(b0, await rectOf(page, ".town-controls")), "the box never covers the buttons").toBe(false);
   const bar = await rectOf(page, ".town-bar");
-  expect(b0.y, "under the bar: on the map").toBeGreaterThanOrEqual(bar.y + bar.h);
+  // (A computer's bar is the right column's top row, Oct 30: there the box is just on the map.)
+  expect(b0.y, "under the bar: on the map").toBeGreaterThanOrEqual(phone ? bar.y + bar.h : map.y);
 
   // Always on: it shows with nothing said (the stream empty), and keeps its place and size. The typing line is there only while you're
   // typing (v4): not now, and no blur behind the box.
