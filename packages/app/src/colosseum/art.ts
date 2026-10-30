@@ -21,7 +21,7 @@
  * | a pillar with its torch | geometry (`buildScene`) + `flameArt` (PROPS.flame) |
  * | a crown banner | `bannerArt` (SCENE.banner) |
  * | the floor and the board's border | `floorArt` (SCENE.sand) + `SQUARES`, `STONE` (the plinth) |
- * | the six giant pieces, white and black | `PIECE_URL` (the board's cburnett pieces) in `propArt` |
+ * | the six giant pieces, white and black | `PIECE_URL` (the board's cburnett pieces) in `propArt`; in 3D behind `?pieces=3d`: meshes made once in `pieces3d.ts` |
  * | a statue | `statueArt` (PROPS.statue) |
  * | the railing in front of your seat | none (the wall's top edge) |
  * | pawn backs | none: a front mirrored and darkened in the sprite shader (arena-gl.ts) |

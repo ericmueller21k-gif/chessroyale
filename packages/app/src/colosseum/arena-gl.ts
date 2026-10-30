@@ -12,7 +12,10 @@
  * - **The props** (the big pieces, the torches' flames, the statues): instances too, one draw call, uploaded again only when a
  *   move is made (the slide itself is worked out on the GPU from when it began).
  *
- * Three draw calls a frame. A frame sets a few uniforms (the camera, the time, the jump's clock) and draws: nothing is
+ * - **The 3D pieces** (only with `?pieces=3d`; pieces3d.ts): the six meshes uploaded once, the pieces as instances written when
+ *   a move is made, one draw call a kind on the board. Without the switch the pieces are props, as above.
+ *
+ * Three draw calls a frame (up to nine with the 3D pieces). A frame sets a few uniforms (the camera, the time, the jump's clock) and draws: nothing is
  * allocated and nothing uploaded. The crowd jumps (a queen captured) by a uniform too.
  */
 import { BANNERS, BOARD, FLOOR_R, GALLERY_H, GALLERY_R, PILLARS, PILLAR_ANGLES, SEATING, STANDS, STATUE, WALL_H, WALL_TOP, aisleAngle, fovFor, landingDepth, lookAt, multiply, perspective, rowR, rowY, seats, squareXZ, VIEWS, type View } from "./arena.ts";

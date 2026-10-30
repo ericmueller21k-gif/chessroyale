@@ -201,7 +201,8 @@ function collar(stem: number, R: number, y: number, t: number): P[] {
   ];
 }
 
-const SEGS = 24;
+/** Steps round a turned shape: 16 reads round at the size the stands see a piece, and keeps a frame near 30k triangles. */
+const SEGS = 16;
 
 /** The pawn: a base, a tapering stem, a collar, a ball for its head. */
 function pawn(): PieceMesh {

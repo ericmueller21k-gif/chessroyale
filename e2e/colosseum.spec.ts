@@ -125,3 +125,28 @@ test("the Colosseum's first look: the card's link in, the arena drawn, Change se
   await expect(page.locator("canvas.town-canvas")).toHaveAttribute("data-ready", "1");
   expect(errors.filter((e) => !/WebGL|GPU stall|willReadFrequently/i.test(e))).toEqual([]);
 });
+
+test("the 3D pieces behind ?pieces=3d: drawn instanced (a draw call a kind on the board), moving with the game; without the switch, the flat pieces", async ({ page }) => {
+  test.setTimeout(180_000);
+  const errors = watchErrors(page);
+  const pieces = async () => ((await state(page)) as { pieces?: string }).pieces;
+  await page.goto("/colosseum?pieces=3d&fast");
+  await expect.poll(async () => (await state(page)).crowd, { message: "the crowd is in", timeout: 60_000 }).toBeGreaterThan(1500);
+  expect((await state(page)).backend).toBe("webgl");
+  expect(await pieces()).toBe("3d");
+  // The arena's three, and one a kind: all six kinds stand on the board at the start.
+  await expect.poll(async () => (await state(page)).drawCalls, { message: "three draw calls and one a piece kind" }).toBe(9);
+  const a = (await sample(page))!;
+  expect(a.sky, "the arena, not an empty sky").toBeLessThan(0.5);
+  // The game plays on: the draw calls stay one a kind on the board.
+  await expect.poll(async () => (await state(page)).plies, { message: "the bots play", timeout: 90_000 }).toBeGreaterThanOrEqual(4);
+  expect((await state(page)).drawCalls).toBeLessThanOrEqual(9);
+  expect((await state(page)).drawCalls).toBeGreaterThanOrEqual(5);
+
+  // Without the switch: the flat pieces, three draw calls, as before.
+  await page.goto("/colosseum");
+  await expect.poll(async () => (await state(page)).crowd, { timeout: 60_000 }).toBeGreaterThan(1500);
+  expect(await pieces()).toBe("flat");
+  await expect.poll(async () => (await state(page)).drawCalls).toBe(3);
+  expect(errors.filter((e) => !/WebGL|GPU stall|willReadFrequently/i.test(e))).toEqual([]);
+});
