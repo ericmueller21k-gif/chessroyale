@@ -490,7 +490,8 @@ noted wherever a slice changed one.
 - **Every town spec on WebGL:** build with `VITE_TOWN_GL=1 npm run build` (WebGL the default, as `?gl=1`) and run them as usual;
   their pixel reads (`colors`, `skyTop`, the tags' and the lights' reads) work on both backends because a WebGL canvas's
   `getContext("2d")` gives the last frame's pixels under the test switches (Town.tsx's `shim`: the frame drawn again at once
-  and read right after the draw). Not in CI yet.
+  and read right after the draw). Not in CI yet. Headless WebGL is software (SwiftShader, 4 to 6 fps), so run them with one
+  worker; the chat's timing checks can come in late there (docs/decisions/2026-10-30-town-webgl.md, "The town's specs").
 
 - `e2e/town-desktop.spec.ts` (Oct 29, the town on a computer): at 1280 × 800, 1440 × 900 and 1920 × 1080 the town's box is home's `.fd-center`
   (within a pixel), the menu and the right column are home's with the global chat showing, Boss Arena is marked, the chat icon is in the bar's

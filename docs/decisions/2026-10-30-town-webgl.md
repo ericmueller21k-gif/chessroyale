@@ -137,6 +137,18 @@ machine) plus handing them to the GPU; the painting goes to the GPU in 5 or 6 dr
 night's lights add none). Canvas 2D's recording is a little cheaper (about 3 to 4 ms here), but then hundreds of separate
 paths, images and blurs have to be painted: the GPU work that drops frames when another game shares the chip.
 
+## The town's specs on both backends (local, Oct 30)
+
+- **Canvas 2D** (the normal build): town, town-desktop, town-tags, town-chat, town-chat-history and town-webgl all pass, phone
+  and computer (the same 7 skips as main). CI's whole suite on the PR: green.
+- **WebGL** (`VITE_TOWN_GL=1 npm run build`, one worker, software WebGL at 4 to 6 fps): 109 passed, 6 failed, 7 skipped. Run
+  again alone, the failures move around (phone and computer swap which ones pass): the chat's timing checks (a fade's
+  CSS, a line still taking touches after minutes, a moderator's menu) and one race that holds steady,
+  `town-chat.spec.ts:953` "less left" (it reads the "Sorry… N seconds" line right after Enter, and with software WebGL holding
+  the page's thread the old line is still showing). The tags' fade passed on its rerun. Every check that reads the
+  canvas (the world drawn, the sky's colors, the lights, the tags, the statues' close-up, the cards) passes on WebGL. The
+  chat is HTML over the canvas; on a GPU the load that makes these late isn't there.
+
 ## What's left
 
 - The recording's JS could shrink further (indexed quads instead of six vertices a square; a leaner vertex): about 3.5 to
