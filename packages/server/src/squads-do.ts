@@ -499,7 +499,8 @@ export class SquadsParty extends DurableObject<Env> {
     await this.persist(core);
     if (!r.lobby) return;
     const battle = this.env.LOBBIES.get(this.env.LOBBIES.idFromName(r.lobby));
-    for (const m of r.members) await battle.revokePartyMember(m).catch((e: unknown) => console.log(`party ${this.record?.code}: revoke ${m}: ${String(e)}`));
+    const party = { code: this.record.code, start: r.start };
+    for (const m of r.members) await battle.revokePartyMember(m, party).catch((e: unknown) => console.log(`party ${party.code}: revoke ${m}: ${String(e)}`));
   }
 
   /** Its battle kicked someone (the AFK kick): out of the party too, never back in (by member id). */
@@ -507,8 +508,14 @@ export class SquadsParty extends DurableObject<Env> {
     if (!this.record || this.record.kind !== "boss") return;
     const core = this.core();
     core.kickMember(id);
-    // (Already out of that battle: nothing to revoke there.)
-    core.takeRevokes();
+    await this.persist(core);
+  }
+
+  /** Its battle from START `id` is over: that battle's passes go. */
+  async battleOver(id: number): Promise<void> {
+    if (!this.record || this.record.kind !== "boss") return;
+    const core = this.core();
+    core.battleOver(id);
     await this.persist(core);
   }
 

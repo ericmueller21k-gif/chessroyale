@@ -49,3 +49,7 @@ Eric's design (Oct 29 and 30) and his OK on the stills (Oct 30: "the solo or the
 - Director's calls: a party battle is recorded but never counts as an online tier beaten (`bossElo` null); no fair-play
   signals from a party's battle (teammates see picks live). A member who has picked can still call the God King (the call
   replaces the pick).
+- (The re-review) A kick in the battle's join window never closes it on the others (a party's battle doesn't close when
+  its lobby empties; it starts with whoever comes, or closes when nothing happens). A revoke names the party and its
+  START, and a battle under a reused code, another START's, or one that's over ignores it; a battle that's over tells its
+  party, whose passes then go. The battle's AFK kick leaves the party's other pending revokes alone.

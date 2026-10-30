@@ -81,6 +81,8 @@ export interface PartyRecord {
   starts?: number;
   /** Each member's own pass into the battle they were placed in (placed.pass is yours alone in your view). */
   passes?: Record<string, string>;
+  /** The START the current `placed` battle is from (a revoke names it; the battle ignores one for another START). */
+  placedStart?: number;
   /** Members kicked after START, for the Durable Object to revoke in the battle (takeRevokes). */
   revokes?: string[];
 }
@@ -301,7 +303,7 @@ export class PartyCore {
    * Someone out of a Boss Battle party: kicked (their token and account never come back in; told so, their socket
    * closed; after START, their pass into the battle revoked: takeRevokes) or leaving.
    */
-  private remove(m: PartyMember, kicked: boolean) {
+  private remove(m: PartyMember, kicked: boolean, revoke = true) {
     if (kicked) {
       this.r.kicked = [...(this.r.kicked ?? []), m.token];
       if (m.userId) this.r.kickedUsers = [...(this.r.kickedUsers ?? []), m.userId];
@@ -310,7 +312,7 @@ export class PartyCore {
         this.io.close?.(m.id);
       }
       // (A battle being made just now: placedIn revokes them in it once it's there.)
-      if (this.r.passes?.[m.id]) this.r.revokes = [...(this.r.revokes ?? []), m.id];
+      if (revoke && this.r.passes?.[m.id]) this.r.revokes = [...(this.r.revokes ?? []), m.id];
     }
     if (this.r.passes) delete this.r.passes[m.id];
     this.r.members = this.r.members.filter((x) => x !== m);
@@ -318,18 +320,28 @@ export class PartyCore {
     this.broadcast();
   }
 
-  /** Their battle kicked them (its AFK kick): out of the party too, by their member id (never a seat someone else took since). */
+  /**
+   * Their battle kicked them (its AFK kick): out of the party too, by their member id (never a seat someone else took
+   * since). They're already out of that battle: nothing to revoke there (and nobody else's pending revoke is touched).
+   */
   kickMember(id: string) {
     const m = this.r.members.find((x) => x.id === id);
-    if (m) this.remove(m, true);
+    if (m) this.remove(m, true, false);
   }
 
-  /** Members kicked after START, for the Durable Object to revoke in the battle (once each). */
-  takeRevokes(): { lobby: string | null; members: string[] } | null {
+  /** The battle from START `id` is over: its passes go (a later kick has nothing to revoke there). */
+  battleOver(id: number) {
+    if (this.r.placedStart !== id) return;
+    delete this.r.passes;
+    delete this.r.revokes;
+  }
+
+  /** Members kicked after START, for the Durable Object to revoke in the battle (once each), with that battle's START. */
+  takeRevokes(): { lobby: string | null; start: number; members: string[] } | null {
     const r = this.r.revokes;
     if (!r?.length) return null;
     delete this.r.revokes;
-    return { lobby: this.r.placed?.lobby ?? null, members: r };
+    return { lobby: this.r.placed?.lobby ?? null, start: this.r.placedStart ?? 0, members: r };
   }
 
   /** The members who must be ready for START: everyone connected but the leader (bots always are). */
@@ -373,6 +385,7 @@ export class PartyCore {
     }
     this.r.state = "placed";
     this.r.placed = { lobby, pass: "", at: this.io.now() };
+    this.r.placedStart = s.id;
     this.r.passes = Object.fromEntries(s.members.filter((m) => this.r.members.some((x) => x.id === m.id)).map((m) => [m.id, m.pass]));
     // (Kicked or gone while it was being made: their passes revoked in it.)
     const dropped = s.members.filter((m) => !this.r.members.some((x) => x.id === m.id)).map((m) => m.id);
