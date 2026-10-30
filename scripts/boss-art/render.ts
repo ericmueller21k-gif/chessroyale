@@ -127,7 +127,7 @@ async function main(req: Req): Promise<object> {
   if (!ch.palette.k) warnings.push(`no outline color: the palette needs "k"`);
   // A home on the town square (an id starting "house-") needs only its idle; a boss's sidekick (a town bot, "sidekick-")
   // its idle, walk, sit and wave; a ranked tier's emblem ("rank-") a still per division, a top tier's ("rank-top-") its idle.
-  const need: readonly string[] = req.id.startsWith("arena-") ? (ARENA[req.id] ?? ["idle"]) : req.id.startsWith("house-") || req.id.startsWith("rank-top-") ? ["idle"] : req.id.startsWith("sidekick-") ? SIDEKICK : req.id.startsWith("rank-set") ? RANK_SET : req.id.startsWith("rank-") ? RANK : REQUIRED;
+  const need: readonly string[] = req.id.startsWith("arena-") ? (ARENA[req.id.replace(/-\d+$/, "")] ?? ["idle"]) : req.id.startsWith("house-") || req.id.startsWith("rank-top-") ? ["idle"] : req.id.startsWith("sidekick-") ? SIDEKICK : req.id.startsWith("rank-set") ? RANK_SET : req.id.startsWith("rank-") ? RANK : REQUIRED;
   const missing = need.filter((a) => !ch.anims[a]);
   if (missing.length) warnings.push(`animations still to draw: ${missing.join(", ")}`);
   // "*": the first frame of every animation side by side (a set of stills).
