@@ -15,7 +15,8 @@
   },
   "include": [
     ".",
-    "../boss-lines/api.ts"
+    "../boss-lines/api.ts",
+    "../../packages/app/src/board/types.ts"
   ],
   "exclude": [
     "out"

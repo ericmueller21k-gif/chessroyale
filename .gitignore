@@ -11,3 +11,4 @@ wrangler.staging.jsonc
 packages/sim/data/fairplay-bank/
 scripts/boss-art/out/*/looks/
 scripts/boss-art/out/*/preview/
+scripts/boss-art/refs/

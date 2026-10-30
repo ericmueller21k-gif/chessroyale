@@ -12,6 +12,7 @@
  */
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { deflateSync } from "node:zlib";
 import { CHARACTERS } from "../../packages/app/src/characters/index.ts";
 import { renderFrame, type Character } from "../../packages/app/src/characters/sprite.ts";
@@ -41,14 +42,14 @@ const hex = (c: string) => {
   const n = parseInt(c.slice(1, 7), 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255] as const;
 };
-const blank = (w: number, h: number, bg: string): Img => {
+export const blank = (w: number, h: number, bg: string): Img => {
   const data = new Uint8ClampedArray(w * h * 4);
   const [r, g, b] = hex(bg);
   for (let i = 0; i < w * h; i++) data.set([r, g, b, 255], i * 4);
   return { w, h, data };
 };
 /** Draws `src` scaled by `s` (nearest neighbor) onto `dst` at (x0, y0), blending by alpha. */
-const blit = (dst: Img, src: Img, x0: number, y0: number, s: number) => {
+export const blit = (dst: Img, src: Img, x0: number, y0: number, s: number) => {
   for (let y = 0; y < src.h * s; y++)
     for (let x = 0; x < src.w * s; x++) {
       const X = x0 + x;
@@ -80,7 +81,7 @@ const chunk = (type: string, data: Buffer) => {
   crc.writeUInt32BE(crc32(td));
   return Buffer.concat([len, td, crc]);
 };
-const png = (img: Img): Buffer => {
+export const png = (img: Img): Buffer => {
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(img.w, 0);
   ihdr.writeUInt32BE(img.h, 4);
@@ -144,6 +145,8 @@ async function main(req: Req): Promise<object> {
   return { file: `${req.out}/look.png`, shown: { anim: req.anim, frames: pick, scale: s, beside: other.id }, facts, warnings };
 }
 
-main(JSON.parse(process.argv[2]!) as Req)
+// (Run as a script; boss-refs.ts imports its picture helpers.)
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url))
+  main(JSON.parse(process.argv[2]!) as Req)
   .then((r) => console.log(JSON.stringify(r)))
   .catch((e: unknown) => console.log(JSON.stringify({ error: e instanceof Error ? `${e.message}\n${(e.stack ?? "").split("\n").slice(1, 4).join("\n")}` : String(e) })));

@@ -17,24 +17,35 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, write
 import { extname, join, relative, resolve, sep } from "node:path";
 import { MODEL, PRICE, hasKey } from "../boss-lines/api.ts";
 
-const [id, briefPath, refsDir] = process.argv.slice(2);
+const ARGS = process.argv.slice(2);
+/** What's drawn: a boss character (the default), a crate item (`--item`) or a ride under the pawn (`--rider`). */
+const MODE: "boss" | "item" | "rider" = ARGS.includes("--rider") ? "rider" : ARGS.includes("--item") ? "item" : "boss";
+const [id, briefPath, refsDir] = ARGS.filter((a) => !a.startsWith("--"));
 if (!id || !/^[a-z][a-z0-9-]{1,30}$/.test(id) || !briefPath) {
-  console.error("usage: npx tsx scripts/boss-art/run.ts <id> <brief.md> [refs dir]");
+  console.error("usage: npx tsx scripts/boss-art/run.ts [--item | --rider] <id> <brief.md> [refs dir]");
   process.exit(2);
 }
+const ITEMISH = MODE !== "boss";
 const CAP = Number(process.env.BOSS_ART_CAP_USD ?? 20);
 if (!(CAP > 0)) throw new Error("BOSS_ART_CAP_USD must be a positive number of dollars");
 const MAX_TURNS = Number(process.env.BOSS_ART_MAX_TURNS ?? 90);
-/** Each turn's output ceiling (thinking included): room for a whole drawing written at once. */
-const MAX_TOKENS = 48000;
+/** Each turn's output ceiling (thinking included): room for a whole drawing written at once (an item is far smaller). */
+const MAX_TOKENS = Number(process.env.BOSS_ART_MAX_TOKENS ?? (MODE === "boss" ? 48000 : MODE === "rider" ? 32000 : 24000));
+/** The model's effort (BOSS_ART_EFFORT): low, medium, high, xhigh or max. */
+const EFFORT = (process.env.BOSS_ART_EFFORT ?? "high") as "low" | "medium" | "high" | "xhigh" | "max";
+if (!["low", "medium", "high", "xhigh", "max"].includes(EFFORT)) throw new Error("BOSS_ART_EFFORT must be low, medium, high, xhigh or max");
 
 const ROOT = resolve(".");
 const OUT = resolve(`scripts/boss-art/out/${id}`);
-const DRAFT = join(OUT, `${id}.ts`);
+const DRAFT = join(OUT, `${id}.${ITEMISH ? "tsx" : "ts"}`);
 const LOOKS = join(OUT, "looks");
 mkdirSync(LOOKS, { recursive: true });
 /** What the model may read: the characters' code, the art guide and the boss area page (read only). */
-const READABLE = ["packages/app/src/characters", ".claude/agents/characters.md", "docs/areas/bosses.md"].map((p) => resolve(p));
+const READABLE = (
+  ITEMISH
+    ? ["packages/app/src/components/Items.tsx", "packages/core/src/crates.ts", "scripts/boss-art/item-kit.tsx", ".claude/agents/item-builder.md", "packages/app/src/characters"]
+    : ["packages/app/src/characters", ".claude/agents/characters.md", "docs/areas/bosses.md"]
+).map((p) => resolve(p));
 const refs = refsDir ? readdirSync(refsDir).filter((f) => /\.(png|jpe?g|webp|gif)$/i.test(f)).sort() : [];
 const IMG_TYPE: Record<string, "image/png" | "image/jpeg" | "image/webp" | "image/gif"> = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif" };
 
@@ -53,6 +64,53 @@ How to work:
 - Write the drawing (write_drawing), then render it (render) and look hard at what comes back: the strip of frames at up to 4x and the phone-size view beside another boss. Fix what reads badly (edit_drawing for small changes) and look again. Every animation should be looked at before you're done, and the idle and the face most of all, since they're on screen the most.
 - The brief's reference pictures are ideas for shape and feel: draw the character in our pixel style, never their pixels.
 - Spend: each tool result tells you what's been spent of the cap. Pace yourself to finish everything well before the cap; when the drawing is complete and you've checked every animation, call done with your notes.`;
+
+const KIT = `The format (read scripts/boss-art/item-kit.tsx first: it's short, and it's the game's own item paint from packages/app/src/components/Items.tsx):
+- Items are SVG drawn by Preact on the pawn's 100 × 100 square, not pixel grids. The house item style: flat fills, a bold dark outline on every part ({...LINE}: 3 units, "#1d1d1f", round joins; lw(n) for any other width, lw(1.6) for small parts), a simple highlight or two, chunky shapes that read at 60 px. Look at a few finished items in Items.tsx for the feel (read a line range: CandyCane ~420-440, Cutlass ~927-950, Spyglass ~951-977, LittleCrown ~677-691, PirateHat ~1023-1052, CaptainsCoat ~978-1022, Parrot ~1053-1073; the ITEM_ART, FRAMES and ATTACH tables from ~1234). .claude/agents/item-builder.md has the conventions.
+- The cburnett pawn on the square: head top y 20, head center (50, 29), radius 9, neck about y 35-38, collar to about y 47, base about y 88, body x 25-75. Weapons sit at the pawn's right side, around x 60-98, slightly tilted (they may reach a little past the square). Head items: the brim at y 25 (attach: 25). Items may rise at most 9 units above the square (y -9: the avatar's clip cuts the rest).
+- Painted parts go through <Region p={p} name="..." d={[paths]} />: they take the item's color, its blemish blotches (purity) and the shine for free; every color scheme comes free. Give each region its own name. p2 is a second color (only with colors: 2). Fixed parts (water, metal, paper, flame, white) are plain paths with {...LINE} outlines, colors you pick to suit the boss. Every item should have enough painted area that its color reads, but fixed parts are welcome where the real thing has a set color.
+- Your file is ${relative(ROOT, DRAFT)}: TSX. Import only from "../../item-kit.tsx" (Region, LINE, lw, mirror, darken, lighten, isLight, Pawn, PAWN_PATH and the types) and "preact" if you need it. No other imports.`;
+
+const ITEM_SYSTEM = `You are an artist drawing one crate item for HunChess, a chess game whose players dress their pawn in cosmetic items from crates. You draw it as code, one TSX file, in the game's own item format, working alone in a loop with tools; you see your work only by rendering it.
+
+${KIT}
+- Export one const of type ItemDraft (id "${id}"): its name, tier, slot (head, face, skin or weapon), a one-line description with a little humor, frame (its box on the square, x y w h, for its tile: every frame of the motion must fit inside), attach (head and face items), layer "back" only if it sits behind the pawn, and motion: { ms: [each frame's length] } (it loops; keep it subtle and alive: a few frames to a dozen or so). Art({ p, p2, side, f }) draws frame f. A skin replaces the pawn: draw <Pawn side={side} /> yourself if the pawn shows, and make the fixed colors read on a white and a black pawn.
+- Motion is drawn by numbers: compute positions from f (a sway angle, a drop's position), so a frame is a number, not a redraw. Long holds at rest and a short beat of motion often read best ("now and then").
+
+How to work:
+- Write the drawing (write_drawing), render it (render) and look hard at what comes back: the motion frame by frame at 4x on a pawn, then phone size (a 60 px lobby pawn, the 130 px home pawn, its 64 px tile) beside existing items, then every color scheme at 75% purity. Fix what reads badly (edit_drawing for small changes) and look again. It must read at 60 px and look great at 4x, in every color, and its motion must be visible but never distracting.
+- The reference pictures are the boss it's named for: take its colors, shapes and feel, in the item style (not pixel art).
+- Spend: each tool result tells you what's been spent of the cap. Pace yourself to finish well before it: a few renders are usually enough. When it's done, call done with short notes: what it is, its motion beat by beat, and any choice the owner might want to change.`;
+
+const RIDER_SYSTEM = `You are an artist drawing one ride for HunChess, a chess game whose players dress their pawn in cosmetic items from crates. A ride is a new, very rare kind of item: the player's pawn rides on it. You draw it as code, one TSX file, in the game's own item format, working alone in a loop with tools; you see your work only by rendering it.
+
+${KIT}
+- A ride is bigger than the pawn and sits under it. The pawn sits on it the way a pawn sits on a park bench or a stool in the game's town: its lower part hidden (behind the ride's seat), the rest resting on top. Export one const of type RiderDraft (id "${id}"): name, tier, a one-line description with a little humor, frame (its box with the pawn on it at rest, for its tile), idle and move ({ ms: [each frame's length] }), pose(anim, f) and two drawings, Back (behind the pawn) and Front (in front of it: what hides the pawn's lower part).
+- pose(anim, f) places a frame: dx, dy move the whole group (the ride and its pawn; 100 units is one square of the town); pawnX, pawnY move the pawn on the ride (up is negative y: lift it so it rests on the seat), pawnTilt tilts it round its base, and cut is the line on the pawn's own square below which it's hidden (the bench-sit hides about its lowest third: cut ≈ 66; more if the seat is high). The pawn's base is at y 88 of its square; the ground line in the renders is y 80-100.
+- idle loops at rest (alive and calm). move is one square of the town's movement, from dx 0 to dx 100 (the town plays it once per square walked, back to back): its last frame should land so the next move's first frame follows on.
+
+How to work:
+- Write the drawing (write_drawing), render it (render, anim idle or move) and look hard at what comes back: the animation frame by frame at 4x with a pawn riding, the town size (a pawn about 45 px) at rest and through its move, every color scheme at 75% purity, its tile. Fix what reads badly (edit_drawing for small changes) and look again. It must read at town size and look great at 4x, in every color; the pawn must clearly sit on it.
+- The reference pictures are the boss it comes from: take its colors, shapes and feel, in the item style (not pixel art).
+- Spend: each tool result tells you what's been spent of the cap. Pace yourself to finish well before it. When it's done, call done with short notes: what it is, idle and move beat by beat, and any choice the owner might want to change.`;
+
+const ITEM_RENDER: Anthropic.Tool = {
+  name: "render",
+  description:
+    MODE === "rider"
+      ? "Render your ride into one picture: on top, one animation (`anim`, idle or move) frame by frame at 4x with a pawn riding (`frames`: 0-based, default all, at most 8; `side`: w or b; `color`: a color id, default red); then the town size at rest and every frame of the move; then every color scheme at 75% purity, 100%, shiny and its tile, beside existing items. Returns the picture, the facts (frame counts, loop lengths) and any warnings."
+      : "Render your item into one picture: on top, its motion frame by frame on a pawn at 4x (`frames`: 0-based, default all, at most 8; `side`: w or b; `color`: a color id, default red); then phone size (a 60 px lobby pawn white and black, the 130 px home pawn, its 64 px tile) beside existing items of its slot; then every color scheme at 75% purity, 100% and shiny. Returns the picture, the facts (frames, its box) and any warnings (spilling past its frame box, rising past the avatar's cap).",
+  input_schema: {
+    type: "object",
+    properties: {
+      ...(MODE === "rider" ? { anim: { type: "string", enum: ["idle", "move"] } } : {}),
+      frames: { type: "array", items: { type: "integer" } },
+      side: { type: "string", enum: ["w", "b"] },
+      color: { type: "string", enum: ["red", "yellow", "sage", "opal", "cobalt", "midnight", "emerald", "oceanic", "pearl"] },
+    },
+    required: [],
+  },
+};
 
 const TOOLS: Anthropic.Tool[] = [
   {
@@ -104,6 +162,14 @@ const TOOLS: Anthropic.Tool[] = [
     input_schema: { type: "object", properties: { contents: { type: "string" } }, required: ["contents"] },
   },
 ];
+
+if (ITEMISH) TOOLS.splice(TOOLS.findIndex((t) => t.name === "render"), 1, ITEM_RENDER);
+for (const t of TOOLS) {
+  if (!ITEMISH) break;
+  if (t.name === "read_file") t.description = "Read a text file: your drawing, packages/app/src/components/Items.tsx, packages/core/src/crates.ts, scripts/boss-art/item-kit.tsx, .claude/agents/item-builder.md or anything under packages/app/src/characters. Optional 1-based line range (Items.tsx is long: read ranges).";
+  if (t.name === "list_files") t.description = "List the files in a folder you may read (packages/app/src/characters and below).";
+  if (t.name === "done") t.description = "Finish: the drawing is complete and its motion and colors have been looked at. Give short notes: what it is, its motion beat by beat, and any choice the owner might want to change.";
+}
 
 // ---- Spend: the real usage of every turn, at Opus 5.5's prices.
 const spent = { usd: 0, input: 0, output: 0, cacheWrite: 0, cacheRead: 0, turns: 0 };
@@ -157,11 +223,11 @@ function runTool(name: string, input: Record<string, unknown>): { content: Conte
       if (!existsSync(DRAFT)) return { content: "write the drawing first", error: true };
       const dir = join(LOOKS, String(++looks).padStart(3, "0"));
       mkdirSync(dir, { recursive: true });
-      const req = { draft: DRAFT, id, anim: str(input.anim) ?? "idle", frames: Array.isArray(input.frames) ? input.frames.map(Number) : undefined, scale: input.scale, bg: input.bg, with: input.with, out: dir };
+      const req = ITEMISH ? { draft: DRAFT, mode: MODE, anim: str(input.anim) ?? undefined, frames: Array.isArray(input.frames) ? input.frames.map(Number) : undefined, side: str(input.side) ?? undefined, color: str(input.color) ?? undefined, out: dir } : { draft: DRAFT, id, anim: str(input.anim) ?? "idle", frames: Array.isArray(input.frames) ? input.frames.map(Number) : undefined, scale: input.scale, bg: input.bg, with: input.with, out: dir };
       let raw: string;
       try {
         // Its own process, with no key in its environment: it runs the drawing's code.
-        raw = execFileSync("npx", ["tsx", "scripts/boss-art/render.ts", JSON.stringify(req)], {
+        raw = execFileSync("npx", ["tsx", `scripts/boss-art/${ITEMISH ? "item-render" : "render"}.ts`, JSON.stringify(req)], {
           cwd: ROOT,
           env: bareEnv(),
           timeout: 60_000,
@@ -202,7 +268,7 @@ const brief = readFileSync(briefPath, "utf8");
 const messages: Anthropic.MessageParam[] = [
   {
     role: "user",
-    content: `${brief}\n\nYour character's id is "${id}". Reference pictures (view_reference): ${refs.length ? refs.join(", ") : "none"}. The spend cap is $${CAP}.`,
+    content: `${brief}\n\nYour ${MODE === "boss" ? "character" : MODE === "rider" ? "ride" : "item"}'s id is "${id}". Reference pictures (view_reference): ${refs.length ? refs.join(", ") : "none"}. The spend cap is $${CAP}.`,
   },
 ];
 const log = (o: object) => appendFileSync(join(OUT, "log.jsonl"), `${JSON.stringify({ at: new Date().toISOString(), ...o })}\n`);
@@ -246,8 +312,8 @@ async function main(): Promise<void> {
           model: MODEL,
           max_tokens: MAX_TOKENS,
           thinking: { type: "adaptive" },
-          output_config: { effort: "high" },
-          system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
+          output_config: { effort: EFFORT },
+          system: [{ type: "text", text: MODE === "item" ? ITEM_SYSTEM : MODE === "rider" ? RIDER_SYSTEM : SYSTEM, cache_control: { type: "ephemeral" } }],
           tools: TOOLS,
           messages,
         })
@@ -298,7 +364,27 @@ async function main(): Promise<void> {
   if (doneNotes === null && !stopped) stopped = `stopped at the turn limit (${MAX_TURNS})`;
   // The final previews of every animation (the repo's own preview script, without the key in its environment).
   let preview = "";
-  if (existsSync(DRAFT)) {
+  if (existsSync(DRAFT) && ITEMISH) {
+    // Every frame of the motion (both animations for a ride), and the standard look, as the renderer draws them.
+    const dir = join(OUT, "preview");
+    mkdirSync(dir, { recursive: true });
+    const shots: [string, object][] = MODE === "rider" ? [["idle", { anim: "idle", all: true }], ["move", { anim: "move", all: true }], ["look", { anim: "idle" }]] : [["frames", { all: true }], ["look", {}]];
+    const made: string[] = [];
+    for (const [name, extra] of shots) {
+      try {
+        const raw = execFileSync("npx", ["tsx", "scripts/boss-art/item-render.ts", JSON.stringify({ draft: DRAFT, mode: MODE, out: dir, ...extra })], { cwd: ROOT, env: bareEnv(), timeout: 120_000, encoding: "utf8" });
+        const r = JSON.parse(raw.trim().split("\n").pop() ?? "{}") as { file?: string; error?: string };
+        if (r.file) {
+          const to = join(dir, `${name}.png`);
+          execFileSync("mv", [r.file, to]);
+          made.push(relative(ROOT, to));
+        } else made.push(`${name}: ${r.error ?? "no picture"}`);
+      } catch (e) {
+        made.push(`${name}: failed (${String(e).slice(0, 200)})`);
+      }
+    }
+    preview = made.join(", ");
+  } else if (existsSync(DRAFT)) {
     try {
       execFileSync("npx", ["tsx", "scripts/preview-characters.ts", join(OUT, "preview"), `extra=${DRAFT}`, `only=${id}`, "looks=none"], {
         cwd: ROOT,
@@ -312,9 +398,9 @@ async function main(): Promise<void> {
     }
   }
   const summary = [
-    `# Boss art: ${id}`,
+    `# Boss art${MODE === "boss" ? "" : ` (${MODE})`}: ${id}`,
     "",
-    `- Model ${MODEL}, effort high, adaptive thinking. ${spent.turns} turns, ${looks} renders.`,
+    `- Model ${MODEL}, effort ${EFFORT}, adaptive thinking. ${spent.turns} turns, ${looks} renders.`,
     `- Spend: **$${spent.usd.toFixed(2)}** of the $${CAP} cap (${spent.input.toLocaleString("en-US")} input, ${spent.cacheWrite.toLocaleString("en-US")} cache-write, ${spent.cacheRead.toLocaleString("en-US")} cache-read, ${spent.output.toLocaleString("en-US")} output tokens).`,
     stopped ? `- **Stopped early:** ${stopped}.` : "- Finished: it called done.",
     `- The drawing: ${relative(ROOT, DRAFT)}${existsSync(DRAFT) ? "" : " (none written)"}.`,
