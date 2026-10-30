@@ -20,7 +20,8 @@
  */
 import { BANNERS, BOARD, FLOOR_R, GALLERY_H, GALLERY_R, PILLARS, PILLAR_ANGLES, SEATING, STANDS, STATUE, WALL_H, WALL_TOP, aisleAngle, fovFor, landingDepth, lookAt, multiply, perspective, rowR, rowY, seats, squareXZ, VIEWS, type View } from "./arena.ts";
 import { PROPS, SCENE, SKY, SQUARES, STONE, type CrowdArt, type Rect } from "./art.ts";
-import { EYE, KINDS, KNIGHT_TURN, PV, SIZE, SLIT, pieceMeshes } from "./pieces3d.ts";
+import { EYE, KINDS, KNIGHT_TURN, PV, SIZE, SLIT, pieceMeshes, toonPawn } from "./pieces3d.ts";
+import { TABLE_INK } from "../town/houses/park.ts";
 
 const VS_SCENE = `#version 300 es
 layout(location=0) in vec3 aPos;
@@ -112,6 +113,11 @@ void main() {
  * profile, a bishop its slit), slides and hops as they did, and is lit from the arena's sun (the a-file and White's end, high),
  * with a soft fill from your side and a little shine. Its shadow, a soft disc on the board, is drawn with it.
  */
+/** A town table ink (houses/park.ts TABLE_INK) as a shader color. */
+const ink = (k: keyof typeof TABLE_INK) => {
+  const h = TABLE_INK[k];
+  return `vec3(${[1, 3, 5].map((i) => (parseInt(h.slice(i, i + 2), 16) / 255).toFixed(3)).join(", ")})`;
+};
 const VS_PIECE = `#version 300 es
 layout(location=0) in vec3 aPos;
 layout(location=1) in vec3 aNrm;
@@ -123,13 +129,16 @@ uniform vec3 uEye;
 uniform float uTime;
 uniform float uSlide;
 uniform float uLift;
+uniform float uHull;
 out vec3 vN;
+out vec3 vLN;
 out vec3 vW;
 out vec3 vObj;
 out float vMat;
 out float vBlack;
 void main() {
   vMat = aMat;
+  vLN = aNrm;
   vBlack = iB.z;
   vObj = aPos / ${SIZE.toFixed(4)};
   if (uTime >= iB.y) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
@@ -149,7 +158,11 @@ void main() {
   } else {
     w = vec3(xz.x, uLift + hop, xz.y) + R * aPos.x + vec3(0.0, aPos.y, 0.0) + F * aPos.z;
     vN = R * aNrm.x + vec3(0.0, aNrm.y, 0.0) + F * aNrm.z;
+    // The toon outline (an inverted hull): the piece pushed out along its normals, about as thick on screen from any seat.
+    // (Its foot kept on the board, so the base's bottom line shows on the squares.)
+    if (uHull > 0.0) { w += normalize(vN) * uHull * distance(uEye, w); w.y = max(w.y, uLift + hop + 0.004); }
   }
+  if (uHull > 0.0 && aMat > 2.5 && aMat < 3.5) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
   vW = w;
   gl_Position = uVP * vec4(w, 1.0);
 }`;
@@ -159,8 +172,11 @@ uniform vec3 uEye;
 in vec3 vN;
 in vec3 vW;
 in vec3 vObj;
+in vec3 vLN;
 in float vMat;
 in float vBlack;
+uniform float uToon;
+uniform float uHull;
 out vec4 o;
 const vec3 IVORY = vec3(0.93, 0.87, 0.74);
 const vec3 EBONY = vec3(0.15, 0.15, 0.18);
@@ -168,6 +184,18 @@ const vec3 GOLD = vec3(0.86, 0.64, 0.24);
 const vec3 SUN = vec3(-0.43, 0.75, 0.5);
 void main() {
   if (vMat > 2.5 && vMat < 3.5) { o = vec4(0.12, 0.08, 0.04, vN.x * 0.55); return; }
+  // The toon pawn (the town's table pieces' inks): its outline, then two flat tones with a hard edge, lit from your upper left
+  // (light: cream, its right side shaded; dark: charcoal, its left side a lighter grey), no shine.
+  if (uHull > 0.0) { o = vec4(mix(${ink("lightLine")}, ${ink("darkLine")}, vBlack), 1.0); return; }
+  if (uToon > 0.5) {
+    // (Each flat face its own tone, so the facets show, as the table pieces' pixels.)
+    vec3 fn = normalize(cross(dFdx(vObj), dFdy(vObj)));
+    if (dot(fn, vec3(0.0, 0.5, 1.0)) < 0.0) fn = -fn;
+    float d = dot(fn, normalize(vec3(-0.65, 0.5, 0.55)));
+    vec3 c = vBlack > 0.5 ? (d > 0.55 ? ${ink("darkShade")} : ${ink("dark")}) : (d > -0.05 ? ${ink("light")} : ${ink("lightShade")});
+    o = vec4(c, 1.0);
+    return;
+  }
   vec3 N = normalize(vN);
   vec3 V = normalize(uEye - vW);
   vec3 L = normalize(SUN);
@@ -201,6 +229,10 @@ const SI = 20;
 /** Props: 32 pieces, the flames, the statues. */
 const PIECES = 32;
 const PROP_N = PIECES + PILLAR_ANGLES.length + STATUE.angles.length;
+/** Which pieces are drawn: the flat pictures, the 3D set (`?pieces=3d`), or the toon pawn (`?pieces=toon`). */
+export type PieceStyle = "flat" | "3d" | "toon";
+/** The toon outline's thickness: meters per meter from your eye (about 3 px on a phone from a seat). */
+const HULL = 0.0045;
 /** The 3D pieces: instance slots a kind (every piece of a kind fits, promotions too), floats an instance. */
 const KIND_CAP = 32;
 const PI3 = 8;
@@ -428,13 +460,17 @@ export class ArenaGL {
     uTime: WebGLUniformLocation;
     uSlide: WebGLUniformLocation;
     uLift: WebGLUniformLocation;
+    uToon: WebGLUniformLocation;
+    uHull: WebGLUniformLocation;
     buf: WebGLBuffer;
     data: Float32Array;
     /** A kind's VAO, its triangles' first index and count, and how many of it stand on the board now. */
     kinds: { vao: WebGLVertexArrayObject; first: number; count: number; n: number }[];
   } | null = null;
-  /** Which pieces are drawn: "3d" only when made with them (the switch); the tests' still pairs flip it back to "flat". */
-  private style: "flat" | "3d" = "flat";
+  /** Which pieces are drawn: "3d" or "toon" only when made with them (the switch); the tests' still pairs flip it back to "flat". */
+  private style: PieceStyle = "flat";
+  /** The 3D style the arena was made with (`?pieces=3d` or `?pieces=toon`), if any. */
+  private readonly solidStyle: PieceStyle = "flat";
   private last: { pieces: readonly FloorPiece[]; t0: number } = { pieces: [], t0: -NEVER };
   private readonly proj = new Float32Array(16);
   private readonly viewM = new Float32Array(16);
@@ -444,7 +480,7 @@ export class ArenaGL {
   drawCalls = 0;
   private statueFoot = 0.8;
 
-  static create(cv: HTMLCanvasElement, pieces3d = false): ArenaGL | null {
+  static create(cv: HTMLCanvasElement, pieces: PieceStyle = "flat"): ArenaGL | null {
     let gl: WebGL2RenderingContext | null = null;
     try {
       gl = cv.getContext("webgl2", { antialias: true, alpha: false, preserveDrawingBuffer: false, powerPreference: "high-performance" });
@@ -453,14 +489,14 @@ export class ArenaGL {
     }
     if (!gl) return null;
     try {
-      return new ArenaGL(gl, pieces3d);
+      return new ArenaGL(gl, pieces);
     } catch (e) {
       console.warn("Colosseum: WebGL 2 failed", e);
       return null;
     }
   }
 
-  private constructor(gl: WebGL2RenderingContext, pieces3d: boolean) {
+  private constructor(gl: WebGL2RenderingContext, pieces: PieceStyle) {
     this.gl = gl;
     const sp = program(gl, VS_SCENE, FS_SCENE);
     const mesh = buildScene();
@@ -510,9 +546,9 @@ export class ArenaGL {
     gl.bindBuffer(gl.ARRAY_BUFFER, pb);
     gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
     this.props = { vao: spriteVao(pb), buf: pb, data, n: 0, tex: null };
-    if (pieces3d) {
-      this.solid = this.buildSolid();
-      this.style = "3d";
+    if (pieces !== "flat") {
+      this.solid = this.buildSolid(pieces === "toon");
+      this.style = this.solidStyle = pieces;
     }
     gl.bindVertexArray(null);
     gl.enable(gl.DEPTH_TEST);
@@ -520,10 +556,12 @@ export class ArenaGL {
   }
 
   /** The 3D pieces: the six meshes in one buffer (built once), the instances' buffer, a VAO a kind. */
-  private buildSolid(): NonNullable<ArenaGL["solid"]> {
+  private buildSolid(toon: boolean): NonNullable<ArenaGL["solid"]> {
     const gl = this.gl;
     const prog = program(gl, VS_PIECE, FS_PIECE);
     const meshes = pieceMeshes();
+    // (The toon look is the pawn alone for now, a mockup: the other kinds stay flat.)
+    if (toon) meshes.p = toonPawn();
     let nv = 0;
     let ni = 0;
     for (const k of KINDS) ((nv += meshes[k].verts.length / PV), (ni += meshes[k].index.length));
@@ -570,16 +608,16 @@ export class ArenaGL {
     });
     gl.bindVertexArray(null);
     const u = (n: string) => gl.getUniformLocation(prog, n)!;
-    return { prog, uVP: u("uVP"), uEye: u("uEye"), uTime: u("uTime"), uSlide: u("uSlide"), uLift: u("uLift"), buf, data, kinds };
+    return { prog, uVP: u("uVP"), uEye: u("uEye"), uTime: u("uTime"), uSlide: u("uSlide"), uLift: u("uLift"), uToon: u("uToon"), uHull: u("uHull"), buf, data, kinds };
   }
 
   /** Which pieces are drawn ("3d" only when the arena was made with them). */
-  get pieceStyle(): "flat" | "3d" {
+  get pieceStyle(): PieceStyle {
     return this.style;
   }
-  /** (The tests' still pairs) Draws the pieces flat or in 3D, the same position. */
-  setPieceStyle(style: "flat" | "3d"): void {
-    if (style === "3d" && !this.solid) return;
+  /** (The tests' still pairs) Draws the pieces flat or in the 3D style the arena was made with, the same position. */
+  setPieceStyle(style: PieceStyle): void {
+    if (style !== "flat" && style !== this.solidStyle) return;
     this.style = style;
     this.setPieces(this.last.pieces, this.last.t0);
   }
@@ -629,7 +667,7 @@ export class ArenaGL {
     this.last.t0 = t0;
     const d = this.props.data;
     let n = 0;
-    const solid = this.style === "3d" ? this.solid : null;
+    const solid = this.style !== "flat" ? this.solid : null;
     if (solid) for (const k of solid.kinds) k.n = 0;
     const put = (x: number, y: number, z: number, h: number, w: number, r: Rect, fx: number, fz: number, t: number, foot: number, flicker: number, goes: number, phase = 0) => {
       const o = n++ * SI;
@@ -658,7 +696,7 @@ export class ArenaGL {
       if (n >= PIECES) break;
       const [x, z] = squareXZ(p.sq);
       const [fx, fz] = p.from ? squareXZ(p.from) : [x, z];
-      if (solid) {
+      if (solid && (this.style === "3d" || p.key[1] === "p")) {
         const ki = KINDS.indexOf(p.key[1] as (typeof KINDS)[number]);
         const kind = solid.kinds[ki];
         if (!kind || kind.n >= KIND_CAP) continue;
@@ -751,7 +789,7 @@ export class ArenaGL {
       gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, this.props.n);
       calls++;
     }
-    const solid = this.style === "3d" ? this.solid : null;
+    const solid = this.style !== "flat" ? this.solid : null;
     if (solid) {
       // The 3D pieces: a draw call a kind on the board; their shadows blend onto the board.
       gl.useProgram(solid.prog);
@@ -760,6 +798,22 @@ export class ArenaGL {
       gl.uniform1f(solid.uTime, time);
       gl.uniform1f(solid.uSlide, SLIDE_S);
       gl.uniform1f(solid.uLift, BOARD.lift);
+      gl.uniform1f(solid.uToon, this.style === "toon" ? 1 : 0);
+      gl.uniform1f(solid.uHull, 0);
+      if (this.style === "toon") {
+        // The outline first: the pushed-out hull's far side only (its near side culled), in the outline's ink.
+        const k = solid.kinds[0]!;
+        if (k.n) {
+          gl.enable(gl.CULL_FACE);
+          gl.cullFace(gl.BACK);
+          gl.uniform1f(solid.uHull, HULL);
+          gl.bindVertexArray(k.vao);
+          gl.drawElementsInstanced(gl.TRIANGLES, k.count, gl.UNSIGNED_SHORT, k.first * 2, k.n);
+          calls++;
+          gl.disable(gl.CULL_FACE);
+          gl.uniform1f(solid.uHull, 0);
+        }
+      }
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
       for (let i = 0; i < solid.kinds.length; i++) {

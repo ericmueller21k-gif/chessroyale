@@ -448,6 +448,52 @@ function knight(): PieceMesh {
 }
 
 /**
+ * The toon pawn (`?pieces=toon`, Eric, Oct 30: "the basic pieces we're all used to seeing" made 3D, chunky like the town's
+ * table pieces): the board's own pawn's outline (a ball for its head, a collar, a body flaring to a wide base) turned in a
+ * few steps round, so its facets show. Drawn in two flat tones and a thick dark outline (arena-gl.ts), no shine, no gold.
+ */
+export function toonPawn(): PieceMesh {
+  const b = new Builder();
+  b.shadow(0.38);
+  const head = { cy: 0.57, r: 0.15 };
+  b.lathe(
+    [
+      { r: 0, y: 0 },
+      { r: 0.33, y: 0 },
+      { r: 0.33, y: 0.075 },
+      { r: 0.27, y: 0.105 },
+      { r: 0.19, y: 0.18 },
+      { r: 0.14, y: 0.28 },
+      { r: 0.12, y: 0.37 },
+      { r: 0.21, y: 0.38 },
+      { r: 0.21, y: 0.43 },
+      { r: 0.1, y: 0.44 },
+      ...arc(0, head.cy, head.r, -Math.acos(0.1 / head.r), Math.PI / 2, 5),
+    ],
+    10,
+  );
+  const m = b.done(head.cy + head.r);
+  // Its normals welded (every copy of a point gets their average): the outline is pushed out along them, so it has no gaps
+  // at the corners. (Its two tones come from its flat faces, in the shader, not from these.)
+  const key = (i: number) => `${m.verts[i]!.toFixed(4)},${m.verts[i + 1]!.toFixed(4)},${m.verts[i + 2]!.toFixed(4)}`;
+  const sum = new Map<string, [number, number, number]>();
+  for (let i = 0; i < m.verts.length; i += PV) {
+    if (m.verts[i + 6] === MAT.shadow) continue;
+    const a = sum.get(key(i)) ?? [0, 0, 0];
+    sum.set(key(i), [a[0] + m.verts[i + 3]!, a[1] + m.verts[i + 4]!, a[2] + m.verts[i + 5]!]);
+  }
+  for (let i = 0; i < m.verts.length; i += PV) {
+    if (m.verts[i + 6] === MAT.shadow) continue;
+    const [x, y, z] = sum.get(key(i))!;
+    const l = Math.hypot(x, y, z) || 1;
+    ((m.verts[i + 3] = x / l), (m.verts[i + 4] = y / l), (m.verts[i + 5] = z / l));
+  }
+  for (let i = 0; i < m.verts.length; i++) if (i % PV < 3) m.verts[i] = m.verts[i]! * SIZE;
+  m.height *= SIZE;
+  return m;
+}
+
+/**
  * How big the pieces are drawn: the shapes above are a real set's proportions with a square 0.8 m; the board's squares are a
  * meter, and the pieces read best from the stands a little bigger than a real set's (the king about 1.5 m, its base 0.8 m).
  */

@@ -20,10 +20,10 @@ import { crowdAnimations, onPrefsChange } from "../prefs.ts";
 import { testParams, testSwitchesAllowed } from "../test-switches.ts";
 import { COLISEUM_PLACE, isSprite } from "../town/world.ts";
 import { BLACK_VIEW, SEAT_VIEWS, VIEWS, otherSeat, seats, turnLimits, viewFor } from "./arena.ts";
-import { ArenaGL, SLIDE_S, buildCrowd } from "./arena-gl.ts";
+import { ArenaGL, SLIDE_S, buildCrowd, type PieceStyle } from "./arena-gl.ts";
 import { PIECE_URL, crowdArt, propArt, sceneArt } from "./art.ts";
 import { floorEngine, type FloorEngine } from "./floor-engine.ts";
-import { FLOOR, FloorMatch, clockText, evalText, resultText, thinkMs, viewersText, type FloorState } from "./match.ts";
+import { FLOOR, FloorMatch, clockText, piecesOf, evalText, resultText, thinkMs, viewersText, type FloorState } from "./match.ts";
 import still from "./still.jpg";
 import "./colosseum.css";
 
@@ -49,8 +49,9 @@ type Hooks = {
     state: () => object;
     seat: (i: number) => unknown;
     flag: () => unknown;
-    pieces: (style: "flat" | "3d") => unknown;
+    pieces: (style: PieceStyle) => unknown;
     freeze: () => unknown;
+    pose: (fen: string) => unknown;
     jump: () => unknown;
     sample: () => { sky: number; hash: number } | null;
   };
@@ -85,7 +86,8 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
     const cv = canvas.current!;
     const el = box.current!;
     // The giant pieces in 3D (`?pieces=3d`, anyone's, for now: Eric decides after the stills); without it, the flat pieces.
-    const arena = ArenaGL.create(cv, new URLSearchParams(location.search).get("pieces") === "3d");
+    const asked = new URLSearchParams(location.search).get("pieces");
+    const arena = ArenaGL.create(cv, asked === "3d" || asked === "toon" ? asked : "flat");
     arenaRef.current = arena;
     setGl(!!arena);
     if (!arena) return;
@@ -264,6 +266,17 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
         if (!testSwitchesAllowed()) return;
         frozenAt.current = performance.now();
         match.current?.stop();
+      },
+      // (Still pairs) The game frozen on a set position: the giant board and the overlay's board both show it.
+      pose: (fen) => {
+        const m = match.current;
+        if (!testSwitchesAllowed() || !m) return;
+        frozenAt.current = performance.now();
+        m.stop();
+        // (A new state object: a move still being thought about when it stopped finds its game gone and isn't played.)
+        m.state = { ...m.state, fen, moves: [], sans: [], took: { w: [], b: [] }, pieces: piecesOf(fen), eval: null, mate: null, status: "playing" };
+        arenaRef.current?.setPieces(m.state.pieces, -1e9);
+        setTick((n) => n + 1);
       },
       jump: () => testSwitchesAllowed() && (jumpAt.current = performance.now()),
       sample: () => {
