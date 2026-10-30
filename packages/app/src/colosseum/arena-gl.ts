@@ -12,11 +12,15 @@
  * - **The props** (the big pieces, the torches' flames, the statues): instances too, one draw call, uploaded again only when a
  *   move is made (the slide itself is worked out on the GPU from when it began).
  *
- * Three draw calls a frame. A frame sets a few uniforms (the camera, the time, the jump's clock) and draws: nothing is
+ * - **The 3D pieces** (only when the gear's "3D pieces" is on; pieces3d.ts): the six meshes uploaded once, the pieces as instances written when
+ *   a move is made, one draw call a kind on the board. Without the switch the pieces are props, as above.
+ *
+ * Three draw calls a frame (up to nine with the 3D pieces). A frame sets a few uniforms (the camera, the time, the jump's clock) and draws: nothing is
  * allocated and nothing uploaded. The crowd jumps (a queen captured) by a uniform too.
  */
 import { BANNERS, BOARD, FLOOR_R, bossSeats, type Seat, GALLERY_H, GALLERY_R, PILLARS, PILLAR_ANGLES, SEATING, STANDS, STATUE, WALL_H, WALL_TOP, aisleAngle, fovFor, landingDepth, lookAt, multiply, perspective, rowR, rowY, seats, squareXZ, VIEWS, type View } from "./arena.ts";
 import { PROPS, SCENE, SKY, SQUARES, STONE, type CrowdArt, type Rect } from "./art.ts";
+import { EYE, KINDS, KNIGHT_TURN, PV, SIZE, SLIT, pieceMeshes } from "./pieces3d.ts";
 
 const VS_SCENE = `#version 300 es
 layout(location=0) in vec3 aPos;
@@ -102,12 +106,104 @@ void main() {
   o = vec4(mix(col, col * 0.34 + vec3(0.07, 0.06, 0.08), vBack), 1.0);
 }`;
 
+/**
+ * The 3D pieces (the gear's "3D pieces"; pieces3d.ts): one mesh a kind, one instance a piece (where it stands, where its slide began,
+ * when, when it goes, its color). Each turns round its upright axis to face you, as the flat pieces did (a knight shows its
+ * profile, a bishop its slit), slides and hops as they did, and is lit from the arena's sun (the a-file and White's end, high),
+ * with a soft fill from your side and a little shine. Its shadow, a soft disc on the board, is drawn with it.
+ */
+const VS_PIECE = `#version 300 es
+layout(location=0) in vec3 aPos;
+layout(location=1) in vec3 aNrm;
+layout(location=2) in float aMat;
+layout(location=3) in vec4 iA;
+layout(location=4) in vec4 iB;
+uniform mat4 uVP;
+uniform vec3 uEye;
+uniform float uTime;
+uniform float uSlide;
+uniform float uLift;
+out vec3 vN;
+out vec3 vW;
+out vec3 vObj;
+out float vMat;
+out float vBlack;
+void main() {
+  vMat = aMat;
+  vBlack = iB.z;
+  vObj = aPos / ${SIZE.toFixed(4)};
+  if (uTime >= iB.y) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+  float s = clamp((uTime - iB.x) / uSlide, 0.0, 1.0);
+  s = s * s * (3.0 - 2.0 * s);
+  vec2 xz = mix(iA.zw, iA.xy, s);
+  float hop = sin(3.14159 * s) * 0.35 * step(0.001, distance(iA.zw, iA.xy));
+  vec2 d = uEye.xz - xz;
+  d /= max(length(d), 0.0001);
+  vec3 R = vec3(d.y, 0.0, -d.x);
+  vec3 F = vec3(d.x, 0.0, d.y);
+  vec3 w;
+  if (aMat > 2.5 && aMat < 3.5) {
+    // The shadow: flat on the board, a little away from the sun, not lifted by the hop.
+    w = vec3(xz.x + aPos.x + 0.035, uLift + 0.006, xz.y + aPos.z - 0.055);
+    vN = aNrm;
+  } else {
+    w = vec3(xz.x, uLift + hop, xz.y) + R * aPos.x + vec3(0.0, aPos.y, 0.0) + F * aPos.z;
+    vN = R * aNrm.x + vec3(0.0, aNrm.y, 0.0) + F * aNrm.z;
+  }
+  vW = w;
+  gl_Position = uVP * vec4(w, 1.0);
+}`;
+const FS_PIECE = `#version 300 es
+precision highp float;
+uniform vec3 uEye;
+in vec3 vN;
+in vec3 vW;
+in vec3 vObj;
+in float vMat;
+in float vBlack;
+out vec4 o;
+const vec3 IVORY = vec3(0.93, 0.87, 0.74);
+const vec3 EBONY = vec3(0.15, 0.15, 0.18);
+const vec3 GOLD = vec3(0.86, 0.64, 0.24);
+const vec3 SUN = vec3(-0.43, 0.75, 0.5);
+void main() {
+  if (vMat > 2.5 && vMat < 3.5) { o = vec4(0.12, 0.08, 0.04, vN.x * 0.55); return; }
+  vec3 N = normalize(vN);
+  vec3 V = normalize(uEye - vW);
+  vec3 L = normalize(SUN);
+  vec3 base = mix(IVORY, EBONY, vBlack);
+  float spec = mix(0.22, 0.35, vBlack);
+  float shine = 22.0;
+  if (vMat > 0.5 && vMat < 1.5) { base = GOLD; spec = 0.55; shine = 30.0; }
+  // The bishop's slit: a groove across the mitre's front (pieces3d.ts SLIT).
+  if (vMat > 1.5 && vMat < 2.5) {
+    float g = abs(vObj.x * ${SLIT.k.toFixed(3)} + vObj.y - ${SLIT.c.toFixed(3)}) * ${(1 / Math.hypot(SLIT.k, 1)).toFixed(4)};
+    float m = (1.0 - smoothstep(${SLIT.w.toFixed(3)}, ${(SLIT.w * 1.6).toFixed(3)}, g)) * smoothstep(0.0, 0.07, vObj.z);
+    base = mix(base, mix(vec3(0.24, 0.17, 0.12), vec3(0.02), vBlack), m);
+  }
+  // The knight's eye (pieces3d.ts EYE), on both sides of its head.
+  if (vMat > 3.5) {
+    vec2 e = vec2(${EYE.x.toFixed(3)}, ${EYE.y.toFixed(3)});
+    vec2 p = vec2(vObj.x * ${Math.cos(KNIGHT_TURN).toFixed(4)} - vObj.z * ${Math.sin(KNIGHT_TURN).toFixed(4)}, vObj.y);
+    float m = 1.0 - smoothstep(${EYE.r.toFixed(3)}, ${(EYE.r * 1.4).toFixed(3)}, distance(p, e));
+    base = mix(base, mix(vec3(0.2, 0.13, 0.08), GOLD, vBlack), m);
+  }
+  float key = max(dot(N, L), 0.0);
+  float fill = max(dot(N, V), 0.0);
+  float sky = 0.5 + 0.5 * N.y;
+  vec3 c = base * (0.2 + 0.18 * sky + 0.72 * key + 0.22 * fill) + spec * pow(max(dot(N, normalize(L + V)), 0.0), shine) * vec3(1.0, 0.96, 0.88);
+  o = vec4(c, 1.0);
+}`;
+
 /** Floats a scene vertex (position, uv, color) and a sprite instance (five vec4s). */
 const SV = 9;
 const SI = 20;
 /** Props: 32 pieces, the flames, the statues. */
 const PIECES = 32;
 const PROP_N = PIECES + PILLAR_ANGLES.length + STATUE.angles.length;
+/** The 3D pieces: instance slots a kind (every piece of a kind fits, promotions too), floats an instance. */
+const KIND_CAP = 32;
+const PI3 = 8;
 /** A slide's length (s). */
 export const SLIDE_S = 0.45;
 /** "Never" for a sprite's going (s). */
@@ -329,6 +425,22 @@ export class ArenaGL {
   private readonly sprite: { prog: WebGLProgram; uVP: WebGLUniformLocation; uEye: WebGLUniformLocation; uTime: WebGLUniformLocation; uJump: WebGLUniformLocation; uSlide: WebGLUniformLocation };
   private readonly crowd: { vao: WebGLVertexArrayObject; buf: WebGLBuffer; n: number; tex: WebGLTexture | null };
   private readonly props: { vao: WebGLVertexArrayObject; buf: WebGLBuffer; data: Float32Array; n: number; tex: WebGLTexture | null };
+  /** The 3D pieces (built the first time they're switched on: the gear's "3D pieces"), or null: the flat pieces, exactly as before. */
+  private solid: {
+    prog: WebGLProgram;
+    uVP: WebGLUniformLocation;
+    uEye: WebGLUniformLocation;
+    uTime: WebGLUniformLocation;
+    uSlide: WebGLUniformLocation;
+    uLift: WebGLUniformLocation;
+    buf: WebGLBuffer;
+    data: Float32Array;
+    /** A kind's VAO, its triangles' first index and count, and how many of it stand on the board now. */
+    kinds: { vao: WebGLVertexArrayObject; first: number; count: number; n: number }[];
+  } | null = null;
+  /** Which pieces are drawn: "3d" only when made with them (the switch); the tests' still pairs flip it back to "flat". */
+  private style: "flat" | "3d" = "flat";
+  private last: { pieces: readonly FloorPiece[]; t0: number } = { pieces: [], t0: -NEVER };
   private readonly proj = new Float32Array(16);
   private readonly viewM = new Float32Array(16);
   private readonly vp = new Float32Array(16);
@@ -337,7 +449,7 @@ export class ArenaGL {
   drawCalls = 0;
   private statueFoot = 0.8;
 
-  static create(cv: HTMLCanvasElement): ArenaGL | null {
+  static create(cv: HTMLCanvasElement, pieces3d = false): ArenaGL | null {
     let gl: WebGL2RenderingContext | null = null;
     try {
       gl = cv.getContext("webgl2", { antialias: true, alpha: false, preserveDrawingBuffer: false, powerPreference: "high-performance" });
@@ -346,14 +458,14 @@ export class ArenaGL {
     }
     if (!gl) return null;
     try {
-      return new ArenaGL(gl);
+      return new ArenaGL(gl, pieces3d);
     } catch (e) {
       console.warn("Colosseum: WebGL 2 failed", e);
       return null;
     }
   }
 
-  private constructor(gl: WebGL2RenderingContext) {
+  private constructor(gl: WebGL2RenderingContext, pieces3d: boolean) {
     this.gl = gl;
     const sp = program(gl, VS_SCENE, FS_SCENE);
     const mesh = buildScene();
@@ -403,9 +515,82 @@ export class ArenaGL {
     gl.bindBuffer(gl.ARRAY_BUFFER, pb);
     gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
     this.props = { vao: spriteVao(pb), buf: pb, data, n: 0, tex: null };
+    if (pieces3d) {
+      this.solid = this.buildSolid();
+      this.style = "3d";
+    }
     gl.bindVertexArray(null);
     gl.enable(gl.DEPTH_TEST);
     gl.clearColor(SKY[0], SKY[1], SKY[2], 1);
+  }
+
+  /** The 3D pieces: the six meshes in one buffer (built once), the instances' buffer, a VAO a kind. */
+  private buildSolid(): NonNullable<ArenaGL["solid"]> {
+    const gl = this.gl;
+    const prog = program(gl, VS_PIECE, FS_PIECE);
+    const meshes = pieceMeshes();
+    let nv = 0;
+    let ni = 0;
+    for (const k of KINDS) ((nv += meshes[k].verts.length / PV), (ni += meshes[k].index.length));
+    const verts = new Float32Array(nv * PV);
+    const index = new Uint16Array(ni);
+    const at: { first: number; count: number }[] = [];
+    let ov = 0;
+    let oi = 0;
+    for (const k of KINDS) {
+      const m = meshes[k];
+      verts.set(m.verts, ov * PV);
+      for (let i = 0; i < m.index.length; i++) index[oi + i] = m.index[i]! + ov;
+      at.push({ first: oi, count: m.index.length });
+      ov += m.verts.length / PV;
+      oi += m.index.length;
+    }
+    const vb = gl.createBuffer()!;
+    gl.bindBuffer(gl.ARRAY_BUFFER, vb);
+    gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
+    const ib = gl.createBuffer()!;
+    const data = new Float32Array(KINDS.length * KIND_CAP * PI3);
+    const buf = gl.createBuffer()!;
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
+    const kinds = at.map(({ first, count }, k) => {
+      const vao = gl.createVertexArray()!;
+      gl.bindVertexArray(vao);
+      gl.bindBuffer(gl.ARRAY_BUFFER, vb);
+      gl.enableVertexAttribArray(0);
+      gl.vertexAttribPointer(0, 3, gl.FLOAT, false, PV * 4, 0);
+      gl.enableVertexAttribArray(1);
+      gl.vertexAttribPointer(1, 3, gl.FLOAT, false, PV * 4, 12);
+      gl.enableVertexAttribArray(2);
+      gl.vertexAttribPointer(2, 1, gl.FLOAT, false, PV * 4, 24);
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      for (let i = 0; i < 2; i++) {
+        gl.enableVertexAttribArray(3 + i);
+        gl.vertexAttribPointer(3 + i, 4, gl.FLOAT, false, PI3 * 4, (k * KIND_CAP * PI3 + i * 4) * 4);
+        gl.vertexAttribDivisor(3 + i, 1);
+      }
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
+      if (k === 0) gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, index, gl.STATIC_DRAW);
+      return { vao, first, count, n: 0 };
+    });
+    gl.bindVertexArray(null);
+    const u = (n: string) => gl.getUniformLocation(prog, n)!;
+    return { prog, uVP: u("uVP"), uEye: u("uEye"), uTime: u("uTime"), uSlide: u("uSlide"), uLift: u("uLift"), buf, data, kinds };
+  }
+
+  /** Which pieces are drawn ("3d" only when the arena was made with them). */
+  get pieceStyle(): "flat" | "3d" {
+    return this.style;
+  }
+  /** Draws the pieces flat or in 3D (the gear's "3D pieces", at once: the same position), the 3D set built the first time. */
+  setPieceStyle(style: "flat" | "3d"): void {
+    if (style === this.style) return;
+    if (style === "3d" && !this.solid) {
+      this.solid = this.buildSolid();
+      this.gl.bindVertexArray(null);
+    }
+    this.style = style;
+    this.setPieces(this.last.pieces, this.last.t0);
   }
 
   private texture(src: TexImageSource, pixelArt: boolean, into?: WebGLTexture): WebGLTexture {
@@ -449,8 +634,12 @@ export class ArenaGL {
    * uploaded (a move's work, not a frame's).
    */
   setPieces(pieces: readonly FloorPiece[], t0: number): void {
+    this.last.pieces = pieces;
+    this.last.t0 = t0;
     const d = this.props.data;
     let n = 0;
+    const solid = this.style === "3d" ? this.solid : null;
+    if (solid) for (const k of solid.kinds) k.n = 0;
     const put = (x: number, y: number, z: number, h: number, w: number, r: Rect, fx: number, fz: number, t: number, foot: number, flicker: number, goes: number, phase = 0) => {
       const o = n++ * SI;
       d[o] = x;
@@ -478,6 +667,22 @@ export class ArenaGL {
       if (n >= PIECES) break;
       const [x, z] = squareXZ(p.sq);
       const [fx, fz] = p.from ? squareXZ(p.from) : [x, z];
+      if (solid) {
+        const ki = KINDS.indexOf(p.key[1] as (typeof KINDS)[number]);
+        const kind = solid.kinds[ki];
+        if (!kind || kind.n >= KIND_CAP) continue;
+        const o = (ki * KIND_CAP + kind.n++) * PI3;
+        const s = solid.data;
+        s[o] = x;
+        s[o + 1] = z;
+        s[o + 2] = fx;
+        s[o + 3] = fz;
+        s[o + 4] = p.from ? t0 : -NEVER;
+        s[o + 5] = p.taken ? t0 + SLIDE_S * 0.85 : NEVER;
+        s[o + 6] = p.key[0] === "b" ? 1 : 0;
+        s[o + 7] = 0;
+        continue;
+      }
       put(x, BOARD.lift, z, PIECE_M, PIECE_M, PROPS.piece[p.key]!, fx, fz, p.from ? t0 : -NEVER, PROPS.pieceFoot, 0, p.taken ? t0 + SLIDE_S * 0.85 : NEVER);
     }
     PILLAR_ANGLES.forEach((a, i) => {
@@ -494,6 +699,10 @@ export class ArenaGL {
     const gl = this.gl;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.props.buf);
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, d, 0, n * SI);
+    if (solid) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, solid.buf);
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, solid.data);
+    }
   }
 
   /** Sizes the drawing buffer (device pixels). */
@@ -550,6 +759,26 @@ export class ArenaGL {
       gl.bindVertexArray(this.props.vao);
       gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, this.props.n);
       calls++;
+    }
+    const solid = this.style === "3d" ? this.solid : null;
+    if (solid) {
+      // The 3D pieces: a draw call a kind on the board; their shadows blend onto the board.
+      gl.useProgram(solid.prog);
+      gl.uniformMatrix4fv(solid.uVP, false, this.vp);
+      gl.uniform3f(solid.uEye, view.eye[0], view.eye[1], view.eye[2]);
+      gl.uniform1f(solid.uTime, time);
+      gl.uniform1f(solid.uSlide, SLIDE_S);
+      gl.uniform1f(solid.uLift, BOARD.lift);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      for (let i = 0; i < solid.kinds.length; i++) {
+        const k = solid.kinds[i]!;
+        if (!k.n) continue;
+        gl.bindVertexArray(k.vao);
+        gl.drawElementsInstanced(gl.TRIANGLES, k.count, gl.UNSIGNED_SHORT, k.first * 2, k.n);
+        calls++;
+      }
+      gl.disable(gl.BLEND);
     }
     gl.bindVertexArray(null);
     this.drawCalls = calls;

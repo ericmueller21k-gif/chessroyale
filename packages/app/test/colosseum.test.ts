@@ -230,3 +230,39 @@ describe("the bosses in the crowd (Eric, Oct 30)", () => {
     expect(coversBoard(VIEWS[0]!, { x: 0, y: rowY(1), z: seatR(1) }, 0.8, 1.75)).toBe(true);
   });
 });
+
+describe("the 3D pieces (the gear's 3D pieces; pieces3d.ts)", () => {
+  it("six meshes, built once: whole triangles, unit normals, standing on the board, sized to a square, the king tallest", async () => {
+    const { KINDS, MAT, PV, pieceMeshes, triangulate, KNIGHT_OUTLINE } = await import("../src/colosseum/pieces3d.ts");
+    const all = pieceMeshes();
+    let verts = 0;
+    for (const k of KINDS) {
+      const m = all[k];
+      const n = m.verts.length / PV;
+      verts += n;
+      expect(m.index.length % 3, k).toBe(0);
+      expect(Math.max(...m.index), k).toBeLessThan(n);
+      let minY = Infinity;
+      let maxR = 0;
+      for (let i = 0; i < m.verts.length; i += PV) {
+        const [x, y, z, nx, ny, nz, mat] = m.verts.subarray(i, i + PV);
+        expect(Math.hypot(nx!, ny!, nz!)).toBeCloseTo(1, 4);
+        if (mat === MAT.shadow) continue;
+        minY = Math.min(minY, y!);
+        maxR = Math.max(maxR, Math.hypot(x!, z!));
+      }
+      expect(minY, `${k} stands on the board`).toBeCloseTo(0, 5);
+      expect(maxR, `${k} fits its square`).toBeLessThan(0.5);
+    }
+    // (All six in one 16-bit index buffer.)
+    expect(verts).toBeLessThan(65536);
+    const h = Object.fromEntries(KINDS.map((k) => [k, all[k].height]));
+    expect(h.k).toBeGreaterThan(h.q!);
+    expect(h.q).toBeGreaterThan(h.b!);
+    expect(h.p).toBeLessThan(Math.min(h.n!, h.b!, h.r!));
+    // (The tallest stays within what the views keep on screen: the board and a piece about 1.6 m tall over it.)
+    expect(h.k).toBeLessThan(1.7);
+    // The knight's head: its outline cut into whole triangles.
+    expect(triangulate(KNIGHT_OUTLINE).length).toBe((KNIGHT_OUTLINE.length - 2) * 3);
+  });
+});
