@@ -112,8 +112,9 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
       bossMaxMoves: n("bossMoves"),
       drawRuleByStage: draw && DRAW_RULES.includes(draw) ? [draw] : undefined,
     }),
-    // (A test link's ?clock= gives Boss alone that clock too: the tests of the clock and of a missed move use it.)
-    ...(n("clock") ? { bossAloneUntimed: false } : {}),
+    // (A test link's ?clock= gives Boss alone that clock instead of Boss Battle's 10 + 10: the tests of the clock and of a
+    // missed move use it.)
+    ...(n("clock") ? { bossAloneClock: false } : {}),
     ...forced,
     ...speed,
     ...start,

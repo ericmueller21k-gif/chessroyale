@@ -623,11 +623,12 @@ export class MatchRunner {
   }
 
   /**
-   * The bullet clock has run out (the Hidden Boss's ultimate): nobody still in the battle has any time left in their
-   * bank. The battle is lost on time (finishBossBattle).
+   * The battle's bank has run out: under the Hidden Boss's bullet clock (his ultimate), or on Boss Battle's own clock
+   * (`bossClock`, BOSS_CLOCK: 10 + 10), nobody still in the battle has any time left in their bank. The battle is lost on
+   * time (finishBossBattle).
    */
   bossOutOfTime(): boolean {
-    if (!bulletClock(this.state.boss)) return false;
+    if (!this.state.boss || (!bulletClock(this.state.boss) && !this.settings.bossClock)) return false;
     const alive = this.alive();
     return alive.length > 0 && alive.every((p) => p.bankMs <= 0);
   }
@@ -1202,7 +1203,7 @@ export class MatchRunner {
       };
       if (stand) this.forceLastStand = false;
     }
-    // (The bullet clock ran out on this move: the battle is lost on time, and no move is played for the crowd.)
+    // (The bank ran out on this move, the bullet clock's or Boss Battle's: the battle is lost on time, and no move is played.)
     const outOfTime = this.bossOutOfTime();
     // (Rounds whose move a power crossed out after it was played (Folio's Revision): fair play skips them.)
     const crossed = new Set<number>();

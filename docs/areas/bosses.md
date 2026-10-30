@@ -12,7 +12,7 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 - **Where bosses are met:** the boss raid (up to 50 people, online; or a Solo raid with 49 bots), the Crowd 50 v 50's
   boss final (the top 4, always against the Hidden Boss since Oct 14), and solo's "Boss alone" (one of the Boss raid
   screen's choices, or `/bosses`; [hub.md](hub.md); you pick every move
-  against a boss you choose on the Boss Battle screen's tiles (the Boss raid screen's since Oct 26, Eric; "Solo Boss Mode" until Oct 29), at a difficulty from Very easy to Very hard, `BOSS_DIFFICULTY`; its **START** begins the battle at once). The Hidden Boss
+  against a boss you choose on the Boss Battle screen's tiles (the Boss raid screen's since Oct 26, Eric; "Solo Boss Mode" until Oct 29), at a difficulty from Very easy to Very hard, `BOSS_DIFFICULTY`; its **START** begins the battle at once). **Boss alone's clock** (Eric, Oct 30, replacing his Oct 21 untimed one): 10 + 10 (`BOSS_CLOCK`, `bossClockSettings`, on with `RAID_SETTINGS.bossAloneClock`): a 10-minute bank, 10 s added as each move begins, no cap on one move, the boss untimed; the dock's clock shows the bank with a "+10" as each move begins, and an empty bank loses on time (`bossClock`: the runner's `bossOutOfTime`, the move not played, "won on time"). A Solo raid keeps the raid's clock, a test link's `?clock=` turns it off, and the Hidden Boss's Bullet replaces it when it comes; docs/decisions/2026-10-30-boss-battle-clock.md. The Hidden Boss
   (below) is met by everyone in the Crowd's boss final, solo and online, and otherwise only by an admin, in Boss alone
   from the `/bosses` picker (his tile on the select screen is dark and locked for everyone).
 - **The Boss raid screen's character select** (Eric, Oct 16; now the Boss Battle screen's, Oct 26; Oct 29: your stage and a party's two invite circles, VS, a smaller "?" box, the five-level difficulty and START, docs/decisions/2026-10-29-boss-battle-look.md; docs/decisions/2026-10-16-boss-character-select.md;
@@ -475,7 +475,7 @@ build): online, phase 1 won is the crowd's victory):
   under the boss bar): what it said is in the dock's line, or gone, decided in `docs/decisions/2026-10-24-boss-screens.md`.
   In the box, the words centered and, at its right, **your clock** (`DockClock`): bold, m:ss rounded up as the big 3-2-1
   counts; running on your move, red in its last 10 s; once your move is in, it holds where it stopped, dimmed, through
-  the boss's turn, the reveal and the moments, whichever screen shows it; under the bullet clock's increment a "+2"
+  the boss's turn, the reveal and the moments, whichever screen shows it; under an increment (Boss alone's 10 + 10, the bullet clock's once he adds one) a "+10" or "+2"
   rises over it as each move begins. None during Lights out's rounds (their prompt and meter take the box: before the
   first round, as the night falls, the dock keeps its layout and your held clock, "Remember where his pieces are." and
   "Clocks stopped."), the phase change, or before your first move. Once the crowd's move lands, a reveal's line leads with

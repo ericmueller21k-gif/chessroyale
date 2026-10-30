@@ -18,7 +18,7 @@ import { Bolt } from "./PowerUpButton.tsx";
 import { useMedia } from "./QuickChat.tsx";
 import { VoiceBubble } from "../speech.tsx";
 import { clockShown } from "../clock-text.ts";
-import { bulletIncrementOn, kingBlocked, mockKingHelp } from "./Recluse.tsx";
+import { bulletIncrementOn, bulletOn, kingBlocked, mockKingHelp } from "./Recluse.tsx";
 import { RaceBadge } from "./Hopper.tsx";
 
 /**
@@ -337,8 +337,8 @@ export const DOCK_PLUS_MS = 1600;
 /**
  * Your clock, bold at the status box's right, the same on every boss battle screen (Eric, Oct 15: "never disappears or
  * jumps between moves"): on your move, counting down (red from TICK_FROM_SECONDS); otherwise, dimmed, what you had
- * left when your move went in. Under the Hidden Boss's bullet clock with its increment, a move begins with the 2 s
- * added, and a brief "+2" beside the number says so. It re-renders itself, once each time the second shown changes;
+ * left when your move went in. On a clock with an increment (Boss Battle's 10 + 10, the Hidden Boss's bullet clock once
+ * he adds one), a move begins with it added, and a brief "+10" (or "+2") beside the number says so. It re-renders itself, once each time the second shown changes;
  * the screen around it doesn't.
  */
 export function DockClock({ match, boss, run }: { match: GameView; boss: GameView["boss"]; run?: DockClockRun }) {
@@ -358,7 +358,8 @@ export function DockClock({ match, boss, run }: { match: GameView; boss: GameVie
   }, [run?.startsAt, run?.deadline, run?.frozen?.until]);
   // (Before your first move of the battle there's nothing to hold yet: none, and the words have the whole box.)
   if (ms === null) return null;
-  const inc = run ? bulletIncrementOn(boss) : 0;
+  // (The increment: the bullet clock's once it's on, else Boss Battle's 10 + 10's.)
+  const inc = !run ? 0 : bulletOn(boss) ? bulletIncrementOn(boss) : match.settings.bossClock ? match.settings.timeIncrementSeconds : 0;
   const plus = inc > 0 && now - run!.startsAt < DOCK_PLUS_MS;
   const low = !!run && Math.ceil(ms / 1000) <= TICK_FROM_SECONDS;
   return (

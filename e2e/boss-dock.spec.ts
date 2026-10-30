@@ -370,3 +370,25 @@ test("the admins' ⚡ and 🐟: on a phone, tiny icons beside the God King's hea
   await fish.click();
   await expect.poll(() => page.evaluate(() => (window as any).match.moves.length as number), { timeout: 60_000 }).toBe(before + 1);
 });
+
+test("Boss alone on Boss Battle's 10 + 10 (Eric, Oct 30): the clock from the first move, 10:10, \"+10\" as a move begins; what a move leaves stays", async ({ page }) => {
+  await page.goto("/?debug&laststand=0&boss=gingerbread");
+  await bossAloneFromHome(page);
+  await expect.poll(() => phase(page), { timeout: 120_000 }).toBe("play");
+  const first = await page.evaluate(() => {
+    const p = (window as any).match.phase;
+    return p.deadline - p.startsAt;
+  });
+  expect(first).toBe(610_000);
+  await expect(page.locator(".boss-dock-status .dk-clock.running .dk-time")).toHaveText(/^10:(10|0\d)$/);
+  await quietMove(page);
+  // His reply, then your next move: the bank less what you used, plus 10 s, and the "+10" rising over it.
+  const plus = page.locator(".boss-dock-status .dk-clock.running .dk-plus");
+  await expect(plus).toHaveText("+10", { timeout: 60_000 });
+  const next = await page.evaluate(() => {
+    const p = (window as any).match.phase;
+    return p.deadline - p.startsAt;
+  });
+  expect(next).toBeGreaterThan(600_000);
+  expect(next).toBeLessThanOrEqual(620_000);
+});
