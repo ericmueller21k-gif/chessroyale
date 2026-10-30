@@ -38,6 +38,7 @@ import {
   RANKED_1V1,
   RANKING,
   RECLUSE_PHASE2,
+  TOWN_CHAT,
   RATING_MIN_MOVES,
   SHOP_FREE,
   SQUADS,
@@ -52,6 +53,7 @@ import {
   fixedLevel,
   isPlayable,
   maiaTopRating,
+  rankedMinHumans,
   kingCharges,
   lastStandBar,
   liveStrip,
@@ -68,6 +70,8 @@ import {
   type SquadsSettings,
   controlLabel,
   rankView,
+  divisionsEnd,
+  emblemId,
   votedControl,
   zoneControl,
 } from "@chessroyale/core";
@@ -235,12 +239,12 @@ function modes(src: FaqSources): FaqSection {
 ### Boss raid and Boss alone {#mode-boss}
 
 - **Boss raid:** up to ${R.lobbySize} players pick the crowd's moves together against a [boss](#boss-brain); the most popular pick is played. Every boss starts from the starting position.
-- **Where:** **Solo Boss Mode** on the home screen. The bosses are at the top: tap one to see it on the stage below (its name, and its difficulty when it isn't Normal), or **?** for a random one. Under them, **Boss alone** meets the one you picked. Raids with people (**Join a raid**, **People only**, **Raid with bots** and **Play with friends**) are moving to the Boss Arena's Coliseum and aren't on the home screen for now.
+- **Where:** **Boss Battle** on the home screen. The bosses are at the top: tap one to see it on the stage below, with you and, behind you, two spots for friends (not open yet), or **?** for a random one. Under the boss's name, the arrows pick its difficulty (${src.difficulty.length} levels, shown by the dots), and **START** meets the boss you picked. Raids with people (**Join a raid**, **People only**, **Raid with bots** and **Play with friends**) are moving to the Boss Arena's Colosseum and aren't on the home screen for now.
 - **Scoring:** the [50 v 50 way](#raid-scoring), its limit widening with the crowd's moves (Boss alone scores as before).
 - **The boss strikes:** every ${n(S.bossKillEvery, "crowd move")} it knocks out the player who gave away the most points since its last strike (as the judge counts them, before the [scoring's limit](#raid-scoring), after the [opening allowance](#opening-allowance); a missed move counts as ${n(S.finalMissLoss, "point")}, and a tie goes against the weaker player over the match), until half the raid is left${finalBoss ? "" : ` (in the Crowd's boss final, until ${S.bossMinSurvivors} are left)`}. If two are still tied for the worst, nobody is struck: it strikes after the next crowd move instead.
 - **The God King** fights on your side, with ${n(S.kingChargesMax, "charge")} ([more on him](#god-king)).
 - The battle ends in checkmate or a draw, or after ${n(S.bossMaxMoves, "crowd move")}, when the engine judges the position.
-- **Boss alone** (on the Solo Boss Mode screen): just you against the boss you picked there, at a difficulty from ${src.difficulty[0]?.label} to ${src.difficulty.at(-1)?.label}. You pick every move, and there's no clock: take as long as you like.
+- **Boss alone** (**START** on the Boss Battle screen): just you against the boss you picked there, at a difficulty from ${src.difficulty[0]?.label} to ${src.difficulty.at(-1)?.label}. You pick every move, and there's no clock: take as long as you like.
 - **The Crowd's boss final** is ${finalBoss ? `always ${finalFoe}, for` : "the same fight for"} the last ${left(src.crowdKnockouts.boss)} of a 50 v 50.${finalBoss ? " He's met nowhere else." : ""}
 
 ### Squads {#mode-squads}
@@ -298,7 +302,12 @@ export function ranked1v1(R: typeof RANKED_1V1): string {
   const blitz = zoneControl("blitz", R);
   const tiers = R.tiers.map((t) => t.name);
   const top = rankView({ games: R.placements.games, ladder: R.placements.maxLadder }, R);
-  const apex = R.apex;
+  const [lowTop, highTop] = [...R.topTiers].sort((a, b) => b.top - a.top);
+  const last = tiers.at(-1)!;
+  // (Where the top tiers' floor sits in the last division: Radiant 1's 80 RP.)
+  const floorRp = R.topFloor - (divisionsEnd(R) - R.pointsPerDivision);
+  const emblems = (ids: readonly string[]) => `!emblems ${ids.join(" ")}`;
+  const example = R.tiers[Math.min(2, R.tiers.length - 1)]!.name;
   const C = R.coins;
   return `### 1 v 1 · Classic chess {#mode-1v1}
 
@@ -307,7 +316,15 @@ export function ranked1v1(R: typeof RANKED_1V1): string {
 - **The clocks:** "${controlLabel(blitz)}" means ${n(blitz.baseSeconds / 60, "minute")} each, plus ${n(blitz.incrementSeconds, "second")} after every move. They start after Black's first move. Each side has ${n(R.firstMoveSeconds, "second")} for its first move, or the game is called off (no result, no rank change).
 - **How a game ends:** checkmate; resigning; running out of time, a loss (but a draw if the other player has only a king, or a king and one knight or one bishop, so they couldn't mate); or a draw, by stalemate, threefold repetition, the 50-move rule, too little material for either side to mate, or agreement. **Offer a draw** is under the board: the other player accepts or declines, and after a decline you can offer again once you've made ${n(R.drawOfferEveryMoves, "more move")}.
 - **Lost your connection?** Your clock keeps running: open the app again (or reload) and you're straight back in the game.
-- **Ranks**, as in League of Legends: ${tiers.slice(0, -1).join(", ")} and ${tiers.at(-1)}, each with divisions 4 (the lowest) to 1, then ${apex.map((a) => a.name).slice(0, -1).join(", ")} and ${apex.at(-1)!.name}, with no divisions. A division is ${n(R.pointsPerDivision, "rank point")} (RP): reach ${num(R.pointsPerDivision)} and you go up a division, the extra carried over; drop below 0 and you go down one. There are no promotion series, and nobody goes below ${tiers[0]} 4 with 0 RP. ${apex[1]!.name} starts ${num(apex[1]!.from)} RP into ${apex[0]!.name}, ${apex[2]!.name} ${num(apex[2]!.from)}.
+- **Ranks:** ${tiers.slice(0, -1).join(", ")} and ${last}, each with divisions ${R.divisions} (the lowest) to 1. A division is ${n(R.pointsPerDivision, "rank point")} (RP): reach ${num(R.pointsPerDivision)} and you go up a division, the extra carried over; drop below 0 and you go down one. There are no promotion series, and nobody goes below ${tiers[0]} ${R.divisions} with 0 RP. Each tier has its emblem, and each division up adds to it, up to a crown and a glow in division 1:
+
+${emblems(R.tiers.map((t) => emblemId(t.name, R.divisions)))}
+${emblems(Array.from({ length: R.divisions }, (_, i) => emblemId(example, R.divisions - i)))}
+
+- **The top two tiers,** with no divisions: **${lowTop!.name}**, the ${num(lowTop!.top)} highest ranks, and above it **${highTop!.name}**, the ${num(highTop!.top)} highest, both from ${floorRp} RP in ${last} 1 (their RP count from there). Equal ranks share a place, and your place is brought up to date within a minute. At ${floorRp} RP or more in ${last} 1 but outside the top ${num(lowTop!.top)}, you stay ${last} 1 and your RP keeps counting past ${floorRp}. Their emblems shimmer:
+
+${emblems([emblemId(lowTop!.name, null), emblemId(highTop!.name, null)])}
+
 - **Rank points:** about +${num(R.points.perGame)} for a win and −${num(R.points.perGame)} for a loss against a player at your level, about 0 for a draw; more for beating someone stronger, less for beating someone weaker. Behind them is a hidden rating, worked out from your results and whom you played them against: when your rank is lower than it, you gain more and lose less (up to ${n(R.points.maxAdjust, "RP", "RP")} more or less), so your rank settles where your play is. A win never costs you points.
 - **Placements:** your first ${n(R.placements.games, "game")} show "Placement 1/${R.placements.games}", "2/${R.placements.games}" and so on; after the last of them you're placed by your hidden rating, at most ${top.label.replace(/ · .*/, "")}.
 - **Coins:** a game pays ${num(C.perMinute.win)} coins a minute for a win, ${num(C.perMinute.draw)} for a draw and ${num(C.perMinute.loss)} for a loss, at least 1 and at most ${num(C.maxPerGame)}, once both sides have made ${n(C.minMoves, "move")}. Up to ${n(C.perDay, "game")} a day pay coins; after that they still count for your rank. A called-off game and a bot game pay nothing.
@@ -484,7 +501,7 @@ A move is **brilliant** when it separated the field: among at least ${B.minPicke
 
 ### Your rating {#rating}
 
-Your rating comes from your moves, not from wins: from the average number of points your moves give away, matched against how many Stockfish gives away at each of its own strength settings (so it's on Stockfish's rating scale). It shows after ${n(src.ratingMinMoves, "move")}, starts near ${src.priorRating} and firms up as your moves come in. A match counts toward your ranking only when at least ${pct(src.rankedShare, 0)} of its seats are real players; solo games and practice mode never count.
+Your rating comes from your moves, not from wins: from the average number of points your moves give away, matched against how many Stockfish gives away at each of its own strength settings (so it's on Stockfish's rating scale). It shows after ${n(src.ratingMinMoves, "move")}, starts near ${src.priorRating} and firms up as your moves come in. A match counts toward your ranking only when at least ${pct(src.rankedShare, 0)} of its seats are real players; solo games and practice mode never count. Your ranking changes only in a match with at least ${rankedMinHumans(src.crowd.lobbySize, src.rankedShare)} real players (${rankedMinHumans(src.raid.lobbySize, src.rankedShare)} in a raid). Solo games never change it.
 `,
   };
 }
@@ -596,9 +613,9 @@ $ strength = tier + the boss's offset + your difficulty
 |---|---|
 ${offsets}
 
-**Worked example.** You're rated ${you}. The weakest tier above ${you} is ${tier}. ${ginger.name} at ${src.difficulty.find((d) => d.elo === 0)?.label ?? "Normal"}: ${tier} ${term(ginger.offset)} = **${gingerElo}**. ${bigBoy.name} at ${hard.label}: ${tier} ${term(bigBoy.offset)} ${term(hard.elo)} = **${bigBoyElo}**.
+**Worked example.** You're rated ${you}. The weakest tier above ${you} is ${tier}. ${ginger.name} at ${src.difficulty.find((d) => d.elo === 0)?.label ?? "Medium"}: ${tier} ${term(ginger.offset)} = **${gingerElo}**. ${bigBoy.name} at ${hard.label}: ${tier} ${term(bigBoy.offset)} ${term(hard.elo)} = **${bigBoyElo}**.
 
-The Solo Boss Mode screen shows the boss you picked by its name, with your difficulty's name under it (unless it's ${src.difficulty.find((d) => d.elo === 0)?.label ?? "Normal"}). Boss alone's menu shows the boss you picked at Boss alone's level, your difficulty's Maia rating, and how far it is from yours ("+200 vs you"); 1 to 5 skulls show how dangerous it is. A Solo raid (Raid with bots) has no difficulty on top.
+The Boss Battle screen shows the boss you picked by its name, with your difficulty's name and its five dots under it. A Solo raid (Raid with bots) has no difficulty on top.
 
 ### Brain 1: Stockfish at a set strength {#stockfish-brain}
 
@@ -795,6 +812,12 @@ Plays from the game so far. A circus tiger who hated his act (the roaring, the j
 - **Hoops** (ultimate): on his turn after the warning, he plays his move as usual, then throws ${num(p.hoopsCount)} burning hoops onto the board before your turn. Each hoop rings a block of 2×2 squares, never on the first or last row, with room between them. For your next ${n(p.hoopsCrowdMoves, "move")}, and his move between them, nothing moves or captures across a hoop: no piece moves into a block, out of it or through it (a knight neither). Pieces inside can still move within their block. Attacks across a hoop still count for the kings: a king can't step onto a square attacked across one, a piece pinned across one stays pinned, and no move may give check across one. If the hoops would leave a side with no move at all, they stop nothing that turn. The engine picks where they land, the ones that hem you in the most, never leaving you without a move or handing either side a mate in one. As your second move lands, the hoops burn out. If his move puts your king in check, they wait until after his next move.`;
   },
 
+  folio: (p, b) => `
+Plays from the game so far. A paper crane folded from a page of handwriting. It tells you the truth, but it never takes anything back for you. ${b.offset < 0 ? `Its powers are why it plays ${Math.abs(b.offset)} under the usual strength.` : b.offset > 0 ? `It plays ${b.offset} over the usual strength.` : "It plays at the usual strength."}
+
+- **Draft** (passive): from turn ${p.draftFirst}, every ${n(p.draftEvery, "turn")}, Folio writes an ink mark under one of your pieces that one of its pieces attacks, and the line of that attack shows faintly. The piece is the most valuable one that you defend and that no cheaper piece of Folio's attacks (never your king; between pieces of equal value, one at random). You have ${n(p.draftWindow, "move")} to end that attack: move the piece, block the line, take the attacker, or anything else that stops it. If the same piece of Folio's still attacks it after your ${ordinal(p.draftWindow)} move, your piece is folded: it can't move for ${n(p.foldTurns, "turn")} (tap it and the line under the board says so). The mark goes as soon as the attack ends, even when Folio moves its own piece away. One mark at a time.
+- **Crease** (ultimate): when the rage meter fills, the warning shows a faint line on the board: where the crease will fall. As your next turn begins, the board is creased along that line (between two files, or two rows) for ${n(p.creaseTurns, "turn")}: none of your pieces may move across it, knights included, and no castling whose king or rook would cross it. Folio folds the board toward itself: its own pieces cross it freely. Attacks still cross it, so checks and pins work as usual. The engine picks the line when the warning shows: the one that costs you nearest ${num(p.creaseLossMin)} to ${num(p.creaseLossMax)} pawns as the board stands then, never more. It never picks a line that leaves you without a move, takes away your mate in one or hands Folio one, and it checks that again as the crease falls: if the board has changed so that it would, the crease doesn't fall. While it holds, if every move you have crosses it (say, your only way out of check), it lifts for that turn, as Sawyer's board saw does.
+- **Revision** (once a battle): when your move punishes a blunder of Folio's (its move cost it ${n(p.revisionDrop, "pawn")} or more against its best, and your reply found it), it crosses out both moves: the board goes back to before its move, it plays the engine's best move there instead, and you move again. Your picks on the crossed-out move keep their points. Never before turn ${p.revisionFrom}, and never after a move that ends the battle. It only ever rewrites its own mistake, never yours.`,
 };
 
 /**
@@ -1010,7 +1033,7 @@ function fairPlay(): FaqSection {
 - **Engine help is cheating, and we look for it.** Using an engine, another device or anyone else's help to pick your moves is against the rules. We watch for engine assistance and act on it. We don't explain how, so it stays hard to dodge.
 - **What happens:** while an account is under review, its online results are held off the rankings. A confirmed cheater is banned from online play (solo stays open). Borderline cases go to a person, never straight to a ban, and a ban can be appealed.
 - **Reporting:** tap a player's name to report them. A report never bans anyone by itself: it puts their games in front of a reviewer sooner.
-- **Chat** is preset lines and emoji only. Tap a name in a chat to mute that player on your device, or to open their profile and report an offensive name or icon. A moderator can turn a player's chat off, or reset their name and icon. Names with slurs or hate in them aren't allowed.
+- **Chat** is preset lines and emoji, except in the town square, where signed-in players type: up to ${TOWN_CHAT.maxChars} characters, one message every ${TOWN_CHAT.gapMs / 1000} seconds. Slurs, swearing, links and contact details are refused, and messages aren't kept (if someone reports one, the report keeps its words and when it was said, for a moderator to read). Tap a name in a chat to mute that player on your device, or to open their profile and report an offensive name or icon; tap a message in the town square to report it. A moderator can turn a player's chat off, take a town square message down, or reset their name and icon. Names with slurs or hate in them aren't allowed.
 - **Practice mode** is for our testers: unlimited power-ups, in the open. A tester practicing is marked 💡 on the leaderboard, and practice never counts toward any ranking.
 `,
   };

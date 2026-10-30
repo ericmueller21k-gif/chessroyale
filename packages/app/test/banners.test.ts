@@ -8,6 +8,7 @@ import { SMUDGY_UI } from "../src/components/Smudgy.tsx";
 import { MOO_UI } from "../src/components/Moo.tsx";
 import { GARDENER_UI } from "../src/components/Gardener.tsx";
 import { TIGER_UI } from "../src/components/Tiger.tsx";
+import { FOLIO_BEATS, FOLIO_UI } from "../src/components/Folio.tsx";
 import { BIGBOY_UI } from "../src/components/BigBoy.tsx";
 import { BOINGO_UI, FUNHOUSE, PIE, SPIN, funhouseFlipAt } from "../src/components/Boingo.tsx";
 import { BLIZZARD, FREEZE, GINGER_UI, THAW } from "../src/components/Ginger.tsx";
@@ -35,7 +36,7 @@ const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
 
 /** Every power moment's view, by kind (the rage warning and each boss's). */
 const VIEWS: Partial<Record<PowerEventKind, { ui: MomentUi; boss: string; name: string }>> = {};
-for (const [ui, name] of [[GINGER_UI, "Ginger"], [BOINGO_UI, "Boingo"], [GREX_UI, "Jefferson"], [HOLLOW_UI, "Hollow"], [BIGBOY_UI, "Big Boy"], [SAWYER_UI, "Sawyer"], [PIG_UI, "Wrangler"], [RECLUSE_UI, "Hidden Boss"], [ALFIL_UI, "Alfil"], [HOPPER_UI, "Chub & Chirp"], [SMUDGY_UI, "Smudgy"], [MOO_UI, "Moo & Moon"], [GARDENER_UI, "Puddles"], [TIGER_UI, "Babur"]] as const) {
+for (const [ui, name] of [[GINGER_UI, "Ginger"], [BOINGO_UI, "Boingo"], [GREX_UI, "Jefferson"], [HOLLOW_UI, "Hollow"], [BIGBOY_UI, "Big Boy"], [SAWYER_UI, "Sawyer"], [PIG_UI, "Wrangler"], [RECLUSE_UI, "Hidden Boss"], [ALFIL_UI, "Alfil"], [HOPPER_UI, "Chub & Chirp"], [SMUDGY_UI, "Smudgy"], [MOO_UI, "Moo & Moon"], [GARDENER_UI, "Puddles"], [TIGER_UI, "Babur"], [FOLIO_UI, "Folio"]] as const) {
   for (const [kind, m] of Object.entries(ui.moments)) VIEWS[kind as PowerEventKind] = { ui: m as MomentUi, boss: ui.id, name };
 }
 VIEWS.warn = { ui: WARN, boss: "bigboy", name: "Big Boy" };
@@ -86,6 +87,11 @@ const POWER_AT: Partial<Record<PowerEventKind, number>> = {
   tusks: ALFIL_BEATS.tusks.castAt,
   slam: ALFIL_BEATS.slam.leapAt,
   hoops: HOOPS_BEATS.throwsAt[0],
+  // (Folio's: the ink lands, the paper folds over, the board folds, the first stroke crosses out its move.)
+  draft: FOLIO_BEATS.draft.inkAt,
+  fold: FOLIO_BEATS.fold.foldAt,
+  crease: FOLIO_BEATS.crease.pressAt,
+  revision: FOLIO_BEATS.revision.strikeAt[0],
 };
 
 /** Each power's banner on screen on Oct 15, ms (its window, at most the 2.5 s it slid off by then). */
@@ -117,7 +123,9 @@ describe("a boss's banners a second shorter", () => {
     expect(css).toMatch(/animation:\s*fb-band-in var\(--fb-in, 330ms\)[^;]*,\s*fb-band-out var\(--fb-out, 240ms\)[^;]*calc\(var\(--fb-ms, 2\.5s\) - var\(--fb-out, 240ms\)\) forwards;/);
     expect(css).not.toMatch(/animation: fb-band /);
     // (The entrances inside it come in its first 0.6 s, whatever its length.)
-    for (const name of ["fb-flash", "fb-face", "fb-slam", "fb-sub", "kc-portrait", "kc-target"]) expect(css).toMatch(new RegExp(`animation: ${name} 2\\.5s`));
+    for (const name of ["fb-flash", "fb-face", "fb-sub", "kc-portrait", "kc-target"]) expect(css).toMatch(new RegExp(`animation: ${name} 2\\.5s`));
+    // (The slam: its own 0.48 s, the first 19.2% of those 2.5 s, where its motion was; it ends there and holds. Oct 29.)
+    expect(css).toMatch(/animation: fb-slam 0\.48s/);
     expect(bannerLength(BOSS_BANNER.ms)).toEqual({ "--fb-ms": "1500ms" });
     expect(bannerLength(undefined)).toBeUndefined();
     expect(BOSS_BANNER.ms).toBe(1500);

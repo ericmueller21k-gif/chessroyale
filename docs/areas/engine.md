@@ -148,7 +148,9 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
     from a fresh worker. At most `BOSS_BRAIN.loadGateMs` (20 s) from the start; then the battle begins whatever
     happened (not ready: Stockfish until it is, as before). If a fresh Stockfish doesn't answer within
     `stockfishBackMs`, Maia is closed and Stockfish started again (the battle needs Stockfish, not Maia).
-    `maia-gate.ts` (`MaiaGate`), `startBrain` in `solo.ts`, `BrainLoading.tsx`.
+    `maia-gate.ts` (`MaiaGate`), `startBrain` in `solo.ts`, `BrainLoading.tsx`. **A town bot's game** (Oct 27,
+    `town-square.md`) takes the same step before its vote ("Loading the bot…", `BotDuel` with `town` in `duel.ts`), by the
+    same rule (`maiaAllowed`), Maia at the bot's rating, Stockfish at that rating until it's ready or if it can't run.
   - **Online, unchanged:** nothing waits; the host's device starts Maia as the intro begins (the lobby's `bossBrain`),
     with its Stockfish running (judging, the boss's moves), and plays Stockfish's move until Maia is ready (or for the
     battle, if it fails).

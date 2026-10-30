@@ -284,10 +284,14 @@ describe("the pump's size and place on a computer", () => {
     // A stage-4 queen on the pump, 20 rows, against her piece (0.772 of a square): within 10% at every size.
     for (let b = 240; b <= 1000; b += 7) expect(Math.abs(20 * pumpScale(b) - (0.772 * b) / 8) / ((0.772 * b) / 8)).toBeLessThan(0.1);
   });
-  it("never needs more of the board's size than the taller bar keeps for it (styles.css' --bd-h)", () => {
-    for (let b = 200; b <= 1000; b += 1) expect(36 * pumpScale(b)).toBeLessThanOrEqual(PUMP_BAR_SHARE * b + 1e-9);
+  it("never needs more of the board's size than the taller bar keeps for it (styles.css' --bd-h, and board-size.css' on a computer)", () => {
+    // (Up to 1600 px: a computer's board grows with the window's height, Oct 29.)
+    for (let b = 200; b <= 1600; b += 1) expect(36 * pumpScale(b)).toBeLessThanOrEqual(PUMP_BAR_SHARE * b + 1e-9);
     const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
     expect(css).toContain(`--bd-h: calc((var(--app-h) - 250px) / ${(1 + PUMP_BAR_SHARE).toFixed(4)});`);
+    // (A computer's: the screen's room less the bar's 38 px inside its padding, the same share.)
+    const desk = readFileSync(new URL("../src/board-size.css", import.meta.url), "utf8");
+    expect(desk).toContain(`--bd-h: calc((var(--app-h) - var(--bd-room) + 38px) / ${(1 + PUMP_BAR_SHARE).toFixed(4)});`);
   });
   it("stands left of his figure on his baseline, clear of everything, or nowhere (then the taller bar)", () => {
     // At 1280 x 800 (Boss alone: the leaderboard one row): his 2x sprite from x 250, his feet on the board's bottom at 577.

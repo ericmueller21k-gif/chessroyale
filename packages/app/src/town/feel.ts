@@ -135,6 +135,8 @@ export const TOWN_FEEL = {
   skyBlendMinutes: 30,
   /** How often the clock is read, in ms (not every frame). */
   skyCheckMs: 60_000,
+  /** The chat text is white once night's weight reaches this, dark ink before it (sky.ts `skyTone`; Eric, Oct 28). */
+  chatNightAt: 0.5,
   /** The sun or the moon (where it stands across the box is each look's `sunX`): its radius (a fraction of the box's smaller side)... */
   sunSize: 0.085,
   /** ...how far below the horizon its middle sits (a fraction of its radius: it rests low, partly behind the world)... */
@@ -246,6 +248,39 @@ export const TOWN_FEEL = {
   stars: 70,
   twinkles: 8,
 
+  // ---- The lights at dusk and night (Oct 27, Eric: lamps in the park "so when it's night and also dusk that they turn
+  // on", and the homes glowing "from inside a little bit… so it clearly kind of shows… there's some liveliness in the
+  // town"). Where each light is, its color and its strength are data beside the art (houses/*.ts `…_LIGHTS` and
+  // `…_POOLS`, the lamp's in houses/park.ts); these shape how they all shine. Drawn after the world's tint, added onto it,
+  // so they really glow; nothing at all by day.
+  /** How strongly the lights shine in each look of the sky (0: off); as the sky blends between looks, so do they. */
+  lightsAt: { dawn: 0, day: 0, dusk: 0.7, night: 1 },
+  /**
+   * The glow spilling round a lit window or glass, in the picture's pixels: two bands, the inner out to this far at this
+   * share of the light's strength, the outer to this far at this share (pixel-art bands, like the lanterns' own glows).
+   */
+  lightSpill: [
+    [1.5, 0.5],
+    [3.2, 0.22],
+  ] as const,
+  /** A halo round a lantern's or a lamp's glass (its radius is the light's own `halo`): three bands, out to this share of it at this share of its strength. */
+  lightHalo: [
+    [0.42, 0.42],
+    [0.72, 0.22],
+    [1, 0.09],
+  ] as const,
+  /** A pool of light on the ground: three bands, out to this share of its size at this share of its strength. */
+  lightPool: [
+    [0.5, 1],
+    [0.78, 0.6],
+    [1, 0.28],
+  ] as const,
+  /** The flicker of the lights marked `flicker` (candles, lanterns, torches): how deep at most (0: none), and how slow (ms a sway). No blinking. */
+  lightFlicker: 0.16,
+  lightFlickerMs: 700,
+  /** The light layer is cleared and laid on the world in tiles this many CSS pixels square: only the tiles a light touches. */
+  lightTilePx: 64,
+
   // ---- The world's edge.
   /** A dark line along the world's rim instead of the haze alone (Eric was curious; off by default)... */
   rimLine: false,
@@ -274,12 +309,49 @@ export const TOWN_FEEL = {
   botGapMs: [2600, 4200] as const,
   /** To a free square this many steps away (at least, at most). */
   botWalk: [2, 4] as const,
+  /**
+   * Now and then a bot goes to sit at a chess table (slice 6): this share of its walks head for a free stool up to this
+   * many steps away; and a bot sitting stays put, when its turn to walk comes, this share of the time.
+   */
+  botSitChance: 0.3,
+  botSitReach: 7,
+  botStaySeated: 0.6,
+  /**
+   * Back in the town after a game with a bot (Oct 27): you on your stool, the bot across; it gets up and wanders off
+   * after this long (unless you've opened its table's card, which holds it).
+   */
+  botLeaveAfterGameMs: 4000,
+  /**
+   * The bots take turns (Oct 28, Eric: "they work on 1 minute timer, 10 out at a time, randomly one each minute starts to
+   * head home, is replaced by another"; docs/decisions/2026-10-28-bots-rotation.md). `botsOut` are in the world at once
+   * (six before Oct 28's turns; ten measured against main: the decision), the others at home. Every `botTurnMs` one out (free, and at
+   * least `botTurnAway` steps from you) walks home and fades into its door over `botFadeMs`; then the bot home longest
+   * fades in at its own door and walks to the square. A bot that came out less than `botOutAtLeastMs` ago isn't sent
+   * home yet (so the last of one round never turns straight back at the next round's first minute). (Before: six out, a
+   * turn every 10 to 20 s, fading out and in where they stood.)
+   */
+  botsOut: 10,
+  botTurnMs: 60000,
+  botTurnAway: 5,
+  botFadeMs: 500,
+  botOutAtLeastMs: 90000,
 
   // ---- Sizes, in squares.
   /** A boss's picture is this many squares tall. */
   bossSquares: 3.0,
+  /**
+   * Some bosses smaller than that in the town square, by their home's id (Eric, Oct 26: "Sawyer the raccoon and the pig
+   * are massive. And the chameleon … about 65% or three-fourths"; Puddles and Jefferson are the right size).
+   */
+  bossScale: { sawyer: 0.7, pig: 0.7, smudgy: 0.7 } as Readonly<Record<string, number>>,
   /** A bot's pawn. */
   botSquares: 1.25,
+  /**
+   * A sidekick (Oct 28) stands this many squares tall from its idle's top to its feet: a bot's pawn's height (its body is
+   * 0.69 of its box: botSquares x 0.69). Its shadows are about a pawn's (`sidekickShadow`, the size a boss's are given).
+   */
+  sidekickSquares: 0.87,
+  sidekickShadow: 0.9,
   /** Your pawn. */
   youSquares: 1.45,
   /**
@@ -294,12 +366,34 @@ export const TOWN_FEEL = {
   /** ...both shrinking (1 / (1 + this x the lift in squares)) and fading (1 - this x the lift) as the hop lifts it. */
   shadowLiftShrink: 4,
   shadowLiftFade: 4,
+  /**
+   * Sitting at a chess table (slice 6): a pawn on a stool shows from this share of its height up (the rest hidden behind
+   * the stool, as if sat), resting on the stool's seat this many squares above the ground: lower than standing.
+   */
+  sitCut: 0.34,
+  sitSeat: 0.3,
+  /**
+   * The Colosseum from afar (slice 6): seen up to this many squares past the rim, standing on the horizon, sunk this many
+   * squares behind the world's curve a square past the rim (its top looming over the horizon), and as hazy as this far
+   * into the far band (0 to 1).
+   */
+  farReach: 16,
+  farSink: 0.35,
+  farHaze: 0.7,
   /** A house's pixels per square (the tent, 144 pixels wide, is about 3.9 squares). */
   housePxPerSquare: 37,
   /** A square drawn less than this many pixels tall (far off) gets no seam: it's barely visible there, and it halves the work. */
   seamMinPx: 7,
   /** Name tags hide past this fraction of the way to the rim. */
   tagFar: 2 / 3,
+  /**
+   * Name tags show only near you by default (Eric, Oct 28: "only people in the radius around you have names shown and as you walk they fade
+   * in and out … about an 8x8 area of squares maybe 10x10"): a figure's tag shows while it is within this many squares of you in both
+   * directions (about a 10 × 10 area), fading over the last `nameFadeSquares` at the edge (full at radius − fade / 2, gone at radius + fade / 2;
+   * tags.ts, `nameAlpha`). The figures themselves are always drawn. "Everyone" in Town settings turns this off.
+   */
+  nameRadius: 5,
+  nameFadeSquares: 1,
 
   // ---- The homes' names (two styles, for Eric to compare: either can be turned off here).
   /** Each home's name floats over it, white with a dark outline, as you come near. */
@@ -324,11 +418,20 @@ export const TOWN_FEEL = {
   closeGlideMs: 900,
   /** Up close, the statue and its pedestal fill the box from this far down it... */
   closeTop: 0.04,
-  /** ...to this far down (or, where they'd reach the − / + and "Back to me" buttons, this many pixels above them)... */
+  /** ...to this far down... */
   closeBottom: 0.95,
-  closeAboveButtons: 10,
-  /** ...and at most this share of its width. */
+  /** ...and at most this share of its width, in the middle. */
   closeMaxWidth: 0.92,
+  /**
+   * Where the statue would reach the − / + and "Back to me" buttons (a phone), it goes round them whichever way lets it be
+   * bigger (so its pedestal's quote is bigger): ending this many pixels above them, or moved off the middle to end this
+   * many pixels left of them, at least `closeSide` pixels from the box's left edge.
+   */
+  closeAboveButtons: 10,
+  closeBesideButtons: 8,
+  closeSide: 6,
+  /** The quote keeps this far (Colosseum pixels) inside its panel's rim. */
+  quoteInset: 0.4,
   /** The close-up drawing crossfades in from the world's figure over this stretch of the glide in (0 to 1). */
   closeSwap: [0.45, 0.8] as const,
   /** A close-up drawing finished while you're already up close fades in over this many ms (it's made ahead, so rarely). */
@@ -341,7 +444,10 @@ export const TOWN_FEEL = {
   /** The close-up drawings are made this long after the page opens, a slice a frame (at most this many ms of work a frame). */
   closeBuildAfterMs: 1500,
   closeBuildBudgetMs: 4,
-  /** The quote renders in line by line once the camera arrives: each line fades in over this many ms, this long after the one above... */
+  /**
+   * The quote renders in line by line once the camera arrives (the panel's squiggles fading as the first line comes): each
+   * line fades in over this many ms, this long after the one above...
+   */
   quoteFadeMs: 320,
   quoteLineMs: 140,
   /** ...and fades out over this many ms when you leave. */
@@ -398,4 +504,28 @@ export const TOWN_FEEL = {
   /** ...this share of a square across when it lands, soft white at this opacity. */
   trailSize: 0.3,
   trailAlpha: 0.9,
+
+  // ---- The chess tables' games (Oct 27; Eric: "random moves back and forth … pieces disappearing … every 7 or 8 moves, it
+  // just resets the boards back"). Look only: no rules, white and black in turn, each piece a step or three forward.
+  /** A move every this many ms, sliding over this many ms (a small hop as it goes), a taken piece fading over this many. */
+  tableMoveMs: 1100,
+  tableSlideMs: 350,
+  tableHop: 0.05,
+  tableTakeMs: 260,
+  /** After this many moves the pieces go back to their start and, this many ms later, play again. */
+  tableMoves: 8,
+  tableResetMs: 1400,
+  /** A waiting table's ring under its free stool: this many squares across its radius, pulsing over this many ms. */
+  tableRingR: 0.36,
+  tableRingPulseMs: 420,
+  /** Its pieces and clock aren't drawn this far into the far band (0 to 1): there they'd be specks. */
+  tableFarCut: 0.5,
+  /**
+   * A table's board is lifted onto its picture in the camera's true perspective, which near the camera (low on the
+   * screen) makes it grow without bound against the picture, a cut-out (Oct 28: Eric's warped boards). Where lifting
+   * would draw it more than this much bigger than at the table's foot, it's worked out a little farther off, where it
+   * still fits, and drawn at the picture's place and scale. Up to this, nothing changes (1.08 to 1.17 over the screen's
+   * usual rows).
+   */
+  tableBoardGrow: 1.2,
 } as const;

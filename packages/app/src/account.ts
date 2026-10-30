@@ -1,5 +1,5 @@
 import { ASK_AGE_LINE, CHAT_MOD, oldEnough, type ChatPicks, type ShopState } from "@chessroyale/core";
-import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, RankEffect, RankView } from "@chessroyale/core";
+import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, RankedSummary } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
 
 /**
@@ -18,14 +18,8 @@ export interface ModeStats {
   teamWins: number;
 }
 
-/** A player's ranked 1 v 1: the rank (core's RankView) and the record. */
-export interface RankedSummary {
-  rank: RankView;
-  games: number;
-  wins: number;
-  losses: number;
-  draws: number;
-}
+/** A player's ranked 1 v 1 (core's RankedSummary: the rank, the record, the peak, the streak and the recent games). */
+export type { RankedSummary };
 
 export interface Profile {
   user: { id: string; name: string; icon: string; signedIn: boolean; email: string | null; google: boolean };
@@ -369,6 +363,8 @@ export function playerName(): string {
 export interface PublicProfile {
   id: string;
   name: string;
+  /** Their icon: a drawing (a PNG data URL), an older account's emoji, or the default pawn "♟" (missing from an older server). */
+  icon?: string;
   look: ItemLook;
   joinedAt: number;
   lastSeen: number | null;
@@ -376,11 +372,10 @@ export interface PublicProfile {
   /** They hide when they're online (Settings → Friends): `online` false and `lastSeen` null. */
   hidden?: boolean;
   rating: number | null;
-  tier: { label: string; level: number; color: string; effect: RankEffect | null } | null;
   topPercent: number | null;
   /** Banned for fair play (the profile says so; nothing else about fair play is shown). */
   banned?: boolean;
-  /** Ranked 1 v 1: the rank and the record (null when banned; missing from an older server). */
+  /** Ranked 1 v 1: the rank shown everywhere, the record, the peak, the streak and the recent games (null when banned; missing from an older server). */
   ranked1v1?: RankedSummary | null;
   crowd: { games: number; wins: number; avgPlace: number | null; best: number | null; cutsSurvivedPct: number | null; brilliant: number | null };
   boss: { raids: number; bossesBeaten: number; strikesSurvived: number | null; lastStands: number | null; survivedPct: number | null; brilliant: number | null };
@@ -404,11 +399,12 @@ export interface PublicProfile {
 }
 
 /**
- * Reports a player (a profile's Report button; `match`: the lobby's code when it's made during a match). Answers with
- * what to tell the reporter ("Thanks, we'll look into it.", or that they already reported them).
+ * Reports a player (a profile's Report button; `match`: the lobby's code when it's made during a match; `line`: the
+ * number of their line in the town square's chat, whose words the server reads from its room). Answers with what to
+ * tell the reporter ("Thanks, we'll look into it.", or that they already reported them).
  */
-export async function reportPlayer(target: string, reason: string, match?: string): Promise<string> {
-  const r = await api<{ message?: string }>("/api/report", { method: "POST", body: JSON.stringify({ target, reason, ...(match ? { match } : {}) }) });
+export async function reportPlayer(target: string, reason: string, match?: string, line?: number): Promise<string> {
+  const r = await api<{ message?: string }>("/api/report", { method: "POST", body: JSON.stringify({ target, reason, ...(match ? { match } : {}), ...(line ? { line } : {}) }) });
   return r.message ?? "Thanks, we'll look into it.";
 }
 

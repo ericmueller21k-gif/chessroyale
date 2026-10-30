@@ -135,9 +135,9 @@ const SCHEMA_COLUMNS: Record<string, string> = {
   ops_errors: "fingerprint hour source kind message version count first_seen last_seen sample",
   ops_reports: "id at kind account version note diag",
   queue_waits: "id mode at players wait_ms",
-  ranked_1v1: "user_id rating rd games wins losses draws ladder last_game last_at coin_day coin_games",
-  ranked_1v1_games: "id white_id black_id control result reason moves times started_at ended_at checked nonce",
-  reports: "id reporter target reason at match",
+  ranked_1v1: "user_id rating rd games wins losses draws ladder last_game last_at coin_day coin_games peak streak",
+  ranked_1v1_games: "id white_id black_id control result reason moves times started_at ended_at checked nonce white_points black_points",
+  reports: "id reporter target reason at match line line_at",
   results:
     "id user_id mode online placement players team team_won avg_score rating played_at brilliant best_move cuts cuts_survived strikes strikes_survived survived last_stand boss_elo boss_id lobby ranked held eval_bar",
   sessions: "token_hash user_id created_at expires_at",

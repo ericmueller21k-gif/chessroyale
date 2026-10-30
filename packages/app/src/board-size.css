@@ -1,0 +1,106 @@
+/*
+ * ---- A computer: the board as big as the window's height lets it, as chess.com's (Eric, Oct 29) ----
+ * docs/decisions/2026-10-29-desktop-board-size.md. Loaded after styles.css (main.tsx), so these rules take over its computer
+ * sizes for every game screen with a chessboard; nothing here applies to a phone or a tablet.
+ *
+ * - The board's side is the window's height less the room the screen really needs above and below it (`--bd-room`: the title
+ *   line, the bar or strip over the board, the "Your move" row under it, the screen's padding), never wider than its column.
+ *   It grows and shrinks live with the window, and with nothing else: every screen of a game has the same room.
+ * - The screen grows to hold that board (`--scr`: the board, the eval bar's room, the 28 px gap and the 340 px column beside
+ *   it, the gutters), never past the window: where the window is too narrow, the board shrinks to its column (width-bound)
+ *   rather than anything overlapping. At least the old width (1000 px beside a leaderboard, 1100 px without), so a short window
+ *   keeps the old layout.
+ * - Boss alone's empty left column (`.tower-space`, kept for the boss and Babur's pump) is 216 px instead of the leaderboard's
+ *   360: room for the widest boss beside the board and for his words (his text box, up to 244 px, right-aligned on him, ends
+ *   258 px left of the board: in the window at every width), the rest to the board. Babur's grows with the board, for his pump.
+ * - A computer is a window 900 × 600 and up with a mouse (`pointer: fine`): a tablet on its side (a touch screen as wide) keeps
+ *   its layout exactly as before.
+ * - Everything beside and on the board already follows its size: the move list (`--board-px`), the God King, your pawn and the
+ *   boss by its corners, Babur's pump (its scale from the board), every overlay in eighths of `--board-size`.
+ * Auto chess has its own board and frame (.ac-root): not changed.
+ */
+@media (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
+  .screen.game {
+    /* (The opening vote, a crowd's play, reveal and final, Spectate: the title line and the line over the board, the row under it.) */
+    --bd-room: 170px;
+    --bd-h: calc(var(--app-h) - var(--bd-room));
+    /* (The screen that holds that board: the eval bar's room both sides, the gutters, the gap and the column beside it.) */
+    --scr-need: calc(var(--bd-h) + 48px + 2 * var(--gutter) + 368px);
+    --scr: min(100vw, max(1100px, var(--scr-need)));
+    width: var(--scr);
+  }
+  .screen.game .board-area .board-wrap {
+    width: min(100%, var(--bd-h));
+  }
+  .screen.game .board-row .eval-bar ~ .board-wrap {
+    width: min(calc(100% - 48px), var(--bd-h));
+  }
+
+  /* Every boss battle (Boss alone, a Solo raid, an online raid, the Hidden Boss's phases, the Crowd's boss final): the title
+     line, the boss's bar (up to 61 px, Puddles' seeds), the dock's row under the board. Babur's taller bar keeps its share
+     (styles.css: B + room + 0.1876 B - 38 fits the window). The God King's sums (--gk-screen) and the boss's room by the
+     window's edge (--bs-need) read the screen's new width. */
+  .screen.game:has(> .boss-dock) {
+    --bd-room: 200px;
+    --bd-h: calc(var(--app-h) - var(--bd-room));
+    --gk-screen: var(--scr);
+    --bs-need: calc(var(--bs-reach, 0px) - (100vw - var(--scr)) / 2 - var(--gutter));
+  }
+  .screen.game:has(> .boss-dock):has(.tg-pump-slot.tg-tall) {
+    --bd-h: calc((var(--app-h) - var(--bd-room) + 38px) / 1.1876);
+  }
+
+  /* Squads' match: the tiny boards over the board (relay's taller), its clocks' line under it. */
+  .screen.game.sq-game {
+    --bd-room: 230px;
+  }
+  .screen.game.sq-game.sq-relay {
+    --bd-room: 250px;
+  }
+  .screen.game.sq-game .board-area .board-wrap,
+  .screen.game.sq-game.sq-relay .board-area .board-wrap {
+    width: min(100%, var(--bd-h));
+  }
+
+  /* The banners' words over the board (a power's, the God King's cut-in, START!): their glow 12 px instead of 24. The words
+     grow with the board, and drawing their 24 px glow at 88 px type through the slam cost a dozen 33 to 117 ms frames on
+     every boss's power banner at 1920 × 1080 (measured headless against main, eric.md's frame-rate rule: cut the corner).
+     A phone keeps 24 px (styles.css' `--fb-glow`). */
+  .screen.game {
+    --fb-glow: 12px;
+  }
+
+  /* 1 v 1 (ranked and casual, and its vote on the board): the two players' strips over and under the board. */
+  .screen.game.duel-screen {
+    --bd-room: 170px;
+    --dv-w: min(100%, var(--bd-h));
+  }
+}
+
+/* Beside a leaderboard (1100 px and up): the screen is the window less the leaderboard's column, as before, up to what its
+   board needs. Boss alone's empty column is narrower (the boss and Babur's pump only). */
+@media (min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
+  .arena .screen.game {
+    --scr: min(100vw - 380px, max(1000px, var(--scr-need)));
+  }
+  .tower-space {
+    flex-basis: var(--ts-w, 216px);
+  }
+  .arena:has(> .tower-space) .screen.game {
+    --scr: min(100vw - var(--ts-w, 216px) - 20px, max(1000px, var(--scr-need)));
+  }
+  /* (With no eval bar, every player's board, the board takes the bar's 24 px and the boss stands 24 px further out: his column is
+     24 px wider, so his words keep their room.) */
+  .arena:not(:has(.board-row > .eval-bar)) {
+    --ts-w: 240px;
+  }
+  /* Babur: his pump stands beside him (docs/decisions/2026-10-24-babur-desktop-pump.md) and grows with the board (a stage-4 queen
+     on it as tall as her piece: up to 0.177 of the board wide), so his column grows with the board's height bound too: room for
+     him, the pump and the gap at any size, where the window has it. */
+  .arena:has(.ch-tiger, .tg-pump-slot) {
+    --ts-w: calc(170px + 0.175 * (var(--app-h) - 200px));
+  }
+  .arena .screen.game:has(> .boss-dock) {
+    --gk-screen: var(--scr);
+  }
+}

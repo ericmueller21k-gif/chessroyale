@@ -40,6 +40,17 @@ export function skyOverride(value: string | null): SkyWeights | null {
   return w;
 }
 
+/** The tone of the chat text over the sky (Eric, Oct 28): dark ink by day, white by night. */
+export type SkyTone = "day" | "night";
+
+/**
+ * Whether the sky is bright or dark enough for the chat text to be ink or white: night's weight against `chatNightAt` (half, so it
+ * flips in the middle of each blend: at 5:30 in the morning and 19:30 in the evening). Dawn and dusk both count as day: sampled under
+ * the chat box, dusk's sky and the lit sand are mostly bright (black ink reads on 71 to 86 percent of it at 3:1, white on 44 to 49),
+ * and only night's is dark (white on 82 to 94 percent, ink on 31 to 44).
+ */
+export const skyTone = (w: SkyWeights): SkyTone => (w.night >= TOWN_FEEL.chatNightAt ? "night" : "day");
+
 /** Mixes one color of every look by the weights. */
 export function mixRGB(w: SkyWeights, pick: (c: SkyLook) => RGB): [number, number, number] {
   const out: [number, number, number] = [0, 0, 0];
@@ -62,6 +73,9 @@ export function mixTint(w: SkyWeights): [number, number, number, number] {
   }
   return a > 0 ? [c[0]! / a, c[1]! / a, c[2]! / a, a] : [0, 0, 0, 0];
 }
+
+/** How strongly the lights shine (the park's lamps, the homes' windows: 0 off, 1 at night's full), following the blend between looks. */
+export const mixLights = (w: SkyWeights): number => LOOKS.reduce((k, l) => k + w[l] * TOWN_FEEL.lightsAt[l], 0);
 
 /** How much of dawn's mist shows (extra haze over the far ground). */
 export const mixMist = (w: SkyWeights): number => LOOKS.reduce((m, l) => m + w[l] * look(l).mist, 0);

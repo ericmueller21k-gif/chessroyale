@@ -9,6 +9,7 @@ import { HOP_AIR_AT, HOP_AIR_MS } from "../characters/tiger-figure.ts";
 import { BALLOON_SHAPES, PUMP_FOOT, PUMP_H, PUMP_PALETTE, PUMP_W, RELEASE_KNOT, TIGER_PUMP, balloonDrawing, balloonLooks, balloonPartOf } from "../characters/tiger-bar.ts";
 import { LAND_Y } from "../characters/effects/tiger.ts";
 import type { Character } from "../characters/sprite.ts";
+import { boardSize } from "../board/logic.ts";
 import type { SoundName } from "../sound.ts";
 import type { BossView } from "../game.ts";
 import { gardenNow, realMs } from "../garden-clock.ts";
@@ -251,16 +252,23 @@ function pumpPlace(slot: HTMLElement, figW: number): PumpPlace {
   const b = board.getBoundingClientRect();
   // (Boxes in screen px, the scale and the place in layout px: they differ only while a transform is on the screen.)
   const zoom = b.width / (board.offsetWidth || 1) || 1;
+  // (The scale for the board as this layout draws it: its element's size now, a whole multiple of 8 device px, as the board
+  // will write it. Not the squares' size, which the board writes a moment later: with the taller bar just taken off, it's still
+  // the smaller board's, and a pump measured at that size could fit where the real one doesn't, flipping back and forth.)
+  const root = board.closest<HTMLElement>(".hb") ?? board;
+  const drawn = boardSize(parseFloat(getComputedStyle(root).width) || board.offsetWidth, window.devicePixelRatio || 1);
   const fig = sprite?.getBoundingClientRect();
   if (side && fig && fig.width > 0) {
-    const s = pumpScale(board.offsetWidth);
+    const s = pumpScale(drawn);
     const at = side.getBoundingClientRect();
     const keep = [...document.querySelectorAll(KEEP_CLEAR)].map((e) => e.getBoundingClientRect());
     const box = sidePump(fig, fig.width / figW, at.bottom, s * zoom, { w: document.documentElement.clientWidth, h: innerHeight }, keep);
     if (box) return { at: "side", scale: s, x: (box.left - at.left) / zoom, side };
   }
   slot.classList.add("tg-tall");
-  return { at: "tall", scale: pumpScale(board.offsetWidth), x: 0, side: null };
+  // (The taller bar's board: the scale for it once the class is on, as above.)
+  const tall = boardSize(parseFloat(getComputedStyle(root).width) || board.offsetWidth, window.devicePixelRatio || 1);
+  return { at: "tall", scale: pumpScale(tall), x: 0, side: null };
 }
 const samePlace = (a: PumpPlace, b: PumpPlace) => a.at === b.at && Math.abs(a.scale - b.scale) < 1e-3 && Math.abs(a.x - b.x) < 0.5 && a.side === b.side;
 

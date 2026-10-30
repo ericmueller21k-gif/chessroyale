@@ -22,6 +22,12 @@ const emit = () => listeners.forEach((l) => l());
 export const friendsState = () => state;
 export const friendsStatus = () => status;
 
+/** Hears every change to the friends lists (a block among them: the town's chat drops that player's lines). */
+export function onFriendsChange(fn: () => void): () => void {
+  listeners.add(fn);
+  return () => void listeners.delete(fn);
+}
+
 /** Whether you've blocked this account (their chat lines are hidden: global chat, and quick chat in matches). */
 export const isBlocked = (uid: string | null | undefined) => !!uid && blockedIds.has(uid);
 

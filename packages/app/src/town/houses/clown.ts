@@ -7,7 +7,7 @@
  */
 import type { Anim, Character, Frame, Layer, Part } from "../../characters/sprite.ts";
 import { CLOWN_PALETTE } from "../../characters/clown.ts";
-import { groundShadow, paint, signBoard, signFace, tuft, type Pt } from "./kit.ts";
+import { FUN_PINK, groundShadow, paint, signBoard, signFace, tuft, WARM, type LightPool, type LightSpot, type Pt } from "./kit.ts";
 
 const C = CLOWN_PALETTE;
 const PALETTE: Record<string, string> = {
@@ -283,3 +283,9 @@ export const HOUSE_CLOWN: Character = {
 /** Where the sign's blank face is (frame pixels), for the game to write "Boingo's Funhouse" on. */
 export const HOUSE_CLOWN_SIGN = signFace(BOARD[0], BOARD[1], BW, BH);
 
+/** Its lights at dusk and night (Oct 27): the gate's dark inside glows warm behind its bars, the swirl tunnel a funhouse pink. */
+export const HOUSE_CLOWN_LIGHTS: readonly LightSpot[] = [
+  { x: 30, y: 66, w: 20, h: BASE - 66, keys: "mc", color: WARM, strength: 0.8 },
+  { x: CX - 14, y: 58, w: 28, h: BASE - 58, keys: "pPm", color: FUN_PINK, strength: 0.55 },
+];
+export const HOUSE_CLOWN_POOLS: readonly LightPool[] = [{ x: CX, y: FOOT - 2, rx: 18, ry: 4, color: FUN_PINK, strength: 0.25 }];

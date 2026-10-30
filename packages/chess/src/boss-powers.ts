@@ -20,6 +20,7 @@ import type { EngineLike } from "./runner.ts";
 import type { MoveScore } from "./uci.ts";
 import {
   bossPowers,
+  heldIn,
   materialOf,
   moveLoss,
   moveSquares,
@@ -37,6 +38,7 @@ import {
   type BossLastMove,
   type BossRules,
   type JudgedEvaluation,
+  type JudgedMove,
   type RageRates,
   type Side,
   type StopFields,
@@ -45,10 +47,10 @@ import {
 import { bossRules } from "./bosses/index.ts";
 
 // Every boss's file, and the shared pieces of the base boss, for the whole package.
-export { bossPowers, materialOf, moveLoss, moveSquares, powerRoll, rageNow, ragePoints, rageSpeedOf, rageTick, topEach, unleashed };
+export { bossPowers, heldIn, materialOf, moveLoss, moveSquares, powerRoll, rageNow, ragePoints, rageSpeedOf, rageTick, topEach, unleashed };
 // (The pass guard: one rule for every power that spends his whole turn.)
 export { PASS_WAIT, passAnswer, passLoses, passScores, type PassScore } from "./bosses/base.ts";
-export type { Battle, BossAsks, BossLastMove, BossRules, JudgedEvaluation, RageRates, StopFields, TurnContext };
+export type { Battle, BossAsks, BossLastMove, BossRules, JudgedEvaluation, JudgedMove, RageRates, StopFields, TurnContext };
 export * from "./bosses/ginger.ts";
 export * from "./bosses/boingo.ts";
 export * from "./bosses/grex.ts";
@@ -65,6 +67,7 @@ export * from "./bosses/smudgy.ts";
 export * from "./bosses/gardener.ts";
 export * from "./bosses/tiger.ts";
 export * from "./bosses/moo.ts";
+export * from "./bosses/folio.ts";
 export * from "./bosses/index.ts";
 
 /** A battle's powers as it starts (nothing has happened yet; the first turn is set up by prepareTurn). */
@@ -164,8 +167,7 @@ export function crowdAllowed(boss: BossState | null | undefined, fen: string): s
   const legal = legalMoves(fen);
   let allowed = legal;
   if (p) {
-    const filter = bossRules(boss)?.crowdFilter;
-    if (filter) allowed = filter(allowed, boss!, fen);
+    allowed = limitCrowd(bossRules(boss), boss!, fen, legal);
     if (!allowed.length) allowed = legal;
   }
   if (barred) {
@@ -216,15 +218,27 @@ export function powerTurn(boss: BossState | null | undefined): boolean {
  * (Eric, Oct 24: Babur's hoop stopped the recapture the plain-chess judge feared;
  * docs/decisions/2026-10-24-king-save-off-on-altered-boards.md). One rule for every boss, no list: a power touches the
  * turn (`powerTurn`, fair play's own test), something stops his moves (`bossStops`), something stops any of the crowd's
- * (`crowdFilter`), or something else of his is on the board (`altersBoard`: Hollow's dark, the Roman candle's shadows,
+ * (`held`, `crowdFilter`), or something else of his is on the board (`altersBoard`: Hollow's dark, the Roman candle's shadows,
  * the carrots). `rules`: the boss's (a test's stand-in).
  */
 export function boardAltered(boss: BossState | null | undefined, fen: string, rules: BossRules | null = bossRules(boss)): boolean {
   if (!boss?.powers || !rules) return false;
   if (rules.powerTurn?.(boss) || rules.bossStops?.(boss) || rules.altersBoard?.(boss)) return true;
-  if (!rules.crowdFilter) return false;
+  if (!rules.crowdFilter && !rules.held) return false;
   const legal = legalMoves(fen);
-  return rules.crowdFilter(legal, boss, fen).length < legal.length;
+  return limitCrowd(rules, boss, fen, legal).length < legal.length;
+}
+
+/**
+ * A boss's limits on the crowd's `legal` moves (none may be left: the caller lifts them): its held pieces first, one rule
+ * for every boss (Eric, Oct 27): a held piece doesn't move, nor castles with a held rook (`heldIn`); then its other limits
+ * (`crowdFilter`).
+ */
+export function limitCrowd(rules: Pick<BossRules, "held" | "crowdFilter"> | null | undefined, boss: BossState, fen: string, legal: string[]): string[] {
+  if (!rules) return legal;
+  const held = rules.held?.(boss, fen) ?? [];
+  const free = held.length ? legal.filter((m) => !heldIn(fen, m, held)) : legal;
+  return rules.crowdFilter ? rules.crowdFilter(free, boss, fen) : free;
 }
 
 /**

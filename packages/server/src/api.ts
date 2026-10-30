@@ -8,8 +8,9 @@ import { chatNoticeSeen } from "./chat-mod.ts";
 import { isAdmin, testSwitchesOn, type AdminEnv } from "./admin.ts";
 import { isPaused, pausedResponse } from "./kill-switches.ts";
 import { chatIconResponse, chatPostResponse, chatSlice } from "./global-chat-api.ts";
+import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, mayTownChat, reportedLine, signedInReader, townPostResponse, townRemoveResponse, townSlice } from "./town-chat-api.ts";
 import { accountDownload, deleteAccount } from "./account-data.ts";
-import { AGE_GATE, ASK_AGE_LINE, TOO_YOUNG_LINE } from "@chessroyale/core";
+import { AGE_GATE, ASK_AGE_LINE, FAIRPLAY, TOO_YOUNG_LINE } from "@chessroyale/core";
 import {
   buyItem,
   cleanEmail,
@@ -181,7 +182,9 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     path !== "/api/appeal" &&
     path !== "/api/chat" &&
     path !== "/api/chat/notice" &&
-    !path.startsWith("/api/chat/icon/")
+    !path.startsWith("/api/chat/icon/") &&
+    path !== "/api/town/chat" &&
+    path !== "/api/town/chat/remove"
   )
     return null;
   const google = !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
@@ -239,7 +242,22 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     // ?chat=N (the home page's global chat is open): its lines after N ride along (global-chat-api.ts).
     const chatSince = url.searchParams.get("chat");
     const chat = chatSince !== null && env.LIVE ? await chatSlice(liveHub(env as Required<Pick<AccountEnv, "LIVE">>), Number(chatSince), now).catch(() => null) : null;
-    return json({ ...liveCache.body, fillSeconds: Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60)), ...(chat ? { chat } : {}), ...(inbox ? { inbox } : {}) });
+    // ?town=N (the town square is open): the town chat's lines after N, for a signed-in account only and never on a device
+    // the age gate marked too young (town-chat-api.ts); while its switch is off, only that it's paused.
+    const townSince = url.searchParams.get("town");
+    let town: unknown = null;
+    if (townSince !== null && env.LIVE && ageAnswer(request) !== "under" && (await signedInReader(sql, token, now).catch(() => null))) {
+      town = isPaused(env, "town-chat", now)
+        ? { paused: true }
+        : await townSlice(liveHub(env as Required<Pick<AccountEnv, "LIVE">>), Number(townSince), now, url.searchParams.get("room"), waitUntil).catch(() => null);
+    }
+    return json({
+      ...liveCache.body,
+      fillSeconds: Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60)),
+      ...(chat ? { chat } : {}),
+      ...(town ? { town } : {}),
+      ...(inbox ? { inbox } : {}),
+    });
   }
 
   // GET /api/chat/icon/KEY: a drawn icon on a line in the global chat (anyone may read the chat).
@@ -401,8 +419,13 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   // POST /api/report {target, reason, match?}: a report about a player (a profile's Report button; `match`: the lobby
   // code when made during a match). One per player per match (outside a match, one a day); see fairplay.ts.
   if (path === "/api/report" && request.method === "POST") {
-    const b = (await request.json().catch(() => ({}))) as { target?: unknown; reason?: unknown; match?: unknown };
-    const r = await reportPlayer(sql, current, b.target, b.reason, b.match, now);
+    const b = (await request.json().catch(() => ({}))) as { target?: unknown; reason?: unknown; match?: unknown; line?: unknown };
+    // A line of the town's chat (`line`: its number): the words are read from the room, never taken from the request; only
+    // someone who may read the town's chat can report a line of it (a guest or a young device can't probe who spoke).
+    const chatReport = b.reason === FAIRPLAY.reports.chatReason;
+    if (chatReport && (!mayTownChat(current) || ageAnswer(request) === "under")) return json({ message: mayTownChat(current) ? TOWN_CHAT_AGE : SIGN_IN_TO_TOWN_CHAT }, 403);
+    const line = chatReport && env.LIVE ? await reportedLine(liveHub(env as Required<Pick<AccountEnv, "LIVE">>), b.line, b.target) : null;
+    const r = await reportPlayer(sql, current, b.target, b.reason, b.match, now, line);
     if (!r.ok) return json({ message: r.message }, 400);
     const already = typeof b.match === "string" ? "You've already reported this player in this match." : "You've already reported this player today.";
     return json({ ok: true, ...(r.already ? { already: true } : {}), message: r.already ? already : REPORT_THANKS });
@@ -426,6 +449,15 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   if (path === "/api/chat" && request.method === "POST") {
     if (!env.LIVE) return json({ message: "The chat isn't set up here." }, 503);
     return chatPostResponse(request, sql, liveHub(env as Required<Pick<AccountEnv, "LIVE">>), current, !signInRequired(env) || isSignedIn(current), now);
+  }
+
+  // POST /api/town/chat {text}: a message in the town square's chat (town-chat-api.ts: signed in, old enough, not banned,
+  // not paused; the room checks the rest). POST /api/town/chat/remove {n}: a moderator takes a line out.
+  if ((path === "/api/town/chat" || path === "/api/town/chat/remove") && request.method === "POST") {
+    if (!env.LIVE) return json({ message: "The chat isn't set up here." }, 503);
+    const hub = liveHub(env as Required<Pick<AccountEnv, "LIVE">>);
+    if (path === "/api/town/chat/remove") return townRemoveResponse(request, hub, isAdmin(env as AdminEnv, current), now, waitUntil);
+    return townPostResponse(request, sql, hub, { user: current, tooYoung: ageAnswer(request) === "under", paused: isPaused(env, "town-chat", now) }, now, waitUntil);
   }
 
   // POST /api/results: a solo match's result, from the browser.

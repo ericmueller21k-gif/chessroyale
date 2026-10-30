@@ -1,9 +1,11 @@
 import type { ComponentChildren, VNode } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import { controlLabel, duelControl } from "@chessroyale/core";
+import { controlLabel, duelControl, type RankView } from "@chessroyale/core";
 import { other, type Color, type DuelEnd } from "@chessroyale/chess/duel";
 import { Board } from "../components/Board.tsx";
+import { seatKey } from "../board/yours.ts";
 import { Avatar } from "../components/Items.tsx";
+import { BrainLoadingCard } from "../components/BrainLoading.tsx";
 import { MatchMenu, type MatchExit } from "../components/MatchMenu.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
 import { COMPUTER_LAYOUT } from "../components/MatchMenu.tsx";
@@ -13,7 +15,8 @@ import { DuelRankPill } from "../components/DuelRankPill.tsx";
 import { DuelStage, type StageSide } from "../components/DuelStage.tsx";
 import { clockAt, type DuelQueue, type DuelSession, type DuelSide, type DuelSnapshot } from "../duel.ts";
 import { account } from "../account.ts";
-import { ranked1v1Rank } from "../ranked.ts";
+import { ranked1v1Rank, yourRankShown } from "../ranked.ts";
+import { RankEmblem } from "../components/RankEmblem.tsx";
 import { clockShown } from "../clock-text.ts";
 
 /**
@@ -22,16 +25,22 @@ import { clockShown } from "../clock-text.ts";
  * and the game, whose board loads once and stays put from the vote to the result. Classes are `dv-`.
  */
 
-/** Redraws when the session (or queue) changes, and `ms` apart while `running` (the clocks). */
+/**
+ * Redraws when the session (or queue) changes, and `ms` apart while `running` (the clocks); returns the time of the draw.
+ * A count, never the time, is what changes: Preact skips a state set to the value it already holds, so with `Date.now()`
+ * a change in the same millisecond as the last draw was never drawn. The game's result and then its outcome landing in
+ * the same millisecond as the clock's last tick left "Updating your rank…" up for good (the clocks stop at the end, so
+ * nothing drew again). docs/decisions/2026-10-28-two-flaky-tests.md.
+ */
 function useSession(s: { subscribe(fn: () => void): () => void }, running: boolean, ms = 100): number {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => s.subscribe(() => setNow(Date.now())), [s]);
+  const [, redraw] = useState(0);
+  useEffect(() => s.subscribe(() => redraw((n) => n + 1)), [s]);
   useEffect(() => {
     if (!running) return;
-    const t = setInterval(() => setNow(Date.now()), ms);
+    const t = setInterval(() => redraw((n) => n + 1), ms);
     return () => clearInterval(t);
   }, [running, ms]);
-  return now;
+  return Date.now();
 }
 
 // ---------------- The stage: the search, then the versus moment ----------------
@@ -107,7 +116,7 @@ function searchStage(queue: DuelQueue, now: number, few: boolean, onKeep: () => 
  */
 export function versusStage(snap: DuelSnapshot) {
   const you = snap.you;
-  const side = (c: Color): StageSide => ({ name: snap.players[c].name, look: snap.players[c].look, rank: snap.players[c].rank });
+  const side = (c: Color): StageSide => ({ name: snap.players[c].name, look: snap.players[c].look, rank: c === you ? yourRankShown(snap.players[c].rank) : snap.players[c].rank });
   const there = snap.phase === "versus";
   return (
     <DuelStage
@@ -167,8 +176,15 @@ export function resultReason(end: DuelEnd, you: Color, them: string): string {
   }
 }
 
+/** Your rank after the game (an admin's `?rank=` in its place), or null: none to show (yet). */
+function rankAfter(snap: DuelSnapshot): RankView | null {
+  const c = !snap.town && !snap.bot && snap.outcome && !snap.outcome.unranked ? snap.outcome.change : null;
+  return c ? yourRankShown(c.after) : null;
+}
+
 /** Your rank's change, in a line ("Gold 2 · 45 RP (+18)", "Placement 2/5", "Placed: Gold 4 · 25 RP"). */
 function rankLine(snap: DuelSnapshot): string | null {
+  if (snap.town) return "Casual game";
   if (snap.bot) return "Unranked game";
   if (!snap.end || snap.end.result === "aborted") return null;
   const o = snap.outcome;
@@ -176,9 +192,10 @@ function rankLine(snap: DuelSnapshot): string | null {
   if (o.unranked) return "Unranked game";
   const c = o.change;
   if (!c) return null;
-  if (c.placed) return `Placed: ${c.after.label}`;
-  if (c.points === null) return c.after.label;
-  return `${c.after.label} (${c.points >= 0 ? "+" : "−"}${Math.abs(c.points)})`;
+  const after = yourRankShown(c.after);
+  if (c.placed) return `Placed: ${after.label}`;
+  if (c.points === null) return after.label;
+  return `${after.label} (${c.points >= 0 ? "+" : "−"}${Math.abs(c.points)})`;
 }
 
 /** A player's strip: pawn, name, rank, and their clock (always in the same place, readable at a glance). */
@@ -187,11 +204,11 @@ function DuelStrip({ p, c, you, ms, running, clockShownNow, away }: { p: DuelSid
   return (
     <div class={`dv-strip${you ? " dv-you" : " dv-them"}`} data-side={c}>
       <span class="dv-strip-pawn" aria-hidden="true">
-        <Avatar look={p.look ?? undefined} side={c} />
+        {p.face ? <img class="dv-face" src={p.face} alt="" /> : <Avatar look={p.look ?? undefined} side={c} />}
       </span>
       <span class="dv-strip-who">
         <PlayerName name={p.name} uid={p.uid ?? undefined} you={you} bot={p.bot} class="dv-name" />
-        <DuelRankPill rank={p.rank} />
+        <DuelRankPill rank={you ? yourRankShown(p.rank) : p.rank} />
         {away && <span class="dv-away">away</span>}
       </span>
       <span class={`dv-clock${running ? " on" : ""}${low ? " low" : ""}`} aria-label={`${you ? "Your" : `${p.name}'s`} clock: ${clockShownNow ? clockShown(ms, { tenths: true }) : "not set"}`}>
@@ -293,7 +310,7 @@ function DuelBoard({ session, snap, now, onHome, onAgain }: { session: DuelSessi
     isYou: (id) => id === you,
     who: (id) => (id === "w" || id === "b" ? { uid: snap.players[id].uid ?? undefined, isBot: !!snap.players[id].bot, team: null } : undefined),
   };
-  const status = over
+  const status = over || snap.loading
     ? null
     : snap.phase === "vote"
       ? "Drag your pawn: Bullet, Blitz or Rapid"
@@ -306,10 +323,25 @@ function DuelBoard({ session, snap, now, onHome, onAgain }: { session: DuelSessi
           : myTurn
             ? "Your move"
             : `${theirName} is thinking`;
-  // Your move shown at once on the board; a move the board can't make (not your turn) is never sent.
+  // Your move shown at once on the board; a move the board can't make (not your turn) is never sent. Premoves (chess.com's)
+  // while it's the other side's move in play: the first plays the moment your turn comes (docs/areas/board.md). Nothing
+  // marks them for the server: 1 v 1 has no timing signal, and its clock charges what it measures (a round trip).
+  const premove = snap.phase === "play" && !over && !snap.loading ? { key: seatKey(session, "duel", you), side: you } : undefined;
   const board = (
-    <Board fen={snap.fen} orientation={orientation} lastMove={snap.lastMove} interactive={myTurn} onMove={(m) => session.move(m)}>
-      {snap.phase === "vote" && snap.voteAt !== null && snap.voteEndsAt !== null && (
+    <Board fen={snap.fen} orientation={orientation} lastMove={snap.lastMove} interactive={myTurn} onMove={(m) => session.move(m)} premove={premove}>
+      {/* A town bot's game: Maia's loading step over the board first (Boss alone's; its Leave goes back to the town). */}
+      {snap.loading && (
+        <BrainLoadingCard
+          icon={
+            <span style={{ display: "block", width: "64px", height: "64px" }}>
+              {snap.players[them].face ? <img class="dv-face" src={snap.players[them].face!} alt="" /> : <Avatar look={snap.players[them].look ?? undefined} side={them} />}
+            </span>
+          }
+          title="Loading the bot…"
+          onLeave={onHome}
+        />
+      )}
+      {snap.phase === "vote" && !snap.loading && snap.voteAt !== null && snap.voteEndsAt !== null && (
         <DuelVote
           you={you}
           picks={snap.picks}
@@ -378,24 +410,39 @@ function DuelResult({ snap, onHome, onAgain }: { snap: DuelSnapshot; onHome: () 
   const line = rankLine(snap);
   const coins = snap.outcome?.coins ?? 0;
   const title = resultTitle(end, you);
+  // (A ranked game's line keeps its emblem's room from "Updating your rank…" on, so nothing moves when it arrives; the
+  // new emblem after a division or tier up.)
+  const ranked = !snap.town && !snap.bot && end.result !== "aborted";
   return (
     <div class={`dv-result${title === "You won" ? " won" : title === "You lost" ? " lost" : ""}`} role="status">
       <strong class="dv-result-title">{title}</strong>
       <p class="dv-result-why">{resultReason(end, you, snap.players[other(you)].name)}</p>
       {(line || coins > 0) && (
-        <span class="dv-result-line">
-          {line && <span class="dv-result-rank">{line}</span>}
-          {line && coins > 0 && " · "}
-          {coins > 0 && <span class="dv-result-coins">+{coins} coins</span>}
+        <span class={`dv-result-line${ranked ? " dv-result-ranked" : ""}`}>
+          {ranked && <RankEmblem rank={rankAfter(snap)} class="dv-result-emblem" />}
+          <span class="dv-result-words">
+            {line && <span class="dv-result-rank">{line}</span>}
+            {line && coins > 0 && " · "}
+            {coins > 0 && <span class="dv-result-coins">+{coins} coins</span>}
+          </span>
         </span>
       )}
       <div class="dv-result-actions">
-        <button type="button" class="btn btn-primary" onClick={onAgain}>
-          {snap.bot ? "Find a person" : "Play again"}
-        </button>
-        <button type="button" class="btn btn-secondary" onClick={onHome}>
-          Home
-        </button>
+        {/* A town bot's game: back to the town, at the table, the bot across. */}
+        {snap.town ? (
+          <button type="button" class="btn btn-primary" onClick={onHome}>
+            Back to town
+          </button>
+        ) : (
+          <>
+            <button type="button" class="btn btn-primary" onClick={onAgain}>
+              {snap.bot ? "Find a person" : "Play again"}
+            </button>
+            <button type="button" class="btn btn-secondary" onClick={onHome}>
+              Home
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

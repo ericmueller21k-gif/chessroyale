@@ -1,5 +1,5 @@
 import type { ComponentChildren } from "preact";
-import { AGE_GATE, CHAT_MOD, FAIRPLAY, FRIENDS, GLOBAL_CHAT, LOBBY_LIFE, OPS, RANKED_1V1 } from "@chessroyale/core";
+import { AGE_GATE, CHAT_MOD, FAIRPLAY, FRIENDS, GLOBAL_CHAT, LOBBY_LIFE, OPS, RANKED_1V1, TOWN_CHAT } from "@chessroyale/core";
 
 /**
  * The privacy policy (/privacy), terms of service (/terms) and copyright page (/copyright): drafts written from what
@@ -151,20 +151,20 @@ function Privacy() {
         what={
           <>
             <p>
-              Your 1 v 1 rank: your tier, division and rank points (or how many placement games you've played), your wins, losses
-              and draws, when you last played, and a hidden rating of how well you play (a number and how sure it is) that
+              Your 1 v 1 rank: your tier, division and rank points (or how many placement games you've played), the highest you've
+              reached, your wins, losses and draws, your current run of wins, when you last played, and a hidden rating of how well you play (a number and how sure it is) that
               decides your rank points and whom you're matched with; and how many of today's games paid you coins (at most{" "}
               {RANKED_1V1.coins.perDay} a day do).
             </p>
             <p>
-              Each ranked game: the two players, the time control, the result and how it ended, every move, how long each move
-              took, and when it started and ended. If fair play checks a reported player's games, the engine's view of each of
+              Each ranked game: the two players, the time control, the result and how it ended, the rank points it moved for each
+              player, every move, how long each move took, and when it started and ended. If fair play checks a reported player's games, the engine's view of each of
               their moves is kept with the game. A game called off before both first moves keeps nothing, and neither does a game
               against a bot (it's played on your device).
             </p>
           </>
         }
-        why="your rank and record, matching you with players near your strength, and checking reported games for fair play."
+        why="your rank and record (on your profile, for anyone: your rank, your highest, your run of wins, and your last five games with whom you played and the rank points; never the hidden rating), matching you with players near your strength, and checking reported games for fair play."
         kept={
           <>
             your rank with your account. A game usually {RANKED_1V1.gamesKeepDays} days after it ends; longer only while a
@@ -195,22 +195,29 @@ function Privacy() {
         what={
           <>
             <p>
-              Chat is preset lines and emoji: there's no typing. Lines in a match go to its players and stay with the match until its
-              lobby closes, up to {LOBBY_LIFE.lobbyResultsKeepMinutes} minutes after the end. Lines in the home page's global chat carry
-              your name, rating and icon.
+              Chat is preset lines and emoji, except in the town square, where signed-in players type. Lines in a match go to its
+              players and stay with the match until its lobby closes, up to {LOBBY_LIFE.lobbyResultsKeepMinutes} minutes after the end.
+              Lines in the home page's global chat carry your name, rating and icon.
+            </p>
+            <p>
+              What you type in the town square goes to the signed-in players there, with your name. A filter checks it first and
+              refuses slurs, swearing, links and contact details. It isn't stored: the server holds each message in memory for{" "}
+              {TOWN_CHAT.lineMs / 60_000} minutes, and then it's gone. If someone reports a message, the report keeps its words and when it
+              was said, for a moderator to read.
             </p>
             <p>
               A moderator's decision about your chat or your name keeps what it was (a warning, a chat ban and until when, lifting a
               ban, or resetting your name and icon), when, who decided and why, and any note to you. Decisions about a guest's chat
               join your account when you sign in from it. Muting a player is kept on your device only. Names with slurs or hate in
-              them are refused, and nothing about that is kept.
+              them are refused, and nothing about that is kept; nor about a message the filter refuses.
             </p>
           </>
         }
         why="to pass your lines to other players, and to act when a name, an icon or how someone chats breaks the rules."
         kept={
           <>
-            global chat keeps its last {GLOBAL_CHAT.keep} lines and shows none older than {hours(GLOBAL_CHAT.maxAgeMs)} hours. A
+            global chat keeps its last {GLOBAL_CHAT.keep} lines and shows none older than {hours(GLOBAL_CHAT.maxAgeMs)} hours. A town
+            square message: {TOWN_CHAT.lineMs / 60_000} minutes in memory, never stored (a reported one: its words with the report). A
             moderator's decision: {CHAT_MOD.keepDecisionsDays} days after it ends (a chat ban with no end, while it lasts). A mute: on
             your device until you unmute.
           </>
@@ -225,7 +232,10 @@ function Privacy() {
               the other players' picks, how long you took, and how often the page was hidden while your clock ran.
             </li>
             <li>A short summary of each online match: how strong your moves were, and a fair-play score.</li>
-            <li>Reports you make and reports about you: the reason and the match.</li>
+            <li>
+              Reports you make and reports about you: the reason and the match, and for a report of a town square message, its words
+              and when it was said.
+            </li>
             <li>If we look into your account: its status, each decision and why, and any appeal you send with our reply.</li>
             <li>A random device marker (a cookie), with the accounts that played online from that device.</li>
             <li>If you're banned: a hash of your email address or Google id, so a new account made with it is banned too.</li>
@@ -280,9 +290,11 @@ function Privacy() {
 
       <h2>What other players see</h2>
       <p>
-        Your profile: your name, the items you wear, when you joined, "Online now" or when you were last seen (unless you hide it in
-        Settings), your rating, rank and "Top %", your 1 v 1 rank and record, your stats and last 10 matches (only their day
-        while you hide when you're online), and "Banned" if you are. Your friends also see whether you're online or in a match, unless you hide it. Nobody
+        Your profile: your name, your icon (the drawing you made, shown blurred behind your pawn), the items you wear, when you
+        joined, "Online now" or when you were last seen (unless you hide it in Settings), your rating, rank and "Top %", your 1 v 1
+        rank, record, best rank and win streak, your last five 1 v 1 games (who you played and the rank points each moved), your stats
+        and last 10 matches (only their day while you hide when you're online), and "Banned" if you are.
+        Your friends also see whether you're online or in a match, unless you hide it. Nobody
         sees who you've blocked. Never your email or how you sign in. In matches and chat,
         players see your name, icon, look and rating, and your picks.
       </p>
@@ -360,7 +372,8 @@ function Privacy() {
         Before anyone signs in, we ask their birth month and year. It's checked on the device and never sent to us or kept: only
         the answer is. Under {AGE_GATE.minAge}, you play as a guest: no sign-in and no email, the default name and icon, and
         nothing you type reaches us or other players (a bug report sends its details without a note). Guests can't play online,
-        post in the global chat, add friends or get invites. The device remembers the answer, so it can't simply be answered again.
+        post in the global chat, type in the town square or see other players' messages there, add friends or get invites. The
+        device remembers the answer, so it can't simply be answered again.
       </p>
       <p>
         If we learn we have personal information from a child under {AGE_GATE.minAge}, we delete it. Parents: email <Mail />.
@@ -372,7 +385,8 @@ function Privacy() {
           <strong>See it, or get a copy:</strong> Settings → Download my data gives you a file (JSON) of everything we keep about your
           account, your bug reports and the error records with your account included. Fair play's detection records aren't in
           it, as they'd show how cheating is found, nor the reasons and names behind moderators' decisions about your chat (the
-          decisions and their notes to you are in it): email <Mail /> for those, and a person answers.
+          decisions and their notes to you are in it): email <Mail /> for those, and a person answers. A report you made of a
+          town square message is in it without the message's words: they're the other player's.
         </li>
         <li>
           <strong>Correct it:</strong> change your name and icon in your profile, or email us.
@@ -398,7 +412,8 @@ function Privacy() {
           sign-in session (you're signed out on every device), your sign-in code's record, your items, coins, crates and shop
           items, your quick-chat picks, your 1 v 1 rank, reports you made and reports about you, moderators' decisions about your chat, fair
           play's records about you, your friends, requests, blocks and invites (from the other players' lists too), your lines
-          in the global chat, the bug reports you sent, and your account id on error records.
+          in the global chat and any of your town square messages still there, the bug reports you sent, and your account id on
+          error records.
         </li>
         <li>
           <strong>Kept, without you:</strong> your match results, moved to one shared "deleted" account and kept without your
@@ -476,7 +491,14 @@ function Terms() {
 
       <h2>Conduct and chat</h2>
       <ul>
-        <li>Chat is preset lines and emoji. Don't use them to harass anyone or to spam.</li>
+        <li>
+          Chat is preset lines and emoji, except in the town square, where signed-in players type. Don't use chat to harass anyone
+          or to spam.
+        </li>
+        <li>
+          In the town square: no slurs, hate, swearing, links or contact details. The filter refuses them, a moderator can take a
+          message down, and you can report one by tapping it.
+        </li>
         <li>Don't attack, overload or scrape the game, and don't play with bots or scripts.</li>
         <li>Names and icons that offend, and names with slurs or hate in them, aren't allowed.</li>
         <li>

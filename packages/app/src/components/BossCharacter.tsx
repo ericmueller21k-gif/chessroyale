@@ -20,6 +20,7 @@ import { prewarmMoo } from "./Moo.tsx";
 import { prewarmGardener, resetGarden } from "./Gardener.tsx";
 import { prewarmTiger } from "./Tiger.tsx";
 import { resetTiger } from "../tiger-show.ts";
+import { prewarmFolio } from "./Folio.tsx";
 import { EngineOverlay, placeEngine, prewarmRecluse } from "./Recluse.tsx";
 import { CRITICAL, LOW, NORMAL, VoiceBubble, bossVoice, holdMs, type Priority } from "../speech.tsx";
 import { mateAttack, prewarmKingAttack } from "./KingAttack.tsx";
@@ -286,6 +287,8 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
     if (kit.ch.id === "gardener") prewarmGardener(kit.ch.name);
     // (Babur's trip to the pump, his place, reactions and hoops, and the balloons and rings on the board.)
     if (kit.ch.id === "tiger") prewarmTiger(kit.ch.name);
+    // (Folio's ink, its paper, the crease and Revision's strokes on the board.)
+    if (kit.ch.id === "folio") prewarmFolio();
     // (The Hidden Boss's phase change: his rage, his leap onto the board, the book thrown down, the chant.)
     if (kit.ch.id === "recluse") prewarmRecluse(boss.crowdSide);
     // (Its attack on a king too: the God King's Last Stand, or its mate.)

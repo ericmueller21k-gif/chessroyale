@@ -13,6 +13,7 @@ import {
   bossThinkMs,
   landedEarlyMs,
   fullMoonMs,
+  folioTurnMs,
   landsAfterHisMove,
   PASS_WAIT,
   powerMomentMs,
@@ -28,6 +29,7 @@ import {
   type BoardRound,
   type WaterAsk,
   type HoopsAsk,
+  type CreaseAsk,
   type BoardScore,
   type ClientMessage,
   type NetFinal,
@@ -243,8 +245,14 @@ export interface LobbyRecord {
     deadline: number;
     deadlines: Record<string, number>;
     startedAt: number;
-    /** `away`: look-aways during the clock before the pick, as the app counted them (fair play's one device signal). */
-    picks: Record<string, { move: string; thinkMs: number; away?: number }>;
+    /**
+     * `away`: look-aways during the clock before the pick, as the app counted them (fair play's one device signal).
+     * `premove`: a premove the server had before any browser could know this position (`premoved`), played at once (see
+     * premoveAhead).
+     */
+    picks: Record<string, { move: string; thinkMs: number; away?: number; premove?: true }>;
+    /** Premoves told ahead by those picking this round, in time to count (premoveAhead), taken as it opened: player → move. */
+    premoved?: Record<string, string>;
     powerUps: Record<string, true>;
     /** Boss battle: players who called the King this move, and who called for his strike. */
     kingCalls?: Record<string, true>;
@@ -309,7 +317,7 @@ export interface LobbyRecord {
   /** The boss's move, held until it has "thought" long enough (your queen banner plays first), and when that is. */
   bossPending?: string;
   /** What came with that move (Wrangler's drag or showdown line-up), held with it. */
-  bossPendingExtras?: { drag?: string; showdown?: string; outside?: boolean; beam?: string[]; balloon?: string; hoops?: string };
+  bossPendingExtras?: { drag?: string; showdown?: string; outside?: boolean; beam?: string[]; balloon?: string; hoops?: string; crease?: string };
   bossMinAt?: number;
   bossIntroDone?: boolean;
   /**
@@ -374,6 +382,17 @@ export interface LobbyRecord {
    */
   fair?: Record<string, FairMove[]>;
   fairV?: number;
+  /**
+   * Fair play: each person's first premove, told ahead of their next turn (premoveAhead), with the seal it was told under
+   * (`premoveSeal` then): player → move.
+   */
+  premoves?: Record<string, { move: string; seal: number }>;
+  /**
+   * Fair play's premove seal: goes up each time the next position starts to be knowable to a browser (a round opening, its
+   * picks showing live to the watching team; a boss step asked of the host or played). A premove counts only if it was
+   * told under an older seal than the round it's played in opens with (takePremoves).
+   */
+  premoveSeal?: number;
   /** People who left the match (resigned, gone too long, before move 1 or once out): see LeftHuman and LEAVING. */
   left?: LeftHuman[];
   /** A private lobby nobody had started: when the last person in it pressed Leave (it closes then; LOBBY_LIFE). */
@@ -473,7 +492,13 @@ const hoopsAsk = (runner: MatchRunner): { hoops?: HoopsAsk } => {
   const hoops = runner.hoopsAsk();
   return hoops ? { hoops } : {};
 };
-const hoopsMs = (runner: MatchRunner | null): number => (runner?.hoopsAsk() ? BOSS_POWERS.hoopsTimeMs : 0);
+const hoopsMs = (runner: MatchRunner | null): number => (runner?.hoopsAsk() ? BOSS_POWERS.hoopsTimeMs : 0) + (runner?.creaseAsk() ? BOSS_POWERS.creaseTimeMs : 0);
+
+/** Folio's Crease for the host to pick after its move (the boss request's `crease`), or nothing (hoopsMs gives the host its time too). */
+const creaseAsk = (runner: MatchRunner): { crease?: CreaseAsk } => {
+  const crease = runner.creaseAsk();
+  return crease ? { crease } : {};
+};
 
 export class LobbyCore {
   private runner: MatchRunner | null = null;
@@ -1090,7 +1115,9 @@ export class LobbyCore {
       case "start":
         return this.start(playerId);
       case "pick":
-        return this.pick(playerId, msg.key, msg.move, msg.away);
+        return this.pick(playerId, msg.key, msg.move, msg.away, msg.premove);
+      case "premove":
+        return this.premoveAhead(playerId, msg.move);
       case "powerUp":
         return this.powerUp(playerId, msg.key);
       case "scores":
@@ -1132,7 +1159,7 @@ export class LobbyCore {
       }
       case "bossMove":
         if (playerId === this.r.hostId && this.r.phase === "boss" && this.r.bossKey === msg.key)
-          this.playBoss(msg.move, { ...(typeof msg.drag === "string" ? { drag: msg.drag } : {}), ...(typeof msg.showdown === "string" ? { showdown: msg.showdown } : {}), ...(msg.outside === true ? { outside: true } : {}), ...(Array.isArray(msg.beam) ? { beam: msg.beam.filter((x): x is string => typeof x === "string").slice(0, 32) } : {}), ...(typeof msg.balloon === "string" ? { balloon: msg.balloon.slice(0, 2) } : {}), ...(typeof msg.hoops === "string" ? { hoops: msg.hoops.slice(0, 32) } : {}) });
+          this.playBoss(msg.move, { ...(typeof msg.drag === "string" ? { drag: msg.drag } : {}), ...(typeof msg.showdown === "string" ? { showdown: msg.showdown } : {}), ...(msg.outside === true ? { outside: true } : {}), ...(Array.isArray(msg.beam) ? { beam: msg.beam.filter((x): x is string => typeof x === "string").slice(0, 32) } : {}), ...(typeof msg.balloon === "string" ? { balloon: msg.balloon.slice(0, 2) } : {}), ...(typeof msg.hoops === "string" ? { hoops: msg.hoops.slice(0, 32) } : {}), ...(typeof msg.crease === "string" ? { crease: msg.crease.slice(0, 8) } : {}) });
         return;
       case "leave":
         // (Cancel on the queue screen once its seats have filled is leaving the match: before move 1, a bot sits in.)
@@ -1389,6 +1416,7 @@ export class LobbyCore {
 
   /** The boss's turn: everyone sees it thinking while the host's engine plays its move. */
   private requestBoss() {
+    this.sealPremoves();
     this.r.phase = "boss";
     this.r.bossKey = `b-${++this.r.counter}`;
     this.r.bossKind = this.runner!.bossMoveKind();
@@ -1411,7 +1439,7 @@ export class LobbyCore {
     const burnt = !!b?.powers?.burnt?.some((x) => x.turn === b.crowdMoves && (x.piece || x.fizzled));
     // (Alfil's pieces came down early after your move: their landing plays first too; so does Moo's Full Moon, his
     // transformation at the start of his turn.)
-    const own = landedEarlyMs(b) + fullMoonMs(b);
+    const own = landedEarlyMs(b) + fullMoonMs(b) + folioTurnMs(b);
     return queenSlain(view) || burnt || own ? this.io.now() + bossThinkMs(view, burnt, own) : undefined;
   }
 
@@ -1460,8 +1488,9 @@ export class LobbyCore {
       ...(kind === "hop" ? { hop: this.r.bounceCandidates ?? [] } : {}),
       ...(kind === "repaint" ? { repaint: this.r.bounceCandidates ?? [], ...(runner.repaintAny() ? { repaintAny: true as const } : {}) } : {}),
       ...(kind === "water" ? waterAsk(runner) : {}),
-      // (The circus tiger's hoops, due after this move: the host places them on the position after it.)
+      // (The circus tiger's hoops, due after this move: the host places them on the position after it; Folio's Crease line too.)
       ...(move ? hoopsAsk(runner) : {}),
+      ...(move ? creaseAsk(runner) : {}),
       // (A step that spends his whole turn: the pass guard, on the host's engine. The server never searches.)
       ...(kind === "fuse" || kind === "carrots" ? { pass: true as const } : {}),
       ...(allowed && !pick ? { allowed } : {}),
@@ -1495,6 +1524,7 @@ export class LobbyCore {
    * bounce plays for everyone, and he plays his move. No host engine anywhere: the bounces play and nothing moves.
    */
   private requestBounce() {
+    this.sealPremoves();
     this.r.phase = "boss";
     this.r.bossKey = `y-${++this.r.counter}`;
     this.r.bossKind = "bounce";
@@ -1517,6 +1547,7 @@ export class LobbyCore {
    */
   private requestAlfil() {
     const runner = this.runner!;
+    this.sealPremoves();
     this.r.phase = "boss";
     this.r.bossKey = `a-${++this.r.counter}`;
     this.r.bossKind = runner.alfilStep()!;
@@ -1538,6 +1569,7 @@ export class LobbyCore {
    */
   private requestHop() {
     const runner = this.runner!;
+    this.sealPremoves();
     this.r.phase = "boss";
     this.r.bossKey = `h-${++this.r.counter}`;
     this.r.bossKind = "hop";
@@ -1560,6 +1592,7 @@ export class LobbyCore {
    * asked for. Any other answer, or no host engine anywhere: the cast.
    */
   private requestCarrots() {
+    this.sealPremoves();
     this.r.phase = "boss";
     this.r.bossKey = `c-${++this.r.counter}`;
     this.r.bossKind = "carrots";
@@ -1580,6 +1613,7 @@ export class LobbyCore {
    */
   private requestRepaint() {
     const runner = this.runner!;
+    this.sealPremoves();
     this.r.phase = "boss";
     this.r.bossKey = `r-${++this.r.counter}`;
     this.r.bossKind = "repaint";
@@ -1601,6 +1635,7 @@ export class LobbyCore {
    * anything else, or no host engine anywhere: no watering this turn (it waits for his next), and his move is asked for.
    */
   private requestWater() {
+    this.sealPremoves();
     this.r.phase = "boss";
     this.r.bossKey = `r-${++this.r.counter}`;
     this.r.bossKind = "water";
@@ -1619,6 +1654,7 @@ export class LobbyCore {
    * crowd's turn. No such move (or no engine anywhere): he skips it.
    */
   private requestExtra() {
+    this.sealPremoves();
     this.r.phase = "boss";
     this.r.bossKey = `x-${++this.r.counter}`;
     this.r.bossKind = "extra";
@@ -1636,6 +1672,7 @@ export class LobbyCore {
    * replies.
    */
   private requestFunhouse() {
+    this.sealPremoves();
     this.r.phase = "boss";
     this.r.bossKey = `f-${++this.r.counter}`;
     this.r.bossKind = "funhouse";
@@ -1646,7 +1683,7 @@ export class LobbyCore {
     this.setTimer("bossTimeout", this.io.now() + BOSS_TIMEOUT_MS);
   }
 
-  private playBoss(move: string, extras: { drag?: string; showdown?: string; outside?: boolean; beam?: string[]; balloon?: string; hoops?: string } = {}) {
+  private playBoss(move: string, extras: { drag?: string; showdown?: string; outside?: boolean; beam?: string[]; balloon?: string; hoops?: string; crease?: string } = {}) {
     this.r.bossKey = undefined;
     // Too soon (your queen banner is still up): hold the move (or Big Boy's bounce) until then.
     if (this.r.bossMinAt && this.io.now() < this.r.bossMinAt - 50) {
@@ -1742,9 +1779,9 @@ export class LobbyCore {
       this.broadcast(this.bossMessage(until));
       return this.setTimer("nextRound", until);
     }
-    // (Wrangler's drag or showdown line-up, Moo's lines for his Moonbeam, the circus tiger's hoops and balloon square: the
-    // runner checks each against his rules before it's used.)
-    this.runner!.applyBossMove(move, undefined, { drag: extras.drag ?? null, showdown: extras.showdown ?? null, outside: extras.outside ?? null, beam: extras.beam ?? null, balloon: extras.balloon ?? null, hoops: extras.hoops ?? null });
+    // (Wrangler's drag or showdown line-up, Moo's lines for his Moonbeam, the circus tiger's hoops and balloon square,
+    // Folio's Crease line: the runner checks each against the rules before it's used.)
+    this.runner!.applyBossMove(move, undefined, { drag: extras.drag ?? null, showdown: extras.showdown ?? null, outside: extras.outside ?? null, beam: extras.beam ?? null, balloon: extras.balloon ?? null, hoops: extras.hoops ?? null, crease: extras.crease ?? null });
     // As the turn passes to the crowd, any power that comes with it (a freeze, a pie, the warning, the blizzard)
     // plays out before the crowd's clock starts.
     // (At a mate, the boss's attack on the crowd's king, if it has one: the result waits for it.)
@@ -1835,7 +1872,10 @@ export class LobbyCore {
     const playing = this.roundHumans();
     for (const h of playing) deadlines[h.id] = now + runner.allowedMsFor(h.id);
     const deadline = Math.max(now, ...Object.values(deadlines));
-    this.r.round = { key, deadline, deadlines, startedAt: now, picks: {}, powerUps: {}, ...(final ? {} : { botsDoneIn: runner.botThinkTimes() }) };
+    const premoved = this.takePremoves(playing.map((h) => h.id));
+    // (From here this round's position is out, and the watching team sees its picks live: a seal.)
+    this.sealPremoves();
+    this.r.round = { key, deadline, deadlines, startedAt: now, picks: {}, powerUps: {}, ...(final ? {} : { botsDoneIn: runner.botThinkTimes() }), ...(premoved ? { premoved } : {}) };
     this.r.phase = "play";
     const st = this.standings();
     const cutoff = this.cutoff();
@@ -1971,7 +2011,56 @@ export class LobbyCore {
     return Math.max(0, upTo - round.startedAt - frozen);
   }
 
-  private pick(playerId: string, key: string, move: string, away?: unknown) {
+  /**
+   * A player's first premove (chess.com's: a move made ahead on their board while it isn't their turn), told ahead of
+   * their next turn so fair play can tell a premove from a fast move without trusting the app. Fair play's rule: a pick is
+   * marked a premove only if the server had that move before any browser could know the position it's played in. So
+   * it's kept only while they can't pick (no round open in which they still have to), under the seal of the moment
+   * (`premoveSeal`); the round they next pick in takes it as it opens only if a seal has come since (`takePremoves`): told
+   * before the step that decided the last of that position (the boss's step asked of the host, the other team's or
+   * mover's round opening, its picks live to watchers). Then a pick that plays it, says so, and comes within
+   * FAIRPLAY.signals.premoveMs of the clock's start is marked, and fair play leaves only its time out of timing. One that
+   * misses any of that is timed as any pick, never held against anyone. Null: no premove now.
+   */
+  private premoveAhead(playerId: string, move: unknown) {
+    if (!this.human(playerId) || this.r.phase === "results") return;
+    if (move !== null && (typeof move !== "string" || !/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move))) return;
+    const round = this.r.round;
+    if (this.r.phase === "play" && round && round.deadlines[playerId] !== undefined && !this.doneThisRound(playerId)) return;
+    const kept = { ...this.r.premoves };
+    if (move === null) delete kept[playerId];
+    else kept[playerId] = { move, seal: this.r.premoveSeal ?? 0 };
+    this.r.premoves = Object.keys(kept).length ? kept : undefined;
+  }
+
+  /**
+   * Fair play's premove seal goes up: the next position starts to be knowable to a browser from now (a round opening, a
+   * boss step asked of the host or played). A premove told from now on can't count for that position (takePremoves).
+   */
+  private sealPremoves() {
+    this.r.premoveSeal = (this.r.premoveSeal ?? 0) + 1;
+  }
+
+  /**
+   * The premoves told ahead by those picking in the round now opening: each counts if it was told under an older seal
+   * than now, before the last of this position was knowable (premoveAhead); the rest are dropped. The others' wait for
+   * their own turn.
+   */
+  private takePremoves(ids: readonly string[]): Record<string, string> | null {
+    const kept = { ...this.r.premoves };
+    const seal = this.r.premoveSeal ?? 0;
+    const taken: Record<string, string> = {};
+    for (const id of ids) {
+      const p = kept[id];
+      if (p === undefined) continue;
+      if (p.seal < seal) taken[id] = p.move;
+      delete kept[id];
+    }
+    this.r.premoves = Object.keys(kept).length ? kept : undefined;
+    return Object.keys(taken).length ? taken : null;
+  }
+
+  private pick(playerId: string, key: string, move: string, away?: unknown, premove?: unknown) {
     const round = this.r.round;
     if (this.r.phase !== "play" || !round || round.key !== key || this.doneThisRound(playerId)) return;
     const now = this.io.now();
@@ -1983,10 +2072,14 @@ export class LobbyCore {
     // Boss battle: only a move allowed this turn (a power's limits; the move the God King took back can't be picked).
     const allowed = this.runner?.boss ? this.runner.crowdAllowed() : null;
     if (allowed && !allowed.includes(move)) return;
+    const thinkMs = Math.min(this.thinkTime(round, now), this.thinkTime(round, deadline));
+    // (A premove: told before any browser could know this position, this very move, and made at once. See premoveAhead.)
+    const premoved = premove === true && round.premoved?.[playerId] === move && thinkMs <= FAIRPLAY.signals.premoveMs;
     round.picks[playerId] = {
       move,
-      thinkMs: Math.min(this.thinkTime(round, now), this.thinkTime(round, deadline)),
+      thinkMs,
       ...(typeof away === "number" && away > 0 ? { away: Math.min(50, Math.round(away)) } : {}),
+      ...(premoved ? { premove: true as const } : {}),
     };
     for (const h of this.r.humans) this.send(h.id, { t: "moved", key, playerId }, false);
     this.sendTally();
@@ -3016,6 +3109,7 @@ export class LobbyCore {
           picks,
           thinkMs: pick?.thinkMs ?? 0,
           away: pick?.away ?? 0,
+          ...(pick?.premove ? { premove: true } : {}),
           legal,
           top: scored.slice(0, FAIRPLAY.deep.candidates).map((x) => x.move),
           ...(p.usedPowerUp ? { powerUp: true } : {}),

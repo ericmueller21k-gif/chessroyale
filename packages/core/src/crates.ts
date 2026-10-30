@@ -78,22 +78,29 @@ export interface ItemDef {
    * e.g. a cape or wings, seen around the piece).
    */
   layer?: "front" | "back";
+  /**
+   * Face items only (every one says): drawn above a hat ("above": goggles, shades) or below it ("below": a beard under a
+   * present's box, a smiley under a pirate hat's brim). Eric, Oct 30: a tag on each item, not a list in the drawing code.
+   */
+  faceLayer?: "above" | "below";
   /** Rolls a second color too (both with the usual color odds), e.g. a present's box and its ribbon. */
   colors?: 2;
 }
 
 /** Whether an item is drawn behind the piece. */
 export const behindPiece = (def: string) => itemDef(def)?.layer === "back";
+/** Whether a face item is drawn above a hat (its `faceLayer`). */
+export const aboveHat = (def: string) => itemDef(def)?.faceLayer === "above";
 
 export const ITEM_DEFS: readonly ItemDef[] = [
   // Winter Crate · Series 1.
-  { id: "santa-beard", name: "Santa Beard", tier: "common", slot: "face", description: "Ho ho ho." },
+  { id: "santa-beard", name: "Santa Beard", tier: "common", slot: "face", faceLayer: "below", description: "Ho ho ho." },
   { id: "beanie", name: "Beanie", tier: "common", slot: "head", description: "A plain knit beanie. Keeps the thinking warm." },
   { id: "tree-tee", name: "Christmas Tree Tee", tier: "common", slot: "skin", description: "Your pawn in a festive T-shirt. The bulbs are the only part that's lit." },
   { id: "antlers", name: "Antlers", tier: "uncommon", slot: "head", description: "Guides the sleigh through the endgame." },
-  { id: "scarf", name: "Scarf", tier: "uncommon", slot: "face", description: "A long knit scarf. Your pawn's mom insisted." },
+  { id: "scarf", name: "Scarf", tier: "uncommon", slot: "face", faceLayer: "below", description: "A long knit scarf. Your pawn's mom insisted." },
   { id: "santa-hat", name: "Santa Hat", tier: "rare", slot: "head", description: "Knows who's been naughty in the opening." },
-  { id: "ski-goggles", name: "Ski Goggles", tier: "rare", slot: "face", colors: 2, description: "Frame in one color, see-through lenses in another. For black-diamond lines." },
+  { id: "ski-goggles", name: "Ski Goggles", tier: "rare", slot: "face", faceLayer: "above", colors: 2, description: "Frame in one color, see-through lenses in another. For black-diamond lines." },
   { id: "snowman", name: "Snowman", tier: "epic", slot: "skin", description: "Your pawn, built of snow, with a scarf." },
   { id: "present", name: "Present", tier: "epic", slot: "head", colors: 2, description: "Worn as a helmet. Box in one color, ribbon in another. Now with a visor, for peeking." },
   { id: "gingerbread", name: "Gingerbread Man", tier: "epic", slot: "skin", description: "Run, run, as fast as you can. Iced, with gumdrop buttons." },
@@ -108,13 +115,13 @@ export const ITEM_DEFS: readonly ItemDef[] = [
   { id: "top-hat", name: "Top Hat", tier: "common", slot: "head", description: "A pawn of means. Monocle sold separately." },
   { id: "viking-helm", name: "Viking Helm", tier: "uncommon", slot: "head", description: "Pushes into any zone. The horns are for show; so is the plan." },
   { id: "little-crown", name: "Little Crown", tier: "uncommon", slot: "head", description: "Dreaming of promotion." },
-  { id: "eyepatch", name: "Eyepatch", tier: "uncommon", slot: "face", description: "Half the vision, twice the swagger." },
-  { id: "dark-shades", name: "Dark Shades", tier: "rare", slot: "face", description: "Can't see the board. Looks great, though." },
+  { id: "eyepatch", name: "Eyepatch", tier: "uncommon", slot: "face", faceLayer: "below", description: "Half the vision, twice the swagger." },
+  { id: "dark-shades", name: "Dark Shades", tier: "rare", slot: "face", faceLayer: "above", description: "Can't see the board. Looks great, though." },
   { id: "suit-and-tie", name: "Suit and Tie", tier: "epic", slot: "skin", colors: 2, description: "A sharp suit in one color, the tie in another. License to promote." },
-  { id: "smiley-face", name: "Smiley Face", tier: "legendary", slot: "face", description: "Have a nice game." },
+  { id: "smiley-face", name: "Smiley Face", tier: "legendary", slot: "face", faceLayer: "below", description: "Have a nice game." },
   { id: "tommy-gun", name: "Tommy Gun", tier: "mythic", slot: "weapon", colors: 2, description: "A classic drum-fed Tommy gun, metal in one color, wood in another. For settling the endgame." },
   // Batch 2 (Oct 14): the rest of the secret agent, and the pirate.
-  { id: "fake-mustache", name: "Fake Mustache", tier: "common", slot: "face", description: "A flawless disguise. Nobody will ever know it's you." },
+  { id: "fake-mustache", name: "Fake Mustache", tier: "common", slot: "face", faceLayer: "below", description: "A flawless disguise. Nobody will ever know it's you." },
   { id: "fedora", name: "Fedora", tier: "common", slot: "head", description: "For trench-coat weather and shadowy endgames." },
   { id: "briefcase", name: "Briefcase", tier: "uncommon", slot: "weapon", description: "Contents classified. Mostly sandwiches." },
   { id: "wire-earpiece", name: "Wire Earpiece", tier: "rare", slot: "head", description: "\"The pawn is moving. Repeat: the pawn is moving.\"" },
@@ -128,7 +135,7 @@ export const ITEM_DEFS: readonly ItemDef[] = [
   // Batch 3 (Oct 14): the ninja.
   { id: "ninja-headband", name: "Ninja Headband", tier: "common", slot: "head", description: "Long tails, for dramatic wind." },
   { id: "shuriken", name: "Shuriken", tier: "common", slot: "weapon", description: "A throwing star. Not for throwing at the board." },
-  { id: "ninja-mask", name: "Ninja Mask", tier: "uncommon", slot: "face", description: "Covers everything below the eyes, including your thinking face." },
+  { id: "ninja-mask", name: "Ninja Mask", tier: "uncommon", slot: "face", faceLayer: "below", description: "Covers everything below the eyes, including your thinking face." },
   { id: "nunchucks", name: "Nunchucks", tier: "uncommon", slot: "weapon", description: "Two sticks, one chain, zero hand-eye coordination." },
   { id: "katana", name: "Katana", tier: "rare", slot: "weapon", description: "Folded a thousand times. Still can't cut through a fortress." },
   { id: "ninja-hood", name: "Ninja Hood", tier: "epic", slot: "head", description: "Only the eyes show, and they're calculating." },

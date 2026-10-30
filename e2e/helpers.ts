@@ -322,15 +322,32 @@ export async function asAdmin(page: Page) {
 
 /**
  * Makes this page's account a real admin on the server (the admin pages: /admin/ops, /admin/fairplay): the local Worker's
- * ADMIN_EMAILS (playwright.config.ts) has one email per lane and project (`${who}-admin-${project}@e2e.test`), given
- * here straight in the local database (no sign-in is set up in tests). Reloads nothing: the server reads it at once.
+ * ADMIN_EMAILS (playwright.config.ts' ADMINS) has one email per lane, spec file and project
+ * (`${who}-admin-${file}-${project}@e2e.test`), given here straight in the local database (no sign-in is set up in tests).
+ * One a file: putting an address on this account takes it off any other (withEmail), so two files running side by side
+ * with one address left the first a guest halfway through ("Sign in to chat with other players." on a Report, Oct 30).
+ * A new spec file that makes an admin needs its line in ADMINS. Reloads nothing: the server reads it at once.
  * The local database is one SQLite file that the running server writes to as well (presence, live lobbies), and this
  * second process gets "database is locked: SQLITE_BUSY" while a write of the server's is under way: then it waits a
  * moment and asks again, as SQLite's own busy wait would (wrangler's command has none). Any other error fails the test,
  * with its message (docs/decisions/2026-10-15-flaky-e2e-batch.md). Answers the account's id.
  */
 export async function asServerAdmin(page: Page, who: "ops" | "chat" = "ops") {
-  const email = `${who}-admin-${test.info().project.name}@e2e.test`;
+  const file = test.info().file.split(/[\\/]/).pop()!.replace(/\.spec\.ts$/, "");
+  return withEmail(page, `${who}-admin-${file}-${test.info().project.name}@e2e.test`);
+}
+
+/**
+ * Makes this page's account a signed-in one (an email on it, given straight in the local database, as `asServerAdmin` does:
+ * no sign-in is set up in tests), e.g. for the town square's chat, which is for signed-in accounts only. A fresh email each
+ * time. Reload the page after it for the app to see it. Answers the account's id.
+ */
+export async function asSignedIn(page: Page, label = "player") {
+  return withEmail(page, `${label}-${test.info().project.name}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}@e2e.test`);
+}
+
+/** Puts `email` on this page's account in the local database (taking it off any other account first). Answers the id. */
+async function withEmail(page: Page, email: string) {
   const id = ((await (await page.request.get("/api/me")).json()) as { user: { id: string } }).user.id;
   const sql = `UPDATE users SET email = NULL WHERE email = '${email}'; UPDATE users SET email = '${email}' WHERE id = '${id}'`;
   for (let attempt = 1; ; attempt++) {
@@ -347,7 +364,7 @@ export async function asServerAdmin(page: Page, who: "ops" | "chat" = "ops") {
 
 /**
  * The full Boss raid screen, every raid choice (Eric, Oct 16; Oct 26: the test link ?mode=raid). It's added to the page's own
- * address, so the switches it was opened with stay. Home's Solo Boss Mode card opens the solo form instead: openSoloBoss.
+ * address, so the switches it was opened with stay. Home's Boss Battle card opens the solo form instead: openSoloBoss.
  */
 export async function openBossRaid(page: Page) {
   const to = new URL(page.url());
@@ -356,18 +373,18 @@ export async function openBossRaid(page: Page) {
   await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
 }
 
-/** Home → Solo Boss Mode's card → its screen: the tiles, the stage and Boss alone (Eric, Oct 26). */
+/** Home → Boss Battle's card → its screen: the tiles, the stage and START (Eric, Oct 26; renamed Oct 29). */
 export async function openSoloBoss(page: Page) {
-  await page.getByRole("main").getByRole("button", { name: /^Solo Boss Mode/ }).click();
-  await expect(page.getByRole("heading", { name: "Solo Boss Mode", exact: true })).toBeVisible();
+  await page.getByRole("main").getByRole("button", { name: /^Boss Battle/ }).click();
+  await expect(page.getByRole("heading", { name: "Boss Battle", exact: true })).toBeVisible();
 }
 
 /**
- * Home → Solo Boss Mode → (the boss's tile, `boss`: its name, as its tile is named) → Boss alone: its menu, the difficulty and
- * that boss, or a random one without `boss` (with ?boss= in the address, the battle at once).
+ * Home → Boss Battle → (the boss's tile, `boss`: its name, as its tile is named) → START: the battle at once, with that boss, or a
+ * random one without `boss`, at the screen's difficulty (Oct 29: START skips the old Boss alone menu).
  */
 export async function bossAloneFromHome(page: Page, boss?: string) {
   await openSoloBoss(page);
   if (boss) await page.getByRole("radiogroup", { name: "Bosses" }).getByRole("radio", { name: boss, exact: true }).click();
-  await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
+  await page.getByRole("main").getByRole("button", { name: "START" }).click();
 }

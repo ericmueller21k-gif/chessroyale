@@ -46,6 +46,43 @@ export function signBoard(x0: number, y0: number, w: number, h: number, wood = "
   });
 }
 
+/**
+ * A light at dusk and night (Oct 27): where a picture glows from inside, as data beside its art (render.ts lights it after
+ * the world's tint: its pixels warm and bright, a soft glow spilling a little round them). A box in the picture's pixels;
+ * `keys`: only the pixels of these palette keys in it light up (the glass, the dark of a doorway; omitted: every drawn pixel
+ * in it), so frames, bars and things standing in front stay dark against the glow.
+ */
+export interface LightSpot {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  keys?: string;
+  /** The light's color, and how strong it shines at night (0 to 1; dusk is weaker: `lightsAt` in feel.ts). */
+  color: string;
+  strength: number;
+  /** A candle's or a torch's slow, gentle flicker. */
+  flicker?: boolean;
+  /** A halo in the air round it (a lantern's, a lamp's): its radius in picture pixels, round the box's middle. */
+  halo?: number;
+}
+/** A faint pool of light on the ground (under a lamp, in front of an open door): its middle and half-axes, in the picture's pixels. */
+export interface LightPool {
+  x: number;
+  y: number;
+  rx: number;
+  ry: number;
+  color: string;
+  strength: number;
+}
+/** The lights' colors: the warm light from inside a home (a lamp or a fire within), a lantern's or a candle's, a torch's. */
+export const WARM = "#ffb85c";
+export const LANTERN_LIGHT = "#ffb648";
+export const TORCH = "#ff9a3c";
+/** Ginger's cold ice-blue (he loves the cold), and the funhouse's pink. */
+export const ICE_LIGHT = "#a8dcff";
+export const FUN_PINK = "#ff8fe0";
+
 /** Where the game writes on a sign board made by signBoard at (x0, y0, w, h): its face, inside the frame. */
 export const signFace = (x0: number, y0: number, w: number, h: number) => ({ x: x0 + 2, y: y0 + 3, w: w - 5, h: h - 6 }) as const;
 

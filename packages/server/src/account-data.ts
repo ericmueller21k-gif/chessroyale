@@ -106,7 +106,8 @@ export const ACCOUNT_STORES: AccountStore[] = [
   },
   {
     // Reports about players (fair play's sheet). The download has the ones the player made; deleting removes those
-    // and the ones about them.
+    // and the ones about them. A report of a town chat line keeps the line's text and time (`line`, `line_at`): they're
+    // the reported player's words, so the reporter's download leaves them out, and they go with either account.
     name: "reports",
     tables: ["reports"],
     export: async (sql, u) => ({ made: await all(sql, "SELECT target, reason, match, at FROM reports WHERE reporter = ? ORDER BY at", u.id) }),

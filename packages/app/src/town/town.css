@@ -1,6 +1,7 @@
 /*
  * The town square (/town): a slim bar, then the world filling the rest of the screen, phone and computer alike. The
- * bar's back button, the zoom pair and "Back to me" stay put (Eric's rule: nothing hidden, nothing shifts). Its own
+ * bar's back button (and, at its right end, the chat icon and the gear), the zoom pair and the focus button ("Back to me") stay put
+ * (Eric's rule: nothing hidden, nothing shifts). Its own
  * file, loaded with the page's code (so none of it is in the main bundle). docs/areas/town-square.md.
  */
 .town-screen {
@@ -12,6 +13,44 @@
   color: var(--text);
   overflow: hidden;
   font-family: Archivo, system-ui, sans-serif;
+}
+/* On a computer the town sits in the front door's frame (TownPage.tsx; Eric, Oct 29): in the center column's box, in the page's flow, the
+   window's height (the page doesn't scroll), with the side menu and the live panel as on home. */
+.town-screen.in-frame {
+  position: relative;
+  inset: auto;
+  height: var(--app-h);
+  overflow: visible;
+}
+/* In the frame the bar is the right column's top row (Eric, Oct 30), over the row the profile button has on other pages: the same 24 px down, 44 px
+   high, the round buttons 44 px as that button is. It sits over the right column, so the world needs none of its height. */
+.town-screen.in-frame .town-bar {
+  position: fixed;
+  z-index: 6;
+  top: calc(var(--banner-h, 0px) + 24px);
+  right: 12px;
+  width: calc(var(--fd-rail) - 25px);
+  height: 44px;
+  padding: 0;
+  gap: 8px;
+  border-bottom: 0;
+  background: none;
+}
+.town-screen.in-frame .town-bar h1 {
+  min-width: 0;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (min-width: 1440px) {
+  .town-screen.in-frame .town-bar h1 {
+    font-size: 18px;
+  }
+}
+.town-screen.in-frame .town-back {
+  width: 44px;
+  height: 44px;
 }
 .town-bar {
   flex: none;
@@ -47,6 +86,22 @@
   overflow: hidden;
   background: #bfe3f3;
 }
+.town-fps {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 5;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font: 600 12px/1.4 ui-monospace, monospace;
+  pointer-events: none;
+}
+/* The drawing's backend after the numbers ("60 fps · 16.7 ms · WebGL"), from Town.tsx's data-backend. */
+.town-fps[data-backend]::after {
+  content: " · " attr(data-backend);
+}
 .town-canvas {
   position: absolute;
   left: 0;
@@ -55,10 +110,8 @@
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
-  cursor: grab;
-}
-.town-canvas:active {
-  cursor: grabbing;
+  /* The ordinary arrow, also while you drag the view (Eric, Oct 26: "just the normal default mouse"). */
+  cursor: default;
 }
 /* Off screen, for screen readers only: a statue's quote while you're up close to it. */
 .town-sr {
@@ -122,14 +175,15 @@
   image-rendering: pixelated;
   pointer-events: none;
 }
+/* The buttons, one row in the map's bottom right corner (Eric, Oct 28): the −/+ pair on the left, the focus button to its right. */
 .town-controls {
   position: absolute;
   right: calc(14px + env(safe-area-inset-right));
   bottom: calc(14px + env(safe-area-inset-bottom));
   z-index: 6;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  flex-direction: row;
+  align-items: center;
   gap: 10px;
 }
 .town-zoom {
@@ -152,22 +206,33 @@
   background: #1f2530;
   color: #fff;
 }
+/* The focus button: round, as high as the −/+ buttons, an icon and no words (its name, "Back to me", is its aria-label). */
 .town-recenter {
+  flex: none;
+  width: 36px;
   height: 36px;
-  padding: 0 14px;
-  border-radius: 999px;
-  border: 1px solid #d8ccb6;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 0;
   background: #fff;
   color: #1f2530;
-  font: 700 13px Archivo, sans-serif;
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
+.town-recenter svg {
+  display: block;
+}
 /*
- * A card over a boss or a home (slice 4; the prototype's card): its name, its one button (a boss's "Challenge alone"; a
- * home's "Shop", greyed, "Coming soon"), its tail pointing at what it's about (--ax). Placed every frame by Town.tsx.
+ * The cards over a boss, a home, the Colosseum, a chess table or a person (slice 4's cards; since Oct 28, Eric's mockup: "dark card",
+ * "thin warm-gold border"): near-black, a thin warm-gold border, rounded corners, white text, gold primary buttons, a tail pointing at
+ * what it's about (--ax). Placed every frame by Town.tsx. A person's card has its own one-row layout at one size (`.town-person`, below).
+ * The grays are all 4.5:1 or better on the card (computed in e2e/town.spec.ts).
  */
 .town-card {
+  --card-bg: #20212a;
+  --card-gold: #d9bb8c;
   position: absolute;
   left: 0;
   top: 0;
@@ -177,29 +242,38 @@
   min-width: 170px;
   max-width: 230px;
   padding: 10px 12px 12px;
+  border: 1.5px solid var(--card-gold);
   border-radius: 14px;
-  background: #fffdf8;
-  color: #1f2530;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.06);
+  background: var(--card-bg);
+  color: #fff;
+  /* (Not a button: the pointer stays the ordinary arrow over the card's words and a bot's picture.) */
+  cursor: default;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.38);
 }
+/* The tail: a square turned on its corner, bordered on the two sides that make the point, over the card's own border. */
 .town-card::after {
   content: "";
   position: absolute;
   left: var(--ax, 50%);
-  bottom: -7px;
-  margin-left: -7px;
-  border: 7px solid transparent;
-  border-bottom: 0;
-  border-top-color: #fffdf8;
+  bottom: -6px;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  background: var(--card-bg);
+  border: solid var(--card-gold);
+  border-width: 0 1.5px 1.5px 0;
+  border-radius: 0 0 2px 0;
+  transform: rotate(45deg);
 }
 .town-card h2 {
   margin: 0 0 8px;
+  color: #fff;
   font: 400 15px/1.2 "Archivo Black", Archivo, sans-serif;
 }
 .town-card-text {
   margin: 0 0 4px;
   font: 500 13px/1.35 Archivo, sans-serif;
-  color: #4a4438;
+  color: #d6d8df;
 }
 .town-btn {
   display: block;
@@ -231,4 +305,163 @@
   font: 600 11px Archivo, sans-serif;
   color: #6d6558;
   text-align: center;
+}
+/* A home's line (Oct 28: only Hollow's has lines, one each time its card opens), in his voice. */
+.town-card-line {
+  margin-bottom: 8px;
+  font-style: italic;
+}
+/* The card's buttons on the dark card (the chat's menu keeps `.town-btn` as it was: it's a light box): a plain one is a dark gray
+   with a gray border and white words, the primary one gold with dark words, a greyed one dimmer and flat (words 4.5:1 on it). */
+.town-card .town-btn {
+  background: #2c2e3a;
+  border-color: #5a5d70;
+  color: #fff;
+}
+.town-card .town-btn.primary {
+  background: linear-gradient(#fdda7e, #f3b957);
+  border-color: #e3a93f;
+  color: #1a1d2b;
+}
+.town-card .town-btn:disabled {
+  background: #272831;
+  border-color: #3a3c4a;
+  color: #9a9eab;
+}
+.town-card .town-btn:focus-visible,
+.town-pic.player:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+.town-card .town-soon {
+  color: #a9adb9;
+}
+
+/*
+ * A person's card (Eric's mockup, Oct 28): one row, one size whoever it is: the picture in a round ring on the left, the words (the
+ * name, the sidekick's line, the rating) in the middle, Play with its crossed swords on the right. Its type, ring and button are the
+ * mockup's measured against its name tags (the tags are drawn 11 to 12 px high in the game); the same size on a phone and a computer.
+ * (Oct 29, Eric: the card near his mockup's 189 × 53, not grown to fit the longest name; a name or line too long for its row shrinks its
+ * own words instead, Town.tsx's fitRows, down to its --fit-min.) docs/decisions/2026-10-28-town-card.md.
+ */
+.town-card.town-person {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 53px;
+  align-items: center;
+  column-gap: 6px;
+  width: 210px;
+  min-width: 0;
+  max-width: none;
+  height: 53px;
+  padding: 0 7px 0 6px;
+}
+/* The picture: a round ring in the kind's color on a white disc. A sidekick's is blue (`#4575fa`, the same family as the sidekicks' name tags but lighter: the ring needs 3:1 on this
+   dark card, the tag's `#1d4ed8` needs white text on it at 4.5:1), a pawn's and a real player's ivory (the white of theirs): both read on the dark card (ivory 12:1). A real player's is a button for their profile; a bot's
+   is a plain box (no button cursor, no focus). */
+.town-pic {
+  --ring: #eadfc6;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  margin: 0;
+  padding: 0;
+  border: 3px solid var(--ring);
+  border-radius: 50%;
+  background: #fff;
+  color: #1a1d2b;
+  font: 400 18px/1 Archivo, sans-serif;
+  overflow: hidden;
+  cursor: default;
+}
+.town-pic.sidekick {
+  --ring: #4575fa;
+}
+button.town-pic.player {
+  cursor: pointer;
+}
+.town-pic img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.town-pic.sidekick img {
+  image-rendering: pixelated;
+}
+.town-pic .user-icon {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.town-who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.town-person h2 {
+  --fit-min: 10px;
+  height: 15px;
+  margin: 0;
+  overflow: hidden;
+  color: #fff;
+  font: 700 13px/15px Archivo, sans-serif;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.town-bot {
+  color: #a5a4aa;
+  /* (12 px beside a 13 px name, and smaller with it when a long name shrinks.) */
+  font-size: 0.923em;
+  font-weight: 500;
+}
+/* The two rows under the name are always there, each its own height (nothing moves when one is empty or a long one shrinks). */
+.town-sub,
+.town-rate {
+  --fit-min: 7.5px;
+  height: 11px;
+  margin: 1px 0 0;
+  overflow: hidden;
+  font: 500 9.5px/11px Archivo, sans-serif;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.town-sub {
+  color: #d6d8df;
+}
+.town-rate {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #eceef2;
+}
+.town-ico-bars {
+  flex: none;
+  color: #e0b46e;
+}
+.town-card .town-btn.town-play {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 53px;
+  min-height: 0;
+  height: 26px;
+  margin: 0;
+  padding: 0;
+  border-radius: 8px;
+  font: 800 12px/1 Archivo, sans-serif;
+}
+/* The drawn button is 26 px high and one width whether it reads "Play" or "Full"; its tap area, 44 high (over the card's padding). */
+.town-play::before {
+  content: "";
+  position: absolute;
+  inset: -9px -5px;
+}
+.town-ico-swords {
+  flex: none;
 }

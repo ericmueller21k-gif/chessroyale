@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { BOSS_ROSTER, hiddenBosses, menuBosses } from "@chessroyale/core";
 import { readFileSync } from "node:fs";
-import { rowSizes, SELECT_FRAMING, SELECT_LINES, SELECT_SOUND, SELECT_TINT, selectLine, TILE_RATIO, TILES_PER_ROW } from "../src/characters/boss-select.ts";
+import { rowSizes, SELECT_FRAMING, SELECT_LINES, SELECT_SOUND, SELECT_TINT, selectLine, TILE_RATIO, TILES_PER_ROW, townSound } from "../src/characters/boss-select.ts";
 import { renderFrame } from "../src/characters/sprite.ts";
 import { bossKit } from "../src/characters/kits.ts";
+import { HOMES } from "../src/town/world.ts";
 
 /** The Boss raid screen's character select: each boss's sound and lines (docs/decisions/2026-10-16-boss-character-select.md). */
 describe("the boss select", () => {
@@ -15,7 +16,8 @@ describe("the boss select", () => {
       // (One of its own pack: its character's or its powers' effects', all named for it: clownSplat is the pie's.)
       const pack = Object.values(bossKit(b.name)!.sounds)[0]!.match(/^[a-z]+/)![0];
       expect(SELECT_SOUND[b.id], b.id).toMatch(new RegExp(`^${pack}[A-Z]`));
-      expect(SELECT_LINES[b.id]?.length ?? 0, b.id).toBeGreaterThanOrEqual(2);
+      // (Folio has one, the director's: its entrance line, the only one its sheet gives it. docs/decisions/2026-10-27-folio-wired.md.)
+      expect(SELECT_LINES[b.id]?.length ?? 0, b.id).toBeGreaterThanOrEqual(b.id === "folio" ? 1 : 2);
     }
     // Nothing for a boss that isn't in the roster.
     for (const id of [...Object.keys(SELECT_SOUND), ...Object.keys(SELECT_LINES)]) expect(BOSS_ROSTER.some((b) => b.id === id), id).toBe(true);
@@ -34,6 +36,8 @@ describe("the boss select", () => {
 
   it("never says the same line twice running; the Hidden Boss's two go in turn", () => {
     for (const b of menuBosses({ admin: false, raid: true })) {
+      // (Folio's one line is its every tap's: below.)
+      if (SELECT_LINES[b.id]!.length === 1) continue;
       let last: string | null = null;
       for (let i = 0; i < 40; i++) {
         const l = selectLine(b.id, last, (i * 0.37) % 1)!;
@@ -47,6 +51,8 @@ describe("the boss select", () => {
     expect([first, second]).toEqual(SELECT_LINES.recluse);
     expect(selectLine("recluse", second)).toBe(first);
     expect(selectLine("nobody", null)).toBeNull();
+    expect(SELECT_LINES.folio).toEqual(["Every game is a draft. Shall we write one?"]);
+    expect(selectLine("folio", SELECT_LINES.folio![0]!)).toBe(SELECT_LINES.folio![0]);
   });
 
   it("never names the Hidden Boss in his lines", () => {
@@ -56,22 +62,22 @@ describe("the boss select", () => {
   it("shares the tiles out over as few rows as it takes, evenly, the longer rows first (docs/decisions/2026-10-23-boss-select-sf.md)", () => {
     const per = TILES_PER_ROW;
     expect(per).toBe(5);
-    // Today's fifteen tiles (thirteen bosses, the Hidden Boss's and "?"): three rows of five.
-    expect(all.length + 1).toBe(15);
-    expect(rowSizes(all.length + 1, per)).toEqual([5, 5, 5]);
+    // Today's sixteen tiles (fourteen bosses, the Hidden Boss's and "?"): three rows of five and "?" on its own (Oct 27, Folio's).
+    expect(all.length + 1).toBe(16);
+    expect(rowSizes(all.length + 1, per)).toEqual([5, 5, 5, 1]);
     expect(rowSizes(14, per)).toEqual([5, 5, 4]);
-    // The next bosses: never a tile alone on a row.
     expect(rowSizes(15, per)).toEqual([5, 5, 5]);
-    expect(rowSizes(16, per)).toEqual([4, 4, 4, 4]);
-    expect(rowSizes(17, per)).toEqual([5, 4, 4, 4]);
+    // The next bosses: five to a row always, so a new tile moves no boss's tile before it.
+    expect(rowSizes(17, per)).toEqual([5, 5, 5, 2]);
     expect(rowSizes(0, per)).toEqual([]);
     for (let n = 1; n <= 60; n++) {
       const rows = rowSizes(n, per);
       expect(rows.reduce((a, b) => a + b, 0), `${n}`).toBe(n);
       expect(Math.max(...rows), `${n}`).toBeLessThanOrEqual(per);
-      expect(Math.max(...rows) - Math.min(...rows), `${n}`).toBeLessThanOrEqual(1);
+      expect(rows.slice(0, -1).every((r) => r === per), `${n}: every row full but the last`).toBe(true);
       expect(rows, `${n}: the longer rows first`).toEqual([...rows].sort((a, b) => b - a));
-      if (n > 1) expect(Math.min(...rows), `${n}: no tile alone`).toBeGreaterThan(1);
+      // (One more tile never moves a tile already there: the rows before it are the same.)
+      expect(rowSizes(n + 1, per).slice(0, rows.length - 1), `${n} + 1`).toEqual(rows.slice(0, -1));
     }
   });
 
@@ -137,7 +143,9 @@ describe("the boss select", () => {
       const palette = Object.values(bossKit(b.name)!.ch.palette).map((c) => c.slice(0, 7).toLowerCase());
       expect(palette, `${b.id}: ${tint} is one of its colors`).toContain(tint);
       // The figure's pixels (not its dark outline: a ring of every shape) against the background's two ends: how many are close to it.
-      const { img } = framed(b);
+      const { img, kit } = framed(b);
+      // (Its halo is a ring of every shape too: Folio's, #3b3530, is a little lighter than the others', which the sum below leaves out.)
+      const halo = kit.ch.halo ? hex(kit.ch.halo) : null;
       for (const [theme, at] of Object.entries(themes)) {
         const { hi, lo } = ends(tint!, at);
         let own = 0, near = 0;
@@ -145,6 +153,7 @@ describe("the boss select", () => {
           if (img.data[i + 3]! < 255) continue;
           const px = [img.data[i]!, img.data[i + 1]!, img.data[i + 2]!];
           if (px[0]! + px[1]! + px[2]! < 120) continue;
+          if (halo && px.every((v, j) => v === halo[j])) continue;
           own++;
           const far = (bg: number[]) => Math.hypot(px[0]! - bg[0]!, px[1]! - bg[1]!, px[2]! - bg[2]!);
           if (Math.min(far(hi), far(lo)) < 50) near++;
@@ -152,5 +161,15 @@ describe("the boss select", () => {
         expect(near / own, `${b.id} in the ${theme} theme: the share of its figure close to its background`).toBeLessThan(0.2);
       }
     }
+  });
+});
+
+describe("a boss's sound when tapped in the town square (Eric, Oct 27)", () => {
+  it("is its select sound, or its own town sounds in turn (Folio: a murmur, then a soft mm-hm)", () => {
+    expect(townSound("tiger", 0)).toBe(SELECT_SOUND.tiger);
+    expect(townSound("tiger", 5)).toBe(SELECT_SOUND.tiger);
+    expect([0, 1, 2, 3].map((n) => townSound("folio", n))).toEqual(["folioMurmur", "folioHum", "folioMurmur", "folioHum"]);
+    // Every boss with a home in the town has one.
+    for (const h of HOMES) expect(townSound(h.id, 0), h.id).toBeTruthy();
   });
 });

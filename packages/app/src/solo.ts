@@ -1,7 +1,7 @@
 import { RECLUSE_PHASE2, BOSS_ALONE_SCORING, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
 import { GUARD_WORDS, MatchRunner, START_FEN, baseAt, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import openingsData from "@chessroyale/chess/data/openings.json";
-import { bulletClock, crowdRace, phase2Numbers, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, fullMoonMs, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs } from "@chessroyale/chess";
+import { bulletClock, crowdRace, phase2Numbers, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, fullMoonMs, folioTurnMs, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, SimulView, Standing, VoteView } from "./game.ts";
 import { PHASE2_ULT_ANIMS, PHASE_CHANGE, Phase2Game, phase2Follows, phase2Mates, phaseChangeRun } from "./recluse-phase2.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
@@ -791,10 +791,10 @@ export class SoloMatch implements GameView {
     const snap = this.bossSnapshot();
     this.set({ kind: "boss", boss: snap, until: 0, thinking: true });
     // (Alone, it has been "thinking" since your move went in: scoring your move counts toward it.)
-    // (G-REX's fire has just burnt something, or Alfil's pieces came down early, or Moo's Full Moon came: it plays out
-    // before the boss's move.)
+    // (G-REX's fire has just burnt something, or Alfil's pieces came down early, or Moo's Full Moon came, or Folio folded a
+    // piece or wrote its Revision: it plays out before the boss's move.)
     const burnt = !!snap.powers?.burnt?.some((b) => b.turn === snap.crowdMoves && (b.piece || b.fizzled));
-    const landed = landedEarlyMs(snap) + fullMoonMs(snap);
+    const landed = landedEarlyMs(snap) + fullMoonMs(snap) + folioTurnMs(snap);
     const minThink = bossThinkMs(snap, burnt, landed) - (this.alone && !burnt && !landed ? Date.now() - this.movedAt : 0);
     await Promise.all([this.runner.playBoss(this.engines[0]), new Promise((r) => setTimeout(r, Math.max(0, minThink)))]);
     if (this.stopped) return;
@@ -1047,7 +1047,14 @@ export class SoloMatch implements GameView {
   private startSimul() {
     if (!this.phase2 || this.stopped) return;
     this.set({ kind: "simul", at: Date.now() + PHASE_CHANGE.countdownMs });
-    this.timer = setTimeout(() => this.startClocks(), PHASE_CHANGE.countdownMs);
+    // The countdown counts from the boards' first frame on screen: the four boards' first draw is one long frame (50 to
+    // 120 ms on a busy computer), and counted from before it the 5 was up short of its second (889 to 974 ms measured).
+    // docs/decisions/2026-10-28-two-flaky-tests.md.
+    afterFirstFrame(() => {
+      if (!this.phase2 || this.stopped || this.phase.kind !== "simul" || this.phase2Playing) return;
+      this.set({ kind: "simul", at: Date.now() + PHASE_CHANGE.countdownMs });
+      this.timer = setTimeout(() => this.startClocks(), PHASE_CHANGE.countdownMs);
+    });
   }
 
   /** Phase 2's play: every clock starts. His line (the God King is gone: absorbed in the phase change). */
@@ -1498,4 +1505,20 @@ export class SoloMatch implements GameView {
       ...(this.runner.bossCarrotWin ? { carrots: true } : {}),
     });
   }
+}
+
+/**
+ * Calls `fn` once, after the frame that draws what was just set is on screen (two animation frames on), or after `maxMs`
+ * when no frames come (a hidden tab, or no page at all: the unit tests).
+ */
+function afterFirstFrame(fn: () => void, maxMs = 250) {
+  let done = false;
+  const go = () => {
+    if (done) return;
+    done = true;
+    fn();
+  };
+  const raf = typeof requestAnimationFrame === "function" ? requestAnimationFrame : null;
+  if (raf) raf(() => raf(go));
+  setTimeout(go, raf ? maxMs : 0);
 }

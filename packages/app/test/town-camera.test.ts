@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { N, forEachSquare, newPt, newView, pickSquare, proj, rowsInView, setView, wrapF, wrapI } from "../src/town/camera.ts";
-import { COLISEUM, HOMES, START, ease, findPath, plotAt, walkable } from "../src/town/world.ts";
+import { N, forEachSquare, newPt, newView, pickSquare, proj, rowsInView, setView, tableLift, wrapF, wrapI, type TableLift } from "../src/town/camera.ts";
+import { TOWN_FEEL } from "../src/town/feel.ts";
+import { TABLE_BOARD } from "../src/town/houses/park.ts";
+import { COLISEUM, HOMES, PARK, PAVING, START, ease, findPath, groundAt, plotAt, walkable } from "../src/town/world.ts";
 
 /** The town square's camera (src/town/camera.ts): pure projection math, on a phone's box and a computer's. */
 const BOXES = [
@@ -20,6 +22,38 @@ describe("town square camera", () => {
     // ... and the horizon sits about a fifth of the way down the box (the prototype's camera).
     expect(v.hy / H).toBeGreaterThan(0.15);
     expect(v.hy / H).toBeLessThan(0.3);
+  });
+
+  it.each(BOXES)("a chess table's board fits its picture anywhere on the screen, near the camera too (Oct 28, Eric's warped boards) (%s)", (shape, W, H) => {
+    const p = newPt();
+    const q = newPt();
+    const L: TableLift = { dz: 0, top: 0, thick: 0, grow: 0 };
+    let moved = 0;
+    for (const zoom of [0, 0.5, 1])
+      for (let dz = -8; dz <= 12; dz += 0.25)
+        for (const dx of [-3, -1, 0, 2.5]) {
+          const v = newView();
+          setView(v, W, H, zoom);
+          // (Only tables whose foot is on the screen or just under it.)
+          if (!proj(v, dx, dz, 0, p) || p.y > H + 60 || p.y < 0) continue;
+          expect(tableLift(v, dx, dz, TABLE_BOARD.top, TABLE_BOARD.thick, L)).toBe(true);
+          // Never drawn more than tableBoardGrow times its foot's scale (the warp: 1.5 to 2.5 and more).
+          expect(L.grow).toBeLessThanOrEqual(TOWN_FEEL.tableBoardGrow);
+          // Where the true lift fits (the usual rows), it's what it always was: worked out where the table stands, its top
+          // the picture's pixels through the lift's pixels a unit there.
+          const lifts = proj(v, dx, dz, 1, q) && p.y - q.y > 0;
+          const top = (TABLE_BOARD.top * (p.k / TOWN_FEEL.housePxPerSquare)) / (p.y - q.y);
+          if (lifts && proj(v, dx, dz, top, q) && q.k / p.k <= TOWN_FEEL.tableBoardGrow) {
+            expect(L.dz).toBe(dz);
+            expect(L.top).toBe(top);
+          } else {
+            expect(L.dz).toBeGreaterThan(dz);
+            moved++;
+          }
+        }
+    // The phone's camera has such rows low on its screen; the computer's doesn't.
+    if (shape === "phone") expect(moved).toBeGreaterThan(0);
+    else expect(moved).toBe(0);
   });
 
   it("the world wraps both ways", () => {
@@ -109,9 +143,9 @@ describe("town square camera", () => {
 });
 
 describe("town square walking", () => {
-  it("thirteen homes spread over the world: neighbors 8 or more squares apart, none near your start, the Coliseum's ground clear", () => {
-    expect(HOMES).toHaveLength(13);
-    expect(new Set(HOMES.map((h) => h.id)).size).toBe(13);
+  it("fourteen homes spread over the world: neighbors 8 or more squares apart, none near your start, the Colosseum's ground clear", () => {
+    expect(HOMES).toHaveLength(14);
+    expect(new Set(HOMES.map((h) => h.id)).size).toBe(14);
     const dist = (ax: number, ay: number, bx: number, by: number) => Math.hypot(wrapF(ax - bx), wrapF(ay - by));
     for (const h of HOMES) {
       expect(dist(h.cx, h.cy, START.c, START.r), `${h.id} from the start`).toBeGreaterThanOrEqual(7.5);
@@ -119,12 +153,17 @@ describe("town square walking", () => {
       expect(near, `${h.id}'s nearest neighbor`).toBeGreaterThanOrEqual(8);
       expect(near, `${h.id}'s nearest neighbor`).toBeLessThanOrEqual(10);
     }
-    // No home stands on the Coliseum's 6 x 6 ground (slice 5 built the Coliseum there: solid), and you start just south of it.
+    // No home stands on the Colosseum's 12 x 12 ground (slice 5 built the Colosseum there: solid; slice 6 made it twice the
+    // size), nor in its park, and you start south of it, in the park in front of its gate (slice 6: the park between; since
+    // the park stood back from it, 11 rows south, still inside the view's rim).
     for (let r = COLISEUM.r0; r < COLISEUM.r0 + COLISEUM.size; r++) for (let c = COLISEUM.c0; c < COLISEUM.c0 + COLISEUM.size; c++) expect(plotAt[r * N + c]).toBeNull();
+    for (let r = PARK.r1 - PARK.d + 1; r <= PARK.r1; r++) for (let c = PARK.c0; c < PARK.c0 + PARK.w; c++) expect(plotAt[r * N + c]).toBeNull();
     expect(START.r).toBeLessThan(COLISEUM.r0);
-    expect(COLISEUM.r0 - START.r).toBeLessThanOrEqual(3);
+    expect(COLISEUM.r0 - START.r).toBeLessThanOrEqual(11);
     expect(START.c).toBeGreaterThanOrEqual(COLISEUM.c0);
     expect(START.c).toBeLessThan(COLISEUM.c0 + COLISEUM.size);
+    expect(groundAt[START.r * N + START.c], "on the park's promenade").toBe(PAVING);
+    expect(walkable(START.c, START.r)).toBe(true);
   });
 
   it("a path walks around a home", () => {

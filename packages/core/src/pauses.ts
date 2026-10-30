@@ -10,9 +10,11 @@ import { BOSS_ROSTER, bossDef, bossInText } from "./boss.ts";
  *   - "solo": Solo and Boss alone (played in the browser: only the app can stop them);
  *   - "shop": the shop and crates (getting items, opening crates; your locker stays);
  *   - "friends": friends;
+ *   - "town-chat": typing in the town square's chat (PAUSE_TOWN_CHAT): nobody sends, and nobody reads players' lines (the
+ *     bosses' chatter goes on);
  *   - "boss:<id>": one boss (PAUSE_BOSS_<ID>): never met, at random or picked.
  */
-export const PAUSABLE = ["classic", "crowd", "raid", "squads", "ranked1v1", "solo", "shop", "friends"] as const;
+export const PAUSABLE = ["classic", "crowd", "raid", "squads", "ranked1v1", "solo", "shop", "friends", "town-chat"] as const;
 export type Pausable = (typeof PAUSABLE)[number] | `boss:${string}`;
 
 /** Every switch there is: the parts above, then one per boss in the roster. */
@@ -31,11 +33,17 @@ const NAMES: Record<(typeof PAUSABLE)[number], string> = {
   solo: "Solo and Boss alone are",
   shop: "The shop is",
   friends: "Friends are",
+  "town-chat": "Town chat is",
 };
+
+/** Parts whose line isn't "… resting for a bit": the town chat's field says this in its place (the director's line). */
+const LINES: Partial<Record<(typeof PAUSABLE)[number], string>> = { "town-chat": "Chat is paused." };
 
 /** The short friendly line for a part that's resting: on its way in (the app), and in the server's refusal. */
 export function pausedLine(what: Pausable): string {
   // (A boss as a sentence says him: "The Hidden Boss is …", "Wrangler is …"; bossInText.)
+  const own = LINES[what as keyof typeof LINES];
+  if (own) return own;
   const boss = what.startsWith("boss:") ? bossDef(what.slice(5)) : null;
   const who = what.startsWith("boss:") ? `${boss ? bossInText(boss.name, true) : "This boss"} is` : (NAMES[what as keyof typeof NAMES] ?? "This is");
   return `${who} resting for a bit. Back soon.`;

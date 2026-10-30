@@ -1,11 +1,14 @@
 import { devices, expect, type Page } from "@playwright/test";
-import { ratingTier } from "@chessroyale/core";
-import { named, soloFromHome, test, openBossRaid } from "./helpers.ts";
+import { rankView } from "@chessroyale/core";
+import { named, soloFromHome, switchesOff, test, openBossRaid } from "./helpers.ts";
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
 
 test("your profile: tap your pawn; the same structure as anyone's, with your own actions", async ({ page }) => {
   await named(page, "Eric");
+  // A player (this server has TEST_SWITCHES on, which gives home an admin's test level and lets `?rank=` count: the app is
+  // told otherwise, as hunchess.com tells a player), so home shows the rank line a player sees.
+  await switchesOff(page);
   await page.goto("/");
   // (Once this device's account exists.)
   await expect(page.locator(".fd-hero-name")).toHaveText("Eric");
@@ -26,12 +29,14 @@ test("your profile: tap your pawn; the same structure as anyone's, with your own
     for (const slot of ["head", "face", "skin", "weapon"]) if ((await post("/api/locker/equip", { slot, item: items[0].id })).ok) break;
   });
   await page.reload();
-  // A solo game counts in your stats, never your ranking: that takes a match with 30% real players.
-  await expect(page.locator(".fd-hero-sub")).toContainText("No rating yet");
-  // A ranked rating, as a ranked match would leave it. (An e2e can't seat 30 people, so from here the server's answers
-  // carry one; the server's side of the rule is in its unit tests, live.test.ts.)
-  const tier = ratingTier(1612)!;
-  const ranked = { rating: 1612, tier: { label: tier.label, level: tier.level, color: tier.color, effect: tier.effect } };
+  // A solo game counts in your stats, never your ranking: that takes a match with 30% real players. Home's line is your
+  // 1 v 1 rank (Oct 28): none played yet.
+  await expect(page.locator(".fd-hero-sub")).toHaveText("Unranked");
+  // A rating, as a ranked match would leave it, and a 1 v 1 rank (an e2e can't seat 30 people nor play hundreds of ranked
+  // games, so from here the server's answers carry them; the server's side is in its unit tests, live.test.ts and
+  // ranked-store.test.ts).
+  const rank = rankView({ games: 40, ladder: 1245 });
+  const ranked = { rating: 1612, ranked1v1: { rank, games: 40, wins: 22, losses: 17, draws: 1, peak: rank, streak: 2, recent: [] } };
   for (const url of [/\/api\/me(\?|$)/, /\/api\/profile\/[\w-]+$/]) {
     await page.route(url, async (route) => {
       const res = await route.fetch();
@@ -39,13 +44,16 @@ test("your profile: tap your pawn; the same structure as anyone's, with your own
     });
   }
   await page.reload();
-  // Home names the rank under your name, in the rank's color.
-  await expect(page.locator(".fd-hero-sub")).toContainText("Weighty · 1612");
-  await expect(page.locator(".fd-hero-sub .fd-rank")).toHaveText("Weighty");
+  // Home names your 1 v 1 rank under your name, the tier in its color; no rating rank's name (retired Oct 28).
+  await expect(page.locator(".fd-hero-sub")).toHaveText("Paragon 5 · 45 RP");
+  await expect(page.locator(".fd-hero-sub .fd-rank")).toHaveText("Paragon 5");
   await page.getByRole("button", { name: "Your profile" }).click();
   await expect(page.getByRole("heading", { name: "Eric" })).toBeVisible();
   await expect(page.getByText("Online now")).toBeVisible();
-  await expect(page.getByText("Weighty · 1612")).toBeVisible();
+  // The card: the 1 v 1 rank's pill, then the rating's number alone.
+  await expect(page.locator(".fd-pills .fd-card-rank")).toHaveText("Paragon 5 · 45 RP");
+  await expect(page.locator(".fd-pills")).toContainText("Rating 1612");
+  await expect(page.locator(".fd-pills")).not.toContainText(/Weighty|Novice|Expert/);
   await expect(page.getByRole("button", { name: "Edit name & icon" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Open locker" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Report", exact: true })).toHaveCount(0);
@@ -85,6 +93,10 @@ test("home → queue → match, then tap a name for that player's profile (phone
     // (A queue of its own, so other tests' players don't land in it.)
     await p.goto("/?debug&pool=profile");
     await openBossRaid(p);
+  }
+  // Both join back to back: here bots fill the raid 8 s after its first join (MATCH_FILL_SECONDS), and a page load in
+  // between can outlast that.
+  for (const p of [desk, phone]) {
     await p.getByRole("button", { name: /^Join a raid/ }).click();
     await expect(p.locator(".fd-seats")).toBeVisible();
   }
@@ -102,10 +114,11 @@ test("home → queue → match, then tap a name for that player's profile (phone
   await desk.locator(".tower-side").getByRole("button", { name: "Phoney's profile" }).click();
   const sheet = desk.locator(".fd-overlay");
   await expect(sheet.getByRole("heading", { name: "Phoney" })).toBeVisible();
-  await expect(sheet.getByRole("button", { name: "Report", exact: true })).toBeVisible();
-  await expect(sheet.getByRole("button", { name: "Add friend" })).toBeEnabled();
-  // (Mid-match there's no game of yours to invite them to: no Invite to play.)
-  await expect(sheet.getByRole("button", { name: "Invite to play" })).toHaveCount(0);
+  // (Oct 28: another player's page is the public profile: Block and Report are in its ••• menu.)
+  await expect(sheet.getByRole("button", { name: "More options" })).toBeEnabled();
+  await expect(sheet.getByRole("button", { name: "Add Friend" })).toBeEnabled();
+  // (Mid-match there's no game of yours to invite them to: Challenge is greyed, not gone.)
+  await expect(sheet.getByRole("button", { name: "Challenge" })).toBeDisabled();
   await expect(sheet.getByRole("button", { name: "Edit name & icon" })).toHaveCount(0);
   await expect(sheet).not.toContainText(/@|Google|email/i);
   await sheet.getByRole("button", { name: "Back", exact: true }).click();
@@ -117,13 +130,15 @@ test("home → queue → match, then tap a name for that player's profile (phone
   await phone.getByRole("dialog", { name: "Leaderboard" }).getByRole("button", { name: "Desky's profile" }).click();
   await expect(phone.locator(".fd-overlay").getByRole("heading", { name: "Desky" })).toBeVisible();
   await expect(phone.locator(".fd-overlay")).toContainText("Online now");
-  // Report them: a reason, then the thanks. The report is about this match: a second one in it isn't counted again.
-  await phone.locator(".fd-overlay").getByRole("button", { name: "Report", exact: true }).click();
+  // Report them (from the ••• menu): a reason, then the thanks. The report is about this match: a second one in it isn't counted again.
+  await phone.locator(".fd-overlay").getByRole("button", { name: "More options" }).click();
+  await phone.getByRole("menuitem", { name: "Report", exact: true }).click();
   for (const reason of ["Cheating", "Offensive name or icon", "Something else"]) await expect(phone.getByRole("button", { name: reason, exact: true })).toBeVisible();
   await phone.getByRole("button", { name: "Cheating", exact: true }).click();
   await expect(phone.getByText("Thanks, we'll look into it.")).toBeVisible();
   await phone.getByRole("dialog", { name: "Report Desky" }).getByRole("button", { name: "Close" }).click();
-  await phone.locator(".fd-overlay").getByRole("button", { name: "Report", exact: true }).click();
+  await phone.locator(".fd-overlay").getByRole("button", { name: "More options" }).click();
+  await phone.getByRole("menuitem", { name: "Report", exact: true }).click();
   await phone.getByRole("button", { name: "Something else", exact: true }).click();
   await expect(phone.getByText("You've already reported this player in this match.")).toBeVisible();
 });

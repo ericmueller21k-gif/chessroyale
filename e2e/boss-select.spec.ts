@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { named, openBossRaid, test } from "./helpers.ts";
+import { named, openBossRaid, openSoloBoss, test } from "./helpers.ts";
 
 /**
  * The Boss raid screen as an old-school character select (Eric, Oct 16; docs/decisions/2026-10-16-boss-character-select.md):
@@ -34,22 +34,23 @@ test("the tiles and the stage: a tap drops the boss on, plays its sound once and
   await page.goto("/?mode=raid");
   await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
   const tiles = page.getByRole("radiogroup", { name: "Bosses" }).getByRole("radio");
-  // Thirteen bosses you can meet (Babur the last), the Hidden Boss's tile, then "?".
-  await expect(tiles).toHaveCount(15);
+  // Fourteen bosses you can meet (Folio the last), the Hidden Boss's tile, then "?".
+  await expect(tiles).toHaveCount(16);
   await expect(tiles.last()).toHaveAccessibleName("Random boss");
   await expect(tiles.nth(9)).toHaveAccessibleName("Smudgy");
   await expect(tiles.nth(10)).toHaveAccessibleName("Moo & Moon");
   await expect(tiles.nth(11)).toHaveAccessibleName("Puddles");
   await expect(tiles.nth(12)).toHaveAccessibleName("Babur");
-  await expect(tiles.nth(13)).toHaveAccessibleName("Locked boss");
+  await expect(tiles.nth(13)).toHaveAccessibleName("Folio");
+  await expect(tiles.nth(14)).toHaveAccessibleName("Locked boss");
 
   // Boingo: his idle on the stage, his name and strength, his pie's splat once, one of his lines in his bubble.
   await tile(page, "Boingo the Clown").click();
   await expect(tile(page, "Boingo the Clown")).toHaveAttribute("aria-checked", "true");
   await expect(page.locator(".bs-stage .bs-sprite")).toHaveAttribute("data-fx", "clown");
   await expect(page.locator(".bs-name")).toHaveText("Boingo the Clown");
-  await expect(page.locator(".bs-rating")).toHaveText("");
-  await expect(page.locator(".bs-rating")).not.toContainText(/Rating|💀|\d/u);
+  await expect(page.locator(".bs-level")).toHaveText("Medium");
+  await expect(page.locator(".bs-level")).not.toContainText(/Rating|💀|\d/u);
   await expect(bubble(page)).toBeVisible();
   // (Nothing shifts, Eric's rule: the "Join a raid" button keeps its box whichever boss is picked, checked below.)
   const joinBox = async (): Promise<Box> => (await page.getByRole("main").getByRole("button", { name: /^Join a raid/ }).boundingBox())!;
@@ -91,8 +92,8 @@ test("the tiles and the stage: a tap drops the boss on, plays its sound once and
   await tile(page, "Puddles").click();
   await expect(page.locator(".bs-stage .bs-sprite")).toHaveAttribute("data-fx", "gardener");
   await expect(page.locator(".bs-name")).toHaveText("Puddles");
-  await expect(page.locator(".bs-rating")).toHaveText("");
-  await expect(page.locator(".bs-rating")).not.toContainText(/Rating|💀|\d/u);
+  await expect(page.locator(".bs-level")).toHaveText("Medium");
+  await expect(page.locator(".bs-level")).not.toContainText(/Rating|💀|\d/u);
   await expect.poll(async () => (await sounds(page)).filter((s) => s.startsWith("gardenerHello")).length).toBe(1);
   await expect.poll(async () => PUDDLES.includes((await bubble(page).getAttribute("aria-label")) ?? "")).toBe(true);
 
@@ -100,10 +101,20 @@ test("the tiles and the stage: a tap drops the boss on, plays its sound once and
   await tile(page, "Babur").click();
   await expect(page.locator(".bs-stage .bs-sprite")).toHaveAttribute("data-fx", "tiger");
   await expect(page.locator(".bs-name")).toHaveText("Babur");
-  await expect(page.locator(".bs-rating")).toHaveText("");
-  await expect(page.locator(".bs-rating")).not.toContainText(/Rating|💀|\d/u);
+  await expect(page.locator(".bs-level")).toHaveText("Medium");
+  await expect(page.locator(".bs-level")).not.toContainText(/Rating|💀|\d/u);
   await expect.poll(async () => (await sounds(page)).filter((s) => s.startsWith("tigerHello")).length).toBe(1);
   await expect.poll(async () => BABUR.includes((await bubble(page).getAttribute("aria-label")) ?? "")).toBe(true);
+
+  // Folio: its idle on the stage, a page turning and a flap of its wing once, its one line.
+  await tile(page, "Folio").click();
+  await expect(page.locator(".bs-stage .bs-sprite")).toHaveAttribute("data-fx", "folio");
+  await expect(page.locator(".bs-name")).toHaveText("Folio");
+  await expect(page.locator(".bs-level")).toHaveText("Medium");
+  await expect.poll(async () => (await sounds(page)).filter((s) => s.startsWith("folioHello")).length).toBe(1);
+  await expect.poll(() => bubble(page).getAttribute("aria-label")).toBe("Every game is a draft. Shall we write one?");
+  // (Its select line is said in the select's own voice: its whisper is the battle's, never heard here.)
+  expect((await sounds(page)).filter((s) => s.startsWith("folioVoice"))).toEqual([]);
 
   // "?": a question mark on the stage, a random boss; Boss alone says so.
   await tile(page, "Random boss").click();
@@ -175,7 +186,7 @@ test("Big Boy stands in the middle of the platform: his feet centered on it (Eri
     const r = c.getBoundingClientRect();
     return r.left + ((a + b + 1) / 2) * (r.width / width);
   });
-  const plat = (await page.locator(".bs-spot .dv-st-plat").boundingBox())!;
+  const plat = (await page.locator(".bs-spot:not(.bs-mine) > .dv-st-plat").boundingBox())!;
   expect(Math.abs(feet - (plat.x + plat.width / 2)), "his feet's middle from the platform's").toBeLessThan(4);
 });
 
@@ -203,9 +214,9 @@ test("the pick reaches Boss alone, a Solo raid and a raid you make; the public q
   await openBossRaid(page);
   await expect(tile(page, "Jefferson")).toHaveAttribute("aria-checked", "true");
   await tile(page, "Sawyer").click();
-  // (The stage shows no number (Eric, Oct 25), and at Normal no difficulty either. A Solo raid's strength is the usual one, a
+  // (The stage shows no number (Eric, Oct 25), and the difficulty's name under the boss (Medium). A Solo raid's strength is the usual one, a
   // step above your rating plus Sawyer's offset: 1350 unrated, as it was; its brain plays it with the bots as a crowd.)
-  await expect(page.locator(".bs-rating")).toHaveText("");
+  await expect(page.locator(".bs-level")).toHaveText("Medium");
   await main.getByRole("button", { name: /^Raid with bots/ }).click();
   await expect.poll(() => page.evaluate(() => (window as any).match?.boss?.id ?? null), { timeout: 60_000 }).toBe("sawyer");
   expect(await page.evaluate(() => (window as any).match.runner.state.boss.elo)).toBe(1350);
@@ -217,11 +228,11 @@ test("the pick reaches Boss alone, a Solo raid and a raid you make; the public q
   await main.getByRole("button", { name: /^Boss alone/ }).click();
   const menu = page.getByRole("dialog", { name: "Boss alone" });
   await expect(menu.locator(".boss-row")).toHaveCount(1);
-  // (Hard: the level the menu shows, 1800, is the rating its brain picks its moves at, Oct 18; the stage names only the difficulty.)
+  // (Hard: the level the menu shows, 2050, is the rating its brain picks its moves at, Oct 18; the stage names only the difficulty.)
   await menu.getByRole("radio", { name: "Hard", exact: true }).click();
   const aloneElo = Number(await menu.locator(".boss-row .br-elo strong").textContent());
-  expect(aloneElo).toBe(1800);
-  await expect(page.locator(".bs-rating")).toHaveText("Hard");
+  expect(aloneElo).toBe(2050);
+  await expect(page.locator(".bs-level")).toHaveText("Hard");
   await menu.getByRole("button", { name: /^Wrangler/ }).click();
   await expect.poll(() => page.evaluate(() => (window as any).match?.boss?.id ?? null), { timeout: 60_000 }).toBe("pig");
   expect(await page.evaluate(() => (window as any).match.runner.bossBrainPlan("", true).rating)).toBe(aloneElo);
@@ -233,7 +244,7 @@ test("a resting boss has no tile, and a pick of it reads as a random boss", asyn
   await page.addInitScript(() => localStorage.setItem("brc.bossId", "clown"));
   await page.goto("/?mode=raid");
   const tiles = page.getByRole("radiogroup", { name: "Bosses" }).getByRole("radio");
-  await expect(tiles).toHaveCount(14);
+  await expect(tiles).toHaveCount(15);
   await expect(tile(page, "Boingo the Clown")).toHaveCount(0);
   await expect(tile(page, "Random boss")).toHaveAttribute("aria-checked", "true");
   await expect(page.locator(".bs-name")).toHaveText("Random boss");
@@ -279,17 +290,23 @@ for (const scheme of ["light", "dark"] as const) {
       await page.setViewportSize({ width: w!, height: h! });
       await page.goto("/?mode=raid");
       await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
-      await expect(page.locator(".bs-tile")).toHaveCount(15);
+      await expect(page.locator(".bs-tile")).toHaveCount(16);
       await page.evaluate(() => document.fonts.ready);
       const g = await page.evaluate(measureGrid);
 
-      // Five to a row on a phone and a computer alike: 5, 5, 5 (fifteen tiles since Babur).
-      expect(g.rows.map((r) => r.tiles.length), at).toEqual([5, 5, 5]);
+      // Five to a row on a phone and a computer alike: 5, 5, 5 and "?" on its own (sixteen tiles since Folio, Oct 27).
+      expect(g.rows.map((r) => r.tiles.length), at).toEqual([5, 5, 5, 1]);
       const tiles = g.rows.flatMap((r) => r.tiles);
       const t0 = tiles[0]!;
 
       // Every tile the very same size and shape: tall (its visible width 1 to 1.55 of its height), its slant a fifth of its width.
       for (const t of tiles) {
+        // ("?" is the smaller box since Oct 29, Eric's picture: 0.82 of a tile's width, half its height.)
+        if (t.name === "Random boss") {
+          expect(Math.abs(t.w - 0.82 * t0.w), `${at} ${t.name}: width`).toBeLessThan(0.6);
+          expect(Math.abs(t.h - 0.5 * t0.h), `${at} ${t.name}: height`).toBeLessThan(0.6);
+          continue;
+        }
         expect(Math.abs(t.w - t0.w), `${at} ${t.name}: width`).toBeLessThan(0.6);
         expect(Math.abs(t.h - t0.h), `${at} ${t.name}: height`).toBeLessThan(0.6);
         expect(Math.abs(t.slant - 0.2 * t.w), `${at} ${t.name}: slant`).toBeLessThan(0.7);
@@ -362,8 +379,8 @@ for (const scheme of ["light", "dark"] as const) {
         expect(a.b, `${at} ${t.name}: figure on past the foot`).toBeGreaterThanOrEqual(t.inner.b - 0.5);
         if (t.name !== "Locked boss") fills.add(t.fill);
       }
-      // A color of its own for each boss with a character (the Hidden Boss's is dark, "?" plain): thirteen, no two the same.
-      expect(fills.size, `${at}: a color each`).toBe(13);
+      // A color of its own for each boss with a character (the Hidden Boss's is dark, "?" plain): fourteen, no two the same.
+      expect(fills.size, `${at}: a color each`).toBe(14);
 
       // Nothing spills past a tile's shape: the gaps are empty, art and all (on either side of each slanted edge, and between the rows).
       const gap = gaps[0]!;
@@ -387,7 +404,7 @@ test("every tile can be tapped, in its middle and either side of a gap; a press 
     const at = `${w}x${h}`;
     await page.setViewportSize({ width: w!, height: h! });
     await page.goto("/?mode=raid");
-    await expect(page.locator(".bs-tile")).toHaveCount(15);
+    await expect(page.locator(".bs-tile")).toHaveCount(16);
     const g = await page.evaluate(measureGrid);
     const slant = g.rows[0]!.tiles[0]!.slant;
     const names = g.rows.flatMap((r) => r.tiles.map((t) => t.name));
@@ -452,16 +469,22 @@ test("the layout: the stage under the tiles, the ways to play under the stage an
     await page.goto("/?mode=raid");
     await tile(page, "Hollow").click();
     const block = (await page.locator(".bs-tiles").boundingBox())!;
-    const stage = (await page.locator(".bs-spot").boundingBox())!;
+    const stage = (await page.locator(".bs-spot:not(.bs-mine)").boundingBox())!;
     const first = (await page.locator(".rd-option").first().boundingBox())!;
     expect(stage.y, `${w}`).toBeGreaterThan(block.y + block.height);
     expect(first.y, `${w}`).toBeGreaterThan(stage.y + stage.height);
     // The tall tiles take most of a small phone: the first way to play is whole in the window from 740 px tall (the stage is smaller up to
-    // 800 px tall for it), and at 568 px the boss's name is still in the window with the page scrolling on from there.
-    if (h! >= 740) expect(first.y + first.height, `${w}x${h}: the first way to play whole in the window`).toBeLessThanOrEqual(h!);
-    else expect((await page.locator(".bs-id").boundingBox())!.y + 48, `${w}x${h}: the boss's name in the window`).toBeLessThanOrEqual(h!);
+    // 800 px tall for it), and at 568 px the boss's name is still in the window with the page scrolling on from there. That's with three
+    // rows of tiles; each row past three (a fourth since Folio's tile, Oct 27: sixteen tiles, five to a row) moves both down by its
+    // own height and gap, and nothing more.
+    const rows = await page.locator(".bs-row").count();
+    const rowBoxes = await page.locator(".bs-row").evaluateAll((es) => es.map((e) => e.getBoundingClientRect().top));
+    const pitch = rows > 1 ? (rowBoxes.at(-1)! - rowBoxes[0]!) / (rows - 1) : 0;
+    const extra = Math.max(0, rows - 3) * pitch;
+    if (h! >= 740) expect(first.y + first.height, `${w}x${h}: the first way to play whole in the window (${rows} rows)`).toBeLessThanOrEqual(h! + extra);
+    else expect((await page.locator(".bs-name").boundingBox())!.y + 48, `${w}x${h}: the boss's name in the window (${rows} rows)`).toBeLessThanOrEqual(h! + extra);
     // Every boss whole inside the stage's width (Wrangler's lasso out to one side, the tallest the Hidden Boss).
-    for (const name of ["Ginger", "Boingo the Clown", "Jefferson", "Hollow", "Big Boy", "Sawyer", "Wrangler", "Alfil", "Chub & Chirp", "Smudgy", "Moo & Moon", "Puddles", "Babur", "Locked boss"]) {
+    for (const name of ["Ginger", "Boingo the Clown", "Jefferson", "Hollow", "Big Boy", "Sawyer", "Wrangler", "Alfil", "Chub & Chirp", "Smudgy", "Moo & Moon", "Puddles", "Babur", "Folio", "Locked boss"]) {
       await tile(page, name).click();
       // (After its drop, which squashes it a little wider for a moment.)
       await page.waitForTimeout(500);
@@ -566,59 +589,104 @@ test("Boss alone's menu and the /bosses picker fit any window: whole, or their r
     // The full picker (/bosses): every boss and a random one, for an admin the Hidden Boss too: the longest list.
     await page.goto("/bosses");
     const all = page.getByRole("dialog", { name: "Choose your boss" });
-    await expect(all.locator(".boss-row")).toHaveCount(15);
+    await expect(all.locator(".boss-row")).toHaveCount(16);
     await expectMenuFits(page, all, `${w}x${h} /bosses`);
     expect(await sideways(page), `${w}x${h}`).toBe(0);
   }
 });
 
-test("the stage shows no number (Eric, Oct 25), only the difficulty when it isn't Normal; Boss alone's menu shows the boss's strength at your difficulty and follows it as it changes", async ({ page }) => {
+test("the stage shows no number (Eric, Oct 25), the difficulty's name (Medium by default); Boss alone's menu shows the boss's strength at your difficulty and follows it as it changes", async ({ page }) => {
   test.skip(desktop(), "one run is enough: a phone");
   await named(page, "Counter");
   // (1580: the tier a step above is 1600; Sawyer and Big Boy are 250 under it, Ginger 100: BOSS_DIFFICULTY's
-  // Easy −300, Normal 0, Hard +250, Hardest +500 on top.)
+  // Very easy −500, Easy −300, Medium 0, Hard +250, Very hard +500 on top.)
   await rated(page, 1580);
   await page.goto("/?mode=raid");
   const main = page.getByRole("main");
-  const stage = page.locator(".bs-rating");
+  const stage = page.locator(".bs-level");
   const menu = page.getByRole("dialog", { name: "Boss alone" });
   // (Boss alone's level: the difficulty's Maia rating, whatever the boss or your rating, Oct 18.)
   const cases: [string, string, number][] = [
-    ["Sawyer", "Hard", 1800],
-    ["Sawyer", "Normal", 1400],
-    ["Ginger", "Easy", 1000],
-    ["Ginger", "Hardest", 2200],
-    ["Big Boy", "Hard", 1800],
+    ["Sawyer", "Hard", 2050],
+    ["Sawyer", "Medium", 1600],
+    ["Ginger", "Easy", 1150],
+    ["Ginger", "Very hard", 2500],
+    ["Big Boy", "Hard", 2050],
   ];
   for (const [boss, level, elo] of cases) {
     await tile(page, boss).click();
     await main.getByRole("button", { name: /^Boss alone/ }).click();
     await menu.getByRole("radio", { name: level, exact: true }).click();
-    // The menu's row shows the number; the stage behind it names only the difficulty, unless it's Normal.
+    // The menu's row shows the number; the stage behind it names the difficulty.
     await expect(menu.locator(".boss-row .br-elo strong")).toHaveText(String(elo));
-    await expect(stage).toHaveText(level === "Normal" ? "" : level);
+    await expect(stage).toHaveText(level);
     await menu.getByRole("button", { name: "Close" }).click();
     await expect(menu).toHaveCount(0);
-    await expect(stage).toHaveText(level === "Normal" ? "" : level);
+    await expect(stage).toHaveText(level);
   }
   // Remembered on this device: the stage after a reload, before the menu opens.
   await page.reload();
   await expect(page.locator(".bs-name")).toHaveText("Big Boy");
   await expect(stage).toHaveText("Hard");
 
-  // The widest difficulty name (Hardest) on one line at 320 px, inside the window.
+  // The widest difficulty name (Very hard) on one line at 320 px, inside the window.
   await rated(page, 2950);
   await page.setViewportSize({ width: 320, height: 568 });
   await page.reload();
   await tile(page, "Ginger").click();
   await main.getByRole("button", { name: /^Boss alone/ }).click();
-  await menu.getByRole("radio", { name: "Hardest", exact: true }).click();
+  await menu.getByRole("radio", { name: "Very hard", exact: true }).click();
   await menu.getByRole("button", { name: "Close" }).click();
-  await expect(stage).toHaveText("Hardest");
+  await expect(stage).toHaveText("Very hard");
   const line = (await stage.boundingBox())!;
   expect(line.x).toBeGreaterThanOrEqual(0);
   expect(line.x + line.width).toBeLessThanOrEqual(320);
   // (One line of 14 px text is about 20 px tall with its emoji; two would be over 32.)
   expect(line.height).toBeLessThan(28);
   expect(await sideways(page)).toBe(0);
+});
+
+test("Boss Battle (Eric, Oct 29): home's card and the screen's header say so; five difficulty levels, the arrows stepping through them and stopping at the ends (greyed there, not hidden); your two invite circles are there, named, and nothing moves", async ({ page }) => {
+  await named(page, "Party");
+  await page.goto("/");
+  await expect(page.getByRole("main").locator(".rd-card").filter({ hasText: /^Boss BattleAny boss, up to 3$/ })).toBeVisible();
+  await openSoloBoss(page);
+  const level = page.locator(".bs-level");
+  const easier = page.getByRole("button", { name: "Easier" });
+  const harder = page.getByRole("button", { name: "Harder" });
+  // (Boxes on the page, not the window: a tap may scroll the page a little, which moves nothing in it.)
+  const frame = () => page.evaluate(() => [".bs-stage", ".bs-start", ".bs-diff", ".bs-dots", ".bs-back.bs-l", ".bs-back.bs-r"].map((q) => { const r = document.querySelector(q)!.getBoundingClientRect(); return [r.x + scrollX, r.y + scrollY, r.width, r.height]; }));
+  await expect(page.locator(".bs-dot")).toHaveCount(5);
+  await expect(page.getByRole("img", { name: "Invite a friend (coming soon)" })).toHaveCount(2);
+  await expect(page.locator(".bs-back")).toHaveCount(2);
+  // Medium is the default (id normal); step down to the end, then up to the other end, then each stop holds.
+  await expect(level).toHaveText("Medium");
+  const still = await frame();
+  const colors = new Set<string>();
+  const seen = async (name: string, dotAt: number) => {
+    await expect(level).toHaveText(name);
+    colors.add(await level.evaluate((e) => getComputedStyle(e).color));
+    await expect(page.locator(".bs-dot").nth(dotAt)).toHaveClass(/\bon\b/);
+    expect(await page.locator(".bs-dot.on").count()).toBe(1);
+    expect(await frame(), `${name}: nothing moves`).toEqual(still);
+  };
+  await easier.click();
+  await seen("Easy", 1);
+  await easier.click();
+  await seen("Very easy", 0);
+  await expect(easier).toHaveAttribute("aria-disabled", "true");
+  await easier.click({ force: true });
+  await seen("Very easy", 0);
+  for (const [name, at] of [["Easy", 1], ["Medium", 2], ["Hard", 3], ["Very hard", 4]] as const) {
+    await harder.click();
+    await seen(name, at);
+  }
+  await expect(harder).toHaveAttribute("aria-disabled", "true");
+  await harder.click({ force: true });
+  await seen("Very hard", 4);
+  expect(colors.size, "each level its own color").toBe(5);
+  // Remembered by its stored id: a reload keeps it.
+  await page.reload();
+  await openSoloBoss(page);
+  await expect(page.locator(".bs-level")).toHaveText("Very hard");
 });

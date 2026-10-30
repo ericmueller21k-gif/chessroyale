@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CRATES,
+  aboveHat,
   FISCHER,
   ITEM_COLORS,
   ITEM_DEFS,
@@ -338,5 +339,17 @@ describe("crates", () => {
     expect(cleanLook({ face: { def: "santa-beard", color: "red", blemish: 49, seed: 1 } }).face?.blemish).toBe(49);
     expect(cleanLook({ face: { def: "santa-beard", color: "red", blemish: 100, seed: 1 } }).face?.blemish).toBe(100);
     expect(cleanLook({ face: { def: "santa-beard", color: "red", blemish: 140, seed: 1 } }).face?.blemish).toBe(100);
+  });
+});
+
+describe("face items over or under a hat", () => {
+  it("every face item says which (faceLayer), no other item does, and only goggles and shades go above (Eric, Oct 30)", () => {
+    for (const d of ITEM_DEFS) {
+      if (d.slot === "face") expect(["above", "below"], d.id).toContain(d.faceLayer);
+      else expect(d.faceLayer, d.id).toBeUndefined();
+    }
+    expect(ITEM_DEFS.filter((d) => d.faceLayer === "above").map((d) => d.id).sort()).toEqual(["dark-shades", "ski-goggles"]);
+    expect(aboveHat("ski-goggles")).toBe(true);
+    expect(aboveHat("smiley-face")).toBe(false);
   });
 });

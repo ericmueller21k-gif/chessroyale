@@ -56,6 +56,27 @@ export async function lockerState(sql: Sql, userId: string): Promise<LockerState
   return { items, equipped, look, crates: earned, keys: CRATES_FREE ? null : 0 };
 }
 
+/**
+ * What several players wear (their looks only, as `lockerState(…).look`), in one read: equipped items joined to the
+ * items. A player with nothing on (or no such player) is missing from the map.
+ */
+export async function looksOf(sql: Sql, userIds: readonly string[]): Promise<Map<string, ItemLook>> {
+  const out = new Map<string, ItemLook>();
+  if (!userIds.length) return out;
+  const rows = await sql.all<{ user_id: string; slot: ItemSlot } & Omit<ItemInstance, "id">>(
+    `SELECT e.user_id, e.slot, i.def, i.color, i.color2, i.blemish, i.seed FROM equipped_items e JOIN items i ON i.id = e.item_id AND i.user_id = e.user_id
+     WHERE e.user_id IN (${userIds.map(() => "?").join(", ")})`,
+    ...userIds,
+  );
+  for (const r of rows) {
+    if (itemDef(r.def)?.slot !== r.slot) continue;
+    const look = out.get(r.user_id) ?? {};
+    look[r.slot] = { def: r.def, color: r.color, blemish: r.blemish, seed: r.seed, ...(r.color2 ? { color2: r.color2 } : {}) };
+    out.set(r.user_id, look);
+  }
+  return out;
+}
+
 /** Opens a crate (free and unlimited while testing). `force` only works while testing. */
 export async function openCrate(
   sql: Sql,

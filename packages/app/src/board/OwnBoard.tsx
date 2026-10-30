@@ -14,17 +14,24 @@
  *   are turned back, and the coordinates name the real squares.
  * - Hollow's dark: a dark square tapped is selected (no piece lifted, no dots); any attempt touching the dark goes to
  *   onDarkTry unchecked.
+ * - chess.com's habits (docs/decisions/2026-10-28-arrows-and-premoves.md): with a mouse, a right-drag draws an arrow and a
+ *   right-click colors a square (Ctrl, Alt and Shift for other colors), a left-click clears them, and the browser's menu
+ *   never opens over the board; and premoves, on a board whose screen opts in (`premove`): your piece moved ahead while
+ *   it's the other side's turn, played the moment your turn comes (board/yours.ts keeps them, by the game's key).
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { BOARD } from "@chessroyale/core";
-import { applyMove, inCheck, pieceAt, sideToMove, touchesDark } from "@chessroyale/chess";
+import { applyMove, inCheck, isChess960Fen, pieceAt, sideToMove, touchesDark } from "@chessroyale/chess";
 import { BoardTurn, coordLabel, type QuarterTurn } from "../board-view.ts";
-import { BRUSHES, FILES, SLIDE_MS, boardInputs, boardSize, cellOf, destsFor, drawArrows, follow, gestureMoves, pieceClass, pieceCloseTo, positionKey, pressDown, pressMove, pressUp, readPieces, refusedMove, slidePiece, squareAtPoint, stillRunning, type BoardPiece, type Box, type PieceCode, type Press, type PressBoard } from "./logic.ts";
+import { BRUSHES, FILES, NO_MARKS, SLIDE_MS, arrowColor, boardInputs, boardSize, cellOf, destsFor, drawArrows, follow, gestureMoves, highlightColor, marksEmpty, pieceClass, pieceCloseTo, positionKey, premoveDests, premovePieces, premoveQueueTurn, premoveSquares, pressDown, pressMove, pressUp, readPieces, refusedMove, slidePiece, squareAtPoint, stillRunning, toggleArrow, toggleSquare, userArrowShape, USER_ARROW, type BoardPiece, type Box, type PieceCode, type Premove, type Press, type PressBoard } from "./logic.ts";
 import type { BoardProps } from "./types.ts";
+import { boardMarksOn, premovesOn } from "../prefs.ts";
+import { addPremove, dropYours, onYours, setMarks, setQueue, yours } from "./yours.ts";
 
 let nextPieceId = 1;
 let boards = 0;
 const NONE: readonly string[] = [];
+const NO_QUEUE: readonly Premove[] = [];
 
 /** A piece's place on the board: its column and row as a share of its own size (a square), so any size fits. */
 const place = (square: string, orientation: "white" | "black", turn: QuarterTurn) => {
@@ -58,11 +65,12 @@ function inCheckDrawn(fen: string): boolean {
 
 /** A move you made, shown until the game next tells the board anything new. */
 type Local = { pieces: Map<string, PieceCode>; last: [string, string] };
-type Promotion = { from: string; to: string; dark?: boolean };
+/** A pawn taken to its last rank, its piece still to pick (`premove`: one moved ahead, kept under `key`). */
+type Promotion = { from: string; to: string; dark?: boolean; premove?: { key: string; side: "w" | "b"; many: boolean } };
 
 /** What the board's drawing layer tells the board around it (the same object for the board's life). */
 interface BoardActs {
-  move(uci: string): void;
+  move(uci: string, how?: { premove?: boolean }): void;
   darkTry(uci: string): void;
   /** A legal move that `moves` doesn't allow, tried: the board's onRefused (none: nothing to work out). */
   refused: { current?: (uci: string) => void };
@@ -81,7 +89,7 @@ interface BoardActs {
  * when what it shows changes (`boardInputs` in logic.ts), or by itself (a tap, a drag, a slide or a fade ending).
  */
 export function OwnBoard(props: BoardProps) {
-  const { fen, orientation, lastMove, interactive, moves, onMove, arrows, small, animate = true, children, marks, dark, onDarkTry, turn = 0, elephants, decor } = props;
+  const { fen, orientation, lastMove, interactive, moves, onMove, arrows, small, animate = true, children, marks, dark, onDarkTry, turn = 0, elephants, decor, premove } = props;
   const onMoveRef = useRef(onMove);
   onMoveRef.current = onMove;
   const onDarkRef = useRef(onDarkTry);
@@ -111,16 +119,17 @@ export function OwnBoard(props: BoardProps) {
   // A new position or the dark changing: no dark square stays selected.
   useLayoutEffect(() => setDarkSel(null), [fen, dark?.join(), interactive]);
 
-  const acts = useMemo<BoardActs>(() => ({ move: (uci) => onMoveRef.current?.(uci), darkTry: (uci) => onDarkRef.current?.(uci), refused: onRefusedRef, stopped: stoppedRef, promote: setPromotion, selectDark: setDarkSel, local }), []);
+  const acts = useMemo<BoardActs>(() => ({ move: (uci, how) => onMoveRef.current?.(uci, how), darkTry: (uci) => onDarkRef.current?.(uci), refused: onRefusedRef, stopped: stoppedRef, promote: setPromotion, selectDark: setDarkSel, local }), []);
   // (The same element while nothing it shows has changed: Preact leaves it, and everything in it, alone.)
   const layer = useMemo(
-    () => <BoardLayer fen={fen} orientation={orientation} lastMove={lastMove} interactive={interactive} moves={moves} arrows={arrows} small={small} animate={animate} marks={marks} dark={dark} darkOn={darkOn} darkSel={darkSel} turn={turn} elephants={elephants} decor={decor} acts={acts} />,
+    () => <BoardLayer fen={fen} orientation={orientation} lastMove={lastMove} interactive={interactive} moves={moves} arrows={arrows} small={small} animate={animate} marks={marks} dark={dark} darkOn={darkOn} darkSel={darkSel} turn={turn} elephants={elephants} decor={decor} premove={premove} acts={acts} />,
     [...boardInputs(props), darkOn, darkSel, cleared.current],
   );
-  const promoWhite = sideToMove(fen) === "w";
+  const promoWhite = promotion?.premove ? promotion.premove.side === "w" : sideToMove(fen) === "w";
 
+  // (The browser's menu never opens over the board, nor over what the screen draws on it: a right-click there is yours.)
   return (
-    <div class={`board-wrap ${small ? "board-small" : ""}`} data-dark-sel={darkSel ?? undefined} data-turn={turn || undefined}>
+    <div class={`board-wrap ${small ? "board-small" : ""}`} data-dark-sel={darkSel ?? undefined} data-turn={turn || undefined} onContextMenu={(e) => e.preventDefault()}>
       {layer}
       <BoardTurn.Provider value={turn}>{children}</BoardTurn.Provider>
       {promotion && (
@@ -134,7 +143,8 @@ export function OwnBoard(props: BoardProps) {
                 const pr = promotion;
                 setPromotion(null);
                 const uci = pr.from + pr.to + p;
-                if (pr.dark) onDarkRef.current?.(uci);
+                if (pr.premove) addPremove(pr.premove.key, { from: pr.from, to: pr.to, promo: p }, pr.premove.many);
+                else if (pr.dark) onDarkRef.current?.(uci);
                 else if (stoppedRef.current?.(uci)) onRefusedRef.current?.(uci);
                 else onMoveRef.current?.(uci);
               }}
@@ -155,7 +165,7 @@ type LayerProps = Omit<BoardProps, "children" | "silent" | "onMove" | "onDarkTry
  * The board's drawing: the squares and their highlights, the pieces (sliding, fading, following a drag), the arrows and
  * the coordinates, and the taps and drags on them. Drawn again only when what it shows changes (see OwnBoard).
  */
-function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, small, animate = true, marks, dark, darkOn, darkSel, turn = 0, elephants, decor, acts }: LayerProps) {
+function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, small, animate = true, marks, dark, darkOn, darkSel, turn = 0, elephants, decor, premove, acts }: LayerProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const boardRef = useRef<HTMLDivElement>(null);
@@ -164,6 +174,13 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
   const darkList = darkOn ? dark! : NONE;
   const uid = useMemo(() => `hb${++boards}`, []);
   const { local, selectDark: setDarkSel, promote: setPromotion } = acts;
+  // Your arrows, highlights and premoves (board/yours.ts): kept under the game's key when the screen gives one (they stay
+  // through its other screens), else under this board's own, forgotten as it goes. Drawn again as they change.
+  const ykey = premove?.key ?? `board:${uid}`;
+  useEffect(() => onYours((k) => k === ykey && redraw()), [ykey]);
+  useEffect(() => () => dropYours(`board:${uid}`), []);
+  const mine = yours(ykey);
+  const queue = premove && !small ? mine.queue : NO_QUEUE;
   // (How many times it has drawn, kept on its squares' element: e2e/perf.spec.ts checks that a boss's effect playing
   // over the board doesn't draw it again every frame.)
   useLayoutEffect(() => {
@@ -175,10 +192,15 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
   const landNext = useRef(false);
 
   const propPieces = useMemo(() => readPieces(fen), [fen]);
-  const shown = local.current?.pieces ?? propPieces;
+  // (With premoves waiting, each piece moved ahead stands on its new square.)
+  const base = local.current?.pieces ?? propPieces;
+  const shown = queue.length ? premovePieces(base, queue) : base;
   const shownLast = local.current ? local.current.last : lastMove ? ([lastMove.slice(0, 2), lastMove.slice(2, 4)] as [string, string]) : null;
   const turnColor = sideToMove(fen);
   const canAct = !!interactive && !small && !local.current;
+  // Premoves: your pieces moved ahead while the other side is to move (a screen that opts in; Settings → Board).
+  const premoving = !!premove && !premove.watch && !small && !local.current && turnColor !== premove.side && premovesOn();
+  const castling = isChess960Fen(fen) ? "" : (fen.split(" ")[2] ?? "");
   const dests = useMemo(() => (interactive && !small ? destsFor(fen, moves, darkList) : new Map<string, string[]>()), [fen, interactive, small, moves?.join(), darkList.join()]);
 
   // ---------------- Which piece is which ----------------
@@ -245,6 +267,10 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
   const [dragId, setDragId] = useState<number | null>(null);
   // (The player's last move here was dragged: the next drag starts at once, as before.)
   const dragged = useRef(false);
+  /** The press being made is a mouse's (a computer: premoves queue up). */
+  const pressMouse = useRef(false);
+  /** A right-drag (an arrow, or a square's color where it started), and the square and color under it now. */
+  const right = useRef<{ from: string; at: string | null; pointer: number; box: Box; mods: PointerEvent } | null>(null);
   const pieceEls = useRef(new Map<number, HTMLElement>());
 
   // A new way up or turn of the board: nothing stays selected or held.
@@ -255,15 +281,15 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
     press.current = null;
   }
 
-  const movable = (sq: string) => canAct && shown.get(sq)?.[0] === turnColor;
+  const movable = (sq: string) => (canAct ? shown.get(sq)?.[0] === turnColor : premoving && shown.get(sq)?.[0] === premove!.side);
   const board: PressBoard = {
     piece: (sq) => shown.get(sq),
     movable,
-    canMove: (from, to) => from !== to && movable(from) && (darkList.length > 0 || !!dests.get(from)?.includes(to)),
-    interactive: !!interactive,
+    canMove: (from, to) => from !== to && movable(from) && (premoving ? premoveDests(shown, from, castling).includes(to) : darkList.length > 0 || !!dests.get(from)?.includes(to)),
+    interactive: !!interactive || premoving,
   };
-  const live = useRef({ board, shown, orientation, turn, darkOn, darkList, darkSel, fen });
-  live.current = { board, shown, orientation, turn, darkOn, darkList, darkSel, fen };
+  const live = useRef({ board, shown, orientation, turn, darkOn, darkList, darkSel, fen, ykey, queue, premoving, premove });
+  live.current = { board, shown, orientation, turn, darkOn, darkList, darkSel, fen, ykey, queue, premoving, premove };
 
   /** A move from the board (tap-tap or a drop): what it is, as the game sees it. */
   const userMove = (from: string, to: string, dropped: boolean) => {
@@ -296,6 +322,55 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
     redraw();
     acts.move(legal[0]!);
   };
+
+  /** A move made ahead (a premove): its piece shows at once on its new square, both squares in the premove color. */
+  const premoveMade = (from: string, to: string, dropped: boolean) => {
+    const s = live.current;
+    const side = s.premove!.side;
+    landNext.current = dropped;
+    dragged.current = dropped;
+    const many = pressMouse.current;
+    if (s.shown.get(from)?.[1] === "p" && to[1] === (side === "w" ? "8" : "1")) return setPromotion({ from, to, premove: { key: s.ykey, side, many } });
+    addPremove(s.ykey, { from, to }, many);
+  };
+
+  /** A move from the board's gestures: made now, or ahead. */
+  const made = (from: string, to: string, dropped: boolean) => (live.current.premoving ? premoveMade(from, to, dropped) : userMove(from, to, dropped));
+
+  /** Every premove cancelled: the pieces back where they are at once, no colors left. */
+  const cancelPremoves = () => {
+    selected.current = null;
+    landNext.current = true;
+    setQueue(live.current.ykey, []);
+  };
+
+  // Your turn has come with premoves waiting: the first plays at once, a normal move from then on (marked as a premove
+  // for the screen); one the game doesn't allow now is cancelled with every one after it, and a power's refusal goes to
+  // the screen as a move you tried would (premoveTurn).
+  useLayoutEffect(() => {
+    if (!premove || premove.watch || !canAct || turnColor !== premove.side || !premovesOn()) return;
+    const q = yours(ykey).queue;
+    if (!q.length) return;
+    const first = q[0]!;
+    const r = premoveQueueTurn(fen, moves, q, { dark: darkList, stopped: acts.stopped.current });
+    if (r.play) {
+      let after: Map<string, PieceCode>;
+      try {
+        after = readPieces(applyMove(fen, r.play));
+      } catch {
+        after = slidePiece(propPieces, first.from, first.to);
+      }
+      local.current = { pieces: after, last: [first.from, first.to] };
+      // (The move first, then the queue: an online crowd tells its server the next premove after this one's pick.)
+      acts.move(r.play, { premove: true });
+      setQueue(ykey, r.rest);
+      redraw();
+    } else {
+      landNext.current = true;
+      setQueue(ykey, r.rest);
+      if (r.refused) acts.refused.current?.(r.refused);
+    }
+  });
 
   /** A move tried that chess allows but `moves` doesn't (a boss power stops it): it stays put, and the screen says why. */
   const refusedTry = (from: string, to: string) => {
@@ -338,6 +413,22 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
     setDragId(null);
   };
 
+  /**
+   * A right-click (chess.com's): with premoves waiting, it cancels them all; else it starts an arrow (dropped on another
+   * square) or a square's color (let go where it started).
+   */
+  const rightDown = (e: PointerEvent) => {
+    e.preventDefault();
+    const s = live.current;
+    if (s.queue.length) return cancelPremoves();
+    if (!boardMarksOn()) return;
+    const box = boxOf();
+    const sq = squareAtPoint(e.clientX, e.clientY, box, s.orientation, s.turn);
+    if (!sq) return;
+    right.current = { from: sq, at: sq, pointer: e.pointerId, box, mods: e };
+    boardRef.current?.setPointerCapture?.(e.pointerId);
+  };
+
   const onDown = (e: PointerEvent) => {
     if (small) return;
     // (A second finger: the drag in progress is let go.)
@@ -345,13 +436,20 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
       cancelPress();
       return;
     }
-    if (!e.isPrimary || (e.pointerType === "mouse" && e.button !== 0)) return;
+    const mouse = e.pointerType === "mouse";
+    if (mouse && e.button === 2 && !right.current) return rightDown(e);
+    if (!e.isPrimary || (mouse && e.button !== 0)) return;
     const s = live.current;
     const box = boxOf();
     const sq = squareAtPoint(e.clientX, e.clientY, box, s.orientation, s.turn);
     if (!sq) return;
     // (A mouse press on the board starts no text selection; a touch's scrolling is decided in onTouch, below.)
-    if (e.pointerType === "mouse") e.preventDefault();
+    if (mouse) e.preventDefault();
+    pressMouse.current = mouse;
+    // A left-click anywhere clears your arrows and highlights (so does a move made with the mouse: it starts with one).
+    if (!marksEmpty(yours(s.ykey).marks)) setMarks(s.ykey, NO_MARKS);
+    // A phone's premove (chess.com's app holds one): a tap anywhere but the move of a piece you've picked up cancels it.
+    if (!mouse && s.queue.length && !s.premove?.watch && !(selected.current && s.board.canMove(selected.current, sq))) return void (cancelPremoves(), redraw());
     // Hollow's dark, before anything else: a dark square tapped is selected; with one selected, the next tap is the
     // attempt from it (your own piece in plain sight picks that one up instead; the same square lets go).
     if (s.darkOn) {
@@ -375,7 +473,7 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
     selected.current = r.selected;
     if (r.move) {
       dragged.current = false;
-      userMove(r.move[0], r.move[1], false);
+      made(r.move[0], r.move[1], false);
     } else if (r.press) {
       press.current = r.press;
       pressBox.current = box;
@@ -391,6 +489,19 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
   };
 
   const onMovePointer = (e: PointerEvent) => {
+    // A right-drag: the arrow follows it, square by square.
+    const rd = right.current;
+    if (rd && e.pointerId === rd.pointer) {
+      const s = live.current;
+      const at = squareAtPoint(e.clientX, e.clientY, rd.box, s.orientation, s.turn);
+      const color = arrowColor(e) !== arrowColor(rd.mods);
+      rd.mods = e;
+      if (at !== rd.at || color) {
+        rd.at = at;
+        redraw();
+      }
+      return;
+    }
     const p = press.current;
     if (!p || e.pointerId !== pressPointer.current) return;
     const s = live.current;
@@ -401,6 +512,17 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
   };
 
   const onUp = (e: PointerEvent) => {
+    // A right-click let go: on its own square, that square's color; on another, an arrow; off the board, nothing.
+    const rd = right.current;
+    if (rd && e.pointerId === rd.pointer) {
+      right.current = null;
+      const s = live.current;
+      const to = e.type === "pointerup" ? squareAtPoint(e.clientX, e.clientY, rd.box, s.orientation, s.turn) : null;
+      const m = yours(s.ykey).marks;
+      if (to && boardMarksOn()) setMarks(s.ykey, to === rd.from ? toggleSquare(m, to, highlightColor(e)) : toggleArrow(m, { from: rd.from, to, color: arrowColor(e) }));
+      redraw();
+      return;
+    }
     const p = press.current;
     if (!p || e.pointerId !== pressPointer.current) return;
     press.current = null;
@@ -410,7 +532,7 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
     const r = pressUp(s.board, selected.current, p, to);
     selected.current = r.selected;
     if (p.started) endDrag(p);
-    if (r.move) userMove(r.move[0], r.move[1], true);
+    if (r.move) made(r.move[0], r.move[1], true);
     else if (p.started && to && to !== p.from) refusedTry(p.from, to);
     redraw();
   };
@@ -482,6 +604,7 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
   const squares = new Map<string, string>();
   const mark = (sq: string, cls: string) => squares.set(sq, squares.has(sq) ? `${squares.get(sq)} ${cls}` : cls);
   if (shownLast) for (const sq of shownLast) mark(sq, "last-move");
+  for (const sq of premoveSquares(queue)) mark(sq, "premove");
   if (BOARD.checkHighlight && !local.current && inCheckDrawn(fen)) {
     const king = [...shown].find(([, p]) => p === `${turnColor}k`)?.[0];
     if (king) mark(king, "check");
@@ -489,11 +612,17 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
   if (sel) {
     mark(sel, "selected");
     if (canAct) for (const d of dests.get(sel) ?? []) mark(d, shown.has(d) ? "move-dest oc" : "move-dest");
+    else if (premoving) for (const d of premoveDests(shown, sel, castling)) mark(d, shown.has(d) ? "move-dest oc" : "move-dest");
   }
   for (const [sq, cls] of Object.entries(marks ?? {})) mark(sq, cls);
   if (darkSel && darkOn) mark(darkSel, "selected");
 
   const drawn = useMemo(() => drawArrows(arrows ?? [], orientation, turn), [arrows, orientation, turn]);
+  // Your own (never on a small board), under the screen's: your squares under its highlights, your arrows under its.
+  const own = small ? NO_MARKS : mine.marks;
+  const rd = right.current;
+  const drawing = rd?.at && rd.at !== rd.from ? { from: rd.from, to: rd.at, color: arrowColor(rd.mods) } : null;
+  const ownArrows = [...own.arrows.map((a) => userArrowShape(a, orientation, turn)), ...(drawing ? [{ ...userArrowShape(drawing, orientation, turn), key: "drawing" }] : [])];
   const brushes = [...new Set(drawn.filter((a) => !a.circle).map((a) => a.brush))];
   const ghost = dragId !== null && press.current ? tr.pieces.find((q) => q.id === dragId) : undefined;
   const white = orientation === "white";
@@ -502,6 +631,9 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
     <div ref={rootRef} class={`board hb orientation-${orientation}${small ? "" : " hb-manipulable"}${jump ? " hb-jump" : ""}`} data-board="own">
       <div ref={containerRef} class="hb-container">
         <div ref={boardRef} class="hb-board" onPointerDown={onDown} onPointerMove={onMovePointer} onPointerUp={onUp} onPointerCancel={onUp}>
+          {Object.entries(own.squares).map(([sq, color]) => (
+            <square key={`u${sq}`} class={`uh uh-${color}`} style={{ transform: place(sq, orientation, turn) }} />
+          ))}
           {[...squares].map(([sq, cls]) => (
             <square key={sq} class={cls} style={{ transform: place(sq, orientation, turn) }} />
           ))}
@@ -526,6 +658,16 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
             );
           })}
         </div>
+        {ownArrows.length > 0 && (
+          <svg class="hb-user-arrows" viewBox="-4 -4 8 8" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+            {ownArrows.map((a) => (
+              <g key={a.key} class={`ua-${a.color}`} data-arrow={a.key}>
+                <polyline points={a.shaft} stroke-width={USER_ARROW.width} />
+                <polygon points={a.head} />
+              </g>
+            ))}
+          </svg>
+        )}
         {drawn.length > 0 && (
           <svg class="hb-shapes" viewBox="-4 -4 8 8" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
             <defs>

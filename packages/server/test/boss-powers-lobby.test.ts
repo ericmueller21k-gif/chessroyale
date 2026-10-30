@@ -297,7 +297,7 @@ describe("boss powers online", () => {
       ids.add(L.core.save().runner!.state.boss!.id!);
     }
     expect([...ids].sort()).toEqual(playable);
-    expect(playable).toEqual(["alfil", "bigboy", "clown", "gardener", "gingerbread", "grex", "hollow", "hopper", "moo", "pig", "sawyer", "smudgy", "tiger"]);
+    expect(playable).toEqual(["alfil", "bigboy", "clown", "folio", "gardener", "gingerbread", "grex", "hollow", "hopper", "moo", "pig", "sawyer", "smudgy", "tiger"]);
   });
 
   it("the test trigger: only an admin's is taken; it brings the ultimate as the next turn begins, once; switched off, nothing", () => {

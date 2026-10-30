@@ -53,12 +53,8 @@ test("an admin's ?brain= link: Ginger on Maia with the full guard, on a phone; M
   page.on("request", (r) => r.url().includes("/engine/maia/") && maiaFiles.push(new URL(r.url()).pathname));
   await page.goto("/?debug&clock=40&bossMoves=6&laststand=0&brain=maia-full");
   await bossAloneFromHome(page, "Ginger");
-  const menu = page.getByRole("dialog", { name: "Boss alone" });
-  // (No picker in the menu any more, Eric, Oct 25: the link asks for the brain.)
-  await expect(menu.getByRole("combobox")).toHaveCount(0);
-  // The menu fetches Maia's files ahead (into the service worker's cache).
+  // (START fetches Maia's files ahead, into the service worker's cache, as the old Boss alone menu did when it opened.)
   await expect.poll(() => maiaFiles.some((f) => f.endsWith(".onnx")), { timeout: 10_000 }).toBe(true);
-  await menu.getByRole("button", { name: /Ginger/ }).click();
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
   expect(await page.evaluate(() => (window as any).match.boss.id)).toBe("gingerbread");
   const debug = page.locator(".brain-debug");
@@ -286,10 +282,6 @@ test("players meet Maia too (forPlayers on): no Brain picker and no debug line; 
   page.on("request", (r) => r.url().includes("/engine/maia/") && maiaFiles.push(r.url()));
   await page.goto("/?debug&clock=40&bossMoves=6&laststand=0");
   await bossAloneFromHome(page, "Ginger");
-  const menu = page.getByRole("dialog", { name: "Boss alone" });
-  await expect(menu.getByRole("button", { name: /Ginger/ })).toBeVisible();
-  await expect(menu.getByRole("combobox", { name: "Boss brain (testing)" })).toHaveCount(0);
-  await menu.getByRole("button", { name: /Ginger/ }).click();
   await play(page);
   await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/^(play|results)$/);
   await expect(page.locator(".brain-debug")).toHaveCount(0);

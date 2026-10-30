@@ -35,6 +35,9 @@ export const POWER_WORDS: Record<PowerId, string> = {
   water: "Watering",
   balloons: "blows up balloons that land as his pieces",
   hoops: "Hoops",
+  draft: "marks a piece to fold",
+  crease: "Crease",
+  revision: "Revision",
 };
 
 /** A boss's card line for its powers: its passive, then its ultimate; empty for a boss without powers yet. */

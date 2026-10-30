@@ -3,13 +3,14 @@ import { named, pickMode, test } from "./helpers.ts";
 
 /**
  * Home (Eric's screenshots): one shadow under your pawn on a phone (the snowman's own ground shadow is hidden there), the
- * "Other modes" label 14 px under the one-line default hint ("Starts within", or "Usually about"), and your pawn hops on
+ * "Other modes" label 14 px under PLAY (Oct 28: the line above PLAY, "Starts within" or "Usually about", used to be under it, and
+ * the label 14 px under that), and your pawn hops on
  * a phone and a computer alike every 30 s (its first hop 4 s after home shows; FRONT_DOOR.heroHopFirstSec and
  * heroHopEverySec; never under reduced motion). Oct 24: the hop was phone-only, so a computer never hopped.
  */
 const desktop = () => test.info().project.name === "desktop";
 
-test("phone home: one shadow under your pawn; the Other modes label 14 px under the Starts-within line", async ({ page }) => {
+test("phone home: one shadow under your pawn; the Other modes label 14 px under PLAY, the Starts-within line above PLAY", async ({ page }) => {
   test.skip(desktop(), "a phone's home");
   await named(page, "Test2");
   // Dress your pawn as a snowman (its art draws its own ground shadow).
@@ -29,20 +30,23 @@ test("phone home: one shadow under your pawn; the Other modes label 14 px under 
     await pickMode(page);
     // (The default line: "Starts within", or "Usually about" once the server knows a wait. Both one line, both spaced the same.)
     await expect(page.locator(".fd-hint")).toHaveText(/^(Starts within \d+ s; bots fill any empty seats|Usually about \d+ s to find a match)$/);
-    await expect(page.locator(".fd-hint.fd-hint-line")).toHaveCount(1);
+    // (Above PLAY: the line's text ends within 8 px over PLAY's top edge.)
+    const above = await page.evaluate(() => {
+      const r = document.createRange();
+      r.selectNodeContents(document.querySelector(".fd-hint")!);
+      return document.querySelector(".fd-play")!.getBoundingClientRect().top - r.getBoundingClientRect().bottom;
+    });
+    expect(above, `${w}×${h}: the line above PLAY, ${above} px over it`).toBeGreaterThanOrEqual(0);
+    expect(above, `${w}×${h}: the line just above PLAY`).toBeLessThanOrEqual(8);
     // (One shadow: the snowman's own is hidden, and the pawn's ::after shadow shows.)
     const pawn = page.locator(".fd-hero .fd-pawn.shadow");
     await expect(pawn.locator(".skin-shadow")).toHaveCount(1);
     expect(await pawn.locator(".skin-shadow").evaluate((el) => getComputedStyle(el).display), `${w}×${h}`).toBe("none");
     expect(await pawn.evaluate((el) => getComputedStyle(el, "::after").content), `${w}×${h}`).not.toBe("none");
     expect(Number(await pawn.evaluate((el) => getComputedStyle(el, "::after").opacity)), `${w}×${h}`).toBeGreaterThan(0);
-    // (The gap: from the hint's line of text to the "Other modes" label's top, then the Boss raid card under the label.)
-    const gap = await page.evaluate(() => {
-      const r = document.createRange();
-      r.selectNodeContents(document.querySelector(".fd-hint")!);
-      return document.querySelector(".fd-other-label")!.getBoundingClientRect().top - r.getBoundingClientRect().bottom;
-    });
-    expect(Math.abs(gap - 14), `${w}×${h}: the label ${gap} px under the line`).toBeLessThanOrEqual(1);
+    // (The gap: from PLAY's bottom to the "Other modes" label's top, then the Boss raid card under the label.)
+    const gap = await page.evaluate(() => document.querySelector(".fd-other-label")!.getBoundingClientRect().top - document.querySelector(".fd-play")!.getBoundingClientRect().bottom);
+    expect(Math.abs(gap - 14), `${w}×${h}: the label ${gap} px under PLAY`).toBeLessThanOrEqual(1);
     const under = await page.evaluate(() => document.querySelector(".rd-card")!.getBoundingClientRect().top - document.querySelector(".fd-other-label")!.getBoundingClientRect().bottom);
     expect(under, `${w}×${h}: the Boss raid card under the label`).toBeGreaterThanOrEqual(0);
   }
@@ -72,6 +76,9 @@ test("home: your pawn hops on a phone and a computer alike, 4 s after home shows
     await page.clock.resume();
     await page.goto("/");
     await expect(page.locator(".fd-hero")).toBeVisible();
+    // (The hop's timer starts in the pawn's effect, which waits for a frame: let two frames pass before the clock stops, or on a busy
+    // runner the stop's jump runs that waiting frame at 1 s and the first hop comes at 5 s, so 4.5 s finds none. Oct 30, CI.)
+    await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(done, 0)))));
     const heroAt = await page.evaluate(() => (window as unknown as { __heroAt: number }).__heroAt);
     // (Freeze the clock a second after the hero shows, then run 70 s of it: the first hop at 4 s, the next at 34 s and at 64 s.)
     await page.clock.pauseAt(heroAt + 1000);

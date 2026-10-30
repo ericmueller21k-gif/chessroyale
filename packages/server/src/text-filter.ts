@@ -1,7 +1,9 @@
 /**
- * The server's filter for the free text players type that others see. Chat is preset lines only, so that's display
- * names: a profile's name, and the name a device sends when it joins a lobby or a Squads party. A name with a slur or
- * a hate term in it is refused (a profile) or replaced (a lobby seat). See docs/decisions/2026-10-16-chat-moderation.md.
+ * The server's filter for the free text players type that others see: display names (a profile's name, and the name a
+ * device sends when it joins a lobby or a Squads party) and, since Oct 28, the town square's typed chat (`chatRefusal`).
+ * A name with a slur or a hate term in it is refused (a profile) or replaced (a lobby seat); a chat message with one, or
+ * with a common swear word, or with a link or contact details, is refused. See docs/decisions/2026-10-16-chat-moderation.md
+ * and docs/decisions/2026-10-28-town-chat-typing.md.
  *
  * A small list of our own, slurs and hate terms only (not swearing), ROT13-encoded so the words don't turn up in
  * searches, diffs or screenshots of the code: `rot13("word")` gives a new entry. Matching folds what people use to get
@@ -41,14 +43,49 @@ const MAX = 64;
 
 /** Digits and symbols used for letters. */
 const LEET: Record<string, string> = { "0": "o", "1": "i", "!": "i", "|": "i", "3": "e", "€": "e", "4": "a", "@": "a", "5": "s", $: "s", "7": "t", "+": "t", "8": "b", "6": "g", "9": "g" };
-/** Letters from other alphabets that look like Latin ones (Cyrillic, Greek). */
+/**
+ * Letters that look like Latin ones, by the Latin letter they pass for (lower case, as `base` leaves them): Cyrillic,
+ * Greek, Armenian, Coptic, Latin's own small capitals and variants (dotless ı, ɡ, ʀ…), from Unicode's confusables for
+ * single Latin letters. Accented letters need none: `base` takes the accents off.
+ */
+const LIKE: Record<string, string> = {
+  a: "аαɑᴀ⍺ɐ",
+  b: "вьбʙƅɓβᖯ",
+  c: "сϲᴄҫςƈꮯ",
+  d: "ԁժᴅɗđðдδ",
+  e: "еєэɛᴇҽɘεǝə",
+  f: "ꜰƒғϝ",
+  g: "ɡɢցǥɠԍ",
+  h: "нһʜհħɦђћ",
+  i: "іιıɪɩ¡ꭵꙇ",
+  j: "јʝϳ",
+  k: "кκᴋҝқƙⱪ",
+  l: "ӏʟłɫɭǀ",
+  m: "мᴍɱ",
+  n: "ոռпиɴηπƞŋɲɳ",
+  o: "оοσᴏօøɵѳⲟθɔ",
+  p: "рρᴘⲣ",
+  q: "ԛɋ",
+  r: "гяʀɾɼɽꭇᴦ",
+  s: "ѕꜱʂ",
+  t: "тτᴛŧƭʈ",
+  u: "υᴜսμʋц",
+  v: "νᴠѵ",
+  w: "ԝᴡωшѡɯ",
+  x: "хχҳ",
+  y: "уʏγүɣ",
+  z: "ᴢʐƶȥ",
+};
 const LOOKALIKE: Record<string, string> = {
-  а: "a", в: "b", е: "e", к: "k", м: "m", н: "h", о: "o", р: "p", с: "c", т: "t", у: "y", х: "x", і: "i", ј: "j", ѕ: "s", ԁ: "d", ӏ: "l", ɡ: "g",
-  α: "a", β: "b", ε: "e", ι: "i", κ: "k", ν: "v", ο: "o", ρ: "p", τ: "t", υ: "u", χ: "x",
+  ...Object.fromEntries(Object.entries(LIKE).flatMap(([latin, like]) => [...like].map((c) => [c, latin]))),
+  // (Letters that stand for two.)
+  ß: "ss", æ: "ae", œ: "oe", þ: "th",
 };
 
-/** Lower case, no accents or invisible characters. */
-const base = (text: string) => text.normalize("NFKD").replace(/[\p{M}\p{Cf}]/gu, "").toLowerCase();
+/** Fillers that show as nothing (Hangul fillers, the blank braille cell): taken out like invisible characters. */
+export const FILLERS = /[\u115F\u1160\u3164\uFFA0\u2800]/gu;
+/** Lower case, no accents, invisible characters or fillers. */
+const base = (text: string) => text.normalize("NFKD").replace(/[\p{M}\p{Cf}]/gu, "").replace(FILLERS, "").toLowerCase();
 /** Look-alikes and leetspeak as the letters they stand for; letters only. */
 const letters = (word: string) => word.replace(/./gsu, (c) => LOOKALIKE[c] ?? LEET[c] ?? c).replace(/[^a-z]/g, "");
 
@@ -58,19 +95,36 @@ const letters = (word: string) => word.replace(/./gsu, (c) => LOOKALIKE[c] ?? LE
  */
 const READINGS = [(w: string) => w, (w: string) => w.replace(/[_.-]*\d+$/, ""), (w: string) => w.replace(/(?<=\d)\d+$/, "")];
 
+/** For a chat message, how each word was made: where each typed piece starts in it, and whether a piece had two letters. */
+interface Pieces {
+  starts: number[];
+  pair: boolean;
+}
+
 /**
  * The name's words, one reading of its digits: letters only within each, and a run of two or more short words (two
- * letters or fewer each) as one word.
+ * letters or fewer each) as one word. For a chat message (`pieces` given), a two-letter word that ends a sentence or a
+ * clause ("go. ok") ends its run, and `pieces` gets, for each word, where its typed pieces start and whether one had two
+ * letters (ordinary short words in a row, "is hi to", rather than letters spaced out, "f u n").
  */
-function words(text: string, reading: (word: string) => string): string[] {
+function words(text: string, reading: (word: string) => string, pieces?: Pieces[]): string[] {
   const out: string[] = [];
   let short = false;
   for (const token of base(text).split(/\s+/)) {
     const w = letters(reading(token));
     if (!w) continue;
-    if (w.length <= 2 && short) out[out.length - 1] += w;
-    else out.push(w);
-    short = w.length <= 2;
+    if (w.length <= 2 && short) {
+      const i = out.length - 1;
+      if (pieces) {
+        pieces[i]!.starts.push(out[i]!.length);
+        if (w.length === 2) pieces[i]!.pair = true;
+      }
+      out[i] += w;
+    } else {
+      out.push(w);
+      pieces?.push({ starts: [0], pair: w.length === 2 });
+    }
+    short = w.length <= 2 && !(pieces && w.length === 2 && /[.,!?;:]$/.test(token));
   }
   return out;
 }
@@ -98,6 +152,127 @@ export function isBlockedText(text: string): boolean {
   if (READINGS.some((reading) => listed(words(name, reading)))) return true;
   const digits = name.normalize("NFKD").replace(/\D/g, "");
   return NUMBERS.some((n) => digits.includes(n));
+}
+
+// ---- Chat: the town square's typed messages (Eric, Oct 28). The names' list, plus common swear words, refused alike
+// (Eric: "it's family-friendly chat", so a word that isn't allowed just isn't allowed); links and contact details refused
+// with a reason of their own. Read the same way as a name (case, accents, look-alikes, leetspeak, spacing folded).
+
+/** Swear words found inside any one word (letters may repeat), as ANYWHERE above but without q for g. */
+const SWEARS_ANYWHERE = [
+  "shpx", "cuhpx", "sphx", "sipx", "cuhx", "fuvg", "ovgpu", "ovngpu", "phag", "nffubyr", "nefrubyr", "onfgneq", "fyhg", "juber", "jnaxre", "obyybpxf",
+  "qvpxurnq", "wnpxnff", "qhzonff", "cvff", "cbea",
+];
+/** Swear words found only as a whole word, exactly (or plural): short ones that are parts of ordinary words. */
+const SWEARS_WORDS = ["nff", "nefr", "qvpx", "pbpx", "chffl", "gjng", "jnax", "cevpx", "gvgf", "jgs", "fgsh", "tgsb"];
+/** The masked spellings ("f*ck" reads as "fck"), as whole words with their endings ("f*cking", "sh*tty", "fukin"). */
+const SWEARS_MASKED = ["shx", "shd", "spx", "sx", "fug", "ogpu", "pag", "qpx"];
+/** Ordinary words with a swear word inside. */
+const SWEARS_ALLOW = ["fphagubecr", "fuvvgnxr", "fuvgnxr", "fuvgn", "cvffneeb", "cbbea", "cuhxrg"];
+/** How much of a chat message is read (a message is at most TOWN_CHAT.maxChars; this bounds the work for any caller). */
+const CHAT_READ = 256;
+
+const SWEAR_ANY_RE = new RegExp(entries(SWEARS_ANYWHERE).map(repeats).join("|"));
+const SWEAR_START_RE = new RegExp(`^(?:${SWEAR_ANY_RE.source})`);
+const SWEAR_WORD_RE = new RegExp(`^(?:(?:${entries(SWEARS_WORDS).join("|")})s?|(?:${entries(SWEARS_MASKED).join("|")})(?:ing|in|ed|er|s|ty|y)?)$`);
+const SWEAR_ALLOW_RE = new RegExp(entries(SWEARS_ALLOW).map(repeats).join("|"), "g");
+/** A swear word starting `at` in this word: inside it from there, or as the whole rest of it. */
+const swearFrom = (w: string, at: number) => {
+  const rest = w.slice(at);
+  return SWEAR_WORD_RE.test(rest) || SWEAR_START_RE.test(rest.replace(SWEAR_ALLOW_RE, ""));
+};
+/**
+ * Whether these words (one reading of a message) hold a swear word:
+ *   - inside a word as typed, or one made of letters spaced out ("f u c k", "u f u c k");
+ *   - in a run of ordinary short words read as one ("is hi to", "go f u c k"), only from where one of its typed pieces
+ *     starts, so a sentence's little words don't spell one by chance ("up or no") while one split among them is caught;
+ *   - across two neighbors when one is short ("f uck", "fuc k", "bi tch", "go f uck"), from where a piece of the first starts.
+ */
+function swears(ws: string[], pieces: Pieces[]): boolean {
+  return ws.some((w, i) => {
+    const p = pieces[i]!;
+    if (p.starts.length === 1 || !p.pair ? SWEAR_WORD_RE.test(w) || SWEAR_ANY_RE.test(w.replace(SWEAR_ALLOW_RE, "")) : p.starts.some((at) => swearFrom(w, at))) return true;
+    // (Its last typed piece, or the next word, short: "f uck", "go f uck", "fuc k".)
+    const next = ws[i + 1];
+    return next !== undefined && Math.min(w.length - p.starts.at(-1)!, next.length) <= 2 && p.starts.some((at) => swearFrom(w + next, at));
+  });
+}
+
+/** Alphabets with letters that pass for Latin ones (and Latin's own extensions: small capitals, IPA letters…). */
+const LOOKALIKE_SCRIPTS = /[\p{Script=Cyrillic}\p{Script=Greek}\p{Script=Armenian}\p{Script=Cherokee}\p{Script=Coptic}\p{Script=Lisu}\p{Script=Latin}]/u;
+/** Each look-alike alphabet on its own, to tell how many a word draws from. */
+const SCRIPTS = ["Cyrillic", "Greek", "Armenian", "Cherokee", "Coptic", "Lisu", "Latin"].map((name) => new RegExp(`\\p{Script=${name}}`, "u"));
+/**
+ * A word, as typed, that mixes alphabets with Latin look-alikes and has a letter of theirs the map doesn't know: real
+ * Latin letters (a to z) beside one ("sh" + a new look-alike + "t"), or letters from two or more of those alphabets
+ * (Cyrillic п, е, г beside a Cherokee letter). In chat it's refused, so a look-alike the list doesn't have yet can't carry
+ * a word past the filter. A known look-alike is read as its Latin letter instead (the lists catch the word). Words wholly
+ * in one alphabet ("дела", "καλημέρα") and other scripts beside Latin ("gg楽しかった", "ok你好") are left alone. (Names
+ * don't get this: real names still work.)
+ */
+const mixedScript = (text: string) =>
+  base(text)
+    .split(/\s+/)
+    .some((t) => {
+      const chars = [...t];
+      if (!chars.some((c) => c > "\x7f" && /\p{L}/u.test(c) && LOOKALIKE_SCRIPTS.test(c) && LOOKALIKE[c] === undefined)) return false;
+      if (/[a-z]/.test(t)) return true;
+      return SCRIPTS.filter((re) => chars.some((c) => /\p{L}/u.test(c) && re.test(c))).length >= 2;
+    });
+
+/**
+ * A phone number, or any other: seven digits or more in the whole message, any script's (the director's call, after three
+ * rounds of shapes opened new holes: "5 5 5 1 2 3 4", "12 34 56 78"). Rating ranges, long score lists and full dates are
+ * refused with them; a short message still carries one or two numbers ("I'm 1500", "gg 1-0", "3+2").
+ */
+const PHONE_DIGITS = 7;
+const digitCount = (text: string) => (text.match(/\p{Nd}/gu) ?? []).length;
+/** The endings of web addresses people paste (not short ones that start sentences when someone skips a space: "me", "to"). */
+const TLDS = "com|net|org|io|co|ly|tv|app|xyz|info|biz|uk|ru|de|fr|ca|au|link|site|online|club|shop|live|top|dev|cc|ws|tk|gl|page|store|chat|gg|me";
+/** The same, without the ones that are everyday words ("polka dot top"), for an address spelled with "dot". */
+const DOT_TLDS = "com|net|org|io|co|ly|tv|xyz|uk|ru|de|fr|ca|au|gg";
+const LINK_RE = new RegExp(
+  [
+    "https?\\b", // http, https, http://
+    "www\\s*[.。｡]",
+    "://",
+    // example.com, bit.ly (no space after the dot; "me" and "gg" only with a path: "t.me/x", "discord.gg/x")
+    `\\b[a-z0-9-]+[.。｡](?:${TLDS.replace("|gg|me", "")})\\b`,
+    "\\b[a-z0-9-]+(?:[.。｡][a-z0-9-]+)*[.。｡][a-z]{2,}/\\S", // t.me/someone, example.co.uk/page
+    `\\b[a-z0-9-]+\\s+[.。｡]\\s*(?:${TLDS})\\b`, // example . io, bit . ly/x (a space before the dot: never prose)
+    `\\b[a-z0-9-]+\\s*[([{]\\s*[.。｡]\\s*[)\\]}]\\s*(?:${TLDS})\\b`, // example(.)com, example [.] com, example{.}net
+    "\\b[a-z0-9-]+\\s*[.。｡]\\s*(?:com|net|org)\\b", // example. com
+    `\\b[a-z0-9-]+\\s*[([{]?\\s*dot\\s*[)\\]}]?\\s*(?:${DOT_TLDS})\\b`, // example dot com, example (dot) io
+  ].join("|"),
+);
+/** Mail services. */
+const MAIL = "gmail|googlemail|hotmail|outlook|yahoo|ymail|icloud|aol|proton|protonmail|gmx|msn";
+/** An email address, a mail service's name ("my gmail"), or one spelled out ("at yahoo", "@ gmail"). */
+const EMAIL_RE = new RegExp(`[\\w.+-]+\\s*@\\s*[\\w-]+[.。｡][a-z]{2,}|\\b(?:gmail|googlemail|hotmail|icloud|protonmail|ymail)\\b|(?:\\bat|@)\\s*(?:${MAIL})\\b`);
+/** Messaging apps and games with their own chat, where "add me on …" moves a conversation off the game. */
+const APPS_RE = /\b(?:discord|snapchat|snap\s+chat|instagram|whatsapp|telegram|tiktok|facebook|skype|wechat|roblox|kik)\b/;
+
+/** What a refused chat message hears: a slur, a hate term or a swear word… */
+export const CHAT_NOT_ALLOWED = "That message isn't allowed.";
+/** …and a link, an email address or a phone number. */
+export const CHAT_NO_CONTACT = "No links or contact details in chat.";
+
+/** Why a chat message (the town square's) is refused, or null when it may go. */
+export function chatRefusal(text: string): string | null {
+  if (typeof text !== "string" || !text) return null;
+  // ("who're" is "who are", not a word inside it.)
+  const said = text.slice(0, CHAT_READ).replace(/\bwho['’]re\b/gi, "who are");
+  const refused = (reading: (word: string) => string) => {
+    const pieces: Pieces[] = [];
+    const ws = words(said, reading, pieces);
+    return listed(ws) || swears(ws, pieces);
+  };
+  const digits = said.normalize("NFKC").replace(/\P{Nd}/gu, "");
+  if (READINGS.some(refused) || mixedScript(said) || NUMBERS.some((n) => digits.includes(n))) return CHAT_NOT_ALLOWED;
+  // (Look-alike letters read as Latin ones, so a Cyrillic "о" can't hide a ".com"; digits and symbols stay as typed.)
+  const plain = base(said).replace(/./gsu, (c) => LOOKALIKE[c] ?? c);
+  if (LINK_RE.test(plain) || EMAIL_RE.test(plain) || APPS_RE.test(plain) || digitCount(said) >= PHONE_DIGITS) return CHAT_NO_CONTACT;
+  return null;
 }
 
 /**

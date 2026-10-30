@@ -19,13 +19,11 @@ import {
   chatPicksAfterGetting,
   cleanChatPickList,
   ownedChatPacks,
-  ratingTier,
   shopItem,
   starterItem,
   topPercent,
   type ChatPickKind,
   type ItemLook,
-  type RankEffect,
   type EquipSlot,
   type ShopState,
   type StoredChatPicks,
@@ -221,6 +219,10 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   { table: "results", column: "eval_bar", type: "INTEGER" },
   // A report made during a match: that match's lobby code (one report per reporter, player and match).
   { table: "reports", column: "match", type: "TEXT" },
+  // A report of a line in the town square's chat (Oct 28, 2026): the line's text and when it was said, from the server's
+  // room (never from the reporter), so a moderator sees what was said. Kept as the report is.
+  { table: "reports", column: "line", type: "TEXT" },
+  { table: "reports", column: "line_at", type: "INTEGER" },
   // Fair play's deep re-check (fairplay-deep.ts): 1 while a match waits for it, and 1 once its counted moves have all
   // been searched again.
   { table: "fairplay_matches", column: "deep_queued", type: "INTEGER" },
@@ -792,12 +794,16 @@ export interface RaidStats {
 }
 
 /**
- * What anyone can see of a player: no email, no sign-in method, no icon, nothing about the account itself.
- * The same structure for your own profile and everyone else's.
+ * What anyone can see of a player: their name, their icon and what they wear and have played; no email, no sign-in
+ * method, nothing about the account itself. The icon became public on Oct 28, 2026 (Eric: it's the picture behind the
+ * pawn on the public profile; icons are reportable and a moderator can reset one, so it was never a secret to
+ * moderate). The same structure for your own profile and everyone else's.
  */
 export interface PublicProfile {
   id: string;
   name: string;
+  /** Their drawn icon (a 48 × 48 PNG data URL), or an older account's emoji; "♟" is the default (none of their own). */
+  icon: string;
   /** What they wear: crate items. */
   look: ItemLook;
   joinedAt: number;
@@ -806,13 +812,11 @@ export interface PublicProfile {
   /** They hide when they're online (Settings → Friends): `online` false and `lastSeen` null, whatever the truth. */
   hidden?: boolean;
   rating: number | null;
-  /** The rank ("Weighty"), its place on the ladder (0 = Novice), its color and a top rank's pill effect. */
-  tier: { label: string; level: number; color: string; effect: RankEffect | null } | null;
   /** "Top 18%" among rated players (null until enough players have a rating). */
   topPercent: number | null;
   /** Banned for fair play (the profile says "Banned"; nothing else about a fair-play case is ever shown). */
   banned: boolean;
-  /** Ranked 1 v 1: the rank and the record (null when banned, as the rating). */
+  /** Ranked 1 v 1: the rank (the rank shown everywhere since Oct 28), the record, the peak, the streak and the recent games (null when banned, as the rating). */
   ranked1v1: RankedSummary | null;
   crowd: CrowdStats;
   boss: RaidStats;
@@ -896,8 +900,8 @@ export function raidStats(rows: ResultRow[]): RaidStats {
 
 /** Anyone's profile by account id (null if there's no such account). */
 export async function publicProfile(sql: Sql, userId: string, now: number): Promise<PublicProfile | null> {
-  const u = await sql.first<{ id: string; name: string; created_at: number; last_seen: number | null; rating: number | null; hide_online: number | null }>(
-    "SELECT id, name, created_at, last_seen, rating, hide_online FROM users WHERE id = ?",
+  const u = await sql.first<{ id: string; name: string; icon: string; created_at: number; last_seen: number | null; rating: number | null; hide_online: number | null }>(
+    "SELECT id, name, icon, created_at, last_seen, rating, hide_online FROM users WHERE id = ?",
     userId,
   );
   if (!u) return null;
@@ -918,17 +922,16 @@ export async function publicProfile(sql: Sql, userId: string, now: number): Prom
   }
   const raids = rows.filter((r) => r.mode === "boss");
   const banned = (await sql.first<{ status: string }>("SELECT status FROM fairplay_cases WHERE user_id = ?", userId))?.status === "banned";
-  const tier = ratingTier(banned ? null : rating);
   return {
     id: u.id,
     name: u.name,
+    icon: u.icon,
     look: (await lockerState(sql, u.id)).look,
     joinedAt: u.created_at,
     lastSeen: u.hide_online ? null : u.last_seen,
     online: !u.hide_online && u.last_seen !== null && now - u.last_seen < FRONT_DOOR.onlineWindowMs,
     ...(u.hide_online ? { hidden: true } : {}),
     rating: banned ? null : rating,
-    tier: tier ? { label: tier.label, level: tier.level, color: tier.color, effect: tier.effect } : null,
     topPercent: banned ? null : top,
     banned,
     ranked1v1: banned ? null : await rankedSummary(sql, u.id),

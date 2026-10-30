@@ -9,7 +9,7 @@
  */
 import type { Anim, Character, Frame, Layer, Part } from "../../characters/sprite.ts";
 import { MOO_PALETTE } from "../../characters/moo.ts";
-import { grain, groundShadow, paint, signBoard, signFace, type Pt } from "./kit.ts";
+import { grain, groundShadow, LANTERN_LIGHT, paint, signBoard, signFace, type LightSpot, type Pt } from "./kit.ts";
 
 const M_ = MOO_PALETTE;
 const PALETTE: Record<string, string> = {
@@ -258,3 +258,6 @@ export const HOUSE_MOO: Character = {
 
 /** Where the sign's blank face is (frame pixels), for the game to write "Moo & Moon Meadow" on. */
 export const HOUSE_MOO_SIGN = signFace(BOARD[0], BOARD[1], BW, BH);
+
+/** Its lights at dusk and night (Oct 27): a meadow has no inside, so its lantern on the post shines, flickering, a halo round it. */
+export const HOUSE_MOO_LIGHTS: readonly LightSpot[] = [{ x: LANTERN[0] + 2, y: LANTERN[1] + 2, w: 4, h: 9, keys: "lm", color: LANTERN_LIGHT, strength: 1, flicker: true, halo: 12 }];

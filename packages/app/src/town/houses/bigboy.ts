@@ -7,7 +7,7 @@
  */
 import type { Anim, Character, Frame, Layer, Part } from "../../characters/sprite.ts";
 import { BIGBOY_PALETTE } from "../../characters/bigboy.ts";
-import { ball, groundShadow, paint, signBoard, signFace, type Pt } from "./kit.ts";
+import { ball, groundShadow, LANTERN_LIGHT, paint, signBoard, signFace, type LightSpot, type Pt } from "./kit.ts";
 
 const B = BIGBOY_PALETTE;
 const PALETTE: Record<string, string> = {
@@ -279,3 +279,6 @@ export const HOUSE_BIGBOY: Character = {
 export const HOUSE_BIGBOY_SIGN = signFace(BOARD[0], BOARD[1], BW, BH);
 
 void ball;
+
+/** Its lights at dusk and night (Oct 27): a crib has no inside, so the toy train's windows glow, like a nightlight. */
+export const HOUSE_BIGBOY_LIGHTS: readonly LightSpot[] = [{ x: 42, y: TRAIN_Y - 9, w: 48, h: 7, keys: "q", color: LANTERN_LIGHT, strength: 1 }];

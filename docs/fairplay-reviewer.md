@@ -25,8 +25,9 @@ agree. Background: DECISIONS.md, "Fair play"; the numbers behind the thresholds:
 
 - `player`: name, joined, signed in or not, online matches (no email for the reviewer).
 - `case`: status, reason, when it opened, who decided last.
-- `reports`: when, why (Cheating, Offensive name or icon, Something else), which match, who (and whether they were
-  signed in).
+- `reports`: when, why (Cheating, Offensive name or icon, Something else, Offensive chat), which match, who (and whether
+  they were signed in). A report of a town square chat line ("Offensive chat") comes without the line's words: those are
+  for a moderator, on the review page.
 - `matches` (newest first, up to 30): `perf` (match strength on our engine-rating scale), `counted`, `score`, `level`,
   `summary` (every signal and the score's parts) and `moves`: each judged pick with
   - `moveNo`, `pick` and `best` (SAN), `loss` (points against the judges' best), `found` (within 1 point);
@@ -59,8 +60,9 @@ matches.
 - a banned case, or one with an appeal waiting (the API refuses anyway);
 - a "Deleted player" (an account deleted while banned or in review): its case is kept so deleting can't get around
   fair play, with no evidence left to weigh; the API refuses it too;
-- a case open only because of "Offensive name or icon" or "Something else" reports: names and behavior are for a
-  person;
+- a case open only because of "Offensive name or icon", "Offensive chat" or "Something else" reports: names, chat and
+  behavior are for a person (never Clear one: a moderator reads the reported line first; the API refuses to clear a case
+  with an "Offensive chat" report since its last decision);
 - anything where the evidence was deleted (`moves: null` for every match) and the summaries alone don't settle it.
 
 **Ban** only on overwhelming evidence, the same bar as automatic bans (`policy.levels`), from matches the deep re-check
@@ -77,7 +79,8 @@ has gone through:
   the engine's best, hard finds 4/5 in 3-5 s each."
 
 **Clear** when the review has no case to answer:
-- reports alone, and the reported matches look like the player's level: strength within a few hundred points of their
+- cheating reports alone (never a case with an "Offensive chat" report: a moderator reads that line first), and the
+  reported matches look like the player's level: strength within a few hundred points of their
   history, evidence below 0 or near it, misses outside the engine's top three, think time rising with difficulty;
 - a strong player whose history is consistently strong (their own median strength close to these matches) and whose
   deep matches stay well below `banDeep`.

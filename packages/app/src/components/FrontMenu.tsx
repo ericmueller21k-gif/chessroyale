@@ -23,7 +23,7 @@ export interface FrontNav {
   signIn?: () => void;
 }
 
-export type FrontPage = "home" | "raid" | "queue" | "profile" | "settings" | "shop" | "lobby" | "friends";
+export type FrontPage = "home" | "town" | "raid" | "queue" | "profile" | "settings" | "shop" | "lobby" | "friends";
 
 const Icon = ({ d, children }: { d?: string; children?: ComponentChildren }) => (
   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -55,8 +55,8 @@ export function SideMenu({ page, nav }: { page?: FrontPage; nav: FrontNav }) {
       <Logo onClick={nav.home} />
       <div class="fd-menu">
         <Item label="Play" on={page === "home" || page === "queue"} onClick={nav.home} icon={<Icon d="M7 4.5v15l12-7.5z" />} />
-        <Item label="Boss Arena" onClick={nav.bossArena} icon={crown()} />
-        <Item label="Solo Boss Mode" on={page === "raid"} onClick={nav.soloBoss} icon={crown()} />
+        <Item label="Boss Arena" on={page === "town"} onClick={nav.bossArena} icon={crown()} />
+        <Item label="Boss Battle" on={page === "raid"} onClick={nav.soloBoss} icon={crown()} />
         <Item
           label="Play with friends"
           on={page === "lobby"}
@@ -145,7 +145,7 @@ export function FrontFrame({ children, page, nav }: { children: ComponentChildre
     <div class={`fd-root${nav ? " framed" : ""}${page ? ` fd-on-${page}` : ""}`}>
       {nav && <SideMenu page={page} nav={nav} />}
       <main class="fd-center">{children}</main>
-      {nav && <RightPanel onProfile={nav.profile} onFriends={nav.friendsList} chat={page === "home"} onSignIn={nav.signIn} />}
+      {nav && <RightPanel onProfile={nav.profile} onFriends={nav.friendsList} chat={page === "home" || page === "town"} onSignIn={nav.signIn} />}
       {/* A new invite: front-door pages only (never over a match, nor in the queue). */}
       {nav && page !== "queue" && <InviteToast />}
     </div>

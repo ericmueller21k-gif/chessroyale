@@ -18,6 +18,9 @@ move.
 
 ## How it works today
 
+- **The board on a computer** (Oct 29; docs/decisions/2026-10-29-desktop-board-size.md, [board.md](board.md)): the window's height
+  less 230 px (the tiny boards over it, the clocks' line under it; a relay 250), never wider than its column: 848 px at
+  1920 × 1080, width-bound at 1280 × 800 (504, as before).
 - **Its kill switch** (`PAUSE_SQUADS`, [ops.md](ops.md) "Kill switches"): no new queue or party (503 with "Squads is
   resting for a bit. Back soon."); a party already in line waits with that line and goes in once it's back; lobbies
   already running finish; admins' test lobbies stay open.

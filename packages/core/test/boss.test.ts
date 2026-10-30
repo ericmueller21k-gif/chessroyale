@@ -11,8 +11,8 @@ describe("the boss template: who can be met", () => {
     expect(playableBosses([base, { ...base, id: "y", kit: null }, { ...base, id: "z", powers: null }]).map((b) => b.id)).toEqual(["x"]);
   });
 
-  it("today: Ginger (Freeze), Boingo the Clown, Jefferson (Fire), Hollow (Darkness), Big Boy (toy blocks, the Big Bounce), Sawyer (saw cuts, the board saw), Wrangler (the lasso drag, the showdown), Alfil (Tusks, the Mammoth Slam), Chub & Chirp (Leapfrog, the Carrot Patch), Smudgy (Camouflage, Repaint), Moo & Moon (Moonbeam, the Full Moon), Puddles (Seeds, Watering) and Babur (Balloons, Hoops)", () => {
-    expect(playableBosses().map((b) => b.id).sort()).toEqual(["alfil", "bigboy", "clown", "gardener", "gingerbread", "grex", "hollow", "hopper", "moo", "pig", "sawyer", "smudgy", "tiger"]);
+  it("today: Ginger (Freeze), Boingo the Clown, Jefferson (Fire), Hollow (Darkness), Big Boy (toy blocks, the Big Bounce), Sawyer (saw cuts, the board saw), Wrangler (the lasso drag, the showdown), Alfil (Tusks, the Mammoth Slam), Chub & Chirp (Leapfrog, the Carrot Patch), Smudgy (Camouflage, Repaint), Moo & Moon (Moonbeam, the Full Moon), Puddles (Seeds, Watering), Babur (Balloons, Hoops) and Folio (Draft, Crease)", () => {
+    expect(playableBosses().map((b) => b.id).sort()).toEqual(["alfil", "bigboy", "clown", "folio", "gardener", "gingerbread", "grex", "hollow", "hopper", "moo", "pig", "sawyer", "smudgy", "tiger"]);
     expect(BOSS_ROSTER.find((b) => b.id === "tiger")).toMatchObject({ name: "Babur", icon: "🐯", kit: "Tiger", offset: -250, powers: { passive: "balloons", ultimate: "hoops" } });
     expect(BOSS_ROSTER.find((b) => b.id === "gardener")).toMatchObject({ name: "Puddles", icon: "🦛", kit: "Gardener", offset: -250, powers: { passive: "seeds", ultimate: "water" } });
     expect(BOSS_ROSTER.find((b) => b.id === "moo")).toMatchObject({ name: "Moo & Moon", icon: "🐄", kit: "Moo", offset: -240, powers: { passive: "moonbeam", ultimate: "fullmoon" } });
@@ -61,7 +61,7 @@ describe("the boss template: who can be met", () => {
       // A picked boss that isn't playable is never met.
       expect(isPlayable(chooseBoss(i / 100, "golem"))).toBe(true);
     }
-    expect(seen).toEqual(new Set(["alfil", "bigboy", "clown", "gardener", "gingerbread", "grex", "hollow", "hopper", "moo", "pig", "sawyer", "smudgy", "tiger"]));
+    expect(seen).toEqual(new Set(["alfil", "bigboy", "clown", "folio", "gardener", "gingerbread", "grex", "hollow", "hopper", "moo", "pig", "sawyer", "smudgy", "tiger"]));
     expect(chooseBoss(0.99, "clown", "clown").id).toBe("clown");
     // With one playable boss, it's met even if it was the last one.
     const one: BossDef[] = [{ id: "a", name: "A", icon: "a", kit: "A", offset: 0, powers: { passive: "pie", ultimate: "funhouse" } }];
@@ -74,8 +74,8 @@ describe("the boss template: who can be met", () => {
     expect([1400, 1600, 1800, 2000, 2200, 2400, 2600, 2800, 3000, 3190].map(bossThreat)).toEqual([1, 1, 2, 2, 3, 3, 4, 4, 5, 5]);
   });
 
-  it("solo's difficulty: Easy −300, Normal your strength, Hard +250, Hardest +500, never past the engine's strongest", () => {
-    expect(BOSS_DIFFICULTY.map((d) => [d.id, d.elo])).toEqual([["easy", -300], ["normal", 0], ["hard", 250], ["hardest", 500]]);
+  it("solo's difficulty: Very easy −500, Easy −300, Medium your strength, Hard +250, Very hard +500, never past the engine's strongest", () => {
+    expect(BOSS_DIFFICULTY.map((d) => [d.id, d.elo])).toEqual([["very-easy", -500], ["easy", -300], ["normal", 0], ["hard", 250], ["hardest", 500]]);
     const at = (base: number, id: string) => bossStrength(base, { offset: -100 }, BOSS_DIFFICULTY.find((d) => d.id === id)!.elo);
     expect([at(1600, "easy"), at(1600, "normal"), at(1600, "hard"), at(1600, "hardest")]).toEqual([1200, 1500, 1750, 2000]);
     expect(at(3000, "hardest")).toBe(ENGINE_MAX_ELO);
