@@ -75,7 +75,15 @@ void main() {
   v_p1 = a_p1;
 }`;
 
-const FS = `#version 300 es
+/**
+ * The fragment shader, in three builds that differ only in which modes they can draw (the same code for each mode): solid
+ * fills alone, solid and textured, and everything (soft lines and pictures too). A draw uses the least one that covers the
+ * modes its triangles use (`Stream.modes`): the same pixels, but a software renderer (SwiftShader, which runs every branch of
+ * a shader for every pixel) spends far less on the ground's and the sky's solid fills. A GPU barely notices.
+ */
+const fsFor = (tex: boolean, soft: boolean) => `#version 300 es
+#define TEX ${tex ? 1 : 0}
+#define SOFT ${soft ? 1 : 0}
 precision highp float;
 precision highp int;
 // The atlas pages (layers 0 to 6 of one array texture) and one texture of its own (layer 7: a light layer, a big picture).
@@ -114,17 +122,20 @@ void main() {
   uint slot = (v_flags >> 3u) & 7u; // (the texture: an atlas page's layer, or 7)
   bool smoothed = ((v_flags >> 6u) & 1u) == 1u;
   uint comp = (v_flags >> 7u) & 3u;
-  vec4 c;
-  if (mode == 0u) {
-    c = v_col;
-  } else if (mode == 1u) {
+  // (Mode 0, solid: the color.)
+  vec4 c = v_col;
+#if TEX
+  if (mode == 1u) {
     c = smoothAt(slot, smoothed ? v_uv : nearUv(slot, v_uv)) * v_col;
-  } else if (mode == 2u) {
+  }
+#endif
+#if SOFT
+  if (mode == 2u) {
     // A line blurred: its half width p0.x, the blur's sigma p0.y; v_uv.x the distance across it.
     float d = v_uv.x;
     float a = phi((v_p0.x - d) / v_p0.y) - phi((-v_p0.x - d) / v_p0.y);
     c = v_col * clamp(a, 0.0, 1.0);
-  } else {
+  } else if (mode == 3u) {
     // A soft picture: v_uv the scratch's pixels; shrunk (scratch), hazed, stretched back (smooth or nearest).
     vec2 s = v_uv;
     if (smoothed) {
@@ -143,10 +154,19 @@ void main() {
     c.rgb = c.rgb * (1.0 - h) + v_col.rgb * (h * c.a);
     c *= v_col.a;
   }
+#endif
   if (comp == 1u) c.a = 0.0;
   else if (comp == 2u) c = vec4(0.0, 0.0, 0.0, c.a);
   o = c;
 }`;
+
+/** One build of the shader (`fsFor`) and where its uniforms are. */
+interface Prog {
+  p: WebGLProgram;
+  uSize: WebGLUniformLocation | null;
+  uFlip: WebGLUniformLocation | null;
+  uTSize: WebGLUniformLocation | null;
+}
 
 /** A GL texture: an atlas page (a layer of the atlas's array texture), a big picture's own, or a light layer's. */
 interface Tex {
@@ -187,6 +207,8 @@ interface Stream {
   f: Float32Array;
   u: Uint32Array;
   n: number;
+  /** The modes its triangles use (bit 1 << mode), for the least shader that draws them (`fsFor`). */
+  modes: number;
   atlas: boolean;
   big: Tex | null;
   /** The framebuffer drawn into (null: the canvas), its size, and its y (the canvas is drawn top down, a layer bottom up). */
@@ -198,7 +220,7 @@ interface Stream {
 
 const newStream = (fb: WebGLFramebuffer | null, flip: number): Stream => {
   const f = new Float32Array(VF * 6 * 2048);
-  return { f, u: new Uint32Array(f.buffer), n: 0, atlas: false, big: null, fb, w: 1, h: 1, flip };
+  return { f, u: new Uint32Array(f.buffer), n: 0, modes: 0, atlas: false, big: null, fb, w: 1, h: 1, flip };
 };
 
 /** A color parsed into premultiplied-ready parts (0 to 1). */
@@ -337,7 +359,12 @@ export function painterGL(cv: HTMLCanvasElement, onLost: (lost: boolean) => void
   if (typeof WebGL2RenderingContext === "undefined") return "no-webgl2";
   let gl: WebGL2RenderingContext | null = null;
   try {
-    gl = cv.getContext("webgl2", { alpha: true, antialias: true, premultipliedAlpha: true, stencil: true, depth: false, preserveDrawingBuffer: false });
+    // A GPU's context, with 4x multisampling for the edges (the picture as designed). Where the browser would draw it in
+    // software instead (no GPU, or one it won't use: SwiftShader, the headless tests' renderer), that one fails, and the
+    // context is made without multisampling: the same picture but for the edges, at about half a frame's cost there
+    // (SwiftShader clears and resolves four samples a pixel on the CPU). docs/decisions/2026-10-30-town-webgl.md.
+    const attrs = { alpha: true, premultipliedAlpha: true, stencil: true, depth: false, preserveDrawingBuffer: false };
+    gl = cv.getContext("webgl2", { ...attrs, antialias: true, failIfMajorPerformanceCaveat: true }) ?? cv.getContext("webgl2", { ...attrs, antialias: false });
   } catch {
     gl = null;
   }
@@ -362,14 +389,12 @@ class GLPainter implements Painter {
   private ups = 0;
   frameNo = 0;
   gen = 1;
-  private prog: WebGLProgram | null = null;
+  /** The shader's three builds (`fsFor`): solid fills; solid and textured; everything. */
+  private progs: Prog[] = [];
   private vao: WebGLVertexArrayObject | null = null;
   private vbo: WebGLBuffer | null = null;
   private vboSize = 0;
   private sLinear: WebGLSampler | null = null;
-  private uSize: WebGLUniformLocation | null = null;
-  private uFlip: WebGLUniformLocation | null = null;
-  private uTSize: WebGLUniformLocation | null = null;
   /** The atlas: one array texture, `cap` pages deep; and a blank texture for "none of its own". */
   private atlas: WebGLTexture | null = null;
   private cap = 0;
@@ -424,22 +449,24 @@ class GLPainter implements Painter {
       if (!gl.getShaderParameter(s, gl.COMPILE_STATUS) && !gl.isContextLost()) console.warn("town gl:", gl.getShaderInfoLog(s));
       return s;
     };
-    const prog = gl.createProgram()!;
-    gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS));
-    gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
-    for (const [i, n] of ["a_pos", "a_uv", "a_col", "a_flags", "a_p0", "a_p1"].entries()) gl.bindAttribLocation(prog, i, n);
-    gl.linkProgram(prog);
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
-      if (!gl.isContextLost()) console.warn("town gl:", gl.getProgramInfoLog(prog));
-      return false;
+    // (All three made now, as the town opens: never a compile on the frame loop.)
+    const vs = sh(gl.VERTEX_SHADER, VS);
+    this.progs = [];
+    for (const [tex, soft] of [[false, false], [true, false], [true, true]] as const) {
+      const prog = gl.createProgram()!;
+      gl.attachShader(prog, vs);
+      gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, fsFor(tex, soft)));
+      for (const [i, n] of ["a_pos", "a_uv", "a_col", "a_flags", "a_p0", "a_p1"].entries()) gl.bindAttribLocation(prog, i, n);
+      gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+        if (!gl.isContextLost()) console.warn("town gl:", gl.getProgramInfoLog(prog));
+        return false;
+      }
+      gl.useProgram(prog);
+      gl.uniform1i(gl.getUniformLocation(prog, "A"), 0);
+      gl.uniform1i(gl.getUniformLocation(prog, "T"), 1);
+      this.progs.push({ p: prog, uSize: gl.getUniformLocation(prog, "u_size"), uFlip: gl.getUniformLocation(prog, "u_flip"), uTSize: gl.getUniformLocation(prog, "u_tsize") });
     }
-    this.prog = prog;
-    gl.useProgram(prog);
-    gl.uniform1i(gl.getUniformLocation(prog, "A"), 0);
-    gl.uniform1i(gl.getUniformLocation(prog, "T"), 1);
-    this.uTSize = gl.getUniformLocation(prog, "u_tsize");
-    this.uSize = gl.getUniformLocation(prog, "u_size");
-    this.uFlip = gl.getUniformLocation(prog, "u_flip");
     this.vao = gl.createVertexArray();
     gl.bindVertexArray(this.vao);
     this.vbo = gl.createBuffer();
@@ -749,6 +776,7 @@ class GLPainter implements Painter {
   flush(st: Stream): void {
     if (st.n === 0 || this.lost) {
       st.n = 0;
+      st.modes = 0;
       st.atlas = false;
       st.big = null;
       return;
@@ -756,15 +784,17 @@ class GLPainter implements Painter {
     const { gl } = this;
     gl.bindFramebuffer(gl.FRAMEBUFFER, st.fb);
     gl.viewport(0, 0, st.w, st.h);
-    gl.useProgram(this.prog);
+    // The least build of the shader that draws every mode the stream holds (the same pixels: `fsFor`).
+    const pg = this.progs[st.modes & (1 << M_SOFTLINE | 1 << M_SOFTIMG) ? 2 : st.modes & (1 << M_TEX) ? 1 : 0]!;
+    gl.useProgram(pg.p);
     gl.bindVertexArray(this.vao);
-    gl.uniform2f(this.uSize, st.w, st.h);
-    gl.uniform1f(this.uFlip, st.flip);
+    gl.uniform2f(pg.uSize, st.w, st.h);
+    gl.uniform1f(pg.uFlip, st.flip);
     // The atlas on unit 0, the draw's texture of its own (or a blank one: a layer's left bound while that layer is drawn
     // into would be a feedback loop) on unit 1.
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, st.big?.t ?? this.dummy);
-    if (st.big) gl.uniform2f(this.uTSize, st.big.w, st.big.h);
+    if (st.big) gl.uniform2f(pg.uTSize, st.big.w, st.big.h);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.atlas);
     const bytes = st.n * VF * 4;
@@ -785,6 +815,7 @@ class GLPainter implements Painter {
     gl.drawArrays(gl.TRIANGLES, 0, st.n);
     this.calls++;
     st.n = 0;
+    st.modes = 0;
     st.atlas = false;
     st.big = null;
   }
@@ -808,10 +839,12 @@ class GLPainter implements Painter {
     if ((this.chains[level] === chain && !this.stale[level]) || this.lost) return;
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, main.w, main.h);
-    gl.useProgram(this.prog);
+    // (The solid build: only the stencil is written, the colors masked.)
+    const pg = this.progs[0]!;
+    gl.useProgram(pg.p);
     gl.bindVertexArray(this.vao);
-    gl.uniform2f(this.uSize, main.w, main.h);
-    gl.uniform1f(this.uFlip, main.flip);
+    gl.uniform2f(pg.uSize, main.w, main.h);
+    gl.uniform1f(pg.uFlip, main.flip);
     gl.colorMask(false, false, false, false);
     gl.enable(gl.STENCIL_TEST);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
@@ -1256,6 +1289,7 @@ class GLCtx {
       o += 3 * VF;
     }
     st.n += (n - 2) * 3;
+    st.modes |= 1 << (flags & 7);
   }
   private packed = new Uint32Array(64);
 
@@ -1387,54 +1421,61 @@ class GLCtx {
     const m = this.m;
     const a = this.globalAlpha;
     const flags = M_SOLID | (this.comp() << 7);
-    // (The town's gradients run straight down under a scale and a move: positions along y.)
-    const ys = (t: number) => gr.y0 + (gr.y1 - gr.y0) * t;
     const n = gr.at.length;
     if (!n) return;
-    const colAt = (Y: number, out: RGBA) => {
-      const t = gr.y1 === gr.y0 ? 0 : (Y - gr.y0) / (gr.y1 - gr.y0);
-      let i = 0;
-      while (i < n && gr.at[i]! < t) i++;
-      if (i === 0) return Object.assign(out, gr.col[0]);
-      if (i === n) return Object.assign(out, gr.col[n - 1]);
-      const t0 = gr.at[i - 1]!;
-      const t1 = gr.at[i]!;
-      const k = t1 > t0 ? (t - t0) / (t1 - t0) : 1;
-      const c0 = gr.col[i - 1]!;
-      const c1 = gr.col[i]!;
-      out.r = c0.r + (c1.r - c0.r) * k;
-      out.g = c0.g + (c1.g - c0.g) * k;
-      out.b = c0.b + (c1.b - c0.b) * k;
-      out.a = c0.a + (c1.a - c0.a) * k;
-      return out;
-    };
-    // The band edges: the rectangle's top and bottom and every stop between.
+    // The band edges: the rectangle's top and bottom and every stop between. (The town's gradients run straight down under a
+    // scale and a move: positions along y.)
     let top = y;
     const bot = y + h;
     const edges = this.gradEdges;
     let ne = 0;
     edges[ne++] = top;
     for (let i = 0; i < n; i++) {
-      const Y = ys(gr.at[i]!);
+      const Y = gr.y0 + (gr.y1 - gr.y0) * gr.at[i]!;
       if (Y > top && Y < bot) edges[ne++] = Y;
     }
     edges[ne++] = bot;
     this.polyRoom(4);
+    const pts = this.gradPts;
     for (let i = 0; i + 1 < ne; i++) {
       top = edges[i]!;
       const b = edges[i + 1]!;
-      const c0 = colAt(top, this.col);
-      const pts = [x, top, x + w, top, x + w, b, x, b];
+      const c0 = this.colorAt(gr, top, this.col);
+      const c1 = this.colorAt(gr, b, this.col2);
+      pts[0] = pts[6] = x;
+      pts[2] = pts[4] = x + w;
+      pts[1] = pts[3] = top;
+      pts[5] = pts[7] = b;
       for (let k = 0; k < 4; k++) {
         const X = pts[k * 2]!;
         const Y = pts[k * 2 + 1]!;
-        const c = k < 2 ? c0 : colAt(b, this.col2);
-        this.v(k, m[0]! * X + m[2]! * Y + m[4]!, m[1]! * X + m[3]! * Y + m[5]!, 0, 0, c, a);
+        this.v(k, m[0]! * X + m[2]! * Y + m[4]!, m[1]! * X + m[3]! * Y + m[5]!, 0, 0, k < 2 ? c0 : c1, a);
       }
       this.emitPoly(4, flags);
     }
   }
+  /** The gradient's color at `Y` (along its line), into `out`. */
+  private colorAt(gr: GLGradient, Y: number, out: RGBA): RGBA {
+    const n = gr.at.length;
+    const t = gr.y1 === gr.y0 ? 0 : (Y - gr.y0) / (gr.y1 - gr.y0);
+    let i = 0;
+    while (i < n && gr.at[i]! < t) i++;
+    if (i === 0) return Object.assign(out, gr.col[0]);
+    if (i === n) return Object.assign(out, gr.col[n - 1]);
+    const t0 = gr.at[i - 1]!;
+    const t1 = gr.at[i]!;
+    const k = t1 > t0 ? (t - t0) / (t1 - t0) : 1;
+    const c0 = gr.col[i - 1]!;
+    const c1 = gr.col[i]!;
+    out.r = c0.r + (c1.r - c0.r) * k;
+    out.g = c0.g + (c1.g - c0.g) * k;
+    out.b = c0.b + (c1.b - c0.b) * k;
+    out.a = c0.a + (c1.a - c0.a) * k;
+    return out;
+  }
   private readonly gradEdges = new Float64Array(64);
+  /** A band's corners (reused: nothing made per frame). */
+  private readonly gradPts = new Float64Array(8);
 
   createLinearGradient(x0: number, y0: number, x1: number, y1: number): CanvasGradient {
     return new GLGradient(x0, y0, x1, y1) as unknown as CanvasGradient;
