@@ -14,7 +14,8 @@ npm run boss-art -- <id> <brief.md> [refs dir]
   - It looks at the brief's reference pictures, and fixes what reads badly until it calls `done`.
 - **Key:** `BOSS_LINES_API_KEY`, as for boss lines (`scripts/boss-lines/api.ts`), read only by the SDK (never printed or written). The renders run in a process of their own without it in the environment, since they run the drawing's code.
 - **Spend:** `BOSS_ART_CAP_USD` (default 20), and at most `BOSS_ART_MAX_TURNS` turns (default 90).
-  - Every turn's real usage is added up at Opus 5.5's prices ($4 / $20 per million tokens; cache writes $5, cache reads $0.20).
+  - Every turn's real usage is added up at the model's prices: Opus 5.5 $4 / $20 per million tokens (cache writes $5), Sonnet 5.5 $2 / $10 (cache writes $2.50); cache reads $0.20.
+- **Model and effort** (Oct 27): `BOSS_ART_MODEL` (default `claude-opus-5-5`; or `claude-sonnet-5-5`) and `BOSS_ART_EFFORT` (default `high`; `low`, `medium`, `xhigh`). The summary names both. `BOSS_ART_MAX_TOKENS` (default 48,000) is each turn's output ceiling, thinking included: at `xhigh` a model can think past 48,000 before it writes, and a turn that runs out of room ends the run.
   - A turn whose worst case (the cached conversation read again, the new part written, a full 48,000 output tokens) could pass the cap isn't sent; the run stops with what it has.
   - Each tool result tells the model what's been spent, so it can pace itself.
 - **Output** (`scripts/boss-art/out/<id>/`):

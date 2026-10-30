@@ -15,6 +15,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { deflateSync } from "node:zlib";
 import { CHARACTERS } from "../../packages/app/src/characters/index.ts";
+import { HOUSES } from "../../packages/app/src/town/houses/index.ts";
 import { renderFrame, type Character } from "../../packages/app/src/characters/sprite.ts";
 
 interface Req {
@@ -35,6 +36,16 @@ interface Img {
 
 /** The anims every boss needs (the kit's moments). */
 export const REQUIRED = ["idle", "entrance", "thinking", "move", "capture", "hurt", "check", "smug", "rattled", "defeat", "victory"] as const;
+/** A boss's sidekick's anims (Oct 27: a town bot you can play, no powers): standing, walking, sitting at a table, a wave. */
+export const SIDEKICK = ["idle", "walk", "sit", "wave"] as const;
+/** A ranked tier's emblem ("rank-"): one still per division, 4 the plainest to 1 the grandest. The top tiers ("rank-top-") have no divisions: one idle. */
+export const RANK = ["d4", "d3", "d2", "d1"] as const;
+/** The whole ladder's emblems in one drawing ("rank-set"): each tier's four divisions, then the two top tiers' idles. */
+export const RANK_SET = [
+  ...["wood", "silver", "gold", "paragon", "illustrious", "sublime", "radiant"].flatMap((t) => RANK.map((d) => `${t}-${d}`)),
+  "pearlescent",
+  "transcendent",
+] as const;
 const GROUND = { dark: "#14161b", light: "#f3f1ec" } as const;
 const MAX_W = 1500;
 
@@ -104,7 +115,10 @@ async function main(req: Req): Promise<object> {
   const warnings: string[] = [];
   if (ch.id !== req.id) warnings.push(`its id is "${ch.id}", not "${req.id}"`);
   if (!ch.palette.k) warnings.push(`no outline color: the palette needs "k"`);
-  const missing = REQUIRED.filter((a) => !ch.anims[a]);
+  // A home on the town square (an id starting "house-") needs only its idle; a boss's sidekick (a town bot, "sidekick-")
+  // its idle, walk, sit and wave; a ranked tier's emblem ("rank-") a still per division, a top tier's ("rank-top-") its idle.
+  const need: readonly string[] = req.id.startsWith("house-") || req.id.startsWith("rank-top-") ? ["idle"] : req.id.startsWith("sidekick-") ? SIDEKICK : req.id.startsWith("rank-set") ? RANK_SET : req.id.startsWith("rank-") ? RANK : REQUIRED;
+  const missing = need.filter((a) => !ch.anims[a]);
   if (missing.length) warnings.push(`animations still to draw: ${missing.join(", ")}`);
   const anim = ch.anims[req.anim];
   const facts = {
@@ -129,7 +143,9 @@ async function main(req: Req): Promise<object> {
   const strip = blank(pick.length * (ch.w * s + gap) + gap, ch.h * s + 2 * gap, bg);
   drawn.forEach((im, n) => blit(strip, im, gap + n * (ch.w * s + gap), gap, s));
   // Phone size: this boss's first idle frame at 1x and 2x, beside the other boss at 2x, feet on one line.
-  const other = CHARACTERS.find((c) => c.id === (req.with ?? "tiger")) ?? CHARACTERS[0]!;
+  // `with` can also name another home's picture (house-hollow, house-gardener, ...).
+  const others = [...CHARACTERS, ...Object.values(HOUSES).map((h) => h.ch)];
+  const other = others.find((c) => c.id === (req.with ?? "tiger")) ?? CHARACTERS[0]!;
   const idle = (c: Character) => renderFrame(c, (c.anims.idle ?? Object.values(c.anims)[0]!).frames[0]!);
   const mine = idle(ch);
   const theirs = idle(other);

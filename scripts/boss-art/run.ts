@@ -15,7 +15,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { execFileSync } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { extname, join, relative, resolve, sep } from "node:path";
-import { MODEL, PRICE, hasKey } from "../boss-lines/api.ts";
+import { MODEL as OPUS, PRICE as OPUS_PRICE, hasKey } from "../boss-lines/api.ts";
 
 const ARGS = process.argv.slice(2);
 /** What's drawn: a boss character (the default), a crate item (`--item`) or a ride under the pawn (`--rider`). */
@@ -27,13 +27,27 @@ if (!id || !/^[a-z][a-z0-9-]{1,30}$/.test(id) || !briefPath) {
 }
 const ITEMISH = MODE !== "boss";
 const CAP = Number(process.env.BOSS_ART_CAP_USD ?? 20);
+/**
+ * The model and its effort (Oct 27, Eric: compare Sonnet and Opus on the same drawing): BOSS_ART_MODEL (default Opus 5.5)
+ * and BOSS_ART_EFFORT (default high). Each model's prices, dollars per million tokens (cache writes at 1.25x input).
+ */
+const MODEL = process.env.BOSS_ART_MODEL ?? OPUS;
+const PRICES: Record<string, { input: number; output: number; cacheWrite: number; cacheRead: number }> = {
+  [OPUS]: OPUS_PRICE,
+  "claude-sonnet-5-5": { input: 2, output: 10, cacheWrite: 2.5, cacheRead: 0.2 },
+};
+const PRICE = PRICES[MODEL]!;
+if (!PRICES[MODEL]) throw new Error(`BOSS_ART_MODEL: no prices for ${MODEL} (${Object.keys(PRICES).join(", ")})`);
+const EFFORT = (process.env.BOSS_ART_EFFORT ?? "high") as "low" | "medium" | "high" | "xhigh";
+if (!["low", "medium", "high", "xhigh"].includes(EFFORT)) throw new Error("BOSS_ART_EFFORT: low, medium, high or xhigh");
 if (!(CAP > 0)) throw new Error("BOSS_ART_CAP_USD must be a positive number of dollars");
 const MAX_TURNS = Number(process.env.BOSS_ART_MAX_TURNS ?? 90);
-/** Each turn's output ceiling (thinking included): room for a whole drawing written at once (an item is far smaller). */
+/**
+ * Each turn's output ceiling (thinking included): room for a whole drawing written at once (an item or a ride is far
+ * smaller). BOSS_ART_MAX_TOKENS raises it (Oct 27: Sonnet 5.5 at xhigh thought past 48,000 before writing; it allows 128,000).
+ */
 const MAX_TOKENS = Number(process.env.BOSS_ART_MAX_TOKENS ?? (MODE === "boss" ? 48000 : MODE === "rider" ? 32000 : 24000));
-/** The model's effort (BOSS_ART_EFFORT): low, medium, high, xhigh or max. */
-const EFFORT = (process.env.BOSS_ART_EFFORT ?? "high") as "low" | "medium" | "high" | "xhigh" | "max";
-if (!["low", "medium", "high", "xhigh", "max"].includes(EFFORT)) throw new Error("BOSS_ART_EFFORT must be low, medium, high, xhigh or max");
+if (!(MAX_TOKENS >= 1000 && MAX_TOKENS <= 128000)) throw new Error("BOSS_ART_MAX_TOKENS: 1000 to 128000");
 
 const ROOT = resolve(".");
 const OUT = resolve(`scripts/boss-art/out/${id}`);
@@ -44,7 +58,7 @@ mkdirSync(LOOKS, { recursive: true });
 const READABLE = (
   ITEMISH
     ? ["packages/app/src/components/Items.tsx", "packages/core/src/crates.ts", "scripts/boss-art/item-kit.tsx", ".claude/agents/item-builder.md", "packages/app/src/characters"]
-    : ["packages/app/src/characters", ".claude/agents/characters.md", "docs/areas/bosses.md"]
+    : ["packages/app/src/characters", "packages/app/src/town/houses", ".claude/agents/characters.md", "docs/areas/bosses.md", "docs/areas/town-square.md", "scripts/boss-art/out/folio", "scripts/boss-art/out/sidekick-jefferson-sonnet-2", "scripts/boss-art/out/rank-wood", "scripts/boss-art/out/rank-sublime", "scripts/boss-art/out/rank-top-transcendent", "scripts/boss-art/briefs"]
 ).map((p) => resolve(p));
 const refs = refsDir ? readdirSync(refsDir).filter((f) => /\.(png|jpe?g|webp|gif)$/i.test(f)).sort() : [];
 const IMG_TYPE: Record<string, "image/png" | "image/jpeg" | "image/webp" | "image/gif"> = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif" };
@@ -171,7 +185,7 @@ for (const t of TOOLS) {
   if (t.name === "done") t.description = "Finish: the drawing is complete and its motion and colors have been looked at. Give short notes: what it is, its motion beat by beat, and any choice the owner might want to change.";
 }
 
-// ---- Spend: the real usage of every turn, at Opus 5.5's prices.
+// ---- Spend: the real usage of every turn, at the model's prices.
 const spent = { usd: 0, input: 0, output: 0, cacheWrite: 0, cacheRead: 0, turns: 0 };
 const dollars = (u: Anthropic.Usage) =>
   (u.input_tokens * PRICE.input + u.output_tokens * PRICE.output + (u.cache_creation_input_tokens ?? 0) * PRICE.cacheWrite + (u.cache_read_input_tokens ?? 0) * PRICE.cacheRead) / 1e6;
