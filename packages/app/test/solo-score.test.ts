@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_SETTINGS, RAID_SETTINGS, type Settings } from "@chessroyale/core";
+import { BOSS_CLOCK, DEFAULT_SETTINGS, RAID_SETTINGS, type Settings } from "@chessroyale/core";
 import { legalMoves, type UciEngine } from "@chessroyale/chess";
 import { SoloMatch } from "../src/solo.ts";
 
@@ -25,8 +25,8 @@ describe("a refused move (solo)", () => {
   });
 
   it("leaves the turn's timeout running: a move the turn doesn't allow changes nothing, and the turn still ends on time", async () => {
-    // (Boss alone with a clock, as a test link's ?clock= gives it: untimed, there's no timeout to leave running.)
-    const m = new SoloMatch([engine], "Ann", { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 1600, bossId: "gingerbread", bossAloneUntimed: false } as Settings);
+    // (Boss alone with the raid's short clock, as a test link's ?clock= gives it, so the turn ends in seconds.)
+    const m = new SoloMatch([engine], "Ann", { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 1600, bossId: "gingerbread", bossAloneClock: false } as Settings);
     m.start();
     for (let i = 0; i < 120 && m.phase.kind !== "play"; i++) await vi.advanceTimersByTimeAsync(500);
     const p = m.phase;
@@ -44,7 +44,7 @@ describe("a refused move (solo)", () => {
   }, 30_000);
 });
 
-describe("Boss alone has no clock (Eric, Oct 21: \"it can just be infinite time when you're playing by yourself\")", () => {
+describe("Boss alone plays on Boss Battle's clock, 10 + 10 (Eric, Oct 30: \"10 min + 10 per move\" for every boss)", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.stubGlobal("fetch", () => Promise.reject(new Error("offline")));
@@ -56,30 +56,56 @@ describe("Boss alone has no clock (Eric, Oct 21: \"it can just be infinite time 
     vi.unstubAllGlobals();
   });
 
-  it("nothing counts down and no move is played for you, an hour on; your move, whenever it comes, plays", async () => {
-    const m = new SoloMatch([engine], "Ann", { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 1600, bossId: "gingerbread", lastStandFrom: 999 } as Settings);
-    m.start();
+  const turn = async (m: SoloMatch) => {
     for (let i = 0; i < 120 && m.phase.kind !== "play"; i++) await vi.advanceTimersByTimeAsync(500);
     const p = m.phase;
     if (p.kind !== "play") throw new Error(`no turn: ${p.kind}`);
-    expect(p.deadline).toBe(0);
+    return p;
+  };
+
+  it("the first move has the bank and its increment (10:10); what a move doesn't use stays, and the next adds 10 s", async () => {
+    const m = new SoloMatch([engine], "Ann", { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 1600, bossId: "gingerbread", lastStandFrom: 999 } as Settings);
+    m.start();
+    const p = await turn(m);
+    expect(BOSS_CLOCK).toEqual({ bankSeconds: 600, incrementSeconds: 10 });
+    expect(p.deadline - p.startsAt).toBe((600 + 10) * 1000);
+    expect(m.settings.bossClock).toBe(true);
     const ply = m.runner.boardOf("you")!.history.length;
-    await vi.advanceTimersByTimeAsync(60 * 60_000);
-    expect(m.phase).toBe(p);
-    expect(m.runner.boardOf("you")!.history).toHaveLength(ply);
+    await vi.advanceTimersByTimeAsync(5_000);
     m.submit(legalMoves(p.board.fen)[0]!);
-    for (let i = 0; i < 60 && m.runner.boardOf("you")!.history.length === ply; i++) await vi.advanceTimersByTimeAsync(500);
-    expect(m.runner.boardOf("you")!.history.length).toBeGreaterThan(ply);
+    for (let i = 0; i < 60 && m.runner.boardOf("you")!.history.length < ply + 2; i++) await vi.advanceTimersByTimeAsync(500);
+    const q = await turn(m);
+    // 600 + 10 - 5 left after the first, then 10 more as the second begins.
+    expect(Math.abs(q.deadline - q.startsAt - (600 + 10 - 5 + 10) * 1000)).toBeLessThan(600);
     m.dispose();
   }, 30_000);
 
-  it("a test link's clock (bossAloneUntimed off) keeps the raid's clock", async () => {
-    const clocked = new SoloMatch([engine], "Ann", { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 1600, bossId: "gingerbread", bossAloneUntimed: false } as Settings);
+  it("out of time loses: the move isn't played and the boss wins on time", async () => {
+    const m = new SoloMatch([engine], "Ann", { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 1600, bossId: "gingerbread", lastStandFrom: 999 } as Settings);
+    m.start();
+    const p = await turn(m);
+    const ply = m.runner.boardOf("you")!.history.length;
+    await vi.advanceTimersByTimeAsync(p.deadline - Date.now() + m.settings.lateGraceMs + 50);
+    for (let i = 0; i < 60 && !m.runner.boss?.result; i++) await vi.advanceTimersByTimeAsync(500);
+    expect(m.runner.boss?.result).toBe("boss");
+    expect(m.runner.bossTimedOut).toBe(true);
+    expect(m.runner.boardOf("you")!.history).toHaveLength(ply);
+    m.dispose();
+  }, 30_000);
+
+  it("a test link's clock (bossAloneClock off) keeps the raid's clock", async () => {
+    const clocked = new SoloMatch([engine], "Ann", { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 1600, bossId: "gingerbread", bossAloneClock: false } as Settings);
     clocked.start();
-    for (let i = 0; i < 120 && clocked.phase.kind !== "play"; i++) await vi.advanceTimersByTimeAsync(500);
-    const p = clocked.phase;
-    if (p.kind !== "play") throw new Error(`no turn: ${p.kind}`);
-    expect(p.deadline).toBeGreaterThan(0);
+    const p = await turn(clocked);
+    expect(p.deadline - p.startsAt).toBe(RAID_SETTINGS.moveClockSeconds! * 1000);
+    expect(clocked.settings.bossClock).toBeFalsy();
     clocked.dispose();
   }, 30_000);
+
+  it("a Solo raid (with bots) keeps the raid's clock", () => {
+    const raid = new SoloMatch([engine], "Ann", { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 1600, bossId: "gingerbread" } as Settings, false, true);
+    expect(raid.settings.bossClock).toBeFalsy();
+    expect(raid.settings.moveClockSeconds).toBe(RAID_SETTINGS.moveClockSeconds);
+    raid.dispose();
+  });
 });

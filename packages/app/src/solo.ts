@@ -1,4 +1,4 @@
-import { RECLUSE_PHASE2, BOSS_ALONE_SCORING, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
+import { RECLUSE_PHASE2, BOSS_ALONE_SCORING, bossClockSettings, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
 import { GUARD_WORDS, MatchRunner, START_FEN, baseAt, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import openingsData from "@chessroyale/chess/data/openings.json";
 import { bulletClock, crowdRace, phase2Numbers, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, fullMoonMs, folioTurnMs, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs } from "@chessroyale/chess";
@@ -86,8 +86,9 @@ export class SoloMatch implements GameView {
     /** A boss raid with bots in the crowd (Solo); without, it's you against the boss (Boss alone). Other modes always have bots. */
     private readonly raidBots = false,
   ) {
-    // Boss alone (a raid without bots) keeps the old scoring; a Solo raid scores as every raid (RAID_SCORING).
-    if (baseSettings.raid && !raidBots) this.baseSettings = { ...baseSettings, ...BOSS_ALONE_SCORING };
+    // Boss alone (a raid without bots) keeps the old scoring; a Solo raid scores as every raid (RAID_SCORING). Boss alone
+    // plays on Boss Battle's clock, 10 + 10 (BOSS_CLOCK; Eric, Oct 30); a Solo raid keeps the raid's.
+    if (baseSettings.raid && !raidBots) this.baseSettings = { ...baseSettings, ...BOSS_ALONE_SCORING, ...(baseSettings.bossAloneClock ? bossClockSettings(baseSettings) : {}) };
     // (The hippo gardener's seeds count by this page's visible time, not an earlier online match's server.)
     setGardenSource(null);
     // (A game on this device: a tester's ?bannerplus= counts.)
@@ -575,8 +576,6 @@ export class SoloMatch implements GameView {
     this.frozen = { at, until: at + ms };
     this.progress.postpone(ms);
     if (this.live) for (const [id, t] of Object.entries(this.live.times)) if (this.live.startsAt + t > at) this.live.times[id] = t + ms;
-    // (Untimed, Boss alone: no clock to stop; your move just waits until the strike is over.)
-    if (this.untimed) return this.set({ ...phase, strike: { calls, needed, mine: true, at, until: at + ms } });
     const deadline = phase.deadline + ms;
     if (this.timer) clearTimeout(this.timer);
     this.timer = setTimeout(() => this.submit(null), deadline - at + this.settings.lateGraceMs);
@@ -774,15 +773,6 @@ export class SoloMatch implements GameView {
    */
   private get alone(): boolean {
     return !!this.runner.boss && this.runner.alive().length === 1;
-  }
-
-  /**
-   * Boss alone has no move clock (bossAloneUntimed; Eric, Oct 21: "it can just be infinite time when you're playing by
-   * yourself"): nothing counts down and no move is played for you. Not under the Hidden Boss's bullet clock (his ultimate
-   * is the clock), and never with bots in the crowd (a Solo raid keeps the raid's clock).
-   */
-  private get untimed(): boolean {
-    return !!this.settings.bossAloneUntimed && !this.raidBots && this.alone && !bulletClock(this.runner.boss);
   }
 
   /** The boss's turn: it thinks (for a moment at least), then its move shows before the crowd picks again. */
@@ -1235,10 +1225,8 @@ export class SoloMatch implements GameView {
     this.playStartedAt = Date.now() + intro;
     this.hint = null;
     const allowed = this.runner.allowedMsFor(HUMAN);
-    // (Untimed, Boss alone: deadline 0, so no clock shows, and no timeout plays a move for you.)
-    const untimed = this.untimed;
-    this.set({ kind: "play", board: boardView(board), startsAt: this.playStartedAt, deadline: untimed ? 0 : this.playStartedAt + allowed, allowedMs: allowed, clock: this.runner.moveClock() });
-    if (!untimed) this.timer = setTimeout(() => this.submit(null), intro + allowed + this.settings.lateGraceMs);
+    this.set({ kind: "play", board: boardView(board), startsAt: this.playStartedAt, deadline: this.playStartedAt + allowed, allowedMs: allowed, clock: this.runner.moveClock() });
+    this.timer = setTimeout(() => this.submit(null), intro + allowed + this.settings.lateGraceMs);
   }
 
   /** The human's pick; final once made. */

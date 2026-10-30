@@ -234,11 +234,16 @@ export interface Settings {
    */
   moveClockSteps: readonly ClockStep[];
   /**
-   * Boss alone (a raid with nobody else in the crowd): no move clock (Eric, Oct 21: "it can just be infinite time when
-   * you're playing by yourself"): nothing counts down and no move is ever played for you. Not under the Hidden Boss's
-   * bullet clock (his ultimate is the clock). A test link's ?clock= turns it off.
+   * Boss alone (a raid with nobody else in the crowd) plays on Boss Battle's clock, BOSS_CLOCK (10 + 10; Eric, Oct 30: "a
+   * normal time control for all bosses probably just 10 min + 10 per move"; it replaces his Oct 21 untimed one). On in
+   * RAID_SETTINGS; a Solo raid (with bots) keeps the raid's clock, and a test link's ?clock= turns it off.
    */
-  bossAloneUntimed?: boolean;
+  bossAloneClock?: boolean;
+  /**
+   * The battle is on a time bank that loses on time (BOSS_CLOCK): a move that empties the bank isn't played, and the boss
+   * wins on time, as under the Hidden Boss's bullet clock. Set with the bank by bossClockSettings, never alone.
+   */
+  bossClock?: boolean;
   /** Pre-game votes: whether a player may move their pawn to another zone after voting (Eric: one vote each, for now). */
   voteChangeAllowed: boolean;
   /**
@@ -672,8 +677,30 @@ export const RAID_SETTINGS: Partial<Settings> = {
   knockoutsPerStage: [],
   openingMoves: 5,
   powerUpsAtStart: 0,
-  bossAloneUntimed: true,
+  bossAloneClock: true,
 };
+
+/**
+ * Boss Battle's clock (Eric, Oct 30: "10 min + 10 per move" for every boss, alone and in a party): a bank of
+ * `bankSeconds`, `incrementSeconds` added as each move begins, no cap on a single move; the boss has none. In a party it's
+ * the team's one bank. Out of time loses. docs/decisions/2026-10-30-boss-battle-clock.md.
+ */
+export const BOSS_CLOCK = { bankSeconds: 600, incrementSeconds: 10 } as const;
+
+/**
+ * The settings for a battle on BOSS_CLOCK: the bank and its increment, and a move clock no bank can reach (the bank plus
+ * the increment on every move a battle can have), so the bank decides. The Hidden Boss's Bullet still replaces it when
+ * it comes (its own bank and increment).
+ */
+export function bossClockSettings(s: Pick<Settings, "bossMaxMoves">, clock: { bankSeconds: number; incrementSeconds: number } = BOSS_CLOCK): Partial<Settings> {
+  return {
+    bossClock: true,
+    timeBankSeconds: clock.bankSeconds,
+    timeIncrementSeconds: clock.incrementSeconds,
+    moveClockSeconds: clock.bankSeconds + clock.incrementSeconds * s.bossMaxMoves,
+    moveClockSteps: [],
+  };
+}
 
 /**
  * Boss alone (you alone against a boss: a raid of one, on this device) scores as before (no cap, streaks or 2
