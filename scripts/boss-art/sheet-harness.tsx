@@ -37,7 +37,7 @@ function Piece({ d }: { d: ItemDraft | RiderDraft }) {
               <Label>at rest</Label>
             </div>
             <div>
-              <RiderView d={d} finish={f} side="w" anim="move" f={mid} scale={0.8} />
+              <RiderView d={d} finish={f} side="w" anim="move" f={mid} scale={0.8} move />
               <Label>moving</Label>
             </div>
             <div>
