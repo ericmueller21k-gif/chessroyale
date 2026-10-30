@@ -98,6 +98,10 @@
   font: 600 12px/1.4 ui-monospace, monospace;
   pointer-events: none;
 }
+/* The drawing's backend after the numbers ("60 fps · 16.7 ms · WebGL"), from Town.tsx's data-backend. */
+.town-fps[data-backend]::after {
+  content: " · " attr(data-backend);
+}
 .town-canvas {
   position: absolute;
   left: 0;

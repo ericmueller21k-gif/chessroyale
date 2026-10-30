@@ -42,13 +42,18 @@ const TIMING_ASKED = (() => {
     return { banner: null, talk: null };
   }
 })();
-/** `?crowd=N` and `?fps` as the page opened (the town reads them once, so a later replaceState that drops the query can't lose them). */
+/**
+ * `?crowd=N`, `?fps` and `?gl=1` as the page opened (the town reads them once, so a later replaceState that drops the query
+ * can't lose them). `gl`: the town drawn with WebGL 2 (Oct 30; anyone, not a test switch). A local e2e build can make it
+ * the default (`VITE_TOWN_GL=1 npm run build`), to run the town's specs on it unchanged (docs/areas/town-square.md, "WebGL").
+ */
 export const TOWN_ASKED = (() => {
+  const glBuild = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_TOWN_GL === "1";
   try {
     const q = new URLSearchParams(globalThis.location?.search ?? "");
-    return { crowd: Number(q.get("crowd")), fps: q.has("fps") };
+    return { crowd: Number(q.get("crowd")), fps: q.has("fps"), gl: q.get("gl") === "1" || glBuild };
   } catch {
-    return { crowd: 0, fps: false };
+    return { crowd: 0, fps: false, gl: glBuild };
   }
 })();
 let gameOnDevice = true;
