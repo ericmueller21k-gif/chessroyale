@@ -86,3 +86,66 @@ test("the stage with a party: invite by link, READY and its check, the leader's 
   await eric.ctx.close();
   await maya.ctx.close();
 });
+
+/** Into a party's battle: Eric leads, Maya and an admin's bot member; both people on their first turn. */
+async function intoBattle(browser: Browser, phone: boolean) {
+  const eric = await person(browser, "Eric", phone);
+  const maya = await person(browser, "Maya", !phone);
+  const e = eric.page;
+  const m = maya.page;
+  await e.goto("/?debug");
+  await openSoloBoss(e);
+  await e.getByRole("radiogroup", { name: "Bosses" }).getByRole("radio", { name: "Boingo", exact: false }).first().click();
+  await e.getByRole("button", { name: "Invite a friend", exact: true }).first().click();
+  const sheet = e.getByRole("dialog", { name: "Invite friends" });
+  const code = (await sheet.getByLabel("Party code").textContent())!.trim();
+  // (The test server's bot member: admins and tests only.)
+  await sheet.getByRole("button", { name: "Add a bot" }).click();
+  await expect(sheet.getByRole("listitem")).toHaveCount(2);
+  await sheet.getByRole("button", { name: "Close" }).click();
+  await m.goto(`/boss/party/${code}?debug`);
+  await expect(m.locator(".bs-start")).toHaveText(/READY$/, { timeout: 15_000 });
+  await m.locator(".bs-start").click();
+  await expect(e.locator(".bs-start")).toBeEnabled({ timeout: 15_000 });
+  await e.locator(".bs-start").click();
+  for (const p of [e, m]) await expect.poll(() => p.evaluate(() => (window as any).match?.phase?.kind ?? "none"), { timeout: 120_000 }).toBe("play");
+  return { eric, maya, e, m };
+}
+
+test("in the battle: picks live in each one's color and changeable, \"Your pick is in.\", the team's pawns with a check or \"…\", the leader's Kick grey for a minute then live; the one kicked goes home told so", async ({ browser }, info) => {
+  test.setTimeout(5 * 60_000);
+  const phone = info.project.name === "phone";
+  const { eric, maya, e, m } = await intoBattle(browser, phone);
+  // Both have the gear, and Eric's team clock reads 10:10 or a little less.
+  for (const p of [e, m]) await expect(p.getByRole("button", { name: "Match options" })).toBeVisible();
+  const { Chess } = await import("chess.js");
+  const fen = await e.evaluate(() => (window as any).match.phase.board.fen as string);
+  const allowed = (await e.evaluate(() => ((window as any).match.boss?.powers?.allowed ?? null) as string[] | null)) ?? new Chess(fen).moves({ verbose: true }).map((x) => x.lan);
+  const [a, b] = allowed.filter((x) => !new Chess(fen).moves({ verbose: true }).find((y) => y.lan === x)?.captured);
+  await e.evaluate((mv) => (window as any).match.submit(mv), a!);
+  await expect(e.locator(".boss-dock .dk-text")).toContainText("Your pick is in.");
+  // Maya sees Eric's pick at once, an arrow in his seat's color (orange), before she picks.
+  const orange = m.locator('.hb-shapes line[stroke="#e8820c"]');
+  await expect(orange).toHaveCount(1, { timeout: 10_000 });
+  // He changes it: still one arrow of his, the turn still open.
+  await e.evaluate((mv) => (window as any).match.submit(mv), b!);
+  await expect.poll(() => m.evaluate(() => ((window as any).match.livePicks() ?? []).map((p: { move: string }) => p.move))).toContain(b);
+  await expect(orange).toHaveCount(1);
+  expect(await e.evaluate(() => (window as any).match.phase.kind)).toBe("play");
+  // The team's pawns: Maya thinking on Eric's screen, with his Kick grey for the first minute; Maya, who may not kick, has none.
+  // (The bot member picks after a think of its own: only Maya is checked here.)
+  await expect(e.locator('.dk-mate[aria-label="Maya: thinking"] .dk-mate-state.think')).toHaveCount(1);
+  const kick = e.getByRole("button", { name: "Kick Maya" });
+  await expect(kick).toHaveClass(/\boff\b/);
+  await expect(m.locator(".dk-kick")).toHaveCount(0);
+  await expect(m.locator(".dk-mate-state.done").first()).toBeVisible();
+  // A minute on: live. A first tap asks, a second kicks; Maya goes home, told so.
+  await expect(kick).not.toHaveClass(/\boff\b/, { timeout: 75_000 });
+  await kick.click();
+  await expect(kick).toHaveText("Kick?");
+  await kick.click();
+  await expect(m.getByText("You were removed from the party.")).toBeVisible({ timeout: 15_000 });
+  await expect.poll(() => e.evaluate(() => (window as any).match.phase.kind), { timeout: 20_000 }).not.toBe("play");
+  await eric.ctx.close();
+  await maya.ctx.close();
+});

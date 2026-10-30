@@ -238,7 +238,7 @@ export class NetMatch implements GameView {
   private key: string | null = null;
   /** Fair play: look-aways during each move's clock, sent with the pick. */
   private lookAways = new LookAways();
-  private myPick: string | null = null;
+  myPick: string | null = null;
   private currentBoard: NetBoard | null = null;
   private standingsList: NetStanding[] = [];
   private slotList: BoardSlot[] = [];
@@ -348,6 +348,14 @@ export class NetMatch implements GameView {
 
   /** The server's answer: how you left, and your result if one went on your record. */
   private onResigned(m: NetLeft) {
+    // (A Boss Battle party's AFK kick: home, with "You were removed from the party.")
+    if (m.how === "kicked") {
+      this.leftHow = "kicked";
+      this.goneResult = null;
+      forgetSeat(this.code);
+      this.closed = false;
+      return this.goneNow("left");
+    }
     this.resigning = false;
     if (this.resignTimer) clearTimeout(this.resignTimer);
     this.closed = true;
@@ -1224,12 +1232,28 @@ export class NetMatch implements GameView {
     if (move === this.boss?.barred || (this.boss?.powers?.allowed && !this.boss.powers.allowed.includes(move))) return;
     if (Date.now() < this.phase.startsAt - 300) return; // Before the clock starts.
     if (this.phase.strike?.until && Date.now() < this.phase.strike.until) return; // While the King strikes.
+    // A Boss Battle party: your pick shows as your arrow and can change until the last pick resolves the turn (the server
+    // says "locked" then), so the turn stays open here.
+    if (this.party) {
+      if (move === this.myPick) return;
+      const first = this.myPick === null;
+      this.myPick = move;
+      this.send({ t: "pick", key: this.key, move, ...(premove ? { premove: true as const } : {}) });
+      crumb(`pick ${move}`);
+      if (first && this.myId) this.progress.mark(this.myId);
+      return this.emit();
+    }
     this.myPick = move;
     const away = this.lookAways.stop();
     this.send({ t: "pick", key: this.key, move, ...(away ? { away } : {}), ...(premove ? { premove: true as const } : {}) });
     crumb(`move ${move}`);
     if (this.myId) this.progress.mark(this.myId);
     this.setPhase({ kind: "scoring", board: this.phase.board, move, strike: this.phase.strike });
+  }
+
+  /** A Boss Battle party: kick a member who hasn't picked a minute after the turn's first pick (the server checks). */
+  partyKick(playerId: string) {
+    if (this.party && this.phase.kind === "play") this.send({ t: "kick", playerId });
   }
 
   /** Crowd: the picks visible to you so far this round (null while you still have to pick). */

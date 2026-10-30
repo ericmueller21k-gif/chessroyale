@@ -21941,3 +21941,162 @@ button.sq-tiny {
   gap: 8px;
   justify-content: center;
 }
+/* ---- Boss Battle's party in the battle (components/BossDock.tsx, PartyMates; docs/decisions/2026-10-30-boss-party.md) ----
+   Your teammates' pawns, small, no names, each on a disc of its seat's color (its arrows' color), a check once it has
+   picked this turn or "…" while it thinks, and for whoever may kick a small Kick under one who hasn't (grey for the first
+   minute). Your own pawn stands on your color's disc. Placed over the dock's room, so nothing in it moves. */
+.pt-disc {
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  width: 44px;
+  height: 9px;
+  margin-left: -22px;
+  border-radius: 50%;
+  background: var(--pt-c);
+  opacity: 0.9;
+}
+.you-pawn > .pt-disc {
+  bottom: 8px;
+}
+.dk-mates {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  pointer-events: none;
+  z-index: 2;
+}
+.dk-mate {
+  position: relative;
+  width: 36px;
+  height: 42px;
+}
+.dk-mate .pt-disc {
+  width: 30px;
+  height: 7px;
+  margin-left: -15px;
+}
+.dk-mate-art {
+  isolation: isolate;
+  z-index: 0;
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  width: 42px;
+  height: 42px;
+  margin-left: -21px;
+}
+.dk-mate-art .avatar {
+  width: 100%;
+  height: 100%;
+}
+.dk-mate-state {
+  position: absolute;
+  left: 50%;
+  top: -12px;
+  translate: -50% 0;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1.5px solid #1d1f24;
+  color: #16a34a;
+}
+.dk-mate-state svg {
+  width: 72%;
+  height: 72%;
+}
+.dk-mate-state.think {
+  width: 28px;
+  height: 16px;
+  border-radius: 8px;
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  justify-content: center;
+}
+.dk-mate-state.think i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #1d1f24;
+  opacity: 0.6;
+}
+.dk-kick {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  translate: -50% 4px;
+  min-width: 44px;
+  height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 13px;
+  background: #c22222;
+  color: #fff;
+  font: 700 12px/26px Archivo, system-ui, sans-serif;
+  pointer-events: auto;
+  z-index: 5;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.dk-kick.off {
+  background: var(--fd-seat, #e4e1da);
+  color: var(--fd-dim, #8f95a0);
+  cursor: default;
+}
+/* A phone's strip: under your pawn and the God King, in the room below them (the panel's row: nothing grows). */
+@media (max-width: 899px) and (min-height: 520px) {
+  .boss-dock.dk-strip.dk-pawn > .dk-mates {
+    grid-column: 3 / 5;
+    grid-row: 2;
+    align-self: start;
+    margin-top: 84px;
+  }
+}
+/* A computer: stacked by the board's corner (Eric, Oct 30: "stack them… rather than shrinking the board"): the God King
+   in his raid place, your pawn above him, your teammates above you. A party's battle has the raid's chat beside the
+   corner, so a row has no room at any width. */
+@media (min-width: 900px) and (min-height: 600px) {
+  .screen.game > .boss-dock.dk-party > .gk-unit {
+    left: calc(100% + var(--gk-off, 2px) + var(--bs-out, 0px));
+  }
+  .screen.game > .boss-dock.dk-party > .you-pawn {
+    --pw: 116px;
+    --feet: 10px;
+    width: 92px;
+    height: 100px;
+    left: calc(100% + var(--gk-off, 2px) + var(--bs-out, 0px) + 14px);
+    bottom: calc(100% - 4px + 132px);
+  }
+  .screen.game > .boss-dock.dk-party > .you-pawn > .pt-disc {
+    width: 50px;
+    height: 9px;
+    margin-left: -25px;
+    bottom: 8px;
+  }
+  .screen.game > .boss-dock.dk-party > .dk-mates {
+    position: absolute;
+    left: calc(100% + var(--gk-off, 2px) + var(--bs-out, 0px));
+    bottom: calc(100% - 4px + 132px + 104px);
+    width: 120px;
+    gap: 0;
+  }
+  .screen.game > .boss-dock.dk-party > .dk-mates .dk-mate {
+    width: 60px;
+    height: 58px;
+  }
+  .screen.game > .boss-dock.dk-party > .dk-mates .dk-mate-art {
+    width: 62px;
+    height: 62px;
+    margin-left: -31px;
+  }
+  /* (Over the teammate's feet: your pawn stands just under them.) */
+  .screen.game > .boss-dock.dk-party > .dk-mates .dk-kick {
+    top: auto;
+    bottom: -4px;
+    translate: -50% 0;
+  }
+}
