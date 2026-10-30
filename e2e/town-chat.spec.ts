@@ -217,7 +217,9 @@ test("the chat box (always on, the default): one see-through box flush in the ma
     expect(b0.h / map.h).toBeLessThan(0.3);
   } else {
     expect(b0.w).toBeGreaterThanOrEqual(400);
-    expect(b0.h).toBeGreaterThanOrEqual(300);
+    // (In the frame a third of the 340 it was, Eric, Oct 30.)
+    expect(b0.h).toBeGreaterThanOrEqual(110);
+    expect(b0.h).toBeLessThanOrEqual(130);
   }
   expect(meets(b0, await rectOf(page, ".town-controls")), "the box never covers the buttons").toBe(false);
   const bar = await rectOf(page, ".town-bar");
@@ -290,9 +292,10 @@ test("the chat box (always on, the default): one see-through box flush in the ma
   expect(m.h, "at most two lines").toBeLessThanOrEqual(2 * m.lh + 6);
   expect(m.sh, "cut off, with dots").toBeGreaterThan(m.h);
   expect(await rectOf(page, ".town-chat")).toEqual(b0);
-  // About 5 lines of messages on a phone and 12 on a computer fit the box before it scrolls.
+  // About 5 lines of messages on a phone and 4 to 5 on a computer (Eric, Oct 30; it was 12) fit the box before it scrolls.
   const fit = await page.locator(".tc-log").evaluate((el) => Math.floor(el.clientHeight / (parseFloat(getComputedStyle(el.querySelector(".tc-line")!).lineHeight) + 2)));
-  expect(fit, "single lines that fit before it scrolls").toBeGreaterThanOrEqual(phone ? 5 : 12);
+  expect(fit, "single lines that fit before it scrolls").toBeGreaterThanOrEqual(phone ? 5 : 4);
+  if (!phone) expect(fit, "no more than about 5 on a computer").toBeLessThanOrEqual(5);
   // It doesn't fade: always on.
   await page.waitForTimeout(CHAT.fadeAfterMs + 1500);
   await expect(log(page)).toHaveCSS("opacity", "1");

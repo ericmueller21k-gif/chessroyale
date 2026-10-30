@@ -198,20 +198,8 @@ test("the sky by the time of day: ?sky=day and ?sky=night draw different skies (
   expect(errors).toEqual([]);
 });
 
-test("/town?fps: an admin sees the frame-rate pill with a number; a player with ?fps does not; without ?fps nobody does", async ({ page }) => {
-  const admin = async (on: boolean) =>
-    page.route("**/api/me*", async (route) => {
-      if (!on || route.request().method() !== "GET") return route.continue();
-      const res = await route.fetch();
-      const body = await res.json().catch(() => null);
-      await route.fulfill({ response: res, json: body ? { ...body, admin: true } : body });
-    });
+test("/town?fps: anyone sees the frame-rate pill with a number (no admin needed, Eric, Oct 30), and ?crowd=50 brings the crowd; without ?fps there is no pill", async ({ page }) => {
   const pill = page.locator(".town-fps");
-  await page.goto("/town?sky=day&fps");
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
-  await page.waitForTimeout(1500);
-  await expect(pill).toHaveCount(0);
-  await admin(true);
   await page.goto("/town?sky=day");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
   await page.waitForTimeout(1500);

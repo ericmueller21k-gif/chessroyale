@@ -416,40 +416,34 @@ function startTown(
   const offAccount = onAccountChange(dress);
   dress();
   // The testers' crowd (`?crowd=N`, up to CROWD_MAX: N more pawns with names wandering the square, to measure the frame
-  // rate with many figures; admins only, so it comes in once the account says so).
-  const crowdIn = () => {
-    const n = Math.min(CROWD_MAX, Math.floor(TOWN_ASKED.crowd) || 0);
-    if (n > 0 && testSwitchesAllowed() && !town.crowd.length) {
-      addCrowd(town, n);
-      cv.dataset.crowd = String(n);
-    }
-  };
-  const offCrowd = onAccountChange(crowdIn);
-  crowdIn();
+  // rate with many figures). Anyone's (Eric, Oct 30: the site is behind Cloudflare Access): only this device draws them.
+  const crowdN = Math.min(CROWD_MAX, Math.floor(TOWN_ASKED.crowd) || 0);
+  if (crowdN > 0) {
+    addCrowd(town, crowdN);
+    cv.dataset.crowd = String(crowdN);
+  }
   // The bots' dressed pawns, drawn once now (their crate items over their pawns), never per frame; plain meanwhile. (The
   // sidekicks' frames are cut from their sheets as the renderer is made.)
   for (const p of town.bots) {
     const lk = p.look;
     if (!isSprite(lk) && lk.wear) void dressedPawn(lk.wear, pawnImage(lk.side, lk.tint), PAWN_PX).then((art) => art && alive && r.botArt.set(p.id, art));
   }
-  // `/town?fps`, admins only (their profile says so, as the crowd's does): a pill in the world's top-right corner, "60 fps · 16.7 ms",
-  // frames over the last second and their mean time, the text set twice a second. Plain counters in the frame loop, nothing else.
+  // `/town?fps`, anyone's (Eric, Oct 30: no admin needed, the site is behind Cloudflare Access): a pill in the world's top-right
+  // corner, "60 fps · 16.7 ms", frames over the last second and their mean time, the text set twice a second. Plain counters in
+  // the frame loop, nothing else.
   let fpsEl: HTMLElement | null = null;
   let fpsN = 0;
   let fpsPrev = 0;
   let fpsAt = 0;
   let fpsPrevAt = 0;
-  const fpsIn = () => {
-    if (fpsEl || !account().profile?.admin || !TOWN_ASKED.fps) return;
+  if (TOWN_ASKED.fps) {
     fpsEl = document.createElement("div");
     fpsEl.className = "town-fps";
     fpsEl.dataset.fps = "";
     // (The backend follows the numbers, "· WebGL" or "· 2D", from town.css: the pill's text stays the numbers.)
     fpsEl.dataset.backend = BACKEND_LABEL[painter.kind];
     cv.parentElement?.append(fpsEl);
-  };
-  const offFps = onAccountChange(fpsIn);
-  fpsIn();
+  }
   /** The game with a bot has been asked for (once). */
   let opened = false;
   let raf = 0;
@@ -1123,8 +1117,6 @@ function startTown(
     stop: () => {
       alive = false;
       offAccount();
-      offCrowd();
-      offFps();
       fpsEl?.remove();
       halt();
       ro.disconnect();

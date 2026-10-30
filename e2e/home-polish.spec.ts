@@ -76,6 +76,9 @@ test("home: your pawn hops on a phone and a computer alike, 4 s after home shows
     await page.clock.resume();
     await page.goto("/");
     await expect(page.locator(".fd-hero")).toBeVisible();
+    // (The hop's timer starts in the pawn's effect, which waits for a frame: let two frames pass before the clock stops, or on a busy
+    // runner the stop's jump runs that waiting frame at 1 s and the first hop comes at 5 s, so 4.5 s finds none. Oct 30, CI.)
+    await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(done, 0)))));
     const heroAt = await page.evaluate(() => (window as unknown as { __heroAt: number }).__heroAt);
     // (Freeze the clock a second after the hero shows, then run 70 s of it: the first hop at 4 s, the next at 34 s and at 64 s.)
     await page.clock.pauseAt(heroAt + 1000);
