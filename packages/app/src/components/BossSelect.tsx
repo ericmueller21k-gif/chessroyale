@@ -166,7 +166,8 @@ export function BossSelect({
   // The member menu open (by member id): above their head; a tap elsewhere or Escape closes it.
   const [menu, setMenu] = useState<string | null>(null);
   const menuFor = party?.back.find((m) => m?.id === menu) ?? null;
-  useEffect(() => {
+  // (A layout effect: Escape closes it from its first frame; an effect waits for a paint, and an Escape meanwhile was lost.)
+  useLayoutEffect(() => {
     if (!menuFor) return;
     const key = (e: KeyboardEvent) => e.key === "Escape" && setMenu(null);
     addEventListener("keydown", key);
