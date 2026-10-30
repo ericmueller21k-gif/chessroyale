@@ -19,7 +19,7 @@ export interface BotGameAsk {
   face: string | null;
 }
 
-type Props = { onBack: () => void; onBossAlone: (id: string) => void; onPlayBot: (game: BotGameAsk) => void; seat: string | null };
+type Props = { onBack: () => void; onBossAlone: (id: string) => void; onPlayBot: (game: BotGameAsk) => void; onColosseum: () => void; seat: string | null };
 type Screen = FunctionComponent<Props & { framed: boolean }>;
 
 /**

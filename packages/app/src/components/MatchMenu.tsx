@@ -125,8 +125,8 @@ function ListRow(props: { icon?: ComponentChildren; label: string; control?: Com
   );
 }
 
-/** An on/off row (the same switch as Settings): the state shows as On or Off on the right. */
-function SwitchRow({ icon, label, on, disabled, onClick }: { icon?: ComponentChildren; label: string; on: boolean; disabled?: boolean; onClick: () => void }) {
+/** An on/off row (the same switch as Settings): the state shows as On or Off on the right. (A screen's own rows: `extra`.) */
+export function SwitchRow({ icon, label, on, disabled, onClick }: { icon?: ComponentChildren; label: string; on: boolean; disabled?: boolean; onClick: () => void }) {
   return (
     <ListRow
       icon={icon}
@@ -212,9 +212,9 @@ function useOpen(): [Open, (o: Open) => void] {
 /**
  * The control at the right end of a match screen's top line: a gear, opening the list in the middle of the screen. `exit`
  * null: nothing to leave right now. `crowd`: the match is a crowd match (Crowd, a raid), which adds the Motion trail row
- * (Animations is in every mode).
+ * (Animations is in every mode). `extra`: a screen's own rows, after Animations (the Colosseum's Ambient crowd noise).
  */
-export function MatchMenu({ exit, crowd = false }: { exit: MatchExit | null; crowd?: boolean }) {
+export function MatchMenu({ exit, crowd = false, extra }: { exit: MatchExit | null; crowd?: boolean; extra?: ComponentChildren }) {
   const [open, setOpen] = useOpen();
   // (Nothing to leave any more, the sheet asking about it goes; Escape closes it.)
   useEffect(() => {
@@ -249,6 +249,7 @@ export function MatchMenu({ exit, crowd = false }: { exit: MatchExit | null; cro
               <div class="mm-list">
                 <SoundRow />
                 <AnimationRows crowd={crowd} />
+                {extra}
                 {exit && <ListRow className="mm-exit" icon={<FlagIcon />} label={rowLabel(exit)} onClick={() => setOpen("confirm")} />}
                 <ListRow icon="🐞" label="Report a bug" onClick={() => setOpen("report")} />
               </div>
