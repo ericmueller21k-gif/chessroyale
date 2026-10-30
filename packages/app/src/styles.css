@@ -22063,6 +22063,10 @@ button.sq-tiny {
   .screen.game > .boss-dock.dk-party > .gk-unit {
     left: calc(100% + var(--gk-off, 2px) + var(--bs-out, 0px));
   }
+  /* (The chat beside the corner stands a little further out, clear of the God King's cape and sword: nothing hidden.) */
+  .screen.game:has(> .boss-dock.dk-party) > .under-board {
+    margin-left: calc(var(--gk-clear) + 32px);
+  }
   .screen.game > .boss-dock.dk-party > .you-pawn {
     --pw: 116px;
     --feet: 10px;

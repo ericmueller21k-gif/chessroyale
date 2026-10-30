@@ -149,3 +149,42 @@ test("in the battle: picks live in each one's color and changeable, \"Your pick 
   await eric.ctx.close();
   await maya.ctx.close();
 });
+
+test("on a computer the party's pawns and the God King are whole, clear of the chat and the move list, inside the window, at 1280×800, 1440×900 and 1920×1080 (nothing hidden)", async ({ browser }, info) => {
+  test.setTimeout(4 * 60_000);
+  test.skip(info.project.name === "phone", "a computer's layout");
+  const { eric, maya, e } = await intoBattle(browser, false);
+  for (const size of [{ width: 1280, height: 800 }, { width: 1440, height: 900 }, { width: 1920, height: 1080 }]) {
+    await e.setViewportSize(size);
+    await e.waitForTimeout(500);
+    // (The God King's drawn pixels over a few of his frames, not his canvas's empty margins.)
+    let drawn = { left: Infinity, right: -Infinity, top: Infinity, bottom: -Infinity };
+    for (let i = 0; i < 6; i++) {
+      const d = await e.evaluate(() => {
+        const cv = document.querySelector(".boss-dock .gk-canvas") as HTMLCanvasElement;
+        const px = cv.getContext("2d")!.getImageData(0, 0, cv.width, cv.height).data;
+        let x0 = cv.width, x1 = -1, y0 = cv.height, y1 = -1;
+        for (let y = 0; y < cv.height; y++) for (let x = 0; x < cv.width; x++) if (px[(y * cv.width + x) * 4 + 3]! > 0) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+        const b = cv.getBoundingClientRect();
+        return { left: b.left + (x0 / cv.width) * b.width, right: b.left + ((x1 + 1) / cv.width) * b.width, top: b.top + (y0 / cv.height) * b.height, bottom: b.top + ((y1 + 1) / cv.height) * b.height };
+      });
+      drawn = { left: Math.min(drawn.left, d.left), right: Math.max(drawn.right, d.right), top: Math.min(drawn.top, d.top), bottom: Math.max(drawn.bottom, d.bottom) };
+      await e.waitForTimeout(250);
+    }
+    const r = await e.evaluate(() => {
+      const box = (el: Element) => { const b = el.getBoundingClientRect(); return { left: b.left, right: b.right, top: b.top, bottom: b.bottom }; };
+      const one = (q: string) => box(document.querySelector(q)!);
+      const pawns = [...document.querySelectorAll(".you-pawn .avatar, .dk-mate .avatar")].map(box);
+      return { pawns, chat: one(".under-board"), moves: one(".mv-side"), w: innerWidth, h: innerHeight };
+    });
+    const apart = (a: { left: number; right: number; top: number; bottom: number }, b: typeof a) => a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top;
+    expect(r.pawns, `${size.width}: you and two teammates`).toHaveLength(3);
+    for (const [name, x] of [["the God King", drawn], ...r.pawns.map((p, i) => [`pawn ${i}`, p] as const)] as const) {
+      expect(apart(x, r.chat), `${size.width}: ${name} clear of the chat`).toBe(true);
+      expect(apart(x, r.moves), `${size.width}: ${name} clear of the move list`).toBe(true);
+      expect(x.left >= 0 && x.top >= 0 && x.right <= r.w && x.bottom <= r.h, `${size.width}: ${name} inside the window`).toBe(true);
+    }
+  }
+  await eric.ctx.close();
+  await maya.ctx.close();
+});

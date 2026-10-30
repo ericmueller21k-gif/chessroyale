@@ -74,3 +74,6 @@ Eric's design (Oct 29 and 30) and his OK on the stills (Oct 30: "the solo or the
 - The Kick: whoever may kick sees a small "Kick" by each one who hasn't picked: grey from the turn's first pick, live a
   minute after it; a first tap asks ("Kick?"), a second kicks. The one kicked goes home with "You were removed from the
   party." (`LeftHow` "kicked").
+- (#423, the review) A computer: the battle's chat stands 32 px further out beside the corner in a party's battle, so the
+  God King's cape and sword, your pawn and your teammates are whole and clear of it at every size (1280 × 800, 1440 × 900,
+  1920 × 1080 checked); the Kick sits over its teammate's pawn, on top.
