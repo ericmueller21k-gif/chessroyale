@@ -260,3 +260,84 @@ export function squareXZ(sq: string): [number, number] {
   const r = sq.charCodeAt(1) - 49;
   return [f - 3.5, 3.5 - r];
 }
+
+/** A boss's seat and its sidekick's beside it: where each stands, and the seats (indices into `seats()`) they take from the pawns. */
+export interface BossSeat {
+  boss: Seat;
+  kid: Seat;
+  taken: readonly number[];
+}
+
+/** How big a boss and a sidekick stand (half their width and their height, meters, a jump's height on top): what mustn't cover the board. */
+const BOSS_BOX = { hw: 0.8, h: 1.75 } as const;
+const KID_BOX = { hw: 0.42, h: 1.0 } as const;
+
+/**
+ * Whether a figure standing at `p` (its feet), `hw` wide each way and `h` tall, covers any of the board (its squares and the
+ * pieces on them) from view `v`: some line from the eye through the figure meets the board behind it.
+ */
+export function coversBoard(v: View, p: { x: number; y: number; z: number }, hw: number, h: number): boolean {
+  const proj = new Float32Array(16);
+  const view = new Float32Array(16);
+  const m = new Float32Array(16);
+  // (Any lens from the eye gives the same answer: which lines meet what doesn't depend on the lens.)
+  perspective(proj, (100 * Math.PI) / 180, 1, 0.1, 200);
+  lookAt(view, v.eye, v.at, 0, 0, new Float32Array(3));
+  multiply(m, proj, view);
+  const B = BOARD.half + BOARD.rim;
+  const board: [number, number, number][] = [];
+  for (const x of [-B, B]) for (const z of [-B, B]) for (const y of [BOARD.lift, BOARD.lift + 1.3]) board.push([x, y, z]);
+  const pb = board.map((q) => project(m, q[0], q[1], q[2], 100, 100)).filter((q): q is [number, number, number] => !!q);
+  const mid = project(m, 0, BOARD.lift, 0, 100, 100);
+  const dx = v.eye[0] - p.x;
+  const dz = v.eye[2] - p.z;
+  const l = Math.hypot(dx, dz) || 1;
+  const rx = dz / l;
+  const rz = -dx / l;
+  const fig: [number, number, number][] = [];
+  for (const s of [-hw, hw]) for (const y of [p.y, p.y + h]) fig.push([p.x + rx * s, y, p.z + rz * s]);
+  const pf = fig.map((q) => project(m, q[0], q[1], q[2], 100, 100));
+  // Behind the eye, or farther than the board's middle: it can't stand in front of the board.
+  if (pf.some((q) => !q) || !mid || Math.max(...pf.map((q) => q![2])) > mid[2]) return false;
+  const box = (q: readonly [number, number, number][]): [number, number, number, number] => [Math.min(...q.map((a) => a[0])), Math.min(...q.map((a) => a[1])), Math.max(...q.map((a) => a[0])), Math.max(...q.map((a) => a[1]))];
+  const [a0, b0, a1, b1] = box(pb);
+  const [c0, d0, c1, d1] = box(pf as [number, number, number][]);
+  return c0 < a1 && c1 > a0 && d0 < b1 && d1 > b0;
+}
+
+/**
+ * Where the bosses who watch sit (Eric, Oct 30: "the boss and their sidekicks next to each other in the crowd in the first 3
+ * rows"): `n` of them, each across two seats with its sidekick in the next, in rows 1 to 3, spread evenly round the ring, at
+ * seats that never change (the same in every view, on every load), and never where one would cover the board from any of the
+ * ten views (`coversBoard`).
+ */
+export function bossSeats(n: number): BossSeat[] {
+  const all = seats();
+  const free = (i: number) => !VIEWS.some((v) => coversBoard(v, all[i]!, KID_BOX.hw, KID_BOX.h));
+  // Three seats in a row, side by side (no aisle between): the boss across the first two, its sidekick in the third.
+  const triples: { i: number; a: number; row: number; boss: Seat }[] = [];
+  for (let i = 0; i + 2 < all.length; i++) {
+    const s = all.slice(i, i + 3);
+    if (s[0]!.row > 2 || s.some((q) => q.row !== s[0]!.row)) continue;
+    const gap = (a: Seat, b: Seat) => Math.hypot(a.x - b.x, a.z - b.z);
+    if (gap(s[0]!, s[1]!) > SEATING.seatGap * 1.5 || gap(s[1]!, s[2]!) > SEATING.seatGap * 1.5) continue;
+    const boss: Seat = { ...s[0]!, x: (s[0]!.x + s[1]!.x) / 2, z: (s[0]!.z + s[1]!.z) / 2, face: (s[0]!.face + s[1]!.face) / 2 };
+    if (VIEWS.some((v) => coversBoard(v, boss, BOSS_BOX.hw, BOSS_BOX.h)) || !free(i + 2)) continue;
+    triples.push({ i, a: Math.atan2(boss.x, boss.z), row: s[0]!.row, boss });
+  }
+  const out: BossSeat[] = [];
+  const used = new Set<number>();
+  for (let k = 0; k < n; k++) {
+    const target = ((k + 0.5) / n) * Math.PI * 2 - Math.PI;
+    const row = k % 3;
+    const off = (t: (typeof triples)[number]) => Math.abs(Math.atan2(Math.sin(t.a - target), Math.cos(t.a - target))) + (t.row === row ? 0 : 0.2);
+    let best: (typeof triples)[number] | null = null;
+    // (Never one boss just behind another: at least 9° apart round the ring.)
+    const near = (t: (typeof triples)[number]) => out.some((o) => Math.abs(Math.atan2(Math.sin(t.a - Math.atan2(o.boss.x, o.boss.z)), Math.cos(t.a - Math.atan2(o.boss.x, o.boss.z)))) < (9 * Math.PI) / 180);
+    for (const t of triples) if (![t.i - 1, t.i, t.i + 1, t.i + 2, t.i + 3].some((j) => used.has(j)) && !near(t) && (!best || off(t) < off(best))) best = t;
+    if (!best) break;
+    for (const j of [best.i, best.i + 1, best.i + 2]) used.add(j);
+    out.push({ boss: best.boss, kid: all[best.i + 2]!, taken: [best.i, best.i + 1, best.i + 2] });
+  }
+  return out;
+}

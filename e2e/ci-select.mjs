@@ -1,16 +1,21 @@
 // CI's e2e plan (.github/workflows/e2e.yml, the `plan` job): which spec files a run tests, and on how many shards.
 // A pull request runs the specs of the areas it changes (e2e/areas.json says which paths belong to which specs) plus
 // the smoke set; a shared foundation, or any path the table doesn't know, runs every spec. A push to main, a manual run
-// and a pull request with the `full-e2e` label run every spec too. Docs: docs/areas/ops.md, "CI e2e".
+// and a pull request with the `full-e2e` label run every spec too. A change to an area named in `webgl` (the town's), or to
+// one of its specs, also runs those specs again on a VITE_TOWN_GL=1 build, WebGL the town's default: two more jobs beside
+// the shards, one per project (`webgl-phone` and `webgl-desktop` in the shard matrix). Docs: docs/areas/ops.md, "CI e2e".
 //
 // Usage:
-//   node e2e/ci-select.mjs full "<why>"      every spec on 5 shards (a push to main, a manual run, the full-e2e label)
+//   node e2e/ci-select.mjs full "<why>" [base]   every spec on 5 shards (a push to main, a manual run, the full-e2e
+//                                           label); the WebGL job if what changed from <base> to HEAD touches its
+//                                           areas, and always without a base (a manual run tests everything)
 //   node e2e/ci-select.mjs diff <base>       the specs for what changed from <base> to HEAD (a pull request: HEAD^1,
 //                                           its merge commit's first parent, which is main as it is now)
 //   node e2e/ci-select.mjs files <path>...   the same for these paths (to try the table out)
 // It writes `specs` (the spec files, space-separated; empty for every spec), `total` (how many shards), `shards` (their
-// numbers, as JSON) and `note` (one line) to $GITHUB_OUTPUT, and why each changed path runs what it runs to
-// $GITHUB_STEP_SUMMARY; to stdout when they aren't set.
+// numbers, then "webgl-phone" and "webgl-desktop" when the WebGL jobs run, as JSON), `webgl` (their spec files; empty:
+// none) and `note` (one line) to $GITHUB_OUTPUT, and why each changed path runs what it runs to $GITHUB_STEP_SUMMARY; to
+// stdout when they aren't set.
 import { execFileSync } from "node:child_process";
 import { appendFileSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -75,7 +80,9 @@ const SPEC = /^e2e\/[^/]+\.spec\.ts$/;
 /**
  * What a pull request that changes `changed` (paths from the repo's root) runs, by the table `areas` (e2e/areas.json),
  * given the spec files there are (`existing`). `full` is why every spec runs (null when it doesn't); `specs` are the
- * spec files to run otherwise (smoke set included, sorted); `why` says, for each changed path, what it adds.
+ * spec files to run otherwise (smoke set included, sorted); `webgl` the specs to run again on the town's WebGL build
+ * (`webgl.specs`, when a path of a `webgl` area or one of those specs changed, whatever `full` says; sorted); `why` says,
+ * for each changed path, what it adds.
  */
 export function select(changed, areas, existing) {
   const matcher = (globs) => {
@@ -85,12 +92,17 @@ export function select(changed, areas, existing) {
   const isFull = matcher(areas.full);
   const isNone = matcher(areas.none);
   const list = Object.entries(areas.areas).map(([name, a]) => ({ name, test: matcher(a.paths), specs: a.specs }));
+  const glAreas = list.filter((a) => (areas.webgl?.areas ?? []).includes(a.name));
+  const glSpecs = areas.webgl?.specs ?? [];
+  let gl = false;
   const have = new Set(existing);
   const leftOut = new Set(areas.leftOut ?? []);
   const picked = new Set(areas.smoke);
   const why = [];
   let full = null;
   for (const path of [...new Set(changed)].sort()) {
+    // (The WebGL jobs: a path of the area's, or one of their specs.)
+    if (glAreas.some((a) => a.test(path)) || glSpecs.includes(path)) gl = true;
     if (isFull(path)) {
       why.push({ path, runs: "every spec: a shared foundation (areas.json, `full`)" });
       full ??= `\`${path}\` is a shared foundation`;
@@ -115,7 +127,14 @@ export function select(changed, areas, existing) {
   }
   const specs = [...picked].filter((s) => have.has(s) && !leftOut.has(s)).sort();
   if (!full && !specs.length) full = "no spec was picked";
-  return { full, specs: full ? [] : specs, why };
+  const webgl = gl ? allWebgl(areas, existing) : [];
+  return { full, specs: full ? [] : specs, webgl, why };
+}
+
+/** The WebGL jobs' specs (`webgl.specs` that exist), sorted: what they run whenever they run. */
+export function allWebgl(areas, existing) {
+  const have = new Set(existing);
+  return [...new Set(areas.webgl?.specs ?? [])].filter((s) => have.has(s)).sort();
 }
 
 /** How many shards `specs` need at SHARD_SECONDS each: at least 1, at most MAX_SHARDS, never more than the files. */
@@ -124,8 +143,11 @@ export function shardCount(specs, weight) {
   return Math.max(1, Math.min(MAX_SHARDS, specs.length, Math.ceil(seconds / SHARD_SECONDS)));
 }
 
+/** The WebGL jobs: one per Playwright project (playwright.config.ts), each the `webgl` specs on one worker. */
+export const WEBGL_JOBS = ["webgl-phone", "webgl-desktop"];
+
 /** The plan as the workflow's outputs, and the note for the run's page (Markdown). */
-export function plan({ full, specs, why }, weight, all) {
+export function plan({ full, specs, webgl = [], why }, weight, all) {
   const total = full ? MAX_SHARDS : shardCount(specs, weight);
   const minutes = (s) => Math.round(s / 60);
   const seconds = (full ? all : specs).reduce((sum, f) => sum + weight(f), 0);
@@ -142,20 +164,29 @@ export function plan({ full, specs, why }, weight, all) {
     md.push("");
   }
   if (!full) md.push(`Specs: ${specs.map((s) => `\`${s}\``).join(", ")}`, "");
-  const outputs = { specs: specs.join(" "), total: String(total), shards: JSON.stringify(Array.from({ length: total }, (_, i) => i + 1)), note };
+  if (webgl.length) md.push(`The town on WebGL too: ${webgl.map((s) => `\`${s}\``).join(", ")} again on a \`VITE_TOWN_GL=1\` build, two more jobs beside the shards, the phone's and the computer's (the town's area changed).`, "");
+  const shards = [...Array.from({ length: total }, (_, i) => i + 1), ...(webgl.length ? WEBGL_JOBS : [])];
+  const outputs = { specs: specs.join(" "), total: String(total), shards: JSON.stringify(shards), webgl: webgl.join(" "), note };
   return { outputs, md: md.join("\n") };
+}
+
+/** The paths changed from `base` to HEAD. */
+function diffFrom(base) {
+  return execFileSync("git", ["diff", "--name-only", "--no-renames", base, "HEAD"], { encoding: "utf8" }).split("\n").filter(Boolean);
 }
 
 function main(argv) {
   const [mode, ...rest] = argv;
   const all = specFiles();
   let picked;
-  if (mode === "full" && rest.length === 1) picked = { full: rest[0], specs: [], why: [] };
-  else if (mode === "diff" && rest.length === 1) {
-    const out = execFileSync("git", ["diff", "--name-only", "--no-renames", rest[0], "HEAD"], { encoding: "utf8" });
-    picked = select(out.split("\n").filter(Boolean), readAreas(), all);
-  } else if (mode === "files" && rest.length) picked = select(rest, readAreas(), all);
-  else throw new Error('usage: node e2e/ci-select.mjs full "<why>" | diff <base> | files <path>...');
+  if (mode === "full" && (rest.length === 1 || rest.length === 2)) {
+    // (The WebGL job by what changed from the base; without one, a manual run: everything.)
+    const webgl = rest[1] ? select(diffFrom(rest[1]), readAreas(), all).webgl : allWebgl(readAreas(), all);
+    picked = { full: rest[0], specs: [], webgl, why: [] };
+  }
+  else if (mode === "diff" && rest.length === 1) picked = select(diffFrom(rest[0]), readAreas(), all);
+  else if (mode === "files" && rest.length) picked = select(rest, readAreas(), all);
+  else throw new Error('usage: node e2e/ci-select.mjs full "<why>" [base] | diff <base> | files <path>...');
   const { outputs, md } = plan(picked, weigher(readTimings()), all);
   const lines = Object.entries(outputs).map(([k, v]) => `${k}=${v.replace(/\n/g, " ")}`);
   if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, lines.join("\n") + "\n");

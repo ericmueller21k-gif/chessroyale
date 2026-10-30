@@ -40,6 +40,19 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     do. Or Actions → e2e → Run workflow on the PR's branch (a manual run tests everything).
   - **On every push to main: the whole suite**, both projects, on 5 shards (about 17 minutes in all, 1 for setup):
     the full run after each merge, which the director checks before the next merge.
+  - **The town on WebGL** (Oct 30; docs/decisions/2026-10-30-town-webgl.md, "Oct 30, later"): a change to the town's
+    area (`webgl` in `areas.json`: a path of the town square's area, or one of the specs below) also runs the town's
+    drawing specs (`town`, `town-desktop`, `town-tags`, `town-webgl`) again on a `VITE_TOWN_GL=1` build, WebGL the town's
+    default (software WebGL: the runners have no GPU). Two more jobs beside the shards, `webgl-phone` and `webgl-desktop`
+    in the shard matrix ("the town on WebGL, webgl-phone"): one project each, one worker (two software-WebGL pages on a
+    runner's 4 CPUs make every check slow enough to miss the chat's and the tags' timings), `TOWN_GL_BUILD=1` for the
+    one check that reads the default. About 10 minutes of tests each (measured locally: 9 for the phone, 10.5 for the
+    computer) plus setup, side by side with the shards, so a town PR's run is about as long as before (its town-chat
+    shard is the longer one); about 25 runner minutes more per run. Their records are in `result`'s summary as shards
+    `webgl-phone` and `webgl-desktop` (their times kept out of the timings table). On a pull request, a push to main that
+    merged such a change (the plan diffs `HEAD^1`) and the full-e2e label; a manual run always. The chat's two specs
+    aren't in it: HTML over the canvas, nothing in them depends on the backend, and on software WebGL they'd need about
+    four more such jobs.
   - **Layout:** `plan`, then the `shard` jobs side by side, then `result`. Each shard runs whole spec files of the
     plan's list (every spec file on main), spread by their measured test time (`e2e/ci-shard.mjs` reads
     `e2e/ci-timings.json`; a new spec counts as the median until the table is refreshed); inside a file the tests run
@@ -68,7 +81,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   - **Caches:** npm (`setup-node`) and Playwright's Chromium (headless shell only, the browser headless runs use;
     `~/.cache/ms-playwright`, keyed by Playwright's version).
   - **Concurrency:** a new push to a PR (or a label added to it) cancels that PR's run still going; pushes to `main`
-    each get their own run. A full run takes 7 jobs (plan, 5 shards, result), a PR's fast check 3 to 7: the account's
+    each get their own run. A full run takes 7 jobs (plan, 5 shards, result), a PR's fast check 3 to 7, and the town's
+    WebGL jobs two more when they run: the account's
     limit on jobs at once (20 on GitHub Free) queues the rest.
   - **Not a required check yet;** if it becomes one, require `result` (one name, whatever the shard count).
 - **Schema at runtime:** D1 tables are made by the Worker (`CREATE TABLE IF NOT EXISTS`, then `ALTER TABLE` migrations
@@ -203,7 +217,7 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-error-capture-
   Reload instead of a blank page; the error is still thrown on once as a page error, so the console and the e2e
   error checks see it). Each kind of error is sent once per page load, at most `OPS.client.maxErrorsPerPage`, a few
   seconds at a time (`OPS.client.batchMs`), by sendBeacon when the page is hidden. Browser extensions' errors and
-  "Script error." are skipped.
+  "Script error." are skipped. The town's WebGL fallback goes the same way as a kind of its own (below, "Health").
 - **What each error carries:** the message and a trimmed stack (12 lines, 1000 characters); the build's version (the commit's first 12
   characters, put in by `vite.config.ts` from `WORKERS_CI_COMMIT_SHA` or git; `dist/version.json` says the same for
   the deploy); the screen (a boss battle's moment too: loading, intro, lights out, fall, the turn's power events), mode,
@@ -297,7 +311,18 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-health-view-an
   - the deployed build (`version.json`: version, commit, when built);
   - the live hub's numbers: online, people in lobbies, and each mode's lobbies waiting and playing and their people,
     Squads included (`LiveBoard.health`);
-  - errors this hour, the hour before and in the last 24 hours (rows are per clock hour), how many kinds, the top 10;
+  - errors this hour, the hour before and in the last 24 hours (rows are per clock hour), how many kinds, the top 10
+    (the town's WebGL fallbacks left out: they have their own count, next);
+  - **the town's WebGL fallbacks** (Oct 30; docs/decisions/2026-10-30-town-webgl.md, "Oct 30, later"): page loads whose
+    town asked for WebGL and drew with Canvas 2D instead, in the last 24 hours and 7 days, in all and by reason
+    (`townFallbacks`). The page reports one at most (`reportTownFallback` in the app's problems.ts, never on the frame
+    loop, nothing shown to the player) through the error reporting, as the kind `town-gl-fallback` with its reason as the
+    message (`TOWN_GL_FALLBACK` in core's settings.ts: `no-webgl2`, `no-context`, `shader`, `lost-twice`, `not-back`):
+    exactly what an error sends (no GPU name, nothing typed), under the same limits, caps, fair counts and 30 days in
+    `ops_errors` (no new table or column). Only those five reasons are counted (anyone can post an error of any kind);
+    each reason's row, with its latest device, is in `/admin/ops`'s error list. `/admin/ops` shows a line, and
+    `npm run ops:report` prints one ("Town WebGL fallbacks (drew with Canvas 2D): 3 in 24 hours, 10 in 7 days (…)");
+    never "Needs attention".
   - the Durable Objects' own errors (kinds named `Class.method`) by class and entry point;
   - players' reports in the last 24 hours by kind, and the latest 5;
   - the engine server: on or off, searches used of today's budget (`engine_usage`, UTC day), its last answer and last

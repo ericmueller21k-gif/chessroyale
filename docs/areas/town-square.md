@@ -80,9 +80,14 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   pages (layers of one array texture) and uploaded again only when render.ts calls `changed` (a tag or a table's board drawn again); clips that are upright
   rectangles cut on the CPU, other shapes a stencil bit each; a stroke's shadow (the table's ring, the pressed square's glow)
   worked out per pixel; the far band's softening in one shader pass (no scratch canvases); lights and their cuts in one
-  blend; text and the bubble drawn once into canvases. No WebGL 2, or no context: Canvas 2D, silently. Context lost: nothing
-  drawn until it's back (textures made again); lost twice within a minute, or not back within 5 s: Canvas 2D for the page. Without `?gl=1`, Canvas 2D
-  exactly as before. The canvas says which (`data-backend`).
+  blend; text and the bubble drawn once into canvases. One shader in three builds (solid; with textures; with the soft
+  modes too), each draw using the least that covers what it holds: the same pixels, much less work for a software
+  renderer. 4x multisampling on a GPU; where the browser would render WebGL in software (no GPU, or SwiftShader in the
+  headless tests: `failIfMajorPerformanceCaveat` refuses the first context), none, which halves a frame there (Oct 30,
+  later). No WebGL 2, no context, or its shader fails: Canvas 2D, silently. Context lost: nothing
+  drawn until it's back (textures made again); lost twice within a minute, or not back within 5 s: Canvas 2D for the page.
+  Each of those fallbacks is reported once a page with its reason, nothing shown (the health view counts them:
+  docs/areas/ops.md, "Health"). Without `?gl=1`, Canvas 2D exactly as before. The canvas says which (`data-backend`).
 - **Taps** (slice 4: `town/press.ts`; cleaned up in slice 5). A finger down presses the square you'd walk to like a
   button: its face dims a little and one bold gold border lies on its edge, glowing outside only, while the finger is
   down; up on the same thing releases it with one short pulse of that border (brighter, a little wider, fading) and you
@@ -490,8 +495,14 @@ noted wherever a slice changed one.
 - **Every town spec on WebGL:** build with `VITE_TOWN_GL=1 npm run build` (WebGL the default, as `?gl=1`) and run them as usual;
   their pixel reads (`colors`, `skyTop`, the tags' and the lights' reads) work on both backends because a WebGL canvas's
   `getContext("2d")` gives the last frame's pixels under the test switches (Town.tsx's `shim`: the frame drawn again at once
-  and read right after the draw). Not in CI yet. Headless WebGL is software (SwiftShader, 4 to 6 fps), so run them with one
-  worker; the chat's timing checks can come in late there (docs/decisions/2026-10-30-town-webgl.md, "The town's specs").
+  and read right after the draw). Headless WebGL is software (SwiftShader: about 14 fps on a phone, 15 on a computer since
+  Oct 30, later; the page's thread waits for each frame), so run them with **one worker**: with two, a check takes 300 to
+  400 ms and the chat's and the tags' timing checks miss. `TOWN_GL_BUILD=1` tells `town-webgl.spec.ts` which default to
+  expect. All six pass so (docs/decisions/2026-10-30-town-webgl.md, "Oct 30, later").
+- **CI on WebGL** (Oct 30): a change to the town's area (`webgl` in `e2e/areas.json`) also runs the drawing specs (town,
+  town-desktop, town-tags, town-webgl) on a `VITE_TOWN_GL=1` build, in two more jobs beside the shards, `webgl-phone` and
+  `webgl-desktop` (one project, one worker each; about 10 minutes of tests each). The chat's two specs aren't in it (HTML
+  over the canvas; nothing in them depends on the backend). docs/areas/ops.md, "CI e2e".
 
 - `e2e/town-desktop.spec.ts` (Oct 29, the town on a computer): at 1280 × 800, 1440 × 900 and 1920 × 1080 the town's box is home's `.fd-center`
   (within a pixel), the menu and the right column are home's with the global chat showing, Boss Arena is marked, the chat icon is in the bar's

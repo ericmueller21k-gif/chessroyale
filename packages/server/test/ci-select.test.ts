@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { globToRegExp, MAX_SHARDS, plan, readAreas, readTimings, select, shardCount, specFiles, weigher } from "../../../e2e/ci-select.mjs";
+import { allWebgl, globToRegExp, MAX_SHARDS, plan, readAreas, readTimings, select, shardCount, specFiles, weigher, WEBGL_JOBS } from "../../../e2e/ci-select.mjs";
 
 /**
  * CI's e2e plan (e2e/ci-select.mjs, from e2e/areas.json; docs/areas/ops.md, "CI e2e"): a pull request runs the specs of
@@ -138,5 +138,39 @@ describe("shards", () => {
   it("a file the timings don't know counts as their median", () => {
     const w = weigher({ "e2e/a.spec.ts": 10, "e2e/b.spec.ts": 20, "e2e/c.spec.ts": 300 });
     expect(w("e2e/new.spec.ts")).toBe(20);
+  });
+});
+
+describe("the town on WebGL (areas.json, `webgl`)", () => {
+  const weight = weigher(readTimings());
+  const gl = [...areas.webgl!.specs].sort();
+
+  it("a town file or one of its drawing specs: those specs again on WebGL; a chat spec, the chat's server, docs or a boss: none", () => {
+    expect(gl).toEqual(["e2e/town-desktop.spec.ts", "e2e/town-tags.spec.ts", "e2e/town-webgl.spec.ts", "e2e/town.spec.ts"]);
+    expect(pick("packages/app/src/town/paint-gl.ts").webgl).toEqual(gl);
+    expect(pick("e2e/town-tags.spec.ts").webgl).toEqual(gl);
+    expect(pick("e2e/town-chat.spec.ts").webgl).toEqual([]);
+    expect(pick("packages/server/src/town-chat.ts").webgl).toEqual([]);
+    expect(pick("docs/areas/town-square.md", "packages/app/src/components/Sawyer.tsx").webgl).toEqual([]);
+  });
+
+  it("a shared foundation with a town file: every spec, and the town's on WebGL too", () => {
+    const r = pick("package.json", "packages/app/src/town/render.ts");
+    expect(r.full).not.toBeNull();
+    expect(r.webgl).toEqual(gl);
+    expect(pick("package.json").webgl).toEqual([]);
+  });
+
+  it("the plan: a WebGL job per project after the numbered shards, with its files, only when picked; a manual run's are the same", () => {
+    const on = plan(pick("packages/app/src/town/paint-gl.ts"), weight, all);
+    const n = Number(on.outputs.total);
+    expect(JSON.parse(on.outputs.shards)).toEqual([...Array.from({ length: n }, (_, i) => i + 1), ...WEBGL_JOBS]);
+    expect(WEBGL_JOBS).toEqual(["webgl-phone", "webgl-desktop"]);
+    expect(on.outputs.webgl.split(" ")).toEqual(gl);
+    expect(on.md).toContain("VITE_TOWN_GL=1");
+    const off = plan(pick("packages/app/src/components/Sawyer.tsx"), weight, all);
+    expect(JSON.parse(off.outputs.shards)).toEqual(Array.from({ length: Number(off.outputs.total) }, (_, i) => i + 1));
+    expect(off.outputs.webgl).toBe("");
+    expect(allWebgl(areas, all)).toEqual(gl);
   });
 });

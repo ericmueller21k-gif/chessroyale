@@ -6,6 +6,11 @@
 #   Playwright config, packages/core, the runner, the protocol, …) or a path the table doesn't know runs every spec, as
 #   does the `full-e2e` label (adding it starts a new run).
 # - A push to main (and a manual run) runs every spec on 5 shards, about 17 minutes: the full run after each merge.
+# - A change to the town's area (e2e/areas.json, `webgl`) also runs the town's drawing specs again on a VITE_TOWN_GL=1
+#   build (WebGL the town's default; the runners have no GPU, so it's software WebGL): two more jobs beside the shards,
+#   `webgl-phone` and `webgl-desktop` in the shard matrix, one project and one worker each (two software-WebGL pages at
+#   once on a runner's 4 CPUs make each check slow enough to miss the chat's and the tags' timings). On a PR, on a push
+#   to main that merged one, with the full-e2e label; a manual run always.
 #
 # Each shard runs whole spec files, spread by their measured time (e2e/ci-shard.mjs, e2e/ci-timings.json). The `result`
 # job puts one summary on the run's page (flaky tests first, then failed ones, each with its shard and error;
@@ -60,6 +65,7 @@ jobs:
       specs: ${{ steps.plan.outputs.specs }}
       total: ${{ steps.plan.outputs.total }}
       shards: ${{ steps.plan.outputs.shards }}
+      webgl: ${{ steps.plan.outputs.webgl }}
       note: ${{ steps.plan.outputs.note }}
     steps:
       - uses: actions/checkout@v4
@@ -70,14 +76,18 @@ jobs:
           EVENT: ${{ github.event_name }}
           FULL_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'full-e2e') }}
         run: |
-          if [ "$EVENT" != pull_request ]; then node e2e/ci-select.mjs full "this is a $EVENT run, which tests everything"
-          elif [ "$FULL_LABEL" = true ]; then node e2e/ci-select.mjs full "the pull request has the full-e2e label"
+          # (HEAD^1: for a push, main before it; for a pull request, main as it is now. A manual run has no base: everything.)
+          if [ "$EVENT" = workflow_dispatch ]; then node e2e/ci-select.mjs full "this is a $EVENT run, which tests everything"
+          elif [ "$EVENT" != pull_request ]; then node e2e/ci-select.mjs full "this is a $EVENT run, which tests everything" HEAD^1
+          elif [ "$FULL_LABEL" = true ]; then node e2e/ci-select.mjs full "the pull request has the full-e2e label" HEAD^1
           else node e2e/ci-select.mjs diff HEAD^1
           fi
 
+  # The shards, and (`webgl-phone`, `webgl-desktop` in the matrix) the town's drawing specs again on a build where WebGL is
+  # the town's default.
   shard:
     needs: plan
-    name: shard ${{ matrix.shard }} of ${{ needs.plan.outputs.total }}
+    name: ${{ startsWith(format('{0}', matrix.shard), 'webgl-') && format('the town on WebGL, {0}', matrix.shard) || format('shard {0} of {1}', matrix.shard, needs.plan.outputs.total) }}
     runs-on: ubuntu-24.04
     # A full run's shard tests for about 30 minutes; the system libraries' install (apt, below) has taken up to 16 on a
     # slow runner (Oct 26), so 45 cut two shards off mid-run with every test still green.
@@ -87,11 +97,16 @@ jobs:
       matrix:
         shard: ${{ fromJSON(needs.plan.outputs.shards) }}
     env:
-      E2E_SHARD_LABEL: Shard ${{ matrix.shard }} of ${{ needs.plan.outputs.total }}
+      E2E_SHARD_LABEL: ${{ startsWith(format('{0}', matrix.shard), 'webgl-') && format('The town on WebGL, {0}', matrix.shard) || format('Shard {0} of {1}', matrix.shard, needs.plan.outputs.total) }}
       E2E_SUMMARY_FILE: ${{ github.workspace }}/e2e-summary/shard-${{ matrix.shard }}.json
-      # The plan's spec files (empty: every spec file).
-      SPECS: ${{ needs.plan.outputs.specs }}
+      SHARD: ${{ matrix.shard }}
+      # The plan's spec files (empty: every spec file); the WebGL jobs' own.
+      SPECS: ${{ startsWith(format('{0}', matrix.shard), 'webgl-') && needs.plan.outputs.webgl || needs.plan.outputs.specs }}
       TOTAL: ${{ needs.plan.outputs.total }}
+      # The WebGL jobs: the build makes WebGL the town's default (test-switches.ts, TOWN_ASKED), and town-webgl.spec.ts's
+      # check of the default knows it.
+      VITE_TOWN_GL: ${{ startsWith(format('{0}', matrix.shard), 'webgl-') && '1' || '' }}
+      TOWN_GL_BUILD: ${{ startsWith(format('{0}', matrix.shard), 'webgl-') && '1' || '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -113,13 +128,18 @@ jobs:
         run: npx playwright install --with-deps --only-shell chromium
       - name: Build the app
         run: npm run build
-      - name: Run shard ${{ matrix.shard }} of ${{ needs.plan.outputs.total }}
+      - name: Run ${{ startsWith(format('{0}', matrix.shard), 'webgl-') && format('the town on WebGL, {0}', matrix.shard) || format('shard {0} of {1}', matrix.shard, needs.plan.outputs.total) }}
         run: |
-          files=$(node e2e/ci-shard.mjs ${{ matrix.shard }} "$TOTAL" $SPECS)
-          echo "Files: $files"
+          # (A WebGL job: all its files, its one project, one worker.)
+          only=""
+          case "$SHARD" in
+            webgl-*) files=$(node e2e/ci-shard.mjs 1 1 $SPECS); only="--project ${SHARD#webgl-} --workers 1" ;;
+            *) files=$(node e2e/ci-shard.mjs "$SHARD" "$TOTAL" $SPECS) ;;
+          esac
+          echo "Files: $files $only"
           # (No files would run the whole suite here: never expected, as the plan has a file for every shard.)
           [ -n "$files" ] || { echo "No spec files for this shard"; exit 1; }
-          npx playwright test $files --grep-invert @perf --forbid-only --retries 1 --trace on-first-retry \
+          npx playwright test $files $only --grep-invert @perf --forbid-only --retries 1 --trace on-first-retry \
             --reporter=list,github,html,./e2e/ci-summary.ts
       # (Kept 90 days, the most GitHub keeps: each run's failed and flaky tests, for a look at which tests catch real bugs
       # and which only flake (Eric, Oct 18). Under a kilobyte a shard.)
@@ -150,7 +170,7 @@ jobs:
     timeout-minutes: 5
     env:
       NOTE: ${{ needs.plan.outputs.note }}
-      TOTAL: ${{ needs.plan.outputs.total }}
+      SHARDS: ${{ needs.plan.outputs.shards }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -163,7 +183,7 @@ jobs:
           merge-multiple: true
       - name: Summary
         if: ${{ needs.plan.result == 'success' }}
-        run: node e2e/ci-summary-merge.mjs "$TOTAL" e2e-summary "$NOTE" >> "$GITHUB_STEP_SUMMARY"
+        run: node e2e/ci-summary-merge.mjs "$SHARDS" e2e-summary "$NOTE" >> "$GITHUB_STEP_SUMMARY"
       - name: The plan and every shard green
         if: ${{ needs.plan.result != 'success' || needs.shard.result != 'success' }}
         run: exit 1
