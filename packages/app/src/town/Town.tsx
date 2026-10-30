@@ -46,6 +46,8 @@ import { TownChat } from "./TownChat.tsx";
 import { TownChatTools } from "./TownChatTools.tsx";
 import { Press } from "./press.ts";
 import { PAWN_PX, Renderer, pawnImage, type Hit } from "./render.ts";
+import { painter2d, type Backend, type Painter } from "./paint.ts";
+import { painterGL } from "./paint-gl.ts";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
 import { BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, tdist, tick, townLine, waitingBot, walkWalker, type HomeId, seatOf, seatText, type Person, type Place, type Seat, type Sq, type StatueId, type Target } from "./world.ts";
 import { dressedPawn, lookKey } from "./you-look.ts";
@@ -299,7 +301,7 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, seat = null, framed
 /** Runs the world in `box` on `cv`: the loop, the camera, the input and the chips. Returns its controls and its stop. */
 function startTown(
   box: HTMLDivElement,
-  cv: HTMLCanvasElement,
+  cv0: HTMLCanvasElement,
   chipEls: (HTMLDivElement | null)[],
   cardEl: HTMLDivElement,
   liveEl: HTMLDivElement,
@@ -309,9 +311,76 @@ function startTown(
   onPlay: (seat: Seat, face: string | null) => void,
 ) {
   const f = TOWN_FEEL;
-  const ctx = cv.getContext("2d")!;
+  /** The world's canvas: a new one if the drawing changes backend (a canvas keeps the first kind of context it gave). */
+  let cv = cv0;
+  // The drawing (paint.ts): Canvas 2D, or WebGL 2 with `?gl=1` (anyone; read once as the page opened). No WebGL 2, or no
+  // context: Canvas 2D, silently. A lost context: nothing is drawn until it's back; lost twice within a minute, Canvas 2D
+  // for the rest of the page.
+  const losses: number[] = [];
+  let lostWait = 0;
+  const onLost = (lost: boolean) => {
+    clearTimeout(lostWait);
+    if (!lost) return void (alive && draw(performance.now()));
+    const now = performance.now();
+    losses.push(now);
+    // (And one that isn't back within a few seconds: the browser isn't giving it back.)
+    if (losses.length >= 2 && now - losses[losses.length - 2]! < 60_000) setTimeout(() => alive && useBackend("2d"));
+    else lostWait = window.setTimeout(() => alive && painter.lost && useBackend("2d"), LOST_WAIT_MS);
+  };
+  let attached = false;
+  /** A new canvas in the old one's place (its class, label, size and data), the input moved over. */
+  const swapCanvas = () => {
+    const n = document.createElement("canvas");
+    n.className = cv.className;
+    n.setAttribute("aria-label", cv.getAttribute("aria-label") ?? "");
+    Object.assign(n.dataset, cv.dataset);
+    n.width = cv.width;
+    n.height = cv.height;
+    n.style.cssText = cv.style.cssText;
+    if (attached) detach();
+    cv.replaceWith(n);
+    cv = n;
+    if (attached) attach();
+  };
+  const makePainter = (kind: Backend): Painter => {
+    if (kind === "webgl") {
+      const p = painterGL(cv, onLost);
+      if (p) return shim(p);
+      swapCanvas(); // (in case it gave a WebGL context before failing)
+    }
+    return painter2d(cv);
+  };
+  /**
+   * (Tests) The pixel reads the town's specs make (`canvas.getContext("2d").getImageData(…)`) work on a WebGL canvas too:
+   * its "2d" gives the last frame's pixels, drawn again at once (same moment, same camera) and read right after the draw.
+   * Only with the test switches on; otherwise a WebGL canvas has no "2d", as always.
+   */
+  const shim = (p: Painter): Painter => {
+    const c = cv as unknown as { getContext: (type: string, o?: unknown) => unknown };
+    const own = c.getContext.bind(c);
+    c.getContext = (type: string, o?: unknown) => (type === "2d" && painter === p && testSwitchesAllowed() ? pixelReader : own(type, o));
+    return p;
+  };
+  const pixelReader = {
+    getImageData: (x: number, y: number, w: number, h: number) => {
+      if (!painter.lost) r.draw(drawnAt, camX, camY, zoomCur, 0);
+      return painter.pixels(x, y, w, h);
+    },
+  };
+  let painter: Painter = makePainter(TOWN_ASKED.gl ? "webgl" : "2d");
+  cv.dataset.backend = painter.kind;
+  /** Draws with `kind` from now on (on a new canvas), the frame drawn again at once. */
+  const useBackend = (kind: Backend) => {
+    painter.dispose();
+    swapCanvas();
+    painter = makePainter(kind);
+    r.setPainter(painter);
+    cv.dataset.backend = painter.kind;
+    if (fpsEl) fpsEl.dataset.backend = BACKEND_LABEL[painter.kind];
+    draw(drawnAt);
+  };
   const town = createTown(performance.now(), undefined, seat);
-  const r = new Renderer(ctx, town, HOMES);
+  const r = new Renderer(painter, town, HOMES);
   // (The signs' pixel font is the game's own; it's loaded on first use, so ask for it now.)
   void document.fonts?.load('8px "Press Start 2P"').catch(() => {});
   // The bosses' sounds for a tap on one, made ahead off the page's thread (the sound worker), so a tap never costs a frame.
@@ -375,6 +444,8 @@ function startTown(
     fpsEl = document.createElement("div");
     fpsEl.className = "town-fps";
     fpsEl.dataset.fps = "";
+    // (The backend follows the numbers, "· WebGL" or "· 2D", from town.css: the pill's text stays the numbers.)
+    fpsEl.dataset.backend = BACKEND_LABEL[painter.kind];
     cv.parentElement?.append(fpsEl);
   }
   /** The game with a bot has been asked for (once). */
@@ -382,6 +453,10 @@ function startTown(
   let raf = 0;
   let last = performance.now();
   let alive = true;
+  /** (Tests, `__townHold`) The frame loop held: the last frame stays, and nothing moves. */
+  let held = false;
+  /** When the last frame was drawn (its `now`). */
+  let drawnAt = performance.now();
   let ready = false;
   let youKey = "";
   /** The open card (also in the screen's state, which draws it), and its size once laid out (NaN: measure it). */
@@ -505,7 +580,8 @@ function startTown(
   };
 
   const draw = (now: number, dt = 0) => {
-    r.draw(now, camX, camY, zoomCur, dt);
+    drawnAt = now;
+    if (!painter.lost) r.draw(now, camX, camY, zoomCur, dt);
     placeChips();
     placeCard();
     const h = town.you.walker.here();
@@ -563,7 +639,7 @@ function startTown(
     raf = requestAnimationFrame(frame);
   };
   const run = () => {
-    if (raf || !alive || document.hidden) return;
+    if (raf || !alive || document.hidden || held) return;
     last = performance.now();
     raf = requestAnimationFrame(frame);
   };
@@ -813,11 +889,22 @@ function startTown(
     e.preventDefault();
     setZoom(e.deltaY > 0);
   };
-  cv.addEventListener("pointerdown", onDown);
-  cv.addEventListener("pointermove", onMove);
-  cv.addEventListener("pointerup", onUp);
-  cv.addEventListener("pointercancel", onCancel);
-  cv.addEventListener("wheel", onWheel, { passive: false });
+  function attach() {
+    cv.addEventListener("pointerdown", onDown);
+    cv.addEventListener("pointermove", onMove);
+    cv.addEventListener("pointerup", onUp);
+    cv.addEventListener("pointercancel", onCancel);
+    cv.addEventListener("wheel", onWheel, { passive: false });
+  }
+  function detach() {
+    cv.removeEventListener("pointerdown", onDown);
+    cv.removeEventListener("pointermove", onMove);
+    cv.removeEventListener("pointerup", onUp);
+    cv.removeEventListener("pointercancel", onCancel);
+    cv.removeEventListener("wheel", onWheel);
+  }
+  attach();
+  attached = true;
 
   function setZoom(out: boolean) {
     leaveClose();
@@ -954,7 +1041,35 @@ function startTown(
   const hookPlayer = (uid: string, name: string, icon?: string, rating?: number): number => (testSwitchesAllowed() ? addTestPlayer(town, { uid, name, icon, rating }) : -1);
   // ... `__townFull(on)`: someone unseen on one stool of every table (no table free for you and a bot: its card's Play greys), or not.
   const hookFull = (on: boolean) => testSwitchesAllowed() && fillTables(town, on);
-  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags };
+  // ... `__townHold(on)`: the frame loop stops (the last frame stays, nothing moves) or goes on; `__townBackend("2d" | "webgl")`:
+  // the drawing's backend from now on (on a new canvas; the held frame drawn again), answering the one it got; `__townPaint()`:
+  // the backend and the last frame's draw calls (WebGL's; 0 for Canvas 2D). For the comparison of the two (e2e/town-webgl.spec.ts).
+  const hookHold = (on: boolean) => {
+    if (!testSwitchesAllowed()) return;
+    held = on;
+    if (on) halt();
+    else run();
+  };
+  const hookBackend = (kind: Backend) => {
+    if (!testSwitchesAllowed()) return null;
+    useBackend(kind);
+    return painter.kind;
+  };
+  // ... `__townBench(n)`: the held frame drawn again n times in a row, in ms a draw (the drawing's own cost, the same frame for
+  // either backend: nothing moves, nothing new to make).
+  const hookBench = (n: number) => {
+    if (!testSwitchesAllowed() || painter.lost) return null;
+    r.draw(drawnAt, camX, camY, zoomCur, 0);
+    const t0 = performance.now();
+    for (let i = 0; i < n; i++) r.draw(drawnAt, camX, camY, zoomCur, 0);
+    return (performance.now() - t0) / n;
+  };
+  const hookPaint = () => {
+    if (!testSwitchesAllowed()) return null;
+    const p = painter as Painter & { uploads?: number; resets?: number };
+    return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0 };
+  };
+  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townBackend?: typeof hookBackend; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench };
   hooks.__townAt = hookAt;
   hooks.__townGlide = hookGlide;
   hooks.__townGather = hookGather;
@@ -968,6 +1083,10 @@ function startTown(
   hooks.__townFull = hookFull;
   hooks.__townBossBack = hookBossBack;
   hooks.__townTags = hookTags;
+  hooks.__townHold = hookHold;
+  hooks.__townBackend = hookBackend;
+  hooks.__townPaint = hookPaint;
+  hooks.__townBench = hookBench;
 
   run();
   draw(performance.now()); // the first frame, before the screen shows
@@ -1015,6 +1134,7 @@ function startTown(
     },
     stop: () => {
       alive = false;
+      clearTimeout(lostWait);
       offAccount();
       fpsEl?.remove();
       halt();
@@ -1034,17 +1154,22 @@ function startTown(
       delete hooks.__townFull;
       delete hooks.__townBossBack;
       delete hooks.__townTags;
+      delete hooks.__townHold;
+      delete hooks.__townBackend;
+      delete hooks.__townPaint;
+      delete hooks.__townBench;
+      painter.dispose();
       if (card?.kind === "boss") town.bosses[card.i]!.held = false;
-      cv.removeEventListener("pointerdown", onDown);
-      cv.removeEventListener("pointermove", onMove);
-      cv.removeEventListener("pointerup", onUp);
-      cv.removeEventListener("pointercancel", onCancel);
-      cv.removeEventListener("wheel", onWheel);
+      detach();
     },
   };
 }
 
 const POSE = { x: 0, y: 0, hop: 0, tilt: 0 };
+/** How long a lost WebGL context may stay lost before the town goes back to Canvas 2D (it's usually back within a second). */
+const LOST_WAIT_MS = 5000;
+/** The frame-rate pill's name for each backend. */
+const BACKEND_LABEL: Record<Backend, string> = { "2d": "2D", webgl: "WebGL" };
 const PA = { x: 0, y: 0, k: 0, depth: 0 };
 const PB = { x: 0, y: 0, k: 0, depth: 0 };
 
