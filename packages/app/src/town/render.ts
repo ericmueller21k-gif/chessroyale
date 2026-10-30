@@ -33,6 +33,7 @@ import { CLOSE, QUOTE_INK, STATUE_W, quoteFace, statueArt, statueFrame, statueH,
 import { CAP, LEADING, layout, lineWidth, renderLines } from "./sign-font.ts";
 import { look, mixLights, mixMist, mixRGB, mixTint, type SkyWeights } from "./sky.ts";
 import { SkyPainter } from "./sky-draw.ts";
+import type { Ctx, PaintLayer, Painter } from "./paint.ts";
 import type { LightPool, LightSpot } from "./houses/kit.ts";
 import { PARK_BENCH, PARK_FOUNTAIN, PARK_LAMP, PARK_LAMP_HEAD, PARK_LAMP_LIGHTS, PARK_LAMP_POOLS, PARK_TABLE, PARK_TREES, TABLE_BACK_RANK, TABLE_BOARD, TABLE_CLOCK_INK, TABLE_DIGITS, TABLE_INK, TABLE_PIECES, TABLE_RING, TABLE_TOP } from "./houses/park.ts";
 import type { SidekickSheet } from "./sidekick-sheets.ts";
@@ -415,10 +416,10 @@ function quoteArt(id: StatueId, lines: string[], s: number, e: number, lead: num
  * each only as big as it needs (the light layer is touched only there); and which of its pixels are lit (the tests find
  * a lit window by it). Each canvas holds the light to add, laid on with "lighter".
  */
-/** A light layer: its canvas (the world's size), and which of its tiles (`lightTilePx` square, nx across, ny down) a light touched. */
+/** A light layer: its picture (the world's size; the drawing layer's, paint.ts), and which of its tiles (`lightTilePx` square, nx across, ny down) a light touched. */
 interface LightLayer {
-  cv: HTMLCanvasElement;
-  g: CanvasRenderingContext2D;
+  cv: PaintLayer;
+  g: Ctx;
   tiles: Uint8Array;
   nx: number;
   ny: number;
@@ -697,11 +698,14 @@ export class Renderer {
   private readonly litBox = new Float32Array(4 * 128);
   private nLit = 0;
 
+  /** What it draws with (paint.ts: Canvas 2D, or WebGL 2 with `?gl=1`), and that one's context. */
+  private ctx: Ctx;
   constructor(
-    private readonly ctx: CanvasRenderingContext2D,
+    private paint: Painter,
     private readonly town: Town,
     private readonly homes: readonly Home[],
   ) {
+    this.ctx = paint.ctx;
     this.places = [...homes, COLISEUM_PLACE];
     this.houseItems = this.places.map((_, i) => newItem("house", i));
     this.names = this.places.map(() => ({ x: 0, y: 0, a: 0, k: 0 }));
@@ -754,6 +758,17 @@ export class Renderer {
     };
   }
 
+  /** Draws with another backend from now on (Town.tsx: the WebGL context lost for good, or a test's switch); its light layers are its own. */
+  setPainter(p: Painter): void {
+    this.paint = p;
+    this.ctx = p.ctx;
+    this.layers.length = 0;
+    this.layer = null;
+    this.nLit = 0;
+    this.sky.forget();
+    this.bandGrad = null;
+  }
+
   /** The canvas's box changed (CSS pixels) or the device's pixel ratio did. */
   resize(W: number, H: number, DPR: number): void {
     this.W = W;
@@ -778,6 +793,7 @@ export class Renderer {
   private frameNo = 0;
   draw(now: number, camX: number, camY: number, zoom: number, dt = 0): void {
     const { ctx, W, H, DPR } = this;
+    this.paint.frame();
     this.frameNo++;
     this.nSoft = 0;
     this.camX = camX;
@@ -811,6 +827,7 @@ export class Renderer {
     ctx.globalAlpha = 1;
     if (TOWN_FEEL.floatingNames) this.drawNames(now);
     if (this.bubble.on) this.drawBubble(this.bubble.text, this.bubble.x, this.bubble.y); // (over a home's name)
+    this.paint.done();
     this.placeChips(now);
   }
 
@@ -1120,7 +1137,7 @@ export class Renderer {
     this.nSq = 0;
     forEachSquare(v, this.camX, this.camY, false, this.drawSquare);
     this.fillSquares();
-    if (TOWN_FEEL.softenFarBand) this.softenBand();
+    if (TOWN_FEEL.softenFarBand && this.paint.kind === "2d") this.softenBand(); // (it reads the canvas back: Canvas 2D only)
     ctx.restore();
   }
 
@@ -1622,7 +1639,7 @@ export class Renderer {
     const pcs = near ? (game?.pcs ?? (this.stillSet ??= setUp())) : [];
     const f = TOWN_FEEL;
     const moving = !!game && pcs.some((q) => now - q.t0 < f.tableSlideMs || (q.gone > 0 && now < q.gone));
-    const paint = (g: CanvasRenderingContext2D) => {
+    const paint = (g: Ctx) => {
       if (m === 1) return this.paintBoard(g, it.dx, dz, top, thick, shift, pcs, game ? now : -1);
       g.save();
       g.transform(m, 0, 0, m, tx, ty);
@@ -1663,7 +1680,7 @@ export class Renderer {
    * Paints table's slab, board and pieces into `cache` (its box: the slab's corners and the tallest piece over them),
    * worked out at (dx, dz) and drawn at x * m + tx, y * m + ty (drawBoard).
    */
-  private cacheBoard(cache: (typeof this.boardCache)[number], key: string, dx: number, dz: number, top: number, thick: number, shift: number, ps: number, m: number, tx: number, ty: number, paint: (g: CanvasRenderingContext2D) => void): void {
+  private cacheBoard(cache: (typeof this.boardCache)[number], key: string, dx: number, dz: number, top: number, thick: number, shift: number, ps: number, m: number, tx: number, ty: number, paint: (g: Ctx) => void): void {
     const { view: v, DPR } = this;
     const a = this.bp;
     const h = TABLE_BOARD.half;
@@ -1692,11 +1709,12 @@ export class Renderer {
     g.clearRect(0, 0, w, hh);
     g.setTransform(DPR, 0, 0, DPR, -x0 * DPR, -y0 * DPR);
     paint(g);
+    this.paint.changed(cv);
     Object.assign(cache, { key, cv, x: x0, y: y0, w: w / DPR, h: hh / DPR });
   }
 
   /** The slab, the board and `pcs` on it, into `g` in the screen's coordinates (`now` < 0: the pieces at rest). */
-  private paintBoard(g: CanvasRenderingContext2D, dx: number, dz: number, top: number, thick: number, shift: number, pcs: readonly TablePiece[], now: number): void {
+  private paintBoard(g: Ctx, dx: number, dz: number, top: number, thick: number, shift: number, pcs: readonly TablePiece[], now: number): void {
     const { view: v } = this;
     const B = TABLE_BOARD;
     const pal = PARK_TABLE.palette;
@@ -1767,15 +1785,14 @@ export class Renderer {
     if (this.lightK <= 0.01) return false;
     // The layer laid on two frames ago: the world's canvas is done with it by now, so clearing it copies nothing.
     if (this.layers.length < 2) {
-      const cv = document.createElement("canvas");
-      this.layers.push({ cv, g: cv.getContext("2d")!, tiles: new Uint8Array(0), nx: 0, ny: 0 });
+      const cv = this.paint.layer();
+      this.layers.push({ cv, g: cv.g, tiles: new Uint8Array(0), nx: 0, ny: 0 });
     }
     const L = (this.layer = this.layers[this.layer === this.layers[0] ? 1 : 0] ?? this.layers[0]!);
     const { canvas } = this.ctx;
     // (Sized like the world's canvas; a new size clears it.)
     if (L.cv.width !== canvas.width || L.cv.height !== canvas.height) {
-      L.cv.width = canvas.width;
-      L.cv.height = canvas.height;
+      L.cv.size(canvas.width, canvas.height);
       L.tiles.fill(0);
     }
     this.eachRun(L, this.clearRun, true);
@@ -1792,7 +1809,7 @@ export class Renderer {
   }
 
   private readonly clearRun = (x: number, y: number, w: number, h: number) => this.layer!.g.clearRect(x, y, w, h);
-  private readonly layRun = (x: number, y: number, w: number, h: number) => this.ctx.drawImage(this.layer!.cv, x, y, w, h, x, y, w, h);
+  private readonly layRun = (x: number, y: number, w: number, h: number) => this.ctx.drawImage(this.layer!.cv.src, x, y, w, h, x, y, w, h);
   /** Each run of a layer's touched tiles in a row, in its device pixels (`clear`: and unmark them). */
   private eachRun(L: LightLayer, fn: (x: number, y: number, w: number, h: number) => void, clear = false): void {
     const { cv, tiles, nx, ny } = L;
@@ -2101,6 +2118,8 @@ export class Renderer {
     const { ctx, DPR } = this;
     const f = 1 / (1 + 0.9 * TOWN_FEEL.bandBlur * s);
     const k = DPR * f;
+    // (WebGL: the same shrink, haze and stretch back in one draw, no scratch canvas.)
+    if (this.paint.soft) return this.paint.soft(img, bx, by, bw, bh, k, haze, this.colors.horizon);
     const pw = Math.ceil(bw * k) + 2;
     const ph = Math.ceil(bh * k) + 2;
     let sc = this.softs[this.nSoft++];
@@ -2279,6 +2298,7 @@ export class Renderer {
         g.fillText(text, w / 2, h / 2);
       }
     }
+    this.paint.changed(cv);
   }
 
   /** The speech bubble: white, rounded, its tail pointing down at the speaker's head. */
@@ -2782,7 +2802,7 @@ const dist2 = (h: Place, x: number, y: number) => wrapF(h.cx - x) ** 2 + wrapF(h
 /** The Colosseum's chip shows all of its icon. */
 const CHIP_ICON_BOX = [0, 0, COLISEUM_CHIP.w] as const;
 
-function roundRect(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+function roundRect(g: Ctx, x: number, y: number, w: number, h: number, r: number): void {
   g.beginPath();
   g.moveTo(x + r, y);
   g.lineTo(x + w - r, y);

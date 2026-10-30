@@ -10,6 +10,7 @@
 import { clamp, N, type View } from "./camera.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { LOOKS, SKY_STOPS, look, mixRGB, type Look, type SkyWeights } from "./sky.ts";
+import type { Ctx } from "./paint.ts";
 
 const lookOf = look;
 const css = (c: readonly number[], a = 1) => (a >= 1 ? `rgb(${c[0]! | 0},${c[1]! | 0},${c[2]! | 0})` : `rgba(${c[0]! | 0},${c[1]! | 0},${c[2]! | 0},${a.toFixed(3)})`);
@@ -123,6 +124,11 @@ export class SkyPainter {
     this.grad = null;
   }
 
+  /** The drawing's backend changed: its gradient is made again by the new one. */
+  forget(): void {
+    this.grad = null;
+  }
+
   private layoutClouds(): void {
     const f = TOWN_FEEL;
     const r = rng(20261026);
@@ -227,7 +233,7 @@ export class SkyPainter {
   }
 
   /** Draws the sky for this frame (before the ground, which covers whatever is below the horizon). */
-  draw(g: CanvasRenderingContext2D, v: View, camX: number, camY: number, now: number, dt: number): void {
+  draw(g: Ctx, v: View, camX: number, camY: number, now: number, dt: number): void {
     const { W, H } = this;
     const w = this.weights;
     const f = TOWN_FEEL;
