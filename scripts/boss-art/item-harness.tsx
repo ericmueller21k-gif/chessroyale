@@ -333,6 +333,8 @@ function measure(): object {
       const host = document.createElementNS("http://www.w3.org/2000/svg", "g");
       g.append(host);
       render(<DraftLayer d={item} finish={fin("red")} side="w" f={f} />, host);
+      // (Measured without the shine's band, which spans the whole frame box.)
+      host.querySelectorAll(".item-shine").forEach((e) => e.remove());
       const b = host.getBBox();
       if (f === 0) facts.artBox = [b.x, b.y, b.width, b.height].map((v) => +v.toFixed(1));
       const shift = ANCHOR[item.slot] !== undefined && item.attach !== undefined ? ANCHOR[item.slot]! - item.attach : 0;

@@ -386,7 +386,7 @@ async function main(): Promise<void> {
     const made: string[] = [];
     for (const [name, extra] of shots) {
       try {
-        const raw = execFileSync("npx", ["tsx", "scripts/boss-art/item-render.ts", JSON.stringify({ draft: DRAFT, mode: MODE, out: dir, ...extra })], { cwd: ROOT, env: bareEnv(), timeout: 120_000, encoding: "utf8" });
+        const raw = execFileSync("npx", ["tsx", "scripts/boss-art/item-render.ts", JSON.stringify({ draft: DRAFT, mode: MODE, out: LOOKS, ...extra })], { cwd: ROOT, env: bareEnv(), timeout: 120_000, encoding: "utf8" });
         const r = JSON.parse(raw.trim().split("\n").pop() ?? "{}") as { file?: string; error?: string };
         if (r.file) {
           const to = join(dir, `${name}.png`);

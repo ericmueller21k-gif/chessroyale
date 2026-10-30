@@ -26,3 +26,37 @@ npm run boss-art -- <id> <brief.md> [refs dir]
   - `looks/`: every picture it looked at.
   - The drawing, the summary and the log are committed; `preview/` and `looks/` aren't.
 - **Typecheck:** `npx tsc -p scripts/boss-art --noEmit`.
+
+## Crate items and rides (`--item`, `--rider`)
+
+```sh
+BOSS_ART_EFFORT=medium BOSS_ART_CAP_USD=3 npm run boss-art -- --item <id> <brief.md> [refs dir]
+BOSS_ART_EFFORT=high BOSS_ART_CAP_USD=6 npm run boss-art -- --rider <id> <brief.md> [refs dir]
+npx tsx scripts/boss-art/boss-refs.ts scripts/boss-art/refs/<id> <boss id>[:anim,anim]   # the boss's pictures, as references
+```
+
+- **The format:** the game's own item format, SVG drawn by Preact on the pawn's 100 × 100 square (Items.tsx), not pixel
+  grids. The drawing (`out/<id>/<id>.tsx`) imports `item-kit.tsx`, a copy of Items.tsx's paint (`Region`, `LINE`, `lw`, …),
+  and exports an `ItemDraft` (what ITEM_DEFS, ITEM_ART, FRAMES, SHINE_BOX and ATTACH would get) or a `RiderDraft` (a ride
+  under the pawn: `Back` and `Front` drawings, its `idle` and its town `move`, and a `pose` per frame that places the pawn,
+  its lower part cut off as the town's bench-sit does).
+- **Its eyes** (`item-render.ts`, its own process without the key): esbuild bundles `item-harness.tsx` with the drawing and
+  Chromium screenshots one picture: the motion frame by frame at 4x on a pawn (240 px), phone size (a 60 px lobby pawn, the
+  130 px home pawn, the 64 px locker tile) beside existing items, and every color at 75% purity, 100% and shiny. A ride:
+  its idle or move at 4x, the town size (a pawn about 45 px) through its move, every color, its tile.
+- `BOSS_ART_EFFORT` (default high) and `BOSS_ART_MAX_TOKENS` (default 24,000 for an item, 32,000 for a ride) as for bosses.
+- **Previews:** `out/<id>/preview/` (not committed): every frame (`frames.png`; a ride: `idle.png`, `move.png`) and the
+  standard look (`look.png`).
+
+### Item motion
+
+The game's items are still today: only the shine moves (a CSS animation). A drawing's motion is frames: its `Art` gets `f`,
+the frame number, and `motion.ms` (a ride: `idle.ms`, `move.ms`) each frame's length. To show them, the game would need:
+- **In the DOM** (votes, lobby, home, locker): `ItemLayer` taking a frame number from one shared clock (one timer for the
+  whole page, ticking each motion's frames, paused when the page is hidden and under reduced motion), so a screen of 100
+  pawns costs one timer. Still items ignore it.
+- **In the town** (a canvas): your dressed pawn is drawn once into a picture (town/you-look.ts); a moving item would be
+  baked into one picture per frame the same way, and the town would pick the frame by the clock. A ride also needs its
+  `move` played per square walked in place of the walk's hop, and the pawn drawn between its `Back` and `Front`, cut at
+  the pose's `cut` (the stool-sit's clip in render.ts, `sitCut`).
+- A new slot, `rider`, in crates.ts (`ItemSlot`, `cleanLook`) and a place for it in the locker.
