@@ -314,8 +314,10 @@ export interface CrowdCell {
   rect: Rect;
   foot: number;
   meters: number;
-  /** What it is: a pawn (plain or in crate items), a boss's sidekick, or a boss (drawn bigger, now and then, among the pawns). */
+  /** What it is: a pawn (plain or in crate items), a boss's sidekick, or a boss (drawn a little bigger, beside its sidekick). */
   kind: CrowdKind;
+  /** A boss's, or a sidekick's boss's, home. */
+  home?: HomeId;
 }
 export type CrowdKind = "pawn" | "sidekick" | "boss";
 export const CROWD_PX = 2048;
@@ -324,7 +326,8 @@ const PER_ROW = CROWD_PX / CELL;
 /** How tall each kind stands, meters from its head to its feet (a pawn's base a step's width). */
 const PAWN_M = 0.62;
 const SIDEKICK_M = 0.64;
-const BOSS_M = 1.15;
+/** (Eric, Oct 30: "the bosses' sprites are expected to be a little bigger": 1.15 before.) */
+const BOSS_M = 1.4;
 /** What the pawn's box covers of it: its head at 9 and its foot at 40.25 of 45. */
 const PAWN_SPAN = (40.25 - 9) / 45;
 
@@ -408,8 +411,8 @@ function bossPicture(id: HomeId): { c: HTMLCanvasElement; foot: number; meters: 
   return { c, foot: 1, meters: (BOSS_M * s) / fh };
 }
 
-/** The bosses that come to watch, scattered among the pawns. */
-const WATCHING: readonly HomeId[] = ["clown", "pig", "moo", "grex", "hopper", "gardener", "sawyer", "bigboy"];
+/** The bosses that come to watch: every boss with a sidekick (each sits once, its sidekick beside it: arena.ts `bossSeats`). */
+const WATCHING: readonly HomeId[] = BOTS.flatMap((b) => (isSprite(b.look) && b.boss ? [b.boss] : []));
 /** The pawn tints of the crowd's plain pawns (the town's bots' tints, and a few more). */
 const TINTS: readonly (string | null)[] = [null, "#ffb3c6", "#9fd3ff", "#3c6e5a", "#c9a46b", "#b48ad6", "#f2d16b"];
 /** How many crowd pawns in crate items (looks seeded the way every bot's is: `botLook`). */
@@ -417,10 +420,10 @@ const DRESSED = 40;
 
 /**
  * Everyone who watches: plain pawns in the town's tints, pawns in bots' crate items (`botLook`), the town bots in their own
- * looks, the bosses' sidekicks and a few bosses, one picture a cell; and each player-bot's portrait (BOTS' index).
+ * looks, the bosses' sidekicks and their bosses, one picture a cell; and each player-bot's portrait (BOTS' index).
  */
 export async function crowdArt(): Promise<CrowdArt> {
-  const pics: { c: HTMLCanvasElement; foot: number; meters: number; kind: CrowdKind; bot?: number }[] = [];
+  const pics: { c: HTMLCanvasElement; foot: number; meters: number; kind: CrowdKind; bot?: number; home?: HomeId }[] = [];
   for (const t of TINTS) for (const side of ["light", "dark"] as const) pics.push({ ...(await pawnPicture(side, t, null)), kind: "pawn" });
   for (let i = 0, n = 0; n < DRESSED && i < DRESSED * 4; i++) {
     const look = botLook(`colosseum-${i}`).look;
@@ -428,13 +431,13 @@ export async function crowdArt(): Promise<CrowdArt> {
     n++;
     pics.push({ ...(await pawnPicture(i % 3 ? "light" : "dark", TINTS[i % TINTS.length]!, look)), kind: "pawn" });
   }
-  await Promise.all(
-    BOTS.map(async (b: TownBot, i) => {
-      const p = isSprite(b.look) ? await sidekickPicture(b.look.sprite) : await pawnPicture(b.look.side, b.look.tint, b.look.wear);
-      pics.push({ ...p, kind: isSprite(b.look) ? "sidekick" : "pawn", bot: i });
-    }),
-  );
-  for (const id of WATCHING) pics.push({ ...bossPicture(id), kind: "boss" });
+  // (In BOTS' order, whichever picture loads first: the same cells on every load.)
+  const bots = await Promise.all(BOTS.map((b: TownBot) => (isSprite(b.look) ? sidekickPicture(b.look.sprite) : pawnPicture(b.look.side, b.look.tint, b.look.wear))));
+  bots.forEach((p, i) => {
+    const b = BOTS[i]!;
+    pics.push({ ...p, kind: isSprite(b.look) ? "sidekick" : "pawn", bot: i, home: isSprite(b.look) ? b.boss : undefined });
+  });
+  for (const id of WATCHING) pics.push({ ...bossPicture(id), kind: "boss", home: id });
 
   const { c, g } = pixelCanvas(CROWD_PX, CROWD_PX);
   const cells: CrowdCell[] = [];
@@ -444,7 +447,7 @@ export async function crowdArt(): Promise<CrowdArt> {
     const y = Math.floor(i / PER_ROW) * CELL;
     // (A pixel's margin round each, so the smaller copies a far crowd is drawn from don't bleed into the next cell.)
     g.drawImage(p.c, x + 2, y + 2, CELL - 4, CELL - 4);
-    cells.push({ rect: rect(x + 2, y + 2, CELL - 4, CELL - 4, CROWD_PX), foot: p.foot, meters: p.meters, kind: p.kind });
+    cells.push({ rect: rect(x + 2, y + 2, CELL - 4, CELL - 4, CROWD_PX), foot: p.foot, meters: p.meters, kind: p.kind, home: p.home });
     if (p.bot !== undefined) portraits.set(p.bot, portraitOf(p.c));
   });
   return { canvas: c, cells, portraits };

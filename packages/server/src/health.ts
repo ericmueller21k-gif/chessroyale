@@ -1,10 +1,11 @@
 /**
  * The health view (docs/areas/ops.md, "Health"): one snapshot of the game for an admin or a script
  * (`GET /api/admin/health`, and the top of `/admin/ops`). What's deployed, who's playing (Squads included), errors
- * this hour, last hour and today by fingerprint, the Durable Objects' errors, players' reports, the engine server's and
- * fair play's budgets, and a quick D1 check. Reads only: a handful of D1 reads and one call to the live hub.
+ * this hour, last hour and today by fingerprint, the Durable Objects' errors, the town's WebGL fallbacks by reason, players'
+ * reports, the engine server's and fair play's budgets, and a quick D1 check. Reads only: a handful of D1 reads and one
+ * call to the live hub.
  */
-import { FAIRPLAY } from "@chessroyale/core";
+import { FAIRPLAY, TOWN_GL_FALLBACK, type TownGlFallback } from "@chessroyale/core";
 import type { Sql } from "./accounts.ts";
 import { engineHealth, type EngineEnv } from "./engine.ts";
 import { liveHub } from "./live-hub.ts";
@@ -38,6 +39,12 @@ export interface Health {
    * kinds; the top 10 by this hour, then the last, then the day.
    */
   errors: { thisHour: number; lastHour: number; day: number; kinds: number; top: HealthError[] };
+  /**
+   * The town's WebGL fallbacks: page loads whose town asked for WebGL and drew with Canvas 2D (TOWN_GL_FALLBACK: each page
+   * reports one, as an error of that kind with its reason as the message), in the last 24 hours and 7 days (by the hour,
+   * as the errors), in all and by reason. Not errors, so not in `errors`; a reason that isn't one of ours isn't counted.
+   */
+  townFallbacks: { day: number; week: number; byReason: Record<TownGlFallback, { day: number; week: number }> };
   /** The Durable Objects' own errors in the last 24 hours, by class, then by entry point (`Class.method`). */
   durableObjects: { thisHour: number; lastHour: number; day: number; byClass: Record<string, number>; byEntry: Record<string, number> };
   /** Players' reports in the last 24 hours, by kind, and the latest 5 (their note cut to 200 characters). */
@@ -70,27 +77,31 @@ export async function health(env: ProblemsEnv & EngineEnv & Pick<Env, "LIVE">, s
   const thisHour = hourOf(now);
   const lastHour = thisHour - HOUR;
   const since = hourOf(now - 24 * HOUR);
+  const week = hourOf(now - 7 * 24 * HOUR);
+  const fallback = TOWN_GL_FALLBACK.kind;
   // (A database that doesn't answer leaves zeros: the view still says what's deployed, who's playing and D1's error.)
   const safe = <T>(p: Promise<T>, none: T) => p.catch(() => none);
   const hours = `SUM(CASE WHEN hour = ? THEN count ELSE 0 END) AS thisHour, SUM(CASE WHEN hour = ? THEN count ELSE 0 END) AS lastHour, SUM(count) AS day`;
-  const [deploy, live, totals, top, entries, reportKinds, latest, engine, fair] = await Promise.all([
+  const [deploy, live, totals, top, entries, fallbacks, reportKinds, latest, engine, fair] = await Promise.all([
     deployed(env),
     env.LIVE ? liveHub(env).health().catch(() => null) : Promise.resolve(null),
     safe(
       sql.first<{ thisHour: number | null; lastHour: number | null; day: number | null; kinds: number }>(
-        `SELECT ${hours}, COUNT(DISTINCT fingerprint) AS kinds FROM ops_errors WHERE hour >= ?`,
+        `SELECT ${hours}, COUNT(DISTINCT fingerprint) AS kinds FROM ops_errors WHERE hour >= ? AND kind != ?`,
         thisHour,
         lastHour,
         since,
+        fallback,
       ),
       null,
     ),
     safe(sql.all<HealthError>(
       `SELECT fingerprint, source, kind, message, ${hours}, MAX(last_seen) AS lastSeen, GROUP_CONCAT(DISTINCT version) AS versions
-       FROM ops_errors WHERE hour >= ? GROUP BY fingerprint ORDER BY thisHour DESC, lastHour DESC, day DESC LIMIT 10`,
+       FROM ops_errors WHERE hour >= ? AND kind != ? GROUP BY fingerprint ORDER BY thisHour DESC, lastHour DESC, day DESC LIMIT 10`,
       thisHour,
       lastHour,
       since,
+      fallback,
     ), []),
     // (A Durable Object's errors are kinds named Class.method: problems.ts, guardEntries.)
     safe(sql.all<{ kind: string; thisHour: number; lastHour: number; day: number }>(
@@ -98,6 +109,14 @@ export async function health(env: ProblemsEnv & EngineEnv & Pick<Env, "LIVE">, s
       thisHour,
       lastHour,
       since,
+    ), []),
+    // (The town's fallbacks: the devices' own kind; its message is the reason.)
+    safe(sql.all<{ reason: string; day: number; week: number }>(
+      `SELECT message AS reason, SUM(CASE WHEN hour >= ? THEN count ELSE 0 END) AS day, SUM(count) AS week
+       FROM ops_errors WHERE hour >= ? AND source = 'client' AND kind = ? GROUP BY message`,
+      since,
+      week,
+      fallback,
     ), []),
     safe(sql.all<{ kind: string; n: number }>("SELECT kind, COUNT(*) AS n FROM ops_reports WHERE at > ? GROUP BY kind", now - 24 * HOUR), []),
     safe(sql.all<{ id: string; kind: string; at: number; note: string }>("SELECT id, kind, at, substr(note, 1, 200) AS note FROM ops_reports WHERE at > ? ORDER BY at DESC LIMIT 5", now - 24 * HOUR), []),
@@ -113,12 +132,23 @@ export async function health(env: ProblemsEnv & EngineEnv & Pick<Env, "LIVE">, s
     durableObjects.byClass[cls] = (durableObjects.byClass[cls] ?? 0) + e.day;
     durableObjects.byEntry[e.kind] = e.day;
   }
+  const townFallbacks: Health["townFallbacks"] = { day: 0, week: 0, byReason: Object.fromEntries(TOWN_GL_FALLBACK.reasons.map((r) => [r, { day: 0, week: 0 }])) as Health["townFallbacks"]["byReason"] };
+  for (const f of fallbacks) {
+    // (Only our own reasons: anyone can send an error of any kind and message.)
+    if (!(TOWN_GL_FALLBACK.reasons as readonly string[]).includes(f.reason)) continue;
+    const n = townFallbacks.byReason[f.reason as TownGlFallback];
+    n.day += f.day;
+    n.week += f.week;
+    townFallbacks.day += f.day;
+    townFallbacks.week += f.week;
+  }
   return {
     at: now,
     deploy,
     live,
     errors: { thisHour: totals?.thisHour ?? 0, lastHour: totals?.lastHour ?? 0, day: totals?.day ?? 0, kinds: totals?.kinds ?? 0, top },
     durableObjects,
+    townFallbacks,
     reports: { day: Object.fromEntries(reportKinds.map((r) => [r.kind, r.n])), latest },
     engine,
     fairplay: { searches: fair?.searches ?? 0, cap: FAIRPLAY.deep.dailySearches },

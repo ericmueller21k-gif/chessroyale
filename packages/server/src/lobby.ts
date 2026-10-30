@@ -458,16 +458,22 @@ export function lobbyClosing(r: LobbyRecord, connected: boolean, life = LOBBY_LI
 
 /** A Boss Battle party's battle (LobbyRecord.party). */
 export interface PartyLobby {
-  pass: string;
+  /**
+   * Who may come in: each member's own pass (from START) → their seat, their party member id and their account. Only that
+   * pass takes that seat, and only from that account; a member kicked meanwhile has theirs revoked (revokePartyMember).
+   */
+  admits: Record<string, { seat: number; member: string; userId?: string }>;
   size: number;
   bots: number;
   leaderSeat: number;
   startBy: number;
   /** Each person's seat in the party (player id → seat), and each bot member's. */
   seats: Record<string, number>;
-  /** The party's code (its AFK kicks are told to it: kickedSeats, which the Durable Object passes on). */
+  /** Each person in the battle's party member id (player id → member id): an AFK kick is told back by it. */
+  members?: Record<string, string>;
+  /** The party's code (its AFK kicks are told to it: kickedMembers, which the Durable Object passes on). */
   partyCode: string;
-  kickedSeats?: number[];
+  kickedMembers?: string[];
 }
 
 export function newLobbyRecord(code: string, now: number, overrides?: LobbyRecord["overrides"], party?: PartyLobby): LobbyRecord {
@@ -673,6 +679,9 @@ export class LobbyCore {
 
   /** Matchmade and still waiting, and its time has come: Default once the fill time has passed; Bots off once ready. */
   private dueToStart(): boolean {
+    // (A party's battle: everyone's here, or its wait is over and someone is.)
+    const pl = this.r.party;
+    if (pl) return this.r.phase === "lobby" && !this.runner && (this.r.humans.length >= pl.size || this.io.now() >= pl.startBy) && this.r.humans.some((h) => h.connected);
     const a = this.r.auto;
     if (!a || a.filledAt || this.r.phase !== "lobby") return false;
     if (a.botsOff) return this.botsOffReady();
@@ -782,7 +791,7 @@ export class LobbyCore {
       this.resendHostWork();
       this.resendJudgeWork(existing.id);
       // Matchmade, and its time came while nobody was here (nothing started it): start now (bots fill the rest unless Bots off).
-      if (!this.r.timer && this.dueToStart()) this.startMatch();
+      if ((!this.r.timer || this.r.party) && this.dueToStart()) this.startMatch();
       return { ok: true as const, playerId: existing.id };
     }
     // Someone who left this match (resigned, or gone too long): they're told so, and how (their app goes home).
@@ -796,10 +805,11 @@ export class LobbyCore {
     if (this.r.phase === "results") return { ok: false as const, message: MATCH_ENDED, ended: true as const };
     if (this.r.phase !== "lobby" || this.r.auto?.filledAt) return { ok: false as const, message: "This match has already started." };
     if (this.r.humans.length >= this.settings.lobbySize) return { ok: false as const, message: "This lobby is full." };
-    // A party's battle: only its members, each in their own seat.
+    // A party's battle: only its members, each by their own pass into their own seat, from their own account.
     const pl = this.r.party;
-    const seat = typeof party.seat === "number" && Number.isInteger(party.seat) ? party.seat : -1;
-    if (pl && (party.pass !== pl.pass || seat < 0 || seat >= BOSS_PARTY.max || Object.values(pl.seats).includes(seat))) return { ok: false as const, message: PARTY_ONLY };
+    const admit = pl && typeof party.pass === "string" && Object.hasOwn(pl.admits, party.pass) ? pl.admits[party.pass]! : null;
+    const seat = admit?.seat ?? -1;
+    if (pl && (!admit || Object.values(pl.seats).includes(seat) || (admit.userId !== undefined && admit.userId !== userId))) return { ok: false as const, message: PARTY_ONLY };
     // (A name the filter refuses becomes "Player N", like an empty one: text-filter.ts.)
     const clean = seatName(name, `Player ${this.r.humans.length + 1}`);
     const id = `p${++this.r.counter}`;
@@ -819,14 +829,17 @@ export class LobbyCore {
       ...(admin ? { admin: true } : {}),
     });
     if (userId) this.r.accounts = { ...(this.r.accounts ?? {}), [id]: userId };
-    if (pl) pl.seats[id] = seat;
+    if (pl && admit) {
+      pl.seats[id] = seat;
+      pl.members = { ...(pl.members ?? {}), [id]: admit.member };
+    }
     if (!this.r.hostId) this.r.hostId = id;
     delete this.r.emptiedAt;
     this.send(id, { t: "welcome", playerId: id, token: newToken, code: this.r.code }, false);
     this.broadcast(this.lobbyMessage(id), false);
     // Matchmade and full (or, Bots off, ready): start now. A party's battle: once every member is here.
     if (this.r.auto && (this.r.humans.length >= this.settings.lobbySize || (this.r.auto.botsOff && this.botsOffReady()))) this.startMatch();
-    else if (pl && this.r.humans.length >= pl.size) this.startMatch();
+    else if (pl && this.dueToStart()) this.startMatch();
     return { ok: true as const, playerId: id };
   }
 
@@ -970,6 +983,8 @@ export class LobbyCore {
       ranked: this.ranked() && !h.practice,
       evalBar: h.evalBar ?? null,
       ...feats,
+      // (A Boss Battle party plays at its own difficulty: never an online tier win; partyFeats.)
+      ...(this.r.party ? { bossElo: null } : {}),
       // (In a boss battle they didn't see it through.)
       ...(feats.strikes !== null ? { survived: false } : {}),
     };
@@ -1034,19 +1049,46 @@ export class LobbyCore {
     if (typeof target !== "string" || !this.partyKickable(by, target)) return;
     console.log(`lobby ${this.r.code}: ${by} kicked ${target} (party, no pick)`);
     const pl = this.r.party!;
-    pl.kickedSeats = [...(pl.kickedSeats ?? []), pl.seats[target] ?? -1];
+    const member = pl.members?.[target];
+    if (member) pl.kickedMembers = [...(pl.kickedMembers ?? []), member];
     this.leaveMatch(this.human(target)!, "kicked");
     if (this.wrapUpIfEmpty()) return;
     this.nobodyToWaitFor();
   }
 
   /** A party's AFK kicks since last asked (by seat), for its Durable Object to tell the party. */
-  takePartyKicks(): { party: string; seats: number[] } | null {
+  takePartyKicks(): { party: string; members: string[] } | null {
     const pl = this.r.party;
-    if (!pl?.kickedSeats?.length) return null;
-    const seats = pl.kickedSeats;
-    delete pl.kickedSeats;
-    return { party: pl.partyCode, seats };
+    if (!pl?.kickedMembers?.length) return null;
+    const members = pl.kickedMembers;
+    delete pl.kickedMembers;
+    return { party: pl.partyCode, members };
+  }
+
+  /**
+   * The party kicked `member` at its stage after START: their pass no longer gets in, and if they're in the battle
+   * already, they're out of it as from the AFK kick (home, told so).
+   */
+  revokePartyMember(member: string) {
+    const pl = this.r.party;
+    if (!pl) return;
+    for (const [pass, a] of Object.entries(pl.admits)) if (a.member === member) delete pl.admits[pass];
+    if (this.r.phase === "lobby") pl.size = Math.max(1, Object.keys(pl.admits).length);
+    const id = Object.entries(pl.members ?? {}).find(([, m]) => m === member)?.[0];
+    const h = id ? this.human(id) : undefined;
+    if (!h) return;
+    console.log(`lobby ${this.r.code}: ${id} revoked (kicked from the party)`);
+    if (!this.inMatch()) {
+      this.leave(h.id);
+      delete pl.seats[h.id];
+      this.io.send(h.id, { t: "resigned", how: "kicked", result: null });
+      this.io.close?.(h.id);
+      if (this.dueToStart()) this.startMatch();
+      return;
+    }
+    this.leaveMatch(h, "kicked");
+    if (this.wrapUpIfEmpty()) return;
+    this.nobodyToWaitFor();
   }
 
   /** The work of leaving (see resign), without wrapping the match up. */
@@ -1231,7 +1273,9 @@ export class LobbyCore {
         // own app has him mock it and shows the charge gone; everyone else sees it with the move's reveal.)
         if (bossRules(this.runner.boss)?.blocksKing) return void this.runner.kingTried();
         if (msg.strike) return this.callStrike(playerId);
-        // Calling the King to play the move is this player's whole turn: no move of their own.
+        // Calling the King to play the move is this player's whole turn: no move of their own. (A party: picks change until
+        // the turn resolves, so a call replaces your pick.)
+        if (this.r.party && round.picks[playerId] && !this.called(playerId)) delete round.picks[playerId];
         if (this.doneThisRound(playerId)) return;
         (round.kingCalls ??= {})[playerId] = true;
         for (const h of this.r.humans) this.send(h.id, { t: "moved", key: round.key, playerId }, false);
@@ -1404,8 +1448,10 @@ export class LobbyCore {
       case "lights":
         return hollowLobby.lightsStep(this.bossLobby);
       case "partyStart":
-        // A party's battle: the members who came by now begin it (nobody came: it closes as any lobby nobody starts).
-        if (this.r.phase === "lobby" && this.r.humans.some((h) => h.connected)) this.startMatch();
+        // A party's battle: the members who came by now begin it. Nobody here just now: it waits again, and the first to
+        // (re)connect begins it (connect's dueToStart), so it never strands.
+        if (this.dueToStart()) this.startMatch();
+        else if (this.r.phase === "lobby") this.setTimer("partyStart", this.io.now() + BOSS_PARTY.joinWaitSec * 1000);
         return;
     }
   }
@@ -3163,7 +3209,9 @@ export class LobbyCore {
    */
   private noteFair(report: RoundReport, lastMoves: Map<number, string | null>) {
     const round = this.r.round;
-    if (!round) return;
+    // (A Boss Battle party sees its teammates' picks live, so copying a strong one would read as an engine's accuracy:
+    // no fair-play signals from a party's battle.)
+    if (!round || this.r.party) return;
     const people = new Set(this.r.humans.filter((h) => !h.practice).map((h) => h.id));
     const sig = FAIRPLAY.signals;
     let added = false;
@@ -3263,6 +3311,9 @@ export class LobbyCore {
           ranked: this.ranked() && !h.practice,
           evalBar: h.evalBar ?? null,
           ...matchFeats(p, stages, boss, !!this.settings.raid),
+          // (A Boss Battle party's boss plays at the party's difficulty, Very easy to Very hard, not a tier: recorded, but
+          // never as an online tier beaten, the profile's "bosses beaten online".)
+          ...(this.r.party ? { bossElo: null } : {}),
         },
       ];
     });

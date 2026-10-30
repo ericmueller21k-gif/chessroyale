@@ -192,3 +192,41 @@ describe("the game on the floor", () => {
     expect(m.state).toMatchObject({ status: "over", result: "0-1", reason: "time" });
   });
 });
+
+describe("the bosses in the crowd (Eric, Oct 30)", () => {
+  it("each boss with a sidekick sits once, its sidekick beside it, in rows 1 to 3, at the same seats whatever the view, never covering the board", async () => {
+    const { buildCrowd } = await import("../src/colosseum/arena-gl.ts");
+    const { bossSeats, coversBoard, rowY, seatR } = await import("../src/colosseum/arena.ts");
+    const homes = BOTS.flatMap((b) => ("sprite" in b.look && b.boss ? [b.boss] : []));
+    expect(homes.length).toBeGreaterThan(10);
+    const r = { u0: 0, v0: 0, u1: 1, v1: 1 };
+    // A crowd's cells as crowdArt makes them: pawns, the sidekicks, the bosses (each cell's u0 marks which it is).
+    const cells = [
+      ...[0, 1, 2].map((i) => ({ rect: { ...r, u0: i / 100 }, foot: 1, meters: 0.6, kind: "pawn" as const })),
+      ...homes.map((h, i) => ({ rect: { ...r, u0: 0.2 + i / 100 }, foot: 1, meters: 0.64, kind: "sidekick" as const, home: h })),
+      ...homes.map((h, i) => ({ rect: { ...r, u0: 0.5 + i / 100 }, foot: 1, meters: 1.4, kind: "boss" as const, home: h })),
+    ];
+    const a = buildCrowd({ cells });
+    expect(buildCrowd({ cells }), "the same seats on every build").toEqual(a);
+    const at = (u0: number) => {
+      const out: { x: number; y: number; z: number }[] = [];
+      for (let o = 0; o < a.length; o += 20) if (Math.abs(a[o + 4]! - u0) < 1e-6) out.push({ x: a[o]!, y: a[o + 1]!, z: a[o + 2]! });
+      return out;
+    };
+    homes.forEach((_, i) => {
+      const kid = at(0.2 + i / 100);
+      const boss = at(0.5 + i / 100);
+      expect(kid.length, "each sidekick once").toBe(1);
+      expect(boss.length, "each boss once").toBe(1);
+      expect(Math.hypot(kid[0]!.x - boss[0]!.x, kid[0]!.z - boss[0]!.z), "side by side").toBeLessThan(1.3);
+      expect(kid[0]!.y).toBe(boss[0]!.y);
+      expect(boss[0]!.y, "rows 1 to 3").toBeLessThanOrEqual(rowY(2) + 1e-6);
+    });
+    // The seats come from the layout alone (no view goes in), and none covers the board from any of the ten views.
+    const seatsNow = bossSeats(homes.length);
+    expect(seatsNow).toEqual(bossSeats(homes.length));
+    for (const v of VIEWS) for (const p of seatsNow) expect(coversBoard(v, p.boss, 0.8, 1.75)).toBe(false);
+    // (And the check does catch one: a boss two rows straight in front of the first seat would cover it.)
+    expect(coversBoard(VIEWS[0]!, { x: 0, y: rowY(1), z: seatR(1) }, 0.8, 1.75)).toBe(true);
+  });
+});
