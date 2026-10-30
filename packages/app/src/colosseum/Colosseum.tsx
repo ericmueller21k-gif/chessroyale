@@ -86,8 +86,7 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
     const cv = canvas.current!;
     const el = box.current!;
     // The giant pieces in 3D (`?pieces=3d`, anyone's, for now: Eric decides after the stills); without it, the flat pieces.
-    const asked = new URLSearchParams(location.search).get("pieces");
-    const arena = ArenaGL.create(cv, asked === "3d" || asked === "toon" ? asked : "flat");
+    const arena = ArenaGL.create(cv, new URLSearchParams(location.search).get("pieces") === "3d" ? "3d" : "flat");
     arenaRef.current = arena;
     setGl(!!arena);
     if (!arena) return;

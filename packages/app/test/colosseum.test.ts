@@ -194,7 +194,7 @@ describe("the game on the floor", () => {
 });
 
 describe("the 3D pieces (?pieces=3d; pieces3d.ts)", () => {
-  it("six meshes, built once: whole triangles, unit normals, standing on the board, sized to a square, the king tallest", async () => {
+  it("six meshes, built once: whole triangles facing outward, unit normals, on the board, inside their squares, each with its outline", async () => {
     const { KINDS, MAT, PV, pieceMeshes, triangulate, KNIGHT_OUTLINE } = await import("../src/colosseum/pieces3d.ts");
     const all = pieceMeshes();
     let verts = 0;
@@ -202,28 +202,42 @@ describe("the 3D pieces (?pieces=3d; pieces3d.ts)", () => {
       const m = all[k];
       const n = m.verts.length / PV;
       verts += n;
+      const v = (i: number, j: number) => m.verts[i * PV + j]!;
       expect(m.index.length % 3, k).toBe(0);
       expect(Math.max(...m.index), k).toBeLessThan(n);
       let minY = Infinity;
       let maxR = 0;
-      for (let i = 0; i < m.verts.length; i += PV) {
-        const [x, y, z, nx, ny, nz, mat] = m.verts.subarray(i, i + PV);
-        expect(Math.hypot(nx!, ny!, nz!)).toBeCloseTo(1, 4);
-        if (mat === MAT.shadow) continue;
-        minY = Math.min(minY, y!);
-        maxR = Math.max(maxR, Math.hypot(x!, z!));
+      let outline = 0;
+      for (let i = 0; i < n; i++) {
+        expect(Math.hypot(v(i, 3), v(i, 4), v(i, 5))).toBeCloseTo(1, 4);
+        if (v(i, 6) === MAT.outline) outline++;
+        if (v(i, 6) === MAT.shadow) continue;
+        minY = Math.min(minY, v(i, 1));
+        maxR = Math.max(maxR, Math.hypot(v(i, 0), v(i, 2)));
       }
+      expect(outline, `${k} has its outline`).toBeGreaterThan(0);
       expect(minY, `${k} stands on the board`).toBeCloseTo(0, 5);
       expect(maxR, `${k} fits its square`).toBeLessThan(0.5);
+      // (The back faces are culled, so a body's triangles must face out and its outline's in.)
+      let wrong = 0;
+      for (let t = 0; t < m.index.length; t += 3) {
+        const [a, b, c] = [m.index[t]!, m.index[t + 1]!, m.index[t + 2]!];
+        if (v(a, 6) === MAT.shadow) continue;
+        const u = [0, 1, 2].map((j) => v(b, j) - v(a, j));
+        const w = [0, 1, 2].map((j) => v(c, j) - v(a, j));
+        const g = [u[1]! * w[2]! - u[2]! * w[1]!, u[2]! * w[0]! - u[0]! * w[2]!, u[0]! * w[1]! - u[1]! * w[0]!];
+        if (Math.hypot(g[0]!, g[1]!, g[2]!) < 1e-9) continue;
+        const nn = [0, 1, 2].map((j) => v(a, 3 + j) + v(b, 3 + j) + v(c, 3 + j));
+        const out = g[0]! * nn[0]! + g[1]! * nn[1]! + g[2]! * nn[2]!;
+        if ((v(a, 6) === MAT.outline) !== out < 0) wrong++;
+      }
+      expect(wrong / (m.index.length / 3), `${k}'s triangles face the right way`).toBeLessThan(0.02);
+      expect(m.height, `${k} about a cburnett piece's height`).toBeGreaterThan(0.6);
+      expect(m.height).toBeLessThan(0.95);
     }
     // (All six in one 16-bit index buffer.)
     expect(verts).toBeLessThan(65536);
-    const h = Object.fromEntries(KINDS.map((k) => [k, all[k].height]));
-    expect(h.k).toBeGreaterThan(h.q!);
-    expect(h.q).toBeGreaterThan(h.b!);
-    expect(h.p).toBeLessThan(Math.min(h.n!, h.b!, h.r!));
-    // (The tallest stays within what the views keep on screen: the board and a piece about 1.6 m tall over it.)
-    expect(h.k).toBeLessThan(1.7);
+    expect(all.k.height).toBe(Math.max(...KINDS.map((k) => all[k].height)));
     // The knight's head: its outline cut into whole triangles.
     expect(triangulate(KNIGHT_OUTLINE).length).toBe((KNIGHT_OUTLINE.length - 2) * 3);
   });
