@@ -30,6 +30,7 @@
  * Nothing is allocated per frame on the hot path: the streams, the path, the state stack and the scratch vertices are
  * typed arrays and objects that grow and are reused.
  */
+import type { TownGlFallback } from "@chessroyale/core";
 import type { Ctx, PaintLayer, Painter } from "./paint.ts";
 
 /** Floats a vertex: x, y, u, v, color (rgba8), flags (u32), p0 to p5. */
@@ -328,19 +329,23 @@ interface Baked {
 const BAKE_MAX = 24;
 
 /**
- * The WebGL 2 painter for the town's canvas, or null when WebGL 2 or its context can't be had (Town.tsx falls back to
- * Canvas 2D, silently). `onLost`: the context was lost (nothing is drawn until it's back) or restored.
+ * The WebGL 2 painter for the town's canvas, or why there's none (Town.tsx falls back to Canvas 2D, silently, and reports
+ * the reason once: problems.ts, `reportTownFallback`): no WebGL 2 in this browser, no context to be had, or the shader
+ * failed. `onLost`: the context was lost (nothing is drawn until it's back) or restored.
  */
-export function painterGL(cv: HTMLCanvasElement, onLost: (lost: boolean) => void): Painter | null {
+export function painterGL(cv: HTMLCanvasElement, onLost: (lost: boolean) => void): Painter | TownGlFallback {
+  if (typeof WebGL2RenderingContext === "undefined") return "no-webgl2";
   let gl: WebGL2RenderingContext | null = null;
   try {
     gl = cv.getContext("webgl2", { alpha: true, antialias: true, premultipliedAlpha: true, stencil: true, depth: false, preserveDrawingBuffer: false });
   } catch {
     gl = null;
   }
-  if (!gl) return null;
+  if (!gl) return "no-context";
   const p = new GLPainter(cv, gl, onLost);
-  return p.init() ? p : null;
+  if (p.init()) return p;
+  p.dispose(); // (its context goes now: Town.tsx draws on a new canvas)
+  return "shader";
 }
 
 class GLPainter implements Painter {
