@@ -1,0 +1,449 @@
+/* Inside the Colosseum (Oct 30, the first look; Colosseum.tsx). The overlay is dark in both themes: it sits over the arena,
+   as Eric's mockup. Phone (portrait, or any window under 900 × 600): the stands at the top, the cards, the moves, the board, the
+   chat below. Computer: the arena fills the screen, the cards and the moves along its top, the board and the chat down its right.
+   Every box keeps its size and place whatever it holds (nothing shifts). */
+.col-screen {
+  --col-panel: rgba(17, 20, 33, 0.92);
+  --col-edge: #3d4259;
+  --col-gold: #f0c04f;
+  --col-text: #f3f1ea;
+  --col-muted: #a7adbf;
+  position: fixed;
+  inset: var(--banner-h, 0px) 0 0 0;
+  display: flex;
+  flex-direction: column;
+  background: #10131d;
+  color: var(--col-text);
+  font-family: Archivo, system-ui, sans-serif;
+  overflow: hidden;
+}
+.col-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: calc(52px + env(safe-area-inset-top));
+  padding: env(safe-area-inset-top) calc(12px + env(safe-area-inset-right)) 0 calc(12px + env(safe-area-inset-left));
+  border-bottom: 1px solid var(--col-edge);
+  background: #151927;
+}
+.col-bar h1 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font: 400 15px/1 "Archivo Black", Archivo, sans-serif;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.col-exit,
+.col-seat {
+  flex: none;
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid var(--col-edge);
+  background: #20253a;
+  color: var(--col-text);
+  font: 700 14px Archivo, sans-serif;
+  cursor: pointer;
+}
+.col-exit {
+  padding: 0 12px;
+}
+.col-seat {
+  background: linear-gradient(#fdda7e, #f3b957);
+  border-color: #e3a93f;
+  color: #1a1d2b;
+}
+.col-bar .mm-more {
+  background: #20253a;
+  border-color: var(--col-edge);
+  color: var(--col-text);
+}
+
+.col-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 0 calc(10px + env(safe-area-inset-bottom));
+}
+.col-arena {
+  position: relative;
+  flex: none;
+  height: 31vh;
+  overflow: hidden;
+  background: #8cb3db;
+}
+.col-canvas,
+.col-still {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+.col-still {
+  object-fit: cover;
+  pointer-events: none;
+}
+.col-fps:empty {
+  display: none;
+}
+.col-fps {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  font: 600 12px Archivo, sans-serif;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+/* The top: the two cards and the middle in one row; the moves under them on a phone. */
+.col-top {
+  flex: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 64px minmax(0, 1fr);
+  grid-template-areas: "w mid b" "moves moves moves";
+  gap: 6px;
+  padding: 0 10px;
+}
+.col-card {
+  grid-area: w;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 6px;
+  align-items: center;
+  height: 76px;
+  padding: 6px;
+  box-sizing: border-box;
+  border: 2px solid var(--col-edge);
+  border-radius: 10px;
+  background: var(--col-panel);
+}
+.col-card.col-b {
+  grid-area: b;
+}
+.col-card.on {
+  border-color: var(--col-gold);
+}
+.col-pic {
+  grid-row: 1;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: #e9e3d4;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  position: relative;
+}
+.col-pic img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+.col-pic .avatar {
+  width: 82%;
+  height: 82%;
+}
+.col-who {
+  grid-row: 1;
+  min-width: 0;
+}
+.col-name {
+  font: 700 12px/1.2 Archivo, sans-serif;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.col-bot {
+  color: var(--col-muted);
+  font-weight: 500;
+}
+.col-elo {
+  font: 600 11px/1.3 Archivo, sans-serif;
+  color: var(--col-muted);
+}
+.col-took {
+  display: flex;
+  height: 14px;
+  overflow: hidden;
+}
+.col-took img {
+  width: 14px;
+  height: 14px;
+  margin-right: -3px;
+}
+.col-clock {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  justify-self: end;
+  padding: 1px 8px;
+  border-radius: 6px;
+  background: #0b0d15;
+  font: 700 16px/1.2 Archivo, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+.col-card.on .col-clock {
+  background: var(--col-gold);
+  color: #1a1d2b;
+}
+.col-mid {
+  grid-area: mid;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  height: 76px;
+  box-sizing: border-box;
+  border: 2px solid var(--col-edge);
+  border-radius: 10px;
+  background: var(--col-panel);
+}
+.col-turn {
+  font: 700 13px Archivo, sans-serif;
+  white-space: nowrap;
+}
+.col-viewers {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font: 700 13px Archivo, sans-serif;
+  color: var(--col-muted);
+}
+/* The last moves: one line on a phone (the newest at its right end), four rows on a computer. */
+.col-moves {
+  grid-area: moves;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  height: 26px;
+  margin: 0;
+  padding: 0 8px;
+  list-style: none;
+  border: 2px solid var(--col-edge);
+  border-radius: 10px;
+  background: var(--col-panel);
+  overflow: hidden;
+  font: 600 12px/22px Archivo, sans-serif;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.col-moves li {
+  display: flex;
+  gap: 5px;
+}
+.col-moves li:empty,
+.col-moves li span:empty {
+  display: none;
+}
+.col-n {
+  color: var(--col-muted);
+}
+.col-moves .on {
+  color: var(--col-gold);
+}
+
+/* The side: the board with its eval bar, the status line, the chat's box. */
+.col-side {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 10px;
+}
+.col-boardrow {
+  flex: none;
+  display: flex;
+  gap: 6px;
+  align-self: center;
+  width: min(100%, calc(31vh + 20px));
+}
+.col-eval {
+  position: relative;
+  flex: none;
+  width: 22px;
+  border: 2px solid var(--col-edge);
+  border-radius: 4px;
+  background: #23252c;
+  overflow: hidden;
+}
+.col-eval-w {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #f1efe9;
+  transition: height 0.4s ease;
+}
+.col-eval-n {
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  top: 2px;
+  text-align: center;
+  font: 700 9px Archivo, sans-serif;
+  letter-spacing: -0.3px;
+  color: #f1efe9;
+  mix-blend-mode: difference;
+}
+.col-board {
+  flex: 1;
+  min-width: 0;
+  border: 2px solid var(--col-gold);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.col-status {
+  flex: none;
+  height: 18px;
+  text-align: center;
+  font: 600 12px/18px Archivo, sans-serif;
+  color: var(--col-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.col-chat {
+  flex: 1;
+  min-height: 60px;
+  padding: 8px 10px;
+  box-sizing: border-box;
+  border: 2px solid var(--col-edge);
+  border-radius: 10px;
+  background: var(--col-panel);
+}
+.col-chat h2 {
+  margin: 0 0 4px;
+  font: 700 12px Archivo, sans-serif;
+  color: var(--col-muted);
+}
+.col-chat p {
+  margin: 0;
+  font: 600 12px Archivo, sans-serif;
+  color: var(--col-muted);
+}
+
+/* Computer: the arena under everything, the overlay on it. */
+@media (min-width: 900px) and (min-height: 600px) {
+  .col-bar h1 {
+    font-size: 19px;
+  }
+  .col-stage {
+    display: block;
+    padding: 0;
+  }
+  .col-arena {
+    position: absolute;
+    inset: 0;
+    height: auto;
+  }
+  .col-top {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(1160px, calc(100% - 20px));
+    grid-template-columns: minmax(0, 1fr) 120px 210px minmax(0, 1fr);
+    grid-template-areas: "w mid moves b";
+    gap: 8px;
+    padding: 0;
+  }
+  .col-card {
+    grid-template-columns: 64px minmax(0, 1fr) auto;
+    grid-template-rows: 1fr;
+    column-gap: 10px;
+    height: 92px;
+    padding: 10px 12px;
+  }
+  .col-pic {
+    width: 64px;
+    height: 64px;
+    border-radius: 10px;
+  }
+  .col-name {
+    font-size: 17px;
+  }
+  .col-elo {
+    font-size: 13px;
+    margin: 2px 0;
+  }
+  .col-took {
+    height: 18px;
+  }
+  .col-took img {
+    width: 18px;
+    height: 18px;
+  }
+  .col-clock {
+    grid-column: 3;
+    grid-row: 1;
+    align-self: center;
+    font-size: 22px;
+    padding: 4px 10px;
+  }
+  .col-mid {
+    height: 92px;
+  }
+  .col-turn,
+  .col-viewers {
+    font-size: 16px;
+  }
+  .col-moves {
+    flex-direction: column;
+    justify-content: center;
+    gap: 0;
+    height: 92px;
+    padding: 4px 12px;
+    font-size: 14px;
+    line-height: 19px;
+  }
+  .col-moves li {
+    display: grid;
+    grid-template-columns: 30px 1fr 1fr;
+  }
+  .col-moves li span:empty {
+    display: block;
+  }
+  .col-side {
+    position: absolute;
+    top: 112px;
+    right: 10px;
+    bottom: 10px;
+    width: clamp(280px, 30vw, 420px);
+    padding: 0;
+  }
+  .col-boardrow {
+    width: 100%;
+    padding: 6px;
+    box-sizing: border-box;
+    border: 2px solid var(--col-edge);
+    border-radius: 10px;
+    background: var(--col-panel);
+  }
+  .col-eval {
+    width: 22px;
+  }
+  .col-eval-n {
+    font-size: 10px;
+  }
+  .col-status {
+    border-radius: 8px;
+    background: var(--col-panel);
+    height: 24px;
+    line-height: 24px;
+    font-size: 13px;
+  }
+}

@@ -97,7 +97,7 @@ function fitRows(card: HTMLElement): void {
   }
 }
 
-export function TownScreen({ onBack, onBossAlone, onPlayBot, seat = null, framed = false }: { onBack: () => void; onBossAlone?: (id: HomeId) => void; onPlayBot?: (game: BotGameAsk) => void; seat?: string | null; framed?: boolean }) {
+export function TownScreen({ onBack, onBossAlone, onPlayBot, onColosseum, seat = null, framed = false }: { onBack: () => void; onBossAlone?: (id: HomeId) => void; onPlayBot?: (game: BotGameAsk) => void; onColosseum?: () => void; seat?: string | null; framed?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const chips = useRef<(HTMLDivElement | null)[]>([]);
@@ -192,6 +192,17 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, seat = null, framed
                   Raids with people
                 </button>
                 <div class="town-soon">Coming soon</div>
+                {/* The first look inside (Oct 30, Eric: a preview, docs/areas/colosseum.md): /colosseum, its Exit back here. */}
+                <a
+                  class="town-btn town-look"
+                  href="/colosseum"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    onColosseum?.();
+                  }}
+                >
+                  Look inside (preview)
+                </a>
               </>
             )}
             {/* A chess table's (no title: Eric, Oct 27): a casual or ranked game of normal chess will start here (the tables'
