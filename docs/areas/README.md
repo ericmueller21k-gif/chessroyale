@@ -16,6 +16,7 @@ and `docs/history/`.
 | The front door: home, queue, profiles, the live line | [hub.md](hub.md) | `hub` |
 | Auto chess, the demo: buy chess pieces with gold, place them, the engine plays the position out (a bot, in the browser) | [autochess.md](autochess.md) | the director |
 | The town square (/town, Boss Arena's card on home): the world where players walk and meet the bosses at their homes (slice 1: the world, five homes, bots) | [town-square.md](town-square.md) | the director |
+| Inside the Colosseum (/colosseum, the town card's "Look inside (preview)"): the arena in WebGL 2, its views, bots playing on its floor | [colosseum.md](colosseum.md) | the director |
 | Accounts and sign-in | [accounts.md](accounts.md) | `hub` |
 | Chat: quick chat, lobby chat, global chat | [chat.md](chat.md) | `social` |
 | The shop, crates, the locker and the icon builder | [shop.md](shop.md) | `item-builder` |

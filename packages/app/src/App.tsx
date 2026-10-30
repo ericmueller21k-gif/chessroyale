@@ -36,6 +36,7 @@ import { FriendsScreen } from "./screens/Friends.tsx";
 import { SettingsScreen } from "./screens/Settings.tsx";
 import { AutoChessScreen } from "./screens/AutoChess.tsx";
 import { TownPage, type BotGameAsk } from "./town/TownPage.tsx";
+import { ColosseumPage } from "./colosseum/ColosseumPage.tsx";
 import { FaqScreen } from "./screens/Faq.tsx";
 import { Logo } from "./components/FrontDoor.tsx";
 import { FrontFrame, type FrontNav } from "./components/FrontMenu.tsx";
@@ -288,6 +289,8 @@ export function App() {
   const [showAutoChess, setShowAutoChess] = useState(() => location.pathname === "/autochess");
   /** The town square (/town; hidden, nothing links to it yet: slice 1 of Boss raid's town square, docs/areas/town-square.md). */
   const [showTown, setShowTown] = useState(() => location.pathname === "/town");
+  /** Inside the Colosseum (/colosseum; the first look, Oct 30: docs/areas/colosseum.md): the town's Colosseum card opens it, Exit goes back to the town. */
+  const [showColosseum, setShowColosseum] = useState(() => location.pathname === "/colosseum");
   /**
    * Where the town opens you, back from a game with a town bot: its seat ("6.0.3": the table, your stool, the bot; the
    * town reads it). A reload during that game lands there too: its address carries it (`/town?at=6.0.3`).
@@ -454,8 +457,8 @@ export function App() {
   // Warm the engine up in the background so play starts instantly (not on Auto chess, whose fights use the HunChess engine:
   // Stockfish isn't loaded there; it warms when you leave it). Not in the town square either: nothing there plays chess yet.
   useEffect(() => {
-    if (!showAutoChess && !showTown) void enginePool();
-  }, [showAutoChess, showTown]);
+    if (!showAutoChess && !showTown && !showColosseum) void enginePool();
+  }, [showAutoChess, showTown, showColosseum]);
 
   // Back on a lobby link this device already has a seat in (a reload, the app reopened, a dropped connection):
   // rejoin straight away (if the lobby has closed since, the connection is refused and the note shows). Otherwise
@@ -1255,6 +1258,18 @@ export function App() {
       />
     );
   }
+  if (!match && showColosseum) {
+    // (Its own Stockfish, started and ended with it: the pool isn't warmed here.)
+    return (
+      <ColosseumPage
+        onExit={() => {
+          setShowColosseum(false);
+          setShowTown(true);
+          history.replaceState(null, "", "/town");
+        }}
+      />
+    );
+  }
   if (!match && showTown) {
     // A player's profile from the town chat's menu: over the town, which stays as it was underneath (Back closes it).
     const overlayT = profileOpen && (
@@ -1270,6 +1285,12 @@ export function App() {
           nav={nav}
           seat={townSeat}
           onPlayBot={playTownBot}
+          onColosseum={() => {
+            setShowTown(false);
+            setTownSeat(null);
+            setShowColosseum(true);
+            history.replaceState(null, "", "/colosseum");
+          }}
           onBack={() => {
             setShowTown(false);
             setTownSeat(null);

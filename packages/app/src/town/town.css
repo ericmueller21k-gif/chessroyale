@@ -300,6 +300,14 @@
   border-color: #ddd5c4;
   cursor: default;
 }
+/* The Colosseum card's link inside (a link styled as a button; Oct 30, the first look). */
+a.town-btn.town-look {
+  box-sizing: border-box;
+  margin-top: 8px;
+  text-align: center;
+  text-decoration: none;
+  line-height: 22px;
+}
 .town-soon {
   margin-top: 4px;
   font: 600 11px Archivo, sans-serif;
