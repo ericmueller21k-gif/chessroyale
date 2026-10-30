@@ -1055,7 +1055,11 @@ function startTown(
     useBackend(kind);
     return painter.kind;
   };
-  const hookPaint = () => (testSwitchesAllowed() ? { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost } : null);
+  const hookPaint = () => {
+    if (!testSwitchesAllowed()) return null;
+    const p = painter as Painter & { uploads?: number; resets?: number };
+    return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0 };
+  };
   const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townBackend?: typeof hookBackend; __townPaint?: typeof hookPaint };
   hooks.__townAt = hookAt;
   hooks.__townGlide = hookGlide;

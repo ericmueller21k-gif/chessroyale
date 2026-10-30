@@ -29,11 +29,11 @@ import type { Ctx, PaintLayer, Painter } from "./paint.ts";
 
 /** Floats a vertex: x, y, u, v, color (rgba8), flags (u32), p0 to p5. */
 const VF = 12;
-const SLOTS = 8;
 const PAGE = 2048;
 /** A picture bigger than this either way gets a texture of its own. */
 const BIG = 1024;
 const PAD = 2;
+/** Atlas pages at most (the array texture grows two at a time up to this; layer 7 is the shader's "a texture of its own"). */
 const MAX_PAGES = 6;
 
 // Flags: mode (bits 0-2), texture slot (3-5), smooth (6), composite (7-8), haze (16-23).
@@ -69,13 +69,13 @@ void main() {
   v_p1 = a_p1;
 }`;
 
-const samplers = (p: string) => Array.from({ length: SLOTS }, (_, i) => `uniform sampler2D ${p}${i};`).join("\n");
-const pick = (p: string) => Array.from({ length: SLOTS }, (_, i) => `    case ${i}u: return texture(${p}${i}, uv);`).join("\n");
 const FS = `#version 300 es
 precision highp float;
 precision highp int;
-${samplers("L")}
-${samplers("N")}
+// The atlas pages (layers 0 to 6 of one array texture) and one texture of its own (layer 7: a light layer, a big picture).
+uniform highp sampler2DArray A;
+uniform sampler2D T;
+uniform vec2 u_tsize;
 in vec2 v_uv;
 in vec4 v_col;
 flat in uint v_flags;
@@ -83,16 +83,12 @@ in vec4 v_p0;
 in vec2 v_p1;
 out vec4 o;
 vec4 smoothAt(uint s, vec2 uv) {
-  switch (s) {
-${pick("L")}
-  }
-  return vec4(0.0);
+  return s == 7u ? texture(T, uv) : texture(A, vec3(uv, float(s)));
 }
-vec4 nearAt(uint s, vec2 uv) {
-  switch (s) {
-${pick("N")}
-  }
-  return vec4(0.0);
+// Nearest: the middle of the texel under uv (what NEAREST picks; smooth sampling there reads that texel alone).
+vec2 nearUv(uint s, vec2 uv) {
+  vec2 n = s == 7u ? u_tsize : vec2(${PAGE}.0);
+  return (floor(uv * n) + 0.5) / n;
 }
 float erf1(float x) {
   float t = 1.0 / (1.0 + 0.3275911 * abs(x));
@@ -109,14 +105,14 @@ vec4 scratch(uint s, vec2 j) {
 }
 void main() {
   uint mode = v_flags & 7u;
-  uint slot = (v_flags >> 3u) & 7u;
+  uint slot = (v_flags >> 3u) & 7u; // (the texture: an atlas page's layer, or 7)
   bool smoothed = ((v_flags >> 6u) & 1u) == 1u;
   uint comp = (v_flags >> 7u) & 3u;
   vec4 c;
   if (mode == 0u) {
     c = v_col;
   } else if (mode == 1u) {
-    c = (smoothed ? smoothAt(slot, v_uv) : nearAt(slot, v_uv)) * v_col;
+    c = smoothAt(slot, smoothed ? v_uv : nearUv(slot, v_uv)) * v_col;
   } else if (mode == 2u) {
     // A line blurred: its half width p0.x, the blur's sigma p0.y; v_uv.x the distance across it.
     float d = v_uv.x;
@@ -146,13 +142,15 @@ void main() {
   o = c;
 }`;
 
-/** A GL texture: an atlas page, a big picture's own, or a light layer's. */
+/** A GL texture: an atlas page (a layer of the atlas's array texture), a big picture's own, or a light layer's. */
 interface Tex {
   t: WebGLTexture | null;
   w: number;
   h: number;
   /** A light layer's: its stream (drawn before the canvas draws the layer). */
   stream: Stream | null;
+  /** An atlas page's layer in the array (0 to MAX_PAGES - 1); -1: a texture of its own. */
+  layer: number;
 }
 
 /** An atlas page: shelves of pictures, each with PAD transparent pixels round it. */
@@ -178,13 +176,13 @@ interface Entry {
   used: number;
 }
 
-/** A target's recorded triangles: its vertices, how many, and the textures they use (by slot). */
+/** A target's recorded triangles: its vertices, how many, whether they read the atlas, and the texture of its own they read (one a draw). */
 interface Stream {
   f: Float32Array;
   u: Uint32Array;
   n: number;
-  slots: (Tex | null)[];
-  nSlots: number;
+  atlas: boolean;
+  big: Tex | null;
   /** The framebuffer drawn into (null: the canvas), its size, and its y (the canvas is drawn top down, a layer bottom up). */
   fb: WebGLFramebuffer | null;
   w: number;
@@ -194,7 +192,7 @@ interface Stream {
 
 const newStream = (fb: WebGLFramebuffer | null, flip: number): Stream => {
   const f = new Float32Array(VF * 6 * 2048);
-  return { f, u: new Uint32Array(f.buffer), n: 0, slots: Array.from({ length: SLOTS }, () => null), nSlots: 0, fb, w: 1, h: 1, flip };
+  return { f, u: new Uint32Array(f.buffer), n: 0, atlas: false, big: null, fb, w: 1, h: 1, flip };
 };
 
 /** A color parsed into premultiplied-ready parts (0 to 1). */
@@ -348,6 +346,10 @@ class GLPainter implements Painter {
   drawCalls = 0;
   lost = false;
   private calls = 0;
+  /** (Tests and the frame-rate check) Pictures uploaded in the last frame, and atlas pages started again so far. */
+  uploads = 0;
+  resets = 0;
+  private ups = 0;
   frameNo = 0;
   gen = 1;
   private prog: WebGLProgram | null = null;
@@ -355,9 +357,14 @@ class GLPainter implements Painter {
   private vbo: WebGLBuffer | null = null;
   private vboSize = 0;
   private sLinear: WebGLSampler | null = null;
-  private sNearest: WebGLSampler | null = null;
   private uSize: WebGLUniformLocation | null = null;
   private uFlip: WebGLUniformLocation | null = null;
+  private uTSize: WebGLUniformLocation | null = null;
+  /** The atlas: one array texture, `cap` pages deep; and a blank texture for "none of its own". */
+  private atlas: WebGLTexture | null = null;
+  private cap = 0;
+  private dummy: WebGLTexture | null = null;
+  private readFb: WebGLFramebuffer | null = null;
   readonly main: Stream = newStream(null, -1);
   private readonly reg = new WeakMap<object, Entry>();
   private readonly live: Entry[] = [];
@@ -418,10 +425,9 @@ class GLPainter implements Painter {
     }
     this.prog = prog;
     gl.useProgram(prog);
-    for (let i = 0; i < SLOTS; i++) {
-      gl.uniform1i(gl.getUniformLocation(prog, `L${i}`), i);
-      gl.uniform1i(gl.getUniformLocation(prog, `N${i}`), SLOTS + i);
-    }
+    gl.uniform1i(gl.getUniformLocation(prog, "A"), 0);
+    gl.uniform1i(gl.getUniformLocation(prog, "T"), 1);
+    this.uTSize = gl.getUniformLocation(prog, "u_tsize");
     this.uSize = gl.getUniformLocation(prog, "u_size");
     this.uFlip = gl.getUniformLocation(prog, "u_flip");
     this.vao = gl.createVertexArray();
@@ -451,11 +457,13 @@ class GLPainter implements Painter {
       return s;
     };
     this.sLinear = sampler(gl.LINEAR);
-    this.sNearest = sampler(gl.NEAREST);
-    for (let i = 0; i < SLOTS; i++) {
-      gl.bindSampler(i, this.sLinear);
-      gl.bindSampler(SLOTS + i, this.sNearest);
-    }
+    gl.bindSampler(0, this.sLinear);
+    gl.bindSampler(1, this.sLinear);
+    this.atlas = null;
+    this.cap = 0;
+    this.dummy = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.dummy);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.disable(gl.DEPTH_TEST);
@@ -468,6 +476,7 @@ class GLPainter implements Painter {
     const { gl, cv, main } = this;
     this.frameNo++;
     this.calls = 0;
+    this.ups = 0;
     main.w = cv.width;
     main.h = cv.height;
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -479,6 +488,8 @@ class GLPainter implements Painter {
     gl.clearStencil(0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
     this.g.level = 0;
+    this.chains.fill(0);
+    this.stale.fill(0);
   }
 
   done(): void {
@@ -486,13 +497,14 @@ class GLPainter implements Painter {
     for (let i = 0; i < this.layerList.length; i++) this.flush(this.layerList[i]!.stream);
     this.flush(this.main);
     this.drawCalls = this.calls;
+    this.uploads = this.ups;
     if (this.frameNo % 300 === 0) this.sweep();
   }
 
   layer(): PaintLayer {
     const src = document.createElement("canvas"); // (only its identity: the layer's texture is found by it)
     src.width = src.height = 1;
-    const tex: Tex = { t: null, w: 0, h: 0, stream: null };
+    const tex: Tex = { t: null, w: 0, h: 0, stream: null, layer: -1 };
     const stream = newStream(null, 1);
     tex.stream = stream;
     const g = new GLCtx(this, stream, { width: 0, height: 0 } as HTMLCanvasElement);
@@ -572,8 +584,15 @@ class GLPainter implements Painter {
     if (e.tex && e.gen === this.gen) this.flushUsing(e.tex);
     if (!(e.tex && e.gen === this.gen && e.w === w && e.h === h)) this.place(e, w, h);
     e.gen = this.gen;
-    gl.bindTexture(gl.TEXTURE_2D, e.tex!.t);
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, e.x, e.y, gl.RGBA, gl.UNSIGNED_BYTE, s);
+    this.ups++;
+    const t = e.tex!;
+    if (t.layer >= 0) {
+      gl.bindTexture(gl.TEXTURE_2D_ARRAY, t.t);
+      gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0, e.x, e.y, t.layer, w, h, 1, gl.RGBA, gl.UNSIGNED_BYTE, s);
+    } else {
+      gl.bindTexture(gl.TEXTURE_2D, t.t);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, e.x, e.y, gl.RGBA, gl.UNSIGNED_BYTE, s);
+    }
   }
 
   /** A place for a w x h picture: an atlas page's shelf, or its own texture. */
@@ -586,7 +605,7 @@ class GLPainter implements Painter {
       gl.bindTexture(gl.TEXTURE_2D, t);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
       if (e.tex && !e.page && e.tex.t) gl.deleteTexture(e.tex.t);
-      e.tex = { t, w, h, stream: null };
+      e.tex = { t, w, h, stream: null, layer: -1 };
       e.page = null;
       e.x = e.y = 0;
       return;
@@ -597,23 +616,55 @@ class GLPainter implements Painter {
     for (const pg of this.pages) if (this.shelf(pg, e, W, H)) return;
     let pg: Page;
     if (this.pages.length < MAX_PAGES) {
-      const t = gl.createTexture();
-      gl.bindTexture(gl.TEXTURE_2D, t);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, PAGE, PAGE, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-      pg = { tex: { t, w: PAGE, h: PAGE, stream: null }, shelves: [], top: 0, used: 0, entries: [] };
+      const layer = this.pages.length;
+      this.grow(layer + 1);
+      pg = { tex: { t: this.atlas, w: PAGE, h: PAGE, stream: null, layer }, shelves: [], top: 0, used: 0, entries: [] };
       this.pages.push(pg);
     } else {
       // Full: the page least lately drawn from starts again, empty (its pictures are uploaded again as they show).
       pg = this.pages.reduce((a, b) => (a.used <= b.used ? a : b));
+      this.resets++;
       this.flushUsing(pg.tex);
       for (const o of pg.entries) if (o.page === pg) ((o.tex = null), (o.page = null));
       pg.entries.length = 0;
       pg.shelves.length = 0;
       pg.top = 0;
-      gl.bindTexture(gl.TEXTURE_2D, pg.tex.t);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, PAGE, PAGE, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      // (Cleared through a framebuffer on its layer.)
+      gl.bindFramebuffer(gl.FRAMEBUFFER, (this.readFb ??= gl.createFramebuffer()));
+      gl.framebufferTextureLayer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, this.atlas, 0, pg.tex.layer);
+      gl.disable(gl.SCISSOR_TEST);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     }
     this.shelf(pg, e, W, H);
+  }
+
+  /**
+   * The atlas's array texture at least `n` pages deep: made, or made again deeper (two pages more at a time, up to
+   * MAX_PAGES), the pages it held copied over on the GPU.
+   */
+  private grow(n: number): void {
+    const { gl } = this;
+    if (this.cap >= n && this.atlas) return;
+    const cap = Math.min(MAX_PAGES, Math.max(n, this.cap + 2));
+    const old = this.atlas;
+    if (old) for (let i = 0; i < this.pages.length; i++) this.flushUsing(this.pages[i]!.tex);
+    const t = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, t);
+    gl.texStorage3D(gl.TEXTURE_2D_ARRAY, 1, gl.RGBA8, PAGE, PAGE, cap);
+    if (old) {
+      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, (this.readFb ??= gl.createFramebuffer()));
+      for (let i = 0; i < this.cap; i++) {
+        gl.framebufferTextureLayer(gl.READ_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, old, 0, i);
+        gl.copyTexSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, i, 0, 0, PAGE, PAGE);
+      }
+      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+      gl.deleteTexture(old);
+    }
+    this.atlas = t;
+    this.cap = cap;
+    for (const pg of this.pages) pg.tex.t = t;
   }
 
   private shelf(pg: Page, e: Entry, W: number, H: number): boolean {
@@ -649,19 +700,23 @@ class GLPainter implements Painter {
     }
   }
 
-  /** The slot `tex` takes in `st` this draw (drawing what `st` holds first when its slots are full). */
+  /** Where the shader finds `tex` in `st`'s next draw: an atlas page's layer, or 7 (one texture of its own a draw: another one draws what `st` holds first). */
   slot(st: Stream, tex: Tex): number {
-    for (let i = 0; i < st.nSlots; i++) if (st.slots[i] === tex) return i;
+    if (tex.layer >= 0) {
+      st.atlas = true;
+      return tex.layer;
+    }
+    if (st.big === tex) return 7;
     if (tex.stream && tex.stream.n > 0) this.flush(tex.stream); // (a layer: its own draws go first)
-    if (st.nSlots === SLOTS) this.flush(st);
-    st.slots[st.nSlots] = tex;
-    return st.nSlots++;
+    if (st.big) this.flush(st);
+    st.big = tex;
+    return 7;
   }
 
   /** Room for `n` more vertices in `st`. */
   room(st: Stream, n: number): void {
     // (A layer about to be drawn on while the canvas still holds a draw of it: the canvas's draws go first.)
-    if (st !== this.main && st.n === 0) for (let i = 0; i < this.main.nSlots; i++) if (this.main.slots[i]?.stream === st) this.flush(this.main);
+    if (st !== this.main && st.n === 0 && this.main.big?.stream === st) this.flush(this.main);
     if ((st.n + n) * VF <= st.f.length) return;
     if (n * VF * 2 > st.f.length || st.n * VF > st.f.length / 2) {
       const f = new Float32Array(Math.max(st.f.length * 2, (st.n + n) * VF * 2));
@@ -677,14 +732,15 @@ class GLPainter implements Painter {
     for (let i = 0; i < this.layerList.length; i++) this.flushIfUses(this.layerList[i]!.stream, tex);
   }
   private flushIfUses(st: Stream, tex: Tex): void {
-    for (let i = 0; i < st.nSlots; i++) if (st.slots[i] === tex) return this.flush(st);
+    if (tex.layer >= 0 ? st.atlas : st.big === tex) this.flush(st);
   }
 
   /** Draws a stream's triangles in one call. */
   flush(st: Stream): void {
     if (st.n === 0 || this.lost) {
       st.n = 0;
-      st.nSlots = 0;
+      st.atlas = false;
+      st.big = null;
       return;
     }
     const { gl } = this;
@@ -694,15 +750,13 @@ class GLPainter implements Painter {
     gl.bindVertexArray(this.vao);
     gl.uniform2f(this.uSize, st.w, st.h);
     gl.uniform1f(this.uFlip, st.flip);
-    // (Every unit: one left holding a layer's texture while that layer is drawn into would be a feedback loop.)
-    for (let i = 0; i < SLOTS; i++) {
-      const t = i < st.nSlots ? st.slots[i]!.t : null;
-      gl.activeTexture(gl.TEXTURE0 + i);
-      gl.bindTexture(gl.TEXTURE_2D, t);
-      gl.activeTexture(gl.TEXTURE0 + SLOTS + i);
-      gl.bindTexture(gl.TEXTURE_2D, t);
-    }
+    // The atlas on unit 0, the draw's texture of its own (or a blank one: a layer's left bound while that layer is drawn
+    // into would be a feedback loop) on unit 1.
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, st.big?.t ?? this.dummy);
+    if (st.big) gl.uniform2f(this.uTSize, st.big.w, st.big.h);
     gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.atlas);
     const bytes = st.n * VF * 4;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
     if (bytes > this.vboSize) {
@@ -713,29 +767,35 @@ class GLPainter implements Painter {
     // (The canvas's draws keep to its stencil's clip; a layer has none.)
     if (st === this.main && this.g.level > 0) {
       gl.enable(gl.STENCIL_TEST);
+      const m = (1 << this.g.level) - 1;
       gl.stencilMask(0xff);
-      gl.stencilFunc(gl.EQUAL, this.g.level, 0x7f);
+      gl.stencilFunc(gl.EQUAL, m, m);
       gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
     } else gl.disable(gl.STENCIL_TEST);
     gl.drawArrays(gl.TRIANGLES, 0, st.n);
     this.calls++;
     st.n = 0;
-    st.nSlots = 0;
-    for (let i = 0; i < SLOTS; i++) st.slots[i] = null;
+    st.atlas = false;
+    st.big = null;
   }
 
   /**
-   * The canvas's clip (the stencil's low 7 bits: how many clips deep a pixel is inside). `up`: one level deeper, to
-   * `level`, where the triangles in the canvas's stream from `from` on (the new clip's shape) cover an odd number of times
-   * (even-odd, the top bit as scratch); else every pixel deeper than `level` back to it. The draws pending go first, at the
-   * clip they were drawn in.
+   * The canvas's clips in the stencil, a bit a level (level k: bit k - 1; inside at level L: the low L bits all set). A clip
+   * one level deeper, `level`, whose shape is the canvas's stream's triangles from `from` on (`hash`: its shape, box x0 to
+   * y1): its bit is flipped by the shape inside the clip above it (even-odd), one pass. A level let go costs nothing (draws
+   * test only the bits of their own level); its bit is cleared, in its box, only when another shape takes that level. The
+   * same shape again on the same clips (the ground's, for the haze) is still there: nothing drawn. The pending draws go
+   * first, at their clip.
    */
-  stencil(from: number, up: boolean, level: number): void {
+  stencil(from: number, level: number, hash: number, x0: number, y0: number, x1: number, y1: number): void {
     const { gl, main } = this;
     const n = main.n;
+    const k = n - from;
     main.n = from;
+    const chain = (level > 1 ? Math.imul(this.chains[level - 1]! ^ hash, 16777619) >>> 0 : hash) || 1;
+    // (The draws pending, at the clip they were drawn in.)
     this.flush(main);
-    if (this.lost) return;
+    if ((this.chains[level] === chain && !this.stale[level]) || this.lost) return;
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, main.w, main.h);
     gl.useProgram(this.prog);
@@ -745,54 +805,57 @@ class GLPainter implements Painter {
     gl.colorMask(false, false, false, false);
     gl.enable(gl.STENCIL_TEST);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
-    // The shape's triangles, then a rectangle over the whole canvas, in the buffer.
-    const k = up ? n - from : 0;
     const need = (k + 6) * VF * 4;
     if (need > this.vboSize) {
       this.vboSize = Math.max(need, this.vboSize * 2, 1 << 20);
       gl.bufferData(gl.ARRAY_BUFFER, this.vboSize, gl.STREAM_DRAW);
     }
-    if (k) gl.bufferSubData(gl.ARRAY_BUFFER, 0, main.f, from * VF, k * VF);
-    const f = this.full;
-    f[2] = f[4] = f[8] = main.w;
-    f[5] = f[9] = f[11] = main.h;
-    for (let i = 0; i < 6; i++) {
-      const o = i * VF;
-      this.fullV[o] = f[i * 2]!;
-      this.fullV[o + 1] = f[i * 2 + 1]!;
-    }
-    gl.bufferSubData(gl.ARRAY_BUFFER, k * VF * 4, this.fullV);
-    if (up) {
-      // Inside the clip so far, the shape flips the top bit.
-      gl.stencilMask(0x80);
-      gl.stencilFunc(gl.EQUAL, level - 1, 0x7f);
-      gl.stencilOp(gl.KEEP, gl.KEEP, gl.INVERT);
-      gl.drawArrays(gl.TRIANGLES, 0, k);
-      // Where it's set, one level deeper (the low bits only)...
-      gl.stencilMask(0x7f);
-      gl.stencilFunc(gl.EQUAL, 0x80, 0x80);
-      gl.stencilOp(gl.KEEP, gl.KEEP, gl.INCR);
-      gl.drawArrays(gl.TRIANGLES, k, 6);
-      // ...and the top bit cleared everywhere.
-      gl.stencilMask(0x80);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, main.f, from * VF, k * VF);
+    const bit = 1 << (level - 1);
+    const B = this.clipBoxes;
+    const o = level * 4;
+    if (this.chains[level] !== 0) {
+      // Another shape had this level: its bit cleared in its box.
+      const f = this.full;
+      f[0] = f[6] = f[10] = B[o]!;
+      f[1] = f[3] = f[7] = B[o + 1]!;
+      f[2] = f[4] = f[8] = B[o + 2]!;
+      f[5] = f[9] = f[11] = B[o + 3]!;
+      for (let i = 0; i < 6; i++) {
+        this.fullV[i * VF] = f[i * 2]!;
+        this.fullV[i * VF + 1] = f[i * 2 + 1]!;
+      }
+      gl.bufferSubData(gl.ARRAY_BUFFER, k * VF * 4, this.fullV);
+      gl.stencilMask(bit);
       gl.stencilFunc(gl.ALWAYS, 0, 0xff);
       gl.stencilOp(gl.KEEP, gl.KEEP, gl.ZERO);
       gl.drawArrays(gl.TRIANGLES, k, 6);
-      this.calls += 3;
-    } else {
-      gl.stencilMask(0x7f);
-      gl.stencilFunc(gl.LESS, level, 0x7f);
-      gl.stencilOp(gl.KEEP, gl.KEEP, gl.REPLACE);
-      gl.drawArrays(gl.TRIANGLES, k, 6);
       this.calls++;
     }
+    // (Deeper levels were cut inside the old shape: they're stale now.)
+    for (let l = level + 1; l < this.chains.length; l++) if (this.chains[l]) this.stale[l] = 1;
+    gl.stencilMask(bit);
+    gl.stencilFunc(gl.EQUAL, bit - 1, bit - 1);
+    gl.stencilOp(gl.KEEP, gl.KEEP, gl.INVERT);
+    gl.drawArrays(gl.TRIANGLES, 0, k);
+    this.calls++;
+    this.chains[level] = chain;
+    this.stale[level] = 0;
+    B[o] = Math.max(0, Math.floor(x0) - 1);
+    B[o + 1] = Math.max(0, Math.floor(y0) - 1);
+    B[o + 2] = Math.min(main.w, Math.ceil(x1) + 1);
+    B[o + 3] = Math.min(main.h, Math.ceil(y1) + 1);
     gl.stencilMask(0xff);
     gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
     gl.colorMask(true, true, true, true);
     gl.disable(gl.STENCIL_TEST);
-    main.n = 0;
   }
-  private readonly full = new Float32Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  /** What each level's bit holds (its shapes' hash, down from the top; 0: nothing), and the levels whose shape was cut under another. */
+  private readonly chains = new Uint32Array(8);
+  private readonly stale = new Uint8Array(8);
+  private readonly full = new Float32Array(12);
+  /** Each clip level's box (device pixels: x0, y0, x1, y1). */
+  private readonly clipBoxes = new Float32Array(4 * 8);
   private readonly fullV = new Float32Array(6 * VF);
 
   soft = (img: CanvasImageSource, x: number, y: number, w: number, h: number, k: number, haze: number, horizon: string): void => this.g.softImage(img, x, y, w, h, k, haze, horizon);
@@ -941,7 +1004,8 @@ class GLCtx {
     this.clipR.set(s.clip);
     this.clipOn = s.clipOn;
     if (s.level < this.level) {
-      this.P.stencil(this.st.n, false, s.level);
+      // (What was drawn inside the clip goes first; letting the clip go costs nothing more.)
+      if (this.st.n) this.P.flush(this.st);
       this.level = s.level;
     }
   }
@@ -1620,8 +1684,31 @@ class GLCtx {
         }
     }
     this.st.n = from + total;
-    this.P.stencil(from, true, this.level + 1);
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (let i = 0; i < this.np; i++) {
+      const x = this.px[i * 2]!;
+      const y = this.px[i * 2 + 1]!;
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
+    }
+    let h = 2166136261;
+    for (let i = 0; i < this.np; i++) h = Math.imul(Math.imul(h ^ Math.round(this.px[i * 2]! * 8), 16777619) ^ Math.round(this.px[i * 2 + 1]! * 8), 16777619);
+    for (let i = 0; i < this.nSub; i++) h = Math.imul(h ^ this.sub[i]!, 16777619);
+    if (this.level >= 7) {
+      // (Deeper than the stencil holds: its box instead. The town never nests clips more than two deep.)
+      this.st.n = from;
+      this.clipTo(x0, y0, x1, y1);
+      return;
+    }
+    this.P.stencil(from, this.level + 1, h >>> 0, x0, y0, x1, y1);
     this.level++;
+    // (What's drawn inside it is cut to its box on the way, too: no work where the stencil would refuse it all.)
+    this.clipTo(x0, y0, x1, y1);
   }
 
   private uprightRect(): boolean {
