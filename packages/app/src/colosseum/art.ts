@@ -9,6 +9,23 @@
  *   its regions (`SCENE`), as UV rectangles.
  * - `propArt()`: the big pieces, the torch flame and the statue (`PROPS`), in one canvas.
  * - `crowdArt()`: everyone who sits in the stands (pawns, sidekicks, bosses), one picture a cell, and the players' portraits.
+ *
+ * **Each role and the one place that makes it** (the API art lands as `Character`s on `claude/colosseum-art`,
+ * `scripts/boss-art/out/arena-*`; each swaps in at its line here, its region's size kept or SCENE/PROPS updated with it):
+ *
+ * | Role | Placeholder made by |
+ * | --- | --- |
+ * | the arena wall, arched (a slice) | `wallArt` (SCENE.arch) |
+ * | the stands (a slice; seat points) | none yet: steps are geometry in arena-gl.ts `buildScene`, seats in arena.ts `seats()` |
+ * | the gallery wall at the top | `galleryArt` (SCENE.gallery) |
+ * | a pillar with its torch | geometry (`buildScene`) + `flameArt` (PROPS.flame) |
+ * | a crown banner | `bannerArt` (SCENE.banner) |
+ * | the floor and the board's border | `floorArt` (SCENE.sand) + `SQUARES`, `STONE` (the plinth) |
+ * | the six giant pieces, white and black | `PIECE_URL` (the board's cburnett pieces) in `propArt` |
+ * | a statue | `statueArt` (PROPS.statue) |
+ * | the railing in front of your seat | none (the wall's top edge) |
+ * | pawn backs | none: a front mirrored and darkened in the sprite shader (arena-gl.ts) |
+ * | far-crowd figures | none: the same crowd pictures, made smaller by the GPU's mipmaps |
  */
 import { botLook, type ItemLook } from "@chessroyale/core";
 import { renderFrame } from "../characters/sprite.ts";
@@ -114,8 +131,13 @@ function archTile(w: number, h: number, k: number, seed: number, archTop: number
   return c;
 }
 
+/** The arena wall's slice (one arch, 256 px square). */
+export const wallArt = (): HTMLCanvasElement => archTile(32, 32, 8, 3, 8);
+/** The gallery wall's slice at the top of the stands (one arch, 256 px square). */
+export const galleryArt = (): HTMLCanvasElement => archTile(32, 32, 8, 5, 5);
+
 /** A crown banner (`w` × `h` pixels, `k` times bigger): royal blue, a gold crown, a gold edge, a swallowtail foot. */
-function bannerArt(w: number, h: number, k: number): HTMLCanvasElement {
+export function bannerArt(w: number, h: number, k: number): HTMLCanvasElement {
   const { c, g } = pixelCanvas(w * k, h * k);
   g.scale(k, k);
   g.fillStyle = "#c9a13a";
@@ -154,7 +176,7 @@ function bannerArt(w: number, h: number, k: number): HTMLCanvasElement {
 }
 
 /** The sand: warm grains, a few pebbles. */
-function sandArt(px: number): HTMLCanvasElement {
+export function floorArt(px: number): HTMLCanvasElement {
   const n = 128;
   const { c: small, g } = pixelCanvas(n, n);
   const r = rng(7);
@@ -188,9 +210,9 @@ export function sceneArt(): HTMLCanvasElement {
   const { c, g } = pixelCanvas(SCENE_PX, SCENE_PX);
   g.fillStyle = "#fff";
   g.fillRect(0, 0, 8, 8);
-  g.drawImage(sandArt(512), 0, 512);
-  g.drawImage(archTile(32, 32, 8, 3, 8), 512, 0);
-  g.drawImage(archTile(32, 32, 8, 5, 5), 768, 0);
+  g.drawImage(floorArt(512), 0, 512);
+  g.drawImage(wallArt(), 512, 0);
+  g.drawImage(galleryArt(), 768, 0);
   g.drawImage(bannerArt(16, 32, 8), 512, 256);
   return c;
 }
@@ -207,7 +229,7 @@ export const PROPS = {
 } as const;
 
 /** The torch's flame: a pixel flame, white-hot at its root. */
-function flameArt(): HTMLCanvasElement {
+export function flameArt(): HTMLCanvasElement {
   const rows = ["....#....", "...##....", "...###...", "..####...", "..#####..", ".##o###..", ".##oo##..", ".#oooo##.", "##oyyo##.", "#ooyyoo##", "#ooyyyo##", ".#oyyyo#.", ".##ooo##.", "..#####.."];
   const { c, g } = pixelCanvas(128, 256);
   const k = 128 / 9;
@@ -267,18 +289,22 @@ export async function propArt(): Promise<{ canvas: HTMLCanvasElement; statueFoot
   );
   g.imageSmoothingEnabled = false;
   g.drawImage(flameArt(), 0, 768);
-  // The statue: a pawn in a gladiator's helm, in stone (never the town's bronze statue).
+  const { c: s, foot: statueFoot } = await statueArt();
+  g.drawImage(s, 256, 768);
+  return { canvas: c, statueFoot };
+}
+
+/** The statue (256 px square) and its feet down the picture: a pawn in a gladiator's helm, in stone (never the town's bronze statue). */
+export async function statueArt(): Promise<{ c: HTMLCanvasElement; foot: number }> {
   const look: ItemLook = { head: { def: "viking-helm", color: "yellow", blemish: 0, seed: 3 } };
   const art = await dressedPawn(look, pawnImage("light", "#d8d0c2"), 196);
   const pic = art?.img ?? pawnImage("light", "#d8d0c2");
-  const statueFoot = art ? (art.pad + PAWN_FOOT) / (1 + 2 * art.pad) : PAWN_FOOT;
-  const s = document.createElement("canvas");
-  s.width = s.height = 256;
-  const sg = s.getContext("2d")!;
-  sg.drawImage(pic, 0, 0, 256, 256);
-  toStone(s);
-  g.drawImage(s, 256, 768);
-  return { canvas: c, statueFoot };
+  const foot = art ? (art.pad + PAWN_FOOT) / (1 + 2 * art.pad) : PAWN_FOOT;
+  const c = document.createElement("canvas");
+  c.width = c.height = 256;
+  c.getContext("2d")!.drawImage(pic, 0, 0, 256, 256);
+  toStone(c);
+  return { c, foot };
 }
 
 // ---- The crowd.

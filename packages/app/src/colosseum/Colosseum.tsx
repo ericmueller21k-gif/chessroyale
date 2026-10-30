@@ -47,9 +47,9 @@ const TURN_PER_PX = 0.0025;
 type Hooks = {
   __colosseum?: {
     state: () => object;
-    seat: (i: number) => void;
-    flag: () => void;
-    jump: () => void;
+    seat: (i: number) => unknown;
+    flag: () => unknown;
+    jump: () => unknown;
     sample: () => { sky: number; hash: number } | null;
   };
 };
@@ -233,11 +233,12 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
   }, []);
 
   // Test hooks.
+  // (Put in place at once: whether the switches are on is known once the account's config loads, so each hook asks then.)
   useEffect(() => {
-    if (!testSwitchesAllowed()) return;
     const w = window as unknown as Hooks;
     w.__colosseum = {
       state: () => {
+        if (!testSwitchesAllowed()) return {};
         const s = match.current?.state;
         return {
           view: viewRef.current,
@@ -250,12 +251,12 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
           fen: s?.fen ?? "",
         };
       },
-      seat: (i) => setView(i),
-      flag: () => match.current?.flag(),
-      jump: () => (jumpAt.current = performance.now()),
+      seat: (i) => testSwitchesAllowed() && setView(i),
+      flag: () => testSwitchesAllowed() && match.current?.flag(),
+      jump: () => testSwitchesAllowed() && (jumpAt.current = performance.now()),
       sample: () => {
         const a = arenaRef.current;
-        if (!a) return null;
+        if (!a || !testSwitchesAllowed()) return null;
         const g = a.gl;
         a.draw(VIEWS[viewRef.current]!, turn.current.yaw, turn.current.pitch, (performance.now() - t0.current) / 1000, 99);
         const W = g.drawingBufferWidth;
