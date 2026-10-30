@@ -35,13 +35,14 @@ links Eric's notes); this page is what's built.
   move (less when its clock runs low). Mate, a draw by the rules, a flag or 240 plies ends a game; the next starts 5 s
   later with two other bots. The big pieces slide (0.45 s, a little hop), a captured one goes as the slide lands. No
   engine (it failed to load): random legal moves, no eval.
-- **The 3D pieces (a switch for now: `?pieces=3d`, anyone's; Eric decides after the stills).** The six Staunton pieces made
-  once in code at load (`colosseum/pieces3d.ts`): pawn, rook (six merlons), bishop (its slit cut in the shader), queen (nine
-  gold points), king (a gold cross) turned from profiles; the knight a horse's-head outline extruded with a bevel, on the same
-  base. Ivory and ebony with a gold trim line, lit from the arena's sun with a soft fill and a little shine, a soft round
-  shadow under each. Each turns round its own axis to face you, as the flat pieces did (a knight always shows its profile).
-  One draw call a kind on the board (up to 9 a frame), the instances written only when a move is made. Without the switch,
-  the flat pieces exactly as before. Decision: `docs/decisions/2026-10-30-colosseum-3d-pieces.md`.
+- **The 3D pieces (a switch for now: `?pieces=3d`, anyone's; Eric decides after the stills).** The board's own cburnett
+  pieces made 3D once in code at load (`colosseum/pieces3d.ts`), chunky like the town's table pieces: each follows its
+  picture's outline and proportions; pawn, rook, bishop (its slit), queen (her points) and king (his cross) turned in ten
+  steps round, the knight the cburnett horse's head extruded with a bevel on a round base. Two flat tones a face from
+  `TABLE_INK` and a thick dark outline (an inverted hull baked into each mesh), no shine, a soft round shadow under each.
+  Each turns round its own axis to face you, as the flat pieces did (a knight always shows its profile). One draw call a kind
+  on the board (up to 9 a frame), the instances written only when a move is made. Without the switch, the flat pieces exactly
+  as before. Decision: `docs/decisions/2026-10-30-colosseum-3d-pieces.md`.
 - **The overlay** (HTML over the arena, as Eric's mockup; on a phone the bar has no title: Exit, Change seat and the gear): each player's card (portrait, name with "(bot)", ELO, the pieces
   taken, the clock: lit gold for the side to move, tenths under 20 s), the middle (Turn N, the viewers: the crowd's size,
   "2.1K"), the last four moves (the one just played in gold), the flat board (the game's `Board`, small, silent; Black's
@@ -84,11 +85,11 @@ drawn yet: the railing in front of your seat, pawn backs (done by the shader), f
 - `e2e/colosseum.spec.ts` (phone and computer): the card's link in, the arena drawn (WebGL, three draw calls, the crowd
   in), Change seat changes the view, a bot game plays and, ended, the next starts, the overlay's pieces, the gear's rows,
   `?view=black`, Exit back to the town.
-- `packages/app/test/colosseum.test.ts`, "the 3D pieces": the six meshes (whole triangles, unit normals, on the board, inside
-  their squares, the king tallest). `e2e/colosseum.spec.ts`, "the 3D pieces behind ?pieces=3d": drawn, nine draw calls at the
+- `packages/app/test/colosseum.test.ts`, "the 3D pieces": the six meshes (whole triangles facing the right way for culling,
+  unit normals, each with its outline, on the board, inside their squares, the king tallest). `e2e/colosseum.spec.ts`, "the 3D pieces behind ?pieces=3d": drawn, nine draw calls at the
   start, the game plays; without the switch, flat and three.
 - Test hooks (test switches on): `window.__colosseum` (`state()` (with `pieces`: "flat" or "3d"), `seat(i)`, `flag()`,
-  `jump()`, `sample()`, `pieces(style)` and `freeze()` for still pairs: the same frame in 3D and flat), and
+  `jump()`, `sample()`, and for still pairs `pieces(style)`, `freeze()` and `pose(fen)`: the same frame in 3D and flat), and
   `?fast` makes the bots move at once and the next game come in 1.2 s.
 
 ## Not built yet
