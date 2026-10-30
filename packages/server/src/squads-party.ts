@@ -16,6 +16,8 @@ export type PartyOutgoing = PartyServerMessage extends infer M ? (M extends { no
 export interface PartyIO {
   now(): number;
   send(memberId: string, msg: PartyOutgoing): void;
+  /** Closes a member's sockets (someone kicked). */
+  close?(memberId: string): void;
   /** A random pass or token (crypto in the Worker). */
   random?(): string;
 }
@@ -33,13 +35,16 @@ export interface PartyMember {
   look?: ItemLook;
   ready?: boolean;
   bot?: true;
+  /** Their account (a Boss Battle party: a kick bans the account; the battle admits only it to their seat). */
+  userId?: string;
 }
 
 /** What START asks the party's Durable Object to make: the battle, a lobby for these members (boss-party). */
 export interface BossStart {
-  pass: string;
-  /** The people (bots aside), who must all join before it begins (or BOSS_PARTY.joinWaitSec passes). */
-  size: number;
+  /** Which START this is (a placement is only ever for its own START). */
+  id: number;
+  /** The people (bots aside): each with their own pass into their own seat, from their own account. */
+  members: { id: string; seat: number; pass: string; userId?: string }[];
   bots: number;
   leaderSeat: number;
   boss: string;
@@ -69,8 +74,15 @@ export interface PartyRecord {
    */
   kind?: "boss";
   boss?: { id: string; difficulty: BossDifficultyId };
+  /** Kicked: their tokens and accounts, never back in. */
   kicked?: string[];
+  kickedUsers?: string[];
   starting?: BossStart;
+  starts?: number;
+  /** Each member's own pass into the battle they were placed in (placed.pass is yours alone in your view). */
+  passes?: Record<string, string>;
+  /** Members kicked after START, for the Durable Object to revoke in the battle (takeRevokes). */
+  revokes?: string[];
 }
 
 export function newPartyRecord(code: string, now: number, kind?: "boss"): PartyRecord {
@@ -111,8 +123,10 @@ export class PartyCore {
     return this.r.kind === "boss" ? BOSS_PARTY.max : SQUADS.partyMax;
   }
 
-  view(): NetParty {
+  /** The party as `forId` sees it (a Boss Battle party's battle pass is each member's own). */
+  view(forId?: string): NetParty {
     const boss = this.r.kind === "boss";
+    const placed = this.r.placed ? (boss ? { ...this.r.placed, pass: (forId && this.r.passes?.[forId]) || "" } : { ...this.r.placed }) : null;
     return {
       code: this.r.code,
       leaderId: this.leaderNow(),
@@ -125,14 +139,14 @@ export class PartyCore {
       max: this.max,
       ...(boss && this.r.boss ? { boss: { ...this.r.boss } } : {}),
       state: this.r.state,
-      ...(this.r.placed ? { placed: { ...this.r.placed } } : {}),
+      ...(placed ? { placed } : {}),
       ...(this.r.state === "queueing" && this.r.busy ? { busy: { ...this.r.busy } } : {}),
     };
   }
 
   private broadcast() {
-    const msg: PartyOutgoing = { t: "party", party: this.view() };
-    for (const m of this.r.members) if (m.connected) this.io.send(m.id, msg);
+    const shared: PartyOutgoing | null = this.r.kind === "boss" ? null : { t: "party", party: this.view() };
+    for (const m of this.r.members) if (m.connected) this.io.send(m.id, shared ?? { t: "party", party: this.view(m.id) });
   }
 
   /** The leader: the first to join who's still here (connected), else the first who is (never a bot). */
@@ -144,11 +158,12 @@ export class PartyCore {
     return this.r.leaderId;
   }
 
-  connect(token: string | undefined, opts: { name?: string; device?: "phone" | "computer"; v?: number; look?: unknown }): { ok: true; memberId: string } | { ok: false; message: string } {
+  connect(token: string | undefined, opts: { name?: string; device?: "phone" | "computer"; v?: number; look?: unknown; userId?: string }): { ok: true; memberId: string } | { ok: false; message: string } {
     const now = this.io.now();
     this.r.activeAt = now;
     if (opts.v !== SQUADS_PROTOCOL) return { ok: false, message: "Update the app to play Squads (reload the page)." };
-    if (token && this.r.kicked?.includes(token)) return { ok: false, message: KICKED };
+    // (Kicked: neither that seat's token nor that account ever comes back in, with a token or without.)
+    if ((token && this.r.kicked?.includes(token)) || (opts.userId && this.r.kickedUsers?.includes(opts.userId))) return { ok: false, message: KICKED };
     const existing = token ? this.r.members.find((m) => m.token === token) : undefined;
     if (existing) {
       existing.connected = true;
@@ -161,7 +176,7 @@ export class PartyCore {
     if (this.r.members.length >= this.max) return { ok: false, message: "This party is full." };
     const id = `m${++this.r.counter}`;
     const name = seatName(opts.name, `Player ${this.r.members.length + 1}`);
-    const member: PartyMember = { id, name, token: this.random(), connected: true, device: opts.device === "phone" ? "phone" : "computer", joinedAt: now, ...(this.r.kind === "boss" ? { seat: this.freeSeat(), look: cleanLook(opts.look) } : {}) };
+    const member: PartyMember = { id, name, token: this.random(), connected: true, device: opts.device === "phone" ? "phone" : "computer", joinedAt: now, ...(this.r.kind === "boss" ? { seat: this.freeSeat(), look: cleanLook(opts.look), ...(opts.userId ? { userId: opts.userId } : {}) } : {}) };
     this.r.members.push(member);
     this.r.leaderId ??= id;
     this.io.send(id, { t: "welcome", v: SQUADS_PROTOCOL, memberId: id, token: member.token, code: this.r.code });
@@ -174,7 +189,7 @@ export class PartyCore {
     const m = this.r.members.find((x) => x.id === id);
     if (!m) return;
     this.io.send(id, { t: "welcome", v: SQUADS_PROTOCOL, memberId: id, token: m.token, code: this.r.code });
-    this.io.send(id, { t: "party", party: this.view() });
+    this.io.send(id, { t: "party", party: this.view(id) });
   }
 
   disconnect(id: string) {
@@ -282,21 +297,39 @@ export class PartyCore {
     }
   }
 
-  /** Someone out of a Boss Battle party: kicked (their token never comes back in, told so) or leaving. */
+  /**
+   * Someone out of a Boss Battle party: kicked (their token and account never come back in; told so, their socket
+   * closed; after START, their pass into the battle revoked: takeRevokes) or leaving.
+   */
   private remove(m: PartyMember, kicked: boolean) {
     if (kicked) {
       this.r.kicked = [...(this.r.kicked ?? []), m.token];
-      if (m.connected && !m.bot) this.io.send(m.id, { t: "error", message: KICKED, ended: true });
+      if (m.userId) this.r.kickedUsers = [...(this.r.kickedUsers ?? []), m.userId];
+      if (m.connected && !m.bot) {
+        this.io.send(m.id, { t: "error", message: KICKED, ended: true });
+        this.io.close?.(m.id);
+      }
+      // (A battle being made just now: placedIn revokes them in it once it's there.)
+      if (this.r.passes?.[m.id]) this.r.revokes = [...(this.r.revokes ?? []), m.id];
     }
+    if (this.r.passes) delete this.r.passes[m.id];
     this.r.members = this.r.members.filter((x) => x !== m);
     if (this.r.leaderId === m.id) this.r.leaderId = this.r.members.find((x) => !x.bot)?.id ?? null;
     this.broadcast();
   }
 
-  /** Their battle kicked them (its AFK kick): out of the party too, by their seat. */
-  kickSeat(seat: number) {
-    const m = this.r.members.find((x) => x.seat === seat);
+  /** Their battle kicked them (its AFK kick): out of the party too, by their member id (never a seat someone else took since). */
+  kickMember(id: string) {
+    const m = this.r.members.find((x) => x.id === id);
     if (m) this.remove(m, true);
+  }
+
+  /** Members kicked after START, for the Durable Object to revoke in the battle (once each). */
+  takeRevokes(): { lobby: string | null; members: string[] } | null {
+    const r = this.r.revokes;
+    if (!r?.length) return null;
+    delete this.r.revokes;
+    return { lobby: this.r.placed?.lobby ?? null, members: r };
   }
 
   /** The members who must be ready for START: everyone connected but the leader (bots always are). */
@@ -310,26 +343,40 @@ export class PartyCore {
     if (id !== this.leaderNow() || this.r.starting || this.notReady().length) return;
     const people = this.r.members.filter((m) => m.connected && !m.bot);
     const lead = this.r.members.find((m) => m.id === id)!;
-    this.r.starting = { pass: this.random(), size: people.length, bots: this.r.members.filter((m) => m.bot).length, leaderSeat: lead.seat ?? 0, boss: this.r.boss?.id ?? "", difficulty: this.r.boss?.difficulty ?? "normal" };
+    this.r.starts = (this.r.starts ?? 0) + 1;
+    this.r.starting = {
+      id: this.r.starts,
+      members: people.map((m) => ({ id: m.id, seat: m.seat ?? 0, pass: this.random(), ...(m.userId ? { userId: m.userId } : {}) })),
+      bots: this.r.members.filter((m) => m.bot).length,
+      leaderSeat: lead.seat ?? 0,
+      boss: this.r.boss?.id ?? "",
+      difficulty: this.r.boss?.difficulty ?? "normal",
+    };
   }
 
-  /** START's battle to make, once (the Durable Object makes the lobby, then calls placedIn). */
+  /** START's battle to make (the Durable Object makes the lobby, one at a time, then calls placedIn with its START's id). */
   takeStart(): BossStart | null {
-    const s = this.r.starting;
-    return s ?? null;
+    return this.r.starting ?? null;
   }
 
-  /** The battle is made (`lobby`), or couldn't be (null): everyone's told where to go, and un-readied for the next. */
-  placedIn(lobby: string | null) {
+  /**
+   * START `id`'s battle is made (`lobby`), or couldn't be (null): everyone's told where to go (each their own pass), and
+   * un-readied for the next. An answer for any other START (a late one) changes nothing.
+   */
+  placedIn(lobby: string | null, id?: number) {
     const s = this.r.starting;
-    if (!s) return;
+    if (!s || (id !== undefined && id !== s.id)) return;
     delete this.r.starting;
     if (!lobby) {
       for (const m of this.r.members) if (m.connected && !m.bot) this.io.send(m.id, { t: "error", message: "Couldn't start the battle. Try again." });
       return this.broadcast();
     }
     this.r.state = "placed";
-    this.r.placed = { lobby, pass: s.pass, at: this.io.now() };
+    this.r.placed = { lobby, pass: "", at: this.io.now() };
+    this.r.passes = Object.fromEntries(s.members.filter((m) => this.r.members.some((x) => x.id === m.id)).map((m) => [m.id, m.pass]));
+    // (Kicked or gone while it was being made: their passes revoked in it.)
+    const dropped = s.members.filter((m) => !this.r.members.some((x) => x.id === m.id)).map((m) => m.id);
+    if (dropped.length) this.r.revokes = [...(this.r.revokes ?? []), ...dropped];
     for (const m of this.r.members) if (!m.bot) m.ready = false;
     this.broadcast();
   }

@@ -13,7 +13,8 @@ type Msg = ServerMessage;
 function battle(size: number, patch: Partial<Settings> = {}, bots = 0) {
   let now = 1_000_000;
   const inbox = new Map<string, Msg[]>();
-  const start: BossStart = { pass: "pass1", size, bots, leaderSeat: 0, boss: "gingerbread", difficulty: "normal" };
+  // (Each member's own pass into their own seat, from their own account: pass0 / u0 for seat 0, and so on.)
+  const start: BossStart = { id: 1, members: Array.from({ length: size }, (_, i) => ({ id: `m${i}`, seat: i, pass: `pass${i}`, userId: `u${i}` })), bots, leaderSeat: 0, boss: "gingerbread", difficulty: "normal" };
   const core = new LobbyCore(
     newLobbyRecord("BATTL", now, bossPartyOverrides(start), partyLobby(start, "PARTY", now)),
     { now: () => now, send: (id, msg) => inbox.set(id, [...(inbox.get(id) ?? []), { ...msg, now } as Msg]) },
@@ -31,7 +32,7 @@ function battle(size: number, patch: Partial<Settings> = {}, bots = 0) {
     }
     now = to;
   };
-  const join = (seat: number, pass = "pass1") => core.connect(undefined, `M${seat}`, "phone", false, 1500, undefined, undefined, null, null, false, { pass, seat });
+  const join = (seat: number, pass = `pass${seat}`, userId = `u${seat}`) => core.connect(undefined, `M${seat}`, "phone", false, 1500, undefined, userId, null, null, false, { pass, seat });
   /** The host scores: `exp` gives the moves' expected scores (others 0.3). */
   const hostScores = (exp: Record<string, number> = {}) => {
     const req = last("p1", "scoreRequest");
@@ -76,6 +77,8 @@ describe("a Boss Battle party's battle (docs/decisions/2026-10-30-boss-party.md)
     expect(B.join(0).ok).toBe(true);
     expect(B.join(0)).toEqual({ ok: false, message: PARTY_ONLY });
     expect(B.join(5)).toEqual({ ok: false, message: PARTY_ONLY });
+    // (A pass takes its own seat, whatever seat the app claims; another account can't use it.)
+    expect(B.join(1, "pass1", "someone-else")).toEqual({ ok: false, message: PARTY_ONLY });
     expect(B.join(2).ok).toBe(true);
     expect(B.core.record.phase).toBe("lobby");
     expect(B.last("p1", "lobby")!.party).toEqual({ seats: { p1: 0, p2: 2 }, leader: "p1" });
@@ -163,7 +166,7 @@ describe("a Boss Battle party's battle (docs/decisions/2026-10-30-boss-party.md)
     B.core.message("p1", { t: "kick", playerId: "p3" });
     expect(B.core.record.humans.map((h) => h.id)).toEqual(["p1", "p2"]);
     expect(B.last("p3", "resigned")!.how).toBe("kicked");
-    expect(B.core.takePartyKicks()).toEqual({ party: "PARTY", seats: [2] });
+    expect(B.core.takePartyKicks()).toEqual({ party: "PARTY", members: ["m2"] });
     expect(B.core.takePartyKicks()).toBeNull();
     // The turn resolves on the picks it has.
     expect(B.core.record.phase).toBe("scoring");
@@ -214,10 +217,11 @@ describe("a Boss Battle party (PartyCore, kind \"boss\")", () => {
     let now = 5_000_000;
     const inbox = new Map<string, PartyServerMessage[]>();
     let n = 0;
-    const core = new PartyCore(newPartyRecord("PARTY", now, "boss"), { now: () => now, send: (id, msg) => inbox.set(id, [...(inbox.get(id) ?? []), { ...msg, now } as PartyServerMessage]), random: () => `r${++n}` });
+    const closed: string[] = [];
+    const core = new PartyCore(newPartyRecord("PARTY", now, "boss"), { now: () => now, send: (id, msg) => inbox.set(id, [...(inbox.get(id) ?? []), { ...msg, now } as PartyServerMessage]), random: () => `r${++n}`, close: (id) => closed.push(id) });
     const view = (id: string) => [...(inbox.get(id) ?? [])].reverse().find((m) => m.t === "party")!.party as Extract<PartyServerMessage, { t: "party" }>["party"];
-    const join = (name: string) => core.connect(undefined, { name, v: SQUADS_PROTOCOL });
-    return { core, inbox, view, join, tick: (ms: number) => (now += ms) };
+    const join = (name: string, token?: string) => core.connect(token, { name, v: SQUADS_PROTOCOL, userId: `u-${name}` });
+    return { core, inbox, view, join, closed, tick: (ms: number) => (now += ms) };
   }
 
   it("up to 3, in seats 0 to 2; the leader's boss and difficulty for everyone; a member's READY; START once all are ready", () => {
@@ -240,9 +244,17 @@ describe("a Boss Battle party (PartyCore, kind \"boss\")", () => {
     P.core.message("m2", { t: "ready", on: true });
     P.core.message("m3", { t: "ready", on: true });
     P.core.message("m1", { t: "start" });
-    expect(P.core.takeStart()).toEqual({ pass: expect.any(String), size: 3, bots: 0, leaderSeat: 0, boss: "tiger", difficulty: "hard" });
-    P.core.placedIn("BATTL");
-    expect(P.view("m2").placed).toMatchObject({ lobby: "BATTL" });
+    const want = P.core.takeStart()!;
+    expect(want).toMatchObject({ id: 1, bots: 0, leaderSeat: 0, boss: "tiger", difficulty: "hard" });
+    expect(want.members.map((m) => [m.id, m.seat])).toEqual([["m1", 0], ["m2", 1], ["m3", 2]]);
+    expect(new Set(want.members.map((m) => m.pass)).size).toBe(3);
+    // A placement for another START (a late one) changes nothing; its own places everyone, each with their own pass.
+    P.core.placedIn("OTHER", 99);
+    expect(P.view("m2").placed).toBeUndefined();
+    P.core.placedIn("BATTL", want.id);
+    expect(P.view("m2").placed).toMatchObject({ lobby: "BATTL", pass: want.members[1]!.pass });
+    expect(P.view("m3").placed).toMatchObject({ lobby: "BATTL", pass: want.members[2]!.pass });
+    expect(P.core.takeStart()).toBeNull();
     // Back for the next battle: everyone un-readied.
     expect(P.view("m2").members.map((m) => m.ready)).toEqual([false, false, false]);
   });
@@ -265,8 +277,8 @@ describe("a Boss Battle party (PartyCore, kind \"boss\")", () => {
     // The seat it left is the next one's.
     expect(sam.ok && P.join("Lee").ok).toBe(true);
     expect(P.view("m1").members.find((m) => m.name === "Lee")!.seat).toBe(2);
-    // Its battle's AFK kick: by seat.
-    P.core.kickSeat(0);
+    // Its battle's AFK kick: by member id.
+    P.core.kickMember("m1");
     expect(P.view("m2").members.map((m) => m.name)).toEqual(["Sam", "Lee"]);
   });
 
@@ -279,6 +291,126 @@ describe("a Boss Battle party (PartyCore, kind \"boss\")", () => {
     P.core.message("m1", { t: "bot", add: true }, { test: true });
     expect(P.view("m1").members.map((m) => [m.seat, !!m.bot, m.ready])).toEqual([[0, false, false], [1, true, true], [2, true, true]]);
     P.core.message("m1", { t: "start" });
-    expect(P.core.takeStart()).toMatchObject({ size: 1, bots: 2 });
+    expect(P.core.takeStart()).toMatchObject({ bots: 2 });
+    expect(P.core.takeStart()!.members).toHaveLength(1);
+  });
+});
+
+describe("Boss Battle party: the review's fixes (#420)", () => {
+  function party() {
+    const inbox = new Map<string, PartyServerMessage[]>();
+    const closed: string[] = [];
+    let n = 0;
+    const core = new PartyCore(newPartyRecord("PARTY", 5_000_000, "boss"), { now: () => 5_000_000, send: (id, msg) => inbox.set(id, [...(inbox.get(id) ?? []), { ...msg, now: 0 } as PartyServerMessage]), random: () => `r${++n}`, close: (id) => closed.push(id) });
+    const join = (name: string, token?: string) => core.connect(token, { name, v: SQUADS_PROTOCOL, userId: `u-${name}` });
+    return { core, inbox, join, closed };
+  }
+
+  it("1: someone kicked is banned by account: no way back in, token or none; their socket is closed", () => {
+    const P = party();
+    P.join("Eric");
+    P.join("Maya");
+    P.core.message("m1", { t: "kick", id: "m2" });
+    expect(P.closed).toEqual(["m2"]);
+    // A tokenless hello from the same account (a new seat, the old trick): refused.
+    expect(P.join("Maya")).toEqual({ ok: false, message: KICKED });
+    expect(P.core.record.members.map((m) => m.name)).toEqual(["Eric"]);
+    // Someone else still gets in.
+    expect(P.join("Sam").ok).toBe(true);
+  });
+
+  it("2: after START, a kick at the stage revokes the kicked member's pass in the battle (by member id)", () => {
+    const P = party();
+    P.join("Eric");
+    P.join("Maya");
+    P.core.message("m2", { t: "ready", on: true });
+    P.core.message("m1", { t: "start" });
+    const want = P.core.takeStart()!;
+    P.core.placedIn("BATTL", want.id);
+    expect(P.core.takeRevokes()).toBeNull();
+    P.core.message("m1", { t: "kick", id: "m2" });
+    expect(P.core.takeRevokes()).toEqual({ lobby: "BATTL", members: ["m2"] });
+    // Kicked while the battle was being made: revoked in it once it's there.
+    const Q = party();
+    Q.join("Eric");
+    Q.join("Maya");
+    Q.core.message("m2", { t: "ready", on: true });
+    Q.core.message("m1", { t: "start" });
+    const w = Q.core.takeStart()!;
+    Q.core.message("m1", { t: "kick", id: "m2" });
+    Q.core.placedIn("BATTL", w.id);
+    expect(Q.core.takeRevokes()).toEqual({ lobby: "BATTL", members: ["m2"] });
+  });
+
+  it("2: in the battle, a pass takes only its own seat, once, from its own account; a revoked pass doesn't get in, and one already in is out", () => {
+    const B = battle(3);
+    // Maya (seat 1) can't take the leader's seat: her pass gives her seat 1 whatever the app says.
+    expect(B.core.connect(undefined, "Maya", "phone", false, 1500, undefined, "u1", null, null, false, { pass: "pass1", seat: 0 }).ok).toBe(true);
+    expect(B.last("p1", "lobby")!.party!.seats).toEqual({ p1: 1 });
+    // The same pass again (a second device, no token): refused, so nobody fills the battle to start it without the leader.
+    expect(B.core.connect(undefined, "Maya2", "phone", false, 1500, undefined, "u1", null, null, false, { pass: "pass1", seat: 2 })).toEqual({ ok: false, message: PARTY_ONLY });
+    // Seat 2's member was kicked at the stage after START: their pass is revoked.
+    B.core.revokePartyMember("m2");
+    expect(B.join(2)).toEqual({ ok: false, message: PARTY_ONLY });
+    expect(B.join(0).ok).toBe(true);
+    // (Everyone still admitted is here: it begins.)
+    expect(B.core.record.phase).not.toBe("lobby");
+    B.advance(61_000);
+    B.core.revokePartyMember("m1");
+    expect(B.core.record.humans.map((h) => h.id)).toEqual(["p2"]);
+    expect(B.last("p1", "resigned")!.how).toBe("kicked");
+  });
+
+  it("3: it never strands: nobody here when the wait is over, it waits again, and the first to come begins it", () => {
+    const B = battle(2);
+    expect(B.join(0).ok).toBe(true);
+    B.core.disconnect("p1");
+    B.advance(BOSS_PARTY.joinWaitSec * 1000 + 10);
+    expect(B.core.record.phase).toBe("lobby");
+    expect(B.core.record.timer?.kind).toBe("partyStart");
+    // Back (with their token): it begins, without waiting for the second member.
+    const token = B.core.record.humans[0]!.token;
+    expect(B.core.connect(token, "M0", "phone", false, 1500, undefined, "u0").ok).toBe(true);
+    expect(B.core.record.phase).not.toBe("lobby");
+    // Or someone new after the wait: also at once.
+    const C = battle(3);
+    C.advance(BOSS_PARTY.joinWaitSec * 1000 + 10);
+    expect(C.core.record.phase).toBe("lobby");
+    expect(C.join(1).ok).toBe(true);
+    expect(C.core.record.phase).not.toBe("lobby");
+  });
+
+  it("5: a party's results never count as an online tier beaten; 6: no fair-play signals from a party's battle", () => {
+    const B = inPlay(2);
+    const r = B.last("p1", "round")!;
+    const m = legalMoves(r.board!.fen)[0]!;
+    B.core.message("p1", { t: "pick", key: r.key, move: m });
+    B.core.message("p2", { t: "pick", key: r.key, move: m });
+    B.hostScores({ [m]: 0.6 });
+    expect(B.core.fairMoves("p1")).toEqual([]);
+    expect(B.core.fairMoves("p2")).toEqual([]);
+    // Out on time: the results, each without a tier.
+    for (let i = 0; i < 40 && B.core.record.phase !== "results"; i++) {
+      B.hostBoss();
+      const rr = B.last("p1", "round");
+      if (rr && B.core.record.phase === "play") B.advance(rr.deadline - B.now + DEFAULT_SETTINGS.lateGraceMs + 10);
+      B.hostScores();
+      B.advance(30_000);
+    }
+    expect(B.core.record.phase).toBe("results");
+    const results = B.core.humanResults();
+    expect(results).toHaveLength(2);
+    for (const res of results) expect(res.bossElo).toBeNull();
+  });
+
+  it("7: a member who has picked can still call the God King instead (the pick is replaced)", () => {
+    const B = inPlay(3);
+    const r = B.last("p1", "round")!;
+    B.core.message("p2", { t: "pick", key: r.key, move: legalMoves(r.board!.fen)[0]! });
+    B.core.message("p2", { t: "king", key: r.key });
+    expect(B.core.record.phase).toBe("scoring");
+    expect(B.core.record.round!.picks.p2).toBeUndefined();
+    B.hostScores();
+    expect(B.last("p1", "reveal")!.king).toBe(true);
   });
 });
