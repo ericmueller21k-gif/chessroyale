@@ -73,6 +73,11 @@
   font-size: 14px;
   line-height: 17px;
 }
+/* On a computer in the frame, a third as tall: about 4 lines (Eric, Oct 30: "it's so easy to click on it when running around … about
+   4-5 lines of text"). A tablet's, and a mouse window under 1024 px (no frame), keep the 340. */
+.town-screen.in-frame .town-chat[data-size="computer"] {
+  height: 120px;
+}
 /* While it's picked up: an outline, so you can see where it is even with nothing in it (only while you carry it). */
 .town-chat.grab {
   outline: 2px dashed var(--chat-ink);

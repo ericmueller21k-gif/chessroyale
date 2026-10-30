@@ -37,7 +37,7 @@ export const CHAT = {
   keepLines: TOWN_CHAT.deviceMax,
   /** A boss or a kid speaks every this many ms, at random between the two. */
   everyMs: [20_000, 45_000] as readonly [number, number],
-  /** The computer's frame (styles.css' "computer"); anything else is a phone. (The box's size is in town-chat.css: about 5 lines on a phone, 12 on a computer.) */
+  /** The computer's frame (styles.css' "computer"); anything else is a phone. (The box's size is in town-chat.css: about 5 lines on a phone, 4 on a computer in the frame, Eric, Oct 30.) */
   computerQuery: "(min-width: 900px) and (min-height: 600px)",
   /** Scrolled this near the foot (px) still counts as at the foot: new lines keep it there. */
   pinSlopPx: 4,

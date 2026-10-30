@@ -225,7 +225,8 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   `town/TownChat.tsx`, the header's icons in `town/TownChatTools.tsx`, its styles in `town/town-chat.css`; one mount each in
   `Town.tsx`). **One box** in the map's **top left corner** (flush, 8 px in), over the map and under the cards: a
   phone's from the left edge to about two thirds across and a bit under a quarter down (about 7 messages), a computer's 500 × 340
-  with a bigger font (about 12 lines; `CHAT.computerQuery` is styles.css' computer). It keeps one place and size whatever it
+  with a bigger font (about 12 lines), and in the frame 500 × 120 (about 4 lines; Eric, Oct 30: a third as tall, "so easy to click on it
+  when running around"; `docs/decisions/2026-10-30-town-chat-short.md`; `CHAT.computerQuery` is styles.css' computer). It keeps one place and size whatever it
   holds, **and in every mode**: the stream ends above a **30 px strip at its foot that is reserved for the typing line** whether it shows
   or not (v4), so the line appearing moves nothing. **Nothing is drawn behind or round the text** (Eric, Oct 28, from his phone:
   "clearly a container still showing behind the text"; "I don't want the shadow text period"): no backing, border, bar, box-shadow,
@@ -430,8 +431,8 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
     `botLeaveAfterGameMs` (4 s), unless its table's card holds it.
 
 ## Frame-rate pill (`?fps`)
-`/town?fps` shows an admin (profile `admin`) a pill in the world's top-right corner, "60 fps · 16.7 ms": frames over the last second and their mean time, text set twice a second from plain counters in the frame loop. Nobody else sees it.
-`?fps` and `?crowd=N` are read once as the page opens (`TOWN_ASKED`, test-switches.ts), so a later replaceState can't lose them; they apply when the account arrives.
+`/town?fps` shows anyone (Eric, Oct 30: no admin needed, the site is behind Cloudflare Access) a pill in the world's top-right corner, "60 fps · 16.7 ms": frames over the last second and their mean time, text set twice a second from plain counters in the frame loop. Without `?fps` there is none. `?crowd=N` is anyone's too (only that device draws the pawns).
+`?fps` and `?crowd=N` are read once as the page opens (`TOWN_ASKED`, test-switches.ts), so a later replaceState can't lose them; they apply as the town opens.
 
 ## The feel: `town/feel.ts`
 
