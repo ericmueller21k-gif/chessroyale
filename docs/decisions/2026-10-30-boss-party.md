@@ -38,6 +38,18 @@ Eric's design (Oct 29 and 30) and his OK on the stills (Oct 30: "the solo or the
   bank: `finishRound`'s `teamMs`), live tallies to everyone, `partyKickable` / `kick`, the kicked seat passed back to the
   party (`takePartyKicks`, `kickSeat`). Settings in `BOSS_PARTY` (max 3, closeCp 30, afkKickSec 60, joinWaitSec 30).
 
+## The review's fixes (#420, Oct 30)
+- A kick bans the account as well as the token (`kickedUsers`), and closes the kicked socket.
+- START gives each member their own pass; the battle admits that pass only to that member's seat, once, from that
+  account (`PartyLobby.admits`). The AFK kick goes back to the party by member id; a kick at the stage after START revokes
+  that member's pass in the battle, and puts them out of it if they're in (`revokePartyMember`).
+- The battle never strands: nobody here when its wait is over, it waits again, and the first to come (or come back) after
+  that begins it.
+- One battle per START (the Durable Object's `making` guard); a placement is only ever its own START's (`starting.id`).
+- Director's calls: a party battle is recorded but never counts as an online tier beaten (`bossElo` null); no fair-play
+  signals from a party's battle (teammates see picks live). A member who has picked can still call the God King (the call
+  replaces the pick).
+
 ## The stage (PR 3)
 - The invite circles are live: a tap makes the party the first time and opens "Invite friends" (the code, the link to
   copy or share, who's in, admins' bot buttons, Leave the party). `/boss/party/CODE` opens Boss Battle in that party.

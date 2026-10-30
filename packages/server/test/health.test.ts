@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CAPACITY, FAIRPLAY, FRONT_DOOR } from "@chessroyale/core";
+import { CAPACITY, FAIRPLAY, FRONT_DOOR, TOWN_GL_FALLBACK } from "@chessroyale/core";
 
 // (The real container needs the Workers runtime; nothing here searches.)
 vi.mock("@cloudflare/containers", () => ({ Container: class {}, getContainer: () => null }));
@@ -323,6 +323,26 @@ describe("the health view", () => {
     expect(h.d1.ok).toBe(true);
   });
 
+  it("the town's WebGL fallbacks: page loads by reason, the last 24 hours and 7 days, apart from the errors; a made-up reason isn't counted", async () => {
+    const { sql, d1 } = await seeded();
+    const t = new ErrorTally();
+    const fall = async (n: number, at: number, reason: string) => {
+      for (let i = 0; i < n; i++) t.add({ fingerprint: `fb-${reason}`, source: "client", kind: TOWN_GL_FALLBACK.kind, message: reason, version: "abc1234def56", sample: "{}" }, at);
+      await t.flush(sql);
+    };
+    await fall(2, NOW - 10 * 60_000, "lost-twice");
+    await fall(1, NOW - 3 * 24 * HOUR, "lost-twice");
+    await fall(3, NOW - 2 * HOUR, "no-context");
+    await fall(4, NOW - 8 * 24 * HOUR, "shader"); // (past the week)
+    await fall(5, NOW - HOUR, "made up");
+    const h = await health({ DB: d1, ASSETS }, sql, NOW);
+    const none = { day: 0, week: 0 };
+    expect(h.townFallbacks).toEqual({ day: 5, week: 6, byReason: { "no-webgl2": none, "no-context": { day: 3, week: 3 }, shader: none, "lost-twice": { day: 2, week: 3 }, "not-back": none } });
+    // Not errors: the errors' numbers are what they were without them.
+    expect(h.errors).toMatchObject({ thisHour: 4, lastHour: 2, day: 12, kinds: 4 });
+    expect(h.errors.top.map((e) => e.kind)).not.toContain(TOWN_GL_FALLBACK.kind);
+  });
+
   it("a database that doesn't answer: D1's error, zeros, and still what's deployed", async () => {
     const broken = {
       first: async () => Promise.reject(new Error("D1 is down")),
@@ -358,5 +378,6 @@ describe("the health view", () => {
     const page = await (await handleOpsAdmin(new Request("https://hunchess.com/admin/ops", { headers: { cookie: `hc_session=${adminToken}` } }), e))!.text();
     expect(page).toContain("<h2>Health</h2>");
     expect(page).toContain("Fair play's deep re-checks:");
+    expect(page).toContain("<b>Town WebGL fallbacks</b>");
   });
 });

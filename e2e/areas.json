@@ -12,6 +12,11 @@
     "e2e/lobby-chat.spec.ts"
   ],
   "leftOut": ["e2e/perf.spec.ts"],
+  "webgl": {
+    "about": "A change to one of these areas, or to one of these specs, also runs these specs again on a VITE_TOWN_GL=1 build (WebGL the town's default; software WebGL on the runners): two more jobs beside the shards, one per project (phone, desktop), one worker each (e2e.yml: 'webgl-phone' and 'webgl-desktop' in the shard matrix). On a pull request, a push to main (what it merged) and the full-e2e label alike; a manual run always. The specs that draw or read the world; the chat's two are left out (HTML over the canvas, nothing in them depends on the backend: on WebGL they only get slower, about four more jobs' worth). docs/areas/ops.md, 'CI e2e'.",
+    "areas": ["the town square (/town)"],
+    "specs": ["e2e/town.spec.ts", "e2e/town-desktop.spec.ts", "e2e/town-tags.spec.ts", "e2e/town-webgl.spec.ts"]
+  },
   "full": [
     "package.json",
     "package-lock.json",

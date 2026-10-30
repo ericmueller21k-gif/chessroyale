@@ -505,8 +505,16 @@ export class Lobby extends DurableObject<Env> {
     if (kicks) {
       await this.persist(core);
       const party = this.env.PARTIES.get(this.env.PARTIES.idFromName(kicks.party));
-      for (const seat of kicks.seats) await party.kickSeat(seat).catch((e: unknown) => console.log(`party ${kicks.party}: kick seat ${seat}: ${String(e)}`));
+      for (const m of kicks.members) await party.kickMember(m).catch((e: unknown) => console.log(`party ${kicks.party}: kick ${m}: ${String(e)}`));
     }
+  }
+
+  /** Its party kicked `member` at the stage after START: their pass no longer gets in (and they're out if in). */
+  async revokePartyMember(member: string): Promise<void> {
+    if (!this.record || (await this.closeIfDue())) return;
+    const core = this.core(this.record.code);
+    core.revokePartyMember(member);
+    await this.persist(core);
   }
 
   async webSocketClose(ws: WebSocket) {
