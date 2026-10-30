@@ -170,8 +170,10 @@ test("a deploy landed while the page was open: the town square's files are gone,
   // (After a deploy the old version's files are gone: the first ask for the town's styles fails as it would then.)
   let asked = 0;
   await page.route(/\/assets\/Town-[^/]*\.css$/, (route) => (asked++ === 0 ? route.fulfill({ status: 404, body: "" }) : route.continue()));
+  // (Counted as the page's documents arrive, not by "load": on a slow run the town's chunk is asked for, refused and the page
+  // loads again before the first page's own "load" ever fires, Oct 30.)
   let loads = 0;
-  page.on("load", () => loads++);
+  page.on("framenavigated", (frame) => frame === page.mainFrame() && loads++);
   await page.goto("/town");
   await expect.poll(() => loads, { message: "the page loaded again" }).toBe(2);
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
