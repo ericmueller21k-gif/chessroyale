@@ -584,8 +584,9 @@ test("new messages: the same box as always on that fades: the lines show when a 
   // The stream is the one always on has (same place, same size: new messages differs only in that it fades), the typing line not showing.
   expect(await rectOf(page, ".tc-log"), "the same stream as always on's").toEqual(lg0);
   await expect(page.locator(".tc-form input")).toBeHidden();
-  // It fades `fadeAfterMs` after the last message, not before (its lines are still kept).
-  await page.waitForTimeout(CHAT.fadeAfterMs - 2500);
+  // It fades `fadeAfterMs` after the last message, not before (its lines are still kept). (2.5 s before it fades, counted from the
+  // message: the checks above take longer on a slow page.)
+  await page.waitForTimeout(Math.max(0, CHAT.fadeAfterMs - 2500 - (Date.now() - said)));
   await expect(log(page)).toHaveCSS("opacity", "1");
   await expect(log(page)).toHaveCSS("opacity", "0", { timeout: 15_000 });
   expect(Date.now() - said, "not before the wait").toBeGreaterThanOrEqual(CHAT.fadeAfterMs);
@@ -878,6 +879,10 @@ test("always on never fades: after the wait, after minutes, with the lines still
   await page.evaluate(() => (window as any).__townChatter(false));
   await expect(icon(page)).toHaveAttribute("aria-label", LABEL.always);
   const box = page.locator(".town-chat");
+  // (The clock held from here, so each jump below is exactly its length: with time flowing, the clock's own catch-up, running
+  // a slow frame's timer as a jump starts, can set the time back when it ends and undo the jump. Software WebGL's frames
+  // are slow enough to do it about one run in four.)
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
   await say(page, "Hollow", "said at noon", "boss");
   const lg = await rectOf(page, ".tc-log");
   const touchable = () => page.evaluate(({ x, y }) => !!document.elementFromPoint(x, y)?.closest(".town-chat"), { x: lg.x + lg.w - 14, y: lg.y + lg.h - 12 });
@@ -933,6 +938,8 @@ test("the text's tone flips with the clock when the sky does: ink before 19:30 a
   await expect(box).toHaveAttribute("data-tone", "day");
   await page.waitForFunction(() => typeof (window as any).__townSay === "function");
   await page.evaluate(() => (window as any).__townChatter(false));
+  // (The clock held from here, so each jump is exactly its length: as "always on never fades" says.)
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
   await say(page, "Hollow", "The park gets quiet after dark.", "boss");
   expect(await colorOf(page, ".tc-boss"), "ink").toBe(INK.day);
   // It's read about once a minute: three minutes on, past the threshold at 19:30, it is night (one tick, due timers fire once).
