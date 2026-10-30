@@ -15,7 +15,7 @@
  * Three draw calls a frame. A frame sets a few uniforms (the camera, the time, the jump's clock) and draws: nothing is
  * allocated and nothing uploaded. The crowd jumps (a queen captured) by a uniform too.
  */
-import { BANNERS, BOARD, FLOOR_R, GALLERY_H, GALLERY_R, PILLARS, PILLAR_ANGLES, SEATING, STANDS, STATUE, WALL_H, WALL_TOP, aisleAngle, fovFor, landingDepth, lookAt, multiply, perspective, rowR, rowY, seats, squareXZ, VIEWS, type View } from "./arena.ts";
+import { BANNERS, BOARD, FLOOR_R, bossSeats, type Seat, GALLERY_H, GALLERY_R, PILLARS, PILLAR_ANGLES, SEATING, STANDS, STATUE, WALL_H, WALL_TOP, aisleAngle, fovFor, landingDepth, lookAt, multiply, perspective, rowR, rowY, seats, squareXZ, VIEWS, type View } from "./arena.ts";
 import { PROPS, SCENE, SKY, SQUARES, STONE, type CrowdArt, type Rect } from "./art.ts";
 
 const VS_SCENE = `#version 300 es
@@ -252,7 +252,11 @@ export function buildScene(): Float32Array {
   return new Float32Array(out);
 }
 
-/** Where each crowd member sits, its cell, which way it faces, its jump: the crowd's instances (built once). */
+/**
+ * Where each crowd member sits, its cell, which way it faces, its jump: the crowd's instances (built once). Every boss with
+ * a sidekick sits once, its sidekick beside it, at its fixed seats in the first three rows (arena.ts `bossSeats`, the same in
+ * every view and on every load); pawns fill every other seat.
+ */
 export function buildCrowd(art: Pick<CrowdArt, "cells">, seed = 20261030): Float32Array {
   let s = seed >>> 0;
   const rnd = () => {
@@ -260,25 +264,16 @@ export function buildCrowd(art: Pick<CrowdArt, "cells">, seed = 20261030): Float
     return s / 4294967296;
   };
   const pawns = art.cells.flatMap((c, i) => (c.kind === "pawn" ? [i] : []));
-  const kids = art.cells.flatMap((c, i) => (c.kind === "sidekick" ? [i] : []));
   const bosses = art.cells.flatMap((c, i) => (c.kind === "boss" ? [i] : []));
+  const kidOf = (home: string | undefined) => art.cells.findIndex((c) => c.kind === "sidekick" && c.home === home);
+  const pairs = bosses.map((b) => ({ boss: b, kid: kidOf(art.cells[b]!.home) })).filter((p) => p.kid >= 0);
+  const places = bossSeats(pairs.length);
+  const taken = new Set(places.flatMap((p) => p.taken));
   const all = seats();
   const out = new Float32Array(all.length * SI);
   let n = 0;
-  let skip = false;
-  for (const seat of all) {
-    if (skip) {
-      skip = false;
-      continue;
-    }
-    const u = rnd();
-    // (No boss sits just in front of a view's seat: a big figure there would hide the board.)
-    const nearView = VIEWS.some((v) => Math.hypot(v.eye[0] - seat.x, v.eye[2] - seat.z) < 5);
-    const cell = u < 0.012 && bosses.length && !nearView ? bosses[Math.floor(rnd() * bosses.length)]! : u < 0.07 && kids.length ? kids[Math.floor(rnd() * kids.length)]! : pawns[Math.floor(rnd() * pawns.length)]!;
+  const put = (seat: Seat, cell: number, jx: number) => {
     const c = art.cells[cell]!;
-    if (c.kind === "boss") skip = true;
-    // (Each a little to one side or the other of its seat, and a little forward or back: a crowd, not a grid.)
-    const jx = (rnd() - 0.5) * 0.12;
     const o = n * SI;
     out[o] = seat.x + Math.cos(seat.face) * jx;
     out[o + 1] = seat.y;
@@ -301,7 +296,17 @@ export function buildCrowd(art: Pick<CrowdArt, "cells">, seed = 20261030): Float
     out[o + 18] = NEVER;
     out[o + 19] = 0;
     n++;
-  }
+  };
+  all.forEach((seat, i) => {
+    if (taken.has(i)) return;
+    // (Each a little to one side or the other of its seat: a crowd, not a grid.)
+    const cell = pawns[Math.floor(rnd() * pawns.length)]!;
+    put(seat, cell, (rnd() - 0.5) * 0.12);
+  });
+  places.forEach((p, k) => {
+    put(p.boss, pairs[k]!.boss, 0);
+    put(p.kid, pairs[k]!.kid, 0);
+  });
   return out.subarray(0, n * SI);
 }
 
