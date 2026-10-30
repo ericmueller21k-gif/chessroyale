@@ -91,3 +91,10 @@ round it (its panels poll now and then, never per frame).
 - New: `e2e/town-desktop.spec.ts` (the box, the frame's parts, the icons, nothing poking out, the menu, loading, a narrow mouse window, and
   phones and tablets against main's boxes).
 - No guard test was edited: `e2e/town-chat.spec.ts`'s "typing works wherever the box shows…" and `e2e/town-tags.spec.ts` are untouched.
+
+## Oct 30: the world fills the whole space between the menu and the right column
+
+Eric (Oct 30, his sketch): the town runs out to the side-menu and right-column lines, top to bottom; its bar moves to the right column's top row. On a computer
+the world is now the whole space between the menu and the right column (no 1080 px limit, no bar of its own), and the bar (back, "Town square", chat icon, gear) sits where
+the profile button is on other pages (not shown on the town page; its row keeps its height). Back, chat and gear are 44 px, the profile button's size. The title is 15 px
+below 1440 px so the four fit the 280 px column. Frame rate (headless, 4 runs in turn, medians): 1440 × 900 main 58.6, here 59.0; 1920 × 1080 main 58.2, here 48.6 (the canvas is 1.6x the pixels): slower, left for Eric. Checks changed: town-desktop.spec.ts box checks (home's middle box, bar 52 px at the box top, gear 14 px from the right → the space between menu and right column full height; bar in the right column, 44 px buttons in order); town.spec.ts "world starts under the bar" → computer: at the window's top; town-chat.spec.ts "under the bar" → computer: on the map. No guard test edited.
