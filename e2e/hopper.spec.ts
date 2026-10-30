@@ -266,7 +266,7 @@ test("their tile and stage, their figure by the board and the dock's count: whol
   await expect(page.locator(".bs-stage .bs-sprite")).toHaveAttribute("data-fx", "hopper");
   await expect(page.locator(".bs-name")).toHaveText("Chub & Chirp");
   await page.waitForTimeout(500);
-  const stage = (await page.locator(".bs-spot").boundingBox())!;
+  const stage = (await page.locator(".bs-spot:not(.bs-mine)").boundingBox())!;
   const fig = (await page.locator(".bs-sprite").boundingBox())!;
   expect(fig.x).toBeGreaterThanOrEqual(stage.x - 1);
   expect(fig.x + fig.width).toBeLessThanOrEqual(stage.x + stage.width + 1);

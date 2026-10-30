@@ -166,10 +166,10 @@ test("computer: a side menu, the center and a live panel; the phone keeps one co
   await expect(menu.getByRole("button", { name: "Settings" })).toHaveAttribute("aria-current", "page");
   await menu.getByRole("button", { name: "Profile" }).click();
   await expect(page.locator(".fd-card")).toBeVisible();
-  // Solo Boss Mode (was Boss raid, Oct 26): its screen, the menu showing where you are; Play is home again.
-  await menu.getByRole("button", { name: "Solo Boss Mode" }).click();
-  await expect(page.getByRole("heading", { name: "Solo Boss Mode", exact: true })).toBeVisible();
-  await expect(menu.getByRole("button", { name: "Solo Boss Mode" })).toHaveAttribute("aria-current", "page");
+  // Boss Battle (was Boss raid, Oct 26): its screen, the menu showing where you are; Play is home again.
+  await menu.getByRole("button", { name: "Boss Battle" }).click();
+  await expect(page.getByRole("heading", { name: "Boss Battle", exact: true })).toBeVisible();
+  await expect(menu.getByRole("button", { name: "Boss Battle" })).toHaveAttribute("aria-current", "page");
   await expect(menu.getByRole("button", { name: "Boss alone" })).toHaveCount(0);
   await menu.getByRole("button", { name: "Play", exact: true }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();

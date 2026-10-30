@@ -136,15 +136,8 @@ test("boss raid (solo): you against a boss from the starting position (Eric, Oct
   test.setTimeout(8 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
   await page.goto("/?debug&pace=quick&clock=20&bossMoves=6");
-  // First, the Boss raid screen's tiles: every boss you can meet (a complete character and powers), the Hidden Boss's
-  // locked tile and a random one. Boss alone's menu then has that boss, at your strength plus its own offset.
+  // Boss Battle's tile for the boss, then START: the battle at once (Oct 29; the tiles' own checks are boss-select.spec.ts).
   await bossAloneFromHome(page, "Boingo the Clown");
-  await expect(page.getByRole("radiogroup", { name: "Bosses" }).getByRole("radio")).toHaveCount(16);
-  const menu = page.getByRole("dialog", { name: "Boss alone" });
-  await expect(menu).toBeVisible();
-  await expect(menu.locator(".boss-row")).toHaveCount(1);
-  await expect(menu.getByRole("button", { name: /Match the group/ })).toHaveCount(0);
-  await menu.getByRole("button", { name: /Boingo the Clown/ }).click();
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
   // No opening to name: the intro says it's a fresh game.
   await expect(page.locator(".boss-intro-note")).toHaveText("A fresh game from the starting position. You play White.");

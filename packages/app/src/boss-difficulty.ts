@@ -1,7 +1,7 @@
 import { BOSS_BRAIN, BOSS_DIFFICULTY, bossStrength, raidBossElo, type BossDef, type BossDifficultyId } from "@chessroyale/core";
 
 /**
- * Solo's difficulty against a boss (next to the boss picker): Easy, Normal, Hard or Hardest. In Boss alone it sets the
+ * Solo's difficulty against a boss (next to the boss picker): Very easy, Easy, Medium, Hard or Very hard (the ids stay very-easy, easy, normal, hard, hardest). In Boss alone it sets the
  * rating the boss picks its moves at (BOSS_DIFFICULTY's `maia`, whatever your rating), and Elo on top of the boss's
  * usual strength for its powers' own brains. Which boss you meet doesn't change. Remembered on this device.
  */
@@ -10,7 +10,7 @@ let picked: BossDifficultyId | null = null;
 
 const known = (v: unknown): v is BossDifficultyId => BOSS_DIFFICULTY.some((d) => d.id === v);
 
-/** The difficulty last chosen on this device (Normal at first). */
+/** The difficulty last chosen on this device (Medium, id `normal`, at first). */
 export function chosenDifficulty(): BossDifficultyId {
   if (picked) return picked;
   try {
@@ -32,19 +32,19 @@ export function rememberDifficulty(id: BossDifficultyId) {
   }
 }
 
-/** Its Elo on top of the boss's strength (Easy −300 … Hardest +500). */
+/** Its Elo on top of the boss's strength (Very easy −500 … Very hard +500). */
 export function difficultyElo(id: BossDifficultyId = chosenDifficulty()): number {
   return BOSS_DIFFICULTY.find((d) => d.id === id)?.elo ?? 0;
 }
 
-/** Boss alone's Maia rating for a difficulty (Easy 1000 … Hardest 2200): the boss picks its moves at it. */
+/** Boss alone's Maia rating for a difficulty (Very easy 700 … Very hard 2500): the boss picks its moves at it. */
 export function difficultyMaia(id: BossDifficultyId = chosenDifficulty()): number {
   return BOSS_DIFFICULTY.find((d) => d.id === id)?.maia ?? 1400;
 }
 
 /** A difficulty's name on screen ("Hard"). */
 export function difficultyLabel(id: BossDifficultyId): string {
-  return BOSS_DIFFICULTY.find((d) => d.id === id)?.label ?? "Normal";
+  return BOSS_DIFFICULTY.find((d) => d.id === id)?.label ?? "Medium";
 }
 
 /**

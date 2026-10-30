@@ -96,7 +96,7 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   says a line** (Oct 28, Eric's three, word for word, about his sidekick: `TOWN_LINES`, `townLine` in `world.ts`), under
   its title, the next in turn each time his card or Hollow Peak's opens (its confirm is the same card); no other card has
   a line. Its card: its name and **"Challenge alone"**, which asks **"Leave the town
-  square?"** / "You'll fight [boss] alone in Solo Boss Mode." / **Leave** / **Stay**; Leave closes the town square and
+  square?"** / "You'll fight [boss] in Boss Battle." / **Leave** / **Stay**; Leave closes the town square and
   opens the Boss raid screen with that boss's tile picked (`rememberBossPick`, then the screen as the side menu opens
   it); Stay closes the confirm and its card. A home: its name, **"Shop"** greyed (shown, not tappable) and "Coming
   soon". The Colosseum (slice 5): "The Colosseum", **"Raids with people"** greyed and "Coming soon" (Eric's menu for

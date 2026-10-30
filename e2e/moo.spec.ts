@@ -499,10 +499,6 @@ test("Moo & Moon: his tile picks him, and Boss alone meets him: his figure in th
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/?debug&clock=60&laststand=0&brain=stockfish");
   await bossAloneFromHome(page, "Moo & Moon");
-  // (The picked boss's own menu: his row, at your strength plus his offset.)
-  const menu = page.getByRole("dialog", { name: "Boss alone" });
-  await expect(menu.locator(".boss-row")).toHaveCount(1);
-  await menu.getByRole("button", { name: /Moo & Moon/ }).click();
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
   expect(await page.evaluate(() => (window as any).match.boss.name)).toBe("Moo & Moon");
   expect(await page.evaluate(() => (window as any).match.boss.id)).toBe("moo");

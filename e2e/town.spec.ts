@@ -296,7 +296,7 @@ test("a boss's card: 'Challenge alone', then 'Leave the town square?'; Stay keep
   let confirm = page.getByRole("dialog", { name: "Leave the town square?" });
   await expect(confirm.getByRole("heading", { name: "Leave the town square?" })).toBeVisible();
   expect(await said()).toBe(1);
-  await expect(confirm.getByText("You'll fight Babur alone in Solo Boss Mode.")).toBeVisible();
+  await expect(confirm.getByText("You'll fight Babur in Boss Battle.")).toBeVisible();
   // Stay: the confirm closes, and you're still in the town square.
   await confirm.getByRole("button", { name: "Stay" }).click();
   await expect(confirm).toBeHidden();
@@ -1173,7 +1173,7 @@ test("the other cards on the same dark look: the boss's, the home's, the Colosse
   await onDark("the boss's card", ["h2"]);
   await card.getByRole("button", { name: "Challenge alone" }).click();
   const confirm = page.getByRole("dialog", { name: "Leave the town square?" });
-  await expect(confirm.getByText("You'll fight Babur alone in Solo Boss Mode.")).toBeVisible();
+  await expect(confirm.getByText("You'll fight Babur in Boss Battle.")).toBeVisible();
   await expect(confirm.getByRole("button", { name: "Leave", exact: true })).toBeEnabled();
   await expect(confirm.getByRole("button", { name: "Stay", exact: true })).toBeEnabled();
   await onDark("the confirm", ["h2", ".town-card-text"]);

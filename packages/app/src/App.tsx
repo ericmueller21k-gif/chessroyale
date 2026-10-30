@@ -94,7 +94,7 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
           // Boss alone and a Solo raid: the boss picked on the Boss raid screen ("" random). Random avoids your last.
           bossId: chosenBoss(hidden),
           ...(hidden ? { bossHidden: true } : {}),
-          // Boss alone: the difficulty chosen next to the boss picker (Easy to Hardest) on top of that strength.
+          // Boss alone: the difficulty chosen next to the boss picker (Very easy to Very hard) on top of that strength.
           bossDifficulty: matchBoss || bossTierFromUrl() ? 0 : difficultyElo(),
           // Boss alone: the difficulty's Maia rating, the boss's moves picked at it (BOSS_DIFFICULTY's `maia`).
           bossAloneMaia: matchBoss || bossTierFromUrl() ? 0 : difficultyMaia(),

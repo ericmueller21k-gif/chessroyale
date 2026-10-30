@@ -25,12 +25,17 @@ export const MOCKUP_LOOK: ItemLook = {
 };
 
 const hoursAgo = (h: number) => Date.now() - h * 3_600_000;
-/** Yesterday (the viewer's) at `min` minutes past midnight: "Yesterday", whatever the time of day now (after the first few minutes of it). */
+/**
+ * Yesterday (the viewer's) at `min` (under 30) minutes past midnight: "Yesterday" at any time of day. "Yesterday" needs a day
+ * or more ago, so in the first half hour after midnight it comes in to the same share of the minutes since then (it ran
+ * 00:00-00:20 as "23h ago" before, Oct 30); a larger `min` stays the later of two.
+ */
 const yesterday = (min: number) => {
   const d = new Date();
+  const sinceMidnight = d.getTime() - new Date(d).setHours(0, 0, 0, 0);
   d.setDate(d.getDate() - 1);
-  d.setHours(0, min, 0, 0);
-  return d.getTime();
+  d.setHours(0, 0, 0, 0);
+  return d.getTime() + Math.min(min * 60_000, (sinceMidnight * min) / 30);
 };
 /** `n` days back at noon: always a date ("Oct 25"). */
 const daysBack = (n: number) => {

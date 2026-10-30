@@ -327,7 +327,6 @@ test("a player in Boss alone never sees Engine move", async ({ page }) => {
   test.setTimeout(3 * 60_000);
   await page.goto("/?debug&laststand=0");
   await bossAloneFromHome(page);
-  await page.getByRole("dialog", { name: "Boss alone" }).locator(".boss-row").first().click();
   await yourMove(page);
   await expect(page.locator(".ult-test, .engine-move")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Engine move" })).toHaveCount(0);
