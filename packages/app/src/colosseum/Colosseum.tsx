@@ -29,6 +29,15 @@ import "./colosseum.css";
 
 /** Ambient crowd noise (no sound yet: the switch only), remembered on this device. */
 const AMBIENT_KEY = "colosseum-ambient";
+/** The giant pieces in 3D (Eric, Oct 30: "a toggle … for 3D vs 2D pieces players can choose"), remembered on this device; off by default. */
+const PIECES_KEY = "colosseum-3d-pieces";
+const pieces3dOn = () => {
+  try {
+    return localStorage.getItem(PIECES_KEY) === "on";
+  } catch {
+    return false;
+  }
+};
 const ambientOn = () => {
   try {
     return localStorage.getItem(AMBIENT_KEY) !== "off";
@@ -49,6 +58,8 @@ type Hooks = {
     state: () => object;
     seat: (i: number) => unknown;
     flag: () => unknown;
+    pieces: (style: "flat" | "3d") => unknown;
+    freeze: () => unknown;
     jump: () => unknown;
     sample: () => { sky: number; hash: number } | null;
   };
@@ -68,9 +79,12 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
   const t0 = useRef(performance.now());
   const [, setTick] = useState(0);
   const match = useRef<FloorMatch | null>(null);
+  /** (Tests: `freeze`) The match's clock held still, so a still pair shows the same clocks. */
+  const frozenAt = useRef<number | null>(null);
   const [portraits, setPortraits] = useState<Map<number, string>>(new Map());
   const [viewers, setViewers] = useState(() => seats().length);
   const [ambient, setAmbient] = useState(ambientOn);
+  const [pieces3d, setPieces3d] = useState(pieces3dOn);
   const [anim, setAnim] = useState(crowdAnimations);
   const animRef = useRef(anim);
   animRef.current = anim;
@@ -80,7 +94,8 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
   useLayoutEffect(() => {
     const cv = canvas.current!;
     const el = box.current!;
-    const arena = ArenaGL.create(cv);
+    // The giant pieces in 3D when the gear's "3D pieces" is on (remembered on this device); else the flat pieces.
+    const arena = ArenaGL.create(cv, pieces3dOn());
     arenaRef.current = arena;
     setGl(!!arena);
     if (!arena) return;
@@ -189,7 +204,7 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
           return all[Math.floor(Math.random() * all.length)]!;
         },
         evaluate: (fen) => (engine ? engine.evaluate(fen) : Promise.resolve(null)),
-        now: () => performance.now(),
+        now: () => frozenAt.current ?? performance.now(),
         random: Math.random,
         wait: (ms) =>
           new Promise((ok) => {
@@ -245,6 +260,7 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
           backend: arenaRef.current ? "webgl" : "still",
           drawCalls: arenaRef.current?.drawCalls ?? 0,
           crowd: arenaRef.current?.crowdCount ?? 0,
+          pieces: arenaRef.current?.pieceStyle ?? "flat",
           game: s?.game ?? 0,
           plies: s?.moves.length ?? 0,
           status: s?.status ?? "waiting",
@@ -253,6 +269,12 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
       },
       seat: (i) => testSwitchesAllowed() && setView(i),
       flag: () => testSwitchesAllowed() && match.current?.flag(),
+      pieces: (style) => testSwitchesAllowed() && arenaRef.current?.setPieceStyle(style),
+      freeze: () => {
+        if (!testSwitchesAllowed()) return;
+        frozenAt.current = performance.now();
+        match.current?.stop();
+      },
       jump: () => testSwitchesAllowed() && (jumpAt.current = performance.now()),
       sample: () => {
         const a = arenaRef.current;
@@ -344,20 +366,37 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
         <MatchMenu
           exit={null}
           extra={
-            <SwitchRow
-              icon="📣"
-              label="Ambient crowd noise"
-              on={ambient}
-              onClick={() => {
-                const on = !ambient;
-                setAmbient(on);
-                try {
-                  localStorage.setItem(AMBIENT_KEY, on ? "on" : "off");
-                } catch {
-                  // (Not remembered: private mode.)
-                }
-              }}
-            />
+            <>
+              <SwitchRow
+                icon="♟"
+                label="3D pieces"
+                on={pieces3d}
+                onClick={() => {
+                  const on = !pieces3d;
+                  setPieces3d(on);
+                  arenaRef.current?.setPieceStyle(on ? "3d" : "flat");
+                  try {
+                    localStorage.setItem(PIECES_KEY, on ? "on" : "off");
+                  } catch {
+                    // (Not remembered: private mode.)
+                  }
+                }}
+              />
+              <SwitchRow
+                icon="📣"
+                label="Ambient crowd noise"
+                on={ambient}
+                onClick={() => {
+                  const on = !ambient;
+                  setAmbient(on);
+                  try {
+                    localStorage.setItem(AMBIENT_KEY, on ? "on" : "off");
+                  } catch {
+                    // (Not remembered: private mode.)
+                  }
+                }}
+              />
+            </>
           }
         />
       </header>

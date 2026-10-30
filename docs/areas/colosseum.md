@@ -38,12 +38,20 @@ links Eric's notes); this page is what's built.
   move (less when its clock runs low). Mate, a draw by the rules, a flag or 240 plies ends a game; the next starts 5 s
   later with two other bots. The big pieces slide (0.45 s, a little hop), a captured one goes as the slide lands. No
   engine (it failed to load): random legal moves, no eval.
+- **The 3D pieces (the gear's "3D pieces", Eric, Oct 30: "a toggle … for 3D vs 2D pieces players can choose"; Off by
+  default, remembered on this device, flipping it redraws at once).** The six Staunton pieces made
+  once in code at load (`colosseum/pieces3d.ts`): pawn, rook (six merlons), bishop (its slit cut in the shader), queen (nine
+  gold points), king (a gold cross) turned from profiles; the knight a horse's-head outline extruded with a bevel, on the same
+  base. Ivory and ebony with a gold trim line, lit from the arena's sun with a soft fill and a little shine, a soft round
+  shadow under each. Each turns round its own axis to face you, as the flat pieces did (a knight always shows its profile).
+  One draw call a kind on the board (up to 9 a frame), the instances written only when a move is made; the 3D set is built
+  the first time it's switched on. Off, the flat pieces exactly as before. Decision: `docs/decisions/2026-10-30-colosseum-3d-pieces.md`.
 - **The overlay** (HTML over the arena, as Eric's mockup; on a phone the bar has no title: Exit, Change seat and the gear): each player's card (portrait, name with "(bot)", ELO, the pieces
   taken, the clock: lit gold for the side to move, tenths under 20 s), the middle (Turn N, the viewers: the crowd's size,
   "2.1K"), the last four moves (the one just played in gold), the flat board (the game's `Board`, small, silent; Black's
   player view turns it round) with its eval bar ("+0.3", "M3"), a status line ("Game 2 · 3+2", then "White wins on time.
   Next game soon."), the chat's box (empty for now: "Coming soon"), and in the top bar Exit, Change seat and the gear
-  (`MatchMenu` with `extra`: Sound, Animations, **Ambient crowd noise** (a switch only, remembered on this device; no
+  (`MatchMenu` with `extra`: Sound, Animations, **3D pieces** (Off by default, remembered on this device), **Ambient crowd noise** (a switch only, remembered on this device; no
   sound yet), Report a bug). Phone (under 900 × 600): the stands at the top (31% of the height), the cards, the moves in
   one line, the board, the chat below. Computer: the arena fills the screen, the cards and moves along its top, the board
   and the chat down its right. Every box keeps its size and place.
@@ -61,13 +69,13 @@ links Eric's notes); this page is what's built.
 Every picture is made in `colosseum/art.ts`, one maker per role (its table lists them): the API art
 (`claude/colosseum-art`, `scripts/boss-art/out/arena-*`) replaces them one at a time. Placeholders now: the wall's and
 the gallery's arch slices, the crown banner, the sand, the stone colors, the pillars (geometry) and their flame, the
-giant pieces (the board's cburnett pieces, Black's in slate), the statue, and the crowd's pictures (the town's own). Not
+giant pieces (the board's cburnett pieces, Black's in slate; in 3D with the gear's "3D pieces"), the statue, and the crowd's pictures (the town's own). Not
 drawn yet: the railing in front of your seat, pawn backs (done by the shader), far-crowd figures (mipmaps do it).
 
 ## Files
 
 `packages/app/src/colosseum/`: `ColosseumPage.tsx` (the lazy page), `Colosseum.tsx` (the screen, the loop, the hooks),
-`arena.ts`, `arena-gl.ts`, `art.ts`, `match.ts`, `floor-engine.ts`, `colosseum.css`, `still.jpg`. The link:
+`arena.ts`, `arena-gl.ts`, `art.ts`, `pieces3d.ts`, `match.ts`, `floor-engine.ts`, `colosseum.css`, `still.jpg`. The link:
 `town/Town.tsx` (the card), `town/TownPage.tsx`, `town/town.css` (`a.town-btn.town-look`). The gear's extra rows:
 `components/MatchMenu.tsx` (`extra`, `SwitchRow`).
 
@@ -81,7 +89,11 @@ drawn yet: the railing in front of your seat, pawn backs (done by the shader), f
 - `e2e/colosseum.spec.ts` (phone and computer): the card's link in, the arena drawn (WebGL, three draw calls, the crowd
   in), Change seat changes the view, a bot game plays and, ended, the next starts, the overlay's pieces, the gear's rows,
   `?view=black`, Exit back to the town.
-- Test hooks (test switches on): `window.__colosseum` (`state()`, `seat(i)`, `flag()`, `jump()`, `sample()`), and
+- `packages/app/test/colosseum.test.ts`, "the 3D pieces": the six meshes (whole triangles, unit normals, on the board, inside
+  their squares, the king tallest). `e2e/colosseum.spec.ts`, "the gear's 3D pieces": Off by default (three draw calls), the row
+  flips it at once (nine), the game plays, a reload keeps it, Off again flat and three.
+- Test hooks (test switches on): `window.__colosseum` (`state()` (with `pieces`: "flat" or "3d"), `seat(i)`, `flag()`,
+  `jump()`, `sample()`, `pieces(style)` and `freeze()` for still pairs: the same frame in 3D and flat), and
   `?fast` makes the bots move at once and the next game come in 1.2 s.
 
 ## Not built yet
