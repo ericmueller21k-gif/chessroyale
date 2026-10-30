@@ -49,6 +49,8 @@ type Hooks = {
     state: () => object;
     seat: (i: number) => unknown;
     flag: () => unknown;
+    pieces: (style: "flat" | "3d") => unknown;
+    freeze: () => unknown;
     jump: () => unknown;
     sample: () => { sky: number; hash: number } | null;
   };
@@ -68,6 +70,8 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
   const t0 = useRef(performance.now());
   const [, setTick] = useState(0);
   const match = useRef<FloorMatch | null>(null);
+  /** (Tests: `freeze`) The match's clock held still, so a still pair shows the same clocks. */
+  const frozenAt = useRef<number | null>(null);
   const [portraits, setPortraits] = useState<Map<number, string>>(new Map());
   const [viewers, setViewers] = useState(() => seats().length);
   const [ambient, setAmbient] = useState(ambientOn);
@@ -80,7 +84,8 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
   useLayoutEffect(() => {
     const cv = canvas.current!;
     const el = box.current!;
-    const arena = ArenaGL.create(cv);
+    // The giant pieces in 3D (`?pieces=3d`, anyone's, for now: Eric decides after the stills); without it, the flat pieces.
+    const arena = ArenaGL.create(cv, new URLSearchParams(location.search).get("pieces") === "3d");
     arenaRef.current = arena;
     setGl(!!arena);
     if (!arena) return;
@@ -189,7 +194,7 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
           return all[Math.floor(Math.random() * all.length)]!;
         },
         evaluate: (fen) => (engine ? engine.evaluate(fen) : Promise.resolve(null)),
-        now: () => performance.now(),
+        now: () => frozenAt.current ?? performance.now(),
         random: Math.random,
         wait: (ms) =>
           new Promise((ok) => {
@@ -245,6 +250,7 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
           backend: arenaRef.current ? "webgl" : "still",
           drawCalls: arenaRef.current?.drawCalls ?? 0,
           crowd: arenaRef.current?.crowdCount ?? 0,
+          pieces: arenaRef.current?.pieceStyle ?? "flat",
           game: s?.game ?? 0,
           plies: s?.moves.length ?? 0,
           status: s?.status ?? "waiting",
@@ -253,6 +259,12 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
       },
       seat: (i) => testSwitchesAllowed() && setView(i),
       flag: () => testSwitchesAllowed() && match.current?.flag(),
+      pieces: (style) => testSwitchesAllowed() && arenaRef.current?.setPieceStyle(style),
+      freeze: () => {
+        if (!testSwitchesAllowed()) return;
+        frozenAt.current = performance.now();
+        match.current?.stop();
+      },
       jump: () => testSwitchesAllowed() && (jumpAt.current = performance.now()),
       sample: () => {
         const a = arenaRef.current;
