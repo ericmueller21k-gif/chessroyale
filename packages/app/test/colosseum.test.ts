@@ -36,7 +36,7 @@ describe("the arena", () => {
     const angles = VIEWS.slice(0, 8).map((v) => Math.round((Math.atan2(v.eye[0], v.eye[2]) * 180) / Math.PI + 360) % 360);
     expect(new Set(angles).size).toBe(8);
     const heights = VIEWS.slice(0, 8).map((v) => v.eye[1]);
-    expect(Math.max(...heights) - Math.min(...heights)).toBeGreaterThan(5);
+    expect(Math.max(...heights) - Math.min(...heights)).toBeGreaterThan(3);
     // The player views: about 20 feet (6 m) above the board, behind their own end.
     expect(VIEWS[WHITE_VIEW]!.eye[1]).toBe(6);
     expect(VIEWS[WHITE_VIEW]!.eye[2]).toBeGreaterThan(4);

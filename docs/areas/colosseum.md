@@ -14,8 +14,8 @@ links Eric's notes); this page is what's built.
   14 rows of stone steps with a landing after the seventh and 8 aisles of stairs, the gallery wall with arches and 12 banners
   at the top, six pillars with torches and two statues (a stone pawn in a gladiator's helm, never the town's bronze statue)
   on the floor, half-way between the seats' angles so none stands between a seat and the board.
-- **The views.** Eight seats round the stands, each at its own angle, lower and higher (rows 1 to 12), each lens set so the
-  board takes about 60% of its height; and two player views, 6 m (about 20 feet) above the board behind White's end and
+- **The views.** Eight seats round the stands, each at its own angle, lower and higher (rows 1 to 9), each lens set so the
+  board takes about 80% of its height (the middle third of the view, as Eric's mockup); and two player views, 6 m (about 20 feet) above the board behind White's end and
   Black's (`?view=white`, `?view=black`, anyone's). The page opens at a random seat; **Change seat** picks another of the
   eight at random. Drag (or swipe) the arena to turn your view a little: never so far the board's middle leaves the screen
   (`turnLimits`). On a computer the lens is shifted so the board sits in the middle of what the overlay leaves.
@@ -24,7 +24,9 @@ links Eric's notes); this page is what's built.
   boss (about 1%, never just in front of a view's seat). One instanced draw call, uploaded once; each turns round its
   upright axis to face you. **Seen from behind** (the rows in front of your seat): no item has back art, so a person
   whose front faces away from you is drawn as its own picture mirrored and darkened toward a shadow; hats and outlines
-  read, no face looks back at you. Your own seat is left empty. No names; nothing in the arena takes a tap.
+  read, no face looks back at you. Of the rows below your seat only the one just in front is drawn, smaller and a
+  little lower (the tops of heads, as the mockup); the rows under it aren't, so they don't cover the arena. Your own seat
+  is left empty. No names; nothing in the arena takes a tap.
 - **The jump.** A queen captured: the crowd jumps twice, each person with its own delay (up to 0.35 s) and height (0.12 to
   0.32 m), worked out on the GPU from one uniform. Not under reduced motion or with Animations off (the gear).
 - **The game on the floor** (`colosseum/match.ts`, `floor-engine.ts`). Two town bots rated 1300 and up (Stockfish's
@@ -33,7 +35,7 @@ links Eric's notes); this page is what's built.
   move (less when its clock runs low). Mate, a draw by the rules, a flag or 240 plies ends a game; the next starts 5 s
   later with two other bots. The big pieces slide (0.45 s, a little hop), a captured one goes as the slide lands. No
   engine (it failed to load): random legal moves, no eval.
-- **The overlay** (HTML over the arena, as Eric's mockup): each player's card (portrait, name with "(bot)", ELO, the pieces
+- **The overlay** (HTML over the arena, as Eric's mockup; on a phone the bar has no title: Exit, Change seat and the gear): each player's card (portrait, name with "(bot)", ELO, the pieces
   taken, the clock: lit gold for the side to move, tenths under 20 s), the middle (Turn N, the viewers: the crowd's size,
   "2.1K"), the last four moves (the one just played in gold), the flat board (the game's `Board`, small, silent; Black's
   player view turns it round) with its eval bar ("+0.3", "M3"), a status line ("Game 2 · 3+2", then "White wins on time.
@@ -45,7 +47,9 @@ links Eric's notes); this page is what's built.
 - **No WebGL 2:** a still of the stands (`colosseum/still.jpg`) in the arena's place; everything else the same.
 - **The frame rate.** Three draw calls a frame (the arena, the crowd, the props). A frame sets the camera, the time and the
   jump's clock and draws: nothing allocated, nothing uploaded (the props are uploaded again only when a move is made). The
-  loop stops while the tab is hidden. `?fps` shows a pill: frames a second and draw calls.
+  loop stops while the tab is hidden. `?fps` shows a pill: frames a second and draw calls. Measured (eric.md's method,
+  headless, software WebGL): phone 7.1 fps, computer 3.9 fps (SwiftShader's fill), the main thread's script 0.44 and
+  0.77 ms a frame, 3 draw calls; numbers in the decision note.
 - **The town is untouched** but for the card's link: none of this loads there, and the town's drawing and frame loop
   are as they were.
 

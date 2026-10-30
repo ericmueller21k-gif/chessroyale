@@ -78,6 +78,12 @@ void main() {
   vec2 dir = toEye / max(d, 0.0001);
   vec3 right = vec3(dir.y, 0.0, -dir.x);
   vBack = iA.y < -50.0 ? 0.0 : smoothstep(0.15, -0.15, dot(vec2(sin(iA.y), cos(iA.y)), dir));
+  // The rows in front of your seat (their backs to you, below you): only the one just in front, smaller and lower (the tops of
+  // their heads, as Eric's mockup); the rows below it aren't drawn, so they don't cover the arena.
+  if (vBack > 0.5 && p.y < uEye.y - 0.4 && d < 6.0) {
+    if (d > 1.7) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+    h *= 0.75; w *= 0.75; p.y -= 0.12;
+  }
   float cx = vBack > 0.5 ? -aCorner.x : aCorner.x;
   vUV = vec2(mix(iRect.x, iRect.z, cx + 0.5), mix(iRect.w, iRect.y, aCorner.y));
   vec3 world = p + right * (aCorner.x * w) + vec3(0.0, (aCorner.y - (1.0 - iC.x)) * h, 0.0);
@@ -309,7 +315,7 @@ export interface FloorPiece {
 }
 
 /** How tall a big piece's picture stands (meters, its cell's height). */
-const PIECE_M = 1.3;
+const PIECE_M = 1.1;
 
 /** The WebGL 2 arena. `create` returns null where there's no WebGL 2 (the page shows a still instead). */
 export class ArenaGL {

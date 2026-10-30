@@ -51,6 +51,19 @@
 .col-exit {
   padding: 0 12px;
 }
+/* A phone: no title in the bar (Exit, Change seat and the gear fill it; the director, Oct 30); still there for screen readers. */
+@media not ((min-width: 900px) and (min-height: 600px)) {
+  .col-bar h1 {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .col-bar .col-seat {
+    margin-left: auto;
+  }
+}
 .col-seat {
   background: linear-gradient(#fdda7e, #f3b957);
   border-color: #e3a93f;

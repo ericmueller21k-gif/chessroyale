@@ -48,7 +48,24 @@ The arena and its views with bots playing on the floor, and the overlay, behind 
   is in the bar.
 - **No WebGL 2:** a still of the stands from the eighth seat (315°, row 11) of this build (`still.jpg`, 140 kB, loaded only then).
 
-## Frame rate
+- **After the director's notes on the first stills (Oct 30):** the seats lower and closer (rows 1 to 9) and each lens
+  narrower, so the board fills about the middle third of the view; of the rows in front of your seat only the one just in
+  front is drawn, smaller and lower (the tops of heads); the giant pieces sized to their squares; on a phone no title in
+  the bar.
 
-See the PR (eric.md's method: headless, phone 390 × 844 and computer 1440 × 900, the medians of four runs, one pass).
-The town's drawing and frame loop are unchanged (its chunk now shares render.ts with this page's chunk; same code).
+## Frame rate (eric.md's method)
+
+Headless, a phone 390 × 844 (3x, the canvas capped at 2x) and a computer 1440 × 900, 5 s at a seat (the second) while the
+bots play, the medians of four runs taken in turn, one pass. This machine has no GPU: WebGL here is SwiftShader (the CPU
+pretending to be a GPU), so the fps are its fill, as the town's WebGL numbers were (4 to 6 fps there).
+
+| | fps (runs) | median fps | script a frame | all main-thread work a frame | draw calls a frame |
+| --- | --- | --- | --- | --- | --- |
+| phone 390 × 844 | 7.1, 6.7, 7.2, 7.6 | 7.1 | 0.44 ms | 5.0 ms | 3 |
+| computer 1440 × 900 | 4.3, 3.2, 4.2, 3.7 | 3.9 | 0.77 ms | 9.0 ms | 3 |
+
+The script a frame (under a millisecond, the overlay's clocks included) is what the page itself costs; the rest is the
+software GPU. On a real GPU three draw calls of this size are well under a millisecond. Eric's phone and laptop decide.
+
+The town is unchanged: no town spec edited, its drawing and frame loop untouched (only the card's link and its style).
+Its lazy chunk now shares render.ts and the art it imports with this page's chunk (the same code, in two files).

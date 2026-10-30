@@ -96,18 +96,19 @@ export interface View {
 /** Seated eye height over a step. */
 const EYE = 1.0;
 /** How much of the lens's height the board (its bounding sphere) takes from a seat. */
-const BOARD_SHARE = 0.62;
+const BOARD_SHARE = 0.8;
 /**
  * A seat's view: row `row`, `deg` degrees round from White's end, looking at the board's middle; its lens as wide as makes
- * the board take `BOARD_SHARE` of its height (between 30° and 62°).
+ * the board take `BOARD_SHARE` of its height (between 24° and 62°): the board fills about the middle third of the view (the
+ * director, Oct 30, on Eric's mockup).
  */
 function seatView(deg: number, row: number): View {
   const a = (deg * Math.PI) / 180;
   const r = seatR(row) + 0.05;
   const eye = [Math.sin(a) * r, rowY(row) + EYE, Math.cos(a) * r] as const;
-  const d = Math.hypot(eye[0], eye[1] - 0.3, eye[2]);
-  const fov = Math.min((62 * Math.PI) / 180, Math.max((30 * Math.PI) / 180, (2 * Math.asin(BOARD_SPHERE / d)) / BOARD_SHARE));
-  return { eye, at: [0, 0.3, 0], fov };
+  const d = Math.hypot(eye[0], eye[1] - 1.1, eye[2]);
+  const fov = Math.min((62 * Math.PI) / 180, Math.max((24 * Math.PI) / 180, (2 * Math.asin(BOARD_SPHERE / d)) / BOARD_SHARE));
+  return { eye, at: [0, 1.1, 0], fov };
 }
 /**
  * The ten views (Eric, Oct 30): eight seats round the stands, lower and higher, each at its own angle (the eight angles
@@ -116,14 +117,14 @@ function seatView(deg: number, row: number): View {
  * up, behind your own end).
  */
 export const VIEWS: readonly View[] = [
-  seatView(0, 5),
-  seatView(45, 2),
-  seatView(90, 10),
-  seatView(135, 3),
-  seatView(180, 12),
-  seatView(225, 1),
-  seatView(270, 8),
-  seatView(315, 11),
+  seatView(0, 3),
+  seatView(45, 1),
+  seatView(90, 6),
+  seatView(135, 2),
+  seatView(180, 8),
+  seatView(225, 0),
+  seatView(270, 5),
+  seatView(315, 7),
   { eye: [0, 6, 9.4], at: [0, 0, 0.4], fov: (56 * Math.PI) / 180 },
   { eye: [0, 6, -9.4], at: [0, 0, -0.4], fov: (56 * Math.PI) / 180 },
 ];
