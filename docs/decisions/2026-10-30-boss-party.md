@@ -37,3 +37,14 @@ Eric's design (Oct 29 and 30) and his OK on the stills (Oct 30: "the solo or the
   The draw rule "party" (`partyMove`), `bossClockSettings`, `kingAnyCall`, `setTeamBank` (the turn's length off the team's
   bank: `finishRound`'s `teamMs`), live tallies to everyone, `partyKickable` / `kick`, the kicked seat passed back to the
   party (`takePartyKicks`, `kickSeat`). Settings in `BOSS_PARTY` (max 3, closeCp 30, afkKickSec 60, joinWaitSec 30).
+
+## The stage (PR 3)
+- The invite circles are live: a tap makes the party the first time and opens "Invite friends" (the code, the link to
+  copy or share, who's in, admins' bot buttons, Leave the party). `/boss/party/CODE` opens Boss Battle in that party.
+- Members stand on the back platforms (seat order), their own dressed pawns; the crown over the leader (you too), the
+  check over a ready member. A tap opens the menu above their head (View profile; the leader's Promote and Kick).
+- The leader's START is greyed until everyone's ready; a member's button reads READY, then "READY ✓". A line under it,
+  its room always kept: "Waiting for Maya to ready up", "Everyone's ready.", "Eric picks the boss and the difficulty."
+- A member's tiles are muted and the arrows greyed (the leader's boss and difficulty); promoted, they keep them.
+- Alone in a party (nobody joined yet), START is still Boss alone's. START with others: everyone joins the battle (the
+  party's pass and their seat); the settings are core's `bossPartySettings`, the same as the server's.

@@ -453,6 +453,8 @@ export interface NetPartyMember {
   look?: ItemLook;
   ready?: boolean;
   bot?: true;
+  /** Their account (View profile). */
+  uid?: string;
 }
 
 /**

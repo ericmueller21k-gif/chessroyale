@@ -212,7 +212,15 @@
         "packages/app/src/boss-difficulty.ts",
         "packages/app/src/power-words.ts"
       ],
-      "specs": ["e2e/boss-select.spec.ts", "e2e/home-ranked.spec.ts"]
+      "specs": ["e2e/boss-select.spec.ts", "e2e/home-ranked.spec.ts", "e2e/boss-party.spec.ts"]
+    },
+    "Boss Battle's party (docs/decisions/2026-10-30-boss-party.md)": {
+      "paths": [
+        "packages/server/src/boss-party.ts",
+        "packages/server/src/squads-party.ts",
+        "packages/app/src/components/BossParty.tsx"
+      ],
+      "specs": ["e2e/boss-party.spec.ts", "e2e/boss-select.spec.ts", "e2e/squads.spec.ts"]
     },
     "the God King": {
       "paths": [

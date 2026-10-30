@@ -33,6 +33,8 @@ export interface PartyMember {
   look?: ItemLook;
   ready?: boolean;
   bot?: true;
+  /** Their account (a Boss Battle party: View profile). */
+  userId?: string;
 }
 
 /** What START asks the party's Durable Object to make: the battle, a lobby for these members (boss-party). */
@@ -120,7 +122,7 @@ export class PartyCore {
         id: m.id,
         name: m.name,
         connected: m.connected,
-        ...(boss ? { seat: m.seat ?? 0, ready: !!m.ready, ...(m.look && Object.keys(m.look).length ? { look: m.look } : {}), ...(m.bot ? { bot: true as const } : {}) } : {}),
+        ...(boss ? { seat: m.seat ?? 0, ready: !!m.ready, ...(m.look && Object.keys(m.look).length ? { look: m.look } : {}), ...(m.bot ? { bot: true as const } : {}), ...(m.userId ? { uid: m.userId } : {}) } : {}),
       })),
       max: this.max,
       ...(boss && this.r.boss ? { boss: { ...this.r.boss } } : {}),
@@ -144,7 +146,7 @@ export class PartyCore {
     return this.r.leaderId;
   }
 
-  connect(token: string | undefined, opts: { name?: string; device?: "phone" | "computer"; v?: number; look?: unknown }): { ok: true; memberId: string } | { ok: false; message: string } {
+  connect(token: string | undefined, opts: { name?: string; device?: "phone" | "computer"; v?: number; look?: unknown; userId?: string }): { ok: true; memberId: string } | { ok: false; message: string } {
     const now = this.io.now();
     this.r.activeAt = now;
     if (opts.v !== SQUADS_PROTOCOL) return { ok: false, message: "Update the app to play Squads (reload the page)." };
@@ -161,7 +163,7 @@ export class PartyCore {
     if (this.r.members.length >= this.max) return { ok: false, message: "This party is full." };
     const id = `m${++this.r.counter}`;
     const name = seatName(opts.name, `Player ${this.r.members.length + 1}`);
-    const member: PartyMember = { id, name, token: this.random(), connected: true, device: opts.device === "phone" ? "phone" : "computer", joinedAt: now, ...(this.r.kind === "boss" ? { seat: this.freeSeat(), look: cleanLook(opts.look) } : {}) };
+    const member: PartyMember = { id, name, token: this.random(), connected: true, device: opts.device === "phone" ? "phone" : "computer", joinedAt: now, ...(this.r.kind === "boss" ? { seat: this.freeSeat(), look: cleanLook(opts.look), ...(opts.userId ? { userId: opts.userId } : {}) } : {}) };
     this.r.members.push(member);
     this.r.leaderId ??= id;
     this.io.send(id, { t: "welcome", v: SQUADS_PROTOCOL, memberId: id, token: member.token, code: this.r.code });

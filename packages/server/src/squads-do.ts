@@ -435,7 +435,7 @@ export class SquadsParty extends DurableObject<Env> {
       const token = typeof msg.token === "string" ? msg.token : undefined;
       const known = token ? this.record.members.find((m) => m.token === token) : undefined;
       if (known) ws.serializeAttachment({ ...attached, playerId: known.id });
-      const result = core.connect(token, { name: attached.name ?? (typeof msg.name === "string" ? msg.name : undefined), device: msg.device === "phone" ? "phone" : "computer", v: msg.v, look: msg.look });
+      const result = core.connect(token, { name: attached.name ?? (typeof msg.name === "string" ? msg.name : undefined), device: msg.device === "phone" ? "phone" : "computer", v: msg.v, look: msg.look, ...(attached.userId ? { userId: attached.userId } : {}) });
       if (!result.ok) return refuse(result.message);
       if (!known) {
         ws.serializeAttachment({ ...attached, playerId: result.memberId });

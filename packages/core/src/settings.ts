@@ -703,6 +703,26 @@ export const BOSS_CLOCK = { bankSeconds: 600, incrementSeconds: 10 } as const;
 export const BOSS_PARTY = { max: 3, closeCp: 30, afkKickSec: 60, joinWaitSec: 30 } as const;
 
 /**
+ * A Boss Battle party's battle's settings (docs/decisions/2026-10-30-boss-party.md), the server's and the app's alike: a
+ * raid of up to BOSS_PARTY.max on the draw rule "party", BOSS_CLOCK as the team's one clock, any member's God King call
+ * for the team, and the boss at the leader's difficulty (its Maia rating and its offset, as Boss alone). The boss itself
+ * (`bossId`) is the caller's to add: a playable one, else random.
+ */
+export function bossPartySettings(difficulty: string): Partial<Settings> {
+  const d = BOSS_DIFFICULTY.find((x) => x.id === difficulty) ?? BOSS_DIFFICULTY.find((x) => x.id === "normal")!;
+  return {
+    ...RAID_SETTINGS,
+    ...bossClockSettings({ bossMaxMoves: RAID_SETTINGS.bossMaxMoves ?? DEFAULT_SETTINGS.bossMaxMoves }),
+    lobbySize: BOSS_PARTY.max,
+    groupSize: BOSS_PARTY.max,
+    drawRuleByStage: ["party"],
+    kingAnyCall: true,
+    bossDifficulty: d.elo,
+    bossAloneMaia: d.maia,
+  };
+}
+
+/**
  * A move's centipawns from the mover's expected score (0 to 1), by Lichess's win-chance curve (expected = 1 / (1 +
  * e^(-0.00368208 cp))), as the judge measures expected scores, not centipawns. Kept inside +-2000 (a decided position).
  */

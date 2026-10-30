@@ -9451,6 +9451,179 @@ button.fd-logo {
   width: 62%;
   height: 62%;
 }
+/* ---- Boss Battle's party on the stage (Eric, Oct 29; docs/decisions/2026-10-30-boss-party.md) ----
+   The invite circle is a button over its platform; a member stands there instead, their own dressed pawn at the back
+   platforms' scale, its feet on the platform's middle; over a head, the leader's crown and a ready member's check (Eric's
+   picture's green check in a white circle). A tap on a member opens a small menu above their head. Nothing moves. */
+.bs-inv-btn,
+.bs-mate {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.bs-inv-btn:disabled {
+  cursor: default;
+}
+.bs-mate {
+  z-index: 1;
+}
+.bs-mate > .fd-pawn {
+  position: absolute;
+  left: -35%;
+  width: 170%;
+  bottom: 24%;
+  pointer-events: none;
+}
+.bs-mate .fd-pawn-stage {
+  display: block;
+}
+.bs-head {
+  position: absolute;
+  left: 50%;
+  top: 19%;
+  width: 0;
+  height: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 2px;
+  z-index: 3;
+  pointer-events: none;
+}
+.bs-me {
+  z-index: 1;
+}
+.bs-head-me {
+  top: 19%;
+}
+.bs-head > * {
+  flex: none;
+}
+.bs-check {
+  display: grid;
+  place-items: center;
+  width: max(22px, 9cqi);
+  height: max(22px, 9cqi);
+  border-radius: 50%;
+  background: #fff;
+  border: 1.5px solid #1d1f24;
+  color: #16a34a;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+.bs-head-me .bs-check {
+  width: max(26px, 11cqi);
+  height: max(26px, 11cqi);
+}
+.bs-check svg {
+  width: 72%;
+  height: 72%;
+}
+.bs-crown {
+  display: block;
+  width: max(22px, 10cqi);
+}
+.bs-head-me .bs-crown {
+  width: max(26px, 12cqi);
+}
+.bs-crown svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.bs-menu-on .dv-st-plat {
+  box-shadow: 0 0 0 2px var(--fd-gold), 0 3px 7px rgba(0, 0, 0, 0.2);
+}
+.bs-menu-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 59;
+}
+/* The member menu: above their head, opening to their right (clear of your pawn and its crown), their name its title. */
+.bs-menu {
+  position: absolute;
+  z-index: 60;
+  bottom: 84%;
+  width: 200px;
+  padding: 4px 6px;
+  background: var(--fd-panel);
+  border: 1px solid var(--fd-line);
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+  font-family: Archivo, system-ui, sans-serif;
+  text-align: left;
+}
+.bs-menu-l {
+  left: 2%;
+  --caret: 12%;
+}
+.bs-menu-r {
+  left: 62%;
+  --caret: 17%;
+}
+.bs-menu::after {
+  content: "";
+  position: absolute;
+  left: calc(var(--caret) - 7px);
+  bottom: -8px;
+  width: 14px;
+  height: 14px;
+  background: var(--fd-panel);
+  border-right: 1px solid var(--fd-line);
+  border-bottom: 1px solid var(--fd-line);
+  transform: rotate(45deg);
+}
+.bs-menu-title {
+  padding: 6px 10px 4px;
+  font-family: "Archivo Black", Archivo, sans-serif;
+  font-size: 15px;
+  color: var(--fd-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bs-menu button {
+  display: block;
+  width: 100%;
+  min-height: 42px;
+  padding: 0 10px;
+  border: 0;
+  border-top: 1px solid var(--fd-line);
+  background: none;
+  text-align: left;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fd-text);
+  cursor: pointer;
+}
+.bs-menu button:disabled {
+  color: var(--fd-dim);
+  cursor: default;
+}
+.bs-menu .bs-danger {
+  color: #c22222;
+}
+/* A member's view: the boss and the difficulty are the leader's (the tiles muted, not tappable; the picked one stays). */
+.bs-theirs .bs-tile:not(.on) {
+  opacity: 0.5;
+  filter: saturate(0.6);
+}
+.bs-theirs .bs-tile {
+  cursor: default;
+}
+/* The line under START / READY: its room always kept, so nothing moves when it changes. */
+.bs-line {
+  min-height: 1.4em;
+  margin: 10px 0 0;
+  text-align: center;
+  font-size: 14px;
+  color: var(--fd-muted);
+}
 /* Its words: a room over the stage (three lines of the bubble), the bubble at its foot, over the boss's side. */
 .bs-say {
   position: relative;
@@ -21761,4 +21934,10 @@ button.sq-tiny {
   .bs-vs {
     font-size: 32px;
   }
+}
+/* Boss Battle's invite sheet (components/BossParty.tsx): Squads' invite rows; admins' bot buttons side by side. */
+.bp-bots {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
 }
