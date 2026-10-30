@@ -11057,9 +11057,16 @@ button.fd-seat {
  */
 @media (min-width: 1024px) {
   .fd-root.framed.fd-on-home .fd-center,
-  .fd-root.framed.fd-on-town .fd-center,
   .fd-root.framed.fd-on-queue .fd-center {
     max-width: 1080px;
+  }
+  /* The town fills everything between the menu and the right column, top to bottom (Eric, Oct 30). Its bar is the right column's top row, where
+     the profile button is on other pages (that row keeps its height here, the button not shown: Profile is in the menu). */
+  .fd-root.framed.fd-on-town .fd-center {
+    max-width: none;
+  }
+  .fd-root.framed.fd-on-town .fd-right > .fd-top-right {
+    visibility: hidden;
   }
   .fd-root.framed .fd-home {
     padding: 24px 24px 28px;

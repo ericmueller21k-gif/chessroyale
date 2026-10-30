@@ -20,6 +20,37 @@
   position: relative;
   inset: auto;
   height: var(--app-h);
+  overflow: visible;
+}
+/* In the frame the bar is the right column's top row (Eric, Oct 30), over the row the profile button has on other pages: the same 24 px down, 44 px
+   high, the round buttons 44 px as that button is. It sits over the right column, so the world needs none of its height. */
+.town-screen.in-frame .town-bar {
+  position: fixed;
+  z-index: 6;
+  top: calc(var(--banner-h, 0px) + 24px);
+  right: 12px;
+  width: calc(var(--fd-rail) - 25px);
+  height: 44px;
+  padding: 0;
+  gap: 8px;
+  border-bottom: 0;
+  background: none;
+}
+.town-screen.in-frame .town-bar h1 {
+  min-width: 0;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (min-width: 1440px) {
+  .town-screen.in-frame .town-bar h1 {
+    font-size: 18px;
+  }
+}
+.town-screen.in-frame .town-back {
+  width: 44px;
+  height: 44px;
 }
 .town-bar {
   flex: none;

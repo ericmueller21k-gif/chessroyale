@@ -75,7 +75,9 @@ test("the town square at /town: the world is drawn and fills its box under the b
   const bar = (await page.locator(".town-bar").boundingBox())!;
   const cv = (await canvas(page).boundingBox())!;
   const wide = test.info().project.name === "desktop" ? (await page.locator(".fd-center").boundingBox())!.width : vp.width;
-  expect(Math.abs(cv.y - (bar.y + bar.height)), "the world starts right under the bar").toBeLessThanOrEqual(1.5);
+  // (A computer's bar is the right column's top row, Oct 30: its world starts at the window's top.)
+  const computer = test.info().project.name === "desktop";
+  expect(Math.abs(cv.y - (computer ? 0 : bar.y + bar.height)), computer ? "the world starts at the window's top" : "the world starts right under the bar").toBeLessThanOrEqual(1.5);
   expect(Math.abs(cv.width - wide), "as wide as the screen (a computer's: its center column)").toBeLessThanOrEqual(1);
   expect(Math.abs(cv.y + cv.height - vp.height), "down to the screen's foot").toBeLessThanOrEqual(1);
 
