@@ -59,7 +59,10 @@ const READABLE = (
   ITEMISH
     ? ["packages/app/src/components/Items.tsx", "packages/core/src/crates.ts", "scripts/boss-art/item-kit.tsx", ".claude/agents/item-builder.md", "packages/app/src/characters"]
     : ["packages/app/src/characters", "packages/app/src/town/houses", ".claude/agents/characters.md", "docs/areas/bosses.md", "docs/areas/town-square.md", "scripts/boss-art/out/folio", "scripts/boss-art/out/sidekick-jefferson-sonnet-2", "scripts/boss-art/out/rank-wood", "scripts/boss-art/out/rank-sublime", "scripts/boss-art/out/rank-top-transcendent", "scripts/boss-art/briefs"]
-).map((p) => resolve(p));
+)
+  // BOSS_ART_READ: more paths it may read, comma-separated (a redo reading its first try).
+  .concat((process.env.BOSS_ART_READ ?? "").split(",").filter(Boolean))
+  .map((p) => resolve(p));
 const refs = refsDir ? readdirSync(refsDir).filter((f) => /\.(png|jpe?g|webp|gif)$/i.test(f)).sort() : [];
 const IMG_TYPE: Record<string, "image/png" | "image/jpeg" | "image/webp" | "image/gif"> = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif" };
 

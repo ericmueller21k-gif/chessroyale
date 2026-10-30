@@ -11,7 +11,7 @@ import * as DRAFT from "virtual:draft";
 import { Pawn, usePaint, type Finish, type ItemDraft, type RiderDraft } from "./item-kit.tsx";
 
 interface Req {
-  mode: "item" | "rider";
+  mode: "item" | "rider" | "sheet";
   /** Which frames of the motion to show big (default all, at most 8). */
   frames?: number[];
   /** Rider mode: which animation the big row shows. */
@@ -57,10 +57,10 @@ const REF_FRAME: Record<string, [number, number, number, number]> = {
   "ninja-gi": [20, 15, 60, 76],
   snowman: [16, 6, 68, 88],
 };
-const fin = (color: string, blemish = 0, seed = 4242): Finish => ({ color, blemish, seed });
-const GROUND = "#2a2d34";
+export const fin = (color: string, blemish = 0, seed = 4242): Finish => ({ color, blemish, seed });
+export const GROUND = "#2a2d34";
 
-function Label({ children }: { children: ComponentChildren }) {
+export function Label({ children }: { children: ComponentChildren }) {
   return <div style={{ font: "12px sans-serif", color: "#d1d5db", textAlign: "center", marginTop: "2px" }}>{children}</div>;
 }
 function Row({ title, children }: { title: string; children: ComponentChildren }) {
@@ -83,7 +83,7 @@ function Cell({ label, children }: { label: string; children: ComponentChildren 
 // ---------------- Items ----------------
 
 /** The draft's art with its paint, in the square's coordinates. */
-function DraftLayer({ d, finish, side, f }: { d: ItemDraft; finish: Finish; side: "w" | "b"; f: number }) {
+export function DraftLayer({ d, finish, side, f }: { d: ItemDraft; finish: Finish; side: "w" | "b"; f: number }) {
   const box = d.shineBox ?? d.frame;
   const p = usePaint(finish, box);
   const p2 = usePaint({ ...finish, color: finish.color2 ?? finish.color, seed: finish.seed + 101 }, box);
@@ -99,7 +99,7 @@ function DraftLayer({ d, finish, side, f }: { d: ItemDraft; finish: Finish; side
 }
 
 /** The draft worn on a pawn, as Avatar draws it: behind or in front of the pawn, shifted to its anchor, capped. */
-function OnPawn({ d, finish, side, f, px, ground = true }: { d: ItemDraft; finish: Finish; side: "w" | "b"; f: number; px: number; ground?: boolean }) {
+export function OnPawn({ d, finish, side, f, px, ground = true }: { d: ItemDraft; finish: Finish; side: "w" | "b"; f: number; px: number; ground?: boolean }) {
   const shift = ANCHOR[d.slot] !== undefined && d.attach !== undefined ? ANCHOR[d.slot]! - d.attach : 0;
   const art = (
     <g clip-path="url(#cap)" transform={`translate(0 ${shift})`}>
@@ -127,12 +127,12 @@ function OnPawn({ d, finish, side, f, px, ground = true }: { d: ItemDraft; finis
 }
 
 /** An existing item on a pawn, for the style. */
-function RefOnPawn({ def, px, side = "w" }: { def: string; px: number; side?: "w" | "b" }) {
+export function RefOnPawn({ def, px, side = "w", color = "cobalt" }: { def: string; px: number; side?: "w" | "b"; color?: string }) {
   const skin = def === "captains-coat" || def === "ninja-gi" || def === "snowman";
   return (
     <svg width={px} height={px} viewBox="0 0 100 100" style={{ overflow: "visible", background: GROUND, display: "block" }}>
       {!skin && <Pawn side={side} />}
-      <ItemLayer def={def} finish={fin("cobalt", 25)} side={side} />
+      <ItemLayer def={def} finish={fin(color, 25)} side={side} />
     </svg>
   );
 }
@@ -253,7 +253,7 @@ function Squares({ n = 2 }: { n?: number }) {
   );
 }
 
-function RiderView({ d, finish, side, anim, f, scale, move = false }: { d: RiderDraft; finish: Finish; side: "w" | "b"; anim: "idle" | "move"; f: number; scale: number; move?: boolean }) {
+export function RiderView({ d, finish, side, anim, f, scale, move = false }: { d: RiderDraft; finish: Finish; side: "w" | "b"; anim: "idle" | "move"; f: number; scale: number; move?: boolean }) {
   const w = move ? RB.w + 100 : RB.w;
   return (
     <svg width={w * scale} height={RB.h * scale} viewBox={`${RB.x} ${RB.y} ${w} ${RB.h}`} style={{ background: GROUND, display: "block" }}>
@@ -352,7 +352,7 @@ function measure(): object {
 }
 
 const root = document.getElementById("app")!;
-try {
+if (req.mode !== "sheet") try {
   if (req.mode === "item") {
     if (!item) throw new Error(`the draft exports no item (an object with id, slot, frame, motion and Art); exports: ${Object.keys(DRAFT).join(", ") || "none"}`);
     render(<ItemPage d={item} />, root);
