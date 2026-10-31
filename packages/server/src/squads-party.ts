@@ -35,7 +35,7 @@ export interface PartyMember {
   look?: ItemLook;
   ready?: boolean;
   bot?: true;
-  /** Their account (a Boss Battle party: a kick bans the account; the battle admits only it to their seat). */
+  /** Their account (a Boss Battle party: View profile; a kick bans the account; the battle admits only it to their seat). */
   userId?: string;
 }
 
@@ -136,7 +136,7 @@ export class PartyCore {
         id: m.id,
         name: m.name,
         connected: m.connected,
-        ...(boss ? { seat: m.seat ?? 0, ready: !!m.ready, ...(m.look && Object.keys(m.look).length ? { look: m.look } : {}), ...(m.bot ? { bot: true as const } : {}) } : {}),
+        ...(boss ? { seat: m.seat ?? 0, ready: !!m.ready, ...(m.look && Object.keys(m.look).length ? { look: m.look } : {}), ...(m.bot ? { bot: true as const } : {}), ...(m.userId ? { uid: m.userId } : {}) } : {}),
       })),
       max: this.max,
       ...(boss && this.r.boss ? { boss: { ...this.r.boss } } : {}),

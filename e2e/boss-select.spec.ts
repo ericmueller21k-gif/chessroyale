@@ -657,7 +657,7 @@ test("Boss Battle (Eric, Oct 29): home's card and the screen's header say so; fi
   // (Boxes on the page, not the window: a tap may scroll the page a little, which moves nothing in it.)
   const frame = () => page.evaluate(() => [".bs-stage", ".bs-start", ".bs-diff", ".bs-dots", ".bs-back.bs-l", ".bs-back.bs-r"].map((q) => { const r = document.querySelector(q)!.getBoundingClientRect(); return [r.x + scrollX, r.y + scrollY, r.width, r.height]; }));
   await expect(page.locator(".bs-dot")).toHaveCount(5);
-  await expect(page.getByRole("img", { name: "Invite a friend (coming soon)" })).toHaveCount(2);
+  await expect(page.getByRole("button", { name: "Invite a friend", exact: true })).toHaveCount(2);
   await expect(page.locator(".bs-back")).toHaveCount(2);
   // Medium is the default (id normal); step down to the end, then up to the other end, then each stop holds.
   await expect(level).toHaveText("Medium");

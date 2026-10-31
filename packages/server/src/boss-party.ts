@@ -1,4 +1,4 @@
-import { BOSS_DIFFICULTY, BOSS_PARTY, DEFAULT_SETTINGS, RAID_SETTINGS, bossClockSettings, bossDef, isPlayable } from "@chessroyale/core";
+import { BOSS_PARTY, bossDef, bossPartySettings, isPlayable } from "@chessroyale/core";
 import type { LobbyRecord, PartyLobby } from "./lobby.ts";
 import type { BossStart } from "./squads-party.ts";
 
@@ -13,20 +13,8 @@ import type { BossStart } from "./squads-party.ts";
  * - never ranked (LobbyCore.ranked), scored as a raid.
  */
 export function bossPartyOverrides(s: Pick<BossStart, "boss" | "difficulty">): NonNullable<LobbyRecord["overrides"]> {
-  const d = BOSS_DIFFICULTY.find((x) => x.id === s.difficulty) ?? BOSS_DIFFICULTY.find((x) => x.id === "normal")!;
   const pick = s.boss && isPlayable(bossDef(s.boss)) ? { bossId: s.boss, bossPicked: s.boss } : {};
-  const overrides = {
-    ...RAID_SETTINGS,
-    ...bossClockSettings({ bossMaxMoves: RAID_SETTINGS.bossMaxMoves ?? DEFAULT_SETTINGS.bossMaxMoves }),
-    lobbySize: BOSS_PARTY.max,
-    groupSize: BOSS_PARTY.max,
-    drawRuleByStage: ["party" as const],
-    kingAnyCall: true,
-    bossDifficulty: d.elo,
-    bossAloneMaia: d.maia,
-    ...pick,
-  };
-  return JSON.parse(JSON.stringify(overrides)) as NonNullable<LobbyRecord["overrides"]>;
+  return JSON.parse(JSON.stringify({ ...bossPartySettings(s.difficulty), ...pick })) as NonNullable<LobbyRecord["overrides"]>;
 }
 
 /** The battle's party record (LobbyRecord.party) from START, its members given until `startBy` to arrive. */

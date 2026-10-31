@@ -1,4 +1,4 @@
-import { LEAVING, SQUADS, type ItemLook, type MercItem } from "@chessroyale/core";
+import { LEAVING, SQUADS, type BossDifficultyId, type ItemLook, type MercItem } from "@chessroyale/core";
 import { toSan, type MoveScore } from "@chessroyale/chess";
 import {
   SQUADS_PROTOCOL,
@@ -1008,18 +1008,20 @@ const LIFTED: Record<BlockLift, string> = { impossible: "that move isn't possibl
 
 // ---------------- Parties ----------------
 
-const partyKey = (code: string) => `brc.party.${code.toUpperCase()}`;
-const PARTY_CURRENT = "brc.party.current";
+/** A party's kind: Squads', or Boss Battle's (docs/decisions/2026-10-30-boss-party.md; /api/boss/party). */
+export type PartyKind = "squads" | "boss";
+const partyKey = (code: string, kind: PartyKind = "squads") => `brc.${kind === "boss" ? "bossparty" : "party"}.${code.toUpperCase()}`;
+const partyCurrentKey = (kind: PartyKind) => (kind === "boss" ? "brc.bossparty.current" : "brc.party.current");
 /** The party this device was last in (after a lobby, "Back to your party" reopens it). */
-export const currentParty = () => {
-  const c = stored(PARTY_CURRENT);
-  return c && /^[A-Z2-9]{5}$/.test(c) && stored(partyKey(c)) ? c : null;
+export const currentParty = (kind: PartyKind = "squads") => {
+  const c = stored(partyCurrentKey(kind));
+  return c && /^[A-Z2-9]{5}$/.test(c) && stored(partyKey(c, kind)) ? c : null;
 };
 
-/** GET /api/squads/party/CODE: open or not; null when it can't tell. */
-export async function partyStatus(code: string): Promise<boolean | null> {
+/** GET /api/squads/party/CODE (or Boss Battle's): open or not; null when it can't tell. */
+export async function partyStatus(code: string, kind: PartyKind = "squads"): Promise<boolean | null> {
   try {
-    const res = await fetch(`/api/squads/party/${encodeURIComponent(code)}`, { signal: AbortSignal.timeout(5000) });
+    const res = await fetch(`/api/${kind}/party/${encodeURIComponent(code)}`, { signal: AbortSignal.timeout(5000) });
     if (res.status === 404) return false;
     if (!res.ok) return null;
     return !!((await res.json()) as { open?: boolean }).open;
@@ -1028,12 +1030,12 @@ export async function partyStatus(code: string): Promise<boolean | null> {
   }
 }
 
-/** POST /api/squads/party: a new party's code. */
-export async function createParty(): Promise<{ code: string } | { error: string } | { banned: true }> {
+/** POST /api/squads/party (or Boss Battle's): a new party's code. */
+export async function createParty(kind: PartyKind = "squads"): Promise<{ code: string } | { error: string } | { banned: true }> {
   // (?pool=NAME: a queue of its own, a test switch.)
-  const pool = testParams().get("pool");
+  const pool = kind === "squads" ? testParams().get("pool") : null;
   try {
-    const res = await fetch(`/api/squads/party${pool ? `?pool=${encodeURIComponent(pool)}` : ""}`, { method: "POST" });
+    const res = await fetch(`/api/${kind}/party${pool ? `?pool=${encodeURIComponent(pool)}` : ""}`, { method: "POST" });
     const body = (await res.json().catch(() => ({}))) as { code?: string; message?: string; banned?: boolean };
     if (body.banned) return { banned: true };
     return body.code ? { code: body.code } : { error: body.message ?? "Couldn't make a party." };
@@ -1060,7 +1062,9 @@ export class PartyClient {
 
   constructor(
     readonly code: string,
-    private readonly onPlaced: (lobby: string, pass: string) => void,
+    /** Placed: the lobby, its pass, and (a Boss Battle party) your seat in it. */
+    private readonly onPlaced: (lobby: string, pass: string, seat: number) => void,
+    readonly kind: PartyKind = "squads",
   ) {}
 
   subscribe(fn: () => void): () => void {
@@ -1077,18 +1081,23 @@ export class PartyClient {
 
   /** The invite link. */
   get link() {
-    return `${location.origin}/squads/party/${this.code}`;
+    return `${location.origin}/${this.kind}/party/${this.code}`;
+  }
+
+  /** You, as the party has you (a Boss Battle party: your seat, READY). */
+  get me() {
+    return this.party?.members.find((m) => m.id === this.memberId) ?? null;
   }
 
   connect() {
     if (this.done) return;
-    const ws = new WebSocket(`${wsBase()}/api/squads/party/${this.code}/ws`);
+    const ws = new WebSocket(`${wsBase()}/api/${this.kind}/party/${this.code}/ws`);
     this.ws = ws;
     let opened = false;
     ws.onopen = () => {
       opened = true;
       this.retry = 0;
-      this.send({ t: "hello", v: SQUADS_PROTOCOL, token: stored(partyKey(this.code)) ?? undefined, name: playerName(), device: device() });
+      this.send({ t: "hello", v: SQUADS_PROTOCOL, token: stored(partyKey(this.code, this.kind)) ?? undefined, name: playerName(), device: device(), ...(this.kind === "boss" ? { look: account().profile?.locker?.look ?? {} } : {}) });
     };
     ws.onmessage = (e) => this.onMessage(JSON.parse(e.data as string) as PartyServerMessage);
     ws.onclose = () => {
@@ -1097,7 +1106,7 @@ export class PartyClient {
         if (!this.done) this.retryTimer = setTimeout(() => this.connect(), Math.min(8000, 500 * 2 ** this.retry++));
       };
       if (opened) return again();
-      void partyStatus(this.code).then((open) => {
+      void partyStatus(this.code, this.kind).then((open) => {
         if (open === false) {
           this.error = "That party has closed.";
           this.close();
@@ -1115,17 +1124,17 @@ export class PartyClient {
     switch (msg.t) {
       case "welcome":
         this.memberId = msg.memberId;
-        store(partyKey(this.code), msg.token);
-        store(PARTY_CURRENT, this.code);
+        store(partyKey(this.code, this.kind), msg.token);
+        store(partyCurrentKey(this.kind), this.code);
         break;
       case "party": {
         this.party = msg.party;
         const p = msg.party.placed;
         // Placed (a lobby with seats for everyone): join it, once per placing (a reload doesn't join an old one).
-        if (msg.party.state === "placed" && p && String(p.at) !== stored(`${partyKey(this.code)}.placed`)) {
-          store(`${partyKey(this.code)}.placed`, String(p.at));
+        if (msg.party.state === "placed" && p && String(p.at) !== stored(`${partyKey(this.code, this.kind)}.placed`)) {
+          store(`${partyKey(this.code, this.kind)}.placed`, String(p.at));
           this.close();
-          this.onPlaced(p.lobby, p.pass);
+          this.onPlaced(p.lobby, p.pass, this.me?.seat ?? 0);
         }
         break;
       }
@@ -1133,6 +1142,8 @@ export class PartyClient {
         if (msg.banned) showBanNotice();
         this.error = msg.message;
         if (msg.ended || msg.banned || !this.memberId) this.close();
+        // (Kicked: this device forgets the party.)
+        if (msg.ended) this.forget();
         break;
       case "closed":
         this.error = "That party has closed.";
@@ -1149,12 +1160,37 @@ export class PartyClient {
     this.send({ t: "cancel" });
   }
 
+  /** A Boss Battle party: READY (on or off), and the leader's choices, Kick, Promote, START; admins' bot members. */
+  ready(on: boolean) {
+    this.send({ t: "ready", on });
+  }
+  choose(boss: string, difficulty: BossDifficultyId) {
+    this.send({ t: "choose", boss, difficulty });
+  }
+  kick(id: string) {
+    this.send({ t: "kick", id });
+  }
+  promote(id: string) {
+    this.send({ t: "promote", id });
+  }
+  start() {
+    this.send({ t: "start" });
+  }
+  bot(add: boolean) {
+    this.send({ t: "bot", add });
+  }
+
+  /** This device forgets the party (left, or kicked). */
+  private forget() {
+    store(partyKey(this.code, this.kind), null);
+    store(`${partyKey(this.code, this.kind)}.placed`, null);
+    if (stored(partyCurrentKey(this.kind)) === this.code) store(partyCurrentKey(this.kind), null);
+  }
+
   /** Leave the party for good (this device forgets it). */
   leave() {
     this.send({ t: "leave" });
-    store(partyKey(this.code), null);
-    store(`${partyKey(this.code)}.placed`, null);
-    if (stored(PARTY_CURRENT) === this.code) store(PARTY_CURRENT, null);
+    this.forget();
     this.done = true;
     setTimeout(() => this.close(), 150);
   }

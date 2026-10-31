@@ -168,6 +168,13 @@ export class NetMatch implements GameView {
   goneResult?: LobbyResult | null;
   /** Joined by typing a code (not a link, a reload or PLAY). */
   typed = false;
+  /**
+   * A Boss Battle party's battle (docs/decisions/2026-10-30-boss-party.md): the party's pass and your seat, sent with
+   * your first hello; then, from the lobby, every member's seat (their color) and the leader now.
+   */
+  partyPass: string | null = null;
+  partySeat = 0;
+  party: { seats: Record<string, number>; leader: string | null } | null = null;
   /** Back into a match that's already being played (the app opened from scratch): the splash until it shows. */
   resuming = false;
   stage = 0;
@@ -472,7 +479,7 @@ export class NetMatch implements GameView {
         // No storage: join as a new player.
       }
       const device = matchMedia("(pointer: coarse)").matches ? "phone" : "computer";
-      this.send({ t: "hello", token, name: this.playerName, device, practice: this.practice, look: account().profile?.locker?.look ?? {}, lastBoss: lastBoss(), evalBar: evalBarOn() });
+      this.send({ t: "hello", token, name: this.playerName, device, practice: this.practice, look: account().profile?.locker?.look ?? {}, lastBoss: lastBoss(), evalBar: evalBarOn(), ...(this.partyPass && !token ? { party: this.partyPass, seat: this.partySeat } : {}) });
     };
     ws.onmessage = (e) => this.onMessage(JSON.parse(e.data as string) as ServerMessage);
     ws.onclose = () => {
@@ -572,6 +579,7 @@ export class NetMatch implements GameView {
         this.fillAt = m.fillAt ? this.local(m.fillAt) : null;
         this.filledAt = m.filledAt ? this.local(m.filledAt) : null;
         this.botsOff = !!m.botsOff;
+        this.party = m.party ?? null;
         if (!m.started && this.phase.kind !== "lobby") this.phase = { kind: "lobby" };
         // A raid's lobby: Maia's files ahead on a device that may play the boss with it.
         if (this.settings.raid) this.maiaAhead();

@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "preact/hooks";
-import { type MatchmakingType, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
+import { type MatchmakingType, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, bossPartySettings, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
 import { bossInUrl, bossTierFromUrl, chosenBoss, chosenHomeMode, chosenMode, lobbyModeOf, raidInUrl, rememberBossPick } from "./screens/Home.tsx";
 import { lastBoss } from "./boss-history.ts";
 import { unlockAudio } from "./components/Countdown.tsx";
@@ -188,6 +188,8 @@ const rejoinCode = (() => {
  * /squads/test or /squads/test/start: the whole tournament from the first vote, bots in every other seat at once).
  */
 const partyLinkCode = location.pathname.match(/^\/squads\/party\/([A-Za-z2-9]{5})\/?$/)?.[1]?.toUpperCase();
+/** Boss Battle's party: its invite link (/boss/party/CODE) opens the Boss Battle screen in that party. */
+const bossPartyLinkCode = location.pathname.match(/^\/boss\/party\/([A-Za-z2-9]{5})\/?$/)?.[1]?.toUpperCase();
 const squadsLinkCode = location.pathname.match(/^\/squads\/([A-Za-z2-9]{5})\/?$/)?.[1]?.toUpperCase();
 const squadsTestStart = ((m) => (m ? (m[1] === undefined || m[1] === "start" ? "votes" : m[1]) : undefined))(location.pathname.match(/^\/squads\/test(?:\/(start|relay|pairs|final))?\/?$/)) as
   | "votes"
@@ -280,7 +282,7 @@ export function App() {
    */
   const [homeIntent, setHomeIntent] = useState<{ kind: "boss" | "friends"; n: number } | null>(() => (location.pathname === "/bosses" ? { kind: "boss", n: 0 } : null));
   /** The Boss raid screen (the Solo Boss Mode card on home, the side menu's Solo Boss Mode, ?mode=raid). */
-  const [raidOpen, setRaidOpen] = useState(raidInUrl);
+  const [raidOpen, setRaidOpen] = useState(() => raidInUrl() || !!bossPartyLinkCode);
   /** That screen is the full one (?mode=raid, the test link: every raid choice), not the Solo Boss Mode form (Eric, Oct 26). */
   const [raidFull, setRaidFull] = useState(raidInUrl);
   const [legal, setLegal] = useState<LegalPage | null>(() => legalPageOf(location.pathname));
@@ -314,6 +316,9 @@ export function App() {
   const [party, setParty] = useState<PartyClient | null>(null);
   const [partyOpen, setPartyOpen] = useState(!!partyLinkCode);
   const [partyError, setPartyError] = useState<string | null>(null);
+  /** Boss Battle's party (docs/decisions/2026-10-30-boss-party.md): its socket on the Boss Battle screen, and a note. */
+  const [bossParty, setBossParty] = useState<PartyClient | null>(null);
+  const [bossPartyError, setBossPartyError] = useState<string | null>(null);
   const [squadsNote, setSquadsNote] = useState<string | null>(() => (squadsLinkCode && !squadsRejoin ? "That match has ended." : null));
   /**
    * The lobby has closed: home (the address too, so reopening the app lands there) with a note, and your result if
@@ -744,6 +749,52 @@ export function App() {
     setParty(null);
     joinSquads(lobby, pass);
   };
+  /** Boss Battle's party placed in its battle: everyone joins it with the party's pass and their seat. */
+  const bossPlaced = (client: PartyClient) => (lobby: string, pass: string, seat: number) => {
+    const b = client.party?.boss;
+    setBossParty(null);
+    joinLobby(lobby, { party: { pass, seat, boss: b?.id ?? "", difficulty: b?.difficulty ?? "normal" } });
+  };
+  const joinBossParty = async (code: string) => {
+    setBossPartyError(null);
+    const open = await partyStatus(code, "boss");
+    if (open === false) return setBossPartyError("That party has closed.");
+    const p: PartyClient = new PartyClient(code.toUpperCase(), (lobby, pass, seat) => bossPlaced(p)(lobby, pass, seat), "boss");
+    setBossParty((old) => {
+      old?.close();
+      return p;
+    });
+    if (location.pathname.startsWith("/boss/party")) history.replaceState(null, "", `/${location.search}`);
+    p.connect();
+  };
+  /** The Boss Battle screen's invite circles: your party (made the first time), to invite from. */
+  const makeBossParty = async (): Promise<boolean> => {
+    if (bossParty && !bossParty.done) return true;
+    setBossPartyError(null);
+    const r = await createParty("boss");
+    if ("banned" in r) {
+      showBanNotice();
+      return false;
+    }
+    if ("error" in r) {
+      setBossPartyError(r.error);
+      return false;
+    }
+    await joinBossParty(r.code);
+    return true;
+  };
+  const leaveBossParty = () => {
+    bossParty?.leave();
+    setBossParty(null);
+  };
+  // (An invite link, or back on the Boss Battle screen after its battle: into the party, once.)
+  useEffect(() => {
+    if (bossPartyLinkCode) void joinBossParty(bossPartyLinkCode);
+  }, []);
+  useEffect(() => {
+    const code = currentParty("boss");
+    if (raidOpen && !match && code && (!bossParty || bossParty.done)) void joinBossParty(code);
+  }, [raidOpen, !!match]);
   const joinParty = async (code: string) => {
     setPartyError(null);
     setPartyOpen(true);
@@ -847,7 +898,7 @@ export function App() {
    * Into a lobby by code. A queue lobby (PLAY) brings the queue's own settings (the server's, remembered with the
    * code for a reload); a lobby you made, the mode you made it in.
    */
-  const joinLobby = (code: string, opts: { queue?: "crowd" | "raid"; mode?: ModeChoiceId; typed?: boolean; resume?: boolean } = {}) => {
+  const joinLobby = (code: string, opts: { queue?: "crowd" | "raid"; mode?: ModeChoiceId; typed?: boolean; resume?: boolean; party?: { pass: string; seat: number; boss: string; difficulty: string } } = {}) => {
     const key = `brc.queue.${code.toUpperCase()}`;
     let queue = opts.queue;
     try {
@@ -860,9 +911,16 @@ export function App() {
     unlockAudio();
     setError(null);
     const m = new NetMatch(code.toUpperCase(), playerName(), enginePool, queue ? false : practiceOn());
-    m.settings = queue
-      ? { ...DEFAULT_SETTINGS, ...(queue === "raid" ? RAID_SETTINGS : modeSettings("crowd", { augments: true })) }
-      : { ...DEFAULT_SETTINGS, ...overridesFromUrl(opts.mode) };
+    m.settings = opts.party
+      ? { ...DEFAULT_SETTINGS, ...bossPartySettings(opts.party.difficulty), ...(opts.party.boss ? { bossId: opts.party.boss } : {}) }
+      : queue
+        ? { ...DEFAULT_SETTINGS, ...(queue === "raid" ? RAID_SETTINGS : modeSettings("crowd", { augments: true })) }
+        : { ...DEFAULT_SETTINGS, ...overridesFromUrl(opts.mode) };
+    if (opts.party) {
+      m.partyPass = opts.party.pass;
+      m.partySeat = opts.party.seat;
+      m.auto = true;
+    }
     // The queue shows at once (not "Connecting…"); the lobby confirms it.
     if (queue) m.auto = true;
     // A code typed into Join that leads nowhere is "Can't join", not the note.
@@ -1451,6 +1509,7 @@ export function App() {
         intent={homeIntent}
         raid={raidOpen}
         full={raidFull}
+        bossParty={{ client: bossParty, error: bossPartyError, onInvite: makeBossParty, onLeave: leaveBossParty }}
         onBossArena={nav.bossArena}
         onRaid={(open) => {
           setRaidOpen(open);
