@@ -118,6 +118,15 @@ decisions. In this order:
 
 Eric: "too big a change for now". Recorded so they aren't lost; nothing gets built until he says so.
 
+- **The beaver builder** (Eric, Oct 20): a new boss who builds pieces in a workshop above the board from scrap wood (one
+  scrap every 15 s), drops each finished piece in, and whose ultimate gnaws one of your pawns into 8 scraps; beaver tokens
+  for the players facing him unlock a beaver hat. Orange hard hat and vest, yellow tool belt, planks on his back. Full
+  notes: [docs/ideas/beaver-builder.md](docs/ideas/beaver-builder.md).
+- **Boss Series Crate #1** (Eric, Oct 29): one item from every boss, rides as the rarest. Art drawn (Oct 30–31); the crate
+  itself isn't built. Notes: [docs/ideas/boss-series-crate.md](docs/ideas/boss-series-crate.md).
+- **Bosses think out loud** (Eric, Oct 24): engine-based lines in each boss's voice, and call-outs on the player's move.
+  Notes: [docs/ideas/bosses-think-out-loud.md](docs/ideas/bosses-think-out-loud.md).
+
 - **A plain boss mode.** Bare-bones chess against Stockfish at a choice of difficulty levels: no God King, no powers,
   no power-ups. Eric thinks many players will want exactly this.
 - **How a 50 v 50 plays out, as a pre-game vote** (another vote round, like format and speed), so players choose each
