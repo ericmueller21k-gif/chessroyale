@@ -106,6 +106,7 @@
     "packages/app/public/licenses/**",
     "packages/app/god-king-preview.html",
     "packages/app/items-preview.html",
+    "packages/app/rides-bake.html",
     "packages/app/src/dev/**",
     "packages/maia-worker/LICENSE",
     "packages/maia-worker/licenses/**",
@@ -614,6 +615,8 @@
         "packages/app/src/screens/Crates.tsx",
         "packages/app/src/components/Cosmetics.tsx",
         "packages/app/src/components/Items.tsx",
+        "packages/app/src/components/item-paint.tsx",
+        "packages/app/src/components/rides/**",
         "packages/app/src/components/PixelIcon.tsx",
         "packages/app/src/icon-pixels.ts"
       ],

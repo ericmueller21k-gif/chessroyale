@@ -45,14 +45,16 @@ import { BarsIcon, SwordsIcon } from "./CardIcons.tsx";
 import { TownChat } from "./TownChat.tsx";
 import { TownChatTools } from "./TownChatTools.tsx";
 import { Press } from "./press.ts";
-import { PAWN_PX, Renderer, pawnImage, type Hit } from "./render.ts";
+import { PAWN_HEAD, PAWN_PX, Renderer, pawnImage, type Hit, type YouArt } from "./render.ts";
+import { Rider, rideSheet, type RiderPawn } from "./rides.ts";
 import { painter2d, type Backend, type Painter } from "./paint.ts";
 import { painterGL } from "./paint-gl.ts";
 import { reportTownFallback } from "../problems.ts";
 import type { TownGlFallback } from "@chessroyale/core";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
 import { BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, tdist, tick, townLine, waitingBot, walkWalker, type HomeId, seatOf, seatText, type Person, type Place, type Seat, type Sq, type StatueId, type Target } from "./world.ts";
-import { dressedPawn, lookKey } from "./you-look.ts";
+import { dressedPawn, lookKey, offRide } from "./you-look.ts";
+import type { ItemLook } from "@chessroyale/core";
 import type { BotGameAsk } from "./TownPage.tsx";
 import "./town.css";
 
@@ -426,15 +428,50 @@ function startTown(
   let sky = pinned ?? clock();
   let skyAt = performance.now();
   r.setSky(sky);
-  // Your pawn as your profile shows it (your crate items), drawn again only when your look changes; plain meanwhile.
+  // Your pawn as your profile shows it (your crate items), drawn again only when your look changes; plain meanwhile. On your
+  // ride if you wear one (Oct 31): its frames with you on them composed once (rides.ts), the last ones kept until they're ready.
   let youLook: string | null = null;
   const dress = () => {
     const look = account().profile?.locker?.look;
     const key = lookKey(look);
     if (key === youLook) return;
     youLook = key;
-    if (!key) r.youArt = null;
-    else void dressedPawn(look, pawnImage("light", null), PAWN_PX).then((art) => youLook === key && alive && (r.youArt = art));
+    const wear = offRide(look);
+    const mount = (art: YouArt | null) => {
+      if (!look?.ride || !rideSheet(look.ride.def)) return void (r.youRider = null);
+      ride(look.ride, art, pawnImage("light", null), (rd) => (youLook === key && alive ? void (r.youRider = rd) : rd.drop()));
+    };
+    if (!lookKey(wear)) {
+      r.youArt = null;
+      mount(null);
+    } else
+      void dressedPawn(wear, pawnImage("light", null), PAWN_PX).then((art) => {
+        if (youLook !== key || !alive) return;
+        r.youArt = art;
+        mount(art);
+      });
+  };
+  /** A rider (rides.ts) for a pawn wearing `ride`: its dressed picture (or the plain pawn) on it; `done` once it's ready. */
+  const ride = (on: NonNullable<ItemLook["ride"]>, art: YouArt | null, plain: HTMLCanvasElement, done: (rd: Rider) => void) => {
+    const sheet = rideSheet(on.def);
+    const pawn: RiderPawn = art ?? { img: plain, pad: 0, top: PAWN_HEAD - 0.75 / 45 };
+    if (sheet) new Rider(sheet, on.color, pawn, done);
+  };
+  /** Someone else's pawn (a bot, the test player; real players later) as the square draws it, made once: its items, its ride. */
+  const dressPerson = (p: Person) => {
+    const lk = p.look;
+    if (isSprite(lk) || !lk.wear) return;
+    const plain = pawnImage(lk.side, lk.tint);
+    const on = lk.wear.ride;
+    const mount = (art: YouArt | null) => on && ride(on, art, plain, (rd) => (alive ? r.riders.set(p.id, rd) : rd.drop()));
+    const wear = offRide(lk.wear);
+    if (!lookKey(wear)) mount(null);
+    else
+      void dressedPawn(wear, plain, PAWN_PX).then((art) => {
+        if (!alive) return;
+        if (art) r.botArt.set(p.id, art);
+        mount(art);
+      });
   };
   const offAccount = onAccountChange(dress);
   dress();
@@ -447,10 +484,7 @@ function startTown(
   }
   // The bots' dressed pawns, drawn once now (their crate items over their pawns), never per frame; plain meanwhile. (The
   // sidekicks' frames are cut from their sheets as the renderer is made.)
-  for (const p of town.bots) {
-    const lk = p.look;
-    if (!isSprite(lk) && lk.wear) void dressedPawn(lk.wear, pawnImage(lk.side, lk.tint), PAWN_PX).then((art) => art && alive && r.botArt.set(p.id, art));
-  }
+  for (const p of town.bots) dressPerson(p);
   // `/town?fps`, anyone's (Eric, Oct 30: no admin needed, the site is behind Cloudflare Access): a pill in the world's top-right
   // corner, "60 fps · 16.7 ms", frames over the last second and their mean time, the text set twice a second. Plain counters in
   // the frame loop, nothing else.
@@ -933,8 +967,9 @@ function startTown(
 
   // A test hook (e2e, with the test switches on: test-switches.ts): where to tap a boss, a home or the Colosseum (its gate)
   // now, in the box.
-  const hookAt = (kind: "boss" | "home" | "coliseum" | "statue" | "table" | "lamp" | "light" | "bot" | "player", id?: HomeId | StatueId | "coliseum" | number | string) => {
+  const hookAt = (kind: "boss" | "home" | "coliseum" | "statue" | "table" | "lamp" | "light" | "bot" | "player" | "square", id?: HomeId | StatueId | "coliseum" | number | string | readonly [number, number]) => {
     const out = { x: 0, y: 0 };
+    if (kind === "square") return testSwitchesAllowed() && Array.isArray(id) && r.squareAt(id[0]!, id[1]!, out) ? out : null;
     if (kind === "player") return testSwitchesAllowed() && r.tapPoint("person", town.people.findIndex((p) => p.uid === id), out) ? out : null;
     if (kind === "bot") return testSwitchesAllowed() && r.tapPoint("person", town.people.findIndex((p) => p.bot === BOTS[Number(id)]), out) ? out : null;
     if (kind === "table") return testSwitchesAllowed() && r.tapPoint("table", Number(id), out) ? out : null;
@@ -1055,11 +1090,29 @@ function startTown(
     town.turnMs = ms;
     town.nextTurnAt = 0;
   };
-  // ... `__townPlayer(uid, name, icon?, rating?)`: a test player (a pawn with an account id: a real player's card, whose picture opens
-  // their profile) stands still beside you; answers its index in the people. The real town has no players yet.
-  const hookPlayer = (uid: string, name: string, icon?: string, rating?: number): number => (testSwitchesAllowed() ? addTestPlayer(town, { uid, name, icon, rating }) : -1);
+  // ... `__townPlayer(uid, name, icon?, rating?, wear?)`: a test player (a pawn with an account id: a real player's card, whose picture
+  // opens their profile) stands still beside you, wearing `wear` (crate items, a ride: as others see a player); answers its index in
+  // the people. The real town has no players yet.
+  const hookPlayer = (uid: string, name: string, icon?: string, rating?: number, wear?: ItemLook): number => {
+    if (!testSwitchesAllowed()) return -1;
+    const i = addTestPlayer(town, { uid, name, icon, rating, wear });
+    dressPerson(town.people[i]!);
+    return i;
+  };
   // ... `__townFull(on)`: someone unseen on one stool of every table (no table free for you and a bot: its card's Play greys), or not.
   const hookFull = (on: boolean) => testSwitchesAllowed() && fillTables(town, on);
+  // ... `__townRide()` (Oct 31, rides): yours (its ride and color, whether its frames are ready, as the last frame drew it: "idle" or
+  // "move" ("" on foot), the frame, which way it faced; your box, foot and head on screen, your square) and each other rider's.
+  const hookRide = () => {
+    if (!testSwitchesAllowed()) return null;
+    const you = town.people.indexOf(town.you);
+    const h = town.you.walker.here();
+    const rd = r.youRider;
+    return {
+      you: { ride: rd?.sheet.id ?? null, color: rd?.color ?? null, ready: !!rd?.ready, ...r.youRide, box: r.drawnBox(you), at: [h.c, h.r] },
+      others: [...r.riders].map(([id, x]) => ({ id, ride: x.sheet.id, color: x.color, ready: x.ready, box: r.drawnBox(town.people.findIndex((p) => p.id === id)) })),
+    };
+  };
   // ... `__townHold(on)`: the frame loop stops (the last frame stays, nothing moves) or goes on; `__townBackend("2d" | "webgl")`:
   // the drawing's backend from now on (on a new canvas; the held frame drawn again), answering the one it got; `__townPaint()`:
   // the backend and the last frame's draw calls (WebGL's; 0 for Canvas 2D). For the comparison of the two (e2e/town-webgl.spec.ts).
@@ -1088,7 +1141,7 @@ function startTown(
     const p = painter as Painter & { uploads?: number; resets?: number };
     return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0 };
   };
-  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townBackend?: typeof hookBackend; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench };
+  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townBackend?: typeof hookBackend; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townRide?: typeof hookRide };
   hooks.__townAt = hookAt;
   hooks.__townGlide = hookGlide;
   hooks.__townGather = hookGather;
@@ -1106,6 +1159,7 @@ function startTown(
   hooks.__townBackend = hookBackend;
   hooks.__townPaint = hookPaint;
   hooks.__townBench = hookBench;
+  hooks.__townRide = hookRide;
 
   run();
   draw(performance.now()); // the first frame, before the screen shows
@@ -1177,6 +1231,7 @@ function startTown(
       delete hooks.__townBackend;
       delete hooks.__townPaint;
       delete hooks.__townBench;
+      delete hooks.__townRide;
       painter.dispose();
       if (card?.kind === "boss") town.bosses[card.i]!.held = false;
       detach();
@@ -1184,7 +1239,7 @@ function startTown(
   };
 }
 
-const POSE = { x: 0, y: 0, hop: 0, tilt: 0 };
+const POSE = { x: 0, y: 0, hop: 0, tilt: 0, step: false, t: 0 };
 /** How long a lost WebGL context may stay lost before the town goes back to Canvas 2D (it's usually back within a second). */
 const LOST_WAIT_MS = 5000;
 /** The frame-rate pill's name for each backend. */

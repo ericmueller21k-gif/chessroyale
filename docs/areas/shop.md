@@ -29,13 +29,26 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
      second stripe color comes from its seed instead, `secondColor`, so it's never stored);
   3. **its purity**: 100% minus a blemish of 0–100% (blotches over that share of its color); shiny at 90%+.
   Crates are opened on the server, so nobody can make themselves a Pearl crown. `CRATES_FREE` is on while testing.
-- **Items** have a slot (head, face, skin, weapon), are drawn on the pawn's 100 × 100 square, and fit by anchors
+- **Items** have a slot (head, face, skin, weapon, ride: `ITEM_SLOTS`, the server's check too), are drawn on the pawn's 100 × 100 square, and fit by anchors
   (head, face, eyes, neck, mouth: each piece's own lines; a mustache sits at the mouth, under a snowman's carrot).
   Every face item is tagged above or below a hat (`faceLayer` in crates.ts; Eric, Oct 30): goggles and shades are drawn
   over a hat, every other face item under it (a smiley under a pirate hat's brim). A new face item must say which.
   Weapons don't move with the piece: they're drawn where every piece's side (or shoulder) is. Your
   pawn wears your equipped items on the vote board, the cut screen and your profile; other players' looks come with
   them into a lobby; bots wear simple seeded outfits (`BOT_LOOKS`).
+- **Rides** (Oct 31: [2026-10-31-rides.md](../decisions/2026-10-31-rides.md)): items in the `ride` slot, one at a time, that your pawn
+  sits on: **Riding Chirp** (the saddle, its flap and the collar take the color) and **Moon's Ride** (the moon does), both Mythic, with
+  a color, a purity and shine like every item. **In no crate yet** (the crate comes later): only admins have them (admins own one of
+  every item, another PR). The drawings were copied as drawn from `claude/boss-art` (`scripts/boss-art/out/riding-chirp/` and
+  `moon-ride/`, Oct 30; their `summary.md` there has the artist's notes) into `components/rides/` (`kit.ts`: the types, `RIDES`).
+  Each is a `Back` and a `Front` with the pawn between them, raised onto its seat, maybe tilted and hidden below the seat (`pose`), and
+  two animations: `idle` and `move` (one square of the town's walk). Drawn: the locker's tile (`ItemArt`: the ride with a white pawn
+  on it), the locker's preview and the profiles' pawn (`Avatar`'s `ride`: the pawn and its items on its ride, its idle playing, fitted
+  into the same box, so a box never grows), the profile's Wearing rows (last), and the town square (baked sheets: town-square.md,
+  "Rides"). **Not drawn** (the pawn alone, as before): a match's screens, the Colosseum's crowd, home's pawn and the menu's ring, the
+  queue's and Squads' cards, the boss stage, the town's person card, and the public profile's Equipped Cosmetics row (four tiles at
+  most; its View all lists the ride). Changing a ride's drawing, the paint or the colors: `npx tsx scripts/bake-rides.ts` (a test
+  fails until it's run).
 - **The locker** keeps each item you own (its color, blemish and seed) and what's equipped in each slot; it can
   delete items. God King effects from the shop are worn there too.
 - **The icon builder** (the profile): a 48 × 48 pixel drawing with a paint bucket and undo (`UNDO_STEPS`), saved as a
@@ -48,6 +61,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 | Item list, tiers, colors, crate odds, rolls | `packages/core/src/crates.ts` |
 | Shop cosmetics | `packages/core/src/shop.ts`; drawn by `packages/app/src/components/Cosmetics.tsx` |
 | Item drawings, fit, cards (`ItemArt`, `Avatar`); crate and box art (`WinterCrateArt`, `PresentArt`, `BetaCrateArt`, `SupplyBoxArt`) | `packages/app/src/components/Items.tsx` |
+| The paint every item uses (color, blotches, shine, `Region`, `LINE`) | `packages/app/src/components/item-paint.tsx` (moved out of Items.tsx, Oct 31) |
+| Rides' drawings (`RIDES`) | `packages/app/src/components/rides/`; their town sheets: `scripts/bake-rides.ts` |
 | Crate page, opening strip, reveal, locker UI (`CRATE_LOOKS`: each crate's art and box) | `packages/app/src/screens/Crates.tsx`; the shop `screens/Shop.tsx` |
 | Server rolls and storage (D1 `items`, `equipped_items`) | `packages/server/src/locker.ts`; the shop's API in `api.ts` / `accounts.ts` |
 | Bots' outfits | `packages/core/src/bot-looks.ts`, `packages/app/src/looks.ts` |
@@ -60,15 +75,17 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 
 ## Tests and tools
 
-- Unit: `packages/core/test/crates.test.ts`, `bot-looks.test.ts`, `packages/server/test/accounts.test.ts`,
+- Unit: `packages/core/test/crates.test.ts` (rides: their slot, no crate, a look keeping its ride), `bot-looks.test.ts`, `packages/server/test/accounts.test.ts` (a ride in the ride slot only),
   `shop-buy.test.ts` (buying with coins, `SHOP_FREE` off), `packages/app/test/blotches.test.ts`, `gift-tube.test.ts`,
   `icon-pixels.test.ts`.
-- e2e: `e2e/icon-editor.spec.ts`, `crate-banner.spec.ts`, `profile.spec.ts`.
+- e2e: `e2e/icon-editor.spec.ts`, `crate-banner.spec.ts`, `profile.spec.ts` (rides: the locker's Ride tab, the preview riding in boxes that
+  don't move, the profile's pawn riding and Wearing; `giveItems` in `e2e/helpers.ts` gives items no crate holds, straight in the local
+  database).
 - The Fischer Random banner (`.fischer-stage` in styles.css): its band slants but the words stay level, so its padding
   must clear the words' ends (about 0.06 of their width); `crate-banner.spec.ts` measures that every frame.
 - The fitting sheet: `npm run preview:items -- <scratch>/sheet.png items=<id>[,<id>]` (read the PNG; keep it out of
   the repo). `sheet=1` gives a short sheet to show a batch (cards, both pawns, `colors=`, `outfits=a+b;c`). `scale=1` or `scale=2`
-  renders at that display scale, to look for stray pixels.
+  renders at that display scale, to look for stray pixels. A ride shows ridden on every skin (`with=pirate-hat` for a hat on the rider).
 
 ## Rules for this area (from `.claude/LESSONS.md`)
 

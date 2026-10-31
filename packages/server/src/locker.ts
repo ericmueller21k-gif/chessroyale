@@ -1,4 +1,4 @@
-import { CRATES_FREE, crateDef, itemDef, mulberry32, rollCrate, type CrateRoll, type ItemInstance, type ItemLook, type ItemSlot } from "@chessroyale/core";
+import { CRATES_FREE, ITEM_SLOTS, crateDef, itemDef, mulberry32, rollCrate, type CrateRoll, type ItemInstance, type ItemLook, type ItemSlot } from "@chessroyale/core";
 import type { Sql, Stmt } from "./accounts.ts";
 
 /**
@@ -107,9 +107,9 @@ export async function openCrate(
   return { ok: true, roll, item: { id, def: roll.def, color: roll.color, ...(roll.color2 ? { color2: roll.color2 } : {}), blemish: roll.blemish, seed: roll.seed }, locker: await lockerState(sql, userId) };
 }
 
-/** Equips an item you own in its slot, or (item null) empties the slot. */
+/** Equips an item you own in its slot (one of ITEM_SLOTS: a ride's too, since Oct 31), or (item null) empties the slot. */
 export async function equipLocker(sql: Sql, userId: string, slot: unknown, itemId: unknown): Promise<{ ok: true; locker: LockerState } | { ok: false; message: string }> {
-  if (slot !== "head" && slot !== "face" && slot !== "skin" && slot !== "weapon") return { ok: false, message: "No such slot." };
+  if (!ITEM_SLOTS.includes(slot as ItemSlot)) return { ok: false, message: "No such slot." };
   if (itemId === null) {
     await sql.run("DELETE FROM equipped_items WHERE user_id = ? AND slot = ?", userId, slot);
     return { ok: true, locker: await lockerState(sql, userId) };

@@ -1,6 +1,6 @@
 import { devices, expect, type Page } from "@playwright/test";
 import { rankView } from "@chessroyale/core";
-import { named, soloFromHome, switchesOff, test, openBossRaid } from "./helpers.ts";
+import { giveItems, named, soloFromHome, switchesOff, test, openBossRaid } from "./helpers.ts";
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
 
@@ -157,4 +157,51 @@ test("in a match: a bot's name opens a bot's card, yours opens your profile", as
   await board.getByRole("button", { name: "Your profile" }).click();
   await expect(page.locator(".fd-overlay").getByRole("heading", { name: "Solo" })).toBeVisible();
   await expect(page.locator(".fd-overlay").getByRole("button", { name: "Edit name & icon" })).toBeVisible();
+});
+
+test("rides (Oct 31): the locker's Ride tab wears one; the preview's pawns ride it, in its idle, in boxes that don't move or grow; your profile's pawn rides it and Wearing lists it; off again, the pawn alone", async ({ page }) => {
+  await named(page, "Rider");
+  await page.goto("/");
+  await expect(page.locator(".fd-hero-name")).toHaveText("Rider");
+  // (No crate holds a ride yet; only admins have them. Given straight, as admins will own them.)
+  await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 40 }]);
+  await page.reload();
+  await page.getByRole("button", { name: "Your profile" }).click();
+  await page.getByRole("button", { name: "Open locker" }).click();
+  const previews = page.locator(".locker-preview .locker-avatar");
+  await expect(previews).toHaveCount(2);
+  const boxes = () => page.locator(".locker-preview, .locker-preview .locker-avatar, .locker-tabs").evaluateAll((els) => els.map((e) => [...Object.values(e.getBoundingClientRect().toJSON())].map((v) => Math.round(Number(v) * 10) / 10)));
+  const before = await boxes();
+  await expect(page.locator(".locker-preview .avatar.riding")).toHaveCount(0);
+  await page.getByRole("tab", { name: "Ride", exact: true }).click();
+  const tile = page.getByRole("button", { name: /^Riding Chirp, Cobalt, purity 60\.0%/ });
+  // Its tile: the ride with a pawn on it, drawn (not a stand-in).
+  await expect(tile.locator(".item-art svg path")).not.toHaveCount(0);
+  await tile.click();
+  await expect(tile).toContainText("Worn");
+  const riding = page.locator('.locker-preview .avatar.riding[data-ride="riding-chirp"]');
+  await expect(riding).toHaveCount(2);
+  // The pawns ride it inside the same boxes: nothing moved or grew (Eric's "nothing shifts").
+  expect(await boxes()).toEqual(before);
+  for (const r of await riding.all()) {
+    const a = (await r.boundingBox())!;
+    const box = (await r.locator("xpath=..").boundingBox())!;
+    expect([a.x, a.y, a.width, a.height]).toEqual([box.x, box.y, box.width, box.height]);
+  }
+  // Its idle plays: the drawing changes over a couple of seconds.
+  const pic = () => riding.first().innerHTML();
+  const first = await pic();
+  await expect.poll(pic, { timeout: 5_000 }).not.toBe(first);
+  // Your profile: your pawn rides it, and Wearing lists it with its slot. (The locker's Back goes home.)
+  await page.getByRole("button", { name: "Back", exact: true }).first().click();
+  await page.getByRole("button", { name: "Your profile" }).click();
+  await expect(page.locator('.fd-card .avatar.riding[data-ride="riding-chirp"]')).toHaveCount(1);
+  await expect(page.locator(".fd-item").filter({ hasText: "Riding Chirp" })).toContainText("Ride · Cobalt · 60% pure");
+  // Off again: the pawn alone, in the same boxes.
+  await page.getByRole("button", { name: "Open locker" }).click();
+  await page.getByRole("tab", { name: "Ride", exact: true }).click();
+  await page.getByRole("button", { name: /^Riding Chirp, Cobalt/ }).click();
+  await expect(page.locator(".locker-preview .avatar.riding")).toHaveCount(0);
+  await expect(page.locator(".locker-preview .avatar")).toHaveCount(2);
+  expect(await boxes()).toEqual(before);
 });

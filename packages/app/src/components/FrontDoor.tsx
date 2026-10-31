@@ -31,7 +31,8 @@ export function Logo({ onClick }: { onClick?: () => void }) {
 
 /**
  * A dressed pawn (the item-builder's Avatar) in a box with room for what sticks out (a weapon, a crown), and an
- * optional shadow under it. `size` picks the box from the stylesheet.
+ * optional shadow under it. `size` picks the box from the stylesheet. `ride` (the profiles, Oct 31): on its ride, if it
+ * has one on, fitted into the same box.
  */
 /** One hop of the hero pawn (styles.css, `fd-hop`: 1.8 s). */
 const HOP_MS = 1800;
@@ -41,11 +42,13 @@ export function DressedPawn({
   size,
   shadow,
   side = "w",
+  ride = false,
 }: {
   look?: ItemLook;
   size: "hero" | "profile" | "ring" | "card" | "seat" | "side" | "stage" | "avatar";
   shadow?: boolean;
   side?: "w" | "b";
+  ride?: boolean;
 }) {
   const pawn = useRef<HTMLSpanElement>(null);
   // Home's hero pawn hops, on a computer as on a phone, not under reduced motion (Eric: "add the bounce effect every 30
@@ -72,7 +75,7 @@ export function DressedPawn({
   }, [size]);
   const box = (
     <span class="fd-pawn-box">
-      <Avatar look={look} side={side} />
+      <Avatar look={look} side={side} ride={ride} />
     </span>
   );
   return (
@@ -257,8 +260,8 @@ export function LevelRing() {
   );
 }
 
-/** The order worn items are listed in. */
-export const WORN_ORDER: readonly ItemSlot[] = ["skin", "head", "face", "weapon"];
+/** The order worn items are listed in (a ride last, Oct 31). */
+export const WORN_ORDER: readonly ItemSlot[] = ["skin", "head", "face", "weapon", "ride"];
 
 /** The 44 px back button at the top left of a front-door page. */
 export function BackButton({ onClick, label = "Back" }: { onClick: () => void; label?: string }) {

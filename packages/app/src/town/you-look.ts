@@ -17,6 +17,13 @@ const PAD = 0.15;
 /** A key for a look (null: nothing on), to tell when it changed. */
 export const lookKey = (look: ItemLook | null | undefined): string | null => (look && Object.keys(look).length ? JSON.stringify(look) : null);
 
+/** What the pawn itself wears: a look without its ride (Oct 31: the town draws the ride under the dressed pawn, rides.ts). */
+export function offRide(look: ItemLook | null | undefined): ItemLook | null {
+  if (!look?.ride) return look ?? null;
+  const { ride: _, ...rest } = look;
+  return rest;
+}
+
 /**
  * Your dressed pawn at `px` pixels a pawn's box, over `pawn` (the plain pawn's picture, square): resolves to null if
  * there's nothing to wear or an image fails to load (the world then keeps the plain pawn).

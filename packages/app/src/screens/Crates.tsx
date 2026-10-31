@@ -549,13 +549,14 @@ function Reveal({ item, onAgain, onClose }: { item: ItemInstance; onAgain: () =>
 // ---------------- Locker ----------------
 
 type LockerTab = ItemSlot | "all" | "king";
-const LOCKER_TABS: readonly LockerTab[] = ["all", "head", "face", "skin", "weapon", "king"];
+const LOCKER_TABS: readonly LockerTab[] = ["all", "head", "face", "skin", "weapon", "ride", "king"];
 const tabName = (t: LockerTab) => (t === "all" ? "All" : t === "king" ? "God King" : SLOT_NAMES[t]);
 
 /**
  * What you own, and the one place to wear it. Crate items, rarest first, with copies of an item in the same color
  * stacked (×3, the purest on top: that's the one you wear). Then what you got in the shop: God King effects. Tap to
- * wear (tap again to take off); hold a crate item (or right-click it) to delete it. Your avatar shows the result.
+ * wear (tap again to take off); hold a crate item (or right-click it) to delete it. Your avatar shows the result (on its ride,
+ * if you wear one: Oct 31, in the same box).
  * (The pawn hats are crate items now, from the Beta crate.)
  */
 export function LockerPanel({ onShop }: { onShop?: () => void }) {
@@ -580,10 +581,10 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
     <div class="locker">
       <div class="ff-window locker-preview">
         <span class="locker-avatar">
-          <Avatar look={locker.look} side="w" />
+          <Avatar look={locker.look} side="w" ride />
         </span>
         <span class="locker-avatar">
-          <Avatar look={locker.look} side="b" />
+          <Avatar look={locker.look} side="b" ride />
         </span>
       </div>
       <div class="shop-tabs locker-tabs" role="tablist">

@@ -25,10 +25,16 @@ export const TIERS: readonly { id: ItemTier; name: string; color: string }[] = [
 
 export const tierInfo = (id: ItemTier) => TIERS.find((t) => t.id === id)!;
 
-/** Where an item goes on your pawn. A skin replaces the pawn itself (votes and the cut screen, not the board). */
-export type ItemSlot = "head" | "face" | "skin" | "weapon";
+/**
+ * Where an item goes on your pawn. A skin replaces the pawn itself (votes and the cut screen, not the board). A ride (Oct 31)
+ * is something your pawn sits on (a grasshopper, a moon): drawn under it in the town square, the locker and the profile.
+ */
+export type ItemSlot = "head" | "face" | "skin" | "weapon" | "ride";
 
-export const SLOT_NAMES: Record<ItemSlot, string> = { head: "Head", face: "Face", skin: "Skin", weapon: "Weapon" };
+/** Every slot, in the locker's order: one item worn in each at most (the server checks a slot is one of these). */
+export const ITEM_SLOTS: readonly ItemSlot[] = ["head", "face", "skin", "weapon", "ride"];
+
+export const SLOT_NAMES: Record<ItemSlot, string> = { head: "Head", face: "Face", skin: "Skin", weapon: "Weapon", ride: "Ride" };
 
 /**
  * Colors, commonest first: `weight` is the chance out of 100. `hex` paints the item; Opal, Oceanic and Pearl
@@ -140,6 +146,10 @@ export const ITEM_DEFS: readonly ItemDef[] = [
   { id: "katana", name: "Katana", tier: "rare", slot: "weapon", description: "Folded a thousand times. Still can't cut through a fortress." },
   { id: "ninja-hood", name: "Ninja Hood", tier: "epic", slot: "head", description: "Only the eyes show, and they're calculating." },
   { id: "ninja-gi", name: "Ninja Gi", tier: "epic", slot: "skin", description: "A wrap-front gi. The belt is black; you've earned it." },
+  // Rides (Oct 31, Eric): your pawn rides one round the town square. In no crate yet (the crate comes later); for now only
+  // admins have them. The saddle (Riding Chirp) and the moon (Moon's Ride) take the item's color.
+  { id: "riding-chirp", name: "Riding Chirp", tier: "mythic", slot: "ride", description: "Chirp, Chub's trusty grasshopper. Goes one square per hop, and chirps about it the whole way." },
+  { id: "moon-ride", name: "Moon's Ride", tier: "mythic", slot: "ride", description: "A sleepy crescent that gives rides on its way to bed. Mind the horns; it never minds anything." },
 ];
 
 export const itemDef = (id: string) => ITEM_DEFS.find((d) => d.id === id);
@@ -417,7 +427,7 @@ export type ItemLook = Partial<Record<ItemSlot, { def: string; color: string; co
 export function cleanLook(raw: unknown): ItemLook {
   const out: ItemLook = {};
   if (!raw || typeof raw !== "object") return out;
-  for (const slot of ["head", "face", "skin", "weapon"] as const) {
+  for (const slot of ITEM_SLOTS) {
     const v = (raw as Record<string, unknown>)[slot] as Record<string, unknown> | undefined;
     if (!v || typeof v !== "object") continue;
     const d = itemDef(String(v.def));
