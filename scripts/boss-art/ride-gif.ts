@@ -2,7 +2,8 @@
  * One GIF for a ride (Oct 31): the ride and its pawn running right 3 squares, left 3 (the side view mirrored), up 2 (the
  * back view), down 2 (the front view), then standing in its idle, on a patch of the town's floor at the town's scale,
  * with a plain pawn on foot beside it so the ride's size reads at a glance. A strip along the top names the ride and
- * gives its width in squares (red when wider than `TOO_WIDE`). Its own process, like item-render.ts, with no API key.
+ * gives its width in squares and drawing units (red when wider than `TOO_WIDE_UNITS`). Its own process, like item-render.ts,
+ * with no API key.
  *   npx tsx scripts/boss-art/ride-gif.ts <id | draft.tsx> [color] [--out <file or folder>]
  *   npx tsx scripts/boss-art/ride-gif.ts --all [--out <folder>]
  * The GIF is `scripts/boss-art/out/<id>/preview/ride.gif` (not committed), and a copy at `--out`.
@@ -27,8 +28,8 @@ const OUT = join(HERE, "out");
 const TOWN_SCALE = 0.45;
 const SHOW = 2;
 /**
- * A town square in town pixels. The town draws your pawn's whole 100-unit square `youSquares` (1.45) squares across, so a
- * square is 100 / 1.45 = 69 units, not 100 (the ride briefs said "100 units is one square"; in the town it is 1.45).
+ * A town square in town pixels. The town draws your pawn's whole 100-unit box `youSquares` (1.45) squares across, so 100
+ * units is the pawn's box, not a square: one square is 100 / 1.45 = 69 units.
  */
 const SQ_W = Math.round((100 * TOWN_SCALE) / TOWN_FEEL.youSquares);
 /** A square's depth on screen, as the town's camera shows it on a phone zoomed out (the town's default), against its width. */
@@ -44,8 +45,8 @@ function floorAspect(): number {
   return (near.y - far.y) / mid.k;
 }
 const SQ_H = Math.round(SQ_W * floorAspect());
-/** The widest a ride should be (squares, drawn pixels, all frames, all views). */
-const TOO_WIDE = 1.25;
+/** The widest a ride should be, in drawing units (drawn pixels, every frame of every view): 125, about 1.8 town squares. */
+const TOO_WIDE_UNITS = 125;
 /** The floor (render.ts SQ_LIGHT, SQ_DARK) and its seams (groundColors: the square's color x 0.86). */
 const SQ_LIGHT = [238, 197, 139] as const;
 const SQ_DARK = [173, 128, 88] as const;
@@ -53,15 +54,20 @@ const SEAM = 0.86;
 
 // ---------------- The film ----------------
 
-/** The sequence: squares run each way, the whole GIF's aim, the idle at the end and the shortest and longest pause between runs (ms). */
+/**
+ * The sequence: squares run each way; each square takes a bot's step (200 ms, `botStepMs`: your own 90 hides the animation),
+ * the ride's move frames scaled to fit, as the town would; the whole GIF's aim, the idle at the end (the ride's own
+ * timing) and the shortest and longest pause between runs (ms).
+ */
 const RIGHT = 3;
 const LEFT = 3;
 const UP = 2;
 const DOWN = 2;
-const AIM_MS = 11_000;
+const SQUARE_MS = TOWN_FEEL.botStepMs;
+const AIM_MS = 10_000;
 const END_IDLE_MS = 2_500;
 const HOLD_MIN_MS = 350;
-const HOLD_MAX_MS = 1_000;
+const HOLD_MAX_MS = 1_500;
 const MIN_FRAME_MS = 20;
 const MAX_BYTES = 4_000_000;
 const CAPTION_H = 34;
@@ -167,6 +173,7 @@ function mirrorX(img: Buffer, w: number, h: number): Buffer {
 interface Made {
   id: string;
   widthSq: number;
+  widthUnits: number;
   widest: string;
   seconds: number;
   bytes: number;
@@ -228,6 +235,7 @@ async function makeGif(browser: Browser, draft: string, color: string, gifPath: 
     }
     if (clipped) warnings.push("a frame reaches the edge of the picture box (about 3 squares round the pawn's foot): it is cut, and its width understated");
     const widthSq = (widest.units / 100) * TOWN_FEEL.youSquares;
+    const widthUnits = Math.round(widest.units);
 
     // The plain pawn's pictures (and its height).
     await page.evaluate((c) => window.__RIDE.pawn(c as Cell), CELL);
@@ -265,11 +273,8 @@ async function makeGif(browser: Browser, draft: string, color: string, gifPath: 
     let x = homeX;
     let y = homeY;
     const idleOf = (v: View) => info.views[v]!.idleMs;
-    const moveTotal = (v: View) => info.views[v]!.moveMs.reduce((s, m) => s + Math.max(MIN_FRAME_MS, m), 0);
     const viewFor = (want: View): View => (has(want) ? want : "side");
-    const steps = (v: View, n: number) => n * moveTotal(v);
-    const total = steps(viewFor("side"), RIGHT + LEFT) + steps(viewFor("back"), UP) + steps(viewFor("front"), DOWN);
-    const holdMs = Math.round(Math.min(HOLD_MAX_MS, Math.max(HOLD_MIN_MS, (AIM_MS - total - END_IDLE_MS) / 4)));
+    const holdMs = Math.round(Math.min(HOLD_MAX_MS, Math.max(HOLD_MIN_MS, (AIM_MS - (RIGHT + LEFT + UP + DOWN) * SQUARE_MS - END_IDLE_MS) / 4)));
     const hold = (v: View, flip: boolean, ms: number, action: string) => {
       const idle = idleOf(v);
       for (let left = ms, f = 0; left > 0; f++) {
@@ -282,12 +287,14 @@ async function makeGif(browser: Browser, draft: string, color: string, gifPath: 
     const run = (want: View, flip: boolean, dx: number, dy: number, n: number, action: string) => {
       const v = viewFor(want);
       const { moveMs, moveDx } = info.views[v]!;
-      const T = moveTotal(v);
+      // One square takes SQUARE_MS: the move's frames keep their proportions but are scaled to fit.
+      const raw = moveMs.reduce((s, m) => s + m, 0);
+      const fit = raw > 0 ? SQUARE_MS / raw : 1;
       for (let j = 0; j < n; j++)
         for (let k = 0, t = 0; k < moveMs.length; k++) {
-          const ms = Math.max(MIN_FRAME_MS, moveMs[k]!);
+          const ms = moveMs[k]! * fit;
           // The side view travels as it was drawn (dx 0 to 100 a square); the front and back views move in place and the town slides them along evenly.
-          const p = v === "side" ? moveDx[k]! / 100 : (t + ms / 2) / T;
+          const p = v === "side" ? moveDx[k]! / 100 : (t + ms / 2) / SQUARE_MS;
           beats.push({ ms, key: `${v}:move:${k}`, flip: v === "side" && flip, x: Math.round(x + dx * (j + p) * SQ_W), y: Math.round(y + dy * (j + p) * SQ_H), action });
           t += ms;
         }
@@ -306,7 +313,7 @@ async function makeGif(browser: Browser, draft: string, color: string, gifPath: 
     run("front", false, 0, 1, DOWN, `run down (${has("front") ? "front" : "side"} view)`);
     hold("side", false, END_IDLE_MS, "idle");
     const ms = beats.reduce((s, b) => s + b.ms, 0);
-    if (ms < 9_000 || ms > 15_000) warnings.push(`${(ms / 1000).toFixed(1)} s long (aimed for 10 to 14)`);
+    if (ms < 8_000 || ms > 15_000) warnings.push(`${(ms / 1000).toFixed(1)} s long (aimed for about 10)`);
 
     // The pictures the beats use, the caption strips, then every frame.
     const pictures = new Map<string, { img: Buffer; flipped: Buffer }>();
@@ -317,11 +324,11 @@ async function makeGif(browser: Browser, draft: string, color: string, gifPath: 
       const img = (await shoot(page, CELL.cw, CELL.ch)).data;
       pictures.set(b.key, { img, flipped: mirrorX(img, CELL.cw, CELL.ch) });
     }
-    const label = `${widthSq.toFixed(2)} squares wide`;
+    const label = `${widthSq.toFixed(2)} squares (${widthUnits} units)`;
     const captions = new Map<string, Buffer>();
     for (const b of beats) {
       if (captions.has(b.action)) continue;
-      await page.evaluate(([w, h, n, l, o, a]) => window.__RIDE.caption(w as number, h as number, n as string, l as string, o as boolean, a as string), [W * SHOW, CAPTION_H, info.name, label, widthSq > TOO_WIDE, b.action] as const);
+      await page.evaluate(([w, h, n, l, o, a]) => window.__RIDE.caption(w as number, h as number, n as string, l as string, o as boolean, a as string), [W * SHOW, CAPTION_H, info.name, label, widthUnits > TOO_WIDE_UNITS, b.action] as const);
       captions.set(b.action, (await shoot(page, W * SHOW, CAPTION_H)).data);
     }
     const FW = W * SHOW;
@@ -330,7 +337,7 @@ async function makeGif(browser: Browser, draft: string, color: string, gifPath: 
     const rgba = Buffer.alloc(FW * FH * 4);
     const stack = Buffer.alloc(FW * FH * 3 * beats.length);
     const delays: number[] = [];
-    for (let n = 0, at = 0; n < beats.length; n++) {
+    for (let n = 0, target = 0, real = 0; n < beats.length; n++) {
       const b = beats[n]!;
       floor.copy(scene);
       const ride = () => {
@@ -352,9 +359,11 @@ async function makeGif(browser: Browser, draft: string, color: string, gifPath: 
         stack[o + 1] = rgba[i * 4 + 1]!;
         stack[o + 2] = rgba[i * 4 + 2]!;
       }
-      // (A GIF's delays are whole hundredths of a second: rounded on the running total, so they don't drift.)
-      delays.push(Math.max(MIN_FRAME_MS, (Math.round((at + b.ms) / 10) - Math.round(at / 10)) * 10));
-      at += b.ms;
+      // (A GIF's delays are whole hundredths of a second, at least 2: each is rounded on the running total, so they don't drift.)
+      target += b.ms;
+      const d = Math.max(MIN_FRAME_MS, Math.round(target / 10) * 10 - real);
+      delays.push(d);
+      real += d;
     }
     let bytes = Infinity;
     for (const colours of [256, 128, 64, 32]) {
@@ -366,7 +375,7 @@ async function makeGif(browser: Browser, draft: string, color: string, gifPath: 
       warnings.push(`${(bytes / 1e6).toFixed(1)} MB with ${colours} colors; trying fewer`);
     }
     if (bytes > MAX_BYTES) warnings.push(`${(bytes / 1e6).toFixed(1)} MB: over 4 MB`);
-    return { id: info.id, widthSq, widest: widest.at, seconds: delays.reduce((s, d) => s + d, 0) / 1000, bytes, file: gifPath, warnings };
+    return { id: info.id, widthSq, widthUnits, widest: widest.at, seconds: delays.reduce((s, d) => s + d, 0) / 1000, bytes, file: gifPath, warnings };
   } finally {
     await page.close();
   }
@@ -418,7 +427,7 @@ async function main(): Promise<void> {
           copyFileSync(gif, to);
           copy = `, copy at ${to}`;
         }
-        console.log(`${m.id}: ${m.widthSq.toFixed(2)} squares wide${m.widthSq > TOO_WIDE ? " (WIDE)" : ""} (widest: ${m.widest}), ${m.seconds.toFixed(1)} s, ${(m.bytes / 1000).toFixed(0)} KB -> ${gif}${copy}`);
+        console.log(`${m.id}: ${m.widthSq.toFixed(2)} squares (${m.widthUnits} units)${m.widthUnits > TOO_WIDE_UNITS ? " WIDE (over 125 units)" : ""} (widest: ${m.widest}), ${m.seconds.toFixed(1)} s, ${(m.bytes / 1000).toFixed(0)} KB -> ${gif}${copy}`);
         for (const w of m.warnings) console.warn(`  warning: ${m.id}: ${w}`);
       } catch (e) {
         failed.push(j.id);

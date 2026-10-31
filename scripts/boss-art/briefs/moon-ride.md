@@ -21,8 +21,8 @@ looks like a banana boat). **Don't do either.**
 - **Town move:** a **glide** across the square with a slight forward lean (nose a touch down, then level), and a
   **short sparkle trail** behind that fades. One square per move, dx 0 to 100; its last frame leads into the next
   move's first.
-- **Size (Eric: "be cognizant of the horizontal size"):** the whole ride, every frame, stays within **1.25 squares
-  wide**: at most 125 units across, e.g. x from about -12 to 113, stars included in the idle; in the move the trail may
+- **Size (Eric: "be cognizant of the horizontal size"):** the whole ride, every frame, stays within **125 units
+  wide** (about 1.8 town squares): e.g. x from about -12 to 113, stars included in the idle; in the move the trail may
   reach a little further back but keep it short (about 20 units).
 - It must read at town size (a pawn about 45 px) and look great at 4x. Dreamy and sweet. The item style (bold dark
   outlines, flat fills, a highlight or two). Never draw letters or numbers.

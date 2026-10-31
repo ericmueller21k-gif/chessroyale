@@ -16,5 +16,5 @@ tips, a silver band, a wooden handle, a plum seat pad; nothing drips or dangles)
   Same frame count and timing as the side's move; the pose keeps dx about 0. Idle: the side's idle, seen from this end
   (the same bob, sway and little wisp of color from the tips).
 - The painted part stays the bristle tips and the trail of color, on whatever shows from each side. Nothing drips or
-  dangles. Every view within 1.25 squares wide (125 units).
+  dangles. Every view within 125 units wide (about 1.8 town squares).
 - Cap: $3, effort high.

@@ -15,5 +15,5 @@ Add the **front** and **back** views to **Hollow's Bulb** (`hollow-bulb`), the f
   (back view). Same frame count and timing as the side's move; the pose keeps dx about 0. Idle: the side's idle seen
   from this end (the same float and the glow slowly dimming and brightening).
 - The painted part stays the glass, and the glow stays its warm fixed color, on whatever shows from each side. Every
-  view within 1.25 squares wide (125 units).
+  view within 125 units wide (about 1.8 town squares).
 - Cap: $3, effort high.

@@ -18,7 +18,7 @@ Christmas lights; the references show him). It replaces a rejected shadow-beast 
 - **Town move:** it **bobs along** across the square, the cord swinging behind with the motion (lags, then catches
   up). One square per move, dx 0 to 100; its last frame leads into the next move's first.
 - **Size (Eric: "be cognizant of the horizontal size"):** the whole ride, cord included, every frame, stays within
-  **1.25 squares wide**: at most 125 units across, e.g. x from about -12 to 113 on the pawn's 100-unit square.
+  **125 units wide** (about 1.8 town squares): x from about -12 to 113 on the pawn's 100-unit box.
 - It must read at town size (a pawn about 45 px) and look great at 4x. Cozy, spooky-cute, festive. The item style (bold
   dark outlines, flat fills, a highlight or two). Never draw letters or numbers.
 - Tier: mythic. Name it "Hollow's Bulb", id "hollow-bulb". Say in your notes the ride's width in units.

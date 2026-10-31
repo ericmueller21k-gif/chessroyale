@@ -36,11 +36,15 @@ npm run boss-art -- --rider-views <id> <brief.md> [refs dir]     # a finished ri
 npx tsx scripts/boss-art/boss-refs.ts scripts/boss-art/refs/<id> <boss id>[:anim,anim]   # the boss's pictures, as references
 ```
 
-- **The format:** the game's own item format, SVG drawn by Preact on the pawn's 100 × 100 square (Items.tsx), not pixel
+- **The format:** the game's own item format, SVG drawn by Preact on the pawn's 100 × 100 box (Items.tsx), not pixel
   grids. The drawing (`out/<id>/<id>.tsx`) imports `item-kit.tsx`, a copy of Items.tsx's paint (`Region`, `LINE`, `lw`, …),
   and exports an `ItemDraft` (what ITEM_DEFS, ITEM_ART, FRAMES, SHINE_BOX and ATTACH would get) or a `RiderDraft` (a ride
   under the pawn: `Back` and `Front` drawings, its `idle` and its town `move`, and a `pose` per frame that places the pawn,
   its lower part cut off as the town's bench-sit does). A ride can also have `views: { front, back }` (below).
+- **Units and the town's squares:** 100 units is the pawn's box, which the town draws about 1.45 town squares across
+  (`youSquares` in town/feel.ts), so **one square is about 69 units**, not 100. A ride's widest frame, in any view, is at
+  most **125 units** (about 1.8 squares); a pawn's own base is about 51 units (0.74 squares). A move's `dx` 0 to 100 stands
+  for one square of travel: the town fits it to one square (69 units).
 - **Its eyes** (`item-render.ts`, its own process without the key): esbuild bundles `item-harness.tsx` with the drawing and
   Chromium screenshots one picture: the motion frame by frame at 4x on a pawn (240 px), phone size (a 60 px lobby pawn, the
   130 px home pawn, the 64 px locker tile) beside existing items, and every color at 75% purity, 100% and shiny. A ride:
@@ -88,32 +92,31 @@ npx tsx scripts/boss-art/ride-gif.ts scripts/boss-art/fixtures/views-test-ride.t
 
 Instead of contact sheets: one GIF of a ride on the town's floor. No API, no key: it bundles the drawing with
 `ride-gif-harness.tsx` (esbuild), draws each frame in Chromium, and puts the GIF together with sharp. Default color red at
-100%; `[color]` is any item color. About 11 s and 250 to 600 KB (it warns under 9 s or over 15 s, and past 4 MB it
+100%; `[color]` is any item color. About 10 s and 250 to 600 KB (it warns under 8 s or over 15 s, and past 4 MB it
 encodes again with fewer colors).
 
-- **The sequence:** a short stand in the idle, run right 3 squares, a stand, run left 3 (the side view, mirrored), a stand,
+- **The sequence:** a stand in the idle, run right 3 squares, a stand, run left 3 (the side view, mirrored), a stand,
   run up 2 (the back view), a stand, run down 2 (the front view), then the idle for 2.5 s (the side view, facing right, so
-  it loops). The stands turn the ride to the next view and last 0.35 to 1 s, whatever brings the total near 11 s. A ride
-  with no front or back view yet uses its side view for up and down and prints a warning.
-- **Pace:** one move cycle per square, as the ride's own `move.ms` times it (the side view travels as drawn, `dx` 0 to
-  100 over the cycle; the front and back views are slid evenly up or down the screen). The town's own step is one square
-  in `youStepMs` = 90 ms, so a ride whose cycle takes 650 ms runs about seven times slower here than the town walks:
-  the town will have to slow its walk or speed the ride up.
+  it loops). The stands turn the ride to the next view and last 0.35 to 1.5 s (about 1.4 s), whatever brings the total
+  near 10 s; they play the idle at its own timing. A ride with no front or back view yet uses its side view for up and
+  down and prints a warning.
+- **Pace:** each square takes 200 ms, a bot's step (`botStepMs`; your own step, `youStepMs`, is 90 ms and hides the
+  animation), with the move's frames scaled to fit, as the town would play them (the side view travels as drawn, `dx` 0 to
+  100 over the cycle; the front and back views are slid evenly up or down the screen). A ride's `move.ms` is only its
+  proportions here; a cycle drawn at 650 ms is played at 200.
 - **The scale** (Eric: "make sure that they're actually scaled properly… be cognizant of the horizontal size"):
-  - Town size is the render tool's: a pawn's 100-unit square is 45 px (0.45 px a unit); the GIF is that raster, shown 2x
-    with nearest-neighbor. The plain pawn stands 4 squares along from where the ride starts.
-  - **A square is 69 units, not 100.** The town draws your pawn's 100-unit square `youSquares` = 1.45 squares across
-    (feel.ts), so one square is 100 / 1.45 = 31 px here. The ride briefs said "100 units is one square"; in the town a
-    drawing 100 units wide is 1.45 squares wide, and a `move` that travels dx 0 to 100 is played over one square (its
-    shape kept, the distance scaled to 69%).
+  - Town size is the render tool's: a pawn's 100-unit box is 45 px (0.45 px a unit); the GIF is that raster, shown 2x with
+    nearest-neighbor. The plain pawn stands 4 squares along from where the ride starts.
+  - One town square is 100 / 1.45 = 31 px here (69 units); see "Units and the town's squares" above.
   - The floor is the town's (render.ts `SQ_LIGHT`, `SQ_DARK`; seams at 0.86), its squares as deep as the town's camera
     shows them on a phone zoomed out (camera.ts at 390 x 844: 0.92 of their width). Sprites stand upright, as in the town.
-- **The caption strip:** the ride's name and its width in squares, **red above 1.25**, and what it's doing (the view
-  shown). The width is the widest frame of any view (idle and every move frame), measured from the drawn pixels (alpha
-  over 20, on a raster 5x finer than the town's), with its pawn on it and without the pose's `dx`.
-- **First pass** (Oct 31, the 14 rides then under `out/`, before the redraws): 1.21 (boingo-pogo) to 2.66 (smudgy-brush)
-  squares wide, 13 of the 14 over 1.25 (riding-chirp 1.75). The drawings were made on the 100-unit square, which the town
-  shows 1.45 squares wide; the redraws and the briefs to come should aim at 1.25 squares, about 86 units.
+- **The caption strip:** the ride's name, its width as "N.NN squares (U units)", **red above 125 units** (about 1.8
+  squares), and what it's doing (the view shown). The width is the widest frame of any view (idle and every move frame),
+  measured from the drawn pixels (alpha over 20, on a raster 5x finer than the town's), with its pawn on it and without
+  the pose's `dx`.
+- **Widths so far** (Oct 31, the 15 rides under `out/`): 84 units (1.21 squares, boingo-pogo) to 178 (2.58,
+  hollow-steed). Eight are over 125: alfil-howdah 128, balloon-pup 131, ginger-sled 147, hollow-steed 178, moon-ride 146,
+  puddles-mower 170, sawyer-dozer 127, smudgy-brush 152 (riding-chirp is 120). Only riding-chirp has front and back views.
 
 ### Item motion
 
