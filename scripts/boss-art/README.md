@@ -49,7 +49,7 @@ npx tsx scripts/boss-art/boss-refs.ts scripts/boss-art/refs/<id> <boss id>[:anim
 - `BOSS_ART_EFFORT` (default high) and `BOSS_ART_MAX_TOKENS` (default 24,000 for an item, 32,000 for a ride) as for bosses.
 - **Previews:** `out/<id>/preview/` (not committed): every frame (`frames.png`; a ride: `idle.png`, `move.png`) and the
   standard look (`look.png`); a ride with views also `front-idle.png`, `front-move.png`, `back-idle.png`,
-  `back-move.png` and `views.png` (the three side by side, every move frame).
+  `back-move.png` and `views.png` (the three side by side, every move frame); `ride.gif` (below) once you've made it.
 
 ### Rider views: front and back (`--rider-views`, Oct 31)
 
@@ -77,6 +77,42 @@ so the game hides face items then); walking **down**, from the **front** (its fa
   with views a whole row: the three side by side, idle and every move frame (or `frames`), at 4x and at town size.
 - **Test fixture:** `fixtures/views-test-ride.tsx`, a plain pony with all three views (not art), for checking the
   harness: `npx tsx scripts/boss-art/item-render.ts '{"draft":"scripts/boss-art/fixtures/views-test-ride.tsx","mode":"rider","view":"all","out":"<dir>"}'`.
+
+### One GIF per ride (`ride-gif.ts`, Oct 31)
+
+```sh
+npx tsx scripts/boss-art/ride-gif.ts <id> [color] [--out <file or folder>]    # out/<id>/preview/ride.gif, and a copy at --out
+npx tsx scripts/boss-art/ride-gif.ts --all [color] [--out <folder>]           # every ride under out/ with a RiderDraft
+npx tsx scripts/boss-art/ride-gif.ts scripts/boss-art/fixtures/views-test-ride.tsx --out <file>   # a drawing outside out/ (needs --out)
+```
+
+Instead of contact sheets: one GIF of a ride on the town's floor. No API, no key: it bundles the drawing with
+`ride-gif-harness.tsx` (esbuild), draws each frame in Chromium, and puts the GIF together with sharp. Default color red at
+100%; `[color]` is any item color. About 11 s and 250 to 600 KB (it warns under 9 s or over 15 s, and past 4 MB it
+encodes again with fewer colors).
+
+- **The sequence:** a short stand in the idle, run right 3 squares, a stand, run left 3 (the side view, mirrored), a stand,
+  run up 2 (the back view), a stand, run down 2 (the front view), then the idle for 2.5 s (the side view, facing right, so
+  it loops). The stands turn the ride to the next view and last 0.35 to 1 s, whatever brings the total near 11 s. A ride
+  with no front or back view yet uses its side view for up and down and prints a warning.
+- **Pace:** one move cycle per square, as the ride's own `move.ms` times it (the side view travels as drawn, `dx` 0 to
+  100 over the cycle; the front and back views are slid evenly up or down the screen). The town's own step is one square
+  in `youStepMs` = 90 ms, so a ride whose cycle takes 650 ms runs about seven times slower here than the town walks:
+  the town will have to slow its walk or speed the ride up.
+- **The scale** (Eric: "make sure that they're actually scaled properly… be cognizant of the horizontal size"):
+  - Town size is the render tool's: a pawn's 100-unit square is 45 px (0.45 px a unit); the GIF is that raster, shown 2x
+    with nearest-neighbor. The plain pawn stands 4 squares along from where the ride starts.
+  - **A square is 69 units, not 100.** The town draws your pawn's 100-unit square `youSquares` = 1.45 squares across
+    (feel.ts), so one square is 100 / 1.45 = 31 px here. The ride briefs said "100 units is one square"; in the town a
+    drawing 100 units wide is 1.45 squares wide, and a `move` that travels dx 0 to 100 is played over one square (its
+    shape kept, the distance scaled to 69%).
+  - The floor is the town's (render.ts `SQ_LIGHT`, `SQ_DARK`; seams at 0.86), its squares as deep as the town's camera
+    shows them on a phone zoomed out (camera.ts at 390 x 844: 0.92 of their width). Sprites stand upright, as in the town.
+- **The caption strip:** the ride's name and its width in squares, **red above 1.25**, and what it's doing (the view
+  shown). The width is the widest frame of any view (idle and every move frame), measured from the drawn pixels (alpha
+  over 20, on a raster 5x finer than the town's), with its pawn on it and without the pose's `dx`.
+- **Rides now** (Oct 31, the 14 under `out/`, all side views only): 1.21 (boingo-pogo) to 2.66 (smudgy-brush) squares
+  wide; all but boingo-pogo are over 1.25.
 
 ### Item motion
 
