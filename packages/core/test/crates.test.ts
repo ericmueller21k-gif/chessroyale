@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   CRATES,
+  ITEM_SLOTS,
+  SLOT_NAMES,
   aboveHat,
   FISCHER,
   ITEM_COLORS,
@@ -25,11 +27,14 @@ import {
   type CrateDef,
 } from "../src/index.ts";
 
+/** Items in no crate yet (Oct 31: the rides; admins have them, and their crate comes later). One by one, never a whole slot. */
+const NO_CRATE_YET = ["riding-chirp", "moon-ride"];
+
 const crate = crateDef("winter-1")!;
 const beta = crateDef("beta-001")!;
 
 describe("crates", () => {
-  it("the odds add up in every crate, and every item is in exactly one crate", () => {
+  it("the odds add up in every crate, and every item is in exactly one crate (but the rides with no crate yet: theirs comes later)", () => {
     expect(ITEM_COLORS.reduce((s, x) => s + x.weight, 0)).toBeCloseTo(100);
     for (const c of CRATES) {
       expect(c.strip.reduce((s, x) => s + x.weight, 0)).toBe(100);
@@ -38,7 +43,7 @@ describe("crates", () => {
       expect(ITEM_DEFS.reduce((s, d) => s + itemChance(c, d.id), 0)).toBeCloseTo(1);
       expect(new Set(c.items).size).toBe(c.items.length);
     }
-    for (const d of ITEM_DEFS) expect(CRATES.filter((c) => c.items.includes(d.id)).map((c) => c.id), d.id).toHaveLength(1);
+    for (const d of ITEM_DEFS) expect(CRATES.filter((c) => c.items.includes(d.id)).map((c) => c.id), d.id).toHaveLength(NO_CRATE_YET.includes(d.id) ? 0 : 1);
     expect(CRATES.map((c) => c.id)).toEqual(["beta-001", "winter-1"]);
   });
 
@@ -351,5 +356,31 @@ describe("face items over or under a hat", () => {
     expect(ITEM_DEFS.filter((d) => d.faceLayer === "above").map((d) => d.id).sort()).toEqual(["dark-shades", "ski-goggles"]);
     expect(aboveHat("ski-goggles")).toBe(true);
     expect(aboveHat("smiley-face")).toBe(false);
+  });
+});
+
+describe("rides (Oct 31)", () => {
+  it("a slot of their own, one ride at a time, Mythic, in no crate yet (admins only until its crate comes)", () => {
+    expect(ITEM_SLOTS).toEqual(["head", "face", "skin", "weapon", "ride"]);
+    expect(SLOT_NAMES.ride).toBe("Ride");
+    const rides = ITEM_DEFS.filter((d) => d.slot === "ride");
+    expect(rides.map((d) => [d.id, d.name, d.tier])).toEqual([
+      ["riding-chirp", "Riding Chirp", "mythic"],
+      ["moon-ride", "Moon's Ride", "mythic"],
+    ]);
+    for (const d of rides) {
+      expect(CRATES.some((c) => c.items.includes(d.id)), d.id).toBe(false);
+      for (const c of CRATES) expect(itemChance(c, d.id)).toBe(0);
+      expect(d.colors).toBeUndefined();
+      expect(d.faceLayer).toBeUndefined();
+    }
+  });
+
+  it("a look keeps its ride (color, purity, seed) and drops one in another slot or that isn't a ride", () => {
+    const ride = { def: "moon-ride", color: "cobalt", blemish: 37.5, seed: 9 };
+    expect(cleanLook({ ride, head: { def: "beanie", color: "red", blemish: 1, seed: 2 } })).toEqual({ ride, head: { def: "beanie", color: "red", blemish: 1, seed: 2 } });
+    expect(cleanLook({ ride: { def: "beanie", color: "red", blemish: 1, seed: 2 } })).toEqual({});
+    expect(cleanLook({ head: ride })).toEqual({});
+    expect(cleanLook({ ride: { def: "riding-chirp", color: "nope", blemish: 500, seed: -3 } }).ride).toEqual({ def: "riding-chirp", color: "red", blemish: 100, seed: 3 });
   });
 });

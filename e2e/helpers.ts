@@ -349,17 +349,44 @@ export async function asSignedIn(page: Page, label = "player") {
 /** Puts `email` on this page's account in the local database (taking it off any other account first). Answers the id. */
 async function withEmail(page: Page, email: string) {
   const id = ((await (await page.request.get("/api/me")).json()) as { user: { id: string } }).user.id;
-  const sql = `UPDATE users SET email = NULL WHERE email = '${email}'; UPDATE users SET email = '${email}' WHERE id = '${id}'`;
+  await localSql(page, `UPDATE users SET email = NULL WHERE email = '${email}'; UPDATE users SET email = '${email}' WHERE id = '${id}'`);
+  return id;
+}
+
+/** Runs `sql` on the local database (waiting out the server's own writes: SQLITE_BUSY, as `asServerAdmin` says). */
+async function localSql(page: Page, sql: string) {
   for (let attempt = 1; ; attempt++) {
     try {
       execFileSync("npx", ["wrangler", "d1", "execute", "hunchess", "--local", "--command", sql], { stdio: "pipe" });
-      return id;
+      return;
     } catch (e) {
       const why = String((e as { stderr?: unknown }).stderr ?? e);
       if (!why.includes("SQLITE_BUSY") || attempt >= 10) throw new Error(`d1 execute failed (attempt ${attempt}): ${why.slice(-500)}`);
       await page.waitForTimeout(300);
     }
   }
+}
+
+/**
+ * Gives this page's account crate items straight in the local database (for items no crate holds yet, such as the rides, Oct
+ * 31: nobody but admins can get one), at the purity given (default 80%). Answers their ids, in order. Wear one with
+ * `wearItem`; reload for the app to see them.
+ */
+export async function giveItems(page: Page, items: readonly { def: string; color: string; blemish?: number; seed?: number }[]) {
+  const user = ((await (await page.request.get("/api/me")).json()) as { user: { id: string } }).user.id;
+  const ids = items.map((_, i) => `e2e-${user.slice(0, 8)}-${Date.now().toString(36)}-${i}`);
+  const rows = items.map((it, i) => `('${ids[i]}', '${user}', '${it.def}', '${it.color}', ${it.blemish ?? 20}, ${it.seed ?? 7 + i}, 'e2e', 0)`);
+  await localSql(page, `INSERT INTO items (id, user_id, def, color, blemish, seed, crate, created_at) VALUES ${rows.join(", ")}`);
+  return ids;
+}
+
+/** Wears item `id` (one of yours) in `slot`, or takes the slot's item off (null), through the server, as the locker does. */
+export async function wearItem(page: Page, slot: string, id: string | null) {
+  const ok = await page.evaluate(
+    async ([slot, item]) => (await fetch("/api/locker/equip", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slot, item }) })).ok,
+    [slot, id] as const,
+  );
+  expect(ok, `wear ${id} in ${slot}`).toBe(true);
 }
 
 /**

@@ -6973,7 +6973,8 @@ button.history-label {
 }
 .avatar.hb-pieces > piece,
 .avatar > .avatar-items,
-.avatar > .avatar-skin {
+.avatar > .avatar-skin,
+.avatar > .avatar-ride {
   position: absolute;
   inset: 0;
   width: 100%;

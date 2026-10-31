@@ -1,4 +1,4 @@
-import { CRATES_FREE, adminCopies, adminCopyDef, crateDef, isAdminCopy, itemDef, mulberry32, rollCrate, type CrateRoll, type ItemInstance, type ItemLook, type ItemSlot } from "@chessroyale/core";
+import { CRATES_FREE, ITEM_SLOTS, adminCopies, adminCopyDef, crateDef, isAdminCopy, itemDef, mulberry32, rollCrate, type CrateRoll, type ItemInstance, type ItemLook, type ItemSlot } from "@chessroyale/core";
 import type { Sql, Stmt } from "./accounts.ts";
 
 /**
@@ -127,11 +127,12 @@ export async function openCrate(
 }
 
 /**
- * Equips an item you own in its slot, or (item null) empties the slot. `admin`: as lockerState's, so an admin copy (one
- * in their locker, read as it is now) can be worn; what's stored is only which item is worn in the slot, as for any item.
+ * Equips an item you own in its slot (one of ITEM_SLOTS: a ride's too, since Oct 31), or (item null) empties the slot.
+ * `admin`: as lockerState's, so an admin copy (one in their locker, read as it is now) can be worn; what's stored is only which
+ * item is worn in the slot, as for any item.
  */
 export async function equipLocker(sql: Sql, userId: string, slot: unknown, itemId: unknown, admin = false): Promise<{ ok: true; locker: LockerState } | { ok: false; message: string }> {
-  if (slot !== "head" && slot !== "face" && slot !== "skin" && slot !== "weapon") return { ok: false, message: "No such slot." };
+  if (!ITEM_SLOTS.includes(slot as ItemSlot)) return { ok: false, message: "No such slot." };
   if (itemId === null) {
     await sql.run("DELETE FROM equipped_items WHERE user_id = ? AND slot = ?", userId, slot);
     return { ok: true, locker: await lockerState(sql, userId, admin) };

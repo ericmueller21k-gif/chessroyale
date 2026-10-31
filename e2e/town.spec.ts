@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { BOTS, STATUES, TABLES, TOWN_LINES, sidekickText } from "../packages/app/src/town/world.ts";
-import { BOARD_SEL, test } from "./helpers.ts";
+import { BOARD_SEL, giveItems, test, wearItem } from "./helpers.ts";
 
 /**
  * The town square (/town; hidden: docs/areas/town-square.md), on a phone and a computer: the page loads, its world is
@@ -1260,5 +1260,95 @@ test("a real player's card (a test player; no real players walk in the town yet)
   await expect(sheet).toHaveCount(0);
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
   await expect(card).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+/** What `__townRide()` answers (rides, Oct 31). */
+interface RideSeen {
+  you: { ride: string | null; color: string | null; ready: boolean; anim: "" | "idle" | "move"; frame: number; facing: number; box: { x0: number; y0: number; x1: number; y1: number; fx: number; fy: number; hy: number } | null; at: [number, number] };
+  others: { id: string; ride: string; color: string; ready: boolean; box: { y0: number; y1: number; fy: number; hy: number } | null }[];
+}
+const rideNow = (p: Page) => p.evaluate(() => (window as unknown as { __townRide: () => RideSeen }).__townRide());
+
+test("rides (Oct 31): your pawn sits on its ride, the ride's idle standing and its move walking, facing the way it goes; its tag over its top; only that color's sheet fetched; another rider as others see them", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Your profile" })).toBeVisible();
+  // (No crate holds a ride yet: given straight, as only admins have them.)
+  const [chirp] = await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 40 }]);
+  await wearItem(page, "ride", chirp!);
+  const sheets: string[] = [];
+  page.on("request", (r) => /\/ride-[\w-]+\.webp/.test(r.url()) && sheets.push(r.url()));
+  await page.goto("/town?sky=day");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect.poll(async () => (await rideNow(page)).you.ready, { message: "your ride's frames are ready", timeout: 20_000 }).toBe(true);
+  // One sheet: the ride you wear, in your ride's color (none is precached).
+  expect(sheets).toHaveLength(1);
+  expect(sheets[0]).toMatch(/ride-riding-chirp-cobalt/);
+  // Standing: its idle, frame after frame.
+  const seen = new Set<number>();
+  for (let i = 0; i < 24; i++) {
+    const r = await rideNow(page);
+    expect([r.you.ride, r.you.color, r.you.anim]).toEqual(["riding-chirp", "cobalt", "idle"]);
+    seen.add(r.you.frame);
+    await page.waitForTimeout(100);
+  }
+  expect(seen.size).toBeGreaterThanOrEqual(4);
+  // Walking: its move, facing the way it goes (watched every frame from before the tap: a step is 90 ms).
+  await page.evaluate(() => {
+    const w = window as unknown as { __townRide: () => RideSeen; __rideSeen: Set<string> };
+    w.__rideSeen = new Set();
+    const look = () => {
+      const r = w.__townRide();
+      if (r) w.__rideSeen.add(`${r.you.anim}:${r.you.facing}`);
+      requestAnimationFrame(look);
+    };
+    requestAnimationFrame(look);
+  });
+  const walkTo = async (c: number, r: number) => {
+    const at = await page.evaluate(([c, r]) => (window as unknown as { __townAt: (k: string, id: [number, number]) => { x: number; y: number } | null }).__townAt("square", [c, r]), [c, r] as [number, number]);
+    expect(at, `square ${c},${r} on screen`).not.toBeNull();
+    const cv = (await canvas(page).boundingBox())!;
+    await page.mouse.click(cv.x + at!.x, cv.y + at!.y);
+    // (There, or beside it if a bot stands there: one pawn a square.)
+    await expect.poll(async () => Math.abs((await you(page))[0] - c) + Math.abs((await you(page))[1] - r)).toBeLessThanOrEqual(1);
+    await expect.poll(async () => (await rideNow(page)).you.anim).toBe("idle");
+  };
+  // (The bots hold still: none walks across your way.)
+  await page.evaluate(() => (window as unknown as { __townCall: (i: number) => void }).__townCall(-1));
+  const [c0, r0] = await you(page);
+  // A tap on the square right beside you walks you there, as on foot: your ride's reach isn't you (taps take the pawn's box).
+  for (const c of [c0 + 1, c0]) {
+    const at = (await page.evaluate(([c, r]) => (window as unknown as { __townAt: (k: string, id: [number, number]) => { x: number; y: number } | null }).__townAt("square", [c, r]), [c, r0] as [number, number]))!;
+    const cv = (await canvas(page).boundingBox())!;
+    await page.mouse.click(cv.x + at.x, cv.y + at.y);
+    await expect.poll(() => you(page), { message: `beside you: ${c},${r0}` }).toEqual([c, r0]);
+    await expect.poll(async () => (await rideNow(page)).you.anim).toBe("idle");
+  }
+  // (Up the promenade onto the walk, clear of the tables and the lamps, then right, then left.)
+  await walkTo(c0, r0 + 5);
+  await walkTo(c0 + 3, r0 + 5);
+  await walkTo(c0 - 1, r0 + 5);
+  const steps = await page.evaluate(() => [...(window as unknown as { __rideSeen: Set<string> }).__rideSeen]);
+  expect(steps).toEqual(expect.arrayContaining(["move:1", "move:-1", "idle:1", "idle:-1"]));
+  // Stopped: the idle again, facing left as it came.
+  await expect.poll(async () => (await rideNow(page)).you.anim).toBe("idle");
+  expect((await rideNow(page)).you.facing).toBe(-1);
+  // Its tag sits over it (the tag's foot 2 px over its head).
+  const me = (await rideNow(page)).you.box!;
+  const tag = (await page.evaluate(() => (window as unknown as { __townTags: () => { kind: string; y: number; h: number }[] }).__townTags())).find((t) => t.kind === "you")!;
+  expect(tag.y + tag.h).toBeCloseTo(me.hy - 2, 0);
+  // Another rider, as others see them (a test player on Moon's Ride; no real players walk in the town yet): on their ride, drawn
+  // as it, its tag over its head, and its color's sheet fetched once.
+  const look = { ride: { def: "moon-ride", color: "pearl", blemish: 10, seed: 3 } };
+  await page.evaluate(([look]) => (window as unknown as { __townPlayer: (uid: string, name: string, icon?: string, rating?: number, wear?: unknown) => number }).__townPlayer("rider-1", "Moony", undefined, 1500, look), [look]);
+  await expect.poll(async () => (await rideNow(page)).others.map((o) => [o.id, o.ride, o.color, o.ready, !!o.box]), { timeout: 20_000 }).toEqual([["player:rider-1", "moon-ride", "pearl", true, true]]);
+  expect(sheets.filter((u) => /ride-moon-ride-pearl/.test(u))).toHaveLength(1);
+  const moony = (await rideNow(page)).others[0]!.box!;
+  const moonyTag = (await page.evaluate(() => (window as unknown as { __townTags: () => { text: string; y: number; h: number }[] }).__townTags())).find((t) => t.text === "Moony");
+  expect(moonyTag, "the rider's tag").toBeTruthy();
+  expect(moonyTag!.y + moonyTag!.h).toBeCloseTo(moony.hy - 2, 0);
+  expect(moony.hy).toBeLessThan((moony.y0 + moony.fy) / 2);
   expect(errors).toEqual([]);
 });

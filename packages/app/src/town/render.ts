@@ -37,6 +37,7 @@ import type { Ctx, PaintLayer, Painter } from "./paint.ts";
 import type { LightPool, LightSpot } from "./houses/kit.ts";
 import { PARK_BENCH, PARK_FOUNTAIN, PARK_LAMP, PARK_LAMP_HEAD, PARK_LAMP_LIGHTS, PARK_LAMP_POOLS, PARK_TABLE, PARK_TREES, TABLE_BACK_RANK, TABLE_BOARD, TABLE_CLOCK_INK, TABLE_DIGITS, TABLE_INK, TABLE_PIECES, TABLE_RING, TABLE_TOP } from "./houses/park.ts";
 import type { SidekickSheet } from "./sidekick-sheets.ts";
+import type { Rider } from "./rides.ts";
 import { COLISEUM_PLACE, GRASS, LAMPS, PAVING, PROPS, STATUES, TABLES, groundAt, isSprite, onColiseum, plotAt, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town } from "./world.ts";
 import { TAG_STYLE, TagCache, namesMode, tagAlpha, type NamesMode, type TagKind } from "./tags.ts";
 
@@ -175,7 +176,7 @@ const PAWN_PATH =
   "m 22.5,9 c -2.21,0 -4,1.79 -4,4 0,0.89 0.29,1.71 0.78,2.38 C 17.33,16.5 16,18.59 16,21 c 0,2.03 0.94,3.84 2.41,5.03 C 15.41,27.09 11,31.58 11,39.5 H 34 C 34,31.58 29.59,27.09 26.59,26.03 28.06,24.84 29,23.03 29,21 29,18.59 27.67,16.5 25.72,15.38 26.21,14.71 26.5,13.89 26.5,13 c 0,-2.21 -1.79,-4 -4,-4 z";
 export const PAWN_PX = 160;
 /** The pawn's head is this far down its box (its top at y 9 of the piece's 45): name tags sit on it. */
-const PAWN_HEAD = 9 / 45;
+export const PAWN_HEAD = 9 / 45;
 /**
  * And its base's foot (the path's bottom at y 39.5, and half its outline): this point stands on the square's middle, so
  * the base sits on the square. (Slices 1 to 4 stood it at 0.96, about a tenth of a square lower: it seemed to float.)
@@ -585,7 +586,7 @@ export class Renderer {
   private readonly propTop: number[];
   /** This person sits at a chess table (drawn lower, on its stool). */
   private sitting = false;
-  private readonly pose: Pose = { x: 0, y: 0, hop: 0, tilt: 0 };
+  private readonly pose: Pose = { x: 0, y: 0, hop: 0, tilt: 0, step: false, t: 0 };
   private readonly p = newPt();
   /**
    * The scratch canvases for softening things in the far band (`blitSoft`): one for each softened this frame, in turn
@@ -655,6 +656,14 @@ export class Renderer {
   youArt: YouArt | null = null;
   /** Each bot's dressed pawn (its crate items, drawn once when the page opens: Town.tsx), by person id; none: plain. */
   readonly botArt = new Map<string, YouArt>();
+  /**
+   * Your ride with you on it, and anyone else's by person id (Oct 31: rides.ts; set by Town.tsx once every frame is
+   * composed, so nothing is made here): drawn in place of the pawn while not seated at a table.
+   */
+  youRider: Rider | null = null;
+  readonly riders = new Map<string, Rider>();
+  /** (Tests) Your ride as the last frame drew it: the animation ("" on foot), its frame, which way it faced. */
+  readonly youRide = { anim: "" as "" | "idle" | "move", frame: -1, facing: 1 };
   /** Each sidekick's frames, by its sheet: every one cut from it as the town opens (the constructor), never per frame. */
   private readonly spriteArt = new Map<SidekickSheet, SpriteFrames>();
   /** Tag widths by name and size; sign and bubble layouts by text. */
@@ -1287,6 +1296,8 @@ export class Renderer {
         x = pose.x;
         y = pose.y;
         if (it.kind === "boss") margin = 2;
+        // (A ride reaches up to about 1.46 squares from its foot: drawn from that far off the box's sides, so it never pops in.)
+        else if (this.riderOf(people[it.i]!)) margin = 1.5;
       }
       it.dx = wrapF(x - this.camX);
       it.dz = wrapF(y - this.camY);
@@ -1340,7 +1351,9 @@ export class Renderer {
           const art = this.youArt;
           const k = 1 + 2 * (art?.pad ?? 0);
           const pad = art?.pad ?? 0;
-          this.drawSprite(it, art?.img ?? (isSprite(person.look) ? pawnImage("light", null) : pawnImage(person.look.side, person.look.tint)), f.youSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.youHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.youSquares);
+          this.youRide.anim = "";
+          if (this.youRider && !table) this.drawRider(it, this.youRider, pose, facing, f.youSquares, now, this.youRide);
+          else this.drawSprite(it, art?.img ?? (isSprite(person.look) ? pawnImage("light", null) : pawnImage(person.look.side, person.look.tint)), f.youSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.youHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.youSquares);
           if (this.fade > 0.02) this.tag(person.name, it.fx, it.hy - 2, "you", clamp((11 * this.p.k) / v.kf, 8, 12), this.fade);
         } else {
           const lk = person.look;
@@ -1355,11 +1368,13 @@ export class Renderer {
               this.drawSprite(it, sp.at(anim, anim === "wave" ? now - person.waved : now + it.i * 613), sp.squares, sh.foot[0] / sh.w, sh.foot[1] / sh.h, sh.w / sh.h, 0, 0, facing, table ? 0 : f.sidekickShadow, sp.top[anim]);
             } else it.on = false; // (its sheet still loading: not drawn, not tapped)
           } else {
-            // A bot's dressed pawn (its one or two crate items, made once), drawn as yours is.
+            // A bot's dressed pawn (its one or two crate items, made once), drawn as yours is; on its ride if it has one.
             const art = this.botArt.get(person.id);
             const k = 1 + 2 * (art?.pad ?? 0);
             const pad = art?.pad ?? 0;
-            this.drawSprite(it, art?.img ?? pawnImage(lk.side, lk.tint), f.botSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.botHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.botSquares);
+            const rider = this.riders.get(person.id);
+            if (rider && !table) this.drawRider(it, rider, pose, facing, f.botSquares, now + it.i * 577);
+            else this.drawSprite(it, art?.img ?? pawnImage(lk.side, lk.tint), f.botSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.botHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.botSquares);
           }
           // Name tags on the near ones only: not far toward the rim (as before), and (Oct 28, Eric) not far from you either, by default: within
           // `nameRadius` squares of you in both directions, fading over the last square (tags.ts; "Everyone" in Town settings: no near rule).
@@ -2099,6 +2114,42 @@ export class Renderer {
     this.box(it, p.depth, x0, y0, x0 + w, y0 + h, p.x, p.y, y0 + head * h);
   }
 
+  /**
+   * A pawn on its ride (Oct 31, rides.ts): one picture, as a pawn is. Standing, the ride's idle; stepping, its move, one cycle
+   * a step (its frames' times scaled to the step: the walk keeps its pace), lifted by the move's hop instead of the hobble. The
+   * pawn keeps its size (`box`: its pawn's box in squares). Its name tag (and its card) sits over its top standing and doesn't
+   * jump with the hop, as a sidekick's doesn't.
+   */
+  private drawRider(it: Item, rd: Rider, pose: Pose, facing: number, box: number, t: number, seen?: { anim: "" | "idle" | "move"; frame: number; facing: number }): void {
+    if (!proj(this.view, it.dx, it.dz, 0, this.p)) return;
+    const sq = (box * rd.h) / 100;
+    let img: HTMLCanvasElement;
+    let lift = 0;
+    let i: number;
+    if (pose.step) {
+      i = rd.moveIndex(pose.t);
+      img = rd.frames.move[i]!;
+      lift = (rd.sheet.lift[i]! * box) / 100;
+    } else img = rd.frames.idle[(i = rd.idleIndex(t))]!;
+    if (seen) {
+      seen.anim = pose.step ? "move" : "idle";
+      seen.frame = i;
+      seen.facing = facing;
+    }
+    this.drawSprite(it, img, sq, rd.footX, rd.footY, rd.w / rd.h, lift, 0, facing, rd.shadow, rd.top + lift / sq);
+    // Taps: only the pawn's own box across (its picture's, as on foot), not the ride's reach, so a tap on the square beside a
+    // rider walks there as it does beside a pawn.
+    const half = (box * (1 + 2 * rd.pawn.pad) * this.p.k) / 2;
+    it.x0 = Math.max(it.x0, it.fx - half);
+    it.x1 = Math.min(it.x1, it.fx + half);
+  }
+
+  /** The rider a person is drawn as now (their ride's frames ready, not seated at a table), or null: on foot. */
+  private riderOf(p: Person): Rider | null {
+    const rd = p.you ? this.youRider : this.riders.get(p.id);
+    return rd && !seated(p) ? rd : null;
+  }
+
   private box(it: Item, depth: number, x0: number, y0: number, x1: number, y1: number, fx: number, fy: number, hy: number): void {
     it.depth = depth;
     it.x0 = x0;
@@ -2611,6 +2662,20 @@ export class Renderer {
   }
 
   /** A person's item this frame (`i`: its index in the people), or null. */
+  /** Where square (c, r)'s middle is on screen this frame (for tests: to walk somewhere). False if it isn't on screen. */
+  squareAt(c: number, r: number, out: { x: number; y: number }): boolean {
+    if (!proj(this.view, wrapF(c - this.camX), wrapF(r - this.camY), 0, this.p)) return false;
+    out.x = this.p.x;
+    out.y = this.p.y;
+    return out.x > 0 && out.x < this.W && out.y > 0 && out.y < this.H;
+  }
+
+  /** (Tests) Person i as the last frame drew them: their box on screen, their foot and the top of their head (their tag sits on it). */
+  drawnBox(i: number): { x0: number; y0: number; x1: number; y1: number; fx: number; fy: number; hy: number } | null {
+    const it = this.personItem(i);
+    return it?.on ? { x0: it.x0, y0: it.y0, x1: it.x1, y1: it.y1, fx: it.fx, fy: it.fy, hy: it.hy } : null;
+  }
+
   private personItem(i: number): Item | null {
     for (const it of this.items) if (it.kind === "person" && it.i === i) return it;
     return null;

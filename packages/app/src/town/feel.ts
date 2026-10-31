@@ -355,6 +355,13 @@ export const TOWN_FEEL = {
   /** Your pawn. */
   youSquares: 1.45,
   /**
+   * Rides (Oct 31): a pawn on its ride is the size it is on foot (its ride drawn at the pawn's scale: the art's 100 units are
+   * the pawn's box). Each ride's `foot` is the line on its drawing (in those units) that stands on the square's middle, where
+   * a pawn's base stands: the grasshopper's feet, the moon's shadow; `shadow` sizes the shadows under it as a sidekick's
+   * (0: none; the moon floats and draws its own).
+   */
+  rides: { "riding-chirp": { foot: 97, shadow: 1.15 }, "moon-ride": { foot: 96, shadow: 0 } } as Readonly<Record<string, { foot: number; shadow: number }>>,
+  /**
    * The shadows under a pawn (and a boss): the soft one this strong (as before), and a contact shadow right under the
    * base, this share of the pawn's width across (about its base's), this many squares deep, this strong (Eric's slice 4
    * test: "the shadows below never change and makes it look like I'm floating")...

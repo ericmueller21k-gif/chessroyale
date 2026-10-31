@@ -175,6 +175,27 @@ describe("wearing an admin copy", () => {
     expect((await looksOf(sql, [eric.id])).get(eric.id)).toBeUndefined();
   });
 
+  it("a ride (Oct 31, rides): an admin has both rides, wears admin:riding-chirp in the ride slot (only there), and others see it; a player can't", async () => {
+    const { sql, d1, eric, player, ericCookie, playerCookie } = await setup();
+    const on = { DB: d1, ...ENV };
+    const mine = (await call(on, "/api/me", ericCookie)).body.locker.items.map((i: { id: string }) => i.id);
+    expect(mine).toEqual(expect.arrayContaining(["admin:riding-chirp", "admin:moon-ride"]));
+    expect((await call(on, "/api/locker/equip", ericCookie, { slot: "head", item: "admin:riding-chirp" })).body).toEqual({ message: "That doesn't go there." });
+    const worn = await call(on, "/api/locker/equip", ericCookie, { slot: "ride", item: "admin:riding-chirp" });
+    expect(worn.status).toBe(200);
+    expect(worn.body.equipped.ride).toBe("admin:riding-chirp");
+    const look = { def: "riding-chirp", color: "red", blemish: 0, seed: ADMIN_ROLL.seed };
+    expect(worn.body.look.ride).toEqual(look);
+    // Others see it (the public profile, the looks a lobby or the town would get); the moon takes its place, one ride at a time.
+    expect((await call(on, `/api/profile/${eric.id}`, playerCookie)).body.look.ride).toEqual(look);
+    expect((await looksOf(sql, [eric.id], new Set([eric.id]))).get(eric.id)?.ride).toEqual(look);
+    expect((await equipLocker(sql, eric.id, "ride", "admin:moon-ride", true)).ok).toBe(true);
+    expect((await lockerState(sql, eric.id, true)).look.ride?.def).toBe("moon-ride");
+    // A player has none, and can't wear one.
+    expect((await call(on, "/api/me", playerCookie)).body.locker.items.map((i: { def: string }) => i.def)).not.toContain("riding-chirp");
+    expect(await equipLocker(sql, player.id, "ride", "admin:riding-chirp")).toEqual({ ok: false, message: "That isn't yours." });
+  });
+
   it("an item they really get fills the gap: its admin copy goes, and if they wore it, the purest real one shows in the slot (nothing stored changes)", async () => {
     const { sql, eric } = await setup();
     expect((await equipLocker(sql, eric.id, "head", "admin:beanie", true)).ok).toBe(true);

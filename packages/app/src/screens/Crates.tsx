@@ -550,13 +550,14 @@ function Reveal({ item, onAgain, onClose }: { item: ItemInstance; onAgain: () =>
 // ---------------- Locker ----------------
 
 type LockerTab = ItemSlot | "all" | "king";
-const LOCKER_TABS: readonly LockerTab[] = ["all", "head", "face", "skin", "weapon", "king"];
+const LOCKER_TABS: readonly LockerTab[] = ["all", "head", "face", "skin", "weapon", "ride", "king"];
 const tabName = (t: LockerTab) => (t === "all" ? "All" : t === "king" ? "God King" : SLOT_NAMES[t]);
 
 /**
  * What you own, and the one place to wear it. Crate items, rarest first, with copies of an item in the same color
  * stacked (×3, the purest on top: that's the one you wear). Then what you got in the shop: God King effects. Tap to
- * wear (tap again to take off); hold a crate item (or right-click it) to delete it. Your avatar shows the result.
+ * wear (tap again to take off); hold a crate item (or right-click it) to delete it. Your avatar shows the result (on its ride,
+ * if you wear one: Oct 31, in the same box).
  * (The pawn hats are crate items now, from the Beta crate.) An admin's locker has one of everything: an admin copy
  * (core/admin-copies.ts) carries an "Admin" tag, wears like any item and can't be deleted (there's nothing stored).
  */
@@ -568,8 +569,9 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
   const shop = profile?.shop;
   if (!locker) return <p class="muted">Your locker needs your account.</p>;
   const top = (s: ItemStack) => s.items[0]!;
+  // (An item this app doesn't know, e.g. one added since it loaded, as an admin's copy of it: left out, not a crash.)
   const stacks = stackItems(locker.items)
-    .filter((s) => tab === "all" || itemDef(top(s).def)?.slot === tab)
+    .filter((s) => itemDef(top(s).def) && (tab === "all" || itemDef(top(s).def)?.slot === tab))
     .sort((a, b) => tierIndex(top(b).def) - tierIndex(top(a).def) || colorIndex(top(b).color) - colorIndex(top(a).color) || top(a).blemish - top(b).blemish);
   // What you got in the shop: God King effects.
   const fromShop = SHOP_ITEMS.filter((i) => wornFromLocker(i) && shop?.owned.includes(i.id));
@@ -582,10 +584,10 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
     <div class="locker">
       <div class="ff-window locker-preview">
         <span class="locker-avatar">
-          <Avatar look={locker.look} side="w" />
+          <Avatar look={locker.look} side="w" ride />
         </span>
         <span class="locker-avatar">
-          <Avatar look={locker.look} side="b" />
+          <Avatar look={locker.look} side="b" ride />
         </span>
       </div>
       <div class="shop-tabs locker-tabs" role="tablist">
