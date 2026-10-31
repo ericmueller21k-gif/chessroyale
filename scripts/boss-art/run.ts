@@ -55,10 +55,11 @@ const DRAFT = join(OUT, `${id}.${ITEMISH ? "tsx" : "ts"}`);
 const LOOKS = join(OUT, "looks");
 mkdirSync(LOOKS, { recursive: true });
 /** What the model may read: the characters' code, the art guide and the boss area page (read only). */
+const ARENA_DONE = existsSync(resolve("scripts/boss-art/out")) ? readdirSync(resolve("scripts/boss-art/out")).filter((d) => d.startsWith("arena-")).map((d) => `scripts/boss-art/out/${d}`) : [];
 const READABLE = (
   ITEMISH
     ? ["packages/app/src/components/Items.tsx", "packages/core/src/crates.ts", "scripts/boss-art/item-kit.tsx", ".claude/agents/item-builder.md", "packages/app/src/characters"]
-    : ["packages/app/src/characters", "packages/app/src/town/houses", ".claude/agents/characters.md", "docs/areas/bosses.md", "docs/areas/town-square.md", "scripts/boss-art/out/folio", "scripts/boss-art/out/sidekick-jefferson-sonnet-2", "scripts/boss-art/out/rank-wood", "scripts/boss-art/out/rank-sublime", "scripts/boss-art/out/rank-top-transcendent", "scripts/boss-art/briefs"]
+    : [...ARENA_DONE, "packages/app/src/characters", "packages/app/src/town/houses", ".claude/agents/characters.md", "docs/areas/bosses.md", "docs/areas/town-square.md", "scripts/boss-art/out/folio", "scripts/boss-art/out/sidekick-jefferson-sonnet-2", "scripts/boss-art/out/rank-wood", "scripts/boss-art/out/rank-sublime", "scripts/boss-art/out/rank-top-transcendent", "scripts/boss-art/briefs"]
 )
   // BOSS_ART_READ: more paths it may read, comma-separated (a redo reading its first try).
   .concat((process.env.BOSS_ART_READ ?? "").split(",").filter(Boolean))
@@ -75,7 +76,11 @@ const SYSTEM = `You are a pixel artist drawing a boss character for HunChess, a 
 The format and the house style:
 - Read packages/app/src/characters/sprite.ts (the format: palette, parts as grids of palette keys, layers, frames, animations) and packages/app/src/characters/paint.ts (shape helpers) first. Then study one or two finished bosses for how they're built (a pose() rig that builds frames from part positions, so moving a part is a number): packages/app/src/characters/tiger.ts, gingerbread.ts, recluse.ts are good examples. .claude/agents/characters.md is the art guide; follow its "How the art works" section (true pixel art, whole pixels, every part outlined in "k", a faint halo, light from the top left, chunky proportions that read at phone size, drama yes, gore no).
 - Your file is ${relative(ROOT, DRAFT)}. Import from the game with paths relative to it: "../../../../packages/app/src/characters/sprite.ts" and "../../../../packages/app/src/characters/paint.ts". Export the character as a named const with id "${id}". Keep it self-contained (no other imports than those two and node built-ins are not needed).
-- It needs these animations, each a few frames to a dozen or more, with ms per frame: idle (loops, alive but calm), entrance, thinking (loops), move, capture, hurt, check, smug, rattled, defeat, victory; plus any the brief asks for. Size it like the other bosses (render shows it beside one at phone size).
+${
+  id.startsWith("arena-")
+    ? `- This is not a boss: it is a piece of scenery for the Colosseum's inside (an arena the game builds from many such pieces), in the same sprite format. It needs exactly the animations the brief names (often just idle; a set of stills is one single-frame animation each). Ignore every boss-only rule (the boss moments, the phone-size comparison's sizing): the brief sets the size. Render's \`tile\` shows a slice repeated side by side ("x") or in a 3 x 3 grid ("xy") to check its seams; \`anim: "*"\` shows the first frame of every animation side by side; exports named ..._SEATS (arrays of [x, y]) are marked in magenta on the render.`
+    : "- It needs these animations, each a few frames to a dozen or more, with ms per frame: idle (loops, alive but calm), entrance, thinking (loops), move, capture, hurt, check, smug, rattled, defeat, victory; plus any the brief asks for. Size it like the other bosses (render shows it beside one at phone size)."
+}
 
 How to work:
 - Write the drawing (write_drawing), then render it (render) and look hard at what comes back: the strip of frames at up to 4x and the phone-size view beside another boss. Fix what reads badly (edit_drawing for small changes) and look again. Every animation should be looked at before you're done, and the idle and the face most of all, since they're on screen the most.
@@ -163,6 +168,7 @@ const TOOLS: Anthropic.Tool[] = [
         scale: { type: "integer" },
         bg: { type: "string", enum: ["dark", "light"] },
         with: { type: "string" },
+        tile: { type: "string", enum: ["x", "xy"], description: "scenery only: repeat the first shown frame 3 times side by side (x) or 3 x 3 (xy), to check seams" },
       },
       required: ["anim"],
     },
@@ -240,7 +246,7 @@ function runTool(name: string, input: Record<string, unknown>): { content: Conte
       if (!existsSync(DRAFT)) return { content: "write the drawing first", error: true };
       const dir = join(LOOKS, String(++looks).padStart(3, "0"));
       mkdirSync(dir, { recursive: true });
-      const req = ITEMISH ? { draft: DRAFT, mode: MODE, anim: str(input.anim) ?? undefined, frames: Array.isArray(input.frames) ? input.frames.map(Number) : undefined, side: str(input.side) ?? undefined, color: str(input.color) ?? undefined, out: dir } : { draft: DRAFT, id, anim: str(input.anim) ?? "idle", frames: Array.isArray(input.frames) ? input.frames.map(Number) : undefined, scale: input.scale, bg: input.bg, with: input.with, out: dir };
+      const req = ITEMISH ? { draft: DRAFT, mode: MODE, anim: str(input.anim) ?? undefined, frames: Array.isArray(input.frames) ? input.frames.map(Number) : undefined, side: str(input.side) ?? undefined, color: str(input.color) ?? undefined, out: dir } : { draft: DRAFT, id, anim: str(input.anim) ?? "idle", frames: Array.isArray(input.frames) ? input.frames.map(Number) : undefined, scale: input.scale, bg: input.bg, with: input.with, tile: input.tile, out: dir };
       let raw: string;
       try {
         // Its own process, with no key in its environment: it runs the drawing's code.
