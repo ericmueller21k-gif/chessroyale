@@ -117,7 +117,7 @@ encodes again with fewer colors).
 - **Widths so far** (Oct 31, the 15 rides under `out/`): 84 units (1.21 squares, boingo-pogo) to 178 (2.58,
   hollow-steed). Eight are over 125: alfil-howdah 128, balloon-pup 131, ginger-sled 147, hollow-steed 178, moon-ride 140,
   puddles-mower 170, sawyer-dozer 127, smudgy-brush 152 (riding-chirp is 120, hollow-bulb 123). Only riding-chirp,
-  hollow-bulb and moon-ride have front and back views.
+  hollow-bulb, moon-ride and smudgy-brush have front and back views.
 
 ### Item motion
 
