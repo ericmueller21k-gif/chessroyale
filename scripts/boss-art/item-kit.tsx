@@ -186,8 +186,9 @@ export interface RiderAnim {
   ms: number[];
 }
 /**
- * Where everything is on a frame: the whole group (rider and pawn) moved by `dx`, `dy` (on the square's units: 100 is
- * one square, so the town's move goes from dx 0 to 100); the pawn moved by `pawnX`, `pawnY` on its rider (riding up a
+ * Where everything is on a frame: the whole group (rider and pawn) moved by `dx`, `dy` (in the pawn's units: its box is
+ * 100, which the town draws about 1.45 town squares across, so one square is about 69 units; a move is drawn from dx 0 to
+ * 100 and the town fits it to one square); the pawn moved by `pawnX`, `pawnY` on its rider (riding up a
  * little: negative y is up), tilted `pawnTilt` degrees round its base, and hidden below `cut` (in the pawn's own
  * square, before it's moved: the bench-sit look hides about its lowest third, cut ≈ 66).
  */
@@ -218,7 +219,7 @@ export interface RiderViewDraft {
   frame?: [number, number, number, number];
   idle: RiderAnim;
   /**
-   * The side view: one square of the town's movement, dx 0 to 100. The front and back views: one square's walk toward or
+   * The side view: one square of the town's movement, drawn as dx 0 to 100 (the town fits it to one square). The front and back views: one square's walk toward or
    * away from the camera, played in place on its square (the town slides it up or down the screen): dx stays about 0,
    * dy is only a bob or a hop.
    */

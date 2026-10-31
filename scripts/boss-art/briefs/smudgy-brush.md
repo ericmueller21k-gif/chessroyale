@@ -18,8 +18,8 @@ dangling): **don't do those**.
 - **Idle:** a slow float bob with a slight sway, a short wisp of color from the tips.
 - **Town move:** it **swoops** across the square, leaving a **short** stroke of color in the air behind that fades.
   One square per move, dx 0 to 100; its last frame leads into the next move's first.
-- **Size (Eric: "be cognizant of the horizontal size"):** the brush itself, every frame, stays within **1.25 squares
-  wide**: at most 125 units across, e.g. x from about -12 to 113 on the pawn's 100-unit square, the idle wisp included;
+- **Size (Eric: "be cognizant of the horizontal size"):** the brush itself, every frame, stays within **125 units
+  wide** (about 1.8 town squares): e.g. x from about -12 to 113 on the pawn's 100-unit box, the idle wisp included;
   the move's trail may reach a little further back but keep it short.
 - It must read at town size (a pawn about 45 px) and look great at 4x. Cute and charming. The item style (bold dark
   outlines, flat fills, a highlight or two). Never draw letters or numbers.
