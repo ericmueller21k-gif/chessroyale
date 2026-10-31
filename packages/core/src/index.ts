@@ -10,6 +10,7 @@ export { RATING_CURVE } from "./rating-curve.ts";
 export * from "./shop.ts";
 export * from "./chat.ts";
 export * from "./crates.ts";
+export * from "./admin-copies.ts";
 export * from "./profile.ts";
 export * from "./bot-looks.ts";
 export * from "./fairplay.ts";

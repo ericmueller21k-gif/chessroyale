@@ -38,6 +38,13 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   them into a lobby; bots wear simple seeded outfits (`BOT_LOOKS`).
 - **The locker** keeps each item you own (its color, blemish and seed) and what's equipped in each slot; it can
   delete items. God King effects from the shop are worn there too.
+- **Admins own one of every item** (`ADMIN_EMAILS`; Oct 31): every crate item and God King effect they don't really own,
+  as an admin copy (`core/admin-copies.ts`: red, emerald second color, 100% purity, id `admin:<item>`), tagged "Admin" in
+  the locker. Never stored: the server adds them in `lockerState` and `shopState`, accepts them in `equipLocker` and
+  `equipItem`, and shows them worn in `publicProfile`, `looksOf` and `duelEntrant`. Deleting ignores them and buying goes
+  by what's really owned. A new item in `ITEM_DEFS` or a new worn shop slot is covered with no change; a new catalog
+  needs its line in `admin-copies.ts`. Chat packs are left out
+  ([2026-10-31-admin-owns-all.md](../decisions/2026-10-31-admin-owns-all.md)).
 - **The icon builder** (the profile): a 48 × 48 pixel drawing with a paint bucket and undo (`UNDO_STEPS`), saved as a
   small PNG data URL (at most 16 KB, checked by the server).
 
@@ -50,6 +57,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 | Item drawings, fit, cards (`ItemArt`, `Avatar`); crate and box art (`WinterCrateArt`, `PresentArt`, `BetaCrateArt`, `SupplyBoxArt`) | `packages/app/src/components/Items.tsx` |
 | Crate page, opening strip, reveal, locker UI (`CRATE_LOOKS`: each crate's art and box) | `packages/app/src/screens/Crates.tsx`; the shop `screens/Shop.tsx` |
 | Server rolls and storage (D1 `items`, `equipped_items`) | `packages/server/src/locker.ts`; the shop's API in `api.ts` / `accounts.ts` |
+| Admins' copies of every item (never stored) | `packages/core/src/admin-copies.ts`; added in `locker.ts` and `accounts.ts` (`shopState`) |
 | Bots' outfits | `packages/core/src/bot-looks.ts`, `packages/app/src/looks.ts` |
 | The icon builder | `packages/app/src/components/PixelIcon.tsx`, `icon-pixels.ts`; server check `isPixelIcon` in `accounts.ts` |
 
@@ -61,9 +69,9 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 ## Tests and tools
 
 - Unit: `packages/core/test/crates.test.ts`, `bot-looks.test.ts`, `packages/server/test/accounts.test.ts`,
-  `shop-buy.test.ts` (buying with coins, `SHOP_FREE` off), `packages/app/test/blotches.test.ts`, `gift-tube.test.ts`,
+  `shop-buy.test.ts` (buying with coins, `SHOP_FREE` off), `admin-copies.test.ts` (admins own one of every item), `packages/app/test/blotches.test.ts`, `gift-tube.test.ts`,
   `icon-pixels.test.ts`.
-- e2e: `e2e/icon-editor.spec.ts`, `crate-banner.spec.ts`, `profile.spec.ts`.
+- e2e: `e2e/icon-editor.spec.ts`, `crate-banner.spec.ts`, `profile.spec.ts` (an admin's locker too).
 - The Fischer Random banner (`.fischer-stage` in styles.css): its band slants but the words stay level, so its padding
   must clear the words' ends (about 0.06 of their width); `crate-banner.spec.ts` measures that every frame.
 - The fitting sheet: `npm run preview:items -- <scratch>/sheet.png items=<id>[,<id>]` (read the PNG; keep it out of

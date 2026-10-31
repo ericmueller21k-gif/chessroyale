@@ -14,6 +14,7 @@ import {
   SHOP_CATEGORIES,
   SHOP_FREE,
   SHOP_ITEMS,
+  adminShopCopies,
   chatPack,
   chatPicks,
   chatPicksAfterGetting,
@@ -28,7 +29,7 @@ import {
   type ShopState,
   type StoredChatPicks,
 } from "@chessroyale/core";
-import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, lockerMoves, lockerState, type LockerState } from "./locker.ts";
+import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, NO_ADMINS, lockerMoves, lockerState, type AdminCheck, type LockerState } from "./locker.ts";
 import { LIVE_SCHEMA } from "./live.ts";
 import { FAIRPLAY_SCHEMA, IDENTITIES_REKEY, fairPlayMoves } from "./fairplay-schema.ts";
 import { FRIENDS_COLUMNS, FRIENDS_SCHEMA, socialDeletes } from "./friends.ts";
@@ -734,7 +735,9 @@ export interface Profile {
   chatMod?: { block?: ChatBlock; notice?: ChatNotice };
 }
 
-export async function profile(sql: Sql, user: User): Promise<Profile> {
+/** Your profile. `admins`: who's an admin (admin.ts): an admin's shop and locker have one of every item, never stored. */
+export async function profile(sql: Sql, user: User, admins: AdminCheck = NO_ADMINS): Promise<Profile> {
+  const admin = admins(user);
   const rows = await sql.all<{ mode: string; online: number; placement: number; players: number; team_won: number | null; rating: number | null; played_at: number; ranked: number | null; held: number | null }>(
     "SELECT mode, online, placement, players, team_won, rating, played_at, ranked, held FROM results WHERE user_id = ? ORDER BY played_at DESC",
     user.id,
@@ -750,11 +753,11 @@ export async function profile(sql: Sql, user: User): Promise<Profile> {
   const chatMod = await chatStanding(sql, user.id, Date.now()).catch(() => null);
   return {
     user: { id: user.id, name: user.name, icon: user.icon, signedIn: !!(user.email || user.google_sub), email: user.email, google: !!user.google_sub },
-    shop: await shopState(sql, user.id),
-    locker: await lockerState(sql, user.id),
+    shop: await shopState(sql, user.id, admin),
+    locker: await lockerState(sql, user.id, admin),
     stats: { all: stats(rows), classic: stats(rows.filter((r) => r.mode === "classic")), crowd: stats(rows.filter((r) => r.mode === "crowd")), boss: stats(rows.filter((r) => r.mode === "boss")) },
     rating: rows.find((r) => r.rating !== null && countsForRanking(r))?.rating ?? null,
-    ranked1v1: await rankedSummary(sql, user.id),
+    ranked1v1: await rankedSummary(sql, user.id, admins),
     recent: rows.slice(0, 10).map((r) => ({
       mode: r.mode,
       online: !!r.online,
@@ -898,10 +901,13 @@ export function raidStats(rows: ResultRow[]): RaidStats {
   };
 }
 
-/** Anyone's profile by account id (null if there's no such account). */
-export async function publicProfile(sql: Sql, userId: string, now: number): Promise<PublicProfile | null> {
-  const u = await sql.first<{ id: string; name: string; icon: string; created_at: number; last_seen: number | null; rating: number | null; hide_online: number | null }>(
-    "SELECT id, name, icon, created_at, last_seen, rating, hide_online FROM users WHERE id = ?",
+/**
+ * Anyone's profile by account id (null if there's no such account). `admins`: who's an admin (admin.ts), so an admin's
+ * look has the admin copies they wear (the email is read only for that, never answered).
+ */
+export async function publicProfile(sql: Sql, userId: string, now: number, admins: AdminCheck = NO_ADMINS): Promise<PublicProfile | null> {
+  const u = await sql.first<{ id: string; name: string; icon: string; email: string | null; created_at: number; last_seen: number | null; rating: number | null; hide_online: number | null }>(
+    "SELECT id, name, icon, email, created_at, last_seen, rating, hide_online FROM users WHERE id = ?",
     userId,
   );
   if (!u) return null;
@@ -926,7 +932,7 @@ export async function publicProfile(sql: Sql, userId: string, now: number): Prom
     id: u.id,
     name: u.name,
     icon: u.icon,
-    look: (await lockerState(sql, u.id)).look,
+    look: (await lockerState(sql, u.id, admins(u))).look,
     joinedAt: u.created_at,
     lastSeen: u.hide_online ? null : u.last_seen,
     online: !u.hide_online && u.last_seen !== null && now - u.last_seen < FRONT_DOOR.onlineWindowMs,
@@ -934,7 +940,7 @@ export async function publicProfile(sql: Sql, userId: string, now: number): Prom
     rating: banned ? null : rating,
     topPercent: banned ? null : top,
     banned,
-    ranked1v1: banned ? null : await rankedSummary(sql, u.id),
+    ranked1v1: banned ? null : await rankedSummary(sql, u.id, admins),
     crowd: crowdStats(rows.filter((r) => r.mode === "crowd")),
     boss: raidStats(raids),
     ratingHistory: rows
@@ -962,19 +968,25 @@ export async function publicProfile(sql: Sql, userId: string, now: number): Prom
 
 // ---------------- The shop ----------------
 
-/** Coins, items owned (starters included) and what's equipped in each slot. */
-export async function shopState(sql: Sql, userId: string): Promise<ShopState> {
-  const owned = (await sql.all<{ item_id: string }>("SELECT item_id FROM inventory WHERE user_id = ?", userId)).map((r) => r.item_id).filter((id) => shopItem(id));
+/**
+ * Coins, items owned (starters included) and what's equipped in each slot. `admin`: an admin's, which also owns every
+ * God King effect (admin copies, core/admin-copies.ts: never stored; listed in `admin`). Chat packs aren't worn, so an
+ * admin's are what they really own.
+ */
+export async function shopState(sql: Sql, userId: string, admin = false): Promise<ShopState> {
+  const stored = (await sql.all<{ item_id: string }>("SELECT item_id FROM inventory WHERE user_id = ?", userId)).map((r) => r.item_id).filter((id) => shopItem(id));
   const starters = SHOP_ITEMS.filter((i) => i.starter).map((i) => i.id);
-  const all = [...new Set([...starters, ...owned])];
+  const all = [...new Set([...starters, ...stored])];
+  const copies = admin ? adminShopCopies(all) : [];
+  const owned = [...all, ...copies];
   const rows = await sql.all<{ slot: string; item_id: string }>("SELECT slot, item_id FROM equipped WHERE user_id = ?", userId);
   const equipped = Object.fromEntries(SHOP_CATEGORIES.filter((c) => !c.ownOnly).map((c) => [c.slot, starterItem(c.slot).id])) as Record<EquipSlot, string>;
   for (const r of rows) {
     const item = shopItem(r.item_id);
-    if (item && item.slot !== "chat" && item.slot === r.slot && all.includes(item.id)) equipped[item.slot] = item.id;
+    if (item && item.slot !== "chat" && item.slot === r.slot && owned.includes(item.id)) equipped[item.slot] = item.id;
   }
   const wallet = await sql.first<{ coins: number }>("SELECT coins FROM wallets WHERE user_id = ?", userId);
-  return { coins: wallet?.coins ?? 0, owned: all, equipped, chat: chatPicks(await storedChatPicks(sql, userId), all) };
+  return { coins: wallet?.coins ?? 0, owned, equipped, chat: chatPicks(await storedChatPicks(sql, userId), all), ...(copies.length ? { admin: copies } : {}) };
 }
 
 /** Quick chat picks as stored (each kind a list, or null for the defaults). */
@@ -1002,22 +1014,25 @@ async function storeChatPicks(sql: Sql, userId: string, kind: ChatPickKind, ids:
  * Quick chat: the lines and/or emoji a player picked in their profile, in their order. Each is cleaned (known lines
  * of that kind, from packs they own, no repeats, at most the cap); null puts that kind back to the defaults.
  */
-export async function setChatPicks(sql: Sql, userId: string, body: { lines?: unknown; emoji?: unknown }): Promise<ShopState> {
+export async function setChatPicks(sql: Sql, userId: string, body: { lines?: unknown; emoji?: unknown }, admin = false): Promise<ShopState> {
   const packs = ownedChatPacks((await shopState(sql, userId)).owned);
   for (const kind of ["lines", "emoji"] as const) {
     const v = body[kind];
     if (v === null) await storeChatPicks(sql, userId, kind, null);
     else if (Array.isArray(v)) await storeChatPicks(sql, userId, kind, cleanChatPickList(v, kind, packs));
   }
-  return shopState(sql, userId);
+  return shopState(sql, userId, admin);
 }
 
-/** Gets an item (free while SHOP_FREE is on, otherwise paid in coins). */
-export async function buyItem(sql: Sql, userId: string, itemId: unknown, now: number): Promise<{ ok: true; shop: ShopState } | { ok: false; message: string }> {
+/**
+ * Gets an item (free while SHOP_FREE is on, otherwise paid in coins). What you really own decides (an admin copy is
+ * never one: it neither stops nor pays for a real one); `admin` only shapes the shop it answers with, as shopState's.
+ */
+export async function buyItem(sql: Sql, userId: string, itemId: unknown, now: number, admin = false): Promise<{ ok: true; shop: ShopState } | { ok: false; message: string }> {
   const item = typeof itemId === "string" ? shopItem(itemId) : undefined;
   if (!item) return { ok: false, message: "That item isn't in the shop." };
   const state = await shopState(sql, userId);
-  if (state.owned.includes(item.id)) return { ok: true, shop: state };
+  if (state.owned.includes(item.id)) return { ok: true, shop: admin ? await shopState(sql, userId, true) : state };
   const price = SHOP_FREE ? 0 : item.price;
   if (price > state.coins) return { ok: false, message: "Not enough coins." };
   if (price > 0) {
@@ -1051,19 +1066,19 @@ export async function buyItem(sql: Sql, userId: string, itemId: unknown, now: nu
     const kind: ChatPickKind = chatPack(item.look.pack)?.kind === "emoji" ? "emoji" : "lines";
     if (added.length) await storeChatPicks(sql, userId, kind, picks[kind]);
   }
-  return { ok: true, shop: await shopState(sql, userId) };
+  return { ok: true, shop: await shopState(sql, userId, admin) };
 }
 
-/** Equips an item you own in its slot. */
-export async function equipItem(sql: Sql, userId: string, itemId: unknown): Promise<{ ok: true; shop: ShopState } | { ok: false; message: string }> {
+/** Equips an item you own in its slot. `admin`: as shopState's, so an admin may wear any God King effect. */
+export async function equipItem(sql: Sql, userId: string, itemId: unknown, admin = false): Promise<{ ok: true; shop: ShopState } | { ok: false; message: string }> {
   const item = typeof itemId === "string" ? shopItem(itemId) : undefined;
   if (!item) return { ok: false, message: "That item isn't in the shop." };
-  const state = await shopState(sql, userId);
+  const state = await shopState(sql, userId, admin);
   if (!state.owned.includes(item.id)) return { ok: false, message: "Get it first." };
   // Chat packs aren't equipped: every one you own is yours to use.
   if (item.slot === "chat") return { ok: true, shop: state };
   await sql.run("INSERT INTO equipped (user_id, slot, item_id) VALUES (?, ?, ?) ON CONFLICT (user_id, slot) DO UPDATE SET item_id = excluded.item_id", userId, item.slot, item.id);
-  return { ok: true, shop: await shopState(sql, userId) };
+  return { ok: true, shop: await shopState(sql, userId, admin) };
 }
 
 /**

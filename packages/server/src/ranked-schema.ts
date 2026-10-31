@@ -4,7 +4,7 @@
  * rest).
  */
 import { RANKED_1V1, mayBeTop, rankView, type RankView, type RankedRecentGame, type RankedSummary } from "@chessroyale/core";
-import { looksOf } from "./locker.ts";
+import { NO_ADMINS, looksOf, type AdminCheck } from "./locker.ts";
 
 /** A deleted account in its games (accounts.ts DELETED_ID; written here so this file needs nothing of accounts.ts at run time). */
 const DELETED = "deleted";
@@ -116,22 +116,24 @@ export const RECENT_GAMES = 5;
  * What a profile shows of a player's 1 v 1 (core's RankedSummary): the rank, the record, the peak (its place among the
  * top ladders as they stand now), the current streak, and the last RECENT_GAMES kept games, newest first (each from
  * this player's side, the opponent by id, name and look; the hidden rating never). Two reads and one for the
- * opponents' looks, plus a place count only at the top tiers' floor.
+ * opponents' looks, plus a place count only at the top tiers' floor. `admins`: who's an admin (admin.ts), so an admin
+ * opponent's look has the admin copies they wear (their email is read only for that, never answered).
  */
-export async function rankedSummary(sql: Sql, userId: string): Promise<RankedSummary> {
+export async function rankedSummary(sql: Sql, userId: string, admins: AdminCheck = NO_ADMINS): Promise<RankedSummary> {
   const row = await sql.first<{ games: number; wins: number; losses: number; draws: number; ladder: number | null; peak: number | null; streak: number | null }>(
     "SELECT games, wins, losses, draws, ladder, peak, streak FROM ranked_1v1 WHERE user_id = ?",
     userId,
   );
-  const games = await sql.all<{ ended_at: number; white_id: string; black_id: string; result: string; white_points: number | null; black_points: number | null; name: string | null }>(
-    `SELECT g.ended_at, g.white_id, g.black_id, g.result, g.white_points, g.black_points, u.name FROM ranked_1v1_games g
+  const games = await sql.all<{ ended_at: number; white_id: string; black_id: string; result: string; white_points: number | null; black_points: number | null; name: string | null; email: string | null }>(
+    `SELECT g.ended_at, g.white_id, g.black_id, g.result, g.white_points, g.black_points, u.name, u.email FROM ranked_1v1_games g
      LEFT JOIN users u ON u.id = CASE WHEN g.white_id = ?1 THEN g.black_id ELSE g.white_id END
      WHERE g.white_id = ?1 OR g.black_id = ?1 ORDER BY g.ended_at DESC, g.id DESC LIMIT ?2`,
     userId,
     RECENT_GAMES,
   );
   const opponentOf = (g: (typeof games)[number]) => (g.white_id === userId ? g.black_id : g.white_id);
-  const looks = await looksOf(sql, [...new Set(games.map(opponentOf).filter((id) => id !== DELETED))]);
+  const adminIds = new Set(games.filter((g) => admins(g)).map(opponentOf));
+  const looks = await looksOf(sql, [...new Set(games.map(opponentOf).filter((id) => id !== DELETED))], adminIds);
   const recent: RankedRecentGame[] = games.map((g) => {
     const white = g.white_id === userId;
     const id = opponentOf(g);

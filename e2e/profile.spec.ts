@@ -1,6 +1,6 @@
 import { devices, expect, type Page } from "@playwright/test";
-import { rankView } from "@chessroyale/core";
-import { named, soloFromHome, switchesOff, test, openBossRaid } from "./helpers.ts";
+import { ITEM_DEFS, SHOP_ITEMS, rankView, wornFromLocker } from "@chessroyale/core";
+import { asServerAdmin, named, soloFromHome, switchesOff, test, openBossRaid } from "./helpers.ts";
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
 
@@ -78,6 +78,38 @@ test("your profile: tap your pawn; the same structure as anyone's, with your own
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(page.locator(".fd-hero-name")).toHaveText("Hunter");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
+});
+
+test("an admin's locker has one of every item, each tagged Admin, worn like any item and never deleted; a player's only theirs", async ({ page }) => {
+  await named(page, "Eric");
+  const crate = page.locator(".locker-grid").first();
+  const fromShop = page.locator(".locker-grid").nth(1);
+  // A player: only what they own (nothing yet), the God King's starter effect.
+  await page.goto("/shop");
+  await page.getByRole("tab", { name: "Locker" }).click();
+  await expect(page.getByText("No crate items here yet. Open a crate!")).toBeVisible();
+  await expect(page.locator(".locker-item")).toHaveCount(1);
+  await expect(page.locator(".locker-admin")).toHaveCount(0);
+  // An admin (ADMIN_EMAILS, docs/decisions/2026-10-31-admin-owns-all.md): one of every crate item and God King effect.
+  const id = await asServerAdmin(page);
+  await page.reload();
+  await page.getByRole("tab", { name: "Locker" }).click();
+  await expect(crate.locator(".locker-item")).toHaveCount(ITEM_DEFS.length);
+  await expect(crate.locator(".locker-admin")).toHaveCount(ITEM_DEFS.length);
+  const kings = SHOP_ITEMS.filter(wornFromLocker);
+  await expect(fromShop.locator(".locker-item")).toHaveCount(kings.length);
+  await expect(fromShop.locator(".locker-admin")).toHaveCount(kings.filter((k) => !k.starter).length);
+  // Worn like any item, and others see it.
+  const crown = crate.getByRole("button", { name: /^Fire & Ice Crown, / });
+  await crown.click();
+  await expect(crown.locator(".locker-worn")).toHaveText("Worn");
+  await expect.poll(async () => ((await (await page.request.get(`/api/profile/${id}`)).json()) as { look: { head?: { def: string } } }).look.head?.def).toBe("fire-ice-crown");
+  // Never deleted: holding (or right-clicking) an admin copy opens nothing.
+  await crown.click({ button: "right" });
+  await page.waitForTimeout(700);
+  await expect(page.locator(".locker-dialog")).toHaveCount(0);
+  await expect(crown.locator(".locker-worn")).toHaveText("Worn");
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
 });
 
