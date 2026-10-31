@@ -1,4 +1,4 @@
-import type { ItemLook, MercItem } from "@chessroyale/core";
+import type { BossDifficultyId, ItemLook, MercItem } from "@chessroyale/core";
 import type { LobbyCloseReason } from "../protocol.ts";
 import type { MoveScore } from "../uci.ts";
 import type { BlockError, SquadsBlock } from "./blocks.ts";
@@ -448,6 +448,13 @@ export interface NetPartyMember {
   id: string;
   name: string;
   connected: boolean;
+  /** A Boss Battle party: their seat (0 to 2, their color in the battle), what they wear, whether they're ready, a bot. */
+  seat?: number;
+  look?: ItemLook;
+  ready?: boolean;
+  bot?: true;
+  /** Their account (View profile). */
+  uid?: string;
 }
 
 /**
@@ -464,16 +471,34 @@ export interface NetParty {
   state: "open" | "queueing" | "placed";
   placed?: { lobby: string; pass: string; at: number };
   busy?: { position: number; waitSeconds: number; message: string };
+  /**
+   * A Boss Battle party (docs/decisions/2026-10-30-boss-party.md): the leader's boss ("" random) and difficulty, which
+   * everyone sees; any change un-readies everyone. `placed` is the battle (a lobby), joined with `pass` and your seat.
+   */
+  boss?: { id: string; difficulty: BossDifficultyId };
 }
 
 export type PartyClientMessage =
-  | { t: "hello"; v: number; token?: string; name?: string; device?: "phone" | "computer" }
+  | { t: "hello"; v: number; token?: string; name?: string; device?: "phone" | "computer"; look?: unknown }
   /** The leader queues the party (everyone connected). Again after a lobby: a new one. */
   | { t: "queue" }
   /** The leader stops looking (in line); a placed party's seats go to bots when its lobby fills. */
   | { t: "cancel" }
   /** Leave the party. */
-  | { t: "leave" };
+  | { t: "leave" }
+  /** A Boss Battle party: a member's READY (on or off). */
+  | { t: "ready"; on: boolean }
+  /** A Boss Battle party, the leader: Kick from party, Promote to party leader. */
+  | { t: "kick"; id: string }
+  | { t: "promote"; id: string }
+  /** A Boss Battle party, the leader: the boss ("" random) and the difficulty (everyone un-readied). */
+  | { t: "choose"; boss: string; difficulty: BossDifficultyId }
+  /** A Boss Battle party, the leader: START, once everyone is ready (the battle is made and everyone placed in it). */
+  | { t: "start" }
+  /** A Boss Battle party, admins and tests only: a bot member in a free seat (`add`), or the last one out. */
+  | { t: "bot"; add: boolean }
+  /** A Boss Battle party: what you wear (your pawn on the others' stages). */
+  | { t: "look"; look: unknown };
 
 export type PartyServerMessage = { now: number } & (
   | { t: "welcome"; v: number; memberId: string; token: string; code: string }

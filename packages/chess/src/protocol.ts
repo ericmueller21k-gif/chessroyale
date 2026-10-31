@@ -528,8 +528,11 @@ export type ClientMessage =
   /** `look`: the crate items you wear (others see them on the cut screen). */
   /** `lastBoss`: the boss this player met last (a BOSS_ROSTER id), so a raid can avoid the one most of the lobby met. */
   /** No rating: the lobby reads the one stored on the player's account (one an older app still sends is ignored). */
-  | { t: "hello"; token?: string; name?: string; device?: "phone" | "computer"; practice?: boolean; look?: unknown; lastBoss?: string | null; evalBar?: boolean }
+  /** `party`, `seat`: a Boss Battle party's battle, its pass (from the party's `placed`) and this member's seat in it. */
+  | { t: "hello"; token?: string; name?: string; device?: "phone" | "computer"; practice?: boolean; look?: unknown; lastBoss?: string | null; evalBar?: boolean; party?: string; seat?: number }
   | { t: "start" }
+  /** A Boss Battle party's AFK kick: `playerId` hasn't picked a minute after the turn's first pick (the lobby's partyKickable). */
+  | { t: "kick"; playerId: string }
   /**
    * `away`: times the page was hidden or lost focus during this move's clock before the pick (fair play). `premove`: a
    * premove played as the turn opened (fair play leaves its time out only if `premove` named it before the turn opened).
@@ -606,7 +609,8 @@ export type LobbyCloseReason = "ended" | "idle" | "abandoned";
  * counted as resigning); they left before move 1 ("early": nothing recorded); or they left after they were already
  * out ("out": their result as it stands, recorded when the match ends).
  */
-export type LeftHow = "resigned" | "away" | "early" | "out";
+/** `kicked`: a Boss Battle party's AFK kick (the leader's, or a teammate's who had picked). */
+export type LeftHow = "resigned" | "away" | "early" | "out" | "kicked";
 
 /**
  * Someone who left: how, and their result as it was recorded then (`placement` of `players`; a loss unless they were
@@ -640,6 +644,8 @@ export type ServerMessage = { now: number } & (
       botsOff?: true;
       /** Matchmade: the seats were filled then (bots in the empty ones); the match begins a moment later. */
       filledAt?: number;
+      /** A Boss Battle party's battle: each member's seat (player id → seat: their color), and its leader now. */
+      party?: { seats: Record<string, number>; leader: string | null };
     }
   /**
    * Can't join (or play on). `ended`: the match is over (or long gone), so the app goes home with a note. `banned`:

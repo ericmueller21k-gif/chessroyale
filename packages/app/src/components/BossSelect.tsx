@@ -73,9 +73,58 @@ function placeOnStage(ch: Character, idle: string): { left: number; width: numbe
 /** The "?" tile's value, and the stage's when a random boss is picked. */
 export const RANDOM = "";
 
+/** A Boss Battle party's member on a back platform (docs/decisions/2026-10-30-boss-party.md). */
+export interface PartySlot {
+  id: string;
+  name: string;
+  look?: ItemLook;
+  leader: boolean;
+  ready: boolean;
+  uid?: string;
+  bot?: boolean;
+}
+
+/** The party on the stage: the two back platforms (a member, or nobody: an invite circle), your own check and crown. */
+export interface StageParty {
+  back: readonly [PartySlot | null, PartySlot | null];
+  me: { leader: boolean; ready: boolean };
+  /** A member's view: the leader picks the boss and the difficulty (the tiles muted, the arrows greyed). */
+  locked: boolean;
+  onProfile: (m: PartySlot) => void;
+  /** The leader's: Kick from party, Promote to party leader. */
+  onKick?: (m: PartySlot) => void;
+  onPromote?: (m: PartySlot) => void;
+}
+
+const CheckIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <path d="M6 12.5l4 4 8-9" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" />
+  </svg>
+);
+const CrownIcon = () => (
+  <svg viewBox="0 0 24 18" aria-hidden="true" focusable="false">
+    <path d="M2 15 1 4l6 5 5-8 5 8 6-5-1 11z" fill="#f2c14e" stroke="#1a1406" stroke-width="1.6" stroke-linejoin="round" />
+  </svg>
+);
+/** Over a head: the leader's crown, a ready member's green check (Eric's picture). */
+const HeadBadges = ({ leader, ready, me }: { leader: boolean; ready: boolean; me?: boolean }) => (
+  <span class={`bs-head${me ? " bs-head-me" : ""}`} aria-hidden="true">
+    {leader && (
+      <span class="bs-crown">
+        <CrownIcon />
+      </span>
+    )}
+    {ready && (
+      <span class="bs-check">
+        <CheckIcon />
+      </span>
+    )}
+  </span>
+);
+
 /** An invite circle: a crisp dashed ring, a very light fill and a person-plus, as in Eric's picture. */
 const InviteCircle = () => (
-  <span class="bs-inv" role="img" aria-label="Invite a friend (coming soon)">
+  <span class="bs-inv" aria-hidden="true">
     <svg class="bs-inv-ring" viewBox="0 0 40 40" aria-hidden="true" focusable="false">
       <circle cx="20" cy="20" r="19.2" />
     </svg>
@@ -92,8 +141,39 @@ const Arrow = ({ left }: { left?: boolean }) => (
   </svg>
 );
 
-export function BossSelect({ value, difficulty, name, look, onPick, onDifficulty }: { value: string; difficulty: BossDifficultyId; name: string; look?: ItemLook; onPick: (id: string) => void; onDifficulty: (id: BossDifficultyId) => void }) {
+export function BossSelect({
+  value,
+  difficulty,
+  name,
+  look,
+  onPick,
+  onDifficulty,
+  onInvite,
+  party,
+}: {
+  value: string;
+  difficulty: BossDifficultyId;
+  name: string;
+  look?: ItemLook;
+  onPick: (id: string) => void;
+  onDifficulty: (id: BossDifficultyId) => void;
+  /** An invite circle: your party (made the first time), to invite a friend into. */
+  onInvite?: () => void;
+  /** In a Boss Battle party: who stands behind you, the checks and crowns, and the member menu. */
+  party?: StageParty;
+}) {
   useServerStatus();
+  // The member menu open (by member id): above their head; a tap elsewhere or Escape closes it.
+  const [menu, setMenu] = useState<string | null>(null);
+  const menuFor = party?.back.find((m) => m?.id === menu) ?? null;
+  // (A layout effect: Escape closes it from its first frame; an effect waits for a paint, and an Escape meanwhile was lost.)
+  useLayoutEffect(() => {
+    if (!menuFor) return;
+    const key = (e: KeyboardEvent) => e.key === "Escape" && setMenu(null);
+    addEventListener("keydown", key);
+    return () => removeEventListener("keydown", key);
+  }, [!!menuFor]);
+  const locked = !!party?.locked;
   const { bosses, hidden } = selectBosses();
   const still = useMedia("(prefers-reduced-motion: reduce)");
   // Each tap (re)starts the drop and the idle under it.
@@ -107,6 +187,8 @@ export function BossSelect({ value, difficulty, name, look, onPick, onDifficulty
     return () => selectVoice.reset();
   }, []);
   const tap = (id: string) => {
+    // (A member's view: the leader picks the boss; the tiles don't take a tap.)
+    if (locked) return;
     warmSounds(Object.values(SELECT_SOUND));
     onPick(id);
     setDrop((d) => ({ n: d.n + 1, at: Date.now() }));
@@ -121,6 +203,7 @@ export function BossSelect({ value, difficulty, name, look, onPick, onDifficulty
   };
   const at = Math.max(0, BOSS_DIFFICULTY.findIndex((d) => d.id === difficulty));
   const step = (by: number) => {
+    if (locked) return;
     const next = BOSS_DIFFICULTY[at + by];
     if (next) onDifficulty(next.id);
   };
@@ -142,7 +225,7 @@ export function BossSelect({ value, difficulty, name, look, onPick, onDifficulty
   return (
     <div class="bs-select">
       {/* (Rows are layout only: the radios stay one group, in order.) */}
-      <div class="bs-tiles" role="radiogroup" aria-label="Bosses" style={{ "--bs-per": TILES_PER_ROW }}>
+      <div class={`bs-tiles${locked ? " bs-theirs" : ""}`} role="radiogroup" aria-label="Bosses" aria-disabled={locked || undefined} style={{ "--bs-per": TILES_PER_ROW }}>
         {rows.map((row, i) => (
           <div class="bs-row" role="presentation" key={i}>
             {row}
@@ -155,18 +238,52 @@ export function BossSelect({ value, difficulty, name, look, onPick, onDifficulty
         </div>
         <div class="bs-row-stage">
           <div class="bs-side">
-            {/* Your pawn in front, two smaller platforms behind you with an invite circle over each (greyed: no live party yet). */}
+            {/* Your pawn in front, two smaller platforms behind you: a party member on each, or an invite circle (Eric, Oct 29). */}
             <div class="bs-spot bs-mine">
-              {(["l", "r"] as const).map((k) => (
-                <span class={`bs-back bs-${k}`} key={k}>
-                  <InviteCircle />
-                  <span class="dv-st-plat" aria-hidden="true" />
-                </span>
-              ))}
+              {(["l", "r"] as const).map((k, i) => {
+                const m = party?.back[i] ?? null;
+                return (
+                  <span class={`bs-back bs-${k}${m && menu === m.id ? " bs-menu-on" : ""}`} key={k}>
+                    {m ? (
+                      <button type="button" class="bs-mate" aria-label={`${m.name}${m.leader ? ", party leader" : m.ready ? ", ready" : ""}`} aria-haspopup="menu" aria-expanded={menu === m.id} onClick={() => setMenu((x) => (x === m.id ? null : m.id))}>
+                        <DressedPawn look={m.look} size="stage" />
+                        <HeadBadges leader={m.leader} ready={m.ready} />
+                      </button>
+                    ) : (
+                      <button type="button" class="bs-inv-btn" aria-label="Invite a friend" onClick={onInvite} disabled={!onInvite}>
+                        <InviteCircle />
+                      </button>
+                    )}
+                    <span class="dv-st-plat" aria-hidden="true" />
+                  </span>
+                );
+              })}
               <span class="dv-st-plat" aria-hidden="true" />
               <span class="bs-me" aria-hidden="true">
                 <DressedPawn look={look} size="stage" />
+                {party && <HeadBadges leader={party.me.leader} ready={party.me.ready} me />}
               </span>
+              {menuFor && party && (
+                <>
+                  <div class="bs-menu-scrim" onClick={() => setMenu(null)} />
+                  <div class={`bs-menu bs-menu-${party.back[0]?.id === menuFor.id ? "l" : "r"}`} role="menu" aria-label={menuFor.name}>
+                    <div class="bs-menu-title">{menuFor.name}</div>
+                    <button type="button" role="menuitem" disabled={!menuFor.uid} onClick={() => (setMenu(null), party.onProfile(menuFor))}>
+                      View profile
+                    </button>
+                    {party.onPromote && (
+                      <button type="button" role="menuitem" disabled={!!menuFor.bot} onClick={() => (setMenu(null), party.onPromote!(menuFor))}>
+                        Promote to party leader
+                      </button>
+                    )}
+                    {party.onKick && (
+                      <button type="button" role="menuitem" class="bs-danger" onClick={() => (setMenu(null), party.onKick!(menuFor))}>
+                        Kick from party
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
             <strong class="bs-you-name">{name}</strong>
           </div>
@@ -190,13 +307,13 @@ export function BossSelect({ value, difficulty, name, look, onPick, onDifficulty
             </strong>
             {/* The difficulty: arrows step through the five levels and stop at the ends (greyed there); the dots show where you are. */}
             <div class="bs-diff" role="group" aria-label="Difficulty">
-              <button type="button" class="bs-arrow" aria-label="Easier" aria-disabled={at === 0 || undefined} onClick={() => step(-1)}>
+              <button type="button" class="bs-arrow" aria-label="Easier" aria-disabled={locked || at === 0 || undefined} onClick={() => step(-1)}>
                 <Arrow left />
               </button>
               <span class="bs-level" data-level={difficulty} aria-live="polite">
                 {BOSS_DIFFICULTY[at]!.label}
               </span>
-              <button type="button" class="bs-arrow" aria-label="Harder" aria-disabled={at === BOSS_DIFFICULTY.length - 1 || undefined} onClick={() => step(1)}>
+              <button type="button" class="bs-arrow" aria-label="Harder" aria-disabled={locked || at === BOSS_DIFFICULTY.length - 1 || undefined} onClick={() => step(1)}>
                 <Arrow />
               </button>
             </div>

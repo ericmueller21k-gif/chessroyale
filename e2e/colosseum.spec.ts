@@ -125,3 +125,42 @@ test("the Colosseum's first look: the card's link in, the arena drawn, Change se
   await expect(page.locator("canvas.town-canvas")).toHaveAttribute("data-ready", "1");
   expect(errors.filter((e) => !/WebGL|GPU stall|willReadFrequently/i.test(e))).toEqual([]);
 });
+
+test("the gear's 3D pieces (off by default): the row flips the giant pieces at once (draw calls 3 ↔ 9) and the choice survives a reload", async ({ page }) => {
+  test.setTimeout(180_000);
+  const errors = watchErrors(page);
+  const pieces = async () => ((await state(page)) as { pieces?: string }).pieces;
+  const row = () => page.getByRole("dialog", { name: "Match options" }).getByRole("switch", { name: /3D pieces/ });
+  await page.goto("/colosseum?fast");
+  await expect.poll(async () => (await state(page)).crowd, { message: "the crowd is in", timeout: 60_000 }).toBeGreaterThan(1500);
+  // Off by default: the flat pieces, three draw calls.
+  expect(await pieces()).toBe("flat");
+  await expect.poll(async () => (await state(page)).drawCalls).toBe(3);
+  await page.getByRole("button", { name: "Match options" }).click();
+  await expect(row()).toHaveAttribute("aria-checked", "false");
+  // On: at once, no reload; the arena's three and one a kind (all six on the board at the start).
+  await row().click();
+  await expect(row()).toHaveAttribute("aria-checked", "true");
+  await expect.poll(async () => (await state(page)).drawCalls, { message: "three draw calls and one a piece kind" }).toBe(9);
+  expect(await pieces()).toBe("3d");
+  const a = (await sample(page))!;
+  expect(a.sky, "the arena, not an empty sky").toBeLessThan(0.5);
+  await page.keyboard.press("Escape");
+  // The game plays on in 3D.
+  await expect.poll(async () => (await state(page)).plies, { message: "the bots play", timeout: 90_000 }).toBeGreaterThanOrEqual(4);
+  expect((await state(page)).drawCalls).toBeGreaterThanOrEqual(5);
+
+  // Remembered on this device: a reload comes back in 3D.
+  await page.reload();
+  await expect.poll(async () => (await state(page)).crowd, { timeout: 60_000 }).toBeGreaterThan(1500);
+  expect(await pieces()).toBe("3d");
+  await expect.poll(async () => (await state(page)).drawCalls).toBeGreaterThanOrEqual(5);
+  await page.getByRole("button", { name: "Match options" }).click();
+  await expect(row()).toHaveAttribute("aria-checked", "true");
+  // Off again: flat, three draw calls, at once.
+  await row().click();
+  await expect(row()).toHaveAttribute("aria-checked", "false");
+  await expect.poll(async () => (await state(page)).drawCalls).toBe(3);
+  expect(await pieces()).toBe("flat");
+  expect(errors.filter((e) => !/WebGL|GPU stall|willReadFrequently/i.test(e))).toEqual([]);
+});

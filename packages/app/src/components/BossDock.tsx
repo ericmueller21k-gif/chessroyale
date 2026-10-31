@@ -1,7 +1,8 @@
 import type { ComponentChildren } from "preact";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { memo } from "preact/compat";
-import { BOSS_POWERS, type ItemLook } from "@chessroyale/core";
+import { BOSS_PARTY, BOSS_POWERS, type ItemLook } from "@chessroyale/core";
+import { PARTY_COLORS } from "../board/logic.ts";
 import { bossRules } from "@chessroyale/chess";
 import { account } from "../account.ts";
 import { bossAlone, type GameView, type StrikeState } from "../game.ts";
@@ -139,7 +140,7 @@ export function BossDock({
   const strip = !!panel;
   // Your pawn, in Boss alone's own screens only (not the Hidden Boss's phase change or phase 2, which pass `king`), and where
   // there's a strip or a computer's corner for it.
-  const pawn = !king && !!boss && bossAlone(match) && (strip || computer);
+  const pawn = !king && !!boss && (bossAlone(match) || !!match.party) && (strip || computer);
   const raceInBox = computer || (beside && !strip);
   const view = nav?.view;
   const moveNo = (p: number) => `${Math.ceil(p / 2)}${p % 2 === 1 ? "" : "…"}`;
@@ -160,7 +161,7 @@ export function BossDock({
   useEffect(() => warmSounds(["kingCant"]), []);
   return (
     <>
-    <div class={`boss-dock${strip ? " dk-strip" : ""}${pawn ? " dk-pawn" : ""}`} ref={dockRef}>
+    <div class={`boss-dock${strip ? " dk-strip" : ""}${pawn ? " dk-pawn" : ""}${pawn && match.party ? " dk-party" : ""}`} ref={dockRef}>
       <div class={`history-nav boss-dock-main${view?.browsing ? " browsing" : ""}${wide ? " wide" : ""}`}>
         {!wide && (
           <button type="button" class="nav-btn" aria-label="Previous move" disabled={!view || view.ply === 0} onClick={() => view?.go(view.ply - 1)}>
@@ -190,7 +191,8 @@ export function BossDock({
       </div>
       {!wide && !raceInBox && <RaceBadge boss={boss} below />}
       {strip && <div class="dk-panel">{panel}</div>}
-      {pawn && <YourPawn look={pawnLook({ id: "", isYou: true, isBot: false }).look} side={boss.crowdSide} hopAt={hopAt(match)} />}
+      {pawn && <YourPawn look={pawnLook({ id: "", isYou: true, isBot: false }).look} side={boss.crowdSide} hopAt={hopAt(match)} seat={match.party && match.myId ? match.party.seats[match.myId] : undefined} />}
+      {pawn && match.party && <PartyMates match={match} side={boss.crowdSide} />}
       <GodKingUnit
         show={king}
         side={side}
@@ -261,13 +263,14 @@ function hopAt(match: GameView): number {
  * draw it): a slow, slight bob like his breathing, and one small hop as your move goes in. CSS transforms only; it's drawn once
  * (memo) and again only for a hop, never per frame. It doesn't react to the King's save, a boss's power or the result.
  */
-const YourPawn = memo(function YourPawn({ look, side, hopAt }: { look: ItemLook | undefined; side: "w" | "b"; hopAt: number }) {
+const YourPawn = memo(function YourPawn({ look, side, hopAt, seat }: { look: ItemLook | undefined; side: "w" | "b"; hopAt: number; seat?: number }) {
   // (The bob keeps the clock's phase, so a screen's new dock carries on where the last one was.)
   const [phase] = useState(() => Date.now() % BOB_MS);
   const age = Date.now() - hopAt;
   const hop = hopAt > 0 && age < HOP_MS;
   return (
-    <div class="you-pawn" aria-hidden="true">
+    <div class="you-pawn" aria-hidden="true" style={seat !== undefined ? { "--pt-c": PARTY_COLORS[seat] ?? PARTY_COLORS[0] } : undefined}>
+      {seat !== undefined && <span class="pt-disc" />}
       <span class="you-pawn-bob" style={{ animationDelay: `-${phase}ms` }}>
         <span key={hop ? hopAt : 0} class={`you-pawn-hop${hop ? " hop" : ""}`} style={hop ? { animationDelay: `-${age}ms` } : undefined}>
           <Avatar look={look} side={side} />
@@ -276,6 +279,88 @@ const YourPawn = memo(function YourPawn({ look, side, hopAt }: { look: ItemLook 
     </div>
   );
 });
+
+/**
+ * A Boss Battle party's teammates in the battle (Eric, Oct 29: "two small icons for teammates, small versions of their
+ * pawns, no names"; docs/decisions/2026-10-30-boss-party.md): each one's pawn on a disc of their seat's color (their
+ * arrows' color), over its head a check once they've picked this turn or "…" while they think. For whoever may kick (the
+ * leader; those who have picked, when it's the leader who hasn't) a small "Kick" under each one who hasn't picked: grey
+ * for the turn's first minute after its first pick, then live; a first tap asks ("Kick?"), a second kicks. Phone: under
+ * your pawn and the God King. Computer: stacked by the board's corner, the God King in his place, you above him, your
+ * teammates above you (the battle's chat takes the room a row would need; the board never shrinks for them).
+ */
+function PartyMates({ match, side }: { match: GameView; side: "w" | "b" }) {
+  const party = match.party!;
+  const me = match.myId ?? null;
+  const [asking, setAsking] = useState<string | null>(null);
+  const [, tick] = useState(0);
+  const playing = match.phase.kind === "play";
+  const now = Date.now();
+  const picks = playing ? (match.livePicks() ?? []).filter((p) => p.at <= now) : [];
+  const picked = (id: string) => picks.some((p) => p.playerId === id);
+  const firstAt = picks.length ? Math.min(...picks.map((p) => p.at)) : null;
+  const liveAt = firstAt === null ? null : firstAt + BOSS_PARTY.afkKickSec * 1000;
+  // (Redrawn once when the kick goes live, not every frame.)
+  useEffect(() => {
+    if (liveAt === null || now >= liveAt) return;
+    const t = setTimeout(() => tick((n) => n + 1), liveAt - now + 20);
+    return () => clearTimeout(t);
+  }, [liveAt]);
+  useEffect(() => setAsking(null), [match.phase.kind]);
+  const leader = party.leader;
+  const mayKick = (id: string) => playing && !!me && !picked(id) && (me === leader || (!!leader && !picked(leader) && picked(me)) || (leader === id && picked(me)));
+  const mates = Object.entries(party.seats)
+    .filter(([id]) => id !== me && match.standings().some((s) => s.id === id && !s.out))
+    .sort((a, b) => a[1] - b[1]);
+  const standing = (id: string) => match.standings().find((s) => s.id === id);
+  return (
+    <div class="dk-mates" role="group" aria-label="Your team">
+      {mates.map(([id, seat]) => {
+        const st = standing(id);
+        const live = liveAt !== null && now >= liveAt;
+        const can = mayKick(id);
+        const name = match.nameOf(id);
+        return (
+          <div class="dk-mate" key={id} style={{ "--pt-c": PARTY_COLORS[seat] ?? PARTY_COLORS[0] }} aria-label={`${name}: ${picked(id) ? "picked" : "thinking"}`}>
+            <span class="pt-disc" aria-hidden="true" />
+            <span class="dk-mate-art" aria-hidden="true">
+              <Avatar look={st ? pawnLook(st).look : undefined} side={side} />
+            </span>
+            {playing && (picked(id) ? (
+              <span class="dk-mate-state done" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M6 12.5l4 4 8-9" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </span>
+            ) : (
+              <span class="dk-mate-state think" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+              </span>
+            ))}
+            {can && firstAt !== null && (
+              <button
+                type="button"
+                class={`dk-kick${live ? "" : " off"}`}
+                aria-disabled={!live || undefined}
+                aria-label={`Kick ${name}`}
+                onClick={() => {
+                  if (!live) return;
+                  if (asking !== id) return setAsking(id);
+                  setAsking(null);
+                  match.partyKick?.(id);
+                }}
+              >
+                {asking === id ? "Kick?" : "Kick"}
+              </button>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 /** The room right of the board the God King needs to stand beside the dock's row on a phone: his 58 px and a gap. */
 export const KING_BESIDE_PX = 66;

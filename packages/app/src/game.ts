@@ -304,6 +304,14 @@ export interface GameView {
    * The watching team sees them all along. Null when hidden.
    */
   livePicks(): LivePick[] | null;
+  /**
+   * A Boss Battle party's battle (online): each member's seat (their color) and the leader now; your pick this turn (it
+   * can change until the turn resolves); the AFK kick (docs/decisions/2026-10-30-boss-party.md). Missing elsewhere.
+   */
+  readonly party?: { seats: Record<string, number>; leader: string | null } | null;
+  readonly myPick?: string | null;
+  readonly myId?: string | null;
+  partyKick?(playerId: string): void;
   /** Crowd augments: your vote on the next round's move clock (at a cut). */
   voteAugment(choice: Augment): void;
   /** Your vote at this cut, if any. */

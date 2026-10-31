@@ -5,6 +5,8 @@ import type { PartyClientMessage, SquadsClientMessage } from "@chessroyale/chess
 import openings from "@chessroyale/chess/data/openings.json";
 import { SquadsCore, newSquadsRecord, squadsClosing, squadsLiveKey, squadsLiveSummary, type LiveMatch, type SquadsRecord, type SquadsReward, type SquadsServerRequest } from "./squads-lobby.ts";
 import { PartyCore, newPartyRecord, partyClosing, type PartyRecord } from "./squads-party.ts";
+import { bossPartyOverrides, partyLobby } from "./boss-party.ts";
+import { openLobbyCode } from "./codes.ts";
 import { DEVICE_COOKIE, SIGN_IN_TO_PLAY, accountOf, isSignedIn, readCookie, signInRequired, withSecrets } from "./api.ts";
 import { d1Sql, ensureSchema, grantReward, recordResult } from "./accounts.ts";
 import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
@@ -324,6 +326,8 @@ export class SquadsLobby extends DurableObject<Env> {
 export class SquadsParty extends DurableObject<Env> {
   private record: (PartyRecord & { queueName: string; fillMs: number }) | null = null;
   private asking = false;
+  /** A Boss Battle party's START is making its battle (one at a time: makeBattle). */
+  private making = false;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -344,6 +348,15 @@ export class SquadsParty extends DurableObject<Env> {
         for (const ws of this.socketsOf(memberId)) {
           try {
             ws.send(text);
+          } catch {
+            // Already closed.
+          }
+        }
+      },
+      close: (memberId) => {
+        for (const ws of this.socketsOf(memberId)) {
+          try {
+            ws.close(4003, "Removed from the party");
           } catch {
             // Already closed.
           }
@@ -385,10 +398,13 @@ export class SquadsParty extends DurableObject<Env> {
     return true;
   }
 
-  /** A new party under this code (false: the code is in use), queueing on `queueName` (lobbies fill after `fillMs`). */
-  async create(code: string, queueName: string, fillMs: number): Promise<boolean> {
+  /**
+   * A new party under this code (false: the code is in use), queueing on `queueName` (lobbies fill after `fillMs`). A
+   * Boss Battle party (`kind` "boss", boss-party.ts) has no queue: its START makes the battle.
+   */
+  async create(code: string, queueName: string, fillMs: number, kind?: "boss"): Promise<boolean> {
     if (this.record && !(await this.closeIfDue())) return false;
-    this.record = { ...newPartyRecord(code, Date.now()), queueName, fillMs };
+    this.record = { ...newPartyRecord(code, Date.now(), kind), queueName, fillMs };
     await this.persist(this.core());
     return true;
   }
@@ -430,7 +446,7 @@ export class SquadsParty extends DurableObject<Env> {
       const token = typeof msg.token === "string" ? msg.token : undefined;
       const known = token ? this.record.members.find((m) => m.token === token) : undefined;
       if (known) ws.serializeAttachment({ ...attached, playerId: known.id });
-      const result = core.connect(token, { name: attached.name ?? (typeof msg.name === "string" ? msg.name : undefined), device: msg.device === "phone" ? "phone" : "computer", v: msg.v });
+      const result = core.connect(token, { name: attached.name ?? (typeof msg.name === "string" ? msg.name : undefined), device: msg.device === "phone" ? "phone" : "computer", v: msg.v, look: msg.look, ...(attached.userId ? { userId: attached.userId } : {}) });
       if (!result.ok) return refuse(result.message);
       if (!known) {
         ws.serializeAttachment({ ...attached, playerId: result.memberId });
@@ -441,10 +457,66 @@ export class SquadsParty extends DurableObject<Env> {
     }
     const memberId = attached.playerId;
     if (!memberId) return;
-    core.message(memberId, msg);
+    core.message(memberId, msg, { test: !!attached.test });
     if (msg.t === "leave") ws.close(4001, "Left the party");
     await this.persist(core, msg.t === "leave" ? ws : undefined);
+    if (this.record.kind === "boss") {
+      await this.revokeInBattle();
+      return this.makeBattle();
+    }
     await this.askMatchmaker();
+  }
+
+  /**
+   * A Boss Battle party's START: its battle, a private lobby only its members may join (boss-party.ts). One at a time
+   * (`making`): a message while the lobby is being made never makes a second, and the placement is tied to its START.
+   */
+  private async makeBattle() {
+    if (this.making || !this.record) return;
+    const want = this.core().takeStart();
+    if (!want) return;
+    this.making = true;
+    try {
+      const code = this.record.code;
+      const lobby = await openLobbyCode(async (c) => (await this.env.LOBBIES.get(this.env.LOBBIES.idFromName(c)).create(c, bossPartyOverrides(want), undefined, undefined, partyLobby(want, code, Date.now()))) !== false).catch(() => null);
+      if (!this.record) return;
+      const core = this.core();
+      core.placedIn(lobby ?? null, want.id);
+      await this.persist(core);
+    } finally {
+      this.making = false;
+    }
+    // (Kicked while it was being made: revoked in it now.)
+    await this.revokeInBattle();
+  }
+
+  /** Members kicked after START: their passes into the battle revoked there (and out of it, if in). */
+  private async revokeInBattle() {
+    if (!this.record || this.making) return;
+    const core = this.core();
+    const r = core.takeRevokes();
+    if (!r) return;
+    await this.persist(core);
+    if (!r.lobby) return;
+    const battle = this.env.LOBBIES.get(this.env.LOBBIES.idFromName(r.lobby));
+    const party = { code: this.record.code, start: r.start };
+    for (const m of r.members) await battle.revokePartyMember(m, party).catch((e: unknown) => console.log(`party ${party.code}: revoke ${m}: ${String(e)}`));
+  }
+
+  /** Its battle kicked someone (the AFK kick): out of the party too, never back in (by member id). */
+  async kickMember(id: string): Promise<void> {
+    if (!this.record || this.record.kind !== "boss") return;
+    const core = this.core();
+    core.kickMember(id);
+    await this.persist(core);
+  }
+
+  /** Its battle from START `id` is over: that battle's passes go. */
+  async battleOver(id: number): Promise<void> {
+    if (!this.record || this.record.kind !== "boss") return;
+    const core = this.core();
+    core.battleOver(id);
+    await this.persist(core);
   }
 
   async webSocketClose(ws: WebSocket) {
