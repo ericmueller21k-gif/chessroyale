@@ -8,7 +8,7 @@ import { render } from "preact";
 import { ITEM_COLORS, type ItemSlot } from "@chessroyale/core";
 import { ItemLayer } from "../../packages/app/src/components/Items.tsx";
 import * as DRAFT from "virtual:draft";
-import { Pawn, usePaint, type Finish, type ItemDraft, type RiderDraft, type RiderFacing, type RiderViewDraft } from "./item-kit.tsx";
+import { Pawn, TRAIL_MAX, usePaint, type Finish, type ItemDraft, type RiderDraft, type RiderFacing, type RiderTrail, type RiderViewDraft } from "./item-kit.tsx";
 
 interface Req {
   mode: "item" | "rider" | "sheet";
@@ -16,8 +16,8 @@ interface Req {
   frames?: number[];
   /** Rider mode: which animation the big row shows. */
   anim?: "idle" | "move";
-  /** Rider mode: which view the page shows ("all": the three side by side; default all when it has front or back). */
-  view?: RiderFacing | "all";
+  /** Rider mode: which view the page shows ("all": the three side by side; default all when it has front or back; "trail": its trail mark). */
+  view?: RiderFacing | "all" | "trail";
   /** The pawn's side on the big row. */
   side?: "w" | "b";
   /** The color on the big row and the phone row. */
@@ -404,6 +404,116 @@ function RiderPage({ d, v }: { d: RiderDraft; v: RiderFacing }) {
   );
 }
 
+// ---------------- A ride's trail mark ----------------
+
+/** One frame of a trail mark round (0, 0), with its own paint (its box the mark's), as ride-gif-harness.tsx draws it. */
+function TrailLayer({ t, finish, v, f, n }: { t: RiderTrail; finish: Finish; v: RiderFacing; f: number; n: number }) {
+  const box: [number, number, number, number] = [-t.w / 2, -t.h / 2, t.w, t.h];
+  const p = usePaint(finish, box);
+  const p2 = usePaint({ ...finish, color: finish.color2 ?? finish.color, seed: finish.seed + 101 }, box);
+  return (
+    <g>
+      <defs>
+        {p.defs}
+        {p2.defs}
+      </defs>
+      {t.Mark({ p, p2, f, view: v, n })}
+    </g>
+  );
+}
+/** The town's floor (ride-gif.ts: render.ts SQ_LIGHT, SQ_DARK). */
+const FLOOR = { light: "#eec58b", dark: "#ad8058" };
+/** A mark on one square of the town's floor (69 units across, about 0.9 as deep), its box dashed. */
+function MarkOnSquare({ t, finish, v, flip, f, n, scale, dark, box = true }: { t: RiderTrail; finish: Finish; v: RiderFacing; flip: boolean; f: number; n: number; scale: number; dark: boolean; box?: boolean }) {
+  const W = 69;
+  const H = 62;
+  return (
+    <svg width={W * scale} height={H * scale} viewBox={`${-W / 2} ${-H / 2} ${W} ${H}`} style={{ display: "block" }}>
+      <rect x={-W / 2} y={-H / 2} width={W} height={H} fill={dark ? FLOOR.dark : FLOOR.light} />
+      {box && <rect x={-t.w / 2} y={-t.h / 2} width={t.w} height={t.h} fill="none" stroke="#2563eb" stroke-width="0.4" stroke-dasharray="1.5 1.5" />}
+      <g transform={flip ? "scale(-1 1)" : undefined}>
+        <TrailLayer t={t} finish={finish} v={v} f={f} n={n} />
+      </g>
+    </svg>
+  );
+}
+/** The ways a ride runs, the view its marks get, and the square's shade they're shown on. */
+const RUNS: { v: RiderFacing; flip: boolean; label: string; dark: boolean }[] = [
+  { v: "side", flip: false, label: "running right (side)", dark: false },
+  { v: "side", flip: true, label: "running left (side, mirrored)", dark: true },
+  { v: "back", flip: false, label: "running up (back)", dark: false },
+  { v: "front", flip: false, label: "running down (front)", dark: true },
+];
+
+/** Its trail mark: every frame at 4x for each way it runs (and the next mark, for marks that take turns), at town size, in every color. */
+function TrailPage({ d, t }: { d: RiderDraft; t: RiderTrail }) {
+  const n = t.ms?.length ?? 0;
+  const color = req.color ?? "red";
+  const frames = (req.frames?.length ? req.frames : Array.from({ length: n }, (_, i) => i)).filter((i) => i >= 0 && i < n).slice(0, req.all ? 64 : 8);
+  const life = (t.ms ?? []).reduce((s, m) => s + m, 0);
+  return (
+    <div style={{ padding: "6px" }}>
+      {RUNS.map((r) => (
+        <Row key={r.label} title={`${d.name}'s trail mark, ${r.label}: frame by frame at 4x (fresh to faded), ${color}; its box dashed (${t.w} x ${t.h}); a square is 69 units`}>
+          {frames.map((f) => (
+            <Cell key={f} label={`frame ${f} (${t.ms[f]} ms)`}>
+              <MarkOnSquare t={t} finish={fin(color, 25)} v={r.v} flip={r.flip} f={f} n={0} scale={1.8} dark={r.dark} />
+            </Cell>
+          ))}
+          <Cell label="next mark, frame 0">
+            <MarkOnSquare t={t} finish={fin(color, 25)} v={r.v} flip={r.flip} f={0} n={1} scale={1.8} dark={r.dark} />
+          </Cell>
+        </Row>
+      ))}
+      <Row title={`Town size (a square 31 px): every frame, each way it runs, on a light and a dark square (life ${life} ms; one every ${t.every ?? 1} square${(t.every ?? 1) > 1 ? "s" : ""})`}>
+        {RUNS.flatMap((r) =>
+          [false, true].map((dark) => (
+            <Cell key={`${r.label}${dark}`} label={`${r.v}${r.flip ? " left" : ""}`}>
+              <div style={{ display: "flex" }}>
+                {Array.from({ length: n }, (_, f) => (
+                  <MarkOnSquare key={f} t={t} finish={fin(color, 25)} v={r.v} flip={r.flip} f={f} n={f % 2} scale={0.45} dark={dark} box={false} />
+                ))}
+              </div>
+            </Cell>
+          )),
+        )}
+      </Row>
+      <Row title="Every color at 75% purity, frame 0, running right, at 2x">
+        {ITEM_COLORS.map((c) => (
+          <Cell key={c.id} label={c.name}>
+            <MarkOnSquare t={t} finish={{ ...fin(c.id, 25, 1000 + c.weight * 10), color2: d.colors === 2 ? "yellow" : undefined }} v="side" flip={false} f={0} n={0} scale={0.9} dark={false} box={false} />
+          </Cell>
+        ))}
+      </Row>
+    </div>
+  );
+}
+
+/** A trail mark's numbers and whether every frame stays inside its box (its drawn shapes, outlines aside, 2 units' slack). */
+function trailFacts(t: RiderTrail): object {
+  const n = t.ms?.length ?? 0;
+  if (!n || t.ms.some((m) => !(m > 0))) warnings.push(`trail.ms must be one or more frame lengths in ms, each above 0 (it is ${JSON.stringify(t.ms)})`);
+  if (!(t.w > 0 && t.h > 0) || t.w > TRAIL_MAX.w || t.h > TRAIL_MAX.h) warnings.push(`trail.w and trail.h must be above 0 and at most ${TRAIL_MAX.w} and ${TRAIL_MAX.h} (they are ${t.w} and ${t.h})`);
+  if (t.every !== undefined && !(Number.isInteger(t.every) && t.every >= 1)) warnings.push(`trail.every must be a whole number of squares, 1 or more (it is ${t.every})`);
+  const g = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  document.body.append(g);
+  const past: string[] = [];
+  for (const v of ["side", "back", "front"] as const)
+    for (let f = 0; f < n; f++) {
+      const host = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      g.append(host);
+      render(<TrailLayer t={t} finish={fin("red")} v={v} f={f} n={0} />, host);
+      host.querySelectorAll(".item-shine").forEach((e) => e.remove());
+      const b = host.getBBox();
+      if (b.width && (b.x < -t.w / 2 - 2 || b.y < -t.h / 2 - 2 || b.x + b.width > t.w / 2 + 2 || b.y + b.height > t.h / 2 + 2)) past.push(`${v} frame ${f} (${[b.x, b.y, b.width, b.height].map((x) => x.toFixed(0)).join(", ")})`);
+      render(null, host);
+      host.remove();
+    }
+  g.remove();
+  if (past.length) warnings.push(`the trail mark spills past its box (${-t.w / 2}, ${-t.h / 2}, ${t.w}, ${t.h}): ${past.slice(0, 4).join("; ")}`);
+  return { frames: n, lifeMs: (t.ms ?? []).reduce((s, m) => s + m, 0), every: t.every ?? 1, w: t.w, h: t.h };
+}
+
 // ---------------- Facts ----------------
 
 /** The art's box on frame 0, and whether it rises past the avatar's cap (9 points over the square). */
@@ -434,7 +544,7 @@ function measure(): object {
   }
   if (rider) {
     const counts = (v: RiderViewDraft) => ({ idleFrames: v.idle?.ms?.length ?? 0, moveFrames: v.move?.ms?.length ?? 0, idleMs: (v.idle?.ms ?? []).reduce((s, x) => s + x, 0), moveMs: (v.move?.ms ?? []).reduce((s, x) => s + x, 0) });
-    facts.rider = { id: rider.id, tier: rider.tier, ...counts(rider), views: facings(rider) };
+    facts.rider = { id: rider.id, tier: rider.tier, ...counts(rider), views: facings(rider), trail: rider.trail ? trailFacts(rider.trail) : null };
     for (const v of ["front", "back"] as const) {
       const view = rider.views?.[v];
       if (!view) continue;
@@ -459,8 +569,13 @@ if (req.mode !== "sheet") try {
     if (!rider) throw new Error(`the draft exports no rider (an object with id, frame, idle, move, pose, Back and Front); exports: ${Object.keys(DRAFT).join(", ") || "none"}`);
     const has = facings(rider);
     const v = req.view ?? (has.length > 1 ? "all" : "side");
-    if (v !== "all" && !has.includes(v)) throw new Error(`the ride has no ${v} view yet (views.${v}); it has: ${has.join(", ")}`);
-    render(v === "all" ? <ViewsPage d={rider} /> : <RiderPage d={rider} v={v} />, root);
+    if (v === "trail") {
+      if (!rider.trail) throw new Error("the ride has no trail mark yet (the RiderDraft's `trail`)");
+      render(<TrailPage d={rider} t={rider.trail} />, root);
+    } else {
+      if (v !== "all" && !has.includes(v)) throw new Error(`the ride has no ${v} view yet (views.${v}); it has: ${has.join(", ")}`);
+      render(v === "all" ? <ViewsPage d={rider} /> : <RiderPage d={rider} v={v} />, root);
+    }
   }
   // Wait a frame for layout, then measure.
   requestAnimationFrame(() => {

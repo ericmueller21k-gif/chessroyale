@@ -5,13 +5,15 @@
  *   - `info()`: the draft's name, its views and each view's idle and move lengths (ms) and the move's dx per frame;
  *   - `sprite(...)`: one frame of one view, the ride with its pawn on it, at its place on a cell (the pawn's foot at the
  *     cell's anchor, which is where the town stands a pawn on its square), without the pose's dx (the GIF moves it);
+ *   - `mark(...)`: one frame of one trail mark on the ground, centered on the cell's anchor (the spot it lands on), or the
+ *     town's droplet at an age when the ride has no trail mark yet;
  *   - `pawn(...)`: the plain pawn in the same cell;
  *   - `caption(...)`: the strip along the top.
  */
 import type { ComponentChildren } from "preact";
 import { render } from "preact";
 import * as DRAFT from "virtual:draft";
-import { Pawn, usePaint, type Finish, type RiderDraft, type RiderFacing, type RiderViewDraft } from "./item-kit.tsx";
+import { Pawn, TRAIL_MAX, usePaint, type Finish, type RiderDraft, type RiderFacing, type RiderTrail, type RiderViewDraft } from "./item-kit.tsx";
 
 const isRider = (v: unknown): v is RiderDraft => !!v && typeof v === "object" && "Back" in v && "Front" in v && "pose" in v;
 const rider = Object.values(DRAFT as Record<string, unknown>).find(isRider);
@@ -74,6 +76,41 @@ function RiderSprite({ d, v, anim, f, finish }: { d: RiderDraft; v: RiderFacing;
   );
 }
 
+/** The town's droplet (town/render.ts drawMarks), in units: `a` its age (0 to 1), `sq` units a square, `size` and `alpha` TOWN_FEEL's. */
+export interface Droplet {
+  a: number;
+  sq: number;
+  size: number;
+  alpha: number;
+}
+function DropletMark({ a, sq, size, alpha }: Droplet) {
+  const rx = sq * size * 0.5 * (1 - 0.6 * a);
+  const o = alpha * (1 - a) * (1 - a);
+  return (
+    <g>
+      <ellipse cx="0" cy={rx * 0.25} rx={rx * 1.5} ry={rx * 0.66} fill="rgb(110,70,30)" fill-opacity={0.22 * o} />
+      <ellipse cx="0" cy="0" rx={rx * 1.4} ry={rx * 0.6} fill="#fff" fill-opacity={0.55 * o} />
+      <ellipse cx="0" cy="0" rx={rx} ry={rx * 0.42} fill="#fff" fill-opacity={o} />
+    </g>
+  );
+}
+
+/** One frame of the ride's trail mark, centered on (0, 0), with its own paint (its box the mark's). */
+function TrailMark({ t, finish, v, f, n }: { t: RiderTrail; finish: Finish; v: RiderFacing; f: number; n: number }) {
+  const box: [number, number, number, number] = [-t.w / 2, -t.h / 2, t.w, t.h];
+  const p = usePaint(finish, box);
+  const p2 = usePaint({ ...finish, color: finish.color2 ?? finish.color, seed: finish.seed + 101 }, box);
+  return (
+    <g>
+      <defs>
+        {p.defs}
+        {p2.defs}
+      </defs>
+      {t.Mark({ p, p2, f, view: v, n })}
+    </g>
+  );
+}
+
 const root = document.getElementById("app")!;
 const api = {
   info() {
@@ -83,13 +120,24 @@ const api = {
       const view = viewOf(rider, v)!;
       views[v] = { idleMs: view.idle?.ms ?? [], moveMs: view.move?.ms ?? [], moveDx: (view.move?.ms ?? []).map((_, f) => view.pose("move", f).dx) };
     }
-    return { id: rider.id, name: rider.name, views };
+    const t = rider.trail;
+    const trail = t ? { ms: t.ms ?? [], every: t.every ?? 1, w: t.w, h: t.h } : null;
+    return { id: rider.id, name: rider.name, views, trail, trailMax: TRAIL_MAX };
   },
   sprite(c: Cell, v: RiderFacing, anim: "idle" | "move", f: number, color: string) {
     render(
       <CellSvg c={c}>
         <RiderSprite d={rider!} v={v} anim={anim} f={f} finish={fin(rider!, color)} />
       </CellSvg>,
+      root,
+    );
+  },
+  /** A trail mark's frame (or, with `drop`, the town's droplet), its spot on the cell's anchor; the cell's svg box is in units round (0, 0). */
+  mark(c: Cell, v: RiderFacing, f: number, n: number, color: string, drop?: Droplet) {
+    render(
+      <svg width={c.cw * c.ss} height={c.ch * c.ss} viewBox={`${-c.ax / TOWN} ${-c.ay / TOWN} ${c.cw / TOWN} ${c.ch / TOWN}`} style={{ display: "block" }}>
+        {drop ? <DropletMark {...drop} /> : <TrailMark t={rider!.trail!} finish={fin(rider!, color)} v={v} f={f} n={n} />}
+      </svg>,
       root,
     );
   },

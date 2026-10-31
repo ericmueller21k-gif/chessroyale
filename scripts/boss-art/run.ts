@@ -13,6 +13,8 @@
  *
  * `--rider-views <id> <brief.md>` adds front and back views to a finished ride: its drawing (out/<id>/<id>.tsx) is the
  * starting file and the reference, and `done` is refused while the side view's pictures differ from the original's.
+ * `--rider-trail <id> <brief.md>` adds (or replaces) a finished ride's trail mark and takes any left-behind trail out of
+ * its frames: `done` is refused while its frames differ from the original's other than by what was taken away.
  */
 import Anthropic from "@anthropic-ai/sdk";
 import { execFileSync } from "node:child_process";
@@ -22,19 +24,21 @@ import { MODEL as OPUS, PRICE as OPUS_PRICE, hasKey } from "../boss-lines/api.ts
 
 const ARGS = process.argv.slice(2);
 /**
- * What's drawn: a boss character (the default), a crate item (`--item`), a ride under the pawn (`--rider`), or the front
- * and back views of a finished ride (`--rider-views`, a ride run that starts from its side view).
+ * What's drawn: a boss character (the default), a crate item (`--item`), a ride under the pawn (`--rider`), the front
+ * and back views of a finished ride (`--rider-views`, a ride run that starts from its side view), or a finished ride's
+ * trail mark (`--rider-trail`, a ride run that starts from the finished ride).
  */
 const VIEWS = ARGS.includes("--rider-views");
-const MODE: "boss" | "item" | "rider" = VIEWS || ARGS.includes("--rider") ? "rider" : ARGS.includes("--item") ? "item" : "boss";
+const TRAIL = ARGS.includes("--rider-trail");
+const MODE: "boss" | "item" | "rider" = VIEWS || TRAIL || ARGS.includes("--rider") ? "rider" : ARGS.includes("--item") ? "item" : "boss";
 const [id, briefPath, refsDir] = ARGS.filter((a) => !a.startsWith("--"));
 if (!id || !/^[a-z][a-z0-9-]{1,30}$/.test(id) || !briefPath) {
-  console.error("usage: npx tsx scripts/boss-art/run.ts [--item | --rider | --rider-views] <id> <brief.md> [refs dir]");
+  console.error("usage: npx tsx scripts/boss-art/run.ts [--item | --rider | --rider-views | --rider-trail] <id> <brief.md> [refs dir]");
   process.exit(2);
 }
 const ITEMISH = MODE !== "boss";
-/** The cap: $20, or $3 for adding a ride's views (Oct 31). */
-const CAP = Number(process.env.BOSS_ART_CAP_USD ?? (VIEWS ? 3 : 20));
+/** The cap: $20, or $3 for adding a ride's views, $1.50 for its trail (Oct 31). */
+const CAP = Number(process.env.BOSS_ART_CAP_USD ?? (VIEWS ? 3 : TRAIL ? 1.5 : 20));
 /**
  * The model and its effort (Oct 27, Eric: compare Sonnet and Opus on the same drawing): BOSS_ART_MODEL (default Opus 5.5)
  * and BOSS_ART_EFFORT (default high). Each model's prices, dollars per million tokens (cache writes at 1.25x input).
@@ -46,7 +50,8 @@ const PRICES: Record<string, { input: number; output: number; cacheWrite: number
 };
 const PRICE = PRICES[MODEL]!;
 if (!PRICES[MODEL]) throw new Error(`BOSS_ART_MODEL: no prices for ${MODEL} (${Object.keys(PRICES).join(", ")})`);
-const EFFORT = (process.env.BOSS_ART_EFFORT ?? "high") as "low" | "medium" | "high" | "xhigh";
+/** (A trail run: medium by default.) */
+const EFFORT = (process.env.BOSS_ART_EFFORT ?? (TRAIL ? "medium" : "high")) as "low" | "medium" | "high" | "xhigh";
 if (!["low", "medium", "high", "xhigh"].includes(EFFORT)) throw new Error("BOSS_ART_EFFORT: low, medium, high or xhigh");
 if (!(CAP > 0)) throw new Error("BOSS_ART_CAP_USD must be a positive number of dollars");
 const MAX_TURNS = Number(process.env.BOSS_ART_MAX_TURNS ?? 90);
@@ -62,25 +67,25 @@ const OUT = resolve(`scripts/boss-art/out/${id}`);
 const DRAFT = join(OUT, `${id}.${ITEMISH ? "tsx" : "ts"}`);
 const LOOKS = join(OUT, "looks");
 /**
- * Adding views: the finished side drawing, kept as it was when the run started (next to the drawing, so its import
- * still resolves; not committed), to show the model and to check the side view against at `done`.
+ * Adding views or a trail: the finished drawing, kept as it was when the run started (next to the drawing, so its import
+ * still resolves; not committed: `<id>.side.tsx`, `<id>.pre-trail.tsx`), to show the model and to check against at `done`.
  */
-const SIDE = join(OUT, `${id}.side.tsx`);
-if (VIEWS) {
+const ORIG = join(OUT, `${id}.${VIEWS ? "side" : "pre-trail"}.tsx`);
+if (VIEWS || TRAIL) {
   if (!existsSync(DRAFT)) {
-    console.error(`--rider-views: no finished ride at ${relative(ROOT, DRAFT)} (draw it first with --rider)`);
+    console.error(`${VIEWS ? "--rider-views" : "--rider-trail"}: no finished ride at ${relative(ROOT, DRAFT)} (draw it first with --rider)`);
     process.exit(2);
   }
-  writeFileSync(SIDE, readFileSync(DRAFT));
+  writeFileSync(ORIG, readFileSync(DRAFT));
 }
-/** This run's own files: a views run keeps the side run's summary and log, and numbers its looks apart. */
-const RUN = VIEWS ? "views-" : "";
+/** This run's own files: a views or trail run keeps the side run's summary and log, and numbers its looks apart. */
+const RUN = VIEWS ? "views-" : TRAIL ? "trail-" : "";
 mkdirSync(LOOKS, { recursive: true });
 /** What the model may read: the characters' code, the art guide and the boss area page (read only). */
 const ARENA_DONE = existsSync(resolve("scripts/boss-art/out")) ? readdirSync(resolve("scripts/boss-art/out")).filter((d) => d.startsWith("arena-")).map((d) => `scripts/boss-art/out/${d}`) : [];
 const READABLE = (
   ITEMISH
-    ? ["packages/app/src/components/Items.tsx", "packages/core/src/crates.ts", "scripts/boss-art/item-kit.tsx", ".claude/agents/item-builder.md", "packages/app/src/characters", ...(VIEWS ? [join(OUT, "summary.md"), SIDE] : [])]
+    ? ["packages/app/src/components/Items.tsx", "packages/core/src/crates.ts", "scripts/boss-art/item-kit.tsx", ".claude/agents/item-builder.md", "packages/app/src/characters", ...(VIEWS || TRAIL ? [join(OUT, "summary.md"), join(OUT, "views-summary.md"), ORIG] : [])]
     : [...ARENA_DONE, "packages/app/src/characters", "packages/app/src/town/houses", ".claude/agents/characters.md", "docs/areas/bosses.md", "docs/areas/town-square.md", "scripts/boss-art/out/folio", "scripts/boss-art/out/sidekick-jefferson-sonnet-2", "scripts/boss-art/out/rank-wood", "scripts/boss-art/out/rank-sublime", "scripts/boss-art/out/rank-top-transcendent", "scripts/boss-art/briefs"]
 )
   // BOSS_ART_READ: more paths it may read, comma-separated (a redo reading its first try).
@@ -126,6 +131,17 @@ How to work:
 - The reference pictures are the boss it's named for: take its colors, shapes and feel, in the item style (not pixel art).
 - Spend: each tool result tells you what's been spent of the cap. Pace yourself to finish well before it: a few renders are usually enough. When it's done, call done with short notes: what it is, its motion beat by beat, and any choice the owner might want to change.`;
 
+/** Nothing left behind in a ride's own frames (Oct 31): the rider, rider-views and rider-trail prompts. */
+const LEFT_BEHIND = `Nothing left behind in the ride's own frames (Oct 31; Eric: the trails appear only when you're running around the town). Its idle has no trail at all, and its move draws nothing that stays behind as it goes: no ribbon, sparkle trail, streaks, smoke line, footprints or puffs left in the air or on the ground behind it. What goes along with the ride is fine (an exhaust puff at its pipe, a kick of dust at its feet that stays with it, a wisp rising from it, twinkles round it at rest). What it leaves behind is its trail mark (\`trail\`), which the town draws on the ground, apart from the ride, only while it runs.`;
+
+/** A ride's trail mark: the format and how the town shows it (the rider and rider-trail prompts). */
+const TRAIL_TEXT = `Its trail (Oct 31). In the town your pawn leaves a few small white droplets on the squares behind it as it runs, each fading out (seen only by you). A ride replaces them with its own trail mark (the RiderDraft's \`trail\`, type RiderTrail): a cricket's little footprints, a bulb's dark smudge, a moon's sparkle.
+- trail: { ms: [each frame's length], every?: one mark every this many squares (default 1), w, h: its box in units, Mark({ p, p2, f, view, n }) }. The town drops one mark on each square the ride leaves while it runs (none while it stands still), where it stays and plays its frames once, fresh to faded (frame 0 when it lands; its life is the sum of ms: a few hundred ms to a second; the droplets live 520 ms, so about three show behind a run), then it's gone. The fade is drawn in its frames (opacity, shrinking, breaking up).
+- It's small and on the ground: drawn round (0, 0), the middle of the square it lands on (a square is about 69 units), inside its box (w × h centered there, at most 40 × 30). Draw it seen from above at the town's angle, a little flattened, lying flat on the floor (no shadow, nothing standing up). It must read on the floor's light tan and dark brown squares at town size (a square 31 px).
+- view is the way the ride was running: side (going right; the town mirrors it for left), back (going up the screen), front (going down), so prints or streaks can point the way it went; n numbers a run's marks (0, 1, 2, …), for marks that take turns (a left and a right footprint).
+- It may take the item's color (p.hex, flat; or a Region: its box is the mark's) or have fixed colors, as the brief says.
+- Render it with view "trail": every frame at 4x for each way it runs, at town size and in every color, then a strip of frames from the ride's GIF (the end of a run right, a moment later as its marks fade, the ends of a run up and a run down) at the town's scale.`;
+
 /** Front and back: what they are and how they move (the rider and rider-views prompts). */
 const VIEWS_TEXT = `Three views (Oct 31). In the town a ride is seen from the way it's going, so a ride can have three views:
 - side (walking left or right): the RiderDraft's own fields, facing our right (the town mirrors it for left).
@@ -147,6 +163,11 @@ ${KIT}
 ${VIEWS_TEXT}
 - Draw the side view. Draw front and back views (views: { front, back }) only if the brief asks for them; they can be added later from the finished side.
 
+${LEFT_BEHIND}
+
+${TRAIL_TEXT}
+- Draw its trail mark if the brief describes one; otherwise leave \`trail\` out (it can be added later).
+
 How to work:
 - Write the drawing (write_drawing), render it (render, anim idle or move) and look hard at what comes back: the animation frame by frame at 4x with a pawn riding, the town size (a pawn about 45 px) at rest and through its move, every color scheme at 75% purity, its tile. Fix what reads badly (edit_drawing for small changes) and look again. It must read at town size and look great at 4x, in every color; the pawn must clearly sit on it.
 - The reference pictures are the boss it comes from: take its colors, shapes and feel, in the item style (not pixel art).
@@ -159,6 +180,8 @@ ${KIT}
 
 ${VIEWS_TEXT}
 
+${LEFT_BEHIND} If the side's move leaves something behind, the front and back views leave nothing behind all the same (the trail mark covers it).
+
 Your task:
 - Your file (${relative(ROOT, DRAFT)}) starts as the finished ride: its side view, already approved. Its source, its maker's notes and pictures of its side view are in the first message. Add views: { front, back } to its RiderDraft, each a RiderViewDraft.
 - The side view must not change at all: not a number, a color, a region's name or the order things are drawn. done renders the side view and compares it with the original's pixels, and refuses while anything differs. So add code, never rewrite: put the new functions after the side's, and add the views field with edit_drawing (small inserts). You may reuse the side's constants, colors and state tables (its idle and move beats) from the new code, but don't edit them.
@@ -168,16 +191,34 @@ How to work:
 - Render with view "all" to see the three views side by side (at rest and through their moves, at 4x and at town size, in two more colors); render one view (view "front" or "back", anim idle or move) to see it frame by frame at 4x and in every color. Look hard and fix what reads badly. Both new views must read at town size (a pawn about 45 px) and look great at 4x, in every color; the pawn must clearly sit on the ride, and from the front its face must read.
 - Spend: each tool result tells you what's been spent of the cap. Pace yourself to finish well before it. When it's done, call done with short notes: what each new view shows, its idle and move beat by beat, and any choice the owner might want to change.`;
 
+const RIDER_TRAIL_SYSTEM = `You are an artist adding the trail mark to a finished ride for HunChess, a chess game whose players dress their pawn in cosmetic items from crates; a ride is a very rare item the pawn rides on. The ride is drawn as code, one TSX file in the game's own item format, and you work alone in a loop with tools; you see your work only by rendering it.
+
+${KIT}
+- The pawn sits on a ride the way a pawn sits on a park bench in the game's town. A ride has an idle and a move (one square's travel) for its side view, and may have front and back views (views: { front, back }) with their own.
+
+${TRAIL_TEXT}
+
+${LEFT_BEHIND}
+
+Your task:
+- Your file (${relative(ROOT, DRAFT)}) starts as the finished ride, already approved. Its source, its maker's notes and pictures of each view are in the first message. Add its trail mark as the brief describes: a \`trail\` field on its RiderDraft, its Mark function after the ride's code (if it already has one, replace it).
+- Take out of the ride's own frames anything left behind, in every view, idle and move: a sparkle trail behind its tail, a ribbon of paint, streaks, smoke or dust left behind in the air or on the ground. Keep what goes along with the ride. Take out only that (remove the code that draws it, or make it draw nothing) and leave everything else exactly as it is: not a number, a color, a region's name or the order things are drawn; the same frames, frame lengths and poses. Add no new views.
+- done renders every frame of every view before and after (in two colors) and refuses while anything differs other than by being taken away: nothing added, nothing of the ride itself changed (what the trail covered may show again). It also refuses while the trail mark is missing, past its box or its limits. Its refusal shows the frames that differ: before, after, and the difference (magenta: taken away; orange: next to it; red: changed or added).
+
+How to work:
+- Render with view "trail" to see the mark (and how it lies behind the running ride); render a view's move (view side, front or back; anim move) to check that nothing is left behind any more. The mark must read at town size on light and dark squares, in every color it takes, and suit the ride.
+- Spend: each tool result tells you what's been spent of the cap. Pace yourself to finish well before it. When it's done, call done with short notes: the mark frame by frame (its life, how it fades, how it points), what you took out of which frames, and any choice the owner might want to change.`;
+
 const ITEM_RENDER: Anthropic.Tool = {
   name: "render",
   description:
     MODE === "rider"
-      ? "Render your ride into one picture. `view`: side, front, back, or all (the default once it has a front or back view). One view: on top, one animation (`anim`, idle or move) frame by frame at 4x with a pawn riding (`frames`: 0-based, default all, at most 8; `side`: w or b; `color`: a color id, default red); then the town size at rest and every frame of the move; then every color scheme at 75% purity, 100%, shiny and its tile, beside existing items. All: the three views side by side in columns, idle frame 0 and some move frames at 4x (`frames`: the move frames, at most 4; default 3 spread over the move; the side's move shown in place), then at town size idle and every move frame, then at rest in cobalt (white pawn) and midnight (black pawn). Returns the picture, the facts (frame counts, loop lengths, per view) and any warnings."
+      ? "Render your ride into one picture. `view`: side, front, back, or all (the default once it has a front or back view); or trail: its trail mark, every frame at 4x for each way it runs (`frames`, `color`), at town size and in every color, plus a second picture, a strip of frames from the ride's GIF at the town's scale (the end of a run right, a moment later as the marks fade, the ends of a run up and a run down). One view: on top, one animation (`anim`, idle or move) frame by frame at 4x with a pawn riding (`frames`: 0-based, default all, at most 8; `side`: w or b; `color`: a color id, default red); then the town size at rest and every frame of the move; then every color scheme at 75% purity, 100%, shiny and its tile, beside existing items. All: the three views side by side in columns, idle frame 0 and some move frames at 4x (`frames`: the move frames, at most 4; default 3 spread over the move; the side's move shown in place), then at town size idle and every move frame, then at rest in cobalt (white pawn) and midnight (black pawn). Returns the picture, the facts (frame counts, loop lengths, per view) and any warnings."
       : "Render your item into one picture: on top, its motion frame by frame on a pawn at 4x (`frames`: 0-based, default all, at most 8; `side`: w or b; `color`: a color id, default red); then phone size (a 60 px lobby pawn white and black, the 130 px home pawn, its 64 px tile) beside existing items of its slot; then every color scheme at 75% purity, 100% and shiny. Returns the picture, the facts (frames, its box) and any warnings (spilling past its frame box, rising past the avatar's cap).",
   input_schema: {
     type: "object",
     properties: {
-      ...(MODE === "rider" ? { anim: { type: "string", enum: ["idle", "move"] }, view: { type: "string", enum: ["side", "front", "back", "all"] } } : {}),
+      ...(MODE === "rider" ? { anim: { type: "string", enum: ["idle", "move"] }, view: { type: "string", enum: ["side", "front", "back", "all", "trail"] } } : {}),
       frames: { type: "array", items: { type: "integer" } },
       side: { type: "string", enum: ["w", "b"] },
       color: { type: "string", enum: ["red", "yellow", "sage", "opal", "cobalt", "midnight", "emerald", "oceanic", "pearl"] },
@@ -263,7 +304,7 @@ function readable(p: string): string | null {
 }
 
 /** One picture from item-render.ts (its own process, with no key in its environment: it runs the drawing's code). */
-function itemRender(req: object): { file?: string; error?: string; facts?: { rider?: { views?: string[] } }; warnings?: string[] } {
+function itemRender(req: object): { file?: string; error?: string; facts?: { rider?: { views?: string[]; trail?: object | null } }; warnings?: string[] } {
   try {
     const raw = execFileSync("npx", ["tsx", "scripts/boss-art/item-render.ts", JSON.stringify(req)], { cwd: ROOT, env: bareEnv(), timeout: 120_000, encoding: "utf8", maxBuffer: 4 << 20 });
     return JSON.parse(raw.trim().split("\n").pop() ?? "{}");
@@ -279,13 +320,13 @@ function itemRender(req: object): { file?: string; error?: string; facts?: { rid
  */
 function sideCheck(needViews: boolean): string | null {
   const shot = (draft: string, anim: string) => {
-    const dir = join(LOOKS, "side-check", `${draft === SIDE ? "original" : "now"}-${anim}`);
+    const dir = join(LOOKS, "side-check", `${draft === ORIG ? "original" : "now"}-${anim}`);
     mkdirSync(dir, { recursive: true });
     return itemRender({ draft, mode: "rider", view: "side", anim, all: true, out: dir });
   };
   const changed: string[] = [];
   for (const anim of ["idle", "move"]) {
-    const was = shot(SIDE, anim);
+    const was = shot(ORIG, anim);
     const now = shot(DRAFT, anim);
     if (now.error) return `the drawing doesn't render: ${now.error}`;
     if (was.error || !was.file || !now.file) return `the side check couldn't render the original: ${was.error ?? "no picture"}`;
@@ -296,7 +337,46 @@ function sideCheck(needViews: boolean): string | null {
       if (missing.length) return `the ride has no ${missing.join(" or ")} view yet (views.${missing[0]})`;
     }
   }
-  return changed.length ? `the side view's pictures differ from the original's (${changed.join(" and ")}: compare the side view with render view "side"; the original is ${relative(ROOT, SIDE)}, read only). Put the side view back exactly as it was` : null;
+  return changed.length ? `the side view's pictures differ from the original's (${changed.join(" and ")}: compare the side view with render view "side"; the original is ${relative(ROOT, ORIG)}, read only). Put the side view back exactly as it was` : null;
+}
+
+/**
+ * A ride's trail in its GIF (ride-gif.ts, its own process without the key): a strip of a few of its frames at the town's
+ * scale, as a picture block, or the reason there's none.
+ */
+function trailStrip(dir: string, color: string): Anthropic.ImageBlockParam | string {
+  const strip = join(dir, "strip.png");
+  try {
+    execFileSync("npx", ["tsx", "scripts/boss-art/ride-gif.ts", DRAFT, color, "--out", join(dir, "ride.gif"), "--strip", strip], { cwd: ROOT, env: bareEnv(), timeout: 180_000, encoding: "utf8", maxBuffer: 4 << 20, stdio: "pipe" });
+  } catch (e) {
+    const err = e as { stdout?: string; stderr?: string; message: string };
+    return `the GIF strip failed: ${(err.stderr || err.stdout || err.message).slice(0, 1500)}`;
+  }
+  return existsSync(strip) ? { type: "image", source: { type: "base64", media_type: "image/png", data: readFileSync(strip).toString("base64") } } : "the GIF strip wasn't written";
+}
+
+/** The trail check's answer (ride-gif.ts --trail-check). */
+interface TrailCheck {
+  ok: boolean;
+  problems: string[];
+  removed?: string[];
+  trail?: object;
+  file?: string | null;
+}
+let trailChecks = 0;
+/**
+ * Adding a trail: whether the ride's frames (every view, idle and move) differ from the original's only by what was taken
+ * away, its timing and travel are the same, and its trail mark is there and within its limits (ride-gif.ts
+ * --trail-check, its own process without the key, since it runs the drawing).
+ */
+function trailCheck(): TrailCheck {
+  try {
+    const raw = execFileSync("npx", ["tsx", "scripts/boss-art/ride-gif.ts", "--trail-check", ORIG, DRAFT, "--out", join(LOOKS, `trail-check-${++trailChecks}`)], { cwd: ROOT, env: bareEnv(), timeout: 600_000, encoding: "utf8", maxBuffer: 4 << 20, stdio: "pipe" });
+    return JSON.parse(raw.trim().split("\n").pop() ?? "{}") as TrailCheck;
+  } catch (e) {
+    const err = e as { stdout?: string; stderr?: string; message: string };
+    return { ok: false, problems: [`the trail check didn't run: ${(err.stderr || err.stdout || err.message).slice(0, 1500)}`] };
+  }
 }
 
 function runTool(name: string, input: Record<string, unknown>): { content: Content; error?: boolean; done?: string } {
@@ -360,7 +440,13 @@ function runTool(name: string, input: Record<string, unknown>): { content: Conte
       const { file, ...rest } = r;
       const text = `${JSON.stringify(rest, null, 1)} ${spendLine()}`;
       if (!file) return { content: text, error: !!r.error };
-      return { content: [{ type: "image", source: { type: "base64", media_type: "image/png", data: readFileSync(file).toString("base64") } }, { type: "text", text }] };
+      const pic: Anthropic.ImageBlockParam = { type: "image", source: { type: "base64", media_type: "image/png", data: readFileSync(file).toString("base64") } };
+      // A ride's trail: its mark, then the strip from its GIF.
+      if (MODE === "rider" && input.view === "trail") {
+        const strip = trailStrip(dir, str(input.color) ?? "red");
+        return { content: typeof strip === "string" ? [pic, { type: "text", text: `${text}\n${strip}` }] : [pic, strip, { type: "text", text: `Above: its trail mark, then the strip from its GIF (the end of a run right, a moment later, the ends of a run up and a run down). ${text}` }] };
+      }
+      return { content: [pic, { type: "text", text }] };
     }
     case "view_reference": {
       const n = str(input.name);
@@ -373,6 +459,13 @@ function runTool(name: string, input: Record<string, unknown>): { content: Conte
         const problem = sideCheck(true);
         if (problem) return { content: `not done: ${problem}. ${spendLine()}`, error: true };
       }
+      if (TRAIL) {
+        const c = trailCheck();
+        if (!c.ok) {
+          const text = `not done:\n- ${c.problems.join("\n- ")}\n(the original is ${relative(ROOT, ORIG)}, read only) ${spendLine()}`;
+          return { content: c.file && existsSync(c.file) ? [{ type: "image", source: { type: "base64", media_type: "image/png", data: readFileSync(c.file).toString("base64") } }, { type: "text", text: `Above: the frames that differ (before | after | the difference). ${text}` }] : text, error: true };
+        }
+      }
       return { content: "noted", done: str(input.notes) ?? "" };
     }
     default:
@@ -384,26 +477,30 @@ function runTool(name: string, input: Record<string, unknown>): { content: Conte
 const brief = readFileSync(briefPath, "utf8");
 const intro = `${brief}\n\nYour ${MODE === "boss" ? "character" : MODE === "rider" ? "ride" : "item"}'s id is "${id}". Reference pictures (view_reference): ${refs.length ? refs.join(", ") : "none"}. The spend cap is $${CAP}.`;
 /**
- * Adding views: the first message also carries the finished side drawing (its source and its maker's notes) and two
- * pictures of its side view (idle, then move), rendered before the first turn (no API spend).
+ * Adding views or a trail: the first message also carries the finished drawing (its source and its maker's notes) and
+ * pictures of it, rendered before the first turn (no API spend): views, the side view's idle and move; a trail, the side
+ * view's idle and every view's move (where a left-behind trail shows).
  */
-function viewsIntro(): Anthropic.ContentBlockParam[] {
-  const summary = join(OUT, "summary.md");
-  const notes = existsSync(summary) ? readFileSync(summary, "utf8").split("## Its notes")[1]?.trim() ?? "" : "";
+function startIntro(): Anthropic.ContentBlockParam[] {
+  const notesOf = (file: string) => (existsSync(join(OUT, file)) ? readFileSync(join(OUT, file), "utf8").split("## Its notes")[1]?.trim() ?? "" : "");
+  const notes = VIEWS ? notesOf("summary.md") : [notesOf("summary.md"), notesOf("views-summary.md") && `Adding its front and back views:\n\n${notesOf("views-summary.md")}`].filter(Boolean).join("\n\n");
   const pics: Anthropic.ContentBlockParam[] = [];
-  for (const anim of ["idle", "move"]) {
-    const dir = join(LOOKS, `views-000-${anim}`);
+  const shots: [string, "idle" | "move"][] = [["side", "idle"], ["side", "move"]];
+  for (let i = 0; i < shots.length; i++) {
+    const [view, anim] = shots[i]!;
+    const dir = join(LOOKS, `${RUN}000-${view}-${anim}`);
     mkdirSync(dir, { recursive: true });
-    const r = itemRender({ draft: SIDE, mode: "rider", view: "side", anim, out: dir });
+    const r = itemRender({ draft: ORIG, mode: "rider", view, anim, out: dir });
     if (!r.file) throw new Error(`the finished ride doesn't render: ${r.error ?? "no picture"}`);
-    pics.push({ type: "image", source: { type: "base64", media_type: "image/png", data: readFileSync(r.file).toString("base64") } }, { type: "text", text: `Above: the side view's ${anim}, frame by frame at 4x, then town size, every color and its tile.` });
+    pics.push({ type: "image", source: { type: "base64", media_type: "image/png", data: readFileSync(r.file).toString("base64") } }, { type: "text", text: `Above: the ${view} view's ${anim}, frame by frame at 4x, then town size${view === "side" ? ", every color and its tile" : ""}.` });
+    if (TRAIL && i === 0) for (const v of (r.facts?.rider?.views ?? []).filter((v) => v !== "side")) shots.push([v, "move"]);
   }
   return [
-    { type: "text", text: `${intro}\n\nThe finished ride, your starting file (${relative(ROOT, DRAFT)}; the original stays at ${relative(ROOT, SIDE)}, read only):\n\n\`\`\`tsx\n${readFileSync(SIDE, "utf8")}\`\`\`\n\nIts maker's notes:\n\n${notes || "(none)"}` },
+    { type: "text", text: `${intro}\n\nThe finished ride, your starting file (${relative(ROOT, DRAFT)}; the original stays at ${relative(ROOT, ORIG)}, read only):\n\n\`\`\`tsx\n${readFileSync(ORIG, "utf8")}\`\`\`\n\nIts maker's notes:\n\n${notes || "(none)"}` },
     ...pics,
   ];
 }
-const messages: Anthropic.MessageParam[] = [{ role: "user", content: VIEWS ? viewsIntro() : intro }];
+const messages: Anthropic.MessageParam[] = [{ role: "user", content: VIEWS || TRAIL ? startIntro() : intro }];
 const log = (o: object) => appendFileSync(join(OUT, `${RUN}log.jsonl`), `${JSON.stringify({ at: new Date().toISOString(), ...o })}\n`);
 
 /** One cache breakpoint on the newest turn's last block (the system prompt has its own); older ones taken off. */
@@ -446,7 +543,7 @@ async function main(): Promise<void> {
           max_tokens: MAX_TOKENS,
           thinking: { type: "adaptive" },
           output_config: { effort: EFFORT },
-          system: [{ type: "text", text: MODE === "item" ? ITEM_SYSTEM : VIEWS ? RIDER_VIEWS_SYSTEM : MODE === "rider" ? RIDER_SYSTEM : SYSTEM, cache_control: { type: "ephemeral" } }],
+          system: [{ type: "text", text: MODE === "item" ? ITEM_SYSTEM : VIEWS ? RIDER_VIEWS_SYSTEM : TRAIL ? RIDER_TRAIL_SYSTEM : MODE === "rider" ? RIDER_SYSTEM : SYSTEM, cache_control: { type: "ephemeral" } }],
           tools: TOOLS,
           messages,
         })
@@ -502,7 +599,7 @@ async function main(): Promise<void> {
     const dir = join(OUT, "preview");
     mkdirSync(dir, { recursive: true });
     // A ride: its side view as before (idle.png, move.png, look.png), then each front and back animation and the three
-    // views side by side (views.png), once it has them.
+    // views side by side (views.png), once it has them, and its trail mark (trail.png) once it has one.
     const shots: [string, object][] = MODE === "rider" ? [["idle", { view: "side", anim: "idle", all: true }], ["move", { view: "side", anim: "move", all: true }], ["look", { view: "side", anim: "idle" }]] : [["frames", { all: true }], ["look", {}]];
     const made: string[] = [];
     for (let i = 0; i < shots.length; i++) {
@@ -517,8 +614,17 @@ async function main(): Promise<void> {
         const has = (r.facts?.rider?.views ?? []).filter((v) => v !== "side");
         for (const v of has) shots.push([`${v}-idle`, { view: v, anim: "idle", all: true }], [`${v}-move`, { view: v, anim: "move", all: true }]);
         if (has.length) shots.push(["views", { view: "all", all: true }]);
+        if (r.facts?.rider?.trail) shots.push(["trail", { view: "trail", all: true }]);
       }
     }
+    // A trail run: the ride's GIF too (preview/ride.gif), its marks dropped behind it as it runs.
+    if (TRAIL)
+      try {
+        execFileSync("npx", ["tsx", "scripts/boss-art/ride-gif.ts", id!], { cwd: ROOT, env: bareEnv(), timeout: 300_000, stdio: "pipe" });
+        made.push(relative(ROOT, join(dir, "ride.gif")));
+      } catch (e) {
+        made.push(`ride.gif: ${String((e as { stderr?: Buffer }).stderr ?? e).slice(0, 300)}`);
+      }
     preview = made.join(", ");
   } else if (existsSync(DRAFT)) {
     try {
@@ -535,14 +641,19 @@ async function main(): Promise<void> {
   }
   // Adding views: whether the side view came through unchanged (done checks it; a run that stopped early may not have).
   const side = VIEWS && existsSync(DRAFT) ? sideCheck(true) : null;
+  // Adding a trail: the same for its frames and its mark; the frames that changed go to preview/trail-check.png.
+  const trail = TRAIL && existsSync(DRAFT) ? trailCheck() : null;
+  if (trail?.file && existsSync(trail.file)) execFileSync("cp", [trail.file, join(OUT, "preview", "trail-check.png")]);
+  const removed = trail?.removed?.length ? `taken out of ${trail.removed.length} frame pictures (${trail.removed.slice(0, 6).join("; ")}${trail.removed.length > 6 ? "; …" : ""}; preview/trail-check.png)` : "nothing taken out of its frames";
   const summary = [
-    `# Boss art${MODE === "boss" ? "" : ` (${VIEWS ? "rider views" : MODE})`}: ${id}`,
+    `# Boss art${MODE === "boss" ? "" : ` (${VIEWS ? "rider views" : TRAIL ? "rider trail" : MODE})`}: ${id}`,
     "",
     `- Model ${MODEL}, effort ${EFFORT}, adaptive thinking. ${spent.turns} turns, ${looks} renders.`,
     `- Spend: **$${spent.usd.toFixed(2)}** of the $${CAP} cap (${spent.input.toLocaleString("en-US")} input, ${spent.cacheWrite.toLocaleString("en-US")} cache-write, ${spent.cacheRead.toLocaleString("en-US")} cache-read, ${spent.output.toLocaleString("en-US")} output tokens).`,
     stopped ? `- **Stopped early:** ${stopped}.` : "- Finished: it called done.",
     `- The drawing: ${relative(ROOT, DRAFT)}${existsSync(DRAFT) ? "" : " (none written)"}.`,
-    ...(VIEWS ? [`- The side view: ${side ? `**${side}** (the original: ${relative(ROOT, SIDE)})` : "unchanged, and the front and back views are drawn"}.`] : []),
+    ...(VIEWS ? [`- The side view: ${side ? `**${side}** (the original: ${relative(ROOT, ORIG)})` : "unchanged, and the front and back views are drawn"}.`] : []),
+    ...(trail ? [`- The trail: ${trail.ok ? `its mark ${JSON.stringify(trail.trail ?? {})}; ${removed}, the rest of every frame unchanged` : `**${trail.problems.join("; ")}** (the original: ${relative(ROOT, ORIG)})`}.`] : []),
     `- Previews: ${preview || "none"}. Each look it took: ${relative(ROOT, LOOKS)}/.`,
     "",
     "## Its notes",

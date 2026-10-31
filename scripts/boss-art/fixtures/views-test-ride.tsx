@@ -1,9 +1,11 @@
 /**
- * A test fixture, not art: a plain little pony with a side, front and back view, to check the rider harness's
- * three-view renders (item-render.ts, `mode: "rider"`, `view: "all"`) and the contact sheet. Not for the game.
+ * A test fixture, not art: a plain little pony with a side, front and back view and a hand-made trail mark (a pair of
+ * hoofprints), to check the rider harness's three-view renders (item-render.ts, `mode: "rider"`, `view: "all"` or
+ * `"trail"`), the contact sheet and ride-gif.ts's trail. Not for the game.
  *   npx tsx scripts/boss-art/item-render.ts '{"draft":"scripts/boss-art/fixtures/views-test-ride.tsx","mode":"rider","view":"all","out":"<dir>"}'
+ *   npx tsx scripts/boss-art/ride-gif.ts scripts/boss-art/fixtures/views-test-ride.tsx --out <file.gif>
  */
-import { LINE, Region, darken, lw, mirror, type RiderDraft, type RiderPose, type RiderProps, type RiderViewDraft } from "../item-kit.tsx";
+import { LINE, Region, darken, lw, mirror, type RiderDraft, type RiderPose, type RiderProps, type RiderTrail, type RiderViewDraft, type TrailProps } from "../item-kit.tsx";
 
 const COAT = "#c99a6b";
 const COAT_D = darken(COAT, 0.25);
@@ -150,6 +152,26 @@ const view = (Back: RiderViewDraft["Back"], Front: RiderViewDraft["Front"], fram
   Front,
 });
 
+// ---- Its trail: a pair of hoofprints on each square it leaves (one fore, one hind, swapping sides each square), toes
+// pointing the way it ran, pressed dark into the ground and fading over four frames.
+const PRINT = "#4a3424";
+const PRINT_FADE = [0.85, 0.62, 0.4, 0.2];
+/** One horseshoe print round (x, y), its toe toward +x (the way it ran, before the turn for up or down). */
+const Print = ({ x, y }: { x: number; y: number }) => (
+  <path d={`M ${x - 2.5} ${y - 4.2} Q ${x + 4.5} ${y - 4.8} ${x + 4.5} ${y} Q ${x + 4.5} ${y + 4.8} ${x - 2.5} ${y + 4.2}`} fill="none" stroke={PRINT} stroke-linecap="round" {...lw(2.6)} />
+);
+function Hoofprints({ f, view, n }: TrailProps) {
+  const turn = view === "back" ? -90 : view === "front" ? 90 : 0;
+  const s = n % 2 ? 1 : -1;
+  return (
+    <g opacity={PRINT_FADE[f] ?? 0} transform={`scale(1 0.9) rotate(${turn})`}>
+      <Print x={4 * s} y={-5} />
+      <Print x={-4 * s} y={5} />
+    </g>
+  );
+}
+const trail: RiderTrail = { ms: [160, 160, 160, 160], every: 1, w: 26, h: 24, Mark: Hoofprints };
+
 export const viewsTestRide: RiderDraft = {
   id: "views-test-ride",
   name: "Views Test Pony",
@@ -165,4 +187,5 @@ export const viewsTestRide: RiderDraft = {
     front: view(FrontBack, FrontFront, [24, 2, 52, 96]),
     back: view(BackBack, BackFront, [24, 2, 52, 96]),
   },
+  trail,
 };

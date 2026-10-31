@@ -12,4 +12,5 @@ packages/sim/data/fairplay-bank/
 scripts/boss-art/out/*/looks/
 scripts/boss-art/out/*/preview/
 scripts/boss-art/out/*/*.side.tsx
+scripts/boss-art/out/*/*.pre-trail.tsx
 scripts/boss-art/refs/

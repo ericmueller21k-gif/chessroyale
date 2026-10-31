@@ -24,8 +24,8 @@ interface Req {
   mode: "item" | "rider" | "sheet";
   frames?: number[];
   anim?: "idle" | "move";
-  /** A ride's view: side, front, back, or "all" (the three side by side; the default when it has front or back). */
-  view?: "side" | "front" | "back" | "all";
+  /** A ride's view: side, front, back, or "all" (the three side by side; the default when it has front or back); or "trail", its trail mark. */
+  view?: "side" | "front" | "back" | "all" | "trail";
   side?: "w" | "b";
   color?: string;
   all?: boolean;

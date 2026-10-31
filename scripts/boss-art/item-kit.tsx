@@ -228,7 +228,47 @@ export interface RiderViewDraft {
   Back: (props: RiderProps) => ComponentChildren;
   Front: (props: RiderProps) => ComponentChildren;
 }
-/** A ride (a new slot, "rider"): its side view, and optionally its front and back views (`views`). */
+/** What a ride's trail mark is given to draw one frame of one mark. */
+export interface TrailProps {
+  /** The item's paint (`p.hex` is its color, flat; `p.fill` may be a sheen gradient) and its second paint. */
+  p: Paint;
+  p2: Paint;
+  /** The frame: 0 when it lands (fresh) to `ms.length - 1` (nearly gone). */
+  f: number;
+  /**
+   * Which way the ride was running when it dropped it, as its views: side (going right: the town mirrors the mark for
+   * left, as it mirrors the ride), back (going up the screen), front (going down).
+   */
+  view: RiderFacing;
+  /** Which mark of the run this is (0, 1, 2, …), for marks that take turns (a left and a right footprint). */
+  n: number;
+}
+/**
+ * A ride's trail (Oct 31; Eric: "all the riders will have like some sort of trail… the trails aren't to be drawn in
+ * unless you're actually running around the town"). In place of the town's white droplets, a running ride leaves this
+ * small mark on the ground: one on each square it leaves (or every `every` squares), where it stays and goes from fresh
+ * to faded over its frames, then is gone. Never drawn while standing, and never part of the ride's own frames.
+ */
+export interface RiderTrail {
+  /** Each frame's length in ms, fresh to faded: the frames are `ms.length`, its life their sum. Gone after the last. */
+  ms: number[];
+  /** One mark every this many squares run (default 1: one on every square left). */
+  every?: number;
+  /**
+   * Its box in units, centered on (0, 0), the spot where it lands (the middle of the square left; one square is about 69
+   * units): at most 40 wide and 30 tall. Every frame of `Mark` stays inside it.
+   */
+  w: number;
+  h: number;
+  /**
+   * One frame of the mark, drawn round (0, 0) on the ground as the town's camera sees it: from above, a little
+   * flattened (a square shows about 0.9 as deep as it is wide). Its own fade is in its frames (opacity, size).
+   */
+  Mark: (props: TrailProps) => ComponentChildren;
+}
+/** A trail mark's limits: its box at most this wide and tall, in units. */
+export const TRAIL_MAX = { w: 40, h: 30 };
+/** A ride (a new slot, "rider"): its side view, and optionally its front and back views (`views`) and its trail mark (`trail`). */
 export interface RiderDraft extends RiderViewDraft {
   id: string;
   name: string;
@@ -239,4 +279,6 @@ export interface RiderDraft extends RiderViewDraft {
   frame: [number, number, number, number];
   /** The views from behind (walking up the screen) and from the front (walking down). */
   views?: { front?: RiderViewDraft; back?: RiderViewDraft };
+  /** What it leaves on the ground as it runs, in place of the town's droplets (none yet: the town's droplets). */
+  trail?: RiderTrail;
 }

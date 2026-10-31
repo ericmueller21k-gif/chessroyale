@@ -33,6 +33,7 @@ npm run boss-art -- <id> <brief.md> [refs dir]
 BOSS_ART_EFFORT=medium BOSS_ART_CAP_USD=3 npm run boss-art -- --item <id> <brief.md> [refs dir]
 BOSS_ART_EFFORT=high BOSS_ART_CAP_USD=6 npm run boss-art -- --rider <id> <brief.md> [refs dir]
 npm run boss-art -- --rider-views <id> <brief.md> [refs dir]     # a finished ride's front and back views ($3, high)
+npm run boss-art -- --rider-trail <id> <brief.md> [refs dir]     # a finished ride's trail mark ($1.50, medium)
 npx tsx scripts/boss-art/boss-refs.ts scripts/boss-art/refs/<id> <boss id>[:anim,anim]   # the boss's pictures, as references
 ```
 
@@ -40,7 +41,8 @@ npx tsx scripts/boss-art/boss-refs.ts scripts/boss-art/refs/<id> <boss id>[:anim
   grids. The drawing (`out/<id>/<id>.tsx`) imports `item-kit.tsx`, a copy of Items.tsx's paint (`Region`, `LINE`, `lw`, …),
   and exports an `ItemDraft` (what ITEM_DEFS, ITEM_ART, FRAMES, SHINE_BOX and ATTACH would get) or a `RiderDraft` (a ride
   under the pawn: `Back` and `Front` drawings, its `idle` and its town `move`, and a `pose` per frame that places the pawn,
-  its lower part cut off as the town's bench-sit does). A ride can also have `views: { front, back }` (below).
+  its lower part cut off as the town's bench-sit does). A ride can also have `views: { front, back }` and a
+  `trail` mark (below).
 - **Units and the town's squares:** 100 units is the pawn's box, which the town draws about 1.45 town squares across
   (`youSquares` in town/feel.ts), so **one square is about 69 units**, not 100. A ride's widest frame, in any view, is at
   most **125 units** (about 1.8 squares); a pawn's own base is about 51 units (0.74 squares). A move's `dx` 0 to 100 stands
@@ -49,11 +51,17 @@ npx tsx scripts/boss-art/boss-refs.ts scripts/boss-art/refs/<id> <boss id>[:anim
   Chromium screenshots one picture: the motion frame by frame at 4x on a pawn (240 px), phone size (a 60 px lobby pawn, the
   130 px home pawn, the 64 px locker tile) beside existing items, and every color at 75% purity, 100% and shiny. A ride:
   its idle or move at 4x, the town size (a pawn about 45 px) through its move, every color, its tile, for one view
-  (`view`: side, front or back); or `view: "all"`, the three views side by side (below).
+  (`view`: side, front or back); or `view: "all"`, the three views side by side; or `view: "trail"`, its trail mark
+  (below).
 - `BOSS_ART_EFFORT` (default high) and `BOSS_ART_MAX_TOKENS` (default 24,000 for an item, 32,000 for a ride) as for bosses.
 - **Previews:** `out/<id>/preview/` (not committed): every frame (`frames.png`; a ride: `idle.png`, `move.png`) and the
   standard look (`look.png`); a ride with views also `front-idle.png`, `front-move.png`, `back-idle.png`,
-  `back-move.png` and `views.png` (the three side by side, every move frame); `ride.gif` (below) once you've made it.
+  `back-move.png` and `views.png` (the three side by side, every move frame); a ride with a trail mark `trail.png`;
+  `ride.gif` (below) once you've made it.
+- **Nothing left behind in a ride's frames** (Oct 31): its idle has no trail, and its move draws nothing that stays
+  behind as it goes (no ribbon, sparkle trail, streaks or footprints left behind; an exhaust puff or a kick of dust that
+  goes along with the ride is fine). What it leaves behind is its trail mark, drawn by the town on the ground, apart from
+  the ride, only while it runs. The rider, views and trail prompts all say so.
 
 ### Rider views: front and back (`--rider-views`, Oct 31)
 
@@ -82,12 +90,57 @@ so the game hides face items then); walking **down**, from the **front** (its fa
 - **Test fixture:** `fixtures/views-test-ride.tsx`, a plain pony with all three views (not art), for checking the
   harness: `npx tsx scripts/boss-art/item-render.ts '{"draft":"scripts/boss-art/fixtures/views-test-ride.tsx","mode":"rider","view":"all","out":"<dir>"}'`.
 
+### Rider trails (`--rider-trail`, Oct 31)
+
+Eric: "I only want the trails to appear when you run… right now we have that thing that follows behind you on the
+squares, that little running liquid effect. We want to replace that if you have a rider, and all the riders will have
+some sort of trail: the cricket might have little cricket footprints, the bulb might have a dark trail that gets left
+behind… the trails aren't to be drawn in unless you're actually running around the town."
+
+- **The town today** (town/render.ts `drawMarks`, feel.ts "Your trail"): as you run, a white droplet lands on each square
+  you leave (at most one every `trailEveryMs`, 150 ms), on the ground under everyone, and fades and shrinks out over
+  `trailLifeMs` (520 ms); yours only, none while you stand.
+- **The format** (`item-kit.tsx`): a `RiderDraft` can have `trail: { ms, every?, w, h, Mark }` (`RiderTrail`):
+  - `ms`: each frame's length, fresh to faded (its frames are `ms.length`, its life their sum; gone after the last);
+  - `every`: one mark every this many squares (default 1, one on every square left);
+  - `w`, `h`: its box in units, centered on the spot it lands on (the middle of the square left), at most 40 × 30
+    (`TRAIL_MAX`; a square is 69 units);
+  - `Mark({ p, p2, f, view, n })`: one frame, drawn round (0, 0) flat on the ground as the camera sees it (a little
+    flattened), its fade in its frames. `view` is the way the ride ran (side, mirrored by the town for left; back going
+    up; front going down), so prints can point the way; `n` numbers a run's marks, for prints that take turns. It may
+    take the item's color (`p.hex`, or a `Region`, its box the mark's) or have fixed colors.
+  - The town would drop it where it drops the droplets today, play its frames by the clock and drop the droplets for
+    yours only when the ride has no mark. It is never part of the ride's own frames, and it isn't counted in its width.
+- **Adding or replacing a ride's trail:** copy `briefs/_trail-template.md` and fill it in, then run
+  `npm run boss-art -- --rider-trail <id> <brief.md>`. It starts from `out/<id>/<id>.tsx` (edited in place; the original
+  kept beside it as `<id>.pre-trail.tsx`, not committed), shows the model its source, its notes (`summary.md` and
+  `views-summary.md`) and pictures of its side idle and every view's move, and asks it to add the `trail` mark and take
+  out anything left behind already drawn into its idle or move frames, in every view, keeping everything else.
+  - `done` is refused until (ride-gif.ts `--trail-check`, its own process without the key): the mark is there, within
+    its limits and inside its box on every frame (each view, two marks); the views, frame lengths and move dx are the
+    same; and every frame of every view (idle and move, red and cobalt) differs from the original's only by what was
+    taken away: no pixel drawn where nothing was, and every group of changed pixels reaching empty ground (what the
+    trail covered may show again; a change to the ride itself, with nothing taken away round it, is refused). The
+    refusal shows the model the frames that differ: before, after, and the difference (magenta taken away, orange next
+    to it, red changed).
+  - Defaults: cap $1.50 (`BOSS_ART_CAP_USD`), effort medium. It writes `trail-summary.md` and `trail-log.jsonl` (the
+    side and views runs' stay), its looks are `looks/trail-*`, and its previews add `trail.png`, `ride.gif` and
+    `trail-check.png` (the frames that changed).
+- **Seeing it:** the render tool's `view: "trail"` shows the mark frame by frame at 4x for each way it runs (right,
+  left, up, down) with its box dashed, on light and dark squares, then at town size and in every color; and a strip of
+  frames from the ride's GIF (`ride-gif.ts --strip`): the end of the run right, 300 ms later as its marks fade, the ends
+  of the runs up and down. By hand: `npx tsx scripts/boss-art/item-render.ts '{"draft":"…","mode":"rider","view":"trail","out":"<dir>"}'`.
+- **Test fixture:** `fixtures/views-test-ride.tsx` has a hand-made trail mark, a pair of hoofprints that swap sides each
+  square and point the way it ran.
+
 ### One GIF per ride (`ride-gif.ts`, Oct 31)
 
 ```sh
 npx tsx scripts/boss-art/ride-gif.ts <id> [color] [--out <file or folder>]    # out/<id>/preview/ride.gif, and a copy at --out
 npx tsx scripts/boss-art/ride-gif.ts --all [color] [--out <folder>]           # every ride under out/ with a RiderDraft
 npx tsx scripts/boss-art/ride-gif.ts scripts/boss-art/fixtures/views-test-ride.tsx --out <file>   # a drawing outside out/ (needs --out)
+npx tsx scripts/boss-art/ride-gif.ts <id> --strip <png>                     # also a few of its frames in one PNG (the runner's look)
+npx tsx scripts/boss-art/ride-gif.ts --trail-check <before.tsx> <after.tsx> [--out <folder>]   # run.ts --rider-trail's check (JSON)
 ```
 
 Instead of contact sheets: one GIF of a ride on the town's floor. No API, no key: it bundles the drawing with
@@ -100,6 +153,12 @@ encodes again with fewer colors).
   it loops). The stands turn the ride to the next view and last 0.35 to 1.5 s (about 1.4 s), whatever brings the total
   near 10 s; they play the idle at its own timing. A ride with no front or back view yet uses its side view for up and
   down and prints a warning.
+- **Its trail:** while it runs, it drops its trail mark on each square it leaves, as the town drops its droplets (as the
+  step onto the next square begins, at most one every `trailEveryMs`, or every `every` squares), on the floor under
+  everyone (the ride, the pawn). Each mark stays where it landed and plays its frames by its own `ms` (the GIF's frames
+  are cut where a mark turns to its next frame), mirrored on the run left, then is gone; none are dropped while it
+  stands, so the stands show the last ones fading. A ride with no trail mark yet drops the town's white droplets (their
+  look, size and 520 ms fade) and prints a note.
 - **Pace:** each square takes 200 ms, a bot's step (`botStepMs`; your own step, `youStepMs`, is 90 ms and hides the
   animation), with the move's frames scaled to fit, as the town would play them (the side view travels as drawn, `dx` 0 to
   100 over the cycle; the front and back views are slid evenly up or down the screen). A ride's `move.ms` is only its
@@ -113,7 +172,7 @@ encodes again with fewer colors).
 - **The caption strip:** the ride's name, its width as "N.NN squares (U units)", **red above 125 units** (about 1.8
   squares), and what it's doing (the view shown). The width is the widest frame of any view (idle and every move frame),
   measured from the drawn pixels (alpha over 20, on a raster 5x finer than the town's), with its pawn on it and without
-  the pose's `dx`.
+  the pose's `dx`, and without its trail marks (drawn apart, on the floor).
 - **Widths so far** (Oct 31, the 15 rides under `out/`): 84 units (1.21 squares, boingo-pogo) to 178 (2.58,
   hollow-steed). Eight are over 125: alfil-howdah 128, balloon-pup 131, ginger-sled 147, hollow-steed 178, moon-ride 140,
   puddles-mower 170, sawyer-dozer 127, smudgy-brush 152 (riding-chirp is 120, hollow-bulb 123). Only riding-chirp,
@@ -133,4 +192,7 @@ the frame number, and `motion.ms` (a ride: `idle.ms`, `move.ms`) each frame's le
 - For a ride's views: the town picks the view by the step's direction (side, mirrored for left; back going up; front
   going down) and slides the ride a square up or down while its front or back `move` plays in place; from behind, the
   pawn's face items are hidden.
+- A ride's trail: in town/render.ts `drawMarks`, when you ride, its `trail.Mark` baked into one picture per frame (per
+  view, mirrored for left, and per `n` for marks that take turns) in place of the droplet, dropped on the square you leave
+  as now (every `every` squares), its frame picked by its age, gone after its life (the sum of `ms`); none while you stand.
 - A new slot, `rider`, in crates.ts (`ItemSlot`, `cleanLook`) and a place for it in the locker.
