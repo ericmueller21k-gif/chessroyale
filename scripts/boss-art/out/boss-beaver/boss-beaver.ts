@@ -30,6 +30,11 @@ const PALETTE: Record<string, string> = {
   O: "#ea7816",
   L: "#ff9d3a",
   l: "#ffc77e",
+  E: "#a3360c", // safety vest: shadow, mid, light
+  F: "#e0561a",
+  G: "#ff7a3c",
+  I: "#f6eed6", // reflective stripe: light, shade
+  K: "#bfb49c",
   s: "#e2e7ec", // reflective stripe / steel light
   S: "#9aa4af", // steel mid
   T: "#5c6570", // steel dark
@@ -163,12 +168,17 @@ function body(): Painted {
   p.F(torso, (x, y) => ramp("abcd", light(x, y)));
   p.F(and(torso, inEllipse(37.5, 57, 9.5, 15)), (x, y) => ramp("mnN", light(x, y) + 0.1));
   // The vest, open down the front.
-  const opening = inPoly([[31, 33], [44, 33], [43, 47], [42.5, 62], [33.5, 62], [32.5, 47]]);
+  const opening = inPoly([[32, 33], [43, 33], [42.5, 47], [42, 62], [34, 62], [33, 47]]);
+  // Light belly fur all down the opening.
+  p.F(and(torso, opening), (x, y) => ramp("mnN", light(x, y) + 0.15));
   const vest = and(torso, (_x, y) => y < 63, not(opening));
-  p.F(vest, (x, y) => (opening(x - 1, y) || opening(x + 1, y) ? "o" : ramp("oOOL", light(x, y) + 0.08)));
-  // Its reflective stripe.
-  p.F(and(vest, (_x, y) => y === 53), () => "s");
-  p.F(and(vest, (_x, y) => y === 54), () => "S");
+  // A red-orange safety vest (a shade apart from the hat), a dark trim along its open front.
+  p.F(vest, (x, y) => (opening(x - 1, y) || opening(x + 1, y) ? "E" : ramp("EFFG", light(x, y) + 0.08)));
+  // Two reflective stripes.
+  for (const sy of [49, 53]) {
+    p.F(and(vest, (_x, y) => y === sy), () => "I");
+    p.F(and(vest, (_x, y) => y === sy + 1), () => "K");
+  }
   // The harness straps over the shoulders, down to the belt, each with a buckle.
   const strapL = inPoly([[28, 35], [31.5, 34.6], [32, 63], [29, 63]]);
   const strapR = inPoly([[45, 34.6], [48.5, 35], [48, 63], [45, 63]]);

@@ -1,29 +1,25 @@
 # Boss art: boss-beaver
 
-- Model claude-opus-5-5, effort high, adaptive thinking. 17 turns, 7 renders.
-- Spend: **$1.33** of the $6 cap (38 input, 83,152 cache-write, 802,153 cache-read, 37,544 output tokens).
+- Model claude-opus-5-5, effort high, adaptive thinking. 8 turns, 6 renders.
+- Spend: **$0.26** of the $3 cap (18 input, 23,869 cache-write, 118,799 cache-read, 5,758 output tokens).
 - Finished: it called done.
 - The drawing: scripts/boss-art/out/boss-beaver/boss-beaver.ts.
 - Previews: scripts/boss-art/out/boss-beaver/preview/ (GIFs, the frame sheet, the comparison). Each look it took: scripts/boss-art/out/boss-beaver/looks/.
 
 ## Its notes
 
-I drew only the idle animation, as the brief asked; the other animations are still to come. Idle is 24 frames over about 4 s and loops. I rendered and checked every frame and the phone-size view next to the tiger and Sawyer; no frame touches the edge.
+He now has an orange safety vest you can clearly see, in every idle frame. I made this pass with small edits to the body() part only. Since the body is one part, the vest rises and settles with his breathing in all 24 frames.
 
-The look follows Eric's design: a stout brown beaver standing upright, turned a little to our left toward the board. He has a dark nose, big buck teeth, small round ears and whiskers. He wears an orange hard hat and an orange vest with a silver reflective stripe, and a yellow harness and tool belt. On the belt are a red-handled hammer at his hip, a tape measure, two pouches and a wrench sticking out of the big pouch. Two crossed planks are strapped on his back, their ends showing over both shoulders. A flat crosshatched dark brown-grey paddle tail sits behind him to our right. No pencil, no letters, light from the top left.
+What was wrong: the file already had a vest, but it was drawn in the hat's exact orange, and most of it was hidden behind the paws, straps and belt. It had one grey stripe that sat right next to the hammer's grey head and looked like part of it. The top of the front opening also showed dark fur.
 
-Idle, beat by beat (mostly 170 ms frames):
-1. He stands calm with his hands on the harness straps and breathes slowly: his chest, arms, planks, head and hat rise a pixel and settle, twice per loop.
-2. Frame 5: a quick blink.
-3. Frames 10–13: he lifts his tail.
-4. Frame 14: the tail pats the ground, and a small puff of dust spreads over the next two frames.
-5. Frames 15–19: his eyes shut into happy arches, and for three of those frames he lifts his chin a pixel, pleased with himself.
-6. He settles back into breathing.
+What I changed:
+- **Vest colour:** three new palette colours (E #a3360c shadow, F #e0561a mid, G #ff7a3c light), a redder and slightly darker orange than the hat, so the two read apart. A dark trim runs down both edges of the opening.
+- **Open front:** the opening is a little narrower and now filled with light belly fur all the way up to the chin, so it reads as an open vest over a pale belly.
+- **Stripes:** two thin reflective stripes in cream (new colours I #f6eed6 and K #bfb49c underneath), at drawing rows 49–50 and 53–54. Being cream, they don't merge with the yellow belt and straps or with the grey steel hammer head just below. Higher rows were tried, but the paws covered them there.
+- **Kept as they were:** the arms are still brown fur, and the pose, face, hat, planks, belt and tools, tail and the idle's timing are untouched.
 
-Choices Eric might want to change:
-- I used a tail pat instead of a hammer tap, so the hammer stays on the belt as in his design.
-- He stands a bit taller than Sawyer and the tiger at phone size (frame 88 × 88, feet at (40, 84)).
-- His brows are hidden under the hat brim, so his cheer comes from the eyes and the "proud" squint.
-- Only one plank's lower end peeks out, by his right hip.
-- The pouches are yellow like the belt.
-- The name "The Beaver Builder" is a placeholder.
+I checked the idle at 4x, 6x and 3x, and beside the tiger at phone size. There the vest reads as a red-orange band with light stripes, separate from both the hat and the yellow belt.
+
+One choice you might want to change: the yellow straps and paws still cover part of the upper vest. To show more orange, the only easy fix is a little orange at the top of each arm (the arm() sleeve setting is already there). I left it at 0 because the brief says the arms stay brown fur.
+
+The render still lists the other animations (entrance through victory) as not drawn yet, which is expected since this pass was idle only.
