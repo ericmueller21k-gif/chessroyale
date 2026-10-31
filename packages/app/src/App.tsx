@@ -227,6 +227,7 @@ function leftNote(how: LeftHow | null | undefined): string {
   if (how === "away") return "You were away from that match too long: a bot took your seat, and it counted as a loss.";
   if (how === "early") return "You left that match before it began.";
   if (how === "out") return "You left that match after you were out.";
+  if (how === "kicked") return "You were removed from the party.";
   return "You resigned that match.";
 }
 
