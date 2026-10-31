@@ -64,3 +64,20 @@ Eric's design (Oct 29 and 30) and his OK on the stills (Oct 30: "the solo or the
 - A member's tiles are muted and the arrows greyed (the leader's boss and difficulty); promoted, they keep them.
 - Alone in a party (nobody joined yet), START is still Boss alone's. START with others: everyone joins the battle (the
   party's pass and their seat); the settings are core's `bossPartySettings`, the same as the server's.
+
+## The battle (PR 4)
+- Every pick this turn is an arrow in its owner's seat color (brushes `party0` orange, `party1` blue, `party2` pink),
+  yours too, live from the server's tally. Your pick keeps the turn open (`NetMatch.submit` in a party): pick again to
+  change it. The dock: "Your pick is in. 2/3 picked", the team clock at its right (the raid's dock clock, on the team's
+  bank: "+10" as each move begins).
+- Your pawn stands on your color's disc; your teammates' pawns, small and nameless, on theirs, a check once they've picked
+  or "…" while they think. Phone: under your pawn and the God King (in the strip's room, nothing grows). Computer: the
+  battle's chat sits beside the board's corner (the raid's layout), so there's no room for a row at any width; stacked
+  there instead (Eric: "stack them… rather than shrinking the board"): the God King in his raid place, you above him,
+  your teammates above you. Eric will try window sizes himself.
+- The Kick: whoever may kick sees a small "Kick" by each one who hasn't picked: grey from the turn's first pick, live a
+  minute after it; a first tap asks ("Kick?"), a second kicks. The one kicked goes home with "You were removed from the
+  party." (`LeftHow` "kicked").
+- (#423, the review) A computer: the battle's chat stands 32 px further out beside the corner in a party's battle, so the
+  God King's cape and sword, your pawn and your teammates are whole and clear of it at every size (1280 × 800, 1440 × 900,
+  1920 × 1080 checked); the Kick sits over its teammate's pawn, on top.
