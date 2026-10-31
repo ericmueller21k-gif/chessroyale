@@ -144,6 +144,21 @@ export function SwitchRow({ icon, label, on, disabled, onClick }: { icon?: Compo
   );
 }
 
+/**
+ * A row with a few settings a tap steps through, the gear's own pill showing the one chosen (lit unless it's the last,
+ * "Off"): a three-way choice in the space of an on/off row, so the list keeps its size. (A screen's own rows: `extra`.)
+ */
+export function CycleRow({ icon, label, value, lit, onClick }: { icon?: ComponentChildren; label: string; value: string; lit: boolean; onClick: () => void }) {
+  return (
+    <ListRow
+      icon={icon}
+      label={label}
+      onClick={onClick}
+      control={<span class={`mm-switch${lit ? " on" : ""}`}>{value}</span>}
+    />
+  );
+}
+
 /** Sound on or off (the same switch as the sound button). */
 function SoundRow() {
   const [m, setM] = useState(isMuted());
