@@ -5,7 +5,7 @@ first of each is the default: the **classic knocks**, PyChess's (GPL-3.0). Next 
 classic, then the other wooden options. The files in `pieces/` are made by `scripts/piece-sounds.py` (in the
 repository, not the app): trimmed to start on the hit, faded out, and leveled to the classic knock of their kind (the
 loudest 30 ms, as a phone speaker and the game's 6 kHz low-pass hear it, matches `move.mp3` or `capture.mp3`). The
-other sounds in this folder have their own `CREDITS.md` (`god-king/`, `banner/`, `menu/`).
+other sounds in this folder have their own `CREDITS.md` (`god-king/`, `banner/`, `menu/`, `colosseum/`).
 
 | File | In the picker | Source | Author | License |
 | --- | --- | --- | --- | --- |

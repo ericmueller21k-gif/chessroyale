@@ -6,6 +6,9 @@ const FILES = __FILES__;
 // The Maia box (/engine/maia/: the worker, its runtime and the model, about 40 MB): not precached, but kept once
 // fetched (a battle that uses it, or the boss menu's prefetch), in a cache named by its files' contents.
 const MAIA = "__MAIA__";
+// Media streamed by an <audio> element (the Colosseum's hour of ambience): never precached nor answered here, so the
+// browser's own Range requests go straight to the network (Safari won't stream media through a service worker's reply).
+const STREAMED = ["/sounds/colosseum/ambient.mp3"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -28,7 +31,7 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);
-  if (request.method !== "GET" || url.origin !== location.origin || url.pathname.startsWith("/api/")) return;
+  if (request.method !== "GET" || url.origin !== location.origin || url.pathname.startsWith("/api/") || STREAMED.includes(url.pathname)) return;
 
   // Every page (including /lobby/CODE invite links) is the single-page app. Fetch it fresh so an
   // update shows up on the next open; fall back to the cached copy only when offline.

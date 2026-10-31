@@ -9,6 +9,9 @@
  * The arena is WebGL 2 (arena-gl.ts): three draw calls a frame, nothing allocated a frame, the crowd still but for its jump
  * (a queen taken). No WebGL 2: a still of the stands in its place, everything else the same.
  *
+ * Sound (ambient.ts): Eric's hour of arena ambience, streamed while the gear's "Ambient crowd noise" is on; a crowd's cheer
+ * with the jump when a queen is taken (under the game's Sound, not the ambient switch).
+ *
  * Test hooks (e2e, with the test switches on): `window.__colosseum` (`state()`, `seat(i)`, `flag()`, `jump()`, `sample()`),
  * and `?fast` makes the bots move at once and the next game come quickly.
  */
@@ -17,9 +20,11 @@ import { Board } from "../components/Board.tsx";
 import { Avatar } from "../components/Items.tsx";
 import { MatchMenu, SwitchRow } from "../components/MatchMenu.tsx";
 import { crowdAnimations, onPrefsChange } from "../prefs.ts";
+import { COLOSSEUM_CHEER, play, warmFile } from "../sound.ts";
 import { testParams, testSwitchesAllowed } from "../test-switches.ts";
 import { COLISEUM_PLACE, isSprite } from "../town/world.ts";
 import { BLACK_VIEW, SEAT_VIEWS, VIEWS, otherSeat, seats, turnLimits, viewFor } from "./arena.ts";
+import { Ambient } from "./ambient.ts";
 import { ArenaGL, SLIDE_S, buildCrowd } from "./arena-gl.ts";
 import { PIECE_URL, crowdArt, propArt, sceneArt } from "./art.ts";
 import { floorEngine, type FloorEngine } from "./floor-engine.ts";
@@ -27,7 +32,7 @@ import { FLOOR, FloorMatch, clockText, evalText, resultText, thinkMs, viewersTex
 import still from "./still.jpg";
 import "./colosseum.css";
 
-/** Ambient crowd noise (no sound yet: the switch only), remembered on this device. */
+/** Ambient crowd noise (ambient.ts: Eric's arena ambience, streamed), remembered on this device; on by default. */
 const AMBIENT_KEY = "colosseum-ambient";
 /** The giant pieces in 3D (Eric, Oct 30: "a toggle … for 3D vs 2D pieces players can choose"), remembered on this device; off by default. */
 const PIECES_KEY = "colosseum-3d-pieces";
@@ -84,6 +89,17 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
   const [portraits, setPortraits] = useState<Map<number, string>>(new Map());
   const [viewers, setViewers] = useState(() => seats().length);
   const [ambient, setAmbient] = useState(ambientOn);
+  const ambience = useRef<Ambient | null>(null);
+  // The ambience while this screen is open (it waits for a tap if the browser won't start it), and the cheer made ready.
+  useEffect(() => {
+    const a = new Ambient(ambientOn());
+    ambience.current = a;
+    warmFile(COLOSSEUM_CHEER);
+    return () => {
+      a.dispose();
+      ambience.current = null;
+    };
+  }, []);
   const [pieces3d, setPieces3d] = useState(pieces3dOn);
   const [anim, setAnim] = useState(crowdAnimations);
   const animRef = useRef(anim);
@@ -223,7 +239,13 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
         const now = (performance.now() - t0.current) / 1000;
         if (a) a.setPieces(s.pieces, animRef.current ? now : now - SLIDE_S);
         if (s.queenTaken) {
+          // The crowd jumps and cheers as the capturing piece lands.
           jumpAt.current = performance.now() + SLIDE_S * 1000;
+          const t = setTimeout(() => {
+            timers.delete(t);
+            if (live) play("colosseumCheer");
+          }, SLIDE_S * 1000);
+          timers.add(t);
           s.queenTaken = false;
         }
         setTick((n) => n + 1);
@@ -265,6 +287,7 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
           plies: s?.moves.length ?? 0,
           status: s?.status ?? "waiting",
           fen: s?.fen ?? "",
+          ambient: ambience.current?.state() ?? null,
         };
       },
       seat: (i) => testSwitchesAllowed() && setView(i),
@@ -275,7 +298,11 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
         frozenAt.current = performance.now();
         match.current?.stop();
       },
-      jump: () => testSwitchesAllowed() && (jumpAt.current = performance.now()),
+      jump: () => {
+        if (!testSwitchesAllowed()) return;
+        jumpAt.current = performance.now();
+        play("colosseumCheer");
+      },
       sample: () => {
         const a = arenaRef.current;
         if (!a || !testSwitchesAllowed()) return null;
@@ -389,6 +416,7 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
                 onClick={() => {
                   const on = !ambient;
                   setAmbient(on);
+                  ambience.current?.set(on);
                   try {
                     localStorage.setItem(AMBIENT_KEY, on ? "on" : "off");
                   } catch {

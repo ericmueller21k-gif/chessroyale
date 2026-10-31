@@ -394,6 +394,10 @@ export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => v
         variations are made from PyChess's sounds by our own script (<a href="/engine/COPYING.txt">license</a>,{" "}
         <a href="/sounds/SOURCES.md">how each was made</a>, <a href="/sounds/pychess-sounds-source.tar.gz" download>their source</a>).
       </p>
+      <p class="fd-note colosseum-credit">
+        The Colosseum's crowd cheer: <a href="https://opengameart.org/content/free-crowd-cheering-sounds">Free Crowd Cheering Sounds</a> by Gregor Quendel (<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>),
+        trimmed, layered and leveled by HunChess (<a href="/sounds/colosseum/CREDITS.md">credits</a>).
+      </p>
       <p class="fd-note licences-credit">
         Built with Preact (MIT) and chess.js (BSD), in the Archivo and Press Start 2P fonts (SIL Open Font License):{" "}
         <a href="/licenses/third-party.txt">licenses</a>.
