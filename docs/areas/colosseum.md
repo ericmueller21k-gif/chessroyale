@@ -51,10 +51,31 @@ links Eric's notes); this page is what's built.
   "2.1K"), the last four moves (the one just played in gold), the flat board (the game's `Board`, small, silent; Black's
   player view turns it round) with its eval bar ("+0.3", "M3"), a status line ("Game 2 · 3+2", then "White wins on time.
   Next game soon."), the chat's box (empty for now: "Coming soon"), and in the top bar Exit, Change seat and the gear
-  (`MatchMenu` with `extra`: Sound, Animations, **3D pieces** (Off by default, remembered on this device), **Ambient crowd noise** (a switch only, remembered on this device; no
-  sound yet), Report a bug). Phone (under 900 × 600): the stands at the top (31% of the height), the cards, the moves in
+  (`MatchMenu` with `extra`: Sound, Animations, **3D pieces** (Off by default, remembered on this device), **Ambient crowd noise** (On by default, remembered on this device:
+  the sound below), Report a bug). Phone (under 900 × 600): the stands at the top (31% of the height), the cards, the moves in
   one line, the board, the chat below. Computer: the arena fills the screen, the cards and moves along its top, the board
   and the chat down its right. Every box keeps its size and place.
+- **Sound** (Eric, Oct 31; `docs/decisions/2026-10-31-colosseum-sound.md`). `colosseum/ambient.ts`:
+  - **The ambience** is Eric's hour of gladiator arena ambience (`sounds/colosseum/ambient.mp3`). It plays while the gear's
+    Ambient crowd noise and the game's Sound are both on and the tab shows.
+  - **How it's made:** `scripts/crowd-sounds.py` tames the clangs (a fast compressor above 2 kHz, a -5 dB high shelf),
+    mixes it to mono at 22.05 kHz and encodes it at 40 kb/s CBR, about 18 MB. Its average sits 15 dB under a move.
+  - **How it streams:** an `<audio>` element, so only what plays is downloaded, by Range requests. The service worker
+    neither precaches nor answers for it (`STREAMED` in `sw-template.js`).
+  - **Who answers the Range requests:** the Worker (`packages/server/src/ranged.ts`). Cloudflare's asset server sends a
+    file whole and without its length, so the path is in `run_worker_first`. The Worker asks for the whole file and
+    passes on only the asked-for bytes as a 206, reading only as far as the range's end. The file's size is in
+    `RANGED_ASSETS`, and a test checks it against the file.
+  - **How it plays:** it starts at a random point in the hour (a `#t=` media fragment, with a seek as a fallback) and
+    loops at the end. Its level goes through Web Audio (`mediaGain` in `sound.ts`: through the master, with a 1 s fade
+    in and out), since iOS ignores an element's volume. If the browser won't start it before a tap, it starts on the
+    next tap or key.
+  - **The cheer:** a queen taken plays the crowd's cheer (`sounds/colosseum/cheer.mp3`, Quendel's CC BY 4.0 cheering with
+    CC0 applause) as the piece lands, with the jump. It is under the game's Sound, not the ambient switch, and is
+    fetched when the screen opens (`warmFile`).
+  - **Credits:** the cheer is credited in Settings, the FAQ and `/licenses/third-party.txt`; both files are in
+    `sounds/colosseum/CREDITS.md`.
+  - **Not on the frame loop:** none of this runs per frame, so the frame budget is unchanged.
 - **No WebGL 2:** a still of the stands (`colosseum/still.jpg`) in the arena's place; everything else the same.
 - **The frame rate.** Three draw calls a frame (the arena, the crowd, the props). A frame sets the camera, the time and the
   jump's clock and draws: nothing allocated, nothing uploaded (the props are uploaded again only when a move is made). The
@@ -75,7 +96,9 @@ drawn yet: the railing in front of your seat, pawn backs (done by the shader), f
 ## Files
 
 `packages/app/src/colosseum/`: `ColosseumPage.tsx` (the lazy page), `Colosseum.tsx` (the screen, the loop, the hooks),
-`arena.ts`, `arena-gl.ts`, `art.ts`, `pieces3d.ts`, `match.ts`, `floor-engine.ts`, `colosseum.css`, `still.jpg`. The link:
+`arena.ts`, `arena-gl.ts`, `art.ts`, `pieces3d.ts`, `match.ts`, `floor-engine.ts`, `ambient.ts` (the streamed ambience),
+`colosseum.css`, `still.jpg`. Sound: `packages/app/public/sounds/colosseum/` (`ambient.mp3`, `cheer.mp3`, `CREDITS.md`),
+made by `scripts/crowd-sounds.py`; `sound.ts` (`colosseumCheer`, `warmFile`, `mediaGain`). The link:
 `town/Town.tsx` (the card), `town/TownPage.tsx`, `town/town.css` (`a.town-btn.town-look`). The gear's extra rows:
 `components/MatchMenu.tsx` (`extra`, `SwitchRow`).
 
@@ -92,12 +115,21 @@ drawn yet: the railing in front of your seat, pawn backs (done by the shader), f
 - `packages/app/test/colosseum.test.ts`, "the 3D pieces": the six meshes (whole triangles, unit normals, on the board, inside
   their squares, the king tallest). `e2e/colosseum.spec.ts`, "the gear's 3D pieces": Off by default (three draw calls), the row
   flips it at once (nine), the game plays, a reload keeps it, Off again flat and three.
-- Test hooks (test switches on): `window.__colosseum` (`state()` (with `pieces`: "flat" or "3d"), `seat(i)`, `flag()`,
-  `jump()`, `sample()`, `pieces(style)` and `freeze()` for still pairs: the same frame in 3D and flat), and
+- Sound: `e2e/colosseum.spec.ts`, "sound: the gear's Ambient crowd noise…" (phone and computer):
+  - On by default, the ambience plays from a non-zero point in the hour and keeps going, fetched by Range requests.
+  - Off pauses it; on plays it again.
+  - `jump()` logs the cheer (`colosseumCheer:running` in `__soundLog`).
+  
+  `packages/app/test/colosseum-sounds.test.ts`:
+  - The hour is mono, 22.05 kHz, 40 kb/s CBR, has no cover image and is under 25 MiB.
+  - The service worker leaves it alone.
+  - The cheer's credit is in Settings, the FAQ and the notice.
+- Test hooks (test switches on): `window.__colosseum` (`state()` (with `pieces`: "flat" or "3d"; `ambient`: playing, time, start), `seat(i)`, `flag()`,
+  `jump()` (the crowd's jump and its cheer), `sample()`, `pieces(style)` and `freeze()` for still pairs: the same frame in 3D and flat), and
   `?fast` makes the bots move at once and the next game come in 1.2 s.
 
 ## Not built yet
 
 The tournament (registration, Swiss pairing, the server's games, the featured boards, standings); the chat in the box;
-crowd noise and sounds; real players' pawns and the viewer count from the server; the two players' pawns on the floor;
+more crowd reactions (a gasp, a boo); real players' pawns and the viewer count from the server; the two players' pawns on the floor;
 the API art; a GPU-side far-crowd simplification if real phones need it.

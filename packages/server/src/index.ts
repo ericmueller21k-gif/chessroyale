@@ -28,6 +28,7 @@ import { pruneChatMod } from "./chat-mod.ts";
 import type { AccessEnv } from "./access.ts";
 import { SERVER_RECHECK_NODES, serverScoreAt, warmEngine, type EngineEnv } from "./engine.ts";
 import { isPaused, pausedResponse, switchStatus, type KillSwitchEnv } from "./kill-switches.ts";
+import { RANGED_ASSETS, rangedAsset } from "./ranged.ts";
 
 export { Lobby, SquadsLobby, SquadsParty, Matchmaker, LiveHub, DuelGame };
 export { EngineServer } from "./engine.ts";
@@ -118,6 +119,9 @@ async function handle(request: Request, rawEnv: Env, ctx: ExecutionContext): Pro
   const url = new URL(request.url);
   // (The admin pages, fair play's and ops', are the Worker's own; everything else outside /api is the app.)
   const admin = /^\/admin\/(fairplay|ops)(\/|$)/.test(url.pathname);
+  // (The Colosseum's hour of ambience, streamed: Range requests, which the asset server doesn't answer; ranged.ts.)
+  const ranged = RANGED_ASSETS[url.pathname];
+  if (ranged) return rangedAsset(request, rawEnv.ASSETS, ranged);
   if (!url.pathname.startsWith("/api/") && !admin) return rawEnv.ASSETS.fetch(request);
   // Load-test counters (OPS_STATS set, and the matching key): see ops.ts.
   if (url.pathname === "/api/ops/stats" && rawEnv.OPS_STATS && request.headers.get("x-ops-key") === rawEnv.OPS_STATS) {

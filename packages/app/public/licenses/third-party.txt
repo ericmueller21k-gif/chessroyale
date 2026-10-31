@@ -5,8 +5,11 @@ whose text follows. (The chess pieces have their own notice: /licenses/pieces.tx
 Maia-3, are separate programs with their own notices: /engine/COPYING.txt, /engine/maia/NOTICE.txt and
 /engine/maia/LICENSE.txt. Their complete source is on this site too, to download: Stockfish's (GPL-3.0) at
 /engine/stockfish-source.tar.gz, our Maia box's (AGPL-3.0) at /engine/maia/maia-box-source.tar.gz. The classic piece
-sounds and their variations are PyChess's, under the GPL-3.0: see "Piece sounds" below. The other sounds are CC0 or
-the game's own: no notice is needed.)
+sounds and their variations are PyChess's, under the GPL-3.0: see "Piece sounds" below. The Colosseum's crowd cheer,
+/sounds/colosseum/cheer.mp3, is made from Gregor Quendel's "Free Crowd Cheering Sounds"
+(https://opengameart.org/content/free-crowd-cheering-sounds), under CC BY 4.0
+(https://creativecommons.org/licenses/by/4.0/), trimmed, layered and leveled by HunChess: /sounds/colosseum/CREDITS.md.
+The other sounds are CC0, royalty free or the game's own: no notice is needed.)
 
 - Preact (https://preactjs.com): MIT license.
 - chess.js (https://github.com/jhlywa/chess.js): BSD 2-Clause license.
