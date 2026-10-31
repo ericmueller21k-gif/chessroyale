@@ -1,6 +1,6 @@
 import { devices, expect, type Page } from "@playwright/test";
-import { rankView } from "@chessroyale/core";
-import { giveItems, named, soloFromHome, switchesOff, test, openBossRaid } from "./helpers.ts";
+import { ITEM_DEFS, SHOP_ITEMS, rankView, wornFromLocker } from "@chessroyale/core";
+import { asServerAdmin, giveItems, named, soloFromHome, switchesOff, test, openBossRaid } from "./helpers.ts";
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
 
@@ -78,6 +78,45 @@ test("your profile: tap your pawn; the same structure as anyone's, with your own
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(page.locator(".fd-hero-name")).toHaveText("Hunter");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
+});
+
+test("an admin's locker has one of every item, each tagged Admin, worn like any item and never deleted; a player's only theirs", async ({ page }) => {
+  await named(page, "Eric");
+  const crate = page.locator(".locker-grid").first();
+  const fromShop = page.locator(".locker-grid").nth(1);
+  // A player: only what they own (nothing yet), the God King's starter effect.
+  await page.goto("/shop");
+  await page.getByRole("tab", { name: "Locker" }).click();
+  await expect(page.getByText("No crate items here yet. Open a crate!")).toBeVisible();
+  await expect(page.locator(".locker-item")).toHaveCount(1);
+  await expect(page.locator(".locker-admin")).toHaveCount(0);
+  // An admin (ADMIN_EMAILS, docs/decisions/2026-10-31-admin-owns-all.md): one of every crate item and God King effect.
+  const id = await asServerAdmin(page);
+  await page.reload();
+  await page.getByRole("tab", { name: "Locker" }).click();
+  await expect(crate.locator(".locker-item")).toHaveCount(ITEM_DEFS.length);
+  await expect(crate.locator(".locker-admin")).toHaveCount(ITEM_DEFS.length);
+  const kings = SHOP_ITEMS.filter(wornFromLocker);
+  await expect(fromShop.locator(".locker-item")).toHaveCount(kings.length);
+  await expect(fromShop.locator(".locker-admin")).toHaveCount(kings.filter((k) => !k.starter).length);
+  // Worn like any item, and others see it.
+  const crown = crate.getByRole("button", { name: /^Fire & Ice Crown, / });
+  await crown.click();
+  await expect(crown.locator(".locker-worn")).toHaveText("Worn");
+  await expect.poll(async () => ((await (await page.request.get(`/api/profile/${id}`)).json()) as { look: { head?: { def: string } } }).look.head?.def).toBe("fire-ice-crown");
+  // Never deleted: holding (or right-clicking) an admin copy opens nothing, and letting go after a hold isn't a tap.
+  await crown.click({ button: "right" });
+  await page.waitForTimeout(700);
+  await expect(page.locator(".locker-dialog")).toHaveCount(0);
+  await expect(crown.locator(".locker-worn")).toHaveText("Worn");
+  await crown.hover();
+  await page.mouse.down();
+  await page.waitForTimeout(700);
+  await page.mouse.up();
+  await page.waitForTimeout(500);
+  await expect(page.locator(".locker-dialog")).toHaveCount(0);
+  await expect(crown.locator(".locker-worn")).toHaveText("Worn");
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
 });
 
@@ -204,4 +243,25 @@ test("rides (Oct 31): the locker's Ride tab wears one; the preview's pawns ride 
   await expect(page.locator(".locker-preview .avatar.riding")).toHaveCount(0);
   await expect(page.locator(".locker-preview .avatar")).toHaveCount(2);
   expect(await boxes()).toEqual(before);
+});
+
+test("rides for an admin (Oct 31; admins own one of every item): the Ride tab has both rides' admin copies; wearing Riding Chirp's, the preview rides it, and in the town square your pawn rides it, in its color", async ({ page }) => {
+  await named(page, "Eric");
+  await page.goto("/");
+  await asServerAdmin(page);
+  await page.goto("/shop");
+  await page.getByRole("tab", { name: "Locker" }).click();
+  await page.getByRole("tab", { name: "Ride", exact: true }).click();
+  const grid = page.locator(".locker-grid").first();
+  await expect(grid.locator(".locker-item")).toHaveCount(2);
+  await expect(grid.locator(".locker-admin")).toHaveCount(2);
+  const chirp = grid.getByRole("button", { name: /^Riding Chirp, / });
+  await chirp.click();
+  await expect(chirp.locator(".locker-worn")).toHaveText("Worn");
+  await expect(page.locator('.locker-preview .avatar.riding[data-ride="riding-chirp"]')).toHaveCount(2);
+  // In the town square, as the town reads anyone's look: your pawn on the admin copy's ride, its red sheet.
+  await page.goto("/town?sky=day");
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __townRide?: () => { you: { ride: string | null; color: string | null; ready: boolean } } | null }).__townRide?.()?.you ?? null), { timeout: 20_000 }).toEqual(
+    expect.objectContaining({ ride: "riding-chirp", color: "red", ready: true }),
+  );
 });

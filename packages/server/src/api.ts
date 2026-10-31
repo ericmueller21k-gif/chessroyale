@@ -1,4 +1,4 @@
-import { deleteLockerItems, equipLocker, lockerState, openCrate } from "./locker.ts";
+import { deleteLockerItems, equipLocker, lockerState, openCrate, type AdminCheck } from "./locker.ts";
 import { liveCounts, pruneLive, type LiveCounts } from "./live.ts";
 import { liveHub, type LiveHub } from "./live-hub.ts";
 import { cachedUserId, firstSighting, forgetToken, inboxOf, markSeen, rememberInbox } from "./presence.ts";
@@ -207,6 +207,9 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   await ensureSchema(sql, env.DB);
   const now = Date.now();
   const token = readCookie(request, SESSION_COOKIE);
+  // Who's an admin (ADMIN_EMAILS): an admin owns one of every item, never stored (core/admin-copies.ts), so the profile,
+  // shop and locker answers carry their admin copies, and others see the ones they wear.
+  const admins: AdminCheck = (u) => isAdmin(env as AdminEnv, u);
 
   // GET /api/live: the live line (online, matches running, in queue, the playing-now list, typical waits). Polled by
   // the front door every few seconds and by matches every 30 s, so it also marks you as online.
@@ -269,7 +272,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   // GET /api/profile/ID: anyone's public profile (what any player can see; nothing private).
   const pm = path.match(/^\/api\/profile\/([A-Za-z0-9_-]{1,64})$/);
   if (pm && request.method === "GET") {
-    const p = await publicProfile(sql, pm[1]!, now);
+    const p = await publicProfile(sql, pm[1]!, now, admins);
     if (!p) return json({ message: "No such player." }, 404);
     // Hiding when you're online hides when you played too: others get each recent match's day, not its time (you get
     // yours exact: "See your result" finds a match by it). The session from this instance's cache, usually no D1 read.
@@ -285,6 +288,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   }
 
   const current = await userFromToken(sql, token, now, presenceTouch(env, waitUntil));
+  const admin = isAdmin(env as AdminEnv, current);
 
   /**
    * Switches the browser to `user` (a new session) and answers with `body` or a redirect. Every sign-in comes through
@@ -303,7 +307,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
       return new Response(null, { status: 302, headers });
     }
     headers.set("content-type", "application/json");
-    return new Response(JSON.stringify(await profile(sql, user)), { status: 200, headers });
+    return new Response(JSON.stringify(await profile(sql, user, admins)), { status: 200, headers });
   };
 
   // GET /api/me: your profile (a guest account is made the first time). It also gives the device its marker.
@@ -311,11 +315,11 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const headers = new Headers({ "content-type": "application/json", "cache-control": "no-store" });
     if (!readCookie(request, DEVICE_COOKIE)) headers.append("set-cookie", cookie(DEVICE_COOKIE, randomToken(16), 400 * 86_400));
     // (Admins, ADMIN_EMAILS as for the fair-play review, also see the boss battle's test trigger.)
-    if (current) return new Response(JSON.stringify({ ...(await profile(sql, current)), ...(isAdmin(env as AdminEnv, current) ? { admin: true } : {}) }), { headers });
+    if (current) return new Response(JSON.stringify({ ...(await profile(sql, current, admins)), ...(admin ? { admin: true } : {}) }), { headers });
     // (A device that answered "too young" plays under the default name.)
     const g = await createGuest(sql, now, ageAnswer(request) === "under" ? "Player" : (url.searchParams.get("name") ?? "Player"));
     headers.append("set-cookie", sessionCookie(g.token));
-    return new Response(JSON.stringify(await profile(sql, g.user)), { headers });
+    return new Response(JSON.stringify(await profile(sql, g.user, admins)), { headers });
   }
   if (!current) return json({ message: "No account on this device yet." }, 401);
 
@@ -326,7 +330,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const body = (await request.json().catch(() => ({}))) as { name?: unknown; icon?: unknown };
     // (A name with a slur or a hate term in it: text-filter.ts.)
     if (typeof body.name === "string" && isBlockedText(String(body.name).slice(0, 64))) return json({ message: NAME_NOT_ALLOWED }, 400);
-    return json(await profile(sql, await updateProfile(sql, current.id, body)));
+    return json(await profile(sql, await updateProfile(sql, current.id, body), admins));
   }
 
   // POST /api/auth/age {oldEnough}: the age question's answer, asked before any sign-in (the app works it out from the
@@ -380,39 +384,39 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   }
 
   // The shop. GET /api/shop: your coins, items and what's equipped. POST /api/shop/buy {item}, /api/shop/equip {item}.
-  if (path === "/api/shop" && request.method === "GET") return json(await shopState(sql, current.id));
+  if (path === "/api/shop" && request.method === "GET") return json(await shopState(sql, current.id, admin));
   // (The shop resting, a kill switch: nothing new from it. Equipping what you have still works.)
   if ((path === "/api/shop/buy" || path === "/api/locker/open") && request.method === "POST" && isPaused(env, "shop")) return pausedResponse("shop");
   if ((path === "/api/shop/buy" || path === "/api/shop/equip") && request.method === "POST") {
     const { item } = (await request.json().catch(() => ({}))) as { item?: unknown };
-    const r = path === "/api/shop/buy" ? await buyItem(sql, current.id, item, now) : await equipItem(sql, current.id, item);
+    const r = path === "/api/shop/buy" ? await buyItem(sql, current.id, item, now, admin) : await equipItem(sql, current.id, item, admin);
     return r.ok ? json(r.shop) : json({ message: r.message }, 400);
   }
   // POST /api/shop/chat {lines?, emoji?}: the quick chat lines and emoji you see in your games (your profile's
   // "Quick chat and emoji"), in your order; null puts one back to the defaults. Answers with your shop.
   if (path === "/api/shop/chat" && request.method === "POST") {
     const b = (await request.json().catch(() => ({}))) as { lines?: unknown; emoji?: unknown };
-    return json(await setChatPicks(sql, current.id, b && typeof b === "object" ? b : {}));
+    return json(await setChatPicks(sql, current.id, b && typeof b === "object" ? b : {}, admin));
   }
 
   // The locker. GET /api/locker; POST /api/locker/open {crate, fischer?, shiny?} (the test switches: admins, or
   // TEST_SWITCHES, and only while crates are free); POST /api/locker/equip {slot, item} (item null empties the slot); POST /api/locker/delete
   // {items} (deletes your crate items for good).
-  if (path === "/api/locker" && request.method === "GET") return json(await lockerState(sql, current.id));
+  if (path === "/api/locker" && request.method === "GET") return json(await lockerState(sql, current.id, admin));
   if (path === "/api/locker/open" && request.method === "POST") {
     const b = (await request.json().catch(() => ({}))) as { crate?: unknown; fischer?: unknown; shiny?: unknown };
     const force = testSwitchesOn(env as AdminEnv, current) ? { fischer: b.fischer === true, shiny: b.shiny === true } : {};
-    const r = await openCrate(sql, current.id, b.crate, force, now);
+    const r = await openCrate(sql, current.id, b.crate, force, now, admin);
     return r.ok ? json(r) : json({ message: r.message }, 400);
   }
   if (path === "/api/locker/equip" && request.method === "POST") {
     const b = (await request.json().catch(() => ({}))) as { slot?: unknown; item?: unknown };
-    const r = await equipLocker(sql, current.id, b.slot, b.item ?? null);
+    const r = await equipLocker(sql, current.id, b.slot, b.item ?? null, admin);
     return r.ok ? json(r.locker) : json({ message: r.message }, 400);
   }
   if (path === "/api/locker/delete" && request.method === "POST") {
     const b = (await request.json().catch(() => ({}))) as { items?: unknown };
-    const r = await deleteLockerItems(sql, current.id, b.items);
+    const r = await deleteLockerItems(sql, current.id, b.items, admin);
     return r.ok ? json(r.locker) : json({ message: r.message }, 400);
   }
 

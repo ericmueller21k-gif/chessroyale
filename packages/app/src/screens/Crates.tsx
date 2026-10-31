@@ -11,6 +11,7 @@ import {
   TIERS,
   crateDef,
   fischerOdds,
+  isAdminCopy,
   isShiny,
   itemChance,
   liveStrip,
@@ -557,7 +558,8 @@ const tabName = (t: LockerTab) => (t === "all" ? "All" : t === "king" ? "God Kin
  * stacked (×3, the purest on top: that's the one you wear). Then what you got in the shop: God King effects. Tap to
  * wear (tap again to take off); hold a crate item (or right-click it) to delete it. Your avatar shows the result (on its ride,
  * if you wear one: Oct 31, in the same box).
- * (The pawn hats are crate items now, from the Beta crate.)
+ * (The pawn hats are crate items now, from the Beta crate.) An admin's locker has one of everything: an admin copy
+ * (core/admin-copies.ts) carries an "Admin" tag, wears like any item and can't be deleted (there's nothing stored).
  */
 export function LockerPanel({ onShop }: { onShop?: () => void }) {
   const { profile } = useAccount();
@@ -601,20 +603,26 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
             const it = top(s);
             const d = itemDef(it.def)!;
             const worn = wornIn(s);
+            // (An admin copy is never stacked: it's there only for an item you don't own.)
+            const admin = isAdminCopy(it.id);
             return (
               <HoldButton
                 key={s.key}
                 class={`locker-item${worn ? " worn" : ""}${isShiny(it.blemish) ? " shiny" : ""}`}
                 style={{ "--tier": tierInfo(d.tier).color }}
-                label={`${d.name}, ${colorName(it)}, purity ${purity(it.blemish).toFixed(1)}%${s.items.length > 1 ? `, ${s.items.length} of them` : ""}. Hold to delete.`}
+                label={`${d.name}, ${colorName(it)}, purity ${purity(it.blemish).toFixed(1)}%${s.items.length > 1 ? `, ${s.items.length} of them` : ""}. ${admin ? "Admin copy." : "Hold to delete."}`}
                 onTap={() => {
                   play("menuSelect");
                   void equipLockerItem(d.slot, worn ? null : it.id);
                 }}
-                onHold={() => {
-                  play("menuOpen");
-                  setDeleting(s);
-                }}
+                onHold={
+                  admin
+                    ? undefined
+                    : () => {
+                        play("menuOpen");
+                        setDeleting(s);
+                      }
+                }
               >
                 <ItemArt def={it.def} finish={it} />
                 <strong>{d.name}</strong>
@@ -624,6 +632,7 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
                 </span>
                 {worn && <span class="locker-worn">Worn</span>}
                 {s.items.length > 1 && <span class="locker-count">×{s.items.length}</span>}
+                {admin && <span class="locker-admin">Admin</span>}
               </HoldButton>
             );
           })}
@@ -652,6 +661,7 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
                   <strong>{item.name}</strong>
                   <span class="small muted">God King effect</span>
                   {worn && <span class="locker-worn">On</span>}
+                  {shop.admin?.includes(item.id) && <span class="locker-admin">Admin</span>}
                 </button>
               );
             })}
@@ -672,8 +682,8 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
 }
 
 /**
- * A button you can tap, or hold (about half a second; or right-click) for something else. Moving the finger (a
- * scroll) cancels the hold, and a hold doesn't also count as a tap.
+ * A button you can tap, or hold (about half a second; or right-click) for something else (none without `onHold`).
+ * Moving the finger (a scroll) cancels the hold, and a hold doesn't also count as a tap.
  */
 function HoldButton({
   onTap,
@@ -681,7 +691,7 @@ function HoldButton({
   label,
   children,
   ...rest
-}: { onTap: () => void; onHold: () => void; label: string; children: ComponentChildren; class: string; style: Record<string, string> }) {
+}: { onTap: () => void; onHold?: () => void; label: string; children: ComponentChildren; class: string; style: Record<string, string> }) {
   const timer = useRef(0);
   const held = useRef(false);
   const from = useRef<{ x: number; y: number } | null>(null);
@@ -691,7 +701,9 @@ function HoldButton({
   };
   const hold = () => {
     cancel();
+    // (Held, with or without anything to do: the click that follows isn't a tap.)
     held.current = true;
+    if (!onHold) return;
     navigator.vibrate?.(15);
     onHold();
   };
