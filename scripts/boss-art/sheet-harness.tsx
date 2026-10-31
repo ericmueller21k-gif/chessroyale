@@ -29,7 +29,7 @@ function Piece({ d }: { d: ItemDraft | RiderDraft }) {
   return (
     <div style={{ background: "#1f2228", borderRadius: "12px", padding: "8px" }}>
       <div style={{ font: "bold 14px sans-serif", color: "#f2c14e", marginBottom: "6px" }}>
-        {d.name} <span style={{ color: "#9ca3af", fontWeight: "normal" }}>({isRider(d) ? "ride" : d.slot}, {d.tier})</span>
+        {d.name} <span style={{ color: "#9ca3af", fontWeight: "normal" }}>({isRider(d) ? "ride" : d.slot}, {d.tier}) · {d.id}</span>
       </div>
       <div style={{ display: "flex", gap: "8px", alignItems: "flex-end" }}>
         {isRider(d) ? (
