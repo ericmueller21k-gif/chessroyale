@@ -522,8 +522,12 @@ async function main(): Promise<void> {
   let jsonRetries = 0;
   while (spent.turns < MAX_TURNS) {
     // The worst this turn could cost: what's cached read again, a generous guess at what's new, and a full output.
-    const newChars = JSON.stringify(messages[messages.length - 1]).length;
-    const worst = (lastInput * PRICE.cacheRead + (newChars / 3) * PRICE.cacheWrite + MAX_TOKENS * PRICE.output) / 1e6;
+    // (A picture is billed by its size, at most about 1,600 tokens, not by its base64 length: Oct 31, the trail runs'
+    // first turns, three pictures and the source, read as $1.90 to $3 of base64 and were all refused under a $1.50 cap.)
+    let images = 0;
+    const newChars = JSON.stringify(messages[messages.length - 1], (k, v) => (k === "data" && typeof v === "string" && v.length > 1000 ? (images++, "") : v)).length;
+    const newTokens = newChars / 3 + images * 1600;
+    const worst = (lastInput * PRICE.cacheRead + newTokens * PRICE.cacheWrite + MAX_TOKENS * PRICE.output) / 1e6;
     if (spent.usd + worst > CAP) {
       stopped = `stopped before turn ${spent.turns + 1}: $${spent.usd.toFixed(2)} spent, and the next turn could cost up to $${worst.toFixed(2)} (cap $${CAP})`;
       break;
