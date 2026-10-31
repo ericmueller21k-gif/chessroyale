@@ -3,8 +3,9 @@
  * scripts/crowd-sounds.py), streamed. An <audio> element, so only what plays is downloaded (Range requests; the service
  * worker leaves the file to the network), started at a random point in the hour and looping at its end; its level goes
  * through Web Audio (`mediaGain`: a 1 s fade in and out, since iOS ignores an element's volume). It plays while the
- * gear's "Ambient crowd noise" is on, the game's Sound is on and the tab shows; if the browser won't start it before a
- * tap, it starts on the next tap or key. Nothing here runs on the frame loop.
+ * gear's "Ambient crowd noise" is Normal or Low (Eric, Oct 31: "turn it down overall … normal volume or low or off"),
+ * the game's Sound is on and the tab shows; if the browser won't start it before a tap, it starts on the next tap or key.
+ * A change of level fades over the same second. Nothing here runs on the frame loop.
  */
 import { isMuted, mediaGain, onMuteChange } from "../sound.ts";
 
@@ -14,6 +15,19 @@ const LENGTH_S = 3600;
 const FADE_S = 1;
 const GESTURES = ["pointerdown", "touchend", "keydown"] as const;
 
+/** The gear's three levels, in the order a tap cycles them. */
+export const AMBIENT_LEVELS = ["normal", "low", "off"] as const;
+export type AmbientLevel = (typeof AMBIENT_LEVELS)[number];
+export const AMBIENT_LEVEL_NAME: Record<AmbientLevel, string> = { normal: "Normal", low: "Low", off: "Off" };
+/** Each level's gain (dB) against the file as made (its average 15 dB under a move): Normal 4 dB down, Low 12 dB down. */
+export const AMBIENT_DB: Record<AmbientLevel, number> = { normal: -4, low: -12, off: -Infinity };
+const gainOf = (l: AmbientLevel) => (l === "off" ? 0 : 10 ** (AMBIENT_DB[l] / 20));
+
+/** A saved choice: "normal" or "low" as saved; the old switch's "on" is Normal, "off" stays Off; nothing saved: Normal. */
+export function ambientLevelOf(saved: string | null): AmbientLevel {
+  return saved === "low" || saved === "off" ? saved : "normal";
+}
+
 export class Ambient {
   private el: HTMLAudioElement | null = null;
   private stopTimer = 0;
@@ -22,20 +36,21 @@ export class Ambient {
   /** Where in the hour it started (s). */
   readonly start = 1 + Math.random() * (LENGTH_S - 2);
 
-  constructor(private wanted: boolean) {
+  constructor(private level: AmbientLevel) {
     this.offMute = onMuteChange(this.update);
     document.addEventListener("visibilitychange", this.update);
     this.update();
   }
 
-  /** The gear's switch. */
-  set(on: boolean) {
-    this.wanted = on;
+  /** The gear's level. */
+  set(level: AmbientLevel) {
+    this.level = level;
     this.update();
   }
 
+  /** (Tests) Whether it plays, where in the hour, its level and the gain it's fading to. */
   state() {
-    return { playing: !!this.el && !this.el.paused, time: this.el?.currentTime ?? 0, start: this.start };
+    return { playing: !!this.el && !this.el.paused, time: this.el?.currentTime ?? 0, start: this.start, level: this.level, gain: this.should() ? gainOf(this.level) : 0 };
   }
 
   dispose() {
@@ -50,7 +65,7 @@ export class Ambient {
     }
   }
 
-  private should = () => this.wanted && !isMuted() && document.visibilityState !== "hidden";
+  private should = () => this.level !== "off" && !isMuted() && document.visibilityState !== "hidden";
 
   private update = () => (this.should() ? this.play() : this.fadeOut());
 
@@ -81,7 +96,7 @@ export class Ambient {
   private play() {
     clearTimeout(this.stopTimer);
     const el = this.element();
-    this.fadeTo(1);
+    this.fadeTo(gainOf(this.level));
     if (el.paused) el.play().catch(() => this.waitForTap());
   }
 

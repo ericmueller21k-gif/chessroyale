@@ -3,6 +3,7 @@
  * after one ends, for as long as the screen is open. Played on this device for this preview (the tournament's games will
  * run on our server). The engine and the clock are passed in, so the tests drive it without Stockfish or waiting.
  */
+import { moveKnock } from "../move-sound.ts";
 import { START_FEN, applyMove, gameEnd, pieceAt, sideToMove, toSan, type GameEnd } from "@chessroyale/chess";
 import { BOTS, type TownBot } from "../town/world.ts";
 import type { FloorPiece } from "./arena-gl.ts";
@@ -51,6 +52,8 @@ export interface FloorState {
   pieces: FloorPiece[];
   /** A queen was taken by the last move (the crowd jumps). */
   queenTaken: boolean;
+  /** The last move's piece sound, as a played game's (move-sound.ts): set by a move, cleared once played. */
+  knock: "move" | "capture" | "castle" | null;
 }
 
 export interface FloorDeps {
@@ -146,6 +149,7 @@ export class FloorMatch {
       reason: null,
       pieces: piecesOf(START_FEN),
       queenTaken: false,
+      knock: null,
     };
   }
 
@@ -225,6 +229,7 @@ export class FloorMatch {
     const { pieces, took } = piecesAfter(before, uci, s.fen);
     s.pieces = pieces;
     s.queenTaken = took === "q";
+    s.knock = moveKnock(before, s.fen, uci);
     if (took) s.took[side].push(took);
     this.onChange(s);
   }
