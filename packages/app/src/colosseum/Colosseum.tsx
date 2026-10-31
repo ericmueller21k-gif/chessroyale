@@ -9,8 +9,9 @@
  * The arena is WebGL 2 (arena-gl.ts): three draw calls a frame, nothing allocated a frame, the crowd still but for its jump
  * (a queen taken). No WebGL 2: a still of the stands in its place, everything else the same.
  *
- * Sound (ambient.ts): Eric's hour of arena ambience, streamed while the gear's "Ambient crowd noise" is on; a crowd's cheer
- * with the jump when a queen is taken (under the game's Sound, not the ambient switch).
+ * Sound: Eric's hour of arena ambience (ambient.ts), streamed while the gear's "Ambient crowd noise" is Normal or Low; each
+ * floor move's piece sound, as a played game's; a crowd's cheer with the jump when a queen is taken (those two under the
+ * game's Sound, not the ambient's level).
  *
  * Test hooks (e2e, with the test switches on): `window.__colosseum` (`state()`, `seat(i)`, `flag()`, `jump()`, `sample()`),
  * and `?fast` makes the bots move at once and the next game come quickly.
@@ -18,13 +19,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { Board } from "../components/Board.tsx";
 import { Avatar } from "../components/Items.tsx";
-import { MatchMenu, SwitchRow } from "../components/MatchMenu.tsx";
+import { CycleRow, MatchMenu, SwitchRow } from "../components/MatchMenu.tsx";
 import { crowdAnimations, onPrefsChange } from "../prefs.ts";
-import { COLOSSEUM_CHEER, play, warmFile } from "../sound.ts";
+import { COLOSSEUM_CHEER, play, warmFile, type SoundName } from "../sound.ts";
 import { testParams, testSwitchesAllowed } from "../test-switches.ts";
 import { COLISEUM_PLACE, isSprite } from "../town/world.ts";
 import { BLACK_VIEW, SEAT_VIEWS, VIEWS, otherSeat, seats, turnLimits, viewFor } from "./arena.ts";
-import { Ambient } from "./ambient.ts";
+import { AMBIENT_LEVELS, AMBIENT_LEVEL_NAME, Ambient, ambientLevelOf, type AmbientLevel } from "./ambient.ts";
 import { ArenaGL, SLIDE_S, buildCrowd } from "./arena-gl.ts";
 import { PIECE_URL, crowdArt, propArt, sceneArt } from "./art.ts";
 import { floorEngine, type FloorEngine } from "./floor-engine.ts";
@@ -32,7 +33,7 @@ import { FLOOR, FloorMatch, clockText, evalText, resultText, thinkMs, viewersTex
 import still from "./still.jpg";
 import "./colosseum.css";
 
-/** Ambient crowd noise (ambient.ts: Eric's arena ambience, streamed), remembered on this device; on by default. */
+/** Ambient crowd noise (ambient.ts: Eric's arena ambience, streamed): Normal, Low or Off, remembered on this device; Normal by default. */
 const AMBIENT_KEY = "colosseum-ambient";
 /** The giant pieces in 3D (Eric, Oct 30: "a toggle … for 3D vs 2D pieces players can choose"), remembered on this device; off by default. */
 const PIECES_KEY = "colosseum-3d-pieces";
@@ -43,11 +44,11 @@ const pieces3dOn = () => {
     return false;
   }
 };
-const ambientOn = () => {
+const ambientLevel = (): AmbientLevel => {
   try {
-    return localStorage.getItem(AMBIENT_KEY) !== "off";
+    return ambientLevelOf(localStorage.getItem(AMBIENT_KEY));
   } catch {
-    return true;
+    return "normal";
   }
 };
 
@@ -88,11 +89,11 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
   const frozenAt = useRef<number | null>(null);
   const [portraits, setPortraits] = useState<Map<number, string>>(new Map());
   const [viewers, setViewers] = useState(() => seats().length);
-  const [ambient, setAmbient] = useState(ambientOn);
+  const [ambient, setAmbient] = useState(ambientLevel);
   const ambience = useRef<Ambient | null>(null);
   // The ambience while this screen is open (it waits for a tap if the browser won't start it), and the cheer made ready.
   useEffect(() => {
-    const a = new Ambient(ambientOn());
+    const a = new Ambient(ambientLevel());
     ambience.current = a;
     warmFile(COLOSSEUM_CHEER);
     return () => {
@@ -238,15 +239,24 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
         const a = arenaRef.current;
         const now = (performance.now() - t0.current) / 1000;
         if (a) a.setPieces(s.pieces, animRef.current ? now : now - SLIDE_S);
+        // A move's piece sound, as a played game's (the move, capture or castle sound picked in Settings, under the game's
+        // Sound), as the piece lands on the floor: after its slide, or at once with Animations off. A queen taken: the crowd
+        // jumps and cheers too, on top of the capture.
+        const land = animRef.current ? SLIDE_S * 1000 : 0;
+        const sounds: SoundName[] = [];
+        if (s.knock) sounds.push(s.knock);
         if (s.queenTaken) {
-          // The crowd jumps and cheers as the capturing piece lands.
           jumpAt.current = performance.now() + SLIDE_S * 1000;
+          sounds.push("colosseumCheer");
+        }
+        s.knock = null;
+        s.queenTaken = false;
+        if (sounds.length) {
           const t = setTimeout(() => {
             timers.delete(t);
-            if (live) play("colosseumCheer");
-          }, SLIDE_S * 1000);
+            if (live) for (const name of sounds) play(name);
+          }, land);
           timers.add(t);
-          s.queenTaken = false;
         }
         setTick((n) => n + 1);
       },
@@ -409,16 +419,17 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
                   }
                 }}
               />
-              <SwitchRow
+              <CycleRow
                 icon="📣"
                 label="Ambient crowd noise"
-                on={ambient}
+                value={AMBIENT_LEVEL_NAME[ambient]}
+                lit={ambient !== "off"}
                 onClick={() => {
-                  const on = !ambient;
-                  setAmbient(on);
-                  ambience.current?.set(on);
+                  const next = AMBIENT_LEVELS[(AMBIENT_LEVELS.indexOf(ambient) + 1) % AMBIENT_LEVELS.length]!;
+                  setAmbient(next);
+                  ambience.current?.set(next);
                   try {
-                    localStorage.setItem(AMBIENT_KEY, on ? "on" : "off");
+                    localStorage.setItem(AMBIENT_KEY, next);
                   } catch {
                     // (Not remembered: private mode.)
                   }
