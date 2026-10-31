@@ -1,4 +1,4 @@
-import { CRATES_FREE, adminCopies, crateDef, isAdminCopy, itemDef, mulberry32, rollCrate, type CrateRoll, type ItemInstance, type ItemLook, type ItemSlot } from "@chessroyale/core";
+import { CRATES_FREE, adminCopies, adminCopyDef, crateDef, isAdminCopy, itemDef, mulberry32, rollCrate, type CrateRoll, type ItemInstance, type ItemLook, type ItemSlot } from "@chessroyale/core";
 import type { Sql, Stmt } from "./accounts.ts";
 
 /**
@@ -53,8 +53,11 @@ export async function lockerState(sql: Sql, userId: string, admin = false): Prom
   const rows = await sql.all<{ slot: ItemSlot; item_id: string }>("SELECT slot, item_id FROM equipped_items WHERE user_id = ?", userId);
   const equipped: LockerState["equipped"] = {};
   const look: ItemLook = {};
+  // An admin's worn admin copy of an item they've since really got (so it has no copy): the purest real one of that item
+  // shows in the slot. Read only: what's stored still names the copy.
+  const realFor = (id: string) => (admin ? stored.filter((i) => i.def === adminCopyDef(id)?.id).sort((a, b) => a.blemish - b.blemish)[0] : undefined);
   for (const r of rows) {
-    const it = items.find((i) => i.id === r.item_id);
+    const it = items.find((i) => i.id === r.item_id) ?? realFor(r.item_id);
     if (!it || itemDef(it.def)?.slot !== r.slot) continue;
     equipped[r.slot] = it.id;
     look[r.slot] = { def: it.def, color: it.color, blemish: it.blemish, seed: it.seed, ...(it.color2 ? { color2: it.color2 } : {}) };

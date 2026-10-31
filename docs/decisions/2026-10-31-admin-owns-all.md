@@ -12,12 +12,14 @@ Area: [shop.md](../areas/shop.md).
   (`publicProfile`, `rankedSummary` → `looksOf`, `duelEntrant`). The one thing written is which item a slot wears
   (`equipped_items`, `equipped`), as for any item. With admin off it points at nothing: the slot reads empty and the God
   King goes back to Holy Light.
-- **Only the gaps.** An item the admin really owns (any copy) gets no admin copy; real items stay as they are. A worn
-  admin copy of an item they then really get reads empty until they wear the real one.
+- **Only the gaps.** An item the admin really owns (any copy) gets no admin copy; real items stay as they are. If they
+  wore the copy of an item they then really get, the purest real one shows in that slot (read only: the stored slot
+  still names the copy).
 - **Nothing real comes of one.** Its id is `admin:<item>` (a stored item's id is hex). Deleting ignores it; buying goes by
   what's really owned (an admin copy neither stops nor pays for a real one). Selling, trading, gifting and listing don't
-  exist yet; anything like them reads the stored items, where an admin copy never is. Download my data and every count
-  leave it out.
+  exist yet; anything like them reads the stored items, where an admin copy never is. Every count leaves it out, and so
+  does Download my data, except the id a worn slot names (`admin:<item>` in the locker's equipped list, a God King
+  effect's id in the shop's).
 - **Calls made:**
   - The roll: red (emerald for a second color: the fitting sheet's defaults), 100% purity, seed 1. The brief said 100%
     and not shiny, but the game makes 90% and up shiny, and changing that means changing how items are drawn, which this

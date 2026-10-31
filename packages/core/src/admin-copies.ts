@@ -16,7 +16,7 @@ import { SHOP_ITEMS, wornFromLocker } from "./shop.ts";
 export const ADMIN_COPY_PREFIX = "admin:";
 
 /** Whether an id is an admin copy's (never a stored item's). */
-export const isAdminCopy = (id: unknown): id is string => typeof id === "string" && id.startsWith(ADMIN_COPY_PREFIX);
+export const isAdminCopy = (id: unknown): id is `${typeof ADMIN_COPY_PREFIX}${string}` => typeof id === "string" && id.startsWith(ADMIN_COPY_PREFIX);
 
 /** The item an admin copy's id names (undefined: not an admin copy's id, or no such item). */
 export const adminCopyDef = (id: unknown): ItemDef | undefined => (isAdminCopy(id) ? itemDef(id.slice(ADMIN_COPY_PREFIX.length)) : undefined);

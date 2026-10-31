@@ -41,8 +41,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 - **Admins own one of every item** (`ADMIN_EMAILS`; Oct 31): every crate item and God King effect they don't really own,
   as an admin copy (`core/admin-copies.ts`: red, emerald second color, 100% purity, id `admin:<item>`), tagged "Admin" in
   the locker. Never stored: the server adds them in `lockerState` and `shopState`, accepts them in `equipLocker` and
-  `equipItem`, and shows them worn in `publicProfile`, `looksOf` and `duelEntrant`. Deleting ignores them and buying goes
-  by what's really owned. A new item in `ITEM_DEFS` or a new worn shop slot is covered with no change; a new catalog
+  `equipItem`, and shows them worn in `publicProfile`, `looksOf` and `duelEntrant` (a worn copy of an item they've since
+  really got shows the purest real one). Deleting ignores them and buying goes by what's really owned. A new item in `ITEM_DEFS` or a new worn shop slot is covered with no change; a new catalog
   needs its line in `admin-copies.ts`. Chat packs are left out
   ([2026-10-31-admin-owns-all.md](../decisions/2026-10-31-admin-owns-all.md)).
 - **The icon builder** (the profile): a 48 × 48 pixel drawing with a paint bucket and undo (`UNDO_STEPS`), saved as a

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ADMIN_ROLL, ITEM_DEFS, SHOP_ITEMS, isAdminCopy, itemDef, wornFromLocker } from "@chessroyale/core";
-import { buyItem, createGuest, createSession, ensureSchema, grantReward, profile, publicProfile, shopState, signInWithIdentity, type Sql, type User } from "../src/accounts.ts";
+import { buyItem, createGuest, createSession, ensureSchema, equipItem, grantReward, profile, publicProfile, shopState, signInWithIdentity, type Sql, type User } from "../src/accounts.ts";
 import { isAdmin } from "../src/admin.ts";
 import { handleAccountApi } from "../src/api.ts";
 import { accountDownload } from "../src/account-data.ts";
@@ -175,15 +175,28 @@ describe("wearing an admin copy", () => {
     expect((await looksOf(sql, [eric.id])).get(eric.id)).toBeUndefined();
   });
 
-  it("an item they really get fills the gap: its admin copy goes (one worn reads empty) and the real one is theirs to wear", async () => {
+  it("an item they really get fills the gap: its admin copy goes, and if they wore it, the purest real one shows in the slot (nothing stored changes)", async () => {
     const { sql, eric } = await setup();
     expect((await equipLocker(sql, eric.id, "head", "admin:beanie", true)).ok).toBe(true);
+    const before = await stored(sql);
+    // Two real Beanies come in (a crate, say): the purer one is worn in the copy's place, for them and for everyone.
+    await sql.run("INSERT INTO items (id, user_id, def, color, blemish, seed, crate, created_at) VALUES ('rough-beanie', ?, 'beanie', 'sage', 30, 8, 'winter-1', ?)", eric.id, T0 + 4);
     await sql.run("INSERT INTO items (id, user_id, def, color, blemish, seed, crate, created_at) VALUES ('real-beanie', ?, 'beanie', 'pearl', 3, 9, 'winter-1', ?)", eric.id, T0 + 5);
     const now = await lockerState(sql, eric.id, true);
-    expect(now.items.filter((i) => i.def === "beanie").map((i) => i.id)).toEqual(["real-beanie"]);
-    expect(now.equipped.head).toBeUndefined();
+    expect(now.items.filter((i) => i.def === "beanie").map((i) => i.id)).toEqual(["real-beanie", "rough-beanie"]);
+    expect(now.equipped.head).toBe("real-beanie");
+    const real = { def: "beanie", color: "pearl", blemish: 3, seed: 9 };
+    expect(now.look.head).toEqual(real);
+    expect((await publicProfile(sql, eric.id, T0, admins))!.look.head).toEqual(real);
+    expect((await looksOf(sql, [eric.id], new Set([eric.id]))).get(eric.id)?.head).toEqual(real);
+    expect((await duelEntrant(sql, eric, T0, true)).player.look?.head).toEqual(real);
+    // Only read so: the stored slot still names the copy, and admin off (no copies) it reads empty, as any copy worn.
+    expect((await stored(sql)).equippedItems).toEqual(before.equippedItems);
+    expect((await lockerState(sql, eric.id)).equipped.head).toBeUndefined();
+    // The copy itself can't be worn again; a real one can.
     expect((await equipLocker(sql, eric.id, "head", "admin:beanie", true)).ok).toBe(false);
-    expect((await equipLocker(sql, eric.id, "head", "real-beanie", true)).ok).toBe(true);
+    expect((await equipLocker(sql, eric.id, "head", "rough-beanie", true)).ok).toBe(true);
+    expect((await lockerState(sql, eric.id, true)).equipped.head).toBe("rough-beanie");
     // The real Santa Hat they own: no admin copy of it to wear.
     expect(await equipLocker(sql, eric.id, "head", "admin:santa-hat", true)).toEqual({ ok: false, message: "That isn't yours." });
   });
@@ -257,10 +270,17 @@ describe("fair play and the economy: nobody else gets one, and one never becomes
     expect(rows.some((r) => isAdminCopy(r.id))).toBe(false);
   });
 
-  it("the account's data (Download my data) has only what's stored: no admin copies", async () => {
+  it("the account's data (Download my data) has only what's stored: no admin copy, just the id a worn slot names", async () => {
     const { sql, eric } = await setup();
     await equipLocker(sql, eric.id, "weapon", "admin:katana", true);
-    const file = (await accountDownload(sql, eric, T0)) as { locker: { items: { id: string }[] } };
+    await equipItem(sql, eric.id, "king-void", true);
+    const file = (await accountDownload(sql, eric, T0)) as {
+      locker: { items: { id: string }[]; equipped: { slot: string; item_id: string }[] };
+      shop: { items: unknown[]; equipped: { slot: string; item_id: string }[] };
+    };
     expect(file.locker.items.map((i) => i.id)).toEqual(["erics-hat"]);
+    expect(file.locker.equipped).toEqual([{ slot: "weapon", item_id: "admin:katana" }]);
+    expect(file.shop.items).toEqual([]);
+    expect(file.shop.equipped).toEqual([{ slot: "king", item_id: "king-void" }]);
   });
 });

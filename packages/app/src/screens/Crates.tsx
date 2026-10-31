@@ -700,8 +700,9 @@ function HoldButton({
   };
   const hold = () => {
     cancel();
-    if (!onHold) return;
+    // (Held, with or without anything to do: the click that follows isn't a tap.)
     held.current = true;
+    if (!onHold) return;
     navigator.vibrate?.(15);
     onHold();
   };

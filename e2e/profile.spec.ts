@@ -105,9 +105,16 @@ test("an admin's locker has one of every item, each tagged Admin, worn like any 
   await crown.click();
   await expect(crown.locator(".locker-worn")).toHaveText("Worn");
   await expect.poll(async () => ((await (await page.request.get(`/api/profile/${id}`)).json()) as { look: { head?: { def: string } } }).look.head?.def).toBe("fire-ice-crown");
-  // Never deleted: holding (or right-clicking) an admin copy opens nothing.
+  // Never deleted: holding (or right-clicking) an admin copy opens nothing, and letting go after a hold isn't a tap.
   await crown.click({ button: "right" });
   await page.waitForTimeout(700);
+  await expect(page.locator(".locker-dialog")).toHaveCount(0);
+  await expect(crown.locator(".locker-worn")).toHaveText("Worn");
+  await crown.hover();
+  await page.mouse.down();
+  await page.waitForTimeout(700);
+  await page.mouse.up();
+  await page.waitForTimeout(500);
   await expect(page.locator(".locker-dialog")).toHaveCount(0);
   await expect(crown.locator(".locker-worn")).toHaveText("Worn");
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
