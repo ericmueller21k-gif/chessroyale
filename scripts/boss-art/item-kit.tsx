@@ -199,11 +199,36 @@ export interface RiderPose {
   pawnTilt?: number;
   cut: number;
 }
+/**
+ * Which way the ride is seen. side: going left or right (drawn facing our right; the town mirrors it for left). back:
+ * going up the screen, seen from behind. front: coming down the screen, seen from the front.
+ */
+export type RiderFacing = "side" | "front" | "back";
 export interface RiderProps extends ArtProps {
   anim: "idle" | "move";
+  /** The view being drawn (side for the RiderDraft's own Back and Front), for code shared between views. */
+  view?: RiderFacing;
 }
-/** A ride (a new slot, "rider"): drawn behind the pawn (`Back`) and in front of it (`Front`). */
-export interface RiderDraft {
+/**
+ * One view of a ride: its own idle and move, a pose per frame, and its two drawings, Back (behind the pawn) and Front
+ * (in front of it). The side view is the RiderDraft's own fields.
+ */
+export interface RiderViewDraft {
+  /** Its box on the pawn's square with its pawn on it, at rest: x, y, w, h (front and back: default the side's). */
+  frame?: [number, number, number, number];
+  idle: RiderAnim;
+  /**
+   * The side view: one square of the town's movement, dx 0 to 100. The front and back views: one square's walk toward or
+   * away from the camera, played in place on its square (the town slides it up or down the screen): dx stays about 0,
+   * dy is only a bob or a hop.
+   */
+  move: RiderAnim;
+  pose: (anim: "idle" | "move", f: number) => RiderPose;
+  Back: (props: RiderProps) => ComponentChildren;
+  Front: (props: RiderProps) => ComponentChildren;
+}
+/** A ride (a new slot, "rider"): its side view, and optionally its front and back views (`views`). */
+export interface RiderDraft extends RiderViewDraft {
   id: string;
   name: string;
   tier: ItemTier;
@@ -211,10 +236,6 @@ export interface RiderDraft {
   colors?: 2;
   /** Its box on the pawn's square with its pawn on it, at rest: x, y, w, h (for the tile). */
   frame: [number, number, number, number];
-  idle: RiderAnim;
-  /** One square of the town's movement (from one square to the next), dx 0 to 100. */
-  move: RiderAnim;
-  pose: (anim: "idle" | "move", f: number) => RiderPose;
-  Back: (props: RiderProps) => ComponentChildren;
-  Front: (props: RiderProps) => ComponentChildren;
+  /** The views from behind (walking up the screen) and from the front (walking down). */
+  views?: { front?: RiderViewDraft; back?: RiderViewDraft };
 }

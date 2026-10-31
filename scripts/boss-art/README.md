@@ -32,6 +32,7 @@ npm run boss-art -- <id> <brief.md> [refs dir]
 ```sh
 BOSS_ART_EFFORT=medium BOSS_ART_CAP_USD=3 npm run boss-art -- --item <id> <brief.md> [refs dir]
 BOSS_ART_EFFORT=high BOSS_ART_CAP_USD=6 npm run boss-art -- --rider <id> <brief.md> [refs dir]
+npm run boss-art -- --rider-views <id> <brief.md> [refs dir]     # a finished ride's front and back views ($3, high)
 npx tsx scripts/boss-art/boss-refs.ts scripts/boss-art/refs/<id> <boss id>[:anim,anim]   # the boss's pictures, as references
 ```
 
@@ -39,14 +40,43 @@ npx tsx scripts/boss-art/boss-refs.ts scripts/boss-art/refs/<id> <boss id>[:anim
   grids. The drawing (`out/<id>/<id>.tsx`) imports `item-kit.tsx`, a copy of Items.tsx's paint (`Region`, `LINE`, `lw`, …),
   and exports an `ItemDraft` (what ITEM_DEFS, ITEM_ART, FRAMES, SHINE_BOX and ATTACH would get) or a `RiderDraft` (a ride
   under the pawn: `Back` and `Front` drawings, its `idle` and its town `move`, and a `pose` per frame that places the pawn,
-  its lower part cut off as the town's bench-sit does).
+  its lower part cut off as the town's bench-sit does). A ride can also have `views: { front, back }` (below).
 - **Its eyes** (`item-render.ts`, its own process without the key): esbuild bundles `item-harness.tsx` with the drawing and
   Chromium screenshots one picture: the motion frame by frame at 4x on a pawn (240 px), phone size (a 60 px lobby pawn, the
   130 px home pawn, the 64 px locker tile) beside existing items, and every color at 75% purity, 100% and shiny. A ride:
-  its idle or move at 4x, the town size (a pawn about 45 px) through its move, every color, its tile.
+  its idle or move at 4x, the town size (a pawn about 45 px) through its move, every color, its tile, for one view
+  (`view`: side, front or back); or `view: "all"`, the three views side by side (below).
 - `BOSS_ART_EFFORT` (default high) and `BOSS_ART_MAX_TOKENS` (default 24,000 for an item, 32,000 for a ride) as for bosses.
 - **Previews:** `out/<id>/preview/` (not committed): every frame (`frames.png`; a ride: `idle.png`, `move.png`) and the
-  standard look (`look.png`).
+  standard look (`look.png`); a ride with views also `front-idle.png`, `front-move.png`, `back-idle.png`,
+  `back-move.png` and `views.png` (the three side by side, every move frame).
+
+### Rider views: front and back (`--rider-views`, Oct 31)
+
+Every ride gets a run up and a run down. Walking left or right the town shows the side view (mirrored for left); walking
+**up** the screen it shows the ride from **behind** (its rump, hind legs, the back of the saddle; the pawn from behind,
+so the game hides face items then); walking **down**, from the **front** (its face and chest).
+
+- **The format** (`item-kit.tsx`): a `RiderDraft` is its side view as before (`idle`, `move`, `pose`, `Back`, `Front`),
+  plus optional `views: { front?, back? }`, each a `RiderViewDraft` with its own `idle`, `move`, `pose`, `Back`, `Front`
+  (and an optional `frame`). `RiderProps` carries `view` for code shared between views. Side-only drawings are unchanged.
+- **The front and back move** is one square walked toward or away from the camera, in place: the town slides the ride up
+  or down the screen, so the pose keeps dx about 0 and dy is only a bob or a hop; the legs step, the wheels roll, it hops.
+  The pawn sits at the same height as on the side (same `pawnY` and `cut`), centered.
+- **Adding views to a finished ride:** copy `briefs/_views-template.md` and fill it in, then run
+  `npm run boss-art -- --rider-views <id> <brief.md>`. It starts from `out/<id>/<id>.tsx` (the drawing it edits in
+  place), shows the model its source, its notes from `summary.md` and pictures of its side view, and asks it to add
+  `front` and `back` that match (proportions, colors, painted part, personality) by inserting code. The original is
+  kept beside it as `<id>.side.tsx` (not committed); `done` is refused until the side view renders pixel for pixel as
+  the original did (idle and move, every frame, every color, the tile) and both views exist. Defaults: cap $3
+  (`BOSS_ART_CAP_USD`), effort high. It writes `views-summary.md` and `views-log.jsonl` (the side run's `summary.md` and
+  `log.jsonl` stay), and its looks are `looks/views-*`.
+- **Seeing them:** the render tool's `view: "all"` (the default once a ride has views) shows the three in columns:
+  idle frame 0 and some move frames at 4x (the side's move in place, so every cell is one size), then idle and every
+  move frame at town size, then cobalt and midnight. The contact sheet (`item-render.ts` `mode: "sheet"`) gives a ride
+  with views a whole row: the three side by side, idle and every move frame (or `frames`), at 4x and at town size.
+- **Test fixture:** `fixtures/views-test-ride.tsx`, a plain pony with all three views (not art), for checking the
+  harness: `npx tsx scripts/boss-art/item-render.ts '{"draft":"scripts/boss-art/fixtures/views-test-ride.tsx","mode":"rider","view":"all","out":"<dir>"}'`.
 
 ### Item motion
 
@@ -59,4 +89,7 @@ the frame number, and `motion.ms` (a ride: `idle.ms`, `move.ms`) each frame's le
   baked into one picture per frame the same way, and the town would pick the frame by the clock. A ride also needs its
   `move` played per square walked in place of the walk's hop, and the pawn drawn between its `Back` and `Front`, cut at
   the pose's `cut` (the stool-sit's clip in render.ts, `sitCut`).
+- For a ride's views: the town picks the view by the step's direction (side, mirrored for left; back going up; front
+  going down) and slides the ride a square up or down while its front or back `move` plays in place; from behind, the
+  pawn's face items are hidden.
 - A new slot, `rider`, in crates.ts (`ItemSlot`, `cleanLook`) and a place for it in the locker.

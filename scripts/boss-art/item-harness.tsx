@@ -8,7 +8,7 @@ import { render } from "preact";
 import { ITEM_COLORS, type ItemSlot } from "@chessroyale/core";
 import { ItemLayer } from "../../packages/app/src/components/Items.tsx";
 import * as DRAFT from "virtual:draft";
-import { Pawn, usePaint, type Finish, type ItemDraft, type RiderDraft } from "./item-kit.tsx";
+import { Pawn, usePaint, type Finish, type ItemDraft, type RiderDraft, type RiderFacing, type RiderViewDraft } from "./item-kit.tsx";
 
 interface Req {
   mode: "item" | "rider" | "sheet";
@@ -16,6 +16,8 @@ interface Req {
   frames?: number[];
   /** Rider mode: which animation the big row shows. */
   anim?: "idle" | "move";
+  /** Rider mode: which view the page shows ("all": the three side by side; default all when it has front or back). */
+  view?: RiderFacing | "all";
   /** The pawn's side on the big row. */
   side?: "w" | "b";
   /** The color on the big row and the phone row. */
@@ -221,17 +223,28 @@ function ItemPage({ d }: { d: ItemDraft }) {
 
 // ---------------- Riders ----------------
 
-/** The rider's box around its pawn: wide enough for a big ride, and the next square for the move. */
-const RB = { x: -45, y: -45, w: 190, h: 165 };
+/** The views a ride has: always its side, then front and back if drawn. */
+export const facings = (d: RiderDraft): RiderFacing[] => ["side", ...(d.views?.front ? ["front" as const] : []), ...(d.views?.back ? ["back" as const] : [])];
+/** One view of a ride (the side view is the draft itself). */
+export const viewOf = (d: RiderDraft, v: RiderFacing): RiderViewDraft | undefined => (v === "side" ? d : d.views?.[v]);
+const VIEW_NAME: Record<RiderFacing, string> = { side: "side (left/right)", front: "front (walking down)", back: "back (walking up)" };
 
-function RiderLayer({ d, finish, side, anim, f }: { d: RiderDraft; finish: Finish; side: "w" | "b"; anim: "idle" | "move"; f: number }) {
-  const box: [number, number, number, number] = d.frame;
+/** The rider's box around its pawn: wide enough for a big ride, and the next square for the side view's move. */
+const RB = { x: -45, y: -45, w: 190, h: 165 };
+/** The front and back views' box (seen end-on: narrower; they move in place). */
+const RB_END = { x: -25, y: -45, w: 150, h: 165 };
+/** The three-view grid's cell: the same for every view, so they compare at one size (the side's move in place). */
+const CELL = { x: -20, y: -45, w: 140, h: 150 };
+
+function RiderLayer({ d, v = "side", finish, side, anim, f, inPlace = false }: { d: RiderDraft; v?: RiderFacing; finish: Finish; side: "w" | "b"; anim: "idle" | "move"; f: number; inPlace?: boolean }) {
+  const view = viewOf(d, v)!;
+  const box: [number, number, number, number] = view.frame ?? d.frame;
   const p = usePaint(finish, box);
   const p2 = usePaint({ ...finish, color: finish.color2 ?? finish.color, seed: finish.seed + 101 }, box);
-  const pose = d.pose(anim, f);
-  const clip = `cut-${anim}-${f}-${finish.color}-${side}`;
+  const pose = view.pose(anim, f);
+  const clip = `cut-${v}-${anim}-${f}-${finish.color}-${side}-${inPlace ? "p" : "t"}`;
   return (
-    <g transform={`translate(${pose.dx} ${pose.dy})`}>
+    <g transform={`translate(${inPlace ? 0 : pose.dx} ${pose.dy})`}>
       <defs>
         {p.defs}
         {p2.defs}
@@ -239,78 +252,142 @@ function RiderLayer({ d, finish, side, anim, f }: { d: RiderDraft; finish: Finis
           <rect x="-50" y="-60" width="200" height={60 + pose.cut} />
         </clipPath>
       </defs>
-      {d.Back({ p, p2, side, f, anim })}
+      {view.Back({ p, p2, side, f, anim, view: v })}
       <g transform={`translate(${pose.pawnX} ${pose.pawnY}) rotate(${pose.pawnTilt ?? 0} 50 88)`}>
         <g clip-path={`url(#${clip})`}>
           <Pawn side={side} />
         </g>
       </g>
-      {d.Front({ p, p2, side, f, anim })}
+      {view.Front({ p, p2, side, f, anim, view: v })}
     </g>
   );
 }
 
 /** The two town squares the move goes across, under the ride (a checker of the park's paving). */
-function Squares({ n = 2 }: { n?: number }) {
+function Squares({ n = 2, x = 0 }: { n?: number; x?: number }) {
   return (
     <g>
       {Array.from({ length: n }, (_, i) => (
-        <rect key={i} x={i * 100} y="80" width="100" height="22" fill={i % 2 ? "#4a4f5a" : "#5b616d"} />
+        <rect key={i} x={x + i * 100} y="80" width="100" height="22" fill={i % 2 ? "#4a4f5a" : "#5b616d"} />
       ))}
     </g>
   );
 }
 
-export function RiderView({ d, finish, side, anim, f, scale, move = false }: { d: RiderDraft; finish: Finish; side: "w" | "b"; anim: "idle" | "move"; f: number; scale: number; move?: boolean }) {
-  const w = move ? RB.w + 100 : RB.w;
+/**
+ * A ride with its pawn on one picture. The side view's move goes across two squares; the front and back views stay on
+ * their square. `cell`: the three-view grid's box, the same for every view (the side's move in place).
+ */
+export function RiderView({ d, v = "side", finish, side, anim, f, scale, move = false, cell = false }: { d: RiderDraft; v?: RiderFacing; finish: Finish; side: "w" | "b"; anim: "idle" | "move"; f: number; scale: number; move?: boolean; cell?: boolean }) {
+  const b = cell ? CELL : v === "side" ? { ...RB, w: move ? RB.w + 100 : RB.w } : RB_END;
+  const two = !cell && v === "side" && move;
   return (
-    <svg width={w * scale} height={RB.h * scale} viewBox={`${RB.x} ${RB.y} ${w} ${RB.h}`} style={{ background: GROUND, display: "block" }}>
-      <Squares n={move ? 2 : 1} />
-      <RiderLayer d={d} finish={finish} side={side} anim={anim} f={f} />
+    <svg width={b.w * scale} height={b.h * scale} viewBox={`${b.x} ${b.y} ${b.w} ${b.h}`} style={{ background: GROUND, display: "block" }}>
+      {cell ? <rect x={CELL.x} y="80" width={CELL.w} height="22" fill="#5b616d" /> : <Squares n={two ? 2 : 1} />}
+      <RiderLayer d={d} v={v} finish={finish} side={side} anim={anim} f={f} inPlace={cell && v === "side"} />
     </svg>
   );
 }
 
-function RiderPage({ d }: { d: RiderDraft }) {
+/** Move frames spread evenly over the move (n of them; all when n >= the count). */
+export const spread = (count: number, n: number) => (n >= count ? Array.from({ length: count }, (_, i) => i) : Array.from({ length: n }, (_, i) => Math.round((i * count) / n)));
+
+/**
+ * The views side by side: a column per view (side, front, back), a row per frame: idle frame 0, then the move's frames
+ * (`moveFrames`: indices into each view's move; a view with fewer frames leaves the cell empty). The side's move is
+ * shown in place, so every cell is the same box.
+ */
+export function ViewsGrid({ d, finish, side = "w", scale, moveFrames, title }: { d: RiderDraft; finish: Finish; side?: "w" | "b"; scale: number; moveFrames: number[]; title?: string }) {
+  const vs = facings(d);
+  const small = scale < 1;
+  const rows: { anim: "idle" | "move"; f: number }[] = [{ anim: "idle", f: 0 }, ...moveFrames.map((f) => ({ anim: "move" as const, f }))];
+  return (
+    <div>
+      {title && <div style={{ font: "bold 13px sans-serif", color: "#f2c14e", margin: "0 0 4px 4px" }}>{title}</div>}
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${vs.length}, auto)`, gap: small ? "3px 4px" : "4px 8px", justifyContent: "start" }}>
+        {vs.map((v) => (
+          <div key={v} style={{ font: `bold ${small ? 10 : 13}px sans-serif`, color: "#d1d5db", textAlign: "center" }}>
+            {small ? v : VIEW_NAME[v]}
+          </div>
+        ))}
+        {rows.flatMap(({ anim, f }) =>
+          vs.map((v) => {
+            const a = viewOf(d, v)![anim];
+            const ok = f < (a?.ms?.length ?? 0);
+            return (
+              <div key={`${anim}${f}${v}`}>
+                {ok ? <RiderView d={d} v={v} finish={finish} side={side} anim={anim} f={f} scale={scale} cell /> : <div style={{ width: `${CELL.w * scale}px`, height: `${CELL.h * scale}px` }} />}
+                <Label>{!ok ? "(none)" : small ? `${anim} ${f}` : `${anim} ${f} (${a.ms[f]} ms)`}</Label>
+              </div>
+            );
+          }),
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** The three views together: at 4x (idle and some move frames), at town size (idle and every move frame), two colors. */
+function ViewsPage({ d }: { d: RiderDraft }) {
+  const color = req.color ?? "red";
+  const side = req.side ?? "w";
+  const most = Math.max(...facings(d).map((v) => viewOf(d, v)!.move?.ms?.length ?? 0));
+  const big = req.frames?.length ? req.frames.filter((i) => i >= 0 && i < most).slice(0, req.all ? 64 : 4) : spread(most, req.all ? most : 3);
+  return (
+    <div style={{ padding: "6px", display: "flex", gap: "18px", alignItems: "flex-start" }}>
+      <ViewsGrid d={d} finish={fin(color, 25)} side={side} scale={1.8} moveFrames={big} title={`${d.name}: the three views at 4x, ${color}, 75% purity (the side's move in place)`} />
+      <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+        <ViewsGrid d={d} finish={fin(color, 25)} side={side} scale={0.45} moveFrames={spread(most, Math.min(most, 12))} title="Town size: idle, every move frame" />
+        {(["cobalt", "midnight"] as const).map((c, i) => (
+          <ViewsGrid key={c} d={d} finish={fin(c, 25, 1300 + i)} side={i ? "b" : "w"} scale={0.62} moveFrames={[]} title={`${c}, ${i ? "black" : "white"} pawn`} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RiderPage({ d, v }: { d: RiderDraft; v: RiderFacing }) {
+  const view = viewOf(d, v)!;
   const anim = req.anim ?? "idle";
-  const a = d[anim];
+  const a = view[anim];
   const n = a?.ms?.length ?? 0;
-  if (!n) warnings.push(`${anim}.ms is empty`);
+  if (!n) warnings.push(`${v === "side" ? "" : `views.${v}.`}${anim}.ms is empty`);
   const frames = (req.frames?.length ? req.frames : Array.from({ length: n }, (_, i) => i)).filter((i) => i >= 0 && i < n).slice(0, req.all ? 64 : 8);
   const side = req.side ?? "w";
   const color = req.color ?? "red";
-  const moveN = d.move?.ms?.length ?? 0;
-  const big = anim === "idle" ? 1.8 : 1.15;
+  const moveN = view.move?.ms?.length ?? 0;
+  const big = v !== "side" ? 1.8 : anim === "idle" ? 1.8 : 1.15;
+  const vname = v === "side" ? "" : `, ${VIEW_NAME[v]}`;
   return (
     <div style={{ padding: "6px" }}>
-      <Row title={`${d.name} (rider, ${d.tier}): "${anim}" frame by frame with a ${side === "w" ? "white" : "black"} pawn riding (4x), ${color}, 75% purity`}>
+      <Row title={`${d.name} (rider, ${d.tier}${vname}): "${anim}" frame by frame with a ${side === "w" ? "white" : "black"} pawn riding (4x), ${color}, 75% purity`}>
         {frames.map((f) => (
           <Cell key={f} label={`frame ${f} (${a.ms[f]} ms)`}>
-            <RiderView d={d} finish={fin(color, 25)} side={side} anim={anim} f={f} scale={req.all ? 1 : big} move={anim === "move"} />
+            <RiderView d={d} v={v} finish={fin(color, 25)} side={side} anim={anim} f={f} scale={req.all ? 1 : big} move={anim === "move"} />
           </Cell>
         ))}
       </Row>
-      <Row title="Town size (a pawn about 45 px): at rest, then every frame of its move across a square">
+      <Row title={`Town size (a pawn about 45 px): at rest, then every frame of its move ${v === "side" ? "across a square" : "(in place: the town slides it along)"}`}>
         <Cell label="idle">
-          <RiderView d={d} finish={fin(color, 25)} side="w" anim="idle" f={0} scale={0.45} />
+          <RiderView d={d} v={v} finish={fin(color, 25)} side="w" anim="idle" f={0} scale={0.45} />
         </Cell>
         {Array.from({ length: Math.min(moveN, 12) }, (_, f) => (
           <Cell key={f} label={`move ${f}`}>
-            <RiderView d={d} finish={fin(color, 25)} side="w" anim="move" f={f} scale={0.45} move />
+            <RiderView d={d} v={v} finish={fin(color, 25)} side="w" anim="move" f={f} scale={0.45} move />
           </Cell>
         ))}
       </Row>
       <Row title="Every color at 75% purity; 100%; shiny; its locker tile; existing items for the style">
         {ITEM_COLORS.map((c) => (
           <Cell key={c.id} label={c.name}>
-            <RiderView d={d} finish={{ ...fin(c.id, 25, 1000 + c.weight * 10), color2: d.colors === 2 ? "yellow" : undefined }} side="w" anim="idle" f={0} scale={0.62} />
+            <RiderView d={d} v={v} finish={{ ...fin(c.id, 25, 1000 + c.weight * 10), color2: d.colors === 2 ? "yellow" : undefined }} side="w" anim="idle" f={0} scale={0.62} />
           </Cell>
         ))}
         <Cell label="100%">
-          <RiderView d={d} finish={fin(color, 0)} side="w" anim="idle" f={0} scale={0.62} />
+          <RiderView d={d} v={v} finish={fin(color, 0)} side="w" anim="idle" f={0} scale={0.62} />
         </Cell>
         <Cell label="shiny">
-          <RiderView d={d} finish={fin(color, 5)} side="b" anim="idle" f={0} scale={0.62} />
+          <RiderView d={d} v={v} finish={fin(color, 5)} side="b" anim="idle" f={0} scale={0.62} />
         </Cell>
         <Cell label="tile">
           <Tile frame={d.frame} px={64}>
@@ -355,7 +432,21 @@ function measure(): object {
     g.remove();
     if ((item.slot === "head" || item.slot === "face") && item.attach === undefined) warnings.push("a head or face item needs `attach` (the line that meets the anchor)");
   }
-  if (rider) facts.rider = { id: rider.id, tier: rider.tier, idleFrames: rider.idle?.ms?.length ?? 0, moveFrames: rider.move?.ms?.length ?? 0, idleMs: (rider.idle?.ms ?? []).reduce((s, x) => s + x, 0), moveMs: (rider.move?.ms ?? []).reduce((s, x) => s + x, 0) };
+  if (rider) {
+    const counts = (v: RiderViewDraft) => ({ idleFrames: v.idle?.ms?.length ?? 0, moveFrames: v.move?.ms?.length ?? 0, idleMs: (v.idle?.ms ?? []).reduce((s, x) => s + x, 0), moveMs: (v.move?.ms ?? []).reduce((s, x) => s + x, 0) });
+    facts.rider = { id: rider.id, tier: rider.tier, ...counts(rider), views: facings(rider) };
+    for (const v of ["front", "back"] as const) {
+      const view = rider.views?.[v];
+      if (!view) continue;
+      facts[v] = counts(view);
+      if (!view.idle?.ms?.length) warnings.push(`views.${v}.idle.ms is empty`);
+      if (!view.move?.ms?.length) warnings.push(`views.${v}.move.ms is empty`);
+      for (let f = 0; f < (view.move?.ms?.length ?? 0); f++) {
+        const pose = view.pose("move", f);
+        if (Math.abs(pose.dx) > 12) warnings.push(`views.${v} move frame ${f}: dx ${pose.dx}; the front and back moves stay on their square (the town slides them), so dx stays about 0`);
+      }
+    }
+  }
   return facts;
 }
 
@@ -366,7 +457,10 @@ if (req.mode !== "sheet") try {
     render(<ItemPage d={item} />, root);
   } else {
     if (!rider) throw new Error(`the draft exports no rider (an object with id, frame, idle, move, pose, Back and Front); exports: ${Object.keys(DRAFT).join(", ") || "none"}`);
-    render(<RiderPage d={rider} />, root);
+    const has = facings(rider);
+    const v = req.view ?? (has.length > 1 ? "all" : "side");
+    if (v !== "all" && !has.includes(v)) throw new Error(`the ride has no ${v} view yet (views.${v}); it has: ${has.join(", ")}`);
+    render(v === "all" ? <ViewsPage d={rider} /> : <RiderPage d={rider} v={v} />, root);
   }
   // Wait a frame for layout, then measure.
   requestAnimationFrame(() => {
