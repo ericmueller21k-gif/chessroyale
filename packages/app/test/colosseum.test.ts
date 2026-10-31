@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { START_FEN, applyMove } from "@chessroyale/chess";
 import { BLACK_VIEW, BOARD, BOARD_SPHERE, PILLARS, PILLAR_ANGLES, SEAT_VIEWS, STATUE, VIEWS, WHITE_VIEW, fovFor, lookAt, multiply, onAisle, otherSeat, perspective, project, railPitch, seats, squareXZ, turnLimits, viewFor } from "../src/colosseum/arena.ts";
 import { PILLAR_TOP_PX } from "../src/colosseum/art.ts";
 import { ARENA_PILLAR } from "../src/colosseum/sprites/arena-pillar.ts";
 import { ARENA_STATUE } from "../src/colosseum/sprites/arena-statue.ts";
+import { AMBIENT_DB, AMBIENT_LEVELS, AMBIENT_LEVEL_NAME, ambientLevelOf } from "../src/colosseum/ambient.ts";
 import { FLOOR, FloorMatch, PLAYERS, clockText, evalText, piecesAfter, piecesOf, resultText, viewersText, type FloorDeps } from "../src/colosseum/match.ts";
 import { BOTS } from "../src/town/world.ts";
 
@@ -239,6 +240,38 @@ describe("the game on the floor", () => {
     // Each side's clock: 3 minutes, less a second a move, plus the 2-second increment.
     expect(FLOOR.baseMs).toBe(180_000);
     expect(FLOOR.incMs).toBe(2_000);
+  });
+
+  it("marks each move's piece sound as a played game's: a move, castling, a capture (Eric, Oct 31)", async () => {
+    const line = ["e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "f8c5", "e1g1", "c5f2"];
+    const knocks: string[] = [];
+    let ply = 0;
+    const m = new FloorMatch(
+      {
+        move: (fen) => (ply < line.length && fen ? Promise.resolve(line[ply++]!) : new Promise(() => {})),
+        evaluate: async () => null,
+        now: () => 0,
+        random: () => 0.3,
+        wait: async () => true,
+        think: () => 10,
+        nextMs: () => 10,
+      },
+      (s) => {
+        if (s.knock) knocks.push(s.knock);
+        s.knock = null; // (The screen clears it once played: an eval's update after doesn't play it again.)
+      },
+    );
+    void m.run();
+    await vi.waitFor(() => expect(knocks).toHaveLength(8));
+    m.stop();
+    expect(knocks).toEqual(["move", "move", "move", "move", "move", "move", "castle", "capture"]);
+  });
+
+  it("the gear's ambient levels: Normal 4 dB and Low 12 dB under the file as made; the old On is Normal, Off stays Off", () => {
+    expect(AMBIENT_LEVELS).toEqual(["normal", "low", "off"]);
+    expect(AMBIENT_DB).toMatchObject({ normal: -4, low: -12 });
+    expect(Object.values(AMBIENT_LEVEL_NAME)).toEqual(["Normal", "Low", "Off"]);
+    expect([null, "on", "normal", "low", "off", "junk"].map(ambientLevelOf)).toEqual(["normal", "normal", "normal", "low", "off", "normal"]);
   });
 
   it("flags the side to move (the e2e's way to end a game at once) and calls a flag a loss on time", () => {

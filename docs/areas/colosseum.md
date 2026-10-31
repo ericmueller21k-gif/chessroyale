@@ -56,13 +56,18 @@ links Eric's notes); this page is what's built.
   "2.1K"), the last four moves (the one just played in gold), the flat board (the game's `Board`, small, silent; Black's
   player view turns it round) with its eval bar ("+0.3", "M3"), a status line ("Game 2 · 3+2", then "White wins on time.
   Next game soon."), the chat's box (empty for now: "Coming soon"), and in the top bar Exit, Change seat and the gear
-  (`MatchMenu` with `extra`: Sound, Animations, **3D pieces** (Off by default, remembered on this device), **Ambient crowd noise** (On by default, remembered on this device:
-  the sound below), Report a bug). Phone (under 900 × 600): the stands at the top (31% of the height), the cards, the moves in
+  (`MatchMenu` with `extra`: Sound, Animations, **3D pieces** (Off by default, remembered on this device), **Ambient crowd noise** (Normal, Low or Off: a tap steps
+  through them, the gear's pill showing the one chosen (`CycleRow`); Normal by default, remembered on this device: the
+  sound below), Report a bug). Phone (under 900 × 600): the stands at the top (31% of the height), the cards, the moves in
   one line, the board, the chat below. Computer: the arena fills the screen, the cards and moves along its top, the board
   and the chat down its right. Every box keeps its size and place.
 - **Sound** (Eric, Oct 31; `docs/decisions/2026-10-31-colosseum-sound.md`). `colosseum/ambient.ts`:
   - **The ambience** is Eric's hour of gladiator arena ambience (`sounds/colosseum/ambient.mp3`). It plays while the gear's
-    Ambient crowd noise and the game's Sound are both on and the tab shows.
+    Ambient crowd noise is Normal or Low, the game's Sound is on and the tab shows.
+  - **Its levels** (Eric, Oct 31: "turn it down overall … normal volume or low or off"; `AMBIENT_DB` in `ambient.ts`):
+    Normal is 4 dB under the file as made (the file's average is 15 dB under a move, so Normal sits about 19 dB under).
+    Low is 12 dB under the file, and Off pauses it. A change fades over 1 s. An old saved "on" reads as Normal; "off"
+    stays Off.
   - **How it's made:** `scripts/crowd-sounds.py` tames the clangs (a fast compressor above 2 kHz, a -5 dB high shelf),
     mixes it to mono at 22.05 kHz and encodes it at 40 kb/s CBR, about 18 MB. Its average sits 15 dB under a move.
   - **How it streams:** an `<audio>` element, so only what plays is downloaded, by Range requests. The service worker
@@ -75,8 +80,13 @@ links Eric's notes); this page is what's built.
     loops at the end. Its level goes through Web Audio (`mediaGain` in `sound.ts`: through the master, with a 1 s fade
     in and out), since iOS ignores an element's volume. If the browser won't start it before a tap, it starts on the
     next tap or key.
+  - **The floor's moves** (Eric, Oct 31: "the normal chess capture sounds while people are watching the game"): each move
+    plays the game's own piece sound, as a played game does: the move, capture or castle sound picked in Settings →
+    Sound (`moveKnock`, `FloorState.knock`). It plays as the piece lands: after its 0.45 s slide, or at once with
+    Animations off, with the giant pieces flat or 3D. It follows the game's Sound setting. The game has no check or
+    checkmate sounds, so none play. The overlay's small board stays silent, so nothing doubles.
   - **The cheer:** a queen taken plays the crowd's cheer (`sounds/colosseum/cheer.mp3`, Quendel's CC BY 4.0 cheering with
-    CC0 applause) as the piece lands, with the jump. It is under the game's Sound, not the ambient switch, and is
+    CC0 applause) as the piece lands, with the jump, on top of the capture sound. It is under the game's Sound, not the ambient switch, and is
     fetched when the screen opens (`warmFile`).
   - **Credits:** the cheer is credited in Settings, the FAQ and `/licenses/third-party.txt`; both files are in
     `sounds/colosseum/CREDITS.md`.
@@ -133,15 +143,21 @@ made by `scripts/crowd-sounds.py`; `sound.ts` (`colosseumCheer`, `warmFile`, `me
   their squares, the king tallest). `e2e/colosseum.spec.ts`, "the gear's 3D pieces": Off by default (three draw calls), the row
   flips it at once (eight), the game plays, a reload keeps it, Off again flat and three.
 - Sound: `e2e/colosseum.spec.ts`, "sound: the gear's Ambient crowd noise…" (phone and computer):
-  - On by default, the ambience plays from a non-zero point in the hour and keeps going, fetched by Range requests.
-  - Off pauses it; on plays it again.
-  - `jump()` logs the cheer (`colosseumCheer:running` in `__soundLog`).
+  - Normal by default, the ambience plays from a non-zero point in the hour and keeps going, fetched by Range requests.
+  - Normal, Low and Off each set a lower gain, and Off pauses it.
+  - A reload keeps Off; Normal plays it again.
+  - The floor's moves log their piece sounds (`move:running` and the like in `__soundLog`).
+  - `jump()` logs the cheer (`colosseumCheer:running`).
+
+  `packages/app/test/colosseum.test.ts` covers:
+  - a floor game's piece sounds (moves, castling, a capture);
+  - the ambient's levels and how an old saved choice reads.
   
   `packages/app/test/colosseum-sounds.test.ts`:
   - The hour is mono, 22.05 kHz, 40 kb/s CBR, has no cover image and is under 25 MiB.
   - The service worker leaves it alone.
   - The cheer's credit is in Settings, the FAQ and the notice.
-- Test hooks (test switches on): `window.__colosseum` (`state()` (with `pieces`: "flat" or "3d"; `ambient`: playing, time, start), `seat(i)`, `flag()`,
+- Test hooks (test switches on): `window.__colosseum` (`state()` (with `pieces`: "flat" or "3d"; `ambient`: playing, time, start, level, gain), `seat(i)`, `flag()`,
   `jump()` (the crowd's jump and its cheer), `sample()`, `pieces(style)` and `freeze()` for still pairs: the same frame in 3D and flat), and
   `?fast` makes the bots move at once and the next game come in 1.2 s.
 

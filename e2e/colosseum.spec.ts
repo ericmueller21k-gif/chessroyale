@@ -123,10 +123,10 @@ test("the Colosseum's first look: the card's link in, the arena drawn, Change se
   await page.getByRole("button", { name: "Match options" }).click();
   const panel = page.getByRole("dialog", { name: "Match options" });
   await expect(panel.getByRole("switch", { name: /Sound/ })).toBeVisible();
-  const amb = panel.getByRole("switch", { name: /Ambient crowd noise/ });
-  await expect(amb).toHaveAttribute("aria-checked", "true");
+  const amb = panel.getByRole("button", { name: /Ambient crowd noise/ });
+  await expect(amb).toContainText("Normal");
   await amb.click();
-  await expect(amb).toHaveAttribute("aria-checked", "false");
+  await expect(amb).toContainText("Low");
   await expect(panel.getByRole("button", { name: /Report a bug/ })).toBeVisible();
   await page.keyboard.press("Escape");
 
@@ -184,21 +184,22 @@ test("the gear's 3D pieces (off by default): the row flips the giant pieces at o
   expect(errors.filter((e) => !/WebGL|GPU stall|willReadFrequently/i.test(e))).toEqual([]);
 });
 
-test("sound: the gear's Ambient crowd noise (on by default) streams the arena's hour from a random point and off fades and pauses it; a queen taken plays the crowd's cheer", async ({ page }) => {
-  test.setTimeout(120_000);
+test("sound: the gear's Ambient crowd noise (Normal by default; Normal, Low, Off: a lower gain each, paused at Off, kept through a reload) streams the arena's hour from a random point; each floor move plays its piece sound; a queen taken plays the crowd's cheer", async ({ page }) => {
+  test.setTimeout(150_000);
   const errors = watchErrors(page);
   const ranges: string[] = [];
   page.on("request", (r) => r.url().includes("/sounds/colosseum/ambient.mp3") && ranges.push(r.headers()["range"] ?? "none"));
   await page.addInitScript(() => ((window as unknown as { __soundLog: string[] }).__soundLog = []));
-  type Amb = { playing: boolean; time: number; start: number } | null | undefined;
+  type Amb = { playing: boolean; time: number; start: number; level: string; gain: number } | null | undefined;
   const amb = async () => ((await state(page)) as { ambient?: Amb }).ambient;
+  const log = () => page.evaluate(() => (window as unknown as { __soundLog: string[] }).__soundLog);
   await page.goto("/colosseum?fast");
   await expect.poll(async () => (await state(page)).crowd, { timeout: 60_000 }).toBeGreaterThan(1500);
   // A tap (browsers start sound only after one): the gear.
   await page.getByRole("button", { name: "Match options" }).click();
   const panel = page.getByRole("dialog", { name: "Match options" });
-  const row = panel.getByRole("switch", { name: /Ambient crowd noise/ });
-  await expect(row).toHaveAttribute("aria-checked", "true");
+  const row = panel.getByRole("button", { name: /Ambient crowd noise/ });
+  await expect(row).toContainText("Normal");
   await expect.poll(async () => (await amb())?.playing, { message: "the ambience plays", timeout: 30_000 }).toBe(true);
   const a = (await amb())!;
   expect(a.start, "a random point in the hour").toBeGreaterThan(1);
@@ -207,17 +208,37 @@ test("sound: the gear's Ambient crowd noise (on by default) streams the arena's 
   await expect.poll(async () => (await amb())!.time, { timeout: 15_000 }).toBeGreaterThan(t);
   expect(ranges.length, "streamed").toBeGreaterThan(0);
   expect(ranges.every((r) => r.startsWith("bytes=")), `Range requests: ${ranges.join(", ")}`).toBe(true);
-  // Off: it fades out (1 s) and pauses. On again: it plays on.
+  // Normal, Low, Off: each a lower gain (Normal 4 dB down, Low 12 dB down), Off paused after its fade.
+  const normal = (await amb())!.gain;
+  expect(normal).toBeCloseTo(10 ** (-4 / 20), 3);
   await row.click();
-  await expect(row).toHaveAttribute("aria-checked", "false");
+  await expect(row).toContainText("Low");
+  const low = (await amb())!;
+  expect(low).toMatchObject({ level: "low", playing: true });
+  expect(low.gain).toBeCloseTo(10 ** (-12 / 20), 3);
+  expect(low.gain).toBeLessThan(normal);
+  await row.click();
+  await expect(row).toContainText("Off");
+  expect((await amb())!.gain).toBe(0);
   await expect.poll(async () => (await amb())?.playing, { timeout: 10_000 }).toBe(false);
+  // Remembered on this device: a reload comes back Off, silent.
+  await page.reload();
+  await expect.poll(async () => (await state(page)).crowd, { timeout: 60_000 }).toBeGreaterThan(1500);
+  await page.getByRole("button", { name: "Match options" }).click();
+  await expect(row).toContainText("Off");
+  expect(await amb()).toMatchObject({ level: "off", playing: false });
+  // Round to Normal again: it plays.
   await row.click();
-  await expect(row).toHaveAttribute("aria-checked", "true");
+  await expect(row).toContainText("Normal");
   await expect.poll(async () => (await amb())?.playing, { timeout: 10_000 }).toBe(true);
   await page.keyboard.press("Escape");
+  // Each move on the floor: its piece sound, as a played game's (the move, capture or castle sound), under the game's sound.
+  await page.evaluate(() => ((window as unknown as { __soundLog: string[] }).__soundLog.length = 0));
+  const plies = (await state(page)).plies;
+  await expect.poll(async () => (await state(page)).plies, { timeout: 60_000 }).toBeGreaterThan(plies + 1);
+  await expect.poll(async () => (await log()).filter((l) => /^(move|capture|castle):running$/.test(l)).length, { message: "the floor's moves knock" }).toBeGreaterThan(0);
   // A queen taken (the crowd's jump, as a capture sets it off): the cheer, under the game's sound.
   await page.evaluate(() => (window as unknown as Hooks).__colosseum.jump());
-  const log = await page.evaluate(() => (window as unknown as { __soundLog: string[] }).__soundLog);
-  expect(log).toContain("colosseumCheer:running");
+  expect(await log()).toContain("colosseumCheer:running");
   expect(errors.filter((e) => !/WebGL|GPU stall|willReadFrequently/i.test(e))).toEqual([]);
 });
