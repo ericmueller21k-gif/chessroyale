@@ -161,6 +161,247 @@ function Front({ p, f, anim }: RiderProps) {
   );
 }
 
+/* ---------------- the end-on views (front and back) ---------------- */
+
+const PIVOT_Y = 96;
+
+/** The side's motion, plus a side-to-side roll for the end-on views. */
+function endMotion(anim: "idle" | "move", f: number) {
+  const m = motionOf(anim, f);
+  return { ...m, roll: m.rock * 1.3 };
+}
+
+/** A leg seen end-on: a short column with three ivory toenails, lifted (and foreshortened) as it steps. */
+function EndLeg({ x, lift, fill }: { x: number; lift: number; fill: string }) {
+  const len = 20;
+  const s = 1 - lift * 0.03;
+  return (
+    <g transform={`translate(${x} ${78 - lift}) scale(1 ${s})`}>
+      <path d={`M -7 -6 L -7 ${len - 3} C -7 ${len + 1} 7 ${len + 1} 7 ${len - 3} L 7 -6 Z`} fill={fill} {...LINE} />
+      <path d={`M -2.8 2 L -2.8 ${len - 6}`} stroke={FUR_DARK} stroke-linecap="round" {...lw(1.4)} />
+      <path d={`M -5.4 ${len - 1.5} a 1.6 1.6 0 0 1 3.2 0 M -1.6 ${len - 1.5} a 1.6 1.6 0 0 1 3.2 0 M 2.2 ${len - 1.5} a 1.6 1.6 0 0 1 3.2 0`} fill={IVORY} stroke={INK} {...lw(1.2)} />
+    </g>
+  );
+}
+
+function Tassel({ x, y, a }: { x: number; y: number; a: number }) {
+  return (
+    <g transform={`translate(${x} ${y}) rotate(${a})`}>
+      <path d="M 0 0 L 0 3" stroke={INK} {...lw(1.6)} />
+      <path d="M 0 2.5 C -2.6 3 -3 8 -2 9 L 2 9 C 3 8 2.6 3 0 2.5 Z" fill={GOLD} stroke={INK} stroke-linejoin="round" {...lw(1.4)} />
+    </g>
+  );
+}
+
+/** The howdah's wall nearest the camera: gold frame, painted panel, gold diamond, corner balls (as the side's). */
+function EndWall({ p }: { p: RiderProps["p"] }) {
+  return (
+    <g>
+      <path d="M 20 40 L 80 40 L 78 55 L 22 55 Z" fill={GOLD} {...LINE} />
+      <Region p={p} name="panel" d={["M 25 43.5 L 75 43.5 L 73.8 51.5 L 26.2 51.5 Z"]} line={1.6} />
+      <path d="M 50 44.5 L 53.5 47.5 L 50 50.5 L 46.5 47.5 Z" fill={GOLD} stroke={INK} {...lw(1.2)} />
+      <path d="M 21 40.5 L 79 40.5" stroke="#fff3c0" stroke-linecap="round" opacity="0.8" {...lw(1.2)} />
+      <circle cx={21} cy={40} r={2.4} fill={GOLD} {...LINE} {...lw(1.4)} />
+      <circle cx={79} cy={40} r={2.4} fill={GOLD} {...LINE} {...lw(1.4)} />
+    </g>
+  );
+}
+
+/** The far wall's top rail and the two side rails, seen over the near wall behind the pawn. */
+function FarRim() {
+  return (
+    <g>
+      <Tube d="M 21 41 L 24.5 35" w={2.6} color={GOLD} line={1.4} />
+      <Tube d="M 79 41 L 75.5 35" w={2.6} color={GOLD} line={1.4} />
+      <path d="M 24 32.5 L 76 32.5 L 76 37 L 24 37 Z" fill={GOLD_DARK} {...LINE} {...lw(1.6)} />
+    </g>
+  );
+}
+
+/** A short post with a gold ball and spike (the side's front posts). */
+function ShortPost({ x, base, top }: { x: number; base: number; top: number }) {
+  return (
+    <g>
+      <Tube d={`M ${x} ${base} L ${x} ${top + 3}`} w={2.6} color={GOLD} line={1.4} />
+      <circle cx={x} cy={top} r={3} fill={GOLD} {...LINE} {...lw(1.6)} />
+      <path d={`M ${x - 1.4} ${top - 2.4} L ${x} ${top - 6.5} L ${x + 1.4} ${top - 2.4} Z`} fill={GOLD} {...LINE} {...lw(1.4)} />
+    </g>
+  );
+}
+
+/** A tall post with a gold ball (the side's back posts); `flag` -1 / 1 flies the pennant to that side. */
+function TallPost({ x, base, p, flag, m }: { x: number; base: number; p?: RiderProps["p"]; flag?: number; m: ReturnType<typeof motionOf> }) {
+  return (
+    <g>
+      <Tube d={`M ${x} ${base} L ${x} 14`} w={2.6} color={GOLD} line={1.4} />
+      {p && flag && (
+        <g transform={`translate(${x} 10) scale(${-flag} 1) skewY(${m.flag * 0.5})`}>
+          <Region p={p} name="pennant" d={[`M 0 0 L ${-13} ${4 + m.flag * 0.15} L 0 8 Z`]} line={1.8} />
+        </g>
+      )}
+      <circle cx={x} cy={10} r={2.6} fill={GOLD} {...LINE} {...lw(1.6)} />
+      <path d={`M ${x} 7.4 L ${x} 4`} stroke={INK} {...lw(1.6)} />
+    </g>
+  );
+}
+
+const zigEnd = (x0: number, x1: number, y: number) => zig(x0, x1, y, 4);
+const END_BODY = `M 18 66 C 16 52 30 45 50 45 C 70 45 84 52 82 66 L 82 82${zigEnd(82, 18, 82)} C 18 80 18 74 18 66 Z`;
+const CAP_END = "M 15 53 C 28 46 72 46 85 53 L 85 73 Q 80 76 75 73 Q 64 61 50 61 Q 36 61 25 73 Q 20 76 15 73 Z";
+const CAP_TRIM = "M 15 70 Q 20 73 25 70 Q 36 58 50 58 Q 64 58 75 70 Q 80 73 85 70 L 85 73.5 Q 80 76.5 75 73.5 Q 64 61.5 50 61.5 Q 36 61.5 25 73.5 Q 20 76.5 15 73.5 Z";
+
+function EndBodyGroup({ m, children }: { m: ReturnType<typeof endMotion>; children: any }) {
+  return <g transform={`translate(0 ${m.bob}) rotate(${m.roll} 50 ${PIVOT_Y})`}>{children}</g>;
+}
+
+function Caparison({ p, m, dy = 0 }: { p: RiderProps["p"]; m: ReturnType<typeof endMotion>; dy?: number }) {
+  return (
+    <g transform={`translate(0 ${dy})`}>
+      <Region p={p} name="caparison" d={[CAP_END]} />
+      <path d={CAP_TRIM} fill={GOLD} {...LINE} {...lw(1.6)} />
+      {[22, 78].map((x) => (
+        <g key={x}>
+          <path d={`M ${x} 59 L ${x + 3.5} 63 L ${x} 67 L ${x - 3.5} 63 Z`} fill={GOLD} {...LINE} {...lw(1.6)} />
+          <path d={`M ${x} 61.5 L ${x + 1.5} 63 L ${x} 64.5 L ${x - 1.5} 63 Z`} fill="#2f5fc0" />
+        </g>
+      ))}
+      <Tassel x={15.5} y={74} a={m.tassel} />
+      <Tassel x={84.5} y={74} a={m.tassel} />
+    </g>
+  );
+}
+
+/* ----- back view: walking away ----- */
+
+function BackViewBack({ f, anim }: RiderProps) {
+  const m = endMotion(anim, f);
+  return (
+    <EndBodyGroup m={m}>
+      {/* ears from behind, out past the rump */}
+      <g transform={`rotate(${-m.ear * 0.6} 32 40)`}>
+        <path d="M 33 40 C 22 29 6 32 5.5 42 C 5 51 14 56 26 51 Z" fill={FUR} {...LINE} />
+        <path d="M 10 44 l 2 -3 2 3" fill="none" stroke={FUR_DARK} stroke-linecap="round" stroke-linejoin="round" {...lw(1.4)} />
+      </g>
+      <g transform={`rotate(${m.ear * 0.6} 68 40)`}>
+        <path d="M 67 40 C 78 29 94 32 94.5 42 C 95 51 86 56 74 51 Z" fill={FUR} {...LINE} />
+        <path d="M 86 44 l 2 -3 2 3" fill="none" stroke={FUR_DARK} stroke-linecap="round" stroke-linejoin="round" {...lw(1.4)} />
+      </g>
+      {/* the top of its head beyond the howdah */}
+      <path d="M 29 40 C 29 28 38 23 46 23 L 47 17.5 L 50 21.5 L 53 17.5 L 54 23 C 62 23 71 28 71 40 Z" fill={FUR} {...LINE} />
+      <path d="M 34 30 C 37 27 41 25.5 44 25.5 M 56 25.5 C 59 25.5 63 27 66 30" fill="none" stroke={FUR_LIGHT} stroke-linecap="round" {...lw(2)} />
+      {/* far (front) posts and the far rim */}
+      <ShortPost x={28} base={34} top={20} />
+      <ShortPost x={72} base={34} top={20} />
+      <FarRim />
+    </EndBodyGroup>
+  );
+}
+
+function BackViewFront({ p, f, anim }: RiderProps) {
+  const m = endMotion(anim, f);
+  const [nb, , fb] = m.legs;
+  const sw = m.tassel * 0.35;
+  return (
+    <g>
+      {/* hind legs: its left (our left), its right */}
+      <EndLeg x={34} lift={nb.lift * 1.6} fill={FUR} />
+      <EndLeg x={66} lift={fb.lift * 1.6} fill={FUR} />
+      <EndBodyGroup m={m}>
+        {/* round shaggy rump */}
+        <path d={END_BODY} fill={FUR} {...LINE} />
+        <path d="M 25 56 C 29 50 37 47.5 44 47" fill="none" stroke={FUR_LIGHT} stroke-linecap="round" {...lw(3)} />
+        <path d="M 50 64 L 50 80" stroke={FUR_DARK} stroke-linecap="round" {...lw(1.4)} />
+        <path d="M 24 78 l 2 -4 2 4 M 72 78 l 2 -4 2 4 M 36 70 l 2 -3 2 3 M 60 70 l 2 -3 2 3" fill="none" stroke={FUR_DARK} stroke-linecap="round" stroke-linejoin="round" {...lw(1.6)} />
+        <Caparison p={p} m={m} />
+        {/* tufted tail down the middle */}
+        <Tube d={`M 50 61 C 50 66 ${50 + sw * 0.5} 70 ${50 + sw} 74`} w={3.5} color={FUR_DARK} />
+        <path d={`M ${50 + sw} 72 l -3.5 5 2.5 -0.5 1 3.5 1 -3.5 2.5 0.5 z`} fill={FUR_DARK} {...LINE} {...lw(1.6)} />
+        {/* near (back) posts, tall, the pennant on its left one */}
+        <TallPost x={23} base={46} p={p} flag={-1} m={m} />
+        <TallPost x={77} base={46} m={m} />
+        <EndWall p={p} />
+      </EndBodyGroup>
+    </g>
+  );
+}
+
+/* ----- front view: walking toward us ----- */
+
+function FrontViewBack({ p, f, anim }: RiderProps) {
+  const m = endMotion(anim, f);
+  return (
+    <EndBodyGroup m={m}>
+      {/* far (back) posts, tall: the pennant flies from its left one (our right) */}
+      <TallPost x={24.5} base={38} m={m} />
+      <TallPost x={75.5} base={38} p={p} flag={1} m={m} />
+      <FarRim />
+    </EndBodyGroup>
+  );
+}
+
+const FACE = "M 30 71 C 30 61 37 55 46 55 L 47 49.5 L 50 54 L 53 49.5 L 54 55 C 63 55 70 61 70 71 C 70 81 61 88 50 88 C 39 88 30 81 30 71 Z";
+
+function FrontViewFront({ p, f, anim }: RiderProps) {
+  const m = endMotion(anim, f);
+  const [, nf, , ff] = m.legs;
+  const tr = m.trunkA * 0.6;
+  return (
+    <g>
+      {/* front legs: its right (our left), its left (our right) */}
+      <EndLeg x={33} lift={ff.lift * 1.6} fill={FUR} />
+      <EndLeg x={67} lift={nf.lift * 1.6} fill={FUR} />
+      <EndBodyGroup m={m}>
+        {/* chest and shoulders */}
+        <path d={END_BODY} fill={FUR} {...LINE} />
+        <Caparison p={p} m={m} dy={5} />
+        {/* near (front) posts and the front wall */}
+        <ShortPost x={21} base={46} top={24} />
+        <ShortPost x={79} base={46} top={24} />
+        <EndWall p={p} />
+        {/* ears out to the sides */}
+        <g transform={`rotate(${-m.ear * 0.7} 34 60)`}>
+          <path d="M 35 60 C 27 49 11 50 10.5 59 C 10 67 20 71 33 69 Z" fill={FUR} {...LINE} />
+          <path d="M 32 61 C 26 54 16 55 15 59.5 C 14.5 64 21 67 30 66 Z" fill={PINK} />
+        </g>
+        <g transform={`rotate(${m.ear * 0.7} 66 60)`}>
+          <path d="M 65 60 C 73 49 89 50 89.5 59 C 90 67 80 71 67 69 Z" fill={FUR} {...LINE} />
+          <path d="M 68 61 C 74 54 84 55 85 59.5 C 85.5 64 79 67 70 66 Z" fill={PINK} />
+        </g>
+        {/* big round head */}
+        <path d={FACE} fill={FUR} {...LINE} />
+        <path d="M 37 61 C 40 58.5 43 57.5 46 57.5 M 54 57.5 C 57 57.5 60 58.5 63 61" fill="none" stroke={FUR_LIGHT} stroke-linecap="round" {...lw(2.5)} />
+        <circle cx={42} cy={68.5} r={3.3} fill={INK} />
+        <circle cx={43.2} cy={67.3} r={1.1} fill="#fff" />
+        <circle cx={58} cy={68.5} r={3.3} fill={INK} />
+        <circle cx={59.2} cy={67.3} r={1.1} fill="#fff" />
+        <ellipse cx={36} cy={76} rx={3.4} ry={2} fill={PINK} opacity={0.85} />
+        <ellipse cx={64} cy={76} rx={3.4} ry={2} fill={PINK} opacity={0.85} />
+        {/* small curled tusks */}
+        <Tube d="M 44 80 C 41 87 35 88 34 83" w={3.4} color={IVORY} line={1.5} />
+        <Tube d="M 56 80 C 59 87 65 88 66 83" w={3.4} color={IVORY} line={1.5} />
+        {/* curled trunk hanging down the middle */}
+        <g transform={`translate(50 73) rotate(${tr})`}>
+          <Tube d={`M 0 0 C 0 7 0.5 13 0 ${18 - m.curl * 0.4} c -0.5 4 4.5 6 6 2`} w={7.5} color={FUR} />
+          <path d="M -2 7 l 4 0 M -2 12.5 l 4 0 M -2 18 l 4 0" stroke={FUR_DARK} stroke-linecap="round" {...lw(1.2)} />
+        </g>
+      </EndBodyGroup>
+    </g>
+  );
+}
+
+function endPose(anim: "idle" | "move", f: number) {
+  const m = endMotion(anim, f);
+  const r = (m.roll * Math.PI) / 180;
+  return {
+    dx: 0,
+    dy: 0,
+    pawnX: (PIVOT_Y - 62) * Math.sin(r),
+    pawnY: -26 + m.bob,
+    pawnTilt: m.roll,
+    cut: 70,
+  };
+}
+
 export const AlfilHowdah: RiderDraft = {
   id: "alfil-howdah",
   name: "Alfil's Howdah",
@@ -184,4 +425,22 @@ export const AlfilHowdah: RiderDraft = {
   },
   Back,
   Front,
+  views: {
+    front: {
+      frame: [4, -9, 92, 109],
+      idle: { ms: [220, 220, 220, 220, 220, 220, 220, 220] },
+      move: { ms: [110, 110, 110, 110, 110, 110, 110, 110] },
+      pose: endPose,
+      Back: FrontViewBack,
+      Front: FrontViewFront,
+    },
+    back: {
+      frame: [4, -9, 92, 109],
+      idle: { ms: [220, 220, 220, 220, 220, 220, 220, 220] },
+      move: { ms: [110, 110, 110, 110, 110, 110, 110, 110] },
+      pose: endPose,
+      Back: BackViewBack,
+      Front: BackViewFront,
+    },
+  },
 };

@@ -1,4 +1,4 @@
-import { Region, LINE, lw, darken, lighten, type RiderDraft, type RiderProps, type Paint } from "../../item-kit.tsx";
+import { Region, LINE, lw, darken, lighten, type RiderDraft, type RiderViewDraft, type RiderProps, type Paint } from "../../item-kit.tsx";
 
 /** One frame's state: group move, spring compression (+ squashed, - stretched), lean (deg, + forward), pawn lag (+ sinks into seat), pom jiggle. */
 interface S {
@@ -203,6 +203,148 @@ function Front({ p, f, anim }: RiderProps) {
   );
 }
 
+/* ---------- front and back views (end-on) ---------- */
+
+/** Side-to-side wobble (deg) for the end-on hop, in place of the side's lean. */
+const ROLL_MOVE = [0, 1, 1.5, -2, -2.5, -1.2, 1, 2.2, 1.8, -1.5, 0.8, 0];
+
+const endSt = (anim: "idle" | "move", f: number): S => {
+  const s = st(anim, f);
+  const n = ROLL_MOVE.length;
+  const roll = anim === "idle" ? 0 : ROLL_MOVE[((f % n) + n) % n];
+  return { ...s, dx: 0, lean: roll };
+};
+
+function endPose(anim: "idle" | "move", f: number) {
+  const s = endSt(anim, f);
+  const y0 = 88 + PAWN_LIFT + s.comp + s.lag;
+  const h = PIVOT_Y - y0;
+  const a = (s.lean * Math.PI) / 180;
+  return {
+    dx: 0,
+    dy: s.dy,
+    pawnX: h * Math.sin(a),
+    pawnY: PIVOT_Y - h * Math.cos(a) - 88,
+    pawnTilt: s.lean,
+    cut: 66 + Math.max(0, -s.lag),
+  };
+}
+
+function ruffleFront() {
+  const n = 9;
+  const xs = Array.from({ length: n + 1 }, (_, i) => 19 + (62 * i) / n);
+  const yb = (x: number) => 43.5 + 3.5 * (1 - ((x - 50) / 31) ** 2);
+  let ruffle = "M 21 38 Q 50 47 79 38 L 81 " + yb(81).toFixed(2);
+  for (let i = n; i > 0; i--) {
+    const x0 = xs[i];
+    const x1 = xs[i - 1];
+    const mx = (x0 + x1) / 2;
+    ruffle += ` Q ${mx.toFixed(2)} ${(yb(mx) + 4.5).toFixed(2)} ${x1.toFixed(2)} ${yb(x1).toFixed(2)}`;
+  }
+  ruffle += " Z";
+  const pleats = xs.slice(1, -1).map((x) => {
+    const t = (x - 21) / 58;
+    const yt = 38 + 2 * t * (1 - t) * 9;
+    return `M ${x.toFixed(2)} ${(yt + 1.5).toFixed(2)} L ${x.toFixed(2)} ${(yb(x) - 0.5).toFixed(2)}`;
+  });
+  return { ruffle, pleats: pleats.join(" ") };
+}
+
+/** The handlebar seen end-on: a silver crossbar with a purple grip and a pom-pom at each end. */
+function CrossBar({ y, pom, roll }: { y: number; pom: number; roll: number }) {
+  const lY = y + pom * 0.85 - roll * 0.15;
+  const rY = y + pom * 0.85 + roll * 0.15;
+  return (
+    <g>
+      <Tube d={`M 24 ${y} L 76 ${y}`} w={4.6} color={SILVER} />
+      <Tube d={`M 12.5 ${y} L 27 ${y}`} w={5.6} color={GRIP} />
+      <Tube d={`M 73 ${y} L 87.5 ${y}`} w={5.6} color={GRIP} />
+      <path d={`M 15 ${y - 1.2} L 24.5 ${y - 1.2} M 75.5 ${y - 1.2} L 85 ${y - 1.2}`} stroke="#fff" stroke-opacity="0.45" stroke-linecap="round" {...lw(1.4)} />
+      <Pom cx={8.5 - pom * 0.25} cy={lY} />
+      <Pom cx={91.5 + pom * 0.25} cy={rY} />
+    </g>
+  );
+}
+
+function EndBack({ p, f, anim, view }: RiderProps) {
+  const s = endSt(anim, f);
+  const c = s.comp;
+  const pts = springPoints(POLE_BOT + c);
+  const lift = Math.max(0, -s.dy);
+  const shR = 13 * (1 - lift / 70) + (anim === "idle" ? c * 0.4 : 0);
+  return (
+    <g>
+      <defs>{p.defs}</defs>
+      <ellipse cx={50} cy={98.5 - s.dy} rx={Math.max(6, shR)} ry={2.4 * (1 - lift / 90)} fill="#000" opacity={0.18 * (1 - lift / 80)} />
+      <g transform={`rotate(${s.lean} 50 ${PIVOT_Y})`}>
+        <rect x={48} y={POLE_BOT - 4 + c} width={4} height={SPRING_BOT + 4 - (POLE_BOT - 4 + c)} fill={SILVER_D} {...LINE} {...lw(2)} />
+        {pts.slice(0, -1).map((a, i) =>
+          i % 2 === 1 ? (
+            <g key={i}>
+              <path d={`M ${a[0]} ${a[1]} L ${pts[i + 1][0]} ${pts[i + 1][1]}`} {...LINE} {...lw(5.5)} />
+              <path d={`M ${a[0]} ${a[1]} L ${pts[i + 1][0]} ${pts[i + 1][1]}`} stroke={SILVER_D} stroke-linecap="round" {...lw(2.6)} />
+            </g>
+          ) : null,
+        )}
+        <g transform={`translate(0 ${c})`}>
+          {view === "back" && <CrossBar y={33.5} pom={s.pom} roll={s.lean} />}
+          <path d="M 21 38 Q 22 31 50 31 Q 78 31 79 38 Z" fill={WHITE} {...LINE} {...lw(2.4)} />
+          <Region p={p} name="cushion" d={["M 24 38.5 Q 24 33 50 33 Q 76 33 76 38.5 Q 76 43.5 50 43.5 Q 24 43.5 24 38.5 Z"]} over={<path d={`${dia(36, 38, 5, 4)} ${dia(50, 38, 5, 4)} ${dia(64, 38, 5, 4)}`} fill={shade(p)} />} line={2.4} />
+          <path d="M 30 36 Q 40 34.2 50 34.4" fill="none" stroke="#fff" stroke-opacity="0.55" stroke-linecap="round" {...lw(1.6)} />
+        </g>
+      </g>
+    </g>
+  );
+}
+
+function EndFront({ p, f, anim, view }: RiderProps) {
+  const s = endSt(anim, f);
+  const c = s.comp;
+  const sh = shade(p);
+  const pts = springPoints(POLE_BOT + c);
+  const { ruffle, pleats } = ruffleFront();
+  const poleDia = [dia(50, 62, 5.5, 5.5), dia(44.5, 73, 5.5, 5.5), dia(55.5, 73, 5.5, 5.5), dia(50, 84, 5.5, 5.5)].join(" ");
+  const cupDia = [17, 28, 39, 50, 61, 72, 83].map((x) => dia(x, 54.5, 5.5, 7)).join(" ");
+  return (
+    <g transform={`rotate(${s.lean} 50 ${PIVOT_Y})`}>
+      {pts.slice(0, -1).map((a, i) =>
+        i % 2 === 0 ? (
+          <g key={i}>
+            <path d={`M ${a[0]} ${a[1]} L ${pts[i + 1][0]} ${pts[i + 1][1]}`} {...LINE} {...lw(6)} />
+            <path d={`M ${a[0]} ${a[1]} L ${pts[i + 1][0]} ${pts[i + 1][1]}`} stroke={SILVER} stroke-linecap="round" {...lw(3)} />
+          </g>
+        ) : null,
+      )}
+      <path d="M 41 98 Q 41 90.5 50 90.5 Q 59 90.5 59 98 Z" fill={RED} {...LINE} {...lw(2.6)} />
+      <path d="M 44.5 94 Q 46 92.3 48.5 92.1" fill="none" stroke="#fff" stroke-opacity="0.6" stroke-linecap="round" {...lw(1.5)} />
+      <g transform={`translate(0 ${c})`}>
+        <rect x={33} y={73} width={34} height={5} rx={2.5} fill={SILVER} {...LINE} {...lw(2.4)} />
+        <Region p={p} name="pole" d={["M 44.5 56 L 55.5 56 L 55.5 79 Q 55.5 83 50 83 Q 44.5 83 44.5 79 Z"]} over={<path d={poleDia} fill={sh} />} line={2.8} />
+        <path d="M 47 64 L 47 70" stroke="#fff" stroke-opacity="0.55" stroke-linecap="round" {...lw(1.8)} />
+        <Region p={p} name="seat" d={["M 23.5 41 L 23.5 52 Q 23.5 61 35 62 L 65 62 Q 76.5 61 76.5 52 L 76.5 41 Z"]} over={<path d={cupDia} fill={sh} />} line={2.8} />
+        <path d="M 27.5 52 Q 28 58 33 59.5" fill="none" stroke="#fff" stroke-opacity="0.55" stroke-linecap="round" {...lw(1.8)} />
+        <path d={ruffle} fill={WHITE} {...LINE} {...lw(2.6)} />
+        <path d={pleats} fill="none" stroke="#c4c6d0" stroke-linecap="round" {...lw(1.3)} />
+        {view === "front" && (
+          <g>
+            <Tube d="M 50 69 L 50 39" w={3.4} color={SILVER} />
+            <CrossBar y={39} pom={s.pom} roll={s.lean} />
+          </g>
+        )}
+      </g>
+    </g>
+  );
+}
+
+const endView = (): RiderViewDraft => ({
+  frame: [2, -7, 96, 106],
+  idle: { ms: [120, 110, 140, 110, 110, 120, 140, 110] },
+  move: { ms: [60, 70, 90, 60, 70, 80, 80, 70, 60, 90, 70, 80] },
+  pose: endPose,
+  Back: EndBack,
+  Front: EndFront,
+});
+
 export const boingoPogo: RiderDraft = {
   id: "boingo-pogo",
   name: "Boingo's Pogo",
@@ -229,4 +371,5 @@ export const boingoPogo: RiderDraft = {
   },
   Back,
   Front,
+  views: { front: endView(), back: endView() },
 };

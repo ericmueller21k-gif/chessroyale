@@ -1,4 +1,4 @@
-import { Region, LINE, lw, type RiderDraft, type RiderProps } from "../../item-kit.tsx";
+import { Region, LINE, lw, type RiderDraft, type RiderProps, type RiderViewDraft } from "../../item-kit.tsx";
 
 const INK = "#1d1d1f";
 const ICING = "#fbfbf8";
@@ -179,6 +179,205 @@ function Front({ p, anim, f }: RiderProps) {
   );
 }
 
+/* ---------- front and back views (end-on) ---------- */
+// the runners seen end-on: a striped post with its hook curling outward at the top
+const END_RUNNERS = ["M25 93 L25 74 C25 64 15 63 14 70", "M75 93 L75 74 C75 64 85 63 86 70"];
+const END_LEGS = ["M30 80 L37 80 L37 90 L30 90 Z", "M63 80 L70 80 L70 90 L63 90 Z"];
+const END_ROLL = [0, 0, 0.8, 0, -0.8, 0, 0.8, 0, -0.5, 0, 0, 0];
+const END_DY = [0, 0.4, 0, 0, 0, 0, 0, 0, 0, 0.3, 0.5, 0.2];
+
+// front view: the nose face, and the tub running away behind the pawn up to the backrest
+const FN_PANEL = "M18 62 Q18 57 24 57 L76 57 Q82 57 82 62 L82 74 Q82 82 74 82 L26 82 Q18 82 18 74 Z";
+const FN_TUB = "M20 62 L23 46 Q24 37 34 37 L66 37 Q76 37 77 46 L80 62 Z";
+const FN_TUB_IN = "M25.5 62 L27.5 49 Q28.5 43 36 43 L64 43 Q71.5 43 72.5 49 L74.5 62 Z";
+const FN_RIM = "M23.5 54 L25 46.5 Q26 40 34 40 L66 40 Q74 40 75 46.5 L76.5 54";
+// back view: the backrest wall (near), and the tub running away to the nose (far)
+const BK_PANEL = "M20 57 Q20 50 27 50 L73 50 Q80 50 80 57 L80 74 Q80 82 72 82 L28 82 Q20 82 20 74 Z";
+const BK_TUB = "M20 60 L23 44 Q24 36 32 36 L68 36 Q76 36 77 44 L80 60 Z";
+const BK_TUB_IN = "M25.5 60 L27.5 46 Q28.5 41 34 41 L66 41 Q71.5 41 72.5 46 L74.5 60 Z";
+const BK_RIM = "M23 54 L24.5 45 Q26 39 33 39 L67 39 Q74 39 75.5 45 L77 54";
+const BK_TOP_ICING = "M24 64 L24 58 Q24 54 29 54" + scallops(29, 71, 54, 6).replace(/^M\S+ \S+/, "") + " Q76 54 76 58 L76 64";
+
+function endSparkle(anim: string, f: number, a: { x: number; y: number }, b: { x: number; y: number }) {
+  if (anim !== "idle") return null;
+  if (f === 3) return { ...a, s: 6 };
+  if (f === 4) return { ...a, s: 2.8 };
+  if (f === 7) return { ...b, s: 5.4 };
+  if (f === 8) return { ...b, s: 2.4 };
+  return null;
+}
+
+function endFlake(anim: string, f: number, step: number) {
+  return anim === "idle"
+    ? { x: 78 + Math.sin(f * 0.8) * 4 - f * 0.3, y: -4 + f * step, r: f >= 11 ? 2.2 : 3.2, rot: f * 15 }
+    : null;
+}
+
+// snow kicked out left and right from the runners while sliding; dir -1 drifts up (away), +1 down (toward us)
+function EndPuffs({ f, dir }: { f: number; dir: number }) {
+  const out = [];
+  for (let k = 1; k <= 8; k++) {
+    const age = f - k;
+    if (age < 0 || age > 2) continue;
+    for (const s of [-1, 1]) {
+      const x = 50 + s * (27 + age * 6.5);
+      const y = 91 + dir * age * 1.8;
+      const r = 2.6 + age * 1.7;
+      out.push(
+        <g key={`${k}${s}`} opacity={age === 2 ? 0.75 : 1}>
+          <circle cx={x} cy={y} r={r} fill="#fff" stroke={INK} {...lw(1.6)} />
+          <circle cx={x + s * r * 0.95} cy={y + 1.5} r={r * 0.62} fill="#fff" stroke={INK} {...lw(1.6)} />
+        </g>,
+      );
+    }
+  }
+  return <g>{out}</g>;
+}
+
+// at the stop, a little spray flies off the two hooks
+function CurlSpray({ f }: { f: number }) {
+  if (f !== 9 && f !== 10) return null;
+  const a = f === 9;
+  return (
+    <g opacity={a ? 1 : 0.7}>
+      {[-1, 1].map((s) => (
+        <g key={s}>
+          <circle cx={50 + s * (a ? 39 : 42)} cy={a ? 64 : 61} r={a ? 2.6 : 3.4} fill="#fff" stroke={INK} {...lw(1.4)} />
+          <circle cx={50 + s * (a ? 35 : 37)} cy={a ? 60 : 56.5} r={a ? 1.8 : 2.4} fill="#fff" stroke={INK} {...lw(1.4)} />
+        </g>
+      ))}
+    </g>
+  );
+}
+
+function FrontViewBack({ p, anim, f }: RiderProps) {
+  return (
+    <g>
+      {anim === "move" && <EndPuffs f={f} dir={-1} />}
+      <Region
+        p={p}
+        name="backrest"
+        d={[FN_TUB]}
+        over={<path d={FN_TUB_IN} fill="#000" opacity="0.24" />}
+      />
+      <path d={FN_TUB_IN} fill="none" stroke={INK} stroke-linejoin="round" {...lw(1.6)} />
+      <Icing d={FN_RIM} />
+    </g>
+  );
+}
+
+function FrontViewFront({ p, anim, f }: RiderProps) {
+  const sparkle = endSparkle(anim, f, { x: 40, y: 61 }, { x: 26, y: 42 });
+  const flake = endFlake(anim, f, 5.5);
+  return (
+    <g>
+      <Region p={p} name="legs" d={END_LEGS} line={2} />
+      <Region
+        p={p}
+        name="panel"
+        d={[FN_PANEL]}
+        over={
+          <g>
+            <path d="M10 58 L92 58 L92 65 L10 65 Z" fill="#fff" opacity="0.14" />
+            <path d="M10 76 L92 76 L92 84 L10 84 Z" fill="#000" opacity="0.12" />
+          </g>
+        }
+      />
+      <Icing d={scallops(22.5, 77.5, 61)} />
+      <Icing d={scallops(22.5, 77.5, 78)} />
+      {[35, 50, 65].map((x) => (
+        <circle key={x} cx={x} cy={70} r="1.7" fill={ICING} stroke={INK} {...lw(1.2)} />
+      ))}
+      <Gumdrop x={30} y={57.5} c="#e0303a" hi="#ff8a8f" />
+      <Gumdrop x={50} y={57.5} c="#35a24a" hi="#8fe39b" />
+      <Gumdrop x={70} y={57.5} c="#e0303a" hi="#ff8a8f" />
+      {END_RUNNERS.map((d) => (
+        <Cane key={d} d={d} />
+      ))}
+      {sparkle && <Sparkle {...sparkle} />}
+      {flake && <Snowflake {...flake} />}
+      {anim === "move" && <CurlSpray f={f} />}
+    </g>
+  );
+}
+
+function BackViewBack({ p }: RiderProps) {
+  return (
+    <g>
+      <Region p={p} name="nose" d={[BK_TUB]} over={<path d={BK_TUB_IN} fill="#000" opacity="0.24" />} />
+      <path d={BK_TUB_IN} fill="none" stroke={INK} stroke-linejoin="round" {...lw(1.6)} />
+      <Icing d={BK_RIM} />
+      <Gumdrop x={24.5} y={49.5} c="#e0303a" hi="#ff8a8f" />
+      <Gumdrop x={75.5} y={49.5} c="#35a24a" hi="#8fe39b" />
+    </g>
+  );
+}
+
+function BackViewFront({ p, anim, f }: RiderProps) {
+  const sparkle = endSparkle(anim, f, { x: 62, y: 55 }, { x: 24.5, y: 58 });
+  const flake = endFlake(anim, f, 4.8);
+  return (
+    <g>
+      <Region p={p} name="legs" d={END_LEGS} line={2} />
+      {END_RUNNERS.map((d) => (
+        <Cane key={d} d={d} />
+      ))}
+      <Region
+        p={p}
+        name="panel"
+        d={[BK_PANEL]}
+        over={
+          <g>
+            <path d="M10 50 L92 50 L92 57 L10 57 Z" fill="#fff" opacity="0.14" />
+            <path d="M10 76 L92 76 L92 84 L10 84 Z" fill="#000" opacity="0.12" />
+          </g>
+        }
+      />
+      <Icing d={BK_TOP_ICING} />
+      <Icing d={scallops(23, 77, 78, 6)} />
+      {[36, 50, 64].map((x) => (
+        <circle key={x} cx={x} cy={68.5} r="1.7" fill={ICING} stroke={INK} {...lw(1.2)} />
+      ))}
+      {sparkle && <Sparkle {...sparkle} />}
+      {flake && <Snowflake {...flake} />}
+      {anim === "move" && <EndPuffs f={f} dir={1} />}
+      {anim === "move" && <CurlSpray f={f} />}
+    </g>
+  );
+}
+
+const endPose = (lean: (tilt: number) => number) => (anim: "idle" | "move", f: number) =>
+  anim === "idle"
+    ? { dx: 0, dy: IDLE_DY[f] ?? 0, pawnX: 0, pawnY: -4 + (IDLE_PY[f] ?? 0), cut: 66 }
+    : {
+        dx: 0,
+        dy: END_DY[f] ?? 0,
+        pawnX: 0,
+        pawnY: -4 + (MOVE_PY[f] ?? 0) + lean(MOVE_TILT[f] ?? 0),
+        pawnTilt: END_ROLL[f] ?? 0,
+        cut: 66,
+      };
+
+const frontView: RiderViewDraft = {
+  frame: [4, 10, 92, 90],
+  idle: { ms: IDLE_MS },
+  move: { ms: MOVE_MS },
+  // leaning back tips the head away (a little lower); the lurch at the stop tips it toward us (lower still)
+  pose: endPose((t) => (t < 0 ? -t * 0.1 : t * 0.22)),
+  Back: FrontViewBack,
+  Front: FrontViewFront,
+};
+
+const backView: RiderViewDraft = {
+  frame: [4, 10, 92, 90],
+  idle: { ms: IDLE_MS },
+  move: { ms: MOVE_MS },
+  // from behind, leaning back tips the head toward us (lower); the lurch tips it away
+  pose: endPose((t) => (t < 0 ? -t * 0.2 : t * 0.05)),
+  Back: BackViewBack,
+  Front: BackViewFront,
+};
+
 export const gingerSled: RiderDraft = {
   id: "ginger-sled",
   name: "Candy Cane Sled",
@@ -193,4 +392,5 @@ export const gingerSled: RiderDraft = {
       : { dx: MOVE_DX[f] ?? 0, dy: 0, pawnX: 3, pawnY: -4 + (MOVE_PY[f] ?? 0), pawnTilt: MOVE_TILT[f] ?? 0, cut: 66 },
   Back,
   Front,
+  views: { front: frontView, back: backView },
 };
