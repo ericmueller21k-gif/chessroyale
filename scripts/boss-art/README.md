@@ -111,9 +111,9 @@ encodes again with fewer colors).
 - **The caption strip:** the ride's name and its width in squares, **red above 1.25**, and what it's doing (the view
   shown). The width is the widest frame of any view (idle and every move frame), measured from the drawn pixels (alpha
   over 20, on a raster 5x finer than the town's), with its pawn on it and without the pose's `dx`.
-- **Rides now** (Oct 31, the 13 under `out/`; riding-chirp has its front and back views, the rest only a side view):
-  1.21 (boingo-pogo) to 2.58 (hollow-steed) squares wide, riding-chirp 1.75; all but boingo-pogo are over 1.25. (The Brush
-  Ride, 2.66 before it was cleared for its redraw, is the widest.)
+- **First pass** (Oct 31, the 14 rides then under `out/`, before the redraws): 1.21 (boingo-pogo) to 2.66 (smudgy-brush)
+  squares wide, 13 of the 14 over 1.25 (riding-chirp 1.75). The drawings were made on the 100-unit square, which the town
+  shows 1.45 squares wide; the redraws and the briefs to come should aim at 1.25 squares, about 86 units.
 
 ### Item motion
 
