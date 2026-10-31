@@ -480,3 +480,22 @@ describe("Boss Battle party: the re-review's fixes (#420)", () => {
     expect(core.takeRevokes()).toEqual({ lobby: "BATTL", start: want.id, members: ["m2"] });
   });
 });
+
+describe("Boss Battle has no boss strikes (Eric, Oct 31: \"that's only for the 50-person mode\")", () => {
+  it("a party's battle goes well past the strike's move count with nobody struck, and no count to a strike anywhere", () => {
+    const B = inPlay(3, { bossKillEvery: 1 });
+    expect(B.core.record.overrides?.bossNoStrikes).toBe(true);
+    for (let turn = 0; turn < 4; turn++) {
+      const r = B.last("p1", "round")!;
+      expect(r.boss!.strikeIn).toBeNull();
+      const legal = legalMoves(r.board!.fen);
+      // (Three different picks, one far worse: the one a strike would knock out.)
+      ["p1", "p2", "p3"].forEach((id, i) => B.core.message(id, { t: "pick", key: r.key, move: legal[i]! }));
+      B.hostScores({ [legal[0]!]: 0.7, [legal[1]!]: 0.69, [legal[2]!]: 0.05 });
+      B.hostBoss();
+    }
+    expect(B.runner().boss!.crowdMoves).toBeGreaterThanOrEqual(4);
+    expect(B.runner().boss!.kills).toEqual([]);
+    expect(B.runner().alive()).toHaveLength(3);
+  });
+});

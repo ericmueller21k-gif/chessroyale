@@ -57,3 +57,12 @@ describe("a Boss Battle party's move (Eric, Oct 29 and 30)", () => {
     expect(drawMove(["d2d4", "d2d4", "e2e4"], { d2d4: 30, e2e4: 0 }, "party", mulberry32(3))).toBe("d2d4");
   });
 });
+
+describe("Boss Battle's no-strikes switch (Eric, Oct 31)", () => {
+  it("bossKillDue never comes with bossNoStrikes; the party's settings have it", async () => {
+    const { bossKillDue, bossPartySettings } = await import("../src/index.ts");
+    expect(bossPartySettings("normal").bossNoStrikes).toBe(true);
+    const state = { boss: { sinceKill: 9, minSurvivors: 1, kills: [] }, players: [] } as never;
+    expect(bossKillDue(state, { ...DEFAULT_SETTINGS, bossNoStrikes: true })).toBe(false);
+  });
+});

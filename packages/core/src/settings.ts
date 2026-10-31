@@ -249,6 +249,12 @@ export interface Settings {
    * the charges are the team's; a raid needs more than half the crowd.
    */
   kingAnyCall?: boolean;
+  /**
+   * Boss Battle (alone and in a party) has no boss strikes (Eric, Oct 31: "we got to get rid of the strike down thing
+   * altogether. That's only for the 50-person mode"): nobody is ever knocked out, and no count to a strike shows. Raids
+   * and the Crowd keep theirs.
+   */
+  bossNoStrikes?: boolean;
   /** Pre-game votes: whether a player may move their pawn to another zone after voting (Eric: one vote each, for now). */
   voteChangeAllowed: boolean;
   /**
@@ -717,6 +723,7 @@ export function bossPartySettings(difficulty: string): Partial<Settings> {
     groupSize: BOSS_PARTY.max,
     drawRuleByStage: ["party"],
     kingAnyCall: true,
+    bossNoStrikes: true,
     bossDifficulty: d.elo,
     bossAloneMaia: d.maia,
   };

@@ -81,3 +81,11 @@ Eric's design (Oct 29 and 30) and his OK on the stills (Oct 30: "the solo or the
 - (#423, the review) A computer: the battle's chat stands 32 px further out beside the corner in a party's battle, so the
   God King's cape and sword, your pawn and your teammates are whole and clear of it at every size (1280 × 800, 1440 × 900,
   1920 × 1080 checked); the Kick sits over its teammate's pawn, on top.
+
+## No boss strikes in Boss Battle (Oct 31)
+Eric, from a live party with two bots: "I got struck down by the boss in like three moves, so we got to get rid of the
+strike down thing altogether. That's only for the 50-person mode." `settings.bossNoStrikes` (on in `bossPartySettings`
+and in Boss alone's settings, `SoloMatch`): `bossKillDue` never comes, nobody is knocked out, and `strikeIn` is null, so
+the boss's card shows the moves left (as the Hidden Boss's does), the intro says nothing about strikes, and no strike's
+moment or line plays. Raids (Solo raid included) and the Crowd keep theirs. FAQ: "With friends" and "Boss alone" say the
+boss never strikes; the raid's strike item says "in a raid".

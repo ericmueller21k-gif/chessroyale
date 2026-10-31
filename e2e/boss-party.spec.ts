@@ -118,6 +118,12 @@ test("in the battle: picks live in each one's color and changeable, \"Your pick 
   const { eric, maya, e, m } = await intoBattle(browser, phone);
   // Both have the gear, and Eric's team clock reads 10:10 or a little less.
   for (const p of [e, m]) await expect(p.getByRole("button", { name: "Match options" })).toBeVisible();
+  // No boss strikes in a party's battle (Eric, Oct 31: "that's only for the 50-person mode"): no count to one anywhere.
+  for (const p of [e, m]) {
+    await expect(p.locator(".boss-next")).toBeVisible();
+    await expect(p.locator(".boss-next")).not.toContainText("Strikes");
+    await expect(p.locator(".boss-dock")).not.toContainText(/struck|Strikes/);
+  }
   const { Chess } = await import("chess.js");
   const fen = await e.evaluate(() => (window as any).match.phase.board.fen as string);
   const allowed = (await e.evaluate(() => ((window as any).match.boss?.powers?.allowed ?? null) as string[] | null)) ?? new Chess(fen).moves({ verbose: true }).map((x) => x.lan);

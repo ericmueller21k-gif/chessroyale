@@ -87,8 +87,9 @@ export class SoloMatch implements GameView {
     private readonly raidBots = false,
   ) {
     // Boss alone (a raid without bots) keeps the old scoring; a Solo raid scores as every raid (RAID_SCORING). Boss alone
-    // plays on Boss Battle's clock, 10 + 10 (BOSS_CLOCK; Eric, Oct 30); a Solo raid keeps the raid's.
-    if (baseSettings.raid && !raidBots) this.baseSettings = { ...baseSettings, ...BOSS_ALONE_SCORING, ...(baseSettings.bossAloneClock ? bossClockSettings(baseSettings) : {}) };
+    // plays on Boss Battle's clock, 10 + 10 (BOSS_CLOCK; Eric, Oct 30), with no boss strikes (Eric, Oct 31); a Solo raid
+    // keeps the raid's clock and strikes.
+    if (baseSettings.raid && !raidBots) this.baseSettings = { ...baseSettings, ...BOSS_ALONE_SCORING, bossNoStrikes: true, ...(baseSettings.bossAloneClock ? bossClockSettings(baseSettings) : {}) };
     // (The hippo gardener's seeds count by this page's visible time, not an earlier online match's server.)
     setGardenSource(null);
     // (A game on this device: a tester's ?bannerplus= counts.)

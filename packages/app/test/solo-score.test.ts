@@ -102,6 +102,25 @@ describe("Boss alone plays on Boss Battle's clock, 10 + 10 (Eric, Oct 30: \"10 m
     clocked.dispose();
   }, 30_000);
 
+  it("no boss strikes (Eric, Oct 31): past the strike's move count, nobody struck and no count to one; a Solo raid keeps them", async () => {
+    const m = new SoloMatch([engine], "Ann", { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 1600, bossId: "gingerbread", lastStandFrom: 999, bossKillEvery: 1 } as Settings);
+    expect(m.settings.bossNoStrikes).toBe(true);
+    m.start();
+    for (let t = 0; t < 3; t++) {
+      const p = await turn(m);
+      expect(m.runner.bossView()!.strikeIn).toBeNull();
+      const ply = m.runner.boardOf("you")!.history.length;
+      m.submit(legalMoves(p.board.fen)[0]!);
+      for (let i = 0; i < 60 && m.runner.boardOf("you")!.history.length < ply + 2; i++) await vi.advanceTimersByTimeAsync(500);
+    }
+    expect(m.runner.boss!.kills).toEqual([]);
+    expect(m.runner.bossKillDue()).toBe(false);
+    m.dispose();
+    const raid = new SoloMatch([engine], "Ann", { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 1600, bossId: "gingerbread" } as Settings, false, true);
+    expect(raid.settings.bossNoStrikes).toBeFalsy();
+    raid.dispose();
+  }, 30_000);
+
   it("a Solo raid (with bots) keeps the raid's clock", () => {
     const raid = new SoloMatch([engine], "Ann", { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 1600, bossId: "gingerbread" } as Settings, false, true);
     expect(raid.settings.bossClock).toBeFalsy();
