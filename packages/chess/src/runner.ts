@@ -1844,9 +1844,12 @@ export class MatchRunner {
     };
   }
 
-  /** The boss strikes now (every bossKillEvery crowd moves; never a boss that doesn't strike: BossRules.noStrikes). */
+  /**
+   * The boss strikes now (every bossKillEvery crowd moves; never a boss that doesn't strike, BossRules.noStrikes, nor in
+   * Boss Battle, settings.bossNoStrikes).
+   */
   bossKillDue(): boolean {
-    return bossKillDue(this.state, this.settings) && !this.finalGameOver() && !bossRules(this.state.boss)?.noStrikes;
+    return bossKillDue(this.state, this.settings) && !this.finalGameOver() && !bossRules(this.state.boss)?.noStrikes && !this.settings.bossNoStrikes;
   }
 
   /** The boss strikes down the player with the worst recent moves; returns who. */
@@ -1894,10 +1897,10 @@ export class MatchRunner {
     if (!b) return null;
     const board = this.boards.get(this.state.boards[0]!)!;
     const s = this.settings;
-    const same = [b, board, board.fen, board.lastMove, board.history, board.history.length, board.bases, this.alive().length, this.bossLast, justKilled, s.bossMinSurvivors, s.bossMaxMoves, s.bossKillEvery, !!s.raid];
+    const same = [b, board, board.fen, board.lastMove, board.history, board.history.length, board.bases, this.alive().length, this.bossLast, justKilled, s.bossMinSurvivors, s.bossMaxMoves, s.bossKillEvery, !!s.raid, !!s.bossNoStrikes];
     const m = this.bossViewMemo;
     if (m && m.same.length === same.length && m.same.every((x, i) => x === same[i])) return m.view;
-    const key = JSON.stringify([b, board.id, board.generation, board.fen, board.lastMove, board.history.join(" "), this.alive().length, this.bossLast, justKilled, s.bossMinSurvivors, s.bossMaxMoves, s.bossKillEvery, !!s.raid]);
+    const key = JSON.stringify([b, board.id, board.generation, board.fen, board.lastMove, board.history.join(" "), this.alive().length, this.bossLast, justKilled, s.bossMinSurvivors, s.bossMaxMoves, s.bossKillEvery, !!s.raid, !!s.bossNoStrikes]);
     this.bossViewMemo = { key, same, view: m?.key === key ? m.view : this.buildBossView(b, justKilled) };
     return this.bossViewMemo.view;
   }
@@ -1914,7 +1917,7 @@ export class MatchRunner {
     const fen = this.boards.get(this.state.boards[0]!)!.fen;
     const powers = bossPowers(b);
     const p = b.powers;
-    const strikes = this.alive().length > (b.minSurvivors ?? this.settings.bossMinSurvivors) && !b.result && !bossRules(b)?.noStrikes;
+    const strikes = this.alive().length > (b.minSurvivors ?? this.settings.bossMinSurvivors) && !b.result && !bossRules(b)?.noStrikes && !this.settings.bossNoStrikes;
     return {
       board: netBoard(this.boards.get(this.state.boards[0]!)!),
       name: info.name,

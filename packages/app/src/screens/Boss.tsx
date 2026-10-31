@@ -475,8 +475,8 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
               {lightsStart
                 ? "Clocks stopped."
                 : intro
-                ? // (A boss that never strikes, the Hidden Boss: nothing about strikes.)
-                  bossRules(boss)?.noStrikes
+                ? // (A boss that never strikes, the Hidden Boss, and Boss Battle alone or in a party: nothing about strikes.)
+                  bossRules(boss)?.noStrikes || match.settings.bossNoStrikes
                   ? ""
                   : `Worst mover struck every ${match.settings.bossKillEvery} moves.`
                 : funMove?.move
