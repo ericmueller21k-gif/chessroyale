@@ -30,7 +30,7 @@ function pose(anim: "idle" | "move", f: number): RiderPose {
   };
 }
 
-/** Glow strength 0..1 (idle: slow pulse dim to bright and back; move: a steady warm glow). */
+/** Glow strength 0..1 (idle: slow pulse dim to bright and back; move: a steady glow). The glow is the second color (p2; Eric, Oct 31). */
 function glow(anim: "idle" | "move", f: number): number {
   if (anim === "idle") return 0.5 - 0.5 * Math.cos((TAU * f) / IDLE_N);
   return 0.7 + 0.1 * Math.sin((TAU * f) / MOVE_N);
@@ -57,7 +57,7 @@ const SILVER_L = "#eef1f5";
 const WIRE = "#2f6a38";
 const WIRE_L = "#5d9a5f";
 
-function Back({ anim, f }: RiderProps) {
+function Back({ p2, anim, f }: RiderProps) {
   const dy = bob(anim, f);
   const k = glow(anim, f);
   const lift = -dy; // how far above rest: the shadow stays on the ground
@@ -66,7 +66,7 @@ function Back({ anim, f }: RiderProps) {
     <g>
       {/* ground: a violet shadow and a warm glow */}
       <g transform={`translate(0 ${lift})`}>
-        <ellipse cx={64} cy={96} rx={42 * s} ry={4.5 * s} fill="#ffe9a8" opacity={0.12 + 0.25 * k} />
+        <ellipse cx={64} cy={96} rx={42 * s} ry={4.5 * s} fill={lighten(p2.hex, 0.45)} opacity={0.12 + 0.25 * k} />
         <ellipse cx={64} cy={96} rx={28 * s} ry={3 * s} fill="#2a1f3d" opacity={0.5} />
       </g>
       {/* cord: a dark green wire, one curl */}
@@ -79,11 +79,11 @@ function Back({ anim, f }: RiderProps) {
   );
 }
 
-function Front({ p, anim, f }: RiderProps) {
+function Front({ p, p2, anim, f }: RiderProps) {
   const k = glow(anim, f);
   const gid = `${p.id}-bulbglow`;
-  const core = "#fff6d2";
-  const halo = lighten(p.hex, 0.6);
+  const core = lighten(p2.hex, 0.55);
+  const halo = lighten(p2.hex, 0.2);
   const r = 17 + 8 * k;
   return (
     <g>
@@ -138,22 +138,22 @@ function endPose(anim: "idle" | "move", f: number): RiderPose {
   };
 }
 
-function EndGround({ anim, f }: RiderProps) {
+function EndGround({ p2, anim, f }: RiderProps) {
   const dy = bob(anim, f);
   const k = glow(anim, f);
   const lift = -dy;
   const s = 1 - lift * 0.03;
   return (
     <g transform={`translate(0 ${lift})`}>
-      <ellipse cx={50} cy={96} rx={32 * s} ry={4.5 * s} fill="#ffe9a8" opacity={0.12 + 0.25 * k} />
+      <ellipse cx={50} cy={96} rx={32 * s} ry={4.5 * s} fill={lighten(p2.hex, 0.45)} opacity={0.12 + 0.25 * k} />
       <ellipse cx={50} cy={96} rx={21 * s} ry={3 * s} fill="#2a1f3d" opacity={0.5} />
     </g>
   );
 }
 
-function GlowDefs({ p, k, gid }: { p: RiderProps["p"]; k: number; gid: string }) {
-  const core = "#fff6d2";
-  const halo = lighten(p.hex, 0.6);
+function GlowDefs({ p2, k, gid }: { p2: RiderProps["p2"]; k: number; gid: string }) {
+  const core = lighten(p2.hex, 0.55);
+  const halo = lighten(p2.hex, 0.2);
   return (
     <defs>
       <radialGradient id={gid} cx="0.5" cy="0.5" r="0.5">
@@ -166,13 +166,13 @@ function GlowDefs({ p, k, gid }: { p: RiderProps["p"]; k: number; gid: string })
   );
 }
 
-function FrontViewFront({ p, anim, f }: RiderProps) {
+function FrontViewFront({ p, p2, anim, f }: RiderProps) {
   const k = glow(anim, f);
   const gid = `${p.id}-bulbglow-f`;
   const r = 17 + 8 * k;
   return (
     <g>
-      <GlowDefs p={p} k={k} gid={gid} />
+      <GlowDefs p2={p2} k={k} gid={gid} />
       <Region p={p} name="glass" d={[END_GLASS]} />
       <g clip-path={`url(#${p.id}-glass)`}>
         <ellipse cx={50} cy={68} rx={r * 1.15} ry={r} fill={`url(#${gid})`} />
@@ -197,17 +197,17 @@ function endSwing(anim: "idle" | "move", f: number): number {
 
 const END_CORD = "M 50 68 L 50 79 C 50 84 45 85 45 81.5 C 45 78 55 78 55 83 C 55 87.5 50.5 88 51 92";
 
-function BackViewFront({ p, anim, f }: RiderProps) {
+function BackViewFront({ p, p2, anim, f }: RiderProps) {
   const k = glow(anim, f);
   const gid = `${p.id}-bulbglow-b`;
   const r = 24 + 6 * k;
   return (
     <g>
-      <GlowDefs p={p} k={k} gid={gid} />
+      <GlowDefs p2={p2} k={k} gid={gid} />
       <Region p={p} name="glass" d={[END_GLASS]} />
       <g clip-path={`url(#${p.id}-glass)`}>
         <ellipse cx={50} cy={66} rx={r * 1.15} ry={r} fill={`url(#${gid})`} />
-        <circle cx={50} cy={68} r={15} fill="none" stroke="#fff6d2" stroke-opacity={0.25 + 0.5 * k} {...lw(3)} />
+        <circle cx={50} cy={68} r={15} fill="none" stroke={lighten(p2.hex, 0.55)} stroke-opacity={0.25 + 0.5 * k} {...lw(3)} />
       </g>
       <path d={END_GLASS} fill="none" {...LINE} />
       {/* cap: collar, ridged screw, dark tip */}
@@ -253,6 +253,7 @@ export const hollowBulb: RiderDraft = {
   id: "hollow-bulb",
   name: "Hollow's Bulb",
   tier: "mythic",
+  colors: 2,
   description: "One bulb from Hollow's strand, gone rogue. Runs on darkness; somehow still lights up.",
   frame: [-12, -9, 125, 108],
   idle: { ms: Array(IDLE_N).fill(300) },
