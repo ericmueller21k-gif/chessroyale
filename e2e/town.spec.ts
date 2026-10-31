@@ -1279,7 +1279,7 @@ test("rides (Oct 31): your pawn sits on its ride, the ride's idle standing and i
   const [chirp] = await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 40 }]);
   await wearItem(page, "ride", chirp!);
   const sheets: string[] = [];
-  page.on("request", (r) => /\/ride-[\w-]+\.png/.test(r.url()) && sheets.push(r.url()));
+  page.on("request", (r) => /\/ride-[\w-]+\.webp/.test(r.url()) && sheets.push(r.url()));
   await page.goto("/town?sky=day");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
   await expect.poll(async () => (await rideNow(page)).you.ready, { message: "your ride's frames are ready", timeout: 20_000 }).toBe(true);
@@ -1318,6 +1318,14 @@ test("rides (Oct 31): your pawn sits on its ride, the ride's idle standing and i
   // (The bots hold still: none walks across your way.)
   await page.evaluate(() => (window as unknown as { __townCall: (i: number) => void }).__townCall(-1));
   const [c0, r0] = await you(page);
+  // A tap on the square right beside you walks you there, as on foot: your ride's reach isn't you (taps take the pawn's box).
+  for (const c of [c0 + 1, c0]) {
+    const at = (await page.evaluate(([c, r]) => (window as unknown as { __townAt: (k: string, id: [number, number]) => { x: number; y: number } | null }).__townAt("square", [c, r]), [c, r0] as [number, number]))!;
+    const cv = (await canvas(page).boundingBox())!;
+    await page.mouse.click(cv.x + at.x, cv.y + at.y);
+    await expect.poll(() => you(page), { message: `beside you: ${c},${r0}` }).toEqual([c, r0]);
+    await expect.poll(async () => (await rideNow(page)).you.anim).toBe("idle");
+  }
   // (Up the promenade onto the walk, clear of the tables and the lamps, then right, then left.)
   await walkTo(c0, r0 + 5);
   await walkTo(c0 + 3, r0 + 5);

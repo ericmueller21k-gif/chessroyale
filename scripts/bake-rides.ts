@@ -1,6 +1,7 @@
 /**
  * Bakes the rides (packages/app/src/components/rides/*.tsx, crate items in the `ride` slot) for the town square: one
- * picture per ride and color, `packages/app/src/town/rides/ride-<ride>-<color>.png`, and what the town needs to play them in
+ * picture per ride and color, `packages/app/src/town/rides/ride-<ride>-<color>.webp` (lossless: bit for bit the page's
+ * drawing, about 40% of a PNG's size), and what the town needs to play them in
  * `packages/app/src/town/ride-sheets.ts` (both generated; don't edit them by hand).
  *
  * Why (docs/decisions/2026-10-31-rides.md): the town draws nothing new per frame (Eric's frame-rate rule), and a ride's
@@ -8,21 +9,22 @@
  * for a ride in a color, cuts it into frames once and puts each rider's pawn between their back and front once. A sheet's
  * rows are idle back, idle front, move back, move front, a frame a column; drawn at 100% purity without the shine (the
  * town shows a ride's color, not its blotches). With each ride: its cell, its frames' times, where the pawn sits on each,
- * the move's lift, and a hash of its drawing, the paint and the colors, which `packages/app/test/town-rides.test.ts`
- * checks, so a sheet can't go stale.
+ * the move's lift, and a hash of what its sheets are drawn from (its drawing, the paint's fills and lines in
+ * components/item-paint.tsx, the colors; not the blotches, which the sheets don't have), which
+ * `packages/app/test/town-rides.test.ts` checks, so a sheet can't go stale.
  *
  * Run after changing a ride, the paint (components/item-paint.tsx) or the colors: `npx tsx scripts/bake-rides.ts`.
  * (It opens /rides-bake.html on the app's dev server in Chromium: packages/app/src/dev/rides-bake.tsx.)
  */
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { ITEM_COLORS } from "../packages/core/src/index.ts";
 
 const RIDE_DIR = "packages/app/src/components/rides";
 const OUT = "packages/app/src/town/ride-sheets.ts";
-const PNGS = "packages/app/src/town/rides";
+const SHEETS = "packages/app/src/town/rides";
 
-/** A hash of what a ride's sheets are drawn from: its drawing, the paint and the colors (the test recomputes it). */
+/** A hash of what a ride's sheets are drawn from: its drawing, the paint's fills and lines, and the colors (the test recomputes it). */
 export function rideHash(id: string, root = "."): string {
   const h = createHash("sha256");
   h.update(readFileSync(`${root}/${RIDE_DIR}/${id}.tsx`));
@@ -35,6 +37,7 @@ const nums = (a: readonly number[]) => `[${a.map((x) => +x.toFixed(2)).join(", "
 
 async function main() {
   const { chromium } = await import("@playwright/test");
+  const sharp = (await import("sharp")).default;
   const { createServer } = await import("vite");
   const server = await createServer({ root: "packages/app", configFile: "packages/app/vite.config.ts", server: { port: 5199, strictPort: false }, logLevel: "error" });
   await server.listen();
@@ -45,7 +48,8 @@ async function main() {
     await page.goto(`${server.resolvedUrls!.local[0]}rides-bake.html`);
     await page.waitForFunction(() => "__bake" in window);
     const rides = await page.evaluate(() => (window as unknown as { __rides: string[] }).__rides);
-    mkdirSync(PNGS, { recursive: true });
+    rmSync(SHEETS, { recursive: true, force: true });
+    mkdirSync(SHEETS, { recursive: true });
     const entries: string[] = [];
     for (const id of rides) {
       const pose = await page.evaluate((id) => (window as unknown as { __poses: (id: string) => { ms: { idle: number[]; move: number[] }; seat: { idle: number[][]; move: number[][] }; lift: number[] } }).__poses(id), id);
@@ -57,8 +61,23 @@ async function main() {
         if (first) first.top = Math.min(first.top, r.top);
         first ??= r;
         const png = Buffer.from(r.png.slice(r.png.indexOf(",") + 1), "base64");
-        writeFileSync(`${PNGS}/ride-${id}-${c.id}.png`, png);
-        bytes += png.length;
+        const webp = await sharp(png).webp({ lossless: true, exact: true, effort: 6 }).toBuffer();
+        // (Lossless, checked: the same pixels as the page drew.)
+        const [a, b] = await Promise.all([sharp(png).ensureAlpha().raw().toBuffer(), sharp(webp).ensureAlpha().raw().toBuffer()]);
+        if (!a.equals(b)) {
+          let n = 0;
+          let n0 = 0;
+          let max = 0;
+          for (let i = 0; i < a.length; i += 4)
+            if (a.readUInt32LE(i) !== b.readUInt32LE(i)) {
+              n++;
+              if (a[i + 3] === 0) n0++;
+              for (let k = 0; k < 4; k++) max = Math.max(max, Math.abs(a[i + k]! - b[i + k]!));
+            }
+          throw new Error(`${id} ${c.id}: the WebP isn't the PNG's pixels (${n} differ, ${n0} of them clear, by ${max} at most)`);
+        }
+        writeFileSync(`${SHEETS}/ride-${id}-${c.id}.webp`, webp);
+        bytes += webp.length;
       }
       const s = first!;
       const seat = (a: number[][]) => `[${a.map(nums).join(", ")}]`;
@@ -70,7 +89,7 @@ async function main() {
     writeFileSync(
       OUT,
       `// Generated by scripts/bake-rides.ts from packages/app/src/components/rides/*.tsx: don't edit by hand
-// (npx tsx scripts/bake-rides.ts). Each ride's sheet in a color is ./rides/ride-<ride>-<color>.png: rows idle back, idle front,
+// (npx tsx scripts/bake-rides.ts). Each ride's sheet in a color is ./rides/ride-<ride>-<color>.webp (lossless): rows idle back, idle front,
 // move back, move front; a frame a column, ${"`w`"} x ${"`h`"} pixels each, at RIDE_PX pixels a unit of the pawn's square.
 
 /** Pixels a unit of the pawn's 100 x 100 square in a sheet (the town's dressed pawns: PAWN_PX, 160 a pawn). */
@@ -92,7 +111,7 @@ export interface RideSheet {
   seat: { readonly idle: readonly (readonly number[])[]; readonly move: readonly (readonly number[])[] };
   /** The move's lift on each frame (units up: the hop). */
   lift: readonly number[];
-  /** A hash of the ride's drawing, the paint and the colors (the test checks it against them). */
+  /** A hash of the ride's drawing, the paint's fills and lines, and the colors (the test checks it against them). */
   hash: string;
 }
 

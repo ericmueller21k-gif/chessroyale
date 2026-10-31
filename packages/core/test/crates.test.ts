@@ -27,11 +27,14 @@ import {
   type CrateDef,
 } from "../src/index.ts";
 
+/** Items in no crate yet (Oct 31: the rides; admins have them, and their crate comes later). One by one, never a whole slot. */
+const NO_CRATE_YET = ["riding-chirp", "moon-ride"];
+
 const crate = crateDef("winter-1")!;
 const beta = crateDef("beta-001")!;
 
 describe("crates", () => {
-  it("the odds add up in every crate, and every item is in exactly one crate (a ride in none yet: its crate comes later)", () => {
+  it("the odds add up in every crate, and every item is in exactly one crate (but the rides with no crate yet: theirs comes later)", () => {
     expect(ITEM_COLORS.reduce((s, x) => s + x.weight, 0)).toBeCloseTo(100);
     for (const c of CRATES) {
       expect(c.strip.reduce((s, x) => s + x.weight, 0)).toBe(100);
@@ -40,7 +43,7 @@ describe("crates", () => {
       expect(ITEM_DEFS.reduce((s, d) => s + itemChance(c, d.id), 0)).toBeCloseTo(1);
       expect(new Set(c.items).size).toBe(c.items.length);
     }
-    for (const d of ITEM_DEFS) expect(CRATES.filter((c) => c.items.includes(d.id)).map((c) => c.id), d.id).toHaveLength(d.slot === "ride" ? 0 : 1);
+    for (const d of ITEM_DEFS) expect(CRATES.filter((c) => c.items.includes(d.id)).map((c) => c.id), d.id).toHaveLength(NO_CRATE_YET.includes(d.id) ? 0 : 1);
     expect(CRATES.map((c) => c.id)).toEqual(["beta-001", "winter-1"]);
   });
 

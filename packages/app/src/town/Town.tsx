@@ -46,7 +46,7 @@ import { TownChat } from "./TownChat.tsx";
 import { TownChatTools } from "./TownChatTools.tsx";
 import { Press } from "./press.ts";
 import { PAWN_HEAD, PAWN_PX, Renderer, pawnImage, type Hit, type YouArt } from "./render.ts";
-import { Rider, rideSheet, type RiderPawn } from "./rides.ts";
+import { dropRiders, leaveRider, ridersHeld, rideSheet, shareRider, type Rider, type RiderPawn } from "./rides.ts";
 import { painter2d, type Backend, type Painter } from "./paint.ts";
 import { painterGL } from "./paint-gl.ts";
 import { reportTownFallback } from "../problems.ts";
@@ -437,9 +437,21 @@ function startTown(
     if (key === youLook) return;
     youLook = key;
     const wear = offRide(look);
+    // (The ride drawn now stays drawn until the new one's frames are ready; then it's given back. One share of a rider each.)
     const mount = (art: YouArt | null) => {
-      if (!look?.ride || !rideSheet(look.ride.def)) return void (r.youRider = null);
-      ride(look.ride, art, pawnImage("light", null), (rd) => (youLook === key && alive ? void (r.youRider = rd) : rd.drop()));
+      const prev = youRide;
+      youRide = look?.ride
+        ? ride(look.ride, art, pawnImage("light", null), `light||${lookKey(wear)}`, (rd) => {
+            if (rd !== youRide || !alive) return;
+            if (youShown && youShown !== rd) leaveRider(youShown);
+            youShown = r.youRider = rd;
+          })
+        : null;
+      if (prev && (prev !== youShown || prev === youRide)) leaveRider(prev);
+      if (!youRide) {
+        if (youShown) leaveRider(youShown);
+        youShown = r.youRider = null;
+      }
     };
     if (!lookKey(wear)) {
       r.youArt = null;
@@ -451,20 +463,26 @@ function startTown(
         mount(art);
       });
   };
-  /** A rider (rides.ts) for a pawn wearing `ride`: its dressed picture (or the plain pawn) on it; `done` once it's ready. */
-  const ride = (on: NonNullable<ItemLook["ride"]>, art: YouArt | null, plain: HTMLCanvasElement, done: (rd: Rider) => void) => {
+  /**
+   * A rider (rides.ts) for a pawn wearing `ride`: its dressed picture (or the plain pawn) on it, shared with anyone whose pawn
+   * looks the same (`pawnKey`: its side, tint and items); `done` once it's ready. Null if the ride has no sheet.
+   */
+  const ride = (on: NonNullable<ItemLook["ride"]>, art: YouArt | null, plain: HTMLCanvasElement, pawnKey: string, done: (rd: Rider) => void): Rider | null => {
     const sheet = rideSheet(on.def);
     const pawn: RiderPawn = art ?? { img: plain, pad: 0, top: PAWN_HEAD - 0.75 / 45 };
-    if (sheet) new Rider(sheet, on.color, pawn, done);
+    return sheet ? shareRider(sheet, on.color, pawnKey, pawn, done) : null;
   };
+  /** The rider your look asked for last (its frames may still be coming), and the one drawn now: each holds a share. */
+  let youRide: Rider | null = null;
+  let youShown: Rider | null = null;
   /** Someone else's pawn (a bot, the test player; real players later) as the square draws it, made once: its items, its ride. */
   const dressPerson = (p: Person) => {
     const lk = p.look;
     if (isSprite(lk) || !lk.wear) return;
     const plain = pawnImage(lk.side, lk.tint);
     const on = lk.wear.ride;
-    const mount = (art: YouArt | null) => on && ride(on, art, plain, (rd) => (alive ? r.riders.set(p.id, rd) : rd.drop()));
     const wear = offRide(lk.wear);
+    const mount = (art: YouArt | null) => on && ride(on, art, plain, `${lk.side}|${lk.tint ?? ""}|${lookKey(wear)}`, (rd) => alive && r.riders.set(p.id, rd));
     if (!lookKey(wear)) mount(null);
     else
       void dressedPawn(wear, plain, PAWN_PX).then((art) => {
@@ -1111,6 +1129,8 @@ function startTown(
     return {
       you: { ride: rd?.sheet.id ?? null, color: rd?.color ?? null, ready: !!rd?.ready, ...r.youRide, box: r.drawnBox(you), at: [h.c, h.r] },
       others: [...r.riders].map(([id, x]) => ({ id, ride: x.sheet.id, color: x.color, ready: x.ready, box: r.drawnBox(town.people.findIndex((p) => p.id === id)) })),
+      // (Sets of rider frames held, shared by riders who look the same, and sheets still decoding or composed from.)
+      held: ridersHeld(),
     };
   };
   // ... `__townHold(on)`: the frame loop stops (the last frame stays, nothing moves) or goes on; `__townBackend("2d" | "webgl")`:
@@ -1207,6 +1227,10 @@ function startTown(
     },
     stop: () => {
       alive = false;
+      // (Every rider's frames freed: they'd stay in memory into a game otherwise.)
+      r.youRider = null;
+      r.riders.clear();
+      dropRiders();
       clearTimeout(lostWait);
       offAccount();
       fpsEl?.remove();

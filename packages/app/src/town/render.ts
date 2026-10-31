@@ -1296,6 +1296,8 @@ export class Renderer {
         x = pose.x;
         y = pose.y;
         if (it.kind === "boss") margin = 2;
+        // (A ride reaches up to about 1.46 squares from its foot: drawn from that far off the box's sides, so it never pops in.)
+        else if (this.riderOf(people[it.i]!)) margin = 1.5;
       }
       it.dx = wrapF(x - this.camX);
       it.dz = wrapF(y - this.camY);
@@ -2119,6 +2121,7 @@ export class Renderer {
    * jump with the hop, as a sidekick's doesn't.
    */
   private drawRider(it: Item, rd: Rider, pose: Pose, facing: number, box: number, t: number, seen?: { anim: "" | "idle" | "move"; frame: number; facing: number }): void {
+    if (!proj(this.view, it.dx, it.dz, 0, this.p)) return;
     const sq = (box * rd.h) / 100;
     let img: HTMLCanvasElement;
     let lift = 0;
@@ -2134,6 +2137,17 @@ export class Renderer {
       seen.facing = facing;
     }
     this.drawSprite(it, img, sq, rd.footX, rd.footY, rd.w / rd.h, lift, 0, facing, rd.shadow, rd.top + lift / sq);
+    // Taps: only the pawn's own box across (its picture's, as on foot), not the ride's reach, so a tap on the square beside a
+    // rider walks there as it does beside a pawn.
+    const half = (box * (1 + 2 * rd.pawn.pad) * this.p.k) / 2;
+    it.x0 = Math.max(it.x0, it.fx - half);
+    it.x1 = Math.min(it.x1, it.fx + half);
+  }
+
+  /** The rider a person is drawn as now (their ride's frames ready, not seated at a table), or null: on foot. */
+  private riderOf(p: Person): Rider | null {
+    const rd = p.you ? this.youRider : this.riders.get(p.id);
+    return rd && !seated(p) ? rd : null;
   }
 
   private box(it: Item, depth: number, x0: number, y0: number, x1: number, y1: number, fx: number, fy: number, hy: number): void {

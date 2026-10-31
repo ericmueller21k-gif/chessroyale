@@ -47,8 +47,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   into the same box, so a box never grows), the profile's Wearing rows (last), and the town square (baked sheets: town-square.md,
   "Rides"). **Not drawn** (the pawn alone, as before): a match's screens, the Colosseum's crowd, home's pawn and the menu's ring, the
   queue's and Squads' cards, the boss stage, the town's person card, and the public profile's Equipped Cosmetics row (four tiles at
-  most; its View all lists the ride). Changing a ride's drawing, the paint or the colors: `npx tsx scripts/bake-rides.ts` (a test
-  fails until it's run).
+  most; its View all lists the ride). Changing a ride's drawing, the paint's fills and lines (`item-paint.tsx`) or the colors:
+  `npx tsx scripts/bake-rides.ts` (a test fails until it's run; the blotches, `blotches.ts`, and other items don't ask for it).
 - **The locker** keeps each item you own (its color, blemish and seed) and what's equipped in each slot; it can
   delete items. God King effects from the shop are worn there too.
 - **Admins own one of every item** (`ADMIN_EMAILS`; Oct 31): every crate item and God King effect they don't really own,
@@ -68,7 +68,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 | Item list, tiers, colors, crate odds, rolls | `packages/core/src/crates.ts` |
 | Shop cosmetics | `packages/core/src/shop.ts`; drawn by `packages/app/src/components/Cosmetics.tsx` |
 | Item drawings, fit, cards (`ItemArt`, `Avatar`); crate and box art (`WinterCrateArt`, `PresentArt`, `BetaCrateArt`, `SupplyBoxArt`) | `packages/app/src/components/Items.tsx` |
-| The paint every item uses (color, blotches, shine, `Region`, `LINE`) | `packages/app/src/components/item-paint.tsx` (moved out of Items.tsx, Oct 31) |
+| The paint every item uses (color, shine, `Region`, `LINE`) and its blemish's blotches | `packages/app/src/components/item-paint.tsx` and `blotches.ts` (moved out of Items.tsx, Oct 31) |
 | Rides' drawings (`RIDES`) | `packages/app/src/components/rides/`; their town sheets: `scripts/bake-rides.ts` |
 | Crate page, opening strip, reveal, locker UI (`CRATE_LOOKS`: each crate's art and box) | `packages/app/src/screens/Crates.tsx`; the shop `screens/Shop.tsx` |
 | Server rolls and storage (D1 `items`, `equipped_items`) | `packages/server/src/locker.ts`; the shop's API in `api.ts` / `accounts.ts` |

@@ -5,7 +5,8 @@ import { LINE, Region, darken, isLight, lighten, lw, usePaint as paintIn, type F
 
 import { rideOf, type RiderDraft } from "./rides/kit.ts";
 
-export { blotchPath, type Finish } from "./item-paint.tsx";
+export { type Finish } from "./item-paint.tsx";
+export { blotchPath } from "./blotches.ts";
 
 /**
  * Crate items, drawn. Every item is drawn once, on a pawn's 100 × 100 square (head centered at 50, 20), with its

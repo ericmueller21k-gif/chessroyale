@@ -569,8 +569,9 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
   const shop = profile?.shop;
   if (!locker) return <p class="muted">Your locker needs your account.</p>;
   const top = (s: ItemStack) => s.items[0]!;
+  // (An item this app doesn't know, e.g. one added since it loaded, as an admin's copy of it: left out, not a crash.)
   const stacks = stackItems(locker.items)
-    .filter((s) => tab === "all" || itemDef(top(s).def)?.slot === tab)
+    .filter((s) => itemDef(top(s).def) && (tab === "all" || itemDef(top(s).def)?.slot === tab))
     .sort((a, b) => tierIndex(top(b).def) - tierIndex(top(a).def) || colorIndex(top(b).color) - colorIndex(top(a).color) || top(a).blemish - top(b).blemish);
   // What you got in the shop: God King effects.
   const fromShop = SHOP_ITEMS.filter((i) => wornFromLocker(i) && shop?.owned.includes(i.id));

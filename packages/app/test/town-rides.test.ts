@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { ITEM_COLORS, ITEM_DEFS } from "@chessroyale/core";
 import { rideHash } from "../../../scripts/bake-rides.ts";
 import { RIDES } from "../src/components/rides/kit.ts";
 import { TOWN_FEEL } from "../src/town/feel.ts";
 import { RIDE_PX, RIDE_SHEETS } from "../src/town/ride-sheets.ts";
+import { Rider } from "../src/town/rides.ts";
 import { Walker, type Pose } from "../src/town/world.ts";
 
 /**
@@ -14,15 +15,22 @@ import { Walker, type Pose } from "../src/town/world.ts";
  * step it is, so it plays one cycle a square at the walk's own pace.
  */
 
-// (No browser here: a sheet's picture never loads, so a rider only works out its numbers.)
-(globalThis as { Image?: unknown }).Image ??= class {
-  onload: (() => void) | null = null;
-  onerror: (() => void) | null = null;
-  src = "";
-};
-const { Rider } = await import("../src/town/rides.ts");
+// (No browser here: a rider only works out its numbers, `compose` false.)
 /** The repository's root (the bake reads its files from there). */
 const ROOT = fileURLToPath(new URL("../../../", import.meta.url));
+
+/** A WebP's width and height, from its header (lossless "VP8L", or "VP8X"). */
+function webpSize(b: Buffer): [number, number] {
+  expect(b.toString("ascii", 0, 4) + b.toString("ascii", 8, 12)).toBe("RIFFWEBP");
+  const chunk = b.toString("ascii", 12, 16);
+  if (chunk === "VP8L") {
+    expect(b[20]).toBe(0x2f);
+    const bits = b.readUInt32LE(21);
+    return [(bits & 0x3fff) + 1, ((bits >> 14) & 0x3fff) + 1];
+  }
+  expect(chunk).toBe("VP8X");
+  return [b.readUIntLE(24, 3) + 1, b.readUIntLE(27, 3) + 1];
+}
 
 describe("the rides' baked sheets", () => {
   it("every ride item has a drawing and a sheet, and every drawing is a ride item", () => {
@@ -34,7 +42,13 @@ describe("the rides' baked sheets", () => {
   it("each sheet is its ride as drawn now, in every color (run npx tsx scripts/bake-rides.ts after a change)", () => {
     for (const [id, s] of Object.entries(RIDE_SHEETS)) {
       expect(s.hash, `${id}: run npx tsx scripts/bake-rides.ts`).toBe(rideHash(id, ROOT));
-      for (const c of ITEM_COLORS) expect(existsSync(`${ROOT}packages/app/src/town/rides/ride-${id}-${c.id}.png`), `${id} ${c.id}`).toBe(true);
+      // Every color's sheet, whole: its columns (the longer animation's frames) and its four rows of cells (a partial bake fails).
+      const cols = Math.max(s.ms.idle.length, s.ms.move.length);
+      for (const c of ITEM_COLORS) {
+        const file = `${ROOT}packages/app/src/town/rides/ride-${id}-${c.id}.webp`;
+        expect(existsSync(file), `${id} ${c.id}`).toBe(true);
+        expect(webpSize(readFileSync(file)), `${id} ${c.id}`).toEqual([cols * s.w, 4 * s.h]);
+      }
       const d = RIDES[id]!;
       expect(s.ms.idle).toEqual(d.idle.ms);
       expect(s.ms.move).toEqual(d.move.ms);
@@ -56,7 +70,7 @@ describe("a rider", () => {
 
   it("stands its ride's feet on the square's middle, its pawn the size it is on foot, its tag over the highest of the ride and the pawn", () => {
     for (const s of Object.values(RIDE_SHEETS)) {
-      const rd = new Rider(s, "red", pawn);
+      const rd = new Rider(s, "red", pawn, false);
       // Its foot: the drawing's middle (x 50) and its feet's line, inside its box.
       expect(rd.x0 + rd.footX * rd.w).toBeCloseTo(50);
       expect(rd.y0 + rd.footY * rd.h).toBeCloseTo(TOWN_FEEL.rides[s.id]!.foot);
@@ -76,7 +90,7 @@ describe("a rider", () => {
 
   it("plays its idle on its own times, and its move one cycle a step, in the shares of its drawn times", () => {
     const s = RIDE_SHEETS["riding-chirp"];
-    const rd = new Rider(s, "red", pawn);
+    const rd = new Rider(s, "red", pawn, false);
     const total = s.ms.idle.reduce((a, b) => a + b, 0);
     expect(rd.idleLoop).toBe(total);
     expect(rd.idleIndex(0)).toBe(0);
@@ -111,5 +125,53 @@ describe("a rider", () => {
     w.update(5000);
     w.pose(5000, pose);
     expect([pose.step, pose.t, pose.x]).toEqual([false, 0, 7]);
+  });
+});
+
+describe("riders shared and freed", () => {
+  const pawn = { img: { width: 160, height: 160 } as HTMLCanvasElement, pad: 0, top: 0.18 };
+  /** A sheet's picture in a test: never arrives (`hang`), or fails to (`fail`). */
+  function picture(how: "hang" | "fail") {
+    (globalThis as { Image?: unknown }).Image = class {
+      src = "";
+      decode() {
+        return how === "hang" ? new Promise(() => {}) : Promise.reject(new Error("404"));
+      }
+    };
+  }
+
+  it("people whose pawns look the same share one set of frames and one sheet; the last one out frees it; the town's close frees everything", async () => {
+    const { shareRider, leaveRider, dropRiders, ridersHeld } = await import("../src/town/rides.ts");
+    picture("hang");
+    const s = RIDE_SHEETS["moon-ride"];
+    const a = shareRider(s, "pearl", "light||null", pawn, () => {});
+    const b = shareRider(s, "pearl", "light||null", pawn, () => {});
+    const c = shareRider(s, "pearl", "dark||null", pawn, () => {});
+    expect(a).toBe(b);
+    expect(c).not.toBe(a);
+    expect(a.users).toBe(2);
+    expect(ridersHeld()).toEqual({ riders: 2, sheets: 1 });
+    leaveRider(a);
+    expect(ridersHeld().riders).toBe(2);
+    leaveRider(b);
+    expect(ridersHeld().riders).toBe(1);
+    dropRiders();
+    expect(ridersHeld()).toEqual({ riders: 0, sheets: 0 });
+  });
+
+  it("a sheet that doesn't come is forgotten, so the next rider in that color fetches it again", async () => {
+    const { shareRider, dropRiders, ridersHeld } = await import("../src/town/rides.ts");
+    picture("fail");
+    const s = RIDE_SHEETS["riding-chirp"];
+    const a = shareRider(s, "sage", "light||null", pawn, () => {});
+    expect(ridersHeld()).toEqual({ riders: 1, sheets: 1 });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(ridersHeld()).toEqual({ riders: 0, sheets: 0 });
+    expect(a.ready).toBe(false);
+    picture("hang");
+    const b = shareRider(s, "sage", "light||null", pawn, () => {});
+    expect(b).not.toBe(a);
+    expect(ridersHeld()).toEqual({ riders: 1, sheets: 1 });
+    dropRiders();
   });
 });
