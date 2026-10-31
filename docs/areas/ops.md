@@ -148,7 +148,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     socket or where TEST_SWITCHES is "1" (`lobby-do.ts`; `lobby-do-practice.test.ts`).
   - **Admins only already:** "Trigger ultimate (testing)" (online the lobby checks too), "Engine move", the boss brain
     picker (`brain`), the Hidden Boss in Boss alone (from the hidden `/bosses` picker since Oct 16: his tile on the Boss
-    raid screen is locked for everyone). Squads' test lobbies and controls: admins or `SQUADS_TEST`.
+    raid screen is locked for everyone). Squads' test lobbies and controls: admins or `SQUADS_TEST`. One of every item in
+    the locker, never stored (admins only, not `TEST_SWITCHES`: [shop.md](shop.md)).
   - **No record from a switched game:** for a player the switches can't apply, so everything the server records
     (results, ranking, fair-play signals, Squads' coins and crates, crate items) comes from a game made without them.
     Solo results are posted by the browser and are never ranked and earn nothing.
