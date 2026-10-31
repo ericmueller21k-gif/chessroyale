@@ -38,8 +38,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   them into a lobby; bots wear simple seeded outfits (`BOT_LOOKS`).
 - **Rides** (Oct 31: [2026-10-31-rides.md](../decisions/2026-10-31-rides.md)): items in the `ride` slot, one at a time, that your pawn
   sits on: **Riding Chirp** (the saddle, its flap and the collar take the color) and **Moon's Ride** (the moon does), both Mythic, with
-  a color, a purity and shine like every item. **In no crate yet** (the crate comes later): only admins have them (admins own one of
-  every item, another PR). The drawings were copied as drawn from `claude/boss-art` (`scripts/boss-art/out/riding-chirp/` and
+  a color, a purity and shine like every item. **In no crate yet** (the crate comes later): only admins have them, as admin copies
+  (red, 100%: "Admins own one of every item", below). The drawings were copied as drawn from `claude/boss-art` (`scripts/boss-art/out/riding-chirp/` and
   `moon-ride/`, Oct 30; their `summary.md` there has the artist's notes) into `components/rides/` (`kit.ts`: the types, `RIDES`).
   Each is a `Back` and a `Front` with the pawn between them, raised onto its seat, maybe tilted and hidden below the seat (`pose`), and
   two animations: `idle` and `move` (one square of the town's walk). Drawn: the locker's tile (`ItemArt`: the ride with a white pawn

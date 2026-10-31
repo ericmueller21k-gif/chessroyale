@@ -247,9 +247,12 @@ test("rides (Oct 31): the locker's Ride tab wears one; the preview's pawns ride 
 
 test("rides for an admin (Oct 31; admins own one of every item): the Ride tab has both rides' admin copies; wearing Riding Chirp's, the preview rides it, and in the town square your pawn rides it, in its color", async ({ page }) => {
   await named(page, "Eric");
-  await page.goto("/");
-  await asServerAdmin(page);
+  // (Once this page's account exists, as a player: no ride.)
   await page.goto("/shop");
+  await page.getByRole("tab", { name: "Locker" }).click();
+  await expect(page.getByText("No crate items here yet. Open a crate!")).toBeVisible();
+  await asServerAdmin(page);
+  await page.reload();
   await page.getByRole("tab", { name: "Locker" }).click();
   await page.getByRole("tab", { name: "Ride", exact: true }).click();
   const grid = page.locator(".locker-grid").first();
