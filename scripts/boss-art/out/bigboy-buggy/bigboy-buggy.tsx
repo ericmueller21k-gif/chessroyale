@@ -1,4 +1,4 @@
-import { Region, LINE, lw, type RiderDraft, type RiderProps } from "../../item-kit.tsx";
+import { Region, LINE, lw, darken, type RiderDraft, type RiderProps, type RiderViewDraft } from "../../item-kit.tsx";
 
 const n = (v: number) => v.toFixed(2);
 const TEAL = "#22a7a0";
@@ -184,6 +184,208 @@ function Front({ p, anim, f }: RiderProps) {
   );
 }
 
+// ---------------- front and back views (seen end-on) ----------------
+const endT = (b: { by: number; tilt: number }) => `translate(0 ${n(b.by)}) rotate(${n(b.tilt)} 50 78)`;
+const cub = (P: number[][], t: number) => {
+  const u = 1 - t;
+  return [0, 1].map((k) => u * u * u * P[0][k] + 3 * u * u * t * P[1][k] + 3 * u * t * t * P[2][k] + t * t * t * P[3][k]);
+};
+const archPts = (L: number[][], ts: number[]) => {
+  const R = L.map(([x, y]) => [100 - x, y]).reverse();
+  const out: number[][] = [];
+  ts.forEach((t) => out.push(cub(L, t)));
+  [...ts].reverse().forEach((t) => out.push(cub(R, 1 - t)));
+  return out;
+};
+const HOOD_E = "M 12 54 C 8 24 26 -4 50 -4 C 74 -4 92 24 88 54 Z";
+const LINING_E = "M 21 54 C 19 30 32 6 50 6 C 68 6 81 30 79 54 Z";
+const LINING_L = [[21, 54], [19, 30], [32, 6], [50, 6]];
+const LIN_SHADE = "M 29 54 C 28 34 38 15 50 15 C 62 15 72 34 71 54 Z";
+const HOOD_RIB = "M 16.5 54 C 13 26 29 1 50 1 C 71 1 87 26 83.5 54";
+const OUTER_L = [[10, 54], [5.5, 23], [25, -5.5], [50, -5.5]];
+const RIM_TOP = "M 14 52 C 14 43.33 86 43.33 86 52 C 86 60.67 14 60.67 14 52 Z";
+const RIM_IN = "M 19 52.5 C 19 46.5 81 46.5 81 52.5 C 81 58.5 19 58.5 19 52.5 Z";
+const BASKET_E = "M 18 55 C 18 71 26 78 38 78 L 62 78 C 74 78 82 71 82 55 Z";
+const RIM_E = "M 16 51 L 84 51 C 87.5 51 87.5 58 84 58 L 16 58 C 12.5 58 12.5 51 16 51 Z";
+const PANEL_E = "M 27 61.5 L 73 61.5 C 75 61.5 75.5 63.5 74.5 65.5 C 72 70 67.5 72.5 61 72.5 L 39 72.5 C 32.5 72.5 28 70 25.5 65.5 C 24.5 63.5 25 61.5 27 61.5 Z";
+
+function EndWheel({ cx, rot }: { cx: number; rot: number }) {
+  const cy = 88;
+  const spokes = [];
+  for (let i = 0; i < 6; i++) {
+    const a = ((rot + i * 60) * Math.PI) / 180;
+    spokes.push(
+      <line key={i} x1={cx} y1={cy} x2={n(cx + Math.cos(a) * 3.4)} y2={n(cy + Math.sin(a) * 6.8)} stroke="#4a535c" {...lw(1.6)} stroke-linecap="round" />,
+    );
+  }
+  return (
+    <g>
+      <ellipse cx={cx} cy={cy} rx={6.4} ry={10} fill={TIRE} {...LINE} />
+      <ellipse cx={cx} cy={cy} rx={4} ry={7.2} fill="#eef3f6" stroke="#1d1d1f" {...lw(1.4)} />
+      {spokes}
+      <ellipse cx={cx} cy={cy} rx={1.7} ry={2.6} fill={TEAL} stroke="#1d1d1f" {...lw(1.2)} />
+      <path d={`M ${n(cx - 4.2)} ${n(cy - 5)} C ${n(cx - 3.6)} ${n(cy - 8)} ${n(cx - 1.5)} ${n(cy - 9)} ${n(cx)} ${n(cy - 9)}`} fill="none" stroke="#fff" stroke-opacity="0.45" {...lw(1.2)} stroke-linecap="round" />
+    </g>
+  );
+}
+
+function EndChassis({ y }: { y: number }) {
+  const d = [
+    `M 25 88 C 22 82 26 ${n(77 + y)} 33 ${n(76 + y)}`,
+    `M 75 88 C 78 82 74 ${n(77 + y)} 67 ${n(76 + y)}`,
+    "M 19 88 L 81 88",
+  ];
+  return (
+    <g>
+      {d.map((s) => (
+        <path key={s + "o"} d={s} fill="none" stroke="#1d1d1f" {...lw(5)} stroke-linecap="round" />
+      ))}
+      {d.map((s) => (
+        <path key={s} d={s} fill="none" stroke={CHROME} {...lw(2.4)} stroke-linecap="round" />
+      ))}
+    </g>
+  );
+}
+
+function Toy({ x, y, a, rattle, dir }: { x: number; y: number; a: number; rattle: boolean; dir: number }) {
+  return (
+    <g transform={`rotate(${n(a)} ${x} ${y})`}>
+      <path d={`M ${x} ${y} L ${x} ${y + 8}`} fill="none" stroke="#1d1d1f" {...lw(1.8)} />
+      <circle cx={x} cy={y + 9.4} r={2.8} fill={TEAL} stroke="#1d1d1f" {...lw(1.6)} />
+      <rect x={x - 2.2} y={y + 11.8} width={4.4} height={6.6} rx={1.6} fill={BABY} stroke="#1d1d1f" {...lw(1.6)} />
+      <Swirl cx={x} cy={y + 25} r={7.6} />
+      {rattle && (
+        <g fill="none" stroke="#1d1d1f" {...lw(1.6)} stroke-linecap="round">
+          <path d={`M ${x + dir * 10} ${y + 20} L ${x + dir * 14} ${y + 18}`} />
+          <path d={`M ${x + dir * 11} ${y + 26} L ${x + dir * 15.5} ${y + 26}`} />
+          <path d={`M ${x + dir * 10} ${y + 32} L ${x + dir * 14} ${y + 34}`} />
+        </g>
+      )}
+    </g>
+  );
+}
+
+function RimTop({ p }: { p: RiderProps["p"] }) {
+  return (
+    <g>
+      <Region p={p} name="rim-back" d={[RIM_TOP]} />
+      <path d={RIM_IN} fill={darken(p.hex, 0.45)} stroke="#1d1d1f" {...lw(1.6)} />
+      <circle cx={15.5} cy={52.5} r={2.6} fill={CHROME} stroke="#1d1d1f" {...lw(1.6)} />
+      <circle cx={84.5} cy={52.5} r={2.6} fill={CHROME} stroke="#1d1d1f" {...lw(1.6)} />
+    </g>
+  );
+}
+
+function FrontViewBack({ p, anim, f }: RiderProps) {
+  const b = body(anim, f);
+  const pts = archPts(LINING_L, [0.12, 0.3, 0.48, 0.66, 0.84]);
+  pts.splice(5, 0, [50, 6]);
+  return (
+    <g transform={endT(b)}>
+      <Region p={p} name="hood" d={[HOOD_E]} />
+      <path d={HOOD_RIB} fill="none" stroke="#1d1d1f" {...lw(1.6)} stroke-linecap="round" />
+      <path d="M 14.5 36 C 16 18 28 2 42 -1" fill="none" stroke="#fff" stroke-opacity="0.5" {...lw(2)} stroke-linecap="round" />
+      <path d={LINING_E} fill={CREAM} {...LINE} />
+      <path d={LIN_SHADE} fill="#efdfc6" />
+      {pts.map(([x, y], i) => (
+        <circle key={i} cx={n(x)} cy={n(y)} r={(i + b.flutter) % 2 ? 3.6 : 2.7} fill={BABY} stroke="#1d1d1f" {...lw(1.6)} />
+      ))}
+      <RimTop p={p} />
+    </g>
+  );
+}
+
+function FrontViewFront({ p, anim, f }: RiderProps) {
+  const b = body(anim, f);
+  return (
+    <g>
+      <EndChassis y={b.by} />
+      <g transform={endT(b)}>
+        <Region p={p} name="basket" d={[BASKET_E]} />
+        <path d={PANEL_E} fill="#fff" fill-opacity="0.18" stroke="#1d1d1f" {...lw(1.6)} />
+        <Swirl cx={50} cy={67} r={5} />
+        <path d="M 21.5 62 C 21.5 68 25 73 31 75" fill="none" stroke="#fff" stroke-opacity="0.5" {...lw(2)} stroke-linecap="round" />
+        <Region p={p} name="rim" d={[RIM_E]} />
+        <path d="M 17 53.6 L 60 53.6" fill="none" stroke="#fff" stroke-opacity="0.55" {...lw(1.6)} stroke-linecap="round" />
+        <Toy x={71.5} y={20} a={-b.toy * 0.6} rattle={b.rattle} dir={1} />
+      </g>
+      <EndWheel cx={19} rot={b.rot} />
+      <EndWheel cx={81} rot={b.rot} />
+    </g>
+  );
+}
+
+function BackViewBack({ p, anim, f }: RiderProps) {
+  const b = body(anim, f);
+  const pts = archPts(OUTER_L, [0.1, 0.26, 0.42, 0.58, 0.74]);
+  return (
+    <g transform={endT(b)}>
+      {pts.map(([x, y], i) => (
+        <circle key={i} cx={n(x)} cy={n(y)} r={(i + b.flutter) % 2 ? 3.6 : 2.7} fill={BABY} stroke="#1d1d1f" {...lw(1.6)} />
+      ))}
+      <Region p={p} name="hood" d={[HOOD_E]} />
+      <path d="M 19 54 C 16 30 31 5 50 5 C 69 5 84 30 81 54" fill="none" stroke="#1d1d1f" {...lw(1.6)} stroke-linecap="round" />
+      <path d="M 26.5 54 C 24.5 36 36 15 50 15 C 64 15 75.5 36 73.5 54" fill="none" stroke="#1d1d1f" {...lw(1.6)} stroke-linecap="round" />
+      <path d="M 14.5 36 C 16 18 28 2 42 -1" fill="none" stroke="#fff" stroke-opacity="0.5" {...lw(2)} stroke-linecap="round" />
+      <RimTop p={p} />
+      <Toy x={26} y={6} a={-b.toy * 0.5} rattle={b.rattle} dir={-1} />
+    </g>
+  );
+}
+
+function BackViewFront({ p, anim, f }: RiderProps) {
+  const b = body(anim, f);
+  const handle = ["M 25 63 L 21.5 40", "M 75 63 L 78.5 40"];
+  return (
+    <g>
+      <EndChassis y={b.by} />
+      <g transform={endT(b)}>
+        <Region p={p} name="basket" d={[BASKET_E]} />
+        <path d="M 21.5 61 C 21.5 68 25 73 31 75" fill="none" stroke="#fff" stroke-opacity="0.5" {...lw(2)} stroke-linecap="round" />
+        <Region p={p} name="rim" d={[RIM_E]} />
+        <path d="M 17 53.6 L 60 53.6" fill="none" stroke="#fff" stroke-opacity="0.55" {...lw(1.6)} stroke-linecap="round" />
+        {handle.map((s) => (
+          <path key={s + "o"} d={s} fill="none" stroke="#1d1d1f" {...lw(5)} stroke-linecap="round" />
+        ))}
+        {handle.map((s) => (
+          <path key={s} d={s} fill="none" stroke={CHROME} {...lw(2.4)} stroke-linecap="round" />
+        ))}
+        <circle cx={25} cy={63} r={2.4} fill={CHROME} stroke="#1d1d1f" {...lw(1.4)} />
+        <circle cx={75} cy={63} r={2.4} fill={CHROME} stroke="#1d1d1f" {...lw(1.4)} />
+        <path d="M 18 40 L 82 40" fill="none" stroke="#1d1d1f" {...lw(7)} stroke-linecap="round" />
+        <path d="M 18 40 L 82 40" fill="none" stroke={TEAL} {...lw(4)} stroke-linecap="round" />
+        <path d="M 22 39 L 46 39" fill="none" stroke="#fff" stroke-opacity="0.45" {...lw(1.2)} stroke-linecap="round" />
+      </g>
+      <EndWheel cx={19} rot={-b.rot} />
+      <EndWheel cx={81} rot={-b.rot} />
+    </g>
+  );
+}
+
+const endPose = (anim: "idle" | "move", f: number) => {
+  const b = body(anim, f);
+  if (anim === "idle") return { dx: 0, dy: 0, pawnX: 0, pawnY: PY + b.by, pawnTilt: b.tilt, cut: 70 };
+  return { dx: 0, dy: MOVE_DY[f], pawnX: 0, pawnY: PY + b.by + MOVE_HOP[f], pawnTilt: b.tilt, cut: 70 };
+};
+
+const FRONT_VIEW: RiderViewDraft = {
+  frame: [2, -9, 96, 108],
+  idle: { ms: Array(IDLE_N).fill(170) },
+  move: { ms: Array(8).fill(90) },
+  pose: endPose,
+  Back: FrontViewBack,
+  Front: FrontViewFront,
+};
+
+const BACK_VIEW: RiderViewDraft = {
+  frame: [2, -9, 96, 108],
+  idle: { ms: Array(IDLE_N).fill(170) },
+  move: { ms: Array(8).fill(90) },
+  pose: endPose,
+  Back: BackViewBack,
+  Front: BackViewFront,
+};
+
 export const BigBoyBuggy: RiderDraft = {
   id: "bigboy-buggy",
   name: "Big Boy's Buggy",
@@ -199,4 +401,5 @@ export const BigBoyBuggy: RiderDraft = {
   },
   Back,
   Front,
+  views: { front: FRONT_VIEW, back: BACK_VIEW },
 };

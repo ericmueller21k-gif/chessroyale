@@ -1,4 +1,4 @@
-import type { RiderDraft, RiderProps, Paint } from "../../item-kit.tsx";
+import type { RiderDraft, RiderProps, Paint, RiderViewDraft } from "../../item-kit.tsx";
 import { Region, LINE, lw } from "../../item-kit.tsx";
 
 /* ---------- geometry helpers ---------- */
@@ -183,6 +183,164 @@ function Front({ p, anim, f }: RiderProps) {
   );
 }
 
+/* ================= end-on views (front and back) ================= */
+const MV_SPLAY = [2.5, -1, -1.5, -2, -1.5, -0.5, 3, -0.5, 0.5];
+const MV_ROLL = [0, 0, 0, 0, 0, 0, 0, 1.5, -0.8];
+const splayOf = (anim: "idle" | "move", f: number) => (anim === "move" ? MV_SPLAY[((f % 9) + 9) % 9] : 0);
+
+/** A bubble's curved highlight, upper left. */
+const bubbleShine = (cx: number, cy: number, rx: number, ry: number) =>
+  `M ${n1(cx - rx * 0.7)} ${n1(cy + ry * 0.02)} Q ${n1(cx - rx * 0.68)} ${n1(cy - ry * 0.62)} ${n1(cx - rx * 0.1)} ${n1(cy - ry * 0.72)}`;
+
+function endPose(anim: "idle" | "move", f: number) {
+  const b = beat(anim, f);
+  const top = GROUND - (GROUND - TOP0) * b.sy;
+  return {
+    dx: 0,
+    dy: b.dy,
+    pawnX: 0,
+    pawnY: -9 + (top - TOP0) + b.lag,
+    pawnTilt: anim === "move" ? MV_ROLL[((f % 9) + 9) % 9] : 0,
+    cut: 68,
+  };
+}
+
+function EndShadow({ b }: { b: Beat }) {
+  const air = -b.dy;
+  const sh = Math.max(0.55, 1 - air / 45);
+  return <ellipse cx="50" cy={GROUND + 1 + air} rx={25 * sh * sxOf(b.sy)} ry={4 * sh} fill="#000" opacity={0.18 * sh} />;
+}
+
+const GLINT_BACK: Record<number, [number, number, number]> = { 1: [38.5, 63, 2.6], 2: [41.5, 58.5, 4.4], 3: [45.5, 55.5, 2.4] };
+const GLINT_FRONT: Record<number, [number, number, number]> = { 1: [37.5, 70, 2.6], 2: [38.5, 64.5, 4.4], 3: [41.5, 60.5, 2.4] };
+
+/* ---- back view: seen from behind ---- */
+function BackBack({ p, anim, f }: RiderProps) {
+  const b = beat(anim, f);
+  const s = splayOf(anim, f);
+  const e = b.head * 1.3;
+  return (
+    <g>
+      <EndShadow b={b} />
+      <g transform={squash(b)}>
+        {/* the front legs, far away, peeking outside the hind legs */}
+        <Seg p={p} s={[31, 71, 28.5 - s * 0.6, 86, 5.8]} name="legnf" dim />
+        <Seg p={p} s={[69, 71, 71.5 + s * 0.6, 86, 5.8]} name="legff" dim />
+        {/* the head behind the pawn: ears peek out round the pawn's head */}
+        <g transform={`translate(0 ${b.head * 0.3})`}>
+          <g transform={`rotate(${-e} 45 19)`}>
+            <Seg p={p} s={[45, 19, 38, 10, 5.3]} name="earn" />
+          </g>
+          <g transform={`rotate(${e} 55 19)`}>
+            <Seg p={p} s={[55, 19, 62, 10, 5.3]} name="earf" />
+          </g>
+          <Region p={p} name="head" d={[circ(50, 23, 8.5)]} />
+        </g>
+      </g>
+    </g>
+  );
+}
+
+function BackFront({ p, anim, f }: RiderProps) {
+  const b = beat(anim, f);
+  const s = splayOf(anim, f);
+  const g = GLINT_BACK[b.glint];
+  const POMY = 44.5;
+  return (
+    <g transform={squash(b)}>
+      {/* hind legs */}
+      <Seg p={p} s={[40, 76, 37.5 - s, 89.5, 6.5]} name="legnb" />
+      <Seg p={p} s={[60, 76, 62.5 + s, 89.5, 6.5]} name="legfb" />
+      {/* the round rear bubble */}
+      <Region p={p} name="body" d={[ell(50, 66.5, 19.5, 15.5)]} />
+      <path d={bubbleShine(50, 66.5, 19.5, 15.5)} {...HL} {...lw(2.8)} />
+      <Knots p={p} name="knots" pts={[[39.5, 80], [60.5, 80]]} />
+      {/* the tail sticking up in the middle, with its pom */}
+      <g transform={`rotate(${b.tail * 0.8} 50 61)`}>
+        <Seg p={p} s={[50, 61, 50, 51, 4.3]} name="tail" />
+        <Region p={p} name="pom" d={[circ(50, POMY, 6.3)]} />
+        <path d={`M 46.3 ${POMY - 1.2} Q 47 ${POMY - 4.2} 49.6 ${POMY - 4.4}`} {...HL} {...lw(2)} />
+        <Knots p={p} name="tailknot" pts={[[50, 51]]} />
+      </g>
+      {g && <Sparkle x={g[0]} y={g[1]} s={g[2]} />}
+    </g>
+  );
+}
+
+/* ---- front view: seen from the front ---- */
+function FrontBack({ p, anim, f }: RiderProps) {
+  const b = beat(anim, f);
+  const s = splayOf(anim, f);
+  return (
+    <g>
+      <EndShadow b={b} />
+      <g transform={squash(b)}>
+        {/* the hind legs, far away, peeking outside the front legs */}
+        <Seg p={p} s={[31, 71, 28.5 - s * 0.6, 86, 5.8]} name="legnb" dim />
+        <Seg p={p} s={[69, 71, 71.5 + s * 0.6, 86, 5.8]} name="legfb" dim />
+      </g>
+    </g>
+  );
+}
+
+function FrontFront({ p, anim, f }: RiderProps) {
+  const b = beat(anim, f);
+  const s = splayOf(anim, f);
+  const e = b.head * 1.3;
+  const g = GLINT_FRONT[b.glint];
+  return (
+    <g transform={squash(b)}>
+      {/* front legs */}
+      <Seg p={p} s={[40, 76, 37.5 - s, 89.5, 6.5]} name="legnf" />
+      <Seg p={p} s={[60, 76, 62.5 + s, 89.5, 6.5]} name="legff" />
+      {/* the chest: the body's front end */}
+      <Region p={p} name="body" d={[ell(50, 67, 19.5, 15.5)]} />
+      <path d={bubbleShine(50, 67, 19.5, 15.5)} {...HL} {...lw(2.8)} />
+      <Knots p={p} name="knots" pts={[[39.5, 80.5], [60.5, 80.5]]} />
+      <Seg p={p} s={[50, 67, 50, 57, 7.5]} name="neck" />
+      <g transform="translate(50 66) scale(0.9) translate(-83 -50.5)">
+        <Bow />
+      </g>
+      {/* the head facing us */}
+      <g transform={`translate(0 ${b.head * 0.3}) rotate(${b.head} 50 60)`}>
+        <g transform={`rotate(${-e} 43.5 45)`}>
+          <Seg p={p} s={[43.5, 45, 34, 37, 5]} name="earn" />
+        </g>
+        <g transform={`rotate(${e} 56.5 45)`}>
+          <Seg p={p} s={[56.5, 45, 66, 37, 5]} name="earf" />
+        </g>
+        <Region p={p} name="head" d={[circ(50, 50.5, 10)]} />
+        <path d={bubbleShine(50, 50.5, 10, 10)} {...HL} {...lw(2.2)} />
+        <ellipse cx="45" cy="48" rx="2" ry="2.4" fill="#1d1d1f" />
+        <ellipse cx="55" cy="48" rx="2" ry="2.4" fill="#1d1d1f" />
+        <circle cx="45.6" cy="47.2" r="0.75" fill="#fff" />
+        <circle cx="55.6" cy="47.2" r="0.75" fill="#fff" />
+        <path d="M 46.2 56.2 Q 50 58.9 53.8 56.2" fill="none" stroke="#1d1d1f" stroke-linecap="round" {...lw(1.4)} />
+        <Knots p={p} name="nose" pts={[[50, 52.8]]} />
+      </g>
+      {g && <Sparkle x={g[0]} y={g[1]} s={g[2]} />}
+    </g>
+  );
+}
+
+const frontView: RiderViewDraft = {
+  frame: [20, 2, 60, 96],
+  idle: { ms: [170, 150, 170, 150, 170, 110, 110, 150] },
+  move: { ms: [90, 60, 70, 80, 70, 60, 90, 80, 90] },
+  pose: endPose,
+  Back: FrontBack,
+  Front: FrontFront,
+};
+
+const backView: RiderViewDraft = {
+  frame: [20, 0, 60, 98],
+  idle: { ms: [170, 150, 170, 150, 170, 110, 110, 150] },
+  move: { ms: [90, 60, 70, 80, 70, 60, 90, 80, 90] },
+  pose: endPose,
+  Back: BackBack,
+  Front: BackFront,
+};
+
 export const balloonPup: RiderDraft = {
   id: "balloon-pup",
   name: "Balloon Pup",
@@ -205,4 +363,5 @@ export const balloonPup: RiderDraft = {
   },
   Back,
   Front,
+  views: { front: frontView, back: backView },
 };
