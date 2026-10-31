@@ -1,5 +1,5 @@
 import { Region, LINE, lw, lighten } from "../../item-kit.tsx";
-import type { RiderDraft, RiderProps, RiderPose, RiderViewDraft } from "../../item-kit.tsx";
+import type { RiderDraft, RiderProps, RiderPose, RiderViewDraft, TrailProps } from "../../item-kit.tsx";
 
 /* Hollow's Bulb: a fat vintage Christmas bulb lying on its side, floating, its cord curled behind like a tail. */
 
@@ -262,4 +262,38 @@ export const hollowBulb: RiderDraft = {
   Back,
   Front,
   views: { front: frontView, back: backView },
+  trail: { ms: [180, 180, 180, 160], w: 32, h: 18, Mark: SmudgeMark },
 };
+
+/* ---- trail: a dark smoky smudge, a faint glint of the glow in the middle ---- */
+
+const SMOKE = "#241a33";
+
+function SmudgeMark({ p, p2, f }: TrailProps) {
+  const gid = `${p.id}-smudge-${f}`;
+  const glint = lighten(p2.hex, 0.35);
+  const a = [0.85, 0.6, 0.4, 0.18][f] ?? 0;
+  const g = [0.7, 0.45, 0.2, 0][f] ?? 0;
+  const grow = [1, 1.06, 1.1, 1.12][f] ?? 1;
+  const blobs: [number, number, number, number][] =
+    f < 2
+      ? [[0, 0, 13 * grow, 6.5 * grow]]
+      : f === 2
+        ? [[-7, -1, 6, 3.5], [4, 1.5, 6.5, 3.2], [9, -2.5, 3.5, 2], [-1, -3, 4, 2.2]]
+        : [[-9, -1.5, 3.5, 2], [6, 2, 4, 1.8], [11, -3, 2.2, 1.3]];
+  return (
+    <g>
+      <defs>
+        <radialGradient id={gid} cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stop-color={SMOKE} stop-opacity={a} />
+          <stop offset="0.55" stop-color={SMOKE} stop-opacity={a * 0.8} />
+          <stop offset="1" stop-color={SMOKE} stop-opacity="0" />
+        </radialGradient>
+      </defs>
+      {blobs.map(([x, y, rx, ry], i) => (
+        <ellipse key={i} cx={x} cy={y} rx={rx} ry={ry} fill={`url(#${gid})`} />
+      ))}
+      {g > 0 && <ellipse cx={0} cy={0} rx={3.5} ry={1.8} fill={glint} opacity={g} />}
+    </g>
+  );
+}

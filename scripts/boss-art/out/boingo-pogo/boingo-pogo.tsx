@@ -1,4 +1,4 @@
-import { Region, LINE, lw, darken, lighten, type RiderDraft, type RiderViewDraft, type RiderProps, type Paint } from "../../item-kit.tsx";
+import { Region, LINE, lw, darken, lighten, type RiderDraft, type RiderViewDraft, type RiderProps, type Paint, type TrailProps } from "../../item-kit.tsx";
 
 /** One frame's state: group move, spring compression (+ squashed, - stretched), lean (deg, + forward), pawn lag (+ sinks into seat), pom jiggle. */
 interface S {
@@ -372,4 +372,32 @@ export const boingoPogo: RiderDraft = {
   Back,
   Front,
   views: { front: endView(), back: endView() },
+  trail: {
+    ms: [170, 170, 160],
+    w: 22,
+    h: 14,
+    Mark: BounceMark,
+  },
 };
+
+/* ---------- trail mark: where the rubber foot landed ---------- */
+
+const RUBBER = "#3d3d42";
+const RUBBER_D = "#26262a";
+const DUST = "#e6d2a6";
+
+function BounceMark({ f }: TrailProps) {
+  const k = [1, 1.25, 1.45][Math.min(2, Math.max(0, f))];
+  const op = [1, 0.6, 0.25][Math.min(2, Math.max(0, f))];
+  const rx = 6.4 * k;
+  const ry = 3.8 * k;
+  const fl = 7.2 + f * 0.8;
+  return (
+    <g opacity={op}>
+      <ellipse cx={0} cy={0} rx={rx} ry={ry} fill="none" stroke={RUBBER} {...lw(f === 0 ? 2.3 : 1.6)} />
+      <ellipse cx={0} cy={0} rx={3 * (f === 0 ? 1 : 0.85)} ry={1.8 * (f === 0 ? 1 : 0.85)} fill={RUBBER_D} />
+      <circle cx={-fl} cy={-3.2 - f * 0.3} r={1.1} fill={DUST} stroke={RUBBER} {...lw(0.6)} />
+      <circle cx={fl + 0.4} cy={2.6 + f * 0.3} r={0.95} fill={DUST} stroke={RUBBER} {...lw(0.6)} />
+    </g>
+  );
+}

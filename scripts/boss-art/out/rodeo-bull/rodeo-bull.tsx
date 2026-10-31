@@ -1,4 +1,4 @@
-import { Region, LINE, lw, darken, lighten, mirror, type RiderDraft, type RiderProps, type RiderViewDraft } from "../../item-kit.tsx";
+import { Region, LINE, lw, darken, lighten, mirror, type RiderDraft, type RiderProps, type RiderViewDraft, type TrailProps } from "../../item-kit.tsx";
 
 const BROWN = "#8b5a36";
 const BROWN_D = "#694128";
@@ -617,4 +617,56 @@ export const rodeoBull: RiderDraft = {
   Back,
   Front,
   views: { front: frontView, back: backView },
+  trail: { ms: [170, 160, 160, 160], w: 26, h: 22, Mark: HoofMark },
 };
+
+// ---- Trail: a pair of cloven hoofprints pointing the way it ran, with a flat tan dust puff beside them.
+
+const PRINT = "#4a2e1c";
+const PRINT_RIM = "#2a1a10";
+const PUFF = "#e6d3ad";
+
+/** Local ground coords (u along the run, v across) to the screen, flattened 0.9. */
+function groundMatrix(view: RiderProps["view"]) {
+  if (view === "back") return [0, -0.9, 1, 0];
+  if (view === "front") return [0, 0.9, -1, 0];
+  return [1, 0, 0, 0.9];
+}
+
+function Hoofprint({ u, v }: { u: number; v: number }) {
+  const half = "M -2.9 -0.45 Q -3.1 -3 0 -3.1 Q 3.2 -3 3.9 -0.5 Z";
+  return (
+    <g transform={`translate(${u} ${v}) scale(1.2)`}>
+      <path d={half} fill={PRINT} stroke={PRINT_RIM} stroke-linejoin="round" {...lw(0.8)} />
+      <path d={half} transform="scale(1 -1)" fill={PRINT} stroke={PRINT_RIM} stroke-linejoin="round" {...lw(0.8)} />
+    </g>
+  );
+}
+
+function HoofMark({ f, view, n }: TrailProps) {
+  const m = groundMatrix(view);
+  const sd = n % 2 ? 1 : -1; // left and right in turn
+  const prints = [1, 0.95, 0.55, 0.22][f] ?? 0;
+  const puffR = [3.8, 4.8, 5.6, 0][f] ?? 0;
+  const puffO = [0.95, 0.7, 0.35, 0][f] ?? 0;
+  // the puff sits beside the prints, a little behind
+  const pu = -2;
+  const pv = sd * -5;
+  const px = m[0] * pu + m[2] * pv;
+  const py = m[1] * pu + m[3] * pv;
+  return (
+    <g>
+      <g opacity={prints} transform={`matrix(${m.join(" ")} 0 0)`}>
+        <Hoofprint u={5} v={sd * 2.2} />
+        <Hoofprint u={-4.5} v={sd * 3.4} />
+      </g>
+      {puffR > 0 && (
+        <g opacity={puffO}>
+          <ellipse cx={px} cy={py} rx={puffR * 1.3} ry={puffR * 0.6} fill={PUFF} stroke="#7a6248" {...lw(0.8)} />
+          <ellipse cx={px - puffR * 0.7} cy={py - puffR * 0.25} rx={puffR * 0.7} ry={puffR * 0.45} fill={PUFF} stroke="#7a6248" {...lw(0.8)} />
+          <ellipse cx={px + puffR * 0.6} cy={py - puffR * 0.2} rx={puffR * 0.6} ry={puffR * 0.4} fill={PUFF} />
+        </g>
+      )}
+    </g>
+  );
+}

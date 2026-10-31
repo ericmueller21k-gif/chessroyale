@@ -1,4 +1,4 @@
-import { Region, LINE, lw, type RiderDraft, type RiderProps, type RiderViewDraft } from "../../item-kit.tsx";
+import { Region, LINE, lw, type RiderDraft, type RiderProps, type RiderViewDraft, type TrailProps } from "../../item-kit.tsx";
 
 const INK = "#1d1d1f";
 const ICING = "#fbfbf8";
@@ -96,8 +96,7 @@ function Snowflake({ x, y, r, rot }: { x: number; y: number; r: number; rot: num
 /* ---------- the drawings ---------- */
 function Back({ anim, f }: RiderProps) {
   const puffs = [];
-  if (anim === "move") {
-    // a puff kicked up behind each frame while sliding; it stays where it was kicked (in the world)
+  if (false as boolean && anim === "move") {
     for (let k = 1; k <= 8; k++) {
       const age = f - k;
       if (age < 0 || age > 2) continue;
@@ -253,7 +252,6 @@ function CurlSpray({ f }: { f: number }) {
 function FrontViewBack({ p, anim, f }: RiderProps) {
   return (
     <g>
-      {anim === "move" && <EndPuffs f={f} dir={-1} />}
       <Region
         p={p}
         name="backrest"
@@ -340,7 +338,6 @@ function BackViewFront({ p, anim, f }: RiderProps) {
       ))}
       {sparkle && <Sparkle {...sparkle} />}
       {flake && <Snowflake {...flake} />}
-      {anim === "move" && <EndPuffs f={f} dir={1} />}
       {anim === "move" && <CurlSpray f={f} />}
     </g>
   );
@@ -393,4 +390,42 @@ export const gingerSled: RiderDraft = {
   Back,
   Front,
   views: { front: frontView, back: backView },
+  trail: { ms: [160, 160, 160, 170], w: 34, h: 28, Mark: SledTrack },
 };
+
+/* ---------- trail: two runner tracks with candy specks ---------- */
+const TRACK_EDGE = "#8f9aa6";
+const TRACK_SNOW = "#eef2f6";
+const SPECKS = [CANE_RED, "#ffffff", "#5fd3a0", CANE_RED];
+function SledTrack({ f, view, n }: TrailProps) {
+  const side = view === "side";
+  const trackO = [1, 0.72, 0.45, 0.2][f] ?? 0;
+  const speckO = [1, 0.9, 0.4, 0][f] ?? 0;
+  // tracks: along x for side (running right), along y for up/down
+  const lines = side
+    ? ["M-16 -4.5 L16 -4.5", "M-16 4.5 L16 4.5"]
+    : ["M-7 -12 L-7 12", "M7 -12 L7 12"];
+  const flip = n % 2 ? -1 : 1;
+  const pts: [number, number][] = side
+    ? [[-11, 0], [-2, flip * 9], [6, -flip * 0.5], [13, -flip * 9]]
+    : [[0, -9], [flip * 12, -1], [-flip * 0.5, 4], [-flip * 12, 10]];
+  return (
+    <g>
+      <g opacity={trackO}>
+        {lines.map((d) => (
+          <path key={d} d={d} fill="none" stroke={TRACK_EDGE} stroke-linecap="round" {...lw(4.4)} />
+        ))}
+        {lines.map((d) => (
+          <path key={d + "i"} d={d} fill="none" stroke={TRACK_SNOW} stroke-linecap="round" {...lw(2.2)} />
+        ))}
+      </g>
+      {speckO > 0 && (
+        <g opacity={speckO}>
+          {pts.map(([x, y], i) => (
+            <circle key={i} cx={x} cy={y} r={f === 2 ? 1.2 : 1.6} fill={SPECKS[i]} stroke={INK} {...lw(0.9)} />
+          ))}
+        </g>
+      )}
+    </g>
+  );
+}

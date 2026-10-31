@@ -1,5 +1,5 @@
-import type { RiderDraft, RiderProps, Paint, RiderViewDraft } from "../../item-kit.tsx";
-import { Region, LINE, lw } from "../../item-kit.tsx";
+import type { RiderDraft, RiderProps, Paint, RiderViewDraft, TrailProps } from "../../item-kit.tsx";
+import { Region, LINE, lw, darken, isLight } from "../../item-kit.tsx";
 
 /* ---------- geometry helpers ---------- */
 const n1 = (v: number) => v.toFixed(1);
@@ -364,4 +364,40 @@ export const balloonPup: RiderDraft = {
   Back,
   Front,
   views: { front: frontView, back: backView },
+  trail: { ms: [180, 180, 190], w: 22, h: 20, Mark: PupPrints },
 };
+
+/* ---------- trail: balloon-dog paw prints ---------- */
+const PRINT_OP = [1, 0.62, 0.35];
+const PRINT_SC = [1.15, 1.1, 1.03];
+
+/** One print pointing +x: a round pad and three toe bubbles ahead of it. */
+function Print({ x, y, fill }: { x: number; y: number; fill: string }) {
+  const d = [
+    ell(x - 1.9, y, 3.3, 2.9),
+    circ(x + 2.9, y - 3, 1.45),
+    circ(x + 4.1, y, 1.45),
+    circ(x + 2.9, y + 3, 1.45),
+  ];
+  return (
+    <g>
+      {d.map((s) => (
+        <path key={s} d={s} fill={fill} stroke="#1d1d1f" stroke-linejoin="round" {...lw(1)} />
+      ))}
+      <path d={`M ${n1(x - 3.9)} ${n1(y - 0.4)} Q ${n1(x - 3.6)} ${n1(y - 2)} ${n1(x - 2)} ${n1(y - 2.1)}`} fill="none" stroke="#fff" stroke-linecap="round" opacity="0.8" {...lw(0.9)} />
+    </g>
+  );
+}
+
+function PupPrints({ p, f, view, n }: TrailProps) {
+  const i = Math.max(0, Math.min(2, f));
+  const fill = darken(p.hex, isLight(p.hex) ? 0.22 : 0.1);
+  const rot = view === "back" ? -90 : view === "front" ? 90 : 0;
+  const lead = n % 2 === 0 ? 1 : -1; // left and right paws take turns leading
+  return (
+    <g opacity={PRINT_OP[i]} transform={`scale(${PRINT_SC[i]} ${(PRINT_SC[i] * 0.86).toFixed(3)}) rotate(${rot})`}>
+      <Print x={3 * lead} y={-4.6} fill={fill} />
+      <Print x={-3 * lead} y={4.6} fill={fill} />
+    </g>
+  );
+}

@@ -1,4 +1,4 @@
-import { Region, LINE, lw, darken, lighten, isLight, type RiderDraft, type RiderProps, type Paint } from "../../item-kit.tsx";
+import { Region, LINE, lw, darken, lighten, isLight, type RiderDraft, type RiderProps, type Paint, type TrailProps } from "../../item-kit.tsx";
 
 type P = [number, number];
 const n = (v: number) => (Math.round(v * 10) / 10).toString();
@@ -351,6 +351,33 @@ function FrontViewFront({ p, anim, f }: RiderProps) {
   );
 }
 
+// ---- trail: a few folded-paper scraps --------------------------------------
+const SCRAP_OP = [1, 0.72, 0.45, 0.18];
+const SCRAP_SPREAD = [0, 0.3, 1.2, 1.8];
+const SCRAP_SIZE = [1, 1, 0.9, 0.75];
+function PaperScraps({ p, f, n: k }: TrailProps) {
+  const i = Math.max(0, Math.min(3, f));
+  const sp = SCRAP_SPREAD[i];
+  const sz = SCRAP_SIZE[i];
+  const flip = k % 2 ? -1 : 1;
+  const piece = (pts: P[], c: P, dir: P, spin: number) => {
+    const o: P = [c[0] + dir[0] * sp, c[1] + dir[1] * sp];
+    return poly(pts.map((q) => rot([o[0] + (q[0] - c[0]) * sz, o[1] + (q[1] - c[1]) * sz], o, spin * sp)));
+  };
+  const A = piece([[-9, -2.5], [-2.5, -4.5], [-5, 3]], [-5.5, -1.3], [-1, -0.3], -8);
+  const Aink = piece([[-7.6, -1.6], [-4, -2.6]], [-5.5, -1.3], [-1, -0.3], -8).replace(/ Z$/, "");
+  const B = piece([[0, 1.8], [8.5, -1.2], [9.2, 0.4], [0.8, 3.6]], [4.6, 1.2], [1, 0.4], 10);
+  const C = piece([[1.5, -5], [6.5, -4.6], [3, -1.6]], [3.7, -3.7], [0.4, -0.6], 14);
+  return (
+    <g transform={`scale(${flip} 1)`} opacity={SCRAP_OP[i]}>
+      <path d={A} fill="#fbf5e6" {...LINE} {...lw(0.9)} />
+      <path d={Aink} fill="none" stroke="#6e80ab" stroke-linecap="round" {...lw(0.8)} />
+      <path d={B} fill="#f4ebd3" {...LINE} {...lw(0.9)} />
+      <path d={C} fill={p.hex} {...LINE} {...lw(0.9)} />
+    </g>
+  );
+}
+
 const endPose = (anim: "idle" | "move", f: number) => {
   const s = state(anim, f);
   return { dx: 0, dy: s.dy, pawnX: 0, pawnY: -10, pawnTilt: 0, cut: 72 };
@@ -370,6 +397,7 @@ export const folioCrane: RiderDraft = {
   },
   Back,
   Front,
+  trail: { ms: [160, 160, 170, 160], w: 24, h: 14, Mark: PaperScraps },
   views: {
     front: { frame: [-8, -9, 116, 110], idle: { ms: IDLE_MS }, move: { ms: MOVE_MS }, pose: endPose, Back: FrontViewBack, Front: FrontViewFront },
     back: { frame: [-8, -9, 116, 110], idle: { ms: IDLE_MS }, move: { ms: MOVE_MS }, pose: endPose, Back: BackViewBack, Front: BackViewFront },

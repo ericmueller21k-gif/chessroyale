@@ -1,4 +1,4 @@
-import type { RiderDraft, RiderProps } from "../../item-kit.tsx";
+import type { RiderDraft, RiderProps, TrailProps } from "../../item-kit.tsx";
 import { Region, LINE, lw, lighten, mirror } from "../../item-kit.tsx";
 
 const COAT = "#f5b83d";
@@ -651,6 +651,41 @@ function GiraffeFront({ anim, f, p }: RiderProps) {
   );
 }
 
+// ───────────── Trail: a pair of cloven hoofprints ─────────────
+
+const PRINT = "#5a3218";
+const PRINT_LINE = "#2e180a";
+const PRINT_RIM = "#d9b07a";
+/** One toe of a cloven print, pointing +x (the way it ran), the upper half; the lower is its mirror in y. */
+const TOE = "M -3 -0.5 C -3.4 -2.6 -1.2 -3.4 0.6 -3 C 2 -2.6 3 -1.6 3.4 -0.6 Z";
+const TOE_LO = "M -3 0.5 C -3.4 2.6 -1.2 3.4 0.6 3 C 2 2.6 3 1.6 3.4 0.6 Z";
+
+function CloveHoof({ x, y, k }: { x: number; y: number; k: number }) {
+  return (
+    <g transform={`translate(${x} ${y}) scale(${k})`}>
+      <path d={TOE} fill="none" stroke={PRINT_RIM} stroke-linejoin="round" {...lw(2.4)} opacity="0.7" />
+      <path d={TOE_LO} fill="none" stroke={PRINT_RIM} stroke-linejoin="round" {...lw(2.4)} opacity="0.7" />
+      <path d={TOE} fill={PRINT} stroke={PRINT_LINE} stroke-linejoin="round" {...lw(1)} />
+      <path d={TOE_LO} fill={PRINT} stroke={PRINT_LINE} stroke-linejoin="round" {...lw(1)} />
+    </g>
+  );
+}
+
+function HoofMark({ f, view, n }: TrailProps) {
+  const s = n % 2 === 0 ? -1 : 1;
+  const ang = view === "back" ? -90 : view === "front" ? 90 : 0;
+  const op = [1, 0.6, 0.28][f] ?? 0.28;
+  const k = 1.5 * ([1, 0.97, 0.92][f] ?? 0.92);
+  return (
+    <g opacity={op} transform="scale(1 0.9)">
+      <g transform={`rotate(${ang})`}>
+        <CloveHoof x={5.5} y={3.2 * s} k={k} />
+        <CloveHoof x={-5.5} y={-3.2 * s} k={k} />
+      </g>
+    </g>
+  );
+}
+
 const END_ANIMS = { idle: { ms: Array(N_IDLE).fill(170) }, move: { ms: Array(N_MOVE).fill(65) } };
 
 export const rider: RiderDraft = {
@@ -672,6 +707,7 @@ export const rider: RiderDraft = {
   },
   Back,
   Front,
+  trail: { ms: [200, 200, 200], w: 26, h: 26, Mark: HoofMark },
   views: {
     back: { ...END_ANIMS, pose: endPose("back"), Back: BackViewBack, Front: BackViewFront },
     front: { ...END_ANIMS, pose: endPose("front"), Back: FrontViewBack, Front: GiraffeFront },

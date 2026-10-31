@@ -1,4 +1,4 @@
-import { Region, LINE, lw, darken, type RiderDraft, type RiderProps, type RiderViewDraft } from "../../item-kit.tsx";
+import { Region, LINE, lw, darken, type RiderDraft, type RiderProps, type RiderViewDraft, type TrailProps } from "../../item-kit.tsx";
 
 const n = (v: number) => v.toFixed(2);
 const TEAL = "#22a7a0";
@@ -402,4 +402,29 @@ export const BigBoyBuggy: RiderDraft = {
   Back,
   Front,
   views: { front: FRONT_VIEW, back: BACK_VIEW },
+  trail: {
+    ms: [200, 200, 200],
+    w: 36,
+    h: 30,
+    Mark: TrailMark,
+  },
 };
+
+// ---------------- trail: two thin wheel tracks, dotted with the spokes' pattern ----------------
+const TRACK = "#4a3c32";
+function TrailMark({ f, view }: TrailProps) {
+  const op = [0.9, 0.55, 0.3][f] ?? 0.3;
+  const dash = ["6 1.6", "6 1.6", "3 4.6"][f] ?? "3 4.6";
+  const w = f === 0 ? 3 : 2.6;
+  const lines =
+    view === "side"
+      ? ["M -16 -4.5 L 16 -4.5", "M -14 4.5 L 16 4.5"]
+      : ["M -6.5 -13 L -6.5 13", "M 6.5 -13 L 6.5 13"];
+  return (
+    <g opacity={op}>
+      {lines.map((d, i) => (
+        <path key={d} d={d} fill="none" stroke={TRACK} {...lw(w)} stroke-linecap="round" stroke-dasharray={dash} stroke-dashoffset={i * 2} />
+      ))}
+    </g>
+  );
+}

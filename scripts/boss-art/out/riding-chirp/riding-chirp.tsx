@@ -1,4 +1,4 @@
-import type { RiderDraft, RiderProps, RiderViewDraft } from "../../item-kit.tsx";
+import type { RiderDraft, RiderProps, RiderViewDraft, TrailProps } from "../../item-kit.tsx";
 import { Region, LINE, lw, darken, lighten, isLight, mirror } from "../../item-kit.tsx";
 
 /* Chirp's fixed colors */
@@ -532,4 +532,45 @@ export const RidingChirp: RiderDraft = {
   Back,
   Front,
   views: { front: FRONT_VIEW, back: BACK_VIEW },
+  trail: {
+    ms: [160, 150, 150, 140],
+    w: 24,
+    h: 22,
+    Mark: ChirpPrints,
+  },
 };
+
+/* ---------- the trail: Chirp's little three-toed footprints, a pair on each square ---------- */
+const SOIL = "#3b3a1a";
+const SOIL_RIM = "#8c8a52";
+/** One print pointing along +x: a round heel pad and three toes fanning forward. */
+function printD(x: number, y: number) {
+  const toes = [
+    [5.2, -2.6],
+    [6.2, 0],
+    [5.2, 2.6],
+  ]
+    .map(([tx, ty]) => `M ${n1(x + 1.2)} ${n1(y)} L ${n1(x + tx)} ${n1(y + ty)}`)
+    .join(" ");
+  return { heel: [x - 0.6, y] as P, toes };
+}
+function ChirpPrints({ f, view, n }: TrailProps) {
+  const op = [0.95, 0.68, 0.4, 0.16][Math.min(f, 3)];
+  const k = [1.2, 1.16, 1.12, 1.06][Math.min(f, 3)];
+  const side = n % 2 === 0 ? -1 : 1;
+  const prints = [printD(-3.2 + (side < 0 ? 1.6 : 0), -3.4 + side * 1.6), printD(-3.2 + (side > 0 ? 1.6 : 0), 3.4 + side * 1.6)];
+  const rot = view === "back" ? -90 : view === "front" ? 90 : 0;
+  const body = (stroke: string, w: number, fill: string) =>
+    prints.map((q, i) => (
+      <g key={i}>
+        <path d={q.toes} fill="none" stroke={stroke} stroke-linecap="round" {...lw(w)} />
+        <ellipse cx={q.heel[0]} cy={q.heel[1]} rx={2.2 + (w - 2) * 0.5} ry={1.8 + (w - 2) * 0.5} fill={fill} />
+      </g>
+    ));
+  return (
+    <g opacity={op} transform={`scale(${k} ${(k * 0.9).toFixed(3)}) rotate(${rot})`}>
+      {body(SOIL_RIM, 3.4, SOIL_RIM)}
+      {body(SOIL, 2, SOIL)}
+    </g>
+  );
+}

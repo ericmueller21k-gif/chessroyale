@@ -402,7 +402,38 @@ function endPose(anim: "idle" | "move", f: number) {
   };
 }
 
+/* ---------------- the trail: round mammoth footprints ---------------- */
+
+const PRINT = "#4a2c1a";
+const PRINT_RIM = "#2e1a0e";
+
+function Mark({ f, view, n }: { p: any; p2?: any; f: number; view: "side" | "front" | "back"; n: number }) {
+  const op = [0.85, 0.5, 0.22][f] ?? 0;
+  const s = [1, 0.97, 0.92][f] ?? 0.9;
+  const side = n % 2 === 0 ? 1 : -1;
+  // toes point the way it ran: side +x, back -y (up), front +y (down)
+  const rot = view === "side" ? 0 : view === "back" ? -90 : 90;
+  const ox = view === "side" ? -2 : side * 6;
+  const oy = view === "side" ? side * 3 : 0;
+  const sx = view === "side" ? 1 : 0.8;
+  return (
+    <g opacity={op} transform={`translate(${ox} ${oy}) scale(${s * sx} ${s * 0.62})`}>
+      <g transform={`rotate(${rot})`}>
+        <ellipse cx={-2} cy={0} rx={12.5} ry={12.5} fill={PRINT} stroke={PRINT_RIM} stroke-width={1.6} />
+        <ellipse cx={-4} cy={0} rx={7} ry={8} fill={PRINT_RIM} opacity={0.35} />
+        {[-48, -16, 16, 48].map((a) => {
+          const r = (a * Math.PI) / 180;
+          const x = -2 + 15.5 * Math.cos(r);
+          const y = 15.5 * Math.sin(r);
+          return <ellipse key={a} cx={x} cy={y} rx={2.6} ry={2.8} fill={PRINT_RIM} transform={`rotate(${a} ${x} ${y})`} />;
+        })}
+      </g>
+    </g>
+  );
+}
+
 export const AlfilHowdah: RiderDraft = {
+  trail: { ms: [240, 230, 230], w: 34, h: 24, Mark },
   id: "alfil-howdah",
   name: "Alfil's Howdah",
   tier: "mythic",

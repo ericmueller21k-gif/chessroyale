@@ -590,7 +590,9 @@ async function main(): Promise<void> {
     const results: Anthropic.ToolResultBlockParam[] = uses.map((u) => {
       const r = runTool(u.name, (u.input ?? {}) as Record<string, unknown>);
       if (r.done !== undefined) doneNotes = r.done;
-      return { type: "tool_result", tool_use_id: u.id, content: r.content, ...(r.error ? { is_error: true } : {}) };
+      // (The API takes only text in an error result: a refusal that shows pictures, the trail check's, goes as a plain result; its text says it was refused. Oct 31.)
+      const textOnly = typeof r.content === "string" || (r.content as { type: string }[]).every((b) => b.type === "text");
+      return { type: "tool_result", tool_use_id: u.id, content: r.content, ...(r.error && textOnly ? { is_error: true } : {}) };
     });
     messages.push({ role: "user", content: results });
     if (doneNotes !== null) break;
