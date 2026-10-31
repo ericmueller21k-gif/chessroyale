@@ -116,25 +116,6 @@ function Front({ p, anim, f }: RiderProps) {
           const t = TW[(f + ph) % TW.length];
           return <Star key={i} x={x} y={y} r={r * (0.4 + 0.6 * t)} o={t} />;
         })}
-      {anim === "move" &&
-        [0, 1, 2].map((k) => {
-          const a = (f + k * 2) % MOVE_N; // age of this sparkle
-          const x = -9 - a * 3.4;
-          const y = 77 + LIFT + [0, -3, 2, -2, 3, 0][(k * 2 + a) % 6] + off(anim, f);
-          return <Star key={k} x={x} y={y} r={5.4 - a * 0.75} o={1 - a / MOVE_N} />;
-        })}
-      {anim === "move" && (
-        <g transform={xf(anim, f)} fill="none" stroke="#fff4b8" stroke-linecap="round">
-          <path d={`M -13 ${76.5 + (f % 2) * 0.5} L ${-24 - (f % 3) * 1.5} ${76.5 + (f % 2) * 0.5}`} opacity={0.55} {...lw(1.6)} />
-          <path d={`M -3 ${80.5 - (f % 2) * 0.5} L ${-14 - ((f + 1) % 3) * 1.5} ${80.5 - (f % 2) * 0.5}`} opacity={0.4} {...lw(1.3)} />
-        </g>
-      )}
-      {anim === "move" && (
-        <g opacity={0.7}>
-          <circle cx={-14 - ((f * 3) % 9)} cy={81 + LIFT} r={1} fill="#fff4b8" />
-          <circle cx={-11 - ((f * 4 + 4) % 12)} cy={72 + LIFT} r={0.9} fill="#fff4b8" />
-        </g>
-      )}
     </g>
   );
 }
@@ -209,16 +190,6 @@ function makeEndBack(v: EndView) {
     return (
       <g>
         <ellipse cx={50} cy={98} rx={36 * s} ry={3.2 * s} fill="#000" opacity={0.18} />
-        {v === "front" &&
-          anim === "move" &&
-          [0, 1, 2].map((k) => {
-            // sparkles left behind, peeking out above the board's far end
-            const a = (f + k * 2) % MOVE_N;
-            const sd = k % 2 === 0 ? -1 : 1;
-            const x = 50 + sd * (30 - a * 1.6 + k * 2);
-            const y = 66 + LIFT + b - a * 3.2 - k;
-            return <Star key={k} x={x} y={y} r={4.6 - a * 0.6} o={1 - a / MOVE_N} />;
-          })}
         <g transform={exf(anim, f)}>
           <Region
             p={p}
@@ -287,29 +258,12 @@ function makeEndFront(v: EndView) {
             const t = TW[(f + ph) % TW.length];
             return <Star key={i} x={x} y={y} r={r * (0.4 + 0.6 * t)} o={t} />;
           })}
-        {v === "back" &&
-          anim === "move" &&
-          [0, 1, 2].map((k) => {
-            // sparkles trailing toward us: dropping and spreading off the near end, shrinking
-            const a = (f + k * 2) % MOVE_N;
-            const sd = k % 2 === 0 ? -1 : 1;
-            const x = 50 + sd * (41 + a * 2.4 + k * 1.5);
-            const y = 77 + LIFT + b + a * 2.4 - k;
-            return <Star key={k} x={x} y={y} r={4 - a * 0.5} o={1 - a / MOVE_N} />;
-          })}
-        {anim === "move" && (
+        {anim === "move" && v === "back" && (
           <g opacity={0.7}>
-            {v === "back" ? (
-              <g>
-                <circle cx={36 - ((f * 3) % 9)} cy={86 + LIFT + ((f * 2) % 6)} r={0.9} fill="#fff4b8" />
-                <circle cx={64 + ((f * 4 + 4) % 12)} cy={85 + LIFT + ((f * 3 + 2) % 7)} r={0.9} fill="#fff4b8" />
-              </g>
-            ) : (
-              <g>
-                <circle cx={22 + ((f * 2) % 6)} cy={64 + LIFT - ((f * 3) % 9)} r={0.9} fill="#fff4b8" />
-                <circle cx={78 - ((f * 2 + 3) % 6)} cy={62 + LIFT - ((f * 3 + 4) % 9)} r={0.9} fill="#fff4b8" />
-              </g>
-            )}
+            <g>
+              <circle cx={36 - ((f * 3) % 9)} cy={86 + LIFT + ((f * 2) % 6)} r={0.9} fill="#fff4b8" />
+              <circle cx={64 + ((f * 4 + 4) % 12)} cy={85 + LIFT + ((f * 3 + 2) % 7)} r={0.9} fill="#fff4b8" />
+            </g>
           </g>
         )}
       </g>
@@ -354,4 +308,50 @@ export const moonRide: RiderDraft = {
   Back,
   Front,
   views: { front: endView("front"), back: endView("back") },
+  trail: { ms: [180, 170, 160, 140], w: 30, h: 18, Mark: StarDust },
 };
+
+// ---- Trail: a little dust of fading stars on the ground. ----
+const DUST_STARS: [number, number, number, string][] = [
+  // x, y, size, fill
+  [-7, -1.5, 6.4, "#ffe27a"],
+  [6, 3, 5.2, "#ffffff"],
+  [9.5, -4.5, 3.8, "#ffe27a"],
+];
+const DUST_SPECKS: [number, number, number, string][] = [
+  [-0.5, 5.6, 1.7, "#ffffff"],
+  [-12.5, 5, 1.5, "#ffe27a"],
+  [1.5, -5.8, 1.5, "#ffffff"],
+];
+// flattened four-point star (seen from above at the town's angle)
+function flatStar(cx: number, cy: number, r: number) {
+  const ry = r * 0.85;
+  const k = r * 0.22;
+  return `M ${cx} ${cy - ry} Q ${cx + k} ${cy - k} ${cx + r} ${cy} Q ${cx + k} ${cy + k} ${cx} ${cy + ry} Q ${cx - k} ${cy + k} ${cx - r} ${cy} Q ${cx - k} ${cy - k} ${cx} ${cy - ry} Z`;
+}
+
+function StarDust({ f, n }: { f: number; n: number }) {
+  if (f >= 3) return null;
+  const sx = n % 2 === 1 ? -1 : 1; // alternate marks scatter mirrored
+  const starScale = f === 0 ? 1 : f === 1 ? 0.62 : 0;
+  const speckO = f === 2 ? 0.6 : 1;
+  return (
+    <g>
+      {starScale > 0 &&
+        DUST_STARS.map(([x, y, r, c], i) => (
+          <path
+            key={`s${i}`}
+            d={flatStar(x * sx, y, r * starScale)}
+            fill={c}
+            opacity={f === 0 ? 1 : 0.85}
+            stroke="#5a4520"
+            stroke-linejoin="round"
+            {...lw(0.9)}
+          />
+        ))}
+      {DUST_SPECKS.map(([x, y, r, c], i) => (
+        <ellipse key={`d${i}`} cx={x * sx} cy={y} rx={r} ry={r * 0.85} fill={c} opacity={speckO} stroke="#5a4520" {...lw(0.6)} />
+      ))}
+    </g>
+  );
+}

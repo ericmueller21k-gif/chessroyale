@@ -1,5 +1,5 @@
 import type { ComponentChildren } from "preact";
-import { Region, LINE, lw, darken, type RiderDraft, type RiderProps } from "../../item-kit.tsx";
+import { Region, LINE, lw, darken, type RiderDraft, type RiderProps, type RiderFacing } from "../../item-kit.tsx";
 
 /* ---------- motion ---------- */
 const N = 8;
@@ -243,8 +243,8 @@ function Back(props: RiderProps) {
   return (
     <g>
       <Shadow dy={dy} />
-      {anim === "move" && <Trail p={p} f={f} />}
-      {wf && (
+      {false && anim === "move" && <Trail p={p} f={f} />}
+      {false && wf && (
         <g transform={`rotate(${a.toFixed(2)} ${CX} ${CY}) translate(0 ${wf[2]})`}>
           <Stroke p={p} d={ribbon(WISP.slice(wf[0], wf[1] + 1), WISP_W.slice(wf[0], wf[1] + 1))} opacity={wf[3]} />
         </g>
@@ -565,8 +565,18 @@ const backView = {
         <g transform={rollT(a)}>
           <VPad />
           <BristleEnd p={p} />
+          {/* the paint that lies on the tuft itself goes along with it */}
           {anim === "idle" && <EndWisp p={p} f={f} view="back" />}
         </g>
+        <clipPath id={`${p.id}-keepb`}>
+          <circle cx={B_BUNDLE_C[0]} cy={B_BUNDLE_C[1]} r={B_BUNDLE_R + 4} />
+          <circle cx="50" cy="73.5" r="13.8" />
+        </clipPath>
+        <clipPath id={`${p.id}-keepb2`}>
+          <circle cx={B_BUNDLE_C[0]} cy={B_BUNDLE_C[1]} r={B_BUNDLE_R + 4} transform={rollT(a)} />
+          <circle cx="50" cy="73.5" r="13.8" transform={rollT(a)} />
+          <ellipse cx="50" cy={94 - dyOf(anim, f)} rx={27 + dyOf(anim, f) + 1} ry="5.4" />
+        </clipPath>
         {anim === "move" && <EndTrail p={p} f={f} view="back" />}
       </g>
     );
@@ -583,9 +593,15 @@ const frontView = {
     return (
       <g>
         <VShadow dy={dyOf(anim, f)} />
-        {anim === "move" && <FrontTrail p={p} f={f} />}
+        <clipPath id={`${p.id}-keepf`}>
+          <path d={F_TUFT} transform={`${rollT(a)} translate(50 50.5) scale(1.07 1.24) translate(-50 -50.5)`} />
+        </clipPath>
+        {anim === "move" && (
+          <g clip-path={`url(#${p.id}-keepf)`}>
+            <FrontTrail p={p} f={f} />
+          </g>
+        )}
         <g transform={rollT(a)}>
-          {anim === "idle" && <EndWisp p={p} f={f} view="front" />}
           <FarTuft p={p} />
         </g>
       </g>
@@ -603,6 +619,42 @@ const frontView = {
 };
 
 type RiderPose = ReturnType<RiderDraft["pose"]>;
+
+/* ---------- its trail mark: dabs and a swipe of paint on the floor ---------- */
+/** A tapered swipe along u (the way it ran), from u0 (w0 half-wide) to u1 (w1), round ends. */
+const swipe = (u0: number, u1: number, w0: number, w1: number) =>
+  `M ${u0} ${-w0} C ${(u0 + u1) / 2} ${-w0 * 1.1} ${(u0 + u1) / 2} ${-w1 * 1.3} ${u1} ${-w1} Q ${u1 + w1 * 1.4} 0 ${u1} ${w1} C ${(u0 + u1) / 2} ${w1 * 1.4} ${(u0 + u1) / 2} ${w0 * 1.1} ${u0} ${w0} Q ${u0 - w0 * 1.3} 0 ${u0} ${-w0} Z`;
+// per frame: swipe pieces, dab radii scale, opacity, glossy
+const MARK_FRAMES: { pieces: [number, number, number, number][]; k: number; o: number; wet: boolean }[] = [
+  { pieces: [[-9, 9, 3.2, 1.3]], k: 1, o: 1, wet: true },
+  { pieces: [[-9, 9, 3, 1.2]], k: 0.95, o: 0.88, wet: false },
+  { pieces: [[-9, -1.5, 2.6, 2], [1.5, 7.5, 1.8, 1.1]], k: 0.7, o: 0.62, wet: false },
+  { pieces: [[-8, -4, 1.8, 1.5], [2.5, 4.5, 1.1, 1]], k: 0.45, o: 0.32, wet: false },
+];
+const DABS: [number, number, number][] = [
+  [-9.5, 6.2, 3],
+  [7.5, -6.4, 2.5],
+  [11, 5, 1.8],
+];
+function PaintMark({ p, f, view }: { p: RiderProps["p"]; f: number; view: RiderFacing }) {
+  const fr = MARK_FRAMES[Math.min(f, MARK_FRAMES.length - 1)];
+  const edge = darken(p.hex, 0.5);
+  const rot = view === "back" ? -90 : view === "front" ? 90 : 0;
+  return (
+    <g opacity={fr.o} transform="scale(1 0.88)">
+      <g transform={`rotate(${rot})`}>
+        {fr.pieces.map(([a, b, w0, w1]) => (
+          <path d={swipe(a, b, w0, w1)} fill={p.hex} stroke={edge} stroke-linejoin="round" {...lw(1.4)} />
+        ))}
+        {fr.wet && <path d="M -8 -1.4 C -3 -1.8 2 -1.2 5 -0.6" fill="none" stroke="#fff" stroke-opacity="0.75" stroke-linecap="round" {...lw(1.2)} />}
+      </g>
+      {DABS.map(([x, y, r]) => (
+        <circle cx={x} cy={y} r={r * fr.k} fill={p.hex} stroke={edge} {...lw(1.3)} />
+      ))}
+      {fr.wet && <circle cx={-10.4} cy={5.2} r={0.9} fill="#fff" opacity="0.8" />}
+    </g>
+  );
+}
 
 export const smudgyBrush: RiderDraft = {
   id: "smudgy-brush",
@@ -626,4 +678,10 @@ export const smudgyBrush: RiderDraft = {
   Back,
   Front,
   views: { front: frontView, back: backView },
+  trail: {
+    ms: [180, 180, 180, 160],
+    w: 30,
+    h: 24,
+    Mark: ({ p, f, view }) => <PaintMark p={p} f={f} view={view} />,
+  },
 };

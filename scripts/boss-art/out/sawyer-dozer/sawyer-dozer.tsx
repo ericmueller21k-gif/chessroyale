@@ -128,7 +128,7 @@ function Crumbs({ f, anim }: RiderProps) {
   ];
   return (
     <g>
-      {(sets[f] ?? []).map(([x, y, r]) => (
+      {(sets[f] ?? []).filter(([x]) => x > 50).map(([x, y, r]) => (
         <circle cx={x} cy={y} r={r} fill={DIRT} {...LINE} {...lw(1.2)} />
       ))}
     </g>
@@ -296,11 +296,12 @@ function EndPuff({ f, anim, sx, dir, k }: RiderProps & { sx: number; dir: number
 }
 
 /** Dirt crumbs kicked out to both sides, one arc each side, staggered. */
-function EndCrumbs({ f, anim }: RiderProps) {
+function EndCrumbs({ f, anim, onTrack }: RiderProps & { onTrack?: boolean }) {
   if (anim !== "move") return null;
   const a = CRUMB_ARC[f % 4];
   const b = CRUMB_ARC[(f + 2) % 4];
-  const list: [number, number, number][] = [a, [100 - b[0], b[1], b[2]]];
+  const all: [number, number, number][] = [a, [100 - b[0], b[1], b[2]]];
+  const list = onTrack ? all.filter(([x]) => x >= 5 && x <= 95) : all;
   return (
     <g>
       {list.map(([x, y, r]) => (
@@ -455,7 +456,7 @@ function BackViewFront(props: RiderProps) {
       {/* tracks */}
       <EndTrack x={5} y0={66} y1={97} w={18} shift={shift} cid={`${p.id}-btl`} />
       <EndTrack x={77} y0={66} y1={97} w={18} shift={shift} cid={`${p.id}-btr`} />
-      <EndCrumbs {...props} />
+      <EndCrumbs {...props} onTrack />
     </g>
   );
 }
@@ -510,4 +511,45 @@ export const sawyerDozer: RiderDraft = {
   Back,
   Front,
   views: { front: FRONT_VIEW, back: BACK_VIEW },
+  trail: { ms: [240, 240, 240], w: 34, h: 16, Mark: TreadMark },
 };
+
+const TREAD = "#4a2f1a";
+const TREAD_L = "#a07a52";
+
+/** Two bands of cleat prints, pressed into the floor, fading and breaking up. */
+function TreadMark({ f, view }: { f: number; view: string }) {
+  const op = [0.95, 0.6, 0.35][f] ?? 0;
+  const side = view === "side";
+  const cleats: string[] = [];
+  const bands: string[] = [];
+  if (side) {
+    for (const by of [-4.5, 4.5]) {
+      bands.push(`M-16 ${by - 2.6} H16 V${by + 2.6} H-16 Z`);
+      for (let i = 0; i < 9; i++) {
+        if (f === 2 && (i + (by > 0 ? 1 : 0)) % 3 === 0) continue;
+        const x = -14 + i * 3.5;
+        cleats.push(`M${x} ${by - 2} V${by + 2}`);
+      }
+    }
+  } else {
+    for (const bx of [-6, 6]) {
+      bands.push(`M${bx - 3.4} -7 H${bx + 3.4} V7 H${bx - 3.4} Z`);
+      for (let i = 0; i < 5; i++) {
+        if (f === 2 && (i + (bx > 0 ? 1 : 0)) % 3 === 0) continue;
+        const y = -6 + i * 3;
+        cleats.push(`M${bx - 2.6} ${y} H${bx + 2.6}`);
+      }
+    }
+  }
+  return (
+    <g opacity={op}>
+      {bands.map((d) => (
+        <path d={d} fill={TREAD} fill-opacity={f === 2 ? 0.12 : 0.22} stroke={TREAD_L} stroke-opacity="0.5" {...lw(0.8)} />
+      ))}
+      {cleats.map((d) => (
+        <path d={d} stroke={TREAD} stroke-linecap="round" {...lw(1.9)} />
+      ))}
+    </g>
+  );
+}

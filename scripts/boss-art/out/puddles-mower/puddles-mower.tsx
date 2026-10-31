@@ -74,7 +74,7 @@ function Exhaust({ anim, f }: { anim: "idle" | "move"; f: number }) {
     for (const b of [0, 4]) {
       let a = f - b;
       if (a < 0) a += MOVE_N;
-      if (a >= 4) continue;
+      if (a >= 1) continue; // only the puff at the pipe; the ones left behind are gone
       const born = b > f ? b - MOVE_N : b;
       const wx = STACK.x - 2 + born * STEP - a * 1.5;
       puffs.push({ x: wx - f * STEP, y: STACK.y - 3 - a * 4, r: 3.2 + a * 1.3, o: 1 - a * 0.2 });
@@ -202,7 +202,6 @@ function Front({ p, anim, f }: RiderProps) {
         <ellipse cx={69} cy={46} rx={9} ry={3.2} fill="none" stroke="#3e3c44" {...lw(2.4)} />
         <circle cx={69} cy={46} r={1.8} fill={BRASS} stroke={INK} {...lw(1.2)} />
       </g>
-      {anim === "move" && <Clippings f={f} />}
     </g>
   );
 }
@@ -330,7 +329,21 @@ function BackViewFront({ p, anim, f }: RiderProps) {
   const nod = flowerNod(anim, f);
   return (
     <g>
-      {anim === "move" && <EndSpray f={f} x0={32} y0={90} />}
+      {anim === "move" && (
+        <g>
+          <clipPath id="pm-back-hidden">
+            <rect x={6.3} y={67.3} width={17.4} height={33.4} rx={7.6} />
+            <rect x={76.3} y={67.3} width={17.4} height={33.4} rx={7.6} />
+            <rect x={19.4} y={53.4} width={61.2} height={37.2} rx={6.4} />
+            <rect x={6.3} y={62} width={19.6} height={18.6} />
+            <rect x={74.1} y={62} width={19.6} height={18.6} />
+          </clipPath>
+          {/* only the bits hidden under the tires remain: nothing shows */}
+          <g clip-path="url(#pm-back-hidden)">
+            <EndSpray f={f} x0={32} y0={90} />
+          </g>
+        </g>
+      )}
       {/* seat cushion */}
       <path d="M27 60 L27 56 Q27 50.5 33 50.5 L67 50.5 Q73 50.5 73 56 L73 60 Z" fill={SEAT} {...LINE} />
       {/* seat back */}
@@ -393,7 +406,19 @@ function FrontViewFront({ p, anim, f }: RiderProps) {
   const rot = anim === "move" ? f * 45 : 0;
   return (
     <g>
-      {anim === "move" && <EndSpray f={f} x0={32} y0={89} />}
+      {anim === "move" && (
+        <g>
+          <clipPath id="pm-front-hidden">
+            <rect x={7.5} y={65.5} width={15} height={31} rx={6.5} />
+            <rect x={77.5} y={65.5} width={15} height={31} rx={6.5} />
+            <rect x={20.5} y={82.5} width={11} height={17} rx={4.9} />
+            <rect x={68.5} y={82.5} width={11} height={17} rx={4.9} />
+          </clipPath>
+          <g clip-path="url(#pm-front-hidden)">
+            <EndSpray f={f} x0={32} y0={89} />
+          </g>
+        </g>
+      )}
       {/* big back wheels beyond, with their fenders */}
       <EndTire cx={15} top={67} bot={95} w={12} rot={rot} dir={-1} hub={-1} />
       <EndTire cx={85} top={67} bot={95} w={12} rot={rot} dir={-1} hub={1} />
@@ -488,6 +513,52 @@ export const puddlesMower: RiderDraft = {
   Back,
   Front,
   views: { front: frontView, back: backView },
+  trail: { ms: [180, 180, 170, 170], w: 38, h: 28, Mark: ClippingsMark },
 };
+
+/* ───────────── Trail: a strip of fresh-cut clippings ───────────── */
+
+// u: along the run (-1..1), v: across (-1..1), a: blade tilt off the run line (deg), c: color, k: fade order (lower stays longer)
+const BLADES = [
+  { u: -0.92, v: 0.2, a: 14, c: 0, k: 0.15 },
+  { u: -0.75, v: -0.55, a: -22, c: 1, k: 0.7 },
+  { u: -0.6, v: 0.6, a: 30, c: 2, k: 0.45 },
+  { u: -0.45, v: -0.1, a: -8, c: 0, k: 0.9 },
+  { u: -0.3, v: 0.75, a: -35, c: 1, k: 0.3 },
+  { u: -0.15, v: -0.7, a: 18, c: 0, k: 0.6 },
+  { u: 0, v: 0.15, a: 40, c: 1, k: 0.05 },
+  { u: 0.12, v: -0.35, a: -16, c: 2, k: 0.8 },
+  { u: 0.28, v: 0.55, a: 10, c: 0, k: 0.5 },
+  { u: 0.42, v: -0.8, a: -40, c: 1, k: 0.25 },
+  { u: 0.55, v: 0.05, a: 24, c: 0, k: 0.95 },
+  { u: 0.7, v: 0.7, a: -12, c: 2, k: 0.65 },
+  { u: 0.82, v: -0.45, a: 32, c: 1, k: 0.35 },
+  { u: 0.95, v: 0.3, a: -26, c: 0, k: 0.75 },
+];
+const BLADE_COLORS = [CLIP, "#62c040", "#2f8a34"];
+
+function ClippingsMark({ f, view, n }: { p: Paint; p2?: Paint; f: number; view: "side" | "front" | "back"; n: number }) {
+  const keep = [1, 0.7, 0.42, 0.18][f] ?? 0;
+  const op = [1, 0.9, 0.7, 0.4][f] ?? 0;
+  const spread = [1, 1.08, 1.2, 1.32][f] ?? 1.3;
+  const flip = n % 2 ? -1 : 1;
+  const side = view === "side";
+  return (
+    <g opacity={op}>
+      {BLADES.filter((b) => b.k < keep).map((b, i) => {
+        const v = b.v * flip * spread;
+        const x = side ? b.u * 15 : v * 6;
+        const y = side ? v * 4.2 : b.u * 11.5;
+        const ang = (side ? 0 : 90) + b.a * flip;
+        const s = side ? 1 : 0.85;
+        return (
+          <g key={i} transform={`translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${ang}) scale(${s} ${s})`}>
+            <path d="M-4.4 0.7 Q0 -2.4 4.4 -0.6 Q0 2.1 -4.4 0.7 Z" fill={BLADE_COLORS[b.c]} stroke="#1f4a17" stroke-linejoin="round" {...lw(0.7)} />
+          </g>
+        );
+      })}
+    </g>
+  );
+}
 
 export type { Paint };
