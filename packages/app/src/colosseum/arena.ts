@@ -40,17 +40,19 @@ export const landingDepth = (k: number): number => (k === STANDS.landingAfter ? 
 export const aisleAngle = (i: number): number => ((i + 0.5) / SEATING.aisles) * Math.PI * 2;
 
 /**
- * The pillars on the floor with their torches, between the board's corners and the wall: eight places round it, half-way
- * between the seats' angles (so none stands between a seat and the board), two of them the statues' (a generic stone pawn in a
- * gladiator's helm, on a plinth, never the town's bronze statue).
+ * The pillars on the floor with their torches (arena-pillar: `h` is its capital's top; its brazier and flame stand above),
+ * by the arena wall: eight places round it, half-way between the seats' angles, two of them the statues' (arena-statue: a
+ * generic marble pawn champion on its plinth, never the town's bronze statue; `h` its height, plinth and all). Close to the
+ * wall, so none hides any of the board from any of the ten views (half-way between the seats, nearer the board, a pillar
+ * stood in the line from a seat to the board's near corners; test/colosseum.test.ts).
  */
-export const PILLARS = { places: 8, r: 7.7, half: 0.28, h: 2.1, offset: Math.PI / 8 } as const;
+export const PILLARS = { places: 8, r: 9.4, h: 2.1, offset: Math.PI / 8 } as const;
 const placeAngle = (i: number): number => PILLARS.offset + (i / PILLARS.places) * Math.PI * 2;
 /** Which of the eight places are statues (the rest pillars). */
 const STATUE_PLACES = [1, 5];
 export const PILLAR_ANGLES: readonly number[] = Array.from({ length: PILLARS.places }, (_, i) => i).filter((i) => !STATUE_PLACES.includes(i)).map(placeAngle);
-export const STATUE = { r: 8.2, h: 3.0, angles: STATUE_PLACES.map(placeAngle) } as const;
-/** The crown banners: on the arena wall between the pillars, and on the gallery wall. */
+export const STATUE = { r: 9.5, h: 3.0, angles: STATUE_PLACES.map(placeAngle) } as const;
+/** The crown banners (arena-banner, hung by its rod's top, swaying): on the arena wall between the pillars (`wallTop` to `wallBottom`), and on the gallery wall. */
 export const BANNERS = { wall: 8, gallery: 12, wallW: 0.9, wallTop: 2.35, wallBottom: 0.55, galleryW: 1.2 } as const;
 
 /** A person seated in the stands: where (their foot on the step), which way they face (toward the middle), which row. */
@@ -167,6 +169,42 @@ export function turnLimits(v: View, aspect: number, out: { yaw: number; pitch: n
   out.pitch = Math.max(halfV * 0.25, halfV - ang);
   return out;
 }
+
+/**
+ * How far up you may look (radians, from the view's own pitch; the board moves down the screen) with the board (its squares,
+ * and so the pieces on them) still above
+ * the railing at the screen's foot (art.ts `railingArt`: in the seats' views, `rail` the share of the screen's height it
+ * takes), the lens shifted down by `shiftY` (NDC: a computer's, Colosseum.tsx) and turned by any yaw up to `yaw`: never more
+ * than `max` (turnLimits' pitch), 0 when the board would touch it without turning.
+ */
+export function railPitch(v: View, aspect: number, shiftY: number, rail: number, yaw: number, max: number): number {
+  perspective(RP.proj, fovFor(v, aspect), aspect, 0.2, 120);
+  RP.proj[9] = shiftY;
+  const clear = (pitch: number) => {
+    for (const y of [-yaw, 0, yaw]) {
+      lookAt(RP.view, v.eye, v.at, y, pitch, RP.fwd);
+      multiply(RP.m, RP.proj, RP.view);
+      // The board's lowest points: its squares' corners (the pieces stand above them).
+      for (const x of [-BOARD.half, BOARD.half])
+        for (const z of [-BOARD.half, BOARD.half]) {
+          const p = project(RP.m, x, BOARD.lift, z, 1, 1);
+          if (p && p[1] > 1 - rail) return false;
+        }
+    }
+    return true;
+  };
+  if (!clear(0)) return 0;
+  if (clear(max)) return max;
+  let lo = 0;
+  let hi = max;
+  for (let i = 0; i < 16; i++) {
+    const mid = (lo + hi) / 2;
+    if (clear(mid)) lo = mid;
+    else hi = mid;
+  }
+  return lo;
+}
+const RP = { proj: new Float32Array(16), view: new Float32Array(16), m: new Float32Array(16), fwd: new Float32Array(3) };
 
 // ---- Matrices (column-major, into arrays made once: nothing allocated a frame).
 

@@ -24,10 +24,10 @@ import { crowdAnimations, onPrefsChange } from "../prefs.ts";
 import { COLOSSEUM_CHEER, play, warmFile, type SoundName } from "../sound.ts";
 import { testParams, testSwitchesAllowed } from "../test-switches.ts";
 import { COLISEUM_PLACE, isSprite } from "../town/world.ts";
-import { BLACK_VIEW, SEAT_VIEWS, VIEWS, otherSeat, seats, turnLimits, viewFor } from "./arena.ts";
+import { BLACK_VIEW, SEAT_VIEWS, VIEWS, otherSeat, railPitch, seats, turnLimits, viewFor } from "./arena.ts";
 import { AMBIENT_LEVELS, AMBIENT_LEVEL_NAME, Ambient, ambientLevelOf, type AmbientLevel } from "./ambient.ts";
 import { ArenaGL, SLIDE_S, buildCrowd } from "./arena-gl.ts";
-import { PIECE_URL, crowdArt, propArt, sceneArt } from "./art.ts";
+import { PIECE_URL, RAIL, crowdArt, propArt, railingArt, sceneArt } from "./art.ts";
 import { floorEngine, type FloorEngine } from "./floor-engine.ts";
 import { FLOOR, FloorMatch, clockText, evalText, resultText, thinkMs, viewersText, type FloorState } from "./match.ts";
 import still from "./still.jpg";
@@ -103,6 +103,8 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
   }, []);
   const [pieces3d, setPieces3d] = useState(pieces3dOn);
   const [anim, setAnim] = useState(crowdAnimations);
+  /** The railing's strip (arena-railing), drawn once. */
+  const [rail] = useState(() => `url(${railingArt()})`);
   const animRef = useRef(anim);
   animRef.current = anim;
   useEffect(() => onPrefsChange(() => setAnim(crowdAnimations())), []);
@@ -118,9 +120,9 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
     if (!arena) return;
     let live = true;
     arena.setScene(sceneArt());
-    void propArt().then(({ canvas: c, statueFoot }) => {
+    void propArt().then((c) => {
       if (!live) return;
-      arena.setProps(c, statueFoot);
+      arena.setProps(c);
       arena.setPieces(match.current?.state.pieces ?? [], -1e9);
     });
     void crowdArt().then((art) => {
@@ -180,10 +182,14 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
     };
     const move = (e: PointerEvent) => {
       if (!drag || e.pointerId !== drag.id) return;
-      turnLimits(VIEWS[viewRef.current]!, el.clientWidth / Math.max(1, el.clientHeight), lim);
+      const v = VIEWS[viewRef.current]!;
+      const aspect = el.clientWidth / Math.max(1, el.clientHeight);
+      turnLimits(v, aspect, lim);
       const c = (v: number, m: number) => Math.max(-m, Math.min(m, v));
       turn.current.yaw = c(drag.yaw - (e.clientX - drag.x) * TURN_PER_PX, lim.yaw);
-      turn.current.pitch = c(drag.pitch + (e.clientY - drag.y) * TURN_PER_PX, lim.pitch);
+      // (Looking up brings the board down the screen: in a seat, never onto the railing at its foot.)
+      const up = viewRef.current < SEAT_VIEWS ? railPitch(v, aspect, arena.shift.y, RAIL.h / Math.max(1, el.clientHeight), lim.yaw, lim.pitch) : lim.pitch;
+      turn.current.pitch = Math.max(-lim.pitch, Math.min(up, drag.pitch + (e.clientY - drag.y) * TURN_PER_PX));
     };
     const up = (e: PointerEvent) => {
       if (drag && e.pointerId === drag.id) drag = null;
@@ -443,6 +449,9 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
         <div class="col-arena" ref={box}>
           <canvas class="col-canvas" ref={canvas} aria-label={COLISEUM_PLACE.name} data-backend={gl === false ? "still" : "webgl"} />
           {gl === false && <img class="col-still" src={still} alt="" draggable={false} />}
+          {/* The stone railing in front of your seat (a seat's view only: the player views float over the floor), along the
+              arena's foot, under the overlay; it takes no taps, so a drag over it still turns your view. */}
+          <div class="col-rail" aria-hidden="true" data-on={view < SEAT_VIEWS ? "1" : "0"} style={{ backgroundImage: rail }} />
           <div class="col-fps" ref={fpsEl} aria-hidden="true" />
         </div>
         <div class="col-top">
