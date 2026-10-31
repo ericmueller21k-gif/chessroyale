@@ -104,6 +104,21 @@ test("the Colosseum's first look: the card's link in, the arena drawn, Change se
   await expect.poll(async () => (await state(page)).plies, { timeout: 60_000 }).toBeGreaterThan(plies);
   expect(await page.locator(".col-board").boundingBox()).toEqual(box1);
 
+  // The railing in front of your seat (the API art, Oct 31): along the arena's foot, the same size at every seat, never over the
+  // overlay's flat board, eval bar, chat or Exit, and taking no taps (a drag over it still turns the view).
+  const rail = page.locator(".col-rail");
+  await expect(rail).toBeVisible();
+  const arenaBox = (await page.locator(".col-arena").boundingBox())!;
+  const railBox = (await rail.boundingBox())!;
+  expect(railBox.y + railBox.height).toBeCloseTo(arenaBox.y + arenaBox.height, 0);
+  expect(railBox.height).toBe(32);
+  expect(await rail.evaluate((e) => getComputedStyle(e).pointerEvents)).toBe("none");
+  for (const sel of [".col-board", ".col-eval", ".col-chat", ".col-exit"]) {
+    const b = (await page.locator(sel).boundingBox())!;
+    const hit = await page.evaluate(([x, y]) => document.elementFromPoint(x!, y!)?.closest(".col-rail") !== null, [b.x + b.width / 2, b.y + b.height / 2]);
+    expect(hit, `the railing over ${sel}`).toBe(false);
+  }
+
   // The gear: Sound, Ambient crowd noise (its sound: the test below), Report a bug.
   await page.getByRole("button", { name: "Match options" }).click();
   const panel = page.getByRole("dialog", { name: "Match options" });
@@ -119,6 +134,8 @@ test("the Colosseum's first look: the card's link in, the arena drawn, Change se
   await page.goto("/colosseum?view=black");
   await expect.poll(async () => (await state(page)).view).toBe(9);
   await expect(page.locator(".col-board .hb, .col-board [class*='board']").first()).toBeVisible();
+  // (No railing in a player view: no seat, floating over the floor.)
+  await expect(page.locator(".col-rail")).toBeHidden();
 
   // Exit: back to the town.
   await page.getByRole("button", { name: "Exit" }).click();
@@ -127,7 +144,7 @@ test("the Colosseum's first look: the card's link in, the arena drawn, Change se
   expect(errors.filter((e) => !/WebGL|GPU stall|willReadFrequently/i.test(e))).toEqual([]);
 });
 
-test("the gear's 3D pieces (off by default): the row flips the giant pieces at once (draw calls 3 ↔ 9) and the choice survives a reload", async ({ page }) => {
+test("the gear's 3D pieces (off by default): the row flips the giant pieces at once (draw calls 3 ↔ 8) and the choice survives a reload", async ({ page }) => {
   test.setTimeout(180_000);
   const errors = watchErrors(page);
   const pieces = async () => ((await state(page)) as { pieces?: string }).pieces;
@@ -139,10 +156,11 @@ test("the gear's 3D pieces (off by default): the row flips the giant pieces at o
   await expect.poll(async () => (await state(page)).drawCalls).toBe(3);
   await page.getByRole("button", { name: "Match options" }).click();
   await expect(row()).toHaveAttribute("aria-checked", "false");
-  // On: at once, no reload; the arena's three and one a kind (all six on the board at the start).
+  // On: at once, no reload; the arena's and the crowd's, and one a kind (all six on the board at the start). (Since the API art,
+  // Oct 31, the flat pieces are the props' only pictures, so in 3D that call has nothing to draw: 8, one fewer than before.)
   await row().click();
   await expect(row()).toHaveAttribute("aria-checked", "true");
-  await expect.poll(async () => (await state(page)).drawCalls, { message: "three draw calls and one a piece kind" }).toBe(9);
+  await expect.poll(async () => (await state(page)).drawCalls, { message: "the arena's and the crowd's draw calls and one a piece kind" }).toBe(8);
   expect(await pieces()).toBe("3d");
   const a = (await sample(page))!;
   expect(a.sky, "the arena, not an empty sky").toBeLessThan(0.5);

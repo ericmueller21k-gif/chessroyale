@@ -1,38 +1,47 @@
 /**
- * The Colosseum's art (Oct 30, the first look): **every picture the arena draws is made here and nowhere else**, so the API
- * run's art (docs/decisions/2026-10-30-colosseum-look.md, "Placeholder art") replaces one function at a time without touching
- * the renderer. Placeholders built from what the town already has: the town's board colors, the board's own pieces
- * (cburnett), the town's pawns in the crate items bots wear, the sidekicks' baked sheets and the bosses' sprites; the stone,
- * arches, banners, flames and the statue drawn here in a few lines of pixel art.
+ * The Colosseum's art: **every picture the arena draws is made here and nowhere else**, so each role swaps in at its one
+ * place without touching the renderer. Since Oct 31 the arena's own pictures are the API run's drawings
+ * (`claude/colosseum-art`, `scripts/boss-art/out/arena-*`, copied into `sprites/`), each a `Character` in the game's sprite
+ * format drawn once with `renderFrame` at whole-pixel scales (the scene's and the crowd's textures magnify with nearest-
+ * neighbor, so a drawing's pixels stay square however close you sit). The crowd is still the town's own pawns, sidekicks
+ * and bosses; the giant pieces are still the board's own (cburnett).
  *
- * - `sceneArt()`: one canvas for the arena's solid parts (the sand, the wall's arches, the gallery's arches, the banner) and
- *   its regions (`SCENE`), as UV rectangles.
- * - `propArt()`: the big pieces, the torch flame and the statue (`PROPS`), in one canvas.
- * - `crowdArt()`: everyone who sits in the stands (pawns, sidekicks, bosses), one picture a cell, and the players' portraits.
+ * - `sceneArt()`: one canvas for the arena's solid parts (the floor, the board's border, the wall's arches, the stands' steps)
+ *   and its regions (`SCENE`), as UV rectangles. Each repeating drawing is laid in with a margin of itself round it, so the
+ *   smaller copies a far wall is drawn from don't bleed in a neighbor.
+ * - `propArt()`: the big pieces (`PROPS`), in one canvas.
+ * - `crowdArt()`: everyone who sits in the stands (pawns, sidekicks, bosses), one picture a cell, the players' portraits, and
+ *   the arena's standing figures (the torch pillars, the banners, the statue: `figures`), each frame of their loops a cell.
+ * - `railingArt()`: the stone railing in front of your seat, a strip along the arena's foot (an image, not a draw call).
  *
- * **Each role and the one place that makes it** (the API art lands as `Character`s on `claude/colosseum-art`,
- * `scripts/boss-art/out/arena-*`; each swaps in at its line here, its region's size kept or SCENE/PROPS updated with it):
+ * **Each role and the one place that makes it:**
  *
- * | Role | Placeholder made by |
+ * | Role | Made by |
  * | --- | --- |
- * | the arena wall, arched (a slice) | `wallArt` (SCENE.arch) |
- * | the stands (a slice; seat points) | none yet: steps are geometry in arena-gl.ts `buildScene`, seats in arena.ts `seats()` |
- * | the gallery wall at the top | `galleryArt` (SCENE.gallery) |
- * | a pillar with its torch | geometry (`buildScene`) + `flameArt` (PROPS.flame) |
- * | a crown banner | `bannerArt` (SCENE.banner) |
- * | the floor and the board's border | `floorArt` (SCENE.sand) + `SQUARES`, `STONE` (the plinth) |
- * | the six giant pieces, white and black | `PIECE_URL` (the board's cburnett pieces) in `propArt`; in 3D (the gear's "3D pieces"): meshes made once in `pieces3d.ts` |
- * | a statue | `statueArt` (PROPS.statue) |
- * | the railing in front of your seat | none (the wall's top edge) |
- * | pawn backs | none: a front mirrored and darkened in the sprite shader (arena-gl.ts) |
- * | far-crowd figures | none: the same crowd pictures, made smaller by the GPU's mipmaps |
+ * | the arena wall, arched (a slice), and the gallery wall at the top | `arena-wall` (`sprites/arena-wall.ts`): `sceneArt` (SCENE.arch) |
+ * | the stands (a slice; seat points) | `arena-stands` (`sprites/arena-stands.ts`): `sceneArt` (SCENE.stepTop, SCENE.riser, SCENE.wallTop, SCENE.parapet); its seat points (16 px apart, 9 px sunk) set where and how low the crowd sits (`SEAT_SINK`) |
+ * | a pillar with its torch (5 frames, its flame flickering) | `arena-pillar` (`sprites/arena-pillar.ts`): `crowdArt` (`figures.pillar`) |
+ * | a crown banner (6 frames, swaying) | `arena-banner` (`sprites/arena-banner.ts`): `crowdArt` (`figures.banner`) |
+ * | the floor and the board's border | `arena-floor` (`sprites/arena-floor.ts`, `floor`, `side`, `corner`): `sceneArt` (SCENE.floor, SCENE.sideTop, SCENE.sideFace, SCENE.corner); the squares `SQUARES` |
+ * | the six giant pieces, white and black | `PIECE_URL` (the board's cburnett pieces) in `propArt`; in 3D (the gear's "3D pieces"): meshes made once in `pieces3d.ts` (Eric: the game's basic pieces; `arena-pieces` and `arena-pieces-2` are not used) |
+ * | a statue | `arena-statue` (`sprites/arena-statue.ts`): `crowdArt` (`figures.statue`) |
+ * | the railing in front of your seat | `arena-railing` (`sprites/arena-railing.ts`): `railingArt` |
+ * | pawn backs | none: a front mirrored and darkened in the sprite shader (arena-gl.ts); `arena-crowd-back`'s plain pawns would hide the crate items |
+ * | far-crowd figures | none: the same crowd pictures, made smaller by the GPU's mipmaps (the far stands face you) |
  */
 import { botLook, type ItemLook } from "@chessroyale/core";
-import { renderFrame } from "../characters/sprite.ts";
+import { renderFrame, type Character } from "../characters/sprite.ts";
 import { BOSS_ART, pawnImage } from "../town/render.ts";
 import { dressedPawn } from "../town/you-look.ts";
 import type { SidekickSheet } from "../town/sidekick-sheets.ts";
 import { BOTS, isSprite, type HomeId, type TownBot } from "../town/world.ts";
+import { ARENA_BANNER } from "./sprites/arena-banner.ts";
+import { ARENA_FLOOR } from "./sprites/arena-floor.ts";
+import { ARENA_PILLAR } from "./sprites/arena-pillar.ts";
+import { ARENA_RAILING } from "./sprites/arena-railing.ts";
+import { ARENA_STANDS, ARENA_STANDS_FRONT, ARENA_STANDS_ROWS, ARENA_STANDS_SEATS } from "./sprites/arena-stands.ts";
+import { ARENA_STATUE } from "./sprites/arena-statue.ts";
+import { ARENA_WALL } from "./sprites/arena-wall.ts";
 import wp from "../board/pieces/cburnett/Chess_plt45.svg?url";
 import wn from "../board/pieces/cburnett/Chess_nlt45.svg?url";
 import wb from "../board/pieces/cburnett/Chess_blt45.svg?url";
@@ -58,8 +67,20 @@ const rect = (x: number, y: number, w: number, h: number, size: number): Rect =>
 /** The board's pieces (cburnett, as on every board in the game): by color and kind ("wp" … "bk"), their pictures' addresses. */
 export const PIECE_URL: Record<string, string> = { wp, wn, wb, wr, wq, wk, bp, bn, bb, br, bq, bk };
 
-// ---- Colors (placeholders: warm sandstone, as Eric's mockup).
-export const STONE = { light: [226, 204, 166], mid: [205, 180, 140], dark: [168, 142, 106], shade: [120, 98, 72] } as const;
+// ---- Colors.
+const rgb = (hex: string): readonly [number, number, number] => {
+  const n = parseInt(hex.slice(1, 7), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+};
+/** The stone's flat colors (the wall's top, the aisles' stairs): the drawings' own sandstone keys (lit to shade). */
+export const STONE = {
+  light: rgb(ARENA_WALL.palette["2"]!),
+  mid: rgb(ARENA_WALL.palette["3"]!),
+  dark: rgb(ARENA_WALL.palette["4"]!),
+  shade: rgb(ARENA_WALL.palette["5"]!),
+  /** The aisles' stairs: the brightest key. */
+  pale: rgb(ARENA_WALL.palette["1"]!),
+} as const;
 /** The giant board's squares: the town's table squares (render.ts's SQ_LIGHT, SQ_DARK). */
 export const SQUARES = { light: [238, 197, 139], dark: [173, 128, 88] } as const;
 /** The sky over the open top. */
@@ -73,189 +94,105 @@ const pixelCanvas = (w: number, h: number) => {
   g.imageSmoothingEnabled = false;
   return { c, g };
 };
-const css = (v: readonly number[], k = 1) => `rgb(${Math.round(v[0]! * k)},${Math.round(v[1]! * k)},${Math.round(v[2]! * k)})`;
 
 /** The town's pawn's foot, down its box (render.ts: the path's bottom at 39.5 of 45, and half its outline). */
 const PAWN_FOOT = 40.25 / 45;
 
-/** A small seeded random (the art is the same every time). */
-function rng(seed: number) {
-  let s = seed >>> 0;
-  return () => {
-    s = (s + 0x6d2b79f5) >>> 0;
-    let t = s;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-/** An arch tile in pixel art (`w` × `h` pixels, drawn `k` times bigger): stone blocks round a dark arch with a lit sill. */
-function archTile(w: number, h: number, k: number, seed: number, archTop: number): HTMLCanvasElement {
-  const { c, g } = pixelCanvas(w * k, h * k);
-  const r = rng(seed);
-  g.scale(k, k);
-  g.fillStyle = css(STONE.mid);
-  g.fillRect(0, 0, w, h);
-  // Blocks: courses 4 pixels high, joints a shade darker, each block's face a touch lighter or darker.
-  for (let y = 0; y < h; y += 4)
-    for (let x = (y / 4) % 2 ? -3 : 0; x < w; x += 6) {
-      g.fillStyle = css(STONE.mid, 0.94 + r() * 0.12);
-      g.fillRect(x, y, 6, 4);
-      g.fillStyle = css(STONE.dark);
-      g.fillRect(x, y + 3, 6, 1);
-      g.fillRect(x + 5, y, 1, 4);
-    }
-  // The arch: a dark opening, round at the top, its edge in lit stone.
-  const cx = w / 2;
-  const aw = w * 0.56;
-  g.fillStyle = css(STONE.light);
-  g.beginPath();
-  g.rect(cx - aw / 2 - 1, archTop + aw / 2, aw + 2, h - archTop - aw / 2);
-  g.arc(cx, archTop + aw / 2, aw / 2 + 1, Math.PI, 0);
-  g.fill();
-  g.fillStyle = "rgb(52,38,30)";
-  g.beginPath();
-  g.rect(cx - aw / 2, archTop + aw / 2, aw, h - archTop - aw / 2);
-  g.arc(cx, archTop + aw / 2, aw / 2, Math.PI, 0);
-  g.fill();
-  // Its depth: a lighter inner side on the left.
-  g.fillStyle = "rgb(84,64,48)";
-  g.fillRect(cx - aw / 2, archTop + aw / 2, 2, h - archTop - aw / 2);
-  // A cornice along the top and a plinth along the foot.
-  g.fillStyle = css(STONE.light);
-  g.fillRect(0, 0, w, 2);
-  g.fillStyle = css(STONE.shade);
-  g.fillRect(0, 2, w, 1);
-  g.fillRect(0, h - 2, w, 2);
+/** A drawing's frame (an animation's `i`th, or a still's) as a canvas at 1:1. */
+export function frameCanvas(ch: Character, anim = "idle", i = 0): HTMLCanvasElement {
+  const { w, h, data } = renderFrame(ch, ch.anims[anim]!.frames[i]!);
+  const { c, g } = pixelCanvas(w, h);
+  g.putImageData(new ImageData(new Uint8ClampedArray(data), w, h), 0, 0);
   return c;
 }
 
-/** The arena wall's slice (one arch, 256 px square). */
-export const wallArt = (): HTMLCanvasElement => archTile(32, 32, 8, 3, 8);
-/** The gallery wall's slice at the top of the stands (one arch, 256 px square). */
-export const galleryArt = (): HTMLCanvasElement => archTile(32, 32, 8, 5, 5);
-
-/** A crown banner (`w` × `h` pixels, `k` times bigger): royal blue, a gold crown, a gold edge, a swallowtail foot. */
-export function bannerArt(w: number, h: number, k: number): HTMLCanvasElement {
-  const { c, g } = pixelCanvas(w * k, h * k);
-  g.scale(k, k);
-  g.fillStyle = "#c9a13a";
-  g.beginPath();
-  g.moveTo(0, 0);
-  g.lineTo(w, 0);
-  g.lineTo(w, h);
-  g.lineTo(w / 2, h - 5);
-  g.lineTo(0, h);
-  g.closePath();
-  g.fill();
-  g.fillStyle = "#24407e";
-  g.beginPath();
-  g.moveTo(1, 2);
-  g.lineTo(w - 1, 2);
-  g.lineTo(w - 1, h - 2);
-  g.lineTo(w / 2, h - 6);
-  g.lineTo(1, h - 2);
-  g.closePath();
-  g.fill();
-  // The rod.
-  g.fillStyle = "#5a3d22";
-  g.fillRect(0, 0, w, 2);
-  // The crown: a band and three points, gold with a darker base.
-  const cx = w / 2;
-  const cy = h * 0.42;
-  g.fillStyle = "#f0c64a";
-  g.fillRect(cx - 5, cy, 10, 3);
-  for (const dx of [-5, -1, 3]) g.fillRect(cx + dx, cy - 3, 2, 3);
-  g.fillRect(cx - 5, cy - 4, 1, 1);
-  g.fillRect(cx - 1 + 0.5, cy - 5, 1, 1);
-  g.fillRect(cx + 4, cy - 4, 1, 1);
-  g.fillStyle = "#b8862a";
-  g.fillRect(cx - 5, cy + 2, 10, 1);
-  return c;
-}
-
-/** The sand: warm grains, a few pebbles. */
-export function floorArt(px: number): HTMLCanvasElement {
-  const n = 128;
-  const { c: small, g } = pixelCanvas(n, n);
-  const r = rng(7);
-  const d = g.createImageData(n, n);
-  for (let i = 0; i < n * n; i++) {
-    const k = 0.92 + r() * 0.12 + (r() < 0.02 ? -0.12 : 0);
-    d.data[i * 4] = 222 * k;
-    d.data[i * 4 + 1] = 196 * k;
-    d.data[i * 4 + 2] = 150 * k;
-    d.data[i * 4 + 3] = 255;
+/**
+ * Lays `src`'s band (sx, sy, w, h) into `g` at (x, y), with a `m`-pixel margin of itself round it: across, the band's own
+ * other end (it repeats side by side), or its edge pixels stretched (`wrapX` false); up and down, its edge rows. A far
+ * wall is drawn from smaller copies of the texture, which mix each pixel with its neighbors: the margin makes those the
+ * band's own.
+ */
+function laid(g: CanvasRenderingContext2D, src: CanvasImageSource, sx: number, sy: number, w: number, h: number, x: number, y: number, m: number, wrapX = true): void {
+  const cols = wrapX
+    ? ([[sx + w - m, m, x - m], [sx, w, x], [sx, m, x + w]] as const)
+    : ([[sx, 1, x - m, m], [sx, w, x, w], [sx + w - 1, 1, x + w, m]] as const);
+  for (const col of cols) {
+    const [cx, cw, dx] = col;
+    const dw = col.length === 4 ? col[3] : cw;
+    g.drawImage(src, cx, sy, cw, h, dx, y, dw, h);
+    g.drawImage(src, cx, sy, cw, 1, dx, y - m, dw, m);
+    g.drawImage(src, cx, sy + h - 1, cw, 1, dx, y + h, dw, m);
   }
-  g.putImageData(d, 0, 0);
-  const { c, g: g2 } = pixelCanvas(px, px);
-  g2.drawImage(small, 0, 0, px, px);
-  return c;
 }
 
 /** The scene's canvas size and its regions. */
 export const SCENE_PX = 1024;
-export const SCENE = {
-  /** A white patch: solid parts (steps, the plinth, the board's squares) are vertex colors over it. */
-  white: rect(1, 1, 6, 6, SCENE_PX),
-  sand: rect(0, 512, 512, 512, SCENE_PX),
-  arch: rect(512, 0, 256, 256, SCENE_PX),
-  gallery: rect(768, 0, 256, 256, SCENE_PX),
-  banner: rect(512, 256, 128, 256, SCENE_PX),
+/** The floor's flags: one 32 px tile a meter (a board square), 20 m of it across the floor's disc. */
+export const FLOOR_PX = 32;
+const FLOOR_AT = [32, 352] as const;
+/** Where each drawing lies in the scene's canvas (pixels): x, y, w, h. */
+const AT = {
+  arch: [744, 8, 64, 64],
+  stands: [744, 96, 64, 88],
+  side: [840, 8, 32, 12],
+  corner: [840, 40, 12, 12],
 } as const;
+const sub = (k: keyof typeof AT, y0: number, y1: number, x0 = 0, x1: number = AT[k][2]) => rect(AT[k][0] + x0, AT[k][1] + y0, x1 - x0, y1 - y0 + 1, SCENE_PX);
+/** The stands' bands (arena-stands, its third row): a step's top (its back edge's line to the bench's front) and its riser (the lit lip to its foot). */
+const ROW = ARENA_STANDS_ROWS[2]!;
+export const SCENE = {
+  /** A white patch: solid parts (the squares, the wall's top, the aisles) are vertex colors over it. */
+  white: rect(1, 1, 6, 6, SCENE_PX),
+  /** The floor's flags, 20 m across (the floor's disc, FLOOR_R 10 m). */
+  floor: rect(FLOOR_AT[0], FLOOR_AT[1], FLOOR_PX * 20, FLOOR_PX * 20, SCENE_PX),
+  /** One arch, the wall's and the gallery's (64 px, a slice that repeats side by side). */
+  arch: rect(...AT.arch, SCENE_PX),
+  /** A step's top and a riser (64 px across: four seats, 16 px each, a seat point in each one's middle). */
+  stepTop: sub("stands", ROW.top, ROW.top + 5),
+  riser: sub("stands", ROW.top + 6, ROW.bottom - 1),
+  /** The lowest row's front (it sits on the wall's top): its coping over the wall's top, its face up to the first row. */
+  wallTop: sub("stands", ARENA_STANDS_FRONT.top, ARENA_STANDS_FRONT.top + 4),
+  parapet: sub("stands", ARENA_STANDS_FRONT.top + 5, ARENA_STANDS_FRONT.bottom),
+  /** The board's border (arena-floor `side`, 32 px a meter): its top (the outer edge to the squares) and its outer face. */
+  sideTop: sub("side", 0, 6),
+  sideFace: sub("side", 7, 11),
+  /** Its corner's top (arena-floor `corner`'s mitred corner, turned for each corner). */
+  corner: sub("corner", 0, 6, 0, 7),
+} as const;
+/** Seats a stands slice holds across (arena-stands: its seat points every 16 px). */
+export const STANDS_SEATS = ARENA_STANDS.w / (ARENA_STANDS_SEATS[1]![0] - ARENA_STANDS_SEATS[0]![0]);
+/**
+ * How far a seated figure's feet sit below its step's top, as a share of a pawn's height: arena-stands puts each seat
+ * point 9 px into the bench in front (its pawns 20 px tall), so the bench hides a seated pawn's foot and the crowd sits on
+ * the benches rather than standing on them. (Kept to the base: below the art's 9 of 20, so a pawn's crate items still show.)
+ */
+export const SEAT_SINK = 0.25;
 
 /** The scene's canvas (made once). */
 export function sceneArt(): HTMLCanvasElement {
   const { c, g } = pixelCanvas(SCENE_PX, SCENE_PX);
   g.fillStyle = "#fff";
   g.fillRect(0, 0, 8, 8);
-  g.drawImage(floorArt(512), 0, 512);
-  g.drawImage(wallArt(), 512, 0);
-  g.drawImage(galleryArt(), 768, 0);
-  g.drawImage(bannerArt(16, 32, 8), 512, 256);
+  // The floor: its tile repeated over the region and a tile's margin round it.
+  const tile = frameCanvas(ARENA_FLOOR, "floor");
+  for (let y = FLOOR_AT[1] - FLOOR_PX; y < SCENE_PX; y += FLOOR_PX) for (let x = FLOOR_AT[0] - FLOOR_PX; x < FLOOR_AT[0] + FLOOR_PX * 21; x += FLOOR_PX) g.drawImage(tile, x, y);
+  const wall = frameCanvas(ARENA_WALL);
+  laid(g, wall, 0, 0, 64, 64, AT.arch[0], AT.arch[1], 8);
+  const stands = frameCanvas(ARENA_STANDS);
+  laid(g, stands, 0, 0, 64, 88, AT.stands[0], AT.stands[1], 8);
+  laid(g, frameCanvas(ARENA_FLOOR, "side"), 0, 0, 32, 12, AT.side[0], AT.side[1], 8);
+  laid(g, frameCanvas(ARENA_FLOOR, "corner"), 0, 0, 12, 12, AT.corner[0], AT.corner[1], 6, false);
   return c;
 }
 
-// ---- Props: the big pieces, the flame, the statue.
+// ---- Props: the big pieces.
 
 export const PROP_PX = 1024;
-/** Each piece's cell (256 px, "wp" … "bk"), the flame's and the statue's; `foot`: where its foot is, down the cell (0 to 1). */
+/** Each piece's cell (256 px, "wp" … "bk"); `pieceFoot`: where its foot is, down the cell (0 to 1). */
 export const PROPS = {
   piece: Object.fromEntries(Object.keys(PIECE_URL).map((k, i) => [k, rect((i % 4) * 256, Math.floor(i / 4) * 256, 256, 256, PROP_PX)])) as Record<string, Rect>,
   pieceFoot: 40.5 / 45,
-  flame: rect(0, 768, 128, 256, PROP_PX),
-  statue: rect(256, 768, 256, 256, PROP_PX),
 } as const;
-
-/** The torch's flame: a pixel flame, white-hot at its root. */
-export function flameArt(): HTMLCanvasElement {
-  const rows = ["....#....", "...##....", "...###...", "..####...", "..#####..", ".##o###..", ".##oo##..", ".#oooo##.", "##oyyo##.", "#ooyyoo##", "#ooyyyo##", ".#oyyyo#.", ".##ooo##.", "..#####.."];
-  const { c, g } = pixelCanvas(128, 256);
-  const k = 128 / 9;
-  rows.forEach((row, y) =>
-    [...row].forEach((ch, x) => {
-      if (ch === ".") return;
-      g.fillStyle = ch === "#" ? "#e8601c" : ch === "o" ? "#f7a531" : "#fff1a8";
-      g.fillRect(Math.round(x * k), Math.round((y + 4) * k), Math.ceil(k), Math.ceil(k));
-    }),
-  );
-  return c;
-}
-
-/** Turns a picture's colors to stone (its shape and shading kept): the statue. */
-function toStone(c: HTMLCanvasElement): void {
-  const g = c.getContext("2d")!;
-  const d = g.getImageData(0, 0, c.width, c.height);
-  for (let i = 0; i < d.data.length; i += 4) {
-    const l = (d.data[i]! * 0.3 + d.data[i + 1]! * 0.55 + d.data[i + 2]! * 0.15) / 255;
-    const k = 0.45 + l * 0.6;
-    d.data[i] = STONE.light[0] * k;
-    d.data[i + 1] = STONE.light[1] * k;
-    d.data[i + 2] = STONE.light[2] * k;
-  }
-  g.putImageData(d, 0, 0);
-}
 
 const loadImage = (src: string): Promise<HTMLImageElement> =>
   new Promise((ok, no) => {
@@ -265,8 +202,8 @@ const loadImage = (src: string): Promise<HTMLImageElement> =>
     img.src = src;
   });
 
-/** The props' canvas: the pieces (when their pictures have loaded), the flame and the statue (a stone pawn in a helm), and where the statue's feet are down its cell. */
-export async function propArt(): Promise<{ canvas: HTMLCanvasElement; statueFoot: number }> {
+/** The props' canvas: the pieces (when their pictures have loaded). */
+export async function propArt(): Promise<HTMLCanvasElement> {
   const { c, g } = pixelCanvas(PROP_PX, PROP_PX);
   g.imageSmoothingEnabled = true;
   await Promise.all(
@@ -287,24 +224,15 @@ export async function propArt(): Promise<{ canvas: HTMLCanvasElement; statueFoot
       }
     }),
   );
-  g.imageSmoothingEnabled = false;
-  g.drawImage(flameArt(), 0, 768);
-  const { c: s, foot: statueFoot } = await statueArt();
-  g.drawImage(s, 256, 768);
-  return { canvas: c, statueFoot };
+  return c;
 }
 
-/** The statue (256 px square) and its feet down the picture: a pawn in a gladiator's helm, in stone (never the town's bronze statue). */
-export async function statueArt(): Promise<{ c: HTMLCanvasElement; foot: number }> {
-  const look: ItemLook = { head: { def: "viking-helm", color: "yellow", blemish: 0, seed: 3 } };
-  const art = await dressedPawn(look, pawnImage("light", "#d8d0c2"), 196);
-  const pic = art?.img ?? pawnImage("light", "#d8d0c2");
-  const foot = art ? (art.pad + PAWN_FOOT) / (1 + 2 * art.pad) : PAWN_FOOT;
-  const c = document.createElement("canvas");
-  c.width = c.height = 256;
-  c.getContext("2d")!.drawImage(pic, 0, 0, 256, 256);
-  toStone(c);
-  return { c, foot };
+// ---- The railing in front of your seat.
+
+/** The railing's strip (arena-railing: 128 x 32, repeating side by side, its foot the screen's foot), as an image's address. */
+export const RAIL = { w: ARENA_RAILING.w, h: ARENA_RAILING.h } as const;
+export function railingArt(): string {
+  return frameCanvas(ARENA_RAILING).toDataURL();
 }
 
 // ---- The crowd.
@@ -331,11 +259,30 @@ const BOSS_M = 1.4;
 /** What the pawn's box covers of it: its head at 9 and its foot at 40.25 of 45. */
 const PAWN_SPAN = (40.25 - 9) / 45;
 
-/** The crowd's art: the canvas, its cells, and the players' portraits (by their index in BOTS: an image's address). */
+/**
+ * One of the arena's standing figures (a pillar, a banner, the statue) in the crowd's canvas: its first frame's cell (the
+ * drawing's own frame, 1:1), its foot down the frame (0 to 1), its width over its height, its height in pixels, and its
+ * loop (`frames` cells side by side, `FIGURE_STRIDE` apart, `ms` each; 1: a still).
+ */
+export interface Figure {
+  rect: Rect;
+  foot: number;
+  aspect: number;
+  px: number;
+  frames: number;
+  ms: number;
+}
+/** How far apart a figure's frames lie across the crowd's canvas (texture coordinates: a cell). */
+export const FIGURE_STRIDE = CELL / CROWD_PX;
+/** The pillar's capital's top, down its drawing (arena-pillar: the abacus at row 28): the pillar's height (arena.ts PILLARS.h) is there. */
+export const PILLAR_TOP_PX = 28;
+
+/** The crowd's art: the canvas, its cells, the players' portraits (by their index in BOTS: an image's address), and the arena's figures. */
 export interface CrowdArt {
   canvas: HTMLCanvasElement;
   cells: CrowdCell[];
   portraits: Map<number, string>;
+  figures: { pillar: Figure; banner: Figure; statue: Figure };
 }
 
 const SHEET_URL: Record<string, string> = Object.fromEntries(
@@ -450,5 +397,17 @@ export async function crowdArt(): Promise<CrowdArt> {
     cells.push({ rect: rect(x + 2, y + 2, CELL - 4, CELL - 4, CROWD_PX), foot: p.foot, meters: p.meters, kind: p.kind, home: p.home });
     if (p.bot !== undefined) portraits.set(p.bot, portraitOf(p.c));
   });
-  return { canvas: c, cells, portraits };
+  // The arena's figures, on the row after the people's: each frame of a loop in its own cell, drawn 1:1 in its middle.
+  let cell = Math.ceil(pics.length / PER_ROW) * PER_ROW;
+  const figure = (ch: Character): Figure => {
+    const anim = ch.anims.idle!;
+    const x0 = (cell % PER_ROW) * CELL + Math.floor((CELL - ch.w) / 2);
+    const y0 = Math.floor(cell / PER_ROW) * CELL + Math.floor((CELL - ch.h) / 2);
+    anim.frames.forEach((_, i) => g.drawImage(frameCanvas(ch, "idle", i), x0 + i * CELL, y0));
+    cell += anim.frames.length;
+    // (Its foot: a pillar's and the statue's the bottom row's foot; the banner's its rod's top, where it hangs.)
+    return { rect: rect(x0, y0, ch.w, ch.h, CROWD_PX), foot: ch.foot[1] >= ch.h - 1 ? 1 : ch.foot[1] / ch.h, aspect: ch.w / ch.h, px: ch.h, frames: anim.frames.length, ms: anim.frames[0]!.ms };
+  };
+  const figures = { pillar: figure(ARENA_PILLAR), banner: figure(ARENA_BANNER), statue: figure(ARENA_STATUE) };
+  return { canvas: c, cells, portraits, figures };
 }

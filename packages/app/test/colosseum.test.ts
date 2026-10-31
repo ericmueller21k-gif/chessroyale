@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { START_FEN, applyMove } from "@chessroyale/chess";
-import { BLACK_VIEW, BOARD_SPHERE, PILLARS, PILLAR_ANGLES, SEAT_VIEWS, STATUE, VIEWS, WHITE_VIEW, fovFor, lookAt, multiply, onAisle, otherSeat, perspective, project, seats, squareXZ, turnLimits, viewFor } from "../src/colosseum/arena.ts";
+import { BLACK_VIEW, BOARD, BOARD_SPHERE, PILLARS, PILLAR_ANGLES, SEAT_VIEWS, STATUE, VIEWS, WHITE_VIEW, fovFor, lookAt, multiply, onAisle, otherSeat, perspective, project, railPitch, seats, squareXZ, turnLimits, viewFor } from "../src/colosseum/arena.ts";
+import { PILLAR_TOP_PX } from "../src/colosseum/art.ts";
+import { ARENA_PILLAR } from "../src/colosseum/sprites/arena-pillar.ts";
+import { ARENA_STATUE } from "../src/colosseum/sprites/arena-statue.ts";
 import { FLOOR, FloorMatch, PLAYERS, clockText, evalText, piecesAfter, piecesOf, resultText, viewersText, type FloorDeps } from "../src/colosseum/match.ts";
 import { BOTS } from "../src/town/world.ts";
 
@@ -55,6 +58,59 @@ describe("the arena", () => {
       }
     }
     expect(PILLAR_ANGLES.length + STATUE.angles.length).toBe(PILLARS.places);
+  });
+
+  it("no pillar or statue hides any of the board (its squares and border) from any of the ten views", () => {
+    // Each figure as drawn (arena-gl.ts buildFigures): a picture its drawing's shape, turned to face the eye. Lines from the eye
+    // through points all over it, carried on to the board's height: none lands on the board behind it.
+    const pillarTall = (PILLARS.h * ARENA_PILLAR.h) / (ARENA_PILLAR.h - PILLAR_TOP_PX);
+    const figures = [
+      ...PILLAR_ANGLES.map((a) => ({ a, r: PILLARS.r, h: pillarTall, hw: (pillarTall * ARENA_PILLAR.w) / ARENA_PILLAR.h / 2 })),
+      ...STATUE.angles.map((a) => ({ a, r: STATUE.r, h: STATUE.h, hw: (STATUE.h * ARENA_STATUE.w) / ARENA_STATUE.h / 2 })),
+    ];
+    const B = BOARD.half + BOARD.rim;
+    for (const v of VIEWS)
+      for (const f of figures) {
+        const px = Math.sin(f.a) * f.r;
+        const pz = Math.cos(f.a) * f.r;
+        const l = Math.hypot(v.eye[0] - px, v.eye[2] - pz);
+        const rx = (v.eye[2] - pz) / l;
+        const rz = -(v.eye[0] - px) / l;
+        for (let i = 0; i <= 20; i++)
+          for (let j = 0; j <= 40; j++) {
+            const s = -f.hw + (2 * f.hw * i) / 20;
+            const q = [px + rx * s, (f.h * j) / 40, pz + rz * s];
+            const dy = q[1]! - v.eye[1];
+            if (dy >= 0) continue;
+            const t = (BOARD.lift - v.eye[1]) / dy;
+            const x = v.eye[0] + (q[0]! - v.eye[0]) * t;
+            const z = v.eye[2] + (q[2]! - v.eye[2]) * t;
+            expect(t < 1 || Math.abs(x) > B || Math.abs(z) > B, `a figure at ${Math.round((f.a * 180) / Math.PI)}° hides the board from view ${VIEWS.indexOf(v)}`).toBe(true);
+          }
+      }
+  });
+
+  it.each(SCREENS)("the railing at the foot of a seat's view never covers the board: at rest, turned either way, and looking up as far as it may (%s)", (_, w, h) => {
+    // (The computer's lens is shifted down by the cards along the top: Colosseum.tsx, about 102 px.)
+    const shift = w > 900 ? 102 / h : 0;
+    const rail = 32 / h;
+    const lim = { yaw: 0, pitch: 0 };
+    for (const v of VIEWS.slice(0, SEAT_VIEWS)) {
+      turnLimits(v, w / h, lim);
+      const up = railPitch(v, w / h, shift, rail, lim.yaw, lim.pitch);
+      expect(up, "you can still look up a little").toBeGreaterThan(0);
+      for (const yaw of [-lim.yaw, 0, lim.yaw])
+        for (const pitch of [0, up, -lim.pitch]) {
+          const p = new Float32Array(16);
+          const m = new Float32Array(16);
+          const vp = new Float32Array(16);
+          perspective(p, fovFor(v, w / h), w / h, 0.2, 120);
+          p[9] = shift;
+          lookAt(m, v.eye, v.at, yaw, pitch, new Float32Array(3));
+          multiply(vp, p, m);
+          for (const [x, z] of [[-4, -4], [4, -4], [4, 4], [-4, 4]]) expect(project(vp, x!, BOARD.lift, z!, w, h)![1]).toBeLessThan(h * (1 - rail));
+        }
+    }
   });
 
   it.each(SCREENS)("every view shows the whole board, turned as far as it may go each way (%s)", (_, w, h) => {
