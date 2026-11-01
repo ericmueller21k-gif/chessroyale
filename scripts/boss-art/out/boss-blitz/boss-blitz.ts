@@ -4,7 +4,7 @@
  * (two faces, ticks only, a red flag) tucked under his front arm, his other paw slapping its button. Facing our left.
  */
 import { canvas, inEllipse, inPoly, toGrid, type Canvas } from "../../../../packages/app/src/characters/paint.ts";
-import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "../../../../packages/app/src/characters/sprite.ts";
+import { lazyParts, partSize, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "../../../../packages/app/src/characters/sprite.ts";
 
 const PALETTE: Record<string, string> = {
   k: "#1a1210",
@@ -44,6 +44,8 @@ const PALETTE: Record<string, string> = {
   m: "#5a1f26", // mouth inside
   r: "#d4636e", // tongue
   z: "#0d0e12", // ground shadow
+  W: "#a8e4ff", // sweat (his animations only)
+  V: "#4fa3e0",
 };
 
 type Pt = readonly [number, number];
@@ -385,6 +387,93 @@ function shadow(): Part {
   return { grid: toGrid(cv), outline: false };
 }
 
+// ---- parts for his animations (the concept's parts above stay as they are)
+type Gesture = "fist" | "point" | "open";
+/** The near arm again, with its paw as a fist, a finger gun (index finger toward the board, thumb up) or flat open. */
+function limb(sh: Pt, el: Pt, wr: Pt, paw: Pt, dark: number, g: Gesture): P {
+  const t = tube([sh, el, wr], [3.2, 2.8, 2.5]);
+  const pawIn = g === "open" ? E(paw[0], paw[1], 3.5, 2.3) : E(paw[0], paw[1], 2.8, 2.6);
+  const [bx, by, bw, bh] = t.box;
+  const x0 = Math.min(bx, Math.floor(paw[0]) - 9);
+  const y0 = Math.min(by, Math.floor(paw[1]) - 6);
+  const x1 = Math.max(bx + bw, Math.ceil(paw[0]) + 5);
+  const y1 = Math.max(by + bh, Math.ceil(paw[1]) + 5);
+  return painted(x0, y0, x1 - x0, y1 - y0, (F, _S, Px) => {
+    F(union(t.inside, pawIn), (x, y) => {
+      if (pawIn(x, y) && (!t.inside(x, y) || t.s(x, y) > 0.95)) {
+        const l = 0.6 - 0.3 * ((x + 0.5 - paw[0]) / 2.8) - 0.3 * ((y + 0.5 - paw[1]) / 2.6) - dark;
+        return ramp(FUR, l + 0.1);
+      }
+      const l = t.light(x, y) - dark;
+      if (t.s(x, y) > 0.82) return ramp(ORANGE, l);
+      if (Math.abs(t.edge(x, y)) < 0.3 && t.s(x, y) > 0.1 && t.light(x, y) > 0.55) return dark ? "C" : "D";
+      return ramp(TEAL, l);
+    });
+    const px = Math.round(paw[0]);
+    const py = Math.round(paw[1]);
+    if (g === "point") {
+      for (let i = 2; i <= 5; i++) Px(px - i, py - 1, i === 5 ? "e" : "d");
+      Px(px - 1, py - 3, "e");
+      Px(px - 1, py - 2, "d");
+      Px(px - 1, py + 1, "t");
+    } else if (g === "open") {
+      for (const dx of [-2, 0, 2]) Px(px + dx, py + 1, "t");
+    } else {
+      Px(paw[0] - 1, paw[1] + 1, "t");
+      Px(paw[0] + 1, paw[1] + 1, "t");
+    }
+  });
+}
+
+type Mouth2 = Mouth | "wide" | "o" | "frown" | "yawn" | "flat" | "grimace";
+const MOUTHS: Record<Exclude<Mouth2, Mouth>, string[]> = {
+  wide: ["...s........", "...sssssssss", "...shhhhhhhs", "...smmmmrrs.", "....smmrrs..", ".....ssss..."],
+  o: ["...s........", "....sss.....", "...smmms....", "...smrms....", "....sss....."],
+  frown: ["...s........", "....s.......", ".....s.ss.s.", "......s..s.."],
+  yawn: ["...s........", "...sssssss..", "...shmmmhs..", "...smmmmms..", "...smmrrms..", "....smmms...", ".....sss...."],
+  flat: ["...s........", "....sssssss."],
+  grimace: ["...s........", "...ssssssss.", "...shshshhs.", "...ssssssss."],
+};
+function mouth2(kind: Exclude<Mouth2, Mouth>): P {
+  return painted(20, 35, 12, 8, (_F, S) => S(MOUTHS[kind], 20, 36), false);
+}
+
+type Eyes2 = Eyes | "us" | "up" | "down" | "joy" | "wink" | "sly";
+const OLD_EYES: readonly string[] = ["open", "half", "shut", "wide"];
+const NEAR2: Record<Exclude<Eyes2, Eyes>, string[]> = {
+  us: [".sssss.", "sYwxxhs", "sYYxxYs", "syyyyys", ".sssss."],
+  up: [".sssss.", "sYYxxws", "sYYYYYs", "syyyyys", ".sssss."],
+  down: [".sssss.", "sYYYwhs", "sxxYYYs", "sxxyyys", ".sssss."],
+  joy: [".......", "..sss..", ".s...s.", "s.....s", "......."],
+  wink: [".......", "..sss..", ".s...s.", "s.....s", "......."],
+  sly: [".......", "sssssss", "sYYxxYs", "syyxxys", ".sssss."],
+};
+const FAR2: Record<Exclude<Eyes2, Eyes>, string[]> = {
+  us: [".ss", "sws", "sxs", "sxy", ".ss"],
+  up: [".ss", "sxs", "sws", "syy", ".ss"],
+  down: [".ss", "sYs", "sws", "sxx", ".ss"],
+  joy: ["...", ".s.", "s.s", "...", "..."],
+  wink: [".ss", "sws", "sxs", "sxy", ".ss"],
+  sly: ["...", "sss", "sxs", "sxy", ".ss"],
+};
+function eyes2(lid: Exclude<Eyes2, Eyes>, look = 0): P {
+  return painted(22, 23, 18, 8, (_F, S) => {
+    S(NEAR2[lid], 31 + look, 25);
+    S(FAR2[lid], 24, 25);
+  }, false);
+}
+/** Worried brows: the inner ends up. */
+function browWorry(): P {
+  return painted(22, 21, 18, 6, (_F, S) => {
+    S(["sss....", "..sssss"], 31, 23);
+    S([".s", "s."], 24, 23);
+  }, false);
+}
+/** The flag fallen: out of time, hanging down over the left face. */
+function flagDown(): P {
+  return painted(10, 56, 7, 7, (_F, S) => S(["..R", ".R.", "SS.", "SR."], 12, 58), true);
+}
+
 // ---- rig
 const { parts: PARTS, add } = lazyParts();
 add("shadow", shadow);
@@ -411,8 +500,50 @@ interface Pose {
   eyes?: Eyes;
   look?: number;
   brow?: number;
-  mouth?: Mouth;
+  mouth?: Mouth2;
   head?: Pt;
+  /** For his animations: the near paw anywhere, and its shape. */
+  at?: Pt;
+  gesture?: Gesture;
+  /** A second near arm, its blur (the frenzy). */
+  blur?: Pt;
+  /** The right button down (default: when the hand is "down"). */
+  press?: boolean;
+  /** The flag jumps up this many pixels; or it has fallen (out of time). */
+  flagY?: number;
+  fallen?: boolean;
+  /** The clock (and the far paw under it) moved; spun by quarter turns about its middle. */
+  clock?: Pt;
+  spin?: number;
+  /** The far paw away from the clock. */
+  pawF?: Pt;
+  eyes2?: Eyes2;
+  worry?: boolean;
+  /** Ears back: 0 up, 3 flat. */
+  ears?: number;
+  /** The cap knocked about. */
+  capAt?: Pt;
+  /** The whole of him moved sideways (zipping in). */
+  dx?: number;
+}
+const r2 = (v: number) => Math.round(v * 2) / 2;
+const toward = (p: Pt, q: Pt, d: number): Pt => {
+  const n = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1;
+  return [p[0] + ((q[0] - p[0]) / n) * d, p[1] + ((q[1] - p[1]) / n) * d];
+};
+/** A layer turned by quarter turns (clockwise) about the pixel corner (cx, cy). */
+function turnAbout(l: Layer, cx: number, cy: number, q: number): Layer {
+  let [w, h] = partSize(PARTS[l.part]!);
+  let x = l.x;
+  let y = l.y;
+  for (let i = 0; i < q; i++) {
+    const nx = cx + cy - y - h;
+    const ny = cy - cx + x;
+    x = nx;
+    y = ny;
+    [w, h] = [h, w];
+  }
+  return { ...l, x: Math.round(x), y: Math.round(y), rot: (q % 4) as 0 | 1 | 2 | 3 };
 }
 
 const HANDS: Record<string, Pt> = { rest: [28, 52], up: [30, 44], high: [27, 47], down: [25.5, 54] };
@@ -437,8 +568,43 @@ function layers(pose: Pose = {}): Layer[] {
   const sh: Pt = [47, 50];
   const wr: Pt = [hand[0] + 2.2, hand[1] + 0.6];
   const el = elbowOf(sh, wr, [11, 11]);
-  const pressed = pose.hand === "down";
-  return [
+  const pressed = pose.press ?? pose.hand === "down";
+  const g = pose.gesture ?? "fist";
+  // the near arm: the concept's own for a named hand, or anywhere (`at`) with a gesture
+  const nearArm = (paw: Pt | undefined): Layer => {
+    if (!paw && g === "fist") return B(placed(`armN:${pose.hand ?? "rest"}`, () => arm(sh, el, wr, hand, 0)));
+    const p = paw ?? hand;
+    const w2: Pt = paw ? toward(p, sh, 2.3) : wr;
+    const bone = Math.max(11, Math.hypot(w2[0] - sh[0], w2[1] - sh[1]) / 2 + 0.4);
+    const e2 = elbowOf(sh, w2, [bone, bone]);
+    return B(placed(`armN:${r2(p[0])},${r2(p[1])}:${g}`, () => limb(sh, e2, w2, p, 0, g)));
+  };
+  // the far arm: the concept's own, or reaching wherever the clock (or the paw) is
+  const clk = pose.clock ?? [0, 0];
+  const farArm = (): Layer => {
+    if (!pose.clock && !pose.pawF) return B(placed("armF", () => arm([30, 50], [24, 59], [17, 67.5], [14.5, 69], 0.2)));
+    const shF: Pt = [30, 50];
+    const paw: Pt = pose.pawF ?? [14.5 + clk[0], 69 + clk[1]];
+    const w2 = toward(paw, shF, 2.5);
+    const bone = Math.max(11, Math.hypot(w2[0] - shF[0], w2[1] - shF[1]) / 2 + 0.4);
+    const e2 = elbowOf(shF, w2, [bone, bone], paw[1] > shF[1] - 6);
+    return B(placed(`armF:${r2(paw[0])},${r2(paw[1])}`, () => arm(shF, e2, w2, paw, 0.2)));
+  };
+  const C = (pl: { name: string; at: Pt }, y = 0) => at(pl, clk[0], dy + clk[1] + y);
+  let clockL: Layer[] = [
+    C(placed("clock", clockBody)),
+    C(placed("btnL", () => button(11, false))),
+    C(placed(`btnR:${pressed}`, () => button(22, pressed))),
+    pose.fallen ? C(placed("flagDown", flagDown)) : C(placed(`flag:${pose.flag ?? 0}`, () => flag(pose.flag ?? 0)), -(pose.flagY ?? 0)),
+  ];
+  if (pose.spin) clockL = clockL.map((l) => turnAbout(l, 19.5 + clk[0], 63.5 + dy + clk[1], pose.spin!));
+  const ears = pose.ears ?? 0;
+  const Ear = (pl: { name: string; at: Pt }) => at(pl, hd[0] + Math.round(ears * 0.7), dy + hd[1] + ears);
+  const mk = pose.mouth ?? "smirk";
+  const lid = pose.eyes2 ?? pose.eyes ?? "open";
+  const look = pose.look ?? 0;
+  const cp = pose.capAt ?? [0, 0];
+  const out: Layer[] = [
     { part: "shadow", x: 22, y: GROUND - 2 },
     B(placed(`tail:${pose.tail ?? 0}`, () => tail(pose.tail ?? 0))),
     legOf([37, 76], [35, ankleY], 0.18, "legF"),
@@ -446,21 +612,21 @@ function layers(pose: Pose = {}): Layer[] {
     legOf([44, 76], [45, ankleY], 0, "legN"),
     at(placed(`shoeN:${lift > 0}`, () => shoe(45, lift > 0, false))),
     B(placed("shorts", shorts)),
-    B(placed("armF", () => arm([30, 50], [24, 59], [17, 67.5], [14.5, 69], 0.2))),
+    farArm(),
     B(placed("torso", torso)),
-    Hd(placed("earF", () => ear(26.5, 17, true))),
-    Hd(placed("earN", () => ear(46.5, 15.5, false))),
+    Ear(placed("earF", () => ear(26.5, 17, true))),
+    Ear(placed("earN", () => ear(46.5, 15.5, false))),
     Hd(placed("head", head)),
-    Hd(placed(`mouth:${pose.mouth ?? "smirk"}`, () => mouth(pose.mouth ?? "smirk"))),
-    Hd(placed(`eyes:${pose.eyes ?? "open"}:${pose.look ?? 0}`, () => eyes(pose.eyes ?? "open", pose.look ?? 0))),
-    Hd(placed(`brow:${pose.brow ?? 0}`, () => brow(pose.brow ?? 0))),
-    Hd(placed("cap", cap)),
-    B(placed("clock", clockBody)),
-    B(placed("btnL", () => button(11, false))),
-    B(placed(`btnR:${pressed}`, () => button(22, pressed))),
-    B(placed(`flag:${pose.flag ?? 0}`, () => flag(pose.flag ?? 0))),
-    B(placed(`armN:${pose.hand ?? "rest"}`, () => arm(sh, el, wr, hand, 0))),
+    Hd(placed(`mouth:${mk}`, () => (mk === "smirk" || mk === "grin" ? mouth(mk) : mouth2(mk)))),
+    Hd(placed(`eyes:${lid}:${look}`, () => (OLD_EYES.includes(lid) ? eyes(lid as Eyes, look) : eyes2(lid as Exclude<Eyes2, Eyes>, look)))),
+    pose.worry ? Hd(placed("browWorry", browWorry)) : Hd(placed(`brow:${pose.brow ?? 0}`, () => brow(pose.brow ?? 0))),
+    at(placed("cap", cap), hd[0] + cp[0], dy + hd[1] + cp[1]),
+    ...clockL,
+    ...(pose.blur ? [nearArm(pose.blur)] : []),
+    nearArm(pose.at),
   ];
+  const dx = pose.dx ?? 0;
+  return dx ? out.map((l) => ({ ...l, x: l.x + dx })) : out;
 }
 
 const F = (ms: number, pose: Pose = {}, extra: Partial<Frame> = {}): Frame => ({ ms, layers: layers(pose), ...extra });
@@ -507,6 +673,346 @@ const idle: Anim = {
   }),
 };
 
+// ---- His animations. Fast guy: short frames, snappy moves, clear held poses.
+
+/** A hit: every color goes pale. */
+const FLASH: Record<string, string> = Object.fromEntries(
+  Object.entries(PALETTE)
+    .filter(([k]) => !["k", "z", "x", "s"].includes(k))
+    .map(([k, c]) => {
+      const n = parseInt(c.slice(1), 16);
+      const mix = (v: number) => Math.round(v + (255 - v) * 0.55).toString(16).padStart(2, "0");
+      return [k, `#${mix((n >> 16) & 255)}${mix((n >> 8) & 255)}${mix(n & 255)}`];
+    }),
+);
+const sp = (x: number, y: number, k: string): Speck => [Math.round(x), Math.round(y), k];
+const shift = (s: readonly Speck[], dx: number, dy: number): Speck[] => s.map(([x, y, k]) => [x + dx, y + dy, k]);
+/** The idle's click, for a clock moved by (ox, oy). */
+const clickAt = (ox: number, oy: number): Speck[] => shift(click(0), ox, oy);
+/** A twinkle: a white dot with four arms. */
+const star = (x: number, y: number, big = false): Speck[] => [
+  sp(x, y, "O"),
+  ...[[-1, 0], [1, 0], [0, -1], [0, 1]].map(([a, b]) => sp(x + a!, y + b!, "Y")),
+  ...(big ? [[-2, 0], [2, 0], [0, -2], [0, 2]].map(([a, b]) => sp(x + a!, y + b!, "H")) : []),
+];
+/** A speed streak from (x, y), `len` long, toward `dir` (1 right, -1 left): bright at its head, fading. */
+const streak = (x: number, y: number, len: number, dir: number): Speck[] =>
+  Array.from({ length: len }, (_, i) => sp(x + i * dir, y, i < len * 0.2 ? "O" : i < len * 0.5 ? "N" : i < len * 0.8 ? "M" : "J")).filter(([px]) => px >= 1 && px < W - 1);
+/** Speed lines across him as he zips in, starting at x0 and running off to the right. */
+const zip = (x0: number, ys: readonly number[]): Speck[] => ys.flatMap((y, i) => streak(x0 + (i % 3) * 3, y, 20 + (i % 2) * 8, 1));
+/** The big slap's sparks off the button (clock at its place, the body down dy): `t` 0 the burst, 1 spread. */
+const bigClick = (dy: number, t: number, ox = 0): Speck[] => {
+  const cx = 24 + ox;
+  const cy = 53 + dy;
+  const rays: Pt[] = [[-1, -1], [1, -1], [0, -1], [-1.6, -0.3], [1.6, -0.3]];
+  const out: Speck[] = [];
+  for (const [rx, ry] of rays) for (let d = 0; d < 4; d++) out.push(sp(cx + rx * (3 + t * 3 + d), cy + ry * (3 + t * 3 + d), t ? ["Y", "H", "H", "J"][d]! : ["O", "O", "Y", "H"][d]!));
+  if (!t) out.push(...star(cx - 8, cy - 6), ...star(cx + 8, cy - 7));
+  else out.push(sp(cx - 10, cy - 9, "Y"), sp(cx + 10, cy - 10, "Y"));
+  return out;
+};
+/** Dust kicked up in front of his feet as he skids, `t` a frame (it spreads and settles). */
+const dust = (t: number, dx = 0): Speck[] => {
+  const out: Speck[] = [];
+  for (let i = 0; i < (t > 1 ? 3 : 4); i++) {
+    const x = 29 + dx - i * 3 - t * 2;
+    const y = 97 - (i % 2) - Math.floor(t / 2);
+    out.push(sp(x, y, t < 2 ? "N" : "M"), sp(x - 1, y, "M"), sp(x, y - 1, t < 2 ? "M" : "J"));
+  }
+  return out;
+};
+/** A drop of sweat. */
+const sweat = (x: number, y: number): Speck[] => [sp(x, y, "W"), sp(x - 1, y + 1, "W"), sp(x, y + 1, "O"), sp(x - 1, y + 2, "V"), sp(x, y + 2, "W")];
+/** The stolen time: a tiny clock face (a ring of gold, a white hand at `ph` 0-3) with a trail behind it. */
+const tinyClock = (x: number, y: number, ph: number, from?: Pt): Speck[] => {
+  const ring: Pt[] = [[-1, -2], [0, -2], [1, -2], [2, -1], [2, 0], [2, 1], [1, 2], [0, 2], [-1, 2], [-2, 1], [-2, 0], [-2, -1]];
+  const hand: Pt = ([[0, -1], [1, 0], [0, 1], [-1, 0]] as Pt[])[ph % 4]!;
+  const trail: Speck[] = from ? [0.25, 0.5, 0.75].map((f, i) => sp(from[0] + (x - from[0]) * f, from[1] + (y - from[1]) * f, ["J", "M", "H"][i]!)) : [];
+  return [...trail, ...ring.map(([a, b]) => sp(x + a, y + b, "Y")), sp(x, y, "O"), sp(x + hand[0], y + hand[1], "O")];
+};
+/** The finger gun's speed streaks, back from the fingertip toward the board. */
+const POINT: Pt = [21, 48];
+const pointLines = (dy: number, len = 1): Speck[] => {
+  const tx = Math.round(POINT[0]) - 7;
+  const ty = Math.round(POINT[1]) - 1 + dy;
+  return [...streak(tx, ty, Math.round(14 * len), -1), ...streak(tx - 2, ty - 3, Math.round(8 * len), -1), ...streak(tx - 2, ty + 3, Math.round(8 * len), -1)];
+};
+
+/** Entrance: speed lines, he zips in from the right in a blur, skids to a stop in a cloud of dust, slaps the clock, a grin at us. */
+const ZIP_YS = [32, 40, 50, 58, 70, 80, 90];
+const entrance: Anim = {
+  loop: false,
+  frames: [
+    { ms: 90, layers: [], specks: zip(6, ZIP_YS), cue: "zip" },
+    F(60, { dx: 36, lift: 2, tail: 4, ears: 2, eyes: "wide", head: [1, 0], hand: "up" }, { specks: zip(30, ZIP_YS) }),
+    F(60, { dx: 14, lift: 1, tail: 4, ears: 2, eyes: "wide", head: [1, 0], hand: "up" }, { specks: zip(40, [36, 52, 66, 84]) }),
+    F(100, { dx: -3, sink: 2, head: [2, 0], ears: 1, eyes: "wide", mouth: "o", tail: 3, hand: "up" }, { cue: "skid", shake: [-1, 0], specks: [...dust(0, -3), ...streak(58, 60, 10, 1), ...streak(60, 76, 8, 1)] }),
+    F(90, { dx: -1, sink: 1, head: [1, 0], tail: 2, hand: "high" }, { specks: dust(1, -1) }),
+    F(90, { tail: 1 }, { specks: dust(2) }),
+    F(80, { hand: "high", lift: 1, brow: 1 }, { specks: dust(3) }),
+    F(80, { hand: "up", lift: 2, brow: 1 }),
+    F(130, { hand: "down", sink: 1, head: [0, 1], mouth: "grin", brow: 1, flag: 1 }, { cue: "click", specks: click(1) }),
+    F(110, { hand: "down", head: [0, 1], mouth: "grin", flag: -1 }),
+    F(420, { mouth: "wide", eyes2: "us", brow: 1, flag: 1 }),
+    F(180, { mouth: "grin" }),
+  ],
+};
+
+/** Thinking: he doesn't think. Bouncing faster than his idle, drumming on the clock, a glance at us, an eye-roll, a yawn. */
+const thinking: Anim = {
+  loop: true,
+  frames: Array.from({ length: 20 }, (_, i) => {
+    const yawn = i >= 12 && i <= 15;
+    const lift = yawn ? 0 : [0, 1, 2, 1][i % 4]!;
+    const tap = !yawn && i % 2 === 1;
+    const eyes2: Eyes2 = i >= 5 && i <= 8 ? "us" : i >= 9 && i <= 11 ? "up" : yawn ? (i === 12 ? "half" : "shut") : i === 18 ? "half" : "open";
+    return F(
+      90,
+      {
+        lift,
+        tail: TAIL[(i * 2) % 8]!,
+        ...(yawn ? { at: [30, 49] as Pt } : tap ? { at: [27, 53] as Pt } : { hand: "rest" as const }),
+        mouth: yawn ? (i === 12 || i === 15 ? "o" : "yawn") : i >= 9 && i <= 11 ? "flat" : "smirk",
+        eyes2,
+        brow: i >= 5 && i <= 8 ? 1 : 0,
+        ears: yawn ? 1 : 0,
+        head: yawn ? [1, -1] : [0, 0],
+      },
+      tap ? { specks: [sp(21, 52 - lift, "J"), sp(22, 51 - lift, "M")], ...(i % 4 === 1 ? { cue: "tick" } : {}) } : i === 13 ? { cue: "yawn" } : {},
+    );
+  }),
+};
+
+/** Move: a snap-point, a finger gun at the board with speed streaks, then a quick slap of the clock. */
+const move: Anim = {
+  loop: false,
+  frames: [
+    F(70, { hand: "up", lift: 1, brow: 1 }),
+    F(90, { at: POINT, gesture: "point", head: [-1, 0], mouth: "grin", brow: 1, lift: 1, tail: 3 }, { cue: "snap", specks: pointLines(-1) }),
+    F(170, { at: POINT, gesture: "point", head: [-1, 0], mouth: "grin", brow: 1, tail: 2 }, { specks: [...pointLines(0, 0.5), ...star(POINT[0] - 10, POINT[1] - 1)] }),
+    F(70, { hand: "up", lift: 1 }),
+    F(120, { hand: "down", sink: 1, head: [0, 1], mouth: "grin", flag: 1 }, { cue: "click", specks: click(1) }),
+    F(90, { hand: "high", flag: -1 }),
+    F(130, { flag: 1 }),
+  ],
+};
+
+/** Capture: a wink and a double fist pump, then a slap of the clock. */
+const PUMP_UP: Pt = [56, 35];
+const PUMP_DN: Pt = [55, 42];
+const capture: Anim = {
+  loop: false,
+  frames: [
+    F(80, { at: PUMP_DN, eyes: "wide", mouth: "wide", lift: 1 }, { cue: "yes" }),
+    F(90, { at: PUMP_UP, eyes2: "wink", mouth: "wide", lift: 2, brow: 1, tail: 3 }),
+    F(90, { at: PUMP_DN, eyes2: "wink", mouth: "wide", lift: 1, tail: 1 }),
+    F(110, { at: PUMP_UP, eyes2: "wink", mouth: "wide", lift: 2, brow: 1, tail: 3 }, { specks: star(55, 31) }),
+    F(80, { hand: "up", mouth: "grin", lift: 1 }),
+    F(130, { hand: "down", sink: 1, head: [0, 1], mouth: "grin", flag: 1 }, { cue: "click", specks: click(1) }),
+    F(100, { hand: "down", head: [0, 1], mouth: "grin", flag: -1 }),
+    F(220, { eyes2: "wink", mouth: "grin", brow: 1, flag: 1 }),
+    F(150, {}),
+  ],
+};
+
+/** Clock Slap (his passive): the paw wound up high, a slam, big sparks, the flag jumps; a tiny clock zips from the clock to his chest. */
+const WIND: Pt = [53, 32];
+const WIND2: Pt = [55, 30];
+const clockSlap: Anim = {
+  loop: false,
+  frames: [
+    F(90, { at: WIND, gesture: "open", lift: 2, eyes2: "sly", mouth: "grin", brow: 1, head: [1, -1], tail: 3 }, { cue: "windup" }),
+    F(130, { at: WIND2, gesture: "open", lift: 3, eyes2: "sly", mouth: "wide", brow: 2, head: [1, -1], tail: 4 }),
+    F(50, { at: [36, 43], gesture: "open", lift: 1, mouth: "wide", brow: 1, tail: 2 }, { specks: [sp(50, 33, "N"), sp(47, 35, "N"), sp(44, 37, "M"), sp(41, 39, "J"), sp(52, 36, "M"), sp(49, 38, "J")] }),
+    F(150, { hand: "down", gesture: "open", sink: 2, head: [0, 2], eyes: "shut", mouth: "wide", flag: 1, flagY: 3, ears: 1, tail: -2 }, { cue: "slam", shake: [0, 2], specks: bigClick(2, 0) }),
+    F(90, { hand: "down", gesture: "open", sink: 1, head: [0, 1], eyes2: "joy", mouth: "wide", flag: -1, flagY: 1 }, { specks: [...bigClick(1, 1), ...tinyClock(19, 50, 0)] }),
+    F(90, { hand: "high", eyes2: "sly", mouth: "grin", flag: 1 }, { specks: tinyClock(22, 42, 1, [19, 50]) }),
+    F(90, { eyes2: "sly", mouth: "grin", flag: -1, lift: 1 }, { specks: tinyClock(31, 41, 2, [22, 42]) }),
+    F(110, { eyes2: "joy", mouth: "wide", brow: 1, lift: 1 }, { cue: "steal", specks: [...star(39, 48, true), ...star(34, 44), ...star(44, 46)] }),
+    F(180, { eyes2: "sly", mouth: "grin", brow: 1 }, { specks: star(40, 49) }),
+    F(150, {}),
+  ],
+};
+
+/** Scramble warning: he holds the clock up toward us, taps it twice, eyebrows up, a sly wide grin. Holds on the last frame. */
+const RAISE: Pt = [2, -10];
+/** His finger taps the clock's right face, like tapping a wristwatch: "time's ticking". */
+const TAP: Pt = [34, 54];
+const TAP_UP: Pt = [36, 50];
+const tapLines: Speck[] = [sp(29, 49, "O"), sp(28, 48, "Y"), sp(31, 48, "O"), sp(32, 47, "Y"), sp(26, 52, "O"), sp(25, 52, "Y")];
+const scrambleWarn: Anim = {
+  loop: false,
+  frames: [
+    F(100, { clock: [1, -5], lift: 1, eyes2: "sly", brow: 1, mouth: "grin" }, { cue: "warn" }),
+    F(130, { clock: RAISE, at: TAP_UP, gesture: "point", eyes2: "us", brow: 2, mouth: "wide" }),
+    F(110, { clock: RAISE, at: TAP, gesture: "point", eyes2: "us", brow: 2, mouth: "wide", head: [0, 1] }, { cue: "tap", specks: tapLines }),
+    F(160, { clock: RAISE, at: TAP_UP, gesture: "point", eyes2: "sly", brow: 2, mouth: "wide", flag: 1 }),
+    F(110, { clock: RAISE, at: TAP, gesture: "point", eyes2: "us", brow: 2, mouth: "wide", flag: -1, head: [0, 1] }, { cue: "tap", specks: tapLines }),
+    F(160, { clock: RAISE, at: TAP_UP, gesture: "point", eyes2: "sly", brow: 2, mouth: "wide", flag: 1 }),
+    F(700, { clock: RAISE, at: TAP_UP, gesture: "point", eyes2: "us", brow: 2, mouth: "wide" }, { specks: [...star(4, 44), ...star(36, 42)] }),
+  ],
+};
+
+/** Time Scramble: the clock tossed up and spun in a blur between his paws, speed lines, sparks, cap and ears ruffled; a catch, a slam, a triumphant pose. */
+const SPIN_C: Pt = [0, -10];
+const frenzy = (i: number): Frame => {
+  const lift = i % 2 ? 2 : 0;
+  const clock: Pt = [SPIN_C[0], SPIN_C[1] - (i % 2)];
+  const cx = 19.5 + clock[0];
+  const cy = 63.5 + clock[1] - lift;
+  const arcs: Speck[] = [];
+  for (const base of [i * 1.3, i * 1.3 + Math.PI]) for (let j = 0; j < 5; j++) {
+    const a = base + j * 0.22;
+    arcs.push(sp(cx + Math.cos(a) * 15, cy + Math.sin(a) * 14, ["O", "N", "M", "M", "J"][j]!));
+  }
+  const SPARKS: Pt[] = [[4, 40], [36, 36], [6, 66], [34, 62], [12, 34], [4, 54]];
+  return F(
+    80,
+    {
+      lift,
+      clock,
+      spin: (i + 1) % 4,
+      at: i % 2 ? [29.5, 47] : [29, 56],
+      blur: i % 2 ? [29, 56] : [29.5, 47],
+      pawF: i % 2 ? [9, 52] : [10, 58],
+      eyes2: i % 3 === 2 ? "joy" : undefined,
+      eyes: "wide",
+      mouth: "wide",
+      brow: 2,
+      ears: [0, 2, 1, 2][i % 4]!,
+      capAt: ([[1, -1], [2, -2], [0, -1], [1, -2]] as Pt[])[i % 4]!,
+      head: [i % 2, 0],
+      tail: [4, -2, 3, -3][i % 4]!,
+    },
+    {
+      shake: [i % 2 ? 1 : -1, 0],
+      specks: [...arcs, ...star(...SPARKS[i % 6]!), ...star(...SPARKS[(i + 3) % 6]!), ...streak(57, 29 + (i % 3) * 6, 12, 1), ...streak(59, 33 + ((i + 1) % 3) * 6, 9, 1)],
+      ...(i === 0 ? { cue: "whirr" } : {}),
+    },
+  );
+};
+const timeScramble: Anim = {
+  loop: false,
+  frames: [
+    F(100, { sink: 2, clock: [0, -2], eyes: "wide", mouth: "wide", brow: 2, ears: 1, hand: "high" }, { cue: "whoosh" }),
+    F(80, { lift: 2, clock: SPIN_C, pawF: [10, 50], at: [30, 45], eyes2: "us", mouth: "wide", brow: 2, tail: 3 }, { specks: [...streak(19, 66, 6, 1), ...streak(14, 68, 5, 1)] }),
+    ...Array.from({ length: 10 }, (_, i) => frenzy(i)),
+    F(80, { lift: 2, clock: [0, -3], hand: "up", eyes: "wide", mouth: "wide", capAt: [1, -1], flag: 1 }),
+    F(150, { hand: "down", gesture: "open", sink: 2, head: [0, 2], eyes: "shut", mouth: "wide", flag: 1, flagY: 3, ears: 1, capAt: [1, 0] }, { cue: "slam", shake: [0, 2], specks: bigClick(2, 0) }),
+    F(110, { hand: "down", gesture: "open", sink: 1, head: [0, 1], eyes2: "joy", mouth: "wide", flag: -1, flagY: 1 }, { specks: bigClick(1, 1) }),
+    F(500, { at: PUMP_UP, lift: 2, eyes2: "sly", mouth: "wide", brow: 2, tail: 3, flag: 1 }, { cue: "ta-da", specks: [...star(56, 30, true), ...star(8, 46), ...star(30, 12)] }),
+    F(180, { mouth: "grin" }),
+  ],
+};
+
+/** Hurt: a pale flash, a flinch, ears back, eyes wide, the clock jolts and the cap jumps; he shakes it off fast. */
+const hurt: Anim = {
+  loop: false,
+  frames: [
+    F(70, { dx: 1, lift: 1, head: [2, -1], ears: 3, eyes: "wide", mouth: "o", clock: [1, -3], flag: 1, flagY: 1, tail: 4, capAt: [1, -2], hand: "up" }, { cue: "oof", pal: FLASH, shake: [2, 0] }),
+    F(80, { dx: 1, sink: 1, head: [1, 0], ears: 3, eyes: "wide", mouth: "o", clock: [0, -1], flag: -1, tail: 3, capAt: [1, -1], worry: true }, { specks: sweat(19, 22) }),
+    F(90, { dx: 1, ears: 2, eyes: "wide", mouth: "frown", flag: 1, worry: true, tail: 2 }, { specks: sweat(18, 25) }),
+    F(100, { ears: 1, eyes: "half", flag: -1 }),
+    F(130, { eyes: "open", brow: 1, lift: 1 }),
+    F(140, {}),
+  ],
+};
+
+/** Check: a cocky finger gun at the board, held with a sly look, then a slap. */
+const check: Anim = {
+  loop: false,
+  frames: [
+    F(80, { hand: "up", lift: 1, brow: 1, eyes2: "sly" }),
+    F(110, { at: POINT, gesture: "point", head: [-1, 0], mouth: "wide", brow: 2, lift: 1, tail: 3 }, { cue: "point", specks: pointLines(-1, 1.3) }),
+    F(260, { at: POINT, gesture: "point", head: [-1, 0], mouth: "grin", eyes2: "sly", brow: 2, tail: 2 }, { specks: [...star(POINT[0] - 11, POINT[1] - 1, true), ...pointLines(0, 0.4)] }),
+    F(70, { hand: "up", lift: 1, mouth: "grin" }),
+    F(130, { hand: "down", sink: 1, head: [0, 1], mouth: "grin", flag: 1 }, { cue: "click", specks: click(1) }),
+    F(100, { hand: "down", head: [0, 1], mouth: "grin", flag: -1 }),
+    F(160, { mouth: "grin", brow: 1, flag: 1 }),
+    F(140, {}),
+  ],
+};
+
+/** Smug (loop): leaning back, half-lidded, polishing his nails on his jacket, then a look at them (a glint). */
+const smug: Anim = {
+  loop: true,
+  frames: Array.from({ length: 12 }, (_, i) =>
+    F(
+      150,
+      {
+        head: [1, -1],
+        ...(i < 6 ? { at: (i % 2 ? [41, 53] : [39, 51]) as Pt } : i < 10 ? { at: [25, 46] as Pt } : { hand: "rest" as const }),
+        eyes: i === 11 ? "shut" : "half",
+        mouth: i >= 7 && i <= 9 ? "grin" : "smirk",
+        brow: i >= 6 && i <= 9 ? 1 : 0,
+        tail: [0, 1, 2, 2, 1, 0, -1, -2, -2, -1, 0, 0][i]!,
+      },
+      i === 7 ? { specks: star(21, 43) } : {},
+    ),
+  ),
+};
+
+/** Rattled (loop): ears flat, worried brows, sweat, fast nervous taps on the clock, glancing at it. */
+const rattled: Anim = {
+  loop: true,
+  frames: Array.from({ length: 12 }, (_, i) => {
+    const down = i % 2 === 1;
+    return F(
+      75,
+      {
+        ...(down ? { hand: "down" as const } : { at: [28, 51] as Pt }),
+        head: [0, down ? 1 : 0],
+        eyes2: i % 6 < 3 ? "down" : undefined,
+        eyes: "wide",
+        ears: 3,
+        worry: true,
+        mouth: "grimace",
+        flag: down ? 1 : -1,
+        tail: down ? -2 : -1,
+      },
+      {
+        shake: [i % 4 === 0 ? 1 : 0, 0],
+        specks: [...sweat(20, 20 + (i % 6) * 2), ...sweat(43, 26 + ((i + 3) % 6)), ...(down ? clickAt(0, 1).slice(0, 4) : [])],
+        ...(i % 4 === 1 ? { cue: "tap" } : {}),
+      },
+    );
+  }),
+};
+
+/** Defeat: the flag falls (a pale flash), a stare at it, then he slumps, the cap slipping over his eyes, the clock drooping. Holds. */
+const defeat: Anim = {
+  loop: false,
+  frames: [
+    F(90, { fallen: true, eyes: "wide", ears: 2, mouth: "o", hand: "rest" }, { cue: "flag", pal: FLASH, shake: [1, 0] }),
+    F(160, { fallen: true, eyes2: "down", ears: 3, mouth: "o", worry: true, head: [0, 1] }),
+    F(140, { fallen: true, sink: 1, eyes: "half", ears: 3, mouth: "frown", worry: true, head: [0, 2], capAt: [-1, 2], clock: [2, 3], at: [32, 60] }, { cue: "slump" }),
+    F(160, { fallen: true, sink: 2, eyes: "shut", ears: 3, mouth: "frown", worry: true, head: [0, 3], capAt: [-1, 4], clock: [3, 5], at: [34, 64], tail: -2 }),
+    F(1200, { fallen: true, sink: 3, eyes: "shut", ears: 3, mouth: "frown", worry: true, head: [0, 3], capAt: [-2, 7], clock: [3, 6], at: [35, 66], tail: -3 }),
+  ],
+};
+
+/** Victory (loop): the clock raised overhead, a bounce on his toes, a fist pump then a finger gun at the board, speed sparkles. */
+const OVERHEAD: Pt = [-5, -44];
+const victory: Anim = {
+  loop: true,
+  frames: Array.from({ length: 12 }, (_, i) =>
+    F(
+      110,
+      {
+        lift: [1, 2, 2, 1, 0, 0][i % 6]!,
+        clock: OVERHEAD,
+        ...(i < 6 ? { at: (i % 3 === 1 ? PUMP_DN : PUMP_UP) as Pt } : { at: POINT, gesture: "point" as const }),
+        eyes2: i < 6 ? "joy" : "sly",
+        mouth: "wide",
+        brow: i < 6 ? 1 : 2,
+        flag: [0, 1, 0, -1][i % 4]!,
+        tail: [0, 2, 3, 2, 0, -1][i % 6]!,
+      },
+      { specks: i % 2 ? [...star(5, 7), ...star(31, 9, true)] : [...star(4, 32), ...star(29, 5)], ...(i === 0 ? { cue: "cheer" } : {}) },
+    ),
+  ),
+};
+
 export const BOSS_BLITZ: Character = {
   id: "boss-blitz",
   name: "Blitz",
@@ -516,5 +1022,5 @@ export const BOSS_BLITZ: Character = {
   palette: PALETTE,
   halo: "#3a2e22",
   parts: PARTS,
-  anims: { idle },
+  anims: { idle, entrance, thinking, move, capture, hurt, check, smug, rattled, defeat, victory, clockSlap, scrambleWarn, timeScramble },
 };
