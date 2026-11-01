@@ -35,10 +35,10 @@ dropped. *(mine)* marks the director's own suggestions.
 ## E. Colosseum pixel style
 | # | Note | Status |
 |---|---|---|
-| E1 | GBA-style pixel pieces from Eric's picture, all six, both colors | round 1 pushed (`claude/colosseum-pixel`); **round 2 building**: smaller, slimmer pieces like the picture, crisper rook/queen tops |
+| E1 | GBA-style pixel pieces from Eric's picture, all six, both colors | **PR #439** (round 2: sizes measured from the picture, slim Staunton shapes, warm outline, four-tone shading); merging when CI is green |
 | E2 | Four high views going round the board; opens behind White *(mine)* | built (round 1) |
 | E3 | Gear row "Pieces": Pixel (default) / 3D / 2D | built (round 1) |
-| E4 | Eric's reference picture: lost in the restart | **ask Eric to re-send** for the final side-by-side |
+| E4 | Eric's reference picture | re-sent; kept in the repo (`docs/refs/colosseum-high-view.png`) |
 
 ## F. Admins
 | F1 | Every admin owns one of every item, now and later; nothing stored | **LIVE** #430 |
