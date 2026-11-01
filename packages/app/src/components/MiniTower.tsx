@@ -10,6 +10,9 @@ import { foldUnderBoard, onPrefsChange, underBoardView } from "../prefs.ts";
 const ROW = 22;
 const HEAD = 18;
 
+/** The scoreboard's last room under the board (MiniTower): a new one starts from it. */
+let lastSpace = 0;
+
 /** The team each match's scoreboard shows (Black, White or All): picked on the scoreboard, your team when it starts. */
 const picks = new WeakMap<object, TeamPick>();
 const PICK_LABEL: Record<TeamPick, string> = { b: "Black", w: "White", all: "All" };
@@ -60,14 +63,20 @@ export function MiniTower({
   useEffect(() => (openProp === undefined ? onPrefsChange(() => setOwn(underBoardView().open)) : undefined), [openProp === undefined]);
   const open = openProp ?? own;
   const [sheet, setSheet] = useState(false);
-  const [space, setSpace] = useState(0);
+  // (Measured before the first paint, from the room it last had: a scoreboard drawn anew (the chat tab's Back, a screen
+  // of its own) shows the rows that fit at once, not three until it has measured and the rest wiping in. Off the page (a
+  // phone's 50 v 50 box through a cut) it keeps its last room.)
+  const [space, setSpace] = useState(lastSpace);
   const body = useRef<HTMLDivElement>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = body.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setSpace(el.clientHeight));
+    const fit = () => {
+      if (el.isConnected) setSpace((lastSpace = el.clientHeight));
+    };
+    const ro = new ResizeObserver(fit);
     ro.observe(el);
-    setSpace(el.clientHeight);
+    fit();
     return () => ro.disconnect();
   }, [open]);
 
