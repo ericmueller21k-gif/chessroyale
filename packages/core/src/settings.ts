@@ -321,8 +321,9 @@ export interface Settings {
   engineHashMb: number;
   botCandidateMoves: number;
   /**
-   * Bot skill temperatures T (in points of loss), strongest to loosest. Bots get
-   * skills spread evenly on a log scale across this range. Chosen in milestone 2.
+   * Bot skill temperatures T (in points of loss), strongest to loosest. Since Nov 1 a lobby's bots get the temperature
+   * of their rating (BOT_LOBBY, botStrength), never tighter than this range's first number (the ?weakbots=1 floor);
+   * botSkillSpread (the sims) still spreads skills evenly on a log scale across it.
    */
   botSkillRange: readonly [number, number];
   botRandomMoveChance: number;
