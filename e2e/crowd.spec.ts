@@ -392,3 +392,71 @@ test("the scoreboard never moves: its top edge, height and the middle box hold t
   expect(worstSpill, "the middle box was measured").toBeGreaterThan(Number.NEGATIVE_INFINITY);
   expect(worstSpill, "middle box content overflow, px (≤ 0: it fits)").toBeLessThanOrEqual(0);
 });
+
+test("the scoreboard box is built once: the same element and header, the same box, through picking, the reveal, the next turn and a cut (phone)", async ({ page }) => {
+  // (Eric, Nov 1: "the container should be static, and anything inside of it should be… fading in and out and moving,
+  // but not flashing". Each phase of a turn is a screen of its own, and each built the box anew: three rows on its first
+  // frame, the rest wiping in. Now it's one element for the match: QuickChat.tsx, KeptBox.)
+  test.setTimeout(5 * 60_000);
+  test.skip(test.info().project.name !== "phone", "a phone's locked screen");
+  await page.setViewportSize({ width: 390, height: 750 });
+  // (A cut after each team's move; loose bots, so you're through it and see the box again.)
+  await page.goto("/?debug&pace=quick&mode=crowd&augments=0&rounds=2&clock=20&weakbots=1");
+  await soloFromHome(page);
+  await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/play|watching/);
+  // A bots-only game has the chat tab too (Eric, Nov 1).
+  await expect(page.locator(".screen.game > .under-board .mini-chat-tab")).toBeVisible();
+  // Every frame: which box element, which header, the box's place and size, and how many rows it shows.
+  await page.evaluate(() => {
+    const w = window as any;
+    const b = (w.__box = { els: [] as Element[], heads: [] as Element[], boxes: [] as string[], fewest: Infinity, seq: [] as string[] });
+    const tick = () => {
+      const kind = w.match?.phase.kind ?? "none";
+      if (b.seq.at(-1) !== kind) b.seq.push(kind);
+      const el = document.querySelector(".screen.game > .under-board");
+      if (el) {
+        if (!b.els.includes(el)) b.els.push(el);
+        const head = el.querySelector(".mini-tower-head");
+        if (head && !b.heads.includes(head)) b.heads.push(head);
+        const r = el.getBoundingClientRect();
+        const at = `${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.width)},${Math.round(r.height)}`;
+        if (!b.boxes.includes(at)) b.boxes.push(at);
+        b.fewest = Math.min(b.fewest, el.querySelectorAll(".tower-row").length);
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  const seq = () => page.evaluate(() => (window as any).__box.seq as string[]);
+  // Until the box is back after a cut, having seen your pick, a reveal and the other team's turn.
+  const done = (s: string[]) => {
+    const cut = s.indexOf("stageBreak");
+    return cut > 0 && ["play", "reveal", "watching"].every((k) => s.slice(0, cut).includes(k)) && s.slice(cut).some((k) => k === "play" || k === "watching");
+  };
+  let submitted = "";
+  const stopAt = Date.now() + 4 * 60_000;
+  while (Date.now() < stopAt && !done(await seq())) {
+    if ((await phase(page)) === "play") {
+      const fen: string = await page.evaluate(() => (window as any).match.phase.board?.fen ?? "");
+      if (fen && fen !== submitted) {
+        submitted = fen;
+        const pick = await page.evaluate(() => [...((window as any).match.runner.planned?.values() ?? [])][0] as string | undefined);
+        await submitMove(page, pick, fen);
+      }
+    }
+    await page.waitForTimeout(200);
+  }
+  const b = await page.evaluate(() => {
+    const b = (window as any).__box;
+    return { els: b.els.length, heads: b.heads.length, boxes: b.boxes, fewest: b.fewest, seq: b.seq };
+  });
+  const where = JSON.stringify(b);
+  expect(done(b.seq), where).toBe(true);
+  // One box element and one header for the match (a screen of its own no longer builds them anew).
+  expect(b.els, where).toBe(1);
+  expect(b.heads, where).toBe(1);
+  // Its place and size never change.
+  expect(b.boxes, where).toHaveLength(1);
+  // Never the three rows of a scoreboard that hasn't measured its box yet (on a 390 × 750 phone it shows about nine).
+  expect(b.fewest, where).toBeGreaterThan(3);
+});

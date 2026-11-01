@@ -132,13 +132,14 @@ test("the panel under the board is never empty: every tap, every remembered layo
     }
   }
   // The chat tab never moves or resizes the board, and its feed shows two whole lines (on this 390 x 664 phone the box
-  // is short: its buttons and lines are smaller, styles.css "A short chat tab").
+  // is short; the tab has no rows of buttons, its T and 😊 open the picks over the feed: #451).
   const boardBox = () => p.locator(".screen.game .board-wrap").boundingBox();
   const onBoardTab = await boardBox();
   await tap(p, CHAT);
   await expectShowing(p, { layout: "chat", open: true }, "Chat, then a reload");
   expect(await boardBox(), "the board, the chat tab against the scoreboard").toEqual(onBoardTab);
-  await p.locator(".qchat-tab .qrow.emoji .qchip:not(:disabled)").first().click();
+  await p.getByRole("button", { name: "Emoji", exact: true }).click();
+  await p.locator(".qchat-tab .qpop .qgroup-lines.emoji .qchip:not(:disabled)").first().click();
   await expect(p.locator(".qchat-tab .qfeed .qline").first()).toBeVisible();
   const lines = await p.evaluate(() => {
     const feed = document.querySelector(".qchat-tab .qfeed") as HTMLElement;
@@ -192,7 +193,7 @@ test("the panel under the board is never empty: every tap, every remembered layo
   await expect(p.locator(".under-board .mini-chat-tab")).toBeVisible();
 });
 
-test("solo Crowd (no chat): the scoreboard alone, full width, folds to its header and opens again", async ({ page }) => {
+test("solo Crowd with chat off: the scoreboard alone, full width, folds to its header and opens again", async ({ page }) => {
   test.setTimeout(3 * 60_000);
   test.skip(test.info().project.name !== "phone", "a phone's layout");
   await named(page, "Solo");
@@ -202,6 +203,8 @@ test("solo Crowd (no chat): the scoreboard alone, full width, folds to its heade
       sessionStorage.setItem("seeded", "1");
       localStorage.setItem("brc.underBoard", "board");
       localStorage.setItem("brc.miniTower", "0");
+      // (Solo's 50 v 50 has chat since Nov 1: off, it's the scoreboard alone, as solo was.)
+      localStorage.setItem("brc.chatOff", "1");
     }
   });
   await page.goto("/?debug&pace=quick&mode=crowd&rounds=2&clock=30&augments=0");

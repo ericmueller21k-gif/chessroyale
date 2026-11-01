@@ -12730,7 +12730,7 @@ img.qicon {
   }
 }
 
-/* A phone's 50 v 50 (Nov 1): one box under the vote box, the scoreboard or the chat (CrowdTabs, QuickChat.tsx). The header
+/* A phone's 50 v 50 (Nov 1): one box under the vote box, the scoreboard or the chat (KeptBox, QuickChat.tsx). The header
    reads Black · White · All, close together, then Chat; the unread count shows on Chat while the scoreboard is up. */
 .screen.game.crowd-50 .mini-tower-head .mini-picks {
   flex: none;
@@ -12741,6 +12741,21 @@ img.qicon {
 }
 .screen.game.crowd-50 .mini-tower-head .mini-chat-tab {
   margin-left: 10px;
+}
+/* "Black" in line with "POS" under it (Eric, Nov 1): both start 3 px in, at the rank squares' left edge (a row's 3 px
+   edge). The tab keeps its full height and stays wider than 24 px; the other labels are as they were. */
+@media (max-width: 899px) and (min-height: 520px) {
+  .screen.game.crowd-50 .mini-tower-head .mini-picks > .mini-pick:first-child {
+    padding-left: 3px;
+  }
+  .screen.game.crowd-50 .mini-tower .tower-head span:first-child {
+    padding-left: 3px;
+    text-align: left;
+  }
+}
+/* (The kept box's place in each screen: a hidden marker, the box right after it.) */
+.ub-place {
+  display: none;
 }
 .mini-unread {
   display: inline-grid;
@@ -12782,42 +12797,97 @@ img.qicon {
   min-width: 30px;
   padding: 0 6px;
 }
-/* A short chat tab (Nov 1, the eval bar off: a 390 x 664 phone's box is 140 px, and its two rows of buttons left the feed
-   one line). The box's height is the screen's (the board never resizes for it), so when it's under the 170 px that two
-   lines and the buttons need, the buttons are 30 px and the lines 18 px: two whole lines show. Every button stays. */
-.screen.game .under-board.ub-chat:not(.closed) {
-  container: ubchat / size;
-}
-@container ubchat (max-height: 169px) {
-  .qchat-tab .qbuttons.rows {
-    gap: 4px;
-    padding: 4px 0;
-  }
-  .qchat-tab .qchip {
-    min-height: 30px;
-    font-size: 12.5px;
-  }
-  .qchat-tab .qrow.emoji.fit .qchip.emoji {
-    min-height: 30px;
-    font-size: 17px;
-  }
-  .qchat-tab .qfeed {
-    padding-block: 1px;
-  }
-  .qchat-tab .qline,
-  .qchat-tab .qline-name {
-    min-height: 18px;
-  }
-  .qchat-tab .qicon {
-    width: 16px;
-    height: 16px;
-    font-size: 12px;
-    line-height: 16px;
-  }
-}
 /* Folded, the scoreboard keeps its share of the width beside chat (or all of it): only its height folds. */
 .screen.game .under-board > .mini-tower.closed {
   flex: 1 1 0;
+}
+/* The chat tab's pickers (Eric, Nov 1): "T" for the phrases and the emoji button, left of "⋯". No rows of buttons under
+   the feed (the feed has the room); a picker opens over the feed's foot, and closes on a send, its button or a tap
+   elsewhere. */
+.qchat-tab {
+  position: relative;
+}
+.qpick-btn.qpick-lines {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 17px;
+}
+.qpick-btn.qpick-emoji {
+  font-size: 16px;
+}
+.qpick-btn.on {
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+}
+/* (Under 360 px the header's four buttons are 28 px wide, so the fold arrow stays in the box at 320.) */
+@media (max-width: 359px) {
+  .qchat-tab .qhead .qhead-btn {
+    width: 28px;
+  }
+}
+.qpick-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.qchat-tab .qpop {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 6px;
+  z-index: 3;
+  max-height: calc(100% - 34px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--qc-edge);
+  border-radius: 10px;
+  background: var(--qc-head);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.4);
+}
+.qchat-tab .qpop .qbuttons {
+  border-top: 0;
+}
+.qchat-tab .qpop .qbuttons.groups {
+  gap: 6px;
+  padding: 8px;
+}
+.qchat-tab .qpop .qgroup-lines {
+  gap: 6px;
+}
+.qchat-tab .qpop .qbuttons.groups .qchip {
+  min-height: 36px;
+  font-size: 13px;
+}
+.qchat-tab .qpop .qbuttons.groups .qchip.emoji {
+  min-width: 40px;
+  font-size: 20px;
+}
+.qchat-tab .qpop .qmenu {
+  padding: 8px;
+}
+/* A shorter phone's box (about 160 px at 664 tall, about 154 at 600): smaller chips (26 px, 24 under 640), so the ten
+   phrases fit whole in three rows without scrolling, and the emoji in one row. */
+@media (max-height: 700px) {
+  .qchat-tab .qpop .qbuttons.groups {
+    gap: 4px;
+    padding: 6px;
+  }
+  .qchat-tab .qpop .qgroup-lines {
+    gap: 4px;
+  }
+  .qchat-tab .qpop .qbuttons.groups .qchip {
+    min-height: 26px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+  .qchat-tab .qpop .qbuttons.groups .qchip.emoji {
+    min-width: 34px;
+    padding: 0 4px;
+    font-size: 18px;
+  }
+}
+@media (max-height: 639px) {
+  .qchat-tab .qpop .qbuttons.groups .qchip {
+    min-height: 24px;
+  }
 }
 
 /* Computers: the column beside the board. 900-1099 px keeps the phone's split (the scoreboard is there); from

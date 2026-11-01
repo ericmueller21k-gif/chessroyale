@@ -101,7 +101,7 @@ test("two players in a Default queue chat before the match starts: each sees the
   expect(await ann.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
 });
 
-test("Solo's queue: the bots say hello, your line shows, and the match itself has no chat", async ({ page }) => {
+test("Solo's queue: the bots say hello, your line shows, and a 50 v 50's chat carries on into the match, with teams", async ({ page }) => {
   await named(page, "Solo Sam");
   await page.goto("/?debug");
   await soloFromHome(page);
@@ -116,10 +116,10 @@ test("Solo's queue: the bots say hello, your line shows, and the match itself ha
   const from = await hello.first().getAttribute("data-from");
   expect(await page.evaluate((id) => (window as any).match.players.some((p: any) => p.id === id && p.isBot), from)).toBe(true);
   expect(await phase(page)).toBe("lobby");
-  // The match: Solo has no chat (the screens are as they were).
+  // The match (a 50 v 50, Eric, Nov 1: "have it in the bot-only game and have the bots just chatting still"): the chat
+  // carries on, now with teams.
   await expect.poll(() => phase(page), { timeout: 20_000 }).toBe("vote");
-  await expect(page.locator(".qchat")).toHaveCount(0);
-  expect(await page.evaluate(() => (window as any).match.chat.enabled)).toBe(false);
+  expect(await page.evaluate(() => [(window as any).match.chat.enabled, (window as any).match.chat.hasTeams()])).toEqual([true, true]);
 });
 
 test("a private lobby: chat while you wait for the host", async ({ page }) => {
