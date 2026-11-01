@@ -13,11 +13,11 @@ const shopOf = (slots: Offer[]): Shop => ({ slots, rerolls: 0, refills: 0 });
 const alwaysOdds = (odds: { p: number; n: number; b: number; r: number; q: number }): AutoChessSettings => ({ ...AUTOCHESS, shop: { ...AUTOCHESS.shop, oddsByLevel: AUTOCHESS.shop.oddsByLevel.map(() => odds) } });
 
 describe("auto chess: the shop (v6)", () => {
-  it("holds the design's numbers: 4 offers, the odds by level (the whole table: autochess-odds.test.ts), a reroll from 5 (1 more each time, up to 10), prices unchanged", () => {
+  it("holds the design's numbers: 4 offers, the odds by level (the whole table: autochess-odds.test.ts), a reroll from 2 (1 more each time, up to 5), the prices in whole gold", () => {
     expect(AUTOCHESS.shop.slots).toBe(4);
-    expect(AUTOCHESS.shop.reroll).toEqual({ first: 5, step: 1, max: 10 });
+    expect(AUTOCHESS.shop.reroll).toEqual({ first: 2, step: 1, max: 5 });
     expect(AUTOCHESS.shop.oddsByLevel).toHaveLength(10);
-    expect(AUTOCHESS.prices).toEqual({ p: 10, n: 30, b: 32, r: 50, q: 90 });
+    expect(AUTOCHESS.prices).toEqual({ p: 1, n: 3, b: 3, r: 5, q: 9 });
   });
 
   it("rolls pieces at the odds of the level, over many rolls (single rolls, and the offers of many seeded shops)", () => {
@@ -139,16 +139,16 @@ describe("auto chess: the shop (v6)", () => {
   it("buying an offer puts the piece on its square, takes the price, rolls a new offer into that slot only, and is repeatable", () => {
     const army = king();
     const shop = shopOf([offer("p", "a3"), offer("n", "c3"), offer("r", "h1"), offer("p", "d4"), offer("q", "d1")]);
-    const bought = buyFromSlot({ army, gold: 100, shop }, 1, 5);
+    const bought = buyFromSlot({ army, gold: 10, shop }, 1, 5);
     if ("block" in bought) throw new Error("should buy");
     expect(bought.army.board).toEqual({ c3: "n" });
-    expect(bought.gold).toBe(70);
+    expect(bought.gold).toBe(7);
     expect(bought.replaced).toBe(0);
     expect(bought.shop.slots).toHaveLength(5);
     // Only slot 1 changed, and its new offer isn't on the bought square.
     expect(bought.shop.slots.filter((_, i) => i !== 1)).toEqual([offer("p", "a3"), offer("r", "h1"), offer("p", "d4"), offer("q", "d1")]);
     expect(bought.shop.slots[1]!.square).not.toBe("c3");
-    expect(buyFromSlot({ army, gold: 100, shop }, 1, 5)).toEqual(bought);
+    expect(buyFromSlot({ army, gold: 10, shop }, 1, 5)).toEqual(bought);
     // Buying the same slot again rolls again (the refill count moves the seed on): over many buys it isn't always the same offer.
     let s = shop;
     const seen = new Set<string>();
@@ -159,7 +159,7 @@ describe("auto chess: the shop (v6)", () => {
     expect(seen.size).toBeGreaterThan(10);
     expect(s.refills).toBe(40);
     // An offer you can't buy stays as it is, with the usual reason.
-    expect(buyFromSlot({ army, gold: 60, shop }, 4, 5)).toEqual({ block: "gold" });
+    expect(buyFromSlot({ army, gold: 8, shop }, 4, 5)).toEqual({ block: "gold" });
     expect(buyFromSlot({ army: { ...army, board: { a3: "p", b3: "p", c3: "p", d3: "p", e3: "p", f3: "p", g3: "p", h3: "p" } }, gold: 500, shop: shopOf([offer("p", "a2")]) }, 0, 5)).toEqual({ block: "pawns" });
     expect(buyFromSlot({ army: { ...army, board: { d2: "q" } }, gold: 500, shop }, 4, 5)).toEqual({ block: "queen" });
   });
@@ -167,17 +167,17 @@ describe("auto chess: the shop (v6)", () => {
   it("holding an offer pays, puts the piece on the bench with its square, rolls a new offer into the slot, and leaves other offers on that square alone", () => {
     const army = king();
     const shop = shopOf([offer("p", "c2"), offer("b", "c2"), offer("r", "h1"), offer("p", "d4"), offer("n", "g3")]);
-    const held = holdFromSlot({ army, gold: 100, shop }, 1, 77);
+    const held = holdFromSlot({ army, gold: 10, shop }, 1, 77);
     if ("block" in held) throw new Error("should hold");
-    expect(held.gold).toBe(68);
+    expect(held.gold).toBe(7);
     expect(held.army.bench).toEqual([offer("b", "c2")]);
     expect(held.army.board).toEqual({});
     expect(held.shop.slots).toHaveLength(5);
     // Only slot 1 changed (nothing stands on c2, so the pawn offered there is still good).
     expect(held.shop.slots.filter((_, i) => i !== 1)).toEqual([offer("p", "c2"), offer("r", "h1"), offer("p", "d4"), offer("n", "g3")]);
-    expect(holdFromSlot({ army, gold: 100, shop }, 1, 77)).toEqual(held);
+    expect(holdFromSlot({ army, gold: 10, shop }, 1, 77)).toEqual(held);
     // The bench's reasons: gold, a full bench, the limits (a held queen is the one queen).
-    expect(holdFromSlot({ army, gold: 20, shop }, 1, 77)).toEqual({ block: "gold" });
+    expect(holdFromSlot({ army, gold: 2, shop }, 1, 77)).toEqual({ block: "gold" });
     const full = { ...army, bench: [offer("p", "a2"), offer("p", "b2"), offer("p", "e2"), offer("p", "f2")] };
     expect(holdFromSlot({ army: full, gold: 100, shop }, 1, 77)).toEqual({ block: "bench" });
     expect(holdFromSlot({ army: { ...army, bench: [offer("q", "d1")] }, gold: 500, shop: shopOf([offer("q", "d2")]) }, 0, 77)).toEqual({ block: "queen" });
@@ -187,7 +187,7 @@ describe("auto chess: the shop (v6)", () => {
     // A bought offer has no hold left to give: a full board still takes a hold.
     const fullBoard: Army = { ...army, board: { a3: "p", b3: "p", c3: "p", d3: "p", e3: "p", f3: "p", g3: "p", h3: "p", b1: "n", g1: "n" } };
     expect(buyFromSlot({ army: fullBoard, gold: 100, shop }, 1, 77)).toEqual({ block: "limit" });
-    expect(holdFromSlot({ army: fullBoard, gold: 100, shop }, 1, 77)).toMatchObject({ gold: 68 });
+    expect(holdFromSlot({ army: fullBoard, gold: 10, shop }, 1, 77)).toMatchObject({ gold: 7 });
   });
 
   it("an offer whose square gets taken is replaced by a new roll (not greyed), and the new offers are usable", () => {
@@ -212,9 +212,9 @@ describe("auto chess: the shop (v6)", () => {
     expect(b3.shop.slots.map((o) => o.square)).not.toContain("c2");
   });
 
-  it("a reroll costs 5 the first time in a round, 1 more each time after it, up to 10; it rolls all four offers, is refused under its price, and is seeded by the reroll count", () => {
-    // The price of the next one, by how many rerolls the round's shop has had: 5, 6, 7, 8, 9, 10, 10, ...
-    expect([0, 1, 2, 3, 4, 5, 6, 7, 20].map((done) => rerollPrice(done))).toEqual([5, 6, 7, 8, 9, 10, 10, 10, 10]);
+  it("a reroll costs 2 the first time in a round, 1 more each time after it, up to 5; it rolls all four offers, is refused under its price, and is seeded by the reroll count", () => {
+    // The price of the next one, by how many rerolls the round's shop has had: 2, 3, 4, 5, 5, ... (Eric, Oct 25)
+    expect([0, 1, 2, 3, 4, 5, 6, 7, 20].map((done) => rerollPrice(done))).toEqual([2, 3, 4, 5, 5, 5, 5, 5, 5]);
     // (A setting: first, step and max.)
     const dearer: AutoChessSettings = { ...AUTOCHESS, shop: { ...AUTOCHESS.shop, reroll: { first: 3, step: 2, max: 8 } } };
     expect([0, 1, 2, 3, 4].map((done) => rerollPrice(done, dearer))).toEqual([3, 5, 7, 8, 8]);
@@ -223,31 +223,31 @@ describe("auto chess: the shop (v6)", () => {
     expect(shop.rerolls).toBe(0);
     const next = rerollFor({ gold: 12, shop, army }, shopSeed(3));
     if ("block" in next) throw new Error("should reroll");
-    expect(next.gold).toBe(7);
+    expect(next.gold).toBe(10);
     expect(next.shop.slots).toHaveLength(4);
     expect(next.shop.rerolls).toBe(1);
     expect(rerollFor({ gold: 12, shop, army }, shopSeed(3))).toEqual(next);
-    expect(rerollFor({ gold: 4, shop, army }, shopSeed(3))).toEqual({ block: "gold" });
-    expect(rerollFor({ gold: 5, shop, army }, shopSeed(3))).toMatchObject({ gold: 0 });
-    // The second costs 6, the third 7, and each is refused with less.
-    expect(rerollFor({ gold: 6, shop: next.shop, army }, shopSeed(3))).toMatchObject({ gold: 0 });
-    expect(rerollFor({ gold: 5, shop: next.shop, army }, shopSeed(3))).toEqual({ block: "gold" });
-    const third = rerollFor({ gold: 100, shop: rerollShop(next.shop, shopSeed(3), army), army }, shopSeed(3));
+    expect(rerollFor({ gold: 1, shop, army }, shopSeed(3))).toEqual({ block: "gold" });
+    expect(rerollFor({ gold: 2, shop, army }, shopSeed(3))).toMatchObject({ gold: 0 });
+    // The second costs 3, the third 4, and each is refused with less.
+    expect(rerollFor({ gold: 3, shop: next.shop, army }, shopSeed(3))).toMatchObject({ gold: 0 });
+    expect(rerollFor({ gold: 2, shop: next.shop, army }, shopSeed(3))).toEqual({ block: "gold" });
+    const third = rerollFor({ gold: 10, shop: rerollShop(next.shop, shopSeed(3), army), army }, shopSeed(3));
     if ("block" in third) throw new Error("should reroll");
-    expect(third.gold).toBe(93);
-    // Once at the top it stays 10.
+    expect(third.gold).toBe(6);
+    // Once at the top it stays 5.
     const sixth = { ...shop, rerolls: 6 };
-    expect(rerollFor({ gold: 100, shop: sixth, army }, shopSeed(3))).toMatchObject({ gold: 90 });
-    expect(rerollFor({ gold: 9, shop: sixth, army }, shopSeed(3))).toEqual({ block: "gold" });
+    expect(rerollFor({ gold: 10, shop: sixth, army }, shopSeed(3))).toMatchObject({ gold: 5 });
+    expect(rerollFor({ gold: 4, shop: sixth, army }, shopSeed(3))).toEqual({ block: "gold" });
     // The refusal and its words name the price of the next one.
-    expect(rerollBlock(4, 0)).toBe("gold");
-    expect(rerollBlock(5, 0)).toBeNull();
-    expect(rerollBlock(6, 2)).toBe("gold");
-    expect(rerollBlock(7, 2)).toBeNull();
-    expect(rerollWords(1, 0)).toBe("Need 4 more");
-    expect(rerollWords(3, 2)).toBe("Need 4 more");
+    expect(rerollBlock(1, 0)).toBe("gold");
+    expect(rerollBlock(2, 0)).toBeNull();
+    expect(rerollBlock(3, 2)).toBe("gold");
+    expect(rerollBlock(4, 2)).toBeNull();
+    expect(rerollWords(1, 0)).toBe("Need 1 more");
+    expect(rerollWords(1, 2)).toBe("Need 3 more");
     // A new round's shop starts at the first price again.
-    expect(rerollPrice(newShop(shopSeed(4), army).rerolls)).toBe(5);
+    expect(rerollPrice(newShop(shopSeed(4), army).rerolls)).toBe(2);
     // Each reroll shows a different roll of all the offers.
     let changed = 0;
     for (let seed = 0; seed < 200; seed++) {
@@ -266,10 +266,10 @@ describe("auto chess: the shop (v6)", () => {
 
   it("the shop refills free at each round's start: new offers, and gold only from the round's income", () => {
     const m1 = beginRound(newMatch(21)).match;
-    expect(m1.you.gold).toBe(100);
+    expect(m1.you.gold).toBe(10);
     const m2 = beginRound(m1).match;
-    // (Gold: the saved 100 + 10 interest + 120 income; the new shop cost nothing.)
-    expect(m2.you.gold).toBe(100 + 10 + 120);
+    // (Gold: the saved 10 + 1 interest + 12 income; the new shop cost nothing.)
+    expect(m2.you.gold).toBe(10 + 1 + 12);
     expect(newShop(shopSeed(roundSeed(m2)), king("b")).slots).toHaveLength(4);
   });
 
