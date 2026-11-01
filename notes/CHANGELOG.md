@@ -30,7 +30,7 @@ dropped. *(mine)* marks the director's own suggestions.
 | C1 | Alfil's ultimate banner cut off on a computer; every boss banner checked | **LIVE** #436 (two Sawyer subtitles overhang 4–5 px, glyphs inside) |
 | C2 | Ult meter on a computer: thicker, twice as long (88 × 10 px) | **LIVE** #436 |
 | D1 | Squads scoreboard: your squad pinned at the top, a thicker line, then the list | **LIVE** #436 |
-| D2 | Crowd team table stays dark in Light mode (found by #436) | Eric: restyle light; **in the 50 v 50 scoreboard PR** |
+| D2 | Crowd team table stays dark in Light mode (found by #436) | **MERGED #441** (the team table follows Light mode) |
 
 ## E. Colosseum pixel style
 | # | Note | Status |
@@ -82,7 +82,7 @@ dropped. *(mine)* marks the director's own suggestions.
 ## Nov 1 (morning): Eric's three
 | # | Note | Status |
 |---|---|---|
-| L1 | **50 v 50 on a phone:** delete "Your team watched this one"; the middle (power-ups, arrows, status, vote results) is one fixed-height box; the scoreboard flush under it, never moves; header pick **Black · White · All** (your team default; selected white, others grey); drop "tap for all 50" (the ▾ opens the full list). Phone only; desktop later | **PR #441**: round 6 (short phones: the box shrinks to the screen, at least 3 vote bars + yours, so the chat keeps room) *(mine)* |
+| L1 | **50 v 50 on a phone:** delete "Your team watched this one"; the middle (power-ups, arrows, status, vote results) is one fixed-height box; the scoreboard flush under it, never moves; header pick **Black · White · All** (your team default; selected white, others grey); drop "tap for all 50" (the ▾ opens the full list). Phone only; desktop later | **MERGED #441** (short phones: the box follows the screen's height, 4 vote bars or top 3 + yours, so the chat keeps room *(mine)*); follow-up: "Wh…" in the split header |
 | L2 | **Auto chess TFT economy** (Eric's Oct 25 numbers, ROADMAP; had been "for another day"): pawn 1, knight 3, bishop 3, rook 5, queen 9 *(mine: 9 per "unless 8 or 9 is more true to chess value")*; 4 gold → 4 XP; interest +1 per 10 up to +5; roll 2, 3, 4, 5 cap 5 per round; income 10, +2 a round, up to 20 (sim: TFT's flat 5 would leave 2–3 pieces, since every round rebuys the army) | **MERGED #440**; Eric to feel-test |
 | L3 | **Board size on a computer:** Settings "Board size: Large · Compact"; Large = as close to chess.com's 0.889 of the height as fits (shrink bosses/rows if needed), the default *(mine, per "the one people open up the game to")*; Compact = today's (Oct 29). Why today's fell short: a fixed 170–230 px room above/below the board, so a short laptop window gets ~0.72 | **BUILDING** (Haiku); stills to Eric first |
 | L3b | **Boss screen on a computer (Eric, Nov 1, after testing):** no title line ("BOSS · move 1" goes; "Move 1" by the boss's name in its bar, or left of "60 moves left"); ⚡ / fish / gear to the right side of the board; the boss's bar right at the top of the window; a smaller bottom gap; the board bigger; **the normal left side menu back on game screens** ("blank-looking boss screen"). **Mockup first** (Eric may send his own) | Mockup APPROVED; **MERGED #443**: side menu on every computer game screen (icons under 1800 px), no board smaller than today, Boss alone 440 → 512 on a laptop, 880 → 952 on 1920 × 1080 |

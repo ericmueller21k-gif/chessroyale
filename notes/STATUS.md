@@ -44,3 +44,4 @@
 - Nov 1 ~13:45: #444 rides lazy-load MERGED 26d39e1 (deploy/CI watcher).
 - Nov 1 ~14:45: #444 lazy-load LIVE 26d39e1, main GREEN incl. WebGL.
 - Nov 1 ~15:30: #443 computer game screens MERGED 3e2c70c (deploy/CI watcher). #441 round 6 CI running (bpvsib32p).
+- Nov 1 ~15:45: #441 50v50 phone scoreboard MERGED 19c0fe2 (deploy/CI watcher). Follow-up: 'Wh…' header ellipsis in split layout.
