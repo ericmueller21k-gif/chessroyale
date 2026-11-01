@@ -1640,7 +1640,7 @@ test("a fight plays to a result, HP changes by the rule, and the next round star
   expect(fight.text).toContain("A side left with only its king loses. Gains count, not army size: 3 pawns gained for 6 moves wins,");
   expect(fight.text).toContain("and a stall (repeats, 10 moves each with no capture, or 60) goes to the side that gained more.");
   expect(fight.text).not.toMatch(/checks? in a row/);
-  expect(fight.text).toContain("A pawn at the far end cashes in for +1 gold.");
+  expect(fight.text).toContain("A pawn at the far end cashes in for +2 gold.");
   expect(fight.lastMove).toBe(true);
   // The board's usual knocks play for the engine's moves (a capture sounds as it does everywhere).
   expect(await page.evaluate(() => (window as any).__soundLog.filter((l: string) => /^(move|capture):/.test(l)).length)).toBeGreaterThan(0);
