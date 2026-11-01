@@ -1,7 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { BOSS_POWERS } from "@chessroyale/core";
-import { asAdmin, openBossRaid, submitMove, test } from "./helpers.ts";
+import { BOARD_SEL, asAdmin, bossAloneFromHome, openBossRaid, submitMove, test } from "./helpers.ts";
 
 /**
  * Timber, the beaver builder (docs/decisions/2026-11-01-timber.md), in the game for admins first (BOSS_ADMIN_FIRST): his tile
@@ -123,5 +123,63 @@ test.describe("Timber", () => {
     expect(s.board).toHaveLength(1);
     expect(BOSS_POWERS.gnawScraps).toBe(8);
     expect(errors).toEqual([]);
+  });
+  test("on a computer his figure stands beside the board, at rest and in his Gnaw: never over the board, the bar or the side menu", async ({ page }) => {
+    test.setTimeout(400_000);
+    test.skip(test.info().project.name !== "desktop", "his figure stands beside the board on a computer only");
+    await asAdmin(page);
+    await page.addInitScript(() => localStorage.setItem("brc.evalBar", "0"));
+    const start = (boss: string) => page.goto(`/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=${boss}&power=scraps`).then(() => bossAloneFromHome(page));
+    const box = (sel: string) =>
+      page.evaluate((s) => {
+        const el = document.querySelector(s);
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return [Math.round(r.left), Math.round(r.top), Math.round(r.right), Math.round(r.bottom)];
+      }, sel);
+    for (const size of [{ width: 1280, height: 800 }, { width: 1440, height: 900 }]) {
+      await page.setViewportSize(size);
+      // Folio's board at this size: the reference, every boss's board is the same box here.
+      await start("folio");
+      await yourMove(page);
+      const folioBoard = await box(BOARD_SEL.wrap);
+      // Timber, from the first move: his figure, the board, the bar and the side menu, every frame (kept only when they change).
+      await start("timber");
+      await yourMove(page);
+      await page.evaluate(() => {
+        const w = window as any;
+        w.__geo = { rest: [] as number[][], cast: [] as number[][] };
+        const box = (q: string) => {
+          const el = document.querySelector(q);
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          return [Math.round(r.left), Math.round(r.top), Math.round(r.right), Math.round(r.bottom)];
+        };
+        const same = (a: number[][], b: number[] | null) => !!b && JSON.stringify(a[a.length - 1]) !== JSON.stringify(b);
+        const look = () => {
+          const g = w.__geo;
+          const rest = box(".boss-char.place-side .boss-char-sprite");
+          if (rest && same(g.rest, rest)) g.rest.push(rest);
+          const cast = box(".pm-caster");
+          if (cast && same(g.cast, cast)) g.cast.push(cast);
+          requestAnimationFrame(look);
+        };
+        requestAnimationFrame(look);
+      });
+      const board = await box(BOARD_SEL.wrap);
+      expect(board).toEqual(folioBoard);
+      const bar = await box(".boss-bar");
+      const nav = await box("nav");
+      // The Gnaw by the admins' trigger; his teeth and cast come on his turn after the warning.
+      await page.locator(".ult-test").click();
+      await playOne(page);
+      await yourMove(page);
+      const geo = await page.evaluate(() => (window as any).__geo as { rest: number[][]; cast: number[][] });
+      const hit = (a: number[], b: number[] | null) => !!b && a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+      expect(geo.rest.length).toBeGreaterThan(0);
+      expect(geo.cast.length).toBeGreaterThan(0);
+      for (const r of geo.rest) for (const other of [board, bar, nav]) expect(hit(r, other), `rest ${r} over ${other}`).toBe(false);
+      for (const c of geo.cast) for (const other of [board, bar, nav]) expect(hit(c, other), `cast ${c} over ${other}`).toBe(false);
+    }
   });
 });
