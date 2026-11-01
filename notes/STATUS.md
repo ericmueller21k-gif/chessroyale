@@ -54,3 +54,10 @@
 - Nov 1 ~19:10: eval-bar-off round 1 113462a: players identical 15/15. Found latent player bug: Babur's pump (no bar) goes to taller slot at 1440/1920, board 832 vs 952. Round 2 Haiku fixing + FAQ line.
 - Nov 1 ~19:15: #446 LIVE 58c9dd3 (deployed 17:58 UTC), main GREEN.
 - Nov 1 ~19:45: Eric approved Blitz + Timber art; order: Timber first, then Blitz. Timber build helper (Opus high, cr-timber) running, admins-first. Crate session question (Folio crown) → I'll take the no-spend hand fix at crate wiring.
+
+## RULE (Eric; restated Nov 1, ~20:15 UTC): ONE Opus helper at a time
+Set in October after ~10 helpers at once used ~30% of a week's usage (docs/decisions/2026-10-19-boss-build-recipe.md).
+Lost after the Nov 1 restart; four Opus helpers ran at once. Now in CLAUDE.md (PR "one Opus helper at a time").
+Queue (one at a time, in order): Timber (running) → Crowd panel (flash, Black, bot chat, T/emoji chat; worktree
+/home/user/cr-crowd-fixes, stopped mid-work) → Crowd cuts (/home/user/cr-crowd-cuts, stopped mid-work, 24 files
+changed) → Maia bots (/home/user/cr-maia-bots, stopped mid-work, 14 files) → auto chess reveal (after Eric's OK on a mockup).
