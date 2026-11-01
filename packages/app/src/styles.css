@@ -8960,6 +8960,17 @@ button.fd-logo {
   color: #fff;
   white-space: nowrap;
 }
+/*
+ * The sky behind the picture by the device's time of day (Nov 1; home-art/town.ts picks it as the page loads, `data-sky`): the dusk
+ * above is the picture as drawn (17:00 to 19:00); a clear light blue by day (06:00 to 17:00), a deep night blue with the town's
+ * lights on at night (19:00 to 06:00). The same in the light and dark themes, like the dusk.
+ */
+.fd-town[data-sky="day"] {
+  background: linear-gradient(180deg, #5aa9e6 0%, #8cc9f2 60%, #c4e6f8 100%);
+}
+.fd-town[data-sky="night"] {
+  background: linear-gradient(180deg, #050a1e 0%, #0b1433 55%, #16224a 100%);
+}
 .fd-town::after {
   content: "";
   position: absolute;

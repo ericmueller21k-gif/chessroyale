@@ -29,7 +29,7 @@ import { RankEmblem } from "../components/RankEmblem.tsx";
 import { SwordsIcon } from "../town/CardIcons.tsx";
 import { Pic, Scene } from "../home-art/Pic.tsx";
 import { ARENA_AUTO_CARD } from "../home-art/arena-auto-card.ts";
-import { TOWN_PICTURE } from "../home-art/town.ts";
+import { TOWN_PICTURE, TOWN_SCENE, TOWN_SKY } from "../home-art/town.ts";
 
 const MODE_KEY = "brc.mode";
 
@@ -991,11 +991,12 @@ export function HomeScreen({
     </div>
   );
   // Chess Town's button (Eric, Oct 31 and Nov 1; it was the Boss Arena card, Oct 26): PLAY's size, under it, the town square (/town)
-  // as a little scene: one of two pictures, picked at random as the page loads, playing its idle, "Chess Town" over it. Its own
-  // class, not PLAY's (`fd-town`; styles.css gives both the same size at every width).
+  // as a little scene: one of two pictures, picked at random as the page loads, playing its idle, "Chess Town" over it, under the sky
+  // of the device's time of day (day, dusk or night; picked as the page loads too, home-art/town.ts). Its own class, not PLAY's
+  // (`fd-town`; styles.css gives both the same size at every width).
   const chessTownButton = (
-    <button type="button" class="fd-town" onClick={onChessTown} data-picture={TOWN_PICTURE.id}>
-      <Scene ch={TOWN_PICTURE.ch} dropBottom={TOWN_PICTURE.dropBottom} groundRow={TOWN_PICTURE.groundRow} class="fd-town-scene" />
+    <button type="button" class="fd-town" onClick={onChessTown} data-picture={TOWN_PICTURE.id} data-sky={TOWN_SKY}>
+      <Scene ch={TOWN_SCENE} dropBottom={TOWN_PICTURE.dropBottom} groundRow={TOWN_PICTURE.groundRow} class="fd-town-scene" />
       <span class="fd-town-label">Chess Town</span>
     </button>
   );
