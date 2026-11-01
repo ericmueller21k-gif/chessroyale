@@ -22550,3 +22550,279 @@ button.sq-tiny {
     translate: -50% 0;
   }
 }
+
+/* ---------------- Timber (components/Timber.tsx; docs/decisions/2026-11-01-timber.md) ---------------- */
+/* His cast by the board's corner: his frame is 98 x 129 (37 rows of it over his hat, for his entrance's drop). */
+.pm-caster.pm-by-timber {
+  aspect-ratio: 98 / 129;
+  width: 31%;
+  left: -6%;
+  top: -36%;
+}
+/* His banners: planks of his workshop, an orange edge (his hard hat). */
+.fight-banner.power-cut.timber .fb-band {
+  background: repeating-linear-gradient(180deg, #7d4a27 0 3.2cqw, #9c6334 3.2cqw 3.6cqw);
+  border-color: #f08a24;
+}
+/* The workshop strip, in the boss bar's prop slot (right of his bars, under the status): his five pieces in a row, each with a bar
+   filling toward its cost and its count, his woodpecker foreman at the end. Positioned at the slot's top right (a phone's speech
+   bubble sits at the bar's foot, under it), the same size
+   whatever it shows, never taking a tap: nothing in the bar moves for it. */
+.ws-strip {
+  position: absolute;
+  right: 0;
+  top: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  pointer-events: none;
+}
+.ws-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 22px;
+  gap: 1px;
+}
+.ws-strip .ws-piece {
+  position: relative;
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+.ws-strip .ws-piece piece {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  will-change: auto;
+}
+.ws-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+/* A computer's bar is one short row (his figure stands by the board): the strip takes the free room's left part over both rows,
+   between his bars and "Move 2", centered on the bar's height. */
+@media (min-width: 900px) and (min-height: 600px) {
+  .boss-bar .boss-prop:has(> .ws-strip) {
+    grid-column: 2;
+    grid-row: 1 / 3;
+  }
+  .boss-bar .ws-strip {
+    top: 50%;
+    right: auto;
+    left: 4px;
+    transform: translateY(-50%);
+  }
+}
+.ws-bar {
+  position: relative;
+  width: 18px;
+  height: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+.ws-bar i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, #f7b267, #e8742c);
+}
+.ws-count {
+  font-size: 9px;
+  line-height: 1;
+  font-weight: 800;
+  color: #ffe0b8;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* A finished piece glows until it drops. */
+.ws-slot.done .ws-piece {
+  filter: drop-shadow(0 0 3px #ffd36b);
+}
+.ws-slot.done .ws-count {
+  color: #ffd36b;
+}
+/* A scrap landing on it: a small bump. */
+.ws-bump {
+  animation: ws-bump 420ms ease-out;
+}
+@keyframes ws-bump {
+  0% {
+    transform: translateY(-6px) scale(1.18);
+  }
+  60% {
+    transform: translateY(1px);
+  }
+  100% {
+    transform: none;
+  }
+}
+.ws-foreman {
+  display: block;
+  width: 26px;
+  height: 26px;
+  margin-left: 1px;
+}
+.ws-foreman canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  transform-origin: 50% 95%;
+}
+/* Each scrap that lands, the foreman pecks (two quick nods). */
+.ws-foreman canvas.ws-peck {
+  animation: ws-peck 160ms steps(2) 3;
+}
+@keyframes ws-peck {
+  50% {
+    transform: rotate(-10deg) translateX(-1px);
+  }
+}
+/* Closed after his last drop: greyed, "Closed" over it. */
+.ws-strip.closed .ws-slot,
+.ws-strip.closed .ws-foreman {
+  opacity: 0.4;
+  filter: grayscale(1);
+}
+.ws-closed {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #ffe0b8;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ws-bump,
+  .ws-foreman canvas.ws-peck {
+    animation: none;
+  }
+}
+/* His moments on the board: his teeth gnawing their way to your pawn, the splinters as it goes, a plank falling onto a dropped
+   piece's square and its puff of sawdust. On the board's own squares (eighths of --board-size), never taking a tap. */
+.tb-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.tb-teeth,
+.tb-splinters,
+.tb-plank {
+  position: absolute;
+  width: calc(var(--board-size, 100%) / 8);
+  height: calc(var(--board-size, 100%) / 8);
+  z-index: 9;
+  pointer-events: none;
+}
+.tb-teeth {
+  left: calc(var(--board-size, 100%) * var(--x0));
+  top: calc(var(--board-size, 100%) * var(--y0));
+  animation-name: tb-teeth;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+}
+@keyframes tb-teeth {
+  to {
+    left: calc(var(--board-size, 100%) * var(--x1));
+    top: calc(var(--board-size, 100%) * var(--y1));
+  }
+}
+.tb-teeth::after {
+  content: "";
+  position: absolute;
+  inset: 8%;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' shape-rendering='crispEdges'%3E%3Cpath d='M2 3h16v8H2z' fill='%237d4a27' stroke='%231e130d'/%3E%3Cpath d='M5 10h5v8H5zM10 10h5v8h-5z' fill='%23fff6dc' stroke='%231e130d'/%3E%3Cpath d='M8 5h4v3H8z' fill='%23140c08'/%3E%3C/svg%3E") center / contain no-repeat;
+  animation: tb-chomp 170ms steps(2) infinite;
+  transform-origin: 50% 30%;
+}
+@keyframes tb-chomp {
+  50% {
+    transform: scaleY(0.7);
+  }
+}
+.tb-splinters,
+.tb-plank {
+  left: calc(var(--board-size, 100%) * var(--sq-x, 0) / 8);
+  top: calc(var(--board-size, 100%) * var(--sq-y, 0) / 8);
+}
+/* The splinters: a burst of wood chips off the square, out and gone. */
+.tb-splinters::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3px;
+  height: 3px;
+  background: #b97f4a;
+  box-shadow: 9px -7px 0 #9c6334, -10px -5px 0 #d4ad86, 7px 9px 0 #7d4a27, -8px 8px 0 #b97f4a, 0 -11px 0 #9c6334, 12px 2px 0 #d4ad86;
+  animation: tb-burst 520ms ease-out both;
+  animation-delay: inherit;
+}
+@keyframes tb-burst {
+  from {
+    transform: scale(0.3);
+    opacity: 1;
+  }
+  to {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+/* The plank: falls onto the square, tipping level as it lands; then a puff of sawdust. */
+.tb-plank::before {
+  content: "";
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 40%;
+  height: 20%;
+  border: 1px solid #1e130d;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #d9a066, #a8692f);
+  animation: tb-plank 600ms ease-in both;
+  animation-delay: inherit;
+}
+@keyframes tb-plank {
+  0% {
+    transform: translateY(-160%) rotate(-24deg);
+    opacity: 1;
+  }
+  53% {
+    transform: translateY(0) rotate(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) rotate(0);
+    opacity: 0;
+  }
+}
+.tb-plank::after {
+  content: "";
+  position: absolute;
+  inset: 20%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(232, 214, 180, 0.85), rgba(232, 214, 180, 0));
+  animation: tb-dust 600ms ease-out both;
+  animation-delay: inherit;
+}
+@keyframes tb-dust {
+  0%,
+  53% {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}

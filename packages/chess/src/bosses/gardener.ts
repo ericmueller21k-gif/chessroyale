@@ -40,7 +40,7 @@ import { BOSS_POWERS, type BossPowerSettings, type BossPowerState, type GardenPl
 import { kingAttacked, legalMoves, mateInOne, pieceAt, sideToMove, withPiece, withoutPiece } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import { stockfishRefuses } from "../uci.ts";
-import { PASS_WAIT, eachOn, logit, meterFull, moveSquares, other, passLoses, powerRoll, testSwitch, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
+import { PASS_WAIT, eachOn, logit, meterFull, moveSquares, other, passLoses, powerRoll, testSwitch, ticksAt, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
 import { blockedBy } from "./bigboy.ts";
 import { passTurn } from "./hollow.ts";
 
@@ -102,7 +102,7 @@ export function seedsAt(g: Pick<GardenState, "since" | "base"> & { fixed?: numbe
   if (g.taken) return { count: g.taken.seeds, next: null };
   if (g.fixed !== undefined && g.fixed !== null) return { count: g.fixed, next: null };
   const every = s.seedEverySec * 1000;
-  const grown = Math.floor(Math.max(0, now - g.since) / every);
+  const grown = ticksAt(g.since, now, every).ticks;
   const count = Math.min(s.seedMax, g.base + grown);
   return { count, next: count >= s.seedMax ? null : g.since + (count - g.base + 1) * every };
 }

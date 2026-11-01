@@ -29,6 +29,8 @@ import { TIGER_CHANCE, TIGER_LINES } from "./tiger-lines.ts";
 import { FOLIO } from "./folio.ts";
 import { ATTACK_PER_SQUARE, ATTACK_STAND, FOLIO_ATTACK, FOLIO_PORTRAIT } from "./folio-attack.ts";
 import { FOLIO_LINES } from "./folio-lines.ts";
+import { TIMBER_FIGURE as TIMBER } from "./timber-figure.ts";
+import { TIMBER_CHANCE, TIMBER_LINES } from "./timber-lines.ts";
 import { lineSounds } from "../speech.tsx";
 import type { Stance } from "./stance.ts";
 import { mooPowered } from "./moo-state.ts";
@@ -747,6 +749,48 @@ export const BOSS_KITS: Record<string, BossKit> = {
     // splash on its square each one. Facing our left; 36 frame pixels a square, 1.7 off (its beak clear of the king's middle).
     kingAttack: { ch: FOLIO_ATTACK, anim: "kingAttack", perSquare: ATTACK_PER_SQUARE, stand: ATTACK_STAND, facesLeft: true, hit: inkItem },
   },
+  // Timber, the beaver builder (Eric's idea, Oct 20; approved Nov 1): docs/decisions/2026-11-01-timber.md. His art's new cues have
+  // no sounds of their own yet (the art run's report): each borrows a near one of another boss's.
+  "Timber": {
+    ch: TIMBER,
+    anims: {
+      // (His periodic strike on a piece, the God King's: his hammer whack.)
+      strike: "capture",
+      // A piece of his dropped: a plank off his back, shown off, swung down to the board (the piece goes on at its `drop` cue).
+      power: "build",
+      // The Gnaw's warning: teeth bared, licking his lips (a loop); the Gnaw: four big chomps, a chew and a burp of sawdust.
+      ultimateWarn: "gnawWarn",
+      ultimate: "gnaw",
+      // A piece landed: a proud nod; his queen: a hop with the hammer high.
+      cheer: "cheer",
+      bigCheer: "bigCheer",
+    },
+    sounds: {
+      drop: "gardenerWhoosh",
+      stomp: "alfilStomp",
+      pat: "smudgyDab",
+      whoosh: "sawyerSwing",
+      tap: "bigboyClack",
+      whack: "bigboyBonk",
+      point: "pigTip",
+      oof: "gardenerOof",
+      thump: "gardenerThump",
+      clatter: "alfilClatter",
+      cheer: "hopperCheer",
+      slap: "hopperThump",
+      pull: "sawyerTape",
+      show: "tigerRustle",
+      clack: "bigboyClack",
+      chomp: "alfilCrunch",
+      burp: "mooPlop",
+    },
+    lines: TIMBER_LINES,
+    chance: TIMBER_CHANCE,
+    portrait: { x: 14, y: 41, w: 42, h: 36, anim: "idle", frame: 0 },
+    // (His frame is 98 x 129, the art's 88 x 88 with room round it for his entrance's drop: timber-figure.ts. The planks on his back and his
+    // tail reach past the usual box on both sides.)
+    wide: true,
+  },
   "Hidden Boss": {
     ch: RECLUSE,
     // (A phone's boss bar: his bust, head and shoulders, the same animations.)
@@ -815,7 +859,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
 for (const lines of Object.values(FOLIO_LINES)) for (const line of lines ?? []) lineSounds.set(line, "folioVoice");
 
 /** Every moment a kit may name an animation for (and so every `anims` key a powered twin may replace). */
-const BEAT_NAMES = ["entrance", "idle", "thinking", "move", "capture", "hurt", "check", "smug", "rattled", "defeat", "victory", "strike", "power", "powerHit", "ultimateWarn", "ultimate", "ultimateHit", "wax", "flurry", "dazed", "plantMany", "plant", "cheer", "bigCheer", "shrug", "place", "wince", "fold", "revision", "kingAttack"] as const satisfies readonly Beat[];
+const BEAT_NAMES = ["entrance", "idle", "thinking", "move", "capture", "hurt", "check", "smug", "rattled", "defeat", "victory", "strike", "power", "powerHit", "ultimateWarn", "ultimate", "ultimateHit", "wax", "flurry", "dazed", "plantMany", "plant", "cheer", "bigCheer", "shrug", "place", "wince", "fold", "revision", "gnawNone", "kingAttack"] as const satisfies readonly Beat[];
 const LOOP_NAMES = ["idle", "thinking", "smug", "rattled", "defeat", "victory"] as const satisfies readonly Loop[];
 const poweredKits = new WeakMap<BossKit, BossKit>();
 /**

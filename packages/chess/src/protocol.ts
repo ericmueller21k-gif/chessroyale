@@ -10,6 +10,7 @@ import type { CamoView } from "./bosses/smudgy.ts";
 import type { GardenView, WaterAsk } from "./bosses/gardener.ts";
 import type { BalloonAsk, HoopsAsk, TigerView } from "./bosses/tiger.ts";
 import type { CreaseAsk, FolioView } from "./bosses/folio.ts";
+import type { WorkshopView } from "./bosses/timber.ts";
 import type { MoveScore } from "./uci.ts";
 /**
  * Messages between the browser and the lobby server (one Durable Object per
@@ -419,6 +420,12 @@ export interface NetBossPowers {
    * plays) and how many he's made.
    */
   garden?: GardenView | null;
+  /**
+   * Timber (missing for other bosses and from older servers; an older app ignores it): his workshop as last settled (each
+   * piece's scraps, the scraps' rolls so far and their seed, the real-time meter's `since`: workshopAt with the screens' clock
+   * gives the scraps landed since), his drops and their cap, his last drop, Gnaw and bonus scraps.
+   */
+  workshop?: WorkshopView | null;
   /**
    * The circus tiger (missing for other bosses and from older servers; an older app ignores them): the balloon on his
    * nozzle (`balloon`: its shape as everyone sees it, a fake queen's "q"; its color; when it went on and when it's fully

@@ -1,6 +1,6 @@
 import { PRIOR_RATING } from "./rating.ts";
 import { mulberry32, randomInt } from "./rng.ts";
-import { BOSS_BRAIN, BOSS_LEVEL, type BossBrain, type BossBrainSettings, type Settings } from "./settings.ts";
+import { BOSS_ADMIN_FIRST, BOSS_BRAIN, BOSS_LEVEL, type BossBrain, type BossBrainSettings, type Settings } from "./settings.ts";
 
 /**
  * Boss battle: the Crowd's finalists team up against a boss. Its strength comes
@@ -77,7 +77,7 @@ export interface BossInfo {
 }
 
 /** The boss powers there are: a passive (or opening) and an ultimate per boss. */
-export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint" | "moonbeam" | "fullmoon" | "seeds" | "water" | "balloons" | "hoops" | "draft" | "crease" | "revision";
+export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint" | "moonbeam" | "fullmoon" | "seeds" | "water" | "balloons" | "hoops" | "draft" | "crease" | "revision" | "scraps" | "gnaw";
 /**
  * Every power, for the test switch (?power=<id>: a boss's ultimate comes early; its passive as usual, but for Wrangler's
  * drag and Alfil's Tusks, which come sooner and more often, the hopper's Leapfrog, whose battle starts with a hop due
@@ -92,7 +92,7 @@ export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | 
  * crease lands as the third does); ?power=revision, its once-a-battle third power (not on its BOSS_ROSTER line), comes at
  * the first crowd move it may follow (turn 5 on), whatever the evaluation says.
  */
-export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops", "draft", "crease", "revision"];
+export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops", "draft", "crease", "revision", "scraps", "gnaw"];
 
 /**
  * A raid boss: the base template every boss fills in. Its powers' rules (which moves are allowed, what happens after
@@ -231,6 +231,13 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // crowd 0.33 in 60 battles, above 0.30; +150, 0.28 in 50 moves, nearer the aim of 0.10 to 0.25; the first sim, at −250
   // and the sheet's rules, put it among the easiest: reports/folio-sim.md).
   { id: "folio", name: "Folio", icon: "📜", kit: "Folio", offset: 150, powers: { passive: "draft", ultimate: "crease" } },
+  // Timber, a beaver builder in an orange hard hat (Eric's idea, Oct 20; his design approved Nov 1): Scraps, a workshop of five
+  // pieces (pawn 2, knight 4, bishop 4, rook 6, queen 12 scraps) fed by a real-time meter (a scrap every 15 s) and 2 scraps a
+  // capture of his, a finished piece dropped onto an empty square of his half at the end of his turn (one a turn, a cap a
+  // battle); and Gnaw, after the usual warning, after his move: one of your pawns eaten, 8 scraps for the workshop
+  // (bosses/timber.ts; docs/decisions/2026-11-01-timber.md; reports/timber-sim.md). Admins first: BOSS_ADMIN_FIRST in
+  // settings.ts (the test links `?boss=timber`, `&power=scraps`, `&power=gnaw`).
+  { id: "timber", name: "Timber", icon: "🦫", kit: "Timber", offset: -250, powers: { passive: "scraps", ultimate: "gnaw" } },
   { id: "recluse", name: "Hidden Boss", icon: "📕", kit: "Hidden Boss", offset: 0, powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true, crowdFinal: true, the: true, levelUnknown: true },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },
   { id: "archer", name: "The Bone Archer", icon: "💀", kit: null, offset: 0, powers: null },
@@ -244,7 +251,15 @@ export const BOSS_ROSTER: readonly BossDef[] = [
 ];
 
 /** The one rule for choosing a boss: it has a complete character and its powers, and isn't hidden from players. */
-export const isPlayable = (b: BossDef | null | undefined): b is BossDef => !!b && b.kit !== null && b.powers !== null && !b.adminOnly;
+export const isPlayable = (b: BossDef | null | undefined): b is BossDef => !!b && b.kit !== null && b.powers !== null && !b.adminOnly && !adminFirst(b);
+/**
+ * A new boss in the game for admins first (BOSS_ADMIN_FIRST in settings.ts; Timber, Nov 1): complete, but met only by an
+ * admin until Eric says go. He shows on an admin's boss select and boss menu (Boss alone and a Solo raid), never at random,
+ * never in a player's. Taking his id out of BOSS_ADMIN_FIRST puts him live for everyone.
+ */
+export const adminFirst = (b: Pick<BossDef, "id"> | null | undefined): boolean => !!b && BOSS_ADMIN_FIRST.includes(b.id);
+/** The bosses in the game for admins first (adminFirst), in roster order. */
+export const adminFirstBosses = (roster: readonly BossDef[] = BOSS_ROSTER): BossDef[] => roster.filter((b) => adminFirst(b) && !b.adminOnly && b.kit !== null && b.powers !== null);
 /** An admin may meet it in Boss alone: a playable boss, or one hidden from players with its character and powers. */
 export const adminPlayable = (b: BossDef | null | undefined): b is BossDef => !!b && b.kit !== null && b.powers !== null;
 /** The bosses only admins meet (in Boss alone), in roster order. */
@@ -253,7 +268,12 @@ export const hiddenBosses = (roster: readonly BossDef[] = BOSS_ROSTER): BossDef[
  * The boss menu's bosses: the playable ones; for an admin picking for Boss alone (not a raid), the hidden ones after them
  * (the Hidden Boss, for testing).
  */
-export const menuBosses = (opts: { admin: boolean; raid: boolean }, roster: readonly BossDef[] = BOSS_ROSTER): BossDef[] => [...playableBosses(roster), ...(opts.admin && !opts.raid ? hiddenBosses(roster) : [])];
+export const menuBosses = (opts: { admin: boolean; raid: boolean }, roster: readonly BossDef[] = BOSS_ROSTER): BossDef[] => [
+  ...playableBosses(roster),
+  // (Admins: the bosses in the game for admins first, Timber, as any other.)
+  ...(opts.admin ? adminFirstBosses(roster) : []),
+  ...(opts.admin && !opts.raid ? hiddenBosses(roster) : []),
+];
 
 /**
  * The boss the Crowd's boss final always meets (Eric, Oct 14: the Hidden Boss, the top 4 against him): the roster's
@@ -637,6 +657,8 @@ export interface BossPowerState {
   crease?: Crease | null;
   /** Folio's other powers (its Draft marks and folds, the Crease's line on its way, Revision). */
   folio?: FolioState | null;
+  /** Timber's Workshop (his passive, Scraps) and his last Gnaw (his ultimate). */
+  workshop?: WorkshopState | null;
   /** What happened as this turn began, for the screens' moments (the same for everyone). */
   events: PowerEvent[];
 }
@@ -822,6 +844,35 @@ export interface Crease {
  *   and Folio's move in their place once played (`move`, `san`); `revisions`, how many this battle (revisionMax).
  * - Counts for the sims and the screens: marks made, folds, marks answered (the attack ended after a crowd move).
  */
+/** The pieces Timber's workshop builds, in its strip's order (WORKSHOP_PIECES). */
+export type WorkshopPiece = "p" | "n" | "b" | "r" | "q";
+export const WORKSHOP_PIECES: readonly WorkshopPiece[] = ["p", "n", "b", "r", "q"];
+
+/**
+ * Timber's Workshop (id timber; his passive, Scraps; the chess package's bosses/timber.ts), as last settled (at the end of
+ * his turn). The screens and the rules work out the scraps landed since from the clock (workshopAt), the same everywhere.
+ * - `prog`: each piece's scraps so far (WORKSHOP_PIECES' order); a finished one holds its cost until it's dropped. `done`: the
+ *   finished pieces in the order they finished (the first one he can have drops first).
+ * - `n`: scraps rolled so far (each one's roll is its index: where it goes, from `wseed`).
+ * - `since`: the real-time meter (the battle's clock, ms): a scrap lands at since + every, since + 2 every, …
+ * - `wseed`: the scraps' rolls' seed, drawn from the battle's (it's public: where a scrap goes is no secret).
+ * - `drops`: pieces dropped this battle (at most workshopDropMax: then the workshop closes).
+ * - `last`: his last drop (after crowd move `at`); `gnaw`: his last Gnaw (the pawn's square; null: you had none);
+ *   `bonus`: his last scraps from captures and the Gnaw (after crowd move `at`), for the screens' landing.
+ */
+export interface WorkshopState {
+  prog: number[];
+  done?: number[];
+  n: number;
+  since: number;
+  wseed: number;
+  drops: number;
+  last?: { at: number; piece: WorkshopPiece; square: string } | null;
+  gnaw?: { at: number; square: string | null; scraps: number } | null;
+  bonus?: { at: number; scraps: number; from: "capture" | "gnaw" | "both" } | null;
+  gnaws: number;
+}
+
 export interface FolioState {
   mark: { square: string; piece: string; attacker: string; by: string; line: string[]; at: number; until: number } | null;
   folded: { square: string; piece: string; at: number; until: number } | null;
@@ -1282,7 +1333,9 @@ export type PowerEventKind =
   | "creaseWarn"
   | "crease"
   | "creaseEnd"
-  | "revision";
+  | "revision"
+  | "build"
+  | "gnaw";
 export interface PowerEvent {
   kind: PowerEventKind;
   turn: number;
@@ -1321,6 +1374,8 @@ export interface PowerEvent {
   line?: string;
   /** Folio's Revision: the two moves crossed out, its own and then the crowd's (UCI). */
   moves?: string[];
+  /** Timber's Gnaw: the scraps the pawn made (its square: `square`; none to gnaw: no square). */
+  scraps?: number;
 }
 
 /** The settings behind the God King's Last Stand. */

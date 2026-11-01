@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { BOSS_ROSTER, isPlayable, type PowerEventKind, type PowerId } from "@chessroyale/core";
+import { BOSS_ROSTER, adminFirst, isPlayable, type PowerEventKind, type PowerId } from "@chessroyale/core";
 import { asAdmin, openBossRaid, submitMove, test } from "./helpers.ts";
 
 /**
@@ -27,9 +27,11 @@ const PASSIVE_EVENTS: Partial<Record<PowerId, PowerEventKind[]>> = {
   seeds: ["plantMany"],
   balloons: ["place"],
   draft: ["draft"],
+  scraps: ["build"],
 };
 
-const PLAYABLE = BOSS_ROSTER.filter(isPlayable);
+// (A boss in the game for admins first, Timber, is checked too: the test plays as an admin.)
+const PLAYABLE = BOSS_ROSTER.filter((b) => isPlayable(b) || adminFirst(b));
 /**
  * A boss whose ultimate needs a position the usual start doesn't give: his own test switch's start instead of his
  * passive's. Smudgy's Repaint can't come while the crowd has all eight pawns (a ninth is a position the engine refuses),
