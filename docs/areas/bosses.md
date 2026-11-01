@@ -524,7 +524,7 @@ build): online, phase 1 won is the crowd's victory):
   window's height less 123 px (Nov 1: no title line; the boss bar up to Puddles' 61 px, the dock's row, the margins), never wider than its
   column: 952 px at 1920 × 1080, 512 at 1280 × 640 in Boss alone (Nov 1; 600 at 1280 × 800; a raid's board is 504 there, its scoreboard beside it). The list, the
   dock, your pawn, the God King, the boss and Babur's pump follow it (they're placed from the board). Boss alone's empty
-  left column is 196 px, 240 without the eval bar (Nov 1, round 2: 216 before; room for the boss's text box, up to 220 px, inside the window); Babur's is `153 + 0.175 × (the window's height − 200)` px (170 before), so his pump,
+  left column is 196 px, 240 without the eval bar (Nov 1, round 2: 216 before; room for the boss's text box, up to 220 px, inside the window); Babur's is `clamp(240, 0.35 × the window's height − 40, 340)` px (Nov 1, round 2: 240 at 1280 × 800, 338 at 1920 × 1080, with or without the bar; was `153 + 0.175 × (the window's height − 200)` px with the bar, 170 before), so his pump,
   which grows with the board, keeps its place beside him at every size (`pumpPlace` sizes it for the board this layout
   draws: the board's own element, not the squares' last size, which flipped it between there and the taller bar).
   From 900 to 1099 px the boss is drawn at 1× by the eval bar, so he's whole in the window; the board makes room only

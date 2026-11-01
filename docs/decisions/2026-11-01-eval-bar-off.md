@@ -12,5 +12,11 @@ gets resized when the eval bar isn't enabled."
 - **Why the boards don't move:** a player's board already had no bar, so every board now lays out as a player's always has. The
   sizes the desktop and layout specs pin were measured with the testers' bar on; they're now the no-bar sizes, and the "never
   smaller than main's" checks still hold.
-- **Known red, for Eric:** Babur's pump at 1440 × 900 and 1920 × 1080 is in the taller slot, not beside him, for a player today
-  (the no-bar layout; the suite only ran with the bar on until now). The check is unchanged; Eric decides (see the PR body).
+- **Babur's pump, round 2 (fixed).** With no bar, his column was the 240 px rule meant for Boss alone, so at 1440 × 900 and 1920 × 1080
+  the pump's box (its size grows with the board) hit the side menu and went in the taller bar, and the board shrank (832 at 1920). His
+  column is now his own formula at every size, `clamp(240px, 0.35 × the window's height − 40px, 340px)` (`board-size.css`): 240 at
+  1280 × 800, 338 at 1920 × 1080. The pump stands beside him at all four sizes; his board is 600 at 1280 × 800 and 640 at 1366 × 768
+  (both as before), 728 at 1440 × 900 (was 680, the taller bar's) and 952 at 1920 × 1080 (was 832). The check
+  is unchanged except its two sizes (1440 680 → 728, 1920 832 → 952; PR body).
+- **FAQ (round 2):** "The eval bar beside the board shows the same number." is dropped (`faq/content.ts`); nothing on screen shows the
+  number now.

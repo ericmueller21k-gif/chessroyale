@@ -292,10 +292,10 @@ test("a computer: Babur's pump beside him at every size, as big as the board's b
   await bossAloneFromHome(page);
   await expect.poll(() => phase(page), { timeout: 120_000 }).toBe("play");
   // (His column grows with the board, so the pump has room beside him. Nov 1, the eval bar off for everyone: the boards are a player's
-  // now, 1280 × 800 600 (was 536), 1366 × 768 640 (was 624), 1440 × 900 680, 1920 × 1080 832 (was 952). Round 2 (Nov 1): the side menu
-  // is icons only below 1800 px, and his column is 153 px + the board's share (170 before).)
-  // (Nov 1: at 1440 × 900 and 1920 × 1080 a player's pump is in the taller slot, not beside him: see the PR; the check stays.)
-  for (const [size, board] of [["1280x800", 600], ["1920x1080", 832], ["1366x768", 640], ["1440x900", 680], ["1280x800", 600]] as const) {
+  // now, 1280 × 800 600 (was 536), 1366 × 768 640 (was 624). Round 2 (Nov 1): the pump is beside him at 1440 × 900 and 1920 × 1080 too,
+  // so the board is 728 at 1440 (was 680) and 952 at 1920 (was 832, the taller bar's): his column is 240 to 340 px by the window's
+  // height (board-size.css), and the side menu is icons only below 1800 px.)
+  for (const [size, board] of [["1280x800", 600], ["1920x1080", 952], ["1366x768", 640], ["1440x900", 728], ["1280x800", 600]] as const) {
     const [w, h] = dims(size);
     await page.setViewportSize({ width: w, height: h });
     await page.waitForTimeout(800);
