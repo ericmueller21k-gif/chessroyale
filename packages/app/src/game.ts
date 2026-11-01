@@ -412,6 +412,12 @@ export function towerView(m: Pick<GameView, "standings" | "cutoff" | "settings" 
 
 export const isCrowd = (m: Pick<GameView, "settings">) => m.settings.mode === "crowd";
 
+/**
+ * A 50 v 50 (Crowd's two teams, not a boss battle): the screens whose middle box and scoreboard hold one place on a
+ * phone (Eric, Nov 1). A boss raid, the Crowd's boss final and every other mode keep their own layout.
+ */
+export const isCrowdFifty = (m: Pick<GameView, "settings" | "boss">) => isCrowd(m) && !m.boss;
+
 /** Decimals a score shows to: 2 where the crowd's scoring keeps them (CrowdScoring), else 1. */
 export const scoreDp = (s: Pick<Settings, "crowdScoring">) => (s.crowdScoring ? 2 : 1);
 

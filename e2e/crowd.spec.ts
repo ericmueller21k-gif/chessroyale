@@ -336,6 +336,7 @@ test("the scoreboard never moves: its top edge, height and the middle box hold t
   let reveals = 0;
   let last = "";
   let submitted = "";
+  let worstSpill = -Infinity;
   const stopAt = Date.now() + 3 * 60_000;
   while (reveals < 2 && Date.now() < stopAt) {
     const s = await page.evaluate(() => {
@@ -345,11 +346,17 @@ test("the scoreboard never moves: its top edge, height and the middle box hold t
         const r = el.getBoundingClientRect();
         return `${Math.round(r.top)} ${Math.round(r.height)}`;
       };
+      const middleBox = () => document.querySelector(".screen.game > .play-footer") ?? document.querySelector(".screen.game > .poll");
       return {
         kind: (m?.phase.kind ?? "none") as string,
         fen: (m?.phase.board?.fen ?? "") as string,
         tower: box(document.querySelector(".screen.game .mini-tower")),
-        middle: box(document.querySelector(".screen.game > .play-footer") ?? document.querySelector(".screen.game > .poll")),
+        middle: box(middleBox()),
+        // The middle box's content fits it (nothing spills onto the scoreboard): how far its content runs past it.
+        spill: (() => {
+          const el = middleBox();
+          return el ? el.scrollHeight - el.clientHeight : 0;
+        })(),
       };
     });
     if (s.kind === "play" && s.fen !== submitted) {
@@ -367,6 +374,7 @@ test("the scoreboard never moves: its top edge, height and the middle box hold t
       tops.add(s.tower.split(" ")[0]!);
       heights.add(s.tower.split(" ")[1]!);
       middles.add(s.middle ?? "none");
+      if (s.middle) worstSpill = Math.max(worstSpill, s.spill);
     }
     await page.waitForTimeout(100);
   }
@@ -379,4 +387,7 @@ test("the scoreboard never moves: its top edge, height and the middle box hold t
   const mid = [...middles].map((v) => v.split(" "));
   expect(new Set(mid.map((v) => v[0])).size, "middle box top").toBe(1);
   expect(new Set(mid.map((v) => v[1])).size, "middle box height").toBe(1);
+  // Nothing spills: the middle box's content never runs past its box (scrollHeight <= clientHeight), on every phase seen.
+  expect(worstSpill, "the middle box was measured").toBeGreaterThan(Number.NEGATIVE_INFINITY);
+  expect(worstSpill, "middle box content overflow, px (≤ 0: it fits)").toBeLessThanOrEqual(0);
 });

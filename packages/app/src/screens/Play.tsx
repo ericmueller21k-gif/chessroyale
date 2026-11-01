@@ -10,6 +10,7 @@ import { BoardClock } from "../components/BoardClock.tsx";
 import { EvalBar, knownEval } from "../components/EvalBar.tsx";
 import { kingTurn, turnCues } from "../godKing.ts";
 import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
+import { isCrowdFifty } from "../game.ts";
 import type { BoardView, GameView, StrikeState } from "../game.ts";
 import { UnderBoard, useMedia } from "../components/QuickChat.tsx";
 import { BossPanel, besideBoard, useBossLayout } from "../components/MovePanel.tsx";
@@ -120,7 +121,9 @@ export function PlayScreen({
   const powerUps = hint !== null ? Math.max(0, held - 1) : held;
   // (A phone's locked screen: the power-up row goes in the middle box, with the status line, so the scoreboard under it
   // keeps its place through every phase; a computer keeps the row under the board.)
-  const lockedPhone = useMedia(LOCKED_PHONE);
+  // (50 v 50 only: a boss raid and the boss final keep the power-up row under the board, as on main.)
+  const fifty = isCrowdFifty(match);
+  const lockedPhone = useMedia(LOCKED_PHONE) && fifty;
   const powerRow = match.boss ? null : (
     <HistoryNav view={history} total={board.history.length} extra={<PowerUps count={powerUps} max={match.settings.powerUpsMax} used={hint !== null} disabled={waiting} onUse={() => match.usePowerUp()} />} />
   );
@@ -231,7 +234,7 @@ export function PlayScreen({
   }, [board.fen, strike?.at, waiting]);
 
   return (
-    <div class="screen game">
+    <div class={fifty ? "screen game crowd-50" : "screen game"}>
       <Hud match={match} />
       <div class="board-area">
         {/* (A boss battle has no line above its board: its dock says what's happening, and "N/M picked" is in it, Eric, Oct 24.) */}

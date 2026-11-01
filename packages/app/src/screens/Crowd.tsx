@@ -18,7 +18,7 @@ import { LastStand, clearSquare, lastStandBoard } from "../components/LastStand.
 import { KING_COMMAND, KING_SUMMON, LAST_STAND, lastStandMs } from "@chessroyale/chess";
 import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossSide } from "../components/BossCharacter.tsx";
-import { allowanceNote, bossAlone, elimination, finalName, myTeam, scoreDp, type BoardView, type GameView, type GroupReveal, type Standing } from "../game.ts";
+import { allowanceNote, bossAlone, elimination, finalName, isCrowdFifty, myTeam, scoreDp, type BoardView, type GameView, type GroupReveal, type Standing } from "../game.ts";
 import { StreakFire } from "../components/StreakFire.tsx";
 import { GavelPiece } from "../components/Gavel.tsx";
 import { Avatar } from "../components/Items.tsx";
@@ -96,7 +96,7 @@ export function WatchScreen({
   const choosing = standings.filter((s) => !s.out && s.team === side);
   const done = choosing.filter((s) => match.done.has(s.id)).length;
   return (
-    <div class="screen game crowd">
+    <div class={`screen game crowd${isCrowdFifty(match) ? " crowd-50" : ""}`}>
       <Hud match={match} />
       <div class="board-area">
         <div class="opening-name">
@@ -515,7 +515,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
   );
 
   return (
-    <div class="screen game crowd" onClick={() => played && !stand && match.skipReveal()}>
+    <div class={`screen game crowd${isCrowdFifty(match) ? " crowd-50" : ""}`} onClick={() => played && !stand && match.skipReveal()}>
       {hud}
       <div class={`board-area${stand && ts >= LAST_STAND.crashAt && ts < LAST_STAND.crashAt + 450 ? " ls-shake" : ""}`}>
         {/* (A boss battle has no line above its board: the dock says what's happening, and "N votes" is in it, Eric, Oct 24.) */}

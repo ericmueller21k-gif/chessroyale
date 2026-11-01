@@ -2974,15 +2974,24 @@ button.history-label {
   /* The middle box (Eric, Nov 1: "a static container in the size of the one"): one height on every phase of a turn, as
      tall as the five vote bars and their result (--mid-h). The power-up row, the status line and the vote results take
      turns in it, so the scoreboard under it never moves (the e2e check in crowd.spec.ts, "the scoreboard never moves"). */
-  .screen.game {
-    --mid-h: 170px;
+  .screen.game.crowd-50 {
+    --mid-h: 276px;
   }
-  .screen.game > .play-footer,
-  .screen.game > .poll {
+  .screen.game.crowd-50 > .play-footer,
+  .screen.game.crowd-50 > .poll {
     flex: none;
     height: var(--mid-h);
     min-height: 0;
     align-content: start;
+  }
+  /* The box is taller than its first size (170 px) by what its tallest content needs (6 bars, a brilliant find of three,
+     the result's wrapped lines: 274 px at most; 276 with a hair's room). On the shortest phones (375 x 667) the board gives
+     back that extra height, down to its 220 px floor, so the scoreboard keeps its header and a row and never spills. */
+  .screen.game.crowd-50 .board-area .board-wrap {
+    width: min(100%, calc(var(--app-h) - 330px - (var(--mid-h) - 170px)));
+  }
+  .screen.game.crowd-50 .board-row .eval-bar ~ .board-wrap {
+    width: min(calc(100% - 48px), calc(var(--app-h) - 330px - (var(--mid-h) - 170px)));
   }
 
   .screen.game .waiting-banner {
