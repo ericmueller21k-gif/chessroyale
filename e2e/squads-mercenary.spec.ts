@@ -88,10 +88,11 @@ test("the Mode vote: Mercenary chosen (Coming soon can't be), and every squad's 
   await expect.poll(() => page.evaluate(() => (window as any).squads.lobby?.rules?.mode ?? null), { timeout: 20_000 }).toBe("mercenary");
   await expect.poll(() => page.evaluate(() => (window as any).squads.wallets.length)).toBe(8);
   // Every squad's coins for everyone: in the side panel (a computer) or the standings' sheet (a phone).
-  if (test.info().project.name === "desktop") await expect(page.locator(".sq-side .sq-row .mc-coins")).toHaveCount(8);
+  // (Nine rows: every squad, and yours pinned at the top too, Nov 1.)
+  if (test.info().project.name === "desktop") await expect(page.locator(".sq-side .sq-row .mc-coins")).toHaveCount(9);
   else {
     await page.locator(".sq-strip").click();
-    await expect(page.locator(".sq-sheet .sq-row .mc-coins")).toHaveCount(8);
+    await expect(page.locator(".sq-sheet .sq-row .mc-coins")).toHaveCount(9);
     await noSideScroll(page);
   }
 });

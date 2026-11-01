@@ -13542,6 +13542,16 @@ img.qicon {
 .fight-banner.power-cut .fb-sub {
   font-size: 3.4cqw;
 }
+/* The big word wraps at its spaces within the words' share of the banner (the portraits stay in view); PowerBanner's
+   fitBigWord makes a word that's still too wide smaller (Eric, Nov 1: "MAMMOTH SLAM!" ran off a computer's board). */
+.fight-banner.power-cut .kc-words {
+  max-width: 42cqw;
+}
+.fight-banner.power-cut .kc-text {
+  white-space: normal;
+  text-wrap: balance;
+  line-height: 0.95;
+}
 /* Ginger's thaw names the pieces it frees: a line that can run longer than its title, so it wraps under it rather than
    widening the words and pushing the faces off the board. */
 .fight-banner.power-cut.thaw .fb-sub {
@@ -13564,6 +13574,19 @@ img.qicon {
   inset: 0 auto 0 0;
   background: linear-gradient(90deg, #f59e0b, #ef4444);
   transition: width 600ms ease-out;
+}
+/* A computer's boss bar: the ultimate's meter twice as long and thicker (Eric, Nov 1: "too small on a computer"). Its fill is
+   still the share of the way to the ultimate, so it fills at the same pace. The bar's padding gives back the four pixels
+   the thicker meter takes, so the bar and the board under it stay where they were. A phone keeps its size. */
+@media (min-width: 900px) and (min-height: 600px) {
+  .boss-bar {
+    padding: 3px 10px 4px;
+  }
+  .boss-bar .rage-meter {
+    width: 88px;
+    height: 10px;
+    border-radius: 5px;
+  }
 }
 .rage-meter.warned,
 .rage-meter.now {
@@ -15267,6 +15290,14 @@ img.qicon {
 }
 .sq-row.out {
   opacity: 0.55;
+}
+/* Your own row, pinned at the top of the standings: a line under it, thicker than a row's edge (the table below is one list). */
+.sq-pin {
+  margin: 0;
+  height: 3px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--line);
 }
 .sq-row-top {
   display: grid;

@@ -444,7 +444,9 @@ door's look; every class is `sq-`.
   (`squads-view.ts`: `liveBank` runs a bank down during a half from the match's banks, its duties and who has locked
   in; ▼▼ when two moves drain it at once; the exact bank comes with each half). Sudden death turns red and pulses. A
   computer: a side panel (from 1100 px). A phone: a strip of eight chips (name and clock), tapped for the whole table
-  and the bracket. The standings' foot has "Leave the lobby" (it asks again while your squad still plays: "Resign: a
+  and the bracket (the same panel in both: Nov 1, Eric: your own squad pinned at the top, then a thicker line, then the
+  whole table as it stands, you in your place too, one list, your name bold; `StandingsPanel` in `SquadsParts.tsx`). The
+  standings' foot has "Leave the lobby" (it asks again while your squad still plays: "Resign: a
   loss, and a bot takes your seat"). The match's top line ends in the match's control as in every mode
   (`MatchMenu`: the gear, with Sound, Animations and Resign, on a phone and a computer; `squadsExit` says what it offers), and the
   votes' top line too; resigning shows "You resigned" (your record, the bot in your seat), then Queue again or Home.

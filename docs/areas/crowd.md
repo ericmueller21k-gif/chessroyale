@@ -169,7 +169,8 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   top line of every screen with a chessboard ends in the match's control (`components/MatchMenu.tsx`): a gear (Eric, Oct 24
   and 25: the same on a phone and a computer; docs/decisions/2026-10-24-match-menu.md and
   2026-10-25-gear-everywhere.md) that opens a list in the middle of the screen over the blurred match: Sound, Animations
-  (every mode), Motion trail (a crowd match only; the vote screen's and the openings' gears too, Oct 25), Resign or Leave,
+  (every mode), Motion trail (a crowd match only; the vote screen's and the openings' gears too, Oct 25), Light / Dark (Nov 1:
+  the same pick as Settings → Theme, shown as the theme on screen; `ThemeRow`), Resign or Leave,
   Report a bug, which asks first. On a computer the
   gear sits at the right end of the title line over the board's column, after an admin's testing items in boss battles
   (the brain's pill, which ellipsizes first, and "Trigger ultimate (testing)": `Hud.tsx`, `.match-tools`; Eric, Oct 13);
