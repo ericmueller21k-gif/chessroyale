@@ -65,3 +65,8 @@ changed) → Maia bots (/home/user/cr-maia-bots, stopped mid-work, 14 files) →
   #447 eval bar: round 4 (director) cb9f74d: profile.spec rides-lazy race (measured "Loading…" layout) fixed in the test.
   Follow-up (not built): the profile page jumps when its data arrives ("Loading…" layout → loaded two-column);
   chat-mod.spec:18 phone flaky once ("GG" from a muted player showed) — root-cause later.
+- ~21:45 UTC: main red on b8a0971 = profile.spec rides-lazy race → #452 (test fix) in CI, merge when green.
+  #447 eval round 5 needed: hollow.spec:208 desktop "round 3: his box frame 1 off screen 358,0,562,83" (both tries).
+  Lights Out prompt (.pm-line.lo-line, bottom:101% of the board, cqw-sized) pokes above the screen top on its first
+  frame at the player-size board; SpeechBox's fit check runs once at mount (useLayoutEffect [fit]) and misses a later
+  layout change. Main flaky on the same test. NEXT Opus helper after the Timber Haiku fix (one at a time).
