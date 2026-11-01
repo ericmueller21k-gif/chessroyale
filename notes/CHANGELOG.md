@@ -47,16 +47,16 @@ dropped. *(mine)* marks the director's own suggestions.
 | # | Note | Status |
 |---|---|---|
 | G1 | Riding Chirp and Moon's Ride in the town | **LIVE** #431 |
-| G2 | Front/back views (run up = back, down = front) | **PR #442** (rides v2) |
+| G2 | Front/back views (run up = back, down = front) | **MERGED #442** (rides v2) |
 | G3 | Moon's Ride redo | **rejected** ("torpedo shark"); on hold, no more redraws until Eric says |
-| G4 | A ride for every boss (12 drafts + Hollow's Bulb instead of the cat) | **PR #442** (rides v2) |
+| G4 | A ride for every boss (12 drafts + Hollow's Bulb instead of the cat) | **MERGED #442** (rides v2) |
 | G5 | Brush Ride redo (shorter, black bristles, colored tips) | approved, drawn; plum seat pad keep/drop: waiting on Eric |
 | G6 | The "pony" was a test fixture, never a ride | noted |
-| G8 | Trails replacing droplets, every ride | **PR #442** (rides v2) |
+| G8 | Trails replacing droplets, every ride | **MERGED #442** (rides v2) |
 | G9 | Ride size knob + `?rideScale=` admin switch | **merged** #435 (deploying); default becomes 0.75 for every ride in rides v2 |
-| G10 | Hollow's Bulb: remove the green cord | **PR #442** (rides v2) |
-| G11 | Cheetah Shoes (Blitz): 2× town walking speed | **PR #442** (rides v2) |
-| G12 | Log Roller (Timber) | **PR #442** (rides v2) |
+| G10 | Hollow's Bulb: remove the green cord | **MERGED #442** (rides v2) |
+| G11 | Cheetah Shoes (Blitz): 2× town walking speed | **MERGED #442** (rides v2) |
+| G12 | Log Roller (Timber) | **MERGED #442** (rides v2) |
 
 ## Bosses and the economy
 | # | Note | Status |

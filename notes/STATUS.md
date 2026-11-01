@@ -32,3 +32,6 @@
 - Nov 1 ~11:15: #441 crowd phone scoreboard opened (cddae0b, CI beiw2juvi). Round 4 helper slip: one send_message call (refused). Earlier helpers: none of the 3 slips touched secrets.
 - Nov 1 ~11:35: #440 autochess MERGED 8675efd (after my 2-number test fix). Worktrees cr-ac-econ, cr-colo-pixel removed.
 - Nov 1 ~11:45: rides v2 PR #442 (26eb9d5; CI buhmaxtq4); GIFs sent. Follow-up: lazy-load ride drawings (+55 KB gzip main bundle). Fixes main's flaky 'beside you' test (camera settle).
+- Nov 1 11:20: wait-ci.sh now also waits for queued workflow runs (a main e2e waiting its turn has no check runs). My slip: a stray './wait-ci.sh 0000000 &' (PID 27319) polls the API ~2/min for up to 80 min, then exits; not killed (PID kills need Eric's OK).
+- Nov 1 ~11:50: #441 CI red (4 tests, all branch-caused: round-4 min-height moved phone board 14 px vs main; desktop qunread in new header; panel split layout). Round 5 Haiku helper fixing. Board layout round 2 Haiku helper running (labels ≥1800, narrow columns, no board smaller than today).
+- Nov 1 ~11:55: #442 rides v2 MERGED bb5e7a1 (deploy/CI watcher). Next: lazy-load ride drawings follow-up (+55 KB gzip).
