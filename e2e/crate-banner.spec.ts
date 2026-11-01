@@ -34,6 +34,76 @@ test("crates: choose either crate; each shows its own boxes, spins them and open
 });
 
 /**
+ * The crate pages' gambling warning (Eric, Nov 1): a small red ring, see-through in the middle, with a solid red "!" in it, at the top
+ * right of the Crates tab and of each crate's page, always there and taking no room; a tap opens a short message box with a Close
+ * button, which moves nothing; Close, Escape and a tap outside it close the box.
+ */
+test("crates: the gambling warning's red ring is always at the top of the crate pages and moves nothing; a tap opens its message box, Close puts it away", async ({ page }) => {
+  await named(page, "Warned");
+  await page.goto("/shop?crates");
+  await expect(page.locator(".crate-row")).toHaveCount(2);
+  const ring = page.getByRole("button", { name: "Gambling warning" });
+  const message = page.getByRole("dialog", { name: "Gambling warning" });
+  const sideways = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  const boxes = (sel: string) => page.locator(sel).evaluateAll((els) => els.map((e) => Object.values(e.getBoundingClientRect().toJSON()).map((v) => Math.round(Number(v) * 10) / 10)));
+  const near = async (name: string, content: string) => {
+    // The ring is red, hollow in the middle with a solid red "!" in it, small, and in the page's top right corner area.
+    await expect(ring, `${name}: always there`).toBeVisible();
+    const look = await ring.evaluate((b) => {
+      const svg = b.querySelector("svg")!;
+      const circle = svg.querySelector("circle")!;
+      const solid = [...svg.querySelectorAll("path, circle")].filter((e) => e !== circle);
+      const css = getComputedStyle(b);
+      return { color: css.color, hollow: circle.getAttribute("fill") === "none", solid: solid.length > 0 && solid.every((e) => e.getAttribute("fill") === "currentColor"), w: svg.getBoundingClientRect().width };
+    });
+    const [r, g, bl] = look.color.match(/\d+/g)!.map(Number);
+    expect(r! > 180 && g! < 120 && bl! < 120, `${name}: red (${look.color})`).toBe(true);
+    expect(look.hollow, `${name}: see-through in the middle`).toBe(true);
+    expect(look.solid, `${name}: a solid "!"`).toBe(true);
+    expect(look.w, `${name}: small`).toBeLessThanOrEqual(36);
+    const b = (await ring.boundingBox())!;
+    const hero = (await page.locator(content).first().boundingBox())!;
+    const column = (await page.locator(".crates, .crate-page").first().boundingBox())!;
+    const vw = page.viewportSize()!.width;
+    expect(b.x + b.width, `${name}: at the right of the page's column`).toBeGreaterThan(column.x + column.width - 12);
+    expect(b.x + b.width, `${name}: not off the page`).toBeLessThanOrEqual(vw);
+    expect(b.y, `${name}: near the top`).toBeLessThan(hero.y);
+    expect(b.width, `${name}: a full tap target`).toBeGreaterThanOrEqual(40);
+    // Opening and closing the message moves nothing else on the page.
+    const before = await boxes(".crates > *:not(.gamble-ring):not(.locker-dialog-back), .crate-page > *:not(.gamble-ring):not(.locker-dialog-back), .shop-head, .area-tabs");
+    await ring.click();
+    await expect(message, `${name}: the message box`).toBeVisible();
+    await expect(message).toContainText("Crates are chance, like gambling. Only spend money you're okay losing.");
+    await expect(message).toHaveText("Crates are chance, like gambling. Only spend money you're okay losing.▶ Close");
+    expect(await boxes(".crates > *:not(.gamble-ring):not(.locker-dialog-back), .crate-page > *:not(.gamble-ring):not(.locker-dialog-back), .shop-head, .area-tabs"), `${name}: nothing moved while it's open`).toEqual(before);
+    const m = (await message.boundingBox())!;
+    expect(m.x, `${name}: inside the screen`).toBeGreaterThanOrEqual(0);
+    expect(m.x + m.width, `${name}: inside the screen`).toBeLessThanOrEqual(vw);
+    await message.getByRole("button", { name: "Close" }).click();
+    await expect(message).toHaveCount(0);
+    expect(await boxes(".crates > *:not(.gamble-ring):not(.locker-dialog-back), .crate-page > *:not(.gamble-ring):not(.locker-dialog-back), .shop-head, .area-tabs"), `${name}: nothing moved after it closes`).toEqual(before);
+    // (Escape, and a tap outside the box, close it too.)
+    await ring.click();
+    await expect(message).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(message).toHaveCount(0);
+    await ring.click();
+    await page.locator(".locker-dialog-back").click({ position: { x: 4, y: 4 } });
+    await expect(message).toHaveCount(0);
+    expect(await sideways(), `${name}: nothing sideways`).toBe(0);
+  };
+  // The Crates tab, then each crate's own page.
+  await near("the Crates tab", ".crate-stock");
+  for (const id of ["beta-001", "winter-1"]) {
+    await page.locator(`.crate-row[data-crate="${id}"]`).click();
+    await expect(page.locator(".crate-hero")).toBeVisible();
+    await near(`${id}'s page`, ".crate-hero");
+    await page.getByRole("button", { name: "‹ Crates" }).click();
+    await expect(page.locator(".crate-row")).toHaveCount(2);
+  }
+});
+
+/**
  * The crate opening's "FISCHER RANDOM!" banner fits its words at every width (DECISIONS.md, "The computer's play
  * column, your icon, no sun"): on a computer it was cut off at both ends and top and bottom. Measured every animation
  * frame while it's up: the face and the words within the stage's width, the words within the band (its slanted edges

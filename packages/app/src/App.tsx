@@ -1112,7 +1112,7 @@ export function App() {
 
   /** Where the computer's side menu goes (front-door pages and, since Oct 29, the town square, outside a match). */
   const goHome = () => {
-    // (The town square is in the frame on a computer: every menu item leaves it; Boss Arena sets it again.)
+    // (The town square is in the frame on a computer: every menu item leaves it; Chess Town sets it again.)
     setShowTown(false);
     setTownSeat(null);
     closeProfile();
@@ -1128,7 +1128,7 @@ export function App() {
       setHomeIntent(null);
       setRaidOpen(false);
     },
-    bossArena: () => {
+    chessTown: () => {
       goHome();
       setHomeIntent(null);
       setRaidOpen(false);
@@ -1223,7 +1223,7 @@ export function App() {
     },
     profile: () => openProfile({ you: true, name: account().profile?.user.name ?? "" }),
     ...Object.fromEntries(
-      (["bossArena", "soloBoss", "friends", "shop", "settings", "friendsList"] as const).map((k) => [
+      (["chessTown", "soloBoss", "friends", "shop", "settings", "friendsList"] as const).map((k) => [
         k,
         () => {
           if (match) leave();
@@ -1510,7 +1510,7 @@ export function App() {
         raid={raidOpen}
         full={raidFull}
         bossParty={{ client: bossParty, error: bossPartyError, onInvite: makeBossParty, onLeave: leaveBossParty }}
-        onBossArena={nav.bossArena}
+        onChessTown={nav.chessTown}
         onRaid={(open) => {
           setRaidOpen(open);
           setRaidFull(false);

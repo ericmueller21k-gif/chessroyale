@@ -37,6 +37,7 @@ import {
 import { deleteLockerItems, equipLockerItem, equipShopItem, openCrate } from "../account.ts";
 import { Avatar, BetaCrateArt, FischerArt, ItemArt, KeyArt, PresentArt, SupplyBoxArt, WinterCrateArt } from "../components/Items.tsx";
 import { FightBanner } from "../components/FightBanner.tsx";
+import { GamblingWarning } from "../components/GamblingWarning.tsx";
 import { KingEffectPreview } from "../components/Cosmetics.tsx";
 import { play, unlockAudio } from "../sound.ts";
 import { useAccount } from "./Profile.tsx";
@@ -126,6 +127,7 @@ export function CratesPanel() {
   if (open) return <CratePage crate={open} resume={resume?.crate === open.id ? resume : undefined} onBack={() => setOpen(null)} />;
   return (
     <div class="crates">
+      <GamblingWarning />
       <div class="crate-stock">
         <span class="stock">
           <span class="stock-art">
@@ -175,6 +177,7 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
     return <CrateOpening crate={crate} force={{ fischer: forceFischer, shiny: forceShiny }} resume={resume} onClose={() => setOpening(false)} />;
   return (
     <div class="crate-page">
+      <GamblingWarning />
       <button type="button" class="btn btn-secondary btn-small" onClick={onBack}>
         ‹ Crates
       </button>

@@ -31,8 +31,8 @@ export function Logo({ onClick }: { onClick?: () => void }) {
 
 /**
  * A dressed pawn (the item-builder's Avatar) in a box with room for what sticks out (a weapon, a crown), and an
- * optional shadow under it. `size` picks the box from the stylesheet. `ride` (the profiles, Oct 31): on its ride, if it
- * has one on, fitted into the same box.
+ * optional shadow under it. `size` picks the box from the stylesheet. `ride` (the profiles, Oct 31; home's pawn and your ring,
+ * Nov 1): on its ride, if it has one on, its idle playing, fitted into the same box.
  */
 /** One hop of the hero pawn (styles.css, `fd-hop`: 1.8 s). */
 const HOP_MS = 1800;
@@ -91,7 +91,7 @@ export function MyPawnButton({ onClick }: { onClick: () => void }) {
   const p = account().profile;
   return (
     <button type="button" class="fd-ring" aria-label="Your profile" onClick={onClick}>
-      <DressedPawn look={p?.locker?.look} size="ring" />
+      <DressedPawn look={p?.locker?.look} size="ring" ride />
     </button>
   );
 }

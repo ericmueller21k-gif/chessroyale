@@ -1,6 +1,6 @@
 import { devices, expect, type Page } from "@playwright/test";
 import { ITEM_DEFS, SHOP_ITEMS, rankView, wornFromLocker } from "@chessroyale/core";
-import { asServerAdmin, giveItems, named, soloFromHome, switchesOff, test, openBossRaid } from "./helpers.ts";
+import { asServerAdmin, giveItems, named, soloFromHome, switchesOff, test, openBossRaid, wearItem } from "./helpers.ts";
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
 
@@ -242,6 +242,44 @@ test("rides (Oct 31): the locker's Ride tab wears one; the preview's pawns ride 
   await page.getByRole("button", { name: /^Riding Chirp, Cobalt/ }).click();
   await expect(page.locator(".locker-preview .avatar.riding")).toHaveCount(0);
   await expect(page.locator(".locker-preview .avatar")).toHaveCount(2);
+  expect(await boxes()).toEqual(before);
+});
+
+test("rides on home (Nov 1): the big pawn and your ring ride Riding Chirp, its idle playing, in the same boxes (nothing grows or moves); off again, the pawn alone", async ({ page }) => {
+  await named(page, "Rider");
+  await page.goto("/");
+  await expect(page.locator(".fd-hero-name")).toHaveText("Rider");
+  const [ride] = await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 40 }]);
+  await page.reload();
+  await expect(page.locator(".fd-hero-name")).toHaveText("Rider");
+  // (The boxes the pawn is in: the card, the pawn, its box, and your ring; whatever it wears, they are these.)
+  const boxes = () =>
+    page.locator(".fd-hero, .fd-hero .fd-pawn-hero, .fd-hero .fd-pawn-box, .fd-ring, .fd-ring .fd-pawn-box, .fd-play-col").evaluateAll((els) => els.map((e) => Object.values(e.getBoundingClientRect().toJSON()).map((v) => Math.round(Number(v) * 10) / 10)));
+  await expect(page.locator(".fd-hero .avatar")).toHaveCount(1);
+  await expect(page.locator(".avatar.riding")).toHaveCount(0);
+  await page.evaluate(() => document.fonts.ready);
+  const before = await boxes();
+  await wearItem(page, "ride", ride!);
+  await page.reload();
+  await expect(page.locator(".fd-hero .avatar.riding[data-ride=\"riding-chirp\"]")).toHaveCount(1);
+  // Your ring rides too (a phone's top bar; a computer's top right and its side menu's Profile item).
+  await expect(page.locator(".fd-ring:visible .avatar.riding")).toHaveCount(1);
+  await page.evaluate(() => document.fonts.ready);
+  expect(await boxes(), "nothing grew or moved when the pawn mounted").toEqual(before);
+  // The ride fills the pawn's own box and its idle plays.
+  const riding = page.locator(".fd-hero .avatar.riding");
+  const a = (await riding.boundingBox())!;
+  const box = (await riding.locator("xpath=..").boundingBox())!;
+  expect([a.x, a.y, a.width, a.height]).toEqual([box.x, box.y, box.width, box.height]);
+  const pic = () => riding.innerHTML();
+  const first = await pic();
+  await expect.poll(pic, { timeout: 5_000 }).not.toBe(first);
+  // Off again: the pawn alone, in the same boxes.
+  await wearItem(page, "ride", null);
+  await page.reload();
+  await expect(page.locator(".fd-hero .avatar")).toHaveCount(1);
+  await expect(page.locator(".avatar.riding")).toHaveCount(0);
+  await page.evaluate(() => document.fonts.ready);
   expect(await boxes()).toEqual(before);
 });
 

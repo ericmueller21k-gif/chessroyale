@@ -485,7 +485,7 @@ Colosseum's gate, with ten chess tables, and made the Colosseum about twice its 
 
 **A new name and a first-visit tour** (Eric, Oct 26: "we've kind of outgrown boss arena… we're going to have this ability to
 challenge other players here, not just the bosses"). Not started; Eric is picking the name (maybe "Town square").
-- **Rename Boss Arena** on home's card and the computer's side menu once Eric has the name.
+- ~~**Rename Boss Arena** on home's card and the computer's side menu once Eric has the name.~~ Done Nov 1: **Chess Town** (Eric's name), a little town scene under PLAY on home and the crest in the computer's side menu ([2026-11-01-home-chess-town.md](docs/decisions/2026-11-01-home-chess-town.md)).
 - **A first-visit tour on home**: the rest of the page dims, and a pointer steps through it with Next: 50 v 50 first, then the
   other modes, and last the town's card with a short pitch ("open world style": walk around, meet the bosses, play people at
   the park). A flag on the player's account remembers they've seen it, so it shows once.

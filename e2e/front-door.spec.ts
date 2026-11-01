@@ -45,7 +45,7 @@ test("home: the live line comes from the server, the RANKED row changes the line
   // (No buttons under PLAY: the shop, your profile and Play with friends are in a phone's top bar and a computer's side
   // menu, Eric, Oct 18.)
   await expect(page.getByRole("main").getByRole("button", { name: "Play with friends", exact: true })).toHaveCount(0);
-  expect((await page.getByRole("main").getByRole("button", { name: /^Boss Arena/ }).boundingBox())!.height).toBeGreaterThanOrEqual(64);
+  expect((await page.getByRole("main").getByRole("button", { name: "Chess Town", exact: true }).boundingBox())!.height).toBeGreaterThanOrEqual(64);
 });
 
 test("home: Play with friends offers lobbies (practice is Solo, on the home screen)", async ({ page }) => {
