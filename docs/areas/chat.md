@@ -13,10 +13,12 @@ Lane: `social`.
 - **Quick chat in a match.** A chat button and panel in the places the design names (the match screens are the
   director's: no change to the board, clock, picks or reveal). Four groups of phrases: Hello and Sporting can go to
   everyone (the Team / All switch); Reactions and Plans stay inside your team, so plans stay secret. Emoji can go to
-  everyone and float up from the sender's scoreboard row. On a phone the space under the board is split between the
-  scoreboard and chat (one view at a time, never an empty box). In the split, the Team / All switch takes the chat
-  header's title place, tighter, with 28 px buttons beside it, so both labels fit whole down to 320 px
-  (`e2e/panel.spec.ts`).
+  everyone and float up from the sender's scoreboard row. On a phone's 50 v 50 the chat is a tab in the scoreboard's
+  header (Black · White · All · Chat; the unread count shows on Chat while the scoreboard is up): Chat replaces the
+  scoreboard in the same box and "‹ Back" returns to it (`CrowdTabs`, `components/QuickChat.tsx`). The Team / All switch
+  sits in that header beside Back, so both labels fit whole down to 320 px (`e2e/panel.spec.ts`). Elsewhere (a
+  computer, a raid, Classic) a phone's space under the board is split between the scoreboard and chat, one view at a
+  time, never an empty box.
 - **The town square's chat log** is its own thing (a fading log in the top left of `/town`: the bosses' and kids' chatter,
   and signed-in players' typed messages, below): its look in [town-square.md](town-square.md), "The chat log".
 - **Your picks.** Each player's profile chooses which lines they see in their games: up to `QUICK_CHAT.maxLines`

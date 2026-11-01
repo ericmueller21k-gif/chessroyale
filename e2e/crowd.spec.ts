@@ -100,8 +100,9 @@ test("the opening allowance on the reveal: a sound move off the engine's line is
   await expect.poll(() => phase(page), { timeout: 60_000, intervals: [50] }).toBe("reveal");
   // Hold the reveal (solo moves on by a timer).
   await page.evaluate(() => clearTimeout((window as any).match.timer));
-  const line = page.locator(".poll-result .allowance-line");
-  await expect(line).toHaveText(/^\d+(\.\d)? forgiven · opening$/);
+  // (Nov 1: the reveal's one line; the allowance is a short number there: "8 forgiven".)
+  const line = page.locator(".poll-result .result-text");
+  await expect(line).toContainText(/ · \d+(\.\d)? forgiven$/);
   const oneLine = () =>
     line.evaluate((el) => {
       const r = el.getBoundingClientRect();
@@ -113,9 +114,9 @@ test("the opening allowance on the reveal: a sound move off the engine's line is
   // The widest notes a move can get (refused the allowance for material; partly forgiven on a loss of nearly 100): still
   // one line, on screen.
   const notes = [
-    [{ loss: 100, material: "missed" }, "no allowance · missed a capture"],
-    [{ loss: 100, material: "gave" }, "no allowance · gave up material"],
-    [{ loss: 99.9, counted: 91.9 }, "8 of 99.9 forgiven · opening"],
+    [{ loss: 100, material: "missed" }, "no allowance"],
+    [{ loss: 100, material: "gave" }, "no allowance"],
+    [{ loss: 99.9, counted: 91.9 }, "8 forgiven"],
   ] as const;
   for (const [patch, words] of notes) {
     await page.evaluate((patch) => {
@@ -126,7 +127,7 @@ test("the opening allowance on the reveal: a sound move off the engine's line is
       Object.assign(me, patch);
       m.emit();
     }, patch);
-    await expect(line).toHaveText(words);
+    await expect(line).toContainText(words);
     const wide = await oneLine();
     expect(wide.spill, wide.text).toBeLessThanOrEqual(0);
     expect(wide.height, wide.text).toBeLessThan(wide.lineHeight * 1.5);

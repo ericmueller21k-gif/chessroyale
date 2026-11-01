@@ -155,7 +155,8 @@ test("a rare brilliant find: the shoutout names you, its bonus is in your score,
   await expect.poll(() => page.evaluate(() => (window as any).match?.phase.kind === "play" && Date.now() > (window as any).match.phase.startsAt + 200).catch(() => false), { timeout: 90_000 }).toBe(true);
   const fen = await page.evaluate(() => (window as any).match.phase.board.fen as string);
   const before = await boardBox(page);
-  const seen = await watchFor(page, { shout: { selector: ".brilliant-line.shoutout.you", text: /Brilliant find! You found .+ · \+1/ } });
+  // (Nov 1: the brilliant find is a mark on its bar, "‼ +1": its text is that, and the .you class says it names you.)
+  const seen = await watchFor(page, { shout: { selector: ".brilliant-line.shoutout.you", text: /‼\s*\+1/ } });
   await submitMove(page, legalMoves(fen)[0], fen);
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("reveal");
   await expect.poll(async () => (await seen.seen()).shout, { timeout: 20_000 }).toBe(true);

@@ -82,6 +82,17 @@ export function allowanceNote(p: { loss: number | null; counted?: number; materi
   return short ? forgiven : `${forgiven} · opening`;
 }
 
+/**
+ * The opening allowance in one short phrase, for the reveal's one line (Nov 1, Eric: "too many words"): "8 forgiven"
+ * (what it took off), or the same reasons as allowanceNote, short ("no allowance", "not capped").
+ */
+export function allowanceShort(p: { loss: number | null; counted?: number; material?: MaterialSlip; uncapped?: MaterialSlip }): string | null {
+  if (p.loss === null || p.loss < 0.05) return null;
+  if (p.material || p.uncapped || p.counted === undefined) return allowanceNote(p, true);
+  const pts = (x: number) => x.toFixed(1).replace(/\.0$/, "");
+  return `${pts(p.counted < 0.05 ? p.loss : p.loss - p.counted)} forgiven`;
+}
+
 /** Your move from a reveal, with what the elimination breakdown needs (null if you weren't picking). */
 export function moveRecordFrom(stage: number, round: number, mine: GroupReveal, isYou: (id: string) => boolean): MoveRecord | null {
   const players = mine.result.players;

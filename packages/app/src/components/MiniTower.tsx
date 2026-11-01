@@ -45,12 +45,15 @@ export function MiniTower({
   head,
   open: openProp,
   floats,
+  chatTab,
 }: {
   match: GameView;
   narrow?: boolean;
   head?: ComponentChildren;
   open?: boolean;
   floats?: ReadonlyMap<string, ChatFloat>;
+  /** A phone's 50 v 50 (Nov 1): the header's Chat tab, its unread count, and what a tap on it does (chat replaces the list). */
+  chatTab?: { unread: number; onOpen: () => void };
 }) {
   // (Without `open` from its place, the space under the board's view, kept in step.)
   const [own, setOwn] = useState(() => underBoardView().open);
@@ -113,6 +116,12 @@ export function MiniTower({
         ) : (
           <button type="button" class="mini-tower-title" onClick={() => setSheet(true)}>
             {view.teamLabel ?? "Leaderboard"}
+          </button>
+        )}
+        {chatTab && (
+          <button type="button" class="mini-pick mini-chat-tab" onClick={chatTab.onOpen} aria-label="Chat" title={chatTab.unread ? `${chatTab.unread} new` : "Chat"}>
+            Chat
+            {chatTab.unread > 0 && <span class="mini-unread" aria-hidden="true">{chatTab.unread}</span>}
           </button>
         )}
         {head}

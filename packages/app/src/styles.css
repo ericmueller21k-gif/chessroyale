@@ -3024,14 +3024,30 @@ button.history-label {
   .screen.game .play-footer {
     gap: 6px;
   }
-  /* The middle box (Eric, Nov 1: "a static container in the size of the one"): one height on every phase of a turn. Round 6:
-     the height comes from the screen's height, 200 px on a tall phone and 112 px on a short one, so the panel under the
-     board keeps about 148 px (the quick chat's feed needs 31 px of it: chat.spec, panel.spec). It changes only when the
-     screen does, a resize or a turned phone. The power-up row, the status line and the vote results take turns in it, so
-     the scoreboard under it never moves (the e2e check in crowd.spec.ts, "the scoreboard never moves"). The board keeps
-     its size on every phone. */
+  /* The scoreboard's top sits 4 px under the vote box's foot (the screen's gap is 6 px). */
+  .screen.game.crowd-50 > .under-board,
+  .screen.game.crowd-50 > .mini-tower {
+    margin-top: -2px;
+  }
+  /* The middle box (Nov 1, Eric: "that space must be the scoreboard"): exactly as tall as the vote box, its bars and the one
+     result line, so the scoreboard's top sits right under the result and the scoreboard fills the rest of the screen. It is
+     one height on every phase of a match (the power-up row, the status line and the vote results take turns in it), so the
+     scoreboard never moves (crowd.spec, "the scoreboard never moves"). A bar is 14 px with its gap, the result line 20 px:
+     six bars at most (--slots; Crowd.tsx, useBarSlots, shows as many as the box holds). The board keeps its size. */
   .screen.game.crowd-50 {
-    --mid-h: clamp(112px, calc(var(--app-h) - 552px), 200px);
+    --slots: 6;
+    --mid-h: calc(var(--slots) * 14px + 20px);
+  }
+  /* Shorter screens: fewer bars, so the scoreboard keeps its rows (at 664 and 667 it keeps four or five with six). */
+  @media (max-height: 639px) {
+    .screen.game.crowd-50 {
+      --slots: 5;
+    }
+  }
+  @media (max-height: 599px) {
+    .screen.game.crowd-50 {
+      --slots: 4;
+    }
   }
   .screen.game.crowd-50 > .play-footer,
   .screen.game.crowd-50 > .poll {
@@ -3040,19 +3056,23 @@ button.history-label {
     min-height: 0;
     align-content: start;
   }
-  /* The middle box's content, compact (Nov 1: the box stays near the size of the usual vote results): one column, the
-     bars a little thinner, and each line of the result and the brilliant find one line (cut with an ellipsis if need be). */
-  /* Round 6: the box can be 112 px, so the bars and the result are compact enough for the most bars that fit, at least the
-     top three, to share the box with the result's two lines and the brilliant find's one line. In px: a bar 13, the result
-     20 + 14, the brilliant find 18, 1 px between blocks: 14 v + 53 for v bars (v = 4: 109, v = 5: 123, v = 6: 137). So up
-     to 123 px of box: four bars, or the top three and yours when yours is outside them; up to 136.99 px: five, or the top
-     four and yours; from 137 px: all six. A bar is cut whole, from the bottom; yours is always drawn. */
-  .screen.game.crowd-50 .poll {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 1px;
-    container-type: size;
+  /* (The power-up row or the waiting line sits in the middle of the box while it's the picking's: the box's height is the
+     vote box's, so the space is shared out, not left at the foot.) */
+  .screen.game.crowd-50 > .play-footer {
+    align-content: center;
   }
+  .screen.game.crowd-50 .poll {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    overflow: hidden;
+  }
+  /* A bar: thin (13 px), the move, its bar, the brilliant find's mark, the votes, and "you" on yours. */
   .screen.game.crowd-50 .poll-row {
+    display: grid;
+    grid-template-columns: 46px minmax(0, 1fr) auto 26px auto;
+    gap: 6px;
+    flex: none;
     height: 13px;
     padding: 0 8px;
     font-size: 12px;
@@ -3061,46 +3081,48 @@ button.history-label {
   .screen.game.crowd-50 .poll-bar {
     height: 8px;
   }
-  .screen.game.crowd-50 .brilliant-line {
-    padding: 1px 8px;
-    font-size: 12px;
-    line-height: 14px;
+  /* The brilliant find: a small mark on its bar ("‼ +1", "‼ +1 each"), not a line of its own. */
+  .screen.game.crowd-50 .poll-mark .brilliant-line {
+    gap: 2px;
+    height: 13px;
+    padding: 0 4px;
+    border-radius: 6px;
+    font-size: 10px;
+    line-height: 11px;
   }
-  @container (max-height: 123px) {
-    .screen.game.crowd-50 .poll-row:nth-child(n + 5):not(.you),
-    .screen.game.crowd-50 .poll:has(> .poll-row.you:nth-child(n + 4)) .poll-row:nth-child(n + 4):not(.you) {
-      display: none;
-    }
+  .screen.game.crowd-50 .poll-mark .brilliant-mark {
+    font-size: 11px;
+    line-height: 11px;
   }
-  @container (min-height: 123.01px) and (max-height: 136.99px) {
-    .screen.game.crowd-50 .poll-row:nth-child(n + 6):not(.you),
-    .screen.game.crowd-50 .poll:has(> .poll-row.you:nth-child(n + 5)) .poll-row:nth-child(n + 5):not(.you) {
-      display: none;
-    }
-  }
+  /* The result: one line (the score, then your move, the best move, the opening allowance and the streak), pinned to the
+     foot of the box so the scoreboard starts right under it. Nothing wraps; the words are short enough for 320 px. */
   .screen.game.crowd-50 .poll-result {
-    display: grid;
-    grid-template-columns: auto minmax(0, max-content);
-    justify-content: center;
+    flex: none;
+    display: flex;
     align-items: baseline;
-    column-gap: 10px;
-    row-gap: 0;
+    justify-content: center;
+    gap: 8px;
+    height: 20px;
+    margin-top: auto;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
   }
   .screen.game.crowd-50 .poll-result .round-score {
     font-size: 20px;
     line-height: 20px;
   }
-  .screen.game.crowd-50 .poll-result .verdict {
+  .screen.game.crowd-50 .result-text {
     min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
     font-size: 12px;
+    line-height: 20px;
+    font-weight: 700;
+    color: var(--muted);
   }
-  .screen.game.crowd-50 .poll-extras,
-  .screen.game.crowd-50 .allowance-line {
-    font-size: 12px;
-    line-height: 14px;
+  @media (max-width: 340px) {
+    .screen.game.crowd-50 .result-text {
+      font-size: 11px;
+    }
   }
 
   .screen.game .waiting-banner {
@@ -3438,7 +3460,7 @@ button.history-label {
 }
 .poll-row {
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr) 34px auto;
+  grid-template-columns: 56px minmax(0, 1fr) auto 34px auto;
   align-items: center;
   gap: 8px;
   padding: 4px 8px;
@@ -12707,6 +12729,58 @@ img.qicon {
   }
 }
 
+/* A phone's 50 v 50 (Nov 1): one box under the vote box, the scoreboard or the chat (CrowdTabs, QuickChat.tsx). The header
+   reads Black · White · All, close together, then Chat; the unread count shows on Chat while the scoreboard is up. */
+.screen.game.crowd-50 .mini-tower-head .mini-picks {
+  flex: none;
+}
+.screen.game.crowd-50 .mini-tower-head .mini-pick {
+  flex: none;
+  padding: 0 7px;
+}
+.screen.game.crowd-50 .mini-tower-head .mini-chat-tab {
+  margin-left: 10px;
+}
+.mini-unread {
+  display: inline-grid;
+  place-items: center;
+  min-width: 16px;
+  height: 16px;
+  margin-left: 4px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #1a1406;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  vertical-align: 1px;
+}
+.qhead-back {
+  flex: none;
+  height: 28px;
+  padding: 0 8px 0 4px;
+  border: 0;
+  background: none;
+  color: var(--qc-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.qchat-tab .qhead {
+  padding-left: 4px;
+}
+/* Team / All: a tap target as tall as the header's buttons (22 px at least, as the split's switch was). */
+.qchat-tab .qto {
+  height: 24px;
+  margin-left: 4px;
+}
+.qchat-tab .qto button {
+  min-width: 30px;
+  padding: 0 6px;
+}
 /* Folded, the scoreboard keeps its share of the width beside chat (or all of it): only its height folds. */
 .screen.game .under-board > .mini-tower.closed {
   flex: 1 1 0;

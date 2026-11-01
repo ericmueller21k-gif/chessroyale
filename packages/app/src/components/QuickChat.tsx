@@ -4,7 +4,7 @@ import { QUICK_CHAT, chatSay, type ChatSay } from "@chessroyale/core";
 import { onAccountChange, refreshChatStanding } from "../account.ts";
 import type { ChatLine, MatchChat } from "../chat.ts";
 import { chatBlockText } from "../chat-mod.ts";
-import type { GameView } from "../game.ts";
+import { isCrowdFifty, type GameView } from "../game.ts";
 import { chatBubbles, foldUnderBoard, onPrefsChange, setChatBubbles, showUnderBoard, underBoardView, type UnderBoardView } from "../prefs.ts";
 import { openProfile } from "../profile-nav.ts";
 import { MiniTower } from "./MiniTower.tsx";
@@ -20,6 +20,8 @@ import { UserIcon } from "./PixelIcon.tsx";
 const WIDE = "(min-width: 1100px) and (min-height: 600px)";
 /** Big screens (900 px+): phrases wrap in their groups instead of scrolling in a row. */
 const ROOMY = "(min-width: 900px) and (min-height: 600px)";
+/** The phone's locked screen (styles.css: one screen, the middle box and the scoreboard under it). */
+export const LOCKED_PHONE = "(max-width: 899px) and (min-height: 520px)";
 
 export function useMedia(query: string): boolean {
   const [on, setOn] = useState(() => matchMedia(query).matches);
@@ -282,15 +284,16 @@ function ToSwitch({ chat }: { chat: MatchChat }) {
   );
 }
 
-export type ChatVariant = "split" | "full" | "side" | "page" | "lobby";
+export type ChatVariant = "split" | "full" | "tab" | "side" | "page" | "lobby";
 
 /**
  * The chat panel: header (title, Team / All, the split buttons), the feed, and the buttons. `split` is a phone's
  * half of the space under the board; `full` the whole of it; `side` the computer's column beside the board; `page`
  * a section of a page (results, watching after you're out); `lobby` the queue's chat before the match (LobbyChat:
- * it takes its size from the box it's placed in).
+ * it takes its size from the box it's placed in); `tab` a phone's 50 v 50 chat tab (CrowdTabs: the scoreboard's box,
+ * with "‹ Back" in its header).
  */
-export function ChatPanel({ people, chat, variant, head, fold }: { people: ChatPeople; chat: MatchChat; variant: ChatVariant; head?: ComponentChildren; fold?: ComponentChildren }) {
+export function ChatPanel({ people, chat, variant, head, fold, back }: { people: ChatPeople; chat: MatchChat; variant: ChatVariant; head?: ComponentChildren; fold?: ComponentChildren; back?: () => void }) {
   const roomy = useMedia(ROOMY);
   const lobby = variant === "lobby";
   const self = useRef({});
@@ -346,8 +349,22 @@ export function ChatPanel({ people, chat, variant, head, fold }: { people: ChatP
       onClick={(e) => e.stopPropagation()}
     >
       <div class="qhead">
+        {/* (A phone's chat tab: "‹ Back" to the scoreboard takes the title's place.) */}
+        {back && (
+          <button
+            type="button"
+            class="qhead-back"
+            aria-label="Back"
+            onClick={(e) => {
+              e.stopPropagation();
+              back();
+            }}
+          >
+            ‹ Back
+          </button>
+        )}
         {/* (A phone's split is narrow: with teams, the Team / All switch takes the title's place.) */}
-        {!(variant === "split" && teams && !chat.off) && <span class="qhead-title">{lobby ? "Lobby" : "Chat"}</span>}
+        {!back && !(variant === "split" && teams && !chat.off) && <span class="qhead-title">{lobby ? "Lobby" : "Chat"}</span>}
         {lobby && !chat.off && <span class="qhead-sub">Everyone here · teams come with the match</span>}
         {teams && !chat.off && <ToSwitch chat={chat} />}
         <span class="qhead-gap" />
@@ -377,7 +394,7 @@ export function ChatPanel({ people, chat, variant, head, fold }: { people: ChatP
         </div>
       ) : options ? (
         <div class="qoptions" ref={feed}>
-          <ChatOptions people={people} chat={chat} bubbles={variant === "split" || variant === "full"} onDone={() => setOptions(false)} />
+          <ChatOptions people={people} chat={chat} bubbles={variant === "split" || variant === "full" || variant === "tab"} onDone={() => setOptions(false)} />
         </div>
       ) : (
         <>
@@ -423,7 +440,7 @@ export function ChatPanel({ people, chat, variant, head, fold }: { people: ChatP
               </button>
             </div>
           ) : (
-            <ChatButtons chat={chat} layout={layout} fit={variant === "full" || ((variant === "page" || lobby) && !roomy)} now={now} />
+            <ChatButtons chat={chat} layout={layout} fit={variant === "full" || variant === "tab" || ((variant === "page" || lobby) && !roomy)} now={now} />
           )}
         </>
       )}
@@ -474,6 +491,7 @@ function ChatOptions({ people, chat, bubbles, onDone }: { people: ChatPeople; ch
 export function UnderBoard({ match }: { match: GameView }) {
   const chat = chatOf(match);
   const wide = useMedia(WIDE);
+  const phone = useMedia(LOCKED_PHONE);
   const [view, setView] = useState<UnderBoardView>(underBoardView);
   useEffect(() => onPrefsChange(() => setView(underBoardView())), []);
   // (Its own fold arrow, on the same view.)
@@ -485,6 +503,7 @@ export function UnderBoard({ match }: { match: GameView }) {
       </div>
     );
   }
+  if (phone && isCrowdFifty(match)) return <CrowdTabs match={match} chat={chat} open={view.open} />;
   const { layout, open } = view;
   const fold = <FoldButton open={open} onToggle={() => foldUnderBoard(!open)} />;
   const unread = chat.unread();
@@ -527,6 +546,37 @@ export function UnderBoard({ match }: { match: GameView }) {
           fold={fold}
         />
       )}
+    </div>
+  );
+}
+
+/** Where each match's 50 v 50 phone box stands: on its chat tab (false: the scoreboard). Kept per match, so it holds through the turns. */
+const chatTabOn = new WeakMap<object, boolean>();
+
+/**
+ * A phone's 50 v 50 (Nov 1): one box under the vote box, filling down to the bottom of the screen. Its header reads
+ * Black · White · All · Chat (the scoreboard's picks, then the chat tab, with the new messages' count while the
+ * scoreboard shows).
+ * Chat replaces the scoreboard in the same box; "‹ Back" returns to the scoreboard as it was picked. The fold arrow
+ * folds either to its header (the view's `open`, as before).
+ */
+function CrowdTabs({ match, chat, open }: { match: GameView; chat: MatchChat; open: boolean }) {
+  const [on, setOn] = useState(() => chatTabOn.get(match) ?? false);
+  const show = (c: boolean) => {
+    chatTabOn.set(match, c);
+    setOn(c);
+  };
+  const fold = <FoldButton open={open} onToggle={() => foldUnderBoard(!open)} />;
+  if (!on) {
+    return (
+      <div class={`under-board ub-tab${open ? "" : " closed"}`}>
+        <MiniTower match={match} open={open} head={fold} floats={chat.floats()} chatTab={{ unread: chat.unread(), onOpen: () => show(true) }} />
+      </div>
+    );
+  }
+  return (
+    <div class={`under-board ub-tab ub-chat${open ? "" : " closed"}`}>
+      <ChatPanel people={matchPeople(match)} chat={chat} variant="tab" back={() => show(false)} fold={fold} />
     </div>
   );
 }

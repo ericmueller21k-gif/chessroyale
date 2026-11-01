@@ -94,7 +94,9 @@ test("two players in a Default queue chat before the match starts: each sees the
   if (test.info().project.name === "desktop") {
     await expect(ann.locator(".qchat-side .qline.lobby", { hasText: "Good luck!" }).locator(".qline-to")).toHaveText("lobby");
   } else {
-    await expect(ann.locator(".qchat-split .qline", { hasText: "Defend the king!" })).toBeVisible();
+    // (Nov 1: on a phone the chat is a tab over the scoreboard; the lobby's lines are there once it's open.)
+    await ann.getByRole("button", { name: "Chat", exact: true }).click();
+    await expect(ann.locator(".under-board .qchat-tab .qline", { hasText: "Defend the king!" })).toBeVisible();
   }
   expect(await ann.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
 });
