@@ -35,3 +35,5 @@
 - Nov 1 11:20: wait-ci.sh now also waits for queued workflow runs (a main e2e waiting its turn has no check runs). My slip: a stray './wait-ci.sh 0000000 &' (PID 27319) polls the API ~2/min for up to 80 min, then exits; not killed (PID kills need Eric's OK).
 - Nov 1 ~11:50: #441 CI red (4 tests, all branch-caused: round-4 min-height moved phone board 14 px vs main; desktop qunread in new header; panel split layout). Round 5 Haiku helper fixing. Board layout round 2 Haiku helper running (labels ≥1800, narrow columns, no board smaller than today).
 - Nov 1 ~11:55: #442 rides v2 MERGED bb5e7a1 (deploy/CI watcher). Next: lazy-load ride drawings follow-up (+55 KB gzip).
+- Nov 1 ~12:00: main 8675efd (#440) full e2e GREEN (queued run, new wait script worked).
+- Nov 1 ~12:20: #441 round 5 72b8ada fixed board position; blocked on short phones (390×664: 62 px under board, chat feed 0). My call: option (a) middle box height from screen height (200 → ~118), ≥3 bars + yours. Round 6 Haiku running.
