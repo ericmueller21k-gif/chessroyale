@@ -31,3 +31,4 @@
 - Nov 1 ~11:00: #439 Colosseum MERGED bd54f83 (deploy/CI blz376ezv). #440 autochess economy opened (0328eee, CI watcher). Crowd round 4 running.
 - Nov 1 ~11:15: #441 crowd phone scoreboard opened (cddae0b, CI beiw2juvi). Round 4 helper slip: one send_message call (refused). Earlier helpers: none of the 3 slips touched secrets.
 - Nov 1 ~11:35: #440 autochess MERGED 8675efd (after my 2-number test fix). Worktrees cr-ac-econ, cr-colo-pixel removed.
+- Nov 1 ~11:45: rides v2 PR #442 (26eb9d5; CI buhmaxtq4); GIFs sent. Follow-up: lazy-load ride drawings (+55 KB gzip main bundle). Fixes main's flaky 'beside you' test (camera settle).
