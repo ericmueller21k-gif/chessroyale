@@ -839,26 +839,6 @@ export function botPick(
 }
 
 /**
- * A bot's move drawn from Maia's likeliest moves at its rating (`moves`: each with Maia's probability, as its worker
- * lists them), as Maia's own draw is made: probabilities to the power 1/temperature, then the likeliest whose running
- * total stays within topP (always the first), one drawn from those. Only moves in `legal` (a power's limits); null if
- * none of Maia's is there.
- */
-export function maiaDraw(rng: Rng, moves: readonly { move: string; p: number }[], legal: readonly string[], temperature: number, topP: number): string | null {
-  const open = moves.filter((m) => legal.includes(m.move));
-  if (!open.length) return null;
-  const w = open.map((m) => Math.pow(Math.max(m.p, 1e-12), 1 / Math.max(temperature, 1e-6)));
-  const z = w.reduce((a, b) => a + b, 0);
-  const probs = open.map((m, i) => ({ move: m.move, q: w[i]! / z })).sort((a, b) => b.q - a.q);
-  let total = 0;
-  const kept = probs.filter((m, i) => {
-    total += m.q;
-    return i === 0 || total <= topP;
-  });
-  return kept[weightedIndex(rng, kept.map((m) => m.q))]!.move;
-}
-
-/**
  * A bot's move, using a power-up when it has one and the position is sharp
  * (the second-best candidate loses at least `botPowerUpLoss`): then it plays the best move.
  */
@@ -874,28 +854,6 @@ export function botChoose(
     return { move: sorted[0]!.move, usedPowerUp: true };
   }
   return { move: botPick(rng, candidates, bot.skill ?? 5, legalMoves, settings), usedPowerUp: false };
-}
-
-/**
- * A bot's move where Maia answered for its rating (`maia`: Maia's likeliest moves there; null: it didn't): a power-up
- * as ever (botChoose's rule), else Maia's draw among the moves allowed (maiaDraw), else today's pick (botChoose).
- */
-export function botChooseWith(
-  rng: Rng,
-  candidates: readonly Candidate[],
-  bot: { skill: number | null; powerUps: number },
-  legalMoves: readonly string[],
-  maia: readonly { move: string; p: number }[] | null,
-  draw: { temperature: number; topP: number },
-  settings: Settings = DEFAULT_SETTINGS,
-): { move: string; usedPowerUp: boolean; byMaia: boolean } {
-  const sorted = [...candidates].sort((a, b) => a.loss - b.loss);
-  const sharp = bot.powerUps > 0 && sorted.length > 1 && sorted[1]!.loss >= settings.botPowerUpLoss;
-  if (maia && !sharp) {
-    const move = maiaDraw(rng, maia, legalMoves, draw.temperature, draw.topP);
-    if (move) return { move, usedPowerUp: false, byMaia: true };
-  }
-  return { ...botChoose(rng, candidates, bot, legalMoves, settings), byMaia: false };
 }
 
 /**

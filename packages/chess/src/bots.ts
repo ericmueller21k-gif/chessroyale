@@ -1,5 +1,4 @@
-import { BOT_MAIA, DEFAULT_SETTINGS, botStrength, shuffle, type Rng, type Settings } from "@chessroyale/core";
-import { within, type HumanCandidate, type HumanEngineLike } from "./boss-brain.ts";
+import { DEFAULT_SETTINGS, botStrength, shuffle, type Rng, type Settings } from "@chessroyale/core";
 import type { Entrant } from "./runner.ts";
 
 /** Bot names: chess terms, openings and puns, short enough for a 360 px scoreboard. */
@@ -31,8 +30,8 @@ export const BOT_NAMES: readonly string[] = [
 ];
 
 /**
- * `count` bots, named and shuffled, to fill empty seats. Each plays at its name's rating (botStrength: BOT_MAIA's bell
- * curve, the same player every match), with Maia where this device runs it and at that rating's temperature otherwise.
+ * `count` bots, named and shuffled, to fill empty seats. Each plays at its name's rating (botStrength: BOT_LOBBY's bell
+ * curve on the game's own rating scale, the same player every match), at the temperature that rating plays like.
  */
 export function botRoster(rng: Rng, count = DEFAULT_SETTINGS.lobbySize - 1, settings: Settings = DEFAULT_SETTINGS): Entrant[] {
   const names = shuffle(rng, BOT_NAMES);
@@ -42,47 +41,4 @@ export function botRoster(rng: Rng, count = DEFAULT_SETTINGS.lobbySize - 1, sett
     const name = `${names[i % names.length]!}${lap ? ` ${lap + 1}` : ""}`;
     return { id: `bot${i}`, name, isBot: true, skill: botStrength(name, settings).skill };
   });
-}
-
-/** The bots' Maia over a match: picks by Maia, picks that fell back to the Stockfish-style one, Maia's asks and their time. */
-export interface BotBrainStats {
-  maia: number;
-  fallback: number;
-  asks: number;
-  askMs: number;
-  slowest: number;
-}
-
-/**
- * Maia's likeliest moves for bots about to pick in one position: asked once per rating among them (`ratings`, one per
- * bot; the most common first), within BOT_MAIA.budgetMs in all, and no more once `stop` says the round is being scored
- * (a person locked in: nobody waits for the bots). A rating not asked by then, or not answered, is left out: its bots
- * pick Stockfish-style. Never waits for Maia to load (not ready: nothing).
- */
-export async function botMaiaLists(
-  engine: HumanEngineLike,
-  fen: string,
-  ratings: readonly number[],
-  stats?: BotBrainStats,
-  stop: () => boolean = () => false,
-  now: () => number = Date.now,
-): Promise<Map<number, HumanCandidate[]>> {
-  const out = new Map<number, HumanCandidate[]>();
-  const count = new Map<number, number>();
-  for (const r of ratings) count.set(r, (count.get(r) ?? 0) + 1);
-  const t0 = now();
-  for (const [rating] of [...count].sort((a, b) => b[1] - a[1] || a[0] - b[0])) {
-    const left = BOT_MAIA.budgetMs - (now() - t0);
-    if (left <= 0 || stop() || !engine.ready()) break;
-    const t = now();
-    const answer = await within(engine.candidates(fen, rating, null, { temperature: BOT_MAIA.temperature, topP: BOT_MAIA.topP, multipv: BOT_MAIA.multipv }), left);
-    if (stats) {
-      const ms = now() - t;
-      stats.asks++;
-      stats.askMs += ms;
-      stats.slowest = Math.max(stats.slowest, ms);
-    }
-    if (answer?.moves.length) out.set(rating, answer.moves);
-  }
-  return out;
 }

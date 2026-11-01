@@ -2,7 +2,7 @@ import { LookAways } from "./lookaway.ts";
 import { engineSpeed, ownEngine } from "./engine.ts";
 import { lastBoss } from "./boss-history.ts";
 import { showBanNotice } from "./components/FairPlay.tsx";
-import { BOSS_BRAIN, BOSS_POWERS, BOT_MAIA, DEFAULT_SETTINGS, LEAVING, PREGAME_VOTES, type MatchmakingType, botChoose, botChooseWith, botRatingForSkill, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings, type SlamPiece } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, LEAVING, PREGAME_VOTES, type MatchmakingType, botChoose, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings, type SlamPiece } from "@chessroyale/core";
 import {
   legalMoves,
   toSan,
@@ -60,8 +60,6 @@ import {
   GUARD_WORDS,
   type BrainNote,
   type HumanUciEngine,
-  type HumanCandidate,
-  botMaiaLists,
   type NetBossBrain,
   type NetBoss,
   type BossAsks,
@@ -947,36 +945,15 @@ export class NetMatch implements GameView {
    * (an admin, or everyone once forPlayers is on). A device that may not plays Stockfish's move, as before.
    */
   private useBrain(plan: NetBossBrain) {
-    // (The boss's Maia loads alone: the bots' goes first.)
-    this.freeBotsBrain();
     if (!maiaAllowed()) return;
     this.bossPlan = plan;
     if (!this.maia) this.maia = startMaia(BOSS_BRAIN.loadTimeoutMs);
   }
 
-  /** Frees Maia (its model holds a few hundred MB), the boss's and the bots'. */
+  /** Frees Maia (its model holds a few hundred MB). */
   private freeBrain() {
     this.maia?.close();
     this.maia = null;
-    this.freeBotsBrain();
-  }
-
-  /**
-   * The bots' Maia (BOT_MAIA), on this device while it scores the Crowd's rounds as the lobby's host: the bots' picks
-   * aren't checked by another device then (no many judges), so this device may make them with Maia, as solo. Started at
-   * the first such round; until it's ready, or if it fails, the bots pick Stockfish-style at their ratings. With many
-   * judges, the bots' picks follow from the lobby's seed on every judge (judge.ts), so they stay Stockfish-style.
-   */
-  private botsMaia: HumanUciEngine | null = null;
-  private botsMaiaFor(fen: string, ratings: readonly number[]): Promise<Map<number, HumanCandidate[]>> | null {
-    if (!BOT_MAIA.on || !maiaAllowed() || this.settings.raid || !ratings.length) return null;
-    this.botsMaia ??= startMaia(BOSS_BRAIN.loadTimeoutMs);
-    return this.botsMaia ? botMaiaLists(this.botsMaia, fen, ratings) : null;
-  }
-
-  private freeBotsBrain() {
-    this.botsMaia?.close();
-    this.botsMaia = null;
   }
 
   /** Maia's files fetched ahead (a raid's lobby, the Crowd's vote for a boss battle): admins' devices, or the host's once it's on for players. */
@@ -1114,11 +1091,8 @@ export class NetMatch implements GameView {
       const legal = plan.allowed ?? legalMoves(plan.fen).filter((mv) => mv !== plan.barred);
       const picks: Record<string, string> = {};
       const powerUps: string[] = [];
-      // (No boss on the board: the bots pick Maia's moves at their ratings, where this device runs Maia.)
-      const plain = !plan.allowed && !plan.barred && !plan.burn?.length && !plan.race && !this.bossPlan;
-      const maia = plain ? await this.botsMaiaFor(plan.fen, plan.bots.map((b) => botRatingForSkill(b.skill))) : null;
       for (const b of plan.bots) {
-        const choice = botChooseWith(Math.random, candidates, { skill: b.skill, powerUps: b.powerUps ?? 0 }, legal, maia?.get(botRatingForSkill(b.skill)) ?? null, BOT_MAIA, this.settings);
+        const choice = botChoose(Math.random, candidates, { skill: b.skill, powerUps: b.powerUps ?? 0 }, legal, this.settings);
         picks[b.id] = choice.move;
         if (choice.usedPowerUp) powerUps.push(b.id);
       }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_TIERS, botRatingForSkill, bossDef, crowdFinalBoss, crowdFinalists, fixedLevel, isPlayable, maiaTopRating, CROWD_KNOCKOUTS, DEFAULT_SETTINGS, RAID_SETTINGS, raidBossElo, bossElo, bossStartPly, bossInfo, botVotes, clockAfterVote, modeSettings, mulberry32, tallyVotes, voteZoneAt, PREGAME_VOTES, type Settings } from "@chessroyale/core";
+import { BOSS_TIERS, bossDef, crowdFinalBoss, crowdFinalists, fixedLevel, isPlayable, maiaTopRating, CROWD_KNOCKOUTS, DEFAULT_SETTINGS, RAID_SETTINGS, raidBossElo, bossElo, bossStartPly, bossInfo, botVotes, clockAfterVote, modeSettings, mulberry32, tallyVotes, voteZoneAt, PREGAME_VOTES, type Settings } from "@chessroyale/core";
 import { bossIntroTimeline, bossShowMs, legalMoves, MatchRunner, moveNumber, START_FEN, sanLineToUci, type EngineLike, type Opening } from "../src/index.ts";
 
 const hash = (s: string) => {
@@ -394,46 +394,6 @@ describe("Crowd mode", () => {
       const report = await runner.score(new Map());
       for (const p of report.boards[0]!.result.players) expect(p.move).toBe(planned.get(p.playerId));
     }
-  });
-
-  it("the bots pick Maia's moves at their ratings (one ask per rating), and today's picks while Maia isn't ready", async () => {
-    const runner = new MatchRunner({
-      settings: { ...base },
-      rng: mulberry32(6),
-      engines: [fake],
-      library,
-      entrants: Array.from({ length: 100 }, (_, i) => ({ id: `b${i}`, name: `B${i}`, isBot: true, skill: [8, 15.5, 64][i % 3]! })),
-    });
-    let ready = false;
-    const asked: number[] = [];
-    runner.botBrain = {
-      ready: () => ready,
-      async candidates(fen, rating) {
-        asked.push(rating);
-        // (Maia's own list: one legal move it's sure of, a different one per rating.)
-        const legal = legalMoves(fen);
-        return { best: null, moves: [{ move: legal[rating % legal.length]!, p: 1 }], ms: 1 };
-      },
-    };
-    runner.deal();
-    const before = await runner.planBotPicks();
-    expect(before.size).toBe(50);
-    expect(asked).toEqual([]);
-    expect(runner.botBrainStats).toMatchObject({ maia: 0, fallback: 50 });
-    await runner.score(new Map());
-    ready = true;
-    runner.deal();
-    const fen = runner.boards.get(0)!.fen;
-    const picks = await runner.planBotPicks();
-    expect(asked.sort()).toEqual([1200, 2100, 600]);
-    const legal = legalMoves(fen);
-    for (const [id, move] of picks) expect(move).toBe(legal[botRatingForSkill(runner.player(id).skill!) % legal.length]);
-    expect(runner.botBrainStats).toMatchObject({ maia: 50, fallback: 50, asks: 3 });
-    // Scored before the bots planned (a person locked in at once): nobody waits for Maia, the bots pick as before.
-    await runner.score(new Map());
-    runner.deal();
-    await runner.score(new Map());
-    expect(runner.botBrainStats).toMatchObject({ maia: 50, fallback: 100, asks: 3 });
   });
 
   it("the clock vote's time control: every bank starts at its bank (only before move 1), every move's cap is its own, bots think within it", async () => {

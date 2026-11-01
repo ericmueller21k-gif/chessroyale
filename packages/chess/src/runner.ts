@@ -7,9 +7,7 @@ import {
   startBanks,
   assignColours,
   assignGroups,
-  BOT_MAIA,
-  botChooseWith,
-  botRatingForSkill,
+  botChoose,
   botThinkMs,
   createMatch,
   drawRuleFor,
@@ -75,8 +73,7 @@ import { pickOpenings, type Opening } from "./openings.ts";
 import { START_FEN, applyMove, baseAt, gameEnd, legalMoves, materialSlips, moveNumber, pieceAt, sideToMove, toSan } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
 import { BOSS_BRAIN, BOSS_LEVEL, ENGINE_MAX_ELO, bossBrainFor, bossLevelBase, bossLevelNow, bossRatingShown, type BossBrain, type BossBrainPlan } from "@chessroyale/core";
-import { humanBrainMove, within, type BrainNote, type HumanCandidate, type HumanEngineLike } from "./boss-brain.ts";
-import { botMaiaLists, type BotBrainStats } from "./bots.ts";
+import { humanBrainMove, within, type BrainNote, type HumanEngineLike } from "./boss-brain.ts";
 import {
   allowedSearch,
   boardAltered,
@@ -694,7 +691,6 @@ export class MatchRunner {
   private strikeBots: number | null = null;
 
   deal(): Map<number, string[]> {
-    this.scoringRound = false;
     this.retiredThisRound = [];
     this.kingCallers = new Set();
     this.kingStrikers = new Set();
@@ -801,7 +797,6 @@ export class MatchRunner {
     humanPicks: ReadonlyMap<string, HumanPick>,
   ): Promise<{ results: BoardRound[]; thinkMs: Record<string, number>; powerUps: Set<string> }> {
     const { rng } = this.opts;
-    this.scoringRound = true;
     if (this.planning) await this.planning;
     const entries = [...this.groups.entries()];
     const results: BoardRound[] = new Array(entries.length);
@@ -844,9 +839,8 @@ export class MatchRunner {
         const allowed = this.crowdAllowed(boardId) ?? undefined;
         const open = await allowedSearch(this.opts.engines[0]!, { fen, allowed }, all);
         const top = judgeCandidates({ allowed }, all, open ?? []);
-        const maia = await this.botMaia(boardId, ids);
         if (this.groups.get(boardId) !== ids) return this.planned; // a new round has been dealt meanwhile
-        for (const [id, move] of Object.entries(this.botPicksFor(boardId, ids, top, maia))) this.planned.set(id, move);
+        for (const [id, move] of Object.entries(this.botPicksFor(boardId, ids, top))) this.planned.set(id, move);
       }
       return this.planned;
     })();
@@ -854,30 +848,8 @@ export class MatchRunner {
     return run;
   }
 
-  /**
-   * The bots' Maia (BOT_MAIA), where this device runs it: each bot picks Maia's move at its rating
-   * (botRatingForSkill of its temperature), and today's pick when Maia doesn't answer. Not in a boss battle: there the
-   * powers' rules (a tile ablaze, the carrot race) shape the bots' picks, so they pick as before.
-   */
-  botBrain: HumanEngineLike | null = null;
-  /** The round is being scored (evaluate began): the bots' Maia asks no more ratings, so nobody waits for it. */
-  private scoringRound = false;
-  /** The bots' picks since the match began while botBrain was set: by Maia, or today's pick instead (`fallback`); Maia's asks and their time. */
-  readonly botBrainStats: BotBrainStats = { maia: 0, fallback: 0, asks: 0, askMs: 0, slowest: 0 };
-
-  /** Maia's likeliest moves for the bots still to pick on a board, at their ratings (botMaiaLists; none without botBrain). */
-  async botMaia(boardId: number, playerIds: readonly string[]): Promise<Map<number, HumanCandidate[]>> {
-    const engine = this.botBrain;
-    if (!BOT_MAIA.on || !engine || this.state.boss) return new Map();
-    const ratings = playerIds.flatMap((id) => {
-      const p = this.player(id);
-      return p.isBot && !this.planned.has(id) ? [botRatingForSkill(p.skill ?? 5)] : [];
-    });
-    return ratings.length ? botMaiaLists(engine, this.boards.get(boardId)!.fen, ratings, this.botBrainStats, () => this.scoringRound) : new Map();
-  }
-
-  /** Picks for every player on a board: humans as given, bots from Maia at their ratings (`maia`: botMaia's) or the engine's top moves. */
-  botPicksFor(boardId: number, playerIds: readonly string[], top: readonly MoveScore[], maia?: ReadonlyMap<number, readonly HumanCandidate[]>): Record<string, string> {
+  /** Picks for every player on a board: humans as given, bots from the engine's top moves. */
+  botPicksFor(boardId: number, playerIds: readonly string[], top: readonly MoveScore[]): Record<string, string> {
     const board = this.boards.get(boardId)!;
     // Boss battle: only the moves allowed this turn (a power's limits; the move the God King took back is off the table).
     const allowed = this.crowdAllowed(boardId);
@@ -896,9 +868,7 @@ export class MatchRunner {
         continue;
       }
       if (!this.botThink.has(id)) this.botThink.set(id, botThinkMs(this.opts.rng, this.roundSettings()));
-      const human = this.botBrain && !this.state.boss ? (maia?.get(botRatingForSkill(p.skill ?? 5)) ?? null) : null;
-      const choice = botChooseWith(this.opts.rng, candidates, p, legal, human, BOT_MAIA, this.settings);
-      if (this.botBrain && !this.state.boss && !choice.usedPowerUp) this.botBrainStats[choice.byMaia ? "maia" : "fallback"]++;
+      const choice = botChoose(this.opts.rng, candidates, p, legal, this.settings);
       if (choice.usedPowerUp) this.botPowerUps.add(id);
       out[id] = choice.move;
     }
@@ -925,7 +895,7 @@ export class MatchRunner {
     // (The boss's rules may offer the bots more moves, scored first: Chub & Chirp's race, the moves that pull a carrot.)
     const offers = judgeOffers(this.state.boss, board.fen).filter((m) => (!allowed || allowed.includes(m)) && !top.some((t) => t.move === m));
     const offered = offers.length ? await engine.scoreMoves(board.fen, offers) : [];
-    const botPicks = this.botPicksFor(boardId, playerIds, [...top, ...offered], await this.botMaia(boardId, playerIds));
+    const botPicks = this.botPicksFor(boardId, playerIds, [...top, ...offered]);
     const picks: Record<string, string | null> = {};
     for (const id of playerIds) picks[id] = this.player(id).isBot ? botPicks[id]! : (humanPicks.get(id)?.move ?? null);
     const known = new Map(top.map((m) => [m.move, m.expected]));

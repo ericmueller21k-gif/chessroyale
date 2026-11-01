@@ -16,10 +16,9 @@
  */
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { BOT_MAIA, DEFAULT_SETTINGS, botRatingForSkill, botSkillSpread, modeSettings, mulberry32, shuffle, type Settings } from "@chessroyale/core";
-import { HumanUciEngine, MatchRunner, botRoster, type Entrant, type Opening } from "@chessroyale/chess";
+import { BOT_LOBBY, DEFAULT_SETTINGS, botRatingForSkill, botSkillSpread, estimateRating, matchLoss, modeSettings, mulberry32, rawLossTotal, shuffle, type Settings } from "@chessroyale/core";
+import { MatchRunner, botRoster, type Entrant, type Opening } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
-import { maiaProcess } from "../src/maia-process.ts";
 import { spearman } from "../src/stats.ts";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
@@ -34,40 +33,32 @@ interface MatchRow {
   place: number;
   outInStage: number | null;
   /** Each bot: its rating (what its temperature plays like, for `before`), its temperature and its place. */
-  field: { rating: number; skill: number; place: number; final: boolean; outInStage: number | null }[];
+  field: { rating: number; skill: number; place: number; final: boolean; outInStage: number | null; raw?: number; moves?: number; shown?: number | null }[];
   /** `maia`: the bots' picks by Maia, and those that fell back to the Stockfish-style pick. Maia's asks and their time. */
   maia?: { maia: number; fallback: number; asks: number; askMs: number; slowest: number };
+  /** The final's eight (the player among them, rating 0): place, matchLoss and raw loss over the match (points per move), moves scored. */
+  finalists?: { rating: number; place: number; matchLoss: number; rawPerMove: number; moves: number }[];
   secs: number;
 }
 
-async function run(kind: string, matches: number, seed0: number, help: string) {
-  if (!["before", "tuned", "maia"].includes(kind)) throw new Error(`bots: before | tuned | maia, not ${kind}`);
+async function run(kind: string, matches: number, seed0: number, help: string, tag = "") {
+  if (!["before", "tuned", "probe"].includes(kind)) throw new Error(`bots: before | tuned | probe, not ${kind}`);
   mkdirSync(OUT, { recursive: true });
   const engines = await Promise.all(Array.from({ length: 3 }, () => createNodeEngine({ nodes: 100_000, hashMb: 16 })));
   const settings: Settings = { ...DEFAULT_SETTINGS, ...modeSettings("crowd"), engineNodes: 100_000 };
   const own = help === "own" ? await createNodeEngine({ nodes: 100_000, hashMb: 16 }) : null;
-  let maia: HumanUciEngine | null = null;
-  if (kind === "maia") {
-    maia = new HumanUciEngine(maiaProcess());
-    if (!(await maia.init(120_000))) throw new Error(`Maia didn't load: ${maia.error}`);
-  }
   for (let m = 0; m < matches; m++) {
     const seed = seed0 + m;
     const t0 = Date.now();
     const rng = mulberry32(7000 + seed);
-    const bots: Entrant[] =
-      kind === "before"
-        ? botSkillSpread(99, { ...settings, botSkillRange: [0.25, 32] }).map((skill, i) => ({ id: `bot${i}`, name: `B${i}`, isBot: true, skill }))
-        : botRoster(rng, 99, settings);
+    const spread = (lo: number, hi: number) => shuffle(rng, botSkillSpread(99, { ...settings, botSkillRange: [lo, hi] })).map((skill, i) => ({ id: `bot${i}`, name: `B${i}`, isBot: true, skill }));
+    const bots: Entrant[] = kind === "before" ? spread(0.25, 32) : kind === "probe" ? spread(4, 1024) : botRoster(rng, 99, settings);
     const entrants = shuffle(rng, [{ id: YOU, name: "Engine", isBot: false }, ...bots]);
     const runner = new MatchRunner({ settings, rng, engines, library, entrants });
-    runner.botBrain = maia;
     const outIn = new Map<string, number>();
     while (!runner.isOver()) {
       runner.deal();
       runner.prefetch();
-      // (The bots decide as the round starts, as solo's do: Maia asked before anyone locks in.)
-      if (maia) await runner.planBotPicks();
       const picks = new Map<string, { move: string; thinkMs: number }>();
       const board = runner.boardOf(YOU);
       if (board && runner.player(YOU).alive) {
@@ -93,16 +84,28 @@ async function run(kind: string, matches: number, seed0: number, help: string) {
       seed,
       place: me.placement!,
       outInStage: outIn.get(YOU) ?? null,
-      field: ps.filter((p) => p.isBot).map((p) => ({ rating: botRatingForSkill(p.skill ?? 5), skill: p.skill ?? 5, place: p.placement!, final: !outIn.has(p.id), outInStage: outIn.get(p.id) ?? null })),
-      ...(maia ? { maia: { ...runner.botBrainStats } } : {}),
+      field: ps
+        .filter((p) => p.isBot)
+        .map((p) => {
+          const losses = p.lossesByStage.flat();
+          const raw = Math.round(losses.reduce((a, b) => a + b, 0) * 100) / 100;
+          return { rating: botRatingForSkill(p.skill ?? 5), skill: p.skill ?? 5, place: p.placement!, final: !outIn.has(p.id), outInStage: outIn.get(p.id) ?? null, raw, moves: losses.length, shown: estimateRating(losses) };
+        }),
+      finalists: ps
+        .filter((p) => !outIn.has(p.id))
+        .sort((a, b) => a.placement! - b.placement!)
+        .map((p) => {
+          const moves = p.lossesByStage.reduce((s, l) => s + l.length, 0) + (p.misses ?? 0);
+          const r = (x: number) => Math.round(x * 100) / 100;
+          return { rating: p.isBot ? botRatingForSkill(p.skill ?? 5) : 0, place: p.placement!, matchLoss: r(matchLoss(p, settings)), rawPerMove: r(rawLossTotal(p, settings) / Math.max(1, moves)), moves };
+        }),
       secs: Math.round((Date.now() - t0) / 1000),
     };
-    appendFileSync(OUT + `${kind}${own ? "-own" : ""}.jsonl`, JSON.stringify(row) + "\n");
-    console.log(`${kind} match ${m + 1}/${matches} (seed ${seed}): engine player ${row.place}${row.outInStage !== null ? ` (out in stage ${row.outInStage + 1})` : ""}, ${row.secs} s${row.maia ? `, Maia ${row.maia.maia} / fallback ${row.maia.fallback}, ${row.maia.asks} asks, ${Math.round(row.maia.askMs / Math.max(1, row.maia.asks))} ms each` : ""}`);
+    appendFileSync(OUT + `${kind}${own ? "-own" : ""}${tag ? `-${tag}` : ""}.jsonl`, JSON.stringify(row) + "\n");
+    console.log(`${kind} match ${m + 1}/${matches} (seed ${seed}): engine player ${row.place}${row.outInStage !== null ? ` (out in stage ${row.outInStage + 1})` : ""}, ${row.secs} s`);
   }
   engines.forEach((e) => e.close());
   own?.close();
-  maia?.close();
 }
 
 // ---------------- The report ----------------
@@ -165,6 +168,6 @@ function summary() {
 
 const [cmd, ...args] = process.argv.slice(2);
 if (cmd === "summary") summary();
-else if (cmd) await run(cmd, Number(args[0] ?? 10), Number(args[1] ?? 1), args[2] ?? "judge");
+else if (cmd) await run(cmd, Number(args[0] ?? 10), Number(args[1] ?? 1), args[2] ?? "judge", args[3] ?? "");
 else console.log("usage: crowd-bots-sim.ts before|tuned|maia [matches] [seed] | summary");
 process.exit(0);
