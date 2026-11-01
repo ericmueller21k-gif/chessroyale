@@ -37,3 +37,4 @@
 - Nov 1 ~11:55: #442 rides v2 MERGED bb5e7a1 (deploy/CI watcher). Next: lazy-load ride drawings follow-up (+55 KB gzip).
 - Nov 1 ~12:00: main 8675efd (#440) full e2e GREEN (queued run, new wait script worked).
 - Nov 1 ~12:20: #441 round 5 72b8ada fixed board position; blocked on short phones (390×664: 62 px under board, chat feed 0). My call: option (a) middle box height from screen height (200 → ~118), ≥3 bars + yours. Round 6 Haiku running.
+- Nov 1 ~12:40: #443 computer game screens opened (8d60f28, CI b4002hc91). Every board ≥ main's at 5 sizes; gaps 1024×768 (−24) and 1800–1856 raid.
