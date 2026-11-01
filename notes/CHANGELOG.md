@@ -30,7 +30,7 @@ dropped. *(mine)* marks the director's own suggestions.
 | C1 | Alfil's ultimate banner cut off on a computer; every boss banner checked | **LIVE** #436 (two Sawyer subtitles overhang 4–5 px, glyphs inside) |
 | C2 | Ult meter on a computer: thicker, twice as long (88 × 10 px) | **LIVE** #436 |
 | D1 | Squads scoreboard: your squad pinned at the top, a thicker line, then the list | **LIVE** #436 |
-| D2 | Crowd team table stays dark in Light mode (found by #436) | waiting on Eric: restyle or not |
+| D2 | Crowd team table stays dark in Light mode (found by #436) | Eric: restyle light; **in the 50 v 50 scoreboard PR** |
 
 ## E. Colosseum pixel style
 | # | Note | Status |
@@ -77,7 +77,7 @@ dropped. *(mine)* marks the director's own suggestions.
 | P2 | Helper rules: one wait call, fresh helpers, PRs by the director, local tests only what changed, ~10 images | **LIVE** #437 |
 | P3 | Smarter PR test selection; main one run at a time | **merged** #438 (median PR test run 34 → ~10 min) |
 | P4 | Speed up the four slowest specs, keeping every check | later |
-| P5 | Where the notes live so a restart can't wipe them | ask Eric |
+| P5 | Where the notes live so a restart can't wipe them | **branch `claude/director-notes`** (Eric's pick; public repo) |
 
 ## Nov 1 (morning): Eric's three
 | # | Note | Status |
@@ -85,4 +85,4 @@ dropped. *(mine)* marks the director's own suggestions.
 | L1 | **50 v 50 on a phone:** delete "Your team watched this one"; the middle (power-ups, arrows, status, vote results) is one fixed-height box; the scoreboard flush under it, never moves; header pick **Black · White · All** (your team default; selected white, others grey); drop "tap for all 50" (the ▾ opens the full list). Phone only; desktop later | **BUILDING** (Haiku) |
 | L2 | **Auto chess TFT economy** (Eric's Oct 25 numbers, ROADMAP; had been "for another day"): pawn 1, knight 3, bishop 3, rook 5, queen 9 *(mine: 9 per "unless 8 or 9 is more true to chess value")*; 4 gold → 4 XP; interest +1 per 10 up to +5; roll 2, 3, 4, 5 cap 5 per round; income TFT-sized by sim (7–10 rounds) | **BUILDING** (Opus) |
 | L3 | **Board size on a computer:** Settings "Board size: Large · Compact"; Large = as close to chess.com's 0.889 of the height as fits (shrink bosses/rows if needed), the default *(mine, per "the one people open up the game to")*; Compact = today's (Oct 29). Why today's fell short: a fixed 170–230 px room above/below the board, so a short laptop window gets ~0.72 | **BUILDING** (Haiku); stills to Eric first |
-| L3b | **Boss screen on a computer (Eric, Nov 1, after testing):** no title line ("BOSS · move 1" goes; "Move 1" by the boss's name in its bar, or left of "60 moves left"); ⚡ / fish / gear to the right side of the board; the boss's bar right at the top of the window; a smaller bottom gap; the board bigger; **the normal left side menu back on game screens** ("blank-looking boss screen"). **Mockup first** (Eric may send his own) | **MOCKUP** (Haiku) at 1280 × 640 and 1920 × 1080; the Board size setting paused until Eric OKs |
+| L3b | **Boss screen on a computer (Eric, Nov 1, after testing):** no title line ("BOSS · move 1" goes; "Move 1" by the boss's name in its bar, or left of "60 moves left"); ⚡ / fish / gear to the right side of the board; the boss's bar right at the top of the window; a smaller bottom gap; the board bigger; **the normal left side menu back on game screens** ("blank-looking boss screen"). **Mockup first** (Eric may send his own) | Mockup **APPROVED** ("Build it", Nov 1); **BUILDING** (Haiku): side menu on every computer game screen, icons only under 1366 px; no Compact setting *(mine)* |

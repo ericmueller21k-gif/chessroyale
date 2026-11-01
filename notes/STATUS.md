@@ -26,3 +26,4 @@
 - Nov 1 09:30: Eric's three building: crowd phone scoreboard (Haiku, cr-crowd-board), board size Large/Compact (Haiku, cr-board-size), autochess TFT economy (Opus, cr-ac-econ). Briefs in nov1b/.
 - Nov 1 09:35: board-size helper redirected to a MOCKUP of Eric's new desktop boss layout (no title line, icons right of board, bar at top, side menu back). Stop after stills.
 - Nov 1 10:00: main a2f721a green + live. 60975fa's main run red: town.spec:1273 'beside you: 22,17' (phone both tries, desktop flaky); a2f721a passed it → intermittent; rides v2 helper asked to root-cause.
+- Nov 1 10:15 Eric: build boss screen (helper running, cr-board-size), notes on branch claude/director-notes (cr-notes; copy + push after updates), team table light → in crowd round 3.
