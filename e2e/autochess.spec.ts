@@ -1747,13 +1747,13 @@ test("a pawn reaching the far end cashes in: it lands, a coin sounds, \"+1\" flo
   });
   await expect(root(page)).toHaveAttribute("data-phase", /^(result|over)$/, { timeout: 60_000 });
   const cash = await page.evaluate(() => (window as any).__cash as { pawnOnB8: boolean; floats: { amount: string; x: string; y: string }[] });
-  // The pawn stood on b8 for a moment, then left: "+1" floated from b8 (column 1, row 0 with White at the bottom).
+  // The pawn stood on b8 for a moment, then left: "+2" floated from b8 (column 1, row 0 with White at the bottom).
   expect(cash.pawnOnB8).toBe(true);
-  expect(cash.floats).toContainEqual({ amount: "1", x: "1", y: "0" });
+  expect(cash.floats).toContainEqual({ amount: "2", x: "1", y: "0" });
   await expect(page.locator(`${BOARD_SEL.piece}.white.pawn[data-square="b8"]`)).toHaveCount(0);
   expect(await soundCount(page, "acCash")).toBe(1);
-  // The 1 gold waits for the next round, in its own part of the line.
-  await expect(page.locator(".ac-card-gold")).toContainText("+ 1 from cash-ins");
+  // The 2 gold waits for the next round, in its own part of the line.
+  await expect(page.locator(".ac-card-gold")).toContainText("+ 2 from cash-ins");
   expect(stockfish).toEqual([]);
   expect(errors).toEqual([]);
 });
