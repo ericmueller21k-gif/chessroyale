@@ -154,6 +154,11 @@ Specialist agents live in `.claude/agents/` (one file each: a name, when to use 
   out of hand"; "I should be able to tell you to add a boss and it should take an hour of a few agents running in
   parallel to finish and push"): each change gets exactly what its lane and the helper testing budget under "Test
   lanes" ask for, no more and no less, at the effort its task calls for. A trial: see "Test lanes".
+  - **One Opus helper at a time (Eric's rule, restated Nov 1, 2026; first set in October after a night of about ten
+    helpers at once used about 30% of a week's usage).** The director never has more than one Opus helper running;
+    the next starts when it finishes. A Haiku helper for a small UI or docs job may run beside it only if Eric has OK'd
+    that job. Background scripts (CI and deploy watchers) don't count. Nov 1: the rule was lost after a restart and four
+    Opus helpers ran at once; this line is here so it survives restarts.
   - A review round, a fix round after a merge, or a new job goes to a fresh helper with a one-page handoff (the PR, the
     findings, the files), never to a resumed one carrying hundreds of thousands of tokens (Nov 1 audit: seven of the ten
     costliest helpers had been resumed for more rounds or handed the next job). A helper mid-task keeps going.
