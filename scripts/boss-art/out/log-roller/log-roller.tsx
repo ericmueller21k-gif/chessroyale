@@ -265,4 +265,46 @@ export const logRoller: RiderDraft = {
   Back: LogBack,
   Front: LogFront,
   views: { front: viewDraft("front"), back: viewDraft("back") },
+  trail: { ms: [170, 150, 150, 130], w: 24, h: 16, Mark: ChipsMark },
 };
+
+/* ---------- Trail: wood chips and a curl of bark, scattered on the floor ---------- */
+/** Chips: x, y, half-length, half-width, angle. Flattened (seen from above at the town's angle). */
+const CHIPS: [number, number, number, number, number][] = [
+  [-6.5, -2.5, 3.2, 1.6, -20],
+  [1.5, 3.5, 2.8, 1.4, 25],
+  [7, -3, 2.4, 1.3, 60],
+  [-1.5, -4.5, 1.8, 1.1, 10],
+];
+
+function ChipsMark({ f, n }: { f: number; n: number }) {
+  const flip = n % 2 === 1 ? -1 : 1;
+  const shift = ((n * 7) % 3) - 1;
+  const op = [1, 0.95, 0.6, 0.28][Math.min(3, f)];
+  const sc = [1, 0.96, 0.9, 0.82][Math.min(3, f)];
+  const settle = [-0.8, 0, 0, 0][Math.min(3, f)];
+  const k = (x: number) => f1(x * flip + shift);
+  return (
+    <g opacity={op} transform={`scale(${sc} ${f1(sc * 0.85)})`}>
+      {CHIPS.map(([x, y, a, b, r], i) => (
+        <path
+          key={i}
+          d={`M ${f1(-a)} 0 L ${f1(-a * 0.3)} ${f1(-b)} L ${f1(a)} ${f1(-b * 0.4)} L ${f1(a * 0.5)} ${f1(b)} Z`}
+          fill={i % 2 ? "#e8b877" : WOOD}
+          stroke="#1d1d1f"
+          {...lw(1.3)}
+          transform={`translate(${k(x)},${f1(y + (i === 0 ? settle : 0))}) rotate(${r * flip + n * 13})`}
+        />
+      ))}
+      {/* the curl of bark */}
+      <path
+        d={`M ${k(-3)} 5 Q ${k(-6.5)} 2.5 ${k(-9.5)} 5.5 Q ${k(-6.5)} 3.8 ${k(-4.5)} 6.8 Z`}
+        fill={BARK_DARK}
+        stroke="#1d1d1f"
+        {...lw(1.3)}
+        stroke-linejoin="round"
+      />
+      <path d={`M ${k(-3)} 5 Q ${k(-6.5)} 2.5 ${k(-9.5)} 5.5`} fill="none" stroke={BARK_LIGHT} {...lw(0.8)} />
+    </g>
+  );
+}
