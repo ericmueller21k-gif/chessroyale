@@ -42,6 +42,12 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
     pace the mode really has (Boss alone's 0.45 s boss move is a different path from a raid's).
   - Nothing hides a text box to make it fit, and hiding a figure mustn't hide the words beside it.
 
+- **A scoreboard that rebuilt itself every phase** (Nov 1, [story](../docs/history/lessons.md#a-scoreboard-that-rebuilt-itself-every-phase-nov-1-2026)):
+  - A component that sizes what it shows from its own box measures in a layout effect, from its last size, so a copy
+    drawn anew shows the same first frame.
+  - Something that should stay put through a match's phases (a box under the board) is one element, not one per
+    screen: count the elements across the phases (a MutationObserver or a per-frame sampler), not only their boxes.
+
 ## Measure what's on screen; don't trust a screenshot
 
 - **Purity that didn't match the item** (Oct 6, [story](../docs/history/lessons.md#purity-that-didnt-match-the-item-oct-6-2026)):

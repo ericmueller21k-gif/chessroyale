@@ -2404,6 +2404,13 @@ export const QUICK_CHAT = {
   botLobbyMax: 2,
   botLobbyDelayMs: [300, 900] as readonly [number, number],
   botLobbyGapMs: 500,
+  /**
+   * Solo 50 v 50 only (Eric, Nov 1: "have the bots just chatting still"): after each of your team's moves, with these odds,
+   * a teammate bot says one of these (everyday picks every player has, to the team), within botMaxPerMinute. Online
+   * matches don't use it (their bots keep the moments above).
+   */
+  botChatterChance: 0.35,
+  botChatter: ["trust-crowd", "defend-king", "go-mate", "wow", "oops", "e-thumbs", "e-fire", "e-clap", "e-laugh", "e-wow"] as readonly string[],
   /** The queue's lobby chat on a phone: the feed shows at least this many whole lines (more when there's room). */
   lobbyFeedLines: 2,
   /**
@@ -3566,7 +3573,7 @@ export const AUTOCHESS: AutoChessSettings = {
   introBubbleMs: 2500,
   fightMoveMs: 600,
   fightNodes: 30000,
-  cashInGold: 1,
+  cashInGold: 2,
   cashInValue: 20,
   fightFastAfter: 30,
   fightFastMoveMs: 300,

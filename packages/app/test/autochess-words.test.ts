@@ -8,7 +8,7 @@ describe("auto chess: what the result says", () => {
   it("the fight's rules, in the box while it plays, from the settings (short enough for a 320 px phone)", () => {
     expect(fightRulesWords()).toBe(
       "One engine plays both armies. A side left with only its king loses. Gains count, not army size: 3 pawns gained for 6 moves wins, " +
-        "and a stall (repeats, 10 moves each with no capture, or 60) goes to the side that gained more. A pawn at the far end cashes in for +1 gold.",
+        "and a stall (repeats, 10 moves each with no capture, or 60) goes to the side that gained more. A pawn at the far end cashes in for +2 gold.",
     );
     expect(fightRulesWords().length).toBeLessThanOrEqual(280);
     expect(fightRulesWords({ ...AUTOCHESS, decisiveMargin: 500, quietCap: 8 })).toContain("5 pawns gained for 6 moves wins, and a stall (repeats, 8 moves each");
@@ -65,7 +65,7 @@ describe("auto chess: what the result says", () => {
     expect(goldWords(g)).toBe("Next round: 12 saved + 14 income + 1 interest + 1 streak + 3 survivors = 31 gold");
     const plain = goldBreakdown(2, { gold: 0, hp: 20, wins: 0, losses: 1, refund: { survivors: 0 } });
     expect(goldWords(plain)).toBe("Next round: 0 saved + 12 income = 12 gold");
-    // A fight's cash-ins (1 gold a pawn) get their own part.
+    // A fight's cash-ins (2 gold a pawn: one pawn here) get their own part.
     const cashed = goldBreakdown(2, { gold: 2, hp: 20, wins: 0, losses: 0, refund: { survivors: 2, cashIns: 2 } } as never);
     expect(goldWords(cashed)).toBe("Next round: 2 saved + 12 income + 2 survivors + 2 from cash-ins = 18 gold");
   });
@@ -113,7 +113,7 @@ describe("auto chess: survivors", () => {
       kingRanks: 2,
       hopEvery: [7, 10],
       fightMoveMs: 600,
-      cashInGold: 1,
+      cashInGold: 2,
       fightFastAfter: 30,
       fightFastMoveMs: 300,
       moveCap: 60,

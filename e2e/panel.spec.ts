@@ -178,7 +178,7 @@ test("the panel under the board is never empty: every tap, every remembered layo
   await expect(p.locator(".under-board .mini-chat-tab")).toBeVisible();
 });
 
-test("solo Crowd (no chat): the scoreboard alone, full width, folds to its header and opens again", async ({ page }) => {
+test("solo Crowd with chat off: the scoreboard alone, full width, folds to its header and opens again", async ({ page }) => {
   test.setTimeout(3 * 60_000);
   test.skip(test.info().project.name !== "phone", "a phone's layout");
   await named(page, "Solo");
@@ -188,6 +188,8 @@ test("solo Crowd (no chat): the scoreboard alone, full width, folds to its heade
       sessionStorage.setItem("seeded", "1");
       localStorage.setItem("brc.underBoard", "board");
       localStorage.setItem("brc.miniTower", "0");
+      // (Solo's 50 v 50 has chat since Nov 1: off, it's the scoreboard alone, as solo was.)
+      localStorage.setItem("brc.chatOff", "1");
     }
   });
   await page.goto("/?debug&pace=quick&mode=crowd&rounds=2&clock=30&augments=0");

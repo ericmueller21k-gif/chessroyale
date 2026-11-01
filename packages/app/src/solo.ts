@@ -51,12 +51,16 @@ export class SoloMatch implements GameView {
   readonly looks = new Map<string, ItemLook>();
   readonly fillAt: number | null = null;
   filledAt: number | null = null;
-  /** Quick chat in the queue (Crowd and raids) while your bots sit down; it closes as the match begins. */
+  /**
+   * Quick chat in the queue (Crowd and raids) while your bots sit down. A 50 v 50 keeps it through the match, the bots
+   * chatting as online (never on the cut screen: Eric, Nov 1); a raid's closes as the match begins.
+   */
   private lobbyChat = new SoloLobbyChat(
     HUMAN,
     () => this.emit(),
     () => account().profile?.shop?.owned,
     () => account().profile?.shop?.chat,
+    () => this.phase.kind === "stageBreak",
   );
   get chat() {
     return this.lobbyChat.chat;
@@ -342,8 +346,14 @@ export class SoloMatch implements GameView {
       this.emit();
       this.timer = setTimeout(() => {
         this.auto = false;
-        // (Solo matches have no chat.)
-        this.lobbyChat.close();
+        // (A 50 v 50's chat carries on into the match, with teams; a raid has none.)
+        if (this.settings.mode === "crowd" && !this.settings.raid) {
+          const seats = this.runner.state.players;
+          this.lobbyChat.startMatch(
+            (id) => (this.runner.boss ? null : (seats.find((p) => p.id === id)?.colour ?? null)),
+            seats.filter((p) => p.isBot).map((p) => p.id),
+          );
+        } else this.lobbyChat.close();
         this.begin();
       }, holdMs);
     };
@@ -1318,6 +1328,7 @@ export class SoloMatch implements GameView {
     }
     // The God King's Last Stand plays out in the reveal; the next move's clock starts after it (nobody loses time).
     const revealMs = (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000 + (mine.king ? kingMoveMs(this.settings) : 0) + (mine.lastStand ? lastStandMs() : 0);
+    this.moveChat(mine);
     this.set({ kind: "reveal", mine, board, until: Date.now() + revealMs });
     this.timer = setTimeout(() => this.afterReveal(), revealMs);
   }
@@ -1344,8 +1355,19 @@ export class SoloMatch implements GameView {
     if (this.stopped) return;
     const report = this.runner.finishRound(scored.results, scored.thinkMs, scored.powerUps);
     const revealMs = (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000;
+    this.moveChat(report.boards[0]!);
     this.set({ kind: "reveal", mine: report.boards[0]!, board, until: Date.now() + revealMs });
     this.timer = setTimeout(() => this.afterReveal(), revealMs);
+  }
+
+  /** A crowd move just played (a 50 v 50 with chat): a bot on the team that picked it may say it was a great one, as online. */
+  private moveChat(b: RoundReport["boards"][number]) {
+    const loss = b.result.players.find((p) => p.move === b.result.playedMove)?.loss;
+    if (loss == null) return;
+    const bots = b.playerIds.filter((id) => this.runner.player(id).isBot && this.runner.player(id).alive);
+    this.lobbyChat.botsSay({ kind: "greatMove", loss }, bots);
+    // (And now and then, after your team's move, a teammate's everyday line.)
+    if (b.playerIds.includes(HUMAN)) this.lobbyChat.chatter(bots);
   }
 
   skipReveal() {
@@ -1509,6 +1531,7 @@ export class SoloMatch implements GameView {
   }
 
   private finish() {
+    this.lobbyChat.botsSay({ kind: "end" }, this.runner.state.players.filter((p) => p.isBot).map((p) => p.id));
     this.freeBrain();
     this.freeBotsBrain();
     this.runner.showdownScout?.reset();
