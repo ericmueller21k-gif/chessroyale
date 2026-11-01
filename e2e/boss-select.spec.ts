@@ -1,4 +1,5 @@
 import { expect, type Page } from "@playwright/test";
+import { adminFirstBosses, playableBosses } from "@chessroyale/core";
 import { named, openBossRaid, openSoloBoss, test } from "./helpers.ts";
 
 /**
@@ -586,10 +587,11 @@ test("Boss alone's menu and the /bosses picker fit any window: whole, or their r
     await expect(alone.getByRole("combobox")).toHaveCount(0);
     await expect(alone.getByText(/BRAIN|Maia/)).toHaveCount(0);
     await expectMenuFits(page, alone, `${w}x${h} Boss alone`);
-    // The full picker (/bosses): every boss and a random one, for an admin the Hidden Boss too: the longest list.
+    // The full picker (/bosses): every boss and a random one, for an admin the Hidden Boss and the admins-first bosses
+    // (Timber, Nov 1) too: the longest list.
     await page.goto("/bosses");
     const all = page.getByRole("dialog", { name: "Choose your boss" });
-    await expect(all.locator(".boss-row")).toHaveCount(16);
+    await expect(all.locator(".boss-row")).toHaveCount(playableBosses().length + adminFirstBosses().length + 2);
     await expectMenuFits(page, all, `${w}x${h} /bosses`);
     expect(await sideways(page), `${w}x${h}`).toBe(0);
   }
