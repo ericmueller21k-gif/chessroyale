@@ -1,4 +1,4 @@
-import type { ComponentChildren } from "preact";
+import { render, type ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { QUICK_CHAT, chatSay, type ChatSay } from "@chessroyale/core";
 import { onAccountChange, refreshChatStanding } from "../account.ts";
@@ -144,7 +144,7 @@ function ChatFeed({ people, chat, scroll, teams, onName, hint, empty }: { people
 }
 
 /** One phrase or emoji button. Grayed while the limits (or the Team / All switch) don't allow it. */
-function SayButton({ chat, say, now }: { chat: MatchChat; say: ChatSay; now: number }) {
+function SayButton({ chat, say, now, onSent }: { chat: MatchChat; say: ChatSay; now: number; onSent?: () => void }) {
   const ok = chat.canSay(say.id, now);
   return (
     <button
@@ -155,6 +155,7 @@ function SayButton({ chat, say, now }: { chat: MatchChat; say: ChatSay; now: num
       onClick={(e) => {
         e.stopPropagation();
         chat.say(say.id);
+        onSent?.();
       }}
     >
       {say.text}
@@ -165,9 +166,10 @@ function SayButton({ chat, say, now }: { chat: MatchChat; say: ChatSay; now: num
 /**
  * The buttons: the lines and emoji this player picked in their profile, in their order. "rows": a phone's row of
  * lines that scrolls sideways, then the emoji (`fit`: in one row the panel's width, no scrolling; else sideways
- * too); "groups": the lines wrapping, then the emoji (a computer).
+ * too); "groups": the lines wrapping, then the emoji (a computer). `only`: the lines or the emoji alone (a phone's chat
+ * tab, one picker at a time), and `onSent` after a tap sends.
  */
-function ChatButtons({ chat, layout, fit, now }: { chat: MatchChat; layout: "rows" | "groups"; fit: boolean; now: number }) {
+function ChatButtons({ chat, layout, fit, now, only, onSent }: { chat: MatchChat; layout: "rows" | "groups"; fit: boolean; now: number; only?: "lines" | "emoji"; onSent?: () => void }) {
   // Your chat is banned (a moderator's decision): why, instead of buttons that can't send. Your profile is read again
   // as this shows, so a ban lifted meanwhile goes.
   const banned = chat.banned(now);
@@ -179,10 +181,12 @@ function ChatButtons({ chat, layout, fit, now }: { chat: MatchChat; layout: "row
       </p>
     );
   }
-  const { lines, emoji } = chat.picked();
+  const picked = chat.picked();
+  const lines = only === "emoji" ? [] : picked.lines;
+  const emoji = only === "lines" ? [] : picked.emoji;
   const none = !lines.length && !emoji.length && <p class="qbuttons-none">Nothing picked. Choose your lines and emoji in your profile, under Quick chat and emoji.</p>;
-  const lineButtons = lines.map((s) => <SayButton key={s.id} chat={chat} say={s} now={now} />);
-  const emojiButtons = emoji.map((s) => <SayButton key={s.id} chat={chat} say={s} now={now} />);
+  const lineButtons = lines.map((s) => <SayButton key={s.id} chat={chat} say={s} now={now} onSent={onSent} />);
+  const emojiButtons = emoji.map((s) => <SayButton key={s.id} chat={chat} say={s} now={now} onSent={onSent} />);
   if (layout === "groups") {
     return (
       <div class="qbuttons groups">
@@ -314,6 +318,38 @@ export function ChatPanel({ people, chat, variant, head, fold, back }: { people:
   };
   const teams = chat.hasTeams();
   const now = Date.now();
+  // A phone's chat tab (Eric, Nov 1): no rows of buttons; "T" opens the phrases and the emoji button the emoji, over the
+  // foot of the feed. A tap on the button again, a line sent, or a tap anywhere else closes it.
+  const tab = variant === "tab";
+  const [pick, setPick] = useState<"lines" | "emoji" | null>(null);
+  const pop = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!pick) return;
+    const away = (e: PointerEvent) => {
+      const t = e.target as Element | null;
+      if (pop.current?.contains(t) || t?.closest?.(".qpick-btn")) return;
+      setPick(null);
+    };
+    document.addEventListener("pointerdown", away, true);
+    return () => document.removeEventListener("pointerdown", away, true);
+  }, [pick]);
+  const pickButton = (what: "lines" | "emoji", label: string, face: string) => (
+    <button
+      type="button"
+      class={`qhead-btn qpick-btn qpick-${what}${pick === what ? " on" : ""}`}
+      aria-label={label}
+      aria-expanded={pick === what}
+      disabled={chat.off}
+      onClick={(e) => {
+        e.stopPropagation();
+        setOptions(false);
+        setMenu(null);
+        setPick(pick === what ? null : what);
+      }}
+    >
+      {face}
+    </button>
+  );
   // On screen while its feed has room to show something (a minimized panel is only its header).
   useLayoutEffect(() => {
     const el = feed.current;
@@ -368,6 +404,8 @@ export function ChatPanel({ people, chat, variant, head, fold, back }: { people:
         {lobby && !chat.off && <span class="qhead-sub">Everyone here · teams come with the match</span>}
         {teams && !chat.off && <ToSwitch chat={chat} />}
         <span class="qhead-gap" />
+        {tab && pickButton("lines", "Quick phrases", "T")}
+        {tab && pickButton("emoji", "Emoji", "😊")}
         {variant !== "split" && (
           <button
             type="button"
@@ -376,6 +414,7 @@ export function ChatPanel({ people, chat, variant, head, fold, back }: { people:
             aria-expanded={options}
             onClick={(e) => {
               e.stopPropagation();
+              setPick(null);
               setOptions(!options);
             }}
           >
@@ -406,46 +445,60 @@ export function ChatPanel({ people, chat, variant, head, fold, back }: { people:
               teams={teams}
               onName={(id) => setMenu(id)}
               hint={hint}
-              empty={lobby ? "Say hello while the seats fill." : teams ? "Tap a line to send it to your team." : "Tap a line to send it."}
+              empty={lobby ? "Say hello while the seats fill." : tab ? (teams ? "Tap T or 😊 to send to your team." : "Tap T or 😊 to send.") : teams ? "Tap a line to send it to your team." : "Tap a line to send it."}
             />
           </div>
-          {target && menu ? (
-            <div class="qmenu" role="group" aria-label={`${target.you ? "You" : target.name}`}>
-              <strong class="qmenu-name">{target.you ? "You" : target.name}</strong>
-              <button
-                type="button"
-                class="qchip"
-                onClick={() => {
-                  setMenu(null);
-                  openProfile({ uid: target.uid, name: target.name, you: target.you, bot: target.bot });
-                }}
-              >
-                Profile
-              </button>
-              {!target.you && (
-                <button
-                  type="button"
-                  class="qchip"
-                  onClick={() => {
-                    chat.mute(menu, !chat.isMuted(menu));
-                    setMenu(null);
-                  }}
-                >
-                  {/* (By account, for every chat on this device; a bot for this match only.) */}
-                  {chat.isMuted(menu) ? "Unmute" : chat.mutesByAccount(menu) ? "Mute" : "Mute for this match"}
-                </button>
-              )}
-              <button type="button" class="qchip quiet" aria-label="Close" onClick={() => setMenu(null)}>
-                ✕
-              </button>
-            </div>
+          {tab ? (
+            (pick || (target && menu)) && (
+              <div class="qpop" ref={pop}>
+                {target && menu ? nameMenu() : <ChatButtons chat={chat} layout="groups" fit={false} now={now} only={pick ?? undefined} onSent={() => setPick(null)} />}
+              </div>
+            )
+          ) : target && menu ? (
+            nameMenu()
           ) : (
-            <ChatButtons chat={chat} layout={layout} fit={variant === "full" || variant === "tab" || ((variant === "page" || lobby) && !roomy)} now={now} />
+            <ChatButtons chat={chat} layout={layout} fit={variant === "full" || ((variant === "page" || lobby) && !roomy)} now={now} />
           )}
         </>
       )}
     </section>
   );
+
+  /** A name's menu: Profile, Mute, close. */
+  function nameMenu() {
+    if (!target || !menu) return null;
+    return (
+      <div class="qmenu" role="group" aria-label={`${target.you ? "You" : target.name}`}>
+        <strong class="qmenu-name">{target.you ? "You" : target.name}</strong>
+        <button
+          type="button"
+          class="qchip"
+          onClick={() => {
+            setMenu(null);
+            openProfile({ uid: target.uid, name: target.name, you: target.you, bot: target.bot });
+          }}
+        >
+          Profile
+        </button>
+        {!target.you && (
+          <button
+            type="button"
+            class="qchip"
+            onClick={() => {
+              chat.mute(menu, !chat.isMuted(menu));
+              setMenu(null);
+            }}
+          >
+            {/* (By account, for every chat on this device; a bot for this match only.) */}
+            {chat.isMuted(menu) ? "Unmute" : chat.mutesByAccount(menu) ? "Mute" : "Mute for this match"}
+          </button>
+        )}
+        <button type="button" class="qchip quiet" aria-label="Close" onClick={() => setMenu(null)}>
+          ✕
+        </button>
+      </div>
+    );
+  }
 }
 
 /** Chat's switches: the bubble (phones), chat off, and the players muted this match. */
@@ -494,6 +547,8 @@ export function UnderBoard({ match }: { match: GameView }) {
   const phone = useMedia(LOCKED_PHONE);
   const [view, setView] = useState<UnderBoardView>(underBoardView);
   useEffect(() => onPrefsChange(() => setView(underBoardView())), []);
+  // A phone's 50 v 50: one box for the whole match (KeptBox), with or without chat.
+  if (phone && isCrowdFifty(match)) return <KeptBox match={match} chat={chat} />;
   // (Its own fold arrow, on the same view.)
   if (!chat || chat.off) return <MiniTower match={match} />;
   if (wide) {
@@ -503,7 +558,6 @@ export function UnderBoard({ match }: { match: GameView }) {
       </div>
     );
   }
-  if (phone && isCrowdFifty(match)) return <CrowdTabs match={match} chat={chat} open={view.open} />;
   const { layout, open } = view;
   const fold = <FoldButton open={open} onToggle={() => foldUnderBoard(!open)} />;
   const unread = chat.unread();
@@ -554,31 +608,70 @@ export function UnderBoard({ match }: { match: GameView }) {
 const chatTabOn = new WeakMap<object, boolean>();
 
 /**
- * A phone's 50 v 50 (Nov 1): one box under the vote box, filling down to the bottom of the screen. Its header reads
- * Black · White · All · Chat (the scoreboard's picks, then the chat tab, with the new messages' count while the
- * scoreboard shows).
- * Chat replaces the scoreboard in the same box; "‹ Back" returns to the scoreboard as it was picked. The fold arrow
- * folds either to its header (the view's `open`, as before).
+ * A phone's 50 v 50 box is one element for the whole match (Nov 1, Eric: "the container should be static"). Each phase of
+ * a turn is a screen of its own (your pick, the counting, the reveal, the other team's turn: App's renderPhase), and each
+ * used to build the box anew, so a new scoreboard drew a few rows on its first frame and the rest wiped in over half a
+ * second, two or three times a turn (docs/decisions/2026-11-01-crowd-steady-box.md). Now the box is made once per match
+ * and drawn by a root of its own (CrowdBox, rendered into it); a screen holds only its place (a hidden marker) and moves the
+ * box in after the marker before its first paint. Through a cut (a screen without it) the box waits off the page and comes
+ * back as the same element.
  */
-function CrowdTabs({ match, chat, open }: { match: GameView; chat: MatchChat; open: boolean }) {
+let kept: { match: object; box: HTMLDivElement } | null = null;
+
+function KeptBox({ match, chat }: { match: GameView; chat: MatchChat | null }) {
+  const place = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    if (kept?.match !== match) {
+      if (kept) render(null, kept.box);
+      const box = document.createElement("div");
+      box.className = "under-board ub-tab";
+      kept = { match, box };
+    }
+    const { box } = kept;
+    if (place.current && place.current.nextSibling !== box) place.current.after(box);
+    render(<CrowdBox match={match} chat={chat} box={box} />, box);
+  });
+  useLayoutEffect(
+    () => () => {
+      const k = kept;
+      if (k?.match !== match) return;
+      k.box.remove();
+      // (Gone for good once no screen has taken it back and the match isn't at a cut: the match is over, or left.)
+      setTimeout(() => {
+        if (kept === k && !k.box.isConnected && match.phase.kind !== "stageBreak") {
+          render(null, k.box);
+          kept = null;
+        }
+      }, 0);
+    },
+    [match],
+  );
+  return <i ref={place} class="ub-place" hidden />;
+}
+
+/**
+ * What the kept box shows: its header reads Black · White · All · Chat (the scoreboard's picks, then the chat tab, with
+ * the new messages' count while the scoreboard shows). Chat replaces the scoreboard in the same box; "‹ Back" returns to
+ * the scoreboard as it was picked. The fold arrow folds either to its header (the view's `open`, as before). With chat
+ * off, the scoreboard alone, with its own fold arrow.
+ */
+function CrowdBox({ match, chat, box }: { match: GameView; chat: MatchChat | null; box: HTMLDivElement }) {
+  const [view, setView] = useState<UnderBoardView>(underBoardView);
+  useEffect(() => onPrefsChange(() => setView(underBoardView())), []);
   const [on, setOn] = useState(() => chatTabOn.get(match) ?? false);
   const show = (c: boolean) => {
     chatTabOn.set(match, c);
     setOn(c);
   };
+  const talk = !!chat && !chat.off;
+  const { open } = view;
+  useLayoutEffect(() => {
+    box.className = `under-board ub-tab${talk && on ? " ub-chat" : ""}${open ? "" : " closed"}`;
+  });
+  if (!chat || !talk) return <MiniTower match={match} />;
   const fold = <FoldButton open={open} onToggle={() => foldUnderBoard(!open)} />;
-  if (!on) {
-    return (
-      <div class={`under-board ub-tab${open ? "" : " closed"}`}>
-        <MiniTower match={match} open={open} head={fold} floats={chat.floats()} chatTab={{ unread: chat.unread(), onOpen: () => show(true) }} />
-      </div>
-    );
-  }
-  return (
-    <div class={`under-board ub-tab ub-chat${open ? "" : " closed"}`}>
-      <ChatPanel people={matchPeople(match)} chat={chat} variant="tab" back={() => show(false)} fold={fold} />
-    </div>
-  );
+  if (!on) return <MiniTower match={match} open={open} head={fold} floats={chat.floats()} chatTab={{ unread: chat.unread(), onOpen: () => show(true) }} />;
+  return <ChatPanel people={matchPeople(match)} chat={chat} variant="tab" back={() => show(false)} fold={fold} />;
 }
 
 /** A page's chat (the results, or watching after you're out). */
