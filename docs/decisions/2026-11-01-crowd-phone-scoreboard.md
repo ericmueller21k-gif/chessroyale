@@ -55,3 +55,24 @@ Calls made:
 
 Guard: `e2e/crowd.spec.ts`, "the scoreboard never moves: its top edge, height and the middle box hold through two turns
 (phone)". It isn't a check of an Eric rule in `docs/rules/eric.md`; it's the new check for "nothing shifts" in a match.
+
+## Round 3 (Nov 1): the board keeps its size, the box is compact, the table follows Light / Dark
+
+- **The board is main's size on every phone.** Round 2's board shrink (the box's extra height taken from the board) is
+  gone. At 390 × 844 the board is 314 px wide, at 375 × 667 it is 299 px (main's).
+- **The middle box is 200 px** (`--mid-h`, from 276). Its tallest content measured 195.6 px in the browser at both sizes:
+  six bars, a brilliant find (one line, its names cut with an ellipsis), the result's two lines.
+  - The brilliant find: "‼ Brilliant find! {names} found it · +N" (+ " each" for several finders). The moves are on the bars, so
+    they're not repeated in the line.
+  - The result, first line: the score with its verdict ("best was Qh5+"; cut with an ellipsis if it must be). Second line:
+    the allowance and the streak, joined on one line ("no allowance · missed a capture · 🔥 +0.50 streak"), cut with an
+    ellipsis if they don't fit.
+  - The bars are thinner (8 px, rows 1 px padding). Nothing is hidden: the only cut is the ellipsis on a name or a verdict.
+- **Scoreboard rows** (the box is shorter, so the scoreboard is taller): at 390 × 844 its top is 596 and its height 242,
+  with 8 rows. At 375 × 667 its top is 581 and its height 80: the header and one row (the scoreboard's rows are what give
+  way on the short phone; the board does not).
+- **Light mode.** The 50 v 50 team table (`MiniTower`, `.mini-tower`) follows the Light / Dark pick: light rows, dark text,
+  the Black · White · All pick in dark (the picked one) and grey (the others). The gold, silver and bronze rank chips, the
+  cut zone, your row's tint and the cut line are unchanged.
+- **Test checks.** None changed or added. The shoutout check's regex ("Brilliant find! You found … · +1") still
+  matches the new line.

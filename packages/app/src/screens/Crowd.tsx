@@ -475,10 +475,11 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
           {landed && shout && (
             <div class={`brilliant-line shoutout${shout.players.some((id) => match.isYou(id)) ? " you" : ""}`} role="status">
               <span class="brilliant-mark" aria-hidden="true">‼</span>
-              <span>
+              {/* One line (Nov 1): the names are cut with an ellipsis if they must be; the moves are on the bars already. */}
+              <span class="brilliant-text">
                 <strong>Brilliant find! </strong>
-                {namesLine(shout.players, match)} found {shout.moves.map((m) => seenSan(fen, m)).join(" / ")} · +{shoutBonus}
-                {shout.players.length > 1 ? " each" : ""}
+                <span class="brilliant-names">{namesLine(shout.players, match)}</span>
+                <span> found it · +{shoutBonus}{shout.players.length > 1 ? " each" : ""}</span>
               </span>
             </div>
           )}
@@ -496,16 +497,21 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
           {me && (
             <div class="poll-result">
               <span class={`round-score ${me.roundScore >= 0 ? "good" : "bad"}`}>{fmt(me.roundScore, dp)}</span>
-              <span class="muted small">
+              <span class="muted small verdict">
                 {me.move && me.move === mine.bestMove ? `you found the best move, ${seenSan(fen, me.move)}` : `${me.move ? `you picked ${seenSan(fen, me.move)}` : "no move from you"} · best was ${seenSan(fen, mine.bestMove)}`}
               </span>
-              {/* The opening allowance on your pick: what it took off, or why it didn't (one line). */}
-              {allowanceNote(me) && <span class="allowance-line">{allowanceNote(me)}</span>}
-              {/* 50 v 50: the streak's bonus in that score (CrowdScoring). */}
-              {!!me.streakBonus && (
-                <span class="streak-note">
-                  <StreakFire count={me.streak ?? 0} /> +{me.streakBonus.toFixed(2)} streak bonus
-                </span>
+              {/* The second line (Nov 1): the opening allowance on your pick (what it took off, or why it didn't) and the
+                  50 v 50 streak's bonus in that score (CrowdScoring), on one line; cut with an ellipsis if they don't fit. */}
+              {(allowanceNote(me) || !!me.streakBonus) && (
+                <div class="poll-extras">
+                  {allowanceNote(me) && <span class="allowance-line">{allowanceNote(me)}</span>}
+                  {allowanceNote(me) && !!me.streakBonus && <span class="extras-sep" aria-hidden="true">·</span>}
+                  {!!me.streakBonus && (
+                    <span class="streak-note">
+                      <StreakFire count={me.streak ?? 0} /> +{me.streakBonus.toFixed(2)} streak
+                    </span>
+                  )}
+                </div>
               )}
             </div>
           )}

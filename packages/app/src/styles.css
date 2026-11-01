@@ -2875,6 +2875,48 @@ button.history-label {
 .tower .team-chip.b {
   box-shadow: inset 0 0 0 1px #6f7787;
 }
+/* Light mode (Eric, Nov 1): the 50 v 50 team table follows the Light / Dark pick like the rest of the match: light rows,
+   dark text. The podium's gold, silver and bronze chips, the cut zone, your row's tint and the cut line stay as they are;
+   the rest of the rank squares go light. */
+:root[data-theme="light"] .mini-tower,
+:root[data-theme="light"] .mini-tower .tower {
+  background: var(--surface);
+  color: var(--text);
+}
+:root[data-theme="light"] .mini-tower-head {
+  background: var(--surface-2);
+}
+:root[data-theme="light"] .mini-tower-title,
+:root[data-theme="light"] .mini-tower-toggle,
+:root[data-theme="light"] .mini-tower-head .mini-pick.on {
+  color: var(--text);
+}
+:root[data-theme="light"] .mini-tower-head .mini-pick {
+  color: var(--muted);
+}
+:root[data-theme="light"] .mini-tower .tower-head {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+:root[data-theme="light"] .mini-tower .tower-row {
+  background-color: var(--surface);
+}
+:root[data-theme="light"] .mini-tower .tower-row:nth-child(odd) {
+  background-image: linear-gradient(rgba(0, 0, 0, 0.03), rgba(0, 0, 0, 0.03));
+}
+:root[data-theme="light"] .mini-tower .tower-row:not(.p1):not(.p2):not(.p3):not(.zone):not(.out) .t-pos {
+  background: #e2ded5;
+  color: var(--text);
+}
+:root[data-theme="light"] .mini-tower .t-elo:not(.top),
+:root[data-theme="light"] .mini-tower .t-avg,
+:root[data-theme="light"] .mini-tower .t-bank,
+:root[data-theme="light"] .mini-tower .tower-gap {
+  color: var(--muted);
+}
+:root[data-theme="light"] .mini-tower .team-chip.w {
+  box-shadow: inset 0 0 0 1px #6a6f7a;
+}
 .mini-tower-body {
   flex: 1;
   min-height: 0;
@@ -2972,10 +3014,11 @@ button.history-label {
     gap: 6px;
   }
   /* The middle box (Eric, Nov 1: "a static container in the size of the one"): one height on every phase of a turn, as
-     tall as the five vote bars and their result (--mid-h). The power-up row, the status line and the vote results take
-     turns in it, so the scoreboard under it never moves (the e2e check in crowd.spec.ts, "the scoreboard never moves"). */
+     tall as its tallest content (--mid-h, measured in the browser at 390 px: six bars, a brilliant find, the result's two
+     lines). The power-up row, the status line and the vote results take turns in it, so the scoreboard under it never
+     moves (the e2e check in crowd.spec.ts, "the scoreboard never moves"). The board keeps its size on every phone. */
   .screen.game.crowd-50 {
-    --mid-h: 276px;
+    --mid-h: 200px;
   }
   .screen.game.crowd-50 > .play-footer,
   .screen.game.crowd-50 > .poll {
@@ -2984,14 +3027,35 @@ button.history-label {
     min-height: 0;
     align-content: start;
   }
-  /* The box is taller than its first size (170 px) by what its tallest content needs (6 bars, a brilliant find of three,
-     the result's wrapped lines: 274 px at most; 276 with a hair's room). On the shortest phones (375 x 667) the board gives
-     back that extra height, down to its 220 px floor, so the scoreboard keeps its header and a row and never spills. */
-  .screen.game.crowd-50 .board-area .board-wrap {
-    width: min(100%, calc(var(--app-h) - 330px - (var(--mid-h) - 170px)));
+  /* The middle box's content, compact (Nov 1: the box stays near the size of the usual vote results): one column, the
+     bars a little thinner, and each line of the result and the brilliant find one line (cut with an ellipsis if need be). */
+  .screen.game.crowd-50 .poll {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
   }
-  .screen.game.crowd-50 .board-row .eval-bar ~ .board-wrap {
-    width: min(calc(100% - 48px), calc(var(--app-h) - 330px - (var(--mid-h) - 170px)));
+  .screen.game.crowd-50 .poll-row {
+    padding: 1px 8px;
+  }
+  .screen.game.crowd-50 .poll-bar {
+    height: 8px;
+  }
+  .screen.game.crowd-50 .brilliant-line {
+    padding: 2px 8px;
+  }
+  .screen.game.crowd-50 .poll-result {
+    display: grid;
+    grid-template-columns: auto minmax(0, max-content);
+    justify-content: center;
+    align-items: baseline;
+    column-gap: 10px;
+  }
+  .screen.game.crowd-50 .poll-result .round-score {
+    line-height: 1.1;
+  }
+  .screen.game.crowd-50 .poll-result .verdict {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .screen.game .waiting-banner {
@@ -3395,6 +3459,31 @@ button.history-label {
   line-height: 1.2;
   color: var(--muted);
   white-space: nowrap;
+}
+/* The reveal's extras (the allowance and the streak, Crowd 50 v 50): one line together, cut with an ellipsis if they must. */
+.poll-extras {
+  grid-column: 1 / -1;
+  flex-basis: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--muted);
+}
+.poll-extras .allowance-line {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.poll-extras .streak-note,
+.poll-extras .extras-sep {
+  flex: none;
 }
 .crowd-cut {
   justify-content: center;
@@ -6757,6 +6846,24 @@ button.history-label {
   font-weight: 900;
   font-size: 17px;
   color: #0891b2;
+}
+/* The shoutout's text (Crowd 50 v 50): one line, its names the part that gives way (ellipsis). */
+.brilliant-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  white-space: nowrap;
+}
+.brilliant-text > strong,
+.brilliant-text > span:not(.brilliant-names) {
+  flex: none;
+}
+.brilliant-names {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ---- Elimination breakdown ---- */
