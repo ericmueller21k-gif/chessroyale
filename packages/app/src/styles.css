@@ -22552,32 +22552,12 @@ button.sq-tiny {
 }
 
 /* ---------------- Timber (components/Timber.tsx; docs/decisions/2026-11-01-timber.md) ---------------- */
-/* His cast by the board's corner (a phone): his frame is 98 x 129 (37 rows of it over his hat, for his entrance's drop). */
+/* His cast by the board's corner, as every boss's (phone and computer): his frame is 98 x 129 (37 rows of it over his hat, for his entrance's drop). */
 .pm-caster.pm-by-timber {
   aspect-ratio: 98 / 129;
   width: 31%;
   left: -6%;
   top: -13%;
-}
-/* On a computer his cast stands beside the board, at its bottom-left corner, where he stands at rest: nothing of him over the
-   board or the boss bar (Round 2, Nov 1: the corner cast covered a8, b8, a7, b7 and the bar's left end). His feet are 8 of his 129
-   frame rows above the frame's foot, so the box drops 6.2% of its own height to put them on the board's bottom edge; its right
-   edge sits at the board's left edge, and his drawing's reach past his feet clears it (docs/decisions/2026-11-01-timber-figure.md). */
-@media (min-width: 900px) and (min-height: 600px) {
-  .pm-caster.pm-by-timber {
-    left: auto;
-    right: 100%;
-    top: auto;
-    bottom: 0;
-    translate: 0 6.2%;
-  }
-}
-/* From 900 to 1099 px his rest figure is drawn at 1x (98 px frame), so his cast is about that size: a fifth of the board's width
-   (the room left of the board is 96 px at 1024 x 768, the side menu's edge 60 px). */
-@media (min-width: 900px) and (max-width: 1099px) and (min-height: 600px) {
-  .pm-caster.pm-by-timber {
-    width: 20%;
-  }
 }
 /* At rest his drawing reaches 43 sprite px right of his feet (his tail): 10 sprite px further out, as Folio's 6 (the frame's box
    would otherwise run 18 px over the board's left edge). */

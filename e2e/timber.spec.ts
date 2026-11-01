@@ -124,7 +124,7 @@ test.describe("Timber", () => {
     expect(BOSS_POWERS.gnawScraps).toBe(8);
     expect(errors).toEqual([]);
   });
-  test("on a computer his figure stands beside the board, at rest and in his Gnaw: never over the board, the bar or the side menu", async ({ page }) => {
+  test("on a computer his figure stands beside the board at rest (never over the board, the bar or the side menu); his cast by the board's corner never over the side menu", async ({ page }) => {
     test.setTimeout(400_000);
     test.skip(test.info().project.name !== "desktop", "his figure stands beside the board on a computer only");
     await asAdmin(page);
@@ -179,7 +179,8 @@ test.describe("Timber", () => {
       expect(geo.rest.length).toBeGreaterThan(0);
       expect(geo.cast.length).toBeGreaterThan(0);
       for (const r of geo.rest) for (const other of [board, bar, nav]) expect(hit(r, other), `rest ${r} over ${other}`).toBe(false);
-      for (const c of geo.cast) for (const other of [board, bar, nav]) expect(hit(c, other), `cast ${c} over ${other}`).toBe(false);
+      // (His cast stands by the board's corner for its moment, as every boss's does: docs/areas/bosses.md.)
+      for (const c of geo.cast) expect(hit(c, nav), `cast ${c} over the side menu ${nav}`).toBe(false);
     }
   });
 });
