@@ -303,7 +303,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 | The public profile's words and numbers, shared pieces | `packages/app/src/public-profile.ts` (+ `test/public-profile.test.ts`), `components/ProfileParts.tsx` (what they wear, recent matches, the report sheet), `public-profile.css` |
 | The live line, app side | `packages/app/src/live.ts` |
 | The FAQ (its words and numbers; the format; the screen) | `packages/app/src/faq/content.ts`, `faq/markdown.ts`, `screens/Faq.tsx` |
-| Light and dark | `packages/app/src/theme.ts` |
+| Light and dark (Settings → Theme; the gear's Light / Dark row, Nov 1) | `packages/app/src/theme.ts`; `components/MatchMenu.tsx` (`ThemeRow`) |
 | Piece sounds (the pickers' options, storage) | `packages/app/src/piece-sounds.ts`; played by `sound.ts`; files in `public/sounds/` (the classics) and `public/sounds/pieces/` (from `scripts/piece-sounds.py`); sources in `public/sounds/SOURCES.md` |
 | Bot-match replays | `packages/app/src/bot-replays.ts`; made by `npm run replays:bots` (`packages/sim/scripts/bot-replays.ts`) |
 | Server: profiles, results, the API | `packages/server/src/accounts.ts`, `api.ts` |

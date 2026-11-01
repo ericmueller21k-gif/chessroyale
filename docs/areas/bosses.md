@@ -147,6 +147,8 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   at a future date** (`boss-sim.ts raid`, below): the aim is about two ultimates in a typical battle of about 40 crowd
   moves (Jefferson about one and a half: his barrage lasts about a third of a battle).
   Boingo's meter is the fastest (`rageSpeed` 1.8): his funhouse holds it for 12 turns.
+  On a computer (from 900 px) the meter is 88 × 10 px, twice as long and thicker than a phone's 44 × 6 (Eric, Nov 1; the
+  bar's padding gives back its height, `styles.css`); it fills at the same pace.
 - **The bosses:**
 
 | Boss (id) | Opening | Passive | Ultimate |
@@ -346,8 +348,10 @@ build): online, phase 1 won is the crowd's victory):
   the split's, the lasso's and the showdown's 1.3 s and the darkness's 1.25 s are their tables' `bannerMs`); Wrangler's
   "DRAW!" from its beat to the moment's end (1.4 s). The banner's length is its band's: it slides in, holds, and is off
   by `--fb-ms`, which `FightBanner`'s and `PowerBanner`'s `ms` set (styles.css: `fb-band-in`, then `fb-band-out` timed
-  from it; the entrances inside it come in its first 0.6 s whatever its length). The moments that grew a second for the
-  longer banner are a second shorter again (`POWER_FX`: the rage warning 1.7 s, freeze 2.3, thaw 2.2, pie 2.3, sparkler
+  from it; the entrances inside it come in its first 0.6 s whatever its length). A power's big word fits its share of
+  the banner (`fitBigWord` in `PowerParts.tsx`: 42% of the banner's width, the words wrap at spaces, a word still too wide
+  is made smaller in the page's font; Nov 1, Eric: "MAMMOTH SLAM!" ran off a computer's board). The moments that grew a
+  second for the longer banner are a second shorter again (`POWER_FX`: the rage warning 1.7 s, freeze 2.3, thaw 2.2, pie 2.3, sparkler
   2.3, Hollow's extra move 2.2, toy block 2.3, saw cut 2.3, the showdown 6 s), Boingo's board turns a second sooner
   (`FUNHOUSE`, `SPIN`; the funhouse 5.2 s, each spin 2.6 s), "START!" makes the intro a second shorter, the phase change
   is a second shorter, and the boss thinks at least 2 s after you take his queen (the banner and a beat:
