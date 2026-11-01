@@ -4,7 +4,7 @@ Lane: the director's (every game screen with a board). Area pages: [board.md](..
 [hub.md](../areas/hub.md) (the side menu is the front door's). Code: `packages/app/src/game-frame.css` (new, loaded after
 `board-size.css`), `components/FrontMenu.tsx` (`GameFrame`, `SideMenu` with `game`), `screens/Hud.tsx` (`BossTools`, the boss
 title line's removal), `screens/Boss.tsx` (`BossBar`'s `move`), `App.tsx` (`sideNav`, `sideNext`, the wrappers), `screens/Duel.tsx`
-(`DuelFront`'s `gameFrame`), `board-size.css` (the room, `--win-w`), `styles.css` (`--win-w` in the places that read the window's
+(`DuelFront`'s `gameFrame`), `components/Tiger.tsx` (the pump keeps clear of the menu), `board-size.css` (the room, `--win-w`), `styles.css` (`--win-w` in the places that read the window's
 width). Tests: `e2e/desktop-board.spec.ts`, `e2e/board-layout.spec.ts`.
 
 ## Eric's words (Nov 1, on the mockup: "Build it")
@@ -25,7 +25,7 @@ and touch tablets are unchanged to the pixel (`desktop-board.spec.ts`'s touch te
    bar, Puddles' 61 px). The Hidden Boss's phases keep their title line (`Hud`'s `keepTitle`: not named in the brief).
 2. **The side menu is on every game screen** (Boss alone, a raid, the Crowd, its vote and reveals, 1 v 1, Squads, Auto chess, the
    results, a lobby): the front door's own `SideMenu`, in a grid column beside the screen (`GameFrame`). **232 px with its labels
-   from 1800 px; below 1800 px icons only** (round 2; round 1 had 1366), each label visually hidden (still read by screen readers)
+   from 1800 px; below 1800 px icons only** (round 2; round 1 had 1366; 80 px, 60 from 900 to 1099 px since round 3), each label visually hidden (still read by screen readers)
    and shown as a tooltip.
    Every screen lays out in what's left of the window (`--win-w`: 100vw less the menu).
 3. **Leaving through the menu is the gear's leave.** An item on a match's screen asks the same confirm the gear's Resign or Leave
@@ -55,9 +55,9 @@ Reading the table:
 
 - **Boss alone is height-bound at 1280 × 640 and 1920 × 1080** (512 and 952) and **width-bound at 1280 × 800 and 1440 × 900** (600 and
   760: the boss's column, the eval bar and the column beside the board take the width the menu leaves).
-- **1024 × 768** (not one of the five sizes): Boss alone is 440, 24 px short of main's 464 (round 1: 384). Not analysed further; the
-  900 to 1099 px layout (his box at 1×, the column at its 280 px least) is what's left to look at. A raid and the Crowd are not
-  measured at that width.
+- **1024 × 768** (not one of the five sizes): Boss alone is 464, main's (round 1: 384, round 2: 440). Round 3 made the side menu
+  60 px from 900 to 1099 px (the column beside the board is at its 280 px least there, so the menu is what's left to give). Babur
+  (his taller bar) 464 too. A raid and the Crowd are not measured at that width.
 - **Between 1800 and 1856 px wide** (by the layout's arithmetic, not measured): the full menu's 232 px makes a raid width-bound below
   main's 880 (824 at 1800 px wide, 864 at 1840). From 1856 px it is at 880 again. If that band matters, the labels' breakpoint (1800)
   is the call to move.
@@ -96,12 +96,47 @@ Round 2 (the director's brief: no board may shrink because of the side menu):
    resize). Both wrap more than before; the font is unchanged.
 10. **The God King's column** (`--gk-column`, what the boss-dock's own sums read) uses the same `--side-w`.
 
+Round 3 (CI on PR #443 failed 13 desktop tests; the director's handoff: fix the layout unless the check is of something Eric asked
+to change):
+
+11. **The gear's list opened under the move list** (Report a bug and Resign could not be clicked: `problems`, `resign` ×2). The tools'
+    row was moved with a `translate`, which makes it the box a `position: fixed` child is laid out and stacked in, so the gear's
+    full-window layer was 28 px tall and under the list. It moves with `left` now (`game-frame.css`, `.gm-tools`).
+12. **The God King, your pawn and a party's pawns stood 4 px above the board's bottom edge** (`grex`, `boss-character`): styles.css
+    places them from the dock's top counting the 10 px row gap that round 1 made a 6 px margin. They count 6 px now.
+13. **A party's move list ran 21 px over the top two pawns at 1280 × 800** (`boss-party`, "nothing hidden"): the tools' 36 px pushed
+    the list down onto the stack. On a party's battle the list gives the 36 px back from its height (at least 120 px), so its foot is
+    where it was on main.
+14. **The board's box is the board's drawn size on a boss battle** (`eval-bar`: the board 4 px off-center with the eval bar off). The
+    board is drawn in whole multiples of 8 device px at the left of its box; the box, the boss's bar and the dock are rounded down to
+    that step now (8 px at 1×, 4 px at 2×; other pixel ratios keep the old box), so the drawn board is the same size and centered.
+15. **Babur's pump stood over the side menu from 900 to 1099 px** (`tiger`: "side" where it had been in the taller bar). The pump's
+    fit now keeps clear of the side menu (`Tiger.tsx`, `KEEP_CLEAR`), so it goes to the taller bar there, as on main. The column
+    beside the board counts the boss's room by the window's edge as the board's (`--side-w`), so the taller bar's board is main's
+    464 at 1024 × 768 (it was 456).
+16. **The side menu is 60 px from 900 to 1099 px** (80 from 1100, 232 from 1800): the boards there are main's (above).
+
 ## Tests (changed checks, old → new)
+
+Round 3 (none guards a rule in `docs/rules/eric.md`; each is of something Eric asked to change: the title line gone, the ⚡ beside the
+board, the side menu on game screens, the sizes):
+
+- `e2e/boss-bar.spec.ts`, "a computer: the boss bar and the title line are the board's width, straight with its edges" → "a computer:
+  the boss bar is the board's width, straight with its edges, and no title line over it": the title line's two edge checks → no
+  `.hud-row` on the screen. The bar's two edge checks are unchanged.
+- `e2e/grex.spec.ts`, the test trigger against Ginger: `.hud-row .ult-test` (1 on a computer) → `.gm-tools .ult-test` (the ⚡ beside the
+  board).
+- `e2e/home-layout.spec.ts`, "computer: PLAY fills the queue in place…": on the match's screen, the side menu `toHaveCount(0)` → visible,
+  and the live panel `toHaveCount(0)` (new).
+- `e2e/autochess.spec.ts`, `whitePieces` (a drag cut off by the end of the move step): the pieces drawn off the board leave out the
+  side menu's Profile pawn (`.fd-side`), as they leave out the avatar's.
+- `e2e/board-layout.spec.ts`, `MAIN_BOARD_BOX` (x, width): 1536 × 864 351.5 → 354; 1920 × 1080 511.5 → 514 (the board centered in its
+  row); 1024 × 768 176, 440 → 156, 464 (main's size).
+
+Round 2:
 
 None of these guards a rule in `docs/rules/eric.md`. The gear's guard (`e2e/match-menu.spec.ts`, "the gear on every screen with a
 chessboard") is unchanged; its title-line test is on the Crowd, which keeps its title line.
-
-Round 2 (this list is the whole change since round 1):
 
 - `e2e/desktop-board.spec.ts`:
   - `NOW` (drawn sizes at 1920 × 1080, 1440 × 900, 1366 × 768, 1280 × 800): alone 1440 528 → 760, 1366 448 → 640, 1280 × 800
@@ -144,3 +179,8 @@ Measured, not asserted: the geometry of every screen at 1280 × 640, 1280 × 800
 1024 × 768 (round 2's measure: the board's wrap and the column boxes; the ones above are from it). Not run locally (CI): the other
 area specs, `boss-speech`, `tiger`, `boss-dock`, `gardener`, `hopper`, which draw these screens' words and pump; the words' width
 changed (above).
+
+Run locally (round 3, this branch with main merged in, the local wrangler on a spare port): the 13 tests CI failed, both projects where
+they have a phone part (21 passed, 5 desktop-only skipped on the phone), `desktop-board.spec.ts` 13 of 13 and `board-layout.spec.ts`'s
+computer test 1 of 1. Measured, not asserted: Boss alone with the eval bar off at 1280 × 640, 1280 × 800, 1366 × 768, 1440 × 900,
+1920 × 1080 and 1024 × 768 (the box, the bar and the dock each the drawn board's width), Babur at 1024 × 768 (the taller bar, 464).

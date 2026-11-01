@@ -122,6 +122,16 @@
     white-space: nowrap;
   }
 }
+/* From 900 to 1099 px wide (no leaderboard: the column beside the board is already at its least): 60 px, so the board keeps main's
+   size there (round 3: at 1024 × 768 Boss alone's was 440, main's 464; the 20 px are the difference). The icons are the same 34 px. */
+@media (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) and (max-width: 1099px) {
+  .gm-frame {
+    --gm-menu: 60px;
+  }
+  .gm-frame > .fd-side {
+    padding: 24px 6px;
+  }
+}
 
 /* ---- A boss battle on a computer with a mouse: the boss's bar at the top, the board under it ---- */
 @media (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
@@ -138,8 +148,23 @@
     grid-row: 1;
     margin-bottom: 8px;
   }
-  .screen.game:has(> .boss-dock) > .boss-dock {
+  .screen.game:has(> .boss-bar):not(:has(> .hud-row)) > .boss-dock {
     margin-top: 6px;
+  }
+  /* (The God King, your pawn and a party's pawns stand on the board's bottom edge, placed from the dock's top: styles.css counts
+     the 10 px row gap that was above it, so here it's the 6 px margin. Round 3: they stood 4 px above the board's edge.) */
+  .screen.game:has(> .boss-bar):not(:has(> .hud-row)) > .boss-dock > .gk-unit,
+  .screen.game:has(> .boss-bar):not(:has(> .hud-row)) > .boss-dock.dk-pawn > .you-pawn {
+    bottom: calc(100% + 6px - 14px);
+  }
+  .screen.game:has(> .boss-bar):not(:has(> .hud-row)) > .boss-dock > .gk-unit.fallen.has-power {
+    bottom: calc(100% + 6px);
+  }
+  .screen.game:has(> .boss-bar):not(:has(> .hud-row)) > .boss-dock.dk-party > .you-pawn {
+    bottom: calc(100% - 8px + 132px);
+  }
+  .screen.game:has(> .boss-bar):not(:has(> .hud-row)) > .boss-dock.dk-party > .dk-mates {
+    bottom: calc(100% - 8px + 132px + 104px);
   }
   /* "Move 1", in the bar, left of the status ("60 moves left"). */
   .boss-move {
@@ -155,7 +180,9 @@
     white-space: nowrap;
   }
   /* The admins' ⚡ and 🐟 and the gear: the column beside the board, at the board's top (the move list's column, the same
-     place: its translate), 36 px above the list. */
+     place as its translate), 36 px above the list. Moved by `left`, not a translate: a transform would make this row the
+     box the gear's fixed layer (.mm-scrim) is laid out in and stacked in, so its list would open 28 px tall under the move
+     list (round 3: CI's Report a bug and Resign could not be clicked). */
   .screen.game > .gm-tools {
     grid-column: 2;
     grid-row: 3;
@@ -166,13 +193,56 @@
     gap: 8px;
     height: 28px;
     min-width: 0;
-    translate: calc(13px - 28px - (var(--gk-column) - var(--board-px, 456px)) / 2) 0;
+    position: relative;
+    left: calc(13px - 28px - (var(--gk-column) - var(--board-px, 456px)) / 2);
   }
   .screen.game:has(> .gm-tools) > .mv-side {
     margin-top: 36px;
   }
+  /* (A party's battle: its pawns stand stacked above the God King under the list, so the list gives the tools' 36 px back from its
+     height, at least 120 px: its foot where it was, clear of the top pawns. Round 3: at 1280 × 800 it ran 21 px over two of them.) */
+  .screen.game:has(> .gm-tools):has(> .boss-dock.dk-party) {
+    --mv-h: max(120px, calc(var(--board-px, 456px) / 2 - 73px - 36px));
+  }
   .screen.game:has(> .gm-tools) > .under-board,
   .screen.game:has(> .gm-tools) > .mini-tower {
     margin-top: calc(var(--mv-h) + 48px);
+  }
+}
+
+/* ---- A boss battle's board box in whole steps of the board's own drawing (round 3) ----
+   The board is drawn in whole multiples of 8 device pixels (board/logic.ts, boardSize) at the left of its box, so a box of any other
+   width left up to 7 px empty at its right: the board sat off-center in its row and short of the boss's bar and the dock, which have
+   the box's width (CI, Nov 1: 4 px at 1280 × 800 with the eval bar off). Here the box, the bar and the dock are rounded down to that
+   step, so all three are the board's drawn width. The drawn board is the same size as before: at 1× the step is 8 px, at 2× (a
+   Retina screen) 4 px. Other pixel ratios keep the old box (a step that isn't a whole number of layout units could round the board
+   itself down a step). */
+@media (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) and (max-resolution: 1dppx) {
+  :root {
+    --bd-step: 8px;
+  }
+}
+@media (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) and (resolution: 2dppx) {
+  :root {
+    --bd-step: 4px;
+  }
+}
+@media (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) and (max-resolution: 1dppx),
+  (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) and (resolution: 2dppx) {
+  .screen.game:has(> .boss-dock) .board-area .board-wrap {
+    width: round(down, min(100% - 2 * max(0px, var(--bs-need)), var(--bd-h)), var(--bd-step));
+  }
+  .screen.game:has(> .boss-dock) .board-row .eval-bar ~ .board-wrap {
+    width: round(down, min(100% - 48px - 2 * max(0px, var(--bs-need)), var(--bd-h)), var(--bd-step));
+  }
+  .screen.game > .boss-dock,
+  .screen.game:has(> .boss-dock) > .hud-row,
+  .screen.game:has(> .boss-dock) > .boss-bar {
+    max-width: round(down, min(100% - 2 * max(0px, var(--bs-need)), var(--bd-h)), var(--bd-step));
+  }
+  .screen.game:has(.board-row > .eval-bar) > .boss-dock,
+  .screen.game:has(> .boss-dock):has(.board-row > .eval-bar) > .hud-row,
+  .screen.game:has(> .boss-dock):has(.board-row > .eval-bar) > .boss-bar {
+    max-width: round(down, min(100% - 48px - 2 * max(0px, var(--bs-need)), var(--bd-h)), var(--bd-step));
   }
 }

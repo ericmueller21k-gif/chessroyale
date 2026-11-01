@@ -42,14 +42,16 @@ const MAIN_ROW_H = 62;
  * no title line, the bar at the top, the side menu beside the screen (icons below 1800 px), the room 123 px, Boss alone's column
  * 196 px (round 2). The top is the bar's: y 63.2. Round 2, old → new (x, width): 1280 × 800 344, 520 → 324, 600; 1440 × 900 496,
  * 528 → 324, 760; 1536 × 864 496, 624 → 351.5, 736; 1920 × 1080 521.5, 952 → 511.5, 952; 1024 × 768 176, 384 → 176, 440 (main's
- * 464: 24 px less, the boss's reach there; see the decision note).
+ * 464: 24 px less, the boss's reach there; see the decision note). Round 3: the board's box is its drawn size, so the board is
+ * centered in its row (1536 × 864 x 351.5 → 354, 1920 × 1080 x 511.5 → 514), and from 900 to 1099 px the side menu is 60 px (1024 × 768 176, 440 → 156, 464:
+ * main's size).
  */
 const MAIN_BOARD_BOX: Record<string, { x: number; y: number; w: number }> = {
   "1280x800": { x: 324, y: 63.2, w: 600 },
   "1440x900": { x: 324, y: 63.2, w: 760 },
-  "1536x864": { x: 351.5, y: 63.2, w: 736 },
-  "1920x1080": { x: 511.5, y: 63.2, w: 952 },
-  "1024x768": { x: 176, y: 63.2, w: 440 },
+  "1536x864": { x: 354, y: 63.2, w: 736 },
+  "1920x1080": { x: 514, y: 63.2, w: 952 },
+  "1024x768": { x: 156, y: 63.2, w: 464 },
 };
 /** A raid's board box at 1280 × 800 (its scoreboard beside it keeps the board width-bound there). Round 2: x 488 → 468, 376 → 456. */
 const RAID_BOARD_BOX: Record<string, { x: number; y: number; w: number }> = { "1280x800": { x: 468, y: 63.2, w: 456 } };

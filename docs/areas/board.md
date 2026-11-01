@@ -98,7 +98,7 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
     round 2, `--side-w`), the board is width-bound instead, never overlapping them. Boss alone's empty left column is 196 px, 240
     without the eval bar (room for the boss and his words; Babur's is 153 px + his share of the height, for his pump). A computer is a window
     900 × 600 and up **with a mouse** (`pointer: fine`; the side menu beside the screen, from Nov 1, `game-frame.css`, takes its width
-    (`--win-w`): 80 px below 1800, 232 from there): phones and tablets, a tablet on its side included, keep their
+    (`--win-w`): 60 px from 900 to 1099, 80 below 1800, 232 from there): phones and tablets, a tablet on its side included, keep their
     sizes to the pixel. Auto chess has its own board and frame: not changed. Tests: `e2e/desktop-board.spec.ts`.
   - **When it draws** (Oct 14, 2026; DECISIONS.md, "The board draws its pieces only when they change"): the board is
     two parts. `OwnBoard` is the wrap, what the screen draws over the board (`children`, under the `BoardTurn`

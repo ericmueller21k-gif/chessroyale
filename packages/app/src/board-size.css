@@ -30,8 +30,10 @@
     --scr-need: calc(var(--bd-h) + 48px + 2 * var(--gutter) + 368px);
     --scr: min(var(--win-w), max(1100px, var(--scr-need)));
     /* The column beside the board (Nov 1): 340 px where the window has the room for the board's height, 280 (its least) where the
-       board is width-bound, so the board gets the 60 px. (`--scr-need` keeps 340: the height-bound screen is the full column.) */
-    --side-w: clamp(280px, calc(var(--scr) - 2 * var(--gutter) - 28px - var(--bd-h) - 48px), 340px);
+       board is width-bound, so the board gets the 60 px. (`--scr-need` keeps 340: the height-bound screen is the full column.) The
+       room the boss needs by the window's edge (`--bs-need`, both sides of the board: styles.css) counts as the board's: round 3, at
+       1024 × 768 Babur's taller bar left the column 5 px over its least, out of the board's. */
+    --side-w: clamp(280px, calc(var(--scr) - 2 * var(--gutter) - 28px - var(--bd-h) - 48px - 2 * max(0px, var(--bs-need, 0px))), 340px);
     width: var(--scr);
     grid-template-columns: minmax(0, 1fr) var(--side-w);
   }

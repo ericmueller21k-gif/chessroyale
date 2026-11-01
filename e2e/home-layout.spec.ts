@@ -292,7 +292,10 @@ test("computer: PLAY fills the queue in place (the menu, the live panel and your
   await expect(page.locator(".fd-count-n")).toHaveText("100", { timeout: 20_000 });
   await expect.poll(() => page.evaluate(() => (window as any).match?.phase.kind), { timeout: 20_000 }).toBe("vote");
   await expect(page.locator(".fd-seats")).toHaveCount(0);
-  await expect(menu).toHaveCount(0);
+  // (The match's own screen: the side menu stays, icons only below 1800 px, so a player can always leave by it; the live panel goes.
+  // Eric, Nov 1: docs/decisions/2026-11-01-game-screens-computer.md.)
+  await expect(menu).toBeVisible();
+  await expect(panel).toHaveCount(0);
 });
 
 test("computer: in the queue, your profile opens over it; another menu item leaves the queue and goes there", async ({ page }) => {

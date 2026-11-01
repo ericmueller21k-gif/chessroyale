@@ -2204,10 +2204,10 @@ const holdings = (p: Page) =>
     board: [...document.querySelectorAll(".hb-board piece.white")].map((e) => `${e.className.replace(/ ?(anim|ac-drawn)/g, "")}@${(e as HTMLElement).dataset.square}`).sort(),
     bench: [...document.querySelectorAll(".ac-bench.you .ac-slot.has")].map((e) => `${(e as HTMLElement).dataset.kind}@${(e as HTMLElement).dataset.square}`),
   }));
-/** Every white piece drawn on the page (not the avatar's pawn or the shop's, the bench's and the odds' little icons), and those on the board itself: a ghost is drawn outside the board. */
+/** Every white piece drawn on the page (not the avatar's pawn, the side menu's Profile pawn or the shop's, the bench's and the odds' little icons), and those on the board itself: a ghost is drawn outside the board. */
 const whitePieces = (p: Page) =>
   p.evaluate(() => ({
-    all: [...document.querySelectorAll("piece.white")].filter((e) => !e.closest(".ac-pawn, .ac-pc")).length,
+    all: [...document.querySelectorAll("piece.white")].filter((e) => !e.closest(".ac-pawn, .ac-pc, .fd-side")).length,
     board: document.querySelectorAll(".hb-board piece.white").length,
   }));
 /** The mouse button goes down on a point and the pointer moves off it: a drag in progress, the button still down. */
