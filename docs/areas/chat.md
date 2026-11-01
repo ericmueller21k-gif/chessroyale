@@ -16,7 +16,9 @@ Lane: `social`.
   everyone and float up from the sender's scoreboard row. On a phone's 50 v 50 the chat is a tab in the scoreboard's
   header (Black · White · All · Chat; the unread count shows on Chat while the scoreboard is up): Chat replaces the
   scoreboard in the same box and "‹ Back" returns to it (`CrowdTabs`, `components/QuickChat.tsx`). The Team / All switch
-  sits in that header beside Back, so both labels fit whole down to 320 px (`e2e/panel.spec.ts`). Elsewhere (a
+  sits in that header beside Back, so both labels fit whole down to 320 px (`e2e/panel.spec.ts`). A box under 170 px tall
+  (a 390 × 664 phone's is 140) has 30 px buttons and 18 px lines, so the feed shows two whole lines; the board never
+  resizes for it (`styles.css`, "A short chat tab", a container query). Elsewhere (a
   computer, a raid, Classic) a phone's space under the board is split between the scoreboard and chat, one view at a
   time, never an empty box.
 - **The town square's chat log** is its own thing (a fading log in the top left of `/town`: the bosses' and kids' chatter,

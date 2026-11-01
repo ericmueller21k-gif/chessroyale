@@ -239,14 +239,14 @@ test("Wrangler's long pull as his first move, then a lasso drag (?power=drag)", 
   const dragSeen = await watchFor(page, { banner: { selector: ".fight-banner.power-cut", text: /LASSO!/ }, layer: { selector: ".pg-layer[data-lasso] .pg-piece" } });
   let drag: any = null;
   let before = 0;
-  // (Each turn's eval bar and brain, for the message if no drag came: a game past DRAG_DECIDED has none.)
+  // (Each turn's position and brain, for the message if no drag came: a game past DRAG_DECIDED has none. No eval bar to read since Nov 1.)
   const turns: string[] = [];
   for (let i = 0; i < 6 && !drag; i++) {
     before = (await bossNow(page)).board.history.length;
     await play(page, await goodMove(page));
     await yourMove(page);
     const b = await bossNow(page);
-    turns.push(`t${b.powers.turn} ${(await page.locator(".eval-label").first().textContent()) ?? "?"} ${await page.evaluate(() => (window as any).match.brainLine ?? "")}`);
+    turns.push(`t${b.powers.turn} ${b.board.fen.split(" ")[0]} ${await page.evaluate(() => (window as any).match.brainLine ?? "")}`);
     if (b.powers.drag && b.powers.drag.turn === b.powers.turn) drag = b;
   }
   expect(drag, `a drag within 6 turns (${turns.join("; ")})`).not.toBeNull();

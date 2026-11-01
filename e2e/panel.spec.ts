@@ -131,8 +131,22 @@ test("the panel under the board is never empty: every tap, every remembered layo
       await expectShowing(p, want, `reload after tap ${i + 1} "${label}"`);
     }
   }
+  // The chat tab never moves or resizes the board, and its feed shows two whole lines (on this 390 x 664 phone the box
+  // is short: its buttons and lines are smaller, styles.css "A short chat tab").
+  const boardBox = () => p.locator(".screen.game .board-wrap").boundingBox();
+  const onBoardTab = await boardBox();
   await tap(p, CHAT);
   await expectShowing(p, { layout: "chat", open: true }, "Chat, then a reload");
+  expect(await boardBox(), "the board, the chat tab against the scoreboard").toEqual(onBoardTab);
+  await p.locator(".qchat-tab .qrow.emoji .qchip:not(:disabled)").first().click();
+  await expect(p.locator(".qchat-tab .qfeed .qline").first()).toBeVisible();
+  const lines = await p.evaluate(() => {
+    const feed = document.querySelector(".qchat-tab .qfeed") as HTMLElement;
+    const cs = getComputedStyle(feed);
+    const line = feed.querySelector(".qline")!.getBoundingClientRect().height;
+    return { room: feed.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom), line, gap: parseFloat(cs.rowGap) || 0 };
+  });
+  expect(lines.room, `two whole lines in the chat tab's feed: ${JSON.stringify(lines)}`).toBeGreaterThanOrEqual(2 * lines.line + lines.gap);
   await reload();
   await expectShowing(p, { layout: "board", open: true }, "reload: the scoreboard, not the chat tab");
 

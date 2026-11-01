@@ -20,3 +20,7 @@ gets resized when the eval bar isn't enabled."
   is unchanged except its two sizes (1440 680 → 728, 1920 832 → 952; PR body).
 - **FAQ (round 2):** "The eval bar beside the board shows the same number." is dropped (`faq/content.ts`); nothing on screen shows the
   number now.
+- **The chat tab on a short phone, round 3.** With the bar off for testers too, `panel.spec.ts` (390 × 664) measured a player's
+  chat tab: a 140 px box whose two rows of buttons left the feed 23 px, one line (players have had this since #446). The
+  board doesn't resize for it (Eric's rule) and nothing gets hidden behind a tap, so a box under 170 px gets 30 px buttons
+  (were 34 and 38) and 18 px lines (were 22): the feed is 39 px, two whole lines, every button still there.

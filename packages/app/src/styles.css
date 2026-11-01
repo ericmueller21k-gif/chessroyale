@@ -12782,6 +12782,39 @@ img.qicon {
   min-width: 30px;
   padding: 0 6px;
 }
+/* A short chat tab (Nov 1, the eval bar off: a 390 x 664 phone's box is 140 px, and its two rows of buttons left the feed
+   one line). The box's height is the screen's (the board never resizes for it), so when it's under the 170 px that two
+   lines and the buttons need, the buttons are 30 px and the lines 18 px: two whole lines show. Every button stays. */
+.screen.game .under-board.ub-chat:not(.closed) {
+  container: ubchat / size;
+}
+@container ubchat (max-height: 169px) {
+  .qchat-tab .qbuttons.rows {
+    gap: 4px;
+    padding: 4px 0;
+  }
+  .qchat-tab .qchip {
+    min-height: 30px;
+    font-size: 12.5px;
+  }
+  .qchat-tab .qrow.emoji.fit .qchip.emoji {
+    min-height: 30px;
+    font-size: 17px;
+  }
+  .qchat-tab .qfeed {
+    padding-block: 1px;
+  }
+  .qchat-tab .qline,
+  .qchat-tab .qline-name {
+    min-height: 18px;
+  }
+  .qchat-tab .qicon {
+    width: 16px;
+    height: 16px;
+    font-size: 12px;
+    line-height: 16px;
+  }
+}
 /* Folded, the scoreboard keeps its share of the width beside chat (or all of it): only its height folds. */
 .screen.game .under-board > .mini-tower.closed {
   flex: 1 1 0;
