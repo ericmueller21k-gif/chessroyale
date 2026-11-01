@@ -57,15 +57,21 @@ links Eric's notes); this page is what's built.
 - **Pixel** (Eric, Oct 31, on the proof of concept: "that's exactly what I was thinking of"). The whole arena is drawn into a
   small target, an art pixel `pixelScale` screen pixels square (worked out when the view or the screen's size changes: a 1 m
   pawn on the board's middle about 16 art pixels tall, at least 2), and scaled up nearest-neighbor: one chunky pixel grid,
-  as Eric's picture. The pieces are the pixel set (`colosseum/pieces-pixel.ts`): the six Staunton shapes at real-set heights
-  (the king about twice the pawn: about 0.97 m and 1.84 m; 1.25 times the proof of concept's), slender stems on wide
-  eight-sided bases (a flat face toward you), bands at the base and the collar (gold on Black, the body's color on White),
-  the king's chunky cross, the queen's coronet, the rook's battlements, the bishop's slit, the knight a horse's head in
-  profile with its eye. Cel-shaded in flat tones (cream with warm brown shadows, navy, gold, as sampled from the picture; no
-  gradients and no shine but a few highlight pixels on navy and gold), lit from the screen's top left; each faces the
-  screen (the camera's plane) and leans back 0.38 of your view's pitch so it stands up like a sprite, its axis on a
-  pixel's middle; a hard contact shadow under it; the scaling up draws a one-pixel dark outline round each piece (and
-  between two, on the farther), worked out in the small target; the scaling up reads one of its pixels a screen pixel. Ten
+  as Eric's picture (`docs/refs/colosseum-high-view.png`); on a screen the browser scales the canvas up nearest-neighbor too
+  (`image-rendering: pixelated`, Pixel only), so a 3x phone's art pixels stay sharp. The pieces are the pixel set
+  (`colosseum/pieces-pixel.ts`), sized and shaped as the picture's (round 2, Nov 1, measured on it): in the high view behind
+  White each stands, outline and all, as tall against the square it stands on near White as the picture's (the pawn 0.8 of
+  the square's width, the rook 0.95, the knight 1.1, the bishop 1.15, the queen 1.27, the king 1.5) on a base as wide (0.58
+  to 0.72), eight-sided and stepped (a flat face toward you), the lower step's top edge a band; above it a skirt narrowing to
+  the stem, a collar (bands gold on Black, the body's color on White), then the top: the pawn's round head, the rook's
+  straight tower and three square merlons, the knight's horse's head in profile with its eye, the bishop's mitre with its
+  slit and ball, the queen's wide coronet of five points and its ball, the king's wide crown and chunky cross. Cel-shaded in
+  flat tones as the picture's (cream in four tones from a near-white highlight to a warm grey-brown shade; navy-charcoal with
+  a lighter navy highlight; gold), lit from the screen's top left; each faces the screen (the camera's plane) and leans back
+  0.6 of your view's pitch so it stands up like the picture's sprites (little of its top showing), its axis on a pixel's
+  middle; a hard contact shadow under it; a one-pixel outline round each piece (and between two, on the farther), dark warm
+  brown round White and near black round Black as the picture's, worked out in the small target; the scaling up reads one
+  of its pixels a screen pixel. Ten
   draw calls (the arena, the crowd, one a kind, the outline, the scaling up).
 - **The 3D pieces (the gear's Pieces: 3D; until Nov 1 the gear's "3D pieces", Eric, Oct 30: "a toggle … for 3D vs 2D pieces players can choose"; Off by
   default, remembered on this device, flipping it redraws at once).** The six Staunton pieces made
@@ -126,7 +132,9 @@ links Eric's notes); this page is what's built.
   eric.md's method, headless, software WebGL, against main): phone 12.7 → 12.9 fps, computer 6.8 → 7.6 fps, script a frame
   0.29 → 0.36 and 0.37 → 0.33 ms, 3 draw calls; numbers in `docs/decisions/2026-10-31-colosseum-api-art.md`. Pixel, the high
   views and the Pieces row (Nov 1): `docs/decisions/2026-11-01-colosseum-pixel.md` (Pixel: 11.7 fps against
-  2D's 9.6 on a computer, level with 2D on a phone, 18.7 against 19.2; 3D 6.9 and 12.1).
+  2D's 9.6 on a computer, level with 2D on a phone, 18.7 against 19.2; 3D 6.9 and 12.1). Round 2 of the pixel set (Nov 1,
+  the same section there): level with or ahead of 2D in the same page in turn, phone and computer, in White's view and the
+  high view.
 - **The town is untouched** but for the card's link: none of this loads there, and the town's drawing and frame loop
   are as they were.
 
@@ -173,7 +181,9 @@ made by `scripts/crowd-sounds.py`; `sound.ts` (`colosseumCheer`, `warmFile`, `me
   `?view=black`, Exit back to the town.
 - `packages/app/test/colosseum.test.ts`, "the 3D pieces": the six meshes (whole triangles, unit normals, on the board, inside
   their squares, the king tallest). "The pixel set and the gear's Pieces": the six pixel meshes (the same, plus real-set
-  heights in order, the king about twice the pawn, eight-sided bases with a face toward you), and the Pieces' order, default
+  heights in order, the king about twice the pawn, eight-sided bases with a face toward you); "as the picture has them": in
+  the high view behind White, phone and computer, each piece on its home square near White as tall as the picture's (within
+  0.05 of a square) and its base as wide (within 0.04), outline and all; and the Pieces' order, default
   and saved choice (an old "3D pieces" on is 3D). `e2e/colosseum.spec.ts`, "the gear's Pieces": Pixel by default (ten draw
   calls), a tap steps to 3D (eight), 2D (three) and Pixel again at once, the game plays, a reload keeps 3D and 2D, an old
   "3D pieces" on comes back as 3D.

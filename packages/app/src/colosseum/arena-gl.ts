@@ -30,7 +30,7 @@
 import { BANNERS, BOARD, FLOOR_R, bossSeats, project, type Seat, GALLERY_H, GALLERY_R, PILLARS, PILLAR_ANGLES, SEATING, STANDS, STATUE, WALL_H, WALL_TOP, aisleAngle, fovFor, landingDepth, lookAt, multiply, perspective, rowR, rowY, seatR, seats, squareXZ, VIEWS, type View } from "./arena.ts";
 import { FIGURE_STRIDE, PILLAR_TOP_PX, PROPS, SCENE, SEAT_SINK, SKY, SQUARES, STANDS_SEATS, STONE, type CrowdArt, type Figure, type Rect } from "./art.ts";
 import { EYE, KINDS, KNIGHT_TURN, PV, SIZE, SLIT, pieceMeshes, type Kind, type PieceMesh } from "./pieces3d.ts";
-import { PIXEL_EYE, PIXEL_KNIGHT_TURN, PIXEL_SIZE, PIXEL_SLIT, pixelMeshes } from "./pieces-pixel.ts";
+import { PIXEL_EYE, PIXEL_KNIGHT_TURN, PIXEL_SLIT, pixelMeshes } from "./pieces-pixel.ts";
 
 const VS_SCENE = `#version 300 es
 layout(location=0) in vec3 aPos;
@@ -239,7 +239,7 @@ void main() {
   vMat = aMat;
   vBlack = iB.z;
   vN = aNrm;
-  vObj = aPos / ${PIXEL_SIZE.toFixed(4)};
+  vObj = aPos;
   vId = uKind * 32.0 + float(gl_InstanceID) + 1.0;
   if (uTime >= iB.y) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); vDepth = 0.0; return; }
   float s = clamp((uTime - iB.x) / uSlide, 0.0, 1.0);
@@ -268,8 +268,9 @@ void main() {
   }
 }`;
 /**
- * The pixel set's look, from Eric's picture: flat tones, hard steps, no gradients and no shine but a few highlight pixels;
- * cream with warm (brown) shadows, navy, gold. The second output marks which piece a pixel is and how near (the outline).
+ * The pixel set's look, from Eric's picture: flat tones, hard steps, no gradients and no shine; cream in four tones (a
+ * near-white highlight to a warm grey-brown shade), navy-charcoal with a few lighter highlight pixels, gold. The second
+ * output marks which piece a pixel is, how near, and whether it's Black's (the outline's color).
  */
 const FS_PIECE_PX = `#version 300 es
 precision highp float;
@@ -281,12 +282,13 @@ in float vDepth;
 flat in float vId;
 layout(location=0) out vec4 o;
 layout(location=1) out vec4 o2;
-const vec3 CREAM_L = vec3(250.0, 238.0, 214.0) / 255.0;
-const vec3 CREAM_M = vec3(214.0, 186.0, 148.0) / 255.0;
-const vec3 CREAM_S = vec3(160.0, 127.0, 93.0) / 255.0;
-const vec3 NAVY_H = vec3(104.0, 108.0, 146.0) / 255.0;
-const vec3 NAVY_M = vec3(55.0, 57.0, 80.0) / 255.0;
-const vec3 NAVY_D = vec3(27.0, 27.0, 40.0) / 255.0;
+const vec3 CREAM_H = vec3(252.0, 248.0, 236.0) / 255.0;
+const vec3 CREAM_L = vec3(238.0, 222.0, 194.0) / 255.0;
+const vec3 CREAM_M = vec3(204.0, 180.0, 148.0) / 255.0;
+const vec3 CREAM_S = vec3(150.0, 122.0, 96.0) / 255.0;
+const vec3 NAVY_H = vec3(100.0, 106.0, 132.0) / 255.0;
+const vec3 NAVY_M = vec3(60.0, 62.0, 78.0) / 255.0;
+const vec3 NAVY_D = vec3(36.0, 37.0, 48.0) / 255.0;
 const vec3 GOLD_H = vec3(255.0, 222.0, 140.0) / 255.0;
 const vec3 GOLD_L = vec3(228.0, 168.0, 72.0) / 255.0;
 const vec3 GOLD_D = vec3(150.0, 100.0, 38.0) / 255.0;
@@ -301,7 +303,7 @@ void main() {
   vec3 c;
   if (gold) c = hi ? GOLD_H : t > 0.1 ? GOLD_L : GOLD_D;
   else if (vBlack > 0.5) c = hi ? NAVY_H : t > 0.2 ? NAVY_M : NAVY_D;
-  else c = t > 0.62 ? CREAM_L : t > 0.2 ? CREAM_M : CREAM_S;
+  else c = t > 0.8 ? CREAM_H : t > 0.5 ? CREAM_L : t > 0.15 ? CREAM_M : CREAM_S;
   // The bishop's slit (pieces-pixel.ts PIXEL_SLIT), across the mitre's front.
   if (vMat > 1.5 && vMat < 2.5 && vObj.z > 0.03 && abs(vObj.x * ${PIXEL_SLIT.k.toFixed(3)} + vObj.y - ${PIXEL_SLIT.c.toFixed(3)}) * ${(1 / Math.hypot(PIXEL_SLIT.k, 1)).toFixed(4)} < ${PIXEL_SLIT.w.toFixed(3)}) c = vBlack > 0.5 ? GOLD_L : CREAM_S;
   // The knight's eye (PIXEL_EYE), on both sides of its head.
@@ -311,7 +313,8 @@ void main() {
   }
   o = vec4(c, 1.0);
   float d = clamp(vDepth / 64.0, 0.0, 1.0) * 255.0;
-  o2 = vec4(vId / 255.0, floor(d) / 255.0, fract(d), 1.0);
+  // (The depth's low byte in 7 bits; its last bit marks a Black piece, for the outline's color.)
+  o2 = vec4(vId / 255.0, floor(d) / 255.0, (floor(fract(d) * 127.0) * 2.0 + step(0.5, vBlack)) / 255.0, 1.0);
 }`;
 
 /** A full-screen triangle (Pixel's outline and scaling up). */
@@ -320,27 +323,36 @@ void main() {
   vec2 p = vec2(gl_VertexID == 1 ? 3.0 : -1.0, gl_VertexID == 2 ? 3.0 : -1.0);
   gl_Position = vec4(p, 0.0, 1.0);
 }`;
-/** Pixel's outline, in the small target (a pixel's four neighbors read there, not a screen pixel's): one dark pixel round each piece. */
+/**
+ * Pixel's outline, in the small target (a pixel's four neighbors read there, not a screen pixel's): one dark pixel round each
+ * piece, dark warm brown round White and near black round Black, as the picture's.
+ */
 const FS_OUTLINE = `#version 300 es
 precision highp float;
 uniform sampler2D uCol;
 uniform sampler2D uId;
 uniform ivec2 uSize;
 out vec4 o;
-const vec3 OUTLINE = vec3(30.0, 21.0, 12.0) / 255.0;
+// (The picture's: a dark warm brown round White, near black round Black.)
+const vec3 OUTLINE_W = vec3(46.0, 33.0, 26.0) / 255.0;
+const vec3 OUTLINE_B = vec3(20.0, 18.0, 22.0) / 255.0;
 float near(vec4 m) { return m.a > 0.5 ? m.g + m.b / 255.0 : 2.0; }
 void main() {
   ivec2 p = ivec2(gl_FragCoord.xy);
   vec4 m = texelFetch(uId, p, 0);
   float d = near(m);
   bool edge = false;
+  float black = 0.0;
   for (int k = 0; k < 4; k++) {
     ivec2 q = clamp(p + (k == 0 ? ivec2(1, 0) : k == 1 ? ivec2(-1, 0) : k == 2 ? ivec2(0, 1) : ivec2(0, -1)), ivec2(0), uSize - 1);
     vec4 n = texelFetch(uId, q, 0);
     // Round a piece, between two pieces (on the farther), and inside one where a part stands well in front (a collar's edge).
-    if (n.a > 0.5 && near(n) < d && (abs(n.r - m.r) > 0.001 || d - near(n) > 0.13 / 64.0)) edge = true;
+    if (n.a > 0.5 && near(n) < d && (abs(n.r - m.r) > 0.001 || d - near(n) > 0.13 / 64.0)) {
+      edge = true;
+      black = mod(floor(n.b * 255.0 + 0.5), 2.0);
+    }
   }
-  o = vec4(edge ? OUTLINE : texelFetch(uCol, p, 0).rgb, 1.0);
+  o = vec4(edge ? mix(OUTLINE_W, OUTLINE_B, black) : texelFetch(uCol, p, 0).rgb, 1.0);
 }`;
 /** Pixel's scaling up to the screen, nearest-neighbor: one read a screen pixel. */
 const FS_UP = `#version 300 es
@@ -358,8 +370,11 @@ void main() {
  * pixel, set when the view or the screen's size changes, never a frame); the proof of concept's grid, which Eric approved.
  */
 const PAWN_ART_PX = 16;
-/** Pixel: how far the pieces lean back, a share of your view's pitch. */
-const PIXEL_TILT = 0.38;
+/**
+ * Pixel: how far the pieces lean back, a share of your view's pitch: 0.6 (round 2, Nov 1; 0.38 before), so they stand up
+ * like the picture's sprites, little of their tops showing.
+ */
+export const PIXEL_TILT = 0.6;
 
 /** Floats a scene vertex (position, uv, color) and a sprite instance (five vec4s). */
 const SV = 9;
@@ -736,6 +751,7 @@ export class ArenaGL {
       this.solids[style] = this.buildSolid(style);
       this.style = style;
     }
+    this.crisp();
     gl.bindVertexArray(null);
     gl.enable(gl.DEPTH_TEST);
     gl.clearColor(SKY[0], SKY[1], SKY[2], 1);
@@ -808,7 +824,17 @@ export class ArenaGL {
       this.gl.bindVertexArray(null);
     }
     this.style = style;
+    this.crisp();
     this.setPieces(this.last.pieces, this.last.t0);
+  }
+
+  /**
+   * Pixel: the browser scales the canvas up to the screen nearest-neighbor too (a phone's canvas is capped at 2x, so on a 3x
+   * phone an art pixel's 2 canvas pixels are 3 screen pixels, kept sharp, not blurred); 3D and 2D smooth, as before.
+   */
+  private crisp(): void {
+    const c = this.gl.canvas as HTMLCanvasElement;
+    if (c.style) c.style.imageRendering = this.style === "pixel" ? "pixelated" : "";
   }
 
   private texture(src: TexImageSource, pixelArt: boolean, into?: WebGLTexture): WebGLTexture {
