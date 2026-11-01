@@ -35,7 +35,7 @@ dropped. *(mine)* marks the director's own suggestions.
 ## E. Colosseum pixel style
 | # | Note | Status |
 |---|---|---|
-| E1 | GBA-style pixel pieces from Eric's picture, all six, both colors | **PR #439** (round 2: sizes measured from the picture, slim Staunton shapes, warm outline, four-tone shading); merging when CI is green |
+| E1 | GBA-style pixel pieces from Eric's picture, all six, both colors | **MERGED #439** (round 2: sizes measured from the picture, slim Staunton shapes, warm outline, four-tone shading); next tweak if needed: finer pixels |
 | E2 | Four high views going round the board; opens behind White *(mine)* | built (round 1) |
 | E3 | Gear row "Pieces": Pixel (default) / 3D / 2D | built (round 1) |
 | E4 | Eric's reference picture | re-sent; kept in the repo (`docs/refs/colosseum-high-view.png`) |
@@ -83,6 +83,6 @@ dropped. *(mine)* marks the director's own suggestions.
 | # | Note | Status |
 |---|---|---|
 | L1 | **50 v 50 on a phone:** delete "Your team watched this one"; the middle (power-ups, arrows, status, vote results) is one fixed-height box; the scoreboard flush under it, never moves; header pick **Black · White · All** (your team default; selected white, others grey); drop "tap for all 50" (the ▾ opens the full list). Phone only; desktop later | **BUILDING** (Haiku) |
-| L2 | **Auto chess TFT economy** (Eric's Oct 25 numbers, ROADMAP; had been "for another day"): pawn 1, knight 3, bishop 3, rook 5, queen 9 *(mine: 9 per "unless 8 or 9 is more true to chess value")*; 4 gold → 4 XP; interest +1 per 10 up to +5; roll 2, 3, 4, 5 cap 5 per round; income TFT-sized by sim (7–10 rounds) | **BUILDING** (Opus) |
+| L2 | **Auto chess TFT economy** (Eric's Oct 25 numbers, ROADMAP; had been "for another day"): pawn 1, knight 3, bishop 3, rook 5, queen 9 *(mine: 9 per "unless 8 or 9 is more true to chess value")*; 4 gold → 4 XP; interest +1 per 10 up to +5; roll 2, 3, 4, 5 cap 5 per round; income 10, +2 a round, up to 20 (sim: TFT's flat 5 would leave 2–3 pieces, since every round rebuys the army) | **PR #440** in CI |
 | L3 | **Board size on a computer:** Settings "Board size: Large · Compact"; Large = as close to chess.com's 0.889 of the height as fits (shrink bosses/rows if needed), the default *(mine, per "the one people open up the game to")*; Compact = today's (Oct 29). Why today's fell short: a fixed 170–230 px room above/below the board, so a short laptop window gets ~0.72 | **BUILDING** (Haiku); stills to Eric first |
 | L3b | **Boss screen on a computer (Eric, Nov 1, after testing):** no title line ("BOSS · move 1" goes; "Move 1" by the boss's name in its bar, or left of "60 moves left"); ⚡ / fish / gear to the right side of the board; the boss's bar right at the top of the window; a smaller bottom gap; the board bigger; **the normal left side menu back on game screens** ("blank-looking boss screen"). **Mockup first** (Eric may send his own) | Mockup **APPROVED** ("Build it", Nov 1); **BUILDING** (Haiku): side menu on every computer game screen, icons only under 1366 px; no Compact setting *(mine)* |

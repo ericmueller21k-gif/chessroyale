@@ -28,3 +28,4 @@
 - Nov 1 10:00: main a2f721a green + live. 60975fa's main run red: town.spec:1273 'beside you: 22,17' (phone both tries, desktop flaky); a2f721a passed it → intermittent; rides v2 helper asked to root-cause.
 - Nov 1 10:15 Eric: build boss screen (helper running, cr-board-size), notes on branch claude/director-notes (cr-notes; copy + push after updates), team table light → in crowd round 3.
 - Nov 1 ~10:45: Colosseum round 2 → PR #439 (9d6f57a, CI b372jbqw7); merge when green; ref picture in repo docs/refs/colosseum-high-view.png.
+- Nov 1 ~11:00: #439 Colosseum MERGED bd54f83 (deploy/CI blz376ezv). #440 autochess economy opened (0328eee, CI watcher). Crowd round 4 running.
