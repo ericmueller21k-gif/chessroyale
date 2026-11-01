@@ -30,3 +30,4 @@
 - Nov 1 ~10:45: Colosseum round 2 → PR #439 (9d6f57a, CI b372jbqw7); merge when green; ref picture in repo docs/refs/colosseum-high-view.png.
 - Nov 1 ~11:00: #439 Colosseum MERGED bd54f83 (deploy/CI blz376ezv). #440 autochess economy opened (0328eee, CI watcher). Crowd round 4 running.
 - Nov 1 ~11:15: #441 crowd phone scoreboard opened (cddae0b, CI beiw2juvi). Round 4 helper slip: one send_message call (refused). Earlier helpers: none of the 3 slips touched secrets.
+- Nov 1 ~11:35: #440 autochess MERGED 8675efd (after my 2-number test fix). Worktrees cr-ac-econ, cr-colo-pixel removed.
