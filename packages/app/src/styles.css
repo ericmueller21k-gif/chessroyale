@@ -3010,12 +3010,14 @@ button.history-label {
     font-size: 12px;
     line-height: 14px;
   }
-  /* The line above the board in a 50 v 50 (Nov 1): two lines tall on every phase, so the board never moves between them.
-     The play line ("Your pick for Black · … picked") wraps to two lines where the room beside the clock is narrow (320 px);
-     the others are one line, at the top of the same box. Nothing is cut, and the board and the scoreboard keep their
-     places (the e2e check in crowd-scoring.spec.ts, "the board doesn't move"). */
-  .screen.game.crowd-50 .board-area > .opening-name {
-    min-height: 28px;
+  /* The line above the board in a 50 v 50 stays one line on every phase at every phone width, so the board keeps main's
+     place (Nov 1, the e2e checks "the board doesn't move" and "the board never moves or resizes"). The play line
+     ("Your pick for Black · 50/50 picked") is about 199 px at 12 px, and beside the clock a 320 px phone has about 188 px
+     for it: under 360 px the line is 11 px (every phase, so the same size everywhere). Nothing is cut or hidden. */
+  @media (max-width: 359px) {
+    .screen.game.crowd-50 .board-area > .opening-name {
+      font-size: 11px;
+    }
   }
   .screen.game .play-footer {
     gap: 6px;

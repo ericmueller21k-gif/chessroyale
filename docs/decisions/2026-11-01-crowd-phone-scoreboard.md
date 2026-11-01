@@ -91,3 +91,28 @@ Guard: `e2e/crowd.spec.ts`, "the scoreboard never moves: its top edge, height an
   14 px shorter there. The board's size is unchanged.
 - **Checks:** none changed. Passing at 320 × 640: the brilliant-find check, "the board never moves or resizes during a turn
   (Crowd and Classic)", and "the scoreboard never moves".
+
+## Round 5 (Nov 1): CI's failures on the branch
+
+- **The line above the board is one line on every phone** (the cause of votes.spec's board box, 84 for main's 70, and
+  desktop-board's crowd box at 390 × 844). Round 4's `min-height: 28px` put the board 14 px lower on every phone; it's
+  gone. In a 50 v 50 the play line ("Your pick for Black · 50/50 picked") is 199 px at 12 px, and beside the clock a
+  320 px phone has about 188 px for it. Under 360 px the line is 11 px, on every phase (the same size everywhere, so the
+  board never moves); "picked" is never cut. Measured with the 50/50 text: one line at 320, 340, 359, 360, 375, 390 and
+  430 px, the board's top at main's 70 at each.
+- **Passing:** "a rare brilliant find … the board doesn't move" (crowd-scoring, phone and computer), "the board never
+  moves or resizes during a turn" (crowd, phone and computer), "the scoreboard never moves" (crowd, phone),
+  "phones and tablets: crowd's board box is main's" (desktop-board).
+- **Not fixed: the split layout at 390 × 664** (chat.spec "quick chat picks …", the unread count; panel.spec "the panel
+  under the board is never empty"). One cause. The e2e phone (iPhone 13's 390 × 664) leaves the space under the board
+  62 px: the scoreboard and chat side by side, with the middle box (200 px) and the board (314 px, main's size) above it.
+  The chat's feed is 0 px there, so it never counts as on screen (`chat.shown` needs 18 px), and the unread count never
+  clears; the panel test needs a feed over 30 px. The chat's quick-chat rows take 85 px of that column, so a feed of 31 px
+  needs 144 px under the board, which leaves the middle box 118 px at this height (its content is about 195 px, round 3).
+  The Black · White · All header isn't the cause. Each fix changes a settled call, so it's left for the director:
+  1. a shorter middle box on phones under about 700 px tall, with the vote results packed into it (nothing hidden;
+     the reveal is denser only there). The one that keeps every check and rule as they are;
+  2. the board shrinks on those phones (about 232 px wide at 664 tall, not 314): reverses "the board's size never changes";
+  3. the quick-chat rows collapse on those phones: breaks "nothing hidden".
+  Changing the two checks is not an option taken here.
+- **Checks changed:** none.
