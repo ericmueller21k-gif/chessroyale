@@ -30,16 +30,36 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     server, about 55 s), `boss-character.spec.ts` (a whole Boss alone battle, Boingo, home to results on a phone and a
     computer, about 40 s) and `lobby-chat.spec.ts` (two players in one lobby through the real server, the bots fill
     it, the match starts; Solo's queue; a private lobby, about 85 s). About 3 minutes of test time, so 1 shard.
+  - **Traced modules** (Nov 1, `docs/decisions/2026-11-01-ci-selection.md`; `traced` in `areas.json`):
+    `packages/core/src/settings.ts`, `packages/core/src/boss.ts`, `e2e/helpers.ts`, the app's `net.ts`, `solo.ts`,
+    `main.tsx`, `board/OwnBoard.tsx` and `account.ts` are followed through the code instead of running everything. The
+    plan reads the module before and after (`traceModule`, plain text, no parser: about a second): the top-level
+    declarations the diff changes (a settings object, a helper, a function or class; comments and types don't run),
+    anything in the module that uses them (and the module state a changed function names), then the files that import
+    the module, or its package's entry, and name one of them (`usersOf`). Each of those counts as a changed path: its
+    area's specs, a spec itself, a unit test nothing. So a settings change runs the specs of the files that read that
+    object, and a helper's change the specs that call it. It still runs everything when a user is a shared foundation
+    or in no area, when it reaches `App.tsx` (`traced.hubs`: it hands the matches and the account to every screen),
+    or when the change can't be placed (the module new or removed, code outside any declaration, a file that doesn't
+    read cleanly). The plan's table says, per traced module, what changed and who uses it. A file reached through a
+    trace counts like the table counts its own changes, nothing more: what it passes on to other files isn't followed.
   - **The whole suite on a PR** when it touches a shared foundation (`full` in `areas.json`: package.json, the
-    lockfile, the Playwright and Wrangler config, `e2e/helpers.ts`, this workflow and its scripts, `packages/core`, the
-    runner, the protocol and chess's shared rules, the server's entry points (`index.ts`, `api.ts`, `lobby.ts`,
-    `lobby-do.ts`) and its stored-data, sign-in, money, ranked and fair-play files, the app's entry, board, match flow
-    (`game.ts`, `solo.ts`, `net.ts`), the play screen and the components every mode shares), or a path no area has
-    (a new file: add it to its area, or leave it out if it's shared). **To force it**, add the `full-e2e` label to the
+    lockfile, the Playwright and Wrangler config, this workflow and its scripts, `packages/core` (but settings.ts and
+    boss.ts, traced), the runner, the protocol and chess's shared rules, the server's entry points (`index.ts`,
+    `api.ts`, `lobby.ts`, `lobby-do.ts`) and its stored-data, sign-in, money, ranked and fair-play files, the app's
+    entry, board, match flow (`game.ts`; `solo.ts` and `net.ts` traced), the play screen and the components every
+    mode shares), or a path no area has (a new file: add it to its area, or leave it out if it's shared). **To force it**, add the `full-e2e` label to the
     PR (that starts a new run, and every push after runs everything until the label is removed): the full lane's PRs
     do. Or Actions → e2e → Run workflow on the PR's branch (a manual run tests everything).
-  - **On every push to main: the whole suite**, both projects, on 5 shards (about 17 minutes in all, 1 for setup):
-    the full run after each merge, which the director checks before the next merge.
+  - **On every push to main: the whole suite**, both projects, on 5 shards (about 44 minutes in all since Oct 30,
+    1 for setup; 22 on Oct 18): the full run after each merge, which the director checks before the next merge.
+    **One main run at a time** (Nov 1; `check` too): a push while main's run is going waits (the run going is never
+    cancelled), and a newer push replaces the one waiting. A merge whose own run was skipped is tested by the next run,
+    which runs every spec on main with every merge since the last run; its summary starts with "The merges this run
+    covers" (and the WebGL jobs go by all of them). **When that run is red,** the culprit is one of those merges: the
+    failed test's `file:line` and error usually name its area, and the plan table of each merge's own PR run says
+    whether it ran that spec; if it isn't clear, re-run the failed spec locally on each merge in turn (`git checkout
+    <merge>`, `npx playwright test <spec>`), oldest first.
   - **The town on WebGL** (Oct 30; docs/decisions/2026-10-30-town-webgl.md, "Oct 30, later"): a change to the town's
     area (`webgl` in `areas.json`: a path of the town square's area, or one of the specs below) also runs the town's
     drawing specs (`town`, `town-desktop`, `town-tags`, `town-webgl`) again on a `VITE_TOWN_GL=1` build, WebGL the town's
@@ -68,9 +88,11 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     report with the retries' traces (`e2e-report-shard-N`, kept 7 days; `npx playwright show-report <folder>`).
     Each shard's record (`e2e-summary-N`: its failed and flaky tests) is kept 90 days, for a look at which tests
     catch real bugs and which only flake (Eric, Oct 18; the first look about two weeks on).
-  - **Try the table locally:** `node e2e/ci-select.mjs files <path>...` prints what a PR changing those paths runs;
-    its tests are `packages/server/test/ci-select.test.ts` (one area's file, docs only, foundations, unknown paths,
-    changed and removed specs, every spec reachable, shard counts).
+  - **Try the table locally:** `node e2e/ci-select.mjs files <path>...` prints what a PR changing those paths runs
+    (a traced module's change is read from where your branch left `origin/main` to your working tree); its tests are
+    `packages/server/test/ci-select.test.ts` (one area's file, docs only, foundations, unknown paths, changed and
+    removed specs, every spec reachable, shard counts; traced: a settings key, a helper, a shared module and the hub,
+    comments and types only, changes it can't place).
   - **Retries and traces:** `--retries 1` in CI (PR and main) until the flaky-test batch lands; the goal is 0, as
     `playwright.config.ts` has it. A test that passes only on its retry is "flaky": the summary lists it first, so
     it stays in view. Traces only on that retry (`on-first-retry`): recording every test measured about 8% slower.

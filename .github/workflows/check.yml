@@ -5,6 +5,11 @@ on:
   pull_request:
   push:
     branches: [main]
+# Main runs one at a time (Nov 1): a push while main's check is going waits, never cancelling it, and a newer push
+# replaces the one waiting (it checks every merge since). Pull requests: a run each, as before.
+concurrency:
+  group: ${{ github.event_name == 'push' && 'check-main' || format('check-{0}', github.run_id) }}
+  cancel-in-progress: false
 jobs:
   check:
     runs-on: ubuntu-latest

@@ -4,8 +4,10 @@
 #   need (about 4 to 8 minutes in all). The `plan` job picks them (e2e/ci-select.mjs, from e2e/areas.json: path
 #   globs to spec files) and says why on the run's page. A shared foundation (package.json, the lockfile, the
 #   Playwright config, packages/core, the runner, the protocol, …) or a path the table doesn't know runs every spec, as
-#   does the `full-e2e` label (adding it starts a new run).
-# - A push to main (and a manual run) runs every spec on 5 shards, about 17 minutes: the full run after each merge.
+#   does the `full-e2e` label (adding it starts a new run). settings.ts, e2e/helpers.ts and a few shared app modules
+#   (`traced` in areas.json) are followed through the code instead: the specs of what uses what the diff changes.
+# - A push to main (and a manual run) runs every spec on 5 shards, about 44 minutes: the full run after each merge. One
+#   main run at a time: a push waits for the run going, and only the newest waiting push runs (it covers the others).
 # - A change to the town's area (e2e/areas.json, `webgl`) also runs the town's drawing specs again on a VITE_TOWN_GL=1
 #   build (WebGL the town's default; the runners have no GPU, so it's software WebGL): two more jobs beside the shards,
 #   `webgl-phone` and `webgl-desktop` in the shard matrix, one project and one worker each (two software-WebGL pages at
@@ -40,10 +42,12 @@ on:
         type: boolean
         default: false
 
-# A new push to a PR (or a label added to it) cancels the PR's run still going; every push to main gets its own run.
+# A new push to a PR (or a label added to it) cancels the PR's run still going. Main runs one at a time (Nov 1): a push
+# while main's run is going waits, never cancelling it, and a newer push replaces the one waiting, so the next run tests
+# main with every merge since the last one (the plan's summary lists them). A manual run has its own group.
 concurrency:
-  group: e2e-${{ github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: true
+  group: ${{ github.event_name == 'push' && 'e2e-main' || format('e2e-{0}', github.event.pull_request.number || github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   # The app is built in its own step, so Playwright's web server only starts wrangler (playwright.config.ts).
@@ -61,6 +65,10 @@ jobs:
     if: ${{ !inputs.perf }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    # (actions: read, for a push to main: the last main run that wasn't skipped.)
+    permissions:
+      contents: read
+      actions: read
     outputs:
       specs: ${{ steps.plan.outputs.specs }}
       total: ${{ steps.plan.outputs.total }}
@@ -75,10 +83,20 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           FULL_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'full-e2e') }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          # (HEAD^1: for a push, main before it; for a pull request, main as it is now. A manual run has no base: everything.)
+          # (HEAD^1: for a pull request, main as it is now. A manual run has no base: everything.)
           if [ "$EVENT" = workflow_dispatch ]; then node e2e/ci-select.mjs full "this is a $EVENT run, which tests everything"
-          elif [ "$EVENT" != pull_request ]; then node e2e/ci-select.mjs full "this is a $EVENT run, which tests everything" HEAD^1
+          elif [ "$EVENT" != pull_request ]; then
+            # A push to main: its base is the commit of main's last run that wasn't skipped (or cancelled), so the WebGL
+            # jobs see every merge this run covers; HEAD^1 if that can't be had. The summary lists those merges.
+            base=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/e2e.yml/runs?branch=main&event=push&per_page=50" \
+              --jq "[.workflow_runs[] | select(.run_number < $GITHUB_RUN_NUMBER and .conclusion != \"cancelled\")][0].head_sha // empty" || true)
+            if [ -z "$base" ] || ! git fetch --no-tags --depth=1 origin "$base"; then base=$(git rev-parse HEAD^1); fi
+            merges=$(gh api "repos/$GITHUB_REPOSITORY/compare/$base...$GITHUB_SHA" \
+              --jq '.commits[] | select(.parents | length > 1) | "- `" + .sha[0:8] + "` " + (.commit.message | split("\n")[0])' || true)
+            if [ -n "$merges" ]; then printf '%s\n\n%s\n\n' "### The merges this run covers (since main's last run, \`${base:0:8}\`)" "$merges" >> "$GITHUB_STEP_SUMMARY"; fi
+            node e2e/ci-select.mjs full "this is a $EVENT run, which tests everything" "$base"
           elif [ "$FULL_LABEL" = true ]; then node e2e/ci-select.mjs full "the pull request has the full-e2e label" HEAD^1
           else node e2e/ci-select.mjs diff HEAD^1
           fi
