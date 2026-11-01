@@ -35,7 +35,8 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   pick's allowance. Counted losses make the round scores (and the group average), standings, cuts, the boss's strikes
   (`finalLosses`), `matchLoss` (`countedLossSum`) and final placements; **raw** losses stay for the board's draw,
   brilliance, ratings and fair play (`lossesByStage`), and a miss costs as before. Bots unchanged. The reveal says it
-  in one line of plain words, one number at most (`allowanceNote` in `game.ts`): "1.2 forgiven · opening", "8 of 9.6
+  in one line of plain words, one number at most (`allowanceNote` in `game.ts`; a phone's 50 v 50 reveal shortens it to
+  `allowanceShort`: "8 forgiven", "no allowance"): "1.2 forgiven · opening", "8 of 9.6
   forgiven · opening", "no allowance · gave up material", "no allowance · missed a capture" (Crowd under the poll,
   Classic under the round score, a boss battle as the dock's second line, shortened under 380 px: "8 of 9.6
   forgiven", "no allowance"); the breakdown says what counted, and the group's average as it counted. Squads isn't scored per move: untouched.
@@ -53,10 +54,12 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   (`round2`); the screens show 2 (`scoreDp`). After power-ups are marked, `MatchRunner.finishRound` runs `crowdBrilliant`:
   a rare find (`brilliance` with `brilliantMinGap`; `brilliantMaxFound` or fewer found it, exactly one when
   `brilliantFewLeft` or fewer picked) adds `brilliantBonus` to the finders and sets `result.brilliant`, which the
-  reveal shows as the shoutout ("Brilliant find! You found Nf5 · +1"; online the reveal message's `brilliant`). The
+  reveal shows as a mark on its bar ("‼ +1", "+1 each" for several finders; its label names the finders; online the
+  reveal message's `brilliant`). The
   standings carry `streak` from `streakFrom` (`NetStanding.streak`), and the scoreboard draws our own fire as a badge on the
   rank square's corner, never in the name's cell, so a name keeps all its room (`components/StreakFire.tsx`, in `RaceTower`'s `.t-pos`: orange, red from 2 more, a white-blue core from 4 more; a flicker, still under reduced
-  motion). The reveal adds "+0.50 streak bonus" under your score, and "not capped · gave up a piece" after the allowance.
+  motion). A phone's 50 v 50 reveal puts the streak ("🔥+0.50") in its one result line; the others' reveal adds "+0.50
+  streak bonus" under your score, and "not capped · gave up a piece" after the allowance.
   Test switches (solo): `?streaks=1` (every seat on a streak, 3 to 9), `?shoutout=1` (your first pick gets a shoutout).
 - **A raid's scoring** (Eric, Oct 25: "Raids should use the 50 v 50 math"; docs/decisions/2026-10-25-raid-scoring.md;
   `RAID_SCORING` in settings.ts, `RAID_SETTINGS.crowdScoring`; measured with Maia raids in `reports/raid-scoring.md`):
@@ -153,11 +156,14 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   duel, boss battle) use the same bank, increment and cap; how many moves each bank lasts is in `DECISIONS.md`, "Crowd
   50 v 50: three chess time controls".
 - **Power-ups:** 3 at the start in Crowd (`powerUpsAtStart`); one shows the engine's top 3 moves for that turn.
-- **The phone's layout (Nov 1; docs/decisions/2026-11-01-crowd-phone-scoreboard.md):** the middle box under the board is one
-  fixed height (`--mid-h`, styles.css, the locked phone screen): the ⚡ row, the status line and the five vote bars take turns
-  in it. The scoreboard under it never moves. Its header picks Black, White or All (yours when the match starts); tapping
-  the picked one or the rows opens the full list for that pick. The reveal has no "your team watched" line any more.
-  Guard: `e2e/crowd.spec.ts`, "the scoreboard never moves".
+- **The phone's layout (Nov 1; docs/decisions/2026-11-01-crowd-phone-scoreboard.md, then 2026-11-01-crowd-phone-tabs.md):**
+  the middle box under the board is one fixed height (`--mid-h`, styles.css, the locked phone screen), exactly the vote
+  box's: its bars (14 px each, six at most; `--slots` steps down on short screens) and the one result line, which sits at
+  its foot. The ⚡ row, the status line and the bars take turns in it. The scoreboard starts 4 px under it and fills the
+  rest of the screen, and never moves. Its header reads Black · White · All · Chat (yours picked when the match starts;
+  tapping the picked one or the rows opens the full list for that pick). Chat replaces the scoreboard in the same box;
+  "‹ Back" returns to the pick. The reveal has no "your team watched" line any more.
+  Guards: `e2e/crowd.spec.ts`, "the scoreboard never moves"; `e2e/panel.spec.ts`, "a phone's 50 v 50 box".
 - **On screen:** every pick appears live on the board as a ghost with a name pill (one name per square, "+N"), live
   tallies, an optional motion trail (Settings → Board), the eval bar (off for everyone since Nov 1: [hub.md](hub.md)), the scoreboard
   and chat under the board. A crowd of one keeps its
