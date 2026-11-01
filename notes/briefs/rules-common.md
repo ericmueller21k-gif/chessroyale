@@ -1,6 +1,8 @@
 ## Rules you must keep (every brief)
 - Don't change any check that guards a rule in `docs/rules/eric.md`; list every changed check old → new in the PR body.
 - Never base anything on, name or hint at a real person.
+- **Push as you go:** commit and push your branch at each real step (WIP commits are fine), so a container restart or a
+  stop loses minutes, not hours.
 - **Working lean (CLAUDE.md, Nov 1 audit):**
   - You can't sit idle: ending your turn ends your run. **Don't wait with `Monitor`, and don't use `ps`/`pgrep`.** Wait in
     one foreground Bash call (timeout 600000): `timeout 590 bash -c 'until <done>; do sleep 30; done'`, repeated if
