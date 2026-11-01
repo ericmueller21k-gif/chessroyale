@@ -3,23 +3,22 @@
  * 50 v 50 matches of 99 bots and one player who always picks the judge's best move (its top line), through the real
  * runner (100k nodes, as crowd-sim.ts). Where that player finishes, and how the bots' places follow their strength.
  *
- *   npx tsx packages/sim/scripts/crowd-bots-sim.ts <bots> [matches=10] [seed=1] [help=judge|own]
+ *   npx tsx packages/sim/scripts/crowd-bots-sim.ts <bots> [matches=10] [seed=1] [help=judge|own] [tag]
  *     <bots>: `before` (the bots as they were until Nov 1: temperatures spread evenly on a log scale over 0.25 to 32),
- *             `tuned` (botRoster's: each bot's rating from its name, BOT_MAIA's bell curve, played Stockfish-style at
- *             that rating's temperature: the fallback), `maia` (the same bots picking Maia's moves at their ratings,
- *             as on a device that runs Maia; the Maia box as its own process).
+ *             `tuned` (botRoster's: each bot's rating from its name, BOT_LOBBY's bell curve, at that rating's
+ *             temperature), `probe` (temperatures spread over 4 to 1024: what each gives away a move, for
+ *             BOT_LOBBY.skillAt).
  *     [help]: where the player's best move comes from: `judge`, the judge's own top line (the same search: the best a
- *             player could know), or `own`, its own engine (another Stockfish at the same nodes, its own hash, as a
- *             player's engine help would be: the judge's re-checks of close calls may then name another best).
+ *             player could know), or `own`, its own engine (another Stockfish at the same nodes, its own hash).
+ *     [tag]: added to the file's name (runs side by side; concatenate them after).
  *
- * One line per match and a summary go to reports/crowd-bots/<bots>.jsonl; `summary` writes reports/crowd-bots.md.
+ * One line per match goes to reports/crowd-bots/<bots>[-own][-tag].jsonl; `summary` writes reports/crowd-bots.md.
  */
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { BOT_LOBBY, DEFAULT_SETTINGS, botRatingForSkill, botSkillSpread, estimateRating, matchLoss, modeSettings, mulberry32, rawLossTotal, shuffle, type Settings } from "@chessroyale/core";
 import { MatchRunner, botRoster, type Entrant, type Opening } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
-import { spearman } from "../src/stats.ts";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const OUT = root + "reports/crowd-bots/";
@@ -34,7 +33,7 @@ interface MatchRow {
   outInStage: number | null;
   /** Each bot: its rating (what its temperature plays like, for `before`), its temperature and its place. */
   field: { rating: number; skill: number; place: number; final: boolean; outInStage: number | null; raw?: number; moves?: number; shown?: number | null }[];
-  /** `maia`: the bots' picks by Maia, and those that fell back to the Stockfish-style pick. Maia's asks and their time. */
+  /** The first try's Maia rows only: picks by Maia, those that fell back to the Stockfish-style pick, Maia's asks and their time. */
   maia?: { maia: number; fallback: number; asks: number; askMs: number; slowest: number };
   /** The final's eight (the player among them, rating 0): place, matchLoss and raw loss over the match (points per move), moves scored. */
   finalists?: { rating: number; place: number; matchLoss: number; rawPerMove: number; moves: number }[];
@@ -112,6 +111,7 @@ async function run(kind: string, matches: number, seed0: number, help: string, t
 
 const mean = (xs: readonly number[]) => xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length);
 const pct = (n: number, d: number) => `${Math.round((100 * n) / Math.max(1, d))}%`;
+const quantile = (xs: readonly number[], q: number) => [...xs].sort((a, b) => a - b)[Math.min(xs.length - 1, Math.floor(q * xs.length))] ?? 0;
 
 function rowsOf(kind: string): MatchRow[] {
   const f = OUT + `${kind}.jsonl`;
@@ -119,49 +119,62 @@ function rowsOf(kind: string): MatchRow[] {
 }
 
 function summary() {
-  const kinds = ["before", "tuned", "maia", "before-own", "tuned-own", "maia-own"].filter((k) => rowsOf(k).length);
   const label: Record<string, string> = {
-    before: "Before (Stockfish-style, temperatures 0.25 to 32)",
-    tuned: "Tuned (Stockfish-style at each bot's rating)",
-    maia: "Maia (each bot's rating)",
+    before: "**Before** (today's bots: temperatures 0.25 to 32)",
+    "wip-maia": "First try: Maia at Maia ratings around 1150",
+    "wip-tuned": "First try: Stockfish-style at the temperatures matching those Maia ratings",
+    tuned: "**After** (BOT_LOBBY: ratings around 1150, Stockfish-style)",
     "before-own": "Before; the player's own engine",
-    "tuned-own": "Tuned; the player's own engine",
-    "maia-own": "Maia; the player's own engine",
+    "wip-tuned-own": "First try, Stockfish-style; the player's own engine",
   };
+  const kinds = Object.keys(label).filter((k) => rowsOf(k).length);
+  // (Before and after: a bot's rating is the one its temperature plays like today; the first try's kept its own labels.)
+  const ratingOf = (k: string, f: MatchRow["field"][number]) => (k.startsWith("wip") ? f.rating : botRatingForSkill(f.skill));
   const out: string[] = [
     "# Crowd 50 v 50: an engine-best player against the bots (Nov 1, 2026)",
     "",
-    "Written by `npx tsx packages/sim/scripts/crowd-bots-sim.ts summary` from `reports/crowd-bots/*.jsonl`.",
-    "Eric (Nov 1): a player making the engine's best moves should finish 1st or 2nd. 99 bots and one player who always",
-    "picks the best move, Crowd's settings (50 v 50, its cuts and its final), the real runner at 100k nodes. The player's",
-    "best move: the judge's own top line (the best a player could know), or (\"own engine\") its own Stockfish at the same",
-    "nodes with its own hash, as engine help on a player's device would be (the judge's re-checks of close calls may name",
-    "another best). Bots:",
+    "Written by `npx tsx packages/sim/scripts/crowd-bots-sim.ts summary` from `reports/crowd-bots/*.jsonl`. Eric (Nov 1): a",
+    "player making the engine's best moves should finish 1st or 2nd. 99 bots and one player who always picks the judge's",
+    "best move (its top line at 100k nodes), Crowd's settings (50 v 50, its cuts, the team final), the real runner. The",
+    "\"first try\" rows are this branch's first version (bots on Maia's rating scale with Maia's moves, and their",
+    "Stockfish-style twin), kept for the comparison; the Maia wiring is gone (docs/decisions/2026-11-01-bot-lobby.md).",
     "",
-    "- **Before:** the bots until Nov 1: temperatures spread evenly on a log scale from 0.25 to 32 over Stockfish's top 8.",
-    `- **Tuned:** each bot's rating from its name (BOT_MAIA: mean ${BOT_MAIA.ratings.mean}, sd ${BOT_MAIA.ratings.sd}, ${BOT_MAIA.ratings.min} to ${BOT_MAIA.ratings.max}), played Stockfish-style at the temperature that loses as much a move (the fallback; and online today).`,
-    "- **Maia:** the same bots picking Maia's own moves at their ratings (temperature 0.8, top-p 0.9), as on a device that runs Maia.",
+    `After: each bot's rating from its name (mean ${BOT_LOBBY.ratings.mean}, sd ${BOT_LOBBY.ratings.sd}, ${BOT_LOBBY.ratings.min} to ${BOT_LOBBY.ratings.max}), each rating's temperature giving away a Maia player's points a move at that rating (BOT_LOBBY.skillAt).`,
     "",
-    "| Bots | Matches | Engine player 1st or 2nd | Its places | Its mean place | Reached the final | Bots: rating vs place (Spearman, higher = stronger bots place better) | Bots 1500+ in the final | Bots under 1000 in the final | Bots out in the first cut | Maia picks (fallback) | Maia per ask (slowest) |",
-    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    "| Bots | Matches | Engine player 1st or 2nd | Its places | Mean place | Bots rated 1500+ in the final | Bots under 1000 in the final | Bots out in the first cut | A 1800+ bot above a 900- one | Bots' scoreboard rating (median, 10th to 90th) |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
   ];
   for (const k of kinds) {
     const rows = rowsOf(k);
     const places = rows.map((r) => r.place);
-    const rho = mean(rows.map((r) => -spearman(r.field.map((f) => f.rating), r.field.map((f) => f.place))));
-    const hi = rows.flatMap((r) => r.field.filter((f) => f.rating >= 1500));
-    const lo = rows.flatMap((r) => r.field.filter((f) => f.rating < 1000));
-    const all = rows.flatMap((r) => r.field);
-    const st = rows.map((r) => r.maia).filter((x): x is NonNullable<MatchRow["maia"]> => !!x);
-    const mp = st.reduce((a, s) => a + s.maia, 0);
-    const fb = st.reduce((a, s) => a + s.fallback, 0);
-    const asks = st.reduce((a, s) => a + s.asks, 0);
-    const ms = st.reduce((a, s) => a + s.askMs, 0);
+    const field = rows.flatMap((r) => r.field.map((f) => ({ ...f, r: ratingOf(k, f) })));
+    const hi = field.filter((f) => f.r >= 1500);
+    const lo = field.filter((f) => f.r < 1000);
+    let above = 0;
+    let pairs = 0;
+    for (const r of rows)
+      for (const a of r.field)
+        for (const b of r.field)
+          if (ratingOf(k, a) >= 1800 && ratingOf(k, b) <= 900) {
+            pairs++;
+            if (a.place < b.place) above++;
+          }
+    const shown = field.flatMap((f) => (f.shown ? [f.shown] : []));
     out.push(
-      `| ${label[k]} | ${rows.length} | ${pct(places.filter((p) => p <= 2).length, rows.length)} | ${places.join(", ")} | ${mean(places).toFixed(1)} | ${pct(rows.filter((r) => r.outInStage === null).length, rows.length)} | ${rho.toFixed(2)} | ${pct(hi.filter((f) => f.final).length, hi.length)} of ${hi.length} | ${pct(lo.filter((f) => f.final).length, lo.length)} of ${lo.length} | ${pct(all.filter((f) => f.outInStage === 0).length, all.length)} | ${st.length ? `${pct(mp, mp + fb)} (${pct(fb, mp + fb)})` : "-"} | ${asks ? `${Math.round(ms / asks)} ms (${Math.max(...st.map((s) => s.slowest))} ms)` : "-"} |`,
+      `| ${label[k]} | ${rows.length} | ${places.filter((p) => p <= 2).length} of ${rows.length} (${pct(places.filter((p) => p <= 2).length, rows.length)}) | ${places.join(", ")} | ${mean(places).toFixed(1)} | ${pct(hi.filter((f) => f.final).length, hi.length)} of ${hi.length} | ${pct(lo.filter((f) => f.final).length, lo.length)} of ${lo.length} | ${pct(field.filter((f) => f.outInStage === 0).length, field.length)} | ${pairs ? pct(above, pairs) : "-"} | ${shown.length ? `${quantile(shown, 0.5)} (${quantile(shown, 0.1)} to ${quantile(shown, 0.9)})` : "-"} |`,
     );
   }
-  out.push("", "Before's \"rating\" is the rating its temperature plays like (botRatingForSkill, held at 2400 above), for the same columns.", "");
+  const probe = ["p1", "p2", "p3", "p4", "p5", "p6"].flatMap((t) => rowsOf(`probe-${t}`)).flatMap((r) => r.field);
+  if (probe.length) {
+    out.push("", "**The probe** (6 matches, bots at temperatures 4 to 1024): points given away a move by temperature, all bots' moves.", "", "| Temperature | Bots | Moves | Points a move |", "| --- | --- | --- | --- |");
+    const bands = [4, 8, 16, 32, 64, 128, 256, 1024];
+    for (let i = 0; i < bands.length - 1; i++) {
+      const fs = probe.filter((f) => f.skill >= bands[i]! && f.skill < bands[i + 1]!);
+      const moves = fs.reduce((a, f) => a + (f.moves ?? 0), 0);
+      out.push(`| ${bands[i]} to ${bands[i + 1]} | ${fs.length} | ${moves} | ${(fs.reduce((a, f) => a + (f.raw ?? 0), 0) / Math.max(1, moves)).toFixed(2)} |`);
+    }
+  }
+  out.push("");
   writeFileSync(root + "reports/crowd-bots.md", out.join("\n"));
   console.log(out.join("\n"));
 }
@@ -169,5 +182,5 @@ function summary() {
 const [cmd, ...args] = process.argv.slice(2);
 if (cmd === "summary") summary();
 else if (cmd) await run(cmd, Number(args[0] ?? 10), Number(args[1] ?? 1), args[2] ?? "judge", args[3] ?? "");
-else console.log("usage: crowd-bots-sim.ts before|tuned|maia [matches] [seed] | summary");
+else console.log("usage: crowd-bots-sim.ts before|tuned|probe [matches] [seed] [judge|own] [tag] | summary");
 process.exit(0);

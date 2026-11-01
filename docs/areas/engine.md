@@ -45,9 +45,9 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   identical (`JUDGES.tolerance` 0). A disagreement asks a third device and the engine server at once; strikes bench a
   device. Fewer than two capable devices (or `JUDGES.on` false): the lobby's **host** scores every round (`pickHost`
   prefers a connected computer over a phone). Knocked-out players' devices keep judging while their page is open.
-- **The Crowd's and Classic's bots** (Nov 1; docs/decisions/2026-11-01-maia-bots.md): Maia's moves at each bot's
-  rating where the picking device runs Maia (solo; online, the host while it scores alone), else Stockfish-style at the
-  temperature that rating plays like. The judge stays Stockfish. [crowd.md](crowd.md), "The bots".
+- **The Crowd's and Squads' bots** (Nov 1; docs/decisions/2026-11-01-bot-lobby.md): Stockfish-style at the
+  temperature each bot's rating plays like (no extra engine work: the judge's top moves). Not Maia (too slow for a
+  team turn on a phone). [crowd.md](crowd.md), "The bots".
 - **Squads' bots** get their engine's top moves from players' devices the same way (the page's one speed check,
   `engineSpeed()`, then `botWork` jobs on the engine pool; [squads.md](squads.md), "The server" and "The screens").
 - **Close calls are re-checked deeper** before a cut (`recheckCloseCalls()` in `runner.ts`: `recheckLoss`,

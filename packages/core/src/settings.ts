@@ -597,13 +597,13 @@ export const WEAK_BOTS: Pick<Settings, "botSkillRange" | "peopleFirst"> = { botS
 export const BOT_LOBBY = {
   ratings: { mean: 1150, sd: 250, min: 600, max: 2200, step: 100 },
   skillAt: [
-    [600, 64],
-    [900, 24],
-    [1200, 15.5],
-    [1500, 12],
-    [1800, 9.7],
-    [2100, 8],
-    [2400, 6.3],
+    [600, 128],
+    [900, 67],
+    [1200, 27],
+    [1500, 16.5],
+    [1800, 11.7],
+    [2100, 8.4],
+    [2400, 6.4],
   ] as readonly (readonly [number, number])[],
 };
 export type BotLobbySettings = typeof BOT_LOBBY;
