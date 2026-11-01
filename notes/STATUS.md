@@ -50,3 +50,4 @@
 - Nov 1 ~16:55 Eric (iPhone, angry): #441 wrong on his phone: 200 px box at his Safari's ~390×750 left 2 scoreboard rows. Wants: box = vote results height, scoreboard fills below, chat as 4th tab (Black·White·All·Chat) replacing scoreboard with Back, ONE result line. Haiku redo (claude/crowd-phone-v2), stills first. #445 closed (superseded).
 - Nov 1 ~18:10: 50v50 redo PR #446 (a4faa55, CI bn471cxid); stills sent; MERGE ONLY AFTER ERIC OKs. fuser -k 9441 freed a stray listener (PID 9136).
 - Nov 1 ~18:20: Eric APPROVED #446 stills → merge when CI green. Eval bar off for everyone: Haiku helper (cr-eval-off); players unchanged (it was testers-only); admins now same as players; Colosseum spectator bar kept *(mine)*.
+- Nov 1 ~18:45: #446 50v50 phone redo MERGED 58c9dd3 (deploy/CI watcher).
