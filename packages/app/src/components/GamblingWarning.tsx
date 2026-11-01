@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import { play } from "../sound.ts";
 
 /** What the message says (Eric approved these words, Nov 1). */
@@ -18,7 +18,9 @@ export function GamblingWarning() {
     setOpen(false);
     ring.current?.focus();
   };
-  useEffect(() => {
+  // (A layout effect: the listener is there in the same commit that shows the box, so an Escape pressed the moment it shows
+  // closes it. A passive effect waits for the next paint, and a key in that gap was lost: PR #435's CI and main, Nov 1.)
+  useLayoutEffect(() => {
     if (!open) return;
     const key = (e: KeyboardEvent) => e.key === "Escape" && close();
     window.addEventListener("keydown", key);
