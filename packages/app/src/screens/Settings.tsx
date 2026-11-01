@@ -7,7 +7,7 @@ import { SignIn } from "../components/SignIn.tsx";
 import { AccountData } from "../components/AccountData.tsx";
 import { BackButton } from "../components/FrontDoor.tsx";
 import { signOut, tooYoung } from "../account.ts";
-import { BOARD_COLORS, boardColors, boardMarksOn, chatBubbles, chatOff, crowdAnimations, crowdTrail, evalBarOn, onPrefsChange, practiceOn, premovesOn, setBoardColors, setBoardMarksOn, setChatBubbles, setChatOff, setCrowdAnimations, setCrowdTrail, setEvalBarOn, setPracticeOn, setPremovesOn, type BoardColors } from "../prefs.ts";
+import { BOARD_COLORS, boardColors, boardMarksOn, chatBubbles, chatOff, crowdAnimations, crowdTrail, onPrefsChange, practiceOn, premovesOn, setBoardColors, setBoardMarksOn, setChatBubbles, setChatOff, setCrowdAnimations, setCrowdTrail, setPracticeOn, setPremovesOn, type BoardColors } from "../prefs.ts";
 import { clearAllPremoves } from "../board/yours.ts";
 import { REEL_VOICES, getReelVoice, isMuted, onMuteChange, previewPieceSound, previewReel, setMuted, setReelVoice, unlockAudio, type ReelVoice } from "../sound.ts";
 import { PIECE_SOUNDS, pieceSound, setPieceSound } from "../piece-sounds.ts";
@@ -361,12 +361,13 @@ export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => v
       {profile?.admin && (
         <section class="fd-section">
           <h2 class="fd-label">TESTING</h2>
-          <p class="fd-note">For testers (admins). Players never see these: for them practice mode and the eval bar are off.</p>
+          <p class="fd-note">For testers (admins). Players never see these: for them practice mode is off, and the eval bar is off for everyone.</p>
           <Toggle title="Practice mode" checked={practiceOn()} onChange={setPracticeOn}>
             Unlimited power-ups (the engine's top 3 moves, any time). You're marked 💡 on the leaderboard.
           </Toggle>
-          <Toggle title="Eval bar" checked={evalBarOn()} onChange={setEvalBarOn}>
-            The engine's winning chances in a bar beside the board, in every mode. Off: no bar, and the board takes its room.
+          {/* (Off for everyone since Nov 1: shown, switched off and not tappable; the stored choice is ignored.) */}
+          <Toggle title="Eval bar" checked={false} disabled onChange={() => undefined}>
+            Off for now: the engine's winning chances in a bar beside the board, shown on no screen.
           </Toggle>
           {/* (Auto chess, the demo, shelved: Eric, Oct 19. Testers only; its screen is /autochess.) */}
           {onAutoChess && (

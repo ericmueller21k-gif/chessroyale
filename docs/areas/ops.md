@@ -166,9 +166,9 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     square, drawn on this device only) and `fps` (a frame-rate pill), to measure the frame rate: switches until Oct 30, then
     anyone's (Eric: no admin needed, the site is behind Cloudflare Access). Gone on Oct 15: `turns` (Crowd is always team turns), `moves` (Classic plays
     its default opening moves) and `soundlab` (its choice is Settings' Reveal sound).
-  - **Testers' options** (Settings → Testing, admins): practice mode and the eval bar count only where the switches do
-    (`practiceOn` and `evalBarOn` in `prefs.ts`); online the lobby takes a `hello`'s practice only from an admin's
-    socket or where TEST_SWITCHES is "1" (`lobby-do.ts`; `lobby-do-practice.test.ts`).
+  - **Testers' options** (Settings → Testing, admins): practice mode counts only where the switches do (`practiceOn` in
+    `prefs.ts`); online the lobby takes a `hello`'s practice only from an admin's socket or where TEST_SWITCHES is "1"
+    (`lobby-do.ts`; `lobby-do-practice.test.ts`). The eval bar is off for everyone since Nov 1 (`evalBarOn()` is false).
   - **Admins only already:** "Trigger ultimate (testing)" (online the lobby checks too), "Engine move", the boss brain
     picker (`brain`), the Hidden Boss in Boss alone (from the hidden `/bosses` picker since Oct 16: his tile on the Boss
     raid screen is locked for everyone). Squads' test lobbies and controls: admins or `SQUADS_TEST`. One of every item in

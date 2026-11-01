@@ -84,13 +84,15 @@ test("settings: the sections in order, the board's choices stick, and Testing (p
   await expect(page.getByRole("switch", { name: /Animations/ })).not.toBeChecked();
   await expect(page.getByRole("switch", { name: /Motion trail/ })).not.toBeChecked();
 
-  // An admin: Testing, last, with practice mode (off until switched; it sticks) and the eval bar (on).
+  // An admin: Testing, last, with practice mode (off until switched; it sticks) and the eval bar (off for everyone since Nov 1:
+  // shown, switched off and not tappable).
   await asAdmin(page);
   await page.reload();
   await expect.poll(labels).toEqual(["THEME", "SOUND", "BOARD", "QUICK CHAT", "HOW TO PLAY", "HELP", "PRIVACY AND TERMS", "TESTING"]);
   const practice = page.getByRole("switch", { name: /Practice mode/ });
   await expect(practice).not.toBeChecked();
-  await expect(page.getByRole("switch", { name: /Eval bar/ })).toBeChecked();
+  await expect(page.getByRole("switch", { name: /Eval bar/ })).not.toBeChecked();
+  await expect(page.getByRole("switch", { name: /Eval bar/ })).toBeDisabled();
   await practice.click();
   await page.reload();
   await expect(page.getByRole("switch", { name: /Practice mode/ })).toBeChecked();

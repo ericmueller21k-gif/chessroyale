@@ -177,7 +177,6 @@ export function setBoardMarksOn(on: boolean) {
   listeners.forEach((l) => l());
 }
 
-const EVAL_BAR_KEY = "brc.evalBar";
 const PRACTICE_KEY = "brc.practice";
 
 /*
@@ -187,26 +186,13 @@ const PRACTICE_KEY = "brc.practice";
  */
 
 /**
- * The eval bar (the engine's winning chances, left of the board): for testers, on unless switched off in Settings →
- * Testing (remembered on the device). Every screen that shows it reads this; off, the board takes its room.
+ * The eval bar (the engine's winning chances, left of the board): off for everyone (Eric, Nov 1: "it should never actually
+ * be displayed… disable it across the board… Nothing gets resized when the eval bar isn't enabled"). Settings → Testing shows
+ * its row switched off and not tappable ("Off for now"), and a device's stored choice is ignored. Nothing draws the bar, so
+ * every board lays out as a player's does. The value is still worked out (EvalBar), so what reads it (`knownEval`: the
+ * God King's word on how it's going) is the same.
  */
-export function evalBarOn(): boolean {
-  if (!testSwitchesAllowed()) return false;
-  try {
-    return localStorage.getItem(EVAL_BAR_KEY) !== "0";
-  } catch {
-    return true;
-  }
-}
-
-export function setEvalBarOn(on: boolean) {
-  try {
-    localStorage.setItem(EVAL_BAR_KEY, on ? "1" : "0");
-  } catch {
-    // Not important: it lasts until a reload.
-  }
-  listeners.forEach((l) => l());
-}
+export const evalBarOn = (): boolean => false;
 
 /** Practice mode (unlimited power-ups, the engine's top 3 at any time): for testers, off unless switched on. */
 export function practiceOn(): boolean {

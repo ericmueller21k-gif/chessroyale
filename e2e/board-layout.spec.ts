@@ -38,7 +38,9 @@ const MAIN_TOWER: Record<string, { x: number; y: number; w: number }> = {
 const MAIN_ROW_H = 62;
 /**
  * Boss alone: the board's box on a computer (x, y, width = height). Measured on main before the pawn (b9712062); since Oct 29
- * sized by the window's height (docs/decisions/2026-10-29-desktop-board-size.md); Nov 1 (docs/decisions/2026-11-01-game-screens-computer.md):
+ * sized by the window's height (docs/decisions/2026-10-29-desktop-board-size.md). Nov 1, the eval bar off for everyone: x is 22
+ * px more (346 at 1280 × 800, 1440 × 900 346, 1536 × 864 376, 1920 × 1080 536; 1024 × 768 unchanged), a player's box, the bar's 24 px
+ * taken by the board. Nov 1 (docs/decisions/2026-11-01-game-screens-computer.md):
  * no title line, the bar at the top, the side menu beside the screen (icons below 1800 px), the room 123 px, Boss alone's column
  * 196 px (round 2). The top is the bar's: y 63.2. Round 2, old → new (x, width): 1280 × 800 344, 520 → 324, 600; 1440 × 900 496,
  * 528 → 324, 760; 1536 × 864 496, 624 → 351.5, 736; 1920 × 1080 521.5, 952 → 511.5, 952; 1024 × 768 176, 384 → 176, 440 (main's
@@ -47,14 +49,17 @@ const MAIN_ROW_H = 62;
  * main's size).
  */
 const MAIN_BOARD_BOX: Record<string, { x: number; y: number; w: number }> = {
-  "1280x800": { x: 324, y: 63.2, w: 600 },
-  "1440x900": { x: 324, y: 63.2, w: 760 },
-  "1536x864": { x: 354, y: 63.2, w: 736 },
-  "1920x1080": { x: 514, y: 63.2, w: 952 },
+  "1280x800": { x: 346, y: 63.2, w: 600 },
+  "1440x900": { x: 346, y: 63.2, w: 760 },
+  "1536x864": { x: 376, y: 63.2, w: 736 },
+  "1920x1080": { x: 536, y: 63.2, w: 952 },
   "1024x768": { x: 156, y: 63.2, w: 464 },
 };
-/** A raid's board box at 1280 × 800 (its scoreboard beside it keeps the board width-bound there). Round 2: x 488 → 468, 376 → 456. */
-const RAID_BOARD_BOX: Record<string, { x: number; y: number; w: number }> = { "1280x800": { x: 468, y: 63.2, w: 456 } };
+/**
+ * A raid's board box at 1280 × 800 (its scoreboard beside it keeps the board width-bound there). Round 2: x 488 → 468, 376 → 456.
+ * Nov 1 (the eval bar off for everyone): x 468 → 444, 456 → 504.
+ */
+const RAID_BOARD_BOX: Record<string, { x: number; y: number; w: number }> = { "1280x800": { x: 444, y: 63.2, w: 504 } };
 /** …and the move list's height, twice: the board's half less 73 px, at least 120 px (styles.css, `--mv-h`; Nov 1: a smaller board). */
 const mainSideH = (board: number) => Math.max(240, board - 146);
 

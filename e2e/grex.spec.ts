@@ -109,12 +109,11 @@ test("Jefferson: his tiles burn in stages counting down, a piece left on one bur
   expect(p3.fire[0].stage).toBe(2);
   await expect(page.locator(".power-board .pw-pips")).toHaveAttribute("data-left", "24");
   await expect(page.locator(".power-board .pw-fire.stage-2 .pw-count")).toHaveText("2");
-  // The pips stand in the gutter right of the board: never over it, its timer bar or the eval bar.
-  const [pips, board, evalBar, timer] = await Promise.all([".power-board .pw-pips", BOARD_SEL.squares, ".eval-bar", ".timer-bar"].map((s) => page.locator(s).first().boundingBox()));
+  // The pips stand in the gutter right of the board: never over it or its timer bar (no eval bar is drawn since Nov 1).
+  const [pips, board, timer] = await Promise.all([".power-board .pw-pips", BOARD_SEL.squares, ".timer-bar"].map((s) => page.locator(s).first().boundingBox()));
   expect(pips!.x).toBeGreaterThanOrEqual(board!.x + board!.width - 0.5);
   expect(pips!.x + pips!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
   expect(pips!.height).toBeGreaterThan(pips!.width * 10);
-  expect(pips!.x).toBeGreaterThan(evalBar!.x + evalBar!.width);
   if (timer) expect(pips!.x).toBeGreaterThanOrEqual(timer.x + timer.width - 0.5);
   // The first wave's square is shadowed, small: it falls 3 turns after the launch.
   expect(p3.shadows).toEqual([{ square: expect.any(String), lands: 6, stage: 1 }]);
