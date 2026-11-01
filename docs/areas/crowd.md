@@ -254,7 +254,7 @@ time controls themselves are in the vote data (`PREGAME_VOTES` in `votes.ts`).
   (each start's board, seeded, the balance window, a Freestyle game through the runner, castling both ways, the snapshot),
   `packages/server/test/lobby.test.ts` ("the start vote online": Freestyle and Random opening, castling, a lobby that
   sleeps), `packages/app/test/board-logic.test.ts`, `faq.test.ts`; e2e `e2e/opening-vote.spec.ts`; the sim
-  `crowd-sim.ts [matches] [start]`.
+  `crowd-sim.ts [matches] [start] [team|boss|duel]` (the cuts, before → after: `reports/crowd-sim.md`, Nov 1).
 - Unit: `packages/core/test/match.test.ts`, `scoring.test.ts`, `votes.test.ts`, `brilliance.test.ts`,
   `packages/chess/test/crowd.test.ts`, `runner.test.ts`, `replay-cache.test.ts`, `long-match.test.ts`. The clock vote:
   `votes.test.ts` (each time control, the bank math, the calibration), `crowd.test.ts` (the runner) and

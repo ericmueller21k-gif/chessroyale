@@ -18,4 +18,6 @@ Calls made:
 - **The top bar counts moves, not plies:** "Move 12 · cut in 4" (moves 12 to 15; counting plies, as before, it would say
   "cut in 8" beside a move number); "cut now" on the stage's last move.
 - **A game that ends before the final** still restarts from another start of the same kind (`replaceBoard`) and the cuts
-  carry on; unchanged. Measured in `reports/crowd-sim.md` (Nov 1).
+  carry on; unchanged. Measured (`reports/crowd-sim.md`, 10 matches, team final, before → after): the final starts at
+  move 21 → 30; games that ended before the final 0 → 1 in 10 matches; finals cut short by the game ending 0% → 0%;
+  strongest bot in the final 20% → 40%, top-5 bots in it 1.4 → 1.9 (a small sample: "no worse").
