@@ -126,23 +126,23 @@ function rook(): PieceMesh {
       { r: 0.15, y: 0.47 },
       { r: 0.19, y: 0.49, m: B },
       { r: 0.19, y: 0.52 },
-      { r: 0.2, y: 0.53 },
-      { r: 0.2, y: top },
-      { r: 0.125, y: top },
-      { r: 0.125, y: top - 0.04 },
-      { r: 0, y: top - 0.04 },
+      { r: 0.21, y: 0.53 },
+      { r: 0.21, y: top },
+      { r: 0.09, y: top },
+      { r: 0.09, y: top - 0.03 },
+      { r: 0, y: top - 0.03 },
     ],
     SEGS,
   );
-  // The battlements: six merlons, a notch facing you between the middle two.
-  const n = 6;
-  const gap = 0.32;
+  // The battlements: five merlons, one square to you (three show from the front, the notches between them).
+  const n = 5;
+  const gap = 0.36;
   for (let k = 0; k < n; k++) {
-    const a0 = ((k + gap / 2) / n) * Math.PI * 2;
-    const a1 = ((k + 1 - gap / 2) / n) * Math.PI * 2;
-    b.ringBlock(a0, a1, 0.125, 0.2, top - 0.001, top + 0.09, MAT.body);
+    const a0 = ((k - 0.5 + gap / 2) / n) * Math.PI * 2;
+    const a1 = ((k + 0.5 - gap / 2) / n) * Math.PI * 2;
+    b.ringBlock(a0, a1, 0.09, 0.21, top - 0.001, top + 0.1, MAT.body);
   }
-  return b.done(top + 0.09);
+  return b.done(top + 0.1);
 }
 
 /**
@@ -243,10 +243,10 @@ function queen(): PieceMesh {
     ],
     SEGS,
   );
-  // The coronet: seven points round the rim (one toward you), and a ball on top.
-  for (let k = 0; k < 7; k++) {
-    const a = (k / 7) * Math.PI * 2;
-    b.ball(Math.sin(a) * 0.17, rim + 0.045, Math.cos(a) * 0.17, 0.043, B, 8);
+  // The coronet: five teeth round the rim, one square to you, and a ball on top.
+  for (let k = 0; k < 5; k++) {
+    const a = (k / 5) * Math.PI * 2;
+    b.ringBlock(a - 0.3, a + 0.3, 0.15, 0.2, rim + 0.01, rim + 0.085, B);
   }
   b.ball(0, rim + 0.15, 0, 0.05, B);
   return b.done(rim + 0.2);

@@ -125,8 +125,8 @@ links Eric's notes); this page is what's built.
   stops while the tab is hidden. `?fps` shows a pill: frames a second and draw calls. Measured with the API art (Oct 31,
   eric.md's method, headless, software WebGL, against main): phone 12.7 → 12.9 fps, computer 6.8 → 7.6 fps, script a frame
   0.29 → 0.36 and 0.37 → 0.33 ms, 3 draw calls; numbers in `docs/decisions/2026-10-31-colosseum-api-art.md`. Pixel, the high
-  views and the Pieces row (Nov 1): `docs/decisions/2026-11-01-colosseum-pixel.md` (Pixel is cheaper than 2D there: far
-  fewer pixels shaded).
+  views and the Pieces row (Nov 1): `docs/decisions/2026-11-01-colosseum-pixel.md` (Pixel: 11.7 fps against
+  2D's 9.6 on a computer, level with 2D on a phone, 18.7 against 19.2; 3D 6.9 and 12.1).
 - **The town is untouched** but for the card's link: none of this loads there, and the town's drawing and frame loop
   are as they were.
 

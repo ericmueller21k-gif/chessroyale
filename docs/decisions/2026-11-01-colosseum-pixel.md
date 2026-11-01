@@ -40,7 +40,21 @@ exactly what I'm envisioning … the viewpoints, they're all way too close to th
 1440 × 900, 5 s while the bots play, main and the branch taken in turn, four runs each, one pass; the medians; White's
 player view, the one view both have, and the branch's high view behind White):
 
-FPS_TABLE
+| | view | main fps (runs) | branch fps (runs) | median fps main → branch | script a frame | draw calls |
+| --- | --- | --- | --- | --- | --- | --- |
+| phone, 2D | White's | 19.4, 19.4, 18.4, 19.1 | 17.9, 20.4, 19.5, 20.4 | 19.2 → 19.9 | 0.25 → 0.22 ms | 3 → 3 |
+| phone, 3D | White's | 12.0, 12.3, 11.8, 12.2 | 9.4, 12.8, 12.4, 11.7 | 12.1 → 12.1 | 0.28 → 0.31 ms | 8 → 8 |
+| phone, Pixel | White's | (main's 2D above) | 17.8, 17.6, 19.7, 21.2 | 19.2 → 18.7 | 0.25 → 0.27 ms | 3 → 10 |
+| phone, high view | behind White | | Pixel 18.6, 3D 12.7, 2D 20.6 (medians) | | 0.31, 0.27, 0.22 ms | 10, 8, 3 |
+| computer, 2D | White's | 9.3, 9.8, 9.4, 10.1 | 9.7, 9.2, 9.8, 9.9 | 9.6 → 9.7 | 0.36 → 0.28 ms | 3 → 3 |
+| computer, 3D | White's | 6.6, 7.3, 6.9, 6.8 | 7.1, 7.1, 7.3, 7.3 | 6.9 → 7.2 | 0.50 → 0.37 ms | 8 → 8 |
+| computer, Pixel | White's | (main's 2D above) | 12.4, 11.5, 11.8, 11.4 | 9.6 → 11.7 | 0.36 → 0.44 ms | 3 → 10 |
+| computer, high view | behind White | | Pixel 11.4, 3D 7.0, 2D 9.5 (medians) | | 0.43, 0.32, 0.26 ms | 10, 8, 3 |
+
+Pixel is the cheapest of the three on a computer (+22% over 2D) and far cheaper than 3D on both (+55% on a phone); on a
+phone it is level with 2D (18.7 against 19.2 and 19.9, inside the runs' spread). An earlier version scaled up and drew the
+outline in one pass at the screen's size (six reads a screen pixel) and ran about 10% under 2D on a phone; the outline
+moved into the small target for that.
 
 Nothing allocated a frame: Pixel's target and its art pixel are made when the screen's size or the view changes; the clear
 colors and draw-buffer lists are made once.
