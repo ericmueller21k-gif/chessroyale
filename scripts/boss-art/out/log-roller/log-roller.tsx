@@ -1,4 +1,4 @@
-import type { RiderDraft, RiderProps } from "../../item-kit.tsx";
+import type { RiderDraft, RiderProps, RiderViewDraft } from "../../item-kit.tsx";
 import { Region, LINE, lw } from "../../item-kit.tsx";
 
 /** The log's round end, its middle and radius, and how far the far end shows above it (the camera looks down). */
@@ -102,6 +102,150 @@ const MOVE_LIFT = [0, -2.5, -1, 0, 0, -2.5, -1, 0];
 const MOVE_TILT = [-3, 2, 5, 2, 3, -2, -5, -2];
 const MOVE_X = [0, 1, 1.5, 0.5, 0, -1, -1.5, -0.5];
 
+/* ---------- Front and back: the log seen lengthwise ---------- */
+/** The end faces' middles (left, right), their half-width, and the log's height on the picture: top 35 (as the side's strip), bottom 96. */
+const VL = 20;
+const VR = 80;
+const VRX = 7;
+const VCY = 65.5;
+const VRY = 30.5;
+/** Where a point of the bark at ψ shows (ψ 0: the top edge seen against the sky, 90: facing the camera, 180: the bottom). */
+const yv = (psi: number) => f1(VCY - VRY * Math.cos((psi * Math.PI) / 180));
+const sn = (psi: number) => Math.sin((psi * Math.PI) / 180);
+const norm = (d: number) => ((d % 360) + 360) % 360;
+/** The roll seen from the front (rolling toward us) or the back (rolling away). */
+const rollOf = (view: "front" | "back", anim: "idle" | "move", f: number) => (view === "back" ? -1 : 1) * angle(anim, f);
+const BAND_HW = (Math.asin(6.5 / R) * 180) / Math.PI;
+const GRAIN: [number, number, number][] = [
+  [10, 28, 10], [55, 50, 13], [100, 31, 9], [145, 60, 12], [190, 40, 11], [235, 63, 10],
+  [280, 29, 11], [325, 54, 13], [170, 26, 8], [35, 68, 7], [260, 47, 9], [80, 62, 9],
+  [120, 46, 8], [300, 66, 7], [215, 27, 7], [20, 44, 8],
+];
+
+/** The band along the bark, between the end faces' inner edges, from ψ1 to ψ2 (both on the seen side). */
+function bodyBand(p1: number, p2: number): string {
+  const s1 = sn(p1);
+  const s2 = sn(p2);
+  const y1 = yv(p1);
+  const y2 = yv(p2);
+  return `M ${f1(VL + VRX * s1)} ${y1} L ${f1(VR - VRX * s1)} ${y1} A ${VRX} ${VRY} 0 0 0 ${f1(VR - VRX * s2)} ${y2} L ${f1(VL + VRX * s2)} ${y2} A ${VRX} ${VRY} 0 0 0 ${f1(VL + VRX * s1)} ${y1} Z`;
+}
+
+/** The band across an end face (as the side's stripe), squeezed into the narrow ellipse; s +1 the right end, −1 the left. */
+function faceBand(ex: number, s: number, psi: number): string {
+  const w = 6.5;
+  const sx = Math.sqrt(R * R - w * w);
+  const r = (psi * Math.PI) / 180;
+  const u = [Math.sin(r), -Math.cos(r)];
+  const n = [Math.cos(r), Math.sin(r)];
+  const P = (a: number, b: number) => `${f1(ex + (s * VRX * (a * u[0] + b * n[0])) / R)} ${f1(VCY + (VRY * (a * u[1] + b * n[1])) / R)}`;
+  const sw = s > 0 ? 1 : 0;
+  return `M ${P(-sx, -w)} L ${P(sx, -w)} A ${VRX} ${VRY} 0 0 ${sw} ${P(sx, w)} L ${P(-sx, w)} A ${VRX} ${VRY} 0 0 ${sw} ${P(-sx, -w)} Z`;
+}
+
+function EndFace({ ex }: { ex: number }) {
+  const k = (r: number) => ({ rx: f1((VRX * r) / R), ry: f1((VRY * r) / R) });
+  return (
+    <g>
+      <ellipse cx={ex} cy={VCY} rx={VRX} ry={VRY} fill={BARK} {...LINE} />
+      <ellipse cx={ex} cy={VCY} {...k(R - 5)} fill={WOOD} stroke="#1d1d1f" {...lw(1.6)} />
+      <ellipse cx={ex} cy={VCY - 0.5} {...k(15)} fill="none" stroke={RING} {...lw(1.6)} />
+      <ellipse cx={ex} cy={VCY - 1} {...k(8)} fill="none" stroke={RING} {...lw(1.4)} />
+      <circle cx={ex} cy={VCY - 1} r={1.3} fill="#8a5a2b" />
+    </g>
+  );
+}
+
+/** The branch stub on the bark at ψ, x along the log. Drawn behind the log when it's round the back. */
+function Stub({ psi, x }: { psi: number; x: number }) {
+  const yb = yv(psi);
+  const c = Math.cos((psi * Math.PI) / 180);
+  const s = sn(psi);
+  const len = c < -0.05 ? Math.min(9, Math.max(0, (97 - yb) / -c)) : 9;
+  const yt = f1(yb - len * c);
+  return (
+    <g>
+      <path d={`M ${x - 5.5} ${yb} L ${x - 4.5} ${yt} L ${x + 4.5} ${yt} L ${x + 5.5} ${yb} Z`} fill={BARK} {...LINE} {...lw(2.4)} />
+      <ellipse cx={x} cy={yt} rx={4.5} ry={f1(Math.max(1, 4.5 * Math.abs(s)))} fill={s > 0 ? WOOD : BARK} stroke="#1d1d1f" {...lw(1.6)} />
+      {s > 0.3 && <circle cx={x} cy={yt} r={1} fill={RING} />}
+    </g>
+  );
+}
+
+function Puffs({ f, y, spread }: { f: number; y: number; spread: number }) {
+  const pf = f % 4;
+  return (
+    <g fill="#c9a06a" stroke="#1d1d1f" {...lw(1.4)}>
+      {[-1, 1].map((d) => (
+        <g key={d}>
+          <circle cx={f1(50 + d * (spread + pf * 1.8))} cy={f1(y - pf * 1.3)} r={f1(2.4 + pf * 0.5)} opacity={f1(1 - pf * 0.2)} />
+          <circle cx={f1(50 + d * (spread - 4 + pf * 1.2))} cy={f1(y + 2 - pf * 0.8)} r={f1(1.6 + (pf % 2) * 0.5)} opacity={f1(1 - pf * 0.15)} />
+        </g>
+      ))}
+    </g>
+  );
+}
+
+function ViewLog({ p, anim, f, view }: RiderProps) {
+  const v = view === "back" ? "back" : "front";
+  const a = rollOf(v, anim, f);
+  const band = norm(120 + a);
+  const stubPsi = norm(v === "back" ? 85 - angle(anim, f) : angle(anim, f) - 25);
+  const stubX = v === "back" ? 33 : 67;
+  const stubSeen = stubPsi > 3 && stubPsi < 177;
+  const stubPeek = stubPsi > 300;
+  const bands: string[] = [];
+  for (const c of [band, band + 180]) {
+    for (const off of [-360, 0, 360]) {
+      const lo = Math.max(1, c + off - BAND_HW);
+      const hi = Math.min(179, c + off + BAND_HW);
+      if (hi > lo) bands.push(bodyBand(lo, hi));
+    }
+  }
+  bands.push(faceBand(VL, -1, band), faceBand(VR, 1, band));
+  return (
+    <g>
+      <ellipse cx={50} cy={96} rx={38} ry={3.5} fill="#000" opacity="0.22" />
+      {stubPeek && <Stub psi={stubPsi - 360} x={stubX} />}
+      <rect x={VL} y={VCY - VRY} width={VR - VL} height={VRY * 2} fill={BARK} {...LINE} />
+      <path d={`M ${VL} ${yv(140)} L ${VR} ${yv(140)} L ${VR} ${VCY + VRY} L ${VL} ${VCY + VRY} Z`} fill={BARK_DARK} opacity="0.35" />
+      <path d={`M ${VL + 9} ${yv(48)} L ${VR - 9} ${yv(48)}`} stroke={BARK_LIGHT} {...lw(2)} stroke-linecap="round" />
+      {GRAIN.map(([g, x, len]) => {
+        const psi = norm(g + a);
+        if (sn(psi) < 0.25) return null;
+        return <path key={g} d={`M ${x} ${yv(psi)} l ${len} 0`} stroke={BARK_DARK} {...lw(1.6)} stroke-linecap="round" />;
+      })}
+      <EndFace ex={VL} />
+      <EndFace ex={VR} />
+      <Region p={p} name="log-band" d={bands} line={2.4} />
+      {stubSeen && <Stub psi={stubPsi} x={stubX} />}
+    </g>
+  );
+}
+
+function ViewLogFront({ f, anim, view }: RiderProps) {
+  return <g>{anim === "move" && view === "back" && <Puffs f={f} y={95} spread={36} />}</g>;
+}
+
+function viewDraft(view: "front" | "back"): RiderViewDraft {
+  const toward = view === "front" ? 1 : -1;
+  return {
+    frame: [10, PY + 20 - 2, 80, 100 - (PY + 20 - 2)],
+    idle: { ms: [420, 110, 110, 110, 150, 120, 120, 120, 150, 180] },
+    move: { ms: Array(MOVE_N).fill(85) },
+    pose(anim, f) {
+      if (anim === "idle") {
+        const a = IDLE_ROCK[f % IDLE_ROCK.length];
+        return { dx: 0, dy: f1(((R * a * Math.PI) / 180) * 0.5 * toward), pawnX: 0, pawnY: PY, pawnTilt: f1(IDLE_TILT[f % IDLE_TILT.length] * 0.5), cut: 87 };
+      }
+      const k = f % MOVE_N;
+      return { dx: 0, dy: MOVE_BUMP[k], pawnX: MOVE_X[k], pawnY: PY + MOVE_LIFT[k], pawnTilt: MOVE_TILT[k], cut: 87 };
+    },
+    Back: ViewLog,
+    Front: ViewLogFront,
+  };
+}
+
 export const logRoller: RiderDraft = {
   id: "log-roller",
   name: "The Log Roller",
@@ -120,4 +264,5 @@ export const logRoller: RiderDraft = {
   },
   Back: LogBack,
   Front: LogFront,
+  views: { front: viewDraft("front"), back: viewDraft("back") },
 };
