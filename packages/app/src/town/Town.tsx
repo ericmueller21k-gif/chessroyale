@@ -452,6 +452,8 @@ function startTown(
           })
         : null;
       if (prev && (prev !== youShown || prev === youRide)) leaveRider(prev);
+      // (Its frames on their way, the drawing's chunk first: you walk on foot meanwhile, in its box, under its tag.)
+      r.youSoon = youRide;
       if (!youRide) {
         if (youShown) leaveRider(youShown);
         youShown = r.youRider = null;
@@ -498,7 +500,11 @@ function startTown(
     const wear = offRide(lk.wear);
     // (Its pace on its ride, as yours: Cheetah Shoes twice a bot's.)
     p.walker.stepMs = TOWN_FEEL.botStepMs / rideSpeed(on?.def);
-    const mount = (art: YouArt | null, back: YouArt | null) => on && ride(on, art, back, plain, lk.side === "dark" ? "b" : "w", `${lk.side}|${lk.tint ?? ""}|${lookKey(wear)}`, (rd) => alive && r.riders.set(p.id, rd));
+    const mount = (art: YouArt | null, back: YouArt | null) => {
+      const rd = on && ride(on, art, back, plain, lk.side === "dark" ? "b" : "w", `${lk.side}|${lk.tint ?? ""}|${lookKey(wear)}`, (rd) => alive && r.riders.set(p.id, rd));
+      // (Its frames on their way: on foot meanwhile, in its rider's box.)
+      if (rd && alive) r.ridersSoon.set(p.id, rd);
+    };
     if (!lookKey(wear)) mount(null, null);
     else
       void dressed(wear, plain, !!on).then(([art, back]) => {
@@ -1136,14 +1142,15 @@ function startTown(
   // ... `__townFull(on)`: someone unseen on one stool of every table (no table free for you and a bot: its card's Play greys), or not.
   const hookFull = (on: boolean) => testSwitchesAllowed() && fillTables(town, on);
   // ... `__townRide()` (Oct 31, rides): yours (its ride, color and size (Nov 1), whether its frames are ready, as the last frame drew it: "idle" or
-  // "move" ("" on foot), the frame, which way it faced; your box, foot and head on screen, your square) and each other rider's.
+  // "move" ("" on foot), the frame, which way it faced; your box, foot and head on screen, your square; Nov 1, `coming`: the ride whose
+  // frames are on their way, its drawing loading or its frames being composed, while you walk on foot in its box) and each other rider's.
   const hookRide = () => {
     if (!testSwitchesAllowed()) return null;
     const you = town.people.indexOf(town.you);
     const h = town.you.walker.here();
     const rd = r.youRider;
     return {
-      you: { ride: rd?.id ?? null, color: rd?.color ?? null, scale: rd?.scale ?? null, ready: !!rd?.ready, ...r.youRide, box: r.drawnBox(you), at: [h.c, h.r], stepMs: town.you.walker.stepMs, marks: r.marksShown() },
+      you: { ride: rd?.id ?? null, color: rd?.color ?? null, scale: rd?.scale ?? null, ready: !!rd?.ready, coming: r.youSoon?.coming ? r.youSoon.id : null, ...r.youRide, box: r.drawnBox(you), at: [h.c, h.r], stepMs: town.you.walker.stepMs, marks: r.marksShown() },
       others: [...r.riders].map(([id, x]) => ({ id, ride: x.id, color: x.color, scale: x.scale, ready: x.ready, box: r.drawnBox(town.people.findIndex((p) => p.id === id)), stepMs: town.people.find((p) => p.id === id)?.walker.stepMs ?? null })),
       // (Sets of rider frames held, shared by riders who look the same.)
       held: ridersHeld(),
@@ -1244,8 +1251,9 @@ function startTown(
     stop: () => {
       alive = false;
       // (Every rider's frames freed: they'd stay in memory into a game otherwise.)
-      r.youRider = null;
+      r.youRider = r.youSoon = null;
       r.riders.clear();
+      r.ridersSoon.clear();
       dropRiders();
       clearTimeout(lostWait);
       offAccount();

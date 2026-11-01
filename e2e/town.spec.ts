@@ -1263,13 +1263,17 @@ test("a real player's card (a test player; no real players walk in the town yet)
   expect(errors).toEqual([]);
 });
 
-/** What `__townRide()` answers (rides, Oct 31; Nov 1: its view, its step's time and your trail). */
+/** A ride's drawing's chunk (Nov 1, rides lazy: components/rides/load.ts): `/assets/<its item id>-<hash>.js`. */
+const DRAWING_CHUNK = /^\/assets\/[a-z]+(-[a-z]+)+-[\w-]{8}\.js$/;
+
+/** What `__townRide()` answers (rides, Oct 31; Nov 1: its view, its step's time and your trail; `coming`: the ride whose frames are on their way). */
 interface RideSeen {
   you: {
     ride: string | null;
     color: string | null;
     scale: number | null;
     ready: boolean;
+    coming: string | null;
     anim: "" | "idle" | "move";
     frame: number;
     facing: number;
@@ -1311,9 +1315,13 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
     { def: "cheetah-shoes", color: "red", blemish: 0 },
   ]);
   await wearItem(page, "ride", chirp!);
-  // Nothing is fetched for a ride (Nov 1: its frames are drawn from its drawing, which the app has; no sheets).
+  // Nothing is fetched for a ride but its drawing (Nov 1: its frames are drawn from it, no sheets; Nov 1, rides lazy: each ride's
+  // drawing is its own chunk, loaded when it's worn).
   const fetched: string[] = [];
-  page.on("request", (r) => /ride/i.test(new URL(r.url()).pathname) && fetched.push(r.url()));
+  page.on("request", (r) => {
+    const path = new URL(r.url()).pathname;
+    if (/ride/i.test(path) && !DRAWING_CHUNK.test(path)) fetched.push(r.url());
+  });
   await page.goto("/town?sky=day");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
   await expect.poll(async () => (await rideNow(page)).you.ready, { message: "your ride's frames are ready", timeout: 30_000 }).toBe(true);
@@ -1433,4 +1441,53 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   expect([(await rideNow(page)).you.ride, (await rideNow(page)).you.stepMs]).toEqual(["cheetah-shoes", 45]);
   expect(fetched).toEqual([]);
   expect(errors).toEqual([]);
+});
+
+test.describe("rides lazy", () => {
+  // (No service worker: it would serve the ride's chunk from its cache, past the hold.)
+  test.use({ serviceWorkers: "block" });
+  test("rides lazy (Nov 1): while your ride's drawing loads (its own chunk), your pawn is on foot in the box and under the tag it will have on its ride; when it comes, the ride appears there and nothing moves", async ({ page }) => {
+    const errors = watchErrors(page);
+    await page.goto("/");
+    await expect(page.getByRole("button", { name: "Your profile" })).toBeVisible();
+    const [chirp] = await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 40 }]);
+    await wearItem(page, "ride", chirp!);
+    // (Its drawing's chunk held back until the boxes are read.)
+    let open!: () => void;
+    const held = new Promise<void>((r) => (open = r));
+    await page.route(/\/assets\/riding-chirp-[\w-]{8}\.js$/, async (route) => {
+      await held;
+      await route.continue();
+    });
+    await page.goto("/town?sky=day");
+    await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+    await page.evaluate(() => (window as unknown as { __townCall: (i: number) => void }).__townCall(-1));
+    await expect.poll(async () => (await rideNow(page)).you.coming, { message: "your ride is on its way" }).toBe("riding-chirp");
+    /** Your box and your tag once the camera has settled (it glides a moment after the town opens). */
+    const settled = async () => {
+      const read = async () => {
+        const box = (await rideNow(page)).you.box!;
+        const tag = (await page.evaluate(() => (window as unknown as { __townTags: () => { kind: string; x: number; y: number; w: number; h: number }[] }).__townTags())).find((t) => t.kind === "you")!;
+        return [box.x0, box.y0, box.x1, box.y1, box.hy, tag.x, tag.y, tag.w, tag.h].map((v) => Math.round(v * 2) / 2);
+      };
+      let prev = await read();
+      for (let i = 0; i < 40; i++) {
+        await page.waitForTimeout(100);
+        const now = await read();
+        if (now.join() === prev.join()) return now;
+        prev = now;
+      }
+      throw new Error("the camera never settled");
+    };
+    const before = await settled();
+    const onFoot = (await rideNow(page)).you;
+    expect([onFoot.ride, onFoot.ready, onFoot.anim]).toEqual([null, false, ""]);
+    open();
+    await expect.poll(async () => (await rideNow(page)).you.ready, { message: "your ride's frames are ready", timeout: 30_000 }).toBe(true);
+    await expect.poll(async () => (await rideNow(page)).you.anim).toBe("idle");
+    // The ride appears under the same tap box and the same tag: nothing moved.
+    expect(await settled()).toEqual(before);
+    expect((await rideNow(page)).you.coming).toBeNull();
+    expect(errors).toEqual([]);
+  });
 });

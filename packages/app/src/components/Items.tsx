@@ -3,7 +3,9 @@ import { useEffect, useState } from "preact/hooks";
 import { aboveHat, behindPiece, isShiny, secondColor, type ItemLook, type ItemSlot } from "@chessroyale/core";
 import { LINE, Region, darken, isLight, lighten, lw, mirror, usePaint as paintIn, type Finish, type Paint } from "./item-paint.tsx";
 
-import { rideOf, type RiderDraft } from "./rides/kit.ts";
+import type { RiderDraft } from "./rides/kit.ts";
+import { rideCells, useRide } from "./rides/load.ts";
+import type { RideCells } from "../town/ride-cells.ts";
 import { rideScale, scaledAt, scaledSeat, seatAnchor } from "./rides/scale.ts";
 
 export { type Finish } from "./item-paint.tsx";
@@ -1162,17 +1164,21 @@ export function ItemLayer({ def, finish, side = "w" }: { def: string; finish: Fi
   );
 }
 
-/** One item on its own, framed square (cards, the strip, the reveal). A sparkle when shiny. A ride: with a pawn on it. */
+/**
+ * One item on its own, framed square (cards, the strip, the reveal). A sparkle when shiny. A ride: with a pawn on it (its tile's
+ * box measured ahead, so the pawn sits in place while the ride's drawing loads, and the ride appears under it: `data-drawn` once it has).
+ */
 export function ItemArt({ def, finish, side = "w", class: cls }: { def: string; finish: Finish; side?: "w" | "b"; class?: string }) {
-  const ride = rideOf(def);
+  const ride = rideCells(def);
+  const d = useRide(ride && def);
   const [x, y, w, h] = FRAMES[def] ?? ride?.frame ?? [0, 0, 100, 100];
   const s = Math.max(w, h) * 1.12;
   const vb = `${x + w / 2 - s / 2} ${y + h / 2 - s / 2} ${s} ${s}`;
   return (
-    <span class={`item-art${isShiny(finish.blemish) ? " shiny" : ""}${cls ? ` ${cls}` : ""}`} style={{ "--sw": String(Math.max(0.4, s / 100)) }}>
+    <span class={`item-art${isShiny(finish.blemish) ? " shiny" : ""}${cls ? ` ${cls}` : ""}`} style={{ "--sw": String(Math.max(0.4, s / 100)) }} data-drawn={ride ? String(+!!d) : undefined}>
       <svg viewBox={vb} aria-hidden="true">
         {ride ? (
-          <RideLayers d={ride} finish={{ ...finish, def }} side={side} anim="idle" f={0}>
+          <RideLayers id={def} c={ride} d={d} finish={{ ...finish, def }} side={side} anim="idle" f={0}>
             <PawnShape side={side} />
           </RideLayers>
         ) : (
@@ -1194,23 +1200,18 @@ function PawnShape({ side }: { side: "w" | "b" }) {
   );
 }
 
+/** Where the pawn sits on a frame, from its measured row ([ms, x, y, tilt, cut]: ride-cells.ts). */
+const seatOf = (row: readonly number[]): [number, number, number, number] => [row[1]!, row[2]!, row[3]!, row[4]!];
 /** A ride's saddle on its first idle frame: the point it's drawn at its scale about (rides/scale.ts). */
-const rideAnchor = (d: RiderDraft): [number, number] => {
-  const p = d.pose("idle", 0);
-  return seatAnchor([p.pawnX, p.pawnY, p.pawnTilt ?? 0, p.cut]);
-};
-/** Where the pawn sits on each frame of a ride drawn at `k` (x, y, tilt, cut), worked out once a ride and size. */
+const rideAnchor = (c: RideCells): [number, number] => seatAnchor(seatOf(c.side.idle[0]!));
+/** Where the pawn sits on each frame of a ride (its side) drawn at `k` (x, y, tilt, cut), worked out once a ride and size. */
 const rideSeats = new Map<string, { idle: [number, number, number, number][]; move: [number, number, number, number][] }>();
-function seatsAt(d: RiderDraft, k: number) {
-  const key = `${d.id}|${k}`;
+function seatsAt(id: string, c: RideCells, k: number) {
+  const key = `${id}|${k}`;
   let v = rideSeats.get(key);
   if (!v) {
-    const a = rideAnchor(d);
-    const at = (anim: "idle" | "move") =>
-      d[anim].ms.map((_, f) => {
-        const p = d.pose(anim, f);
-        return scaledSeat([p.pawnX, p.pawnY, p.pawnTilt ?? 0, p.cut], a, k);
-      });
+    const a = rideAnchor(c);
+    const at = (anim: "idle" | "move") => c.side[anim].map((r) => scaledSeat(seatOf(r), a, k));
     rideSeats.set(key, (v = { idle: at("idle"), move: at("move") }));
   }
   return v;
@@ -1221,12 +1222,14 @@ function seatsAt(d: RiderDraft, k: number) {
  * it wears, on its own square) raised onto the seat, tilted round its base and hidden below the seat (the pose's `cut`),
  * then the ride's front. The ride's own move across a square (`dx`, `dy`) isn't drawn here: the town moves it. `k` (Nov 1):
  * the ride's size, drawn about its saddle, the pawn at its own size on the scaled saddle (rides/scale.ts); the tiles keep 1.
+ * Where the pawn sits comes from the ride's measured numbers (`c`, ride-cells.ts), so until its drawing `d` has loaded (its own
+ * chunk: rides/load.ts) the pawn sits there whole, and the ride appears under it (Nov 1, rides lazy: nothing moves).
  */
-export function RideLayers({ d, finish, side, anim, f, k = 1, children }: { d: RiderDraft; finish: Finish & { def: string }; side: "w" | "b"; anim: "idle" | "move"; f: number; k?: number; children: ComponentChildren }) {
-  const p = paintIn(finish, d.frame);
-  const p2 = paintIn({ color: secondColor(finish) ?? finish.color, blemish: finish.blemish, seed: finish.seed + 101 }, d.frame);
-  const [pawnX, pawnY, tilt, cut] = seatsAt(d, k)[anim][f]!;
-  const a = rideAnchor(d);
+export function RideLayers({ id, c, d, finish, side, anim, f, k = 1, children }: { id: string; c: RideCells; d: RiderDraft | undefined; finish: Finish & { def: string }; side: "w" | "b"; anim: "idle" | "move"; f: number; k?: number; children: ComponentChildren }) {
+  const p = paintIn(finish, c.frame as [number, number, number, number]);
+  const p2 = paintIn({ color: secondColor(finish) ?? finish.color, blemish: finish.blemish, seed: finish.seed + 101 }, c.frame as [number, number, number, number]);
+  const [pawnX, pawnY, tilt, cut] = seatsAt(id, c, k)[anim][f]!;
+  const a = rideAnchor(c);
   const sized = k === 1 ? undefined : `translate(${a[0]} ${a[1]}) scale(${k}) translate(${-a[0]} ${-a[1]})`;
   const seat = `${p.id}-seat`;
   return (
@@ -1238,11 +1241,11 @@ export function RideLayers({ d, finish, side, anim, f, k = 1, children }: { d: R
           <rect x="-60" y="-60" width="220" height={60 + cut} />
         </clipPath>
       </defs>
-      <g transform={sized}>{d.Back({ p, p2, side, f, anim })}</g>
-      <g transform={`translate(${pawnX} ${pawnY}) rotate(${tilt} 50 88)`}>
-        <g clip-path={`url(#${seat})`}>{children}</g>
+      {d ? <g transform={sized}>{d.Back({ p, p2, side, f, anim })}</g> : null}
+      <g class="ride-pawn" transform={`translate(${pawnX} ${pawnY}) rotate(${tilt} 50 88)`}>
+        <g clip-path={d ? `url(#${seat})` : undefined}>{children}</g>
       </g>
-      <g transform={sized}>{d.Front({ p, p2, side, f, anim })}</g>
+      {d ? <g transform={sized}>{d.Front({ p, p2, side, f, anim })}</g> : null}
     </g>
   );
 }
@@ -1254,25 +1257,33 @@ export function RideLayers({ d, finish, side, anim, f, k = 1, children }: { d: R
  * keeps its size in it (the square is never smaller than at 1, bigger only if a bigger ride needs it) and the ride stands on its foot.
  */
 const rideViews = new Map<string, { s: number; v: string }>();
-function rideSquare(d: RiderDraft, k: number): { s: number; v: string } {
-  const key = `${d.id}|${k}`;
+function rideSquare(id: string, c: RideCells, k: number): { s: number; v: string } {
+  const key = `${id}|${k}`;
   let v = rideViews.get(key);
   if (v) return v;
-  const a = rideAnchor(d);
-  const [fx, fy, fw, fh] = d.frame;
+  const a = rideAnchor(c);
+  const [fx, fy, fw, fh] = c.frame;
   const [rx, ry] = [scaledAt(fx, a[0], k), scaledAt(fy, a[1], k)];
-  const lift = Math.min(...seatsAt(d, k).idle.map((s) => s[1]));
+  const lift = Math.min(...seatsAt(id, c, k).idle.map((s) => s[1]));
   const x0 = Math.min(rx, -12);
   const x1 = Math.max(rx + fw * k, 112);
   const y0 = Math.min(ry, -9 + lift);
   // (Its foot: the ride's, at its size.)
   const y1 = scaledAt(Math.max(fy + fh, 100), a[1], k);
-  const s = Math.max(x1 - x0, y1 - y0, k === 1 ? 0 : rideSquare(d, 1).s);
+  const s = Math.max(x1 - x0, y1 - y0, k === 1 ? 0 : rideSquare(id, c, 1).s);
   v = { s, v: `${((x0 + x1) / 2 - s / 2).toFixed(1)} ${(y1 - s).toFixed(1)} ${s.toFixed(1)} ${s.toFixed(1)}` };
   rideViews.set(key, v);
   return v;
 }
-export const rideView = (d: RiderDraft, k = 1): string => rideSquare(d, k).v;
+export const rideView = (id: string, c: RideCells, k = 1): string => rideSquare(id, c, k).v;
+
+/** A ride's idle times (its side's, measured), one array a ride, so a riding avatar's timer keeps going as it draws again. */
+const idleTimes = new Map<string, number[]>();
+const idleMs = (id: string, c: RideCells): number[] => {
+  let ms = idleTimes.get(id);
+  if (!ms) idleTimes.set(id, (ms = c.side.idle.map((r) => r[0]!)));
+  return ms;
+};
 
 /** A ride's idle, frame by frame on its own times (still under reduced motion): one timer per riding avatar on the screen. */
 function useIdleFrame(ms: readonly number[]): number {
@@ -1294,20 +1305,25 @@ function useIdleFrame(ms: readonly number[]): number {
   return f;
 }
 
-/** A pawn riding (Avatar with `ride`): the ride's idle, the pawn and its items on the seat, all in one picture fitted to the box. */
-function RidingAvatar({ d, mount, side, rider }: { d: RiderDraft; mount: NonNullable<ItemLook["ride"]>; side: "w" | "b"; rider: ComponentChildren }) {
-  const f = useIdleFrame(d.idle.ms);
+/**
+ * A pawn riding (Avatar with `ride`): the ride's idle, the pawn and its items on the seat, all in one picture fitted to the box.
+ * Its box and the pawn's seat are measured ahead (ride-cells.ts): until the ride's drawing has loaded (rides/load.ts) the pawn
+ * sits in place and the ride appears under it (`data-drawn` once it has).
+ */
+function RidingAvatar({ id, c, mount, side, rider }: { id: string; c: RideCells; mount: NonNullable<ItemLook["ride"]>; side: "w" | "b"; rider: ComponentChildren }) {
+  const d = useRide(id);
+  const f = useIdleFrame(idleMs(id, c));
   // (Its size: RIDES.scale, or an admin's `?rideScale=`.)
-  const k = rideScale(d.id);
+  const k = rideScale(id);
   return (
-    <span class="avatar riding" aria-hidden="true" data-ride={d.id} data-scale={k}>
-      <svg class="avatar-ride" viewBox={rideView(d, k)}>
+    <span class="avatar riding" aria-hidden="true" data-ride={id} data-scale={k} data-drawn={String(+!!d)}>
+      <svg class="avatar-ride" viewBox={rideView(id, c, k)}>
         <defs>
           <clipPath id="avatar-cap">
             <rect x="-12" y="-9" width="124" height="112" />
           </clipPath>
         </defs>
-        <RideLayers d={d} finish={mount} side={side} anim="idle" f={f} k={k}>
+        <RideLayers id={id} c={c} d={d} finish={mount} side={side} anim="idle" f={f} k={k}>
           {rider}
         </RideLayers>
       </svg>
@@ -1349,11 +1365,12 @@ export function Avatar({ look, side = "w", ride = false }: { look?: ItemLook; si
     </g>
   );
   const mount = ride ? at("ride") : undefined;
-  const d = rideOf(mount?.def);
-  if (mount && d)
+  const c = rideCells(mount?.def);
+  if (mount && c)
     return (
       <RidingAvatar
-        d={d}
+        id={mount.def}
+        c={c}
         mount={mount}
         side={side}
         rider={
