@@ -1,4 +1,4 @@
-import { RECLUSE_PHASE2, BOSS_ALONE_SCORING, bossClockSettings, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
+import { RECLUSE_PHASE2, BOSS_ALONE_SCORING, bossClockSettings, BOSS_BRAIN, BOSS_POWERS, BOT_MAIA, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
 import { GUARD_WORDS, MatchRunner, START_FEN, baseAt, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import openingsData from "@chessroyale/chess/data/openings.json";
 import { bulletClock, crowdRace, phase2Numbers, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, fullMoonMs, folioTurnMs, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs } from "@chessroyale/chess";
@@ -234,6 +234,7 @@ export class SoloMatch implements GameView {
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
     this.freeBrain();
+    this.freeBotsBrain();
     this.runner?.showdownScout?.stop();
     this.progress.reset();
     this.live = null;
@@ -375,6 +376,7 @@ export class SoloMatch implements GameView {
 
   /** The match begins: the pre-game votes, the boss's intro (a raid) or the opening. */
   private begin() {
+    this.startBotsBrain();
     if (pregameVotes(this.settings).length) return this.startVote(0);
     // Boss raid: straight to the boss's intro, which replays the opening from the starting position itself.
     if (this.settings.raid) return this.nextRound();
@@ -445,6 +447,30 @@ export class SoloMatch implements GameView {
     this.timer = setTimeout(() => (v.index + 1 < v.count ? this.startVote(v.index + 1) : this.nextRound()), nextAt - Date.now());
   }
 
+  // ---------------- The bots' Maia ----------------
+
+  /** Maia's worker for the bots' picks (BOT_MAIA), from the match's start until a boss battle, the end, or you're out. */
+  private botsMaia: HumanUciEngine | null = null;
+
+  /**
+   * The bots pick Maia's moves at their ratings (docs/decisions/2026-11-01-maia-bots.md), if this device may run Maia:
+   * its worker starts now, beside Stockfish, and loads during the votes; until it's ready (or if it fails) each bot
+   * picks Stockfish-style at its rating's temperature, never waited on. Not in a raid: a boss battle's bots pick as before.
+   */
+  private startBotsBrain() {
+    if (!BOT_MAIA.on || this.botsMaia || this.settings.raid || !maiaAllowed() || typeof Worker === "undefined") return;
+    if (!this.runner.state.players.some((p) => p.isBot)) return;
+    this.botsMaia = startMaia(BOSS_BRAIN.loadTimeoutMs);
+    this.runner.botBrain = this.botsMaia;
+  }
+
+  /** Frees the bots' Maia (a few hundred MB): before a boss battle's own loading step, at the end, or once you're out. */
+  private freeBotsBrain() {
+    this.botsMaia?.close();
+    this.botsMaia = null;
+    if (this.runner) this.runner.botBrain = null;
+  }
+
   // ---------------- Boss battle ----------------
 
   /** Maia's worker, when the boss plays with the Maia brain (BOSS_BRAIN); closed after the battle. */
@@ -469,6 +495,7 @@ export class SoloMatch implements GameView {
    * it is, as before.
    */
   private startBrain(next: (afterLoading?: boolean) => void) {
+    this.freeBotsBrain();
     if (!this.runner.state.boss || this.maia) return next();
     const { picked, maia } = soloBrain(this.settings.raid && !this.raidBots);
     const plan = this.runner.bossBrainPlan(picked, maia)!;
@@ -993,6 +1020,7 @@ export class SoloMatch implements GameView {
     if (this.timer) clearTimeout(this.timer);
     this.begun = true;
     this.freeBrain();
+    this.freeBotsBrain();
     this.brainShown = isAdmin();
     // (Phase 1's words are over: neither voice carries a line into the phase change. His were cleared as he fell, so his
     // mumbling goes on until his chant cuts in.)
@@ -1421,6 +1449,8 @@ export class SoloMatch implements GameView {
 
   /** After a knockout, the rest of the match (the final too) is played quickly with no UI. */
   private async simulateRest() {
+    // (Nobody watches the bots now: they pick Stockfish-style at their ratings' temperatures, which is quicker.)
+    this.freeBotsBrain();
     while (!this.runner.isOver()) {
       // (You left: the rest isn't played out.)
       if (this.stopped) return;
@@ -1480,6 +1510,7 @@ export class SoloMatch implements GameView {
 
   private finish() {
     this.freeBrain();
+    this.freeBotsBrain();
     this.runner.showdownScout?.reset();
     const winner = this.runner.state.players.find((p) => p.placement === 1);
     this.set({

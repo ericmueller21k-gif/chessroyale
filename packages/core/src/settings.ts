@@ -582,6 +582,103 @@ export const WEAK_BOT_SKILL: readonly [number, number] = [8, 32];
  */
 export const WEAK_BOTS: Pick<Settings, "botSkillRange" | "peopleFirst"> = { botSkillRange: WEAK_BOT_SKILL, peopleFirst: true };
 
+/**
+ * The Crowd's and Classic's bots as players (Eric, Nov 1: "the base bots should all be playing off of a Maia engine …
+ * with varying strength"; "mostly about 800 to 1500, with some range above and below, not a lobby of strong players";
+ * "a player making the engine's best moves should finish 1st or 2nd"). docs/decisions/2026-11-01-maia-bots.md.
+ *
+ * - `ratings`: each bot's Maia rating, fixed by its name (the same player every match): a bell curve (`mean`, `sd`),
+ *   held within `min` to `max`, rounded to `step` (so the bots picking in one position share a few ratings: Maia is
+ *   asked once per rating, not once per bot). About 84% of bots land between 800 and 1500.
+ * - `skillAt`: the bot's Stockfish-style temperature (botPick) for a Maia rating, where the two lose the same points per
+ *   move on the rating curve's 160 positions (reports/maia-calibration's rows, Maia at temperature 0.8 and top-p 0.9;
+ *   the bot over the top 8 with its 2% random moves). Between points, along a line in log(temperature). The bot plays
+ *   this when Maia isn't there (not loaded, too slow, a boss battle, online), so it's the same strength either way.
+ * - `temperature`, `topP`: Maia's own draw from its probabilities, as the bosses' and the town's bots' (BOSS_BRAIN).
+ * - `multipv`: Maia's likeliest moves asked per rating (its most: enough to cover top-p).
+ * - `budgetMs`: the longest the bots' Maia picks may take in one position; ratings not asked by then pick Stockfish-style.
+ * - `on`: off, every bot picks Stockfish-style at its rating's temperature.
+ */
+export const BOT_MAIA = {
+  on: true,
+  ratings: { mean: 1150, sd: 250, min: 600, max: 2200, step: 100 },
+  skillAt: [
+    [600, 64],
+    [900, 24],
+    [1200, 15.5],
+    [1500, 12],
+    [1800, 9.7],
+    [2100, 8],
+    [2400, 6.3],
+  ] as readonly (readonly [number, number])[],
+  temperature: 0.8,
+  topP: 0.9,
+  multipv: 20,
+  budgetMs: 2500,
+};
+export type BotMaiaSettings = typeof BOT_MAIA;
+
+/** 32-bit FNV-1a of a string (a bot's name: its fixed rating). */
+function nameHash(name: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < name.length; i++) h = Math.imul(h ^ name.charCodeAt(i), 0x01000193) >>> 0;
+  return h >>> 0;
+}
+
+/** A bot's Maia rating, from its name alone (the same every match): BOT_MAIA.ratings' bell curve. */
+export function botRatingOf(name: string, b: Pick<BotMaiaSettings, "ratings"> = BOT_MAIA): number {
+  const { mean, sd, min, max, step } = b.ratings;
+  let a = nameHash(name);
+  const next = () => {
+    // (mulberry32, inline: rng.ts imports nothing from here, and this file stays free of imports.)
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const u1 = Math.max(next(), 1e-9);
+  const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * next());
+  return Math.max(min, Math.min(max, Math.round((mean + sd * z) / step) * step));
+}
+
+/** The temperature (botPick) that plays like a Maia rating (BOT_MAIA.skillAt; held at its ends). */
+export function botSkillForRating(rating: number, b: Pick<BotMaiaSettings, "skillAt"> = BOT_MAIA): number {
+  const pts = b.skillAt;
+  if (rating <= pts[0]![0]) return pts[0]![1];
+  for (let i = 1; i < pts.length; i++) {
+    const [r1, s1] = pts[i]!;
+    const [r0, s0] = pts[i - 1]!;
+    if (rating <= r1) return Math.round(Math.exp(Math.log(s0) + ((rating - r0) / (r1 - r0)) * (Math.log(s1) - Math.log(s0))) * 1000) / 1000;
+  }
+  return pts[pts.length - 1]![1];
+}
+
+/** The Maia rating a temperature plays like (botSkillForRating's inverse, held at its ends), rounded to the step. */
+export function botRatingForSkill(skill: number, b: Pick<BotMaiaSettings, "skillAt" | "ratings"> = BOT_MAIA): number {
+  const pts = b.skillAt;
+  const step = b.ratings.step;
+  const snap = (r: number) => Math.round(r / step) * step;
+  if (skill >= pts[0]![1]) return pts[0]![0];
+  for (let i = 1; i < pts.length; i++) {
+    const [r1, s1] = pts[i]!;
+    const [r0, s0] = pts[i - 1]!;
+    if (skill >= s1) return snap(r0 + ((Math.log(s0) - Math.log(skill)) / (Math.log(s0) - Math.log(s1))) * (r1 - r0));
+  }
+  return pts[pts.length - 1]![0];
+}
+
+/**
+ * A bot's rating and temperature as its seat gets them: its name's rating (botRatingOf), as loose as `botSkillRange`
+ * allows at least (the ?weakbots=1 switch: then the rating that temperature plays like).
+ */
+export function botStrength(name: string, settings: Pick<Settings, "botSkillRange"> = DEFAULT_SETTINGS): { rating: number; skill: number } {
+  const rating = botRatingOf(name);
+  const skill = botSkillForRating(rating);
+  const floor = settings.botSkillRange[0];
+  return skill >= floor ? { rating, skill } : { rating: Math.min(rating, botRatingForSkill(floor)), skill: floor };
+}
+
 /** `count` bot skills spread evenly on a log scale across `botSkillRange`, strongest first. */
 export function botSkillSpread(count: number, settings: Settings = DEFAULT_SETTINGS): number[] {
   const [lo, hi] = settings.botSkillRange;
