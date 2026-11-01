@@ -11,6 +11,7 @@ import { rookTakenMoment, smudgyFen } from "../components/Smudgy.tsx";
 import { fullMoonMoment, noteMooMoments } from "../components/Moo.tsx";
 import { folioMoments, revisionFen } from "../components/Folio.tsx";
 import { gardenerFen } from "../components/Gardener.tsx";
+import { timberFen } from "../components/Timber.tsx";
 import { pickLine } from "../characters/boss-beats.ts";
 import { rememberBoss } from "../boss-history.ts";
 import { bossKit } from "../characters/kits.ts";
@@ -384,7 +385,9 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   // Folio's Revision: the position after your move until its moment takes both moves back (the game's board is already back:
   // a base); the board slides the pieces back then.
   const revised = bounceShown || splitShown || pig || alfil || hopper || smudgy || gardener ? null : revisionFen(boss, moments, now);
-  const boardFen = bounceShown ?? splitShown ?? pig?.fen ?? alfil ?? hopper ?? smudgy?.fen ?? gardener?.fen ?? revised?.fen ?? fenShown;
+  // Timber's: a piece he dropped off its square until his plank lands; a pawn he gnaws on its square until his last chomp.
+  const timber = bounceShown || splitShown || pig || alfil || hopper || smudgy || gardener || revised ? null : timberFen(boss, moments, now, fenShown);
+  const boardFen = bounceShown ?? splitShown ?? pig?.fen ?? alfil ?? hopper ?? smudgy?.fen ?? gardener?.fen ?? revised?.fen ?? timber?.fen ?? fenShown;
   const evalFen = bounceShown && bounceShown !== boss.board.fen ? (boss.powers?.bounce?.before ?? fenShown) : (pig?.evalFen ?? fenShown);
   const jolt = bounceJolt(bounce && now >= bounce.at ? bounce : null, now) ?? boardSawJolt(moment, now) ?? alfilJolt(moment, now);
   // (One or two pieces by name; more, how many: the dock's line stays one line.)

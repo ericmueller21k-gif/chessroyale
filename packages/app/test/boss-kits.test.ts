@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_ROSTER, isPlayable, playableBosses } from "@chessroyale/core";
+import { BOSS_ROSTER, adminFirst, isPlayable, playableBosses } from "@chessroyale/core";
 import { BOSS_KITS } from "../src/characters/kits.ts";
 import type { Beat } from "../src/characters/boss-beats.ts";
 
@@ -24,7 +24,8 @@ describe("the playable rule: a complete character and its powers", () => {
 
   it("a boss with a kit but no powers, or powers but no kit, is never playable", () => {
     // (A boss hidden from players, the Hidden Boss, is never playable either: only an admin meets him, in Boss alone.)
-    for (const b of BOSS_ROSTER) expect(isPlayable(b)).toBe(b.kit !== null && b.powers !== null && !b.adminOnly);
+    // (Nor one in the game for admins first, BOSS_ADMIN_FIRST: Timber, until Eric says go.)
+    for (const b of BOSS_ROSTER) expect(isPlayable(b)).toBe(b.kit !== null && b.powers !== null && !b.adminOnly && !adminFirst(b));
     expect(playableBosses().every((b) => b.powers)).toBe(true);
   });
 });

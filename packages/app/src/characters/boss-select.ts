@@ -39,6 +39,8 @@ export const SELECT_SOUND: Readonly<Record<string, SoundName>> = {
   tiger: "tigerHello",
   // A page turning, then a flap of its wing.
   folio: "folioHello",
+  // His hammer's tap.
+  timber: "bigboyClack",
   // The Hidden Boss: his low, ominous hum (the stare).
   recluse: "recluseHum",
 };
@@ -79,6 +81,7 @@ export const SELECT_LINES: Readonly<Record<string, readonly string[]>> = {
   tiger: ["No roaring tonight. Balloons only.", "Another masterpiece.", "Don't rush the artist."],
   // Folio (the director's, Oct 26): its select and intro line, the only one (its tile comes with the wiring lane).
   folio: ["Every game is a draft. Shall we write one?"],
+  timber: ["Hard hats on. We're building today.", "Measure twice, checkmate once.", "Got wood? I've got plenty."],
   // The Hidden Boss (Eric's own first line; never named on screen): the two in turn.
   recluse: ["Team up on me. It wouldn't be the first time anyone did that.", "You're not ready to fight me yet."],
 };
@@ -151,6 +154,8 @@ export const SELECT_FRAMING: Readonly<Record<string, Framing>> = {
   tiger: { neck: [31, 78], span: 56, at: 0.69 },
   // (Its long neck: the point under its head, so its head, beak and the near wing's root are in the tile.)
   folio: { neck: [30, 40], span: 58, at: 0.5 },
+  // (His hat and buck teeth in the tile, the planks' ends over his shoulders.)
+  timber: { neck: [38, 79], span: 58, at: 0.52 },
   recluse: { neck: [33, 47], span: 61, at: 0.5 },
 };
 
@@ -177,4 +182,6 @@ export const SELECT_TINT: Readonly<Record<string, string>> = {
   tiger: "#2f7fe0",
   // (Its deep ink: its cream paper and its vermilion seal stand clear on it, in the light theme's lighter wash too.)
   folio: "#575c78",
+  // (A workshop blue-green, across the wheel from his orange hat and vest and his brown fur.)
+  timber: "#2f8f9d",
 };

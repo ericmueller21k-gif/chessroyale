@@ -934,7 +934,7 @@ export const BOSS_POWERS = {
    * Oct 27, after the first sim put it among the easiest; was the brief's start, 1): 2.8 Creases a battle of 50 moves in
    * the raid sim (reports/folio-sim.md).
    */
-  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.3, folio: 1.3 } as Readonly<Record<string, number>>,
+  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.3, folio: 1.3, timber: 0.7 } as Readonly<Record<string, number>>,
   /**
    * The Hidden Boss's ultimate, the bullet clock (Eric, Oct 14: "Meter builds starting turn 1, about 7 turns in he says
    * something about how you're thinking too much and to just play pure chess etc, true to him, then for the rest of phase 1
@@ -1489,7 +1489,34 @@ export const BOSS_POWERS = {
   revisionDrop: 1.5,
   revisionMax: 1,
   revisionFrom: 5,
+  /**
+   * Timber's Workshop (his passive, Scraps; Eric, Nov 1; bosses/timber.ts; docs/decisions/2026-11-01-timber.md): one scrap
+   * every scrapEverySec seconds (Eric's 15; the cap, the lead guard and the Gnaw's pace are the sim's: reports/timber-sim.md) on the battle's clock (the real-time meter: the server's online, the page's visible time solo),
+   * plus scrapsPerCapture for each capture of his. Each goes, at random, to one of the five pieces not yet finished; a piece is
+   * finished at its cost (workshopCosts, in scraps). At the end of his turn one finished piece (the first finished that he can
+   * have) is dropped onto an empty square of his half that you don't attack; at most workshopDropMax a battle (the sim's), then
+   * the workshop closes. A finished slot starts over at 0.
+   */
+  scrapEverySec: 15,
+  scrapsPerCapture: 2,
+  workshopCosts: { p: 2, n: 4, b: 4, r: 6, q: 12 },
+  workshopDropMax: 2,
+  /**
+   * A piece drops only while it leaves him at most workshopLeadMax pawns ahead of you on material (pawn 1, knight and bishop 3,
+   * rook 5, queen 9): he rebuilds what he lost rather than running away with the battle (the sim's call: free pieces with no
+   * limit decided nearly every battle; reports/timber-sim.md). One that would put him further ahead waits on the bench.
+   */
+  workshopLeadMax: 1,
+  /** Timber's Gnaw (his ultimate, the rage meter's: rageSpeed.timber): after his move, one of your pawns eaten, gnawScraps scraps for his workshop. */
+  gnawScraps: 8,
 } as const;
+
+/**
+ * Bosses in the game for admins first (Eric, Nov 1: Timber "admins first"): complete and playable, but only an admin meets
+ * them (the boss select, Boss alone and a Solo raid), until Eric says go. **To put one live for everyone, take its id out of
+ * this list** (core boss.ts's `adminFirst`; nothing else changes).
+ */
+export const BOSS_ADMIN_FIRST: readonly string[] = ["timber"];
 
 /**
  * How Sawyer's split pawn looks (packages/app/src/components/Sawyer.tsx). Looks only: the rules, the engine and the

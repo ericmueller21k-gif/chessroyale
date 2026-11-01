@@ -98,6 +98,7 @@ describe("the God King's Last Stand on a board a boss has changed: Eric's case",
  * Every boss with powers, by its BOSS_ROSTER id: the states of his that change the board (each: the save sits out while
  * it's on, and comes again once it's gone), or why none does. A new boss fails "every boss is audited" until it's here.
  */
+const TIMBER_FRESH = { prog: [0, 0, 0, 0, 0], done: [], n: 0, since: 0, wseed: 1, drops: 0, gnaws: 0 };
 const AUDIT: Record<string, { on: Record<string, Patch>; off: Patch } | { none: string }> = {
   gingerbread: {
     on: {
@@ -163,6 +164,14 @@ const AUDIT: Record<string, { on: Record<string, Patch>; off: Patch } | { none: 
     off: () => ({ crease: null, folio: FOLIO_FRESH }),
   },
   recluse: { none: "his passive blocks the God King's help: the Last Stand never comes against him anyway" },
+  // (Timber's drop and his Gnaw change the board at his turn's end: that crowd turn the save sits out, as Babur's landing.)
+  timber: {
+    on: {
+      "a piece of his just dropped": () => ({ workshop: { ...TIMBER_FRESH, drops: 1, last: { at: 0, piece: "n", square: "a5" } } }),
+      "a pawn of yours just gnawed": () => ({ workshop: { ...TIMBER_FRESH, gnaws: 1, gnaw: { at: 0, square: "h2", scraps: 8 } } }),
+    },
+    off: () => ({ workshop: TIMBER_FRESH }),
+  },
 };
 
 describe("the God King's Last Stand on a board a boss has changed: every boss", () => {

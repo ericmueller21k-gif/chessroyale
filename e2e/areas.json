@@ -341,6 +341,15 @@
       ],
       "specs": ["e2e/gardener.spec.ts", "e2e/king-attack.spec.ts"]
     },
+    "Timber (timber)": {
+      "paths": [
+        "packages/chess/src/bosses/timber.ts",
+        "packages/app/src/characters/timber*.ts",
+        "packages/app/src/characters/sidekicks/timber.ts",
+        "packages/app/src/components/Timber.tsx"
+      ],
+      "specs": ["e2e/timber.spec.ts", "e2e/boss-smoke.spec.ts"]
+    },
     "Folio (folio)": {
       "paths": [
         "packages/chess/src/bosses/folio.ts",

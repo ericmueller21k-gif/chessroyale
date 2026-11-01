@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { BOSS_DIFFICULTY, hiddenBosses, menuBosses, type BossDef, type BossDifficultyId, type ItemLook } from "@chessroyale/core";
+import { isAdmin } from "../boss-brain.ts";
 import { DressedPawn } from "./FrontDoor.tsx";
 import { bossKit } from "../characters/kits.ts";
 import { frameKeys, type Character } from "../characters/sprite.ts";
@@ -36,10 +37,14 @@ const selectVoice = new Voice();
 /** The last line said by each boss here (no line twice running; the Hidden Boss's two in turn). */
 const lastLine = new Map<string, string>();
 
-/** What the select shows: the bosses you can meet (resting ones left out), then the hidden ones (dark, locked). */
-export function selectBosses(): { bosses: BossDef[]; hidden: BossDef[] } {
+/**
+ * What the select shows: the bosses you can meet (resting ones left out), then the hidden ones (dark, locked). An admin also
+ * meets the bosses in the game for admins first (BOSS_ADMIN_FIRST: Timber, until Eric says go), each a tile like any other;
+ * nobody else sees them.
+ */
+export function selectBosses(admin = isAdmin()): { bosses: BossDef[]; hidden: BossDef[] } {
   const on = (b: BossDef) => !isPaused(`boss:${b.id}`);
-  return { bosses: menuBosses({ admin: false, raid: true }).filter(on), hidden: hiddenBosses().filter(on) };
+  return { bosses: menuBosses({ admin, raid: true }).filter(on), hidden: hiddenBosses().filter(on) };
 }
 
 /**

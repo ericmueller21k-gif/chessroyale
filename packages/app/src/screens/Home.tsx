@@ -588,7 +588,8 @@ export function HomeScreen({
   // locked: never stored, so nothing starts against him). Kept for Boss alone, a Solo raid and a raid you make
   // (rememberBossPick); the public queues are always a random boss. A resting boss reads as random.
   const [pick, setPick] = useState(() => {
-    const id = chosenBoss();
+    // (An admin's pick may be a boss in the game for admins first: Timber.)
+    const id = chosenBoss(isAdmin());
     return selectBosses().bosses.some((b) => b.id === id) ? id : RANDOM;
   });
   const hiddenPicked = selectBosses().hidden.some((b) => b.id === pick);
