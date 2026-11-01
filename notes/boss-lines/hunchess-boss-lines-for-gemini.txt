@@ -1,0 +1,684 @@
+HUNCHESS BOSS LINES: the prompt for Gemini (Nov 1, 2026)
+
+For Eric: copy everything below the COPY FROM HERE line into Gemini. It answers in parts; type "next" after each
+part until it says ALL DONE (about 14 parts). If a part stops partway, type "continue". Then send the parts back
+to Claude any way that's easy: a share link, "Export to Docs" (Claude can read your Google Drive), or pasted.
+Nothing here goes into the game until the director has checked every line against the rules below.
+
+===== COPY FROM HERE =====
+
+You're writing original dialogue for HunChess, a chess game for phones and computers. Players fight cartoon boss
+characters at chess. Sometimes one player fights a boss alone; sometimes a whole crowd of players votes on each move
+together, so "you" in a line should work for one player or a crowd. Each boss is a chess opponent with two special
+powers: a passive power that comes every few turns, and an ultimate that comes when its rage meter fills. The players
+have a champion, the God King, who stands by the board and can step in (he strikes the boss or plays a move).
+Players also walk around a town square where the bosses and their little kid sidekicks live. A chat box in the top
+corner shows what they say now and then, and players can play the kids at chess tables in the park. Players can
+also ride vehicles called rides around town; every boss has a ride made in its style.
+
+Lines show in a small speech bubble during battle, so they're short and punchy. The tone is a funny, friendly
+cartoon for all ages: teasing, never cruel.
+
+WHAT I NEED
+
+Part A, battle lines, for each boss (16 bosses, listed below):
+1. more.<moment>: 3 new lines for every moment in its "Lines it says now" list (6 for its power and ultimate
+   moments, including ultimateWarn). Use the moment names exactly as listed. For the two new bosses (Timber and
+   Blitz), write what their entry asks for instead.
+2. open.<name>: 2 lines for each named opening below, said when the game opens with it, in the boss's own
+   voice. Plus open.other: 3 lines for any other named opening, which never say its name.
+3. pos.<name>: 2 lines for each position moment below.
+4. take.<piece>: 2 lines for each piece he captures from you: take.pawn, take.knight, take.bishop, take.rook,
+   take.queen. Make them about him: a tiger retired from the circus might say of a knight, "Another animal freed."
+   A hippo gardener might say, "This one will look perfect in my garden."
+5. ride.own: 4 lines for when you show up riding his own ride ("Nice ride!", or "Where did you get that?", in his
+   voice). ride.other: 3 lines for when you ride another boss's ride. Use {ride} where the ride's name goes, for
+   example: "{ride}? In MY battle? Bold."
+
+Part B, the town chat, for each boss:
+1. town: 10 everyday lines for the chat box: about the town, its home, the park, chess, the time of day, its kid.
+
+Part C, the bosses talking to each other in the town chat:
+1. One short exchange for every pair of the 16 bosses (120 pairs): 2 or 3 lines, back and forth. They're
+   neighbors and rivals, not enemies: teasing, bragging, a little history between them. Each pair should feel like
+   those two. Ginger loves cold and hates heat, so the fiery ones (Jefferson, and Babur with his burning hoops)
+   get his frostiest lines.
+
+Part D, the kids (the little guys), for each kid:
+1. town: 8 lines for the chat box.
+2. withBoss: 2 short exchanges with its own boss (2 or 3 lines each).
+3. table.hello, table.take, table.check, table.win, table.lose, table.draw: 2 lines each, for a game with them at
+   the park tables. Each kid's rating says how strong it is: 700 is a beginner, 2500 a master. Let that show.
+4. Then 16 kid-to-kid exchanges, kids you think would get along or squabble (2 or 3 lines each).
+5. For the woodpecker and the tortoise, 3 name ideas each (10 letters at most, original, not a real person).
+
+RULES FOR EVERY LINE
+- Battle lines: 70 characters at most, including spaces. Town and kid lines: 60 at most. One sentence or two
+  short ones. Use … for trailing off.
+- Original. No famous catchphrases, song lyrics, movie quotes, brands or trademarks.
+- Never name, quote or hint at a real person. That includes chess players and openings named after people,
+  which is why open.other never says the opening's name.
+- Never use the words Soviet, Russian or Grinch. Hollow never says Santa. Ginger never says "snap".
+- There's a secret boss in the game. Never mention any boss, character or place that isn't in this prompt.
+- American English spelling.
+- Stay in character. Each boss sounds like itself, never like a generic villain. Go easy on its pet words, tics
+  and sound effects: at most about one line in five, never two in a row.
+- Talk about powers the way a player sees them on the board, never with numbers or rules text.
+- Fair play: never hint at a good move for the player, and never give away anything hidden (which of Smudgy's
+  pawns is the rook, where Puddles' seeds are, what's in Hollow's dark).
+- Don't repeat a line the boss already says, or another line you've written. Vary the shape of the lines, not
+  just the words.
+- Pronouns as given in each entry.
+
+HOW TO REPLY (plain text only: no tables, no bullets, no bold, no numbering)
+Start each block with a header line, then one line per row: the key, a space, a | and a space, then the line.
+Example:
+@@ BOSS Alfil
+more.powerHit | Two became one. Worth every turn.
+open.sicilian | The Sicilian? I was there before it had a name.
+pos.youCastle | Hiding your king in the corner? Cozy.
+take.knight | Little horse. Big tusks.
+ride.own | My howdah! You do look regal up there.
+ride.other | {ride}? Mammoths walk, thank you.
+@@ TOWN Alfil
+town | The Pyramid's cool in the afternoon. Mind the dust.
+@@ PAIR Alfil + Babur
+Alfil | Big cat. Bigger ears on me.
+Babur | Please. I only want quiet and a balloon.
+@@ KID Woolly
+town | Woolly is big! Well, getting there.
+withBoss | Woolly: Grandpa, when do I get tusks?
+withBoss | Alfil: Patience. Mammoths never rush.
+withBoss | ---
+table.hello | Woolly will try to stomp! Gently.
+@@ KIDPAIR Woolly + Stripes
+Woolly | Can I hold the balloon?
+Stripes | Only if you promise not to sit on it.
+@@ NAMES Timber's woodpecker
+name | (an idea)
+
+(In withBoss, write each speaker's name before a colon, and put a --- row between the two exchanges.)
+
+ORDER: two bosses per reply, in the order listed (Part A, then that boss's Part B). Then the 120 pairs in four
+replies of 30. Then the kids in two replies. Then the kid pairs and the names. End the last reply with ALL DONE.
+
+THE NAMED OPENINGS (for open.<name>)
+- sicilian: Sicilian Defense
+- french: French Defense
+- italian: Italian Game
+- spanish: Spanish Game (call it only this; never its other name, which is a person's)
+- queensgambit: Queen's Gambit (accepted or declined)
+- kingsindian: King's Indian Defense
+- english: English Opening
+- slav: Slav Defense (and Semi-Slav)
+- scotch: Scotch Game
+- dutch: Dutch Defense
+- catalan: Catalan Opening
+- vienna: Vienna Game
+- fourknights: Four Knights Game
+- kingsgambit: King's Gambit
+- scandinavian: Scandinavian Defense
+- london: London System
+- benoni: Benoni Defense
+- other: any other named opening (never say its name)
+
+THE POSITION MOMENTS (for pos.<name>)
+- youCastle: you castle
+- heCastles: he castles
+- youPromote: your pawn reaches the end and becomes a queen
+- hePromotes: his pawn becomes a queen
+- enPassant: someone captures en passant
+- queenTrade: the queens are traded off
+- heLosesQueen: he loses his queen
+- attackQueen: you attack his queen
+- youFork: your piece attacks two of his at once
+- heForks: his piece attacks two of yours at once
+- youPin: you pin one of his pieces
+- blunder: you make a big mistake
+- greatMove: you find a really strong move
+- longThink: you've been thinking a long time
+- endgame: only a few pieces are left
+- repetition: the same position keeps repeating (a draw is close)
+- godKing: the God King (your champion) steps in against him
+
+THE BOSSES
+
+=== Ginger ===
+Who: An angry gingerbread man who escaped Santa's oven, fell into the North Pole's cold and came out a frost-powered cookie who hates heat.
+Ginger was about to be baked in Santa's workshop when he realized the oven was going to finish him off, so he ran. He fled across the North Pole, took a tumble into the deep cold, and came out infused with it: now his icing glints like frost, his eyes go ice-blue and his candy cane glows with winter. He loves cold things, though just the nice kind, like a cool fridge, not a glacier. What he wants is a world with no ovens and plenty of shade, and to prove a cookie can be the scariest thing on the board. He sizes up the other bosses by temperature: anything fiery or glowing warm is a sworn enemy he keeps at cane's length, anything icy is practically family, and everyone else is a bit stale until proven otherwise. He's loud, grumpy and a little silly, but his powers are no joke.
+Voice: Short, puffed-up bursts with lots of exclamation points, like a small cookie trying to sound big. He grumbles into a fragment, then lands a cold pun. When ovens or heat come up he trails off with "…" and shivers. Tic: "Hmph.", used sparingly (never "snap").
+Pronouns: he
+Powers: Freeze: every few turns he freezes one of your pieces; it can't move until it thaws (never your king). Ultimate, Blizzard: for three turns nearly everything of yours is frozen; at first only one piece, picked at random, can move, then the ice thaws.
+Kid: Crumb
+Ride: Candy Cane Sled: Gingerbread hull, candy-cane runners. Steering is optional; nibbling the gumdrops is not.
+Lines it says now (match this voice; don't repeat these):
+  entrance: Ginger is here! / You'll crumble! / Fresh out of the freezer!
+  move: Snap! / Hmph! / Out of my way! / Cold move. Colder heart.
+  capture: Crumbs to crumbs! / Into the cookie jar! / Snapped it up! / That one's iced!
+  check: Check! Feeling a chill? / Your king's on thin ice! / Snap! Check!
+  hurt: My icing! / Ow! I'm cracking! / You'll pay for that crumb!
+  thinking: Sugar and spite… / Let it simmer… / Cooling down… not.
+  smug: Half-baked, all of you! / Stale! So stale! / Cool as ice.
+  rattled: My gumdrops are sweating! / Stop! I'll melt! / Not my icing!
+  defeat: I… crumble… / Oh, snap… / Back to the oven…
+  victory: Snap! I win! / Sweet, sweet victory! / Iced you all! Ha!
+  strike: Snap! You're done! / Crumbled!
+  power: Chill out! / Stay frosty! / On ice you go! / Cold feet?
+  ultimateWarn: A storm is brewing… / Feel that chill? / Wrap up warm… / The frost is coming…
+  ultimate: Let it snow! / Freeze, all of you! / Snow day! Ha!
+  kingAttack: Frostbite, your majesty! / Snap! Snap! Snap! / Feeling a chill yet?
+  ultimateHit: Melting? Already?! / Hmph. Don't get comfy. / My lovely ice! / Drip, drip… bah!
+
+=== Boingo the Clown ===
+Who: A grinning harlequin on a pogo stick, left behind by the circus, who now lives in the old funhouse and makes you laugh whether you like it or not.
+The circus packed up and rolled out of town one night, and nobody came back for Boingo. He kept his pogo stick, a cart of cream pies and the keys to the old funhouse, and he's been bouncing around in there ever since. Nobody laughs at his act anymore, so now he makes them laugh, with pies on the board and a funhouse that turns the whole game upside down. What he really wants is an audience that stays to the end. To him, the other bosses are fellow performers in a show that never closes. He loves teaming up because it means someone is finally watching, and he can't resist pranking his partners, asking them silly questions or trying to get the grumpy ones to crack a smile.
+Voice: Short, bouncy bursts with lots of exclamation points, like a joke told mid-hop. He sometimes calls himself Boingo. A honk or a giggle sneaks in now and then, never every line. When a joke flops, his sentences shrink and trail off with "…"
+Pronouns: he
+Powers: Pie: he throws a cream pie onto a square; nobody, him included, can move there for a while. Ultimate, Funhouse: he turns the whole board around (upside down, then sideways) a step every few turns, until it's back the right way up.
+Kid: Squirt
+Ride: Boingo's Pogo: A clown's pogo stick with a frilly seat. Every square is a BOING.
+Lines it says now (match this voice; don't repeat these):
+  entrance: Honk honk! Showtime! / Step right up! / Who ordered a clown?
+  move: Boing! / Hee hee! / Your turn, chumps! / Watch my feet!
+  capture: Mine now! Honk! / Into the hat it goes! / Snatched it! Hee hee! / Whoopsie! For me!
+  check: Honk! Check! / Knock knock! / Peekaboo, king!
+  hurt: Hey! That was mine! / Ow! My nose! / No fair!
+  thinking: Eeny, meeny… / Hmm, hmm, hmm… / Spin the wheel…
+  smug: Too easy! / Is this chess or a circus? / Boingo's on a roll!
+  rattled: Not funny anymore… / Uh-oh… / Nobody laughs at Boingo!
+  defeat: Waaah! My pogo! / Show's over… / Not… funny…
+  victory: Ta-da! Honk honk! / Boingo wins! Hee hee! / Send in the next clowns!
+  strike: Pie in your face! / Hee hee! Gotcha!
+  power: Pie time! / Special delivery! / Extra cream for you! / Splat! Hee hee!
+  ultimateWarn: Something funny's coming… / Get ready to laugh… / Boingo's big finale…
+  ultimate: Welcome to the funhouse! / Topsy-turvy! / Round and round we go!
+  kingAttack: Pie, pie, and more pie! / Honk! Extra cream! / Say cheese… cake!
+
+=== Jefferson ===
+Who: A cocky, fire-loving giraffe who spent years sure he was a dinosaur and now lights everything in reach, which is a lot.
+Jefferson grew up certain he was a dinosaur and answered to G-REX for years, roar and all. Then he landed a job as the fireworks stand's mascot, found out what a lit fuse feels like, and has been lighting things he shouldn't ever since. He wants the biggest, loudest show anyone has ever seen, and a crowd going "ooh" and "aah" for him. He treats the other bosses as his audience: teammates to impress, rivals to out-sparkle. He sizes everyone up by height and counts the God King, wings spread, as his only real competition. Deep down he still hopes one of them will finally call him scary.
+Voice: Quick, bouncy bursts of three to six words, lots of exclamation marks, and fire puns stacked back to back. He interrupts himself, lets a roar slip, then corrects it with a sheepish "I mean…". He often opens with "Ooh!" when something excites him. He asks cocky questions and never waits for the answer.
+Pronouns: he
+Powers: Sparkler: a square on your half catches fire and burns down over a few turns; a piece of yours still on it at the end is lost (never your king). Ultimate, Roman Candle: waves of fireworks rain on the board, their shadows showing a few turns ahead where they'll land; some land on his own half, but his pieces are fireproof.
+Kid: Sparky
+Ride: Giraffe Gallop: A young giraffe with a hot head, a hotter mane and no idea what a speed limit is. Its horns are lit.
+Lines it says now (match this voice; don't repeat these):
+  entrance: Jefferson in the house! / Feel the heat! / Rawr! I mean… hi. / Hot stuff coming through!
+  move: Sizzlin'! / Too hot to handle? / Smokin'! / Watch and learn.
+  capture: Toast! / Extra crispy! / Burnt to a crisp! / Well done. Very well done.
+  check: Check! Feeling warm? / Your king's toast! / Hot seat, your majesty! / Check! Getting hot?
+  hurt: Hey! Not the face! / Ow! That's hot! / You singed me! / Rude!
+  thinking: Let it simmer… / Slow roast… / Warming up…
+  smug: Too hot to handle? / Tiny arms? Not me! / Burn, baby, burn! / Neck and neck? Nope!
+  rattled: Is it hot in here? / My neck's sweating! / Not cool. Not cool!
+  defeat: Burnt out… / Extinct… again… / My flame… fizzled…
+  victory: Too hot for you! / Rawr! Champion! / Hottest neck in town! / Fire it up!
+  strike: Torched! / Flame on!
+  power: Catch! / Hot potato! / Light it up! / Heads up! / Spark it!
+  powerHit: Toasty! / Ashes to ashes! / Poof! Crispy! / Smells like victory!
+  ultimateWarn: Got a big one for you… / Wanna see a trick? / Lighting the fuse… / Big bang coming…
+  ultimate: Fireworks time! / Ooh! Aah! Ha! / Look up! Way up!
+  ultimateHit: Incoming! / It's raining fire! / Hot rain! Ha! / Here they come!
+  kingAttack: Fireworks, your majesty! / Ooh! Aah! Ouch! / Let's light up the king!
+
+=== Hollow ===
+Who: A shaggy, black-furred creature, torn apart by villagers and held together by a swirling void of darkness, who wants every crowd to forget what's hiding in the dark.
+The villagers tore Hollow apart. The darkness brought him back, and now it holds him together through the middle, where his belly used to be: a band of violet-black dark around a slowly swirling void. Torn seams on his shoulder, cheek and thigh are bound the same way. If that center were ever ruptured… he'd rather not think about it. He carries a strand of Christmas lights wherever he goes, and he always takes the dark side of the board. What he wants is simple: to slip pieces into the dark and watch the crowd forget what was there. He finds the loud, bright bosses tiring, and anything that glows is a natural rival. He quietly respects anyone who can sit still and keep a secret. Mostly he thinks the others talk too much, though he listens to every word, because remembering is his whole game.
+Voice: Short, low sentences, often two to four words. Lots of periods and trailing "…" pauses. He speaks softly, asks unsettling questions, and lets silences do the work. He calls things "little" when he means to belittle them. An occasional "Mm." or "Shh." is his only tic.
+Pronouns: he
+Powers: Darkness: he tucks squares into the dark so you can't see what's there; touch the dark and guess wrong and it costs you. Ultimate, Lights Out: the whole board goes dark; when the lights come back, if you've lost track of too many of his pieces, he moves twice.
+Kid: Glim
+Ride: Hollow's Bulb: One bulb from Hollow's strand, gone rogue. Runs on darkness; somehow still lights up.
+Lines it says now (match this voice; don't repeat these):
+  entrance: Hollow is here. / Did you leave a light on? / I was always here. / Hush now.
+  move: Mm. / Quietly… / Step by step. / Into the dark.
+  capture: Gone. Like you'll forget. / Mine now. / Swallowed. / Into the void.
+  check: Check. Look closer. / Your king can't hide. / Check. Feel the cold?
+  hurt: You'll pay for that. / That… stung. / I've been torn before.
+  thinking: Let it get darker… / Shh… / Patience…
+  smug: How do you like the dark? / Lost already? / Can you still see it?
+  rattled: Too bright… too bright! / No… not the light! / I'm coming apart!
+  defeat: The light… again… / Remember me… / Torn… apart…
+  victory: Lights out. For good. / Darkness wins. / You forgot. They all do.
+  strike: Forgotten. / Gone dark.
+  darkFirst: Don't forget what's there. Forgetting costs.
+  power: Can you still see it? / How do you like the dark? / Remember it? / Dark there now. / Forgetting yet?
+  claim: The dark side is mine. / I'll take the dark. / Black suits me.
+  ultimateWarn: It's getting dark… / Feel it?
+  ultimate: It's time.
+  found: Hmph. You remembered. / Lucky. / Not bad… for now.
+  missed: Forgotten already? / Forgetting costs. / Wrong. So wrong.
+  lightsBack: Remember that. / Lights on. For now. / Keep your eyes open.
+  lightsHeld: The light holds. For now. / You remembered. This time. / Hmph. The light holds.
+  lightsFailed: You forgot. The dark moves twice. / Forgotten. I move twice. / The dark moves twice.
+  kingAttack: Shh. Sleep now, little king. / Into the dark with you. / Lights out, little king.
+
+=== Big Boy ===
+Who: A baby who never stopped growing, so now the whole chessboard is his playpen and every piece is his toy.
+Big Boy is a baby who never stopped growing. Everything he can reach is a toy, and he can reach a lot: blocks, lollipops, your pieces. He starts every game by waddling over and eating one of your center pawns as a snack, then gets to playing. He drops toy blocks in your way and, when he gets mad, bounces your pieces all over the board. He only stops for a nap, and he never wants a nap. He wants one thing: more toys, and everyone playing with him forever. He sees the other bosses as giant, noisy playmates. He gives them baby nicknames, asks them blunt questions, tries to grab their stuff, and gets upset when they won't play his game his way.
+Voice: Short bursts of two to five words, almost always with an exclamation mark. He calls himself "Big boy" or "me" and drops little words and verb endings ("Me go!", "Big boy win!"). He doubles words when excited ("bouncy bouncy"), trails off with "…" when sleepy or scared, and turns to sound effects like nom, boing and bonk. Sound effects and "Mine!" are seasoning, not every line.
+Pronouns: he
+Powers: Snack: before the first move he eats one of your center pawns. Toy Blocks: he drops toy blocks on squares nobody can move onto (knights hop them). Ultimate, Big Bounce: he bounces and your pieces get knocked around the board.
+Kid: Blocky
+Ride: Big Boy's Buggy: Naptime on wheels. Big Boy swears he's too old for it, but it's his.
+Lines it says now (match this voice; don't repeat these):
+  entrance: Big boy here! / Mine! All mine! / Wanna play?
+  snack: Nom nom. / Yummy pawn! / Snack time!
+  move: Mine! / Me go! / Hee hee! / Big boy move!
+  capture: Mine! / Gimme! / Nom nom. / My toy now!
+  check: Peekaboo! / Boo! / Got you!
+  hurt: Waaaah! / No fair! / Owie! / Mine! Give back!
+  thinking: Hmmm… / Goo? / Uhhh…
+  smug: Easy peasy! / Big boy winning! / Hee hee hee!
+  rattled: Uh-oh. / Mama? / No like this…
+  defeat: Waaaah! / Nap time… / Not fair…
+  victory: Big boy win! / Yay! All mine! / Again! Again!
+  strike: Bonk! / Time out! / Bad! Bonk!
+  power: Catch! / Blocky! / My toy! / Stack it!
+  ultimateWarn: Big boy mad! / Waaaah!
+  ultimate: Big boy BOUNCE! / Boing boing! / Bouncy bouncy!
+  kingAttack: Bonk, bonk, BONK! / Bad king! Time out! / Waaah! Mine! Mine!
+
+=== Sawyer ===
+Who: A dumpster-schooled raccoon contractor in a yellow hard hat who 'renovates' your chessboard with a saw and never pulls a permit.
+Sawyer learned carpentry from the dumpster behind a lumber yard, studying bent nails, sawdust and half-read instruction sheets until he decided he was a pro. Now he wears the hard hat, carries the red-and-black saw, skips every permit and 'renovates' whatever he finds, mostly the board you're playing on. He wants the whole world up to his code, which is a code only he knows. To Sawyer the other bosses are a crew, a client list and a pile of fixer-uppers all at once: he sizes up their homes, offers free estimates nobody asked for, and calls anyone who doesn't need renovating 'a real load-bearing pal.'
+Voice: Short, clipped job-site talk: fragments, quick verdicts and exclamation points, like a contractor shouting across a noisy room. He sizes things up out loud (a quick 'Hmm…' then a ruling), turns everything into a job, and now and then revs the saw ('Vrrrm!'), but only as a rare garnish.
+Pronouns: he
+Powers: Split: after his first move he saws one of his pawns in two (two pawns from one). Saw Cuts: he cuts lines into your half that your pieces can't walk across (knights hop them). Ultimate, Board Saw: he saws the board in two for a while; nothing crosses the middle until it glues back together.
+Kid: Chip
+Ride: Sawyer's Dozer: Pushes dirt, pushes luck, never pushes the brake.
+Lines it says now (match this voice; don't repeat these):
+  entrance: Measure twice, cut once. / Hard hat zone! / Let's get sawing.
+  split: Two for one! / Half off! / Double trouble!
+  move: Snip. / Clean cut. / On the level.
+  capture: Timber! / Sawed it. / That's lumber now.
+  check: Cut off! / Nowhere to run. / Corner cut!
+  hurt: Splinters! / Ow! My thumb! / Not my good saw!
+  thinking: Measure twice… / Where's my pencil? / Hmm, level…
+  smug: Built to last. / Solid work. / Right on schedule.
+  rattled: Not up to code… / Wobbly… / Structural damage!
+  defeat: Out of order… / Back to the shop… / Blunt blade…
+  victory: Job done! / Measure twice, win once. / Signed off!
+  strike: Timber! / You're fired! / Off the job!
+  power: Mind the gap. / Keep off the cut! / Snip snip. / Clean cut.
+  ultimateWarn: This board's getting renovated. / Stand back… / Revving up…
+  ultimate: Timber! / Renovation time! / Down the middle!
+  kingAttack: Demolition time! / Cut it out? Never! / Timber, your majesty!
+
+=== Wrangler ===
+Who: A rodeo pig who got sick of being chased around the ring, grabbed the rope, and now lassos anything on the board that dares to move.
+Wrangler spent years as the rodeo's runaway act: the pig the cowboys chased in circles for the crowd's laughs. One day he caught the rope mid-throw and kept it. Now he does the chasing. He ropes pieces off their squares and lines them up face to face, waiting for high noon to settle it. He wants respect, a spotless hat, and a crowd that cheers for the pig this time. He sees the other bosses as one big herd: a few he'd ride with, most he'd like to rope, and anybody who snickers at his snout gets tugged a square to the left.
+Voice: Short drawled bursts, usually three to six words. Drops his g's (pickin's, ropin') and says yer and 'em. Slow, squinty questions trail off with a '…'; exclamations come out loud and quick. Snorts and yee-haws are seasoning, not the meal: one now and then, never two lines in a row.
+Pronouns: he
+Powers: Lasso: every few turns he ropes one of your pieces and drags it a square (never a king or a bishop). Ultimate, Showdown: at high noon he lines up duels, his piece against one of yours of the same kind, and you pick which duel happens.
+Kid: Tex
+Ride: Rodeo Bull: Eight seconds is the record. He's never once let anyone off early.
+Lines it says now (match this voice; don't repeat these):
+  entrance: Howdy, varmints. / Saddle up! / Yee-haw!
+  pull: Giddy-up, pawn! / Yank!
+  move: Giddy-up. / Easy now. / Mosey on.
+  capture: Roped! / Hog-tied! / Got 'im!
+  check: Reach for the sky! / Hands up! / Corralled!
+  hurt: Oink! / Dang varmints! / My hat!
+  thinking: Hmm, reckon… / Lemme think… / Snort…
+  smug: Heh heh. Snort. / Easy pickin's. / Like roping fence posts.
+  rattled: Uh oh… / Rustlers! / This ain't good…
+  defeat: I'll be danged… / Back to the barn… / Outdrawn…
+  victory: Yee-haw! / Rodeo's over! / Snort snort!
+  strike: Git along! / Yer outta here! / Yee-haw!
+  power: Git over here! / C'mere, little doggie. / Yoink!
+  tug: Fine. Just a tug, then. / Yoink, anyhow. / A tug'll do.
+  ready: I've got you in my sights.
+  ultimate: This board ain't big enough for the six of us. / It's high noon!
+  kingAttack: Dance, little king! / Crack! Crack! Yee-haw! / Git along, your majesty!
+
+=== Alfil ===
+Who: A grumpy, shaggy woolly mammoth who held the bishop's square long before bishops existed, and wants it back.
+In old Persian and Arabic chess, the piece beside the king and queen was an elephant: the alfil. Then the bishop showed up, took his squares, and the old piece was retired. Alfil never got over it. Now he's back on his hind legs, fists up, wearing his red and blue brow plate and caparison, holding the gold ankus he took from his rider. He doesn't need anyone steering him anymore. He wants the board to remember who came first, and he wants every bishop to feel a little nervous. He sees the other bosses as new pieces: quick, flashy, always in a hurry. He likes them, but he treats them like kids at a family reunion and corrects them about history nobody asked about. He gets along best with anyone who's patient, and anyone who likes the cold.
+Voice: Short, heavy sentences of two to six words, each ending in a full stop like a footstep. He talks slowly and uses "…" when he's chewing on a thought. He calls smaller things "little" and loves a quick setup with a blunt payoff. His tics are a lone "Stomp." and a low "Hrmph." Both are rare, never two lines in a row.
+Pronouns: he (a woolly mammoth; in old chess the bishop was an elephant, and he wants the square back)
+Powers: Tusks: two of his pawns glow, he waits, and they fuse into an elephant (a bishop); that's his whole move. Ultimate, Mammoth Slam: he stomps and three of your pieces fly up into the air for three turns, then come back down.
+Kid: Woolly
+Ride: Alfil's Howdah: A baby mammoth with a tiny throne on its back. It plods, you reign, nobody hurries.
+Lines it says now (match this voice; don't repeat these):
+  entrance: Before your bishops, there was me. / The old piece is back. / Make room. Big guy coming through.
+  move: Stomp. / Heavy step. / Make way.
+  capture: Trampled! / Squashed flat. / I never forget a piece.
+  check: Check! Feel the ground shake? / Check. Stampede! / Small king. Big tusks.
+  hurt: Hey! Mind the tusks! / Ow! My trunk! / That stung!
+  thinking: Elephants never rush. / Slow and heavy… / Let me chew on that…
+  smug: Old school wins. / Ten thousand years of practice. / Thick skin. Big plans.
+  rattled: The ice age was easier… / My tusks are shaking… / Not my squares…
+  defeat: Back to the ice… / Replaced… again… / The bishops can have it…
+  victory: The board is mine again! / Who needs bishops? / Mammoth win!
+  strike: Trampled! / Out of my way!
+  power: Two little pawns make one big problem. / Glow, little ones. / Pawns today. Elephant tomorrow.
+  powerHit: Worth the wait. / I'll skip my move. You'll wish I hadn't. / Patience. Something old is coming back.
+  ultimateWarn: Hold on to something. / Feel that rumble? / Brace yourselves…
+  ultimate: What goes up… / Up you go! / Fly, little pieces!
+  ultimateHit: …must come down. / And down they come. / Welcome back. Miss me?
+  kingAttack: Poke! Poke! Poke! / Out of my way, little king! / Remember me now?
+
+=== Chub & Chirp ===
+Who: A chatty brown rabbit and his chirping grasshopper best friend, sharing one saddle, who hop right over your pawns and race you for carrots.
+Chub and Chirp grew up in the same meadow and have shared one little saddle ever since. Chub does all the talking, and Chirp answers in chirps that only Chub claims to understand. Their rule for life is simple: if something's in the way, go over it, because Chirp never walks around. What they want most is a good race, a full satchel and carrots for dinner, ideally all three at once. They see the other bosses as neighbors and future friends. Chub asks every one of them if they have carrots, and Chirp sizes up which of them he could hop over.
+Voice: Short, bright bursts with lots of exclamation points. Chub often turns mid-thought to talk to Chirp and translates his answers. Chirp's reply shows as "(Chirp!)" now and then, never every line. He gets excited fast and droops even faster when things go wrong.
+Pronouns: two friends drawn as one: Chub, a brown rabbit, rides Chirp, a grasshopper. Chub talks; Chirp only chirps, written as (Chirp!)
+Powers: Leapfrog: his pawn hops right over one of yours that stands nose to nose with it. Ultimate, Carrot Patch (once a battle): five carrots are planted, you both race to pull them, then a spin decides what they're worth.
+Kid: Bun & Bug
+Ride: Riding Chirp: Chirp, Chub's trusty grasshopper, with a saddle. Goes one square per hop, and chirps about it the whole way.
+Lines it says now (match this voice; don't repeat these):
+  entrance: Chub and Chirp, reporting for hops! / Ready, Chirp? (Chirp!) / Two friends. One saddle. Big plans.
+  move: Hup! / Easy, Chirp. Easy. / Nice and springy. / Hop to it!
+  capture: Nibbled! / Into the satchel! / Chirp, look what I got!
+  hurt: Not the ears! / Chirp! You okay, buddy? / My scarf!
+  strike: Hop along now! / Bounced out!
+  power: Leapfrog! / Pardon us! Coming over! / Mind your head! / Up, over, and hello! / Chirp never walks around.
+  thinking: Chirp? …Chirp. Good point. / Thinking with my ears…
+  check: Check! Thump, thump! / Check! Chirp says hi!
+  smug: Best team in the meadow! / High five, Chirp! Er, high six!
+  rattled: Chirp, hop faster! / Uh-oh. Ears down.
+  victory: Victory lap, Chirp! / Carrots for everyone! Well, us.
+  defeat: Chirp… carry me home… / Out of hops…
+  ultimateWarn: I smell carrots… / Chirp, start digging.
+  ultimate: Carrot Patch! Race you! / Five carrots. Ready, set, HOP! / Dinner's planted. Hands off.
+  carrotHis: Pulled one! / Ooh, a big one! / Count it, Chirp! / Crunchy! That's ours.
+  carrotYours: Those are OUR carrots! / Carrot thief! / Put that back! / Chirp, they took one!
+  spinBig: Come on… come on… YES! / Look at that haul!
+  spinSmall: A little something. Thanks! / Small prize. Still a prize.
+  spinEmpty: Nothing? Not even a pawn? / Empty reel. Empty tummy. / Well, it was fun to spin.
+  carrotsAll: Five carrots! That's the game! / All five! Good game, everyone!
+  kingAttack: Eat your veggies, your majesty! / Carrots away! And away! And away! / Open wide, King!
+
+=== Smudgy ===
+Who: A lime-green chameleon who never could blend in, so he became a painter and now hides a rook in plain sight.
+Every chameleon Smudgy grew up with could vanish into a leaf. Not him: his orange, teal and green stripes stayed loud no matter how hard he tried. So he picked up a brush and decided that if he couldn't change his colors, he'd change everyone else's. Now he paints his pawns, swaps his rook into hiding, and turns your knights and bishops his color with a flick of the wrist. He wants two things: to be noticed and admired as a real artist, and to pull off one perfect disappearing trick that would make the other chameleons gasp. He sees the other bosses as portrait subjects and color schemes. Fire bosses are "warm tones," ice bosses are "cool tones," dark and light are just black and white paint to him, and anyone who won't hold still is a personal tragedy.
+Voice: Short, bright sentences, like an art teacher who's had too much coffee. Trails off with … while he's working, bursts into exclamations on reveals, and drops little critic's asides about color and composition. Calls his pawns "the boys." Fussy about wet paint, proud of every splat.
+Pronouns: he
+Powers: Camouflage: his rook hides among his pawns, painted to look just like one, until it strikes. Repaint (twice a battle at most): he paints one of his pawns your color and one of your knights or bishops his.
+Kid: Dabble
+Ride: Brush Ride: Smudgy's spare brush. It flies fine; it just won't stop signing its work in the air.
+Lines it says now (match this voice; don't repeat these):
+  entrance: Smudgy, artist. Don't touch the wet parts. / Every chameleon blends in. I'd rather stand out. / Hold still. I'm painting you into a corner.
+  move: A little dab here… / Broad strokes. / Needs more yellow. / Light touch.
+  capture: Painted over! / That one didn't go with the room. / Into the scrap pile!
+  hurt: My palette! / Hey! That was still drying! / Smudged!
+  strike: Brush stroke! / Splat!
+  power: Now you see it… / Which one's which? Even I forget. / Fresh coat for the boys.
+  camoStrike: Surprise! A rook all along! / Ta-da! Nobody ever notices me. Until now.
+  rookTaken: Hey! How did you know?! / My masterpiece!
+  thinking: Where does this one go… / An artist never rushes.
+  check: Check! Hold that pose! / Check! Somebody frame this!
+  smug: A masterpiece, if I say so myself. / The other chameleons should see me now.
+  rattled: This isn't the picture I had in mind! / Too many colors! Too many!
+  victory: Signed, Smudgy! / Hang it in a gallery!
+  defeat: Back to the drawing board… / I wanted to stand out. Not like this.
+  ultimateWarn: My brush is getting itchy… / Time for a new color scheme.
+  ultimate: Repaint! Your side, my side, who can tell? / A little white here, a little black there… / Let's switch things up.
+  kingAttack: Hold still, your majesty. You need a touch-up. / Yellow's your color, King! / Splat! Splat! Splat!
+
+=== Moo & Moon ===
+Who: A lonely Holstein calf and the curious Moon who befriended him; the Moon does the talking, and Moo answers in moos.
+Moo was a lonely farm calf who always wanted a friend. Every night the Moon looked down, curious about the farm animals, and the one it kept hearing was a little cow saying "Moo." So that became his name, and now they're best friends: Moo hugs the Moon, or rides it like a little boat, and the Moon talks for both of them. What they want is simple: to play, stay up late, and never be lonely again. The Moon sees the other bosses as the most interesting new neighbors since the farm, and asks them a lot of questions. It feels at home with night and dark types, and gets a bit shy around sunny or fiery ones. Moo just wants to know if they're nice.
+Voice: The Moon talks in short, bright sentences with lots of exclamation points, and often asks Moo questions. Moo answers in parentheses with a single moo and a feeling icon, never real words. The Moon is gentle even when it's winning, says "please" and "sorry" to pieces, and trails off with … when it's sleepy or worried.
+Pronouns: two friends: Moo, a cow who only ever says Moo (with a feeling), and the Moon, a crescent who does the talking. Moo's sounds go in brackets, like (Moo!). Only these two may use the little icons {heart} {question} {sparkle} {pawn} {anger} {zzz}, as in their lines
+Powers: Moonbeam: every few of his moves a moonbeam stuns one of your pieces; it can't move next turn. Ultimate, Full Moon: Moo glows and plays his very best for five moves, ends with a flurry of five beams, then he's dazed.
+Kid: Twinkle
+Ride: Moon's Ride: A sleepy crescent that gives rides on its way to bed. Mind the horns; it never minds anything.
+Lines it says now (match this voice; don't repeat these):
+  entrance: Hi! This is Moo. He's my best friend. (Moo! {heart}) / I watched your farm for ages. Let's play! (Moo? {question}) / Moo, look! Little horses! (Moooo… {sparkle})
+  move: Ooh, good one, Moo! / (Moo.) / Easy does it, buddy. / (Moo. {pawn})
+  capture: We got one! (MOO! {sparkle}) / Sorry, little piece! (Moo.) / (Moo! {heart})
+  hurt: Hey! That one was ours! (Moo. {anger}) / Moo! Are you okay?! (…moo.) / (MOO! {anger})
+  strike: Moonlight, coming down! / (Moo! {sparkle})
+  power: Moonbeam! Stay right there, please. / A little moonlight for you! / Shhh. That one's napping now. (Moo. {zzz})
+  wax: I'm getting fuller, Moo… I can feel it! (Mooo…) / Half a moon! Halfway there! (Moo! {moon}) / Almost full! (Moo moo! {sparkle})
+  thinking: Hmm… which one, Moo? (Moo. {pawn}) / Moo's chewing on it. (Moo. {grass})
+  check: Check! Did we do that? (MOO! {sparkle}) / Your king looks worried! (Moo? {question})
+  smug: Best friends make the best moves! (Moo! {heart}) / (Moo. {cowbell})
+  rattled: Uh-oh. Moo, hold me tighter. (Moo… {question}) / So many pieces, Moo! (Moo?!)
+  victory: We did it, Moo! (MOOOO! {heart}) / Best night ever! (Moo! {cowbell})
+  defeat: That's okay, Moo. We have each other. (…moo. {heart}) / Time to go home… (Moo. {zzz})
+  ultimateWarn: Moo… I think I'm almost full… (Moo? {moon}) / Look up, everyone! (Mooo… {sparkle})
+  ultimate: FULL MOON! Now, Moo! (MOOOOOO!!) / Take my light, buddy! (MOO! {sparkle})
+  flurry: Moonbeams, everywhere! (MOO MOO MOO!) / Lights out, little pieces!
+  dazed: Oh dear. Too much moon. (…moo. {zzz}) / Easy, buddy. Easy. (Moo… {zzz})
+  kingAttack: Shine, shine, shine! (MOO! {sparkle}) / Sorry, King. Moo really wants to win! (Moo!) / Moonbeam, moonbeam, moonbeam! (MOO!)
+
+=== Puddles ===
+Who: A big, unhurried hippo gardener who plants hidden seeds as the clock ticks, then waters the whole board to see what comes up.
+Puddles is an upright hippo with a garden hose, a soft smile and two green thumbs. He tends a garden where every patch of soil is a chess square. Every game, he starts from the very beginning, like a seed. While you think, he plants; when he's cross, the clouds roll in and he waters everything at once, hoping for a fine crop or, once in a blue moon, a prize queen. He wants a blue ribbon at the county fair and guests who wipe their feet. He sees the other bosses as neighbors: dear, noisy, and forever stepping in his flower beds. He waves at all of them, then quietly checks his petunias.
+Voice: Slow and short. Plain sentences ending in periods, often a word repeated for weight ("Good soil. Very good soil."). Gentle warnings framed as garden manners. A trailing "…" when he's waiting on something to grow. Rarely shouts; an exclamation means it's watering time or a prize came up. Sound effects like "Plop." and "Spritz!" are a sprinkle, not a downpour.
+Pronouns: he (a hippo gardener)
+Powers: Seeds: as the clock ticks he plants hidden seeds around the board. Ultimate, Watering: he waters the whole board (his whole turn) and the seeds come up; what grows can help him or hurt him.
+Kid: Drizzle
+Ride: Puddles's Mower: Top speed: a brisk stroll. Puddles insists that's plenty for the lawn and for the war.
+Lines it says now (match this voice; don't repeat these):
+  entrance: Mind the flower beds. / Big feet, gentle hands. Wipe yours. / Welcome to my garden. Stay as long as you like. Longer, ideally.
+  plantMany: A few seeds to start… / Good soil here. Very good soil.
+  plant: Another one. / Take your time. They grow either way. / Plop.
+  move: Slow and steady. / One step at a time. / Easy does it. / Patience.
+  capture: Weeded out. / Pulled it up by the roots. / That one was crowding the bed.
+  hurt: My petunias! / Hey! I just watered that. / Ouch. That'll leave a mark on the lawn.
+  strike: Spritz! / Little drink for you!
+  thinking: Hmm… let it grow. / Good things take time.
+  check: Check. Feeling the heat? / Check. Nowhere to plant your feet.
+  smug: Everything's coming up roses. / Green thumb. Both of them.
+  rattled: Somebody's trampling my garden! / This was not in the seed catalog.
+  ultimateWarn: Clouds are rolling in… / Feels like rain.
+  ultimate: Watering time! / Let's see what comes up! / Drink up, little ones!
+  cheer: Look at that! A fine crop. / Grown it myself!
+  bigCheer: A queen! Prize of the county fair! / Now that's what I call a harvest!
+  shrug: Hm. Dry year. / Next season.
+  ownEaten: Not that one! Bad plant! / Well… it was hungry.
+  victory: Another fine harvest. / Everything in its season.
+  defeat: Trampled… my whole garden… / I'll replant. I always do.
+  kingAttack: Hold still, your majesty. You look thirsty. / Spritz! Spritz! Spritz! / A royal soaking!
+
+=== Babur ===
+Who: Babur is a retired circus tiger who walked out on the roaring and the burning hoops to make balloon chess pieces, and he would like some quiet, please.
+Babur spent years as the circus's star tiger: roaring on cue, leaping through burning hoops, bowing for crowds he never asked for. One night he watched someone twisting silly balloon animals and decided that was his real calling. Now he blows up balloons shaped like chess pieces and lets them float onto the board. Some land as pieces and plenty pop, and he insists every one is art. All he wants is to be taken seriously as an artist, and to nap. He treats the other bosses like a touring troupe he got stuck with. Anyone with an act is a fellow performer he'll grudgingly respect. Anyone loud is a headliner he'd rather not share a ring with. Anyone who mentions hoops gets a long, tired stare. He's dry and a bit sour, but never mean, and he goes soft the moment someone admires a balloon.
+Voice: Short, flat, dry sentences ending in periods, often two or three clipped beats in a row. He's bored and deadpan by default, sometimes with a weary 'Ugh.' or 'Fine.' up front. He only uses exclamation marks when a balloon delights him or the hoops come out. He uses circus words (show, act, crowd, curtain) with an eye-roll. Tics like 'Ugh.', 'Fine.' and 'Ta-da.' are seasoning, about one line in five at most.
+Pronouns: he (a retired circus tiger)
+Powers: Balloons: with his pump he blows up balloon pieces that land on the board as his; some of them pop. Ultimate, Hoops: burning hoops go up around some of your pieces; nothing gets in or out while they burn.
+Kid: Stripes
+Ride: Balloon Pup: A very good boy, twisted from one very long balloon. Do not bring a pin to the park.
+Lines it says now (match this voice; don't repeat these):
+  entrance: Ugh. Another crowd. / No roaring tonight. Balloons only. / Step right up. Or don't. I'm on break.
+  place: Let's see what this one wants to be. / Just a little air… / Shh. Creative process.
+  move: Fine. I'll move. / Padding along. / Quietly now. / No leaping. I'm retired.
+  capture: Pop goes your piece. / That one didn't make the show. / Swat.
+  hurt: Hey! Watch the whiskers. / Rude. I was concentrating. / That's coming out of your ticket.
+  strike: Swat! / Claws out. Just this once.
+  thinking: Thinking. Please hold your applause. / Don't rush the artist.
+  check: Check. Ta-da. / Check. The crowd goes mild.
+  smug: Now that's showmanship. / Balloon artist. Chess genius. Same paws.
+  rattled: This was not in the act! / Somebody get the ringmaster!
+  ultimateWarn: Oh no. Not the hoops. / I swore I'd never do this again…
+  ultimate: Fine! The hoops! Happy now? / One last show. Burning hoops! / Through the hoops, everybody!
+  cheer: Ta-da! Fresh from the pump. / Balloon art. Very serious. / Another masterpiece.
+  bigCheer: A queen! My finest work! / Look at her! She's perfect!
+  wince: …I meant to do that. / Too much air. Again. / That one was a rough draft.
+  victory: Show's over. Exit through the gift shop. / Bow. Curtain. Nap.
+  defeat: Back to the circus, I guess… / My balloons… all of them…
+  kingAttack: A balloon for your majesty. And another. / Bonk! Bonk! Bonk! / Hold still. This one's a crown.
+
+=== Folio ===
+Folio is a paper crane folded from a page of someone's very serious handwritten notes. It's calm, polite and quietly sure of itself, an editor at heart: every game is a draft, every move can be revised, and it reads your plans like a page. It speaks in short, neat, complete sentences, never shouts, and is a little smug in the gentlest way. When it talks it makes a soft bird chirp.
+Pronouns: it (a paper crane folded from a page of someone's handwriting; never he or she)
+Powers: Draft: it marks one of your pieces, counts down, and folds that piece away for a while. Ultimate, Crease: it draws a pencil line across the board and folds along it; your pieces can't cross the crease for a few turns. Revision (once a battle): when you punish one of its mistakes, it crosses out both moves and plays a different one.
+Kid: Pleat
+Ride: Paper Crane: Folded from a page of someone's very serious notes. Flies fine, as long as nobody tries to read it.
+Lines it says now (match this voice; don't repeat these):
+  entrance: Every game is a draft. Shall we write one?
+  power: I'll be honest: that piece is next.
+  fold: Folded. It'll keep.
+  ultimateWarn: Mind the crease.
+  revision: Let me write that again.
+  victory: Well played. Keep the crane.
+  defeat: Beautifully written. I'll fold this one away.
+
+=== Timber ===
+Timber is a stout, friendly brown beaver standing upright: big buck teeth, an orange hard hat and safety vest, a yellow tool belt (hammer, tape measure, wrench), two planks on his back and a flat paddle tail. Proud and cheerful, a craftsman pleased with his work. He runs a workshop beside the board and builds new chess pieces out of scraps.
+Pronouns: he (NEW boss, not in the game yet: no lines yet)
+Powers: Workshop (his passive): scraps come in as time passes and every time he captures; they go toward a pawn, knight, bishop, rook or queen in his workshop, and a finished piece is dropped onto an empty square on his side of the board. Ultimate, Gnaw: he gnaws one of your pawns down to scraps (if you have no pawns, nothing happens).
+Kid: his woodpecker foreman (a busy, bossy-but-friendly little woodpecker in a tiny hard hat; no name yet)
+Ride: The Log Roller: Timber's favorite commute. Keep your feet moving and never, ever look down.
+Lines:
+  (none yet) Write 4 lines each for: entrance, thinking, move, capture, check, hurt, smug, rattled, victory, defeat, strike, kingAttack,
+  scrap (scraps land in his workshop), built (a piece is finished), drop (he drops a new piece on the board),
+  ultimateWarn, ultimate (Gnaw), gnawNothing (you have no pawn to gnaw).
+
+=== Blitz ===
+Blitz is a cheetah hustler from the park's speed-chess tables: lanky, spotted, black tear marks, a cocky grin, a backwards cap and a teal and orange zip jacket, with a chess clock tucked under one arm that he loves to slap. Fast-talking and restless, a showman, friendly-cocky, never mean. Everything is about speed and time with him.
+Pronouns: he (NEW boss, not in the game yet: no lines yet)
+Powers: Clock Slap (his passive): when he captures a piece he slaps the clock and steals some of your time. Ultimate, Time Scramble: after a warning turn, your next five moves get only a few seconds each.
+Kid: his tortoise (a tiny, very slow tortoise; the joke is fast guy, slow buddy; no name yet)
+Ride: Cheetah Shoes: Spotted, laced and twice as fast. Blitz says the spots are just for show; the speed is not.
+Lines:
+  (none yet) Write 4 lines each for: entrance, thinking, move, capture, check, hurt, smug, rattled, victory, defeat, strike, kingAttack,
+  clockSlap (he slaps the clock after a capture), ultimateWarn, ultimate (Time Scramble starts), scrambleEnd (it's over).
+
+THE KIDS (name, whose kid, chess rating, look)
+- Squirt: Boingo's kid, rated 700, a tiny clown with a squirting flower
+- Tex: Wrangler's kid, rated 800, a little cowboy piglet
+- Dabble: Smudgy's kid, rated 1000, a little chameleon painter who blends in
+- Blocky: Big Boy's kid, rated 1100, a toddler with a big toy block
+- Bun & Bug: Chub & Chirp's kid, rated 1300, a baby bunny and a tiny bug who rides on him
+- Pleat: Folio's kid, rated 1400, a little folded paper bird ('it')
+- Twinkle: Moo & Moon's kid, rated 1600, a little star
+- Drizzle: Puddles's kid, rated 1700, a little hippo with a watering can
+- Chip: Sawyer's kid, rated 1900, a little raccoon helper who carries the small planks
+- Stripes: Babur's kid, rated 2000, a tiger cub with a purple balloon whose roar comes out squeaky
+- Woolly: Alfil's kid, rated 2200, a baby mammoth
+- Crumb: Ginger's kid, rated 2300, a little gingerbread kid, still a bit warm from the oven
+- Sparky: Jefferson's kid, rated 2400, a little giraffe with a sparkler
+- Glim: Hollow's kid, rated 2500, Hollow's eerie little shadow kid; the strongest bot in town, stronger than Hollow himself; only ever eerie, never cute
+- (no name yet: 3 ideas wanted): Timber's kid, rated about 1500, a busy, bossy-but-friendly woodpecker foreman in a tiny hard hat
+- (no name yet: 3 ideas wanted): Blitz's kid, rated about 1200, a tiny, very slow tortoise who carries his own little chess clock
+
+Some lines the kids say now: Ooh, sparkly! Is it fireworks time yet? (Sparky) / Psst! Smell my flower. Go on, closer! (Squirt) / Crumb here! Careful, I'm still warm. (Crumb) / Shh. The dark is thinking. (Glim) / Blocky stacks it up. Then, crash! (Blocky) / Chip made a pawn. It's a little crooked. (Chip) / Stripes tried a roar. It came out squeaky. (Stripes)
+
+THE PAIRS (Part C), in this order:
+1. Ginger + Boingo the Clown
+2. Ginger + Jefferson
+3. Ginger + Hollow
+4. Ginger + Big Boy
+5. Ginger + Sawyer
+6. Ginger + Wrangler
+7. Ginger + Alfil
+8. Ginger + Chub & Chirp
+9. Ginger + Smudgy
+10. Ginger + Moo & Moon
+11. Ginger + Puddles
+12. Ginger + Babur
+13. Ginger + Folio
+14. Ginger + Timber
+15. Ginger + Blitz
+16. Boingo the Clown + Jefferson
+17. Boingo the Clown + Hollow
+18. Boingo the Clown + Big Boy
+19. Boingo the Clown + Sawyer
+20. Boingo the Clown + Wrangler
+21. Boingo the Clown + Alfil
+22. Boingo the Clown + Chub & Chirp
+23. Boingo the Clown + Smudgy
+24. Boingo the Clown + Moo & Moon
+25. Boingo the Clown + Puddles
+26. Boingo the Clown + Babur
+27. Boingo the Clown + Folio
+28. Boingo the Clown + Timber
+29. Boingo the Clown + Blitz
+30. Jefferson + Hollow
+31. Jefferson + Big Boy
+32. Jefferson + Sawyer
+33. Jefferson + Wrangler
+34. Jefferson + Alfil
+35. Jefferson + Chub & Chirp
+36. Jefferson + Smudgy
+37. Jefferson + Moo & Moon
+38. Jefferson + Puddles
+39. Jefferson + Babur
+40. Jefferson + Folio
+41. Jefferson + Timber
+42. Jefferson + Blitz
+43. Hollow + Big Boy
+44. Hollow + Sawyer
+45. Hollow + Wrangler
+46. Hollow + Alfil
+47. Hollow + Chub & Chirp
+48. Hollow + Smudgy
+49. Hollow + Moo & Moon
+50. Hollow + Puddles
+51. Hollow + Babur
+52. Hollow + Folio
+53. Hollow + Timber
+54. Hollow + Blitz
+55. Big Boy + Sawyer
+56. Big Boy + Wrangler
+57. Big Boy + Alfil
+58. Big Boy + Chub & Chirp
+59. Big Boy + Smudgy
+60. Big Boy + Moo & Moon
+61. Big Boy + Puddles
+62. Big Boy + Babur
+63. Big Boy + Folio
+64. Big Boy + Timber
+65. Big Boy + Blitz
+66. Sawyer + Wrangler
+67. Sawyer + Alfil
+68. Sawyer + Chub & Chirp
+69. Sawyer + Smudgy
+70. Sawyer + Moo & Moon
+71. Sawyer + Puddles
+72. Sawyer + Babur
+73. Sawyer + Folio
+74. Sawyer + Timber
+75. Sawyer + Blitz
+76. Wrangler + Alfil
+77. Wrangler + Chub & Chirp
+78. Wrangler + Smudgy
+79. Wrangler + Moo & Moon
+80. Wrangler + Puddles
+81. Wrangler + Babur
+82. Wrangler + Folio
+83. Wrangler + Timber
+84. Wrangler + Blitz
+85. Alfil + Chub & Chirp
+86. Alfil + Smudgy
+87. Alfil + Moo & Moon
+88. Alfil + Puddles
+89. Alfil + Babur
+90. Alfil + Folio
+91. Alfil + Timber
+92. Alfil + Blitz
+93. Chub & Chirp + Smudgy
+94. Chub & Chirp + Moo & Moon
+95. Chub & Chirp + Puddles
+96. Chub & Chirp + Babur
+97. Chub & Chirp + Folio
+98. Chub & Chirp + Timber
+99. Chub & Chirp + Blitz
+100. Smudgy + Moo & Moon
+101. Smudgy + Puddles
+102. Smudgy + Babur
+103. Smudgy + Folio
+104. Smudgy + Timber
+105. Smudgy + Blitz
+106. Moo & Moon + Puddles
+107. Moo & Moon + Babur
+108. Moo & Moon + Folio
+109. Moo & Moon + Timber
+110. Moo & Moon + Blitz
+111. Puddles + Babur
+112. Puddles + Folio
+113. Puddles + Timber
+114. Puddles + Blitz
+115. Babur + Folio
+116. Babur + Timber
+117. Babur + Blitz
+118. Folio + Timber
+119. Folio + Blitz
+120. Timber + Blitz
+
+Start now with the first two bosses: Ginger and Boingo the Clown.

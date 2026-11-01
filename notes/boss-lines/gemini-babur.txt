@@ -1,0 +1,335 @@
+@@ EXISTING Babur (Review & Suggestions)
+existing.entrance | Ugh. Another crowd. [KEEP]
+existing.entrance | No roaring tonight. Balloons only. [KEEP]
+existing.entrance | Step right up. Or don't. I'm on break. [KEEP]
+existing.place | Let's see what this one wants to be. [SUGGEST: Twisting it into shape. Don't breathe on it.]
+existing.place | Just a little air… [KEEP]
+existing.place | Shh. Creative process. [KEEP]
+existing.move | Fine. I'll move. [KEEP]
+existing.move | Padding along. [SUGGEST: One paw at a time. No rush.]
+existing.move | Quietly now. [KEEP]
+existing.move | No leaping. I'm retired. [KEEP]
+existing.capture | Pop goes your piece. [KEEP]
+existing.capture | That one didn't make the show. [SUGGEST: Cut from the act. Too loud.]
+existing.capture | Swat. [REMOVE - duplicate of strike 'Swat!'; SUGGEST: Off the stage with that one.]
+existing.hurt | Hey! Watch the whiskers. [KEEP]
+existing.hurt | Rude. I was concentrating. [KEEP]
+existing.hurt | That's coming out of your ticket. [SUGGEST: Hey. Do I look like a scratching post?]
+existing.strike | Swat! [KEEP]
+existing.strike | Claws out. Just this once. [KEEP]
+existing.thinking | Thinking. Please hold your applause. [KEEP]
+existing.thinking | Don't rush the artist. [KEEP]
+existing.check | Check. Ta-da. [KEEP]
+existing.check | Check. The crowd goes mild. [KEEP]
+existing.smug | Now that's showmanship. [SUGGEST: You can't rush real art. Or a good nap.]
+existing.smug | Balloon artist. Chess genius. Same paws. [KEEP]
+existing.rattled | This was not in the act! [KEEP]
+existing.rattled | Somebody get the ringmaster! [SUGGEST: Hey! Who let a pin near the board?]
+existing.ultimateWarn | Oh no. Not the hoops. [KEEP]
+existing.ultimateWarn | I swore I'd never do this again… [KEEP]
+existing.ultimate | Fine! The hoops! Happy now? [KEEP]
+existing.ultimate | One last show. Burning hoops! [KEEP]
+existing.ultimate | Through the hoops, everybody! [SUGGEST: Rings of fire! Stay inside yours!]
+existing.cheer | Ta-da! Fresh from the pump. [KEEP]
+existing.cheer | Balloon art. Very serious. [KEEP]
+existing.cheer | Another masterpiece. [SUGGEST: Look at that knot. Pure skill.]
+existing.bigCheer | A queen! My finest work! [KEEP]
+existing.bigCheer | Look at her! She's perfect! [KEEP]
+existing.wince | …I meant to do that. [KEEP]
+existing.wince | Too much air. Again. [KEEP]
+existing.wince | That one was a rough draft. [KEEP]
+existing.victory | Show's over. Exit through the gift shop. [KEEP]
+existing.victory | Bow. Curtain. Nap. [KEEP]
+existing.defeat | Back to the circus, I guess… [KEEP]
+existing.defeat | My balloons… all of them… [KEEP]
+existing.kingAttack | A balloon for your majesty. And another. [KEEP]
+existing.kingAttack | Bonk! Bonk! Bonk! [SUGGEST: Squeak, squeak, bonk. Royal treatment.]
+existing.kingAttack | Hold still. This one's a crown. [KEEP]
+
+@@ BOSS Babur
+more.entrance | Keep it down. The rubber's delicate.
+more.entrance | I brought the pump. You brought the noise.
+more.entrance | One game. Then I'm taking a nap.
+more.place | Squeak, twist, fold. Done.
+more.place | Careful with the claws… careful…
+more.place | One more puff ought to do it.
+more.place | This one feels like a winner. Probably.
+more.place | Art takes air. Lots of air.
+more.place | Hold your breath. It's touchy.
+more.move | Over here now. Big thrill.
+more.move | Pacing myself. Like a pro.
+more.move | One square closer to my nap.
+more.capture | Cleared off the stage.
+more.capture | Too stiff. Needs more bounce.
+more.capture | Gone. Now I have room to work.
+more.hurt | Watch the stripes. They're vintage.
+more.hurt | Ugh. That ruined my whole mood.
+more.hurt | Did you just poke a tiger? Bold.
+more.strike | Back of the paw. Sit down.
+more.strike | Show's closed on that square.
+more.strike | Off my stage.
+more.thinking | Give me a second. My paws are tired.
+more.thinking | Staring at the board. Very dramatic.
+more.thinking | Hold on. Sizing up the angles.
+more.check | Check. Try not to panic.
+more.check | Your king's in the spotlight. Check.
+more.check | Check. You can clap if you want.
+more.smug | Still got it. Even without the roar.
+more.smug | Clean work. Barely lifted a paw.
+more.smug | Better than jumping through fire, huh?
+more.rattled | Too loud. Way too loud in here.
+more.rattled | My pump's jamming. Hold everything!
+more.rattled | Okay, now you're testing my patience.
+more.ultimateWarn | Don't make me get the matches…
+more.ultimateWarn | You really want the old act? Fine…
+more.ultimateWarn | I smell smoke. My least favorite part…
+more.ultimateWarn | The crowd always wants the fire…
+more.ultimateWarn | Ugh. Dragging out the big rings…
+more.ultimateWarn | Say goodbye to my fur. Here goes…
+more.ultimate | Up go the hoops! Nobody move!
+more.ultimate | Fire in the ring! Stay put!
+more.ultimate | Old habits burn hard! Watch your whiskers!
+more.ultimate | Look! Fire! Just like the posters!
+more.ultimate | Hot enough for you?! Stay in your ring!
+more.ultimate | Center ring! Nobody leaves the circle!
+more.cheer | Look at that shine! Not a single leak!
+more.cheer | Squeaky clean! Best one all week!
+more.cheer | It stayed inflated! I knew it would!
+more.bigCheer | A balloon queen! Museum quality!
+more.bigCheer | Even the ringmaster couldn't top her!
+more.bigCheer | Look at that crown! Two twists and a pinch!
+more.wince | Cheap rubber. Definitely the rubber.
+more.wince | Ugh. My claw slipped.
+more.wince | Nobody look at the scraps. Move along.
+more.victory | Good show. Tip jar's by the door.
+more.victory | That's a wrap. Lights out, everybody.
+more.victory | And the tiger wins without a single jump.
+more.defeat | Show's canceled. Refunds at the gate…
+more.defeat | Flat. Completely flat…
+more.defeat | I'm going back to bed…
+more.kingAttack | Have a giraffe. And a poodle. And a swan.
+more.kingAttack | Squeaky balloon barrage. Very fierce.
+more.kingAttack | Ta-da. Your king is covered in rubber.
+open.sicilian | The Sicilian. Sharp. Keep it away from the balloons.
+open.sicilian | Sicilian, huh. A bit dramatic for a matinee.
+open.french | The French. Slow, quiet, lots of walls. I approve.
+open.french | French Defense. Good. Nobody has to rush.
+open.italian | The Italian Game. Classic act. Never leaves the tour.
+open.italian | Italian, is it. Straight to the center ring.
+open.spanish | The Spanish Game. Long show. Hope you brought a cushion.
+open.spanish | Spanish Game. Poking my knight before the curtain's up.
+open.queensgambit | Queen's Gambit. Giving away snacks in the first act.
+open.queensgambit | A gambit. Everybody wants to be a daredevil.
+open.kingsindian | King's Indian. Cozy little tent you're building there.
+open.kingsindian | Tucking the king away early. Smart. I like a quiet corner.
+open.english | The English. Side entrance. Very polite.
+open.english | Starting on the wing. Fine by me.
+open.slav | The Slav. Solid. Like a crate you can nap on.
+open.slav | Slav Defense. No flash, no fire. My kind of opening.
+open.scotch | The Scotch. Opening the tent flaps right away.
+open.scotch | Scotch Game. Wide open. Nowhere to hide the pump.
+open.dutch | The Dutch. Little drafty around your king.
+open.dutch | Dutch Defense. Bold choice. Or you slipped.
+open.catalan | The Catalan. Sniping from the cheap seats.
+open.catalan | Catalan. That bishop wants the whole aisle.
+open.vienna | The Vienna. Fancy footwork for so early in the show.
+open.vienna | Vienna Game. Quiet setup, loud finish.
+open.fourknights | Four Knights. Look, a whole pony show.
+open.fourknights | Four horses in the ring. Smells like the old tent.
+open.kingsgambit | King's Gambit. Ugh. Show-offs on move two.
+open.kingsgambit | Throwing pawns around already. Pace yourself.
+open.scandinavian | Scandinavian. Bringing the star out before the warm-up.
+open.scandinavian | Queen out on move two. The crowd loves a diva.
+open.london | The London. Same act every night. Respect.
+open.london | London System. Predictable. Good for my blood pressure.
+open.benoni | The Benoni. Messy. Like the ring after the clowns leave.
+open.benoni | Benoni Defense. Living dangerously, huh.
+open.other | Oh, a textbook routine. Did you rehearse this?
+open.other | I know this script. Seen it in three different towns.
+open.other | Fancy opening. Still comes down to paws and balloons.
+pos.youCastle | Tucked into the dressing room. Cozy.
+pos.youCastle | Castled. Smart. Keep the king out of the splash zone.
+pos.heCastles | I'll be in my trailer if you need me.
+pos.heCastles | King's offstage. Now I can work in peace.
+pos.youPromote | Great. Another diva on the board.
+pos.youPromote | A new queen. And you didn't even need a pump.
+pos.hePromotes | Pawn from the back row makes headliner. Nice.
+pos.hePromotes | Promoted. Real wood, too. Not even rubber.
+pos.enPassant | Caught it in mid-air. Old circus reflex.
+pos.enPassant | Passing through? Ticket, please.
+pos.queenTrade | Both headliners gone. Good. Quieter now.
+pos.queenTrade | Queens off. Now the stagehands do the real work.
+pos.heLosesQueen | Ugh. There goes the whole budget.
+pos.heLosesQueen | Lost the queen. Guess I'll blow up a spare.
+pos.attackQueen | Hey. Hands off the leading lady.
+pos.attackQueen | Poking at my queen? Rude.
+pos.youFork | Two at once. Look at the juggler over here.
+pos.youFork | Ugh. A fork. I hate split shifts.
+pos.heForks | Two for one. And I didn't even leave the ground.
+pos.heForks | Pick your favorite. The other one's mine.
+pos.youPin | Stuck in place. Reminds me of the old cage.
+pos.youPin | Pinned. Fine. I wasn't moving anyway.
+pos.blunder | Ooh. Even the back row winced at that one.
+pos.blunder | Was that part of your act, or did you slip?
+pos.greatMove | Hmph. Okay, that was worth a polite clap.
+pos.greatMove | Sharp move. Keep that away from my balloons.
+pos.longThink | Take your time. I'm getting paid by the hour. Not really.
+pos.longThink | Still thinking? Wake me when it's my turn.
+pos.endgame | Late show. Almost nobody left in the tent.
+pos.endgame | Just a few pieces left. Time to wrap this up.
+pos.repetition | Encore? We just did this bit twice.
+pos.repetition | Round and round. Like a pony in the ring.
+pos.godKing | Oh great. The guy with the wings. Watch the balloons.
+pos.godKing | The God King. Little flashy for my taste.
+take.pawn | One less ticket holder in the front row.
+take.pawn | Little guy. Barely worth unsheathing a claw.
+take.knight | Another animal freed from the act. You're welcome.
+take.knight | No more prancing around my ring, horse.
+take.bishop | Pointy hat. Bad for the balloons. Had to go.
+take.bishop | Off the diagonal. You were blocking my light.
+take.rook | Heavy. Like hauling tent poles in the rain.
+take.rook | Solid tower. Good place to scratch my claws.
+take.queen | The headliner leaves the stage. Ta-da.
+take.queen | Your star's out. Show's basically mine now.
+ride.own | Watch your knees. That pup took me six twists.
+ride.own | Hey. No spurs on the Balloon Pup.
+ride.own | Good boy, isn't he. Don't sit on his tail.
+ride.own | You brought my dog. Don't pop him.
+ride.other | {ride}? Loud. Keep it off my paws.
+ride.other | You rode {ride} in here? Circus left a week ago.
+ride.other | Park {ride} outside. It's making my balloons nervous.
+
+@@ TOWN Babur
+town | Nice bench. Good shade. Nobody ask me to roar.
+town | Stripes tried to twist a giraffe. Made a worm. Still proud.
+town | Ran out of red balloons. Guess today's a blue pawn day.
+town | The park's quiet before noon. Best time for a nap.
+town | If you hear a pop, it wasn't me. Probably.
+town | Used to sleep in a wagon. A real bed does wonders.
+town | Taught Stripes the two-pinch poodle. Kid's a natural.
+town | Keep the pinecones away from my stand, please.
+town | Evening breeze is nice. Balloons float a little lower.
+town | No tickets, no ringmaster, no fire. Just chess.
+
+@@ PAIR Ginger + Babur
+Ginger | Keep those burning hoops on your side, cat!
+Babur | Relax, cookie. I hate lighting them as much as you do.
+Ginger | Hmph. Stick to the cold rubber!
+
+@@ PAIR Boingo the Clown + Babur
+Boingo the Clown | Babur! Old pal! Do the roar! Do the jump!
+Babur | We weren't pals, Boingo. You threw a pie in my cage.
+Boingo the Clown | Hee hee! You looked hungry!
+
+@@ PAIR Jefferson + Babur
+Jefferson | Ooh! Burning hoops! Let me light 'em! Please?!
+Babur | Step back, tall guy. Keep your sparks off my rubber.
+Jefferson | Spoilsport…
+
+@@ PAIR Hollow + Babur
+Hollow | Red balloons… easy to lose in the dark.
+Babur | They squeak when you touch them, pal. Good luck sneaking.
+Hollow | Mm. We'll see.
+
+@@ PAIR Big Boy + Babur
+Big Boy | Kitty! Gimme balloon! Mine!
+Babur | Gentle. Squeeze it like that and—
+Big Boy | POP! …Waaaah!
+
+@@ PAIR Sawyer + Babur
+Sawyer | Balloon pieces? Not up to code, cat. One splinter and boom.
+Babur | Then keep your sawdust on your own side of the park.
+Sawyer | Hmph. Touchy artist.
+
+@@ PAIR Wrangler + Babur
+Wrangler | Reckon I could rope one of them floating pawns.
+Babur | Go ahead. You'll rope a handful of empty rubber.
+Wrangler | Snort. Fair point, cat.
+
+@@ PAIR Alfil + Babur
+Alfil | Big cat. Bigger ears on me.
+Babur | Please. I only want quiet and a balloon.
+Alfil | Hrmph. Quiet suits me too.
+
+@@ PAIR Chub & Chirp + Babur
+Chub & Chirp | Can you twist an orange carrot balloon? (Chirp!)
+Babur | Sure. Long twist, green knot on top. Don't bite it.
+Chub & Chirp | No promises! Thanks, Mr. Tiger!
+
+@@ PAIR Smudgy + Babur
+Smudgy | From one artist to another, Babur… bold use of magenta!
+Babur | Finally. Someone in this town with an eye for form.
+Smudgy | Just keep your hoops away from my canvas!
+
+@@ PAIR Moo & Moon + Babur
+Moo & Moon | Moo likes your squeaky horses! (Moo! {heart})
+Babur | Here, kid. Tied a little white cow for him.
+Moo & Moon | Look, Moo, it's you! (Moooo… {sparkle})
+
+@@ PAIR Puddles + Babur
+Puddles | A rubber rook landed in my petunias.
+Babur | Wind took it. Keep it. Adds color to the bed.
+Puddles | Hm. Does keep the crows off.
+
+@@ PAIR Babur + Folio
+Folio | Paper holds a crease. Rubber merely stretches.
+Babur | Let's see your crane bounce off a table, note-page.
+Folio | A fair point. Two quiet crafts.
+
+@@ PAIR Babur + Timber
+Timber | Solid oak beats a balloon any day, friend!
+Babur | Yeah, until you have to carry the bag home.
+Timber | Ha! Good workout for the tail!
+
+@@ PAIR Babur + Blitz
+Blitz | Pick up the pace, big cat! Clock's ticking!
+Babur | Rush a balloon and it pops. Sit down, spots.
+Blitz | Sit? Never heard of it!
+
+@@ KID Stripes
+town | Stripes tried a big roar! It went squeak.
+town | Purple balloons are the toughest to pop.
+town | Dad says real tigers nap after lunch.
+town | Careful! Claws in when you hold the string!
+town | I twisted a pawn all by myself today!
+town | Don't tell Dad, but I like the shiny hoops.
+town | Pouncing practice! …Right after this game.
+town | My stripes are crooked? No, that's art!
+withBoss | Stripes: Dad, watch me roar! Mew!
+withBoss | Babur: Good. Keep it quiet like that and we're fine.
+withBoss | ---
+withBoss | Stripes: My balloon knight looks like a sausage!
+withBoss | Babur: Shorter neck, bigger ears. Watch my paws.
+table.hello | Paws ready! Watch the purple balloon, please.
+table.hello | Dad taught me this setup. No roaring needed.
+table.take | Pounced on it! Squeak!
+table.take | Swiped! Clean paw, no claws.
+table.check | Check! Hear me squeak!
+table.check | Check! Your king's cornered in the ring.
+table.win | I won! Wait till I show Dad!
+table.win | Game over! Want a balloon crown?
+table.lose | Aw, popped my whole plan! Good game.
+table.lose | Outplayed! Back to the drawing board.
+table.draw | A tie! Nobody pops today.
+table.draw | Draw! Even steven. Time for a nap.
+
+@@ KIDPAIR Woolly + Stripes
+Woolly | Can I hold the balloon?
+Stripes | Only if you promise not to sit on it.
+Woolly | Woolly will be super careful!
+
+@@ KIDPAIR Stripes + Sparky
+Sparky | Wanna see my sparkler? It goes fzzzz!
+Stripes | Whoa, back up! My purple balloon's right here!
+Sparky | Oops! Holding it way over here now!
+
+@@ KIDPAIR Stripes + Dabble
+Dabble | Hold still! I'm painting spots on your balloon!
+Stripes | Make them stripes! Tigers don't do spots.
+Dabble | Ooh, teal stripes! Coming right up!
+
+@@ KIDPAIR Stripes + Crumb
+Crumb | You're rated 2000? Hmph. Warm up for me!
+Stripes | Careful, cookie. I pounce fast when I'm awake.
+Crumb | Bring it on, squeaky!
+
