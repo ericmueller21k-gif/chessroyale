@@ -3496,7 +3496,7 @@ export const AUTOCHESS: AutoChessSettings = {
   introBubbleMs: 2500,
   fightMoveMs: 600,
   fightNodes: 30000,
-  cashInGold: 1,
+  cashInGold: 2,
   cashInValue: 20,
   fightFastAfter: 30,
   fightFastMoveMs: 300,
