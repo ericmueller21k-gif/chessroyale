@@ -45,10 +45,17 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   two animations: `idle` and `move` (one square of the town's walk). Drawn: the locker's tile (`ItemArt`: the ride with a white pawn
   on it), the locker's preview and the profiles' pawn (`Avatar`'s `ride`: the pawn and its items on its ride, its idle playing, fitted
   into the same box, so a box never grows), the profile's Wearing rows (last), and the town square (baked sheets: town-square.md,
-  "Rides"). **Not drawn** (the pawn alone, as before): a match's screens, the Colosseum's crowd, home's pawn and the menu's ring, the
+  "Rides"), and **home** (Nov 1: the big pawn on your card, your ring and the side menu's Profile item; hub.md, "Your ride on home").
+  **Not drawn** (the pawn alone, as before): a match's screens, the Colosseum's crowd, the
   queue's and Squads' cards, the boss stage, the town's person card, and the public profile's Equipped Cosmetics row (four tiles at
   most; its View all lists the ride). Changing a ride's drawing, the paint's fills and lines (`item-paint.tsx`) or the colors:
   `npx tsx scripts/bake-rides.ts` (a test fails until it's run; the blotches, `blotches.ts`, and other items don't ask for it).
+- **The gambling warning** (Eric, Nov 1; `components/GamblingWarning.tsx`): a small red ring, see-through in the middle, with a bubbly
+  solid-red "!" in it, always at the top right of the crate pages: the Crates tab and each crate's own page (not the opening or the
+  reveal). It sits over the page's corner (`gamble-ring` in `styles.css`: out of the flow, a 40 px tap target round a 30 px ring), so it
+  takes no room and moves nothing. A tap opens a short message box (the locker's dialog look, `role="dialog"`): **"Crates are chance, like
+  gambling. Only spend money you're okay losing."**, with a Close button (Escape and a tap outside close it too). Eric approved the
+  wording; the ring and the box are the same in light and dark. Guard: `e2e/crate-banner.spec.ts`, "the gambling warning's red ring…".
 - **The locker** keeps each item you own (its color, blemish and seed) and what's equipped in each slot; it can
   delete items. God King effects from the shop are worn there too.
 - **Admins own one of every item** (`ADMIN_EMAILS`; Oct 31): every crate item and God King effect they don't really own,
@@ -70,7 +77,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 | Item drawings, fit, cards (`ItemArt`, `Avatar`); crate and box art (`WinterCrateArt`, `PresentArt`, `BetaCrateArt`, `SupplyBoxArt`) | `packages/app/src/components/Items.tsx` |
 | The paint every item uses (color, shine, `Region`, `LINE`) and its blemish's blotches | `packages/app/src/components/item-paint.tsx` and `blotches.ts` (moved out of Items.tsx, Oct 31) |
 | Rides' drawings (`RIDES`) | `packages/app/src/components/rides/`; their town sheets: `scripts/bake-rides.ts` |
-| Crate page, opening strip, reveal, locker UI (`CRATE_LOOKS`: each crate's art and box) | `packages/app/src/screens/Crates.tsx`; the shop `screens/Shop.tsx` |
+| Crate page, opening strip, reveal, locker UI (`CRATE_LOOKS`: each crate's art and box) | `packages/app/src/screens/Crates.tsx`; the shop `screens/Shop.tsx`; the gambling warning `components/GamblingWarning.tsx` |
 | Server rolls and storage (D1 `items`, `equipped_items`) | `packages/server/src/locker.ts`; the shop's API in `api.ts` / `accounts.ts` |
 | Admins' copies of every item (never stored) | `packages/core/src/admin-copies.ts`; added in `locker.ts` and `accounts.ts` (`shopState`) |
 | Bots' outfits | `packages/core/src/bot-looks.ts`, `packages/app/src/looks.ts` |

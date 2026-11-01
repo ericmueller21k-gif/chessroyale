@@ -7056,6 +7056,40 @@ button.history-label {
   display: grid;
   gap: 12px;
 }
+/*
+ * The gambling warning (Eric, Nov 1; GamblingWarning.tsx): a small red ring over the top right corner of the crate pages (the Crates
+ * tab and a crate's own page). It's out of the flow, so it takes no room and moves nothing; the 40 px button is a full tap target
+ * round the 30 px ring. Its message box is the locker's dialog (below).
+ */
+.crates,
+.crate-page {
+  position: relative;
+}
+.gamble-ring {
+  position: absolute;
+  top: -3px;
+  right: -4px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--danger);
+  cursor: pointer;
+}
+.gamble-ring svg {
+  display: block;
+  width: 30px;
+  height: 30px;
+}
+.gamble-dialog p {
+  margin: 4px 0 2px;
+  font-size: 14px;
+  line-height: 1.45;
+}
 .crate-stock {
   display: flex;
   gap: 10px;
@@ -8358,6 +8392,7 @@ button.fd-logo {
 }
 .fd-btn:active:not(:disabled),
 .fd-play:active:not(:disabled),
+.fd-town:active,
 .fd-modes button:active {
   transform: scale(0.97);
 }
@@ -8876,7 +8911,9 @@ button.fd-logo {
 .fd-mode-panel.idle button:active {
   transform: none;
 }
-.fd-play {
+/* (Chess Town's button, `fd-town`, is PLAY's size at every width: it's in each of PLAY's size rules below, so they never part.) */
+.fd-play,
+.fd-town {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -8884,10 +8921,16 @@ button.fd-logo {
   /*
    * (Oct 26, Eric: "the play button is too small": 64 px. Oct 28: "make the play button bigger with the space we gain": the
    * room the compact Other modes cards and the shorter options give back is PLAY's, so the pawn's card, the page and
-   * everything under PLAY keep their size and place. 97 px = 64 + 4 (options) + 20 (Boss Arena) + 28 (the pair) - 15 (the
-   * room under the last card, kept: below) - 4 (the label's room under PLAY).)
+   * everything under PLAY keep their size and place. 97 px = 64 + 4 (options) + 20 (the Boss Arena card, now Chess Town's button) +
+   * 28 (the pair) - 15 (the room under the last card, kept: below) - 4 (the label's room under PLAY). Nov 1: Chess Town's button
+   * took PLAY's size under PLAY, and the card's room with it.)
+   *
+   * A short phone (Nov 1): Chess Town's button is PLAY's size, 33 px taller than the card it replaced, and the pawn's card was already
+   * at its smallest on a 640 px phone, so below 700 px of height the two give the 33 px back together, 17 px less each at the
+   * most, 80 px, reached at 666 px (the page keeps fitting from 360 × 640 up, as it did: "should never have to be scrolling down on
+   * the phone"). From 700 px up they're 97 px as before.
    */
-  height: 97px;
+  height: clamp(80px, calc(97px - (700px - var(--app-h)) / 2), 97px);
   border: 0;
   border-radius: 18px;
   background: var(--fd-gold);
@@ -8901,6 +8944,63 @@ button.fd-logo {
 .fd-play:disabled {
   opacity: 0.45;
   cursor: default;
+}
+/*
+ * Chess Town's button (Eric, Oct 31 and Nov 1; Home.tsx): PLAY's size (the rules above and the computer's below), a little town
+ * scene filling it (home-art/Pic.tsx: one of two pictures, playing its idle) with the name over it in big white letters with a dark
+ * outline. The sky is the pictures' dusk in the light theme and the dark alike (the colors are fixed, not the theme's), and the gold
+ * ring is drawn over the picture (a border would shrink it). The words sit a little above the middle so the picture's lower half
+ * (the doors, the table and its pawns) shows.
+ */
+.fd-town {
+  position: relative;
+  overflow: hidden;
+  padding: 0 0 26px;
+  background: linear-gradient(180deg, #232c4a 0%, #4a3f5e 62%, #6b4f54 100%);
+  color: #fff;
+  white-space: nowrap;
+}
+.fd-town::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 2px var(--fd-gold);
+  pointer-events: none;
+}
+.fd-town-scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+.fd-town-label {
+  position: relative;
+  z-index: 1;
+  font-size: 32px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #fff;
+  -webkit-text-stroke: 6px #1a1208;
+  paint-order: stroke fill;
+  text-shadow: 0 2px 0 rgba(26, 18, 8, 0.55);
+}
+/* (A 320 px phone: the button is 272 px wide, so the words are a little smaller and still whole.) */
+@media (max-width: 359px) {
+  .fd-town-label {
+    font-size: 28px;
+  }
+}
+/* A computer: PLAY is 76 px tall there (60 in a short window), so the words are smaller and sit lower. */
+@media (min-width: 1024px) {
+  .fd-root.framed .fd-town {
+    padding-bottom: 10px;
+  }
+  .fd-root.framed .fd-town-label {
+    font-size: 30px;
+  }
 }
 /* PLAY, the line under it and an error: spaced as the play column is. */
 .fd-go {
@@ -9120,10 +9220,6 @@ button.fd-logo {
 }
 .rd-face .boss-portrait {
   width: 56px;
-}
-/* Solo Boss Mode's card picture: the crown, in the card's gold (CrownArt, Home.tsx). */
-.fd-crown {
-  color: var(--fd-gold-text);
 }
 /* The card's portrait: a still that moves on to the next boss (BossCardFace), the new one fading in over the last. */
 .rd-face-stack,
@@ -9847,7 +9943,7 @@ button.fd-logo {
 }
 /*
  * Home's Other modes cards are compact, on a phone as on a computer (Eric, Oct 28: "shrink those down vertically and make the
- * play button bigger with the space we gain"): Boss Arena 64 px (its picture 48 px beside the words; it was 84 px on a
+ * play button bigger with the space we gain"): the Boss Arena card 64 px (now Chess Town's button, PLAY's size; its picture 48 px beside the words; it was 84 px on a
  * phone), and under it Solo Boss Mode and Auto chess side by side (Eric, Oct 26; half width each), each with its picture to
  * the left of the words, 56 px tall (they were 84 px on a phone, with the picture above the words, and 64 px on a computer).
  * No › on the half cards: "Solo Boss Mode" and its picture fill a 172 px card at 390 px with no room for it.
@@ -9899,8 +9995,7 @@ button.fd-logo {
 .fd-root .rd-pair .rd-card.rd-half .rd-card-text span {
   font-size: 12px;
 }
-/* (A 320 px phone: the half card is 137 px wide, so a smaller picture and words keep "Solo Boss Mode" on one line, and Boss Arena's
-   line stays on one line too, so no card grows.) */
+/* (A 320 px phone: the half card is 137 px wide, so a smaller picture and words keep "Solo Boss Mode" on one line, so no card grows.) */
 @media (max-width: 359px) {
   .fd-root .fd-play-col .rd-card {
     gap: 10px;
@@ -11167,6 +11262,10 @@ button.fd-seat {
     place-items: center;
     color: var(--fd-gold-text);
   }
+  /* Chess Town's crest (home-art): its own 40 px (a pixel of art a pixel of screen on a computer), in the 34 px icon slot. */
+  .fd-menu-crest {
+    margin: -3px;
+  }
   .fd-right {
     position: sticky;
     /* (Under the maintenance banner, when one shows: --banner-h is 0 otherwise.) */
@@ -11380,7 +11479,8 @@ button.fd-seat {
   }
   /* (Oct 28, Eric: "make the play button bigger with the space we gain": 76 px = 64 + 4 (the options) + 8 (the pair's cards),
      so the live window's board and the page keep their size.) */
-  .fd-root.framed .fd-play {
+  .fd-root.framed .fd-play,
+  .fd-root.framed .fd-town {
     height: 76px;
     font-size: 40px;
   }
@@ -11421,13 +11521,23 @@ button.fd-seat {
     justify-content: flex-end;
     gap: 12px;
   }
+  /*
+   * (Nov 1: Chess Town's button is PLAY's size, 12 px more than the card it replaced, and the live window's board is the column's
+   * elastic part, so under 812 px of height the two give the 12 px back together, 70 px at the least (a 1280 × 800 laptop): the board
+   * keeps the size it had, 233 px at most. From 812 px up, and in a short window (below), they're as they were.)
+   */
+  .fd-root.framed .fd-play,
+  .fd-root.framed .fd-town {
+    height: clamp(70px, calc(76px - (812px - var(--app-h)) / 2), 76px);
+  }
   /* (A short window, a laptop's: the column closer, so the live window keeps a board worth seeing. PLAY 60 px here, up from
      48 (Oct 28; 43 before Oct 26): the board keeps the size it had at 680 px tall.) */
   @media (max-height: 760px) {
     .fd-root.framed .fd-play-col {
       gap: 8px;
     }
-    .fd-root.framed .fd-play {
+    .fd-root.framed .fd-play,
+    .fd-root.framed .fd-town {
       height: 60px;
       font-size: 32px;
     }

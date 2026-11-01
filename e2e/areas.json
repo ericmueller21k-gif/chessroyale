@@ -464,9 +464,10 @@
         "packages/app/src/App.tsx",
         "packages/app/src/screens/Home.tsx",
         "packages/app/src/components/FrontDoor.tsx",
-        "packages/app/src/components/FrontMenu.tsx"
+        "packages/app/src/components/FrontMenu.tsx",
+        "packages/app/src/home-art/**"
       ],
-      "specs": ["e2e/busy.spec.ts", "e2e/faq.spec.ts", "e2e/home-layout.spec.ts", "e2e/home-polish.spec.ts", "e2e/home-ranked.spec.ts", "e2e/legal.spec.ts", "e2e/matchmaking.spec.ts"]
+      "specs": ["e2e/boss-select.spec.ts", "e2e/busy.spec.ts", "e2e/faq.spec.ts", "e2e/home-layout.spec.ts", "e2e/home-polish.spec.ts", "e2e/home-ranked.spec.ts", "e2e/legal.spec.ts", "e2e/matchmaking.spec.ts", "e2e/profile.spec.ts", "e2e/town-desktop.spec.ts"]
     },
     "the stylesheet (one file for every screen: the specs that measure layouts)": {
       "paths": ["packages/app/src/styles.css"],
@@ -613,6 +614,7 @@
       "paths": [
         "packages/app/src/screens/Shop.tsx",
         "packages/app/src/screens/Crates.tsx",
+        "packages/app/src/components/GamblingWarning.tsx",
         "packages/app/src/components/Cosmetics.tsx",
         "packages/app/src/components/Items.tsx",
         "packages/app/src/components/item-paint.tsx",

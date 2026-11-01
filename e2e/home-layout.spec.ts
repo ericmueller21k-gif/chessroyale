@@ -83,7 +83,7 @@ test("light or dark lives in Settings (Match device / Light / Dark), not on home
   expect(await sideways(page)).toBe(0);
 });
 
-test("computer: the play column in the phone's order (the RANKED row, its panel, PLAY, Other modes with the Boss Arena card and Auto chess at the bottom); the panel greyed (none selected, not tappable) and PLAY dimmed until a mode is picked; no Shop, Profile or Play with friends buttons", async ({ page }) => {
+test("computer: the play column in the phone's order (the RANKED row, its panel, PLAY, Chess Town's button, Other modes with Boss Battle and Auto chess at the bottom); the panel greyed (none selected, not tappable) and PLAY dimmed until a mode is picked; no Shop, Profile or Play with friends buttons", async ({ page }) => {
   test.skip(!desktop(), "the computer's layout");
   await named(page, "Columned");
   const main = page.getByRole("main");
@@ -113,10 +113,10 @@ test("computer: the play column in the phone's order (the RANKED row, its panel,
     await expect(menu.getByRole("button", { name: "Profile" })).toBeVisible();
     await expect(menu.getByRole("button", { name: "Play with friends" })).toBeVisible();
     // Top to bottom, as on a phone (Eric, Oct 19: chess first): the RANKED row, its panel (matchmaking), the line above PLAY
-    // (Oct 28) and PLAY, then "Other modes" (Oct 24), the Boss Arena card (full width), and Boss Battle and Auto chess side
-    // by side at the bottom (Eric, Oct 26: half width each).
+    // (Oct 28) and PLAY, then Chess Town's button (PLAY's size; Nov 1, in the old Boss Arena card's place), "Other modes" (Oct 24),
+    // and Boss Battle and Auto chess side by side at the bottom (Eric, Oct 26: half width each).
     const box = async (l: import("@playwright/test").Locator) => (await l.boundingBox())!;
-    const boss = await box(main.getByRole("button", { name: /^Boss Arena/ }));
+    const town = await box(main.getByRole("button", { name: "Chess Town", exact: true }));
     const solo = await box(main.getByRole("button", { name: /^Boss Battle/ }));
     const auto = await box(main.getByRole("button", { name: /^Auto chess/ }));
     const other = await box(main.getByRole("heading", { name: "Other modes", exact: true }));
@@ -124,19 +124,19 @@ test("computer: the play column in the phone's order (the RANKED row, its panel,
     const types = await box(main.getByRole("radiogroup", { name: "Matchmaking" }));
     const p = await box(play);
     const hint = await box(page.locator(".fd-hint"));
-    expect(boss.height).toBeGreaterThanOrEqual(60);
-    expect(Math.abs(boss.width - modes.width), `${w}: the card full width`).toBeLessThan(2);
+    expect(Math.abs(town.height - p.height), `${w}: Chess Town as tall as PLAY`).toBeLessThan(0.5);
+    expect(Math.abs(town.width - modes.width), `${w}: Chess Town full width`).toBeLessThan(2);
     expect(modes.y + modes.height).toBeLessThanOrEqual(types.y);
     expect(types.y + types.height, `${w}: the modes right above PLAY's line`).toBeLessThanOrEqual(hint.y);
     expect(hint.y - (types.y + types.height)).toBeLessThan(30);
     expect(hint.y + hint.height, `${w}: the line above PLAY`).toBeLessThanOrEqual(p.y);
     expect(p.y - (hint.y + hint.height), `${w}: the line just above PLAY`).toBeLessThan(12);
-    expect(other.y, `${w}: Other modes below PLAY`).toBeGreaterThanOrEqual(p.y + p.height);
-    expect(boss.y, `${w}: the Boss Arena card under Other modes`).toBeGreaterThanOrEqual(other.y + other.height);
-    expect(solo.y, `${w}: the pair under the Boss Arena card`).toBeGreaterThanOrEqual(boss.y + boss.height);
+    expect(town.y, `${w}: Chess Town below PLAY`).toBeGreaterThanOrEqual(p.y + p.height);
+    expect(other.y, `${w}: Other modes below Chess Town`).toBeGreaterThanOrEqual(town.y + town.height);
+    expect(solo.y, `${w}: the pair under Other modes`).toBeGreaterThanOrEqual(other.y + other.height);
     expect(Math.abs(solo.y - auto.y), `${w}: Boss Battle and Auto chess side by side`).toBeLessThan(2);
     expect(Math.abs(solo.width - auto.width), `${w}: the two half cards the same width`).toBeLessThan(2);
-    expect(Math.abs(solo.width * 2 + 10 - boss.width), `${w}: two half cards and their gap are Boss Arena's width`).toBeLessThan(2);
+    expect(Math.abs(solo.width * 2 + 10 - town.width), `${w}: two half cards and their gap are Chess Town's width`).toBeLessThan(2);
     await expect(page.locator(".fd-hint")).toHaveText(/Starts within|Usually about|Solo vs/);
     if (w >= 1280) {
       // Beside your card: the Boss raid card ends level with your card's bottom, and the room above is free (for a live
@@ -381,7 +381,7 @@ test("phone: the queue takes the whole screen; the count, the grid and Cancel ar
   expect(await sideways(page)).toBe(0);
 });
 
-test("phone: home fits the screen with no scrolling from 360×640 up, in every mode, the Boss Arena, Boss Battle and Auto chess cards at the bottom under PLAY; the shop, your profile and Friends are in the top bar", async ({ page }) => {
+test("phone: home fits the screen with no scrolling from 360×640 up, in every mode, Chess Town's button under PLAY and the Boss Battle and Auto chess cards at the bottom; the shop, your profile and Friends are in the top bar", async ({ page }) => {
   test.skip(desktop(), "a phone's screen (Eric, Oct 18: \"should never have to be scrolling down on the phone\")");
   await named(page, LONG_NAME);
   for (const [width, height] of [[360, 640], [375, 667], [390, 664], [390, 844], [430, 932]] as const) {
@@ -498,33 +498,34 @@ test("computer at a laptop's window (1280×600, 1366×768): no gear on home (Set
   }
 });
 
-test("Other modes: Boss Arena full width, then Boss Battle and Auto chess side by side at half width each; Boss Arena opens the town square and Back is home; Boss Battle opens its screen with START; ?mode=raid opens the full Boss raid screen with all five (Eric, Oct 26)", async ({ page }) => {
+test("Chess Town's button and Other modes: Chess Town under PLAY at PLAY's width, then Boss Battle and Auto chess side by side at half width each; Chess Town opens the town square and Back is home; Boss Battle opens its screen with START; ?mode=raid opens the full Boss raid screen with all five (Eric, Oct 26 and Nov 1)", async ({ page }) => {
   await named(page, "Arena");
   await page.goto("/");
   const main = page.getByRole("main");
   const cards = main.locator(".rd-card");
-  await expect(cards).toHaveCount(3);
-  await expect(cards.nth(0)).toHaveText(/^Boss ArenaParty up and take on the bosses›$/);
-  await expect(cards.nth(1)).toHaveText(/^Boss BattleAny boss, up to 3$/);
-  await expect(cards.nth(2)).toHaveText(/^Auto chessBuild an army$/);
-  // Boss Arena full width on top; Boss Battle and Auto chess side by side below it, half width each, the same size.
-  const b = (await cards.nth(0).boundingBox())!;
-  const s = (await cards.nth(1).boundingBox())!;
-  const a = (await cards.nth(2).boundingBox())!;
-  expect(s.y, "the pair under Boss Arena").toBeGreaterThanOrEqual(b.y + b.height);
+  const town = main.getByRole("button", { name: "Chess Town", exact: true });
+  await expect(cards).toHaveCount(2);
+  await expect(town).toHaveText("Chess Town");
+  await expect(cards.nth(0)).toHaveText(/^Boss BattleAny boss, up to 3$/);
+  await expect(cards.nth(1)).toHaveText(/^Auto chessBuild an army$/);
+  // Chess Town as wide as the pair; Boss Battle and Auto chess side by side below it, half width each, the same size.
+  const t = (await town.boundingBox())!;
+  const s = (await cards.nth(0).boundingBox())!;
+  const a = (await cards.nth(1).boundingBox())!;
+  expect(s.y, "the pair under Chess Town").toBeGreaterThanOrEqual(t.y + t.height);
   expect(Math.abs(s.y - a.y), "Boss Battle and Auto chess side by side").toBeLessThan(1);
   expect(Math.abs(s.width - a.width), "the two half cards the same width").toBeLessThan(1);
   expect(Math.abs(s.height - a.height), "the two half cards the same height").toBeLessThan(1);
-  expect(Math.abs(s.width * 2 + 10 - b.width), "two half cards and their gap are Boss Arena's width").toBeLessThan(1);
-  // Boss Arena: the town square (/town), drawn; Back is home.
-  await cards.nth(0).click();
+  expect(Math.abs(s.width * 2 + 10 - t.width), "two half cards and their gap are Chess Town's width").toBeLessThan(1);
+  // Chess Town: the town square (/town), drawn; Back is home.
+  await town.click();
   await expect(page.locator("canvas.town-canvas")).toHaveAttribute("data-ready", "1");
   expect(new URL(page.url()).pathname).toBe("/town");
   await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   expect(new URL(page.url()).pathname).toBe("/");
   // Boss Battle: its screen, titled so, with START (no list of options). Back is home.
-  await cards.nth(1).click();
+  await cards.nth(0).click();
   await expect(page.getByRole("heading", { name: "Boss Battle", exact: true })).toBeVisible();
   await expect(main.locator(".rd-option")).toHaveCount(0);
   await expect(main.getByRole("button", { name: "START" })).toBeVisible();
@@ -534,14 +535,14 @@ test("Other modes: Boss Arena full width, then Boss Battle and Auto chess side b
   await page.goto("/?mode=raid");
   await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
   await expect(main.locator(".rd-option")).toHaveCount(5);
-  // A computer's side menu: Boss Battle opens its screen (highlighted there), Boss Arena the town square.
+  // A computer's side menu: Boss Battle opens its screen (highlighted there), Chess Town the town square.
   if (desktop()) {
     await page.goto("/");
     const menu = page.getByRole("navigation", { name: "Menu" });
     await menu.getByRole("button", { name: "Boss Battle" }).click();
     await expect(page.getByRole("heading", { name: "Boss Battle", exact: true })).toBeVisible();
     await expect(menu.getByRole("button", { name: "Boss Battle" })).toHaveAttribute("aria-current", "page");
-    await menu.getByRole("button", { name: "Boss Arena" }).click();
+    await menu.getByRole("button", { name: "Chess Town" }).click();
     await expect(page.locator("canvas.town-canvas")).toHaveAttribute("data-ready", "1");
     expect(new URL(page.url()).pathname).toBe("/town");
   }

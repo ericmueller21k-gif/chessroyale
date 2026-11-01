@@ -5,8 +5,8 @@ Boss raid's coming home: a small round world where players walk around and meet 
 the time of day, the curved ground, all fourteen boss homes with their bosses roaming near them, the bots (twenty since Oct
 28: six pawns and the bosses' fourteen sidekicks) and you; slice 4
 added the press, the trail and the cards; **slice 5 the Colosseum** in the middle; **slice 6** made the Colosseum about
-twice its size, the map bigger, and put **the park** with its ten chess tables in front of its gate; **the lights** (Oct 27) light the park's lamps and the homes' windows at dusk and night; **the chat log** (Oct 28; v2, v3 and v4 the same day) is one box in the top left corner, with a chat icon and a gear in the header, where the bosses and their kids say a line now and then and signed-in players type (tap the box to type); **name tags** (Oct 28) show only near you by default, a boss's sidekick's in blue. Home's **Boss Arena** card (Oct 26, Eric)
-opens it, and the computer's side menu's Boss Arena item; the address `/town` opens it directly too (`hunchess.com/town`,
+twice its size, the map bigger, and put **the park** with its ten chess tables in front of its gate; **the lights** (Oct 27) light the park's lamps and the homes' windows at dusk and night; **the chat log** (Oct 28; v2, v3 and v4 the same day) is one box in the top left corner, with a chat icon and a gear in the header, where the bosses and their kids say a line now and then and signed-in players type (tap the box to type); **name tags** (Oct 28) show only near you by default, a boss's sidekick's in blue. Home's **Chess Town** button (Oct 26, Eric, as the Boss Arena card; since Nov 1 a little town scene under PLAY)
+opens it, and the computer's side menu's Chess Town item; the address `/town` opens it directly too (`hunchess.com/town`,
 behind Cloudflare Access like the rest of the site). Phone and computer; **on a computer it sits in the front door's frame** (Oct 29, below).
 
 ## How it works
@@ -17,7 +17,7 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   while you walk round it (Eric's frame-rate rule, `docs/rules/eric.md`); a game with a bot loads it when it opens.
 - **Layout.** A slim bar (the back button, "Town square", and at its right end the chat icon and the gear: "The chat log"),
   then the world fills the rest of the screen. **On a computer (Oct 29, Eric) the town sits in the front door's frame:** the side
-  menu on the left (Boss Arena marked as where you are) and the live panel with the global chat on the right, as on home, and the
+  menu on the left (Chess Town marked as where you are) and the live panel with the global chat on the right, as on home, and the
   town filling the center column's box, edge to edge (`.fd-center`, which is home's middle box: the same left, top, width and
   height at every size from 1024 px up; the box is as high as the window, so at 1024 to 1279 px, where home's own box grows
   taller than the window and scrolls, it's the window's height). Its bar is the box's top line, and the buttons, the chips,
@@ -28,7 +28,7 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   `in-frame` to its screen (`town.css`: in the page's flow, the window's height, not fixed). On a computer **the chat icon sits right
   after the "Town square" title and the gear alone at the right end** (`town-chat.css`: the tools' box `display: contents`, the gear
   `margin-left: auto`): the chat's place was hard to see at the far right. Every side-menu item leaves the town (`goHome` in
-  `App.tsx` closes it), Boss Arena opens it again. Known limit: resizing a mouse window across 1024 px adds or takes away the
+  `App.tsx` closes it), Chess Town opens it again. Known limit: resizing a mouse window across 1024 px adds or takes away the
   frame, which starts the town again at its start square. The world never assumes a screen size: it fills its box and works its camera out
   from the box's shape, so the panels Eric designs around it can change without touching it. The back button, the chat icon, the
   gear and the buttons stay put. **The buttons** (Eric, Oct 28: "remove the 'Back to me' button … replace with circular focus
@@ -529,10 +529,10 @@ noted wherever a slice changed one.
   over the canvas; nothing in them depends on the backend). docs/areas/ops.md, "CI e2e".
 
 - `e2e/town-desktop.spec.ts` (Oct 29, the town on a computer): at 1280 × 800, 1440 × 900 and 1920 × 1080 the town's box is home's `.fd-center`
-  (within a pixel), the menu and the right column are home's with the global chat showing, Boss Arena is marked, the chat icon is in the bar's
+  (within a pixel), the menu and the right column are home's with the global chat showing, Chess Town is marked, the chat icon is in the bar's
   left part after the title, the gear at its right end and neither over the title, the world fills the box under a 52 px bar, the buttons keep
   their corner and the chat box its place, the chips and an open card are inside the box and the page doesn't scroll; the side menu's Play and
-  Boss Arena go home and back; the center column, the menu and the right column keep one box each while the town loads; a 900 × 700 mouse
+  Chess Town go home and back; the center column, the menu and the right column keep one box each while the town loads; a 900 × 700 mouse
   window has the whole screen and both icons at the right; and phones (390 × 844, 430 × 932) and tablets (768 × 1024, 1024 × 768 touch) have
   main's boxes (taken at 5e70aeed) for the screen, the bar, its four buttons, the world, the controls and the chat box, and no frame.
 - `packages/app/test/town-camera.test.ts`: the projection (the focus in the middle column, wrapping both ways, a tap picks

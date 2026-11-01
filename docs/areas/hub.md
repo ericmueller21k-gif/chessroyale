@@ -38,27 +38,46 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     row and the board). PLAY, the cards and the line stay put. 1 v 1's PLAY is
     `startRanked1v1()`: its queue at once, at `/1v1` ([ranked.md](ranked.md)); resting (`PAUSE_RANKED1V1`), PLAY is
     off with its line, as the other modes.
-  - **Other modes** (Oct 24, Eric: "a tiny text that says other modes, right below play"; Oct 26: three cards): an 11 px
-    muted label under PLAY (14 px under it on a phone), then the **Boss Arena card** full width, and under it the **Solo Boss
-    Mode card** and the **Auto chess** card side by side, half width each (`rd-pair`, Eric, Oct 26). Every card has its picture to the left
-    of its words (Oct 28, Eric: "there's plenty of space for them to sit to the left of the text"): Boss Arena 64 px tall with a 48 px
-    picture (84 px on a phone before), the half cards 56 px with a 32 px picture (28 px at 320 px wide), the name and one short line
-    ("Any boss, alone", "Build an army") beside it, and no › on the half cards (no room for it beside the picture at 390 px). The
-    Auto chess picture is a white knight from the board's own piece art. Auto chess opens `/autochess`, as Settings' Testing row does, with its back
-    button home. PLAY takes the room the shorter options and cards gave back (Oct 26, Eric: "the play button is too small", 64 px;
+  - **Chess Town's button** (Eric, Oct 31 and Nov 1; it was the full-width Boss Arena card, Oct 26, "Party up and take on the bosses";
+    [docs/decisions/2026-11-01-home-chess-town.md](../decisions/2026-11-01-home-chess-town.md)): right under PLAY, **exactly PLAY's size at
+    every width** (`.fd-town` is in each of PLAY's size rules in `styles.css`: 97 px on a phone, 76 px on a computer, 60 px in a short
+    window; the column's gap between them), opening the town square at `/town` (the same page the address opens; its back button is
+    home). A little town scene fills it, playing its idle loop, with **CHESS TOWN** over it in big white letters with a dark outline
+    (a bit above the middle, so the lower half of the picture shows) and the gold ring over the picture. **Two pictures, picked at random
+    as the page loads, 50/50** (`pickTownPicture` in `home-art/town.ts`; `?town=A` or `?town=B` in the address forces one, for stills
+    and tests: anyone's address, not a gated test switch): **A**, the skyline (the tower, the houses, the trees), and **B**, the square
+    (the shops, the table with its two pawns, the lamps, a bird). The dusk sky behind them is the same in the light and the dark theme.
+    The scene (`Scene` in `home-art/Pic.tsx`, its math `sceneLayout` in `home-art/layout.ts`, unit-tested) is drawn on a canvas,
+    nearest-neighbor, at the biggest whole-pixel scale whose height fits the button (3 css px an art pixel on a phone, 2 on a computer; B's
+    plain last 3 rows are cut when the box is a little short), down on the button's foot and centered; where the button is wider than the
+    picture a narrow gap is filled by the ground's end column, a wide one (a computer) by the picture's own ends repeating, so the ground
+    runs to the edge. It's drawn only when its frame changes (the loops are 4 to 5 frames a second, not every animation frame), still on
+    the first frame under reduced motion. The side menu's **Chess Town** item opens the same page (the town has no side menu, so it
+    never shows as the open page) with **the crest** (`arena-town-badge`, 40 px, its idle playing) as its icon in place of the crown;
+    Boss Battle keeps the crown there. The crest isn't on the button.
+  - **Other modes** (Oct 24, Eric: "a tiny text that says other modes, right below play"; Oct 26: three cards; Nov 1: two): an 11 px
+    muted label under Chess Town's button (14 px under it on a phone), then the **Boss Battle** and **Auto chess** cards side by side, half
+    width each (`rd-pair`, Eric, Oct 26). Every card has its picture to the left of its words (Oct 28, Eric: "there's plenty of space for
+    them to sit to the left of the text"): the cards 56 px tall with a 32 px picture (28 px at 320 px wide), the name and one short
+    line ("Any boss, up to 3", "Build an army") beside it, and no › (no room for it beside the picture at 390 px). **Boss Battle's picture
+    is the rotating boss faces** (Nov 1; from the old Boss Arena card: a still of one boss you can meet, turning to the next every 30 s
+    (`FRONT_DOOR.bossCardMs`) with a 0.6 s fade (`bossCardFadeMs`), never the Hidden Boss or a resting boss, the card's size fixed; it
+    waits while the app is hidden, and under reduced motion there's no fade (`BossCardFace` in `components/BossSelect.tsx`; test switch
+    `?cardMs=`); the crown it had is gone from the card). **Auto chess's picture is the army** (Nov 1: `arena-auto-card`, 32 px, its idle
+    playing; it was the board's white knight). Auto chess opens `/autochess`, as Settings' Testing row does, with its back button home.
+    PLAY takes the room the shorter options and cards gave back (Oct 26, Eric: "the play button is too small", 64 px;
     Oct 28: "make the play button bigger with the space we gain"): **97 px on a phone** (label 44 px), **76 px on a computer** (label
-    40 px), 60 px in a computer's short window, under 760 px tall (was 48; label 32 px). The pawn's card, the page's height, the
-    live window's board and the last card's foot keep their size and place (measured at every size the fit test uses, to
-    the pixel), so on a phone home fits as before: the column's gaps are 8 px, its top and bottom padding are 10 px and the last
-    card keeps the 15 px of room under it. "Other modes" is centered over the cards.
-  - **The Boss Arena card** (Eric, Oct 26, replacing the Boss raid card; full width, "Boss Arena", "Party up and take on the
-    bosses") opens the town square at `/town` (the same page the address opens; its back button is home).
-    Its picture is a still of one boss you can meet, turning to the next every 30 s (`FRONT_DOOR.bossCardMs`) with a 0.6 s
-    fade (`bossCardFadeMs`), never the Hidden Boss or a resting boss, the card's size fixed; it waits while the app is
-    hidden, and under reduced motion there's no fade (`BossCardFace` in `components/BossSelect.tsx`; test switch
-    `?cardMs=`). The animated card with lines is shelved (a later idea). The title is Archivo, not Archivo Black: that
-    file's lowercase i has no dot, so "raid" read as "raId" (Oct 24). The side menu's **Boss Arena** item opens the same
-    page (the town has no side menu, so it never shows as the open page).
+    40 px), 60 px in a computer's short window, under 760 px tall (was 48; label 32 px), and Chess Town's button is the same: it replaced a
+    64 px card with a PLAY-sized one, so where the page had no room left the two give it back together (Nov 1): **a phone under 700 px tall**
+    has them 97 px down to 80 px (at 666 px and below; the page keeps fitting from 360 × 640 up with no scrolling), and **a computer
+    window 761 to 811 px tall** has them 76 px down to 70 px (the live window's board keeps its size, 233 px at most). 1440 × 900 and
+    390 × 844 are as before, and a short laptop (1280 × 720) is 60 px as before.
+    The title is Archivo, not Archivo Black: that file's lowercase i has no dot, so "raid" read as "raId" (Oct 24). "Other modes" is
+    centered over the cards.
+  - **The pictures' source** (Nov 1): the four drawings (`arena-town-skyline`, `arena-town-square`, `arena-town-badge`, `arena-auto-card`,
+    in `packages/app/src/home-art/`) are the API's drawings from `origin/claude/boss-art` (`scripts/boss-art/out/<name>/<name>.ts`, with
+    each one's `summary.md` there), copied as drawn, only their two import lines changed; `home-art/Pic.tsx` plays them with the
+    bosses' own `renderFrame`. A new picture is a drawing there, copied here the same way.
   - **The Solo Boss Mode card** (Eric, Oct 26; half width; "Boss Battle", "Any boss, up to 3" since Oct 29) opens the **Boss Battle
     screen**, the Boss raid screen's solo form (below). Its picture is the crown from the side menu's old Boss raid
     item, drawn large in the card's gold (`CrownArt` in `screens/Home.tsx`): a placeholder until Opus draws one.
@@ -76,7 +95,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     plays its sound once and says one of its lines (the boss section, [bosses.md](bosses.md)). Under the stage the ways
     to play. **Boss Battle** (Oct 26 as Solo Boss Mode; the home card and the side menu's item) shows **START** (Oct 29; it was the Boss alone button); the full
     screen (`?mode=raid`, the test link, titled "Boss raid") shows every choice below, as before, until the raids move to
-    the Boss Arena's Colosseum. Each choice goes through its flow: **Join a raid** and **People only** (the raid's queues, always a random boss:
+    Chess Town's Colosseum. Each choice goes through its flow: **Join a raid** and **People only** (the raid's queues, always a random boss:
     "Random boss · …"), **Raid with bots** (a Solo raid against the boss picked), **Boss alone** (its menu: the
     difficulty and the boss picked; a phone's sheet at the foot under 600 px wide, a dialog in the middle with room all
     round from 600 px at any height, its rows scrolling inside so it always fits) and **Play with friends** (a raid made
@@ -106,13 +125,18 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     gray) centered above it, as wide as the icon (`LevelRing`, `TEST_LEVEL` in `components/FrontDoor.tsx`). **The level is a
     placeholder** until the real levels exist. The ring and the level are drawn outside the icon's box and take
     no room, so home is the same size and shape with or without them (and doesn't move when the account loads).
+  - **Your ride on home** (Eric, Nov 1: he equipped Riding Chirp and "it doesn't show on the main page on desktop"): the big pawn on
+    your card, your ring (a phone's top bar, a computer's top right) and the side menu's Profile item ride the ride you wear
+    (`DressedPawn`'s `ride`, as the locker's preview and the profiles do; [2026-10-31-rides.md](../decisions/2026-10-31-rides.md)), its
+    idle playing, fitted into the same box so nothing grows or moves; its hop (every 30 s) carries the pawn and its ride together.
+    The same big pawn on a computer's queue screen rides too (it's the same card). Not your pawn in the queue's and Squads' small cards or a match's screens (still the pawn alone).
   - A screen that replaces home (a phone's queue, the Boss raid screen, home again) starts at its top. A match's Home
     and a closed lobby's note land on home itself; Cancel in a raid's queue goes back to the Boss raid screen (the full one).
   - **Phone:** a top bar (the logo, your pawn (your profile), the shop, **Friends** (with a count
     of requests and invites), then a gear that opens Settings in one tap; a computer's are its side menu's, so none is
     there; [docs/decisions/2026-10-17-phone-settings-gear.md](../decisions/2026-10-17-phone-settings-gear.md),
     [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)), then one column: your card, the RANKED row, its panel, the line
-    above PLAY and PLAY (Oct 28), then Other modes with the Boss Arena card, and Boss Battle and Auto chess side by side under it, at the bottom. Your pawn's card takes the room
+    above PLAY and PLAY (Oct 28), then Chess Town's button (PLAY's size), then Other modes with Boss Battle and Auto chess side by side, at the bottom. Your pawn's card takes the room
     left: your tag (icon, name, "Gold 3 · 45 RP"; an admin's test version below) centered above your pawn's head, the pawn 75% bigger than before
     (170 × 154 → up to 298 × 270) and sized to the room the tag leaves (Oct 24). On a short card (under 190 px tall: a
     640 px phone, or a 740 px one (measured at 320, 375 and 430 px wide), since the options panel is there from the first view, Oct 25)
@@ -121,7 +145,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     ([docs/decisions/2026-10-18-phone-home-fits.md](../decisions/2026-10-18-phone-home-fits.md)). Big tap targets, no
     sideways scroll at 320–430 px; a long name on your home card ellipsizes.
   - **Computer** (1024 px+): a side menu, the play column in the center in the phone's order (Eric, Oct 18): the RANKED
-    row, its panel, the line above PLAY and PLAY (Oct 28), then Other modes with the Boss Arena card, and Boss Battle and Auto chess side by side under it (a little shorter) at the
+    row, its panel, the line above PLAY and PLAY (Oct 28), then Chess Town's button (PLAY's size), then Other modes with Boss Battle and Auto chess side by side (a little shorter) at the
     bottom; a side panel (playing now, global chat). The pawn hops on a computer too (Oct 24: the hop was phone-only).
     From 1280 px the play column starts with the **live window**: the featured real match (a matchmade one, most
     people, then newest) or, when none runs, bot-match replays played on a shared clock cycle so everyone sees the same
@@ -265,7 +289,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 
 | What | Where |
 | --- | --- |
-| Screens | `packages/app/src/screens/Home.tsx` (home, the RANKED row, the Other modes cards (Boss Arena, Boss Battle), the Boss raid screen and its Solo Boss Mode form), `Landing.tsx`, `Queue.tsx`, `Profile.tsx`, `PlayerProfile.tsx` (yours), `PublicProfile.tsx` (everyone's), `Settings.tsx`, `Lobby.tsx`, `Legal.tsx`, `Friends.tsx` |
+| Screens | `packages/app/src/screens/Home.tsx` (home, the RANKED row, Chess Town's button, the Other modes cards (Boss Battle, Auto chess), the Boss raid screen and its Solo Boss Mode form), `Landing.tsx`, `Queue.tsx`, `Profile.tsx`, `PlayerProfile.tsx` (yours), `PublicProfile.tsx` (everyone's), `Settings.tsx`, `Lobby.tsx`, `Legal.tsx`, `Friends.tsx` |
 | Friends' pieces (rows, the live panel's section, the toast, Invite friends, the settings, a profile's buttons) | `packages/app/src/components/Friends.tsx`; the list and actions `friends.ts` |
 | The computer's frame and menus | `components/FrontDoor.tsx`, `FrontMenu.tsx`, `LiveWindow.tsx`, `LiveNumber.tsx`, `MiniBoard.tsx`, `TinyBoard.tsx`, `LeaderboardSheet.tsx` |
 | Names and icons everywhere | `components/PlayerName.tsx`, `PixelIcon.tsx` (`UserIcon`), `profile-nav.ts` |
@@ -292,14 +316,16 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   eval bar: testers only), `faq.test.ts` (the FAQ: contents against sections, links, every boss, numbers following the
   settings); `packages/server/test/lobby-do-practice.test.ts` (online practice: testers only).
 - e2e: `e2e/front-door.spec.ts`, `home-ranked.spec.ts` (the RANKED row at 320-390 px and on a computer, home keeping still through every click
-  (PLAY, the line above it, the board preview, the Boss Arena card and the panel within 1 px, at 320 and 390 px and 1280-1920 px), "home, said
-  once" (Oct 28: no ⓘ, titles only, the line above PLAY, the cards' pictures beside their words, PLAY's height, a phone fits) and "test rank
+  (PLAY, the line above it, the board preview, Chess Town's button and the panel within 1 px, at 320 and 390 px and 1280-1920 px), "home, said
+  once" (Oct 28: no ⓘ, titles only, the line above PLAY, the cards' pictures beside their words, PLAY's height, Chess Town's button PLAY's size, a phone fits) and "test rank
   and level" (an admin's `?rank=`, ring and LVL 38; a player sees neither, and their real 1 v 1 rank), 1 v 1's PLAY,
   the Boss raid screen (`?mode=raid`) and each of its choices, `/bosses`), `boss-select.spec.ts` (the character select: a
   tap's drop, sound and line, "?", the Hidden Boss dark and locked and never named, the pick reaching Boss alone, a Solo
   raid and a raid you make, resting bosses, the layout at 320-1280 px, the card turning; Boss alone's menu and
   `/bosses` fitting 1280×600 to 1920×1080 and phones at 320-390 px, its last row reachable; one number per boss, the
   stage's and the menu's and the battle's), `landing.spec.ts`, `home-layout.spec.ts`, `live-window.spec.ts`, `profile.spec.ts`, `public-profile.spec.ts` (the public profile on a phone and a computer at 1280 and 1440: every card, the 1v1 menu with the card the same height in every mode, the icon behind the pawn, the level line, nothing shifting while it loads, your own page greyed, Challenge, Add Friend, Block and Report),
+  `profile.spec.ts` also checks that home's pawn and your ring ride your ride in the same boxes (Nov 1); `crate-banner.spec.ts` also the crate pages' gambling warning (shop.md);
+  unit: `packages/app/test/home-art.test.ts` (the 50/50 pick and `?town=`, the scene's whole-pixel layout at phone, computer and short-laptop sizes, the four drawings' frames);
   `install.spec.ts`, `crate-banner.spec.ts`, `friends.spec.ts` (two players: request, accept, online, the invites
   setting, an invite joined from its toast, a block; the phone's line at 320 px), `eval-bar.spec.ts` (testers: the
   switch in Settings only, the board's room, phone and computer; players: no bar, no switch), `piece-sounds.spec.ts`

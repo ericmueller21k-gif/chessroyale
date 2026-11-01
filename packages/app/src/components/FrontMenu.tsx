@@ -5,12 +5,14 @@ import { useLive, type PlayingNow } from "../live.ts";
 import { AccountBar, DressedPawn, GearIcon, LiveLine, Logo } from "./FrontDoor.tsx";
 import { GlobalChat } from "./GlobalChat.tsx";
 import { FriendsPanel, InviteToast } from "./Friends.tsx";
+import { Pic } from "../home-art/Pic.tsx";
+import { ARENA_TOWN_BADGE } from "../home-art/arena-town-badge.ts";
 
 /** Where the computer's side menu can take you. */
 export interface FrontNav {
   home: () => void;
-  /** Boss Arena: the town square (/town; Eric, Oct 26). */
-  bossArena: () => void;
+  /** Chess Town: the town square (/town; Eric, Oct 26, as Boss Arena; renamed Nov 1). */
+  chessTown: () => void;
   /** Solo Boss Mode: the solo boss screen (the tiles, the stage, Boss alone; Eric, Oct 26). */
   soloBoss: () => void;
   friends: () => void;
@@ -31,7 +33,7 @@ const Icon = ({ d, children }: { d?: string; children?: ComponentChildren }) => 
   </svg>
 );
 
-/** The crown: the Boss Arena and Solo Boss Mode items' icon (Home.tsx's CrownArt draws the same path). */
+/** The crown: Boss Battle's icon (Chess Town has the crest). */
 const crown = () => (
   <Icon>
     <path d="M5 20h14M6 20l-1.5-11 4.5 3.5L12 5l3 7.5L19.5 9 18 20" />
@@ -55,7 +57,7 @@ export function SideMenu({ page, nav }: { page?: FrontPage; nav: FrontNav }) {
       <Logo onClick={nav.home} />
       <div class="fd-menu">
         <Item label="Play" on={page === "home" || page === "queue"} onClick={nav.home} icon={<Icon d="M7 4.5v15l12-7.5z" />} />
-        <Item label="Boss Arena" on={page === "town"} onClick={nav.bossArena} icon={crown()} />
+        <Item label="Chess Town" on={page === "town"} onClick={nav.chessTown} icon={<Pic ch={ARENA_TOWN_BADGE} scale={1} class="fd-menu-crest" />} />
         <Item label="Boss Battle" on={page === "raid"} onClick={nav.soloBoss} icon={crown()} />
         <Item
           label="Play with friends"
@@ -81,7 +83,7 @@ export function SideMenu({ page, nav }: { page?: FrontPage; nav: FrontNav }) {
             </Icon>
           }
         />
-        <Item label="Profile" on={page === "profile"} onClick={nav.profile} icon={<DressedPawn size="ring" look={p?.locker?.look} />} />
+        <Item label="Profile" on={page === "profile"} onClick={nav.profile} icon={<DressedPawn size="ring" look={p?.locker?.look} ride />} />
       </div>
       <div class="fd-menu fd-menu-end">
         <Item label="Settings" on={page === "settings"} onClick={nav.settings} icon={<GearIcon />} />

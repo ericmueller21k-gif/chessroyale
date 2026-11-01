@@ -60,8 +60,8 @@ for (const [w, h] of [[1280, 800], [1440, 900], [1920, 1080]] as const) {
     nearBox(t.screen, between, 1, "the town's box is the space between the menu and the right column, full height");
     nearBox(await box(page, ".fd-side"), home.side, 1, "the menu is home's");
     nearBox(await box(page, ".fd-right"), home.right, 1, "the right column is home's");
-    // The frame's parts show and work as on home: the menu (Boss Arena is where you are), the live panel and the global chat.
-    await expect(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Boss Arena" })).toHaveAttribute("aria-current", "page");
+    // The frame's parts show and work as on home: the menu (Chess Town is where you are), the live panel and the global chat.
+    await expect(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Chess Town" })).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("complementary", { name: "Live" })).toBeVisible();
     await expect(page.getByRole("region", { name: "Global chat" })).toBeVisible();
 
@@ -102,7 +102,7 @@ for (const [w, h] of [[1280, 800], [1440, 900], [1920, 1080]] as const) {
   });
 }
 
-test("the menu works as on home: Play goes home, Boss Arena comes back to the town; nothing jumps while the town loads", async ({ page }) => {
+test("the menu works as on home: Play goes home, Chess Town comes back to the town; nothing jumps while the town loads", async ({ page }) => {
   onlyComputer();
   // Nothing jumps as it loads: the center column's box is one box from the first frame that has it to the world's first frame and after.
   await page.addInitScript(() => {
@@ -131,10 +131,10 @@ test("the menu works as on home: Play goes home, Boss Arena comes back to the to
   await menu.getByRole("button", { name: "Play", exact: true }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   expect(new URL(page.url()).pathname).toBe("/");
-  await menu.getByRole("button", { name: "Boss Arena" }).click();
+  await menu.getByRole("button", { name: "Chess Town" }).click();
   await ready(page);
   expect(new URL(page.url()).pathname).toBe("/town");
-  await expect(menu.getByRole("button", { name: "Boss Arena" })).toHaveAttribute("aria-current", "page");
+  await expect(menu.getByRole("button", { name: "Chess Town" })).toHaveAttribute("aria-current", "page");
 });
 
 test("a mouse window narrower than the frame (900 × 700) has the whole screen and both icons at the right, as a phone does", async ({ page }) => {

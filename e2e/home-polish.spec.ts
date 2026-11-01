@@ -3,14 +3,14 @@ import { named, pickMode, test } from "./helpers.ts";
 
 /**
  * Home (Eric's screenshots): one shadow under your pawn on a phone (the snowman's own ground shadow is hidden there), the
- * "Other modes" label 14 px under PLAY (Oct 28: the line above PLAY, "Starts within" or "Usually about", used to be under it, and
- * the label 14 px under that), and your pawn hops on
+ * "Other modes" label 14 px under Chess Town's button, which is under PLAY (Oct 28: the line above PLAY, "Starts within" or
+ * "Usually about", used to be under it, and the label 14 px under that; Nov 1: Chess Town's button between them), and your pawn hops on
  * a phone and a computer alike every 30 s (its first hop 4 s after home shows; FRONT_DOOR.heroHopFirstSec and
  * heroHopEverySec; never under reduced motion). Oct 24: the hop was phone-only, so a computer never hopped.
  */
 const desktop = () => test.info().project.name === "desktop";
 
-test("phone home: one shadow under your pawn; the Other modes label 14 px under PLAY, the Starts-within line above PLAY", async ({ page }) => {
+test("phone home: one shadow under your pawn; Chess Town's button right under PLAY and the Other modes label 14 px under it, the Starts-within line above PLAY", async ({ page }) => {
   test.skip(desktop(), "a phone's home");
   await named(page, "Test2");
   // Dress your pawn as a snowman (its art draws its own ground shadow).
@@ -44,11 +44,14 @@ test("phone home: one shadow under your pawn; the Other modes label 14 px under 
     expect(await pawn.locator(".skin-shadow").evaluate((el) => getComputedStyle(el).display), `${w}×${h}`).toBe("none");
     expect(await pawn.evaluate((el) => getComputedStyle(el, "::after").content), `${w}×${h}`).not.toBe("none");
     expect(Number(await pawn.evaluate((el) => getComputedStyle(el, "::after").opacity)), `${w}×${h}`).toBeGreaterThan(0);
-    // (The gap: from PLAY's bottom to the "Other modes" label's top, then the Boss raid card under the label.)
-    const gap = await page.evaluate(() => document.querySelector(".fd-other-label")!.getBoundingClientRect().top - document.querySelector(".fd-play")!.getBoundingClientRect().bottom);
-    expect(Math.abs(gap - 14), `${w}×${h}: the label ${gap} px under PLAY`).toBeLessThanOrEqual(1);
+    // (Nov 1: Chess Town's button is the column's gap (8 px) under PLAY; the gap from its bottom to the "Other modes" label's top is
+    // the 14 px that was under PLAY, then the cards under the label.)
+    const between = await page.evaluate(() => document.querySelector(".fd-town")!.getBoundingClientRect().top - document.querySelector(".fd-play")!.getBoundingClientRect().bottom);
+    expect(Math.abs(between - 8), `${w}×${h}: Chess Town ${between} px under PLAY`).toBeLessThanOrEqual(1);
+    const gap = await page.evaluate(() => document.querySelector(".fd-other-label")!.getBoundingClientRect().top - document.querySelector(".fd-town")!.getBoundingClientRect().bottom);
+    expect(Math.abs(gap - 14), `${w}×${h}: the label ${gap} px under Chess Town`).toBeLessThanOrEqual(1);
     const under = await page.evaluate(() => document.querySelector(".rd-card")!.getBoundingClientRect().top - document.querySelector(".fd-other-label")!.getBoundingClientRect().bottom);
-    expect(under, `${w}×${h}: the Boss raid card under the label`).toBeGreaterThanOrEqual(0);
+    expect(under, `${w}×${h}: the cards under the label`).toBeGreaterThanOrEqual(0);
   }
 });
 
