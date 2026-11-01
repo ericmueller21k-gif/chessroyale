@@ -15,15 +15,22 @@
  * - **The props** (the big pieces): instances too, one draw call, uploaded again only when a move is made (the slide itself
  *   is worked out on the GPU from when it began).
  *
- * - **The 3D pieces** (only when the gear's "3D pieces" is on; pieces3d.ts): the six meshes uploaded once, the pieces as instances written when
- *   a move is made, one draw call a kind on the board. Without the switch the pieces are props, as above.
+ * - **The 3D pieces** (the gear's Pieces: 3D; pieces3d.ts): the six meshes uploaded once, the pieces as instances written when
+ *   a move is made, one draw call a kind on the board. With 2D the pieces are props, as above.
+ * - **Pixel** (the gear's Pieces: Pixel, the default since Nov 1; pieces-pixel.ts): the whole arena drawn into a small target
+ *   (an art pixel `pixelScale` screen pixels square) and scaled up nearest-neighbor, one chunky pixel grid as Eric's picture;
+ *   the pixel set drawn like the 3D pieces (one draw call a kind), cel-shaded in flat tones, each facing the screen and
+ *   leaning back a little like a sprite, its axis on a pixel's middle; each piece's one-pixel outline drawn in the small
+ *   target, then the scaling up (one read a screen pixel).
  *
- * Three draw calls a frame (eight with the 3D pieces: the arena, the crowd and one a kind; the props then have nothing to draw). A frame sets a few uniforms (the camera, the time, the jump's clock) and draws: nothing is
- * allocated and nothing uploaded. The crowd jumps (a queen captured) by a uniform too.
+ * Three draw calls a frame with 2D; eight with 3D (the arena, the crowd and one a kind: the props then have nothing to draw);
+ * ten with Pixel (those, the outline and the scaling up). A frame sets a few uniforms (the camera, the time, the jump's clock) and draws:
+ * nothing is allocated and nothing uploaded. The crowd jumps (a queen captured) by a uniform too.
  */
-import { BANNERS, BOARD, FLOOR_R, bossSeats, type Seat, GALLERY_H, GALLERY_R, PILLARS, PILLAR_ANGLES, SEATING, STANDS, STATUE, WALL_H, WALL_TOP, aisleAngle, fovFor, landingDepth, lookAt, multiply, perspective, rowR, rowY, seatR, seats, squareXZ, VIEWS, type View } from "./arena.ts";
+import { BANNERS, BOARD, FLOOR_R, bossSeats, project, type Seat, GALLERY_H, GALLERY_R, PILLARS, PILLAR_ANGLES, SEATING, STANDS, STATUE, WALL_H, WALL_TOP, aisleAngle, fovFor, landingDepth, lookAt, multiply, perspective, rowR, rowY, seatR, seats, squareXZ, VIEWS, type View } from "./arena.ts";
 import { FIGURE_STRIDE, PILLAR_TOP_PX, PROPS, SCENE, SEAT_SINK, SKY, SQUARES, STANDS_SEATS, STONE, type CrowdArt, type Figure, type Rect } from "./art.ts";
-import { EYE, KINDS, KNIGHT_TURN, PV, SIZE, SLIT, pieceMeshes } from "./pieces3d.ts";
+import { EYE, KINDS, KNIGHT_TURN, PV, SIZE, SLIT, pieceMeshes, type Kind, type PieceMesh } from "./pieces3d.ts";
+import { PIXEL_EYE, PIXEL_KNIGHT_TURN, PIXEL_SIZE, PIXEL_SLIT, pixelMeshes } from "./pieces-pixel.ts";
 
 const VS_SCENE = `#version 300 es
 layout(location=0) in vec3 aPos;
@@ -90,7 +97,8 @@ void main() {
   vBack = iA.y < -50.0 ? 0.0 : smoothstep(0.15, -0.15, dot(vec2(sin(iA.y), cos(iA.y)), dir));
   // The rows in front of your seat (their backs to you, below you): only the one just in front, smaller and lower (the tops of
   // their heads, as Eric's mockup); the rows below it aren't drawn, so they don't cover the arena.
-  if (vBack > 0.5 && p.y < uEye.y - 0.4 && d < 6.0) {
+  // (Not from a high view: its eye floats far above the stands, and the rows under it aren't in front of a seat.)
+  if (vBack > 0.5 && p.y < uEye.y - 0.4 && uEye.y - p.y < 6.0 && d < 6.0) {
     if (d > 1.7) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
     h *= 0.75; w *= 0.75; p.y -= 0.12;
   }
@@ -113,7 +121,7 @@ void main() {
 }`;
 
 /**
- * The 3D pieces (the gear's "3D pieces"; pieces3d.ts): one mesh a kind, one instance a piece (where it stands, where its slide began,
+ * The 3D pieces (the gear's Pieces: 3D; pieces3d.ts): one mesh a kind, one instance a piece (where it stands, where its slide began,
  * when, when it goes, its color). Each turns round its upright axis to face you, as the flat pieces did (a knight shows its
  * profile, a bishop its slit), slides and hops as they did, and is lit from the arena's sun (the a-file and White's end, high),
  * with a soft fill from your side and a little shine. Its shadow, a soft disc on the board, is drawn with it.
@@ -201,6 +209,158 @@ void main() {
   o = vec4(c, 1.0);
 }`;
 
+/**
+ * The pixel set (Pixel; pieces-pixel.ts), drawn into the small target: each piece faces the screen (the camera's plane, not
+ * its eye, so none leans sideways), leaning back by part of your view's pitch so it stands up on screen as a sprite does, its
+ * axis on a pixel's middle (so it rasterizes the same both sides). Its contact shadow lies flat under it, a little to the
+ * lower right. The normal stays the piece's own (it always faces the screen): the light is the screen's, from the top left.
+ */
+const VS_PIECE_PX = `#version 300 es
+layout(location=0) in vec3 aPos;
+layout(location=1) in vec3 aNrm;
+layout(location=2) in float aMat;
+layout(location=3) in vec4 iA;
+layout(location=4) in vec4 iB;
+uniform mat4 uVP;
+uniform float uTime;
+uniform float uSlide;
+uniform float uLift;
+uniform float uKind;
+uniform float uTilt;
+uniform vec2 uRes;
+uniform vec3 uFwd;
+out vec3 vN;
+out vec3 vObj;
+out float vMat;
+out float vBlack;
+out float vDepth;
+flat out float vId;
+void main() {
+  vMat = aMat;
+  vBlack = iB.z;
+  vN = aNrm;
+  vObj = aPos / ${PIXEL_SIZE.toFixed(4)};
+  vId = uKind * 32.0 + float(gl_InstanceID) + 1.0;
+  if (uTime >= iB.y) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); vDepth = 0.0; return; }
+  float s = clamp((uTime - iB.x) / uSlide, 0.0, 1.0);
+  s = s * s * (3.0 - 2.0 * s);
+  vec2 xz = mix(iA.zw, iA.xy, s);
+  float hop = sin(3.14159 * s) * 0.35 * step(0.001, distance(iA.zw, iA.xy));
+  vec2 f = -normalize(uFwd.xz);
+  vec3 R = vec3(f.y, 0.0, -f.x);
+  vec3 F = vec3(f.x, 0.0, f.y);
+  vec3 w;
+  bool shadow = aMat > 2.5 && aMat < 3.5;
+  if (shadow) {
+    w = vec3(xz.x, uLift + 0.006, xz.y) + R * (aPos.x + 0.06) + F * (aPos.z - 0.05);
+  } else {
+    float a = asin(clamp(-uFwd.y, -1.0, 1.0)) * uTilt;
+    vec3 U = vec3(0.0, cos(a), 0.0) - F * sin(a);
+    vec3 F2 = F * cos(a) + vec3(0.0, sin(a), 0.0);
+    w = vec3(xz.x, uLift + hop, xz.y) + R * aPos.x + U * aPos.y + F2 * aPos.z;
+  }
+  gl_Position = uVP * vec4(w, 1.0);
+  vDepth = gl_Position.w;
+  if (!shadow) {
+    vec4 c = uVP * vec4(xz.x, uLift + hop, xz.y, 1.0);
+    vec2 px = (c.xy / c.w * 0.5 + 0.5) * uRes;
+    gl_Position.xy += (floor(px) + 0.5 - px) / uRes * 2.0 * gl_Position.w;
+  }
+}`;
+/**
+ * The pixel set's look, from Eric's picture: flat tones, hard steps, no gradients and no shine but a few highlight pixels;
+ * cream with warm (brown) shadows, navy, gold. The second output marks which piece a pixel is and how near (the outline).
+ */
+const FS_PIECE_PX = `#version 300 es
+precision highp float;
+in vec3 vN;
+in vec3 vObj;
+in float vMat;
+in float vBlack;
+in float vDepth;
+flat in float vId;
+layout(location=0) out vec4 o;
+layout(location=1) out vec4 o2;
+const vec3 CREAM_L = vec3(250.0, 238.0, 214.0) / 255.0;
+const vec3 CREAM_M = vec3(214.0, 186.0, 148.0) / 255.0;
+const vec3 CREAM_S = vec3(160.0, 127.0, 93.0) / 255.0;
+const vec3 NAVY_H = vec3(104.0, 108.0, 146.0) / 255.0;
+const vec3 NAVY_M = vec3(55.0, 57.0, 80.0) / 255.0;
+const vec3 NAVY_D = vec3(27.0, 27.0, 40.0) / 255.0;
+const vec3 GOLD_H = vec3(255.0, 222.0, 140.0) / 255.0;
+const vec3 GOLD_L = vec3(228.0, 168.0, 72.0) / 255.0;
+const vec3 GOLD_D = vec3(150.0, 100.0, 38.0) / 255.0;
+const vec3 L = vec3(-0.55, 0.7, 0.45) * ${(1 / Math.hypot(0.55, 0.7, 0.45)).toFixed(5)};
+const vec3 H = vec3(-0.55, 0.7, 1.45) * ${(1 / Math.hypot(0.55, 0.7, 1.45)).toFixed(5)};
+void main() {
+  if (vMat > 2.5 && vMat < 3.5) { o = vec4(0.13, 0.07, 0.03, vN.x > 0.3 ? 0.62 : 0.0); o2 = vec4(0.0); return; }
+  vec3 N = normalize(vN);
+  float t = dot(N, L);
+  bool hi = pow(max(dot(N, H), 0.0), 60.0) > 0.55;
+  bool gold = vBlack > 0.5 && vMat > 4.5;
+  vec3 c;
+  if (gold) c = hi ? GOLD_H : t > 0.1 ? GOLD_L : GOLD_D;
+  else if (vBlack > 0.5) c = hi ? NAVY_H : t > 0.2 ? NAVY_M : NAVY_D;
+  else c = t > 0.62 ? CREAM_L : t > 0.2 ? CREAM_M : CREAM_S;
+  // The bishop's slit (pieces-pixel.ts PIXEL_SLIT), across the mitre's front.
+  if (vMat > 1.5 && vMat < 2.5 && vObj.z > 0.03 && abs(vObj.x * ${PIXEL_SLIT.k.toFixed(3)} + vObj.y - ${PIXEL_SLIT.c.toFixed(3)}) * ${(1 / Math.hypot(PIXEL_SLIT.k, 1)).toFixed(4)} < ${PIXEL_SLIT.w.toFixed(3)}) c = vBlack > 0.5 ? GOLD_L : CREAM_S;
+  // The knight's eye (PIXEL_EYE), on both sides of its head.
+  if (vMat > 3.5 && vMat < 4.5) {
+    vec2 p = vec2(vObj.x * ${Math.cos(PIXEL_KNIGHT_TURN).toFixed(4)} - vObj.z * ${Math.sin(PIXEL_KNIGHT_TURN).toFixed(4)}, vObj.y);
+    if (distance(p, vec2(${PIXEL_EYE.x.toFixed(3)}, ${PIXEL_EYE.y.toFixed(3)})) < ${PIXEL_EYE.r.toFixed(3)}) c = vBlack > 0.5 ? GOLD_L : vec3(0.18, 0.12, 0.08);
+  }
+  o = vec4(c, 1.0);
+  float d = clamp(vDepth / 64.0, 0.0, 1.0) * 255.0;
+  o2 = vec4(vId / 255.0, floor(d) / 255.0, fract(d), 1.0);
+}`;
+
+/** A full-screen triangle (Pixel's outline and scaling up). */
+const VS_FULL = `#version 300 es
+void main() {
+  vec2 p = vec2(gl_VertexID == 1 ? 3.0 : -1.0, gl_VertexID == 2 ? 3.0 : -1.0);
+  gl_Position = vec4(p, 0.0, 1.0);
+}`;
+/** Pixel's outline, in the small target (a pixel's four neighbors read there, not a screen pixel's): one dark pixel round each piece. */
+const FS_OUTLINE = `#version 300 es
+precision highp float;
+uniform sampler2D uCol;
+uniform sampler2D uId;
+uniform ivec2 uSize;
+out vec4 o;
+const vec3 OUTLINE = vec3(30.0, 21.0, 12.0) / 255.0;
+float near(vec4 m) { return m.a > 0.5 ? m.g + m.b / 255.0 : 2.0; }
+void main() {
+  ivec2 p = ivec2(gl_FragCoord.xy);
+  vec4 m = texelFetch(uId, p, 0);
+  float d = near(m);
+  bool edge = false;
+  for (int k = 0; k < 4; k++) {
+    ivec2 q = clamp(p + (k == 0 ? ivec2(1, 0) : k == 1 ? ivec2(-1, 0) : k == 2 ? ivec2(0, 1) : ivec2(0, -1)), ivec2(0), uSize - 1);
+    vec4 n = texelFetch(uId, q, 0);
+    // Round a piece, between two pieces (on the farther), and inside one where a part stands well in front (a collar's edge).
+    if (n.a > 0.5 && near(n) < d && (abs(n.r - m.r) > 0.001 || d - near(n) > 0.13 / 64.0)) edge = true;
+  }
+  o = vec4(edge ? OUTLINE : texelFetch(uCol, p, 0).rgb, 1.0);
+}`;
+/** Pixel's scaling up to the screen, nearest-neighbor: one read a screen pixel. */
+const FS_UP = `#version 300 es
+precision mediump float;
+uniform sampler2D uOut;
+uniform float uScale;
+uniform ivec2 uSize;
+out vec4 o;
+void main() {
+  o = texelFetch(uOut, min(ivec2(floor(gl_FragCoord.xy / uScale)), uSize - 1), 0);
+}`;
+
+/**
+ * Pixel: a pawn standing on the board's middle is about this many art pixels tall (`pixelScale`: whole screen pixels an art
+ * pixel, set when the view or the screen's size changes, never a frame); the proof of concept's grid, which Eric approved.
+ */
+const PAWN_ART_PX = 16;
+/** Pixel: how far the pieces lean back, a share of your view's pitch. */
+const PIXEL_TILT = 0.38;
+
 /** Floats a scene vertex (position, uv, color) and a sprite instance (five vec4s). */
 const SV = 9;
 const SI = 20;
@@ -212,6 +372,13 @@ const KIND_CAP = 32;
 const PI3 = 8;
 /** A slide's length (s). */
 export const SLIDE_S = 0.45;
+/** Pixel: the reference pawn's height (m) the art pixel is worked out from; the clear colors and draw buffers, made once. */
+const PAWN_M = 1.0;
+const SKY_RGBA = new Float32Array([SKY[0], SKY[1], SKY[2], 1]);
+const NONE_RGBA = new Float32Array(4);
+/** (WebGL's COLOR_ATTACHMENT0 and 1, and NONE: numbers, so Node's tests can load this file.) */
+const DRAW_COLOR = [0x8ce0, 0];
+const DRAW_BOTH = [0x8ce0, 0x8ce1];
 /** "Never" for a sprite's going (s). */
 const NEVER = 1e9;
 
@@ -431,6 +598,36 @@ export interface FloorPiece {
 /** How tall a big piece's picture stands (meters, its cell's height). */
 const PIECE_M = 1.1;
 
+/** The gear's Pieces: Pixel (the default), 3D or 2D ("flat": the props). */
+export type PieceStyle = "pixel" | "3d" | "flat";
+/** The gear's Pieces, in the order a tap steps through them, and each one's name on the gear's pill. */
+export const PIECE_STYLES: readonly PieceStyle[] = ["pixel", "3d", "flat"];
+export const PIECE_STYLE_NAME: Record<PieceStyle, string> = { pixel: "Pixel", "3d": "3D", flat: "2D" };
+/** The Pieces a device has saved (`saved`), or else what it had saved for the old "3D pieces" (`old`): "on" keeps 3D; else Pixel. */
+export function pieceStyleOf(saved: string | null, old: string | null): PieceStyle {
+  if (saved === "pixel" || saved === "3d" || saved === "flat") return saved;
+  return old === "on" ? "3d" : "pixel";
+}
+
+/** A set of solid pieces (3D or Pixel): its program, its instances, a VAO a kind. */
+interface Solid {
+  prog: WebGLProgram;
+  uVP: WebGLUniformLocation;
+  uEye: WebGLUniformLocation | null;
+  uTime: WebGLUniformLocation;
+  uSlide: WebGLUniformLocation;
+  uLift: WebGLUniformLocation;
+  /** (Pixel's: which kind, the lean, the small target's size, the way you look.) */
+  uKind: WebGLUniformLocation | null;
+  uTilt: WebGLUniformLocation | null;
+  uRes: WebGLUniformLocation | null;
+  uFwd: WebGLUniformLocation | null;
+  buf: WebGLBuffer;
+  data: Float32Array;
+  /** A kind's VAO, its triangles' first index and count, and how many of it stand on the board now. */
+  kinds: { vao: WebGLVertexArrayObject; first: number; count: number; n: number }[];
+}
+
 /** The WebGL 2 arena. `create` returns null where there's no WebGL 2 (the page shows a still instead). */
 export class ArenaGL {
   readonly gl: WebGL2RenderingContext;
@@ -439,21 +636,28 @@ export class ArenaGL {
   /** The crowd and the arena's figures: `n` instances drawn, `people` of them the crowd. */
   private readonly crowd: { vao: WebGLVertexArrayObject; buf: WebGLBuffer; n: number; people: number; tex: WebGLTexture | null };
   private readonly props: { vao: WebGLVertexArrayObject; buf: WebGLBuffer; data: Float32Array; n: number; tex: WebGLTexture | null };
-  /** The 3D pieces (built the first time they're switched on: the gear's "3D pieces"), or null: the flat pieces, exactly as before. */
-  private solid: {
-    prog: WebGLProgram;
-    uVP: WebGLUniformLocation;
-    uEye: WebGLUniformLocation;
-    uTime: WebGLUniformLocation;
-    uSlide: WebGLUniformLocation;
-    uLift: WebGLUniformLocation;
-    buf: WebGLBuffer;
-    data: Float32Array;
-    /** A kind's VAO, its triangles' first index and count, and how many of it stand on the board now. */
-    kinds: { vao: WebGLVertexArrayObject; first: number; count: number; n: number }[];
+  /** The 3D pieces and the pixel set, each built the first time it's chosen (the gear's Pieces); 2D: the props, exactly as before. */
+  private readonly solids: Partial<Record<"3d" | "pixel", Solid>> = {};
+  /** Which pieces are drawn (the gear's Pieces: Pixel, 3D, 2D = "flat"); Pixel draws the whole arena on the pixel grid. */
+  private style: PieceStyle = "flat";
+  /** Pixel's small target: color, the pieces' marks (which, how near), depth; its size, and its program (made the first time). */
+  private px: {
+    fb: WebGLFramebuffer;
+    col: WebGLTexture;
+    id: WebGLTexture;
+    depth: WebGLRenderbuffer;
+    /** The outlined picture, still small, and its framebuffer. */
+    outFb: WebGLFramebuffer;
+    out: WebGLTexture;
+    w: number;
+    h: number;
+    line: { prog: WebGLProgram; uSize: WebGLUniformLocation };
+    up: { prog: WebGLProgram; uScale: WebGLUniformLocation; uSize: WebGLUniformLocation };
+    vao: WebGLVertexArrayObject;
   } | null = null;
-  /** Which pieces are drawn: "3d" only when made with them (the switch); the tests' still pairs flip it back to "flat". */
-  private style: "flat" | "3d" = "flat";
+  /** Pixel: screen pixels an art pixel, and the view and screen size it was worked out for. */
+  pixelScale = 1;
+  private scaleFor: { view: View | null; w: number; h: number } = { view: null, w: 0, h: 0 };
   private last: { pieces: readonly FloorPiece[]; t0: number } = { pieces: [], t0: -NEVER };
   private readonly proj = new Float32Array(16);
   private readonly viewM = new Float32Array(16);
@@ -462,7 +666,7 @@ export class ArenaGL {
   /** Draw calls in the last frame. */
   drawCalls = 0;
 
-  static create(cv: HTMLCanvasElement, pieces3d = false): ArenaGL | null {
+  static create(cv: HTMLCanvasElement, style: PieceStyle = "flat"): ArenaGL | null {
     let gl: WebGL2RenderingContext | null = null;
     try {
       gl = cv.getContext("webgl2", { antialias: true, alpha: false, preserveDrawingBuffer: false, powerPreference: "high-performance" });
@@ -471,14 +675,14 @@ export class ArenaGL {
     }
     if (!gl) return null;
     try {
-      return new ArenaGL(gl, pieces3d);
+      return new ArenaGL(gl, style);
     } catch (e) {
       console.warn("Colosseum: WebGL 2 failed", e);
       return null;
     }
   }
 
-  private constructor(gl: WebGL2RenderingContext, pieces3d: boolean) {
+  private constructor(gl: WebGL2RenderingContext, style: PieceStyle) {
     this.gl = gl;
     const sp = program(gl, VS_SCENE, FS_SCENE);
     const mesh = buildScene();
@@ -528,20 +732,20 @@ export class ArenaGL {
     gl.bindBuffer(gl.ARRAY_BUFFER, pb);
     gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
     this.props = { vao: spriteVao(pb), buf: pb, data, n: 0, tex: null };
-    if (pieces3d) {
-      this.solid = this.buildSolid();
-      this.style = "3d";
+    if (style !== "flat") {
+      this.solids[style] = this.buildSolid(style);
+      this.style = style;
     }
     gl.bindVertexArray(null);
     gl.enable(gl.DEPTH_TEST);
     gl.clearColor(SKY[0], SKY[1], SKY[2], 1);
   }
 
-  /** The 3D pieces: the six meshes in one buffer (built once), the instances' buffer, a VAO a kind. */
-  private buildSolid(): NonNullable<ArenaGL["solid"]> {
+  /** The 3D pieces or the pixel set: the six meshes in one buffer (built once), the instances' buffer, a VAO a kind. */
+  private buildSolid(style: "3d" | "pixel"): Solid {
     const gl = this.gl;
-    const prog = program(gl, VS_PIECE, FS_PIECE);
-    const meshes = pieceMeshes();
+    const prog = style === "pixel" ? program(gl, VS_PIECE_PX, FS_PIECE_PX) : program(gl, VS_PIECE, FS_PIECE);
+    const meshes: Record<Kind, PieceMesh> = style === "pixel" ? pixelMeshes() : pieceMeshes();
     let nv = 0;
     let ni = 0;
     for (const k of KINDS) ((nv += meshes[k].verts.length / PV), (ni += meshes[k].index.length));
@@ -588,18 +792,19 @@ export class ArenaGL {
     });
     gl.bindVertexArray(null);
     const u = (n: string) => gl.getUniformLocation(prog, n)!;
-    return { prog, uVP: u("uVP"), uEye: u("uEye"), uTime: u("uTime"), uSlide: u("uSlide"), uLift: u("uLift"), buf, data, kinds };
+    const v = (n: string) => gl.getUniformLocation(prog, n);
+    return { prog, uVP: u("uVP"), uEye: v("uEye"), uTime: u("uTime"), uSlide: u("uSlide"), uLift: u("uLift"), uKind: v("uKind"), uTilt: v("uTilt"), uRes: v("uRes"), uFwd: v("uFwd"), buf, data, kinds };
   }
 
-  /** Which pieces are drawn ("3d" only when the arena was made with them). */
-  get pieceStyle(): "flat" | "3d" {
+  /** Which pieces are drawn. */
+  get pieceStyle(): PieceStyle {
     return this.style;
   }
-  /** Draws the pieces flat or in 3D (the gear's "3D pieces", at once: the same position), the 3D set built the first time. */
-  setPieceStyle(style: "flat" | "3d"): void {
+  /** Draws the pieces as Pixel, 3D or 2D (the gear's Pieces, at once: the same position), a set built the first time it's chosen. */
+  setPieceStyle(style: PieceStyle): void {
     if (style === this.style) return;
-    if (style === "3d" && !this.solid) {
-      this.solid = this.buildSolid();
+    if (style !== "flat" && !this.solids[style]) {
+      this.solids[style] = this.buildSolid(style);
       this.gl.bindVertexArray(null);
     }
     this.style = style;
@@ -656,7 +861,7 @@ export class ArenaGL {
     this.last.t0 = t0;
     const d = this.props.data;
     let n = 0;
-    const solid = this.style === "3d" ? this.solid : null;
+    const solid = this.style === "flat" ? null : (this.solids[this.style] ?? null);
     if (solid) for (const k of solid.kinds) k.n = 0;
     const put = (x: number, y: number, z: number, h: number, w: number, r: Rect, fx: number, fz: number, t: number, foot: number, goes: number) => {
       const o = n++ * SI;
@@ -739,9 +944,22 @@ export class ArenaGL {
     this.proj[9] = this.shift.y;
     lookAt(this.viewM, view.eye, view.at, yaw, pitch, this.fwd);
     multiply(this.vp, this.proj, this.viewM);
-    gl.viewport(0, 0, w, h);
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     let calls = 0;
+    const pixel = this.style === "pixel";
+    const px = pixel ? this.pixelTarget(view, w, h) : null;
+    if (px) {
+      // Pixel: everything into the small target; the arena and the crowd mark no piece.
+      gl.bindFramebuffer(gl.FRAMEBUFFER, px.fb);
+      gl.viewport(0, 0, px.w, px.h);
+      gl.drawBuffers(DRAW_BOTH);
+      gl.clearBufferfv(gl.COLOR, 0, SKY_RGBA);
+      gl.clearBufferfv(gl.COLOR, 1, NONE_RGBA);
+      gl.clear(gl.DEPTH_BUFFER_BIT);
+      gl.drawBuffers(DRAW_COLOR);
+    } else {
+      gl.viewport(0, 0, w, h);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    }
     gl.useProgram(this.scene.prog);
     gl.uniformMatrix4fv(this.scene.uVP, false, this.vp);
     gl.activeTexture(gl.TEXTURE0);
@@ -768,28 +986,131 @@ export class ArenaGL {
       gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, this.props.n);
       calls++;
     }
-    const solid = this.style === "3d" ? this.solid : null;
+    const solid = this.style === "flat" ? null : (this.solids[this.style] ?? null);
     if (solid) {
-      // The 3D pieces: a draw call a kind on the board; their shadows blend onto the board.
+      // The 3D pieces or the pixel set: a draw call a kind on the board; their shadows blend onto the board.
       gl.useProgram(solid.prog);
       gl.uniformMatrix4fv(solid.uVP, false, this.vp);
-      gl.uniform3f(solid.uEye, view.eye[0], view.eye[1], view.eye[2]);
+      if (solid.uEye) gl.uniform3f(solid.uEye, view.eye[0], view.eye[1], view.eye[2]);
       gl.uniform1f(solid.uTime, time);
       gl.uniform1f(solid.uSlide, SLIDE_S);
       gl.uniform1f(solid.uLift, BOARD.lift);
+      if (px) {
+        gl.drawBuffers(DRAW_BOTH);
+        gl.uniform1f(solid.uTilt, PIXEL_TILT);
+        gl.uniform2f(solid.uRes, px.w, px.h);
+        gl.uniform3f(solid.uFwd, this.fwd[0]!, this.fwd[1]!, this.fwd[2]!);
+      }
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
       for (let i = 0; i < solid.kinds.length; i++) {
         const k = solid.kinds[i]!;
         if (!k.n) continue;
+        if (px) gl.uniform1f(solid.uKind, i);
         gl.bindVertexArray(k.vao);
         gl.drawElementsInstanced(gl.TRIANGLES, k.count, gl.UNSIGNED_SHORT, k.first * 2, k.n);
         calls++;
       }
       gl.disable(gl.BLEND);
     }
+    if (px) {
+      // The pieces' outline, still small; then up to the screen, nearest-neighbor.
+      gl.disable(gl.DEPTH_TEST);
+      gl.bindVertexArray(px.vao);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, px.outFb);
+      gl.useProgram(px.line.prog);
+      gl.uniform2i(px.line.uSize, px.w, px.h);
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, px.id);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, px.col);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      calls++;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, w, h);
+      gl.useProgram(px.up.prog);
+      gl.uniform1f(px.up.uScale, this.pixelScale);
+      gl.uniform2i(px.up.uSize, px.w, px.h);
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, null);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, px.out);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      calls++;
+      gl.enable(gl.DEPTH_TEST);
+    }
     gl.bindVertexArray(null);
     this.drawCalls = calls;
+  }
+
+  /**
+   * Pixel's small target for this view on a w × h screen: made the first time, sized again only when the screen's size or the
+   * art pixel's changes. The art pixel (`pixelScale`) is worked out only when the view or the screen's size changes: a pawn on
+   * the board's middle (standing as the pieces do) about PAWN_ART_PX art pixels tall, at least 2 screen pixels an art pixel.
+   */
+  private pixelTarget(view: View, w: number, h: number): NonNullable<ArenaGL["px"]> {
+    const gl = this.gl;
+    const f = this.scaleFor;
+    if (f.view !== view || f.w !== w || f.h !== h) {
+      f.view = view;
+      f.w = w;
+      f.h = h;
+      // (Standing as the pieces do: leaning back toward you by PIXEL_TILT of your pitch.)
+      const lean = Math.asin(Math.max(-1, Math.min(1, -this.fwd[1]!))) * PIXEL_TILT;
+      const fl = Math.hypot(this.fwd[0]!, this.fwd[2]!) || 1;
+      const k = (Math.sin(lean) * PAWN_M) / fl;
+      const a = project(this.vp, 0, BOARD.lift, 0, w, h);
+      const b = project(this.vp, this.fwd[0]! * k, BOARD.lift + Math.cos(lean) * PAWN_M, this.fwd[2]! * k, w, h);
+      this.pixelScale = a && b ? Math.max(2, Math.round(Math.abs(a[1] - b[1]) / PAWN_ART_PX)) : 2;
+    }
+    if (!this.px) {
+      const line = program(gl, VS_FULL, FS_OUTLINE);
+      const up = program(gl, VS_FULL, FS_UP);
+      const u = (p: WebGLProgram, n: string) => gl.getUniformLocation(p, n)!;
+      gl.useProgram(line);
+      gl.uniform1i(u(line, "uCol"), 0);
+      gl.uniform1i(u(line, "uId"), 1);
+      gl.useProgram(up);
+      gl.uniform1i(u(up, "uOut"), 0);
+      this.px = {
+        fb: gl.createFramebuffer()!,
+        col: gl.createTexture()!,
+        id: gl.createTexture()!,
+        depth: gl.createRenderbuffer()!,
+        outFb: gl.createFramebuffer()!,
+        out: gl.createTexture()!,
+        w: 0,
+        h: 0,
+        line: { prog: line, uSize: u(line, "uSize") },
+        up: { prog: up, uScale: u(up, "uScale"), uSize: u(up, "uSize") },
+        vao: gl.createVertexArray()!,
+      };
+    }
+    const t = this.px;
+    const tw = Math.ceil(w / this.pixelScale);
+    const th = Math.ceil(h / this.pixelScale);
+    if (t.w !== tw || t.h !== th) {
+      t.w = tw;
+      t.h = th;
+      for (const tex of [t.col, t.id, t.out]) {
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, tw, th, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      }
+      gl.bindRenderbuffer(gl.RENDERBUFFER, t.depth);
+      gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT24, tw, th);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, t.fb);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t.col, 0);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, t.id, 0);
+      gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, t.depth);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, t.outFb);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t.out, 0);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    }
+    return t;
   }
 
   /** The last frame's view-projection (tests: where a point lands). */
