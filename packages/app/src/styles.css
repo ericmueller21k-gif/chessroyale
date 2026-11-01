@@ -12856,6 +12856,32 @@ img.qicon {
 .qchat-tab .qpop .qmenu {
   padding: 8px;
 }
+/* A shorter phone's box (about 160 px at 664 tall, about 154 at 600): smaller chips (26 px, 24 under 640), so the ten
+   phrases fit whole in three rows without scrolling, and the emoji in one row. */
+@media (max-height: 700px) {
+  .qchat-tab .qpop .qbuttons.groups {
+    gap: 4px;
+    padding: 6px;
+  }
+  .qchat-tab .qpop .qgroup-lines {
+    gap: 4px;
+  }
+  .qchat-tab .qpop .qbuttons.groups .qchip {
+    min-height: 26px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+  .qchat-tab .qpop .qbuttons.groups .qchip.emoji {
+    min-width: 34px;
+    padding: 0 4px;
+    font-size: 18px;
+  }
+}
+@media (max-height: 639px) {
+  .qchat-tab .qpop .qbuttons.groups .qchip {
+    min-height: 24px;
+  }
+}
 
 /* Computers: the column beside the board. 900-1099 px keeps the phone's split (the scoreboard is there); from
    1100 px the leaderboard has the side of the screen and chat gets the column under the panel. */
