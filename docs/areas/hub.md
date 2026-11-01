@@ -240,16 +240,18 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   the device (`brc.crowdAnim`, `brc.crowdTrail`, the same keys as before); `useBoardAnimations` and `useMotionTrail` in
   `hooks.ts`.
 - **Testing (admins): practice mode and the eval bar** (Eric, Oct 15: "The engine moves and eval settings will be
-  phased to an admin only menu for testers"). Both count only where the test switches do (`prefs.ts`: `practiceOn`,
-  `evalBarOn` read `testSwitchesAllowed()`: an admin, a server with TEST_SWITCHES on, Vite's dev server). For players
-  practice is off and there's no eval bar, whatever the device stored (`brc.practice`, `brc.evalBar`). Online the lobby
-  checks too: a `hello`'s practice counts only from an admin's socket or where TEST_SWITCHES is "1" (`lobby-do.ts`).
-- **The eval bar** (testers; its switch since Oct 10, testers only since Oct 15): on by default. Off, no bar on any
-  board (every mode: the play, reveal, vote, final and boss screens all use `EvalBar`, which draws nothing) and the
-  board takes its room, centered, on a phone and a computer. Only in Settings, never on a board screen. Kept on the
-  device (`brc.evalBar`; accounts keep no preferences). The value is still worked out (the God King's word on how it's
-  going reads it). Each result records it (`results.eval_bar`: 1 on, 0 off, NULL from older apps), from solo's post and
-  the online `hello`: every player's reads 0 since Oct 15.
+  phased to an admin only menu for testers"). Practice mode counts only where the test switches do (`prefs.ts`:
+  `practiceOn` reads `testSwitchesAllowed()`: an admin, a server with TEST_SWITCHES on, Vite's dev server). For players
+  practice is off, whatever the device stored (`brc.practice`). Online the lobby checks too: a `hello`'s practice counts
+  only from an admin's socket or where TEST_SWITCHES is "1" (`lobby-do.ts`).
+- **The eval bar: off for everyone** (Eric, Nov 1: "it should never actually be displayed… we can keep it in the
+  settings for now, but disable it… Nothing gets resized when the eval bar isn't enabled"; decision:
+  docs/decisions/2026-11-01-eval-bar-off.md). `evalBarOn()` is false on every device, testers and test servers too, so
+  `EvalBar` draws nothing on any board (the play, reveal, vote, final and boss screens) and every board takes the room
+  a player's always has, centered, on a phone and a computer. Settings → Testing keeps its "Eval bar" row, switched off
+  and not tappable ("Off for now"); a stored `brc.evalBar` is ignored. The value is still worked out (the God King's
+  word on how it's going reads it). Each result records it (`results.eval_bar`: 1 on, 0 off, NULL from older apps),
+  from solo's post and the online `hello`: every device's reads 0 since Nov 1.
 - **The Reveal sound** (Settings → Sound, Oct 15; was the sound lab): the roulette's voice as the crowd's move is
   chosen (`REEL_VOICES` in `sound.ts`, `brc.reelVoice`): Steel pan (the default), Kalimba, Marimba, Glockenspiel, Music
   box, 8-bit blip. Picking plays a whole roulette (`previewReel`), as ▶ does without picking.
@@ -322,9 +324,9 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 ## Tests and tools
 
 - Unit: `packages/server/test/accounts.test.ts`, `live.test.ts`, `packages/core/test/profile.test.ts`, `packages/app/test/public-profile.test.ts` (the public profile: the online line's forms, the merged recent list, the rarity and color text, the stats),
-  `packages/app/test/theme.test.ts`, `under-board.test.ts`, `king-attack.test.ts` (the eval bar's setting),
-  `piece-sounds.test.ts` (the piece-sound picks: storage, fallback, files), `testers.test.ts` (practice mode and the
-  eval bar: testers only), `faq.test.ts` (the FAQ: contents against sections, links, every boss, numbers following the
+  `packages/app/test/theme.test.ts`, `under-board.test.ts`, `king-attack.test.ts` (the eval bar is off for everyone),
+  `piece-sounds.test.ts` (the piece-sound picks: storage, fallback, files), `testers.test.ts` (practice mode, and the
+  eval bar off for everyone), `faq.test.ts` (the FAQ: contents against sections, links, every boss, numbers following the
   settings); `packages/server/test/lobby-do-practice.test.ts` (online practice: testers only).
 - e2e: `e2e/front-door.spec.ts`, `home-ranked.spec.ts` (the RANKED row at 320-390 px and on a computer, home keeping still through every click
   (PLAY, the line above it, the board preview, Chess Town's button and the panel within 1 px, at 320 and 390 px and 1280-1920 px), "home, said
@@ -338,8 +340,8 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   `profile.spec.ts` also checks that home's pawn and your ring ride your ride in the same boxes (Nov 1), at every ride's 0.75 and as drawn too (`?rideScale=1`), and ("rides lazy", Nov 1) that while a ride's drawing (its own chunk) is held back home's pawn and ring, your profile's pawn and the locker's tile keep the same boxes, the pawn sitting where it will ride, the ride appearing under it; `crate-banner.spec.ts` also the crate pages' gambling warning (shop.md);
   unit: `packages/app/test/home-art.test.ts` (the 50/50 pick and `?town=`, the scene's whole-pixel layout at phone, computer and short-laptop sizes, the four drawings' frames, the clock's three skies and `?sky=`, and that each look keeps every pixel in its place); `home-polish.spec.ts` also checks Chess Town's button under the three skies (the clock's edges, `?sky=`, nothing moving, no swap while you look);
   `install.spec.ts`, `crate-banner.spec.ts`, `friends.spec.ts` (two players: request, accept, online, the invites
-  setting, an invite joined from its toast, a block; the phone's line at 320 px), `eval-bar.spec.ts` (testers: the
-  switch in Settings only, the board's room, phone and computer; players: no bar, no switch), `piece-sounds.spec.ts`
+  setting, an invite joined from its toast, a block; the phone's line at 320 px), `eval-bar.spec.ts` (never shown, testers
+  too: the Testing row shown, off and disabled, the board's room, phone and computer; players: no bar, no switch), `piece-sounds.spec.ts`
   (pick, preview, reload, what loads, every file's start and loudness; the Reveal sound), `faq.spec.ts` (Settings →
   FAQ, a jump to a section, a link to a heading, back).
 - Frames: `npm run frames:home`, `frames:queue`.

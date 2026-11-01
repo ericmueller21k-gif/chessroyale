@@ -104,8 +104,9 @@
     --scr: min(var(--win-w) - var(--ts-w, 196px) - 20px, max(1000px, var(--scr-need)));
   }
   /* (With no eval bar, every player's board, the board takes the bar's 24 px and the boss stands 24 px further out: his column is
-     24 px wider, so his words keep their room.) */
-  .arena:not(:has(.board-row > .eval-bar)) {
+     24 px wider, so his words keep their room. Round 2 (Nov 1): not Babur's, whose column is his formula below with or without the bar:
+     at 240 px his pump didn't fit beside him at 1440 and 1920, so it went in the taller bar and the board shrank.) */
+  .arena:not(:has(.board-row > .eval-bar)):not(:has(.tg-pump-slot)) {
     --ts-w: 240px;
   }
   /* His words (Nov 1): his text box is no wider than his column, so its left edge stays in the window (boss alone's column is
@@ -121,9 +122,12 @@
   }
   /* Babur: his pump stands beside him (docs/decisions/2026-10-24-babur-desktop-pump.md) and grows with the board (a stage-4 queen
      on it as tall as her piece: up to 0.177 of the board wide), so his column grows with the board's height bound too: room for
-     him, the pump and the gap at any size, where the window has it (Nov 1: 153 px + that, 170 before: the side menu's 80 px). */
+     him, the pump and the gap at any size, where the window has it. Round 2 (Nov 1, the eval bar off for everyone): with no bar this
+     is his column too (the 240 px above is not Babur's). It's 240 px at 1280 × 800 (the board 600, as a player's was) and 338 at
+     1920 × 1080: at 1440 × 900 and 1920 × 1080 his pump stands beside him at the board's size, not in the taller bar (that took the
+     board to 832 at 1920). Was 153 px + 0.175 of the window's height less 200 (with the bar), 170 before: the side menu's 80 px. */
   .arena:has(.ch-tiger, .tg-pump-slot) {
-    --ts-w: calc(153px + 0.175 * (var(--app-h) - 200px));
+    --ts-w: clamp(240px, calc(0.35 * var(--app-h) - 40px), 340px);
   }
   .arena .screen.game:has(> .boss-dock) {
     --gk-screen: var(--scr);

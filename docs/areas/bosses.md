@@ -519,12 +519,12 @@ build): online, phase 1 won is the crowd's victory):
   `e2e/hopper.spec.ts`, `e2e/boss-character.spec.ts`.
 - **The boss screen on a computer** (Eric, Oct 11): the boss by the board's bottom-left corner, the God King by its
   bottom-right, mirroring him (feet level, as far from the board; in Boss alone, since Oct 28, your pawn stands there and
-  he stands to its right); the status box under the board at its width; the column beside the board starts after the God King. The eval bar draws behind them both. A phone is unchanged.
+  he stands to its right); the status box under the board at its width; the column beside the board starts after the God King. (The eval bar is off for everyone since Nov 1: nothing is drawn beside the board, and every board is the no-bar size below.) A phone is unchanged.
   **The board's size** (Eric, Oct 29, as chess.com's; docs/decisions/2026-10-29-desktop-board-size.md, `board-size.css`): the
   window's height less 123 px (Nov 1: no title line; the boss bar up to Puddles' 61 px, the dock's row, the margins), never wider than its
-  column: 952 px at 1920 × 1080, 512 at 1280 × 640 in Boss alone (Nov 1; 600 at 1280 × 800; a raid's board is 456 there, its scoreboard beside it). The list, the
+  column: 952 px at 1920 × 1080, 512 at 1280 × 640 in Boss alone (Nov 1; 600 at 1280 × 800; a raid's board is 504 there, its scoreboard beside it). The list, the
   dock, your pawn, the God King, the boss and Babur's pump follow it (they're placed from the board). Boss alone's empty
-  left column is 196 px, 240 without the eval bar (Nov 1, round 2: 216 before; room for the boss's text box, up to 220 px, inside the window); Babur's is `153 + 0.175 × (the window's height − 200)` px (170 before), so his pump,
+  left column is 196 px, 240 without the eval bar (Nov 1, round 2: 216 before; room for the boss's text box, up to 220 px, inside the window); Babur's is `clamp(240, 0.35 × the window's height − 40, 340)` px (Nov 1, round 2: 240 at 1280 × 800, 338 at 1920 × 1080, with or without the bar; was `153 + 0.175 × (the window's height − 200)` px with the bar, 170 before), so his pump,
   which grows with the board, keeps its place beside him at every size (`pumpPlace` sizes it for the board this layout
   draws: the board's own element, not the squares' last size, which flipped it between there and the taller bar).
   From 900 to 1099 px the boss is drawn at 1× by the eval bar, so he's whole in the window; the board makes room only
@@ -928,7 +928,8 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
 - Text a player must read to play (Lights out's prompt) stays on screen as long as it applies, outside the speech box.
 - A boss's words go into its voice (`speech.tsx`), never into a box a screen or a moment owns: a line lives as long as
   the rule says, not as long as the screen that said it. Nothing hides a speech box to make it fit: it shrinks, then
-  moves into view. Test a line's whole time on screen, every frame (`e2e/boss-speech.spec.ts`).
+  moves into view, by whole pixels rounded away from the edge (rounded to the nearest, Lights out's four-row prompt
+  stayed a quarter pixel above a computer's window, Nov 1). Test a line's whole time on screen, every frame (`e2e/boss-speech.spec.ts`).
 - A power's moment that shows something for less than about a second (a thaw's melt) is checked by watching for it from
   before the boss's move (`watchFor`, `watchSquares`), never by `toBeVisible` after its banner: its looks are up to a
   second apart (Oct 12, "A melt the test blinked through").

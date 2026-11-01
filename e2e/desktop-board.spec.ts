@@ -22,21 +22,23 @@ const dims = (s: string) => s.split("x").map(Number) as [number, number];
 const ROOM = { alone: 123, raid: 123, crowd: 170, vote: 170, duel: 170, squads: 230 } as const;
 type Screen = keyof typeof ROOM;
 /**
- * The board's side, measured with this change (testers' eval bar on, as `?debug` shows it). Nov 1, round 2: the side menu is
- * icons only below 1800 px (80 px, not 232), and the columns beside the board give the room back: the right column is 280 px
- * where the window is what limits the board (340 where its height does), a leaderboard 340 px (was 360), Boss alone's empty
- * column 196 px (was 216). Every screen's board is now at least main's at these sizes (MAIN below).
+ * The board's side, measured with this change. Nov 1 (the eval bar off for everyone, as every player's board is: a raid's,
+ * the Crowd's and its opening vote's 1280 to 1440 px boards are 504, 584 and 664 now, were 456, 536 and 616 with the testers'
+ * bar on; Boss alone's and 1v1's and Squads' are the same). Round 2 (Nov 1): the side menu is icons only below 1800 px (80 px,
+ * not 232), and the columns beside the board give the room back: the right column is 280 px where the window is what limits
+ * the board (340 where its height does), a leaderboard 340 px (was 360), Boss alone's empty column 196 px (was 216). Every
+ * screen's board is at least main's at these sizes (MAIN below).
  */
 const NOW: Record<Screen, Record<Size, number>> = {
   alone: { "1920x1080": 952, "1440x900": 760, "1366x768": 640, "1280x800": 600 },
-  raid: { "1920x1080": 944, "1440x900": 616, "1366x768": 536, "1280x800": 456 },
-  crowd: { "1920x1080": 904, "1440x900": 616, "1366x768": 536, "1280x800": 456 },
-  vote: { "1920x1080": 904, "1440x900": 616, "1366x768": 536, "1280x800": 456 },
+  raid: { "1920x1080": 952, "1440x900": 664, "1366x768": 584, "1280x800": 504 },
+  crowd: { "1920x1080": 904, "1440x900": 664, "1366x768": 584, "1280x800": 504 },
+  vote: { "1920x1080": 904, "1440x900": 664, "1366x768": 584, "1280x800": 504 },
   duel: { "1920x1080": 904, "1440x900": 728, "1366x768": 592, "1280x800": 624 },
   squads: { "1920x1080": 848, "1440x900": 664, "1366x768": 536, "1280x800": 504 },
 };
 /**
- * Main at a2f721a, before the Nov 1 changes (measured with the eval bar on, as the NOW sizes): the board's side must be at least
+ * Main at a2f721a, before the Nov 1 changes (measured with the eval bar on, as the sizes were then): the board's side must be at least
  * this at every size, no allowance. (Nov 1, round 2: replaces the older main sizes these checks had since Oct 29, which were
  * smaller: Boss alone at 1920 × 1080 was 552, main's is 880.)
  */
@@ -289,10 +291,11 @@ test("a computer: Babur's pump beside him at every size, as big as the board's b
   await page.goto("/?debug&pace=quick&clock=60&laststand=0&boss=tiger");
   await bossAloneFromHome(page);
   await expect.poll(() => phase(page), { timeout: 120_000 }).toBe("play");
-  // (His column grows with the board, so the pump has room beside him. Nov 1, round 2: the side menu is icons only below 1800 px,
-  // and his column is 153 px + the board's share (170 before). 1280 × 800 536 (round 1: 456; main: 536), 1366 × 768 624 (round 1:
-  // 400; main: 568), 1440 × 900 680 (round 1: 448; main: 680), 1920 × 1080 952 (round 1: 896; main: 880): testers' eval bar on.)
-  for (const [size, board] of [["1280x800", 536], ["1920x1080", 952], ["1366x768", 624], ["1440x900", 680], ["1280x800", 536]] as const) {
+  // (His column grows with the board, so the pump has room beside him. Nov 1, the eval bar off for everyone: the boards are a player's
+  // now, 1280 × 800 600 (was 536), 1366 × 768 640 (was 624). Round 2 (Nov 1): the pump is beside him at 1440 × 900 and 1920 × 1080 too,
+  // so the board is 728 at 1440 (was 680) and 952 at 1920 (was 832, the taller bar's): his column is 240 to 340 px by the window's
+  // height (board-size.css), and the side menu is icons only below 1800 px.)
+  for (const [size, board] of [["1280x800", 600], ["1920x1080", 952], ["1366x768", 640], ["1440x900", 728], ["1280x800", 600]] as const) {
     const [w, h] = dims(size);
     await page.setViewportSize({ width: w, height: h });
     await page.waitForTimeout(800);
@@ -314,14 +317,15 @@ test("a computer: Babur's pump beside him at every size, as big as the board's b
 });
 
 /**
- * Phones and tablets: the board's box (x, y, side) is main's at every size, to the pixel. Measured on main (613bf24e) the same
- * way: each screen opened at 390 × 844 and the window then set to each size in turn. A tablet on its side (1024 × 768 and
- * 1180 × 820, touch) keeps its old layout too: the new sizes are a computer's (a mouse).
+ * Phones and tablets: the board's box (x, y, side) is a player's (no eval bar; Nov 1: the phone and tablet boxes that were main's
+ * with the testers' bar on are these now, 360 px on a phone, not 312), to the pixel. Each screen opened at 390 × 844 and the
+ * window then set to each size in turn. A tablet on its side (1024 × 768 and 1180 × 820, touch) keeps its old layout too: the
+ * new sizes are a computer's (a mouse).
  */
 const TOUCH = ["390x844", "430x932", "768x1024", "844x390", "1024x768", "1180x820"] as const;
 const MAIN_TOUCH: Record<"alone" | "crowd" | "duel", Record<(typeof TOUCH)[number], [number, number, number]>> = {
-  alone: { "390x844": [38, 153, 312], "430x932": [38, 153, 352], "768x1024": [142, 153, 483], "844x390": [292, 175, 259], "1024x768": [96, 133, 464], "1180x820": [408, 133, 355] },
-  crowd: { "390x844": [38, 70, 312], "430x932": [38, 70, 352], "768x1024": [142, 70, 483], "844x390": [292, 85, 259], "1024x768": [52, 95, 552], "1180x820": [408, 95, 355] },
+  alone: { "390x844": [14, 153, 360], "430x932": [14, 153, 400], "768x1024": [118, 153, 530.7], "844x390": [292, 175, 259], "1024x768": [96, 133, 464], "1180x820": [384, 133, 402.7] },
+  crowd: { "390x844": [14, 70, 360], "430x932": [14, 70, 400], "768x1024": [118, 70, 530.7], "844x390": [292, 85, 259], "1024x768": [52, 95, 552], "1180x820": [384, 95, 402.7] },
   duel: { "390x844": [14, 90, 360], "430x932": [14, 90, 400], "768x1024": [118, 90, 531], "844x390": [312, 104, 219], "1024x768": [69, 114, 517], "1180x820": [121, 114, 568] },
 };
 async function touchPage(browser: Browser) {
@@ -329,7 +333,7 @@ async function touchPage(browser: Browser) {
   return { ctx, page: await ctx.newPage() };
 }
 for (const screen of ["alone", "crowd", "duel"] as const) {
-  test(`phones and tablets: ${screen}'s board box is main's at 390 × 844, 430 × 932, 768 × 1024, a phone on its side and a tablet on its side`, async ({ browser }) => {
+  test(`phones and tablets: ${screen}'s board box is a player's at 390 × 844, 430 × 932, 768 × 1024, a phone on its side and a tablet on its side`, async ({ browser }) => {
     test.skip(test.info().project.name !== "desktop", "it opens its own phone windows; once is enough");
     test.setTimeout(4 * 60_000);
     const { ctx, page } = await touchPage(browser);

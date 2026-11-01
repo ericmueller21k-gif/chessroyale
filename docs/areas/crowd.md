@@ -183,7 +183,7 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   Guards: `e2e/crowd.spec.ts`, "the scoreboard never moves" and "the scoreboard box is built once"; `e2e/panel.spec.ts`,
   "a phone's 50 v 50 box".
 - **On screen:** every pick appears live on the board as a ghost with a name pill (one name per square, "+N"), live
-  tallies, an optional motion trail (Settings → Board), the eval bar (testers only: [hub.md](hub.md)), the scoreboard
+  tallies, an optional motion trail (Settings → Board), the eval bar (off for everyone since Nov 1: [hub.md](hub.md)), the scoreboard
   and chat under the board. A crowd of one keeps its
   move on the board (no ghost, no snap-back). The board never moves between screens.
 - **What the reveal draws each frame** (Oct 16; docs/decisions/2026-10-16-the-reveal-draws-only-what-changed.md):

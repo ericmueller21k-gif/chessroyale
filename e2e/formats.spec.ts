@@ -244,8 +244,9 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
   expect(san).toBe(move);
   await expect(page.locator(".boss-dock-status")).toContainText("?? Blunder:");
   await expect(page.locator(".boss-dock-status .blunder-words")).toHaveText(/^(Loses your (knight|bishop|rook|queen)|Allows mate|(Your c|C)hances \d+% → \d+%)/);
-  // The eval bar plunges to your chances after the move (ringed red) while the warning is up.
-  await expect(page.locator(".eval-bar.plunged")).toBeVisible();
+  // The eval bar plunges to your chances after the move while the warning is up; since Nov 1 the bar is off for everyone, so
+  // nothing of it is drawn (its plunge isn't seen by anyone; the warning's own checks above and below stay).
+  await expect(page.locator(".eval-bar")).toHaveCount(0);
   await expect(page.getByRole("alert", { name: /^Last stand:/ })).toBeVisible({ timeout: 8_000 });
   // (Each blow's "−N": the God King's own, or the boss's when it attacks him itself, like Hollow.)
   await expect(page.locator(".ls-dmg, .ka-hp").first()).toBeVisible({ timeout: 6_000 });

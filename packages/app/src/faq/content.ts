@@ -456,7 +456,7 @@ function scoring(src: FaqSources): FaqSection {
     body: `
 ### The judge {#judge}
 
-Every pick is scored by **Stockfish**, the chess engine (the judge). For any position, it gives the side to move an **expected score** from 0 to 1: the chance of a win plus half the chance of a draw. 0.50 is level; 0.62 means you'd expect to score 62 out of 100 from here. The eval bar beside the board shows the same number.
+Every pick is scored by **Stockfish**, the chess engine (the judge). For any position, it gives the side to move an **expected score** from 0 to 1: the chance of a win plus half the chance of a draw. 0.50 is level; 0.62 means you'd expect to score 62 out of 100 from here.
 
 The judge looks at the same fixed amount for every pick (${num(S.engineNodes)} positions), so the same position always gets the same score.
 
