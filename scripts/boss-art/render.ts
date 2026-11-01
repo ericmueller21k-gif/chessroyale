@@ -128,7 +128,7 @@ async function main(req: Req): Promise<object> {
   if (!ch.palette.k) warnings.push(`no outline color: the palette needs "k"`);
   // A home on the town square (an id starting "house-") needs only its idle; a boss's sidekick (a town bot, "sidekick-")
   // its idle, walk, sit and wave; a ranked tier's emblem ("rank-") a still per division, a top tier's ("rank-top-") its idle.
-  const need: readonly string[] = req.id.startsWith("arena-") ? (ARENA[req.id.replace(/-\d+$/, "")] ?? ["idle"]) : req.id.startsWith("house-") || req.id.startsWith("rank-top-") ? ["idle"] : req.id.startsWith("sidekick-") ? SIDEKICK : req.id.startsWith("rank-set") ? RANK_SET : req.id.startsWith("rank-") ? RANK : REQUIRED;
+  const need: readonly string[] = req.id.startsWith("arena-") || req.id.startsWith("token-") ? (ARENA[req.id.replace(/-\d+$/, "")] ?? ["idle"]) : req.id.startsWith("house-") || req.id.startsWith("rank-top-") ? ["idle"] : req.id.startsWith("sidekick-") ? SIDEKICK : req.id.startsWith("rank-set") ? RANK_SET : req.id.startsWith("rank-") ? RANK : REQUIRED;
   const missing = need.filter((a) => !ch.anims[a]);
   if (missing.length) warnings.push(`animations still to draw: ${missing.join(", ")}`);
   // "*": the first frame of every animation side by side (a set of stills).
@@ -149,7 +149,7 @@ async function main(req: Req): Promise<object> {
     let edge = false;
     for (let x = 0; x < im.w && !edge; x++) edge = im.data[x * 4 + 3]! > 0 || im.data[((im.h - 1) * im.w + x) * 4 + 3]! > 0;
     for (let y = 0; y < im.h && !edge; y++) edge = im.data[y * im.w * 4 + 3]! > 0 || im.data[(y * im.w + im.w - 1) * 4 + 3]! > 0;
-    if (edge && !req.id.startsWith("arena-")) warnings.push(`${req.anim} frame ${i}: a pixel touches the frame's edge (it may be cut off)`);
+    if (edge && !req.id.startsWith("arena-") && !req.id.startsWith("token-")) warnings.push(`${req.anim} frame ${i}: a pixel touches the frame's edge (it may be cut off)`);
     for (const [x, y] of seats) if (x >= 0 && y >= 0 && x < im.w && y < im.h) im.data.set([255, 0, 255, 255], (y * im.w + x) * 4);
     return im;
   });
