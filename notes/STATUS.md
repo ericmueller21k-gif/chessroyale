@@ -61,3 +61,7 @@ Lost after the Nov 1 restart; four Opus helpers ran at once. Now in CLAUDE.md (P
 Queue (one at a time, in order): Timber (running) → Crowd panel (flash, Black, bot chat, T/emoji chat; worktree
 /home/user/cr-crowd-fixes, stopped mid-work) → Crowd cuts (/home/user/cr-crowd-cuts, stopped mid-work, 24 files
 changed) → Maia bots (/home/user/cr-maia-bots, stopped mid-work, 14 files) → auto chess reveal (after Eric's OK on a mockup).
+- Nov 1 ~21:00 UTC: #448 (cash-in 2 gold) MERGED b84bb92; #449 (one-Opus rule + notes pointer) MERGED b8a0971.
+  #447 eval bar: round 4 (director) cb9f74d: profile.spec rides-lazy race (measured "Loading…" layout) fixed in the test.
+  Follow-up (not built): the profile page jumps when its data arrives ("Loading…" layout → loaded two-column);
+  chat-mod.spec:18 phone flaky once ("GG" from a muted player showed) — root-cause later.
