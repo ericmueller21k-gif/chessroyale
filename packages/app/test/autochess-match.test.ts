@@ -68,14 +68,14 @@ describe("auto chess: the economy", () => {
     expect(refundFor(["q", "r", "b"]).survivors).toBe(4);
   });
 
-  it("a pawn that cashed in during the fight pays its side 1 gold with the next round's income (counted in the interest)", () => {
-    expect(AUTOCHESS.cashInGold).toBe(1);
+  it("a pawn that cashed in during the fight pays its side 2 gold with the next round's income (counted in the interest)", () => {
+    expect(AUTOCHESS.cashInGold).toBe(2);
     const m: MatchState = beginRound(newMatch(7)).match;
     const r = settleRound(m, "bot", { you: ["n"], bot: ["p"] }, AUTOCHESS, { you: 2, bot: 1 });
-    expect(r.match.you.refund).toEqual({ survivors: 1, cashIns: 2 });
-    expect(r.match.bot.refund).toEqual({ survivors: 0, cashIns: 1 });
+    expect(r.match.you.refund).toEqual({ survivors: 1, cashIns: 4 });
+    expect(r.match.bot.refund).toEqual({ survivors: 0, cashIns: 2 });
     const g = goldBreakdown(2, r.match.you);
-    expect(g).toMatchObject({ saved: 10, survivors: 1, cashIns: 2, income: 12, interest: 1, total: 10 + 1 + 2 + 12 + 1 });
+    expect(g).toMatchObject({ saved: 10, survivors: 1, cashIns: 4, income: 12, interest: 1, total: 10 + 1 + 4 + 12 + 1 });
     // Paid out: the next round starts with nothing waiting.
     expect(beginRound(r.match).match.you.refund).toEqual({ survivors: 0 });
   });
