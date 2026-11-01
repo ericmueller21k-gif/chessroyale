@@ -48,3 +48,5 @@
 - Nov 1 ~15:55: usage check after the restart: 14 helpers 297M re-read total (top 80M rides v2), 0 Monitor loops: audit rules working. Header 'Wh…' fix helper running (Haiku, cr-crowd-head).
 - Nov 1 ~16:30: #443 layout LIVE 3e2c70c, main GREEN. #441 scoreboard LIVE 19c0fe2 (main CI pending, watcher bkqfp7e4a). #445 header fix CI b15stpun1.
 - Nov 1 ~16:55 Eric (iPhone, angry): #441 wrong on his phone: 200 px box at his Safari's ~390×750 left 2 scoreboard rows. Wants: box = vote results height, scoreboard fills below, chat as 4th tab (Black·White·All·Chat) replacing scoreboard with Back, ONE result line. Haiku redo (claude/crowd-phone-v2), stills first. #445 closed (superseded).
+- Nov 1 ~18:10: 50v50 redo PR #446 (a4faa55, CI bn471cxid); stills sent; MERGE ONLY AFTER ERIC OKs. fuser -k 9441 freed a stray listener (PID 9136).
+- Nov 1 ~18:20: Eric APPROVED #446 stills → merge when CI green. Eval bar off for everyone: Haiku helper (cr-eval-off); players unchanged (it was testers-only); admins now same as players; Colosseum spectator bar kept *(mine)*.
