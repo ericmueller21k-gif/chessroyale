@@ -51,3 +51,6 @@
 - Nov 1 ~18:10: 50v50 redo PR #446 (a4faa55, CI bn471cxid); stills sent; MERGE ONLY AFTER ERIC OKs. fuser -k 9441 freed a stray listener (PID 9136).
 - Nov 1 ~18:20: Eric APPROVED #446 stills → merge when CI green. Eval bar off for everyone: Haiku helper (cr-eval-off); players unchanged (it was testers-only); admins now same as players; Colosseum spectator bar kept *(mine)*.
 - Nov 1 ~18:45: #446 50v50 phone redo MERGED 58c9dd3 (deploy/CI watcher).
+- Nov 1 ~19:10: eval-bar-off round 1 113462a: players identical 15/15. Found latent player bug: Babur's pump (no bar) goes to taller slot at 1440/1920, board 832 vs 952. Round 2 Haiku fixing + FAQ line.
+- Nov 1 ~19:15: #446 LIVE 58c9dd3 (deployed 17:58 UTC), main GREEN.
+- Nov 1 ~19:45: Eric approved Blitz + Timber art; order: Timber first, then Blitz. Timber build helper (Opus high, cr-timber) running, admins-first. Crate session question (Folio crown) → I'll take the no-spend hand fix at crate wiring.

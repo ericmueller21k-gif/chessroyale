@@ -61,8 +61,8 @@ dropped. *(mine)* marks the director's own suggestions.
 ## Bosses and the economy
 | # | Note | Status |
 |---|---|---|
-| H1 | Blitz (cheetah): Clock Slap passive, Time Scramble ult, tortoise sidekick | approved; art done; game build after art approval |
-| H2 | Timber (beaver): workshop strip, scraps, Gnaw ult, woodpecker foreman | approved; art done; game build after art approval; beaver size: waiting on Eric |
+| H1 | Blitz (cheetah): Clock Slap passive, Time Scramble ult, tortoise sidekick | art **APPROVED** (Nov 1); build **after Timber** (Eric's order) |
+| H2 | Timber (beaver): workshop strip, scraps, Gnaw ult, woodpecker foreman | art **APPROVED** (Nov 1); **BUILDING** first (Opus, admins first) |
 | J1 | Boss tokens: each boss's face on a coin (crest style); Ginger and Blitz examples drawn | waiting on Eric's OK |
 | J2 | Token earning: one token per boss per day for playing | design (Opus xhigh) for Eric's OK |
 | J3 | Boss shops: contents TBD (not rides) | waiting on Eric's ideas |
