@@ -10,9 +10,11 @@
  *   it, the gutters), never past the window: where the window is too narrow, the board shrinks to its column (width-bound)
  *   rather than anything overlapping. At least the old width (1000 px beside a leaderboard, 1100 px without), so a short window
  *   keeps the old layout.
- * - Boss alone's empty left column (`.tower-space`, kept for the boss and Babur's pump) is 216 px instead of the leaderboard's
- *   360: room for the widest boss beside the board and for his words (his text box, up to 244 px, right-aligned on him, ends
- *   258 px left of the board: in the window at every width), the rest to the board. Babur's grows with the board, for his pump.
+ * - Boss alone's empty left column (`.tower-space`, kept for the boss and Babur's pump) is 196 px (Nov 1; 216 before): room for
+ *   the widest boss beside the board and for his words (his text box, up to 220 px, right-aligned on him, its left edge at the
+ *   window's content edge), the rest to the board. Babur's grows with the board, for his pump.
+ * - The column beside the board is 340 px where the window has the room for the board's height, 280 px where the board is
+ *   width-bound (`--side-w`); a leaderboard beside a board is 340 px (was 360). Nov 1: the side menu's width comes out of these.
  * - A computer is a window 900 × 600 and up with a mouse (`pointer: fine`): a tablet on its side (a touch screen as wide) keeps
  *   its layout exactly as before.
  * - Everything beside and on the board already follows its size: the move list (`--board-px`), the God King, your pawn and the
@@ -27,7 +29,11 @@
     /* (The screen that holds that board: the eval bar's room both sides, the gutters, the gap and the column beside it.) */
     --scr-need: calc(var(--bd-h) + 48px + 2 * var(--gutter) + 368px);
     --scr: min(var(--win-w), max(1100px, var(--scr-need)));
+    /* The column beside the board (Nov 1): 340 px where the window has the room for the board's height, 280 (its least) where the
+       board is width-bound, so the board gets the 60 px. (`--scr-need` keeps 340: the height-bound screen is the full column.) */
+    --side-w: clamp(280px, calc(var(--scr) - 2 * var(--gutter) - 28px - var(--bd-h) - 48px), 340px);
     width: var(--scr);
+    grid-template-columns: minmax(0, 1fr) var(--side-w);
   }
   .screen.game .board-area .board-wrap {
     width: min(100%, var(--bd-h));
@@ -45,6 +51,7 @@
     --bd-room: 123px;
     --bd-h: calc(var(--app-h) - var(--bd-room));
     --gk-screen: var(--scr);
+    --gk-column: calc(var(--gk-screen) - 2 * var(--gutter) - 28px - var(--side-w));
     --bs-need: calc(var(--bs-reach, 0px) - (var(--win-w) - var(--scr)) / 2 - var(--gutter));
   }
   .screen.game:has(> .boss-dock):has(.tg-pump-slot.tg-tall) {
@@ -81,25 +88,40 @@
 /* Beside a leaderboard (1100 px and up): the screen is the window less the leaderboard's column, as before, up to what its
    board needs. Boss alone's empty column is narrower (the boss and Babur's pump only). */
 @media (min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
+  /* The leaderboard beside the board: 340 px (was 360; Nov 1, the side menu's width comes from the board). Its 20 px gap. */
+  .tower-side {
+    flex: 0 0 340px;
+  }
   .arena .screen.game {
-    --scr: min(var(--win-w) - 380px, max(1000px, var(--scr-need)));
+    --scr: min(var(--win-w) - 360px, max(1000px, var(--scr-need)));
   }
   .tower-space {
-    flex-basis: var(--ts-w, 216px);
+    flex-basis: var(--ts-w, 196px);
   }
   .arena:has(> .tower-space) .screen.game {
-    --scr: min(var(--win-w) - var(--ts-w, 216px) - 20px, max(1000px, var(--scr-need)));
+    --scr: min(var(--win-w) - var(--ts-w, 196px) - 20px, max(1000px, var(--scr-need)));
   }
   /* (With no eval bar, every player's board, the board takes the bar's 24 px and the boss stands 24 px further out: his column is
      24 px wider, so his words keep their room.) */
   .arena:not(:has(.board-row > .eval-bar)) {
     --ts-w: 240px;
   }
+  /* His words (Nov 1): his text box is no wider than his column, so its left edge stays in the window (boss alone's column is
+     196 px now; Babur's 220 px fits his). */
+  .arena .boss-side .bc-bubble {
+    max-width: min(220px, var(--ts-w, 196px));
+  }
+  /* The God King's words beside your pawn (Boss alone): they open right of him, and the room there is the column's width less
+     98 px (the board's share of the window is what's left: a bigger board pushes him right). They wrap to fit it, up to 250 px;
+     at 340 px (the window's height is the limit) that's 242 px. (Nov 1: at 1440 × 900 they ran 44 px off the window.) */
+  .screen.game:has(> .boss-dock):has(.you-pawn) > .boss-dock .gk-bubble {
+    max-width: min(250px, calc(var(--side-w) - 98px));
+  }
   /* Babur: his pump stands beside him (docs/decisions/2026-10-24-babur-desktop-pump.md) and grows with the board (a stage-4 queen
      on it as tall as her piece: up to 0.177 of the board wide), so his column grows with the board's height bound too: room for
-     him, the pump and the gap at any size, where the window has it. */
+     him, the pump and the gap at any size, where the window has it (Nov 1: 153 px + that, 170 before: the side menu's 80 px). */
   .arena:has(.ch-tiger, .tg-pump-slot) {
-    --ts-w: calc(170px + 0.175 * (var(--app-h) - 200px));
+    --ts-w: calc(153px + 0.175 * (var(--app-h) - 200px));
   }
   .arena .screen.game:has(> .boss-dock) {
     --gk-screen: var(--scr);

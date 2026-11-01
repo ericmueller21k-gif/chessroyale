@@ -5,7 +5,7 @@
  * (`display: contents`), and the rules below are for a computer with a mouse only (MOUSE_LAYOUT).
  *
  * - The side menu: the front door's (components/FrontMenu.tsx, SideMenu, `game`), on every game screen with a board. 232 px
- *   with its labels from 1366 px wide; below that, icons only, the labels as tooltips and read by screen readers, so the
+ *   with its labels from 1800 px wide (Nov 1, round 2); below that, icons only, the labels as tooltips and read by screen readers, so the
  *   board keeps its room. The screens lay out in what's left (`--win-w`, read by board-size.css and styles.css).
  * - A boss battle: no title line. The boss's bar is the top of the screen (its "Move N" left of the status), and the ⚡, the
  *   fish and the gear sit at the top of the column beside the board (Hud.tsx, BossTools), the move list under them.
@@ -89,8 +89,9 @@
   }
 }
 
-/* Below 1366 px: icons only. The labels stay in the page for screen readers (visually hidden), and show as tooltips. */
-@media (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) and (max-width: 1365px) {
+/* Below 1800 px: icons only (Nov 1, round 2: 1366 and 1440 laptops and screens lost 152 px of board to the labels). The labels stay
+   in the page for screen readers (visually hidden), and show as tooltips. */
+@media (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) and (max-width: 1799px) {
   .gm-frame {
     --gm-menu: 80px;
   }

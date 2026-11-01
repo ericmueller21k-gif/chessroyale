@@ -22,28 +22,32 @@ const dims = (s: string) => s.split("x").map(Number) as [number, number];
 const ROOM = { alone: 123, raid: 123, crowd: 170, vote: 170, duel: 170, squads: 230 } as const;
 type Screen = keyof typeof ROOM;
 /**
- * The board's side, measured with this change (testers' eval bar on, as `?debug` shows it), and on main before it. At 1280 × 800
- * and 1366 × 768 a raid's, the Crowd's and Squads' are width-bound: their scoreboard (360 px) and the column beside the board
- * (340 px) leave the board no more.
+ * The board's side, measured with this change (testers' eval bar on, as `?debug` shows it). Nov 1, round 2: the side menu is
+ * icons only below 1800 px (80 px, not 232), and the columns beside the board give the room back: the right column is 280 px
+ * where the window is what limits the board (340 where its height does), a leaderboard 340 px (was 360), Boss alone's empty
+ * column 196 px (was 216). Every screen's board is now at least main's at these sizes (MAIN below).
  */
 const NOW: Record<Screen, Record<Size, number>> = {
-  alone: { "1920x1080": 952, "1440x900": 528, "1366x768": 448, "1280x800": 520 },
-  raid: { "1920x1080": 864, "1440x900": 384, "1366x768": 304, "1280x800": 376 },
-  crowd: { "1920x1080": 864, "1440x900": 384, "1366x768": 304, "1280x800": 376 },
-  vote: { "1920x1080": 864, "1440x900": 384, "1366x768": 304, "1280x800": 376 },
+  alone: { "1920x1080": 952, "1440x900": 760, "1366x768": 640, "1280x800": 600 },
+  raid: { "1920x1080": 944, "1440x900": 616, "1366x768": 536, "1280x800": 456 },
+  crowd: { "1920x1080": 904, "1440x900": 616, "1366x768": 536, "1280x800": 456 },
+  vote: { "1920x1080": 904, "1440x900": 616, "1366x768": 536, "1280x800": 456 },
   duel: { "1920x1080": 904, "1440x900": 728, "1366x768": 592, "1280x800": 624 },
-  squads: { "1920x1080": 848, "1440x900": 432, "1366x768": 352, "1280x800": 424 },
+  squads: { "1920x1080": 848, "1440x900": 664, "1366x768": 536, "1280x800": 504 },
 };
+/**
+ * Main at a2f721a, before the Nov 1 changes (measured with the eval bar on, as the NOW sizes): the board's side must be at least
+ * this at every size, no allowance. (Nov 1, round 2: replaces the older main sizes these checks had since Oct 29, which were
+ * smaller: Boss alone at 1920 × 1080 was 552, main's is 880.)
+ */
 const MAIN: Record<Screen, Record<Size, number>> = {
-  alone: { "1920x1080": 552, "1440x900": 552, "1366x768": 480, "1280x800": 456 },
-  raid: { "1920x1080": 552, "1440x900": 552, "1366x768": 480, "1280x800": 456 },
-  crowd: { "1920x1080": 552, "1440x900": 552, "1366x768": 536, "1280x800": 456 },
-  vote: { "1920x1080": 552, "1440x900": 552, "1366x768": 536, "1280x800": 456 },
-  duel: { "1920x1080": 704, "1440x900": 648, "1366x768": 512, "1280x800": 544 },
-  squads: { "1920x1080": 600, "1440x900": 600, "1366x768": 536, "1280x800": 504 },
+  alone: { "1920x1080": 880, "1440x900": 696, "1366x768": 568, "1280x800": 600 },
+  raid: { "1920x1080": 880, "1440x900": 616, "1366x768": 536, "1280x800": 456 },
+  crowd: { "1920x1080": 904, "1440x900": 616, "1366x768": 536, "1280x800": 456 },
+  vote: { "1920x1080": 904, "1440x900": 616, "1366x768": 536, "1280x800": 456 },
+  duel: { "1920x1080": 904, "1440x900": 728, "1366x768": 592, "1280x800": 624 },
+  squads: { "1920x1080": 848, "1440x900": 664, "1366x768": 536, "1280x800": 504 },
 };
-/** The side menu's width (game-frame.css): icons only below 1366 px, the labels from there. The board may lose that much to it. */
-const MENU = (size: Size) => (dims(size)[0] < 1366 ? 80 : 232);
 /** chess.com's board against its window's height (Eric's screenshot, Oct 29: 921 px of 1036). */
 const CHESS_COM = 921 / 1036;
 
@@ -149,7 +153,7 @@ async function check(page: Page, screen: Screen, size: Size) {
   // Its size: what this change measured, never more than the window's height allows, never less than main's.
   expect(Math.abs(b - NOW[screen][size]), `${at}: the board's side (${b})`).toBeLessThanOrEqual(1);
   expect(b, `${at}: within the window's height less the screen's room`).toBeLessThanOrEqual(h - ROOM[screen] + 0.5);
-  expect(b, `${at}: never smaller than main's, less the side menu's width`).toBeGreaterThanOrEqual(MAIN[screen][size] - MENU(size) - 0.5);
+  expect(b, `${at}: never smaller than main's`).toBeGreaterThanOrEqual(MAIN[screen][size] - 0.5);
   expect(Math.abs(g.board.b - g.board.y - b), `${at}: square`).toBeLessThanOrEqual(1);
   // Nothing scrolls; everything in the window.
   expect(g.scrollY, `${at}: no scrolling down`).toBeLessThanOrEqual(0);
@@ -285,10 +289,10 @@ test("a computer: Babur's pump beside him at every size, as big as the board's b
   await page.goto("/?debug&pace=quick&clock=60&laststand=0&boss=tiger");
   await bossAloneFromHome(page);
   await expect.poll(() => phase(page), { timeout: 120_000 }).toBe("play");
-  // (His column grows with the board, so the pump has room beside him. Nov 1: the side menu takes its width too, so the board
-  // is narrower at every width below 1920: 1280 × 800 456 (was 536; the icon menu's 80 px), 1366 × 768 400 (was 568), 1440 × 900
-  // 448 (was 680), 1920 × 1080 896 (was 880): testers' eval bar on.)
-  for (const [size, board] of [["1280x800", 456], ["1920x1080", 896], ["1366x768", 400], ["1440x900", 448], ["1280x800", 456]] as const) {
+  // (His column grows with the board, so the pump has room beside him. Nov 1, round 2: the side menu is icons only below 1800 px,
+  // and his column is 153 px + the board's share (170 before). 1280 × 800 536 (round 1: 456; main: 536), 1366 × 768 624 (round 1:
+  // 400; main: 568), 1440 × 900 680 (round 1: 448; main: 680), 1920 × 1080 952 (round 1: 896; main: 880): testers' eval bar on.)
+  for (const [size, board] of [["1280x800", 536], ["1920x1080", 952], ["1366x768", 624], ["1440x900", 680], ["1280x800", 536]] as const) {
     const [w, h] = dims(size);
     await page.setViewportSize({ width: w, height: h });
     await page.waitForTimeout(800);
@@ -377,11 +381,11 @@ test("a computer's boss screen: no title line; the boss's bar at the top, 'Move 
 });
 
 /**
- * Nov 1: the front door's side menu on a computer's game screens (Boss alone, the Crowd, 1 v 1, Squads): icons only below
- * 1366 px (the labels as tooltips, read by screen readers), the full menu from 1366 px. A phone and a touch tablet have none
- * (the touch test above keeps their boards to the pixel).
+ * Nov 1 (round 2: the labels from 1800 px, not 1366): the front door's side menu on a computer's game screens (Boss alone, the
+ * Crowd, 1 v 1, Squads): icons only below 1800 px (the labels as tooltips, read by screen readers), the full menu from 1800 px.
+ * A phone and a touch tablet have none (the touch test above keeps their boards to the pixel).
  */
-test("a computer's game screens: the side menu is on each; icons only below 1366 px, its labels as tooltips; the full menu from 1366 px", async ({ browser }) => {
+test("a computer's game screens: the side menu is on each; icons only below 1800 px, its labels as tooltips; the full menu from 1800 px", async ({ browser }) => {
   test.skip(test.info().project.name !== "desktop", "a computer only; it opens its own windows");
   test.setTimeout(12 * 60_000);
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
@@ -402,10 +406,13 @@ test("a computer's game screens: the side menu is on each; icons only below 1366
   await check("alone 1280 x 800", false);
   await page.setViewportSize({ width: 1366, height: 768 });
   await page.waitForTimeout(500);
-  await check("alone 1366 x 768", true);
+  await check("alone 1366 x 768", false);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.waitForTimeout(500);
-  await check("alone 1440 x 900", true);
+  await check("alone 1440 x 900", false);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.waitForTimeout(500);
+  await check("alone 1920 x 1080", true);
   await page.setViewportSize({ width: 1280, height: 800 });
   for (const screen of ["crowd", "duel", "squads"] as Screen[]) {
     await into(page, screen);

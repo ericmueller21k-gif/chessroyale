@@ -94,10 +94,11 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
     (`--bd-room`: a boss battle 123 px (Nov 1: no title line), a crowd's screens and 1 v 1 170, Squads 230, its relay 250),
     never wider than its column; the screen grows to hold it (`--scr`), at least its old width, never past the window. So it grows and shrinks
     live with the window and with nothing else (every screen of a game has the same room). Where the window is too narrow
-    (a scoreboard's 360 px and the 340 px column beside the board), the board is width-bound instead, never overlapping
-    them. Boss alone's empty left column is 216 px, 240 without the eval bar (room for the boss and his words; Babur's grows with the board, for his pump). A computer is a window
+    (a scoreboard's 340 px and the column beside the board: 280 px where the width is the limit, 340 where the height is; Nov 1,
+    round 2, `--side-w`), the board is width-bound instead, never overlapping them. Boss alone's empty left column is 196 px, 240
+    without the eval bar (room for the boss and his words; Babur's is 153 px + his share of the height, for his pump). A computer is a window
     900 × 600 and up **with a mouse** (`pointer: fine`; the side menu beside the screen, from Nov 1, `game-frame.css`, takes its width
-    (`--win-w`): 80 px below 1366, 232 from there): phones and tablets, a tablet on its side included, keep their
+    (`--win-w`): 80 px below 1800, 232 from there): phones and tablets, a tablet on its side included, keep their
     sizes to the pixel. Auto chess has its own board and frame: not changed. Tests: `e2e/desktop-board.spec.ts`.
   - **When it draws** (Oct 14, 2026; DECISIONS.md, "The board draws its pieces only when they change"): the board is
     two parts. `OwnBoard` is the wrap, what the screen draws over the board (`children`, under the `BoardTurn`
