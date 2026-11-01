@@ -18,6 +18,7 @@ def stamp(s):
 def digest(path):
     steps = written = reread = peak = big = images = waits = 0
     tools = collections.Counter()
+    seen = set()
     first = last = None
     with open(path) as fh:
         for line in fh:
@@ -30,16 +31,23 @@ def digest(path):
             m = d.get("message") or {}
             content = m.get("content") if isinstance(m.get("content"), list) else []
             if d.get("type") == "assistant":
-                u = m.get("usage") or {}
-                written += u.get("output_tokens", 0)
-                ctx = u.get("input_tokens", 0) + u.get("cache_read_input_tokens", 0) + u.get("cache_creation_input_tokens", 0)
-                reread += ctx
-                peak = max(peak, ctx)
+                # One reply is split over several lines (thinking, text, each tool call), each carrying the reply's usage:
+                # count it once per reply (Nov 1 audit: counting every line read about 1.8 times too high).
+                mid = m.get("id")
+                if mid is None or mid not in seen:
+                    if mid is not None:
+                        seen.add(mid)
+                    u = m.get("usage") or {}
+                    written += u.get("output_tokens", 0)
+                    ctx = u.get("input_tokens", 0) + u.get("cache_read_input_tokens", 0) + u.get("cache_creation_input_tokens", 0)
+                    reread += ctx
+                    peak = max(peak, ctx)
                 for c in content:
                     if c.get("type") == "tool_use":
                         steps += 1
                         tools[c.get("name")] += 1
-                        if "sleep" in json.dumps(c.get("input", {})):
+                        # A wait: a sleep, or a Monitor (a helper re-arming Monitor is a loop of looks: Nov 1 audit).
+                        if c.get("name") == "Monitor" or "sleep" in json.dumps(c.get("input", {})):
                             waits += 1
             elif d.get("type") == "user":
                 for c in content:
