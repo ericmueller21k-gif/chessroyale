@@ -42,3 +42,5 @@
 - Nov 1 ~13:05: #444 rides lazy-load opened (4480573, CI bwk5i8z84). Helper slip: pkill -f on its own respawning wrangler. Pattern: wrangler dev respawns after fuser -k (seen twice) → give helpers a clean stop recipe.
 - Nov 1 ~13:30: #443 CI red (13 desktop tests across problems/resign/autochess/boss-party/boss-character/home-layout/boss-bar/eval-bar/grex/tiger). Round 3 Opus high helper fixing; failures saved in nov1b/board/ci443/failures.txt. Brief now has a wrangler-stop recipe (no pkill).
 - Nov 1 ~13:45: #444 rides lazy-load MERGED 26d39e1 (deploy/CI watcher).
+- Nov 1 ~14:45: #444 lazy-load LIVE 26d39e1, main GREEN incl. WebGL.
+- Nov 1 ~15:30: #443 computer game screens MERGED 3e2c70c (deploy/CI watcher). #441 round 6 CI running (bpvsib32p).
