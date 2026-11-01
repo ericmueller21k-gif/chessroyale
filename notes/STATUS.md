@@ -38,3 +38,7 @@
 - Nov 1 ~12:00: main 8675efd (#440) full e2e GREEN (queued run, new wait script worked).
 - Nov 1 ~12:20: #441 round 5 72b8ada fixed board position; blocked on short phones (390×664: 62 px under board, chat feed 0). My call: option (a) middle box height from screen height (200 → ~118), ≥3 bars + yours. Round 6 Haiku running.
 - Nov 1 ~12:40: #443 computer game screens opened (8d60f28, CI b4002hc91). Every board ≥ main's at 5 sizes; gaps 1024×768 (−24) and 1800–1856 raid.
+- Nov 1 ~12:45: rides v2 bb5e7a1 LIVE (deployed 11:56 UTC) and main full e2e GREEN incl. WebGL town.
+- Nov 1 ~13:05: #444 rides lazy-load opened (4480573, CI bwk5i8z84). Helper slip: pkill -f on its own respawning wrangler. Pattern: wrangler dev respawns after fuser -k (seen twice) → give helpers a clean stop recipe.
+- Nov 1 ~13:30: #443 CI red (13 desktop tests across problems/resign/autochess/boss-party/boss-character/home-layout/boss-bar/eval-bar/grex/tiger). Round 3 Opus high helper fixing; failures saved in nov1b/board/ci443/failures.txt. Brief now has a wrangler-stop recipe (no pkill).
+- Nov 1 ~13:45: #444 rides lazy-load MERGED 26d39e1 (deploy/CI watcher).
