@@ -88,7 +88,7 @@ chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-
   the sides "you" and "your opponent" ("Fight stalled (60 moves each): you gained 2 pawns." or "... the edge." under a pawn, "Your opponent gained 3+ pawns
   and held it for 6 moves."; the decisions: [endings](../decisions/2026-10-21-autochess-endings.md), [gains](../decisions/2026-10-21-autochess-gain.md)). **A side left
   with only its king loses at once** (both: a draw), and so does a side that starts the fight with only its king. **No promotion: a pawn that moves onto its last rank cashes in:** it lands there, a
-  coin sounds, a "+1" floats up from the square, and it leaves the board; its owner gets **1 gold** (`cashInGold`) with the next round's
+  coin sounds, a "+2" floats up from the square, and it leaves the board; its owner gets **2 gold** (`cashInGold`; Eric, Nov 1: "they give 2 points, even though they only cost one"; was 1) with the next round's
   pay ("+ 1 from cash-ins" in the result's gold line). The engine knows every one of these rules inside its search (the counters are part
   of its position, and it judges a stall as the fight does) but the early end, which only stops a fight it is winning anyway; the fight
   plays by the engine's own rules code, so the two never disagree. Stockfish isn't loaded on this screen.
