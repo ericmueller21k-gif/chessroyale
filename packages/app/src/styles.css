@@ -2842,6 +2842,39 @@ button.history-label {
   width: 40px;
   color: #9aa2b1;
 }
+/* Black · White · All: the picked one in white, the others grey (the phone's scoreboard header, MiniTower). */
+.mini-tower-head .mini-picks {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+.mini-tower-head .mini-pick {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0 4px;
+  border: none;
+  background: none;
+  color: #6f7787;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.mini-tower-head .mini-pick.on {
+  color: #ffffff;
+}
+.tower .team-chip {
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+/* (The black mark needs an edge on the scoreboard's dark rows.) */
+.tower .team-chip.b {
+  box-shadow: inset 0 0 0 1px #6f7787;
+}
 .mini-tower-body {
   flex: 1;
   min-height: 0;
@@ -2937,6 +2970,19 @@ button.history-label {
   }
   .screen.game .play-footer {
     gap: 6px;
+  }
+  /* The middle box (Eric, Nov 1: "a static container in the size of the one"): one height on every phase of a turn, as
+     tall as the five vote bars and their result (--mid-h). The power-up row, the status line and the vote results take
+     turns in it, so the scoreboard under it never moves (the e2e check in crowd.spec.ts, "the scoreboard never moves"). */
+  .screen.game {
+    --mid-h: 170px;
+  }
+  .screen.game > .play-footer,
+  .screen.game > .poll {
+    flex: none;
+    height: var(--mid-h);
+    min-height: 0;
+    align-content: start;
   }
 
   .screen.game .waiting-banner {

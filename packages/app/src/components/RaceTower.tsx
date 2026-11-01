@@ -30,6 +30,7 @@ export function RaceTower({
   floats,
   bank = true,
   dp = 1,
+  teams = false,
 }: {
   standings: readonly Standing[];
   cutoff: number;
@@ -55,6 +56,8 @@ export function RaceTower({
   bank?: boolean;
   /** Decimals on the points (scoreDp: 2 in Crowd 50 v 50). */
   dp?: number;
+  /** Everyone's rows ("All"): a small mark in each row's name cell for its team (white or black). */
+  teams?: boolean;
 }) {
   const pts = (x: number) => signed(x, dp);
   const ROW = mini ? 22 : 30;
@@ -149,6 +152,7 @@ export function RaceTower({
               </span>
               <span class="t-name">
                 {done?.has(r.id) && <span class="t-check">✓</span>}
+                {teams && r.team && <span class={`team-chip ${r.team}`} title={r.team === "w" ? "White team" : "Black team"} />}
                 {mini ? <span class="t-name-text">{r.name}</span> : <PlayerName class="t-name-text" name={r.name} uid={r.uid} you={r.isYou} bot={r.isBot} />}
                 {r.practice && (
                   <span class="t-practice" title="Practice mode (unlimited power-ups)">

@@ -11,7 +11,7 @@ import { EvalBar, knownEval } from "../components/EvalBar.tsx";
 import { kingTurn, turnCues } from "../godKing.ts";
 import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
 import type { BoardView, GameView, StrikeState } from "../game.ts";
-import { UnderBoard } from "../components/QuickChat.tsx";
+import { UnderBoard, useMedia } from "../components/QuickChat.tsx";
 import { BossPanel, besideBoard, useBossLayout } from "../components/MovePanel.tsx";
 import { PowerUps } from "../components/PowerUpButton.tsx";
 import { BossDock, Dots } from "../components/BossDock.tsx";
@@ -27,6 +27,8 @@ import { REFUSED_MS, refusedLine, throughLine } from "../refused.ts";
 import { Hud } from "./Hud.tsx";
 
 const HINT_BRUSHES = ["green", "blue", "yellow"] as const;
+/** The phone's locked screen (styles.css: one screen, the middle box and the scoreboard under it). */
+const LOCKED_PHONE = "(max-width: 899px) and (min-height: 520px)";
 const DARK_COST = BOSS_POWERS.darkTryCost;
 const DARK_TRIES = BOSS_POWERS.darkTries;
 
@@ -116,6 +118,12 @@ export function PlayScreen({
   const you = standings.find((s) => s.isYou);
   const held = match.practice ? Infinity : (you?.powerUps ?? 0);
   const powerUps = hint !== null ? Math.max(0, held - 1) : held;
+  // (A phone's locked screen: the power-up row goes in the middle box, with the status line, so the scoreboard under it
+  // keeps its place through every phase; a computer keeps the row under the board.)
+  const lockedPhone = useMedia(LOCKED_PHONE);
+  const powerRow = match.boss ? null : (
+    <HistoryNav view={history} total={board.history.length} extra={<PowerUps count={powerUps} max={match.settings.powerUpsMax} used={hint !== null} disabled={waiting} onUse={() => match.usePowerUp()} />} />
+  );
   // Crowd 50 v 50: only your team is picking this turn.
   const alive = standings.filter((s) => !s.out && (s.team == null || s.team === side));
   // Once you've moved, your move stays on the board while the others finish.
@@ -275,13 +283,8 @@ export function PlayScreen({
             {crowd && waiting && !history.browsing && <LiveGhosts match={match} fen={board.fen} orientation={orientation} />}
           </Board>
         </div>
-        {!match.boss && (
-          <HistoryNav
-            view={history}
-            total={board.history.length}
-            extra={<PowerUps count={powerUps} max={match.settings.powerUpsMax} used={hint !== null} disabled={waiting} onUse={() => match.usePowerUp()} />}
-          />
-        )}
+        {/* (On a phone the power-up row is in the middle box below, with the status line: see the footer.) */}
+        {!match.boss && !lockedPhone && powerRow}
       </div>
       {match.boss ? (
         <BossDock
@@ -374,6 +377,7 @@ export function PlayScreen({
         />
       ) : (
         <div class="play-footer">
+        {lockedPhone && powerRow}
         {waiting ? (
           <div class="waiting-banner" role="status">
             <span class="waiting-dots" aria-hidden="true">

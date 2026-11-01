@@ -492,26 +492,23 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
               </span>
             </div>
           )}
-          <div class="poll-result">
-            {me ? (
-              <>
-                <span class={`round-score ${me.roundScore >= 0 ? "good" : "bad"}`}>{fmt(me.roundScore, dp)}</span>
-                <span class="muted small">
-                  {me.move && me.move === mine.bestMove ? `you found the best move, ${seenSan(fen, me.move)}` : `${me.move ? `you picked ${seenSan(fen, me.move)}` : "no move from you"} · best was ${seenSan(fen, mine.bestMove)}`}
+          {/* (Only for your own pick: a turn you watched has no line under the bars.) */}
+          {me && (
+            <div class="poll-result">
+              <span class={`round-score ${me.roundScore >= 0 ? "good" : "bad"}`}>{fmt(me.roundScore, dp)}</span>
+              <span class="muted small">
+                {me.move && me.move === mine.bestMove ? `you found the best move, ${seenSan(fen, me.move)}` : `${me.move ? `you picked ${seenSan(fen, me.move)}` : "no move from you"} · best was ${seenSan(fen, mine.bestMove)}`}
+              </span>
+              {/* The opening allowance on your pick: what it took off, or why it didn't (one line). */}
+              {allowanceNote(me) && <span class="allowance-line">{allowanceNote(me)}</span>}
+              {/* 50 v 50: the streak's bonus in that score (CrowdScoring). */}
+              {!!me.streakBonus && (
+                <span class="streak-note">
+                  <StreakFire count={me.streak ?? 0} /> +{me.streakBonus.toFixed(2)} streak bonus
                 </span>
-                {/* The opening allowance on your pick: what it took off, or why it didn't (one line). */}
-                {allowanceNote(me) && <span class="allowance-line">{allowanceNote(me)}</span>}
-                {/* 50 v 50: the streak's bonus in that score (CrowdScoring). */}
-                {!!me.streakBonus && (
-                  <span class="streak-note">
-                    <StreakFire count={me.streak ?? 0} /> +{me.streakBonus.toFixed(2)} streak bonus
-                  </span>
-                )}
-              </>
-            ) : (
-              <span class="muted small">Your team watched this one · best was {seenSan(fen, mine.bestMove)}</span>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
       ),
     [match, mine, still, landed, grow],
