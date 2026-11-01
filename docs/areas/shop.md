@@ -36,22 +36,31 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   Weapons don't move with the piece: they're drawn where every piece's side (or shoulder) is. Your
   pawn wears your equipped items on the vote board, the cut screen and your profile; other players' looks come with
   them into a lobby; bots wear simple seeded outfits (`BOT_LOOKS`).
-- **Rides** (Oct 31: [2026-10-31-rides.md](../decisions/2026-10-31-rides.md)): items in the `ride` slot, one at a time, that your pawn
-  sits on: **Riding Chirp** (the saddle, its flap and the collar take the color) and **Moon's Ride** (the moon does), both Mythic, with
-  a color, a purity and shine like every item. **In no crate yet** (the crate comes later): only admins have them, as admin copies
-  (red, 100%: "Admins own one of every item", below). The drawings were copied as drawn from `claude/boss-art` (`scripts/boss-art/out/riding-chirp/` and
-  `moon-ride/`, Oct 30; their `summary.md` there has the artist's notes) into `components/rides/` (`kit.ts`: the types, `RIDES`).
-  Each is a `Back` and a `Front` with the pawn between them, raised onto its seat, maybe tilted and hidden below the seat (`pose`), and
-  two animations: `idle` and `move` (one square of the town's walk). Drawn: the locker's tile (`ItemArt`: the ride with a white pawn
-  on it), the locker's preview and the profiles' pawn (`Avatar`'s `ride`: the pawn and its items on its ride, its idle playing, fitted
-  into the same box, so a box never grows), the profile's Wearing rows (last), and the town square (baked sheets: town-square.md,
-  "Rides"), and **home** (Nov 1: the big pawn on your card, your ring and the side menu's Profile item; hub.md, "Your ride on home").
-  **Each ride's size** under its pawn (Nov 1): `RIDES.scale` in core's settings (1 for now), everywhere a rider is drawn but the item's
-  own tile; an admin's `?rideScale=K` tries one size for every ride (town-square.md, "Rides"; [2026-11-01-ride-scale.md](../decisions/2026-11-01-ride-scale.md)).
+- **Rides** (Oct 31: [2026-10-31-rides.md](../decisions/2026-10-31-rides.md); Nov 1, every boss's:
+  [2026-11-01-rides-v2.md](../decisions/2026-11-01-rides-v2.md)): items in the `ride` slot, one at a time, that your pawn sits on,
+  all Mythic, with a color, a purity and shine like every item: **Riding Chirp**, **Moon's Ride**, and (Nov 1) **Hollow's Bulb** (two
+  colors: the glass and its glow), **Brush Ride**, **Alfil's Howdah**, **Balloon Pup**, **Big Boy's Buggy**, **Boingo's Pogo**, **Paper
+  Crane**, **Candy Cane Sled**, **Giraffe Gallop**, **Puddles's Mower**, **Sawyer's Dozer**, **Rodeo Bull**, **Cheetah Shoes** (Blitz's:
+  twice as fast in the town) and **The Log Roller** (Timber's). Their names and lines are the drawings' own. **In no crate yet** (the
+  crate comes later): only admins have them, as admin copies (red, emerald second color, 100%: "Admins own one of every item", below).
+  **Where the drawings came from:** copied as drawn from `claude/boss-art` (`scripts/boss-art/out/<ride>/<ride>.tsx`; their
+  `summary.md`, `views-summary.md` and `trail-summary.md` there have the artist's notes; Moon's Ride Oct 30, the rest Nov 1) into
+  `components/rides/` (`kit.ts`: the types, `RIDES`); only their import lines changed and the `!`s the app's typecheck asks for, and
+  Hollow's Bulb's green cord was taken out of every view by hand (Eric, Nov 1: "we don't really need that"). Moon's Ride stays as it
+  was (its side only; its redraw is on hold) and the old cat, `hollow-steed`, isn't one. Each is a `Back` and a `Front` with the pawn
+  between them, raised onto its seat, maybe tilted and hidden below the seat (`pose`), and two animations: `idle` and `move` (one
+  square of the town's walk): its side; all but Moon's Ride also have `views` (its back, walking up the screen, and its front, walking
+  down) and a `trail` mark (town-square.md, "Rides"). Drawn: the locker's tile (`ItemArt`: the ride with a white pawn on it), the
+  locker's preview and the profiles' pawn (`Avatar`'s `ride`: the pawn and its items on its ride's side, its idle playing, fitted into
+  the same box, so a box never grows), the profile's Wearing rows (last), the town square (town-square.md, "Rides"), and **home** (Nov 1:
+  the big pawn on your card, your ring and the side menu's Profile item; hub.md, "Your ride on home").
+  **Each ride's size** under its pawn (Nov 1): every ride 0.75 (`RIDES.defaultScale` in core's settings; Eric: "0.75 is good"), a ride
+  listed in `RIDES.scale` its own, everywhere a rider is drawn but the item's own tile; an admin's `?rideScale=K` tries one size for
+  every ride (town-square.md, "Rides"; [2026-11-01-ride-scale.md](../decisions/2026-11-01-ride-scale.md)).
   **Not drawn** (the pawn alone, as before): a match's screens, the Colosseum's crowd, the
   queue's and Squads' cards, the boss stage, the town's person card, and the public profile's Equipped Cosmetics row (four tiles at
-  most; its View all lists the ride). Changing a ride's drawing, the paint's fills and lines (`item-paint.tsx`) or the colors:
-  `npx tsx scripts/bake-rides.ts` (a test fails until it's run; the blotches, `blotches.ts`, and other items don't ask for it).
+  most; its View all lists the ride). Changing a ride's drawing or the paint (`item-paint.tsx`): `npx tsx scripts/measure-rides.ts`
+  (the town's cells for it; a test fails until it's run).
 - **The gambling warning** (Eric, Nov 1; `components/GamblingWarning.tsx`): a small red ring, see-through in the middle, with a bubbly
   solid-red "!" in it, always at the top right of the crate pages: the Crates tab and each crate's own page (not the opening or the
   reveal). It sits over the page's corner (`gamble-ring` in `styles.css`: out of the flow, a 40 px tap target round a 30 px ring), so it
@@ -78,7 +87,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 | Shop cosmetics | `packages/core/src/shop.ts`; drawn by `packages/app/src/components/Cosmetics.tsx` |
 | Item drawings, fit, cards (`ItemArt`, `Avatar`); crate and box art (`WinterCrateArt`, `PresentArt`, `BetaCrateArt`, `SupplyBoxArt`) | `packages/app/src/components/Items.tsx` |
 | The paint every item uses (color, shine, `Region`, `LINE`) and its blemish's blotches | `packages/app/src/components/item-paint.tsx` and `blotches.ts` (moved out of Items.tsx, Oct 31) |
-| Rides' drawings (`RIDES`) | `packages/app/src/components/rides/`; their town sheets: `scripts/bake-rides.ts` |
+| Rides' drawings (`RIDES`) | `packages/app/src/components/rides/` (`draw.tsx`: one layer as SVG); their town cells: `scripts/measure-rides.ts` |
 | Crate page, opening strip, reveal, locker UI (`CRATE_LOOKS`: each crate's art and box) | `packages/app/src/screens/Crates.tsx`; the shop `screens/Shop.tsx`; the gambling warning `components/GamblingWarning.tsx` |
 | Server rolls and storage (D1 `items`, `equipped_items`) | `packages/server/src/locker.ts`; the shop's API in `api.ts` / `accounts.ts` |
 | Admins' copies of every item (never stored) | `packages/core/src/admin-copies.ts`; added in `locker.ts` and `accounts.ts` (`shopState`) |

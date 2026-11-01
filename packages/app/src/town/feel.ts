@@ -358,9 +358,28 @@ export const TOWN_FEEL = {
    * Rides (Oct 31): a pawn on its ride is the size it is on foot (its ride drawn at the pawn's scale: the art's 100 units are
    * the pawn's box). Each ride's `foot` is the line on its drawing (in those units) that stands on the square's middle, where
    * a pawn's base stands: the grasshopper's feet, the moon's shadow; `shadow` sizes the shadows under it as a sidekick's
-   * (0: none; the moon floats and draws its own).
+   * (0: none; the moon floats and draws its own). Nov 1 (rides v2), every boss's ride: its feet, wheels, runners or tracks (a
+   * unit or two over its lowest drawn row, which `npx tsx scripts/measure-rides.ts` logs), or the shadow it draws itself (the
+   * bulb, the brush, the pup, the pogo, the crane, the log: shadow 0). Its back and front views stand on the same line.
    */
-  rides: { "riding-chirp": { foot: 97, shadow: 1.15 }, "moon-ride": { foot: 96, shadow: 0 } } as Readonly<Record<string, { foot: number; shadow: number }>>,
+  rides: {
+    "riding-chirp": { foot: 97, shadow: 1.15 },
+    "moon-ride": { foot: 96, shadow: 0 },
+    "hollow-bulb": { foot: 96, shadow: 0 },
+    "smudgy-brush": { foot: 94, shadow: 0 },
+    "alfil-howdah": { foot: 99.5, shadow: 1.3 },
+    "balloon-pup": { foot: 97, shadow: 0 },
+    "bigboy-buggy": { foot: 98, shadow: 1.2 },
+    "boingo-pogo": { foot: 98.5, shadow: 0 },
+    "folio-crane": { foot: 98, shadow: 0 },
+    "ginger-sled": { foot: 95, shadow: 1.2 },
+    "jefferson-giraffe": { foot: 96.5, shadow: 1 },
+    "puddles-mower": { foot: 98, shadow: 1.3 },
+    "sawyer-dozer": { foot: 100, shadow: 1.4 },
+    "rodeo-bull": { foot: 97, shadow: 1.2 },
+    "cheetah-shoes": { foot: 95, shadow: 0.9 },
+    "log-roller": { foot: 96, shadow: 0 },
+  } as Readonly<Record<string, { foot: number; shadow: number }>>,
   /**
    * The shadows under a pawn (and a boss): the soft one this strong (as before), and a contact shadow right under the
    * base, this share of the pawn's width across (about its base's), this many squares deep, this strong (Eric's slice 4
@@ -503,7 +522,8 @@ export const TOWN_FEEL = {
   targetSize: 0.5,
 
   // ---- Your trail (slice 4; Eric: "a little trail your guy leaves behind as he runs… like you're leaving little
-  // droplets"). Yours only: other people's pawns leave none.
+  // droplets"). Yours only: other people's pawns leave none. On a ride with a trail (Nov 1, rides v2; Eric: "Chirp's…
+  // definitely the way to go"), its own mark on every square you leave instead, on its own times (rides.ts, `trail`).
   /** A droplet on the square you leave, at most one every this many ms (so about three show while you run)... */
   trailEveryMs: 150,
   /** ...each fading and shrinking out over this many ms... */

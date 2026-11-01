@@ -147,9 +147,24 @@ export const ITEM_DEFS: readonly ItemDef[] = [
   { id: "ninja-hood", name: "Ninja Hood", tier: "epic", slot: "head", description: "Only the eyes show, and they're calculating." },
   { id: "ninja-gi", name: "Ninja Gi", tier: "epic", slot: "skin", description: "A wrap-front gi. The belt is black; you've earned it." },
   // Rides (Oct 31, Eric): your pawn rides one round the town square. In no crate yet (the crate comes later); for now only
-  // admins have them. The saddle (Riding Chirp) and the moon (Moon's Ride) take the item's color.
+  // admins have them. The saddle (Riding Chirp) and the moon (Moon's Ride) take the item's color. Nov 1 (Eric: "load them and
+  // test the feel"): every boss's ride, the same way (docs/decisions/2026-11-01-rides-v2.md); names and lines are the drawings'.
   { id: "riding-chirp", name: "Riding Chirp", tier: "mythic", slot: "ride", description: "Chirp, Chub's trusty grasshopper. Goes one square per hop, and chirps about it the whole way." },
   { id: "moon-ride", name: "Moon's Ride", tier: "mythic", slot: "ride", description: "A sleepy crescent that gives rides on its way to bed. Mind the horns; it never minds anything." },
+  { id: "hollow-bulb", name: "Hollow's Bulb", tier: "mythic", slot: "ride", colors: 2, description: "One bulb from Hollow's strand, gone rogue. Runs on darkness; somehow still lights up." },
+  { id: "smudgy-brush", name: "Brush Ride", tier: "mythic", slot: "ride", description: "Smudgy's spare brush. It flies fine; it just won't stop signing its work in the air." },
+  { id: "alfil-howdah", name: "Alfil's Howdah", tier: "mythic", slot: "ride", description: "A baby mammoth with a tiny throne on its back. It plods, you reign, nobody hurries." },
+  { id: "balloon-pup", name: "Balloon Pup", tier: "mythic", slot: "ride", description: "A very good boy, twisted from one very long balloon. Do not bring a pin to the park." },
+  { id: "bigboy-buggy", name: "Big Boy's Buggy", tier: "mythic", slot: "ride", description: "Naptime on wheels. Big Boy swears he's too old for it, but it's his." },
+  { id: "boingo-pogo", name: "Boingo's Pogo", tier: "mythic", slot: "ride", description: "A clown's pogo stick with a frilly seat. Every square is a BOING; your opponent's nerves are not included." },
+  { id: "folio-crane", name: "Paper Crane", tier: "mythic", slot: "ride", description: "Folded from a page of someone's very serious notes. Flies fine, as long as nobody tries to read it." },
+  { id: "ginger-sled", name: "Candy Cane Sled", tier: "mythic", slot: "ride", description: "Gingerbread hull, candy-cane runners. Steering is optional; nibbling the gumdrops is not." },
+  { id: "jefferson-giraffe", name: "Giraffe Gallop", tier: "mythic", slot: "ride", description: "A young giraffe with a hot head, a hotter mane and no idea what a speed limit is. Mind the horns: they're lit." },
+  { id: "puddles-mower", name: "Puddles's Mower", tier: "mythic", slot: "ride", description: "Top speed: a brisk stroll. Puddles insists that's plenty for the lawn and for the war." },
+  { id: "sawyer-dozer", name: "Sawyer's Dozer", tier: "mythic", slot: "ride", description: "Pushes dirt, pushes luck, never pushes the brake. Hard hat not included." },
+  { id: "rodeo-bull", name: "Rodeo Bull", tier: "mythic", slot: "ride", description: "Eight seconds is the record. He's never once let anyone off early." },
+  { id: "cheetah-shoes", name: "Cheetah Shoes", tier: "mythic", slot: "ride", description: "Spotted, laced and twice as fast. Blitz says the spots are just for show; the speed is not." },
+  { id: "log-roller", name: "The Log Roller", tier: "mythic", slot: "ride", description: "Timber's favorite commute. Keep your feet moving and never, ever look down." },
 ];
 
 export const itemDef = (id: string) => ITEM_DEFS.find((d) => d.id === id);

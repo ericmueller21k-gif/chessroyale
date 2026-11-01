@@ -56,8 +56,8 @@ const allBut = (...keep: string[]) => new Set(halfSquares("w").filter((sq) => !k
 const LEGAL: AutoChessSettings = { ...AUTOCHESS, adjustMode: "legal" };
 
 describe("auto chess stars: the numbers", () => {
-  it("holds the design's: a star-up is a flat 5, three stars at most, the move step 5 s and 3 s a starred piece, the bot buys star-ups nearly always", () => {
-    expect(AUTOCHESS.starUpCost).toBe(5);
+  it("holds the design's: a star-up is a flat 1, three stars at most, the move step 5 s and 3 s a starred piece, the bot buys star-ups nearly always", () => {
+    expect(AUTOCHESS.starUpCost).toBe(1);
     expect(AUTOCHESS.maxStars).toBe(3);
     expect(AUTOCHESS.adjustMode).toBe("stars");
     expect(AUTOCHESS.moveBase).toBe(5);
@@ -186,8 +186,8 @@ describe("auto chess stars: the offer rule", () => {
     // (Level 4: four pieces, so the board is full.)
     const q = offer("q", "d1");
     expect(starUpTarget(full, q)).toEqual({ where: "board", square: "d1", becomes: 2 });
-    expect(buyBlock(full, 100, q, AUTOCHESS, 4)).toBeNull();
-    expect(buyBlock(full, 4, q, AUTOCHESS, 4)).toBe("gold");
+    expect(buyBlock(full, 1, q, AUTOCHESS, 4)).toBeNull();
+    expect(buyBlock(full, 0, q, AUTOCHESS, 4)).toBe("gold");
     // A new queen is refused: the one queen, and a full board.
     expect(buyBlock(full, 500, offer("q", "d2"), AUTOCHESS, 4)).toBe("queen");
     expect(buyBlock(white({ a2: "p", b2: "p", c2: "p", d2: "p" }), 500, offer("n", "e2"), AUTOCHESS, 4)).toBe("limit");
@@ -228,14 +228,14 @@ describe("auto chess stars: how often a star-up shows", () => {
 });
 
 describe("auto chess stars: the merge", () => {
-  it("a star-up on the board costs 5, adds no piece, and the piece gains a star: plain, 2, 3, and a 3-star's offer is a new piece that can't land", () => {
+  it("a star-up on the board costs 1, adds no piece, and the piece gains a star: plain, 2, 3, and a 3-star's offer is a new piece that can't land", () => {
     let a = white({ f2: "r", a2: "p" });
-    let gold = 100;
+    let gold = 10;
     const shop = shopOf([offer("r", "f2"), offer("n", "c3"), offer("b", "h3"), offer("p", "c4")]);
     const one = buyFromSlot({ army: a, gold, shop }, 0, 5, AUTOCHESS, 4);
     if ("block" in one) throw new Error("should buy");
     expect(one.starUp).toEqual({ where: "board", square: "f2", becomes: 2 });
-    expect(one.gold).toBe(95);
+    expect(one.gold).toBe(9);
     expect(one.army.board).toEqual({ f2: "r", a2: "p" });
     expect(one.army.stars).toEqual({ f2: 2 });
     // The slot rolled again; the others stayed.
@@ -247,21 +247,21 @@ describe("auto chess stars: the merge", () => {
     const two = buyFromSlot({ army: a, gold, shop: shopOf([offer("r", "f2")]) }, 0, 6, AUTOCHESS, 4);
     if ("block" in two) throw new Error("should buy");
     expect(two.army.stars).toEqual({ f2: 3 });
-    expect(two.gold).toBe(90);
+    expect(two.gold).toBe(8);
     // At three stars there is nothing left to star up: the offer is a new rook on a taken square.
     expect(starUpTarget(two.army, offer("r", "f2"))).toBeNull();
     expect(buyBlock(two.army, 100, offer("r", "f2"))).toBe("taken");
   });
 
-  it("a held piece gains its star on the bench, keeping its square; a new piece rolled that matches a held piece's kind and square merges into it at 5", () => {
+  it("a held piece gains its star on the bench, keeping its square; a new piece rolled that matches a held piece's kind and square merges into it at 1", () => {
     const a = white({}, {}, [{ kind: "b", square: "c1" }, { kind: "n", square: "g3" }]);
     // (The shop meant it as a new bishop on the empty c1: it is the star-up of the one held for c1.)
-    expect(offerPrice(a, offer("b", "c1"))).toBe(5);
-    expect(offerPrice(a, offer("b", "d1"))).toBe(32);
-    const got = buyFromSlot({ army: a, gold: 40, shop: shopOf([offer("b", "c1")]) }, 0, 3, AUTOCHESS, 4);
+    expect(offerPrice(a, offer("b", "c1"))).toBe(1);
+    expect(offerPrice(a, offer("b", "d1"))).toBe(3);
+    const got = buyFromSlot({ army: a, gold: 4, shop: shopOf([offer("b", "c1")]) }, 0, 3, AUTOCHESS, 4);
     if ("block" in got) throw new Error("should buy");
     expect(got.starUp).toEqual({ where: "bench", index: 0, becomes: 2 });
-    expect(got.gold).toBe(35);
+    expect(got.gold).toBe(3);
     expect(got.army.bench).toEqual([{ kind: "b", square: "c1", stars: 2 }, { kind: "n", square: "g3" }]);
     expect(got.army.board).toEqual({});
     // Held for another square or another kind: an ordinary new piece.
@@ -303,45 +303,45 @@ describe("auto chess stars: the merge", () => {
 });
 
 describe("auto chess stars: prices and refunds", () => {
-  it("a piece's price is what it cost: its price and 5 for each star above the first; selling gives back 75% of that, rounded down", () => {
-    expect(paidFor("n", 1)).toBe(30);
-    expect(paidFor("n", 2)).toBe(35);
-    expect(paidFor("r", 3)).toBe(60);
-    expect(sellValue("n", AUTOCHESS)).toBe(22);
-    expect(sellValue("n", AUTOCHESS, 2)).toBe(26);
-    expect(sellValue("r", AUTOCHESS, 3)).toBe(45);
-    expect(sellValue("q", AUTOCHESS, 3)).toBe(75);
-    expect(sellValue("p", AUTOCHESS)).toBe(7);
+  it("a piece's price is what it cost: its price and 1 for each star above the first; selling gives back 75% of that, to the nearest whole gold (a half up)", () => {
+    expect(paidFor("n", 1)).toBe(3);
+    expect(paidFor("n", 2)).toBe(4);
+    expect(paidFor("r", 3)).toBe(7);
+    expect(sellValue("n", AUTOCHESS)).toBe(2);
+    expect(sellValue("n", AUTOCHESS, 2)).toBe(3);
+    expect(sellValue("r", AUTOCHESS, 3)).toBe(5);
+    expect(sellValue("q", AUTOCHESS, 3)).toBe(8);
+    expect(sellValue("p", AUTOCHESS)).toBe(1);
   });
 
   it("selling a starred piece pays for its stars and takes them with it, from the board and from the bench", () => {
     const a = white({ f2: "r", c3: "n" }, { f2: 3, c3: 2 }, [{ kind: "b", square: "a1", stars: 2 }]);
     const sold = sellPiece(a, "f2", "r")!;
-    expect(sold.gold).toBe(45);
+    expect(sold.gold).toBe(5);
     expect(sold.army.board).toEqual({ c3: "n" });
     expect(sold.army.stars).toEqual({ c3: 2 });
     const last = sellPiece(sold.army, "c3", "n")!;
-    expect(last.gold).toBe(26);
+    expect(last.gold).toBe(3);
     expect(last.army.stars).toBeUndefined();
     const held = sellHeld(a, 0, "b")!;
-    expect(held.gold).toBe(Math.floor(0.75 * 37));
+    expect(held.gold).toBe(Math.round(0.75 * 4));
     expect(held.army.bench).toEqual([]);
     // A plain one is as it was.
-    expect(sellPiece(white({ c3: "n" }), "c3", "n")!.gold).toBe(22);
+    expect(sellPiece(white({ c3: "n" }), "c3", "n")!.gold).toBe(2);
   });
 
   it("the survivors' refund counts everything paid: 25% of the prices and the star-ups of the pieces still standing", () => {
-    expect(worth(["r", "n"], AUTOCHESS)).toBe(80);
-    expect(worth(["r", "n"], AUTOCHESS, 3)).toBe(95);
-    expect(refundFor(["r", "n"]).survivors).toBe(20);
-    expect(refundFor(["r", "n"], AUTOCHESS, 3).survivors).toBe(23);
+    expect(worth(["r", "n"], AUTOCHESS)).toBe(8);
+    expect(worth(["r", "n"], AUTOCHESS, 3)).toBe(11);
+    expect(refundFor(["r", "n"]).survivors).toBe(2);
+    expect(refundFor(["r", "n"], AUTOCHESS, 3).survivors).toBe(3);
     expect(starUpsIn({ a1: 2, b2: 3 })).toBe(3);
     expect(starUpsIn(undefined)).toBe(0);
     // Through the round's settling.
     const { match } = beginRound(newMatch(3));
     const settled = settleRound(match, "you", { you: ["r", "n"], bot: ["b"] }, AUTOCHESS, { you: 0, bot: 0 }, { you: 2, bot: 0 });
-    expect(settled.result.refund.you.survivors).toBe(Math.floor(0.25 * (80 + 10)));
-    expect(settled.result.refund.bot.survivors).toBe(8);
+    expect(settled.result.refund.you.survivors).toBe(Math.round(0.25 * (8 + 2)));
+    expect(settled.result.refund.bot.survivors).toBe(1);
   });
 
   it("the stars follow a piece through the fight's moves, and a captured piece's stars go with it", () => {
@@ -512,21 +512,21 @@ describe("auto chess stars: the move step", () => {
 });
 
 describe("auto chess stars: the bot", () => {
-  it("buys the star-ups it is offered, nearly always, for 5: the best (most stars, dearest piece) first", () => {
+  it("buys the star-ups it is offered, nearly always, for 1: the best (most stars, dearest piece) first", () => {
     const a = white({ c3: "n", d2: "b" }, { d2: 2 });
     const shop = shopOf([offer("n", "c3"), offer("b", "d2"), offer("r", "h3"), offer("p", "c4")]);
-    const ups = botStarUps(shop, a, 100);
+    const ups = botStarUps(shop, a, 10);
     // The bishop's makes a 3-star, the knight's a 2-star: the bishop first.
     expect(ups.map((u) => u.offer)).toEqual([offer("b", "d2"), offer("n", "c3")]);
-    expect(botStarUps(shop, a, 4)).toEqual([]);
-    expect(botStarUps(shop, a, 5)).toHaveLength(2);
-    // Across many plans from a bench of four pieces (a lot of offers to match) it buys them, each for 5, each one a star more, and never past three.
+    expect(botStarUps(shop, a, 0)).toEqual([]);
+    expect(botStarUps(shop, a, 1)).toHaveLength(2);
+    // Across many plans from a bench of four pieces (a lot of offers to match) it buys them, each for 1, each one a star more, and never past three.
     const bench: Held[] = [{ kind: "n", square: "c1" }, { kind: "b", square: "d1" }, { kind: "r", square: "a2" }, { kind: "n", square: "h3" }];
     let plans = 0;
     let withUp = 0;
-    let ups5 = 0;
+    let upsBought = 0;
     for (let seed = 0; seed < 300; seed++) {
-      const plan = botPlan("w", "e1", 150, 4, mulberry32(seed), AUTOCHESS, bench, { level: 4, xp: 0 });
+      const plan = botPlan("w", "e1", 15, 4, mulberry32(seed), AUTOCHESS, bench, { level: 4, xp: 0 });
       plans++;
       const buys = plan.events.filter((e) => e.type === "starup");
       if (buys.length) withUp++;
@@ -534,9 +534,9 @@ describe("auto chess stars: the bot", () => {
         expect(e.price).toBe(AUTOCHESS.starUpCost);
         expect([2, 3]).toContain(e.stars);
         expect(["board", "bench"]).toContain(e.where);
-        ups5++;
+        upsBought++;
       }
-      expect(plan.spent).toBeLessThanOrEqual(150);
+      expect(plan.spent).toBeLessThanOrEqual(15);
       for (const [sq, s] of Object.entries(plan.army.stars ?? {})) {
         expect(plan.army.board[sq]).toBeDefined();
         expect(plan.army.board[sq]).not.toBe("p");
@@ -545,7 +545,7 @@ describe("auto chess stars: the bot", () => {
       for (const h of plan.army.bench) expect(h.stars === undefined || h.stars === 2 || h.stars === 3).toBe(true);
     }
     expect(withUp).toBeGreaterThan(plans * 0.1);
-    expect(ups5).toBeGreaterThan(40);
+    expect(upsBought).toBeGreaterThan(40);
   });
 
   it("stars its bench too: a held piece gains its stars where it is, and the plan's events replay to the same bench and board", () => {
@@ -553,7 +553,7 @@ describe("auto chess stars: the bot", () => {
     const bench: Held[] = [{ kind: "n", square: "c1" }, { kind: "b", square: "d1" }, { kind: "r", square: "a2" }];
     let benchUps = 0;
     for (let seed = 0; seed < 400; seed++) {
-      const full = botPlan("w", "e1", 300, 6, mulberry32(seed), { ...AUTOCHESS, bot: { ...AUTOCHESS.bot, xpChance: 0, xpChanceFull: 0 } }, bench, { level: 4, xp: 0 });
+      const full = botPlan("w", "e1", 30, 6, mulberry32(seed), { ...AUTOCHESS, bot: { ...AUTOCHESS.bot, xpChance: 0, xpChanceFull: 0 } }, bench, { level: 4, xp: 0 });
       const end = botBenchAt(full.events, bench, 99);
       expect([...end].sort((a, b) => (a.square < b.square ? -1 : 1))).toEqual([...full.army.bench].sort((a, b) => (a.square < b.square ? -1 : 1)));
       const board = botAt(full.events, 99);
@@ -570,9 +570,9 @@ describe("auto chess stars: the bot", () => {
     const always = { ...AUTOCHESS, bot: { ...AUTOCHESS.bot, starUpChance: 1 } };
     let alwaysUps = 0;
     for (let seed = 0; seed < 150; seed++) {
-      const a = botBuys({ ...white(), bench }, 150, 4, mulberry32(seed), never, { level: 4, xp: 0 });
+      const a = botBuys({ ...white(), bench }, 15, 4, mulberry32(seed), never, { level: 4, xp: 0 });
       expect(a.buys.filter((b) => b.type === "starup")).toHaveLength(0);
-      alwaysUps += botBuys({ ...white(), bench }, 150, 4, mulberry32(seed), always, { level: 4, xp: 0 }).buys.filter((b) => b.type === "starup").length;
+      alwaysUps += botBuys({ ...white(), bench }, 15, 4, mulberry32(seed), always, { level: 4, xp: 0 }).buys.filter((b) => b.type === "starup").length;
     }
     expect(alwaysUps).toBeGreaterThan(20);
   });

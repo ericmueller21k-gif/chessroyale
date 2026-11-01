@@ -79,9 +79,9 @@ function serviceWorker(): Plugin {
         // (Not the live window's bot replays: only a computer's home fetches them, so phones never download them. Nor
         // the Maia box: about 40 MB, fetched only for a battle that uses it, then kept in its own cache: MAIA below.
         // Nor the engines' source archives: for whoever downloads them, never for the game. Nor the Colosseum's hour of
-        // ambience, about 18 MB, streamed by an <audio> element only while it plays: see STREAMED in sw-template.js. Nor the
-        // rides' baked sheets, about 2 MB, the town fetching only the one a rider in the square wears: town/rides/ride-*.webp.)
-        .filter((f) => f !== "/sw.js" && f !== "/version.json" && !f.endsWith(".webmanifest") && !f.endsWith(".txt") && !f.endsWith(".tar.gz") && !f.startsWith("/replays/") && !f.startsWith("/engine/maia/") && f !== "/sounds/colosseum/ambient.mp3" && !/^\/assets\/ride-.*\.webp$/.test(f))
+        // ambience, about 18 MB, streamed by an <audio> element only while it plays: see STREAMED in sw-template.js. (The rides'
+        // baked sheets were left out here until Nov 1; the town now draws its riders from the rides' own drawings: town/rides.ts.)
+        .filter((f) => f !== "/sw.js" && f !== "/version.json" && !f.endsWith(".webmanifest") && !f.endsWith(".txt") && !f.endsWith(".tar.gz") && !f.startsWith("/replays/") && !f.startsWith("/engine/maia/") && f !== "/sounds/colosseum/ambient.mp3")
         // Hosts redirect /index.html to /, and a cached redirect can't answer a page load.
         .map((f) => (f === "/index.html" ? "/" : f))
         .sort();

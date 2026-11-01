@@ -513,6 +513,8 @@ challenge other players here, not just the bosses"). Not started; Eric is pickin
 
 ## Auto chess: a TFT-style economy (Eric, Oct 25, 2026; for another day, needs testing)
 
+**Built Nov 1** (queen 9, income 10 +2 a round up to 20, the rest as below, scaled to whole gold): [docs/decisions/2026-11-01-autochess-tft-economy.md](docs/decisions/2026-11-01-autochess-tft-economy.md). Next: Eric's feel test.
+
 Eric: rework Auto chess's gold so it plays like Teamfight Tactics, with buying, rolling and leveling in small whole numbers.
 "Will need to test it a bit so it feels like TFT… not sure yet but this is for another day." His numbers, with today's in
 brackets (`AUTOCHESS` in `packages/core/src/settings.ts`; today's are on a ×10 scale):

@@ -94,7 +94,7 @@ import { clockWords, damageWords, endWords, fightRulesWords, goldWords, headline
  * in `autochess/` (pure, tested); this draws them. Nothing is recorded, rewarded or sent anywhere.
  *
  * v8 (docs/decisions/2026-10-22-autochess-stars.md) adds stars: a piece but a pawn or the king can have 2 or 3 (small gold stars drawn on it, on the board, the benches,
- * their revealed pieces and the shop cards), a star-up offer is a card with a gold glow (a rainbow one for a third star) that costs 5 and merges into the piece, and the
+ * their revealed pieces and the shop cards), a star-up offer is a card with a gold glow (a rainbow one for a third star) that costs `starUpCost` (1) and merges into the piece, and the
  * move step is for the starred pieces only: each moves once (a 2-star one legal move, a 3-star to any empty square of your half), in 5 s plus 3 s a starred piece of
  * the side with more.
  *

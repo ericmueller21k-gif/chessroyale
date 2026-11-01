@@ -274,13 +274,14 @@ test("rides on home (Nov 1): the big pawn and your ring ride Riding Chirp, its i
   const pic = () => riding.innerHTML();
   const first = await pic();
   await expect.poll(pic, { timeout: 5_000 }).not.toBe(first);
-  // At a size (Nov 1, an admin's `?rideScale=0.75`): the ride smaller under the same pawn, in the same boxes.
-  expect(await riding.getAttribute("data-scale")).toBe("1");
-  await page.goto("/?rideScale=0.75");
-  await expect(page.locator('.fd-hero .avatar.riding[data-scale="0.75"]')).toHaveCount(1);
-  await expect(page.locator('.fd-ring:visible .avatar.riding[data-scale="0.75"]')).toHaveCount(1);
+  // At a size (Nov 1): every ride at 0.75 (RIDES.defaultScale, Eric: "0.75 is good"); an admin's `?rideScale=1` tries it as
+  // drawn, the ride bigger under the same pawn, in the same boxes.
+  expect(await riding.getAttribute("data-scale")).toBe("0.75");
+  await page.goto("/?rideScale=1");
+  await expect(page.locator('.fd-hero .avatar.riding[data-scale="1"]')).toHaveCount(1);
+  await expect(page.locator('.fd-ring:visible .avatar.riding[data-scale="1"]')).toHaveCount(1);
   await page.evaluate(() => document.fonts.ready);
-  expect(await boxes(), "nothing grew or moved at a smaller ride").toEqual(before);
+  expect(await boxes(), "nothing grew or moved at a bigger ride").toEqual(before);
   // Off again: the pawn alone, in the same boxes.
   await wearItem(page, "ride", null);
   await page.reload();
@@ -290,7 +291,7 @@ test("rides on home (Nov 1): the big pawn and your ring ride Riding Chirp, its i
   expect(await boxes()).toEqual(before);
 });
 
-test("rides for an admin (Oct 31; admins own one of every item): the Ride tab has both rides' admin copies; wearing Riding Chirp's, the preview rides it, and in the town square your pawn rides it, in its color", async ({ page }) => {
+test("rides for an admin (Oct 31; admins own one of every item): the Ride tab has every ride's admin copy (Nov 1: every boss's); wearing Riding Chirp's, the preview rides it, and in the town square your pawn rides it, in its color", async ({ page }) => {
   await named(page, "Eric");
   // (Once this page's account exists, as a player: no ride.)
   await page.goto("/shop");
@@ -301,13 +302,15 @@ test("rides for an admin (Oct 31; admins own one of every item): the Ride tab ha
   await page.getByRole("tab", { name: "Locker" }).click();
   await page.getByRole("tab", { name: "Ride", exact: true }).click();
   const grid = page.locator(".locker-grid").first();
-  await expect(grid.locator(".locker-item")).toHaveCount(2);
-  await expect(grid.locator(".locker-admin")).toHaveCount(2);
+  const rides = ITEM_DEFS.filter((d) => d.slot === "ride").length;
+  expect(rides).toBe(16);
+  await expect(grid.locator(".locker-item")).toHaveCount(rides);
+  await expect(grid.locator(".locker-admin")).toHaveCount(rides);
   const chirp = grid.getByRole("button", { name: /^Riding Chirp, / });
   await chirp.click();
   await expect(chirp.locator(".locker-worn")).toHaveText("Worn");
   await expect(page.locator('.locker-preview .avatar.riding[data-ride="riding-chirp"]')).toHaveCount(2);
-  // In the town square, as the town reads anyone's look: your pawn on the admin copy's ride, its red sheet.
+  // In the town square, as the town reads anyone's look: your pawn on the admin copy's ride, in its red.
   await page.goto("/town?sky=day");
   await expect.poll(() => page.evaluate(() => (window as unknown as { __townRide?: () => { you: { ride: string | null; color: string | null; ready: boolean } } | null }).__townRide?.()?.you ?? null), { timeout: 20_000 }).toEqual(
     expect.objectContaining({ ride: "riding-chirp", color: "red", ready: true }),

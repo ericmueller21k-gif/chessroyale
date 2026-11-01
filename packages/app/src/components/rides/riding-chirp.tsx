@@ -1,8 +1,8 @@
-// Copied as drawn from `claude/boss-art` (scripts/boss-art/out/riding-chirp/riding-chirp.tsx, Oct 30): only the import lines changed and a few `!` the app's
-// stricter typecheck asks for.
-// The art's kit there (scripts/boss-art/item-kit.tsx) is a copy of ../item-paint.tsx. Notes: docs/areas/shop.md, "Rides".
-import type { RiderDraft, RiderProps } from "./kit.ts";
-import { Region, LINE, lw, darken, lighten, isLight } from "../item-paint.tsx";
+// Copied as drawn from `claude/boss-art` (scripts/boss-art/out/riding-chirp/riding-chirp.tsx, Nov 1: the side view, its front and back views, its
+// trail mark): only the import lines changed and the `!`s the app's stricter typecheck asks for (noUncheckedIndexedAccess).
+// The art's kit there (scripts/boss-art/item-kit.tsx) is a copy of ../item-paint.tsx and ./kit.ts. Notes: docs/areas/shop.md, "Rides".
+import type { RiderDraft, RiderProps, RiderViewDraft, TrailProps } from "./kit.ts";
+import { Region, LINE, lw, darken, lighten, isLight, mirror } from "../item-paint.tsx";
 
 /* Chirp's fixed colors */
 const C = {
@@ -269,6 +269,253 @@ function Front({ p, anim, f }: RiderProps) {
   );
 }
 
+/* ---------- the front and back views (end-on), sharing the side's beats ---------- */
+const mx = (pts: P[]): P[] => pts.map(([x, y]) => [100 - x, y] as P);
+const mp = (q: P): P => [100 - q[0], q[1]];
+function tones(hex: string) {
+  const dark = !isLight(hex) && (parseInt(hex.slice(1, 3), 16) + parseInt(hex.slice(3, 5), 16) + parseInt(hex.slice(5, 7), 16)) / 3 < 70;
+  return { blanket: dark ? lighten(hex, 0.28) : darken(hex, 0.22), trim: dark ? lighten(hex, 0.6) : lighten(hex, 0.45) };
+}
+function endBlanket() {
+  let d = "M 20 66 Q 18 54 24 51 Q 50 45 76 51 Q 82 54 80 66";
+  for (let i = 0; i < 6; i++) {
+    const x = 80 - i * 10;
+    d += ` Q ${x - 5} 70.5 ${x - 10} 66`;
+  }
+  return d + " Z";
+}
+const E_BLANKET = endBlanket();
+const E_FLAP_L = "M 20.5 53 L 25.5 53.5 Q 26.5 61 25 66.5 L 21 66.5 Q 19.5 61 20.5 53 Z";
+const E_FLAPS = [E_FLAP_L, mirror(E_FLAP_L)];
+
+/** An antenna seen end-on: up, then bowing out (dir -1 to our left, 1 to our right). */
+function endAntenna(bx: number, by: number, ang: number, L: number, dir: number, bow: number) {
+  const r = (ang * Math.PI) / 180;
+  const tx = bx + dir * L * Math.sin(r);
+  const ty = by - L * Math.cos(r);
+  const cx = bx + dir * L * bow;
+  const cy = by - L * 0.7;
+  return `M ${n1(bx)} ${n1(by)} Q ${n1(cx)} ${n1(cy)} ${n1(tx)} ${n1(ty)}`;
+}
+
+/** A front-view antenna: out sideways first (clear of the pawn), then up and a little out. */
+function frontAntenna(bx: number, by: number, ang: number, L: number, dir: number) {
+  const r = (ang * Math.PI) / 180;
+  const tx = bx + dir * (12 + 0.6 * L * Math.sin(r));
+  const ty = by - L * Math.cos(r);
+  return `M ${n1(bx)} ${n1(by)} Q ${n1(bx + dir * 18)} ${n1(by - 9)} ${n1(tx)} ${n1(ty)}`;
+}
+
+interface EL {
+  front: P[];
+  mid: P[];
+  hindH: P;
+  hindK: P;
+  hind: P[];
+}
+/** Our left-hand legs seen from the front (mirror for the right). */
+function legsF(s: S): EL {
+  const b = s.b;
+  if (s.mode === "kick")
+    return { front: [[42, 79], [39, 88], [38, 95], [35, 96.5]], mid: [[30, 78], [26, 86], [25, 93], [22, 94.5]], hindH: [30, 72], hindK: [17, 63], hind: [[17, 63], [12, 87], [9, 90]] };
+  if (s.mode === "air")
+    return { front: [[42, 79], [37, 86], [38, 91], [41, 92]], mid: [[30, 78], [24, 84], [25, 89], [28, 90]], hindH: [30, 72], hindK: [16, 54], hind: [[16, 54], [11, 79], [14, 83]] };
+  if (s.mode === "reach")
+    return { front: [[42, 79], [34, 86], [30, 93], [27, 94]], mid: [[30, 78], [22, 85], [19, 92], [16, 93]], hindH: [30, 72], hindK: [16, 54], hind: [[16, 54], [12, 85], [9, 88]] };
+  return {
+    front: [[42, 79 + b], [36, 85 + b * 0.5], [34, 95], [30, 96]],
+    mid: [[30, 78 + b], [24, 84 + b * 0.5], [22, 94], [18, 95]],
+    hindH: [30, 72 + b],
+    hindK: [16, 52 + b * 0.7],
+    hind: [[16, 52 + b * 0.7], [14, 92], [11, 94]],
+  };
+}
+/** Our left-hand legs seen from behind (mirror for the right). */
+function legsB(s: S): EL {
+  const b = s.b;
+  if (s.mode === "kick")
+    return { front: [[44, 86], [42, 91], [41, 95], [39, 96]], mid: [[37, 84], [33, 90], [32, 95], [30, 96]], hindH: [33, 78], hindK: [16, 64], hind: [[16, 64], [12, 91], [9, 94]] };
+  if (s.mode === "air")
+    return { front: [[44, 86], [41, 89], [43, 92], [45, 92.5]], mid: [[37, 84], [32, 88], [34, 92], [37, 93]], hindH: [33, 78], hindK: [15, 54], hind: [[15, 54], [10, 80], [13, 84]] };
+  if (s.mode === "reach")
+    return { front: [[44, 86], [40, 90], [38, 94], [36, 95]], mid: [[37, 84], [30, 89], [27, 94], [24, 95]], hindH: [33, 78], hindK: [15, 54], hind: [[15, 54], [11, 86], [8, 89]] };
+  return {
+    front: [[44, 86 + b], [41, 90 + b * 0.5], [40, 95], [38, 95.5]],
+    mid: [[37, 84 + b], [31, 89 + b * 0.5], [29, 95], [26, 96]],
+    hindH: [33, 78 + b],
+    hindK: [15, 50 + b * 0.7],
+    hind: [[15, 50 + b * 0.7], [9, 93], [5, 95]],
+  };
+}
+const liftLeg = (pts: P[], lift: number, dir: number): P[] =>
+  lift ? pts.map((q, i) => (i === 0 ? q : ([q[0] + dir * lift * 0.25, q[1] - lift * (i === 1 ? 0.8 : 1)] as P))) : pts;
+
+const E_CANTLE_F = "M 29 52 Q 27 42 33 38 Q 50 35 67 38 Q 73 42 71 52 Z";
+const E_POMMEL = "M 26 50 Q 38 52 43 46 Q 50 41 57 46 Q 62 52 74 50 Q 77 56 72 60 Q 50 64 28 60 Q 23 56 26 50 Z";
+const E_HORN = "M 46.4 42.5 a 3.6 3.2 0 1 0 7.2 0 a 3.6 3.2 0 1 0 -7.2 0 Z";
+const E_COLLAR = "M 37.5 79.5 Q 50 87 62.5 79.5 L 63 84 Q 50 91.5 37 84 Z";
+const E_CANTLE_B = "M 28 58 Q 26 51 32 47.5 Q 50 44 68 47.5 Q 74 51 72 58 Q 50 61 28 58 Z";
+
+function FrontViewBack({ p, anim, f }: RiderProps) {
+  const s = st(anim, f);
+  return (
+    <g transform={`translate(0 ${s.b})`}>
+      {/* the back rim of the seat, behind the pawn */}
+      <Region p={p} name="cantle" d={[E_CANTLE_F]} line={2.4} />
+    </g>
+  );
+}
+
+function FrontViewFront({ p, anim, f }: RiderProps) {
+  const s = st(anim, f);
+  const L = legsF(s);
+  const b = s.b;
+  const hy = b + s.rot * 0.35;
+  const t = tones(p.hex);
+  const lift = s.lift ?? 0;
+  return (
+    <g>
+      {/* hind legs: shins, then the big folded thighs peeking out at the sides */}
+
+      {/* middle legs */}
+      <Limb pts={L.mid} fill={C.legFar} w={2.6} />
+      <Limb pts={mx(L.mid)} fill={C.legFar} w={2.6} />
+      <g transform={`translate(0 ${b})`}>
+        {/* body end-on */}
+        <ellipse cx="50" cy="70" rx="27" ry="17" fill={C.body} />
+        <path d="M 25 75 Q 50 84 75 75 Q 70 86 50 87 Q 30 86 25 75 Z" fill={C.belly} />
+        <ellipse cx="50" cy="70" rx="27" ry="17" fill="none" {...LINE} />
+        {/* blanket, flaps and the front of the saddle */}
+        <Region p={p} name="blanket" d={[E_BLANKET]} fill={t.blanket} over={<path d="M 17 60.5 Q 50 54.5 83 60.5" fill="none" stroke={t.trim} {...lw(2.6)} />} />
+        <Region p={p} name="flap" d={E_FLAPS} line={2} />
+        <Region p={p} name="saddle" d={[E_POMMEL]} />
+        <path d="M 29 56 Q 50 60 71 56" fill="none" stroke={t.trim} stroke-dasharray="2 2" {...lw(1)} />
+        <path d="M 29 52 Q 34 53 39 50" fill="none" stroke="#fff" stroke-opacity="0.45" stroke-linecap="round" {...lw(1.8)} />
+        <Region p={p} name="horn" d={[E_HORN]} line={2} />
+      </g>
+      {/* front legs, planted */}
+      <Limb pts={L.front} fill={C.leg} w={2.6} />
+      <Limb pts={liftLeg(mx(L.front), lift, 1)} fill={C.leg} w={2.6} />
+      {/* collar on the chest */}
+      <g transform={`translate(0 ${b})`}>
+        <Region p={p} name="collar" d={[E_COLLAR]} line={1.8} />
+      </g>
+      {/* head */}
+      <g transform={`translate(0 ${hy})`}>
+        <ellipse cx="50" cy="68" rx="17" ry="14" fill={C.body} {...LINE} />
+        <path d="M 37.5 61 Q 41 55.8 47 55.2" fill="none" stroke={C.bodyHi} stroke-linecap="round" {...lw(2.2)} />
+        <path d="M 45.5 77.4 Q 50 76 54.5 77.4 Q 54 82.2 50 82.8 Q 46 82.2 45.5 77.4 Z" fill={C.mouth} {...LINE} {...lw(1.6)} />
+        <ellipse cx="37.5" cy="73.5" rx="3.2" ry="1.9" fill={C.blush} opacity="0.6" />
+        <ellipse cx="62.5" cy="73.5" rx="3.2" ry="1.9" fill={C.blush} opacity="0.6" />
+        {s.blink ? (
+          <path d="M 35.5 65 Q 40 69 44.5 65 M 55.5 65 Q 60 69 64.5 65" fill="none" stroke={C.ink} stroke-linecap="round" {...lw(2.4)} />
+        ) : (
+          <g>
+            <ellipse cx="40" cy="65" rx="5.4" ry="6.8" fill={C.eye} stroke={C.ink} {...lw(1.6)} />
+            <ellipse cx="60" cy="65" rx="5.4" ry="6.8" fill={C.eye} stroke={C.ink} {...lw(1.6)} />
+            <circle cx="41.8" cy="62" r="2.2" fill="#fff" />
+            <circle cx="61.8" cy="62" r="2.2" fill="#fff" />
+            <circle cx="38.4" cy="68.3" r="1" fill="#fff" />
+            <circle cx="58.4" cy="68.3" r="1" fill="#fff" />
+          </g>
+        )}
+        <path d="M 47 73.6 Q 50 76 53 73.6" fill="none" stroke={C.ink} stroke-linecap="round" {...lw(1.4)} />
+      </g>
+      {/* the bell under his chin */}
+      <g transform={`translate(-29.6 ${8.4 + b})`}>
+        <path d="M 76.4 79.6 Q 76.4 75.6 79.6 75.6 Q 82.8 75.6 82.8 79.6 L 83.6 82.6 L 75.6 82.6 Z" fill={C.gold} {...LINE} {...lw(1.6)} />
+        <circle cx="79.6" cy="83.4" r="1.2" fill={C.ink} />
+      </g>
+      {/* antennae: the far one on our left, the near one on our right */}
+      <Antenna d={frontAntenna(37, 60 + hy, 6 + s.a2 * 0.6, 32, -1)} fill={C.ant} />
+      <Antenna d={frontAntenna(63, 60 + hy, 6 + s.a1 * 0.6, 32, 1)} fill={C.ant} />
+    </g>
+  );
+}
+
+function BackViewBack({ anim, f }: RiderProps) {
+  const s = st(anim, f);
+  const b = s.b;
+  return (
+    <g>
+      {/* antennae rising behind the pawn: the near one on our left */}
+      <Antenna d={endAntenna(45, 47 + b, 22 + s.a1 * 0.6, 38, -1, 0.42)} fill={C.ant} />
+      <Antenna d={endAntenna(55, 47 + b, 22 + s.a2 * 0.6, 38, 1, 0.42)} fill={C.ant} />
+    </g>
+  );
+}
+
+function BackViewFront({ p, anim, f }: RiderProps) {
+  const s = st(anim, f);
+  const L = legsB(s);
+  const b = s.b;
+  const rb = b - s.rot * 0.35;
+  const sb = b - s.rot * 0.15;
+  const t = tones(p.hex);
+  const lift = s.lift ?? 0;
+  return (
+    <g>
+      {/* the far front legs and the middle legs under him */}
+      <Limb pts={liftLeg(L.front, lift, -1)} fill={C.legFar} w={2.4} />
+      <Limb pts={mx(L.front)} fill={C.legFar} w={2.4} />
+      <Limb pts={L.mid} fill={C.legFar} w={2.6} />
+      <Limb pts={mx(L.mid)} fill={C.legFar} w={2.6} />
+      {/* hind shins, behind the thighs */}
+      <Limb pts={L.hind} fill={C.leg} w={2.4} />
+      <Limb pts={mx(L.hind)} fill={C.leg} w={2.4} />
+      <g transform={`translate(0 ${rb})`}>
+        {/* the rump end-on */}
+        <ellipse cx="50" cy="70" rx="26" ry="18" fill={C.body} />
+        <path d="M 24.5 75 Q 50 84 75.5 75 Q 71 87 50 88 Q 29 87 24.5 75 Z" fill={C.belly} />
+        <path d="M 31 82 Q 50 88.5 69 82 M 37 85.5 Q 50 89 63 85.5" fill="none" stroke={darken(C.body, 0.35)} stroke-linecap="round" {...lw(1.4)} />
+        <ellipse cx="50" cy="70" rx="26" ry="18" fill="none" {...LINE} />
+        {/* the folded wings meeting down his back */}
+        <path d="M 50 56 Q 35 56 29 62 Q 36 75 50 81 Z" fill={C.wing} {...LINE} {...lw(2)} />
+        <path d="M 50 56 Q 65 56 71 62 Q 64 75 50 81 Z" fill={C.wing} {...LINE} {...lw(2)} />
+        <path d="M 33 63 Q 39 71 47 76" fill="none" stroke={darken(C.wing, 0.3)} stroke-linecap="round" {...lw(1.1)} />
+        <path d="M 67 63 Q 61 71 53 76" fill="none" stroke={darken(C.wing, 0.3)} stroke-linecap="round" {...lw(1.1)} />
+      </g>
+      <g transform={`translate(0 ${sb})`}>
+        {/* blanket, flaps and the back of the saddle */}
+        <Region p={p} name="blanket" d={[E_BLANKET]} fill={t.blanket} over={<path d="M 17 60.5 Q 50 54.5 83 60.5" fill="none" stroke={t.trim} {...lw(2.6)} />} />
+        <Region p={p} name="flap" d={E_FLAPS} line={2} />
+        <Region p={p} name="saddle" d={[E_CANTLE_B]} />
+        <path d="M 32 54.5 Q 50 57.5 68 54.5" fill="none" stroke={t.trim} stroke-dasharray="2 2" {...lw(1)} />
+        <path d="M 30 55 Q 29.5 51.5 33 49.5" fill="none" stroke="#fff" stroke-opacity="0.45" stroke-linecap="round" {...lw(1.8)} />
+      </g>
+      {/* the big striped jumping thighs, folded up at his sides */}
+      <Femur H={[L.hindH[0], L.hindH[1] - b + rb]} K={L.hindK} r1={7} r2={3} fill={C.leg} mark={darken("#c4d65c", 0.3)} />
+      <Femur H={mp([L.hindH[0], L.hindH[1] - b + rb])} K={mp(L.hindK)} r1={7} r2={3} fill={C.leg} mark={darken("#c4d65c", 0.3)} />
+    </g>
+  );
+}
+
+const endPose = (anim: "idle" | "move", f: number) => {
+  if (anim === "move") {
+    const m = MOVE[f % MOVE.length]!;
+    return { dx: 0, dy: m.dy, pawnX: 0, pawnY: -16 + m.b + m.extra, pawnTilt: 0, cut: 69 - m.extra };
+  }
+  const s = IDLE[f % IDLE.length]!;
+  return { dx: 0, dy: 0, pawnX: 0, pawnY: -16 + s.b, pawnTilt: 0, cut: 69 };
+};
+
+const FRONT_VIEW: RiderViewDraft = {
+  frame: [2, 0, 96, 100],
+  idle: { ms: IDLE_MS },
+  move: { ms: MOVE_MS },
+  pose: endPose,
+  Back: FrontViewBack,
+  Front: FrontViewFront,
+};
+const BACK_VIEW: RiderViewDraft = {
+  frame: [0, 0, 100, 100],
+  idle: { ms: IDLE_MS },
+  move: { ms: MOVE_MS },
+  pose: endPose,
+  Back: BackViewBack,
+  Front: BackViewFront,
+};
+
 export const RidingChirp: RiderDraft = {
   id: "riding-chirp",
   name: "Riding Chirp",
@@ -287,4 +534,46 @@ export const RidingChirp: RiderDraft = {
   },
   Back,
   Front,
+  views: { front: FRONT_VIEW, back: BACK_VIEW },
+  trail: {
+    ms: [160, 150, 150, 140],
+    w: 24,
+    h: 22,
+    Mark: ChirpPrints,
+  },
 };
+
+/* ---------- the trail: Chirp's little three-toed footprints, a pair on each square ---------- */
+const SOIL = "#3b3a1a";
+const SOIL_RIM = "#8c8a52";
+/** One print pointing along +x: a round heel pad and three toes fanning forward. */
+function printD(x: number, y: number) {
+  const toes = [
+    [5.2, -2.6],
+    [6.2, 0],
+    [5.2, 2.6],
+  ]
+    .map(([tx, ty]) => `M ${n1(x + 1.2)} ${n1(y)} L ${n1(x + tx!)} ${n1(y + ty!)}`)
+    .join(" ");
+  return { heel: [x - 0.6, y] as P, toes };
+}
+function ChirpPrints({ f, view, n }: TrailProps) {
+  const op = [0.95, 0.68, 0.4, 0.16][Math.min(f, 3)]!;
+  const k = [1.2, 1.16, 1.12, 1.06][Math.min(f, 3)]!;
+  const side = n % 2 === 0 ? -1 : 1;
+  const prints = [printD(-3.2 + (side < 0 ? 1.6 : 0), -3.4 + side * 1.6), printD(-3.2 + (side > 0 ? 1.6 : 0), 3.4 + side * 1.6)];
+  const rot = view === "back" ? -90 : view === "front" ? 90 : 0;
+  const body = (stroke: string, w: number, fill: string) =>
+    prints.map((q, i) => (
+      <g key={i}>
+        <path d={q.toes} fill="none" stroke={stroke} stroke-linecap="round" {...lw(w)} />
+        <ellipse cx={q.heel[0]} cy={q.heel[1]} rx={2.2 + (w - 2) * 0.5} ry={1.8 + (w - 2) * 0.5} fill={fill} />
+      </g>
+    ));
+  return (
+    <g opacity={op} transform={`scale(${k} ${(k * 0.9).toFixed(3)}) rotate(${rot})`}>
+      {body(SOIL_RIM, 3.4, SOIL_RIM)}
+      {body(SOIL, 2, SOIL)}
+    </g>
+  );
+}

@@ -2584,11 +2584,19 @@ export type TownGlFallback = (typeof TOWN_GL_FALLBACK.reasons)[number];
  * Rides (Nov 1, Eric: "this cricket is too damn big I wanna see it at 75%"): each ride's size under its pawn, by its item id
  * (crates.ts, the `ride` slot). The ride is drawn at this scale about the pawn's seat, the pawn at its own size, still sitting
  * in the saddle, and the ride still standing on the square; everywhere a rider is drawn (the town, the locker, the profiles,
- * home's pawn and ring). 1 is the size as drawn; a ride not listed is 1. An admin's `?rideScale=` (`tryScale`'s range) tries
- * one size for every ride on that page (docs/decisions/2026-11-01-ride-scale.md).
+ * home's pawn and ring). 1 is the size as drawn. Every ride is `defaultScale` (Nov 1, Eric, after trying `?rideScale=`: "0.75
+ * is good, I have a feeling most we will scale to that"; it was 1) unless `scale` lists it. An admin's `?rideScale=`
+ * (`tryScale`'s range) tries one size for every ride on that page (docs/decisions/2026-11-01-ride-scale.md).
+ *
+ * `speed` (Nov 1, the rides v2 brief: Cheetah Shoes, "twice as fast"): how much faster than on foot a pawn walks the town on
+ * its ride, by item id; a ride not listed is 1. Your step takes TOWN_FEEL.youStepMs / speed (a bot's or another player's,
+ * botStepMs / speed). The town's walking isn't sent to the server (no real players walk in the town yet), so there's no
+ * server-side check of it to scale (docs/decisions/2026-11-01-rides-v2.md).
  */
 export const RIDES = {
-  scale: { "riding-chirp": 1, "moon-ride": 1 } as Readonly<Record<string, number>>,
+  defaultScale: 0.75,
+  scale: {} as Readonly<Record<string, number>>,
+  speed: { "cheetah-shoes": 2 } as Readonly<Record<string, number>>,
   tryScale: [0.5, 1.25] as const,
 };
 
@@ -3188,13 +3196,16 @@ export interface ShopOdds {
  * XP (design v4 and v6): each round starts with only the two kings on the boards.
  */
 export interface AutoChessSettings {
-  /** What each piece costs in the shop (a pawn 10 ... a queen 90: the chess value times ten, a bishop a little over a knight). */
+  /**
+   * What each piece costs in the shop: its chess value in whole gold, pawn 1, knight 3, bishop 3, rook 5, queen 9 (the TFT-style economy (Eric, Oct 25 and Nov 1, 2026; docs/decisions/2026-11-01-autochess-tft-economy.md);
+   * it was the chess value times ten, a bishop 32: 10, 30, 32, 50, 90).
+   */
   readonly prices: { readonly p: number; readonly n: number; readonly b: number; readonly r: number; readonly q: number };
   /**
    * The shop (v5, Eric Oct 20; v6 Oct 20 evening; v7 Oct 21): this many offers (4 since v7, was 5), each a piece and a square on
    * your half where it will land; buying an offer rolls a new one into its slot; one reroll of all the offers costs `reroll.first`
-   * gold the first time in a round and `reroll.step` more each time after it, up to `reroll.max` (v7.1, Eric Oct 22: "5+1 per roll up
-   * to 10 max per round": 5, 6, 7, 8, 9, 10, 10, ...), back to the first price at each round's start. The shop refills free at each round's start. **The odds follow the level of whoever's shop it is** (v7, Eric Oct 21: "when
+   * gold the first time in a round and `reroll.step` more each time after it, up to `reroll.max` (the TFT-style economy, Eric Oct 25:
+   * 2, 3, 4, 5, 5, ...; v7.1's was 5, 6, ... 10 on the old ×10 scale), back to the first price at each round's start. The shop refills free at each round's start. **The odds follow the level of whoever's shop it is** (v7, Eric Oct 21: "when
    * you level you have slightly higher chances for better pieces and pawn odds slightly decrease... [queens] shouldn't even appear
    * till level 7 like in TFT"): `oddsByLevel[level - 1]` is the percent of each kind for a shop rolled at that level, level 1 first
    * (play starts at `levels.start`, 4, and tops at `levels.max`, 10); each row adds up to 100. No rooks before level 5, no queens
@@ -3207,7 +3218,8 @@ export interface AutoChessSettings {
     readonly oddsByLevel: readonly ShopOdds[];
     readonly reroll: { readonly first: number; readonly step: number; readonly max: number };
   };
-  /** Selling a piece, from the board or the bench, gives back this share of what was paid for it (its price, and `starUpCost` for each star above the first, v8), rounded down (v6, Eric Oct 20: 75%: P7 N22 B24 R37 Q67). */
+  /** Selling a piece, from the board or the bench, gives back this share of what was paid for it (its price, and `starUpCost` for each star above the first, v8), rounded to the nearest whole gold, a half up (v6, Eric Oct 20: 75%; whole gold since the TFT-style economy, Nov 1: P1 N2 B2 R4 Q7; it was
+   * rounded down on the ×10 scale, P7 N22 B24 R37 Q67). */
   readonly sellBack: number;
   /**
    * The bench (v6, Eric Oct 20: "the bench is going to be a massive strategy"): this many held pieces, each keeping the square it
@@ -3251,7 +3263,7 @@ export interface AutoChessSettings {
    * Stars (v8, Eric Oct 22: "pieces can now be 2 starred which lets you move the piece once legally during the action phase... 3 star pieces can
    * move anywhere... Pawns can't be starred up"). Every piece but a pawn or the king has 1 (plain), 2 or 3 (`maxStars`) stars. A star changes
    * nothing in the fight (a 3-star rook is a rook); it only lets the piece move in the move step. **A star-up costs a flat `starUpCost` gold**
-   * (Eric: "5 cost to upgrade every time... having it be 5 is already generous"), whatever the piece and its stars, and merges into the piece
+   * (Eric: "5 cost to upgrade every time... having it be 5 is already generous"; 1 since the TFT-style economy, half a pawn rounded up), whatever the piece and its stars, and merges into the piece
    * where it is (board or bench). Selling a piece, and the survivors' refund, count everything paid for it: its price plus `starUpCost` for
    * each star above the first. The move step's length is above (`moveBase`, `movePerStar`; Eric: "a flat 5 seconds no matter what... if you
    * have two and your opponent has two starred up pieces, that's still just... an extra 6 seconds total").
@@ -3354,11 +3366,11 @@ export interface AutoChessSettings {
   readonly piecesPerDamage: number;
   /** Gold at the start of round 1, before its income. */
   readonly startGold: number;
-  /** A round's income: `first` in round 1, `step` more each round, up to `max`. */
+  /** A round's income: `first` in round 1, `step` more each round, up to `max` (10, 12, ... 20 since the TFT-style economy; was 100, 120, ... 200). */
   readonly income: { readonly first: number; readonly step: number; readonly max: number };
-  /** Interest on gold banked before the income: `gold` for every full `per` banked, up to `max`. */
+  /** Interest on gold banked before the income: `gold` for every full `per` banked, up to `max` (Eric, Oct 25: +1 per 10, up to +5 at 50; was 10 per 100, up to 30). */
   readonly interest: { readonly per: number; readonly gold: number; readonly max: number };
-  /** After a fight each side gets this share (rounded down) of everything paid for its pieces still on the board (their prices and their star-ups, v8), win or lose; bench pieces get all of theirs back. */
+  /** After a fight each side gets this share (rounded to the nearest whole gold, a half up, since the TFT-style economy) of everything paid for its pieces still on the board (their prices and their star-ups, v8), win or lose; bench pieces get all of theirs back. */
   readonly survivorRefund: number;
   /**
    * Gold for a streak, at the start of the next round: from `n` rounds in a row, `gold` (the highest row that fits). A draw
@@ -3370,7 +3382,7 @@ export interface AutoChessSettings {
   readonly queenLimit: number;
   readonly maxPawns: number;
   readonly pawnsPerFile: number;
-  /** The bot: the chance it keeps a hundred banked for interest (when it has the gold to), how many moves it tries while adjusting, and the search it uses. */
+  /** The bot: the chance it banks gold for interest (when it has the gold to; whole `interest.per`s, up to the interest's top), how many moves it tries while adjusting, and the search it uses. */
   readonly bot: {
     /** It locks in at a seeded time between these shares of the step's open part (before its locked end), or never, this often. */
     readonly lockFrom: number;
@@ -3379,7 +3391,7 @@ export interface AutoChessSettings {
     /**
      * Its shop rerolls (the same climbing price as yours, `shop.reroll`): at most this many a round, only with this much gold, this often
      * (more often when the shop shows nothing but pawns). v7.1: 4 / 40 / 0.15 / 0.4 became 3 / 70 / 0.06 / 0.2, so the bot rerolls in about a third
-     * of rounds (63% before, at 2 gold a roll) and spends about what it did on rerolls (2 gold a round).
+     * of rounds (63% before, at 2 gold a roll) and spends about what it did on rerolls (2 gold a round). The TFT-style economy (Nov 1): `rerollGold` 7.
      */
     readonly maxRerolls: number;
     readonly rerollGold: number;
@@ -3390,7 +3402,7 @@ export interface AutoChessSettings {
     readonly holdChance: number;
     /** Its pieces go down evenly over the step's open part, the last by this share of it (so something is on its board early, to scout). */
     readonly placeBy: number;
-    /** It buys XP (20 gold for 4) now and then: at most this many a round, with this chance each time it has the gold (more with its board full: a level is room). */
+    /** It buys XP (4 gold for 4 XP) now and then: at most this many a round, with this chance each time it has the gold (more with its board full: a level is room). */
     readonly maxXpBuys: number;
     readonly xpGold: number;
     /** With this much gold it buys XP even when that gives no level yet (it saves up for the next). */
@@ -3398,6 +3410,10 @@ export interface AutoChessSettings {
     readonly xpChance: number;
     readonly xpChanceFull: number;
     readonly saveChance: number;
+    /** When it banks for interest it still spends at least this much (a few pieces' worth). */
+    readonly saveKeep: number;
+    /** It buys a queen only with this much more left after her (it buys one when rich, not with its last coins). */
+    readonly queenChange: number;
     /** Whenever one of its offers is a star-up it can pay for, it buys it this often (Eric: "buys star-ups as a player would", nearly always). */
     readonly starUpChance: number;
     readonly adjustTries: number;
@@ -3408,7 +3424,7 @@ export interface AutoChessSettings {
 }
 
 export const AUTOCHESS: AutoChessSettings = {
-  prices: { p: 10, n: 30, b: 32, r: 50, q: 90 },
+  prices: { p: 1, n: 3, b: 3, r: 5, q: 9 },
   shop: {
     slots: 4,
     // Percent P/N/B/R/Q by level, level 1 first (v7, Eric Oct 21).
@@ -3424,12 +3440,12 @@ export const AUTOCHESS: AutoChessSettings = {
       { p: 42, n: 20, b: 19, r: 14, q: 5 },
       { p: 36, n: 21, b: 20, r: 16, q: 7 },
     ],
-    reroll: { first: 5, step: 1, max: 10 },
+    reroll: { first: 2, step: 1, max: 5 },
   },
   sellBack: 0.75,
   benchSlots: 4,
   lockIn: false,
-  lockInBonus: 25,
+  lockInBonus: 3,
   buySeconds: 30,
   lockSeconds: 3,
   circlesDelaySeconds: 2,
@@ -3438,12 +3454,12 @@ export const AUTOCHESS: AutoChessSettings = {
   adjustMode: "stars",
   adjustSeconds: 7,
   adjustMoves: 1,
-  starUpCost: 5,
+  starUpCost: 1,
   maxStars: 3,
   moveBase: 5,
   movePerStar: 3,
   fightGlow: false,
-  levels: { start: 4, max: 10, freeXp: 2, buyXp: 4, buyXpCost: 20, xpToNext: [4, 8, 12, 16, 20, 24] },
+  levels: { start: 4, max: 10, freeXp: 2, buyXp: 4, buyXpCost: 4, xpToNext: [4, 8, 12, 16, 20, 24] },
   kingRanks: 2,
   hopEvery: [7, 10],
   hopSeconds: 1.8,
@@ -3453,7 +3469,7 @@ export const AUTOCHESS: AutoChessSettings = {
   introBubbleMs: 2500,
   fightMoveMs: 600,
   fightNodes: 30000,
-  cashInGold: 5,
+  cashInGold: 1,
   cashInValue: 20,
   fightFastAfter: 30,
   fightFastMoveMs: 300,
@@ -3468,13 +3484,13 @@ export const AUTOCHESS: AutoChessSettings = {
   damagePerRound: 1,
   piecesPerDamage: 3,
   startGold: 0,
-  income: { first: 100, step: 20, max: 200 },
-  interest: { per: 100, gold: 10, max: 30 },
+  income: { first: 10, step: 2, max: 20 },
+  interest: { per: 10, gold: 1, max: 5 },
   survivorRefund: 0.25,
   winStreakGold: [
-    { n: 2, gold: 10 },
-    { n: 4, gold: 20 },
-    { n: 5, gold: 30 },
+    { n: 2, gold: 1 },
+    { n: 4, gold: 2 },
+    { n: 5, gold: 3 },
   ],
   lossStreakGold: [
     { n: 2, gold: 0 },
@@ -3484,5 +3500,5 @@ export const AUTOCHESS: AutoChessSettings = {
   queenLimit: 1,
   maxPawns: 8,
   pawnsPerFile: 3,
-  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 3, rerollGold: 70, rerollChance: 0.06, rerollChanceBare: 0.2, maxHolds: 2, holdChance: 0.5, placeBy: 0.7, maxXpBuys: 3, xpGold: 60, xpRichGold: 140, xpChance: 0.2, xpChanceFull: 0.7, saveChance: 0.3, starUpChance: 0.95, adjustTries: 16, adjustDestinations: 3, adjustNodes: 8000, adjustMargin: 0.02 },
+  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 3, rerollGold: 7, rerollChance: 0.06, rerollChanceBare: 0.2, maxHolds: 2, holdChance: 0.5, placeBy: 0.7, maxXpBuys: 3, xpGold: 6, xpRichGold: 14, xpChance: 0.3, xpChanceFull: 0.8, saveChance: 0.3, saveKeep: 8, queenChange: 4, starUpChance: 0.95, adjustTries: 16, adjustDestinations: 3, adjustNodes: 8000, adjustMargin: 0.02 },
 };

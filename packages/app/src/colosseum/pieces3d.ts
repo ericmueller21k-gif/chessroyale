@@ -11,7 +11,8 @@
  * shows its profile and a bishop its slit).
  *
  * Every vertex: position, normal, and a material: body, gold trim, the bishop's mitre (where the slit is cut, in the shader),
- * the knight's head (its eye, in the shader), or the soft round shadow under the piece (its alpha in the normal's x).
+ * the knight's head (its eye, in the shader), or the soft round shadow under the piece (its alpha in the normal's x); the pixel
+ * set (pieces-pixel.ts) adds `band`: its trim, gold on Black and the body's own color on White.
  */
 
 /** The six kinds, in the order the renderer draws them. */
@@ -19,7 +20,7 @@ export const KINDS = ["p", "n", "b", "r", "q", "k"] as const;
 export type Kind = (typeof KINDS)[number];
 
 /** A vertex's material. */
-export const MAT = { body: 0, gold: 1, mitre: 2, shadow: 3, head: 4 } as const;
+export const MAT = { body: 0, gold: 1, mitre: 2, shadow: 3, head: 4, band: 5 } as const;
 
 /** Floats a vertex: x, y, z, nx, ny, nz, material. */
 export const PV = 7;
@@ -41,13 +42,13 @@ export interface PieceMesh {
 }
 
 /** A profile point: radius and height; `m` the material of the stretch from this point to the next. */
-interface P {
+export interface P {
   r: number;
   y: number;
   m?: number;
 }
 
-class Builder {
+export class Builder {
   readonly v: number[] = [];
   readonly i: number[] = [];
   get n(): number {
@@ -167,7 +168,7 @@ class Builder {
 }
 
 /** Points on a circle round (cx, cy) in the profile (r = cx + R cos a, y = cy + R sin a), from angle a0 to a1. */
-function arc(cx: number, cy: number, R: number, a0: number, a1: number, n: number, m?: number): P[] {
+export function arc(cx: number, cy: number, R: number, a0: number, a1: number, n: number, m?: number): P[] {
   const out: P[] = [];
   for (let k = 0; k < n; k++) {
     const a = a0 + ((a1 - a0) * k) / (n - 1);
@@ -393,9 +394,15 @@ function knight(): PieceMesh {
   const b = new Builder();
   b.shadow(0.4);
   b.lathe([...base(0.3, 0.16, 0.2), { r: 0.205, y: 0.17, m: MAT.gold }, { r: 0.2, y: 0.185 }, { r: 0, y: 0.185 }], SEGS);
-  const P = KNIGHT_OUTLINE;
-  const T = 0.12;
-  const bev = 0.03;
+  extrude(b, KNIGHT_OUTLINE, 0.12, 0.03, KNIGHT_TURN, MAT.head);
+  return b.done(Math.max(...KNIGHT_OUTLINE.map((p) => p[1])));
+}
+
+/**
+ * A flat outline `P` (x, y; counter-clockwise) given depth: `T` each side of z = 0, its edge bevelled `bev`, turned `turn`
+ * (radians) round the upright axis (the knight's head; pieces-pixel.ts's too).
+ */
+export function extrude(b: Builder, P: readonly (readonly [number, number])[], T: number, bev: number, turn: number, m: number): void {
   const N = P.length;
   // Each edge's outward normal (counter-clockwise: the right of its direction), and each corner's: smooth where it bends gently.
   const en = P.map((p, i) => {
@@ -415,9 +422,9 @@ function knight(): PieceMesh {
     return [p[0] - mx * bev, p[1] - my * bev] as const;
   });
   // Turned toward you a little round the upright axis (the nose comes forward), so the head's depth shows.
-  const cs = Math.cos(KNIGHT_TURN);
-  const sn = Math.sin(KNIGHT_TURN);
-  const V = (x: number, y: number, z: number, nx: number, ny: number, nz: number) => b.vert(x * cs + z * sn, y, -x * sn + z * cs, nx * cs + nz * sn, ny, -nx * sn + nz * cs, MAT.head);
+  const cs = Math.cos(turn);
+  const sn = Math.sin(turn);
+  const V = (x: number, y: number, z: number, nx: number, ny: number, nz: number) => b.vert(x * cs + z * sn, y, -x * sn + z * cs, nx * cs + nz * sn, ny, -nx * sn + nz * cs, m);
   const tris = triangulate(inset);
   for (const s of [1, -1]) {
     const f = inset.map(([x, y]) => V(x, y, s * T, 0, 0, s));
@@ -444,7 +451,6 @@ function knight(): PieceMesh {
       b.tri(bv[0]!, bv[2]!, bv[3]!);
     }
   }
-  return b.done(Math.max(...P.map((p) => p[1])));
 }
 
 /**
