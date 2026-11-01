@@ -1358,7 +1358,8 @@ test("a drag with a finger: a placed piece onto the shop sells it", async ({ pag
   await expect(piece(page, "white", "pawn", "h3")).toBeVisible();
   await dragTouch(page, await center(page, "h3"), await shopMiddle(page));
   await expect(piece(page, "white", "pawn", "h3")).toHaveCount(0);
-  expect(await goldOf(page)).toBe(97);
+  // (10 gold, a pawn bought for 1, sold for 1: 75% of 1, to the nearest gold.)
+  expect(await goldOf(page)).toBe(10);
   expect(errors).toEqual([]);
 });
 
@@ -2331,7 +2332,8 @@ test("locking in under a drag ends the drag: the bonus is the only gold that mov
   await page.mouse.move(b.x, b.y, { steps: 4 });
   await page.mouse.up();
   await expect(ghosts(page)).toHaveCount(0);
-  expect(await goldOf(page)).toBe(125);
+  // (10 gold and the lock-in bonus, 3: nothing was bought.)
+  expect(await goldOf(page)).toBe(13);
   await expect(held(page)).toHaveCount(0);
   expect(errors).toEqual([]);
 });
