@@ -24,6 +24,13 @@ export function offRide(look: ItemLook | null | undefined): ItemLook | null {
   return rest;
 }
 
+/** What the pawn shows from behind (Nov 1, rides v2, the director's call: a ride's back view): its look without its face items (a hat still shows). */
+export function offFace(look: ItemLook | null | undefined): ItemLook | null {
+  if (!look?.face) return look ?? null;
+  const { face: _, ...rest } = look;
+  return rest;
+}
+
 /**
  * Your dressed pawn at `px` pixels a pawn's box, over `pawn` (the plain pawn's picture, square): resolves to null if
  * there's nothing to wear or an image fails to load (the world then keeps the plain pawn).

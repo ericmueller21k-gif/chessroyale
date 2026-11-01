@@ -46,14 +46,16 @@ import { TownChat } from "./TownChat.tsx";
 import { TownChatTools } from "./TownChatTools.tsx";
 import { Press } from "./press.ts";
 import { PAWN_HEAD, PAWN_PX, Renderer, pawnImage, type Hit, type YouArt } from "./render.ts";
-import { dropRiders, leaveRider, ridersHeld, rideSheet, shareRider, type Rider, type RiderPawn } from "./rides.ts";
+import { dropRiders, leaveRider, ridersHeld, rideArt, shareRider, type Rider, type RiderPawn } from "./rides.ts";
+import { rideSpeed } from "../components/rides/scale.ts";
+import { secondColor } from "@chessroyale/core";
 import { painter2d, type Backend, type Painter } from "./paint.ts";
 import { painterGL } from "./paint-gl.ts";
 import { reportTownFallback } from "../problems.ts";
 import type { TownGlFallback } from "@chessroyale/core";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
 import { BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, tdist, tick, townLine, waitingBot, walkWalker, type HomeId, seatOf, seatText, type Person, type Place, type Seat, type Sq, type StatueId, type Target } from "./world.ts";
-import { dressedPawn, lookKey, offRide } from "./you-look.ts";
+import { dressedPawn, lookKey, offFace, offRide } from "./you-look.ts";
 import type { ItemLook } from "@chessroyale/core";
 import type { BotGameAsk } from "./TownPage.tsx";
 import "./town.css";
@@ -437,11 +439,13 @@ function startTown(
     if (key === youLook) return;
     youLook = key;
     const wear = offRide(look);
+    // (Your ride's pace, Nov 1: Cheetah Shoes walk twice as fast; RIDES.speed. As the look is put on, before its frames are ready.)
+    town.you.walker.stepMs = f.youStepMs / rideSpeed(look?.ride?.def);
     // (The ride drawn now stays drawn until the new one's frames are ready; then it's given back. One share of a rider each.)
-    const mount = (art: YouArt | null) => {
+    const mount = (art: YouArt | null, back: YouArt | null) => {
       const prev = youRide;
       youRide = look?.ride
-        ? ride(look.ride, art, pawnImage("light", null), `light||${lookKey(wear)}`, (rd) => {
+        ? ride(look.ride, art, back, pawnImage("light", null), "w", `light||${lookKey(wear)}`, (rd) => {
             if (rd !== youRide || !alive) return;
             if (youShown && youShown !== rd) leaveRider(youShown);
             youShown = r.youRider = rd;
@@ -455,22 +459,32 @@ function startTown(
     };
     if (!lookKey(wear)) {
       r.youArt = null;
-      mount(null);
+      mount(null, null);
     } else
-      void dressedPawn(wear, pawnImage("light", null), PAWN_PX).then((art) => {
+      void dressed(wear, pawnImage("light", null), !!look?.ride).then(([art, back]) => {
         if (youLook !== key || !alive) return;
         r.youArt = art;
-        mount(art);
+        mount(art, back);
       });
   };
   /**
-   * A rider (rides.ts) for a pawn wearing `ride`: its dressed picture (or the plain pawn) on it, shared with anyone whose pawn
-   * looks the same (`pawnKey`: its side, tint and items); `done` once it's ready. Null if the ride has no sheet.
+   * A pawn's dressed picture, and (`riding`: its ride has a back view) the same seen from behind, its face items left off (Nov 1,
+   * rides v2, the director's call: from behind a face item doesn't show, a hat does).
    */
-  const ride = (on: NonNullable<ItemLook["ride"]>, art: YouArt | null, plain: HTMLCanvasElement, pawnKey: string, done: (rd: Rider) => void): Rider | null => {
-    const sheet = rideSheet(on.def);
-    const pawn: RiderPawn = art ?? { img: plain, pad: 0, top: PAWN_HEAD - 0.75 / 45 };
-    return sheet ? shareRider(sheet, on.color, pawnKey, pawn, done) : null;
+  const dressed = (wear: ItemLook | null, plain: HTMLCanvasElement, riding: boolean): Promise<[YouArt | null, YouArt | null]> => {
+    const front = dressedPawn(wear, plain, PAWN_PX);
+    if (!riding || !wear?.face) return front.then((a) => [a, a]);
+    return Promise.all([front, dressedPawn(offFace(wear), plain, PAWN_PX)]);
+  };
+  /**
+   * A rider (rides.ts) for a pawn wearing `ride`: its dressed picture (or the plain pawn) on it, and from behind (`back`), shared
+   * with anyone whose pawn looks the same (`pawnKey`: its side, tint and items); `done` once it's ready. Null if it isn't a ride.
+   */
+  const ride = (on: NonNullable<ItemLook["ride"]>, art: YouArt | null, back: YouArt | null, plain: HTMLCanvasElement, side: "w" | "b", pawnKey: string, done: (rd: Rider) => void): Rider | null => {
+    const ra = rideArt(on.def);
+    const bare: RiderPawn = { img: plain, pad: 0, top: PAWN_HEAD - 0.75 / 45 };
+    const colors = { color: on.color, color2: secondColor(on) ?? on.color, side };
+    return ra ? shareRider(ra, colors, pawnKey, art ?? bare, back ?? art ?? bare, done) : null;
   };
   /** The rider your look asked for last (its frames may still be coming), and the one drawn now: each holds a share. */
   let youRide: Rider | null = null;
@@ -482,13 +496,15 @@ function startTown(
     const plain = pawnImage(lk.side, lk.tint);
     const on = lk.wear.ride;
     const wear = offRide(lk.wear);
-    const mount = (art: YouArt | null) => on && ride(on, art, plain, `${lk.side}|${lk.tint ?? ""}|${lookKey(wear)}`, (rd) => alive && r.riders.set(p.id, rd));
-    if (!lookKey(wear)) mount(null);
+    // (Its pace on its ride, as yours: Cheetah Shoes twice a bot's.)
+    p.walker.stepMs = TOWN_FEEL.botStepMs / rideSpeed(on?.def);
+    const mount = (art: YouArt | null, back: YouArt | null) => on && ride(on, art, back, plain, lk.side === "dark" ? "b" : "w", `${lk.side}|${lk.tint ?? ""}|${lookKey(wear)}`, (rd) => alive && r.riders.set(p.id, rd));
+    if (!lookKey(wear)) mount(null, null);
     else
-      void dressedPawn(wear, plain, PAWN_PX).then((art) => {
+      void dressed(wear, plain, !!on).then(([art, back]) => {
         if (!alive) return;
         if (art) r.botArt.set(p.id, art);
-        mount(art);
+        mount(art, back);
       });
   };
   const offAccount = onAccountChange(dress);
@@ -1127,9 +1143,9 @@ function startTown(
     const h = town.you.walker.here();
     const rd = r.youRider;
     return {
-      you: { ride: rd?.sheet.id ?? null, color: rd?.color ?? null, scale: rd?.scale ?? null, ready: !!rd?.ready, ...r.youRide, box: r.drawnBox(you), at: [h.c, h.r] },
-      others: [...r.riders].map(([id, x]) => ({ id, ride: x.sheet.id, color: x.color, scale: x.scale, ready: x.ready, box: r.drawnBox(town.people.findIndex((p) => p.id === id)) })),
-      // (Sets of rider frames held, shared by riders who look the same, and sheets still decoding or composed from.)
+      you: { ride: rd?.id ?? null, color: rd?.color ?? null, scale: rd?.scale ?? null, ready: !!rd?.ready, ...r.youRide, box: r.drawnBox(you), at: [h.c, h.r], stepMs: town.you.walker.stepMs, marks: r.marksShown() },
+      others: [...r.riders].map(([id, x]) => ({ id, ride: x.id, color: x.color, scale: x.scale, ready: x.ready, box: r.drawnBox(town.people.findIndex((p) => p.id === id)), stepMs: town.people.find((p) => p.id === id)?.walker.stepMs ?? null })),
+      // (Sets of rider frames held, shared by riders who look the same.)
       held: ridersHeld(),
     };
   };

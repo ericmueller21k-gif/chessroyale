@@ -1,164 +1,186 @@
-import { describe, expect, it } from "vitest";
-import { existsSync, readFileSync } from "node:fs";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { fileURLToPath } from "node:url";
-import { ITEM_COLORS, ITEM_DEFS } from "@chessroyale/core";
-import { rideHash } from "../../../scripts/bake-rides.ts";
-import { RIDES } from "../src/components/rides/kit.ts";
+import { ITEM_DEFS, RIDES as RIDE_SETTINGS } from "@chessroyale/core";
+import { rideHash } from "../../../scripts/measure-rides.ts";
+import { FACINGS, RIDES, viewOf } from "../src/components/rides/kit.ts";
+import { rideSpeed, seatAnchor } from "../src/components/rides/scale.ts";
 import { TOWN_FEEL } from "../src/town/feel.ts";
-import { RIDE_PX, RIDE_SHEETS } from "../src/town/ride-sheets.ts";
-import { Rider } from "../src/town/rides.ts";
-import { seatAnchor } from "../src/components/rides/scale.ts";
+import { RIDE_CELLS } from "../src/town/ride-cells.ts";
+import { Rider, rideArt } from "../src/town/rides.ts";
 import { Walker, type Pose } from "../src/town/world.ts";
 
 /**
- * Rides in the town (Oct 31; docs/decisions/2026-10-31-rides.md): each ride's baked sheets are its drawing as drawn, in every
- * color; a rider's frames, its stance and its tag's height come from them; the walk tells a ride's move how far through a
- * step it is, so it plays one cycle a square at the walk's own pace.
+ * Rides in the town (Oct 31; Nov 1, rides v2: docs/decisions/2026-11-01-rides-v2.md): every ride is a catalog item with its
+ * drawing (its side, and its back and front views and trail mark where it has them), measured for the town (ride-cells.ts); a
+ * rider's frames, its stance and its tag's height in each view come from them; the walk says which view (the way it last
+ * walked) and how far through a step it is, so a ride's move plays one cycle a square at the walk's own pace.
  */
 
 // (No browser here: a rider only works out its numbers, `compose` false.)
-/** The repository's root (the bake reads its files from there). */
+/** The repository's root (the measure reads its files from there). */
 const ROOT = fileURLToPath(new URL("../../../", import.meta.url));
+const pawn = { img: { width: 208, height: 208 } as HTMLCanvasElement, pad: 0.15, top: 0.2 };
+const art = (id: string) => rideArt(id)!;
+const RED = { color: "red", color2: "red", side: "w" as const };
 
-/** A WebP's width and height, from its header (lossless "VP8L", or "VP8X"). */
-function webpSize(b: Buffer): [number, number] {
-  expect(b.toString("ascii", 0, 4) + b.toString("ascii", 8, 12)).toBe("RIFFWEBP");
-  const chunk = b.toString("ascii", 12, 16);
-  if (chunk === "VP8L") {
-    expect(b[20]).toBe(0x2f);
-    const bits = b.readUInt32LE(21);
-    return [(bits & 0x3fff) + 1, ((bits >> 14) & 0x3fff) + 1];
-  }
-  expect(chunk).toBe("VP8X");
-  return [b.readUIntLE(24, 3) + 1, b.readUIntLE(27, 3) + 1];
-}
-
-describe("the rides' baked sheets", () => {
-  it("every ride item has a drawing and a sheet, and every drawing is a ride item", () => {
-    const rides = ITEM_DEFS.filter((d) => d.slot === "ride").map((d) => d.id);
-    expect(Object.keys(RIDES).sort()).toEqual([...rides].sort());
-    expect(Object.keys(RIDE_SHEETS).sort()).toEqual([...rides].sort());
+describe("the rides", () => {
+  it("every ride item has a drawing and its measured views, and every drawing is a ride item, with the drawing's own name and line (Nov 1: every boss's)", () => {
+    const rides = ITEM_DEFS.filter((d) => d.slot === "ride");
+    expect(rides.map((d) => d.id).sort()).toEqual(
+      ["riding-chirp", "moon-ride", "hollow-bulb", "smudgy-brush", "alfil-howdah", "balloon-pup", "bigboy-buggy", "boingo-pogo", "folio-crane", "ginger-sled", "jefferson-giraffe", "puddles-mower", "sawyer-dozer", "rodeo-bull", "cheetah-shoes", "log-roller"].sort(),
+    );
+    expect(Object.keys(RIDES).sort()).toEqual(rides.map((d) => d.id).sort());
+    expect(Object.keys(RIDE_CELLS).sort()).toEqual(rides.map((d) => d.id).sort());
+    for (const def of rides) {
+      const d = RIDES[def.id]!;
+      expect([def.name, def.description, def.tier, def.colors]).toEqual([d.name, d.description, "mythic", d.colors]);
+      // A view measured for each view drawn (Moon's Ride: its side only, as Eric left it).
+      for (const v of ["back", "front"] as const) expect(!!RIDE_CELLS[def.id]![v], `${def.id} ${v}`).toBe(!!d.views?.[v]);
+      expect(TOWN_FEEL.rides[def.id], def.id).toBeDefined();
+    }
+    expect(RIDES["moon-ride"]!.views).toBeUndefined();
+    expect(RIDES["moon-ride"]!.trail).toBeUndefined();
+    // Every other ride has both views and a trail mark, inside the art's limits (40 x 30 units).
+    for (const d of Object.values(RIDES).filter((x) => x.id !== "moon-ride")) {
+      expect([!!d.views?.back, !!d.views?.front, !!d.trail], d.id).toEqual([true, true, true]);
+      expect(d.trail!.w, d.id).toBeLessThanOrEqual(40);
+      expect(d.trail!.h, d.id).toBeLessThanOrEqual(30);
+    }
   });
 
-  it("each sheet is its ride as drawn now, in every color (run npx tsx scripts/bake-rides.ts after a change)", () => {
-    for (const [id, s] of Object.entries(RIDE_SHEETS)) {
-      expect(s.hash, `${id}: run npx tsx scripts/bake-rides.ts`).toBe(rideHash(id, ROOT));
-      // Every color's sheet, whole: its columns (the longer animation's frames) and its four rows of cells (a partial bake fails).
-      const cols = Math.max(s.ms.idle.length, s.ms.move.length);
-      for (const c of ITEM_COLORS) {
-        const file = `${ROOT}packages/app/src/town/rides/ride-${id}-${c.id}.webp`;
-        expect(existsSync(file), `${id} ${c.id}`).toBe(true);
-        expect(webpSize(readFileSync(file)), `${id} ${c.id}`).toEqual([cols * s.w, 4 * s.h]);
-      }
-      const d = RIDES[id]!;
-      expect(s.ms.idle).toEqual(d.idle.ms);
-      expect(s.ms.move).toEqual(d.move.ms);
-      for (const anim of ["idle", "move"] as const)
-        s.seat[anim].forEach((seat, f) => {
-          const p = d.pose(anim, f);
-          expect(seat, `${id} ${anim} ${f}`).toEqual([p.pawnX, p.pawnY, p.pawnTilt ?? 0, p.cut].map((x) => +x.toFixed(2)));
-        });
-      expect(s.lift).toEqual(d.move.ms.map((_, f) => +(-d.pose("move", f).dy).toFixed(2)));
-      // The cell is the same pixels a unit as the town's dressed pawns (160 a pawn).
-      expect(Math.abs(s.w - s.cell[2] * RIDE_PX)).toBeLessThanOrEqual(1);
-      expect(TOWN_FEEL.rides[id], id).toBeDefined();
-    }
+  it("each ride's cells are its drawing as drawn now (run npx tsx scripts/measure-rides.ts after a change)", () => {
+    for (const [id, c] of Object.entries(RIDE_CELLS)) expect(c.hash, `${id}: run npx tsx scripts/measure-rides.ts`).toBe(rideHash(id, ROOT));
+  });
+
+  it("every ride is 0.75 its drawn size (Nov 1, Eric: \"0.75 is good\"), one default, and Cheetah Shoes walk twice as fast", () => {
+    expect(RIDE_SETTINGS.defaultScale).toBe(0.75);
+    expect(RIDE_SETTINGS.scale).toEqual({});
+    expect(RIDE_SETTINGS.speed).toEqual({ "cheetah-shoes": 2 });
+    expect(rideSpeed("cheetah-shoes")).toBe(2);
+    expect(rideSpeed("riding-chirp")).toBe(1);
+    expect(rideSpeed(undefined)).toBe(1);
   });
 });
 
 describe("a rider", () => {
-  const pawn = { img: { width: 208, height: 208 } as HTMLCanvasElement, pad: 0.15, top: 0.2 };
-
-  it("stands its ride's feet on the square's middle, its pawn the size it is on foot, its tag over the highest of the ride and the pawn", () => {
-    for (const s of Object.values(RIDE_SHEETS)) {
-      const rd = new Rider(s, "red", pawn, false);
-      // Its foot: the drawing's middle (x 50) and its feet's line, inside its box.
-      expect(rd.x0 + rd.footX * rd.w).toBeCloseTo(50);
-      expect(rd.y0 + rd.footY * rd.h).toBeCloseTo(TOWN_FEEL.rides[s.id]!.foot);
-      // The box holds the ride's cell and the pawn raised onto its seat.
-      expect(rd.x0).toBeLessThanOrEqual(s.cell[0]);
-      expect(rd.x0 + rd.w).toBeGreaterThanOrEqual(s.cell[0] + s.cell[2]);
-      const seatY = Math.min(...s.seat.idle.map((x) => x[1]!));
-      expect(rd.y0).toBeLessThanOrEqual(-12 + seatY);
-      // Its top: the pawn's top on its seat (a hat over the head) or the ride's own, whichever is higher.
-      const pawnTop = -15 + 0.2 * 130 + seatY;
-      const rideTop = s.cell[1] + s.top / RIDE_PX;
-      expect(rd.y0 + rd.top * rd.h).toBeCloseTo(Math.min(pawnTop, rideTop));
+  it("in each of its views stands its ride's feet on the square's middle, its pawn the size it is on foot, its tag over the highest of the ride and the pawn", () => {
+    for (const id of Object.keys(RIDES)) {
+      const rd = new Rider(art(id), RED, pawn, pawn, false);
+      const d = RIDES[id]!;
+      rd.views.forEach((rv, i) => {
+        const facing = FACINGS[i]!;
+        // (A ride without that view keeps its side.)
+        expect(rv.facing, `${id} ${facing}`).toBe(facing === "side" || d.views?.[facing] ? facing : "side");
+        const m = RIDE_CELLS[id]![rv.facing]!;
+        const v = viewOf(d, rv.facing);
+        // Its foot: the drawing's middle (x 50) and its feet's line, inside its box (at 1, as drawn).
+        expect(rv.x0 + rv.footX * rv.w).toBeCloseTo(50);
+        expect(rv.y0 + rv.footY * rv.h).toBeCloseTo(TOWN_FEEL.rides[id]!.foot);
+        // The box holds the ride's cell and the pawn raised onto its seat.
+        expect(rv.x0).toBeLessThanOrEqual(m.cell[0]);
+        expect(rv.x0 + rv.w).toBeGreaterThanOrEqual(m.cell[0] + m.cell[2]);
+        const seatY = Math.min(...v.idle.ms.map((_, f) => v.pose("idle", f).pawnY));
+        expect(rv.y0).toBeLessThanOrEqual(-12 + seatY);
+        // Its top: the pawn's top on its seat (a hat over the head) or the ride's own, whichever is higher.
+        expect(rv.y0 + rv.top * rv.h).toBeCloseTo(Math.min(-15 + 0.2 * 130 + seatY, m.cell[1] + m.top));
+        // Its times and lift: the view's own.
+        expect(rv.idleEnds.length).toBe(v.idle.ms.length);
+        expect(rv.moveEnds.length).toBe(v.move.ms.length);
+        expect(rv.lift.map((x) => x + 0)).toEqual(v.move.ms.map((_, f) => -v.pose("move", f).dy + 0));
+      });
       expect(rd.ready).toBe(false);
       rd.drop();
     }
   });
 
+  it("from behind, its pawn is the one with its face items left off (the director's call); from the side and the front, the pawn as dressed", () => {
+    const back = { ...pawn, top: 0.25 };
+    const rd = new Rider(art("riding-chirp"), RED, pawn, back, false);
+    expect(rd.views.map((v) => v.pawn)).toEqual([pawn, back, pawn]);
+    // (Moon's Ride has no back view: its side, the pawn as dressed.)
+    const moon = new Rider(art("moon-ride"), RED, pawn, back, false);
+    expect(moon.views.map((v) => v.pawn)).toEqual([pawn, pawn, pawn]);
+    expect(new Set(moon.views).size).toBe(1);
+  });
+
   it("at a smaller or bigger size (Nov 1, RIDES.scale): the ride scaled about its saddle, the pawn its own size still in the saddle, the ride on the square", () => {
-    for (const s of Object.values(RIDE_SHEETS))
+    for (const id of Object.keys(RIDES))
       for (const k of [0.5, 0.75, 1.25]) {
-        const one = new Rider(s, "red", pawn, false);
-        const rd = new Rider(s, "red", pawn, false, k);
+        const one = new Rider(art(id), RED, pawn, pawn, false);
+        const rd = new Rider(art(id), RED, pawn, pawn, false, k);
         expect(rd.scale).toBe(k);
-        const a = seatAnchor(s.seat.idle[0]!);
-        const foot = TOWN_FEEL.rides[s.id]!.foot;
-        // The ride: its cell k times as big about the saddle, its feet still on the square's middle (the foot the town stands it on).
-        expect(rd.cell[2]).toBeCloseTo(k * s.cell[2]);
-        expect(rd.cell[3]).toBeCloseTo(k * s.cell[3]);
-        expect(rd.x0 + rd.footX * rd.w).toBeCloseTo(a[0] + k * (50 - a[0]));
-        expect(rd.y0 + rd.footY * rd.h).toBeCloseTo(a[1] + k * (foot - a[1]));
-        // The pawn: the same picture, the same size (the frames are composed at RIDE_PX either way, the pawn drawn 100 + 2 pad units),
-        // on its first idle frame where it was; on every frame its cut line on the saddle as scaled (the same share of it hidden).
-        expect(rd.seats.idle[0]).toEqual([...s.seat.idle[0]!]);
-        for (const anim of ["idle", "move"] as const)
-          s.seat[anim].forEach((seat, f) => {
-            const [x, y, tilt, cut] = rd.seats[anim][f]!;
-            expect([tilt, cut]).toEqual([seat[2], seat[3]]);
-            // (Where the middle of its cut line is, tilted round its base: on the saddle's point, scaled about the anchor.)
-            const r = (tilt! * Math.PI) / 180;
-            const q = [50 - (cut! - 88) * Math.sin(r), 88 + (cut! - 88) * Math.cos(r)];
-            expect(x! + q[0]!, `${s.id} ${k} ${anim} ${f}`).toBeCloseTo(a[0] + k * (seat[0]! + q[0]! - a[0]));
-            expect(y! + q[1]!, `${s.id} ${k} ${anim} ${f}`).toBeCloseTo(a[1] + k * (seat[1]! + q[1]! - a[1]));
-          });
-        // Standing on the square, the pawn is lower by the ride's shrinking under it (higher when it grows), never resized.
-        const drop = (rd.y0 + rd.footY * rd.h - (rd.seats.idle[0]![1]!)) - (one.y0 + one.footY * one.h - one.seats.idle[0]![1]!);
-        expect(drop).toBeCloseTo((k - 1) * (foot - a[1]));
-        // Its hop and its shadow at its size; drawn from farther off the sides when bigger.
-        expect(rd.lift).toEqual(s.lift.map((l) => l * k));
-        expect(rd.shadow).toBeCloseTo(TOWN_FEEL.rides[s.id]!.shadow * k);
+        for (let vi = 0; vi < 3; vi++) {
+          const rv = rd.views[vi]!;
+          const r1 = one.views[vi]!;
+          const v = viewOf(RIDES[id]!, rv.facing);
+          const m = RIDE_CELLS[id]![rv.facing]!;
+          const seat = (anim: "idle" | "move", f: number) => {
+            const p = v.pose(anim, f);
+            return [p.pawnX, p.pawnY, p.pawnTilt ?? 0, p.cut];
+          };
+          const a = seatAnchor(seat("idle", 0));
+          const foot = TOWN_FEEL.rides[id]!.foot;
+          // The ride: its cell k times as big about the saddle, its feet still on the square's middle.
+          expect(rv.cell[2]).toBeCloseTo(k * m.cell[2]);
+          expect(rv.cell[3]).toBeCloseTo(k * m.cell[3]);
+          expect(rv.x0 + rv.footX * rv.w).toBeCloseTo(a[0] + k * (50 - a[0]));
+          expect(rv.y0 + rv.footY * rv.h).toBeCloseTo(a[1] + k * (foot - a[1]));
+          // The pawn: the same size; on every frame its cut line on the saddle as scaled (the same share of it hidden).
+          for (const anim of ["idle", "move"] as const)
+            v[anim].ms.forEach((_, f) => {
+              const s0 = seat(anim, f);
+              const [x, y, tilt, cut] = rv.seats[anim][f]!;
+              expect([tilt, cut]).toEqual([s0[2], s0[3]]);
+              const r = (tilt! * Math.PI) / 180;
+              const q = [50 - (cut! - 88) * Math.sin(r), 88 + (cut! - 88) * Math.cos(r)];
+              expect(x! + q[0]!, `${id} ${rv.facing} ${k} ${anim} ${f}`).toBeCloseTo(a[0] + k * (s0[0]! + q[0]! - a[0]));
+              expect(y! + q[1]!, `${id} ${rv.facing} ${k} ${anim} ${f}`).toBeCloseTo(a[1] + k * (s0[1]! + q[1]! - a[1]));
+            });
+          // Standing on the square, the pawn is lower by the ride's shrinking under it (higher when it grows), never resized.
+          const drop = rv.y0 + rv.footY * rv.h - rv.seats.idle[0]![1]! - (r1.y0 + r1.footY * r1.h - r1.seats.idle[0]![1]!);
+          expect(drop).toBeCloseTo((k - 1) * (foot - a[1]));
+          rv.lift.forEach((l, i) => expect(l).toBeCloseTo(r1.lift[i]! * k));
+          expect(rv.x0 + rv.w).toBeGreaterThanOrEqual(rv.cell[0] + rv.cell[2]);
+        }
+        // Its shadow and its trail mark at its size; drawn from farther off the sides when bigger.
+        expect(rd.shadow).toBeCloseTo(TOWN_FEEL.rides[id]!.shadow * k);
+        if (rd.trail) expect([rd.trail.w, rd.trail.h]).toEqual([RIDES[id]!.trail!.w * k, RIDES[id]!.trail!.h * k]);
         expect(rd.margin).toBe(k > 1 ? 1.5 * k : 1.5);
-        // The box still holds the ride's cell and the raised pawn; its tag over the higher of the two.
-        expect(rd.x0).toBeLessThanOrEqual(rd.cell[0]);
-        expect(rd.x0 + rd.w).toBeGreaterThanOrEqual(rd.cell[0] + rd.cell[2]);
-        const seatY = Math.min(...rd.seats.idle.map((x) => x[1]!));
-        expect(rd.y0).toBeLessThanOrEqual(-12 + seatY);
-        expect(rd.y0 + rd.top * rd.h).toBeCloseTo(Math.min(-15 + 0.2 * 130 + seatY, rd.cell[1] + (k * s.top) / RIDE_PX));
         one.drop();
         rd.drop();
       }
   });
 
-  it("plays its idle on its own times, and its move one cycle a step, in the shares of its drawn times", () => {
-    const s = RIDE_SHEETS["riding-chirp"];
-    const rd = new Rider(s, "red", pawn, false);
-    const total = s.ms.idle.reduce((a, b) => a + b, 0);
-    expect(rd.idleLoop).toBe(total);
-    expect(rd.idleIndex(0)).toBe(0);
-    expect(rd.idleIndex(s.ms.idle[0]! - 1)).toBe(0);
-    expect(rd.idleIndex(s.ms.idle[0]!)).toBe(1);
-    expect(rd.idleIndex(total + 1)).toBe(0);
-    expect(rd.idleIndex(total - 1)).toBe(s.ms.idle.length - 1);
+  it("plays its idle on its own times, its move one cycle a step in the shares of its drawn times, and its trail mark on the mark's own times", () => {
+    const d = RIDES["riding-chirp"]!;
+    const rd = new Rider(art("riding-chirp"), RED, pawn, pawn, false);
+    const rv = rd.views[0];
+    const total = d.idle.ms.reduce((a, b) => a + b, 0);
+    expect(rv.idleLoop).toBe(total);
+    expect(rv.idleIndex(0)).toBe(0);
+    expect(rv.idleIndex(d.idle.ms[0]! - 1)).toBe(0);
+    expect(rv.idleIndex(d.idle.ms[0]!)).toBe(1);
+    expect(rv.idleIndex(total + 1)).toBe(0);
+    expect(rv.idleIndex(total - 1)).toBe(d.idle.ms.length - 1);
     // The move: 650 ms as drawn, played over one step whatever its length (the walk keeps its pace).
-    const moveTotal = s.ms.move.reduce((a, b) => a + b, 0);
+    const moveTotal = d.move.ms.reduce((a, b) => a + b, 0);
     let at = 0;
-    s.ms.move.forEach((ms, i) => {
-      expect(rd.moveIndex(at / moveTotal + 1e-6), `frame ${i}`).toBe(i);
+    d.move.ms.forEach((ms, i) => {
+      expect(rv.moveIndex(at / moveTotal + 1e-6), `frame ${i}`).toBe(i);
       at += ms;
     });
-    expect(rd.moveIndex(1)).toBe(s.ms.move.length - 1);
+    expect(rv.moveIndex(1)).toBe(d.move.ms.length - 1);
+    // The trail (Chirp's prints: 160, 150, 150, 140 ms): gone after 600 ms, one on every square.
+    expect(rd.trail).toMatchObject({ ends: [160, 310, 460, 600], life: 600, every: 1 });
+    expect(new Rider(art("moon-ride"), RED, pawn, pawn, false).trail).toBeNull();
     rd.drop();
   });
 
-  it("a walker says how far through its step it is (0 to 1, even in time), and standing, that it isn't stepping", () => {
+  it("a walker says how far through its step it is (0 to 1, even in time), standing that it isn't stepping, and which way it last walked (its view)", () => {
     const w = new Walker({ c: 5, r: 5 }, 90, true, 0.5);
     const pose: Pose = { x: 0, y: 0, hop: 0, tilt: 0, step: true, t: 1 };
     w.pose(0, pose);
-    expect([pose.step, pose.t]).toEqual([false, 0]);
+    expect([pose.step, pose.t, w.view]).toEqual([false, 0, 0]);
     w.go([{ c: 6, r: 5 }, { c: 7, r: 5 }]);
     w.update(1000);
     w.pose(1000 + 45, pose);
@@ -169,54 +191,74 @@ describe("a rider", () => {
     expect(pose.t).toBeCloseTo(0.1);
     w.update(5000);
     w.pose(5000, pose);
-    expect([pose.step, pose.t, pose.x]).toEqual([false, 0, 7]);
+    expect([pose.step, pose.t, pose.x, w.view, w.facing]).toEqual([false, 0, 7, 0, 1]);
+    // Up the screen (away, r growing): its back; down (r shrinking): its front; standing, the last one; left: its side, facing left.
+    w.go([{ c: 7, r: 6 }]);
+    w.update(6000);
+    expect(w.view).toBe(1);
+    w.update(7000);
+    expect(w.view).toBe(1);
+    w.go([{ c: 7, r: 5 }]);
+    w.update(8000);
+    expect(w.view).toBe(2);
+    w.go([{ c: 6, r: 5 }]);
+    w.update(9000);
+    expect([w.view, w.facing]).toEqual([0, -1]);
+  });
+
+  it("a walker's step time can change (Cheetah Shoes: half a step's time), and its steps take that long", () => {
+    const w = new Walker({ c: 5, r: 5 }, 90, true);
+    w.stepMs = TOWN_FEEL.youStepMs / rideSpeed("cheetah-shoes");
+    expect(w.stepMs).toBe(45);
+    const pose: Pose = { x: 0, y: 0, hop: 0, tilt: 0, step: false, t: 0 };
+    w.go([{ c: 6, r: 5 }, { c: 7, r: 5 }]);
+    w.update(1000);
+    w.update(1045);
+    w.pose(1045 + 22.5, pose);
+    expect([pose.x, pose.t]).toEqual([6.5, 0.5]);
   });
 });
 
 describe("riders shared and freed", () => {
-  const pawn = { img: { width: 160, height: 160 } as HTMLCanvasElement, pad: 0, top: 0.18 };
-  /** A sheet's picture in a test: never arrives (`hang`), or fails to (`fail`). */
-  function picture(how: "hang" | "fail") {
-    (globalThis as { Image?: unknown }).Image = class {
-      src = "";
-      decode() {
-        return how === "hang" ? new Promise(() => {}) : Promise.reject(new Error("404"));
-      }
-    };
-  }
+  const plain = { img: { width: 160, height: 160 } as HTMLCanvasElement, pad: 0, top: 0.18 };
+  afterEach(() => vi.unstubAllGlobals());
 
-  it("people whose pawns look the same share one set of frames and one sheet; the last one out frees it; the town's close frees everything", async () => {
+  it("people whose pawns look the same share one set of frames; the last one out frees it; the town's close frees everything", async () => {
     const { shareRider, leaveRider, dropRiders, ridersHeld } = await import("../src/town/rides.ts");
-    picture("hang");
-    const s = RIDE_SHEETS["moon-ride"];
-    const a = shareRider(s, "pearl", "light||null", pawn, () => {});
-    const b = shareRider(s, "pearl", "light||null", pawn, () => {});
-    const c = shareRider(s, "pearl", "dark||null", pawn, () => {});
+    // (Composing never gets its first animation frame here.)
+    vi.stubGlobal("requestAnimationFrame", () => 0);
+    const pearl = { color: "pearl", color2: "pearl", side: "w" as const };
+    const a = shareRider(art("moon-ride"), pearl, "light||null", plain, plain, () => {});
+    const b = shareRider(art("moon-ride"), pearl, "light||null", plain, plain, () => {});
+    const c = shareRider(art("moon-ride"), { ...pearl, side: "b" }, "dark||null", plain, plain, () => {});
+    const d = shareRider(art("moon-ride"), RED, "light||null", plain, plain, () => {});
     expect(a).toBe(b);
     expect(c).not.toBe(a);
+    expect(d).not.toBe(a);
     expect(a.users).toBe(2);
-    expect(ridersHeld()).toEqual({ riders: 2, sheets: 1 });
+    expect(ridersHeld()).toEqual({ riders: 3 });
     leaveRider(a);
-    expect(ridersHeld().riders).toBe(2);
+    expect(ridersHeld().riders).toBe(3);
     leaveRider(b);
-    expect(ridersHeld().riders).toBe(1);
+    expect(ridersHeld().riders).toBe(2);
     dropRiders();
-    expect(ridersHeld()).toEqual({ riders: 0, sheets: 0 });
+    expect(ridersHeld()).toEqual({ riders: 0 });
   });
 
-  it("a sheet that doesn't come is forgotten, so the next rider in that color fetches it again", async () => {
+  it("a rider whose pictures don't come is forgotten, so the next rider on that look makes them again", async () => {
     const { shareRider, dropRiders, ridersHeld } = await import("../src/town/rides.ts");
-    picture("fail");
-    const s = RIDE_SHEETS["riding-chirp"];
-    const a = shareRider(s, "sage", "light||null", pawn, () => {});
-    expect(ridersHeld()).toEqual({ riders: 1, sheets: 1 });
-    await new Promise((r) => setTimeout(r, 0));
-    expect(ridersHeld()).toEqual({ riders: 0, sheets: 0 });
+    // (An animation frame comes, but there's no page to draw the ride's SVG in: its pictures fail.)
+    vi.stubGlobal("requestAnimationFrame", (f: (t: number) => void) => setTimeout(() => f(0), 0));
+    const sage = { color: "sage", color2: "sage", side: "w" as const };
+    const a = shareRider(art("riding-chirp"), sage, "light||null", plain, plain, () => {});
+    expect(ridersHeld()).toEqual({ riders: 1 });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(ridersHeld()).toEqual({ riders: 0 });
     expect(a.ready).toBe(false);
-    picture("hang");
-    const b = shareRider(s, "sage", "light||null", pawn, () => {});
+    vi.stubGlobal("requestAnimationFrame", () => 0);
+    const b = shareRider(art("riding-chirp"), sage, "light||null", plain, plain, () => {});
     expect(b).not.toBe(a);
-    expect(ridersHeld()).toEqual({ riders: 1, sheets: 1 });
+    expect(ridersHeld()).toEqual({ riders: 1 });
     dropRiders();
   });
 });

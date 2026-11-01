@@ -1,7 +1,7 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { aboveHat, behindPiece, isShiny, secondColor, type ItemLook, type ItemSlot } from "@chessroyale/core";
-import { LINE, Region, darken, isLight, lighten, lw, usePaint as paintIn, type Finish, type Paint } from "./item-paint.tsx";
+import { LINE, Region, darken, isLight, lighten, lw, mirror, usePaint as paintIn, type Finish, type Paint } from "./item-paint.tsx";
 
 import { rideOf, type RiderDraft } from "./rides/kit.ts";
 import { rideScale, scaledAt, scaledSeat, seatAnchor } from "./rides/scale.ts";
@@ -21,8 +21,6 @@ export { blotchPath } from "./blotches.ts";
 const usePaint = (finish: Finish, def: string): Paint => paintIn(finish, SHINE_BOX[def] ?? FRAMES[def] ?? [0, 0, 100, 100]);
 
 // ---------------- The items ----------------
-
-const mirror = (d: string) => d.replace(/(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)/g, (_m, x, y) => `${100 - Number(x)} ${y}`);
 
 function SantaHat({ p }: { p: Paint }) {
   return (
