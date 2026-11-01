@@ -27,6 +27,13 @@ notes to a private place or strip them). Never put a secret value here or anywhe
 - API credits (Claude API, `BOSS_LINES_API_KEY`): conserve; only for Eric-approved art; $20 cap a run unless Eric raises
   it; send a cost estimate first. Gemini (Eric's own) for bulk writing like boss lines.
 
+## Talking to Eric (Nov 1, restated: "I don't need all of this text")
+- **Quiet by default.** No message for routine events: CI results, late subscription notices, unsubscribes, deploys,
+  re-armed watchers, merges of things Eric already knows about. Do the work silently.
+- Write to Eric only when: he asked something, something needs his decision, or a batch he's waiting on is done (then
+  one short message covering all of it). Short. No status lists he didn't ask for.
+- Every reply costs usage; long ones on every event waste it.
+
 ## Merging and PRs
 - Always merge without asking, merge commits, never merge red. Helpers never merge and never open PRs: they push and
   write a PR-body file; the director opens the PR (GitHub MCP), unsubscribes from its activity (again when the late
@@ -46,6 +53,8 @@ notes to a private place or strip them). Never put a secret value here or anywhe
 - Style: simple beats flashy, American English, no slop, short messages, times in Eric's local time (UTC−5).
 - Real people: never base anything on, name or hint at a real person; the bronze statue's subject is never named.
 - Test-value review (Oct 18 reminder): offered; don't start until Eric says go.
+- Names (Eric, Nov 1: "whatever you come up with is fine"): Timber's woodpecker **Rivet**, Blitz's tortoise **Tick**.
+- Colosseum spectator eval bar: keep (Eric, Nov 1).
 
 ## Security (verbatim constraints; never relax)
 - Never paste or print secret values; secrets live in Cloudflare. Never ask Eric to paste tokens in chat.
