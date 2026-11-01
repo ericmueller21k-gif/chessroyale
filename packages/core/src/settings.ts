@@ -2581,6 +2581,18 @@ export const TOWN_GL_FALLBACK = {
 export type TownGlFallback = (typeof TOWN_GL_FALLBACK.reasons)[number];
 
 /**
+ * Rides (Nov 1, Eric: "this cricket is too damn big I wanna see it at 75%"): each ride's size under its pawn, by its item id
+ * (crates.ts, the `ride` slot). The ride is drawn at this scale about the pawn's seat, the pawn at its own size, still sitting
+ * in the saddle, and the ride still standing on the square; everywhere a rider is drawn (the town, the locker, the profiles,
+ * home's pawn and ring). 1 is the size as drawn; a ride not listed is 1. An admin's `?rideScale=` (`tryScale`'s range) tries
+ * one size for every ride on that page (docs/decisions/2026-11-01-ride-scale.md).
+ */
+export const RIDES = {
+  scale: { "riding-chirp": 1, "moon-ride": 1 } as Readonly<Record<string, number>>,
+  tryScale: [0.5, 1.25] as const,
+};
+
+/**
  * Fair play (the `fairplay` delegate): reports, cases and what each level does. See DECISIONS.md, "Fair play".
  *   - watch: recorded only (the player's moves are kept as evidence);
  *   - review: a person (or the automated reviewer) looks; meanwhile their results are held off ranking (the rating,

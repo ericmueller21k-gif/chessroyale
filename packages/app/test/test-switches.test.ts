@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AccountState, Profile } from "../src/account.ts";
-import { bannerPlusFor, testParams, testSwitchesFor, timingSeconds } from "../src/test-switches.ts";
+import { RIDES } from "@chessroyale/core";
+import { bannerPlusFor, rideScaleFor, rideScaleValue, testParams, testSwitchesFor, timingSeconds } from "../src/test-switches.ts";
 
 /**
  * The address's test switches (?debug, ?win=1, ?rounds=2, ?pool=, …; docs/areas/ops.md, "Test switches"): only for an
@@ -81,5 +82,37 @@ describe("?bannerplus= and ?talkplus= (Eric, Oct 24: a URL to try the lengths)",
     vi.stubEnv("DEV", false);
     expect(sw.bannerPlusAsked()).toBeNull();
     expect(sw.talkPlusMs()).toBe(0);
+  });
+});
+
+describe("?rideScale= (Eric, Nov 1: \"I wanna see it at 75%\")", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+  it("a size from 0.5 to 1.25; anything else is ignored", () => {
+    expect(rideScaleValue("0.75")).toBe(0.75);
+    expect(rideScaleValue("0.5")).toBe(0.5);
+    expect(rideScaleValue("1.25")).toBe(1.25);
+    expect(rideScaleValue("1")).toBe(1);
+    for (const bad of [null, "", " ", "0.4", "1.3", "-1", "abc", "75%", "Infinity", "NaN"]) expect(rideScaleValue(bad), String(bad)).toBeNull();
+  });
+  it("counts only where the test switches do; read from the address once, as the page opens; over every ride's own size", async () => {
+    expect(rideScaleFor(0.75, () => true)).toBe(0.75);
+    expect(rideScaleFor(0.75, () => false)).toBeNull();
+    expect(rideScaleFor(null, () => true)).toBeNull();
+    vi.stubGlobal("location", { search: "?rideScale=0.75" });
+    vi.resetModules();
+    const { rideScale } = await import("../src/components/rides/scale.ts");
+    vi.stubEnv("DEV", true);
+    vi.stubGlobal("location", { search: "" });
+    expect(rideScale("riding-chirp")).toBe(0.75);
+    expect(rideScale("moon-ride")).toBe(0.75);
+    // Not allowed: each ride's own (RIDES.scale: 1 for now).
+    vi.stubEnv("DEV", false);
+    expect(rideScale("riding-chirp")).toBe(RIDES.scale["riding-chirp"]);
+    expect(rideScale("moon-ride")).toBe(1);
+    expect(rideScale("not-a-ride")).toBe(1);
   });
 });

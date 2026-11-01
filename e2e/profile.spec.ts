@@ -274,6 +274,13 @@ test("rides on home (Nov 1): the big pawn and your ring ride Riding Chirp, its i
   const pic = () => riding.innerHTML();
   const first = await pic();
   await expect.poll(pic, { timeout: 5_000 }).not.toBe(first);
+  // At a size (Nov 1, an admin's `?rideScale=0.75`): the ride smaller under the same pawn, in the same boxes.
+  expect(await riding.getAttribute("data-scale")).toBe("1");
+  await page.goto("/?rideScale=0.75");
+  await expect(page.locator('.fd-hero .avatar.riding[data-scale="0.75"]')).toHaveCount(1);
+  await expect(page.locator('.fd-ring:visible .avatar.riding[data-scale="0.75"]')).toHaveCount(1);
+  await page.evaluate(() => document.fonts.ready);
+  expect(await boxes(), "nothing grew or moved at a smaller ride").toEqual(before);
   // Off again: the pawn alone, in the same boxes.
   await wearItem(page, "ride", null);
   await page.reload();

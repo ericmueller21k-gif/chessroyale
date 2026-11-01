@@ -1296,8 +1296,12 @@ export class Renderer {
         x = pose.x;
         y = pose.y;
         if (it.kind === "boss") margin = 2;
-        // (A ride reaches up to about 1.46 squares from its foot: drawn from that far off the box's sides, so it never pops in.)
-        else if (this.riderOf(people[it.i]!)) margin = 1.5;
+        // (A ride reaches up to about 1.46 squares from its foot at its size as drawn: drawn from that far off the box's sides, more
+        // if it's drawn bigger, so it never pops in.)
+        else {
+          const rd = this.riderOf(people[it.i]!);
+          if (rd) margin = rd.margin;
+        }
       }
       it.dx = wrapF(x - this.camX);
       it.dz = wrapF(y - this.camY);
@@ -2129,7 +2133,7 @@ export class Renderer {
     if (pose.step) {
       i = rd.moveIndex(pose.t);
       img = rd.frames.move[i]!;
-      lift = (rd.sheet.lift[i]! * box) / 100;
+      lift = (rd.lift[i]! * box) / 100;
     } else img = rd.frames.idle[(i = rd.idleIndex(t))]!;
     if (seen) {
       seen.anim = pose.step ? "move" : "idle";
