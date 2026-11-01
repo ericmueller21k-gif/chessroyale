@@ -412,4 +412,53 @@ export const cheetahShoes: RiderDraft = {
     return <Shoe p={p} bx={NEAR.bx} gy={NEAR.gy} name="near" s={nearAt(anim, f)} />;
   },
   views: { front: endView("front"), back: endView("back") },
+  trail: {
+    ms: [110, 110, 120, 110],
+    w: 36,
+    h: 24,
+    Mark: SkidMark,
+  },
 };
+
+const DUST = "#e6c48c";
+const DUST_D = "#6b4e2c";
+
+/** Skid streaks of dust, drawn going right (the town mirrors it for left), a puff at their back end. */
+function SkidMark({ f, view, n }: { f: number; view: "side" | "front" | "back"; n: number }) {
+  const k = Math.min(f, 3);
+  const op = [1, 0.85, 0.6, 0.3][k];
+  const w = [2.8, 3.2, 3, 2.6][k];
+  const ys = [-3.2, 0, 3.2];
+  const lens = [16, 20, 14];
+  const off = n % 2 ? 1.5 : 0;
+  const streaks: string[] = [];
+  ys.forEach((y, i) => {
+    const x1 = -8 + i * 1.5 - off;
+    const x2 = x1 + lens[i];
+    if (k < 2) streaks.push(`M ${x1} ${y} L ${x2} ${y}`);
+    else if (k === 2) streaks.push(`M ${x1} ${y} L ${x1 + 5} ${y} M ${x1 + 8} ${y} L ${x2 - 2} ${y}`);
+    else streaks.push(`M ${x1 + 2} ${y} L ${x1 + 4} ${y} M ${x1 + 10} ${y} L ${x1 + 11} ${y}`);
+  });
+  const ps = [0.8, 1, 1.15, 1.25][k];
+  const spread = [0, 1, 2.5, 4][k];
+  const puffs: [number, number, number][] = [
+    [-10 - spread, -1.5 - spread * 0.5, 3.2],
+    [-11.5 - spread * 1.4, 2 + spread * 0.5, 2.6],
+    [-7.5 - spread * 0.6, 1.5 + spread * 0.7, 2],
+  ];
+  const tf = view === "side" ? "scale(1 0.8)" : view === "back" ? "scale(0.8 0.72) rotate(-90)" : "scale(0.8 0.72) rotate(90)";
+  const tf2 = `${tf} translate(3 0)`;
+  return (
+    <g opacity={op} transform={tf2}>
+      {streaks.map((d, i) => (
+        <path key={`o${i}`} d={d} fill="none" stroke={DUST_D} stroke-linecap="round" stroke-width={w + 1.6} />
+      ))}
+      {streaks.map((d, i) => (
+        <path key={`i${i}`} d={d} fill="none" stroke={DUST} stroke-linecap="round" stroke-width={w} />
+      ))}
+      {puffs.map(([x, y, r], i) => (
+        <circle key={`p${i}`} cx={x} cy={y} r={r * ps * (k === 3 ? 0.7 : 1)} fill={DUST} stroke={DUST_D} stroke-width={1.2} />
+      ))}
+    </g>
+  );
+}
