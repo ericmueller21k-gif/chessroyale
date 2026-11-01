@@ -294,7 +294,7 @@ export type ChatVariant = "split" | "full" | "tab" | "side" | "page" | "lobby";
  * The chat panel: header (title, Team / All, the split buttons), the feed, and the buttons. `split` is a phone's
  * half of the space under the board; `full` the whole of it; `side` the computer's column beside the board; `page`
  * a section of a page (results, watching after you're out); `lobby` the queue's chat before the match (LobbyChat:
- * it takes its size from the box it's placed in); `tab` a phone's 50 v 50 chat tab (CrowdTabs: the scoreboard's box,
+ * it takes its size from the box it's placed in); `tab` a phone's 50 v 50 chat tab (CrowdBox: the scoreboard's box,
  * with "‹ Back" in its header).
  */
 export function ChatPanel({ people, chat, variant, head, fold, back }: { people: ChatPeople; chat: MatchChat; variant: ChatVariant; head?: ComponentChildren; fold?: ComponentChildren; back?: () => void }) {
