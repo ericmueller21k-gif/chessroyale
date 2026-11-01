@@ -352,6 +352,9 @@ test.describe("rides lazy", () => {
     open = await holdDrawing(page, "riding-chirp");
     await page.reload();
     await page.getByRole("button", { name: "Your profile" }).click();
+    // (The profile itself first: until its data comes the page shows "Loading…" in a different layout, so a slow
+    // server measured that one and then the loaded page, 255 px apart (CI, Nov 1). The ride is held either way.)
+    await expect(page.locator(".fd-card .fd-seen")).toBeVisible();
     const card = ".fd-card .avatar.riding";
     await expect(page.locator(`${card}[data-drawn="0"]`)).toHaveCount(1);
     const cardBefore = await settled(`.fd-card .fd-pawn-box, ${card}`);
