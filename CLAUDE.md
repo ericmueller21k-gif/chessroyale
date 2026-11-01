@@ -152,16 +152,25 @@ Specialist agents live in `.claude/agents/` (one file each: a name, when to use 
   out of hand"; "I should be able to tell you to add a boss and it should take an hour of a few agents running in
   parallel to finish and push"): each change gets exactly what its lane and the helper testing budget under "Test
   lanes" ask for, no more and no less, at the effort its task calls for. A trial: see "Test lanes".
-  - A review round, or a fix round after a merge, goes to a fresh helper with a one-page handoff (the PR, the
-    findings, the files), not to a resumed one carrying hundreds of thousands of tokens. A helper mid-task keeps going.
-  - Waiting (CI, a deploy, a local run) is one background command that reports when it's done, never a loop of looks.
-  - Big output goes to a file: read its tail or grep it. Screenshots: look at the final ones, not every attempt.
-    Small checks go together in one command.
+  - A review round, a fix round after a merge, or a new job goes to a fresh helper with a one-page handoff (the PR, the
+    findings, the files), never to a resumed one carrying hundreds of thousands of tokens (Nov 1 audit: seven of the ten
+    costliest helpers had been resumed for more rounds or handed the next job). A helper mid-task keeps going.
+  - Waiting: the director waits with one background command that reports when it's done. A helper can't sit idle
+    (ending its turn ends its run), so it waits in one foreground Bash call, `timeout 590 bash -c 'until <done>; do
+    sleep 30; done'`, repeated if needed: never with `Monitor` (Nov 1 audit: helpers re-armed it hundreds of times,
+    every few seconds, each one a full re-read) and never polling more often than every 30 s.
+  - Helpers push and report; they don't open PRs or wait on CI. The director opens the PR (GitHub MCP) from the
+    helper's PR-body file and watches CI.
+  - Locally, run only the tests being written or changed (plus `@perf` where the rules ask); don't re-run the whole
+    area spec before pushing: CI does that.
+  - Big output goes to a file: read its tail or grep it. Images: the final stills only, about 10 a job, not every
+    attempt. Small checks go together in one command.
   - After each batch of work the director runs `python3 .claude/tools/helper-usage.py <its task folder>` (one line per
     helper: steps, peak history, re-read, hours, waits, big outputs, images). Only when a helper stands out or a new
     waste pattern shows, it starts an audit helper (same model, `medium`, read-only) on those helpers. The audit only
     proposes: the director weighs each proposal, and Eric approves any that touch a quality gate (tests, reviews, CI,
-    effort) or this file. Two audits in a row that change nothing retire it. `docs/decisions/2026-10-17-working-lean.md`.
+    effort) or this file. Two audits in a row that change nothing retire it. `docs/decisions/2026-10-17-working-lean.md`;
+    the Nov 1 audit and what came of it: `docs/decisions/2026-11-01-usage-audit.md`.
 - **Any other window works only in its own lane** and doesn't act as the director.
 - **Before starting,** check `git log origin/main` and open PRs for work already in flight.
 - Each piece of work goes on its own branch and PR.
