@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { ITEM_DEFS, RIDES as RIDE_SETTINGS } from "@chessroyale/core";
 import { rideHash } from "../../../scripts/measure-rides.ts";
-import { FACINGS, RIDES, viewOf } from "../src/components/rides/kit.ts";
+import { FACINGS, viewOf, type RiderDraft } from "../src/components/rides/kit.ts";
+import { RIDE_IDS, loadRide, rideDrawing } from "../src/components/rides/load.ts";
 import { rideSpeed, seatAnchor } from "../src/components/rides/scale.ts";
 import { TOWN_FEEL } from "../src/town/feel.ts";
 import { RIDE_CELLS } from "../src/town/ride-cells.ts";
@@ -22,6 +24,8 @@ const ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 const pawn = { img: { width: 208, height: 208 } as HTMLCanvasElement, pad: 0.15, top: 0.2 };
 const art = (id: string) => rideArt(id)!;
 const RED = { color: "red", color2: "red", side: "w" as const };
+/** Every ride's drawing (each its own chunk in the app: load.ts), loaded here up front. */
+const RIDES: Record<string, RiderDraft> = Object.fromEntries(await Promise.all(RIDE_IDS.map(async (id) => [id, (await loadRide(id))!] as const)));
 
 describe("the rides", () => {
   it("every ride item has a drawing and its measured views, and every drawing is a ride item, with the drawing's own name and line (Nov 1: every boss's)", () => {
@@ -50,6 +54,46 @@ describe("the rides", () => {
 
   it("each ride's cells are its drawing as drawn now (run npx tsx scripts/measure-rides.ts after a change)", () => {
     for (const [id, c] of Object.entries(RIDE_CELLS)) expect(c.hash, `${id}: run npx tsx scripts/measure-rides.ts`).toBe(rideHash(id, ROOT));
+  });
+
+  it("each ride's measured numbers are its drawing's (Nov 1, rides lazy): its tile's box, each view's frames (times, seats, lift) and its trail's, so every box is sized before the drawing loads", () => {
+    for (const id of RIDE_IDS) {
+      const d = RIDES[id]!;
+      const c = RIDE_CELLS[id]!;
+      expect(c.frame, id).toEqual(d.frame);
+      for (const facing of FACINGS) {
+        const m = c[facing];
+        if (!m) continue;
+        const v = viewOf(d, facing);
+        for (const anim of ["idle", "move"] as const) {
+          expect(m[anim].map((r) => r[0]), `${id} ${facing} ${anim}`).toEqual(v[anim].ms);
+          v[anim].ms.forEach((_, f) => {
+            const p = v.pose(anim, f);
+            const want = [p.pawnX, p.pawnY, p.pawnTilt ?? 0, p.cut, ...(anim === "move" ? [p.dy] : [])];
+            m[anim][f]!.slice(1).forEach((x, i) => expect(x, `${id} ${facing} ${anim} ${f}`).toBeCloseTo(want[i]!, 3));
+          });
+        }
+      }
+      expect(c.trail ?? null, id).toEqual(d.trail ? { ms: d.trail.ms, w: d.trail.w, h: d.trail.h, every: Math.max(1, d.trail.every ?? 1) } : null);
+    }
+  });
+
+  it("each drawing loads on its own (Nov 1, rides lazy): only load.ts imports one, never statically, so none is in the main bundle; once loaded it's kept, and a non-ride is none", async () => {
+    const SRC = fileURLToPath(new URL("../src/", import.meta.url));
+    const files = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? files(`${dir}${e.name}/`) : /\.tsx?$/.test(e.name) ? [`${dir}${e.name}`] : []));
+    const drawing = new RegExp(`["/](${RIDE_IDS.join("|")})\\.tsx["']`);
+    for (const f of files(SRC)) {
+      const text = readFileSync(f, "utf8");
+      const lines = text.split("\n").filter((l) => drawing.test(l) && /\bimport\b/.test(l));
+      if (f.endsWith("components/rides/load.ts")) {
+        expect(lines.length).toBe(RIDE_IDS.length);
+        for (const l of lines) expect(l, l).toMatch(/\(\) => import\("\.\/[a-z-]+\.tsx"\)/);
+      } else expect(lines, f).toEqual([]);
+    }
+    expect(rideDrawing("riding-chirp")).toBe(RIDES["riding-chirp"]);
+    expect(await loadRide("riding-chirp")).toBe(RIDES["riding-chirp"]);
+    expect(await loadRide("pirate-hat")).toBeUndefined();
+    expect(await loadRide("toString")).toBeUndefined();
   });
 
   it("every ride is 0.75 its drawn size (Nov 1, Eric: \"0.75 is good\"), one default, and Cheetah Shoes walk twice as fast", () => {
@@ -86,7 +130,9 @@ describe("a rider", () => {
         // Its times and lift: the view's own.
         expect(rv.idleEnds.length).toBe(v.idle.ms.length);
         expect(rv.moveEnds.length).toBe(v.move.ms.length);
-        expect(rv.lift.map((x) => x + 0)).toEqual(v.move.ms.map((_, f) => -v.pose("move", f).dy + 0));
+        // (As measured: ride-cells.ts keeps a thousandth of a unit.)
+        expect(rv.lift.length).toBe(v.move.ms.length);
+        rv.lift.forEach((x, f) => expect(x).toBeCloseTo(-v.pose("move", f).dy, 3));
       });
       expect(rd.ready).toBe(false);
       rd.drop();
@@ -130,7 +176,8 @@ describe("a rider", () => {
             v[anim].ms.forEach((_, f) => {
               const s0 = seat(anim, f);
               const [x, y, tilt, cut] = rv.seats[anim][f]!;
-              expect([tilt, cut]).toEqual([s0[2], s0[3]]);
+              expect(tilt).toBeCloseTo(s0[2]!, 3);
+              expect(cut).toBeCloseTo(s0[3]!, 3);
               const r = (tilt! * Math.PI) / 180;
               const q = [50 - (cut! - 88) * Math.sin(r), 88 + (cut! - 88) * Math.cos(r)];
               expect(x! + q[0]!, `${id} ${rv.facing} ${k} ${anim} ${f}`).toBeCloseTo(a[0] + k * (s0[0]! + q[0]! - a[0]));

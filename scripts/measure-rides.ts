@@ -3,7 +3,9 @@
  * cell (the box round every frame of it, in the pawn's square's units) and top (its highest drawn row standing), written to
  * `packages/app/src/town/ride-cells.ts` (generated; don't edit it by hand), with a hash of what they're read from (the ride's
  * drawing and the paint's lines, components/item-paint.tsx), which `packages/app/test/town-rides.test.ts` checks, so a cell
- * can't go stale.
+ * can't go stale. With them (Nov 1, rides lazy) each ride's numbers from its drawing that every box a rider is drawn in needs: its tile's
+ * box, each view's frames (their times, where the pawn sits, the move's lift) and its trail's, so the boxes are sized in the main
+ * bundle before the drawing (its own chunk: components/rides/load.ts) has loaded.
  *
  * Why (Nov 1, rides v2: docs/decisions/2026-11-01-rides-v2.md): the town composes each rider's frames from the ride's drawing
  * itself, once, a frame an animation frame (town/rides.ts), into a box it must know before it starts; measuring a drawing
@@ -40,10 +42,15 @@ async function main() {
     await page.waitForFunction(() => "__measure" in window);
     const rides = await page.evaluate(() => (window as unknown as { __rides: string[] }).__rides);
     const entries: string[] = [];
+    type Poses = { frame: number[]; views: Record<string, { idle: number[][]; move: number[][] }>; trail: { ms: number[]; w: number; h: number; every: number } | null };
+    const rows = (r: number[][]) => `[${r.map((x) => `[${x.join(", ")}]`).join(", ")}]`;
     for (const id of rides) {
       const views = await page.evaluate((id) => (window as unknown as { __measure: (id: string) => Promise<Record<string, { cell: number[]; top: number; bottom: number }>> }).__measure(id), id);
-      const v = Object.entries(views).map(([k, x]) => `${k}: { cell: [${x.cell.join(", ")}], top: ${x.top} }`);
-      entries.push(`  ${JSON.stringify(id)}: { ${v.join(", ")}, hash: "${rideHash(id)}" },`);
+      const pose = await page.evaluate((id) => (window as unknown as { __poses: (id: string) => Promise<Poses> }).__poses(id), id);
+      const v = Object.entries(views).map(([k, x]) => `    ${k}: { cell: [${x.cell.join(", ")}], top: ${x.top}, idle: ${rows(pose.views[k]!.idle)}, move: ${rows(pose.views[k]!.move)} },`);
+      const t = pose.trail;
+      const trail = t ? `    trail: { ms: [${t.ms.join(", ")}], w: ${t.w}, h: ${t.h}, every: ${t.every} },\n` : "";
+      entries.push(`  ${JSON.stringify(id)}: {\n    frame: [${pose.frame.join(", ")}],\n${v.join("\n")}\n${trail}    hash: "${rideHash(id)}",\n  },`);
       console.log(`${id}: ${Object.entries(views).map(([k, x]) => `${k} ${x.cell.join(" ")}, lowest row ${x.bottom}`).join("; ")}`);
     }
     writeFileSync(
@@ -54,17 +61,29 @@ async function main() {
 /** Pixels a unit of the pawn's 100 x 100 square a rider's frames are composed at (the town's dressed pawns: PAWN_PX, 160 a pawn). */
 export const RIDE_PX = 1.6;
 
-/** One view of a ride, measured: the box round every frame of it, both layers, any color (x, y, w, h, in the pawn's square's units), and its highest drawn row standing (units down from the box's top). */
+/**
+ * One view of a ride, measured: the box round every frame of it, both layers, any color (x, y, w, h, in the pawn's square's units),
+ * its highest drawn row standing (units down from the box's top), and its frames as drawn: \`idle\` [ms, x, y, tilt, cut] each (its
+ * time, and where the pawn sits: the pose's pawnX, pawnY, pawnTilt, cut), \`move\` the same and its lift (the pose's dy). What every
+ * box a rider is drawn in needs, in the main bundle, so it's sized before the ride's drawing (its own chunk) has loaded.
+ */
 export interface RideCell {
   cell: readonly [number, number, number, number];
   top: number;
+  idle: readonly (readonly number[])[];
+  move: readonly (readonly number[])[];
 }
 
-/** A ride's views, measured (front and back only if it has them), and a hash of its drawing and the paint (the test checks it). */
+/**
+ * A ride's views, measured (front and back only if it has them), its tile's box (the drawing's \`frame\`), its trail mark's times,
+ * box and spacing if it leaves one, and a hash of its drawing and the paint (the test checks it).
+ */
 export interface RideCells {
+  frame: readonly [number, number, number, number];
   side: RideCell;
   back?: RideCell;
   front?: RideCell;
+  trail?: { ms: readonly number[]; w: number; h: number; every: number };
   hash: string;
 }
 

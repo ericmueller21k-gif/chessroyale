@@ -45,7 +45,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   crate comes later): only admins have them, as admin copies (red, emerald second color, 100%: "Admins own one of every item", below).
   **Where the drawings came from:** copied as drawn from `claude/boss-art` (`scripts/boss-art/out/<ride>/<ride>.tsx`; their
   `summary.md`, `views-summary.md` and `trail-summary.md` there have the artist's notes; Moon's Ride Oct 30, the rest Nov 1) into
-  `components/rides/` (`kit.ts`: the types, `RIDES`); only their import lines changed and the `!`s the app's typecheck asks for, and
+  `components/rides/` (`kit.ts`: the types; `load.ts`: each drawing its own chunk, loaded when a ride is drawn, Nov 1: town-square.md,
+  "Rides"); only their import lines changed and the `!`s the app's typecheck asks for, and
   Hollow's Bulb's green cord was taken out of every view by hand (Eric, Nov 1: "we don't really need that"). Moon's Ride stays as it
   was (its side only; its redraw is on hold) and the old cat, `hollow-steed`, isn't one. Each is a `Back` and a `Front` with the pawn
   between them, raised onto its seat, maybe tilted and hidden below the seat (`pose`), and two animations: `idle` and `move` (one
@@ -53,7 +54,9 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   down) and a `trail` mark (town-square.md, "Rides"). Drawn: the locker's tile (`ItemArt`: the ride with a white pawn on it), the
   locker's preview and the profiles' pawn (`Avatar`'s `ride`: the pawn and its items on its ride's side, its idle playing, fitted into
   the same box, so a box never grows), the profile's Wearing rows (last), the town square (town-square.md, "Rides"), and **home** (Nov 1:
-  the big pawn on your card, your ring and the side menu's Profile item; hub.md, "Your ride on home").
+  the big pawn on your card, your ring and the side menu's Profile item; hub.md, "Your ride on home"). Each of those boxes, and where the
+  pawn sits in it, comes from the ride's measured numbers (`town/ride-cells.ts`), so while its drawing loads the pawn sits in place and
+  the ride appears under it (`data-drawn` says when it has; Nov 1, [2026-11-01-rides-lazy.md](../decisions/2026-11-01-rides-lazy.md)).
   **Each ride's size** under its pawn (Nov 1): every ride 0.75 (`RIDES.defaultScale` in core's settings; Eric: "0.75 is good"), a ride
   listed in `RIDES.scale` its own, everywhere a rider is drawn but the item's own tile; an admin's `?rideScale=K` tries one size for
   every ride (town-square.md, "Rides"; [2026-11-01-ride-scale.md](../decisions/2026-11-01-ride-scale.md)).

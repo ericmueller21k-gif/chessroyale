@@ -669,6 +669,13 @@ export class Renderer {
    */
   youRider: Rider | null = null;
   readonly riders = new Map<string, Rider>();
+  /**
+   * The riders asked for, yours and anyone else's (Nov 1, rides lazy: set by Town.tsx as a look is put on): while one's frames are
+   * on their way (its drawing's chunk loading, then its frames composed) its person walks on foot, but in the box and under the tag
+   * the rider will have (measured ahead: ride-cells.ts), so nothing moves when the ride appears.
+   */
+  youSoon: Rider | null = null;
+  readonly ridersSoon = new Map<string, Rider>();
   /** (Tests) Your ride as the last frame drew it: the animation ("" on foot), its frame, which way it faced, its view (0 side, 1 back, 2 front). */
   readonly youRide = { anim: "" as "" | "idle" | "move", frame: -1, facing: 1, view: 0 };
   /** Each sidekick's frames, by its sheet: every one cut from it as the town opens (the constructor), never per frame. */
@@ -1306,7 +1313,7 @@ export class Renderer {
         // (A ride reaches up to about 1.46 squares from its foot at its size as drawn: drawn from that far off the box's sides, more
         // if it's drawn bigger, so it never pops in.)
         else {
-          const rd = this.riderOf(people[it.i]!);
+          const rd = this.riderOf(people[it.i]!) ?? this.soonOf(people[it.i]!);
           if (rd) margin = rd.margin;
         }
       }
@@ -1364,7 +1371,10 @@ export class Renderer {
           const pad = art?.pad ?? 0;
           this.youRide.anim = "";
           if (this.youRider && !table) this.drawRider(it, this.youRider, pose, facing, w.view, f.youSquares, now, this.youRide);
-          else this.drawSprite(it, art?.img ?? (isSprite(person.look) ? pawnImage("light", null) : pawnImage(person.look.side, person.look.tint)), f.youSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.youHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.youSquares);
+          else {
+            this.drawSprite(it, art?.img ?? (isSprite(person.look) ? pawnImage("light", null) : pawnImage(person.look.side, person.look.tint)), f.youSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.youHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.youSquares);
+            this.soonBox(it, this.soonOf(person), w.view, f.youSquares);
+          }
           if (this.fade > 0.02) this.tag(person.name, it.fx, it.hy - 2, "you", clamp((11 * this.p.k) / v.kf, 8, 12), this.fade);
         } else {
           const lk = person.look;
@@ -1385,7 +1395,10 @@ export class Renderer {
             const pad = art?.pad ?? 0;
             const rider = this.riders.get(person.id);
             if (rider && !table) this.drawRider(it, rider, pose, facing, w.view, f.botSquares, now + it.i * 577);
-            else this.drawSprite(it, art?.img ?? pawnImage(lk.side, lk.tint), f.botSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.botHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.botSquares);
+            else {
+              this.drawSprite(it, art?.img ?? pawnImage(lk.side, lk.tint), f.botSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.botHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.botSquares);
+              this.soonBox(it, this.soonOf(person), w.view, f.botSquares);
+            }
           }
           // Name tags on the near ones only: not far toward the rim (as before), and (Oct 28, Eric) not far from you either, by default: within
           // `nameRadius` squares of you in both directions, fading over the last square (tags.ts; "Everyone" in Town settings: no near rule).
@@ -2173,6 +2186,25 @@ export class Renderer {
   private riderOf(p: Person): Rider | null {
     const rd = p.you ? this.youRider : this.riders.get(p.id);
     return rd && !seated(p) ? rd : null;
+  }
+
+  /** The rider a person on foot will be drawn as once its frames come (not seated at a table, none drawn now), or null. */
+  private soonOf(p: Person): Rider | null {
+    const rd = p.you ? this.youSoon : this.ridersSoon.get(p.id);
+    return rd?.coming && !seated(p) && !this.riderOf(p) ? rd : null;
+  }
+
+  /**
+   * A person on foot whose rider is coming (`soonOf`): their box and tag as the rider's will be, standing in this view (its
+   * measured numbers, as drawRider places it), so neither moves when the ride appears. Only the box: the pawn is drawn on foot.
+   */
+  private soonBox(it: Item, rd: Rider | null, view: 0 | 1 | 2, box: number): void {
+    if (!rd) return;
+    const rv = rd.views[view];
+    const h = ((box * rv.h) / 100) * this.p.k;
+    it.y0 = it.fy - rv.footY * h;
+    it.y1 = it.y0 + h;
+    it.hy = it.y0 + rv.top * h;
   }
 
   private box(it: Item, depth: number, x0: number, y0: number, x1: number, y1: number, fx: number, fy: number, hy: number): void {

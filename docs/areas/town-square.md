@@ -378,12 +378,17 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   middle (its feet, the moon's shadow: `TOWN_FEEL.rides`). **Its name tag sits over the highest of the ride and the pawn standing** (a
   hat, the moon's stars) and doesn't jump with the hop, as a sidekick's doesn't; the card sits over it as over any tag; tags and the
   bubble are drawn after every figure, so a ride never covers one. Seated at a table, the pawn sits as before, without its ride.
-  **Drawn as a pawn is: one picture a frame.** Nothing is fetched for a ride (Nov 1: the baked WebP sheets, 2 MB for two rides, are
-  gone). A rider's frames are composed once from the ride's own drawing (`components/rides/draw.tsx`: each layer of each frame as SVG,
+  **Drawn as a pawn is: one picture a frame.** Nothing is fetched for a ride but its drawing (Nov 1: the baked WebP sheets, 2 MB for
+  two rides, are gone; Nov 1, rides lazy: each ride's drawing is its own chunk, 1 to 7 KB gzip, loaded only when a ride is drawn, and your
+  own worn ride's is asked for as the app starts, after its first paint: `components/rides/load.ts`,
+  [2026-11-01-rides-lazy.md](../decisions/2026-11-01-rides-lazy.md)). A rider's frames are composed once from the ride's own drawing (`components/rides/draw.tsx`: each layer of each frame as SVG,
   made into an image, in the ride's colors at the rider's size, as `dressedPawn` makes your dressed pawn), with the pawn on its seat
   (its back, the pawn, its front), **one frame an animation frame** (`Rider` in `town/rides.ts`), every view, then its trail marks; each
-  view's box comes from `town/ride-cells.ts` (measured ahead by `scripts/measure-rides.ts`; a hash test keeps it fresh). Until that's
-  done (about 2 s on a phone) the person walks on foot. A picture that fails is forgotten, so a later rider tries again. **Riders who
+  view's box comes from `town/ride-cells.ts` (measured ahead by `scripts/measure-rides.ts`, with each view's frames' seats, times and lift,
+  the tile's box and the trail's numbers; a hash test keeps it fresh). Until that's done (its drawing loaded, then about 2 s on a phone)
+  the person walks on foot, **in the box and under the tag the rider will have** (Nov 1, rides lazy: the renderer's `youSoon` and
+  `ridersSoon`), so the ride appears in place and nothing moves. A picture (or the drawing's chunk) that fails is forgotten, so a later
+  rider tries again. **Riders who
   look the same share one set of frames** (the ride, its colors, the pawn's side, tint and items, its size: `shareRider`), each set freed
   when no one rides on it and all of them when the town closes (`dropRiders`). A ride shows its colors (both, for a two-color ride),
   not its copy's blotches or its shine (the sets are shared by color). **Taps** take only the pawn's own box across (as on foot), not
@@ -567,15 +572,19 @@ noted wherever a slice changed one.
   behind it carries the pawn without its face items; at a size, the ride scaled about its saddle, the pawn its size on it, the ride on
   the square (every view, and its trail mark); its idle on its own times, its move one cycle a step in its drawn shares, its trail on
   the mark's times; a walker's step progress and its view (side, back walking up, front walking down, kept standing); a step's time
-  settable (the shoes: 45 ms); riders who look the same share one set of frames, freed by the last one out and by the town's close; a
+  settable (the shoes: 45 ms); (Nov 1, rides lazy) the measured numbers are each drawing's (tile box, every view's frames, trail), and
+  only `load.ts` imports a drawing, never statically; riders who look the same share one set of frames, freed by the last one out and by the town's close; a
   rider whose pictures don't come is forgotten, so the next one makes them again.
-- `e2e/town.spec.ts`, "rides (Oct 31; Nov 1, every boss's)" (phone and desktop): wearing Riding Chirp, nothing is fetched for it;
+- `e2e/town.spec.ts`, "rides (Oct 31; Nov 1, every boss's)" (phone and desktop): wearing Riding Chirp, nothing is fetched for it but
+  its drawing's chunk;
   standing, its idle frame after frame at 0.75; a tap on the square beside you walks you there, either way (the square read once the
   camera has settled, the bots standing still: Nov 1, the fix for main's flaky "beside you"); walking up, right, left and down: its
   back, its side facing each way and its front (watched every frame; back and front never mirrored), the idle of each view standing;
   its prints in all three directions and never the droplets, none once you stand; your tag over your head; test players on Moon's
   Ride and Cheetah Shoes drawn riding (the shoes' steps 100 ms), Moon's tag over it; with `?rideScale=1` your ride as drawn, your tap
   box as wide, the picture taller, your head higher, the tag over it; Cheetah Shoes worn, your step 45 ms.
+- `e2e/town.spec.ts`, "rides lazy" (Nov 1, phone and desktop): Riding Chirp's chunk held back, you stand on foot in the box and under
+  the tag your rider will have (`__townRide().you.coming`); let through, the ride appears there: the tap box and the tag unchanged.
 - `packages/app/test/town-sky.test.ts`: which look shows when, the looks always adding up to 1 and blending over their
   half hour in order, `?sky=`, and the tint (none by day, softer at dawn than dusk, coolest and darkest at night).
 - `packages/app/test/town-world.test.ts`: one pawn a square (a taken square ends you next to it, the end is always free

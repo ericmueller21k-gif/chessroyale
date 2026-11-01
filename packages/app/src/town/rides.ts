@@ -5,22 +5,24 @@
  * those views keeps its side). While you run on a ride with a trail, each square you leave gets its mark instead of the droplets.
  *
  * Nothing about a ride is drawn in the town's frame loop beyond one picture a rider, as a pawn is. Each rider's frames are
- * composed once, as the rider is first needed: every frame of every view, from the ride's own drawing (components/rides/, as
- * SVG made into an image: draw.tsx) in the ride's colors, at the rider's size, with the rider's pawn on its seat (the ride's
+ * composed once, as the rider is first needed: every frame of every view, from the ride's own drawing (components/rides/, its
+ * own chunk, loaded first if it hasn't: load.ts; as SVG made into an image: draw.tsx) in the ride's colors, at the rider's size, with the rider's pawn on its seat (the ride's
  * back, the pawn, the ride's front), one frame an animation frame, never all at once; then its trail marks the same way. Nothing
  * is fetched (until Nov 1 each ride came as WebP sheets baked in every color: two rides were 2 MB, fifteen with three views
  * would have been about 40 MB). Riders on the same ride, in the same colors and size, with the same pawn share one set of frames,
- * and every set is freed when the town closes (`dropRiders`). Until its frames are ready a person walks on foot as before. A ride
+ * and every set is freed when the town closes (`dropRiders`). Until its frames are ready a person walks on foot as before, in the
+ * box and under the tag the rider will have (its numbers are all measured ahead: ride-cells.ts, so nothing moves as it appears). A ride
  * shows its colors, not its copy's blotches or its shine (the frames are shared by color).
  *
  * Its size (Nov 1; components/rides/scale.ts): the ride is drawn at its scale (RIDES.scale, or an admin's `?rideScale=`) about
  * its saddle as its frames are composed, the pawn at its own size on the scaled saddle; nothing of it is worked out per frame.
  */
 import { h } from "preact";
-import { RIDE_CELLS, RIDE_PX, type RideCell } from "./ride-cells.ts";
+import { RIDE_PX, type RideCell, type RideCells } from "./ride-cells.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { rideScale, scaledAt, scaledSeat, seatAnchor } from "../components/rides/scale.ts";
-import { FACINGS, RIDES, viewOf, type RiderDraft, type RiderFacing } from "../components/rides/kit.ts";
+import { FACINGS, type RiderDraft, type RiderFacing } from "../components/rides/kit.ts";
+import { loadRide, rideCells } from "../components/rides/load.ts";
 import { RideLayer, RideMark, svgImage, svgText, type RideColors } from "../components/rides/draw.tsx";
 
 /** The pawn a rider carries: its picture (the square's, dressed or plain), the margin round the pawn's box in it, and its top (a share of the picture, down). */
@@ -30,15 +32,15 @@ export interface RiderPawn {
   top: number;
 }
 
-/** A ride's drawing and its measured views. */
+/** A ride (its item id) and its measured views (ride-cells.ts: all a rider's numbers; its drawing loads as its frames are composed). */
 export interface RideArt {
-  draft: RiderDraft;
-  cells: (typeof RIDE_CELLS)[string];
+  id: string;
+  cells: RideCells;
 }
 
 /**
  * One view of a rider (side, back or front): every frame of its idle and move with the pawn on its seat, composed once into a
- * canvas each, and the numbers that place them. All its frames share one box (`x0`, `y0`, `w`, `h`, in the pawn's square's
+ * canvas each, and the numbers that place them (all from the view's measured numbers, `m`: none wait for the drawing). All its frames share one box (`x0`, `y0`, `w`, `h`, in the pawn's square's
  * units) round the ride's cell and the raised pawn. The ride is drawn at `k` about its saddle (`seatAnchor`, this view's own),
  * the pawn at its own size on the scaled saddle (`scaledSeat`).
  */
@@ -64,22 +66,17 @@ export class RiderView {
   readonly lift: readonly number[];
   constructor(
     readonly facing: RiderFacing,
-    d: RiderDraft,
     m: RideCell,
     readonly pawn: RiderPawn,
     k: number,
     foot: number,
   ) {
-    const v = viewOf(d, facing);
-    const pose = (anim: "idle" | "move", f: number) => {
-      const p = v.pose(anim, f);
-      return [p.pawnX, p.pawnY, p.pawnTilt ?? 0, p.cut];
-    };
-    const at = (anim: "idle" | "move") => v[anim].ms.map((_, f) => pose(anim, f));
-    const a = seatAnchor(pose("idle", 0));
+    // (A frame's row: [ms, x, y, tilt, cut], a move's then its dy.)
+    const seat = (row: readonly number[]) => row.slice(1, 5);
+    const a = seatAnchor(seat(m.idle[0]!));
     const [cx, cy, cw, ch] = (this.cell = [scaledAt(m.cell[0], a[0], k), scaledAt(m.cell[1], a[1], k), m.cell[2] * k, m.cell[3] * k]);
-    this.seats = { idle: at("idle").map((s) => scaledSeat(s, a, k)), move: at("move").map((s) => scaledSeat(s, a, k)) };
-    this.lift = v.move.ms.map((_, f) => -v.pose("move", f).dy * k);
+    this.seats = { idle: m.idle.map((r) => scaledSeat(seat(r), a, k)), move: m.move.map((r) => scaledSeat(seat(r), a, k)) };
+    this.lift = m.move.map((r) => -r[5]! * k);
     const p = 100 * pawn.pad;
     // Room for the pawn's picture raised onto its seat (its items capped 9 units over its square: Items.tsx) and tilted.
     const lift = Math.min(...this.seats.idle.map((s) => s[1]!), ...this.seats.move.map((s) => s[1]!));
@@ -94,11 +91,11 @@ export class RiderView {
     const pawnTop = -p + pawn.top * (100 + 2 * p) + Math.min(...this.seats.idle.map((s) => s[1]!));
     this.top = (Math.min(rideTop, pawnTop) - this.y0) / this.h;
     let t = 0;
-    this.idleEnds = v.idle.ms.map((ms) => (t += Math.max(16, ms)));
+    this.idleEnds = m.idle.map((r) => (t += Math.max(16, r[0]!)));
     this.idleLoop = t;
-    const total = v.move.ms.reduce((x, y) => x + y, 0);
+    const total = m.move.reduce((x, r) => x + r[0]!, 0);
     t = 0;
-    this.moveEnds = v.move.ms.map((ms) => (t += ms) / total);
+    this.moveEnds = m.move.map((r) => (t += r[0]!) / total);
   }
   /** Its idle's frame `t` ms into the loop. */
   idleIndex(t: number): number {
@@ -165,23 +162,27 @@ export class Rider {
     /** The ride's size under its pawn (RIDES.scale; 1: as drawn). */
     readonly scale = 1,
   ) {
-    const { draft: d, cells } = art;
+    const { id, cells } = art;
     const k = scale;
-    const feel = TOWN_FEEL.rides[d.id] ?? { foot: 96, shadow: 1 };
-    const side = new RiderView("side", d, cells.side, pawn, k, feel.foot);
-    const back = cells.back && d.views?.back ? new RiderView("back", d, cells.back, pawnBack, k, feel.foot) : side;
-    const front = cells.front && d.views?.front ? new RiderView("front", d, cells.front, pawn, k, feel.foot) : side;
+    const feel = TOWN_FEEL.rides[id] ?? { foot: 96, shadow: 1 };
+    const side = new RiderView("side", cells.side, pawn, k, feel.foot);
+    const back = cells.back ? new RiderView("back", cells.back, pawnBack, k, feel.foot) : side;
+    const front = cells.front ? new RiderView("front", cells.front, pawn, k, feel.foot) : side;
     this.views = [side, back, front];
     this.shadow = feel.shadow * k;
     this.margin = 1.5 * Math.max(1, k);
-    const t = d.trail;
+    const t = cells.trail;
     let at = 0;
-    this.trail = t ? { frames: FACINGS.map(() => [[], []]), ends: t.ms.map((ms) => (at += ms)), life: at, w: t.w * k, h: t.h * k, every: Math.max(1, t.every ?? 1) } : null;
+    this.trail = t ? { frames: FACINGS.map(() => [[], []]), ends: t.ms.map((ms) => (at += ms)), life: at, w: t.w * k, h: t.h * k, every: t.every } : null;
     if (compose) this.start();
   }
   /** The ride's item id and color (the test hook). */
   get id(): string {
-    return this.art.draft.id;
+    return this.art.id;
+  }
+  /** Its frames are on their way (its drawing loading, or being composed): its person walks on foot meanwhile, in its box. */
+  get coming(): boolean {
+    return !this.ready && !this.dead;
   }
   get color(): string {
     return this.colors.color;
@@ -191,16 +192,36 @@ export class Rider {
     if (this.ready) queueMicrotask(() => f(this));
     else if (!this.dead) this.waiting.push(f);
   }
-  /** Composes its frames from the ride's drawing, one an animation frame; then it's ready. */
+  /** Loads the ride's drawing (its own chunk, once for everyone: load.ts), then composes its frames from it, one an animation frame; then it's ready. */
   private start(): void {
-    const { draft: d } = this.art;
+    void loadRide(this.id)
+      .then((d) => {
+        // (Its chunk didn't come: as a picture that fails, below.)
+        if (!d) throw new Error(`The ride ${this.id}'s drawing didn't load.`);
+        return this.compose(this.jobs(d));
+      })
+      .then(
+        () => {
+          if (this.dead) return;
+          this.ready = true;
+          for (const f of this.waiting.splice(0)) f(this);
+        },
+        () => {
+          // (A picture or the drawing didn't come: these frames are forgotten, so a later rider tries again; this one stays on foot.)
+          this.drop();
+          for (const [key, x] of riders) if (x === this) riders.delete(key);
+        },
+      );
+  }
+  /** Its frames' jobs: every frame of every view, then its trail marks, from the ride's drawing `d`. */
+  private jobs(d: RiderDraft): Job[] {
     const k = this.scale;
     const s = RIDE_PX;
     const jobs: Job[] = [];
     for (const rv of new Set(this.views)) {
       const cell = this.art.cells[rv.facing]!.cell;
       for (const anim of ["idle", "move"] as const)
-        for (let i = 0; i < viewOf(d, rv.facing)[anim].ms.length; i++) {
+        for (let i = 0; i < rv.seats[anim].length; i++) {
           // (The ride's layers drawn at its size, so they're put down pixel for pixel.)
           const layer = (part: "Back" | "Front") => svgText(h(RideLayer, { d, view: rv.facing, c: this.colors, anim, f: i, part }), cell, s * k);
           jobs.push({ make: () => [layer("Back"), layer("Front")], done: ([b, f]) => (rv.frames[anim][i] = this.frame(rv, anim, i, b!, f!)) });
@@ -225,18 +246,7 @@ export class Rider {
               },
             });
     }
-    void this.compose(jobs).then(
-      () => {
-        if (this.dead) return;
-        this.ready = true;
-        for (const f of this.waiting.splice(0)) f(this);
-      },
-      () => {
-        // (A picture didn't come: these frames are forgotten, so a later rider tries again; this one stays on foot.)
-        this.drop();
-        for (const [key, x] of riders) if (x === this) riders.delete(key);
-      },
-    );
+    return jobs;
   }
   /** The jobs, one an animation frame: each puts down what the one before made, then makes its own (its images decode in between). */
   private async compose(jobs: Job[]): Promise<void> {
@@ -304,8 +314,8 @@ const riders = new Map<string, Rider>();
  */
 export function shareRider(art: RideArt, colors: RideColors, pawnKey: string, pawn: RiderPawn, pawnBack: RiderPawn, done: (r: Rider) => void): Rider {
   // (Its size as it's made: RIDES.scale, or an admin's `?rideScale=` once it counts.)
-  const scale = rideScale(art.draft.id);
-  const key = `${art.draft.id}|${colors.color}|${colors.color2}|${colors.side}|${scale}|${pawnKey}`;
+  const scale = rideScale(art.id);
+  const key = `${art.id}|${colors.color}|${colors.color2}|${colors.side}|${scale}|${pawnKey}`;
   let r = riders.get(key);
   if (!r) riders.set(key, (r = new Rider(art, colors, pawn, pawnBack, true, scale)));
   r.users++;
@@ -329,9 +339,8 @@ export function dropRiders(): void {
 /** (Tests) How many sets of rider frames are held now. */
 export const ridersHeld = () => ({ riders: riders.size });
 
-/** A ride's drawing and measured views by its item id (undefined: not a ride, or not measured). */
+/** A ride's measured views by its item id (undefined: not a ride). */
 export function rideArt(def: string | undefined): RideArt | undefined {
-  const draft = def ? RIDES[def] : undefined;
-  const cells = def ? RIDE_CELLS[def] : undefined;
-  return draft && cells ? { draft, cells } : undefined;
+  const cells = rideCells(def);
+  return def && cells ? { id: def, cells } : undefined;
 }

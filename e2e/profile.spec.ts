@@ -291,6 +291,88 @@ test("rides on home (Nov 1): the big pawn and your ring ride Riding Chirp, its i
   expect(await boxes()).toEqual(before);
 });
 
+/** Holds a ride's drawing's chunk (Nov 1, rides lazy: each its own, `/assets/<ride>-<hash>.js`) until the answer is called. */
+async function holdDrawing(page: Page, ride: string): Promise<() => void> {
+  let open!: () => void;
+  const held = new Promise<void>((r) => (open = r));
+  await page.route(new RegExp(`/assets/${ride}-[\\w-]{8}\\.js$`), async (route) => {
+    await held;
+    await route.continue();
+  });
+  return open;
+}
+
+test.describe("rides lazy", () => {
+  // (No service worker: it would serve the ride's chunk from its cache, past the hold.)
+  test.use({ serviceWorkers: "block" });
+  test("rides lazy (Nov 1): each ride's drawing loads on its own; until it comes, home's pawn and ring, your profile's pawn and the locker's tile keep their boxes, the pawn sitting where it will ride; the ride appears under it and nothing moves", async ({ page }) => {
+    // (Still: no hop on home, the idle on its first frame, so every box can be read twice.)
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await named(page, "Rider");
+    await page.goto("/");
+    await expect(page.locator(".fd-hero-name")).toHaveText("Rider");
+    const [chirp] = await giveItems(page, [
+      { def: "riding-chirp", color: "cobalt", blemish: 40 },
+      { def: "moon-ride", color: "pearl", blemish: 40 },
+    ]);
+    await wearItem(page, "ride", chirp!);
+    /** The boxes (each element's, rounded to a tenth of a pixel) and, in each, where the pawn sits (its top left and width). */
+    const boxes = (sel: string) =>
+      page.locator(sel).evaluateAll((els) =>
+        els.map((e) => {
+          const r = (b: DOMRect) => [b.x, b.y, b.width, b.height].map((v) => Math.round(v * 10) / 10);
+          const pawn = e.querySelector(".ride-pawn");
+          return [...r(e.getBoundingClientRect()), ...(pawn ? r(pawn.getBoundingClientRect()).slice(0, 3) : [])];
+        }),
+      );
+    /** The same once they've stopped moving (an overlay slides in as it opens). */
+    const settled = async (sel: string) => {
+      let prev = await boxes(sel);
+      for (let i = 0; i < 40; i++) {
+        await page.waitForTimeout(100);
+        const now = await boxes(sel);
+        if (now.length && JSON.stringify(now) === JSON.stringify(prev)) return now;
+        prev = now;
+      }
+      throw new Error(`${sel}: never settled`);
+    };
+    // Home: your worn ride's drawing is asked for as the app starts; held back, the big pawn and your ring sit where they'll ride.
+    let open = await holdDrawing(page, "riding-chirp");
+    await page.reload();
+    const home = ".fd-hero, .fd-hero .fd-pawn-box, .fd-hero .avatar.riding, .fd-ring:visible .fd-pawn-box, .fd-ring:visible .avatar.riding";
+    await expect(page.locator('.fd-hero .avatar.riding[data-ride="riding-chirp"][data-drawn="0"]')).toHaveCount(1);
+    await expect(page.locator('.fd-ring:visible .avatar.riding[data-drawn="0"]')).toHaveCount(1);
+    await page.evaluate(() => document.fonts.ready);
+    const homeBefore = await settled(home);
+    open();
+    await expect(page.locator('.fd-hero .avatar.riding[data-drawn="1"]')).toHaveCount(1);
+    await expect(page.locator('.fd-ring:visible .avatar.riding[data-drawn="1"]')).toHaveCount(1);
+    expect(await boxes(home), "home: nothing moved when the ride came").toEqual(homeBefore);
+    // Your profile's pawn, the same.
+    open = await holdDrawing(page, "riding-chirp");
+    await page.reload();
+    await page.getByRole("button", { name: "Your profile" }).click();
+    const card = ".fd-card .avatar.riding";
+    await expect(page.locator(`${card}[data-drawn="0"]`)).toHaveCount(1);
+    const cardBefore = await settled(`.fd-card .fd-pawn-box, ${card}`);
+    open();
+    await expect(page.locator(`${card}[data-drawn="1"]`)).toHaveCount(1);
+    expect(await boxes(`.fd-card .fd-pawn-box, ${card}`), "your profile: nothing moved").toEqual(cardBefore);
+    // The locker's Ride tab: Moon's Ride's tile (its drawing not loaded on this page yet).
+    open = await holdDrawing(page, "moon-ride");
+    await page.getByRole("button", { name: "Open locker" }).click();
+    await page.getByRole("tab", { name: "Ride", exact: true }).click();
+    const tile = page.getByRole("button", { name: /^Moon's Ride, / });
+    await expect(tile.locator('.item-art[data-drawn="0"]')).toHaveCount(1);
+    const tileBoxes = () => tile.locator("xpath=.").evaluateAll((els) => els.map((e) => [e, e.querySelector(".item-art")!, e.querySelector(".ride-pawn")!].map((x) => Object.values(x.getBoundingClientRect().toJSON()).map((v) => Math.round(Number(v) * 10) / 10))));
+    await settled(".locker-grid");
+    const tileBefore = await tileBoxes();
+    open();
+    await expect(tile.locator('.item-art[data-drawn="1"]')).toHaveCount(1);
+    expect(await tileBoxes(), "the locker's tile: nothing moved").toEqual(tileBefore);
+  });
+});
+
 test("rides for an admin (Oct 31; admins own one of every item): the Ride tab has every ride's admin copy (Nov 1: every boss's); wearing Riding Chirp's, the preview rides it, and in the town square your pawn rides it, in its color", async ({ page }) => {
   await named(page, "Eric");
   // (Once this page's account exists, as a player: no ride.)

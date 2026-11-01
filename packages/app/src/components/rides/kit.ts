@@ -1,21 +1,5 @@
 import type { ComponentChildren } from "preact";
 import type { Paint } from "../item-paint.tsx";
-import { AlfilHowdah } from "./alfil-howdah.tsx";
-import { balloonPup } from "./balloon-pup.tsx";
-import { BigBoyBuggy } from "./bigboy-buggy.tsx";
-import { boingoPogo } from "./boingo-pogo.tsx";
-import { cheetahShoes } from "./cheetah-shoes.tsx";
-import { folioCrane } from "./folio-crane.tsx";
-import { gingerSled } from "./ginger-sled.tsx";
-import { hollowBulb } from "./hollow-bulb.tsx";
-import { rider as jeffersonGiraffe } from "./jefferson-giraffe.tsx";
-import { logRoller } from "./log-roller.tsx";
-import { moonRide } from "./moon-ride.tsx";
-import { puddlesMower } from "./puddles-mower.tsx";
-import { RidingChirp } from "./riding-chirp.tsx";
-import { rodeoBull } from "./rodeo-bull.tsx";
-import { sawyerDozer } from "./sawyer-dozer.tsx";
-import { smudgyBrush } from "./smudgy-brush.tsx";
 
 /**
  * Rides (Oct 31; Nov 1, every boss's: docs/decisions/2026-11-01-rides-v2.md): crate items in the `ride` slot (crates.ts) that
@@ -24,7 +8,8 @@ import { smudgyBrush } from "./smudgy-brush.tsx";
  * (`pose`). Two animations: `idle` (standing) and `move` (one square of the town's walk). That's its side view (walking left or
  * right); most rides also have a view from behind (walking up the screen) and from the front (walking down: `views`), and a
  * mark they leave on the ground as they run (`trail`). The types are the art pipeline's (scripts/boss-art/item-kit.tsx on
- * `claude/boss-art`), so a ride's drawing comes over as drawn.
+ * `claude/boss-art`), so a ride's drawing comes over as drawn. Each drawing is its own chunk, loaded when a ride is drawn (load.ts:
+ * the list of them); this file is only their types.
  */
 
 /** Which way a ride is seen: side (walking left or right; drawn facing right), back (walking up the screen), front (walking down). */
@@ -123,26 +108,3 @@ export const FACINGS: readonly RiderFacing[] = ["side", "back", "front"];
 
 /** A ride's view: the side's own fields, or its front's or back's (the side's when it has none). */
 export const viewOf = (d: RiderDraft, view: RiderFacing): RiderViewDraft => (view === "side" ? d : (d.views?.[view] ?? d));
-
-/** Every ride's drawing, by its item id (crates.ts). A new ride: its drawing in this folder, and a line here. */
-export const RIDES: Readonly<Record<string, RiderDraft>> = {
-  "riding-chirp": RidingChirp,
-  "moon-ride": moonRide,
-  "hollow-bulb": hollowBulb,
-  "smudgy-brush": smudgyBrush,
-  "alfil-howdah": AlfilHowdah,
-  "balloon-pup": balloonPup,
-  "bigboy-buggy": BigBoyBuggy,
-  "boingo-pogo": boingoPogo,
-  "folio-crane": folioCrane,
-  "ginger-sled": gingerSled,
-  "jefferson-giraffe": jeffersonGiraffe,
-  "puddles-mower": puddlesMower,
-  "sawyer-dozer": sawyerDozer,
-  "rodeo-bull": rodeoBull,
-  "cheetah-shoes": cheetahShoes,
-  "log-roller": logRoller,
-};
-
-/** A ride's drawing, or undefined for any other item. */
-export const rideOf = (def: string | undefined): RiderDraft | undefined => (def ? RIDES[def] : undefined);

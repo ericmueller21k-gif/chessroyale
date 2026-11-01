@@ -1,14 +1,17 @@
 import { render } from "preact";
 import { ITEM_COLORS } from "@chessroyale/core";
-import { FACINGS, RIDES, type RiderFacing } from "../components/rides/kit.ts";
+import { FACINGS, viewOf, type RiderFacing } from "../components/rides/kit.ts";
 import { RideLayer, svgImage, svgText } from "../components/rides/draw.tsx";
+import { RIDE_IDS, loadRide } from "../components/rides/load.ts";
 
 /**
  * Dev only (not in the build): measures each ride's views for the town square (`npx tsx scripts/measure-rides.ts`, which opens
  * this page on the app's dev server). `window.__measure(id)` draws every frame of each of the ride's views (side, and its back
  * and front if it has them), both layers, in every color, and answers each view's cell (the box round all of them, in the pawn's
  * square's units, with room for the outlines) and its top (the highest drawn row of any idle frame, in units). The town composes
- * its riders' frames from the drawings themselves (town/rides.ts), into these cells.
+ * its riders' frames from the drawings themselves (town/rides.ts), into these cells. `window.__poses(id)` (Nov 1, rides lazy) answers
+ * the numbers every box needs before the drawing has loaded: its tile's box, each view's frames (their times and where the pawn sits)
+ * and its trail mark's times and box.
  */
 
 /** Pixels a unit the top is read at (the town's: RIDE_PX). */
@@ -16,7 +19,7 @@ const PX = 1.6;
 const ANIMS = ["idle", "move"] as const;
 
 async function measure(id: string) {
-  const d = RIDES[id];
+  const d = await loadRide(id);
   if (!d) throw new Error(`no ride ${id}`);
   const host = document.getElementById("app")!;
   const out: Partial<Record<RiderFacing, { cell: number[]; top: number; bottom: number }>> = {};
@@ -78,6 +81,29 @@ async function measure(id: string) {
   return out;
 }
 
-const w = window as unknown as { __measure: typeof measure; __rides: string[] };
+/** A number as the registry keeps it (to a thousandth of a unit; never -0). */
+const r3 = (x: number) => Math.round(x * 1000) / 1000 + 0;
+
+/** A ride's tile box, its views' frames ([ms, x, y, tilt, cut] standing; a move's also its lift, the pose's dy) and its trail's numbers. */
+async function poses(id: string) {
+  const d = await loadRide(id);
+  if (!d) throw new Error(`no ride ${id}`);
+  const views: Partial<Record<RiderFacing, { idle: number[][]; move: number[][] }>> = {};
+  for (const view of FACINGS) {
+    if (view !== "side" && !d.views?.[view]) continue;
+    const v = viewOf(d, view);
+    const rows = (anim: "idle" | "move") =>
+      v[anim].ms.map((ms, f) => {
+        const p = v.pose(anim, f);
+        return [ms, r3(p.pawnX), r3(p.pawnY), r3(p.pawnTilt ?? 0), r3(p.cut), ...(anim === "move" ? [r3(p.dy)] : [])];
+      });
+    views[view] = { idle: rows("idle"), move: rows("move") };
+  }
+  const t = d.trail;
+  return { frame: d.frame, views, trail: t ? { ms: t.ms, w: t.w, h: t.h, every: Math.max(1, t.every ?? 1) } : null };
+}
+
+const w = window as unknown as { __measure: typeof measure; __poses: typeof poses; __rides: readonly string[] };
 w.__measure = measure;
-w.__rides = Object.keys(RIDES);
+w.__poses = poses;
+w.__rides = RIDE_IDS;
