@@ -327,8 +327,9 @@ export interface Settings {
   engineHashMb: number;
   botCandidateMoves: number;
   /**
-   * Bot skill temperatures T (in points of loss), strongest to loosest. Bots get
-   * skills spread evenly on a log scale across this range. Chosen in milestone 2.
+   * Bot skill temperatures T (in points of loss), strongest to loosest. Since Nov 1 a lobby's bots get the temperature
+   * of their rating (BOT_LOBBY, botStrength), never tighter than this range's first number (the ?weakbots=1 floor);
+   * botSkillSpread (the sims) still spreads skills evenly on a log scale across it.
    */
   botSkillRange: readonly [number, number];
   botRandomMoveChance: number;
@@ -589,6 +590,95 @@ export const WEAK_BOT_SKILL: readonly [number, number] = [8, 32];
  * (docs/decisions/2026-10-16-flaky-e2e-batch-2.md). Never for players.
  */
 export const WEAK_BOTS: Pick<Settings, "botSkillRange" | "peopleFirst"> = { botSkillRange: WEAK_BOT_SKILL, peopleFirst: true };
+
+/**
+ * The bots as a lobby (Eric, Nov 1: "mostly about 800 to 1500, with some range above and below", like a real lobby of
+ * whoever is online; "a player making the engine's best moves should finish 1st or 2nd").
+ * docs/decisions/2026-11-01-bot-lobby.md.
+ *
+ * - `ratings`: each bot's rating, fixed by its name (the same player every match), on a chess site's scale (Maia's,
+ *   Lichess's). A bell curve (`mean`, `sd`), held within `min` to `max`, rounded to `step`. About 89% of bots land
+ *   between 800 and 1500, about 5% on either side.
+ * - `skillAt`: the bot's temperature (botPick, over the judge's top moves with its `botRandomMoveChance`) that gives
+ *   away, in a Crowd 50 v 50, the points a move Maia gives away at that rating (reports/maia-calibration.md's per-move
+ *   table; the temperatures' losses measured by `packages/sim/scripts/crowd-bots-sim.ts probe`, reports/crowd-bots.md).
+ *   No temperature gives away more than about 7.3 a move, so 600 sits at 128. Between points, along a line in
+ *   log(temperature); held at its ends. Stockfish-style, not Maia: Maia is too slow for a team turn on a phone.
+ */
+export const BOT_LOBBY = {
+  ratings: { mean: 1150, sd: 250, min: 600, max: 2200, step: 100 },
+  skillAt: [
+    [600, 128],
+    [900, 67],
+    [1200, 27],
+    [1500, 16.5],
+    [1800, 11.7],
+    [2100, 8.4],
+    [2400, 6.4],
+  ] as readonly (readonly [number, number])[],
+};
+export type BotLobbySettings = typeof BOT_LOBBY;
+
+/** 32-bit FNV-1a of a string (a bot's name: its fixed rating). */
+function nameHash(name: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < name.length; i++) h = Math.imul(h ^ name.charCodeAt(i), 0x01000193) >>> 0;
+  return h >>> 0;
+}
+
+/** A bot's rating, from its name alone (the same every match): BOT_LOBBY.ratings' bell curve. */
+export function botRatingOf(name: string, b: Pick<BotLobbySettings, "ratings"> = BOT_LOBBY): number {
+  const { mean, sd, min, max, step } = b.ratings;
+  let a = nameHash(name);
+  const next = () => {
+    // (mulberry32, inline: rng.ts imports nothing from here, and this file stays free of imports.)
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const u1 = Math.max(next(), 1e-9);
+  const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * next());
+  return Math.max(min, Math.min(max, Math.round((mean + sd * z) / step) * step));
+}
+
+/** The temperature (botPick) that plays like a rating (BOT_LOBBY.skillAt; held at its ends). */
+export function botSkillForRating(rating: number, b: Pick<BotLobbySettings, "skillAt"> = BOT_LOBBY): number {
+  const pts = b.skillAt;
+  if (rating <= pts[0]![0]) return pts[0]![1];
+  for (let i = 1; i < pts.length; i++) {
+    const [r1, s1] = pts[i]!;
+    const [r0, s0] = pts[i - 1]!;
+    if (rating <= r1) return Math.round(Math.exp(Math.log(s0) + ((rating - r0) / (r1 - r0)) * (Math.log(s1) - Math.log(s0))) * 1000) / 1000;
+  }
+  return pts[pts.length - 1]![1];
+}
+
+/** The rating a temperature plays like (botSkillForRating's inverse, held at its ends), rounded to the step. */
+export function botRatingForSkill(skill: number, b: Pick<BotLobbySettings, "skillAt" | "ratings"> = BOT_LOBBY): number {
+  const pts = b.skillAt;
+  const step = b.ratings.step;
+  const snap = (r: number) => Math.round(r / step) * step;
+  if (skill >= pts[0]![1]) return pts[0]![0];
+  for (let i = 1; i < pts.length; i++) {
+    const [r1, s1] = pts[i]!;
+    const [r0, s0] = pts[i - 1]!;
+    if (skill >= s1) return snap(r0 + ((Math.log(s0) - Math.log(skill)) / (Math.log(s0) - Math.log(s1))) * (r1 - r0));
+  }
+  return pts[pts.length - 1]![0];
+}
+
+/**
+ * A bot's rating and temperature as its seat gets them: its name's rating (botRatingOf), as loose as `botSkillRange`
+ * allows at least (the ?weakbots=1 switch: then the rating that temperature plays like).
+ */
+export function botStrength(name: string, settings: Pick<Settings, "botSkillRange"> = DEFAULT_SETTINGS): { rating: number; skill: number } {
+  const rating = botRatingOf(name);
+  const skill = botSkillForRating(rating);
+  const floor = settings.botSkillRange[0];
+  return skill >= floor ? { rating, skill } : { rating: Math.min(rating, botRatingForSkill(floor)), skill: floor };
+}
 
 /** `count` bot skills spread evenly on a log scale across `botSkillRange`, strongest first. */
 export function botSkillSpread(count: number, settings: Settings = DEFAULT_SETTINGS): number[] {

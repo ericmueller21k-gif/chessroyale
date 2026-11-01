@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, botSkillSpread, shuffle, type Rng, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, botStrength, shuffle, type Rng, type Settings } from "@chessroyale/core";
 import type { Entrant } from "./runner.ts";
 
 /** Bot names: chess terms, openings and puns, short enough for a 360 px scoreboard. */
@@ -30,15 +30,15 @@ export const BOT_NAMES: readonly string[] = [
 ];
 
 /**
- * `count` bots with a wide spread of skill (see `botSkillRange` in settings),
- * named and shuffled. Used to fill empty seats.
+ * `count` bots, named and shuffled, to fill empty seats. Each plays at its name's rating (botStrength: BOT_LOBBY's bell
+ * curve on the game's own rating scale, the same player every match), at the temperature that rating plays like.
  */
 export function botRoster(rng: Rng, count = DEFAULT_SETTINGS.lobbySize - 1, settings: Settings = DEFAULT_SETTINGS): Entrant[] {
-  const skills = botSkillSpread(count, settings);
   const names = shuffle(rng, BOT_NAMES);
   // Past the name list (big lobbies), names repeat with a number: "Queenie 2".
-  return skills.map((skill, i) => {
+  return Array.from({ length: count }, (_, i) => {
     const lap = Math.floor(i / names.length);
-    return { id: `bot${i}`, name: `${names[i % names.length]!}${lap ? ` ${lap + 1}` : ""}`, isBot: true, skill };
+    const name = `${names[i % names.length]!}${lap ? ` ${lap + 1}` : ""}`;
+    return { id: `bot${i}`, name, isBot: true, skill: botStrength(name, settings).skill };
   });
 }

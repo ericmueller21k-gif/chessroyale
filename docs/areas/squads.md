@@ -178,7 +178,8 @@ move.
   - Bots use 1-2 same-move tokens a Pairs match, 76-80% refunded (Mercenary's blocks: `reports/squads-mercenary.md`).
   - The final's vote: a clear majority on 54-72% of moves, the coin on 11-18%.
   - Ties go to the bank, and no longer to the coin (0 of 258: banks are rarely both at zero).
-- **Bots** (`bots.ts`): the existing bot engine (Stockfish's top moves, then `botPick` at a skill; blocked moves left
+- **Bots** (`bots.ts`): the existing bot engine (Stockfish's top moves, then `botPick` at a skill (since Nov 1 the
+  temperature its name's rating plays like: `botRoster`, [crowd.md](crowd.md) "The bots"); blocked moves left
   out, `topAllowed`) for Relay moves, pair picks (never the partner's, unless it's the bot's own best move and an only
   move, `isOnlyMove` at `bots.sameMoveGap`, with a token left: then the same), and the final's votes (`botVotePick`:
   sometimes a person's pick on the squad, `copyHumanChance`). Blocks, sparingly (`botBlock`): the other squad's

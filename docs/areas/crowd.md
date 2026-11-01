@@ -13,7 +13,7 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   patch `DEFAULT_SETTINGS`. Two are played on these screens:
   - **Crowd 50 v 50** (the main mode): 100 players, one board, two teams of 50, each playing one side all game. Every
     player picks a move on their team's turns; the **most popular** pick is played (`drawRuleByStage: ["popular"]`).
-    Bots fill empty seats (see [matchmaking.md](matchmaking.md)). Always team turns (`crowdTeams` in
+    Bots fill empty seats (see [matchmaking.md](matchmaking.md)); each plays at its own rating ("The bots" below). Always team turns (`crowdTeams` in
     `CROWD_SETTINGS`): the "everyone moves" choice went on Oct 15, 2026 (DECISIONS.md).
   - **Boss raid** (`RAID_SETTINGS`, `crowdTeams: false`): up to 50 people (no bots online) pick the crowd's moves
     together against a boss, from the starting position. Solo's "Boss alone" is a raid with a crowd of one. See
@@ -141,8 +141,17 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   three finalists on the other boards (`phase2Follows`, `phase2Mates` in `recluse-phase2.ts`). No reward comes from this
   path (rewards only via Squads: ROADMAP.md). Duel: the last two. `finalMaxTurns` caps a final; the engine
   adjudicates.
+- **The bots** (Nov 1; docs/decisions/2026-11-01-bot-lobby.md; Eric: "mostly about 800 to 1500, some range above and
+  below", "a player making the engine's best moves should finish 1st or 2nd"). Each bot has a rating fixed by its name
+  (`botRatingOf`: `BOT_LOBBY.ratings`, a bell curve around 1150, 600 to 2200, in steps of 100), the same player every
+  match, and picks Stockfish-style (`botPick` over the judge's top moves) at the temperature that rating plays like
+  (`botSkillForRating`, `BOT_LOBBY.skillAt`: a Maia player's points given away a move at that rating, matched in the
+  Crowd). `botRoster` seats them everywhere a lobby is filled (solo, online, Squads, a Solo raid). Not Maia: about
+  0.75 s of Maia a team turn on a computer, about 3 s on a phone (`reports/crowd-bots.md`). Test:
+  `npx tsx packages/sim/scripts/crowd-bots-sim.ts tuned 10` (an engine-best player among 99 bots; `summary` writes
+  `reports/crowd-bots.md`).
 - **Test switch `?weakbots=1`** (solo, and a lobby you create; `WEAK_BOTS`): every bot plays loosely (`WEAK_BOT_SKILL`:
-  a temperature of 8 points or more), and people rank above bots in the standings (`peopleFirst`), so every cut takes
+  a temperature of 8 points or more, `botStrength`; since Nov 1 every bot is that loose anyway), and people rank above bots in the standings (`peopleFirst`), so every cut takes
   bots first and a test's player surely reaches the boss final's top 4. Loose bots alone stopped doing it on Oct 15: the
   opening allowance leaves them level with the engine's best move, and one pick the judge's final numbers rank above it
   then decides the strict last cut (docs/decisions/2026-10-16-flaky-e2e-batch-2.md). Never for players.
