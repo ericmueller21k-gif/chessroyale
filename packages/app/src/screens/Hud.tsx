@@ -2,7 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import { LeaderboardSheet } from "../components/LeaderboardSheet.tsx";
 import { LiveNumber } from "../components/LiveNumber.tsx";
 import { BrainDebug, EngineMove, UltimateTest } from "../components/BossDock.tsx";
-import { COMPUTER_LAYOUT, MatchMenu } from "../components/MatchMenu.tsx";
+import { COMPUTER_LAYOUT, MatchMenu, MOUSE_LAYOUT } from "../components/MatchMenu.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { exitFor } from "../match-exit.ts";
 import { clockShown } from "../clock-text.ts";
@@ -44,9 +44,10 @@ const pts = (x: number) => (Math.abs(x) < 0.05 ? "0.0" : (x > 0 ? "+" : "−") +
  * score on the cut line. Tap it for the full leaderboard. Then every board as
  * a tiny live board (yours ringed).
  */
-export function Hud({ match, stripFrozen = false }: { match: GameView; stripFrozen?: boolean }) {
+export function Hud({ match, stripFrozen = false, keepTitle = false }: { match: GameView; stripFrozen?: boolean; keepTitle?: boolean }) {
   const [open, setOpen] = useState(false);
   const computer = useMedia(COMPUTER_LAYOUT);
+  const mouse = useMedia(MOUSE_LAYOUT);
   // During the reveal the round counter has already moved on; show the round just played.
   const shownRound = match.phase.kind === "reveal" ? match.roundsPlayed : match.roundsPlayed + 1;
   // Crowd 50 v 50: your team, with your team's cut line.
@@ -78,6 +79,16 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
   const moveNo = fen ? Number(fen.split(" ")[5]) || 1 : null;
   const turnsLeft = roundsInStage(match.settings, match.stage) - match.roundsPlayed;
   const team = view.teamLabel ? (alive.find((s) => s.isYou)?.team ?? null) : null;
+  // A boss battle on a computer with a mouse (Nov 1, Eric: "completely gone from the top"): no title line. The boss's bar
+  // is the top of the screen and says the move; the ⚡, the fish and the gear go at the top of the column beside the board
+  // (BossTools, the move list under them). Phones, tablets and the Hidden Boss's phases (keepTitle) keep the line.
+  if (boss && mouse && !keepTitle)
+    return (
+      <>
+        <BossBar boss={boss} match={match} move={`Move ${Math.min(boss.crowdMoves + 1, boss.maxMoves)}`} />
+        <BossTools match={match} crowd={crowd} />
+      </>
+    );
   return (
     <>
       <div class="hud-row">
@@ -147,5 +158,22 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
       {boss ? <BossBar boss={boss} match={match} /> : <BoardsStrip slots={match.slots()} current={myBoardId(match)} frozen={stripFrozen} />}
       {open && <LeaderboardSheet match={match} onClose={() => setOpen(false)} />}
     </>
+  );
+}
+
+/**
+ * A computer's boss screens (Nov 1): the admins' ⚡ and 🐟 and the gear, at the top of the column beside the board, with the
+ * move list under them (board-size.css, `.gm-tools`). The gear's list is the title line's own (MatchMenu).
+ */
+function BossTools({ match, crowd }: { match: GameView; crowd: boolean }) {
+  return (
+    <div class="gm-tools">
+      <span class="match-tools">
+        <BrainDebug match={match} hidden />
+        <UltimateTest match={match} icon />
+        <EngineMove match={match} icon />
+      </span>
+      <MatchMenu exit={exitFor(match)} crowd={crowd} />
+    </div>
   );
 }

@@ -26,7 +26,7 @@
     --bd-h: calc(var(--app-h) - var(--bd-room));
     /* (The screen that holds that board: the eval bar's room both sides, the gutters, the gap and the column beside it.) */
     --scr-need: calc(var(--bd-h) + 48px + 2 * var(--gutter) + 368px);
-    --scr: min(100vw, max(1100px, var(--scr-need)));
+    --scr: min(var(--win-w), max(1100px, var(--scr-need)));
     width: var(--scr);
   }
   .screen.game .board-area .board-wrap {
@@ -36,15 +36,16 @@
     width: min(calc(100% - 48px), var(--bd-h));
   }
 
-  /* Every boss battle (Boss alone, a Solo raid, an online raid, the Hidden Boss's phases, the Crowd's boss final): the title
-     line, the boss's bar (up to 61 px, Puddles' seeds), the dock's row under the board. Babur's taller bar keeps its share
+  /* Every boss battle (Boss alone, a Solo raid, an online raid, the Hidden Boss's phases, the Crowd's boss final): (Nov 1: no
+     title line on a computer with a mouse, the boss's bar is the top; game-frame.css' margins are in this room) the boss's bar
+     (up to 61 px, Puddles' seeds), the dock's row under the board. Babur's taller bar keeps its share
      (styles.css: B + room + 0.1876 B - 38 fits the window). The God King's sums (--gk-screen) and the boss's room by the
      window's edge (--bs-need) read the screen's new width. */
   .screen.game:has(> .boss-dock) {
-    --bd-room: 200px;
+    --bd-room: 123px;
     --bd-h: calc(var(--app-h) - var(--bd-room));
     --gk-screen: var(--scr);
-    --bs-need: calc(var(--bs-reach, 0px) - (100vw - var(--scr)) / 2 - var(--gutter));
+    --bs-need: calc(var(--bs-reach, 0px) - (var(--win-w) - var(--scr)) / 2 - var(--gutter));
   }
   .screen.game:has(> .boss-dock):has(.tg-pump-slot.tg-tall) {
     --bd-h: calc((var(--app-h) - var(--bd-room) + 38px) / 1.1876);
@@ -81,13 +82,13 @@
    board needs. Boss alone's empty column is narrower (the boss and Babur's pump only). */
 @media (min-width: 1100px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
   .arena .screen.game {
-    --scr: min(100vw - 380px, max(1000px, var(--scr-need)));
+    --scr: min(var(--win-w) - 380px, max(1000px, var(--scr-need)));
   }
   .tower-space {
     flex-basis: var(--ts-w, 216px);
   }
   .arena:has(> .tower-space) .screen.game {
-    --scr: min(100vw - var(--ts-w, 216px) - 20px, max(1000px, var(--scr-need)));
+    --scr: min(var(--win-w) - var(--ts-w, 216px) - 20px, max(1000px, var(--scr-need)));
   }
   /* (With no eval bar, every player's board, the board takes the bar's 24 px and the boss stands 24 px further out: his column is
      24 px wider, so his words keep their room.) */

@@ -91,7 +91,7 @@ function burnStart(key: string): number {
  * under it free room, a slot for the boss's own prop (BossUi.barProp). The boss's threat (1 to 5) is in the bar's label, no
  * longer drawn (Eric, Oct 23: "remove the skull shit"; the select screen and the menus keep their skulls).
  */
-export function BossBar({ boss, match }: { boss: BossView; match?: GameView }) {
+export function BossBar({ boss, match, move }: { boss: BossView; match?: GameView; move?: string }) {
   // A boss with a character stands at the bar's left on a phone (on a computer, by the board: see BossSide), with
   // its portrait in the bar instead.
   const char = !!match && hasCharacter(match);
@@ -122,6 +122,8 @@ export function BossBar({ boss, match }: { boss: BossView; match?: GameView }) {
             </>
           )}
         </span>
+        {/* (The move number, a computer's: left of the status, where the title line said it, Nov 1.) */}
+        {move && <span class="boss-move">{move}</span>}
         <span class="boss-next">
           {match?.bossNote != null
             ? match.bossNote

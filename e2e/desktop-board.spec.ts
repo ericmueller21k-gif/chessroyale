@@ -19,7 +19,7 @@ type Size = (typeof SIZES)[number];
 const dims = (s: string) => s.split("x").map(Number) as [number, number];
 
 /** Each screen's room above and below the board (board-size.css' --bd-room): its board is never taller than the rest. */
-const ROOM = { alone: 200, raid: 200, crowd: 170, vote: 170, duel: 170, squads: 230 } as const;
+const ROOM = { alone: 123, raid: 123, crowd: 170, vote: 170, duel: 170, squads: 230 } as const;
 type Screen = keyof typeof ROOM;
 /**
  * The board's side, measured with this change (testers' eval bar on, as `?debug` shows it), and on main before it. At 1280 × 800
@@ -27,12 +27,12 @@ type Screen = keyof typeof ROOM;
  * (340 px) leave the board no more.
  */
 const NOW: Record<Screen, Record<Size, number>> = {
-  alone: { "1920x1080": 880, "1440x900": 696, "1366x768": 568, "1280x800": 600 },
-  raid: { "1920x1080": 880, "1440x900": 616, "1366x768": 536, "1280x800": 456 },
-  crowd: { "1920x1080": 904, "1440x900": 616, "1366x768": 536, "1280x800": 456 },
-  vote: { "1920x1080": 904, "1440x900": 616, "1366x768": 536, "1280x800": 456 },
+  alone: { "1920x1080": 952, "1440x900": 528, "1366x768": 448, "1280x800": 520 },
+  raid: { "1920x1080": 864, "1440x900": 384, "1366x768": 304, "1280x800": 376 },
+  crowd: { "1920x1080": 864, "1440x900": 384, "1366x768": 304, "1280x800": 376 },
+  vote: { "1920x1080": 864, "1440x900": 384, "1366x768": 304, "1280x800": 376 },
   duel: { "1920x1080": 904, "1440x900": 728, "1366x768": 592, "1280x800": 624 },
-  squads: { "1920x1080": 848, "1440x900": 664, "1366x768": 536, "1280x800": 504 },
+  squads: { "1920x1080": 848, "1440x900": 432, "1366x768": 352, "1280x800": 424 },
 };
 const MAIN: Record<Screen, Record<Size, number>> = {
   alone: { "1920x1080": 552, "1440x900": 552, "1366x768": 480, "1280x800": 456 },
@@ -42,6 +42,8 @@ const MAIN: Record<Screen, Record<Size, number>> = {
   duel: { "1920x1080": 704, "1440x900": 648, "1366x768": 512, "1280x800": 544 },
   squads: { "1920x1080": 600, "1440x900": 600, "1366x768": 536, "1280x800": 504 },
 };
+/** The side menu's width (game-frame.css): icons only below 1366 px, the labels from there. The board may lose that much to it. */
+const MENU = (size: Size) => (dims(size)[0] < 1366 ? 80 : 232);
 /** chess.com's board against its window's height (Eric's screenshot, Oct 29: 921 px of 1036). */
 const CHESS_COM = 921 / 1036;
 
@@ -87,6 +89,7 @@ const BESIDE: Record<string, string> = {
   chat: ".screen.game > .under-board",
   squadPanel: ".screen.game .sq-panel",
   strips: ".screen.game .dv-strip",
+  tools: ".screen.game > .gm-tools",
 };
 async function look(page: Page) {
   return page.evaluate(
@@ -146,7 +149,7 @@ async function check(page: Page, screen: Screen, size: Size) {
   // Its size: what this change measured, never more than the window's height allows, never less than main's.
   expect(Math.abs(b - NOW[screen][size]), `${at}: the board's side (${b})`).toBeLessThanOrEqual(1);
   expect(b, `${at}: within the window's height less the screen's room`).toBeLessThanOrEqual(h - ROOM[screen] + 0.5);
-  expect(b, `${at}: never smaller than main's`).toBeGreaterThanOrEqual(MAIN[screen][size] - 0.5);
+  expect(b, `${at}: never smaller than main's, less the side menu's width`).toBeGreaterThanOrEqual(MAIN[screen][size] - MENU(size) - 0.5);
   expect(Math.abs(g.board.b - g.board.y - b), `${at}: square`).toBeLessThanOrEqual(1);
   // Nothing scrolls; everything in the window.
   expect(g.scrollY, `${at}: no scrolling down`).toBeLessThanOrEqual(0);
@@ -170,7 +173,9 @@ async function check(page: Page, screen: Screen, size: Size) {
   // What sits beside the board follows it.
   const m = g.around.moves?.[0];
   if (m) {
-    expect(Math.abs(m.y - g.board.y), `${at}: the moves from the board's top`).toBeLessThanOrEqual(1);
+    // (A boss battle's ⚡, fish and gear sit at the board's top, the list 36 px under them: Nov 1.)
+    expect(Math.abs(m.y - g.board.y - (g.around.tools ? 36 : 0)), `${at}: the moves from the board's top (under the tools)`).toBeLessThanOrEqual(1);
+    if (g.around.tools) expect(Math.abs(g.around.tools[0]!.y - g.board.y), `${at}: the tools from the board's top`).toBeLessThanOrEqual(1);
     expect(m.x - g.board.r, `${at}: the moves a small gap off the board`).toBeGreaterThanOrEqual(12);
     expect(m.x - g.board.r, `${at}: the moves a small gap off the board`).toBeLessThanOrEqual(16.5);
     expect(Math.abs(m.b - m.y - Math.max(120, b / 2 - 73)), `${at}: the moves half the board less 73 px`).toBeLessThanOrEqual(2);
@@ -202,7 +207,7 @@ async function check(page: Page, screen: Screen, size: Size) {
   // The title line and a boss's bar over the board, the board's width (a boss battle: straight with its edges).
   const title = g.around.title?.[0];
   if (title) expect(title.b, `${at}: the title line above the board`).toBeLessThanOrEqual(g.board.y);
-  if (g.around.bar) for (const x of [g.around.bar[0]!, title!]) expect(Math.abs(x.x - g.board.x), `${at}: straight with the board's left edge`).toBeLessThanOrEqual(1);
+  if (g.around.bar) for (const x of [g.around.bar[0]!, title].filter(Boolean) as Box[]) expect(Math.abs(x.x - g.board.x), `${at}: straight with the board's left edge`).toBeLessThanOrEqual(1);
   return { b, ratio: b / h };
 }
 
@@ -280,9 +285,10 @@ test("a computer: Babur's pump beside him at every size, as big as the board's b
   await page.goto("/?debug&pace=quick&clock=60&laststand=0&boss=tiger");
   await bossAloneFromHome(page);
   await expect.poll(() => phase(page), { timeout: 120_000 }).toBe("play");
-  // (His column grows with the board, so the pump has room beside him; at 1280 × 800 and 1440 × 900 the board gives up a little
-  // width for it, testers' eval bar on: 536 and 680 px, the bar off 584 and 696.)
-  for (const [size, board] of [["1280x800", 536], ["1920x1080", 880], ["1366x768", 568], ["1440x900", 680], ["1280x800", 536]] as const) {
+  // (His column grows with the board, so the pump has room beside him. Nov 1: the side menu takes its width too, so the board
+  // is narrower at every width below 1920: 1280 × 800 456 (was 536; the icon menu's 80 px), 1366 × 768 400 (was 568), 1440 × 900
+  // 448 (was 680), 1920 × 1080 896 (was 880): testers' eval bar on.)
+  for (const [size, board] of [["1280x800", 456], ["1920x1080", 896], ["1366x768", 400], ["1440x900", 448], ["1280x800", 456]] as const) {
     const [w, h] = dims(size);
     await page.setViewportSize({ width: w, height: h });
     await page.waitForTimeout(800);
@@ -339,3 +345,95 @@ for (const screen of ["alone", "crowd", "duel"] as const) {
     await ctx.close();
   });
 }
+
+/**
+ * Nov 1 (docs/decisions/2026-11-01-game-screens-computer.md): on a computer a boss battle has no title line: the boss's bar is
+ * the top of the screen, its "Move N" left of the status, the admins' ⚡ and 🐟 and the gear at the top of the column beside the
+ * board, the move list under them. The Crowd keeps its title line.
+ */
+test("a computer's boss screen: no title line; the boss's bar at the top, 'Move 1' left of its status; the gear at the column's top, beside the board; the Crowd keeps its title line", async ({ browser }) => {
+  test.skip(test.info().project.name !== "desktop", "a computer only; it opens its own windows");
+  test.setTimeout(6 * 60_000);
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const page = await ctx.newPage();
+  await into(page, "alone");
+  await expect(page.locator(".screen.game > .hud-row"), "no title line").toHaveCount(0);
+  const bar = (await page.locator(".screen.game > .boss-bar").boundingBox())!;
+  expect(bar.y, "the boss's bar at the window's top").toBeLessThanOrEqual(8);
+  const move = page.locator(".boss-bar .boss-move");
+  await expect(move).toHaveText(/^Move 1$/);
+  const [mv, st] = await Promise.all([move.boundingBox(), page.locator(".boss-bar .boss-next").boundingBox()]);
+  expect(mv!.x + mv!.width, "'Move 1' left of the status").toBeLessThanOrEqual(st!.x + 1);
+  const gear = page.locator(".screen.game > .gm-tools").getByRole("button", { name: "Match options" });
+  await expect(gear).toHaveCount(1);
+  const gb = (await gear.boundingBox())!;
+  const board = (await look(page)).board;
+  expect(gb.x, "the gear beside the board").toBeGreaterThanOrEqual(board.r);
+  expect(gb.y, "the gear at the board's top").toBeLessThanOrEqual(board.y + 28);
+  const crowd = await ctx.newPage();
+  await into(crowd, "crowd");
+  await expect(crowd.locator(".screen.game > .hud-row"), "the Crowd keeps its title line").toHaveCount(1);
+  await ctx.close();
+});
+
+/**
+ * Nov 1: the front door's side menu on a computer's game screens (Boss alone, the Crowd, 1 v 1, Squads): icons only below
+ * 1366 px (the labels as tooltips, read by screen readers), the full menu from 1366 px. A phone and a touch tablet have none
+ * (the touch test above keeps their boards to the pixel).
+ */
+test("a computer's game screens: the side menu is on each; icons only below 1366 px, its labels as tooltips; the full menu from 1366 px", async ({ browser }) => {
+  test.skip(test.info().project.name !== "desktop", "a computer only; it opens its own windows");
+  test.setTimeout(12 * 60_000);
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const page = await ctx.newPage();
+  const items = ["Play", "Chess Town", "Boss Battle", "Play with friends", "Shop & crates", "Profile", "Settings"];
+  const check = async (at: string, labels: boolean) => {
+    const side = page.locator(".gm-frame > .fd-side");
+    await expect(side, `${at}: the side menu`).toBeVisible();
+    await expect(side.locator(".fd-menu-item"), `${at}: its items`).toHaveCount(items.length);
+    for (const name of items) await expect(side.getByRole("button", { name, exact: true }), `${at}: ${name}`).toHaveAttribute("title", name);
+    const w = (await side.boundingBox())!.width;
+    const label = (await side.locator(".fd-menu-item > span:last-child").first().boundingBox())!;
+    expect(Math.abs(w - (labels ? 232 : 80)), `${at}: the menu ${w} px wide`).toBeLessThanOrEqual(1);
+    if (labels) expect(label.width, `${at}: its labels show`).toBeGreaterThan(20);
+    else expect(label.width, `${at}: icons only (the label read by screen readers, not seen)`).toBeLessThanOrEqual(2);
+  };
+  await into(page, "alone");
+  await check("alone 1280 x 800", false);
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.waitForTimeout(500);
+  await check("alone 1366 x 768", true);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.waitForTimeout(500);
+  await check("alone 1440 x 900", true);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  for (const screen of ["crowd", "duel", "squads"] as Screen[]) {
+    await into(page, screen);
+    await check(`${screen} 1280 x 800`, false);
+  }
+  await ctx.close();
+});
+
+/**
+ * Nov 1: the side menu leaves a match the way the gear's Resign or Leave does: its confirm first (Cancel keeps the battle on),
+ * then the match is out and the page it asked for is shown.
+ */
+test("a computer's side menu on a boss battle: its confirm first (Cancel keeps the battle), then the match is out and the page it asked for shows", async ({ browser }) => {
+  test.skip(test.info().project.name !== "desktop", "a computer only; it opens its own windows");
+  test.setTimeout(6 * 60_000);
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const page = await ctx.newPage();
+  await into(page, "alone");
+  const side = page.locator(".gm-frame > .fd-side");
+  await side.getByRole("button", { name: "Settings", exact: true }).click();
+  const ask = page.getByRole("alertdialog");
+  await expect(ask).toBeVisible();
+  await ask.getByRole("button", { name: "Cancel" }).click();
+  await expect(ask).toHaveCount(0);
+  await expect.poll(() => phase(page)).toBe("play");
+  await side.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: /^(Resign|Leave)$/ }).click();
+  await expect(page.locator(".fd-root.fd-on-settings"), "the page it asked for").toBeVisible({ timeout: 30_000 });
+  await ctx.close();
+});
+
