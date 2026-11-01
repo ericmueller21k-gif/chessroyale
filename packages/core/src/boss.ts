@@ -233,10 +233,11 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   { id: "folio", name: "Folio", icon: "📜", kit: "Folio", offset: 150, powers: { passive: "draft", ultimate: "crease" } },
   // Timber, a beaver builder in an orange hard hat (Eric's idea, Oct 20; his design approved Nov 1): Scraps, a workshop of five
   // pieces (pawn 2, knight 4, bishop 4, rook 6, queen 12 scraps) fed by a real-time meter (a scrap every 15 s) and 2 scraps a
-  // capture of his, a finished piece dropped onto an empty square of his half at the end of his turn (one a turn, a cap a
-  // battle); and Gnaw, after the usual warning, after his move: one of your pawns eaten, 8 scraps for the workshop
-  // (bosses/timber.ts; docs/decisions/2026-11-01-timber.md; reports/timber-sim.md). Admins first: BOSS_ADMIN_FIRST in
-  // settings.ts (the test links `?boss=timber`, `&power=scraps`, `&power=gnaw`).
+  // capture of his, a finished piece dropped onto an empty square of his half at the end of his turn (one a turn, 2 a battle,
+  // never leaving him more than a pawn ahead); and Gnaw, after the usual warning, after his move: one of your pawns eaten, 8
+  // scraps for the workshop (bosses/timber.ts; docs/decisions/2026-11-01-timber.md). The raid sim at the usual −250 and
+  // rageSpeed 0.7: the crowd scores 0.18 in 46 moves over 36 battles, in the pack (reports/timber-sim.md). Admins first:
+  // BOSS_ADMIN_FIRST in settings.ts (the test links `?boss=timber`, `&power=scraps`, `&power=gnaw`).
   { id: "timber", name: "Timber", icon: "🦫", kit: "Timber", offset: -250, powers: { passive: "scraps", ultimate: "gnaw" } },
   { id: "recluse", name: "Hidden Boss", icon: "📕", kit: "Hidden Boss", offset: 0, powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true, crowdFinal: true, the: true, levelUnknown: true },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },

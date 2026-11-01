@@ -78,7 +78,7 @@ describe("Timber's sheet", () => {
     expect(menuBosses({ admin: true, raid: false }).some((d) => d.id === "timber")).toBe(true);
   });
 
-  it("has Eric's numbers: a scrap every 15 s, 2 a capture, 8 a Gnaw; pawn 2, knight 4, bishop 4, rook 6, queen 12", () => {
+  it("has Eric's numbers: a scrap every 15 s, 2 a capture, 8 a Gnaw; pawn 2, knight 4, bishop 4, rook 6, queen 12 (the cap: the sim's)", () => {
     expect(S.scrapEverySec).toBe(15);
     expect(S.scrapsPerCapture).toBe(2);
     expect(S.gnawScraps).toBe(8);
@@ -175,7 +175,7 @@ describe("in a battle", () => {
     expect(board.bases?.at(-1)).toEqual({ ply: board.history.length, fen });
   });
 
-  it("drops at most one piece a turn, the first finished he can have, and starts its slot over", async () => {
+  it("drops at most one piece a turn, the first finished he can have that leaves him at most a pawn ahead, and starts its slot over", async () => {
     const b = battle(4);
     await crowdMove(b.r);
     const full = WORKSHOP_PIECES.map((p) => costOf(p));
@@ -183,9 +183,12 @@ describe("in a battle", () => {
     await b.r.playBoss(fakeEngine());
     const w = powersOf(b.r).workshop!;
     expect(w.drops).toBe(1);
-    expect(w.last!.piece).toBe("q");
-    expect(w.prog).toEqual([2, 4, 4, 6, 0]);
-    expect(w.done).toEqual([1, 0, 2, 3]);
+    // (His queen finished first, but she'd put him 5 pawns ahead (he's a knight and a pawn down): past workshopLeadMax, she waits.
+    // The knight, next, leaves him a pawn behind.)
+    expect(S.workshopLeadMax).toBe(1);
+    expect(w.last!.piece).toBe("n");
+    expect(w.prog).toEqual([2, 0, 4, 6, 12]);
+    expect(w.done).toEqual([4, 0, 2, 3]);
   });
 
   it("a capture of his: 2 scraps", async () => {

@@ -1379,7 +1379,7 @@ export const BOSS_POWERS = {
   revisionFrom: 5,
   /**
    * Timber's Workshop (his passive, Scraps; Eric, Nov 1; bosses/timber.ts; docs/decisions/2026-11-01-timber.md): one scrap
-   * every scrapEverySec seconds on the battle's clock (the real-time meter: the server's online, the page's visible time solo),
+   * every scrapEverySec seconds (Eric's 15; the cap, the lead guard and the Gnaw's pace are the sim's: reports/timber-sim.md) on the battle's clock (the real-time meter: the server's online, the page's visible time solo),
    * plus scrapsPerCapture for each capture of his. Each goes, at random, to one of the five pieces not yet finished; a piece is
    * finished at its cost (workshopCosts, in scraps). At the end of his turn one finished piece (the first finished that he can
    * have) is dropped onto an empty square of his half that you don't attack; at most workshopDropMax a battle (the sim's), then
@@ -1389,6 +1389,12 @@ export const BOSS_POWERS = {
   scrapsPerCapture: 2,
   workshopCosts: { p: 2, n: 4, b: 4, r: 6, q: 12 },
   workshopDropMax: 2,
+  /**
+   * A piece drops only while it leaves him at most workshopLeadMax pawns ahead of you on material (pawn 1, knight and bishop 3,
+   * rook 5, queen 9): he rebuilds what he lost rather than running away with the battle (the sim's call: free pieces with no
+   * limit decided nearly every battle; reports/timber-sim.md). One that would put him further ahead waits on the bench.
+   */
+  workshopLeadMax: 1,
   /** Timber's Gnaw (his ultimate, the rage meter's: rageSpeed.timber): after his move, one of your pawns eaten, gnawScraps scraps for his workshop. */
   gnawScraps: 8,
 } as const;

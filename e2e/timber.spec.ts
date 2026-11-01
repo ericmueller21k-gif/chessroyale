@@ -93,7 +93,7 @@ test.describe("Timber", () => {
     await expect(slots.locator(".ws-count")).toHaveText([/\/2$/, /\/4$/, /\/4$/, /\/6$/, /\/12$/]);
     await expect(page.locator(".ws-strip .ws-foreman canvas")).toBeVisible();
     await expect(slots.first()).toHaveClass(/done/);
-    // Scraps land while you think (a scrap every 15 s on the battle's clock).
+    // Scraps land while you think (a scrap every scrapEverySec on the battle's clock).
     const before = await strip(page);
     await expect.poll(() => strip(page), { timeout: 10_000 }).not.toBe(before);
     // Your move; his move, then his pawn drops on his half: the build moment, the plank on its square, the slot back to 0.

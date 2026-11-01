@@ -15,7 +15,9 @@
  *   have (never a position the engine refuses: a ninth pawn, more pieces than promotions could make), is dropped onto an empty
  *   square of his half (his own two back ranks first), the first of a seeded order the guards allow (the circus tiger's landing guards, `landCheck`: never
  *   the en passant square, a pawn never on a first or last rank, never a square you attack, never a check either way, never
- *   a mate in one for either side, never you without a move). At most one a turn; none allowed: it waits on the bench.
+ *   a mate in one for either side, never you without a move), and never one that would put him more than workshopLeadMax
+ *   pawns ahead of you on material (he rebuilds what he lost; the sim's call). At most one a turn; none allowed: it waits on
+ *   the bench.
  *   Its slot starts over at 0. A base at its ply.
  * - **The cap:** workshopDropMax drops a battle (the sim's); after the last the workshop closes (no more scraps; the strip
  *   greys). From the starting position nothing can drop until he has lost a pawn or a piece (a ninth pawn, a third knight
@@ -36,7 +38,7 @@ import { BOSS_POWERS, WORKSHOP_PIECES, type BossPowerSettings, type BossPowerSta
 import { BOSS_OPENING, newBoard } from "../boards.ts";
 import { kingAttackers, legalMoves, pieceAt, sideToMove, withoutPiece } from "../rules.ts";
 import { stockfishRefuses } from "../uci.ts";
-import { crowdHalf, from, meterFull, other, powerRoll, testSwitch, ticksAt, to, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
+import { VALUE, crowdHalf, from, materialOf, meterFull, other, powerRoll, testSwitch, ticksAt, to, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
 import { BALLOON_TEST_MOVES, landCheck, landRefused } from "./tiger.ts";
 
 // ---------------- His moments ----------------
@@ -56,7 +58,7 @@ export const TIMBER_ANIM = { scrap: 1190, build: 1630, buildDropAt: 860, gnaw: 1
  */
 export const TIMBER_FX = { build: TIMBER_ANIM.build, gnaw: 1500 + TIMBER_ANIM.gnaw } as const;
 
-type WorkshopSettings = Pick<BossPowerSettings, "scrapEverySec" | "scrapsPerCapture" | "workshopCosts" | "workshopDropMax" | "gnawScraps">;
+type WorkshopSettings = Pick<BossPowerSettings, "scrapEverySec" | "scrapsPerCapture" | "workshopCosts" | "workshopDropMax" | "workshopLeadMax" | "gnawScraps">;
 
 // ---------------- The workshop ----------------
 
@@ -295,6 +297,7 @@ export const timberBattle = {
     let fen = boardOf(b).fen;
     if (sideToMove(fen) !== boss.crowdSide || !legalMoves(fen).length) return null;
     const at = boss.crowdMoves;
+    const his = other(boss.crowdSide);
     const now = workshopAt(w0, b.now(), s);
     const w: WorkshopState = { ...w0, prog: now.prog, done: now.done, n: now.n, since: now.since };
     const open = !workshopClosed(w, s);
@@ -337,6 +340,8 @@ export const timberBattle = {
     if (open) {
       for (const k of finished(w.prog, w.done, s)) {
         const piece = WORKSHOP_PIECES[k]!;
+        // (Never past workshopLeadMax pawns ahead of you on material: he rebuilds, he doesn't run away with it.)
+        if (materialOf(fen, his) + VALUE[piece]! > materialOf(fen, boss.crowdSide) + s.workshopLeadMax) continue;
         const sq = dropSquare(fen, piece, w.wseed, w.drops);
         if (!sq) continue;
         setBoard(b, sq.fen);
