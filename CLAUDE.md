@@ -73,8 +73,10 @@ spelling in names too; older names (e.g. `colour`) stay until touched.
     once the boss kit lands): about 4 to 8 minutes in all (measured Oct 18: 3 m 44 s for the smoke set alone, 5 m 28 s
     for one boss's file). `e2e/areas.json` maps paths to specs; a shared
     foundation (package.json, the lockfile, the Playwright config, `packages/core`, the runner, the protocol, the board,
-    …) or a path it doesn't know runs the whole suite, and so does the `full-e2e` label. Every push to `main` runs the
-    whole suite, both projects, on 5 runners (about 17 minutes). `docs/areas/ops.md`, "CI e2e". A new boss (or any new
+    …) or a path it doesn't know runs the whole suite, and so does the `full-e2e` label. Settings, `e2e/helpers.ts` and
+    a few shared app modules are traced instead (Nov 1): the specs of whatever uses what the diff changes. Every push to
+    `main` runs the whole suite, both projects, on 5 runners (about 44 minutes), one run at a time (a newer push
+    waiting replaces an older one; the next run covers both). `docs/areas/ops.md`, "CI e2e". A new boss (or any new
     area) adds its paths and spec to `e2e/areas.json`, or its PRs keep running everything. CI retries a failed test
     once until the flaky-test batch lands (the goal is no retries); its `result` job lists flaky tests (passed only on
     the retry) first, then failed ones, each with its shard, `file:line`, project and error. Not a required check yet

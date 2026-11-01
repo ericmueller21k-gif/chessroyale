@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allWebgl, globToRegExp, MAX_SHARDS, plan, readAreas, readTimings, select, shardCount, specFiles, weigher, WEBGL_JOBS } from "../../../e2e/ci-select.mjs";
+import { allWebgl, globToRegExp, MAX_SHARDS, plan, readAreas, readModule, readTimings, select, shardCount, specFiles, traceModule, weigher, WEBGL_JOBS } from "../../../e2e/ci-select.mjs";
 
 /**
  * CI's e2e plan (e2e/ci-select.mjs, from e2e/areas.json; docs/areas/ops.md, "CI e2e"): a pull request runs the specs of
@@ -172,5 +172,123 @@ describe("the town on WebGL (areas.json, `webgl`)", () => {
     expect(JSON.parse(off.outputs.shards)).toEqual(Array.from({ length: Number(off.outputs.total) }, (_, i) => i + 1));
     expect(off.outputs.webgl).toBe("");
     expect(allWebgl(areas, all)).toEqual(gl);
+  });
+});
+
+describe("traced modules (areas.json, `traced`): a change followed through the code", () => {
+  // A small repo in memory: each file's text before and after the pull request (null: not there).
+  const repo = (files: Record<string, [string | null, string | null]>) => ({
+    before: (p: string) => files[p]?.[0] ?? null,
+    after: (p: string) => files[p]?.[1] ?? null,
+    grep: (words: string[]) => Object.keys(files).filter((p) => words.some((w) => new RegExp(`\\b${w}\\b`).test(files[p]?.[1] ?? ""))),
+  });
+  const same = (text: string): [string, string] => [text, text];
+  const SETTINGS = "packages/core/src/settings.ts";
+  const settings = (chat: number, autochess: number) =>
+    `// Every tunable.\nexport const QUICK_CHAT = { gapMs: ${chat} };\n\nexport const AUTOCHESS = {\n  /** Rounds. */\n  rounds: ${autochess},\n};\n\nexport type Settings = { a: number };\n`;
+  const base = {
+    "packages/core/package.json": same(JSON.stringify({ name: "@chessroyale/core", exports: { ".": "./src/index.ts" } })),
+    "packages/core/src/index.ts": same(`export * from "./settings.ts";\n`),
+    // Auto chess's own file reads AUTOCHESS; the lobby (a shared foundation) reads QUICK_CHAT, as does a unit test.
+    "packages/app/src/autochess/fight.ts": same(`import { AUTOCHESS } from "@chessroyale/core";\nexport const rounds = () => AUTOCHESS.rounds;\n`),
+    "packages/server/src/lobby.ts": same(`import { QUICK_CHAT, type Settings } from "@chessroyale/core";\nexport const gap = () => QUICK_CHAT.gapMs;\n// AUTOCHESS is named here only in a comment.\n`),
+    "packages/core/test/chat.test.ts": same(`import { QUICK_CHAT } from "../src/settings.ts";\nexport const x = QUICK_CHAT;\n`),
+  };
+  const autochess = ["e2e/autochess.spec.ts", "e2e/home-layout.spec.ts"];
+
+  it("a settings key: the specs of the areas whose files read it, plus the smoke set", () => {
+    const r = select([SETTINGS], areas, all, repo({ ...base, [SETTINGS]: [settings(3000, 5), settings(3000, 6)] }));
+    expect(r.full).toBeNull();
+    expect(r.specs).toEqual([...new Set([...smoke, ...autochess])].sort());
+    expect(r.why).toEqual([{ path: SETTINGS, runs: "changes AUTOCHESS; used by `packages/app/src/autochess/fight.ts` (AUTOCHESS): Auto chess, the demo" }]);
+  });
+
+  it("a settings key a shared foundation reads (or a file in no area): every spec, and the run says which", () => {
+    const r = select([SETTINGS], areas, all, repo({ ...base, [SETTINGS]: [settings(3000, 5), settings(3001, 5)] }));
+    expect(r.full).toBe("`packages/core/src/settings.ts` changes QUICK_CHAT, which `packages/server/src/lobby.ts` uses: a shared foundation");
+    const unknown = { ...base, "packages/app/src/brand-new.ts": same(`import { AUTOCHESS } from "@chessroyale/core";\nexport const n = AUTOCHESS;\n`) };
+    expect(select([SETTINGS], areas, all, repo({ ...unknown, [SETTINGS]: [settings(3000, 5), settings(3000, 6)] })).full).toMatch(/brand-new\.ts` uses: not in e2e\/areas\.json$/);
+  });
+
+  it("comments and types only: nothing runs but the smoke set", () => {
+    const after = settings(3000, 5).replace("/** Rounds. */", "/** Rounds a match lasts. */").replace("a: number", "a: number; b?: string");
+    const r = select([SETTINGS], areas, all, repo({ ...base, [SETTINGS]: [settings(3000, 5), after] }));
+    expect([r.full, r.specs]).toEqual([null, smoke]);
+    expect(r.why[0]?.runs).toBe("changes nothing that runs (comments, types); nothing else uses that");
+  });
+
+  it("a change it can't place runs everything: code outside a declaration, a module that doesn't read cleanly, or no diff to read", () => {
+    const loose = settings(3000, 5) + "QUICK_CHAT.gapMs = 1;\n";
+    expect(select([SETTINGS], areas, all, repo({ ...base, [SETTINGS]: [settings(3000, 5), loose] })).full).toMatch(/code outside any declaration changed/);
+    const broken = settings(3000, 6) + "export const S = `never closed;\n";
+    expect(select([SETTINGS], areas, all, repo({ ...base, [SETTINGS]: [settings(3000, 5), broken] })).full).toMatch(/doesn't read cleanly/);
+    expect(select([SETTINGS], areas, all, repo({ ...base, [SETTINGS]: [null, settings(3000, 5)] })).full).toMatch(/it's new/);
+    // (Without the repo, e.g. no base to diff: a shared foundation, as before.)
+    expect(select([SETTINGS], areas, all).full).toBe("`packages/core/src/settings.ts` is a shared foundation");
+  });
+
+  it("a helper in e2e/helpers.ts: the specs that call it (directly or through another helper), plus the smoke set", () => {
+    const HELPERS = "e2e/helpers.ts";
+    const helpers = (wait: number) =>
+      `import { expect, type Page } from "@playwright/test";\n\nexport async function openTown(page: Page) {\n  await page.goto("/town");\n  await page.waitForTimeout(${wait});\n}\n\nexport async function townAndChat(page: Page) {\n  await openTown(page);\n}\n\nexport const pickMode = async (page: Page) => expect(page).toBeTruthy();\n`;
+    const r = select(
+      [HELPERS],
+      areas,
+      all,
+      repo({
+        [HELPERS]: [helpers(100), helpers(200)],
+        "e2e/town.spec.ts": same(`import { openTown } from "./helpers.ts";\ntest("t", async ({ page }) => openTown(page));\n`),
+        "e2e/town-chat.spec.ts": same(`import { townAndChat as go } from "./helpers";\ntest("t", async ({ page }) => go(page));\n`),
+        "e2e/solo.spec.ts": same(`import { pickMode } from "./helpers.ts";\ntest("t", async ({ page }) => pickMode(page));\n`),
+      }),
+    );
+    expect(r.full).toBeNull();
+    expect(r.specs).toEqual([...new Set([...smoke, "e2e/town.spec.ts", "e2e/town-chat.spec.ts"])].sort());
+    expect(r.specs).not.toContain("e2e/solo.spec.ts");
+    // (town.spec.ts is one of the town's drawing specs: the WebGL jobs run too.)
+    expect(r.webgl.length).toBeGreaterThan(0);
+  });
+
+  it("a shared module (net.ts): the areas of the files that import what changed; one App.tsx imports runs everything", () => {
+    const NET = "packages/app/src/net.ts";
+    const net = (ms: number) =>
+      `import { crumb } from "./problems.ts";\n\nexport async function lobbyStatus(code: string) {\n  return fetch("/api/lobby/" + code, { signal: AbortSignal.timeout(${ms}) });\n}\n\nexport class NetMatch {\n  open() { crumb("open"); }\n}\n`;
+    const files = {
+      [NET]: [net(5000), net(4000)] as [string, string],
+      "packages/app/src/screens/Lobby.tsx": same(`import { lobbyStatus } from "../net.ts";\nexport const L = () => lobbyStatus("A");\n`),
+      "packages/app/src/App.tsx": same(`import { NetMatch } from "./net.ts";\nexport const m = () => new NetMatch();\n`),
+    };
+    const r = select([NET], areas, all, repo(files));
+    expect(r.full).toBeNull();
+    expect(r.specs).toEqual(expect.arrayContaining(["e2e/multiplayer.spec.ts", "e2e/lobby-close.spec.ts", ...smoke]));
+    expect(r.specs).not.toContain("e2e/home-layout.spec.ts");
+    const changedClass = net(5000).replace('crumb("open")', 'crumb("opened")');
+    expect(select([NET], areas, all, repo({ ...files, [NET]: [net(5000), changedClass] })).full).toBe(
+      "`packages/app/src/net.ts` changes NetMatch, which `packages/app/src/App.tsx` uses: it hands what it gets to every screen (areas.json, `traced.hubs`)",
+    );
+  });
+
+  it("a changed function's module state is changed too (what reads it, and who uses that)", () => {
+    const before = `let current = 0;\nexport function setCurrent(n: number) {\n  current = n;\n}\nexport function getCurrent() {\n  return current;\n}\nexport const LIMIT = 3;\n`;
+    expect(traceModule(before, before.replace("current = n;", "current = n + 1;")).names).toEqual(["getCurrent", "setCurrent"]);
+    expect(traceModule(before, before.replace("LIMIT = 3", "LIMIT = 4")).names).toEqual(["LIMIT"]);
+  });
+
+  it("reads modules as code: strings, templates, regular expressions and JSX don't hide or invent a change", () => {
+    const src = `const URL = "https://example.com"; // a comment\nexport const RE = /\\/\\/[a-z]+/g;\nexport const T = \`a \${URL} // not a comment\nexport const NOT_A_DECL = 1\n\`;\nexport const f = (x: number[]) => x[0]! / 2;\n`;
+    const m = readModule(src)!;
+    expect(m.map((s) => s.kind === "decl" && s.names[0])).toEqual(["URL", "RE", "T", "f"]);
+    expect(m[0]?.text).toBe('const URL = "https://example.com";');
+    // A change inside the template's text is the template's, not a new declaration's.
+    expect(traceModule(src, src.replace("NOT_A_DECL = 1", "NOT_A_DECL = 2")).names).toEqual(["T"]);
+    const tsx = `export function A() {\n  return (\n    <p>\n      Don't go to https://x.y/z <b>{n}</b>\n    </p>\n  );\n}\n// Next.\nexport const B = 1;\n`;
+    expect(readModule(tsx, "x.tsx")!.map((s) => s.kind === "decl" && s.names[0])).toEqual(["A", "B"]);
+    expect(traceModule(tsx, tsx.replace("https://x.y/z", "https://x.y/w"), "x.tsx").names).toEqual(["A"]);
+  });
+
+  it("the traced modules are shared foundations too, so without a diff they still run everything", () => {
+    const full = areas.full.map(globToRegExp);
+    for (const m of areas.traced!.modules) expect(full.some((re) => re.test(m)), m).toBe(true);
+    for (const h of areas.traced!.hubs ?? []) expect(full.some((re) => re.test(h)), h).toBe(false);
   });
 });

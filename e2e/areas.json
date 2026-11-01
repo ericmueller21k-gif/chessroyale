@@ -17,6 +17,21 @@
     "areas": ["the town square (/town)"],
     "specs": ["e2e/town.spec.ts", "e2e/town-desktop.spec.ts", "e2e/town-tags.spec.ts", "e2e/town-webgl.spec.ts"]
   },
+  "traced": {
+    "about": "Shared modules whose change is followed through the code instead of running everything (e2e/ci-select.mjs, traceChanges): the top-level declarations the diff changes (comments and types don't run), what in the module uses them, then the files that import the module (or its package's entry) and name one of them; each of those counts as a changed path here (its area's specs, a spec itself; a shared foundation or a path no area has runs everything). A user that is itself traced is followed the same way. A change it can't place (the module new or removed, code outside any declaration, a file it can't read as code) leaves the module in `full`: every spec. docs/areas/ops.md, 'CI e2e'; docs/decisions/2026-11-01-ci-selection.md.",
+    "modules": [
+      "packages/core/src/settings.ts",
+      "packages/core/src/boss.ts",
+      "e2e/helpers.ts",
+      "packages/app/src/net.ts",
+      "packages/app/src/solo.ts",
+      "packages/app/src/main.tsx",
+      "packages/app/src/board/OwnBoard.tsx",
+      "packages/app/src/account.ts"
+    ],
+    "hubs": ["packages/app/src/App.tsx"],
+    "hubsAbout": "A traced change that reaches a hub runs everything: App.tsx makes the matches and the account and hands them to every screen, so what it imports reaches every area, not only home's (a change to App.tsx's own code still runs home's specs, as before)."
+  },
   "full": [
     "package.json",
     "package-lock.json",
@@ -218,7 +233,7 @@
         "packages/app/src/boss-difficulty.ts",
         "packages/app/src/power-words.ts"
       ],
-      "specs": ["e2e/boss-select.spec.ts", "e2e/home-ranked.spec.ts", "e2e/boss-party.spec.ts"]
+      "specs": ["e2e/alfil.spec.ts", "e2e/boss-select.spec.ts", "e2e/home-ranked.spec.ts", "e2e/boss-party.spec.ts", "e2e/hopper.spec.ts"]
     },
     "Boss Battle's party (docs/decisions/2026-10-30-boss-party.md)": {
       "paths": [
@@ -467,7 +482,7 @@
         "packages/app/src/components/FrontMenu.tsx",
         "packages/app/src/home-art/**"
       ],
-      "specs": ["e2e/boss-select.spec.ts", "e2e/busy.spec.ts", "e2e/faq.spec.ts", "e2e/home-layout.spec.ts", "e2e/home-polish.spec.ts", "e2e/home-ranked.spec.ts", "e2e/legal.spec.ts", "e2e/matchmaking.spec.ts", "e2e/profile.spec.ts", "e2e/town-desktop.spec.ts"]
+      "specs": ["e2e/age-gate.spec.ts", "e2e/boss-select.spec.ts", "e2e/busy.spec.ts", "e2e/faq.spec.ts", "e2e/home-layout.spec.ts", "e2e/home-polish.spec.ts", "e2e/home-ranked.spec.ts", "e2e/kill-switches.spec.ts", "e2e/landing.spec.ts", "e2e/legal.spec.ts", "e2e/live-window.spec.ts", "e2e/matchmaking.spec.ts", "e2e/profile.spec.ts", "e2e/town-desktop.spec.ts"]
     },
     "the stylesheet (one file for every screen: the specs that measure layouts)": {
       "paths": ["packages/app/src/styles.css"],
@@ -479,6 +494,7 @@
         "e2e/boss-dock.spec.ts",
         "e2e/boss-select.spec.ts",
         "e2e/boss-side.spec.ts",
+        "e2e/chat.spec.ts",
         "e2e/eval-bar.spec.ts",
         "e2e/home-layout.spec.ts",
         "e2e/match-screen.spec.ts",
@@ -598,7 +614,7 @@
         "packages/app/src/components/ChatPicks.tsx",
         "e2e/public-profile-data.ts"
       ],
-      "specs": ["e2e/chat-mod.spec.ts", "e2e/fairplay.spec.ts", "e2e/friends.spec.ts", "e2e/profile.spec.ts", "e2e/public-profile.spec.ts", "e2e/ranked-1v1.spec.ts"]
+      "specs": ["e2e/chat.spec.ts", "e2e/chat-mod.spec.ts", "e2e/fairplay.spec.ts", "e2e/friends.spec.ts", "e2e/profile.spec.ts", "e2e/public-profile.spec.ts", "e2e/ranked-1v1.spec.ts"]
     },
     "friends": {
       "paths": [
