@@ -57,6 +57,8 @@ export function lobbyOptions(query: URLSearchParams, test: boolean): { overrides
       })(),
       roundsPerStage: n("rounds"),
       firstStageRounds: n("rounds"),
+      // (The same rounds in every stage: the Crowd's own schedule, `stageRounds`, emptied.)
+      stageRounds: n("rounds") ? [] : undefined,
       moveClockSeconds: n("clock"),
       finalMaxTurns: n("finalTurns"),
       bossMaxMoves: n("bossMoves"),

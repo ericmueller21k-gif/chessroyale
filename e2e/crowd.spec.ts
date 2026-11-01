@@ -49,8 +49,11 @@ test("narrow phones: the top bar's numbers stay clear of the options button, and
     });
     expect(bar.spill, `${device}: ${bar.text}`).toBeLessThanOrEqual(0);
     expect(bar.clear, `${device}: the cut pill runs under the options button`).toBeGreaterThanOrEqual(0);
-    expect(bar.labelCut, `${device}: "Move 34 · cut in 2" is cut short`).toBe(false);
-    // Play to the first cut (up to 16 go out: ties at the line go through) and hold it there. You play the engine's best
+    expect(bar.labelCut, `${device}: "Move 34 · cut now" is cut short`).toBe(false);
+    // The countdown is in moves, as the board counts them (Nov 1): with ?rounds=2 a stage is one move, so this one is the
+    // cut's ("cut now"; counting plies, it said "cut in 2").
+    expect(bar.text, device).toContain("cut now");
+    // Play to the first cut (up to 30 go out: ties at the line go through) and hold it there. You play the engine's best
     // move, so you go through: nobody's pick scores better than yours, and you start well above your team's line. (A
     // bot's pick, which this copied before, is now and then a random legal move, `botRandomMoveChance`; one put you out,
     // and then the first name listed is yours, "You" in red and not struck through, by design.)
@@ -179,7 +182,7 @@ test("online, once you're out, a later cut says so (not \"You're through\") and 
 test("Crowd 50 v 50: plays your team's turns, watches the other team's, survives cuts, through the team final to results", async ({ page }) => {
   test.setTimeout(10 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
-  // Two rounds a stage, as in a real match (a cut after every move: one ply for each team). With one, a stage is a
+  // Two rounds a stage (one move: one ply for each team; a real match's are longer, CROWD_STAGE_ROUNDS). With one, a stage is a
   // single ply, so at the first cut the team that hasn't moved yet is all tied on 0 and its cut is a coin flip: you
   // could go out before ever playing.
   await page.goto("/?debug&pace=quick&mode=crowd&rounds=2&clock=20&augments=0&finalTurns=12");

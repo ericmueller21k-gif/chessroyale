@@ -77,7 +77,8 @@ export function Hud({ match, stripFrozen = false, keepTitle = false }: { match: 
   const p = match.phase;
   const fen = "board" in p && p.board ? p.board.fen : null;
   const moveNo = fen ? Number(fen.split(" ")[5]) || 1 : null;
-  const turnsLeft = roundsInStage(match.settings, match.stage) - match.roundsPlayed;
+  // (In moves, as the board counts them: a round is one team's turn, so two make a move. "cut now": this move is the last.)
+  const movesLeft = Math.ceil((roundsInStage(match.settings, match.stage) - match.roundsPlayed) / 2);
   const team = view.teamLabel ? (alive.find((s) => s.isYou)?.team ?? null) : null;
   // A boss battle on a computer with a mouse (Nov 1, Eric: "completely gone from the top"): no title line. The boss's bar
   // is the top of the screen and says the move; the ⚡, the fish and the gear go at the top of the column beside the board
@@ -108,7 +109,7 @@ export function Hud({ match, stripFrozen = false, keepTitle = false }: { match: 
                   <span>{moveNo ? `Move ${moveNo}` : "Crowd"}</span>
                   <span class="muted">
                     <span class="hud-dot"> · </span>
-                    {turnsLeft <= 1 ? "cut now" : `cut in ${turnsLeft}`}
+                    {movesLeft <= 1 ? "cut now" : `cut in ${movesLeft}`}
                   </span>
                 </span>
               </>

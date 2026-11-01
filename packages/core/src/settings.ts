@@ -295,6 +295,12 @@ export interface Settings {
   roundsPerStage: number;
   /** Rounds in stage 1, before the first cut: longer, so one bad start doesn't knock anyone out. */
   firstStageRounds: number;
+  /**
+   * Rounds in each knockout stage in turn, when a mode's stages differ (Crowd 50 v 50: CROWD_STAGE_ROUNDS); the last entry
+   * covers later stages. Set and not empty, it replaces `firstStageRounds` and `roundsPerStage` (`roundsInStage`); a
+   * test's `?rounds=` empties it.
+   */
+  stageRounds?: readonly number[];
   /** Players knocked out at the end of each knockout stage; the 2v2 final follows. */
   knockoutsPerStage: readonly number[];
   scoresBetweenStages: ScoreCarry;
@@ -409,7 +415,9 @@ export interface CrowdScoring {
 export const CROWD_SCORING: CrowdScoring = {
   cap: [2, 3.5, 5, 8],
   capCurve: "ratio",
-  capFrom: [0, 1, 5, 9],
+  // ±3.5 from cut 1 (move 11), ±5 from cut 2 (move 16), ±8 from cut 3 (move 20) and in the endings: about where they
+  // came when a cut followed every move (moves 11, 15, 19; the cuts changed on Nov 1, docs/decisions/2026-11-01-crowd-cuts.md).
+  capFrom: [0, 1, 2, 3],
   uncapPawns: 3,
   sharedFrom: 5,
   sharedMin: 3,
@@ -432,7 +440,7 @@ export const CROWD_SCORING: CrowdScoring = {
  * A raid's scoring (Eric, Oct 25: "Raids should use the 50 v 50 math: the dampers and the early forgiveness";
  * docs/decisions/2026-10-25-raid-scoring.md, measured in reports/raid-scoring.md): 50 v 50's, but a raid has no cuts, so
  * the cap widens by the crowd's move (`capFromMove`): +-2 for the first 10 crowd moves, as 50 v 50's first 10 picks,
- * then +-3.5, +-5 and +-8 on the same picks as 50 v 50's cuts 1, 5 and 9. A raid often plays on in a decided game, where
+ * then +-3.5, +-5 and +-8 from picks 11, 15 and 19 (where 50 v 50's cuts 1, 5 and 9 came until Nov 1; its cuts 1, 2 and 3 now). A raid often plays on in a decided game, where
  * every move is "strong", so a move counts for streaks only when the crowd gave away `streakMinAverage` points or more on
  * average. No bubble: nothing is cut. The boss's strike still goes by the points given away (strikeVictim), never by
  * these. Boss alone keeps the old scoring (BOSS_ALONE_SCORING).
@@ -594,9 +602,9 @@ export const MAX_OPENING_MOVES = 10;
 /** Plies of opening on a board where White starts (Black-start boards get one more). */
 export const openingPlies = (s: Pick<Settings, "openingMoves">) => 2 * Math.max(0, Math.min(MAX_OPENING_MOVES, Math.round(s.openingMoves)));
 
-/** Rounds in a knockout stage (stage 0 is the longer first one). */
-export const roundsInStage = (s: Pick<Settings, "roundsPerStage" | "firstStageRounds">, stage: number) =>
-  stage === 0 ? s.firstStageRounds : s.roundsPerStage;
+/** Rounds in a knockout stage: `stageRounds`' entry when the mode has a list, else the longer first one, then `roundsPerStage`. */
+export const roundsInStage = (s: Pick<Settings, "roundsPerStage" | "firstStageRounds" | "stageRounds">, stage: number) =>
+  s.stageRounds?.length ? s.stageRounds[Math.min(stage, s.stageRounds.length - 1)]! : stage === 0 ? s.firstStageRounds : s.roundsPerStage;
 
 /**
  * The opening allowance (Eric, Oct 15, 2026; docs/decisions/2026-10-15-opening-allowance-and-ties.md): early in a game a
@@ -618,19 +626,29 @@ export const OPENING_ALLOWANCE = {
 /**
  * Crowd 50 v 50 knockouts for each way to end: they leave 8 (team final), 4 (the boss final, against the Hidden Boss) or
  * 2 (duel); `crowdFinalists` says how many. The boss final's are the duel's cuts stopping at four (Eric, Oct 14: "the top
- * four always battle versus [him]"; it was the top 10 against a random boss).
+ * four always battle versus [him]"; it was the top 10 against a random boss). Fewer, bigger cuts (Eric, Nov 1: "we need
+ * fewer eliminations, but we can eliminate more players"): 100 → 70 → 48 → 32 → 20 → 12 → 8 (team final) → 4 (boss
+ * final) → 2 (duel), half of each cut from each team. Each cut comes after CROWD_STAGE_ROUNDS' stage.
+ * docs/decisions/2026-11-01-crowd-cuts.md.
  */
 export const CROWD_KNOCKOUTS: Record<FinalFormat, readonly number[]> = {
-  team: [16, 14, 12, 10, 8, 8, 6, 6, 4, 4, 4],
-  boss: [16, 14, 12, 10, 8, 8, 6, 6, 4, 4, 4, 2, 2],
-  duel: [16, 14, 12, 10, 8, 8, 6, 6, 4, 4, 4, 2, 2, 2],
+  team: [30, 22, 16, 12, 8, 4],
+  boss: [30, 22, 16, 12, 8, 4, 4],
+  duel: [30, 22, 16, 12, 8, 4, 4, 2],
 };
 
 /**
+ * Crowd 50 v 50: the rounds (plies: a move is one from each team) before each cut, CROWD_KNOCKOUTS' stages in order:
+ * cuts after moves 10, 15, 19, 23, 26 and 29 (the team final), 32 (the boss final) and 34 (the duel). Longer rounds, so
+ * the chess has room between cuts (Eric, Nov 1: "it takes away from the chess game because there's too many cuts").
+ */
+export const CROWD_STAGE_ROUNDS: readonly number[] = [20, 10, 8, 8, 6, 6, 6, 4];
+
+/**
  * Crowd mode: 100 players, 50 v 50, on one board from the starting position; each team picks its side's moves and the
- * most popular pick is played. No cuts for the first 10 moves (20 plies), then a cut after every move (2 plies, half
- * from each team) down to the ending the pre-game vote picked (CROWD_KNOCKOUTS). Scores carry over all game (a stage
- * is only one move long). 3 power-ups, none earned.
+ * most popular pick is played. No cuts for the first 10 moves, then a cut every 2 to 5 moves (CROWD_STAGE_ROUNDS, half
+ * of each cut from each team) down to the ending the pre-game vote picked (CROWD_KNOCKOUTS). Scores carry over all game.
+ * 3 power-ups, none earned.
  */
 export const CROWD_SETTINGS: Partial<Settings> = {
   mode: "crowd",
@@ -640,6 +658,8 @@ export const CROWD_SETTINGS: Partial<Settings> = {
   groupSize: 100,
   knockoutsPerStage: CROWD_KNOCKOUTS.team,
   finalFormat: "team",
+  stageRounds: CROWD_STAGE_ROUNDS,
+  // (Used only when `stageRounds` is emptied: a test's ?rounds=, which sets both.)
   firstStageRounds: 20,
   roundsPerStage: 2,
   scoresBetweenStages: "carry",
@@ -686,6 +706,8 @@ export const RAID_SETTINGS: Partial<Settings> = {
   lobbySize: 50,
   groupSize: 50,
   knockoutsPerStage: [],
+  // (No cuts, so no Crowd schedule: firstStageRounds as before.)
+  stageRounds: [],
   openingMoves: 5,
   powerUpsAtStart: 0,
   bossAloneClock: true,

@@ -56,6 +56,7 @@ import {
   isPlayable,
   maiaTopRating,
   rankedMinHumans,
+  roundsInStage,
   kingCharges,
   lastStandBar,
   liveStrip,
@@ -213,6 +214,12 @@ function modes(src: FaqSources): FaqSection {
     return o ? `**${o.label}**` : timeControl(p);
   };
   const teamSizes = S.teamFinalSizes.map((x) => `${x}v${x}`);
+  // The cuts (CROWD_KNOCKOUTS, CROWD_STAGE_ROUNDS): how many go at each and after which move the teams play (a stage's
+  // rounds are plies, one move from each team). The team final's cuts, then the ones the boss final and the duel add.
+  const cutAfter = (i: number) => Math.ceil(sum(Array.from({ length: i + 1 }, (_, j) => roundsInStage(C, j))) / 2);
+  const andList = (xs: readonly string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}` : (xs[0] ?? ""));
+  const TK = src.crowdKnockouts.team;
+  const cutsFrom = (f: FinalFormat, from: number) => andList(src.crowdKnockouts[f].slice(from).map((k, i) => `${k} after move ${cutAfter(from + i)}`));
   // The start vote's options by their id (their labels and opening moves from the vote's data).
   const SV = src.startVote;
   const startBy = (id: string) => SV.options.find((o) => o.patch.crowdStart === id);
@@ -230,7 +237,7 @@ function modes(src: FaqSources): FaqSection {
 
 - **${C.lobbySize} players, one game of chess**, from the first move. Two teams of ${team}: your team plays White or Black all game.
 - Each turn, everyone on the side to move picks a move before the clock runs out, and the **most popular pick is played** (a tie is settled at random).
-- Every pick is scored (see [How your moves are scored](#scoring)). No one goes out for the first ${n(C.firstStageRounds / 2, "move")}; after that, the lowest scorers are cut after every move, the same number from each team. Scores carry over all game.
+- Every pick is scored (see [How your moves are scored](#scoring)). No one goes out for the first ${n(cutAfter(0), "move")}. Then the lowest scorers are cut, the same number from each team: ${cutsFrom("team", 0)}, which leaves ${left(TK)} for the team final. A boss final adds ${n(src.crowdKnockouts.boss.length - TK.length, "more cut")} (${cutsFrom("boss", TK.length)}); a duel adds ${n(src.crowdKnockouts.duel.length - TK.length, "more cut")} (${cutsFrom("duel", TK.length)}). The moves count from the first one the teams play (a Random opening's own moves don't count). Scores carry over all game.
 - **A tie at the cut line goes through:** everyone tied exactly with the last player through stays in, and the cuts still to come take the extra, a little at each. So does anyone within ${n(src.crowdScoring.cutGrace, "point")} of that player ([the bubble](#crowd-scoring)). Only the last cut before the ending breaks a tie, so the ending has its size: fewer points given away before the [opening allowance](#opening-allowance) go through, then less thinking time.
 - **You vote on the ending** before move 1: a team final (the top ${left(src.crowdKnockouts.team)} play on: ${teamSizes.slice(0, -1).join(", ")}, then ${teamSizes.at(-1)} to the end), a boss final (the top ${left(src.crowdKnockouts.boss)} team up against ${finalFoe}) or a duel (the best of each side, 1v1). Then on how it starts, then on the clock.
 - **How it starts**, voted on before move 1: ${startLabel("normal")}, the usual starting position; ${startLabel("random")}, a real, balanced opening already ${n(randomMoves, "move")} in for each side, so the game picks up at move ${randomMoves + 1}; or ${startLabel("freestyle")}: the pieces on the back row start shuffled, the same for both sides and different every game. To castle in Freestyle, move your king onto its rook: the king lands on the g- or c-file with the rook beside it, as usual. Nobody voting means ${SV.options[SV.defaultOption]?.label}. Both teams play from that start; a boss final is played from the usual starting position.
