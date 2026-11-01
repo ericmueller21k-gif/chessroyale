@@ -12817,6 +12817,12 @@ img.qicon {
   border-radius: 7px;
   background: color-mix(in srgb, var(--accent) 24%, transparent);
 }
+/* (Under 360 px the header's four buttons are 28 px wide, so the fold arrow stays in the box at 320.) */
+@media (max-width: 359px) {
+  .qchat-tab .qhead .qhead-btn {
+    width: 28px;
+  }
+}
 .qpick-btn:disabled {
   opacity: 0.35;
   cursor: default;
