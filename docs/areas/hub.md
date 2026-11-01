@@ -46,7 +46,14 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     (a bit above the middle, so the lower half of the picture shows) and the gold ring over the picture. **Two pictures, picked at random
     as the page loads, 50/50** (`pickTownPicture` in `home-art/town.ts`; `?town=A` or `?town=B` in the address forces one, for stills
     and tests: anyone's address, not a gated test switch): **A**, the skyline (the tower, the houses, the trees), and **B**, the square
-    (the shops, the table with its two pawns, the lamps, a bird). The dusk sky behind them is the same in the light and the dark theme.
+    (the shops, the table with its two pawns, the lamps, a bird). **Three skies by the device's clock** (Nov 1,
+    [docs/decisions/2026-11-01-chess-town-skies.md](../decisions/2026-11-01-chess-town-skies.md); `skyAt` and `pickSky` in `home-art/town.ts`,
+    the hours in `TOWN_SKY_HOURS`; `?sky=day|dusk|night` forces one, `?night=1` is night): **day** 06:00 to 17:00 (a light-blue sky, the town in
+    fuller colors, the windows unlit glass), **dusk** 17:00 to 19:00 (the pictures as drawn, the dusk sky), **night** 19:00 to 06:00 (a deep
+    night-blue sky, the town darker and cooler, the windows and lamps lit warm, a dozen fixed stars and a glow round the lamp). The look is a
+    palette swap of the same drawings (`townLook` in `home-art/looks.ts`: the same parts at the same places, the same idle loop; only the night
+    adds loose pixels, on pixels that are empty in every frame), picked once as the page loads, so it never swaps while you look; the sky is
+    `.fd-town[data-sky]` in `styles.css`. The same in the light and the dark theme.
     The scene (`Scene` in `home-art/Pic.tsx`, its math `sceneLayout` in `home-art/layout.ts`, unit-tested) is drawn on a canvas,
     nearest-neighbor, at the biggest whole-pixel scale whose height fits the button (3 css px an art pixel on a phone, 2 on a computer; B's
     plain last 3 rows are cut when the box is a little short), down on the button's foot and centered; where the button is wider than the
@@ -325,7 +332,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   `/bosses` fitting 1280×600 to 1920×1080 and phones at 320-390 px, its last row reachable; one number per boss, the
   stage's and the menu's and the battle's), `landing.spec.ts`, `home-layout.spec.ts`, `live-window.spec.ts`, `profile.spec.ts`, `public-profile.spec.ts` (the public profile on a phone and a computer at 1280 and 1440: every card, the 1v1 menu with the card the same height in every mode, the icon behind the pawn, the level line, nothing shifting while it loads, your own page greyed, Challenge, Add Friend, Block and Report),
   `profile.spec.ts` also checks that home's pawn and your ring ride your ride in the same boxes (Nov 1), at a smaller ride too (`?rideScale=0.75`); `crate-banner.spec.ts` also the crate pages' gambling warning (shop.md);
-  unit: `packages/app/test/home-art.test.ts` (the 50/50 pick and `?town=`, the scene's whole-pixel layout at phone, computer and short-laptop sizes, the four drawings' frames);
+  unit: `packages/app/test/home-art.test.ts` (the 50/50 pick and `?town=`, the scene's whole-pixel layout at phone, computer and short-laptop sizes, the four drawings' frames, the clock's three skies and `?sky=`, and that each look keeps every pixel in its place); `home-polish.spec.ts` also checks Chess Town's button under the three skies (the clock's edges, `?sky=`, nothing moving, no swap while you look);
   `install.spec.ts`, `crate-banner.spec.ts`, `friends.spec.ts` (two players: request, accept, online, the invites
   setting, an invite joined from its toast, a block; the phone's line at 320 px), `eval-bar.spec.ts` (testers: the
   switch in Settings only, the board's room, phone and computer; players: no bar, no switch), `piece-sounds.spec.ts`
