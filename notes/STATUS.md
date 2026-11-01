@@ -70,3 +70,8 @@ changed) → Maia bots (/home/user/cr-maia-bots, stopped mid-work, 14 files) →
   Lights Out prompt (.pm-line.lo-line, bottom:101% of the board, cqw-sized) pokes above the screen top on its first
   frame at the player-size board; SpeechBox's fit check runs once at mount (useLayoutEffect [fit]) and misses a later
   layout change. Main flaky on the same test. NEXT Opus helper after the Timber Haiku fix (one at a time).
+- ~22:20 UTC: #452 MERGED 97e49bd (main red fix). #450 Timber r2 (Haiku) 4e7a1df: beside the board on a computer + recluse.test list; CI.
+  #447 round 5 592caf8: SpeechBox into-view move rounds away from the edge (Hollow prompt 0.25 px above); CI.
+  #451 crowd panel: CI. Cuts and Maia WIP committed+pushed (claude/crowd-cuts, claude/maia-bots).
+  NOW RUNNING (the one Opus): cuts round 2 (handoff notes/briefs/handoff-cuts-r2.md). Next: Maia bots round 2.
+  Eric open questions: Timber lead rule OK?; solo 50v50 chat column on computer?; move Folio/Babur/Moo corner casts beside the board?
