@@ -121,7 +121,7 @@
     "packages/app/public/licenses/**",
     "packages/app/god-king-preview.html",
     "packages/app/items-preview.html",
-    "packages/app/rides-bake.html",
+    "packages/app/rides-measure.html",
     "packages/app/src/dev/**",
     "packages/maia-worker/LICENSE",
     "packages/maia-worker/licenses/**",

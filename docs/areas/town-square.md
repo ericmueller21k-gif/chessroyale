@@ -93,7 +93,8 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   down; up on the same thing releases it with one short pulse of that border (brighter, a little wider, fading) and you
   set off; moving past `dragPx` first lets it go (no pulse, no walk) and becomes a
   look-around drag. No sound and no vibration (Eric). A small gold ring marks your destination until you arrive. As you
-  run you leave about three soft white droplets on the squares you leave, fading out in about half a second (yours only).
+  run you leave about three soft white droplets on the squares you leave, fading out in about half a second (yours only); on a
+  ride with a trail, its own mark instead (Nov 1: "Rides", below).
   All their numbers are in `feel.ts`.
 - **One pawn a square, like chess** (`world.ts`): a walk may pass through people, but nobody ends on a square someone
   stands on or is headed for (`taken`: a walker's goal). A free square is its own end; a taken one, a person or a boss
@@ -361,28 +362,36 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   shadows are a bot's, sized from the pawn rather than the margin your items are drawn in.
 
 - **Rides** (Oct 31, Eric: "a GIF of it running around town with a piece mounted to it… and then… an idle animation, the usual";
-  docs/decisions/2026-10-31-rides.md). A pawn wearing a ride (crates.ts's `ride` slot: Riding Chirp, Moon's Ride; shop.md, "Rides")
+  docs/decisions/2026-10-31-rides.md; Nov 1, every boss's, with views and trails: docs/decisions/2026-11-01-rides-v2.md). A pawn
+  wearing a ride (crates.ts's `ride` slot: sixteen, all admin-only for now; shop.md, "Rides")
   sits on it: yours, a bot's or a test player's as others see them (any `PawnLook` whose `wear` has a ride; real players later), the
   ride's **idle** standing and its **move** walking, **one cycle a step** (the art's frame times scaled to the step: 90 ms yours, 200 a
   bot's; the walk keeps its pace), lifted by the move's hop (the grasshopper's) instead of the hobble, its shadows shrinking with it;
-  mirrored facing left as a pawn is. The pawn keeps its size (the ride is drawn at the pawn's scale) and its ride stands on the square's
+  mirrored facing left as a pawn is. **Its view** (Nov 1, Eric: "a run up and a run down"): walking left or right its side, up the
+  screen its back, down the screen its front (never mirrored); standing, the idle of the view it last walked in (`Walker.view`), for
+  you and everyone else alike; a ride without views (Moon's Ride) keeps its side. From behind, the pawn's face items don't show (its
+  hat does: the back view carries the pawn dressed without its face slot). **Its trail** (Nov 1; Eric: "Chirp's… definitely the way to
+  go"): while you run on a ride with a `trail`, each square you leave gets its mark, on its own times and fade (`trail.ms`), pointing the
+  way you went (the side's mirrored going left), at the ride's size, **in place of the droplets**; standing, none come; yours only, as
+  the droplets are. No ride, or Moon's Ride: the droplets. **Its pace**: `RIDES.speed` in settings, one number a ride (Cheetah Shoes
+  2): a step takes `youStepMs` (or a bot's `botStepMs`) over it. The pawn keeps its size (the ride is drawn at the pawn's scale) and its ride stands on the square's
   middle (its feet, the moon's shadow: `TOWN_FEEL.rides`). **Its name tag sits over the highest of the ride and the pawn standing** (a
   hat, the moon's stars) and doesn't jump with the hop, as a sidekick's doesn't; the card sits over it as over any tag; tags and the
   bubble are drawn after every figure, so a ride never covers one. Seated at a table, the pawn sits as before, without its ride.
-  **Drawn as a pawn is: one picture a frame.** Each ride's frames are baked in every color (`scripts/bake-rides.ts`:
-  `town/rides/ride-<ride>-<color>.webp`, lossless, rows idle back, idle front, move back, move front, at the dressed pawns' 160
-  pixels a pawn; `town/ride-sheets.ts`: the cell, the times, where the pawn sits on each frame, the move's lift, a hash a test
-  checks). The town fetches the one sheet a rider wears (not precached: vite.config.ts) and decodes it off the page's thread
-  (`createImageBitmap`); then the rider's frames are composed straight from it (its back, the rider's pawn on its seat, its front:
-  source rectangles), one frame an animation frame (`Rider` in `town/rides.ts`), and the sheet is let go (a failed fetch is
-  forgotten, so a later rider tries again). Until that's done (about a third of a second) the person walks on foot. **Riders who
-  look the same share one set of frames** (the ride, its color, the pawn's side, tint and items: `shareRider`), each set freed when
-  no one rides on it and all of them when the town closes (`dropRiders`). A ride shows its color, not its purity's blotches or its
-  shine (the sheets are per color: the corner cut for the frame rate). **Taps** take only the pawn's own box across (as on foot), not
+  **Drawn as a pawn is: one picture a frame.** Nothing is fetched for a ride (Nov 1: the baked WebP sheets, 2 MB for two rides, are
+  gone). A rider's frames are composed once from the ride's own drawing (`components/rides/draw.tsx`: each layer of each frame as SVG,
+  made into an image, in the ride's colors at the rider's size, as `dressedPawn` makes your dressed pawn), with the pawn on its seat
+  (its back, the pawn, its front), **one frame an animation frame** (`Rider` in `town/rides.ts`), every view, then its trail marks; each
+  view's box comes from `town/ride-cells.ts` (measured ahead by `scripts/measure-rides.ts`; a hash test keeps it fresh). Until that's
+  done (about 2 s on a phone) the person walks on foot. A picture that fails is forgotten, so a later rider tries again. **Riders who
+  look the same share one set of frames** (the ride, its colors, the pawn's side, tint and items, its size: `shareRider`), each set freed
+  when no one rides on it and all of them when the town closes (`dropRiders`). A ride shows its colors (both, for a two-color ride),
+  not its copy's blotches or its shine (the sets are shared by color). **Taps** take only the pawn's own box across (as on foot), not
   the ride's reach, so a tap on the square beside a rider walks there; a rider is drawn from 1.5 squares off the box's sides (a pawn
   from 1; more for a ride drawn bigger than 1), its ride reaching about 1.46 squares from its foot.
   **Each ride's size** (Nov 1, Eric: "scale down the riders with just a button so to speak… I wanna see it at 75%";
-  docs/decisions/2026-11-01-ride-scale.md): `RIDES.scale` in core's settings, one number a ride (1 for now). The ride is drawn at that
+  docs/decisions/2026-11-01-ride-scale.md): every ride 0.75 (`RIDES.defaultScale` in core's settings, Nov 1, Eric: "0.75 is good";
+  `RIDES.scale` for a ride that differs). The ride is drawn at that
   size about its saddle (its first idle frame's: `components/rides/scale.ts`) under a pawn of the usual size, which still sits in the
   saddle (each frame's seat moves with the scaled saddle; the same share of the pawn hidden in it) while the ride stands on the square,
   its hop and its shadow scaled too; worked out once as a rider's frames are composed, nothing per frame. The same everywhere a rider
@@ -390,8 +399,8 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   size; the item's own tile keeps 1). **`?rideScale=K`** (0.5 to 1.25), a test switch (admins on the live site): every ride on that
   page at K, to try sizes; read once as the page opens (`test-switches.ts`).
   Test hook: `__townRide()` (yours: its ride, color and size, ready, the
-  animation and frame the last frame drew, which way it faced, your box, foot and head on screen; every other rider's; and the sets
-  of frames and sheets held); `__townAt("square", [c, r])` says where a square is on screen; `__townPlayer(…, wear)` dresses the
+  animation, frame and view the last frame drew, which way it faced, your box, foot and head on screen, your step's time, your trail's
+  marks and droplets showing; every other rider's, with its step's time; and the sets of frames held); `__townAt("square", [c, r])` says where a square is on screen; `__townPlayer(…, wear)` dresses the
   test player (a ride too).
 - **The bots and playing them** (Oct 27, Eric: "a few bots… with different skill level… if you tap them you can invite
   them to a game and then you both run over to the chessboard"; `docs/decisions/2026-10-27-town-bots.md`). **Twenty bots
@@ -507,7 +516,7 @@ noted wherever a slice changed one.
 
 - `packages/app/src/town/`: `TownPage.tsx` (the lazy load, and on a computer the frame round it), `Town.tsx` (the screen, the loop, input, chips, cards, the sky's
   clock, the statues' close-up, the backend and its fallbacks), `press.ts` (a finger as a button), `camera.ts`, `world.ts`, `render.ts`, `paint.ts` (the drawing layer; Canvas 2D),
-  `paint-gl.ts` (its WebGL 2 backend), `you-look.ts`, `rides.ts`, `ride-sheets.ts` and `rides/*.webp` (the rides' baked frames, generated), `sky.ts`, `sky-draw.ts`, `sign-font.ts`, `feel.ts`, `town.css`, `chat.ts`, `TownChat.tsx` and `town-chat.css` (the chat log), `houses/`
+  `paint-gl.ts` (its WebGL 2 backend), `you-look.ts`, `rides.ts`, `ride-cells.ts` (the rides' views measured, generated), `sky.ts`, `sky-draw.ts`, `sign-font.ts`, `feel.ts`, `town.css`, `chat.ts`, `TownChat.tsx` and `town-chat.css` (the chat log), `houses/`
   (one file per home, fourteen in all, the Colosseum's `coliseum.ts`, the park's `park.ts`, the kit of shared pieces and the index),
   `sidekick-sheets.ts` and `sidekicks/*.png` (the sidekicks' baked frames, generated), `CardIcons.tsx` (the card's crossed swords and
   rating bars, inline SVG).
@@ -550,17 +559,23 @@ noted wherever a slice changed one.
   always fit), the layout
   (fourteen homes 8 to 10 squares from their nearest neighbors, none near the start, the Colosseum's ground and the park
   clear, and the start south of it on the park's promenade), the walk around a home, and the eased steps meeting the even ones at the same speed.
-- `packages/app/test/town-rides.test.ts` (Oct 31, rides; Nov 1, sizes: the ride scaled about its saddle, the pawn its size on it,
-  the ride on the square): every ride item has a drawing and a sheet; each sheet is its ride as drawn now,
-  in every color (the hash: run `npx tsx scripts/bake-rides.ts` after a change), whole (its size read from its file's header), its
-  times, seats and lift the drawing's; a rider stands its ride's feet on the square's middle, its tag over the higher of the ride and
-  its pawn; its idle on its own times and its move one cycle a step in its drawn shares; a walker's step progress; riders who look the
-  same share one set of frames and one sheet, freed by the last one out and by the town's close; a sheet that doesn't come is
-  forgotten, so the next rider fetches it again.
-- `e2e/town.spec.ts`, "rides (Oct 31)" (phone and desktop): wearing Riding Chirp, only its color's sheet is fetched; standing, its idle
-  frame after frame; a tap on the square beside you walks you there, either way; walking right then left, its move facing each way
-  (watched every frame); stopped, the idle facing left; your tag over your head; a test player on Moon's Ride drawn riding, its tag
-  over it; with `?rideScale=0.75` (Nov 1) your ride at 0.75, your tap box as wide, the picture shorter, your head lower, the tag over it.
+- `packages/app/test/town-rides.test.ts` (Oct 31, rides; Nov 1, sizes; Nov 1, every boss's with views and trails): every ride item
+  has its drawing (its name and line the drawing's) and its measured views, every drawing is a ride item; all but Moon's Ride have a
+  back, a front and a trail inside the art's limits; the cells are each drawing as drawn now (the hash: run
+  `npx tsx scripts/measure-rides.ts` after a change); every ride 0.75 by one default, Cheetah Shoes' speed 2; in each view a rider
+  stands its ride's feet on the square's middle, its tag over the higher of the ride and its pawn, its times and lift the view's; from
+  behind it carries the pawn without its face items; at a size, the ride scaled about its saddle, the pawn its size on it, the ride on
+  the square (every view, and its trail mark); its idle on its own times, its move one cycle a step in its drawn shares, its trail on
+  the mark's times; a walker's step progress and its view (side, back walking up, front walking down, kept standing); a step's time
+  settable (the shoes: 45 ms); riders who look the same share one set of frames, freed by the last one out and by the town's close; a
+  rider whose pictures don't come is forgotten, so the next one makes them again.
+- `e2e/town.spec.ts`, "rides (Oct 31; Nov 1, every boss's)" (phone and desktop): wearing Riding Chirp, nothing is fetched for it;
+  standing, its idle frame after frame at 0.75; a tap on the square beside you walks you there, either way (the square read once the
+  camera has settled, the bots standing still: Nov 1, the fix for main's flaky "beside you"); walking up, right, left and down: its
+  back, its side facing each way and its front (watched every frame; back and front never mirrored), the idle of each view standing;
+  its prints in all three directions and never the droplets, none once you stand; your tag over your head; test players on Moon's
+  Ride and Cheetah Shoes drawn riding (the shoes' steps 100 ms), Moon's tag over it; with `?rideScale=1` your ride as drawn, your tap
+  box as wide, the picture taller, your head higher, the tag over it; Cheetah Shoes worn, your step 45 ms.
 - `packages/app/test/town-sky.test.ts`: which look shows when, the looks always adding up to 1 and blending over their
   half hour in order, `?sky=`, and the tint (none by day, softer at dawn than dusk, coolest and darkest at night).
 - `packages/app/test/town-world.test.ts`: one pawn a square (a taken square ends you next to it, the end is always free

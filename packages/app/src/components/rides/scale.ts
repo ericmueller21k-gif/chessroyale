@@ -7,8 +7,11 @@ import { rideScaleAsked } from "../../test-switches.ts";
  * (town/rides.ts, composed once) and the locker's, the profiles' and home's (Items.tsx's RideLayers).
  */
 
-/** A ride's size now: this page's `?rideScale=` (an admin's), else its own (RIDES.scale), else 1. */
-export const rideScale = (id: string): number => rideScaleAsked() ?? RIDES.scale[id] ?? 1;
+/** A ride's size now: this page's `?rideScale=` (an admin's), else its own (RIDES.scale), else every ride's (RIDES.defaultScale). */
+export const rideScale = (id: string): number => rideScaleAsked() ?? RIDES.scale[id] ?? RIDES.defaultScale;
+
+/** How much faster than on foot a pawn walks the town on this ride (RIDES.speed; 1: no faster). */
+export const rideSpeed = (id: string | undefined): number => (id ? (RIDES.speed[id] ?? 1) : 1);
 
 /** Where the pawn sits on a frame, in the pawn's square's units: x, y (its square moved), tilt (degrees round its base, 50 88), cut (hidden below, in its own square). */
 export type Seat = readonly number[];

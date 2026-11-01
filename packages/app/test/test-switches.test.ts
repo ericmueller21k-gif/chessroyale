@@ -109,10 +109,11 @@ describe("?rideScale= (Eric, Nov 1: \"I wanna see it at 75%\")", () => {
     vi.stubGlobal("location", { search: "" });
     expect(rideScale("riding-chirp")).toBe(0.75);
     expect(rideScale("moon-ride")).toBe(0.75);
-    // Not allowed: each ride's own (RIDES.scale: 1 for now).
+    // Not allowed: each ride's own (RIDES.scale), else every ride's (RIDES.defaultScale: 0.75 since Nov 1, Eric: "0.75 is good").
     vi.stubEnv("DEV", false);
-    expect(rideScale("riding-chirp")).toBe(RIDES.scale["riding-chirp"]);
-    expect(rideScale("moon-ride")).toBe(1);
-    expect(rideScale("not-a-ride")).toBe(1);
+    expect(RIDES.defaultScale).toBe(0.75);
+    expect(rideScale("riding-chirp")).toBe(RIDES.scale["riding-chirp"] ?? RIDES.defaultScale);
+    expect(rideScale("moon-ride")).toBe(RIDES.scale["moon-ride"] ?? RIDES.defaultScale);
+    expect(rideScale("not-a-ride")).toBe(RIDES.defaultScale);
   });
 });

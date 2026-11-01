@@ -453,6 +453,11 @@ export class Walker {
   c: number;
   r: number;
   facing: 1 | -1 = 1;
+  /**
+   * The way it last walked, for a ride's views (Nov 1, rides v2): 0 left or right (its side; `facing` says which), 1 up the
+   * screen (away: its back), 2 down (toward you: its front). Standing, the one it last walked in.
+   */
+  view: 0 | 1 | 2 = 0;
   /** When it claimed the square it will end on (its goal): the order of `go`s, 0 for where it first stood. */
   claim = 0;
   private queue: Sq[] = [];
@@ -460,7 +465,8 @@ export class Walker {
   private step: { fc: number; fr: number; to: Sq; dc: number; dr: number; t0: number; first: boolean; last: boolean } | null = null;
   constructor(
     sq: Sq,
-    readonly stepMs: number,
+    /** How long a step takes (ms): a ride may make it shorter (RIDES.speed: Town.tsx sets it as the look is put on). */
+    public stepMs: number,
     readonly hobble: boolean,
     /** How much the walk eases into its first step and out of its last (TOWN_FEEL.walkEase; 0 = even steps). */
     readonly ease = 0,
@@ -519,6 +525,8 @@ export class Walker {
     const dc = wrapF(to.c - this.c);
     const dr = wrapF(to.r - this.r);
     if (dc) this.facing = dc < 0 ? -1 : 1;
+    if (dc) this.view = 0;
+    else if (dr) this.view = dr > 0 ? 1 : 2;
     this.step = { fc: this.c, fr: this.r, to, dc, dr, t0, first, last: this.queue.length === 0 };
   }
   /** Its pose at `now`, into `out`. */

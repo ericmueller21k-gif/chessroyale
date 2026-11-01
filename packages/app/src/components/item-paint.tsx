@@ -9,8 +9,8 @@ export type { Box } from "./blotches.ts";
  * The paint every drawn crate item uses (moved out of Items.tsx on Oct 31, word for word, so the rides' drawings in
  * `rides/` can use it too): an item's color (a gradient for the sheen colors), the shine at 90%+ purity, the outlines
  * (`LINE`, `lw`) and `Region`, a painted part, which lays the blemish's blotches on (blotches.ts). Items.tsx (the items, the
- * avatar) and the rides import it; nothing here knows any item. The rides' baked sheets for the town are drawn with this
- * file, so a change here asks for `npx tsx scripts/bake-rides.ts` (a test says so); the blotches don't (the sheets have none).
+ * avatar) and the rides import it; nothing here knows any item. The rides' measured cells for the town (town/ride-cells.ts) are
+ * read with this file's lines, so a change here asks for `npx tsx scripts/measure-rides.ts` (a test says so).
  */
 
 export interface Finish {
@@ -102,6 +102,9 @@ export function usePaint(finish: Finish, box: Box): Paint {
     box,
   };
 }
+
+/** A path mirrored across the pawn's square (x to 100 - x): a part drawn once for both sides. */
+export const mirror = (d: string) => d.replace(/(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)/g, (_m, x, y) => `${100 - Number(x)} ${y}`);
 
 /** Line widths scale with how closely the item is framed (--sw), so outlines stay crisp on a card and in a grid. */
 export const lw = (n: number) => ({ style: `stroke-width: calc(var(--sw, 1) * ${n}px)` });

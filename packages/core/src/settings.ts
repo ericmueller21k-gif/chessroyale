@@ -2584,11 +2584,19 @@ export type TownGlFallback = (typeof TOWN_GL_FALLBACK.reasons)[number];
  * Rides (Nov 1, Eric: "this cricket is too damn big I wanna see it at 75%"): each ride's size under its pawn, by its item id
  * (crates.ts, the `ride` slot). The ride is drawn at this scale about the pawn's seat, the pawn at its own size, still sitting
  * in the saddle, and the ride still standing on the square; everywhere a rider is drawn (the town, the locker, the profiles,
- * home's pawn and ring). 1 is the size as drawn; a ride not listed is 1. An admin's `?rideScale=` (`tryScale`'s range) tries
- * one size for every ride on that page (docs/decisions/2026-11-01-ride-scale.md).
+ * home's pawn and ring). 1 is the size as drawn. Every ride is `defaultScale` (Nov 1, Eric, after trying `?rideScale=`: "0.75
+ * is good, I have a feeling most we will scale to that"; it was 1) unless `scale` lists it. An admin's `?rideScale=`
+ * (`tryScale`'s range) tries one size for every ride on that page (docs/decisions/2026-11-01-ride-scale.md).
+ *
+ * `speed` (Nov 1, the rides v2 brief: Cheetah Shoes, "twice as fast"): how much faster than on foot a pawn walks the town on
+ * its ride, by item id; a ride not listed is 1. Your step takes TOWN_FEEL.youStepMs / speed (a bot's or another player's,
+ * botStepMs / speed). The town's walking isn't sent to the server (no real players walk in the town yet), so there's no
+ * server-side check of it to scale (docs/decisions/2026-11-01-rides-v2.md).
  */
 export const RIDES = {
-  scale: { "riding-chirp": 1, "moon-ride": 1 } as Readonly<Record<string, number>>,
+  defaultScale: 0.75,
+  scale: {} as Readonly<Record<string, number>>,
+  speed: { "cheetah-shoes": 2 } as Readonly<Record<string, number>>,
   tryScale: [0.5, 1.25] as const,
 };
 

@@ -37,7 +37,7 @@ import type { Ctx, PaintLayer, Painter } from "./paint.ts";
 import type { LightPool, LightSpot } from "./houses/kit.ts";
 import { PARK_BENCH, PARK_FOUNTAIN, PARK_LAMP, PARK_LAMP_HEAD, PARK_LAMP_LIGHTS, PARK_LAMP_POOLS, PARK_TABLE, PARK_TREES, TABLE_BACK_RANK, TABLE_BOARD, TABLE_CLOCK_INK, TABLE_DIGITS, TABLE_INK, TABLE_PIECES, TABLE_RING, TABLE_TOP } from "./houses/park.ts";
 import type { SidekickSheet } from "./sidekick-sheets.ts";
-import type { Rider } from "./rides.ts";
+import type { Rider, RiderTrail } from "./rides.ts";
 import { COLISEUM_PLACE, GRASS, LAMPS, PAVING, PROPS, STATUES, TABLES, groundAt, isSprite, onColiseum, plotAt, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town } from "./world.ts";
 import { TAG_STYLE, TagCache, namesMode, tagAlpha, type NamesMode, type TagKind } from "./tags.ts";
 
@@ -647,6 +647,13 @@ export class Renderer {
   private readonly drops = Array.from({ length: 8 }, () => ({ c: 0, r: 0, t0: -1e9 }));
   private dropNext = 0;
   private dropAt = -1e9;
+  /**
+   * On a ride with a trail (Nov 1, rides v2), its marks instead of the droplets: each one's square, when it landed, which way
+   * you were going (`view`: 0 side, 1 back, 2 front; `flip` -1 going left), which mark of the run (`n`) and whose trail it is.
+   */
+  private readonly marks = Array.from({ length: 24 }, () => ({ c: 0, r: 0, t0: -1e9, view: 0, flip: 1, n: 0, tr: null as RiderTrail | null }));
+  private markNext = 0;
+  private markRun = 0;
   private lastC = -1;
   private lastR = -1;
   /** The boss's items, by boss (for its card's place). */
@@ -662,8 +669,8 @@ export class Renderer {
    */
   youRider: Rider | null = null;
   readonly riders = new Map<string, Rider>();
-  /** (Tests) Your ride as the last frame drew it: the animation ("" on foot), its frame, which way it faced. */
-  readonly youRide = { anim: "" as "" | "idle" | "move", frame: -1, facing: 1 };
+  /** (Tests) Your ride as the last frame drew it: the animation ("" on foot), its frame, which way it faced, its view (0 side, 1 back, 2 front). */
+  readonly youRide = { anim: "" as "" | "idle" | "move", frame: -1, facing: 1, view: 0 };
   /** Each sidekick's frames, by its sheet: every one cut from it as the town opens (the constructor), never per frame. */
   private readonly spriteArt = new Map<SidekickSheet, SpriteFrames>();
   /** Tag widths by name and size; sign and bubble layouts by text. */
@@ -1356,7 +1363,7 @@ export class Renderer {
           const k = 1 + 2 * (art?.pad ?? 0);
           const pad = art?.pad ?? 0;
           this.youRide.anim = "";
-          if (this.youRider && !table) this.drawRider(it, this.youRider, pose, facing, f.youSquares, now, this.youRide);
+          if (this.youRider && !table) this.drawRider(it, this.youRider, pose, facing, w.view, f.youSquares, now, this.youRide);
           else this.drawSprite(it, art?.img ?? (isSprite(person.look) ? pawnImage("light", null) : pawnImage(person.look.side, person.look.tint)), f.youSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.youHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.youSquares);
           if (this.fade > 0.02) this.tag(person.name, it.fx, it.hy - 2, "you", clamp((11 * this.p.k) / v.kf, 8, 12), this.fade);
         } else {
@@ -1377,7 +1384,7 @@ export class Renderer {
             const k = 1 + 2 * (art?.pad ?? 0);
             const pad = art?.pad ?? 0;
             const rider = this.riders.get(person.id);
-            if (rider && !table) this.drawRider(it, rider, pose, facing, f.botSquares, now + it.i * 577);
+            if (rider && !table) this.drawRider(it, rider, pose, facing, w.view, f.botSquares, now + it.i * 577);
             else this.drawSprite(it, art?.img ?? pawnImage(lk.side, lk.tint), f.botSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.botHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.botSquares);
           }
           // Name tags on the near ones only: not far toward the rim (as before), and (Oct 28, Eric) not far from you either, by default: within
@@ -2122,30 +2129,44 @@ export class Renderer {
    * A pawn on its ride (Oct 31, rides.ts): one picture, as a pawn is. Standing, the ride's idle; stepping, its move, one cycle
    * a step (its frames' times scaled to the step: the walk keeps its pace), lifted by the move's hop instead of the hobble. The
    * pawn keeps its size (`box`: its pawn's box in squares). Its name tag (and its card) sits over its top standing and doesn't
-   * jump with the hop, as a sidekick's doesn't.
+   * jump with the hop, as a sidekick's doesn't. Nov 1 (rides v2): seen the way it last walked (`view`: its side, mirrored to
+   * face its walk; its back walking up the screen; its front walking down), standing in that view's idle.
    */
-  private drawRider(it: Item, rd: Rider, pose: Pose, facing: number, box: number, t: number, seen?: { anim: "" | "idle" | "move"; frame: number; facing: number }): void {
+  private drawRider(it: Item, rd: Rider, pose: Pose, facing: number, view: 0 | 1 | 2, box: number, t: number, seen?: { anim: "" | "idle" | "move"; frame: number; facing: number; view: number }): void {
     if (!proj(this.view, it.dx, it.dz, 0, this.p)) return;
-    const sq = (box * rd.h) / 100;
+    const rv = rd.views[view];
+    // (Only its side is mirrored: its back and front are drawn as they are.)
+    const flip = rv.facing === "side" ? facing : 1;
+    const sq = (box * rv.h) / 100;
     let img: HTMLCanvasElement;
     let lift = 0;
     let i: number;
     if (pose.step) {
-      i = rd.moveIndex(pose.t);
-      img = rd.frames.move[i]!;
-      lift = (rd.lift[i]! * box) / 100;
-    } else img = rd.frames.idle[(i = rd.idleIndex(t))]!;
+      i = rv.moveIndex(pose.t);
+      img = rv.frames.move[i]!;
+      lift = (rv.lift[i]! * box) / 100;
+    } else img = rv.frames.idle[(i = rv.idleIndex(t))]!;
     if (seen) {
       seen.anim = pose.step ? "move" : "idle";
       seen.frame = i;
-      seen.facing = facing;
+      seen.facing = flip;
+      seen.view = rv === rd.views[0] ? 0 : view;
     }
-    this.drawSprite(it, img, sq, rd.footX, rd.footY, rd.w / rd.h, lift, 0, facing, rd.shadow, rd.top + lift / sq);
+    this.drawSprite(it, img, sq, rv.footX, rv.footY, rv.w / rv.h, lift, 0, flip, rd.shadow, rv.top + lift / sq);
     // Taps: only the pawn's own box across (its picture's, as on foot), not the ride's reach, so a tap on the square beside a
     // rider walks there as it does beside a pawn.
     const half = (box * (1 + 2 * rd.pawn.pad) * this.p.k) / 2;
     it.x0 = Math.max(it.x0, it.fx - half);
     it.x1 = Math.min(it.x1, it.fx + half);
+  }
+
+  /** (Tests) Your trail now: the ride's marks showing (by view: side, back, front) and the droplets showing. */
+  marksShown(): { side: number; back: number; front: number; drops: number } {
+    const now = performance.now();
+    const out = { side: 0, back: 0, front: 0, drops: 0 };
+    for (const m of this.marks) if (m.tr && now - m.t0 < m.tr.life) out[(["side", "back", "front"] as const)[m.view]!]++;
+    for (const d of this.drops) if (now - d.t0 < TOWN_FEEL.trailLifeMs) out.drops++;
+    return out;
   }
 
   /** The rider a person is drawn as now (their ride's frames ready, not seated at a table), or null: on foot. */
@@ -2456,12 +2477,29 @@ export class Renderer {
   private drawMarks(now: number): void {
     const { ctx, town } = this;
     const f = TOWN_FEEL;
-    // A droplet on each square you leave as you run (one at most every trailEveryMs).
+    // A droplet on each square you leave as you run (one at most every trailEveryMs); on a ride with a trail (Nov 1, rides v2),
+    // its mark on each square you leave instead (every `every` squares), pointing the way you went.
     const w = town.you.walker;
     const hc = w.hereC();
     const hr = w.hereR();
+    const rd = this.youRider;
+    const tr = rd && !seated(town.you) ? rd.trail : null;
+    if (!w.moving()) this.markRun = 0;
     if (hc !== this.lastC || hr !== this.lastR) {
-      if (this.lastC >= 0 && now - this.dropAt >= f.trailEveryMs) {
+      if (this.lastC >= 0 && tr) {
+        if (this.markRun++ % tr.every === 0) {
+          const m = this.marks[this.markNext++ % this.marks.length]!;
+          const dc = wrapF(hc - this.lastC);
+          const dr = wrapF(hr - this.lastR);
+          m.c = this.lastC;
+          m.r = this.lastR;
+          m.t0 = now;
+          m.view = dc ? 0 : dr > 0 ? 1 : 2;
+          m.flip = dc < 0 ? -1 : 1;
+          m.n = this.markRun - 1;
+          m.tr = tr;
+        }
+      } else if (this.lastC >= 0 && now - this.dropAt >= f.trailEveryMs) {
         const d = this.drops[this.dropNext++ % this.drops.length]!;
         d.c = this.lastC;
         d.r = this.lastR;
@@ -2472,6 +2510,31 @@ export class Renderer {
       this.lastR = hr;
     }
     ctx.save();
+    for (const m of this.marks) {
+      const mt = m.tr;
+      const age = now - m.t0;
+      if (!mt || age < 0 || age >= mt.life) continue;
+      let fi = 0;
+      while (fi < mt.ends.length - 1 && age >= mt.ends[fi]!) fi++;
+      const img = mt.frames[m.view]?.[m.n & 1]?.[fi];
+      if (!img || !img.width) continue;
+      const dx = wrapF(m.c - this.camX);
+      const dz = wrapF(m.r - this.camY);
+      if (radial(this.view, dx, dz) > this.view.rim || !proj(this.view, dx, dz, 0, this.p)) continue;
+      // (Its box is in the pawn's square's units: your pawn's box is youSquares squares across.)
+      const u = (this.p.k * f.youSquares) / 100;
+      const mw = mt.w * u;
+      const mh = mt.h * u;
+      ctx.globalAlpha = enterOf(this.view, dx, dz);
+      if (m.flip < 0) {
+        ctx.save();
+        ctx.translate(this.p.x, 0);
+        ctx.scale(-1, 1);
+        ctx.translate(-this.p.x, 0);
+        ctx.drawImage(img, this.p.x - mw / 2, this.p.y - mh / 2, mw, mh);
+        ctx.restore();
+      } else ctx.drawImage(img, this.p.x - mw / 2, this.p.y - mh / 2, mw, mh);
+    }
     for (const d of this.drops) {
       const a = (now - d.t0) / f.trailLifeMs;
       if (a < 0 || a >= 1) continue;

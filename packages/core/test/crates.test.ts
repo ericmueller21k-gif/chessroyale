@@ -28,7 +28,8 @@ import {
 } from "../src/index.ts";
 
 /** Items in no crate yet (Oct 31: the rides; admins have them, and their crate comes later). One by one, never a whole slot. */
-const NO_CRATE_YET = ["riding-chirp", "moon-ride"];
+// (Every ride, Nov 1: admins only until their crate comes.)
+const NO_CRATE_YET = ["riding-chirp", "moon-ride", "hollow-bulb", "smudgy-brush", "alfil-howdah", "balloon-pup", "bigboy-buggy", "boingo-pogo", "folio-crane", "ginger-sled", "jefferson-giraffe", "puddles-mower", "sawyer-dozer", "rodeo-bull", "cheetah-shoes", "log-roller"];
 
 const crate = crateDef("winter-1")!;
 const beta = crateDef("beta-001")!;
@@ -364,14 +365,30 @@ describe("rides (Oct 31)", () => {
     expect(ITEM_SLOTS).toEqual(["head", "face", "skin", "weapon", "ride"]);
     expect(SLOT_NAMES.ride).toBe("Ride");
     const rides = ITEM_DEFS.filter((d) => d.slot === "ride");
+    // (Nov 1, every boss's: the drawings' names.)
     expect(rides.map((d) => [d.id, d.name, d.tier])).toEqual([
       ["riding-chirp", "Riding Chirp", "mythic"],
       ["moon-ride", "Moon's Ride", "mythic"],
+      ["hollow-bulb", "Hollow's Bulb", "mythic"],
+      ["smudgy-brush", "Brush Ride", "mythic"],
+      ["alfil-howdah", "Alfil's Howdah", "mythic"],
+      ["balloon-pup", "Balloon Pup", "mythic"],
+      ["bigboy-buggy", "Big Boy's Buggy", "mythic"],
+      ["boingo-pogo", "Boingo's Pogo", "mythic"],
+      ["folio-crane", "Paper Crane", "mythic"],
+      ["ginger-sled", "Candy Cane Sled", "mythic"],
+      ["jefferson-giraffe", "Giraffe Gallop", "mythic"],
+      ["puddles-mower", "Puddles's Mower", "mythic"],
+      ["sawyer-dozer", "Sawyer's Dozer", "mythic"],
+      ["rodeo-bull", "Rodeo Bull", "mythic"],
+      ["cheetah-shoes", "Cheetah Shoes", "mythic"],
+      ["log-roller", "The Log Roller", "mythic"],
     ]);
     for (const d of rides) {
       expect(CRATES.some((c) => c.items.includes(d.id)), d.id).toBe(false);
       for (const c of CRATES) expect(itemChance(c, d.id)).toBe(0);
-      expect(d.colors).toBeUndefined();
+      // (One color, but Hollow's Bulb: its glow is the second, as drawn.)
+      expect(d.colors).toBe(d.id === "hollow-bulb" ? 2 : undefined);
       expect(d.faceLayer).toBeUndefined();
     }
   });
