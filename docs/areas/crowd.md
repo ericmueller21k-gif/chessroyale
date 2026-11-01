@@ -153,6 +153,11 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   duel, boss battle) use the same bank, increment and cap; how many moves each bank lasts is in `DECISIONS.md`, "Crowd
   50 v 50: three chess time controls".
 - **Power-ups:** 3 at the start in Crowd (`powerUpsAtStart`); one shows the engine's top 3 moves for that turn.
+- **The phone's layout (Nov 1; docs/decisions/2026-11-01-crowd-phone-scoreboard.md):** the middle box under the board is one
+  fixed height (`--mid-h`, styles.css, the locked phone screen): the ⚡ row, the status line and the five vote bars take turns
+  in it. The scoreboard under it never moves. Its header picks Black, White or All (yours when the match starts); tapping
+  the picked one or the rows opens the full list for that pick. The reveal has no "your team watched" line any more.
+  Guard: `e2e/crowd.spec.ts`, "the scoreboard never moves".
 - **On screen:** every pick appears live on the board as a ghost with a name pill (one name per square, "+N"), live
   tallies, an optional motion trail (Settings → Board), the eval bar (testers only: [hub.md](hub.md)), the scoreboard
   and chat under the board. A crowd of one keeps its

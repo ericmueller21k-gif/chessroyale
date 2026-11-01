@@ -387,23 +387,36 @@ export function myTeam(m: Pick<GameView, "standings">): "w" | "b" | null {
   return m.standings().find((s) => s.isYou)?.team ?? null;
 }
 
+/** Which players the scoreboard shows: a team (Black, White), or everyone ("All", ranked by points, team marks). */
+export type TeamPick = "w" | "b" | "all";
+
 /**
  * The leaderboard as you should see it: in Crowd 50 v 50 each team has its own
  * cut (half the knockouts each), so it shows your team with your team's cut line
  * (where the cut would fall now: the rows it would take are marked `cut`; ties at the line go through).
+ * `pick` (the phone's scoreboard, TeamPick) shows another team instead, or "All": both teams ranked by points, with
+ * each row's team marked (`teams`) and no cut line (each team is cut on its own).
  */
-export function towerView(m: Pick<GameView, "standings" | "cutoff" | "settings" | "stage" | "totalPlayers"> & { boss?: BossView | null }): { standings: Standing[]; cutoff: number; teamLabel: string | null } {
+export function towerView(m: Pick<GameView, "standings" | "cutoff" | "settings" | "stage" | "totalPlayers"> & { boss?: BossView | null }, pick?: TeamPick): { standings: Standing[]; cutoff: number; teamLabel: string | null; teams?: boolean } {
   const all = m.standings();
   // Boss battle: one crowd, no cut line (the boss strikes instead). Boss alone: just you, your own row.
   if (m.boss) return { standings: all, cutoff: all.filter((s) => !s.out).length, teamLabel: bossAlone(m) ? "You" : "The crowd" };
   const team = all.find((s) => s.isYou)?.team ?? null;
   if (!team) return { standings: all, cutoff: m.cutoff, teamLabel: null };
-  const mine = all.filter((s) => s.team === team);
+  if (pick === "all") return { standings: all, cutoff: all.filter((s) => !s.out).length, teamLabel: "All players", teams: true };
+  const side = pick ?? team;
+  const mine = all.filter((s) => s.team === side);
   const alive = mine.filter((s) => !s.out);
-  return { standings: mine, cutoff: alive.filter((s) => !s.cut).length, teamLabel: team === "w" ? "White team" : "Black team" };
+  return { standings: mine, cutoff: alive.filter((s) => !s.cut).length, teamLabel: side === "w" ? "White team" : "Black team" };
 }
 
 export const isCrowd = (m: Pick<GameView, "settings">) => m.settings.mode === "crowd";
+
+/**
+ * A 50 v 50 (Crowd's two teams, not a boss battle): the screens whose middle box and scoreboard hold one place on a
+ * phone (Eric, Nov 1). A boss raid, the Crowd's boss final and every other mode keep their own layout.
+ */
+export const isCrowdFifty = (m: Pick<GameView, "settings" | "boss">) => isCrowd(m) && !m.boss;
 
 /** Decimals a score shows to: 2 where the crowd's scoring keeps them (CrowdScoring), else 1. */
 export const scoreDp = (s: Pick<Settings, "crowdScoring">) => (s.crowdScoring ? 2 : 1);

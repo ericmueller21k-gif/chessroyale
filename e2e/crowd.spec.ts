@@ -321,3 +321,73 @@ test("the board never moves or resizes during a turn (Crowd and Classic)", async
     expect(seen!.long.rect).toBe(at);
   }
 });
+
+test("the scoreboard never moves: its top edge, height and the middle box hold through two turns (phone)", async ({ page }) => {
+  // (Nov 1: "I should never see the scoreboard container shifting up or down", a phone's locked screen.)
+  test.setTimeout(4 * 60_000);
+  test.skip(test.info().project.name !== "phone", "a phone's locked screen");
+  await page.goto("/?debug&pace=quick&mode=crowd&augments=0");
+  await soloFromHome(page);
+  await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/play|watching/);
+  const tops = new Set<string>();
+  const heights = new Set<string>();
+  const middles = new Set<string>();
+  const kinds = new Set<string>();
+  let reveals = 0;
+  let last = "";
+  let submitted = "";
+  let worstSpill = -Infinity;
+  const stopAt = Date.now() + 3 * 60_000;
+  while (reveals < 2 && Date.now() < stopAt) {
+    const s = await page.evaluate(() => {
+      const m = (window as any).match;
+      const box = (el: Element | null) => {
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return `${Math.round(r.top)} ${Math.round(r.height)}`;
+      };
+      const middleBox = () => document.querySelector(".screen.game > .play-footer") ?? document.querySelector(".screen.game > .poll");
+      return {
+        kind: (m?.phase.kind ?? "none") as string,
+        fen: (m?.phase.board?.fen ?? "") as string,
+        tower: box(document.querySelector(".screen.game .mini-tower")),
+        middle: box(middleBox()),
+        // The middle box's content fits it (nothing spills onto the scoreboard): how far its content runs past it.
+        spill: (() => {
+          const el = middleBox();
+          return el ? el.scrollHeight - el.clientHeight : 0;
+        })(),
+      };
+    });
+    if (s.kind === "play" && s.fen !== submitted) {
+      // (The engine's best move, or any legal one: a turn has to end for the next one to show.)
+      const best = await engineTop(page, "judged", 12_000).catch(() => null);
+      submitted = s.fen;
+      await submitMove(page, best?.top[0]?.move, best?.fen);
+    }
+    if (s.kind !== last) {
+      if (s.kind === "reveal") reveals++;
+      last = s.kind;
+    }
+    if (["play", "watching", "reveal"].includes(s.kind) && s.tower) {
+      kinds.add(s.kind);
+      tops.add(s.tower.split(" ")[0]!);
+      heights.add(s.tower.split(" ")[1]!);
+      middles.add(s.middle ?? "none");
+      if (s.middle) worstSpill = Math.max(worstSpill, s.spill);
+    }
+    await page.waitForTimeout(100);
+  }
+  expect(reveals, "two turns played").toBeGreaterThanOrEqual(2);
+  expect([...kinds].sort(), "the phases seen with the scoreboard").toEqual(expect.arrayContaining(["play", "reveal"]));
+  // The scoreboard's top edge and height are the same on every phase of both turns.
+  expect([...tops], "scoreboard top edge").toHaveLength(1);
+  expect([...heights], "scoreboard height").toHaveLength(1);
+  // The middle box keeps its place and its height (the power-up row, the status and the vote results take turns in it).
+  const mid = [...middles].map((v) => v.split(" "));
+  expect(new Set(mid.map((v) => v[0])).size, "middle box top").toBe(1);
+  expect(new Set(mid.map((v) => v[1])).size, "middle box height").toBe(1);
+  // Nothing spills: the middle box's content never runs past its box (scrollHeight <= clientHeight), on every phase seen.
+  expect(worstSpill, "the middle box was measured").toBeGreaterThan(Number.NEGATIVE_INFINITY);
+  expect(worstSpill, "middle box content overflow, px (≤ 0: it fits)").toBeLessThanOrEqual(0);
+});
