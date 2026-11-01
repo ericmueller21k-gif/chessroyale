@@ -1,4 +1,5 @@
 import { devices, expect, type Page } from "@playwright/test";
+import { legalMoves } from "@chessroyale/chess";
 import { named, soloFromHome, test, pickMode } from "./helpers.ts";
 
 /**
@@ -6,6 +7,8 @@ import { named, soloFromHome, test, pickMode } from "./helpers.ts";
  * width, open or folded to its header. Eric saw it big and empty (Oct 7, 2026): two buttons each controlled half of
  * the view, and one combination drew a full-height box with nothing in it. Whatever is tapped and whatever a device
  * remembers, the panel shows the scoreboard's rows, the chat, or a small header bar: never an empty box.
+ * (Nov 1, Eric: a phone's 50 v 50 is one box, the chat a tab: Black · White · All · Chat; "‹ Back" returns to the
+ * scoreboard. The split is gone there; the tests below walk the tab.)
  */
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
@@ -91,46 +94,50 @@ test("the panel under the board is never empty: every tap, every remembered layo
     await expect.poll(() => p.evaluate(() => (window as any).match?.chat?.enabled ?? false), { timeout: 60_000 }).toBe(true);
     await expect.poll(() => phase(p), { timeout: 60_000 }).toMatch(/play|watching|reveal|scoring/);
   };
-  // A fresh device: side by side, open.
+  // A fresh device: the scoreboard, open (the chat is its tab).
   await p.evaluate(() => {
     for (const k of Object.keys(localStorage)) if (/^brc\.(underBoard|miniTower)/.test(k)) localStorage.removeItem(k);
   });
   await reload();
-  await expectShowing(p, { layout: "split", open: true }, "fresh");
+  await expectShowing(p, { layout: "board", open: true }, "fresh");
 
-  // Every button from every state, by real taps. Making a panel bigger always opens it (Eric: "it should reset the
-  // other toggle"); folding leaves just the header. After each tap, a reload keeps the same view.
+  // Every button from every state, by real taps. Chat replaces the scoreboard in the same box and "‹ Back" returns to it;
+  // folding leaves just the header (the fold is remembered; the Chat tab is not, so a reload shows the scoreboard).
   const FOLD = "Minimize the leaderboard and chat";
   const OPEN = "Show the leaderboard and chat";
-  const walk: [string, { layout: "split" | "board" | "chat"; open: boolean }][] = [
-    [FOLD, { layout: "split", open: false }],
-    ["Leaderboard full width", { layout: "board", open: true }],
+  const CHAT = "Chat";
+  const BACK = "Back";
+  const walk: [string, { layout: "board" | "chat"; open: boolean }][] = [
     [FOLD, { layout: "board", open: false }],
     [OPEN, { layout: "board", open: true }],
-    [FOLD, { layout: "board", open: false }],
-    ["Side by side", { layout: "split", open: true }],
-    ["Chat full width", { layout: "chat", open: true }],
-    [FOLD, { layout: "chat", open: false }],
-    ["Side by side", { layout: "split", open: true }],
-    [FOLD, { layout: "split", open: false }],
-    ["Chat full width", { layout: "chat", open: true }],
+    [CHAT, { layout: "chat", open: true }],
     [FOLD, { layout: "chat", open: false }],
     [OPEN, { layout: "chat", open: true }],
-    ["Side by side", { layout: "split", open: true }],
-    ["Leaderboard full width", { layout: "board", open: true }],
-    ["Side by side", { layout: "split", open: true }],
-    [FOLD, { layout: "split", open: false }],
-    [OPEN, { layout: "split", open: true }],
+    [BACK, { layout: "board", open: true }],
+    [FOLD, { layout: "board", open: false }],
+    [OPEN, { layout: "board", open: true }],
+    [CHAT, { layout: "chat", open: true }],
+    [FOLD, { layout: "chat", open: false }],
+    [BACK, { layout: "board", open: false }],
+    [OPEN, { layout: "board", open: true }],
   ];
+  // (A reload shows the scoreboard, the Chat tab isn't remembered: so the reload check is on the scoreboard's states, and a
+  // chat state's steps follow on from the one before, as the tab stays.)
   for (const [i, [label, want]] of walk.entries()) {
     await tap(p, label);
     await expectShowing(p, want, `tap ${i + 1} "${label}"`);
-    await reload();
-    await expectShowing(p, want, `reload after tap ${i + 1} "${label}"`);
+    if (want.layout === "board") {
+      await reload();
+      await expectShowing(p, want, `reload after tap ${i + 1} "${label}"`);
+    }
   }
+  await tap(p, CHAT);
+  await expectShowing(p, { layout: "chat", open: true }, "Chat, then a reload");
+  await reload();
+  await expectShowing(p, { layout: "board", open: true }, "reload: the scoreboard, not the chat tab");
 
   // A device that remembers an older build's two settings (the layout, and the fold) in any combination: it shows
-  // something after a reload. A full-width panel that was folded opens (that's how it got stuck).
+  // the scoreboard after a reload, open or folded as the fold says. (The layout setting is the split's; the tab has none.)
   for (const layout of ["split", "board", "chat"]) {
     for (const fold of ["1", "0"]) {
       await p.evaluate(([l, f]) => {
@@ -139,7 +146,7 @@ test("the panel under the board is never empty: every tap, every remembered layo
         localStorage.setItem("brc.miniTower", f);
       }, [layout, fold]);
       await reload();
-      const want = { layout, open: fold === "1" || layout !== "split" } as { layout: "split" | "board" | "chat"; open: boolean };
+      const want = { layout: "board", open: fold === "1" || layout !== "split" } as { layout: "board"; open: boolean };
       await expectShowing(p, want, `older build: ${layout}, ${fold === "1" ? "open" : "folded"}`);
     }
   }
@@ -164,10 +171,11 @@ test("the panel under the board is never empty: every tap, every remembered layo
   await expectShowing(p, { layout: "board", open: false }, "chat off, folded, reloaded");
   await tap(p, "Show the leaderboard");
   await expectShowing(p, { layout: "board", open: true }, "chat off, opened");
-  // Chat back on: the remembered layout returns.
+  // Chat back on: the scoreboard, with its Chat tab.
   await p.evaluate(() => localStorage.setItem("brc.chatOff", "0"));
   await reload();
-  await expectShowing(p, { layout: "chat", open: true }, "chat on again");
+  await expectShowing(p, { layout: "board", open: true }, "chat on again");
+  await expect(p.locator(".under-board .mini-chat-tab")).toBeVisible();
 });
 
 test("solo Crowd (no chat): the scoreboard alone, full width, folds to its header and opens again", async ({ page }) => {
@@ -195,8 +203,9 @@ test("solo Crowd (no chat): the scoreboard alone, full width, folds to its heade
   await expectShowing(page, { layout: "board", open: true }, "solo, opened");
 });
 
-test("the split chat's Team / All switch: both labels whole at 320, 360 and 390 px, no sideways scroll", async ({ browser }) => {
-  // (It read "TEAM | AI" at 360 px: the switch shrank to the room its header had left.)
+test("the chat tab's Team / All switch: both labels whole at 320, 360 and 390 px, no sideways scroll", async ({ browser }) => {
+  // (It read "TEAM | AI" at 360 px: the switch shrank to the room its header had left. Nov 1: the chat is a tab now, with
+  // "‹ Back" in the same header.)
   test.setTimeout(4 * 60_000);
   test.skip(test.info().project.name !== "phone", "a phone's layout");
   const p = await (await browser.newContext({ ...devices["iPhone 13"], browserName: undefined } as any)).newPage();
@@ -206,9 +215,10 @@ test("the split chat's Team / All switch: both labels whole at 320, 360 and 390 
   await p.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect.poll(() => p.evaluate(() => (window as any).match?.chat?.enabled ?? false), { timeout: 90_000 }).toBe(true);
   await expect.poll(() => phase(p), { timeout: 90_000 }).toMatch(/play|watching/);
+  await p.getByRole("button", { name: "Chat", exact: true }).click();
   for (const width of [390, 360, 320]) {
     await p.setViewportSize({ width, height: 664 });
-    await expect(p.locator(".under-board.ub-split .qchat-split .qto")).toBeVisible();
+    await expect(p.locator(".under-board.ub-tab .qchat-tab .qto")).toBeVisible();
     // (Two frames: the layout settles after the resize.)
     await p.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
     const v = await p.evaluate(() => {
@@ -216,7 +226,7 @@ test("the split chat's Team / All switch: both labels whole at 320, 360 and 390 
         const r = e.getBoundingClientRect();
         return { l: r.left, r: r.right, t: r.top, b: r.bottom, w: r.width, h: r.height };
       };
-      const panel = document.querySelector(".qchat-split")!;
+      const panel = document.querySelector(".qchat-tab")!;
       const sw = panel.querySelector(".qto")!;
       return {
         panel: box(panel),
@@ -246,4 +256,69 @@ test("the split chat's Team / All switch: both labels whole at 320, 360 and 390 
       expect(h.box.l >= v.sw.r - 0.5 || h.box.r <= v.sw.l + 0.5, where).toBe(true);
     }
   }
+});
+
+test("a phone's 50 v 50 box (Nov 1): at 390 × 750 the scoreboard starts under the reveal's one line, with four rows or more; Chat replaces it in the same box and Back returns to the same pick", async ({ browser }) => {
+  // (Eric, Nov 1, on his phone: the scoreboard right up against the vote results and filling the rest of the screen; the
+  // chat a tab in the scoreboard's header, "‹ Back" to the scoreboard as it was picked.)
+  test.setTimeout(6 * 60_000);
+  test.skip(test.info().project.name !== "phone", "a phone's layout");
+  const p = await (await browser.newContext({ ...devices["iPhone 13"], browserName: undefined, colorScheme: "dark" } as any)).newPage();
+  await named(p, "Boxer");
+  await p.goto("/?debug&pool=box");
+  await pickMode(p);
+  await p.getByRole("button", { name: "PLAY", exact: true }).click();
+  await expect.poll(() => p.evaluate(() => (window as any).match?.chat?.enabled ?? false), { timeout: 90_000 }).toBe(true);
+  await expect.poll(() => phase(p), { timeout: 90_000 }).toMatch(/play|watching/);
+  await p.setViewportSize({ width: 390, height: 750 });
+  // Your team's move, then the reveal with your result line.
+  const stopAt = Date.now() + 4 * 60_000;
+  while (Date.now() < stopAt && !(await p.locator(".poll-result").isVisible().catch(() => false))) {
+    if ((await phase(p)) === "play") {
+      const fen: string = await p.evaluate(() => (window as any).match.phase.board.fen);
+      await p.evaluate((uci) => (window as any).match.submit(uci), legalMoves(fen)[0]!);
+    }
+    await p.waitForTimeout(300);
+  }
+  await expect(p.locator(".poll-result")).toBeVisible({ timeout: 60_000 });
+  const boxes = () =>
+    p.evaluate(() => {
+      const box = (sel: string) => {
+        const e = document.querySelector(sel);
+        if (!e) return null;
+        const r = e.getBoundingClientRect();
+        return { l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height };
+      };
+      return {
+        result: box(".screen.game .poll-result"),
+        under: box(".screen.game .under-board"),
+        rows: [...document.querySelectorAll(".screen.game .mini-tower .tower-row")].filter((e) => (e as HTMLElement).offsetParent !== null).length,
+        pick: [...document.querySelectorAll(".screen.game .mini-tower .mini-pick.on")].map((e) => e.textContent)[0] ?? null,
+        vh: innerHeight,
+        under_mt: getComputedStyle(document.querySelector(".screen.game .under-board") ?? document.body).marginTop,
+        under_parent: document.querySelector(".screen.game .under-board")?.parentElement?.className ?? null,
+      };
+    });
+  const reveal = await boxes();
+  // The scoreboard's top is right under the result line (4 px at most), and fills the rest of the screen.
+  expect(reveal.vh, JSON.stringify(reveal)).toBe(750);
+  expect(reveal.under!.t - reveal.result!.b, JSON.stringify(reveal)).toBeLessThanOrEqual(4);
+  expect(reveal.under!.t - reveal.result!.b, JSON.stringify(reveal)).toBeGreaterThanOrEqual(0);
+  expect(Math.round(reveal.under!.b), JSON.stringify(reveal)).toBeGreaterThanOrEqual(750 - 12);
+  expect(reveal.rows, JSON.stringify(reveal)).toBeGreaterThanOrEqual(4);
+  // Pick All, then Chat: the chat replaces the scoreboard in the same box; Back returns to All.
+  await p.locator(".screen.game .mini-tower .mini-pick", { hasText: /^All$/ }).click();
+  const picked = (await boxes()).pick;
+  expect(picked).toBe("All");
+  const before = (await boxes()).under!;
+  await p.getByRole("button", { name: "Chat", exact: true }).click();
+  await expect(p.locator(".screen.game .under-board .qchat-tab")).toBeVisible();
+  const chat = await boxes();
+  expect(chat.under, JSON.stringify(chat)).toEqual(before);
+  expect(await p.locator(".screen.game .under-board .mini-tower").count()).toBe(0);
+  await p.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(p.locator(".screen.game .under-board .mini-tower")).toBeVisible();
+  const back = await boxes();
+  expect(back.pick, JSON.stringify(back)).toBe("All");
+  expect(back.under, JSON.stringify(back)).toEqual(before);
 });

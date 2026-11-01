@@ -12,7 +12,7 @@ import { kingTurn, turnCues } from "../godKing.ts";
 import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
 import { isCrowdFifty } from "../game.ts";
 import type { BoardView, GameView, StrikeState } from "../game.ts";
-import { UnderBoard, useMedia } from "../components/QuickChat.tsx";
+import { LOCKED_PHONE, UnderBoard, useMedia } from "../components/QuickChat.tsx";
 import { BossPanel, besideBoard, useBossLayout } from "../components/MovePanel.tsx";
 import { PowerUps } from "../components/PowerUpButton.tsx";
 import { BossDock, Dots } from "../components/BossDock.tsx";
@@ -28,8 +28,6 @@ import { REFUSED_MS, refusedLine, throughLine } from "../refused.ts";
 import { Hud } from "./Hud.tsx";
 
 const HINT_BRUSHES = ["green", "blue", "yellow"] as const;
-/** The phone's locked screen (styles.css: one screen, the middle box and the scoreboard under it). */
-const LOCKED_PHONE = "(max-width: 899px) and (min-height: 520px)";
 const DARK_COST = BOSS_POWERS.darkTryCost;
 const DARK_TRIES = BOSS_POWERS.darkTries;
 

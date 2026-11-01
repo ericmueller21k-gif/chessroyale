@@ -18,7 +18,7 @@ import { LastStand, clearSquare, lastStandBoard } from "../components/LastStand.
 import { KING_COMMAND, KING_SUMMON, LAST_STAND, lastStandMs } from "@chessroyale/chess";
 import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossSide } from "../components/BossCharacter.tsx";
-import { allowanceNote, bossAlone, elimination, finalName, isCrowdFifty, myTeam, scoreDp, type BoardView, type GameView, type GroupReveal, type Standing } from "../game.ts";
+import { allowanceNote, allowanceShort, bossAlone, elimination, finalName, isCrowdFifty, myTeam, scoreDp, type BoardView, type GameView, type GroupReveal, type Standing } from "../game.ts";
 import { StreakFire } from "../components/StreakFire.tsx";
 import { GavelPiece } from "../components/Gavel.tsx";
 import { Avatar } from "../components/Items.tsx";
@@ -133,6 +133,25 @@ export function WatchScreen({
       <UnderBoard match={match} />
     </div>
   );
+}
+
+/** The vote box's height in a 50 v 50 (Nov 1): a bar is 14 px with its gap, the result line 20 px; four bars at least. */
+const BAR_PX = 14;
+const RESULT_PX = 20;
+
+/** How many bars the vote box holds, from its height (the box's height is set by the screen: styles.css, --mid-h). */
+function useBarSlots(ref: { current: HTMLElement | null }): number {
+  const [slots, setSlots] = useState(6);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const fit = () => setSlots(Math.max(4, Math.min(6, Math.floor((el.clientHeight - RESULT_PX) / BAR_PX))));
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    fit();
+    return () => ro.disconnect();
+  }, []);
+  return slots;
 }
 
 /**
@@ -275,7 +294,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
       r.you ||= match.isYou(p.playerId);
       byMove.set(p.move, r);
     }
-    return [...byMove.values()].sort((a, b) => b.votes - a.votes || (a.move === mine.result.playedMove ? -1 : 1)).slice(0, 5);
+    return [...byMove.values()].sort((a, b) => b.votes - a.votes || (a.move === mine.result.playedMove ? -1 : 1));
   }, [mine]);
   const top = rows[0]?.votes ?? 1;
   const me = picks.find((p) => match.isYou(p.playerId));
@@ -289,8 +308,9 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
   const shoutBonus = match.settings.crowdScoring?.brilliantBonus ?? 0;
   const youBrilliant = !!me && !!bril?.players.includes(me.playerId);
   const youHelped = !!me && !!bril && !youBrilliant && bril.moves.includes(me.move ?? "");
-  const yours = me?.move ?? null;
-  const yourRow = yours && !rows.some((r) => r.move === yours) ? { move: yours, votes: picks.filter((p) => p.move === yours).length, you: true } : null;
+  // The vote box's bars: how many its height holds (see useBarSlots); yours and the brilliant find's move come first.
+  const pollBox = useRef<HTMLDivElement>(null);
+  const slots = useBarSlots(pollBox);
 
   // The ghosts come in silently; the winner gets three tones as it blinks.
   // (Not when you're the whole crowd: your move was simply played.)
@@ -435,90 +455,89 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
       ) : null,
     [match, mine, still, landed, played, away, leaping, charges, fallen, warning, blow, dockCommand, layout.strip],
   );
-  // (Crowd: the vote bars count up as the ghosts come in, then hold.)
-  const poll = useMemo(
-    () =>
-      match.boss ? null : (
-        <div class="poll" role="status">
-          {rows.map((r) => {
-            const win = landed && r.move === mine.result.playedMove;
-            return (
-              <div key={r.move} class={`poll-row${win ? " win" : ""}${landed && !win ? " lose" : ""}${r.you ? " you" : ""}`}>
-                <span class="poll-move">{seenSan(fen, r.move)}</span>
-                <span class="poll-bar">
-                  <i style={{ width: `${(100 * r.votes * grow) / top}%` }} />
-                </span>
-                <span class="poll-votes">{Math.round(r.votes * grow)}</span>
-                {r.you && <span class="poll-you">you</span>}
-              </div>
-            );
-          })}
-          {yourRow && (
-            <div class="poll-row you">
-              <span class="poll-move">{seenSan(fen, yourRow.move)}</span>
+  // (Crowd: the vote bars count up as the ghosts come in, then hold. Nov 1: the box is as tall as the bars and the one
+  // result line; the brilliant find is a mark on its bar; the result is one line, the score then your move and the best.)
+  const poll = useMemo(() => {
+    if (match.boss) return null;
+    // The bars the box holds: yours and the brilliant find's move always, then the most voted (five, as before).
+    const yourRow = rows.find((r) => r.you) ?? null;
+    const brilRow = shout ? (rows.find((r) => shout.moves.includes(r.move)) ?? null) : null;
+    const cand = rows.filter((r, i) => i < 5 || r === yourRow || r === brilRow);
+    const must = [...new Set([yourRow, brilRow].filter((r) => !!r))];
+    const keep = new Set([...must, ...cand.filter((r) => !must.includes(r))].slice(0, slots));
+    const bars = cand.filter((r) => keep.has(r));
+    const mark = landed && shout ? shout : null;
+    const youFound = !!mark && mark.players.some((id) => match.isYou(id));
+    const allowance = me ? allowanceShort(me) : null;
+    return (
+      <div class="poll" role="status" ref={pollBox}>
+        {bars.map((r) => {
+          const win = landed && r.move === mine.result.playedMove;
+          const marked = !!mark && mark.moves.includes(r.move);
+          return (
+            <div key={r.move} class={`poll-row${win ? " win" : ""}${landed && !win ? " lose" : ""}${r.you ? " you" : ""}`}>
+              <span class="poll-move">{seenSan(fen, r.move)}</span>
               <span class="poll-bar">
-                <i style={{ width: `${(100 * yourRow.votes * grow) / top}%` }} />
+                <i style={{ width: `${(100 * r.votes * grow) / top}%` }} />
               </span>
-              <span class="poll-votes">{Math.round(yourRow.votes * grow)}</span>
-              <span class="poll-you">you</span>
-            </div>
-          )}
-          {mine.king !== undefined && (mine.kingCalls ?? 0) > 0 && (
-            <div class={`poll-row king-row${landed && mine.king ? " win" : ""}`}>
-              <span class="poll-move">👑 King</span>
-              <span class="poll-bar">
-                <i style={{ width: `${Math.min(100, (100 * (mine.kingCalls ?? 0) * grow) / Math.max(1, voters))}%` }} />
-              </span>
-              <span class="poll-votes">{Math.round((mine.kingCalls ?? 0) * grow)}</span>
-            </div>
-          )}
-          {landed && shout && (
-            <div class={`brilliant-line shoutout${shout.players.some((id) => match.isYou(id)) ? " you" : ""}`} role="status">
-              <span class="brilliant-mark" aria-hidden="true">‼</span>
-              {/* One line (Nov 1): the names are cut with an ellipsis if they must be; the moves are on the bars already. */}
-              <span class="brilliant-text">
-                <strong>Brilliant find! </strong>
-                <span class="brilliant-names">{namesLine(shout.players, match)}</span>
-                <span> found it · +{shoutBonus}{shout.players.length > 1 ? " each" : ""}</span>
-              </span>
-            </div>
-          )}
-          {landed && bril && (
-            <div class={`brilliant-line${youBrilliant ? " you" : ""}`} role="status">
-              <span class="brilliant-mark" aria-hidden="true">‼</span>
-              <span>
-                <strong>{youBrilliant ? "Brilliant! " : "Brilliant move: "}</strong>
-                {bril.moves.map((m) => seenSan(fen, m)).join(" / ")} · only {bril.found} of {bril.total} found it
-                {youHelped ? " (with a power-up: it doesn't count)" : ""}
-              </span>
-            </div>
-          )}
-          {/* (Only for your own pick: a turn you watched has no line under the bars.) */}
-          {me && (
-            <div class="poll-result">
-              <span class={`round-score ${me.roundScore >= 0 ? "good" : "bad"}`}>{fmt(me.roundScore, dp)}</span>
-              <span class="muted small verdict">
-                {me.move && me.move === mine.bestMove ? `you found the best move, ${seenSan(fen, me.move)}` : `${me.move ? `you picked ${seenSan(fen, me.move)}` : "no move from you"} · best was ${seenSan(fen, mine.bestMove)}`}
-              </span>
-              {/* The second line (Nov 1): the opening allowance on your pick (what it took off, or why it didn't) and the
-                  50 v 50 streak's bonus in that score (CrowdScoring), on one line; cut with an ellipsis if they don't fit. */}
-              {(allowanceNote(me) || !!me.streakBonus) && (
-                <div class="poll-extras">
-                  {allowanceNote(me) && <span class="allowance-line">{allowanceNote(me)}</span>}
-                  {allowanceNote(me) && !!me.streakBonus && <span class="extras-sep" aria-hidden="true">·</span>}
-                  {!!me.streakBonus && (
-                    <span class="streak-note">
-                      <StreakFire count={me.streak ?? 0} /> +{me.streakBonus.toFixed(2)} streak
+              {/* The brilliant find (CrowdScoring): a small mark on its bar, its names and bonus in its label. */}
+              <span class="poll-mark">
+                {marked && (
+                  <span class={`brilliant-line shoutout${youFound ? " you" : ""}`} role="img" aria-label={`Brilliant find! ${namesLine(mark!.players, match)} found it · +${shoutBonus}${mark!.players.length > 1 ? " each" : ""}`}>
+                    <span class="brilliant-mark" aria-hidden="true">
+                      ‼
                     </span>
-                  )}
-                </div>
-              )}
+                    <span aria-hidden="true">
+                      +{shoutBonus}
+                      {mark!.players.length > 1 ? " each" : ""}
+                    </span>
+                  </span>
+                )}
+              </span>
+              <span class="poll-votes">{Math.round(r.votes * grow)}</span>
+              <span class="poll-you">{r.you ? "you" : ""}</span>
             </div>
-          )}
-        </div>
-      ),
-    [match, mine, still, landed, grow],
-  );
+          );
+        })}
+        {mine.king !== undefined && (mine.kingCalls ?? 0) > 0 && (
+          <div class={`poll-row king-row${landed && mine.king ? " win" : ""}`}>
+            <span class="poll-move">👑 King</span>
+            <span class="poll-bar">
+              <i style={{ width: `${Math.min(100, (100 * (mine.kingCalls ?? 0) * grow) / Math.max(1, voters))}%` }} />
+            </span>
+            <span class="poll-votes">{Math.round((mine.kingCalls ?? 0) * grow)}</span>
+          </div>
+        )}
+        {landed && bril && (
+          <div class={`brilliant-line${youBrilliant ? " you" : ""}`} role="status">
+            <span class="brilliant-mark" aria-hidden="true">‼</span>
+            <span>
+              <strong>{youBrilliant ? "Brilliant! " : "Brilliant move: "}</strong>
+              {bril.moves.map((m) => seenSan(fen, m)).join(" / ")} · only {bril.found} of {bril.total} found it
+              {youHelped ? " (with a power-up: it doesn't count)" : ""}
+            </span>
+          </div>
+        )}
+        {/* (Only for your own pick: a turn you watched has no result line.) */}
+        {me && (
+          <div class="poll-result">
+            <span class={`round-score ${me.roundScore >= 0 ? "good" : "bad"}`}>{fmt(me.roundScore, dp)}</span>
+            <span class="result-text">
+              {me.move ? `you ${seenSan(fen, me.move)}` : "no move"}
+              {me.move && me.move === mine.bestMove ? " · best move" : ` · best ${seenSan(fen, mine.bestMove)}`}
+              {allowance && ` · ${allowance}`}
+              {!!me.streakBonus && (
+                <>
+                  {" · "}
+                  <StreakFire count={me.streak ?? 0} /> +{me.streakBonus.toFixed(2)}
+                </>
+              )}
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  }, [match, mine, still, landed, grow, slots]);
 
   return (
     <div class={`screen game crowd${isCrowdFifty(match) ? " crowd-50" : ""}`} onClick={() => played && !stand && match.skipReveal()}>
