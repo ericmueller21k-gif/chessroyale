@@ -3022,12 +3022,14 @@ button.history-label {
   .screen.game .play-footer {
     gap: 6px;
   }
-  /* The middle box (Eric, Nov 1: "a static container in the size of the one"): one height on every phase of a turn, as
-     tall as its tallest content (--mid-h, measured in the browser at 390 px: six bars, a brilliant find, the result's two
-     lines). The power-up row, the status line and the vote results take turns in it, so the scoreboard under it never
-     moves (the e2e check in crowd.spec.ts, "the scoreboard never moves"). The board keeps its size on every phone. */
+  /* The middle box (Eric, Nov 1: "a static container in the size of the one"): one height on every phase of a turn. Round 6:
+     the height comes from the screen's height, 200 px on a tall phone and 112 px on a short one, so the panel under the
+     board keeps about 148 px (the quick chat's feed needs 31 px of it: chat.spec, panel.spec). It changes only when the
+     screen does, a resize or a turned phone. The power-up row, the status line and the vote results take turns in it, so
+     the scoreboard under it never moves (the e2e check in crowd.spec.ts, "the scoreboard never moves"). The board keeps
+     its size on every phone. */
   .screen.game.crowd-50 {
-    --mid-h: 200px;
+    --mid-h: clamp(112px, calc(var(--app-h) - 552px), 200px);
   }
   .screen.game.crowd-50 > .play-footer,
   .screen.game.crowd-50 > .poll {
@@ -3038,18 +3040,41 @@ button.history-label {
   }
   /* The middle box's content, compact (Nov 1: the box stays near the size of the usual vote results): one column, the
      bars a little thinner, and each line of the result and the brilliant find one line (cut with an ellipsis if need be). */
+  /* Round 6: the box can be 112 px, so the bars and the result are compact enough for the most bars that fit, at least the
+     top three, to share the box with the result's two lines and the brilliant find's one line. In px: a bar 13, the result
+     20 + 14, the brilliant find 18, 1 px between blocks: 14 v + 53 for v bars (v = 4: 109, v = 5: 123, v = 6: 137). So up
+     to 123 px of box: four bars, or the top three and yours when yours is outside them; up to 136.99 px: five, or the top
+     four and yours; from 137 px: all six. A bar is cut whole, from the bottom; yours is always drawn. */
   .screen.game.crowd-50 .poll {
     grid-template-columns: minmax(0, 1fr);
-    gap: 2px;
+    gap: 1px;
+    container-type: size;
   }
   .screen.game.crowd-50 .poll-row {
-    padding: 1px 8px;
+    height: 13px;
+    padding: 0 8px;
+    font-size: 12px;
+    line-height: 13px;
   }
   .screen.game.crowd-50 .poll-bar {
     height: 8px;
   }
   .screen.game.crowd-50 .brilliant-line {
-    padding: 2px 8px;
+    padding: 1px 8px;
+    font-size: 12px;
+    line-height: 14px;
+  }
+  @container (max-height: 123px) {
+    .screen.game.crowd-50 .poll-row:nth-child(n + 5):not(.you),
+    .screen.game.crowd-50 .poll:has(> .poll-row.you:nth-child(n + 4)) .poll-row:nth-child(n + 4):not(.you) {
+      display: none;
+    }
+  }
+  @container (min-height: 123.01px) and (max-height: 136.99px) {
+    .screen.game.crowd-50 .poll-row:nth-child(n + 6):not(.you),
+    .screen.game.crowd-50 .poll:has(> .poll-row.you:nth-child(n + 5)) .poll-row:nth-child(n + 5):not(.you) {
+      display: none;
+    }
   }
   .screen.game.crowd-50 .poll-result {
     display: grid;
@@ -3057,14 +3082,23 @@ button.history-label {
     justify-content: center;
     align-items: baseline;
     column-gap: 10px;
+    row-gap: 0;
   }
   .screen.game.crowd-50 .poll-result .round-score {
-    line-height: 1.1;
+    font-size: 20px;
+    line-height: 20px;
   }
   .screen.game.crowd-50 .poll-result .verdict {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+  }
+  .screen.game.crowd-50 .poll-extras,
+  .screen.game.crowd-50 .allowance-line {
+    font-size: 12px;
+    line-height: 14px;
   }
 
   .screen.game .waiting-banner {

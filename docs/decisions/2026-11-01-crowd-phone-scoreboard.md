@@ -116,3 +116,41 @@ Guard: `e2e/crowd.spec.ts`, "the scoreboard never moves: its top edge, height an
   3. the quick-chat rows collapse on those phones: breaks "nothing hidden".
   Changing the two checks is not an option taken here.
 - **Checks changed:** none.
+
+
+## Round 6 (Nov 1): short phones make room for the chat
+
+The director's call on Round 5's "not fixed" (option 1: a shorter middle box on short phones, the vote results packed into
+it; nothing hidden, and the board and the rules stay as they were).
+
+- **The box's height comes from the screen's height.** `--mid-h` is `clamp(112px, calc(var(--app-h) - 552px), 200px)` on a
+  50 v 50 phone (styles.css). The panel under the board is what's left: 552 px is the board's bottom and the gaps above it,
+  measured at 390 × 664 (board 314 px, top 70). Heights: 320 × 640 → 112, 375 × 667 → 115, 390 × 664 → 112, 700 → 148, 752
+  and taller → 200. It is a CSS value, so it changes only when `--app-h` does (a resize or a turned phone), never during a
+  turn; the board's width already depends on `--app-h` the same way.
+- **The floor is 112 px, not the 118 px the director set.** At 118 the chat-only panel (the "Chat full width" step of
+  `panel.spec.ts`) has a 27 px feed, and the check needs more than 30. That layout needs about 148 px under the board, so the
+  floor comes down 6 px. It still fits the content (below), with 3 px to spare at 112.
+- **The vote results fit the shorter box.** The bars, the result and the brilliant find are compact in a 50 v 50 on a phone:
+  a bar row is 13 px (its name 12 px, the bar 8 px); the result is 20 px + 14 px (the points, then the verdict, then the
+  allowance and streak line, each one line); a brilliant find is 18 px (one line, its names cut with an ellipsis). Each bar
+  takes 14 px with its gap, and the rest 53 px: four bars take 109 px, five 123, six 137.
+  - Up to 123 px of box: four bars. If yours is outside the first three, the first three and yours.
+  - From 123 px up to 137: five bars, or the first four and yours.
+  - From 137 px: all of them (five bars and yours, six at most).
+  - A bar is never drawn half: the ones that don't fit are not drawn (the bottom ones; yours always is).
+  This is a CSS container query on the vote box (`container-type: size`), so the count depends on the box's height only.
+- **The board stays main's size and place on every phone** (its top is 70 px at 390 × 844, `e2e/desktop-board.spec.ts`, and at
+  390 × 664, measured). The scoreboard's top edge and height are the same on every phase of a match.
+- **Measured** (Playwright, the phones' real CSS, a solo 50 v 50 turn and its reveal): 390 × 664: box 112, four bars (or three
+  and yours), the result, and a worst-case probe (four bars, the two-line result, a brilliant line) fits with nothing spilled
+  (scrollHeight = clientHeight). 375 × 667: box 115. 320 × 640: box 112. 390 × 844: box 200, six bars and the result. The
+  online split at 390 × 664 (with chat): panel 150 px, chat feed 37 px.
+- **Below about 644 px tall the panel gets less.** The board itself shrinks there (main's `app-h − 330` rule), so the space
+  under the board stays about 242 px and the panel is about 130 px: the chat's feed is then short of the 31 px. Nothing in the
+  e2e checks is that short (the e2e phone is 664). Director to judge: a smaller minimum bar count there, or the board's floor.
+- **Checks changed: none.** Named checks run locally, phone and desktop where they apply, all passing: `votes.spec.ts:54`,
+  `desktop-board.spec.ts:322`, `chat.spec.ts:75`, `panel.spec.ts:79`, the brilliant-find test in `crowd-scoring.spec.ts`,
+  and `crowd.spec.ts`'s "the board never moves or resizes during a turn" and "the scoreboard never moves".
+- **Seen, not changed:** in the split layout the scoreboard's header is narrow, so "White" shows as "Wh..." beside the
+  chat at 390 px. The pick header isn't part of this round; it's the side-by-side width.
