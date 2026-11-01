@@ -79,3 +79,5 @@ changed) → Maia bots (/home/user/cr-maia-bots, stopped mid-work, 14 files) →
   Open: #447 eval (main merged in 0cca5f8: short-chat CSS dropped, panel.spec emoji via picker; CI), #450 Timber
   (3f81dca: cast back at the corner like every boss; CI), #453 cuts (CI), #454 bots lobby 800-1500 (CI; not Maia: too slow).
   No helper running. Eric questions: Timber lead (2 pawns?), bot ratings scale (chess-site vs scoreboard), test-value review.
+- ~23:45 UTC: MERGED #453 cuts (1715dcf), #454 bots lobby (f1082ac), #447 eval bar off (2fbed8e). Deploy + main CI watchers on each.
+  Open: #450 Timber (e2f701e: town-bots and boss-select counts; CI). No helper running.
