@@ -75,3 +75,7 @@ changed) → Maia bots (/home/user/cr-maia-bots, stopped mid-work, 14 files) →
   #451 crowd panel: CI. Cuts and Maia WIP committed+pushed (claude/crowd-cuts, claude/maia-bots).
   NOW RUNNING (the one Opus): cuts round 2 (handoff notes/briefs/handoff-cuts-r2.md). Next: Maia bots round 2.
   Eric open questions: Timber lead rule OK?; solo 50v50 chat column on computer?; move Folio/Babur/Moo corner casts beside the board?
+- ~23:00 UTC: main GREEN on 9dfefa1 (#451 live: steady scoreboard, T/😊 chat, bots chat). Restart #2 at ~22:00 (disk kept).
+  Open: #447 eval (main merged in 0cca5f8: short-chat CSS dropped, panel.spec emoji via picker; CI), #450 Timber
+  (3f81dca: cast back at the corner like every boss; CI), #453 cuts (CI), #454 bots lobby 800-1500 (CI; not Maia: too slow).
+  No helper running. Eric questions: Timber lead (2 pawns?), bot ratings scale (chess-site vs scoreboard), test-value review.
