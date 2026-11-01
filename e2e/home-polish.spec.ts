@@ -55,6 +55,97 @@ test("phone home: one shadow under your pawn; Chess Town's button right under PL
   }
 });
 
+/**
+ * Chess Town's button under three skies (Eric, Nov 1; docs/decisions/2026-11-01-chess-town-skies.md): the device's clock picks day
+ * (06:00 to 17:00), dusk (17:00 to 19:00, the picture as drawn) or night (19:00 to 06:00, the lights on) as the page loads; ?sky= forces
+ * one. Nothing hidden, nothing shifts: the button, PLAY and everything under them keep their boxes under all three, the name keeps
+ * its look, and a sky picked at load doesn't swap while you look.
+ */
+test("Chess Town's button under day, dusk and night: the clock picks one as the page loads and keeps it, ?sky= forces one, and nothing moves or resizes", async ({ page }) => {
+  await named(page, "Test2");
+  const look = () =>
+    page.evaluate(() => {
+      const b = document.querySelector<HTMLElement>(".fd-town")!;
+      const box = (sel: string) => {
+        const r = document.querySelector(sel)!.getBoundingClientRect();
+        return [r.x, r.y, r.width, r.height].map((v) => Math.round(v * 10) / 10);
+      };
+      const label = getComputedStyle(b.querySelector(".fd-town-label")!);
+      // The picture as painted (the canvas's own pixels): how bright it is on average, and how many pixels are painted.
+      const cv = b.querySelector<HTMLCanvasElement>("canvas")!;
+      const px = cv.getContext("2d")!.getImageData(0, 0, cv.width, cv.height).data;
+      let sum = 0;
+      let n = 0;
+      for (let i = 0; i < px.length; i += 4)
+        if (px[i + 3]! > 200) {
+          sum += 0.299 * px[i]! + 0.587 * px[i + 1]! + 0.114 * px[i + 2]!;
+          n++;
+        }
+      const sky = getComputedStyle(b).backgroundImage.match(/rgb\((\d+), (\d+), (\d+)\)/)!.slice(1).map(Number);
+      return {
+        sky: b.dataset.sky,
+        town: box(".fd-town"),
+        play: box(".fd-play"),
+        other: box(".fd-other-label"),
+        cards: box(".rd-card"),
+        label: [label.color, label.webkitTextStrokeWidth, label.webkitTextStrokeColor, label.fontSize].join("|"),
+        painted: n,
+        picture: sum / n,
+        // The sky's top color, how bright.
+        skyTop: 0.299 * sky[0]! + 0.587 * sky[1]! + 0.114 * sky[2]!,
+      };
+    });
+  const load = async (query: string) => {
+    await page.goto("/" + query);
+    await page.locator(".fd-town").waitFor();
+    await page.evaluate(() => document.fonts.ready);
+    await expect.poll(async () => (await look()).painted, `${query}: the picture is drawn`).toBeGreaterThan(500);
+    return look();
+  };
+  // The clock picks it, at the device's own local time (every edge of the three windows).
+  const byClock = async (h: number, m: number) => {
+    await page.clock.setFixedTime(new Date(2026, 5, 15, h, m));
+    return load("?town=A");
+  };
+  const edges = [
+    [5, 59, "night"],
+    [6, 0, "day"],
+    [16, 59, "day"],
+    [17, 0, "dusk"],
+    [18, 59, "dusk"],
+    [19, 0, "night"],
+  ] as const;
+  const seen: Record<string, Awaited<ReturnType<typeof look>>> = {};
+  for (const [h, m, sky] of edges) {
+    const l = await byClock(h, m);
+    expect(l.sky, `${h}:${String(m).padStart(2, "0")}`).toBe(sky);
+    seen[sky] = l;
+  }
+  // The three looks: lighter sky and picture by day than at dusk, and much darker at night; the same boxes and the same name.
+  expect(seen.day!.skyTop).toBeGreaterThan(seen.dusk!.skyTop + 40);
+  expect(seen.night!.skyTop).toBeLessThan(seen.dusk!.skyTop - 15);
+  expect(seen.day!.picture).toBeGreaterThan(seen.dusk!.picture);
+  expect(seen.night!.picture).toBeLessThan(seen.dusk!.picture * 0.6);
+  for (const sky of ["day", "night"] as const)
+    for (const k of ["town", "play", "other", "cards", "label"] as const) expect(seen[sky]![k], `${sky}: ${k} as at dusk`).toEqual(seen.dusk![k]);
+  expect(seen.night!.label.startsWith("rgb(255, 255, 255)|"), "the name stays white with its outline").toBe(true);
+  // ?sky= wins over the clock, in either direction; ?night=1 is night.
+  expect((await load("?town=B&sky=night")).sky).toBe("night");
+  await page.clock.setFixedTime(new Date(2026, 5, 15, 22, 0));
+  expect((await load("?town=B&sky=day")).sky).toBe("day");
+  expect((await load("?town=B&night=1")).sky).toBe("night");
+  expect((await load("?town=B")).sky, "no ?sky=: the clock's 22:00").toBe("night");
+  // Picked as the page loads and never swapping while you look: the clock passing 19:00 changes nothing until the next load.
+  await page.clock.setFixedTime(new Date(2026, 5, 15, 18, 59));
+  expect((await load("?town=B")).sky).toBe("dusk");
+  await page.clock.setFixedTime(new Date(2026, 5, 15, 19, 1));
+  await page.waitForTimeout(1200);
+  const after = await look();
+  expect(after.sky, "still the dusk it opened with").toBe("dusk");
+  expect(after.town).toEqual(seen.dusk!.town);
+  expect((await load("?town=B")).sky, "a new load at 19:01").toBe("night");
+});
+
 test("home: your pawn hops on a phone and a computer alike, 4 s after home shows and then every 30 s, never under reduced motion; the hop's animation runs", async ({ page }) => {
   test.setTimeout(180_000);
   await named(page, "Test2");
