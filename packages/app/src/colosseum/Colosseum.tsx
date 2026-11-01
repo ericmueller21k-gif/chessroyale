@@ -1,32 +1,35 @@
 /**
  * Inside the Colosseum, the first look (Eric, Oct 30; docs/decisions/2026-10-30-colosseum-look.md, docs/areas/colosseum.md):
- * the arena from a seat in the stands (one of eight; "Change seat" picks another at random), or a player's view
- * (`?view=white` / `?view=black`), two town bots playing 3+2 on the giant board, and the overlay over it, as Eric's mockup:
+ * the arena from high over the board behind White (where it opens; one of four high views going round the board), or a seat
+ * in the stands (one of eight; "Change seat" picks another of the twelve at random), or a player's view (`?view=white` /
+ * `?view=black`), two town bots playing 3+2 on the giant board, and the overlay over it, as Eric's mockup:
  * each player's card (portrait, name, ELO, the pieces taken, the clock), the middle (the turn, the viewers, the last moves),
  * the flat board with its eval bar (this device's Stockfish, a low depth, only while this screen is open), the chat's box
  * (empty for now), Exit, Change seat and the gear.
  *
- * The arena is WebGL 2 (arena-gl.ts): three draw calls a frame, nothing allocated a frame, the crowd still but for its jump
- * (a queen taken). No WebGL 2: a still of the stands in its place, everything else the same.
+ * The arena is WebGL 2 (arena-gl.ts): with the gear's Pieces, Pixel (the default: the whole arena on one chunky pixel grid,
+ * the pixel set; ten draw calls), 3D (eight) or 2D (three); nothing allocated a frame, the crowd still but for its jump (a
+ * queen taken). No WebGL 2: a still of the stands in its place, everything else the same.
  *
  * Sound: Eric's hour of arena ambience (ambient.ts), streamed while the gear's "Ambient crowd noise" is Normal or Low; each
  * floor move's piece sound, as a played game's; a crowd's cheer with the jump when a queen is taken (those two under the
  * game's Sound, not the ambient's level).
  *
- * Test hooks (e2e, with the test switches on): `window.__colosseum` (`state()`, `seat(i)`, `flag()`, `jump()`, `sample()`),
- * and `?fast` makes the bots move at once and the next game come quickly.
+ * Test hooks (e2e, with the test switches on): `window.__colosseum` (`state()`, `seat(i)`, `flag()`, `jump()`, `sample()`,
+ * `pieces(style)`, `freeze()`, and for stills `lens(view)` and `place(pieces)`), and `?fast` makes the bots move at once and
+ * the next game come quickly.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { Board } from "../components/Board.tsx";
 import { Avatar } from "../components/Items.tsx";
-import { CycleRow, MatchMenu, SwitchRow } from "../components/MatchMenu.tsx";
+import { CycleRow, MatchMenu } from "../components/MatchMenu.tsx";
 import { crowdAnimations, onPrefsChange } from "../prefs.ts";
 import { COLOSSEUM_CHEER, play, warmFile, type SoundName } from "../sound.ts";
 import { testParams, testSwitchesAllowed } from "../test-switches.ts";
 import { COLISEUM_PLACE, isSprite } from "../town/world.ts";
-import { BLACK_VIEW, SEAT_VIEWS, VIEWS, otherSeat, railPitch, seats, turnLimits, viewFor } from "./arena.ts";
+import { BLACK_VIEW, SEAT_VIEWS, VIEWS, otherSeat, railPitch, seats, turnLimits, viewFor, viewsFor, type View } from "./arena.ts";
 import { AMBIENT_LEVELS, AMBIENT_LEVEL_NAME, Ambient, ambientLevelOf, type AmbientLevel } from "./ambient.ts";
-import { ArenaGL, SLIDE_S, buildCrowd } from "./arena-gl.ts";
+import { ArenaGL, PIECE_STYLES, PIECE_STYLE_NAME, SLIDE_S, buildCrowd, pieceStyleOf, type FloorPiece, type PieceStyle } from "./arena-gl.ts";
 import { PIECE_URL, RAIL, crowdArt, propArt, railingArt, sceneArt } from "./art.ts";
 import { floorEngine, type FloorEngine } from "./floor-engine.ts";
 import { FLOOR, FloorMatch, clockText, evalText, resultText, thinkMs, viewersText, type FloorState } from "./match.ts";
@@ -35,13 +38,17 @@ import "./colosseum.css";
 
 /** Ambient crowd noise (ambient.ts: Eric's arena ambience, streamed): Normal, Low or Off, remembered on this device; Normal by default. */
 const AMBIENT_KEY = "colosseum-ambient";
-/** The giant pieces in 3D (Eric, Oct 30: "a toggle … for 3D vs 2D pieces players can choose"), remembered on this device; off by default. */
-const PIECES_KEY = "colosseum-3d-pieces";
-const pieces3dOn = () => {
+/**
+ * The gear's Pieces (Nov 1; it replaces Oct 30's "3D pieces" on/off, Eric: "a toggle … for 3D vs 2D pieces players can
+ * choose"): Pixel (the default), 3D or 2D, remembered on this device. Anyone who had "3D pieces" on keeps 3D.
+ */
+const PIECES_KEY = "colosseum-pieces";
+const OLD_PIECES_KEY = "colosseum-3d-pieces";
+const pieceStyle = (): PieceStyle => {
   try {
-    return localStorage.getItem(PIECES_KEY) === "on";
+    return pieceStyleOf(localStorage.getItem(PIECES_KEY), localStorage.getItem(OLD_PIECES_KEY));
   } catch {
-    return false;
+    return "pixel";
   }
 };
 const ambientLevel = (): AmbientLevel => {
@@ -64,8 +71,10 @@ type Hooks = {
     state: () => object;
     seat: (i: number) => unknown;
     flag: () => unknown;
-    pieces: (style: "flat" | "3d") => unknown;
+    pieces: (style: PieceStyle) => unknown;
     freeze: () => unknown;
+    lens: (v: View | null) => unknown;
+    place: (pieces: FloorPiece[]) => unknown;
     jump: () => unknown;
     sample: () => { sky: number; hash: number } | null;
   };
@@ -76,9 +85,14 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const fpsEl = useRef<HTMLDivElement>(null);
   const [gl, setGl] = useState<boolean | null>(null);
-  const [view, setView] = useState(() => viewFor(new URLSearchParams(location.search).get("view"), Math.floor(Math.random() * SEAT_VIEWS)));
+  // The high view behind White (the director, Nov 1: Eric found the seats too close), or a player view (`?view=white`, `black`).
+  const [view, setView] = useState(() => viewFor(new URLSearchParams(location.search).get("view")));
   const viewRef = useRef(view);
   viewRef.current = view;
+  /** The views for this screen's shape (the high views' eyes set for it: arena.ts viewsFor), made when its size changes. */
+  const views = useRef<View[]>(VIEWS.slice());
+  /** (Tests, for stills: `lens`) a view of their own in place of the one chosen. */
+  const lens = useRef<View | null>(null);
   const turn = useRef({ yaw: 0, pitch: 0 });
   const jumpAt = useRef(-1e9);
   const arenaRef = useRef<ArenaGL | null>(null);
@@ -101,7 +115,7 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
       ambience.current = null;
     };
   }, []);
-  const [pieces3d, setPieces3d] = useState(pieces3dOn);
+  const [pieces, setPieces] = useState(pieceStyle);
   const [anim, setAnim] = useState(crowdAnimations);
   /** The railing's strip (arena-railing), drawn once. */
   const [rail] = useState(() => `url(${railingArt()})`);
@@ -113,8 +127,8 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
   useLayoutEffect(() => {
     const cv = canvas.current!;
     const el = box.current!;
-    // The giant pieces in 3D when the gear's "3D pieces" is on (remembered on this device); else the flat pieces.
-    const arena = ArenaGL.create(cv, pieces3dOn());
+    // The giant pieces as the gear's Pieces says (remembered on this device): Pixel, 3D or 2D.
+    const arena = ArenaGL.create(cv, pieceStyle());
     arenaRef.current = arena;
     setGl(!!arena);
     if (!arena) return;
@@ -142,6 +156,7 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
       arena.size(Math.max(1, Math.round(W * dpr)), Math.max(1, Math.round(H * dpr)));
       arena.shift.x = wide.matches && side ? (side.offsetWidth + 10) / W : 0;
       arena.shift.y = wide.matches && top ? (top.offsetHeight + 10) / H : 0;
+      views.current = viewsFor(W / H, wide.matches);
     };
     fit();
     const ro = new ResizeObserver(fit);
@@ -155,7 +170,7 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
     const frame = (now: number) => {
       const t = turn.current;
       const jump = reduced.matches || !animRef.current ? 99 : (now - jumpAt.current) / 1000;
-      arena.draw(VIEWS[viewRef.current]!, t.yaw, t.pitch, (now - t0.current) / 1000, jump);
+      arena.draw(lens.current ?? views.current[viewRef.current]!, t.yaw, t.pitch, (now - t0.current) / 1000, jump);
       if (showFps && fpsEl.current) {
         n++;
         if (!at) at = now;
@@ -182,7 +197,7 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
     };
     const move = (e: PointerEvent) => {
       if (!drag || e.pointerId !== drag.id) return;
-      const v = VIEWS[viewRef.current]!;
+      const v = views.current[viewRef.current]!;
       const aspect = el.clientWidth / Math.max(1, el.clientHeight);
       turnLimits(v, aspect, lim);
       const c = (v: number, m: number) => Math.max(-m, Math.min(m, v));
@@ -299,6 +314,7 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
           drawCalls: arenaRef.current?.drawCalls ?? 0,
           crowd: arenaRef.current?.crowdCount ?? 0,
           pieces: arenaRef.current?.pieceStyle ?? "flat",
+          pixelScale: arenaRef.current?.pieceStyle === "pixel" ? arenaRef.current.pixelScale : 0,
           game: s?.game ?? 0,
           plies: s?.moves.length ?? 0,
           status: s?.status ?? "waiting",
@@ -309,6 +325,8 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
       seat: (i) => testSwitchesAllowed() && setView(i),
       flag: () => testSwitchesAllowed() && match.current?.flag(),
       pieces: (style) => testSwitchesAllowed() && arenaRef.current?.setPieceStyle(style),
+      lens: (v) => testSwitchesAllowed() && (lens.current = v),
+      place: (p) => testSwitchesAllowed() && arenaRef.current?.setPieces(p, -1e9),
       freeze: () => {
         if (!testSwitchesAllowed()) return;
         frozenAt.current = performance.now();
@@ -323,7 +341,7 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
         const a = arenaRef.current;
         if (!a || !testSwitchesAllowed()) return null;
         const g = a.gl;
-        a.draw(VIEWS[viewRef.current]!, turn.current.yaw, turn.current.pitch, (performance.now() - t0.current) / 1000, 99);
+        a.draw(lens.current ?? views.current[viewRef.current]!, turn.current.yaw, turn.current.pitch, (performance.now() - t0.current) / 1000, 99);
         const W = g.drawingBufferWidth;
         const H = g.drawingBufferHeight;
         const px = new Uint8Array(4);
@@ -410,16 +428,17 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
           exit={null}
           extra={
             <>
-              <SwitchRow
+              <CycleRow
                 icon="♟"
-                label="3D pieces"
-                on={pieces3d}
+                label="Pieces"
+                value={PIECE_STYLE_NAME[pieces]}
+                lit
                 onClick={() => {
-                  const on = !pieces3d;
-                  setPieces3d(on);
-                  arenaRef.current?.setPieceStyle(on ? "3d" : "flat");
+                  const next = PIECE_STYLES[(PIECE_STYLES.indexOf(pieces) + 1) % PIECE_STYLES.length]!;
+                  setPieces(next);
+                  arenaRef.current?.setPieceStyle(next);
                   try {
-                    localStorage.setItem(PIECES_KEY, on ? "on" : "off");
+                    localStorage.setItem(PIECES_KEY, next);
                   } catch {
                     // (Not remembered: private mode.)
                   }
