@@ -380,6 +380,14 @@ describe("the FAQ's numbers come from the settings", () => {
     expect(moved).toContain("gives up 5 pawns' worth");
   });
 
+  it("the Crowd's cuts (Nov 1): how many go at each and after which move, from CROWD_KNOCKOUTS and CROWD_STAGE_ROUNDS", () => {
+    expect(section("modes")).toContain(
+      "No one goes out for the first 10 moves. Then the lowest scorers are cut, the same number from each team: 30 after move 10, 22 after move 15, 16 after move 19, 12 after move 23, 8 after move 26 and 4 after move 29, which leaves 8 for the team final. A boss final adds 1 more cut (4 after move 32); a duel adds 2 more cuts (4 after move 32 and 2 after move 34).",
+    );
+    const moved = section("modes", { ...FAQ_DEFAULTS, crowd: { ...FAQ_DEFAULTS.crowd, stageRounds: [12, 6] }, crowdKnockouts: { team: [50, 40], boss: [50, 40, 6], duel: [50, 40, 6, 2] } });
+    expect(moved).toContain("No one goes out for the first 6 moves. Then the lowest scorers are cut, the same number from each team: 50 after move 6 and 40 after move 9, which leaves 10 for the team final. A boss final adds 1 more cut (6 after move 12); a duel adds 2 more cuts (6 after move 12 and 2 after move 15).");
+  });
+
   it("a raid's scoring: 50 v 50's, the limit by crowd move, the strike by points given away; Boss alone as before; every number from RAID_SCORING", () => {
     const rs = FAQ_DEFAULTS.raid.crowdScoring!;
     const t = section("scoring");

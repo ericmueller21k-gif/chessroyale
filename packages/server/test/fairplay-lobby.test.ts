@@ -339,7 +339,7 @@ function finalLobby() {
     { now: () => now, send: (id, msg) => inbox.set(id, [...(inbox.get(id) ?? []), { ...msg, now } as ServerMessage]) },
     library,
     mulberry32(3),
-    { ...DEFAULT_SETTINGS, ...modeSettings("crowd", { augments: false }), finalFormat: "duel", knockoutsPerStage: [2, 2], firstStageRounds: 1, roundsPerStage: 1, boardIntroSeconds: 0 },
+    { ...DEFAULT_SETTINGS, ...modeSettings("crowd", { augments: false }), finalFormat: "duel", knockoutsPerStage: [2, 2], stageRounds: [], firstStageRounds: 1, roundsPerStage: 1, boardIntroSeconds: 0 },
   );
   const last = <T extends ServerMessage["t"]>(id: string, t: T) =>
     [...(inbox.get(id) ?? [])].reverse().find((m) => m.t === t) as Extract<ServerMessage, { t: T }> | undefined;

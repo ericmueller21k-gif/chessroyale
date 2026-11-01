@@ -14,9 +14,7 @@ describe("lobby: closing (LOBBY_LIFE)", () => {
     ...modeSettings("crowd", { augments: false }),
     finalFormat: format,
     knockoutsPerStage: CROWD_KNOCKOUTS[format],
-    // A real match's length (the test lobby's default is one round a stage).
-    firstStageRounds: 20,
-    roundsPerStage: 2,
+    // (A real match's length: the Crowd's own stages, CROWD_STAGE_ROUNDS, over the test lobby's one round a stage.)
   });
   /** Runs the match on its own clock: every timer as it falls due, with nobody picking or scoring. */
   const playOut = (L: ReturnType<typeof setup>, check?: () => void) => {

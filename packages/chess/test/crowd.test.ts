@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_TIERS, bossDef, crowdFinalBoss, crowdFinalists, fixedLevel, isPlayable, maiaTopRating, CROWD_KNOCKOUTS, DEFAULT_SETTINGS, RAID_SETTINGS, raidBossElo, bossElo, bossStartPly, bossInfo, botVotes, clockAfterVote, modeSettings, mulberry32, tallyVotes, voteZoneAt, PREGAME_VOTES, type Settings } from "@chessroyale/core";
+import { BOSS_TIERS, bossDef, crowdFinalBoss, crowdFinalists, fixedLevel, isPlayable, maiaTopRating, CROWD_KNOCKOUTS, DEFAULT_SETTINGS, roundsInStage, RAID_SETTINGS, raidBossElo, bossElo, bossStartPly, bossInfo, botVotes, clockAfterVote, modeSettings, mulberry32, tallyVotes, voteZoneAt, PREGAME_VOTES, type Settings } from "@chessroyale/core";
 import { bossIntroTimeline, bossShowMs, legalMoves, MatchRunner, moveNumber, START_FEN, sanLineToUci, type EngineLike, type Opening } from "../src/index.ts";
 
 const hash = (s: string) => {
@@ -68,12 +68,13 @@ describe("Crowd mode", () => {
     const { runner, sizes, plies } = await playKnockouts(settings, 1);
     // The plan's sizes, but for the bubble grace (CROWD_SCORING.cutGrace, Oct 24): a cut can keep a player or two in
     // within it, the cuts after take those places (cutCarry), and the ending has its size.
-    const plan = [84, 70, 58, 48, 40, 32, 26, 20, 16, 12, 8];
+    // Six cuts, after moves 10, 15, 19, 23, 26 and 29 (Eric, Nov 1: fewer, bigger cuts).
+    const plan = [70, 48, 32, 20, 12, 8];
     sizes.forEach((n, i) => expect(n - plan[i]!).toBeGreaterThanOrEqual(0));
     sizes.forEach((n, i) => expect(n - plan[i]!).toBeLessThanOrEqual(2));
     expect(sizes).toHaveLength(plan.length);
     expect(sizes.at(-1)).toBe(8);
-    expect(plies).toBe(20 + 2 * 10);
+    expect(plies).toBe(2 * 29);
     // The final: each team's four, the side to move first, alternating teams.
     let f = runner.final!;
     expect(f.format).toBe("team");
@@ -181,9 +182,9 @@ describe("Crowd mode", () => {
     const { runner, sizes, plies } = await playKnockouts(settings, 4);
     expect(crowdFinalists("boss")).toBe(4);
     expect(sizes.at(-1)).toBe(4);
-    // The duel's cuts, stopping at four: two from each team at the last two.
-    expect(sizes).toEqual([84, 70, 58, 48, 40, 32, 26, 20, 16, 12, 8, 6, 4]);
-    expect(plies).toBe(20 + 2 * 12);
+    // The duel's cuts, stopping at four: two from each team at the last, after move 32.
+    expect(sizes).toEqual([70, 48, 32, 20, 12, 8, 4]);
+    expect(plies).toBe(2 * 32);
     const boss = runner.boss!;
     expect(boss.id).toBe(crowdFinalBoss()!.id);
     expect(boss.id).toBe("recluse");
@@ -426,8 +427,8 @@ describe("Crowd mode", () => {
       if (runner.stageComplete()) runner.endStage();
       rounds++;
     }
-    // (The knockouts: the first stage's rounds, then the rest a stage each.)
-    expect(rounds).toBe(settings.firstStageRounds + (CROWD_KNOCKOUTS.boss.length - 1) * settings.roundsPerStage);
+    // (The knockouts: each stage's rounds, CROWD_STAGE_ROUNDS.)
+    expect(rounds).toBe(CROWD_KNOCKOUTS.boss.reduce((n, _, i) => n + roundsInStage(settings, i), 0));
     // Each bot paid what it thought beyond the 2 s increment, never more than 8 s a move, from its 3:00.
     for (const p of runner.state.players.filter((x) => x.movesTimed > 0)) {
       expect(p.bankMs).toBe(Math.max(0, 180_000 + p.movesTimed * 2_000 - p.thinkMsTotal));
@@ -469,13 +470,13 @@ describe("Crowd mode", () => {
       await runner.score(new Map());
       if (runner.stageComplete()) runner.endStage();
     }
-    // The knockouts end after move 22 (44 plies).
-    expect([1, 5, 6, 10, 11, 15, 16, 20, 21, 22].map((m) => seen.get(m))).toEqual([10, 10, 15, 15, 20, 20, 25, 25, 30, 30]);
+    // The knockouts end after move 32 (64 plies).
+    expect([1, 5, 6, 10, 11, 15, 16, 20, 21, 32].map((m) => seen.get(m))).toEqual([10, 10, 15, 15, 20, 20, 25, 25, 30, 30]);
     // The boss battle starts again from the starting position (the Hidden Boss's), but its clock counts on from where the
     // game was: 30 s.
-    expect(runner.boss!.clockFromMove).toBe(23);
+    expect(runner.boss!.clockFromMove).toBe(33);
     runner.deal();
-    expect(runner.clockMove()).toBe(23);
+    expect(runner.clockMove()).toBe(33);
     expect(runner.moveClock()).toBe(30);
   });
 

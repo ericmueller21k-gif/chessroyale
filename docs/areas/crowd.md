@@ -72,8 +72,14 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   away, not by these ([bosses.md](bosses.md), "The strike"). Online raids and a Solo raid (Raid with bots) score this
   way; **Boss alone** keeps the old scoring (`BOSS_ALONE_SCORING`, put over the settings by `SoloMatch` when a raid has
   no bots).
-- **The cut.** After each stage (`firstStageRounds`, then `roundsPerStage`) the lowest scorers are knocked out
-  (`knockoutsPerStage`; in 50 v 50 the same number from each team). **Ties at the line go through** (`cutPlan` in
+- **The cut.** After each stage (`roundsInStage`: Classic `firstStageRounds`, then `roundsPerStage`; 50 v 50 its own
+  list, `stageRounds`) the lowest scorers are knocked out (`knockoutsPerStage`; in 50 v 50 the same number from each team).
+  **50 v 50's cuts** (Eric, Nov 1: fewer, bigger cuts, longer rounds; docs/decisions/2026-11-01-crowd-cuts.md):
+  `CROWD_STAGE_ROUNDS` [20, 10, 8, 8, 6, 6, 6, 4] plies, so cuts after moves 10, 15, 19, 23, 26 and 29 taking
+  `CROWD_KNOCKOUTS` 30, 22, 16, 12, 8 and 4 (100 → 70 → 48 → 32 → 20 → 12 → 8: the team final from move 30), then 4
+  after move 32 (the boss final's four) and 2 after move 34 (the duel). A test's `?rounds=N` empties `stageRounds`, so
+  every stage is N rounds. The top bar counts down in moves, as the board numbers them ("Move 12 · cut in 4"; "cut now"
+  on the stage's last move). **Ties at the line go through** (`cutPlan` in
   `match.ts`): everyone tied exactly (`sameScore`) with the last player through stays in (in 50 v 50 so does anyone within
   `cutGrace` of them, the bubble grace, except at the last cut); nobody goes out on thinking
   time or a coin flip. What that leaves over is owed by the cuts still to come, spread evenly over them (`cutCarry`, per

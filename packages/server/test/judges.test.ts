@@ -63,7 +63,7 @@ function setup(opts: { judges?: Partial<JudgeConfig>; server?: boolean; settings
       library,
       mulberry32(seed),
       // Crowd 50 v 50: one board; the team to move picks (bots fill the seats), and every device judges.
-      { ...DEFAULT_SETTINGS, ...modeSettings("crowd", { augments: false }), roundsPerStage: 1, firstStageRounds: 1, boardIntroSeconds: 0, ...opts.settings },
+      { ...DEFAULT_SETTINGS, ...modeSettings("crowd", { augments: false }), stageRounds: [], roundsPerStage: 1, firstStageRounds: 1, boardIntroSeconds: 0, ...opts.settings },
     );
   let core = make(7);
   const take = (id: string, t: Msg["t"]) => {

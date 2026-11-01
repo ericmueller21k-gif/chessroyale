@@ -49,6 +49,7 @@ function crowdFinal(patch: Partial<Settings> = {}, seed = 7) {
       finalFormat: "boss",
       knockoutsPerStage: CROWD_KNOCKOUTS.boss,
       // (Two rounds a stage: with one, the team that hasn't moved yet is all tied at the first cut.)
+      stageRounds: [],
       firstStageRounds: 2,
       roundsPerStage: 2,
       boardIntroSeconds: 0,

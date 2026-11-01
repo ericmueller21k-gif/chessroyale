@@ -264,7 +264,7 @@ describe("lobby", () => {
 
 describe("lobby: Crowd mode", () => {
   it("50 v 50: the watching team gets the board, everyone sees the vote, and the cut's augment vote sets the clock", () => {
-    const L = setup({ ...modeSettings("crowd"), augments: false, cutClockVote: true, firstStageRounds: 2, roundsPerStage: 2, boardIntroSeconds: 0 });
+    const L = setup({ ...modeSettings("crowd"), augments: false, cutClockVote: true, stageRounds: [], firstStageRounds: 2, roundsPerStage: 2, boardIntroSeconds: 0 });
     L.core.connect(undefined, "Ann", "computer");
     L.core.connect(undefined, "Bo", "phone");
     L.core.message("p1", { t: "start" });
@@ -291,10 +291,10 @@ describe("lobby: Crowd mode", () => {
     }
     const brk = L.last("p1", "stageBreak")!;
     expect(brk.augments).toBe(true);
-    // Up to the cut's 16 (8 a team): ties at the line go through (at move 1 the opening allowance makes many). The cut
-    // is exactly the rows the leaderboard marked, and the cutoff counts the rest.
+    // Up to the first cut's 30 (15 a team): ties at the line go through (at move 1 the opening allowance makes many). The
+    // cut is exactly the rows the leaderboard marked, and the cutoff counts the rest.
     expect(brk.knockedOut.length).toBeGreaterThan(0);
-    expect(brk.knockedOut.length).toBeLessThanOrEqual(16);
+    expect(brk.knockedOut.length).toBeLessThanOrEqual(CROWD_KNOCKOUTS.team[0]!);
     expect([...brk.knockedOut].sort()).toEqual(brk.standings.filter((s) => s.cut).map((s) => s.id).sort());
     expect(brk.cutoff).toBe(brk.standings.filter((s) => !s.out).length - brk.knockedOut.length);
     L.core.message("p1", { t: "augment", choice: "more" });
@@ -304,7 +304,7 @@ describe("lobby: Crowd mode", () => {
   });
 
   it("the home page's live window: a running match reports its board and the crowd's top votes on the move just played (no names)", () => {
-    const L = setup({ ...modeSettings("crowd"), augments: false, firstStageRounds: 4, roundsPerStage: 2, boardIntroSeconds: 0 });
+    const L = setup({ ...modeSettings("crowd"), augments: false, stageRounds: [], firstStageRounds: 4, roundsPerStage: 2, boardIntroSeconds: 0 });
     L.core.connect(undefined, "Ann", "computer");
     L.core.connect(undefined, "Bo", "phone");
     expect(L.core.liveSummary().board).toBeNull();
@@ -337,7 +337,7 @@ describe("lobby: Crowd mode", () => {
   });
 
   it("live tallies: nobody sees picks before making their own; the watching team sees them; the bot plan is scored", () => {
-    const L = setup({ ...modeSettings("crowd"), augments: false, firstStageRounds: 4, roundsPerStage: 2, boardIntroSeconds: 0 });
+    const L = setup({ ...modeSettings("crowd"), augments: false, stageRounds: [], firstStageRounds: 4, roundsPerStage: 2, boardIntroSeconds: 0 });
     L.core.connect(undefined, "Ann", "computer");
     L.core.connect(undefined, "Bo", "phone");
     L.core.message("p1", { t: "start" });
@@ -675,7 +675,7 @@ describe("lobby: Crowd mode", () => {
   });
 
   it("the boss final online (always the Hidden Boss): the host plays his moves, he never strikes, results carry the outcome", () => {
-    const L = setup({ ...modeSettings("crowd", { augments: false }), finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, firstStageRounds: 1, roundsPerStage: 1, boardIntroSeconds: 0, bossMaxMoves: 7 });
+    const L = setup({ ...modeSettings("crowd", { augments: false }), finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, stageRounds: [], firstStageRounds: 1, roundsPerStage: 1, boardIntroSeconds: 0, bossMaxMoves: 7 });
     // (Ann has switched the eval bar off; Bo's app is from before the setting: it doesn't say.)
     L.core.connect(undefined, "Ann", "computer", false, null, undefined, undefined, null, false);
     L.core.connect(undefined, "Bo", "phone");
