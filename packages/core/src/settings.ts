@@ -587,12 +587,14 @@ export const WEAK_BOTS: Pick<Settings, "botSkillRange" | "peopleFirst"> = { botS
  * whoever is online; "a player making the engine's best moves should finish 1st or 2nd").
  * docs/decisions/2026-11-01-bot-lobby.md.
  *
- * - `ratings`: each bot's rating, fixed by its name (the same player every match), on the game's own scale: the rating
- *   the scoreboard shows (RATING_CURVE: points given away a move). A bell curve (`mean`, `sd`), held within `min` to
- *   `max`, rounded to `step`. About 89% of bots land between 800 and 1500, about 5% on either side.
+ * - `ratings`: each bot's rating, fixed by its name (the same player every match), on a chess site's scale (Maia's,
+ *   Lichess's). A bell curve (`mean`, `sd`), held within `min` to `max`, rounded to `step`. About 89% of bots land
+ *   between 800 and 1500, about 5% on either side.
  * - `skillAt`: the bot's temperature (botPick, over the judge's top moves with its `botRandomMoveChance`) that gives
- *   away a rating's points a move in a Crowd 50 v 50 (lossForRating; fitted on `reports/crowd-bots/probe*.jsonl`,
- *   `packages/sim/scripts/crowd-bots-sim.ts`). Between points, along a line in log(temperature); held at its ends.
+ *   away, in a Crowd 50 v 50, the points a move Maia gives away at that rating (reports/maia-calibration.md's per-move
+ *   table; the temperatures' losses measured by `packages/sim/scripts/crowd-bots-sim.ts probe`, reports/crowd-bots.md).
+ *   No temperature gives away more than about 7.3 a move, so 600 sits at 128. Between points, along a line in
+ *   log(temperature); held at its ends. Stockfish-style, not Maia: Maia is too slow for a team turn on a phone.
  */
 export const BOT_LOBBY = {
   ratings: { mean: 1150, sd: 250, min: 600, max: 2200, step: 100 },

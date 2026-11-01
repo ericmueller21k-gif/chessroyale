@@ -124,8 +124,6 @@ function summary() {
     "wip-maia": "First try: Maia at Maia ratings around 1150",
     "wip-tuned": "First try: Stockfish-style at the temperatures matching those Maia ratings",
     tuned: "**After** (BOT_LOBBY: ratings around 1150, Stockfish-style)",
-    "before-own": "Before; the player's own engine",
-    "wip-tuned-own": "First try, Stockfish-style; the player's own engine",
   };
   const kinds = Object.keys(label).filter((k) => rowsOf(k).length);
   // (Before and after: a bot's rating is the one its temperature plays like today; the first try's kept its own labels.)
@@ -174,7 +172,21 @@ function summary() {
       out.push(`| ${bands[i]} to ${bands[i + 1]} | ${fs.length} | ${moves} | ${(fs.reduce((a, f) => a + (f.raw ?? 0), 0) / Math.max(1, moves)).toFixed(2)} |`);
     }
   }
-  out.push("");
+  out.push(
+    "",
+    "**Why the engine-best player isn't always 1st.** Its only losses come from the judge changing its mind: a bot's pick",
+    "outside the top line, searched on its own, or a close call re-checked deeper (700k nodes), can score above the top line",
+    "the player took, and then that line counts as a loss (traced in the first try's 3rd and 5th places: one to four such moves). The finalists are ranked",
+    "on points given away a move over the whole match, and the luckiest of 50 bots on a team often give away under one.",
+    "",
+    "**Maia for the bots' moves (measured Nov 1, this machine, Node, the Maia box on one thread):** 73 ms an ask (median;",
+    "90th percentile 81 ms); one team turn of 50 bots needs one ask per rating among them (10 for 50 of the bot names), so",
+    "0.74 s a turn (most 0.86 s). In the first try's full matches, with the judge's Stockfish busy beside it: 197 ms an",
+    "ask on average, the slowest 1.4 s, and 2.2% of picks fell back to Stockfish-style within its 2.5 s budget. A phone",
+    "(the CPU slowed 4x, as for the bosses' Maia): about 0.3 s an ask, 3 s a team turn, past that budget. Stockfish-style",
+    "picks cost nothing extra: they choose from the judge's top moves, already searched.",
+    "",
+  );
   writeFileSync(root + "reports/crowd-bots.md", out.join("\n"));
   console.log(out.join("\n"));
 }
