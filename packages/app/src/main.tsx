@@ -19,6 +19,8 @@ import { loadRide } from "./components/rides/load.ts";
 import "./styles.css";
 // (A computer's board as big as the window's height: after styles.css, whose computer sizes it takes over.)
 import "./board-size.css";
+// (A computer's game screens: the side menu beside them, and a boss battle's top, Nov 1: after board-size.css.)
+import "./game-frame.css";
 
 // Errors on this device are reported (problems.ts), from the start.
 watchErrors();

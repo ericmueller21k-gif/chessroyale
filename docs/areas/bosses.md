@@ -328,7 +328,7 @@ build): online, phase 1 won is the crowd's victory):
   would, then strikes on d2; 2, it steps to d6 and d5 and your rook takes it hidden (Ke2, Rd1, Rxd5); in both Kd1 and Kd2
   are moves the board you see offers and the real board refuses); admins
   see "Trigger ultimate (testing)" in any boss battle (`ultimateTestButton`, `triggerUltimate`: the ultimate as the next
-  crowd turn begins, no warning; on a computer in the title line with the brain's pill, before the gear; on a
+  crowd turn begins, no warning; on a computer in the column beside the board, before the gear (Nov 1: no title line); on a
   phone a tiny ⚡ beside the God King's head, Oct 24). A boss's attack on a king: `?boss=hollow&laststand=1` (Boss alone: your first move
   calls the God King's Last Stand, and Hollow lashes him) and `?boss=hollow&mate=1` (Boss alone from 1.f3 e5 2.g4, the
   boss to move: he mates at once, lashes your king, then the result; `settings.bossMateTest`, solo only).
@@ -521,10 +521,10 @@ build): online, phase 1 won is the crowd's victory):
   bottom-right, mirroring him (feet level, as far from the board; in Boss alone, since Oct 28, your pawn stands there and
   he stands to its right); the status box under the board at its width; the column beside the board starts after the God King. The eval bar draws behind them both. A phone is unchanged.
   **The board's size** (Eric, Oct 29, as chess.com's; docs/decisions/2026-10-29-desktop-board-size.md, `board-size.css`): the
-  window's height less 200 px (the title line, the boss bar up to Puddles' 61 px, the dock's row), never wider than its
-  column: 880 px at 1920 × 1080, 600 at 1280 × 800 in Boss alone (a raid's scoreboard leaves 456 there). The list, the
+  window's height less 123 px (Nov 1: no title line; the boss bar up to Puddles' 61 px, the dock's row, the margins), never wider than its
+  column: 952 px at 1920 × 1080, 512 at 1280 × 640 in Boss alone (Nov 1; 600 at 1280 × 800; a raid's board is 456 there, its scoreboard beside it). The list, the
   dock, your pawn, the God King, the boss and Babur's pump follow it (they're placed from the board). Boss alone's empty
-  left column is 216 px, 240 without the eval bar (was the scoreboard's 360; room for the boss's text box, which ends 258 px left of the board); Babur's is `170 + 0.175 × (the window's height − 200)` px, so his pump,
+  left column is 196 px, 240 without the eval bar (Nov 1, round 2: 216 before; room for the boss's text box, up to 220 px, inside the window); Babur's is `153 + 0.175 × (the window's height − 200)` px (170 before), so his pump,
   which grows with the board, keeps its place beside him at every size (`pumpPlace` sizes it for the board this layout
   draws: the board's own element, not the squares' last size, which flipped it between there and the taller bar).
   From 900 to 1099 px the boss is drawn at 1× by the eval bar, so he's whole in the window; the board makes room only

@@ -7,6 +7,8 @@ import { GlobalChat } from "./GlobalChat.tsx";
 import { FriendsPanel, InviteToast } from "./Friends.tsx";
 import { Pic } from "../home-art/Pic.tsx";
 import { ARENA_TOWN_BADGE } from "../home-art/arena-town-badge.ts";
+import { MOUSE_LAYOUT } from "./MatchMenu.tsx";
+import { useMedia } from "./QuickChat.tsx";
 
 /** Where the computer's side menu can take you. */
 export interface FrontNav {
@@ -40,26 +42,31 @@ const crown = () => (
   </Icon>
 );
 
-function Item({ label, icon, on, onClick }: { label: string; icon: ComponentChildren; on?: boolean; onClick: () => void }) {
+function Item({ label, icon, on, tip, onClick }: { label: string; icon: ComponentChildren; on?: boolean; tip?: boolean; onClick: () => void }) {
   return (
-    <button type="button" class={`fd-menu-item${on ? " on" : ""}`} aria-current={on ? "page" : undefined} onClick={onClick}>
+    <button type="button" class={`fd-menu-item${on ? " on" : ""}`} aria-current={on ? "page" : undefined} title={tip ? label : undefined} onClick={onClick}>
       <span class="fd-menu-icon">{icon}</span>
       <span>{label}</span>
     </button>
   );
 }
 
-/** The computer's left column: the logo, where to go, and Settings at the bottom (like the big chess sites). */
-export function SideMenu({ page, nav }: { page?: FrontPage; nav: FrontNav }) {
+/**
+ * The computer's left column: the logo, where to go, and Settings at the bottom (like the big chess sites). `game`: on a
+ * match's screen (GameFrame, Nov 1), where each item leaves the match first (App.tsx), its labels as tooltips.
+ */
+export function SideMenu({ page, nav, game = false }: { page?: FrontPage; nav: FrontNav; game?: boolean }) {
   const p = account().profile;
+  const tip = game;
   return (
     <nav class="fd-side" aria-label="Menu">
       <Logo onClick={nav.home} />
       <div class="fd-menu">
-        <Item label="Play" on={page === "home" || page === "queue"} onClick={nav.home} icon={<Icon d="M7 4.5v15l12-7.5z" />} />
-        <Item label="Chess Town" on={page === "town"} onClick={nav.chessTown} icon={<Pic ch={ARENA_TOWN_BADGE} scale={1} class="fd-menu-crest" />} />
-        <Item label="Boss Battle" on={page === "raid"} onClick={nav.soloBoss} icon={crown()} />
+        <Item tip={tip} label="Play" on={page === "home" || page === "queue"} onClick={nav.home} icon={<Icon d="M7 4.5v15l12-7.5z" />} />
+        <Item tip={tip} label="Chess Town" on={page === "town"} onClick={nav.chessTown} icon={<Pic ch={ARENA_TOWN_BADGE} scale={1} class="fd-menu-crest" />} />
+        <Item tip={tip} label="Boss Battle" on={page === "raid"} onClick={nav.soloBoss} icon={crown()} />
         <Item
+          tip={tip}
           label="Play with friends"
           on={page === "lobby"}
           onClick={nav.friends}
@@ -73,6 +80,7 @@ export function SideMenu({ page, nav }: { page?: FrontPage; nav: FrontNav }) {
           }
         />
         <Item
+          tip={tip}
           label="Shop & crates"
           on={page === "shop"}
           onClick={nav.shop}
@@ -83,10 +91,10 @@ export function SideMenu({ page, nav }: { page?: FrontPage; nav: FrontNav }) {
             </Icon>
           }
         />
-        <Item label="Profile" on={page === "profile"} onClick={nav.profile} icon={<DressedPawn size="ring" look={p?.locker?.look} ride />} />
+        <Item tip={tip} label="Profile" on={page === "profile"} onClick={nav.profile} icon={<DressedPawn size="ring" look={p?.locker?.look} ride />} />
       </div>
       <div class="fd-menu fd-menu-end">
-        <Item label="Settings" on={page === "settings"} onClick={nav.settings} icon={<GearIcon />} />
+        <Item tip={tip} label="Settings" on={page === "settings"} onClick={nav.settings} icon={<GearIcon />} />
       </div>
     </nav>
   );
@@ -134,6 +142,23 @@ export function RightPanel({ onProfile, onFriends, chat, onSignIn }: { onProfile
       {/* The home page's global chat (the social lane's: components/GlobalChat.tsx). */}
       {chat && <GlobalChat onSignIn={onSignIn} />}
     </aside>
+  );
+}
+
+/**
+ * A match's screen on a computer with a mouse (Nov 1): the side menu beside it, the match in the rest (game-frame.css). A
+ * phone or a tablet has no frame: the screen is as it was.
+ */
+export function GameFrame({ children, nav }: { children: ComponentChildren; nav: FrontNav }) {
+  // (Not on a touch screen: the front door's side menu is shown at 1024 px and wider whatever the pointer, which would move a
+  // tablet's screen, so it isn't drawn there. The frame is the same element either way (no box of its own on a phone or a
+  // tablet: game-frame.css), so a window that crosses the line keeps its screen mounted.)
+  const mouse = useMedia(MOUSE_LAYOUT);
+  return (
+    <div class="gm-frame">
+      {mouse && <SideMenu nav={nav} game />}
+      <div class="gm-main">{children}</div>
+    </div>
   );
 }
 

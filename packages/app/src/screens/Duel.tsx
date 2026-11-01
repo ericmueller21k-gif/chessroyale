@@ -228,6 +228,7 @@ export function DuelFront({
   queue,
   session,
   frame,
+  gameFrame,
   onCancel,
   onBot,
   onAway,
@@ -237,6 +238,8 @@ export function DuelFront({
   queue: DuelQueue | null;
   session: DuelSession | null;
   frame: (stage: ComponentChildren) => VNode;
+  /** The game's board (not the search or the versus moment, which are the front door's): a computer's side menu beside it. */
+  gameFrame?: (board: VNode) => VNode;
   onCancel: () => void;
   onBot: () => void;
   /** Home (or anywhere else) while the search goes on: the bar on every screen brings you back. */
@@ -282,7 +285,8 @@ export function DuelFront({
       </div>
     );
   if (snap.phase === "waiting" || snap.phase === "versus") return frame(versusStage(snap));
-  return <DuelBoard session={session} snap={snap} now={now} onHome={onHome} onAgain={onAgain} />;
+  const board = <DuelBoard session={session} snap={snap} now={now} onHome={onHome} onAgain={onAgain} />;
+  return gameFrame ? gameFrame(board) : board;
 }
 
 function DuelBoard({ session, snap, now, onHome, onAgain }: { session: DuelSession; snap: DuelSnapshot; now: number; onHome: () => void; onAgain: () => void }) {

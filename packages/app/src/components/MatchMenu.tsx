@@ -30,6 +30,9 @@ export interface MatchExit {
 
 /** The game's computer layout (styles.css, "Computer layout"). */
 export const COMPUTER_LAYOUT = "(min-width: 900px) and (min-height: 600px)";
+/** A computer with a mouse (not a touch screen: a tablet on its side keeps its layout, Nov 1): the screens of Nov 1's
+ * computer layout (the side menu, the boss bar at the top, the column's tools). */
+export const MOUSE_LAYOUT = "(min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine)";
 
 /** A flag (resign), drawn so it looks the same everywhere (an emoji flag doesn't). */
 export function FlagIcon({ size = 18 }: { size?: number }) {

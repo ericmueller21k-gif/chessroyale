@@ -295,7 +295,7 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
   }, [revived]);
   // (The header and the boss's place don't move with the frame: drawn as the match changes, useStillKey.)
   const still = useStillKey(match, now);
-  const hud = useMemo(() => <Hud match={match} />, [match, still]);
+  const hud = useMemo(() => <Hud match={match} keepTitle />, [match, still]);
   const bossSide = useMemo(() => <BossSide match={match} />, [match, still]);
   const strip = useMedia(STRIP_LAYOUT);
   if (!v) return null;
@@ -514,7 +514,7 @@ export function SimulScreen({ match }: { match: GameView }) {
   const [watch, setWatch] = useState(0);
   // (The header and the boss's place don't move with the frame: drawn as the match changes, useStillKey.)
   const still = useStillKey(match, now);
-  const hud = useMemo(() => <Hud match={match} />, [match, still]);
+  const hud = useMemo(() => <Hud match={match} keepTitle />, [match, still]);
   const bossSide = useMemo(() => <BossSide match={match} />, [match, still]);
   // (Back to your board, the first: the same callback every frame, so the dock isn't drawn again for it.)
   const back = useCallback(() => setWatch(match.simul?.boards[0]?.id ?? 0), [match]);

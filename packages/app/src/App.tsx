@@ -11,7 +11,7 @@ import { bossAlone, cutLabel, elimination, isCrowd, roundLive, scoreDp, towerVie
 import { NetMatch, forgetSeat, hasSeat, lobbyStatus, type LobbyGone, type LobbyResult } from "./net.ts";
 import { exitFor, exitMatch, onExitMatch } from "./match-exit.ts";
 import { useRecluseTalk } from "./recluse-talk.ts";
-import { MatchMenu } from "./components/MatchMenu.tsx";
+import { ConfirmExit, MatchMenu, type MatchExit } from "./components/MatchMenu.tsx";
 import type { LeftHow } from "@chessroyale/chess";
 import { SoloMatch } from "./solo.ts";
 import { FinalScreen } from "./screens/Final.tsx";
@@ -39,7 +39,7 @@ import { TownPage, type BotGameAsk } from "./town/TownPage.tsx";
 import { ColosseumPage } from "./colosseum/ColosseumPage.tsx";
 import { FaqScreen } from "./screens/Faq.tsx";
 import { Logo } from "./components/FrontDoor.tsx";
-import { FrontFrame, type FrontNav } from "./components/FrontMenu.tsx";
+import { FrontFrame, GameFrame, type FrontNav } from "./components/FrontMenu.tsx";
 import { useAccount } from "./screens/Profile.tsx";
 import { LandingScreen } from "./screens/Landing.tsx";
 import { LegalScreen, leaveLegal, legalPageOf, type LegalPage } from "./screens/Legal.tsx";
@@ -51,7 +51,7 @@ import { StageBreakScreen } from "./screens/StageBreak.tsx";
 import { ChatBubble, useMedia } from "./components/QuickChat.tsx";
 import { LobbyChat } from "./components/LobbyChat.tsx";
 import { PartyClient, SquadsClient, createParty, currentParty, currentSquads, forgetSquads, partyStatus, squadsQueue, squadsSeat, squadsStatus, squadsTestLobby } from "./squads.ts";
-import { SquadsQueue, SquadsScreen, squadsWaiting } from "./screens/Squads.tsx";
+import { SquadsQueue, SquadsScreen, squadsExit, squadsWaiting } from "./screens/Squads.tsx";
 import { PartySheet } from "./screens/SquadsParty.tsx";
 import { BotDuel, DuelQueue, NetDuel, savedDuelQueue, setRanked1v1Starter, startRanked1v1, type DuelSession } from "./duel.ts";
 import { confirmLeaveDuelQueue, duelFoundAlert, setAwaySearch } from "./components/DuelQueueBar.tsx";
@@ -249,6 +249,10 @@ const storedGuest = () => {
 };
 
 type AnyMatch = GameView & { dispose(): void };
+/** The pages a computer's side menu goes to from a match (each leaves the match first, App's matchPage). */
+type MatchPage = Exclude<keyof FrontNav, "signIn">;
+/** The game a computer's side menu leaves (App's sideNav): a match, a 1 v 1 duel, a Squads lobby or auto chess. */
+type SideFrom = "match" | "duel" | "squads" | "auto";
 
 /** What's on screen, for error reports (problems.ts): a match's phase (a boss battle's moment too), else the page. */
 function screenOf(match: AnyMatch | null, page: string): string {
@@ -300,6 +304,10 @@ export function App() {
    * town reads it). A reload during that game lands there too: its address carries it (`/town?at=6.0.3`).
    */
   const [townSeat, setTownSeat] = useState<string | null>(() => (location.pathname === "/town" ? new URLSearchParams(location.search).get("at") : null));
+  // A computer's side menu on a match's screen (Nov 1): its item asks Resign or Leave first (the gear's own confirm), then
+  // goes there. `sideAsk`: the confirm on screen, and the item behind it; `sideNext`: the page to go to once the match is out.
+  const [sideAsk, setSideAsk] = useState<{ exit: MatchExit; then: MatchPage } | null>(null);
+  const [sideNext, setSideNext] = useState<{ page: MatchPage; from: SideFrom } | null>(null);
   // Chose "play vs bots as a guest" on the landing page (this device remembers).
   const [guest, setGuest] = useState(storedGuest);
   const [inviteSkipped, setInviteSkipped] = useState(false);
@@ -1165,6 +1173,62 @@ export function App() {
     },
     signIn: () => chooseGuest(false),
   };
+  /**
+   * A computer's side menu on a game screen (GameFrame, Nov 1): the page it asks for. Something to leave (`exit`): its
+   * confirm first, the same as the gear's (ConfirmExit), then the leaving; the page once that's out (sideNext, below). Nothing
+   * to leave: `idle` leaves at once, then the page.
+   */
+  const sideNav = (from: SideFrom, exit: () => MatchExit | null, idle: () => void): FrontNav => {
+    const page = (k: MatchPage) => () => {
+      const e = exit();
+      if (!e) {
+        idle();
+        nav[k]();
+        return;
+      }
+      setSideAsk({ exit: { ...e, go: () => { setSideNext({ page: k, from }); e.go(); } }, then: k });
+    };
+    return { home: page("home"), chessTown: page("chessTown"), soloBoss: page("soloBoss"), friends: page("friends"), shop: page("shop"), profile: page("profile"), settings: page("settings"), friendsList: page("friendsList") };
+  };
+  const matchNav = sideNav("match", () => (match ? exitFor(match) : null), () => { if (match) leave(); });
+  const duelSnap = duel?.snapshot() ?? null;
+  const duelOver = duelSnap?.phase === "over";
+  const duelNav = sideNav(
+    "duel",
+    () => (duelSnap && !duelOver ? { kind: duelSnap.moves.length < 2 ? "leave" : "resign", note: duelSnap.moves.length < 2 ? "The game is called off: no result, and no rank change." : "It counts as a loss.", go: () => duel!.resign() } : null),
+    leaveDuel,
+  );
+  const squadsNav = sideNav("squads", () => (squads ? squadsExit(squads, { onHome: leaveSquads, onResign: () => squads.resign(), onAgain: squadsAgain, party: !!squads.party }) : null), leaveSquads);
+  // (Auto chess's own leave: its gear's row and question.)
+  const autoBack = () => {
+    setShowAutoChess(false);
+    history.replaceState(null, "", "/");
+  };
+  const autoNav = sideNav("auto", () => ({ kind: "leave", note: "You go home, and this game ends. Nothing is recorded.", go: autoBack, row: "Leave", ask: "Leave this game?" }), () => {});
+  // (Once the game is out, the page the side menu asked for: a match gone or at its results, a duel over, a squad out, auto chess left.)
+  useEffect(() => {
+    const s = sideNext;
+    if (!s) return;
+    const out =
+      s.from === "match"
+        ? !match || match.phase.kind === "results" || (match instanceof NetMatch && match.exited)
+        : s.from === "duel"
+          ? !duel || duelOver
+          : s.from === "squads"
+            ? !squads || !!squads.resigned
+            : !showAutoChess;
+    if (!out) return;
+    setSideNext(null);
+    if (s.from === "match" && match) leave();
+    if (s.from === "duel") leaveDuel();
+    if (s.from === "squads" && squads) leaveSquads();
+    nav[s.page]();
+  });
+  const sideConfirm = sideAsk && (
+    <div class="mm-scrim" onClick={() => setSideAsk(null)}>
+      <ConfirmExit exit={sideAsk.exit} onCancel={() => setSideAsk(null)} />
+    </div>
+  );
   // Friends (friends.ts): what an invite can point at (a private lobby still waiting, your party), making one at the
   // front door in the home screen's mode, and joining someone's. Set every render, so it sees this render's state.
   setInviteHost({
@@ -1258,6 +1322,7 @@ export function App() {
           queue={duelQueue}
           session={duel}
           frame={(stage) => homeFrame(stage, undefined, false)}
+          gameFrame={(board) => <GameFrame nav={duelNav}>{board}</GameFrame>}
           onCancel={leaveDuel}
           onBot={botDuel}
           onAway={duelGoAway}
@@ -1272,6 +1337,7 @@ export function App() {
           }
         />
         {overlayD}
+        {sideConfirm}
       </>
     );
   }
@@ -1303,19 +1369,22 @@ export function App() {
       );
     return (
       <>
-        <SquadsScreen client={squads} actions={{ onHome: leaveSquads, onResign: () => squads.resign(), onAgain: squadsAgain, party: !!squads.party }} />
+        <GameFrame nav={squadsNav}>
+          <SquadsScreen client={squads} actions={{ onHome: leaveSquads, onResign: () => squads.resign(), onAgain: squadsAgain, party: !!squads.party }} />
+        </GameFrame>
         {overlayS}
+        {sideConfirm}
       </>
     );
   }
   if (!match && showAutoChess) {
     return (
-      <AutoChessScreen
-        onBack={() => {
-          setShowAutoChess(false);
-          history.replaceState(null, "", "/");
-        }}
-      />
+      <>
+        <GameFrame nav={autoNav}>
+          <AutoChessScreen onBack={autoBack} />
+        </GameFrame>
+        {sideConfirm}
+      </>
     );
   }
   if (!match && showColosseum) {
@@ -1644,66 +1713,74 @@ export function App() {
   if (!tower)
     return (
       <>
-        {screen}
-        {bubble}
-        {overlay}
+        <GameFrame nav={matchNav}>
+          {screen}
+          {bubble}
+          {overlay}
+        </GameFrame>
+        {sideConfirm}
       </>
     );
   return (
-    <div class="arena">
-      {overlay}
-      {noTower ? (
-        <div class="tower-space" aria-hidden="true" />
-      ) : (
-      <aside class="tower-side">
-        {(() => {
-          const v = towerView(match);
-          return (
-            <>
-              {v.teamLabel && <div class="tower-team">{v.teamLabel}</div>}
-              <RaceTower standings={v.standings} cutoff={v.cutoff} done={roundLive(match) ? match.done : undefined} cutLabel={cutLabel(match)} floats={match.chat?.floats()} bank={!(match as GameView).simul} dp={scoreDp(match.settings)} />
-            </>
-          );
-        })()}
-      </aside>
-      )}
-      {screen}
-      {bubble}
-    </div>
-  );
-}
-
-const boardKey = (b: { id: number; generation: number; ply: number }) => `${b.id}:${b.generation}:${b.ply}`;
-
-/** Going back into a match already being played: the splash until its screen comes (not the queue it started in). */
-const resumingSplash = (match: AnyMatch) =>
-  match instanceof NetMatch && match.resuming && (match.phase.kind === "loading" || (match.phase.kind === "lobby" && match.started));
-
-/**
- * Waiting for a match to fill: a queue you joined with PLAY (from the tap, while connecting, and in its lobby), or
- * Solo's bots taking their seats. Private lobbies with a code have their own screen.
- */
-function inQueue(match: AnyMatch): boolean {
-  if (resumingSplash(match)) return false;
-  const k = match.phase.kind;
-  if (match instanceof SoloMatch) return k === "lobby";
-  return match instanceof NetMatch && match.auto && (k === "loading" || k === "lobby");
-}
-
-function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () => void }) {
-  const p = match.phase;
-  if (resumingSplash(match))
-    return (
-      <div class="fd-splash">
-        <Logo />
-      </div>
+    <>
+      <GameFrame nav={matchNav}>
+        <div class="arena">
+          {overlay}
+          {noTower ? (
+            <div class="tower-space" aria-hidden="true" />
+          ) : (
+          <aside class="tower-side">
+            {(() => {
+              const v = towerView(match);
+              return (
+                <>
+                  {v.teamLabel && <div class="tower-team">{v.teamLabel}</div>}
+                  <RaceTower standings={v.standings} cutoff={v.cutoff} done={roundLive(match) ? match.done : undefined} cutLabel={cutLabel(match)} floats={match.chat?.floats()} bank={!(match as GameView).simul} dp={scoreDp(match.settings)} />
+                </>
+              );
+            })()}
+          </aside>
+          )}
+          {screen}
+          {bubble}
+        </div>
+      </GameFrame>
+      {sideConfirm}
+      </>
     );
-  // (The queue, inQueue above, is the home screen's: see App.)
-  switch (p.kind) {
-    case "loading":
+  }
+
+  const boardKey = (b: { id: number; generation: number; ply: number }) => `${b.id}:${b.generation}:${b.ply}`;
+
+  /** Going back into a match already being played: the splash until its screen comes (not the queue it started in). */
+  const resumingSplash = (match: AnyMatch) =>
+    match instanceof NetMatch && match.resuming && (match.phase.kind === "loading" || (match.phase.kind === "lobby" && match.started));
+
+  /**
+   * Waiting for a match to fill: a queue you joined with PLAY (from the tap, while connecting, and in its lobby), or
+   * Solo's bots taking their seats. Private lobbies with a code have their own screen.
+   */
+  function inQueue(match: AnyMatch): boolean {
+    if (resumingSplash(match)) return false;
+    const k = match.phase.kind;
+    if (match instanceof SoloMatch) return k === "lobby";
+    return match instanceof NetMatch && match.auto && (k === "loading" || k === "lobby");
+  }
+
+  function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () => void }) {
+    const p = match.phase;
+    if (resumingSplash(match))
       return (
-        <div class="screen center">
-          <p class="muted">Connecting…</p>
+        <div class="fd-splash">
+          <Logo />
+        </div>
+      );
+    // (The queue, inQueue above, is the home screen's: see App.)
+    switch (p.kind) {
+      case "loading":
+        return (
+          <div class="screen center">
+            <p class="muted">Connecting…</p>
         </div>
       );
     case "lobby":

@@ -235,8 +235,8 @@ test("an admin's test trigger against Ginger, pressed during your turn: the bliz
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
   const btn = page.locator(".ult-test");
   await expect(btn).toHaveAccessibleName("Trigger ultimate (testing)");
-  // (A computer: in the title line, before sound and the flag; a phone: under the dock. Eric, Oct 13.)
-  await expect(page.locator(".hud-row .ult-test")).toHaveCount(test.info().project.name === "desktop" ? 1 : 0);
+  // (A computer: beside the board, before the gear, where the title line's tools went on Nov 1; a phone: under the dock. Eric, Oct 13.)
+  await expect(page.locator(".gm-tools .ult-test")).toHaveCount(test.info().project.name === "desktop" ? 1 : 0);
   await btn.click();
   await expect(btn).toHaveAccessibleName("Ultimate next turn (testing)");
   await expect(btn).toBeDisabled();
