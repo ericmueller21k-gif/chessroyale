@@ -76,3 +76,18 @@ Guard: `e2e/crowd.spec.ts`, "the scoreboard never moves: its top edge, height an
   cut zone, your row's tint and the cut line are unchanged.
 - **Test checks.** None changed or added. The shoutout check's regex ("Brilliant find! You found … · +1") still
   matches the new line.
+
+## Round 4 (Nov 1): the board never moves between the screens
+
+- **The failing check** ("a rare brilliant find: … and the board doesn't move", 320 × 640): the line above the board on the
+  play screen ("Your pick for Black · … picked") wrapped to two lines (28 px) and the reveal's line is one (14 px), so the
+  board moved 14 px. Main wraps the same line here, so the check fails on main in this environment too (the director
+  reports main's CI passing it: the wrap depends on the font's width there). The branch didn't change that line.
+- **The decision:** in a 50 v 50 on a phone (`.screen.game.crowd-50`), the line above the board is at least two lines tall
+  (`min-height: 28px`) on every phase. The text sits at the top of the box, and nothing is cut or hidden. The alternatives
+  were rejected: an ellipsis would hide "picked", which main shows in full; a shorter line would drop "Your pick for", which
+  main shows too.
+- **The cost:** on the reveal and the watch screen the board and the scoreboard under it sit 14 px lower, so the scoreboard is
+  14 px shorter there. The board's size is unchanged.
+- **Checks:** none changed. Passing at 320 × 640: the brilliant-find check, "the board never moves or resizes during a turn
+  (Crowd and Classic)", and "the scoreboard never moves".
