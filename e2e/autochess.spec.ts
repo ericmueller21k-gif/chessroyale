@@ -1720,7 +1720,7 @@ test("a fight plays to a result, HP changes by the rule, and the next round star
   expect(errors).toEqual([]);
 });
 
-test("a pawn reaching the far end cashes in: it lands, a coin sounds, \"+1\" floats up from its square, it leaves, and the 1 gold is in the next round's line", async ({ page }) => {
+test("a pawn reaching the far end cashes in: it lands, a coin sounds, \"+2\" floats up from its square, it leaves, and the 2 gold is in the next round's line", async ({ page }) => {
   test.setTimeout(90_000);
   const errors = watchErrors(page);
   // (A test switch, `?fightfen=`: the fight starts from this position. White's king on h1 is shut in and its h-pawn blocked, so its one
