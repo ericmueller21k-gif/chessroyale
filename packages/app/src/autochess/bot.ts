@@ -13,7 +13,7 @@ import { type Army, type Color, type Held, type Kind, type Offer, type StarCount
  * free; it buys XP now and then (when that gives it a level), and when its board is full (its level's limit) it holds a good piece
  * on its bench for the next round. It sells nothing. Everything random comes from the round's seed.
  *
- * **Stars** (v8, Eric Oct 22: the bot "buys star-ups as a player would (nearly always, with 5 gold), stars its bench too"): any of its offers that is a star-up it can pay for
+ * **Stars** (v8, Eric Oct 22: the bot "buys star-ups as a player would (nearly always, with 5 gold"; 1 gold since the TFT-style economy), stars its bench too"): any of its offers that is a star-up it can pay for
  * (`starUpTarget`: a piece of its own that can star up, on the board or held) it buys, `bot.starUpChance` of the time, before anything else and whatever its board's room
  * (a merge adds no piece). In the move step (the "stars" mode) it moves each of its starred pieces: a 2-star the best of its legal moves by the engine, a 3-star the best of
  * a sample of the empty squares of its half (`botStarMoves`).
@@ -26,8 +26,6 @@ import { type Army, type Color, type Held, type Kind, type Offer, type StarCount
 const WEIGHTS: Record<Kind, readonly [number, number]> = { p: [1, 1], n: [4, 3], b: [4, 3], r: [3, 4], q: [0, 3] };
 /** After this many rounds it buys the late mix. */
 const LATE_ROUND = 6;
-/** A queen only when this much more is left after it (it buys a queen when rich, not with its last coins). */
-const QUEEN_CHANGE = 40;
 
 /** The star-ups in a shop that the bot can pay for with `budget`, best first: the one that gives the most stars, then of the dearest piece, then in slot order. */
 export function botStarUps(shop: Shop, army: Army, budget: number, cfg: AutoChessSettings = AUTOCHESS): { offer: Offer; slot: number; target: StarTarget }[] {
@@ -58,7 +56,7 @@ export interface BotBuy {
  * buys from its own shop (a piece on a square of its half: it picks among what is on offer by its weights, and a bought slot rolls
  * a new offer), now and then rerolling when it has gold to spare (more often when the shop shows nothing but pawns). It buys XP now
  * and then, when that would give it a level (room for another piece) or it is rich; with its board full (its level's number of pieces)
- * it may hold a good piece on its bench instead (not a pawn). Sometimes it keeps a hundred banked for interest. `army`: its army
+ * it may hold a good piece on its bench instead (not a pawn). Sometimes it banks gold for interest (whole `interest.per`s, up to the interest's top). `army`: its army
  * when it is done, bench included; `level`: its level and XP after what it bought (`from`: what it had).
  */
 export function botBuys(
@@ -72,7 +70,8 @@ export function botBuys(
   const per = cfg.interest.per;
   let budget = gold;
   // (Saving: only when the interest is worth it and a few pieces' worth is left to spend.)
-  if (gold >= per + 30 && rng() < cfg.bot.saveChance) budget = gold - Math.min(Math.floor((gold - 30) / per), cfg.interest.max / cfg.interest.gold) * per;
+  const keep = cfg.bot.saveKeep;
+  if (gold >= per + keep && rng() < cfg.bot.saveChance) budget = gold - Math.min(Math.floor((gold - keep) / per), cfg.interest.max / cfg.interest.gold) * per;
   const t = Math.min(1, (round - 1) / (LATE_ROUND - 1));
   const seed = (rng() * 2 ** 32) >>> 0;
   let army = start;
@@ -105,7 +104,7 @@ export function botBuys(
   let rerolls = 0;
   let holds = 0;
   for (let looks = 0; looks < 60; looks++) {
-    // A star-up first (v8): nearly always, with the 5 gold; it adds no piece, so a full board or bench doesn't stop it. The one that gives the most stars, then the dearest piece.
+    // A star-up first (v8): nearly always, for `starUpCost`; it adds no piece, so a full board or bench doesn't stop it. The one that gives the most stars, then the dearest piece.
     const ups = botStarUps(shop, army, budget, cfg);
     if (ups.length && rng() < cfg.bot.starUpChance) {
       const { offer, slot, target } = ups[0]!;
@@ -127,7 +126,7 @@ export function botBuys(
         // (A star-up isn't a piece to buy or hold: it was weighed above.)
         if (starUpTarget(army, offer, cfg)) return false;
         if (holding ? offer.kind === "p" || holdBlock(army, budget, offer, cfg) : buyBlock(army, budget, offer, cfg, level.level)) return false;
-        return !(offer.kind === "q" && budget < priceOf("q", cfg) + QUEEN_CHANGE);
+        return !(offer.kind === "q" && budget < priceOf("q", cfg) + cfg.bot.queenChange);
       });
     const bare = options.every((o) => o.offer.kind === "p");
     // Gold to spare: a reroll (at the same climbing price as yours, `rerollPrice`) leaves enough for a knight and the bot has the gold it likes to keep.

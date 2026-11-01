@@ -8,7 +8,7 @@ describe("auto chess: what the result says", () => {
   it("the fight's rules, in the box while it plays, from the settings (short enough for a 320 px phone)", () => {
     expect(fightRulesWords()).toBe(
       "One engine plays both armies. A side left with only its king loses. Gains count, not army size: 3 pawns gained for 6 moves wins, " +
-        "and a stall (repeats, 10 moves each with no capture, or 60) goes to the side that gained more. A pawn at the far end cashes in for +5 gold.",
+        "and a stall (repeats, 10 moves each with no capture, or 60) goes to the side that gained more. A pawn at the far end cashes in for +1 gold.",
     );
     expect(fightRulesWords().length).toBeLessThanOrEqual(280);
     expect(fightRulesWords({ ...AUTOCHESS, decisiveMargin: 500, quietCap: 8 })).toContain("5 pawns gained for 6 moves wins, and a stall (repeats, 8 moves each");
@@ -60,14 +60,14 @@ describe("auto chess: what the result says", () => {
   });
 
   it("the gold line adds up: savings, income, interest, streak, survivors (the empty ones left out)", () => {
-    const g = goldBreakdown(3, { gold: 120, hp: 20, wins: 2, losses: 0, refund: { survivors: 11 } });
-    expect(g.total).toBe(120 + 11 + 140 + 10 + 10);
-    expect(goldWords(g)).toBe("Next round: 120 saved + 140 income + 10 interest + 10 streak + 11 survivors = 291 gold");
+    const g = goldBreakdown(3, { gold: 12, hp: 20, wins: 2, losses: 0, refund: { survivors: 3 } });
+    expect(g.total).toBe(12 + 3 + 14 + 1 + 1);
+    expect(goldWords(g)).toBe("Next round: 12 saved + 14 income + 1 interest + 1 streak + 3 survivors = 31 gold");
     const plain = goldBreakdown(2, { gold: 0, hp: 20, wins: 0, losses: 1, refund: { survivors: 0 } });
-    expect(goldWords(plain)).toBe("Next round: 0 saved + 120 income = 120 gold");
-    // A fight's cash-ins (5 gold a pawn) get their own part.
-    const cashed = goldBreakdown(2, { gold: 20, hp: 20, wins: 0, losses: 0, refund: { survivors: 2, cashIns: 10 } } as never);
-    expect(goldWords(cashed)).toBe("Next round: 20 saved + 120 income + 2 survivors + 10 from cash-ins = 152 gold");
+    expect(goldWords(plain)).toBe("Next round: 0 saved + 12 income = 12 gold");
+    // A fight's cash-ins (1 gold a pawn) get their own part.
+    const cashed = goldBreakdown(2, { gold: 2, hp: 20, wins: 0, losses: 0, refund: { survivors: 2, cashIns: 2 } } as never);
+    expect(goldWords(cashed)).toBe("Next round: 2 saved + 12 income + 2 survivors + 2 from cash-ins = 18 gold");
   });
 
   it("a clock counts down in whole seconds, rounded up", () => {
@@ -83,20 +83,21 @@ describe("auto chess: survivors", () => {
     // White has a queen on a8; Black has a rook and a pawn.
     const fen = "Q3k3/8/8/8/8/8/p7/r3K3 w - - 0 1";
     expect(piecesOn(fen)).toEqual({ w: ["q"], b: ["p", "r"] });
-    expect(refundFor(piecesOn(fen).w)).toEqual({ survivors: Math.floor(90 * AUTOCHESS.survivorRefund) });
+    expect(refundFor(piecesOn(fen).w)).toEqual({ survivors: Math.round(9 * AUTOCHESS.survivorRefund) });
+    expect(refundFor(piecesOn(fen).w).survivors).toBe(2);
     const { match, result } = settleRound(beginRound(newMatch(1)).match, "you", { you: piecesOn(fen).w, bot: piecesOn(fen).b });
     // You won in round 1 with one piece left: the bot loses 1 (the round's number) and nothing for the piece (1 for every 3).
     expect(result.damage).toBe(1);
     expect(match.bot.hp).toBe(23);
   });
 
-  it("the settings hold the design's numbers (v4, v5, v6, v7): tune them here, nowhere else", () => {
+  it("the settings hold the design's numbers (v4, v5, v6, v7, the TFT-style economy): tune them here, nowhere else", () => {
     expect(AUTOCHESS).toMatchObject({
-      shop: { slots: 4, reroll: { first: 5, step: 1, max: 10 } },
+      shop: { slots: 4, reroll: { first: 2, step: 1, max: 5 } },
       sellBack: 0.75,
       benchSlots: 4,
       lockIn: false,
-      lockInBonus: 25,
+      lockInBonus: 3,
       buySeconds: 30,
       lockSeconds: 3,
       circlesDelaySeconds: 2,
@@ -104,15 +105,15 @@ describe("auto chess: survivors", () => {
       adjustMode: "stars",
       adjustSeconds: 7,
       adjustMoves: 1,
-      starUpCost: 5,
+      starUpCost: 1,
       maxStars: 3,
       moveBase: 5,
       movePerStar: 3,
-      levels: { start: 4, max: 10, freeXp: 2, buyXp: 4, buyXpCost: 20, xpToNext: [4, 8, 12, 16, 20, 24] },
+      levels: { start: 4, max: 10, freeXp: 2, buyXp: 4, buyXpCost: 4, xpToNext: [4, 8, 12, 16, 20, 24] },
       kingRanks: 2,
       hopEvery: [7, 10],
       fightMoveMs: 600,
-      cashInGold: 5,
+      cashInGold: 1,
       fightFastAfter: 30,
       fightFastMoveMs: 300,
       moveCap: 60,
@@ -125,15 +126,16 @@ describe("auto chess: survivors", () => {
       damagePerRound: 1,
       piecesPerDamage: 3,
       startGold: 0,
-      income: { first: 100, step: 20, max: 200 },
-      interest: { per: 100, gold: 10, max: 30 },
+      income: { first: 10, step: 2, max: 20 },
+      interest: { per: 10, gold: 1, max: 5 },
       survivorRefund: 0.25,
       queenLimit: 1,
-      bot: expect.objectContaining({ lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 3, rerollGold: 70, rerollChance: 0.06, rerollChanceBare: 0.2, maxHolds: 2, holdChance: 0.5, placeBy: 0.7, maxXpBuys: 3, xpGold: 60, xpRichGold: 140, xpChance: 0.2, xpChanceFull: 0.7 }),
+      bot: expect.objectContaining({ lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 3, rerollGold: 7, rerollChance: 0.06, rerollChanceBare: 0.2, maxHolds: 2, holdChance: 0.5, placeBy: 0.7, maxXpBuys: 3, xpGold: 6, xpRichGold: 14, xpChance: 0.3, xpChanceFull: 0.8, saveChance: 0.3, saveKeep: 8, queenChange: 4 }),
       maxPawns: 8,
       pawnsPerFile: 3,
     });
-    expect(AUTOCHESS.winStreakGold).toEqual([{ n: 2, gold: 10 }, { n: 4, gold: 20 }, { n: 5, gold: 30 }]);
+    expect(AUTOCHESS.prices).toEqual({ p: 1, n: 3, b: 3, r: 5, q: 9 });
+    expect(AUTOCHESS.winStreakGold).toEqual([{ n: 2, gold: 1 }, { n: 4, gold: 2 }, { n: 5, gold: 3 }]);
     expect(AUTOCHESS.lossStreakGold.every((r) => r.gold === 0)).toBe(true);
   });
 });
