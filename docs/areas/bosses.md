@@ -928,7 +928,8 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
 - Text a player must read to play (Lights out's prompt) stays on screen as long as it applies, outside the speech box.
 - A boss's words go into its voice (`speech.tsx`), never into a box a screen or a moment owns: a line lives as long as
   the rule says, not as long as the screen that said it. Nothing hides a speech box to make it fit: it shrinks, then
-  moves into view. Test a line's whole time on screen, every frame (`e2e/boss-speech.spec.ts`).
+  moves into view, by whole pixels rounded away from the edge (rounded to the nearest, Lights out's four-row prompt
+  stayed a quarter pixel above a computer's window, Nov 1). Test a line's whole time on screen, every frame (`e2e/boss-speech.spec.ts`).
 - A power's moment that shows something for less than about a second (a thaw's melt) is checked by watching for it from
   before the boss's move (`watchFor`, `watchSquares`), never by `toBeVisible` after its banner: its looks are up to a
   second apart (Oct 12, "A melt the test blinked through").
