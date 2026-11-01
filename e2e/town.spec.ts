@@ -1265,7 +1265,7 @@ test("a real player's card (a test player; no real players walk in the town yet)
 
 /** What `__townRide()` answers (rides, Oct 31). */
 interface RideSeen {
-  you: { ride: string | null; color: string | null; ready: boolean; anim: "" | "idle" | "move"; frame: number; facing: number; box: { x0: number; y0: number; x1: number; y1: number; fx: number; fy: number; hy: number } | null; at: [number, number] };
+  you: { ride: string | null; color: string | null; scale: number | null; ready: boolean; anim: "" | "idle" | "move"; frame: number; facing: number; box: { x0: number; y0: number; x1: number; y1: number; fx: number; fy: number; hy: number } | null; at: [number, number] };
   others: { id: string; ride: string; color: string; ready: boolean; box: { y0: number; y1: number; fy: number; hy: number } | null }[];
 }
 const rideNow = (p: Page) => p.evaluate(() => (window as unknown as { __townRide: () => RideSeen }).__townRide());
@@ -1350,5 +1350,23 @@ test("rides (Oct 31): your pawn sits on its ride, the ride's idle standing and i
   expect(moonyTag, "the rider's tag").toBeTruthy();
   expect(moonyTag!.y + moonyTag!.h).toBeCloseTo(moony.hy - 2, 0);
   expect(moony.hy).toBeLessThan((moony.y0 + moony.fy) / 2);
+  // At a size (Nov 1, an admin's `?rideScale=0.75`; RIDES.scale otherwise): the ride smaller under the same pawn, standing on the
+  // same square. The pawn's tap box is as wide, the picture shorter, the head lower (the pawn sits lower on the smaller ride),
+  // the tag still over it.
+  const full = (await rideNow(page)).you;
+  expect(full.scale).toBe(1);
+  await page.goto("/town?sky=day&rideScale=0.75");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect.poll(async () => (await rideNow(page)).you.ready, { message: "your ride's frames are ready", timeout: 20_000 }).toBe(true);
+  await page.evaluate(() => (window as unknown as { __townCall: (i: number) => void }).__townCall(-1));
+  await expect.poll(async () => (await rideNow(page)).you.anim).toBe("idle");
+  const small = (await rideNow(page)).you;
+  expect([small.ride, small.scale]).toEqual(["riding-chirp", 0.75]);
+  const [a, b] = [full.box!, small.box!];
+  expect(b.x1 - b.x0).toBeCloseTo(a.x1 - a.x0, 1);
+  expect(b.y1 - b.y0).toBeLessThan(a.y1 - a.y0);
+  expect(b.fy - b.hy).toBeLessThan(a.fy - a.hy);
+  const smallTag = (await page.evaluate(() => (window as unknown as { __townTags: () => { kind: string; y: number; h: number }[] }).__townTags())).find((t) => t.kind === "you")!;
+  expect(smallTag.y + smallTag.h).toBeCloseTo(b.hy - 2, 0);
   expect(errors).toEqual([]);
 });

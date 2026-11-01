@@ -380,7 +380,16 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   no one rides on it and all of them when the town closes (`dropRiders`). A ride shows its color, not its purity's blotches or its
   shine (the sheets are per color: the corner cut for the frame rate). **Taps** take only the pawn's own box across (as on foot), not
   the ride's reach, so a tap on the square beside a rider walks there; a rider is drawn from 1.5 squares off the box's sides (a pawn
-  from 1), its ride reaching about 1.46 squares from its foot. Test hook: `__townRide()` (yours: its ride and color, ready, the
+  from 1; more for a ride drawn bigger than 1), its ride reaching about 1.46 squares from its foot.
+  **Each ride's size** (Nov 1, Eric: "scale down the riders with just a button so to speak… I wanna see it at 75%";
+  docs/decisions/2026-11-01-ride-scale.md): `RIDES.scale` in core's settings, one number a ride (1 for now). The ride is drawn at that
+  size about its saddle (its first idle frame's: `components/rides/scale.ts`) under a pawn of the usual size, which still sits in the
+  saddle (each frame's seat moves with the scaled saddle; the same share of the pawn hidden in it) while the ride stands on the square,
+  its hop and its shadow scaled too; worked out once as a rider's frames are composed, nothing per frame. The same everywhere a rider
+  is drawn: the town (Canvas 2D and WebGL), the locker, the profiles, home's pawn and ring (`RideLayers`'s `k`; the boxes keep their
+  size; the item's own tile keeps 1). **`?rideScale=K`** (0.5 to 1.25), a test switch (admins on the live site): every ride on that
+  page at K, to try sizes; read once as the page opens (`test-switches.ts`).
+  Test hook: `__townRide()` (yours: its ride, color and size, ready, the
   animation and frame the last frame drew, which way it faced, your box, foot and head on screen; every other rider's; and the sets
   of frames and sheets held); `__townAt("square", [c, r])` says where a square is on screen; `__townPlayer(…, wear)` dresses the
   test player (a ride too).
@@ -541,7 +550,8 @@ noted wherever a slice changed one.
   always fit), the layout
   (fourteen homes 8 to 10 squares from their nearest neighbors, none near the start, the Colosseum's ground and the park
   clear, and the start south of it on the park's promenade), the walk around a home, and the eased steps meeting the even ones at the same speed.
-- `packages/app/test/town-rides.test.ts` (Oct 31, rides): every ride item has a drawing and a sheet; each sheet is its ride as drawn now,
+- `packages/app/test/town-rides.test.ts` (Oct 31, rides; Nov 1, sizes: the ride scaled about its saddle, the pawn its size on it,
+  the ride on the square): every ride item has a drawing and a sheet; each sheet is its ride as drawn now,
   in every color (the hash: run `npx tsx scripts/bake-rides.ts` after a change), whole (its size read from its file's header), its
   times, seats and lift the drawing's; a rider stands its ride's feet on the square's middle, its tag over the higher of the ride and
   its pawn; its idle on its own times and its move one cycle a step in its drawn shares; a walker's step progress; riders who look the
@@ -550,7 +560,7 @@ noted wherever a slice changed one.
 - `e2e/town.spec.ts`, "rides (Oct 31)" (phone and desktop): wearing Riding Chirp, only its color's sheet is fetched; standing, its idle
   frame after frame; a tap on the square beside you walks you there, either way; walking right then left, its move facing each way
   (watched every frame); stopped, the idle facing left; your tag over your head; a test player on Moon's Ride drawn riding, its tag
-  over it.
+  over it; with `?rideScale=0.75` (Nov 1) your ride at 0.75, your tap box as wide, the picture shorter, your head lower, the tag over it.
 - `packages/app/test/town-sky.test.ts`: which look shows when, the looks always adding up to 1 and blending over their
   half hour in order, `?sky=`, and the tint (none by day, softer at dawn than dusk, coolest and darkest at night).
 - `packages/app/test/town-world.test.ts`: one pawn a square (a taken square ends you next to it, the end is always free

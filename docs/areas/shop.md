@@ -46,6 +46,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   on it), the locker's preview and the profiles' pawn (`Avatar`'s `ride`: the pawn and its items on its ride, its idle playing, fitted
   into the same box, so a box never grows), the profile's Wearing rows (last), and the town square (baked sheets: town-square.md,
   "Rides"), and **home** (Nov 1: the big pawn on your card, your ring and the side menu's Profile item; hub.md, "Your ride on home").
+  **Each ride's size** under its pawn (Nov 1): `RIDES.scale` in core's settings (1 for now), everywhere a rider is drawn but the item's
+  own tile; an admin's `?rideScale=K` tries one size for every ride (town-square.md, "Rides"; [2026-11-01-ride-scale.md](../decisions/2026-11-01-ride-scale.md)).
   **Not drawn** (the pawn alone, as before): a match's screens, the Colosseum's crowd, the
   queue's and Squads' cards, the boss stage, the town's person card, and the public profile's Equipped Cosmetics row (four tiles at
   most; its View all lists the ride). Changing a ride's drawing, the paint's fills and lines (`item-paint.tsx`) or the colors:

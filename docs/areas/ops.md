@@ -136,7 +136,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   dashed outline, so a screenshot shows it; nothing else changes), and `bannerplus=SECONDS` (0 to 3: the extra time on
   every banner over the board, and everything after a banner that much later, for the games on the device; online the
   server's default) and `talkplus=SECONDS` (0 to 3: added to every speech line's read time), both read from the address
-  once as the page opens, so they hold for the page (Oct 24). The `sayBoss(text)` hook (speech.tsx: a boss's voice says
+  once as the page opens, so they hold for the page (Oct 24), and `rideScale=K` (0.5 to 1.25: every ride drawn at that size
+  under its pawn on the page, over RIDES.scale, to try sizes; read once as the page opens; town-square.md, "Rides"; Nov 1). The `sayBoss(text)` hook (speech.tsx: a boss's voice says
   any line at once, for e2e/boss-bar-same.spec.ts).
   - **Kept for everyone** (the home screen's own choices): `mode` and a raid's boss picked from the menu; preferences
     and pages (`anim`, `trail`, `crates`); the town square's `crowd=N` (N more pawns with names, up to 100, wandering the

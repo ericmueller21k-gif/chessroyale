@@ -1119,7 +1119,7 @@ function startTown(
   };
   // ... `__townFull(on)`: someone unseen on one stool of every table (no table free for you and a bot: its card's Play greys), or not.
   const hookFull = (on: boolean) => testSwitchesAllowed() && fillTables(town, on);
-  // ... `__townRide()` (Oct 31, rides): yours (its ride and color, whether its frames are ready, as the last frame drew it: "idle" or
+  // ... `__townRide()` (Oct 31, rides): yours (its ride, color and size (Nov 1), whether its frames are ready, as the last frame drew it: "idle" or
   // "move" ("" on foot), the frame, which way it faced; your box, foot and head on screen, your square) and each other rider's.
   const hookRide = () => {
     if (!testSwitchesAllowed()) return null;
@@ -1127,8 +1127,8 @@ function startTown(
     const h = town.you.walker.here();
     const rd = r.youRider;
     return {
-      you: { ride: rd?.sheet.id ?? null, color: rd?.color ?? null, ready: !!rd?.ready, ...r.youRide, box: r.drawnBox(you), at: [h.c, h.r] },
-      others: [...r.riders].map(([id, x]) => ({ id, ride: x.sheet.id, color: x.color, ready: x.ready, box: r.drawnBox(town.people.findIndex((p) => p.id === id)) })),
+      you: { ride: rd?.sheet.id ?? null, color: rd?.color ?? null, scale: rd?.scale ?? null, ready: !!rd?.ready, ...r.youRide, box: r.drawnBox(you), at: [h.c, h.r] },
+      others: [...r.riders].map(([id, x]) => ({ id, ride: x.sheet.id, color: x.color, scale: x.scale, ready: x.ready, box: r.drawnBox(town.people.findIndex((p) => p.id === id)) })),
       // (Sets of rider frames held, shared by riders who look the same, and sheets still decoding or composed from.)
       held: ridersHeld(),
     };

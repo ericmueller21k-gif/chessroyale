@@ -7,6 +7,7 @@ import { RIDES } from "../src/components/rides/kit.ts";
 import { TOWN_FEEL } from "../src/town/feel.ts";
 import { RIDE_PX, RIDE_SHEETS } from "../src/town/ride-sheets.ts";
 import { Rider } from "../src/town/rides.ts";
+import { seatAnchor } from "../src/components/rides/scale.ts";
 import { Walker, type Pose } from "../src/town/world.ts";
 
 /**
@@ -86,6 +87,50 @@ describe("a rider", () => {
       expect(rd.ready).toBe(false);
       rd.drop();
     }
+  });
+
+  it("at a smaller or bigger size (Nov 1, RIDES.scale): the ride scaled about its saddle, the pawn its own size still in the saddle, the ride on the square", () => {
+    for (const s of Object.values(RIDE_SHEETS))
+      for (const k of [0.5, 0.75, 1.25]) {
+        const one = new Rider(s, "red", pawn, false);
+        const rd = new Rider(s, "red", pawn, false, k);
+        expect(rd.scale).toBe(k);
+        const a = seatAnchor(s.seat.idle[0]!);
+        const foot = TOWN_FEEL.rides[s.id]!.foot;
+        // The ride: its cell k times as big about the saddle, its feet still on the square's middle (the foot the town stands it on).
+        expect(rd.cell[2]).toBeCloseTo(k * s.cell[2]);
+        expect(rd.cell[3]).toBeCloseTo(k * s.cell[3]);
+        expect(rd.x0 + rd.footX * rd.w).toBeCloseTo(a[0] + k * (50 - a[0]));
+        expect(rd.y0 + rd.footY * rd.h).toBeCloseTo(a[1] + k * (foot - a[1]));
+        // The pawn: the same picture, the same size (the frames are composed at RIDE_PX either way, the pawn drawn 100 + 2 pad units),
+        // on its first idle frame where it was; on every frame its cut line on the saddle as scaled (the same share of it hidden).
+        expect(rd.seats.idle[0]).toEqual([...s.seat.idle[0]!]);
+        for (const anim of ["idle", "move"] as const)
+          s.seat[anim].forEach((seat, f) => {
+            const [x, y, tilt, cut] = rd.seats[anim][f]!;
+            expect([tilt, cut]).toEqual([seat[2], seat[3]]);
+            // (Where the middle of its cut line is, tilted round its base: on the saddle's point, scaled about the anchor.)
+            const r = (tilt! * Math.PI) / 180;
+            const q = [50 - (cut! - 88) * Math.sin(r), 88 + (cut! - 88) * Math.cos(r)];
+            expect(x! + q[0]!, `${s.id} ${k} ${anim} ${f}`).toBeCloseTo(a[0] + k * (seat[0]! + q[0]! - a[0]));
+            expect(y! + q[1]!, `${s.id} ${k} ${anim} ${f}`).toBeCloseTo(a[1] + k * (seat[1]! + q[1]! - a[1]));
+          });
+        // Standing on the square, the pawn is lower by the ride's shrinking under it (higher when it grows), never resized.
+        const drop = (rd.y0 + rd.footY * rd.h - (rd.seats.idle[0]![1]!)) - (one.y0 + one.footY * one.h - one.seats.idle[0]![1]!);
+        expect(drop).toBeCloseTo((k - 1) * (foot - a[1]));
+        // Its hop and its shadow at its size; drawn from farther off the sides when bigger.
+        expect(rd.lift).toEqual(s.lift.map((l) => l * k));
+        expect(rd.shadow).toBeCloseTo(TOWN_FEEL.rides[s.id]!.shadow * k);
+        expect(rd.margin).toBe(k > 1 ? 1.5 * k : 1.5);
+        // The box still holds the ride's cell and the raised pawn; its tag over the higher of the two.
+        expect(rd.x0).toBeLessThanOrEqual(rd.cell[0]);
+        expect(rd.x0 + rd.w).toBeGreaterThanOrEqual(rd.cell[0] + rd.cell[2]);
+        const seatY = Math.min(...rd.seats.idle.map((x) => x[1]!));
+        expect(rd.y0).toBeLessThanOrEqual(-12 + seatY);
+        expect(rd.y0 + rd.top * rd.h).toBeCloseTo(Math.min(-15 + 0.2 * 130 + seatY, rd.cell[1] + (k * s.top) / RIDE_PX));
+        one.drop();
+        rd.drop();
+      }
   });
 
   it("plays its idle on its own times, and its move one cycle a step, in the shares of its drawn times", () => {
