@@ -1,28 +1,45 @@
 # Boss art: boss-blitz
 
-- Model claude-opus-5-5, effort medium, adaptive thinking. 18 turns, 11 renders.
-- Spend: **$1.54** of the $3 cap (40 input, 103,875 cache-write, 1,347,516 cache-read, 37,546 output tokens).
+- Model claude-opus-5-5, effort high, adaptive thinking. 42 turns, 29 renders.
+- Spend: **$3.56** of the $9.5 cap (86 input, 206,099 cache-write, 4,707,194 cache-read, 79,331 output tokens).
 - Finished: it called done.
 - The drawing: scripts/boss-art/out/boss-blitz/boss-blitz.ts.
 - Previews: scripts/boss-art/out/boss-blitz/preview/ (GIFs, the frame sheet, the comparison). Each look it took: scripts/boss-art/out/boss-blitz/looks/.
 
 ## Its notes
 
-Blitz, the speed-chess cheetah, is a concept, so only `idle` is drawn, as the brief asked. I looked at every frame at large scale and at phone size beside the tiger; he comes out about the tiger's height.
+Blitz now has his full animation set. The concept is untouched: the palette, parts, proportions, face and the 32-frame `idle` render exactly as before (I checked it again at the end, beside the gardener).
 
-Idle: 32 frames of 110 ms (3.5 s), looping.
-- The whole time: he bounces on his toes (up 1 px, up 2 px, up 1 px, down, every 0.44 s). His heels lift and his sneakers tip onto their toes. His tail tip flicks on an 8-frame cycle.
-- Frames 4–8, the first slap: his paw lifts, winds up, then slams down. He stops bouncing and dips his knees, and the right clock button clicks down 1 px. White and yellow click sparks fly off it, he flashes an open grin and his eyebrow pops up. The frame where the paw lands carries a `click` sound cue.
-- Frames 6–11: the red flag wobbles left and right, then settles.
-- Frames 12–17: a cocky open grin with teeth and two quick eyebrow wiggles.
-- Frames 20–27: a second slap and flag wobble, the same as the first.
-- Frames 29–30: a blink, then back to the smirk.
+**What I added to the file (extended, not redrawn):**
+- **Palette:** two sweat blues, `W` and `V`. No existing color changed.
+- **New parts:** the near arm with three paw shapes (fist, finger gun with the thumb up, flat open paw); six extra eyes (looking at us, eye-roll, glancing down, happy ^^, wink, sly half-lid); six extra mouths (wide open grin, "o", frown, yawn, flat, clenched-teeth grimace); worried brows; and a fallen flag.
+- **New pose settings:** the near paw can go anywhere; a second "blur" arm; the clock can move or spin by quarter turns; the far paw can leave the clock; the flag can jump or fall; ears go back; the cap gets knocked about; he can slide sideways.
+- **Defaults:** every new setting starts at zero, so the idle comes out unchanged.
 
-Choices you might want to change:
-- His front arm crosses his chest to reach the clock, which can read a little like folded arms. The other way would be to tuck the clock under his back arm.
-- I kept his snout short so his head stays round and cat-like; the face is fairly flat in profile.
-- I made his eyes a deeper amber-orange because yellow eyes disappeared into the gold fur. I couldn't see clearly how they read at full size, so they're worth a look.
-- The bounce never stops, even during the grin. That's restless, as the brief asks, but it may look busy beside calmer bosses; a slower 8-frame bounce would calm it.
-- The cap is the same orange as the jacket. A teal cap with an orange brim would set his head apart from his body more.
+The canvas is still 72 × 104 with his feet at (40, 99). The clock shows only tick marks, no numerals.
 
-The file is scripts/boss-art/out/boss-blitz/boss-blitz.ts, exporting BOSS_BLITZ (id "boss-blitz"). It's built on a pose rig (how high he's lifted, knee bend, tail, slapping paw, flag wobble, eyes, eyebrow, mouth), which should make the full set of animations quicker to add if he's chosen.
+**The animations, beat by beat:**
+- **entrance** (1.49 s, once): speed lines alone, then he zips in from the right in two blurred frames, skids to a stop leaning back with an "o" mouth and dust, settles, winds up, slaps the clock (click, flag wobble), and holds a wide grin at us before going back to his smirk. Cues: zip, skid, click.
+- **thinking** (1.8 s, loop): bouncing faster than his idle and drumming over the button (small tick sparks), a glance at us with a raised brow, an eye-roll with a flat mouth, a big yawn, then drumming again.
+- **move** (0.74 s): wind-up, then a finger gun at the board with speed streaks and a twinkle at the fingertip, then a quick slap (click). Cues: snap, click.
+- **capture** (1.05 s): a wink and a double fist pump out to the side with a sparkle, then a slap and a held wink-grin. Cues: yes, click.
+- **clockSlap** (1.13 s, his passive): the paw wound up high behind his head on his toes, a swoosh, then a big open-paw slam (screen shake, burst of sparks, the flag jumps). A tiny gold clock face with a trail zips from the clock to his chest and bursts into sparkles; he finishes with happy eyes and a sly grin. Cues: windup, slam, steal.
+- **scrambleWarn** (1.47 s, holds its last frame): he lifts the clock to chest height and taps its right face twice with one finger, like tapping a wristwatch. Brows up, sly wide grin, looking at us; the last frame holds for 700 ms. Cues: warn, tap.
+- **timeScramble** (2.0 s): a crouch, then he tosses the clock up. It spins a quarter turn every frame between his paws, with two near arms shown as a blur, white whirl arcs, sparks, speed lines, the cap and ears jittering and a shaking frame. Then he catches it, slams it (sparks, flag jump) and holds a triumphant fist pump with sparkles. Cues: whoosh, whirr, slam, ta-da.
+- **hurt** (0.61 s): a pale flash; he flinches back with ears flat, eyes wide and an "o" mouth while the clock and cap jolt. A sweat drop and worried brows, then a quick shake-off back to his smirk. Cue: oof.
+- **check** (1.05 s): a bigger finger gun with longer streaks, held with a sly look and a big twinkle, then a slap. Cues: point, click.
+- **smug** (1.8 s, loop): head tipped back, half-lidded, polishing his nails on his jacket, then holding the paw out to look at it (a glint), a slow blink.
+- **rattled** (0.9 s, loop): ears flat, worried brows, clenched-teeth grimace, sweat running down, fast nervous taps with small clicks, eyes darting between the clock and the board, a slight jitter. Cue: tap.
+- **defeat** (holds after 1.75 s): a pale flash as the flag falls, a stare down at it, then he slumps, knees bending, head down, the cap slipping over his eyes, the clock sagging low in a limp arm. Cues: flag, slump.
+- **victory** (1.32 s, loop): the clock held high over his head with the far arm, bouncing on his toes with a big grin, a fist pump, then a finger gun at the board, with sparkles around the clock. Cue: cheer.
+
+**Choices Eric might want to change:**
+- **Longer arms in some poses.** Victory (clock overhead), the finger gun and holding his paw out in smug stretch the arms beyond the idle's length. The upper arm is mostly hidden behind his body and head, but it is a cheat.
+- **Victory loops** (like the tiger's) and starts straight in the clock-overhead pose; it could instead be a one-time raise that then holds.
+- **The frenzy's "arms a blur"** is drawn as two near arms at once, a cartoon convention. If it reads as an extra arm, I can swap it for whirl lines only.
+- **Time Scramble spins the clock in the air** rather than hammering it; the brief allowed either.
+- **The flag's jump is small** (2–3 px) because the clock's buttons sit right above it; the sparks carry most of the slam.
+- **In defeat**, the near ear still sticks up above the slipped cap; I can flatten or hide it.
+- **The idle's raised-brow wiggle is mostly hidden under the cap** in the concept (I left it as it is). That's why the new worried brows sit one pixel lower.
+- **The entrance's two zip-in frames** start partly off the frame on purpose, which sets off the edge warning. They get it on purpose.
+- **Cue names are new:** zip, skid, snap, yes, windup, slam, steal, warn, tap, whoosh, whirr, ta-da, oof, point, tick, yawn, flag, slump, cheer. They still need sounds.
