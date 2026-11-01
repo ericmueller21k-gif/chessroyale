@@ -12562,6 +12562,30 @@ img.qicon {
   text-overflow: ellipsis;
   padding-right: 2px;
 }
+/* Black · White · All beside chat (Nov 1: "White" read "Wh…"): the picks take the room their words need, and the split
+   button keeps its own. Each word whole: the picked one's ellipsis (above) is off. Full width keeps the equal thirds. */
+.mini-tower.narrow .mini-tower-head .mini-picks {
+  flex: 1 1 auto;
+  justify-content: space-between;
+}
+.mini-tower.narrow .mini-tower-head .mini-pick {
+  flex: 0 0 auto;
+  padding: 0 3px;
+}
+.mini-tower.narrow .mini-tower-head .mini-pick.on {
+  overflow: visible;
+  text-overflow: clip;
+  padding: 0 3px;
+}
+/* (Under 360 px the picks' room is about 99 px at 320 and the 12 px words need 108: at 11 px, 2 px each side and tighter, they need about 90.) */
+@media (max-width: 359px) {
+  .mini-tower.narrow .mini-tower-head .mini-pick,
+  .mini-tower.narrow .mini-tower-head .mini-pick.on {
+    font-size: 11px;
+    padding: 0 2px;
+    letter-spacing: 0.02em;
+  }
+}
 
 /* A page's chat (results, watching, the cut once you're out): a box in the page's own colors. */
 .qchat-page {

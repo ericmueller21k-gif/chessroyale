@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { devices, expect } from "@playwright/test";
 import { CROWD_SETTINGS } from "@chessroyale/core";
-import { createLobbyFromHome, engineTop, expectCoordsInSquares, named, soloFromHome, submitMove, test } from "./helpers.ts";
+import { createLobbyFromHome, engineTop, expectCoordsInSquares, named, pickMode, soloFromHome, submitMove, test } from "./helpers.ts";
 
 const phase = (p: any) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
 
@@ -390,4 +390,36 @@ test("the scoreboard never moves: its top edge, height and the middle box hold t
   // Nothing spills: the middle box's content never runs past its box (scrollHeight <= clientHeight), on every phase seen.
   expect(worstSpill, "the middle box was measured").toBeGreaterThan(Number.NEGATIVE_INFINITY);
   expect(worstSpill, "middle box content overflow, px (≤ 0: it fits)").toBeLessThanOrEqual(0);
+});
+
+test("the scoreboard's Black · White · All fit in the split with chat (phone): no word is cut at 390 or 320 px", async ({ browser }) => {
+  // (Nov 1: "White" read "Wh…" beside the chat: the picked one's ellipsis. Each pick takes the room its word needs.)
+  test.setTimeout(4 * 60_000);
+  test.skip(test.info().project.name !== "phone", "a phone's split");
+  const p = await (await browser.newContext({ ...devices["iPhone 13"], browserName: undefined } as any)).newPage();
+  await named(p, "Splitter");
+  await p.goto("/?debug&pace=quick&mode=crowd&augments=0&pool=crowdhead");
+  await pickMode(p);
+  await p.getByRole("button", { name: "PLAY", exact: true }).click();
+  await expect.poll(() => p.evaluate(() => (window as any).match?.chat?.enabled ?? false), { timeout: 90_000 }).toBe(true);
+  await expect.poll(() => phase(p), { timeout: 90_000 }).toMatch(/play|watching/);
+  for (const width of [390, 320]) {
+    await p.setViewportSize({ width, height: 664 });
+    // (Two frames: the layout settles after the resize.)
+    await p.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    const v = await p.evaluate(() => {
+      const split = !!document.querySelector(".under-board.ub-split .mini-tower.narrow");
+      const picks = [...document.querySelectorAll(".screen.game .mini-tower .mini-pick")] as HTMLElement[];
+      return {
+        split,
+        picks: picks.map((b) => ({ text: b.textContent, cut: b.scrollWidth - b.clientWidth })),
+        scroll: document.documentElement.scrollWidth - window.innerWidth,
+      };
+    });
+    const where = `${width} px: ${JSON.stringify(v)}`;
+    expect(v.split, where).toBe(true);
+    expect(v.scroll, where).toBeLessThanOrEqual(0);
+    expect(v.picks.map((b) => b.text), where).toEqual(["Black", "White", "All"]);
+    for (const b of v.picks) expect(b.cut, `${where}: "${b.text}" cut`).toBeLessThanOrEqual(0);
+  }
 });
