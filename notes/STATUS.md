@@ -22,6 +22,16 @@ Everything from Nov 1 is merged: #447 eval bar off, #448 cash-in 2 gold, #449 on
    admins get keys and tokens in their inventory. Stored data → the data part at Opus xhigh. Only Babur's for now.
 3. Brush Ride trail = ink dripping from the brush's back (Haiku; no pad).
 
+## Boss tokens: Eric's rules (Nov 2), director's picks marked (mine)
+- Earned by playing any boss battle (win or lose), counted once it reaches 10 of your moves or 5 minutes, whichever is
+  first (mine). Which boss's token: random, equal odds over every live boss (not the Hidden Boss, not admins-first) (mine).
+- Per account, a rolling 24 h window ("ticker"): the first counted battle with no token in the window always drops one;
+  after that 25% a battle, up to 3 in the window. Decided by the server, never the device (fair play).
+- On the result screen (victory or defeat): a square box in the gambling warning's style: "You got a [Boss] token!" + OK;
+  it goes to your inventory.
+- A boss crate costs 3 tokens of that boss, or 1 of its tokens + 1 crate key.
+- Build after the shop prototype, at Opus xhigh (stored data). Admins get test keys/tokens.
+
 ## Waiting on Eric
 - Timber's drop limit: 1 pawn ahead (live) or 2 (retune)?
 - Bot ratings: 800-1500 chess-site scale (live) or scoreboard scale?
