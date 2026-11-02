@@ -66,8 +66,48 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   (the town's cells for it; a test fails until it's run).
 - **A boss's crate, sold inside the boss's home** (Nov 2, round 1: Babur's and Puddles'; town-square.md, "Inside a shop"): the
   Shopkeeper's card shows the crate, its prizes (the boss's ride first), its price (`BOSS_CRATE_PRICE` in core's settings: 3 of the boss's
-  tokens, or 1 token and 1 crate key) and what you have. Buying goes through `buyBossCrate` (`town/shops/shops.ts`), which answers "Coming
-  soon" until round 2 builds the tokens, the keys and the purchase.
+  tokens, or 1 token and 1 crate key) and what you have. Since round 2 (below) buying is real.
+- **Boss tokens, crate keys and buying a boss crate** (Nov 2, round 2; [2026-11-02-boss-tokens.md](../decisions/2026-11-02-boss-tokens.md);
+  `BOSS_TOKENS` in core's settings, the rules in `core/boss-tokens.ts`, the server's side in `server/boss-tokens.ts`):
+  - **Earning** (Eric's rules): a boss battle (a Boss raid online, a Boss Battle party, a Solo raid, Boss alone; not the Crowd's boss
+    final), won or lost, **counts once it reaches 10 of your moves or 5 minutes**. Per account, over a **rolling 24 hours**: the first
+    counted battle with no token in the window always drops one; after that 25% a battle, up to 3 in the window. Which boss's token:
+    one of the live bosses (`dropBosses`: playable for players, not the Hidden Boss, not Timber while he's admins first, not one resting),
+    each as likely. Where sign-in is set up, only signed-in accounts earn them (a guest's things move to the account it signs in to, so
+    many guests could fill one account past the cap); locally and in e2e (no sign-in) guests do.
+  - **Decided by the server only.** An online battle by its match room: `LobbyCore` counts each person's picks that went in (`picked`,
+    at each turn's lock) and knows when the match began; `bossBattleSpan` gives their moves and time (to the end, or to when they left),
+    and the Durable Object's `saveResults` counts the battle (`countBossBattle`) as it saves their result (once). A **solo** battle runs on
+    the device, so the server can't see its moves: it counts by **the server's clock alone**: `POST /api/boss/solo/start` as the battle
+    begins (App.tsx's `startSolo`, `noteSoloBattle`: the server notes the time in `solo_battles`, one open per account, a new start
+    replacing it), `POST /api/boss/solo/finish {battle}` from its result screen (taken off in one statement, so it's finished once): it
+    counts when 5 minutes or more passed between the two. Its 10-moves path isn't there (the device's word). The drop itself is one
+    transaction: the drop row goes in only while the window (counted in the same statement) has room, and the token with it.
+  - **The result screen** (`components/TokenBox.tsx`, on `ResultsScreen` for any boss battle): when the server says the battle dropped
+    you a token, a square box in the gambling warning's look (the locker's dialog), the token turning in it, **"You got a Babur token!"**
+    (`tokenGotLine`: "an Alfil token", "a Boingo token") and **OK** (Escape or a tap outside close it too). Solo: the finish's answer.
+    Online: `GET /api/boss/token?battle=CODE`, asked at 0.7, 2.2, 5.2, 11 and 21 s after the results while the room writes them.
+  - **The inventory** (the Crates tab, `TokenStock`): under Keys and Crates, **"Boss tokens"**: every live boss's token with "× N",
+    greyed at none (shown, not hidden), an admin's admins-first boss's too; "From boss battles. Spend them on a boss's crate in its shop
+    in the town." **Keys are counted now** (`wallets.crate_keys`; the Crates tab's "Keys × ∞" became the real count), and a boss crate
+    takes one; the Crates tab's own crates stay free while testing ("Crates are unlimited while we test.").
+  - **The token pictures** are the drawings from `claude/boss-art` (`scripts/boss-art/out/token-<name>/`), copied into
+    `components/tokens/` (only their import lines changed, and the `!`s the app's typecheck asks for), one chunk loaded the first time a
+    token shows (`TokenArt.tsx`: 40 × 40 crisp; `animate` plays its idle, the result box's; a plain gold coin for a boss with none). Every
+    live boss and Timber have one; Blitz's is drawn, waiting for its boss.
+  - **The crates** (`BOSS_CRATES` in core's crates.ts, beside `CRATES` but never in it, so the Crates tab can't open one free): Babur's
+    and Puddles', each the boss's ride (the only Mythic, the only item behind Fischer Random: 2%) and the Beta Crate's 24 Common to
+    Epic items in its boxes, at the existing crates' odds; rolled on the server as every crate.
+  - **Buying** (`POST /api/shop/boss-crate {crate, way}`, `buyBossCrate`): one D1 batch, as the coin shop's: the item goes in only if
+    the tokens (and the key) are there, then they come off only if that item went in; the counts can't go below zero (a CHECK on
+    `boss_tokens.n`, and the guards). A double tap or two devices are two buys, each paid in full or refused. The shop's kill switch
+    refuses it. The shop card's answer: the item and "You got … It's in your Locker.", or "You need 3 Babur tokens." /
+    "You need 1 Babur token and 1 crate key.".
+  - **Admins' test grants** (the Crates tab's "Admin: test grants", admins only: "+1 crate key"; a boss, "+1 token", "+3 tokens";
+    `POST /api/locker/grant`, "Not found" for anyone else; at most `grantMax` (10) at once). Never a drop: the window doesn't count them.
+  - **Stored** (each an account's: `account-data.ts`, "bossTokens"; the privacy page's "Boss tokens"): `boss_tokens` (counts),
+    `boss_token_drops` (each drop: when, which battle; kept 30 days, the Worker's schedule clears older), `solo_battles` (the open one),
+    and `wallets.crate_keys`. A guest signing in to an account brings them along (added up; the drops too, so the window counts them).
 - **The gambling warning** (Eric, Nov 1; `components/GamblingWarning.tsx`): a small red ring, see-through in the middle, with a bubbly
   solid-red "!" in it, always at the top right of the crate pages: the Crates tab and each crate's own page (not the opening or the
   reveal). It sits over the page's corner (`gamble-ring` in `styles.css`: out of the flow, a 40 px tap target round a 30 px ring), so it
@@ -97,21 +137,27 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 | Rides' drawings (`RIDES`) | `packages/app/src/components/rides/` (`draw.tsx`: one layer as SVG); their town cells: `scripts/measure-rides.ts` |
 | Crate page, opening strip, reveal, locker UI (`CRATE_LOOKS`: each crate's art and box) | `packages/app/src/screens/Crates.tsx`; the shop `screens/Shop.tsx`; the gambling warning `components/GamblingWarning.tsx` |
 | Server rolls and storage (D1 `items`, `equipped_items`) | `packages/server/src/locker.ts`; the shop's API in `api.ts` / `accounts.ts` |
+| Boss tokens, crate keys, the boss crate purchase, solo battles, admins' grants | `packages/server/src/boss-tokens.ts`; rules `packages/core/src/boss-tokens.ts`; the crates `BOSS_CRATES` in `crates.ts` |
+| The token pictures, the inventory's tokens, the result box | `packages/app/src/components/tokens/`, `TokenArt.tsx`, `TokenBox.tsx`; `boss-tokens.ts` (the app's asking); `screens/Crates.tsx` (`TokenStock`, `AdminGrants`) |
 | Admins' copies of every item (never stored) | `packages/core/src/admin-copies.ts`; added in `locker.ts` and `accounts.ts` (`shopState`) |
 | Bots' outfits | `packages/core/src/bot-looks.ts`, `packages/app/src/looks.ts` |
 | The icon builder | `packages/app/src/components/PixelIcon.tsx`, `icon-pixels.ts`; server check `isPixelIcon` in `accounts.ts` |
 
 ## Settings
 
-`crates.ts` (`ITEM_DEFS`, `CRATES`, `ITEM_COLORS`, `PURITY_BANDS`, `CRATES_FREE`), `shop.ts` (`SHOP_ITEMS`,
+`crates.ts` (`ITEM_DEFS`, `CRATES`, `BOSS_CRATES`, `ITEM_COLORS`, `PURITY_BANDS`, `CRATES_FREE`), `BOSS_TOKENS` and
+`BOSS_CRATE_PRICE` in settings.ts, `shop.ts` (`SHOP_ITEMS`,
 `SHOP_FREE`), `BOT_LOOKS` and `QUICK_CHAT.packPrices` in settings.ts.
 
 ## Tests and tools
 
 - Unit: `packages/core/test/crates.test.ts` (rides: their slot, no crate, a look keeping its ride), `bot-looks.test.ts`, `packages/server/test/accounts.test.ts` (a ride in the ride slot only),
-  `shop-buy.test.ts` (buying with coins, `SHOP_FREE` off), `admin-copies.test.ts` (admins own one of every item, a ride too), `packages/app/test/blotches.test.ts`, `gift-tube.test.ts`,
+  `shop-buy.test.ts` (buying with coins, `SHOP_FREE` off), `boss-tokens.test.ts` (the drop rule and its window, a race for the
+  window's first place, which boss, guests where sign-in is set up, 10 moves / 5 minutes, solo timed by the server and counted once,
+  the match room's count of picks, buying both ways, not enough, twice at once, admins' grants admin-only, a guest's sign-in), `admin-copies.test.ts` (admins own one of every item, a ride too), `packages/app/test/blotches.test.ts`, `gift-tube.test.ts`,
   `icon-pixels.test.ts`.
-- e2e: `e2e/icon-editor.spec.ts`, `crate-banner.spec.ts`, `profile.spec.ts` (an admin's locker too; rides: the locker's Ride tab, the preview
+- e2e: `e2e/shop.spec.ts` (round 2: an admin's grants and both buys, the counts following; a counted Boss alone battle's token box,
+  its start pushed back in the local database by `backdateSoloBattle`), `e2e/icon-editor.spec.ts`, `crate-banner.spec.ts`, `profile.spec.ts` (an admin's locker too; rides: the locker's Ride tab, the preview
   riding in boxes that don't move, the profile's pawn riding and Wearing; `giveItems` in `e2e/helpers.ts` gives items no crate holds,
   straight in the local database).
 - The Fischer Random banner (`.fischer-stage` in styles.css): its band slants but the words stay level, so its padding

@@ -496,8 +496,10 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
 
 ## Inside a shop (Nov 2, round 1)
 
-Eric, Nov 2: walk up to Babur's home and go in; inside, the Shopkeeper sells **Babur's Boss Crate**. Round 1 is the town side, with buying
-stubbed behind one function; round 2 adds the stored data (the tokens, the crate keys, the purchase). Decisions:
+Eric, Nov 2: walk up to Babur's home and go in; inside, the Shopkeeper sells **Babur's Boss Crate**. Round 1 was the town side, with
+buying stubbed behind one function; round 2 (Nov 2) put the stored data behind it: boss tokens, crate keys and the purchase
+([shop.md](shop.md), "Boss tokens"; [2026-11-02-boss-tokens.md](../decisions/2026-11-02-boss-tokens.md)). Inside, the page's header says
+the shop's name (the home's: **"Babur's Circus"**, **"Puddles' Botanical Garden"**), not "Town square". Decisions:
 [2026-11-02-shop-interiors-r1.md](../decisions/2026-11-02-shop-interiors-r1.md) (this round's calls),
 [2026-11-02-building-interiors.md](../decisions/2026-11-02-building-interiors.md), [2026-11-02-shop-zoom.md](../decisions/2026-11-02-shop-zoom.md)
 and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.md) (the art's, on `claude/boss-art`).
@@ -534,10 +536,12 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   `talkRange` (3) squares of it, its card shows (**"Shopkeeper"**, **Talk**); a tap on it or the counter walks you in front of it, the
   counter between you. A card you close stays closed until you move on.
 - **The crate's card** (Talk): in the middle of the room, **"Babur's Boss Crate"** / **"Puddles' Boss Crate"**, the crate's picture, its
-  prizes (the boss's ride first, always: Balloon Pup; Puddles's Mower), the price line (**"3 Babur tokens, or 1 Babur token + 1 crate key"**,
-  `BOSS_CRATE_PRICE` in core's settings), what you have (**"You have 0 Babur tokens and 0 crate keys."**: `bossHoldings`, none until
-  round 2) and two buttons, **"Buy with 3 Babur tokens"** and **"Buy with 1 Babur token + 1 crate key"**, both through `buyBossCrate(boss,
-  way)`, which in round 1 answers **"Coming soon"** in a row under them that's always there.
+  prizes (the boss's ride first, always: Balloon Pup; Puddles's Mower; then **"+ 24 Beta Crate items, Common to Epic"**), the price line
+  (**"3 Babur tokens, or 1 Babur token + 1 crate key"**, `BOSS_CRATE_PRICE` in core's settings), what you have (**"You have 2 Babur tokens
+  and 1 crate key."**: `bossHoldings`, your locker's, drawn again whenever your account changes) and two buttons, **"Buy with 3 Babur
+  tokens"** and **"Buy with 1 Babur token + 1 crate key"**, each greyed while you can't pay that way (`canAfford`), both through
+  `buyBossCrate(boss, way)`: the server's purchase (round 2). Its answer shows in a row under them that's always there, 40 px high: the
+  item's picture and **"You got Balloon Pup! It's in your Locker."**, or the server's reason (**"You need 3 Babur tokens."**).
 - **The way out**: standing on one of the two squares just inside the door, a card says **"Go out"**. The door is behind you as you look
   north: walk back toward it, or drag the view back to it and tap it.
 - **Test hooks** (test switches on): the room's canvas `canvas.town-shop-canvas` carries `data-room`, `data-you`, `data-ready`;
@@ -584,10 +588,12 @@ noted wherever a slice changed one.
 
 - `e2e/shop.spec.ts` (Nov 2, inside a shop; phone and computer): Babur's card's "Go in", inside in Close (− and + switch cameras), a tap
   on the Shopkeeper walks you up and its card's Talk opens "Babur's Boss Crate" (the price line, Balloon Pup, what you have, both buys
-  answering "Coming soon" in a row that doesn't grow the card), then the view dragged back to the door, "Go out" and you're outside at
-  the tent's door; Puddles' greenhouse: Drizzle's crate with Puddles's Mower, and the back button takes you out. Unit:
+  greyed with nothing to pay), the header saying "Babur's Circus", then the view dragged back to the door, "Go out" and you're outside
+  at the tent's door ("Town square" again); Puddles' greenhouse: Drizzle's crate with Puddles's Mower, and the back button takes you out.
+  Round 2: an admin's test grants and both buys, the counts following and the card not growing (shop.md, "Boss tokens"). Unit:
   `packages/app/test/shop-room.test.ts` (both rooms' walls, counter, pieces and pond solid, the way out, every free square reachable,
-  the talking range and where a tap on the Shopkeeper sends you; the crates' words; the stub).
+  the talking range and where a tap on the Shopkeeper sends you; the crates' words; a way's button needing its price; the buy going
+  to the server).
 - `e2e/town-webgl.spec.ts` (Oct 30, WebGL): the same held frame drawn by both backends in one page (`__townHold`, `__townBackend`;
   `__townPaint()` gives the backend and the last frame's draw calls, `__townBench(n)` the ms a draw of the held frame),
   compared pixel by pixel, phone and computer: the park by day, the park at night (the lights), a statue up close at night;
@@ -795,7 +801,7 @@ title; a bot waiting, two playing (the board's pixels change), a tap on their ga
 
 ## Not built yet
 
-The bottom strip, a player's card's Play and "Invite to party" (their card has the row, with Play greyed: Oct 28), buying a boss's crate
-(round 2: the tokens, the keys, the purchase) and the other homes' insides, battles in a shop's circle, your ride inside a shop, the Colosseum's menu (raids with people,
+The bottom strip, a player's card's Play and "Invite to party" (their card has the row, with Play greyed: Oct 28), the other homes'
+insides (and their crates), battles in a shop's circle, your ride inside a shop, the Colosseum's menu (raids with people,
 party), the park's matchmaking (sitting at a table queues you: `ROADMAP.md`, "The park"), quick chats, other people's dressed pawns, the Simple map setting, real players and
 rooms, sounds.
