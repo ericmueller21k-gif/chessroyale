@@ -1057,7 +1057,9 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const botKing = g.round.plan.army.king;
   // While buying you see every piece of theirs (pawns too) as a plain circle, live; every 3 s a piece is revealed, piece for piece by kind (one of theirs, then a match
   // of yours, or the other way round: reveal.ts). Your pieces they haven't seen yet are slightly grayed, and the next of yours to be revealed has a thin yellow border.
-  const seen = g.phase === "buy" ? botSeen(g.round.plan.events, g.round.log, elapsed / 1000, cfg) : null;
+  // (Read at the latest of the clock and your last change: the clock is read every 120 ms, and a piece you just put down is grayed from its first frame, not a tick later.)
+  const seenAt = Math.max(elapsed / 1000, g.round.log.at(-1)?.at ?? 0);
+  const seen = g.phase === "buy" ? botSeen(g.round.plan.events, g.round.log, seenAt, cfg) : null;
   const unseen = new Set(seen?.unseen ?? []);
   // Their bench shows real pieces, each with the square it keeps (Eric, Oct 21: intentional): what it came in with and what it has held since, live as the circles are.
   const theirBench: Held[] = g.phase === "buy" ? botBenchAt(g.round.plan.events, g.round.botBench, Math.max(0, elapsed / 1000 - cfg.circlesDelaySeconds)) : g.phase === "meet" ? botBenchAt(g.round.plan.events, g.round.botBench, 0) : (g.round.botStart ?? g.round.plan.army).bench;

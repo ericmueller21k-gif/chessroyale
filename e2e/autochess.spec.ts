@@ -2229,11 +2229,16 @@ test("the clock is in the gold row (v7.1, Eric Oct 22): the small time with the 
 
 const ghosts = (p: Page) => p.locator(".ac-ghost");
 const sellZone = (p: Page) => p.locator(".ac-sell-drop");
-/** What a drag that does nothing must leave alone: your gold, your pieces on the board and the bench. */
+/**
+ * What a drag that does nothing must leave alone: your gold, your pieces on the board (each one's color, kind and square) and the bench. Only those: a piece's other
+ * classes (a slide, its stars' outline, the reveal's gray, which can change on any tick of the step) aren't what it holds.
+ */
 const holdings = (p: Page) =>
   p.evaluate(() => ({
     gold: Number(document.querySelector(".ac-gold-you b")?.textContent),
-    board: [...document.querySelectorAll(".hb-board piece.white")].map((e) => `${e.className.replace(/ ?(anim|ac-drawn)/g, "")}@${(e as HTMLElement).dataset.square}`).sort(),
+    board: [...document.querySelectorAll(".hb-board piece.white")]
+      .map((e) => `white ${["pawn", "knight", "bishop", "rook", "queen", "king"].find((k) => e.classList.contains(k)) ?? "?"}@${(e as HTMLElement).dataset.square}`)
+      .sort(),
     bench: [...document.querySelectorAll(".ac-bench.you .ac-slot.has")].map((e) => `${(e as HTMLElement).dataset.kind}@${(e as HTMLElement).dataset.square}`),
   }));
 /** Every white piece drawn on the page (not the avatar's pawn, the side menu's Profile pawn or the shop's, the bench's and the odds' little icons), and those on the board itself: a ghost is drawn outside the board. */
