@@ -1,10 +1,12 @@
 /**
  * The contact sheet item-render.ts shows for `mode: "sheet"`: every drawing in `virtual:drafts` (each a module's exports)
  * on a pawn at phone size, at rest and mid-motion, plus existing items by id (`window.__REQ.extra`), then `__DONE`.
+ * A ride with front and back views gets a whole row: its three views side by side, idle frame 0 and the move's frames
+ * (`window.__REQ.frames`: which ones, default all), at 4x and at town size.
  */
 import { render } from "preact";
 import * as SHEET from "virtual:drafts";
-import { Label, OnPawn, RefOnPawn, RiderView, fin } from "./item-harness.tsx";
+import { Label, OnPawn, RefOnPawn, RiderView, ViewsGrid, facings, fin, viewOf } from "./item-harness.tsx";
 import type { ItemDraft, RiderDraft } from "./item-kit.tsx";
 
 interface Req {
@@ -15,6 +17,8 @@ interface Req {
   title?: string;
   /** More looks of a drawing, after the pieces: its id, a color, an existing item worn over it, a label. */
   looks?: { id: string; color: string; over?: string; label: string }[];
+  /** Rides with views: the move frames shown (default all). */
+  frames?: number[];
 }
 const req = (window as unknown as { __REQ: Req }).__REQ;
 const mods = Object.values(SHEET as Record<string, Record<string, unknown>>);
@@ -26,10 +30,25 @@ function Piece({ d }: { d: ItemDraft | RiderDraft }) {
   const f = fin(color, 15, 777);
   const n = isRider(d) ? d.move.ms.length : d.motion.ms.length;
   const mid = Math.floor(n / 2);
+  if (isRider(d) && facings(d).length > 1) {
+    const most = Math.max(...facings(d).map((v) => viewOf(d, v)!.move.ms.length));
+    const frames = req.frames?.length ? req.frames.filter((i) => i >= 0 && i < most) : Array.from({ length: most }, (_, i) => i);
+    return (
+      <div style={{ background: "#1f2228", borderRadius: "12px", padding: "8px", flexBasis: "100%" }}>
+        <div style={{ font: "bold 14px sans-serif", color: "#f2c14e", marginBottom: "6px" }}>
+          {d.name} <span style={{ color: "#9ca3af", fontWeight: "normal" }}>(ride, {d.tier}) · {d.id} · {facings(d).join(", ")}</span>
+        </div>
+        <div style={{ display: "flex", gap: "18px", alignItems: "flex-start" }}>
+          <ViewsGrid d={d} finish={f} scale={1.8} moveFrames={frames} title="4x (the side's move in place)" />
+          <ViewsGrid d={d} finish={f} side="b" scale={0.45} moveFrames={frames} title="town size" />
+        </div>
+      </div>
+    );
+  }
   return (
     <div style={{ background: "#1f2228", borderRadius: "12px", padding: "8px" }}>
       <div style={{ font: "bold 14px sans-serif", color: "#f2c14e", marginBottom: "6px" }}>
-        {d.name} <span style={{ color: "#9ca3af", fontWeight: "normal" }}>({isRider(d) ? "ride" : d.slot}, {d.tier})</span>
+        {d.name} <span style={{ color: "#9ca3af", fontWeight: "normal" }}>({isRider(d) ? "ride" : d.slot}, {d.tier}) · {d.id}</span>
       </div>
       <div style={{ display: "flex", gap: "8px", alignItems: "flex-end" }}>
         {isRider(d) ? (

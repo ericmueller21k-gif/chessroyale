@@ -186,8 +186,9 @@ export interface RiderAnim {
   ms: number[];
 }
 /**
- * Where everything is on a frame: the whole group (rider and pawn) moved by `dx`, `dy` (on the square's units: 100 is
- * one square, so the town's move goes from dx 0 to 100); the pawn moved by `pawnX`, `pawnY` on its rider (riding up a
+ * Where everything is on a frame: the whole group (rider and pawn) moved by `dx`, `dy` (in the pawn's units: its box is
+ * 100, which the town draws about 1.45 town squares across, so one square is about 69 units; a move is drawn from dx 0 to
+ * 100 and the town fits it to one square); the pawn moved by `pawnX`, `pawnY` on its rider (riding up a
  * little: negative y is up), tilted `pawnTilt` degrees round its base, and hidden below `cut` (in the pawn's own
  * square, before it's moved: the bench-sit look hides about its lowest third, cut ≈ 66).
  */
@@ -199,11 +200,76 @@ export interface RiderPose {
   pawnTilt?: number;
   cut: number;
 }
+/**
+ * Which way the ride is seen. side: going left or right (drawn facing our right; the town mirrors it for left). back:
+ * going up the screen, seen from behind. front: coming down the screen, seen from the front.
+ */
+export type RiderFacing = "side" | "front" | "back";
 export interface RiderProps extends ArtProps {
   anim: "idle" | "move";
+  /** The view being drawn (side for the RiderDraft's own Back and Front), for code shared between views. */
+  view?: RiderFacing;
 }
-/** A ride (a new slot, "rider"): drawn behind the pawn (`Back`) and in front of it (`Front`). */
-export interface RiderDraft {
+/**
+ * One view of a ride: its own idle and move, a pose per frame, and its two drawings, Back (behind the pawn) and Front
+ * (in front of it). The side view is the RiderDraft's own fields.
+ */
+export interface RiderViewDraft {
+  /** Its box on the pawn's square with its pawn on it, at rest: x, y, w, h (front and back: default the side's). */
+  frame?: [number, number, number, number];
+  idle: RiderAnim;
+  /**
+   * The side view: one square of the town's movement, drawn as dx 0 to 100 (the town fits it to one square). The front and back views: one square's walk toward or
+   * away from the camera, played in place on its square (the town slides it up or down the screen): dx stays about 0,
+   * dy is only a bob or a hop.
+   */
+  move: RiderAnim;
+  pose: (anim: "idle" | "move", f: number) => RiderPose;
+  Back: (props: RiderProps) => ComponentChildren;
+  Front: (props: RiderProps) => ComponentChildren;
+}
+/** What a ride's trail mark is given to draw one frame of one mark. */
+export interface TrailProps {
+  /** The item's paint (`p.hex` is its color, flat; `p.fill` may be a sheen gradient) and its second paint. */
+  p: Paint;
+  p2: Paint;
+  /** The frame: 0 when it lands (fresh) to `ms.length - 1` (nearly gone). */
+  f: number;
+  /**
+   * Which way the ride was running when it dropped it, as its views: side (going right: the town mirrors the mark for
+   * left, as it mirrors the ride), back (going up the screen), front (going down).
+   */
+  view: RiderFacing;
+  /** Which mark of the run this is (0, 1, 2, …), for marks that take turns (a left and a right footprint). */
+  n: number;
+}
+/**
+ * A ride's trail (Oct 31; Eric: "all the riders will have like some sort of trail… the trails aren't to be drawn in
+ * unless you're actually running around the town"). In place of the town's white droplets, a running ride leaves this
+ * small mark on the ground: one on each square it leaves (or every `every` squares), where it stays and goes from fresh
+ * to faded over its frames, then is gone. Never drawn while standing, and never part of the ride's own frames.
+ */
+export interface RiderTrail {
+  /** Each frame's length in ms, fresh to faded: the frames are `ms.length`, its life their sum. Gone after the last. */
+  ms: number[];
+  /** One mark every this many squares run (default 1: one on every square left). */
+  every?: number;
+  /**
+   * Its box in units, centered on (0, 0), the spot where it lands (the middle of the square left; one square is about 69
+   * units): at most 40 wide and 30 tall. Every frame of `Mark` stays inside it.
+   */
+  w: number;
+  h: number;
+  /**
+   * One frame of the mark, drawn round (0, 0) on the ground as the town's camera sees it: from above, a little
+   * flattened (a square shows about 0.9 as deep as it is wide). Its own fade is in its frames (opacity, size).
+   */
+  Mark: (props: TrailProps) => ComponentChildren;
+}
+/** A trail mark's limits: its box at most this wide and tall, in units. */
+export const TRAIL_MAX = { w: 40, h: 30 };
+/** A ride (a new slot, "rider"): its side view, and optionally its front and back views (`views`) and its trail mark (`trail`). */
+export interface RiderDraft extends RiderViewDraft {
   id: string;
   name: string;
   tier: ItemTier;
@@ -211,10 +277,8 @@ export interface RiderDraft {
   colors?: 2;
   /** Its box on the pawn's square with its pawn on it, at rest: x, y, w, h (for the tile). */
   frame: [number, number, number, number];
-  idle: RiderAnim;
-  /** One square of the town's movement (from one square to the next), dx 0 to 100. */
-  move: RiderAnim;
-  pose: (anim: "idle" | "move", f: number) => RiderPose;
-  Back: (props: RiderProps) => ComponentChildren;
-  Front: (props: RiderProps) => ComponentChildren;
+  /** The views from behind (walking up the screen) and from the front (walking down). */
+  views?: { front?: RiderViewDraft; back?: RiderViewDraft };
+  /** What it leaves on the ground as it runs, in place of the town's droplets (none yet: the town's droplets). */
+  trail?: RiderTrail;
 }

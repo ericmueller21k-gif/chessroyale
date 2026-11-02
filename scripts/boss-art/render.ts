@@ -26,6 +26,8 @@ interface Req {
   scale?: number;
   bg?: "dark" | "light";
   with?: string;
+  /** Scenery ("arena-"): the first shown frame repeated 3 times side by side ("x") or 3 x 3 ("xy"), for its seams. */
+  tile?: "x" | "xy";
   out: string;
 }
 interface Img {
@@ -46,8 +48,14 @@ export const RANK_SET = [
   "pearlescent",
   "transcendent",
 ] as const;
-/** Scenery for the Colosseum ("arena-"): the stills its brief names, one single-frame animation each. */
+/**
+ * The Colosseum's inside, in pieces ("arena-", Oct 30): scenery the arena's scene places, each needing only the
+ * animations its brief names (a set of stills: one single-frame animation each).
+ */
 export const ARENA: Record<string, readonly string[]> = {
+  "arena-floor": ["floor", "corner", "side"],
+  "arena-pieces": ["wk", "wq", "wr", "wb", "wn", "wp", "bk", "bq", "br", "bb", "bn", "bp"],
+  "arena-crowd-back": ["red", "blue", "green", "gold", "purple", "far"],
   "arena-pieces-gba": ["wr", "br", "wn", "bn"],
 };
 const GROUND = { dark: "#14161b", light: "#f3f1ec" } as const;
@@ -121,7 +129,7 @@ async function main(req: Req): Promise<object> {
   if (!ch.palette.k) warnings.push(`no outline color: the palette needs "k"`);
   // A home on the town square (an id starting "house-") needs only its idle; a boss's sidekick (a town bot, "sidekick-")
   // its idle, walk, sit and wave; a ranked tier's emblem ("rank-") a still per division, a top tier's ("rank-top-") its idle.
-  const need: readonly string[] = req.id.startsWith("arena-") ? (ARENA[req.id] ?? ["idle"]) : req.id.startsWith("house-") || req.id.startsWith("rank-top-") ? ["idle"] : req.id.startsWith("sidekick-") ? SIDEKICK : req.id.startsWith("rank-set") ? RANK_SET : req.id.startsWith("rank-") ? RANK : REQUIRED;
+  const need: readonly string[] = req.id.startsWith("arena-") || req.id.startsWith("token-") ? (ARENA[req.id.replace(/-\d+$/, "")] ?? ["idle"]) : req.id.startsWith("house-") || req.id.startsWith("rank-top-") ? ["idle"] : req.id.startsWith("sidekick-") ? SIDEKICK : req.id.startsWith("rank-set") ? RANK_SET : req.id.startsWith("rank-") ? RANK : REQUIRED;
   const missing = need.filter((a) => !ch.anims[a]);
   if (missing.length) warnings.push(`animations still to draw: ${missing.join(", ")}`);
   // "*": the first frame of every animation side by side (a set of stills).
@@ -134,20 +142,41 @@ async function main(req: Req): Promise<object> {
   if (!anim) return { error: `no animation "${req.anim}"`, facts, warnings };
   const bg = GROUND[req.bg ?? "dark"];
   const pick = (req.frames?.length ? req.frames : anim.frames.map((_, i) => i)).filter((i) => i >= 0 && i < anim.frames.length).slice(0, every ? 14 : 8);
+  // Seat points (exports named ..._SEATS: arrays of [x, y]) marked in magenta.
+  const seats = Object.entries(mod).filter(([k, v]) => k.endsWith("_SEATS") && Array.isArray(v)).flatMap(([, v]) => v as [number, number][]);
   // Each frame drawn on transparency first, for the edge check; then laid on the ground.
   const drawn = pick.map((i) => {
     const im = renderFrame(ch, anim.frames[i]!);
     let edge = false;
     for (let x = 0; x < im.w && !edge; x++) edge = im.data[x * 4 + 3]! > 0 || im.data[((im.h - 1) * im.w + x) * 4 + 3]! > 0;
     for (let y = 0; y < im.h && !edge; y++) edge = im.data[y * im.w * 4 + 3]! > 0 || im.data[(y * im.w + im.w - 1) * 4 + 3]! > 0;
-    if (edge && !req.id.startsWith("arena-")) warnings.push(`${req.anim} frame ${i}: a pixel touches the frame's edge (it may be cut off)`);
+    if (edge && !req.id.startsWith("arena-") && !req.id.startsWith("token-")) warnings.push(`${req.anim} frame ${i}: a pixel touches the frame's edge (it may be cut off)`);
+    for (const [x, y] of seats) if (x >= 0 && y >= 0 && x < im.w && y < im.h) im.data.set([255, 0, 255, 255], (y * im.w + x) * 4);
     return im;
   });
   const gap = 4;
   let s = Math.max(1, Math.min(6, Math.round(req.scale ?? 4)));
-  while (s > 1 && (pick.length * (ch.w * s + gap) + gap > MAX_W || ch.h * s + 2 * gap > 1500 - 4 * ch.h - 16)) s--;
-  const strip = blank(pick.length * (ch.w * s + gap) + gap, ch.h * s + 2 * gap, bg);
-  drawn.forEach((im, n) => blit(strip, im, gap + n * (ch.w * s + gap), gap, s));
+  let strip: Img;
+  if (req.tile) {
+    // Seams: the first shown frame repeated edge to edge.
+    const nx = 3;
+    const ny = req.tile === "xy" ? 3 : 1;
+    while (s > 1 && (nx * ch.w * s + 2 * gap > MAX_W || ny * ch.h * s + 2 * gap > 1500 - 4 * ch.h - 16)) s--;
+    strip = blank(nx * ch.w * s + 2 * gap, ny * ch.h * s + 2 * gap, bg);
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) blit(strip, drawn[0]!, gap + i * ch.w * s, gap + j * ch.h * s, s);
+  } else {
+    while (s > 1 && (pick.length * (ch.w * s + gap) + gap > MAX_W || ch.h * s + 2 * gap > 1500 - 4 * ch.h - 16)) s--;
+    // Too wide even at scale 1 (a whole room's frames side by side): show only the frames that fit, so the picture
+    // stays within the API's size for many-image requests (a Puddles shop run stopped on an 8-frame room, Nov 2).
+    const fit = Math.max(1, Math.floor((MAX_W - gap) / (ch.w * s + gap)));
+    if (pick.length > fit) {
+      warnings.push(`only the first ${fit} of the ${pick.length} frames asked for fit side by side at scale ${s}: ask for the rest by number`);
+      pick.length = fit;
+      drawn.length = fit;
+    }
+    strip = blank(pick.length * (ch.w * s + gap) + gap, ch.h * s + 2 * gap, bg);
+    drawn.forEach((im, n) => blit(strip, im, gap + n * (ch.w * s + gap), gap, s));
+  }
   // Phone size: this boss's first idle frame at 1x and 2x, beside the other boss at 2x, feet on one line.
   // `with` can also name another home's picture (house-hollow, house-gardener, ...).
   const others = [...CHARACTERS, ...Object.values(HOUSES).map((h) => h.ch)];
@@ -164,7 +193,7 @@ async function main(req: Req): Promise<object> {
   blit(look, strip, 0, 0, 1);
   blit(look, phone, 0, strip.h, 1);
   writeFileSync(`${req.out}/look.png`, png(look));
-  return { file: `${req.out}/look.png`, shown: { anim: req.anim, frames: pick, scale: s, beside: other.id }, facts, warnings };
+  return { file: `${req.out}/look.png`, shown: { anim: req.anim, frames: pick, tile: req.tile, scale: s, beside: other.id }, facts, warnings };
 }
 
 // (Run as a script; boss-refs.ts imports its picture helpers.)
