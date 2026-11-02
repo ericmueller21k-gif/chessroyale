@@ -505,7 +505,7 @@ column, on up to two smaller lines in the bar's same height, the full name as it
 [2026-11-02-building-interiors.md](../decisions/2026-11-02-building-interiors.md), [2026-11-02-shop-zoom.md](../decisions/2026-11-02-shop-zoom.md)
 and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.md) (the art's, on `claude/boss-art`).
 
-- **Which homes.** Babur's Circus (`tiger`) and Puddles' Botanical Garden (`gardener`): `SHOPS` in `town/shops/shops.ts`. Their home's card
+- **Which homes.** Babur's Circus (`tiger`), Puddles' Botanical Garden (`gardener`) and Alfil's Pyramid (`alfil`, Nov 2: Woolly the Shopkeeper, "Alfil's Boss Crate" with Alfil's Howdah, a sandstone ceiling, the chat's day tone): `SHOPS` in `town/shops/shops.ts`. Their home's card
   is its name, centered, and **"Go in"** (gold) under it, centered, nothing else (Eric, Nov 2: "chop the Shop and Coming soon": a short
   card, `.town-card.town-door`); every other home's card is as it was (its name, Hollow's line, "Shop" greyed and "Coming soon").
 - **Going in.** "Go in" walks you to the square in front of the door (the plot's front row's middle, a row out); there the town zooms in on
@@ -554,6 +554,38 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   north: walk back toward it, or drag the view back to it and tap it.
 - **Test hooks** (test switches on): the room's canvas `canvas.town-shop-canvas` carries `data-room`, `data-you`, `data-ready`;
   `__shopAt("keeper" | "door" | "square", [c, r])`, `__shopCam()`, `__shopBench(n)`, `__shopRide()` (your ride inside).
+
+## Challenging a boss (Nov 2: Pokémon-gym style, Alfil first)
+
+Eric, Nov 2: challenge a boss in the town and it walks into its home with you; you each walk to your start mark on its battle
+circle; it says its line; its own animation brings the board in; its own transition covers the screen while the battle loads; after
+the battle, "Back to town" puts you where you stood. Decision: [2026-11-02-boss-challenge.md](../decisions/2026-11-02-boss-challenge.md).
+
+- **Which bosses.** Those in `BOSS_INTROS` (`town/shops/challenge.ts`): Alfil. Every other boss's card works as before (its confirm,
+  Leave, the Boss raid screen). Per player: it all happens on your own screen; the boss stays at its home for everyone else.
+- **The flow** (`nextFlow`, pure): the boss's card's **"Challenge alone"**, its confirm **"Challenge Alfil?"** / "You'll fight Alfil in
+  Boss Battle, then come back here." / **Fight** / Stay. Fight keeps where you stand (`standOf`), and you and the boss walk to its
+  door (the boss at your pace) and in (the shop's zoom and fade; the room and the intro's art load only now: `shops/intro.ts`,
+  `shops/alfil-intro-art.ts`). Inside (the room in challenge mode: no cards, no walking by tap, its own framing,
+  `CHALLENGE_FEEL.camZoom` and `camSouth`), you walk to the south start mark and the boss to the north one (`marksOf`, from the
+  art's `circle-mark` tiles), side by side at `walkStepMs`. Facing each other: its line in a speech bubble over its head and into the
+  chat log (`BOSS_INTROS[id].line`; Alfil's a placeholder, "I'll show you the power of the old piece.", until Gemini's lines), the
+  pyramid rising `riseAtMs` into it, holding, cracking, crumbling, the table and its board (`introBeats` / `introAt`), its cues'
+  sounds (`cues`). Then the storm (`startStorm`: a canvas over the whole page, outside the town, so it stays as the town closes)
+  sweeps in, the battle starts under it (the app's `challengeFromTown`: Boss alone, as START), and it slides off the board. The back
+  button calls it off until the storm starts. A tap doesn't skip. About 6 s from the door to the storm covering.
+- **After the battle:** the result screen's leaving button reads **"Back to town"**; it (and the gear's Leave: "You'll go back to the
+  town square.") opens the town with you on the square you stood on, facing the same way (`createTown`'s `stand`). "Play again" keeps it.
+- **The server's lines in the town's chat** (signed-in players; blue, `.tc-server`, no name and no menu): "Ann challenged Alfil!" as the
+  battle starts; as it finishes, "Ann beat Alfil in 34 moves!", "Alfil beat Ann in 21 moves.", "Ann drew with Alfil in 40 moves.",
+  "Ann surrendered to Alfil after 15 moves." (a resign after `TOWN_CHAT.challengeSurrenderMoves`, 10; before, it's a quit), and
+  " + Alfil token" on the end when the battle dropped one. No spam: while one of your challenges is unfinished (a quit: a leave, an
+  early resign), your next challenge posts no start line; its finish posts the outcome and closes it (`TownChat.challenge`, server).
+- **Test hooks:** the room's canvas `data-intro` (its step); `__shopIntro()`; the storm's `canvas.boss-storm` (`data-phase`);
+  `__townYou()`.
+- **Tests:** `packages/app/test/boss-challenge.test.ts` (the flow, the marks, the timeline, the storm's edge, back to where you
+  stood), `packages/server/test/town-chat.test.ts` (the lines and the no-spam rule, and through the API), `e2e/boss-challenge.spec.ts`
+  (phone and computer: a quit, then a finished challenge, the lines), `e2e/shop.spec.ts` (Alfil's Pyramid's crate).
 
 ## Frame-rate pill (`?fps`)
 `/town?fps` shows anyone (Eric, Oct 30: no admin needed, the site is behind Cloudflare Access) a pill in the world's top-right corner, "60 fps · 16.7 ms · 2D": frames over the last second and their mean time, text set twice a second from plain counters in the frame loop, then the drawing's backend ("· WebGL" with `?gl=1`; added by town.css from `data-backend`, so the pill's text stays the numbers). Without `?fps` there is none. `?crowd=N` is anyone's too (only that device draws the pawns).
