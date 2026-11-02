@@ -10,7 +10,7 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - PR #464 50 v 50 bot spread + top-3 draw (full-e2e; CI watcher).
 - Merged Nov 2 evening: #464 bot spread (retuned wider), #465 batch B. Live site stuck on 10:14 build (Cloudflare cache) until Eric purges.
 - PR #466 boss challenge (Alfil): round 2 running on the same branch (brief notes/briefs/brief-challenge-r2.md): boss left/you right, chairs, default intro for Babur/Puddles.
-- One Opus (high): challenge round 2 (cr-challenge).
+- One Opus (high): Big Boy's home + intro and Timber's king attack (cr-bigboy, claude/bigboy-home, brief notes/briefs/brief-bigboy-timber.md).
 - #463 Colosseum pieces merged but NOT live: hunchess.com serves the 10:14 build from Cloudflare's cache (HIT, query ignored) though CF deployed 4fac91ad at 16:15. Asked Eric to purge / check cache rules.
 - API art: Colosseum GBA pixel pieces (session_01JuCWRvpifUHBYDWXqYcDtk; asks Eric once, ~$3-6, cap $8).
 - One Opus: test-value changes (worktree /home/user/cr-testvalue, branch claude/test-value, brief
@@ -20,8 +20,6 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
   branch claude/boss-art; asks Eric once, ~$4-6, cap $8).
 
 ## Queue (one Opus at a time)
-0c. When the art session's Timber king attack lands (boss-art scripts/boss-art/out/boss-beaver/boss-beaver.ts BOSS_BEAVER_ATTACK, its notes give perSquare/stand/facesLeft/cue→sound/hit): wire kits.ts kingAttack + add "timber" to KING_ATTACKERS in boss-timing.ts. Big Boy home + intro drawing now (same session).
-- Art session (session_01JuCWRrhykEFvvmv5JKWgRX) = expert for all boss homes + battle intros (API only): Alfil's home now,
   then Alfil's intro (sand pyramid, table, sandstorm).
 - Gemini Part D (challenge lines) prompt: scratchpad lines/hunchess-boss-challenge-lines-for-gemini.txt, sent to Eric.
 0. NEXT after shops r2: Colosseum Pixel pieces (Eric Nov 2): Pixel must pixelate ONLY the pieces, never the crowd/arena
