@@ -163,7 +163,8 @@ export interface ChallengeEnd {
 export function challengeText(name: string, boss: string, end?: ChallengeEnd): string {
   if (!end) return `${name} challenged ${boss}!`;
   const n = end.moves;
-  const moves = (word: string) => (n === null ? "" : ` ${word} ${n} move${n === 1 ? "" : "s"}`);
+  // (No count when it's not known, or none of your moves were played: "Alfil beat Ann.")
+  const moves = (word: string) => (!n ? "" : ` ${word} ${n} move${n === 1 ? "" : "s"}`);
   const line =
     end.outcome === "won"
       ? `${name} beat ${boss}${moves("in")}!`

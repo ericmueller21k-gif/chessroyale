@@ -214,7 +214,8 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
       {review && <Breakdown moves={match.moves} you={elim?.you} line={elim?.line} placement={elim ? placement : null} lastCut={elim?.lastCut} onClose={() => setReview(false)} dp={scoreDp(match.settings)} />}
       {avgMs > 0 && <p class="muted small">Scoring took {Math.round(avgMs)} ms per round on this device.</p>}
       <div class="actions">
-        <button type="button" class="btn btn-secondary" onClick={onHome}>
+        {/* (Its words on one line: "Back to town" after a boss challenged in the town.) */}
+        <button type="button" class="btn btn-secondary" style={{ whiteSpace: "nowrap" }} onClick={onHome}>
           {homeText}
         </button>
         <button type="button" class="btn btn-primary" onClick={onAgain}>

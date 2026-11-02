@@ -50,6 +50,12 @@ export const CHALLENGE_FEEL = {
   stormInMs: 600,
   coveredMinMs: 250,
   stormOutMs: 600,
+  /**
+   * The room's camera through a challenge: looking at this many squares south of the table (between it and you), at this zoom (0
+   * Close, 1 the town's zoomed-in camera): you, the board and the boss all in view, the boss's line under the chat log.
+   */
+  camSouth: 1.5,
+  camZoom: 0.6,
   /** The storm's tiles are drawn this many times their size, crisp. */
   stormScale: 3,
 } as const;

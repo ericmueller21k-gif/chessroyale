@@ -457,8 +457,9 @@ function startRoom(
   const tall: CamSet = { ...f.camTall };
   const wide: CamSet = { ...f.camWide };
   const sets: CamPair = { tall, wide };
-  let zoomCur = 0;
-  let zoomTarget = 0;
+  // (A challenge: its own framing, CHALLENGE_FEEL.camZoom and camSouth, from the start.)
+  let zoomCur = challenge ? CHALLENGE_FEEL.camZoom : 0;
+  let zoomTarget = zoomCur;
   let camX = you.c;
   let camY = you.r;
   let vx = 0;
@@ -969,7 +970,7 @@ function startRoom(
       drawUp(u, now);
     }
     while (k < figN) drawFigure(figK[k++]!, now);
-    if (kidBox.on) drawTag("Shopkeeper", "sidekick", kidBox.hx, kidBox.hy);
+    if (kidBox.on && !ci) drawTag("Shopkeeper", "sidekick", kidBox.hx, kidBox.hy);
     if (youHead.on) drawTag(youName(), "you", youHead.x, youHead.y);
     if (ci && introNow?.line && bossHead.on) drawBubble(ci.def.line, bossHead.x, bossHead.y);
     placeCard();
@@ -1056,16 +1057,18 @@ function startRoom(
     stepIntro(now);
     stepCards();
     if (follow) {
-      // A critically damped spring toward you (the town's), solved exactly for the frame.
+      // A critically damped spring toward you (the town's), solved exactly for the frame; in a challenge, toward its framing.
       you.pose(now, pose);
+      const gx = marks ? marks.table.c : pose.x;
+      const gy = marks ? marks.table.r + C.camSouth : pose.y;
       const w = f.followSpring;
       const e = Math.exp(-w * dt);
-      const x = camX - pose.x;
-      const y = camY - pose.y;
+      const x = camX - gx;
+      const y = camY - gy;
       const jx = vx + w * x;
       const jy = vy + w * y;
-      camX = pose.x + (x + jx * dt) * e;
-      camY = pose.y + (y + jy * dt) * e;
+      camX = gx + (x + jx * dt) * e;
+      camY = gy + (y + jy * dt) * e;
       vx = (vx - w * jx * dt) * e;
       vy = (vy - w * jy * dt) * e;
     } else vx = vy = 0;

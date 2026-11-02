@@ -729,6 +729,7 @@ describe("town chat: a boss challenged from the town (the server's lines; Eric, 
     expect(challengeText("Ann", "Alfil", { outcome: "surrendered", moves: 15, token: null })).toBe("Ann surrendered to Alfil after 15 moves.");
     expect(challengeText("Ann", "Alfil", { outcome: "lost", moves: 1, token: null })).toBe("Alfil beat Ann in 1 move.");
     expect(challengeText("Ann", "Alfil", { outcome: "won", moves: null, token: null })).toBe("Ann beat Alfil!");
+    expect(challengeText("Ann", "Alfil", { outcome: "lost", moves: 0, token: null })).toBe("Alfil beat Ann.");
     expect(challengeText("Ann", "Alfil", { outcome: "won", moves: 34, token: "Babur" })).toBe("Ann beat Alfil in 34 moves! + Babur token");
     expect(endsChallenge({ outcome: "surrendered", moves: TOWN_CHAT.challengeSurrenderMoves - 1, token: null })).toBe(false);
     expect(endsChallenge({ outcome: "surrendered", moves: TOWN_CHAT.challengeSurrenderMoves, token: null })).toBe(true);
