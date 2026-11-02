@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_SETTINGS, RAID_SETTINGS, type Settings } from "@chessroyale/core";
+import { BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, type Settings } from "@chessroyale/core";
+import { legalMoves, type UciEngine } from "@chessroyale/chess";
 import { SoloMatch } from "../src/solo.ts";
+import { engineMoveTitle } from "../src/components/BossDock.tsx";
 import { NetMatch } from "../src/net.ts";
 
 /** Whether this device's profile says admin (as /api/me does for an email in ADMIN_EMAILS). */
@@ -54,5 +56,58 @@ describe("Engine move: who sees it", () => {
   it("online matches have no Engine move at all", () => {
     expect("engineMove" in NetMatch.prototype).toBe(false);
     expect("engineMoveShown" in NetMatch.prototype).toBe(false);
+  });
+});
+
+/**
+ * What answers it (Eric, Nov 2: "I think it's set to Maia … Can you set that back to Stockfish?"): Stockfish's own search at full
+ * strength, one line at engineMoveNodes over the allowed moves, its best played as yours; its title says so before the boss's
+ * brain line.
+ */
+describe("Engine move: Stockfish at full strength, never Maia", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", () => Promise.reject(new Error("offline")));
+    vi.stubGlobal("location", { search: "" });
+    // (Maia's worker never answers: the boss's loading step ends at its gate.)
+    vi.stubGlobal("Worker", class { onmessage = null; onerror = null; postMessage() {} terminate() {} });
+  });
+  afterEach(() => {
+    who.admin = false;
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("plays the best of one full-strength search (engineMoveNodes, no strength limit) as your move", async () => {
+    who.admin = true;
+    // (The search's best is the LAST legal move: the hints' first line would be another, so the test tells them apart.)
+    const deep: { n: number; nodes: number }[] = [];
+    const engine = {
+      topMoves: async (fen: string, n: number) => legalMoves(fen).slice(0, n).map((move, i) => ({ move, expected: 0.5 - 0.01 * i })),
+      scoreMoves: async (_fen: string, moves: string[]) => moves.map((move) => ({ move, expected: 0.5 })),
+      topMovesAt: async (fen: string, n: number, nodes: number) => {
+        if (nodes === BOSS_POWERS.engineMoveNodes) deep.push({ n, nodes });
+        return legalMoves(fen).slice(-n).map((move) => ({ move, expected: 0.6 }));
+      },
+      playAtElo: async (fen: string) => legalMoves(fen)[0]!,
+    } as unknown as UciEngine;
+    const m = new SoloMatch([engine], "Ann", raid(), false, false);
+    m.start();
+    for (let i = 0; i < 200 && m.phase.kind !== "play"; i++) await vi.advanceTimersByTimeAsync(500);
+    expect(m.phase.kind).toBe("play");
+    const fen = (m.phase as { board: { fen: string } }).board.fen;
+    const before = m.moves.length;
+    await vi.advanceTimersByTimeAsync(1000);
+    m.engineMove();
+    for (let i = 0; i < 20 && m.moves.length === before; i++) await vi.advanceTimersByTimeAsync(100);
+    expect(deep).toEqual([{ n: 1, nodes: 1_000_000 }]);
+    expect(m.moves[before]?.fen).toBe(fen);
+    expect(m.moves[before]?.move).toBe(legalMoves(fen).at(-1));
+    m.dispose();
+  }, 30_000);
+
+  it("its title says Stockfish first, then the boss's brain line (Maia's is the boss's)", () => {
+    expect(engineMoveTitle("Maia 1450 · no guard · Maia's #1 · 120 ms")).toBe("Engine move (Stockfish) · Boss: Maia 1450 · no guard · Maia's #1 · 120 ms");
+    expect(engineMoveTitle("")).toBe("Engine move (Stockfish)");
   });
 });

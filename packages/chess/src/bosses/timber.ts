@@ -195,21 +195,29 @@ export const buildReaction = (piece: WorkshopPiece): "bigCheer" | "cheer" => (pi
  * The test switches: ?power=gnaw warns as the second turn begins, the Gnaw after his move on his turn after it; ?power=scraps
  * starts from BALLOON_TEST_MOVES with his pawn finished (it drops at the end of his first turn).
  */
+/** How many Gnaws a battle he has at most (BOSS_POWERS.maxUltimates.timber; none set: no cap). */
+const gnawMax = (s: Pick<BossPowerSettings, "maxUltimates"> = BOSS_POWERS): number => s.maxUltimates?.["timber"] ?? Infinity;
+
 export const TIMBER: BossRules = {
   id: "timber",
   // Gnaw: the meter full as a turn begins, its warning that turn; on his turn after it, after his move (afterBossMove). The
   // trigger (`ultNext`, kept): after his next move, without the warning.
   ultimateOnHisTurn: true,
+  // At most maxUltimates.timber Gnaws a battle (Eric, Nov 2: two): after the last his meter stays empty, shown dimmed.
+  get ultimateMax() {
+    return gnawMax();
+  },
+  spentMeterShown: true,
   ultimate(next, t) {
-    if (next.warnAt !== undefined || t.ultNext) return false;
+    if (next.warnAt !== undefined || t.ultNext || (next.ults ?? 0) >= gnawMax(t.s)) return false;
     if (meterFull(next, t) || testSwitch(t, next)) {
       next.warnAt = t.turn;
       t.events.push({ kind: "warn", turn: t.turn });
     }
     return false;
   },
-  // (The Gnaw is his turn's end: over as the crowd's next turn begins.)
-  ultimateRunning: (p, turn) => turn <= (p.ultAt ?? 0),
+  // (The Gnaw is his turn's end: over as the crowd's next turn begins. After his last, for the rest of the battle: none come.)
+  ultimateRunning: (p, turn, s) => (p.ults ?? 0) >= gnawMax(s) || turn <= (p.ultAt ?? 0),
   // As the crowd's turn after his turn's end begins: his Gnaw, then his drop.
   everyTurn(next, t) {
     const w = next.workshop;

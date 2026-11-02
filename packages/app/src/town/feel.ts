@@ -597,4 +597,9 @@ export const SHOP_FEEL = {
   floorSplitPx: 90,
   /** The fire hoops' glow (Babur's): its warm pool under each hoop this strong (0 to 1, over the art's own `strength`). */
   glow: 1,
+  /**
+   * Your ride comes in with you (Eric, Nov 2: "I want the ride, your rider goes in with you"): drawn under you inside as the town
+   * draws it. false: it waits outside and you walk in on foot (round 1's way), and come out on it.
+   */
+  rideInside: true as boolean,
 } as const;

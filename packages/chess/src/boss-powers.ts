@@ -274,15 +274,20 @@ export function rageOf(boss: BossState | null | undefined, s: RageRates = BOSS_P
   const own = bossRules(boss)?.meter;
   if (own) return own(p, turnOf(boss!), { ...BOSS_POWERS, ...s });
   // (Once a battle, Chub & Chirp's; Smudgy's last Repaint: from the turn after it, no meter.)
-  if (p.ultAt !== undefined && ultimateSpent(boss) && turnOf(boss!) > p.ultAt) return null;
+  // (Timber's: it stays, empty: spentMeterShown.)
+  if (p.ultAt !== undefined && ultimateSpent(boss) && turnOf(boss!) > p.ultAt) return bossRules(boss)?.spentMeterShown ? 0 : null;
   if (p.ultAt !== undefined) return turnOf(boss!) <= p.ultAt ? 1 : 0;
   return Math.max(0, Math.min(1, rageNow(p, rageSpeedOf(boss!.id, s), s) / s.rageFull));
 }
 
-/** The meter is held empty: an ultimate came and its effect still runs (the screens show it paused). */
+/**
+ * The meter is held empty: an ultimate came and its effect still runs, or (spentMeterShown: Timber's) the last a battle allows
+ * has come (the screens show it paused).
+ */
 export const ragePaused = (boss: BossState | null | undefined): boolean => {
   const p = boss?.powers;
-  return !!p && p.ultAt !== undefined && turnOf(boss!) > p.ultAt && !bossRules(boss)?.meter && !ultimateSpent(boss);
+  const rules = bossRules(boss);
+  return !!p && p.ultAt !== undefined && turnOf(boss!) > p.ultAt && !rules?.meter && (!ultimateSpent(boss) || !!rules?.spentMeterShown);
 };
 
 // ---------------- The judge plays by the same rules ----------------

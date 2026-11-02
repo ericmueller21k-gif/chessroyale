@@ -966,11 +966,14 @@ export const BOSS_POWERS = {
    */
   ultimateTestButton: true,
   /**
-   * Testing, admins only, Boss alone (Eric, Oct 14): an "Engine move" button that plays Stockfish's best move for you
-   * through the normal move path. Its search is the power-up hints' (`engineNodes`, 250,000 nodes: well under a second
-   * on a phone, already under way as your move starts), so it adds no engine work. false removes it.
+   * Testing, admins only, Boss alone (Eric, Oct 14): an "Engine move" button (the 🐟) that plays Stockfish's best move for you
+   * through the normal move path. false removes it. Nov 2 (Eric: "set that back to Stockfish"): its own search, Stockfish at full
+   * strength (no strength limit, one line) over engineMoveNodes nodes and the moves allowed this turn; never Maia's move, never
+   * the boss's brain. (Until then it played the top of the judge's ranking from the power-up hints' search: `engineNodes`,
+   * 250,000 nodes over eight lines.)
    */
   engineMoveButton: true,
+  engineMoveNodes: 1_000_000,
   /**
    * The funhouse (Boingo's ultimate; Eric, Oct 11): he turns the board round in steps, funhouseStepTurns crowd turns
    * apart: upside down (180°) as it comes, then a quarter turn to a side picked from the seed (90° or 270°), then a half
@@ -1509,6 +1512,13 @@ export const BOSS_POWERS = {
   workshopLeadMax: 1,
   /** Timber's Gnaw (his ultimate, the rage meter's: rageSpeed.timber): after his move, one of your pawns eaten, gnawScraps scraps for his workshop. */
   gnawScraps: 8,
+  /**
+   * The most ultimates a boss has in one battle, by BOSS_ROSTER id (one not listed: no cap). Timber's Gnaw at most twice (Eric,
+   * Nov 2: "make it so this beaver only ults up to 2 times a game. After 2 times, his meter just stops charging. Otherwise, it's
+   * too strong."): after his second his meter stays empty and dimmed for the rest of the battle, and the admins' trigger is gone.
+   * (Smudgy's Repaint keeps its own cap, repaintMax.) docs/decisions/2026-11-02-nov2-fixes.md.
+   */
+  maxUltimates: { timber: 2 } as Readonly<Record<string, number>>,
 } as const;
 
 /**
@@ -1741,6 +1751,12 @@ export const KING_SPEECH = {
   perQuietMove: 0.1,
   /** A remark on a move (a brilliant, good or bad move, a capture, a check given, the boss's slip) waits this many crowd moves after the last remark. */
   remarkGapMoves: 6,
+  /**
+   * His praise of a good move ("Masterful! Even I'd play that.": greatMove, goodMove) never comes in a game's first this many
+   * moves: the move's number in the game (the FEN's), so the crowd's own first ten from the start (Eric, Nov 2: "The king should not
+   * be saying that on the first move of the game … let's just make it the first 10 moves of the game").
+   */
+  praiseFromMove: 11,
   /** How likely each remark and each piece of small talk is to be said, when it may be (critical cues always speak). */
   chance: {
     greatMove: 0.3,

@@ -11,6 +11,11 @@
  * crate). You start in Close (SHOP_FEEL.close, the third-person camera); the town's − / + switch between Close and the town's
  * zoomed-in camera. Inside is just you: the town's bots and other players don't come in.
  *
+ * Your ride comes in with you (Eric, Nov 2: "your rider goes in with you"; SHOP_FEEL.rideInside): the town's own rider, its frames
+ * composed as the town drew them (town/rides.ts: the ride at its scale, 0.75 of the pawn), drawn under you at the room's camera,
+ * its idle standing and its move walking, its side, back or front the way you go, at its own pace (RIDES.speed); you go out still
+ * on it. No ride (or rideInside false: the ride waits outside, as round 1 had it): on foot.
+ *
  * You walk by tapping, as in the town (one square at a time, round what's solid: shops/room.ts); a drag looks around and the focus
  * button brings the camera back. Standing within talking range of the Shopkeeper, its card ("Shopkeeper", Talk) shows; Talk opens
  * the crate's card (its picture, its prizes, the price, what you have, and the two ways to buy, through `buyBossCrate`). Standing
@@ -32,6 +37,8 @@ import { PAWN_HEAD, PAWN_PATH, type YouArt } from "../render.ts";
 import { SIDEKICK_SHEETS, type SidekickSheet } from "../sidekick-sheets.ts";
 import { TAG_STYLE, type TagKind } from "../tags.ts";
 import { Walker, type HomeId } from "../world.ts";
+import type { Rider } from "../rides.ts";
+import { rideSpeed } from "../../components/rides/scale.ts";
 import { inTalkRange, isFloor, makeRoom, onDoor, tapTarget, findPath, type Room, type ShopPlace, type Sq } from "./room.ts";
 import { bossHoldings, buyBossCrate, holdLine, priceLine, prizeRows, shopOf, wayText, type CrateWay, type ShopDef } from "./shops.ts";
 
@@ -113,7 +120,7 @@ export interface ShopCtl {
   recenter: () => void;
 }
 
-export function ShopRoom({ room, youArt, youName, onZoom, onOut, onReady, ctl }: { room: LoadedRoom; youArt: () => YouArt | null; youName: () => string; onZoom: (out: boolean) => void; onOut: () => void; onReady: () => void; ctl: { current: ShopCtl | null } }) {
+export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onReady, ctl }: { room: LoadedRoom; youArt: () => YouArt | null; /** The town's rider you're on (its frames ready), or null: on foot. */ youRider: () => Rider | null; youName: () => string; onZoom: (out: boolean) => void; onOut: () => void; onReady: () => void; ctl: { current: ShopCtl | null } }) {
   const box = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const cardEl = useRef<HTMLDivElement>(null);
@@ -122,7 +129,7 @@ export function ShopRoom({ room, youArt, youName, onZoom, onOut, onReady, ctl }:
   const eng = useRef<ReturnType<typeof startRoom> | null>(null);
   const { def } = room;
   useLayoutEffect(() => {
-    const r = (eng.current = startRoom(box.current!, canvas.current!, cardEl.current!, room, youArt, youName, onZoom, (c) => {
+    const r = (eng.current = startRoom(box.current!, canvas.current!, cardEl.current!, room, youArt, youRider, youName, onZoom, (c) => {
       setCard(c);
       setMsg("");
     }));
@@ -207,6 +214,9 @@ function CratePic({ frames }: { frames: Frames }) {
   return <canvas class="shop-crate-pic" ref={ref} aria-hidden="true" />;
 }
 
+/** A Walker's view (the town's: 1 up the screen, its rows running away from the camera) as a room draws it (rows toward the camera). */
+const roomView = (v: 0 | 1 | 2): 0 | 1 | 2 => (v === 1 ? 2 : v === 2 ? 1 : 0);
+
 /** The pawn's base's foot down its box (render.ts's PAWN_FOOT: the path's bottom at y 39.5, and half its outline). */
 const PAWN_FOOT = (39.5 + 0.75) / 45;
 const SHADOW = "rgb(60,35,10)";
@@ -235,6 +245,7 @@ function startRoom(
   cardEl: HTMLDivElement,
   loaded: LoadedRoom,
   youArt: () => YouArt | null,
+  youRider: () => Rider | null,
   youName: () => string,
   onZoom: (out: boolean) => void,
   onCard: (c: ShopCard | null) => void,
@@ -247,7 +258,17 @@ function startRoom(
   const n = room.n;
   const g = cv.getContext("2d")!;
   const you = new Walker(room.start, f.youStepMs, true, f.walkEase);
-  you.view = 1;
+  // (Facing the counter, north: away from the camera. The Walker's views are the town's, whose rows run away from the camera;
+  // a room's run toward it, so its back and front swap: roomView.)
+  you.view = 2;
+  /** The rider drawn inside now (your ride's, its frames ready; SHOP_FEEL.rideInside), or null: on foot. */
+  const riding = (): Rider | null => {
+    if (!S.rideInside) return null;
+    const rd = youRider();
+    return rd?.ready ? rd : null;
+  };
+  /** The test hook's view of your ride (as the town's `youRide`): its animation and frame drawn last, its side, its view. */
+  const seen = { ride: null as string | null, anim: "" as "" | "idle" | "move", frame: -1, facing: 1, view: 0 };
 
   // ---- The floor, baked once: every tile (turned as the layout says) into one picture of the whole room, n x n squares.
   const floor = document.createElement("canvas");
@@ -553,10 +574,65 @@ function startRoom(
     g.drawImage(loaded.kid.img, i * sheet.w, 0, sheet.w, sheet.h, x0, y0, sheet.w * s, sheet.h * s);
     Object.assign(kidBox, { x0, y0, x1: x0 + sheet.w * s, y1: y0 + sheet.h * s, on: true, hx: pt.x, hy: pt.y - (sheet.foot[1] - sheet.top.idle) * s - 2 });
   };
+  /**
+   * You on your ride (town/rides.ts' frames, as the town's drawRider draws them): its idle standing, its move a cycle a step,
+   * lifted by its hop; its shadows as the town's (smaller and lighter as it lifts); your tag over its top standing.
+   */
+  const drawRiding = (rd: Rider, now: number) => {
+    const view = roomView(you.view);
+    const rv = rd.views[view];
+    const flip = rv.facing === "side" ? you.facing : 1;
+    const box = f.youSquares;
+    let img: HTMLCanvasElement;
+    let lift = 0;
+    let i: number;
+    if (pose.step) {
+      i = rv.moveIndex(pose.t);
+      img = rv.frames.move[i]!;
+      lift = (rv.lift[i]! * box) / 100;
+    } else img = rv.frames.idle[(i = rv.idleIndex(now))]!;
+    Object.assign(seen, { ride: rd.id, anim: pose.step ? "move" : "idle", frame: i, facing: flip, view: rv === rd.views[0] ? 0 : view });
+    const h = ((box * rv.h) / 100) * pt.k;
+    const w = (h * rv.w) / rv.h;
+    const x0 = pt.x - rv.footX * w;
+    const y0 = pt.y - rv.footY * h - lift * pt.k;
+    // The shadows (the town's drawSprite for a rider: sized by the ride's own `shadow`).
+    const up = Math.max(0, lift);
+    const grow = 1 / (1 + up * f.shadowLiftShrink);
+    const fade = Math.max(0, 1 - up * f.shadowLiftFade);
+    const soft = rd.shadow;
+    g.fillStyle = SHADOW;
+    g.globalAlpha = f.shadowAlpha * (0.5 + 0.5 * fade);
+    g.beginPath();
+    g.ellipse(pt.x, pt.y, Math.min(w * 0.42, pt.k * 0.42 * soft) * grow, pt.k * 0.12 * soft * grow, 0, 0, Math.PI * 2);
+    g.fill();
+    g.globalAlpha = f.contactShadowAlpha * fade;
+    g.beginPath();
+    g.ellipse(pt.x, pt.y, pt.k * f.contactShadowW * 1.45 * Math.min(soft, 1.2) * grow, pt.k * f.contactShadowDepth * grow, 0, 0, Math.PI * 2);
+    g.fill();
+    g.globalAlpha = 1;
+    g.save();
+    if (flip < 0) {
+      g.translate(pt.x, 0);
+      g.scale(-1, 1);
+      g.translate(-pt.x, 0);
+    }
+    // (Crisp drawn bigger than its pixels, smooth smaller: as the town draws it.)
+    g.imageSmoothingEnabled = h < img.height * 1.5;
+    g.drawImage(img, x0, y0, w, h);
+    g.restore();
+    g.imageSmoothingEnabled = false;
+    // (The tag over its top standing: it doesn't jump with the hop.)
+    Object.assign(youHead, { x: pt.x, y: y0 + lift * pt.k + rv.top * h - 2, on: true });
+  };
   const drawYou = (now: number) => {
     youHead.on = false;
+    seen.anim = "";
     you.pose(now, pose);
     if (!P(pose.x, pose.y)) return;
+    const rd = riding();
+    if (rd) return drawRiding(rd, now);
+    seen.ride = null;
     const a = youArt();
     const pad = a?.pad ?? 0;
     const kk = 1 + 2 * pad;
@@ -748,6 +824,8 @@ function startRoom(
     last = now;
     zoomCur += (zoomTarget - zoomCur) * (1 - Math.exp(-dt * f.zoomRate));
     if (Math.abs(zoomTarget - zoomCur) < 0.001) zoomCur = zoomTarget;
+    // (On your ride inside, at its pace: RIDES.speed, as in the town.)
+    you.stepMs = f.youStepMs / rideSpeed(riding()?.id);
     you.update(now);
     stepCards();
     if (follow) {
@@ -882,6 +960,7 @@ function startRoom(
     return P(s.c, s.r) && pt.x >= 0 && pt.x <= W && pt.y >= 0 && pt.y <= H ? { x: pt.x, y: pt.y } : null;
   };
   const hookCam = () => (testSwitchesAllowed() ? { zoom: zoomCur, zoomTarget, room: def.home, follow, focus: [camX, camY] } : null);
+  const hookRide = () => (testSwitchesAllowed() ? { ...seen, stepMs: you.stepMs } : null);
   const hookBench = (k: number) => {
     if (!testSwitchesAllowed()) return null;
     const now = performance.now();
@@ -890,8 +969,9 @@ function startRoom(
     for (let i = 0; i < k; i++) draw(now);
     return (performance.now() - t0) / k;
   };
-  const hooks = window as unknown as { __shopAt?: typeof hookAt; __shopCam?: typeof hookCam; __shopBench?: typeof hookBench };
+  const hooks = window as unknown as { __shopAt?: typeof hookAt; __shopCam?: typeof hookCam; __shopBench?: typeof hookBench; __shopRide?: typeof hookRide };
   hooks.__shopAt = hookAt;
+  hooks.__shopRide = hookRide;
   hooks.__shopCam = hookCam;
   hooks.__shopBench = hookBench;
 
@@ -919,6 +999,7 @@ function startRoom(
       delete hooks.__shopAt;
       delete hooks.__shopCam;
       delete hooks.__shopBench;
+      delete hooks.__shopRide;
     },
   };
 }

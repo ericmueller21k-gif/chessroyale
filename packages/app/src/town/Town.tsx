@@ -229,6 +229,7 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, onColosseum, seat =
           <inside.View
             room={inside.room}
             youArt={() => ctl.current?.youArt() ?? null}
+            youRider={() => ctl.current?.youRider() ?? null}
             youName={playerName}
             onZoom={setShopOut}
             onOut={() => void goOut()}
@@ -1369,6 +1370,8 @@ function startTown(
     },
     /** Your pawn's picture as the town draws it (your items on), for the room inside a shop. */
     youArt: () => r.youArt,
+    /** The rider you're on as the town draws you (its frames ready), or null: on foot. Inside a shop it comes in with you. */
+    youRider: () => r.youRider,
     chip: (i: number) => {
       const h = chipPlace[i];
       if (!h) return;

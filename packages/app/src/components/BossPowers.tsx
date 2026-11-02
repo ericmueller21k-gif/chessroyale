@@ -2,7 +2,7 @@ import type { ComponentChildren } from "preact";
 import { useContext, useLayoutEffect, useRef } from "preact/hooks";
 import { BoardTurn, type QuarterTurn } from "../board-view.ts";
 import { BOSS_BANNER, BOSS_POWERS, bossBannerMs, type PowerEventKind } from "@chessroyale/core";
-import { KING_ATTACK, bannerLeadMs, mateMoments, powerFxMs, powerMomentMs } from "@chessroyale/chess";
+import { KING_ATTACK, bannerLeadMs, bossRules, mateMoments, powerFxMs, powerMomentMs } from "@chessroyale/chess";
 import { bossKit, poweredKit, type BossKit } from "../characters/kits.ts";
 import { cueAt } from "../characters/power-art.ts";
 import type { BossView } from "../game.ts";
@@ -271,7 +271,8 @@ export function PowerMoment({ boss, moment, now: wall, orientation, side }: { bo
  * The boss bar's rage meter: it fills over the battle (faster as the boss loses material, the crowd gets ahead on the
  * judged eval or the God King strikes the boss), glows as it nears full, flashes for the one-turn warning, is full on
  * the ultimate's turn, then empties and stays empty (dimmed, paused) while the ultimate's effect runs, and fills again
- * for the next one (Eric, Oct 11: several a battle).
+ * for the next one (Eric, Oct 11: several a battle). A boss capped at a few a battle that keeps its meter shown (Timber: two,
+ * Nov 2) has it empty and dimmed after the last, for the rest of the battle.
  */
 export function RageMeter({ boss }: { boss: BossView }): ComponentChildren {
   const p = boss.powers;
@@ -279,6 +280,9 @@ export function RageMeter({ boss }: { boss: BossView }): ComponentChildren {
   const show = !!p && p.rage !== null && !boss.result;
   // (Warned, it's full: the test switch can bring the ultimate before the meter is. Older servers: null once spent.)
   const paused = !!p?.paused;
+  // (Spent: the last ultimate a battle allows has come and the meter stays, empty and dimmed: Timber's after his second Gnaw.)
+  const rules = bossRules(boss);
+  const spent = paused && !!rules?.spentMeterShown && (p?.ults ?? 0) >= (rules?.ultimateMax ?? Infinity);
   const now = !!p && p.ultAt !== null && !paused;
   const pct = ragePct(boss) ?? 0;
   // The meter only drops when an ultimate empties it: from what this device last showed, it holds a moment (the screen
@@ -307,11 +311,11 @@ export function RageMeter({ boss }: { boss: BossView }): ComponentChildren {
     <span
       class={`rage-meter${glow ? " glow" : ""}${p!.warned ? " warned" : ""}${now ? " now" : ""}${paused ? " paused" : ""}`}
       role="meter"
-      aria-label={paused ? "Rage: empty while the ultimate lasts" : `Rage ${pct}%`}
+      aria-label={spent ? "Rage: no more ultimates this battle" : paused ? "Rage: empty while the ultimate lasts" : `Rage ${pct}%`}
       aria-valuenow={pct}
       aria-valuemin={0}
       aria-valuemax={100}
-      title={paused ? "Rage: empty until the boss's ultimate is over" : "Rage: when it's full, the boss's ultimate is coming"}
+      title={spent ? "Rage: no more ultimates this battle" : paused ? "Rage: empty until the boss's ultimate is over" : "Rage: when it's full, the boss's ultimate is coming"}
     >
       {/* (No width transition while it slides down: a transition would override the slide.) */}
       <i ref={bar} style={drain ? { width: `${pct}%`, transition: "none" } : { width: `${pct}%` }} />

@@ -14,12 +14,16 @@ import {
   legalMoves,
   pieceAt,
   powerTurn,
+  rageOf,
+  ragePaused,
   scrapTarget,
   sideToMove,
   stockfishRefuses,
   timberEvents,
+  triggerUltimate,
   workshopAt,
   workshopClosed,
+  type EngineLike,
 } from "../src/index.ts";
 import { ticksAt } from "../src/bosses/base.ts";
 import { KIT_OPENING, crowdPick, fakeEngine, kitSettings } from "./boss-kit-lib.ts";
@@ -226,6 +230,41 @@ describe("in a battle", () => {
     expect(powersOf(b.r).ultAt).toBeUndefined();
   });
 
+  it("Gnaws at most twice a battle (Eric, Nov 2): after the second his meter stays at 0, held, and a third never comes, not even from the admins' trigger", async () => {
+    expect(S.maxUltimates["timber"]).toBe(2);
+    const b = battle(6, { test: "gnaw" });
+    // (The meter topped up before every crowd move: full again as each turn begins, so only the cap can stop a Gnaw.)
+    const fill = () => {
+      const boss = b.r.state.boss!;
+      b.r.state = { ...b.r.state, boss: { ...boss, powers: { ...boss.powers!, charge: (boss.powers!.charge ?? 0) + 1000 } } };
+    };
+    let spentAt = -1;
+    for (let i = 0; i < 60 && !b.r.isOver() && !b.r.boss!.result; i++) {
+      b.tick(1);
+      if (b.r.bossToMove()) await b.r.playBoss(fakeEngine());
+      else if (b.r.boss!.crowdMoves >= 24) break;
+      else {
+        fill();
+        await crowdMove(b.r);
+      }
+      const p = powersOf(b.r);
+      expect(p.ults ?? 0).toBeLessThanOrEqual(2);
+      if (p.ults === 2 && spentAt < 0) spentAt = b.r.boss!.crowdMoves;
+      if (spentAt >= 0 && b.r.boss!.crowdMoves > spentAt && !b.r.bossToMove()) {
+        // From the crowd turn after his second: the meter at 0, held (shown dimmed), no warning; the trigger refuses.
+        expect(rageOf(b.r.boss)).toBe(0);
+        expect(ragePaused(b.r.boss)).toBe(true);
+        expect(p.warnAt === undefined || p.ultAt !== undefined).toBe(true);
+        expect(p.events.some((e) => e.kind === "warn")).toBe(false);
+        expect(triggerUltimate(b.r.boss).ok).toBe(false);
+      }
+    }
+    expect(spentAt, "two Gnaws came").toBeGreaterThan(0);
+    expect(b.r.boss!.crowdMoves - spentAt, "and many turns after the second").toBeGreaterThanOrEqual(8);
+    expect(powersOf(b.r).ults).toBe(2);
+    expect(powersOf(b.r).workshop!.gnaws).toBe(2);
+  });
+
   it("Gnaw with none of your pawns left eats nothing (said on screen); one whose going would check you is never picked", () => {
     expect(gnawPick("4k3/8/8/8/8/8/8/4K3 w - - 0 40", 1, 0)).toBe("none");
     // (The e2 pawn shields White's king from the rook on e8: only the a2 pawn may go.)
@@ -252,5 +291,48 @@ describe("in a battle", () => {
       expect(w.drops).toBeLessThanOrEqual(S.workshopDropMax);
       if (w.last) expect(["1", "2", "3", "4"]).toContain(w.last.square[1]);
     }
+  });
+});
+
+/**
+ * The admins' Engine move (the 🐟; Eric, Nov 2: "set that back to Stockfish"): runner.engineBest is Stockfish's own search, one
+ * line, no strength limit, at the nodes asked, over the moves this turn allows; never the boss's move (playAtElo, Maia's place).
+ * (Here against Timber: any boss would do.)
+ */
+describe("Engine move: Stockfish at full strength", () => {
+  it("asks the judge's engine for one line at engineMoveNodes over the allowed moves, and plays its best; never a strength-limited move", async () => {
+    expect(S.engineMoveNodes).toBe(1_000_000);
+    const calls: { kind: string; n?: number; nodes?: number; moves?: readonly string[] }[] = [];
+    const base = fakeEngine();
+    const eng: EngineLike = {
+      ...base,
+      topMoves: async (fen, n) => (calls.push({ kind: "topMoves", n }), base.topMoves(fen, n)),
+      topMovesAt: async (fen, n, nodes, moves) => {
+        calls.push({ kind: "topMovesAt", n, nodes, moves });
+        const all = await base.topMovesAt!(fen, 99, nodes);
+        return all.filter((m) => !moves || moves.includes(m.move)).slice(0, n);
+      },
+      playAtElo: async (fen) => (calls.push({ kind: "playAtElo" }), base.playAtElo!(fen, 1500)),
+    };
+    const settings = kitSettings({ boss: "timber", test: "", maxMoves: 60 });
+    const r = new MatchRunner({ settings, rng: mulberry32(3), engines: [eng], library: [KIT_OPENING], entrants: [{ id: "h0", name: "H", isBot: false }], raidSide: "w", clock: () => 0 });
+    r.deal();
+    const fen = fenOf(r);
+    calls.length = 0;
+    const best = await r.engineBest(fen, S.engineMoveNodes);
+    expect(calls).toEqual([{ kind: "topMovesAt", n: 1, nodes: 1_000_000, moves: undefined }]);
+    expect(best).toBe((await base.topMoves(fen, 1))[0]!.move);
+    // A power limits the moves: only those searched, and the best of them played.
+    const allowed = legalMoves(fen).slice(-2);
+    r.crowdAllowed = () => allowed;
+    calls.length = 0;
+    const limited = await r.engineBest(fen, S.engineMoveNodes);
+    expect(calls).toEqual([{ kind: "topMovesAt", n: 1, nodes: 1_000_000, moves: allowed }]);
+    expect(allowed).toContain(limited);
+    // None allowed: no move, and no search.
+    r.crowdAllowed = () => [];
+    calls.length = 0;
+    expect(await r.engineBest(fen, S.engineMoveNodes)).toBeNull();
+    expect(calls).toEqual([]);
   });
 });

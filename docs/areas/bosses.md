@@ -89,8 +89,11 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 - **Engine move** (admins only, Boss alone, Oct 14; `BOSS_POWERS.engineMoveButton`): a 🐟 icon beside the God King's head
   next to the ultimate's ⚡ (a phone, Oct 24; its title is the brain's line, which a phone doesn't show; a computer: the
   title line's "Engine move" button) plays Stockfish's best move
-  as yours (`SoloMatch.engineMove`: the power-up hints' search, `topMovesFor`, so only the moves the turn allows), through
-  the normal move path. Gated by `engineMoveAllowed` in `boss-brain.ts`; online matches (`NetMatch`) have none. Tests:
+  as yours, through the normal move path. Since Nov 2 (Eric: "set that back to Stockfish") its own search: Stockfish at full
+  strength, one line, no strength limit, `engineMoveNodes` (1,000,000) over the moves the turn allows (`runner.engineBest`), on
+  the judge's engine (it waits while Stockfish is paused or busy); never Maia's move. Before, the top of the judge's ranking from
+  the power-up hints' search (`topMovesFor`, 250,000 nodes over eight lines). Its title: **"Engine move (Stockfish) · Boss:
+  …"**, the boss's brain line second (Maia's is the boss's). Gated by `engineMoveAllowed` in `boss-brain.ts`; online matches (`NetMatch`) have none. Tests:
   `packages/app/test/engine-move.test.ts`, `e2e/recluse.spec.ts`.
 - **The ground rules of every power** (the server decides, the same everywhere):
   - Every power comes from the battle's seed (drawn once, as it starts) and the position, so the server, the solo game
@@ -139,7 +142,9 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   own material lost (`ragePerMaterial`: a queen's worth is half the meter) and with each of the God King's strikes on
   the boss (`rageStrike`: a quarter of it), every gain times the boss's `rageSpeed`. Full: a "RAGE!" warning, then the
   ultimate as the next crowd turn begins. Hollow's Lights out, Big Boy's Big Bounce and Alfil's Mammoth Slam come at the
-  start of the boss's turn instead (Lights out's only warning is the full meter). The meter is full on the ultimate's own turn, then
+  start of the boss's turn instead (Lights out's only warning is the full meter). A cap a battle: `ultimateMax` in a boss's rules
+  (Smudgy's `repaintMax`: after his last the meter goes; Timber's `maxUltimates.timber`, 2, Eric, Nov 2: after his second Gnaw the
+  meter stays on the bar, empty and dimmed, `spentMeterShown`, its title "Rage: no more ultimates this battle"). The meter is full on the ultimate's own turn, then
   empties; while the ultimate's effect still runs (its rules' `ultimateRunning`: the blizzard its three turns, the Big
   Bounce its own turn, the funhouse until the board is back, the Roman candle until its last fire is out, Lights out through
   the turn after it, the board saw while the halves are apart, the Mammoth Slam while its pieces are up) it stays empty, dimmed and dashed on screen

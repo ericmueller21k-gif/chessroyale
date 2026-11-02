@@ -322,7 +322,7 @@ test("the admins' ⚡ and 🐟: on a phone, tiny icons beside the God King's hea
     await expect(page.locator(".match-tools > .ult-test.gk-tool")).toHaveText("⚡");
     await expect(page.locator(".match-tools > .engine-move.gk-tool")).toHaveText("🐟");
     await expect(page.locator(".match-tools .brain-debug")).toBeHidden();
-    await expect(fish).toHaveAttribute("title", /^Engine move · .*Maia/, { timeout: 30_000 });
+    await expect(fish).toHaveAttribute("title", /^Engine move \(Stockfish\) · Boss: .*Maia/, { timeout: 30_000 });
     await expect(page.locator(".boss-dock .gk-tool")).toHaveCount(0);
     return;
   }
@@ -361,7 +361,7 @@ test("the admins' ⚡ and 🐟: on a phone, tiny icons beside the God King's hea
   expect(Number(g.opacity), "muted at rest").toBeCloseTo(0.6, 1);
   // The brain's line: hidden on a phone, its words in the 🐟's title.
   await expect(page.locator(".brain-debug")).toBeHidden();
-  await expect(fish).toHaveAttribute("title", /^Engine move · Maia \d+ · no guard/, { timeout: 30_000 });
+  await expect(fish).toHaveAttribute("title", /^Engine move \(Stockfish\) · Boss: Maia \d+ · no guard/, { timeout: 30_000 });
   // ⚡ triggers the ultimate (its name says so); 🐟 plays the engine's move as yours.
   await ult.click();
   await expect(page.getByRole("button", { name: "Ultimate next turn (testing)", exact: true })).toBeVisible();
