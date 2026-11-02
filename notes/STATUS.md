@@ -7,7 +7,9 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 ## Running
 - PR #458 shop interiors r1 (CI watcher). Next: round 2 at xhigh (tokens + purchase).
 - PR #463 Colosseum new GBA set as Pixel + Colosseum's own Animations (off): CI watcher.
-- One Opus (high): 50 v 50 bot spread + top-3 weighted played move (cr-spread, claude/crowd-bot-spread, brief notes/briefs/brief-crowd-bot-spread.md).
+- PR #464 50 v 50 bot spread + top-3 draw (full-e2e; CI watcher).
+- One Opus (high): Nov 2 bug fixes batch B (cr-fixb, claude/nov2-fixes-b, brief notes/briefs/brief-nov2-bugfixes-b.md).
+- #463 Colosseum pieces merged but NOT live: hunchess.com serves the 10:14 build from Cloudflare's cache (HIT, query ignored) though CF deployed 4fac91ad at 16:15. Asked Eric to purge / check cache rules.
 - API art: Colosseum GBA pixel pieces (session_01JuCWRvpifUHBYDWXqYcDtk; asks Eric once, ~$3-6, cap $8).
 - One Opus: test-value changes (worktree /home/user/cr-testvalue, branch claude/test-value, brief
   notes/briefs/testvalue-changes.md): flakes first, then speed, formats→crowd-hidden merge, CI selection.
@@ -16,9 +18,6 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
   branch claude/boss-art; asks Eric once, ~$4-6, cap $8).
 
 ## Queue (one Opus at a time)
-0a. NEXT after crowd bot spread: Nov 2 bug fixes batch B (brief notes/briefs/brief-nov2-bugfixes-b.md): augment tap-through,
-   augment emojis gone, boss crate → inventory + normal open animation (stored data), shop chat text color, shop cards
-   name + Go in only, shop drag flipped on mobile; roadmap: emoji packs, boss challenge from town.
 0b. Later (after Alfil art): boss challenge from town (code).
 - Art session (session_01JuCWRrhykEFvvmv5JKWgRX) = expert for all boss homes + battle intros (API only): Alfil's home now,
   then Alfil's intro (sand pyramid, table, sandstorm).
