@@ -19,6 +19,12 @@ The calls made:
 - **Order:** the line starts as you face each other and the pyramid rises 0.4 s into it, holding (its idle) until the line's
   1.8 s are up; then crack, crumble, the table on its own for 0.35 s, the storm. That's the art's own plan (rise, then "idle
   while he says it"), and it keeps the whole thing under 6 s: about 1.2 s walking in, 3.9 s of intro, 0.6 s of storm in.
+- **The boss's God King attack** (Eric, Nov 2: "fire off the boss attack animation… a few seconds before the screen overlay hits
+  … until the screen is fully cloaked"): its kit's `kingAttack` with its kit's sounds, from 2 s before the storm covers
+  (`attackLeadMs`: during the crumble), its target the board on the table (it drops in beside the table, as beside a king), at its
+  room size; past its leap-off it lashes again and again, so it's still going as the storm covers and the battle loads. Any boss
+  whose kit has one gets it; one without (Timber today) skips it. Its hit effects on the king's square aren't drawn in the room:
+  the attack's own figure and sounds read on their own.
 - **No skipping** (a tap does nothing during the intro). It's short; a skip can come if Eric wants it. The back button calls it
   off until the storm starts.
 - **The board** on Alfil's table is the town's park-table board (the same code, without its cache), white's ranks nearest you.

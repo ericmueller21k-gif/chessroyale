@@ -3,7 +3,7 @@ import { INTRO_ALFIL_PYRAMID } from "../src/town/shops/alfil-intro-art.ts";
 import { SHOP_ALFIL_LAYOUT } from "../src/town/shops/alfil-art.ts";
 import { SHOP_BABUR_LAYOUT } from "../src/town/shops/babur-art.ts";
 import { SHOP_PUDDLES_LAYOUT } from "../src/town/shops/puddles-art.ts";
-import { CHALLENGE_FEEL, frameAt, introAt, introBeats, introCues, introLength, introOf, marksOf, nextFlow, stormEdge, type ChallengeEvent, type ChallengeFlow, type IntroAnims } from "../src/town/shops/challenge.ts";
+import { CHALLENGE_FEEL, attackStart, attackTime, frameAt, introAt, introBeats, introCues, introLength, introOf, marksOf, nextFlow, stormEdge, type ChallengeEvent, type ChallengeFlow, type IntroAnims } from "../src/town/shops/challenge.ts";
 import { findPath, makeRoom } from "../src/town/shops/room.ts";
 import { SHOPS } from "../src/town/shops/shops.ts";
 import { HOMES, START, Walker, createTown, standOf } from "../src/town/world.ts";
@@ -166,5 +166,26 @@ describe("back to the town", () => {
     w.go([{ c: 6, r: 5 }, { c: 7, r: 5 }]);
     w.update(0);
     expect(standOf(w)).toMatchObject({ c: 6, r: 5 });
+  });
+});
+
+describe("the boss's attack in its intro (its God King attack)", () => {
+  const beats = introBeats(ALFIL);
+  const beat = { lashAt: 560, leaveAt: 2380 };
+
+  it("starts attackLeadMs before the storm covers the screen (so during the crumble), and keeps on until the battle shows", () => {
+    const at = attackStart(beats);
+    expect(at).toBe(introLength(beats) + CHALLENGE_FEEL.stormInMs - CHALLENGE_FEEL.attackLeadMs);
+    expect(introAt(beats, ALFIL, at).step).toMatch(/crack|crumble|table/);
+    expect(attackTime(0, beat)).toBe(0);
+    expect(attackTime(1000, beat)).toBe(1000);
+    // (Where it would leap off, its lashes again, over and over.)
+    expect(attackTime(2380, beat)).toBe(560);
+    expect(attackTime(2380 + 1820 + 10, beat)).toBe(570);
+  });
+
+  it("Alfil's kit has one (every playable boss's does but Timber's: his intro would skip it)", async () => {
+    const { bossKit } = await import("../src/characters/kits.ts");
+    expect(bossKit(introOf("alfil")!.name)?.kingAttack).toBeDefined();
   });
 });

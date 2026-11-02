@@ -1,13 +1,13 @@
 import { expect, type Page } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { BOARD_SEL, asSignedIn, test } from "./helpers.ts";
+import { BOARD_SEL, asSignedIn, named, test } from "./helpers.ts";
 
 /**
  * A boss challenged from the town, Pokémon-gym style (Eric, Nov 2; docs/areas/town-square.md, "Challenging a boss"), Alfil first, on a
  * phone and a computer: his card's "Challenge alone", its confirm ("Challenge Alfil?", Fight); you and Alfil walk to his Pyramid's
  * door and in; you each walk to your start mark on the battle circle (you south, him north, facing each other); he says his line in
  * a speech bubble (and into the chat log); the sand pyramid rises between you, cracks and crumbles, and his table with the board is
- * there; the sandstorm sweeps in, the battle loads under it (Boss alone, Alfil), and it slides off the board; the boss mates you
+ * there; his God King attack plays beside it a couple of seconds before the sandstorm covers the screen; the sandstorm sweeps in, the battle loads under it (Boss alone, Alfil), and it slides off the board; the boss mates you
  * (?mate=1), the result screen, "Back to town", and you're in the town square where you stood, facing the same way. The town's chat
  * (signed in): the server's lines (Eric, Nov 2), "<you> challenged Alfil!" as the battle starts and "Alfil beat <you> in N moves." as it
  * finishes; a first challenge quit (the gear's Leave or Resign before 10 moves) posts no outcome, and the second posts no start line.
@@ -30,7 +30,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 type Stand = { c: number; r: number; facing: number; view: number; moving: boolean };
-type Intro = { step: string; you: [number, number]; boss: [number, number]; line: boolean; table: boolean; pyramid: { anim: string; frame: number } | null };
+type Intro = { step: string; attack: boolean; you: [number, number]; boss: [number, number]; line: boolean; table: boolean; pyramid: { anim: string; frame: number } | null };
 type Hooks = {
   __townAt?: (k: string, id: string) => { x: number; y: number } | null;
   __townYou?: () => Stand | null;
@@ -74,8 +74,8 @@ async function toConfirm(page: Page) {
   await expect.poll(async () => (await youNow(page))?.moving, { message: "you've walked up to him" }).toBe(false);
   return { confirm, stood: (await youNow(page))! };
 }
-/** The server's lines in the town's chat now. */
-const serverLines = (page: Page) => page.locator(".tc-line.tc-server").allTextContents();
+/** The server's lines in the town's chat now, about `who` (the town's chat is everyone's: the other project's lines are there too). */
+const serverLines = async (page: Page, who: string) => (await page.locator(".tc-line.tc-server").allTextContents()).filter((l) => l.includes(` ${who} `) || l.includes(` ${who}.`));
 /** Back in the town square, where you stood, facing the way you faced. */
 async function backAt(page: Page, stood: Stand) {
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
@@ -93,6 +93,9 @@ test("challenging Alfil in the town: in with him to his marks, his line, the pyr
   if (SHOTS) mkdirSync(SHOTS, { recursive: true });
   const shot = async (name: string) => SHOTS && (await page.screenshot({ path: `${SHOTS}/${name}-${project}.png` }));
   // Signed in (the town's chat is for signed-in players: the server's lines too).
+  // (A name of its own: the town's chat is shared with the other project's run.)
+  const me = `Ch${project[0]}${Math.random().toString(36).slice(2, 6)}`;
+  await named(page, me);
   // (Once the page has its account: signing in a request's own new account would race the page's.)
   await page.goto("/town");
   await expect(town(page)).toHaveAttribute("data-ready", "1");
@@ -115,7 +118,7 @@ test("challenging Alfil in the town: in with him to his marks, his line, the pyr
     if (how === "Resign") await page.getByRole("button", { name: "Back to town" }).click();
     await backAt(page, stood);
     // Its start line, and no outcome.
-    await expect.poll(() => serverLines(page), { timeout: 15_000 }).toEqual([expect.stringMatching(/ challenged Alfil!$/)]);
+    await expect.poll(() => serverLines(page, me), { timeout: 15_000 }).toEqual([expect.stringMatching(new RegExp(`\\] ${me} challenged Alfil!$`))]);
   }
 
   // ---- A second challenge, finished (?mate=1: the boss mates you at once, so the battle ends by itself and its result shows).
@@ -155,10 +158,14 @@ test("challenging Alfil in the town: in with him to his marks, his line, the pyr
   await expect.poll(step, { message: "it crumbles: the table and the board", intervals: [50] }).toMatch(/crumble|table/);
   await expect.poll(async () => (await intro(page))?.table, { intervals: [50] }).toBe(true);
   await shot("04-table");
+  // His God King attack (his kit's), beside the table, a couple of seconds before the storm covers the screen (Eric, Nov 2), and on.
+  await expect.poll(async () => (await intro(page))?.attack, { message: "his attack", intervals: [50] }).toBe(true);
+  expect(await storm(page).getAttribute("data-phase", { timeout: 100 }).catch(() => null), "before the storm covers").not.toBe("covered");
+  await shot("045-attack");
   // The storm sweeps in over everything, and the battle loads under it.
   await expect(storm(page)).toHaveCount(1, { timeout: 10_000 });
   await expect(storm(page)).toHaveAttribute("data-boss", "alfil");
-  await expect.poll(() => storm(page).getAttribute("data-phase").catch(() => null), { intervals: [50] }).toBe("covered");
+  await expect(storm(page)).toHaveAttribute("data-covered", "1");
   grabbing = false;
   await grabbed;
   for (const [i, f] of frames.entries()) writeFileSync(`${SHOTS}/gif-${String(i).padStart(3, "0")}.png`, f);
@@ -183,8 +190,8 @@ test("challenging Alfil in the town: in with him to his marks, his line, the pyr
   // The server's lines: still the one start line (the quit left it open: no second), and this battle's outcome (?mate=1 plays
   // your moves for you, none of them yours: no count; the counts are packages/server/test/town-chat.test.ts's).
   await expect
-    .poll(() => serverLines(page), { timeout: 15_000 })
-    .toEqual([expect.stringMatching(/ challenged Alfil!$/), expect.stringMatching(/ Alfil beat .+?( in \d+ moves?)?\.$/)]);
+    .poll(() => serverLines(page, me), { timeout: 15_000 })
+    .toEqual([expect.stringMatching(new RegExp(`\\] ${me} challenged Alfil!$`)), expect.stringMatching(new RegExp(`\\] Alfil beat ${me}( in \\d+ moves?)?\\.$`))]);
   await shot("08-back-in-town");
   expect(errors).toEqual([]);
 });

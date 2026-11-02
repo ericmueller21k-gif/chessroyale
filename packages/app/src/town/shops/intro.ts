@@ -12,6 +12,8 @@
  *   battle opens under it): the storm's tile (tiled, 3x, crisp) sweeps in behind its front, holds while the battle loads, and slides
  *   out with its front mirrored.
  */
+import { KING_ATTACK } from "@chessroyale/chess";
+import { bossKit } from "../../characters/kits.ts";
 import { renderFrame, type Character } from "../../characters/sprite.ts";
 import { play, warmSounds, type SoundName } from "../../sound.ts";
 import { newPt, proj, tableLift, type TableLift, type View } from "../camera.ts";
@@ -56,6 +58,11 @@ export interface LoadedIntro {
   /** The boss: its sprite's idle frames, when each ends, and how many squares tall it stands (the town's size). */
   boss: { ch: Character; frames: HTMLCanvasElement[]; ends: number[]; loop: number; squares: number };
   storm: StormArt;
+  /**
+   * Its God King attack (its kit's `kingAttack`), or null: a boss without one skips it. Its frames, each one's ms and cue, its
+   * sounds by cue (the kit's), how it faces, where its feet stand off its target (frame pixels: `stand` squares of `perSquare`).
+   */
+  attack: { ch: Character; frames: HTMLCanvasElement[]; ms: number[]; cues: (string | undefined)[]; sounds: Readonly<Record<string, SoundName>>; facesLeft: boolean; standPx: number; beat: typeof KING_ATTACK } | null;
 }
 
 const canvasOf = (w: number, h: number) => {
@@ -111,8 +118,23 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
       backs: art.front.anims.idle!.frames.map((_, i) => scaled(toCanvas(art.front, "idle", i), k, true)),
       ms: stormFrames.map((f) => Math.max(16, f.ms)),
     };
+    // Its God King attack, if its kit has one (every playable boss's does but Timber's, today).
+    const kit = bossKit(def.name);
+    const ka = kit?.kingAttack ?? null;
+    const attack = ka
+      ? {
+          ch: ka.ch,
+          frames: ka.ch.anims[ka.anim]!.frames.map((_, i) => toCanvas(ka.ch, ka.anim, i)),
+          ms: ka.ch.anims[ka.anim]!.frames.map((f) => Math.max(16, f.ms)),
+          cues: ka.ch.anims[ka.anim]!.frames.map((f) => f.cue),
+          sounds: kit!.sounds,
+          facesLeft: !!ka.facesLeft,
+          standPx: ka.stand * ka.perSquare,
+          beat: KING_ATTACK,
+        }
+      : null;
     // (The cues' sounds made ahead, in the sound worker: playing one never costs a frame.)
-    warmSounds(Object.values(def.cues) as SoundName[]);
+    warmSounds([...(Object.values(def.cues) as SoundName[]), ...(attack ? Object.values(attack.sounds) : [])]);
     return {
       home,
       def,
@@ -122,6 +144,7 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
       table: { ch: art.table, img: toCanvas(art.table, "idle", 0), palette: art.palette },
       boss: { ch: bossCh, frames: bossIdle.map((_, i) => toCanvas(bossCh, "idle", i)), ends, loop: t, squares: TOWN_FEEL.bossSquares * (TOWN_FEEL.bossScale[home] ?? 1) },
       storm,
+      attack,
     };
   });
   p.catch(() => loading.delete(home));
@@ -260,7 +283,7 @@ export interface Storm {
 /**
  * Starts the storm: its front sweeps in from the left over `stormInMs` with the storm tiled behind it (all on one frame index),
  * then it holds, covering everything, until `out()`. The canvas takes every tap while it shows. Its phase is on the element
- * (`data-phase`: "in", "covered", "out") for tests.
+ * (`data-phase`: "in", "covered", "out"; `data-covered="1"` once it has covered the screen) for tests.
  */
 export function startStorm(intro: LoadedIntro): Storm {
   const F = CHALLENGE_FEEL;
@@ -333,6 +356,7 @@ export function startStorm(intro: LoadedIntro): Storm {
       phase = "covered";
       coveredAt = performance.now();
       cv.dataset.phase = phase;
+      cv.dataset.covered = "1";
       ok();
     }, F.stormInMs),
   );

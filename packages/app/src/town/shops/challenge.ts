@@ -13,6 +13,8 @@ import type { ShopPlace } from "./room.ts";
 
 /** A boss's intro: its challenge line (one per boss: Gemini's lines, Part D, drop in here) and the sounds on its art's cues. */
 export interface BossIntro {
+  /** Its name as its kit knows it (its God King attack comes from there). */
+  name: string;
   /** Said out loud in a speech bubble over its head (and into the town's chat log) as you face each other. */
   line: string;
   /** A sound for each of the art's cues that has a fitting one (the boss's own pack): none is silent. */
@@ -27,6 +29,7 @@ export interface BossIntro {
  */
 export const BOSS_INTROS: Readonly<Partial<Record<HomeId, BossIntro>>> = {
   alfil: {
+    name: "Alfil",
     line: "I'll show you the power of the old piece.",
     cues: { rumble: "alfilRumble", crack: "alfilCrunch", crumble: "alfilThud", table: "alfilGlow", storm: "alfilWhoosh" },
   },
@@ -56,6 +59,12 @@ export const CHALLENGE_FEEL = {
    */
   camSouth: 1.5,
   camZoom: 0.6,
+  /**
+   * The boss's attack (its kit's `kingAttack`, the one it fires at the God King; Eric, Nov 2: "a few seconds before the screen
+   * overlay hits… it continues on until the screen is fully cloaked"): it starts this long before the storm covers the screen,
+   * and plays on (its lashes over and over) until the battle takes the screen. A boss without one skips it.
+   */
+  attackLeadMs: 2000,
   /** The storm's tiles are drawn this many times their size, crisp. */
   stormScale: 3,
 } as const;
@@ -219,6 +228,20 @@ export function introCues(beats: readonly IntroBeat[], a: IntroAnims): { cue: st
     { cue: "crumble", at: at("crumble") },
     { cue: "table", at: at("crumble") + sum(a.crumble.slice(0, a.tableFrame)) },
   ];
+}
+
+// ---- The boss's attack (its God King attack: its kit's `kingAttack`).
+
+/** When the attack starts, ms into the intro: `attackLeadMs` before the storm covers the screen (never before the intro starts). */
+export const attackStart = (beats: readonly IntroBeat[], feel: Pick<typeof CHALLENGE_FEEL, "stormInMs" | "attackLeadMs"> = CHALLENGE_FEEL): number =>
+  Math.max(0, introLength(beats) + feel.stormInMs - feel.attackLeadMs);
+/**
+ * Where its animation is, `t` ms into it: as it plays at the God King (its drop-in, its first lashes), and from the moment it would
+ * leap off, its lashes again and again (`lashAt` to `leaveAt`), so it keeps on until the screen is covered.
+ */
+export function attackTime(t: number, beat: { lashAt: number; leaveAt: number }): number {
+  if (t < beat.leaveAt) return Math.max(0, t);
+  return beat.lashAt + ((t - beat.lashAt) % (beat.leaveAt - beat.lashAt));
 }
 
 // ---- The storm.

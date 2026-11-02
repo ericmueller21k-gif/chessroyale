@@ -571,7 +571,9 @@ the battle, "Back to town" puts you where you stood. Decision: [2026-11-02-boss-
   art's `circle-mark` tiles), side by side at `walkStepMs`. Facing each other: its line in a speech bubble over its head and into the
   chat log (`BOSS_INTROS[id].line`; Alfil's a placeholder, "I'll show you the power of the old piece.", until Gemini's lines), the
   pyramid rising `riseAtMs` into it, holding, cracking, crumbling, the table and its board (`introBeats` / `introAt`), its cues'
-  sounds (`cues`). Then the storm (`startStorm`: a canvas over the whole page, outside the town, so it stays as the town closes)
+  sounds (`cues`). From `attackLeadMs` (2 s) before the storm covers, the boss fires its God King attack (its kit's `kingAttack`,
+  with its sounds) at the board, beside the table, its lashes looping until the battle takes the screen (`attackStart`,
+  `attackTime`); a boss whose kit has none skips it. Then the storm (`startStorm`: a canvas over the whole page, outside the town, so it stays as the town closes)
   sweeps in, the battle starts under it (the app's `challengeFromTown`: Boss alone, as START), and it slides off the board. The back
   button calls it off until the storm starts. A tap doesn't skip. About 6 s from the door to the storm covering.
 - **After the battle:** the result screen's leaving button reads **"Back to town"**; it (and the gear's Leave: "You'll go back to the

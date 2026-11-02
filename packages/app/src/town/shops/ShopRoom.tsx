@@ -43,7 +43,8 @@ import type { Rider } from "../rides.ts";
 import { rideSpeed } from "../../components/rides/scale.ts";
 import { inTalkRange, isFloor, makeRoom, onDoor, tapTarget, findPath, type Room, type ShopPlace, type Sq } from "./room.ts";
 import { POOL_LINE, bossHoldings, buyBossCrate, canAfford, holdLine, priceLine, prizeRows, shopOf, wayText, type CrateWay, type ShopDef } from "./shops.ts";
-import { CHALLENGE_FEEL, introAt, introCues, introLength, marksOf, type IntroNow } from "./challenge.ts";
+import { CHALLENGE_FEEL, attackStart, attackTime, frameAt as animFrame, introAt, introCues, introLength, marksOf, type IntroNow } from "./challenge.ts";
+import { play } from "../../sound.ts";
 import { paintTable, playCue, type LoadedIntro } from "./intro.ts";
 import { say } from "../chat.ts";
 
@@ -317,6 +318,10 @@ function startRoom(
   let introDone = false;
   const cues = ci ? introCues(ci.beats, ci.anims) : [];
   const introEnd = ci ? introLength(ci.beats) : 0;
+  /** Its God King attack (its kit's), from `attackAt` into the intro on: the frame showing (-1: not attacking), its last cue's frame. */
+  const attackAt = ci ? attackStart(ci.beats) : Infinity;
+  let attackFrame = -1;
+  let attackCued = -1;
   if (boss && marks) {
     you.stepMs = C.walkStepMs;
     const yp = findPath(room, you.here(), marks.youSq);
@@ -348,6 +353,17 @@ function startRoom(
       say(def.boss, ci.def.line, "boss");
     }
     while (cueN < cues.length && t >= cues[cueN]!.at) playCue(ci, cues[cueN++]!.cue);
+    // The boss's attack: from `attackAt` on, until the battle takes the screen (its lashes again and again), each frame's sound.
+    const a = ci.attack;
+    if (a && t >= attackAt) {
+      attackFrame = animFrame(a.ms, attackTime(t - attackAt, a.beat), false);
+      if (attackFrame !== attackCued) {
+        attackCued = attackFrame;
+        const cue = a.cues[attackFrame];
+        const sound = cue ? a.sounds[cue] : undefined;
+        if (sound) play(sound);
+      }
+    }
     if (cv.dataset.intro !== introNow.step) cv.dataset.intro = introNow.step;
     if (!introDone && t >= introEnd) {
       introDone = true;
@@ -773,9 +789,27 @@ function startRoom(
   };
   /** The boss (in a challenge): its town sprite, its idle playing, at the town's size, its shadows as the town draws a boss's. */
   const bossHead = { x: 0, y: 0, on: false };
+  /**
+   * The boss's God King attack: dropped in beside the table, its target the board (to its right, or its left for one drawn facing
+   * left), at the boss's own size in the room.
+   */
+  const drawAttack = () => {
+    const a = ci!.attack!;
+    if (!marks || !P(marks.table.c, marks.table.r)) return;
+    const img = a.frames[attackFrame]!;
+    const k = (ci!.boss.squares * pt.k) / ci!.boss.ch.h;
+    const side = a.facesLeft ? 1 : -1;
+    const fx = pt.x + side * a.standPx * k;
+    const x0 = fx - a.ch.foot[0] * k;
+    const y0 = pt.y - a.ch.foot[1] * k;
+    g.imageSmoothingEnabled = k < 1.5;
+    g.drawImage(img, x0, y0, img.width * k, img.height * k);
+    g.imageSmoothingEnabled = false;
+  };
   const drawBoss = (now: number) => {
     bossHead.on = false;
     if (!ci || !boss) return;
+    if (attackFrame >= 0 && ci.attack) return drawAttack();
     boss.pose(now, bossPose);
     if (!P(bossPose.x + bossOx(now), bossPose.y)) return;
     const b = ci.boss;
@@ -961,7 +995,8 @@ function startRoom(
     addFig(pose.y, 1);
     if (boss && marks) {
       boss.pose(now, bossPose);
-      addFig(bossPose.y, 2);
+      // (Attacking, it stands beside the table, just in front of it.)
+      addFig(attackFrame >= 0 ? marks.table.r + 0.01 : bossPose.y, 2);
       if (introNow) addFig(marks.table.r, 3);
     }
     let k = 0;
@@ -1201,7 +1236,7 @@ function startRoom(
     const now = performance.now();
     you.pose(now, pose);
     boss.pose(now, bossPose);
-    return { step: introNow?.step ?? "walk", you: [pose.x + youOx(now), pose.y], boss: [bossPose.x + bossOx(now), bossPose.y], line: !!introNow?.line && bossHead.on, table: !!introNow?.table, pyramid: introNow?.pyramid ?? null };
+    return { step: introNow?.step ?? "walk", attack: attackFrame >= 0, you: [pose.x + youOx(now), pose.y], boss: [bossPose.x + bossOx(now), bossPose.y], line: !!introNow?.line && bossHead.on, table: !!introNow?.table, pyramid: introNow?.pyramid ?? null };
   };
   const hookBench = (k: number) => {
     if (!testSwitchesAllowed()) return null;
