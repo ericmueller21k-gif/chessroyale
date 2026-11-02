@@ -71,3 +71,11 @@ live, make it the default piece style option in the colosseum, remove the old pi
   each standing at its square's middle, far ranks first.
 - **What it replaces:** the Pixel set's meshes and shader (pieces-pixel.ts, its part of arena-gl.ts). The 2D and 3D gear
   options are untouched by this art.
+
+## Round 5: the pawn (Nov 2)
+
+Eric: "The pawns look like hell, look at my original reference, yours look like a pyramid, mine have the normal slender
+taller look." The pawn no longer uses the shared tall base: its own low, flat base (a step, a gold band, a sloped top), a
+slim, nearly straight stem, a gold collar, a short neck and a bigger round head lifted clear of the collar; 19 tall (was
+16). New: `mockup-3d-mid-computer.png` and `mockup-3d-mid-phone.png`, a middle game like the reference so the pawns stand
+in the open; `compare-3d-reference.png` now shows that one beside the reference.

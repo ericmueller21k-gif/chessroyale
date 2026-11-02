@@ -77,13 +77,16 @@ writeFileSync(`${outDir}/arena-pieces-3d.json`, JSON.stringify({
 // The start position, all 32.
 const BACK = "rnbqkbnr";
 const POS: [string, string][] = [..."abcdefgh"].flatMap((f, i) => [[f + "1", "w" + BACK[i]], [f + "2", "wp"], [f + "7", "bp"], [f + "8", "b" + BACK[i]]] as [string, string][]);
-for (const dev of ["computer", "phone"]) {
+// A middle game like Eric's picture, so the pawns stand in the open.
+const MID: [string, string][] = [["a1", "wr"], ["e1", "wk"], ["f1", "wr"], ["c2", "wb"], ["a3", "wp"], ["b4", "wp"], ["d4", "wp"], ["e3", "wp"], ["f2", "wp"], ["g3", "wp"], ["h4", "wp"], ["f3", "wn"], ["d2", "wq"],
+  ["c6", "bn"], ["e5", "bp"], ["a7", "bp"], ["b7", "bp"], ["c5", "bp"], ["f7", "bp"], ["g7", "bp"], ["h6", "bp"], ["a8", "br"], ["d8", "bq"], ["f8", "br"], ["g8", "bk"], ["e7", "bb"], ["f6", "bn"]];
+for (const [dev, pos, name] of [["computer", POS, "start"], ["phone", POS, "start"], ["computer", MID, "mid"], ["phone", MID, "mid"]] as const) {
   const info = JSON.parse(readFileSync(`${inDir}/empty-${dev}.json`, "utf8"));
   const shot = readPng(`${inDir}/empty-${dev}.png`);
   const per = info.px.scale * ((info.rect.w * info.dpr) / info.cw);
   const cx = info.rect.x * info.dpr, cy = info.rect.y * info.dpr;
-  const placed = POS.map(([sq, k]) => { const p = info.px.sqs[sq] as [number, number]; return { k, x: Math.round(p[0] / info.px.scale), y: Math.round(p[1] / info.px.scale) }; }).sort((a, b) => a.y - b.y);
+  const placed = pos.map(([sq, k]) => { const p = info.px.sqs[sq] as [number, number]; return { k, x: Math.round(p[0] / info.px.scale), y: Math.round(p[1] / info.px.scale) }; }).sort((a, b) => a.y - b.y);
   for (const p of placed) { const s = shots[p.k]!; paint(shot, toImg(s), cx + (p.x - s.ax) * per, cy + (p.y - s.ay) * per, per); }
-  writeFileSync(`${outDir}/mockup-3d-${dev}.png`, png(shot));
+  writeFileSync(`${outDir}/mockup-3d-${name === "start" ? "" : "mid-"}${dev}.png`, png(shot));
 }
 console.log("wrote", outDir);

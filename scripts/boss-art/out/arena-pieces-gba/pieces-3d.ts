@@ -7,7 +7,7 @@
  *   foot (the middle of the square the piece stands on) at the origin, **+z the piece's front** (toward the viewer), +x its
  *   right as you face it. The knight's head looks toward -x (to the viewer's left); mirror x for the other way.
  * - **A model** is `inside(x, y, z)`: the material at that point (body, gold, groove, eye) or null outside. Heights, foot to
- *   top: pawn 16, rook 19, knight 22, bishop 23, queen 25, king 30.
+ *   top: pawn 19, rook 19, knight 22, bishop 23, queen 25, king 30.
  * - **`drawPiece(kind, side, pitch)`** draws one piece as seen from above at `pitch` radians (0 level, 0.52 the stands behind
  *   White as mocked up) facing its front, one pixel a unit: palette keys (`PALETTE`), null empty, the foot's pixel (ax, ay).
  *   Flat cel bands lit from the top left and front, a 1-pixel outline round it and where a nearer part covers a farther one.
@@ -219,12 +219,30 @@ function turnedAbove(profile: (y: number) => [number, Mat] | null, extra?: (x: n
   };
 }
 
-/** The pawn: a short stem, a gold collar, a neck and the round head (16 tall). */
+/**
+ * The pawn (Eric, Nov 2: "yours look like a pyramid, mine have the normal slender taller look", his reference's pawns): its
+ * own low, flat base (a step, a gold band, a sloped top), a slim waisted stem, a gold collar, a short neck and the round
+ * head (19 tall).
+ */
 function pawnModel(): Model {
-  return turnedAbove(
-    (y) => (y < 10.2 ? [3.2 - (y - 9) * 0.5, "body"] : y < 11.1 ? [3.3, "gold"] : y < 11.6 ? [1.9, "body"] : null),
-    (x, y, z) => (y >= 11.1 && Math.hypot(x, y - 13.6, z) <= 2.45 ? "body" : undefined),
-  );
+  const profile = (y: number): [number, Mat] | null => {
+    if (y < 1.2) return [4.4, "body"];
+    if (y < 2) return [4.3, "gold"];
+    if (y < 3.3) return [3.9 - ((y - 2) / 1.3) * 0.7, "body"];
+    if (y < 3.8) return [2.6, "groove"];
+    if (y < 11.5) { const s = (y - 3.8) / 7.7; return [1.5 + 0.7 * (1 - s) ** 2, "body"]; }
+    if (y < 12.4) return [3, "gold"];
+    if (y < 13.4) return [1.5, "body"];
+    return null;
+  };
+  return {
+    inside(x, y, z) {
+      if (y < 0) return null;
+      if (y >= 12.4 && Math.hypot(x, y - 16, z) <= 3.05) return "body";
+      const pr = profile(y);
+      return pr && Math.hypot(x, z) <= pr[0] ? pr[1] : null;
+    },
+  };
 }
 
 /** The queen: a waisted stem, a gold collar, a cup flaring out to an open coronet of seven gold points, a gold ball (25 tall). */
