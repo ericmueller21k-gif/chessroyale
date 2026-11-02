@@ -46,6 +46,10 @@ export const RANK_SET = [
   "pearlescent",
   "transcendent",
 ] as const;
+/** Scenery for the Colosseum ("arena-"): the stills its brief names, one single-frame animation each. */
+export const ARENA: Record<string, readonly string[]> = {
+  "arena-pieces-gba": ["wr", "br", "wn", "bn"],
+};
 const GROUND = { dark: "#14161b", light: "#f3f1ec" } as const;
 const MAX_W = 1500;
 
@@ -117,24 +121,26 @@ async function main(req: Req): Promise<object> {
   if (!ch.palette.k) warnings.push(`no outline color: the palette needs "k"`);
   // A home on the town square (an id starting "house-") needs only its idle; a boss's sidekick (a town bot, "sidekick-")
   // its idle, walk, sit and wave; a ranked tier's emblem ("rank-") a still per division, a top tier's ("rank-top-") its idle.
-  const need: readonly string[] = req.id.startsWith("house-") || req.id.startsWith("rank-top-") ? ["idle"] : req.id.startsWith("sidekick-") ? SIDEKICK : req.id.startsWith("rank-set") ? RANK_SET : req.id.startsWith("rank-") ? RANK : REQUIRED;
+  const need: readonly string[] = req.id.startsWith("arena-") ? (ARENA[req.id] ?? ["idle"]) : req.id.startsWith("house-") || req.id.startsWith("rank-top-") ? ["idle"] : req.id.startsWith("sidekick-") ? SIDEKICK : req.id.startsWith("rank-set") ? RANK_SET : req.id.startsWith("rank-") ? RANK : REQUIRED;
   const missing = need.filter((a) => !ch.anims[a]);
   if (missing.length) warnings.push(`animations still to draw: ${missing.join(", ")}`);
-  const anim = ch.anims[req.anim];
+  // "*": the first frame of every animation side by side (a set of stills).
+  const every = req.anim === "*";
+  const anim = every ? { frames: Object.values(ch.anims).map((a) => a.frames[0]!) } : ch.anims[req.anim];
   const facts = {
     frame: `${ch.w} x ${ch.h}, feet at (${ch.foot.join(", ")})`,
     anims: Object.fromEntries(Object.entries(ch.anims).map(([k, a]) => [k, `${a.frames.length} frames, ${a.frames.reduce((s, f) => s + f.ms, 0)} ms${a.loop ? ", loops" : ""}`])),
   };
   if (!anim) return { error: `no animation "${req.anim}"`, facts, warnings };
   const bg = GROUND[req.bg ?? "dark"];
-  const pick = (req.frames?.length ? req.frames : anim.frames.map((_, i) => i)).filter((i) => i >= 0 && i < anim.frames.length).slice(0, 8);
+  const pick = (req.frames?.length ? req.frames : anim.frames.map((_, i) => i)).filter((i) => i >= 0 && i < anim.frames.length).slice(0, every ? 14 : 8);
   // Each frame drawn on transparency first, for the edge check; then laid on the ground.
   const drawn = pick.map((i) => {
     const im = renderFrame(ch, anim.frames[i]!);
     let edge = false;
     for (let x = 0; x < im.w && !edge; x++) edge = im.data[x * 4 + 3]! > 0 || im.data[((im.h - 1) * im.w + x) * 4 + 3]! > 0;
     for (let y = 0; y < im.h && !edge; y++) edge = im.data[y * im.w * 4 + 3]! > 0 || im.data[(y * im.w + im.w - 1) * 4 + 3]! > 0;
-    if (edge) warnings.push(`${req.anim} frame ${i}: a pixel touches the frame's edge (it may be cut off)`);
+    if (edge && !req.id.startsWith("arena-")) warnings.push(`${req.anim} frame ${i}: a pixel touches the frame's edge (it may be cut off)`);
     return im;
   });
   const gap = 4;
