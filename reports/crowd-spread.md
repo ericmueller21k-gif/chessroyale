@@ -60,3 +60,7 @@ bots: 1200 at 4.3 a pick, bot blunders 6.4%, played blunders 2.3% (from 2.0% bef
 only 67%. The points come from blunders: a 1200 bot then missed a plain recapture about half the time, and with the
 move drawn from the top 3, the team played some of them. Eric's goal comes first (variety, blunders rare), so the bots
 keep BOT_LOBBY's temperatures: the same order by rating, about 60% of the points they gave away before.
+
+Eric's check (Nov 1: "a player making the engine's best moves should finish 1st or 2nd"), after this change:
+`npx tsx packages/sim/scripts/crowd-bots-sim.ts tuned 4 101` and `... tuned 4 201`, 8 full matches: the engine-best
+player finished 1, 1, 1, 1, 2, 1, 1, 1.

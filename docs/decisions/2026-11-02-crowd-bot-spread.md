@@ -38,3 +38,5 @@ top 8 (the plurality's share about 29%), so the team often played the 6th to 8th
 engine's best 33% → 39% of turns; turns at 95%+ one move 7.8% → 1.4%; the played move a top-3 line 61% → 74%; played
 blunders 1.9% → 1.0%; bot picks that blunder 9.7% → 3.8%. Games from the same start part ways at the first move before
 and after; all 48 lines distinct by move 10 and 20.
+Eric's check on the bots' strength (`crowd-bots-sim.ts tuned`, 8 full matches, an engine-best player among 99 bots):
+1st or 2nd in 8 of 8 (1st in 7).
