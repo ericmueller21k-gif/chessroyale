@@ -3,8 +3,9 @@
  *
  * 1. INTRO_BIGBOY_BLOCKS: his toy-block chess table. Six alphabet blocks (B, I, G, B, O, Y: they spell his name as they
  *    land) drop in one by one and stack into a 3-2-1 pyramid (`build`); the board, drawn by code, plops onto the top
- *    block (`plop`: dust and stars); two bigger blocks drop in as the stools (`chairs`); `idle` is the finished table.
- *    Same width and foot offset as park.ts PARK_TABLE (111 wide, the foot 6 px over the bottom), taller for the drop.
+ *    block (`plop`: dust and stars); two big stool blocks drop in (`chairs`: a dark gray B on the left, a bone W on the
+ *    right); `idle` is the finished table. PARK_TABLE's foot offset (6 px over the bottom), 8 px wider each side
+ *    (127) for the stools' puffs, taller for the drop. INTRO_BIGBOY_STOOL_B / _W: each stool on its own (idle, drop).
  * 2. INTRO_BIGBOY_TABLE_PALETTE: the slab's keys "1"-"5" (a teal foam play mat, his shirt's teal) and the board's squares
  *    L / D (INTRO_BIGBOY_TABLE_INK has the same in TABLE_INK's shape).
  * 3. INTRO_BIGBOY_SWIRL (128 x 128, tiles both ways) and INTRO_BIGBOY_SWIRL_FRONT (48 x 128, tiles top to bottom): the
@@ -78,6 +79,13 @@ const PALETTE: Record<string, string> = {
   X: "#2d2c33",
   x: "#57565f",
   j: "#0c0c10",
+  // The stools: a very dark gray toy block (face, shade, top) and a bone off-white one (face, shade, top).
+  A: "#46454c",
+  C: "#2f2e34",
+  D: "#64636c",
+  H: "#e8dcc2",
+  I: "#c4b38f",
+  J: "#f7efdc",
   "-": "#0d0e1280", // ground shadow: core, rim (see-through)
   "+": "#0d0e1244",
 };
@@ -146,7 +154,8 @@ function star(x: number, y: number, size: number, hot = "F", arm = "Y", tip = "y
 // ================================================================================================================
 
 const PX = 37; // pixels a square (TOWN_FEEL.housePxPerSquare)
-const TW = 3 * PX; // 111
+const MARGIN = 8; // grown 8 px each side of PARK_TABLE's 111 so the big stools' landing puffs stay inside
+const TW = 3 * PX + 2 * MARGIN; // 127
 const TH = 100;
 const TFOOT = TH - 6; // 94
 const TCX = Math.floor(TW / 2); // 55
@@ -162,6 +171,33 @@ const GLYPHS: Record<string, readonly string[]> = {
   Y: ["#...#", ".#.#.", "..#..", "..#..", "..#.."],
   star: ["..#..", "#####", ".###.", ".#.#.", "#...#"],
   heart: [".#.#.", "#####", "#####", ".###.", "..#.."],
+  // The stools' big letters (2-px strokes).
+  bigB: [
+    "#######..",
+    "########.",
+    "##....##.",
+    "##....##.",
+    "#######..",
+    "########.",
+    "##.....##",
+    "##.....##",
+    "##.....##",
+    "#########",
+    "########.",
+  ],
+  bigW: [
+    "##.......##",
+    "##.......##",
+    "##.......##",
+    "##...#...##",
+    "##..###..##",
+    "##.##.##.##",
+    "##.##.##.##",
+    "####...####",
+    "####...####",
+    ".##.....##.",
+    ".##.....##.",
+  ],
 };
 /** A block's colors: its face, shade, top (a light tint), its glyph's color and the glyph's drop shadow. */
 interface Look {
@@ -180,6 +216,8 @@ const LOOKS = {
   purple: { face: "6", shade: "?", top: "}", ink: "F", glyph: "Y" },
   teal: { face: "u", shade: "T", top: "U", ink: "F", glyph: "star" },
   pink: { face: "z", shade: "N", top: "n", ink: "F", glyph: "heart" },
+  black: { face: "A", shade: "C", top: "D", ink: "J", glyph: "bigB" },
+  white: { face: "H", shade: "I", top: "J", ink: "A", glyph: "bigW" },
 } satisfies Record<string, Look>;
 
 /**
@@ -189,27 +227,36 @@ const LOOKS = {
  */
 function blockPart(lk: Look, w: number, top: number, front: number): Part {
   const g = GLYPHS[lk.glyph]!;
-  const gh = Math.min(5, front - 2);
-  const gx = Math.floor((w - 5) / 2);
+  const GW = g[0]!.length;
+  const GH = g.length;
+  const gh = Math.min(GH, front - 2);
+  const gx = Math.floor((w - GW) / 2);
   const gy = top + 1 + Math.max(0, Math.floor((front - 2 - gh) / 2));
   const glyphAt = (i: number, j: number): boolean => {
     const c = i - gx;
     const r = j - gy;
-    if (c < 0 || c > 4 || r < 0 || r >= gh) return false;
-    const src = gh === 5 ? r : Math.round((r * 4) / Math.max(1, gh - 1));
+    if (c < 0 || c >= GW || r < 0 || r >= gh) return false;
+    const src = gh === GH ? r : Math.round((r * (GH - 1)) / Math.max(1, gh - 1));
     return g[src]![c] === "#";
   };
+  // The big stool blocks: rounder corners (2 px) and a longer glint.
+  const big = w >= 16;
+  const H = top + front;
   const rows: string[] = [];
-  for (let j = 0; j < top + front; j++) {
+  for (let j = 0; j < H; j++) {
     let row = "";
     for (let i = 0; i < w; i++) {
       if (j < top) {
-        if (j === 0 && (i === 0 || i === w - 1)) row += ".";
-        else if (j === 0 && i >= 1 && i <= 2) row += "F";
+        if (j === 0 && (i === 0 || i === w - 1 || (big && (i === 1 || i === w - 2)))) row += ".";
+        else if (big && j === 1 && (i === 0 || i === w - 1)) row += ".";
+        else if (j === 0 && i >= (big ? 2 : 1) && i <= (big ? 6 : 2)) row += "F";
+        else if (big && j === 1 && i >= 1 && i <= 2) row += "F";
         else row += i === w - 1 ? lk.face : lk.top;
         continue;
       }
-      if (j === top + front - 1 && (i === 0 || i === w - 1)) row += lk.shade; // the rounded bottom corners, in shade
+      if (big && j === H - 1 && (i === 0 || i === w - 1)) row += ".";
+      else if (big && ((j === H - 1 && (i === 1 || i === w - 2)) || (j === H - 2 && i === 0))) row += lk.shade;
+      else if (j === H - 1 && (i === 0 || i === w - 1)) row += lk.shade; // the rounded bottom corners, in shade
       else if (glyphAt(i, j)) row += lk.ink;
       else if (glyphAt(i - 1, j - 1)) row += lk.shade;
       else if (i === w - 1 || j === top + front - 1) row += lk.shade;
@@ -242,9 +289,19 @@ const TABLE_BLOCKS: Block[] = [
   tb(TCX + 5, 1, LOOKS.blue),
   tb(TCX, 2, LOOKS.purple),
 ];
-/** The stools: bigger blocks (11 wide, a 4-row top, an 8-row front) where PARK_TABLE's stools stand, their tops at its seat. */
-const sb = (cx: number, lk: Look): Block => ({ cx, bottom: TFOOT - 1, lk, w: 11, top: 4, front: 8 });
-const STOOL_BLOCKS: Block[] = [sb(TCX - PX, LOOKS.teal), sb(TCX + PX, LOOKS.pink)];
+/**
+ * The stools: big blocks (22 wide, an 8-row top, a 16-row front: 24 tall) where PARK_TABLE's stools stand (a square
+ * either side of the middle): the black side's dark gray B on the left, the white side's bone W on the right.
+ */
+const STOOL_W = 22;
+const STOOL_TOP = 8;
+const STOOL_FRONT = 16;
+/** The stools' top edge over the foot (24), and the seat: the middle of their top face (20, twice SEAT_H). */
+export const INTRO_BIGBOY_STOOL_TOP_H = STOOL_TOP + STOOL_FRONT;
+export const INTRO_BIGBOY_STOOL_SEAT_H = STOOL_FRONT + STOOL_TOP / 2;
+const sb = (cx: number, lk: Look): Block => ({ cx, bottom: TFOOT - 1, lk, w: STOOL_W, top: STOOL_TOP, front: STOOL_FRONT });
+const STOOL_BLOCKS: Block[] = [sb(TCX - PX, LOOKS.black), sb(TCX + PX, LOOKS.white)];
+void SEAT_H;
 
 const blkParts: Record<string, Part> = {};
 /** A block drawn at rest, squashed (landing) or stretched (bouncing), `lift` pixels up. */
@@ -392,6 +449,31 @@ export const INTRO_BIGBOY_BLOCKS: Character = {
     idle: { loop: true, frames: [blocksIdle] },
   },
 };
+
+/**
+ * Each stool on its own (the game puts each on the side of whoever plays that color): `idle` the still block, `drop`
+ * its fall, squash, bounce and settle as in `chairs` (cue `stool` on the landing). Same height and ground line as the
+ * table (100 tall, the foot 6 px over the bottom, so the fall comes in from above as it does there); the foot is the
+ * ground under its bottom middle.
+ */
+const SW = 51;
+const SCX = Math.floor(SW / 2); // 25
+function stoolChar(id: string, name: string, lk: Look): Character {
+  const b = sb(SCX, lk);
+  const parts: Record<string, Part> = {};
+  const keep = (fr: Frame): Frame => {
+    for (const l of fr.layers) parts[l.part] = blkParts[l.part]!;
+    return fr;
+  };
+  const idle = keep({ ms: 1000, layers: [...restShadows([b]), blockLayer(b, "rest")] });
+  const drop: Frame[] = Array.from({ length: 7 }, (_, p) => {
+    const d = dropped(b, p, true);
+    return keep({ ms: p === 6 ? 200 : 70, layers: [...d.under, ...d.layers], specks: d.specks, ...(p === 3 ? { cue: "stool" } : {}) });
+  });
+  return { id, name, w: SW, h: TH, foot: [SCX, TFOOT], palette: PALETTE, halo: HALO, parts, anims: { idle: { loop: true, frames: [idle] }, drop: { loop: false, frames: drop } } };
+}
+export const INTRO_BIGBOY_STOOL_B = stoolChar("intro-bigboy-stool-b", "Big Boy's B stool (the black side's)", LOOKS.black);
+export const INTRO_BIGBOY_STOOL_W = stoolChar("intro-bigboy-stool-w", "Big Boy's W stool (the white side's)", LOOKS.white);
 
 // ================================================================================================================
 // 2. The table's colors.
@@ -737,13 +819,13 @@ const gridSlots = (f: number, at: Pt) => [
   ...[0, 1].map((j) => ({ prefix: `fr${j}`, ch: INTRO_BIGBOY_SWIRL_FRONT, frame: frontFrames[f]!, at: [at[0] + 3 * ST, at[1] + j * ST] as Pt })),
 ];
 
-const SHEET_W = 240 + GRID_W;
+const SHEET_W = 256 + GRID_W;
 const SHEET_H = GRID_H + 4;
-const AT = { blocks: [2, 2] as Pt, table: [2, 106] as Pt, board: [124, 6] as Pt, grid: [238, 2] as Pt };
+const AT = { blocks: [2, 2] as Pt, table: [2, 106] as Pt, board: [140, 6] as Pt, grid: [254, 2] as Pt, stoolB: [140, 158] as Pt, stoolW: [196, 158] as Pt };
 const sheetParts: Record<string, Part> = {};
 const sheetAnims: Record<string, Anim> = {};
 /** The sheet with one piece's frame swapped in (the rest at rest). */
-function sheetFrame(over: { blocks?: Frame; grid?: number }, ms: number): Frame {
+function sheetFrame(over: { blocks?: Frame; grid?: number; stoolB?: Frame; stoolW?: Frame }, ms: number): Frame {
   return compose(
     sheetParts,
     [
@@ -751,6 +833,8 @@ function sheetFrame(over: { blocks?: Frame; grid?: number }, ms: number): Frame 
       { prefix: "tab", ch: blocksPlus, frame: slabFrame, at: AT.table },
       { prefix: "brd", ch: blocksPlus, frame: boardFrame, at: AT.board },
       ...gridSlots(over.grid ?? 0, AT.grid),
+      { prefix: "stb", ch: INTRO_BIGBOY_STOOL_B, frame: over.stoolB ?? INTRO_BIGBOY_STOOL_B.anims.idle!.frames[0]!, at: AT.stoolB },
+      { prefix: "stw", ch: INTRO_BIGBOY_STOOL_W, frame: over.stoolW ?? INTRO_BIGBOY_STOOL_W.anims.idle!.frames[0]!, at: AT.stoolW },
     ],
     ms,
   );
@@ -758,6 +842,8 @@ function sheetFrame(over: { blocks?: Frame; grid?: number }, ms: number): Frame 
 sheetAnims.idle = { loop: true, frames: [sheetFrame({}, 1000)] };
 for (const [name, anim] of Object.entries(INTRO_BIGBOY_BLOCKS.anims))
   sheetAnims[`blocks-${name}`] = { loop: anim.loop, frames: anim.frames.map((fr) => ({ ...sheetFrame({ blocks: fr }, fr.ms), ...(fr.cue ? { cue: fr.cue } : {}) })) };
+sheetAnims["stool-b-drop"] = { loop: false, frames: INTRO_BIGBOY_STOOL_B.anims.drop!.frames.map((fr) => ({ ...sheetFrame({ stoolB: fr }, fr.ms), ...(fr.cue ? { cue: fr.cue } : {}) })) };
+sheetAnims["stool-w-drop"] = { loop: false, frames: INTRO_BIGBOY_STOOL_W.anims.drop!.frames.map((fr) => ({ ...sheetFrame({ stoolW: fr }, fr.ms), ...(fr.cue ? { cue: fr.cue } : {}) })) };
 sheetAnims.swirl = { loop: true, frames: [0, 1, 2, 3, 4, 5].map((f) => sheetFrame({ grid: f }, 70)) };
 
 /** (While drawing, a single piece can be reviewed on its own here; the sheet when null.) */

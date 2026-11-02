@@ -55,3 +55,21 @@ It's art only. The Shopkeeper is the teddy kid's existing sprite.
 - **The ball pit is lively up close.** It could drop to fewer colors.
 - The circle's wedges are pastel; they could be bolder.
 - The circle's start marks are north and south (see above).
+
+## Second pass (Nov 2): the puzzle-mat circle and the zoo rug ($1.17)
+Eric: "make the big boy rainbow battle area the same color pattern tile style you did for the paths… the center then
+should be a zoo animal rug… then the little battle spots sit on the rug." He approved it in my own dialog. Brief:
+`briefs/shop-bigboy-interior-2.md`; the run's notes: `house-shop-bigboy/summary.md` (the first run's:
+`summary-try1.md`).
+
+- **The floor:** the circle is now the walkway's teal and yellow foam squares, in the same checker, so the paths run
+  straight in. The octagon, its rainbow bumper and its block side stay. The rainbow wedges, the white ring, the middle
+  line and the north and south marks are gone.
+- **The rug:** a cream rug with a red scalloped, stitched border, 5.8 squares across. It has six printed animal faces (a
+  lion, an elephant, a zebra, a hippo, a monkey and a giraffe), stars and hearts, and a small lollipop swirl in the middle
+  where the table stands.
+- **The start marks:** two white pads with a star, on the rug: the boss's west and yours east, 1.5 squares out on the
+  middle line. New export: `SHOP_BIGBOY_MARKS = { boss: [8, 10.5], you: [11, 10.5] }`.
+- **Views:** [view-inside-circle.png](house-shop-bigboy/view-inside-circle.png),
+  [view-close-in-circle.png](house-shop-bigboy/view-close-in-circle.png).
+- **Bigboy total:** $7.27.

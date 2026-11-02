@@ -39,3 +39,20 @@ you on the right).
   the board drawn higher for this boss (a code change).
 - **The swirl is very busy on purpose**, so it covers the screen. Dropping the smallest lollipops would calm it.
 - **The colors** of the stools and the slab are the artist's picks.
+
+## Second pass (Nov 2): bigger B and W stools ($0.62)
+Eric: "double the size of the blocks that you sit on, the black color side block should be a B and the white color side
+block shows a W… a dark dark gray and a bone off white." He approved it in my own dialog. Brief:
+`briefs/intro-bigboy-2.md`.
+
+- **The stools:** each is now 22 px wide and 24 px tall. A very dark gray block with a bone-colored **B** is on the left,
+  and a bone off-white block with a dark gray **W** on the right.
+  - [view-blocks-stools.png](house-intro-bigboy/view-blocks-stools.png)
+- **New exports:**
+  - `INTRO_BIGBOY_STOOL_B` and `INTRO_BIGBOY_STOOL_W`: each 51 x 100, foot (25, 94), with `idle` and `drop` (7 frames, cue
+    `stool` on frame 3). The game can put each on the side of whoever plays that color.
+  - `INTRO_BIGBOY_STOOL_TOP_H` = 24 and `INTRO_BIGBOY_STOOL_SEAT_H` = 20 (twice the park stools' 10): **the code must
+    raise the sitting players by about 10 px.**
+- **The table picture grew** to 127 wide (8 px each side) for the bigger landing puffs. Its foot is now (63, 94);
+  everything keeps its place relative to the foot.
+- **Intro total:** $2.91.

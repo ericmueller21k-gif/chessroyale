@@ -1,7 +1,7 @@
 # Boss art: house-shop-bigboy
 
-- Model claude-opus-5-5, effort high, adaptive thinking. 31 turns, 18 renders.
-- Spend: **$6.10** of the $10 cap (66 input, 405,655 cache-write, 6,150,917 cache-read, 141,955 output tokens).
+- Model claude-opus-5-5, effort high, adaptive thinking. 11 turns, 7 renders.
+- Spend: **$1.17** of the $1.9 cap (24 input, 114,459 cache-write, 772,823 cache-read, 21,936 output tokens).
 - Finished: it called done.
 - The drawing: scripts/boss-art/out/house-shop-bigboy/house-shop-bigboy.ts.
 - Previews: the final preview failed: /home/user/chessroyale/scripts/preview-characters.ts:42
@@ -19,18 +19,41 @@ Node.js v22.23.4
 
 ## Its notes
 
-Big Boy's shop (house-shop-bigboy), structured like Alfil's: each piece is its own Character `shop-bigboy-<name>` in SHOP_BIGBOY_PIECES, SHOP_BIGBOY_LAYOUT (ShopPlace with w/d), room still HOUSE_SHOP_BIGBOY with one viewing anim per piece plus review sheets (review-floor, review-circle, review-pit, review-walk, review-shop, review-props, review-anims, strip-airplane, room-live). Exports SHOP_BIGBOY_COUNTER_SIGN, SHOP_BIGBOY_CRATE_AT ([124,15] in counter px), SHOP_BIGBOY_LIGHTS / SHOP_BIGBOY_POOLS (each with `piece`). Imports sprite.ts and (like Alfil's) town/houses/kit.ts for groundShadow/signBoard/signFace/light types — say if it must avoid kit.ts. Colors: Big Boy's palette (rainbow 1-6 + shades/tints, teal shirt, diaper blues, crib wood, his outline).
+Second pass on Big Boy's shop: I changed only the battle circle's floor (`circleMat` and the helpers it uses). The walkway, pit, walls and props are as they were, and so are the piece names and exports.
 
-LAYOUT: platform cols 4-15 rows 1-4 (counter cols 8-11 row 3, kid row 2, backdrop row 0); circle cols 6-13 rows 7-14; walkway cols 9-10 rows 15-18 (door mat row 18) and rows 5-6, east arm rows 10-11 cols 14-17 (under the airplane), west arm rows 10-11 cols 2-5 (rocking horse on cols 2-3 row 10). All pit squares solid.
+**What changed**
+- **Circle floor:** the rainbow wedges are gone. The octagon is now made of the walkway's own foam squares, using the same `foamPx` with the same teal and yellow, the same speckle texture and the same puzzle nubs. The checker is the same `(col+row)%2` one, so the four walkways run straight into it. In the full-room render the circle and the walkways read as one floor.
+- **Kept as before:** the octagon shape, the padded rainbow bumper round the edge with its openings where the walkways join, and the toy-block side over the pit. The tiles are still found and named `circle-1`, `circle-2`, … by the loop after `circleMat`. There are more of them now, because the checker means fewer squares match each other when turned.
+- **Removed:** the white middle line, the thin white ring, and the old north and south start marks.
 
-FLOOR (37x37, flat, no outline): pit-a/b/c ball pit (bigger soft balls, mostly red/yellow/blue/green, occasional orange/purple, never two alike touching; balls crossing tile edges are shared/wrapped so any pit tile meets any other seamlessly). Pit edge tiles `pit-<a|b|c>-<w|c|p|x>…`: under a raised floor to the north its 6-px side face shows (rainbow toy blocks under walkway/circle, mattress side under the platform) plus a shadow band; west/corner shade. Walkway `walk-<t|y>-<sides>`: teal/yellow foam puzzle-mat squares, soft white bumpers on pit sides (nubs at inner corners). Platform `plat-<sides>`: pale-blue quilted crib mattress, teal buttons, teal piping. Circle `circle-1..37` (deduplicated, reused with rot): 24 pastel rainbow wedges (play parachute), white ring, padded bumper in full rainbow with openings at all four walkway joins, 2x2 lollipop-swirl emblem, white middle line, white star start-mark pads N and S. floor-door: rainbow rug (east square = flip).
+**The zoo-animal rug**
+- **Size:** it's round, about 216 px across (5.8 squares). The edge is at 104 px from the center, and its 28 scallops reach out to 108.
+- **Border:** a scalloped red border with a dashed white stitch line round it, lit on the upper left and outlined in deep red. It casts a 1–2 px shadow onto the foam to the lower right.
+- **Field:** cream, with a faint ring of dots inside the border.
+- **Animals:** six flat, printed-look animal faces with a dark brown line round each and 2×2 black eyes. Going round:
+  - lion at north (orange petalled mane);
+  - elephant at north-east (grey, pink-lined ears, curled trunk);
+  - zebra at south-east (black chevron stripes, grey muzzle, mane tuft);
+  - hippo at south (lilac, two little teeth);
+  - monkey at south-west (brown, heart-shaped face);
+  - giraffe at north-west (patched neck, little horns).
+- **Fillers:** four small yellow stars and four pink hearts sit in the gaps between the animals.
+- **Middle:** Big Boy's lollipop-swirl emblem, small (about 38 px across), where the table stands.
 
-WALLS: wall-window / wall-window-b 148x130 (4 sq): big white-framed window, clean sky, rainbow over hills, clouds; wall / wall-b 37x130: striped nursery paper, star/moon decals; all with an alphabet-block frieze top band (BIG BOY spelled between windows) for the ceiling to follow; teal wainscot. wall-pillar 37x150: crooked B-I-G-B-O-Y block stack with a star. wall-side/-b/-pillar 37x130/150 (repeat every 37 px; block column along the top). hem 37x24 see-through crib rail; hem-pillar 37x150 block stack. Side/hem pillars spell YAHOO (reads mirrored for the east). entrance 74x112 (2 sq): rainbow stacking-toy arch with bright day, grass and path through it. backdrop 148x150 (4 sq): white toy shelf with cloud top full of toys.
+**The start marks**
+- Two white pads with a teal outline and a yellow star, longer north to south (22 × 34 px), both on the middle line (Y = 0).
+- **Boss (west):** centered at X = −55.5, the middle of column 8, on the line between rows 10 and 11.
+- **You (east):** centered at X = +55.5, the middle of column 11, same line.
+- New export: `SHOP_BIGBOY_MARKS = { boss: [8, 10.5], you: [11, 10.5] }`.
 
-SHOP: counter 148x44 (4x1), 29 px tall body: A-F letter blocks under a white board, blank teal-framed plaque, little blocks + rattle on top. crate 30x27: rainbow toy box, white star, white lid, lollipop on top; idle 6 frames x 220 ms: glint runs along the rainbow then winks on the lollipop.
+**Checks**
+- I rendered `review-circle` (2×) and the room still at scale 1 (one frame).
+- I also added a review-only animation, `review-rug` (the six middle squares at 3×), to check the animals up close. It's harmless, and you can delete the line if you'd rather not keep it.
+- The render warns that a pixel touches the frame's edge on the review and room views. That's because those pictures fill the whole frame, so nothing is cut off.
 
-SHOWPIECE airplane 111x211 (3x3, stands on row 9, covers cols 15-17 rows 7-9), 16 frames x 90 ms: a little 3D toy plane ray-marched per pixel (red body, yellow wings, blue tail, light-blue canopy, spinning 2-blade prop, wheels), flying anticlockwise round a 56x30 ellipse 86 px over the balls: away up the right, across the back (smaller, higher), toward you down the left, side-on across the front (bigger); banked into the turn; string from its back to a fixed hook far above (swings); soft shadow on the balls follows. Checked all 16 frames: smooth.
-
-PLUSHES (upright, bottoms hidden by ball heaps): giraffe 36x78 (tallest), tiger 38x38, bear 36x40 (red bow), elephant 42x38, duck 30x28, bunny 30x48. PROPS: beach-ball 32x30 (pit), blocks-big 40x46 (B-I-G on platform), rocking-horse 74x62 (2x1), toy-train 74x44 (2x1, 6 frames x 200 ms steam puffs, windows glow), nightlight 30x46 (sleepy moon, 4 frames x 400 ms glow breathing). Lights: nightlight moon + train windows; pools under both.
-
-Owner might change: pit is still lively at close zoom (could drop to fewer colors); circle wedges pastel vs bolder; plane seen from 45° above and fairly large (~1 square across at the front); the side-wall pillar only shows its top block (as in Alfil's).
+**Choices you might want to change**
+- The animals are faces only (about 30 px each), not whole bodies, so they read clearly at phone size and stay calm.
+- Animal outlines are dark brown (`N`), softer than the house black.
+- The border is red, to stand out against the teal and yellow.
+- The pads are white on a cream rug; the teal outline is what carries them.
+- The zebra's stripes are a little busy close up.
