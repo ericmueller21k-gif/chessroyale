@@ -321,10 +321,11 @@ for (const scheme of ["light", "dark"] as const) {
 
       // Every tile the very same size and shape: tall (its visible width 1 to 1.55 of its height), its slant a fifth of its width.
       for (const t of tiles) {
-        // ("?" is the smaller box since Oct 29, Eric's picture: 0.82 of a tile's width, half its height.)
+        // ("?" is the smaller box since Oct 29, Eric's picture: 0.82 of a tile's width, half its height; in a computer's two rows it's
+        // full height, so its edge runs parallel to its neighbor's: docs/decisions/2026-11-02-boss-select-rows.md.)
         if (t.name === "Random boss") {
           expect(Math.abs(t.w - 0.82 * t0.w), `${at} ${t.name}: width`).toBeLessThan(0.6);
-          expect(Math.abs(t.h - 0.5 * t0.h), `${at} ${t.name}: height`).toBeLessThan(0.6);
+          expect(Math.abs(t.h - (desktop() ? 1 : 0.5) * t0.h), `${at} ${t.name}: height`).toBeLessThan(0.6);
           continue;
         }
         expect(Math.abs(t.w - t0.w), `${at} ${t.name}: width`).toBeLessThan(0.6);

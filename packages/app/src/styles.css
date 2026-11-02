@@ -11605,6 +11605,12 @@ button.fd-seat {
       margin-right: calc(var(--bs-gap) - var(--bs-w) * 0.2);
       translate: calc((var(--bs-gap) - var(--bs-w) * 0.2) / 2) 0;
     }
+    /* The "?" in a row with the bosses: full height and the bosses' slant (the small one stands alone in a row of five), so its
+       edge runs parallel to the Hidden Boss's and the gap between them is as even as the others'. Still 0.82 of a card wide. */
+    .bs-tile.bs-random {
+      height: var(--bs-h);
+      --bs-slant: calc(var(--bs-w) * 0.2);
+    }
   }
 }
 @media (min-width: 1440px) {
