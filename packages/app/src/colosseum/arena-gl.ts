@@ -30,7 +30,7 @@
 import { BANNERS, BOARD, FLOOR_R, bossSeats, project, type Seat, GALLERY_H, GALLERY_R, PILLARS, PILLAR_ANGLES, SEATING, STANDS, STATUE, WALL_H, WALL_TOP, aisleAngle, fovFor, landingDepth, lookAt, multiply, perspective, rowR, rowY, seatR, seats, squareXZ, VIEWS, type View } from "./arena.ts";
 import { FIGURE_STRIDE, PILLAR_TOP_PX, PROPS, SCENE, SEAT_SINK, SKY, SQUARES, STANDS_SEATS, STONE, type CrowdArt, type Figure, type Rect } from "./art.ts";
 import { EYE, KINDS, KNIGHT_TURN, PV, SIZE, SLIT, pieceMeshes, type Kind, type PieceMesh } from "./pieces3d.ts";
-import { FRAME as GBA_FRAME, PALETTE as GBA_PALETTE, drawPiece } from "./pieces-gba.ts";
+import { FRAME as GBA_FRAME, MODELS as GBA_MODELS, PALETTE as GBA_PALETTE, drawModel } from "./pieces-gba.ts";
 
 const VS_SCENE = `#version 300 es
 layout(location=0) in vec3 aPos;
@@ -210,6 +210,12 @@ void main() {
 }`;
 
 /**
+ * Pixel: farther pieces drawn smaller, as the picture's: each piece is drawn at a share of its size by how wide its square is
+ * on screen against the square nearest you (1, 0.9, … 0.5: `buckets` steps of `step`), each share's sprites drawn ahead from
+ * the model itself, so a smaller piece is as crisp, its outline still one pixel.
+ */
+export const GBA_SCALE = { step: 0.1, buckets: 6 } as const;
+/**
  * Pixel's pieces (Nov 2; pieces-gba.ts, the art session's models): each a sprite drawn from its 3D model for your seat's
  * pitch, laid on the full-size arena one texel an art pixel (`pixelScale` screen pixels square), its foot on the art pixel
  * its square's middle (sliding: its place on the slide) falls in, so its pixels never change as it moves: crisp and still.
@@ -228,6 +234,9 @@ uniform float uScale;
 uniform vec2 uRes;
 uniform vec4 uFrame;
 uniform vec2 uAtlas;
+uniform vec3 uRight;
+uniform float uNear;
+uniform float uReady;
 out vec2 vUV;
 void main() {
   vUV = vec2(0.0);
@@ -237,11 +246,16 @@ void main() {
   vec2 xz = mix(iA.zw, iA.xy, s);
   float hop = sin(3.14159 * s) * 0.35 * step(0.001, distance(iA.zw, iA.xy));
   vec4 c = uVP * vec4(xz.x, uLift + hop, xz.y, 1.0);
-  vec2 art = floor((c.xy / c.w * 0.5 + 0.5) * uRes / uScale);
+  vec2 at = (c.xy / c.w * 0.5 + 0.5) * uRes;
+  vec2 art = floor(at / uScale);
+  // Smaller farther off: the square here against the one nearest you, in whole steps (GBA_SCALE), each drawn ahead.
+  vec4 c2 = uVP * vec4(vec3(xz.x, uLift + hop, xz.y) + uRight, 1.0);
+  float f = distance((c2.xy / c2.w * 0.5 + 0.5) * uRes, at) / uNear;
+  float b = clamp(floor((1.0 - f) / ${GBA_SCALE.step.toFixed(3)} + 0.5), 0.0, uReady - 1.0);
   // (The sprite's rows run down from its top; its foot pixel (ax, ay) on that art pixel.)
   vec2 p = vec2(art.x - uFrame.z + (aCorner.x + 0.5) * uFrame.x, art.y + uFrame.w + 1.0 - (1.0 - aCorner.y) * uFrame.y);
   gl_Position = vec4(p * uScale / uRes * 2.0 - 1.0, 0.0, 1.0);
-  vUV = (iB.zw * uFrame.xy + vec2(aCorner.x + 0.5, 1.0 - aCorner.y) * uFrame.xy) / uAtlas;
+  vUV = (vec2(iB.z, b * 2.0 + iB.w) * uFrame.xy + vec2(aCorner.x + 0.5, 1.0 - aCorner.y) * uFrame.xy) / uAtlas;
 }`;
 const FS_GBA = `#version 300 es
 precision mediump float;
@@ -265,9 +279,9 @@ export const SQUARE_ART_PX = 20;
  * doesn't redraw them.
  */
 export const GBA_PITCH = { share: 30 / 47, max: 0.7, step: 0.02 } as const;
-/** Pixel: the sprites' atlas, a column a kind (p n b r q k) and a row a side (White, then Black). */
+/** Pixel: the sprites' atlas, a column a kind (p n b r q k), two rows a share (White, then Black). */
 const GBA_KINDS = ["p", "n", "b", "r", "q", "k"] as const;
-const GBA_ATLAS = { w: GBA_FRAME.w * 6, h: GBA_FRAME.h * 2 } as const;
+export const GBA_ATLAS = { w: GBA_FRAME.w * 6, h: GBA_FRAME.h * 2 * GBA_SCALE.buckets } as const;
 /** Floats a Pixel piece's instance. */
 const PG = 8;
 
@@ -279,24 +293,31 @@ export function gbaPitch(view: View): number {
 }
 
 /**
- * Pixel's art pixel for a view through `vp` on a w × h screen: whole screen pixels, at least 2, so the board square nearest
- * you (on the line from the board's middle toward your eye) is about SQUARE_ART_PX art pixels across.
+ * Pixel's art pixel for a view through `vp` on a w × h screen (`scale`: whole screen pixels, at least 2), so the board square
+ * nearest you (on the line from the board's middle toward your eye) is about SQUARE_ART_PX art pixels across; `near`: that
+ * square's width on screen (pixels), what the farther pieces' shares are measured against.
  */
-export function gbaArtPixel(vp: Float32Array, view: View, w: number, h: number): number {
+export function gbaArtPixel(vp: Float32Array, view: View, w: number, h: number): { scale: number; near: number } {
   const ex = view.eye[0];
   const ez = view.eye[2];
   const el = Math.hypot(ex, ez) || 1;
   const [nx, nz] = [(ex / el) * 3.5, (ez / el) * 3.5];
   const a = project(vp, nx - (ez / el) * 0.5, BOARD.lift, nz + (ex / el) * 0.5, w, h);
   const b = project(vp, nx + (ez / el) * 0.5, BOARD.lift, nz - (ex / el) * 0.5, w, h);
-  return a && b ? Math.max(2, Math.round(Math.hypot(a[0] - b[0], a[1] - b[1]) / SQUARE_ART_PX)) : 2;
+  const near = a && b ? Math.hypot(a[0] - b[0], a[1] - b[1]) : 2 * SQUARE_ART_PX;
+  return { scale: Math.max(2, Math.round(near / SQUARE_ART_PX)), near };
 }
 
-/** One of Pixel's sprites (pieces-gba.ts `drawPiece`) into the atlas's pixels (RGBA, straight alpha) at its cell. */
-export function paintGba(atlas: Uint8Array, kind: number, black: boolean, pitch: number): void {
-  const shot = drawPiece(GBA_KINDS[kind]!, black ? "b" : "w", pitch);
+/**
+ * One of Pixel's sprites (pieces-gba.ts, the art session's model drawn by its own `drawModel`) into the atlas's pixels (RGBA,
+ * straight alpha) at its cell: `kind` 0 to 5 (p n b r q k), Black's or White's, at this pitch, its share `bucket` of its size.
+ */
+export function paintGba(atlas: Uint8Array, kind: number, black: boolean, pitch: number, bucket = 0): void {
+  const m = GBA_MODELS[GBA_KINDS[kind]!];
+  const f = 1 - bucket * GBA_SCALE.step;
+  const shot = drawModel(f === 1 ? m : { inside: (x, y, z) => m.inside(x / f, y / f, z / f) }, black ? "b" : "w", pitch);
   const x0 = kind * GBA_FRAME.w;
-  const y0 = black ? GBA_FRAME.h : 0;
+  const y0 = (bucket * 2 + (black ? 1 : 0)) * GBA_FRAME.h;
   for (let y = 0; y < GBA_FRAME.h; y++)
     for (let x = 0; x < GBA_FRAME.w; x++) {
       const o = ((y0 + y) * GBA_ATLAS.w + x0 + x) * 4;
@@ -598,7 +619,10 @@ export class ArenaGL {
     pixels: Uint8Array;
     pitch: number;
     drawing: GbaDrawing | null;
-    u: Record<"uVP" | "uTime" | "uSlide" | "uLift" | "uScale" | "uRes" | "uFrame" | "uAtlas", WebGLUniformLocation>;
+    /** How many shares (GBA_SCALE) the atlas holds now, from 1 down; and the nearest square's width on screen. */
+    ready: number;
+    near: number;
+    u: Record<"uVP" | "uTime" | "uSlide" | "uLift" | "uScale" | "uRes" | "uFrame" | "uAtlas" | "uRight" | "uNear" | "uReady", WebGLUniformLocation>;
   } | null = null;
   /** Pixel: screen pixels an art pixel (a square near you about SQUARE_ART_PX art pixels across), at least 2. */
   pixelScale = 2;
@@ -796,41 +820,51 @@ export class ArenaGL {
       pixels: new Uint8Array(GBA_ATLAS.w * GBA_ATLAS.h * 4),
       pitch: -1,
       drawing: null,
-      u: { uVP: u("uVP"), uTime: u("uTime"), uSlide: u("uSlide"), uLift: u("uLift"), uScale: u("uScale"), uRes: u("uRes"), uFrame: u("uFrame"), uAtlas: u("uAtlas") },
+      ready: 0,
+      near: 2 * SQUARE_ART_PX,
+      u: { uVP: u("uVP"), uTime: u("uTime"), uSlide: u("uSlide"), uLift: u("uLift"), uScale: u("uScale"), uRes: u("uRes"), uFrame: u("uFrame"), uAtlas: u("uAtlas"), uRight: u("uRight"), uNear: u("uNear"), uReady: u("uReady") },
     };
   }
 
   /**
-   * Pixel's sprites for this pitch. The first time, drawn at once (about 150 ms for the twelve); after that (Change seat), drawn
-   * one sprite a task off the frame loop while the old set still shows, then uploaded together.
+   * Pixel's sprites for this pitch: twelve a share (GBA_SCALE), about 150 ms each twelve. The first time, the full-size twelve
+   * at once, then the smaller shares one sprite a task off the frame loop, each share shown as it's done (until then a
+   * farther piece shows the smallest share there is). After that (Change seat), the new set drawn the same way off the frame
+   * loop while the old one still shows, then put in its place whole.
    */
   private gbaSprites(pitch: number): void {
     const g = this.gba!;
     if (g.pitch === pitch || g.drawing?.pitch === pitch) return;
-    const upload = (px: Uint8Array) => {
+    const upload = (px: Uint8Array, ready: number) => {
       const gl = this.gl;
       gl.bindTexture(gl.TEXTURE_2D, g.tex);
       gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, GBA_ATLAS.w, GBA_ATLAS.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      g.pixels = px;
       g.pitch = pitch;
+      g.ready = ready;
     };
     if (g.drawing?.timer) clearTimeout(g.drawing.timer);
     g.drawing = null;
-    if (g.pitch < 0) {
-      for (let i = 0; i < 12; i++) paintGba(g.pixels, i % 6, i >= 6, pitch);
-      upload(g.pixels);
-      return;
-    }
-    const d: GbaDrawing = { pitch, next: 0, pixels: new Uint8Array(g.pixels.length), timer: null };
+    const first = g.pitch < 0 || g.ready < 1;
+    const d: GbaDrawing = { pitch, next: 0, pixels: first ? g.pixels : new Uint8Array(g.pixels.length), timer: null };
+    const all = GBA_SCALE.buckets * 12;
+    const paint = () => {
+      const b = Math.floor(d.next / 12);
+      const i = d.next % 12;
+      paintGba(d.pixels, i % 6, i >= 6, pitch, b);
+      d.next++;
+      // (The first time, each share goes up as it's done; after, the whole new set at the end.)
+      if (first && d.next % 12 === 0) upload(d.pixels, d.next / 12);
+      else if (!first && d.next === all) upload(d.pixels, GBA_SCALE.buckets);
+    };
+    if (first) while (d.next < 12) paint();
+    if (d.next >= all) return;
     const step = () => {
       if ((g.drawing as GbaDrawing | null) !== d) return;
-      paintGba(d.pixels, d.next % 6, d.next >= 6, pitch);
-      if (++d.next < 12) d.timer = setTimeout(step, 0);
-      else {
-        g.pixels = d.pixels;
-        g.drawing = null;
-        upload(d.pixels);
-      }
+      paint();
+      if (d.next < all) d.timer = setTimeout(step, 0);
+      else g.drawing = null;
     };
     g.drawing = d;
     d.timer = setTimeout(step, 0);
@@ -1073,6 +1107,11 @@ export class ArenaGL {
         gl.uniform2f(g.u.uRes, w, h);
         gl.uniform4f(g.u.uFrame, GBA_FRAME.w, GBA_FRAME.h, GBA_FRAME.ax, GBA_FRAME.ay);
         gl.uniform2f(g.u.uAtlas, GBA_ATLAS.w, GBA_ATLAS.h);
+        // (The screen's right along the board, a meter: the square's width here, against the nearest's.)
+        const fl = Math.hypot(this.fwd[0]!, this.fwd[2]!) || 1;
+        gl.uniform3f(g.u.uRight, -this.fwd[2]! / fl, 0, this.fwd[0]! / fl);
+        gl.uniform1f(g.u.uNear, g.near);
+        gl.uniform1f(g.u.uReady, g.ready);
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, g.tex);
         gl.bindVertexArray(g.vao);
@@ -1096,7 +1135,9 @@ export class ArenaGL {
     f.view = view;
     f.w = w;
     f.h = h;
-    this.pixelScale = gbaArtPixel(this.vp, view, w, h);
+    const art = gbaArtPixel(this.vp, view, w, h);
+    this.pixelScale = art.scale;
+    this.gba!.near = art.near;
     this.gbaSprites(gbaPitch(view));
     if (this.sortView !== view) {
       this.sortView = view;

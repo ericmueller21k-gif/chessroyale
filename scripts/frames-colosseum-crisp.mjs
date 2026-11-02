@@ -2,14 +2,15 @@
 // position, phone (390 x 844) and computer (1440 x 900), plus a 4x crop of the near rook and knight; and with `gif`, a few
 // opening moves sliding, each frame drawn at its own time 1/25 s apart (the test hook `snap(time, box)`), so the GIF plays
 // at the page's own pace, not the software renderer's few frames a second.
-//   node scripts/frames-colosseum-crisp.mjs <out-dir> <label, e.g. before|after> [stills|gif|both] [phone|desktop|both]
+//   node scripts/frames-colosseum-crisp.mjs <out-dir> <label, e.g. before|after> [stills|gif|both] [phone|desktop|both] [seat]
+// (`seat`: a view's index, `__colosseum.seat(i)`: 0 to 7 the stands' seats; none: the high view behind White.)
 import { mkdirSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 import { chromium, devices } from "@playwright/test";
 import { createServer } from "vite";
 
-const [out = "crisp-frames", label = "after", what = "stills", which = "both"] = process.argv.slice(2);
+const [out = "crisp-frames", label = "after", what = "stills", which = "both", seat = ""] = process.argv.slice(2);
 const outDir = resolve(out);
 mkdirSync(outDir, { recursive: true });
 const server = await createServer({ root: "packages/app", configFile: "packages/app/vite.config.ts", server: { port: 5297, strictPort: false, fs: { allow: [resolve(".")] } }, logLevel: "error" });
@@ -44,6 +45,10 @@ async function cropRect(p) {
 
 async function stills(name) {
   const { ctx, p } = await open(name);
+  if (seat) {
+    await p.evaluate((i) => window.__colosseum.seat(i), Number(seat));
+    await p.waitForTimeout(800);
+  }
   await p.evaluate((fen) => {
     const h = window.__colosseum;
     h.freeze();
@@ -58,7 +63,7 @@ async function stills(name) {
     h.place(out);
   }, START);
   await p.waitForTimeout(1500);
-  const file = `${outDir}/${label}-${name}.png`;
+  const file = `${outDir}/${label}-${name}${seat ? `-seat${seat}` : ""}.png`;
   await p.screenshot({ path: file });
   const box = await cropRect(p);
   // The near rook and knight (a1, b1) at 4x, nearest-neighbor, from the screenshot (its device pixels).
@@ -66,7 +71,7 @@ async function stills(name) {
     const k = PROFILES[name].deviceScaleFactor ?? 1;
     const pad = 6;
     const g = `${Math.round((box.w + 2 * pad) * k)}x${Math.round((box.h + 2 * pad) * k)}+${Math.round((box.x - pad) * k)}+${Math.round((box.y - pad) * k)}`;
-    execFileSync("convert", [file, "-crop", g, "+repage", "-filter", "point", "-resize", `${400 / k}%`, `${outDir}/${label}-${name}-rook-knight-4x.png`]);
+    execFileSync("convert", [file, "-crop", g, "+repage", "-filter", "point", "-resize", `${400 / k}%`, `${outDir}/${label}-${name}${seat ? `-seat${seat}` : ""}-rook-knight-4x.png`]);
     writeFileSync(`${outDir}/crop-${name}.json`, JSON.stringify(box));
   }
   console.log(name, "still", file, JSON.stringify(await p.evaluate(() => window.__colosseum.state())));
@@ -90,7 +95,11 @@ function startPieces() {
 const MOVES = [["e2", "e4"], ["e7", "e5"], ["g1", "f3"], ["b8", "c6"], ["f1", "c4"], ["g8", "f6"]];
 async function gif(name) {
   const { ctx, p } = await open(name);
-  const dir = `${outDir}/${label}-${name}-gif`;
+  if (seat) {
+    await p.evaluate((i) => window.__colosseum.seat(i), Number(seat));
+    await p.waitForTimeout(800);
+  }
+  const dir = `${outDir}/${label}-${name}${seat ? `-seat${seat}` : ""}-gif`;
   mkdirSync(dir, { recursive: true });
   let pieces = startPieces();
   await p.evaluate((ps) => (window.__colosseum.freeze(), window.__colosseum.place(ps)), pieces);
@@ -122,7 +131,7 @@ async function gif(name) {
     for (let i = 0; i < 20; i++) await shot((t += 0.04));
   }
   try {
-    const gif = `${outDir}/${label}-${name}.gif`;
+    const gif = `${outDir}/${label}-${name}${seat ? `-seat${seat}` : ""}.gif`;
     execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-framerate", "25", "-i", `${dir}/f%03d.png`, "-vf", "split[a][b];[a]palettegen=max_colors=256[p];[b][p]paletteuse=dither=none", gif]);
     console.log(name, "gif", gif, n, "frames");
   } catch (e) {
