@@ -223,8 +223,10 @@ function pitBalls(seed: number): Ball[] {
         if (d < nd) [nd, near] = [d, b];
       }
       if (!ok) continue;
-      let k = MIDS[Math.floor(grain(n, 4, s) * 6)]!;
-      if (near && near.k === k) k = MIDS[(MIDS.indexOf(k) + 1 + Math.floor(grain(n, 5, s) * 5)) % 6]!;
+      // Mostly the classic four (red, yellow, blue, green), now and then an orange or a purple; never two alike touching.
+      const pick = (g: number) => "AAACCCEEEDDBG"[Math.floor(g * 13)]!;
+      let k = pick(grain(n, 4, s));
+      for (let tr = 0; near && near.k === k && tr < 4; tr++) k = pick(grain(n, 5 + tr, s));
       balls.push({ x, y, r, k, z: zLo + grain(n, 6, s) * (zHi - zLo) });
     }
   };
@@ -1056,9 +1058,9 @@ export const SHOP_BIGBOY_CRATE = (() => {
     }
   const frames = [0, 1, 2, 3, 4, 5].map((f) => {
     const g = cv(XW, XH);
-    const gx = [-9, 3, 10, 17, 24, -9][f]!;
-    if (gx > 0) stamp(g, gx, 7, [".F.", "FFF", ".F."]);
-    if (f === 5) stamp(g, 15, 0, [".F.", "FFF", ".F."]);
+    const gx = [-9, 2, 8, 14, 20, -9][f]!;
+    if (gx > 0) stamp(g, gx, 13, [".F.", "FFF", ".F."]); // along the rainbow's top edge
+    if (f === 5) stamp(g, 17, 1, [".F.", "FFF", ".F."]);
     return [groundShadow(XW / 2, XH - 2, 13, 2), box, lid, cropBit(pop)!, ...(cropBit(g, false) ? [cropBit(g, false)!] : [])];
   });
   return def("crate", [1, 1], XW, XH, [XW / 2, XH - 2], frames, 220);
@@ -1105,8 +1107,8 @@ const AH = A_RISE + 3 * T;
 const AFOOT = A_RISE + 2 * T + 18; // its foot: the middle of its south row
 const A_CX = Math.floor(AW / 2);
 const A_GY = A_RISE + T + 18; // the loop's middle on the floor: the middle of its middle row
-const LOOP_RX = 33;
-const LOOP_RY = 17;
+const LOOP_RX = 28;
+const LOOP_RY = 15;
 const FLY_H = 86; // how high it flies over the balls
 const HOOK: Pt = [A_CX, A_GY - FLY_H - 300]; // the string's hook in the ceiling, far over the picture
 const A_N = 16;
@@ -1121,7 +1123,7 @@ function planeFrame(f: number) {
   const Yn = LOOP_RY * Math.sin(th); // north of the loop's middle
   const psi = Math.atan2(LOOP_RY * Math.cos(th), -LOOP_RX * Math.sin(th));
   const bank = 0.38;
-  const s = 1.08 - 0.12 * Math.sin(th);
+  const s = 1.4 - 0.15 * Math.sin(th);
   const prop = f * 2.2;
   const [cp, sp, cb, sb] = [Math.cos(psi), Math.sin(psi), Math.cos(bank), Math.sin(bank)];
   const local = (q: V3): V3 => {
@@ -1141,7 +1143,7 @@ function planeFrame(f: number) {
   };
   const scy = A_GY - Yn - FLY_H; // its middle on screen
   const L = [-0.5, -0.4, 0.77];
-  const box = 22;
+  const box = 30;
   const px = new Map<string, { k: string; t: number }>();
   for (let sy0 = Math.floor(scy - box); sy0 <= scy + box; sy0++)
     for (let sx0 = Math.floor(X - box); sx0 <= X + box; sx0++) {
@@ -1197,11 +1199,380 @@ export const SHOP_BIGBOY_AIRPLANE = (() => {
       const t = (top[1] - y) / (top[1] - HOOK[1]);
       put(str, Math.round(top[0] + (HOOK[0] - top[0]) * t - 0.5), y, "Z");
     }
-    const shadow = groundShadow(X, A_GY - Yn, 10 * s, 4.5 * s);
+    const shadow = groundShadow(X, A_GY - Yn, 11 * s, 5 * s);
     return [shadow, cropBit(str, false)!, cropBit(c, true)!];
   });
   return def("airplane", [3, 3], AW, AH, [A_CX, AFOOT], frames, 90);
 })();
+
+// ==== The stuffed animals half sunk in the balls: soft, round, button eyes and stitched seams, friendly, not too sweet.
+
+/** An ellipse on the canvas, lit top left in `ramp` (light, mid, shade); a dark line round it (a seam between two pieces). */
+const blob = (c: Cv, cx: number, cy: number, rx: number, ry: number, ramp: string, line = true) => {
+  for (let y = Math.floor(cy - ry - 1); y <= cy + ry + 1; y++)
+    for (let x = Math.floor(cx - rx - 1); x <= cx + rx + 1; x++) {
+      const X = (x + 0.5 - cx) / rx;
+      const Y = (y + 0.5 - cy) / ry;
+      if (Math.hypot(X, Y) > 1) continue;
+      const edge = line && Math.hypot((x + 0.5 - cx) / Math.max(0.5, rx - 1), (y + 0.5 - cy) / Math.max(0.5, ry - 1)) > 1;
+      put(c, x, y, edge ? "k" : X + Y < -0.75 ? ramp[0]! : X + Y > 0.55 ? ramp[2]! : ramp[1]!);
+    }
+};
+/** A button eye: 2 x 2 dark, a shine. */
+const eye = (c: Cv, x: number, y: number) => stamp(c, x, y, ["FY", "YY"]);
+/** A stitched seam: a dashed line of `k` from (x0, y0) to (x1, y1), only over what's drawn. */
+const seam = (c: Cv, x0: number, y0: number, x1: number, y1: number, k: string) => {
+  const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+  for (let t = 0; t <= n; t += 2) {
+    const x = Math.round(x0 + ((x1 - x0) * t) / n);
+    const y = Math.round(y0 + ((y1 - y0) * t) / n);
+    if (get(c, x, y) !== "." && get(c, x, y) !== "k") put(c, x, y, k);
+  }
+};
+/** A ball of the pit seen from the side (for the heaps round the toys): `k` its color. */
+const heapBall = (c: Cv, cx: number, cy: number, r: number, k: string) => {
+  for (let y = Math.floor(cy - r); y <= cy + r; y++)
+    for (let x = Math.floor(cx - r); x <= cx + r; x++) {
+      const X = x + 0.5 - cx;
+      const Y = y + 0.5 - cy;
+      const d = Math.hypot(X, Y);
+      if (d > r) continue;
+      put(c, x, y, d > r - 0.9 ? "k" : Math.hypot(X + r * 0.4, Y + r * 0.4) < r * 0.32 ? BTINT[k]! : X + Y > r * 0.4 ? k.toLowerCase() : k);
+    }
+};
+/** A little heap of balls `w` wide at `foot`, hiding a toy's bottom: a back row, a front row. */
+const heap = (c: Cv, cx: number, foot: number, w: number, seed: number) => {
+  const n = Math.max(2, Math.round(w / 6.5));
+  const step = (w - 7) / (n - 1);
+  for (let i = 0; i < n - 1; i++) heapBall(c, cx - w / 2 + 3.5 + step * (i + 0.5), foot - 8.5 + (i % 2), 3.7, MIDS[Math.floor(grain(i, 2, seed) * 6)]!);
+  for (let i = 0; i < n; i++) heapBall(c, cx - w / 2 + 3.5 + step * i, foot - 4 + ((i + 1) % 2), 3.8, MIDS[Math.floor(grain(i, 1, seed) * 6)]!);
+};
+const plush = (name: string, W: number, H: number, draw: (c: Cv, F: number) => void, heapW: number, seed: number) => {
+  const F = H - 3;
+  const c = cv(W, H);
+  draw(c, F);
+  heap(c, W / 2, F + 1, heapW, seed);
+  return def(name, [1, 1], W, H, [Math.floor(W / 2), F], [[groundShadow(W / 2, F - 1, heapW / 2 + 1, 3), cropBit(c, true)!]]);
+};
+const YEL = "[39";
+const ORA = ")28";
+const BRN = "mlL";
+const GRY = "jiw";
+const WHT = "FWV";
+const MUZ = "MMm";
+
+/** The giraffe, the tallest: its long neck and head up out of the balls, little horns, a soft snout, patches. */
+export const SHOP_BIGBOY_PLUSH_GIRAFFE = plush("plush-giraffe", 36, 78, (c, F) => {
+  blob(c, 12, F - 6, 11, 7, YEL); // its back, sunk
+  for (let j = 0; j <= 14; j++) {
+    const t = j / 14;
+    blob(c, 13 + Math.sin(t * 1.5) * 4, F - 8 - t * 44, 5, 4.6, YEL, false);
+  }
+  // Its mane down the back of the neck, its patches.
+  for (let j = 0; j < 40; j += 3) put(c, Math.round(8 + Math.sin(((40 - j) / 40) * 1.5) * 4), F - 12 - j, "J");
+  for (const [x, y] of [[13, F - 20], [16, F - 30], [12, F - 38], [17, F - 44], [10, F - 9], [17, F - 8]] as const)
+    for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1], [2, 0]] as const) if (YEL.includes(get(c, x + dx, y + dy))) put(c, x + dx, y + dy, "J");
+  seam(c, 20, F - 14, 20, F - 46, "9");
+  // Horns and ears behind the head, the head, its snout.
+  for (const hx of [14, 20]) {
+    for (let y = F - 70; y < F - 62; y++) put(c, hx, y, "O");
+    blob(c, hx + 0.5, F - 71, 2, 2, "KJO");
+  }
+  blob(c, 9, F - 61, 4, 2.4, YEL);
+  blob(c, 18, F - 58, 8.5, 6.5, YEL);
+  blob(c, 24.5, F - 55, 5.5, 4.5, MUZ);
+  put(c, 26, F - 57, "l");
+  put(c, 28, F - 56, "l");
+  for (const [x, y] of [[22, F - 53], [23, F - 52], [24, F - 52], [25, F - 52], [26, F - 53]] as const) put(c, x, y, "l");
+  eye(c, 18, F - 61);
+  put(c, 15, F - 56, "n"); // a blush
+}, 26, 5);
+
+/** The tiger: a big round head and its paws on the balls, stripes, a white muzzle, round ears. */
+export const SHOP_BIGBOY_PLUSH_TIGER = plush("plush-tiger", 38, 38, (c, F) => {
+  blob(c, 19, F - 8, 13, 9, ORA);
+  blob(c, 9, 7, 4, 4, ORA);
+  blob(c, 29, 7, 4, 4, ORA);
+  blob(c, 9.5, 7.5, 1.8, 1.8, "nnz", false);
+  blob(c, 28.5, 7.5, 1.8, 1.8, "nnz", false);
+  blob(c, 19, 16, 12.5, 10.5, ORA);
+  for (const [x0, y0, x1, y1] of [[19, 6, 19, 9], [16, 7, 16, 9], [22, 7, 22, 9], [7, 15, 10, 16], [7, 18, 10, 18], [28, 16, 31, 15], [28, 18, 31, 18]] as const) {
+    const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+    for (let t = 0; t <= n; t++) put(c, Math.round(x0 + ((x1 - x0) * t) / n), Math.round(y0 + ((y1 - y0) * t) / n), "N");
+  }
+  blob(c, 16, 21, 4.5, 3.5, WHT);
+  blob(c, 22, 21, 4.5, 3.5, WHT);
+  stamp(c, 17, 18, ["zzzz", ".zz."]);
+  eye(c, 13, 14);
+  eye(c, 24, 14);
+  blob(c, 9, F - 3, 5, 3.5, ORA);
+  blob(c, 29, F - 3, 5, 3.5, ORA);
+  seam(c, 19, 26, 19, F - 6, "8");
+}, 34, 9);
+
+/** A teddy bear (an old friend of the kid's), with a red bow, its arms up as if it wants a hug. */
+export const SHOP_BIGBOY_PLUSH_BEAR = plush("plush-bear", 36, 40, (c, F) => {
+  blob(c, 18, F - 8, 11, 9.5, BRN);
+  blob(c, 18, F - 6, 5.5, 5, MUZ, false);
+  blob(c, 6, F - 16, 4, 6, BRN);
+  blob(c, 30, F - 16, 4, 6, BRN);
+  blob(c, 9, 7, 4, 4, BRN);
+  blob(c, 27, 7, 4, 4, BRN);
+  blob(c, 9.5, 7.5, 1.8, 1.8, MUZ, false);
+  blob(c, 26.5, 7.5, 1.8, 1.8, MUZ, false);
+  blob(c, 18, 15, 10.5, 9, BRN);
+  blob(c, 18, 19.5, 4.8, 3.6, MUZ);
+  stamp(c, 17, 17, ["YY", "YY"]);
+  stamp(c, 16, 21, ["k..k", ".kk."]);
+  eye(c, 13, 13);
+  eye(c, 22, 13);
+  stamp(c, 12, 24, ["k1k....k1k", "k117kk711k", "k11k77k11k", "k1k....k1k"].map((r) => r));
+  seam(c, 18, 28, 18, F - 2, "L");
+}, 30, 13);
+
+/** The elephant: in his grey-lilac, big pink-lined ears, its trunk curled up happily. */
+export const SHOP_BIGBOY_PLUSH_ELEPHANT = plush("plush-elephant", 42, 38, (c, F) => {
+  blob(c, 22, F - 7, 13, 9, GRY);
+  blob(c, 9, 15, 7.5, 9, GRY);
+  blob(c, 33, 15, 7.5, 9, GRY);
+  blob(c, 10, 15, 4.5, 6, "nnz", false);
+  blob(c, 32, 15, 4.5, 6, "nnz", false);
+  blob(c, 21, 14, 10, 9.5, GRY);
+  const path: Pt[] = [[21, 20], [21.5, 23], [23, 26], [26, 27.5], [29, 26.5], [30.5, 24], [30, 21.5]];
+  path.forEach(([x, y], i) => blob(c, x, y, 3.2 - i * 0.18, 3.2 - i * 0.18, GRY, false));
+  for (const [x, y] of path.slice(1, 5)) put(c, Math.round(x), Math.round(y + 1.5), "w");
+  blob(c, 30, 20.5, 2, 1.6, "nnz", false);
+  eye(c, 16, 12);
+  eye(c, 25, 12);
+  put(c, 13, 17, "n");
+  put(c, 29, 17, "n");
+  seam(c, 21, 6, 21, 10, "w");
+}, 34, 17);
+
+/** A rubber-duck plush bobbing in the balls. */
+export const SHOP_BIGBOY_PLUSH_DUCK = plush("plush-duck", 30, 28, (c, F) => {
+  blob(c, 13, F - 6, 11, 7, YEL);
+  blob(c, 4, F - 10, 3, 2.5, YEL);
+  blob(c, 18, 9, 6.5, 6, YEL);
+  blob(c, 25, 11, 4, 2.3, ORA);
+  put(c, 22, 11, "8");
+  eye(c, 19, 7);
+  blob(c, 11, F - 8, 5.5, 3.5, YEL);
+  seam(c, 8, F - 8, 15, F - 8, "9");
+}, 24, 21);
+
+/** A bunny: long ears up, white with pink inside, a pink nose. */
+export const SHOP_BIGBOY_PLUSH_BUNNY = plush("plush-bunny", 30, 48, (c, F) => {
+  blob(c, 15, F - 6, 10, 7.5, WHT);
+  blob(c, 10, 11, 3.8, 10.5, WHT);
+  blob(c, 20, 10, 3.8, 10.5, WHT);
+  blob(c, 10, 12, 1.6, 7.5, "nnz", false);
+  blob(c, 20, 11, 1.6, 7.5, "nnz", false);
+  blob(c, 15, 25, 9, 8, WHT);
+  stamp(c, 14, 26, ["zz", ".k"]);
+  stamp(c, 12, 28, ["k..k.", ".kk.."].map((r) => r.replace(/\./g, ".")));
+  eye(c, 11, 22);
+  eye(c, 18, 22);
+  put(c, 9, 27, "n");
+  put(c, 21, 27, "n");
+  seam(c, 15, 34, 15, F - 2, "V");
+}, 26, 25);
+
+// ==== The props.
+
+/** A beach ball afloat on the pit (red, white, blue, yellow gores), a glint, balls heaped round it. */
+export const SHOP_BIGBOY_BEACH_BALL = plush("beach-ball", 32, 30, (c, F) => {
+  const cx = 16;
+  const cy = F - 11;
+  for (let y = 0; y < 30; y++)
+    for (let x = 0; x < 32; x++) {
+      const X = x + 0.5 - cx;
+      const Y = y + 0.5 - cy;
+      const d = Math.hypot(X, Y);
+      if (d > 12) continue;
+      if (d > 11.1) {
+        put(c, x, y, "k");
+        continue;
+      }
+      if (X < -3 && Y < -3 && d > 4 && d < 8) {
+        put(c, x, y, "F");
+        continue;
+      }
+      if (Math.hypot(X + 2, Y + 8) < 2.6) {
+        put(c, x, y, "F");
+        continue;
+      }
+      const seg = Math.floor(((Math.atan2(Y + 8, X + 2) + Math.PI) / (2 * Math.PI)) * 6) % 6;
+      const k = ["1", "F", "5", "3", "F", "4"][seg]!;
+      const sh = X + Y > 6;
+      put(c, x, y, k === "F" ? (sh ? "W" : "F") : sh ? SHD[SAT.indexOf(k)]! : k);
+    }
+}, 28, 29);
+
+/** A big stack of toy blocks spelling B-I-G (two at the bottom, one on top), letters big. */
+export const SHOP_BIGBOY_BLOCKS_BIG = (() => {
+  const W = 40;
+  const H = 46;
+  const F = H - 3;
+  const c = cv(W, H);
+  const big = (x0: number, y1: number, k: number, l: string) => {
+    const S = 15;
+    for (let j = 0; j < S + 3; j++)
+      for (let i = 0; i < S + 3; i++) {
+        const y = y1 - S - 2 + j;
+        let key: string | null = null;
+        if (j < 3) key = i >= 3 - j && i < S + 3 - j ? (j === 0 ? "F" : TNT[k]!) : null;
+        else if (i >= S) key = i - S < 3 && j - 3 < S - (i - S) ? SHD[k]! : null;
+        else if (i === 0 || j === 3 || i === S - 1 || j === S + 2) key = "k";
+        else key = glyphAt(l, Math.floor((i - 4) / 2) + (i < 4 ? -9 : 0), Math.floor((j - 5) / 2) + (j < 5 ? -9 : 0)) ? "F" : i < 3 || j < 6 ? TNT[k]! : SAT[k]!;
+        if (key) put(c, x0 + i, y, key);
+      }
+  };
+  big(2, F, 0, "B");
+  big(19, F, 4, "I");
+  big(11, F - 18, 3, "G");
+  return def("blocks-big", [1, 1], W, H, [W / 2, F], [[groundShadow(W / 2, F - 1, 19, 3), cropBit(c, true)!]]);
+})();
+
+/**
+ * The rocking horse, two squares wide: a white wooden horse facing left on curved rockers, a rainbow mane and tail, a teal
+ * saddle, red handles.
+ */
+export const SHOP_BIGBOY_ROCKING_HORSE = (() => {
+  const W = 2 * T;
+  const H = 62;
+  const F = H - 4;
+  const c = cv(W, H);
+  const rock = (x: number) => F - 2 - 9 * ((x + 0.5 - 37) / 34) ** 2;
+  // Legs, splayed, down to the rocker.
+  for (const [hx, fx] of [[26, 17], [30, 24], [46, 50], [50, 57]] as const)
+    for (let y = 32; y < rock(fx); y++) {
+      const t = (y - 32) / (rock(fx) - 32);
+      const x = Math.round(hx + (fx - hx) * t);
+      put(c, x, y, "k");
+      put(c, x + 1, y, "W");
+      put(c, x + 2, y, "V");
+      put(c, x + 3, y, "k");
+    }
+  for (let x = 3; x < 72; x++) {
+    const y = Math.round(rock(x));
+    put(c, x, y - 1, "k");
+    put(c, x, y, "K");
+    put(c, x, y + 1, "J");
+    put(c, x, y + 2, "O");
+    put(c, x, y + 3, "k");
+  }
+  // The tail, the body, the neck and head, the mane.
+  for (let i = 0; i < 6; i++) blob(c, 57 + i * 1.2, 25 + i * 2.6, 2.6, 2.2, TNT[i]! + SAT[i]! + SHD[i]!, false);
+  blob(c, 38, 29, 17, 8.5, WHT);
+  for (let j = 0; j <= 8; j++) blob(c, 24 - j * 0.9, 25 - j * 1.6, 5, 4.2, WHT, false);
+  blob(c, 13, 12, 9, 5.5, WHT);
+  blob(c, 6.5, 13.5, 3.2, 3.6, "WVV", false);
+  blob(c, 18, 6, 2, 3, WHT);
+  for (let i = 0; i < 6; i++) blob(c, 20 + i * 1.6, 7 + i * 2.6, 2.4, 2, TNT[i]! + SAT[i]! + SHD[i]!, false);
+  eye(c, 13, 10);
+  put(c, 5, 14, "k");
+  // The saddle and its blanket, the handle through the head.
+  blob(c, 38, 22, 8, 3.5, "Uut");
+  stamp(c, 31, 24, ["kkkkkkkkkkkkkkk", "k1F1F1F1F1F1F1k", "kkkkkkkkkkkkkkk"]);
+  stamp(c, 11, 15, ["k11k", "k77k"]);
+  stamp(c, 12, 19, ["kk", "k1", "kk"]);
+  return def("rocking-horse", [2, 1], W, H, [W / 2, F], [[groundShadow(W / 2, F - 1, 34, 3), cropBit(c, true)!]]);
+})();
+
+/**
+ * A toy train on the platform, two squares wide: a red engine and a yellow and a blue car, their windows lit warm (a
+ * nightlight at dusk: see SHOP_BIGBOY_LIGHTS), black wheels. `idle`: puffs of steam rise from the funnel (6 frames).
+ */
+const TRW = 2 * T;
+const TRH = 44;
+const TRF = TRH - 4;
+export const SHOP_BIGBOY_TOY_TRAIN = (() => {
+  const c = cv(TRW, TRH);
+  const car = (x0: number, w: number, k: number, engine: boolean) => {
+    const y0 = TRF - 18;
+    for (let y = y0; y <= TRF - 5; y++)
+      for (let x = x0; x < x0 + w; x++) {
+        const i = x - x0;
+        const j = y - y0;
+        let key = j < 2 ? TNT[k]! : i > w - 3 || j > 10 ? SHD[k]! : SAT[k]!;
+        if (i === 0 || i === w - 1 || j === 0 || y === TRF - 5) key = "k";
+        else if (!engine && j >= 3 && j <= 7 && ((i >= 3 && i <= 7) || (i >= w - 8 && i <= w - 4))) key = j === 3 || i === 3 || i === w - 8 ? "f" : "v";
+        else if (engine && j >= 3 && j <= 7 && i >= w - 9 && i <= w - 4) key = j === 3 ? "f" : "v";
+        put(c, x, y, key);
+      }
+    for (const wx of [x0 + 5, x0 + w - 6]) heapBallLike(c, wx, TRF - 3, 3.4);
+  };
+  const heapBallLike = (cc: Cv, cx: number, cy: number, r: number) => {
+    for (let y = Math.floor(cy - r); y <= cy + r; y++)
+      for (let x = Math.floor(cx - r); x <= cx + r; x++) {
+        const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+        if (d <= r) put(cc, x, y, d > r - 1 ? "k" : d < 1.2 ? "W" : "Z");
+      }
+  };
+  car(2, 22, 5, false);
+  car(25, 22, 2, false);
+  car(48, 24, 0, true);
+  // The engine's cab roof, its funnel and boiler front, a cowcatcher.
+  stamp(c, 55, TRF - 20, ["kkkkkkkkkkkkkkkkkk", "k(((((((((((((((7k", "kkkkkkkkkkkkkkkkkk"]);
+  stamp(c, 50, TRF - 26, ["kkkkk", "kZZZk", ".kZk.", ".kZk.", ".kZk.", ".kZk.", ".kZk.", ".kZk."]);
+  stamp(c, 70, TRF - 13, ["kk..", "k3k.", "k33k", "kkkk"]);
+  for (const x of [24, 47]) stamp(c, x, TRF - 9, ["k", "k"]);
+  const puffs: Pt[][] = [[[52, 9]], [[53, 5]], [[54, 1], [52, 10]], [[53, 6]], [[55, 2]], []];
+  const frames = puffs.map((ps) => {
+    const s = cv(TRW, TRH);
+    for (const [px, py] of ps) {
+      const k = cloudAt(0, 0, 0, 0, 1);
+      void k;
+      for (let y = 0; y < 6; y++) for (let x = 0; x < 7; x++) if (Math.hypot(x + 0.5 - 3.5, y + 0.5 - 3) < 3.1) put(s, px + x - 3, py + y, y < 3 ? "F" : "W");
+    }
+    const sb = cropBit(s, true);
+    return [groundShadow(TRW / 2, TRF - 1, 36, 3), cropBit(c, true)!, ...(sb ? [sb] : [])];
+  });
+  return def("toy-train", [2, 1], TRW, TRH, [TRW / 2, TRF], frames, 200);
+})();
+
+/**
+ * A nightlight: a sleepy crescent moon (eyes shut, a smile) glowing warm on a little white cloud stand, a star beside it.
+ * `idle`: its glow breathes, brighter and softer (4 frames). Its light: SHOP_BIGBOY_LIGHTS.
+ */
+const NLW = 30;
+const NLH = 46;
+const NLF = NLH - 3;
+export const SHOP_BIGBOY_NIGHTLIGHT = (() => {
+  const base = paint(2, NLF - 10, 26, 11, (x, y) => cloudAt(x, y, 15, NLF - 5, 0.75) ?? null);
+  const moon = (glow: boolean) =>
+    paint(3, 4, 22, 30, (x, y) => {
+      const X = x + 0.5 - 14;
+      const Y = y + 0.5 - 19;
+      const d = Math.hypot(X, Y);
+      if (d > 13 || Math.hypot(X - 7, Y - 3) < 10.5) return null;
+      if (Math.abs(Y + 1) < 0.6 && X > -9 && X < -5) return "O"; // its shut eye
+      if (Math.hypot(X + 7.5, Y - 4) < 2.2 && Y > 4.5) return "O"; // its smile
+      return glow ? (X + Y < -6 ? "v" : "f") : X + Y < -6 ? "f" : "3";
+    });
+  const star = paint(19, 2, 11, 11, (x, y) => {
+    const st = starAt(x + 0.5 - 24.5, y + 0.5 - 7.5, 5.5);
+    return st ? (st === 2 ? "9" : "3") : null;
+  });
+  const post = paint(13, 33, 3, 3, () => "W");
+  const frames = [true, true, false, true].map((g) => [groundShadow(NLW / 2, NLF - 1, 12, 2), post, base, moon(g), star]);
+  return def("nightlight", [1, 1], NLW, NLH, [NLW / 2, NLF], frames, 400);
+})();
+
+/**
+ * The lights at dusk and night, each on its piece (`piece`; x, y in that piece's own pixels): the nightlight's moon (only
+ * its glowing pixels), the toy train's windows.
+ */
+export const SHOP_BIGBOY_LIGHTS: readonly (LightSpot & { piece: string })[] = [
+  { piece: "nightlight", x: 3, y: 4, w: 22, h: 30, keys: "vf", color: LANTERN_LIGHT, strength: 1, halo: 34 },
+  { piece: "toy-train", x: 2, y: TRF - 18, w: 70, h: 14, keys: "vf", color: LANTERN_LIGHT, strength: 0.8 },
+];
+/** ... and soft pools on the floor under them. */
+export const SHOP_BIGBOY_POOLS: readonly (LightPool & { piece: string })[] = [
+  { piece: "nightlight", x: NLW / 2, y: NLF, rx: 40, ry: 13, color: LANTERN_LIGHT, strength: 0.3 },
+  { piece: "toy-train", x: TRW / 2, y: TRF, rx: 36, ry: 8, color: LANTERN_LIGHT, strength: 0.15 },
+];
 
 //@@PIECES@@
 
@@ -1302,6 +1673,17 @@ at("hem-pillar", 19, 19, true, { flip: true });
 at("counter", 8, 3, true);
 at("crate", 8, 3, false); // on the counter (see SHOP_BIGBOY_CRATE_AT): its place is the counter's
 at("airplane", 15, 9, true); // over columns 15-17, rows 7-9, the east walkway passing under it
+at("plush-giraffe", 3, 7, true);
+at("plush-tiger", 16, 15, true);
+at("plush-bear", 5, 16, true);
+at("plush-elephant", 2, 14, true);
+at("plush-duck", 12, 17, true);
+at("plush-bunny", 17, 4, true);
+at("beach-ball", 14, 13, true);
+at("blocks-big", 5, 2, true);
+at("nightlight", 14, 2, true);
+at("toy-train", 12, 4, true);
+at("rocking-horse", 2, 10, true); // on the end of the west walkway: columns 2-3
 //@@PROPS@@
 
 /** Where every piece goes: name, column (its west-most square), row (its south-most), solid; floor tiles first, then the upright pieces north to south. */
@@ -1417,7 +1799,40 @@ const strip = (name: string, y0: number, y1: number, z: number, cols: number) =>
   roomParts[`strip-${name}`] = { grid, outline: false };
   anims[`strip-${name}`] = { loop: true, frames: [{ ms: 1000, layers: [{ part: `strip-${name}`, x: 0, y: 0 }] }] };
 };
-strip("airplane", 20, 175, 2, 3);
+strip("airplane", 20, 175, 1, 6);
+strip("crate", 0, XH, 4, 6);
+strip("toy-train", 0, TRH, 3, 3);
+strip("nightlight", 0, NLH, 4, 4);
+anims["review-anims"] = {
+  loop: true,
+  frames: [{ ms: 1000, layers: [{ part: "strip-crate", x: 0, y: 0 }, { part: "strip-toy-train", x: 0, y: XH * 4 + 10 }, { part: "strip-nightlight", x: 0, y: XH * 4 + 10 + 2 * (TRH * 3 + 4) + 10 }] }],
+};
+{
+  // (For review: the props and the plushes side by side at 3x, in one frame.)
+  const names = ["plush-giraffe", "plush-tiger", "plush-bear", "plush-elephant", "plush-duck", "plush-bunny", "beach-ball", "blocks-big", "nightlight", "crate", "rocking-horse", "toy-train", "entrance"];
+  let x = 4;
+  let y = 4;
+  let rowH = 0;
+  const layers: Layer[] = [];
+  for (const n of names) {
+    const q = PIECES[n];
+    if (!q) continue;
+    const z = 3;
+    if (x + q.w * z > RW) {
+      x = 4;
+      y += rowH + 6;
+      rowH = 0;
+    }
+    const qc = toChar(q);
+    const k = frameKeys(qc, qc.anims.idle!.frames[0]!);
+    const g = Array.from({ length: q.h * z }, (_, yy) => Array.from({ length: q.w * z }, (_, xx) => k[Math.floor(yy / z)]![Math.floor(xx / z)] ?? ".").join(""));
+    roomParts[`review-prop-${n}`] = { grid: g, outline: false };
+    layers.push({ part: `review-prop-${n}`, x, y });
+    x += q.w * z + 6;
+    rowH = Math.max(rowH, q.h * z);
+  }
+  anims["review-props"] = { loop: true, frames: [{ ms: 1000, layers }] };
+}
 //@@REVIEW@@
 
 /** Every piece by its name (as SHOP_BIGBOY_LAYOUT names them), each its own Character `shop-bigboy-<name>`. */

@@ -55,7 +55,7 @@ const P = (c: number, r: number, lift = 0) => (proj(v, c - PC, PR - r, lift, pt)
 
 for (const pl of SHOP_BABUR_LAYOUT) {
   const im = imgs[pl.name]!;
-  const flat = /^(floor|ring|circle|emblem)/.test(pl.name);
+  const flat = /^(floor|ring|circle|emblem|pit|walk|plat)/.test(pl.name);
   if (flat) {
     // Corners: north-west, north-east, south-east, south-west (north is up the picture).
     const cs4 = [P(pl.col - 0.5, pl.row - 0.5), P(pl.col + 0.5, pl.row - 0.5), P(pl.col + 0.5, pl.row + 0.5), P(pl.col - 0.5, pl.row + 0.5)];
@@ -65,7 +65,8 @@ for (const pl of SHOP_BABUR_LAYOUT) {
   }
   const wsq = pl.w ?? 1;
   const dsq = (pl as { d?: number }).d ?? 1;
-  if (dsq > 1) {
+  // Deep pieces drawn as a plan (a pond, a fountain basin) lie flat; a deep but upright one (the toy plane over its loop) stands.
+  if (dsq > 1 && !/airplane/.test(pl.name)) {
     // A deep piece drawn as a plan (the big pond garden: 5 x 8 squares seen from above): its plan lies flat on its squares,
     // cut into one tile a square, and the strip above its north row (the tall plants' tops) stands up there.
     const rise = im.h - dsq * SQ;
@@ -125,7 +126,7 @@ const page = await browser.newPage({ viewport: { width: W, height: H }, deviceSc
 await page.setContent(html);
 await page.evaluate("window.__name = (f) => f");
 await page.evaluate(
-  async ({ imgs, floor, up, W, H, DPR, kidPng, sheet, glass, stone }) => {
+  async ({ imgs, floor, up, W, H, DPR, kidPng, sheet, glass, stone, nursery }) => {
     const cv = document.getElementById("c") as HTMLCanvasElement;
     cv.width = W * DPR;
     cv.height = H * DPR;
@@ -134,7 +135,18 @@ await page.evaluate(
     const g = cv.getContext("2d")!;
     g.scale(DPR, DPR);
     g.imageSmoothingEnabled = false;
-    if (stone) {
+    if (nursery) {
+      // A nursery ceiling (mockup only, not drawn art): soft sky blue with pale clouds and little stars.
+      const sky = g.createLinearGradient(0, 0, 0, H * 0.45);
+      sky.addColorStop(0, "#7fb4e8");
+      sky.addColorStop(1, "#cfe6fb");
+      g.fillStyle = sky;
+      g.fillRect(0, 0, W, H);
+      g.fillStyle = "#ffffff";
+      for (const [cx, cy, r] of [[60, 40, 22], [90, 34, 18], [290, 60, 26], [320, 52, 20], [200, 20, 16]] as const) { g.beginPath(); g.arc(cx, cy, r, 0, 7); g.fill(); }
+      g.fillStyle = "#ffe36a";
+      for (const [sx, sy] of [[150, 70], [250, 25], [30, 90], [360, 100], [120, 15]] as const) g.fillRect(sx, sy, 4, 4);
+    } else if (stone) {
       // A pyramid's sandstone ceiling (mockup only, not drawn art): warm stone, darker toward the top, with beams.
       const sky = g.createLinearGradient(0, 0, 0, H * 0.45);
       sky.addColorStop(0, "#5a3f22");
@@ -285,7 +297,7 @@ await page.evaluate(
       }
     }
   },
-  { imgs, floor, up, W, H, DPR, kidPng, sheet, glass: SHOP === "puddles", stone: SHOP === "alfil" },
+  { imgs, floor, up, W, H, DPR, kidPng, sheet, glass: SHOP === "puddles", stone: SHOP === "alfil", nursery: SHOP === "bigboy" },
 );
 await page.locator("#c").screenshot({ path: out });
 await browser.close();
