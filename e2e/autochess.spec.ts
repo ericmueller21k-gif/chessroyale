@@ -251,6 +251,9 @@ test("the shop: four offers, each a piece and a square of your own, on a square 
   // On the board: four silhouettes, each on its own square (never two on one: Eric, Oct 21), and each fills its square.
   expect(new Set(shown.map((o) => o.square)).size).toBe(4);
   await expect(page.locator(".ac-sil")).toHaveCount(4);
+  // (Measured once they're in: each pops in (`ac-appear`, 160 ms from scale 0.4, its translateY(-50%) blended in), and the first one
+  // read mid-pop sat 2 to 6 px off its square's middle: the flaky "b4: vertically on its square", Nov 2. The check is as tight as before.)
+  await page.locator(".ac-sil").evaluateAll((els) => Promise.all(els.flatMap((el) => el.getAnimations()).map((a) => a.finished)));
   const boardBox = (await page.locator(".ac-layer").boundingBox())!;
   const sq = boardBox.width / 8;
   const boxes = await Promise.all(shown.map(async (_, slot) => (await silhouette(page, slot).boundingBox())!));
