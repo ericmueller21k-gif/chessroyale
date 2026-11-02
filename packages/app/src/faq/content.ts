@@ -938,6 +938,9 @@ function godKing(src: FaqSources): FaqSection {
   const S = src.settings;
   // (The Crowd's boss final's boss, the Hidden Boss: the God King's help doesn't work against him.)
   const finalBoss = crowdFinalBoss(src.roster);
+  // (The crowd's moves played before the first one he can save: none on its first lastStandFromMove moves.)
+  const from = S.lastStandFromMove;
+  const first = from + 1;
   const bar = (best: number, moves: number, charges: number) => (best * 100 < S.lastStandFrom ? "no save" : num(lastStandBar(best, moves, charges, S), 1));
   // Sample positions: comfortable, the edge of the weak band, two inside it, and just under the no-save line.
   const mid = (S.lastStandFrom + S.lastStandShareBelow) / 200;
@@ -945,7 +948,7 @@ function godKing(src: FaqSources): FaqSection {
     .map((x) => Math.round(x * 100) / 100)
     .filter((x, i, a) => x > 0 && a.indexOf(x) === i)
     .sort((a, b) => b - a)
-    .map((b) => `| ${pct(b, 0)} | ${bar(b, 0, 1)} | ${bar(b, 0, 0)} | ${bar(b, S.lastStandDecayMoves, 0)} |`)
+    .map((b) => `| ${pct(b, 0)} | ${bar(b, from, 1)} | ${bar(b, from, 0)} | ${bar(b, Math.max(from, S.lastStandDecayMoves), 0)} |`)
     .join("\n");
   const start = S.lastStandLoss + S.lastStandChargedExtra;
   const end = S.lastStandLossFloor + S.lastStandChargedExtra;
@@ -972,9 +975,10 @@ Either needs **more than half the crowd** to call him. Bots back a person's call
 
 Once per battle, with or without charges, he steps in to stop a disaster. When the crowd's move is played and the judge's numbers say it gave away at least **the bar** (points against the best move), he dives onto the board, takes the blow meant for your piece and falls. The move is undone, and the crowd picks again with a fresh clock (the move he took back is off the table). The round's scores stand: the picks that chose it still cost what they cost.
 
+${from > 0 ? `**Not before move ${first}.** He never steps in on the crowd's first ${n(from, "move")} of the battle: he's ready from its ${ordinal(first)} move on. The moves count from the battle's start, however it began (a Random opening, Freestyle, or a battle that picks up a game in progress).\n` : ""}
 $ plain bar = ${S.lastStandLossFloor} + ${S.lastStandLoss - S.lastStandLossFloor} × max(0, 1 − crowd moves / ${S.lastStandDecayMoves}) + ${S.lastStandChargedExtra} while he has charges
 
-So it starts at ${start} with charges (${S.lastStandLoss} without) and eases to ${end} (${S.lastStandLossFloor}) by crowd move ${S.lastStandDecayMoves}, then stays there. In a weak position there are fewer points to lose, so the chances left matter too (the chances left are the best move's expected score):
+So it starts at ${start} with charges (${S.lastStandLoss} without)${from > 0 ? `, is ${num(lastStandBar(0.5, from, 1, S), 1)} (${num(lastStandBar(0.5, from, 0, S), 1)}) on move ${first}, the first he can save,` : ""} and eases to ${end} (${S.lastStandLossFloor}) by crowd move ${S.lastStandDecayMoves}, then stays there. In a weak position there are fewer points to lose, so the chances left matter too (the chances left are the best move's expected score):
 
 - **Under ${S.lastStandFrom}%:** no save. The game already counts as lost.
 - **From ${S.lastStandFrom}% to ${S.lastStandShareBelow}%:** the bar is ${S.lastStandShare === 0.5 ? "half" : pct(S.lastStandShare, 0)} of the chances left, when that's lower than the plain bar.
@@ -982,11 +986,11 @@ So it starts at ${start} with charges (${S.lastStandLoss} without) and eases to 
 
 $ bar = min(plain bar, ${num(S.lastStandShare)} × chances left)    (from ${S.lastStandFrom}% to ${S.lastStandShareBelow}%)
 
-| Best move worth | First move, with charges | First move, none | Move ${S.lastStandDecayMoves} on, none |
+| Best move worth | ${from > 0 ? `Move ${first}` : "First move"}, with charges | ${from > 0 ? `Move ${first}` : "First move"}, none | Move ${Math.max(from, S.lastStandDecayMoves)} on, none |
 |---|---|---|---|
 ${rows}
 
-**Worked example.** On the first move, from a level position, the crowd hangs its queen: that gives away 50 to 70 points, well over ${start}, so he saves it. Later, with the crowd down to ${pct(weak, 0)}, a move that throws away ${num(lastStandBar(weak, 0, 1, S), 1)} points (half of what was left) calls him too. A sacrifice the engine likes gives nothing away, so it never calls him: he judges the chances, not the material.
+**Worked example.** On move ${first}, from a level position, the crowd hangs its queen: that gives away 50 to 70 points, well over ${num(lastStandBar(0.5, from, 1, S), 1)}, so he saves it${from > 0 ? ` (the same queen hung on move ${from} would stand)` : ""}. Later, with the crowd down to ${pct(weak, 0)}, a move that throws away ${num(lastStandBar(weak, from, 1, S), 1)} points (half of what was left) calls him too. A sacrifice the engine likes gives nothing away, so it never calls him: he judges the chances, not the material.
 
 **What you see:** a warning, everything freezes, he dives onto the piece's square with his cut-in, the piece slides back, he takes the blow (the boss drops in and attacks him: Hollow lashes him with his string of lights, Alfil jabs him with his ankus, Sawyer saws at him, Wrangler cracks his lasso at him, Boingo pies him, Big Boy bonks him with his lollipop, Ginger jabs him with his candy cane and Jefferson fires his Roman candle at him), staggers, falls and fades. Then the crowd picks again. He's gone for the rest of the battle, and the charges he fell with go to the crowd: everyone still in gets ${n(S.lastStandPowerUps, "power-up")} for each (a power-up shows the engine's top 3 moves). He never steps in when only one move was possible.
 

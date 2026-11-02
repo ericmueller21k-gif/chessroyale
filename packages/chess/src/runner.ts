@@ -1099,7 +1099,8 @@ export class MatchRunner {
    * not he has charges left: the move gave away at least the bar (lastStandBar: it falls the longer the battle
    * goes without one, and in a weak position it's a share of the chances left), and the crowd wasn't already lost
    * (lastStandFrom). The judge's numbers decide, as given. Never while a boss's power has changed the board
-   * (boardAltered).
+   * (boardAltered), nor on the crowd's first lastStandFromMove moves of the battle (Eric, Nov 2; lastStandDue: here
+   * `b.crowdMoves` is the crowd's moves already played in this battle, the one being judged not yet counted).
    */
   private lastStandFor(
     fen: string,
