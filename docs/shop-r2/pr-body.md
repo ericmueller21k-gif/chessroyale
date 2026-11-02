@@ -38,7 +38,10 @@ Eric's boss token rules (Nov 2), built server-side, and the shop card's buying m
 - **The shop card:** real counts ("You have 2 Babur tokens and 1 crate key."), a way's button greyed when you can't pay it, the answer
   with the item's picture in the row that was always there (40 px now, so nothing moves), and "+ 24 Beta Crate items, Common to Epic"
   under the ride.
-- **Inside a shop the header says the shop's name** ("Babur's Circus", "Puddles' Botanical Garden"), not "Town square".
+- **Inside a shop the header says the shop's name** ("Babur's Circus", "Puddles' Botanical Garden"), not "Town square"; in a
+  computer's narrow header column it takes up to two smaller lines (the bar's height unchanged), the full name as its tooltip.
+- **Robustness:** the app retries a solo battle's finish once after a server error (never double-counted: the server takes the battle
+  off in one statement), and a START tapped before the account has loaded waits for it.
 - **Admins' test grants** in the Crates tab ("Admin: test grants": +1 crate key; a boss, +1 token, +3 tokens), `POST /api/locker/grant`,
   "Not found" for anyone else, at most 10 at once. No Worker variable needed.
 - **Stored data** (backward compatible: new tables, and one column added with a default; old rows read 0, old apps keep working):
@@ -97,11 +100,20 @@ None guards a rule in `docs/rules/eric.md`.
 ## Lane
 
 **Full lane** (stored data: new D1 tables and a column; fair play: drops decided by the server). Please add the `full-e2e` label.
-Local runs: typecheck; the server, core and app unit tests above; the shop spec's changed and new tests (RESULTS).
+Local runs (all green): `npm run typecheck`; unit tests touched (196 in 8 files: `boss-tokens`, `account-data`, `accounts`,
+`sign-in-races`, `shop-buy`, `ci-select` on the server, `shop-room` and `faq` in the app; plus core's `crates`); `e2e/shop.spec.ts`
+whole, both projects, 10 of 10 (under the e2e lock, the app built after merging main). The new paths are mapped in `e2e/areas.json`
+(the shop area runs `shop.spec.ts`; `server/boss-tokens.ts` is with the other stored-data files in `full`).
 
 ## Stills (`docs/shop-r2/`)
 
-STILLS
+- `result-token-box-phone.png`, `result-token-box-desktop.png`: the result screen's square box after a counted Boss alone battle.
+- `inventory-tokens-phone.png`, `inventory-tokens-desktop.png`: the Crates tab with keys, the boss tokens (4 of Babur's) and the
+  admin's test grants.
+- `shop-card-counts-phone.png`, `shop-card-counts-desktop.png`: Babur's crate card with real counts, both ways open (and the header
+  "Babur's Circus").
+- `shop-card-after-buy-phone.png`, `shop-card-after-buy-desktop.png`: after buying with 3 tokens: the item and its picture, 1 token and
+  1 key left, the tokens' way greyed.
 
 ## For Eric
 
