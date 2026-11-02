@@ -17,6 +17,10 @@ Everything from Nov 1 is merged: #447 eval bar off, #448 cash-in 2 gold, #449 on
   branch claude/boss-art; asks Eric once, ~$4-6, cap $8).
 
 ## Queue (one Opus at a time)
+0. NEXT after shops r2: Colosseum Pixel pieces (Eric Nov 2): Pixel must pixelate ONLY the pieces, never the crowd/arena
+   (today arena-gl.ts draws the whole arena into the small target). Draw the pieces from the new GBA-style sprites (API run
+   session_01JuCWRvpifUHBYDWXqYcDtk, scripts/boss-art/out/arena-pieces-gba/, after Eric OKs them). If Eric likes them, he
+   said the other piece styles aren't needed (ask before removing 3D/2D).
 - Haiku running beside (Eric OK'd "Send Haiku"): Boss Battle picker, 2 rows on the computer (cr-bsrows,
   claude/boss-select-rows, brief notes/briefs/brief-boss-select-rows.md).
 1. Auto chess reveal (Eric's simpler version): your placed pieces gray until revealed to the opponent, then normal; yellow
