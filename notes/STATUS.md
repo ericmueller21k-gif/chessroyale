@@ -7,7 +7,8 @@ Everything from Nov 1 is merged: #447 eval bar off, #448 cash-in 2 gold, #449 on
 ## Running
 - One Opus: test-value changes (worktree /home/user/cr-testvalue, branch claude/test-value, brief
   notes/briefs/testvalue-changes.md): flakes first, then speed, formats→crowd-hidden merge, CI selection.
-- API art session (outside the one-Opus rule, Eric): boss tokens for the other 14 (session_01JuCWRuuJUf92wTLxwR6d8N,
+- API art sessions (outside the one-Opus rule, Eric): circus interior (session_01JuCWRrhykEFvvmv5JKWgRX, ~$4-7, cap $10);
+  boss tokens for the other 14 (session_01JuCWRuuJUf92wTLxwR6d8N,
   branch claude/boss-art; asks Eric once, ~$4-6, cap $8).
 
 ## Queue (one Opus at a time)
