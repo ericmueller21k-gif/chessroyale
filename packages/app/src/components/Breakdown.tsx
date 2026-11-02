@@ -41,7 +41,8 @@ export function Breakdown({
   const played = moves.filter((m) => m.bestMove);
   const costly = [...played].filter((m) => m.roundScore < 0).sort((a, b) => a.roundScore - b.roundScore).slice(0, 3);
   const brilliant = played.filter((m) => m.brilliant);
-  const [open, setOpen] = useState<MoveRecord | null>(costly[0] ?? null);
+  // (On the result page the first move's board is open when nothing cost you: the review shows with no tap.)
+  const [open, setOpen] = useState<MoveRecord | null>(costly[0] ?? (inline ? played[0] : null) ?? null);
   const short = you !== undefined && line !== undefined ? line - you : null;
   return (
     <div class={inline ? "breakdown inline" : "breakdown"} role={inline ? undefined : "dialog"} aria-label={inline ? undefined : "Your game, move by move"}>
