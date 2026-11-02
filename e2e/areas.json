@@ -481,7 +481,7 @@
         "packages/app/src/match-exit.ts",
         "packages/app/src/components/MatchMenu.tsx"
       ],
-      "specs": ["e2e/crowd.spec.ts", "e2e/formats.spec.ts", "e2e/match-menu.spec.ts", "e2e/problems.spec.ts", "e2e/resign.spec.ts"]
+      "specs": ["e2e/crowd.spec.ts", "e2e/crowd-hidden.spec.ts", "e2e/formats.spec.ts", "e2e/match-menu.spec.ts", "e2e/problems.spec.ts", "e2e/resign.spec.ts"]
     },
     "home and the front door": {
       "paths": [

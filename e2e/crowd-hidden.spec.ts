@@ -10,6 +10,8 @@ import { RECLUSE_LINES } from "../packages/app/src/characters/recluse-lines.ts";
  *   (?win=1), he collapses, then his phase 2 with the other finalists on the other three boards.
  * - Online: everyone sees his intro by name, four in the battle, his bullet clock; a try at the God King spends a charge
  *   and your move goes on; his chatter (Oct 15), driven on this device from its own view, comes within half a minute. (Phase 2 isn't online: phase 1 won is the victory, unit-tested in crowd-hidden-boss.test.ts.)
+ * - Both (Nov 2, from formats.spec.ts' two boss-battle tests, merged here): he never strikes and the God King never comes; online the
+ *   host's browser plays his replies, through to the result.
  */
 const him = crowdFinalBoss()!;
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
@@ -27,6 +29,27 @@ async function knockouts(page: Page, minutes: number, until: (p: Page) => Promis
     }
     await page.waitForTimeout(200);
   }
+}
+
+/**
+ * Plays on in his battle as a strong player (the engine's best move) until the results, noting each phase seen and, while it's
+ * his turn, whether he was thinking or moving (formats.spec.ts' old `playToResults`, for the battle alone).
+ */
+async function playOn(page: Page, minutes: number): Promise<Set<string>> {
+  const seen = new Set<string>();
+  const stopAt = Date.now() + minutes * 60_000;
+  while (Date.now() < stopAt) {
+    const p = await phase(page);
+    seen.add(p);
+    if (p === "results") break;
+    if (p === "boss") seen.add(await page.evaluate(() => ((window as any).match.phase.thinking ? "bossThinking" : "bossMove")).catch(() => "none"));
+    if (p === "play") {
+      const pick = await engineTop(page, "judged", 12_000).catch(() => null);
+      await submitMove(page, pick?.top[0]?.move, pick?.fen).catch(() => undefined);
+    }
+    await page.waitForTimeout(250);
+  }
+  return seen;
 }
 
 test("the vote: the boss final's card is his (his name and icon, the top 4), between Team final and Duel, and fits its card", async ({ page }) => {
@@ -89,6 +112,9 @@ test("solo Crowd: the top 4 meet him; the God King's help tried spends a charge;
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("phaseChange");
   expect(await fall.seen()).toEqual({ dock: true });
   expect((await bossNow(page)).result).toBe("crowd");
+  // He never struck, and the God King, tried, never came (formats.spec.ts' solo boss battle, merged here Nov 2).
+  expect((await bossNow(page)).kills).toEqual([]);
+  expect((await bossNow(page)).kingMoves).toEqual([]);
   // (The phase change is about 25 s since Oct 17: its added beats are settings.)
   const added = RECLUSE_PHASE2.change.talkMs + RECLUSE_PHASE2.change.absorbHoldMs + RECLUSE_PHASE2.change.castHoldMs;
   await expect.poll(() => phase(page), { timeout: 30_000 + added }).toBe("simul");
@@ -107,7 +133,7 @@ test("solo Crowd: the top 4 meet him; the God King's help tried spends a charge;
 });
 
 test("online: a Crowd boss final meets him: his intro by name for everyone, four in the battle; a try at the God King spends a charge and your move goes on; his bullet clock", async ({ page }) => {
-  test.setTimeout(12 * 60_000);
+  test.setTimeout(16 * 60_000);
   test.skip(test.info().project.name !== "desktop", "one run is enough: a computer");
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -158,5 +184,15 @@ test("online: a Crowd boss final meets him: his intro by name for everyone, four
   const chatter = (await page.evaluate(() => (window as any).__chatter)) as { at: number; text: string };
   console.log(`Online, his first chatter ${((chatter.at - playAt) / 1000).toFixed(1)} s after your first move began: ${chatter.text}`);
   expect(chatter.at - playAt).toBeLessThanOrEqual(30_000);
+  // On to the result (formats.spec.ts' online boss battle, merged here Nov 2): the host's browser plays his replies, he never
+  // strikes, the God King never comes, and the result is one of the three.
+  const seen = await playOn(page, 8);
+  expect(seen.has("results"), [...seen].join(", ")).toBe(true);
+  expect(seen.has("bossThinking") || seen.has("bossMove") || seen.has("spectating"), "his replies").toBe(true);
+  expect(["crowd", "boss", "draw"]).toContain(await page.evaluate(() => (window as any).match.phase.bossResult));
+  const end = await bossNow(page);
+  expect(end.id).toBe(him.id);
+  expect(end.kills).toEqual([]);
+  expect(end.kingMoves).toEqual([]);
   expect(errors).toEqual([]);
 });

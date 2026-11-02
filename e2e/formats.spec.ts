@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { crowdFinalBoss } from "@chessroyale/core";
-import { BOARD_SEL, createLobbyFromHome, engineTop, named, soloFromHome, submitMove, test, bossAloneFromHome, pickMode } from "./helpers.ts";
+import { BOARD_SEL, engineTop, named, soloFromHome, submitMove, test, bossAloneFromHome, pickMode } from "./helpers.ts";
 
 /** The boss final's boss (Eric, Oct 14: always the Hidden Boss), by his roster name. */
 const finalBoss = crowdFinalBoss()!;
@@ -103,33 +103,6 @@ test("team final: the top 8 play 4v4, the weakest on each side go out, everyone 
   const places = await page.evaluate(() => (window as any).match.runner.state.players.map((p: any) => p.placement).sort((a: number, b: number) => a - b));
   expect(places).toEqual(Array.from({ length: 100 }, (_, i) => i + 1));
   if (seen.has("final")) await expect(page.locator(".team-result")).toBeVisible();
-});
-
-test("boss battle (solo): always the Hidden Boss; he replies, never strikes, the God King never comes, and the result shows", async ({ page }) => {
-  test.setTimeout(10 * 60_000);
-  test.skip(test.info().project.name !== "phone", "one run is enough");
-  await page.goto("/?debug&pace=quick&mode=crowd&format=boss&rounds=1&clock=20&bossMoves=7");
-  await soloFromHome(page);
-  const seen = new Set<string>();
-  await playToResults(page, seen, 9);
-  expect(await phase(page)).toBe("results");
-  const boss = await page.evaluate(() => (window as any).match.runner.state.boss);
-  expect(boss.id).toBe(finalBoss.id);
-  expect(["crowd", "boss", "draw"]).toContain(boss.result);
-  expect(boss.kills).toEqual([]);
-  expect(boss.kingCharges).toBeGreaterThanOrEqual(0);
-  const reached = await page.evaluate(() => {
-    const m = (window as any).match;
-    const me = m.runner.player("you");
-    return me.outInStage === null || me.outInStage >= m.settings.knockoutsPerStage.length;
-  });
-  if (reached) {
-    for (const k of ["boss", "bossThinking", "bossMove"]) expect(seen.has(k)).toBe(true);
-    expect(seen.has("bossKill")).toBe(false);
-    // You called the King every move: against him he never comes (each try spent a charge).
-    expect(boss.kingMoves).toEqual([]);
-  }
-  await expect(page.locator(".team-result")).toBeVisible();
 });
 
 test("boss raid (solo): you against a boss from the starting position (Eric, Oct 21); the King can strike it", async ({ page }) => {
@@ -298,19 +271,7 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
   await expect(page.locator(`.ls-card .mini ${BOARD_SEL.arrowLine}`).first()).toBeAttached();
 });
 
-test("boss battle (online): always the Hidden Boss, the host's browser plays him", async ({ page }) => {
-  test.setTimeout(12 * 60_000);
-  test.skip(test.info().project.name !== "desktop", "one run is enough");
-  await page.goto("/?debug&pace=quick&mode=crowd&format=boss&rounds=1&clock=15&bossMoves=6");
-  await createLobbyFromHome(page);
-  await page.getByRole("button", { name: /Start with 1 player/ }).click();
-  const seen = new Set<string>();
-  await playToResults(page, seen, 11);
-  expect(await phase(page)).toBe("results");
-  expect(seen.has("bossThinking") || seen.has("bossMove") || seen.has("spectating")).toBe(true);
-  expect(["crowd", "boss", "draw"]).toContain(await page.evaluate(() => (window as any).match.phase.bossResult));
-  expect(await page.evaluate(() => (window as any).match.boss?.id)).toBe(finalBoss.id);
-});
+// (The boss final's two battles, solo and online, are crowd-hidden.spec.ts's: their checks merged there, Nov 2.)
 
 test("Play now: players land in the same lobby, the count climbs, bots fill it and the votes begin", async ({ browser }) => {
   test.setTimeout(3 * 60_000);
