@@ -278,7 +278,8 @@ time controls themselves are in the vote data (`PREGAME_VOTES` in `votes.ts`).
   (`crowdFinalBoss`), `packages/chess/test/crowd.test.ts` ("50 v 50 boss final"), `packages/server/test/crowd-hidden-boss.test.ts`
   (online: his brain and strength, the God King tried, the bullet clock and a loss on time, his fall then the results),
   `packages/app/test/recluse-phase2.test.ts` (phase 2 in a solo Crowd's final), `faq.test.ts`; e2e
-  `e2e/crowd-hidden.spec.ts` (the card; solo through phase 2; online), `formats.spec.ts`.
+  `e2e/crowd-hidden.spec.ts` (the card; solo through phase 2, no strikes, the God King never comes; online to the result,
+  his replies played by the host's browser: formats.spec.ts' two boss-battle tests merged in, Nov 2).
 - e2e: `e2e/crowd.spec.ts`, `formats.spec.ts`, `votes.spec.ts`, `match-screen.spec.ts`, `panel.spec.ts`,
   `solo.spec.ts`, `multiplayer.spec.ts`, `castling.spec.ts`, `perf.spec.ts`.
 - Frames: `npm run frames:boss` (one move, real taps), `frames:flash` (white flashes), `frames:vote`, `frames:chat`.

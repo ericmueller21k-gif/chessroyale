@@ -141,7 +141,7 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   audited from the roster; a stub boss's new filter); e2e `e2e/king-save-altered.spec.ts` (Babur's hoops).
 - Unit: `packages/chess/test/last-stand.test.ts`, `packages/app/test/god-king.test.ts`,
   `packages/app/test/god-king-sprite.test.ts`, `packages/server/test/lobby.test.ts`.
-- e2e: `e2e/formats.spec.ts` (the boss final), `e2e/boss-powers.spec.ts`.
+- e2e: `e2e/crowd-hidden.spec.ts` (the boss final: tried, he never comes), `e2e/boss-powers.spec.ts`.
 - Frames in the game: `npm run frames:god-king -- <dir> [w|b] [phone|desktop|both] [summon|laststand|all] [light|dark]`;
   a boss's attack in his Last Stand: `npm run frames:king-attack -- <dir> hollow [phone|desktop|both] laststand`.
 - e2e for a boss's attack in his Last Stand: `e2e/king-attack.spec.ts`. Unit: `packages/app/test/king-attack.test.ts`

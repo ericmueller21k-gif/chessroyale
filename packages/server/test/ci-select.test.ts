@@ -274,6 +274,17 @@ describe("traced modules (areas.json, `traced`): a change followed through the c
     expect(traceModule(before, before.replace("LIMIT = 3", "LIMIT = 4")).names).toEqual(["LIMIT"]);
   });
 
+  it("a constant holding a plain value isn't state: a changed function that names it doesn't change its other readers", () => {
+    // (prefs.ts' pattern, Nov 2: each setting a key's name, read by its getter and written to by its setter.)
+    const before = `const KEY = "brc.a";\nconst OTHER = "brc.b";\nconst listeners = new Set<() => void>();\nexport function a() {\n  return localStorage.getItem(KEY);\n}\nexport function setA(v: string) {\n  localStorage.setItem(KEY, v);\n}\nexport function b() {\n  return localStorage.getItem(OTHER);\n}\nexport const MAX = 3;\nexport function setB(v: string) {\n  if (v.length < MAX) localStorage.setItem(OTHER, v);\n  listeners.forEach((l) => l());\n}\nexport function onChange(l: () => void) {\n  listeners.add(l);\n}\n`;
+    // setA's change: only setA (KEY is a plain string: a(), which reads it, is the same).
+    expect(traceModule(before, before.replace("setItem(KEY, v)", "setItem(KEY, v.trim())")).names).toEqual(["setA"]);
+    // setB's change: setB, and onChange, which shares the set it might write (a Set isn't a plain value); never a() or b().
+    expect(traceModule(before, before.replace("v.length < MAX", "v.length <= MAX")).names).toEqual(["onChange", "setB"]);
+    // A plain value changed itself is still followed to what reads it.
+    expect(traceModule(before, before.replace('"brc.a"', '"brc.a2"')).names).toEqual(["a", "setA"]);
+  });
+
   it("reads modules as code: strings, templates, regular expressions and JSX don't hide or invent a change", () => {
     const src = `const URL = "https://example.com"; // a comment\nexport const RE = /\\/\\/[a-z]+/g;\nexport const T = \`a \${URL} // not a comment\nexport const NOT_A_DECL = 1\n\`;\nexport const f = (x: number[]) => x[0]! / 2;\n`;
     const m = readModule(src)!;

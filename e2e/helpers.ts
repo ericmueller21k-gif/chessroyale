@@ -9,10 +9,17 @@ import { test as base, expect, type Page } from "@playwright/test";
  */
 export const test = base.extend<{ closeOwnContexts: void }>({
   closeOwnContexts: [
-    async ({ browser }, use) => {
+    async ({ browser, context }, use) => {
       const before = new Set(browser.contexts());
       await use();
-      await Promise.all(browser.contexts().filter((c) => !before.has(c)).map((c) => c.close()));
+      // Every route is let go before its page closes, and a handler still running then fails quietly: a handler waiting on
+      // `route.fetch()` as the test ended (switchesOff's /api/auth/config, asked for by the last page load) threw "route.fetch:
+      // Target page, context or browser has been closed" into a test that had passed (public-profile's flaky helpers.ts:303, Nov 2).
+      const own = browser.contexts().filter((c) => !before.has(c));
+      await Promise.all(
+        [context, ...own].flatMap((c) => [c.unrouteAll({ behavior: "ignoreErrors" }), ...c.pages().map((p) => p.unrouteAll({ behavior: "ignoreErrors" }))]),
+      );
+      await Promise.all(own.map((c) => c.close()));
     },
     { auto: true },
   ],

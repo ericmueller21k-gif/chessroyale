@@ -166,6 +166,11 @@ const skyTop = (p: Page) =>
     return [r / n, g / n, b / n];
   });
 
+test.describe("a deploy landed", () => {
+  // (No service worker: once it controls the page, it answers the town's styles from its own cache, past the route, so the refusal
+  // never came and the page never loaded again: the flaky "the page loaded again: 1" (Nov 2). The service worker installs on the
+  // page's "load" and takes over at once, so on a quick run it was in charge before the town's chunk asked for its styles.)
+  test.use({ serviceWorkers: "block" });
 test("a deploy landed while the page was open: the town square's files are gone, so the page loads again, once, and the town opens", async ({ page }) => {
   // (After a deploy the old version's files are gone: the first ask for the town's styles fails as it would then.)
   let asked = 0;
@@ -176,11 +181,12 @@ test("a deploy landed while the page was open: the town square's files are gone,
   page.on("framenavigated", (frame) => frame === page.mainFrame() && loads++);
   await page.goto("/town");
   await expect.poll(() => loads, { message: "the page loaded again" }).toBe(2);
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
-  // (The second time the app's service worker serves them: no route sees that ask.)
+  // (The second load fetches the town's chunk again, from the network now: a busy runner took over 5 s.)
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 20_000 });
   expect(asked, "the styles were refused").toBeGreaterThanOrEqual(1);
   expect(loads, "the page loaded again, once").toBe(2);
   expect(await colors(page), "the world is drawn, not blank").toBeGreaterThan(40);
+});
 });
 
 test("the sky by the time of day: ?sky=day and ?sky=night draw different skies (a day's top is light blue, a night's deep navy)", async ({ page }) => {
@@ -216,10 +222,15 @@ async function tapPoint(p: Page, kind: "boss" | "home") {
   const cv = (await canvas(p).boundingBox())!;
   return { x: cv.x + xy.x, y: cv.y + xy.y };
 }
-/** Brings Babur's Circus into view: it's often there from the start; else its chip glides the camera to it. */
+/**
+ * Brings Babur's Circus into view: it's often there from the start; else its chip glides the camera to it. (The click goes to the
+ * chip itself, in the page: the chips slide along the edge while the camera follows your walk (after a tap on a table, say), so a
+ * click at where the chip was a moment before landed on the map, walked you there and called off the glide: the flaky "the circus
+ * comes into view: null", Nov 2.)
+ */
 async function toBabur(p: Page) {
   if (await tapPoint(p, "home")) return;
-  await p.getByRole("button", { name: "Go to Babur's Circus" }).click({ force: true });
+  await p.getByRole("button", { name: "Go to Babur's Circus" }).dispatchEvent("click");
   await expect.poll(() => tapPoint(p, "home"), { message: "the circus comes into view" }).not.toBeNull();
 }
 /**
@@ -1287,6 +1298,21 @@ interface RideSeen {
 }
 const rideNow = (p: Page) => p.evaluate(() => (window as unknown as { __townRide: () => RideSeen }).__townRide());
 /**
+ * A rider's tag's foot and head (its drawn box's `hy`) in the same frame: read together in one call (Nov 2). Read in two calls, a
+ * frame or more apart, the idle's bob had moved the head by a pixel or so between them: the flaky "toBeCloseTo … 319.67 / 318.78".
+ */
+const tagOverHead = (p: Page, id: string, name: string) =>
+  p.evaluate(
+    ([id, name]) => {
+      const w = window as unknown as { __townRide: () => RideSeen; __townTags: () => { text: string; kind: string; y: number; h: number }[] };
+      const r = w.__townRide();
+      const box = id === "you" ? r.you.box : r.others.find((o) => o.id === id)?.box;
+      const tag = w.__townTags().find((t) => (id === "you" ? t.kind === "you" : t.text === name));
+      return { foot: tag ? tag.y + tag.h : null, hy: box?.hy ?? null };
+    },
+    [id, name],
+  );
+/**
  * Where square (c, r) is on screen once the camera has settled (Nov 1). The camera trails your walk and keeps gliding a moment
  * after you stop; a square read while it glides moves before the click lands. Beside you on a phone, the next square's middle
  * is only about a quarter of a square (8 px) clear of your own tap box, so a click a few frames late tapped your own pawn and
@@ -1395,9 +1421,8 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   await page.waitForTimeout(800);
   expect((await rideNow(page)).you.marks).toEqual({ side: 0, back: 0, front: 0, drops: 0 });
   // Its tag sits over it (the tag's foot 2 px over its head).
-  const me = (await rideNow(page)).you.box!;
-  const tag = (await page.evaluate(() => (window as unknown as { __townTags: () => { kind: string; y: number; h: number }[] }).__townTags())).find((t) => t.kind === "you")!;
-  expect(tag.y + tag.h).toBeCloseTo(me.hy - 2, 0);
+  const me = await tagOverHead(page, "you", "");
+  expect(me.foot!).toBeCloseTo(me.hy! - 2, 0);
   // Another rider, as others see them (a test player on Moon's Ride; no real players walk in the town yet): on their ride, drawn
   // as it, its tag over its head; and one in Cheetah Shoes, whose steps take half a bot's (Nov 1: twice as fast).
   const look = { ride: { def: "moon-ride", color: "pearl", blemish: 10, seed: 3 } };
@@ -1409,9 +1434,9 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   ]);
   expect(fetched).toEqual([]);
   const moony = (await rideNow(page)).others.find((o) => o.id === "player:rider-1")!.box!;
-  const moonyTag = (await page.evaluate(() => (window as unknown as { __townTags: () => { text: string; y: number; h: number }[] }).__townTags())).find((t) => t.text === "Moony");
-  expect(moonyTag, "the rider's tag").toBeTruthy();
-  expect(moonyTag!.y + moonyTag!.h).toBeCloseTo(moony.hy - 2, 0);
+  const moonyTag = await tagOverHead(page, "player:rider-1", "Moony");
+  expect(moonyTag.foot, "the rider's tag").not.toBeNull();
+  expect(moonyTag.foot!).toBeCloseTo(moonyTag.hy! - 2, 0);
   expect(moony.hy).toBeLessThan((moony.y0 + moony.fy) / 2);
   // At a size (Nov 1: every ride 0.75, RIDES.defaultScale; an admin's `?rideScale=1` tries it as drawn): the ride bigger under the
   // same pawn, standing on the same square. The pawn's tap box is as wide, the picture taller, the head higher (the pawn sits
@@ -1431,8 +1456,8 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   expect(b.x1 - b.x0).toBeCloseTo(a.x1 - a.x0, 1);
   expect(b.y1 - b.y0).toBeLessThan(a.y1 - a.y0);
   expect(b.fy - b.hy).toBeLessThan(a.fy - a.hy);
-  const fullTag = (await page.evaluate(() => (window as unknown as { __townTags: () => { kind: string; y: number; h: number }[] }).__townTags())).find((t) => t.kind === "you")!;
-  expect(fullTag.y + fullTag.h).toBeCloseTo(a.hy - 2, 0);
+  const fullTag = await tagOverHead(page, "you", "");
+  expect(fullTag.foot!).toBeCloseTo(fullTag.hy! - 2, 0);
   // Cheetah Shoes (Nov 1, Blitz's): your step takes half its time (45 ms, youStepMs / RIDES.speed), and its frames are drawn.
   await wearItem(page, "ride", shoes!);
   await page.goto("/town?sky=day");

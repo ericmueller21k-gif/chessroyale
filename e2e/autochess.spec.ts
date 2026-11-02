@@ -251,6 +251,9 @@ test("the shop: four offers, each a piece and a square of your own, on a square 
   // On the board: four silhouettes, each on its own square (never two on one: Eric, Oct 21), and each fills its square.
   expect(new Set(shown.map((o) => o.square)).size).toBe(4);
   await expect(page.locator(".ac-sil")).toHaveCount(4);
+  // (Measured once they're in: each pops in (`ac-appear`, 160 ms from scale 0.4, its translateY(-50%) blended in), and the first one
+  // read mid-pop sat 2 to 6 px off its square's middle: the flaky "b4: vertically on its square", Nov 2. The check is as tight as before.)
+  await page.locator(".ac-sil").evaluateAll((els) => Promise.all(els.flatMap((el) => el.getAnimations()).map((a) => a.finished)));
   const boardBox = (await page.locator(".ac-layer").boundingBox())!;
   const sq = boardBox.width / 8;
   const boxes = await Promise.all(shown.map(async (_, slot) => (await silhouette(page, slot).boundingBox())!));
@@ -1771,6 +1774,8 @@ test("a fight always ends even if the engine never answers (?stall=1): its looks
 });
 
 test("the result says why, by the gains: a side that gained 3 pawns wins early, a stall goes to the side that gained (at 320 px, the box holds it and the page doesn't scroll)", async ({ page }) => {
+  // (At 320 px whatever the project, with no tap: one project runs it, Nov 2.)
+  test.skip(!phone(), "at 320 px, no input: the phone project runs it");
   test.setTimeout(150_000);
   const errors = watchErrors(page);
   await page.setViewportSize({ width: 320, height: 568 });
@@ -1803,6 +1808,8 @@ test("the result says why, by the gains: a side that gained 3 pawns wins early, 
 });
 
 test("a side that starts the fight with only its king loses at once: the round is over with no move played", async ({ page }) => {
+  // (At 320 px whatever the project, with no tap: one project runs it, Nov 2.)
+  test.skip(!phone(), "at 320 px, no input: the phone project runs it");
   test.setTimeout(90_000);
   const errors = watchErrors(page);
   // (At the narrowest screen: the result's box must hold its words and buttons.)
@@ -3131,6 +3138,8 @@ test("the quick chat (v9): a tap shows its line in a bubble over your pawn; the 
 });
 
 test("the meeting fits the board: at 320, 390, 428 px wide and on a computer, the pawns, the countdown, the quick chat and the bubbles stay inside the board (and the screen)", async ({ page }) => {
+  // (Its sizes are its own, a computer's among them: one project runs them, Nov 2.)
+  test.skip(!phone(), "the sizes are the test's own: the phone project runs them all, the computer's too");
   test.setTimeout(180_000);
   // (The full 10 s meeting, so there is time to look at it.)
   for (const [w, h] of [

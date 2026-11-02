@@ -79,9 +79,13 @@ test("an admin's ?brain= link: Ginger on Maia with the full guard, on a phone; M
   for (const l of maia) expect(Number(l.match(/(\d+) ms/)![1])).toBeLessThan(1500);
 });
 
-test("every boss is on Maia, no guard, by default for an admin (Boss alone, a phone): its moves are Maia's", async ({ page }) => {
+test("every boss is on Maia, no guard, by default for an admin (Boss alone, a phone): its moves are Maia's (three bosses a run, in turn by the day)", async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough: a phone");
-  const bosses = BOSS_ROSTER.filter(isPlayable).map((b) => b.id);
+  // (Three bosses a run, the next three each day (UTC), so every boss comes round in turn (Nov 2); every boss's choice of Maia,
+  // by the same rule, is packages/app/test/maia-players.test.ts's, run on every push.)
+  const all = BOSS_ROSTER.filter(isPlayable).map((b) => b.id);
+  const day = Math.floor(Date.now() / 86_400_000);
+  const bosses = [0, 1, 2].map((k) => all[(day * 3 + k) % all.length]!);
   test.setTimeout(bosses.length * 120_000);
   await asAdmin(page);
   for (const id of bosses) {

@@ -671,7 +671,7 @@ noted wherever a slice changed one.
   wait on the server; a line's menu (your own: Mute and Report greyed; Report reaching fair play's case page with the line; a
   moderator's Remove leaving every log; Profile over the town and back; Mute hiding the player); the switch off ("Chat is
   paused.", the chatter going on); the privacy page's two 5-minute sentences. Only each test's own lines are counted: other tests' players share the room.
-- `e2e/town-chat-history.spec.ts` (phone and desktop; real time, its own file so it runs beside the others): a line another player said is still on
+- `e2e/town-chat-history.spec.ts` (a phone since Nov 2: the wait is the same on a computer; real time, its own file so it runs beside the others): a line another player said is still on
   the screen 4 minutes later, Report reaches fair play with it and a moderator's Remove takes it out of every log (the room holds 5 minutes).
 - `packages/app/test/town-tags.test.ts` (Oct 28, name tags): the near rule's alpha at 4, 4.5, 5, 5.5 and 6 squares (1, 1, 0.5, 0, 0; a straight line between, never rising with
   distance; its numbers are `feel.ts`'), the smaller of it and the far fade, your tag / an open card's figure / a table partner always shown (at any distance), "Everyone"
