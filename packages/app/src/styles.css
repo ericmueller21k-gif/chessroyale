@@ -11567,6 +11567,45 @@ button.fd-seat {
   .fd-root.framed .bs-tiles {
     margin-inline: -22px;
   }
+  /* The Boss Battle page takes the middle column's width (the frame's center, 920 px at most). Everything on it keeps the 496 px
+     column it had, except the select, which fills the column when it can go in two rows (Eric, Nov 2: "two rows of whatever
+     that comes out to… use that middle space… everything else bumps up"). docs/decisions/2026-11-02-boss-select-rows.md. */
+  .fd-root.framed .rd-page {
+    max-width: none;
+    container: rd-page / inline-size;
+  }
+  .fd-root.framed .rd-page > :is(.fd-page-head, .fd-notice, .bs-select, .rd-options, .rd-about, .fd-rest, .fd-hint, .fd-error) {
+    width: 100%;
+    max-width: 496px;
+    margin-inline: auto;
+  }
+  /* Two rows when the page's width (the column less its padding) is 660 px or more: cards of 90 px or more, the 17 tiles of
+     an admin's two rows of nine and eight at 1280 px wide. Narrower keeps five a row, as before. Each row of cards is one
+     flex line: every card's margin to the next is the gap less its slant, so a line is as wide as its cards' visible
+     widths; the translate moves each card by half the slant less the gap, which centers the visible cards in the line. */
+  @container rd-page (min-width: 660px) {
+    .fd-root.framed .rd-page > .bs-select {
+      max-width: none;
+    }
+    .bs-row {
+      display: contents;
+    }
+    .bs-tiles {
+      --bs-w: calc((100cqi - (var(--bs-two) - 1) * var(--bs-gap)) / (var(--bs-two) - 0.2 * (var(--bs-two) - 1)));
+      flex-direction: row;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: var(--bs-gap) 0;
+    }
+    .bs-tile + .bs-tile {
+      margin-left: 0;
+    }
+    .bs-tile {
+      height: var(--bs-h);
+      margin-right: calc(var(--bs-gap) - var(--bs-w) * 0.2);
+      translate: calc((var(--bs-gap) - var(--bs-w) * 0.2) / 2) 0;
+    }
+  }
 }
 @media (min-width: 1440px) {
   .fd-root.framed {
