@@ -76,7 +76,8 @@ export const CHAT_BACKGROUND_NOTE = "A soft tint behind the chat, always on whil
 /** The mode a tap on the icon goes to: always on, new messages, off, and round again. */
 export const nextChatMode = (m: ChatMode): ChatMode => CHAT_MODES[(CHAT_MODES.indexOf(m) + 1) % CHAT_MODES.length]!;
 
-export type ChatKind = "boss" | "kid" | "player" | "system";
+/** "server": the server's own lines for everyone (a boss challenged from the town, and how it went: Nov 2), in their own blue. */
+export type ChatKind = "boss" | "kid" | "player" | "system" | "server";
 
 /** Who said a player's line, from the server: their account id and the line's number in its room, and the name color their device picked (names.ts). */
 export interface ChatWho {

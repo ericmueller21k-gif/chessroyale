@@ -35,7 +35,7 @@ test.beforeEach(async ({ page }) => {
 const town = (p: Page) => p.locator("canvas.town-canvas");
 const room = (p: Page) => p.locator("canvas.town-shop-canvas");
 type Hooks = {
-  __townAt?: (k: string, id: string) => { x: number; y: number } | null;
+  __townAt?: (k: string, id: string | readonly [number, number]) => { x: number; y: number } | null;
   __shopAt?: (k: string, sq?: readonly [number, number]) => { x: number; y: number } | null;
   __shopCam?: () => { zoom: number; zoomTarget: number; room: string; focus: [number, number] } | null;
   __shopRide?: () => { ride: string | null; anim: "" | "idle" | "move"; frame: number; facing: number; view: number; stepMs: number } | null;
@@ -185,6 +185,30 @@ test("Puddles' greenhouse: Go in, Drizzle's crate with Puddles's Mower; the back
   expect(errors).toEqual([]);
 });
 
+test("Alfil's Pyramid (Nov 2): Go in, Woolly's crate with Alfil's Howdah; the chat's words dark over the sandstone", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  await page.goto("/town?sky=night");
+  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  // (His Pyramid is across the map: the camera glides there, as its chip would.)
+  await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("alfil"));
+  await expect.poll(() => homeAt(page, "alfil"), { message: "the Pyramid comes into view" }).not.toBeNull();
+  await goIn(page, "alfil", "Alfil's Pyramid");
+  await expect(room(page)).toHaveAttribute("data-room", "alfil");
+  await expect(page.getByRole("heading", { name: "Alfil's Pyramid" })).toBeVisible();
+  await expect(page.locator(".town-chat")).toHaveAttribute("data-tone", "day");
+  await talk(page);
+  const crate = page.getByRole("dialog", { name: "Alfil's Boss Crate", exact: true });
+  await expect(crate).toBeVisible();
+  await expect(crate).toContainText("3 Alfil tokens, or 1 Alfil token + 1 crate key");
+  await expect(crate).toContainText("Alfil's Howdah");
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/alfil-crate-${test.info().project.name}.png` });
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 /** A drag from `from` to `to`: a finger (real touch events) on the phone, the mouse on the computer. */
 async function dragBy(p: Page, from: { x: number; y: number }, to: { x: number; y: number }) {
   if (test.info().project.name === "phone") {
@@ -236,7 +260,15 @@ test("inside, a drag looks around as the town's does (Eric, Nov 2: \"when I drag
   await expect.poll(() => homeAt(page, "tiger"), { message: "Babur's tent in view" }).not.toBeNull();
   const d = Math.round(((await town(page).boundingBox())!.height * 0.1) / 2) * 2;
   await page.waitForTimeout(1500); // (the camera's glide settles)
-  await followsFinger(page, () => homeAt(page, "tiger"), d);
+  // (A fixed point of the world, as inside: the middle of the tent's plot, under its picture. Not `homeAt`: that's where a tap lands
+  // on the tent, found round whatever stands in front of it, and Babur juggling on his square there covers a little more or less of
+  // it from frame to frame, so it hops between the tent's left and right corners (about 110 px) whichever way the camera goes.)
+  const tent = async () => {
+    const xy = await page.evaluate(() => (window as unknown as Hooks).__townAt?.("square", [28, 4]) ?? null);
+    const cv = (await town(page).boundingBox())!;
+    return xy && { x: cv.x + xy.x, y: cv.y + xy.y };
+  };
+  await followsFinger(page, tent, d);
   // Inside: a square in front of you, the same.
   await goIn(page, "tiger", "Babur's Circus");
   await expect.poll(async () => (await shopCam(page))?.zoom).toBe(0);

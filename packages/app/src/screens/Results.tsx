@@ -13,7 +13,7 @@ import { FlagIcon, MatchMenu } from "../components/MatchMenu.tsx";
 import { exitFor } from "../match-exit.ts";
 import { TokenBox } from "../components/TokenBox.tsx";
 
-export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { match: GameView; placement: number; winner: string; onAgain: () => void; onHome: () => void }) {
+export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeText = "Home" }: { match: GameView; placement: number; winner: string; onAgain: () => void; onHome: () => void; /** Its leaving button's words: "Back to town" after a boss challenged in the town. */ homeText?: string }) {
   const played = match.moves.filter((m) => m.move !== null);
   const [review, setReview] = useState(false);
   // Out at a cut (Crowd): the breakdown measures you against the line you missed.
@@ -214,8 +214,9 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
       {review && <Breakdown moves={match.moves} you={elim?.you} line={elim?.line} placement={elim ? placement : null} lastCut={elim?.lastCut} onClose={() => setReview(false)} dp={scoreDp(match.settings)} />}
       {avgMs > 0 && <p class="muted small">Scoring took {Math.round(avgMs)} ms per round on this device.</p>}
       <div class="actions">
-        <button type="button" class="btn btn-secondary" onClick={onHome}>
-          Home
+        {/* (Its words on one line: "Back to town" after a boss challenged in the town.) */}
+        <button type="button" class="btn btn-secondary" style={{ whiteSpace: "nowrap" }} onClick={onHome}>
+          {homeText}
         </button>
         <button type="button" class="btn btn-primary" onClick={onAgain}>
           Play again

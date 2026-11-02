@@ -445,6 +445,19 @@ export interface Pose {
   t: number;
 }
 
+/**
+ * Where you stood in the town when you challenged a boss (its square, the way you faced): the battle's "Back to town" puts you
+ * back here, Pokémon-gym style (Eric, Nov 2; shops/challenge.ts). Plain data, carried by the app while you're in the battle.
+ */
+export interface Stand {
+  c: number;
+  r: number;
+  facing: 1 | -1;
+  view: 0 | 1 | 2;
+}
+/** Where `w` stands now (the square it's on or stepping onto) and the way it faces. */
+export const standOf = (w: Walker): Stand => ({ c: w.hereC(), r: w.hereR(), facing: w.facing, view: w.view });
+
 /** Claims are numbered in the order they're made: the earlier claim on a square keeps it (keepApart). */
 let claims = 0;
 
@@ -719,13 +732,18 @@ export function seatOf(text: string | null | undefined): Seat | null {
  * you sit on your stool at that table and the bot across (it gets up after `botLeaveAfterGameMs`). `outN`: how many bots
  * are out in the square (`botsOut`; the tests may have them all out).
  */
-export function createTown(now: number, seed = 20261025, seat: Seat | null = null, outN = TOWN_FEEL.botsOut): Town {
+export function createTown(now: number, seed = 20261025, seat: Seat | null = null, outN = TOWN_FEEL.botsOut, stand: Stand | null = null): Town {
   const rnd = lcg(seed);
   const f = TOWN_FEEL;
   const table = seat ? TABLES[seat.table]! : null;
-  const yours = table ? table.stools[seat!.stool]! : START;
+  // (Back from a boss's challenge: where you stood as you challenged it, facing the way you faced: Pokémon-gym style.)
+  const yours = table ? table.stools[seat!.stool]! : stand ? { c: wrapI(stand.c), r: wrapI(stand.r) } : START;
   const theirs = table ? table.stools[1 - seat!.stool]! : null;
   const you: Person = { id: "you", name: "", look: { side: "light", tint: null, wear: null }, you: true, walker: new Walker(yours, f.youStepMs, true, f.walkEase), sit: !!seat, bot: null, waved: -Infinity, home: false, came: -Infinity, leaves: Infinity, going: false, trip: null, due: false };
+  if (stand && !table) {
+    you.walker.facing = stand.facing;
+    you.walker.view = stand.view;
+  }
   // Each boss starts on the square in front of its home's middle (toward the camera).
   const bosses: Boss[] = HOMES.map((home) => ({ home, walker: new Walker({ c: home.cx, r: wrapI(home.cy - 2) }, f.bossStepMs, false), nextAt: null, onScreen: false, held: false, lastLine: null }));
   // Who's out (`botsOut` of them, shuffled by the town's seed, so the town opens the same way every time, as the tests

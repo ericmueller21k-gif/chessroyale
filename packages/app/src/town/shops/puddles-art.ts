@@ -265,12 +265,12 @@ export const SHOP_PUDDLES_CIRCLE_EDGE_DIAG_B = tileDef("circle-edge-diag-b", dia
 /** The circle's square inside each corner, where the diagonal band's end clips its corner. */
 export const SHOP_PUDDLES_CIRCLE_EDGE_CORNER = tileDef("circle-edge-corner", (x, y) => hedge(x + y + 1, x - y + 74) ?? flag(x, y, "x"));
 
-/** The middle line: a 3 px green stripe along the tile's south edge (turned twice for the square south of it). */
+/** The middle line: a 3 px green stripe along the tile's south edge (turned to face the line: it runs north to south between the emblem's halves). */
 const midLine = (tone: string) => (x: number, y: number) => (y >= T - 3 ? (y === T - 3 ? "G" : "F") : flag(x, y, tone));
 export const SHOP_PUDDLES_CIRCLE_LINE = tileDef("circle-line", midLine("x"));
 export const SHOP_PUDDLES_CIRCLE_LINE_B = tileDef("circle-line-b", midLine("X"));
 
-/** A start mark: a green-edged pad (two squares wide) with a leaf on it, one inside each of the north and south edges. */
+/** A start mark: a green-edged pad (two squares wide) with a leaf on it, one either side of the emblem, west and east (turned). */
 const mark = (x: number, y: number): string | null => {
   const X = Math.abs(x + 0.5 - 37);
   const Y = Math.abs(y + 0.5 - 18.5);
@@ -1517,11 +1517,13 @@ for (const [cs, rs, r] of [[[7, 6], [7, 8], 0], [[12, 13], [7, 8], 1], [[13, 12]
   DIAG[`${cs[1]},${rs[1]}`] = r;
 }
 const CORNER: Record<string, 0 | 1 | 2 | 3> = { "7,8": 0, "12,8": 1, "12,13": 2, "7,13": 3 };
-const SPECIAL: Record<string, [string, 0 | 2]> = {
-  "9,8": ["circle-mark-l", 0],
-  "10,8": ["circle-mark-r", 0],
-  "10,13": ["circle-mark-l", 2],
-  "9,13": ["circle-mark-r", 2],
+// The start marks west and east of the emblem (the challenge's "across": the boss west, you east, the table between: Nov 2, round 2),
+// each pointing out; the middle line between them runs north to south.
+const SPECIAL: Record<string, [string, 0 | 1 | 2 | 3]> = {
+  "8,11": ["circle-mark-l", 3],
+  "8,10": ["circle-mark-r", 3],
+  "11,10": ["circle-mark-l", 1],
+  "11,11": ["circle-mark-r", 1],
   "9,10": ["emblem-nw", 0],
   "10,10": ["emblem-ne", 0],
   "9,11": ["emblem-sw", 0],
@@ -1540,7 +1542,7 @@ for (let row = 0; row < 20; row++)
     else if (row === 14 && col >= 8 && col <= 11) at("circle-edge", col, row, false, { rot: 2 });
     else if (col === 6 && row >= 9 && row <= 12) at("circle-edge", col, row, false, { rot: 3 });
     else if (col === 13 && row >= 9 && row <= 12) at("circle-edge", col, row, false, { rot: 1 });
-    else if ((row === 10 || row === 11) && col >= 7 && col <= 12) at(even ? "circle-line" : "circle-line-b", col, row, false, row === 11 ? { rot: 2 } : {});
+    else if ((col === 9 || col === 10) && row >= 8 && row <= 13) at(even ? "circle-line" : "circle-line-b", col, row, false, { rot: col === 9 ? 3 : 1 });
     else if (col >= 7 && col <= 12 && row >= 8 && row <= 13) at(even ? "circle-a" : "circle-b", col, row, false);
     else if (row === 18 && (col === 9 || col === 10)) at("floor-door", col, row, false);
     else if (MOSS.has(k) && even) at("floor-c", col, row, false);

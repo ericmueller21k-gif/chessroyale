@@ -8,7 +8,7 @@ import { LINE_GONE } from "../src/fairplay.ts";
 import { LiveHub } from "../src/live-hub.ts";
 import { CHAT_NOT_ALLOWED, CHAT_NO_CONTACT, rot13 } from "../src/text-filter.ts";
 import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, TOWN_CHAT_PAUSED, expireTownCache, forgetTownCache, townRemoveResponse, townSlice, type TownHub } from "../src/town-chat-api.ts";
-import { TOWN_COLOR_LIMIT, TOWN_EMPTY, TOWN_REPEAT, TOWN_TOO_LONG, TownChat, charCount, tidyColor, tidyMessage, townSince, townWait, type TownSender } from "../src/town-chat.ts";
+import { TOWN_COLOR_LIMIT, TOWN_EMPTY, TOWN_REPEAT, TOWN_TOO_LONG, TownChat, challengeText, charCount, endsChallenge, tidyColor, tidyMessage, townSince, townWait, type TownSender } from "../src/town-chat.ts";
 import { caseDetail } from "../src/admin.ts";
 import { decide } from "../src/fairplay.ts";
 import { memoryDb } from "./memory-db.ts";
@@ -253,6 +253,39 @@ describe("town chat: the API", () => {
   }
   type Live = { town?: { n: number; lines: { n: number; from: string; name: string; text: string; at: number }[]; gone?: number[]; paused?: true } };
   const live = async (res: Response) => (await res.json()) as Live;
+
+  it("a boss challenged from the town: its battle's start and finish post the server's lines (no spam); a guest's post none", async () => {
+    const { sql, call, signedIn, hub } = await setup();
+    const a = await signedIn("Ann");
+    const guest = await createGuest(sql, Date.now(), "Guesty");
+    const texts = async () => (await hub.townRead()).lines.map((l) => l.text);
+    const start = async (token: string, town?: string) => ((await (await call("/api/boss/solo/start", token, town ? { town } : {})).json()) as { battle: string | null }).battle!;
+    const finish = (token: string, battle: string, end: object) => call("/api/boss/solo/finish", token, { battle, ...end });
+    // A plain Boss alone (no `town`) posts nothing; a challenge's start does.
+    await start(a.token);
+    expect(await texts()).toEqual([]);
+    const b1 = await start(a.token, "alfil");
+    expect(await texts()).toEqual(["Ann challenged Alfil!"]);
+    // A surrender before 10 moves is a quit: no line, and the next start posts none.
+    expect((await finish(a.token, b1, { outcome: "surrendered", moves: 4 })).status).toBe(200);
+    const b2 = await start(a.token, "alfil");
+    expect(await texts()).toEqual(["Ann challenged Alfil!"]);
+    // Its finish: how it went, your moves (the device's word); the answer is as before (no extra fields).
+    const done = await finish(a.token, b2, { outcome: "lost", moves: 21 });
+    expect(await done.json()).toEqual({ counted: false, token: null });
+    expect(await texts()).toEqual(["Ann challenged Alfil!", "Alfil beat Ann in 21 moves."]);
+    // Once: finishing it again posts nothing; a made-up outcome posts nothing.
+    await finish(a.token, b2, { outcome: "won", moves: 99 });
+    const b3 = await start(a.token, "alfil");
+    await finish(a.token, b3, { outcome: "champion", moves: 3 });
+    expect(await texts()).toEqual(["Ann challenged Alfil!", "Alfil beat Ann in 21 moves.", "Ann challenged Alfil!"]);
+    // A guest's challenge: nothing in the town's chat.
+    await start(guest.token, "alfil");
+    expect((await texts()).length).toBe(3);
+    // The lines read as the server's own: no account, no name.
+    const read = await live(await call("/api/live?town=0", a.token));
+    expect(read.town!.lines.every((l) => l.from === "" && l.name === "")).toBe(true);
+  });
 
   it("signed-in players send and read each other's lines with the live poll; a guest gets none and can't send", async () => {
     const { sql, call, signedIn } = await setup();
@@ -682,5 +715,68 @@ describe("town chat: the API after the review", () => {
     await sql.run("INSERT INTO reports (reporter, target, reason, at, match, line, line_at) VALUES (?, ?, ?, ?, NULL, ?, ?)", ann.user.id, troll.user.id, "Offensive chat", t + 6, "again", t + 6);
     expect(await decide(sql, troll.user.id, "review", "reviewer", "a new report", t + 7)).toMatchObject({ ok: true });
     expect(await decide(sql, troll.user.id, "clear", "reviewer", "nothing unusual here", t + 8)).toMatchObject({ ok: false, status: 409 });
+  });
+});
+
+describe("town chat: a boss challenged from the town (the server's lines; Eric, Nov 2)", () => {
+  const won = (battle: string, moves: number | null = 34, token: string | null = null) => ({ kind: "finish" as const, battle, outcome: "won" as const, moves, token });
+
+  it("the words: the start, each way it ends with your moves, a surrender after enough moves, a token dropped on the end", () => {
+    expect(challengeText("Ann", "Alfil")).toBe("Ann challenged Alfil!");
+    expect(challengeText("Ann", "Alfil", { outcome: "won", moves: 34, token: null })).toBe("Ann beat Alfil in 34 moves!");
+    expect(challengeText("Ann", "Alfil", { outcome: "lost", moves: 21, token: null })).toBe("Alfil beat Ann in 21 moves.");
+    expect(challengeText("Ann", "Alfil", { outcome: "drew", moves: 40, token: null })).toBe("Ann drew with Alfil in 40 moves.");
+    expect(challengeText("Ann", "Alfil", { outcome: "surrendered", moves: 15, token: null })).toBe("Ann surrendered to Alfil after 15 moves.");
+    expect(challengeText("Ann", "Alfil", { outcome: "lost", moves: 1, token: null })).toBe("Alfil beat Ann in 1 move.");
+    expect(challengeText("Ann", "Alfil", { outcome: "won", moves: null, token: null })).toBe("Ann beat Alfil!");
+    expect(challengeText("Ann", "Alfil", { outcome: "lost", moves: 0, token: null })).toBe("Alfil beat Ann.");
+    expect(challengeText("Ann", "Alfil", { outcome: "won", moves: 34, token: "Babur" })).toBe("Ann beat Alfil in 34 moves! + Babur token");
+    expect(endsChallenge({ outcome: "surrendered", moves: TOWN_CHAT.challengeSurrenderMoves - 1, token: null })).toBe(false);
+    expect(endsChallenge({ outcome: "surrendered", moves: TOWN_CHAT.challengeSurrenderMoves, token: null })).toBe(true);
+    expect(TOWN_CHAT.challengeSurrenderMoves).toBe(10);
+  });
+
+  it("a start posts its line, the server's own (no account, no name); its battle's finish posts how it went and closes it", () => {
+    const c = new TownChat();
+    const start = c.challenge(ann, "Alfil", { kind: "start", boss: "alfil", battle: "b1" }, T0);
+    expect(start).toMatchObject({ n: 1, from: "", name: "", text: "Ann challenged Alfil!", sys: "challenge" });
+    expect(c.challengeOpen("ann")).toBe(true);
+    // (Another battle's finish, or a finish with nothing open, posts nothing.)
+    expect(c.challenge(ann, "", won("other"), T0 + 1)).toBeNull();
+    expect(c.challenge(bo, "", won("b1"), T0 + 1)).toBeNull();
+    expect(c.challenge(ann, "", won("b1"), T0 + 2)).toMatchObject({ n: 2, text: "Ann beat Alfil in 34 moves!", sys: "challenge" });
+    expect(c.challengeOpen("ann")).toBe(false);
+    // Once only: the same finish again is nothing.
+    expect(c.challenge(ann, "", won("b1"), T0 + 3)).toBeNull();
+    expect(c.snapshot(T0 + 3).lines.map((l) => l.text)).toEqual(["Ann challenged Alfil!", "Ann beat Alfil in 34 moves!"]);
+  });
+
+  it("no spam: a quit posts nothing and leaves it open, and the next start posts no line until one of their challenges finishes", () => {
+    const c = new TownChat();
+    expect(c.challenge(ann, "Alfil", { kind: "start", boss: "alfil", battle: "b1" }, T0)).not.toBeNull();
+    // Quit: a leave never finishes; a surrender before 10 moves is a quit too.
+    expect(c.challenge(ann, "", { kind: "finish", battle: "b1", outcome: "surrendered", moves: 9, token: null }, T0 + 1)).toBeNull();
+    expect(c.challengeOpen("ann")).toBe(true);
+    // Again, and again: no new start line.
+    expect(c.challenge(ann, "Alfil", { kind: "start", boss: "alfil", battle: "b2" }, T0 + 2)).toBeNull();
+    expect(c.challenge(ann, "Alfil", { kind: "start", boss: "alfil", battle: "b3" }, T0 + 3)).toBeNull();
+    // Only the newest battle's finish counts; it ends the challenge with its line (a surrender after enough moves counts).
+    expect(c.challenge(ann, "", won("b2"), T0 + 4)).toBeNull();
+    expect(c.challenge(ann, "", { kind: "finish", battle: "b3", outcome: "surrendered", moves: 15, token: null }, T0 + 5)).toMatchObject({ text: "Ann surrendered to Alfil after 15 moves." });
+    // Finished: the next start posts its line again. Someone else's challenges are their own.
+    expect(c.challenge(ann, "Alfil", { kind: "start", boss: "alfil", battle: "b4" }, T0 + 6)).toMatchObject({ text: "Ann challenged Alfil!" });
+    expect(c.challenge(bo, "Alfil", { kind: "start", boss: "alfil", battle: "x1" }, T0 + 6)).toMatchObject({ text: "Bo challenged Alfil!" });
+    const texts = c.snapshot(T0 + 7).lines.map((l) => l.text);
+    expect(texts.filter((t) => t === "Ann challenged Alfil!")).toHaveLength(2);
+  });
+
+  it("an unfinished challenge is forgotten after a day (memory only), and the lines go after 5 minutes as any line", () => {
+    const c = new TownChat();
+    c.challenge(ann, "Alfil", { kind: "start", boss: "alfil", battle: "b1" }, T0);
+    expect(c.snapshot(T0 + TOWN_CHAT.lineMs).lines).toEqual([]);
+    expect(c.challengeOpen("ann")).toBe(true);
+    c.sweep(T0 + TOWN_CHAT.challengeOpenMs);
+    expect(c.challengeOpen("ann")).toBe(false);
+    expect(c.challenge(ann, "Alfil", { kind: "start", boss: "alfil", battle: "b2" }, T0 + TOWN_CHAT.challengeOpenMs + 1)).not.toBeNull();
   });
 });

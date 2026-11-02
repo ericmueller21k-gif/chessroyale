@@ -3,6 +3,9 @@ import { useEffect, useState } from "preact/hooks";
 import type { ItemLook } from "@chessroyale/core";
 import { FrontFrame, type FrontNav } from "../components/FrontMenu.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
+import type { Stand } from "./world.ts";
+
+export type { Stand };
 
 /**
  * A game with a town bot, asked for as you both sit down: the seat to come back to ("6.0.3": the table, your stool, the
@@ -19,7 +22,17 @@ export interface BotGameAsk {
   face: string | null;
 }
 
-type Props = { onBack: () => void; onBossAlone: (id: string) => void; onPlayBot: (game: BotGameAsk) => void; onColosseum: () => void; seat: string | null };
+type Props = {
+  onBack: () => void;
+  onBossAlone: (id: string) => void;
+  /** A boss with an intro challenged (Alfil, Babur, Puddles): start its battle under its transition; resolves once the battle shows. */
+  onBossChallenge: (id: string, stand: Stand | null) => Promise<void>;
+  onPlayBot: (game: BotGameAsk) => void;
+  onColosseum: () => void;
+  seat: string | null;
+  /** Back from a boss's challenge: where you stood as you challenged it. */
+  stand: Stand | null;
+};
 type Screen = FunctionComponent<Props & { framed: boolean }>;
 
 /**
@@ -32,7 +45,9 @@ const COMPUTER = "(min-width: 1024px) and (hover: hover) and (pointer: fine)";
 /**
  * The town square's page (/town), loaded when it opens: its code, art and styles are their own chunk, never in the main
  * bundle. Until it arrives (a moment) the page is its plain background: no loading bar. `onBossAlone`: a boss's card's
- * "Challenge alone", confirmed: out of the town square to the Boss raid screen, that boss's tile picked. `onPlayBot`:
+ * "Challenge alone", confirmed: out of the town square to the Boss raid screen, that boss's tile picked. `onBossChallenge`: the
+ * same for a boss with an intro (Pokémon-gym style: town/shops/challenge.ts), its battle started at once under its transition;
+ * `stand`: back from that battle, where you stood. `onPlayBot`:
  * you and a bot sit down at a table, and the game opens; `seat`: back from that game, you sit at that table again, the
  * bot across.
  */

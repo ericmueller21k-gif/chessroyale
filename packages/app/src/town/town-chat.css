@@ -27,6 +27,7 @@
   /* A boss's name and a kid's (gold and mint, deeper by day), and the count of characters left. */
   --chat-boss: #7a5600;
   --chat-kid: #0a5f36;
+  --chat-server: #1d4ed8;
   position: absolute;
   top: 8px;
   left: calc(8px + env(safe-area-inset-left));
@@ -56,6 +57,7 @@
   --chat-system: #c8ccd2;
   --chat-boss: #ffd479;
   --chat-kid: #9be8c0;
+  --chat-server: #9cc2ff;
 }
 .town-chat[hidden] {
   display: none;
@@ -193,6 +195,12 @@
 }
 .town-chat[data-tone="night"] .tc-player .tc-name {
   color: var(--nn, var(--chat-ink));
+}
+/* The server's own line for everyone (a boss challenged from the town, and how its battle went: Nov 2): blue, a little bolder, no
+   name. The day blue on the light tint and the night blue on the dark one both read at 4.5:1 or better. */
+.tc-server {
+  font-weight: 600;
+  color: var(--chat-server);
 }
 /* A line only you see (a gray system line): the "too soon" and every refusal. */
 .tc-system {

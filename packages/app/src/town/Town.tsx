@@ -42,7 +42,8 @@ import { SELECT_SOUND, TOWN_SOUNDS, townSound } from "../characters/boss-select.
 import { N, proj, wrapF, wrapI } from "./camera.ts";
 import { SHOP_FEEL, TOWN_FEEL } from "./feel.ts";
 import { shopOf } from "./shops/shops.ts";
-import type { LoadedRoom, ShopCtl, ShopRoom } from "./shops/ShopRoom.tsx";
+import type { LoadedRoom, RoomIntro, ShopCtl, ShopRoom } from "./shops/ShopRoom.tsx";
+import { introOf, nextFlow, type ChallengeEvent, type ChallengeFlow } from "./shops/challenge.ts";
 import { BarsIcon, SwordsIcon } from "./CardIcons.tsx";
 import { TownChat } from "./TownChat.tsx";
 import { TownChatTools } from "./TownChatTools.tsx";
@@ -56,7 +57,7 @@ import { painterGL } from "./paint-gl.ts";
 import { reportTownFallback } from "../problems.ts";
 import type { TownGlFallback } from "@chessroyale/core";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
-import { BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, tdist, tick, townLine, waitingBot, walkWalker, type HomeId, seatOf, seatText, type Person, type Place, type Seat, type Sq, type StatueId, type Target } from "./world.ts";
+import { BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, tdist, tick, townLine, waitingBot, walkWalker, type HomeId, seatOf, seatText, standOf, type Person, type Place, type Seat, type Sq, type Stand, type StatueId, type Target } from "./world.ts";
 import { dressedPawn, lookKey, offFace, offRide } from "./you-look.ts";
 import type { ItemLook } from "@chessroyale/core";
 import type { BotGameAsk } from "./TownPage.tsx";
@@ -105,7 +106,30 @@ function fitRows(card: HTMLElement): void {
   }
 }
 
-export function TownScreen({ onBack, onBossAlone, onPlayBot, onColosseum, seat = null, framed = false }: { onBack: () => void; onBossAlone?: (id: HomeId) => void; onPlayBot?: (game: BotGameAsk) => void; onColosseum?: () => void; seat?: string | null; framed?: boolean }) {
+export function TownScreen({
+  onBack,
+  onBossAlone,
+  onBossChallenge,
+  onPlayBot,
+  onColosseum,
+  seat = null,
+  stand = null,
+  framed = false,
+}: {
+  onBack: () => void;
+  onBossAlone?: (id: HomeId) => void;
+  /**
+   * A boss with an intro challenged (shops/challenge.ts): its transition covers the screen; start its battle (Boss alone, as its
+   * screen's START does) and resolve once the battle shows (the transition slides off it). `stand`: where you stood, to come back to.
+   */
+  onBossChallenge?: (id: HomeId, stand: Stand | null) => Promise<void>;
+  onPlayBot?: (game: BotGameAsk) => void;
+  onColosseum?: () => void;
+  seat?: string | null;
+  /** Back from a boss's challenge: where you stood as you challenged it (you start there, facing the same way). */
+  stand?: Stand | null;
+  framed?: boolean;
+}) {
   const box = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const chips = useRef<(HTMLDivElement | null)[]>([]);
@@ -116,7 +140,10 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, onColosseum, seat =
   const [card, setCard] = useState<Card | null>(null);
   // Inside a shop (Nov 2, round 1; shops/ShopRoom.tsx, loaded when you go in): the room, and its zoom (− / + switch Close and the
   // town's zoomed-in camera there). `fade` is the black the town zooms into and the room fades in from.
-  const [inside, setInside] = useState<{ room: LoadedRoom; View: typeof ShopRoom } | null>(null);
+  const [inside, setInside] = useState<{ room: LoadedRoom; View: typeof ShopRoom; intro: RoomIntro | null } | null>(null);
+  /** A boss's challenge (shops/challenge.ts), where it is: "town" when there's none. */
+  const flow = useRef<ChallengeFlow>("town");
+  const step = (e: ChallengeEvent) => (flow.current = nextFlow(flow.current, e));
   const [shopOut, setShopOut] = useState(false);
   const shopCtl = useRef<ShopCtl | null>(null);
   const fade = useRef<HTMLDivElement>(null);
@@ -131,13 +158,19 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, onColosseum, seat =
   };
   const townCanvas = () => box.current?.querySelector<HTMLCanvasElement>("canvas.town-canvas") ?? null;
   const later = (ms: number) => new Promise<void>((ok) => setTimeout(ok, ms));
-  /** You stand at a shop's door (its "Go in"): the town zooms in on the door (`x`, `y` in the box) and fades to black; the room opens. */
-  const goIn = async (id: HomeId, x: number, y: number) => {
+  /**
+   * You stand at a shop's door (its "Go in"): the town zooms in on the door (`x`, `y` in the box) and fades to black; the room opens.
+   * A boss's challenge (`challenge`) goes in the same way, the boss beside you, with its intro's art loading too; the room plays it.
+   */
+  const goIn = async (id: HomeId, x: number, y: number, challenge = false) => {
     if (doorBusy.current) return;
     doorBusy.current = true;
     const F = SHOP_FEEL;
+    if (challenge) step("atDoor");
     // (Its code and art load now, while the town zooms: nothing of a shop loads while you walk round the town.)
     const load = import("./shops/ShopRoom.tsx").then((m) => m.loadRoom(id).then((room) => ({ room, View: m.ShopRoom })));
+    // (A challenge's intro art too: loaded only now, as you go in to fight.)
+    const intro = challenge ? import("./shops/intro.ts").then(async (m) => ({ m, intro: await m.loadIntro(id)! })) : null;
     const cv = townCanvas();
     if (cv) {
       cv.style.transformOrigin = `${x.toFixed(1)}px ${y.toFixed(1)}px`;
@@ -147,16 +180,40 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, onColosseum, seat =
     fadeTo(1, F.fadeMs, F.doorZoomMs - F.fadeMs);
     await later(F.doorZoomMs);
     const got = await load.catch(() => null);
-    if (!got || !box.current) {
+    const fight = intro ? await intro.catch(() => null) : null;
+    if (!got || !box.current || (challenge && !fight)) {
       // (It didn't load: back out to the town as you were.)
       if (cv) cv.style.transform = "";
       fadeTo(0, F.fadeMs);
       doorBusy.current = false;
+      if (challenge) {
+        step("cancel");
+        ctl.current?.endChallenge();
+      }
       return;
     }
     ctl.current?.pause();
     setShopOut(false);
-    setInside(got);
+    if (fight) step("inside");
+    setInside({ ...got, intro: fight ? { intro: fight.intro, onMarks: () => step("onMarks"), onDone: () => void stormIn(id, fight.m, fight.intro) } : null });
+  };
+  /**
+   * The intro is done: the boss's transition sweeps in (outside the town's tree: it stays as the town closes), the battle starts
+   * under it (the app's, as Boss alone's START), and once the battle shows it slides out.
+   */
+  const stormIn = async (id: HomeId, m: typeof import("./shops/intro.ts"), intro: RoomIntro["intro"]) => {
+    if (flow.current !== "intro") return;
+    step("introDone");
+    const storm = m.startTransition(intro);
+    await storm.covered;
+    step("stormCovers");
+    try {
+      await onBossChallenge?.(id, ctl.current?.challengeStand() ?? null);
+    } finally {
+      step("battleReady");
+      await storm.out();
+      step("stormGone");
+    }
   };
   /** The room drew its first frame: the black lifts. */
   const shopReady = () => {
@@ -166,7 +223,13 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, onColosseum, seat =
   /** "Go out" (or the back button inside): the room fades to black, and the town zooms back out from the door. */
   const goOut = async () => {
     if (doorBusy.current) return;
+    // (A challenge can be called off, with the back button, until its transition starts: the battle is coming from then on.)
+    if (flow.current !== "town" && flow.current !== "walkIn" && flow.current !== "intro") return;
     doorBusy.current = true;
+    if (flow.current !== "town") {
+      step("cancel");
+      ctl.current?.endChallenge();
+    }
     const F = SHOP_FEEL;
     fadeTo(1, F.fadeMs);
     await later(F.fadeMs);
@@ -188,7 +251,7 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, onColosseum, seat =
     const t = startTown(box.current!, canvas.current!, chips.current, cardEl.current!, live.current!, setZoomedOut, setCard, seatOf(seat), (s, face) => {
       const b = BOTS[s.bot]!;
       onPlayBot?.({ seat: seatText(s), name: botLabel(b), rating: b.rating, look: isSprite(b.look) ? null : b.look.wear, face });
-    }, (id, x, y) => void goIn(id, x, y));
+    }, (id, x, y, challenge) => void goIn(id, x, y, challenge), stand, () => step("cancel"));
     ctl.current = t;
     return t.stop;
   }, []);
@@ -207,7 +270,12 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, onColosseum, seat =
     void document.fonts?.ready.then(() => live && fitRows(el));
     return () => void (live = false);
   }, [fitKey]);
-  const label = card?.kind === "coliseum" ? COLISEUM_PLACE.name : card?.kind === "table" ? "Chess table" : person ? (bot ? botLabel(bot) : person.name) : home ? (card!.confirm ? "Leave the town square?" : card!.kind === "boss" ? home.boss : home.name) : undefined;
+  const label = card?.kind === "coliseum" ? COLISEUM_PLACE.name : card?.kind === "table" ? "Chess table" : person ? (bot ? botLabel(bot) : person.name) : home ? (card!.confirm ? (introOf(home.id) ? `Challenge ${home.boss}?` : "Leave the town square?") : card!.kind === "boss" ? home.boss : home.name) : undefined;
+  /** A boss with an intro: "Fight" on its confirm. You and the boss walk to its door and in (once: a challenge already going is left alone). */
+  const fight = (i: number) => {
+    if (flow.current !== "town" || doorBusy.current) return;
+    if (ctl.current?.challenge(i)) step("fight");
+  };
 
   return (
     <div class={framed ? "town-screen in-frame" : "town-screen"}>
@@ -242,6 +310,7 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, onColosseum, seat =
             onOut={() => void goOut()}
             onReady={shopReady}
             ctl={shopCtl}
+            intro={inside.intro}
           />
         )}
         <div class="town-overlay">
@@ -250,7 +319,20 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, onColosseum, seat =
           {/* The card: over the boss's head or the home's top, its tail pointing there (placed every frame). Dark, with a gold border
               (Eric's mockup, Oct 28); a person's is one row at one size (`town-person`). */}
           <div class={card?.kind === "person" ? "town-card town-person" : card?.kind === "home" && !card.confirm && home && shopOf(home.id) ? "town-card town-door" : "town-card"} ref={cardEl} role="dialog" aria-label={label} style={{ display: card ? "" : "none" }}>
-            {card && home && card.confirm && (
+            {/* A boss with an intro (every boss whose home has an inside, Nov 2: shops/challenge.ts): you fight it in its home, then come back here. */}
+            {card && home && card.confirm && introOf(home.id) && (
+              <>
+                <h2>Challenge {home.boss}?</h2>
+                <p class="town-card-text">You'll fight {home.boss} in Boss Battle, then come back here.</p>
+                <button type="button" class="town-btn primary" onClick={() => fight(card.i)}>
+                  Fight
+                </button>
+                <button type="button" class="town-btn" onClick={() => ctl.current?.closeCard()}>
+                  Stay
+                </button>
+              </>
+            )}
+            {card && home && card.confirm && !introOf(home.id) && (
               <>
                 <h2>Leave the town square?</h2>
                 <p class="town-card-text">You'll fight {home.boss} in Boss Battle.</p>
@@ -431,7 +513,11 @@ function startTown(
   onCard: (c: Card | null) => void,
   seat: Seat | null,
   onPlay: (seat: Seat, face: string | null) => void,
-  onGoIn: (id: HomeId, x: number, y: number) => void,
+  onGoIn: (id: HomeId, x: number, y: number, challenge: boolean) => void,
+  /** Back from a boss's challenge: where you stood (you start there). */
+  stand: Stand | null = null,
+  /** A boss's challenge called off on the way to its door (a tap elsewhere walked you away). */
+  onChallengeOff: () => void = () => {},
 ) {
   const f = TOWN_FEEL;
   /** The world's canvas: a new one if the drawing changes backend (a canvas keeps the first kind of context it gave). */
@@ -508,7 +594,7 @@ function startTown(
     if (fpsEl) fpsEl.dataset.backend = BACKEND_LABEL[painter.kind];
     draw(drawnAt);
   };
-  const town = createTown(performance.now(), undefined, seat);
+  const town = createTown(performance.now(), undefined, seat, undefined, stand);
   const r = new Renderer(painter, town, HOMES);
   // (The signs' pixel font is the game's own; it's loaded on first use, so ask for it now.)
   void document.fonts?.load('8px "Press Start 2P"').catch(() => {});
@@ -658,6 +744,21 @@ function startTown(
   let away = false;
   /** A home's "Go in" sent you to its door (its index in HOMES; -1: none): you go in once you stand there. */
   let goingIn = -1;
+  /**
+   * A boss's challenge (shops/challenge.ts): the boss walking to its door with you (its index in the bosses; -1: none), and where you
+   * stood as you challenged it (the battle's "Back to town" brings you back there).
+   */
+  let challenging = -1;
+  let challengeStand: Stand | null = null;
+  /** Calls a challenge off on the town's side: its boss is let go (it roams again, at its own pace). */
+  const endChallenge = () => {
+    const b = town.bosses[challenging];
+    if (b) {
+      b.held = false;
+      b.walker.stepMs = f.bossStepMs;
+    }
+    challenging = -1;
+  };
   /** When the last frame was drawn (its `now`). */
   let drawnAt = performance.now();
   let ready = false;
@@ -828,7 +929,7 @@ function startTown(
       goingIn = -1;
       const at = { x: r.W / 2, y: r.H / 2 };
       r.squareAt(h.cx, wrapI(h.cy - 1), at);
-      onGoIn(h.id, at.x, at.y);
+      onGoIn(h.id, at.x, at.y, challenging >= 0);
     }
     stepClose(dt);
     updateCamera(dt, now);
@@ -1081,6 +1182,10 @@ function startTown(
     // walking to with a bot, and a way into a shop).
     cancelMeet(town);
     goingIn = -1;
+    if (challenging >= 0) {
+      endChallenge();
+      onChallengeOff();
+    }
     town.you.sit = p.card?.kind === "table";
     if (p.dest && walkWalker(town.you.walker, p.dest)) {
       follow = true;
@@ -1263,6 +1368,8 @@ function startTown(
   // ... `__townRide()` (Oct 31, rides): yours (its ride, color and size (Nov 1), whether its frames are ready, as the last frame drew it: "idle" or
   // "move" ("" on foot), the frame, which way it faced; your box, foot and head on screen, your square; Nov 1, `coming`: the ride whose
   // frames are on their way, its drawing loading or its frames being composed, while you walk on foot in its box) and each other rider's.
+  /** (Tests) Where you stand (your square, the way you face) and whether you're walking: a boss's challenge brings you back here. */
+  const hookYou = () => (testSwitchesAllowed() ? { ...standOf(town.you.walker), moving: town.you.walker.moving() } : null);
   const hookRide = () => {
     if (!testSwitchesAllowed()) return null;
     const you = town.people.indexOf(town.you);
@@ -1303,7 +1410,7 @@ function startTown(
     const p = painter as Painter & { uploads?: number; resets?: number };
     return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0 };
   };
-  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townBackend?: typeof hookBackend; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townRide?: typeof hookRide };
+  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townBackend?: typeof hookBackend; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townRide?: typeof hookRide; __townYou?: typeof hookYou };
   hooks.__townAt = hookAt;
   hooks.__townGlide = hookGlide;
   hooks.__townGather = hookGather;
@@ -1322,6 +1429,7 @@ function startTown(
   hooks.__townPaint = hookPaint;
   hooks.__townBench = hookBench;
   hooks.__townRide = hookRide;
+  hooks.__townYou = hookYou;
 
   run();
   draw(performance.now()); // the first frame, before the screen shows
@@ -1370,6 +1478,34 @@ function startTown(
       follow = true;
       glide = null;
     },
+    /**
+     * A boss's "Fight" (its confirm, for a boss with an intro: shops/challenge.ts): where you stand is kept (you come back here after
+     * the battle), and you and the boss walk to its home's door, side by side, at your pace; you go in together once you're there.
+     */
+    challenge: (i: number): boolean => {
+      const h = HOMES[i]!;
+      const boss = town.bosses[i]!;
+      const stood = standOf(town.you.walker);
+      setCard(null);
+      leaveClose();
+      cancelMeet(town);
+      town.you.sit = false;
+      const to = spotNear(town, town.you.walker, { c: h.cx, r: wrapI(h.cy - 2) }, false);
+      if (!to || !walkWalker(town.you.walker, to)) return false;
+      challengeStand = stood;
+      challenging = i;
+      boss.held = true;
+      boss.walker.stepMs = f.youStepMs;
+      const beside = spotNear(town, boss.walker, to, true);
+      if (beside) walkWalker(boss.walker, beside);
+      goingIn = i;
+      follow = true;
+      glide = null;
+      return true;
+    },
+    /** Where you stood as you challenged a boss (null: no challenge). */
+    challengeStand: () => challengeStand,
+    endChallenge,
     /** Inside a shop the town waits (`away`: no frames); coming out, it goes on. */
     pause: () => {
       away = true;
@@ -1426,6 +1562,7 @@ function startTown(
       delete hooks.__townPaint;
       delete hooks.__townBench;
       delete hooks.__townRide;
+      delete hooks.__townYou;
       painter.dispose();
       if (card?.kind === "boss") town.bosses[card.i]!.held = false;
       detach();
