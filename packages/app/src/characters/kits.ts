@@ -749,8 +749,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
     // splash on its square each one. Facing our left; 36 frame pixels a square, 1.7 off (its beak clear of the king's middle).
     kingAttack: { ch: FOLIO_ATTACK, anim: "kingAttack", perSquare: ATTACK_PER_SQUARE, stand: ATTACK_STAND, facesLeft: true, hit: inkItem },
   },
-  // Timber, the beaver builder (Eric's idea, Oct 20; approved Nov 1): docs/decisions/2026-11-01-timber.md. His art's new cues have
-  // no sounds of their own yet (the art run's report): each borrows a near one of another boss's.
+  // Timber, the beaver builder (Eric's idea, Oct 20; approved Nov 1): docs/decisions/2026-11-01-timber.md. His sounds are his own,
+  // all wood (Eric, Nov 2: "a gnawing wood sound… Wood knocking, cutting, saw, thumping"): characters/timber-sounds.ts.
   "Timber": {
     ch: TIMBER,
     anims: {
@@ -766,23 +766,31 @@ export const BOSS_KITS: Record<string, BossKit> = {
       bigCheer: "bigCheer",
     },
     sounds: {
-      drop: "gardenerWhoosh",
-      stomp: "alfilStomp",
-      pat: "smudgyDab",
-      whoosh: "sawyerSwing",
-      tap: "bigboyClack",
-      whack: "bigboyBonk",
-      point: "pigTip",
-      oof: "gardenerOof",
-      thump: "gardenerThump",
-      clatter: "alfilClatter",
-      cheer: "hopperCheer",
-      slap: "hopperThump",
-      pull: "sawyerTape",
-      show: "tigerRustle",
-      clack: "bigboyClack",
-      chomp: "alfilCrunch",
-      burp: "mooPlop",
+      // (A plank swung down; at his entrance, his fall.)
+      drop: "timberSwoosh",
+      // (He lands on the boards.)
+      stomp: "timberThump",
+      pat: "timberPat",
+      whoosh: "timberSwoosh",
+      tap: "timberTap",
+      whack: "timberWhack",
+      // (A knock for emphasis.)
+      point: "timberKnock",
+      oof: "timberOof",
+      thump: "timberThump",
+      clatter: "timberClatter",
+      // (His happy chitter.)
+      cheer: "timberChitter",
+      slap: "timberSlap",
+      // (A plank slid out of its strap.)
+      pull: "timberSlide",
+      // (A proud "hup!" as he shows it off.)
+      show: "timberHup",
+      // (His teeth clacked.)
+      clack: "timberClack",
+      chomp: "timberChomp",
+      // (A burp of sawdust.)
+      burp: "timberBurp",
     },
     lines: TIMBER_LINES,
     chance: TIMBER_CHANCE,
