@@ -525,6 +525,10 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
 - **Walking** (`shops/room.ts`, pure): a tap walks you a square at a time round what's solid (the walls, the counter, every solid piece's
   squares, the way out's own squares, the Shopkeeper's); a tap on something solid walks you beside it. There's no joystick (the town has
   none either). Inside is just you: the town's bots and other players don't come in.
+- **On a ride** (Eric, Nov 2: "your rider goes in with you"; `SHOP_FEEL.rideInside`, true): your ride comes in under you, the town's own
+  rider (its frames as `town/rides.ts` composed them, the ride at its scale, 0.75 of the pawn), at the room's camera; its idle standing,
+  its move a cycle a step, its side, back (up the room) or front (down it) the way you go, at its pace (`RIDES.speed`). You come out still
+  on it. false: it waits outside and you walk in on foot, as round 1 had it. No ride: on foot.
 - **The Shopkeeper**: the boss's kid's sheet (Stripes for Babur, beside the counter's east end: behind it the 58 px counter hides him;
   Drizzle for Puddles, behind the middle of the low counter), its idle playing, a blue "Shopkeeper" tag. Standing still within
   `talkRange` (3) squares of it, its card shows (**"Shopkeeper"**, **Talk**); a tap on it or the counter walks you in front of it, the
@@ -537,7 +541,7 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
 - **The way out**: standing on one of the two squares just inside the door, a card says **"Go out"**. The door is behind you as you look
   north: walk back toward it, or drag the view back to it and tap it.
 - **Test hooks** (test switches on): the room's canvas `canvas.town-shop-canvas` carries `data-room`, `data-you`, `data-ready`;
-  `__shopAt("keeper" | "door" | "square", [c, r])`, `__shopCam()`, `__shopBench(n)`.
+  `__shopAt("keeper" | "door" | "square", [c, r])`, `__shopCam()`, `__shopBench(n)`, `__shopRide()` (your ride inside).
 
 ## Frame-rate pill (`?fps`)
 `/town?fps` shows anyone (Eric, Oct 30: no admin needed, the site is behind Cloudflare Access) a pill in the world's top-right corner, "60 fps · 16.7 ms · 2D": frames over the last second and their mean time, text set twice a second from plain counters in the frame loop, then the drawing's backend ("· WebGL" with `?gl=1`; added by town.css from `data-backend`, so the pill's text stays the numbers). Without `?fps` there is none. `?crowd=N` is anyone's too (only that device draws the pawns).

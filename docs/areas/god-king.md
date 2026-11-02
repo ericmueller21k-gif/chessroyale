@@ -83,7 +83,9 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   dock stays, empty (`king="gone"`), nothing to tap, and he says nothing in phase 2 (his phase 2 lines are gone). (On a
   phone, where his place is a line under the dock's row, that line closes up instead: the row above doesn't move.)
 - **His lines** come from cues (a new danger to your queen or king, a mate threat, a queen taken, his own acts, a boss
-  power…). Critical cues always speak; everything else is paced by `KING_SPEECH` (about 5 to 10 lines a game). Each
+  power…). Critical cues always speak; everything else is paced by `KING_SPEECH` (about 5 to 10 lines a game). His praise of
+  a move ("Masterful! Even I'd play that.", `greatMove`; "A fine move.", `goodMove`) never comes in a game's first 10 moves
+  (Eric, Nov 2: `KING_SPEECH.praiseFromMove` 11, the move's number in the game, the FEN's; `crowdMoveCues`). Each
   line then follows the speech rule every speaker shares (`speech.tsx`, `SPEECH`; Oct 10): it types out and stays
   readable for 2.2 s plus 35 ms a character (at most 4.5 s); a critical line cuts in on a remark or small talk, but
   waits for another critical line to have its time; the others wait their turn and lapse after 5 s.

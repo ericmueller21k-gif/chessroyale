@@ -194,12 +194,14 @@ test("on a ride (Eric, Nov 2: \"your rider goes in with you\"): inside you're on
   expect(await ride()).toMatchObject({ ride: "riding-chirp", view: 1, stepMs: outside.stepMs });
   // Walking up to the Shopkeeper: its move, frame after frame; standing there, its idle again.
   await page.evaluate(() => {
-    const w = window as unknown as { __shopRide: () => { anim: string; frame: number; view: number } | null; __seen: Set<string> };
+    const w = window as unknown as { __shopRide?: () => { anim: string; frame: number; view: number } | null; __seen: Set<string> };
     w.__seen = new Set();
     const tick = () => {
+      // (Until you go out: the hook goes with the room.)
+      if (!w.__shopRide) return;
       const r = w.__shopRide();
       if (r?.anim) w.__seen.add(`${r.anim}:${r.frame}:${r.view}`);
-      if (w.__shopRide) requestAnimationFrame(tick);
+      requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
   });
