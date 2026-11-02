@@ -77,3 +77,6 @@ mockup script, not the art. Stripes stands beside the counter's east end: behind
 - Two squares from the counter: [view-at-counter.png](house-shop-babur/view-at-counter.png)
 - The "Close" zoom (Eric, Nov 2: a second, third-person zoom, about 3x; `docs/decisions/2026-11-02-shop-zoom.md`), the same
   spots: [view-close-at-counter.png](house-shop-babur/view-close-at-counter.png), [view-close-in-ring.png](house-shop-babur/view-close-in-ring.png)
+
+**Zoom, settled (Eric, Nov 2):** inside buildings you start in the Close view, and the town's zoom buttons zoom out to the
+town's view. Shops render as in the Close stills: that art quality is enough, so there's no redraw.
