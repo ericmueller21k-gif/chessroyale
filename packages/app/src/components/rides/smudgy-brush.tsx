@@ -488,9 +488,9 @@ const drop = (x: number, y: number, r: number) =>
   `M ${n1(x)} ${n1(y - 2 * r)} Q ${n1(x + 0.9 * r)} ${n1(y - 0.2 * r)} ${n1(x + r)} ${n1(y)} A ${n1(r)} ${n1(r)} 0 0 1 ${n1(x - r)} ${n1(y)} Q ${n1(x - 0.9 * r)} ${n1(y - 0.2 * r)} ${n1(x)} ${n1(y - 2 * r)} Z`;
 /** The drops as they leave the bristle end, round the square's middle: how far behind it (`back`), across it (`side`) and their size (`r`). */
 const DROPS: [number, number, number][] = [
-  [7, 0, 2.2],
-  [9.5, -3.6, 1.6],
-  [5.5, 3.8, 1.4],
+  [7, 0, 3.3],
+  [9.5, -4.4, 2.4],
+  [5.5, 4.6, 2.1],
 ];
 // Per frame (fresh to nearly gone): how far each drop has fallen, its size and its opacity.
 const DROP_FRAMES = [
