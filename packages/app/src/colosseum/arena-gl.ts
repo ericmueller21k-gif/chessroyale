@@ -17,20 +17,19 @@
  *
  * - **The 3D pieces** (the gear's Pieces: 3D; pieces3d.ts): the six meshes uploaded once, the pieces as instances written when
  *   a move is made, one draw call a kind on the board. With 2D the pieces are props, as above.
- * - **Pixel** (the gear's Pieces: Pixel, the default since Nov 1; pieces-pixel.ts): the whole arena drawn into a small target
- *   (an art pixel `pixelScale` screen pixels square) and scaled up nearest-neighbor, one chunky pixel grid as Eric's picture;
- *   the pixel set drawn like the 3D pieces (one draw call a kind), cel-shaded in flat tones, each facing the screen and
- *   leaning back a little like a sprite, its axis on a pixel's middle; each piece's one-pixel outline drawn in the small
- *   target, then the scaling up (one read a screen pixel).
+ * - **Pixel** (the gear's Pieces: Pixel, the default; since Nov 2 the art session's models, pieces-gba.ts): the arena and the
+ *   crowd full size as in 3D and 2D; each piece a sprite drawn from its model for your seat's pitch (when the view changes,
+ *   never a frame), farther ones at a smaller share, laid on one texel an art pixel (`pixelScale` screen pixels), its foot on
+ *   an art pixel, so it's crisp and still as it slides. One draw call.
  *
  * Three draw calls a frame with 2D; eight with 3D (the arena, the crowd and one a kind: the props then have nothing to draw);
- * ten with Pixel (those, the outline and the scaling up). A frame sets a few uniforms (the camera, the time, the jump's clock) and draws:
+ * three with Pixel (the arena, the crowd, the sprites). A frame sets a few uniforms (the camera, the time, the jump's clock) and draws:
  * nothing is allocated and nothing uploaded. The crowd jumps (a queen captured) by a uniform too.
  */
 import { BANNERS, BOARD, FLOOR_R, bossSeats, project, type Seat, GALLERY_H, GALLERY_R, PILLARS, PILLAR_ANGLES, SEATING, STANDS, STATUE, WALL_H, WALL_TOP, aisleAngle, fovFor, landingDepth, lookAt, multiply, perspective, rowR, rowY, seatR, seats, squareXZ, VIEWS, type View } from "./arena.ts";
 import { FIGURE_STRIDE, PILLAR_TOP_PX, PROPS, SCENE, SEAT_SINK, SKY, SQUARES, STANDS_SEATS, STONE, type CrowdArt, type Figure, type Rect } from "./art.ts";
 import { EYE, KINDS, KNIGHT_TURN, PV, SIZE, SLIT, pieceMeshes, type Kind, type PieceMesh } from "./pieces3d.ts";
-import { PIXEL_EYE, PIXEL_KNIGHT_TURN, PIXEL_SLIT, pixelMeshes } from "./pieces-pixel.ts";
+import { FRAME as GBA_FRAME, MODELS as GBA_MODELS, PALETTE as GBA_PALETTE, drawModel } from "./pieces-gba.ts";
 
 const VS_SCENE = `#version 300 es
 layout(location=0) in vec3 aPos;
@@ -210,171 +209,125 @@ void main() {
 }`;
 
 /**
- * The pixel set (Pixel; pieces-pixel.ts), drawn into the small target: each piece faces the screen (the camera's plane, not
- * its eye, so none leans sideways), leaning back by part of your view's pitch so it stands up on screen as a sprite does, its
- * axis on a pixel's middle (so it rasterizes the same both sides). Its contact shadow lies flat under it, a little to the
- * lower right. The normal stays the piece's own (it always faces the screen): the light is the screen's, from the top left.
+ * Pixel: farther pieces drawn smaller, as the picture's: each piece is drawn at a share of its size by how wide its square is
+ * on screen against the square nearest you (1, 0.9, … 0.5: `buckets` steps of `step`), each share's sprites drawn ahead from
+ * the model itself, so a smaller piece is as crisp, its outline still one pixel.
  */
-const VS_PIECE_PX = `#version 300 es
-layout(location=0) in vec3 aPos;
-layout(location=1) in vec3 aNrm;
-layout(location=2) in float aMat;
-layout(location=3) in vec4 iA;
-layout(location=4) in vec4 iB;
+export const GBA_SCALE = { step: 0.1, buckets: 6 } as const;
+/**
+ * Pixel's pieces (Nov 2; pieces-gba.ts, the art session's models): each a sprite drawn from its 3D model for your seat's
+ * pitch, laid on the full-size arena one texel an art pixel (`pixelScale` screen pixels square), its foot on the art pixel
+ * its square's middle (sliding: its place on the slide) falls in, so its pixels never change as it moves: crisp and still.
+ * Far ranks first (the instances are written in that order), no depth: nothing in the arena stands over the board's pieces.
+ * Per instance: where it stands and where its slide began, when the slide began and when it goes, and its cell in the atlas.
+ */
+const VS_GBA = `#version 300 es
+layout(location=0) in vec2 aCorner;
+layout(location=1) in vec4 iA;
+layout(location=2) in vec4 iB;
 uniform mat4 uVP;
 uniform float uTime;
 uniform float uSlide;
 uniform float uLift;
-uniform float uKind;
-uniform float uTilt;
+uniform float uScale;
 uniform vec2 uRes;
-uniform vec3 uFwd;
-out vec3 vN;
-out vec3 vObj;
-out float vMat;
-out float vBlack;
-out float vDepth;
-flat out float vId;
+uniform vec4 uFrame;
+uniform vec2 uAtlas;
+uniform vec3 uRight;
+uniform float uNear;
+uniform float uReady;
+out vec2 vUV;
 void main() {
-  vMat = aMat;
-  vBlack = iB.z;
-  vN = aNrm;
-  vObj = aPos;
-  vId = uKind * 32.0 + float(gl_InstanceID) + 1.0;
-  if (uTime >= iB.y) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); vDepth = 0.0; return; }
+  vUV = vec2(0.0);
+  if (uTime >= iB.y) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
   float s = clamp((uTime - iB.x) / uSlide, 0.0, 1.0);
   s = s * s * (3.0 - 2.0 * s);
   vec2 xz = mix(iA.zw, iA.xy, s);
   float hop = sin(3.14159 * s) * 0.35 * step(0.001, distance(iA.zw, iA.xy));
-  vec2 f = -normalize(uFwd.xz);
-  vec3 R = vec3(f.y, 0.0, -f.x);
-  vec3 F = vec3(f.x, 0.0, f.y);
-  vec3 w;
-  bool shadow = aMat > 2.5 && aMat < 3.5;
-  if (shadow) {
-    w = vec3(xz.x, uLift + 0.006, xz.y) + R * (aPos.x + 0.06) + F * (aPos.z - 0.05);
-  } else {
-    float a = asin(clamp(-uFwd.y, -1.0, 1.0)) * uTilt;
-    vec3 U = vec3(0.0, cos(a), 0.0) - F * sin(a);
-    vec3 F2 = F * cos(a) + vec3(0.0, sin(a), 0.0);
-    w = vec3(xz.x, uLift + hop, xz.y) + R * aPos.x + U * aPos.y + F2 * aPos.z;
-  }
-  gl_Position = uVP * vec4(w, 1.0);
-  vDepth = gl_Position.w;
-  if (!shadow) {
-    vec4 c = uVP * vec4(xz.x, uLift + hop, xz.y, 1.0);
-    vec2 px = (c.xy / c.w * 0.5 + 0.5) * uRes;
-    gl_Position.xy += (floor(px) + 0.5 - px) / uRes * 2.0 * gl_Position.w;
-  }
+  vec4 c = uVP * vec4(xz.x, uLift + hop, xz.y, 1.0);
+  vec2 at = (c.xy / c.w * 0.5 + 0.5) * uRes;
+  vec2 art = floor(at / uScale);
+  // Smaller farther off: the square here against the one nearest you, in whole steps (GBA_SCALE), each drawn ahead.
+  vec4 c2 = uVP * vec4(vec3(xz.x, uLift + hop, xz.y) + uRight, 1.0);
+  float f = distance((c2.xy / c2.w * 0.5 + 0.5) * uRes, at) / uNear;
+  float b = clamp(floor((1.0 - f) / ${GBA_SCALE.step.toFixed(3)} + 0.5), 0.0, uReady - 1.0);
+  // (The sprite's rows run down from its top; its foot pixel (ax, ay) on that art pixel.)
+  vec2 p = vec2(art.x - uFrame.z + (aCorner.x + 0.5) * uFrame.x, art.y + uFrame.w + 1.0 - (1.0 - aCorner.y) * uFrame.y);
+  gl_Position = vec4(p * uScale / uRes * 2.0 - 1.0, 0.0, 1.0);
+  vUV = (vec2(iB.z, b * 2.0 + iB.w) * uFrame.xy + vec2(aCorner.x + 0.5, 1.0 - aCorner.y) * uFrame.xy) / uAtlas;
 }`;
-/**
- * The pixel set's look, from Eric's picture: flat tones, hard steps, no gradients and no shine; cream in four tones (a
- * near-white highlight to a warm grey-brown shade), navy-charcoal with a few lighter highlight pixels, gold. The second
- * output marks which piece a pixel is, how near, and whether it's Black's (the outline's color).
- */
-const FS_PIECE_PX = `#version 300 es
-precision highp float;
-in vec3 vN;
-in vec3 vObj;
-in float vMat;
-in float vBlack;
-in float vDepth;
-flat in float vId;
-layout(location=0) out vec4 o;
-layout(location=1) out vec4 o2;
-const vec3 CREAM_H = vec3(252.0, 248.0, 236.0) / 255.0;
-const vec3 CREAM_L = vec3(238.0, 222.0, 194.0) / 255.0;
-const vec3 CREAM_M = vec3(204.0, 180.0, 148.0) / 255.0;
-const vec3 CREAM_S = vec3(150.0, 122.0, 96.0) / 255.0;
-const vec3 NAVY_H = vec3(100.0, 106.0, 132.0) / 255.0;
-const vec3 NAVY_M = vec3(60.0, 62.0, 78.0) / 255.0;
-const vec3 NAVY_D = vec3(36.0, 37.0, 48.0) / 255.0;
-const vec3 GOLD_H = vec3(255.0, 222.0, 140.0) / 255.0;
-const vec3 GOLD_L = vec3(228.0, 168.0, 72.0) / 255.0;
-const vec3 GOLD_D = vec3(150.0, 100.0, 38.0) / 255.0;
-const vec3 L = vec3(-0.55, 0.7, 0.45) * ${(1 / Math.hypot(0.55, 0.7, 0.45)).toFixed(5)};
-const vec3 H = vec3(-0.55, 0.7, 1.45) * ${(1 / Math.hypot(0.55, 0.7, 1.45)).toFixed(5)};
-void main() {
-  if (vMat > 2.5 && vMat < 3.5) { o = vec4(0.13, 0.07, 0.03, vN.x > 0.3 ? 0.62 : 0.0); o2 = vec4(0.0); return; }
-  vec3 N = normalize(vN);
-  float t = dot(N, L);
-  bool hi = pow(max(dot(N, H), 0.0), 60.0) > 0.55;
-  bool gold = vBlack > 0.5 && vMat > 4.5;
-  vec3 c;
-  if (gold) c = hi ? GOLD_H : t > 0.1 ? GOLD_L : GOLD_D;
-  else if (vBlack > 0.5) c = hi ? NAVY_H : t > 0.2 ? NAVY_M : NAVY_D;
-  else c = t > 0.8 ? CREAM_H : t > 0.5 ? CREAM_L : t > 0.15 ? CREAM_M : CREAM_S;
-  // The bishop's slit (pieces-pixel.ts PIXEL_SLIT), across the mitre's front.
-  if (vMat > 1.5 && vMat < 2.5 && vObj.z > 0.03 && abs(vObj.x * ${PIXEL_SLIT.k.toFixed(3)} + vObj.y - ${PIXEL_SLIT.c.toFixed(3)}) * ${(1 / Math.hypot(PIXEL_SLIT.k, 1)).toFixed(4)} < ${PIXEL_SLIT.w.toFixed(3)}) c = vBlack > 0.5 ? GOLD_L : CREAM_S;
-  // The knight's eye (PIXEL_EYE), on both sides of its head.
-  if (vMat > 3.5 && vMat < 4.5) {
-    vec2 p = vec2(vObj.x * ${Math.cos(PIXEL_KNIGHT_TURN).toFixed(4)} - vObj.z * ${Math.sin(PIXEL_KNIGHT_TURN).toFixed(4)}, vObj.y);
-    if (distance(p, vec2(${PIXEL_EYE.x.toFixed(3)}, ${PIXEL_EYE.y.toFixed(3)})) < ${PIXEL_EYE.r.toFixed(3)}) c = vBlack > 0.5 ? GOLD_L : vec3(0.18, 0.12, 0.08);
-  }
-  o = vec4(c, 1.0);
-  float d = clamp(vDepth / 64.0, 0.0, 1.0) * 255.0;
-  // (The depth's low byte in 7 bits; its last bit marks a Black piece, for the outline's color.)
-  o2 = vec4(vId / 255.0, floor(d) / 255.0, (floor(fract(d) * 127.0) * 2.0 + step(0.5, vBlack)) / 255.0, 1.0);
-}`;
-
-/** A full-screen triangle (Pixel's outline and scaling up). */
-const VS_FULL = `#version 300 es
-void main() {
-  vec2 p = vec2(gl_VertexID == 1 ? 3.0 : -1.0, gl_VertexID == 2 ? 3.0 : -1.0);
-  gl_Position = vec4(p, 0.0, 1.0);
-}`;
-/**
- * Pixel's outline, in the small target (a pixel's four neighbors read there, not a screen pixel's): one dark pixel round each
- * piece, dark warm brown round White and near black round Black, as the picture's.
- */
-const FS_OUTLINE = `#version 300 es
-precision highp float;
-uniform sampler2D uCol;
-uniform sampler2D uId;
-uniform ivec2 uSize;
-out vec4 o;
-// (The picture's: a dark warm brown round White, near black round Black.)
-const vec3 OUTLINE_W = vec3(46.0, 33.0, 26.0) / 255.0;
-const vec3 OUTLINE_B = vec3(20.0, 18.0, 22.0) / 255.0;
-float near(vec4 m) { return m.a > 0.5 ? m.g + m.b / 255.0 : 2.0; }
-void main() {
-  ivec2 p = ivec2(gl_FragCoord.xy);
-  vec4 m = texelFetch(uId, p, 0);
-  float d = near(m);
-  bool edge = false;
-  float black = 0.0;
-  for (int k = 0; k < 4; k++) {
-    ivec2 q = clamp(p + (k == 0 ? ivec2(1, 0) : k == 1 ? ivec2(-1, 0) : k == 2 ? ivec2(0, 1) : ivec2(0, -1)), ivec2(0), uSize - 1);
-    vec4 n = texelFetch(uId, q, 0);
-    // Round a piece, between two pieces (on the farther), and inside one where a part stands well in front (a collar's edge).
-    if (n.a > 0.5 && near(n) < d && (abs(n.r - m.r) > 0.001 || d - near(n) > 0.13 / 64.0)) {
-      edge = true;
-      black = mod(floor(n.b * 255.0 + 0.5), 2.0);
-    }
-  }
-  o = vec4(edge ? mix(OUTLINE_W, OUTLINE_B, black) : texelFetch(uCol, p, 0).rgb, 1.0);
-}`;
-/** Pixel's scaling up to the screen, nearest-neighbor: one read a screen pixel. */
-const FS_UP = `#version 300 es
+const FS_GBA = `#version 300 es
 precision mediump float;
-uniform sampler2D uOut;
-uniform float uScale;
-uniform ivec2 uSize;
+uniform sampler2D uTex;
+in vec2 vUV;
 out vec4 o;
 void main() {
-  o = texelFetch(uOut, min(ivec2(floor(gl_FragCoord.xy / uScale)), uSize - 1), 0);
+  vec4 c = texture(uTex, vUV);
+  if (c.a < 0.5) discard;
+  o = vec4(c.rgb, 1.0);
 }`;
 
 /**
- * Pixel: a pawn standing on the board's middle is about this many art pixels tall (`pixelScale`: whole screen pixels an art
- * pixel, set when the view or the screen's size changes, never a frame); the proof of concept's grid, which Eric approved.
+ * Pixel: a board square near you is about this many art pixels across (`pixelScale`: whole screen pixels an art pixel, at
+ * least 2, set when the view or the screen's size changes, never a frame): the size the art session drew the pieces for.
  */
-const PAWN_ART_PX = 16;
+export const SQUARE_ART_PX = 20;
 /**
- * Pixel: how far the pieces lean back, a share of your view's pitch: 0.6 (round 2, Nov 1; 0.38 before), so they stand up
- * like the picture's sprites, little of their tops showing.
+ * Pixel: the pitch the sprites are drawn at, a share of your seat's own (the high view behind White looks down 47 degrees,
+ * its sprites drawn at 30, as the art session's mockups Eric approved), at most `max`; rounded to `step` so a seat's turn
+ * doesn't redraw them.
  */
-export const PIXEL_TILT = 0.6;
+export const GBA_PITCH = { share: 30 / 47, max: 0.7, step: 0.02 } as const;
+/** Pixel: the sprites' atlas, a column a kind (p n b r q k), two rows a share (White, then Black). */
+const GBA_KINDS = ["p", "n", "b", "r", "q", "k"] as const;
+export const GBA_ATLAS = { w: GBA_FRAME.w * 6, h: GBA_FRAME.h * 2 * GBA_SCALE.buckets } as const;
+/** Floats a Pixel piece's instance. */
+const PG = 8;
+
+/** Pixel's sprite pitch (radians) for a view: a share of how far it looks down, rounded. */
+export function gbaPitch(view: View): number {
+  const dy = view.eye[1] - view.at[1];
+  const p = Math.atan2(dy, Math.hypot(view.eye[0] - view.at[0], view.eye[2] - view.at[2])) * GBA_PITCH.share;
+  return Math.min(GBA_PITCH.max, Math.max(0, Math.round(p / GBA_PITCH.step) * GBA_PITCH.step));
+}
+
+/**
+ * Pixel's art pixel for a view through `vp` on a w × h screen (`scale`: whole screen pixels, at least 2), so the board square
+ * nearest you (on the line from the board's middle toward your eye) is about SQUARE_ART_PX art pixels across; `near`: that
+ * square's width on screen (pixels), what the farther pieces' shares are measured against.
+ */
+export function gbaArtPixel(vp: Float32Array, view: View, w: number, h: number): { scale: number; near: number } {
+  const ex = view.eye[0];
+  const ez = view.eye[2];
+  const el = Math.hypot(ex, ez) || 1;
+  const [nx, nz] = [(ex / el) * 3.5, (ez / el) * 3.5];
+  const a = project(vp, nx - (ez / el) * 0.5, BOARD.lift, nz + (ex / el) * 0.5, w, h);
+  const b = project(vp, nx + (ez / el) * 0.5, BOARD.lift, nz - (ex / el) * 0.5, w, h);
+  const near = a && b ? Math.hypot(a[0] - b[0], a[1] - b[1]) : 2 * SQUARE_ART_PX;
+  return { scale: Math.max(2, Math.round(near / SQUARE_ART_PX)), near };
+}
+
+/**
+ * One of Pixel's sprites (pieces-gba.ts, the art session's model drawn by its own `drawModel`) into the atlas's pixels (RGBA,
+ * straight alpha) at its cell: `kind` 0 to 5 (p n b r q k), Black's or White's, at this pitch, its share `bucket` of its size.
+ */
+export function paintGba(atlas: Uint8Array, kind: number, black: boolean, pitch: number, bucket = 0): void {
+  const m = GBA_MODELS[GBA_KINDS[kind]!];
+  const f = 1 - bucket * GBA_SCALE.step;
+  const shot = drawModel(f === 1 ? m : { inside: (x, y, z) => m.inside(x / f, y / f, z / f) }, black ? "b" : "w", pitch);
+  const x0 = kind * GBA_FRAME.w;
+  const y0 = (bucket * 2 + (black ? 1 : 0)) * GBA_FRAME.h;
+  for (let y = 0; y < GBA_FRAME.h; y++)
+    for (let x = 0; x < GBA_FRAME.w; x++) {
+      const o = ((y0 + y) * GBA_ATLAS.w + x0 + x) * 4;
+      const k = shot.keys[y]?.[x];
+      const n = k ? parseInt(GBA_PALETTE[k]!.slice(1, 7), 16) : 0;
+      atlas[o] = (n >> 16) & 255;
+      atlas[o + 1] = (n >> 8) & 255;
+      atlas[o + 2] = n & 255;
+      atlas[o + 3] = k ? 255 : 0;
+    }
+}
 
 /** Floats a scene vertex (position, uv, color) and a sprite instance (five vec4s). */
 const SV = 9;
@@ -387,13 +340,6 @@ const KIND_CAP = 32;
 const PI3 = 8;
 /** A slide's length (s). */
 export const SLIDE_S = 0.45;
-/** Pixel: the reference pawn's height (m) the art pixel is worked out from; the clear colors and draw buffers, made once. */
-const PAWN_M = 1.0;
-const SKY_RGBA = new Float32Array([SKY[0], SKY[1], SKY[2], 1]);
-const NONE_RGBA = new Float32Array(4);
-/** (WebGL's COLOR_ATTACHMENT0 and 1, and NONE: numbers, so Node's tests can load this file.) */
-const DRAW_COLOR = [0x8ce0, 0];
-const DRAW_BOTH = [0x8ce0, 0x8ce1];
 /** "Never" for a sprite's going (s). */
 const NEVER = 1e9;
 
@@ -624,7 +570,7 @@ export function pieceStyleOf(saved: string | null, old: string | null): PieceSty
   return old === "on" ? "3d" : "pixel";
 }
 
-/** A set of solid pieces (3D or Pixel): its program, its instances, a VAO a kind. */
+/** The 3D pieces: their program, their instances, a VAO a kind. */
 interface Solid {
   prog: WebGLProgram;
   uVP: WebGLUniformLocation;
@@ -632,15 +578,18 @@ interface Solid {
   uTime: WebGLUniformLocation;
   uSlide: WebGLUniformLocation;
   uLift: WebGLUniformLocation;
-  /** (Pixel's: which kind, the lean, the small target's size, the way you look.) */
-  uKind: WebGLUniformLocation | null;
-  uTilt: WebGLUniformLocation | null;
-  uRes: WebGLUniformLocation | null;
-  uFwd: WebGLUniformLocation | null;
   buf: WebGLBuffer;
   data: Float32Array;
   /** A kind's VAO, its triangles' first index and count, and how many of it stand on the board now. */
   kinds: { vao: WebGLVertexArrayObject; first: number; count: number; n: number }[];
+}
+
+/** Pixel's sprites being drawn for a new pitch, one a task: the next to draw, the atlas's new pixels, the task waiting. */
+interface GbaDrawing {
+  pitch: number;
+  next: number;
+  pixels: Uint8Array;
+  timer: ReturnType<typeof setTimeout> | null;
 }
 
 /** The WebGL 2 arena. `create` returns null where there's no WebGL 2 (the page shows a still instead). */
@@ -651,33 +600,40 @@ export class ArenaGL {
   /** The crowd and the arena's figures: `n` instances drawn, `people` of them the crowd. */
   private readonly crowd: { vao: WebGLVertexArrayObject; buf: WebGLBuffer; n: number; people: number; tex: WebGLTexture | null };
   private readonly props: { vao: WebGLVertexArrayObject; buf: WebGLBuffer; data: Float32Array; n: number; tex: WebGLTexture | null };
-  /** The 3D pieces and the pixel set, each built the first time it's chosen (the gear's Pieces); 2D: the props, exactly as before. */
-  private readonly solids: Partial<Record<"3d" | "pixel", Solid>> = {};
-  /** Which pieces are drawn (the gear's Pieces: Pixel, 3D, 2D = "flat"); Pixel draws the whole arena on the pixel grid. */
+  /** The 3D pieces, built the first time they're chosen (the gear's Pieces); 2D: the props, exactly as before. */
+  private solid: Solid | null = null;
+  /** Which pieces are drawn (the gear's Pieces: Pixel, 3D, 2D = "flat"). */
   private style: PieceStyle = "flat";
-  /** Pixel's small target: color, the pieces' marks (which, how near), depth; its size, and its program (made the first time). */
-  private px: {
-    fb: WebGLFramebuffer;
-    col: WebGLTexture;
-    id: WebGLTexture;
-    depth: WebGLRenderbuffer;
-    /** The outlined picture, still small, and its framebuffer. */
-    outFb: WebGLFramebuffer;
-    out: WebGLTexture;
-    w: number;
-    h: number;
-    line: { prog: WebGLProgram; uSize: WebGLUniformLocation };
-    up: { prog: WebGLProgram; uScale: WebGLUniformLocation; uSize: WebGLUniformLocation };
+  /**
+   * Pixel's pieces (made the first time they're chosen): the sprites' atlas (its pixels, the pitch they're drawn for, and a
+   * pitch being drawn off the frame loop), the instances (far ranks first) and the program.
+   */
+  private gba: {
+    prog: WebGLProgram;
     vao: WebGLVertexArrayObject;
+    buf: WebGLBuffer;
+    data: Float32Array;
+    n: number;
+    tex: WebGLTexture;
+    pixels: Uint8Array;
+    pitch: number;
+    drawing: GbaDrawing | null;
+    /** How many shares (GBA_SCALE) the atlas holds now, from 1 down; and the nearest square's width on screen. */
+    ready: number;
+    near: number;
+    u: Record<"uVP" | "uTime" | "uSlide" | "uLift" | "uScale" | "uRes" | "uFrame" | "uAtlas" | "uRight" | "uNear" | "uReady", WebGLUniformLocation>;
   } | null = null;
-  /** Pixel: screen pixels an art pixel, and the view and screen size it was worked out for. */
-  pixelScale = 1;
+  /** Pixel: screen pixels an art pixel (a square near you about SQUARE_ART_PX art pixels across), at least 2. */
+  pixelScale = 2;
   private scaleFor: { view: View | null; w: number; h: number } = { view: null, w: 0, h: 0 };
   private last: { pieces: readonly FloorPiece[]; t0: number } = { pieces: [], t0: -NEVER };
   private readonly proj = new Float32Array(16);
   private readonly viewM = new Float32Array(16);
   private readonly vp = new Float32Array(16);
   readonly fwd = new Float32Array(3);
+  /** Pixel: where you look from (x, z) when its pieces were last put in order (far ranks first), and that view. */
+  private sortEye: [number, number] = [0, 99];
+  private sortView: View | null = null;
   /** Draw calls in the last frame. */
   drawCalls = 0;
 
@@ -747,21 +703,20 @@ export class ArenaGL {
     gl.bindBuffer(gl.ARRAY_BUFFER, pb);
     gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
     this.props = { vao: spriteVao(pb), buf: pb, data, n: 0, tex: null };
-    if (style !== "flat") {
-      this.solids[style] = this.buildSolid(style);
-      this.style = style;
-    }
+    this.style = style;
+    if (style === "3d") this.solid = this.buildSolid();
+    if (style === "pixel") this.gba = this.buildGba();
     this.crisp();
     gl.bindVertexArray(null);
     gl.enable(gl.DEPTH_TEST);
     gl.clearColor(SKY[0], SKY[1], SKY[2], 1);
   }
 
-  /** The 3D pieces or the pixel set: the six meshes in one buffer (built once), the instances' buffer, a VAO a kind. */
-  private buildSolid(style: "3d" | "pixel"): Solid {
+  /** The 3D pieces: the six meshes in one buffer (built once), the instances' buffer, a VAO a kind. */
+  private buildSolid(): Solid {
     const gl = this.gl;
-    const prog = style === "pixel" ? program(gl, VS_PIECE_PX, FS_PIECE_PX) : program(gl, VS_PIECE, FS_PIECE);
-    const meshes: Record<Kind, PieceMesh> = style === "pixel" ? pixelMeshes() : pieceMeshes();
+    const prog = program(gl, VS_PIECE, FS_PIECE);
+    const meshes: Record<Kind, PieceMesh> = pieceMeshes();
     let nv = 0;
     let ni = 0;
     for (const k of KINDS) ((nv += meshes[k].verts.length / PV), (ni += meshes[k].index.length));
@@ -809,7 +764,7 @@ export class ArenaGL {
     gl.bindVertexArray(null);
     const u = (n: string) => gl.getUniformLocation(prog, n)!;
     const v = (n: string) => gl.getUniformLocation(prog, n);
-    return { prog, uVP: u("uVP"), uEye: v("uEye"), uTime: u("uTime"), uSlide: u("uSlide"), uLift: u("uLift"), uKind: v("uKind"), uTilt: v("uTilt"), uRes: v("uRes"), uFwd: v("uFwd"), buf, data, kinds };
+    return { prog, uVP: u("uVP"), uEye: v("uEye"), uTime: u("uTime"), uSlide: u("uSlide"), uLift: u("uLift"), buf, data, kinds };
   }
 
   /** Which pieces are drawn. */
@@ -819,18 +774,104 @@ export class ArenaGL {
   /** Draws the pieces as Pixel, 3D or 2D (the gear's Pieces, at once: the same position), a set built the first time it's chosen. */
   setPieceStyle(style: PieceStyle): void {
     if (style === this.style) return;
-    if (style !== "flat" && !this.solids[style]) {
-      this.solids[style] = this.buildSolid(style);
-      this.gl.bindVertexArray(null);
-    }
+    if (style === "3d" && !this.solid) this.solid = this.buildSolid();
+    if (style === "pixel" && !this.gba) this.gba = this.buildGba();
+    this.gl.bindVertexArray(null);
     this.style = style;
     this.crisp();
     this.setPieces(this.last.pieces, this.last.t0);
   }
 
+  /** Pixel's pieces: the program, a quad's corners, the instances' buffer and the atlas (drawn at the first frame's pitch). */
+  private buildGba(): NonNullable<ArenaGL["gba"]> {
+    const gl = this.gl;
+    const prog = program(gl, VS_GBA, FS_GBA);
+    const vao = gl.createVertexArray()!;
+    gl.bindVertexArray(vao);
+    const corner = gl.createBuffer()!;
+    gl.bindBuffer(gl.ARRAY_BUFFER, corner);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-0.5, 0, 0.5, 0, 0.5, 1, -0.5, 0, 0.5, 1, -0.5, 1]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 8, 0);
+    const buf = gl.createBuffer()!;
+    const data = new Float32Array(PIECES * PG);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
+    for (let i = 0; i < 2; i++) {
+      gl.enableVertexAttribArray(1 + i);
+      gl.vertexAttribPointer(1 + i, 4, gl.FLOAT, false, PG * 4, i * 16);
+      gl.vertexAttribDivisor(1 + i, 1);
+    }
+    gl.bindVertexArray(null);
+    const tex = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.NEAREST], [gl.TEXTURE_MAG_FILTER, gl.NEAREST], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]] as const) gl.texParameteri(gl.TEXTURE_2D, k, v);
+    const u = (n: string) => gl.getUniformLocation(prog, n)!;
+    gl.useProgram(prog);
+    gl.uniform1i(u("uTex"), 0);
+    return {
+      prog,
+      vao,
+      buf,
+      data,
+      n: 0,
+      tex,
+      pixels: new Uint8Array(GBA_ATLAS.w * GBA_ATLAS.h * 4),
+      pitch: -1,
+      drawing: null,
+      ready: 0,
+      near: 2 * SQUARE_ART_PX,
+      u: { uVP: u("uVP"), uTime: u("uTime"), uSlide: u("uSlide"), uLift: u("uLift"), uScale: u("uScale"), uRes: u("uRes"), uFrame: u("uFrame"), uAtlas: u("uAtlas"), uRight: u("uRight"), uNear: u("uNear"), uReady: u("uReady") },
+    };
+  }
+
+  /**
+   * Pixel's sprites for this pitch: twelve a share (GBA_SCALE), about 150 ms each twelve. The first time, the full-size twelve
+   * at once, then the smaller shares one sprite a task off the frame loop, each share shown as it's done (until then a
+   * farther piece shows the smallest share there is). After that (Change seat), the new set drawn the same way off the frame
+   * loop while the old one still shows, then put in its place whole.
+   */
+  private gbaSprites(pitch: number): void {
+    const g = this.gba!;
+    if (g.pitch === pitch || g.drawing?.pitch === pitch) return;
+    const upload = (px: Uint8Array, ready: number) => {
+      const gl = this.gl;
+      gl.bindTexture(gl.TEXTURE_2D, g.tex);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, GBA_ATLAS.w, GBA_ATLAS.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      g.pixels = px;
+      g.pitch = pitch;
+      g.ready = ready;
+    };
+    if (g.drawing?.timer) clearTimeout(g.drawing.timer);
+    g.drawing = null;
+    const first = g.pitch < 0 || g.ready < 1;
+    const d: GbaDrawing = { pitch, next: 0, pixels: first ? g.pixels : new Uint8Array(g.pixels.length), timer: null };
+    const all = GBA_SCALE.buckets * 12;
+    const paint = () => {
+      const b = Math.floor(d.next / 12);
+      const i = d.next % 12;
+      paintGba(d.pixels, i % 6, i >= 6, pitch, b);
+      d.next++;
+      // (The first time, each share goes up as it's done; after, the whole new set at the end.)
+      if (first && d.next % 12 === 0) upload(d.pixels, d.next / 12);
+      else if (!first && d.next === all) upload(d.pixels, GBA_SCALE.buckets);
+    };
+    if (first) while (d.next < 12) paint();
+    if (d.next >= all) return;
+    const step = () => {
+      if ((g.drawing as GbaDrawing | null) !== d) return;
+      paint();
+      if (d.next < all) d.timer = setTimeout(step, 0);
+      else g.drawing = null;
+    };
+    g.drawing = d;
+    d.timer = setTimeout(step, 0);
+  }
+
   /**
    * Pixel: the browser scales the canvas up to the screen nearest-neighbor too (a phone's canvas is capped at 2x, so on a 3x
-   * phone an art pixel's 2 canvas pixels are 3 screen pixels, kept sharp, not blurred); 3D and 2D smooth, as before.
+   * phone a piece's art pixel of 2 canvas pixels is 3 screen pixels, kept sharp, not blurred); 3D and 2D smooth, as before.
    */
   private crisp(): void {
     const c = this.gl.canvas as HTMLCanvasElement;
@@ -887,8 +928,38 @@ export class ArenaGL {
     this.last.t0 = t0;
     const d = this.props.data;
     let n = 0;
-    const solid = this.style === "flat" ? null : (this.solids[this.style] ?? null);
+    const solid = this.style === "3d" ? this.solid : null;
     if (solid) for (const k of solid.kinds) k.n = 0;
+    const gba = this.style === "pixel" ? this.gba : null;
+    if (gba) {
+      // Pixel: far ranks first (from where you look), each its kind's cell in the atlas.
+      const e = this.sortEye;
+      const far = (p: FloorPiece) => {
+        const [x, z] = squareXZ(p.sq);
+        return -Math.hypot(x - e[0], z - e[1]);
+      };
+      const order = pieces.slice(0, PIECES).sort((a, b) => far(a) - far(b));
+      order.forEach((p, i) => {
+        const [x, z] = squareXZ(p.sq);
+        const [fx, fz] = p.from ? squareXZ(p.from) : [x, z];
+        const o = i * PG;
+        const g = gba.data;
+        g[o] = x;
+        g[o + 1] = z;
+        g[o + 2] = fx;
+        g[o + 3] = fz;
+        g[o + 4] = p.from ? t0 : -NEVER;
+        g[o + 5] = p.taken ? t0 + SLIDE_S * 0.85 : NEVER;
+        g[o + 6] = Math.max(0, GBA_KINDS.indexOf(p.key[1] as (typeof GBA_KINDS)[number]));
+        g[o + 7] = p.key[0] === "b" ? 1 : 0;
+      });
+      gba.n = order.length;
+      this.props.n = 0;
+      const gl = this.gl;
+      gl.bindBuffer(gl.ARRAY_BUFFER, gba.buf);
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, gba.data, 0, order.length * PG);
+      return;
+    }
     const put = (x: number, y: number, z: number, h: number, w: number, r: Rect, fx: number, fz: number, t: number, foot: number, goes: number) => {
       const o = n++ * SI;
       d[o] = x;
@@ -971,21 +1042,9 @@ export class ArenaGL {
     lookAt(this.viewM, view.eye, view.at, yaw, pitch, this.fwd);
     multiply(this.vp, this.proj, this.viewM);
     let calls = 0;
-    const pixel = this.style === "pixel";
-    const px = pixel ? this.pixelTarget(view, w, h) : null;
-    if (px) {
-      // Pixel: everything into the small target; the arena and the crowd mark no piece.
-      gl.bindFramebuffer(gl.FRAMEBUFFER, px.fb);
-      gl.viewport(0, 0, px.w, px.h);
-      gl.drawBuffers(DRAW_BOTH);
-      gl.clearBufferfv(gl.COLOR, 0, SKY_RGBA);
-      gl.clearBufferfv(gl.COLOR, 1, NONE_RGBA);
-      gl.clear(gl.DEPTH_BUFFER_BIT);
-      gl.drawBuffers(DRAW_COLOR);
-    } else {
-      gl.viewport(0, 0, w, h);
-      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    }
+    // The arena and the crowd, full size in every style (Pixel too, since Nov 2: only its pieces are on the art pixel's grid).
+    gl.viewport(0, 0, w, h);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.useProgram(this.scene.prog);
     gl.uniformMatrix4fv(this.scene.uVP, false, this.vp);
     gl.activeTexture(gl.TEXTURE0);
@@ -1012,131 +1071,78 @@ export class ArenaGL {
       gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, this.props.n);
       calls++;
     }
-    const solid = this.style === "flat" ? null : (this.solids[this.style] ?? null);
+    const solid = this.style === "3d" ? this.solid : null;
     if (solid) {
-      // The 3D pieces or the pixel set: a draw call a kind on the board; their shadows blend onto the board.
+      // The 3D pieces: a draw call a kind on the board; their shadows blend onto the board.
       gl.useProgram(solid.prog);
       gl.uniformMatrix4fv(solid.uVP, false, this.vp);
       if (solid.uEye) gl.uniform3f(solid.uEye, view.eye[0], view.eye[1], view.eye[2]);
       gl.uniform1f(solid.uTime, time);
       gl.uniform1f(solid.uSlide, SLIDE_S);
       gl.uniform1f(solid.uLift, BOARD.lift);
-      if (px) {
-        gl.drawBuffers(DRAW_BOTH);
-        gl.uniform1f(solid.uTilt, PIXEL_TILT);
-        gl.uniform2f(solid.uRes, px.w, px.h);
-        gl.uniform3f(solid.uFwd, this.fwd[0]!, this.fwd[1]!, this.fwd[2]!);
-      }
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
       for (let i = 0; i < solid.kinds.length; i++) {
         const k = solid.kinds[i]!;
         if (!k.n) continue;
-        if (px) gl.uniform1f(solid.uKind, i);
         gl.bindVertexArray(k.vao);
         gl.drawElementsInstanced(gl.TRIANGLES, k.count, gl.UNSIGNED_SHORT, k.first * 2, k.n);
         calls++;
       }
       gl.disable(gl.BLEND);
     }
-    if (px) {
-      // The pieces' outline, still small; then up to the screen, nearest-neighbor.
-      gl.disable(gl.DEPTH_TEST);
-      gl.bindVertexArray(px.vao);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, px.outFb);
-      gl.useProgram(px.line.prog);
-      gl.uniform2i(px.line.uSize, px.w, px.h);
-      gl.activeTexture(gl.TEXTURE1);
-      gl.bindTexture(gl.TEXTURE_2D, px.id);
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, px.col);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
-      calls++;
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-      gl.viewport(0, 0, w, h);
-      gl.useProgram(px.up.prog);
-      gl.uniform1f(px.up.uScale, this.pixelScale);
-      gl.uniform2i(px.up.uSize, px.w, px.h);
-      gl.activeTexture(gl.TEXTURE1);
-      gl.bindTexture(gl.TEXTURE_2D, null);
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, px.out);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
-      calls++;
-      gl.enable(gl.DEPTH_TEST);
+    const g = this.style === "pixel" ? this.gba : null;
+    if (g) {
+      this.gbaView(view, w, h);
+      if (g.n) {
+        // Pixel: the sprites, far ranks first, over the board (no depth: nothing stands over the board's pieces).
+        gl.disable(gl.DEPTH_TEST);
+        gl.useProgram(g.prog);
+        gl.uniformMatrix4fv(g.u.uVP, false, this.vp);
+        gl.uniform1f(g.u.uTime, time);
+        gl.uniform1f(g.u.uSlide, SLIDE_S);
+        gl.uniform1f(g.u.uLift, BOARD.lift);
+        gl.uniform1f(g.u.uScale, this.pixelScale);
+        gl.uniform2f(g.u.uRes, w, h);
+        gl.uniform4f(g.u.uFrame, GBA_FRAME.w, GBA_FRAME.h, GBA_FRAME.ax, GBA_FRAME.ay);
+        gl.uniform2f(g.u.uAtlas, GBA_ATLAS.w, GBA_ATLAS.h);
+        // (The screen's right along the board, a meter: the square's width here, against the nearest's.)
+        const fl = Math.hypot(this.fwd[0]!, this.fwd[2]!) || 1;
+        gl.uniform3f(g.u.uRight, -this.fwd[2]! / fl, 0, this.fwd[0]! / fl);
+        gl.uniform1f(g.u.uNear, g.near);
+        gl.uniform1f(g.u.uReady, g.ready);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, g.tex);
+        gl.bindVertexArray(g.vao);
+        gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, g.n);
+        calls++;
+        gl.enable(gl.DEPTH_TEST);
+      }
     }
     gl.bindVertexArray(null);
     this.drawCalls = calls;
   }
 
   /**
-   * Pixel's small target for this view on a w × h screen: made the first time, sized again only when the screen's size or the
-   * art pixel's changes. The art pixel (`pixelScale`) is worked out only when the view or the screen's size changes: a pawn on
-   * the board's middle (standing as the pieces do) about PAWN_ART_PX art pixels tall, at least 2 screen pixels an art pixel.
+   * Pixel, when the view or the screen's size changes (never a frame): the art pixel (`pixelScale`: a board square near you
+   * about SQUARE_ART_PX art pixels across, at least 2 screen pixels), the sprites for this view's pitch, and the pieces in
+   * order from it (far ranks first).
    */
-  private pixelTarget(view: View, w: number, h: number): NonNullable<ArenaGL["px"]> {
-    const gl = this.gl;
+  private gbaView(view: View, w: number, h: number): void {
     const f = this.scaleFor;
-    if (f.view !== view || f.w !== w || f.h !== h) {
-      f.view = view;
-      f.w = w;
-      f.h = h;
-      // (Standing as the pieces do: leaning back toward you by PIXEL_TILT of your pitch.)
-      const lean = Math.asin(Math.max(-1, Math.min(1, -this.fwd[1]!))) * PIXEL_TILT;
-      const fl = Math.hypot(this.fwd[0]!, this.fwd[2]!) || 1;
-      const k = (Math.sin(lean) * PAWN_M) / fl;
-      const a = project(this.vp, 0, BOARD.lift, 0, w, h);
-      const b = project(this.vp, this.fwd[0]! * k, BOARD.lift + Math.cos(lean) * PAWN_M, this.fwd[2]! * k, w, h);
-      this.pixelScale = a && b ? Math.max(2, Math.round(Math.abs(a[1] - b[1]) / PAWN_ART_PX)) : 2;
+    if (f.view === view && f.w === w && f.h === h) return;
+    f.view = view;
+    f.w = w;
+    f.h = h;
+    const art = gbaArtPixel(this.vp, view, w, h);
+    this.pixelScale = art.scale;
+    this.gba!.near = art.near;
+    this.gbaSprites(gbaPitch(view));
+    if (this.sortView !== view) {
+      this.sortView = view;
+      this.sortEye = [view.eye[0], view.eye[2]];
+      this.setPieces(this.last.pieces, this.last.t0);
     }
-    if (!this.px) {
-      const line = program(gl, VS_FULL, FS_OUTLINE);
-      const up = program(gl, VS_FULL, FS_UP);
-      const u = (p: WebGLProgram, n: string) => gl.getUniformLocation(p, n)!;
-      gl.useProgram(line);
-      gl.uniform1i(u(line, "uCol"), 0);
-      gl.uniform1i(u(line, "uId"), 1);
-      gl.useProgram(up);
-      gl.uniform1i(u(up, "uOut"), 0);
-      this.px = {
-        fb: gl.createFramebuffer()!,
-        col: gl.createTexture()!,
-        id: gl.createTexture()!,
-        depth: gl.createRenderbuffer()!,
-        outFb: gl.createFramebuffer()!,
-        out: gl.createTexture()!,
-        w: 0,
-        h: 0,
-        line: { prog: line, uSize: u(line, "uSize") },
-        up: { prog: up, uScale: u(up, "uScale"), uSize: u(up, "uSize") },
-        vao: gl.createVertexArray()!,
-      };
-    }
-    const t = this.px;
-    const tw = Math.ceil(w / this.pixelScale);
-    const th = Math.ceil(h / this.pixelScale);
-    if (t.w !== tw || t.h !== th) {
-      t.w = tw;
-      t.h = th;
-      for (const tex of [t.col, t.id, t.out]) {
-        gl.bindTexture(gl.TEXTURE_2D, tex);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, tw, th, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      }
-      gl.bindRenderbuffer(gl.RENDERBUFFER, t.depth);
-      gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT24, tw, th);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, t.fb);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t.col, 0);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, t.id, 0);
-      gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, t.depth);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, t.outFb);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t.out, 0);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    }
-    return t;
   }
 
   /** The last frame's view-projection (tests: where a point lands). */
@@ -1145,6 +1151,8 @@ export class ArenaGL {
   }
 
   dispose(): void {
+    const d = this.gba?.drawing;
+    if (d?.timer) clearTimeout(d.timer);
     this.gl.getExtension("WEBGL_lose_context")?.loseContext();
   }
 }

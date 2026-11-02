@@ -43,7 +43,7 @@ links Eric's notes); this page is what's built.
   little lower (the tops of heads, as the mockup); the rows under it aren't, so they don't cover the arena. Your own seat
   is left empty. No names; nothing in the arena takes a tap.
 - **The jump.** A queen captured: the crowd jumps twice, each person with its own delay (up to 0.35 s) and height (0.12 to
-  0.32 m), worked out on the GPU from one uniform. Not under reduced motion or with Animations off (the gear).
+  0.32 m), worked out on the GPU from one uniform. Not under reduced motion or with the Colosseum's Animations off (the gear).
 - **The game on the floor** (`colosseum/match.ts`, `floor-engine.ts`). Two town bots rated 1300 and up (Stockfish's
   UCI_Elo starts at 1320) play 3+2 on this device: this screen's own Stockfish worker, started when it opens and ended when
   it closes, plays each bot at its rating and gives the eval bar its number (12,000 nodes). A bot thinks 0.4 to 5 s a
@@ -54,25 +54,26 @@ links Eric's notes); this page is what's built.
   is the default; the choice is remembered on this device (`colosseum-pieces`), and anyone who had "3D pieces" on (and has
   chosen nothing since) gets 3D (`pieceStyleOf`). Changing it redraws at once. Decision:
   `docs/decisions/2026-11-01-colosseum-pixel.md`.
-- **Pixel** (Eric, Oct 31, on the proof of concept: "that's exactly what I was thinking of"). The whole arena is drawn into a
-  small target, an art pixel `pixelScale` screen pixels square (worked out when the view or the screen's size changes: a 1 m
-  pawn on the board's middle about 16 art pixels tall, at least 2), and scaled up nearest-neighbor: one chunky pixel grid,
-  as Eric's picture (`docs/refs/colosseum-high-view.png`); on a screen the browser scales the canvas up nearest-neighbor too
-  (`image-rendering: pixelated`, Pixel only), so a 3x phone's art pixels stay sharp. The pieces are the pixel set
-  (`colosseum/pieces-pixel.ts`), sized and shaped as the picture's (round 2, Nov 1, measured on it): in the high view behind
-  White each stands, outline and all, as tall against the square it stands on near White as the picture's (the pawn 0.8 of
-  the square's width, the rook 0.95, the knight 1.1, the bishop 1.15, the queen 1.27, the king 1.5) on a base as wide (0.58
-  to 0.72), eight-sided and stepped (a flat face toward you), the lower step's top edge a band; above it a skirt narrowing to
-  the stem, a collar (bands gold on Black, the body's color on White), then the top: the pawn's round head, the rook's
-  straight tower and three square merlons, the knight's horse's head in profile with its eye, the bishop's mitre with its
-  slit and ball, the queen's wide coronet of five points and its ball, the king's wide crown and chunky cross. Cel-shaded in
-  flat tones as the picture's (cream in four tones from a near-white highlight to a warm grey-brown shade; navy-charcoal with
-  a lighter navy highlight; gold), lit from the screen's top left; each faces the screen (the camera's plane) and leans back
-  0.6 of your view's pitch so it stands up like the picture's sprites (little of its top showing), its axis on a pixel's
-  middle; a hard contact shadow under it; a one-pixel outline round each piece (and between two, on the farther), dark warm
-  brown round White and near black round Black as the picture's, worked out in the small target; the scaling up reads one
-  of its pixels a screen pixel. Ten
-  draw calls (the arena, the crowd, one a kind, the outline, the scaling up).
+- **Pixel** (Nov 2; Eric, on the art session's models: "it looks better now… make it the default piece style option in the
+  colosseum, remove the old pixel one"; before that, Nov 2: "it also pixelates the entire crowd, and it looks terrible. The
+  whole point was just to change the chess pieces"). The arena, the stands and the crowd draw full size, as in 3D and 2D;
+  only the pieces are pixel art. They are the art session's 3D models (`colosseum/pieces-gba.ts` and the 2D grids they're
+  built from, `arena-pieces-gba.ts`, both from the branch `claude/boss-art`): each drawn from its model as a sprite, one ray
+  an art pixel, flat cel bands of the palette (cream, navy-charcoal, gold bands, the rook's gold top, the knight's gold mane,
+  the bishop's gold slit), a one-pixel outline; every pixel a palette color. **For your seat:** the pieces face the screen,
+  so only the pitch changes from seat to seat: the sprites are drawn at a share of your view's pitch (`GBA_PITCH`: the high
+  view behind White's 47° gives the mockups' 30°), when the view changes, never a frame (the first twelve at once, about
+  150 ms; the rest, and a new seat's set, one sprite a task off the frame loop, the old set showing until the new one is
+  whole). **Farther pieces smaller,** as the picture's: each kind is drawn ahead at six shares of its size (1 down to 0.5,
+  `GBA_SCALE`), and each piece shows the share its square's width on screen gives against the square nearest you, worked out
+  on the GPU where it stands (a sliding piece steps a share at most once or twice). **The art pixel** (`pixelScale`): whole
+  screen pixels, at least 2, so the square nearest you is about 20 art pixels across (`SQUARE_ART_PX`, the size the models
+  were drawn for); 3 on a 1440 × 900 computer, 2 canvas pixels on a phone. **Crisp and still:** each sprite laid on one texel
+  an art pixel, nearest-neighbor, its foot on the art pixel its square's middle (or its place on a slide) falls in, so its
+  pixels never change as it moves; far ranks first, over the board (nothing in the arena stands over its pieces); the canvas
+  scaled to a 3x phone nearest-neighbor (`image-rendering: pixelated`, Pixel only). The knight looks to your left. No contact
+  shadow (the models' mockups have none). Three draw calls (the arena, the crowd, the pieces). Decision:
+  `docs/decisions/2026-11-02-colosseum-gba-pieces.md`; stills: `docs/colosseum-crisp3d/`.
 - **The 3D pieces (the gear's Pieces: 3D; until Nov 1 the gear's "3D pieces", Eric, Oct 30: "a toggle … for 3D vs 2D pieces players can choose"; Off by
   default, remembered on this device, flipping it redraws at once).** The six Staunton pieces made
   once in code at load (`colosseum/pieces3d.ts`): pawn, rook (six merlons), bishop (its slit cut in the shader), queen (nine
@@ -86,7 +87,10 @@ links Eric's notes); this page is what's built.
   "2.1K"), the last four moves (the one just played in gold), the flat board (the game's `Board`, small, silent; Black's
   player view turns it round) with its eval bar ("+0.3", "M3"), a status line ("Game 2 · 3+2", then "White wins on time.
   Next game soon."), the chat's box (empty for now: "Coming soon"), and in the top bar Exit, Change seat and the gear
-  (`MatchMenu` with `extra`: Sound, Animations, **Pieces** (Pixel, 3D or 2D: a tap steps through them, the gear's pill
+  (`MatchMenu` with `extra` and `animations`: Sound, **Animations** (the Colosseum's own since Nov 2, Eric: "the default animation
+  toggle should be no animation", "the colosseum settings are separate": the pieces' slide and the crowd's jump; off unless
+  chosen on, remembered on this device as `colosseum-animations`; Settings → Board's Animations is its own, unchanged),
+  **Pieces** (Pixel, 3D or 2D: a tap steps through them, the gear's pill
   showing the one chosen; Pixel by default, remembered on this device), **Ambient crowd noise** (Normal, Low or Off: a tap steps
   through them, the gear's pill showing the one chosen (`CycleRow`); Normal by default, remembered on this device: the
   sound below), Report a bug). Phone (under 900 × 600): the stands at the top (31% of the height), the cards, the moves in
@@ -125,16 +129,16 @@ links Eric's notes); this page is what's built.
 - **No WebGL 2:** a still of the stands (`colosseum/still.jpg`, the eighth seat, retaken with the API art) in the arena's
   place; everything else the same.
 - **The frame rate.** Three draw calls a frame with 2D (the arena, the crowd with the arena's figures, the props), eight with
-  3D, ten with Pixel (Pixel's small target is made when the screen's size changes, never a frame). A frame sets the
+  3D, three with Pixel (its sprites are drawn when the view changes, never a frame). A frame sets the
   camera, the time and the jump's clock and draws: nothing allocated, nothing uploaded (the props are uploaded again only
   when a move is made; the flames' flicker and the banners' sway are frames picked on the GPU from the clock). The loop
   stops while the tab is hidden. `?fps` shows a pill: frames a second and draw calls. Measured with the API art (Oct 31,
   eric.md's method, headless, software WebGL, against main): phone 12.7 → 12.9 fps, computer 6.8 → 7.6 fps, script a frame
   0.29 → 0.36 and 0.37 → 0.33 ms, 3 draw calls; numbers in `docs/decisions/2026-10-31-colosseum-api-art.md`. Pixel, the high
   views and the Pieces row (Nov 1): `docs/decisions/2026-11-01-colosseum-pixel.md` (Pixel: 11.7 fps against
-  2D's 9.6 on a computer, level with 2D on a phone, 18.7 against 19.2; 3D 6.9 and 12.1). Round 2 of the pixel set (Nov 1,
-  the same section there): level with or ahead of 2D in the same page in turn, phone and computer, in White's view and the
-  high view.
+  2D's 9.6 on a computer, level with 2D on a phone, 18.7 against 19.2; 3D 6.9 and 12.1). The art session's pieces (Nov 2,
+  the arena full size again; the styles in the same page in turn, the high view behind White, medians of six 2 s windows):
+  phone Pixel 18.4, 2D 20.2, 3D 11.0; computer Pixel 9.8, 2D 9.8, 3D 7.4.
 - **The town is untouched** but for the card's link: none of this loads there, and the town's drawing and frame loop
   are as they were.
 
@@ -157,7 +161,7 @@ same pictures made smaller by mipmaps). Still placeholders: the board's squares 
 ## Files
 
 `packages/app/src/colosseum/`: `ColosseumPage.tsx` (the lazy page), `Colosseum.tsx` (the screen, the loop, the hooks),
-`arena.ts`, `arena-gl.ts`, `art.ts`, `sprites/` (the API art's drawings), `pieces3d.ts`, `pieces-pixel.ts`, `match.ts`, `floor-engine.ts`, `ambient.ts` (the streamed ambience),
+`arena.ts`, `arena-gl.ts`, `art.ts`, `sprites/` (the API art's drawings), `pieces3d.ts`, `pieces-gba.ts` and `arena-pieces-gba.ts` (Pixel's models, from the art session), `match.ts`, `floor-engine.ts`, `ambient.ts` (the streamed ambience),
 `colosseum.css`, `still.jpg`. Sound: `packages/app/public/sounds/colosseum/` (`ambient.mp3`, `cheer.mp3`, `CREDITS.md`),
 made by `scripts/crowd-sounds.py`; `sound.ts` (`colosseumCheer`, `warmFile`, `mediaGain`). The link:
 `town/Town.tsx` (the card), `town/TownPage.tsx`, `town/town.css` (`a.town-btn.town-look`). The gear's extra rows:
@@ -176,17 +180,17 @@ made by `scripts/crowd-sounds.py`; `sound.ts` (`colosseumCheer`, `warmFile`, `me
   a player view, a move's pieces (slide, capture, castling, en passant), the
   overlay's words, a game played to its end and the next one started, a flag.
 - `e2e/colosseum.spec.ts` (phone and computer): the card's link in, the arena drawn (WebGL, opening on the high view behind
-  White in Pixel: ten draw calls, the crowd in, no railing), Change seat changes the view, the railing at the arena's foot (never over the flat board, the eval bar, the chat or
+  White in Pixel: three draw calls, the crowd in, no railing; the gear's Animations off by default, its own setting), Change seat changes the view, the railing at the arena's foot (never over the flat board, the eval bar, the chat or
   Exit; no taps; none in a player view), a bot game plays and, ended, the next starts, the overlay's pieces, the gear's rows,
   `?view=black`, Exit back to the town.
 - `packages/app/test/colosseum.test.ts`, "the 3D pieces": the six meshes (whole triangles, unit normals, on the board, inside
-  their squares, the king tallest). "The pixel set and the gear's Pieces": the six pixel meshes (the same, plus real-set
-  heights in order, the king about twice the pawn, eight-sided bases with a face toward you); "as the picture has them": in
-  the high view behind White, phone and computer, each piece on its home square near White as tall as the picture's (within
-  0.05 of a square) and its base as wide (within 0.04), outline and all; and the Pieces' order, default
-  and saved choice (an old "3D pieces" on is 3D). `e2e/colosseum.spec.ts`, "the gear's Pieces": Pixel by default (ten draw
-  calls), a tap steps to 3D (eight), 2D (three) and Pixel again at once, the game plays, a reload keeps 3D and 2D, an old
-  "3D pieces" on comes back as 3D.
+  their squares, the king tallest). "Pixel's pieces (Nov 2)": the twelve sprites (every pixel a palette color or empty, an outline round each, standing on
+  its foot, heights in the real set's order), drawn for your seat (the high view behind White at the mockups' 30°, every view's
+  pitch in range, a square near you about 20 art pixels, phone and computer), the atlas's shares each smaller; and the
+  Pieces' order, default and saved choice (an old "3D pieces" on is 3D). `e2e/colosseum.spec.ts`, "the gear's Pieces": Pixel
+  by default (three draw calls), a tap steps to 3D (eight), 2D (three) and Pixel again at once, the game plays, a reload keeps
+  3D and 2D, an old "3D pieces" on comes back as 3D; the first test: the gear's Animations off by default, on with a tap,
+  saved as the Colosseum's own (Settings → Board's untouched).
 - Sound: `e2e/colosseum.spec.ts`, "sound: the gear's Ambient crowd noise…" (phone and computer):
   - Normal by default, the ambience plays from a non-zero point in the hour and keeps going, fetched by Range requests.
   - Normal, Low and Off each set a lower gain, and Off pauses it.
@@ -203,8 +207,9 @@ made by `scripts/crowd-sounds.py`; `sound.ts` (`colosseumCheer`, `warmFile`, `me
   - The service worker leaves it alone.
   - The cheer's credit is in Settings, the FAQ and the notice.
 - Test hooks (test switches on): `window.__colosseum` (`state()` (with `pieces`: "pixel", "3d" or "flat", and `pixelScale`; `ambient`: playing, time, start, level, gain), `seat(i)`, `flag()`,
-  `jump()` (the crowd's jump and its cheer), `sample()`, `pieces(style)` and `freeze()` for still pairs: the same frame in 3D and flat; `lens(view)` and `place(pieces)` for close-up
-  stills: a view of their own and a position of their own), and
+  `jump()` (the crowd's jump and its cheer), `sample()`, `pieces(style)` and `freeze()` for still pairs: the same frame in 3D and flat; `lens(view)` and `place(pieces, slideStart?)` for close-up
+  stills: a view of their own and a position of their own; `snap(time?, box?)`, the arena drawn at a time and read back, and
+  `screenBox(squares)`, for stills and GIFs: `scripts/frames-colosseum-crisp.mjs`), and
   `?fast` makes the bots move at once and the next game come in 1.2 s.
 
 ## Not built yet

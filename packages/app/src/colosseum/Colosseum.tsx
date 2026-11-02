@@ -23,11 +23,10 @@ import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { Board } from "../components/Board.tsx";
 import { Avatar } from "../components/Items.tsx";
 import { CycleRow, MatchMenu } from "../components/MatchMenu.tsx";
-import { crowdAnimations, onPrefsChange } from "../prefs.ts";
 import { COLOSSEUM_CHEER, play, warmFile, type SoundName } from "../sound.ts";
 import { testParams, testSwitchesAllowed } from "../test-switches.ts";
 import { COLISEUM_PLACE, isSprite } from "../town/world.ts";
-import { BLACK_VIEW, SEAT_VIEWS, VIEWS, otherSeat, railPitch, seats, turnLimits, viewFor, viewsFor, type View } from "./arena.ts";
+import { BLACK_VIEW, BOARD, SEAT_VIEWS, project, squareXZ, VIEWS, otherSeat, railPitch, seats, turnLimits, viewFor, viewsFor, type View } from "./arena.ts";
 import { AMBIENT_LEVELS, AMBIENT_LEVEL_NAME, Ambient, ambientLevelOf, type AmbientLevel } from "./ambient.ts";
 import { ArenaGL, PIECE_STYLES, PIECE_STYLE_NAME, SLIDE_S, buildCrowd, pieceStyleOf, type FloorPiece, type PieceStyle } from "./arena-gl.ts";
 import { PIECE_URL, RAIL, crowdArt, propArt, railingArt, sceneArt } from "./art.ts";
@@ -49,6 +48,19 @@ const pieceStyle = (): PieceStyle => {
     return pieceStyleOf(localStorage.getItem(PIECES_KEY), localStorage.getItem(OLD_PIECES_KEY));
   } catch {
     return "pixel";
+  }
+};
+/**
+ * The Colosseum's own Animations (Nov 2, Eric: "the default animation toggle should be no animation"; "the colosseum settings
+ * are separate"): the pieces' slide and the crowd's jump. Off unless chosen on, remembered on this device; Settings → Board's
+ * Animations (Crowd, raids, Classic's and Squads' reveals) is its own and unchanged.
+ */
+const ANIM_KEY = "colosseum-animations";
+export const colosseumAnimations = (): boolean => {
+  try {
+    return localStorage.getItem(ANIM_KEY) === "1";
+  } catch {
+    return false;
   }
 };
 const ambientLevel = (): AmbientLevel => {
@@ -74,9 +86,13 @@ type Hooks = {
     pieces: (style: PieceStyle) => unknown;
     freeze: () => unknown;
     lens: (v: View | null) => unknown;
-    place: (pieces: FloorPiece[]) => unknown;
+    place: (pieces: FloorPiece[], t0?: number) => unknown;
     jump: () => unknown;
     sample: () => { sky: number; hash: number } | null;
+    /** (Stills and GIFs) the arena drawn at `time` (the page's clock, s; now if none), read back as a PNG data URL, cut to `box` (canvas px). */
+    snap: (time?: number, box?: { x: number; y: number; w: number; h: number }) => string | null;
+    /** (Stills) the screen box (CSS px) round these squares' pieces, as the last frame drew them. */
+    screenBox: (squares: string[]) => { x: number; y: number; w: number; h: number } | null;
   };
 };
 
@@ -116,12 +132,11 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
     };
   }, []);
   const [pieces, setPieces] = useState(pieceStyle);
-  const [anim, setAnim] = useState(crowdAnimations);
+  const [anim, setAnim] = useState(colosseumAnimations);
   /** The railing's strip (arena-railing), drawn once. */
   const [rail] = useState(() => `url(${railingArt()})`);
   const animRef = useRef(anim);
   animRef.current = anim;
-  useEffect(() => onPrefsChange(() => setAnim(crowdAnimations())), []);
 
   // The arena: WebGL 2, its art, its frame loop, the drag to turn.
   useLayoutEffect(() => {
@@ -326,7 +341,7 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
       flag: () => testSwitchesAllowed() && match.current?.flag(),
       pieces: (style) => testSwitchesAllowed() && arenaRef.current?.setPieceStyle(style),
       lens: (v) => testSwitchesAllowed() && (lens.current = v),
-      place: (p) => testSwitchesAllowed() && arenaRef.current?.setPieces(p, -1e9),
+      place: (p, at = -1e9) => testSwitchesAllowed() && arenaRef.current?.setPieces(p, at),
       freeze: () => {
         if (!testSwitchesAllowed()) return;
         frozenAt.current = performance.now();
@@ -356,6 +371,35 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
             hash = (Math.imul(hash, 31) + (px[0]! >> 4) * 256 + (px[1]! >> 4) * 16 + (px[2]! >> 4)) | 0;
           }
         return { sky: sky / n, hash };
+      },
+      snap: (time, box) => {
+        const a = arenaRef.current;
+        if (!a || !testSwitchesAllowed()) return null;
+        a.draw(lens.current ?? views.current[viewRef.current]!, turn.current.yaw, turn.current.pitch, time ?? (performance.now() - t0.current) / 1000, 99);
+        const cv = a.gl.canvas as HTMLCanvasElement;
+        if (!box) return cv.toDataURL("image/png");
+        const c = document.createElement("canvas");
+        c.width = box.w;
+        c.height = box.h;
+        c.getContext("2d")!.drawImage(cv, box.x, box.y, box.w, box.h, 0, 0, box.w, box.h);
+        return c.toDataURL("image/png");
+      },
+      screenBox: (squares) => {
+        const a = arenaRef.current;
+        if (!a || !testSwitchesAllowed()) return null;
+        const cv = a.gl.canvas as HTMLCanvasElement;
+        const r = cv.getBoundingClientRect();
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+        for (const sq of squares) {
+          const [x, z] = squareXZ(sq);
+          // (A square's foot corners and 2.2 m above its middle: the tallest piece and its lean fit inside.)
+          for (const [dx, dy, dz] of [[-0.5, 0, -0.5], [0.5, 0, 0.5], [-0.5, 0, 0.5], [0.5, 0, -0.5], [0, 2.2, 0]] as const) {
+            const p = project(a.viewProj, x + dx, BOARD.lift + dy, z + dz, r.width, r.height);
+            if (!p) continue;
+            x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]);
+          }
+        }
+        return Number.isFinite(x0) ? { x: r.left + x0, y: r.top + y0, w: x1 - x0, h: y1 - y0 } : null;
       },
     };
     return () => void delete w.__colosseum;
@@ -426,6 +470,17 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
         </button>
         <MatchMenu
           exit={null}
+          animations={{
+            on: anim,
+            toggle: () => {
+              setAnim(!anim);
+              try {
+                localStorage.setItem(ANIM_KEY, anim ? "0" : "1");
+              } catch {
+                // (Not remembered: private mode.)
+              }
+            },
+          }}
           extra={
             <>
               <CycleRow
