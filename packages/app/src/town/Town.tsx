@@ -319,7 +319,7 @@ export function TownScreen({
           {/* The card: over the boss's head or the home's top, its tail pointing there (placed every frame). Dark, with a gold border
               (Eric's mockup, Oct 28); a person's is one row at one size (`town-person`). */}
           <div class={card?.kind === "person" ? "town-card town-person" : card?.kind === "home" && !card.confirm && home && shopOf(home.id) ? "town-card town-door" : "town-card"} ref={cardEl} role="dialog" aria-label={label} style={{ display: card ? "" : "none" }}>
-            {/* A boss with an intro (Alfil first, Nov 2: shops/challenge.ts): you fight it in its home, then come back here. */}
+            {/* A boss with an intro (every boss whose home has an inside, Nov 2: shops/challenge.ts): you fight it in its home, then come back here. */}
             {card && home && card.confirm && introOf(home.id) && (
               <>
                 <h2>Challenge {home.boss}?</h2>

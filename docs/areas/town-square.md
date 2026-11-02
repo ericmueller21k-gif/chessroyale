@@ -555,27 +555,46 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
 - **Test hooks** (test switches on): the room's canvas `canvas.town-shop-canvas` carries `data-room`, `data-you`, `data-ready`;
   `__shopAt("keeper" | "door" | "square", [c, r])`, `__shopCam()`, `__shopBench(n)`, `__shopRide()` (your ride inside).
 
-## Challenging a boss (Nov 2: Pokémon-gym style, Alfil first)
+## Challenging a boss (Nov 2: Pokémon-gym style)
 
 Eric, Nov 2: challenge a boss in the town and it walks into its home with you; you each walk to your start mark on its battle
 circle; it says its line; its own animation brings the board in; its own transition covers the screen while the battle loads; after
-the battle, "Back to town" puts you where you stood. Decision: [2026-11-02-boss-challenge.md](../decisions/2026-11-02-boss-challenge.md).
+the battle, "Back to town" puts you where you stood. Round 2 (Nov 2, after the intro GIF): "For Alfil he shattered the pyramid, that's
+fine for him, but for other bosses they should just be swinging for a few seconds… I also prefer the normal look is boss on left, you
+on right, not vertical… just be sure the table and chairs and pieces all are logically placed." Decisions:
+[2026-11-02-boss-challenge.md](../decisions/2026-11-02-boss-challenge.md), [2026-11-02-boss-challenge-r2.md](../decisions/2026-11-02-boss-challenge-r2.md).
 
-- **Which bosses.** Those in `BOSS_INTROS` (`town/shops/challenge.ts`): Alfil. Every other boss's card works as before (its confirm,
-  Leave, the Boss raid screen). Per player: it all happens on your own screen; the boss stays at its home for everyone else.
-- **The flow** (`nextFlow`, pure): the boss's card's **"Challenge alone"**, its confirm **"Challenge Alfil?"** / "You'll fight Alfil in
+- **Which bosses.** Those in `BOSS_INTROS` (`town/shops/challenge.ts`): every boss whose home has an inside (`SHOPS`): Alfil (his own
+  intro, `custom: true`), Babur and Puddles (the default intro). Every other boss's card works as before (its confirm, Leave, the Boss
+  raid screen). Per player: it all happens on your own screen; the boss stays at its home for everyone else.
+- **The layout** (`layout`, per boss): **"across"** (the default, all three today): the boss on the table's west (the screen's
+  left), you on its east, side by side on the circle's middle row, each `standOff.across` (1.5) squares out, facing each other;
+  **"facing"**: the boss north, you south (`standOff.facing`, 2.5: the circles' old marks). `marksOf(layout, how)` finds the circle's
+  middle from its floor (`circle-*`, `ring-*`, `emblem-*`), moved `clearOff` south when a piece stands there (Babur's pedestal).
+  Alfil's and Puddles' drawn start marks sit west and east of the emblem, the middle line north to south (a unit test keeps the marks
+  where the layout puts you).
+- **The table:** the town's park table (`PARK_TABLE`, three squares across: a stool, the leg, a stool), in the boss's colors when its
+  art has a table (Alfil's), else the park's stone. A stool at each player's side, `stoolOff` (1) from the middle, nothing on the empty
+  sides: across, the picture as drawn; facing, its middle square alone and a stool north and south. The board (`paintTable`) is
+  turned to the layout (`boardSquare`): white's ranks nearest you, black's nearest the boss, the a-file on your left; across, the
+  knights face the other side. You and the boss stand just past your stools, in front of them.
+- **The flow** (`nextFlow`, pure): the boss's card's **"Challenge alone"**, its confirm **"Challenge Babur?"** / "You'll fight Babur in
   Boss Battle, then come back here." / **Fight** / Stay. Fight keeps where you stand (`standOf`), and you and the boss walk to its
-  door (the boss at your pace) and in (the shop's zoom and fade; the room and the intro's art load only now: `shops/intro.ts`,
-  `shops/alfil-intro-art.ts`). Inside (the room in challenge mode: no cards, no walking by tap, its own framing,
-  `CHALLENGE_FEEL.camZoom` and `camSouth`), you walk to the south start mark and the boss to the north one (`marksOf`, from the
-  art's `circle-mark` tiles), side by side at `walkStepMs`. Facing each other: its line in a speech bubble over its head and into the
-  chat log (`BOSS_INTROS[id].line`; Alfil's a placeholder, "I'll show you the power of the old piece.", until Gemini's lines), the
-  pyramid rising `riseAtMs` into it, holding, cracking, crumbling, the table and its board (`introBeats` / `introAt`), its cues'
-  sounds (`cues`). From `attackLeadMs` (2 s) before the storm covers, the boss fires its God King attack (its kit's `kingAttack`,
-  with its sounds) at the board, beside the table, its lashes looping until the battle takes the screen (`attackStart`,
-  `attackTime`); a boss whose kit has none skips it. Then the storm (`startStorm`: a canvas over the whole page, outside the town, so it stays as the town closes)
-  sweeps in, the battle starts under it (the app's `challengeFromTown`: Boss alone, as START), and it slides off the board. The back
-  button calls it off until the storm starts. A tap doesn't skip. About 6 s from the door to the storm covering.
+  door (the boss at your pace) and in (the shop's zoom and fade; the room and the intro load only now: `shops/intro.ts`, and Alfil's
+  art, `shops/alfil-intro-art.ts`). Inside (the room in challenge mode: no cards, no walking by tap, its own framing per layout,
+  `CHALLENGE_FEEL.cam`), you each walk to your mark, side by side at `walkStepMs`, settle onto its middle and turn to face each other.
+  Its line in a speech bubble over its head (not the chat log; `BOSS_INTROS[id].line`, placeholders until Gemini's lines). Then:
+  - **Alfil's own:** the pyramid rising `riseAtMs` into the line, holding, cracking, crumbling, the table and its board (`introBeats`
+    / `introAt`), his cues' sounds; from `attackLeadMs` (2 s) before the storm covers, his God King attack at the board, beside the
+    table on his side, its lashes looping (`attackStart`, `attackTime`); the sandstorm (`startStorm`).
+  - **The default** (`custom: false`): the table pops in `popAtMs` into the line (grows from its foot past its size and back over
+    `popMs`, a dust puff over `puffMs`, the app's soft "pop"); from the line's end the boss swings its God King attack in place for
+    `swingMs` (its kit's `kingAttack` and sounds: its lashes only, looping, no drop-in or leap, `attackTime(…, inPlace)`); then the
+    flash and the wipe (`startWipe`: `flashes` white flashes over `flashMs`, black bands wiping in from alternate sides over `wipeMs`,
+    the boss's own whoosh; held black while the battle loads; faded off over `wipeOutMs`).
+  Each transition is a canvas over the whole page, outside the town (it stays as the town closes); the battle starts under it (the
+  app's `challengeFromTown`: Boss alone, as START). The back button calls it off until the transition starts. A tap doesn't skip.
+  About 6 s from the door to the screen covered.
 - **After the battle:** the result screen's leaving button reads **"Back to town"**; it (and the gear's Leave: "You'll go back to the
   town square.") opens the town with you on the square you stood on, facing the same way (`createTown`'s `stand`). "Play again" keeps it.
 - **The server's lines in the town's chat** (signed-in players; blue, `.tc-server`, no name and no menu): "Ann challenged Alfil!" as the
@@ -583,11 +602,13 @@ the battle, "Back to town" puts you where you stood. Decision: [2026-11-02-boss-
   "Ann surrendered to Alfil after 15 moves." (a resign after `TOWN_CHAT.challengeSurrenderMoves`, 10; before, it's a quit), and
   " + Alfil token" on the end when the battle dropped one. No spam: while one of your challenges is unfinished (a quit: a leave, an
   early resign), your next challenge posts no start line; its finish posts the outcome and closes it (`TownChat.challenge`, server).
-- **Test hooks:** the room's canvas `data-intro` (its step); `__shopIntro()`; the storm's `canvas.boss-storm` (`data-phase`);
-  `__townYou()`.
-- **Tests:** `packages/app/test/boss-challenge.test.ts` (the flow, the marks, the timeline, the storm's edge, back to where you
-  stood), `packages/server/test/town-chat.test.ts` (the lines and the no-spam rule, and through the API), `e2e/boss-challenge.spec.ts`
-  (phone and computer: a quit, then a finished challenge, the lines), `e2e/shop.spec.ts` (Alfil's Pyramid's crate).
+- **Test hooks:** the room's canvas `data-intro` (its step); `__shopIntro()` (step, layout, where you and the boss stand and face, the
+  line, the table and its stools); the storm's `canvas.boss-storm` and the wipe's `canvas.boss-wipe` (`data-phase`); `__townYou()`.
+- **Tests:** `packages/app/test/boss-challenge.test.ts` (the flow, the layouts and marks, the stools, the board's turn, both timelines,
+  the storm's edge, the wipe, back to where you stood), `packages/server/test/town-chat.test.ts` (the lines and the no-spam rule, and
+  through the API), `e2e/boss-challenge.spec.ts` (phone and computer: Alfil, a quit then a finished challenge and the lines; Babur's
+  default intro and back), `e2e/shop.spec.ts` (Alfil's Pyramid's crate), `e2e/town.spec.ts` (a boss without an inside, Folio: the
+  Boss raid screen).
 
 ## Frame-rate pill (`?fps`)
 `/town?fps` shows anyone (Eric, Oct 30: no admin needed, the site is behind Cloudflare Access) a pill in the world's top-right corner, "60 fps · 16.7 ms · 2D": frames over the last second and their mean time, text set twice a second from plain counters in the frame loop, then the drawing's backend ("· WebGL" with `?gl=1`; added by town.css from `data-backend`, so the pill's text stays the numbers). Without `?fps` there is none. `?crowd=N` is anyone's too (only that device draws the pawns).

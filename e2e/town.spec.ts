@@ -230,7 +230,10 @@ async function tapPoint(p: Page, kind: "boss" | "home", id = "tiger") {
  */
 async function toBabur(p: Page, id = "tiger", home = "Babur's Circus") {
   if (await tapPoint(p, "home", id)) return;
-  await p.getByRole("button", { name: `Go to ${home}` }).dispatchEvent("click");
+  // (A home without its chip on the edge just now, as Folio's on a phone: the camera glides there, as the chip would.)
+  const chip = p.getByRole("button", { name: `Go to ${home}` });
+  if (await chip.count()) await chip.dispatchEvent("click");
+  else await p.evaluate((i) => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.(i), id);
   await expect.poll(() => tapPoint(p, "home", id), { message: `${home} comes into view` }).not.toBeNull();
 }
 /**
@@ -316,8 +319,8 @@ test("a boss's card: 'Challenge alone', then 'Leave the town square?'; Stay keep
   let card = await openCard(page, "boss", "Folio", "folio");
   // No line on his card (only Hollow's has lines: Oct 28).
   await expect(card.locator(".town-card-line")).toHaveCount(0);
-  // He says something as his card opens (Eric, Oct 27: his select sound), once: its confirm opening is the same card.
-  const said = () => page.evaluate(() => ((window as any).__soundLog as string[]).filter((l) => l.startsWith("folioHello")).length);
+  // He says something as his card opens (Eric, Oct 27: his town sound, Folio's murmur or hum), once: its confirm opening is the same card.
+  const said = () => page.evaluate(() => ((window as any).__soundLog as string[]).filter((l) => /^folio(Murmur|Hum)/.test(l)).length);
   await expect.poll(said).toBe(1);
   await card.getByRole("button", { name: "Challenge alone" }).click();
   let confirm = page.getByRole("dialog", { name: "Leave the town square?" });

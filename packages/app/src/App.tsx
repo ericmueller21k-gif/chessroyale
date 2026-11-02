@@ -663,7 +663,7 @@ export function App() {
     history.pushState({ townGame: g.seat }, "", `/town${rest ? `${rest}&` : "?"}at=${g.seat}`);
   };
   /**
-   * A boss challenged in the town (one with an intro: town/shops/challenge.ts, Alfil first), its transition covering the screen: its
+   * A boss challenged in the town (one with an intro: town/shops/challenge.ts), its transition covering the screen: its
    * battle starts now, Boss alone's (that boss picked, your difficulty, a token counting, as Boss Battle's START), and resolves once
    * the battle's screen shows. Leaving the battle (its result's "Back to town") puts you back where you stood (`townReturn`).
    */
