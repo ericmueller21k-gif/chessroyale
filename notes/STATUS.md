@@ -14,6 +14,9 @@ Everything from Nov 1 is merged: #447 eval bar off, #448 cash-in 2 gold, #449 on
   branch claude/boss-art; asks Eric once, ~$4-6, cap $8).
 
 ## Queue (one Opus at a time)
+0. NEXT after shop r1: Timber's own sounds (Eric, Nov 2: he borrows Big Boy's clack etc.; all his cues are borrowed,
+   kits.ts "no sounds of their own yet"). Synth set timber-sounds.ts: gnawing wood, knocking, sawing, thumping, hammer
+   tap; pick sound = gnaw. WAVs to Eric first, then wire (boss-select.ts:43, kits.ts Timber sounds). Opus high.
 1. Auto chess reveal (Eric's simpler version): your placed pieces gray until revealed to the opponent, then normal; yellow
    2 px border = next to reveal; no green; all ungray at the move step; opponent circles as today; piece-for-piece
    matching (pawn↔pawn, knight/bishop↔knight/bishop, rook↔rook, queen↔queen; unmatched stay hidden); first placer's
