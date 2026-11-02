@@ -7,7 +7,7 @@
  *   foot (the middle of the square the piece stands on) at the origin, **+z the piece's front** (toward the viewer), +x its
  *   right as you face it. The knight's head looks toward -x (to the viewer's left); mirror x for the other way.
  * - **A model** is `inside(x, y, z)`: the material at that point (body, gold, groove, eye) or null outside. Heights, foot to
- *   top: pawn 19, rook 19, knight 22, bishop 23, queen 25, king 30.
+ *   top: pawn 17, rook 19, knight 22, bishop 23, queen 25, king 30.
  * - **`drawPiece(kind, side, pitch)`** draws one piece as seen from above at `pitch` radians (0 level, 0.52 the stands behind
  *   White as mocked up) facing its front, one pixel a unit: palette keys (`PALETTE`), null empty, the foot's pixel (ax, ay).
  *   Flat cel bands lit from the top left and front, a 1-pixel outline round it and where a nearer part covers a farther one.
@@ -222,7 +222,7 @@ function turnedAbove(profile: (y: number) => [number, Mat] | null, extra?: (x: n
 /**
  * The pawn (Eric, Nov 2: "yours look like a pyramid, mine have the normal slender taller look", his reference's pawns): its
  * own low, flat base (a step, a gold band, a sloped top), a slim waisted stem, a gold collar, a short neck and the round
- * head (19 tall).
+ * head (17 tall; Eric's pick of three, Nov 2: "that's the best one").
  */
 function pawnModel(): Model {
   const profile = (y: number): [number, Mat] | null => {
@@ -230,15 +230,15 @@ function pawnModel(): Model {
     if (y < 2) return [4.3, "gold"];
     if (y < 3.3) return [3.9 - ((y - 2) / 1.3) * 0.7, "body"];
     if (y < 3.8) return [2.6, "groove"];
-    if (y < 11.5) { const s = (y - 3.8) / 7.7; return [1.5 + 0.7 * (1 - s) ** 2, "body"]; }
-    if (y < 12.4) return [3, "gold"];
-    if (y < 13.4) return [1.5, "body"];
+    if (y < 11) { const s = (y - 3.8) / 7.2; return [1.35 + 1.15 * (1 - s) ** 2, "body"]; }
+    if (y < 11.9) return [2.8, "gold"];
+    if (y < 12.4) return [1.3, "body"];
     return null;
   };
   return {
     inside(x, y, z) {
       if (y < 0) return null;
-      if (y >= 12.4 && Math.hypot(x, y - 16, z) <= 3.05) return "body";
+      if (y >= 12.4 && Math.hypot(x, y - 14.55, z) <= 2.4) return "body";
       const pr = profile(y);
       return pr && Math.hypot(x, z) <= pr[0] ? pr[1] : null;
     },

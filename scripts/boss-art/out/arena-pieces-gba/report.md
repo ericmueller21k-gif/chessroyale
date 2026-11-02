@@ -79,3 +79,10 @@ taller look." The pawn no longer uses the shared tall base: its own low, flat ba
 slim, nearly straight stem, a gold collar, a short neck and a bigger round head lifted clear of the collar; 19 tall (was
 16). New: `mockup-3d-mid-computer.png` and `mockup-3d-mid-phone.png`, a middle game like the reference so the pawns stand
 in the open; `compare-3d-reference.png` now shows that one beside the reference.
+
+## Round 6: Eric's pawn (Nov 2)
+
+Eric: "Use the pawn you did right after I asked for it to be thinner, that's the best one." Back to round 5's first try:
+its own low, flat base with a gold band, a slim waisted stem (wider at the foot), a gold collar, a short neck and a round
+head; 17 tall. (The later straighter stem and bigger head, 19 tall, are dropped.) The sheet, mockups and comparison are
+redrawn with it.
