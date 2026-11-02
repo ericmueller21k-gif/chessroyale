@@ -3,8 +3,8 @@ import { INTRO_ALFIL_PYRAMID } from "../src/town/shops/alfil-intro-art.ts";
 import { SHOP_ALFIL_LAYOUT } from "../src/town/shops/alfil-art.ts";
 import { SHOP_BABUR_LAYOUT } from "../src/town/shops/babur-art.ts";
 import { SHOP_PUDDLES_LAYOUT } from "../src/town/shops/puddles-art.ts";
-import { SHOP_BIGBOY_LAYOUT, SHOP_BIGBOY_PIECES } from "../src/town/shops/bigboy-art.ts";
-import { INTRO_BIGBOY_BLOCKS, INTRO_BIGBOY_SWIRL, INTRO_BIGBOY_SWIRL_FRONT, INTRO_BIGBOY_TABLE_PALETTE } from "../src/town/shops/bigboy-intro-art.ts";
+import { SHOP_BIGBOY_LAYOUT, SHOP_BIGBOY_MARKS, SHOP_BIGBOY_PIECES } from "../src/town/shops/bigboy-art.ts";
+import { INTRO_BIGBOY_BLOCKS, INTRO_BIGBOY_STOOL_B, INTRO_BIGBOY_STOOL_SEAT_H, INTRO_BIGBOY_STOOL_TOP_H, INTRO_BIGBOY_STOOL_W, INTRO_BIGBOY_SWIRL, INTRO_BIGBOY_SWIRL_FRONT, INTRO_BIGBOY_TABLE_PALETTE } from "../src/town/shops/bigboy-intro-art.ts";
 import { TABLE_BOARD } from "../src/town/houses/park.ts";
 import { renderFrame } from "../src/characters/sprite.ts";
 import { BOSS_INTROS, CHALLENGE_FEEL, attackStart, attackTime, boardSquare, frameAt, introAt, introBeats, introCues, introLength, introOf, marksOf, nextFlow, stormEdge, wipeAt, type BlocksAnims, type ChallengeEvent, type ChallengeFlow, type IntroAnims } from "../src/town/shops/challenge.ts";
@@ -142,8 +142,11 @@ describe("the battle circle's marks", () => {
     }
   });
 
-  it("Big Boy's drawn start marks (his circle's own tiles) are where you stand across: west and east of the emblem, a two-square pad each; none north or south", () => {
-    const m = marksOf(SHOP_BIGBOY_LAYOUT, "across")!;
+  it("Big Boy's start marks (SHOP_BIGBOY_MARKS, drawn on his rug) are where you stand across: west and east of the table, a two-square pad each; none north or south", () => {
+    const m = marksOf(SHOP_BIGBOY_LAYOUT, "across", SHOP_BIGBOY_MARKS)!;
+    expect([m.boss, m.you]).toEqual([{ c: SHOP_BIGBOY_MARKS.boss[0], r: SHOP_BIGBOY_MARKS.boss[1] }, { c: SHOP_BIGBOY_MARKS.you[0], r: SHOP_BIGBOY_MARKS.you[1] }]);
+    // (The same as the layout's own: a square and a half either side of the circle's middle, the table there.)
+    expect(m).toEqual(marksOf(SHOP_BIGBOY_LAYOUT, "across"));
     // (A pad's teal edge, "T": only the marks have it on the circle.)
     const edged = (c: number, r: number) => {
       const p = SHOP_BIGBOY_LAYOUT.find((q) => q.col === c && q.row === r && /^circle-/.test(q.name))!;
@@ -268,7 +271,7 @@ describe("the intro's timeline (Big Boy's toy blocks, Nov 2)", () => {
   const F = CHALLENGE_FEEL;
   const beat = (s: string) => beats.find((b) => b.step === s)!;
 
-  it("the art: build 21 frames (6 blocks landing, the top one last), plop 5 (its first the board's touchdown), chairs 8 (2 stools); his table three squares across, the board's slab on its top block", () => {
+  it("the art: build 21 frames (6 blocks landing, the top one last), plop 5 (its first the board's touchdown), chairs 8 (2 stools); his table three squares across (and 8 px each side for the stools' puffs), the board's slab on its top block; the stools a dark gray B on the boss's side (black's), a bone W on yours", () => {
     expect(B.build).toHaveLength(21);
     expect(B.cues.build.filter(Boolean)).toEqual(["block", "block", "block", "block", "block", "block-top"]);
     expect(B.plop).toHaveLength(5);
@@ -276,14 +279,33 @@ describe("the intro's timeline (Big Boy's toy blocks, Nov 2)", () => {
     expect(B.chairs).toHaveLength(8);
     expect(B.cues.chairs.filter(Boolean)).toEqual(["stool", "stool"]);
     const ch = INTRO_BIGBOY_BLOCKS;
-    expect(ch.w).toBe(3 * TOWN_FEEL.housePxPerSquare);
-    expect(Math.floor(ch.foot[0] / TOWN_FEEL.housePxPerSquare)).toBe(1);
+    const PX = TOWN_FEEL.housePxPerSquare;
+    expect([ch.w, ch.foot[0], ch.foot[1]]).toEqual([3 * PX + 16, Math.floor((3 * PX + 16) / 2), ch.h - 6]);
     // (The top block's top, in the middle, is where the town lays a table's slab: TABLE_BOARD.top over the foot.)
     const img = renderFrame(ch, ch.anims.idle!.frames[0]!);
-    let top = ch.h;
-    for (let y = 0; y < ch.h && top === ch.h; y++) if (img.data[(y * ch.w + ch.foot[0]) * 4 + 3]! > 0) top = y;
+    const topAt = (x: number) => {
+      for (let y = 0; y < ch.h; y++) if (img.data[(y * ch.w + x) * 4 + 3]! > 0) return y;
+      return ch.h;
+    };
+    const top = topAt(ch.foot[0]);
     expect(ch.foot[1] - top - TABLE_BOARD.top).toBeGreaterThanOrEqual(0);
     expect(ch.foot[1] - top - TABLE_BOARD.top).toBeLessThanOrEqual(2);
+    // The stools a square either side of the foot (where the players' stools stand: stoolOff), their tops STOOL_TOP_H (24) over it
+    // (its outline and glow a pixel or two above), the seat 20 (twice the park stools'); the boss (black) west, you (white) east.
+    expect([INTRO_BIGBOY_STOOL_TOP_H, INTRO_BIGBOY_STOOL_SEAT_H]).toEqual([24, 20]);
+    const rgb = (x: number, y: number) => "#" + Array.from(img.data.slice((y * ch.w + x) * 4, (y * ch.w + x) * 4 + 3), (v) => v.toString(16).padStart(2, "0")).join("");
+    for (const [dx, face] of [[-PX * CHALLENGE_FEEL.stoolOff, "#46454c"], [PX * CHALLENGE_FEEL.stoolOff, "#e8dcc2"]] as const) {
+      const x = ch.foot[0] + dx;
+      expect(ch.foot[1] - topAt(x) - INTRO_BIGBOY_STOOL_TOP_H, `${dx}`).toBeGreaterThanOrEqual(0);
+      expect(ch.foot[1] - topAt(x) - INTRO_BIGBOY_STOOL_TOP_H, `${dx}`).toBeLessThanOrEqual(2);
+      expect(rgb(x - 8, ch.foot[1] - 9), `${dx}: its front's face`).toBe(face);
+    }
+    expect(boardSquare("across", 0, 0).x, "white's back rank east, yours").toBeGreaterThan(0);
+    // Each stool on its own too (51 x 100, the table's ground line), idle and its drop (a "stool" cue as it lands).
+    for (const st of [INTRO_BIGBOY_STOOL_B, INTRO_BIGBOY_STOOL_W]) {
+      expect([st.w, st.h, ...st.foot], st.id).toEqual([51, ch.h, 25, ch.foot[1]]);
+      expect(st.anims.drop!.frames.map((f) => f.cue).filter(Boolean), st.id).toEqual(["stool"]);
+    }
     // His slab's and board's colors; the swirl tiles (128 a side) and its front, six frames each, looping.
     for (const k of ["1", "2", "4", "L", "D"]) expect(INTRO_BIGBOY_TABLE_PALETTE).toHaveProperty(k);
     expect([INTRO_BIGBOY_SWIRL.w, INTRO_BIGBOY_SWIRL.h, INTRO_BIGBOY_SWIRL_FRONT.h]).toEqual([128, 128, 128]);

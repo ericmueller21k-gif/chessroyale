@@ -505,7 +505,7 @@ column, on up to two smaller lines in the bar's same height, the full name as it
 [2026-11-02-building-interiors.md](../decisions/2026-11-02-building-interiors.md), [2026-11-02-shop-zoom.md](../decisions/2026-11-02-shop-zoom.md)
 and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.md) (the art's, on `claude/boss-art`).
 
-- **Which homes.** Babur's Circus (`tiger`), Puddles' Botanical Garden (`gardener`) and Alfil's Pyramid (`alfil`, Nov 2: Woolly the Shopkeeper, "Alfil's Boss Crate" with Alfil's Howdah, a sandstone ceiling, the chat's day tone) and Big Boy's Crib (`bigboy`, Nov 2: Blocky the Shopkeeper, "Big Boy's Boss Crate" with Big Boy's Buggy, a nursery ceiling of sky, clouds and stars, the chat's day tone; a ball pit, solid, under a walkway, the shop's platform and the battle circle you walk on; his toy airplane, three squares deep, stands up whole at its foot, `RoomArt.upright`, rather than lying flat as a plan): `SHOPS` in `town/shops/shops.ts`. Their home's card
+- **Which homes.** Babur's Circus (`tiger`), Puddles' Botanical Garden (`gardener`) and Alfil's Pyramid (`alfil`, Nov 2: Woolly the Shopkeeper, "Alfil's Boss Crate" with Alfil's Howdah, a sandstone ceiling, the chat's day tone) and Big Boy's Crib (`bigboy`, Nov 2: Blocky the Shopkeeper, "Big Boy's Boss Crate" with Big Boy's Buggy, a nursery ceiling of sky, clouds and stars, the chat's day tone; a ball pit, solid, under a walkway, the shop's platform and the battle circle you walk on, the circle in the walkway's foam squares with a zoo-animal rug in its middle; his toy airplane, three squares deep, stands up whole at its foot, `RoomArt.upright`, rather than lying flat as a plan): `SHOPS` in `town/shops/shops.ts`. Their home's card
   is its name, centered, and **"Go in"** (gold) under it, centered, nothing else (Eric, Nov 2: "chop the Shop and Coming soon": a short
   card, `.town-card.town-door`); every other home's card is as it was (its name, Hollow's line, "Shop" greyed and "Coming soon").
 - **Going in.** "Go in" walks you to the square in front of the door (the plot's front row's middle, a row out); there the town zooms in on
@@ -571,8 +571,9 @@ on right, not vertical… just be sure the table and chairs and pieces all are l
   left), you on its east, side by side on the circle's middle row, each `standOff.across` (1.5) squares out, facing each other;
   **"facing"**: the boss north, you south (`standOff.facing`, 2.5: the circles' old marks). `marksOf(layout, how)` finds the circle's
   middle from its floor (`circle-*`, `ring-*`, `emblem-*`), moved `clearOff` south when a piece stands there (Babur's pedestal).
-  Alfil's, Puddles' and Big Boy's drawn start marks sit west and east of the emblem, the middle line north to south (a unit test keeps
-  the marks where the layout puts you; Big Boy's are drawn into his circle's tiles, turned in `circleMat`).
+  Alfil's and Puddles' drawn start marks sit west and east of the emblem, the middle line north to south (a unit test keeps the marks
+  where the layout puts you). Big Boy's are on the zoo rug in his circle's middle, and his art exports them (`SHOP_BIGBOY_MARKS`,
+  `RoomArt.marks`): `marksOf(layout, how, drawn)` stands you on them across, the table halfway between (the same squares).
 - **The table:** the town's park table (`PARK_TABLE`, three squares across: a stool, the leg, a stool), in the boss's colors when its
   art has a table (Alfil's), else the park's stone. A stool at each player's side, `stoolOff` (1) from the middle, nothing on the empty
   sides: across, the picture as drawn; facing, its middle square alone and a stool north and south. The board (`paintTable`) is
@@ -590,7 +591,7 @@ on right, not vertical… just be sure the table and chairs and pieces all are l
   - **Big Boy's own** (Nov 2, toy blocks: `BlocksAnims`, `isBlocks`): six alphabet blocks drop in and stack 3-2-1 (B-I-G, B-O, Y:
     `build`, from `riseAtMs` into the line, a wooden clack as each lands, a bonk for the top one); the line ends as the board drops
     onto the top block (`boardDropMs` from `dropFrom` squares up, his toss) and plops on (`plop`: dust and stars, a poof); the two
-    stool blocks drop in at your sides (`chairs`, a clack each); the table alone `tableHoldMs`. The blocks are his table and stools
+    stool blocks drop in at your sides (`chairs`, a clack each: a dark gray B on his side, black's, a bone W on yours, white's); the table alone `tableHoldMs`. The blocks are his table and stools
     (their own picture, no park table); the board is lifted until its slab's front rests on the top block (`slabFrontY`), so the
     slab doesn't hide the upper blocks. His God King attack from `attackLeadMs` before the cover, beside the table, as Alfil's; then
     his lollipop swirl (`INTRO_BIGBOY_SWIRL` and its front), played as Alfil's sandstorm (`startStorm`), his swish.

@@ -14,8 +14,8 @@ import { BOARD_SEL, asSignedIn, named, test } from "./helpers.ts";
  * finishes; a first challenge quit (the gear's Leave or Resign before 10 moves) posts no outcome, and the second posts no start line.
  * Babur (the default intro, round 2): in with him to his ring, across the table from him, his line, the table popping in, his attack
  * swung in place, the flash and the wipe (`canvas.boss-wipe`), the battle under it, and the gear's Leave back to where you stood.
- * Big Boy (his own intro, Nov 2): in with him to his crib's circle, across the table's place from him, his line, his toy blocks
- * building the table, the board dropping and plopping on, the stools dropping in, his attack beside it before his lollipop swirl
+ * Big Boy (his own intro, Nov 2): in with him to his crib's circle, onto its rug's marks across the table's place from him, his line, his
+ * toy blocks building the table, the board dropping and plopping on, the stools (his B, your W) dropping in, his attack beside it before his lollipop swirl
  * (`canvas.boss-storm`) covers the screen, the battle under it, and the gear's Leave back to where you stood.
  * CHALLENGE_SHOTS=<dir>: the stills (both projects) and, on the phone, the intro's frames for its GIF (docs/boss-challenge/).
  * Test hooks: the room's canvas `data-intro` (its step); `window.__shopIntro()` (the step, the layout, where you and the boss stand
@@ -279,7 +279,7 @@ test("challenging Big Boy in the town: his own intro (his line, his toy blocks b
   await expect(town(page)).toHaveAttribute("data-ready", "1");
   const { confirm, stood } = await toConfirm(page, "bigboy", "Big Boy");
   await confirm.getByRole("button", { name: "Fight" }).click();
-  // In his Crib: you both walk in up the walkway, to either side of his circle's middle (its marks, west and east).
+  // In his Crib: you both walk in up the walkway onto his circle's zoo rug, to its start marks (SHOP_BIGBOY_MARKS: his west, yours east).
   await expect(room(page)).toHaveAttribute("data-room", "bigboy", { timeout: 20_000 });
   await expect(page.getByRole("heading", { name: "Big Boy's Crib" })).toBeVisible();
   const frames: Buffer[] = [];
@@ -306,7 +306,8 @@ test("challenging Big Boy in the town: his own intro (his line, his toy blocks b
   expect(atLine.line).toBe(true);
   expect(atLine.pyramid).toBeNull();
   await expect(page.locator(".tc-line").filter({ hasText: "My blocks! My board! Big boy go first!" })).toHaveCount(0);
-  // His blocks build the table under his line; the board drops onto it and plops on; the stools drop in at your sides.
+  // His blocks build the table under his line; the board drops onto it and plops on; the stools drop in at your sides (his dark B, your
+  // bone W: the table's picture, a square either side of its middle).
   await expect.poll(step, { message: "the blocks build", intervals: [50] }).toBe("build");
   expect((await intro(page))!.blocks?.anim).toBe("build");
   await shot("bb-build");

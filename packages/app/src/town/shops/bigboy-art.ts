@@ -3,15 +3,15 @@
  * camera looks north, things stand upright at their foot, 37 px a square): the inside of the giant crib of
  * town/houses/bigboy.ts, in Big Boy's colors (characters/bigboy.ts: his toy rainbow "1"-"6", the whites, the teal of his
  * BIG BOY shirt, the light blue of his diaper, the crib's wood). The whole floor is a ball pit; a raised walkway of foam
- * play-mat squares with soft white bumpers joins the door, the battle circle (a rainbow play mat raised on giant toy
- * blocks), the shop's quilted platform and the showpiece, a toy airplane flying round on its string from the ceiling.
+ * play-mat squares with soft white bumpers joins the door, the battle circle (the same foam mat in a rainbow bumper, raised
+ * on giant toy blocks, a zoo-animal rug in its middle), the shop's quilted platform and the showpiece, a toy airplane flying round on its string from the ceiling.
  * Stuffed animals poke up out of the balls. The back wall is bright and clean: big windows on a sky with a rainbow, a
  * frieze of alphabet blocks along its top (the ceiling can follow on in toy blocks).
  * Each piece is its own `Character` (`shop-bigboy-<name>`); `SHOP_BIGBOY_LAYOUT` says where each piece goes. Copied as drawn from
- * `claude/boss-art` (scripts/boss-art/out/house-shop-bigboy/house-shop-bigboy.ts, Nov 2), its imports moved, its room still and
- * review strips (HOUSE_SHOP_BIGBOY) left there, its battle circle's start marks turned west and east (below), and three lines of
- * the airplane's drawing typed for the app's stricter checks (nothing drawn changes). Built as Alfil's
- * shop is (shops/alfil-art.ts).
+ * `claude/boss-art` (scripts/boss-art/out/house-shop-bigboy/house-shop-bigboy.ts, Nov 2, its second pass: the circle in the
+ * walkway's foam with a zoo-animal rug, the start marks west and east on it, SHOP_BIGBOY_MARKS), its imports moved, its room
+ * still and review strips (HOUSE_SHOP_BIGBOY) left there, and three lines of the airplane's drawing typed for the app's stricter
+ * checks (nothing drawn changes). Built as Alfil's shop is (shops/alfil-art.ts).
  *
  * Footing: a piece's foot is the middle of its square (a wide piece's: the middle of its width, on the middle of its row;
  * a deep piece stands on its south row). Floor tiles are flat, top-down, 37 x 37, foot at their middle; some are turned
@@ -412,7 +412,8 @@ function platTile(s: Sides): string {
   return name;
 }
 
-// ==== The battle circle: an octagon of rainbow play mat (columns 6-13, rows 7-14) raised on toy blocks over the pit.
+// ==== The battle circle: an octagon of the walkway's foam mat (columns 6-13, rows 7-14) in a rainbow bumper, raised on
+// toy blocks over the pit, a round zoo-animal rug in its middle.
 
 /** Its middle, in floor pixels (a pixel corner), and the distance in from its edge. */
 const CCX = 10 * T;
@@ -433,9 +434,200 @@ const starAt = (X: number, Y: number, r: number): number => {
   return d > lim ? 0 : d > lim - 1.1 ? 2 : 1;
 };
 /**
- * The mat at (X, Y) from its middle; null outside. Rainbow wedges (24, soft tints) like a play parachute, a white ring, a
- * padded bumper round the edge in the wedges' full colors (open where the walkways join, at the middle of each side);
- * the lollipop-swirl emblem, the white middle line and the two star start marks over it.
+ * The start marks, as (column, row) of each mark's middle: the boss's on the west, yours on the east, both on the
+ * circle's middle line (the line between rows 10 and 11), 1.5 squares out from its middle.
+ */
+export const SHOP_BIGBOY_MARKS = { boss: [8, 10.5], you: [11, 10.5] } as const;
+const MARK_X = [(8.5 * T) - CCX, (11.5 * T) - CCX]; // -55.5, +55.5
+
+// ---- The zoo-animal rug in the middle: a round nursery rug, a scalloped red border with white stitching, a cream field
+// printed with friendly animal faces (lion, elephant, giraffe, monkey, zebra, hippo) round his little lollipop emblem.
+// The animals are drawn once on a canvas (its middle the circle's middle) and the mat reads them off it.
+const RUG_R = 104; // the field's border reaches here, its scallops 4 px past
+const RUG_IN = 92; // the field inside the border
+const RUG_C = 120;
+const RUG = cv(2 * RUG_C, 2 * RUG_C);
+const RL = "N"; // the print's line
+/** A filled ellipse on the rug in `k`, a line round it (none if `line` is false). */
+const rb = (cx: number, cy: number, rx: number, ry: number, k: string, line = true) => {
+  for (let y = Math.floor(cy - ry - 1); y <= cy + ry + 1; y++)
+    for (let x = Math.floor(cx - rx - 1); x <= cx + rx + 1; x++) {
+      const X = (x + 0.5 - cx) / rx;
+      const Y = (y + 0.5 - cy) / ry;
+      if (Math.hypot(X, Y) > 1) continue;
+      const edge = line && Math.hypot((x + 0.5 - cx) / Math.max(0.5, rx - 1), (y + 0.5 - cy) / Math.max(0.5, ry - 1)) > 1;
+      put(RUG, x, y, edge ? RL : k);
+    }
+};
+/** A soft tube through `pts` (offsets from cx, cy), radius `r`: its line first, then (after `between`) its fill. */
+const tube = (cx: number, cy: number, pts: readonly (readonly [number, number])[], r: number, k: string, between: () => void) => {
+  for (const [dx, dy] of pts) rb(cx + dx, cy + dy, r + 1, r + 1, RL, false);
+  between();
+  for (const [dx, dy] of pts) rb(cx + dx, cy + dy, r, r, k, false);
+};
+const rs = (x: number, y: number, rows: readonly string[]) => stamp(RUG, x, y, rows);
+const EYES = (cx: number, y: number, gap: number) => {
+  rs(cx - gap - 2, y, ["kk", "kk"]);
+  rs(cx + gap, y, ["kk", "kk"]);
+};
+{
+  const o = RUG_C;
+  // The lion (north): a petalled orange mane, a yellow face, a pale muzzle.
+  {
+    const [cx, cy] = [o, o - 66];
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * 2 * Math.PI;
+      rb(cx + Math.cos(a) * 10, cy + Math.sin(a) * 10, 4.8, 4.8, "2");
+    }
+    rb(cx, cy, 11, 11, "2", false);
+    rb(cx - 7, cy - 7, 3.2, 3.2, "3");
+    rb(cx + 7, cy - 7, 3.2, 3.2, "3");
+    rb(cx, cy + 0.5, 8.5, 8, "3");
+    rb(cx - 2.5, cy + 3.5, 3, 2.4, "[", false);
+    rb(cx + 2.5, cy + 3.5, 3, 2.4, "[", false);
+    EYES(cx, cy - 3, 3);
+    rs(cx - 2, cy + 1, ["kkkk", ".kk."]);
+    rs(cx - 3, cy + 5, ["k..k", ".kk."].map((r) => r.replace("kk", "kk")));
+  }
+  // The elephant (north-east): big ears lined pink, its trunk curled up at the end.
+  {
+    const [cx, cy] = [o + 50, o - 46];
+    rb(cx - 11, cy - 1, 7, 9, "i");
+    rb(cx + 11, cy - 1, 7, 9, "i");
+    rb(cx - 11.5, cy - 0.5, 4, 6, "n", false);
+    rb(cx + 11.5, cy - 0.5, 4, 6, "n", false);
+    tube(cx, cy, [[0, 4], [0, 7], [0.5, 10], [1.5, 12.5], [3.5, 14], [6, 13.5], [7, 11.5]], 2.4, "i", () => rb(cx, cy - 2, 8.5, 8.5, "i"));
+    EYES(cx, cy - 4, 2);
+    put(RUG, cx - 6, cy + 1, "n");
+    put(RUG, cx + 5, cy + 1, "n");
+  }
+  // The giraffe (north-west): a yellow neck with brown patches, little horns, a soft snout.
+  {
+    const [cx, cy] = [o - 50, o - 50];
+    for (const hx of [cx - 4, cx + 3]) {
+      rs(hx, cy - 15, ["NN", "OO", "NN"].map((r) => r));
+      rs(hx, cy - 12, ["NN", "NN", "NN"]);
+    }
+    rb(cx - 10, cy - 7, 4, 2.2, "3");
+    rb(cx + 10, cy - 7, 4, 2.2, "3");
+    tube(cx, cy, [[0, 2], [0, 6], [0, 10], [0, 14], [0, 18]], 4, "3", () => rb(cx, cy - 4, 7.5, 7, "3"));
+    rb(cx, cy - 4, 7.5, 7, "3");
+    rb(cx, cy, 5.5, 3.6, "K");
+    for (const [x, y] of [[-2, 8], [1, 12], [-3, 15], [1, 18], [-3, 20]] as const) rs(cx + x, cy + y, ["JJ", "JJ"]);
+    rs(cx - 1, cy - 10, ["JJ"]);
+    EYES(cx, cy - 6, 2);
+    put(RUG, cx - 2, cy - 1, "O");
+    put(RUG, cx + 1, cy - 1, "O");
+    rs(cx - 2, cy + 1, ["k..k", ".kk."]);
+  }
+  // The monkey (south-west): a brown head, round ears, a heart-shaped pale face.
+  {
+    const [cx, cy] = [o - 50, o + 48];
+    rb(cx - 11, cy, 4.5, 4.5, "l");
+    rb(cx + 11, cy, 4.5, 4.5, "l");
+    rb(cx - 11, cy, 2.3, 2.3, "M", false);
+    rb(cx + 11, cy, 2.3, 2.3, "M", false);
+    rb(cx, cy, 10.5, 10, "l");
+    rb(cx - 3.5, cy - 1.5, 4.5, 4.5, "M", false);
+    rb(cx + 3.5, cy - 1.5, 4.5, 4.5, "M", false);
+    rb(cx, cy + 3.5, 7.5, 5, "M", false);
+    rs(cx - 2, cy - 11, [".NN.", "NllN"]);
+    EYES(cx, cy - 3, 2);
+    put(RUG, cx - 1, cy + 1, "L");
+    put(RUG, cx, cy + 1, "L");
+    rs(cx - 3, cy + 4, ["k....k", ".kkkk."]);
+  }
+  // The zebra (south-east): a long white face in black chevrons, a grey muzzle, a black mane tuft.
+  {
+    const [cx, cy] = [o + 50, o + 48];
+    rs(cx - 2, cy - 14, [".kk.", "kkkk"]);
+    rb(cx - 6, cy - 10, 2.5, 4, "F");
+    rb(cx + 6, cy - 10, 2.5, 4, "F");
+    rb(cx, cy - 1, 8, 11, "F");
+    for (let y = cy - 12; y <= cy + 2; y++)
+      for (let x = cx - 8; x < cx + 8; x++) {
+        const dx = Math.abs(x + 0.5 - cx);
+        if (get(RUG, x, y) === "F" && dx > 1.5 && (((y - cy + 40 - Math.floor(dx * 0.7)) % 3) + 3) % 3 === 0 && !(dx < 5 && y >= cy - 5 && y <= cy - 2)) put(RUG, x, y, "k");
+      }
+    rb(cx, cy + 6, 6.5, 4.5, "j");
+    EYES(cx, cy - 4, 2);
+    put(RUG, cx - 3, cy + 6, "w");
+    put(RUG, cx + 2, cy + 6, "w");
+    rs(cx - 2, cy + 8, ["k..k", ".kk."]);
+  }
+  // The hippo (south): a wide lilac head, a big muzzle, little ears, two teeth.
+  {
+    const [cx, cy] = [o, o + 68];
+    rb(cx - 8, cy - 10, 3, 2.5, "}");
+    rb(cx + 8, cy - 10, 3, 2.5, "}");
+    rb(cx - 8, cy - 10, 1.4, 1.2, "n", false);
+    rb(cx + 8, cy - 10, 1.4, 1.2, "n", false);
+    rb(cx, cy - 4, 10.5, 7.5, "}");
+    rb(cx, cy + 4, 12.5, 6.5, "}");
+    EYES(cx, cy - 7, 3);
+    rs(cx - 6, cy + 1, ["66", "66"]);
+    rs(cx + 4, cy + 1, ["66", "66"]);
+    rs(cx - 5, cy + 5, ["k........k", ".kkkkkkkk.", "..FF..FF.."]);
+    put(RUG, cx - 10, cy + 2, "n");
+    put(RUG, cx + 9, cy + 2, "n");
+  }
+  // Little yellow stars and pink hearts in the gaps between them.
+  for (const deg of [-67, -113, 67, 113]) {
+    const [sx, sy] = [Math.round(o + 79 * Math.cos((deg * Math.PI) / 180)), Math.round(o + 79 * Math.sin((deg * Math.PI) / 180))];
+    for (let j = -5; j <= 5; j++)
+      for (let i = -5; i <= 5; i++) {
+        const st = starAt(i + 0.5, j + 1, 4.6);
+        if (st) put(RUG, sx + i, sy + j, st === 2 ? "9" : "3");
+      }
+  }
+  for (const deg of [-27, -153, 27, 153]) {
+    const [hx, hy] = [Math.round(o + 82 * Math.cos((deg * Math.PI) / 180)), Math.round(o + 82 * Math.sin((deg * Math.PI) / 180))];
+    rs(hx - 3, hy - 2, [".zz.zz.", "znnznzz", "zznzzzz", ".zzzzz.", "..zzz..", "...z..."]);
+  }
+}
+/** The rug at (X, Y) from its middle, or null off it. */
+function rugAt(X: number, Y: number): string | null {
+  const r = Math.hypot(X, Y);
+  const a = Math.atan2(Y, X);
+  const edge = RUG_R + 4 * Math.abs(Math.cos(a * 14));
+  if (r > edge) return null;
+  if (r > edge - 1.2 || (r > RUG_IN && r < RUG_IN + 1.2)) return "7";
+  if (r > RUG_IN) {
+    // The border: red, white stitching round it, lit along its upper left.
+    if (Math.abs(r - 98) < 0.6 && Math.floor((a * 98) / 3) % 2 === 0) return "F";
+    return r > edge - 2.4 && X + Y > 0 ? "7" : r < RUG_IN + 2.4 && X + Y < 0 ? "(" : "1";
+  }
+  // The start marks: white pads, longer north to south, a yellow star on each.
+  for (const mx of MARK_X) {
+    const Xr = X - mx;
+    const dm = Math.hypot(Xr, Math.max(0, Math.abs(Y) - 6)) - 10.5;
+    if (dm <= 0) {
+      if (dm > -1.3) return "T";
+      const st = starAt(Xr, Y + 0.5, 8.5);
+      if (st) return st === 2 ? "8" : Xr + Y < -2 ? "[" : "3";
+      return dm > -2.5 || Xr + Y > 9 ? "W" : "F";
+    }
+  }
+  // The emblem: Big Boy's lollipop, small, a rainbow swirl in a white ring.
+  if (r < 20) {
+    if (r > 18.8) return "k";
+    if (r > 16.2) return r > 18 || X + Y > 16 ? "W" : "F";
+    if (r < 1.5) return "F";
+    const band = ((Math.floor((a / (2 * Math.PI)) * 6 + r / 3.2) % 6) + 6) % 6;
+    if (r > 10 && r < 13.5 && Math.abs(a + 2.36) < 0.45) return "F"; // its shine
+    return X + Y > 10 ? SHD[band]! : SAT[band]!;
+  }
+  const k = get(RUG, Math.floor(X + RUG_C), Math.floor(Y + RUG_C));
+  if (k !== ".") return k;
+  // The field: cream, a ring of little dots between the animals and the border.
+  if (Math.abs(r - 86) < 1 && Math.floor((a * 86) / 4) % 2 === 0) return "R";
+  return "r";
+}
+const FOAM_SHADE: Record<string, string> = { u: "t", U: "u", y: "9", "[": "y" };
+/**
+ * The mat at (X, Y) from its middle; null outside. The walkway's own foam squares (teal and yellow by turns, in the same
+ * checker so the walkways run on into it), a padded bumper round the edge in his rainbow (open where the walkways join, at
+ * the middle of each side), and the zoo-animal rug in the middle with the two start marks on it.
  */
 function circleMat(X: number, Y: number): string | null {
   const d = octD(X, Y);
@@ -450,33 +642,17 @@ function circleMat(X: number, Y: number): string | null {
     if ((fr < 0.05 || fr > 0.95) && d >= 1 && d < 5) return SHD[w]!;
     return [SHD, SAT, TNT, SAT, SAT, SHD][Math.floor(d)]![w]!;
   }
+  const rug = rugAt(X, Y);
+  if (rug) return rug;
+  // The foam, the rug's soft shadow on it to the lower right.
+  const gx = Math.floor(CCX + X);
+  const gy = Math.floor(CCY + Y);
+  const col = Math.floor(gx / T);
+  const row = Math.floor(gy / T);
+  const k = foamPx(gx - col * T, gy - row * T, (col + row) % 2 ? "t" : "y");
   const r = Math.hypot(X, Y);
-  // The emblem: Big Boy's lollipop, a rainbow swirl in a white ring.
-  if (r < 36) {
-    if (r > 34.6) return "k";
-    if (r > 31) return r > 33.6 || X + Y > 30 ? "W" : "F";
-    if (r < 2.5) return "F";
-    const ang = Math.atan2(Y, X);
-    const band = ((Math.floor((ang / (2 * Math.PI)) * 6 + r / 5.5) % 6) + 6) % 6;
-    if (r > 20 && r < 25 && Math.abs(ang + 2.36) < 0.42) return "F"; // its shine
-    return X + Y > 18 ? SHD[band]! : SAT[band]!;
-  }
-  // The start marks: a white pad (two squares tall) with a yellow star, west and east of the emblem, a square and a half out, where
-  // the boss and you stand at the challenge's table (its "across": the boss west, you east; Nov 2, round 2), each star pointing out.
-  // (Drawn north and south, inside those edges, before Eric's "boss on left, you on right": turned here, as Alfil's and Puddles' were.)
-  for (const mx of [-55.5, 55.5]) {
-    const Xr = X - mx;
-    const dm = Math.hypot(Math.max(0, Math.abs(Y) - 17), Xr) - 10.5;
-    if (dm <= 0) {
-      if (dm > -1.3) return "T";
-      const st = mx < 0 ? starAt(-Y, Xr + 0.5, 8.5) : starAt(Y, 0.5 - Xr, 8.5);
-      if (st) return st === 2 ? "8" : Xr + Y < -2 ? "[" : "3";
-      return dm > -2.5 || Y > 24 ? "W" : "F";
-    }
-  }
-  if (Math.abs(X) < 2) return Math.abs(X) < 1 ? "F" : "W"; // the middle line, north to south between the marks
-  if (Math.abs(r - 104) < 1.25) return "F"; // the ring
-  return TNT[w]!;
+  const edge = RUG_R + 4 * Math.abs(Math.cos(Math.atan2(Y, X) * 14));
+  return r < edge + 1.8 && X + Y > 20 ? FOAM_SHADE[k] ?? k : k;
 }
 
 // The circle's squares: each square's picture, the same tile reused (turned) wherever the mat repeats.
@@ -1692,6 +1868,7 @@ at("rocking-horse", 2, 10, true); // on the end of the west walkway: columns 2-3
 
 /** Where every piece goes: name, column (its west-most square), row (its south-most), solid; floor tiles first, then the upright pieces north to south. */
 export const SHOP_BIGBOY_LAYOUT: readonly ShopPlace[] = [...LAYOUT.slice(0, FLOOR_COUNT), ...LAYOUT.slice(FLOOR_COUNT).sort((a, b) => a.row - b.row || a.col - b.col)];
+
 
 /** Every piece by its name (as SHOP_BIGBOY_LAYOUT names them), each its own Character `shop-bigboy-<name>`. */
 export const SHOP_BIGBOY_PIECES: Readonly<Record<string, Character>> = Object.fromEntries(Object.values(PIECES).map((p) => [p.name, toChar(p)]));

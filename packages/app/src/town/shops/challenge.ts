@@ -188,12 +188,18 @@ export interface Marks {
   youFace: 1 | -1 | null;
   bossFace: 1 | -1 | null;
 }
+/** A room's drawn start marks, the boss's west and yours east (column, row of each middle), as its art exports them (Big Boy's). */
+export interface DrawnMarks {
+  boss: readonly [number, number];
+  you: readonly [number, number];
+}
 /**
  * Where you, the boss, the table and its stools are in a room (its battle circle's middle: the box round its `circle-*` or `ring-*`
  * floor and its emblem; `clearOff` south of it when a piece stands there, as Babur's pedestal does), by layout; null for a room
  * without a circle. The circles' drawn start marks (Alfil's and Puddles') are where the layout puts you (a unit test keeps them so).
+ * A room whose art exports its marks (`drawn`: Big Boy's, west and east) has you stand on them across, the table halfway between.
  */
-export function marksOf(layout: readonly ShopPlace[], how: IntroLayout, feel: Pick<typeof CHALLENGE_FEEL, "standOff" | "stoolOff" | "clearOff"> = CHALLENGE_FEEL): Marks | null {
+export function marksOf(layout: readonly ShopPlace[], how: IntroLayout, drawn?: DrawnMarks | null, feel: Pick<typeof CHALLENGE_FEEL, "standOff" | "stoolOff" | "clearOff"> = CHALLENGE_FEEL): Marks | null {
   let c0 = Infinity, c1 = -Infinity, r0 = Infinity, r1 = -Infinity;
   for (const p of layout) {
     if (!/^(circle|ring|emblem)-/.test(p.name)) continue;
@@ -210,8 +216,10 @@ export function marksOf(layout: readonly ShopPlace[], how: IntroLayout, feel: Pi
   const d = feel.standOff[how];
   const k = feel.stoolOff;
   const across = how === "across";
-  const boss = across ? { c: table.c - d, r: table.r } : { c: table.c, r: table.r - d };
-  const you = across ? { c: table.c + d, r: table.r } : { c: table.c, r: table.r + d };
+  const art = across && drawn ? drawn : null;
+  if (art) [table.c, table.r] = [(art.boss[0] + art.you[0]) / 2, (art.boss[1] + art.you[1]) / 2];
+  const boss = art ? { c: art.boss[0], r: art.boss[1] } : across ? { c: table.c - d, r: table.r } : { c: table.c, r: table.r - d };
+  const you = art ? { c: art.you[0], r: art.you[1] } : across ? { c: table.c + d, r: table.r } : { c: table.c, r: table.r + d };
   // (Each comes up from the door, south: to the mark's south square, the boss on the west of you, so neither crosses the other.)
   return {
     layout: how,

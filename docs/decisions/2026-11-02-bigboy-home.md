@@ -10,8 +10,8 @@ starts is a bunch of rainbow swirly lollipops"; Timber was "the only boss with n
 The calls made:
 - **His crib is a shop** as the other three are: Blocky the Shopkeeper behind the middle of the letter-block counter, "Big Boy's Boss
   Crate" (his Buggy first, the same price and odds), the chat's day tone, a nursery ceiling (the mockup's sky, clouds and stars).
-- **His circle's start marks turned west and east** (drawn north and south before Eric's "boss on left, you on right"), a square and a
-  half out where the layout stands you, the middle line north to south: in `circleMat` (his circle's tiles are drawn from it).
+- **His circle's start marks** are the art's own since its second pass (below): west and east on the rug (`SHOP_BIGBOY_MARKS`), passed to
+  `marksOf` (`RoomArt.marks`). (The first pass drew them north and south, and the app turned them in `circleMat`; that turning is gone.)
 - **The airplane stands up whole** (`RoomArt.upright`): a deep piece (3 x 3 squares) that isn't a plan; drawn at its foot as any
   upright piece. Its squares and the pit are solid; you walk on the walkway, the platform and the circle.
 - **His intro: across** (him left, you right), the same code as Alfil's with his pieces: the blocks are his table and its stools (their
@@ -26,3 +26,9 @@ The calls made:
   (the attack's own map: his kit's "whack" is the gnaw). Wood chips off the king's square each hit, drawn by code as the notes suggest
   (`chipHit`). No king-attack line yet (none written; he's silent as he lands). In `KING_ATTACKERS`: only the mate's hold reads it, so
   his Gnaw cap (two a battle) is untouched.
+- **Art update (Nov 2, the art's second pass).** Eric: "make the big boy battle area the same tile style as the paths to the shop and
+  exit; the center a zoo animal rug replacing the thin white circle; the battle spots sit on the rug", and bigger stools ("the black
+  color side block should be a B and the white color side block shows a W… a dark dark gray and a bone off white"). Re-copied both
+  art files. The stools stay in the table's picture (`chairs`, `idle`): its B is on the left, the boss's side, and the boss plays black
+  (the crowd is always white), so the separate `INTRO_BIGBOY_STOOL_B` / `_W` aren't needed and aren't wired. Nobody sits on them in
+  the intro (you and the boss stand just past them, on the marks), so `INTRO_BIGBOY_STOOL_SEAT_H` (now 20) moves no one.
