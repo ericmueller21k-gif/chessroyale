@@ -8,14 +8,15 @@ export type ScoreCarry = "reset" | "carry";
 /**
  * How the move that continues a board is chosen from the group's picks:
  * - random: each pick is one ticket (the original spec)
- * - popular: the move most players picked (a tie is drawn among the tied moves)
+ * - popular: the move most players picked (a tie is drawn among the tied moves); with `crowdPlayedFromTop` over 1 (50 v 50),
+ *   one of the most-picked few, by their picks (crowdTopOdds)
  * - best: the best move picked (a tie is drawn)
  * - weighted: a draw where better moves get more tickets (see drawWeightPoints)
  */
 export type DrawRule = "random" | "popular" | "best" | "weighted" | "party";
 export const DRAW_RULES: readonly DrawRule[] = ["random", "popular", "best", "weighted", "party"];
 
-/** Game modes: Classic (many boards, players rotate) and Crowd (everyone on one board, the most popular move is played). */
+/** Game modes: Classic (many boards, players rotate) and Crowd (everyone on one board, the crowd's picks decide the move). */
 export type GameMode = "classic" | "crowd";
 /** What the first screen offers: Classic, Crowd (50 v 50), and the boss raid (a Crowd variant). */
 export type ModeChoiceId = GameMode | "raid";
@@ -769,7 +770,7 @@ export const CROWD_BOTS: CrowdBotSpread = {
   blunderLoss: 15,
   blunderWeight: 0.1,
   focus: [1, 4],
-  lean: [0, 1.5],
+  lean: [0, 1.2],
   powerUpChance: 0.25,
 };
 
@@ -781,8 +782,8 @@ export const CROWD_BOTS: CrowdBotSpread = {
 export const CROWD_STAGE_ROUNDS: readonly number[] = [20, 10, 8, 8, 6, 6, 6, 4];
 
 /**
- * Crowd mode: 100 players, 50 v 50, on one board from the starting position; each team picks its side's moves and the
- * most popular pick is played. No cuts for the first 10 moves, then a cut every 2 to 5 moves (CROWD_STAGE_ROUNDS, half
+ * Crowd mode: 100 players, 50 v 50, on one board from the starting position; each team picks its side's moves and one
+ * of its three most popular picks is played, by their picks (crowdPlayedFromTop). No cuts for the first 10 moves, then a cut every 2 to 5 moves (CROWD_STAGE_ROUNDS, half
  * of each cut from each team) down to the ending the pre-game vote picked (CROWD_KNOCKOUTS). Scores carry over all game.
  * 3 power-ups, none earned.
  */

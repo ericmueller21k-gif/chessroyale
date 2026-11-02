@@ -3368,7 +3368,8 @@ export class LobbyCore {
     const counts = new Map<string, number>();
     for (const p of b.result.players) if (p.move) counts.set(p.move, (counts.get(p.move) ?? 0) + 1);
     const played = b.result.playedMove;
-    const top = [...counts.entries()].sort((x, y) => y[1] - x[1] || (x[0] === played ? -1 : y[0] === played ? 1 : 0)).slice(0, 3);
+    // (The move played first, then the most voted: in 50 v 50 it's drawn from the top 3, so not always the most voted.)
+    const top = [...counts.entries()].sort((x, y) => Number(y[0] === played) - Number(x[0] === played) || y[1] - x[1]).slice(0, 3);
     const board = this.runner?.boards.get(b.boardId);
     // (Named on the board the crowd sees: Smudgy's hidden rook a pawn, as the home page shows it too.)
     const fen = maskedFen(b.fenBefore, this.hiddenRook(played));
