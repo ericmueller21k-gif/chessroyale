@@ -1,4 +1,5 @@
 import { expect, type Page } from "@playwright/test";
+import { bossCrateOf } from "@chessroyale/core";
 import { asServerAdmin, backdateSoloBattle, bossAloneFromHome, giveItems, test, wearItem } from "./helpers.ts";
 
 /**
@@ -10,7 +11,8 @@ import { asServerAdmin, backdateSoloBattle, bossAloneFromHome, giveItems, test, 
  * shop's name. And Puddles' greenhouse: Drizzle's crate, his ride, and the back button takes you out.
  * And on a ride (Nov 2): it comes in with you, and you come out still on it.
  * Round 2 (boss tokens, Nov 2): an admin gives himself Babur tokens and a crate key in the Crates tab and buys Babur's crate both
- * ways, the counts following; and a counted solo boss battle (its start pushed back in the local database: the server times it) drops
+ * ways, the counts following (since Eric's Nov 2 fixes the crates go into the inventory, and he opens both there with the usual
+ * strip); a drag inside follows the finger as the town's does; the chat's words take each room's tone; and a counted solo boss battle (its start pushed back in the local database: the server times it) drops
  * a token, its box on the result screen. SHOP_SHOTS=<dir>: the stills for the PR (docs/shop-r2/).
  * Test hooks: the room's canvas (`canvas.town-shop-canvas`) carries `data-room`, `data-you="c,r"` and `data-ready="1"`;
  * `window.__shopAt("keeper" | "door" | "square", [c, r]?)` says where to tap; `__shopCam()` the room's camera; `__shopRide()` your
@@ -291,7 +293,8 @@ test("on a ride (Eric, Nov 2: \"your rider goes in with you\"): inside you're on
   expect(errors).toEqual([]);
 });
 
-test("boss tokens: an admin gives himself Babur tokens and a crate key in the Crates tab, then buys Babur's crate both ways; the counts follow", async ({ page }) => {
+test("boss tokens: an admin gives himself Babur tokens and a crate key in the Crates tab, buys Babur's crate both ways (into the inventory, Nov 2), then opens both there with the usual strip; the counts follow", async ({ page }) => {
+  test.setTimeout(150_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   await asServerAdmin(page);
@@ -330,10 +333,10 @@ test("boss tokens: an admin gives himself Babur tokens and a crate key in the Cr
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/shop-card-counts-${test.info().project.name}.png` });
   const before = (await crate.boundingBox())!;
   const answer = crate.locator(".shop-msg");
-  // With 3 tokens: the crate opens into the locker; 1 token and the key left, so only the key's way stays open.
+  // With 3 tokens: the crate goes into your inventory, unopened (Eric, Nov 2: "it says when you buy it it's in your inventory"); 1
+  // token and the key left, so only the key's way stays open.
   await byTokens.click();
-  await expect(answer).toHaveText(/^You got .+! It's in your Locker\.$/);
-  await expect(answer.locator(".shop-msg-art .item-art")).toBeVisible();
+  await expect(answer).toHaveText("Babur's Boss Crate is in your inventory.");
   await expect(crate).toContainText("You have 1 Babur token and 1 crate key.");
   await expect(byTokens).toBeDisabled();
   await expect(byKey).toBeEnabled();
@@ -341,15 +344,55 @@ test("boss tokens: an admin gives himself Babur tokens and a crate key in the Cr
   // With the token and the key: nothing left, both ways greyed.
   await byKey.click();
   await expect(crate).toContainText("You have 0 Babur tokens and 0 crate keys.");
-  await expect(answer).toHaveText(/^You got .+! It's in your Locker\.$/);
+  await expect(answer).toHaveText("Babur's Boss Crate is in your inventory.");
   await expect(byKey).toBeDisabled();
   await expect(byTokens).toBeDisabled();
   // (The answer's row was there all along: the card didn't grow.)
   expect((await crate.boundingBox())!.height).toBeCloseTo(before.height, 0);
-  // Two items from Babur's crate in the locker; nothing left to spend.
-  const locker = (await (await page.request.get("/api/locker")).json()) as { items: { id: string }[]; tokens: Record<string, number>; keys: number };
-  expect(locker.items.filter((i) => !i.id.startsWith("admin:"))).toHaveLength(2);
-  expect([locker.tokens, locker.keys]).toEqual([{}, 0]);
+  // Two of Babur's crates held, unopened: no item from them yet; nothing left to spend.
+  type LockerNow = { items: { id: string; def: string }[]; tokens: Record<string, number>; keys: number; bossCrates: Record<string, number> };
+  const lockerNow = async () => (await (await page.request.get("/api/locker")).json()) as LockerNow;
+  const mine = (l: LockerNow) => l.items.filter((i) => !i.id.startsWith("admin:"));
+  let locker = await lockerNow();
+  expect(mine(locker)).toHaveLength(0);
+  expect([locker.tokens, locker.keys, locker.bossCrates]).toEqual([{}, 0, { "boss-tiger": 2 }]);
+
+  // The inventory (the Crates tab): Babur's crate with the other crates, "You have 2"; Puddles' greyed, "You have none".
+  await page.goto("/shop?crates");
+  const row = page.locator('.boss-crate-row[data-crate="boss-tiger"]');
+  await expect(row).toContainText("Babur's Boss Crate");
+  await expect(row).toContainText("You have 2");
+  await expect(row).not.toHaveClass(/none/);
+  await expect(page.locator('.boss-crate-row[data-crate="boss-gardener"]')).toContainText("You have none");
+  await expect(page.locator('.boss-crate-row[data-crate="boss-gardener"]')).toHaveClass(/none/);
+  if (SHOTS) {
+    await row.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${SHOTS}/inventory-boss-crates-${test.info().project.name}.png` });
+  }
+  // Open it as any crate opens: the strip spins, then the reveal (an item from Babur's crate).
+  await row.click();
+  await expect(page.locator(".crate-held")).toHaveText("You have 2.");
+  const open = page.getByRole("button", { name: /^▶ Open$/ });
+  await open.click();
+  await expect(page.locator(".crate-opening .spin")).toBeVisible({ timeout: 15_000 });
+  const reveal = page.locator(".reveal-card");
+  await expect(reveal).toBeVisible({ timeout: 30_000 });
+  const again = reveal.getByRole("button", { name: "▶ Open another" });
+  await expect(again).toBeEnabled();
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/boss-crate-reveal-${test.info().project.name}.png` });
+  // The second, the last: then "Open another" is greyed (none left), and the page says so, its Open greyed.
+  await again.click();
+  await expect(page.locator(".crate-opening .spin")).toBeVisible({ timeout: 15_000 });
+  await expect(reveal).toBeVisible({ timeout: 30_000 });
+  await expect(reveal.getByRole("button", { name: "▶ Open another" })).toBeDisabled();
+  await reveal.getByRole("button", { name: "▶ Done" }).click();
+  await expect(page.locator(".crate-held")).toHaveText("You have none. Babur's shop in the town sells it.");
+  await expect(open).toBeDisabled();
+  // Two items from Babur's crate in the locker now, the crates gone.
+  locker = await lockerNow();
+  expect(mine(locker)).toHaveLength(2);
+  for (const it of mine(locker)) expect(bossCrateOf("tiger")!.items).toContain(it.def);
+  expect(locker.bossCrates).toEqual({});
   expect(errors).toEqual([]);
 });
 

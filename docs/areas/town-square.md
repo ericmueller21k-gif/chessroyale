@@ -117,7 +117,7 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   square?"** / "You'll fight [boss] in Boss Battle." / **Leave** / **Stay**; Leave closes the town square and
   opens the Boss raid screen with that boss's tile picked (`rememberBossPick`, then the screen as the side menu opens
   it); Stay closes the confirm and its card. A home: its name, **"Shop"** greyed (shown, not tappable) and "Coming
-  soon". The Colosseum (slice 5): "The Colosseum", **"Raids with people"** greyed and "Coming soon" (Eric's menu for
+  soon"; a home you can go into (a shop: "Inside a shop", below) only its name and **"Go in"**, centered. The Colosseum (slice 5): "The Colosseum", **"Raids with people"** greyed and "Coming soon" (Eric's menu for
   raids with people will live there). The boss stays put while its card is open. Tapping something both opens its card
   and walks you next to it.
 - **Looking around.** Drag to look
@@ -506,7 +506,8 @@ column, on up to two smaller lines in the bar's same height, the full name as it
 and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.md) (the art's, on `claude/boss-art`).
 
 - **Which homes.** Babur's Circus (`tiger`) and Puddles' Botanical Garden (`gardener`): `SHOPS` in `town/shops/shops.ts`. Their home's card
-  adds **"Go in"** (gold) above its greyed "Shop" and "Coming soon", which stay; every other home's card is as it was.
+  is its name, centered, and **"Go in"** (gold) under it, centered, nothing else (Eric, Nov 2: "chop the Shop and Coming soon": a short
+  card, `.town-card.town-door`); every other home's card is as it was (its name, Hollow's line, "Shop" greyed and "Coming soon").
 - **Going in.** "Go in" walks you to the square in front of the door (the plot's front row's middle, a row out); there the town zooms in on
   the door (a CSS scale of the town's canvas about the door, `SHOP_FEEL.doorZoom` over `doorZoomMs`) and fades to black (`.town-fade`,
   `fadeMs`), the room's code and art load (only now: `shops/ShopRoom.tsx` and each room's art are chunks of their own), the town waits
@@ -524,7 +525,9 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   stand at the door. One loop on one Canvas 2D canvas; headless, 60 fps walking on a phone and a computer (Nov 2).
 - **The camera.** You start in **Close** (`SHOP_FEEL.close`: h 3.2, back 2.4, pitch 24°, cy 0.3, in place of the town's numbers of those
   names; the box's shape blends the rest as in the town). The town's − / + switch between Close and the town's zoomed-in camera (the wheel
-  too); a drag looks around (kept inside the room); the focus button brings it back.
+  too); a drag looks around (kept inside the room) exactly as the town's does, the floor following the finger both ways (Eric, Nov 2: "when I
+  drag from down to up, it should be the same as the town movement"; the room's rows run toward the camera where the town's run away, so
+  its camY goes the other way); the focus button brings it back.
 - **Walking** (`shops/room.ts`, pure): a tap walks you a square at a time round what's solid (the walls, the counter, every solid piece's
   squares, the way out's own squares, the Shopkeeper's); a tap on something solid walks you beside it. There's no joystick (the town has
   none either). Inside is just you: the town's bots and other players don't come in.
@@ -541,8 +544,12 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   (**"3 Babur tokens, or 1 Babur token + 1 crate key"**, `BOSS_CRATE_PRICE` in core's settings), what you have (**"You have 2 Babur tokens
   and 1 crate key."**: `bossHoldings`, your locker's, drawn again whenever your account changes) and two buttons, **"Buy with 3 Babur
   tokens"** and **"Buy with 1 Babur token + 1 crate key"**, each greyed while you can't pay that way (`canAfford`), both through
-  `buyBossCrate(boss, way)`: the server's purchase (round 2). Its answer shows in a row under them that's always there, 40 px high: the
-  item's picture and **"You got Balloon Pup! It's in your Locker."**, or the server's reason (**"You need 3 Babur tokens."**).
+  `buyBossCrate(boss, way)`: the server's purchase (round 2), into your inventory, unopened (Eric, Nov 2; the Crates tab opens it:
+  [shop.md](shop.md), "Boss crates you hold"). Its answer shows in a row under them that's always there, 40 px high: **"Babur's Boss Crate
+  is in your inventory."**, or the server's reason (**"You need 3 Babur tokens."**).
+- **The chat log inside** (Eric, Nov 2: "make the default text color white, or black, depending on darkness of background in the shop"):
+  the town's chat box over the room takes the room's tone, not the sky's (`ShopDef.chatTone`: TownChat's `data-tone`): Babur's dark tent
+  `night` (white words on a dark tint), Puddles' light greenhouse `day` (dark words on a light tint), whatever the time outside.
 - **The way out**: standing on one of the two squares just inside the door, a card says **"Go out"**. The door is behind you as you look
   north: walk back toward it, or drag the view back to it and tap it.
 - **Test hooks** (test switches on): the room's canvas `canvas.town-shop-canvas` carries `data-room`, `data-you`, `data-ready`;
@@ -591,7 +598,9 @@ noted wherever a slice changed one.
   on the Shopkeeper walks you up and its card's Talk opens "Babur's Boss Crate" (the price line, Balloon Pup, what you have, both buys
   greyed with nothing to pay), the header saying "Babur's Circus", then the view dragged back to the door, "Go out" and you're outside
   at the tent's door ("Town square" again); Puddles' greenhouse: Drizzle's crate with Puddles's Mower, and the back button takes you out.
-  Round 2: an admin's test grants and both buys, the counts following and the card not growing (shop.md, "Boss tokens"). Unit:
+  Round 2: an admin's test grants and both buys, the counts following and the card not growing (shop.md, "Boss tokens"); since Nov 2 the
+  crates bought go into the inventory and are opened there with the usual strip. Nov 2: the home card's "Go in" alone; the chat's tone
+  in each room (Babur's by day outside, Puddles' by night); a drag inside follows the finger as the town's, a finger and a mouse. Unit:
   `packages/app/test/shop-room.test.ts` (both rooms' walls, counter, pieces and pond solid, the way out, every free square reachable,
   the talking range and where a tap on the Shopkeeper sends you; the crates' words; a way's button needing its price; the buy going
   to the server).

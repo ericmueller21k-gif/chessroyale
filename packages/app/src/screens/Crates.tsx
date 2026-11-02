@@ -106,6 +106,8 @@ function getUnseen(): Unseen | null {
 /** A crate by its id: the Crates tab's own (free while testing), or a boss's (bought in its shop, held until you open it: Nov 2). */
 const anyCrate = (id: string): CrateDef | undefined => crateDef(id) ?? bossCrateDef(id);
 const isBossCrate = (c: CrateDef): c is BossCrateDef => "boss" in c;
+/** "Babur's", "Puddles'" (as his home's and his crate's names have it). */
+const possessive = (name: string) => (name.endsWith("s") ? `${name}'` : `${name}'s`);
 /** How many of a boss crate your locker holds, unopened. */
 const heldOf = (locker: { bossCrates?: Record<string, number> } | undefined, c: CrateDef) => locker?.bossCrates?.[c.id] ?? 0;
 
@@ -300,7 +302,7 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
         <span class="small">{crate.blurb}</span>
         {boss && (
           <span class="small crate-held" data-held={held}>
-            {held ? `You have ${held}.` : `You have none. ${tokenBossName(boss.boss)}'s shop in the town sells it.`}
+            {held ? `You have ${held}.` : `You have none. ${possessive(tokenBossName(boss.boss))} shop in the town sells it.`}
           </span>
         )}
       </div>

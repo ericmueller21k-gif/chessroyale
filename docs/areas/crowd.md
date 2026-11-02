@@ -94,7 +94,9 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   out, ties go through"), "Why was I cut?" (the elimination breakdown: "level with the last player through" only at the
   last cut, with why). `stageBreakSeconds` 10.
 - **Pre-game votes (50 v 50, `augments`).** Before move 1 everyone votes by dragging their pawn into one of three zones
-  on an empty board (or tapping a card): how it ends (**team final**, **the Hidden Boss** (the boss final), **duel**), then
+  on an empty board (or tapping a zone, which puts your pawn there, Eric, Nov 2; or tapping a card; the zone takes the tap, never the board
+  under it). The options are words only: their emoji (on the cards, the zones and the winner's banner) were deleted (Eric, Nov 2; Squads'
+  votes, on the same screen, too; docs/decisions/2026-11-02-nov2-fixes-b.md): how it ends (**team final**, **the Hidden Boss** (the boss final), **duel**), then
   "How does it start?" (**Normal**, **Random opening**, **Freestyle**; Normal when nobody votes; below), then "How fast?", a
   chess time control (**Bullet 3+2**, **Blitz 5+3**, **Rapid 10+5**, left to right; Blitz when nobody votes). The options and what
   they change are plain data in `packages/core/src/votes.ts` (a time control is one `timeControl(...)` entry: its bank,
