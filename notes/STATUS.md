@@ -5,6 +5,8 @@ Everything from Nov 1 is merged: #447 eval bar off, #448 cash-in 2 gold, #449 on
 #451 steady scoreboard + T/😊 chat + bot chat, #452 profile test race, #453 new cuts, #454 bot lobby (800-1500).
 
 ## Running
+- One Opus (high): shop interiors round 1 (worktree /home/user/cr-shop, branch claude/shop-interiors, brief
+  notes/briefs/brief-shop-r1.md): Go in/out, Close camera, Shopkeeper, crate card (buy = stub). Round 2 at xhigh: tokens + purchase.
 - One Opus: test-value changes (worktree /home/user/cr-testvalue, branch claude/test-value, brief
   notes/briefs/testvalue-changes.md): flakes first, then speed, formats→crowd-hidden merge, CI selection.
 - API art sessions (outside the one-Opus rule, Eric): circus interior (session_01JuCWRrhykEFvvmv5JKWgRX, ~$4-7, cap $10);
