@@ -344,8 +344,12 @@ const bossCrate = (boss: string, name: string, ride: string): BossCrateDef => ({
   ],
 });
 
-/** Every boss's crate (only those whose home has a shop so far: Babur's and Puddles'). */
-export const BOSS_CRATES: readonly BossCrateDef[] = [bossCrate("tiger", "Babur's Boss Crate", "balloon-pup"), bossCrate("gardener", "Puddles' Boss Crate", "puddles-mower")];
+/** Every boss's crate (only those whose home has a shop so far: Babur's, Puddles' and Alfil's). */
+export const BOSS_CRATES: readonly BossCrateDef[] = [
+  bossCrate("tiger", "Babur's Boss Crate", "balloon-pup"),
+  bossCrate("gardener", "Puddles' Boss Crate", "puddles-mower"),
+  bossCrate("alfil", "Alfil's Boss Crate", "alfil-howdah"),
+];
 
 export const bossCrateDef = (id: string) => BOSS_CRATES.find((c) => c.id === id);
 /** A boss's crate, by its boss's id. */

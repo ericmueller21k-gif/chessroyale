@@ -212,6 +212,7 @@ describe("buying a boss's crate", () => {
     expect(BOSS_CRATES.map((c) => [c.boss, c.ride])).toEqual([
       ["tiger", "balloon-pup"],
       ["gardener", "puddles-mower"],
+      ["alfil", "alfil-howdah"],
     ]);
     for (const c of BOSS_CRATES) expect(c.items).toContain(c.ride);
     const { sql, id } = await account();

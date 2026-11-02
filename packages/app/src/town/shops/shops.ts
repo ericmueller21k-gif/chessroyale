@@ -21,14 +21,14 @@ export interface ShopDef {
   /** Its crate's name, word for word ("Babur's Boss Crate"). */
   crate: string;
   /** The Shopkeeper: the boss's kid (its sheet's name in town/sidekicks/), drawn at `at` (a square, fractions allowed). */
-  kid: "babur" | "puddles";
+  kid: "babur" | "puddles" | "alfil";
   at: readonly [number, number];
   /** The squares the Shopkeeper stands on (nobody else can): you can talk to it within `SHOP_FEEL.talkRange` of one. */
   keeper: readonly Sq[];
   /** What the crate can give (its items' ids in core's ITEM_DEFS): the boss's ride first, always. */
   prizes: readonly string[];
-  /** Above the walls: a tent's canvas or a greenhouse's glass (drawn by the game, not the art: as the mockup did). */
-  roof: "tent" | "glass";
+  /** Above the walls: a tent's canvas, a greenhouse's glass or a pyramid's sandstone (drawn by the game, not the art: as the mockup did). */
+  roof: "tent" | "glass" | "stone";
   /**
    * The chat log's text over the room (Eric, Nov 2: "white, or black, depending on darkness of background in the shop"): "night" for
    * a dark room (white words on a dark tint: Babur's tent), "day" for a light one (dark words on a light tint: Puddles' greenhouse),
@@ -43,6 +43,8 @@ export const SHOPS: Readonly<Partial<Record<HomeId, ShopDef>>> = {
   tiger: { home: "tiger", boss: "Babur", crate: "Babur's Boss Crate", kid: "babur", at: [12.6, 2.6], keeper: [{ c: 12, r: 2 }, { c: 13, r: 2 }], prizes: ["balloon-pup"], roof: "tent", chatTone: "night" },
   // Drizzle stands behind the middle of the low potting counter (44 px: Drizzle shows over it).
   gardener: { home: "gardener", boss: "Puddles", crate: "Puddles' Boss Crate", kid: "puddles", at: [9.5, 2], keeper: [{ c: 9, r: 2 }, { c: 10, r: 2 }], prizes: ["puddles-mower"], roof: "glass", chatTone: "day" },
+  // Woolly stands behind the middle of the low counter (its body 29 px: Woolly shows over it), as the mockup has him.
+  alfil: { home: "alfil", boss: "Alfil", crate: "Alfil's Boss Crate", kid: "alfil", at: [9.5, 2], keeper: [{ c: 9, r: 2 }, { c: 10, r: 2 }], prizes: ["alfil-howdah"], roof: "stone", chatTone: "day" },
 };
 
 /** The shop inside a home, or null: every other home has no "Go in" yet. */

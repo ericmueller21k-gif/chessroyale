@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { SHOP_BABUR_LAYOUT } from "../src/town/shops/babur-art.ts";
 import { SHOP_PUDDLES_LAYOUT } from "../src/town/shops/puddles-art.ts";
+import { SHOP_ALFIL_LAYOUT } from "../src/town/shops/alfil-art.ts";
 import { findPath, inTalkRange, makeRoom, onDoor, stepsFrom, tapTarget, walkable, type Room, type Sq } from "../src/town/shops/room.ts";
 import { POOL_LINE, buyBossCrate, canAfford, inInventoryLine, holdLine, priceLine, prizeRows, shopOf, wayText, SHOPS } from "../src/town/shops/shops.ts";
 import { bossCrateOf } from "@chessroyale/core";
@@ -13,9 +14,11 @@ import { SHOP_FEEL } from "../src/town/feel.ts";
  */
 const babur = makeRoom(SHOP_BABUR_LAYOUT, SHOPS.tiger!.keeper);
 const puddles = makeRoom(SHOP_PUDDLES_LAYOUT, SHOPS.gardener!.keeper);
+const alfil = makeRoom(SHOP_ALFIL_LAYOUT, SHOPS.alfil!.keeper);
 const rooms: [string, Room][] = [
   ["Babur's", babur],
   ["Puddles'", puddles],
+  ["Alfil's", alfil],
 ];
 
 describe.each(rooms)("%s room", (_name, room) => {
@@ -115,8 +118,8 @@ describe("the rooms' own pieces", () => {
 });
 
 describe("the shops", () => {
-  it("only Babur's and Puddles' homes have an inside", () => {
-    expect(HOMES.filter((h) => shopOf(h.id)).map((h) => h.id)).toEqual(["tiger", "gardener"]);
+  it("only Babur's, Puddles' and Alfil's homes have an inside", () => {
+    expect(HOMES.filter((h) => shopOf(h.id)).map((h) => h.id).sort()).toEqual(["alfil", "gardener", "tiger"]);
   });
 
   it("the crates' words: names, the price line, what you have; the boss's ride is a prize", () => {
@@ -132,10 +135,14 @@ describe("the shops", () => {
     expect(holdLine(b, { tokens: 1, keys: 1 })).toBe("You have 1 Babur token and 1 crate key.");
     expect(prizeRows(b)[0]).toMatchObject({ id: "balloon-pup", name: "Balloon Pup", kind: "Mythic ride" });
     expect(prizeRows(p)[0]).toMatchObject({ id: "puddles-mower", name: "Puddles's Mower", kind: "Mythic ride" });
+    const a = shopOf("alfil")!;
+    expect(a.crate).toBe("Alfil's Boss Crate");
+    expect(priceLine(a)).toBe("3 Alfil tokens, or 1 Alfil token + 1 crate key");
+    expect(prizeRows(a)[0]).toMatchObject({ id: "alfil-howdah", name: "Alfil's Howdah", kind: "Mythic ride" });
   });
 
   it("each shop sells its boss's crate (core's BOSS_CRATES), its ride among the prizes; a way's button needs its price held", () => {
-    for (const s of [shopOf("tiger")!, shopOf("gardener")!]) {
+    for (const s of [shopOf("tiger")!, shopOf("gardener")!, shopOf("alfil")!]) {
       const crate = bossCrateOf(s.home)!;
       expect(crate.name).toBe(s.crate);
       expect(crate.items).toContain(s.prizes[0]);
