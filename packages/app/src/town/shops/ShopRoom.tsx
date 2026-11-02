@@ -46,7 +46,8 @@ import { inTalkRange, isFloor, makeRoom, onDoor, tapTarget, findPath, type Room,
 import { POOL_LINE, bossHoldings, buyBossCrate, canAfford, holdLine, priceLine, prizeRows, shopOf, wayText, type CrateWay, type ShopDef } from "./shops.ts";
 import { CHALLENGE_FEEL, attackStart, attackTime, frameAt as animFrame, introAt, introCues, introLength, marksOf, type IntroNow } from "./challenge.ts";
 import { play } from "../../sound.ts";
-import { paintTable, playCue, type LoadedIntro } from "./intro.ts";
+import { paintTable, playCue, slabFrontY, type LoadedIntro } from "./intro.ts";
+import { TABLE_BOARD } from "../houses/park.ts";
 
 /** A room's art, as its file exports it. */
 interface RoomArt {
@@ -914,9 +915,15 @@ function startRoom(
     if (bl) {
       if (n.blocks) put(bl.frames[n.blocks.anim][n.blocks.frame]!, bl.ch);
       if (n.table) {
+        // (Lifted until the slab's front rests on the top block, its foot TABLE_BOARD.top over the table's: else the slab, reaching
+        // toward you, would hide the pyramid's upper blocks. Then `drop` squares higher while it falls.)
+        const dx = marks.table.c - camX;
+        const dz = camY - marks.table.r;
+        const front = slabFrontY(v, dx, dz);
+        const rest = front === null ? 0 : Math.max(0, front - (y - TABLE_BOARD.top * s));
         g.save();
-        g.translate(0, -n.drop * pt.k);
-        paintTable(g, v, marks.table.c - camX, camY - marks.table.r, ci.table.palette, marks.layout);
+        g.translate(0, -rest - n.drop * pt.k);
+        paintTable(g, v, dx, dz, ci.table.palette, marks.layout);
         g.restore();
       }
       return;

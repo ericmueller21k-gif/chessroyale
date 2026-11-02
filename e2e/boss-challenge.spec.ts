@@ -288,9 +288,13 @@ test("challenging Big Boy in the town: his own intro (his line, his toy blocks b
     while (grabbing) frames.push(await page.screenshot({ scale: "css" }));
   })();
   const seen = new Set<string>();
+  // (His attack, seen at any look before the swirl covers: a slow phone's screenshots for the GIF can make the looks far apart.)
+  let attacked = false;
   const step = async () => {
-    const s = (await intro(page))?.step ?? "";
+    const i = await intro(page);
+    const s = i?.step ?? "";
     seen.add(s);
+    if (i?.attack && (await storm(page).getAttribute("data-covered", { timeout: 50 }).catch(() => null)) !== "1") attacked = true;
     return s;
   };
   await expect.poll(step, { message: "on their marks: his line", timeout: 15_000, intervals: [50] }).toBe("line");
@@ -314,8 +318,7 @@ test("challenging Big Boy in the town: his own intro (his line, his toy blocks b
   expect(atTable).toMatchObject({ table: true, drop: 0, blocks: { anim: "idle" } });
   await shot("bb-table");
   // His God King attack beside the table before the swirl covers the screen.
-  await expect.poll(async () => (await intro(page))?.attack, { message: "his attack", intervals: [50] }).toBe(true);
-  expect(await storm(page).getAttribute("data-phase", { timeout: 100 }).catch(() => null), "before the swirl covers").not.toBe("covered");
+  await expect.poll(async () => (await step(), attacked), { message: "his attack, before the swirl covers", intervals: [50] }).toBe(true);
   await shot("bb-attack");
   // His lollipop swirl sweeps in over everything (played as Alfil's sandstorm), the battle loading under it.
   await expect(storm(page)).toHaveCount(1, { timeout: 10_000 });

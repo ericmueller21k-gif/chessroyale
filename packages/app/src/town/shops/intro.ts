@@ -262,6 +262,25 @@ const bq = newPt();
 const grid = Array.from({ length: 81 }, newPt);
 const lift: TableLift = { dz: 0, top: 0, thick: 0, grow: 1 };
 /**
+ * Where the slab's front edge's foot (its bottom, middle) is on the screen, for a table at (dx, dz) through view `v`, as paintTable
+ * draws it: its y. Null: off the view. (Toy blocks: the slab reaches half a board toward you from the top block it lies on, so it is
+ * lifted until this edge rests on that block's top, or its front would hide the blocks under it.)
+ */
+export function slabFrontY(v: View, dx: number, dz: number): number | null {
+  const B = TABLE_BOARD;
+  if (!proj(v, dx, dz, 0, bp)) return null;
+  const fy = bp.y;
+  const fk = bp.k;
+  if (!tableLift(v, dx, dz, B.top, B.thick, lift)) return null;
+  const z = lift.dz;
+  if (z !== dz && !proj(v, dx, z, 0, bp)) return null;
+  const m = fk / bp.k;
+  const ty = fy - bp.y * m;
+  if (!proj(v, dx, z - B.half, lift.top - lift.thick, bq)) return null;
+  return bq.y * m + ty;
+}
+
+/**
  * The table's top at (dx, dz) through view `v` (as the town's park tables: render.ts drawBoard): the slab's front, its top and its
  * gold far edge, the 8 x 8 squares lying flat, the pieces standing on them, far ones first, turned for the layout (`boardSquare`:
  * white's nearest you). `alpha`: how much it shows.
