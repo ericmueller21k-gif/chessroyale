@@ -49,6 +49,8 @@ notes to a private place or strip them). Never put a secret value here or anywhe
 - Decisions go in `docs/decisions/YYYY-MM-DD-title.md`.
 
 ## Eric's working rules
+- Boss homes/intros ship one boss at a time as each is done (Eric, Nov 2); tell Eric when each is LIVE (one line), he
+  checks the real animation flow and placement on his phone.
 - Approval flow for rare items and rides: design → Eric OK → API draws → drawing to Eric → OK → into the game. UI:
   mockups or stills first.
 - "Nothing hidden, nothing shifts" by default; briefs list "Rules you must keep".
