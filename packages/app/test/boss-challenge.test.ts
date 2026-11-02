@@ -3,7 +3,11 @@ import { INTRO_ALFIL_PYRAMID } from "../src/town/shops/alfil-intro-art.ts";
 import { SHOP_ALFIL_LAYOUT } from "../src/town/shops/alfil-art.ts";
 import { SHOP_BABUR_LAYOUT } from "../src/town/shops/babur-art.ts";
 import { SHOP_PUDDLES_LAYOUT } from "../src/town/shops/puddles-art.ts";
-import { CHALLENGE_FEEL, attackStart, attackTime, boardSquare, frameAt, introAt, introBeats, introCues, introLength, introOf, marksOf, nextFlow, stormEdge, wipeAt, type ChallengeEvent, type ChallengeFlow, type IntroAnims } from "../src/town/shops/challenge.ts";
+import { SHOP_BIGBOY_LAYOUT, SHOP_BIGBOY_PIECES } from "../src/town/shops/bigboy-art.ts";
+import { INTRO_BIGBOY_BLOCKS, INTRO_BIGBOY_SWIRL, INTRO_BIGBOY_SWIRL_FRONT, INTRO_BIGBOY_TABLE_PALETTE } from "../src/town/shops/bigboy-intro-art.ts";
+import { TABLE_BOARD } from "../src/town/houses/park.ts";
+import { renderFrame } from "../src/characters/sprite.ts";
+import { BOSS_INTROS, CHALLENGE_FEEL, attackStart, attackTime, boardSquare, frameAt, introAt, introBeats, introCues, introLength, introOf, marksOf, nextFlow, stormEdge, wipeAt, type BlocksAnims, type ChallengeEvent, type ChallengeFlow, type IntroAnims } from "../src/town/shops/challenge.ts";
 import { PARK_TABLE } from "../src/town/houses/park.ts";
 import { INTRO_ALFIL_TABLE } from "../src/town/shops/alfil-intro-art.ts";
 import { findPath, makeRoom } from "../src/town/shops/room.ts";
@@ -43,23 +47,24 @@ describe("the challenge's flow", () => {
     expect(run(["fight", "atDoor", "cancel", "fight"])).toBe("toDoor");
   });
 
-  it("every boss whose home has an inside has an intro (Alfil his own, Babur and Puddles the default); every other boss is challenged as before (the Boss raid screen)", () => {
+  it("every boss whose home has an inside has an intro (Alfil and Big Boy their own, Babur and Puddles the default); every other boss is challenged as before (the Boss raid screen)", () => {
     const withIntro = HOMES.filter((h) => introOf(h.id)).map((h) => h.id).sort();
-    expect(withIntro).toEqual(["alfil", "gardener", "tiger"]);
+    expect(withIntro).toEqual(["alfil", "bigboy", "gardener", "tiger"]);
     expect(withIntro).toEqual(Object.keys(SHOPS).sort());
     expect(introOf("alfil")).toMatchObject({ custom: true, line: "I'll show you the power of the old piece." });
     expect(introOf("tiger")).toMatchObject({ custom: false, name: "Babur", line: "Fine. One more show. Then I'm on break." });
     expect(introOf("gardener")).toMatchObject({ custom: false, name: "Puddles", line: "Wipe your feet. Then let's see what grows." });
+    expect(introOf("bigboy")).toMatchObject({ custom: true, name: "Big Boy", line: "My blocks! My board! Big boy go first!" });
     expect(introOf("hollow")).toBeNull();
   });
 
-  it("the layout: across for all three today (the boss on the left, you on the right: Eric's normal look)", () => {
-    for (const id of ["alfil", "tiger", "gardener"] as const) expect(introOf(id)!.layout, id).toBe("across");
+  it("the layout: across for all four today (the boss on the left, you on the right: Eric's normal look)", () => {
+    for (const id of ["alfil", "tiger", "gardener", "bigboy"] as const) expect(introOf(id)!.layout, id).toBe("across");
   });
 });
 
 describe("the battle circle's marks", () => {
-  const ROOMS = { alfil: SHOP_ALFIL_LAYOUT, tiger: SHOP_BABUR_LAYOUT, gardener: SHOP_PUDDLES_LAYOUT } as const;
+  const ROOMS = { alfil: SHOP_ALFIL_LAYOUT, tiger: SHOP_BABUR_LAYOUT, gardener: SHOP_PUDDLES_LAYOUT, bigboy: SHOP_BIGBOY_LAYOUT } as const;
 
   it("across: the boss west of the table, you east, all on the circle's middle row; each a square and a half out, just past its stool", () => {
     for (const [id, layout] of Object.entries(ROOMS)) {
@@ -135,6 +140,19 @@ describe("the battle circle's marks", () => {
         expect(pad).toEqual([Math.floor(who.r), Math.ceil(who.r)]);
       }
     }
+  });
+
+  it("Big Boy's drawn start marks (his circle's own tiles) are where you stand across: west and east of the emblem, a two-square pad each; none north or south", () => {
+    const m = marksOf(SHOP_BIGBOY_LAYOUT, "across")!;
+    // (A pad's teal edge, "T": only the marks have it on the circle.)
+    const edged = (c: number, r: number) => {
+      const p = SHOP_BIGBOY_LAYOUT.find((q) => q.col === c && q.row === r && /^circle-/.test(q.name))!;
+      expect(p, `${c},${r}`).toBeDefined();
+      return SHOP_BIGBOY_PIECES[p.name]!.anims.idle!.frames[0]!.layers.some((l) => SHOP_BIGBOY_PIECES[p.name]!.parts[l.part]!.grid.some((row) => row.includes("T")));
+    };
+    for (const who of [m.boss, m.you]) for (const r of [Math.floor(who.r), Math.ceil(who.r)]) expect(edged(who.c, r), `${who.c},${r}`).toBe(true);
+    const marked = SHOP_BIGBOY_LAYOUT.filter((p) => /^circle-/.test(p.name) && edged(p.col, p.row)).map((p) => `${p.col},${p.row}`).sort();
+    expect(marked).toEqual(["11,10", "11,11", "8,10", "8,11"]);
   });
 
   it("you and the boss walk in side by side from the door, neither crossing the other, each path clear and short", () => {
@@ -235,6 +253,95 @@ describe("the intro's timeline (Alfil's art)", () => {
   });
 });
 
+/** Big Boy's toy blocks' frames, as shops/intro.ts reads them from his art. */
+const blocksOf = (): BlocksAnims => {
+  const A = INTRO_BIGBOY_BLOCKS.anims;
+  const ms = (a: "build" | "plop" | "chairs") => A[a]!.frames.map((f) => f.ms);
+  const cues = (a: "build" | "plop" | "chairs") => A[a]!.frames.map((f) => f.cue);
+  return { build: ms("build"), plop: ms("plop"), chairs: ms("chairs"), cues: { build: cues("build"), plop: cues("plop"), chairs: cues("chairs") } };
+};
+
+describe("the intro's timeline (Big Boy's toy blocks, Nov 2)", () => {
+  const B = blocksOf();
+  const beats = introBeats(B);
+  const at = (t: number) => introAt(beats, B, t);
+  const F = CHALLENGE_FEEL;
+  const beat = (s: string) => beats.find((b) => b.step === s)!;
+
+  it("the art: build 21 frames (6 blocks landing, the top one last), plop 5 (its first the board's touchdown), chairs 8 (2 stools); his table three squares across, the board's slab on its top block", () => {
+    expect(B.build).toHaveLength(21);
+    expect(B.cues.build.filter(Boolean)).toEqual(["block", "block", "block", "block", "block", "block-top"]);
+    expect(B.plop).toHaveLength(5);
+    expect(B.cues.plop[0]).toBe("plop");
+    expect(B.chairs).toHaveLength(8);
+    expect(B.cues.chairs.filter(Boolean)).toEqual(["stool", "stool"]);
+    const ch = INTRO_BIGBOY_BLOCKS;
+    expect(ch.w).toBe(3 * TOWN_FEEL.housePxPerSquare);
+    expect(Math.floor(ch.foot[0] / TOWN_FEEL.housePxPerSquare)).toBe(1);
+    // (The top block's top, in the middle, is where the town lays a table's slab: TABLE_BOARD.top over the foot.)
+    const img = renderFrame(ch, ch.anims.idle!.frames[0]!);
+    let top = ch.h;
+    for (let y = 0; y < ch.h && top === ch.h; y++) if (img.data[(y * ch.w + ch.foot[0]) * 4 + 3]! > 0) top = y;
+    expect(ch.foot[1] - top - TABLE_BOARD.top).toBeGreaterThanOrEqual(0);
+    expect(ch.foot[1] - top - TABLE_BOARD.top).toBeLessThanOrEqual(2);
+    // His slab's and board's colors; the swirl tiles (128 a side) and its front, six frames each, looping.
+    for (const k of ["1", "2", "4", "L", "D"]) expect(INTRO_BIGBOY_TABLE_PALETTE).toHaveProperty(k);
+    expect([INTRO_BIGBOY_SWIRL.w, INTRO_BIGBOY_SWIRL.h, INTRO_BIGBOY_SWIRL_FRONT.h]).toEqual([128, 128, 128]);
+    for (const c of [INTRO_BIGBOY_SWIRL, INTRO_BIGBOY_SWIRL_FRONT]) expect(c.anims.idle!).toMatchObject({ loop: true, frames: { length: 6 } });
+  });
+
+  it("the line, the blocks building under it, the board dropping and plopping on, the stools dropping in, the table alone; then the swirl", () => {
+    expect(beats.map((b) => b.step)).toEqual(["line", "build", "drop", "plop", "chairs", "table", "done"]);
+    expect(beat("build").at).toBe(F.riseAtMs);
+    expect(beat("build").end - beat("build").at).toBe(B.build.reduce((a, b) => a + b, 0));
+    expect(beat("drop").end - beat("drop").at).toBe(F.boardDropMs);
+    expect(beat("table").end - beat("table").at).toBe(F.tableHoldMs);
+    // The line alone, nothing between you yet.
+    expect(at(100)).toMatchObject({ step: "line", line: true, blocks: null, table: false, stools: false, pyramid: null });
+    // The blocks landing, one by one, under the line.
+    expect(at(F.riseAtMs + 10)).toMatchObject({ step: "build", line: true, blocks: { anim: "build", frame: 0 }, table: false });
+    // The board falling from above onto the built table (its last frame), still above it, then lower; the line done.
+    const d0 = at(beat("drop").at + 1);
+    const d1 = at(beat("drop").at + F.boardDropMs * 0.8);
+    expect(d0).toMatchObject({ step: "drop", line: false, blocks: { anim: "build", frame: B.build.length - 1 }, table: true, stools: false });
+    expect(d0.drop).toBeGreaterThan(F.dropFrom * 0.95);
+    expect(d1.drop).toBeGreaterThan(0);
+    expect(d1.drop).toBeLessThan(d0.drop);
+    // On it as it plops (dust and stars), then the stools drop in, then it all stands.
+    expect(at(beat("plop").at)).toMatchObject({ step: "plop", blocks: { anim: "plop", frame: 0 }, table: true, drop: 0, stools: false });
+    expect(at(beat("chairs").at + 1)).toMatchObject({ step: "chairs", blocks: { anim: "chairs", frame: 0 }, table: true, stools: true });
+    expect(at(beat("table").at + 1)).toMatchObject({ step: "table", blocks: { anim: "idle", frame: 0 }, table: true, stools: true, drop: 0 });
+    expect(at(introLength(beats) + 50)).toMatchObject({ step: "done", table: true, stools: true });
+  });
+
+  it("the cues (his sounds) come on the art's frames: a clack as each block lands, a bonk for the top one, his toss as the board drops, a poof as it plops on, a clack for each stool", () => {
+    const cues = introCues(beats, B);
+    const frameAtMs = (anim: "build" | "plop" | "chairs", i: number) => beat(anim).at + B[anim].slice(0, i).reduce((a, b) => a + b, 0);
+    expect(cues).toEqual([
+      ...[3, 6, 9, 12, 15].map((i) => ({ cue: "block", at: frameAtMs("build", i) })),
+      { cue: "block-top", at: frameAtMs("build", 18) },
+      { cue: "drop", at: beat("drop").at },
+      { cue: "plop", at: beat("plop").at },
+      { cue: "stool", at: frameAtMs("chairs", 3) },
+      { cue: "stool", at: frameAtMs("chairs", 4) },
+    ]);
+    // Every cue, and the swirl's "storm", has one of his sounds.
+    const map = BOSS_INTROS.bigboy!.cues;
+    for (const c of [...new Set(cues.map((x) => x.cue)), "storm"]) expect(map[c], c).toMatch(/^bigboy[A-Z]/);
+  });
+
+  it("is short: the line to the swirl under 4 s, and the whole challenge, the walk in and the swirl too, under 6 s; his attack from 2 s before the swirl covers", () => {
+    const len = introLength(beats);
+    expect(len).toBeLessThanOrEqual(4000);
+    const walk = 9 * F.walkStepMs + F.settleMs;
+    expect(walk + len + F.stormInMs).toBeLessThan(6000);
+    const a = attackStart(beats);
+    expect(a).toBe(len + F.stormInMs - F.attackLeadMs);
+    expect(a).toBeGreaterThan(beat("drop").at);
+    expect(a).toBeLessThan(len);
+  });
+});
+
 describe("the storm's edge", () => {
   it("in: from its front just off the left to just off the right (covered); out: from covered to its front off the right", () => {
     const w = 390;
@@ -285,7 +392,7 @@ describe("the boss's attack in its intro (its God King attack)", () => {
     expect(attackTime(2380 + 1820 + 10, beat)).toBe(570);
   });
 
-  it("Alfil's kit has one (every playable boss's does but Timber's: his intro would skip it)", async () => {
+  it("Alfil's kit has one (every playable boss's does, Timber's too since Nov 2)", async () => {
     const { bossKit } = await import("../src/characters/kits.ts");
     expect(bossKit(introOf("alfil")!.name)?.kingAttack).toBeDefined();
   });

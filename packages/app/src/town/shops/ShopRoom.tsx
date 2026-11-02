@@ -899,7 +899,8 @@ function startRoom(
    * Between you (in a challenge): the pyramid's frame, or the table with its board (the crumble's last frames over it). The table's
    * picture is three squares across, a stool in each outer one: across, the stools are where you and the boss stand, so it's drawn
    * whole; facing, its middle (the leg) alone, the stools drawn on their own (`drawStool`). The default intro's table pops in (grows
-   * from its foot, a touch past its size and back) in a puff of dust.
+   * from its foot, a touch past its size and back) in a puff of dust. Toy blocks (Big Boy's) are the table and its stools: their frame,
+   * and the board on the top block once it drops (falling from above it, `drop` squares up, then on it).
    */
   const drawCenter = () => {
     const n = introNow;
@@ -909,6 +910,17 @@ function startRoom(
     const y = pt.y;
     const put = (img: HTMLCanvasElement, ch: Character, fx = ch.foot[0]) => g.drawImage(img, x - fx * s, y - ch.foot[1] * s, img.width * s, img.height * s);
     g.imageSmoothingEnabled = false;
+    const bl = ci.blocks;
+    if (bl) {
+      if (n.blocks) put(bl.frames[n.blocks.anim][n.blocks.frame]!, bl.ch);
+      if (n.table) {
+        g.save();
+        g.translate(0, -n.drop * pt.k);
+        paintTable(g, v, marks.table.c - camX, camY - marks.table.r, ci.table.palette, marks.layout);
+        g.restore();
+      }
+      return;
+    }
     if (n.table) {
       const T = ci.table;
       const popping = n.pop < 1;
@@ -1347,8 +1359,10 @@ function startRoom(
       facing: { you: you.facing, boss: boss.facing },
       line: !!introNow?.line && bossHead.on,
       table: !!introNow?.table,
-      stools: introNow?.table ? [[marks!.bossStool.c, marks!.bossStool.r], [marks!.youStool.c, marks!.youStool.r]] : [],
+      stools: introNow?.stools ? [[marks!.bossStool.c, marks!.bossStool.r], [marks!.youStool.c, marks!.youStool.r]] : [],
       pyramid: introNow?.pyramid ?? null,
+      blocks: introNow?.blocks ?? null,
+      drop: introNow?.drop ?? 0,
     };
   };
   const hookBench = (k: number) => {

@@ -25,7 +25,7 @@ export interface BotGameAsk {
 type Props = {
   onBack: () => void;
   onBossAlone: (id: string) => void;
-  /** A boss with an intro challenged (Alfil, Babur, Puddles): start its battle under its transition; resolves once the battle shows. */
+  /** A boss with an intro challenged (Alfil, Big Boy, Babur, Puddles): start its battle under its transition; resolves once the battle shows. */
   onBossChallenge: (id: string, stand: Stand | null) => Promise<void>;
   onPlayBot: (game: BotGameAsk) => void;
   onColosseum: () => void;

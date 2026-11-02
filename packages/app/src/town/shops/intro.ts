@@ -1,9 +1,10 @@
 /**
  * A boss's intro, drawn (shops/challenge.ts has the timing; ShopRoom.tsx plays it in the room): loaded only when you challenge the
- * boss (its art is a chunk of its own: Alfil's is shops/alfil-intro-art.ts, copied from `claude/boss-art`), every frame drawn into
- * a canvas of its own as it loads, behind the town's fade, never in a frame loop.
+ * boss (its art is a chunk of its own: Alfil's is shops/alfil-intro-art.ts, Big Boy's shops/bigboy-intro-art.ts, copied from
+ * `claude/boss-art`), every frame drawn into a canvas of its own as it loads, behind the town's fade, never in a frame loop.
  *
- * - The board coming in: the pyramid's frames (its `rise`, `idle`, `crack` and `crumble`), the table (the town's park table, in the
+ * - The board coming in: the pyramid's frames (its `rise`, `idle`, `crack` and `crumble`), or the toy blocks' (Big Boy's: `build`,
+ *   `plop`, `chairs` and `idle`: the blocks are his table and its stools, the board dropped onto them), the table (the town's park table, in the
  *   boss's colors when its art has them, else the park's stone) and, on it, the slab, the board and the pieces as the town lays them
  *   on a park table (render.ts `drawBoard`: `paintTable` here is that, without the town's cache, the game or the clock): the slab in
  *   the table's stone, its squares in its colors (the palette's `L` / `D`), the pieces in the town's own ink (TABLE_INK), turned to the
@@ -26,21 +27,28 @@ import { BOSS_ART } from "../render.ts";
 import type { HomeId } from "../world.ts";
 import { CHALLENGE_FEEL, boardSquare, introBeats, introOf, stormEdge, wipeAt, type BossIntro, type IntroAnims, type IntroBeat, type IntroLayout } from "./challenge.ts";
 
-/** A boss's intro art, as its file exports it. */
-interface IntroArt {
-  pyramid: Character;
-  table: Character;
+/**
+ * A boss's intro art, as its file exports it: a pyramid that brings in its table (Alfil's), or toy blocks that are the table and its
+ * stools (Big Boy's); the slab's and board's colors; its storm (a tile and its front).
+ */
+type IntroArt = (
+  | { pyramid: Character; table: Character; blocks?: undefined }
+  | { blocks: Character; pyramid?: undefined; table?: undefined }
+) & {
   /** The slab's keys "1" to "5" and the board's squares `L` / `D`. */
   palette: Readonly<Record<string, string>>;
   storm: Character;
   front: Character;
-}
+};
 const ART: Partial<Record<HomeId, () => Promise<IntroArt>>> = {
   alfil: () =>
     import("./alfil-intro-art.ts").then((m) => ({ pyramid: m.INTRO_ALFIL_PYRAMID, table: m.INTRO_ALFIL_TABLE, palette: m.INTRO_ALFIL_TABLE_PALETTE, storm: m.INTRO_ALFIL_STORM, front: m.INTRO_ALFIL_FRONT })),
+  bigboy: () =>
+    import("./bigboy-intro-art.ts").then((m) => ({ blocks: m.INTRO_BIGBOY_BLOCKS, palette: m.INTRO_BIGBOY_TABLE_PALETTE, storm: m.INTRO_BIGBOY_SWIRL, front: m.INTRO_BIGBOY_SWIRL_FRONT })),
 };
 
 type PyramidAnim = "rise" | "idle" | "crack" | "crumble";
+type BlocksAnim = "build" | "plop" | "chairs" | "idle";
 
 /** The storm's frames, ready: each tile `stormScale` times its size, the front and the front mirrored, and each frame's ms. */
 export interface StormArt {
@@ -57,8 +65,10 @@ export interface LoadedIntro {
   /** Its own art's timing (null: the default intro). */
   anims: IntroAnims | null;
   beats: IntroBeat[];
-  /** Its pyramid (null: the default intro, whose table pops in). */
+  /** Its pyramid (null: none: toy blocks, or the default intro, whose table pops in). */
   pyramid: { ch: Character; frames: Record<PyramidAnim, HTMLCanvasElement[]> } | null;
+  /** Its toy blocks (Big Boy's: the table and its stools, built as you watch; null: none). */
+  blocks: { ch: Character; frames: Record<BlocksAnim, HTMLCanvasElement[]> } | null;
   /**
    * The table: its picture (three squares across: a stool, the leg, a stool), its middle square alone (`leg`) and a stool alone
    * (`stool`, its foot at its middle), and the slab's and board's colors.
@@ -119,8 +129,17 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
   p = (def.custom && load ? load() : Promise.resolve(null)).then((art) => {
     let anims: IntroAnims | null = null;
     let pyramid: LoadedIntro["pyramid"] = null;
+    let blocks: LoadedIntro["blocks"] = null;
     let storm: StormArt | null = null;
-    if (art) {
+    if (art?.blocks) {
+      const bl = art.blocks;
+      const ms = (a: BlocksAnim) => bl.anims[a]!.frames.map((f) => f.ms);
+      const cues = (a: BlocksAnim) => bl.anims[a]!.frames.map((f) => f.cue);
+      anims = { build: ms("build"), plop: ms("plop"), chairs: ms("chairs"), cues: { build: cues("build"), plop: cues("plop"), chairs: cues("chairs") } };
+      const frames = {} as Record<BlocksAnim, HTMLCanvasElement[]>;
+      for (const a of ["build", "plop", "chairs", "idle"] as const) frames[a] = bl.anims[a]!.frames.map((_, i) => toCanvas(bl, a, i));
+      blocks = { ch: bl, frames };
+    } else if (art) {
       const py = art.pyramid;
       const ms = (a: PyramidAnim) => py.anims[a]!.frames.map((f) => f.ms);
       // (The art's "table" cue: the crumble frame whose middle is clear, the table showing behind the falling sand.)
@@ -129,6 +148,8 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
       const frames = {} as Record<PyramidAnim, HTMLCanvasElement[]>;
       for (const a of ["rise", "idle", "crack", "crumble"] as const) frames[a] = py.anims[a]!.frames.map((_, i) => toCanvas(py, a, i));
       pyramid = { ch: py, frames };
+    }
+    if (art) {
       const k = CHALLENGE_FEEL.stormScale;
       const stormFrames = art.storm.anims.idle!.frames;
       storm = {
@@ -138,15 +159,15 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
         ms: stormFrames.map((f) => Math.max(16, f.ms)),
       };
     }
-    // The table: the boss's own, or the town's park table in its stone (the same geometry: a stool, the leg, a stool).
-    const tch = art?.table ?? PARK_TABLE;
+    // The table: the boss's own (its blocks, built), or the town's park table in its stone (the same geometry: a stool, the leg, a stool).
+    const tch = art?.blocks ?? art?.table ?? PARK_TABLE;
     const img = toCanvas(tch, "idle", 0);
     const table = { ch: tch, img, leg: third(img, 1), stool: third(img, 0), palette: art?.palette ?? PARK_TABLE.palette };
     const bossCh = BOSS_ART[home];
     let t = 0;
     const bossIdle = bossCh.anims.idle!.frames;
     const ends = bossIdle.map((f) => (t += Math.max(16, f.ms)));
-    // Its God King attack, if its kit has one (every playable boss's does but Timber's, today).
+    // Its God King attack, if its kit has one (every playable boss's does, Timber's too since Nov 2; the Hidden Boss has no home).
     const kit = bossKit(def.name);
     const ka = kit?.kingAttack ?? null;
     const attack = ka
@@ -169,6 +190,7 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
       anims,
       beats: introBeats(anims),
       pyramid,
+      blocks,
       table,
       boss: { ch: bossCh, frames: bossIdle.map((_, i) => toCanvas(bossCh, "idle", i)), ends, loop: t, squares: TOWN_FEEL.bossSquares * (TOWN_FEEL.bossScale[home] ?? 1) },
       storm,
