@@ -1033,7 +1033,7 @@ const scrapAnim: Anim = {
 
 /**
  * Build (the Workshop, a piece dropped): he reaches back and slides a plank up out of its strap, shows it off overhead, and
- * swings it down toward the board as if setting the piece there (cue `drop` where it lands), then slides it back in.
+ * swings it down toward the board as if setting the piece there (cue `set` where it lands), then slides it back in.
  */
 const build: Anim = {
   loop: false,
@@ -1045,7 +1045,7 @@ const build: Anim = {
     f(170, { noPlank: true, armL: { h: [11, 34] }, held: { top: [8, 3], bot: [12, 50] }, head: [-1, 0], headDy: -1, mood: "proud", mouth: "open", jaw: 2 }, { cue: "show" }),
     f(170, { noPlank: true, armL: { h: [11, 33] }, held: { top: [8, 2], bot: [12, 49] }, head: [-1, 0], headDy: -1, breath: 1, mood: "proud", mouth: "grin" }),
     f(90, { noPlank: true, armL: { h: [19, 36] }, armR: { h: [32, 30] }, held: { top: [4, 46], bot: [44, 18] }, lean: -1, mood: "squint", brows: "angry" }),
-    f(150, { noPlank: true, armL: { h: [17, 48] }, armR: { h: [30, 42] }, held: { top: [3, 68], bot: [37, 34] }, lean: -2, head: [-1, 1], sink: 1, mood: "smile", mouth: "grin", front: true }, { cue: "drop", shake: [0, 1], specks: puff(4, 74, 0) }),
+    f(150, { noPlank: true, armL: { h: [17, 48] }, armR: { h: [30, 42] }, held: { top: [3, 68], bot: [37, 34] }, lean: -2, head: [-1, 1], sink: 1, mood: "smile", mouth: "grin", front: true }, { cue: "set", shake: [0, 1], specks: puff(4, 74, 0) }),
     f(140, { noPlank: true, armL: { h: [17, 48] }, armR: { h: [30, 42] }, held: { top: [3, 68], bot: [37, 34] }, lean: -2, head: [-1, 1], mood: "proud", mouth: "grin", front: true }, { specks: puff(4, 74, 1) }),
     f(110, { head: [1, 0], armR: { h: [69, 11] }, plankOut: 12, mood: "smile" }, { specks: puff(4, 74, 2) }),
     f(100, { head: [1, 0], armR: { h: [65, 16] }, plankOut: 5 }),

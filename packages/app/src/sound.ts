@@ -24,6 +24,7 @@ import { mooSound, type MooSound } from "./characters/moo-sounds.ts";
 import { gardenerSound, type GardenerSound } from "./characters/gardener-sounds.ts";
 import { tigerSound, type TigerSound } from "./characters/tiger-sounds.ts";
 import { folioSound, type FolioSound } from "./characters/folio-sounds.ts";
+import { timberSound, type TimberSound } from "./characters/timber-sounds.ts";
 import { godKingSound } from "./characters/god-king-sounds.ts";
 import { captureWorkerError } from "./problems.ts";
 import { makeBossSound, type BossSound } from "./characters/boss-sounds.ts";
@@ -288,6 +289,9 @@ const mooBoss = (name: MooSound) => (t: number) => buffer(mooSound(name, ctx!.sa
 const gardenerBoss = (name: GardenerSound) => (t: number) => buffer(gardenerSound(name, ctx!.sampleRate), t);
 const tigerBoss = (name: TigerSound) => (t: number) => buffer(tigerSound(name, ctx!.sampleRate), t);
 const folioBoss = (name: FolioSound) => (t: number) => buffer(folioSound(name, ctx!.sampleRate), t);
+const timberBoss = (name: TimberSound) => (t: number) => buffer(timberSound(name, ctx!.sampleRate), t);
+/** Timber's build sound picks one of these each time (Eric, Nov 2: "interchangeable between the tap, the whack, and the knock"). */
+export const TIMBER_BUILD = ["timberTap", "timberWhack", "timberKnock"] as const satisfies readonly SoundName[];
 /** The God King tapped with no charges left: his soft "can't" (god-king-sounds.ts). */
 const kingCant = (t: number) => buffer(godKingSound("cant", ctx!.sampleRate), t);
 /** One of the Roman candle's shots: a whistle (one of three, its pitch a little either way), now and then a crackle at its top. */
@@ -771,6 +775,26 @@ export type SoundName =
   | "folioVoice"
   | "folioMurmur"
   | "folioHum"
+  // Timber, the beaver builder (a raid boss): synthesized, all wood, see characters/timber-sounds.ts.
+  | "timberGnaw"
+  | "timberChomp"
+  | "timberClack"
+  | "timberKnock"
+  | "timberPat"
+  | "timberTap"
+  | "timberWhack"
+  | "timberSaw"
+  | "timberThump"
+  | "timberClatter"
+  | "timberSlap"
+  | "timberSwoosh"
+  | "timberSlide"
+  | "timberChitter"
+  | "timberOof"
+  | "timberHup"
+  | "timberBurp"
+  // (His build: a tap, a whack or a knock, one at random each time: Eric, Nov 2.)
+  | "timberBuild"
   | "kingCant"
   // Squads: a short tick in the last seconds of your free time, and the sting as a squad enters sudden death.
   | "sqTick"
@@ -1027,6 +1051,24 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   folioVoice: folioBoss("voice"),
   folioMurmur: folioBoss("murmur"),
   folioHum: folioBoss("hum"),
+  timberGnaw: timberBoss("gnaw"),
+  timberChomp: timberBoss("chomp"),
+  timberClack: timberBoss("clack"),
+  timberKnock: timberBoss("knock"),
+  timberPat: timberBoss("pat"),
+  timberTap: timberBoss("tap"),
+  timberWhack: timberBoss("whack"),
+  timberSaw: timberBoss("saw"),
+  timberThump: timberBoss("thump"),
+  timberClatter: timberBoss("clatter"),
+  timberSlap: timberBoss("slap"),
+  timberSwoosh: timberBoss("swoosh"),
+  timberSlide: timberBoss("slide"),
+  timberChitter: timberBoss("chitter"),
+  timberOof: timberBoss("oof"),
+  timberHup: timberBoss("hup"),
+  timberBurp: timberBoss("burp"),
+  timberBuild: (t: number) => SOUNDS[TIMBER_BUILD[Math.floor(Math.random() * TIMBER_BUILD.length)]!](t),
   kingCant,
   sqTick: (t) => clockTick(t, 0.22),
   sqSting,
@@ -1234,6 +1276,24 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   folioVoice: [["folio", "voice"]],
   folioMurmur: [["folio", "murmur"]],
   folioHum: [["folio", "hum"]],
+  timberGnaw: [["timber", "gnaw"]],
+  timberChomp: [["timber", "chomp"]],
+  timberClack: [["timber", "clack"]],
+  timberKnock: [["timber", "knock"]],
+  timberPat: [["timber", "pat"]],
+  timberTap: [["timber", "tap"]],
+  timberWhack: [["timber", "whack"]],
+  timberSaw: [["timber", "saw"]],
+  timberThump: [["timber", "thump"]],
+  timberClatter: [["timber", "clatter"]],
+  timberSlap: [["timber", "slap"]],
+  timberSwoosh: [["timber", "swoosh"]],
+  timberSlide: [["timber", "slide"]],
+  timberChitter: [["timber", "chitter"]],
+  timberOof: [["timber", "oof"]],
+  timberHup: [["timber", "hup"]],
+  timberBurp: [["timber", "burp"]],
+  timberBuild: [["timber", "tap"], ["timber", "whack"], ["timber", "knock"]],
   kingCant: [["godKing", "cant"]],
 };
 /** The sound worker (sound-worker.ts), started with the first warmSounds; null where there's none (or it failed). */
