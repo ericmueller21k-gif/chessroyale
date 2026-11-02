@@ -15,3 +15,19 @@ pieces if these turn out the way we want."
   a finer art pixel on a phone (the canvas is 2x today; at 3x a scale of 4 gives about 18) or a smaller phone set.
 - **Next, once Eric approves:** the pawn, bishop, queen and king in a second run on the same base and palette (the model's
   notes in `summary.md` say how), then the director's helper draws them in the arena in place of the meshes.
+
+## Round 2: the 3D model (Nov 2)
+
+Eric, on the flat trial: "Have it draw them 3d in the same style it is right now, no smear, the plan all along was to
+mirror the first reference image." On the spend: "No just actually draw the 3d model based on the 2d image you just made
+for the horse and rook, then send me a view of it from the crowd." So no API run (no spend): built here, by hand, in
+`scripts/boss-art/arena-pieces-3d.ts`.
+- **The model,** from the 2D drawing's own grids, one unit a sprite pixel: every row of the rook and the bases turned round
+  the axis (gold rows gold rings, dark rows grooves); the rook's top a ring wall of four battlements round a sunken roof;
+  the knight's head the sprite's head given a rounded thickness, the mane gold, the eye on both cheeks.
+- **The view from the crowd:** each pixel one ray from the stands behind White, looking down 30 degrees (Eric's picture's
+  pieces show their bases' tops and the rook's top at about this angle); flat bands of the same palette lit from the top
+  left, a 1-pixel outline round each piece and where a nearer part covers a farther one. Every pixel is a palette color.
+- `sheet-3d.png` (1x and 4x), `mockup-3d-computer.png`, `mockup-3d-phone.png` (laid on the empty arena as before),
+  `compare-3d-reference.png` (Eric's picture's board beside the computer mockup), `arena-pieces-3d.json` (the four
+  drawings as palette keys, the foot's pixel). The other four pieces would be built the same way from their 2D drawings.
