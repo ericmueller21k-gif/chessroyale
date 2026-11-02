@@ -9,6 +9,7 @@
 import { BOSS_CRATE_PRICE, BOSS_CRATE_POOL, bossCrateOf, itemDef, tierInfo, type ItemInstance } from "@chessroyale/core";
 import { buyBossCrateOnServer, tokenCount } from "../../account.ts";
 import type { HomeId } from "../world.ts";
+import type { SkyTone } from "../sky.ts";
 import type { Sq } from "./room.ts";
 
 export interface ShopDef {
@@ -27,14 +28,20 @@ export interface ShopDef {
   prizes: readonly string[];
   /** Above the walls: a tent's canvas or a greenhouse's glass (drawn by the game, not the art: as the mockup did). */
   roof: "tent" | "glass";
+  /**
+   * The chat log's text over the room (Eric, Nov 2: "white, or black, depending on darkness of background in the shop"): "night" for
+   * a dark room (white words on a dark tint: Babur's tent), "day" for a light one (dark words on a light tint: Puddles' greenhouse),
+   * whatever the town's sky is doing outside. The town's own two tones (TownChat's `data-tone`).
+   */
+  chatTone: SkyTone;
 }
 
 export const SHOPS: Readonly<Partial<Record<HomeId, ShopDef>>> = {
   // Stripes stands beside the counter's east end, a little behind it: behind the counter itself its 58 px hides him (the
   // mockup's place, scripts/boss-art/shop-view.ts).
-  tiger: { home: "tiger", boss: "Babur", crate: "Babur's Boss Crate", kid: "babur", at: [12.6, 2.6], keeper: [{ c: 12, r: 2 }, { c: 13, r: 2 }], prizes: ["balloon-pup"], roof: "tent" },
+  tiger: { home: "tiger", boss: "Babur", crate: "Babur's Boss Crate", kid: "babur", at: [12.6, 2.6], keeper: [{ c: 12, r: 2 }, { c: 13, r: 2 }], prizes: ["balloon-pup"], roof: "tent", chatTone: "night" },
   // Drizzle stands behind the middle of the low potting counter (44 px: Drizzle shows over it).
-  gardener: { home: "gardener", boss: "Puddles", crate: "Puddles' Boss Crate", kid: "puddles", at: [9.5, 2], keeper: [{ c: 9, r: 2 }, { c: 10, r: 2 }], prizes: ["puddles-mower"], roof: "glass" },
+  gardener: { home: "gardener", boss: "Puddles", crate: "Puddles' Boss Crate", kid: "puddles", at: [9.5, 2], keeper: [{ c: 9, r: 2 }, { c: 10, r: 2 }], prizes: ["puddles-mower"], roof: "glass", chatTone: "day" },
 };
 
 /** The shop inside a home, or null: every other home has no "Go in" yet. */

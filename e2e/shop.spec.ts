@@ -102,6 +102,8 @@ test("Babur's tent: Go in, start in Close, talk to the Shopkeeper, the crate's p
   // Inside: a step in from the door, in Close (the + is the pressed one), the town's chips put away; the header says the shop's name.
   await expect(room(page)).toHaveAttribute("data-room", "tiger");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Babur's Circus");
+  // The chat log over the dark tent: white words (Eric, Nov 2), by day outside too (?sky=day).
+  await expect(page.locator(".town-chat")).toHaveAttribute("data-tone", "night");
   await expect(room(page)).toHaveAttribute("data-you", "10,17");
   expect((await shopCam(page))!.zoom).toBe(0);
   await expect(page.getByRole("button", { name: "Zoom in" })).toHaveAttribute("aria-pressed", "true");
@@ -160,10 +162,14 @@ test("Babur's tent: Go in, start in Close, talk to the Shopkeeper, the crate's p
 test("Puddles' greenhouse: Go in, Drizzle's crate with Puddles's Mower; the back button takes you out", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
-  await page.goto("/town?sky=day");
+  // (By night outside: the chat's words are white in the town, dark in the greenhouse.)
+  await page.goto("/town?sky=night");
   await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await expect(page.locator(".town-chat")).toHaveAttribute("data-tone", "night");
   await goIn(page, "gardener", "Puddles' Botanical Garden");
   await expect(room(page)).toHaveAttribute("data-room", "gardener");
+  // The chat log over the light greenhouse: dark words (Eric, Nov 2), by night outside.
+  await expect(page.locator(".town-chat")).toHaveAttribute("data-tone", "day");
   await talk(page);
   const crate = page.getByRole("dialog", { name: "Puddles' Boss Crate", exact: true });
   await expect(crate).toBeVisible();

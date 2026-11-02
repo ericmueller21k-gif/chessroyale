@@ -2,7 +2,7 @@
  * The town square's chat log (Eric, Oct 28): one box in the map's top left corner, a continuous stream of lines ("[9:41] Name:
  * message", the name bold, colored by kind: a player's from a palette, picked at random each time they join), newest at the bottom.
  * No backing, border or shadow on any line (the text is near-black by day and white by night, following the town's own sky:
- * `data-tone`, read about once a minute, set only when it flips). The box holds every line of the last 5 minutes (`lifeMs`), at most
+ * `data-tone`, read about once a minute, set only when it flips; inside a shop, the room's own tone instead, its `chatTone`: Nov 2). The box holds every line of the last 5 minutes (`lifeMs`), at most
  * 100 (`keepLines`), and scrolls: a finger on a phone, the wheel on a computer; new lines keep it at its foot unless you've scrolled
  * up, then a "↓ new" marker says so (`Stick`).
  *
@@ -48,13 +48,14 @@ import { openProfile } from "../profile-nav.ts";
 import { useServerStatus } from "../status.ts";
 import { testSwitchesAllowed } from "../test-switches.ts";
 import { CHAT, CHAT_BOX, ChatLog, Stick, chatBlurs, chatShows, clampBox, loadChatPos, onTownChatLineTap, saveChatPos, say, setTownChatLineTap, startChatter, tooSoonText, townTone, type ChatKind, type ChatLine, type Rect } from "./chat.ts";
+import type { SkyTone } from "./sky.ts";
 import { cutTownText, mayTownChat, openTownFeed, removeTownLine, reportTownLine, sendTownChat, townChars, townChatOff } from "./chat-net.ts";
 import { NAME_COLORS, nameColorIndex } from "./names.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { useChatBackground, useChatMode } from "./TownChatTools.tsx";
 import "./town-chat.css";
 
-export function TownChat() {
+export function TownChat({ tone: room }: { /** Inside a shop: its room's tone (shops.ts' `chatTone`), whatever the sky outside. */ tone?: SkyTone } = {}) {
   const wrap = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLInputElement>(null);
@@ -389,7 +390,7 @@ export function TownChat() {
   const blur = chatBlurs(mode, log.shown, typing, background);
 
   return (
-    <div class="town-chat" ref={wrap} hidden={mode === "off"} data-size={computer ? "computer" : "phone"} data-mode={mode} data-on={on ? "1" : "0"} data-blur={blur ? "1" : "0"} data-typing={typing ? "1" : "0"} data-tone={tone} style={`--chat-out:${CHAT.fadeMs}ms;--chat-in:${CHAT.fadeInMs}ms`}>
+    <div class="town-chat" ref={wrap} hidden={mode === "off"} data-size={computer ? "computer" : "phone"} data-mode={mode} data-on={on ? "1" : "0"} data-blur={blur ? "1" : "0"} data-typing={typing ? "1" : "0"} data-tone={room ?? tone} style={`--chat-out:${CHAT.fadeMs}ms;--chat-in:${CHAT.fadeInMs}ms`}>
       {/* The slight blur behind the whole box, the stream and the typing line together: one rounded rectangle (town-chat.css). */}
       <div class="tc-back" aria-hidden="true" />
       {/* (Focusable, so a keyboard gets to the box: Enter opens typing, as a tap does.) */}
