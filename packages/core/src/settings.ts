@@ -2747,6 +2747,15 @@ export const RIDES = {
 };
 
 /**
+ * A boss's crate, sold by the Shopkeeper inside the boss's home (Eric, Nov 2: "3 Babur tokens, or 1 Babur token + 1 crate key"):
+ * its two prices, in that boss's tokens and crate keys. Round 1 shows them (packages/app/src/town/shops/); buying is round 2's.
+ */
+export const BOSS_CRATE_PRICE = {
+  tokens: 3,
+  withKey: { tokens: 1, keys: 1 },
+} as const;
+
+/**
  * Fair play (the `fairplay` delegate): reports, cases and what each level does. See DECISIONS.md, "Fair play".
  *   - watch: recorded only (the player's moves are kept as evidence);
  *   - review: a person (or the automated reviewer) looks; meanwhile their results are held off ranking (the rating,

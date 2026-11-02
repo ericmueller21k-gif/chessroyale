@@ -473,3 +473,101 @@ button.town-pic.player {
 .town-ico-swords {
   flex: none;
 }
+
+/*
+ * Inside a shop (Nov 2, round 1: shops/ShopRoom.tsx): the room's own canvas over the town's (the town waits under it), the town's
+ * edge chips put away while you're in, and the black the town zooms into as you go in (and the room fades in from).
+ */
+.town-shop {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+}
+.town-shop-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+.town-inside .town-chip {
+  visibility: hidden;
+}
+.town-fade {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+}
+/* The crate's card: in the middle of the room (no tail), its picture and prizes side by side, the price, what you have, the two
+   ways to buy, and a row under them for the answer (always there, so nothing moves when it comes). */
+.town-card.shop-crate {
+  min-width: 260px;
+  max-width: 300px;
+}
+.town-card.shop-crate::after {
+  display: none;
+}
+.shop-crate-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.shop-crate-pic {
+  flex: none;
+  width: 90px;
+  height: 81px;
+  image-rendering: pixelated;
+}
+.shop-label {
+  margin: 0 0 3px;
+  font: 600 11px Archivo, sans-serif;
+  color: #a9adb9;
+}
+.shop-prizes ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.shop-prizes li {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 4px;
+}
+.shop-prize-name {
+  font: 700 14px/1.25 Archivo, sans-serif;
+  color: #fff;
+}
+.shop-prize-kind {
+  font: 700 11px/1.3 Archivo, sans-serif;
+}
+.shop-price {
+  margin: 4px 0 2px;
+  font: 700 13px/1.35 Archivo, sans-serif;
+  color: #fff;
+}
+.shop-hold {
+  margin: 0 0 2px;
+  font: 500 12px/1.35 Archivo, sans-serif;
+  color: #d6d8df;
+}
+.town-card .shop-msg {
+  min-height: 14px;
+  margin-top: 6px;
+}
+.shop-prize-kind {
+  color: #d6d8df;
+}
+.shop-prize-kind i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 5px;
+  border-radius: 50%;
+}
