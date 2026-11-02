@@ -477,8 +477,8 @@ describe("the pixel set and the gear's Pieces (Nov 1; pieces-pixel.ts)", () => {
   it("as the picture has them (round 2): in the high view behind White, each piece on its square near White as tall as the picture's and its base as wide, outline and all, phone and computer", async () => {
     const A = await import("../src/colosseum/arena.ts");
     const { KINDS, MAT, PV } = await import("../src/colosseum/pieces3d.ts");
-    const { PIXEL_BASE, PIXEL_TARGET, pixelMeshes } = await import("../src/colosseum/pieces-pixel.ts");
-    const { PIXEL_TILT } = await import("../src/colosseum/arena-gl.ts");
+    const { PIXEL_BASE, PIXEL_FIT, PIXEL_TARGET, pixelMeshes } = await import("../src/colosseum/pieces-pixel.ts");
+    const { PAWN_ART_PX, PIXEL_TILT } = await import("../src/colosseum/arena-gl.ts");
     const all = pixelMeshes();
     const home: Record<string, string> = { p: "e2", r: "h1", n: "g1", b: "f1", q: "d1", k: "e1" };
     for (const [W, H, computer] of [[1440, 848, true], [780, 1688, false]] as const) {
@@ -497,16 +497,24 @@ describe("the pixel set and the gear's Pieces (Nov 1; pieces-pixel.ts)", () => {
       const a = Math.asin(-fwd[1]!) * PIXEL_TILT;
       const U = [-F[0]! * Math.sin(a), Math.cos(a), -F[2]! * Math.sin(a)];
       const F2 = [F[0]! * Math.cos(a), Math.sin(a), F[2]! * Math.cos(a)];
-      // The art pixel (arena-gl.ts pixelTarget: a 1 m pawn on the board's middle 16 art pixels tall), and the outline round it.
+      // The screen's up (square to its right and to the way you look).
+      const up = [Rt[1]! * fwd[2]! - Rt[2]! * fwd[1]!, Rt[2]! * fwd[0]! - Rt[0]! * fwd[2]!, Rt[0]! * fwd[1]! - Rt[1]! * fwd[0]!];
+      const ul = Math.hypot(up[0]!, up[1]!, up[2]!);
+      for (let i = 0; i < 3; i++) up[i] = up[i]! / ul;
+      // The art pixel (arena-gl.ts pixelTarget: a 1 m pawn on the board's middle PAWN_ART_PX art pixels tall), and the outline round it.
       const k0 = Math.sin(a) / fl;
       const p0 = A.project(vp, 0, A.BOARD.lift, 0, W, H)!;
       const p1 = A.project(vp, fwd[0]! * k0, A.BOARD.lift + Math.cos(a), fwd[2]! * k0, W, H)!;
-      const art = Math.max(2, Math.round(Math.abs(p0[1] - p1[1]) / 16));
+      const art = Math.max(2, Math.round(Math.abs(p0[1] - p1[1]) / PAWN_ART_PX));
       for (const k of KINDS) {
         const [x, z] = A.squareXZ(home[k]!);
         const l = A.project(vp, x - 0.5, A.BOARD.lift, z, W, H)!;
         const r = A.project(vp, x + 0.5, A.BOARD.lift, z, W, H)!;
         const sw = r[0] - l[0];
+        // Laid out as a sprite (Nov 2): flat, a whole number of art pixels a meter at its foot.
+        const foot = A.project(vp, x, A.BOARD.lift, z, W, H)!;
+        const top = A.project(vp, x + up[0]!, A.BOARD.lift + up[1]!, z + up[2]!, W, H)!;
+        const kpx = Math.max(1, Math.round((foot[1] - top[1]) / art)) * art;
         let y0 = Infinity;
         let y1 = -Infinity;
         let b0 = Infinity;
@@ -514,13 +522,15 @@ describe("the pixel set and the gear's Pieces (Nov 1; pieces-pixel.ts)", () => {
         const m = all[k].verts;
         for (let i = 0; i < m.length; i += PV) {
           if (m[i + 6] === MAT.shadow) continue;
-          const [px, py, pz] = [m[i]!, m[i + 1]!, m[i + 2]!];
-          const s = A.project(vp, x + Rt[0]! * px + U[0]! * py + F2[0]! * pz, A.BOARD.lift + U[1]! * py + F2[1]! * pz, z + Rt[2]! * px + U[2]! * py + F2[2]! * pz, W, H)!;
-          y0 = Math.min(y0, s[1]);
-          y1 = Math.max(y1, s[1]);
+          const [fx, fy] = PIXEL_FIT[k];
+          const [px, py, pz] = [m[i]! * fx, m[i + 1]! * fy, m[i + 2]! * fx];
+          const o = [0, 1, 2].map((j) => Rt[j]! * px + U[j]! * py + F2[j]! * pz);
+          const s = [kpx * (o[0]! * Rt[0]! + o[1]! * Rt[1]! + o[2]! * Rt[2]!), -kpx * (o[0]! * up[0]! + o[1]! * up[1]! + o[2]! * up[2]!)];
+          y0 = Math.min(y0, s[1]!);
+          y1 = Math.max(y1, s[1]!);
           if (py < 1e-6) {
-            b0 = Math.min(b0, s[0]);
-            b1 = Math.max(b1, s[0]);
+            b0 = Math.min(b0, s[0]!);
+            b1 = Math.max(b1, s[0]!);
           }
         }
         const tall = (y1 - y0 + 2 * art) / sw;

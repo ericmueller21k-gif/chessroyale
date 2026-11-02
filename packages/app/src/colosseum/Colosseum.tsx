@@ -74,11 +74,11 @@ type Hooks = {
     pieces: (style: PieceStyle) => unknown;
     freeze: () => unknown;
     lens: (v: View | null) => unknown;
-    place: (pieces: FloorPiece[]) => unknown;
+    place: (pieces: FloorPiece[], t0?: number) => unknown;
     jump: () => unknown;
     sample: () => { sky: number; hash: number } | null;
-    /** (Stills and GIFs) the arena drawn now and read back as a PNG data URL. */
-    snap: () => string | null;
+    /** (Stills and GIFs) the arena drawn at `time` (the page's clock, s; now if none), read back as a PNG data URL, cut to `box` (canvas px). */
+    snap: (time?: number, box?: { x: number; y: number; w: number; h: number }) => string | null;
     /** (Stills) the screen box (CSS px) round these squares' pieces, as the last frame drew them. */
     screenBox: (squares: string[]) => { x: number; y: number; w: number; h: number } | null;
   };
@@ -330,7 +330,7 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
       flag: () => testSwitchesAllowed() && match.current?.flag(),
       pieces: (style) => testSwitchesAllowed() && arenaRef.current?.setPieceStyle(style),
       lens: (v) => testSwitchesAllowed() && (lens.current = v),
-      place: (p) => testSwitchesAllowed() && arenaRef.current?.setPieces(p, -1e9),
+      place: (p, at = -1e9) => testSwitchesAllowed() && arenaRef.current?.setPieces(p, at),
       freeze: () => {
         if (!testSwitchesAllowed()) return;
         frozenAt.current = performance.now();
@@ -361,11 +361,17 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
           }
         return { sky: sky / n, hash };
       },
-      snap: () => {
+      snap: (time, box) => {
         const a = arenaRef.current;
         if (!a || !testSwitchesAllowed()) return null;
-        a.draw(lens.current ?? views.current[viewRef.current]!, turn.current.yaw, turn.current.pitch, (performance.now() - t0.current) / 1000, 99);
-        return (a.gl.canvas as HTMLCanvasElement).toDataURL("image/png");
+        a.draw(lens.current ?? views.current[viewRef.current]!, turn.current.yaw, turn.current.pitch, time ?? (performance.now() - t0.current) / 1000, 99);
+        const cv = a.gl.canvas as HTMLCanvasElement;
+        if (!box) return cv.toDataURL("image/png");
+        const c = document.createElement("canvas");
+        c.width = box.w;
+        c.height = box.h;
+        c.getContext("2d")!.drawImage(cv, box.x, box.y, box.w, box.h, 0, 0, box.w, box.h);
+        return c.toDataURL("image/png");
       },
       screenBox: (squares) => {
         const a = arenaRef.current;

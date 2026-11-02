@@ -30,7 +30,7 @@
 import { BANNERS, BOARD, FLOOR_R, bossSeats, project, type Seat, GALLERY_H, GALLERY_R, PILLARS, PILLAR_ANGLES, SEATING, STANDS, STATUE, WALL_H, WALL_TOP, aisleAngle, fovFor, landingDepth, lookAt, multiply, perspective, rowR, rowY, seatR, seats, squareXZ, VIEWS, type View } from "./arena.ts";
 import { FIGURE_STRIDE, PILLAR_TOP_PX, PROPS, SCENE, SEAT_SINK, SKY, SQUARES, STANDS_SEATS, STONE, type CrowdArt, type Figure, type Rect } from "./art.ts";
 import { EYE, KINDS, KNIGHT_TURN, PV, SIZE, SLIT, pieceMeshes, type Kind, type PieceMesh } from "./pieces3d.ts";
-import { PIXEL_EYE, PIXEL_KNIGHT, PIXEL_KNIGHT_TURN, PIXEL_MANE, PIXEL_SLIT, pixelMeshes } from "./pieces-pixel.ts";
+import { PIXEL_EYE, PIXEL_FIT, PIXEL_KNIGHT, PIXEL_KNIGHT_TURN, PIXEL_MANE, PIXEL_SLIT, pixelMeshes } from "./pieces-pixel.ts";
 
 /** GLSL: the knight's back edge (its outline's first points, base to ear) as straight steps, x at a height y. */
 function knightBackGlsl(): string {
@@ -244,6 +244,7 @@ uniform float uKind;
 uniform float uTilt;
 uniform vec2 uRes;
 uniform vec3 uFwd;
+uniform vec2 uFit;
 out vec3 vN;
 out vec3 vObj;
 out float vMat;
@@ -254,8 +255,11 @@ vec2 toPx(vec4 c) { return (c.xy / c.w * 0.5 + 0.5) * uRes; }
 void main() {
   vMat = aMat;
   vBlack = iB.z;
-  vN = aNrm;
+  // (Its kind's fit, PIXEL_FIT: wider and taller as drawn; the normal, the slit's and the eye's places stay the mesh's.)
+  vec3 fit = vec3(uFit.x, uFit.y, uFit.x);
+  vN = aNrm / fit;
   vObj = aPos;
+  vec3 aP = aPos * fit;
   vId = uKind * 32.0 + float(gl_InstanceID) + 1.0;
   if (uTime >= iB.y) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); vDepth = 0.0; return; }
   float s = clamp((uTime - iB.x) / uSlide, 0.0, 1.0);
@@ -269,12 +273,12 @@ void main() {
   bool shadow = aMat > 2.5 && aMat < 3.5;
   vec3 foot = vec3(xz.x, uLift + (shadow ? 0.0 : hop), xz.y);
   if (shadow) {
-    w = vec3(xz.x, uLift + 0.006, xz.y) + R * (aPos.x + 0.06) + F * (aPos.z - 0.05);
+    w = vec3(xz.x, uLift + 0.006, xz.y) + R * (aP.x + 0.06) + F * (aP.z - 0.05);
   } else {
     float a = asin(clamp(-uFwd.y, -1.0, 1.0)) * uTilt;
     vec3 U = vec3(0.0, cos(a), 0.0) - F * sin(a);
     vec3 F2 = F * cos(a) + vec3(0.0, sin(a), 0.0);
-    w = foot + R * aPos.x + U * aPos.y + F2 * aPos.z;
+    w = foot + R * aP.x + U * aP.y + F2 * aP.z;
   }
   gl_Position = uVP * vec4(w, 1.0);
   vDepth = gl_Position.w;
@@ -349,7 +353,8 @@ void main() {
   // The knight's eye (PIXEL_EYE), on both sides of its head.
   if (vMat > 3.5 && vMat < 4.5) {
     vec2 p = vec2(vObj.x * ${Math.cos(PIXEL_KNIGHT_TURN).toFixed(4)} - vObj.z * ${Math.sin(PIXEL_KNIGHT_TURN).toFixed(4)}, vObj.y);
-    if (distance(p, vec2(${PIXEL_EYE.x.toFixed(3)}, ${PIXEL_EYE.y.toFixed(3)})) < ${PIXEL_EYE.r.toFixed(3)}) c = vBlack > 0.5 ? GOLD_L : vec3(0.18, 0.12, 0.08);
+    vec2 e = abs(p - vec2(${PIXEL_EYE.x.toFixed(3)}, ${PIXEL_EYE.y.toFixed(3)}));
+    if (max(e.x, e.y) < ${PIXEL_EYE.r.toFixed(3)}) c = vBlack > 0.5 ? GOLD_L : vec3(0.18, 0.12, 0.08);
   }
   o = vec4(c, 1.0);
   float d = clamp(vDepth / 64.0, 0.0, 1.0) * 255.0;
@@ -680,6 +685,7 @@ interface Solid {
   uTilt: WebGLUniformLocation | null;
   uRes: WebGLUniformLocation | null;
   uFwd: WebGLUniformLocation | null;
+  uFit: WebGLUniformLocation | null;
   buf: WebGLBuffer;
   data: Float32Array;
   /** A kind's VAO, its triangles' first index and count, and how many of it stand on the board now. */
@@ -852,7 +858,7 @@ export class ArenaGL {
     gl.bindVertexArray(null);
     const u = (n: string) => gl.getUniformLocation(prog, n)!;
     const v = (n: string) => gl.getUniformLocation(prog, n);
-    return { prog, uVP: u("uVP"), uEye: v("uEye"), uTime: u("uTime"), uSlide: u("uSlide"), uLift: u("uLift"), uKind: v("uKind"), uTilt: v("uTilt"), uRes: v("uRes"), uFwd: v("uFwd"), buf, data, kinds };
+    return { prog, uVP: u("uVP"), uEye: v("uEye"), uTime: u("uTime"), uSlide: u("uSlide"), uLift: u("uLift"), uKind: v("uKind"), uTilt: v("uTilt"), uRes: v("uRes"), uFwd: v("uFwd"), uFit: v("uFit"), buf, data, kinds };
   }
 
   /** Which pieces are drawn. */
@@ -1073,7 +1079,11 @@ export class ArenaGL {
       for (let i = 0; i < solid.kinds.length; i++) {
         const k = solid.kinds[i]!;
         if (!k.n) continue;
-        if (px) gl.uniform1f(solid.uKind, i);
+        if (px) {
+          const fit = PIXEL_FIT[KINDS[i]!];
+          gl.uniform1f(solid.uKind, i);
+          gl.uniform2f(solid.uFit, fit[0], fit[1]);
+        }
         gl.bindVertexArray(k.vao);
         gl.drawElementsInstanced(gl.TRIANGLES, k.count, gl.UNSIGNED_SHORT, k.first * 2, k.n);
         calls++;

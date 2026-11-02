@@ -25,6 +25,20 @@ import { Builder, MAT, arc, extrude, type Kind, type P, type PieceMesh } from ".
 export const PIXEL_TARGET: Record<Kind, number> = { p: 0.8, r: 0.95, n: 1.1, b: 1.15, q: 1.27, k: 1.5 };
 /** How wide each piece's base is on screen there, outline and all (the picture's). */
 export const PIXEL_BASE: Record<Kind, number> = { p: 0.58, r: 0.64, n: 0.7, b: 0.66, q: 0.72, k: 0.7 };
+/**
+ * Each kind drawn this much wider (x and z) and taller (y) than its mesh (Nov 2): laid out as a sprite with a finer art pixel,
+ * its one-pixel outline adds less than round 2's did, so each is widened and raised to stand as the picture's again
+ * (`PIXEL_TARGET`, `PIXEL_BASE`; the tests measure it). In the shader, so the slit's, the eye's and the mane's places stay the
+ * mesh's.
+ */
+export const PIXEL_FIT: Record<Kind, readonly [number, number]> = {
+  p: [1.058, 1.067],
+  n: [1.107, 1.036],
+  b: [1.089, 1.051],
+  r: [1.129, 1.078],
+  q: [1.057, 1.041],
+  k: [1.071, 1.032],
+};
 /** Steps round a smooth turned part: 16 reads round on the pixel grid at these sizes. */
 const SEGS = 16;
 /** The bishop's slit (in the shader): the line k·x + y = `c` across the mitre's front, `w` half its width (meters). */
@@ -161,7 +175,8 @@ function rook(): PieceMesh {
   );
   // The battlements: three merlons across the top as you see it (every piece faces the screen, as a sprite's), square
   // notches between them through which the board shows, thin front to back so their tops don't show.
-  const m = 0.12;
+  // (Nov 2: merlons 0.1 wide, so each notch is 0.1 too, about three art pixels: one shows through between its outlines.)
+  const m = 0.1;
   const d = 0.09;
   for (const x of [-ro + m / 2, 0, ro - m / 2]) b.box(x - m / 2, top - 0.001, -d, x + m / 2, H.r, d, MAT.body);
   return b.done(H.r);
@@ -208,7 +223,7 @@ const H: Record<Kind, number> = { p: 0.62, r: 0.75, n: 0.93, b: 1.0, q: 1.12, k:
 const KNIGHT_AT = { sx: 0.62, sy: H.n - 0.17, y0: 0.17, dx: 0.035 } as const;
 const knightAt = ([x, y]: readonly [number, number]) => [KNIGHT_AT.sx * x + KNIGHT_AT.dx, KNIGHT_AT.y0 + KNIGHT_AT.sy * y] as const;
 export const PIXEL_KNIGHT: readonly (readonly [number, number])[] = KNIGHT_UNIT.map(knightAt);
-/** The knight's eye (in the shader): its middle in the head's outline (x, y; meters) and its radius. */
+/** The knight's eye (in the shader): its middle in the head's outline (x, y; meters) and its half-width (a square: Nov 2). */
 /**
  * The knight's mane (in the shader, Nov 2, after the hand-drawn knight): a strip `w` wide (meters) in from the back of its neck
  * from the height `y0` up to the ear (the outline's point `ear`), and a shaded strip `shade` wide in front of it.
@@ -216,7 +231,7 @@ export const PIXEL_KNIGHT: readonly (readonly [number, number])[] = KNIGHT_UNIT.
 export const PIXEL_MANE = { ear: 7, y0: KNIGHT_AT.y0 + KNIGHT_AT.sy * 0.3, w: 0.05, shade: 0.12 } as const;
 export const PIXEL_EYE = (() => {
   const [x, y] = knightAt([-0.15, 0.73]);
-  return { x, y, r: 0.04 } as const;
+  return { x, y, r: 0.032 } as const;
 })();
 
 function knight(): PieceMesh {
