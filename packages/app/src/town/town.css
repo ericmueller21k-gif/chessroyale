@@ -84,6 +84,8 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  /* (Never scrolled, either: a button brought into view inside it, a shop's card's, once moved the whole world off its box.) */
+  overflow: clip;
   background: #bfe3f3;
 }
 .town-fps {
