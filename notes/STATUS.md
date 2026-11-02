@@ -8,7 +8,8 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - PR #458 shop interiors r1 (CI watcher). Next: round 2 at xhigh (tokens + purchase).
 - PR #463 Colosseum new GBA set as Pixel + Colosseum's own Animations (off): CI watcher.
 - PR #464 50 v 50 bot spread + top-3 draw (full-e2e; CI watcher).
-- One Opus (high): Nov 2 bug fixes batch B (cr-fixb, claude/nov2-fixes-b, brief notes/briefs/brief-nov2-bugfixes-b.md).
+- PR #465 batch B (full-e2e; CI watcher). PR #464 bot spread retuned (bd38237; CI watcher).
+- One Opus (high): Alfil's home + boss challenge from town (cr-challenge, claude/boss-challenge, brief notes/briefs/brief-boss-challenge-alfil.md).
 - #463 Colosseum pieces merged but NOT live: hunchess.com serves the 10:14 build from Cloudflare's cache (HIT, query ignored) though CF deployed 4fac91ad at 16:15. Asked Eric to purge / check cache rules.
 - API art: Colosseum GBA pixel pieces (session_01JuCWRvpifUHBYDWXqYcDtk; asks Eric once, ~$3-6, cap $8).
 - One Opus: test-value changes (worktree /home/user/cr-testvalue, branch claude/test-value, brief
@@ -18,7 +19,6 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
   branch claude/boss-art; asks Eric once, ~$4-6, cap $8).
 
 ## Queue (one Opus at a time)
-0b. Later (after Alfil art): boss challenge from town (code).
 - Art session (session_01JuCWRrhykEFvvmv5JKWgRX) = expert for all boss homes + battle intros (API only): Alfil's home now,
   then Alfil's intro (sand pyramid, table, sandstorm).
 - Gemini Part D (challenge lines) prompt: scratchpad lines/hunchess-boss-challenge-lines-for-gemini.txt, sent to Eric.
