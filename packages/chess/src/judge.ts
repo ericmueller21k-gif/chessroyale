@@ -8,7 +8,7 @@
  * the device and in the lobby (judgedBoard), so the lobby can check a report on its own, and two honest devices'
  * reports are identical (the browser engine is deterministic: reports/judge-determinism.md).
  */
-import { DEFAULT_SETTINGS, botChoose, mulberry32 } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, botChoose, botLeanFor, mulberry32, type CrowdBotSpread } from "@chessroyale/core";
 import { legalMoves, sideToMove } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
 import { applyRecheck, recheckTargets, repliesFrom, type EngineLike, type RecheckSettings } from "./runner.ts";
@@ -19,6 +19,8 @@ export interface JudgeRules {
   botCandidateMoves: number;
   botRandomMoveChance: number;
   botPowerUpLoss: number;
+  /** Crowd 50 v 50: the bots spread over the good lines with the turn's shared lean (CROWD_BOTS); unset, botPick. */
+  crowdBots?: CrowdBotSpread;
 }
 
 export interface JudgeJob {
@@ -92,10 +94,12 @@ export function judgeBotPicks(job: JudgeJob, top: readonly MoveScore[], extra: r
   const legal = all.length ? all : legalMoves(job.fen);
   const rng = mulberry32(job.seed);
   const settings = { ...DEFAULT_SETTINGS, ...job.rules };
+  // (Crowd 50 v 50: the team's lean, drawn first from the seed, so every device and the lobby draw the same.)
+  const lean = job.bots.length ? botLeanFor(rng, candidates, settings) : undefined;
   const picks: string[] = [];
   const powerUps: number[] = [];
   job.bots.forEach((b, i) => {
-    const choice = botChoose(rng, candidates, { skill: b.skill, powerUps: b.powerUps }, legal, settings);
+    const choice = botChoose(rng, candidates, { skill: b.skill, powerUps: b.powerUps }, legal, settings, lean);
     picks.push(choice.move);
     if (choice.usedPowerUp) powerUps.push(i);
   });

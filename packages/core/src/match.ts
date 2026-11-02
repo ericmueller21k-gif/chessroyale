@@ -1,7 +1,7 @@
 import type { BossPowerState } from "./boss.ts";
 import { randomInt, shuffle, weightedIndex, type Rng } from "./rng.ts";
 import type { GroupResult } from "./scoring.ts";
-import { DEFAULT_SETTINGS, moveClockAt, roundsInStage, type Settings } from "./settings.ts";
+import { DEFAULT_SETTINGS, moveClockAt, roundsInStage, type CrowdBotSpread, type Settings } from "./settings.ts";
 
 /**
  * Match structure from buildspec.md: knockout stages scored on move quality,
@@ -839,8 +839,65 @@ export function botPick(
 }
 
 /**
+ * Crowd 50 v 50: one team turn's shared lean (CROWD_BOTS), the same for every bot of the team that turn. Drawn from the
+ * turn's random source before any bot picks, in a fixed number of draws (two, then one per candidate in the order
+ * given), so every device that has the same candidates and seed draws the same lean.
+ */
+export interface BotLean {
+  /** How closely appeal follows the engine this turn (the loss's weight). */
+  focus: number;
+  /** Each line's shared appeal this turn (added to its log-weight); a line not listed has none. */
+  taste: Record<string, number>;
+}
+
+export function botLean(rng: Rng, candidates: readonly Candidate[], spread: CrowdBotSpread): BotLean {
+  const [f0, f1] = spread.focus;
+  const focus = Math.exp(Math.log(f0) + rng() * (Math.log(f1) - Math.log(f0)));
+  const strength = spread.lean[0] + rng() * (spread.lean[1] - spread.lean[0]);
+  const taste: Record<string, number> = {};
+  for (const c of candidates) {
+    // (A normal draw, Box-Muller.)
+    const z = Math.sqrt(-2 * Math.log(Math.max(rng(), 1e-12))) * Math.cos(2 * Math.PI * rng());
+    taste[c.move] = strength * z;
+  }
+  return { focus, taste };
+}
+
+/**
+ * A Crowd 50 v 50 bot's pick (CROWD_BOTS): a good line (one of the first `moves` giving away under `blunderLoss`) by
+ * exp(-focus x loss / T + taste), any other by `blunderWeight` x exp(-loss / T); now and then a random legal move
+ * (`botRandomMoveChance`), as botPick.
+ */
+export function botPickSpread(
+  rng: Rng,
+  candidates: readonly Candidate[],
+  skill: number,
+  legalMoves: readonly string[],
+  spread: CrowdBotSpread,
+  lean: BotLean,
+  settings: Settings = DEFAULT_SETTINGS,
+): string {
+  if (legalMoves.length && rng() < settings.botRandomMoveChance) return legalMoves[randomInt(rng, 0, legalMoves.length - 1)]!;
+  if (!candidates.length) return legalMoves[randomInt(rng, 0, legalMoves.length - 1)]!;
+  const t = Math.max(skill, 1e-6);
+  const good = new Set(
+    [...candidates]
+      .sort((a, b) => a.loss - b.loss)
+      .filter((c) => c.loss < spread.blunderLoss)
+      .slice(0, spread.moves)
+      .map((c) => c.move),
+  );
+  const weights = candidates.map((c) =>
+    good.has(c.move) ? Math.exp(-(lean.focus * c.loss) / t + (lean.taste[c.move] ?? 0)) : spread.blunderWeight * Math.exp(-c.loss / t),
+  );
+  return candidates[weightedIndex(rng, weights)]!.move;
+}
+
+/**
  * A bot's move, using a power-up when it has one and the position is sharp
- * (the second-best candidate loses at least `botPowerUpLoss`): then it plays the best move.
+ * (the second-best candidate loses at least `botPowerUpLoss`): then it plays the best move. With Crowd 50 v 50's
+ * `crowdBots` and the turn's `lean`: a bot uses one there only with CROWD_BOTS' `powerUpChance`, and otherwise picks by
+ * botPickSpread.
  */
 export function botChoose(
   rng: Rng,
@@ -848,12 +905,20 @@ export function botChoose(
   bot: { skill: number | null; powerUps: number },
   legalMoves: readonly string[],
   settings: Settings = DEFAULT_SETTINGS,
+  lean?: BotLean,
 ): { move: string; usedPowerUp: boolean } {
   const sorted = [...candidates].sort((a, b) => a.loss - b.loss);
-  if (bot.powerUps > 0 && sorted.length > 1 && sorted[1]!.loss >= settings.botPowerUpLoss) {
+  const spread = lean ? settings.crowdBots : undefined;
+  if (bot.powerUps > 0 && sorted.length > 1 && sorted[1]!.loss >= settings.botPowerUpLoss && (!spread || rng() < spread.powerUpChance)) {
     return { move: sorted[0]!.move, usedPowerUp: true };
   }
+  if (spread && lean) return { move: botPickSpread(rng, candidates, bot.skill ?? 5, legalMoves, spread, lean, settings), usedPowerUp: false };
   return { move: botPick(rng, candidates, bot.skill ?? 5, legalMoves, settings), usedPowerUp: false };
+}
+
+/** The turn's lean for a team of bots under `settings` (Crowd 50 v 50's crowdBots), or none (bots pick as botPick). */
+export function botLeanFor(rng: Rng, candidates: readonly Candidate[], settings: Pick<Settings, "crowdBots">): BotLean | undefined {
+  return settings.crowdBots ? botLean(rng, candidates, settings.crowdBots) : undefined;
 }
 
 /**

@@ -2,7 +2,7 @@ import { LookAways } from "./lookaway.ts";
 import { engineSpeed, ownEngine } from "./engine.ts";
 import { lastBoss } from "./boss-history.ts";
 import { showBanNotice } from "./components/FairPlay.tsx";
-import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, LEAVING, PREGAME_VOTES, type MatchmakingType, botChoose, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings, type SlamPiece } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, LEAVING, PREGAME_VOTES, type MatchmakingType, botChoose, botLeanFor, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings, type SlamPiece } from "@chessroyale/core";
 import {
   legalMoves,
   toSan,
@@ -1091,8 +1091,10 @@ export class NetMatch implements GameView {
       const legal = plan.allowed ?? legalMoves(plan.fen).filter((mv) => mv !== plan.barred);
       const picks: Record<string, string> = {};
       const powerUps: string[] = [];
+      // (Crowd 50 v 50: the team's lean this turn, one for all its bots.)
+      const lean = botLeanFor(Math.random, candidates, this.settings);
       for (const b of plan.bots) {
-        const choice = botChoose(Math.random, candidates, { skill: b.skill, powerUps: b.powerUps ?? 0 }, legal, this.settings);
+        const choice = botChoose(Math.random, candidates, { skill: b.skill, powerUps: b.powerUps ?? 0 }, legal, this.settings, lean);
         picks[b.id] = choice.move;
         if (choice.usedPowerUp) powerUps.push(b.id);
       }
@@ -1131,6 +1133,7 @@ export class NetMatch implements GameView {
           const botPicks: Record<string, string> = {};
           const botThinkMs: Record<string, number> = {};
           const botPowerUps: string[] = [];
+          const lean = botLeanFor(Math.random, candidates, this.settings);
           for (const b of job.bots) {
             // Crowd: picks decided at the start of the round (and already shown live) stand.
             const planned = job.botPlan?.[b.id];
@@ -1140,7 +1143,7 @@ export class NetMatch implements GameView {
               botThinkMs[b.id] = thinkMs(Math.random, this.settings);
               continue;
             }
-            const choice = botChoose(Math.random, candidates, { skill: b.skill, powerUps: b.powerUps ?? 0 }, legal, this.settings);
+            const choice = botChoose(Math.random, candidates, { skill: b.skill, powerUps: b.powerUps ?? 0 }, legal, this.settings, lean);
             botPicks[b.id] = choice.move;
             if (choice.usedPowerUp) botPowerUps.push(b.id);
             botThinkMs[b.id] = thinkMs(Math.random, this.settings);

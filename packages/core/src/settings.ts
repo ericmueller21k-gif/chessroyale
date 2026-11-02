@@ -309,6 +309,13 @@ export interface Settings {
   drawRuleByStage: readonly DrawRule[];
   /** Weighted draw: a pick's tickets halve for roughly every this-many × 0.7 points of loss (exp(-loss / this)). */
   drawWeightPoints: number;
+  /**
+   * The "popular" rule's played move. 1: the most picked (a tie drawn among the tied). More (Crowd 50 v 50's 3, Eric,
+   * Nov 2: "if say 45 people castle it will most likely castle but might play one of the other moves"): one of the
+   * this-many most-picked moves, each with the odds of its picks over theirs (crowdTopOdds; 45 / 3 / 2 plays 90% / 6% /
+   * 4%). Boss battles keep 1.
+   */
+  crowdPlayedFromTop: number;
   /** Opening moves per side played on each board before the first round (0-10, a lobby setting). Boards where Black starts get one ply more. */
   openingMoves: number;
   /**
@@ -333,6 +340,8 @@ export interface Settings {
    */
   botSkillRange: readonly [number, number];
   botRandomMoveChance: number;
+  /** Crowd 50 v 50's bots (CROWD_BOTS): spread over the good lines with each turn's shared lean. Unset: botPick as before. */
+  crowdBots?: CrowdBotSpread;
   /** Bots' recorded thinking time, for tie-breaks (seconds). */
   botThinkSeconds: readonly [number, number];
   /** The 2v2 final: moves each finalist makes (fewer if the game ends first). */
@@ -567,6 +576,7 @@ export const DEFAULT_SETTINGS: Settings = {
   missedMoveScore: -25,
   drawRuleByStage: ["popular", "best"],
   drawWeightPoints: 4,
+  crowdPlayedFromTop: 1,
   openingMoves: 4,
   openingBalance: [0.4, 0.6],
   engineNodes: 250_000,
@@ -728,6 +738,39 @@ export const CROWD_KNOCKOUTS: Record<FinalFormat, readonly number[]> = {
 };
 
 /**
+ * Crowd 50 v 50's bots (Eric, Nov 2: "the goal should be unique lines favored over optimal play"; "the bots aren't
+ * hijacking which move is chosen every time"; docs/decisions/2026-11-02-crowd-bot-spread.md). Each team turn draws one
+ * shared lean (botLean) from the turn's random source before any bot picks; then each bot weighs the judge's lines:
+ *
+ * - a **good line** (one of the first `moves` lines giving away less than `blunderLoss` points: Lichess's blunder, a
+ *   15% swing in expected score) by exp(-focus x loss / T + taste), T the bot's temperature (its rating, BOT_LOBBY);
+ * - any other line (a blunder, or past the first `moves`) by `blunderWeight` x exp(-loss / T): rare, rarer the stronger.
+ *
+ * The lean: `focus` (log-uniform over its range) is how closely this turn's appeal follows the engine (high: the team
+ * crowds onto the best; low: it scatters); `taste` is a normal draw per line times a strength drawn over `lean`, the
+ * same for every bot of the team that turn, so the plurality lands on different good lines turn to turn (humans herd).
+ * Weaker bots (higher T) follow the taste more and the engine less. `powerUpChance`: a bot holding a power-up uses it
+ * on a sharp turn (the second line gives away `botPowerUpLoss` or more) with this chance, and then plays the best line;
+ * before Nov 2 every bot holding one used it at once, so a whole team picked the same move (the unanimous castles).
+ */
+export interface CrowdBotSpread {
+  moves: number;
+  blunderLoss: number;
+  blunderWeight: number;
+  focus: readonly [number, number];
+  lean: readonly [number, number];
+  powerUpChance: number;
+}
+export const CROWD_BOTS: CrowdBotSpread = {
+  moves: 5,
+  blunderLoss: 15,
+  blunderWeight: 0.15,
+  focus: [0.5, 2],
+  lean: [0, 1.5],
+  powerUpChance: 0.25,
+};
+
+/**
  * Crowd 50 v 50: the rounds (plies: a move is one from each team) before each cut, CROWD_KNOCKOUTS' stages in order:
  * cuts after moves 10, 15, 19, 23, 26 and 29 (the team final), 32 (the boss final) and 34 (the duel). Longer rounds, so
  * the chess has room between cuts (Eric, Nov 1: "it takes away from the chess game because there's too many cuts").
@@ -756,6 +799,8 @@ export const CROWD_SETTINGS: Partial<Settings> = {
   crowdScoring: CROWD_SCORING,
   colourPerStage: false,
   drawRuleByStage: ["popular"],
+  crowdPlayedFromTop: 3,
+  crowdBots: CROWD_BOTS,
   powerUpsAtStart: 3,
   powerUpsPerStage: 0,
   openingMoves: 0,
@@ -792,6 +837,9 @@ export const RAID_SETTINGS: Partial<Settings> = {
   crowdTeams: false,
   // (50 v 50's scoring, its cap widening by the crowd's move: RAID_SCORING. Boss alone: BOSS_ALONE_SCORING.)
   crowdScoring: RAID_SCORING,
+  // (The most popular pick is played, and bots pick as everywhere else: 50 v 50's crowdPlayedFromTop and crowdBots are off.)
+  crowdPlayedFromTop: 1,
+  crowdBots: undefined,
   augments: false,
   lobbySize: 50,
   groupSize: 50,

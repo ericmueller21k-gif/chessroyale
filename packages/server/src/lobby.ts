@@ -2575,7 +2575,8 @@ export class LobbyCore {
 
   /** The rules the bots' picks follow, for a job. */
   private judgeRules() {
-    return { botCandidateMoves: DEFAULT_SETTINGS.botCandidateMoves, botRandomMoveChance: this.settings.botRandomMoveChance, botPowerUpLoss: this.settings.botPowerUpLoss };
+    const crowdBots = this.settings.crowdBots;
+    return { botCandidateMoves: DEFAULT_SETTINGS.botCandidateMoves, botRandomMoveChance: this.settings.botRandomMoveChance, botPowerUpLoss: this.settings.botPowerUpLoss, ...(crowdBots ? { crowdBots } : {}) };
   }
 
   /** People whose picks can decide this stage's cut (near the cut line). */
