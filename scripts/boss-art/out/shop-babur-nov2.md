@@ -67,3 +67,11 @@ wall rising above row 0. The camera looks north and you come in at the bottom.
   - the king balloon's color: it's blue because a red one disappears against the red drum;
   - the balloon stack, which is a little small.
 - The file typechecks (`npx tsc -p scripts/boss-art --noEmit`).
+
+## Inside, through the town's camera (mockup)
+`npx tsx scripts/boss-art/shop-view.ts <out.png> <col> <row>` lays the room out through town/camera.ts (the town's zoomed-in
+phone camera, 390 x 844), with your pawn and Stripes at the town's sizes. The ceiling stripes above the walls are drawn by the
+mockup script, not the art. Stripes stands beside the counter's east end: behind it, the 58 px counter hides Stripes.
+
+- In the ring, looking north to the counter: [view-inside-ring.png](house-shop-babur/view-inside-ring.png)
+- Two squares from the counter: [view-at-counter.png](house-shop-babur/view-at-counter.png)
