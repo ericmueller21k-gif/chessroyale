@@ -1,9 +1,10 @@
 import { expect, type Page } from "@playwright/test";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { Chess } from "chess.js";
 import { KING_ATTACK, LAST_STAND } from "@chessroyale/chess";
 import { BOSS_ROSTER } from "@chessroyale/core";
 import { BOSS_KITS } from "../packages/app/src/characters/kits.ts";
-import { BOARD_SEL, test, bossAloneFromHome } from "./helpers.ts";
+import { BOARD_SEL, asAdmin, test, bossAloneFromHome } from "./helpers.ts";
 
 /**
  * A boss's attack on a king (Hollow's; Eric, Oct 10), played alone on a phone and a computer with real taps, watched
@@ -165,7 +166,8 @@ const ASSAULTS = [
   { id: "tiger", name: "Babur", facesLeft: true, sounds: ["tigerBonk", "tigerPop"] },
   { id: "folio", name: "Folio", facesLeft: true, sounds: ["folioScratch", "folioDab"] },
   // (Timber, Nov 2: his hammer's whacks and knocks, then his plank's bat and smash; his attack's own sounds.)
-  { id: "timber", name: "Timber", facesLeft: true, sounds: ["timberWhack", "timberKnock"] },
+  // (Admins first, BOSS_ADMIN_FIRST: an admin's battle, or `boss=timber` falls back to another boss.)
+  { id: "timber", name: "Timber", facesLeft: true, sounds: ["timberWhack", "timberKnock"], admin: true },
 ];
 /** How many squares wide a boss's attack figure is drawn (its kit's: before the shrink near the board's top). */
 const attackWidth = (id: string) => {
@@ -176,12 +178,15 @@ const attackWidth = (id: string) => {
  * On a computer, the two widest figures only (Nov 2): the rest of what's checked is the same on either, and a computer's board is the
  * bigger one, so its widest figures are the ones that could leave the screen. The phone runs every boss.
  */
+/** KING_ATTACK_SHOTS=<dir>: on the phone, Timber's attack's frames for its GIF (docs/bigboy-home/), as it plays in the battle. */
+const SHOTS = process.env.KING_ATTACK_SHOTS;
 const COMPUTER = new Set([...ASSAULTS].sort((a, b) => attackWidth(b.id) - attackWidth(a.id)).slice(0, 2).map((b) => b.id));
 for (const b of ASSAULTS)
   test(`the God King's Last Stand against ${b.name}: ${b.name} assaults him, then he falls and you pick again`, async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === "desktop" && !COMPUTER.has(b.id), "a computer runs the two widest figures; the phone runs every boss");
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
+    if ("admin" in b) await asAdmin(page);
     await page.goto(`/?debug&clock=60&boss=${b.id}&laststand=1`);
     await page.evaluate(() => ((window as any).__soundLog = []));
     await bossAloneFromHome(page);
@@ -203,8 +208,18 @@ for (const b of ASSAULTS)
     await page.mouse.click(at(mv.to).x, at(mv.to).y);
     await expect(page.locator(".last-stand")).toBeVisible({ timeout: 30_000 });
     const standAt = Number(await page.locator(".last-stand").getAttribute("data-start"));
+    const frames: Buffer[] = [];
+    if (SHOTS && b.id === "timber" && testInfo.project.name === "phone") {
+      // (From just before he drops in to just after he hops off.)
+      await expect.poll(() => page.evaluate(() => Date.now()), { intervals: [50], timeout: 30_000 }).toBeGreaterThan(standAt + ATTACK_AT - 150);
+      while ((await page.evaluate(() => Date.now())) < standAt + ATTACK_AT + ATTACK_MS + 200) frames.push(await page.screenshot({ scale: "css" }));
+    }
     await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("play");
     const s = await samples();
+    if (frames.length) {
+      mkdirSync(SHOTS!, { recursive: true });
+      for (const [i, f] of frames.entries()) writeFileSync(`${SHOTS}/timber-gif-${String(i).padStart(3, "0")}.png`, f);
+    }
     const during = s.filter((x) => x.start && x.now >= x.start && x.now < x.start + ATTACK_MS);
     expect(during.length).toBeGreaterThan(20);
     expect(Math.abs(during[0].start - (standAt + ATTACK_AT))).toBeLessThanOrEqual(1);
