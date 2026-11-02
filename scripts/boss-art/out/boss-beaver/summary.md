@@ -1,45 +1,71 @@
 # Boss art: boss-beaver
 
-- Model claude-opus-5-5, effort high, adaptive thinking. 44 turns, 36 renders.
-- Spend: **$4.76** of the $9 cap (90 input, 284,486 cache-write, 6,614,126 cache-read, 100,566 output tokens).
+- Model claude-opus-5-5, effort high, adaptive thinking. 27 turns, 16 renders.
+- Spend: **$2.09** of the $5 cap (58 input, 137,690 cache-write, 2,750,124 cache-read, 42,546 output tokens).
 - Finished: it called done.
 - The drawing: scripts/boss-art/out/boss-beaver/boss-beaver.ts.
 - Previews: scripts/boss-art/out/boss-beaver/preview/ (GIFs, the frame sheet, the comparison). Each look it took: scripts/boss-art/out/boss-beaver/looks/.
 
 ## Its notes
 
-Timber's full animation set is drawn in scripts/boss-art/out/boss-beaver/boss-beaver.ts (export BOSS_BEAVER, id "boss-beaver", name now "Timber"). I looked at every animation at 4x and beside the tiger at phone size.
+I've added BOSS_BEAVER_ATTACK (id "timber-attack", name "Timber (his attack)") to the end of boss-beaver.ts. It spreads BOSS_BEAVER, so it uses his own parts and palette. His existing parts and animations are unchanged; the only edit above the new code is the KING_ATTACK import from packages/chess/src/boss-timing.ts. I couldn't open boss-timing.ts, so the times below assume the brief's numbers (landAt 470, lashAt 560, every 170 ms, 10 hits, leaveAt 2380, ms 2780). All frame times are worked out from KING_ATTACK, so they follow it if it changes.
 
-**The idle is unchanged.** I added the rigging around the approved drawing, and at rest the rig gives the same parts, in the same order, at the same places. That means the same pose, face, palette, hat, vest, planks, belt, tools, tail and timing. I checked this by reading through the code and by looking at the idle render; I couldn't compare the frames pixel by pixel.
+Check this: the render tool only shows the file's first exported character, so to look at kingAttack I briefly removed "export" from BOSS_BEAVER. It's restored, and his own idle renders as before, but worth a look in the diff.
 
-**Rig (numbers in `Pose`):**
-- **Whole body:** breathing; a crouch or sit (`sink`), with the feet set apart (`spread`); a sideways lean; moving all of him and lifting him into the air (`dx`, `air`).
-- **Head:** it moves as one. On it: eyes (smile, blink, proud, squint, shut, wide, wink), brows (cheer, angry, worry, up), mouth (smile, grin, frown, open with `jaw` 1–5, which drops a chin and shows his lower teeth) and a tongue for licking his lips.
-- **Hat:** shifted or tilted on his head, or off it altogether.
-- **Arms:** each paw is placed by a point and the elbow bends by itself. Switches bring the near arm, or the far arm, in front of his face.
-- **What he holds:** the hammer comes off his belt into either paw at any angle. The back plank slides out of its strap; he can hold a plank, a scrap of wood, and his tools can spill.
+What I looked at: kingAttack frame by frame at 2x (and the face at 4x) on dark and light backgrounds, and its idle beside Big Boy. The hammer and plank stay inside the frame, and the last render gave no edge warnings.
 
-**Animations, beat by beat:**
-- **entrance:** his shadow grows; he drops in with his hat lifting off and lands with a stomp and dust (cue `stomp`). He straightens his hat with the far paw (`pat`), pulls the hammer, twirls it (`whoosh`), taps it with a puff of sawdust (`tap`) and puts it back.
-- **thinking** (loop): paw on his chin, eyes narrowed, a blink. He shuts one eye to sight along the board, and his tail taps (`tap`).
-- **move:** hammer off the belt, a point and a tap at the board (`tap`), then back on the belt.
-- **capture:** he winds the hammer up beside his hat, swings it down (`whack`), chips and sawdust fly, he holds it up proudly, then puts it away.
-- **hurt:** a flash and a shake (`oof`), his hat knocked askew, then a gruff glare. He straightens the hat with his paw (`pat`).
-- **check:** he raises the hammer and points it at the board, leaning in with his brows down (`point`), jabs once (`tap`) and grins.
-- **smug** (loop): hammer resting on his far shoulder, chin up, a toothy grin, a wink, a slow tail pat.
-- **rattled** (loop): shaking, eyes wide, brows worried, sweat flying, tail twitching, his hat slipping down over his brow.
-- **defeat:** a flash (`oof`), his hat flies off, his tools pop off the belt, he sits down hard (`thump`). The hat lands tipped over on his tail, the tape and wrench lie on the ground (`clatter`), and he sits dazed with stars round his head. The last frame holds for 900 ms.
-- **victory** (loop): hammer high, the other fist up, hopping, his tail slapping (`slap`), wood chips falling like confetti.
-- **scrap:** a scrap drops in from the upper left and he catches it. He sets it at our upper left, takes the hammer and taps it into place twice, with a puff of sawdust each time (cue `tap` ×2), then puts the hammer back. Afterwards the scrap is gone: the game's workshop strip takes over.
-- **build:** he reaches back and slides the plank up out of its strap (`pull`). He swings it over his head and holds it up at his side to show it off (`show`). Then he swings it down to the board (`drop`, on the frame it lands) and slides it back into the strap (`pat`), so he ends with two planks as in the idle.
-- **gnawWarn** (loop): he leans in with his teeth bared and eyes narrowed and gleeful. He licks his lips three times and clacks his teeth twice (`clack`).
-- **gnaw:** he leans in, jaw wide, then four bites with splinters and chips flying from his mouth (`chomp` ×4). He leans back with a satisfied chew, then a little burp of sawdust (`burp`).
-- **cheer:** a proud nod with his mouth open (`cheer`) and a tail pat.
-- **bigCheer:** he crouches, then hops with the hammer high and the other fist up (`cheer`), with chips flying. He lands with a slap of the tail (`slap`), does a second slap, and puts the hammer away.
+FRAME AND FOOT: 110 x 108, foot at (62, 102). That's 22 px of room on the king's side (our left), 18 px above for the drop, and 2 px below so the landing shake stays inside. The idle is one still: him at rest.
 
-**Choices you might want to change:**
-- **No `BOSS_BEAVER_ATTACK`:** it would need the shared `KING_ATTACK` timings and `attack-frame.ts`, which this file can't import.
-- **Little headroom:** the frame is still 88×88, so the idle stays exactly as it was. Hops are only 2–3 px, and raised hammers sit beside his hat rather than above it.
-- **Hammer reach:** points at the board stay inside the frame, so the hammer head comes near the left edge. The render warns that pixels touch the frame's edge in several animations; mostly it's chips and dust flying off.
-- **The hat in defeat:** it lands tipped over on his tail, partly behind him. Upside down in front of him, it covered his legs.
-- **Possible bug in the approved file:** the far paw's rest point is at x 46.5, a half pixel. The preview draws it, but the game may drop or shift a part placed at a fractional position. I left it alone so the idle stays exactly as approved. If it needs fixing, rounding `HAND_R` changes one paw by a pixel.
+HOW IT GOES (frame: ms):
+- f0 0–103: empty, a small shadow.
+- f1 103–202: empty, the shadow spreads.
+- f2 202–291: he falls in from 18 px up, eyes wide, hammer raised off his belt, hat lifting.
+- f3 291–381: 9 px up.
+- f4 381–470: 3 px up.
+- f5 470–560: lands with a squash, hammer wound up, sawdust puffs and dust at his feet, a shake.
+- Hits 1–7 (f6–f19): a 90 ms hit frame on each beat (560 + 170·i), then an 80 ms wind-up for the next.
+  - Whacks at 560, 900, 1240, 1580 come down on the king's head, with a steel swish arc.
+  - Knocks at 730, 1070, 1410 swing across the king's middle, with speed lines.
+  - Every hit has a small white impact burst and wood chips flung left.
+- f20 1750: knock 8.
+- f21 1840–1880: the hammer goes back on his belt as his far paw slides the plank out of its strap.
+- f22 1880–1920: the plank drawn back like a bat.
+- f23 1920–2010: hit 9, the plank swung flat into the king.
+- f24 2010–2090: the plank raised up behind his head.
+- f25 2090–2190: hit 10, the plank smashed down on the king's head (big arc, chips both ways, heavy shake).
+- f26 2190–2250: he holds it there, grinning.
+- f27 2250–2310: he hefts the plank across his chest.
+- f28 2310–2380: slides it back into its strap.
+- f29–f32 2380–2580: his beat, 50 ms a frame: a buck-toothed laugh, head thrown back with his jaw open, shoulders bobbing, a wink at the end.
+- f33 2580–2640: crouch.
+- f34 2640–2690: hops up 8 px.
+- f35 2690–2740: 18 px up.
+- f36 2740–2760: his shadow alone.
+- f37 2760–2780: empty.
+
+CUES (frame @ ms):
+- swoosh f2 @202 (he drops in)
+- thump f5 @470 (landing)
+- whack f6 @560, knock f8 @730, whack f10 @900, knock f12 @1070, whack f14 @1240, knock f16 @1410, whack f18 @1580, knock f20 @1750 (hammer hits)
+- slide f21 @1840 (plank out)
+- whack f23 @1920 (plank bat swing)
+- thump f25 @2090 (plank smash)
+- slide f28 @2310 (plank back in)
+- chitter f29 @2380 (his laugh)
+- hup f34 @2640 (he hops off)
+
+FOR THE KIT:
+- perSquare 40: he's about 80 px tall with his hat, so he stands about 2 squares, close to Big Boy's 1.9 at 36. At 36 he'd tower over Big Boy.
+- stand 1.15: the hammer head lands about 1.1 squares from his feet and the plank's end about 1.3. At 1.15 the hammer hits the king's middle and his paw stays clear of the king's edge.
+- facesLeft: true (the king on our left, his hammer paw's side).
+- Hit effect (for code to draw): wood chips and sawdust bursting off the king's square with a short white flash, like Sawyer's sawItem in wood colours (#f6d38e, #e0aa5c, #b47b36, #7e5222, sawdust #e8d2a4).
+  - Chips spray up and out for the whacks (hits 1, 3, 5, 7).
+  - Sideways from the side he hits for the knocks and the plank bat (hits 2, 4, 6, 8, 9).
+  - A bigger splinter burst for the plank smash (hit 10).
+
+CHOICES YOU MIGHT WANT TO CHANGE:
+- I kept his usual hammer size, so a hammer hit is small at phone size. The swish arcs and speed lines carry them, and the plank hits are the big ones. A bigger cartoon hammer would be a new part.
+- No tail slap: his tail is rooted behind him and can't reach the king without a new tail part. The plank bat and smash take its place.
+- The plank swap is two quick 40 ms frames.
+- There's an extra "slide" cue at 1840, between hits 8 and 9.
+- At f27 the plank is hefted across his chest rather than resting on his shoulder.

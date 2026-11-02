@@ -22,6 +22,7 @@
  */
 import { canvas, inEllipse, inPoly, roundLight, toGrid, type Canvas } from "../../../../packages/app/src/characters/paint.ts";
 import type { Anim, Character, Frame, Layer, Part, Speck } from "../../../../packages/app/src/characters/sprite.ts";
+import { KING_ATTACK } from "../../../../packages/chess/src/boss-timing.ts";
 
 const PALETTE: Record<string, string> = {
   k: "#1e130d", // outline
@@ -1140,4 +1141,181 @@ export const BOSS_BEAVER: Character = {
   halo: "#2e2620",
   parts: PARTS,
   anims: { idle, entrance, thinking, move, capture, hurt, check, smug, rattled, defeat, victory, scrap: scrapAnim, build, gnawWarn, gnaw, cheer, bigCheer },
+};
+
+// ---- His attack on a king (the kit's `kingAttack`): the king to our left (his hammer paw's side, `facesLeft`). He drops
+// in hammer high, lands with a thump, hammers the king (overhead whacks and side knocks in turn, chips flying), then
+// pulls the plank off his back and bats the king with it, and smashes it down on its head; rests the plank, slides it
+// back in its strap, a buck-toothed chitter, and hops off.
+
+/** Room to our left (the king's side) for the hammer's and the plank's reach, and headroom to drop in from. */
+const A_REACH = 22;
+const A_TOP = 18;
+const AW = W + A_REACH;
+const AH = H + A_TOP + 2;
+/** One of his frames moved into the attack's frame; `air`: his own ground shadow off (the spreading one is drawn instead). */
+function toAttack(fr: Frame, ground: readonly Speck[] = [], air = false): Frame {
+  const specks = [...(fr.specks ?? []).map(([x, y, k]): Speck => [x + A_REACH, y + A_TOP, k]), ...ground].filter(
+    ([x, y]) => x >= 2 && y >= 2 && x <= AW - 3 && y <= AH - 3,
+  );
+  return { ...fr, layers: fr.layers.filter((l) => !air || l.part !== "shadow").map((l) => ({ ...l, x: l.x + A_REACH, y: l.y + A_TOP })), specks };
+}
+/** His shadow alone, in the attack's frame. */
+const groundAt = (r: number): Speck[] => shadowOnly(r).map(([x, y, k]): Speck => [x + A_REACH, y + A_TOP, k]);
+
+/** A swish of the swing: an arc round (cx, cy) (drawing pixels) from angle `from` to `to` (degrees), solid near its end. */
+function swish(cx: number, cy: number, r: number, from: number, to: number): Speck[] {
+  const out: Speck[] = [];
+  const seen = new Set<string>();
+  const n = Math.ceil(Math.abs(to - from) / 2.5);
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const a = ((from + (to - from) * t) * Math.PI) / 180;
+    for (const [dr, k] of [[0, "s"], [-1, "S"], [1, "T"]] as const) {
+      if (t < 0.45 && (i + (dr + 1)) % 3 !== 0) continue;
+      if (dr !== 0 && t < 0.25) continue;
+      const x = Math.round(cx + Math.cos(a) * (r + dr));
+      const y = Math.round(cy + Math.sin(a) * (r + dr));
+      if (seen.has(`${x},${y}`)) continue;
+      seen.add(`${x},${y}`);
+      out.push(px(x, y, k));
+    }
+  }
+  return out;
+}
+/** Speed lines streaming back (to our right) from a side hit at (x, y), `rows` of them. */
+function streaks(x: number, y: number, rows: readonly number[], len = 16, k = "s"): Speck[] {
+  const out: Speck[] = [];
+  rows.forEach((dy, j) => {
+    for (let d = 0; d < len; d++) {
+      if (d > len / 2 && (d + j) % 3) continue;
+      out.push(px(x + d, y + dy, d < 3 ? "I" : k));
+    }
+  });
+  return out;
+}
+/** A burst of impact: a white star and a few chips. */
+function bang(x: number, y: number): Speck[] {
+  return [px(x, y, "I"), px(x - 1, y, "C"), px(x + 1, y, "C"), px(x, y - 1, "C"), px(x, y + 1, "C"), px(x - 2, y - 2, "I"), px(x + 2, y - 2, "I"), px(x - 2, y + 2, "I"), px(x + 2, y + 2, "I")];
+}
+
+const FIERCE: Pose = { mood: "squint", brows: "angry", mouth: "grin" };
+const GRUNT: Pose = { mood: "squint", brows: "angry", mouth: "open", jaw: 2 };
+/** The overhead whack: the hammer brought down onto the king's head. */
+const WHACK: Pose = { ...FIERCE, armL: { h: [9, 38] }, hammer: 165, armR: { h: [60, 36] }, lean: -3, sink: 2, head: [-1, 1], tail: 0 };
+const WHACK_AT: Pt = [-6, 48];
+/** Wound up for it: the hammer up over his head and back. */
+const WIND_UP: Pose = { ...GRUNT, armL: { h: [14, 21] }, hammer: -80, armR: { h: [61, 40] }, lean: 1, headDy: -1, tail: -18 };
+/** The side knock: swung across at the king's middle. */
+const KNOCK: Pose = { ...FIERCE, armL: { h: [10, 50] }, hammer: 182, armR: { h: [58, 44] }, lean: -3, sink: 4, head: [-2, 1], tail: -4 };
+const KNOCK_AT: Pt = [-7, 56];
+/** Wound up for it: the hammer pulled back across him. */
+const WIND_BACK: Pose = { ...GRUNT, armL: { h: [38, 50] }, hammer: -12, armR: { h: [61, 42] }, lean: 2, sink: 1, head: [1, 0], tail: -16 };
+
+/** The plank: off his back, back over his shoulder like a bat, swung at the king, raised, smashed down on it. */
+const PULL: Pose = { ...FIERCE, head: [1, 0], armL: { h: [30, 48] }, armR: { h: [69, 11] }, plankOut: 12, tail: -10 };
+const BAT_BACK: Pose = { ...GRUNT, noPlank: true, held: { top: [76, 18], bot: [36, 50] }, armL: { h: [34, 50] }, armR: { h: [40, 48] }, lean: 2, head: [1, 0], tail: -18 };
+const BAT: Pose = { ...FIERCE, noPlank: true, held: { top: [-13, 57], bot: [27, 51] }, armL: { h: [21, 53] }, armR: { h: [28, 51] }, lean: -3, sink: 3, head: [-2, 1], tail: 0 };
+const BAT_AT: Pt = [-13, 54];
+const PLANK_HIGH: Pose = { ...GRUNT, jaw: 3, noPlank: true, held: { top: [54, -10], bot: [16, 26] }, armL: { h: [18, 25] }, armR: { h: [62, 28] }, lean: 1, headDy: -1, tail: -22 };
+const SMASH: Pose = { ...FIERCE, mood: "shut", noPlank: true, held: { top: [-12, 55], bot: [22, 39] }, armL: { h: [21, 40] }, armR: { h: [28, 42] }, lean: -3, sink: 4, head: [-2, 2], tail: 0 };
+const SMASH_AT: Pt = [-11, 50];
+/** The plank rested on his shoulder. */
+const RESTED: Pose = { noPlank: true, held: { top: [84, 28], bot: [34, 47] }, armL: { h: [33, 48] }, armR: { h: [60, 34] }, mood: "proud", mouth: "grin", headDy: -1, tail: -12 };
+
+/**
+ * His attack on a king, on the shared beats (KING_ATTACK, boss-timing.ts), every frame's time worked out from them so
+ * they add up exactly; the king to our left (his hammer paw's side; the board mirrors him when it's to his right).
+ */
+const kingAttack: Anim = (() => {
+  const A = KING_ATTACK;
+  const frames: Frame[] = [];
+  let t = 0;
+  const to = (until: number, fr: (ms: number) => Frame) => {
+    const ms = Math.round(until - t);
+    if (ms <= 0) return;
+    frames.push(fr(ms));
+    t += ms;
+  };
+  const he = (p: Pose, extra: Partial<Frame> = {}, ground: readonly Speck[] = [], air = false) => (ms: number) => toAttack(f(ms, p, extra), ground, air);
+  const empty = (r: number) => (ms: number): Frame => ({ ms, layers: [], specks: r ? groundAt(r) : [] });
+
+  // The drop: his shadow spreads, then he falls in, hammer up off his belt.
+  const D = A.landAt;
+  to(D * 0.22, empty(7));
+  to(D * 0.43, empty(16));
+  to(D * 0.62, he({ ...GRUNT, mood: "wide", jaw: 3, air: 18, ...HIGH, armR: { h: [63, 30] }, tail: -24, hat: [0, -2], hatTilt: -6 }, { cue: "swoosh" }, groundAt(22), true));
+  to(D * 0.81, he({ ...GRUNT, jaw: 3, air: 9, ...HIGH, armR: { h: [63, 32] }, tail: -18, hat: [0, -1], hatTilt: -4 }, {}, groundAt(28), true));
+  to(D, he({ ...GRUNT, air: 3, armL: { h: [13, 25] }, hammer: -80, armR: { h: [62, 34] }, tail: -12 }, {}, groundAt(32), true));
+  // The landing: a squash, a thump, sawdust puffing off his feet; the hammer already up and back.
+  to(A.lashAt, he({ ...FIERCE, mood: "shut", sink: 5, spread: 2, armL: { h: [14, 23] }, hammer: -84, armR: { h: [62, 42] }, tail: 0, hat: [0, 1] }, { cue: "thump", shake: [0, 2], specks: [...feetDust(0), ...puff(14, GROUND - 1, 0), ...puff(64, GROUND - 1, 0)] }));
+
+  // Ten hits on the beat: whack, knock, ... (the hammer), then the plank: a bat swing and the smash.
+  for (let i = 0; i < A.lashes; i++) {
+    const at = A.lashAt + i * A.lashEveryMs;
+    const next = at + A.lashEveryMs;
+    const last = i === A.lashes - 1;
+    const plank = i >= A.lashes - 2;
+    const high = plank ? last : i % 2 === 0;
+    // The chips of the hit before, still flying.
+    const prev = (n: number): Speck[] => {
+      if (i === 0) return [];
+      const j = i - 1;
+      const p = j >= A.lashes - 2 ? BAT_AT : j % 2 === 0 ? WHACK_AT : KNOCK_AT;
+      return chips(p[0], p[1], n, j, 7, -1);
+    };
+    if (!plank) {
+      const P = high ? WHACK : KNOCK;
+      const hit = high ? WHACK_AT : KNOCK_AT;
+      const trail = high ? swish(22.5, 42, 26, -70, -172) : streaks(hit[0] + 7, hit[1], [-3, -1, 1, 3], 18);
+      to(at + 90, he(P, { cue: high ? "whack" : "knock", shake: high ? [0, 1] : [-1, 0], specks: [...trail, ...bang(hit[0] - 1, hit[1]), ...chips(hit[0], hit[1], 0, i, 7, -1), ...prev(2)] }));
+      if (i === A.lashes - 3) {
+        // The hammer goes back on his belt; he pulls the plank off his back, and draws it back like a bat.
+        to(at + 130, he(PULL, { cue: "slide", specks: chips(hit[0], hit[1], 1, i, 7, -1) }));
+        to(next, he(BAT_BACK, { specks: chips(hit[0], hit[1], 2, i, 7, -1) }));
+      } else {
+        to(next, he(high ? WIND_BACK : WIND_UP, { specks: chips(hit[0], hit[1], 1, i, 7, -1) }));
+      }
+    } else if (!last) {
+      to(at + 90, he(BAT, { cue: "whack", shake: [-2, 0], specks: [...streaks(BAT_AT[0] + 14, BAT_AT[1], [-4, -2, 0, 2, 4], 22, "C"), ...bang(BAT_AT[0], BAT_AT[1]), ...chips(BAT_AT[0], BAT_AT[1], 0, i, 9, -1), ...prev(2)] }));
+      to(next, he(PLANK_HIGH, { specks: chips(BAT_AT[0], BAT_AT[1], 1, i, 9, -1) }));
+    } else {
+      // The big one: the plank smashed down on the king's head.
+      const sm = (n: number) => [...chips(SMASH_AT[0], SMASH_AT[1], n, 3, 9, -1), ...chips(SMASH_AT[0] + 2, SMASH_AT[1], n, 6, 5, 1)];
+      to(at + 100, he(SMASH, { cue: "thump", shake: [0, 2], specks: [...swish(22, 46, 35, -100, -196), ...bang(SMASH_AT[0], SMASH_AT[1]), ...sm(0), ...prev(2)] }));
+      to(at + 160, he({ ...SMASH, mood: "squint", mouth: "grin" }, { specks: [...sm(1), ...puff(SMASH_AT[0] + 1, SMASH_AT[1] - 1, 1)] }));
+      // He rests it on his shoulder, then slides it back into its strap.
+      to(A.leaveAt - 70, he(RESTED, { specks: [...sm(2), ...puff(SMASH_AT[0] + 1, SMASH_AT[1] - 1, 2)] }));
+      to(A.leaveAt, he({ armR: { h: [68, 12] }, plankOut: 10, mood: "proud", mouth: "grin" }, { cue: "slide" }));
+    }
+  }
+
+  // His own beat: a buck-toothed grin and a chitter, his shoulders bobbing; then a crouch and a hop off.
+  const L = A.ms - A.leaveAt;
+  const chit = A.leaveAt + L * 0.5;
+  const CH: Pose = { mood: "proud", mouth: "open", armL: { h: [29, 52] }, armR: { h: [47, 52] } };
+  to(A.leaveAt + L * 0.125, he({ ...CH, jaw: 3, head: [1, -2], hat: [0, -1], tail: -14 }, { cue: "chitter" }));
+  to(A.leaveAt + L * 0.25, he({ ...CH, mouth: "grin", breath: 1, tail: -18 }));
+  to(A.leaveAt + L * 0.375, he({ ...CH, jaw: 3, head: [1, -2], hat: [0, -1], tail: -14 }));
+  to(chit, he({ ...CH, mood: "wink", mouth: "grin", breath: 1, tail: -6 }));
+  to(A.leaveAt + L * 0.65, he({ sink: 4, spread: 1, mood: "proud", mouth: "grin", tail: 0 }));
+  to(A.leaveAt + L * 0.775, he({ air: 8, mood: "proud", mouth: "open", jaw: 2, armL: { h: [14, 30] }, armR: { h: [64, 30] }, tail: -18, hat: [0, -1] }, { cue: "hup", specks: feetDust(0) }, groundAt(28), true));
+  to(A.leaveAt + L * 0.9, he({ air: 18, mood: "proud", mouth: "grin", armL: { h: [13, 28] }, armR: { h: [65, 28] }, tail: -24, hat: [0, -2], hatTilt: -6 }, { specks: feetDust(1) }, groundAt(20), true));
+  to(A.ms - 20, empty(10));
+  to(A.ms, empty(0));
+  return { loop: false, frames };
+})();
+
+/**
+ * Timber for his attack on a king (his kit's `kingAttack`): his own parts and palette, in a frame `A_REACH` wider on the
+ * left (the king's side: his hammer and plank) and `A_TOP` taller (he drops in). Its `idle`, one still, is for the preview.
+ */
+export const BOSS_BEAVER_ATTACK: Character = {
+  ...BOSS_BEAVER,
+  id: "timber-attack",
+  name: "Timber (his attack)",
+  w: AW,
+  h: AH,
+  foot: [BOSS_BEAVER.foot[0] + A_REACH, BOSS_BEAVER.foot[1] + A_TOP],
+  anims: { idle: { loop: true, frames: [toAttack(f(1000, {}))] }, kingAttack },
 };
