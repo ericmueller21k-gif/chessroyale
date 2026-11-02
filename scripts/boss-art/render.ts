@@ -165,6 +165,14 @@ async function main(req: Req): Promise<object> {
     for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) blit(strip, drawn[0]!, gap + i * ch.w * s, gap + j * ch.h * s, s);
   } else {
     while (s > 1 && (pick.length * (ch.w * s + gap) + gap > MAX_W || ch.h * s + 2 * gap > 1500 - 4 * ch.h - 16)) s--;
+    // Too wide even at scale 1 (a whole room's frames side by side): show only the frames that fit, so the picture
+    // stays within the API's size for many-image requests (a Puddles shop run stopped on an 8-frame room, Nov 2).
+    const fit = Math.max(1, Math.floor((MAX_W - gap) / (ch.w * s + gap)));
+    if (pick.length > fit) {
+      warnings.push(`only the first ${fit} of the ${pick.length} frames asked for fit side by side at scale ${s}: ask for the rest by number`);
+      pick.length = fit;
+      drawn.length = fit;
+    }
     strip = blank(pick.length * (ch.w * s + gap) + gap, ch.h * s + 2 * gap, bg);
     drawn.forEach((im, n) => blit(strip, im, gap + n * (ch.w * s + gap), gap, s));
   }

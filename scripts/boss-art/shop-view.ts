@@ -55,7 +55,7 @@ const P = (c: number, r: number, lift = 0) => (proj(v, c - PC, PR - r, lift, pt)
 
 for (const pl of SHOP_BABUR_LAYOUT) {
   const im = imgs[pl.name]!;
-  const flat = pl.name.startsWith("floor") || pl.name.startsWith("ring");
+  const flat = /^(floor|ring|circle|emblem)/.test(pl.name);
   if (flat) {
     // Corners: north-west, north-east, south-east, south-west (north is up the picture).
     const cs4 = [P(pl.col - 0.5, pl.row - 0.5), P(pl.col + 0.5, pl.row - 0.5), P(pl.col + 0.5, pl.row + 0.5), P(pl.col - 0.5, pl.row + 0.5)];
@@ -90,7 +90,7 @@ const me = P(PC, PR)!;
 up.push({ t: "pawn", x: me.x, y: me.y, k: me.k, depth: me.depth });
 up.sort((a, b) => (b as { depth: number }).depth - (a as { depth: number }).depth);
 
-const kidPng = readFileSync("packages/app/src/town/sidekicks/babur.png").toString("base64");
+const kidPng = readFileSync(`packages/app/src/town/sidekicks/${SHOP}.png`).toString("base64");
 
 const html = `<html><body style="margin:0;background:#000"><canvas id=c></canvas></body></html>`;
 const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM ?? "/opt/pw-browsers/chromium" });
@@ -98,7 +98,7 @@ const page = await browser.newPage({ viewport: { width: W, height: H }, deviceSc
 await page.setContent(html);
 await page.evaluate("window.__name = (f) => f");
 await page.evaluate(
-  async ({ imgs, floor, up, W, H, DPR, kidPng, sheet }) => {
+  async ({ imgs, floor, up, W, H, DPR, kidPng, sheet, glass }) => {
     const cv = document.getElementById("c") as HTMLCanvasElement;
     cv.width = W * DPR;
     cv.height = H * DPR;
@@ -107,26 +107,44 @@ await page.evaluate(
     const g = cv.getContext("2d")!;
     g.scale(DPR, DPR);
     g.imageSmoothingEnabled = false;
-    // Above the walls: the tent's shaded canvas roof, dim toward the peak.
-    const sky = g.createLinearGradient(0, 0, 0, H * 0.5);
-    sky.addColorStop(0, "#2a0d10");
-    sky.addColorStop(1, "#5a1a1e");
-    g.fillStyle = sky;
-    g.fillRect(0, 0, W, H);
-    // The big top's ceiling (mockup only, not drawn art): dim red and cream canvas stripes running up to a peak above the screen.
-    const peakX = W / 2, peakY = -H * 0.9;
-    for (let i = -24; i <= 24; i++) {
-      const x0 = W / 2 + i * W * 0.09, x1 = W / 2 + (i + 1) * W * 0.09;
-      g.beginPath();
-      g.moveTo(peakX, peakY);
-      g.lineTo(x0, H * 0.45);
-      g.lineTo(x1, H * 0.45);
-      g.closePath();
-      const st = g.createLinearGradient(0, 0, 0, H * 0.45);
-      st.addColorStop(0, i & 1 ? "#1c0a0b" : "#2a1512");
-      st.addColorStop(1, i & 1 ? "#6e1a20" : "#8a7a68");
-      g.fillStyle = st;
-      g.fill();
+    if (glass) {
+      // A greenhouse's glass roof (mockup only, not drawn art): pale sky through panes in white mullions.
+      const sky = g.createLinearGradient(0, 0, 0, H * 0.45);
+      sky.addColorStop(0, "#9fd0e6");
+      sky.addColorStop(1, "#d9eef2");
+      g.fillStyle = sky;
+      g.fillRect(0, 0, W, H);
+      g.strokeStyle = "#f4f2ea";
+      g.lineWidth = 3;
+      for (let i = -12; i <= 12; i++) {
+        g.beginPath();
+        g.moveTo(W / 2 + i * W * 0.05, -H * 0.5);
+        g.lineTo(W / 2 + i * W * 0.18, H * 0.45);
+        g.stroke();
+      }
+      for (const y of [H * 0.06, H * 0.15, H * 0.26]) g.fillRect(0, y, W, 0), g.beginPath(), g.moveTo(0, y), g.lineTo(W, y), g.stroke();
+    } else {
+      // Above the walls: the tent's shaded canvas roof, dim toward the peak.
+      const sky = g.createLinearGradient(0, 0, 0, H * 0.5);
+      sky.addColorStop(0, "#2a0d10");
+      sky.addColorStop(1, "#5a1a1e");
+      g.fillStyle = sky;
+      g.fillRect(0, 0, W, H);
+      // The big top's ceiling (mockup only, not drawn art): dim red and cream canvas stripes running up to a peak above the screen.
+      const peakX = W / 2, peakY = -H * 0.9;
+      for (let i = -24; i <= 24; i++) {
+        const x0 = W / 2 + i * W * 0.09, x1 = W / 2 + (i + 1) * W * 0.09;
+        g.beginPath();
+        g.moveTo(peakX, peakY);
+        g.lineTo(x0, H * 0.45);
+        g.lineTo(x1, H * 0.45);
+        g.closePath();
+        const st = g.createLinearGradient(0, 0, 0, H * 0.45);
+        st.addColorStop(0, i & 1 ? "#1c0a0b" : "#2a1512");
+        st.addColorStop(1, i & 1 ? "#6e1a20" : "#8a7a68");
+        g.fillStyle = st;
+        g.fill();
+      }
     }
     const canv: Record<string, HTMLCanvasElement> = {};
     for (const [n, im] of Object.entries(imgs)) {
@@ -225,7 +243,7 @@ await page.evaluate(
       }
     }
   },
-  { imgs, floor, up, W, H, DPR, kidPng, sheet },
+  { imgs, floor, up, W, H, DPR, kidPng, sheet, glass: SHOP !== "babur" },
 );
 await page.locator("#c").screenshot({ path: out });
 await browser.close();
