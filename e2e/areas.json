@@ -75,6 +75,7 @@
     "packages/server/src/*-schema.ts",
     "packages/server/src/fairplay*.ts",
     "packages/server/src/locker.ts",
+    "packages/server/src/boss-tokens.ts",
     "packages/server/src/ranked.ts",
     "packages/app/index.html",
     "packages/app/vite.config.ts",
@@ -650,9 +651,13 @@
         "packages/app/src/components/item-paint.tsx",
         "packages/app/src/components/rides/**",
         "packages/app/src/components/PixelIcon.tsx",
-        "packages/app/src/icon-pixels.ts"
+        "packages/app/src/icon-pixels.ts",
+        "packages/app/src/boss-tokens.ts",
+        "packages/app/src/components/TokenArt.tsx",
+        "packages/app/src/components/TokenBox.tsx",
+        "packages/app/src/components/tokens/**"
       ],
-      "specs": ["e2e/crate-banner.spec.ts", "e2e/home-layout.spec.ts", "e2e/icon-editor.spec.ts", "e2e/profile.spec.ts", "e2e/votes.spec.ts"]
+      "specs": ["e2e/crate-banner.spec.ts", "e2e/home-layout.spec.ts", "e2e/icon-editor.spec.ts", "e2e/profile.spec.ts", "e2e/votes.spec.ts", "e2e/shop.spec.ts"]
     },
     "chat": {
       "paths": [

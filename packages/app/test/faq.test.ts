@@ -423,6 +423,20 @@ describe("the FAQ's numbers come from the settings", () => {
     expect(moved).toContain(`${((50 / 110) * 100).toFixed(1)}%`);
   });
 
+  it("boss tokens and boss crates, from the settings: the rule, the price, each crate's ride", () => {
+    const t = section("crates");
+    expect(t).toContain("A boss battle, won or lost, counts once it reaches 10 of your moves or 5 minutes.");
+    expect(t).toContain("your first counted battle always gives you a boss's token");
+    expect(t).toContain("25% of the time, up to 3");
+    expect(t).toContain("its crate for 3 tokens of that boss, or 1 token and 1 crate key");
+    expect(t).toContain("Babur's Boss Crate holds Balloon Pup (2% of the time: the only item behind its Fischer Random) and 24 Common to Epic items");
+    expect(t).toContain("Puddles' Boss Crate holds Puddles's Mower");
+    const moved = section("crates", { ...FAQ_DEFAULTS, bossTokens: { ...FAQ_DEFAULTS.bossTokens, moves: 12, cap: 4 }, bossCratePrice: { tokens: 5, withKey: { tokens: 2, keys: 1 } } });
+    expect(moved).toContain("reaches 12 of your moves");
+    expect(moved).toContain("up to 4");
+    expect(moved).toContain("for 5 tokens of that boss, or 2 tokens and 1 crate key");
+  });
+
   it("the clock vote's time controls, the default, and a raid's clock", () => {
     const t = section("modes");
     expect(t).toContain("Bullet 3+2 (3 minutes, +2 s a move, at most 10 s on a move), Blitz 5+3 (5 minutes, +3 s a move, at most 15 s on a move) or Rapid 10+5 (10 minutes, +5 s a move, at most 20 s on a move)");
@@ -601,11 +615,11 @@ describe("the FAQ: leaving or resigning", () => {
 
 describe("the FAQ keeps to how the game works", () => {
   it("says nothing about how the app talks to the server, admin or test controls", () => {
-    // ("Token" alone is a login's; Squads' same-move tokens and Mercenary's Stockfish tokens are rules of the game, so a
-    // line about them may say it.)
+    // ("Token" alone is a login's; Squads' same-move tokens, Mercenary's Stockfish tokens and boss tokens are the game's own
+    // things, so a line about them may say it.)
     const t = text()
       .split("\n")
-      .map((l) => (/same-move|stockfish token/i.test(l) ? l.replace(/\btokens?\b/gi, "") : l))
+      .map((l) => (/same-move|stockfish token|boss tokens?\b/i.test(l) ? l.replace(/\btokens?\b/gi, "") : l))
       .join("\n");
     expect(t).not.toMatch(/\/api\b|websocket|endpoint|protocol|durable|\bhost\b|admin|secret|token|rate limit|\?[a-z]+=|test switch|trigger ultimate/i);
   });

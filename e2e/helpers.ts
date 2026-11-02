@@ -387,6 +387,15 @@ export async function giveItems(page: Page, items: readonly { def: string; color
   return ids;
 }
 
+/**
+ * Pushes this page's open solo boss battle's start back `ms` in the local database: the server times a solo battle by its own clock
+ * (packages/server/src/boss-tokens.ts), so a test's short battle can count as one of 5 minutes or more.
+ */
+export async function backdateSoloBattle(page: Page, ms: number) {
+  const user = ((await (await page.request.get("/api/me")).json()) as { user: { id: string } }).user.id;
+  await localSql(page, `UPDATE solo_battles SET started_at = started_at - ${Math.round(ms)} WHERE user_id = '${user}'`);
+}
+
 /** Wears item `id` (one of yours) in `slot`, or takes the slot's item off (null), through the server, as the locker does. */
 export async function wearItem(page: Page, slot: string, id: string | null) {
   const ok = await page.evaluate(
