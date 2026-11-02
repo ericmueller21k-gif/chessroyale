@@ -19,6 +19,11 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
   branch claude/boss-art; asks Eric once, ~$4-6, cap $8).
 
 ## Queue (one Opus at a time)
+0a. NEXT: God King's Last Stand off until the crowd has played 5 moves of the battle (Eric, Nov 2: "hard set… five moves in no
+   matter what before it will even look to make a save… whatever the opening, Fischer Random or a piece eaten"). A setting
+   (`lastStandFromMove: 5`) checked in core `lastStandDue` (boss.ts ~1405, used by runner.ts lastStandFor: solo and online);
+   check what `b.crowdMoves` counts at that call (runner.ts 1058/1248); the FAQ's Last Stand section says it; last-stand.test
+   pins old → new; the ?laststand=1 test switch still forces it.
   then Alfil's intro (sand pyramid, table, sandstorm).
 - Gemini Part D (challenge lines) prompt: scratchpad lines/hunchess-boss-challenge-lines-for-gemini.txt, sent to Eric.
 0. NEXT after shops r2: Colosseum Pixel pieces (Eric Nov 2): Pixel must pixelate ONLY the pieces, never the crowd/arena
