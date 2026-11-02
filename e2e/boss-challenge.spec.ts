@@ -14,6 +14,9 @@ import { BOARD_SEL, asSignedIn, named, test } from "./helpers.ts";
  * finishes; a first challenge quit (the gear's Leave or Resign before 10 moves) posts no outcome, and the second posts no start line.
  * Babur (the default intro, round 2): in with him to his ring, across the table from him, his line, the table popping in, his attack
  * swung in place, the flash and the wipe (`canvas.boss-wipe`), the battle under it, and the gear's Leave back to where you stood.
+ * Big Boy (his own intro, Nov 2): in with him to his crib's circle, onto its rug's marks across the table's place from him, his line, his
+ * toy blocks building the table, the board dropping and plopping on, the stools (his B, your W) dropping in, his attack beside it before his lollipop swirl
+ * (`canvas.boss-storm`) covers the screen, the battle under it, and the gear's Leave back to where you stood.
  * CHALLENGE_SHOTS=<dir>: the stills (both projects) and, on the phone, the intro's frames for its GIF (docs/boss-challenge/).
  * Test hooks: the room's canvas `data-intro` (its step); `window.__shopIntro()` (the step, the layout, where you and the boss stand
  * and face, the line, the board and its stools); the storm's canvas `canvas.boss-storm` and the wipe's `canvas.boss-wipe`
@@ -34,7 +37,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 type Stand = { c: number; r: number; facing: number; view: number; moving: boolean };
-type Intro = { step: string; layout: string; attack: boolean; you: [number, number]; boss: [number, number]; facing: { you: number; boss: number }; line: boolean; table: boolean; stools: [number, number][]; pyramid: { anim: string; frame: number } | null };
+type Intro = { step: string; layout: string; attack: boolean; you: [number, number]; boss: [number, number]; facing: { you: number; boss: number }; line: boolean; table: boolean; stools: [number, number][]; pyramid: { anim: string; frame: number } | null; blocks: { anim: string; frame: number } | null; drop: number };
 type Hooks = {
   __townAt?: (k: string, id: string) => { x: number; y: number } | null;
   __townYou?: () => Stand | null;
@@ -265,3 +268,78 @@ test("challenging Babur in the town: the default intro (his line, the table pops
   expect(errors).toEqual([]);
 });
 
+test("challenging Big Boy in the town: his own intro (his line, his toy blocks build the table, the board plops on, the stools drop in, his attack, the lollipop swirl), the battle; Leave back where you stood", async ({ page }) => {
+  test.setTimeout(240_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  const project = test.info().project.name;
+  if (SHOTS) mkdirSync(SHOTS, { recursive: true });
+  const shot = async (name: string) => SHOTS && (await page.screenshot({ path: `${SHOTS}/${name}-${project}.png` }));
+  await page.goto("/town");
+  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  const { confirm, stood } = await toConfirm(page, "bigboy", "Big Boy");
+  await confirm.getByRole("button", { name: "Fight" }).click();
+  // In his Crib: you both walk in up the walkway onto his circle's zoo rug, to its start marks (SHOP_BIGBOY_MARKS: his west, yours east).
+  await expect(room(page)).toHaveAttribute("data-room", "bigboy", { timeout: 20_000 });
+  await expect(page.getByRole("heading", { name: "Big Boy's Crib" })).toBeVisible();
+  const frames: Buffer[] = [];
+  let grabbing = !!SHOTS && project === "phone";
+  const grabbed = (async () => {
+    while (grabbing) frames.push(await page.screenshot({ scale: "css" }));
+  })();
+  const seen = new Set<string>();
+  // (His attack, seen at any look before the swirl covers: a slow phone's screenshots for the GIF can make the looks far apart.)
+  let attacked = false;
+  const step = async () => {
+    const i = await intro(page);
+    const s = i?.step ?? "";
+    seen.add(s);
+    if (i?.attack && (await storm(page).getAttribute("data-covered", { timeout: 50 }).catch(() => null)) !== "1") attacked = true;
+    return s;
+  };
+  await expect.poll(step, { message: "on their marks: his line", timeout: 15_000, intervals: [50] }).toBe("line");
+  const atLine = (await intro(page))!;
+  expect(atLine.layout).toBe("across");
+  expect(atLine.you).toEqual([11, 10.5]);
+  expect(atLine.boss).toEqual([8, 10.5]);
+  expect(atLine.facing).toEqual({ you: -1, boss: 1 });
+  expect(atLine.line).toBe(true);
+  expect(atLine.pyramid).toBeNull();
+  await expect(page.locator(".tc-line").filter({ hasText: "My blocks! My board! Big boy go first!" })).toHaveCount(0);
+  // His blocks build the table under his line; the board drops onto it and plops on; the stools drop in at your sides (his dark B, your
+  // bone W: the table's picture, a square either side of its middle).
+  await expect.poll(step, { message: "the blocks build", intervals: [50] }).toBe("build");
+  expect((await intro(page))!.blocks?.anim).toBe("build");
+  await shot("bb-build");
+  await expect.poll(step, { message: "the board plops on", intervals: [50] }).toMatch(/plop|chairs/);
+  await expect.poll(async () => (await intro(page))?.stools.length, { message: "the stools drop in", intervals: [50] }).toBe(2);
+  expect((await intro(page))!.stools).toEqual([[8.5, 10.5], [10.5, 10.5]]);
+  await expect.poll(step, { message: "the table stands", intervals: [50] }).toMatch(/table|done/);
+  const atTable = (await intro(page))!;
+  expect(atTable).toMatchObject({ table: true, drop: 0, blocks: { anim: "idle" } });
+  await shot("bb-table");
+  // His God King attack beside the table before the swirl covers the screen.
+  await expect.poll(async () => (await step(), attacked), { message: "his attack, before the swirl covers", intervals: [50] }).toBe(true);
+  await shot("bb-attack");
+  // His lollipop swirl sweeps in over everything (played as Alfil's sandstorm), the battle loading under it.
+  await expect(storm(page)).toHaveCount(1, { timeout: 10_000 });
+  await expect(storm(page)).toHaveAttribute("data-boss", "bigboy");
+  await expect(storm(page)).toHaveAttribute("data-covered", "1");
+  await shot("bb-swirl");
+  grabbing = false;
+  await grabbed;
+  for (const [i, f] of frames.entries()) writeFileSync(`${SHOTS}/bigboy-gif-${String(i).padStart(3, "0")}.png`, f);
+  expect([...seen].filter((s) => ["line", "build", "drop", "plop", "chairs", "table"].includes(s)).length).toBeGreaterThanOrEqual(4);
+  await expect(page.locator(BOARD_SEL.wrap).first()).toBeVisible({ timeout: 60_000 });
+  await expect(storm(page)).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.getByRole("heading", { name: "Big Boy's Crib" })).toHaveCount(0);
+  // The gear's Leave (or Resign, as the battle offers): back in the town square where you stood.
+  await page.getByRole("button", { name: "Match options" }).click();
+  const quit = page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: /^(Leave|Resign)$/ });
+  const how = (await quit.textContent())!.trim();
+  await quit.click();
+  await page.getByRole("alertdialog").getByRole("button", { name: how, exact: true }).click();
+  if (how === "Resign") await page.getByRole("button", { name: "Back to town" }).click();
+  await backAt(page, stood);
+  expect(errors).toEqual([]);
+});

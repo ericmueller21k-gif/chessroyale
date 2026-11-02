@@ -28,8 +28,9 @@ export interface BossIntro {
   /** Where you and it stand at the table. */
   layout: IntroLayout;
   /**
-   * Its own board art and transition (shops/intro.ts ART: Alfil's pyramid and sandstorm), or false: the default intro (the table
-   * pops in between you, it swings its God King attack in place for a few seconds, then a flash and a wipe to black).
+   * Its own board art and transition (shops/intro.ts ART: Alfil's pyramid and sandstorm, Big Boy's toy blocks and lollipop swirl), or
+   * false: the default intro (the table pops in between you, it swings its God King attack in place for a few seconds, then a flash
+   * and a wipe to black).
    */
   custom: boolean;
   /** A sound for each cue that has a fitting one (the boss's own pack; the default's "table" pop and "wipe"): none is silent. */
@@ -38,11 +39,14 @@ export interface BossIntro {
 
 /**
  * The bosses with an intro: every boss whose home has an inside (shops/shops.ts SHOPS; Nov 2, round 2: "for other bosses they should
- * just be swinging for a few seconds like discussed"). Alfil has his own (his pyramid and sandstorm); Babur and Puddles the default.
+ * just be swinging for a few seconds like discussed"). Alfil has his own (his pyramid and sandstorm), Big Boy his (his toy blocks
+ * and lollipop swirl, Nov 2); Babur and Puddles the default.
  * The lines are placeholders until Gemini's lines arrive (Part D), each in its boss's voice (characters/*-lines.ts). Alfil's cues are
  * his own synthesized sounds (characters/alfil-sounds.ts): a low rumble as the pyramid rises, the grinding crunch as it cracks, the
  * ground's thud as it falls, the soft glow as the board shows, and a whoosh as the storm comes in. The default's: the app's soft pop
- * as the table appears, and the boss's own whoosh as the screen flashes.
+ * as the table appears, and the boss's own whoosh as the screen flashes. Big Boy's are his own toy sounds (characters/bigboy-sounds.ts):
+ * a wooden clack as each block lands (a bonk for the top one), his toss as the board drops, a poof as it plops on, a clack for each
+ * stool, and his swish as the swirl comes in.
  */
 export const BOSS_INTROS: Readonly<Partial<Record<HomeId, BossIntro>>> = {
   alfil: {
@@ -66,6 +70,13 @@ export const BOSS_INTROS: Readonly<Partial<Record<HomeId, BossIntro>>> = {
     custom: false,
     cues: { table: "pop", wipe: "gardenerWhoosh" },
   },
+  bigboy: {
+    name: "Big Boy",
+    line: "My blocks! My board! Big boy go first!",
+    layout: "across",
+    custom: true,
+    cues: { block: "bigboyClack", "block-top": "bigboyBonk", drop: "bigboyToss", plop: "bigboyPoof", stool: "bigboyClack", storm: "bigboySwish" },
+  },
 };
 
 /** The boss's intro, or null: challenged as before (no intro yet). */
@@ -80,8 +91,11 @@ export const CHALLENGE_FEEL = {
   /** The line shows this long (ms) from when you face each other; the pyramid starts to rise `riseAtMs` into it. */
   lineMs: 1800,
   riseAtMs: 400,
-  /** The table and its board hold this long after the pyramid has crumbled, before the storm. */
+  /** The table and its board hold this long after the pyramid has crumbled (or the blocks' stools have landed), before the storm. */
   tableHoldMs: 350,
+  /** Toy blocks (Big Boy's): the board falls onto the built table over this long (ms), from `dropFrom` squares above it. */
+  boardDropMs: 180,
+  dropFrom: 2.5,
   /** The storm sweeps in over this long (ms), holds covered at least `coveredMinMs` (longer while the battle loads), and slides out over `stormOutMs`. */
   stormInMs: 600,
   coveredMinMs: 250,
@@ -174,12 +188,18 @@ export interface Marks {
   youFace: 1 | -1 | null;
   bossFace: 1 | -1 | null;
 }
+/** A room's drawn start marks, the boss's west and yours east (column, row of each middle), as its art exports them (Big Boy's). */
+export interface DrawnMarks {
+  boss: readonly [number, number];
+  you: readonly [number, number];
+}
 /**
  * Where you, the boss, the table and its stools are in a room (its battle circle's middle: the box round its `circle-*` or `ring-*`
  * floor and its emblem; `clearOff` south of it when a piece stands there, as Babur's pedestal does), by layout; null for a room
  * without a circle. The circles' drawn start marks (Alfil's and Puddles') are where the layout puts you (a unit test keeps them so).
+ * A room whose art exports its marks (`drawn`: Big Boy's, west and east) has you stand on them across, the table halfway between.
  */
-export function marksOf(layout: readonly ShopPlace[], how: IntroLayout, feel: Pick<typeof CHALLENGE_FEEL, "standOff" | "stoolOff" | "clearOff"> = CHALLENGE_FEEL): Marks | null {
+export function marksOf(layout: readonly ShopPlace[], how: IntroLayout, drawn?: DrawnMarks | null, feel: Pick<typeof CHALLENGE_FEEL, "standOff" | "stoolOff" | "clearOff"> = CHALLENGE_FEEL): Marks | null {
   let c0 = Infinity, c1 = -Infinity, r0 = Infinity, r1 = -Infinity;
   for (const p of layout) {
     if (!/^(circle|ring|emblem)-/.test(p.name)) continue;
@@ -196,8 +216,10 @@ export function marksOf(layout: readonly ShopPlace[], how: IntroLayout, feel: Pi
   const d = feel.standOff[how];
   const k = feel.stoolOff;
   const across = how === "across";
-  const boss = across ? { c: table.c - d, r: table.r } : { c: table.c, r: table.r - d };
-  const you = across ? { c: table.c + d, r: table.r } : { c: table.c, r: table.r + d };
+  const art = across && drawn ? drawn : null;
+  if (art) [table.c, table.r] = [(art.boss[0] + art.you[0]) / 2, (art.boss[1] + art.you[1]) / 2];
+  const boss = art ? { c: art.boss[0], r: art.boss[1] } : across ? { c: table.c - d, r: table.r } : { c: table.c, r: table.r - d };
+  const you = art ? { c: art.you[0], r: art.you[1] } : across ? { c: table.c + d, r: table.r } : { c: table.c, r: table.r + d };
   // (Each comes up from the door, south: to the mark's south square, the boss on the west of you, so neither crosses the other.)
   return {
     layout: how,
@@ -225,8 +247,8 @@ export function boardSquare(how: IntroLayout, file: number, rank: number): { x: 
 
 // ---- The intro's timeline: from when you face each other on the marks.
 
-/** The art's animations: each frame's ms (the pyramid's `rise`, `idle`, `crack`, `crumble`), and the crumble frame the table shows on. */
-export interface IntroAnims {
+/** A pyramid's animations (Alfil's): each frame's ms (its `rise`, `idle`, `crack`, `crumble`), and the crumble frame the table shows on. */
+export interface PyramidAnims {
   rise: readonly number[];
   idle: readonly number[];
   crack: readonly number[];
@@ -234,18 +256,35 @@ export interface IntroAnims {
   /** The crumble frame (from 0) whose middle is clear: the table and its board show from it on (the art's "table" cue). */
   tableFrame: number;
 }
-export type IntroStep = "line" | "rise" | "idle" | "crack" | "crumble" | "table" | "swing" | "done";
+/**
+ * Toy blocks' animations (Big Boy's; Eric, Nov 2: "6 toy blocks drop down and stack to form a 3,2,1 pyramid formation, and the board
+ * then plops on top. Then 2 more blocks drop for the chairs"): each frame's ms and cue (the art's) for the table building itself
+ * (`build`), the board landing on its top block (`plop`: the code drops the board, `boardDropMs`, so it touches down on its first
+ * frame) and the two stools dropping in (`chairs`).
+ */
+export interface BlocksAnims {
+  build: readonly number[];
+  plop: readonly number[];
+  chairs: readonly number[];
+  cues: { readonly build: readonly (string | undefined)[]; readonly plop: readonly (string | undefined)[]; readonly chairs: readonly (string | undefined)[] };
+}
+/** A boss's own art's animations: a pyramid (Alfil's) or toy blocks (Big Boy's). */
+export type IntroAnims = PyramidAnims | BlocksAnims;
+export const isBlocks = (a: IntroAnims): a is BlocksAnims => "build" in a;
+export type IntroStep = "line" | "rise" | "idle" | "crack" | "crumble" | "build" | "drop" | "plop" | "chairs" | "table" | "swing" | "done";
 export interface IntroBeat {
   step: IntroStep;
   at: number;
   end: number;
 }
 const sum = (ms: readonly number[]) => ms.reduce((a, b) => a + b, 0);
-type BeatFeel = Pick<typeof CHALLENGE_FEEL, "lineMs" | "riseAtMs" | "tableHoldMs" | "swingMs">;
+type BeatFeel = Pick<typeof CHALLENGE_FEEL, "lineMs" | "riseAtMs" | "tableHoldMs" | "swingMs" | "boardDropMs">;
 /**
- * The beats. A boss's own art (`a`: Alfil's pyramid): the line alone, the pyramid rising (`riseAtMs` into the line), holding (its
- * idle) until the line is done, cracking, crumbling, the table on its own for a moment; then done (its transition). The default
- * (`a` null): the line (the table pops in `popAtMs` into it), then its attack swung in place for `swingMs`; then done.
+ * The beats. A boss's own art (`a`): Alfil's pyramid: the line alone, the pyramid rising (`riseAtMs` into the line), holding (its
+ * idle) until the line is done, cracking, crumbling, the table on its own for a moment; Big Boy's blocks: the line alone, the blocks
+ * building the table (`riseAtMs` into the line, holding their last frame until the line is done), the board dropping onto it and
+ * plopping down, the stools dropping in, the table on its own for a moment; then done (its transition). The default (`a` null): the
+ * line (the table pops in `popAtMs` into it), then its attack swung in place for `swingMs`; then done.
  */
 export function introBeats(a: IntroAnims | null, feel: BeatFeel = CHALLENGE_FEEL): IntroBeat[] {
   const out: IntroBeat[] = [];
@@ -257,6 +296,13 @@ export function introBeats(a: IntroAnims | null, feel: BeatFeel = CHALLENGE_FEEL
   if (!a) {
     add("line", feel.lineMs);
     add("swing", feel.swingMs);
+  } else if (isBlocks(a)) {
+    add("line", feel.riseAtMs);
+    add("build", sum(a.build) + Math.max(0, feel.lineMs - feel.riseAtMs - sum(a.build)));
+    add("drop", feel.boardDropMs);
+    add("plop", sum(a.plop));
+    add("chairs", sum(a.chairs));
+    add("table", feel.tableHoldMs);
   } else {
     add("line", feel.riseAtMs);
     add("rise", sum(a.rise));
@@ -288,6 +334,12 @@ export interface IntroNow {
   step: IntroStep;
   /** The pyramid's animation and frame (null: none shows: before it rises, once it's crumbled, or the default intro). */
   pyramid: { anim: "rise" | "idle" | "crack" | "crumble"; frame: number } | null;
+  /** Toy blocks' animation and frame (null: none shows: before they drop in, or another boss's intro); `idle` once it's all built. */
+  blocks: { anim: "build" | "plop" | "chairs" | "idle"; frame: number } | null;
+  /** How far above its place on the table the board is, in squares (toy blocks: it drops on; 0 for every other intro). */
+  drop: number;
+  /** The table's stools show (with the table; toy blocks: from when they drop in). */
+  stools: boolean;
   /** The boss's line is over its head (from facing you until the pyramid cracks; the default: until it swings). */
   line: boolean;
   /** The table and its board show (from the crumble's clear frame on; the default: from its pop on). */
@@ -300,40 +352,79 @@ export interface IntroNow {
   puff: number;
 }
 const easeOutBack = (u: number) => 1 + 2.2 * (u - 1) ** 3 + 1.2 * (u - 1) ** 2;
-export function introAt(beats: readonly IntroBeat[], a: IntroAnims | null, t: number, feel: Pick<typeof CHALLENGE_FEEL, "popAtMs" | "popMs" | "puffMs"> = CHALLENGE_FEEL): IntroNow {
+export function introAt(beats: readonly IntroBeat[], a: IntroAnims | null, t: number, feel: Pick<typeof CHALLENGE_FEEL, "popAtMs" | "popMs" | "puffMs" | "dropFrom"> = CHALLENGE_FEEL): IntroNow {
   const b = beats.find((x) => t < x.end) ?? beats[beats.length - 1]!;
   const into = t - b.at;
-  const base = { step: b.step, pyramid: null, drift: false, pop: 1, puff: -1 };
+  const base = { step: b.step, pyramid: null, blocks: null, drop: 0, drift: false, pop: 1, puff: -1 };
   if (!a) {
     const p = t - feel.popAtMs;
     const shown = p >= 0;
-    return { ...base, line: b.step === "line" && t >= 0, table: shown, pop: shown ? easeOutBack(Math.min(1, p / feel.popMs)) : 0, puff: shown && p < feel.puffMs ? p / feel.puffMs : -1 };
+    return { ...base, line: b.step === "line" && t >= 0, table: shown, stools: shown, pop: shown ? easeOutBack(Math.min(1, p / feel.popMs)) : 0, puff: shown && p < feel.puffMs ? p / feel.puffMs : -1 };
+  }
+  if (isBlocks(a)) {
+    // (The line until the board drops; the blocks build, the board falls and plops on, the stools drop in, then it all stands.)
+    const dropAt = beats.find((x) => x.step === "drop")!;
+    const line = t >= 0 && t < dropAt.at;
+    const blocks = (anim: "build" | "plop" | "chairs" | "idle", frame: number) => ({ ...base, blocks: { anim, frame }, line });
+    switch (b.step) {
+      case "line":
+        return { ...base, line, table: false, stools: false };
+      case "build":
+        return { ...blocks("build", frameAt(a.build, into, false)), table: false, stools: false };
+      case "drop": {
+        const u = Math.min(1, into / Math.max(1, dropAt.end - dropAt.at));
+        return { ...blocks("build", a.build.length - 1), table: true, stools: false, drop: feel.dropFrom * (1 - u * u) };
+      }
+      case "plop":
+        return { ...blocks("plop", frameAt(a.plop, into, false)), table: true, stools: false };
+      case "chairs":
+        return { ...blocks("chairs", frameAt(a.chairs, into, false)), table: true, stools: true };
+      default:
+        return { ...blocks("idle", 0), table: true, stools: true };
+    }
   }
   const crackAt = beats.find((x) => x.step === "crack")!.at;
   const line = t >= 0 && t < crackAt;
   switch (b.step) {
     case "line":
-      return { ...base, line, table: false };
+      return { ...base, line, table: false, stools: false };
     case "rise":
     case "crack":
-      return { ...base, pyramid: { anim: b.step, frame: frameAt(a[b.step], into, false) }, line, table: false };
+      return { ...base, pyramid: { anim: b.step, frame: frameAt(a[b.step], into, false) }, line, table: false, stools: false };
     case "idle":
-      return { ...base, pyramid: { anim: "idle", frame: frameAt(a.idle, into, true) }, line, table: false };
+      return { ...base, pyramid: { anim: "idle", frame: frameAt(a.idle, into, true) }, line, table: false, stools: false };
     case "crumble": {
       const frame = frameAt(a.crumble, into, false);
-      return { ...base, pyramid: { anim: "crumble", frame }, line, table: frame >= a.tableFrame };
+      return { ...base, pyramid: { anim: "crumble", frame }, line, table: frame >= a.tableFrame, stools: frame >= a.tableFrame };
     }
     default:
-      return { ...base, line, table: true, drift: true };
+      return { ...base, line, table: true, stools: true, drift: true };
   }
 }
 /**
- * The cue each beat starts on, and when. A boss's own art: "rumble" as it rises, "crack", "crumble", and "table" on the crumble's
- * clear frame. The default: "table" as it pops in.
+ * The cue each beat starts on, and when. A pyramid: "rumble" as it rises, "crack", "crumble", and "table" on the crumble's clear
+ * frame. Toy blocks: the art's own cues on their frames ("block" as each lands, "block-top", "plop" as the board touches down, "stool"
+ * as each stool lands), and "drop" as the board starts to fall. The default: "table" as it pops in.
  */
 export function introCues(beats: readonly IntroBeat[], a: IntroAnims | null, feel: Pick<typeof CHALLENGE_FEEL, "popAtMs"> = CHALLENGE_FEEL): { cue: string; at: number }[] {
   if (!a) return [{ cue: "table", at: feel.popAtMs }];
   const at = (s: IntroStep) => beats.find((x) => x.step === s)!.at;
+  if (isBlocks(a)) {
+    const out: { cue: string; at: number }[] = [];
+    const frames = (anim: "build" | "plop" | "chairs") => {
+      let t = at(anim);
+      a[anim].forEach((ms, i) => {
+        const cue = a.cues[anim][i];
+        if (cue) out.push({ cue, at: t });
+        t += ms;
+      });
+    };
+    frames("build");
+    out.push({ cue: "drop", at: at("drop") });
+    frames("plop");
+    frames("chairs");
+    return out;
+  }
   return [
     { cue: "rumble", at: at("rise") },
     { cue: "crack", at: at("crack") },

@@ -209,6 +209,36 @@ test("Alfil's Pyramid (Nov 2): Go in, Woolly's crate with Alfil's Howdah; the ch
   expect(errors).toEqual([]);
 });
 
+test("Big Boy's Crib (Nov 2): Go in, Blocky's crate with Big Boy's Buggy; the chat's words dark over the nursery", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  await page.goto("/town?sky=night");
+  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("bigboy"));
+  await expect.poll(() => homeAt(page, "bigboy"), { message: "the Crib comes into view" }).not.toBeNull();
+  await goIn(page, "bigboy", "Big Boy's Crib");
+  await expect(room(page)).toHaveAttribute("data-room", "bigboy");
+  await expect(page.getByRole("heading", { name: "Big Boy's Crib" })).toBeVisible();
+  await expect(page.locator(".town-chat")).toHaveAttribute("data-tone", "day");
+  // Up the walkway to the counter (the ball pit round it is solid): the Shopkeeper's card.
+  await expect.poll(() => shopAt(page, "keeper"), { message: "the Shopkeeper is drawn" }).not.toBeNull();
+  const at = (await shopAt(page, "keeper"))!;
+  await page.mouse.click(at.x, at.y);
+  const card = page.getByRole("dialog", { name: "Shopkeeper", exact: true });
+  await expect(card).toBeVisible({ timeout: 15_000 });
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/bigboy-counter-${test.info().project.name}.png` });
+  await card.getByRole("button", { name: "Talk" }).click();
+  const crate = page.getByRole("dialog", { name: "Big Boy's Boss Crate", exact: true });
+  await expect(crate).toBeVisible();
+  await expect(crate).toContainText("3 Big Boy tokens, or 1 Big Boy token + 1 crate key");
+  await expect(crate).toContainText("Big Boy's Buggy");
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/bigboy-crate-${test.info().project.name}.png` });
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 /** A drag from `from` to `to`: a finger (real touch events) on the phone, the mouse on the computer. */
 async function dragBy(p: Page, from: { x: number; y: number }, to: { x: number; y: number }) {
   if (test.info().project.name === "phone") {

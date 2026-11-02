@@ -228,7 +228,7 @@ export function KingAttack({
       {him && (
         <span class={`ka-boss${mirrored ? " flip" : ""}`} style={{ left: sq(box.x), top: sq(box.y), width: sq(box.w), aspectRatio: `${ch.w} / ${ch.h}`, ...(clipTop > 0 ? { clipPath: `inset(${(clipTop * 100).toFixed(2)}% 0 0 0)` } : {}) }}>
           {/* (Moo's attack during his Full Moon is drawn powered up: the kit's `poweredAnim`.) */}
-          <SpriteAnim ch={ch} anim={ka.poweredAnim && kit.powered?.on(boss, now, "bossMove") ? ka.poweredAnim : ka.anim} since={startAt} sounds={kit.sounds} id={`attack-${seed}`} />
+          <SpriteAnim ch={ch} anim={ka.poweredAnim && kit.powered?.on(boss, now, "bossMove") ? ka.poweredAnim : ka.anim} since={startAt} sounds={ka.sounds ?? kit.sounds} id={`attack-${seed}`} />
         </span>
       )}
       {/* (Each lash's "−N" says which lash it is, for e2e/king-attack.spec.ts: every one shows.) */}

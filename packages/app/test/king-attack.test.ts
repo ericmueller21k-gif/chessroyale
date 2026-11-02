@@ -5,7 +5,7 @@ import { BOSS_KITS, bossKit } from "../src/characters/kits.ts";
 import { HOLLOW, HOLLOW_ATTACK, HOLLOW_LINES } from "../src/characters/hollow.ts";
 import { ALFIL_LINES } from "../src/characters/alfil.ts";
 import { GOD_KING } from "../src/characters/god-king.ts";
-import { EFFECTS, animLength, bonkItem, carrotItem, frostItem, lashItem, lassoItem, moonItem, paintItem, pieItem, popItem, sawItem, waterItem } from "../src/characters/power-art.ts";
+import { EFFECTS, animLength, bonkItem, carrotItem, chipItem, frostItem, lashItem, lassoItem, moonItem, paintItem, pieItem, popItem, sawItem, waterItem } from "../src/characters/power-art.ts";
 import { CLOWN_LINES } from "../src/characters/clown.ts";
 import { SAWYER_LINES } from "../src/characters/sawyer.ts";
 import { PIG_LINES } from "../src/characters/pig.ts";
@@ -31,6 +31,7 @@ import type { KingAttackKit } from "../src/characters/kits.ts";
 import { frameKeys, renderFrame, type Anim } from "../src/characters/sprite.ts";
 import { ATTACK_ROOM_ABOVE, KING_MIDDLE, attackTop, kingAttackBeat, kingAttackPlace } from "../src/components/KingAttack.tsx";
 import { evalBarOn } from "../src/prefs.ts";
+import { timberSound, type TimberSound } from "../src/characters/timber-sounds.ts";
 
 // A boss's attack on a king (Eric, Oct 10: Hollow first): the kit's `kingAttack`, his frames on the shared beats, the
 // God King's blows on its lashes in his Last Stand, and the hits on the king's square.
@@ -51,7 +52,7 @@ describe("the kit's kingAttack", () => {
       .filter(([, k]) => k.kingAttack)
       .map(([name]) => BOSS_ROSTER.find((b) => b.kit === name)!.id);
     expect(withAttack).toEqual([...KING_ATTACKERS]);
-    expect(withAttack).toEqual(["clown", "gingerbread", "grex", "hollow", "bigboy", "sawyer", "pig", "alfil", "hopper", "smudgy", "moo", "gardener", "tiger", "folio"]);
+    expect(withAttack).toEqual(["clown", "gingerbread", "grex", "hollow", "bigboy", "sawyer", "pig", "alfil", "hopper", "smudgy", "moo", "gardener", "tiger", "folio", "timber"]);
   });
 
   it("Alfil's: a `jab` cue on each of the shared hits, lasting the attack exactly, his ankus's tip in the king's square, a gold jab on it each hit", () => {
@@ -282,6 +283,91 @@ describe("the relentless assaults: Sawyer saws, Wrangler cracks his lasso, Boing
 });
 
 /**
+ * Timber's (Nov 2: he was the one boss without one; the art's notes, scripts/boss-art/out/timber-king-attack-nov2.md on
+ * claude/boss-art): his hammer's whacks and knocks in turn on the first eight hits, then the plank's bat and its smash; his own
+ * wood sounds for every cue (his attack's own map: his kit's `whack` is the gnaw), wood chips off the king's square each hit.
+ */
+describe("Timber's attack on a king (Nov 2)", () => {
+  const kit = bossKit("Timber")!;
+  const ka = kit.kingAttack!;
+  const anim = ka.ch.anims[ka.anim]!;
+  const s = starts(anim);
+  const hits = anim.frames.flatMap((f, i) => (kingAttackHits().includes(s[i]!) ? [f] : []));
+
+  it("is his kit's, drawn facing our left, 40 frame pixels a square, 1.15 squares off; lasting the attack exactly, empty at both ends", () => {
+    expect(ka).toMatchObject({ anim: "kingAttack", perSquare: 40, stand: 1.15, facesLeft: true });
+    expect(anim.loop).toBe(false);
+    expect(animLength(anim)).toBe(KING_ATTACK.ms);
+    expect(anim.frames[0]!.layers).toEqual([]);
+    expect(anim.frames.at(-1)!.layers).toEqual([]);
+  });
+
+  it("lands a hit on each of the shared hits: whack, knock four times (his hammer), then the plank's bat (a whack) and its smash (a thump)", () => {
+    expect(hits).toHaveLength(KING_ATTACK.lashes);
+    expect(hits.map((f) => f.cue)).toEqual(["whack", "knock", "whack", "knock", "whack", "knock", "whack", "knock", "whack", "thump"]);
+  });
+
+  it("has a sound for every cue in it, his own (timber-sounds.ts), as the art's notes map them", () => {
+    const cues = [...new Set(anim.frames.flatMap((f) => (f.cue ? [f.cue] : [])))].sort();
+    expect(cues).toEqual(["chitter", "hup", "knock", "slide", "swoosh", "thump", "whack"]);
+    for (const c of cues) expect(ka.sounds?.[c], c).toMatch(/^timber[A-Z]/);
+    expect(ka.sounds).toEqual({ swoosh: "timberSwoosh", thump: "timberThump", whack: "timberWhack", knock: "timberKnock", slide: "timberSlide", chitter: "timberChitter", hup: "timberHup" });
+    // (His kit's own `whack` is still the gnaw as he takes a piece: the attack's map doesn't change it.)
+    expect(kit.sounds.whack).toBe("timberGnaw");
+    // All ten hits' sounds together stay under a move.
+    const rate = 44100;
+    const at0 = kingAttackHits()[0]!;
+    const span = Math.round(((kingAttackHits().at(-1)! - at0) / 1000) * rate);
+    const mix = new Float32Array(span + rate);
+    hits.forEach((f, i) => {
+      const w = timberSound(ka.sounds![f.cue!]!.replace(/^timber/, "").replace(/^./, (c) => c.toLowerCase()) as TimberSound, rate);
+      const at = Math.round(((kingAttackHits()[i]! - at0) / 1000) * rate);
+      for (let j = 0; j < w.length && at + j < mix.length; j++) mix[at + j]! += w[j]!;
+    });
+    let peak = 0;
+    let sum = 0;
+    for (let j = 0; j < span; j++) {
+      peak = Math.max(peak, Math.abs(mix[j]!));
+      sum += mix[j]! * mix[j]!;
+    }
+    expect(peak).toBeLessThan(MOVE_PEAK);
+    expect(10 * Math.log10(sum / span)).toBeLessThan(MOVE_MEAN_DB);
+  });
+
+  it("reaches past the middle of the king's square on each hit (his hammer or plank), his body clear of it", () => {
+    for (const f of hits) {
+      expect(reach(ka, f)).toBeGreaterThan(ka.stand);
+      // (His body (fur, muzzle, face, hat, vest, belt, tail) never over the king's middle: only the hammer, the plank and what flies off
+      // them. His hammer is short (the art's kit, stand 1.15): his paw on its handle comes within a fifth of a square of it, the others'
+      // bodies stay 0.35 off.)
+      expect(reach(ka, f, (k) => "abcdemnNxvXwWoOLlEFGKYyZPBtuUViqQ".includes(k))).toBeLessThanOrEqual(ka.stand - 0.2);
+    }
+  });
+
+  it("chips fly off the king's square each hit, from his side: up and out for a whack, sideways for a knock or the bat, a big burst for the smash", () => {
+    expect(ka.hit).toBe(chipItem);
+    expect(Array.from({ length: KING_ATTACK.lashes }, (_, i) => ka.hit("e1", i, "L", 0).anim)).toEqual(["hitUL", "hitSL", "hitUL", "hitSL", "hitUL", "hitSL", "hitUL", "hitSL", "hitSL", "hitXL"]);
+    expect(ka.hit("a3", 9, "R", 7)).toEqual({ square: "a3", name: "chipHit", anim: "hitXR", since: 7 });
+    for (let i = 0; i < KING_ATTACK.lashes; i++)
+      for (const side of ["L", "R"] as const) {
+        const fx = EFFECTS.chipHit.ch.anims[ka.hit("e1", i, side, 0).anim!]!;
+        expect(fx.loop).toBe(false);
+        expect(animLength(fx)).toBeLessThanOrEqual(KING_ATTACK.lashEveryMs + 50);
+        expect(fx.frames.at(-1)!.specks ?? []).toEqual([]);
+        expect(fx.frames[1]!.specks!.length).toBeGreaterThan(8);
+        for (const fr of fx.frames)
+          for (const [x, y, k] of fr.specks ?? []) {
+            expect(EFFECTS.chipHit.ch.palette).toHaveProperty(k);
+            expect(x >= 0 && y >= 0 && x < 32 && y < 32).toBe(true);
+          }
+      }
+    // (The smash's burst is the biggest.)
+    const n = (a: string) => EFFECTS.chipHit.ch.anims[a]!.frames[1]!.specks!.length;
+    expect(n("hitXL")).toBeGreaterThan(n("hitUL"));
+  });
+});
+
+/**
  * Where each attacker looks (Eric, Oct 18: Wrangler "looks like he's hitting him without looking"): in every hit frame,
  * the features of his face (the keys below, in his head part as drawn: flipped if its layer is) against the middle of
  * the whole head. A head turned to one side (Sawyer, Wrangler, Jefferson) or eyes glancing (Big Boy, Ginger) must point
@@ -311,6 +397,8 @@ const FACES: Record<string, { keys: string; front?: boolean; head?: string; gaze
   // (Folio's head is a paper crane's in profile, its beak toward the king: its eye sits at the middle of its head, so it reads as
   // front on, never turned away.)
   Folio: { keys: "x", front: true },
+  // (Timber's face is turned a little to our left, toward the board, as all his art is: his eyes, nose and mouth.)
+  Timber: { keys: "xX" },
 };
 /** Where his eyes look in a frame (the mean of his two pupils' x, in eye pixels; - toward our left), from the eye layers' own poses. */
 function gazeTurn(f: Anim["frames"][number]): number {

@@ -6,8 +6,9 @@
  * (scripts/boss-art/shop-view.ts on claude/boss-art): through the town's own camera (camera.ts), the floor tiles laid flat on
  * their squares (baked once into one picture, drawn as two triangles a block), each upright piece stood at its foot at the town's
  * scale (37 px a square), a deep piece drawn as a plan (Puddles' pond garden) lying flat on its squares with the strip above its
- * north row standing up, the Shopkeeper (the boss's kid, its idle playing, a blue "Shopkeeper" tag) and you, far to near; a tent's
- * canvas or a greenhouse's glass above the walls. Animated pieces loop (the fire hoops, the pond, the palm, the fountain, the
+ * north row standing up (unless the room's art says it stands up whole: Big Boy's airplane), the Shopkeeper (the boss's kid, its idle
+ * playing, a blue "Shopkeeper" tag) and you, far to near; a tent's canvas, a greenhouse's glass, a pyramid's sandstone or a nursery's
+ * sky above the walls. Animated pieces loop (the fire hoops, the pond, the palm, the fountain, the
  * crate). You start in Close (SHOP_FEEL.close, the third-person camera); the town's − / + switch between Close and the town's
  * zoomed-in camera. Inside is just you: the town's bots and other players don't come in.
  *
@@ -43,9 +44,10 @@ import type { Rider } from "../rides.ts";
 import { rideSpeed } from "../../components/rides/scale.ts";
 import { inTalkRange, isFloor, makeRoom, onDoor, tapTarget, findPath, type Room, type ShopPlace, type Sq } from "./room.ts";
 import { POOL_LINE, bossHoldings, buyBossCrate, canAfford, holdLine, priceLine, prizeRows, shopOf, wayText, type CrateWay, type ShopDef } from "./shops.ts";
-import { CHALLENGE_FEEL, attackStart, attackTime, frameAt as animFrame, introAt, introCues, introLength, marksOf, type IntroNow } from "./challenge.ts";
+import { CHALLENGE_FEEL, attackStart, attackTime, frameAt as animFrame, introAt, introCues, introLength, marksOf, type DrawnMarks, type IntroNow } from "./challenge.ts";
 import { play } from "../../sound.ts";
-import { paintTable, playCue, type LoadedIntro } from "./intro.ts";
+import { paintTable, playCue, slabFrontY, type LoadedIntro } from "./intro.ts";
+import { TABLE_BOARD } from "../houses/park.ts";
 
 /** A room's art, as its file exports it. */
 interface RoomArt {
@@ -55,11 +57,16 @@ interface RoomArt {
   crateAt: readonly [number, number];
   lights: readonly (LightSpot & { piece: string })[];
   pools: readonly (LightPool & { piece: string })[];
+  /** Deep pieces that stand up at their foot, as any upright piece (Big Boy's airplane, flying round over three squares by three), not laid flat as a plan. */
+  upright?: readonly string[];
+  /** Its battle circle's drawn start marks, when its art exports them (Big Boy's rug: the boss's west, yours east). */
+  marks?: DrawnMarks;
 }
 const ART: Partial<Record<HomeId, () => Promise<RoomArt>>> = {
   tiger: () => import("./babur-art.ts").then((m) => ({ layout: m.SHOP_BABUR_LAYOUT, pieces: m.SHOP_BABUR_PIECES, crateAt: m.SHOP_BABUR_CRATE_AT, lights: m.SHOP_BABUR_HOOP_LIGHTS, pools: m.SHOP_BABUR_HOOP_POOLS })),
   gardener: () => import("./puddles-art.ts").then((m) => ({ layout: m.SHOP_PUDDLES_LAYOUT, pieces: m.SHOP_PUDDLES_PIECES, crateAt: m.SHOP_PUDDLES_CRATE_AT, lights: [], pools: [] })),
   alfil: () => import("./alfil-art.ts").then((m) => ({ layout: m.SHOP_ALFIL_LAYOUT, pieces: m.SHOP_ALFIL_PIECES, crateAt: m.SHOP_ALFIL_CRATE_AT, lights: m.SHOP_ALFIL_LIGHTS, pools: m.SHOP_ALFIL_POOLS })),
+  bigboy: () => import("./bigboy-art.ts").then((m) => ({ layout: m.SHOP_BIGBOY_LAYOUT, pieces: m.SHOP_BIGBOY_PIECES, crateAt: m.SHOP_BIGBOY_CRATE_AT, lights: m.SHOP_BIGBOY_LIGHTS, pools: m.SHOP_BIGBOY_POOLS, upright: ["airplane"], marks: m.SHOP_BIGBOY_MARKS })),
 };
 
 /** A piece's frames, each drawn once into a canvas, and when each ends in its loop. */
@@ -304,7 +311,7 @@ function startRoom(
   // circle, side by side, at the challenge's pace; each settles onto its mark's middle; facing each other, the intro plays.
   const C = CHALLENGE_FEEL;
   const ci = challenge?.intro ?? null;
-  const marks = ci ? marksOf(art.layout, ci.def.layout) : null;
+  const marks = ci ? marksOf(art.layout, ci.def.layout, art.marks) : null;
   const across = marks?.layout === "across";
   const boss = ci && marks ? new Walker({ c: room.start.c - 1, r: room.start.r }, C.walkStepMs, false) : null;
   const bossPose = { x: 0, y: 0, hop: 0, tilt: 0, step: false, t: 0 };
@@ -410,7 +417,7 @@ function startRoom(
     const w = p.w ?? 1;
     const d = p.d ?? 1;
     const ch = art.pieces[p.name]!;
-    if (d > 1) {
+    if (d > 1 && !art.upright?.includes(p.name)) {
       // The plan lies flat on its w x d squares; the strip above its north row (its plants' tops) stands up there.
       flats.push(p);
       const rise = ch.h - d * SQ;
@@ -527,6 +534,24 @@ function startRoom(
         rg.lineTo(W, y);
         rg.stroke();
       }
+      return;
+    }
+    if (def.roof === "nursery") {
+      // A nursery's ceiling (as the mockup drew it): soft sky blue with pale clouds and little stars.
+      const sky = rg.createLinearGradient(0, 0, 0, H * 0.45);
+      sky.addColorStop(0, "#7fb4e8");
+      sky.addColorStop(1, "#cfe6fb");
+      rg.fillStyle = sky;
+      rg.fillRect(0, 0, W, H);
+      const k = W / 390;
+      rg.fillStyle = "#ffffff";
+      for (const [cx, cy, r] of [[60, 40, 22], [90, 34, 18], [290, 60, 26], [320, 52, 20], [200, 20, 16]] as const) {
+        rg.beginPath();
+        rg.arc(cx * k, cy * k, r * k, 0, Math.PI * 2);
+        rg.fill();
+      }
+      rg.fillStyle = "#ffe36a";
+      for (const [sx, sy] of [[150, 70], [250, 25], [30, 90], [360, 100], [120, 15]] as const) rg.fillRect(sx * k, sy * k, 4, 4);
       return;
     }
     if (def.roof === "stone") {
@@ -877,7 +902,8 @@ function startRoom(
    * Between you (in a challenge): the pyramid's frame, or the table with its board (the crumble's last frames over it). The table's
    * picture is three squares across, a stool in each outer one: across, the stools are where you and the boss stand, so it's drawn
    * whole; facing, its middle (the leg) alone, the stools drawn on their own (`drawStool`). The default intro's table pops in (grows
-   * from its foot, a touch past its size and back) in a puff of dust.
+   * from its foot, a touch past its size and back) in a puff of dust. Toy blocks (Big Boy's) are the table and its stools: their frame,
+   * and the board on the top block once it drops (falling from above it, `drop` squares up, then on it).
    */
   const drawCenter = () => {
     const n = introNow;
@@ -887,6 +913,23 @@ function startRoom(
     const y = pt.y;
     const put = (img: HTMLCanvasElement, ch: Character, fx = ch.foot[0]) => g.drawImage(img, x - fx * s, y - ch.foot[1] * s, img.width * s, img.height * s);
     g.imageSmoothingEnabled = false;
+    const bl = ci.blocks;
+    if (bl) {
+      if (n.blocks) put(bl.frames[n.blocks.anim][n.blocks.frame]!, bl.ch);
+      if (n.table) {
+        // (Lifted until the slab's front rests on the top block, its foot TABLE_BOARD.top over the table's: else the slab, reaching
+        // toward you, would hide the pyramid's upper blocks. Then `drop` squares higher while it falls.)
+        const dx = marks.table.c - camX;
+        const dz = camY - marks.table.r;
+        const front = slabFrontY(v, dx, dz);
+        const rest = front === null ? 0 : Math.max(0, front - (y - TABLE_BOARD.top * s));
+        g.save();
+        g.translate(0, -rest - n.drop * pt.k);
+        paintTable(g, v, dx, dz, ci.table.palette, marks.layout);
+        g.restore();
+      }
+      return;
+    }
     if (n.table) {
       const T = ci.table;
       const popping = n.pop < 1;
@@ -1325,8 +1368,10 @@ function startRoom(
       facing: { you: you.facing, boss: boss.facing },
       line: !!introNow?.line && bossHead.on,
       table: !!introNow?.table,
-      stools: introNow?.table ? [[marks!.bossStool.c, marks!.bossStool.r], [marks!.youStool.c, marks!.youStool.r]] : [],
+      stools: introNow?.stools ? [[marks!.bossStool.c, marks!.bossStool.r], [marks!.youStool.c, marks!.youStool.r]] : [],
       pyramid: introNow?.pyramid ?? null,
+      blocks: introNow?.blocks ?? null,
+      drop: introNow?.drop ?? 0,
     };
   };
   const hookBench = (k: number) => {
