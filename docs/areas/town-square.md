@@ -505,7 +505,7 @@ column, on up to two smaller lines in the bar's same height, the full name as it
 [2026-11-02-building-interiors.md](../decisions/2026-11-02-building-interiors.md), [2026-11-02-shop-zoom.md](../decisions/2026-11-02-shop-zoom.md)
 and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.md) (the art's, on `claude/boss-art`).
 
-- **Which homes.** Babur's Circus (`tiger`), Puddles' Botanical Garden (`gardener`) and Alfil's Pyramid (`alfil`, Nov 2: Woolly the Shopkeeper, "Alfil's Boss Crate" with Alfil's Howdah, a sandstone ceiling, the chat's day tone): `SHOPS` in `town/shops/shops.ts`. Their home's card
+- **Which homes.** Babur's Circus (`tiger`), Puddles' Botanical Garden (`gardener`) and Alfil's Pyramid (`alfil`, Nov 2: Woolly the Shopkeeper, "Alfil's Boss Crate" with Alfil's Howdah, a sandstone ceiling, the chat's day tone) and Big Boy's Crib (`bigboy`, Nov 2: Blocky the Shopkeeper, "Big Boy's Boss Crate" with Big Boy's Buggy, a nursery ceiling of sky, clouds and stars, the chat's day tone; a ball pit, solid, under a walkway, the shop's platform and the battle circle you walk on; his toy airplane, three squares deep, stands up whole at its foot, `RoomArt.upright`, rather than lying flat as a plan): `SHOPS` in `town/shops/shops.ts`. Their home's card
   is its name, centered, and **"Go in"** (gold) under it, centered, nothing else (Eric, Nov 2: "chop the Shop and Coming soon": a short
   card, `.town-card.town-door`); every other home's card is as it was (its name, Hollow's line, "Shop" greyed and "Coming soon").
 - **Going in.** "Go in" walks you to the square in front of the door (the plot's front row's middle, a row out); there the town zooms in on
@@ -565,14 +565,14 @@ on right, not vertical… just be sure the table and chairs and pieces all are l
 [2026-11-02-boss-challenge.md](../decisions/2026-11-02-boss-challenge.md), [2026-11-02-boss-challenge-r2.md](../decisions/2026-11-02-boss-challenge-r2.md).
 
 - **Which bosses.** Those in `BOSS_INTROS` (`town/shops/challenge.ts`): every boss whose home has an inside (`SHOPS`): Alfil (his own
-  intro, `custom: true`), Babur and Puddles (the default intro). Every other boss's card works as before (its confirm, Leave, the Boss
+  intro, `custom: true`), Big Boy (his own, Nov 2), Babur and Puddles (the default intro). Every other boss's card works as before (its confirm, Leave, the Boss
   raid screen). Per player: it all happens on your own screen; the boss stays at its home for everyone else.
-- **The layout** (`layout`, per boss): **"across"** (the default, all three today): the boss on the table's west (the screen's
+- **The layout** (`layout`, per boss): **"across"** (the default, all four today): the boss on the table's west (the screen's
   left), you on its east, side by side on the circle's middle row, each `standOff.across` (1.5) squares out, facing each other;
   **"facing"**: the boss north, you south (`standOff.facing`, 2.5: the circles' old marks). `marksOf(layout, how)` finds the circle's
   middle from its floor (`circle-*`, `ring-*`, `emblem-*`), moved `clearOff` south when a piece stands there (Babur's pedestal).
-  Alfil's and Puddles' drawn start marks sit west and east of the emblem, the middle line north to south (a unit test keeps the marks
-  where the layout puts you).
+  Alfil's, Puddles' and Big Boy's drawn start marks sit west and east of the emblem, the middle line north to south (a unit test keeps
+  the marks where the layout puts you; Big Boy's are drawn into his circle's tiles, turned in `circleMat`).
 - **The table:** the town's park table (`PARK_TABLE`, three squares across: a stool, the leg, a stool), in the boss's colors when its
   art has a table (Alfil's), else the park's stone. A stool at each player's side, `stoolOff` (1) from the middle, nothing on the empty
   sides: across, the picture as drawn; facing, its middle square alone and a stool north and south. The board (`paintTable`) is
@@ -581,12 +581,19 @@ on right, not vertical… just be sure the table and chairs and pieces all are l
 - **The flow** (`nextFlow`, pure): the boss's card's **"Challenge alone"**, its confirm **"Challenge Babur?"** / "You'll fight Babur in
   Boss Battle, then come back here." / **Fight** / Stay. Fight keeps where you stand (`standOf`), and you and the boss walk to its
   door (the boss at your pace) and in (the shop's zoom and fade; the room and the intro load only now: `shops/intro.ts`, and Alfil's
-  art, `shops/alfil-intro-art.ts`). Inside (the room in challenge mode: no cards, no walking by tap, its own framing per layout,
+  art, `shops/alfil-intro-art.ts`, or Big Boy's, `shops/bigboy-intro-art.ts`). Inside (the room in challenge mode: no cards, no walking by tap, its own framing per layout,
   `CHALLENGE_FEEL.cam`), you each walk to your mark, side by side at `walkStepMs`, settle onto its middle and turn to face each other.
   Its line in a speech bubble over its head (not the chat log; `BOSS_INTROS[id].line`, placeholders until Gemini's lines). Then:
   - **Alfil's own:** the pyramid rising `riseAtMs` into the line, holding, cracking, crumbling, the table and its board (`introBeats`
     / `introAt`), his cues' sounds; from `attackLeadMs` (2 s) before the storm covers, his God King attack at the board, beside the
     table on his side, its lashes looping (`attackStart`, `attackTime`); the sandstorm (`startStorm`).
+  - **Big Boy's own** (Nov 2, toy blocks: `BlocksAnims`, `isBlocks`): six alphabet blocks drop in and stack 3-2-1 (B-I-G, B-O, Y:
+    `build`, from `riseAtMs` into the line, a wooden clack as each lands, a bonk for the top one); the line ends as the board drops
+    onto the top block (`boardDropMs` from `dropFrom` squares up, his toss) and plops on (`plop`: dust and stars, a poof); the two
+    stool blocks drop in at your sides (`chairs`, a clack each); the table alone `tableHoldMs`. The blocks are his table and stools
+    (their own picture, no park table); the board is lifted until its slab's front rests on the top block (`slabFrontY`), so the
+    slab doesn't hide the upper blocks. His God King attack from `attackLeadMs` before the cover, beside the table, as Alfil's; then
+    his lollipop swirl (`INTRO_BIGBOY_SWIRL` and its front), played as Alfil's sandstorm (`startStorm`), his swish.
   - **The default** (`custom: false`): the table pops in `popAtMs` into the line (grows from its foot past its size and back over
     `popMs`, a dust puff over `puffMs`, the app's soft "pop"); from the line's end the boss swings its God King attack in place for
     `swingMs` (its kit's `kingAttack` and sounds: its lashes only, looping, no drop-in or leap, `attackTime(…, inPlace)`); then the
@@ -607,7 +614,7 @@ on right, not vertical… just be sure the table and chairs and pieces all are l
 - **Tests:** `packages/app/test/boss-challenge.test.ts` (the flow, the layouts and marks, the stools, the board's turn, both timelines,
   the storm's edge, the wipe, back to where you stood), `packages/server/test/town-chat.test.ts` (the lines and the no-spam rule, and
   through the API), `e2e/boss-challenge.spec.ts` (phone and computer: Alfil, a quit then a finished challenge and the lines; Babur's
-  default intro and back), `e2e/shop.spec.ts` (Alfil's Pyramid's crate), `e2e/town.spec.ts` (a boss without an inside, Folio: the
+  default intro and back; Big Boy's own intro and back), `e2e/shop.spec.ts` (Alfil's Pyramid's and Big Boy's Crib's crates), `e2e/town.spec.ts` (a boss without an inside, Folio: the
   Boss raid screen).
 
 ## Frame-rate pill (`?fps`)

@@ -623,7 +623,15 @@ build): online, phase 1 won is the crowd's victory):
   - **Adding one for another boss:** its kit's `kingAttack` (an animation whose hits land on `kingAttackHits()`, cued,
     lasting `KING_ATTACK.ms`), its hit effect, its `kingAttack` lines, and its id in `KING_ATTACKERS` (a unit test keeps
     the two lists the same); its face's keys in the facing test, and its line in the "every square" test (both in
-    `packages/app/test/king-attack.test.ts`).
+    `packages/app/test/king-attack.test.ts`). Its cues' sounds are the kit's `sounds`, or the attack's own `sounds` map when a
+    cue's name means something else in the kit (Timber: his attack's `whack` is his hammer, his kit's is the gnaw).
+  - **Timber's** (Nov 2; the art's notes `scripts/boss-art/out/timber-king-attack-nov2.md` on `claude/boss-art`): `BOSS_BEAVER_ATTACK`
+    in `timber.ts` (copied as drawn, lines only), 40 frame pixels a square, 1.15 off, facing left: he drops in hammer high, hammers
+    the king (whacks and knocks in turn), bats it with the plank off his back and smashes it on its head, chitters and hops off. Wood
+    chips off its square each hit (`chipHit` in `effects/timber.ts`, `chipItem`: up and out for a whack, sideways for a knock or the
+    bat, a big burst for the smash). His own wood sounds (swoosh, thump, whack, knock, slide, chitter, hup). No `kingAttack` lines yet
+    (he says nothing as he lands). `timber` is in `KING_ATTACKERS`: the mate's longer hold; nothing in his rules (his Gnaws, at most two
+    a battle) reads it. Admins first, so e2e plays his Last Stand as an admin.
 
 ## Where the code is
 
@@ -645,7 +653,7 @@ Each boss lives in its own files, one per layer, on a shared base. The shared fi
 | The boss's brain (Maia-3 or Stockfish) | `bossBrainFor` (core `boss.ts`), `packages/chess/src/boss-brain.ts`, `human-uci.ts`, `bossMoveFrom` and `bossBrainPlan` (`runner.ts`); online the lobby's `bossBrainNow` and the host's `hostBoss` (`net.ts`); solo `startBrain` (`solo.ts`); `packages/app/src/maia.ts`, `boss-brain.ts` (`?brain=` for admins), `BrainDebug` (`BossDock.tsx`); the Maia box `packages/maia-worker/` | none (every boss: `BOSS_BRAIN.brain`; an exception would go in `BOSS_BRAIN.byBoss`) |
 | The boss screen | `packages/app/src/screens/Boss.tsx` (still names a few bosses: see below; Sawyer's split hides the new half until the crack, and his board saw jolts the board; Wrangler's lasso and showdown keep pieces where they were until they're hauled: `pigBoard`; what it draws each frame and what it keeps: `useStillKey` in `hooks.ts`); `screens/Play.tsx` (Wrangler's duel prompt in the dock) | |
 | The boss menu's power words | `packages/app/src/power-words.ts` (`Record<PowerId, …>`) | |
-| A boss's attack on a king (the Last Stand, its mate) | `components/KingAttack.tsx`, `KING_ATTACK`, `KING_ATTACKERS`, `bossTurnShowMs` (`boss-timing.ts`), `KingAttackKit` (`kits.ts`), `LastStand.tsx`, `screens/Boss.tsx` | its kit's `kingAttack` (Hollow: `HOLLOW_ATTACK` in `hollow.ts`, `lashHit` in `effects/hollow.ts`, `hollowLash`; Alfil: `ALFIL_ATTACK`, `ankusHit`; Sawyer: `SAWYER_ATTACK`, `sawHit` in `effects/sawyer.ts`; Wrangler: `PIG_ATTACK`, `lassoHit` in `effects/pig.ts`; Boingo: `CLOWN_ATTACK`, `pieHit` in `effects/boingo.ts`; Big Boy: `BIGBOY_ATTACK`, `bonkHit` in `effects/bigboy.ts`; Ginger: `GINGER_ATTACK`, `frostHit` in `effects/ginger.ts`; Jefferson: `GREX_ATTACK`, `popHit` in `effects/grex.ts`; Chub & Chirp: `HOPPER_ATTACK`, `carrotHit` in `effects/hopper.ts`; Puddles: `GARDENER_ATTACK`, `waterHit` (`waterItem`) in `effects/gardener.ts`; their frames: `attack-frame.ts`; each hit's frames: `hitAnims` in `effects/common.ts`) |
+| A boss's attack on a king (the Last Stand, its mate) | `components/KingAttack.tsx`, `KING_ATTACK`, `KING_ATTACKERS`, `bossTurnShowMs` (`boss-timing.ts`), `KingAttackKit` (`kits.ts`), `LastStand.tsx`, `screens/Boss.tsx` | its kit's `kingAttack` (Hollow: `HOLLOW_ATTACK` in `hollow.ts`, `lashHit` in `effects/hollow.ts`, `hollowLash`; Alfil: `ALFIL_ATTACK`, `ankusHit`; Sawyer: `SAWYER_ATTACK`, `sawHit` in `effects/sawyer.ts`; Wrangler: `PIG_ATTACK`, `lassoHit` in `effects/pig.ts`; Boingo: `CLOWN_ATTACK`, `pieHit` in `effects/boingo.ts`; Big Boy: `BIGBOY_ATTACK`, `bonkHit` in `effects/bigboy.ts`; Ginger: `GINGER_ATTACK`, `frostHit` in `effects/ginger.ts`; Jefferson: `GREX_ATTACK`, `popHit` in `effects/grex.ts`; Chub & Chirp: `HOPPER_ATTACK`, `carrotHit` in `effects/hopper.ts`; Puddles: `GARDENER_ATTACK`, `waterHit` (`waterItem`) in `effects/gardener.ts`; Timber: `BOSS_BEAVER_ATTACK` in `timber.ts`, `chipHit` (`chipItem`) in `effects/timber.ts`; their frames: `attack-frame.ts`; each hit's frames: `hitAnims` in `effects/common.ts`) |
 
 ### The base boss (`packages/chess/src/bosses/base.ts`)
 
