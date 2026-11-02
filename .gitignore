@@ -9,3 +9,6 @@ items-preview.png
 characters-preview/
 wrangler.staging.jsonc
 packages/sim/data/fairplay-bank/
+
+# Crowd spread probe output (crowd-spread-probe.ts): the summary is reports/crowd-spread.md
+reports/crowd-spread/*.jsonl

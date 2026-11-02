@@ -12,7 +12,10 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 - **A mode is a preset over one engine.** `modeSettings()` and `CROWD_SETTINGS` / `RAID_SETTINGS` in settings.ts
   patch `DEFAULT_SETTINGS`. Two are played on these screens:
   - **Crowd 50 v 50** (the main mode): 100 players, one board, two teams of 50, each playing one side all game. Every
-    player picks a move on their team's turns; the **most popular** pick is played (`drawRuleByStage: ["popular"]`).
+    player picks a move on their team's turns; one of the team's **3 most-picked** moves is played, drawn by their picks
+    (`drawRuleByStage: ["popular"]` with `crowdPlayedFromTop: 3`, `crowdTopOdds`: 45 / 3 / 2 plays 90% / 6% / 4%; moves
+    tied across 3rd place are left out; a boss battle keeps the most popular; Nov 2,
+    docs/decisions/2026-11-02-crowd-bot-spread.md). The reveal's line adds the played move's chance when it wasn't sure.
     Bots fill empty seats (see [matchmaking.md](matchmaking.md)); each plays at its own rating ("The bots" below). Always team turns (`crowdTeams` in
     `CROWD_SETTINGS`): the "everyone moves" choice went on Oct 15, 2026 (DECISIONS.md).
   - **Boss raid** (`RAID_SETTINGS`, `crowdTeams: false`): up to 50 people (no bots online) pick the crowd's moves
@@ -152,6 +155,13 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   0.75 s of Maia a team turn on a computer, about 3 s on a phone (`reports/crowd-bots.md`). Test:
   `npx tsx packages/sim/scripts/crowd-bots-sim.ts tuned 10` (an engine-best player among 99 bots; `summary` writes
   `reports/crowd-bots.md`).
+  **In 50 v 50 they spread over the good lines** (Nov 2; `CROWD_BOTS`, `botLean`, `botPickSpread` in core/match.ts;
+  docs/decisions/2026-11-02-crowd-bot-spread.md; Eric: "unique lines favored over optimal play"): each team turn draws
+  one shared lean from the turn's seed (a focus on the engine's numbers and a taste per line, the same for every bot of
+  the team), then each bot weighs the first 5 lines under 15 points by exp(-focus x loss / T + taste) and any other line
+  far lower; a bot holding a power-up uses it on a sharp turn only 25% of the time (before, all of them at once: the
+  unanimous castles). Online the lean rides in the judge job's rules (`JudgeRules.crowdBots`). Probe:
+  `npx tsx packages/sim/scripts/crowd-spread-probe.ts 48 40 normal 501 4 now|before` (reports/crowd-spread.md).
 - **Test switch `?weakbots=1`** (solo, and a lobby you create; `WEAK_BOTS`): every bot plays loosely (`WEAK_BOT_SKILL`:
   a temperature of 8 points or more, `botStrength`; since Nov 1 every bot is that loose anyway), and people rank above bots in the standings (`peopleFirst`), so every cut takes
   bots first and a test's player surely reaches the boss final's top 4. Loose bots alone stopped doing it on Oct 15: the
@@ -254,6 +264,10 @@ time controls themselves are in the vote data (`PREGAME_VOTES` in `votes.ts`).
   agree), `runner.test.ts` (Classic's boards with ties kept in), `packages/app/test/faq.test.ts`. Sims:
   `packages/sim/scripts/opening-allowance.ts` (the calibration, `reports/opening-allowance.md`) and
   `allowance-sim.ts` (before/after Crowd matches, `reports/allowance-sim.md`).
+- 50 v 50's bots and played move: unit `packages/core/test/crowd-bot-spread.test.ts` (a team at lobby ratings never all
+  picks one move, Eric's castle included; the plurality moves between good lines; the top-3 odds and ties; the draw),
+  `packages/chess/test/judge.test.ts` (the lean from the seed alone), `packages/server/test/lobby.test.ts` (the live
+  window leads with the played move). Probe: `packages/sim/scripts/crowd-spread-probe.ts`.
 - 50 v 50's scoring: unit `packages/core/test/crowd-scoring.test.ts` (the cap's shape and its stages, pieces uncapped,
   the shared relief's thresholds, streaks and their start and ramp, a miss, rare finds and the switch, the bubble grace
   and what carries, 2 decimals), `packages/app/test/faq.test.ts`; e2e `e2e/crowd-scoring.spec.ts` (the fire's tiers,

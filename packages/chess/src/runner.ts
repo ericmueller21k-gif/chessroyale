@@ -8,6 +8,7 @@ import {
   assignColours,
   assignGroups,
   botChoose,
+  botLeanFor,
   botThinkMs,
   createMatch,
   drawRuleFor,
@@ -35,6 +36,7 @@ import {
   type MatchState,
   type PlayerState,
   type RetireReason,
+  type BotLean,
   type Rng,
   type Settings,
   type Side,
@@ -840,6 +842,8 @@ export class MatchRunner {
   private botPowerUps = new Set<string>();
   /** Bot picks decided early this round (so a screen can show them live as each bot finishes). */
   private planned = new Map<string, string>();
+  /** Crowd 50 v 50: this turn's lean for the team's bots (botLean), by stage, round, board and position. */
+  private lean: { key: string; lean: BotLean } | null = null;
   private planning: Promise<unknown> | null = null;
 
   /**
@@ -875,6 +879,13 @@ export class MatchRunner {
     const open = judgeRanked(this.state.boss, allowed ? judgeCandidates({ allowed }, top) : [...top], board.fen);
     const best = open[0]?.expected ?? top[0]!.expected;
     const candidates = open.map((m) => ({ move: m.move, loss: Math.max(0, (best - m.expected) * 100) }));
+    // Crowd 50 v 50: the team's lean this turn, drawn once (the plan and the scoring share it).
+    const leanKey = `${this.state.stage}:${this.state.round}:${boardId}:${board.fen}`;
+    if (this.lean?.key !== leanKey) {
+      const lean = botLeanFor(this.opts.rng, candidates, this.settings);
+      this.lean = lean ? { key: leanKey, lean } : null;
+    }
+    const lean = this.lean?.lean;
     const out: Record<string, string> = {};
     for (const id of playerIds) {
       const p = this.player(id);
@@ -885,7 +896,7 @@ export class MatchRunner {
         continue;
       }
       if (!this.botThink.has(id)) this.botThink.set(id, botThinkMs(this.opts.rng, this.roundSettings()));
-      const choice = botChoose(this.opts.rng, candidates, p, legal, this.settings);
+      const choice = botChoose(this.opts.rng, candidates, p, legal, this.settings, lean);
       if (choice.usedPowerUp) this.botPowerUps.add(id);
       out[id] = choice.move;
     }
@@ -961,7 +972,8 @@ export class MatchRunner {
       playerIds.filter((id) => !abstained.has(id)).map((id) => ({ playerId: id, move: picks[id] ?? null })),
       evaluation,
       this.opts.rng,
-      this.settings,
+      // (A boss battle keeps the most popular pick: crowdPlayedFromTop is 50 v 50's.)
+      this.state.boss ? { ...this.settings, crowdPlayedFromTop: 1 } : this.settings,
       drawRuleFor(this.state.stage, this.settings),
       this.allowanceFor(board.fen, evaluation.bestMove, pickList),
       this.scoreContext(board),

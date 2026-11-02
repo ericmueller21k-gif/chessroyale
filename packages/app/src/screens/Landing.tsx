@@ -17,7 +17,7 @@ const FAQ: [string, string][] = [
   ],
   [
     "How does 50 v 50 work?",
-    `${CROWD.lobbySize} players, one game of chess from the first move. You're on White or Black for the whole game. Every turn your team of ${CROWD.lobbySize / 2} picks a move, and the most popular pick is played. Stockfish scores every pick, so you score by choosing well, even when the crowd goes the other way. After move ${roundsInStage(CROWD, 0) / 2} the lowest scorers start going out, a cut every few moves. Before the game, everyone votes on how it ends: a team final (${versus(CROWD.teamFinalSizes[0]!)} down to ${versus(CROWD.teamFinalSizes.at(-1)!)}), a boss final where the top ${crowdFinalists("boss")} take on ${FINAL_BOSS}, or a duel between the best of each side.`,
+    `${CROWD.lobbySize} players, one game of chess from the first move. You're on White or Black for the whole game. Every turn your team of ${CROWD.lobbySize / 2} picks a move, and one of its three most popular picks is played: the more picks, the likelier. Stockfish scores every pick, so you score by choosing well, even when the crowd goes the other way. After move ${roundsInStage(CROWD, 0) / 2} the lowest scorers start going out, a cut every few moves. Before the game, everyone votes on how it ends: a team final (${versus(CROWD.teamFinalSizes[0]!)} down to ${versus(CROWD.teamFinalSizes.at(-1)!)}), a boss final where the top ${crowdFinalists("boss")} take on ${FINAL_BOSS}, or a duel between the best of each side.`,
   ],
   ["Is it free?", "Yes. Coins and cosmetics will be earned by playing, never bought, and they never change the game."],
   [

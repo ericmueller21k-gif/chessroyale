@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS } from "@chessroyale/core";
+import { CROWD_BOTS, DEFAULT_SETTINGS } from "@chessroyale/core";
 import {
   applyRecheck,
   blameJudge,
@@ -67,6 +67,16 @@ describe("judge jobs", () => {
     // Another seed, other picks (usually); the same report from a second device agrees exactly.
     const again = judgedBoard(j, await runJudgeJob(fakeEngine(), j))!;
     expect(boardsAgree(board, again).agree).toBe(true);
+  });
+
+  it("Crowd 50 v 50's bots (rules.crowdBots): the team's lean and picks follow from the seed alone, and they spread", async () => {
+    const team = Array.from({ length: 50 }, (_, i) => ({ skill: 10 + i, powerUps: 3 }));
+    const j = job({ bots: team, rules: { ...rules, crowdBots: CROWD_BOTS } });
+    const report = await runJudgeJob(fakeEngine(), j);
+    const board = judgedBoard(j, report)!;
+    expect(board.botPicks).toEqual(judgeBotPicks(j, report.top, report.extra).picks);
+    expect(judgeBotPicks(j, report.top)).toEqual(judgeBotPicks(j, report.top));
+    expect(new Set(board.botPicks).size).toBeGreaterThan(2);
   });
 
   it("catches a report that doesn't hold together", async () => {

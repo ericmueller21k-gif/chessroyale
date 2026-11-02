@@ -108,7 +108,7 @@ function RealMatch({ match }: { match: NonNullable<LiveCounts["featured"]> }) {
   );
 }
 
-/** "White's crowd: Nf3 31 · e4 12 · d4 5", the move played (the most votes) first and bold. */
+/** "White's crowd: Nf3 31 · e4 12 · d4 5", the move played first and bold (in 50 v 50 drawn from the top 3), then the most voted. */
 function Votes({ who, votes }: { who: string; votes: [string, number][] }) {
   return (
     <>
