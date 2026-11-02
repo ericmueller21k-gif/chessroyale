@@ -1748,6 +1748,12 @@ export const KING_SPEECH = {
   perQuietMove: 0.1,
   /** A remark on a move (a brilliant, good or bad move, a capture, a check given, the boss's slip) waits this many crowd moves after the last remark. */
   remarkGapMoves: 6,
+  /**
+   * His praise of a good move ("Masterful! Even I'd play that.": greatMove, goodMove) never comes in a game's first this many
+   * moves: the move's number in the game (the FEN's), so the crowd's own first ten from the start (Eric, Nov 2: "The king should not
+   * be saying that on the first move of the game … let's just make it the first 10 moves of the game").
+   */
+  praiseFromMove: 11,
   /** How likely each remark and each piece of small talk is to be said, when it may be (critical cues always speak). */
   chance: {
     greatMove: 0.3,

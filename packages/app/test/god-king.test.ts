@@ -128,6 +128,24 @@ describe("the God King's lines", () => {
     expect(crowdMoveCues(takeQueen, "f3h4", 0)[0]!.cue).toBe("queenWon");
   });
 
+  it("never praises a move in the game's first 10 moves (Eric, Nov 2: \"A masterful play\" on his first move): from move 11, as before", () => {
+    expect(KING_SPEECH.praiseFromMove).toBe(11);
+    const praise = (fen: string, loss: number) => crowdMoveCues(fen, "g1f3", loss).map((c) => c.cue).filter((c) => c === "greatMove" || c === "goodMove");
+    const at = (n: number, side: "w" | "b" = "w") => `rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR ${side} KQkq - 0 ${n}`;
+    // The first move of the game, and the tenth: a perfect move, a good one: no praise.
+    for (const n of [1, 5, 10]) {
+      expect(praise(at(n), 0), `move ${n}`).toEqual([]);
+      expect(praise(at(n), 3), `move ${n}`).toEqual([]);
+    }
+    // (Black's tenth too: the move's number in the game counts both sides alike.)
+    expect(crowdMoveCues("rnbqkbnr/pppppppp/8/8/8/5N2/PPPPPPPP/RNBQKB1R b KQkq - 1 10", "g8f6", 0).map((c) => c.cue)).not.toContain("greatMove");
+    // From the eleventh: as before.
+    expect(praise(at(11), 0)).toEqual(["greatMove"]);
+    expect(praise(at(11), 3)).toEqual(["goodMove"]);
+    // His other words on a move aren't held back: a capture on move 2 is still said.
+    expect(crowdMoveCues("rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2", "e4d5", 0).map((c) => c.cue)).toEqual(["crowdCapture"]);
+  });
+
   it("warns of a mate threat: the boss would mate at once if the crowd passed", () => {
     // Scholar's mate set up: Black's queen and bishop aim at f7 (White to move... here Black to move, threatened).
     expect(mateThreatened("r1bqkbnr/pppp1ppp/2n5/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 3 3")).toBe(true);

@@ -276,7 +276,7 @@ export function resetKingSpeech() {
 
 /**
  * The God King's word on the crowd's move once it lands: the boss's queen taken (always), how good it was (points lost
- * against the best move), a check, a capture.
+ * against the best move; praise only from the game's move KING_SPEECH.praiseFromMove), a check, a capture.
  */
 export function crowdMoveCues(fen: string, played: string, loss: number | null): { cue: KingCue; key: string }[] {
   const key = `crowd-${fen}`;
@@ -286,10 +286,15 @@ export function crowdMoveCues(fen: string, played: string, loss: number | null):
   if (loss !== null && loss >= 12) out.push({ cue: "badMove", key });
   if (inCheck(applyMove(fen, played))) out.push({ cue: "crowdCheck", key });
   if (took) out.push({ cue: "crowdCapture", key });
-  if (loss !== null && loss <= 1) out.push({ cue: "greatMove", key });
-  else if (loss !== null && loss <= 4) out.push({ cue: "goodMove", key });
+  // (No praise in a game's first moves: KING_SPEECH.praiseFromMove, the move's number in the game.)
+  const praise = loss !== null && moveNumber(fen) >= KING_SPEECH.praiseFromMove;
+  if (praise && loss <= 1) out.push({ cue: "greatMove", key });
+  else if (praise && loss <= 4) out.push({ cue: "goodMove", key });
   return out;
 }
+
+/** The number of the move about to be played in `fen` (its full-move field: 1 for either side's first move). */
+const moveNumber = (fen: string): number => Number(fen.split(" ")[5]) || 1;
 
 /** The side to move in `fen` (the crowd, as its move begins) is threatened with mate in one: if it passed, the other side could mate. */
 export function mateThreatened(fen: string): boolean {
