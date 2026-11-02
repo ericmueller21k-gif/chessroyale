@@ -125,7 +125,7 @@ const page = await browser.newPage({ viewport: { width: W, height: H }, deviceSc
 await page.setContent(html);
 await page.evaluate("window.__name = (f) => f");
 await page.evaluate(
-  async ({ imgs, floor, up, W, H, DPR, kidPng, sheet, glass }) => {
+  async ({ imgs, floor, up, W, H, DPR, kidPng, sheet, glass, stone }) => {
     const cv = document.getElementById("c") as HTMLCanvasElement;
     cv.width = W * DPR;
     cv.height = H * DPR;
@@ -134,7 +134,22 @@ await page.evaluate(
     const g = cv.getContext("2d")!;
     g.scale(DPR, DPR);
     g.imageSmoothingEnabled = false;
-    if (glass) {
+    if (stone) {
+      // A pyramid's sandstone ceiling (mockup only, not drawn art): warm stone, darker toward the top, with beams.
+      const sky = g.createLinearGradient(0, 0, 0, H * 0.45);
+      sky.addColorStop(0, "#5a3f22");
+      sky.addColorStop(1, "#b88d56");
+      g.fillStyle = sky;
+      g.fillRect(0, 0, W, H);
+      g.strokeStyle = "#7d5c33";
+      g.lineWidth = 4;
+      for (let i = -12; i <= 12; i++) {
+        g.beginPath();
+        g.moveTo(W / 2 + i * W * 0.05, -H * 0.5);
+        g.lineTo(W / 2 + i * W * 0.18, H * 0.45);
+        g.stroke();
+      }
+    } else if (glass) {
       // A greenhouse's glass roof (mockup only, not drawn art): pale sky through panes in white mullions.
       const sky = g.createLinearGradient(0, 0, 0, H * 0.45);
       sky.addColorStop(0, "#9fd0e6");
@@ -270,7 +285,7 @@ await page.evaluate(
       }
     }
   },
-  { imgs, floor, up, W, H, DPR, kidPng, sheet, glass: SHOP !== "babur" },
+  { imgs, floor, up, W, H, DPR, kidPng, sheet, glass: SHOP === "puddles", stone: SHOP === "alfil" },
 );
 await page.locator("#c").screenshot({ path: out });
 await browser.close();
