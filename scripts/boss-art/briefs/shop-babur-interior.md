@@ -102,3 +102,8 @@ Render each piece at 3x or 4x on both backgrounds, then the room still (scale 1)
 seams or a visible repeat; the walls tile side by side; everything reads as the inside of tiger.ts's tent in its colors;
 nothing is on fire; the path from the door to the counter is clear. Call done with notes on your choices and each piece's
 size in pixels and squares.
+
+## How to write it (a first try ran out of room writing everything in one turn)
+Build the file in steps: first `write_drawing` a short skeleton (the palette, the floor tiles, the wall, the layout and
+the room still) and render it; then add the other pieces a few at a time with `edit_drawing`, rendering as you go. Keep
+each turn's writing under about 600 lines; use small helper functions (kit.ts `paint`) so pieces stay compact.
