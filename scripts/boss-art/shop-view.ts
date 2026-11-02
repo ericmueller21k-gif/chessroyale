@@ -10,7 +10,13 @@ import { newPt, newView, proj, setView } from "../../packages/app/src/town/camer
 import { TOWN_FEEL } from "../../packages/app/src/town/feel.ts";
 import { SIDEKICK_SHEETS } from "../../packages/app/src/town/sidekick-sheets.ts";
 import { renderFrame } from "../../packages/app/src/characters/sprite.ts";
-import { SHOP_BABUR_LAYOUT, SHOP_BABUR_PIECES, SHOP_BABUR_CRATE_AT } from "./out/house-shop-babur/house-shop-babur.ts";
+// SHOP: which shop (babur, puddles, ...): its drawing out/house-shop-<shop>, its kid's sheet, where the kid stands.
+const SHOP = process.env.SHOP ?? "babur";
+const U = SHOP.toUpperCase();
+const mod = (await import(`./out/house-shop-${SHOP}/house-shop-${SHOP}.ts`)) as Record<string, unknown>;
+const SHOP_BABUR_LAYOUT = mod[`SHOP_${U}_LAYOUT`] as readonly { name: string; col: number; row: number; rot?: number; flip?: boolean; w?: number }[];
+const SHOP_BABUR_PIECES = mod[`SHOP_${U}_PIECES`] as Record<string, import("../../packages/app/src/characters/sprite.ts").Character>;
+const SHOP_BABUR_CRATE_AT = mod[`SHOP_${U}_CRATE_AT`] as readonly [number, number];
 import { readFileSync } from "node:fs";
 
 const [out = "shop-view.png", cs = "10", rs = "16", ws = "390", hs = "844", cam = "town"] = process.argv.slice(2);
@@ -31,7 +37,9 @@ const pt = newPt();
 // Each piece's first idle frame as RGBA.
 const imgs: Record<string, { w: number; h: number; data: number[]; foot: readonly [number, number] }> = {};
 for (const [name, ch] of Object.entries(SHOP_BABUR_PIECES)) {
-  const r = renderFrame(ch, (ch.anims.idle ?? Object.values(ch.anims)[0]!).frames[0]!);
+  const fr = (ch.anims.idle ?? Object.values(ch.anims)[0]!).frames;
+  // FRAME: which frame of each piece's idle (for an animated view: one picture per frame).
+  const r = renderFrame(ch, fr[Number(process.env.FRAME ?? 0) % fr.length]!);
   imgs[name] = { w: r.w, h: r.h, data: Array.from(r.data), foot: ch.foot };
 }
 
@@ -72,9 +80,10 @@ for (const pl of SHOP_BABUR_LAYOUT) {
   up.push({ t: "img", img: pl.name, x: p.x + ox * s, y: p.y + oy * s, s, flip: !!pl.flip, depth: p.depth + (pl.name === "crate" ? -0.01 : 0) });
 }
 // Stripes behind the counter (row 2, middle), and you.
-const sheet = SIDEKICK_SHEETS.babur;
+const sheet = SIDEKICK_SHEETS[SHOP as keyof typeof SIDEKICK_SHEETS];
 // Beside the counter's east end, a little behind it (behind the counter itself the 58 px counter hides it).
-const kid = P(12.6, 2.6)!;
+const [kc, kr] = (process.env.KID ?? (SHOP === "babur" ? "12.6,2.6" : "9.5,2")).split(",").map(Number) as [number, number];
+const kid = P(kc, kr)!;
 const kidSquares = TOWN_FEEL.sidekickSquares / (sheet.foot[1] / sheet.h - sheet.top.idle / sheet.h);
 up.push({ t: "kid", x: kid.x, y: kid.y, s: (kidSquares * kid.k) / sheet.h, depth: kid.depth, tag: "Shopkeeper" });
 const me = P(PC, PR)!;
