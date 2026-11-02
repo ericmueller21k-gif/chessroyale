@@ -3381,12 +3381,21 @@ export interface AutoChessSettings {
    */
   readonly lockIn: boolean;
   readonly lockInBonus: number;
-  /** The buy-and-place step, its locked end (no buying, selling or moving), and how far behind the opponent's circles show. */
+  /**
+   * The buy-and-place step, its locked end (no buying, selling or moving), and how far behind the opponent's circles (and its bench,
+   * gold and level) show: 0 since Nov 2, live (Eric: placing first pays, so who placed first must be seen; it was 2 s from Oct 19).
+   */
   readonly buySeconds: number;
   readonly lockSeconds: number;
   readonly circlesDelaySeconds: number;
-  /** While you buy, one of their pieces (a circle, a pawn too) is revealed at random every this many seconds, and stays shown (v6, Eric Oct 20: 5 s, so 5 in the 30). */
+  /**
+   * While you buy, a piece is revealed every this many seconds (Eric, Nov 1-2: 3 s; was 5 s at random), piece for piece by kind:
+   * a piece shows only with a piece of the other side of its group in `revealGroups` (pawn and pawn, knight or bishop and knight or
+   * bishop, rook and rook, queen and queen), the later placed of a pair first. A kind in no group stays hidden until the move step.
+   * The rules: packages/app/src/autochess/reveal.ts, docs/decisions/2026-11-02-autochess-reveal.md.
+   */
   readonly revealSeconds: number;
+  readonly revealGroups: readonly (readonly ("p" | "n" | "b" | "r" | "q")[])[];
   /**
    * The adjust step, shown to players as the **move step** (v6, Eric Oct 20; v2 Oct 21): `adjustSeconds` long, with their full board
    * shown, in which you make `adjustMoves` change, hidden from them until the fight. `adjustStep` false turns the step off (straight to
@@ -3594,8 +3603,9 @@ export const AUTOCHESS: AutoChessSettings = {
   lockInBonus: 3,
   buySeconds: 30,
   lockSeconds: 3,
-  circlesDelaySeconds: 2,
-  revealSeconds: 5,
+  circlesDelaySeconds: 0,
+  revealSeconds: 3,
+  revealGroups: [["p"], ["n", "b"], ["r"], ["q"]],
   adjustStep: true,
   adjustMode: "stars",
   adjustSeconds: 7,

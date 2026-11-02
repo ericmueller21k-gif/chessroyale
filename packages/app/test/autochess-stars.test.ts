@@ -37,7 +37,7 @@ import {
 import { botBenchAt, botAt, botBuys, botPlan, botStarMoves, botStarUps } from "../src/autochess/bot.ts";
 import { beginRound, newMatch, refundFor, settleRound, worth } from "../src/autochess/economy.ts";
 import { moveStars, starsAfter } from "../src/autochess/fight.ts";
-import { revealedAt } from "../src/autochess/reveal.ts";
+import { boardChanges, botSeen } from "../src/autochess/reveal.ts";
 import { buyFromSlot, holdFromSlot, newShop, replaceTaken, rollOffer, shopSeed, type Shop } from "../src/autochess/shop.ts";
 import type { Army, Held, Kind, Offer, StarCount } from "../src/autochess/types.ts";
 
@@ -583,13 +583,14 @@ describe("auto chess stars: the bot", () => {
       { at: 2, type: "buy" as const, kind: "r" as Kind, square: "a8", price: 50 },
       { at: 6, type: "starup" as const, kind: "n" as Kind, square: "c6", price: 5, stars: 2 as StarCount, where: "board" as const },
     ];
-    const first = revealedAt(events, 1, 5.5);
+    // Yours: a knight and a rook too, so theirs are matched piece for piece and get revealed.
+    const yours = boardChanges("you", {}, { c3: "n", a1: "r" }, 1.5);
+    const first = botSeen(events, yours, 5.5).revealed;
     expect(first.every((r) => r.stars === undefined)).toBe(true);
-    const later = revealedAt(events, 1, 12);
-    const knight = later.find((r) => r.square === "c6");
-    if (knight) expect(knight.stars).toBe(2);
-    const rook = later.find((r) => r.square === "a8");
-    if (rook) expect(rook.stars).toBeUndefined();
+    const later = botSeen(events, yours, 12).revealed;
+    expect(later.find((r) => r.square === "c6")?.stars).toBe(2);
+    expect(later.find((r) => r.square === "a8")).toBeDefined();
+    expect(later.find((r) => r.square === "a8")?.stars).toBeUndefined();
     expect(botAt(events, 5).stars).toEqual({});
     expect(botAt(events, 7).stars).toEqual({ c6: 2 });
   });
