@@ -204,7 +204,7 @@ export function TownScreen({
   const stormIn = async (id: HomeId, m: typeof import("./shops/intro.ts"), intro: RoomIntro["intro"]) => {
     if (flow.current !== "intro") return;
     step("introDone");
-    const storm = m.startStorm(intro);
+    const storm = m.startTransition(intro);
     await storm.covered;
     step("stormCovers");
     try {

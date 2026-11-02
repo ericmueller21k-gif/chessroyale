@@ -304,7 +304,8 @@ function startRoom(
   // circle, side by side, at the challenge's pace; each settles onto its mark's middle; facing each other, the intro plays.
   const C = CHALLENGE_FEEL;
   const ci = challenge?.intro ?? null;
-  const marks = ci ? marksOf(art.layout) : null;
+  const marks = ci ? marksOf(art.layout, ci.def.layout) : null;
+  const across = marks?.layout === "across";
   const boss = ci && marks ? new Walker({ c: room.start.c - 1, r: room.start.r }, C.walkStepMs, false) : null;
   const bossPose = { x: 0, y: 0, hop: 0, tilt: 0, step: false, t: 0 };
   /** When you and the boss each reached your mark's square (-1: walking), and when you both stood on your marks' middles (the intro's 0). */
@@ -321,6 +322,8 @@ function startRoom(
   const attackAt = ci ? attackStart(ci.beats) : Infinity;
   let attackFrame = -1;
   let attackCued = -1;
+  /** The default intro (no art of its own): its attack is swung in place, where it stands. */
+  const inPlace = !!ci && !ci.def.custom;
   if (boss && marks) {
     you.stepMs = C.walkStepMs;
     const yp = findPath(room, you.here(), marks.youSq);
@@ -331,13 +334,22 @@ function startRoom(
   /** The last half square onto a mark's middle (0 until it's there; then easing to its half). */
   const settle = (at: number, half: number, now: number) => (at < 0 ? 0 : half * Math.min(1, (now - at) / C.settleMs));
   const youOx = (now: number) => (marks ? settle(youAt, marks.you.c - marks.youSq.c, now) : 0);
+  const youOy = (now: number) => (marks ? settle(youAt, marks.you.r - marks.youSq.r, now) : 0);
   const bossOx = (now: number) => (marks ? settle(bossAt, marks.boss.c - marks.bossSq.c, now) : 0);
+  const bossOy = (now: number) => (marks ? settle(bossAt, marks.boss.r - marks.bossSq.r, now) : 0);
   /** The challenge, a frame on: the walk in, then the intro's beats (its line said once, in the bubble by his head; its cues' sounds). */
   const stepIntro = (now: number) => {
     if (!ci || !boss || !marks || !challenge) return;
     boss.update(now);
-    if (youAt < 0 && !you.moving()) youAt = now;
-    if (bossAt < 0 && !boss.moving()) bossAt = now;
+    // (On its mark, each turns to face the other across the table: Walker's side view, `facing` the way.)
+    if (youAt < 0 && !you.moving()) {
+      youAt = now;
+      if (marks.youFace) [you.facing, you.view] = [marks.youFace, 0];
+    }
+    if (bossAt < 0 && !boss.moving()) {
+      bossAt = now;
+      if (marks.bossFace) [boss.facing, boss.view] = [marks.bossFace, 0];
+    }
     if (onMarksAt < 0 && youAt >= 0 && bossAt >= 0) onMarksAt = Math.max(youAt, bossAt) + C.settleMs;
     if (onMarksAt < 0 || now < onMarksAt) {
       introNow = null;
@@ -355,7 +367,7 @@ function startRoom(
     // The boss's attack: from `attackAt` on, until the battle takes the screen (its lashes again and again), each frame's sound.
     const a = ci.attack;
     if (a && t >= attackAt) {
-      attackFrame = animFrame(a.ms, attackTime(t - attackAt, a.beat), false);
+      attackFrame = animFrame(a.ms, attackTime(t - attackAt, a.beat, inPlace), false);
       if (attackFrame !== attackCued) {
         attackCued = attackFrame;
         const cue = a.cues[attackFrame];
@@ -472,8 +484,9 @@ function startRoom(
   const tall: CamSet = { ...f.camTall };
   const wide: CamSet = { ...f.camWide };
   const sets: CamPair = { tall, wide };
-  // (A challenge: its own framing, CHALLENGE_FEEL.camZoom and camSouth, from the start.)
-  let zoomCur = challenge ? CHALLENGE_FEEL.camZoom : 0;
+  // (A challenge: its own framing, CHALLENGE_FEEL.cam for its layout, from the start.)
+  const cam = marks ? C.cam[marks.layout] : null;
+  let zoomCur = cam ? cam.zoom : 0;
   let zoomTarget = zoomCur;
   let camX = you.c;
   let camY = you.r;
@@ -750,7 +763,7 @@ function startRoom(
     youHead.on = false;
     seen.anim = "";
     you.pose(now, pose);
-    if (!P(pose.x + youOx(now), pose.y)) return;
+    if (!P(pose.x + youOx(now), pose.y + youOy(now))) return;
     const rd = riding();
     if (rd) return drawRiding(rd, now);
     seen.ride = null;
@@ -789,28 +802,44 @@ function startRoom(
   /** The boss (in a challenge): its town sprite, its idle playing, at the town's size, its shadows as the town draws a boss's. */
   const bossHead = { x: 0, y: 0, on: false };
   /**
-   * The boss's God King attack: dropped in beside the table, its target the board (to its right, or its left for one drawn facing
-   * left), at the boss's own size in the room.
+   * The boss's God King attack, at the boss's own size in the room. Its own intro (Alfil's): dropped in beside the table, its target
+   * the board, on the boss's side of it (across: the west; facing: to the board's left, or right for one drawn facing left). The
+   * default: swung in place where it stands, facing you. Turned to face the way it should (the art faces right, or left for
+   * `facesLeft`).
    */
-  const drawAttack = () => {
+  const drawAttack = (now: number) => {
     const a = ci!.attack!;
-    if (!marks || !P(marks.table.c, marks.table.r)) return;
+    if (!marks) return;
+    let face: number;
+    if (inPlace) {
+      boss!.pose(now, bossPose);
+      if (!P(bossPose.x + bossOx(now), bossPose.y + bossOy(now))) return;
+      face = marks.bossFace ?? boss!.facing;
+    } else {
+      if (!P(marks.table.c, marks.table.r)) return;
+      face = across ? 1 : a.facesLeft ? -1 : 1;
+    }
     const img = a.frames[attackFrame]!;
     const k = (ci!.boss.squares * pt.k) / ci!.boss.ch.h;
-    const side = a.facesLeft ? 1 : -1;
-    const fx = pt.x + side * a.standPx * k;
-    const x0 = fx - a.ch.foot[0] * k;
+    // (Its feet: where it stands, or `standPx` off the board on the side it faces from.)
+    const fx = inPlace ? pt.x : pt.x - face * a.standPx * k;
+    const flip = (face < 0) !== a.facesLeft;
     const y0 = pt.y - a.ch.foot[1] * k;
+    g.save();
+    // (Mirrored about its feet: they stay where they are.)
+    g.translate(fx, 0);
+    if (flip) g.scale(-1, 1);
     g.imageSmoothingEnabled = k < 1.5;
-    g.drawImage(img, x0, y0, img.width * k, img.height * k);
+    g.drawImage(img, -a.ch.foot[0] * k, y0, img.width * k, img.height * k);
+    g.restore();
     g.imageSmoothingEnabled = false;
   };
   const drawBoss = (now: number) => {
     bossHead.on = false;
     if (!ci || !boss) return;
-    if (attackFrame >= 0 && ci.attack) return drawAttack();
+    if (attackFrame >= 0 && ci.attack) return drawAttack(now);
     boss.pose(now, bossPose);
-    if (!P(bossPose.x + bossOx(now), bossPose.y)) return;
+    if (!P(bossPose.x + bossOx(now), bossPose.y + bossOy(now))) return;
     const b = ci.boss;
     const u = now % b.loop;
     let i = 0;
@@ -843,26 +872,70 @@ function startRoom(
     g.imageSmoothingEnabled = false;
     Object.assign(bossHead, { x: pt.x, y: y0 + h * 0.04, on: true });
   };
-  /** Between you (in a challenge): the pyramid's frame, or the table with its board (the crumble's last frames over it). */
+  /**
+   * Between you (in a challenge): the pyramid's frame, or the table with its board (the crumble's last frames over it). The table's
+   * picture is three squares across, a stool in each outer one: across, the stools are where you and the boss stand, so it's drawn
+   * whole; facing, its middle (the leg) alone, the stools drawn on their own (`drawStool`). The default intro's table pops in (grows
+   * from its foot, a touch past its size and back) in a puff of dust.
+   */
   const drawCenter = () => {
     const n = introNow;
     if (!ci || !marks || !n || !P(marks.table.c, marks.table.r)) return;
     const s = pt.k / SQ;
     const x = pt.x;
     const y = pt.y;
-    const put = (img: HTMLCanvasElement, ch: Character) => g.drawImage(img, x - ch.foot[0] * s, y - ch.foot[1] * s, img.width * s, img.height * s);
+    const put = (img: HTMLCanvasElement, ch: Character, fx = ch.foot[0]) => g.drawImage(img, x - fx * s, y - ch.foot[1] * s, img.width * s, img.height * s);
     g.imageSmoothingEnabled = false;
     if (n.table) {
-      put(ci.table.img, ci.table.ch);
-      paintTable(g, v, marks.table.c - camX, camY - marks.table.r, ci.table.palette);
+      const T = ci.table;
+      const popping = n.pop < 1;
+      if (popping) {
+        g.save();
+        g.translate(x, y);
+        g.scale(n.pop, n.pop);
+        g.translate(-x, -y);
+      }
+      if (across) put(T.img, T.ch);
+      else put(T.leg, T.ch, T.ch.foot[0] - T.leg.width);
+      if (n.pop > 0) paintTable(g, v, marks.table.c - camX, camY - marks.table.r, T.palette, marks.layout);
+      if (popping) g.restore();
     }
+    if (n.puff >= 0) drawPuff(x, y, n.puff);
     const py = ci.pyramid;
+    if (!py) return;
     if (n.pyramid) put(py.frames[n.pyramid.anim][n.pyramid.frame]!, py.ch);
     else if (n.drift) put(py.frames.crumble[py.frames.crumble.length - 1]!, py.ch);
   };
-  /** What stands among the pieces this frame (the Shopkeeper 0, you 1, the boss 2, the board 3), by row: drawn far to near. */
-  const figZ = new Float64Array(4);
-  const figK = new Uint8Array(4);
+  /** A stool on its own (facing: the table's north one, or its south one), as the table's picture has it. */
+  const drawStool = (at: { c: number; r: number }) => {
+    const n = introNow;
+    if (!ci || !n?.table || !P(at.c, at.r)) return;
+    const T = ci.table;
+    const s = pt.k / SQ * n.pop;
+    // (The stool's square is the picture's left third: its middle over the stool's foot.)
+    g.drawImage(T.stool, pt.x - (T.stool.width / 2) * s, pt.y - T.ch.foot[1] * s, T.stool.width * s, T.stool.height * s);
+  };
+  /** The default's dust puff as the table pops in: a ring of soft dust round its foot, spreading and fading (`u` 0 to 1). */
+  const drawPuff = (x: number, y: number, u: number) => {
+    const k = pt.k;
+    const e = 1 - (1 - u) ** 2;
+    g.fillStyle = "#e9dfcc";
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + 0.4;
+      const r = k * (0.35 + 0.55 * e);
+      g.globalAlpha = 0.75 * (1 - u);
+      g.beginPath();
+      g.ellipse(x + Math.cos(a) * r, y + Math.sin(a) * r * 0.38 - k * 0.12 * e, k * (0.16 + 0.12 * e), k * (0.11 + 0.08 * e), 0, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.globalAlpha = 1;
+  };
+  /**
+   * What stands among the pieces this frame (the Shopkeeper 0, you 1, the boss 2, the board 3, and facing the boss's stool 4 and
+   * yours 5), by row: drawn far to near.
+   */
+  const figZ = new Float64Array(6);
+  const figK = new Uint8Array(6);
   let figN = 0;
   const addFig = (z: number, k: number) => {
     let i = figN++;
@@ -874,7 +947,7 @@ function startRoom(
     figZ[i] = z;
     figK[i] = k;
   };
-  const drawFigure = (k: number, now: number) => (k === 0 ? drawKid(now) : k === 1 ? drawYou(now) : k === 2 ? drawBoss(now) : drawCenter());
+  const drawFigure = (k: number, now: number) => (k === 0 ? drawKid(now) : k === 1 ? drawYou(now) : k === 2 ? drawBoss(now) : k === 3 ? drawCenter() : drawStool(k === 4 ? marks!.bossStool : marks!.youStool));
   /** A speech bubble's lines (wrapped once for its words). */
   const bubbles = new Map<string, { lines: string[]; w: number }>();
   /** The boss's line in a speech bubble (the town's: white, rounded, its tail pointing down at the speaker's head). */
@@ -991,12 +1064,19 @@ function startRoom(
     you.pose(now, pose);
     figN = 0;
     addFig(def.at[1], 0);
-    addFig(pose.y, 1);
+    addFig(pose.y + youOy(now), 1);
     if (boss && marks) {
       boss.pose(now, bossPose);
-      // (Attacking, it stands beside the table, just in front of it.)
-      addFig(attackFrame >= 0 ? marks.table.r + 0.01 : bossPose.y, 2);
-      if (introNow) addFig(marks.table.r, 3);
+      // (Its own intro's attack stands beside the table, just in front of it; the default's where it stands.)
+      addFig(attackFrame >= 0 && !inPlace ? marks.table.r + 0.01 : bossPose.y + bossOy(now), 2);
+      if (introNow) {
+        // (Across, you and the boss stand on the table's row, at its stools: the table first, you in front of yours.)
+        addFig(across ? marks.table.r - 0.01 : marks.table.r, 3);
+        if (!across) {
+          addFig(marks.bossStool.r, 4);
+          addFig(marks.youStool.r, 5);
+        }
+      }
     }
     let k = 0;
     for (const u of ups) {
@@ -1094,7 +1174,7 @@ function startRoom(
       // A critically damped spring toward you (the town's), solved exactly for the frame; in a challenge, toward its framing.
       you.pose(now, pose);
       const gx = marks ? marks.table.c : pose.x;
-      const gy = marks ? marks.table.r + C.camSouth : pose.y;
+      const gy = marks ? marks.table.r + cam!.south : pose.y;
       const w = f.followSpring;
       const e = Math.exp(-w * dt);
       const x = camX - gx;
@@ -1235,7 +1315,18 @@ function startRoom(
     const now = performance.now();
     you.pose(now, pose);
     boss.pose(now, bossPose);
-    return { step: introNow?.step ?? "walk", attack: attackFrame >= 0, you: [pose.x + youOx(now), pose.y], boss: [bossPose.x + bossOx(now), bossPose.y], line: !!introNow?.line && bossHead.on, table: !!introNow?.table, pyramid: introNow?.pyramid ?? null };
+    return {
+      step: introNow?.step ?? "walk",
+      layout: marks!.layout,
+      attack: attackFrame >= 0,
+      you: [pose.x + youOx(now), pose.y + youOy(now)],
+      boss: [bossPose.x + bossOx(now), bossPose.y + bossOy(now)],
+      facing: { you: you.facing, boss: boss.facing },
+      line: !!introNow?.line && bossHead.on,
+      table: !!introNow?.table,
+      stools: introNow?.table ? [[marks!.bossStool.c, marks!.bossStool.r], [marks!.youStool.c, marks!.youStool.r]] : [],
+      pyramid: introNow?.pyramid ?? null,
+    };
   };
   const hookBench = (k: number) => {
     if (!testSwitchesAllowed()) return null;

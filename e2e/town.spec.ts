@@ -215,9 +215,9 @@ test("/town?fps: anyone sees the frame-rate pill with a number (no admin needed,
   await expect(pill).toHaveText(/^\d+ fps · \d+\.\d ms$/, { timeout: 10_000 });
 });
 
-/** Where to tap Babur (or his circus) now, in the page; null while he isn't drawn. */
-async function tapPoint(p: Page, kind: "boss" | "home") {
-  const xy = await p.evaluate((k) => (window as unknown as { __townAt?: (k: string, id: string) => { x: number; y: number } | null }).__townAt?.(k, "tiger") ?? null, kind);
+/** Where to tap Babur (or his circus; or another boss, `id`) now, in the page; null while he isn't drawn. */
+async function tapPoint(p: Page, kind: "boss" | "home", id = "tiger") {
+  const xy = await p.evaluate(([k, i]) => (window as unknown as { __townAt?: (k: string, id: string) => { x: number; y: number } | null }).__townAt?.(k, i) ?? null, [kind, id] as const);
   if (!xy) return null;
   const cv = (await canvas(p).boundingBox())!;
   return { x: cv.x + xy.x, y: cv.y + xy.y };
@@ -228,23 +228,23 @@ async function tapPoint(p: Page, kind: "boss" | "home") {
  * click at where the chip was a moment before landed on the map, walked you there and called off the glide: the flaky "the circus
  * comes into view: null", Nov 2.)
  */
-async function toBabur(p: Page) {
-  if (await tapPoint(p, "home")) return;
-  await p.getByRole("button", { name: "Go to Babur's Circus" }).dispatchEvent("click");
-  await expect.poll(() => tapPoint(p, "home"), { message: "the circus comes into view" }).not.toBeNull();
+async function toBabur(p: Page, id = "tiger", home = "Babur's Circus") {
+  if (await tapPoint(p, "home", id)) return;
+  await p.getByRole("button", { name: `Go to ${home}` }).dispatchEvent("click");
+  await expect.poll(() => tapPoint(p, "home", id), { message: `${home} comes into view` }).not.toBeNull();
 }
 /**
  * Taps Babur or his circus until its card opens (he may stroll a step between the look and the tap; the hook's point is
  * one a tap would hit then).
  */
-async function openCard(p: Page, kind: "boss" | "home", name: string) {
+async function openCard(p: Page, kind: "boss" | "home", name: string, id = "tiger") {
   const card = p.getByRole("dialog", { name, exact: true });
   await expect(async () => {
     if (await card.isVisible()) return;
     // A tap that met someone else first (Babur strolling in front of his home) opened their card: close it, so the next
     // tap can't land on its buttons.
     if (await p.getByRole("dialog").isVisible()) await p.keyboard.press("Escape");
-    const at = await tapPoint(p, kind);
+    const at = await tapPoint(p, kind, id);
     expect(at, "drawn").not.toBeNull();
     await p.mouse.click(at!.x, at!.y);
     await expect(card).toBeVisible({ timeout: 1500 });
@@ -306,36 +306,37 @@ test("the lights at dusk and night: at ?sky=night a park lamp's glass and Babur'
   expect(errors).toEqual([]);
 });
 
+// (Folio's: a boss whose home has no inside, so no challenge in it: Babur's, Puddles' and Alfil's are e2e/boss-challenge.spec.ts's.)
 test("a boss's card: 'Challenge alone', then 'Leave the town square?'; Stay keeps you, Leave opens the Boss raid screen with that boss's tile picked", async ({ page }) => {
   const errors = watchErrors(page);
   await page.addInitScript(() => ((window as any).__soundLog = []));
   await page.goto("/town");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
-  await toBabur(page);
-  let card = await openCard(page, "boss", "Babur");
+  await toBabur(page, "folio", "Folio's Folded House");
+  let card = await openCard(page, "boss", "Folio", "folio");
   // No line on his card (only Hollow's has lines: Oct 28).
   await expect(card.locator(".town-card-line")).toHaveCount(0);
   // He says something as his card opens (Eric, Oct 27: his select sound), once: its confirm opening is the same card.
-  const said = () => page.evaluate(() => ((window as any).__soundLog as string[]).filter((l) => l.startsWith("tigerHello")).length);
+  const said = () => page.evaluate(() => ((window as any).__soundLog as string[]).filter((l) => l.startsWith("folioHello")).length);
   await expect.poll(said).toBe(1);
   await card.getByRole("button", { name: "Challenge alone" }).click();
   let confirm = page.getByRole("dialog", { name: "Leave the town square?" });
   await expect(confirm.getByRole("heading", { name: "Leave the town square?" })).toBeVisible();
   expect(await said()).toBe(1);
-  await expect(confirm.getByText("You'll fight Babur in Boss Battle.")).toBeVisible();
+  await expect(confirm.getByText("You'll fight Folio in Boss Battle.")).toBeVisible();
   // Stay: the confirm closes, and you're still in the town square.
   await confirm.getByRole("button", { name: "Stay" }).click();
   await expect(confirm).toBeHidden();
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
-  // Again, and Leave: the Boss raid screen (its tiles and stage), Babur's tile picked.
-  card = await openCard(page, "boss", "Babur");
+  // Again, and Leave: the Boss raid screen (its tiles and stage), Folio's tile picked.
+  card = await openCard(page, "boss", "Folio", "folio");
   await card.getByRole("button", { name: "Challenge alone" }).click();
   confirm = page.getByRole("dialog", { name: "Leave the town square?" });
   await confirm.getByRole("button", { name: "Leave" }).click();
   const tiles = page.getByRole("radiogroup", { name: "Bosses" });
   await expect(tiles).toBeVisible();
-  await expect(tiles.getByRole("radio", { name: "Babur", exact: true })).toHaveAttribute("aria-checked", "true");
-  await expect(page.locator(".bs-name")).toHaveText("Babur");
+  await expect(tiles.getByRole("radio", { name: "Folio", exact: true })).toHaveAttribute("aria-checked", "true");
+  await expect(page.locator(".bs-name")).toHaveText("Folio");
   expect(new URL(page.url()).pathname).toBe("/");
   await expect(page.getByRole("heading", { name: "Town square" })).toHaveCount(0);
   expect(errors).toEqual([]);
@@ -1213,9 +1214,10 @@ test("the other cards on the same dark look: the boss's, the home's, the Colosse
   await expect(card.getByRole("button", { name: "Challenge alone" })).toBeEnabled();
   await onDark("the boss's card", ["h2"]);
   await card.getByRole("button", { name: "Challenge alone" }).click();
-  const confirm = page.getByRole("dialog", { name: "Leave the town square?" });
-  await expect(confirm.getByText("You'll fight Babur in Boss Battle.")).toBeVisible();
-  await expect(confirm.getByRole("button", { name: "Leave", exact: true })).toBeEnabled();
+  // (His is a challenge in his home now, Nov 2: its own confirm, on the same look as "Leave the town square?".)
+  const confirm = page.getByRole("dialog", { name: "Challenge Babur?" });
+  await expect(confirm.getByText("You'll fight Babur in Boss Battle, then come back here.")).toBeVisible();
+  await expect(confirm.getByRole("button", { name: "Fight", exact: true })).toBeEnabled();
   await expect(confirm.getByRole("button", { name: "Stay", exact: true })).toBeEnabled();
   await onDark("the confirm", ["h2", ".town-card-text"]);
   expect(await contrastOf(page, ".town-card .town-btn:not(.primary)", ".town-card .town-btn:not(.primary)"), "the confirm's plain button").toBeGreaterThanOrEqual(WCAG_TEXT);

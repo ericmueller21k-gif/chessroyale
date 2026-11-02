@@ -3,12 +3,15 @@
  * boss (its art is a chunk of its own: Alfil's is shops/alfil-intro-art.ts, copied from `claude/boss-art`), every frame drawn into
  * a canvas of its own as it loads, behind the town's fade, never in a frame loop.
  *
- * - The board coming in: the pyramid's frames (its `rise`, `idle`, `crack` and `crumble`), the table (the town's park table in the
- *   boss's colors) and, on it, the slab, the board and the pieces as the town lays them on a park table (render.ts `drawBoard`:
- *   `paintTable` here is that, without the town's cache, the game or the clock): the slab in the boss's stone, its squares in his
- *   colors (the art's palette `L` / `D`), the pieces in the town's own ink (TABLE_INK), white's on the rank nearest you.
+ * - The board coming in: the pyramid's frames (its `rise`, `idle`, `crack` and `crumble`), the table (the town's park table, in the
+ *   boss's colors when its art has them, else the park's stone) and, on it, the slab, the board and the pieces as the town lays them
+ *   on a park table (render.ts `drawBoard`: `paintTable` here is that, without the town's cache, the game or the clock): the slab in
+ *   the table's stone, its squares in its colors (the palette's `L` / `D`), the pieces in the town's own ink (TABLE_INK), turned to the
+ *   layout (challenge.ts `boardSquare`): white's ranks nearest you, black's nearest the boss. The table's picture is three squares
+ *   across, a stool in each outer one: across, as it is; facing, its middle square alone and a stool on each player's side.
  * - The boss itself (its town sprite, BOSS_ART: its `idle`), walking in and standing on its mark.
- * - The transition: `startStorm`, a canvas over the whole page (outside the town's tree, so it stays as the town closes and the
+ * - The transition (`startTransition`): a boss's own (`startStorm`, Alfil's sandstorm), or the default (`startWipe`: a flash and a
+ *   wipe to black). Each a canvas over the whole page (outside the town's tree, so it stays as the town closes and the
  *   battle opens under it): the storm's tile (tiled, 3x, crisp) sweeps in behind its front, holds while the battle loads, and slides
  *   out with its front mirrored.
  */
@@ -18,10 +21,10 @@ import { renderFrame, type Character } from "../../characters/sprite.ts";
 import { play, warmSounds, type SoundName } from "../../sound.ts";
 import { newPt, proj, tableLift, type TableLift, type View } from "../camera.ts";
 import { TOWN_FEEL } from "../feel.ts";
-import { TABLE_BOARD, TABLE_INK, TABLE_PIECES } from "../houses/park.ts";
+import { PARK_TABLE, TABLE_BOARD, TABLE_INK, TABLE_PIECES } from "../houses/park.ts";
 import { BOSS_ART } from "../render.ts";
 import type { HomeId } from "../world.ts";
-import { CHALLENGE_FEEL, introBeats, introOf, stormEdge, type BossIntro, type IntroAnims, type IntroBeat } from "./challenge.ts";
+import { CHALLENGE_FEEL, boardSquare, introBeats, introOf, stormEdge, wipeAt, type BossIntro, type IntroAnims, type IntroBeat, type IntroLayout } from "./challenge.ts";
 
 /** A boss's intro art, as its file exports it. */
 interface IntroArt {
@@ -51,13 +54,20 @@ export interface StormArt {
 export interface LoadedIntro {
   home: HomeId;
   def: BossIntro;
-  anims: IntroAnims;
+  /** Its own art's timing (null: the default intro). */
+  anims: IntroAnims | null;
   beats: IntroBeat[];
-  pyramid: { ch: Character; frames: Record<PyramidAnim, HTMLCanvasElement[]> };
-  table: { ch: Character; img: HTMLCanvasElement; palette: Readonly<Record<string, string>> };
+  /** Its pyramid (null: the default intro, whose table pops in). */
+  pyramid: { ch: Character; frames: Record<PyramidAnim, HTMLCanvasElement[]> } | null;
+  /**
+   * The table: its picture (three squares across: a stool, the leg, a stool), its middle square alone (`leg`) and a stool alone
+   * (`stool`, its foot at its middle), and the slab's and board's colors.
+   */
+  table: { ch: Character; img: HTMLCanvasElement; leg: HTMLCanvasElement; stool: HTMLCanvasElement; palette: Readonly<Record<string, string>> };
   /** The boss: its sprite's idle frames, when each ends, and how many squares tall it stands (the town's size). */
   boss: { ch: Character; frames: HTMLCanvasElement[]; ends: number[]; loop: number; squares: number };
-  storm: StormArt;
+  /** Its storm (null: the default transition, the flash and the wipe). */
+  storm: StormArt | null;
   /**
    * Its God King attack (its kit's `kingAttack`), or null: a boss without one skips it. Its frames, each one's ms and cue, its
    * sounds by cue (the kit's), how it faces, where its feet stand off its target (frame pixels: `stand` squares of `perSquare`).
@@ -90,34 +100,52 @@ const scaled = (src: HTMLCanvasElement, k: number, flip = false): HTMLCanvasElem
   return c;
 };
 
+/** A picture's third (0 the left square, 1 the middle, 2 the right), as a canvas of its own. */
+const third = (img: HTMLCanvasElement, i: number): HTMLCanvasElement => {
+  const w = Math.round(img.width / 3);
+  const c = canvasOf(w, img.height);
+  c.getContext("2d")!.drawImage(img, i * w, 0, w, img.height, 0, 0, w, img.height);
+  return c;
+};
+
 const loading = new Map<HomeId, Promise<LoadedIntro>>();
-/** Loads a boss's intro (its art's chunk, every frame drawn), once; null for a boss without one. */
+/** Loads a boss's intro (its art's chunk, if it has its own, every frame drawn), once; null for a boss without one. */
 export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
   const def = introOf(home);
   const load = ART[home];
-  if (!def || !load) return null;
+  if (!def || (def.custom && !load)) return null;
   let p = loading.get(home);
   if (p) return p;
-  p = load().then((art) => {
-    const py = art.pyramid;
-    const ms = (a: PyramidAnim) => py.anims[a]!.frames.map((f) => f.ms);
-    // (The art's "table" cue: the crumble frame whose middle is clear, the table showing behind the falling sand.)
-    const tableFrame = Math.max(0, py.anims.crumble!.frames.findIndex((f) => f.cue === "table"));
-    const anims: IntroAnims = { rise: ms("rise"), idle: ms("idle"), crack: ms("crack"), crumble: ms("crumble"), tableFrame };
-    const frames = {} as Record<PyramidAnim, HTMLCanvasElement[]>;
-    for (const a of ["rise", "idle", "crack", "crumble"] as const) frames[a] = py.anims[a]!.frames.map((_, i) => toCanvas(py, a, i));
+  p = (def.custom && load ? load() : Promise.resolve(null)).then((art) => {
+    let anims: IntroAnims | null = null;
+    let pyramid: LoadedIntro["pyramid"] = null;
+    let storm: StormArt | null = null;
+    if (art) {
+      const py = art.pyramid;
+      const ms = (a: PyramidAnim) => py.anims[a]!.frames.map((f) => f.ms);
+      // (The art's "table" cue: the crumble frame whose middle is clear, the table showing behind the falling sand.)
+      const tableFrame = Math.max(0, py.anims.crumble!.frames.findIndex((f) => f.cue === "table"));
+      anims = { rise: ms("rise"), idle: ms("idle"), crack: ms("crack"), crumble: ms("crumble"), tableFrame };
+      const frames = {} as Record<PyramidAnim, HTMLCanvasElement[]>;
+      for (const a of ["rise", "idle", "crack", "crumble"] as const) frames[a] = py.anims[a]!.frames.map((_, i) => toCanvas(py, a, i));
+      pyramid = { ch: py, frames };
+      const k = CHALLENGE_FEEL.stormScale;
+      const stormFrames = art.storm.anims.idle!.frames;
+      storm = {
+        tiles: stormFrames.map((_, i) => scaled(toCanvas(art.storm, "idle", i), k)),
+        fronts: art.front.anims.idle!.frames.map((_, i) => scaled(toCanvas(art.front, "idle", i), k)),
+        backs: art.front.anims.idle!.frames.map((_, i) => scaled(toCanvas(art.front, "idle", i), k, true)),
+        ms: stormFrames.map((f) => Math.max(16, f.ms)),
+      };
+    }
+    // The table: the boss's own, or the town's park table in its stone (the same geometry: a stool, the leg, a stool).
+    const tch = art?.table ?? PARK_TABLE;
+    const img = toCanvas(tch, "idle", 0);
+    const table = { ch: tch, img, leg: third(img, 1), stool: third(img, 0), palette: art?.palette ?? PARK_TABLE.palette };
     const bossCh = BOSS_ART[home];
     let t = 0;
     const bossIdle = bossCh.anims.idle!.frames;
     const ends = bossIdle.map((f) => (t += Math.max(16, f.ms)));
-    const k = CHALLENGE_FEEL.stormScale;
-    const stormFrames = art.storm.anims.idle!.frames;
-    const storm: StormArt = {
-      tiles: stormFrames.map((_, i) => scaled(toCanvas(art.storm, "idle", i), k)),
-      fronts: art.front.anims.idle!.frames.map((_, i) => scaled(toCanvas(art.front, "idle", i), k)),
-      backs: art.front.anims.idle!.frames.map((_, i) => scaled(toCanvas(art.front, "idle", i), k, true)),
-      ms: stormFrames.map((f) => Math.max(16, f.ms)),
-    };
     // Its God King attack, if its kit has one (every playable boss's does but Timber's, today).
     const kit = bossKit(def.name);
     const ka = kit?.kingAttack ?? null;
@@ -140,8 +168,8 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
       def,
       anims,
       beats: introBeats(anims),
-      pyramid: { ch: py, frames },
-      table: { ch: art.table, img: toCanvas(art.table, "idle", 0), palette: art.palette },
+      pyramid,
+      table,
       boss: { ch: bossCh, frames: bossIdle.map((_, i) => toCanvas(bossCh, "idle", i)), ends, loop: t, squares: TOWN_FEEL.bossSquares * (TOWN_FEEL.bossScale[home] ?? 1) },
       storm,
       attack,
@@ -160,16 +188,19 @@ export function playCue(intro: LoadedIntro, cue: string): void {
 
 // ---- The board on the table (render.ts drawBoard, without its cache, game or clock).
 
-/** White's back rank from the a-file, as you look at it from your mark (the a-file on your left). */
+/** White's back rank from the a-file (the a-file on your left as you sit at it). */
 const BACK_RANK = ["R", "N", "B", "Q", "K", "B", "N", "R"] as const;
 const pieceImgs = new Map<string, HTMLCanvasElement>();
-/** A piece in pixels (TABLE_PIECES, in the town's TABLE_INK: its fill shaded on the right, an outline round it), made once. */
-function pieceImg(kind: string, light: boolean): HTMLCanvasElement {
-  const key = kind + (light ? "l" : "d");
+/**
+ * A piece in pixels (TABLE_PIECES, in the town's TABLE_INK: its fill shaded on the right, an outline round it), made once. `flip`:
+ * its knight turned to face left (the art's faces right).
+ */
+function pieceImg(kind: string, light: boolean, flip: boolean): HTMLCanvasElement {
+  const key = kind + (light ? "l" : "d") + (flip && kind === "N" ? "f" : "");
   let c = pieceImgs.get(key);
   if (c) return c;
   let rows = TABLE_PIECES[kind]!;
-  if (!light && kind === "N") rows = rows.map((r) => [...r].reverse().join(""));
+  if (flip && kind === "N") rows = rows.map((r) => [...r].reverse().join(""));
   const w = rows[0]!.length + 2;
   const h = rows.length + 2;
   c = canvasOf(w, h);
@@ -191,15 +222,29 @@ function pieceImg(kind: string, light: boolean): HTMLCanvasElement {
   return c;
 }
 
+/** The 32 pieces at the start, where they stand on the table for a layout (challenge.ts boardSquare), far (north) ones first. */
+const piecesOf = new Map<IntroLayout, { kind: string; light: boolean; x: number; z: number }[]>();
+function tablePieces(how: IntroLayout) {
+  let out = piecesOf.get(how);
+  if (out) return out;
+  out = [];
+  for (const rank of [0, 1, 6, 7])
+    for (let file = 0; file < 8; file++) out.push({ kind: rank === 0 || rank === 7 ? BACK_RANK[file]! : "P", light: rank < 2, ...boardSquare(how, file, rank) });
+  out.sort((a, b) => b.z - a.z);
+  piecesOf.set(how, out);
+  return out;
+}
+
 const bp = newPt();
 const bq = newPt();
 const grid = Array.from({ length: 81 }, newPt);
 const lift: TableLift = { dz: 0, top: 0, thick: 0, grow: 1 };
 /**
  * The table's top at (dx, dz) through view `v` (as the town's park tables: render.ts drawBoard): the slab's front, its top and its
- * gold far edge, the 8 x 8 squares lying flat, the pieces standing on them, far ones first. `alpha`: how much it shows.
+ * gold far edge, the 8 x 8 squares lying flat, the pieces standing on them, far ones first, turned for the layout (`boardSquare`:
+ * white's nearest you). `alpha`: how much it shows.
  */
-export function paintTable(g: CanvasRenderingContext2D, v: View, dx: number, dz: number, pal: Readonly<Record<string, string>>, alpha = 1): void {
+export function paintTable(g: CanvasRenderingContext2D, v: View, dx: number, dz: number, pal: Readonly<Record<string, string>>, how: IntroLayout, alpha = 1): void {
   const B = TABLE_BOARD;
   if (!proj(v, dx, dz, 0, bp)) return;
   const fx = bp.x;
@@ -237,12 +282,15 @@ export function paintTable(g: CanvasRenderingContext2D, v: View, dx: number, dz:
   quad([[-h, -h, top], [h, -h, top], [h, -h, top - thick], [-h, -h, top - thick]], pal["4"]!);
   quad([[-h, -h, top], [h, -h, top], [h, h, top], [-h, h, top]], pal["2"]!);
   quad([[-h, h, top], [h, h, top], [h, h - 0.03, top], [-h, h - 0.03, top]], pal["1"]!);
-  // The squares: the light in one fill, the dark in another (rank 0, nearest you, has its a-file square dark, as a board does).
+  // The squares: the light in one fill, the dark in another (a1, white's a-file square on its back rank, is dark, as a board's is).
   for (const dark of [false, true]) {
     g.beginPath();
     for (let gi = 0; gi < 8; gi++)
       for (let fi = 0; fi < 8; fi++) {
-        if (((fi + gi) % 2 === 0) !== dark) continue;
+        // (The square's x column `fi` and z row `gi` as a file and rank: across, the ranks run east to west and the files north.)
+        const file = how === "across" ? gi : fi;
+        const rank = how === "across" ? 7 - fi : gi;
+        if (((file + rank) % 2 === 0) !== dark) continue;
         const p0 = grid[gi * 9 + fi]!;
         const p1 = grid[gi * 9 + fi + 1]!;
         const p2 = grid[(gi + 1) * 9 + fi + 1]!;
@@ -256,18 +304,14 @@ export function paintTable(g: CanvasRenderingContext2D, v: View, dx: number, dz:
     g.fillStyle = dark ? pal.D! : pal.L!;
     g.fill();
   }
-  // The pieces, far ranks first: black's (the boss's side), then white's (yours).
+  // The pieces, far ones first (by their row on the table, north to south). Across, the knights face the other side: yours west
+  // (left, toward the boss), its east; facing, black's turned (as the town's tables have them).
   g.imageSmoothingEnabled = false;
-  for (let gi = 7; gi >= 0; gi--) {
-    if (gi > 1 && gi < 6) continue;
-    const light = gi < 2;
-    for (let fi = 0; fi < 8; fi++) {
-      const kind = gi === 0 || gi === 7 ? BACK_RANK[fi]! : "P";
-      if (!proj(v, dx - hb + (fi + 0.5) * sq, z - hb + (gi + 0.5) * sq, top, bq)) continue;
-      const img = pieceImg(kind, light);
-      const ps = bq.k * B.piecePx;
-      g.drawImage(img, bq.x - shift - (img.width * ps) / 2, bq.y - (img.height - 1) * ps, img.width * ps, img.height * ps);
-    }
+  for (const p of tablePieces(how)) {
+    if (!proj(v, dx + p.x * sq, z + p.z * sq, top, bq)) continue;
+    const img = pieceImg(p.kind, p.light, how === "across" ? p.light : !p.light);
+    const ps = bq.k * B.piecePx;
+    g.drawImage(img, bq.x - shift - (img.width * ps) / 2, bq.y - (img.height - 1) * ps, img.width * ps, img.height * ps);
   }
   g.restore();
 }
@@ -285,9 +329,12 @@ export interface Storm {
  * then it holds, covering everything, until `out()`. The canvas takes every tap while it shows. Its phase is on the element
  * (`data-phase`: "in", "covered", "out"; `data-covered="1"` once it has covered the screen) for tests.
  */
+/** The boss's transition: its own (Alfil's sandstorm), or the default (the flash and the wipe). */
+export const startTransition = (intro: LoadedIntro): Storm => (intro.storm ? startStorm(intro) : startWipe(intro));
+
 export function startStorm(intro: LoadedIntro): Storm {
   const F = CHALLENGE_FEEL;
-  const art = intro.storm;
+  const art = intro.storm!;
   const cv = document.createElement("canvas");
   cv.className = "boss-storm";
   cv.setAttribute("aria-hidden", "true");
@@ -373,3 +420,84 @@ export function startStorm(intro: LoadedIntro): Storm {
   };
   return { covered, out };
 }
+
+// ---- The default transition: a flash, then a wipe to black (Pokémon style; Eric, Nov 2: "a default transition").
+
+/**
+ * Starts the default transition: the screen flashes white (`flashes` times over `flashMs`), then black bands wipe across it, every
+ * other one from the other side (`wipeBands` of them, over `wipeMs`), and it holds black while the battle loads; `out()` fades the
+ * black off over `wipeOutMs`. A canvas over the whole page, outside the town's tree, taking every tap (as the storm's). Its phase is
+ * on the element (`data-phase`: "flash", "in", "covered", "out"; `data-covered="1"` once it covers the screen) for tests.
+ */
+export function startWipe(intro: LoadedIntro): Storm {
+  const F = CHALLENGE_FEEL;
+  const cv = document.createElement("canvas");
+  cv.className = "boss-wipe";
+  cv.setAttribute("aria-hidden", "true");
+  cv.dataset.boss = intro.home;
+  cv.style.cssText = "position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:2147483000;touch-action:none;pointer-events:auto";
+  document.body.append(cv);
+  const g = cv.getContext("2d")!;
+  // (The canvas is drawn at one pixel per CSS pixel: flat fills only, nothing to be crisp.)
+  const t0 = performance.now();
+  let outAt = -1;
+  let raf = 0;
+  const setPhase = (ph: string) => {
+    if (cv.dataset.phase !== ph) cv.dataset.phase = ph;
+  };
+  const frame = (now: number) => {
+    const W = innerWidth;
+    const H = innerHeight;
+    if (cv.width !== W || cv.height !== H) {
+      cv.width = W;
+      cv.height = H;
+    }
+    g.clearRect(0, 0, W, H);
+    if (outAt >= 0) {
+      g.globalAlpha = Math.max(0, 1 - (now - outAt) / F.wipeOutMs);
+      g.fillStyle = "#000";
+      g.fillRect(0, 0, W, H);
+      g.globalAlpha = 1;
+    } else {
+      const { flash, wipe } = wipeAt(now - t0);
+      if (flash) {
+        g.fillStyle = "rgba(255,255,255,0.92)";
+        g.fillRect(0, 0, W, H);
+      }
+      if (wipe > 0) {
+        const n = F.wipeBands;
+        const bh = Math.ceil(H / n);
+        const w = Math.ceil(W * wipe);
+        g.fillStyle = "#000";
+        for (let i = 0; i < n; i++) g.fillRect(i % 2 ? W - w : 0, i * bh, w, bh);
+      }
+    }
+    raf = requestAnimationFrame(frame);
+  };
+  raf = requestAnimationFrame(frame);
+  setPhase("flash");
+  playCue(intro, "wipe");
+  // (The phases go by the clock, not by frames: a hidden tab still gets to the battle.)
+  setTimeout(() => setPhase("in"), F.flashMs);
+  let coveredAt = 0;
+  const covered = new Promise<void>((ok) =>
+    setTimeout(() => {
+      coveredAt = performance.now();
+      setPhase("covered");
+      cv.dataset.covered = "1";
+      ok();
+    }, F.flashMs + F.wipeMs),
+  );
+  const out = async () => {
+    await covered;
+    const wait = coveredAt + F.coveredMinMs - performance.now();
+    if (wait > 0) await new Promise((ok) => setTimeout(ok, wait));
+    outAt = performance.now();
+    setPhase("out");
+    await new Promise((ok) => setTimeout(ok, F.wipeOutMs));
+    cancelAnimationFrame(raf);
+    cv.remove();
+  };
+  return { covered, out };
+}
+
