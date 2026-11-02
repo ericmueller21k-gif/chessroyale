@@ -634,7 +634,8 @@ function startRoom(
     g.drawImage(roof, 0, 0, W, H);
     // Outside, past the low front wall: the bright day the door opens onto (a flat pale ground).
     const q = pq as [typeof pt, typeof pt, typeof pt, typeof pt];
-    if (P(-6, n - 0.5, q[0]) && P(n + 5, n - 0.5, q[1]) && P(n + 5, n + 6, q[2]) && P(-6, n + 6, q[3])) {
+    const near = Math.min(n + 6, camY + v.back - 0.6); // (up to just in front of the camera)
+    if (near > n - 0.5 && P(-6, n - 0.5, q[0]) && P(n + 5, n - 0.5, q[1]) && P(n + 5, near, q[2]) && P(-6, near, q[3])) {
       g.fillStyle = "#e6dfcf";
       g.beginPath();
       g.moveTo(q[0].x, q[0].y);
@@ -872,7 +873,11 @@ function startRoom(
   cv.dataset.room = def.home;
   const hookAt = (kind: "keeper" | "door" | "square", sq?: readonly [number, number]) => {
     if (!testSwitchesAllowed()) return null;
-    if (kind === "keeper") return kidBox.on ? { x: (kidBox.x0 + kidBox.x1) / 2, y: kidBox.y0 + (kidBox.y1 - kidBox.y0) * 0.7 } : null;
+    if (kind === "keeper") {
+      const x = (kidBox.x0 + kidBox.x1) / 2;
+      const y = kidBox.y0 + (kidBox.y1 - kidBox.y0) * 0.7;
+      return kidBox.on && x > 0 && x < W && y > 0 && y < H ? { x, y } : null;
+    }
     const s = kind === "door" ? room.doors[0]! : { c: sq![0], r: sq![1] };
     return P(s.c, s.r) && pt.x >= 0 && pt.x <= W && pt.y >= 0 && pt.y <= H ? { x: pt.x, y: pt.y } : null;
   };
