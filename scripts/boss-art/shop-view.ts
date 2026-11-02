@@ -64,6 +64,33 @@ for (const pl of SHOP_BABUR_LAYOUT) {
     continue;
   }
   const wsq = pl.w ?? 1;
+  const dsq = (pl as { d?: number }).d ?? 1;
+  if (dsq > 1) {
+    // A deep piece drawn as a plan (the big pond garden: 5 x 8 squares seen from above): its plan lies flat on its squares,
+    // cut into one tile a square, and the strip above its north row (the tall plants' tops) stands up there.
+    const rise = im.h - dsq * SQ;
+    const crop = (x0: number, y0: number, w: number, h: number, foot: readonly [number, number]) => {
+      const data: number[] = [];
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) data.push(...im.data.slice(((y0 + y) * im.w + x0 + x) * 4, ((y0 + y) * im.w + x0 + x) * 4 + 4));
+      return { w, h, data, foot };
+    };
+    for (let dr = 0; dr < dsq; dr++)
+      for (let dc = 0; dc < wsq; dc++) {
+        const c = pl.col + dc, r = pl.row - dsq + 1 + dr;
+        const cs4 = [P(c - 0.5, r - 0.5), P(c + 0.5, r - 0.5), P(c + 0.5, r + 0.5), P(c - 0.5, r + 0.5)];
+        if (cs4.some((q) => !q)) continue;
+        const key = `${pl.name}#${dc},${dr}`;
+        imgs[key] = crop(dc * SQ, rise + dr * SQ, SQ, SQ, [18, 18]);
+        floor.push({ t: "tile", img: key, rot: 0, q: cs4.flatMap((q) => [q!.x, q!.y]) });
+      }
+    if (rise > 0) {
+      const key = `${pl.name}#rise`;
+      imgs[key] = crop(0, 0, im.w, rise, [Math.floor(im.w / 2), rise - 1]);
+      const p = P(pl.col + (wsq - 1) / 2, pl.row - dsq + 0.5);
+      if (p) up.push({ t: "img", img: key, x: p.x, y: p.y, s: p.k / SQ, flip: false, depth: p.depth });
+    }
+    continue;
+  }
   let fc = pl.col + (wsq - 1) / 2;
   let fr = pl.row;
   let ox = 0, oy = 0;

@@ -78,6 +78,8 @@ const PALETTE: Record<string, string> = {
   "9": "#fff8e2",
   "0": "#ded6c6",
   "@": "#cbc2b1",
+  j: "#e2865a", // a koi under the water: body, head
+  p: "#f0ad82",
 };
 
 const T = 37;
@@ -1012,19 +1014,450 @@ export const SHOP_PUDDLES_FLOWER_BED = (() => {
 })();
 
 /**
- * The pond garden, his animated showpiece, three squares wide and two deep: a small round pond in a ring of stones, seen
- * from above at the town's angle; reeds and cattails behind it, foxgloves and a fern, lily pads with a pink water lily on
- * it, a stepping stone, low flowers along its near rim. `idle` (8 frames): a drop gathers on a reed leaf's tip and falls,
- * ripples spread from where it lands (and from a second spot, out of step), the lily pads bob, the flowers nod.
+ * The pond garden, his animated showpiece and the room's eye-catcher: five squares wide and eight deep, along the east
+ * wall. A long pond seen from above at the town's angle (a big north pool and a smaller south one joined by a narrow
+ * waist), in a ring of stones on a mossy bed; a little arched wooden footbridge across the waist; lily pads, three pink
+ * water lilies and two buds, a frog on a pad, two koi circling each other and a goldfish under the water; reeds and
+ * cattails, foxgloves, ferns, a mossy boulder and clumps of pink and white flowers all round its edge, standing upright.
+ * `idle` (8 frames, 190 ms): a drop gathers on an arching reed leaf, falls and rings out across the water; two more
+ * ripples spread out of step; the pads bob; the flowers and reeds nod; the koi turn round each other (half a turn a loop,
+ * so they swap places); the goldfish circles the other way; the frog blinks and puffs its throat.
  */
-const PGW = 3 * T;
-const PGH = 96;
-const PGF = PGH - 4;
-const PCX = 55; // the pond's middle
-const PCY = PGF - 20;
-const PRX = 42;
-const PRY = 15;
+const PGW = 5 * T;
+const PG_RISE = 60; // how far its picture rises above its north row
+const PGH = PG_RISE + 8 * T;
+const PGF = PG_RISE + 7 * T + 18; // its foot: the middle of its south row
+/** A canvas cropped to what's drawn on it, as a Bit (its part no bigger than its picture); null if it's empty. */
+const cropBit = (c: Cv, outline = true): Bit | null => {
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -1;
+  let y1 = -1;
+  c.forEach((row, y) =>
+    row.forEach((k, x) => {
+      if (k === ".") return;
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
+    }),
+  );
+  if (x1 < 0) return null;
+  return { part: { grid: c.slice(y0, y1 + 1).map((r) => r.slice(x0, x1 + 1).join("")), outline }, at: [x0, y0] };
+};
 export const SHOP_PUDDLES_POND_GARDEN = (() => {
+  const N = 8;
+  const R = PG_RISE;
+  /** A nod: -amp..amp round the loop, `ph` its phase. */
+  const sw = (f: number, ph: number, amp = 1) => Math.round(amp * Math.sin((2 * Math.PI * f) / N + ph));
+  const smooth = (t: number) => {
+    const u = Math.max(0, Math.min(1, t));
+    return u * u * (3 - 2 * u);
+  };
+
+  // ---- The pond's shape: a big north pool and a smaller south one, joined by a narrow waist (under the footbridge).
+  const LOBES = [
+    { cx: 98, cy: R + 92, rx: 66, ry: 58 },
+    { cx: 86, cy: R + 222, rx: 60, ry: 48 },
+  ];
+  const lobeHw = (i: number, y: number) => {
+    const l = LOBES[i]!;
+    const t = (y - l.cy) / l.ry;
+    return Math.abs(t) >= 1 ? 0 : l.rx * Math.sqrt(1 - t * t);
+  };
+  const hwAt = (y: number) => {
+    const waist = y > R + 120 && y < R + 200 ? 19 : 0;
+    return (lobeHw(0, y) ** 4 + lobeHw(1, y) ** 4 + waist ** 4) ** 0.25;
+  };
+  const cxAt = (y: number) => 98 - 12 * smooth((y - R - 130) / 70);
+  const inPond = (x: number, y: number) => {
+    const hw = hwAt(y + 0.5);
+    if (hw <= 0) return false;
+    const d = x + 0.5 - cxAt(y + 0.5);
+    const wob = (vnoise(d < 0 ? 0 : 60, y, 7, 111) - 0.5) * 4 * Math.min(1, hw / 12);
+    return Math.abs(d) < hw + wob;
+  };
+
+  // ---- The footbridge across the waist: its deck's far and near edges (before the arch lifts its middle).
+  const BX0 = 50;
+  const BX1 = 134;
+  const DF = R + 155;
+  const DN = R + 166;
+  const arch = (x: number) => Math.round(5 * Math.sin(Math.PI * Math.max(0, Math.min(1, (x + 0.5 - BX0) / (BX1 - BX0)))));
+
+  // ---- The water, still: the far rim's shade, deep in the middle of each pool, the glass roof's light lying across it.
+  const base: Key[][] = Array.from({ length: PGH }, (_, y) =>
+    Array.from({ length: PGW }, (_, x) => {
+      if (!inPond(x, y)) return null;
+      if (!inPond(x, y - 3) || !inPond(x - 2, y - 2)) return "1";
+      if (x >= BX0 && x <= BX1) {
+        const nb = DN - arch(x);
+        if (y > nb + 3 && y <= nb + 6) return "1"; // the bridge's shadow
+      }
+      const e = Math.min(...LOBES.map((l) => Math.hypot((x + 0.5 - l.cx) / l.rx, (y + 0.5 - l.cy) / l.ry)));
+      const deep = e < 0.5 || (e < 0.6 && (x + y) % 2 === 0);
+      const b = (((y - x * 0.5 - 20) % 70) + 70) % 70;
+      const lit = b < 3 || (b === 4 && x % 2 === 0) || (b > 9 && b < 11);
+      if (lit && grain(x, y, 117) > 0.985) return "4";
+      return lit ? (deep ? "2" : "3") : deep ? "1" : "2";
+    }),
+  );
+
+  // ---- Under the water and on it, per frame.
+  const RIPPLES: [number, number, number][] = [[150, R + 104, 4], [62, R + 128, 0], [102, R + 238, 2]]; // where, and the frame it starts
+  const TIP: Pt = [150, R + 66]; // the reed leaf's tip the drop falls from
+  const TIP_DY = [0, 1, -1, 0, 0, 0, 0, 0]; // it dips under the drop's weight and springs back as it lets go
+  const water = (f: number): Bit => {
+    const c: Cv = base.map((r) => r.map((k) => k ?? "."));
+    const wet = (x: number, y: number) => x >= 0 && y >= 0 && x < PGW && y < PGH && !!base[y]![x];
+    /** A fish on an oval path round (cx, cy), its head at angle `th`, its body trailing along the path; ramp: head, body, tail, patch. */
+    const fish = (cx: number, cy: number, rx: number, ry: number, th: number, dir: number, ramp: string, len = 13) => {
+      const rr = (rx + ry) / 2;
+      for (let s = len; s >= 0; s -= 0.5) {
+        const a = th - (dir * s) / rr;
+        const px = cx + Math.cos(a) * rx;
+        const py = cy + Math.sin(a) * ry;
+        const r = s < 1.5 ? 1.3 : s < 7 ? 1.9 : s < len - 3 ? 1.9 - (s - 7) * 0.4 : 0.7 + (s - (len - 3)) * 0.45;
+        const k = s < 3 ? ramp[0]! : s >= len - 3 ? ramp[2]! : ramp[3] && s > 4.5 && s < 7 ? ramp[3] : ramp[1]!;
+        for (let y = Math.floor(py - r); y <= Math.ceil(py + r); y++)
+          for (let x = Math.floor(px - r); x <= Math.ceil(px + r); x++) if (Math.hypot(x + 0.5 - px, y + 0.5 - py) <= r && wet(x, y)) c[y]![x] = k;
+      }
+    };
+    // Two koi, alike, circling each other: half a turn a loop, so each ends where the other began.
+    const th = (Math.PI * f) / N;
+    fish(92, R + 92, 16, 10, th, 1, "pjci");
+    fish(92, R + 92, 16, 10, th + Math.PI, 1, "pjci");
+    // A goldfish in the south pool, the other way round, a whole turn a loop.
+    fish(80, R + 226, 10, 6, 1 - (2 * Math.PI * f) / N, -1, "MLK", 10);
+    // Ripples: a splash, then rings spreading (a fainter one inside), fading out.
+    for (const [sx, sy, t0] of RIPPLES) {
+      const age = (f - t0 + N) % N;
+      if (age > 4) continue;
+      const r = 1 + age * 3.2;
+      for (let y = Math.floor(sy - r); y <= Math.ceil(sy + r); y++)
+        for (let x = Math.floor(sx - r - 2); x <= Math.ceil(sx + r + 2); x++) {
+          if (!wet(x, y)) continue;
+          const d = Math.hypot(x + 0.5 - sx, (y + 0.5 - sy) * 1.6);
+          const faint = base[y]![x] === "1" ? "2" : "3";
+          if (age === 0 && d < 1.2) c[y]![x] = "4";
+          else if (age > 0 && Math.abs(d - r) < 0.75 && (age < 4 || (x + y) % 2 === 0)) c[y]![x] = age < 3 ? "4" : faint;
+          else if (age >= 2 && Math.abs(d - (r - 4)) < 0.6 && (x + y) % 2 === 0) c[y]![x] = faint;
+        }
+    }
+    return cropBit(c, false)!;
+  };
+
+  // ---- The ring of stones round it: rounded stones lit on top, the near ones showing a face; every other one on a second
+  // part, so each is outlined against its neighbors.
+  const STONES: { x: number; y: number; w: number; h: number; near: boolean }[] = [];
+  const tryStone = (sx: number, sy: number) => {
+    if (inPond(Math.floor(sx), Math.floor(sy))) return;
+    if (STONES.some((s) => Math.hypot(s.x - sx, (s.y - sy) * 1.25) < 7.5)) return;
+    const i = STONES.length;
+    const near = inPond(Math.floor(sx), Math.floor(sy) - 6);
+    STONES.push({ x: sx, y: sy, w: 4 + grain(i, 1, 112) * 1.6, h: (near ? 3.3 : 2.6) + grain(i, 2, 112) * 0.8, near });
+  };
+  for (const l of LOBES)
+    for (let a = 0; a < 360; a += 3) {
+      const dx = Math.cos((a * Math.PI) / 180);
+      const dy = Math.sin((a * Math.PI) / 180);
+      let t = 0;
+      while (t < 120 && inPond(Math.floor(l.cx + dx * t), Math.floor(l.cy + dy * t))) t += 0.5;
+      tryStone(l.cx + dx * (t + 2.5), l.cy + dy * (t + 1.5));
+    }
+  for (let y = R + 136; y <= R + 188; y += 2) {
+    const mx = Math.round(cxAt(y));
+    if (!inPond(mx, y)) continue;
+    let xl = mx;
+    let xr = mx;
+    while (inPond(xl - 1, y)) xl--;
+    while (inPond(xr + 1, y)) xr++;
+    tryStone(xl - 3, y);
+    tryStone(xr + 3, y);
+  }
+  const stoneCv = [cv(PGW, PGH), cv(PGW, PGH)];
+  STONES.forEach((s, i) => {
+    const c = stoneCv[i % 2]!;
+    for (let y = Math.floor(s.y - s.h); y <= Math.ceil(s.y + s.h); y++)
+      for (let x = Math.floor(s.x - s.w); x <= Math.ceil(s.x + s.w); x++) {
+        const X = (x + 0.5 - s.x) / s.w;
+        const Y = (y + 0.5 - s.y) / s.h;
+        if (X * X + Y * Y > 1) continue;
+        const moss = grain(i, 3, 112) > 0.7 && Y < -0.2 && X < 0 && (x + y) % 2 === 0;
+        put(c, x, y, moss ? "G" : Y < -0.35 && X < 0.5 ? "T" : Y > (s.near ? 0.2 : 0.45) || X > 0.75 ? "s" : "S");
+      }
+  });
+  const stoneBits = stoneCv.map((c) => cropBit(c)!);
+
+  // ---- The bed it all sits in: soft moss with earth showing here and there.
+  const bedCv = cv(PGW, PGH);
+  fill(bedCv, (x, y) => {
+    const qx = Math.max(Math.abs(x + 0.5 - PGW / 2) - (PGW / 2 - 3 - 22), 0);
+    const qy = Math.max(Math.abs(y + 0.5 - (R + 148)) - (144 - 22), 0);
+    const d = Math.hypot(qx, qy) - 22 + (vnoise(x, y, 6, 113) - 0.5) * 5;
+    if (d > 0) return null;
+    if (inPond(x, y)) return "1";
+    if (d > -2) return "E";
+    const n = vnoise(x, y, 5, 114);
+    if (n < 0.25) return "E";
+    return n > 0.62 && n < 0.7 ? "G" : "F";
+  });
+  const bedBit = cropBit(bedCv)!;
+
+  // ---- The lily pads (each bobs a pixel in its own time), lilies, buds, the frog.
+  const PADS: [number, number, number, number, number][] = [
+    [58, R + 62, 9, 1, 0], [78, R + 50, 6, -1, 2], [126, R + 110, 10, -1, 4], [138, R + 128, 6, 1, 1], [46, R + 104, 7, 1, 3],
+    [104, R + 136, 6, -1, 5], [120, R + 48, 5, 1, 6], [140, R + 80, 5, -1, 2],
+    [58, R + 244, 10, 1, 1], [108, R + 204, 8, -1, 3], [124, R + 250, 6, 1, 5], [46, R + 200, 5, -1, 0], [88, R + 264, 5, 1, 4],
+  ];
+  const bobOf = (f: number, ph: number) => (Math.sin((2 * Math.PI * f) / N + ph) > 0 ? 1 : 0);
+  const LILY = ["..h...h..", ".hih.hih.", "hgiiLiigh", ".fghLhgf.", "..ffgff.."];
+  const BUD = [".h.", "hig", "fgf", ".G."];
+  const FROG = ["GH...GH.", "wkG.Gwk.", "GGGGGGGF", "FHHGGGHF", ".FGGGGF.", "GF....FG"];
+  const pads = (f: number): Bit[] => {
+    const c = cv(PGW, PGH);
+    const top: Bit[] = [];
+    PADS.forEach(([px, py0, w, notch, ph], i) => {
+      const py = py0 + bobOf(f, ph);
+      const h = w * 0.5;
+      for (let y = Math.floor(py - h); y <= Math.ceil(py + h); y++)
+        for (let x = px - w; x <= px + w; x++) {
+          const X = (x + 0.5 - px) / w;
+          const Y = (y + 0.5 - py) / h;
+          if (X * X + Y * Y > 1) continue;
+          if (X * notch > 0.05 && Math.abs(Y) < Math.abs(X) * 0.5) continue; // its notch
+          put(c, x, y, Y < -0.35 && X < 0.3 ? "H" : Y > 0.45 ? "F" : "G");
+        }
+      const one = cv(PGW, PGH);
+      if (i === 0 || i === 2 || i === 9) stamp(one, px - 4, py - 4, LILY);
+      if (i === 7 || i === 10) stamp(one, px - 1, py - 3, BUD);
+      if (i === 8) {
+        const blink = f === 2;
+        const puff = f === 5 || f === 6;
+        const rows = FROG.map((r) => (blink ? r.replace(/[wk]/g, "G") : r));
+        if (puff) rows[3] = "FHiiiGHF";
+        stamp(one, px - 4, py - 4, rows);
+      }
+      const b = cropBit(one);
+      if (b) top.push(b);
+    });
+    return [cropBit(c)!, ...top];
+  };
+
+  // ---- The plants, upright, each drawn on its own (so each is outlined against what's behind it).
+  const blade = (c: Cv, x: number, foot: number, h: number, lean: number, sway: number) => {
+    for (let s = 0; s < h; s++) {
+      const px = Math.round(x + lean * s + (sway * s * s) / (h * h));
+      put(c, px, foot - s, s > h - 4 ? "H" : "G");
+      if (s < h - 6) put(c, px + 1, foot - s, "F");
+    }
+  };
+  const CATTAIL = [".F.", "766", "765", "765", "765", "765", "665", "655", ".F."];
+  /** A clump of reeds from one foot: [dx, height, lean, cattail?] a blade. */
+  const reeds = (c: Cv, x: number, foot: number, bl: [number, number, number, number][], sway: number) => {
+    for (const [dx, h, lean, cat] of bl) {
+      blade(c, x + dx, foot, h, lean, sway);
+      if (!cat) continue;
+      const s = h - 9;
+      const px = Math.round(x + dx + lean * s + (sway * s * s) / (h * h));
+      stamp(c, px - 1, foot - s - 5, CATTAIL);
+    }
+  };
+  /** A foxglove: a tall stem hung with pink bells (lit on the left, freckled), green buds at its tip, leaves at its foot. */
+  const foxglove = (c: Cv, x: number, foot: number, h: number, sway: number) => {
+    const xs = (s: number) => Math.round(x + (sway * s) / h);
+    for (let s = 0; s < h; s++) put(c, xs(s), foot - s, "F");
+    for (let s = 12; s < h; s++) {
+      const bx = xs(s);
+      const by = foot - s;
+      if (s > h - 5) {
+        put(c, bx, by, s === h - 1 ? "H" : "G");
+        continue;
+      }
+      const half = s > h - 10 ? 1 : s % 3 === 0 ? 2 : 1;
+      for (let dx = -half; dx <= half; dx++) put(c, bx + dx, by, dx < 0 ? "h" : dx > 0 ? (half === 2 && dx === 1 ? "g" : "f") : s % 3 === 0 ? "i" : "g");
+      if (s % 3 === 0 && half === 2) put(c, bx + (s % 6 ? 1 : -1), by + 1, "f"); // a bell's dark mouth
+    }
+    stamp(c, x - 5, foot - 4, ["..GH.HG...", ".GHGGGHGF.", "GGFGFGFGFF", ".FF.F.FF.."]);
+  };
+  /** A low mound of leaves `w` wide, flowers of `keys` (pink and white) dotted on it, every other one nodding. */
+  const clump = (c: Cv, x: number, foot: number, w: number, h: number, keys: string, sway: number, seed: number) => {
+    const x0 = x - Math.floor(w / 2);
+    const topAt = (i: number) => foot - Math.round(h * Math.sin((Math.PI * (i + 0.5)) / w) ** 0.7 + 2 * vnoise(x0 + i, 0, 3, seed));
+    for (let i = 0; i < w; i++)
+      for (let y = topAt(i); y <= foot; y++) {
+        const n = vnoise(x0 + i, y, 2, seed + 1);
+        put(c, x0 + i, y, y < topAt(i) + 2 && n > 0.4 ? "H" : y === foot ? "E" : n > 0.5 ? "G" : "F");
+      }
+    const n = Math.max(1, Math.round(w / 4.5));
+    for (let j = 0; j < n; j++) {
+      const i = Math.round(((j + 0.5) * w) / n);
+      const k = keys[j % keys.length]!;
+      const fx = x0 + i + (j % 2 ? sway : 0);
+      const fy = topAt(Math.min(w - 1, i)) - 1 + (j % 2 ? 3 : 0);
+      stamp(c, fx - 1, fy, [`.${k}.`, `${k}L${k}`, `.${k}.`]);
+    }
+  };
+  /** A fern: fronds arching out from one foot, leaflets either side (lit above). */
+  const fern = (c: Cv, x: number, foot: number, len: number, sway: number) => {
+    for (const [ang, l, droop] of [[-80, 0.8, 0.6], [-50, 1, 0.55], [-20, 1, 0.35], [15, 1, 0.35], [45, 1, 0.55], [78, 0.8, 0.6]] as const) {
+      const a = (ang * Math.PI) / 180;
+      const dx = Math.sin(a);
+      const dy = -Math.cos(a);
+      const L = len * l;
+      let i = 0;
+      for (let t = 0; t <= 1.0001; t += 1 / (L * 1.5), i++) {
+        const px = Math.round(x + dx * L * t + sway * t * t);
+        const py = Math.round(foot - 2 + dy * L * t + droop * L * t * t);
+        put(c, px, py, "G");
+        if (i % 2 || t < 0.1) continue;
+        const n = Math.round(3 * (1 - t) + 1);
+        for (let s = 1; s <= n; s++) {
+          put(c, Math.round(px - dy * s * 0.7), Math.round(py + dx * s * 0.4 - s * 0.3), "H");
+          put(c, Math.round(px + dy * s * 0.7), Math.round(py - dx * s * 0.4 + s * 0.3), "F");
+        }
+      }
+    }
+  };
+  /** A mossy boulder. */
+  const rock = (c: Cv, x: number, foot: number, w: number, h: number) => {
+    for (let y = foot - 2 * h; y <= foot; y++)
+      for (let xx = x - w; xx <= x + w; xx++) {
+        const X = (xx + 0.5 - x) / w;
+        const Y = (y + 0.5 - (foot - h * 0.8)) / h;
+        if (X * X + Y * Y > 1 || y > foot) continue;
+        const moss = Y < -0.45 + vnoise(xx, 0, 3, 118) * 0.3;
+        put(c, xx, y, moss ? (Y < -0.75 && X < 0.2 ? "H" : X > 0.5 ? "F" : "G") : X < -0.4 && Y < 0.3 ? "T" : X > 0.45 || Y > 0.6 ? "s" : "S");
+      }
+  };
+  /** A tuft of grass. */
+  const tuft = (c: Cv, x: number, foot: number, h: number, sway: number) => {
+    for (const [dx, hh, lean] of [[-1, h * 0.7, -0.35], [0, h, sway * 0.12], [1, h * 0.8, 0.4]] as const)
+      for (let s = 0; s < hh; s++) put(c, Math.round(x + dx + lean * s), foot - s, s > hh - 3 ? "H" : dx < 0 ? "F" : "G");
+  };
+  /** The long reed leaf arching out over the north pool: the drop gathers at its tip. */
+  const leaf = (c: Cv, f: number) => {
+    const P0: Pt = [175, R + 72];
+    const P1: Pt = [164, R + 30];
+    const P2: Pt = [TIP[0], TIP[1] + TIP_DY[f]!];
+    for (let t = 0; t <= 1.0001; t += 0.01) {
+      const px = Math.round((1 - t) ** 2 * P0[0] + 2 * t * (1 - t) * P1[0] + t * t * P2[0]);
+      const py = Math.round((1 - t) ** 2 * P0[1] + 2 * t * (1 - t) * P1[1] + t * t * P2[1]);
+      put(c, px, py, t > 0.85 ? "H" : "G");
+      if (t < 0.8) put(c, px, py + 1, "F");
+    }
+  };
+
+  // ---- The footbridge: the far rail, the deck of planks across, the near rail, each its own part.
+  const POSTS = [BX0 + 2, 72, 92, 112, BX1 - 3];
+  const bridgeBits = (() => {
+    const far = cv(PGW, PGH);
+    const deck = cv(PGW, PGH);
+    const near = cv(PGW, PGH);
+    for (let x = BX0; x <= BX1; x++) {
+      const a = arch(x);
+      for (let y = DF - a; y <= DN - a; y++) {
+        const p = (x - BX0) % 5;
+        put(deck, x, y, p === 4 ? "N" : p === 0 ? "Q" : y === DN - a ? "O" : "P");
+      }
+      for (let j = 1; j <= 3; j++) put(deck, x, DN - a + j, j === 1 ? "O" : "N"); // its edge
+      if (x > BX0 + 1 && x < BX1 - 1) {
+        put(far, x, DF - a - 8, "Q");
+        put(far, x, DF - a - 7, "O");
+        put(near, x, DN - a - 9, "Q");
+        put(near, x, DN - a - 8, "O");
+      }
+    }
+    for (const px of POSTS) {
+      const a = arch(px);
+      for (let y = DF - a - 8; y <= DF - a; y++) for (let i = 0; i < 2; i++) put(far, px + i, y, i ? "O" : "P");
+      for (let y = DN - a - 9; y <= DN - a + 3; y++) for (let i = 0; i < 2; i++) put(near, px + i, y, y === DN - a - 9 ? "Q" : i ? "O" : "P");
+    }
+    return [cropBit(far)!, cropBit(deck)!, cropBit(near)!];
+  })();
+
+  type Up = { foot: number; make: (f: number) => Bit[] };
+  const UPS: Up[] = [];
+  const up = (foot: number, draw: (c: Cv, f: number) => void) =>
+    UPS.push({
+      foot,
+      make: (f) => {
+        const c = cv(PGW, PGH);
+        draw(c, f);
+        const b = cropBit(c);
+        return b ? [b] : [];
+      },
+    });
+  // Along the north rim, behind the water: reeds, a fern, foxgloves, flowers, more reeds and foxgloves.
+  up(R + 42, (c, f) => reeds(c, 22, R + 42, [[-6, 26, -0.15, 0], [-3, 38, -0.08, 1], [0, 46, 0, 0], [3, 40, 0.06, 1], [6, 30, 0.14, 0]], sw(f, 0)));
+  up(R + 30, (c, f) => fern(c, 46, R + 30, 14, sw(f, 1)));
+  up(R + 24, (c, f) => foxglove(c, 66, R + 24, 48, sw(f, 2)));
+  up(R + 27, (c, f) => foxglove(c, 79, R + 27, 58, sw(f, 2.7)));
+  up(R + 24, (c, f) => clump(c, 104, R + 24, 26, 10, "hwg", sw(f, 3), 120));
+  up(R + 30, (c, f) => reeds(c, 132, R + 30, [[-5, 30, -0.12, 0], [-2, 44, -0.05, 1], [1, 50, 0.02, 0], [4, 38, 0.1, 1], [7, 26, 0.18, 0]], sw(f, 4)));
+  up(R + 36, (c, f) => foxglove(c, 154, R + 36, 46, sw(f, 4.6)));
+  up(R + 44, (c, f) => foxglove(c, 170, R + 44, 56, sw(f, 5.2)));
+  // The east strip, against the wall: reeds (one leaf arching over the water), flowers, more reeds.
+  up(R + 76, (c, f) => {
+    reeds(c, 176, R + 76, [[-3, 32, -0.06, 0], [0, 44, -0.02, 1], [3, 36, 0.05, 0]], sw(f, 5.8));
+    leaf(c, f);
+  });
+  up(R + 112, (c, f) => clump(c, 176, R + 112, 12, 7, "wh", sw(f, 0.5), 121));
+  up(R + 142, (c, f) => reeds(c, 176, R + 142, [[-3, 34, -0.05, 1], [0, 42, 0, 0], [3, 30, 0.08, 0]], sw(f, 1.2)));
+  // The east bank by the bridge: foxgloves, a mossy boulder, a fern.
+  up(R + 156, (c, f) => foxglove(c, 152, R + 156, 46, sw(f, 1.8)));
+  up(R + 162, (c, f) => foxglove(c, 166, R + 162, 54, sw(f, 2.4)));
+  up(R + 184, (c) => rock(c, 147, R + 184, 11, 8));
+  up(R + 190, (c, f) => fern(c, 172, R + 190, 12, sw(f, 3.1)));
+  // The south pool's east side.
+  up(R + 228, (c, f) => reeds(c, 166, R + 228, [[-5, 28, -0.12, 0], [-2, 40, -0.04, 1], [1, 46, 0.02, 0], [4, 36, 0.09, 1], [7, 24, 0.16, 0]], sw(f, 3.7)));
+  up(R + 254, (c, f) => clump(c, 164, R + 254, 18, 8, "hgh", sw(f, 4.3), 122));
+  up(R + 272, (c, f) => tuft(c, 176, R + 272, 9, sw(f, 5)));
+  // The west side, toward the circle: lower, flowers and a foxglove.
+  up(R + 76, (c, f) => clump(c, 15, R + 76, 20, 9, "hw", sw(f, 5.6), 123));
+  up(R + 96, (c, f) => tuft(c, 24, R + 96, 9, sw(f, 0.3)));
+  up(R + 122, (c, f) => foxglove(c, 14, R + 122, 42, sw(f, 0.9)));
+  up(R + 146, (c, f) => clump(c, 16, R + 146, 18, 8, "wh", sw(f, 1.5), 124));
+  up(R + 164, (c, f) => clump(c, 32, R + 164, 22, 9, "hgw", sw(f, 2.1), 125));
+  up(R + 176, (c, f) => tuft(c, 12, R + 176, 8, sw(f, 2.6)));
+  up(R + 200, (c, f) => fern(c, 20, R + 200, 11, sw(f, 3.2)));
+  up(R + 232, (c, f) => clump(c, 12, R + 232, 14, 7, "h", sw(f, 3.8), 126));
+  up(R + 266, (c, f) => reeds(c, 12, R + 266, [[-2, 24, -0.1, 0], [1, 30, 0, 1], [4, 22, 0.1, 0]], sw(f, 4.4)));
+  // Along the near (south) rim: low flowers, so the water shows over them.
+  up(R + 288, (c, f) => clump(c, 38, R + 288, 26, 7, "hwh", sw(f, 5), 127));
+  up(R + 290, (c, f) => clump(c, 86, R + 290, 22, 6, "gwh", sw(f, 5.5), 128));
+  up(R + 288, (c, f) => clump(c, 134, R + 288, 24, 7, "whh", sw(f, 0.2), 129));
+  up(R + 286, (c, f) => tuft(c, 14, R + 286, 8, sw(f, 0.8)));
+  UPS.push({ foot: DN, make: () => bridgeBits });
+  UPS.sort((a, b) => a.foot - b.foot);
+
+  // ---- The drop: it gathers on the leaf's tip (0-1), falls (2-3), lands (4: the ripple there starts).
+  const LAND_Y = RIPPLES[0]![1];
+  const drop = (f: number): Bit[] => {
+    const c = cv(PGW, PGH);
+    const [tx, ty] = TIP;
+    if (f === 0) stamp(c, tx, ty + 2, ["3"]);
+    if (f === 1) stamp(c, tx, ty + 3, ["4", "3"]);
+    if (f === 2) stamp(c, tx, ty + 14, ["4", "3"]);
+    if (f === 3) stamp(c, tx, ty + 28, ["3", "4", "3"]);
+    if (f === 4) stamp(c, tx - 2, LAND_Y - 4, ["4...4", ".4.4.", "..4.."]);
+    const b = cropBit(c, false);
+    return b ? [b] : [];
+  };
+
+  const frames = Array.from({ length: N }, (_, f) => [bedBit, water(f), ...pads(f), ...stoneBits, ...UPS.flatMap((u) => u.make(f)), ...drop(f)]);
+  return def("pond-garden", [5, 8], PGW, PGH, [Math.floor(PGW / 2), PGF], frames, 190);
+})();
+
+/** (The pond garden of the first pass, 3 x 2 squares, kept out of the room: see SHOP_PUDDLES_POND_GARDEN.) */
+const OLD_POND = () => {
+  const PGW = 3 * T;
+  const PGH = 96;
+  const PGF = PGH - 4;
+  const PCX = 55;
+  const PCY = PGF - 20;
+  const PRX = 42;
+  const PRY = 15;
   const N = 8;
   const RIPPLES: [number, number, number][] = [[46, PCY - 3, 3], [72, PCY + 4, 7]]; // where, and the frame it starts
   const TIP: Pt = [46, PCY - 30]; // the reed leaf's tip the drop falls from
@@ -1188,8 +1621,9 @@ export const SHOP_PUDDLES_POND_GARDEN = (() => {
     front(f),
     drop(f),
   ]);
-  return def("pond-garden", [3, 2], PGW, PGH, [PCX, PGF], frames, 190);
-})();
+  return { w: PGW, h: PGH, foot: [PCX, PGF] as Pt, frames };
+};
+void OLD_POND;
 
 /** A green wheelbarrow of seedlings in little pots, its wheel to the front left, its handles to the right. */
 const WBW = 48;
@@ -1240,7 +1674,7 @@ export interface ShopPlace {
   flip?: boolean;
   /** Squares wide, for the wide pieces, from `col` east. */
   w?: number;
-  /** Squares deep, for the deep pieces (the pond garden: 2), from `row` north: it stands on `row`, and covers the rows north of it too. */
+  /** Squares deep, for the deep pieces (the pond garden: 8), from `row` north: it stands on `row`, and covers the rows north of it too. */
   d?: number;
   /** The way out (the entrance): walking into it leaves the greenhouse. */
   exit?: boolean;
@@ -1313,9 +1747,9 @@ at("potting-bench", 2, 3, true);
 at("counter", 8, 3, true);
 at("crate", 8, 3, false); // on the counter (see SHOP_PUDDLES_CRATE_AT): its place is the counter's
 at("palm", 16, 3, true);
-at("hose-reel", 17, 6, true);
 at("fountain", 3, 9, true);
-at("pond-garden", 15, 10, true);
+at("pond-garden", 14, 13, true); // columns 14-18, rows 6-13 (its picture rises over row 5)
+at("hose-reel", 17, 17, true);
 at("flower-bed", 2, 14, true);
 at("wheelbarrow", 16, 15, true);
 
@@ -1412,23 +1846,29 @@ for (const p of Object.values(PIECES)) {
   anims["review-circle"] = { loop: true, frames: [{ ms: 1000, layers: [{ part: "review-circle", x: 0, y: 4 }] }] };
 }
 
-/** (For review: the pond garden's 8 frames at 3x, two across, cropped to the pond.) */
+/** (For review: the pond garden's 8 frames at 1x, four across and two down: render it at scale 2.) */
 {
   const p = PIECES["pond-garden"]!;
   const ch = toChar(p);
   const keys = ch.anims.idle!.frames.map((fr) => frameKeys(ch, fr));
-  const [cx0, cy0, cw, chh, Z] = [6, 24, 100, 70, 3];
-  const grid = Array.from({ length: 4 * (chh * Z + 4) }, (_, y) =>
-    Array.from({ length: 2 * (cw * Z + 4) }, (_, x) => {
-      const f = Math.floor(y / (chh * Z + 4)) * 2 + Math.floor(x / (cw * Z + 4));
-      const lx = Math.floor((x % (cw * Z + 4)) / Z);
-      const ly = Math.floor((y % (chh * Z + 4)) / Z);
-      if (lx >= cw || ly >= chh) return ".";
-      return keys[f]![cy0 + ly]![cx0 + lx] ?? ".";
+  const [cw, chh] = [p.w, p.h + 4];
+  const grid = Array.from({ length: 2 * chh }, (_, y) =>
+    Array.from({ length: 4 * cw }, (_, x) => {
+      const f = Math.floor(y / chh) * 4 + Math.floor(x / cw);
+      return keys[f]![y % chh]?.[x % cw] ?? ".";
     }).join(""),
   );
   roomParts["review-pond"] = { grid, outline: false };
-  anims["review-pond"] = { loop: true, frames: [{ ms: 1000, layers: [{ part: "review-pond", x: 4, y: 4 }] }] };
+  anims["review-pond"] = { loop: true, frames: [{ ms: 1000, layers: [{ part: "review-pond", x: 0, y: 4 }] }] };
+  // (And each frame at 3x, cropped to the pond: x 18-172, y 40-336.)
+  anims["review-pond-zoom"] = {
+    loop: true,
+    frames: keys.map((k, f) => {
+      const n = `review-pond-zoom-${f}`;
+      roomParts[n] = { grid: Array.from({ length: 296 * 3 }, (_, y) => Array.from({ length: 154 * 3 }, (_, x) => k[40 + Math.floor(y / 3)]?.[18 + Math.floor(x / 3)] ?? ".").join("")), outline: false };
+      return { ms: p.ms, layers: [{ part: n, x: 4, y: 4 }] };
+    }),
+  };
   // The small props side by side, blown up 4x.
   const props = ["crate", "hose-reel", "fountain", "wheelbarrow", "flower-bed", "potting-bench"];
   let x = 4;

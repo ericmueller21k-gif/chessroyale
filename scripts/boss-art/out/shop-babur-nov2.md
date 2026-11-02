@@ -12,8 +12,12 @@ was drawn for it.
 - **First try: $1.14**, with no drawing. It tried to write the whole file in one turn and ran past the 48,000-token limit
   for a turn (`house-shop-babur/summary-try1.md`).
 - **Second try: $3.37** over 27 turns and 19 renders, and it finished. For this try the limit for a turn was raised to
-  96,000 tokens, and the brief told it to build the file in steps (`house-shop-babur/summary.md`).
-- **Total: $4.51** of the $10 cap.
+  96,000 tokens, and the brief told it to build the file in steps (`house-shop-babur/summary-try2.md`).
+- **Total for the room: $4.51** of the $10 cap.
+- **The burning hoops, first pass: $1.28** (Eric, Nov 2: every home gets an animated piece), in
+  `house-shop-babur/summary-hoops1.md`.
+- **The bigger hoops, second pass: $1.37** (Eric, Nov 2: "the rings… much bigger"), in `house-shop-babur/summary.md`.
+- **All in: $7.16.**
 
 ## The room: 20 x 20 squares (37 px a square)
 ![The room laid out](house-shop-babur/room.png)
@@ -22,8 +26,9 @@ was drawn for it.
 wall rising above row 0. The camera looks north and you come in at the bottom.
 - **Back wall:** a little stage behind the counter, with drapes and a balloon-knight medallion.
 - **Counter:** at row 3, with the crate on it. Stripes stands behind it on row 2.
-- **Props:** the balloon cart is top left and the cold hoop top right. The juggling-pin rack is on the right, and the
-  balloon chess stack and the costume trunk are lower left and lower right.
+- **Props:** the balloon cart is top left and the cold hoop below it on the left. Three big burning hoops are staggered
+  down the east side. The balloon chess stack is lower left, and the costume trunk and the juggling-pin rack are lower
+  right, near the front.
 - **Ring:** an octagon with the balloon king on its pedestal in the middle.
 - **Front:** a low striped hem with the entrance flap at columns 9-10. That's the way out.
 - **Walking:** there's a clear way at least 2 squares wide from the door to the counter, and the ring is walkable.
@@ -49,11 +54,12 @@ wall rising above row 0. The camera looks north and you come in at the bottom.
 | `counter` | 148 x 58; 4 x 1.5 | A red ticket-booth counter with unlit bulbs and gold stars. Its blank plaque is `SHOP_BABUR_COUNTER_SIGN`. |
 | `crate` | 30 x 27; about 1 x 1 | **Babur's Boss Crate**: red bands, gold corners and a bow of balloons. It sits at `SHOP_BABUR_CRATE_AT` = (112, 13) in counter pixels. Idle: a glint moves round its corners (4 x 450 ms). |
 | `balloon-stand` | 74 x 96; 2 x 2.6 | The balloon-twisting cart, with a pump and limp balloons. Idle: its balloons bob 1 px, out of step (4 x 300 ms). |
-| `hoop-stand` | 37 x 86; 1 x 2.3 | A **cold** gold hoop with a blue ribbon. No fire. |
+| `hoop-stand` | 37 x 86; 1 x 2.3 | A **cold** gold hoop with a blue ribbon. No fire. At (3, 7). |
+| `fire-hoop-a`, `-b`, `-c` | 119 x 152; 3 x 1 each | **The showpiece:** three burning hoops, each a 71 px steel ring (it was 29 px) on a steel stand with a gold collar. The ring's bottom is a square above the floor. Idle: 8 frames at 110 ms of flickering flames and rising sparks. The three use one drawing with their frames shifted by 0, 3 and 5, so they never pulse together. At (15-17, 5), (16-18, 9) and (15-17, 13). Lights: `SHOP_BABUR_HOOP_LIGHTS` and `SHOP_BABUR_HOOP_POOLS`, one per hoop, each with a `piece` field naming its hoop. Its coordinates are in that hoop's own pixels. |
 | `balloon-stack` | 37 x 60; 1 x 1.6 | A balloon rook, pawn, knight and bishop on a low crate. |
 | `pedestal` | 37 x 72; 1 x 2 | A red and gold drum with a big blue balloon king on it. |
-| `trunk` | 37 x 44; 1 x 1.2 | Extra. A costume trunk with a top hat and a striped scarf. |
-| `pin-rack` | 37 x 46; 1 x 1.2 | Extra. Juggling pins on a rack. |
+| `trunk` | 37 x 44; 1 x 1.2 | Extra. A costume trunk with a top hat and a striped scarf. Now at (17, 16). |
+| `pin-rack` | 37 x 46; 1 x 1.2 | Extra. Juggling pins on a rack. Now at (15, 17). |
 
 ## For the code helper
 - **Feet:** the art puts a wide piece's foot at the middle of its width, on the middle of its row. If the game measures
@@ -80,3 +86,9 @@ mockup script, not the art. Stripes stands beside the counter's east end: behind
 
 **Zoom, settled (Eric, Nov 2):** inside buildings you start in the Close view, and the town's zoom buttons zoom out to the
 town's view. Shops render as in the Close stills: that art quality is enough, so there's no redraw.
+
+**The burning hoops, close (Nov 2, second pass):** [view-close-fire-hoops.gif](house-shop-babur/view-close-fire-hoops.gif),
+from (14, 17.5) looking north. The camera always looks north, so the near hoop partly covers the two behind it. The
+whole room from above shows all three: [room.png](house-shop-babur/room.png).
+- **Renamed exports:** `SHOP_BABUR_FIRE_HOOPS` is now `SHOP_BABUR_FIRE_HOOP_A`, `_B` and `_C`. Nothing imports the old
+  name yet.

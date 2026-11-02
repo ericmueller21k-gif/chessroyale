@@ -14,7 +14,9 @@ is Drizzle's existing sprite.
 - It stopped one step short of calling done: a render of all 8 frames of a whole-room view came out wider than the API
   accepts in a many-image request (3,000 px). Every piece was already drawn, and the file typechecks. The renderer now
   shows only the frames that fit (`scripts/boss-art/render.ts`), so this won't stop a run again.
-- **Shops so far: Babur $5.79 (with the fire hoops), Puddles $3.80.**
+- **The bigger pond (second pass, Nov 2): $2.37** (`house-shop-puddles/summary.md`). The runner was killed for lack of
+  memory with the redraw already in place.
+- **Shops so far: Babur $7.16 (with both hoop passes), Puddles $6.17.**
 
 ## The room: 20 x 20 squares (37 px a square)
 ![The room laid out](house-shop-puddles/room.png)
@@ -24,8 +26,8 @@ is Drizzle's existing sprite.
 - **Counter:** row 3, a green plank potting counter with the crate on it. Drizzle stands behind it.
 - **Battle circle:** an octagon of pale flagstones at columns 6-13, rows 7-14, with a flowered hedge edge. A sprout emblem
   sits in the middle on a line across the circle, with a leaf start mark north and south.
-- **Props:** the potting bench is top left and the palm top right. The hose reel is on the right, the fountain on the left,
-  the pond garden east of the circle, the flower bed lower left and the wheelbarrow lower right.
+- **Props:** the potting bench is top left and the palm top right. The fountain is on the left, the flower bed lower left,
+  and the wheelbarrow and hose reel lower right. The big pond garden runs down the east side, columns 14-18, rows 6-13.
 - **Front:** a low glass wall with open glass doors at columns 9-10, the way out.
 
 ## The pieces (width x height in px)
@@ -49,13 +51,25 @@ is Drizzle's existing sprite.
 | `fountain` | 44 x 72 | Idle: running water (4 frames). |
 | `hose-reel` | 44 x 52 | His green hose and a brass nozzle. |
 | `flower-bed` | 74 x 42 | Pink flowers in a raised wooden bed. |
-| **`pond-garden`** | 111 x 96 (3 x 2 squares) | **The showpiece.** Lily pads, a pink water lily, cattails and pink foxgloves in a ring of stones. Idle: 8 frames at 190 ms. |
+| **`pond-garden`** | 185 x 356 (5 x 8 squares) | **The showpiece**, redrawn bigger (Eric, Nov 2: "like 3x the size"). Two pools in rings of stones joined by a wooden footbridge, with koi, lily pads, pink water lilies, a frog, cattails, reeds and pink foxgloves. Idle: 8 frames at 190 ms: ripples, bobbing pads, swimming koi. It was 111 x 96 (3 x 2). |
 | `wheelbarrow` | 48 x 46 | Extra: a barrow of seedlings. |
 
 ## Inside, through the town's camera (mockup, Close zoom: the default inside)
 - At the counter, with Drizzle: [view-close-at-counter.png](house-shop-puddles/view-close-at-counter.png)
 - Standing in the battle circle: [view-close-in-circle.png](house-shop-puddles/view-close-in-circle.png)
 - The pond garden, animated: [view-close-pond.gif](house-shop-puddles/view-close-pond.gif)
+
+## The bigger pond (Nov 2, second pass)
+- **Size:** 9 x 6 squares can't fit beside the battle circle: the east side is only 5 squares wide, and the circle stays
+  in the middle. So it's a long pond, 5 squares wide and 8 deep (columns 14-18, rows 6-13). That's 40 squares against the
+  old 6, about 6.7 times the area.
+- **Moves:** the hose reel moved to (17, 17). The wheelbarrow stays at (16, 15), just south of the pond. The circle, the
+  counter and the path from the door are unchanged.
+- **Drawn flat:** the pond is drawn as a plan seen from above, and the layout gives its depth (`d: 8`). The mockup lays it
+  flat on its 40 squares, with the plants' tops above its north row standing up. Standing the whole picture upright, as
+  for the other props, would make it a wall 9 squares high. The code helper must lay it flat too. The catch is that its
+  reeds and foxgloves lie flat with the water. If Eric wants them to stand up, a later pass can split the tall plants
+  into upright pieces placed round it.
 - Zoomed out (the town's view), in the circle: [view-inside-circle.png](house-shop-puddles/view-inside-circle.png)
 
 The glass roof above the walls is drawn by the mockup script, not by the art.
@@ -63,4 +77,4 @@ The glass roof above the walls is drawn by the mockup script, not by the art.
 
 ## Calls Eric may want to change
 - The counter is 44 px tall, not 32. Drizzle still shows over it (see the counter view).
-- The hose reel stands half behind the pond's foxgloves when seen from the south.
+- The pond's tall plants lie flat with it (see above).

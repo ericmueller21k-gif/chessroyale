@@ -884,113 +884,154 @@ export const SHOP_BABUR_PIN_RACK = (() => {
 // ==== The room's showpiece (Eric, Nov 2): three burning hoops on stands, the ones Babur throws in his ultimate.
 
 /**
- * `fire-hoops` (3 x 1 squares): three steel hoops about 30 px across, upright facing you, each on a short steel post with a
- * gold collar and a small round foot, tongues of fire licking up and outward all round it (the tiger's hoop: wrapped steel
- * lit from the top left, fire white-hot at the ring to dark red at the tips). `idle`: only the flames move (8 x 110 ms,
- * looping): each tongue swells and sinks on a whole number of cycles a loop and a wave runs up it, each hoop on its own
- * phases so the three never pulse together; a spark rises off one now and then. The picture is 5 px wider each side than
- * its three squares, so the side flames have room.
+ * `fire-hoop-a`, `-b`, `-c` (3 x 1 squares each, Nov 2, third pass: about 2.5 times the first): the same big steel hoop,
+ * 71 px across, upright facing you, its bottom a square above the floor on a tall steel post with a gold collar gripping the
+ * ring and a round steel base, layered tongues of fire licking up and outward all round it (the tiger's hoop: wrapped steel
+ * lit from the top left; the fire white-hot at the ring, then yellow, orange, red, dark red at the tips). `idle`: only the
+ * flames move (8 x 110 ms, looping): each tongue swells and sinks on a whole number of cycles a loop and a lick runs up it;
+ * sparks rise off it now and then. The three pieces are one drawing with their frames shifted (0, 3, 5 frames), so they
+ * never burn in step. The picture is 4 px wider each side than its three squares.
  */
-const FHM = 5; // the margin each side
+const FHM = 4; // the margin each side
 const FHW = 3 * T + 2 * FHM;
-const FHH = 84;
+const FHH = 152;
 const FHF = FHH - 3;
-const FH_CY = 31; // the rings' middle
-const FH_R = 14; // their outer radius (29 across), the steel 3 thick
-const FH_IN = FH_R - 3;
-const FH_X = [FHM + 18, FHM + 18 + T, FHM + 18 + 2 * T] as const;
+const FH_R = 35; // the ring's outer radius (71 across), the steel 5 thick
+const FH_IN = FH_R - 5;
+const FH_CY = FHF - T - FH_R; // its middle: its bottom a square above the floor
+const FH_CX = FHM + Math.floor((3 * T) / 2);
 const FH_N = 8; // frames
 const HEAT = "ilmnR"; // dark red to white-hot
-function hoopFire(cx: number, f: number, h: number): Bit {
-  const x0 = cx - 24;
-  const c = cv(49, FH_CY + FH_R + 2);
+/** The steel ring and its fire at frame `f` (one canvas, the whole piece wide, outlined as one). */
+function hoopFire(f: number): Bit {
+  const cx = FH_CX;
   const cy = FH_CY;
+  const c = cv(FHW, cy + FH_R + 3);
   const t = f / FH_N;
-  // The steel: a ring lit from the top left, wrapped with dark bands (the old act's tape), its inner edge in its own shade.
+  // The steel: a round tube lit from the top left (bright on its upper left, its inner face lit on the hole's lower right),
+  // wrapped with slanted dark tape.
   for (let y = 0; y < c.length; y++)
-    for (let x = 0; x < 49; x++) {
-      const [X, Y] = [x + x0 - cx, y - cy];
+    for (let x = 0; x < FHW; x++) {
+      const [X, Y] = [x - cx, y - cy];
       const d = Math.hypot(X, Y);
-      if (d > FH_R + 0.2 || d < FH_IN + 0.2) continue;
+      if (d > FH_R + 0.3 || d < FH_IN + 0.3) continue;
       const ang = Math.atan2(Y, X);
-      const wrap = Math.floor(((ang + Math.PI) / (2 * Math.PI)) * 36) % 4 === 0;
+      const s = (d - FH_IN - 0.3) / (FH_R - FH_IN); // 0 its inner edge, 1 its outer
       const lit = (-X - Y) / (d * Math.SQRT2);
-      put(c, x, y, wrap ? "%" : d < FH_IN + 1.2 ? (lit < -0.2 ? "&" : "%") : lit > 0.3 ? "=" : lit < -0.45 ? "%" : "&");
+      const b = 0.42 + 0.4 * lit * (2 * s - 1) + 0.28 * (1 - Math.abs(2 * s - 1)) + 0.12 * lit;
+      const wrap = Math.floor(((ang + Math.PI) / (2 * Math.PI)) * 84 + s * 2.2) % 6 === 0;
+      const k = b > 0.68 ? "=" : b > 0.36 ? "&" : "%";
+      put(c, x, y, wrap ? (k === "=" ? "&" : "%") : k);
     }
-  // The fire: tongues off the outer edge, each leaning out and up, longest over the top, short along the bottom (none where
-  // the collar grips it); each swells and sinks on whole cycles of the loop, and a wave runs up it (a lick).
-  const g = (i: number, s: number) => grain(i, h, s);
-  const n = 24;
-  for (let i = 0; i < n; i++) {
-    const a = ((i + 0.6 * g(i, 31)) / n) * Math.PI * 2;
-    const [ox, oy] = [Math.cos(a), Math.sin(a)];
-    if (oy > 0.88) continue;
-    const [bx, by] = [cx + ox * (FH_R + 0.4), cy + oy * (FH_R + 0.4)];
-    let [dx, dy] = [ox * 0.55 + Math.sign(ox) * Math.max(0, oy) * 0.6, -1 + Math.min(0, oy) * 0.3];
-    const dl = Math.hypot(dx, dy);
-    [dx, dy] = [dx / dl, dy / dl];
-    const k = 1 + (i % 2);
-    const len = (8 - 3.5 * Math.min(0, oy) - 4.5 * Math.max(0, oy)) * (0.65 + 0.35 * g(i, 32)) * (0.72 + 0.28 * Math.sin(2 * Math.PI * (t * k + g(i, 33))));
-    const width = Math.min(2.5, 1.2 + len * 0.17);
-    for (let y = Math.floor(by - len - 3); y <= by + 3; y++)
-      for (let x = Math.floor(bx - len - 3); x <= bx + len + 3; x++) {
-        const lx = x - x0;
-        if (y < 0 || y >= c.length || lx < 0 || lx >= 49) continue;
-        const [X, Y] = [x - cx, y - cy];
-        if (Math.hypot(X, Y) < FH_R + 0.3) continue; // never on the steel, never in the hole
-        const [px, py] = [x - bx, y - by];
-        const al = px * dx + py * dy;
-        if (al < -0.6 || al > len) continue;
-        const across = Math.abs(-px * dy + py * dx + Math.sin(al * 0.8 - 2 * Math.PI * 2 * t + i) * 0.6);
-        const fr = Math.max(0, al) / len;
-        if (across > width * (1 - fr * 0.82)) continue;
-        const key = fr < 0.22 && across < 0.9 ? "R" : fr < 0.45 ? "n" : fr < 0.72 ? "m" : fr < 0.9 ? "l" : "i";
-        const old = c[y]![lx]!;
-        if (HEAT.indexOf(key) > HEAT.indexOf(old)) put(c, lx, y, key); // the hotter wins where tongues overlap
-      }
-  }
-  return { part: asPart(c, true), at: [x0, 0] };
+  // The fire: two layers of tongues off the outer edge, big ones and short hot ones between them, each leaning out and up,
+  // longest over the top, short along the bottom (none where the collar grips it).
+  const g = (i: number, sd: number) => grain(i, 0, sd);
+  const LAYERS = [
+    { n: 28, k: 1, hot: 0, sd: 31, off: 0 },
+    { n: 28, k: 0.55, hot: 0.22, sd: 41, off: 0.5 },
+  ];
+  for (const L of LAYERS)
+    for (let i = 0; i < L.n; i++) {
+      const a = ((i + L.off + 0.5 * g(i, L.sd)) / L.n) * Math.PI * 2;
+      const [ox, oy] = [Math.cos(a), Math.sin(a)];
+      if (oy > 0.86) continue;
+      const [bx, by] = [cx + ox * (FH_R + 0.5), cy + oy * (FH_R + 0.5)];
+      let [dx, dy] = [ox * 0.6 + Math.sign(ox) * Math.max(0, oy) * 1.2, -1 + Math.min(0, oy) * 0.3];
+      const dl = Math.hypot(dx, dy);
+      [dx, dy] = [dx / dl, dy / dl];
+      const cyc = 1 + ((i + (L.off ? 1 : 0)) % 2);
+      const len = (20 - 10 * Math.min(0, oy) - 6 * Math.max(0, oy)) * (0.65 + 0.35 * g(i, L.sd + 1)) * (0.7 + 0.3 * Math.sin(2 * Math.PI * (t * cyc + g(i, L.sd + 2)))) * L.k;
+      const width = Math.min(5.5, 1.8 + len * 0.2);
+      for (let y = Math.floor(by - len - 6); y <= by + 6; y++)
+        for (let x = Math.floor(bx - len - 6); x <= bx + len + 6; x++) {
+          if (y < 0 || y >= c.length || x < 0 || x >= FHW) continue;
+          if (Math.hypot(x - cx, y - cy) <= FH_R + 0.3) continue; // never on the steel, never in the hole
+          const [px, py] = [x - bx, y - by];
+          const al = px * dx + py * dy;
+          if (al < -1 || al > len) continue;
+          const fr = Math.max(0, al) / len;
+          // A lick: the tongue sways more toward its tip, the wave running up it twice a loop.
+          const across = Math.abs(-px * dy + py * dx + Math.sin(al * 0.45 - 2 * Math.PI * 2 * t + i * 1.7) * 1.4 * fr);
+          const prof = fr < 0.25 ? 0.8 + 0.8 * fr : (1 - fr) / 0.75;
+          if (across > width * prof + 0.3) continue;
+          const heat = 1 - fr * 0.95 - (across / (width * Math.max(prof, 0.2))) * 0.3 + L.hot;
+          const key = heat > 0.78 ? "R" : heat > 0.56 ? "n" : heat > 0.36 ? "m" : heat > 0.16 ? "l" : "i";
+          const old = c[y]![x]!;
+          if (HEAT.indexOf(key) > HEAT.indexOf(old)) put(c, x, y, key); // the hotter wins where tongues overlap
+        }
+    }
+  return { part: asPart(c, true), at: [0, 0] };
 }
-/** A hoop's stand: a small round foot, a steel post lit on its left, a gold collar gripping the ring's bottom. */
-const hoopStand = (cx: number): Bit[] => [
-  groundShadow(cx, FHF, 11, 3),
-  paint(cx - 7, FHF - 4, 15, 5, (x, y) => {
-    const X = x - cx;
-    const j = y - (FHF - 4);
-    if (((X + 0.5 - 0.5) / 7.5) ** 2 + ((j + 0.5 - 2.5) / 2.5) ** 2 > 1) return null;
-    return j < 2 ? (X < 3 ? "=" : "&") : X < -3 ? "&" : "%";
-  }),
-  paint(cx - 1, FH_CY + FH_R, 3, FHF - 3 - FH_CY - FH_R, (x) => (x === cx - 1 ? "=" : x === cx ? "&" : "%")),
+/** The stand: a round steel base, a steel post 5 wide lit on its left, a gold band at its foot. */
+const hoopStand = (): Bit[] => {
+  const cx = FH_CX;
+  const top = FHF - 5; // the base's top face, its middle
+  return [
+    groundShadow(cx, FHF, 20, 4),
+    paint(cx - 12, top - 4, 25, 11, (x, y) => {
+      const X = x - cx;
+      const sx = X / 12.4;
+      if (Math.abs(sx) > 1) return null;
+      const cc = Math.sqrt(1 - sx * sx);
+      const [y0, y1] = [top - 3.6 * cc, top + 3.6 * cc];
+      if (y + 0.5 < y0 || y + 0.5 > y1 + 3) return null;
+      if (y + 0.5 <= y1) return X < 4 ? "=" : "&"; // its top face
+      return y + 0.5 > y1 + 2 ? "%" : X < -4 ? "&" : "%"; // its rim
+    }),
+    paint(cx - 2, FH_CY + FH_R, 5, top - FH_CY - FH_R, (x) => {
+      const X = x - cx;
+      return X < 0 ? "=" : X === 0 ? "&" : X === 1 ? "&" : "%";
+    }),
+    paint(cx - 3, top - 3, 7, 3, (x, y) => {
+      const X = x - cx;
+      return y === top - 3 ? (X < 1 ? "M" : "L") : X < -1 ? "L" : X > 1 ? "J" : "K";
+    }),
+  ];
+};
+/** The gold collar gripping the ring's bottom. */
+const hoopCollar = () =>
+  paint(FH_CX - 4, FH_CY + FH_R - 4, 9, 8, (x, y) => {
+    const X = x - FH_CX;
+    const j = y - (FH_CY + FH_R - 4);
+    if (j === 0) return Math.abs(X) > 3 ? null : X < 1 ? "M" : "L";
+    if (j === 4) return X < 2 ? "L" : "K"; // a lit ridge round its middle
+    return X < -2 ? "M" : X < 1 ? "L" : X > 2 ? "J" : "K";
+  });
+/** A spark rising off the hoop (no outline: a hot pixel over a cooler one), by its age 0 to 3. */
+const spark = (x: number, y: number, age: number): Bit => paint(x, y, 1, 2, (_, yy) => (yy === y ? "Rnml"[age]! : "nmli"[age]!), false);
+/** The hoop's sparks: [first frame, x off the ring's middle, y off the ring's top, drift per frame]. Each lives 4 frames. */
+const SPARKS: readonly (readonly [number, number, number, number])[] = [
+  [1, -9, -22, -1],
+  [3, 30, -8, 1],
+  [5, 12, -24, 1],
+  [7, -34, -4, -1],
 ];
-const hoopCollar = (cx: number) =>
-  paint(cx - 2, FH_CY + FH_R - 1, 5, 4, (x, y) => {
-    const X = x - cx;
-    const j = y - (FH_CY + FH_R - 1);
-    return j === 0 ? (X < 1 ? "M" : "L") : X < 0 ? "L" : X > 1 ? "J" : "K";
+const hoopSparks = (f: number): Bit[] =>
+  SPARKS.flatMap(([f0, sx, sy, dr]) => {
+    const age = (f - f0 + FH_N) % FH_N;
+    return age < 4 ? [spark(FH_CX + sx + dr * age, FH_CY - FH_R + sy - age * 5, age)] : [];
   });
-/** A spark rising off a hoop (no outline: a hot pixel over a cooler one), by its age 0 to 2. */
-const spark = (x: number, y: number, age: number): Bit => paint(x, y, 1, 2, (_, yy) => (yy === y ? "Rnm"[age]! : "nml"[age]!), false);
-/** Which hoop sends a spark up when: [hoop, first frame, its x off the ring's middle]. */
-const SPARKS: readonly (readonly [number, number, number])[] = [[0, 1, -6], [2, 4, 5], [1, 6, 3]];
-export const SHOP_BABUR_FIRE_HOOPS = (() => {
-  const still = FH_X.map((cx) => ({ stand: hoopStand(cx), collar: hoopCollar(cx) }));
-  const frames = Array.from({ length: FH_N }, (_, f) => {
-    const bits: Bit[] = [];
-    FH_X.forEach((cx, h) => bits.push(...still[h]!.stand));
-    // Each hoop's flames on a phase of its own (3 and 5 frames on), so the three never pulse together.
-    FH_X.forEach((cx, h) => bits.push(hoopFire(cx, (f + [0, 3, 5][h]!) % FH_N, h), still[h]!.collar));
-    for (const [h, f0, sx] of SPARKS) {
-      const age = (f - f0 + FH_N) % FH_N;
-      if (age < 3) bits.push(spark(FH_X[h]! + sx + age, FH_CY - FH_R - 8 - age * 4, age));
-    }
-    return bits;
-  });
-  return def("fire-hoops", [3, 1], FHW, FHH, [FHM + Math.floor((3 * T) / 2), FHF], frames, 110);
-})();
-/** The hoops' fire at dusk and night: each ring's flames (only the fire's pixels light), flickering, a halo round each. */
-export const SHOP_BABUR_HOOP_LIGHTS: readonly LightSpot[] = FH_X.map((cx) => ({ x: cx - 24, y: 0, w: 49, h: FH_CY + FH_R + 2, keys: HEAT, color: TORCH, strength: 1, flicker: true, halo: 30 }));
-/** ... and a warm pool on the sawdust under each. */
-export const SHOP_BABUR_HOOP_POOLS: readonly LightPool[] = FH_X.map((cx) => ({ x: cx, y: FHF, rx: 22, ry: 7, color: TORCH, strength: 0.3 }));
+const FIRES = Array.from({ length: FH_N }, (_, f) => hoopFire(f));
+const STAND = hoopStand();
+const COLLAR = hoopCollar();
+/** A hoop piece: the drawing's frames from `shift` on, so each burns out of step with the others. */
+const fireHoop = (name: string, shift: number) =>
+  def(name, [3, 1], FHW, FHH, [FH_CX, FHF], Array.from({ length: FH_N }, (_, f) => {
+    const g = (f + shift) % FH_N;
+    return [...STAND, FIRES[g]!, COLLAR, ...hoopSparks(g)];
+  }), 110);
+export const SHOP_BABUR_FIRE_HOOP_A = fireHoop("fire-hoop-a", 0);
+export const SHOP_BABUR_FIRE_HOOP_B = fireHoop("fire-hoop-b", 3);
+export const SHOP_BABUR_FIRE_HOOP_C = fireHoop("fire-hoop-c", 5);
+const HOOP_NAMES = ["fire-hoop-a", "fire-hoop-b", "fire-hoop-c"] as const;
+/**
+ * The hoops' fire at dusk and night, one per hoop piece (`piece`; x, y in that piece's own pixels): its flames (only the
+ * fire's pixels light), flickering, a wide halo.
+ */
+export const SHOP_BABUR_HOOP_LIGHTS: readonly (LightSpot & { piece: string })[] = HOOP_NAMES.map((piece) => ({ piece, x: 0, y: 0, w: FHW, h: FH_CY + FH_R + 3, keys: HEAT, color: TORCH, strength: 1, flicker: true, halo: 56 }));
+/** ... and a warm pool on the sawdust under each (in its piece's pixels, round its foot). */
+export const SHOP_BABUR_HOOP_POOLS: readonly (LightPool & { piece: string })[] = HOOP_NAMES.map((piece) => ({ piece, x: FH_CX, y: FHF, rx: 52, ry: 15, color: TORCH, strength: 0.32 }));
+
 
 //@@PIECES@@
 
@@ -1064,12 +1105,16 @@ at("hem-pole", 19, 19, true, { flip: true });
 at("balloon-stand", 2, 3, true);
 at("counter", 8, 3, true);
 at("crate", 8, 3, false); // on the counter (see SHOP_BABUR_CRATE_AT): its place is the counter's
-at("fire-hoops", 15, 4, true); // the showpiece, burning (3 squares: 15-17)
-at("hoop-stand", 3, 7, true); // the old cold hoop, moved across the room out of the fire's way
-at("pin-rack", 17, 6, true);
+// The showpiece, burning: three big hoops down the east side, staggered (a and c on columns 15-17, b a square east on 16-18),
+// four rows apart so their flames never touch; column 14 stays open beside the ring.
+at("fire-hoop-a", 15, 5, true);
+at("fire-hoop-b", 16, 9, true);
+at("fire-hoop-c", 15, 13, true);
+at("hoop-stand", 3, 7, true); // the old cold hoop, across the room out of the fire's way
 at("pedestal", 9, 10, true);
 at("balloon-stack", 3, 12, true);
-at("trunk", 16, 12, true);
+at("trunk", 17, 16, true); // moved south, out of the hoops' way
+at("pin-rack", 15, 17, true); // likewise
 
 /** Where every piece goes: name, column (its west-most square), row, solid; floor tiles first, then the upright pieces north to south. */
 export const SHOP_BABUR_LAYOUT: readonly ShopPlace[] = [...LAYOUT.slice(0, FLOOR_COUNT), ...LAYOUT.slice(FLOOR_COUNT).sort((a, b) => a.row - b.row || a.col - b.col)];

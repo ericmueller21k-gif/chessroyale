@@ -1,11 +1,9 @@
-# Boss art: house-shop-puddles
+# Boss art: house-shop-puddles (second pass: the big pond garden)
 
-- Model claude-opus-5-5, effort high, adaptive thinking. 30 turns, 22 renders.
-- Spend: **$3.80** of the $10 cap (62 input, 249,150 cache-write, 4,221,741 cache-read, 85,605 output tokens).
-- **Stopped early:** the API call failed: 400 {"type":"error","error":{"type":"invalid_request_error","message":"messages.1.content.72.image.source.base64.data: At least one of the image dimensions exceed max allowed size for many-image requests: 3000 pixels"},"request_id":"req_011CgdPwBpgFPPHdR2Vz5eBq"}.
-- The drawing: scripts/boss-art/out/house-shop-puddles/house-shop-puddles.ts.
-- Previews: the final preview failed: . Each look it took: scripts/boss-art/out/house-shop-puddles/looks/.
-
-## Its notes
-
-(none: it didn't call done)
+- Model claude-opus-5-5, effort high, adaptive thinking. Brief: `scripts/boss-art/briefs/shop-puddles-interior-2.md`.
+- Spend: **$2.37** logged over 11 turns, of a $4.50 cap. A turn in flight when the run stopped may have cost about
+  $0.10 more that wasn't logged.
+- **Stopped early:** the container ran out of memory and killed the runner during its 11th turn's render. It was running
+  alongside the Babur hoops run. By then the redraw was in place: the file typechecks, the pond is 5 x 8 squares, and all
+  8 frames are drawn. So the drawing was kept rather than paying to rerun, and it never wrote its own notes.
+- The first pass's summary and log: `summary-try1.md`, `log-try1.jsonl`.
