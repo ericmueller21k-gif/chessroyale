@@ -11611,6 +11611,9 @@ button.fd-seat {
       height: var(--bs-h);
       --bs-slant: calc(var(--bs-w) * 0.2);
     }
+    .bs-tile.bs-random .bs-q {
+      font-size: calc(var(--bs-w) * 0.42);
+    }
   }
 }
 @media (min-width: 1440px) {
