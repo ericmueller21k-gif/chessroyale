@@ -494,6 +494,51 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
     and the bot across, its card closed (`createTown`'s `seat`); the bot gets up and wanders off after
     `botLeaveAfterGameMs` (4 s), unless its table's card holds it.
 
+## Inside a shop (Nov 2, round 1)
+
+Eric, Nov 2: walk up to Babur's home and go in; inside, the Shopkeeper sells **Babur's Boss Crate**. Round 1 is the town side, with buying
+stubbed behind one function; round 2 adds the stored data (the tokens, the crate keys, the purchase). Decisions:
+[2026-11-02-shop-interiors-r1.md](../decisions/2026-11-02-shop-interiors-r1.md) (this round's calls),
+[2026-11-02-building-interiors.md](../decisions/2026-11-02-building-interiors.md), [2026-11-02-shop-zoom.md](../decisions/2026-11-02-shop-zoom.md)
+and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.md) (the art's, on `claude/boss-art`).
+
+- **Which homes.** Babur's Circus (`tiger`) and Puddles' Botanical Garden (`gardener`): `SHOPS` in `town/shops/shops.ts`. Their home's card
+  adds **"Go in"** (gold) above its greyed "Shop" and "Coming soon", which stay; every other home's card is as it was.
+- **Going in.** "Go in" walks you to the square in front of the door (the plot's front row's middle, a row out); there the town zooms in on
+  the door (a CSS scale of the town's canvas about the door, `SHOP_FEEL.doorZoom` over `doorZoomMs`) and fades to black (`.town-fade`,
+  `fadeMs`), the room's code and art load (only now: `shops/ShopRoom.tsx` and each room's art are chunks of their own), the town waits
+  (`pause`: no frames, nothing moves, its chips put away) and the room fades in from black. **Going out** ("Go out", or the back button,
+  which inside a shop means out, not home): the room fades to black and the town zooms back out from the door, you where you stood.
+- **The room** (`shops/ShopRoom.tsx`): 20 × 20 squares from the art's layout (`shops/babur-art.ts`, `shops/puddles-art.ts`, copied from
+  `claude/boss-art`), drawn as the approved mockup (`scripts/boss-art/shop-view.ts` there) drew it, through `camera.ts` (`setView`'s
+  `sets`: the room's own camera sets): the floor tiles baked once into one picture and laid flat in blocks of two squares (a block drawn
+  large near the camera a square at a time: `floorBlock`, `floorSplitPx`), each upright piece stood at its foot at 37 px a square, Puddles'
+  pond garden (`d: 8`) laid flat on its 40 squares with the strip above its north row (its plants' tops) standing up, the Shopkeeper and
+  you among them far to near; the tent's canvas or the greenhouse's glass above the walls, and the bright day past the low front wall.
+  Babur's three burning hoops glow (their pools and halos, the art's `piece`-keyed lights, `SHOP_FEEL.glow`). Every piece's frames are
+  drawn into canvases as the room loads, behind the black; animated pieces loop on one clock (the hoops, the pond, the palm, the fountain,
+  the crate, the balloon cart). A piece nearer the camera than `nearFull` squares fades out (gone by `nearGone`): the front wall as you
+  stand at the door. One loop on one Canvas 2D canvas; headless, 60 fps walking on a phone and a computer (Nov 2).
+- **The camera.** You start in **Close** (`SHOP_FEEL.close`: h 3.2, back 2.4, pitch 24°, cy 0.3, in place of the town's numbers of those
+  names; the box's shape blends the rest as in the town). The town's − / + switch between Close and the town's zoomed-in camera (the wheel
+  too); a drag looks around (kept inside the room); the focus button brings it back.
+- **Walking** (`shops/room.ts`, pure): a tap walks you a square at a time round what's solid (the walls, the counter, every solid piece's
+  squares, the way out's own squares, the Shopkeeper's); a tap on something solid walks you beside it. There's no joystick (the town has
+  none either). Inside is just you: the town's bots and other players don't come in.
+- **The Shopkeeper**: the boss's kid's sheet (Stripes for Babur, beside the counter's east end: behind it the 58 px counter hides him;
+  Drizzle for Puddles, behind the middle of the low counter), its idle playing, a blue "Shopkeeper" tag. Standing still within
+  `talkRange` (3) squares of it, its card shows (**"Shopkeeper"**, **Talk**); a tap on it or the counter walks you in front of it, the
+  counter between you. A card you close stays closed until you move on.
+- **The crate's card** (Talk): in the middle of the room, **"Babur's Boss Crate"** / **"Puddles' Boss Crate"**, the crate's picture, its
+  prizes (the boss's ride first, always: Balloon Pup; Puddles's Mower), the price line (**"3 Babur tokens, or 1 Babur token + 1 crate key"**,
+  `BOSS_CRATE_PRICE` in core's settings), what you have (**"You have 0 Babur tokens and 0 crate keys."**: `bossHoldings`, none until
+  round 2) and two buttons, **"Buy with 3 Babur tokens"** and **"Buy with 1 Babur token + 1 crate key"**, both through `buyBossCrate(boss,
+  way)`, which in round 1 answers **"Coming soon"** in a row under them that's always there.
+- **The way out**: standing on one of the two squares just inside the door, a card says **"Go out"**. The door is behind you as you look
+  north: walk back toward it, or drag the view back to it and tap it.
+- **Test hooks** (test switches on): the room's canvas `canvas.town-shop-canvas` carries `data-room`, `data-you`, `data-ready`;
+  `__shopAt("keeper" | "door" | "square", [c, r])`, `__shopCam()`, `__shopBench(n)`.
+
 ## Frame-rate pill (`?fps`)
 `/town?fps` shows anyone (Eric, Oct 30: no admin needed, the site is behind Cloudflare Access) a pill in the world's top-right corner, "60 fps · 16.7 ms · 2D": frames over the last second and their mean time, text set twice a second from plain counters in the frame loop, then the drawing's backend ("· WebGL" with `?gl=1`; added by town.css from `data-backend`, so the pill's text stays the numbers). Without `?fps` there is none. `?crowd=N` is anyone's too (only that device draws the pawns).
 `?fps`, `?crowd=N` and `?gl=1` are read once as the page opens (`TOWN_ASKED`, test-switches.ts), so a later replaceState can't lose them; they apply as the town opens.
@@ -524,7 +569,8 @@ noted wherever a slice changed one.
   `paint-gl.ts` (its WebGL 2 backend), `you-look.ts`, `rides.ts`, `ride-cells.ts` (the rides' views measured, generated), `sky.ts`, `sky-draw.ts`, `sign-font.ts`, `feel.ts`, `town.css`, `chat.ts`, `TownChat.tsx` and `town-chat.css` (the chat log), `houses/`
   (one file per home, fourteen in all, the Colosseum's `coliseum.ts`, the park's `park.ts`, the kit of shared pieces and the index),
   `sidekick-sheets.ts` and `sidekicks/*.png` (the sidekicks' baked frames, generated), `CardIcons.tsx` (the card's crossed swords and
-  rating bars, inline SVG).
+  rating bars, inline SVG), `shops/` (inside a shop: `shops.ts` which homes and the crate's words and the buy stub, `room.ts` the room's
+  walking, `ShopRoom.tsx` the room, `babur-art.ts` and `puddles-art.ts` the rooms' art).
 - The sidekicks' art: `packages/app/src/characters/sidekicks/<boss>.ts` (one `Character` each, `sidekick-<boss>`, copied
   as drawn from `claude/boss-art`), baked by `scripts/bake-sidekicks.ts` (`npx tsx scripts/bake-sidekicks.ts`).
 - References: `docs/mockups/town-square/` (the prototype Eric tested, and the pictures for the homes: Eric's for the
@@ -532,6 +578,12 @@ noted wherever a slice changed one.
 
 ## Tests
 
+- `e2e/shop.spec.ts` (Nov 2, inside a shop; phone and computer): Babur's card's "Go in", inside in Close (− and + switch cameras), a tap
+  on the Shopkeeper walks you up and its card's Talk opens "Babur's Boss Crate" (the price line, Balloon Pup, what you have, both buys
+  answering "Coming soon" in a row that doesn't grow the card), then the view dragged back to the door, "Go out" and you're outside at
+  the tent's door; Puddles' greenhouse: Drizzle's crate with Puddles's Mower, and the back button takes you out. Unit:
+  `packages/app/test/shop-room.test.ts` (both rooms' walls, counter, pieces and pond solid, the way out, every free square reachable,
+  the talking range and where a tap on the Shopkeeper sends you; the crates' words; the stub).
 - `e2e/town-webgl.spec.ts` (Oct 30, WebGL): the same held frame drawn by both backends in one page (`__townHold`, `__townBackend`;
   `__townPaint()` gives the backend and the last frame's draw calls, `__townBench(n)` the ms a draw of the held frame),
   compared pixel by pixel, phone and computer: the park by day, the park at night (the lights), a statue up close at night;
@@ -739,6 +791,7 @@ title; a bot waiting, two playing (the board's pixels change), a tap on their ga
 
 ## Not built yet
 
-The bottom strip, a player's card's Play and "Invite to party" (their card has the row, with Play greyed: Oct 28), the shop itself, the Colosseum's menu (raids with people,
+The bottom strip, a player's card's Play and "Invite to party" (their card has the row, with Play greyed: Oct 28), buying a boss's crate
+(round 2: the tokens, the keys, the purchase) and the other homes' insides, battles in a shop's circle, your ride inside a shop, the Colosseum's menu (raids with people,
 party), the park's matchmaking (sitting at a table queues you: `ROADMAP.md`, "The park"), quick chats, other people's dressed pawns, the Simple map setting, real players and
 rooms, sounds.

@@ -64,6 +64,10 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   queue's and Squads' cards, the boss stage, the town's person card, and the public profile's Equipped Cosmetics row (four tiles at
   most; its View all lists the ride). Changing a ride's drawing or the paint (`item-paint.tsx`): `npx tsx scripts/measure-rides.ts`
   (the town's cells for it; a test fails until it's run).
+- **A boss's crate, sold inside the boss's home** (Nov 2, round 1: Babur's and Puddles'; town-square.md, "Inside a shop"): the
+  Shopkeeper's card shows the crate, its prizes (the boss's ride first), its price (`BOSS_CRATE_PRICE` in core's settings: 3 of the boss's
+  tokens, or 1 token and 1 crate key) and what you have. Buying goes through `buyBossCrate` (`town/shops/shops.ts`), which answers "Coming
+  soon" until round 2 builds the tokens, the keys and the purchase.
 - **The gambling warning** (Eric, Nov 1; `components/GamblingWarning.tsx`): a small red ring, see-through in the middle, with a bubbly
   solid-red "!" in it, always at the top right of the crate pages: the Crates tab and each crate's own page (not the opening or the
   reveal). It sits over the page's corner (`gamble-ring` in `styles.css`: out of the flow, a 40 px tap target round a 30 px ring), so it
