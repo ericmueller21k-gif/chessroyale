@@ -19,6 +19,7 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
   branch claude/boss-art; asks Eric once, ~$4-6, cap $8).
 
 ## Queue (one Opus at a time)
+0c. When the art session's Timber king attack lands (boss-art scripts/boss-art/out/boss-beaver/boss-beaver.ts BOSS_BEAVER_ATTACK, its notes give perSquare/stand/facesLeft/cue→sound/hit): wire kits.ts kingAttack + add "timber" to KING_ATTACKERS in boss-timing.ts. Big Boy home + intro drawing now (same session).
 - Art session (session_01JuCWRrhykEFvvmv5JKWgRX) = expert for all boss homes + battle intros (API only): Alfil's home now,
   then Alfil's intro (sand pyramid, table, sandstorm).
 - Gemini Part D (challenge lines) prompt: scratchpad lines/hunchess-boss-challenge-lines-for-gemini.txt, sent to Eric.
