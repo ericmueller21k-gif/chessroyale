@@ -15,8 +15,11 @@ Everything from Nov 1 is merged: #447 eval bar off, #448 cash-in 2 gold, #449 on
    2 px border = next to reveal; no green; all ungray at the move step; opponent circles as today; piece-for-piece
    matching (pawn↔pawn, knight/bishop↔knight/bishop, rook↔rook, queen↔queen; unmatched stay hidden); first placer's
    piece concealed, so the first reveal is the opponent's. Every ~3 s.
-2. Babur's shop prototype: walk up to his home → zoom like the statues → card "Go in" → circus-tent interior ~20x20 tiles,
-   auto zoomed in, a crate stand (buy with Babur coins). Waiting on Eric: price shown with "Coming soon"? only Babur's?
+2. Babur's shop (Eric, Nov 2): walk up to his home → card "Go in" → zoom in, fade into a circus-tent interior (~20x20
+   tiles, auto zoomed in). Inside: a copy of his kid's sprite (Stripes) named "Shopkeeper" (tag over its head). Talk to
+   it → "Babur's Boss Crate": its prizes always include his ride (Balloon Pup). Cost: 1 crate key + 1 Babur token.
+   Tokens: from playing that boss, up to ~3 a boss a day (earning design for Eric's OK; not built yet). For testing,
+   admins get keys and tokens in their inventory. Stored data → the data part at Opus xhigh. Only Babur's for now.
 3. Brush Ride trail = ink dripping from the brush's back (Haiku; no pad).
 
 ## Waiting on Eric
