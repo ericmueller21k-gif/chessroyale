@@ -1,6 +1,6 @@
 /**
  * Renders Timber's synthesized sounds to WAV files for Eric to listen to before they merge (16-bit mono, 44.1 kHz):
- * one per sound, plus `select.wav` (his select sound, the gnaw). `npx tsx scripts/timber-sounds-wav.ts [out dir]`,
+ * one per sound, plus `select.wav` (his select sound, the chitter). `npx tsx scripts/timber-sounds-wav.ts [out dir]`,
  * docs/timber-sounds/ by default.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -33,7 +33,7 @@ function wav(samples: Float32Array): Buffer {
 
 mkdirSync(out, { recursive: true });
 for (const name of TIMBER_SOUNDS) writeFileSync(join(out, `${name}.wav`), wav(timberSound(name, RATE)));
-// (His select sound by its name in the game, `timberGnaw`: the module's `gnaw`.)
+// (His select sound by its name in the game, `timberChitter`: the module's `chitter`.)
 const select = SELECT_SOUND.timber!.replace(/^timber(.)/, (_, c: string) => c.toLowerCase()) as TimberSound;
 writeFileSync(join(out, "select.wav"), wav(timberSound(select, RATE)));
 console.log(`${TIMBER_SOUNDS.length + 1} files in ${out} (select: ${select})`);

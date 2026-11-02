@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { TIMBER_BUILD } from "../src/sound.ts";
 import { TIMBER_SOUNDS, timberSound, type TimberSound } from "../src/characters/timber-sounds.ts";
 import { BOSS_KITS } from "../src/characters/kits.ts";
 import { SELECT_SOUND, TOWN_SOUNDS, townSound } from "../src/characters/boss-select.ts";
@@ -6,14 +7,17 @@ import { MOVE_MEAN_DB, MOVE_PEAK } from "../src/characters/synth.ts";
 
 /** Timber's own sounds, all wood (Eric, Nov 2: "He's using Big Boy's sounds… gnawing wood… knocking, cutting, saw, thumping"). */
 const kit = BOSS_KITS["Timber"]!;
-const own = (name: string) => /^timber[A-Z]/.test(name) && TIMBER_SOUNDS.includes((name[6]!.toLowerCase() + name.slice(7)) as TimberSound);
+const own = (name: string): boolean => name === "timberBuild" ? TIMBER_BUILD.every(own) : /^timber[A-Z]/.test(name) && TIMBER_SOUNDS.includes((name[6]!.toLowerCase() + name.slice(7)) as TimberSound);
 
 describe("Timber's sounds", () => {
-  it("are all his own: his kit's, his select sound (the gnaw) and his town taps', none of another boss's", () => {
+  it("are all his own: his kit's, his select sound (the chitter) and his town taps', none of another boss's", () => {
     const his = [...Object.values(kit.sounds), SELECT_SOUND.timber!, ...(TOWN_SOUNDS.timber ?? [])];
     for (const s of his) expect(own(s), s).toBe(true);
-    expect(SELECT_SOUND.timber).toBe("timberGnaw");
-    expect([0, 1, 2, 3].map((n) => townSound("timber", n))).toEqual(["timberGnaw", "timberSaw", "timberKnock", "timberGnaw"]);
+    expect(SELECT_SOUND.timber).toBe("timberChitter");
+    // (Eric, Nov 2: the build a tap, a whack or a knock; the gnaw when he takes your piece.)
+    expect(kit.sounds.set).toBe("timberBuild");
+    expect(kit.sounds.whack).toBe("timberGnaw");
+    expect([0, 1, 2, 3].map((n) => townSound("timber", n))).toEqual(["timberChitter", "timberSaw", "timberKnock", "timberChitter"]);
     // (And no other boss's kit, select or town sound is one of his.)
     for (const [name, k] of Object.entries(BOSS_KITS)) if (name !== "Timber") for (const s of Object.values(k.sounds)) expect(s, `${name}`).not.toMatch(/^timber/);
     for (const [id, s] of Object.entries(SELECT_SOUND)) if (id !== "timber") expect(s, id).not.toMatch(/^timber/);
@@ -21,7 +25,7 @@ describe("Timber's sounds", () => {
 
   it("has one for every cue in his animations, and every one of his is used", () => {
     for (const [name, an] of Object.entries(kit.ch.anims)) for (const f of an.frames) if (f.cue) expect(kit.sounds[f.cue], `${name}: ${f.cue}`).toBeTruthy();
-    const used = new Set([...Object.values(kit.sounds), SELECT_SOUND.timber, ...(TOWN_SOUNDS.timber ?? [])]);
+    const used = new Set<string>([...Object.values(kit.sounds), SELECT_SOUND.timber!, ...(TOWN_SOUNDS.timber ?? []), ...TIMBER_BUILD]);
     for (const n of TIMBER_SOUNDS) expect(used.has(`timber${n[0]!.toUpperCase()}${n.slice(1)}` as never), n).toBe(true);
   });
 

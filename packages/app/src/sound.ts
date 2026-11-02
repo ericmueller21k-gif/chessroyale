@@ -290,6 +290,8 @@ const gardenerBoss = (name: GardenerSound) => (t: number) => buffer(gardenerSoun
 const tigerBoss = (name: TigerSound) => (t: number) => buffer(tigerSound(name, ctx!.sampleRate), t);
 const folioBoss = (name: FolioSound) => (t: number) => buffer(folioSound(name, ctx!.sampleRate), t);
 const timberBoss = (name: TimberSound) => (t: number) => buffer(timberSound(name, ctx!.sampleRate), t);
+/** Timber's build sound picks one of these each time (Eric, Nov 2: "interchangeable between the tap, the whack, and the knock"). */
+export const TIMBER_BUILD = ["timberTap", "timberWhack", "timberKnock"] as const satisfies readonly SoundName[];
 /** The God King tapped with no charges left: his soft "can't" (god-king-sounds.ts). */
 const kingCant = (t: number) => buffer(godKingSound("cant", ctx!.sampleRate), t);
 /** One of the Roman candle's shots: a whistle (one of three, its pitch a little either way), now and then a crackle at its top. */
@@ -791,6 +793,8 @@ export type SoundName =
   | "timberOof"
   | "timberHup"
   | "timberBurp"
+  // (His build: a tap, a whack or a knock, one at random each time: Eric, Nov 2.)
+  | "timberBuild"
   | "kingCant"
   // Squads: a short tick in the last seconds of your free time, and the sting as a squad enters sudden death.
   | "sqTick"
@@ -1064,6 +1068,7 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   timberOof: timberBoss("oof"),
   timberHup: timberBoss("hup"),
   timberBurp: timberBoss("burp"),
+  timberBuild: (t: number) => SOUNDS[TIMBER_BUILD[Math.floor(Math.random() * TIMBER_BUILD.length)]!](t),
   kingCant,
   sqTick: (t) => clockTick(t, 0.22),
   sqSting,
@@ -1288,6 +1293,7 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   timberOof: [["timber", "oof"]],
   timberHup: [["timber", "hup"]],
   timberBurp: [["timber", "burp"]],
+  timberBuild: [["timber", "tap"], ["timber", "whack"], ["timber", "knock"]],
   kingCant: [["godKing", "cant"]],
 };
 /** The sound worker (sound-worker.ts), started with the first warmSounds; null where there's none (or it failed). */

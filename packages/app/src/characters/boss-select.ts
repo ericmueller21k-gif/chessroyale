@@ -39,8 +39,8 @@ export const SELECT_SOUND: Readonly<Record<string, SoundName>> = {
   tiger: "tigerHello",
   // A page turning, then a flap of its wing.
   folio: "folioHello",
-  // His teeth gnawing wood.
-  timber: "timberGnaw",
+  // His happy beaver chitter (Eric, Nov 2).
+  timber: "timberChitter",
   // The Hidden Boss: his low, ominous hum (the stare).
   recluse: "recluseHum",
 };
@@ -53,7 +53,7 @@ export const TOWN_SOUNDS: Readonly<Record<string, readonly SoundName[]>> = {
   // A low, slow murmur, then a soft "mm-hm" (Eric's picks).
   folio: ["folioMurmur", "folioHum"],
   // His gnaw, a hand saw's strokes, a knock on wood.
-  timber: ["timberGnaw", "timberSaw", "timberKnock"],
+  timber: ["timberChitter", "timberSaw", "timberKnock"],
 };
 
 /** The sound for a boss's `n`th tap in the town square (from 0). */

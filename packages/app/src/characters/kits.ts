@@ -766,14 +766,17 @@ export const BOSS_KITS: Record<string, BossKit> = {
       bigCheer: "bigCheer",
     },
     sounds: {
-      // (A plank swung down; at his entrance, his fall.)
+      // (His entrance: his fall.)
       drop: "timberSwoosh",
+      // (A piece of his built: the plank set down. A tap, a whack or a knock, at random: Eric, Nov 2.)
+      set: "timberBuild",
       // (He lands on the boards.)
       stomp: "timberThump",
       pat: "timberPat",
       whoosh: "timberSwoosh",
       tap: "timberTap",
-      whack: "timberWhack",
+      // (He takes your piece: the gnaw. Eric, Nov 2: "when he eats your piece".)
+      whack: "timberGnaw",
       // (A knock for emphasis.)
       point: "timberKnock",
       oof: "timberOof",
