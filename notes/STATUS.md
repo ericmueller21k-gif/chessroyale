@@ -8,10 +8,10 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - PR #458 shop interiors r1 (CI watcher). Next: round 2 at xhigh (tokens + purchase).
 - PR #463 Colosseum new GBA set as Pixel + Colosseum's own Animations (off): CI watcher.
 - PR #464 50 v 50 bot spread + top-3 draw (full-e2e; CI watcher).
-- Merged Nov 2 evening: #464 bot spread (retuned wider), #465 batch B. Live site stuck on 10:14 build (Cloudflare cache) until Eric purges.
+- Merged Nov 2 evening: #464 bot spread (retuned wider), #465 batch B. Deploys live again (0431678 live 18:59; the 16:15 cache stall cleared).
 - PR #466 boss challenge (Alfil): round 2 running on the same branch (brief notes/briefs/brief-challenge-r2.md): boss left/you right, chairs, default intro for Babur/Puddles.
 - One Opus (high): Big Boy's home + intro and Timber's king attack (cr-bigboy, claude/bigboy-home, brief notes/briefs/brief-bigboy-timber.md).
-- #463 Colosseum pieces merged but NOT live: hunchess.com serves the 10:14 build from Cloudflare's cache (HIT, query ignored) though CF deployed 4fac91ad at 16:15. Asked Eric to purge / check cache rules.
+- #463 Colosseum pieces live (with 0431678).
 - API art: Colosseum GBA pixel pieces (session_01JuCWRvpifUHBYDWXqYcDtk; asks Eric once, ~$3-6, cap $8).
 - One Opus: test-value changes (worktree /home/user/cr-testvalue, branch claude/test-value, brief
   notes/briefs/testvalue-changes.md): flakes first, then speed, formats→crowd-hidden merge, CI selection.
