@@ -27,7 +27,7 @@ import { crowdAnimations, onPrefsChange } from "../prefs.ts";
 import { COLOSSEUM_CHEER, play, warmFile, type SoundName } from "../sound.ts";
 import { testParams, testSwitchesAllowed } from "../test-switches.ts";
 import { COLISEUM_PLACE, isSprite } from "../town/world.ts";
-import { BLACK_VIEW, SEAT_VIEWS, VIEWS, otherSeat, railPitch, seats, turnLimits, viewFor, viewsFor, type View } from "./arena.ts";
+import { BLACK_VIEW, BOARD, SEAT_VIEWS, project, squareXZ, VIEWS, otherSeat, railPitch, seats, turnLimits, viewFor, viewsFor, type View } from "./arena.ts";
 import { AMBIENT_LEVELS, AMBIENT_LEVEL_NAME, Ambient, ambientLevelOf, type AmbientLevel } from "./ambient.ts";
 import { ArenaGL, PIECE_STYLES, PIECE_STYLE_NAME, SLIDE_S, buildCrowd, pieceStyleOf, type FloorPiece, type PieceStyle } from "./arena-gl.ts";
 import { PIECE_URL, RAIL, crowdArt, propArt, railingArt, sceneArt } from "./art.ts";
@@ -77,6 +77,10 @@ type Hooks = {
     place: (pieces: FloorPiece[]) => unknown;
     jump: () => unknown;
     sample: () => { sky: number; hash: number } | null;
+    /** (Stills and GIFs) the arena drawn now and read back as a PNG data URL. */
+    snap: () => string | null;
+    /** (Stills) the screen box (CSS px) round these squares' pieces, as the last frame drew them. */
+    screenBox: (squares: string[]) => { x: number; y: number; w: number; h: number } | null;
   };
 };
 
@@ -356,6 +360,29 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
             hash = (Math.imul(hash, 31) + (px[0]! >> 4) * 256 + (px[1]! >> 4) * 16 + (px[2]! >> 4)) | 0;
           }
         return { sky: sky / n, hash };
+      },
+      snap: () => {
+        const a = arenaRef.current;
+        if (!a || !testSwitchesAllowed()) return null;
+        a.draw(lens.current ?? views.current[viewRef.current]!, turn.current.yaw, turn.current.pitch, (performance.now() - t0.current) / 1000, 99);
+        return (a.gl.canvas as HTMLCanvasElement).toDataURL("image/png");
+      },
+      screenBox: (squares) => {
+        const a = arenaRef.current;
+        if (!a || !testSwitchesAllowed()) return null;
+        const cv = a.gl.canvas as HTMLCanvasElement;
+        const r = cv.getBoundingClientRect();
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+        for (const sq of squares) {
+          const [x, z] = squareXZ(sq);
+          // (A square's foot corners and 1.5 m above its middle: the tallest piece and its lean fit inside.)
+          for (const [dx, dy, dz] of [[-0.5, 0, -0.5], [0.5, 0, 0.5], [-0.5, 0, 0.5], [0.5, 0, -0.5], [0, 1.5, 0]] as const) {
+            const p = project(a.viewProj, x + dx, BOARD.lift + dy, z + dz, r.width, r.height);
+            if (!p) continue;
+            x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]);
+          }
+        }
+        return Number.isFinite(x0) ? { x: r.left + x0, y: r.top + y0, w: x1 - x0, h: y1 - y0 } : null;
       },
     };
     return () => void delete w.__colosseum;
