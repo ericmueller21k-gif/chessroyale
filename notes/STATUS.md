@@ -1,15 +1,13 @@
 # Director status: the current state only (keep under ~40 lines; old entries go to CHANGELOG.md). Rules: RULES.md.
 
-## Live on main (green, f2ee8da, Nov 2 00:00 UTC)
-Everything from Nov 1 is merged: #447 eval bar off, #448 cash-in 2 gold, #449 one-Opus rule, #450 Timber (admins first),
-#451 steady scoreboard + T/😊 chat + bot chat, #452 profile test race, #453 new cuts, #454 bot lobby (800-1500).
+## Live on main (green, d2715fa, Nov 2 08:16 UTC)
+Nov 1 work plus Nov 2: #456 auto chess reveal, #457 brush ink, #458 shops r1 (Babur, Puddles; buy = Coming soon), #459 Timber
+sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise moves 1-10, #461 boss picker 2 rows on computer.
 
 ## Running
 - PR #458 shop interiors r1 (CI watcher). Next: round 2 at xhigh (tokens + purchase).
-- PR #459 Timber's own sounds: WAVs sent to Eric; merge only after his OK.
-- PR #460 Nov 2 fixes (ride into shops, Timber 2 Gnaws, 🐟 = Stockfish, no King praise moves 1-10): CI watcher.
 - One Opus (xhigh): shops round 2, tokens + buying (cr-tokens, claude/shop-tokens, brief notes/briefs/brief-shop-r2-tokens.md).
-- #458 shops r1 and #459 Timber sounds merged (Eric's picks: chitter select, tap/whack/knock build, gnaw on capture).
+- API art: Colosseum GBA pixel pieces (session_01JuCWRvpifUHBYDWXqYcDtk; asks Eric once, ~$3-6, cap $8).
 - One Opus: test-value changes (worktree /home/user/cr-testvalue, branch claude/test-value, brief
   notes/briefs/testvalue-changes.md): flakes first, then speed, formats→crowd-hidden merge, CI selection.
 - API art sessions (outside the one-Opus rule, Eric): circus interior (session_01JuCWRrhykEFvvmv5JKWgRX, ~$4-7, cap $10);
@@ -21,8 +19,6 @@ Everything from Nov 1 is merged: #447 eval bar off, #448 cash-in 2 gold, #449 on
    (today arena-gl.ts draws the whole arena into the small target). Draw the pieces from the new GBA-style sprites (API run
    session_01JuCWRvpifUHBYDWXqYcDtk, scripts/boss-art/out/arena-pieces-gba/, after Eric OKs them). If Eric likes them, he
    said the other piece styles aren't needed (ask before removing 3D/2D).
-- Haiku running beside (Eric OK'd "Send Haiku"): Boss Battle picker, 2 rows on the computer (cr-bsrows,
-  claude/boss-select-rows, brief notes/briefs/brief-boss-select-rows.md).
 1. Auto chess reveal (Eric's simpler version): your placed pieces gray until revealed to the opponent, then normal; yellow
    2 px border = next to reveal; no green; all ungray at the move step; opponent circles as today; piece-for-piece
    matching (pawn↔pawn, knight/bishop↔knight/bishop, rook↔rook, queen↔queen; unmatched stay hidden); first placer's
