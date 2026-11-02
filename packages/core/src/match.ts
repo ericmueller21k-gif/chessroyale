@@ -887,8 +887,13 @@ export function botPickSpread(
       .slice(0, spread.moves)
       .map((c) => c.move),
   );
+  // (The taste centered over the good lines: it moves the bots between good lines, never toward or away from the
+  // blunders as a whole, so a turn with one good line keeps the blunders as rare as ever.)
+  let mean = 0;
+  for (const m of good) mean += lean.taste[m] ?? 0;
+  mean /= Math.max(good.size, 1);
   const weights = candidates.map((c) =>
-    good.has(c.move) ? Math.exp(-(lean.focus * c.loss) / t + (lean.taste[c.move] ?? 0)) : spread.blunderWeight * Math.exp(-c.loss / t),
+    good.has(c.move) ? Math.exp(-(lean.focus * c.loss) / t + (lean.taste[c.move] ?? 0) - mean) : spread.blunderWeight * Math.exp(-c.loss / t),
   );
   return candidates[weightedIndex(rng, weights)]!.move;
 }

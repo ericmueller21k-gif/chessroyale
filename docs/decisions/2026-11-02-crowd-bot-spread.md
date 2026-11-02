@@ -40,3 +40,11 @@ blunders 1.9% → 1.0%; bot picks that blunder 9.7% → 3.8%. Games from the sam
 and after; all 48 lines distinct by move 10 and 20.
 Eric's check on the bots' strength (`crowd-bots-sim.ts tuned`, 8 full matches, an engine-best player among 99 bots):
 1st or 2nd in 8 of 8 (1st in 7).
+
+## Retune, same day (Eric: "spread better across the best 4-5 moves, or even 7 moves when it's early game", and the played move should be a top-3 line less often, not more)
+- `CROWD_BOTS`: `moves` 5 → 7, `focus` [1, 4] → [0.1, 1], `lean` [0, 1.2] → [0.8, 2.5]; the taste is now centered over the
+  good lines (it moves bots between good lines, never toward the blunders as a whole).
+- Measured (`crowd-spread-probe.ts`, 24 games each): normal start, 40 plies: plurality = engine best 36% → 26%; played
+  move a top-3 line 67% → 55% (55% of 960 turns), played blunders 1.3% → 0.7%, played ranks 1-7: 242, 165, 117, 116, 117,
+  90, 110. Random opening, 16 plies: plurality = best 24%, played top-3 57%, played blunders 0.5%.
+- `crowd-bots-sim.ts tuned`, 10 matches: the engine-best player finished 1st in 9, 2nd in 1.

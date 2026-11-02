@@ -766,11 +766,14 @@ export interface CrowdBotSpread {
   powerUpChance: number;
 }
 export const CROWD_BOTS: CrowdBotSpread = {
-  moves: 5,
+  // (Eric, Nov 2, on the first tune: the plurality was the engine's best 39% of turns and the played move a top-3 line
+  // 74%: "spread better across the best 4-5 moves, or even 7 moves when it's early game". Wider: 7 lines, a looser focus,
+  // a stronger lean: plurality = best about 25%, played a top-3 line about 55%, played blunders about 1.5%.)
+  moves: 7,
   blunderLoss: 15,
   blunderWeight: 0.1,
-  focus: [1, 4],
-  lean: [0, 1.2],
+  focus: [0.1, 1],
+  lean: [0.8, 2.5],
   powerUpChance: 0.25,
 };
 
