@@ -32,6 +32,15 @@ export const newPt = (): Pt => ({ x: 0, y: 0, k: 0, depth: 0 });
 /** How many points make the rim's line (the horizon). */
 const RIM_STEPS = 64;
 
+/**
+ * A camera's two tuned sets, the phone's and the computer's, in place of the town's (`TOWN_FEEL.camTall` and `camWide`): inside a
+ * shop (shops/ShopRoom.tsx), the Close camera blended toward the town's. Worked out afresh every call.
+ */
+export interface CamPair {
+  tall: CamSet;
+  wide: CamSet;
+}
+
 /** The camera for a frame. Make one with newView and refresh it with setView. */
 export interface View {
   W: number;
@@ -47,6 +56,8 @@ export interface View {
   oy: number;
   /** The blended camera set for this box. */
   P: CamSet;
+  /** The sets it was last worked out from, if not the town's (setView's `sets`). */
+  sets: CamPair | null;
   h: number;
   back: number;
   cs: number;
@@ -79,6 +90,7 @@ export function newView(): View {
     ox: 0,
     oy: 0,
     P: { ...TOWN_FEEL.camTall },
+    sets: null,
     h: 1,
     back: 1,
     cs: 1,
@@ -105,8 +117,9 @@ const tmp = newPt();
  * Works the camera out for a box of W x H CSS pixels at a zoom (0 = normal, 1 = zoomed out), through a lens of `mag`
  * shifted `oy` down and `ox` right (the close-up; 1, 0, 0: none). Cheap when nothing changed.
  */
-export function setView(v: View, W: number, H: number, zoom: number, mag = 1, oy = 0, ox = 0): void {
-  if (v.W === W && v.H === H && v.zoom === zoom && v.mag === mag && v.oy === oy && v.ox === ox) return;
+export function setView(v: View, W: number, H: number, zoom: number, mag = 1, oy = 0, ox = 0, sets?: CamPair): void {
+  if (!sets && !v.sets && v.W === W && v.H === H && v.zoom === zoom && v.mag === mag && v.oy === oy && v.ox === ox) return;
+  v.sets = sets ?? null;
   v.W = W;
   v.H = H;
   v.zoom = zoom;
@@ -116,7 +129,9 @@ export function setView(v: View, W: number, H: number, zoom: number, mag = 1, oy
   const f = TOWN_FEEL;
   const t = clamp((W / H - f.aspectTall) / (f.aspectWide - f.aspectTall), 0, 1);
   const P = v.P;
-  for (const k of KEYS) P[k] = f.camTall[k] + (f.camWide[k] - f.camTall[k]) * t;
+  const tall = sets?.tall ?? f.camTall;
+  const wide = sets?.wide ?? f.camWide;
+  for (const k of KEYS) P[k] = tall[k] + (wide[k] - tall[k]) * t;
   v.h = P.h * (1 + f.zoomOutHeight * zoom);
   v.back = P.back * (1 + f.zoomOutBack * zoom);
   const th = ((P.th + f.zoomOutPitch * zoom) * Math.PI) / 180;

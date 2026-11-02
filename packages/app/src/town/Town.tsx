@@ -39,8 +39,10 @@ import { account, onAccountChange, playerName } from "../account.ts";
 import { TOWN_ASKED, testSwitchesAllowed } from "../test-switches.ts";
 import { play, warmSounds } from "../sound.ts";
 import { SELECT_SOUND, TOWN_SOUNDS, townSound } from "../characters/boss-select.ts";
-import { N, proj, wrapF } from "./camera.ts";
-import { TOWN_FEEL } from "./feel.ts";
+import { N, proj, wrapF, wrapI } from "./camera.ts";
+import { SHOP_FEEL, TOWN_FEEL } from "./feel.ts";
+import { shopOf } from "./shops/shops.ts";
+import type { LoadedRoom, ShopCtl, ShopRoom } from "./shops/ShopRoom.tsx";
 import { BarsIcon, SwordsIcon } from "./CardIcons.tsx";
 import { TownChat } from "./TownChat.tsx";
 import { TownChatTools } from "./TownChatTools.tsx";
@@ -112,13 +114,81 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, onColosseum, seat =
   const ctl = useRef<Ctl | null>(null);
   const [zoomedOut, setZoomedOut] = useState<boolean>(TOWN_FEEL.startZoomedOut);
   const [card, setCard] = useState<Card | null>(null);
+  // Inside a shop (Nov 2, round 1; shops/ShopRoom.tsx, loaded when you go in): the room, and its zoom (− / + switch Close and the
+  // town's zoomed-in camera there). `fade` is the black the town zooms into and the room fades in from.
+  const [inside, setInside] = useState<{ room: LoadedRoom; View: typeof ShopRoom } | null>(null);
+  const [shopOut, setShopOut] = useState(false);
+  const shopCtl = useRef<ShopCtl | null>(null);
+  const fade = useRef<HTMLDivElement>(null);
+  /** Going in or out: taps wait, and another way in or out isn't started. */
+  const doorBusy = useRef(false);
+  const fadeTo = (to: 0 | 1, ms: number, delay = 0) => {
+    const el = fade.current;
+    if (!el) return;
+    el.style.transition = `opacity ${ms}ms linear ${delay}ms`;
+    el.style.opacity = String(to);
+    el.style.pointerEvents = to ? "auto" : "none";
+  };
+  const townCanvas = () => box.current?.querySelector<HTMLCanvasElement>("canvas.town-canvas") ?? null;
+  const later = (ms: number) => new Promise<void>((ok) => setTimeout(ok, ms));
+  /** You stand at a shop's door (its "Go in"): the town zooms in on the door (`x`, `y` in the box) and fades to black; the room opens. */
+  const goIn = async (id: HomeId, x: number, y: number) => {
+    if (doorBusy.current) return;
+    doorBusy.current = true;
+    const F = SHOP_FEEL;
+    // (Its code and art load now, while the town zooms: nothing of a shop loads while you walk round the town.)
+    const load = import("./shops/ShopRoom.tsx").then((m) => m.loadRoom(id).then((room) => ({ room, View: m.ShopRoom })));
+    const cv = townCanvas();
+    if (cv) {
+      cv.style.transformOrigin = `${x.toFixed(1)}px ${y.toFixed(1)}px`;
+      cv.style.transition = `transform ${F.doorZoomMs}ms ease-in`;
+      cv.style.transform = `scale(${F.doorZoom})`;
+    }
+    fadeTo(1, F.fadeMs, F.doorZoomMs - F.fadeMs);
+    await later(F.doorZoomMs);
+    const got = await load.catch(() => null);
+    if (!got || !box.current) {
+      // (It didn't load: back out to the town as you were.)
+      if (cv) cv.style.transform = "";
+      fadeTo(0, F.fadeMs);
+      doorBusy.current = false;
+      return;
+    }
+    ctl.current?.pause();
+    setShopOut(false);
+    setInside(got);
+  };
+  /** The room drew its first frame: the black lifts. */
+  const shopReady = () => {
+    fadeTo(0, SHOP_FEEL.fadeMs);
+    setTimeout(() => (doorBusy.current = false), SHOP_FEEL.fadeMs);
+  };
+  /** "Go out" (or the back button inside): the room fades to black, and the town zooms back out from the door. */
+  const goOut = async () => {
+    if (doorBusy.current) return;
+    doorBusy.current = true;
+    const F = SHOP_FEEL;
+    fadeTo(1, F.fadeMs);
+    await later(F.fadeMs);
+    setInside(null);
+    ctl.current?.resume();
+    const cv = townCanvas();
+    if (cv) {
+      cv.style.transition = `transform ${F.doorZoomMs}ms ease-out`;
+      cv.style.transform = "";
+    }
+    fadeTo(0, F.fadeMs);
+    await later(F.doorZoomMs);
+    if (cv) cv.style.transition = cv.style.transformOrigin = "";
+    doorBusy.current = false;
+  };
 
   // (A layout effect: the world's first frame is drawn before the screen first shows.)
   useLayoutEffect(() => {
     const t = startTown(box.current!, canvas.current!, chips.current, cardEl.current!, live.current!, setZoomedOut, setCard, seatOf(seat), (s, face) => {
       const b = BOTS[s.bot]!;
       onPlayBot?.({ seat: seatText(s), name: botLabel(b), rating: b.rating, look: isSprite(b.look) ? null : b.look.wear, face });
-    });
+    }, (id, x, y) => void goIn(id, x, y));
     ctl.current = t;
     return t.stop;
   }, []);
@@ -142,17 +212,30 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, onColosseum, seat =
   return (
     <div class={framed ? "town-screen in-frame" : "town-screen"}>
       <header class="town-bar">
-        <button type="button" class="town-back" aria-label="Back" onClick={onBack}>
+        {/* (Inside a shop, back takes you out to the town square.) */}
+        <button type="button" class="town-back" aria-label="Back" onClick={inside ? () => void goOut() : onBack}>
           ‹
         </button>
         <h1>Town square</h1>
         {/* The chat's icon (its three modes) and the gear (Town settings), at the right end of the same line (on a computer, in the frame: the chat icon beside the title, the gear at the right end). */}
         <TownChatTools />
       </header>
-      <div class="town-box" ref={box}>
+      <div class={inside ? "town-box town-inside" : "town-box"} ref={box}>
         <canvas class="town-canvas" ref={canvas} aria-label="The town square" />
         {/* A statue's quote, for screen readers, while you stand up close to it (it's drawn on its pedestal). */}
         <div class="town-sr" ref={live} aria-live="polite" />
+        {/* Inside a shop: the room over the town (the town waits, as you left it). */}
+        {inside && (
+          <inside.View
+            room={inside.room}
+            youArt={() => ctl.current?.youArt() ?? null}
+            youName={playerName}
+            onZoom={setShopOut}
+            onOut={() => void goOut()}
+            onReady={shopReady}
+            ctl={shopCtl}
+          />
+        )}
         <div class="town-overlay">
           {/* The chat log, top left (its own file): under the cards; while it shows it takes every touch on its own area (the map under it gets none), faded none; the chips keep off its box (CHAT_BOX). */}
           <TownChat />
@@ -184,6 +267,12 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, onColosseum, seat =
               <>
                 <h2>{home.name}</h2>
                 {card.line && <p class="town-card-text town-card-line">{card.line}</p>}
+                {/* A home with its inside built (Nov 2: Babur's and Puddles'): you walk to its door and go in. */}
+                {shopOf(home.id) && (
+                  <button type="button" class="town-btn primary" onClick={() => ctl.current?.goIn(card.i)}>
+                    Go in
+                  </button>
+                )}
                 <button type="button" class="town-btn" disabled>
                   Shop
                 </button>
@@ -291,18 +380,21 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, onColosseum, seat =
             </div>
           ))}
         </div>
+        {/* The black the town zooms into as you go in, and the room fades in from (and back, going out). */}
+        <div class="town-fade" ref={fade} />
         <div class="town-controls">
+          {/* (Inside a shop the same buttons work the room's camera: Close, or the town's zoomed-in camera.) */}
           <div class="town-zoom">
-            <button type="button" aria-label="Zoom out" aria-pressed={zoomedOut} onClick={() => ctl.current?.zoom(true)}>
+            <button type="button" aria-label="Zoom out" aria-pressed={inside ? shopOut : zoomedOut} onClick={() => (inside ? shopCtl.current?.zoom(true) : ctl.current?.zoom(true))}>
               −
             </button>
-            <button type="button" aria-label="Zoom in" aria-pressed={!zoomedOut} onClick={() => ctl.current?.zoom(false)}>
+            <button type="button" aria-label="Zoom in" aria-pressed={inside ? !shopOut : !zoomedOut} onClick={() => (inside ? shopCtl.current?.zoom(false) : ctl.current?.zoom(false))}>
               +
             </button>
           </div>
           {/* The focus button (Eric, Oct 28: "replace with circular focus icon"): a ring, four ticks and a dot, a map's locate-me;
               still named "Back to me", and still brings the camera back to you. */}
-          <button type="button" class="town-recenter" aria-label="Back to me" onClick={() => ctl.current?.recenter()}>
+          <button type="button" class="town-recenter" aria-label="Back to me" onClick={() => (inside ? shopCtl.current?.recenter() : ctl.current?.recenter())}>
             <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
               <circle cx="12" cy="12" r="6.2" fill="none" stroke="currentColor" stroke-width="2" />
               <path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
@@ -326,6 +418,7 @@ function startTown(
   onCard: (c: Card | null) => void,
   seat: Seat | null,
   onPlay: (seat: Seat, face: string | null) => void,
+  onGoIn: (id: HomeId, x: number, y: number) => void,
 ) {
   const f = TOWN_FEEL;
   /** The world's canvas: a new one if the drawing changes backend (a canvas keeps the first kind of context it gave). */
@@ -548,6 +641,10 @@ function startTown(
   let alive = true;
   /** (Tests, `__townHold`) The frame loop held: the last frame stays, and nothing moves. */
   let held = false;
+  /** Inside a shop: the town waits as you left it (no frames, nothing moves) until you come out. */
+  let away = false;
+  /** A home's "Go in" sent you to its door (its index in HOMES; -1: none): you go in once you stand there. */
+  let goingIn = -1;
   /** When the last frame was drawn (its `now`). */
   let drawnAt = performance.now();
   let ready = false;
@@ -712,6 +809,14 @@ function startTown(
         onPlay(s, r.spriteFace(town.meet.bot));
       }
     }
+    // At a shop's door after its "Go in": the town zooms in on the door and you go in (TownScreen's goIn).
+    if (goingIn >= 0 && !town.you.walker.moving()) {
+      const h = HOMES[goingIn]!;
+      goingIn = -1;
+      const at = { x: r.W / 2, y: r.H / 2 };
+      r.squareAt(h.cx, wrapI(h.cy - 1), at);
+      onGoIn(h.id, at.x, at.y);
+    }
     stepClose(dt);
     updateCamera(dt, now);
     draw(now, dt);
@@ -732,7 +837,7 @@ function startTown(
     raf = requestAnimationFrame(frame);
   };
   const run = () => {
-    if (raf || !alive || document.hidden || held) return;
+    if (raf || !alive || document.hidden || held || away) return;
     last = performance.now();
     raf = requestAnimationFrame(frame);
   };
@@ -960,8 +1065,9 @@ function startTown(
     // A tap on anything but the statue you're looking at walks you away from it: the camera glides back out.
     if (p.statue < 0 || p.statue !== closeOn) leaveClose();
     // You sit when a tap on a table sent you to its stool; any other walk stands you up (and calls off a game you were
-    // walking to with a bot).
+    // walking to with a bot, and a way into a shop).
     cancelMeet(town);
+    goingIn = -1;
     town.you.sit = p.card?.kind === "table";
     if (p.dest && walkWalker(town.you.walker, p.dest)) {
       follow = true;
@@ -1238,6 +1344,31 @@ function startTown(
       meet(town, { bot, table, yours, theirs: bot.walker.here() });
     },
     confirm: () => card && setCard({ ...card, confirm: true }),
+    /** A home's "Go in" (a shop's: shops/shops.ts): you walk to the square in front of its door, and go in once there. */
+    goIn: (i: number) => {
+      const h = HOMES[i]!;
+      setCard(null);
+      leaveClose();
+      cancelMeet(town);
+      town.you.sit = false;
+      const to = spotNear(town, town.you.walker, { c: h.cx, r: wrapI(h.cy - 2) }, false);
+      if (!to || !walkWalker(town.you.walker, to)) return;
+      goingIn = i;
+      follow = true;
+      glide = null;
+    },
+    /** Inside a shop the town waits (`away`: no frames); coming out, it goes on. */
+    pause: () => {
+      away = true;
+      goingIn = -1;
+      halt();
+    },
+    resume: () => {
+      away = false;
+      run();
+    },
+    /** Your pawn's picture as the town draws it (your items on), for the room inside a shop. */
+    youArt: () => r.youArt,
     chip: (i: number) => {
       const h = chipPlace[i];
       if (!h) return;

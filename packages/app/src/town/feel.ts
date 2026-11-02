@@ -556,3 +556,45 @@ export const TOWN_FEEL = {
    */
   tableBoardGrow: 1.2,
 } as const;
+
+/**
+ * Inside a shop (Nov 2, round 1: Babur's circus tent and Puddles' greenhouse; shops/ShopRoom.tsx,
+ * docs/decisions/2026-11-02-shop-interiors-r1.md). The rooms' own numbers (their squares, the door, the shopkeeper's square) are in
+ * shops/rooms.ts.
+ */
+export const SHOP_FEEL = {
+  /**
+   * "Close" (Eric, Nov 2: "super zoomed resembling normal 3rd person sizing", the default inside): the camera comes down and in
+   * behind you and looks more ahead than down. These four replace the town's camTall and camWide numbers of the same names (the
+   * box's shape still blends the rest); `docs/decisions/2026-11-02-shop-zoom.md`. Zoomed out (−) inside is the town's own
+   * zoomed-in camera (camTall / camWide as they are).
+   */
+  close: { h: 3.2, back: 2.4, th: 24, cy: 0.3 },
+  /**
+   * You can talk to the Shopkeeper from this many squares away (either direction, from its nearest square). A tap on it walks
+   * you to the square this far in front of it (the counter between you), as the mockup's "at the counter" view stands.
+   */
+  talkRange: 3,
+  /**
+   * An upright piece nearer the camera than this many squares (its depth: the front wall as you stand at the door, a prop
+   * between the camera and you) fades out, gone by `nearGone`: up close it would fill the screen. (Close puts you about 3.5 deep.)
+   */
+  nearFull: 3,
+  nearGone: 2,
+  /**
+   * Going in (and out): the town zooms in on the door, this many times bigger over `doorZoomMs`, then fades to black over
+   * `fadeMs`, and the room fades in from black over `fadeMs` (going out: the same, backwards).
+   */
+  doorZoom: 2.4,
+  doorZoomMs: 600,
+  fadeMs: 260,
+  /**
+   * The floor is drawn flat on its squares in blocks of this many squares a side (each block two triangles of one baked picture of
+   * the whole floor): 1 is exactly the mockup's (a tile a draw), 2 a quarter of the draws, the room's gentle curve barely bent.
+   */
+  floorBlock: 2,
+  /** ...a block drawn taller than this many pixels (near the camera, where a block's perspective bends most) is drawn a square at a time. */
+  floorSplitPx: 90,
+  /** The fire hoops' glow (Babur's): its warm pool under each hoop this strong (0 to 1, over the art's own `strength`). */
+  glow: 1,
+} as const;
