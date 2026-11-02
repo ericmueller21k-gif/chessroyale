@@ -35,7 +35,7 @@ test.beforeEach(async ({ page }) => {
 const town = (p: Page) => p.locator("canvas.town-canvas");
 const room = (p: Page) => p.locator("canvas.town-shop-canvas");
 type Hooks = {
-  __townAt?: (k: string, id: string) => { x: number; y: number } | null;
+  __townAt?: (k: string, id: string | readonly [number, number]) => { x: number; y: number } | null;
   __shopAt?: (k: string, sq?: readonly [number, number]) => { x: number; y: number } | null;
   __shopCam?: () => { zoom: number; zoomTarget: number; room: string; focus: [number, number] } | null;
   __shopRide?: () => { ride: string | null; anim: "" | "idle" | "move"; frame: number; facing: number; view: number; stepMs: number } | null;
@@ -260,7 +260,15 @@ test("inside, a drag looks around as the town's does (Eric, Nov 2: \"when I drag
   await expect.poll(() => homeAt(page, "tiger"), { message: "Babur's tent in view" }).not.toBeNull();
   const d = Math.round(((await town(page).boundingBox())!.height * 0.1) / 2) * 2;
   await page.waitForTimeout(1500); // (the camera's glide settles)
-  await followsFinger(page, () => homeAt(page, "tiger"), d);
+  // (A fixed point of the world, as inside: the middle of the tent's plot, under its picture. Not `homeAt`: that's where a tap lands
+  // on the tent, found round whatever stands in front of it, and Babur juggling on his square there covers a little more or less of
+  // it from frame to frame, so it hops between the tent's left and right corners (about 110 px) whichever way the camera goes.)
+  const tent = async () => {
+    const xy = await page.evaluate(() => (window as unknown as Hooks).__townAt?.("square", [28, 4]) ?? null);
+    const cv = (await town(page).boundingBox())!;
+    return xy && { x: cv.x + xy.x, y: cv.y + xy.y };
+  };
+  await followsFinger(page, tent, d);
   // Inside: a square in front of you, the same.
   await goIn(page, "tiger", "Babur's Circus");
   await expect.poll(async () => (await shopCam(page))?.zoom).toBe(0);
