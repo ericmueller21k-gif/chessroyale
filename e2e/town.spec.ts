@@ -341,16 +341,29 @@ test("a boss's card: 'Challenge alone', then 'Leave the town square?'; Stay keep
   expect(errors).toEqual([]);
 });
 
-test("a home's card: its name, 'Shop' greyed (shown, not tappable) and 'Coming soon'; a tap anywhere else closes it", async ({ page }) => {
+test("a home you can go into (Babur's): its card is its name, then 'Go in' under it, both centered, nothing else (Eric, Nov 2: \"chop the Shop and Coming soon\"); a tap anywhere else closes it", async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/town");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
   await toBabur(page);
   const card = await openCard(page, "home", "Babur's Circus");
-  const shop = card.getByRole("button", { name: "Shop" });
-  await expect(shop).toBeVisible();
-  await expect(shop).toBeDisabled();
-  await expect(card.getByText("Coming soon", { exact: true })).toBeVisible();
+  // Its name and Go in, nothing else (a home without a shop keeps "Shop" greyed and "Coming soon": Hollow Peak's, below).
+  await expect(card.locator(":scope > *")).toHaveCount(2);
+  await expect(card.getByRole("button")).toHaveText(["Go in"]);
+  await expect(card.getByText("Coming soon", { exact: true })).toHaveCount(0);
+  // Centered: the name's words and the button in the middle of the card (within a pixel), the button under the name.
+  const mid = (b: { x: number; width: number }) => b.x + b.width / 2;
+  const box = (await card.boundingBox())!;
+  const go = (await card.getByRole("button", { name: "Go in" }).boundingBox())!;
+  const name = await card.locator("h2").evaluate((h) => {
+    const r = document.createRange();
+    r.selectNodeContents(h);
+    const t = r.getBoundingClientRect();
+    return { x: t.x, width: t.width, bottom: h.getBoundingClientRect().bottom };
+  });
+  expect(Math.abs(mid(name) - mid(box)), "the name centered").toBeLessThan(1.5);
+  expect(Math.abs(mid(go) - mid(box)), "Go in centered").toBeLessThan(1.5);
+  expect(go.y).toBeGreaterThanOrEqual(name.bottom - 0.5);
   // A tap on the world elsewhere (low in the middle) closes it.
   const cv = (await canvas(page).boundingBox())!;
   await page.mouse.click(cv.x + cv.width * 0.3, cv.y + cv.height * 0.85);
@@ -819,8 +832,10 @@ test("Hollow's card: one of his three lines (Eric's words), the next one each ti
   };
   await open();
   await expect(card.getByText(lines[0]!, { exact: true })).toBeVisible();
-  // Its shop greyed as before, under the line.
+  // Its shop greyed as before, under the line, and "Coming soon" (a home without a shop keeps its card as it was; one you can go
+  // into shows only its name and "Go in").
   await expect(card.getByRole("button", { name: "Shop" })).toBeDisabled();
+  await expect(card.getByText("Coming soon", { exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(card).toBeHidden();
   await open();
@@ -1208,8 +1223,7 @@ test("the other cards on the same dark look: the boss's, the home's, the Colosse
   await expect(confirm).toBeHidden();
   // His home's.
   card = await openCard(page, "home", "Babur's Circus");
-  await expect(card.getByRole("button", { name: "Shop" })).toBeDisabled();
-  await expect(card.getByText("Coming soon", { exact: true })).toBeVisible();
+  await expect(card.getByRole("button", { name: "Go in" })).toBeEnabled();
   await onDark("the home's card", ["h2"]);
   await page.keyboard.press("Escape");
   expect(errors).toEqual([]);

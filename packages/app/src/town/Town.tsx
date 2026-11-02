@@ -249,7 +249,7 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, onColosseum, seat =
           <TownChat />
           {/* The card: over the boss's head or the home's top, its tail pointing there (placed every frame). Dark, with a gold border
               (Eric's mockup, Oct 28); a person's is one row at one size (`town-person`). */}
-          <div class={card?.kind === "person" ? "town-card town-person" : "town-card"} ref={cardEl} role="dialog" aria-label={label} style={{ display: card ? "" : "none" }}>
+          <div class={card?.kind === "person" ? "town-card town-person" : card?.kind === "home" && !card.confirm && home && shopOf(home.id) ? "town-card town-door" : "town-card"} ref={cardEl} role="dialog" aria-label={label} style={{ display: card ? "" : "none" }}>
             {card && home && card.confirm && (
               <>
                 <h2>Leave the town square?</h2>
@@ -271,16 +271,21 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, onColosseum, seat =
                 </button>
               </>
             )}
-            {card && home && !card.confirm && card.kind === "home" && (
+            {/* A home with its inside built (Nov 2: Babur's and Puddles'): its name and "Go in", centered, nothing else (Eric, Nov 2: "chop
+                the Shop and Coming soon"); you walk to its door and go in. */}
+            {card && home && !card.confirm && card.kind === "home" && shopOf(home.id) && (
+              <>
+                <h2>{home.name}</h2>
+                <button type="button" class="town-btn primary" onClick={() => ctl.current?.goIn(card.i)}>
+                  Go in
+                </button>
+              </>
+            )}
+            {/* Every other home: its name (its line, Hollow's), its shop greyed and "Coming soon". */}
+            {card && home && !card.confirm && card.kind === "home" && !shopOf(home.id) && (
               <>
                 <h2>{home.name}</h2>
                 {card.line && <p class="town-card-text town-card-line">{card.line}</p>}
-                {/* A home with its inside built (Nov 2: Babur's and Puddles'): you walk to its door and go in. */}
-                {shopOf(home.id) && (
-                  <button type="button" class="town-btn primary" onClick={() => ctl.current?.goIn(card.i)}>
-                    Go in
-                  </button>
-                )}
                 <button type="button" class="town-btn" disabled>
                   Shop
                 </button>

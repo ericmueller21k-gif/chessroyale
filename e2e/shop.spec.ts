@@ -70,8 +70,10 @@ async function goIn(p: Page, id: string, name: string) {
     await p.mouse.click(at!.x, at!.y);
     await expect(card).toBeVisible({ timeout: 1500 });
   }).toPass({ timeout: 20_000 });
-  // The other homes' cards keep "Shop" greyed and "Coming soon"; these two add "Go in" (shown, tappable).
-  await expect(card.getByRole("button", { name: "Shop" })).toBeDisabled();
+  // A home you can go into: its name and "Go in", nothing else (Eric, Nov 2: "chop the Shop and Coming soon"; the other homes keep
+  // them: e2e/town.spec.ts).
+  await expect(card.getByRole("button")).toHaveText(["Go in"]);
+  await expect(card.getByText("Coming soon", { exact: true })).toHaveCount(0);
   await card.getByRole("button", { name: "Go in" }).click();
   await expect(room(p)).toHaveAttribute("data-ready", "1", { timeout: 20_000 });
 }

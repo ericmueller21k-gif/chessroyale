@@ -282,6 +282,13 @@
   color: #fff;
   font: 400 15px/1.2 "Archivo Black", Archivo, sans-serif;
 }
+/* A home you can go into (Eric, Nov 2): its name centered, then "Go in" under it, centered; nothing else, so it's a short card. */
+.town-card.town-door {
+  text-align: center;
+}
+.town-card.town-door h2 {
+  margin-bottom: 4px;
+}
 .town-card-text {
   margin: 0 0 4px;
   font: 500 13px/1.35 Archivo, sans-serif;
