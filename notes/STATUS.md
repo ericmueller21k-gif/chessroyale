@@ -6,7 +6,7 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 
 ## Running
 - PR #458 shop interiors r1 (CI watcher). Next: round 2 at xhigh (tokens + purchase).
-- One Opus (high): Colosseum crisp 3D pieces + pixelate only pieces (cr-crisp, claude/colosseum-crisp3d, brief notes/briefs/brief-colosseum-crisp3d.md). Art session also hand-built 3D rook/knight (boss-art 7886ee9, sent to Eric).
+- One Opus (high), REDIRECTED Nov 2: wire the art session's hand-built 3D GBA set (boss-art arena-pieces-3d.ts) as the Colosseum's default "Pixel" pieces, remove the old Pixel meshes, pixelate only pieces, Animations default off everywhere. Was: crisp 3D pieces (cr-crisp, claude/colosseum-crisp3d, brief notes/briefs/brief-colosseum-crisp3d.md). Art session also hand-built 3D rook/knight (boss-art 7886ee9, sent to Eric).
 - API art: Colosseum GBA pixel pieces (session_01JuCWRvpifUHBYDWXqYcDtk; asks Eric once, ~$3-6, cap $8).
 - One Opus: test-value changes (worktree /home/user/cr-testvalue, branch claude/test-value, brief
   notes/briefs/testvalue-changes.md): flakes first, then speed, formats→crowd-hidden merge, CI selection.
