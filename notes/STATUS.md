@@ -16,6 +16,13 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
   branch claude/boss-art; asks Eric once, ~$4-6, cap $8).
 
 ## Queue (one Opus at a time)
+0a. NEXT after crowd bot spread: Nov 2 bug fixes batch B (brief notes/briefs/brief-nov2-bugfixes-b.md): augment tap-through,
+   augment emojis gone, boss crate → inventory + normal open animation (stored data), shop chat text color, shop cards
+   name + Go in only, shop drag flipped on mobile; roadmap: emoji packs, boss challenge from town.
+0b. Later (after Alfil art): boss challenge from town (code).
+- Art session (session_01JuCWRrhykEFvvmv5JKWgRX) = expert for all boss homes + battle intros (API only): Alfil's home now,
+  then Alfil's intro (sand pyramid, table, sandstorm).
+- Gemini Part D (challenge lines) prompt: scratchpad lines/hunchess-boss-challenge-lines-for-gemini.txt, sent to Eric.
 0. NEXT after shops r2: Colosseum Pixel pieces (Eric Nov 2): Pixel must pixelate ONLY the pieces, never the crowd/arena
    (today arena-gl.ts draws the whole arena into the small target). Draw the pieces from the new GBA-style sprites (API run
    session_01JuCWRvpifUHBYDWXqYcDtk, scripts/boss-art/out/arena-pieces-gba/, after Eric OKs them). If Eric likes them, he

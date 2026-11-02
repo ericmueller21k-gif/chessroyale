@@ -1,0 +1,24 @@
+HUNCHESS BOSS LINES, PART D: CHALLENGE LINES (Nov 2, 2026)
+
+For Eric: paste everything below COPY FROM HERE into the SAME Gemini chat you used for the boss lines (it already
+knows the 16 bosses). Type "next" after each part until it says ALL DONE. Send the parts back to Claude.
+
+===== COPY FROM HERE =====
+
+One more part for the same 16 bosses, in the same style and rules as before (short, punchy, funny, friendly for all
+ages, teasing never cruel, no real people, no brand names).
+
+New moment: a player walks up to a boss in the town square and challenges it. The boss leads the player into its
+own home (its arena), they each walk to their side of the battle circle in the middle of the floor, and the boss
+says ONE line out loud before its chess board appears in a magical way. Then the battle starts.
+Example for Alfil, the old elephant chess piece: "I'll show you the power of the old piece."
+
+Part D, for each boss:
+1. challenge: 6 lines the boss says as it faces you in its arena, before the board appears. Grand, in-character,
+   a little dramatic, about its home, its power or its style, never about a specific opening.
+2. challenge.again: 3 lines for when you've already beaten it before and come back.
+3. leave.win: 2 lines it says as you walk out after you beat it (a gracious or sore loser, in character).
+4. leave.lose: 2 lines it says as you walk out after it beat you.
+
+Format exactly like before: a heading per boss, then each line on its own line as  key: text
+(for example  challenge: I'll show you the power of the old piece.). Do 4 bosses per part. Say ALL DONE at the end.
