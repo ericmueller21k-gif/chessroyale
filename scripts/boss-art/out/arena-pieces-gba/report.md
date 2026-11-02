@@ -31,3 +31,13 @@ for the horse and rook, then send me a view of it from the crowd." So no API run
 - `sheet-3d.png` (1x and 4x), `mockup-3d-computer.png`, `mockup-3d-phone.png` (laid on the empty arena as before),
   `compare-3d-reference.png` (Eric's picture's board beside the computer mockup), `arena-pieces-3d.json` (the four
   drawings as palette keys, the foot's pixel). The other four pieces would be built the same way from their 2D drawings.
+
+## Round 3: gold accents and the bishop (Nov 2)
+
+Eric: "The rook flat area on the top should be gold, horse mane gold, bishop helmet strip thing on top gold like in our
+reference. This is so they have a sharper defined look but still maintain the design style."
+- The rook: the flat tops of its battlements and the roof inside them gold (from the stands the roof is mostly hidden by
+  the wall, so the tops carry it).
+- The knight: the mane a flat-sided gold ridge down the back of the neck, one clean gold stripe from the side.
+- The bishop (new, `wb`, `bb`): built straight in 3D on the shared base: a stem narrowing to a gold collar, an egg-shaped
+  mitre with a small ball on top, and the slit across the mitre's front a gold strip from upper left to lower right.

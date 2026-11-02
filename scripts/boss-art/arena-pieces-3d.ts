@@ -4,6 +4,7 @@
  * (out/arena-pieces-gba, `PIECES`), one unit a sprite pixel:
  * - the rook and every base: each row of the sprite turned round the piece's axis (its half-width the radius, its gold rows
  *   gold rings, its dark rows grooves); the rook's top three rows a ring wall cut into four battlements round a sunken roof;
+ * - the bishop: turned in 3D on the same base, its mitre's slit a gold strip;
  * - the knight's head: the sprite's head pushed out into a rounded slab (thicker toward its middle), the mane gold, the eye
  *   on both cheeks.
  * Drawn from a seat in the stands (looking down `PITCH`) at one screen pixel a unit, each pixel one ray: flat cel bands of
@@ -71,10 +72,12 @@ function rookModel(): Model {
         if (r > R || r < R - WALL) return null;
         const a = Math.atan2(x, z); // 0 = toward you
         const sector = (((a / (Math.PI / 2)) % 1) + 1.5) % 1; // 0.5 at a merlon's middle
-        return Math.abs(sector - 0.5) < 0.3 ? "body" : null;
+        // (Their flat tops gold, with the roof: the rook's top reads gold from the stands.)
+        return Math.abs(sector - 0.5) < 0.3 ? (f === 15 ? "gold" : "body") : null;
       }
       // The roof inside the ring, sunk in its shadow.
-      if (f === 18 && Math.hypot(x, z) < R - WALL) return "groove";
+      // The flat roof inside the ring: gold (Eric, Nov 2: "the rook flat area on the top should be gold").
+      if (f === 18 && Math.hypot(x, z) < R - WALL) return "gold";
       return body(x, y, z);
     },
   };
@@ -109,10 +112,39 @@ function knightModel(): Model {
       const k = cell(c, f);
       if (k === ".") return null;
       const d = dist[f]![c]!;
-      const half = Math.min(2.8, 0.6 + 0.85 * d);
+      // The mane (Eric, Nov 2: gold) a flat-sided ridge down the back of the neck, so its side is one clean gold stripe.
+      const half = k === "M" || k === "N" ? 2.4 : Math.min(2.8, 0.6 + 0.85 * d);
       if (Math.abs(z) > half) return null;
       if (k === "E") return Math.abs(z) > half - 0.8 ? "eye" : "body";
       return GOLD.has(k) ? "gold" : "body";
+    },
+  };
+}
+
+/**
+ * The bishop (Eric, Nov 2: its mitre's "strip thing on top gold like in our reference"), turned like the rook: the shared
+ * base, a stem narrowing up to a gold collar, the mitre (an egg narrowing to a point), a small ball on top, and the slit
+ * across the mitre's front a gold strip, falling from the upper left to the lower right.
+ */
+function bishopModel(): Model {
+  const base = turned(PIECES.r!, 25, 33);
+  const radius = (y: number): [number, Mat] | null => {
+    if (y < 9) return null;
+    if (y < 12.6) return [3.5 - ((y - 9) / 3.6) * 1.2, "body"];
+    if (y < 13.8) return [3.6, "gold"];
+    if (y < 14.6) return [2.6, "body"];
+    if (y < 16.2) return [2.6 + ((y - 14.6) / 1.6) * 0.9, "body"];
+    if (y < 21.4) return [3.5 * Math.sqrt(Math.max(0, 1 - ((y - 16.2) / 5.2) ** 2)), "body"];
+    return null;
+  };
+  return {
+    inside(x, y, z) {
+      if (y < 9) return base(x, y, z);
+      if (Math.hypot(x, y - 22, z) <= 1.25) return "body";
+      const pr = radius(y);
+      if (!pr || Math.hypot(x, z) > pr[0]) return null;
+      if (y > 15.4 && y < 21 && z > -0.5 && Math.abs(y - 18.4 + 0.75 * x) < 0.7) return "gold";
+      return pr[1];
     },
   };
 }
@@ -194,6 +226,7 @@ const readPng = (f: string): Img => {
 
 const shots: Record<string, Shot> = {
   wr: draw(rookModel(), "w"), br: draw(rookModel(), "b"), wn: draw(knightModel(), "w"), bn: draw(knightModel(), "b"),
+  wb: draw(bishopModel(), "w"), bb: draw(bishopModel(), "b"),
 };
 
 // The drawings as data (palette keys, "." empty), for whoever puts them in the arena.
@@ -205,7 +238,7 @@ writeFileSync(`${outDir}/arena-pieces-3d.json`, JSON.stringify({
 
 // The sheet: the four at 1x, then 4x, on a light and a dark square.
 {
-  const gap = 8, n = 4, s4 = 4, cw = 32;
+  const gap = 8, n = 6, s4 = 4, cw = 32;
   const im = blank(gap + n * (cw * s4 + gap), gap + 34 + gap + 34 * s4 + gap, "#e9d6ae");
   Object.values(shots).forEach((s, i) => {
     const x1 = gap + i * (cw + gap); rect(im, x1 + s.ax - 10, gap + s.ay - 6, 20, 10, i % 2 ? "#a97c55" : "#eac99a"); paint(im, toImg(s), x1, gap, 1);
@@ -216,7 +249,7 @@ writeFileSync(`${outDir}/arena-pieces-3d.json`, JSON.stringify({
 
 // From the crowd: laid on a still of the arena with no pieces (the high view behind White), each foot on its square's
 // middle, snapped to the arena's art grid, at its art pixel's size on the still; far ranks first.
-const POS: [string, string][] = [["a1", "wr"], ["g1", "wn"], ["f3", "wn"], ["d1", "wr"], ["e4", "wn"], ["c6", "bn"], ["a8", "br"], ["h8", "br"], ["f6", "bn"], ["d5", "wr"]];
+const POS: [string, string][] = [["a1", "wr"], ["c1", "wb"], ["f3", "wn"], ["d1", "wr"], ["e4", "wn"], ["g2", "wb"], ["c6", "bn"], ["a8", "br"], ["h8", "br"], ["f6", "bn"], ["c8", "bb"], ["e7", "bb"], ["d5", "wr"]];
 for (const dev of ["computer", "phone"]) {
   const info = JSON.parse(readFileSync(`${inDir}/empty-${dev}.json`, "utf8"));
   const shot = readPng(`${inDir}/empty-${dev}.png`);
