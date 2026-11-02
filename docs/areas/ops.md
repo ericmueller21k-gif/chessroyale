@@ -32,10 +32,12 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     it, the match starts; Solo's queue; a private lobby, about 85 s). About 3 minutes of test time, so 1 shard.
   - **Traced modules** (Nov 1, `docs/decisions/2026-11-01-ci-selection.md`; `traced` in `areas.json`):
     `packages/core/src/settings.ts`, `packages/core/src/boss.ts`, `e2e/helpers.ts`, the app's `net.ts`, `solo.ts`,
-    `main.tsx`, `board/OwnBoard.tsx` and `account.ts` are followed through the code instead of running everything. The
+    `main.tsx`, `board/OwnBoard.tsx`, `account.ts`, and since Nov 2 `game.ts`, `prefs.ts`, `test-switches.ts`,
+    `screens/Hud.tsx` and `components/EvalBar.tsx` are followed through the code instead of running everything. The
     plan reads the module before and after (`traceModule`, plain text, no parser: about a second): the top-level
     declarations the diff changes (a settings object, a helper, a function or class; comments and types don't run),
-    anything in the module that uses them (and the module state a changed function names), then the files that import
+    anything in the module that uses them (and the module state a changed function names; not a constant holding a plain
+    value, a storage key's name say, which nothing can write: Nov 2), then the files that import
     the module, or its package's entry, and name one of them (`usersOf`). Each of those counts as a changed path: its
     area's specs, a spec itself, a unit test nothing. So a settings change runs the specs of the files that read that
     object, and a helper's change the specs that call it. It still runs everything when a user is a shared foundation
