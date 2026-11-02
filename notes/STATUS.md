@@ -6,7 +6,7 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 
 ## Running
 - PR #458 shop interiors r1 (CI watcher). Next: round 2 at xhigh (tokens + purchase).
-- No Opus helper running. Next: Colosseum pixel pieces code once Eric OKs the API sprites.
+- One Opus (high): Colosseum crisp 3D pieces + pixelate only pieces (cr-crisp, claude/colosseum-crisp3d, brief notes/briefs/brief-colosseum-crisp3d.md). Art session also hand-built 3D rook/knight (boss-art 7886ee9, sent to Eric).
 - API art: Colosseum GBA pixel pieces (session_01JuCWRvpifUHBYDWXqYcDtk; asks Eric once, ~$3-6, cap $8).
 - One Opus: test-value changes (worktree /home/user/cr-testvalue, branch claude/test-value, brief
   notes/briefs/testvalue-changes.md): flakes first, then speed, formats→crowd-hidden merge, CI selection.
@@ -15,6 +15,7 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
   branch claude/boss-art; asks Eric once, ~$4-6, cap $8).
 
 ## Queue (one Opus at a time)
+0a. NEXT after crisp 3D: 50 v 50 bots all pick the same move (brief notes/briefs/brief-crowd-bot-spread.md).
 0. NEXT after shops r2: Colosseum Pixel pieces (Eric Nov 2): Pixel must pixelate ONLY the pieces, never the crowd/arena
    (today arena-gl.ts draws the whole arena into the small target). Draw the pieces from the new GBA-style sprites (API run
    session_01JuCWRvpifUHBYDWXqYcDtk, scripts/boss-art/out/arena-pieces-gba/, after Eric OKs them). If Eric likes them, he
