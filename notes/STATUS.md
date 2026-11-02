@@ -6,8 +6,8 @@ Everything from Nov 1 is merged: #447 eval bar off, #448 cash-in 2 gold, #449 on
 
 ## Running
 - PR #458 shop interiors r1 (CI watcher). Next: round 2 at xhigh (tokens + purchase).
-- One Opus (high): Timber's own sounds (worktree /home/user/cr-tsound, branch claude/timber-sounds, brief
-  notes/briefs/brief-timber-sounds.md); WAVs to Eric before merge.
+- PR #459 Timber's own sounds: WAVs sent to Eric; merge only after his OK.
+- One Opus (high): Nov 2 fixes (cr-nov2, claude/nov2-fixes from claude/shop-interiors, brief notes/briefs/brief-nov2-fixes.md).
 - One Opus: test-value changes (worktree /home/user/cr-testvalue, branch claude/test-value, brief
   notes/briefs/testvalue-changes.md): flakes first, then speed, formats→crowd-hidden merge, CI selection.
 - API art sessions (outside the one-Opus rule, Eric): circus interior (session_01JuCWRrhykEFvvmv5JKWgRX, ~$4-7, cap $10);
@@ -15,10 +15,6 @@ Everything from Nov 1 is merged: #447 eval bar off, #448 cash-in 2 gold, #449 on
   branch claude/boss-art; asks Eric once, ~$4-6, cap $8).
 
 ## Queue (one Opus at a time)
-0. NEXT (one Opus high batch, Eric Nov 2): (a) your ride goes INTO shops with you (not left outside; keep the
-   leave-outside code as a fallback); (b) Timber ults at most 2 times a game, then his meter stops charging; (c) the
-   admins' 🐟 Engine move (the cheat) = Stockfish's best move; Eric thinks it's on Maia: check what it uses and what its
-   title line says; the bosses' own brain stays as is.
 - Haiku running beside (Eric OK'd "Send Haiku"): Boss Battle picker, 2 rows on the computer (cr-bsrows,
   claude/boss-select-rows, brief notes/briefs/brief-boss-select-rows.md).
 1. Auto chess reveal (Eric's simpler version): your placed pieces gray until revealed to the opponent, then normal; yellow
