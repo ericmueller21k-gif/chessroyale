@@ -1,7 +1,7 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "preact/hooks";
 import { type MatchmakingType, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, bossPartySettings, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
-import { bossInUrl, bossTierFromUrl, chosenBoss, chosenHomeMode, chosenMode, lobbyModeOf, raidInUrl, rememberBossPick } from "./screens/Home.tsx";
+import { bossInUrl, bossTierFromUrl, chosenBoss, chosenHomeMode, chosenMode, lobbyModeOf, prefetchBossAlone, raidInUrl, rememberBossPick } from "./screens/Home.tsx";
 import { lastBoss } from "./boss-history.ts";
 import { unlockAudio } from "./components/Countdown.tsx";
 import { RaceTower } from "./components/RaceTower.tsx";
@@ -9,7 +9,7 @@ import { resetBoardsStrip } from "./components/TinyBoard.tsx";
 import { enginePool } from "./engine.ts";
 import { bossAlone, cutLabel, elimination, isCrowd, roundLive, scoreDp, towerView, type GameView } from "./game.ts";
 import { NetMatch, forgetSeat, hasSeat, lobbyStatus, type LobbyGone, type LobbyResult } from "./net.ts";
-import { exitFor, exitMatch, onExitMatch } from "./match-exit.ts";
+import { exitFor, exitMatch, onExitMatch, setExitTo } from "./match-exit.ts";
 import { useRecluseTalk } from "./recluse-talk.ts";
 import { ConfirmExit, MatchMenu, type MatchExit } from "./components/MatchMenu.tsx";
 import type { LeftHow } from "@chessroyale/chess";
@@ -35,7 +35,7 @@ import { setInviteHost } from "./friends.ts";
 import { FriendsScreen } from "./screens/Friends.tsx";
 import { SettingsScreen } from "./screens/Settings.tsx";
 import { AutoChessScreen } from "./screens/AutoChess.tsx";
-import { TownPage, type BotGameAsk } from "./town/TownPage.tsx";
+import { TownPage, type BotGameAsk, type Stand } from "./town/TownPage.tsx";
 import { ColosseumPage } from "./colosseum/ColosseumPage.tsx";
 import { FaqScreen } from "./screens/Faq.tsx";
 import { Logo } from "./components/FrontDoor.tsx";
@@ -307,6 +307,8 @@ export function App() {
    * town reads it). A reload during that game lands there too: its address carries it (`/town?at=6.0.3`).
    */
   const [townSeat, setTownSeat] = useState<string | null>(() => (location.pathname === "/town" ? new URLSearchParams(location.search).get("at") : null));
+  /** Where the town opens you, back from a boss's challenge (Pokémon-gym style): where you stood as you challenged it. */
+  const [townStand, setTownStand] = useState<Stand | null>(null);
   // A computer's side menu on a match's screen (Nov 1): its item asks Resign or Leave first (the gear's own confirm), then
   // goes there. `sideAsk`: the confirm on screen, and the item behind it; `sideNext`: the page to go to once the match is out.
   const [sideAsk, setSideAsk] = useState<{ exit: MatchExit; then: MatchPage } | null>(null);
@@ -659,6 +661,27 @@ export function App() {
     });
     const rest = searchWithoutSeat();
     history.pushState({ townGame: g.seat }, "", `/town${rest ? `${rest}&` : "?"}at=${g.seat}`);
+  };
+  /**
+   * A boss challenged in the town (one with an intro: town/shops/challenge.ts, Alfil first), its transition covering the screen: its
+   * battle starts now, Boss alone's (that boss picked, your difficulty, a token counting, as Boss Battle's START), and resolves once
+   * the battle's screen shows. Leaving the battle (its result's "Back to town") puts you back where you stood (`townReturn`).
+   */
+  const townReturn = useRef<Stand | null>(null);
+  const challengeFromTown = async (id: string, stand: Stand | null) => {
+    rememberBossPick(id);
+    townReturn.current = stand ?? { c: -1, r: -1, facing: 1, view: 0 };
+    setExitTo("town");
+    prefetchBossAlone(id, account().profile?.rating ?? null);
+    setShowTown(false);
+    setTownSeat(null);
+    setTownStand(null);
+    setHomeIntent(null);
+    setRaidOpen(false);
+    history.replaceState(null, "", `/${location.search}`);
+    await startSolo("raid");
+    // (Two frames: the battle's screen is drawn under the transition before it slides off.)
+    await new Promise<void>((ok) => requestAnimationFrame(() => requestAnimationFrame(() => ok())));
   };
   /** Out of the game, back to the town at its table (its result's "Back to town", or the back button: `popped`). */
   const backToTown = (popped = false) => {
@@ -1120,6 +1143,17 @@ export function App() {
     // Done with a match that's over: this device forgets its seat (its old link then says it has ended).
     if (match instanceof NetMatch && match.phase.kind === "results") forgetSeat(match.code);
     setMatch(null);
+    // A boss's battle from the town's challenge: back to the town square, where you stood as you challenged it.
+    const back = townReturn.current;
+    if (back) {
+      townReturn.current = null;
+      setExitTo("home");
+      setTownStand(back.c >= 0 ? back : null);
+      setTownSeat(null);
+      setShowTown(true);
+      history.replaceState(null, "", `/town${location.search}`);
+      return;
+    }
     history.replaceState(null, "", "/");
   };
 
@@ -1128,6 +1162,7 @@ export function App() {
     // (The town square is in the frame on a computer: every menu item leaves it; Chess Town sets it again.)
     setShowTown(false);
     setTownSeat(null);
+    setTownStand(null);
     closeProfile();
     setShowSettings(false);
     setShowFaq(false);
@@ -1418,16 +1453,20 @@ export function App() {
         <TownPage
           nav={nav}
           seat={townSeat}
+          stand={townStand}
+          onBossChallenge={challengeFromTown}
           onPlayBot={playTownBot}
           onColosseum={() => {
             setShowTown(false);
             setTownSeat(null);
+            setTownStand(null);
             setShowColosseum(true);
             history.replaceState(null, "", "/colosseum");
           }}
           onBack={() => {
             setShowTown(false);
             setTownSeat(null);
+            setTownStand(null);
             history.replaceState(null, "", "/");
           }}
           // A boss's "Challenge alone", confirmed: out of the town square to the Solo Boss Mode screen (the solo form, as the
@@ -1437,6 +1476,7 @@ export function App() {
             rememberBossPick(id);
             setShowTown(false);
             setTownSeat(null);
+            setTownStand(null);
             history.replaceState(null, "", "/");
             setHomeIntent(null);
             setRaidFull(false);
@@ -1708,6 +1748,7 @@ export function App() {
     },
     // (Solo again as it was: through the queue screen, or Boss alone straight in.)
     again: () => (match instanceof SoloMatch ? void startSolo(match.settings.raid ? "raid" : match.settings.mode, { fill: match.players.length > 0 }) : leave()),
+    homeText: townReturn.current ? "Back to town" : undefined,
   });
   // Computers get the leaderboard as a permanent sidebar during the knockout stages (and the pre-game votes, so the
   // board is in the same place when the game begins).
@@ -1772,7 +1813,7 @@ export function App() {
     return match instanceof NetMatch && match.auto && (k === "loading" || k === "lobby");
   }
 
-  function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () => void }) {
+  function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () => void; homeText?: string }) {
     const p = match.phase;
     if (resumingSplash(match))
       return (
@@ -1847,6 +1888,8 @@ export function App() {
           winner={p.winner}
           onAgain={actions.again}
           onHome={actions.leave}
+          // (A boss's battle from the town's challenge: its leaving goes back to the town, where you stood.)
+          homeText={actions.homeText}
         />
       );
   }

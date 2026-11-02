@@ -75,6 +75,15 @@ const BOSS_KEY = "brc.bossId";
 /** The boss just picked from the menu ("" for a random one; kept here too, for when there's no storage). */
 let pickedBoss: string | null = null;
 /** Remembers the boss picked from the menu (for this solo raid or lobby, and next time): an id, or "" for random. */
+/**
+ * Boss alone's Maia files fetched ahead, as Boss Battle's START does before the battle (only when the boss picked, or any of them
+ * for a random pick, is likely to pick its moves with Maia at that difficulty). The town's challenge (Pokémon-gym style) too.
+ */
+export function prefetchBossAlone(pick: string, rating: number | null, difficulty: BossDifficultyId = chosenDifficulty()) {
+  const bosses = menuBosses({ admin: isAdmin(), raid: false }).filter((b) => !isPaused(`boss:${b.id}`) && (pick === RANDOM || b.id === pick));
+  if (maiaLikely(bosses.map((b) => bossAloneElo(rating, b, difficulty)))) prefetchMaia();
+}
+
 export function rememberBossPick(id: string) {
   pickedBoss = id;
   try {
@@ -629,8 +638,7 @@ export function HomeScreen({
   // Boss Battle's START: Maia's files fetched ahead as the old Boss alone menu did when it opened, then the battle.
   const start = () => {
     if (rest("solo")) return;
-    const bosses = menuBosses({ admin: isAdmin(), raid: false }).filter((b) => !isPaused(`boss:${b.id}`) && (pick === RANDOM || b.id === pick));
-    if (maiaLikely(bosses.map((b) => bossAloneElo(profile?.rating ?? null, b, difficulty)))) prefetchMaia();
+    prefetchBossAlone(pick, profile?.rating ?? null, difficulty);
     onSolo("raid");
   };
   const pickBoss = (id: string) => {

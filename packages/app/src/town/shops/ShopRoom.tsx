@@ -43,6 +43,9 @@ import type { Rider } from "../rides.ts";
 import { rideSpeed } from "../../components/rides/scale.ts";
 import { inTalkRange, isFloor, makeRoom, onDoor, tapTarget, findPath, type Room, type ShopPlace, type Sq } from "./room.ts";
 import { POOL_LINE, bossHoldings, buyBossCrate, canAfford, holdLine, priceLine, prizeRows, shopOf, wayText, type CrateWay, type ShopDef } from "./shops.ts";
+import { CHALLENGE_FEEL, introAt, introCues, introLength, marksOf, type IntroNow } from "./challenge.ts";
+import { paintTable, playCue, type LoadedIntro } from "./intro.ts";
+import { say } from "../chat.ts";
 
 /** A room's art, as its file exports it. */
 interface RoomArt {
@@ -123,7 +126,18 @@ export interface ShopCtl {
   recenter: () => void;
 }
 
-export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onReady, ctl }: { room: LoadedRoom; youArt: () => YouArt | null; /** The town's rider you're on (its frames ready), or null: on foot. */ youRider: () => Rider | null; youName: () => string; onZoom: (out: boolean) => void; onOut: () => void; onReady: () => void; ctl: { current: ShopCtl | null } }) {
+/**
+ * A boss's challenge played in its room (shops/challenge.ts): you and the boss walk in to the battle circle's marks, it says its
+ * line, the board comes in between you; then `onDone` (the town starts the boss's transition and the battle).
+ */
+export interface RoomIntro {
+  intro: LoadedIntro;
+  /** You both stand on your marks, facing each other: the line and the board's animation begin. */
+  onMarks?: () => void;
+  onDone: () => void;
+}
+
+export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onReady, ctl, intro = null }: { room: LoadedRoom; youArt: () => YouArt | null; /** The town's rider you're on (its frames ready), or null: on foot. */ youRider: () => Rider | null; youName: () => string; onZoom: (out: boolean) => void; onOut: () => void; onReady: () => void; ctl: { current: ShopCtl | null }; /** A boss's challenge to play here (none: the shop as usual). */ intro?: RoomIntro | null }) {
   const box = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const cardEl = useRef<HTMLDivElement>(null);
@@ -135,7 +149,7 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
     const r = (eng.current = startRoom(box.current!, canvas.current!, cardEl.current!, room, youArt, youRider, youName, onZoom, (c) => {
       setCard(c);
       setMsg("");
-    }));
+    }, intro));
     ctl.current = r;
     onReady();
     return () => {
@@ -267,6 +281,7 @@ function startRoom(
   youName: () => string,
   onZoom: (out: boolean) => void,
   onCard: (c: ShopCard | null) => void,
+  challenge: RoomIntro | null = null,
 ) {
   const f = TOWN_FEEL;
   const S = SHOP_FEEL;
@@ -285,6 +300,61 @@ function startRoom(
     const rd = youRider();
     return rd?.ready ? rd : null;
   };
+  // ---- A boss's challenge (shops/challenge.ts): the boss comes in beside you and you each walk to your start mark on the battle
+  // circle, side by side, at the challenge's pace; each settles onto its mark's middle; facing each other, the intro plays.
+  const C = CHALLENGE_FEEL;
+  const ci = challenge?.intro ?? null;
+  const marks = ci ? marksOf(art.layout) : null;
+  const boss = ci && marks ? new Walker({ c: room.start.c - 1, r: room.start.r }, C.walkStepMs, false) : null;
+  const bossPose = { x: 0, y: 0, hop: 0, tilt: 0, step: false, t: 0 };
+  /** When you and the boss each reached your mark's square (-1: walking), and when you both stood on your marks' middles (the intro's 0). */
+  let youAt = -1;
+  let bossAt = -1;
+  let onMarksAt = -1;
+  let introNow: IntroNow | null = null;
+  let cueN = 0;
+  let said = false;
+  let introDone = false;
+  const cues = ci ? introCues(ci.beats, ci.anims) : [];
+  const introEnd = ci ? introLength(ci.beats) : 0;
+  if (boss && marks) {
+    you.stepMs = C.walkStepMs;
+    const yp = findPath(room, you.here(), marks.youSq);
+    const bp = findPath(room, boss.here(), marks.bossSq);
+    if (yp) you.go(yp);
+    if (bp) boss.go(bp);
+  }
+  /** The last half square onto a mark's middle (0 until it's there; then easing to its half). */
+  const settle = (at: number, half: number, now: number) => (at < 0 ? 0 : half * Math.min(1, (now - at) / C.settleMs));
+  const youOx = (now: number) => (marks ? settle(youAt, marks.you.c - marks.youSq.c, now) : 0);
+  const bossOx = (now: number) => (marks ? settle(bossAt, marks.boss.c - marks.bossSq.c, now) : 0);
+  /** The challenge, a frame on: the walk in, then the intro's beats (its line said once, into the chat log too; its cues' sounds). */
+  const stepIntro = (now: number) => {
+    if (!ci || !boss || !marks || !challenge) return;
+    boss.update(now);
+    if (youAt < 0 && !you.moving()) youAt = now;
+    if (bossAt < 0 && !boss.moving()) bossAt = now;
+    if (onMarksAt < 0 && youAt >= 0 && bossAt >= 0) onMarksAt = Math.max(youAt, bossAt) + C.settleMs;
+    if (onMarksAt < 0 || now < onMarksAt) {
+      introNow = null;
+      if (cv.dataset.intro !== "walk") cv.dataset.intro = "walk";
+      return;
+    }
+    const t = now - onMarksAt;
+    introNow = introAt(ci.beats, ci.anims, t);
+    if (!said) {
+      said = true;
+      challenge.onMarks?.();
+      say(def.boss, ci.def.line, "boss");
+    }
+    while (cueN < cues.length && t >= cues[cueN]!.at) playCue(ci, cues[cueN++]!.cue);
+    if (cv.dataset.intro !== introNow.step) cv.dataset.intro = introNow.step;
+    if (!introDone && t >= introEnd) {
+      introDone = true;
+      challenge.onDone();
+    }
+  };
+
   /** The test hook's view of your ride (as the town's `youRide`): its animation and frame drawn last, its side, its view. */
   const seen = { ride: null as string | null, anim: "" as "" | "idle" | "move", frame: -1, facing: 1, view: 0 };
 
@@ -664,7 +734,7 @@ function startRoom(
     youHead.on = false;
     seen.anim = "";
     you.pose(now, pose);
-    if (!P(pose.x, pose.y)) return;
+    if (!P(pose.x + youOx(now), pose.y)) return;
     const rd = riding();
     if (rd) return drawRiding(rd, now);
     seen.ride = null;
@@ -700,8 +770,122 @@ function startRoom(
     g.imageSmoothingEnabled = false;
     Object.assign(youHead, { x: pt.x, y: y0 + head * h - 2, on: true });
   };
-  /** The Shopkeeper (`kid`) or you. */
-  const drawFigure = (kid: boolean, now: number) => (kid ? drawKid(now) : drawYou(now));
+  /** The boss (in a challenge): its town sprite, its idle playing, at the town's size, its shadows as the town draws a boss's. */
+  const bossHead = { x: 0, y: 0, on: false };
+  const drawBoss = (now: number) => {
+    bossHead.on = false;
+    if (!ci || !boss) return;
+    boss.pose(now, bossPose);
+    if (!P(bossPose.x + bossOx(now), bossPose.y)) return;
+    const b = ci.boss;
+    const u = now % b.loop;
+    let i = 0;
+    while (i < b.ends.length - 1 && u >= b.ends[i]!) i++;
+    const img = b.frames[i]!;
+    const h = b.squares * pt.k;
+    const w = (h * b.ch.w) / b.ch.h;
+    const x0 = pt.x - (b.ch.foot[0] / b.ch.w) * w;
+    const y0 = pt.y - (b.ch.foot[1] / b.ch.h) * h;
+    const soft = 1.6;
+    g.fillStyle = SHADOW;
+    g.globalAlpha = f.shadowAlpha;
+    g.beginPath();
+    g.ellipse(pt.x, pt.y, Math.min(w * 0.42, pt.k * 0.42 * soft), pt.k * 0.12 * soft, 0, 0, Math.PI * 2);
+    g.fill();
+    g.globalAlpha = f.contactShadowAlpha;
+    g.beginPath();
+    g.ellipse(pt.x, pt.y, pt.k * f.contactShadowW * 1.45 * 1.2, pt.k * f.contactShadowDepth, 0, 0, Math.PI * 2);
+    g.fill();
+    g.globalAlpha = 1;
+    g.save();
+    if (boss.facing < 0) {
+      g.translate(pt.x, 0);
+      g.scale(-1, 1);
+      g.translate(-pt.x, 0);
+    }
+    g.imageSmoothingEnabled = h < img.height * 1.5;
+    g.drawImage(img, x0, y0, w, h);
+    g.restore();
+    g.imageSmoothingEnabled = false;
+    Object.assign(bossHead, { x: pt.x, y: y0 + h * 0.04, on: true });
+  };
+  /** Between you (in a challenge): the pyramid's frame, or the table with its board (the crumble's last frames over it). */
+  const drawCenter = () => {
+    const n = introNow;
+    if (!ci || !marks || !n || !P(marks.table.c, marks.table.r)) return;
+    const s = pt.k / SQ;
+    const x = pt.x;
+    const y = pt.y;
+    const put = (img: HTMLCanvasElement, ch: Character) => g.drawImage(img, x - ch.foot[0] * s, y - ch.foot[1] * s, img.width * s, img.height * s);
+    g.imageSmoothingEnabled = false;
+    if (n.table) {
+      put(ci.table.img, ci.table.ch);
+      paintTable(g, v, marks.table.c - camX, camY - marks.table.r, ci.table.palette);
+    }
+    const py = ci.pyramid;
+    if (n.pyramid) put(py.frames[n.pyramid.anim][n.pyramid.frame]!, py.ch);
+    else if (n.drift) put(py.frames.crumble[py.frames.crumble.length - 1]!, py.ch);
+  };
+  /** What stands among the pieces this frame (the Shopkeeper 0, you 1, the boss 2, the board 3), by row: drawn far to near. */
+  const figZ = new Float64Array(4);
+  const figK = new Uint8Array(4);
+  let figN = 0;
+  const addFig = (z: number, k: number) => {
+    let i = figN++;
+    while (i > 0 && figZ[i - 1]! > z) {
+      figZ[i] = figZ[i - 1]!;
+      figK[i] = figK[i - 1]!;
+      i--;
+    }
+    figZ[i] = z;
+    figK[i] = k;
+  };
+  const drawFigure = (k: number, now: number) => (k === 0 ? drawKid(now) : k === 1 ? drawYou(now) : k === 2 ? drawBoss(now) : drawCenter());
+  /** A speech bubble's lines (wrapped once for its words). */
+  const bubbles = new Map<string, { lines: string[]; w: number }>();
+  /** The boss's line in a speech bubble (the town's: white, rounded, its tail pointing down at the speaker's head). */
+  const drawBubble = (text: string, ax: number, ay: number) => {
+    g.font = `500 12px Archivo, system-ui, sans-serif`;
+    let b = bubbles.get(text);
+    if (!b) {
+      const lines: string[] = [];
+      let line = "";
+      for (const w of text.split(" ")) {
+        const tt = line ? `${line} ${w}` : w;
+        if (g.measureText(tt).width > 176 && line) {
+          lines.push(line);
+          line = w;
+        } else line = tt;
+      }
+      if (line) lines.push(line);
+      b = { lines, w: Math.max(...lines.map((l) => g.measureText(l).width)) + 20 };
+      bubbles.set(text, b);
+    }
+    const lh = 16;
+    const h = b.lines.length * lh + 10;
+    const bx = Math.max(6, Math.min(W - b.w - 6, ax - b.w / 2));
+    const by = Math.max(6, ay - h - 9);
+    g.save();
+    g.shadowColor = "rgba(0,0,0,.25)";
+    g.shadowBlur = 8;
+    g.shadowOffsetY = 2;
+    g.fillStyle = "#fff";
+    g.beginPath();
+    g.roundRect(bx, by, b.w, h, 12);
+    g.fill();
+    const tx = Math.max(bx + 14, Math.min(bx + b.w - 14, ax));
+    g.beginPath();
+    g.moveTo(tx - 6, by + h - 1);
+    g.lineTo(tx + 6, by + h - 1);
+    g.lineTo(tx, by + h + 7);
+    g.closePath();
+    g.fill();
+    g.restore();
+    g.fillStyle = "#1d1b19";
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    for (let i = 0; i < b.lines.length; i++) g.fillText(b.lines[i]!, bx + b.w / 2, by + 5 + lh / 2 + i * lh);
+  };
   const drawTag = (text: string, kind: TagKind, x: number, y: number) => {
     const c = tag(text, kind);
     const w = c.width / DPR;
@@ -768,20 +952,26 @@ function startRoom(
       g.stroke();
     } else dest.on = false;
     drawGlows(now);
-    // Far to near: the pieces by their rows, the Shopkeeper and you each drawn before the first piece nearer than them.
+    // Far to near: the pieces by their rows, the Shopkeeper and you (and in a challenge the boss and the board between you) each
+    // drawn before the first piece nearer than them.
     you.pose(now, pose);
-    const kidFirst = def.at[1] <= pose.y;
-    const z0 = kidFirst ? def.at[1] : pose.y;
-    const z1 = kidFirst ? pose.y : def.at[1];
-    let drawn = 0;
+    figN = 0;
+    addFig(def.at[1], 0);
+    addFig(pose.y, 1);
+    if (boss && marks) {
+      boss.pose(now, bossPose);
+      addFig(bossPose.y, 2);
+      if (introNow) addFig(marks.table.r, 3);
+    }
+    let k = 0;
     for (const u of ups) {
-      if (drawn === 0 && z0 < u.z) drawFigure(drawn++ === 0 === kidFirst, now);
-      if (drawn === 1 && z1 < u.z) drawFigure(drawn++ === 0 === kidFirst, now);
+      while (k < figN && figZ[k]! < u.z) drawFigure(figK[k++]!, now);
       drawUp(u, now);
     }
-    while (drawn < 2) drawFigure(drawn++ === 0 === kidFirst, now);
+    while (k < figN) drawFigure(figK[k++]!, now);
     if (kidBox.on) drawTag("Shopkeeper", "sidekick", kidBox.hx, kidBox.hy);
     if (youHead.on) drawTag(youName(), "you", youHead.x, youHead.y);
+    if (ci && introNow?.line && bossHead.on) drawBubble(ci.def.line, bossHead.x, bossHead.y);
     placeCard();
     const h = you.here();
     const key = `${h.c},${h.r}`;
@@ -811,6 +1001,7 @@ function startRoom(
     setCard(null);
   };
   const stepCards = () => {
+    if (ci) return; // (A challenge: no cards; you're here to fight.)
     const h = you.here();
     const key = `${h.c},${h.r}`;
     if (shut && shut !== key) shut = "";
@@ -860,8 +1051,9 @@ function startRoom(
     zoomCur += (zoomTarget - zoomCur) * (1 - Math.exp(-dt * f.zoomRate));
     if (Math.abs(zoomTarget - zoomCur) < 0.001) zoomCur = zoomTarget;
     // (On your ride inside, at its pace: RIDES.speed, as in the town.)
-    you.stepMs = f.youStepMs / rideSpeed(riding()?.id);
+    if (!ci) you.stepMs = f.youStepMs / rideSpeed(riding()?.id);
     you.update(now);
+    stepIntro(now);
     stepCards();
     if (follow) {
       // A critically damped spring toward you (the town's), solved exactly for the frame.
@@ -933,6 +1125,7 @@ function startRoom(
     return { x: e.clientX - rc.left, y: e.clientY - rc.top };
   };
   const onDown = (e: PointerEvent) => {
+    if (ci) return; // (A challenge plays out on its own: no walking, no looking around.)
     cv.setPointerCapture?.(e.pointerId);
     P(camX, camY - 0.5, pq[0]);
     P(camX, camY + 0.5, pq[1]);
@@ -999,6 +1192,14 @@ function startRoom(
   };
   const hookCam = () => (testSwitchesAllowed() ? { zoom: zoomCur, zoomTarget, room: def.home, follow, focus: [camX, camY] } : null);
   const hookRide = () => (testSwitchesAllowed() ? { ...seen, stepMs: you.stepMs } : null);
+  /** (Tests) A challenge's state: its step ("walk" until you're both on your marks), where you and the boss stand, the line and the board showing. */
+  const hookIntro = () => {
+    if (!testSwitchesAllowed() || !ci || !boss) return null;
+    const now = performance.now();
+    you.pose(now, pose);
+    boss.pose(now, bossPose);
+    return { step: introNow?.step ?? "walk", you: [pose.x + youOx(now), pose.y], boss: [bossPose.x + bossOx(now), bossPose.y], line: !!introNow?.line && bossHead.on, table: !!introNow?.table, pyramid: introNow?.pyramid ?? null };
+  };
   const hookBench = (k: number) => {
     if (!testSwitchesAllowed()) return null;
     const now = performance.now();
@@ -1007,8 +1208,9 @@ function startRoom(
     for (let i = 0; i < k; i++) draw(now);
     return (performance.now() - t0) / k;
   };
-  const hooks = window as unknown as { __shopAt?: typeof hookAt; __shopCam?: typeof hookCam; __shopBench?: typeof hookBench; __shopRide?: typeof hookRide };
+  const hooks = window as unknown as { __shopAt?: typeof hookAt; __shopCam?: typeof hookCam; __shopBench?: typeof hookBench; __shopRide?: typeof hookRide; __shopIntro?: typeof hookIntro };
   hooks.__shopAt = hookAt;
+  hooks.__shopIntro = hookIntro;
   hooks.__shopRide = hookRide;
   hooks.__shopCam = hookCam;
   hooks.__shopBench = hookBench;
@@ -1038,6 +1240,7 @@ function startRoom(
       delete hooks.__shopCam;
       delete hooks.__shopBench;
       delete hooks.__shopRide;
+      delete hooks.__shopIntro;
     },
   };
 }

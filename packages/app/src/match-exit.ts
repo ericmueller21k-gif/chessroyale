@@ -6,6 +6,11 @@ import type { MatchExit } from "./components/MatchMenu.tsx";
  * next), so the control in any screen's top line can call it.
  */
 let handler: (() => void) | null = null;
+/** Where leaving goes: home, or back to the town square (a boss's battle from the town's challenge: the app sets it). */
+let exitTo: "home" | "town" = "home";
+export function setExitTo(to: "home" | "town") {
+  exitTo = to;
+}
 
 export function onExitMatch(fn: () => void): () => void {
   handler = fn;
@@ -32,7 +37,7 @@ export function exitNote(m: Pick<GameView, "serverPaced" | "seatToBot" | "boss" 
   const out = !!m.standings().find((s) => s.isYou)?.out;
   if (kind === "leave") {
     if (out) return online ? "You're already out, so your result stands. You'll go home." : "You're already out, so your result stands. You'll see it now.";
-    if (!online) return "You'll go home. Nothing goes on your record.";
+    if (!online) return exitTo === "town" ? "You'll go back to the town square. Nothing goes on your record." : "You'll go home. Nothing goes on your record.";
     return m.seatToBot ? "You'll go home, and a bot takes your seat." : "You'll go home, and your seat is freed.";
   }
   if (!online) return m.boss && m.totalPlayers === 1 ? "The game ends here and counts as a loss." : "The match ends here for you and counts as a loss.";
