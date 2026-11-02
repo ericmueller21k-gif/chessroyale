@@ -7,7 +7,9 @@ Everything from Nov 1 is merged: #447 eval bar off, #448 cash-in 2 gold, #449 on
 ## Running
 - PR #458 shop interiors r1 (CI watcher). Next: round 2 at xhigh (tokens + purchase).
 - PR #459 Timber's own sounds: WAVs sent to Eric; merge only after his OK.
-- One Opus (high): Nov 2 fixes (cr-nov2, claude/nov2-fixes from claude/shop-interiors, brief notes/briefs/brief-nov2-fixes.md).
+- PR #460 Nov 2 fixes (ride into shops, Timber 2 Gnaws, 🐟 = Stockfish, no King praise moves 1-10): CI watcher.
+- One Opus (xhigh): shops round 2, tokens + buying (cr-tokens, claude/shop-tokens, brief notes/briefs/brief-shop-r2-tokens.md).
+- #458 shops r1 and #459 Timber sounds merged (Eric's picks: chitter select, tap/whack/knock build, gnaw on capture).
 - One Opus: test-value changes (worktree /home/user/cr-testvalue, branch claude/test-value, brief
   notes/briefs/testvalue-changes.md): flakes first, then speed, formats→crowd-hidden merge, CI selection.
 - API art sessions (outside the one-Opus rule, Eric): circus interior (session_01JuCWRrhykEFvvmv5JKWgRX, ~$4-7, cap $10);
