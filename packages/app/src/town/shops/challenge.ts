@@ -87,10 +87,11 @@ export const CHALLENGE_FEEL = {
   coveredMinMs: 250,
   stormOutMs: 600,
   /**
-   * The room's camera through a challenge, by layout: looking at this many squares south of the table, at this zoom (0 Close, 1 the
-   * town's zoomed-in camera): you, the board and the boss all in view, the boss's line under the chat log.
+   * The room's camera through a challenge, by layout: looking at this many squares south of the table (and west of it: the boss is
+   * wider than you), at this zoom (0 Close, 1 the town's zoomed-in camera): you, the board and the boss all in view, the boss's line
+   * under the chat log.
    */
-  cam: { across: { south: 0.8, zoom: 0.45 }, facing: { south: 1.5, zoom: 0.6 } },
+  cam: { across: { south: 0.8, west: 0.3, zoom: 0.45 }, facing: { south: 1.5, west: 0, zoom: 0.6 } },
   /**
    * How far (squares) each of you stands from the table's middle, by layout: across, just outside your stool (the park table's
    * stools stand `stoolOff` from its middle); facing, on the circle's drawn north and south marks.
@@ -98,6 +99,8 @@ export const CHALLENGE_FEEL = {
   standOff: { across: 1.5, facing: 2.5 },
   /** The park table's stools: this far (squares) from the table's middle (park.ts PARK_TABLE: three squares across). */
   stoolOff: 1,
+  /** A circle whose middle has a piece standing in it (Babur's ring, its pedestal): the table stands this many squares south of it. */
+  clearOff: 1.5,
   /**
    * The default intro (a boss without its own art): the line from facing each other for `lineMs` (above); the table and its board
    * pop in `popAtMs` into it (growing in over `popMs`, a dust puff round its foot over `puffMs`); from the line's end it swings its
@@ -173,10 +176,10 @@ export interface Marks {
 }
 /**
  * Where you, the boss, the table and its stools are in a room (its battle circle's middle: the box round its `circle-*` or `ring-*`
- * floor and its emblem), by layout; null for a room without a circle. The circles' drawn start marks (Alfil's and Puddles') are where
- * the layout puts you (a unit test keeps them so).
+ * floor and its emblem; `clearOff` south of it when a piece stands there, as Babur's pedestal does), by layout; null for a room
+ * without a circle. The circles' drawn start marks (Alfil's and Puddles') are where the layout puts you (a unit test keeps them so).
  */
-export function marksOf(layout: readonly ShopPlace[], how: IntroLayout, feel: Pick<typeof CHALLENGE_FEEL, "standOff" | "stoolOff"> = CHALLENGE_FEEL): Marks | null {
+export function marksOf(layout: readonly ShopPlace[], how: IntroLayout, feel: Pick<typeof CHALLENGE_FEEL, "standOff" | "stoolOff" | "clearOff"> = CHALLENGE_FEEL): Marks | null {
   let c0 = Infinity, c1 = -Infinity, r0 = Infinity, r1 = -Infinity;
   for (const p of layout) {
     if (!/^(circle|ring|emblem)-/.test(p.name)) continue;
@@ -187,6 +190,9 @@ export function marksOf(layout: readonly ShopPlace[], how: IntroLayout, feel: Pi
   }
   if (c0 > c1) return null;
   const table = { c: (c0 + c1) / 2, r: (r0 + r1) / 2 };
+  // (A piece in the circle's middle squares: the table goes in front of it, south.)
+  const inMiddle = (p: ShopPlace) => p.solid && p.col <= Math.ceil(table.c) && p.col + (p.w ?? 1) - 1 >= Math.floor(table.c) && p.row >= Math.floor(table.r) && p.row - (p.d ?? 1) + 1 <= Math.ceil(table.r);
+  if (layout.some(inMiddle)) table.r += feel.clearOff;
   const d = feel.standOff[how];
   const k = feel.stoolOff;
   const across = how === "across";

@@ -861,7 +861,8 @@ function startRoom(
     g.fill();
     g.globalAlpha = 1;
     g.save();
-    if (boss.facing < 0) {
+    // (Its town figure faces the way its attack's art does, as its kit says: Babur's and Puddles' left. Turned to face `facing`.)
+    if ((boss.facing < 0) !== !!ci.attack?.facesLeft) {
       g.translate(pt.x, 0);
       g.scale(-1, 1);
       g.translate(-pt.x, 0);
@@ -1173,7 +1174,7 @@ function startRoom(
     if (follow) {
       // A critically damped spring toward you (the town's), solved exactly for the frame; in a challenge, toward its framing.
       you.pose(now, pose);
-      const gx = marks ? marks.table.c : pose.x;
+      const gx = marks ? marks.table.c - cam!.west : pose.x;
       const gy = marks ? marks.table.r + cam!.south : pose.y;
       const w = f.followSpring;
       const e = Math.exp(-w * dt);

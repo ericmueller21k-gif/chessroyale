@@ -5,15 +5,19 @@ import { BOARD_SEL, asSignedIn, named, test } from "./helpers.ts";
 /**
  * A boss challenged from the town, Pokémon-gym style (Eric, Nov 2; docs/areas/town-square.md, "Challenging a boss"), Alfil first, on a
  * phone and a computer: his card's "Challenge alone", its confirm ("Challenge Alfil?", Fight); you and Alfil walk to his Pyramid's
- * door and in; you each walk to your start mark on the battle circle (you south, him north, facing each other); he says his line in
- * a speech bubble by his head (not the chat log); the sand pyramid rises between you, cracks and crumbles, and his table with the board is
- * there; his God King attack plays beside it a couple of seconds before the sandstorm covers the screen; the sandstorm sweeps in, the battle loads under it (Boss alone, Alfil), and it slides off the board; the boss mates you
+ * door and in; you each walk to your start mark on the battle circle (across, Nov 2 round 2: him west of the table, you east, facing
+ * each other); he says his line in a speech bubble by his head (not the chat log); the sand pyramid rises between you, cracks and
+ * crumbles, and his table with the board is there, a stool at each of your sides; his God King attack plays beside it a couple of
+ * seconds before the sandstorm covers the screen; the sandstorm sweeps in, the battle loads under it (Boss alone, Alfil), and it slides off the board; the boss mates you
  * (?mate=1), the result screen, "Back to town", and you're in the town square where you stood, facing the same way. The town's chat
  * (signed in): the server's lines (Eric, Nov 2), "<you> challenged Alfil!" as the battle starts and "Alfil beat <you> in N moves." as it
  * finishes; a first challenge quit (the gear's Leave or Resign before 10 moves) posts no outcome, and the second posts no start line.
+ * Babur (the default intro, round 2): in with him to his ring, across the table from him, his line, the table popping in, his attack
+ * swung in place, the flash and the wipe (`canvas.boss-wipe`), the battle under it, and the gear's Leave back to where you stood.
  * CHALLENGE_SHOTS=<dir>: the stills (both projects) and, on the phone, the intro's frames for its GIF (docs/boss-challenge/).
- * Test hooks: the room's canvas `data-intro` (its step); `window.__shopIntro()` (the step, where you and the boss stand, the line,
- * the board); the storm's canvas `canvas.boss-storm` (`data-phase`); `__townYou()` (your square, the way you face).
+ * Test hooks: the room's canvas `data-intro` (its step); `window.__shopIntro()` (the step, the layout, where you and the boss stand
+ * and face, the line, the board and its stools); the storm's canvas `canvas.boss-storm` and the wipe's `canvas.boss-wipe`
+ * (`data-phase`); `__townYou()` (your square, the way you face).
  */
 test.use({ actionTimeout: 15_000 });
 const SHOTS = process.env.CHALLENGE_SHOTS;
@@ -30,7 +34,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 type Stand = { c: number; r: number; facing: number; view: number; moving: boolean };
-type Intro = { step: string; attack: boolean; you: [number, number]; boss: [number, number]; line: boolean; table: boolean; pyramid: { anim: string; frame: number } | null };
+type Intro = { step: string; layout: string; attack: boolean; you: [number, number]; boss: [number, number]; facing: { you: number; boss: number }; line: boolean; table: boolean; stools: [number, number][]; pyramid: { anim: string; frame: number } | null };
 type Hooks = {
   __townAt?: (k: string, id: string) => { x: number; y: number } | null;
   __townYou?: () => Stand | null;
@@ -42,33 +46,33 @@ const storm = (p: Page) => p.locator("canvas.boss-storm");
 const youNow = (p: Page) => p.evaluate(() => (window as unknown as Hooks).__townYou?.() ?? null);
 const intro = (p: Page) => p.evaluate(() => (window as unknown as Hooks).__shopIntro?.() ?? null);
 
-/** Where to tap Alfil now (in the page); null while he isn't drawn. */
-async function alfilAt(p: Page) {
-  const xy = await p.evaluate(() => (window as unknown as Hooks).__townAt?.("boss", "alfil") ?? null);
+/** Where to tap Alfil (or another boss, `id`) now (in the page); null while he isn't drawn. */
+async function alfilAt(p: Page, id = "alfil") {
+  const xy = await p.evaluate((i) => (window as unknown as Hooks).__townAt?.("boss", i) ?? null, id);
   if (!xy) return null;
   const cv = (await town(p).boundingBox())!;
   return { x: cv.x + xy.x, y: cv.y + xy.y };
 }
 
-/** Opens Alfil's card (his Pyramid is across the map: the camera glides there, as its chip would) and his challenge's confirm. */
-async function toConfirm(page: Page) {
-  if (!(await alfilAt(page))) await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("alfil"));
-  await expect.poll(() => alfilAt(page), { message: "Alfil comes into view" }).not.toBeNull();
+/** Opens Alfil's card (his Pyramid is across the map: the camera glides there, as its chip would) and his challenge's confirm (or another boss's). */
+async function toConfirm(page: Page, id = "alfil", name = "Alfil") {
+  if (!(await alfilAt(page, id))) await page.evaluate((i) => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.(i), id);
+  await expect.poll(() => alfilAt(page, id), { message: `${name} comes into view` }).not.toBeNull();
   // His card (he may stroll a step between the look and the tap: tap again; another's card that opened is closed first).
-  const card = page.getByRole("dialog", { name: "Alfil", exact: true });
+  const card = page.getByRole("dialog", { name, exact: true });
   await expect(async () => {
     if (await card.isVisible()) return;
     if (await page.getByRole("dialog").isVisible()) await page.keyboard.press("Escape");
-    const at = await alfilAt(page);
+    const at = await alfilAt(page, id);
     expect(at, "drawn").not.toBeNull();
     await page.mouse.click(at!.x, at!.y);
     await expect(card).toBeVisible({ timeout: 1500 });
   }).toPass({ timeout: 20_000 });
   // The entry is today's: "Challenge alone", then its confirm, his own (a boss with an intro): you fight him and come back here.
   await card.getByRole("button", { name: "Challenge alone" }).click();
-  const confirm = page.getByRole("dialog", { name: "Challenge Alfil?" });
-  await expect(confirm.getByRole("heading", { name: "Challenge Alfil?" })).toBeVisible();
-  await expect(confirm.getByText("You'll fight Alfil in Boss Battle, then come back here.")).toBeVisible();
+  const confirm = page.getByRole("dialog", { name: `Challenge ${name}?` });
+  await expect(confirm.getByRole("heading", { name: `Challenge ${name}?` })).toBeVisible();
+  await expect(confirm.getByText(`You'll fight ${name} in Boss Battle, then come back here.`)).toBeVisible();
   await expect(confirm.getByRole("button")).toHaveText(["Fight", "Stay"]);
   // Where you stand as you challenge him (the tap on him walked you up to him: once you've stopped).
   await expect.poll(async () => (await youNow(page))?.moving, { message: "you've walked up to him" }).toBe(false);
@@ -146,8 +150,11 @@ test("challenging Alfil in the town: in with him to his marks, his line, the pyr
   };
   await expect.poll(step, { message: "on their marks: his line", timeout: 15_000, intervals: [50] }).toBe("line");
   const atLine = (await intro(page))!;
-  expect(atLine.you).toEqual([9.5, 13]);
-  expect(atLine.boss).toEqual([9.5, 8]);
+  // Across (Eric's normal look): him on the table's west, you on its east, on the circle's middle row, facing each other.
+  expect(atLine.layout).toBe("across");
+  expect(atLine.you).toEqual([11, 10.5]);
+  expect(atLine.boss).toEqual([8, 10.5]);
+  expect(atLine.facing).toEqual({ you: -1, boss: 1 });
   expect(atLine.line).toBe(true);
   await shot("02-line");
   // His line is in the bubble by his head only, never in the town's chat log (Eric, Nov 2).
@@ -157,6 +164,8 @@ test("challenging Alfil in the town: in with him to his marks, his line, the pyr
   await shot("03-crack");
   await expect.poll(step, { message: "it crumbles: the table and the board", intervals: [50] }).toMatch(/crumble|table/);
   await expect.poll(async () => (await intro(page))?.table, { intervals: [50] }).toBe(true);
+  // A stool at each of your sides, between you and the table (none on its empty sides).
+  expect((await intro(page))!.stools).toEqual([[8.5, 10.5], [10.5, 10.5]]);
   await shot("04-table");
   // His God King attack (his kit's), beside the table, a couple of seconds before the storm covers the screen (Eric, Nov 2), and on.
   await expect.poll(async () => (await intro(page))?.attack, { message: "his attack", intervals: [50] }).toBe(true);
@@ -195,3 +204,64 @@ test("challenging Alfil in the town: in with him to his marks, his line, the pyr
   await shot("08-back-in-town");
   expect(errors).toEqual([]);
 });
+
+test("challenging Babur in the town: the default intro (his line, the table pops in, his attack swung in place, the flash and the wipe), the battle; Leave back where you stood", async ({ page }) => {
+  test.setTimeout(240_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  const project = test.info().project.name;
+  if (SHOTS) mkdirSync(SHOTS, { recursive: true });
+  const shot = async (name: string) => SHOTS && (await page.screenshot({ path: `${SHOTS}/${name}-${project}.png` }));
+  await page.goto("/town");
+  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  const { confirm, stood } = await toConfirm(page, "tiger", "Babur");
+  await confirm.getByRole("button", { name: "Fight" }).click();
+  // In his Circus: you both walk in, to either side of his ring's middle (his pedestal: the table stands in front of it).
+  await expect(room(page)).toHaveAttribute("data-room", "tiger", { timeout: 20_000 });
+  await expect(page.getByRole("heading", { name: "Babur's Circus" })).toBeVisible();
+  const frames: Buffer[] = [];
+  let grabbing = !!SHOTS && project === "phone";
+  const grabbed = (async () => {
+    while (grabbing) frames.push(await page.screenshot({ scale: "css" }));
+  })();
+  const step = async () => (await intro(page))?.step ?? "";
+  await expect.poll(step, { message: "on their marks: his line", timeout: 15_000, intervals: [50] }).toBe("line");
+  const atLine = (await intro(page))!;
+  expect(atLine.layout).toBe("across");
+  expect(atLine.you).toEqual([11, 12]);
+  expect(atLine.boss).toEqual([8, 12]);
+  expect(atLine.facing).toEqual({ you: -1, boss: 1 });
+  expect(atLine.line).toBe(true);
+  expect(atLine.pyramid).toBeNull();
+  // The table pops in while he talks, its stools at your sides.
+  await expect.poll(async () => (await intro(page))?.table, { message: "the table pops in", intervals: [50] }).toBe(true);
+  expect((await intro(page))!.stools).toEqual([[8.5, 12], [10.5, 12]]);
+  await page.waitForTimeout(300);
+  await shot("r2-babur-table");
+  await expect(page.locator(".tc-line").filter({ hasText: "Fine. One more show. Then I'm on break." })).toHaveCount(0);
+  // His attack, swung in place (where he stands), for a few seconds; the line gone.
+  await expect.poll(step, { message: "he swings", intervals: [50] }).toBe("swing");
+  const swing = (await intro(page))!;
+  expect(swing).toMatchObject({ attack: true, line: false, table: true, boss: [8, 12] });
+  await shot("r2-babur-swing");
+  // The flash and the wipe to black, the battle loading under it.
+  await expect(page.locator("canvas.boss-wipe")).toHaveCount(1, { timeout: 10_000 });
+  await expect(page.locator("canvas.boss-wipe")).toHaveAttribute("data-boss", "tiger");
+  await expect(page.locator("canvas.boss-wipe")).toHaveAttribute("data-covered", "1");
+  grabbing = false;
+  await grabbed;
+  for (const [i, f] of frames.entries()) writeFileSync(`${SHOTS}/babur-gif-${String(i).padStart(3, "0")}.png`, f);
+  await expect(page.locator(BOARD_SEL.wrap).first()).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator("canvas.boss-wipe")).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.locator("canvas.boss-storm")).toHaveCount(0);
+  // The gear's Leave (or Resign, as the battle offers): back in the town square where you stood.
+  await page.getByRole("button", { name: "Match options" }).click();
+  const quit = page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: /^(Leave|Resign)$/ });
+  const how = (await quit.textContent())!.trim();
+  await quit.click();
+  await page.getByRole("alertdialog").getByRole("button", { name: how, exact: true }).click();
+  if (how === "Resign") await page.getByRole("button", { name: "Back to town" }).click();
+  await backAt(page, stood);
+  expect(errors).toEqual([]);
+});
+

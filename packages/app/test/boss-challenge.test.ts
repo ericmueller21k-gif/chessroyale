@@ -64,14 +64,30 @@ describe("the battle circle's marks", () => {
   it("across: the boss west of the table, you east, all on the circle's middle row; each a square and a half out, just past its stool", () => {
     for (const [id, layout] of Object.entries(ROOMS)) {
       const m = marksOf(layout, "across")!;
-      expect(m.table, id).toEqual({ c: 9.5, r: 10.5 });
-      expect(m.boss, id).toEqual({ c: 8, r: 10.5 });
-      expect(m.you, id).toEqual({ c: 11, r: 10.5 });
-      // (Each walks to its mark's south square, then the last half square north onto its middle.)
-      expect(m.youSq, id).toEqual({ c: 11, r: 11 });
-      expect(m.bossSq, id).toEqual({ c: 8, r: 11 });
+      // (Babur's ring has his pedestal in its middle: the table stands clearOff south of it, in front.)
+      const r = id === "tiger" ? 10.5 + CHALLENGE_FEEL.clearOff : 10.5;
+      expect(m.table, id).toEqual({ c: 9.5, r });
+      expect(m.boss, id).toEqual({ c: 8, r });
+      expect(m.you, id).toEqual({ c: 11, r });
+      // (Each walks to its mark's south square, then the last half square north onto its middle: none for a whole row.)
+      expect(m.youSq, id).toEqual({ c: 11, r: Math.ceil(r) });
+      expect(m.bossSq, id).toEqual({ c: 8, r: Math.ceil(r) });
       // Facing each other: the boss right (toward you), you left.
       expect([m.bossFace, m.youFace], id).toEqual([1, -1]);
+    }
+  });
+
+  it("the table stands clear of the room's pieces (Babur's pedestal, in his ring's middle, stays behind it)", () => {
+    const pedestal = SHOP_BABUR_LAYOUT.find((p) => p.name === "pedestal")!;
+    expect([pedestal.col, pedestal.row]).toEqual([9, 10]);
+    const m = marksOf(SHOP_BABUR_LAYOUT, "across")!;
+    expect(m.table.r - pedestal.row).toBeGreaterThanOrEqual(2);
+    // Every square you, the boss, the table and the stools stand on is clear, in all three rooms.
+    for (const [id, layout] of Object.entries(ROOMS)) {
+      const mm = marksOf(layout, "across")!;
+      const solid = new Set(layout.filter((p) => p.solid).flatMap((p) => Array.from({ length: p.w ?? 1 }, (_, i) => Array.from({ length: p.d ?? 1 }, (_, j) => `${p.col + i},${p.row - j}`)).flat()));
+      for (const at of [mm.you, mm.boss, mm.table, mm.youStool, mm.bossStool])
+        for (const c of [Math.floor(at.c), Math.ceil(at.c)]) for (const r of [Math.floor(at.r), Math.ceil(at.r)]) expect(solid.has(`${c},${r}`), `${id} ${c},${r}`).toBe(false);
     }
   });
 
