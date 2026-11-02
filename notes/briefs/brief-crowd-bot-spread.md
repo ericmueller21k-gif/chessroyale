@@ -42,3 +42,14 @@ other moves. That should be the norm. Top 3 moves only (for now), each % decided
    team's played move (after part 1) is a top-3 engine move most of the time, and blunders stay rare. Report bots' average
    loss per rating before/after; their ratings may need re-calibrating (BOT_LOBBY.skillAt, reports/crowd-bots.md): do it.
 3. Also find and fix whatever made them unanimous (the original bug), if it's a bug.
+
+## Eric, one more (Nov 2) — the goal, over everything above
+"The bots should deliberately pick between the top moves based on the engine scores of each move, but add a random factor. So
+if engine lines 1-5 are not blunders … we really just want it so the bots aren't hijacking which move is chosen every time, and
+this allows for every game to have unique positions and also feel more human. Sometimes they lean stronger, sometimes they
+don't. **The goal should be unique lines favored over optimal play.**"
+- So: among the engine's top 5 that aren't blunders (define "blunder" by loss, in settings), appeal follows the engine score
+  only loosely, plus the turn's random lean; the lean's strength itself varies turn to turn (some turns the bots crowd onto the
+  best, some turns they scatter or herd elsewhere). Moves that are blunders stay rare.
+- Measure "unique lines": play many bot-only 50 v 50 games from the same start and report how soon games diverge and how
+  many distinct positions by move 10/20, before vs after. Favor variety over strength; keep blunders rare.
