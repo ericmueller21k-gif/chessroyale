@@ -1368,6 +1368,8 @@ function startTown(
   // ... `__townRide()` (Oct 31, rides): yours (its ride, color and size (Nov 1), whether its frames are ready, as the last frame drew it: "idle" or
   // "move" ("" on foot), the frame, which way it faced; your box, foot and head on screen, your square; Nov 1, `coming`: the ride whose
   // frames are on their way, its drawing loading or its frames being composed, while you walk on foot in its box) and each other rider's.
+  /** (Tests) Where you stand (your square, the way you face) and whether you're walking: a boss's challenge brings you back here. */
+  const hookYou = () => (testSwitchesAllowed() ? { ...standOf(town.you.walker), moving: town.you.walker.moving() } : null);
   const hookRide = () => {
     if (!testSwitchesAllowed()) return null;
     const you = town.people.indexOf(town.you);
@@ -1408,7 +1410,7 @@ function startTown(
     const p = painter as Painter & { uploads?: number; resets?: number };
     return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0 };
   };
-  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townBackend?: typeof hookBackend; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townRide?: typeof hookRide };
+  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townBackend?: typeof hookBackend; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townRide?: typeof hookRide; __townYou?: typeof hookYou };
   hooks.__townAt = hookAt;
   hooks.__townGlide = hookGlide;
   hooks.__townGather = hookGather;
@@ -1427,6 +1429,7 @@ function startTown(
   hooks.__townPaint = hookPaint;
   hooks.__townBench = hookBench;
   hooks.__townRide = hookRide;
+  hooks.__townYou = hookYou;
 
   run();
   draw(performance.now()); // the first frame, before the screen shows
@@ -1559,6 +1562,7 @@ function startTown(
       delete hooks.__townPaint;
       delete hooks.__townBench;
       delete hooks.__townRide;
+      delete hooks.__townYou;
       painter.dispose();
       if (card?.kind === "boss") town.bosses[card.i]!.held = false;
       detach();
