@@ -63,7 +63,14 @@ async function stills(name) {
   const file = `${outDir}/${label}-${name}.png`;
   await p.screenshot({ path: file });
   const box = await cropRect(p);
-  if (box) writeFileSync(`${outDir}/crop-${name}.json`, JSON.stringify(box));
+  // The near rook and knight (a1, b1) at 4x, nearest-neighbor, from the screenshot (its device pixels).
+  if (box) {
+    const k = PROFILES[name].deviceScaleFactor ?? 1;
+    const pad = 6;
+    const g = `${Math.round((box.w + 2 * pad) * k)}x${Math.round((box.h + 2 * pad) * k)}+${Math.round((box.x - pad) * k)}+${Math.round((box.y - pad) * k)}`;
+    execFileSync("convert", [file, "-crop", g, "+repage", "-filter", "point", "-resize", `${400 / k}%`, `${outDir}/${label}-${name}-rook-knight-4x.png`]);
+    writeFileSync(`${outDir}/crop-${name}.json`, JSON.stringify(box));
+  }
   console.log(name, "still", file, JSON.stringify(await p.evaluate(() => window.__colosseum.state())));
   await ctx.close();
 }

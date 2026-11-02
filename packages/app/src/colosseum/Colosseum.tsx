@@ -375,8 +375,8 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
         let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
         for (const sq of squares) {
           const [x, z] = squareXZ(sq);
-          // (A square's foot corners and 1.5 m above its middle: the tallest piece and its lean fit inside.)
-          for (const [dx, dy, dz] of [[-0.5, 0, -0.5], [0.5, 0, 0.5], [-0.5, 0, 0.5], [0.5, 0, -0.5], [0, 1.5, 0]] as const) {
+          // (A square's foot corners and 2.2 m above its middle: the tallest piece and its lean fit inside.)
+          for (const [dx, dy, dz] of [[-0.5, 0, -0.5], [0.5, 0, 0.5], [-0.5, 0, 0.5], [0.5, 0, -0.5], [0, 2.2, 0]] as const) {
             const p = project(a.viewProj, x + dx, BOARD.lift + dy, z + dz, r.width, r.height);
             if (!p) continue;
             x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]);

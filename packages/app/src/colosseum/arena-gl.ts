@@ -30,7 +30,18 @@
 import { BANNERS, BOARD, FLOOR_R, bossSeats, project, type Seat, GALLERY_H, GALLERY_R, PILLARS, PILLAR_ANGLES, SEATING, STANDS, STATUE, WALL_H, WALL_TOP, aisleAngle, fovFor, landingDepth, lookAt, multiply, perspective, rowR, rowY, seatR, seats, squareXZ, VIEWS, type View } from "./arena.ts";
 import { FIGURE_STRIDE, PILLAR_TOP_PX, PROPS, SCENE, SEAT_SINK, SKY, SQUARES, STANDS_SEATS, STONE, type CrowdArt, type Figure, type Rect } from "./art.ts";
 import { EYE, KINDS, KNIGHT_TURN, PV, SIZE, SLIT, pieceMeshes, type Kind, type PieceMesh } from "./pieces3d.ts";
-import { PIXEL_EYE, PIXEL_KNIGHT_TURN, PIXEL_SLIT, pixelMeshes } from "./pieces-pixel.ts";
+import { PIXEL_EYE, PIXEL_KNIGHT, PIXEL_KNIGHT_TURN, PIXEL_MANE, PIXEL_SLIT, pixelMeshes } from "./pieces-pixel.ts";
+
+/** GLSL: the knight's back edge (its outline's first points, base to ear) as straight steps, x at a height y. */
+function knightBackGlsl(): string {
+  const pts = PIXEL_KNIGHT.slice(0, PIXEL_MANE.ear + 1);
+  const f = (n: number) => n.toFixed(4);
+  const lines = pts.slice(1).map(([x1, y1], i) => {
+    const [x0, y0] = pts[i]!;
+    return `  if (y < ${f(y1)}) return mix(${f(x0)}, ${f(x1)}, clamp((y - ${f(y0)}) / ${f(y1 - y0)}, 0.0, 1.0));`;
+  });
+  return `${lines.join("\n")}\n  return ${f(pts[pts.length - 1]![0])};`;
+}
 
 const VS_SCENE = `#version 300 es
 layout(location=0) in vec3 aPos;
@@ -210,10 +221,14 @@ void main() {
 }`;
 
 /**
- * The pixel set (Pixel; pieces-pixel.ts), drawn into the small target: each piece faces the screen (the camera's plane, not
- * its eye, so none leans sideways), leaning back by part of your view's pitch so it stands up on screen as a sprite does, its
- * axis on a pixel's middle (so it rasterizes the same both sides). Its contact shadow lies flat under it, a little to the
- * lower right. The normal stays the piece's own (it always faces the screen): the light is the screen's, from the top left.
+ * The pixel set (Pixel; pieces-pixel.ts), drawn into the pieces' own small target (the arena stays full size; Nov 2): each
+ * piece faces the screen (the camera's plane, not its eye, so none leans sideways), leaning back by part of your view's pitch
+ * so it stands up on screen as a sprite does. **Drawn as a sprite is** (Nov 2, against the smear): its foot on an art pixel's
+ * middle, and its shape laid out flat at a whole number of art pixels a meter (`s`, the perspective's scale at its foot,
+ * rounded), not through the perspective; so a piece's pixels are the same wherever it stands until its scale steps a whole
+ * pixel, and nothing shimmers as it slides. (Its depth stays the perspective's, so its own parts and its neighbors still
+ * cover each other rightly.) Its contact shadow lies flat under it, a little to the lower right, its foot snapped the same.
+ * The normal stays the piece's own (it always faces the screen): the light is the screen's, from the top left.
  */
 const VS_PIECE_PX = `#version 300 es
 layout(location=0) in vec3 aPos;
@@ -235,6 +250,7 @@ out float vMat;
 out float vBlack;
 out float vDepth;
 flat out float vId;
+vec2 toPx(vec4 c) { return (c.xy / c.w * 0.5 + 0.5) * uRes; }
 void main() {
   vMat = aMat;
   vBlack = iB.z;
@@ -251,26 +267,38 @@ void main() {
   vec3 F = vec3(f.x, 0.0, f.y);
   vec3 w;
   bool shadow = aMat > 2.5 && aMat < 3.5;
+  vec3 foot = vec3(xz.x, uLift + (shadow ? 0.0 : hop), xz.y);
   if (shadow) {
     w = vec3(xz.x, uLift + 0.006, xz.y) + R * (aPos.x + 0.06) + F * (aPos.z - 0.05);
   } else {
     float a = asin(clamp(-uFwd.y, -1.0, 1.0)) * uTilt;
     vec3 U = vec3(0.0, cos(a), 0.0) - F * sin(a);
     vec3 F2 = F * cos(a) + vec3(0.0, sin(a), 0.0);
-    w = vec3(xz.x, uLift + hop, xz.y) + R * aPos.x + U * aPos.y + F2 * aPos.z;
+    w = foot + R * aPos.x + U * aPos.y + F2 * aPos.z;
   }
   gl_Position = uVP * vec4(w, 1.0);
   vDepth = gl_Position.w;
-  if (!shadow) {
-    vec4 c = uVP * vec4(xz.x, uLift + hop, xz.y, 1.0);
-    vec2 px = (c.xy / c.w * 0.5 + 0.5) * uRes;
-    gl_Position.xy += (floor(px) + 0.5 - px) / uRes * 2.0 * gl_Position.w;
+  vec4 c = uVP * vec4(foot, 1.0);
+  vec2 at = toPx(c);
+  vec2 snap = floor(at) + 0.5;
+  if (shadow) {
+    gl_Position.xy += (snap - at) / uRes * 2.0 * gl_Position.w;
+    return;
   }
+  // The screen's up (square to its right and to the way you look), and the art pixels a meter at the foot, whole.
+  vec3 up = normalize(cross(R, normalize(uFwd)));
+  float k = max(1.0, floor((toPx(uVP * vec4(foot + up, 1.0)) - at).y + 0.5));
+  vec3 o = w - foot;
+  vec2 px = snap + k * vec2(dot(o, R), dot(o, up));
+  gl_Position.xy = (px / uRes * 2.0 - 1.0) * gl_Position.w;
 }`;
 /**
- * The pixel set's look, from Eric's picture: flat tones, hard steps, no gradients and no shine; cream in four tones (a
- * near-white highlight to a warm grey-brown shade), navy-charcoal with a few lighter highlight pixels, gold. The second
- * output marks which piece a pixel is, how near, and whether it's Black's (the outline's color).
+ * The pixel set's look, from Eric's picture and the hand-drawn sprites' sheet: flat tones in hard steps, no gradients, no
+ * shine. Each tone is a band across the piece, picked by which way its surface faces on screen (left lit, right in shade, a
+ * top lit), as a sprite artist lays them: cream in four (a near-white highlight to a warm grey-brown shade), navy-charcoal in
+ * three, gold in three. (Nov 2: the bands come from the smooth normal's sideways lean alone, never from a highlight's power,
+ * so a tone never breaks into one-pixel specks.) The second output marks which piece a pixel is, how near, and whether it's
+ * Black's (the outline's color). The color goes out premultiplied (the shadow is see-through), for the laying on.
  */
 const FS_PIECE_PX = `#version 300 es
 precision highp float;
@@ -292,18 +320,30 @@ const vec3 NAVY_D = vec3(36.0, 37.0, 48.0) / 255.0;
 const vec3 GOLD_H = vec3(255.0, 222.0, 140.0) / 255.0;
 const vec3 GOLD_L = vec3(228.0, 168.0, 72.0) / 255.0;
 const vec3 GOLD_D = vec3(150.0, 100.0, 38.0) / 255.0;
-const vec3 L = vec3(-0.55, 0.7, 0.45) * ${(1 / Math.hypot(0.55, 0.7, 0.45)).toFixed(5)};
-const vec3 H = vec3(-0.55, 0.7, 1.45) * ${(1 / Math.hypot(0.55, 0.7, 1.45)).toFixed(5)};
+// The back of the knight's neck, from its base up to the ear: its x at a height y (pieces-pixel.ts PIXEL_KNIGHT).
+float knightBack(float y) {
+${knightBackGlsl()}
+}
 void main() {
-  if (vMat > 2.5 && vMat < 3.5) { o = vec4(0.13, 0.07, 0.03, vN.x > 0.3 ? 0.62 : 0.0); o2 = vec4(0.0); return; }
+  if (vMat > 2.5 && vMat < 3.5) { o = vN.x > 0.3 ? vec4(0.13, 0.07, 0.03, 1.0) * 0.62 : vec4(0.0); o2 = vec4(0.0); return; }
   vec3 N = normalize(vN);
-  float t = dot(N, L);
-  bool hi = pow(max(dot(N, H), 0.0), 60.0) > 0.55;
+  // Which band: a top (facing up) is lit; else by how far the surface turns left (lit) or right (shade); an underside shaded.
+  int band = N.y > 0.7 ? 1 : N.y < -0.55 ? 3 : N.x < -0.5 ? 0 : N.x < 0.12 ? 1 : N.x < 0.55 ? 2 : 3;
+  // The knight's head is flat: its sides face you, lit, but for a shaded strip down the back of its neck and the mane behind it
+  // (gold on Black, the deepest cream on White), as the hand-drawn knight's.
+  bool mane = false;
+  if (vMat > 3.5 && vMat < 4.5 && abs(N.z) > 0.9) {
+    vec2 q = vec2(vObj.x * ${Math.cos(PIXEL_KNIGHT_TURN).toFixed(4)} - vObj.z * ${Math.sin(PIXEL_KNIGHT_TURN).toFixed(4)}, vObj.y);
+    float d = knightBack(q.y) - q.x;
+    mane = q.y > ${PIXEL_MANE.y0.toFixed(3)} && d < ${PIXEL_MANE.w.toFixed(3)};
+    band = d < ${PIXEL_MANE.shade.toFixed(3)} ? 2 : 1;
+  }
   bool gold = vBlack > 0.5 && vMat > 4.5;
   vec3 c;
-  if (gold) c = hi ? GOLD_H : t > 0.1 ? GOLD_L : GOLD_D;
-  else if (vBlack > 0.5) c = hi ? NAVY_H : t > 0.2 ? NAVY_M : NAVY_D;
-  else c = t > 0.8 ? CREAM_H : t > 0.5 ? CREAM_L : t > 0.15 ? CREAM_M : CREAM_S;
+  if (gold) c = band == 0 ? GOLD_H : band < 3 ? GOLD_L : GOLD_D;
+  else if (vBlack > 0.5) c = band == 0 ? NAVY_H : band < 3 ? NAVY_M : NAVY_D;
+  else c = band == 0 ? CREAM_H : band == 1 ? CREAM_L : band == 2 ? CREAM_M : CREAM_S;
+  if (mane) c = vBlack > 0.5 ? GOLD_L : CREAM_S;
   // The bishop's slit (pieces-pixel.ts PIXEL_SLIT), across the mitre's front.
   if (vMat > 1.5 && vMat < 2.5 && vObj.z > 0.03 && abs(vObj.x * ${PIXEL_SLIT.k.toFixed(3)} + vObj.y - ${PIXEL_SLIT.c.toFixed(3)}) * ${(1 / Math.hypot(PIXEL_SLIT.k, 1)).toFixed(4)} < ${PIXEL_SLIT.w.toFixed(3)}) c = vBlack > 0.5 ? GOLD_L : CREAM_S;
   // The knight's eye (PIXEL_EYE), on both sides of its head.
@@ -317,15 +357,16 @@ void main() {
   o2 = vec4(vId / 255.0, floor(d) / 255.0, (floor(fract(d) * 127.0) * 2.0 + step(0.5, vBlack)) / 255.0, 1.0);
 }`;
 
-/** A full-screen triangle (Pixel's outline and scaling up). */
+/** A full-screen triangle (Pixel's outline and laying the pieces on). */
 const VS_FULL = `#version 300 es
 void main() {
   vec2 p = vec2(gl_VertexID == 1 ? 3.0 : -1.0, gl_VertexID == 2 ? 3.0 : -1.0);
   gl_Position = vec4(p, 0.0, 1.0);
 }`;
 /**
- * Pixel's outline, in the small target (a pixel's four neighbors read there, not a screen pixel's): one dark pixel round each
- * piece, dark warm brown round White and near black round Black, as the picture's.
+ * Pixel's outline, in the pieces' small target (a pixel's four neighbors read there, not a screen pixel's): one dark pixel
+ * round each piece, dark warm brown round White and near black round Black, as the picture's. Everything else keeps its color
+ * and its see-through (premultiplied: the pieces solid, their shadows part, the rest clear).
  */
 const FS_OUTLINE = `#version 300 es
 precision highp float;
@@ -352,9 +393,12 @@ void main() {
       black = mod(floor(n.b * 255.0 + 0.5), 2.0);
     }
   }
-  o = vec4(edge ? mix(OUTLINE_W, OUTLINE_B, black) : texelFetch(uCol, p, 0).rgb, 1.0);
+  o = edge ? vec4(mix(OUTLINE_W, OUTLINE_B, black), 1.0) : texelFetch(uCol, p, 0);
 }`;
-/** Pixel's scaling up to the screen, nearest-neighbor: one read a screen pixel. */
+/**
+ * Pixel's pieces laid on the arena (drawn full size), scaled up nearest-neighbor: one read a screen pixel, blended
+ * (premultiplied), so only the pieces, their outlines and their shadows are on the art pixel's grid.
+ */
 const FS_UP = `#version 300 es
 precision mediump float;
 uniform sampler2D uOut;
@@ -369,7 +413,7 @@ void main() {
  * Pixel: a pawn standing on the board's middle is about this many art pixels tall (`pixelScale`: whole screen pixels an art
  * pixel, set when the view or the screen's size changes, never a frame); the proof of concept's grid, which Eric approved.
  */
-const PAWN_ART_PX = 16;
+export const PAWN_ART_PX = 22;
 /**
  * Pixel: how far the pieces lean back, a share of your view's pitch: 0.6 (round 2, Nov 1; 0.38 before), so they stand up
  * like the picture's sprites, little of their tops showing.
@@ -389,7 +433,6 @@ const PI3 = 8;
 export const SLIDE_S = 0.45;
 /** Pixel: the reference pawn's height (m) the art pixel is worked out from; the clear colors and draw buffers, made once. */
 const PAWN_M = 1.0;
-const SKY_RGBA = new Float32Array([SKY[0], SKY[1], SKY[2], 1]);
 const NONE_RGBA = new Float32Array(4);
 /** (WebGL's COLOR_ATTACHMENT0 and 1, and NONE: numbers, so Node's tests can load this file.) */
 const DRAW_COLOR = [0x8ce0, 0];
@@ -973,19 +1016,9 @@ export class ArenaGL {
     let calls = 0;
     const pixel = this.style === "pixel";
     const px = pixel ? this.pixelTarget(view, w, h) : null;
-    if (px) {
-      // Pixel: everything into the small target; the arena and the crowd mark no piece.
-      gl.bindFramebuffer(gl.FRAMEBUFFER, px.fb);
-      gl.viewport(0, 0, px.w, px.h);
-      gl.drawBuffers(DRAW_BOTH);
-      gl.clearBufferfv(gl.COLOR, 0, SKY_RGBA);
-      gl.clearBufferfv(gl.COLOR, 1, NONE_RGBA);
-      gl.clear(gl.DEPTH_BUFFER_BIT);
-      gl.drawBuffers(DRAW_COLOR);
-    } else {
-      gl.viewport(0, 0, w, h);
-      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    }
+    // The arena and the crowd, full size in every style (Pixel too, since Nov 2: only the pieces go on its grid).
+    gl.viewport(0, 0, w, h);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.useProgram(this.scene.prog);
     gl.uniformMatrix4fv(this.scene.uVP, false, this.vp);
     gl.activeTexture(gl.TEXTURE0);
@@ -1022,13 +1055,21 @@ export class ArenaGL {
       gl.uniform1f(solid.uSlide, SLIDE_S);
       gl.uniform1f(solid.uLift, BOARD.lift);
       if (px) {
+        // Pixel: the pieces alone into their small target (nothing stands in front of the board's pieces in any view).
+        gl.bindFramebuffer(gl.FRAMEBUFFER, px.fb);
+        gl.viewport(0, 0, px.w, px.h);
         gl.drawBuffers(DRAW_BOTH);
+        gl.clearBufferfv(gl.COLOR, 0, NONE_RGBA);
+        gl.clearBufferfv(gl.COLOR, 1, NONE_RGBA);
+        gl.clear(gl.DEPTH_BUFFER_BIT);
         gl.uniform1f(solid.uTilt, PIXEL_TILT);
         gl.uniform2f(solid.uRes, px.w, px.h);
         gl.uniform3f(solid.uFwd, this.fwd[0]!, this.fwd[1]!, this.fwd[2]!);
       }
       gl.enable(gl.BLEND);
-      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      // (Pixel's colors go out premultiplied, so its small target keeps a shadow's see-through for the laying on.)
+      if (px) gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      else gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
       for (let i = 0; i < solid.kinds.length; i++) {
         const k = solid.kinds[i]!;
         if (!k.n) continue;
@@ -1040,7 +1081,8 @@ export class ArenaGL {
       gl.disable(gl.BLEND);
     }
     if (px) {
-      // The pieces' outline, still small; then up to the screen, nearest-neighbor.
+      // The pieces' outline, still small; then laid on the arena, nearest-neighbor.
+      gl.drawBuffers(DRAW_COLOR);
       gl.disable(gl.DEPTH_TEST);
       gl.bindVertexArray(px.vao);
       gl.bindFramebuffer(gl.FRAMEBUFFER, px.outFb);
@@ -1061,7 +1103,10 @@ export class ArenaGL {
       gl.bindTexture(gl.TEXTURE_2D, null);
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, px.out);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
+      gl.disable(gl.BLEND);
       calls++;
       gl.enable(gl.DEPTH_TEST);
     }

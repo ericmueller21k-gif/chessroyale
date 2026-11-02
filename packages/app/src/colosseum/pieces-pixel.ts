@@ -209,6 +209,11 @@ const KNIGHT_AT = { sx: 0.62, sy: H.n - 0.17, y0: 0.17, dx: 0.035 } as const;
 const knightAt = ([x, y]: readonly [number, number]) => [KNIGHT_AT.sx * x + KNIGHT_AT.dx, KNIGHT_AT.y0 + KNIGHT_AT.sy * y] as const;
 export const PIXEL_KNIGHT: readonly (readonly [number, number])[] = KNIGHT_UNIT.map(knightAt);
 /** The knight's eye (in the shader): its middle in the head's outline (x, y; meters) and its radius. */
+/**
+ * The knight's mane (in the shader, Nov 2, after the hand-drawn knight): a strip `w` wide (meters) in from the back of its neck
+ * from the height `y0` up to the ear (the outline's point `ear`), and a shaded strip `shade` wide in front of it.
+ */
+export const PIXEL_MANE = { ear: 7, y0: KNIGHT_AT.y0 + KNIGHT_AT.sy * 0.3, w: 0.05, shade: 0.12 } as const;
 export const PIXEL_EYE = (() => {
   const [x, y] = knightAt([-0.15, 0.73]);
   return { x, y, r: 0.04 } as const;
