@@ -329,8 +329,6 @@ function startRoom(
   const attackAt = ci ? attackStart(ci.beats) : Infinity;
   let attackFrame = -1;
   let attackCued = -1;
-  /** The default intro (no art of its own): its attack is swung in place, where it stands. */
-  const inPlace = !!ci && !ci.def.custom;
   /** When you both start walking up to the marks (`insideMs` after the room's first frame: its fade-in, then a beat just inside); -1: not yet. */
   let walkFrom = -1;
   let walking = false;
@@ -388,7 +386,7 @@ function startRoom(
     // The boss's attack: from `attackAt` on, until the battle takes the screen (its lashes again and again), each frame's sound.
     const a = ci.attack;
     if (a && t >= attackAt) {
-      attackFrame = animFrame(a.ms, attackTime(t - attackAt, a.beat, inPlace), false);
+      attackFrame = animFrame(a.ms, attackTime(t - attackAt, a.beat, true), false);
       if (attackFrame !== attackCued) {
         attackCued = attackFrame;
         const cue = a.cues[attackFrame];
@@ -842,16 +840,16 @@ function startRoom(
   /** The boss (in a challenge): its town sprite, its idle playing, at the town's size, its shadows as the town draws a boss's. */
   const bossHead = { x: 0, y: 0, on: false };
   /**
-   * The boss's God King attack, at the boss's own size in the room, its feet where the boss stands (clear of its stool, Nov 2). Its
-   * own intro (Alfil's, Big Boy's): the whole attack, its drop-in too, toward the board (across: east). The default: its lashes swung
-   * in place, facing you. Turned to face the way it should (the art faces right, or left for `facesLeft`).
+   * The boss's God King attack, at the boss's own size in the room: its lashes swung in place (no drop-in, no leap off), its feet
+   * where the boss stands (clear of its stool, Nov 2), facing you. Turned to face the way it should (the art faces right, or left
+   * for `facesLeft`).
    */
   const drawAttack = (now: number) => {
     const a = ci!.attack!;
     if (!marks) return;
     boss!.pose(now, bossPose);
     if (!P(bossPose.x + bossOx(now), bossPose.y + bossOy(now))) return;
-    const face = inPlace ? (marks.bossFace ?? boss!.facing) : across ? 1 : a.facesLeft ? -1 : 1;
+    const face = marks.bossFace ?? boss!.facing;
     const img = a.frames[attackFrame]!;
     const k = (ci!.boss.squares * pt.k) / ci!.boss.ch.h;
     // (Its feet where the boss stands, clear of its stool: Nov 2, "make sure they're not standing where the chair blocks are".)

@@ -1,5 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { CHALLENGE_FEEL } from "../packages/app/src/town/shops/challenge.ts";
 import { BOARD_SEL, asSignedIn, named, test } from "./helpers.ts";
 
 /**
@@ -48,6 +49,18 @@ const room = (p: Page) => p.locator("canvas.town-shop-canvas");
 const storm = (p: Page) => p.locator("canvas.boss-storm");
 const youNow = (p: Page) => p.evaluate(() => (window as unknown as Hooks).__townYou?.() ?? null);
 const intro = (p: Page) => p.evaluate(() => (window as unknown as Hooks).__shopIntro?.() ?? null);
+
+/**
+ * Once the stools are in, you and the boss have hopped back to stand clear of them (CHALLENGE_FEEL.clear, from the table's middle at
+ * column 9.5, on row `r`): neither on nor in front of a stool (Eric, Nov 2). The drawings' own clearance is the unit test's.
+ */
+async function clearOfStools(p: Page, r: number) {
+  const at = async () => {
+    const i = (await intro(p))!;
+    return [i.you[0], i.you[1], i.boss[0], i.boss[1]].map((v) => Math.round(v * 100) / 100);
+  };
+  await expect.poll(at, { message: "hopped back clear of the stools", intervals: [50] }).toEqual([9.5 + CHALLENGE_FEEL.clear.you, r, 9.5 - CHALLENGE_FEEL.clear.boss, r]);
+}
 
 /** Where to tap Alfil (or another boss, `id`) now (in the page); null while he isn't drawn. */
 async function alfilAt(p: Page, id = "alfil") {
@@ -169,6 +182,8 @@ test("challenging Alfil in the town: in with him to his marks, his line, the pyr
   await expect.poll(async () => (await intro(page))?.table, { intervals: [50] }).toBe(true);
   // A stool at each of your sides, between you and the table (none on its empty sides).
   expect((await intro(page))!.stools).toEqual([[8.5, 10.5], [10.5, 10.5]]);
+  // You both hop back clear of the stools as they come in (Nov 2: "make sure they're not standing where the chair blocks are").
+  await clearOfStools(page, 10.5);
   await shot("04-table");
   // His God King attack (his kit's), beside the table, a couple of seconds before the storm covers the screen (Eric, Nov 2), and on.
   await expect.poll(async () => (await intro(page))?.attack, { message: "his attack", intervals: [50] }).toBe(true);
@@ -236,16 +251,17 @@ test("challenging Babur in the town: the default intro (his line, the table pops
   expect(atLine.facing).toEqual({ you: -1, boss: 1 });
   expect(atLine.line).toBe(true);
   expect(atLine.pyramid).toBeNull();
-  // The table pops in while he talks, its stools at your sides.
+  // After his line (and a pause) the table pops in, its stools at your sides; you both hop back clear of them.
   await expect.poll(async () => (await intro(page))?.table, { message: "the table pops in", intervals: [50] }).toBe(true);
   expect((await intro(page))!.stools).toEqual([[8.5, 12], [10.5, 12]]);
-  await page.waitForTimeout(300);
+  await clearOfStools(page, 12);
   await shot("r2-babur-table");
   await expect(page.locator(".tc-line").filter({ hasText: "Fine. One more show. Then I'm on break." })).toHaveCount(0);
   // His attack, swung in place (where he stands), for a few seconds; the line gone.
   await expect.poll(step, { message: "he swings", intervals: [50] }).toBe("swing");
   const swing = (await intro(page))!;
-  expect(swing).toMatchObject({ attack: true, line: false, table: true, boss: [8, 12] });
+  expect(swing).toMatchObject({ attack: true, line: false, table: true });
+  expect(swing.boss[0]).toBeCloseTo(9.5 - CHALLENGE_FEEL.clear.boss);
   await shot("r2-babur-swing");
   // The flash and the wipe to black, the battle loading under it.
   await expect(page.locator("canvas.boss-wipe")).toHaveCount(1, { timeout: 10_000 });
@@ -278,15 +294,20 @@ test("challenging Big Boy in the town: his own intro (his line, his toy blocks b
   await page.goto("/town");
   await expect(town(page)).toHaveAttribute("data-ready", "1");
   const { confirm, stood } = await toConfirm(page, "bigboy", "Big Boy");
+  // (The phone's GIF at real timing: every frame from the Fight tap to the swirl covering, each with its ms since the tap.)
+  const frames: { at: number; png: Buffer }[] = [];
+  let grabbing = !!SHOTS && project === "phone";
+  const fightAt = Date.now();
   await confirm.getByRole("button", { name: "Fight" }).click();
+  const grabbed = (async () => {
+    while (grabbing) {
+      const png = await page.screenshot({ scale: "css" });
+      frames.push({ at: Date.now() - fightAt, png });
+    }
+  })();
   // In his Crib: you both walk in up the walkway onto his circle's zoo rug, to its start marks (SHOP_BIGBOY_MARKS: his west, yours east).
   await expect(room(page)).toHaveAttribute("data-room", "bigboy", { timeout: 20_000 });
   await expect(page.getByRole("heading", { name: "Big Boy's Crib" })).toBeVisible();
-  const frames: Buffer[] = [];
-  let grabbing = !!SHOTS && project === "phone";
-  const grabbed = (async () => {
-    while (grabbing) frames.push(await page.screenshot({ scale: "css" }));
-  })();
   const seen = new Set<string>();
   // (His attack, seen at any look before the swirl covers: a slow phone's screenshots for the GIF can make the looks far apart.)
   let attacked = false;
@@ -314,9 +335,11 @@ test("challenging Big Boy in the town: his own intro (his line, his toy blocks b
   await expect.poll(step, { message: "the board plops on", intervals: [50] }).toMatch(/plop|chairs/);
   await expect.poll(async () => (await intro(page))?.stools.length, { message: "the stools drop in", intervals: [50] }).toBe(2);
   expect((await intro(page))!.stools).toEqual([[8.5, 10.5], [10.5, 10.5]]);
-  await expect.poll(step, { message: "the table stands", intervals: [50] }).toMatch(/table|done/);
+  await expect.poll(step, { message: "the table stands", intervals: [50] }).toMatch(/table|swing|done/);
   const atTable = (await intro(page))!;
   expect(atTable).toMatchObject({ table: true, drop: 0, blocks: { anim: "idle" } });
+  // His B and your W in full view: you both hopped back clear of them as they dropped (Eric, Nov 2).
+  await clearOfStools(page, 10.5);
   await shot("bb-table");
   // His God King attack beside the table before the swirl covers the screen.
   await expect.poll(async () => (await step(), attacked), { message: "his attack, before the swirl covers", intervals: [50] }).toBe(true);
@@ -325,10 +348,12 @@ test("challenging Big Boy in the town: his own intro (his line, his toy blocks b
   await expect(storm(page)).toHaveCount(1, { timeout: 10_000 });
   await expect(storm(page)).toHaveAttribute("data-boss", "bigboy");
   await expect(storm(page)).toHaveAttribute("data-covered", "1");
+  const coveredMs = Date.now() - fightAt;
   await shot("bb-swirl");
   grabbing = false;
   await grabbed;
-  for (const [i, f] of frames.entries()) writeFileSync(`${SHOTS}/bigboy-gif-${String(i).padStart(3, "0")}.png`, f);
+  if (SHOTS) writeFileSync(`${SHOTS}/bigboy-timing-${project}.txt`, `Fight to covered: ${coveredMs} ms\n`);
+  for (const [i, f] of frames.entries()) writeFileSync(`${SHOTS}/bigboy-gif-${String(i).padStart(3, "0")}-${String(f.at).padStart(6, "0")}.png`, f.png);
   expect([...seen].filter((s) => ["line", "build", "drop", "plop", "chairs", "table"].includes(s)).length).toBeGreaterThanOrEqual(4);
   await expect(page.locator(BOARD_SEL.wrap).first()).toBeVisible({ timeout: 60_000 });
   await expect(storm(page)).toHaveCount(0, { timeout: 10_000 });

@@ -29,8 +29,8 @@ export interface BossIntro {
   layout: IntroLayout;
   /**
    * Its own board art and transition (shops/intro.ts ART: Alfil's pyramid and sandstorm, Big Boy's toy blocks and lollipop swirl), or
-   * false: the default intro (the table pops in between you, it swings its God King attack in place for a few seconds, then a flash
-   * and a wipe to black).
+   * false: the default intro (the table pops in between you, then a flash and a wipe to black). Every intro ends with its God King
+   * attack swung in place for a couple of seconds.
    */
   custom: boolean;
   /** A sound for each cue that has a fitting one (the boss's own pack; the default's "table" pop and "wipe"): none is silent. */
@@ -93,23 +93,23 @@ export const CHALLENGE_FEEL = {
   /** In the town, you and the boss walk to its door at this pace (ms a square): the town's walkers' pace (botStepMs), not your run. */
   doorStepMs: 200,
   /** Inside, you both stand just in the door this long (ms, from the room's first frame: its fade-in, then a beat) before walking. */
-  insideMs: 450,
+  insideMs: 400,
   /** Walking up to the marks, side by side: ms a square (a slow walk: the room's squares show bigger than the town's). */
-  walkStepMs: 200,
+  walkStepMs: 180,
   /** The last half square onto the middle of a two-square start mark, in ms. */
   settleMs: 250,
   /** On the marks, facing each other, this long (ms) before the line. */
-  faceMs: 400,
+  faceMs: 300,
   /** The line in the bubble over the boss's head (ms): long enough to read. */
   lineMs: 2500,
   /** The pause after the line, before the board starts coming in (ms). */
-  afterLineMs: 350,
+  afterLineMs: 300,
   /** Alfil's pyramid holds this long (its idle, ms) once it has risen, before it cracks. */
   holdMs: 600,
   /** The small gap between build steps (ms): Big Boy's blocks stacked and the board dropping, the board on and the stools dropping. */
   gapMs: 300,
   /** The finished table (and its stools) on its own this long (ms) before the attack. */
-  tableHoldMs: 500,
+  tableHoldMs: 400,
   /** Toy blocks (Big Boy's): the board falls onto the built table over this long (ms), from `dropFrom` squares above it. */
   boardDropMs: 220,
   dropFrom: 2.5,
@@ -122,7 +122,7 @@ export const CHALLENGE_FEEL = {
    * wider than you, and stands further out), at this zoom (0 Close, 1 the town's zoomed-in camera): you, the table, both stools and
    * the boss all in view, the boss's line under the chat log.
    */
-  cam: { across: { south: 0.8, west: 0.55, zoom: 0.62 }, facing: { south: 1.5, west: 0, zoom: 0.6 } },
+  cam: { across: { south: 0.8, west: 0.75, zoom: 0.8 }, facing: { south: 1.5, west: 0, zoom: 0.6 } },
   /**
    * How far (squares) each of you stands from the table's middle, by layout, walking in and saying the line: across, on the start
    * marks just outside the stools (the park table's stools stand `stoolOff` from its middle); facing, on the circle's drawn north
@@ -482,8 +482,8 @@ export function introCues(beats: readonly IntroBeat[], a: IntroAnims | null): { 
 // ---- The boss's attack (its God King attack: its kit's `kingAttack`).
 
 /**
- * When the attack starts, ms into the intro: as it swings (after the table's beat on its own), where it stands, clear of its
- * stool; `swingMs` before its transition has covered the screen.
+ * When the attack starts, ms into the intro: as it swings (after the table's beat on its own), in place where it stands, clear of
+ * its stool (every intro since Nov 2's pacing: `attackTime`'s `inPlace`); `swingMs` before its transition has covered the screen.
  */
 export const attackStart = (beats: readonly IntroBeat[]): number => stepAt(beats, "swing");
 /**

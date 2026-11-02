@@ -43,7 +43,7 @@ import { N, proj, wrapF, wrapI } from "./camera.ts";
 import { SHOP_FEEL, TOWN_FEEL } from "./feel.ts";
 import { shopOf } from "./shops/shops.ts";
 import type { LoadedRoom, RoomIntro, ShopCtl, ShopRoom } from "./shops/ShopRoom.tsx";
-import { introOf, nextFlow, type ChallengeEvent, type ChallengeFlow } from "./shops/challenge.ts";
+import { CHALLENGE_FEEL, introOf, nextFlow, type ChallengeEvent, type ChallengeFlow } from "./shops/challenge.ts";
 import { BarsIcon, SwordsIcon } from "./CardIcons.tsx";
 import { TownChat } from "./TownChat.tsx";
 import { TownChatTools } from "./TownChatTools.tsx";
@@ -757,6 +757,7 @@ function startTown(
       b.held = false;
       b.walker.stepMs = f.bossStepMs;
     }
+    if (challenging >= 0) town.you.walker.stepMs = f.youStepMs / rideSpeed(account().profile?.locker?.look?.ride?.def);
     challenging = -1;
   };
   /** When the last frame was drawn (its `now`). */
@@ -1480,7 +1481,7 @@ function startTown(
     },
     /**
      * A boss's "Fight" (its confirm, for a boss with an intro: shops/challenge.ts): where you stand is kept (you come back here after
-     * the battle), and you and the boss walk to its home's door, side by side, at your pace; you go in together once you're there.
+     * the battle), and you and the boss walk to its home's door, side by side, at a walk (CHALLENGE_FEEL.doorStepMs); you go in together once you're there.
      */
     challenge: (i: number): boolean => {
       const h = HOMES[i]!;
@@ -1495,7 +1496,9 @@ function startTown(
       challengeStand = stood;
       challenging = i;
       boss.held = true;
-      boss.walker.stepMs = f.youStepMs;
+      // (A calm walk to the door together, at the town's walking pace: not your run. Nov 2, "they both run in… it all happens so quick".)
+      town.you.walker.stepMs = CHALLENGE_FEEL.doorStepMs;
+      boss.walker.stepMs = CHALLENGE_FEEL.doorStepMs;
       const beside = spotNear(town, boss.walker, to, true);
       if (beside) walkWalker(boss.walker, beside);
       goingIn = i;
