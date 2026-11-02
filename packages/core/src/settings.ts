@@ -2764,11 +2764,33 @@ export const RIDES = {
 
 /**
  * A boss's crate, sold by the Shopkeeper inside the boss's home (Eric, Nov 2: "3 Babur tokens, or 1 Babur token + 1 crate key"):
- * its two prices, in that boss's tokens and crate keys. Round 1 shows them (packages/app/src/town/shops/); buying is round 2's.
+ * its two prices, in that boss's tokens and crate keys. Bought on the server (server/boss-tokens.ts, `buyBossCrate`: one
+ * transaction); what each crate holds is BOSS_CRATES in crates.ts.
  */
 export const BOSS_CRATE_PRICE = {
   tokens: 3,
   withKey: { tokens: 1, keys: 1 },
+} as const;
+
+/**
+ * Boss tokens (Eric, Nov 2; docs/decisions/2026-11-02-boss-tokens.md). A boss battle counts once it reaches `moves` of your own
+ * moves or `minutes` of play, whichever comes first, win or lose. Per account, over a rolling `windowHours`: the first counted
+ * battle with no token in the window always drops one; after that each counted battle drops one `chance` of the time, up to `cap`
+ * in the window. Which boss's token: one of the live bosses (core/boss-tokens.ts, `dropBosses`), each as likely. Decided by the
+ * server only: an online battle by its match room (it counts your picks and keeps the time), a solo battle by the server's own
+ * clock alone (`minutes` from its start to its finish as the server saw them: the device's word for its moves isn't trusted).
+ * Where sign-in is set up, only signed-in accounts earn them (a guest's would move on signing in: many guests into one account).
+ * `shortNames`: a boss whose token says a shorter name than the boss's own ("Boingo token", as its picture is named).
+ * `grantMax`: the most an admin's test grant gives at once (keys, or one boss's tokens).
+ */
+export const BOSS_TOKENS = {
+  moves: 10,
+  minutes: 5,
+  windowHours: 24,
+  chance: 0.25,
+  cap: 3,
+  shortNames: { clown: "Boingo" } as Readonly<Record<string, string>>,
+  grantMax: 10,
 } as const;
 
 /**

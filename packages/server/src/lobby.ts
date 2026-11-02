@@ -366,6 +366,8 @@ export interface LobbyRecord {
   feats?: Record<string, { brilliant: number; best: { san: string; score: number } | null }>;
   /** When the match began (after any pre-start show). */
   startedAt?: number;
+  /** Boss tokens: how many of each person's picks went in (their own moves), by player id: `bossBattleSpan`. */
+  picked?: Record<string, number>;
   /** Quick chat (Crowd matches and boss raids, from the lobby before the match: the queue, a private lobby). */
   chat?: ChatRecord;
   /**
@@ -2274,6 +2276,8 @@ export class LobbyCore {
   private lock() {
     if (!this.runner || !this.r.round || this.r.phase !== "play") return;
     this.r.phase = "scoring";
+    // (Boss tokens: each person's own moves, the picks that went in this turn.)
+    for (const h of this.r.humans) if (this.r.round.picks[h.id]?.move) (this.r.picked ??= {})[h.id] = (this.r.picked?.[h.id] ?? 0) + 1;
     // (A party: the turn's length comes out of the team's one bank, up to the clock's end.)
     if (this.r.party) this.r.round.teamMs = this.thinkTime(this.r.round, Math.min(this.io.now(), this.r.round.deadline));
     const skills = new Map(this.r.bots.map((b) => [b.id, b.skill]));
@@ -3283,6 +3287,17 @@ export class LobbyCore {
       }
     }
     if (added) this.r.fairV = (this.r.fairV ?? 0) + 1;
+  }
+
+  /**
+   * Boss tokens (core's battleCounts; server/boss-tokens.ts): a person's own moves in a boss battle (their picks that went in)
+   * and how long they played it, from the match's start to its end, or to when they left. Null: not a boss battle (a raid).
+   */
+  bossBattleSpan(playerId: string): { moves: number; ms: number } | null {
+    if (!this.settings.raid || !this.r.startedAt) return null;
+    const left = this.r.left?.find((l) => l.id === playerId);
+    const end = left?.at ?? this.r.endedAt ?? this.io.now();
+    return { moves: this.r.picked?.[playerId] ?? 0, ms: Math.max(0, end - this.r.startedAt) };
   }
 
   /** Fair play: a person's recorded picks this match (for their fair-play summary once it's over). */

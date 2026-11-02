@@ -30,6 +30,7 @@ import {
   type StoredChatPicks,
 } from "@chessroyale/core";
 import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, NO_ADMINS, lockerMoves, lockerState, type AdminCheck, type LockerState } from "./locker.ts";
+import { BOSS_TOKENS_SCHEMA, tokenMoves } from "./boss-tokens.ts";
 import { LIVE_SCHEMA } from "./live.ts";
 import { FAIRPLAY_SCHEMA, IDENTITIES_REKEY, fairPlayMoves } from "./fairplay-schema.ts";
 import { FRIENDS_COLUMNS, FRIENDS_SCHEMA, socialDeletes } from "./friends.ts";
@@ -142,6 +143,8 @@ const SCHEMA = [
   )`,
   // Crate items and what's equipped (locker.ts).
   ...LOCKER_SCHEMA,
+  // Boss tokens, the drops that gave them and an open solo boss battle (boss-tokens.ts).
+  ...BOSS_TOKENS_SCHEMA,
   // The live line: running lobbies, queue waits (live.ts).
   ...LIVE_SCHEMA,
   // Reports about players (the profile's Report button), for a person to read.
@@ -230,6 +233,8 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   { table: "fairplay_matches", column: "deep_done", type: "INTEGER" },
   // Crates earned (Squads' placement rewards, Oct 10, 2026), counted for when crates stop being free (CRATES_FREE).
   { table: "wallets", column: "crates", type: "INTEGER NOT NULL DEFAULT 0" },
+  // Crate keys (Nov 2, 2026: a boss crate takes one; an admin's test grant gives them): boss-tokens.ts.
+  { table: "wallets", column: "crate_keys", type: "INTEGER NOT NULL DEFAULT 0" },
   // Each account's latest rating, for the percentile (filled in from the results already stored).
   { table: "users", column: "rating", type: "INTEGER", then: [`UPDATE users SET rating = ${LATEST_RATING("users.id")}`] },
   // Friends (Oct 15, 2026): who may invite you, hiding when you're online (friends.ts).
@@ -520,6 +525,7 @@ export async function signInWithIdentity(
         stmt(`UPDATE users SET rating = ${LATEST_RATING("users.id")} WHERE id = ?`, owner.id),
         ...shopMoves(current.id, owner.id),
         ...lockerMoves(current.id, owner.id),
+        ...tokenMoves(current.id, owner.id),
         ...rankedMoves(current.id, owner.id),
         stmt("DELETE FROM sessions WHERE user_id = ?", current.id),
         ...socialDeletes(current.id),
@@ -1100,7 +1106,7 @@ export async function grantReward(sql: Sql, userId: string, coins: number, crate
 }
 
 /**
- * A guest's items, equipped choices, coins, crates and chat picks join the account they sign in to (the account's own
+ * A guest's items, equipped choices, coins, crates, crate keys and chat picks join the account they sign in to (the account's own
  * choices win): the statements, for the sign-in's one batch. The wallet is added up, so it must leave the guest in the
  * same transaction.
  */
@@ -1109,7 +1115,7 @@ function shopMoves(from: string, to: string): Stmt[] {
     stmt("INSERT OR IGNORE INTO inventory (user_id, item_id, acquired_at) SELECT ?, item_id, acquired_at FROM inventory WHERE user_id = ?", to, from),
     stmt("INSERT OR IGNORE INTO equipped (user_id, slot, item_id) SELECT ?, slot, item_id FROM equipped WHERE user_id = ?", to, from),
     stmt(
-      "INSERT INTO wallets (user_id, coins, crates) SELECT ?, coins, crates FROM wallets WHERE user_id = ? AND (coins > 0 OR crates > 0) ON CONFLICT (user_id) DO UPDATE SET coins = coins + excluded.coins, crates = crates + excluded.crates",
+      "INSERT INTO wallets (user_id, coins, crates, crate_keys) SELECT ?, coins, crates, crate_keys FROM wallets WHERE user_id = ? AND (coins > 0 OR crates > 0 OR crate_keys > 0) ON CONFLICT (user_id) DO UPDATE SET coins = coins + excluded.coins, crates = crates + excluded.crates, crate_keys = crate_keys + excluded.crate_keys",
       to,
       from,
     ),
