@@ -79,7 +79,7 @@ import { addXp, buyXp, xpBlock, xpToNext, xpWords } from "../autochess/level.ts"
 import { bonusFor, botLocked, bothLocked, buyFreeze, freezeWords, noLocks, tickLocks, youLock, type Locks } from "../autochess/lockin.ts";
 import { firstHopMs, hopWaitMs } from "../autochess/hop.ts";
 import { BOT_OPENER, QUICK_CHAT, chatLine, replyMs } from "../autochess/chat.ts";
-import { botSeen } from "../autochess/reveal.ts";
+import { boardChanges, botSeen, type BoardChange } from "../autochess/reveal.ts";
 import { buyFromSlot, holdFromSlot, newShop, oddsFor, replaceTaken, rerollFor, rerollPrice, rerollWords, shopSeed, type Shop } from "../autochess/shop.ts";
 import { moveStars, playFight, thinFight, withPiece } from "../autochess/fight.ts";
 import { armiesFen, armyPieces, fenFrom, fightStart, piecesOn, starUpsByColor } from "../autochess/position.ts";
@@ -89,7 +89,7 @@ import { clockWords, damageWords, endWords, fightRulesWords, goldWords, headline
 /**
  * Auto chess, the demo (/autochess; docs/decisions/2026-10-19-autochess-demo.md, docs/areas/autochess.md): you against a
  * bot, all in this browser. Each round the game puts both kings down; the shop offers pieces, each with a square of your half
- * (30 s, the last 3 locked) while the bot's pieces show as plain circles 2 s behind; then their real pieces show and you get
+ * (30 s, the last 3 locked) while the bot's pieces show as plain circles, revealed piece for piece by kind every 3 s; then their real pieces show and you get
  * one move (7 s: one legal chess move with the piece picked for you, on your half); then the engine plays both armies out. The rules are
  * in `autochess/` (pure, tested); this draws them. Nothing is recorded, rewarded or sent anywhere.
  *
@@ -109,7 +109,7 @@ import { clockWords, damageWords, endWords, fightRulesWords, goldWords, headline
  * pawns, names and bars wait out of sight and fade in as the middle pawns go.
  */
 
-/** How often the clock is read: the countdown, the circles 2 s behind and the end of each step. Nothing is drawn per frame but the move clock's bars (their own small component). */
+/** How often the clock is read: the countdown, the reveals and the end of each step. Nothing is drawn per frame but the move clock's bars (their own small component). */
 const TICK_MS = 120;
 /** How long a message under the board stays. */
 const SAY_MS = 4200;
@@ -149,6 +149,8 @@ interface RoundState {
   /** What the bot held when the round began (its bench, with the squares turned to this round's colors); its holds and placings come on top, by time. */
   botBench: Offer[];
   plan: BotPlan;
+  /** Your board's changes while buying (what you put down or sold, and when), for the reveals (reveal.ts). */
+  log: BoardChange[];
   /** The bot's army after its adjust step (hidden until the fight). */
   botFinal: Army | null;
   gold: { you: GoldBreakdown; bot: GoldBreakdown };
@@ -216,7 +218,7 @@ function startRound(prev: MatchState, cfg: AutoChessSettings): { match: MatchSta
   const plan = botPlan(theirs, kings[theirs], match.bot.gold, match.round, mulberry32(seed ^ 0x9e3779b9), cfg, botBench, { level: match.bot.level, xp: match.bot.xp });
   const you = emptyArmy(mine, kings[mine], carryBench(match.you.bench));
   // (The shop rolls by the level you have now, the free XP of this round's start counted.)
-  return { match, round: { you, shop: newShop(shopSeed(seed), you, cfg, match.you.level), locks: noLocks, adj: null, adjustMs: cfg.adjustSeconds * 1000, botStart: null, botBench, plan, botFinal: null, gold } };
+  return { match, round: { you, shop: newShop(shopSeed(seed), you, cfg, match.you.level), locks: noLocks, adj: null, adjustMs: cfg.adjustSeconds * 1000, botStart: null, botBench, plan, log: [], botFinal: null, gold } };
 }
 
 /** Pieces a test starts with (`?stars=`, `?benchstars=`, `?botbench=`): a kind, the square it stands on or is held for, and its stars (1: plain). */
@@ -253,8 +255,8 @@ function newGame(seed: number, cfg: AutoChessSettings, presets?: Presets): Game 
     }
     const bench: Held[] = presets.bench.filter((p) => inHalf(p.square, you.color)).slice(0, cfg.benchSlots).map((p) => ({ kind: p.kind, square: p.square, ...(p.stars > 1 ? { stars: p.stars as StarCount } : {}) }));
     you = { ...you, bench };
-    // (The shop rolls again for the army it has now, so a test can find the seed that shows a star-up.)
-    return { match, phase: first, ...stamp(), round: { ...round, you, shop: newShop(shopSeed(roundSeed(match)), you, cfg, match.you.level) }, fight: null, outcome: null };
+    // (The shop rolls again for the army it has now, so a test can find the seed that shows a star-up. The pieces were put down as the step began.)
+    return { match, phase: first, ...stamp(), round: { ...round, you, log: boardChanges("you", {}, you.board, 0), shop: newShop(shopSeed(roundSeed(match)), you, cfg, match.you.level) }, fight: null, outcome: null };
   }
   return { match, phase: first, ...stamp(), round, fight: null, outcome: null };
 }
@@ -271,7 +273,7 @@ function newGame(seed: number, cfg: AutoChessSettings, presets?: Presets): Game 
  */
 function settingsFor(quick: boolean, gold: number, adjust: boolean, lockIn: boolean, mode: AutoChessSettings["adjustMode"] | null, level: number, fightGlow: boolean, introOff: boolean): AutoChessSettings {
   // (Two seconds locked, so a test has time to try buying in the lock before the reveal.)
-  const base = quick ? { ...AUTOCHESS, buySeconds: 7, lockSeconds: 2, circlesDelaySeconds: 0.5, revealSeconds: 1.5, fightMoveMs: 60, fightFastMoveMs: 30, introSeconds: 2, introReplyMs: [300, 600] as const } : AUTOCHESS;
+  const base = quick ? { ...AUTOCHESS, buySeconds: 7, lockSeconds: 2, revealSeconds: 1.5, fightMoveMs: 60, fightFastMoveMs: 30, introSeconds: 2, introReplyMs: [300, 600] as const } : AUTOCHESS;
   let out = gold > 0 ? { ...base, startGold: base.startGold + gold } : base;
   if (!adjust) out = { ...out, adjustStep: false };
   if (lockIn) out = { ...out, lockIn: true };
@@ -287,8 +289,6 @@ const colorName = (c: Color) => (c === "w" ? "White" : "Black");
 const SOUNDS_USED = ["acPlace", "acHold", "acReroll", "sell", "acXp", "acLevel", "acLock", "acReveal", "acCash", "acStar2", "acStar3"] as const;
 /** What the opponent is called: the same word as a bot in a 1 v 1. */
 const BOT_NAME = "Bot";
-/** The seed of a round's reveals (which of their pieces shows, and when: reveal.ts). */
-const revealSeed = (match: MatchState) => (roundSeed(match) ^ 0x6b43a9b5) >>> 0;
 /** Whether a square is a dark one (a bench tile takes the color of the square its piece keeps). */
 const squareDark = (square: string) => (square.charCodeAt(0) - 96 + Number(square[1])) % 2 === 0;
 const capital = (s: string) => s[0]!.toUpperCase() + s.slice(1);
@@ -408,7 +408,14 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const presets: Presets = { board: parsePresets(params.get("stars")), bench: parsePresets(params.get("benchstars")), bot: parsePresets(params.get("botbench")) };
   const [game, setGame] = useState<Game>(() => newGame(Number.isFinite(seedParam) && params.get("seed") ? seedParam : (Math.random() * 2 ** 31) | 0, cfg, presets));
   const gref = useRef(game);
-  const commit = (g: Game) => {
+  const commit = (next: Game) => {
+    const prev = gref.current;
+    let g = next;
+    // (Your board changed while buying, in this round: logged with the moment, for the reveals.)
+    if (g.phase === "buy" && prev.phase === "buy" && g.round.log === prev.round.log && g.round.you.board !== prev.round.you.board) {
+      const changes = boardChanges("you", prev.round.you.board, g.round.you.board, Math.max(0, performance.now() - g.phaseStart) / 1000);
+      if (changes.length) g = { ...g, round: { ...g.round, log: [...g.round.log, ...changes] } };
+    }
     gref.current = g;
     setGame(g);
   };
@@ -1048,9 +1055,11 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const you = g.phase === "adjust" || g.phase === "fight" ? (g.round.adj?.army ?? g.round.you) : g.round.you;
   const botArmy = g.round.botFinal && g.phase !== "buy" && g.phase !== "adjust" ? g.round.botFinal : g.phase === "buy" ? g.round.plan.army : (g.round.botStart ?? g.round.plan.army);
   const botKing = g.round.plan.army.king;
-  // While buying you see every piece of theirs (pawns too) as a plain circle, 2 s behind, and every few seconds one of them is revealed at random and stays shown.
-  const seen = g.phase === "buy" ? botSeen(g.round.plan.events, revealSeed(g.match), elapsed / 1000, cfg) : null;
-  // Their bench shows real pieces, each with the square it keeps (Eric, Oct 21: intentional): what it came in with and what it has held since, 2 s behind as the circles are.
+  // While buying you see every piece of theirs (pawns too) as a plain circle, live; every 3 s a piece is revealed, piece for piece by kind (one of theirs, then a match
+  // of yours, or the other way round: reveal.ts). Your pieces they haven't seen yet are slightly grayed, and the next of yours to be revealed has a thin yellow border.
+  const seen = g.phase === "buy" ? botSeen(g.round.plan.events, g.round.log, elapsed / 1000, cfg) : null;
+  const unseen = new Set(seen?.unseen ?? []);
+  // Their bench shows real pieces, each with the square it keeps (Eric, Oct 21: intentional): what it came in with and what it has held since, live as the circles are.
   const theirBench: Held[] = g.phase === "buy" ? botBenchAt(g.round.plan.events, g.round.botBench, Math.max(0, elapsed / 1000 - cfg.circlesDelaySeconds)) : g.phase === "meet" ? botBenchAt(g.round.plan.events, g.round.botBench, 0) : (g.round.botStart ?? g.round.plan.army).bench;
   // (A tap on one of their bench pieces holds only while that piece is still there, in that slot.)
   const theirTapped = theirTap && theirBench[theirTap.index]?.kind === theirTap.kind && theirBench[theirTap.index]?.square === theirTap.square && (g.phase === "buy" || g.phase === "adjust") ? theirTap : null;
@@ -1148,7 +1157,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const outcome = g.outcome;
   const matchEnd = g.phase === "over" && outcome ? matchWords(outcome.result.outcome === "you") : null;
 
-  // The opponent's level, as far as you see it: while you buy, the XP it has bought so far (2 s behind, as its pieces are).
+  // The opponent's level, as far as you see it: while you buy, the XP it has bought so far (live, as its pieces are).
   const botLevelNow = seen ? addXp({ level: g.match.bot.level, xp: g.match.bot.xp }, seen.xpBuys * cfg.levels.buyXp, cfg) : { level: g.match.bot.level, xp: g.match.bot.xp };
   const xpOff = locked || !!xpBlock(g.match.you, goldNow, cfg);
   const botHp = Math.max(0, g.match.bot.hp);
@@ -1169,11 +1178,15 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const upTargets = offers.map((o) => starUpTarget(g.round.you, o, cfg));
   // The outlines of the starred pieces show while you buy, place and move; through the fight and the result only the tiny stars stay (`fightGlow`, `?fightglow=1`, keeps the outlines).
   const ringOn = g.phase === "buy" || g.phase === "meet" || g.phase === "adjust" || cfg.fightGlow;
+  // (A piece of yours the opponent hasn't seen yet, while you buy, is drawn slightly grayed: `ac-unseen`.)
   const starDecor: PieceDecor = {
-    key: `${ringOn ? "o" : "s"}${Object.entries(starMap).map(([sq, n]) => `${sq}${n}`).join(",")}`,
+    key: `${ringOn ? "o" : "s"}${Object.entries(starMap).map(([sq, n]) => `${sq}${n}`).join(",")}|${[...unseen].join(",")}`,
     of: (square, code) => {
       const n = starMap[square];
-      return n ? { cls: ringOn ? "ac-drawn" : undefined, kids: <StarArt color={code[0] as Color} kind={code[1] as Kind} n={n} outline={ringOn} /> } : null;
+      const dim = code[0] === mine && unseen.has(square);
+      if (!n && !dim) return null;
+      const cls = [n && ringOn ? "ac-drawn" : "", dim ? "ac-unseen" : ""].filter(Boolean).join(" ");
+      return { cls: cls || undefined, kids: n ? <StarArt color={code[0] as Color} kind={code[1] as Kind} n={n} outline={ringOn} /> : null };
     },
   };
   // The shop's odds at your level (v7): each kind's percent, in a small pill in the gold row.
@@ -1282,6 +1295,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                 {(seen?.revealed ?? []).map((r) => (
                   <span key={r.square} class="ac-ping" data-square={r.square} style={sq(r.square)} />
                 ))}
+                {seen?.next && <span class="ac-cell ac-next" data-square={seen.next} style={sq(seen.next)} />}
                 {theirTapped && <span class="ac-cell ac-red" data-square={theirTapped.square} style={sq(theirTapped.square)} />}
                 {offers.map((o, slot) =>
                   // (A star-up lands nowhere and shows nothing on the board: its card is where it is.)
