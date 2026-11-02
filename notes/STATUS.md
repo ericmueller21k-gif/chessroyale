@@ -6,7 +6,7 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 
 ## Running
 - PR #458 shop interiors r1 (CI watcher). Next: round 2 at xhigh (tokens + purchase).
-- One Opus (xhigh): shops round 2, tokens + buying (cr-tokens, claude/shop-tokens, brief notes/briefs/brief-shop-r2-tokens.md).
+- PR #462 shops r2: boss tokens, keys, buying (full-e2e label; CI watcher). No Opus helper running.
 - API art: Colosseum GBA pixel pieces (session_01JuCWRvpifUHBYDWXqYcDtk; asks Eric once, ~$3-6, cap $8).
 - One Opus: test-value changes (worktree /home/user/cr-testvalue, branch claude/test-value, brief
   notes/briefs/testvalue-changes.md): flakes first, then speed, formats→crowd-hidden merge, CI selection.
@@ -41,6 +41,7 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Build after the shop prototype, at Opus xhigh (stored data). Admins get test keys/tokens.
 
 ## Waiting on Eric
+- Tokens (#462): guests earn tokens? boss crate ride odds 2% (Fischer Random) ok or higher? Crowd boss final counts?
 - Timber's drop limit: 1 pawn ahead (live) or 2 (retune)?
 - Bot ratings: 800-1500 chess-site scale (live) or scoreboard scale?
 - Boss lines from Gemini (he sends them slowly; kids are family; names Rivet/Tick).
