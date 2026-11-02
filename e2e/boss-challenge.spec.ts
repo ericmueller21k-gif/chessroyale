@@ -6,7 +6,7 @@ import { BOARD_SEL, asSignedIn, named, test } from "./helpers.ts";
  * A boss challenged from the town, Pokémon-gym style (Eric, Nov 2; docs/areas/town-square.md, "Challenging a boss"), Alfil first, on a
  * phone and a computer: his card's "Challenge alone", its confirm ("Challenge Alfil?", Fight); you and Alfil walk to his Pyramid's
  * door and in; you each walk to your start mark on the battle circle (you south, him north, facing each other); he says his line in
- * a speech bubble (and into the chat log); the sand pyramid rises between you, cracks and crumbles, and his table with the board is
+ * a speech bubble by his head (not the chat log); the sand pyramid rises between you, cracks and crumbles, and his table with the board is
  * there; his God King attack plays beside it a couple of seconds before the sandstorm covers the screen; the sandstorm sweeps in, the battle loads under it (Boss alone, Alfil), and it slides off the board; the boss mates you
  * (?mate=1), the result screen, "Back to town", and you're in the town square where you stood, facing the same way. The town's chat
  * (signed in): the server's lines (Eric, Nov 2), "<you> challenged Alfil!" as the battle starts and "Alfil beat <you> in N moves." as it
@@ -150,8 +150,8 @@ test("challenging Alfil in the town: in with him to his marks, his line, the pyr
   expect(atLine.boss).toEqual([9.5, 8]);
   expect(atLine.line).toBe(true);
   await shot("02-line");
-  // His line goes into the town's chat log too.
-  await expect(page.locator(".tc-line.tc-boss").filter({ hasText: "I'll show you the power of the old piece." })).toHaveCount(1);
+  // His line is in the bubble by his head only, never in the town's chat log (Eric, Nov 2).
+  await expect(page.locator(".tc-line").filter({ hasText: "I'll show you the power of the old piece." })).toHaveCount(0);
   await expect.poll(step, { message: "the pyramid rises", intervals: [50] }).toMatch(/rise|idle/);
   await expect.poll(step, { message: "it cracks", intervals: [50] }).toBe("crack");
   await shot("03-crack");

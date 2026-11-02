@@ -15,7 +15,7 @@ import type { ShopPlace } from "./room.ts";
 export interface BossIntro {
   /** Its name as its kit knows it (its God King attack comes from there). */
   name: string;
-  /** Said out loud in a speech bubble over its head (and into the town's chat log) as you face each other. */
+  /** Said out loud in a speech bubble by its head (not the chat log: Eric, Nov 2) as you face each other. */
   line: string;
   /** A sound for each of the art's cues that has a fitting one (the boss's own pack): none is silent. */
   cues: Readonly<Record<string, string>>;

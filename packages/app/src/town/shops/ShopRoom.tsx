@@ -46,7 +46,6 @@ import { POOL_LINE, bossHoldings, buyBossCrate, canAfford, holdLine, priceLine, 
 import { CHALLENGE_FEEL, attackStart, attackTime, frameAt as animFrame, introAt, introCues, introLength, marksOf, type IntroNow } from "./challenge.ts";
 import { play } from "../../sound.ts";
 import { paintTable, playCue, type LoadedIntro } from "./intro.ts";
-import { say } from "../chat.ts";
 
 /** A room's art, as its file exports it. */
 interface RoomArt {
@@ -333,7 +332,7 @@ function startRoom(
   const settle = (at: number, half: number, now: number) => (at < 0 ? 0 : half * Math.min(1, (now - at) / C.settleMs));
   const youOx = (now: number) => (marks ? settle(youAt, marks.you.c - marks.youSq.c, now) : 0);
   const bossOx = (now: number) => (marks ? settle(bossAt, marks.boss.c - marks.bossSq.c, now) : 0);
-  /** The challenge, a frame on: the walk in, then the intro's beats (its line said once, into the chat log too; its cues' sounds). */
+  /** The challenge, a frame on: the walk in, then the intro's beats (its line said once, in the bubble by his head; its cues' sounds). */
   const stepIntro = (now: number) => {
     if (!ci || !boss || !marks || !challenge) return;
     boss.update(now);
@@ -350,7 +349,7 @@ function startRoom(
     if (!said) {
       said = true;
       challenge.onMarks?.();
-      say(def.boss, ci.def.line, "boss");
+      // (His line is said in the bubble by his head only, not in the chat log: Eric, Nov 2.)
     }
     while (cueN < cues.length && t >= cues[cueN]!.at) playCue(ci, cues[cueN++]!.cue);
     // The boss's attack: from `attackAt` on, until the battle takes the screen (its lashes again and again), each frame's sound.
@@ -880,24 +879,24 @@ function startRoom(
   const bubbles = new Map<string, { lines: string[]; w: number }>();
   /** The boss's line in a speech bubble (the town's: white, rounded, its tail pointing down at the speaker's head). */
   const drawBubble = (text: string, ax: number, ay: number) => {
-    g.font = `500 12px Archivo, system-ui, sans-serif`;
+    g.font = `500 11px Archivo, system-ui, sans-serif`;
     let b = bubbles.get(text);
     if (!b) {
       const lines: string[] = [];
       let line = "";
       for (const w of text.split(" ")) {
         const tt = line ? `${line} ${w}` : w;
-        if (g.measureText(tt).width > 176 && line) {
+        if (g.measureText(tt).width > 140 && line) {
           lines.push(line);
           line = w;
         } else line = tt;
       }
       if (line) lines.push(line);
-      b = { lines, w: Math.max(...lines.map((l) => g.measureText(l).width)) + 20 };
+      b = { lines, w: Math.max(...lines.map((l) => g.measureText(l).width)) + 16 };
       bubbles.set(text, b);
     }
-    const lh = 16;
-    const h = b.lines.length * lh + 10;
+    const lh = 14;
+    const h = b.lines.length * lh + 8;
     const bx = Math.max(6, Math.min(W - b.w - 6, ax - b.w / 2));
     const by = Math.max(6, ay - h - 9);
     g.save();
