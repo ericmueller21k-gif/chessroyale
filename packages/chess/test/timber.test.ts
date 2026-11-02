@@ -14,10 +14,13 @@ import {
   legalMoves,
   pieceAt,
   powerTurn,
+  rageOf,
+  ragePaused,
   scrapTarget,
   sideToMove,
   stockfishRefuses,
   timberEvents,
+  triggerUltimate,
   workshopAt,
   workshopClosed,
 } from "../src/index.ts";
@@ -224,6 +227,41 @@ describe("in a battle", () => {
     // (Then the meter fills again from empty.)
     await crowdMove(b.r);
     expect(powersOf(b.r).ultAt).toBeUndefined();
+  });
+
+  it("Gnaws at most twice a battle (Eric, Nov 2): after the second his meter stays at 0, held, and a third never comes, not even from the admins' trigger", async () => {
+    expect(S.maxUltimates["timber"]).toBe(2);
+    const b = battle(6, { test: "gnaw" });
+    // (The meter topped up before every crowd move: full again as each turn begins, so only the cap can stop a Gnaw.)
+    const fill = () => {
+      const boss = b.r.state.boss!;
+      b.r.state = { ...b.r.state, boss: { ...boss, powers: { ...boss.powers!, charge: (boss.powers!.charge ?? 0) + 1000 } } };
+    };
+    let spentAt = -1;
+    for (let i = 0; i < 60 && !b.r.isOver() && !b.r.boss!.result; i++) {
+      b.tick(1);
+      if (b.r.bossToMove()) await b.r.playBoss(fakeEngine());
+      else if (b.r.boss!.crowdMoves >= 24) break;
+      else {
+        fill();
+        await crowdMove(b.r);
+      }
+      const p = powersOf(b.r);
+      expect(p.ults ?? 0).toBeLessThanOrEqual(2);
+      if (p.ults === 2 && spentAt < 0) spentAt = b.r.boss!.crowdMoves;
+      if (spentAt >= 0 && b.r.boss!.crowdMoves > spentAt && !b.r.bossToMove()) {
+        // From the crowd turn after his second: the meter at 0, held (shown dimmed), no warning; the trigger refuses.
+        expect(rageOf(b.r.boss)).toBe(0);
+        expect(ragePaused(b.r.boss)).toBe(true);
+        expect(p.warnAt === undefined || p.ultAt !== undefined).toBe(true);
+        expect(p.events.some((e) => e.kind === "warn")).toBe(false);
+        expect(triggerUltimate(b.r.boss).ok).toBe(false);
+      }
+    }
+    expect(spentAt, "two Gnaws came").toBeGreaterThan(0);
+    expect(b.r.boss!.crowdMoves - spentAt, "and many turns after the second").toBeGreaterThanOrEqual(8);
+    expect(powersOf(b.r).ults).toBe(2);
+    expect(powersOf(b.r).workshop!.gnaws).toBe(2);
   });
 
   it("Gnaw with none of your pawns left eats nothing (said on screen); one whose going would check you is never picked", () => {

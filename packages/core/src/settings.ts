@@ -1509,6 +1509,13 @@ export const BOSS_POWERS = {
   workshopLeadMax: 1,
   /** Timber's Gnaw (his ultimate, the rage meter's: rageSpeed.timber): after his move, one of your pawns eaten, gnawScraps scraps for his workshop. */
   gnawScraps: 8,
+  /**
+   * The most ultimates a boss has in one battle, by BOSS_ROSTER id (one not listed: no cap). Timber's Gnaw at most twice (Eric,
+   * Nov 2: "make it so this beaver only ults up to 2 times a game. After 2 times, his meter just stops charging. Otherwise, it's
+   * too strong."): after his second his meter stays empty and dimmed for the rest of the battle, and the admins' trigger is gone.
+   * (Smudgy's Repaint keeps its own cap, repaintMax.) docs/decisions/2026-11-02-nov2-fixes.md.
+   */
+  maxUltimates: { timber: 2 } as Readonly<Record<string, number>>,
 } as const;
 
 /**

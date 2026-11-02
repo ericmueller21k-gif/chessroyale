@@ -299,6 +299,11 @@ export interface BossRules {
    */
   ultimateMax?: number;
   /**
+   * After its last ultimate (ultimateMax) the meter stays on the bar, empty and dimmed, rather than going (Timber, Nov 2: nothing
+   * hidden; Smudgy's goes).
+   */
+  spentMeterShown?: boolean;
+  /**
    * The God King's help doesn't work against this boss (the Hidden Boss's passive): his move, his strike and his Last
    * Stand never come (the runner's kingDecision, callStrike, lastStandFor). A player's try at his move or strike spends a
    * charge as if it had worked (the runner's kingTried; Eric, Oct 14); the Last Stand, which nobody calls, spends nothing.
