@@ -488,6 +488,8 @@ button.town-pic.player {
 }
 .town-shop .town-card {
   z-index: 6;
+  /* (Eric, Nov 2: every line of a card inside a shop is centered, the titles too.) */
+  text-align: center;
 }
 .town-shop-canvas {
   position: absolute;
@@ -522,6 +524,7 @@ button.town-pic.player {
 }
 .shop-crate-top {
   display: flex;
+  justify-content: center;
   align-items: center;
   gap: 12px;
   margin-bottom: 6px;
