@@ -420,9 +420,11 @@ export function readModule(src, path = "x.ts") {
     } else if ((m = /^(export\s+)?(default\s+)?(?:async\s+)?function\s*\*?\s*([\w$]+)/.exec(text)) || (m = /^(export\s+)?(default\s+)?(?:abstract\s+)?class\s+([\w$]+)/.exec(text)) || (m = /^(export\s+)?()(?:const\s+)?enum\s+([\w$]+)/.exec(text))) {
       stmts.push({ kind: "decl", names: m[2] ? [m[3], "default"] : [m[3]], exported: !!m[1], fn: true, text });
     } else if ((m = /^(export\s+)?(?:const|let|var)\s+([\w$]+)/.exec(text)) && !multi) {
-      // (A function kept in a constant runs later too; any other constant or variable is state it might write.)
+      // (A function kept in a constant runs later too; any other constant or variable is state it might write, except a constant
+      // holding a plain value (a string, number, true, false or null), which nothing can write: a key's name, a limit.)
       const fn = /^[^=]*=\s*(?:async\s+)?(?:function\b|(?:\([^)]*\)|[\w$]+)\s*(?::[^=]*)?=>)/.test(text);
-      stmts.push({ kind: "decl", names: [m[2]], exported: !!m[1], fn, text });
+      const fixed = !fn && /^(?:export\s+)?const\s+[\w$]+\s*(?::[^=]*)?=\s*(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`[^`$]*`|-?[\d.][\w.]*|true|false|null)\s*(?:as\s+const\s*)?;?$/.test(text);
+      stmts.push({ kind: "decl", names: [m[2]], exported: !!m[1], fn, ...(fixed ? { fixed } : {}), text });
     }
     else if (/^export\s+default\b/.test(text)) stmts.push({ kind: "decl", names: ["default"], exported: true, text });
     else stmts.push({ kind: "other", text });
@@ -444,8 +446,9 @@ function spread(stmts, seeds) {
     if (s.kind === "decl" && s.exported) for (const n of s.names) exported.add(n);
     if (s.kind === "exportList") for (const [name, as = name] of s.names) exported.add(name), as !== name && exported.add(`${name}=>${as}`);
   }
-  // (A changed function may also write the module's state: its constants and variables that it names change too.)
-  const state = stmts.filter((s) => s.kind === "decl" && !s.fn);
+  // (A changed function may also write the module's state: its constants and variables that it names change too. Not a constant
+  // holding a plain value: it can't be written.)
+  const state = stmts.filter((s) => s.kind === "decl" && !s.fn && !s.fixed);
   const wrote = new Set();
   for (let grew = true; grew; ) {
     grew = false;

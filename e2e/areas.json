@@ -27,7 +27,12 @@
       "packages/app/src/solo.ts",
       "packages/app/src/main.tsx",
       "packages/app/src/board/OwnBoard.tsx",
-      "packages/app/src/account.ts"
+      "packages/app/src/account.ts",
+      "packages/app/src/game.ts",
+      "packages/app/src/prefs.ts",
+      "packages/app/src/test-switches.ts",
+      "packages/app/src/screens/Hud.tsx",
+      "packages/app/src/components/EvalBar.tsx"
     ],
     "hubs": ["packages/app/src/App.tsx"],
     "hubsAbout": "A traced change that reaches a hub runs everything: App.tsx makes the matches and the account and hands them to every screen, so what it imports reaches every area, not only home's (a change to App.tsx's own code still runs home's specs, as before)."
