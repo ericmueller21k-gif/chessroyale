@@ -9,6 +9,7 @@ import { LiveHub } from "./live-hub.ts";
 import { openLobbyCode } from "./codes.ts";
 import { MATCH_ENDED } from "./lobby.ts";
 import { d1Sql, ensureSchema, lobbyResult, purgeEmailCodes, sha256, type User } from "./accounts.ts";
+import { purgeTokenDrops } from "./boss-tokens.ts";
 import { duelEntrant, purgeDuelGames } from "./ranked.ts";
 import { DEVICE_COOKIE, SESSION_COOKIE, SIGN_IN_TO_PLAY, accountOf, handleAccountApi, isSignedIn, readCookie, signInRequired, withSecrets, type AccountEnv, type WaitUntil } from "./api.ts";
 import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
@@ -87,7 +88,7 @@ export default {
 
   /**
    * The Worker's schedule (wrangler.jsonc, every 15 minutes): old errors and player reports deleted (problems.ts), chat
-   * moderation's old decisions (chat-mod.ts), ranked 1 v 1's old games (ranked.ts), and fair play's deep re-check of flagged players' moves on the engine
+   * moderation's old decisions (chat-mod.ts), ranked 1 v 1's old games (ranked.ts), old boss token drops (boss-tokens.ts), and fair play's deep re-check of flagged players' moves on the engine
    * server (cases in review at once, the rest off-peak; fairplay-deep.ts). An error is logged and counted like any other; the first job's never skips the second.
    */
   async scheduled(_event: ScheduledController, rawEnv: Env, ctx: ExecutionContext): Promise<void> {
@@ -105,6 +106,8 @@ export default {
         await pruneChatMod(sql, Date.now()).catch(failed("chat"));
         // Ranked 1 v 1's games past keeping (ranked.ts: RANKED_1V1.gamesKeepDays, longer for a player in a fair-play review).
         await purgeDuelGames(sql, Date.now()).catch(failed("duels"));
+        // Boss token drops past keeping (boss-tokens.ts: DROPS_KEEP_DAYS; the window needs one day).
+        await purgeTokenDrops(sql, Date.now()).catch(failed("tokens"));
         const env = await withSecrets(rawEnv);
         const search = containerSearch(env);
         if (!search) return;

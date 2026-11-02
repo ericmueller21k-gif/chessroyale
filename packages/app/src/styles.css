@@ -7334,6 +7334,91 @@ button.history-label {
   width: 34px;
   height: 34px;
 }
+/* A boss token (components/TokenArt.tsx; Nov 2): its 40 x 40 picture, crisp at its box's size; a boss with no picture yet, a plain
+   gold coin with the boss's initial. */
+.token-art {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+}
+.token-art canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+.token-plain {
+  display: grid;
+  place-items: center;
+  width: 84%;
+  height: 84%;
+  border: 2px solid #b97c10;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffe08a, #f4b740 60%, #b97c10);
+  color: #2a1c14;
+  font-weight: 800;
+}
+/* Your boss tokens in the Crates tab, under your keys and crates: a cell per boss (its token, "× 2"), greyed at none. */
+.token-stock {
+  display: grid;
+  gap: 6px;
+}
+.token-stock .ff-title,
+.token-stock p {
+  margin: 0;
+}
+.token-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+  gap: 6px 4px;
+}
+.token-cell {
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  font-size: 12px;
+  font-weight: 800;
+}
+.token-cell .token-art {
+  width: 40px;
+  height: 40px;
+}
+.token-cell.none {
+  opacity: 0.45;
+}
+/* Admins only: test grants (crate keys, a boss's tokens). */
+.admin-grants {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+}
+.admin-grants-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.admin-grants select {
+  min-height: 32px;
+  font: inherit;
+}
+/* The result screen's boss token box (components/TokenBox.tsx): the gambling warning's box (its width too), square, the token big
+   in its middle. */
+.token-box {
+  aspect-ratio: 1;
+  align-content: center;
+}
+.token-box-art {
+  width: 112px;
+  height: 112px;
+}
+.token-box p {
+  font-size: 16px;
+  font-weight: 800;
+}
 .crate-row {
   display: grid;
   grid-template-columns: 64px 1fr auto;

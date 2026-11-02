@@ -26,6 +26,9 @@ import {
   stackItems,
   tierInfo,
   wornFromLocker,
+  isPlayable,
+  tokenBossName,
+  tokenBosses,
   type CrateDef,
   type CrateLook,
   type CrateRoll,
@@ -34,7 +37,8 @@ import {
   type ItemStack,
   type PresentTier,
 } from "@chessroyale/core";
-import { deleteLockerItems, equipLockerItem, equipShopItem, openCrate } from "../account.ts";
+import { deleteLockerItems, equipLockerItem, equipShopItem, grantTestItems, openCrate } from "../account.ts";
+import { TokenArt } from "../components/TokenArt.tsx";
 import { Avatar, BetaCrateArt, FischerArt, ItemArt, KeyArt, PresentArt, SupplyBoxArt, WinterCrateArt } from "../components/Items.tsx";
 import { FightBanner } from "../components/FightBanner.tsx";
 import { GamblingWarning } from "../components/GamblingWarning.tsx";
@@ -137,6 +141,8 @@ export function CratesPanel() {
         </span>
         <span class="stock">Crates × {count(locker?.crates)}</span>
       </div>
+      <TokenStock tokens={locker?.tokens ?? {}} admin={!!profile?.admin} />
+      {profile?.admin && <AdminGrants />}
       {CRATES.map((c) => {
         const { Crate } = CRATE_LOOKS[c.look];
         return (
@@ -157,8 +163,74 @@ export function CratesPanel() {
           </button>
         );
       })}
-      {CRATES_FREE && <p class="shop-note">Crates and keys are unlimited while we test.</p>}
+      {CRATES_FREE && <p class="shop-note">Crates are unlimited while we test.</p>}
     </div>
+  );
+}
+
+/**
+ * Your boss tokens (Nov 2, shops round 2), beside your keys and crates: every live boss's token with how many you have (greyed at
+ * none: shown, not hidden), and any other boss's you hold (an admin's: Timber's, for admins first). From boss battles; spent on a
+ * boss's crate in its shop in the town.
+ */
+function TokenStock({ tokens, admin }: { tokens: Record<string, number>; admin: boolean }) {
+  const bosses = tokenBosses().filter((b) => admin || !!tokens[b.id] || isPlayable(b));
+  return (
+    <section class="token-stock" aria-label="Boss tokens">
+      <h3 class="ff-title">Boss tokens</h3>
+      <div class="token-grid">
+        {bosses.map((b) => {
+          const n = tokens[b.id] ?? 0;
+          return (
+            <span key={b.id} class={`token-cell${n ? "" : " none"}`} data-boss={b.id} title={`${tokenBossName(b.id)} token`}>
+              <TokenArt boss={b.id} />
+              <span class="token-count">× {n}</span>
+            </span>
+          );
+        })}
+      </div>
+      <p class="small muted">From boss battles. Spend them on a boss's crate in its shop in the town.</p>
+    </section>
+  );
+}
+
+/** Admins only: test grants to yourself (crate keys, any boss's tokens), for trying the boss crates (the server checks it's you). */
+function AdminGrants() {
+  const [boss, setBoss] = useState("tiger");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const give = (body: { keys?: number; boss?: string; tokens?: number }) => {
+    setBusy(true);
+    setError(null);
+    void grantTestItems(body)
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Something went wrong."))
+      .finally(() => setBusy(false));
+  };
+  return (
+    <section class="admin-grants" aria-label="Admin test grants">
+      <strong>Admin: test grants</strong>
+      <div class="admin-grants-row">
+        <button type="button" class="btn btn-secondary btn-small" disabled={busy} onClick={() => give({ keys: 1 })}>
+          +1 crate key
+        </button>
+      </div>
+      <div class="admin-grants-row">
+        <select aria-label="Boss" value={boss} onChange={(e) => setBoss((e.target as HTMLSelectElement).value)}>
+          {tokenBosses().map((b) => (
+            <option key={b.id} value={b.id}>
+              {tokenBossName(b.id)}
+            </option>
+          ))}
+        </select>
+        <button type="button" class="btn btn-secondary btn-small" disabled={busy} onClick={() => give({ boss, tokens: 1 })}>
+          +1 token
+        </button>
+        <button type="button" class="btn btn-secondary btn-small" disabled={busy} onClick={() => give({ boss, tokens: 3 })}>
+          +3 tokens
+        </button>
+      </div>
+      {error && <p class="shop-error">{error}</p>}
+    </section>
   );
 }
 

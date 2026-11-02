@@ -6,7 +6,8 @@ import { REPORT_THANKS, appeal, fairStatus, reportPlayer } from "./fairplay.ts";
 import { NAME_NOT_ALLOWED, isBlockedText } from "./text-filter.ts";
 import { chatNoticeSeen } from "./chat-mod.ts";
 import { isAdmin, testSwitchesOn, type AdminEnv } from "./admin.ts";
-import { isPaused, pausedResponse } from "./kill-switches.ts";
+import { isPaused, pausedBosses, pausedResponse } from "./kill-switches.ts";
+import { battleToken, buyBossCrate, finishSoloBattle, grantTestItems, startSoloBattle } from "./boss-tokens.ts";
 import { chatIconResponse, chatPostResponse, chatSlice } from "./global-chat-api.ts";
 import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, mayTownChat, reportedLine, signedInReader, townPostResponse, townRemoveResponse, townSlice } from "./town-chat-api.ts";
 import { accountDownload, deleteAccount } from "./account-data.ts";
@@ -184,7 +185,10 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     path !== "/api/chat/notice" &&
     !path.startsWith("/api/chat/icon/") &&
     path !== "/api/town/chat" &&
-    path !== "/api/town/chat/remove"
+    path !== "/api/town/chat/remove" &&
+    path !== "/api/boss/solo/start" &&
+    path !== "/api/boss/solo/finish" &&
+    path !== "/api/boss/token"
   )
     return null;
   const google = !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
@@ -386,7 +390,14 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   // The shop. GET /api/shop: your coins, items and what's equipped. POST /api/shop/buy {item}, /api/shop/equip {item}.
   if (path === "/api/shop" && request.method === "GET") return json(await shopState(sql, current.id, admin));
   // (The shop resting, a kill switch: nothing new from it. Equipping what you have still works.)
-  if ((path === "/api/shop/buy" || path === "/api/locker/open") && request.method === "POST" && isPaused(env, "shop")) return pausedResponse("shop");
+  if ((path === "/api/shop/buy" || path === "/api/locker/open" || path === "/api/shop/boss-crate") && request.method === "POST" && isPaused(env, "shop")) return pausedResponse("shop");
+  // POST /api/shop/boss-crate {crate, way}: buys a boss's crate inside its shop, with 3 of the boss's tokens ("tokens") or a
+  // token and a crate key ("key"), and opens it: one transaction (boss-tokens.ts, buyBossCrate). Answers {roll, item, locker}.
+  if (path === "/api/shop/boss-crate" && request.method === "POST") {
+    const b = (await request.json().catch(() => ({}))) as { crate?: unknown; way?: unknown };
+    const r = await buyBossCrate(sql, current.id, b?.crate, b?.way, now, admin);
+    return r.ok ? json(r) : json({ message: r.message }, 400);
+  }
   if ((path === "/api/shop/buy" || path === "/api/shop/equip") && request.method === "POST") {
     const { item } = (await request.json().catch(() => ({}))) as { item?: unknown };
     const r = path === "/api/shop/buy" ? await buyItem(sql, current.id, item, now, admin) : await equipItem(sql, current.id, item, admin);
@@ -413,6 +424,14 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const b = (await request.json().catch(() => ({}))) as { slot?: unknown; item?: unknown };
     const r = await equipLocker(sql, current.id, b.slot, b.item ?? null, admin);
     return r.ok ? json(r.locker) : json({ message: r.message }, 400);
+  }
+  // POST /api/locker/grant {keys?, boss?, tokens?}: an admin's test grant to their own account (crate keys, a boss's tokens); for
+  // anyone else it isn't there. Answers the locker.
+  if (path === "/api/locker/grant" && request.method === "POST") {
+    if (!admin) return json({ message: "Not found" }, 404);
+    const b = (await request.json().catch(() => ({}))) as { keys?: unknown; boss?: unknown; tokens?: unknown };
+    const r = await grantTestItems(sql, current.id, b && typeof b === "object" ? b : {});
+    return r.ok ? json(await lockerState(sql, current.id, admin)) : json({ message: r.message }, 400);
   }
   if (path === "/api/locker/delete" && request.method === "POST") {
     const b = (await request.json().catch(() => ({}))) as { items?: unknown };
@@ -463,6 +482,17 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     if (path === "/api/town/chat/remove") return townRemoveResponse(request, hub, isAdmin(env as AdminEnv, current), now, waitUntil);
     return townPostResponse(request, sql, hub, { user: current, tooYoung: ageAnswer(request) === "under", paused: isPaused(env, "town-chat", now) }, now, waitUntil);
   }
+
+  // Boss tokens (boss-tokens.ts). A solo boss battle is counted by the server's clock: POST /api/boss/solo/start as it begins
+  // ({battle}: its id, or null when this account can't earn tokens), POST /api/boss/solo/finish {battle} on its result screen
+  // ({counted, token}). An online battle's match room counts it; GET /api/boss/token?battle=CODE answers the token it dropped
+  // you ({token}: a boss's id, or null).
+  if (path === "/api/boss/solo/start" && request.method === "POST") return json({ battle: await startSoloBattle(sql, current.id, now, signInRequired(env)) });
+  if (path === "/api/boss/solo/finish" && request.method === "POST") {
+    const b = (await request.json().catch(() => ({}))) as { battle?: unknown };
+    return json(await finishSoloBattle(sql, current.id, b?.battle, now, { off: pausedBosses(env, now), signedInOnly: signInRequired(env) }));
+  }
+  if (path === "/api/boss/token" && request.method === "GET") return json({ token: await battleToken(sql, current.id, url.searchParams.get("battle"), now) });
 
   // POST /api/results: a solo match's result, from the browser.
   if (path === "/api/results" && request.method === "POST") {

@@ -60,6 +60,7 @@ import { measureSound } from "./sound.ts";
 import { noteWhere } from "./problems.ts";
 import { testParams } from "./test-switches.ts";
 import { evalBarOn, practiceOn } from "./prefs.ts";
+import { noteSoloBattle } from "./boss-tokens.ts";
 import { isPaused, pausedBosses } from "./status.ts";
 
 /**
@@ -899,6 +900,8 @@ export function App() {
     setLoading(false);
     const fill = !!opts.fill;
     const m = new SoloMatch(engines, playerName(), { ...DEFAULT_SETTINGS, ...overridesFromUrl(mode, fill) }, practiceOn(), fill);
+    // A boss battle (Boss alone, a Solo raid): the server notes its start, to time it for a boss token (boss-tokens.ts).
+    if (m.settings.raid) noteSoloBattle(m);
     use(m);
     if (fill) m.fill();
     else m.start();

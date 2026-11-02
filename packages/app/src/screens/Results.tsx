@@ -11,6 +11,7 @@ import { bossInText, crowdFinalists, rankedMinHumans } from "@chessroyale/core";
 import { BossCharacter, hasCharacter } from "../components/BossCharacter.tsx";
 import { FlagIcon, MatchMenu } from "../components/MatchMenu.tsx";
 import { exitFor } from "../match-exit.ts";
+import { TokenBox } from "../components/TokenBox.tsx";
 
 export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { match: GameView; placement: number; winner: string; onAgain: () => void; onHome: () => void }) {
   const played = match.moves.filter((m) => m.move !== null);
@@ -220,6 +221,8 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome }: { m
           Play again
         </button>
       </div>
+      {/* A boss battle that dropped you a token: its box, over the screen (Eric, Nov 2). */}
+      {match.settings.raid && <TokenBox match={match} />}
     </div>
   );
 }

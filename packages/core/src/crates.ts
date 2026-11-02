@@ -314,8 +314,47 @@ export const liveStrip = (crate: CrateDef) => crate.strip.filter((x) => (x.tier 
 export const crateDef = (id: string) => CRATES.find((c) => c.id === id);
 
 /**
- * While testing: unlimited crates and keys, and the test switches (?fischer=1, ?shiny=1) work for those allowed them
- * (an admin, or TEST_SWITCHES: docs/areas/ops.md, "Test switches").
+ * A boss's crate (Nov 2, shops round 2; docs/decisions/2026-11-02-boss-tokens.md): sold by the Shopkeeper inside the boss's home,
+ * for its tokens (BOSS_CRATE_PRICE), never opened free from the Crates tab (so it isn't in CRATES, and `crateDef` doesn't know it).
+ * It's a crate like the others, rolled the same way on the server: the boss's ride (Mythic) behind Fischer Random, the only item
+ * there, and the Beta Crate's Common to Epic items in its boxes, at the existing crates' odds (40/26/18/14, Fischer Random 2).
+ */
+export interface BossCrateDef extends CrateDef {
+  /** Its boss (a BOSS_ROSTER id, also the town's home id): whose tokens buy it. */
+  boss: string;
+  /** The boss's ride (ITEM_DEFS): always among its prizes. */
+  ride: string;
+}
+
+/** What every boss crate holds besides its boss's ride: the Beta Crate's Common to Epic items. */
+export const BOSS_CRATE_POOL: readonly string[] = CRATES.find((c) => c.id === "beta-001")!.items.filter((id) => !["legendary", "mythic"].includes(itemDef(id)!.tier));
+
+const bossCrate = (boss: string, name: string, ride: string): BossCrateDef => ({
+  id: `boss-${boss}`,
+  boss,
+  ride,
+  name,
+  blurb: `${itemDef(ride)!.name}, and the Beta Crate's hats, shades and gear`,
+  look: "beta",
+  strip: CRATES.find((c) => c.id === "beta-001")!.strip,
+  items: [...BOSS_CRATE_POOL, ride],
+  fischer: [
+    { tier: "legendary", weight: 80 },
+    { tier: "mythic", weight: 20 },
+  ],
+});
+
+/** Every boss's crate (only those whose home has a shop so far: Babur's and Puddles'). */
+export const BOSS_CRATES: readonly BossCrateDef[] = [bossCrate("tiger", "Babur's Boss Crate", "balloon-pup"), bossCrate("gardener", "Puddles' Boss Crate", "puddles-mower")];
+
+export const bossCrateDef = (id: string) => BOSS_CRATES.find((c) => c.id === id);
+/** A boss's crate, by its boss's id. */
+export const bossCrateOf = (boss: string) => BOSS_CRATES.find((c) => c.boss === boss);
+
+/**
+ * While testing: unlimited crates (the Crates tab's, opened free), and the test switches (?fischer=1, ?shiny=1) work for those
+ * allowed them (an admin, or TEST_SWITCHES: docs/areas/ops.md, "Test switches"). Crate keys are counted and stored since Nov 2
+ * (a boss crate takes one), and a boss crate is never free.
  */
 export const CRATES_FREE = true;
 

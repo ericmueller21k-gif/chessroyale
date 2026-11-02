@@ -1,5 +1,6 @@
 import { CRATES_FREE, ITEM_SLOTS, adminCopies, adminCopyDef, crateDef, isAdminCopy, itemDef, mulberry32, rollCrate, type CrateRoll, type ItemInstance, type ItemLook, type ItemSlot } from "@chessroyale/core";
 import type { Sql, Stmt } from "./accounts.ts";
+import { tokenHoldings } from "./boss-tokens.ts";
 
 /**
  * The locker: crate items a player owns (each with its own color, blemish and seed) and what's equipped in each
@@ -41,9 +42,12 @@ export interface LockerState {
   equipped: Partial<Record<ItemSlot, string>>;
   /** What you wear, ready to show (and to send to a lobby). */
   look: ItemLook;
-  /** Crates and keys you have (null: unlimited, while testing). */
+  /** Crates you have (null: unlimited, while testing). */
   crates: number | null;
-  keys: number | null;
+  /** Crate keys you have (a boss crate takes one; stored since Nov 2, 2026: until then always null, unlimited). */
+  keys: number;
+  /** Boss tokens you have, by boss (only those you have some of): boss-tokens.ts. */
+  tokens: Record<string, number>;
 }
 
 /** A player's locker. `admin`: theirs is an admin's, so it has an admin copy of every item they don't own. */
@@ -65,7 +69,8 @@ export async function lockerState(sql: Sql, userId: string, admin = false): Prom
   for (const it of items) if (!it.color2) delete it.color2;
   // (Crates earned, e.g. Squads' placement rewards, are counted in the wallet for when crates stop being free.)
   const earned = CRATES_FREE ? null : ((await sql.first<{ crates: number | null }>("SELECT crates FROM wallets WHERE user_id = ?", userId).catch(() => null))?.crates ?? 0);
-  return { items, equipped, look, crates: earned, keys: CRATES_FREE ? null : 0 };
+  const { tokens, keys } = await tokenHoldings(sql, userId);
+  return { items, equipped, look, crates: earned, keys, tokens };
 }
 
 /**

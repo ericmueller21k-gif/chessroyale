@@ -33,7 +33,7 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
     (`youngGuest` in the app).
   - "Delete account" keeps the flag.
 - **Signing in keeps what you played as a guest.** A new identity attaches to your current account; one that already
-  belongs to an account switches you to it, moves your guest results, items, coins and crates over and deletes the
+  belongs to an account switches you to it, moves your guest results, items, coins, crates, crate keys and boss tokens over and deletes the
   empty guest. That whole merge is one batch (one transaction): two sign-ins at once move the coins once, a buy in
   another tab lands wholly before it or wholly after, and a failure moves nothing (`sign-in-races.test.ts`;
   [docs/decisions/2026-10-16-sign-in-races.md](../decisions/2026-10-16-sign-in-races.md)). The guest's reports (made
@@ -76,6 +76,9 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
       on the review page as "Deleted player"). A new account with the identity is banned again, or goes to review.
   - **A lobby or a reward that finishes later** records nothing for a deleted account: its writes say `WHERE EXISTS`
     the account.
+  - **Boss tokens** (store `bossTokens`: `boss_tokens`, `boss_token_drops`, `solo_battles`; crate keys in `wallets.crate_keys`;
+    [shop.md](shop.md), "Boss tokens"): the download has the counts, each drop (boss, when, its battle) and an open solo battle's
+    start; deleting removes all three. Drops older than 30 days go on the Worker's schedule.
   - **Ranked 1 v 1** (store `ranked1v1`: `ranked_1v1`, `ranked_1v1_games`; [ranked.md](ranked.md), "Data stored"):
     the download has the rank and the player's kept games (the opponent by name); deleting removes the rank and makes
     the player "deleted" in their opponents' games. A guest's rank moves to the account on sign-in only if the account

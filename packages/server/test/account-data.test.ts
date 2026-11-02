@@ -30,6 +30,7 @@ import { chatBlock, decideChat } from "../src/chat-mod.ts";
 import { GlobalChat } from "../src/global-chat.ts";
 import { LiveBoard } from "../src/live.ts";
 import { equipLocker, openCrate } from "../src/locker.ts";
+import { countBossBattle, grantTestItems, startSoloBattle } from "../src/boss-tokens.ts";
 import { memoryDb } from "./memory-db.ts";
 
 /**
@@ -83,6 +84,10 @@ async function world() {
   // (An item of Bo's, which stays his.)
   await openCrate(sql, bo.user.id, CRATES[0]!.id, {}, T0 + 4);
   await equipLocker(sql, a.id, "head", null);
+  // Boss tokens: a crate key and tokens (an admin's grant), a token a battle dropped, and a solo battle she has open.
+  await grantTestItems(sql, a.id, { keys: 1, boss: "tiger", tokens: 2 });
+  await countBossBattle(sql, a.id, T0 + 4, { battle: "ABCDE", rng: () => 0 });
+  await startSoloBattle(sql, a.id, T0 + 4, true);
   // Reports both ways, and a device she played online from.
   await reportPlayer(sql, a, bo.user.id, "Cheating", "ABCDE", T0 + 5);
   await reportPlayer(sql, bo.user, a.id, "Offensive name or icon", null, T0 + 6);
@@ -112,6 +117,8 @@ async function world() {
  */
 const SCHEMA_COLUMNS: Record<string, string> = {
   blocks: "user_id blocked_id at",
+  boss_token_drops: "id user_id boss at battle",
+  boss_tokens: "user_id boss n",
   chat_mod_log: "id user_id at action until by reason note ended_at seen",
   chat_picks: "user_id lines emoji",
   email_codes: "email code_hash expires_at attempts sent_at hour_start sends_this_hour",
@@ -141,8 +148,9 @@ const SCHEMA_COLUMNS: Record<string, string> = {
   results:
     "id user_id mode online placement players team team_won avg_score rating played_at brilliant best_move cuts cuts_survived strikes strikes_survived survived last_stand boss_elo boss_id lobby ranked held eval_bar",
   sessions: "token_hash user_id created_at expires_at",
+  solo_battles: "user_id id started_at",
   users: "id name icon email google_sub created_at last_seen rating allow_invites hide_online age_ok_at",
-  wallets: "user_id coins crates",
+  wallets: "user_id coins crates crate_keys",
 };
 
 /** The server's source files, every folder. */
@@ -193,7 +201,10 @@ describe("download my data", () => {
       ["boss", null],
     ]);
     expect(d.results[0]).not.toHaveProperty("held");
-    expect(d.shop.wallet).toEqual({ coins: 50, crates: 2 });
+    expect(d.shop.wallet).toEqual({ coins: 50, crates: 2, crate_keys: 1 });
+    expect(d.bossTokens.tokens).toEqual([{ boss: "gingerbread", n: 1 }, { boss: "tiger", n: 2 }]);
+    expect(d.bossTokens.drops).toEqual([{ boss: "gingerbread", at: new Date(T0 + 4).toISOString(), battle: "ABCDE" }]);
+    expect(d.bossTokens.soloBattle).toEqual({ started_at: new Date(T0 + 4).toISOString() });
     expect(d.shop.items.map((i: { item_id: string }) => i.item_id)).toContain(SHOP_ITEMS.find((i) => i.slot === "chat" && !i.starter)!.id);
     expect(d.locker.items).toHaveLength(1);
     expect(d.reports).toEqual({ made: [{ target: bo.user.id, reason: "Cheating", match: "ABCDE", at: new Date(T0 + 5).toISOString() }] });

@@ -88,7 +88,7 @@ export const ACCOUNT_STORES: AccountStore[] = [
     name: "shop",
     tables: ["wallets", "inventory", "equipped", "chat_picks"],
     export: async (sql, u) => ({
-      wallet: await sql.first("SELECT coins, crates FROM wallets WHERE user_id = ?", u.id),
+      wallet: await sql.first("SELECT coins, crates, crate_keys FROM wallets WHERE user_id = ?", u.id),
       items: await all(sql, "SELECT item_id, acquired_at FROM inventory WHERE user_id = ?", u.id),
       equipped: await all(sql, "SELECT slot, item_id FROM equipped WHERE user_id = ?", u.id),
       chatPicks: await sql.first("SELECT lines, emoji FROM chat_picks WHERE user_id = ?", u.id),
@@ -103,6 +103,18 @@ export const ACCOUNT_STORES: AccountStore[] = [
       equipped: await all(sql, "SELECT slot, item_id FROM equipped_items WHERE user_id = ?", u.id),
     }),
     erase: (u) => [stmt("DELETE FROM equipped_items WHERE user_id = ?", u.id), stmt("DELETE FROM items WHERE user_id = ?", u.id)],
+  },
+  {
+    // Boss tokens (boss-tokens.ts): how many of each boss's tokens the player has, the tokens their battles dropped (when, and
+    // the battle: an online match's lobby code or a solo battle's id), and a solo boss battle they have open (when it began).
+    name: "bossTokens",
+    tables: ["boss_tokens", "boss_token_drops", "solo_battles"],
+    export: async (sql, u) => ({
+      tokens: await all(sql, "SELECT boss, n FROM boss_tokens WHERE user_id = ? ORDER BY boss", u.id),
+      drops: await all(sql, "SELECT boss, at, battle FROM boss_token_drops WHERE user_id = ? ORDER BY at", u.id),
+      soloBattle: await sql.first("SELECT started_at FROM solo_battles WHERE user_id = ?", u.id),
+    }),
+    erase: (u) => ["boss_tokens", "boss_token_drops", "solo_battles"].map((t) => stmt(`DELETE FROM ${t} WHERE user_id = ?`, u.id)),
   },
   {
     // Reports about players (fair play's sheet). The download has the ones the player made; deleting removes those

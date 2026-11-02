@@ -15,6 +15,9 @@
 import {
   BOSS_BRAIN,
   BOSS_CLOCK,
+  BOSS_CRATES,
+  BOSS_CRATE_PRICE,
+  BOSS_TOKENS,
   BOSS_PARTY,
   BOSS_DIFFICULTY,
   BOSS_LEVEL,
@@ -61,9 +64,11 @@ import {
   lastStandBar,
   liveStrip,
   tierItems,
+  itemDef,
   maiaRatingFor,
   scoreGroup,
   type BossBrainSettings,
+  type BossCrateDef,
   type BossDef,
   type BossPowerSettings,
   type CrateDef,
@@ -103,6 +108,10 @@ export interface FaqSources {
   ratingMinMoves: number;
   rankedShare: number;
   crates: readonly CrateDef[];
+  /** Boss crates (sold in the bosses' shops for their tokens), boss tokens' rules and a boss crate's price. */
+  bossCrates: readonly BossCrateDef[];
+  bossTokens: typeof BOSS_TOKENS;
+  bossCratePrice: typeof BOSS_CRATE_PRICE;
   colors: readonly { id: string; name: string; weight: number }[];
   purity: readonly { low: number; high: number; weight: number }[];
   itemTiers: readonly { id: string; name: string }[];
@@ -144,6 +153,9 @@ export const FAQ_DEFAULTS: FaqSources = {
   ratingMinMoves: RATING_MIN_MOVES,
   rankedShare: RANKING.rankedMinHumanShare,
   crates: CRATES,
+  bossCrates: BOSS_CRATES,
+  bossTokens: BOSS_TOKENS,
+  bossCratePrice: BOSS_CRATE_PRICE,
   colors: ITEM_COLORS,
   purity: PURITY_BANDS,
   itemTiers: TIERS,
@@ -1012,6 +1024,17 @@ function crates(src: FaqSources): FaqSection {
   const pTotal = sum(src.purity.map((b) => b.weight)) || 1;
   const purity = src.purity.map((b) => `| ${num(b.low, 1)}% to ${num(b.high, 1)}% | ${pct(b.weight / pTotal, 3)} |`).join("\n");
   const shiny = sum(src.purity.filter((b) => b.low >= 90).map((b) => b.weight)) / pTotal;
+  // Boss tokens and boss crates (Nov 2): each boss crate's ride, the only item behind its Fischer Random.
+  const bt = src.bossTokens;
+  const bp = src.bossCratePrice;
+  const fischerShare = (c: CrateDef) => {
+    const live = liveStrip(c);
+    return (live.find((x) => x.tier === "fischer")?.weight ?? 0) / (sum(live.map((x) => x.weight)) || 1);
+  };
+  const bossCrates = src.bossCrates
+    .map((c) => `**${c.name}** holds ${itemDef(c.ride)?.name ?? c.ride} (${pct(fischerShare(c), 0)} of the time: the only item behind its Fischer Random) and ${c.items.length - 1} Common to Epic items`)
+    .join("; ");
+  const n = (k: number, one: string) => `${k} ${one}${k === 1 ? "" : "s"}`;
   return {
     id: "crates",
     title: "Crates and items",
@@ -1039,6 +1062,8 @@ Some items take a second color (a present's ribbon, a suit's tie), rolled the sa
 | Purity | Chance |
 |---|---|
 ${purity}
+
+**Boss tokens and boss crates.** A boss battle, won or lost, counts once it reaches ${bt.moves} of your moves or ${bt.minutes} minutes. In any ${bt.windowHours} hours, your first counted battle always gives you a boss's token (one of the bosses you can meet, each as likely), and each one after that gives one ${pct(bt.chance, 0)} of the time, up to ${bt.cap}. Our server decides, never your device, and it times a solo battle itself (${bt.minutes} minutes from its start to its end). A boss's shop in the town sells its crate for ${n(bp.tokens, "token")} of that boss, or ${n(bp.withKey.tokens, "token")} and ${n(bp.withKey.keys, "crate key")}: ${bossCrates}, in the same boxes at the same odds as above.
 
 Shiny comes about 1 time in ${num(1 / (shiny || 1), 0)}. Crates are opened by the game's server, never by your device, so nobody can roll themselves a Pearl crown. The shop sells God King effects (the color of his bolts, beam and halo) and quick-chat packs.${src.cratesFree || src.shopFree ? " While HunChess is being tested, crates and the shop are free." : ""}
 `,

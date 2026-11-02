@@ -1,19 +1,23 @@
 import { expect, type Page } from "@playwright/test";
-import { giveItems, test, wearItem } from "./helpers.ts";
+import { asServerAdmin, backdateSoloBattle, bossAloneFromHome, giveItems, test, wearItem } from "./helpers.ts";
 
 /**
  * Inside a shop (Nov 2, round 1; docs/areas/town-square.md, "Inside a shop"), on a phone and a computer: walk up to Babur's
  * Circus, its card's "Go in" (you walk to the door, the town zooms in on it and fades), you start inside in Close (the third-person
  * camera; − and + switch to the town's zoomed-in camera and back), a tap on the Shopkeeper walks you up to the counter and its card
- * says "Shopkeeper" with Talk, Talk opens "Babur's Boss Crate" (the price line, Balloon Pup among the prizes, what you have, and a buy
- * answering "Coming soon"), then the door's "Go out" brings you back outside at the tent's door. And Puddles' greenhouse: Drizzle's
- * crate, his ride, and the back button takes you out.
+ * says "Shopkeeper" with Talk, Talk opens "Babur's Boss Crate" (the price line, Balloon Pup among the prizes, what you have, and both
+ * buys greyed with nothing to pay), then the door's "Go out" brings you back outside at the tent's door. Inside, the header says the
+ * shop's name. And Puddles' greenhouse: Drizzle's crate, his ride, and the back button takes you out.
  * And on a ride (Nov 2): it comes in with you, and you come out still on it.
+ * Round 2 (boss tokens, Nov 2): an admin gives himself Babur tokens and a crate key in the Crates tab and buys Babur's crate both
+ * ways, the counts following; and a counted solo boss battle (its start pushed back in the local database: the server times it) drops
+ * a token, its box on the result screen. SHOP_SHOTS=<dir>: the stills for the PR (docs/shop-r2/).
  * Test hooks: the room's canvas (`canvas.town-shop-canvas`) carries `data-room`, `data-you="c,r"` and `data-ready="1"`;
  * `window.__shopAt("keeper" | "door" | "square", [c, r]?)` says where to tap; `__shopCam()` the room's camera; `__shopRide()` your
  * ride inside (its id, the animation and frame drawn last, its side and view, the step's time).
  */
 test.use({ actionTimeout: 15_000 });
+const SHOTS = process.env.SHOP_SHOTS;
 
 // The chat log's box lies over a corner of the map and takes taps there (as in e2e/town.spec.ts): these tests aim at the map.
 test.beforeEach(async ({ page }) => {
@@ -93,8 +97,9 @@ test("Babur's tent: Go in, start in Close, talk to the Shopkeeper, the crate's p
   const door = await town(page).getAttribute("data-you");
   const [dc, dr] = door!.split(",").map(Number) as [number, number];
   expect(Math.abs(dc - 28) + Math.abs(dr - 2), `at the door (28, 2): ${door}`).toBeLessThanOrEqual(2);
-  // Inside: a step in from the door, in Close (the + is the pressed one), the town's chips put away.
+  // Inside: a step in from the door, in Close (the + is the pressed one), the town's chips put away; the header says the shop's name.
   await expect(room(page)).toHaveAttribute("data-room", "tiger");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Babur's Circus");
   await expect(room(page)).toHaveAttribute("data-you", "10,17");
   expect((await shopCam(page))!.zoom).toBe(0);
   await expect(page.getByRole("button", { name: "Zoom in" })).toHaveAttribute("aria-pressed", "true");
@@ -115,14 +120,9 @@ test("Babur's tent: Go in, start in Close, talk to the Shopkeeper, the crate's p
   await expect(crate).toContainText("3 Babur tokens, or 1 Babur token + 1 crate key");
   await expect(crate).toContainText("Balloon Pup");
   await expect(crate).toContainText("You have 0 Babur tokens and 0 crate keys.");
-  const answer = crate.locator(".shop-msg");
-  const before = (await crate.boundingBox())!;
-  await crate.getByRole("button", { name: "Buy with 3 Babur tokens" }).click();
-  await expect(answer).toHaveText("Coming soon");
-  await crate.getByRole("button", { name: "Buy with 1 Babur token + 1 crate key" }).click();
-  await expect(answer).toHaveText("Coming soon");
-  // (The answer's row was there all along: the card didn't grow.)
-  expect((await crate.boundingBox())!.height).toBeCloseTo(before.height, 0);
+  // Nothing to pay with: both ways shown, greyed (round 2; round 1's buys answered "Coming soon").
+  await expect(crate.getByRole("button", { name: "Buy with 3 Babur tokens" })).toBeDisabled();
+  await expect(crate.getByRole("button", { name: "Buy with 1 Babur token + 1 crate key" })).toBeDisabled();
   await page.keyboard.press("Escape");
   await expect(crate).toBeHidden();
 
@@ -148,6 +148,7 @@ test("Babur's tent: Go in, start in Close, talk to the Shopkeeper, the crate's p
   await out.getByRole("button", { name: "Go out" }).click();
   // Outside again, at the tent's door, the town going on.
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Town square");
   await expect(town(page)).toHaveAttribute("data-you", door!);
   await expect(page.locator(".town-fade")).toHaveCSS("opacity", "0", { timeout: 5000 });
   expect(errors).toEqual([]);
@@ -218,5 +219,94 @@ test("on a ride (Eric, Nov 2: \"your rider goes in with you\"): inside you're on
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(town(page)).toHaveAttribute("data-ready", "1");
   expect(await townRide()).toMatchObject({ ride: "riding-chirp", ready: true });
+  expect(errors).toEqual([]);
+});
+
+test("boss tokens: an admin gives himself Babur tokens and a crate key in the Crates tab, then buys Babur's crate both ways; the counts follow", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  await asServerAdmin(page);
+  // The Crates tab: your keys (counted now), your crates, and every boss's token with how many you have (none: greyed).
+  await page.goto("/shop?crates");
+  const crates = page.locator(".crates");
+  await expect(crates.getByText("Keys × 0")).toBeVisible();
+  const babur = crates.locator('.token-cell[data-boss="tiger"]');
+  await expect(babur).toContainText("× 0");
+  await expect(babur).toHaveClass(/none/);
+  // The admin's test grants: a key, then Babur's tokens.
+  const grants = page.getByRole("region", { name: "Admin test grants" });
+  await grants.getByRole("button", { name: "+1 crate key" }).click();
+  await expect(crates.getByText("Keys × 1")).toBeVisible();
+  await grants.getByRole("combobox", { name: "Boss" }).selectOption("tiger");
+  await grants.getByRole("button", { name: "+3 tokens" }).click();
+  await expect(babur).toContainText("× 3");
+  await grants.getByRole("button", { name: "+1 token" }).click();
+  await expect(babur).toContainText("× 4");
+  await expect(babur).not.toHaveClass(/none/);
+  await expect(babur.locator(".token-art")).toHaveAttribute("data-drawn", "1");
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/inventory-tokens-${test.info().project.name}.png` });
+
+  // Babur's tent: the card has the real counts, both ways open.
+  await page.goto("/town?sky=day");
+  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await goIn(page, "tiger", "Babur's Circus");
+  await talk(page);
+  const crate = page.getByRole("dialog", { name: "Babur's Boss Crate", exact: true });
+  await expect(crate).toContainText("You have 4 Babur tokens and 1 crate key.");
+  await expect(crate).toContainText("+ 24 Beta Crate items, Common to Epic");
+  const byTokens = crate.getByRole("button", { name: "Buy with 3 Babur tokens" });
+  const byKey = crate.getByRole("button", { name: "Buy with 1 Babur token + 1 crate key" });
+  await expect(byTokens).toBeEnabled();
+  await expect(byKey).toBeEnabled();
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/shop-card-counts-${test.info().project.name}.png` });
+  const before = (await crate.boundingBox())!;
+  const answer = crate.locator(".shop-msg");
+  // With 3 tokens: the crate opens into the locker; 1 token and the key left, so only the key's way stays open.
+  await byTokens.click();
+  await expect(answer).toHaveText(/^You got .+! It's in your Locker\.$/);
+  await expect(answer.locator(".shop-msg-art .item-art")).toBeVisible();
+  await expect(crate).toContainText("You have 1 Babur token and 1 crate key.");
+  await expect(byTokens).toBeDisabled();
+  await expect(byKey).toBeEnabled();
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/shop-card-after-buy-${test.info().project.name}.png` });
+  // With the token and the key: nothing left, both ways greyed.
+  await byKey.click();
+  await expect(crate).toContainText("You have 0 Babur tokens and 0 crate keys.");
+  await expect(answer).toHaveText(/^You got .+! It's in your Locker\.$/);
+  await expect(byKey).toBeDisabled();
+  await expect(byTokens).toBeDisabled();
+  // (The answer's row was there all along: the card didn't grow.)
+  expect((await crate.boundingBox())!.height).toBeCloseTo(before.height, 0);
+  // Two items from Babur's crate in the locker; nothing left to spend.
+  const locker = (await (await page.request.get("/api/locker")).json()) as { items: { id: string }[]; tokens: Record<string, number>; keys: number };
+  expect(locker.items.filter((i) => !i.id.startsWith("admin:"))).toHaveLength(2);
+  expect([locker.tokens, locker.keys]).toEqual([{}, 0]);
+  expect(errors).toEqual([]);
+});
+
+test("boss tokens: a counted boss battle (Boss alone, 5 minutes by the server's clock) drops one: the result screen's square box, OK, and it's in the inventory", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  // Hollow mates you at once (?mate=1). The server times a solo battle itself: its finish waits while the battle's start is pushed
+  // back 6 minutes in the local database, so it counts; a new account's window is empty, so it always drops a token.
+  await page.goto("/?debug&clock=60&boss=hollow&mate=1");
+  await page.route("**/api/boss/solo/finish", async (route) => {
+    await backdateSoloBattle(page, 6 * 60_000);
+    await route.continue();
+  });
+  await bossAloneFromHome(page);
+  const box = page.getByRole("dialog", { name: /^You got an? .+ token!$/ });
+  await expect(box).toBeVisible({ timeout: 120_000 });
+  await expect(page.getByText(/Hollow won/)).toBeVisible();
+  await expect(box.locator(".token-art")).toHaveAttribute("data-drawn", "1");
+  const b = (await box.boundingBox())!;
+  expect(Math.abs(b.width - b.height), "a square box").toBeLessThan(2);
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/result-token-box-${test.info().project.name}.png` });
+  const boss = await box.locator(".token-art").getAttribute("data-token");
+  await box.getByRole("button", { name: "OK" }).click();
+  await expect(box).toBeHidden();
+  // The token is yours: one, of the boss the box showed.
+  const locker = (await (await page.request.get("/api/locker")).json()) as { tokens: Record<string, number> };
+  expect(locker.tokens).toEqual({ [boss!]: 1 });
   expect(errors).toEqual([]);
 });

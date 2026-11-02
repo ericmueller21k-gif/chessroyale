@@ -9,13 +9,14 @@ import type { Env } from "./index.ts";
 import { countCall } from "./ops.ts";
 import { liveHub } from "./live-hub.ts";
 import { SERVER_RECHECK_NODES, serverRecheck, serverScoreAt, warmEngine } from "./engine.ts";
-import { CAPACITY, CHAT_MOD, DEFAULT_SETTINGS } from "@chessroyale/core";
+import { CAPACITY, CHAT_MOD, DEFAULT_SETTINGS, battleCounts } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
 import { chatBlock } from "./chat-mod.ts";
 import { BANNED_MESSAGE, banCheck, eligibleForRanked, recordFairPlay } from "./fairplay.ts";
 import { caseMailer } from "./fairplay-mail.ts";
 import { isAdmin } from "./admin.ts";
 import { pausedBosses } from "./kill-switches.ts";
+import { countBossBattle } from "./boss-tokens.ts";
 
 const library = openings as unknown as Opening[];
 
@@ -162,7 +163,8 @@ export class Lobby extends DurableObject<Env> {
     if (over) rec.resultsSaved = true;
     const sql = d1Sql(this.env.DB);
     const mode = this.mode();
-    const mail = caseMailer(await withSecrets(this.env));
+    const env = await withSecrets(this.env);
+    const mail = caseMailer(env);
     for (const r of [...left, ...(over ? core.humanResults() : [])]) {
       const userId = rec.accounts?.[r.playerId];
       // (Someone who deleted their account mid-match gets nothing recorded: recordFairPlay and recordResult skip them.)
@@ -175,6 +177,14 @@ export class Lobby extends DurableObject<Env> {
       // …then a player in review (or banned) has their results held off ranking until they're cleared.
       const held = !(await eligibleForRanked(sql, userId).catch(() => true));
       await recordResult(sql, userId, { ...r, mode, online: true, lobby: rec.code, held }, Date.now()).catch(() => undefined);
+      // Boss tokens: a boss battle counts once it reached 10 of their own moves or 5 minutes (this room's count and clock), win
+      // or lose; then maybe a token (boss-tokens.ts). Once: a result is saved once (resultsSaved, a left player's `saved`).
+      const span = core.bossBattleSpan(r.playerId);
+      if (span && battleCounts(span)) {
+        await countBossBattle(sql, userId, Date.now(), { battle: rec.code, off: pausedBosses(this.env), signedInOnly: signInRequired(env) }).catch((e: unknown) =>
+          console.log(`boss token for ${rec.code}: ${String(e)}`),
+        );
+      }
     }
   }
 

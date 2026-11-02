@@ -183,12 +183,23 @@ function Privacy() {
         title="Your locker, coins and shop"
         what={
           <p>
-            The crate items you own (each with its color, purity and pattern), what you wear, your coins and earned crates, your shop
-            items, and the quick-chat lines you picked.
+            The crate items you own (each with its color, purity and pattern), what you wear, your coins, earned crates and crate keys,
+            your shop items, and the quick-chat lines you picked.
           </p>
         }
         why="so what you own is yours on every device."
         kept="until you delete an item or the account is deleted."
+      />
+      <Item
+        title="Boss tokens"
+        what={
+          <p>
+            How many of each boss's tokens you have, each token a boss battle gave you (when, and which battle), and when a solo boss
+            battle you're playing began.
+          </p>
+        }
+        why="so a token is yours on every device, the game can tell how many you've had in the last day, and a solo battle's length is timed by our server, not your device."
+        kept="your tokens until you spend them or the account is deleted; each token's record for 30 days; a solo battle's start until it ends."
       />
       <Item
         title="Chat"
@@ -409,8 +420,8 @@ function Privacy() {
       <ul>
         <li>
           <strong>Deleted:</strong> your account (name, icon, email or Google id, when you joined and were last seen), every
-          sign-in session (you're signed out on every device), your sign-in code's record, your items, coins, crates and shop
-          items, your quick-chat picks, your 1 v 1 rank, reports you made and reports about you, moderators' decisions about your chat, fair
+          sign-in session (you're signed out on every device), your sign-in code's record, your items, coins, crates, crate keys and
+          shop items, your boss tokens and their records, your quick-chat picks, your 1 v 1 rank, reports you made and reports about you, moderators' decisions about your chat, fair
           play's records about you, your friends, requests, blocks and invites (from the other players' lists too), your lines
           in the global chat and any of your town square messages still there, the bug reports you sent, and your account id on
           error records.
