@@ -966,11 +966,14 @@ export const BOSS_POWERS = {
    */
   ultimateTestButton: true,
   /**
-   * Testing, admins only, Boss alone (Eric, Oct 14): an "Engine move" button that plays Stockfish's best move for you
-   * through the normal move path. Its search is the power-up hints' (`engineNodes`, 250,000 nodes: well under a second
-   * on a phone, already under way as your move starts), so it adds no engine work. false removes it.
+   * Testing, admins only, Boss alone (Eric, Oct 14): an "Engine move" button (the 🐟) that plays Stockfish's best move for you
+   * through the normal move path. false removes it. Nov 2 (Eric: "set that back to Stockfish"): its own search, Stockfish at full
+   * strength (no strength limit, one line) over engineMoveNodes nodes and the moves allowed this turn; never Maia's move, never
+   * the boss's brain. (Until then it played the top of the judge's ranking from the power-up hints' search: `engineNodes`,
+   * 250,000 nodes over eight lines.)
    */
   engineMoveButton: true,
+  engineMoveNodes: 1_000_000,
   /**
    * The funhouse (Boingo's ultimate; Eric, Oct 11): he turns the board round in steps, funhouseStepTurns crowd turns
    * apart: upside down (180°) as it comes, then a quarter turn to a side picked from the seed (90° or 270°), then a half

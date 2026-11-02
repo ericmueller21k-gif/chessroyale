@@ -23,6 +23,7 @@ import {
   triggerUltimate,
   workshopAt,
   workshopClosed,
+  type EngineLike,
 } from "../src/index.ts";
 import { ticksAt } from "../src/bosses/base.ts";
 import { KIT_OPENING, crowdPick, fakeEngine, kitSettings } from "./boss-kit-lib.ts";
@@ -290,5 +291,48 @@ describe("in a battle", () => {
       expect(w.drops).toBeLessThanOrEqual(S.workshopDropMax);
       if (w.last) expect(["1", "2", "3", "4"]).toContain(w.last.square[1]);
     }
+  });
+});
+
+/**
+ * The admins' Engine move (the 🐟; Eric, Nov 2: "set that back to Stockfish"): runner.engineBest is Stockfish's own search, one
+ * line, no strength limit, at the nodes asked, over the moves this turn allows; never the boss's move (playAtElo, Maia's place).
+ * (Here against Timber: any boss would do.)
+ */
+describe("Engine move: Stockfish at full strength", () => {
+  it("asks the judge's engine for one line at engineMoveNodes over the allowed moves, and plays its best; never a strength-limited move", async () => {
+    expect(S.engineMoveNodes).toBe(1_000_000);
+    const calls: { kind: string; n?: number; nodes?: number; moves?: readonly string[] }[] = [];
+    const base = fakeEngine();
+    const eng: EngineLike = {
+      ...base,
+      topMoves: async (fen, n) => (calls.push({ kind: "topMoves", n }), base.topMoves(fen, n)),
+      topMovesAt: async (fen, n, nodes, moves) => {
+        calls.push({ kind: "topMovesAt", n, nodes, moves });
+        const all = await base.topMovesAt!(fen, 99, nodes);
+        return all.filter((m) => !moves || moves.includes(m.move)).slice(0, n);
+      },
+      playAtElo: async (fen) => (calls.push({ kind: "playAtElo" }), base.playAtElo!(fen, 1500)),
+    };
+    const settings = kitSettings({ boss: "timber", test: "", maxMoves: 60 });
+    const r = new MatchRunner({ settings, rng: mulberry32(3), engines: [eng], library: [KIT_OPENING], entrants: [{ id: "h0", name: "H", isBot: false }], raidSide: "w", clock: () => 0 });
+    r.deal();
+    const fen = fenOf(r);
+    calls.length = 0;
+    const best = await r.engineBest(fen, S.engineMoveNodes);
+    expect(calls).toEqual([{ kind: "topMovesAt", n: 1, nodes: 1_000_000, moves: undefined }]);
+    expect(best).toBe((await base.topMoves(fen, 1))[0]!.move);
+    // A power limits the moves: only those searched, and the best of them played.
+    const allowed = legalMoves(fen).slice(-2);
+    r.crowdAllowed = () => allowed;
+    calls.length = 0;
+    const limited = await r.engineBest(fen, S.engineMoveNodes);
+    expect(calls).toEqual([{ kind: "topMovesAt", n: 1, nodes: 1_000_000, moves: allowed }]);
+    expect(allowed).toContain(limited);
+    // None allowed: no move, and no search.
+    r.crowdAllowed = () => [];
+    calls.length = 0;
+    expect(await r.engineBest(fen, S.engineMoveNodes)).toBeNull();
+    expect(calls).toEqual([]);
   });
 });

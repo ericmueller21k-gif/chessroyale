@@ -769,6 +769,23 @@ export class MatchRunner {
     return judgeRanked(boss, top.length ? top : all, fen);
   }
 
+  /**
+   * Stockfish's own best move at full strength (the admins' Engine move, Eric, Nov 2): one search of one line with no strength
+   * limit, at `nodes`, over the moves the crowd may play this turn (a power's limits, as the judge sees them). The judge's
+   * engine, so it waits for Stockfish while it's paused or busy; never Maia (the boss's brain), never a boss's re-ranking.
+   * Null: no move.
+   */
+  async engineBest(fen: string, nodes: number): Promise<string | null> {
+    const engine = this.opts.engines[0]!;
+    const id = this.state.boards[0];
+    const crowdTurn = !!this.state.boss && id !== undefined && this.boards.get(id)?.fen === fen;
+    const allowed = crowdTurn ? (this.crowdAllowed(id) ?? undefined) : undefined;
+    if (allowed && !allowed.length) return null;
+    const top = engine.topMovesAt ? await engine.topMovesAt(fen, 1, nodes, allowed) : allowed ? await engine.scoreMoves(fen, allowed) : await engine.topMoves(fen, 1);
+    const best = [...top].sort((a, b) => b.expected - a.expected)[0]?.move;
+    return best && (!allowed || allowed.includes(best)) ? best : null;
+  }
+
   boardOf(playerId: string): BoardState | null {
     for (const [b, ids] of this.groups) if (ids.includes(playerId)) return this.boards.get(b)!;
     return null;

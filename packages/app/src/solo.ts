@@ -717,7 +717,8 @@ export class SoloMatch implements GameView {
   engineThinking = false;
   /**
    * Testing, admins in Boss alone: Stockfish's best move played as your own, through the normal move path (clocks,
-   * the boss's reply and powers as usual). The power-up hints' search: the moves this turn allows, already under way.
+   * the boss's reply and powers as usual). Its own search (Nov 2): Stockfish at full strength, one line, engineMoveNodes, over the
+   * moves this turn allows (runner.engineBest); before, the power-up hints' search.
    */
   engineMove() {
     // (The Hidden Boss's phase 2: your board, its Chess960 position, on this device's engine; then your move as usual.)
@@ -727,12 +728,12 @@ export class SoloMatch implements GameView {
     const fen = this.phase.board.fen;
     this.engineThinking = true;
     this.emit();
+    // (Stockfish at full strength, its own search: never Maia's move, never the boss's brain. Eric, Nov 2.)
     void this.runner
-      .topMovesFor(fen)
-      .catch(() => [])
-      .then((top) => {
+      .engineBest(fen, BOSS_POWERS.engineMoveNodes)
+      .catch(() => null)
+      .then((best) => {
         this.engineThinking = false;
-        const best = top[0]?.move;
         if (best && !this.stopped && this.phase.kind === "play" && this.phase.board.fen === fen) this.submit(best);
         else this.emit();
       });

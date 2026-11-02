@@ -534,9 +534,15 @@ function brainLine(match: GameView): string {
 }
 
 /**
- * Testing, admins only, Boss alone (Eric, Oct 14): "Engine move" plays Stockfish's best move for you (SoloMatch.engineMove).
- * Waits while it searches and when it isn't your move. A phone: a tiny 🐟 beside the God King, whose title is the brain's line;
- * a computer: in the title line (Hud.tsx).
+ * The 🐟's title (Nov 2): what plays your move first, "Engine move (Stockfish)", then the boss's brain line (Maia's, often: the
+ * boss's, not the cheat's), so the one isn't taken for the other.
+ */
+export const engineMoveTitle = (brain: string): string => (brain ? `Engine move (Stockfish) · Boss: ${brain}` : "Engine move (Stockfish)");
+
+/**
+ * Testing, admins only, Boss alone (Eric, Oct 14): "Engine move" plays Stockfish's best move for you (SoloMatch.engineMove:
+ * Stockfish at full strength, never Maia, Nov 2). Waits while it searches and when it isn't your move. A phone: a tiny 🐟
+ * beside the God King, whose title says so and then gives the boss's brain line; a computer: in the title line (Hud.tsx).
  */
 export function EngineMove({ match, icon = false }: { match: GameView; icon?: boolean }) {
   // (The Hidden Boss's phase 2 too: on your board, while it's your move there.)
@@ -551,7 +557,7 @@ export function EngineMove({ match, icon = false }: { match: GameView; icon?: bo
       icon={icon}
       glyph="🐟"
       label="Engine move"
-      title={line ? `Engine move · ${line}` : "Engine move"}
+      title={engineMoveTitle(line)}
       disabled={!ready || !!match.engineThinking}
       onClick={() => match.engineMove?.()}
     />
