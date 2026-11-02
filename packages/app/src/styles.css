@@ -4416,11 +4416,6 @@ button.history-label {
 .vote-label.lose {
   opacity: 0.35;
 }
-.vote-zone-icon {
-  font-size: clamp(16px, 5.4vw, 28px);
-  line-height: 1;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
-}
 .vote-zone-count {
   display: inline-block;
   font-weight: 900;
@@ -4503,9 +4498,10 @@ button.history-label {
   transition: none;
 }
 /* Tap a zone, with your pawn picked up. */
+/* (Under your own pawn, z-index 3: a pawn standing in a zone can still be dragged out again where changing is allowed.) */
 .vote-zone-hit {
   position: absolute;
-  z-index: 5;
+  z-index: 2;
   border: none;
   background: transparent;
   padding: 0;
@@ -4559,10 +4555,6 @@ button.history-label {
   font-size: 11px;
   opacity: 0.75;
 }
-.vote-banner .vote-banner-icon {
-  font-size: 40px;
-  opacity: 1;
-}
 @keyframes banner-in {
   from {
     transform: scale(0.85);
@@ -4605,9 +4597,6 @@ button.history-label {
 .vote-card.lose {
   opacity: 0.45;
 }
-.vote-card-icon {
-  font-size: 22px;
-}
 .vote-card strong {
   font-size: 14px;
 }
@@ -4643,9 +4632,6 @@ button.history-label {
   border-color: color-mix(in srgb, var(--muted) 75%, transparent);
   background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--muted) 16%, transparent) 0 6px, transparent 6px 12px);
   animation: none;
-}
-.vote-label.disabled .vote-zone-icon {
-  opacity: 0.7;
 }
 .vote-zone-soon {
   font-weight: 800;

@@ -101,8 +101,8 @@ export interface VoteHost {
 /**
  * A pre-game vote. The board is empty but for the players: everyone is their own pawn, dressed in their look,
  * White's scattered over ranks 1-2 and Black's over ranks 7-8. Yours is solid and a little bigger (voteYouScale);
- * everyone else's is a faint ghost. Drag your pawn into one of the three zones (or tap it, then a zone, or tap a
- * card) to vote. Everyone's pawn glides into the zone they vote for as the votes come in, and each zone's count pops
+ * everyone else's is a faint ghost. Drag your pawn into one of the three zones (or tap a zone, or tap a card) to vote
+ * (a tap on a zone takes your pawn there: Eric, Nov 2). Everyone's pawn glides into the zone they vote for as the votes come in, and each zone's count pops
  * as it goes up. When time's up the winning zone lights up and everyone who didn't vote walks into it ("Didn't vote?
  * You're with the crowd"), then the banner names the winner; between the votes everyone walks back to their spot,
  * and after the last one the pawns fade and the real pieces drop into place for the game.
@@ -361,21 +361,22 @@ export function VoteScreen({
                   return <VotePawn key={p.id} id={p.id} left={left} top={top} look={look.look} side={pawnSide} voted={voted} />;
                 })}
               </div>
-              {/* Each zone's icon and count, on its far half (the other team's): your team's votes and your pawn
-                  land on the near half, in full view. */}
+              {/* Each zone's count, on its far half (the other team's): your team's votes and your pawn land on the near
+                  half, in full view. (No icons: the votes' emoji were taken off, Eric, Nov 2.) */}
               <div class="vote-labels" aria-hidden="true">
                 {def.options.map((o, i) => {
                   const box = zoneOnScreen(zoneOf(i), orientation);
                   const state = vote.result === null ? "" : vote.result === i ? " win" : " lose";
                   return (
                     <div key={o.id} class={`vote-label${state}${o.disabled ? " disabled" : ""}`} style={{ left: `${box.left}%`, top: `${box.top}%`, width: `${box.width}%`, height: `${box.height / 2}%` }}>
-                      <span class="vote-zone-icon">{o.icon}</span>
                       {o.disabled ? <span class="vote-zone-soon">Soon</span> : <PopCount n={counts[i]!} class="vote-zone-count" />}
                     </div>
                   );
                 })}
               </div>
-              {selected &&
+              {/* A tap on a zone puts your pawn there: your vote (Eric, Nov 2: "Tapping on an augment area puts your piece there"),
+                  whether or not you picked your pawn up first. The zone takes the tap, so the board under it never gets one. */}
+              {canAct &&
                 def.options.map((o, i) => {
                   const box = zoneOnScreen(zoneOf(i), orientation);
                   if (o.disabled) return null;
@@ -412,7 +413,6 @@ export function VoteScreen({
             {counting && <FirstVoteHint key={vote.key} open={open} done={!!mine} />}
             {winner && now >= walkedAt && (
               <div class={`vote-banner${winner.detail ? " with-detail" : ""}${resetting || leaving ? " leaving" : ""}`} role="status">
-                <span class="vote-banner-icon">{winner.icon}</span>
                 <strong>{winner.label}</strong>
                 <span>{winner.blurb}</span>
                 {winner.detail && <span class="vote-banner-detail">{winner.detail}</span>}
@@ -436,9 +436,6 @@ export function VoteScreen({
               aria-disabled={o.disabled ? true : undefined}
               onClick={() => cast(i, voteZoneCentre(zoneOf(i), side))}
             >
-              <span class="vote-card-icon" aria-hidden="true">
-                {o.icon}
-              </span>
               <strong>{o.label}</strong>
               <span class="vote-card-blurb">{o.blurb}</span>
               {!o.disabled && (

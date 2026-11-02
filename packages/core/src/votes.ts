@@ -9,9 +9,9 @@ import { CROWD_KNOCKOUTS, CROWD_START, crowdFinalists, type Settings } from "./s
  * change. See DECISIONS.md, "Pre-game vote overhaul (Oct 7, 2026)".
  */
 
+/** A vote's option: words only (the emoji each had were taken off, Eric, Nov 2: "delete them entirely"; our own art may come later). */
 export interface VoteOption {
   id: string;
-  icon: string;
   label: string;
   /** One short line under the label. */
   blurb: string;
@@ -55,11 +55,10 @@ const minutes = (seconds: number) => String(Math.round((seconds / 60) * 100) / 1
  * game, 3 s added every move), with its cap in the blurb. The label and blurb are made from the numbers, so they can't
  * disagree. The patch also clears any rising schedule (moveClockSteps), so the cap is the same on every move.
  */
-function timeControl(id: string, icon: string, name: string, tc: TimeControl): VoteOption {
+function timeControl(id: string, name: string, tc: TimeControl): VoteOption {
   const mins = minutes(tc.timeBankSeconds);
   return {
     id,
-    icon,
     label: `${name} ${mins}+${tc.timeIncrementSeconds}`,
     blurb: `${mins} min + ${tc.timeIncrementSeconds} s a move · max ${tc.moveClockSeconds} s`,
     patch: { ...tc, moveClockSteps: [] },
@@ -76,9 +75,9 @@ function timeControl(id: string, icon: string, name: string, tc: TimeControl): V
  */
 function speedVote(): PregameVote {
   const options = [
-    timeControl("bullet", "⚡", "Bullet", { timeBankSeconds: 180, timeIncrementSeconds: 2, moveClockSeconds: 10 }),
-    timeControl("blitz", "🔥", "Blitz", { timeBankSeconds: 300, timeIncrementSeconds: 3, moveClockSeconds: 15 }),
-    timeControl("rapid", "⏱️", "Rapid", { timeBankSeconds: 600, timeIncrementSeconds: 5, moveClockSeconds: 20 }),
+    timeControl("bullet", "Bullet", { timeBankSeconds: 180, timeIncrementSeconds: 2, moveClockSeconds: 10 }),
+    timeControl("blitz", "Blitz", { timeBankSeconds: 300, timeIncrementSeconds: 3, moveClockSeconds: 15 }),
+    timeControl("rapid", "Rapid", { timeBankSeconds: 600, timeIncrementSeconds: 5, moveClockSeconds: 20 }),
   ];
   // Nobody votes: Blitz, by its id (DECISIONS.md, "Crowd 50 v 50: three chess time controls").
   return { id: "speed", title: "How fast?", defaultOption: optionIndex(options, "blitz"), options };
@@ -86,7 +85,7 @@ function speedVote(): PregameVote {
 
 /**
  * The boss final's card (Eric, Oct 14: "instead of saying boss raid it'll say hidden boss"): the boss it always meets
- * (crowdFinalBoss: the Hidden Boss), named and drawn as the roster has him, so renaming him is one edit there; the blurb
+ * (crowdFinalBoss: the Hidden Boss), named as the roster has him, so renaming him is one edit there; the blurb
  * names the ending and says how many face him (crowdFinalists: the top 4) without naming him again. With no such boss:
  * a random one (also while he's resting: `roster` without him, rosterWithout).
  */
@@ -95,7 +94,6 @@ export function bossFinalOption(roster: readonly BossDef[] = BOSS_ROSTER): VoteO
   const n = crowdFinalists("boss");
   return {
     id: "boss",
-    icon: boss?.icon ?? "👹",
     label: boss?.name ?? "Boss final",
     // (The card names the boss; its line names the ending, the boss final, as everywhere else.)
     blurb: boss ? `Boss final: top ${n} team up against him` : `Boss final: top ${n} team up against a boss`,
@@ -108,7 +106,6 @@ function formatVote(): PregameVote {
   const options: VoteOption[] = [
     {
       id: "team",
-      icon: "🛡️",
       label: "Team final",
       blurb: "Top 8 play on: 4v4, 3v3, then 2v2 to the end",
       patch: { finalFormat: "team", knockoutsPerStage: CROWD_KNOCKOUTS.team },
@@ -116,7 +113,6 @@ function formatVote(): PregameVote {
     bossFinalOption(),
     {
       id: "duel",
-      icon: "⚔️",
       label: "Duel",
       blurb: "The best of each side, 1v1 to the end",
       patch: { finalFormat: "duel", knockoutsPerStage: CROWD_KNOCKOUTS.duel },
@@ -134,9 +130,9 @@ function formatVote(): PregameVote {
 function openingVote(): PregameVote {
   const n: number = CROWD_START.randomOpeningMoves;
   const options: VoteOption[] = [
-    { id: "normal", icon: "♟️", label: "Normal", blurb: "The usual starting position", patch: { crowdStart: "normal", openingMoves: 0 } },
-    { id: "random", icon: "🎲", label: "Random opening", blurb: `A real opening, ${n} ${n === 1 ? "move" : "moves"} in`, patch: { crowdStart: "random", openingMoves: n } },
-    { id: "freestyle", icon: "🔀", label: "Freestyle", blurb: "The back-row pieces start shuffled", patch: { crowdStart: "freestyle", openingMoves: 0 } },
+    { id: "normal", label: "Normal", blurb: "The usual starting position", patch: { crowdStart: "normal", openingMoves: 0 } },
+    { id: "random", label: "Random opening", blurb: `A real opening, ${n} ${n === 1 ? "move" : "moves"} in`, patch: { crowdStart: "random", openingMoves: n } },
+    { id: "freestyle", label: "Freestyle", blurb: "The back-row pieces start shuffled", patch: { crowdStart: "freestyle", openingMoves: 0 } },
   ];
   return { id: "start", title: "How does it start?", defaultOption: optionIndex(options, "normal"), options };
 }

@@ -66,11 +66,10 @@ describe("how it ends: the boss final is the Hidden Boss's (Eric, Oct 14)", () =
   const format = PREGAME_VOTES.find((v) => v.id === "format")!;
   const boss = format.options.find((o) => o.id === "boss")!;
 
-  it("its card is the boss it always meets, named and drawn as the roster has him, and how many face him (the top 4), from the settings", () => {
+  it("its card is the boss it always meets, named as the roster has him, and how many face him (the top 4), from the settings", () => {
     const him = crowdFinalBoss()!;
     expect(boss.label).toBe(him.name);
     expect(boss.label).toBe("Hidden Boss");
-    expect(boss.icon).toBe(him.icon);
     expect(boss.blurb).toBe(`Boss final: top ${crowdFinalists("boss")} team up against him`);
     expect(boss.blurb).toBe("Boss final: top 4 team up against him");
     // Its place and the default stay (Team final; Eric, Oct 13: options never move).
@@ -96,13 +95,15 @@ describe("how it starts (Eric, Oct 24): Normal | Random opening | Freestyle, the
 
   it("held second, between how it ends and the clock; its cards left to right, in a player's words", () => {
     expect(PREGAME_VOTES.map((v) => v.title)).toEqual(["How does it end?", "How does it start?", "How fast?"]);
-    expect(start.options.map((o) => [o.id, o.icon, o.label, o.blurb])).toEqual([
-      ["normal", "♟️", "Normal", "The usual starting position"],
-      ["random", "🎲", "Random opening", `A real opening, ${CROWD_START.randomOpeningMoves} moves in`],
-      ["freestyle", "🔀", "Freestyle", "The back-row pieces start shuffled"],
+    expect(start.options.map((o) => [o.id, o.label, o.blurb])).toEqual([
+      ["normal", "Normal", "The usual starting position"],
+      ["random", "Random opening", `A real opening, ${CROWD_START.randomOpeningMoves} moves in`],
+      ["freestyle", "Freestyle", "The back-row pieces start shuffled"],
     ]);
     // Eric's word for the variant is Freestyle: a player never reads Chess960 or Fischer Random in the vote.
     for (const v of PREGAME_VOTES) expect(JSON.stringify(v)).not.toMatch(/960|fischer/i);
+    // And no emoji on any vote's options (Eric, Nov 2: "delete them entirely").
+    for (const v of PREGAME_VOTES) expect(JSON.stringify(v.options)).not.toMatch(/\p{Extended_Pictographic}/u);
   });
 
   it("nobody votes: Normal, by its id", () => {
