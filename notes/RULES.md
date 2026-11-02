@@ -24,6 +24,9 @@ notes to a private place or strip them). Never put a secret value here or anywhe
   `fuser -k PORT/tcp` only.
 - Small jobs (a number, a test pin, a doc) the director does itself, no helper.
 - After each batch: `python3 .claude/tools/helper-usage.py <tasks dir>`.
+- **Art is drawn by the paid API, never by a session on plan usage** (Eric, Nov 2: "I want all the others to use api like they
+  did before for these unless I tell you otherwise"). An art session only briefs, runs the API runner, renders and pushes;
+  if Eric declines a spend, it stops and asks; it never draws by hand instead. Report art cost as API $ and say plan usage.
 - API credits (Claude API, `BOSS_LINES_API_KEY`): conserve; only for Eric-approved art; $20 cap a run unless Eric raises
   it; send a cost estimate first. Gemini (Eric's own) for bulk writing like boss lines.
 
