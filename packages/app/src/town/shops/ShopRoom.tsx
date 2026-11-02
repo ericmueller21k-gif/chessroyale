@@ -331,22 +331,36 @@ function startRoom(
   let attackCued = -1;
   /** The default intro (no art of its own): its attack is swung in place, where it stands. */
   const inPlace = !!ci && !ci.def.custom;
-  if (boss && marks) {
-    you.stepMs = C.walkStepMs;
-    const yp = findPath(room, you.here(), marks.youSq);
-    const bp = findPath(room, boss.here(), marks.bossSq);
-    if (yp) you.go(yp);
-    if (bp) boss.go(bp);
-  }
+  /** When you both start walking up to the marks (`insideMs` after the room's first frame: its fade-in, then a beat just inside); -1: not yet. */
+  let walkFrom = -1;
+  let walking = false;
+  if (boss && marks) you.stepMs = C.walkStepMs;
   /** The last half square onto a mark's middle (0 until it's there; then easing to its half). */
   const settle = (at: number, half: number, now: number) => (at < 0 ? 0 : half * Math.min(1, (now - at) / C.settleMs));
-  const youOx = (now: number) => (marks ? settle(youAt, marks.you.c - marks.youSq.c, now) : 0);
-  const youOy = (now: number) => (marks ? settle(youAt, marks.you.r - marks.youSq.r, now) : 0);
-  const bossOx = (now: number) => (marks ? settle(bossAt, marks.boss.c - marks.bossSq.c, now) : 0);
-  const bossOy = (now: number) => (marks ? settle(bossAt, marks.boss.r - marks.bossSq.r, now) : 0);
+  /** The hop back clear of the stools (from the mark to its clear place, as the intro says: `introNow.back`). */
+  const back = () => introNow?.back ?? 0;
+  const youOx = (now: number) => (marks ? settle(youAt, marks.you.c - marks.youSq.c, now) + back() * (marks.youClear.c - marks.you.c) : 0);
+  const youOy = (now: number) => (marks ? settle(youAt, marks.you.r - marks.youSq.r, now) + back() * (marks.youClear.r - marks.you.r) : 0);
+  const bossOx = (now: number) => (marks ? settle(bossAt, marks.boss.c - marks.bossSq.c, now) + back() * (marks.bossClear.c - marks.boss.c) : 0);
+  const bossOy = (now: number) => (marks ? settle(bossAt, marks.boss.r - marks.bossSq.r, now) + back() * (marks.bossClear.r - marks.boss.r) : 0);
+  /** How high the hop back lifts you both now, in squares. */
+  const hopLift = () => (introNow?.hop ?? 0) * C.hopUp;
   /** The challenge, a frame on: the walk in, then the intro's beats (its line said once, in the bubble by his head; its cues' sounds). */
   const stepIntro = (now: number) => {
     if (!ci || !boss || !marks || !challenge) return;
+    // (Just inside the door a beat, then you both walk up to the marks.)
+    if (walkFrom < 0) walkFrom = now + C.insideMs;
+    if (!walking) {
+      if (now < walkFrom) {
+        if (cv.dataset.intro !== "walk") cv.dataset.intro = "walk";
+        return;
+      }
+      walking = true;
+      const yp = findPath(room, you.here(), marks.youSq);
+      const bp = findPath(room, boss.here(), marks.bossSq);
+      if (yp) you.go(yp);
+      if (bp) boss.go(bp);
+    }
     boss.update(now);
     // (On its mark, each turns to face the other across the table: Walker's side view, `facing` the way.)
     if (youAt < 0 && !you.moving()) {
@@ -750,6 +764,7 @@ function startRoom(
       img = rv.frames.move[i]!;
       lift = (rv.lift[i]! * box) / 100;
     } else img = rv.frames.idle[(i = rv.idleIndex(now))]!;
+    lift += hopLift();
     Object.assign(seen, { ride: rd.id, anim: pose.step ? "move" : "idle", frame: i, facing: flip, view: rv === rd.views[0] ? 0 : view });
     const h = ((box * rv.h) / 100) * pt.k;
     const w = (h * rv.w) / rv.h;
@@ -798,7 +813,7 @@ function startRoom(
     const h = f.youSquares * kk * pt.k;
     const fy = (pad + PAWN_FOOT) / kk;
     const head = Math.min(a?.top ?? 1, (pad + PAWN_HEAD) / kk);
-    const lift = pose.hop * f.youHop * pt.k;
+    const lift = (pose.hop * f.youHop + hopLift()) * pt.k;
     shadows(pt.x, pt.y, pt.k, h / kk);
     const y0 = pt.y - fy * h - lift;
     g.save();
@@ -827,27 +842,20 @@ function startRoom(
   /** The boss (in a challenge): its town sprite, its idle playing, at the town's size, its shadows as the town draws a boss's. */
   const bossHead = { x: 0, y: 0, on: false };
   /**
-   * The boss's God King attack, at the boss's own size in the room. Its own intro (Alfil's): dropped in beside the table, its target
-   * the board, on the boss's side of it (across: the west; facing: to the board's left, or right for one drawn facing left). The
-   * default: swung in place where it stands, facing you. Turned to face the way it should (the art faces right, or left for
-   * `facesLeft`).
+   * The boss's God King attack, at the boss's own size in the room, its feet where the boss stands (clear of its stool, Nov 2). Its
+   * own intro (Alfil's, Big Boy's): the whole attack, its drop-in too, toward the board (across: east). The default: its lashes swung
+   * in place, facing you. Turned to face the way it should (the art faces right, or left for `facesLeft`).
    */
   const drawAttack = (now: number) => {
     const a = ci!.attack!;
     if (!marks) return;
-    let face: number;
-    if (inPlace) {
-      boss!.pose(now, bossPose);
-      if (!P(bossPose.x + bossOx(now), bossPose.y + bossOy(now))) return;
-      face = marks.bossFace ?? boss!.facing;
-    } else {
-      if (!P(marks.table.c, marks.table.r)) return;
-      face = across ? 1 : a.facesLeft ? -1 : 1;
-    }
+    boss!.pose(now, bossPose);
+    if (!P(bossPose.x + bossOx(now), bossPose.y + bossOy(now))) return;
+    const face = inPlace ? (marks.bossFace ?? boss!.facing) : across ? 1 : a.facesLeft ? -1 : 1;
     const img = a.frames[attackFrame]!;
     const k = (ci!.boss.squares * pt.k) / ci!.boss.ch.h;
-    // (Its feet: where it stands, or `standPx` off the board on the side it faces from.)
-    const fx = inPlace ? pt.x : pt.x - face * a.standPx * k;
+    // (Its feet where the boss stands, clear of its stool: Nov 2, "make sure they're not standing where the chair blocks are".)
+    const fx = pt.x;
     const flip = (face < 0) !== a.facesLeft;
     const y0 = pt.y - a.ch.foot[1] * k;
     g.save();
@@ -873,7 +881,7 @@ function startRoom(
     const h = b.squares * pt.k;
     const w = (h * b.ch.w) / b.ch.h;
     const x0 = pt.x - (b.ch.foot[0] / b.ch.w) * w;
-    const y0 = pt.y - (b.ch.foot[1] / b.ch.h) * h;
+    const y0 = pt.y - (b.ch.foot[1] / b.ch.h) * h - hopLift() * pt.k;
     const soft = 1.6;
     g.fillStyle = SHADOW;
     g.globalAlpha = f.shadowAlpha;
@@ -1111,8 +1119,7 @@ function startRoom(
     addFig(pose.y + youOy(now), 1);
     if (boss && marks) {
       boss.pose(now, bossPose);
-      // (Its own intro's attack stands beside the table, just in front of it; the default's where it stands.)
-      addFig(attackFrame >= 0 && !inPlace ? marks.table.r + 0.01 : bossPose.y + bossOy(now), 2);
+      addFig(bossPose.y + bossOy(now), 2);
       if (introNow) {
         // (Across, you and the boss stand on the table's row, at its stools: the table first, you in front of yours.)
         addFig(across ? marks.table.r - 0.01 : marks.table.r, 3);

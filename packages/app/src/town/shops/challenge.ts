@@ -82,19 +82,36 @@ export const BOSS_INTROS: Readonly<Partial<Record<HomeId, BossIntro>>> = {
 /** The boss's intro, or null: challenged as before (no intro yet). */
 export const introOf = (id: HomeId): BossIntro | null => BOSS_INTROS[id] ?? null;
 
-/** Every number that shapes the challenge's timing (the whole of it under about 6 s, from the door to the storm covering). */
+/**
+ * Every number that shapes the challenge's timing and where everyone stands. The pacing (Eric, Nov 2, after Big Boy's live: "it
+ * happens so damn fast… Stretch that out a few more seconds: slowly walk up to the chessboard, then say your line, then the tiles
+ * drop down, then the seats drop down. Add a little delay between these things"): a walk to the door and in, a beat inside, a slow
+ * walk up to the marks, a pause, the line, a pause, each build step with a small gap between, the attack swung, the cover. About
+ * 10 to 12 s from Fight to the cover (it was about 5 to 6). Every beat is one number here; the timeline is `introBeats`.
+ */
 export const CHALLENGE_FEEL = {
-  /** Walking in, you and the boss side by side: ms a square (the boss's own town pace, 420, is too slow for this). */
-  walkStepMs: 120,
+  /** In the town, you and the boss walk to its door at this pace (ms a square): the town's walkers' pace (botStepMs), not your run. */
+  doorStepMs: 200,
+  /** Inside, you both stand just in the door this long (ms, from the room's first frame: its fade-in, then a beat) before walking. */
+  insideMs: 450,
+  /** Walking up to the marks, side by side: ms a square (a slow walk: the room's squares show bigger than the town's). */
+  walkStepMs: 200,
   /** The last half square onto the middle of a two-square start mark, in ms. */
-  settleMs: 140,
-  /** The line shows this long (ms) from when you face each other; the pyramid starts to rise `riseAtMs` into it. */
-  lineMs: 1800,
-  riseAtMs: 400,
-  /** The table and its board hold this long after the pyramid has crumbled (or the blocks' stools have landed), before the storm. */
-  tableHoldMs: 350,
+  settleMs: 250,
+  /** On the marks, facing each other, this long (ms) before the line. */
+  faceMs: 400,
+  /** The line in the bubble over the boss's head (ms): long enough to read. */
+  lineMs: 2500,
+  /** The pause after the line, before the board starts coming in (ms). */
+  afterLineMs: 350,
+  /** Alfil's pyramid holds this long (its idle, ms) once it has risen, before it cracks. */
+  holdMs: 600,
+  /** The small gap between build steps (ms): Big Boy's blocks stacked and the board dropping, the board on and the stools dropping. */
+  gapMs: 300,
+  /** The finished table (and its stools) on its own this long (ms) before the attack. */
+  tableHoldMs: 500,
   /** Toy blocks (Big Boy's): the board falls onto the built table over this long (ms), from `dropFrom` squares above it. */
-  boardDropMs: 180,
+  boardDropMs: 220,
   dropFrom: 2.5,
   /** The storm sweeps in over this long (ms), holds covered at least `coveredMinMs` (longer while the battle loads), and slides out over `stormOutMs`. */
   stormInMs: 600,
@@ -102,27 +119,41 @@ export const CHALLENGE_FEEL = {
   stormOutMs: 600,
   /**
    * The room's camera through a challenge, by layout: looking at this many squares south of the table (and west of it: the boss is
-   * wider than you), at this zoom (0 Close, 1 the town's zoomed-in camera): you, the board and the boss all in view, the boss's line
-   * under the chat log.
+   * wider than you, and stands further out), at this zoom (0 Close, 1 the town's zoomed-in camera): you, the table, both stools and
+   * the boss all in view, the boss's line under the chat log.
    */
-  cam: { across: { south: 0.8, west: 0.3, zoom: 0.45 }, facing: { south: 1.5, west: 0, zoom: 0.6 } },
+  cam: { across: { south: 0.8, west: 0.55, zoom: 0.62 }, facing: { south: 1.5, west: 0, zoom: 0.6 } },
   /**
-   * How far (squares) each of you stands from the table's middle, by layout: across, just outside your stool (the park table's
-   * stools stand `stoolOff` from its middle); facing, on the circle's drawn north and south marks.
+   * How far (squares) each of you stands from the table's middle, by layout, walking in and saying the line: across, on the start
+   * marks just outside the stools (the park table's stools stand `stoolOff` from its middle); facing, on the circle's drawn north
+   * and south marks.
    */
   standOff: { across: 1.5, facing: 2.5 },
+  /**
+   * Standing clear (Eric, Nov 2: "Make sure they're not standing where the chair blocks are; that looks like bad design"): as the
+   * stools come in, you and the boss each take a little hop back (`hopMs`, `hopUp` squares high at its top) to this far from the
+   * table's middle (squares), so no part of you near the floor is in front of a stool (a unit test measures every boss's drawing).
+   * Across only (facing, the stools stand between you and the table).
+   */
+  clear: { you: 2.2, boss: 2.6 },
+  hopMs: 320,
+  hopUp: 0.3,
   /** The park table's stools: this far (squares) from the table's middle (park.ts PARK_TABLE: three squares across). */
   stoolOff: 1,
   /** A circle whose middle has a piece standing in it (Babur's ring, its pedestal): the table stands this many squares south of it. */
   clearOff: 1.5,
   /**
-   * The default intro (a boss without its own art): the line from facing each other for `lineMs` (above); the table and its board
-   * pop in `popAtMs` into it (growing in over `popMs`, a dust puff round its foot over `puffMs`); from the line's end it swings its
-   * God King attack in place for `swingMs`; then the flash and the wipe.
+   * The default intro (a boss without its own art): after the line and its pause, the table and its board pop in (growing over
+   * `popMs`, a dust puff round its foot over `puffMs`), the table holds, then it swings its God King attack in place.
    */
-  popAtMs: 450,
-  popMs: 220,
+  popMs: 300,
   puffMs: 500,
+  /**
+   * The boss's attack (its kit's `kingAttack`, the one it fires at the God King; Eric, Nov 2: "a few seconds before the screen
+   * overlay hits… it continues on until the screen is fully cloaked"): swung where it stands for this long (ms) before its
+   * transition has covered the screen, and on (its lashes over and over) until the battle takes the screen. A boss without one
+   * skips it (the same time, standing).
+   */
   swingMs: 2000,
   /** The default transition: the screen flashes white `flashes` times over `flashMs`, black bands wipe in over `wipeMs`, and the black fades off over `wipeOutMs`. */
   flashes: 3,
@@ -130,12 +161,6 @@ export const CHALLENGE_FEEL = {
   wipeMs: 380,
   wipeBands: 8,
   wipeOutMs: 420,
-  /**
-   * The boss's attack (its kit's `kingAttack`, the one it fires at the God King; Eric, Nov 2: "a few seconds before the screen
-   * overlay hits… it continues on until the screen is fully cloaked"): it starts this long before the storm covers the screen,
-   * and plays on (its lashes over and over) until the battle takes the screen. A boss without one skips it.
-   */
-  attackLeadMs: 2000,
   /** The storm's tiles are drawn this many times their size, crisp. */
   stormScale: 3,
 } as const;
@@ -184,6 +209,12 @@ export interface Marks {
   /** The table's two stools, one at each player's side (nothing on the empty sides): the boss's and yours. */
   bossStool: Sq;
   youStool: Sq;
+  /**
+   * Where each stands once the stools are in (the little hop back, CHALLENGE_FEEL.clear): across, a clear step outside its stool,
+   * on the same row; facing, its mark (the stools stand between you and the table there).
+   */
+  youClear: Sq;
+  bossClear: Sq;
   /** The way each faces, standing: 1 the screen's right (east), -1 its left; null facing north or south (the sprite as it walked). */
   youFace: 1 | -1 | null;
   bossFace: 1 | -1 | null;
@@ -199,7 +230,7 @@ export interface DrawnMarks {
  * without a circle. The circles' drawn start marks (Alfil's and Puddles') are where the layout puts you (a unit test keeps them so).
  * A room whose art exports its marks (`drawn`: Big Boy's, west and east) has you stand on them across, the table halfway between.
  */
-export function marksOf(layout: readonly ShopPlace[], how: IntroLayout, drawn?: DrawnMarks | null, feel: Pick<typeof CHALLENGE_FEEL, "standOff" | "stoolOff" | "clearOff"> = CHALLENGE_FEEL): Marks | null {
+export function marksOf(layout: readonly ShopPlace[], how: IntroLayout, drawn?: DrawnMarks | null, feel: Pick<typeof CHALLENGE_FEEL, "standOff" | "stoolOff" | "clearOff" | "clear"> = CHALLENGE_FEEL): Marks | null {
   let c0 = Infinity, c1 = -Infinity, r0 = Infinity, r1 = -Infinity;
   for (const p of layout) {
     if (!/^(circle|ring|emblem)-/.test(p.name)) continue;
@@ -230,6 +261,8 @@ export function marksOf(layout: readonly ShopPlace[], how: IntroLayout, drawn?: 
     table,
     bossStool: across ? { c: table.c - k, r: table.r } : { c: table.c, r: table.r - k },
     youStool: across ? { c: table.c + k, r: table.r } : { c: table.c, r: table.r + k },
+    youClear: across ? { c: table.c + Math.max(feel.clear.you, you.c - table.c), r: you.r } : you,
+    bossClear: across ? { c: table.c - Math.max(feel.clear.boss, table.c - boss.c), r: boss.r } : boss,
     youFace: across ? -1 : null,
     bossFace: across ? 1 : null,
   };
@@ -271,20 +304,27 @@ export interface BlocksAnims {
 /** A boss's own art's animations: a pyramid (Alfil's) or toy blocks (Big Boy's). */
 export type IntroAnims = PyramidAnims | BlocksAnims;
 export const isBlocks = (a: IntroAnims): a is BlocksAnims => "build" in a;
-export type IntroStep = "line" | "rise" | "idle" | "crack" | "crumble" | "build" | "drop" | "plop" | "chairs" | "table" | "swing" | "done";
+export type IntroStep = "face" | "line" | "pause" | "rise" | "idle" | "crack" | "crumble" | "build" | "drop" | "plop" | "chairs" | "pop" | "table" | "swing" | "done";
 export interface IntroBeat {
   step: IntroStep;
   at: number;
   end: number;
 }
 const sum = (ms: readonly number[]) => ms.reduce((a, b) => a + b, 0);
-type BeatFeel = Pick<typeof CHALLENGE_FEEL, "lineMs" | "riseAtMs" | "tableHoldMs" | "swingMs" | "boardDropMs">;
+type BeatFeel = Pick<
+  typeof CHALLENGE_FEEL,
+  "faceMs" | "lineMs" | "afterLineMs" | "holdMs" | "gapMs" | "tableHoldMs" | "boardDropMs" | "popMs" | "swingMs" | "stormInMs" | "flashMs" | "wipeMs"
+>;
+/** How long the boss's transition takes to cover the screen (ms): its own storm's sweep, or the default's flash and wipe. */
+export const coverMs = (custom: boolean, feel: Pick<typeof CHALLENGE_FEEL, "stormInMs" | "flashMs" | "wipeMs"> = CHALLENGE_FEEL): number =>
+  custom ? feel.stormInMs : feel.flashMs + feel.wipeMs;
 /**
- * The beats. A boss's own art (`a`): Alfil's pyramid: the line alone, the pyramid rising (`riseAtMs` into the line), holding (its
- * idle) until the line is done, cracking, crumbling, the table on its own for a moment; Big Boy's blocks: the line alone, the blocks
- * building the table (`riseAtMs` into the line, holding their last frame until the line is done), the board dropping onto it and
- * plopping down, the stools dropping in, the table on its own for a moment; then done (its transition). The default (`a` null): the
- * line (the table pops in `popAtMs` into it), then its attack swung in place for `swingMs`; then done.
+ * The beats, from when you both stand on your marks (Eric, Nov 2: "slowly walk up to the chessboard, then say your line, then the
+ * tiles drop down, then the seats drop down. Add a little delay between these things"): facing each other a moment, the line alone,
+ * a pause; then the board coming in, a step at a time: Alfil's pyramid rising, holding, cracking, crumbling (the table inside);
+ * Big Boy's blocks stacking, a gap, the board dropping and plopping on, a gap, the stools dropping in; the default's table popping
+ * in; then the table on its own a beat, and the attack swung (`swingMs` until the transition has covered the screen); then done
+ * (the transition starts).
  */
 export function introBeats(a: IntroAnims | null, feel: BeatFeel = CHALLENGE_FEEL): IntroBeat[] {
   const out: IntroBeat[] = [];
@@ -293,29 +333,32 @@ export function introBeats(a: IntroAnims | null, feel: BeatFeel = CHALLENGE_FEEL
     out.push({ step, at: t, end: t + ms });
     t += ms;
   };
-  if (!a) {
-    add("line", feel.lineMs);
-    add("swing", feel.swingMs);
-  } else if (isBlocks(a)) {
-    add("line", feel.riseAtMs);
-    add("build", sum(a.build) + Math.max(0, feel.lineMs - feel.riseAtMs - sum(a.build)));
+  add("face", feel.faceMs);
+  add("line", feel.lineMs);
+  add("pause", feel.afterLineMs);
+  if (!a) add("pop", feel.popMs);
+  else if (isBlocks(a)) {
+    add("build", sum(a.build));
+    add("pause", feel.gapMs);
     add("drop", feel.boardDropMs);
     add("plop", sum(a.plop));
+    add("pause", feel.gapMs);
     add("chairs", sum(a.chairs));
-    add("table", feel.tableHoldMs);
   } else {
-    add("line", feel.riseAtMs);
     add("rise", sum(a.rise));
-    add("idle", Math.max(0, feel.lineMs - t));
+    add("idle", feel.holdMs);
     add("crack", sum(a.crack));
     add("crumble", sum(a.crumble));
-    add("table", feel.tableHoldMs);
   }
+  add("table", feel.tableHoldMs);
+  add("swing", Math.max(0, feel.swingMs - coverMs(!!a, feel)));
   out.push({ step: "done", at: t, end: Infinity });
   return out;
 }
 /** The intro's whole length (ms): when its transition starts. */
 export const introLength = (beats: readonly IntroBeat[]): number => beats[beats.length - 1]!.at;
+/** When a step starts (its first beat), ms into the intro. */
+const stepAt = (beats: readonly IntroBeat[], s: IntroStep): number => beats.find((x) => x.step === s)!.at;
 
 /** The frame (from 0) showing `t` ms into an animation of these frames: looping, or held on its last. */
 export function frameAt(ms: readonly number[], t: number, loop: boolean): number {
@@ -340,9 +383,9 @@ export interface IntroNow {
   drop: number;
   /** The table's stools show (with the table; toy blocks: from when they drop in). */
   stools: boolean;
-  /** The boss's line is over its head (from facing you until the pyramid cracks; the default: until it swings). */
+  /** The boss's line is over its head (its own beat, alone). */
   line: boolean;
-  /** The table and its board show (from the crumble's clear frame on; the default: from its pop on). */
+  /** The table and its board show (from the crumble's clear frame on; toy blocks: from the board's drop; the default: from its pop on). */
   table: boolean;
   /** The crumble's last frame (the low drift of sand) lies over the table's foot: kept, as the art allows, until the storm. */
   drift: boolean;
@@ -350,65 +393,68 @@ export interface IntroNow {
   pop: number;
   /** The default's dust puff round the table's foot: how far through it is (0 to 1), or -1: none. */
   puff: number;
+  /** The hop back clear of the stools (CHALLENGE_FEEL.clear): how far from the mark to the clear place (0 to 1, eased)... */
+  back: number;
+  /** ...and how high in it (0 to 1: 1 at its top, `hopUp` squares). */
+  hop: number;
 }
 const easeOutBack = (u: number) => 1 + 2.2 * (u - 1) ** 3 + 1.2 * (u - 1) ** 2;
-export function introAt(beats: readonly IntroBeat[], a: IntroAnims | null, t: number, feel: Pick<typeof CHALLENGE_FEEL, "popAtMs" | "popMs" | "puffMs" | "dropFrom"> = CHALLENGE_FEEL): IntroNow {
+/**
+ * When you and the boss hop back clear of the stools, ms into the intro: as they come in (the default's pop; Big Boy's stools
+ * starting to drop; Alfil's table showing through the crumble).
+ */
+export function hopStart(beats: readonly IntroBeat[], a: IntroAnims | null): number {
+  if (!a) return stepAt(beats, "pop");
+  if (isBlocks(a)) return stepAt(beats, "chairs");
+  return stepAt(beats, "crumble") + sum(a.crumble.slice(0, a.tableFrame));
+}
+export function introAt(beats: readonly IntroBeat[], a: IntroAnims | null, t: number, feel: Pick<typeof CHALLENGE_FEEL, "popMs" | "puffMs" | "dropFrom" | "hopMs"> = CHALLENGE_FEEL): IntroNow {
   const b = beats.find((x) => t < x.end) ?? beats[beats.length - 1]!;
-  const into = t - b.at;
-  const base = { step: b.step, pyramid: null, blocks: null, drop: 0, drift: false, pop: 1, puff: -1 };
+  const h = Math.min(1, Math.max(0, (t - hopStart(beats, a)) / feel.hopMs));
+  const base = { step: b.step, pyramid: null, blocks: null, drop: 0, drift: false, pop: 1, puff: -1, line: b.step === "line", back: h * h * (3 - 2 * h), hop: h > 0 && h < 1 ? Math.sin(Math.PI * h) : 0 };
   if (!a) {
-    const p = t - feel.popAtMs;
+    const p = t - stepAt(beats, "pop");
     const shown = p >= 0;
-    return { ...base, line: b.step === "line" && t >= 0, table: shown, stools: shown, pop: shown ? easeOutBack(Math.min(1, p / feel.popMs)) : 0, puff: shown && p < feel.puffMs ? p / feel.puffMs : -1 };
+    return { ...base, table: shown, stools: shown, pop: shown ? easeOutBack(Math.min(1, p / feel.popMs)) : 0, puff: shown && p < feel.puffMs ? p / feel.puffMs : -1 };
   }
   if (isBlocks(a)) {
-    // (The line until the board drops; the blocks build, the board falls and plops on, the stools drop in, then it all stands.)
-    const dropAt = beats.find((x) => x.step === "drop")!;
-    const line = t >= 0 && t < dropAt.at;
-    const blocks = (anim: "build" | "plop" | "chairs" | "idle", frame: number) => ({ ...base, blocks: { anim, frame }, line });
-    switch (b.step) {
-      case "line":
-        return { ...base, line, table: false, stools: false };
-      case "build":
-        return { ...blocks("build", frameAt(a.build, into, false)), table: false, stools: false };
-      case "drop": {
-        const u = Math.min(1, into / Math.max(1, dropAt.end - dropAt.at));
-        return { ...blocks("build", a.build.length - 1), table: true, stools: false, drop: feel.dropFrom * (1 - u * u) };
-      }
-      case "plop":
-        return { ...blocks("plop", frameAt(a.plop, into, false)), table: true, stools: false };
-      case "chairs":
-        return { ...blocks("chairs", frameAt(a.chairs, into, false)), table: true, stools: true };
-      default:
-        return { ...blocks("idle", 0), table: true, stools: true };
+    // (Nothing until the blocks drop in; they stack (held built through the gap), the board falls and plops on (held through the
+    // gap), the stools drop in, then it all stands.)
+    const blocks = (anim: "build" | "plop" | "chairs" | "idle", frame: number) => ({ ...base, blocks: { anim, frame } });
+    const drop = beats.find((x) => x.step === "drop")!;
+    if (t < stepAt(beats, "build")) return { ...base, table: false, stools: false };
+    if (t < drop.at) return { ...blocks("build", frameAt(a.build, t - stepAt(beats, "build"), false)), table: false, stools: false };
+    if (t < drop.end) {
+      const u = Math.min(1, (t - drop.at) / Math.max(1, drop.end - drop.at));
+      return { ...blocks("build", a.build.length - 1), table: true, stools: false, drop: feel.dropFrom * (1 - u * u) };
     }
+    const chairs = stepAt(beats, "chairs");
+    if (t < chairs) return { ...blocks("plop", frameAt(a.plop, t - drop.end, false)), table: true, stools: false };
+    if (t < chairs + sum(a.chairs)) return { ...blocks("chairs", frameAt(a.chairs, t - chairs, false)), table: true, stools: true };
+    return { ...blocks("idle", 0), table: true, stools: true };
   }
-  const crackAt = beats.find((x) => x.step === "crack")!.at;
-  const line = t >= 0 && t < crackAt;
-  switch (b.step) {
-    case "line":
-      return { ...base, line, table: false, stools: false };
-    case "rise":
-    case "crack":
-      return { ...base, pyramid: { anim: b.step, frame: frameAt(a[b.step], into, false) }, line, table: false, stools: false };
-    case "idle":
-      return { ...base, pyramid: { anim: "idle", frame: frameAt(a.idle, into, true) }, line, table: false, stools: false };
-    case "crumble": {
-      const frame = frameAt(a.crumble, into, false);
-      return { ...base, pyramid: { anim: "crumble", frame }, line, table: frame >= a.tableFrame, stools: frame >= a.tableFrame };
-    }
-    default:
-      return { ...base, line, table: true, stools: true, drift: true };
+  const rise = stepAt(beats, "rise");
+  const idle = stepAt(beats, "idle");
+  const crack = stepAt(beats, "crack");
+  const crumble = stepAt(beats, "crumble");
+  if (t < rise) return { ...base, table: false, stools: false };
+  if (t < idle) return { ...base, pyramid: { anim: "rise", frame: frameAt(a.rise, t - rise, false) }, table: false, stools: false };
+  if (t < crack) return { ...base, pyramid: { anim: "idle", frame: frameAt(a.idle, t - idle, true) }, table: false, stools: false };
+  if (t < crumble) return { ...base, pyramid: { anim: "crack", frame: frameAt(a.crack, t - crack, false) }, table: false, stools: false };
+  if (t < crumble + sum(a.crumble)) {
+    const frame = frameAt(a.crumble, t - crumble, false);
+    return { ...base, pyramid: { anim: "crumble", frame }, table: frame >= a.tableFrame, stools: frame >= a.tableFrame };
   }
+  return { ...base, table: true, stools: true, drift: true };
 }
 /**
  * The cue each beat starts on, and when. A pyramid: "rumble" as it rises, "crack", "crumble", and "table" on the crumble's clear
  * frame. Toy blocks: the art's own cues on their frames ("block" as each lands, "block-top", "plop" as the board touches down, "stool"
  * as each stool lands), and "drop" as the board starts to fall. The default: "table" as it pops in.
  */
-export function introCues(beats: readonly IntroBeat[], a: IntroAnims | null, feel: Pick<typeof CHALLENGE_FEEL, "popAtMs"> = CHALLENGE_FEEL): { cue: string; at: number }[] {
-  if (!a) return [{ cue: "table", at: feel.popAtMs }];
-  const at = (s: IntroStep) => beats.find((x) => x.step === s)!.at;
+export function introCues(beats: readonly IntroBeat[], a: IntroAnims | null): { cue: string; at: number }[] {
+  const at = (s: IntroStep) => stepAt(beats, s);
+  if (!a) return [{ cue: "table", at: at("pop") }];
   if (isBlocks(a)) {
     const out: { cue: string; at: number }[] = [];
     const frames = (anim: "build" | "plop" | "chairs") => {
@@ -436,14 +482,10 @@ export function introCues(beats: readonly IntroBeat[], a: IntroAnims | null, fee
 // ---- The boss's attack (its God King attack: its kit's `kingAttack`).
 
 /**
- * When the attack starts, ms into the intro. A boss's own art: `attackLeadMs` before its storm covers the screen (never before the
- * intro starts), beside the table. The default: as it swings (the line's end), in place.
+ * When the attack starts, ms into the intro: as it swings (after the table's beat on its own), where it stands, clear of its
+ * stool; `swingMs` before its transition has covered the screen.
  */
-export function attackStart(beats: readonly IntroBeat[], feel: Pick<typeof CHALLENGE_FEEL, "stormInMs" | "attackLeadMs"> = CHALLENGE_FEEL): number {
-  const swing = beats.find((b) => b.step === "swing");
-  if (swing) return swing.at;
-  return Math.max(0, introLength(beats) + feel.stormInMs - feel.attackLeadMs);
-}
+export const attackStart = (beats: readonly IntroBeat[]): number => stepAt(beats, "swing");
 /**
  * Where its animation is, `t` ms into it: as it plays at the God King (its drop-in, its first lashes), and from the moment it would
  * leap off, its lashes again and again (`lashAt` to `leaveAt`), so it keeps on until the screen is covered. `inPlace` (the default
