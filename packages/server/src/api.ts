@@ -395,7 +395,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   // token and a crate key ("key"), and opens it: one transaction (boss-tokens.ts, buyBossCrate). Answers {roll, item, locker}.
   if (path === "/api/shop/boss-crate" && request.method === "POST") {
     const b = (await request.json().catch(() => ({}))) as { crate?: unknown; way?: unknown };
-    const r = await buyBossCrate(sql, current.id, b.crate, b.way, now, admin);
+    const r = await buyBossCrate(sql, current.id, b?.crate, b?.way, now, admin);
     return r.ok ? json(r) : json({ message: r.message }, 400);
   }
   if ((path === "/api/shop/buy" || path === "/api/shop/equip") && request.method === "POST") {
