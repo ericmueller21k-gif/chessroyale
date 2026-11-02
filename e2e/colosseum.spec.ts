@@ -194,7 +194,7 @@ test("the gear's Pieces (Pixel by default): a tap steps Pixel, 3D, 2D and back, 
   await expect(row()).toContainText("3D");
   await page.keyboard.press("Escape");
   await expect.poll(async () => (await state(page)).plies, { message: "the bots play", timeout: 90_000 }).toBeGreaterThanOrEqual(4);
-  expect((await state(page)).drawCalls).toBeGreaterThanOrEqual(5);
+  expect((await state(page)).drawCalls, JSON.stringify(await state(page))).toBeGreaterThanOrEqual(5);
 
   // Remembered on this device: a reload comes back in 3D.
   await page.reload();
