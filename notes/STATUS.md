@@ -15,6 +15,12 @@ Everything from Nov 1 is merged: #447 eval bar off, #448 cash-in 2 gold, #449 on
   branch claude/boss-art; asks Eric once, ~$4-6, cap $8).
 
 ## Queue (one Opus at a time)
+0. NEXT (one Opus high batch, Eric Nov 2): (a) your ride goes INTO shops with you (not left outside; keep the
+   leave-outside code as a fallback); (b) Timber ults at most 2 times a game, then his meter stops charging; (c) the
+   admins' 🐟 Engine move (the cheat) = Stockfish's best move; Eric thinks it's on Maia: check what it uses and what its
+   title line says; the bosses' own brain stays as is.
+- Haiku running beside (Eric OK'd "Send Haiku"): Boss Battle picker, 2 rows on the computer (cr-bsrows,
+  claude/boss-select-rows, brief notes/briefs/brief-boss-select-rows.md).
 1. Auto chess reveal (Eric's simpler version): your placed pieces gray until revealed to the opponent, then normal; yellow
    2 px border = next to reveal; no green; all ungray at the move step; opponent circles as today; piece-for-piece
    matching (pawn↔pawn, knight/bishop↔knight/bishop, rook↔rook, queen↔queen; unmatched stay hidden); first placer's
