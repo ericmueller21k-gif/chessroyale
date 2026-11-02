@@ -40,5 +40,10 @@ The calls made here, each easy to change:
 - **Drops are kept 30 days** (the window needs one; the rest is for answering a question), then the Worker's schedule clears them.
 - **Admins' grants live in the Crates tab** (there was no admin grant menu before): "+1 crate key", a boss and "+1 token" / "+3
   tokens"; at most 10 at once; no Worker variable was needed (admins are `ADMIN_EMAILS`).
+- **The shop's name in the header:** on a computer the header sits in the narrow right column, where "Puddles' Botanical Garden" can't
+  fit on one line: a shop's name takes up to two smaller lines there (13 px), in the bar's same height, its full name as the tooltip.
+- **The result screen's token box** is the gambling warning's dialog (its width, its look), made square.
+- **The app retries a solo battle's finish once** after a server error (a hiccup shouldn't cost a token; the server takes the battle
+  off in one statement, so it's never counted twice), and a START tapped before the account has loaded waits for it.
 - **Token pictures:** copied as drawn from `claude/boss-art`; every live boss and Timber have one (Blitz's waits for its boss). A boss
   without one gets a plain gold coin with its initial.

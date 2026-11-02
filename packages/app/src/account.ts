@@ -284,9 +284,21 @@ export async function startSoloBossBattle(): Promise<string | null> {
   return (await api<{ battle: string | null }>("/api/boss/solo/start", { method: "POST", body: "{}" })).battle;
 }
 
-/** A solo boss battle's result screen: whether it counted (by the server's clock) and the token it dropped, if any. */
+/**
+ * A solo boss battle's result screen: whether it counted (by the server's clock) and the token it dropped, if any. Asked a second
+ * time after a moment when the first try fails on the way or on the server (a hiccup shouldn't cost a token): the server takes the
+ * battle off in one statement, so it's never counted twice.
+ */
 export async function finishSoloBossBattle(battle: string): Promise<{ counted: boolean; token: string | null }> {
-  return api<{ counted: boolean; token: string | null }>("/api/boss/solo/finish", { method: "POST", body: JSON.stringify({ battle }) });
+  const ask = () => api<{ counted: boolean; token: string | null }>("/api/boss/solo/finish", { method: "POST", body: JSON.stringify({ battle }) });
+  try {
+    return await ask();
+  } catch (e) {
+    const status = (e as { status?: number }).status;
+    if (status !== undefined && status < 500) throw e;
+    await new Promise((r) => setTimeout(r, 1000));
+    return ask();
+  }
 }
 
 /** The token an online boss battle (its lobby code) dropped you, if the server has counted it yet. */

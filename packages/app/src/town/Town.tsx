@@ -216,8 +216,14 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, onColosseum, seat =
         <button type="button" class="town-back" aria-label="Back" onClick={inside ? () => void goOut() : onBack}>
           ‹
         </button>
-        {/* (Inside a shop, the shop's name: "Babur's Circus"; Nov 2.) */}
-        <h1>{(inside && HOMES.find((h) => h.id === inside.room.def.home)?.name) || "Town square"}</h1>
+        {/* (Inside a shop, the shop's name: "Babur's Circus"; Nov 2. On a computer's narrow header, on up to two smaller lines.) */}
+        {inside ? (
+          <h1 class="town-shop-name" title={HOMES.find((h) => h.id === inside.room.def.home)?.name}>
+            {HOMES.find((h) => h.id === inside.room.def.home)?.name ?? "Town square"}
+          </h1>
+        ) : (
+          <h1>Town square</h1>
+        )}
         {/* The chat's icon (its three modes) and the gear (Town settings), at the right end of the same line (on a computer, in the frame: the chat icon beside the title, the gear at the right end). */}
         <TownChatTools />
       </header>

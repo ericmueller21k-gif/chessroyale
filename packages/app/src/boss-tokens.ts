@@ -1,4 +1,4 @@
-import { finishSoloBossBattle, onlineBattleToken, refreshProfile, startSoloBossBattle } from "./account.ts";
+import { account, finishSoloBossBattle, onAccountChange, onlineBattleToken, refreshProfile, startSoloBossBattle } from "./account.ts";
 
 /**
  * Boss tokens on the result screen (Eric, Nov 2; docs/decisions/2026-11-02-boss-tokens.md). The server decides every drop; this
@@ -8,10 +8,32 @@ import { finishSoloBossBattle, onlineBattleToken, refreshProfile, startSoloBossB
  * writes the results.
  */
 
+/** Your account has loaded (a START tapped the moment the app opens waits for it), or it didn't within `ms`. */
+function accountReady(ms = 15_000): Promise<boolean> {
+  if (account().profile) return Promise.resolve(true);
+  return new Promise((done) => {
+    const off = onAccountChange(() => {
+      if (!account().profile) return;
+      off();
+      clearTimeout(late);
+      done(true);
+    });
+    const late = setTimeout(() => {
+      off();
+      done(false);
+    }, ms);
+  });
+}
+
 /** Each solo boss battle's id on the server, asked for as it began (null: no token to earn here). */
 const solo = new WeakMap<object, Promise<string | null>>();
 export function noteSoloBattle(match: object): void {
-  solo.set(match, startSoloBossBattle().catch(() => null));
+  solo.set(
+    match,
+    accountReady()
+      .then((ok) => (ok ? startSoloBossBattle() : null))
+      .catch(() => null),
+  );
 }
 
 /** What a result screen knows of its match. */

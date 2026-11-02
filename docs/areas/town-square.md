@@ -499,7 +499,8 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
 Eric, Nov 2: walk up to Babur's home and go in; inside, the Shopkeeper sells **Babur's Boss Crate**. Round 1 was the town side, with
 buying stubbed behind one function; round 2 (Nov 2) put the stored data behind it: boss tokens, crate keys and the purchase
 ([shop.md](shop.md), "Boss tokens"; [2026-11-02-boss-tokens.md](../decisions/2026-11-02-boss-tokens.md)). Inside, the page's header says
-the shop's name (the home's: **"Babur's Circus"**, **"Puddles' Botanical Garden"**), not "Town square". Decisions:
+the shop's name (the home's: **"Babur's Circus"**, **"Puddles' Botanical Garden"**), not "Town square" (on a computer's narrow header
+column, on up to two smaller lines in the bar's same height, the full name as its tooltip). Decisions:
 [2026-11-02-shop-interiors-r1.md](../decisions/2026-11-02-shop-interiors-r1.md) (this round's calls),
 [2026-11-02-building-interiors.md](../decisions/2026-11-02-building-interiors.md), [2026-11-02-shop-zoom.md](../decisions/2026-11-02-shop-zoom.md)
 and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.md) (the art's, on `claude/boss-art`).

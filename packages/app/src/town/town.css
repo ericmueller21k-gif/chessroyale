@@ -48,6 +48,16 @@
     font-size: 18px;
   }
 }
+/* Inside a shop its name ("Puddles' Botanical Garden") is longer than "Town square": on a computer's narrow header it takes up to two
+   smaller lines, inside the bar's same 44 px. */
+.town-screen.in-frame .town-bar h1.town-shop-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 13px;
+  line-height: 1.1;
+  white-space: normal;
+}
 .town-screen.in-frame .town-back {
   width: 44px;
   height: 44px;

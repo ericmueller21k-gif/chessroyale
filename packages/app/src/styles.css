@@ -7405,9 +7405,9 @@ button.history-label {
   min-height: 32px;
   font: inherit;
 }
-/* The result screen's boss token box (components/TokenBox.tsx): the gambling warning's box, square, the token big in its middle. */
+/* The result screen's boss token box (components/TokenBox.tsx): the gambling warning's box (its width too), square, the token big
+   in its middle. */
 .token-box {
-  width: min(260px, 100%);
   aspect-ratio: 1;
   align-content: center;
 }
