@@ -91,3 +91,12 @@ changed) → Maia bots (/home/user/cr-maia-bots, stopped mid-work, 14 files) →
   runs ran everything); fix 6 flakes (town :167/:1086/:1273, autochess tolerances, helpers.ts:303 route, recluse 950 ms,
   crate-banner :41, chat-mod/lobby-chat) → retries to 0; refresh ci-timings.json. Eric-rule tests never cut.
   Waiting on Eric: OK to do it (one Opus); boss-smoke 3 bosses on non-boss PRs (his rule says every boss).
+- Nov 2 ~00:45 UTC, Eric's answers: test changes OK (no boss-smoke trim: GitHub-side and useful); ride scale 0.75 stays;
+  Brush Ride: no pad, its trail = ink dripping from the brush's back; auto chess reveal SIMPLER: your placed pieces gray
+  until revealed to the opponent, then normal; yellow border = next to reveal; NO green; at the move step all ungray;
+  opponent's circles as today (piece-for-piece matching + first-placer concealed still stand); tokens: Ginger/Blitz
+  perfect → API run for the other 14 (session_01JuCWRuuJUf92wTLxwR6d8N, asks Eric, ~$4-6, cap $8); beaver size = pick;
+  NEW: shops: walk up to a home → zoom like the statues → card "Go in" → interior ~20x20 tiles, auto zoomed in; buy a
+  crate with that boss's coins there; prototype Babur's (inside a circus tent), Opus, own scheme. Payments later.
+  API runs are outside the one-Opus rule (Eric). Queue (one Opus): test changes (running) → auto chess reveal → Babur shop.
+  Haiku job: Brush Ride ink-drip trail.
