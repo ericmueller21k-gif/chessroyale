@@ -4,7 +4,7 @@ import { d1Sql, ensureSchema } from "./accounts.ts";
 import { LiveBoard, pruneLive, typicalWait, writeLastSeen, type LiveCounts, type LiveHealth, type LobbySummary } from "./live.ts";
 import { countCall } from "./ops.ts";
 import { GlobalChat, type GlobalChatSnapshot, type GlobalLine, type GlobalPost, type GlobalSender } from "./global-chat.ts";
-import { TownChat, type TownLine, type TownPost, type TownSender, type TownSnapshot } from "./town-chat.ts";
+import { TownChat, type ChallengeNote, type TownLine, type TownPost, type TownSender, type TownSnapshot } from "./town-chat.ts";
 import { pruneFriends, recentNews } from "./friends.ts";
 import type { Env } from "./index.ts";
 
@@ -202,6 +202,14 @@ export class LiveHub extends DurableObject<Env> {
     const post = this.town.post(sender, text, now);
     if (post.ok) await this.townAlarm();
     return { post, town: this.town.snapshot(now) };
+  }
+
+  /** A boss challenged from the town: its battle started or finished (town-chat.ts `challenge`); the line it posted, or null. */
+  async townChallenge(sender: Pick<TownSender, "id" | "name">, bossName: string, note: ChallengeNote): Promise<TownLine | null> {
+    countCall("hub.townChallenge");
+    const line = this.town.challenge(sender, bossName, note, Date.now());
+    if (line) await this.townAlarm();
+    return line;
   }
 
   /** The alarm rings by the time the town's next line (or kept send) is `TOWN_CHAT.lineMs` (5 minutes) old, so it goes then, visitors or not. */

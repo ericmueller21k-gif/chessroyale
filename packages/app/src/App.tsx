@@ -679,7 +679,7 @@ export function App() {
     setHomeIntent(null);
     setRaidOpen(false);
     history.replaceState(null, "", `/${location.search}`);
-    await startSolo("raid");
+    await startSolo("raid", { town: id });
     // (Two frames: the battle's screen is drawn under the transition before it slides off.)
     await new Promise<void>((ok) => requestAnimationFrame(() => requestAnimationFrame(() => ok())));
   };
@@ -911,7 +911,7 @@ export function App() {
    * bots first, and a raid has 49 of them in the crowd with a boss matched to you. Boss alone: you against the boss
    * picked from the menu, at once.
    */
-  const startSolo = async (mode?: ModeChoiceId, opts: { fill?: boolean } = {}) => {
+  const startSolo = async (mode?: ModeChoiceId, opts: { fill?: boolean; town?: string } = {}) => {
     // (Solo and Boss alone resting, a kill switch: not even from a results screen's "again".)
     if (isPaused("solo")) {
       leave();
@@ -924,7 +924,8 @@ export function App() {
     const fill = !!opts.fill;
     const m = new SoloMatch(engines, playerName(), { ...DEFAULT_SETTINGS, ...overridesFromUrl(mode, fill) }, practiceOn(), fill);
     // A boss battle (Boss alone, a Solo raid): the server notes its start, to time it for a boss token (boss-tokens.ts).
-    if (m.settings.raid) noteSoloBattle(m);
+    // (`town`: a boss challenged from the town: the server announces it in the town's chat, and how it ended.)
+    if (m.settings.raid) noteSoloBattle(m, opts.town);
     use(m);
     if (fill) m.fill();
     else m.start();

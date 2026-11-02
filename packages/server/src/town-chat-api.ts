@@ -1,11 +1,11 @@
-import { TOWN_CHAT, pausedLine } from "@chessroyale/core";
+import { TOWN_CHAT, pausedLine, tokenBossName } from "@chessroyale/core";
 import type { Sql, User } from "./accounts.ts";
 import { caseOf } from "./fairplay.ts";
 import { CHAT_OFF, chatBlock } from "./chat-mod.ts";
 import { isBlockedText } from "./text-filter.ts";
 import { cachedUserId } from "./presence.ts";
 import { BANNED_FROM_CHAT } from "./global-chat-api.ts";
-import { TOWN_INPUT_MAX, TOWN_TOO_LONG, tidyColor, townSince, type TownLine, type TownPost, type TownSender, type TownSlice, type TownSnapshot } from "./town-chat.ts";
+import { TOWN_INPUT_MAX, TOWN_TOO_LONG, tidyColor, townSince, type ChallengeNote, type TownLine, type TownPost, type TownSender, type TownSlice, type TownSnapshot } from "./town-chat.ts";
 import type { LiveHub } from "./live-hub.ts";
 
 /**
@@ -20,7 +20,7 @@ import type { LiveHub } from "./live-hub.ts";
  */
 
 /** The hub's side of it (the live hub, or a stand-in in tests). */
-export type TownHub = Pick<LiveHub, "townRead" | "townPost" | "townLine" | "townRemove">;
+export type TownHub = Pick<LiveHub, "townRead" | "townPost" | "townLine" | "townRemove" | "townChallenge">;
 
 export const SIGN_IN_TO_TOWN_CHAT = "Sign in to chat with other players.";
 export const TOWN_CHAT_AGE = "Chat with other players is for accounts 13 and older.";
@@ -158,6 +158,27 @@ export async function townRemoveResponse(request: Request, hub: TownHub, admin: 
   const { removed, town } = (await hub.townRemove(n)) as { removed: boolean; town: TownSnapshot };
   keep(town, now, waitUntil);
   return removed ? json({ ok: true }) : json({ message: "That line has already gone." }, 404);
+}
+
+/**
+ * A boss challenged from the town (Eric, Nov 2: the server's own lines in the town's chat, "Ann challenged Alfil!" and "Ann beat
+ * Alfil!"): its battle started (POST /api/boss/solo/start {town: boss}) or that battle finished (POST /api/boss/solo/finish
+ * {battle, outcome}, once: the battle is taken off in one statement first). Only for a player who may be in the town's chat
+ * (signed in, not on a device marked too young, not banned or chat-banned, the chat not paused); the name is the account's (a
+ * name the filter refuses goes out as "Player"). The room keeps the no-spam rule (one unfinished start line at a time). What the
+ * server knows: the account, that this battle was started as that challenge and finished once. What it can't: who won (a solo
+ * battle is played on the device; its outcome is the device's word), or that a finish wasn't a resign (the app sends none then).
+ */
+export async function townChallengeNote(sql: Sql, hub: TownHub, a: TownAsker, boss: string, note: ChallengeNote, now: number): Promise<TownLine | null> {
+  if (refusal(a)) return null;
+  if ((await caseOf(sql, a.user.id))?.status === "banned") return null;
+  if (await chatBlock(sql, a.user.id, now)) return null;
+  const row = await sql.first<{ name: string }>("SELECT name FROM users WHERE id = ?", a.user.id);
+  const name = row?.name ?? a.user.name;
+  const line = (await hub.townChallenge({ id: a.user.id, name: isBlockedText(name) ? "Player" : name }, tokenBossName(boss), note)) as TownLine | null;
+  // (This instance's copy of the room is stale now: the next read asks the hub.)
+  if (line) cache = null;
+  return line;
 }
 
 /**

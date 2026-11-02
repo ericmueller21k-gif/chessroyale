@@ -7,11 +7,11 @@ import { NAME_NOT_ALLOWED, isBlockedText } from "./text-filter.ts";
 import { chatNoticeSeen } from "./chat-mod.ts";
 import { isAdmin, testSwitchesOn, type AdminEnv } from "./admin.ts";
 import { isPaused, pausedBosses, pausedResponse } from "./kill-switches.ts";
-import { battleToken, buyBossCrate, finishSoloBattle, grantTestItems, openBossCrate, startSoloBattle } from "./boss-tokens.ts";
+import { battleToken, buyBossCrate, endSoloBattle, grantTestItems, openBossCrate, startSoloBattle } from "./boss-tokens.ts";
 import { chatIconResponse, chatPostResponse, chatSlice } from "./global-chat-api.ts";
-import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, mayTownChat, reportedLine, signedInReader, townPostResponse, townRemoveResponse, townSlice } from "./town-chat-api.ts";
+import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, mayTownChat, reportedLine, signedInReader, townChallengeNote, townPostResponse, townRemoveResponse, townSlice } from "./town-chat-api.ts";
 import { accountDownload, deleteAccount } from "./account-data.ts";
-import { AGE_GATE, ASK_AGE_LINE, FAIRPLAY, TOO_YOUNG_LINE, bossCrateDef } from "@chessroyale/core";
+import { AGE_GATE, ASK_AGE_LINE, FAIRPLAY, TOO_YOUNG_LINE, bossCrateDef, bossDef, tokenBossName } from "@chessroyale/core";
 import {
   buyItem,
   cleanEmail,
@@ -488,10 +488,25 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   // ({battle}: its id, or null when this account can't earn tokens), POST /api/boss/solo/finish {battle} on its result screen
   // ({counted, token}). An online battle's match room counts it; GET /api/boss/token?battle=CODE answers the token it dropped
   // you ({token}: a boss's id, or null).
-  if (path === "/api/boss/solo/start" && request.method === "POST") return json({ battle: await startSoloBattle(sql, current.id, now, signInRequired(env)) });
-  if (path === "/api/boss/solo/finish" && request.method === "POST") {
-    const b = (await request.json().catch(() => ({}))) as { battle?: unknown };
-    return json(await finishSoloBattle(sql, current.id, b?.battle, now, { off: pausedBosses(env, now), signedInOnly: signInRequired(env) }));
+  // A boss challenged from the town (Nov 2): its start carries {town: boss}, its finish {outcome: "won" | "lost" | "drew"} (none for
+  // a resign); the server's line in the town's chat goes out from here (town-chat-api.ts townChallengeNote: the no-spam rule).
+  if ((path === "/api/boss/solo/start" || path === "/api/boss/solo/finish") && request.method === "POST") {
+    const b = (await request.json().catch(() => ({}))) as { battle?: unknown; town?: unknown; outcome?: unknown; moves?: unknown };
+    const asker = { user: current, tooYoung: ageAnswer(request) === "under", paused: isPaused(env, "town-chat", now) };
+    const note = (boss: string, n: Parameters<typeof townChallengeNote>[4]) =>
+      env.LIVE ? townChallengeNote(sql, liveHub(env as Required<Pick<AccountEnv, "LIVE">>), asker, boss, n, now).catch(() => null) : null;
+    if (path === "/api/boss/solo/start") {
+      const battle = await startSoloBattle(sql, current.id, now, signInRequired(env));
+      if (typeof b?.town === "string" && bossDef(b.town)) await note(b.town, { kind: "start", boss: b.town, battle });
+      return json({ battle });
+    }
+    const done = await endSoloBattle(sql, current.id, b?.battle, now, { off: pausedBosses(env, now), signedInOnly: signInRequired(env) });
+    // (The outcome and your moves are the device's word: a solo battle is played there. The token is the server's own drop.)
+    const outcome = b?.outcome === "won" || b?.outcome === "lost" || b?.outcome === "drew" || b?.outcome === "surrendered" ? b.outcome : null;
+    const moves = typeof b?.moves === "number" && Number.isInteger(b.moves) && b.moves >= 0 && b.moves <= 999 ? b.moves : null;
+    if (done.ended && outcome) await note("", { kind: "finish", battle: b!.battle as string, outcome, moves, token: done.token ? tokenBossName(done.token) : null });
+    const { ended: _ended, ...answer } = done;
+    return json(answer);
   }
   if (path === "/api/boss/token" && request.method === "GET") return json({ token: await battleToken(sql, current.id, url.searchParams.get("battle"), now) });
 

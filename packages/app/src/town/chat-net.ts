@@ -30,6 +30,8 @@ export interface TownLine {
   text: string;
   /** The name color their device picked when it joined the town (a number into the palette: names.ts); absent from an older app. */
   color?: number;
+  /** The server's own line (no player behind it: `from` and `name` empty): a boss challenged from the town, and how it ended. */
+  sys?: "challenge";
 }
 
 interface Slice {

@@ -118,7 +118,8 @@ export function TownChat({ tone: room }: { /** Inside a shop: its room's tone (s
       return;
     }
     return openTownFeed({
-      line: (l) => log.say(l.name, l.text, "player", Date.now(), { uid: l.from, n: l.n, color: l.color }),
+      // (The server's own lines, a boss challenged from the town and how it went: its blue, no name, no menu: no account behind it.)
+      line: (l) => (l.sys ? log.say("", l.text, "server", Date.now(), { uid: "", n: l.n }) : log.say(l.name, l.text, "player", Date.now(), { uid: l.from, n: l.n, color: l.color })),
       drop: (test) => log.drop((l) => l.uid !== undefined && l.n !== undefined && test({ n: l.n, from: l.uid })),
       paused: () => redraw((n) => n + 1),
     });

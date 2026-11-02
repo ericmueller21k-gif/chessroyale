@@ -160,11 +160,16 @@ export interface SoloFinish {
  * moves aren't counted: they're only the device's word. An unknown or replaced battle counts nothing.
  */
 export async function finishSoloBattle(sql: Sql, userId: string, battle: unknown, now: number, opts: Omit<DropOptions, "battle"> = {}): Promise<SoloFinish> {
-  if (typeof battle !== "string" || !SOLO_ID.test(battle)) return { counted: false, token: null };
+  const { ended: _ended, ...done } = await endSoloBattle(sql, userId, battle, now, opts);
+  return done;
+}
+/** The same, and whether it was this account's open battle, finished now (once: a second finish of it is false): the town's challenge line goes on it. */
+export async function endSoloBattle(sql: Sql, userId: string, battle: unknown, now: number, opts: Omit<DropOptions, "battle"> = {}): Promise<SoloFinish & { ended: boolean }> {
+  if (typeof battle !== "string" || !SOLO_ID.test(battle)) return { ended: false, counted: false, token: null };
   const row = await sql.first<{ started_at: number }>("DELETE FROM solo_battles WHERE user_id = ? AND id = ? RETURNING started_at", userId, battle);
-  if (!row) return { counted: false, token: null };
+  if (!row) return { ended: false, counted: false, token: null };
   const counted = battleCounts({ moves: 0, ms: now - row.started_at });
-  return { counted, token: counted ? await countBossBattle(sql, userId, now, { ...opts, battle }) : null };
+  return { ended: true, counted, token: counted ? await countBossBattle(sql, userId, now, { ...opts, battle }) : null };
 }
 
 /** How long the result screen may ask for its battle's token. */

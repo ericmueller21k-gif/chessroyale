@@ -27,18 +27,34 @@ function accountReady(ms = 15_000): Promise<boolean> {
 
 /** Each solo boss battle's id on the server, asked for as it began (null: no token to earn here). */
 const solo = new WeakMap<object, Promise<string | null>>();
-export function noteSoloBattle(match: object): void {
+/** `town`: the boss challenged from the town (its start and its finish go into the town's chat, the server's lines). */
+export function noteSoloBattle(match: object, town?: string): void {
   solo.set(
     match,
     accountReady()
-      .then((ok) => (ok ? startSoloBossBattle() : null))
+      .then((ok) => (ok ? startSoloBossBattle(town) : null))
       .catch(() => null),
   );
+}
+
+/**
+ * How a finished boss battle went, for the town's chat (the server posts it only for a challenge from the town): won, lost,
+ * drawn or surrendered (a resign: the server posts it only after enough moves), and your moves; null for a leave (no line).
+ */
+export function battleOutcome(match: TokenMatch): { outcome: "won" | "lost" | "drew" | "surrendered"; moves: number } | null {
+  const p = match.phase;
+  if (p?.kind !== "results" || !p.bossResult) return null;
+  const moves = (match.moves ?? []).filter((m) => m.move !== null).length;
+  if (p.left) return (p.left as { how?: string }).how === "resigned" ? { outcome: "surrendered", moves } : null;
+  return { outcome: p.bossResult === "crowd" ? "won" : p.bossResult === "boss" ? "lost" : "drew", moves };
 }
 
 /** What a result screen knows of its match. */
 export interface TokenMatch {
   settings: { raid?: boolean };
+  phase?: { kind: string; bossResult?: "crowd" | "boss" | "draw"; left?: unknown };
+  /** Your moves (a pass is `null`): how many, for the town's chat line. */
+  moves?: readonly { move: unknown }[];
   serverPaced?: boolean;
   code?: string;
 }
@@ -58,7 +74,7 @@ export function battleToken(match: TokenMatch): Promise<string | null> {
     const started = solo.get(match);
     if (started) {
       const id = await started;
-      if (id) token = (await finishSoloBossBattle(id).catch(() => null))?.token ?? null;
+      if (id) token = (await finishSoloBossBattle(id, battleOutcome(match)).catch(() => null))?.token ?? null;
     } else if (match.serverPaced && match.code) {
       for (const ms of ONLINE_ASKS) {
         await sleep(ms);

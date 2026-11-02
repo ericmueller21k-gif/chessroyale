@@ -2556,6 +2556,17 @@ export const TOWN_CHAT = {
    * is asked at most this often per instance however many players read.
    */
   readCacheMs: 2_000,
+  /**
+   * A boss challenged from the town (Eric, Nov 2: town/shops/challenge.ts): the server posts "Ann challenged Alfil!" as its battle
+   * starts and "Ann beat Alfil!" / "Alfil beat Ann." as it finishes, and a player's start line waits while one of theirs is still
+   * unfinished (no spam). The room forgets an unfinished one after this long (memory only: a restart forgets them all too).
+   */
+  challengeOpenMs: 86_400_000,
+  /**
+   * A town challenge's battle surrendered (resigned) after this many of your moves or more posts "Ann surrendered to Alfil after 15
+   * moves." (Eric, Nov 2); fewer is a quit: no line, and the challenge stays unfinished (the no-spam rule).
+   */
+  challengeSurrenderMoves: 10,
 } as const;
 
 /**

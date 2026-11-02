@@ -33,6 +33,11 @@ export interface TownLine {
    * join): a small whole number the app reads into its palette. Absent when the sender's app sent none. Cosmetic only.
    */
   color?: number;
+  /**
+   * A line the server says itself, not a player (`from` and `name` empty; the app shows it in its own blue, with no menu): a boss
+   * challenged from the town, and how its battle ended (`challengeLine`).
+   */
+  sys?: "challenge";
 }
 
 /** What the server knows of someone sending, from their account (never from the request). */
@@ -140,6 +145,41 @@ export function sameKey(text: string): number {
   return 4294967296 * (2097151 & h2) + (h1 >>> 0);
 }
 
+/**
+ * A town challenge's battle ended: you won, the boss won, a draw, or you surrendered (resigned: a line only after
+ * TOWN_CHAT.challengeSurrenderMoves of your moves; before, and a leave, is a quit: no line at all).
+ */
+export type ChallengeOutcome = "won" | "lost" | "drew" | "surrendered";
+/** How it ended, for a line: its outcome, your moves (null: not known) and the boss token it dropped (its boss's name; null: none). */
+export interface ChallengeEnd {
+  outcome: ChallengeOutcome;
+  moves: number | null;
+  token: string | null;
+}
+/**
+ * The server's challenge lines (Eric, Nov 2): "Ann challenged Alfil!"; "Ann beat Alfil in 34 moves!", "Alfil beat Ann in 21 moves.",
+ * "Ann drew with Alfil in 40 moves.", "Ann surrendered to Alfil after 15 moves."; a token the battle dropped on the end: " + Alfil token".
+ */
+export function challengeText(name: string, boss: string, end?: ChallengeEnd): string {
+  if (!end) return `${name} challenged ${boss}!`;
+  const n = end.moves;
+  const moves = (word: string) => (n === null ? "" : ` ${word} ${n} move${n === 1 ? "" : "s"}`);
+  const line =
+    end.outcome === "won"
+      ? `${name} beat ${boss}${moves("in")}!`
+      : end.outcome === "lost"
+        ? `${boss} beat ${name}${moves("in")}.`
+        : end.outcome === "drew"
+          ? `${name} drew with ${boss}${moves("in")}.`
+          : `${name} surrendered to ${boss}${moves("after")}.`;
+  return end.token ? `${line} + ${end.token} token` : line;
+}
+/** A challenge's step, as the Worker passes it on: its battle started (its id on the server), or that battle finished, with how. */
+export type ChallengeNote = { kind: "start"; boss: string; battle: string | null } | ({ kind: "finish"; battle: string } & ChallengeEnd);
+/** A finish that ends a challenge with a line: not a surrender before TOWN_CHAT.challengeSurrenderMoves of your moves (that's a quit). */
+export const endsChallenge = (end: ChallengeEnd, surrenderMoves: number = TOWN_CHAT.challengeSurrenderMoves): boolean =>
+  end.outcome !== "surrendered" || (end.moves ?? 0) >= surrenderMoves;
+
 export class TownChat {
   /** This room's id (a new one with every start). */
   readonly room = crypto.randomUUID().slice(0, 8);
@@ -148,6 +188,11 @@ export class TownChat {
   private gone: { n: number; at: number }[] = [];
   /** Each account's messages within TOWN_CHAT.repeatMs: when, and a hash of what (`sameKey`), for the wait and the repeat. */
   private sent = new Map<string, { at: number; key: number }[]>();
+  /**
+   * Each account's town challenge whose start line went out and whose battle hasn't finished yet (one at a time: no spam): its boss
+   * (by name, as the lines say it) and the battle whose finish ends it (the newest one started since).
+   */
+  private open = new Map<string, { boss: string; battle: string | null; at: number }>();
 
   constructor(private o: TownChatOptions = TOWN_CHAT) {}
 
@@ -182,6 +227,37 @@ export class TownChat {
     this.held.push(line);
     if (this.held.length > this.o.holdMax) this.held.splice(0, this.held.length - this.o.holdMax);
     return { ok: true, line };
+  }
+
+  /**
+   * A boss challenged from the town (the Worker has checked the account may be in the town's chat). Its battle starting posts
+   * "Ann challenged Alfil!", unless one of theirs is still unfinished: then nothing goes out, but this battle is now the one whose
+   * finish counts. A battle finishing (won, lost, drawn, or surrendered after enough moves: `endsChallenge`) posts how it went and
+   * closes the challenge, only when it's that battle; anything else (a quit) posts nothing and leaves it open. The line, or null.
+   */
+  challenge(sender: Pick<TownSender, "id" | "name">, bossName: string, note: ChallengeNote, now: number): TownLine | null {
+    this.sweep(now);
+    const open = this.open.get(sender.id);
+    if (note.kind === "start") {
+      this.open.set(sender.id, { boss: bossName, battle: note.battle, at: now });
+      return open ? null : this.notice(challengeText(sender.name, bossName), now);
+    }
+    if (!open || !open.battle || open.battle !== note.battle || !endsChallenge(note, this.o.challengeSurrenderMoves)) return null;
+    this.open.delete(sender.id);
+    return this.notice(challengeText(sender.name, open.boss, note), now);
+  }
+
+  /** Whether this account has a challenge still unfinished (its next start posts no line). */
+  challengeOpen(accountId: string): boolean {
+    return this.open.has(accountId);
+  }
+
+  /** A line the server says itself (`sys`), held as players' lines are, for TOWN_CHAT.lineMs. */
+  private notice(text: string, now: number): TownLine {
+    const line: TownLine = { n: ++this.n, at: now, from: "", name: "", text, sys: "challenge" };
+    this.held.push(line);
+    if (this.held.length > this.o.holdMax) this.held.splice(0, this.held.length - this.o.holdMax);
+    return line;
   }
 
   /** The room now: the lines held and the ones taken out, each within TOWN_CHAT.lineMs. */
@@ -224,6 +300,7 @@ export class TownChat {
     const old = (at: number) => now - at >= this.o.lineMs;
     if (this.held.length && old(this.held[0]!.at)) this.held = this.held.filter((l) => !old(l.at));
     if (this.gone.length && old(this.gone[0]!.at)) this.gone = this.gone.filter((g) => !old(g.at));
+    for (const [id, c] of this.open) if (now - c.at >= this.o.challengeOpenMs) this.open.delete(id);
     const keep = Math.max(this.o.repeatMs, this.o.gapMs);
     for (const [id, s] of this.sent) {
       const recent = s.filter((x) => now - x.at < keep);

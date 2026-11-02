@@ -283,10 +283,13 @@ export async function grantTestItems(body: { keys?: number; boss?: string; token
   if (state.profile) set({ profile: { ...state.profile, locker } });
 }
 
-/** A solo boss battle begins: the server notes when (its id; null when this account earns no tokens, or there's no server). */
-export async function startSoloBossBattle(): Promise<string | null> {
+/**
+ * A solo boss battle begins: the server notes when (its id; null when this account earns no tokens, or there's no server). `town`:
+ * the boss challenged from the town (Nov 2), whose start the server announces in the town's chat ("Ann challenged Alfil!").
+ */
+export async function startSoloBossBattle(town?: string): Promise<string | null> {
   if (!state.profile) return null;
-  return (await api<{ battle: string | null }>("/api/boss/solo/start", { method: "POST", body: "{}" })).battle;
+  return (await api<{ battle: string | null }>("/api/boss/solo/start", { method: "POST", body: JSON.stringify(town ? { town } : {}) })).battle;
 }
 
 /**
@@ -294,8 +297,9 @@ export async function startSoloBossBattle(): Promise<string | null> {
  * time after a moment when the first try fails on the way or on the server (a hiccup shouldn't cost a token): the server takes the
  * battle off in one statement, so it's never counted twice.
  */
-export async function finishSoloBossBattle(battle: string): Promise<{ counted: boolean; token: string | null }> {
-  const ask = () => api<{ counted: boolean; token: string | null }>("/api/boss/solo/finish", { method: "POST", body: JSON.stringify({ battle }) });
+export async function finishSoloBossBattle(battle: string, end: { outcome: "won" | "lost" | "drew" | "surrendered"; moves: number } | null = null): Promise<{ counted: boolean; token: string | null }> {
+  // (`end`: how it ended and your moves, for the town's chat when it was a challenge from the town: "Ann beat Alfil in 34 moves!".)
+  const ask = () => api<{ counted: boolean; token: string | null }>("/api/boss/solo/finish", { method: "POST", body: JSON.stringify(end ? { battle, ...end } : { battle }) });
   try {
     return await ask();
   } catch (e) {
