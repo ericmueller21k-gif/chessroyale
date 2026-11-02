@@ -562,7 +562,9 @@ circle; it says its line; its own animation brings the board in; its own transit
 the battle, "Back to town" puts you where you stood. Round 2 (Nov 2, after the intro GIF): "For Alfil he shattered the pyramid, that's
 fine for him, but for other bosses they should just be swinging for a few seconds… I also prefer the normal look is boss on left, you
 on right, not vertical… just be sure the table and chairs and pieces all are logically placed." Decisions:
-[2026-11-02-boss-challenge.md](../decisions/2026-11-02-boss-challenge.md), [2026-11-02-boss-challenge-r2.md](../decisions/2026-11-02-boss-challenge-r2.md).
+[2026-11-02-boss-challenge.md](../decisions/2026-11-02-boss-challenge.md), [2026-11-02-boss-challenge-r2.md](../decisions/2026-11-02-boss-challenge-r2.md),
+the pacing and standing clear of the stools (Eric, Nov 2, after Big Boy's live: "it all happens so quick"; "make sure they're not
+standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decisions/2026-11-02-challenge-pacing.md).
 
 - **Which bosses.** Those in `BOSS_INTROS` (`town/shops/challenge.ts`): every boss whose home has an inside (`SHOPS`): Alfil (his own
   intro, `custom: true`), Big Boy (his own, Nov 2), Babur and Puddles (the default intro). Every other boss's card works as before (its confirm, Leave, the Boss
@@ -578,31 +580,36 @@ on right, not vertical… just be sure the table and chairs and pieces all are l
   art has a table (Alfil's), else the park's stone. A stool at each player's side, `stoolOff` (1) from the middle, nothing on the empty
   sides: across, the picture as drawn; facing, its middle square alone and a stool north and south. The board (`paintTable`) is
   turned to the layout (`boardSquare`): white's ranks nearest you, black's nearest the boss, the a-file on your left; across, the
-  knights face the other side. You and the boss stand just past your stools, in front of them.
+  knights face the other side. You and the boss walk to and talk on your marks, just past your stools; as the stools come in (the
+  default's pop, Big Boy's stools dropping, Alfil's table showing through the crumble: `hopStart`) you each take a little hop back
+  (`hopMs`, `hopUp`) to `clear` (you 2.2, the boss 2.6 squares from the table's middle: `Marks.youClear` / `bossClear`), so no part
+  of either near the floor stands in front of a stool (a unit test measures every boss's drawing, its attack's feet and the pawn).
 - **The flow** (`nextFlow`, pure): the boss's card's **"Challenge alone"**, its confirm **"Challenge Babur?"** / "You'll fight Babur in
   Boss Battle, then come back here." / **Fight** / Stay. Fight keeps where you stand (`standOf`), and you and the boss walk to its
-  door (the boss at your pace) and in (the shop's zoom and fade; the room and the intro load only now: `shops/intro.ts`, and Alfil's
+  door (both at `doorStepMs`, the town's walking pace, not your run) and in (the shop's zoom and fade; the room and the intro load only now: `shops/intro.ts`, and Alfil's
   art, `shops/alfil-intro-art.ts`, or Big Boy's, `shops/bigboy-intro-art.ts`). Inside (the room in challenge mode: no cards, no walking by tap, its own framing per layout,
-  `CHALLENGE_FEEL.cam`), you each walk to your mark, side by side at `walkStepMs`, settle onto its middle and turn to face each other.
-  Its line in a speech bubble over its head (not the chat log; `BOSS_INTROS[id].line`, placeholders until Gemini's lines). Then:
-  - **Alfil's own:** the pyramid rising `riseAtMs` into the line, holding, cracking, crumbling, the table and its board (`introBeats`
-    / `introAt`), his cues' sounds; from `attackLeadMs` (2 s) before the storm covers, his God King attack at the board, beside the
-    table on his side, its lashes looping (`attackStart`, `attackTime`); the sandstorm (`startStorm`).
+  `CHALLENGE_FEEL.cam`), you both stand just inside a beat (`insideMs`, from the room's first frame), then walk up to your marks, side
+  by side at `walkStepMs` (a slow walk), settle onto their middles and turn to face each other. Every beat is one number in
+  `CHALLENGE_FEEL`, laid out by `introBeats`: facing each other `faceMs`; the line alone in a speech bubble over its head for `lineMs`
+  (2.5 s; not the chat log; `BOSS_INTROS[id].line`, placeholders until Gemini's lines); a pause (`afterLineMs`); then:
+  - **Alfil's own:** the pyramid rising, holding `holdMs` (its idle), cracking, crumbling, the table and its board (`introAt`), his
+    cues' sounds; then the sandstorm (`startStorm`).
   - **Big Boy's own** (Nov 2, toy blocks: `BlocksAnims`, `isBlocks`): six alphabet blocks drop in and stack 3-2-1 (B-I-G, B-O, Y:
-    `build`, from `riseAtMs` into the line, a wooden clack as each lands, a bonk for the top one); the line ends as the board drops
-    onto the top block (`boardDropMs` from `dropFrom` squares up, his toss) and plops on (`plop`: dust and stars, a poof); the two
-    stool blocks drop in at your sides (`chairs`, a clack each: a dark gray B on his side, black's, a bone W on yours, white's); the table alone `tableHoldMs`. The blocks are his table and stools
-    (their own picture, no park table); the board is lifted until its slab's front rests on the top block (`slabFrontY`), so the
-    slab doesn't hide the upper blocks. His God King attack from `attackLeadMs` before the cover, beside the table, as Alfil's; then
-    his lollipop swirl (`INTRO_BIGBOY_SWIRL` and its front), played as Alfil's sandstorm (`startStorm`), his swish.
-  - **The default** (`custom: false`): the table pops in `popAtMs` into the line (grows from its foot past its size and back over
-    `popMs`, a dust puff over `puffMs`, the app's soft "pop"); from the line's end the boss swings its God King attack in place for
-    `swingMs` (its kit's `kingAttack` and sounds: its lashes only, looping, no drop-in or leap, `attackTime(…, inPlace)`); then the
-    flash and the wipe (`startWipe`: `flashes` white flashes over `flashMs`, black bands wiping in from alternate sides over `wipeMs`,
-    the boss's own whoosh; held black while the battle loads; faded off over `wipeOutMs`).
+    `build`, a wooden clack as each lands, a bonk for the top one); a gap (`gapMs`); the board drops onto the top block
+    (`boardDropMs` from `dropFrom` squares up, his toss) and plops on (`plop`: dust and stars, a poof); a gap; the two stool blocks drop
+    in at your sides (`chairs`, a clack each: a dark gray B on his side, black's, a bone W on yours, white's). The blocks are his table
+    and stools (their own picture, no park table); the board is lifted until its slab's front rests on the top block (`slabFrontY`),
+    so the slab doesn't hide the upper blocks. Then his lollipop swirl (`INTRO_BIGBOY_SWIRL` and its front), played as Alfil's
+    sandstorm (`startStorm`), his swish.
+  - **The default** (`custom: false`): the table pops in (`pop`: grows from its foot past its size and back over `popMs`, a dust puff
+    over `puffMs`, the app's soft "pop"); then the flash and the wipe (`startWipe`: `flashes` white flashes over `flashMs`, black bands
+    wiping in from alternate sides over `wipeMs`, the boss's own whoosh; held black while the battle loads; faded off over `wipeOutMs`).
+  Every intro then holds the table on its own `tableHoldMs`, and the boss swings its God King attack in place where it stands (its
+  kit's `kingAttack` and sounds: its lashes only, looping, no drop-in or leap: `attackStart`, `attackTime(…, inPlace)`) for
+  `swingMs` (2 s) until its transition has covered the screen (`coverMs`), and on until the battle shows.
   Each transition is a canvas over the whole page, outside the town (it stays as the town closes); the battle starts under it (the
   app's `challengeFromTown`: Boss alone, as START). The back button calls it off until the transition starts. A tap doesn't skip.
-  About 6 s from the door to the screen covered.
+  About 12 s from Fight to the screen covered for Big Boy and Alfil, 9 for the default (it was about 6; the room's loading adds to it).
 - **After the battle:** the result screen's leaving button reads **"Back to town"**; it (and the gear's Leave: "You'll go back to the
   town square.") opens the town with you on the square you stood on, facing the same way (`createTown`'s `stand`). "Play again" keeps it.
 - **The server's lines in the town's chat** (signed-in players; blue, `.tc-server`, no name and no menu): "Ann challenged Alfil!" as the
@@ -612,7 +619,8 @@ on right, not vertical… just be sure the table and chairs and pieces all are l
   early resign), your next challenge posts no start line; its finish posts the outcome and closes it (`TownChat.challenge`, server).
 - **Test hooks:** the room's canvas `data-intro` (its step); `__shopIntro()` (step, layout, where you and the boss stand and face, the
   line, the table and its stools); the storm's `canvas.boss-storm` and the wipe's `canvas.boss-wipe` (`data-phase`); `__townYou()`.
-- **Tests:** `packages/app/test/boss-challenge.test.ts` (the flow, the layouts and marks, the stools, the board's turn, both timelines,
+- **Tests:** `packages/app/test/boss-challenge.test.ts` (the flow, the layouts and marks, the stools, the board's turn, the timelines,
+  the pacing beat by beat, the hop back, every figure clear of the stools,
   the storm's edge, the wipe, back to where you stood), `packages/server/test/town-chat.test.ts` (the lines and the no-spam rule, and
   through the API), `e2e/boss-challenge.spec.ts` (phone and computer: Alfil, a quit then a finished challenge and the lines; Babur's
   default intro and back; Big Boy's own intro and back), `e2e/shop.spec.ts` (Alfil's Pyramid's and Big Boy's Crib's crates), `e2e/town.spec.ts` (a boss without an inside, Folio: the
