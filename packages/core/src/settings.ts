@@ -752,6 +752,9 @@ export const CROWD_KNOCKOUTS: Record<FinalFormat, readonly number[]> = {
  * Weaker bots (higher T) follow the taste more and the engine less. `powerUpChance`: a bot holding a power-up uses it
  * on a sharp turn (the second line gives away `botPowerUpLoss` or more) with this chance, and then plays the best line;
  * before Nov 2 every bot holding one used it at once, so a whole team picked the same move (the unanimous castles).
+ * The bots keep BOT_LOBBY's temperatures: here they give away about 60% of the points a move they did before Nov 2,
+ * in the same order by rating (a Maia-matched table needs a 1200 bot to miss a plain recapture about half the time, and
+ * the team then plays blunders: reports/crowd-spread.md).
  */
 export interface CrowdBotSpread {
   moves: number;
@@ -764,8 +767,8 @@ export interface CrowdBotSpread {
 export const CROWD_BOTS: CrowdBotSpread = {
   moves: 5,
   blunderLoss: 15,
-  blunderWeight: 0.15,
-  focus: [0.5, 2],
+  blunderWeight: 0.1,
+  focus: [1, 4],
   lean: [0, 1.5],
   powerUpChance: 0.25,
 };
