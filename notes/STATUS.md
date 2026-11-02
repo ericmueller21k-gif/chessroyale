@@ -83,3 +83,11 @@ changed) → Maia bots (/home/user/cr-maia-bots, stopped mid-work, 14 files) →
   Open: #450 Timber (e2f701e: town-bots and boss-select counts; CI). No helper running.
 - ~00:00 UTC Nov 2: MERGED #450 Timber, admins first (f2ee8da). All of today's PRs merged. Main CI watcher on f2ee8da.
   Next (Eric's OK first): auto chess reveal mockup; Timber lead rule 2 pawns?; bots rating scale question.
+- Nov 2 ~00:30 UTC: TEST-VALUE REVIEW done (report in chat only; helper couldn't write files). Key: full run ~370 test-min
+  (~43 min wall) → ~320 (~38); per day ~4,600 → ~3,650 runner-min (−20%). Proposals: speed up boss-bar-same (23 min:
+  measure lines at first frame, per-boss tests) and autochess (25.6: ?quick=1, one project for width loops); merge
+  formats :108/:300 into crowd-hidden; king-attack desktop 2 widest bosses; town-chat-history, solo phone only; maia :82
+  3 rotating bosses; move EvalBar.tsx, prefs.ts, test-switches.ts, Hud.tsx, game.ts from `full` to `traced` (61/94 PR
+  runs ran everything); fix 6 flakes (town :167/:1086/:1273, autochess tolerances, helpers.ts:303 route, recluse 950 ms,
+  crate-banner :41, chat-mod/lobby-chat) → retries to 0; refresh ci-timings.json. Eric-rule tests never cut.
+  Waiting on Eric: OK to do it (one Opus); boss-smoke 3 bosses on non-boss PRs (his rule says every boss).
