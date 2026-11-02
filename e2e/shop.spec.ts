@@ -185,6 +185,30 @@ test("Puddles' greenhouse: Go in, Drizzle's crate with Puddles's Mower; the back
   expect(errors).toEqual([]);
 });
 
+test("Alfil's Pyramid (Nov 2): Go in, Woolly's crate with Alfil's Howdah; the chat's words dark over the sandstone", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  await page.goto("/town?sky=night");
+  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  // (His Pyramid is across the map: the camera glides there, as its chip would.)
+  await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("alfil"));
+  await expect.poll(() => homeAt(page, "alfil"), { message: "the Pyramid comes into view" }).not.toBeNull();
+  await goIn(page, "alfil", "Alfil's Pyramid");
+  await expect(room(page)).toHaveAttribute("data-room", "alfil");
+  await expect(page.getByRole("heading", { name: "Alfil's Pyramid" })).toBeVisible();
+  await expect(page.locator(".town-chat")).toHaveAttribute("data-tone", "day");
+  await talk(page);
+  const crate = page.getByRole("dialog", { name: "Alfil's Boss Crate", exact: true });
+  await expect(crate).toBeVisible();
+  await expect(crate).toContainText("3 Alfil tokens, or 1 Alfil token + 1 crate key");
+  await expect(crate).toContainText("Alfil's Howdah");
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/alfil-crate-${test.info().project.name}.png` });
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 /** A drag from `from` to `to`: a finger (real touch events) on the phone, the mouse on the computer. */
 async function dragBy(p: Page, from: { x: number; y: number }, to: { x: number; y: number }) {
   if (test.info().project.name === "phone") {
