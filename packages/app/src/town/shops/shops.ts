@@ -3,10 +3,11 @@
  * each shop sells, and the words its cards say. Light: the town imports it to know which home's card says "Go in"; the room
  * itself (its art, its drawing) loads only when you go in (ShopRoom.tsx). docs/decisions/2026-11-02-shop-interiors-r1.md.
  *
- * Round 1 is the town side only: the crate's price and what you hold are shown, and buying goes through one function,
- * `buyBossCrate`, a stub that answers "Coming soon". Round 2 puts the stored data behind it (the tokens, the keys, the crate).
+ * Round 2 (Nov 2, docs/decisions/2026-11-02-boss-tokens.md): what you hold is your locker's (the boss's tokens, your crate keys),
+ * and `buyBossCrate` is the purchase: the server takes the price and opens the crate into your locker, in one transaction.
  */
-import { BOSS_CRATE_PRICE, itemDef, tierInfo } from "@chessroyale/core";
+import { BOSS_CRATE_PRICE, BOSS_CRATE_POOL, bossCrateOf, itemDef, tierInfo, type ItemInstance } from "@chessroyale/core";
+import { buyBossCrateOnServer, tokenCount } from "../../account.ts";
 import type { HomeId } from "../world.ts";
 import type { Sq } from "./room.ts";
 
@@ -67,24 +68,38 @@ export const prizeRows = (s: ShopDef): { id: string; name: string; kind: string;
     const t = tierInfo(d.tier);
     return { id, name: d.name, kind: `${t.name} ${d.slot}`, color: t.color };
   });
+/** The rest of a boss crate's prizes, in a line under its ride: "+ 24 Beta Crate items, Common to Epic". */
+export const POOL_LINE = `+ ${BOSS_CRATE_POOL.length} Beta Crate items, Common to Epic`;
 
-/**
- * What you hold of a boss's tokens and of crate keys. Round 1: nothing is stored yet (round 2 adds the tokens and the keys), so
- * none.
- */
-export const bossHoldings = (_boss: HomeId): Holdings => ({ tokens: 0, keys: 0 });
+/** What you hold of a boss's tokens and of crate keys: your locker's, as the server last said. */
+export const bossHoldings = (boss: HomeId): Holdings => tokenCount(boss);
 
-/** What a buy came to: done, or why not (shown under the buttons). */
+/** You hold enough to buy the crate that way (its button is greyed otherwise; the server checks again). */
+export const canAfford = (h: Holdings, way: CrateWay): boolean => {
+  const p = way === "tokens" ? { tokens: BOSS_CRATE_PRICE.tokens, keys: 0 } : BOSS_CRATE_PRICE.withKey;
+  return h.tokens >= p.tokens && h.keys >= p.keys;
+};
+
+/** What a buy came to: done (with the item it gave), or why not (shown under the buttons). */
 export interface BuyResult {
   ok: boolean;
   message: string;
+  /** The item the crate opened to (a buy that went through). */
+  item?: ItemInstance;
 }
-/** The words a buy answers with while buying isn't built (round 1). */
-export const COMING_SOON = "Coming soon";
+/** A buy's answer: "You got Balloon Pup! It's in your Locker." */
+export const gotLine = (def: string) => `You got ${itemDef(def)?.name ?? "an item"}! It's in your Locker.`;
 /**
- * Buys a boss's crate one of its two ways. Every buy button goes through here, and only here. Round 1: a stub that answers
- * "Coming soon" and changes nothing; round 2 makes it the purchase (the server takes the tokens and the key and opens the crate).
+ * Buys a boss's crate one of its two ways. Every buy button goes through here, and only here: the server takes the price (the
+ * tokens, and the key) and opens the crate into your locker, in one transaction (server/boss-tokens.ts), or says why not.
  */
-export async function buyBossCrate(_boss: HomeId, _way: CrateWay): Promise<BuyResult> {
-  return { ok: false, message: COMING_SOON };
+export async function buyBossCrate(boss: HomeId, way: CrateWay): Promise<BuyResult> {
+  const crate = bossCrateOf(boss);
+  if (!crate) return { ok: false, message: "This crate isn't sold yet." };
+  try {
+    const { item } = await buyBossCrateOnServer(crate.id, way);
+    return { ok: true, message: gotLine(item.def), item };
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : "Something went wrong." };
+  }
 }

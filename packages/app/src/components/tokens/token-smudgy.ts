@@ -70,7 +70,7 @@ const STRIPE = [["r", "q", "p"], ["v", "u", "t"], ["d", "c", "b"]];
 const casque = paint(11, 6, 18, 14, outlined(casqueIs, (x, y) => {
   const band = (((Math.floor((y - 8 - (x - 20) * 0.35) / 2) % 2) + 2) % 2);
   const lit = -(x + 0.5 - 20) / 8.6 - (y + 0.5 - 15) / 7.4;
-  return STRIPE[band][lit > 0.5 ? 0 : lit < -0.4 ? 2 : 1];
+  return STRIPE[band]![lit > 0.5 ? 0 : lit < -0.4 ? 2 : 1]!;
 }));
 
 // The head: wide and lime green, a long smirking mouth, a yellow-green throat.
@@ -109,8 +109,8 @@ const eye = (cx: number, cy: number) =>
     const lit = (-dx - dy) / r;
     return lit > 0.4 ? "e" : lit < -0.5 ? "b" : "d";
   }));
-const eyeL = eye(...EYES[0]);
-const eyeR = eye(...EYES[1]);
+const eyeL = eye(...EYES[0]!);
+const eyeR = eye(...EYES[1]!);
 
 // The beret: deep plum, tipped down to the right over the casque.
 const beretIs: Is = (x, y) => {

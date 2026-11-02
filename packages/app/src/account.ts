@@ -250,7 +250,53 @@ export interface Locker {
   equipped: Partial<Record<ItemSlot, string>>;
   look: ItemLook;
   crates: number | null;
+  /** Crate keys (an older server: null, unlimited). */
   keys: number | null;
+  /** Boss tokens you have, by boss id (only those you have some of; missing from an older server). */
+  tokens?: Record<string, number>;
+}
+
+/** Your crate keys and one boss's tokens, as your locker has them now. */
+export const tokenCount = (boss: string): { tokens: number; keys: number } => {
+  const l = state.profile?.locker;
+  return { tokens: l?.tokens?.[boss] ?? 0, keys: l?.keys ?? 0 };
+};
+
+/**
+ * Buys a boss's crate inside its shop (`way`: 3 of its tokens, or a token and a crate key) and opens it, on the server, in one
+ * transaction (server/boss-tokens.ts). Your locker comes back with it. Throws the server's message (not enough, the shop resting).
+ */
+export async function buyBossCrateOnServer(crate: string, way: "tokens" | "key"): Promise<{ roll: CrateRoll; item: ItemInstance }> {
+  const r = await api<{ roll: CrateRoll; item: ItemInstance; locker: Locker }>("/api/shop/boss-crate", { method: "POST", body: JSON.stringify({ crate, way }) });
+  if (state.profile) set({ profile: { ...state.profile, locker: r.locker } });
+  return { roll: r.roll, item: r.item };
+}
+
+/** An admin's test grant to themselves: crate keys, and a boss's tokens. Your locker comes back with it. */
+export async function grantTestItems(body: { keys?: number; boss?: string; tokens?: number }): Promise<void> {
+  const locker = await api<Locker>("/api/locker/grant", { method: "POST", body: JSON.stringify(body) });
+  if (state.profile) set({ profile: { ...state.profile, locker } });
+}
+
+/** A solo boss battle begins: the server notes when (its id; null when this account earns no tokens, or there's no server). */
+export async function startSoloBossBattle(): Promise<string | null> {
+  if (!state.profile) return null;
+  return (await api<{ battle: string | null }>("/api/boss/solo/start", { method: "POST", body: "{}" })).battle;
+}
+
+/** A solo boss battle's result screen: whether it counted (by the server's clock) and the token it dropped, if any. */
+export async function finishSoloBossBattle(battle: string): Promise<{ counted: boolean; token: string | null }> {
+  return api<{ counted: boolean; token: string | null }>("/api/boss/solo/finish", { method: "POST", body: JSON.stringify({ battle }) });
+}
+
+/** The token an online boss battle (its lobby code) dropped you, if the server has counted it yet. */
+export async function onlineBattleToken(code: string): Promise<string | null> {
+  return (await api<{ token: string | null }>(`/api/boss/token?battle=${encodeURIComponent(code)}`)).token;
+}
+
+/** Your profile again (after a token dropped: its count in your locker). */
+export async function refreshProfile(): Promise<void> {
+  if (state.profile) set({ profile: await api<Profile>("/api/me") });
 }
 
 /**

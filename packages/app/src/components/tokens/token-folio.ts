@@ -40,8 +40,8 @@ type P = readonly [number, number];
 function inPoly(px: number, py: number, poly: readonly P[]): boolean {
   let c = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const [xi, yi] = poly[i];
-    const [xj, yj] = poly[j];
+    const [xi, yi] = poly[i]!;
+    const [xj, yj] = poly[j]!;
     if (yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) c = !c;
   }
   return c;
@@ -59,7 +59,7 @@ function folded(poly: readonly P[], face: Fn, ink: Set<string> = new Set()) {
       return f;
     }
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]])
-      if (S(x + dx, y + dy)) return "k";
+      if (S(x + dx!, y + dy!)) return "k";
     return null;
   });
 }
@@ -80,7 +80,7 @@ const wing = folded(
     if (!wingS(x - 2, y) && y < 31) return "G";
     const sx = x - 25;
     const sy = y - 24;
-    if (sx >= 0 && sx < 4 && sy >= 0 && sy < 4) return SEAL[sy][sx];
+    if (sx >= 0 && sx < 4 && sy >= 0 && sy < 4) return SEAL[sy]![sx]!;
     const cx = 29.5 + (y - 4) * 0.02; // the crease down the wing
     if (Math.abs(x + 0.5 - cx - 0.5) < 0.5) return "E";
     return x + 0.5 < cx ? "B" : "D";

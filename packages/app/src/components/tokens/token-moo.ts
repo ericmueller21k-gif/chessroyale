@@ -44,8 +44,8 @@ function draw({ has, col }: Shape, outline = true) {
   for (let y = 0; y < S; y++)
     for (let x = 0; x < S; x++) {
       if (!inside(x, y)) continue;
-      if (inS(x, y)) cv[y][x] = col(x, y);
-      else if (outline && (inS(x - 1, y) || inS(x + 1, y) || inS(x, y - 1) || inS(x, y + 1))) cv[y][x] = "k";
+      if (inS(x, y)) cv[y]![x] = col(x, y);
+      else if (outline && (inS(x - 1, y) || inS(x + 1, y) || inS(x, y - 1) || inS(x, y + 1))) cv[y]![x] = "k";
     }
 }
 const ell = (cx: number, cy: number, rx: number, ry: number) => (x: number, y: number) =>
@@ -80,7 +80,7 @@ ear(32.5, 17.5, 1);
 // Small tan horns.
 const horn = (pts: [number, number][]) => {
   const set = new Set(pts.map(([x, y]) => `${x},${y}`));
-  draw({ has: (x, y) => set.has(`${x},${y}`), col: (x, y) => (y <= pts[0][1] ? "j" : x < 23 ? "i" : "h") });
+  draw({ has: (x, y) => set.has(`${x},${y}`), col: (x, y) => (y <= pts[0]![1] ? "j" : x < 23 ? "i" : "h") });
 };
 horn([[18, 10], [19, 11], [20, 11], [19, 12], [20, 12]]);
 horn([[30, 10], [28, 11], [29, 11], [28, 12], [29, 12]]);
@@ -106,7 +106,7 @@ const MOON_FACE: [number, number, string][] = [
   [8, 23, "v"], [13, 23, "v"],
   [10, 24, "u"], [11, 24, "u"], [9, 23, "u"], [12, 23, "u"],
 ];
-for (const [x, y, c] of MOON_FACE) if (inside(x, y)) cv[y][x] = c;
+for (const [x, y, c] of MOON_FACE) if (inside(x, y)) cv[y]![x] = c;
 
 // The head: round and cream.
 const headE = ell(24, 20, 7.2, 7.6);
@@ -135,16 +135,16 @@ for (const ex of [20, 27]) {
   EYES.push([ex, 18, "w"], [ex + 1, 18, "x"], [ex, 19, "x"], [ex + 1, 19, "x"], [ex, 20, "e"], [ex + 1, 20, "e"]);
   EYES.push([ex - 1, 18, "k"], [ex - 1, 19, "k"], [ex + 2, 18, "k"], [ex + 2, 19, "k"], [ex, 17, "k"], [ex + 1, 17, "k"]);
 }
-for (const [x, y, c] of EYES) cv[y][x] = c;
+for (const [x, y, c] of EYES) cv[y]![x] = c;
 
 // The cream tuft between the horns.
 const TUFT: [number, number, string][] = [
   [22, 11, "k"], [23, 10, "k"], [24, 11, "k"], [25, 10, "k"], [26, 11, "k"],
   [23, 11, "F"], [24, 12, "E"], [25, 11, "E"], [23, 12, "F"], [25, 12, "E"],
 ];
-for (const [x, y, c] of TUFT) cv[y][x] = c;
+for (const [x, y, c] of TUFT) cv[y]![x] = c;
 
-const face = paint(0, 0, S, S, (x, y) => cv[y][x]);
+const face = paint(0, 0, S, S, (x, y) => cv[y]![x]!);
 
 const W = (part: string, at: readonly [number, number]) => ({ part, x: at[0], y: at[1] });
 const layers = [W("disc", disc.at), W("face", face.at)];

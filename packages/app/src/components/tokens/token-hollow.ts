@@ -80,11 +80,11 @@ const figure = paint(5, 4, 30, 32, (x, y) => {
   if (!inside(x, y)) return null;
   if (!fig(x, y)) {
     // his thin violet edge glow
-    for (const [ax, ay] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (fig(x + ax, y + ay)) return "u";
-    for (const [ax, ay] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) if (fig(x + ax, y + ay)) return "v";
+    for (const [ax, ay] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (fig(x + ax!, y + ay!)) return "u";
+    for (const [ax, ay] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) if (fig(x + ax!, y + ay!)) return "v";
     return null;
   }
-  for (const [ax, ay] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!fig(x + ax, y + ay) && inside(x + ax, y + ay)) return "k";
+  for (const [ax, ay] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!fig(x + ax!, y + ay!) && inside(x + ax!, y + ay!)) return "k";
   const head = inHead(x, y);
   if (head) {
     const key = `${x},${y}`;

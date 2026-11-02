@@ -567,9 +567,24 @@ button.town-pic.player {
   font: 500 12px/1.35 Archivo, sans-serif;
   color: #d6d8df;
 }
+/* The answer's row: its height kept for a bought item's picture (40 px) beside up to two lines, so nothing moves when it comes. */
 .town-card .shop-msg {
-  min-height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
   margin-top: 6px;
+  line-height: 1.3;
+}
+.shop-msg-art {
+  flex: none;
+  width: 40px;
+  height: 40px;
+}
+.shop-pool {
+  font: 600 11px/1.3 Archivo, sans-serif;
+  color: #a9adb9;
 }
 .shop-prize-kind {
   color: #d6d8df;

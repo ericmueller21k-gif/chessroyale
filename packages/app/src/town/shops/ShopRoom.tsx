@@ -18,7 +18,8 @@
  *
  * You walk by tapping, as in the town (one square at a time, round what's solid: shops/room.ts); a drag looks around and the focus
  * button brings the camera back. Standing within talking range of the Shopkeeper, its card ("Shopkeeper", Talk) shows; Talk opens
- * the crate's card (its picture, its prizes, the price, what you have, and the two ways to buy, through `buyBossCrate`). Standing
+ * the crate's card (its picture, its prizes, the price, what you have, and the two ways to buy, through `buyBossCrate`: round 2, the
+ * server's purchase; a way you can't pay is greyed, and the answer, with the item's picture, shows under them). Standing
  * just inside the way out, a card says "Go out".
  *
  * One requestAnimationFrame loop draws everything on one canvas (Canvas 2D); it stops when you go out or the tab is hidden. Every
@@ -26,7 +27,10 @@
  * Test hooks (test switches on): the canvas's `data-room` (its home), `data-you="c,r"`, `data-ready="1"`; `window.__shopAt("keeper"
  * | "door" | "square", [c, r]?)` where to tap; `__shopCam()` the camera (its zoom: 0 Close, 1 the town's); `__shopBench(n)` ms a draw.
  */
-import { useLayoutEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
+import type { ItemInstance } from "@chessroyale/core";
+import { onAccountChange } from "../../account.ts";
+import { ItemArt } from "../../components/Items.tsx";
 import { renderFrame, type Character } from "../../characters/sprite.ts";
 import { testSwitchesAllowed } from "../../test-switches.ts";
 import { newPt, newView, proj, setView, type CamPair } from "../camera.ts";
@@ -40,7 +44,7 @@ import { Walker, type HomeId } from "../world.ts";
 import type { Rider } from "../rides.ts";
 import { rideSpeed } from "../../components/rides/scale.ts";
 import { inTalkRange, isFloor, makeRoom, onDoor, tapTarget, findPath, type Room, type ShopPlace, type Sq } from "./room.ts";
-import { bossHoldings, buyBossCrate, holdLine, priceLine, prizeRows, shopOf, wayText, type CrateWay, type ShopDef } from "./shops.ts";
+import { POOL_LINE, bossHoldings, buyBossCrate, canAfford, holdLine, priceLine, prizeRows, shopOf, wayText, type CrateWay, type ShopDef } from "./shops.ts";
 
 /** A room's art, as its file exports it. */
 interface RoomArt {
@@ -126,12 +130,15 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
   const cardEl = useRef<HTMLDivElement>(null);
   const [card, setCard] = useState<ShopCard | null>(null);
   const [msg, setMsg] = useState("");
+  /** The item a buy gave (its picture beside the answer). */
+  const [got, setGot] = useState<ItemInstance | null>(null);
   const eng = useRef<ReturnType<typeof startRoom> | null>(null);
   const { def } = room;
   useLayoutEffect(() => {
     const r = (eng.current = startRoom(box.current!, canvas.current!, cardEl.current!, room, youArt, youRider, youName, onZoom, (c) => {
       setCard(c);
       setMsg("");
+      setGot(null);
     }));
     ctl.current = r;
     onReady();
@@ -140,7 +147,20 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
       r.stop();
     };
   }, []);
-  const buy = (way: CrateWay) => void buyBossCrate(def.home, way).then((res) => setMsg(res.message));
+  // What you hold: your locker's, as the server last said (a buy, a token from a battle, an admin's grant), drawn again with it.
+  const [, accountChanged] = useState(0);
+  useEffect(() => onAccountChange(() => accountChanged((n) => n + 1)), []);
+  const [busy, setBusy] = useState(false);
+  const buy = (way: CrateWay) => {
+    if (busy) return;
+    setBusy(true);
+    setGot(null);
+    void buyBossCrate(def.home, way).then((res) => {
+      setBusy(false);
+      setMsg(res.message);
+      setGot(res.item ?? null);
+    });
+  };
   const held = bossHoldings(def.home);
   const label = card === "talk" ? "Shopkeeper" : card === "crate" ? def.crate : card === "door" ? "Door" : undefined;
   return (
@@ -177,20 +197,27 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
                       </span>
                     </li>
                   ))}
+                  <li class="shop-pool">{POOL_LINE}</li>
                 </ul>
               </div>
             </div>
             <p class="shop-price">{priceLine(def)}</p>
             <p class="shop-hold">{holdLine(def, held)}</p>
-            <button type="button" class="town-btn primary" onClick={() => buy("tokens")}>
+            {/* (A way you can't pay is greyed, not hidden; the server checks again.) */}
+            <button type="button" class="town-btn primary" disabled={busy || !canAfford(held, "tokens")} onClick={() => buy("tokens")}>
               Buy with {wayText(def, "tokens")}
             </button>
-            <button type="button" class="town-btn" onClick={() => buy("key")}>
+            <button type="button" class="town-btn" disabled={busy || !canAfford(held, "key")} onClick={() => buy("key")}>
               Buy with {wayText(def, "key")}
             </button>
-            {/* (Its row is always there, empty until a buy answers: nothing moves.) */}
+            {/* (Its row is always there, its height kept for the item's picture, empty until a buy answers: nothing moves.) */}
             <div class="town-soon shop-msg" aria-live="polite">
-              {msg}
+              {got && (
+                <span class="shop-msg-art">
+                  <ItemArt def={got.def} finish={got} />
+                </span>
+              )}
+              <span>{msg}</span>
             </div>
           </>
         )}

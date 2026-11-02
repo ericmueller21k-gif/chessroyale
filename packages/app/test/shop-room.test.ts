@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { SHOP_BABUR_LAYOUT } from "../src/town/shops/babur-art.ts";
 import { SHOP_PUDDLES_LAYOUT } from "../src/town/shops/puddles-art.ts";
 import { findPath, inTalkRange, makeRoom, onDoor, stepsFrom, tapTarget, walkable, type Room, type Sq } from "../src/town/shops/room.ts";
-import { COMING_SOON, buyBossCrate, holdLine, priceLine, prizeRows, shopOf, wayText, SHOPS } from "../src/town/shops/shops.ts";
+import { POOL_LINE, buyBossCrate, canAfford, gotLine, holdLine, priceLine, prizeRows, shopOf, wayText, SHOPS } from "../src/town/shops/shops.ts";
+import { bossCrateOf } from "@chessroyale/core";
 import { HOMES } from "../src/town/world.ts";
 import { SHOP_FEEL } from "../src/town/feel.ts";
 
@@ -133,8 +134,41 @@ describe("the shops", () => {
     expect(prizeRows(p)[0]).toMatchObject({ id: "puddles-mower", name: "Puddles's Mower", kind: "Mythic ride" });
   });
 
-  it("buying goes through buyBossCrate, which says 'Coming soon' in round 1", async () => {
-    expect(await buyBossCrate("tiger", "tokens")).toEqual({ ok: false, message: COMING_SOON });
-    expect(await buyBossCrate("gardener", "key")).toEqual({ ok: false, message: "Coming soon" });
+  it("each shop sells its boss's crate (core's BOSS_CRATES), its ride among the prizes; a way's button needs its price held", () => {
+    for (const s of [shopOf("tiger")!, shopOf("gardener")!]) {
+      const crate = bossCrateOf(s.home)!;
+      expect(crate.name).toBe(s.crate);
+      expect(crate.items).toContain(s.prizes[0]);
+    }
+    expect(POOL_LINE).toBe("+ 24 Beta Crate items, Common to Epic");
+    expect(canAfford({ tokens: 3, keys: 0 }, "tokens")).toBe(true);
+    expect(canAfford({ tokens: 2, keys: 5 }, "tokens")).toBe(false);
+    expect(canAfford({ tokens: 1, keys: 1 }, "key")).toBe(true);
+    expect(canAfford({ tokens: 1, keys: 0 }, "key")).toBe(false);
+    expect(canAfford({ tokens: 0, keys: 3 }, "key")).toBe(false);
+    expect(gotLine("balloon-pup")).toBe("You got Balloon Pup! It's in your Locker.");
+  });
+
+  it("buying goes through buyBossCrate: the server's purchase (round 2), its answer the item or the server's reason", async () => {
+    const asked: { url: string; body: unknown }[] = [];
+    const answer = (status: number, body: object) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+    let next = answer(400, { message: "You need 3 Babur tokens." });
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      asked.push({ url, body: JSON.parse(String(init?.body)) });
+      return next;
+    }) as typeof fetch;
+    try {
+      expect(await buyBossCrate("tiger", "tokens")).toEqual({ ok: false, message: "You need 3 Babur tokens." });
+      const item = { id: "x1", def: "balloon-pup", color: "red", blemish: 10, seed: 3 };
+      next = answer(200, { roll: { fischer: true, def: "balloon-pup", color: "red", blemish: 10, seed: 3 }, item, locker: {} });
+      expect(await buyBossCrate("gardener", "key")).toEqual({ ok: true, message: "You got Balloon Pup! It's in your Locker.", item });
+      expect(asked).toEqual([
+        { url: "/api/shop/boss-crate", body: { crate: "boss-tiger", way: "tokens" } },
+        { url: "/api/shop/boss-crate", body: { crate: "boss-gardener", way: "key" } },
+      ]);
+    } finally {
+      globalThis.fetch = real;
+    }
   });
 });

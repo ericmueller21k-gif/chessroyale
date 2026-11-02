@@ -37,8 +37,8 @@ const disc = paint(0, 0, 40, 40, (x, y) => {
 
 // A small hand-drawn grid stamped at a place, clipped to the navy middle.
 function stamp(x0: number, y0: number, rows: string[]) {
-  return paint(x0, y0, rows[0].length, rows.length, (x, y) => {
-    const ch = rows[y - y0][x - x0];
+  return paint(x0, y0, rows[0]!.length, rows.length, (x, y) => {
+    const ch = rows[y - y0]![x - x0]!;
     if (ch === "." || !inside(x, y)) return null;
     return ch;
   });
