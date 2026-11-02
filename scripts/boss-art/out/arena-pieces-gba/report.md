@@ -41,3 +41,33 @@ reference. This is so they have a sharper defined look but still maintain the de
 - The knight: the mane a flat-sided gold ridge down the back of the neck, one clean gold stripe from the side.
 - The bishop (new, `wb`, `bb`): built straight in 3D on the shared base: a stem narrowing to a gold collar, an egg-shaped
   mitre with a small ball on top, and the slit across the mitre's front a gold strip from upper left to lower right.
+
+## Round 4: the full set, and how the game uses it (Nov 2)
+
+Eric (via the director): "I had it build the bishop, it looks better now. Have it finish the pieces and queue it to go
+live, make it the default piece style option in the colosseum, remove the old pixel one."
+- **New:** the pawn (stem, gold collar, round head; 16 tall), the queen (waisted stem, gold collar, a cup flaring to an
+  open coronet of seven gold points, a gold ball; 25) and the king (gold collar, a body flaring to a gold crown band, a low
+  cap and a thick gold cross; about 31), White and Black, on the same base as the rook, knight and bishop.
+- `sheet-3d.png` (all 12 at 1x and 4x), `mockup-3d-computer.png` and `mockup-3d-phone.png` (the start position, all 32, on
+  the empty arena), `compare-3d-reference.png`, `arena-pieces-3d.json` (all 12 at 30 degrees as palette keys).
+
+### For the game side (the director's helper)
+- **The code:** `scripts/boss-art/out/arena-pieces-gba/pieces-3d.ts` (pure TypeScript, no Node or DOM) with
+  `arena-pieces-gba.ts` beside it (the 2D grids it builds from, and `PALETTE`). Move both into `packages/app/src/colosseum/`.
+  - `MODELS[kind].inside(x, y, z)`: the material at a point (`"body" | "gold" | "groove" | "eye"`) or null.
+  - `drawPiece(kind, side, pitch)`: one piece as a sprite: `{ w: 32, h: 40, ax: 16, ay: 33, keys }`, `keys[y][x]` a
+    `PALETTE` key or null; the foot (the middle of the piece's square) at pixel (ax, ay). `kind` is p n b r q k, `side`
+    w or b, `pitch` how far down the seat looks at the piece, in radians (0.52 = 30 degrees, the mockups).
+- **Units and axes:** one unit = one sprite pixel = one art pixel of the Pixel arena, drawn for a board square about 20
+  art pixels across near White (today the arena gives about 19 on a computer, 16 on a phone: pick the art pixel so a
+  square near White is about 20, or the pieces stand a little large on a phone). y is up, the foot at the origin; **+z is
+  the piece's front** (the side `drawPiece` shows); the knight looks toward -x (the viewer's left): mirror the sprite for
+  a knight facing the other way.
+- **Every seat (Change seat):** the pieces turn to face the screen as today's Pixel pieces do, so only the pitch differs
+  from seat to seat. Draw the 12 sprites when the seat (its pitch) changes: about 140 ms for all 12 on a computer here
+  (one ray a pixel, marched in the pieces' box), so expect a few hundred ms on a phone, once per seat change, never per
+  frame; a spare pitch or two can be drawn ahead. Then draw them as textured quads (the props path, nearest-neighbor),
+  each standing at its square's middle, far ranks first.
+- **What it replaces:** the Pixel set's meshes and shader (pieces-pixel.ts, its part of arena-gl.ts). The 2D and 3D gear
+  options are untouched by this art.

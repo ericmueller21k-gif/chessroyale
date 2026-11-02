@@ -15,184 +15,12 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { inflateSync, deflateSync } from "node:zlib";
-import { PIECES, PALETTE, FOOT_X, FOOT_Y } from "./out/arena-pieces-gba/arena-pieces-gba.ts";
+import { PALETTE, drawPiece, type Shot } from "./out/arena-pieces-gba/pieces-3d.ts";
 
 const [inDir, outDir, pitchArg] = process.argv.slice(2) as [string, string, string?];
 /** How far down the view looks at the pieces (degrees): the stands behind White, as Eric's picture shows its pieces. */
 const PITCH = ((Number(pitchArg) || 30) * Math.PI) / 180;
 
-type Mat = "body" | "gold" | "groove" | "eye";
-type Side = "w" | "b";
-const TONES: Record<Side, Record<Mat, string[]>> = {
-  // highlight, light, mid, shade
-  w: { body: ["W", "w", "c", "C"], gold: ["Y", "G", "G", "g"], groove: ["C", "C", "k", "k"], eye: ["k", "k", "k", "k"] },
-  b: { body: ["B", "b", "d", "d"], gold: ["Y", "G", "G", "g"], groove: ["d", "K", "K", "K"], eye: ["Y", "Y", "G", "G"] },
-};
-const OUTLINE: Record<Side, string> = { w: "k", b: "K" };
-const GOLD = new Set(["T", "U", "V", "R", "S", "Q", "M", "N"]);
-
-/** A row of the sprite (frame row f) as a turned ring: its radius (the inside, outline left off) and material. */
-function ringOf(grid: string[][], f: number): { r: number; mat: Mat } | null {
-  const row = grid[f];
-  if (!row) return null;
-  const cells = row.filter((k) => k !== ".");
-  if (!cells.length) return null;
-  const inner = cells.filter((k) => k !== "O");
-  const gold = inner.filter((k) => GOLD.has(k)).length;
-  const mat: Mat = !inner.length ? "groove" : gold * 2 > inner.length ? "gold" : "body";
-  return { r: inner.length ? inner.length / 2 : cells.length / 2 - 1, mat };
-}
-
-interface Model { inside(x: number, y: number, z: number): Mat | null }
-
-/** World: y up, the foot at the origin, +z toward the viewer; frame row f spans y in [FOOT_Y - f, FOOT_Y - f + 1). */
-const rowAt = (y: number) => FOOT_Y - Math.floor(y);
-
-function turned(grid: string[][], from: number, to: number) {
-  return (x: number, y: number, z: number): Mat | null => {
-    const f = rowAt(y);
-    if (f < from || f > to) return null;
-    const ring = ringOf(grid, f);
-    if (!ring) return null;
-    return Math.hypot(x, z) <= ring.r ? ring.mat : null;
-  };
-}
-
-function rookModel(): Model {
-  const g = PIECES.r!;
-  const body = turned(g, 18, 33);
-  const R = ringOf(g, 18)!.r; // the crown's radius
-  const WALL = 2;
-  return {
-    inside(x, y, z) {
-      const f = rowAt(y);
-      if (f >= 15 && f <= 17) {
-        // Three rows of battlements: a ring wall, four merlons (one facing you), the roof sunk inside.
-        const r = Math.hypot(x, z);
-        if (r > R || r < R - WALL) return null;
-        const a = Math.atan2(x, z); // 0 = toward you
-        const sector = (((a / (Math.PI / 2)) % 1) + 1.5) % 1; // 0.5 at a merlon's middle
-        // (Their flat tops gold, with the roof: the rook's top reads gold from the stands.)
-        return Math.abs(sector - 0.5) < 0.3 ? (f === 15 ? "gold" : "body") : null;
-      }
-      // The roof inside the ring, sunk in its shadow.
-      // The flat roof inside the ring: gold (Eric, Nov 2: "the rook flat area on the top should be gold").
-      if (f === 18 && Math.hypot(x, z) < R - WALL) return "gold";
-      return body(x, y, z);
-    },
-  };
-}
-
-function knightModel(): Model {
-  const g = PIECES.n!;
-  const base = turned(g, 25, 33);
-  // The head's cells (frame rows 12..24) and each cell's distance (in cells) to the outside, for the slab's rounding.
-  const H0 = 12, H1 = 24;
-  const cell = (c: number, f: number) => (f >= H0 && f <= H1 ? (g[f]?.[c] ?? ".") : ".");
-  const dist: number[][] = [];
-  for (let f = H0; f <= H1; f++) {
-    dist[f] = [];
-    for (let c = 0; c < g[0]!.length; c++) {
-      let d = 0;
-      if (cell(c, f) !== ".")
-        for (d = 1; d < 6; d++) {
-          let edge = false;
-          for (let dy = -d; dy <= d && !edge; dy++) for (let dx = -d; dx <= d && !edge; dx++) if (Math.hypot(dx, dy) <= d && cell(c + dx, f + dy) === ".") edge = true;
-          if (edge) break;
-        }
-      dist[f]![c] = d;
-    }
-  }
-  return {
-    inside(x, y, z) {
-      const f = rowAt(y);
-      if (f > H1) return base(x, y, z);
-      if (f < H0) return null;
-      const c = Math.floor(x + FOOT_X + 0.5);
-      const k = cell(c, f);
-      if (k === ".") return null;
-      const d = dist[f]![c]!;
-      // The mane (Eric, Nov 2: gold) a flat-sided ridge down the back of the neck, so its side is one clean gold stripe.
-      const half = k === "M" || k === "N" ? 2.4 : Math.min(2.8, 0.6 + 0.85 * d);
-      if (Math.abs(z) > half) return null;
-      if (k === "E") return Math.abs(z) > half - 0.8 ? "eye" : "body";
-      return GOLD.has(k) ? "gold" : "body";
-    },
-  };
-}
-
-/**
- * The bishop (Eric, Nov 2: its mitre's "strip thing on top gold like in our reference"), turned like the rook: the shared
- * base, a stem narrowing up to a gold collar, the mitre (an egg narrowing to a point), a small ball on top, and the slit
- * across the mitre's front a gold strip, falling from the upper left to the lower right.
- */
-function bishopModel(): Model {
-  const base = turned(PIECES.r!, 25, 33);
-  const radius = (y: number): [number, Mat] | null => {
-    if (y < 9) return null;
-    if (y < 12.6) return [3.5 - ((y - 9) / 3.6) * 1.2, "body"];
-    if (y < 13.8) return [3.6, "gold"];
-    if (y < 14.6) return [2.6, "body"];
-    if (y < 16.2) return [2.6 + ((y - 14.6) / 1.6) * 0.9, "body"];
-    if (y < 21.4) return [3.5 * Math.sqrt(Math.max(0, 1 - ((y - 16.2) / 5.2) ** 2)), "body"];
-    return null;
-  };
-  return {
-    inside(x, y, z) {
-      if (y < 9) return base(x, y, z);
-      if (Math.hypot(x, y - 22, z) <= 1.25) return "body";
-      const pr = radius(y);
-      if (!pr || Math.hypot(x, z) > pr[0]) return null;
-      if (y > 15.4 && y < 21 && z > -0.5 && Math.abs(y - 18.4 + 0.75 * x) < 0.7) return "gold";
-      return pr[1];
-    },
-  };
-}
-
-interface Shot { w: number; h: number; ax: number; ay: number; keys: (string | null)[][] }
-
-/** Draws a model from the stands: one ray a pixel, flat tones, then the outline. `ax, ay`: the foot's pixel. */
-function draw(m: Model, side: Side): Shot {
-  const d = [0, -Math.sin(PITCH), -Math.cos(PITCH)];
-  const up = [0, Math.cos(PITCH), -Math.sin(PITCH)];
-  const L = (() => { const v = [-0.55, 0.7, 0.45]; const n = Math.hypot(...v); return v.map((a) => a / n); })();
-  const W = 32, H = 34, ax = 16, ay = 27; // the foot (world origin) lands on pixel (16, 27)
-  const depth: number[][] = Array.from({ length: H }, () => Array<number>(W).fill(Infinity));
-  const keys: (string | null)[][] = Array.from({ length: H }, () => Array<string | null>(W).fill(null));
-  for (let py = 0; py < H; py++)
-    for (let px = 0; px < W; px++) {
-      const u = px + 0.5 - ax, v = ay - (py + 0.5);
-      const o = [u - d[0]! * 40, up[1]! * v - d[1]! * 40, up[2]! * v - d[2]! * 40];
-      for (let t = 0; t < 80; t += 0.03) {
-        const p = [o[0]! + d[0]! * t, o[1]! + d[1]! * t, o[2]! + d[2]! * t];
-        if (p[1]! < 0 || p[1]! >= 34) continue;
-        const mat = m.inside(p[0]!, p[1]!, p[2]!);
-        if (!mat) continue;
-        // The surface's facing: the middle of the empty space round the hit, looking out.
-        let nx = 0, ny = 0, nz = 0;
-        for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) for (let k = -2; k <= 2; k++) {
-          const s = 0.45;
-          if (Math.hypot(i, j, k) > 2.2 || (i === 0 && j === 0 && k === 0)) continue;
-          if (!m.inside(p[0]! + i * s, p[1]! + j * s, p[2]! + k * s) && p[1]! + j * s >= 0) { nx += i; ny += j; nz += k; }
-        }
-        const n = Math.hypot(nx, ny, nz) || 1;
-        const lit = (nx * L[0]! + ny * L[1]! + nz * L[2]!) / n;
-        const tone = lit > 0.72 ? 0 : lit > 0.38 ? 1 : lit > 0.05 ? 2 : 3;
-        keys[py]![px] = TONES[side][mat][tone]!;
-        depth[py]![px] = t;
-        break;
-      }
-    }
-  // The outline: round the shape, and on the farther side of a jump in depth (a nearer part over a farther one).
-  const out = keys.map((r) => r.slice());
-  for (let y = 0; y < H; y++)
-    for (let x = 0; x < W; x++) {
-      const nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => [x + dx!, y + dy!] as const).filter(([X, Y]) => X >= 0 && Y >= 0 && X < W && Y < H);
-      if (!keys[y]![x]) { if (nb.some(([X, Y]) => keys[Y]![X])) out[y]![x] = OUTLINE[side]; continue; }
-      if (nb.some(([X, Y]) => keys[Y]![X] && depth[Y]![X]! < depth[y]![x]! - 2.2)) out[y]![x] = OUTLINE[side];
-    }
-  return { w: W, h: H, ax, ay, keys: out };
-}
 
 // ---- pictures ----
 interface Img { w: number; h: number; data: Uint8ClampedArray }
@@ -224,10 +52,7 @@ const readPng = (f: string): Img => {
   return { w, h, data: dd };
 };
 
-const shots: Record<string, Shot> = {
-  wr: draw(rookModel(), "w"), br: draw(rookModel(), "b"), wn: draw(knightModel(), "w"), bn: draw(knightModel(), "b"),
-  wb: draw(bishopModel(), "w"), bb: draw(bishopModel(), "b"),
-};
+const shots: Record<string, Shot> = Object.fromEntries((["w", "b"] as const).flatMap((side) => (["p", "n", "b", "r", "q", "k"] as const).map((k) => [side + k, drawPiece(k, side, PITCH)])));
 
 // The drawings as data (palette keys, "." empty), for whoever puts them in the arena.
 writeFileSync(`${outDir}/arena-pieces-3d.json`, JSON.stringify({
@@ -238,18 +63,20 @@ writeFileSync(`${outDir}/arena-pieces-3d.json`, JSON.stringify({
 
 // The sheet: the four at 1x, then 4x, on a light and a dark square.
 {
-  const gap = 8, n = 6, s4 = 4, cw = 32;
-  const im = blank(gap + n * (cw * s4 + gap), gap + 34 + gap + 34 * s4 + gap, "#e9d6ae");
+  const gap = 8, n = 12, s4 = 4, cw = 32, ch = 40;
+  const im = blank(gap + n * (cw * s4 + gap), gap + ch + gap + ch * s4 + gap, "#e9d6ae");
   Object.values(shots).forEach((s, i) => {
     const x1 = gap + i * (cw + gap); rect(im, x1 + s.ax - 10, gap + s.ay - 6, 20, 10, i % 2 ? "#a97c55" : "#eac99a"); paint(im, toImg(s), x1, gap, 1);
-    const x4 = gap + i * (cw * s4 + gap), y4 = gap + 34 + gap; rect(im, x4 + (s.ax - 10) * s4, y4 + (s.ay - 6) * s4, 20 * s4, 10 * s4, i % 2 ? "#a97c55" : "#eac99a"); paint(im, toImg(s), x4, y4, s4);
+    const x4 = gap + i * (cw * s4 + gap), y4 = gap + ch + gap; rect(im, x4 + (s.ax - 10) * s4, y4 + (s.ay - 6) * s4, 20 * s4, 10 * s4, i % 2 ? "#a97c55" : "#eac99a"); paint(im, toImg(s), x4, y4, s4);
   });
   writeFileSync(`${outDir}/sheet-3d.png`, png(im));
 }
 
 // From the crowd: laid on a still of the arena with no pieces (the high view behind White), each foot on its square's
 // middle, snapped to the arena's art grid, at its art pixel's size on the still; far ranks first.
-const POS: [string, string][] = [["a1", "wr"], ["c1", "wb"], ["f3", "wn"], ["d1", "wr"], ["e4", "wn"], ["g2", "wb"], ["c6", "bn"], ["a8", "br"], ["h8", "br"], ["f6", "bn"], ["c8", "bb"], ["e7", "bb"], ["d5", "wr"]];
+// The start position, all 32.
+const BACK = "rnbqkbnr";
+const POS: [string, string][] = [..."abcdefgh"].flatMap((f, i) => [[f + "1", "w" + BACK[i]], [f + "2", "wp"], [f + "7", "bp"], [f + "8", "b" + BACK[i]]] as [string, string][]);
 for (const dev of ["computer", "phone"]) {
   const info = JSON.parse(readFileSync(`${inDir}/empty-${dev}.json`, "utf8"));
   const shot = readPng(`${inDir}/empty-${dev}.png`);
