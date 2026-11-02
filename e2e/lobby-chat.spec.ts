@@ -103,22 +103,43 @@ test("two players in a Default queue chat before the match starts: each sees the
 
 test("Solo's queue: the bots say hello, your line shows, and a 50 v 50's chat carries on into the match, with teams", async ({ page }) => {
   await named(page, "Solo Sam");
+  // Solo's queue is up about 3.1 s (MATCHMAKING.soloFillMs + soloHoldMs, all in the page). On a busy runner one or two of the
+  // test's steps outlasted it: the chat was gone before it was looked at, or the tap waited on a button already gone until the
+  // 5-minute timeout (the flaky ".fd-home.queueing .qchat-lobby: visible" and "Test timeout", Nov 2). So the page watches the
+  // queue itself as it happens (a MutationObserver: no round trips): the chat as it shows, a tap on its "Have fun!" right then,
+  // your line, and the first bot's hello, each with the match's phase at that moment. The checks are the same.
+  await page.addInitScript(() => {
+    const seen: { chat: string | null; mine: string | null; hello: { from: string; phase: string } | null } = { chat: null, mine: null, hello: null };
+    (window as any).__queueSeen = seen;
+    const phase = () => (window as any).match?.phase?.kind ?? "none";
+    let tapped = false;
+    const look = () => {
+      const chat = document.querySelector(".fd-home.queueing .qchat-lobby");
+      if (!chat) return;
+      if (seen.chat === null) seen.chat = phase();
+      const fun = [...chat.querySelectorAll<HTMLButtonElement>(".qchip")].find((b) => b.textContent?.includes("Have fun!"));
+      if (!tapped && fun && !fun.disabled) {
+        tapped = true;
+        fun.click();
+      }
+      if (seen.mine === null && [...chat.querySelectorAll(".qline.you")].some((l) => l.textContent?.includes("Have fun!"))) seen.mine = phase();
+      const bot = chat.querySelector('.qline[data-from^="bot"]');
+      if (!seen.hello && bot) seen.hello = { from: bot.getAttribute("data-from")!, phase: phase() };
+    };
+    addEventListener("DOMContentLoaded", () => new MutationObserver(look).observe(document.body, { childList: true, subtree: true, attributes: true }));
+  });
   await page.goto("/?debug");
   await soloFromHome(page);
-  await expect(page.locator(".fd-seats")).toBeVisible({ timeout: 60_000 });
-  const chat = page.locator(".fd-home.queueing .qchat-lobby");
-  await expect(chat).toBeVisible();
-  await chat.locator(".qchip", { hasText: "Have fun!" }).click();
-  await expect(chat.locator(".qline.you", { hasText: "Have fun!" })).toBeVisible();
-  // A bot (one already in its seat) says hello while the seats fill (botLobbyChance is 1: always one or two).
-  const hello = chat.locator('.qline[data-from^="bot"]');
-  await expect(hello.first()).toBeVisible({ timeout: 4_000 });
-  const from = await hello.first().getAttribute("data-from");
-  expect(await page.evaluate((id) => (window as any).match.players.some((p: any) => p.id === id && p.isBot), from)).toBe(true);
-  expect(await phase(page)).toBe("lobby");
   // The match (a 50 v 50, Eric, Nov 1: "have it in the bot-only game and have the bots just chatting still"): the chat
   // carries on, now with teams.
-  await expect.poll(() => phase(page), { timeout: 20_000 }).toBe("vote");
+  await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("vote");
+  const seen = await page.evaluate(() => (window as any).__queueSeen as { chat: string | null; mine: string | null; hello: { from: string; phase: string } | null });
+  // The queue's chat showed (the seats filling), your line showed, and a bot (one already in its seat) said hello while the
+  // seats filled (botLobbyChance is 1: always one or two), all before the match.
+  expect(seen.chat, "the queue's chat").toBe("lobby");
+  expect(seen.mine, "your line, in the queue").toBe("lobby");
+  expect(seen.hello?.phase, "a bot's hello, in the queue").toBe("lobby");
+  expect(await page.evaluate((id) => (window as any).match.players.some((p: any) => p.id === id && p.isBot), seen.hello!.from)).toBe(true);
   expect(await page.evaluate(() => [(window as any).match.chat.enabled, (window as any).match.chat.hasTeams()])).toEqual([true, true]);
 });
 
