@@ -154,6 +154,16 @@ pieces all are logically placed." Decision note: `docs/decisions/2026-11-02-boss
     tile picked. The helpers take a boss id (default Babur's), and a home without its chip in view is reached by the camera's glide.
   - "the other cards on the same dark look …": Babur's confirm "Leave the town square?" / "You'll fight Babur in Boss Battle." / Leave →
     "Challenge Babur?" / "You'll fight Babur in Boss Battle, then come back here." / Fight (the same look and contrast checks).
+- `e2e/shop.spec.ts`, "inside, a drag looks around as the town's does": the town half measured `homeAt("tiger")` (where a tap lands on
+  Babur's tent) → the tent plot's middle square `__townAt("square", [28, 4])`, a fixed point of the world, as the inside half already
+  does. The check itself is unchanged: each drag (down, up, right) moves that point the finger's way, 0.4 to 2.5 times as far. Why: the
+  computer run failed in CI (shard 4, first try and retry) with the right-drag reading −34 px for +80. The camera was right (the
+  trace's frames show the tent moving 80 px right with the mouse); the reading wasn't. `homeAt` is the renderer's `tapPoint`, which
+  searches a grid over the tent for the first point no nearer figure covers, and Babur stands on his square right in front of the tent
+  juggling: his frames cover a little more or less of it, so the point hopped between the tent's left and right gift boxes (about
+  110 px) between two readings. Not a challenge's leftovers: locally, alone, the same hops showed (+111 px across on a pure vertical
+  drag) and passed only because they happened on the axis not checked. With the square the readings are steady (the same numbers
+  every run). Main has the same test and the same hop; it lands by timing.
 - None of these guards a rule in `docs/rules/eric.md`. No check removed.
 
 ### Tests run locally (round 2)
@@ -161,6 +171,8 @@ pieces all are logically placed." Decision note: `docs/decisions/2026-11-02-boss
 - Typecheck (app); unit `packages/app/test/boss-challenge.test.ts` (32) and `shop-room.test.ts`: pass.
 - e2e under the shared lock, on a port of its own: `e2e/boss-challenge.spec.ts` (Alfil and Babur) phone and computer, 4 passed;
   `e2e/town.spec.ts -g "a boss's card: 'Challenge alone'|the other cards on the same dark look"` phone and computer, 4 passed.
+- The drag check (CI fix): `e2e/boss-challenge.spec.ts` then `e2e/shop.spec.ts:255` in one worker on the computer, 3 passed (before
+  and after the fix); `e2e/shop.spec.ts:255` phone and computer, repeated 3 times each, 6 passed with identical readings.
 - Frame rate: the town's drawing and loop unchanged; not measured. In a room, a challenge draws the same figures as round 1 plus two
   stools (facing only) and, for the default, a few dust ellipses for half a second.
 
