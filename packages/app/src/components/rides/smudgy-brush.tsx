@@ -1,6 +1,9 @@
 import type { ComponentChildren } from "preact";
 // Copied as drawn from `claude/boss-art` (scripts/boss-art/out/smudgy-brush/smudgy-brush.tsx, Nov 1: the side view, its front and back views, its
 // trail mark): only the import lines changed and a few `!` the app's stricter typecheck asks for.
+// Nov 2 (Eric: "It should just be a brush"; the ink dripping from its back is its trail): no seat pad (the side's, the back's and
+// the front's), and the trail mark is ink drops off the bristle end (`InkDrops`), in place of the paint swipe and the paint
+// streaks the back and front views drew while it ran. docs/decisions/2026-11-02-brush-ink-trail.md.
 // The art's kit there (scripts/boss-art/item-kit.tsx) is a copy of ../item-paint.tsx and ./kit.ts. Notes: docs/areas/shop.md, "Rides".
 import type { RiderDraft, RiderProps, RiderFacing } from "./kit.ts";
 import { Region, LINE, lw, darken } from "../item-paint.tsx";
@@ -91,8 +94,6 @@ const METAL_HI = "#f2f4f7";
 const METAL_DK = "#868d99";
 const HAIR = "#2f2b35";
 const HAIR_HI = "#6e6878";
-const PAD = "#7d3c98";
-const PAD_HI = "#a865c4";
 
 const HANDLE =
   "M 35 64.4 C 50 63 62 63 74 64.2 L 103.5 65.6 C 108.5 65.6 111 67.6 111 70 C 111 72.4 108.5 74.4 103.5 74.4 L 74 75.8 C 62 77 50 77 35 75.6 Z";
@@ -101,9 +102,6 @@ const BRISTLES =
   "M 21 62.2 C 13 59.6 5 59.8 0 62.8 C -4 65 -7.6 67.4 -10 68.6 C -7.4 70.8 -4 73.8 0 76 C 5 79.2 13 80 21 77.8 Z";
 /** The dipped part: everything left of a wavy line, clipped to the bristles. */
 const TIP = "M 7.5 52 C 5 57 8.5 60.5 6 64.5 C 4 68.5 8 72 5.5 75.5 C 4.5 78.5 6.5 83 7 88 L -16 88 L -16 52 Z";
-const SEAT =
-  "M 41 65.4 C 41 62.6 43 62 46 62.2 C 55 63 64 63 72 62.2 C 75 62 77 62.6 77 65.4 L 76.6 74.6 C 76.4 77 74.8 77.8 72 77.8 C 64 78.4 55 78.4 46.2 77.8 C 43.4 77.8 41.6 77 41.4 74.6 Z";
-
 function Brush({ p }: RiderProps) {
   const clip = `${p.id}-bristle`;
   return (
@@ -140,10 +138,6 @@ function Brush({ p }: RiderProps) {
       <path d={FERRULE} fill={METAL} {...LINE} />
       <path d="M 23.5 64 L 34 65.2" fill="none" stroke={METAL_HI} stroke-linecap="round" {...lw(2.2)} />
       <path d="M 26.5 63 L 26.5 77.2 M 30.5 63.4 L 30.5 76.8" fill="none" stroke={METAL_DK} stroke-linecap="round" {...lw(1.3)} />
-      {/* the seat pad (Smudgy's beret plum) */}
-      <path d={SEAT} fill={PAD} {...LINE} />
-      <path d="M 45 65.6 C 54 66.3 64 66.3 73 65.6" fill="none" stroke={PAD_HI} stroke-linecap="round" stroke-dasharray="2.4 2.6" {...lw(1.4)} />
-      <path d="M 45 74.6 C 54 75.3 64 75.3 73 74.6" fill="none" stroke={darken(PAD, 0.3)} stroke-linecap="round" stroke-dasharray="2.4 2.6" {...lw(1.4)} />
     </g>
   );
 }
@@ -300,19 +294,6 @@ function VShadow({ dy }: { dy: number }) {
   return <ellipse cx="50" cy={94 - dy} rx={27 + dy} ry="3.6" fill="#000" opacity="0.18" />;
 }
 
-/** The seat pad seen end-on (the same plum, the same stitching). */
-const V_PAD =
-  "M 24 64.2 C 24 61.6 25.6 60.6 28.4 60.7 C 40 61.5 60 61.5 71.6 60.7 C 74.4 60.6 76 61.6 76 64.2 L 75.6 75.6 C 75.4 78.2 73.8 79.3 71 79.3 C 60 80 40 80 29 79.3 C 26.2 79.3 24.6 78.2 24.4 75.6 Z";
-function VPad() {
-  return (
-    <g>
-      <path d={V_PAD} fill={PAD} {...LINE} />
-      <path d="M 28.5 65 C 40 65.8 60 65.8 71.5 65" fill="none" stroke={PAD_HI} stroke-linecap="round" stroke-dasharray="2.4 2.6" {...lw(1.4)} />
-      <path d="M 28.5 75.4 C 40 76.2 60 76.2 71.5 75.4" fill="none" stroke={darken(PAD, 0.3)} stroke-linecap="round" stroke-dasharray="2.4 2.6" {...lw(1.4)} />
-    </g>
-  );
-}
-
 /* --- back view: the bristle end toward us --- */
 const B_BUNDLE_C: P = [50, 79.5];
 const B_BUNDLE_R = 13;
@@ -400,125 +381,13 @@ function FarTuft({ p }: { p: RiderProps["p"] }) {
 function NearHandle() {
   return (
     <g>
-      <ellipse cx="50" cy="68.4" rx="7.4" ry="3" fill={darken(PAD, 0.45)} />
+      <ellipse cx="50" cy="68.4" rx="7.4" ry="3" fill={darken(WOOD, 0.5)} />
       <path d="M 43.4 68.4 C 43.4 66.6 56.6 66.6 56.6 68.4 L 56.2 84 L 43.8 84 Z" fill={WOOD} {...LINE} />
       <path d="M 46.6 70.6 L 46.6 80.5" fill="none" stroke={WOOD_HI} stroke-linecap="round" {...lw(2.2)} />
       <path d="M 54 72 L 54 80" fill="none" stroke={WOOD_DK} stroke-linecap="round" {...lw(1.3)} />
       <ellipse cx="50" cy="84" rx="6.4" ry="5.6" fill={WOOD} {...LINE} />
       <ellipse cx="50" cy="84.2" rx="3.4" ry="2.8" fill="none" stroke={WOOD_DK} {...lw(1.3)} />
       <path d={arcPath(50, 84, 4.6, 200, 250)} fill="none" stroke={WOOD_HI} stroke-linecap="round" {...lw(1.6)} />
-    </g>
-  );
-}
-
-/* --- the color it leaves, seen end-on --- */
-function EndTrail({ p, f, view }: { p: RiderProps["p"]; f: number; view: "front" | "back" }) {
-  const t = f / N;
-  const back = view === "back";
-  const L = 27;
-  const steps = 9;
-  const tip: P = back ? B_TIP_C : [50, 34];
-  const dir = back ? 1 : -1; // back: the trail comes toward us (down); front: it runs away (up)
-  const k = back ? 0.4 : 0.62;
-  const gain = back ? 3.2 : 4.5; // swung a little wide so it reads as a stroke, not a drip
-  const cur = rotP(tip[0], tip[1], rollAt(t));
-  const pts: P[] = [];
-  const w: number[] = [];
-  for (let i = 0; i <= steps; i++) {
-    const s = -4 + ((L + 4) * i) / steps;
-    const tau = Math.max(0, s) / 100;
-    const tp = t - tau;
-    const past = rotP(tip[0], tip[1], rollAt(tp));
-    const x = cur[0] + gain * (past[0] - cur[0] + swayAt(tp) - swayAt(t));
-    const y = past[1] + dir * k * s + moveDy(tp) - moveDy(t);
-    pts.push([x, y]);
-    const u = Math.max(0, s) / L;
-    w.push((back ? 7.4 * (1 + 0.3 * u) : 7.4 * (1 - 0.3 * u)) * (1 - 0.35 * u * u) + 0.6 * Math.sin(u * 10));
-  }
-  const streaks = (
-    <>
-      <path d={alongLine(pts, -2, 2, steps - 1)} fill="none" stroke="#000" stroke-opacity="0.22" stroke-linecap="round" {...lw(1.3)} />
-      <path d={alongLine(pts, 2.2, 1, steps - 3)} fill="none" stroke="#fff" stroke-opacity="0.5" stroke-linecap="round" {...lw(1.4)} />
-    </>
-  );
-  const id = `${p.id}-vtrail-${view}`;
-  const y0 = pts[0]![1];
-  const y1 = pts[pts.length - 1]![1];
-  return (
-    <g>
-      <defs>
-        <linearGradient id={`${id}-g`} gradientUnits="userSpaceOnUse" x1="0" y1={y0 - dir * 4} x2="0" y2={y1 - dir * 2}>
-          <stop offset="0" stop-color="#fff" />
-          <stop offset="0.55" stop-color="#fff" stop-opacity="0.9" />
-          <stop offset="1" stop-color="#fff" stop-opacity="0" />
-        </linearGradient>
-        <mask id={id} maskUnits="userSpaceOnUse" x="-10" y="-10" width="120" height="120">
-          <rect x="-10" y="-10" width="120" height="120" fill={`url(#${id}-g)`} />
-        </mask>
-      </defs>
-      <g mask={`url(#${id})`}>
-        <Stroke p={p} d={ribbon(pts, w)} over={streaks} />
-      </g>
-    </g>
-  );
-}
-
-/** Front view: the broad stroke the splayed tuft leaves, running away up behind the pawn (its edges show past it). */
-function FrontTrail({ p, f }: { p: RiderProps["p"]; f: number }) {
-  const t = f / N;
-  const steps = 8;
-  const L = 22;
-  const left: P[] = [];
-  const right: P[] = [];
-  const mid: P[] = [];
-  for (let i = 0; i <= steps; i++) {
-    const s = (L * i) / steps;
-    const tp = t - s / 100;
-    const u = s / L;
-    // the stroke bends with where the brush was: its sway and roll, and the swoop's dip
-    const cx = 50 + 2.2 * (swayAt(tp) - swayAt(t)) + 0.9 * (rollAt(tp) - rollAt(t));
-    const cy = 50 - 0.6 * s + moveDy(tp) - moveDy(t);
-    const hw = 29.5 * (1 - 0.34 * u) + 0.6 * Math.sin(u * 9);
-    mid.push([cx, cy]);
-    left.push([cx - hw, cy]);
-    right.push([cx + hw, cy]);
-  }
-  const lt = left[steps]!;
-  const rt = right[steps]!;
-  const top = mid[steps]!;
-  const d =
-    `M ${n1(left[0]![0])} ${n1(left[0]![1])}` +
-    smoothThrough(left) +
-    ` C ${n1(lt[0])} ${n1(lt[1] - 5)} ${n1(top[0] - 8)} ${n1(top[1] - 4)} ${n1(top[0])} ${n1(top[1] - 4)}` +
-    ` C ${n1(top[0] + 8)} ${n1(top[1] - 4)} ${n1(rt[0])} ${n1(rt[1] - 5)} ${n1(rt[0])} ${n1(rt[1])}` +
-    smoothThrough([...right].reverse()) +
-    " Z";
-  const edge = (side: P[], off: number) => {
-    const q = side.slice(1, steps).map(([x, y]): P => [x + off, y]);
-    return `M ${n1(q[0]![0])} ${n1(q[0]![1])}` + smoothThrough(q);
-  };
-  const streaks = (
-    <>
-      <path d={edge(left, 3) + " " + edge(right, -5)} fill="none" stroke="#000" stroke-opacity="0.2" stroke-linecap="round" {...lw(1.3)} />
-      <path d={edge(left, 6.5) + " " + edge(right, -2.6)} fill="none" stroke="#fff" stroke-opacity="0.5" stroke-linecap="round" {...lw(1.4)} />
-    </>
-  );
-  const id = `${p.id}-vtrail-front`;
-  return (
-    <g>
-      <defs>
-        <linearGradient id={`${id}-g`} gradientUnits="userSpaceOnUse" x1="0" y1="46" x2="0" y2={top[1] - 4}>
-          <stop offset="0" stop-color="#fff" />
-          <stop offset="0.45" stop-color="#fff" stop-opacity="0.85" />
-          <stop offset="1" stop-color="#fff" stop-opacity="0" />
-        </linearGradient>
-        <mask id={id} maskUnits="userSpaceOnUse" x="-10" y="-10" width="120" height="120">
-          <rect x="-10" y="-10" width="120" height="120" fill={`url(#${id}-g)`} />
-        </mask>
-      </defs>
-      <g mask={`url(#${id})`}>
-        <Stroke p={p} d={d} over={streaks} />
-      </g>
     </g>
   );
 }
@@ -567,7 +436,6 @@ const backView = {
     return (
       <g>
         <g transform={rollT(a)}>
-          <VPad />
           <BristleEnd p={p} />
           {/* the paint that lies on the tuft itself goes along with it */}
           {anim === "idle" && <EndWisp p={p} f={f} view="back" />}
@@ -581,7 +449,6 @@ const backView = {
           <circle cx="50" cy="73.5" r="13.8" transform={rollT(a)} />
           <ellipse cx="50" cy={94 - dyOf(anim, f)} rx={27 + dyOf(anim, f) + 1} ry="5.4" />
         </clipPath>
-        {anim === "move" && <EndTrail p={p} f={f} view="back" />}
       </g>
     );
   },
@@ -597,14 +464,6 @@ const frontView = {
     return (
       <g>
         <VShadow dy={dyOf(anim, f)} />
-        <clipPath id={`${p.id}-keepf`}>
-          <path d={F_TUFT} transform={`${rollT(a)} translate(50 50.5) scale(1.07 1.24) translate(-50 -50.5)`} />
-        </clipPath>
-        {anim === "move" && (
-          <g clip-path={`url(#${p.id}-keepf)`}>
-            <FrontTrail p={p} f={f} />
-          </g>
-        )}
         <g transform={rollT(a)}>
           <FarTuft p={p} />
         </g>
@@ -615,7 +474,6 @@ const frontView = {
     const a = rollOf(anim, f);
     return (
       <g transform={rollT(a)}>
-        <VPad />
         <NearHandle />
       </g>
     );
@@ -624,38 +482,40 @@ const frontView = {
 
 type RiderPose = ReturnType<RiderDraft["pose"]>;
 
-/* ---------- its trail mark: dabs and a swipe of paint on the floor ---------- */
-/** A tapered swipe along u (the way it ran), from u0 (w0 half-wide) to u1 (w1), round ends. */
-const swipe = (u0: number, u1: number, w0: number, w1: number) =>
-  `M ${u0} ${-w0} C ${(u0 + u1) / 2} ${-w0 * 1.1} ${(u0 + u1) / 2} ${-w1 * 1.3} ${u1} ${-w1} Q ${u1 + w1 * 1.4} 0 ${u1} ${w1} C ${(u0 + u1) / 2} ${w1 * 1.4} ${(u0 + u1) / 2} ${w0 * 1.1} ${u0} ${w0} Q ${u0 - w0 * 1.3} 0 ${u0} ${-w0} Z`;
-// per frame: swipe pieces, dab radii scale, opacity, glossy
-const MARK_FRAMES: { pieces: [number, number, number, number][]; k: number; o: number; wet: boolean }[] = [
-  { pieces: [[-9, 9, 3.2, 1.3]], k: 1, o: 1, wet: true },
-  { pieces: [[-9, 9, 3, 1.2]], k: 0.95, o: 0.88, wet: false },
-  { pieces: [[-9, -1.5, 2.6, 2], [1.5, 7.5, 1.8, 1.1]], k: 0.7, o: 0.62, wet: false },
-  { pieces: [[-8, -4, 1.8, 1.5], [2.5, 4.5, 1.1, 1]], k: 0.45, o: 0.32, wet: false },
+/* ---------- its trail mark: ink drops falling off the bristle end, as it runs (Eric, Nov 2: "the ink dripping from the back of it") ---------- */
+/** A drop (its tip up, a teardrop) of radius r, centered on (x, y). */
+const drop = (x: number, y: number, r: number) =>
+  `M ${n1(x)} ${n1(y - 2 * r)} Q ${n1(x + 0.9 * r)} ${n1(y - 0.2 * r)} ${n1(x + r)} ${n1(y)} A ${n1(r)} ${n1(r)} 0 0 1 ${n1(x - r)} ${n1(y)} Q ${n1(x - 0.9 * r)} ${n1(y - 0.2 * r)} ${n1(x)} ${n1(y - 2 * r)} Z`;
+/** The drops as they leave the bristle end, round the square's middle: how far behind it (`back`), across it (`side`) and their size (`r`). */
+const DROPS: [number, number, number][] = [
+  [7, 0, 2.2],
+  [9.5, -3.6, 1.6],
+  [5.5, 3.8, 1.4],
 ];
-const DABS: [number, number, number][] = [
-  [-9.5, 6.2, 3],
-  [7.5, -6.4, 2.5],
-  [11, 5, 1.8],
+// Per frame (fresh to nearly gone): how far each drop has fallen, its size and its opacity.
+const DROP_FRAMES = [
+  { fall: 0, k: 1, o: 1 },
+  { fall: 2.6, k: 0.92, o: 0.85 },
+  { fall: 5.2, k: 0.8, o: 0.55 },
+  { fall: 7.8, k: 0.62, o: 0.25 },
 ];
-function PaintMark({ p, f, view }: { p: RiderProps["p"]; f: number; view: RiderFacing }) {
-  const fr = MARK_FRAMES[Math.min(f, MARK_FRAMES.length - 1)]!;
+/** Behind the brush is the way it came: left (side, going right: the town mirrors it going left), down the screen (back) or up (front). */
+function InkDrops({ p, f, view }: { p: RiderProps["p"]; f: number; view: RiderFacing }) {
+  const fr = DROP_FRAMES[Math.min(f, DROP_FRAMES.length - 1)]!;
   const edge = darken(p.hex, 0.5);
-  const rot = view === "back" ? -90 : view === "front" ? 90 : 0;
   return (
-    <g opacity={fr.o} transform="scale(1 0.88)">
-      <g transform={`rotate(${rot})`}>
-        {fr.pieces.map(([a, b, w0, w1]) => (
-          <path d={swipe(a, b, w0, w1)} fill={p.hex} stroke={edge} stroke-linejoin="round" {...lw(1.4)} />
-        ))}
-        {fr.wet && <path d="M -8 -1.4 C -3 -1.8 2 -1.2 5 -0.6" fill="none" stroke="#fff" stroke-opacity="0.75" stroke-linecap="round" {...lw(1.2)} />}
-      </g>
-      {DABS.map(([x, y, r]) => (
-        <circle cx={x} cy={y} r={r * fr.k} fill={p.hex} stroke={edge} {...lw(1.3)} />
-      ))}
-      {fr.wet && <circle cx={-10.4} cy={5.2} r={0.9} fill="#fff" opacity="0.8" />}
+    <g opacity={fr.o}>
+      {DROPS.map(([back, side, r]) => {
+        const [x, y] = view === "side" ? [-back, side] : view === "back" ? [side, back] : [side, -back];
+        const cx = x;
+        const cy = y + fr.fall;
+        return (
+          <g>
+            <path d={drop(cx, cy, r * fr.k)} fill={p.hex} stroke={edge} {...lw(1.1)} />
+            <circle cx={n1(cx - 0.35 * r * fr.k)} cy={n1(cy - 0.5 * r * fr.k)} r={n1(0.32 * r * fr.k)} fill="#fff" opacity="0.8" />
+          </g>
+        );
+      })}
     </g>
   );
 }
@@ -686,6 +546,6 @@ export const smudgyBrush: RiderDraft = {
     ms: [180, 180, 180, 160],
     w: 30,
     h: 24,
-    Mark: ({ p, f, view }) => <PaintMark p={p} f={f} view={view} />,
+    Mark: ({ p, f, view }) => <InkDrops p={p} f={f} view={view} />,
   },
 };
