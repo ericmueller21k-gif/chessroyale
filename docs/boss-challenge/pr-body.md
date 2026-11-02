@@ -15,7 +15,7 @@ its back edge), Woolly the Shopkeeper behind the low counter, the sandstone ceil
   Stay). Every other boss: unchanged (the Boss raid screen).
 - Fight: you and the boss walk to its door and in (the shop's zoom and fade; the room and the intro's art load only now, their own
   chunks: `alfil-art` 36 kB, `alfil-intro-art` 15 kB, `intro` 6 kB). Inside, you walk to the battle circle's south mark and the boss
-  to the north one, side by side, facing each other; he says his line in a speech bubble and into the town's chat log; the sand
+  to the north one, side by side, facing each other; he says his line in a speech bubble by his head (not the chat log: Eric); the sand
   pyramid rises between you, holds, cracks and crumbles, and his table with the board is there (the town's park-table board,
   white's ranks nearest you); from 2 s before the storm covers, he fires his God King attack (his kit's `kingAttack`, with its
   sounds) at the board beside the table, lashing on until the battle takes the screen (any boss with a `kingAttack`; Timber, with
@@ -58,7 +58,7 @@ Stills and the GIF: `docs/boss-challenge/` (`intro-phone.gif`: the walk in to th
 - The Crates tab lists **Alfil's Boss Crate** (the boss crates' rows are generic), and the FAQ's boss-crate line names it (generated).
 - A boss with an intro, its card's confirm: **"Challenge Alfil?"** / **"You'll fight Alfil in Boss Battle, then come back here."** /
   **"Fight"** / **"Stay"** (was "Leave the town square?" / "You'll fight Alfil in Boss Battle." / Leave / Stay; unchanged for the others).
-- Alfil's line, in a speech bubble and the chat log: **"I'll show you the power of the old piece."** (a placeholder until Gemini's lines).
+- Alfil's line, in a speech bubble by his head (not the chat log): **"I'll show you the power of the old piece."** (a placeholder until Gemini's lines).
 - The pyramid, the table, the attack and the sandstorm (art and sounds as above).
 - The result screen after a town challenge: **"Back to town"** in place of "Home" (on one line).
 - The gear's Leave note after a town challenge: **"You'll go back to the town square. Nothing goes on your record."** (was "You'll go
@@ -93,9 +93,89 @@ spot and facing, the two lines and no second start line), `e2e/shop.spec.ts` ("A
   measured (eric.md: only when the drawing or the frame loop changes). The room's loop draws the same for a shop (its figures sorted
   in a fixed array of four); a challenge adds the boss, the board and the attack for its few seconds.
 
+## Round 2 (Eric, Nov 2, after the intro GIF)
+
+"For Alfil he shattered the pyramid, that's fine for him, but for other bosses they should just be swinging for a few seconds like
+discussed. Also in the gif the chairs are not on the right side where the chess board is. I also prefer the normal look is boss on left,
+you on right, not vertical, but I'm ok if it's some for some bosses and the opposite for others; just be sure the table and chairs and
+pieces all are logically placed." Decision note: `docs/decisions/2026-11-02-boss-challenge-r2.md`; the area page's "Challenging a boss".
+
+### What changed
+
+- **A layout per boss** (`BOSS_INTROS[id].layout`): **"across"** (the default): the boss on the table's west (the screen's left), you on
+  its east, side by side on the circle's middle row, a square and a half out, facing each other; **"facing"**: the boss north, you south.
+  `marksOf(layout, how)` finds the circle's middle from its floor (any room with a circle or ring, marks drawn or not).
+- **Alfil: across.** Both tried: across (`docs/boss-challenge/04-table-phone.png`) shows you, the table, both stools and him side by
+  side, nothing hidden; facing (`r2-alfil-facing-phone.png`) hides his stool behind the table and stands him small, far behind it, with
+  your back to the camera. Across is also Eric's normal look. His and Puddles' drawn start marks moved west and east of the emblem
+  (turned, each pointing out), and the circle's middle line now runs north to south between them.
+- **Table, chairs and pieces:** the park table's picture is three squares across, a stool in each outer square: across, it stands as
+  drawn, its stools at the players' sides; facing, its middle square alone and a stool north and south. You and the boss stand just
+  past your stools, in front of them. The board is turned to the layout: white's ranks nearest you, black's nearest the boss, the
+  a-file on your left; across, the knights face the other side. The boss's town figure turns to face the table (Babur's and Puddles'
+  art faces left, as their attacks' does: `facesLeft`).
+- **The default intro, for every boss whose home has an inside: Babur and Puddles now** (Alfil keeps his pyramid and sandstorm): walk in
+  with you, the line in the bubble by its head (1.8 s); the town's stone park table pops in between you during it (grows from its foot,
+  a dust puff, the app's soft pop); the boss swings its God King attack in place for 2 s (its kit's `kingAttack` and sounds, its lashes
+  only, looping: no drop-in, no leap, hitting nothing); then the default transition (`startWipe`): three white flashes and black bands
+  wiping in from alternate sides (0.8 s, the boss's own whoosh), the battle loads under the black, which fades off. About 5.8 s from the
+  door to black. Babur's ring has his pedestal in its middle: the table stands 1.5 squares south of it, in front.
+- Kept from round 1: the chat lines, the return to town, everything else.
+
+### Every player-visible change and new text
+
+- Babur's and Puddles' cards: "Challenge alone" now opens **"Challenge Babur?"** / **"You'll fight Babur in Boss Battle, then come back
+  here."** / **Fight** / Stay (and Puddles'), was "Leave the town square?" / "You'll fight Babur in Boss Battle." / Leave / Stay. Fight
+  takes you into their home for the intro and the battle, and back to town after; the server's town-chat lines now name them too
+  ("Ann challenged Babur!", …).
+- New lines (placeholders until Gemini's, each in its boss's voice): Babur **"Fine. One more show. Then I'm on break."**; Puddles
+  **"Wipe your feet. Then let's see what grows."**
+- Alfil's intro: across (him left, you right), his stools at your sides, the board turned to you.
+- Alfil's and Puddles' rooms: the start marks west and east of the emblem, the middle line north to south (also as a shop).
+- The default intro and its flash and wipe (Babur, Puddles).
+
+### Checks changed (old → new)
+
+- `packages/app/test/boss-challenge.test.ts`:
+  - "only Alfil has an intro so far" (`["alfil"]`) → "every boss whose home has an inside has an intro" (`["alfil", "gardener",
+    "tiger"]`, equal to `SHOPS`' keys; Alfil custom, Babur and Puddles the default, their lines).
+  - "Alfil's: you on the south mark, the boss on the north" (`marksOf(layout)`) → "facing: the boss north of the table, you south"
+    (`marksOf(layout, "facing")`, the same numbers); new "across" test (all three rooms: boss (8, r), you (11, r), facing each other).
+  - "you and the boss walk in side by side…" (Alfil only: your path all on column 10, his on 9) → all three rooms, across: the boss
+    keeps to your west row for row; each path at most 1.2 s.
+  - "found from any room's art (… Babur's ring has none: null)" → "found from any room's circle (Babur's ring: found)".
+  - New: the stools, the table's picture, the drawn marks where you stand, the table clear of room pieces (Babur's pedestal), the
+    board's turn (`boardSquare`), the default intro's timeline, its in-place attack, its cues, its length, the wipe.
+- `e2e/boss-challenge.spec.ts`: Alfil on his marks `you [9.5, 13]`, `boss [9.5, 8]` → `[11, 10.5]`, `[8, 10.5]`, layout "across",
+  facing each other; new: his stools `[[8.5, 10.5], [10.5, 10.5]]`. New test: Babur's default intro (phone and computer).
+- `e2e/town.spec.ts`:
+  - "a boss's card: 'Challenge alone', then 'Leave the town square?' …": Babur → **Folio** (a boss without an inside; Babur's is a
+    challenge now): his card, his town sound (`folioMurmur`/`folioHum`, was `tigerHello`), "You'll fight Folio in Boss Battle.", Folio's
+    tile picked. The helpers take a boss id (default Babur's), and a home without its chip in view is reached by the camera's glide.
+  - "the other cards on the same dark look …": Babur's confirm "Leave the town square?" / "You'll fight Babur in Boss Battle." / Leave →
+    "Challenge Babur?" / "You'll fight Babur in Boss Battle, then come back here." / Fight (the same look and contrast checks).
+- None of these guards a rule in `docs/rules/eric.md`. No check removed.
+
+### Tests run locally (round 2)
+
+- Typecheck (app); unit `packages/app/test/boss-challenge.test.ts` (32) and `shop-room.test.ts`: pass.
+- e2e under the shared lock, on a port of its own: `e2e/boss-challenge.spec.ts` (Alfil and Babur) phone and computer, 4 passed;
+  `e2e/town.spec.ts -g "a boss's card: 'Challenge alone'|the other cards on the same dark look"` phone and computer, 4 passed.
+- Frame rate: the town's drawing and loop unchanged; not measured. In a room, a challenge draws the same figures as round 1 plus two
+  stools (facing only) and, for the default, a few dust ellipses for half a second.
+
+### Stills and GIFs (`docs/boss-challenge/`)
+
+- At the table: Alfil `04-table-phone.png` / `04-table-desktop.png`; Babur `r2-babur-table-phone.png` / `r2-babur-table-desktop.png`;
+  Puddles `r2-puddles-table-phone.png` / `r2-puddles-table-desktop.png`.
+- Alfil facing (the layout not chosen): `r2-alfil-facing-phone.png`.
+- Babur swinging: `r2-babur-swing-phone.png`; the wipe: `r2-puddles-wipe-phone.png`.
+- GIFs (phone): Babur's default intro `r2-babur-intro-phone.gif`; Alfil's, redone across, `intro-phone.gif`. The round-1 stills `02-line`,
+  `03-crack`, `04-table`, `045-attack`, `05-storm` are redone across.
+
 ## Lane
 
-Targeted, with a boss's art and wiring (boss lane's review pass suggested). It also touches the shop's stored data's edge (a third boss
+Targeted (round 2 adds layout and drawing logic in the room, the default intro and transition, and two room floors' marks), with a boss's art and wiring (boss lane's review pass suggested). It also touches the shop's stored data's edge (a third boss
 crate in BOSS_CRATES, at the existing price and odds) and the town chat's server room (new server-posted lines, memory only, no
 schema change): the director may want the full lane for the crate.
 

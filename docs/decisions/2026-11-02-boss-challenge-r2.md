@@ -5,9 +5,9 @@ swinging for a few seconds like discussed. Also in the gif the chairs are not on
 prefer the normal look is boss on left, you on right, not vertical, but I'm ok if it's some for some bosses and the opposite for
 others; just be sure the table and chairs and pieces all are logically placed."
 
-- **Alfil: across**, like the other two. Both were tried (stills in `docs/boss-challenge/r2-alfil-across-phone.png` and
+- **Alfil: across**, like the other two. Both were tried (stills: across `docs/boss-challenge/04-table-phone.png`, facing
   `r2-alfil-facing-phone.png`). Across shows you, the table, both stools and Alfil side by side with nothing hidden; facing hides
-  his stool behind the table and puts the board between you edge-on. It's also Eric's stated normal look. His (and Puddles') drawn
+  his stool behind the table and stands him small, far behind it, with your back to the camera. It's also Eric's stated normal look. His (and Puddles') drawn
   start marks moved west and east of the emblem, and the middle line turned north to south, so the floor matches where you stand.
 - **Where you stand:** a square and a half from the table's middle, just past your stool (the park table's stools are one square
   out). Two and a half (the circle's edge) left a gap between each player and their chair.
