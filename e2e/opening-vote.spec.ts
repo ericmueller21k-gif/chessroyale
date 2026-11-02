@@ -89,7 +89,8 @@ test("the three votes in order: how it ends, how it starts, how fast; the start'
   await expect(page.locator(".vote-step")).toHaveText("Vote 2 of 3");
   await expect(page.locator(".vote-card strong")).toHaveText(["Normal", "Random opening", "Freestyle"]);
   await expect(page.locator(".vote-card-blurb")).toHaveText(["The usual starting position", `A real opening, ${CROWD_START.randomOpeningMoves} moves in`, "The back-row pieces start shuffled"]);
-  await expect(page.locator(".vote-card-icon")).toHaveText(["♟️", "🎲", "🔀"]);
+  // No emoji on the cards or the zones (Eric, Nov 2: "delete them entirely").
+  for (const sel of [".vote-cards", ".vote-labels"]) expect(await page.locator(sel).innerText(), sel).not.toMatch(/\p{Extended_Pictographic}/u);
   for (const sel of [".vote-card", ".vote-zone"]) {
     const xs = await page.locator(sel).evaluateAll((els) => els.map((e) => e.getBoundingClientRect().x));
     expect(xs, sel).toHaveLength(3);

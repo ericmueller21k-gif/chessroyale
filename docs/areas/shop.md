@@ -98,16 +98,30 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   - **The crates** (`BOSS_CRATES` in core's crates.ts, beside `CRATES` but never in it, so the Crates tab can't open one free): Babur's
     and Puddles', each the boss's ride (the only Mythic, the only item behind Fischer Random: 2%) and the Beta Crate's 24 Common to
     Epic items in its boxes, at the existing crates' odds; rolled on the server as every crate.
-  - **Buying** (`POST /api/shop/boss-crate {crate, way}`, `buyBossCrate`): one D1 batch, as the coin shop's: the item goes in only if
-    the tokens (and the key) are there, then they come off only if that item went in; the counts can't go below zero (a CHECK on
-    `boss_tokens.n`, and the guards). A double tap or two devices are two buys, each paid in full or refused. The shop's kill switch
-    refuses it. The shop card's answer: the item and "You got … It's in your Locker.", or "You need 3 Babur tokens." /
-    "You need 1 Babur token and 1 crate key.".
+  - **Buying** (`POST /api/shop/boss-crate {crate, way}`, `buyBossCrate`): one D1 batch, as the coin shop's: the crate goes into your
+    inventory (a `boss_crates` row, unopened) only if the tokens (and the key) are there, then they come off only if that row went in; the
+    counts can't go below zero (a CHECK on `boss_tokens.n`, and the guards). A double tap or two devices are two buys, each paid in full or
+    refused. The shop's kill switch refuses it. Answers `{crate, locker}`. The shop card's answer: **"Babur's Boss Crate is in your
+    inventory."** (Eric, Nov 2; until then a buy opened it at once into the Locker), or "You need 3 Babur tokens." / "You need 1 Babur
+    token and 1 crate key.".
+  - **Boss crates you hold** (Eric, Nov 2: "Buying a boss crate from shopkeepers adds the crate to your inventory … they open and shuffle
+    the same way normal crate animations work"; [2026-11-02-nov2-fixes-b.md](../decisions/2026-11-02-nov2-fixes-b.md)): the Crates tab
+    lists every boss crate under **"Boss crates"**, below the others, its boss's token on the crate's corner, its blurb and **"You have
+    2"** (greyed with **"You have none"**: shown, not hidden; a tap still shows what's inside). Its page says **"You have 2."** or
+    **"You have none. Babur's shop in the town sells it."**; **"▶ Open"** (greyed at none; no test switches for these) opens it with the
+    Crates tab's own strip, unwrap, Fischer Random and reveal, from the crate's own pool (`BOSS_CRATES`); "▶ Open another" greys when none
+    is left. The locker's `bossCrates` (crate id → how many). **Opening** (`POST /api/locker/open {crate}` with a boss crate's id:
+    `openBossCrate`): one D1 batch: the item goes in only if you hold one of those crates, then the oldest of them comes off only if that
+    item went in; so each opens once, never twice, a double tap or two devices open two only if you hold two, and nobody opens one they
+    haven't got ("You have no Babur's Boss Crate to open."). The roll is the server's, never a test switch's. The shop's kill switch
+    refuses it too.
   - **Admins' test grants** (the Crates tab's "Admin: test grants", admins only: "+1 crate key"; a boss, "+1 token", "+3 tokens";
     `POST /api/locker/grant`, "Not found" for anyone else; at most `grantMax` (10) at once). Never a drop: the window doesn't count them.
   - **Stored** (each an account's: `account-data.ts`, "bossTokens"; the privacy page's "Boss tokens"): `boss_tokens` (counts),
     `boss_token_drops` (each drop: when, which battle; kept 30 days, the Worker's schedule clears older), `solo_battles` (the open one),
-    and `wallets.crate_keys`. A guest signing in to an account brings them along (added up; the drops too, so the window counts them).
+    `boss_crates` (Nov 2: each crate bought and not opened yet, its crate id and when; a new table, so older data reads as none), and
+    `wallets.crate_keys`. A guest signing in to an account brings them along (added up; the drops and the crates too, so the window
+    counts the drops).
 - **The gambling warning** (Eric, Nov 1; `components/GamblingWarning.tsx`): a small red ring, see-through in the middle, with a bubbly
   solid-red "!" in it, always at the top right of the crate pages: the Crates tab and each crate's own page (not the opening or the
   reveal). It sits over the page's corner (`gamble-ring` in `styles.css`: out of the flow, a 40 px tap target round a 30 px ring), so it

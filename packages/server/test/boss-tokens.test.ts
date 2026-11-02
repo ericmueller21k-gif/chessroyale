@@ -3,7 +3,7 @@ import { BOSS_CRATES, BOSS_TOKENS, RAID_SETTINGS, TOKEN_WINDOW_MS, battleCounts,
 import { legalMoves } from "@chessroyale/chess";
 import { createGuest, createSession, ensureSchema, signInWithIdentity, type Sql } from "../src/accounts.ts";
 import { handleAccountApi } from "../src/api.ts";
-import { battleToken, buyBossCrate, countBossBattle, finishSoloBattle, grantTestItems, startSoloBattle, tokenHoldings } from "../src/boss-tokens.ts";
+import { battleToken, bossCrateHoldings, buyBossCrate, countBossBattle, finishSoloBattle, grantTestItems, openBossCrate, startSoloBattle, tokenHoldings } from "../src/boss-tokens.ts";
 import { lockerState, openCrate } from "../src/locker.ts";
 import { setup } from "./lobby-fixture.ts";
 import { memoryDb } from "./memory-db.ts";
@@ -204,6 +204,8 @@ async function holding(tokens: number, keys = 0) {
   return a;
 }
 const items = (db: ReturnType<typeof memoryDb>["db"], id: string) => db.prepare("SELECT def, crate FROM items WHERE user_id = ?").all(id) as { def: string; crate: string }[];
+/** The boss crates an account holds, unopened, as stored: one row each. */
+const held = (db: ReturnType<typeof memoryDb>["db"], id: string) => (db.prepare("SELECT crate FROM boss_crates WHERE user_id = ? ORDER BY crate").all(id) as { crate: string }[]).map((r) => r.crate);
 
 describe("buying a boss's crate", () => {
   it("the crates: each boss's ride among its prizes, and never in the Crates tab's free crates", async () => {
@@ -216,22 +218,26 @@ describe("buying a boss's crate", () => {
     expect(await openCrate(sql, id, babur.id, {}, T0)).toEqual({ ok: false, message: "No such crate." });
   });
 
-  it("with 3 tokens: the crate opens into the locker, and the tokens are spent", async () => {
+  it("with 3 tokens: the crate goes into your inventory unopened (Eric, Nov 2), and the tokens are spent", async () => {
     const { sql, db, id } = await holding(4);
     const r = await buyBossCrate(sql, id, babur.id, "tokens", T0);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(babur.items).toContain(r.item.def);
-    expect(items(db, id)).toEqual([{ def: r.item.def, crate: "boss-tiger" }]);
-    expect(r.locker.tokens).toEqual({ tiger: 1 });
-    expect(r.locker.items.map((i) => i.id)).toContain(r.item.id);
+    expect(r.crate).toBe("boss-tiger");
+    expect(held(db, id)).toEqual(["boss-tiger"]);
+    // Not opened: no item yet.
+    expect(items(db, id)).toEqual([]);
+    expect([r.locker.tokens, r.locker.bossCrates, r.locker.items]).toEqual([{ tiger: 1 }, { "boss-tiger": 1 }, []]);
   });
 
-  it("with a token and a crate key: both are spent", async () => {
-    const { sql, db, id } = await holding(1, 2);
+  it("with a token and a crate key: both are spent; a second buy holds a second crate", async () => {
+    const { sql, db, id } = await holding(2, 2);
     const r = await buyBossCrate(sql, id, babur.id, "key", T0);
-    expect(r.ok && [r.locker.tokens, r.locker.keys]).toEqual([{}, 1]);
-    expect(items(db, id)).toHaveLength(1);
+    expect(r.ok && [r.locker.tokens, r.locker.keys, r.locker.bossCrates]).toEqual([{ tiger: 1 }, 1, { "boss-tiger": 1 }]);
+    const again = await buyBossCrate(sql, id, babur.id, "key", T0 + 1);
+    expect(again.ok && [again.locker.tokens, again.locker.keys, again.locker.bossCrates]).toEqual([{}, 0, { "boss-tiger": 2 }]);
+    expect(held(db, id)).toEqual(["boss-tiger", "boss-tiger"]);
+    expect(items(db, id)).toEqual([]);
   });
 
   it("not enough: refused, nothing spent and nothing given (another boss's tokens don't count)", async () => {
@@ -240,6 +246,7 @@ describe("buying a boss's crate", () => {
     expect(await buyBossCrate(sql, id, babur.id, "tokens", T0)).toEqual({ ok: false, message: "You need 3 Babur tokens." });
     expect(await buyBossCrate(sql, id, babur.id, "key", T0)).toEqual({ ok: false, message: "You need 1 Babur token and 1 crate key." });
     expect(items(db, id)).toEqual([]);
+    expect(held(db, id)).toEqual([]);
     expect(await tokenHoldings(sql, id)).toEqual({ tokens: { gardener: 5, tiger: 2 }, keys: 0 });
     // Keys without a token: refused too.
     const k = await holding(0, 3);
@@ -258,18 +265,18 @@ describe("buying a boss's crate", () => {
     const one = await holding(3, 0);
     const both = await Promise.all([buyBossCrate(one.sql, one.id, babur.id, "tokens", T0), buyBossCrate(one.sql, one.id, babur.id, "tokens", T0)]);
     expect(both.filter((r) => r.ok)).toHaveLength(1);
-    expect(items(one.db, one.id)).toHaveLength(1);
+    expect(held(one.db, one.id)).toHaveLength(1);
     expect(await tokenHoldings(one.sql, one.id)).toEqual({ tokens: {}, keys: 0 });
     // The two ways at once, with 3 tokens and a key (enough for either, not both): one crate, paid its own way.
     const mixed = await holding(3, 1);
     const ways = await Promise.all([buyBossCrate(mixed.sql, mixed.id, babur.id, "tokens", T0), buyBossCrate(mixed.sql, mixed.id, babur.id, "key", T0)]);
     expect(ways.filter((r) => r.ok)).toHaveLength(1);
     expect(await tokenHoldings(mixed.sql, mixed.id)).toEqual(ways[0]!.ok ? { tokens: {}, keys: 1 } : { tokens: { tiger: 2 }, keys: 0 });
-    expect(items(mixed.db, mixed.id)).toHaveLength(1);
+    expect(held(mixed.db, mixed.id)).toHaveLength(1);
     const two = await holding(6, 0);
     const paid = await Promise.all([buyBossCrate(two.sql, two.id, babur.id, "tokens", T0), buyBossCrate(two.sql, two.id, babur.id, "tokens", T0)]);
     expect(paid.every((r) => r.ok)).toBe(true);
-    expect(items(two.db, two.id)).toHaveLength(2);
+    expect(held(two.db, two.id)).toHaveLength(2);
     expect((await tokenHoldings(two.sql, two.id)).tokens).toEqual({});
   });
 
@@ -283,8 +290,135 @@ describe("buying a boss's crate", () => {
       },
     };
     expect(await buyBossCrate(racing, id, babur.id, "tokens", T0)).toEqual({ ok: false, message: "You need 3 Babur tokens." });
-    expect(items(db, id)).toEqual([]);
+    expect(held(db, id)).toEqual([]);
     expect((await tokenHoldings(sql, id)).tokens).toEqual({ tiger: 1 });
+  });
+});
+
+describe("holding and opening a boss crate (Eric, Nov 2: it's in your inventory; it opens as any crate)", () => {
+  const puddles = bossCrateOf("gardener")!;
+  /** An account holding `n` of Babur's crates, bought the usual way. */
+  async function crates(n: number) {
+    const a = await holding(3 * n);
+    for (let i = 0; i < n; i++) expect((await buyBossCrate(a.sql, a.id, babur.id, "tokens", T0 + i)).ok).toBe(true);
+    return a;
+  }
+
+  it("opening one you hold: an item from its pool into the locker, rolled by the server; the crate is gone", async () => {
+    const { sql, db, id } = await crates(1);
+    const r = await openBossCrate(sql, id, babur.id, T0 + MIN);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(babur.items).toContain(r.item.def);
+    expect(r.roll.def).toBe(r.item.def);
+    expect(items(db, id)).toEqual([{ def: r.item.def, crate: "boss-tiger" }]);
+    expect(held(db, id)).toEqual([]);
+    expect(r.locker.bossCrates).toEqual({});
+    expect(r.locker.items.map((i) => i.id)).toContain(r.item.id);
+  });
+
+  it("once, never twice: a second open of the one crate is refused and gives nothing", async () => {
+    const { sql, db, id } = await crates(1);
+    expect((await openBossCrate(sql, id, babur.id, T0 + MIN)).ok).toBe(true);
+    expect(await openBossCrate(sql, id, babur.id, T0 + MIN)).toEqual({ ok: false, message: "You have no Babur's Boss Crate to open." });
+    expect(items(db, id)).toHaveLength(1);
+  });
+
+  it("twice at once (a double tap, two devices) with one crate: one item, the crate gone; with two crates, two items", async () => {
+    const one = await crates(1);
+    const both = await Promise.all([openBossCrate(one.sql, one.id, babur.id, T0 + MIN), openBossCrate(one.sql, one.id, babur.id, T0 + MIN)]);
+    expect(both.filter((r) => r.ok)).toHaveLength(1);
+    expect(items(one.db, one.id)).toHaveLength(1);
+    expect(held(one.db, one.id)).toEqual([]);
+    const two = await crates(2);
+    const twice = await Promise.all([openBossCrate(two.sql, two.id, babur.id, T0 + MIN), openBossCrate(two.sql, two.id, babur.id, T0 + MIN)]);
+    expect(twice.every((r) => r.ok)).toBe(true);
+    expect(items(two.db, two.id)).toHaveLength(2);
+    expect(held(two.db, two.id)).toEqual([]);
+    expect(await openBossCrate(two.sql, two.id, babur.id, T0 + MIN)).toEqual({ ok: false, message: "You have no Babur's Boss Crate to open." });
+  });
+
+  it("can't open one you don't have: none at all, another boss's, or someone else's; not a boss crate; nothing given, nothing taken", async () => {
+    const none = await holding(0);
+    expect(await openBossCrate(none.sql, none.id, babur.id, T0)).toEqual({ ok: false, message: "You have no Babur's Boss Crate to open." });
+    expect(items(none.db, none.id)).toEqual([]);
+    // Holding Babur's doesn't open Puddles'.
+    const { sql, db, id } = await crates(1);
+    expect(await openBossCrate(sql, id, puddles.id, T0)).toEqual({ ok: false, message: "You have no Puddles' Boss Crate to open." });
+    expect(held(db, id)).toEqual(["boss-tiger"]);
+    // Someone else's crate isn't yours to open (the other account, on the same database).
+    const other = await createGuest(sql, T0, "Other");
+    expect((await openBossCrate(sql, other.user.id, babur.id, T0)).ok).toBe(false);
+    expect(held(db, id)).toEqual(["boss-tiger"]);
+    expect(items(db, other.user.id)).toEqual([]);
+    // A free crate's id, a made-up one, not a string.
+    for (const bad of ["beta-001", "boss-nobody", 7, null]) expect(await openBossCrate(sql, id, bad, T0)).toEqual({ ok: false, message: "No such crate." });
+    expect(items(db, id)).toEqual([]);
+  });
+
+  it("the crate opened elsewhere just before this open's transaction: it gives nothing and takes nothing more", async () => {
+    const { sql, db, id } = await crates(1);
+    const racing: Sql = {
+      ...sql,
+      async batch(statements) {
+        db.prepare("DELETE FROM boss_crates WHERE user_id = ?").run(id);
+        return sql.batch(statements);
+      },
+    };
+    expect(await openBossCrate(racing, id, babur.id, T0)).toEqual({ ok: false, message: "You have no Babur's Boss Crate to open." });
+    expect(items(db, id)).toEqual([]);
+  });
+
+  it("an item that can't go in (its write fails): the crate stays, the whole open undone", async () => {
+    const { sql, db, id } = await crates(1);
+    const failing: Sql = {
+      ...sql,
+      async batch(statements) {
+        // The crate's statement runs, then the last one fails: D1's batch (and this one) rolls the whole of it back.
+        return sql.batch([...statements, { sql: "INSERT INTO nowhere VALUES (1)", params: [] }]);
+      },
+    };
+    await expect(openBossCrate(failing, id, babur.id, T0)).rejects.toThrow();
+    expect(held(db, id)).toEqual(["boss-tiger"]);
+    expect(items(db, id)).toEqual([]);
+  });
+
+  it("through the API: /api/locker/open opens a boss crate you hold (never with a test switch), refuses one you don't; the shop's kill switch refuses both", async () => {
+    const call = async (env: object, path: string, body: unknown, cookie: string) => {
+      const res = (await handleAccountApi(new Request(`https://hunchess.com${path}`, { method: "POST", body: JSON.stringify(body), headers: { cookie } }), env as never))!;
+      return { status: res.status, body: (await res.json()) as Record<string, unknown> };
+    };
+    const { sql, d1, db } = memoryDb();
+    await ensureSchema(sql);
+    const g = await createGuest(sql, T0, "Eric");
+    const eric = await signInWithIdentity(sql, g.user, "email", "eric@example.com", {}, T0);
+    const cookie = `hc_session=${await createSession(sql, eric.id, Date.now())}`;
+    const env = { DB: d1, ADMIN_EMAILS: "eric@example.com", TEST_SWITCHES: "1" };
+    expect(await call(env, "/api/locker/open", { crate: babur.id }, cookie)).toEqual({ status: 400, body: { message: "You have no Babur's Boss Crate to open." } });
+    await grantTestItems(sql, eric.id, { boss: "tiger", tokens: 6 });
+    const bought = await call(env, "/api/shop/boss-crate", { crate: babur.id, way: "tokens" }, cookie);
+    expect([bought.status, bought.body.crate, (bought.body.locker as { bossCrates: unknown }).bossCrates]).toEqual([200, "boss-tiger", { "boss-tiger": 1 }]);
+    expect(bought.body.item).toBeUndefined();
+    // (A forced Fischer Random is a free crate's test switch: a boss crate ignores it.)
+    const opened = await call(env, "/api/locker/open", { crate: babur.id, fischer: true, shiny: true }, cookie);
+    expect(opened.status).toBe(200);
+    expect(babur.items).toContain((opened.body.item as { def: string }).def);
+    expect((opened.body.locker as { bossCrates: unknown }).bossCrates).toEqual({});
+    expect(await call(env, "/api/locker/open", { crate: babur.id }, cookie)).toEqual({ status: 400, body: { message: "You have no Babur's Boss Crate to open." } });
+    // The shop resting: no buys, no opens (with enough for a buy, and a crate held: both would go through otherwise); nothing changes.
+    expect((await call(env, "/api/shop/boss-crate", { crate: babur.id, way: "tokens" }, cookie)).status).toBe(200);
+    await grantTestItems(sql, eric.id, { boss: "tiger", tokens: 3 });
+    const paused = { ...env, PAUSE_SHOP: "1" };
+    expect((await call(paused, "/api/locker/open", { crate: babur.id }, cookie)).status).toBe(503);
+    expect((await call(paused, "/api/shop/boss-crate", { crate: babur.id, way: "tokens" }, cookie)).status).toBe(503);
+    expect(held(db, eric.id)).toEqual(["boss-tiger"]);
+    expect((await tokenHoldings(sql, eric.id)).tokens).toEqual({ tiger: 3 });
+  });
+
+  it("an older account (no boss crates table rows) reads as holding none; the locker always says so", async () => {
+    const { sql, id } = await holding(0);
+    expect((await lockerState(sql, id)).bossCrates).toEqual({});
+    expect(await bossCrateHoldings(sql, id)).toEqual({});
   });
 });
 
@@ -313,25 +447,27 @@ describe("admins' test grants", () => {
     expect((await call(env, "/api/locker/grant", { keys: 1000 }, ericCookie)).body.keys).toBe(2 + BOSS_TOKENS.grantMax);
     expect(await call(env, "/api/locker/grant", { boss: "recluse", tokens: 3 }, ericCookie)).toEqual({ status: 400, body: { message: "Nothing to give." } });
     expect(await call(env, "/api/locker/grant", { boss: "nobody", tokens: 3 }, ericCookie)).toEqual({ status: 400, body: { message: "Nothing to give." } });
-    // And the admin buys Babur's crate through the API, both ways.
+    // And the admin buys Babur's crate through the API, both ways (into the inventory, unopened).
     expect((await call(env, "/api/shop/boss-crate", { crate: babur.id, way: "tokens" }, ericCookie)).status).toBe(200);
     await call(env, "/api/locker/grant", { boss: "tiger", tokens: 1 }, ericCookie);
     const k = await call(env, "/api/shop/boss-crate", { crate: babur.id, way: "key" }, ericCookie);
-    expect([k.status, (k.body.locker as { keys: number }).keys]).toEqual([200, 2 + BOSS_TOKENS.grantMax - 1]);
+    expect([k.status, (k.body.locker as { keys: number }).keys, (k.body.locker as { bossCrates: unknown }).bossCrates]).toEqual([200, 2 + BOSS_TOKENS.grantMax - 1, { "boss-tiger": 2 }]);
     // The player can't buy without tokens.
     expect(await call(env, "/api/shop/boss-crate", { crate: babur.id, way: "tokens" }, playerCookie)).toEqual({ status: 400, body: { message: "You need 3 Babur tokens." } });
   });
 });
 
 describe("a guest signing in to an existing account", () => {
-  it("brings its tokens, keys and drops along (added up; the account's window counts the drops)", async () => {
+  it("brings its tokens, keys, drops and unopened boss crates along (added up; the account's window counts the drops)", async () => {
     const { sql, db } = memoryDb();
     await ensureSchema(sql);
     const a = await createGuest(sql, T0, "Owner");
     const owner = await signInWithIdentity(sql, a.user, "email", "owner@example.com", {}, T0);
     await grantTestItems(sql, owner.id, { boss: "tiger", tokens: 1, keys: 1 });
     const guest = await createGuest(sql, T0, "Guest");
-    await grantTestItems(sql, guest.user.id, { boss: "tiger", tokens: 2, keys: 2 });
+    await grantTestItems(sql, guest.user.id, { boss: "tiger", tokens: 5, keys: 2 });
+    // (The guest buys a crate and keeps it unopened: it comes along too.)
+    expect((await buyBossCrate(sql, guest.user.id, babur.id, "tokens", T0)).ok).toBe(true);
     await countBossBattle(sql, guest.user.id, T0, { battle: "AAAAA", rng: UNLUCKY });
     await signInWithIdentity(sql, guest.user, "email", "owner@example.com", {}, T0 + MIN);
     const held = await tokenHoldings(sql, owner.id);
@@ -342,5 +478,7 @@ describe("a guest signing in to an existing account", () => {
     // The moved drop fills the window's first place: an unlucky battle now drops nothing.
     expect(await countBossBattle(sql, owner.id, T0 + 2 * MIN, { battle: "AAAAB", rng: UNLUCKY })).toBeNull();
     expect((await lockerState(sql, owner.id)).keys).toBe(3);
+    expect(await bossCrateHoldings(sql, owner.id)).toEqual({ "boss-tiger": 1 });
+    expect(await bossCrateHoldings(sql, guest.user.id)).toEqual({});
   });
 });

@@ -4,11 +4,13 @@
  * itself (its art, its drawing) loads only when you go in (ShopRoom.tsx). docs/decisions/2026-11-02-shop-interiors-r1.md.
  *
  * Round 2 (Nov 2, docs/decisions/2026-11-02-boss-tokens.md): what you hold is your locker's (the boss's tokens, your crate keys),
- * and `buyBossCrate` is the purchase: the server takes the price and opens the crate into your locker, in one transaction.
+ * and `buyBossCrate` is the purchase: the server takes the price and puts the crate in your inventory, in one transaction (since
+ * Eric's Nov 2 fixes it isn't opened at once: you open it in the Crates tab, as any crate).
  */
-import { BOSS_CRATE_PRICE, BOSS_CRATE_POOL, bossCrateOf, itemDef, tierInfo, type ItemInstance } from "@chessroyale/core";
+import { BOSS_CRATE_PRICE, BOSS_CRATE_POOL, bossCrateOf, itemDef, tierInfo } from "@chessroyale/core";
 import { buyBossCrateOnServer, tokenCount } from "../../account.ts";
 import type { HomeId } from "../world.ts";
+import type { SkyTone } from "../sky.ts";
 import type { Sq } from "./room.ts";
 
 export interface ShopDef {
@@ -27,14 +29,20 @@ export interface ShopDef {
   prizes: readonly string[];
   /** Above the walls: a tent's canvas or a greenhouse's glass (drawn by the game, not the art: as the mockup did). */
   roof: "tent" | "glass";
+  /**
+   * The chat log's text over the room (Eric, Nov 2: "white, or black, depending on darkness of background in the shop"): "night" for
+   * a dark room (white words on a dark tint: Babur's tent), "day" for a light one (dark words on a light tint: Puddles' greenhouse),
+   * whatever the town's sky is doing outside. The town's own two tones (TownChat's `data-tone`).
+   */
+  chatTone: SkyTone;
 }
 
 export const SHOPS: Readonly<Partial<Record<HomeId, ShopDef>>> = {
   // Stripes stands beside the counter's east end, a little behind it: behind the counter itself its 58 px hides him (the
   // mockup's place, scripts/boss-art/shop-view.ts).
-  tiger: { home: "tiger", boss: "Babur", crate: "Babur's Boss Crate", kid: "babur", at: [12.6, 2.6], keeper: [{ c: 12, r: 2 }, { c: 13, r: 2 }], prizes: ["balloon-pup"], roof: "tent" },
+  tiger: { home: "tiger", boss: "Babur", crate: "Babur's Boss Crate", kid: "babur", at: [12.6, 2.6], keeper: [{ c: 12, r: 2 }, { c: 13, r: 2 }], prizes: ["balloon-pup"], roof: "tent", chatTone: "night" },
   // Drizzle stands behind the middle of the low potting counter (44 px: Drizzle shows over it).
-  gardener: { home: "gardener", boss: "Puddles", crate: "Puddles' Boss Crate", kid: "puddles", at: [9.5, 2], keeper: [{ c: 9, r: 2 }, { c: 10, r: 2 }], prizes: ["puddles-mower"], roof: "glass" },
+  gardener: { home: "gardener", boss: "Puddles", crate: "Puddles' Boss Crate", kid: "puddles", at: [9.5, 2], keeper: [{ c: 9, r: 2 }, { c: 10, r: 2 }], prizes: ["puddles-mower"], roof: "glass", chatTone: "day" },
 };
 
 /** The shop inside a home, or null: every other home has no "Go in" yet. */
@@ -80,25 +88,23 @@ export const canAfford = (h: Holdings, way: CrateWay): boolean => {
   return h.tokens >= p.tokens && h.keys >= p.keys;
 };
 
-/** What a buy came to: done (with the item it gave), or why not (shown under the buttons). */
+/** What a buy came to: done, or why not (shown under the buttons). */
 export interface BuyResult {
   ok: boolean;
   message: string;
-  /** The item the crate opened to (a buy that went through). */
-  item?: ItemInstance;
 }
-/** A buy's answer: "You got Balloon Pup! It's in your Locker." */
-export const gotLine = (def: string) => `You got ${itemDef(def)?.name ?? "an item"}! It's in your Locker.`;
+/** A buy's answer (Eric, Nov 2: "it says when you buy it it's in your inventory"): "Babur's Boss Crate is in your inventory." */
+export const inInventoryLine = (crate: string) => `${crate} is in your inventory.`;
 /**
  * Buys a boss's crate one of its two ways. Every buy button goes through here, and only here: the server takes the price (the
- * tokens, and the key) and opens the crate into your locker, in one transaction (server/boss-tokens.ts), or says why not.
+ * tokens, and the key) and puts the crate in your inventory, unopened, in one transaction (server/boss-tokens.ts), or says why not.
  */
 export async function buyBossCrate(boss: HomeId, way: CrateWay): Promise<BuyResult> {
   const crate = bossCrateOf(boss);
   if (!crate) return { ok: false, message: "This crate isn't sold yet." };
   try {
-    const { item } = await buyBossCrateOnServer(crate.id, way);
-    return { ok: true, message: gotLine(item.def), item };
+    await buyBossCrateOnServer(crate.id, way);
+    return { ok: true, message: inInventoryLine(crate.name) };
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : "Something went wrong." };
   }

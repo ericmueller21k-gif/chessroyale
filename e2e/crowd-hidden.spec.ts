@@ -52,7 +52,7 @@ async function playOn(page: Page, minutes: number): Promise<Set<string>> {
   return seen;
 }
 
-test("the vote: the boss final's card is his (his name and icon, the top 4), between Team final and Duel, and fits its card", async ({ page }) => {
+test("the vote: the boss final's card is his (his name, the top 4; no emoji since Nov 2), between Team final and Duel, and fits its card", async ({ page }) => {
   test.setTimeout(2 * 60_000);
   await page.goto("/?debug&mode=crowd&augments=1");
   await soloFromHome(page);
@@ -60,10 +60,10 @@ test("the vote: the boss final's card is his (his name and icon, the top 4), bet
   const cards = page.locator(".vote-card");
   await expect(cards).toHaveCount(3);
   await expect(cards.locator("strong")).toHaveText(["Team final", him.name, "Duel"]);
-  await expect(cards.nth(1).locator(".vote-card-icon")).toHaveText(him.icon);
   await expect(cards.nth(1).locator(".vote-card-blurb")).toHaveText(`Boss final: top ${crowdFinalists("boss")} team up against him`);
-  // His zone on the board shows his icon too.
-  await expect(page.locator(".vote-zone-icon").nth(1)).toHaveText(him.icon);
+  // No emoji on his card or his zone (Eric, Nov 2: the votes' emoji deleted entirely; his icon was on both).
+  expect(await cards.nth(1).innerText()).not.toContain(him.icon);
+  expect(await page.locator(".vote-labels").innerText()).not.toMatch(/\p{Extended_Pictographic}/u);
   // Nothing cut off: the label and blurb wrap inside the card.
   const fit = await cards.nth(1).evaluate((c) => [...c.querySelectorAll("strong, .vote-card-blurb")].every((e) => e.scrollWidth <= e.clientWidth + 1) && c.scrollWidth <= c.clientWidth + 1);
   expect(fit).toBe(true);

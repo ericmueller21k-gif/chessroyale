@@ -153,7 +153,8 @@ describe("Squads: pre-game votes", () => {
     expect(votes[1]!.options.map((o) => o.rule.start)).toEqual(["standard", "same", "random"]);
     expect(votes[2]!.options.map((o) => o.rule.clock)).toEqual([...SQUADS.clocks]);
     expect(votes[2]!.options.map((o) => o.id)).toEqual(["bullet", "blitz", "rapid"]);
-    expect(votes[2]!.options.map((o) => o.icon)).toEqual(["⚡", "🔥", "⏱️"]);
+    // No emoji on any option (Eric, Nov 2: the votes' emoji deleted entirely).
+    for (const v of votes) for (const o of v.options) expect(JSON.stringify(o)).not.toMatch(/\p{Extended_Pictographic}/u);
     // Each card in chess form, its numbers from settings: "Bullet 2+1", "2 min + 1 s a move · max 10 s".
     SQUADS.clocks.forEach((c, i) => {
       const o = votes[2]!.options[i]!;

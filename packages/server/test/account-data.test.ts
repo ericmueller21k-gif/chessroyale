@@ -117,6 +117,7 @@ async function world() {
  */
 const SCHEMA_COLUMNS: Record<string, string> = {
   blocks: "user_id blocked_id at",
+  boss_crates: "id user_id crate bought_at",
   boss_token_drops: "id user_id boss at battle",
   boss_tokens: "user_id boss n",
   chat_mod_log: "id user_id at action until by reason note ended_at seen",

@@ -32,7 +32,8 @@ import { lockerState, type LockerState } from "./locker.ts";
  *
  * Tables (each an account's: account-data.ts, "bossTokens"): `boss_tokens` (how many of each boss's tokens an account holds),
  * `boss_token_drops` (every token a battle dropped: the rolling window counts these, and the result screen finds its battle's),
- * `solo_battles` (the solo battle an account has open). Crate keys are a wallet's `crate_keys` (accounts.ts, COLUMNS).
+ * `solo_battles` (the solo battle an account has open), `boss_crates` (the boss crates an account bought and hasn't opened yet: one
+ * row each, Nov 2). Crate keys are a wallet's `crate_keys` (accounts.ts, COLUMNS).
  * (Only types come from accounts.ts: it imports this file's schema while it loads.)
  */
 export const BOSS_TOKENS_SCHEMA = [
@@ -55,6 +56,16 @@ export const BOSS_TOKENS_SCHEMA = [
     id TEXT NOT NULL,
     started_at INTEGER NOT NULL
   )`,
+  // A boss crate bought and not opened yet (Eric, Nov 2: the buy puts it in your inventory; you open it there). One row a crate, so a
+  // buy's payment and an opening's item each hang off the row they make or take, as the coin shop's item does (buyBossCrate,
+  // openBossCrate). `crate`: its BOSS_CRATES id ("boss-tiger"). A new table: nothing older reads or writes it.
+  `CREATE TABLE IF NOT EXISTS boss_crates (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    crate TEXT NOT NULL,
+    bought_at INTEGER NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS boss_crates_user ON boss_crates (user_id, crate)`,
 ];
 
 const stmt = (sql: string, ...params: unknown[]): Stmt => ({ sql, params });
@@ -191,12 +202,19 @@ export function notEnough(boss: string, way: CrateWay): string {
   return `You need ${c.keys ? `${tokens} and ${n(c.keys, "crate key")}` : tokens}.`;
 }
 
+/** The boss crates an account holds, unopened, by crate id ("boss-tiger": only those it has some of). */
+export async function bossCrateHoldings(sql: Sql, userId: string): Promise<Record<string, number>> {
+  const rows = await sql.all<{ crate: string; n: number }>("SELECT crate, COUNT(*) AS n FROM boss_crates WHERE user_id = ? GROUP BY crate ORDER BY crate", userId);
+  return Object.fromEntries(rows.map((r) => [r.crate, r.n]));
+}
+
 /**
- * Buys a boss's crate (BOSS_CRATES) one of its two ways, and opens it as the Crates tab opens a crate: the roll is the server's,
- * the item goes into the locker. One transaction (D1's batch: all of it or none; as the coin shop's buyItem): the item goes in only
- * if the tokens (and the key) are there, then they come off, only if that item went in. Nothing can change between the statements
- * of one transaction, so the price is paid exactly when the item is given: never one without the other. Two taps or two devices
- * at once are two buys, each paid for in full or refused; a count can't go below zero (the table's CHECK, and the guards).
+ * Buys a boss's crate (BOSS_CRATES) one of its two ways, into your inventory (Eric, Nov 2: "Buying a boss crate from shopkeepers adds
+ * the crate to your inventory"; until then a buy opened it at once): a `boss_crates` row, unopened, which the Crates tab opens
+ * (openBossCrate). One transaction (D1's batch: all of it or none; as the coin shop's buyItem): the crate goes in only if the tokens
+ * (and the key) are there, then they come off, only if that crate went in. Nothing can change between the statements of one
+ * transaction, so the price is paid exactly when the crate is given: never one without the other. Two taps or two devices at once
+ * are two buys, each paid for in full or refused; a count can't go below zero (the table's CHECK, and the guards).
  */
 export async function buyBossCrate(
   sql: Sql,
@@ -205,28 +223,21 @@ export async function buyBossCrate(
   way: unknown,
   now: number,
   admin = false,
-): Promise<{ ok: true; roll: CrateRoll; item: ItemInstance; locker: LockerState } | { ok: false; message: string }> {
+): Promise<{ ok: true; crate: string; locker: LockerState } | { ok: false; message: string }> {
   const crate = typeof crateId === "string" ? bossCrateDef(crateId) : undefined;
   if (!crate) return { ok: false, message: "No such crate." };
   if (way !== "tokens" && way !== "key") return { ok: false, message: "No such price." };
   const cost = wayCost(way);
-  const roll = rollCrate(mulberry32(crypto.getRandomValues(new Uint32Array(1))[0]!), crate);
   const id = randomHex(9);
-  const paid = "EXISTS (SELECT 1 FROM items WHERE id = ? AND user_id = ?)";
+  const paid = "EXISTS (SELECT 1 FROM boss_crates WHERE id = ? AND user_id = ?)";
   await sql.batch([
     stmt(
-      `INSERT INTO items (id, user_id, def, color, color2, blemish, seed, crate, fischer, created_at)
-       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM boss_tokens WHERE user_id = ? AND boss = ? AND n >= ?)
+      `INSERT INTO boss_crates (id, user_id, crate, bought_at)
+       SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM boss_tokens WHERE user_id = ? AND boss = ? AND n >= ?)
          AND (? = 0 OR EXISTS (SELECT 1 FROM wallets WHERE user_id = ? AND crate_keys >= ?))`,
       id,
       userId,
-      roll.def,
-      roll.color,
-      roll.color2 ?? null,
-      roll.blemish,
-      roll.seed,
       crate.id,
-      roll.fischer ? 1 : 0,
       now,
       userId,
       crate.boss,
@@ -238,7 +249,57 @@ export async function buyBossCrate(
     stmt(`UPDATE boss_tokens SET n = n - ? WHERE user_id = ? AND boss = ? AND ${paid}`, cost.tokens, userId, crate.boss, id, userId),
     ...(cost.keys ? [stmt(`UPDATE wallets SET crate_keys = crate_keys - ? WHERE user_id = ? AND ${paid}`, cost.keys, userId, id, userId)] : []),
   ]);
-  if (!(await sql.first(`SELECT 1 FROM items WHERE id = ? AND user_id = ?`, id, userId))) return { ok: false, message: notEnough(crate.boss, way) };
+  if (!(await sql.first(`SELECT 1 FROM boss_crates WHERE id = ? AND user_id = ?`, id, userId))) return { ok: false, message: notEnough(crate.boss, way) };
+  return { ok: true, crate: crate.id, locker: await lockerState(sql, userId, admin) };
+}
+
+/** Why a boss crate couldn't be opened: "You have no Babur's Boss Crate to open." */
+export const noneToOpen = (name: string) => `You have no ${name} to open.`;
+
+/**
+ * Opens one of your boss crates (the Crates tab, Nov 2), as a crate opens: the roll is the server's (its own randomness, never a test
+ * switch: a boss crate is paid for), from that crate's pool, and the item goes into the locker. One transaction: the item goes in only
+ * if you hold one of these crates, then one of them (the oldest) comes off, only if that item went in. So a crate opens once, never
+ * twice (two taps or two devices at once: one item, one crate gone, the other refused), and nobody opens one they haven't got.
+ */
+export async function openBossCrate(
+  sql: Sql,
+  userId: string,
+  crateId: unknown,
+  now: number,
+  admin = false,
+): Promise<{ ok: true; roll: CrateRoll; item: ItemInstance; locker: LockerState } | { ok: false; message: string }> {
+  const crate = typeof crateId === "string" ? bossCrateDef(crateId) : undefined;
+  if (!crate) return { ok: false, message: "No such crate." };
+  const roll = rollCrate(mulberry32(crypto.getRandomValues(new Uint32Array(1))[0]!), crate);
+  const id = randomHex(9);
+  await sql.batch([
+    stmt(
+      `INSERT INTO items (id, user_id, def, color, color2, blemish, seed, crate, fischer, created_at)
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM boss_crates WHERE user_id = ? AND crate = ?)`,
+      id,
+      userId,
+      roll.def,
+      roll.color,
+      roll.color2 ?? null,
+      roll.blemish,
+      roll.seed,
+      crate.id,
+      roll.fischer ? 1 : 0,
+      now,
+      userId,
+      crate.id,
+    ),
+    stmt(
+      `DELETE FROM boss_crates WHERE id = (SELECT id FROM boss_crates WHERE user_id = ? AND crate = ? ORDER BY bought_at, id LIMIT 1)
+         AND EXISTS (SELECT 1 FROM items WHERE id = ? AND user_id = ?)`,
+      userId,
+      crate.id,
+      id,
+      userId,
+    ),
+  ]);
+  if (!(await sql.first(`SELECT 1 FROM items WHERE id = ? AND user_id = ?`, id, userId))) return { ok: false, message: noneToOpen(crate.name) };
   const item: ItemInstance = { id, def: roll.def, color: roll.color, ...(roll.color2 ? { color2: roll.color2 } : {}), blemish: roll.blemish, seed: roll.seed };
   return { ok: true, roll, item, locker: await lockerState(sql, userId, admin) };
 }
@@ -262,9 +323,9 @@ export async function grantTestItems(sql: Sql, userId: string, body: { keys?: un
 }
 
 /**
- * A guest's tokens, drops and open solo battle join the account it signs in to, for the sign-in's one batch (its crate keys go
- * with the wallet: accounts.ts, shopMoves). Tokens are added up; the drops come along, so the account's window counts them; the
- * account's own open battle wins. (Where sign-in is set up a guest earns none, so this moves nothing there.)
+ * A guest's tokens, drops, open solo battle and unopened boss crates join the account it signs in to, for the sign-in's one batch
+ * (its crate keys go with the wallet: accounts.ts, shopMoves). Tokens are added up; the drops come along, so the account's window
+ * counts them; the account's own open battle wins; the crates come along. (Where sign-in is set up a guest earns none, so this moves nothing there.)
  */
 export const tokenMoves = (from: string, to: string): Stmt[] => [
   stmt(
@@ -276,6 +337,8 @@ export const tokenMoves = (from: string, to: string): Stmt[] => [
   stmt("UPDATE boss_token_drops SET user_id = ? WHERE user_id = ?", to, from),
   stmt("INSERT OR IGNORE INTO solo_battles (user_id, id, started_at) SELECT ?, id, started_at FROM solo_battles WHERE user_id = ?", to, from),
   stmt("DELETE FROM solo_battles WHERE user_id = ?", from),
+  // (Its unopened boss crates come along, each one.)
+  stmt("UPDATE boss_crates SET user_id = ? WHERE user_id = ?", to, from),
 ];
 
 /** Drops are kept this long (the window needs a day; the rest is for a person looking into a question), then go. */

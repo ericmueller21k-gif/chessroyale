@@ -123,9 +123,6 @@ export function upgradeRules<R extends SquadsRules | null>(r: R, s: SquadsSettin
   return clock === r.clock ? r : { ...r, clock };
 }
 
-/** The Clock options' icons, as the 50 v 50's. */
-const CLOCK_ICONS: Readonly<Record<string, string>> = { rapid: "⏱️", blitz: "🔥", bullet: "⚡" };
-
 /**
  * The mode vote's options, left to right (fixed): Classic, Mercenary, and a third mode shown as "Coming soon" (it can't
  * be voted for).
@@ -133,7 +130,6 @@ const CLOCK_ICONS: Readonly<Record<string, string>> = { rapid: "⏱️", blitz: 
 export const MODE_OPTIONS: readonly SquadsVoteOption[] = [
   {
     id: "classic",
-    icon: "♟️",
     label: "Classic",
     blurb: "Just chess: no coins, no blocks",
     detail: "Same-move tokens in Pairs, as always",
@@ -142,23 +138,21 @@ export const MODE_OPTIONS: readonly SquadsVoteOption[] = [
   },
   {
     id: "mercenary",
-    icon: "💰",
     label: "Mercenary",
     blurb: "Earn coins, shop between rounds",
     detail: "Coins for captures and wins; spend them between rounds on items for the next one. Blocks are on.",
     patch: {},
     rule: { mode: "mercenary" },
   },
-  { id: "soon", icon: "🔒", label: "Coming soon", blurb: "A third mode is on its way", patch: {}, rule: {}, disabled: true },
+  { id: "soon", label: "Coming soon", blurb: "A third mode is on its way", patch: {}, rule: {}, disabled: true },
 ];
 
 /** The Start vote's options, left to right (fixed). */
 const START_OPTIONS: readonly SquadsVoteOption[] = [
-  { id: "standard", icon: "♟️", label: "Normal", blurb: "The usual starting position", patch: {}, rule: { start: "standard" } },
-  { id: "same", icon: "📖", label: "One opening", blurb: "Every board from the same opening", patch: {}, rule: { start: "same" } },
+  { id: "standard", label: "Normal", blurb: "The usual starting position", patch: {}, rule: { start: "standard" } },
+  { id: "same", label: "One opening", blurb: "Every board from the same opening", patch: {}, rule: { start: "same" } },
   {
     id: "random",
-    icon: "🎲",
     label: "Random openings",
     blurb: "Each board its own opening",
     detail: "Each opening is played on two boards of a match, colors swapped",
@@ -182,10 +176,9 @@ export function squadsVotes(s: SquadsSettings = SQUADS): readonly SquadsVote[] {
       title: "How fast?",
       // (By its id: the option a reorder can't move.)
       defaultOption: Math.max(0, s.clocks.indexOf(defaultClock(s))),
-      // Bullet on the left, the longest on the right (Eric, Oct 16), in the settings' order. (Icons as the 50 v 50's, by id.)
+      // Bullet on the left, the longest on the right (Eric, Oct 16), in the settings' order.
       options: s.clocks.map((c) => ({
         id: c.id,
-        icon: CLOCK_ICONS[c.id] ?? "⏱️",
         label: clockLabel(c),
         blurb: teamClockLine(c),
         detail: teamClockDetail(c),

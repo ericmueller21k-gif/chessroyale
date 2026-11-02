@@ -126,6 +126,15 @@ Eric: "too big a change for now". Recorded so they aren't lost; nothing gets bui
   itself isn't built. Notes: [docs/ideas/boss-series-crate.md](docs/ideas/boss-series-crate.md).
 - **Bosses think out loud** (Eric, Oct 24): engine-based lines in each boss's voice, and call-outs on the player's move.
   Notes: [docs/ideas/bosses-think-out-loud.md](docs/ideas/bosses-think-out-loud.md).
+- **Emoji packs** (Eric, Nov 2; not now): an API art job makes our own emoji packs; then the default emoji are deleted everywhere (the
+  pre-game votes' went first, Nov 2: docs/decisions/2026-11-02-nov2-fixes-b.md). **Pack 1:** chess piece emoji, free. **Pack 2:** chess
+  reactions (a blunder's "oops", "nice move", and the like).
+- **Boss challenge from the town, Pokémon-gym style** (Eric, Nov 2; not built): challenge a boss in the town and it walks into its home
+  with you; you each walk to your marks on the battle circle; it says its challenge line (Gemini's lines, Part D); its own animation brings
+  the board in (Alfil: a sand pyramid rises between you, cracks, and the board comes out on a table in his colors; the table is the town's,
+  recolored per boss for now); then its own full-screen transition (Alfil: a sandstorm); the battle; the usual result screen (the token
+  box as now); leaving puts you back in the town where you stood. The art comes first, from the shop art session through the API, one
+  boss at a time (Alfil first: his home, then his intro); the code after the art.
 
 - **A plain boss mode.** Bare-bones chess against Stockfish at a choice of difficulty levels: no God King, no powers,
   no power-ups. Eric thinks many players will want exactly this.

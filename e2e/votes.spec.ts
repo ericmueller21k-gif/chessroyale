@@ -51,7 +51,7 @@ async function drag(page: Page, from: { x: number; y: number }, to: { x: number;
   await cdp.detach();
 }
 
-test("the vote board: your pawn is solid, drag it into a zone, the count goes up; the next vote starts from home; the game begins with the pieces", async ({ page }) => {
+test("the vote board: your pawn is solid, drag it into a zone, the count goes up; a tap on a zone votes too (never the board's); the next vote starts from home; the game begins with the pieces", async ({ page }) => {
   test.setTimeout(3 * 60_000);
   const touch = test.info().project.name === "phone";
   await page.goto("/?debug&mode=crowd&augments=1");
@@ -127,6 +127,29 @@ test("the vote board: your pawn is solid, drag it into a zone, the count goes up
   // The clock, the third vote (Eric, Oct 24: how it starts comes second; e2e/opening-vote.spec.ts): everyone back on
   // their spot (yours too), and the time controls left to right.
   await expect(page.getByRole("heading", { name: "How does it start?" })).toBeVisible({ timeout: 10_000 });
+  // A tap on a zone, your pawn not picked up first, puts it there: your vote (Eric, Nov 2: "Tapping on an augment area puts your
+  // piece there"). The zone takes the tap: the board under it never gets one (no press reaches it, no square marked).
+  await page.evaluate(() => {
+    const w = window as unknown as { __boardDowns: number };
+    w.__boardDowns = 0;
+    document.querySelector(".vote-screen .hb-board")!.addEventListener("pointerdown", () => w.__boardDowns++, true);
+  });
+  await expect(page.locator(".vote-me.selected")).toHaveCount(0);
+  await page.waitForTimeout(400);
+  const left = await centre(page, ".vote-zone", 0);
+  if (touch) await page.touchscreen.tap(left.x, left.y);
+  else await page.mouse.click(left.x, left.y);
+  await expect.poll(() => page.evaluate(() => (window as any).match.myVote)).toBe(0);
+  await expect(page.locator(".vote-card.on")).toContainText("Normal");
+  const leftZone = (await page.locator(".vote-zone").nth(0).boundingBox())!;
+  await expect
+    .poll(async () => {
+      const c = await centre(page, ".vote-me");
+      return c.x > leftZone.x && c.x < leftZone.x + leftZone.width && c.y > leftZone.y && c.y < leftZone.y + leftZone.height;
+    }, { message: "your pawn stands in the zone you tapped" })
+    .toBe(true);
+  expect(await page.evaluate(() => (window as unknown as { __boardDowns: number }).__boardDowns), "presses that reached the board").toBe(0);
+  await expect(page.locator(".vote-screen .hb-board square.selected, .vote-screen .hb-board square.uh")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "How fast?" })).toBeVisible({ timeout: 20_000 });
   // Bullet on the left, the longest on the right (Eric, Oct 16), from either side (Eric, Oct 13: never change position).
   await expect(page.locator(".vote-card strong")).toHaveText(["Bullet 3+2", "Blitz 5+3", "Rapid 10+5"]);

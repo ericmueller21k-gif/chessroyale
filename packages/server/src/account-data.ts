@@ -106,15 +106,17 @@ export const ACCOUNT_STORES: AccountStore[] = [
   },
   {
     // Boss tokens (boss-tokens.ts): how many of each boss's tokens the player has, the tokens their battles dropped (when, and
-    // the battle: an online match's lobby code or a solo battle's id), and a solo boss battle they have open (when it began).
+    // the battle: an online match's lobby code or a solo battle's id), a solo boss battle they have open (when it began), and the
+    // boss crates they bought and haven't opened (which, and when: Nov 2).
     name: "bossTokens",
-    tables: ["boss_tokens", "boss_token_drops", "solo_battles"],
+    tables: ["boss_tokens", "boss_token_drops", "solo_battles", "boss_crates"],
     export: async (sql, u) => ({
       tokens: await all(sql, "SELECT boss, n FROM boss_tokens WHERE user_id = ? ORDER BY boss", u.id),
       drops: await all(sql, "SELECT boss, at, battle FROM boss_token_drops WHERE user_id = ? ORDER BY at", u.id),
       soloBattle: await sql.first("SELECT started_at FROM solo_battles WHERE user_id = ?", u.id),
+      bossCrates: await all(sql, "SELECT crate, bought_at FROM boss_crates WHERE user_id = ? ORDER BY bought_at", u.id),
     }),
-    erase: (u) => ["boss_tokens", "boss_token_drops", "solo_battles"].map((t) => stmt(`DELETE FROM ${t} WHERE user_id = ?`, u.id)),
+    erase: (u) => ["boss_tokens", "boss_token_drops", "solo_battles", "boss_crates"].map((t) => stmt(`DELETE FROM ${t} WHERE user_id = ?`, u.id)),
   },
   {
     // Reports about players (fair play's sheet). The download has the ones the player made; deleting removes those
