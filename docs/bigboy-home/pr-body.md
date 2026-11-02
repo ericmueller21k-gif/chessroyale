@@ -9,15 +9,15 @@ lands, never rebased). The art is from `claude/boss-art` (`scripts/boss-art/out/
 
 **Big Boy's Crib is a shop**, as Babur's, Puddles' and Alfil's are: his card says "Go in"; the room is the art (`town/shops/bigboy-art.ts`,
 its imports moved, its room still and review strips left on the art branch, three lines of the airplane's drawing typed for the app's
-stricter checks): a ball pit (solid) under a foam walkway, the quilted shop platform and the rainbow battle circle you walk on; Blocky (his
+stricter checks): a ball pit (solid) under a foam walkway, the quilted shop platform and the battle circle you walk on (the walkway's foam squares, a zoo-animal rug in its middle); Blocky (his
 kid's sprite) the Shopkeeper behind the letter-block counter; "Big Boy's Boss Crate" (core's `BOSS_CRATES`: Big Boy's Buggy first, the same
-price and odds); a nursery ceiling (sky blue, clouds, little stars: the mockup's); the chat's day tone. His circle's start marks, drawn
-north and south, are turned west and east (a square and a half out, where the challenge stands you), the middle line north to south. The
-toy airplane is a deep piece (3 x 3 squares) that stands up whole at its foot (`RoomArt.upright`), not laid flat. Its own chunk: 32 kB.
+price and odds); a nursery ceiling (sky blue, clouds, little stars: the mockup's); the chat's day tone. His start marks are on the rug, west and
+east, a square and a half out (the art's `SHOP_BIGBOY_MARKS`, where the challenge stands you). The
+toy airplane is a deep piece (3 x 3 squares) that stands up whole at its foot (`RoomArt.upright`), not laid flat. Its own chunk: 36 kB.
 
-**Big Boy's challenge intro** (`BOSS_INTROS.bigboy`, layout "across", his own art: `town/shops/bigboy-intro-art.ts`, 10.5 kB): his line in
+**Big Boy's challenge intro** (`BOSS_INTROS.bigboy`, layout "across", his own art: `town/shops/bigboy-intro-art.ts`, 12 kB): his line in
 the bubble; six alphabet blocks drop in and stack 3-2-1 (B-I-G, B-O, Y), a clack each and a bonk for the top one; the board drops onto the
-top block (his toss) and plops on (dust and stars, a poof); two stool blocks drop in at your sides (a clack each); the table alone a
+top block (his toss) and plops on (dust and stars, a poof); two stool blocks drop in at your sides (a dark gray B on his side, a bone W on yours; a clack each); the table alone a
 moment; his God King attack beside the table from 2 s before the cover (as Alfil's); his lollipop swirl sweeps over the page, played as
 Alfil's sandstorm (his swish); the battle loads under it. About 1.2 s walking in, 3.7 s of intro, 0.6 s of swirl. The timeline code is
 Alfil's, generalized (`BlocksAnims` beside the pyramid's: `introBeats`, `introAt`, `introCues` read the art's own frame cues). The board is
@@ -95,6 +95,42 @@ Big Boy in the town" (phone and computer); `e2e/shop.spec.ts` "Big Boy's Crib" (
 - At the table: `bigboy-table-phone.png` (his attack beside it), `bigboy-table-desktop.png`.
 - GIFs (phone): his intro, from the walk in to the swirl and the battle under it, `bigboy-intro-phone.gif`; Timber's attack on the God King in
   his Last Stand, `timber-attack-phone.gif`.
+
+## Art update (Nov 2, the art's second pass)
+
+Eric: "make the big boy battle area the same tile style as the paths to the shop and exit; the center a zoo animal rug replacing the
+thin white circle; the battle spots sit on the rug", and bigger stools (a dark gray B, a bone W). Both art files re-copied from
+`claude/boss-art` (527991e3; imports moved, the review sheets left there, as before).
+
+- **His room:** the circle is the walkway's teal and yellow foam squares in its rainbow bumper, a cream zoo-animal rug (a lion, an
+  elephant, a giraffe, a monkey, a zebra, a hippo, stars and hearts, his little lollipop in the middle) with the two start pads on it,
+  west and east. The art exports them (`SHOP_BIGBOY_MARKS = { boss: [8, 10.5], you: [11, 10.5] }`); the room passes them to `marksOf`
+  (`RoomArt.marks`, a new optional `drawn` argument: across, you stand on them, the table halfway between). The same squares as before;
+  the app's turning of the old north and south marks is gone with them.
+- **His intro:** the stools are twice the size, a dark gray block with a bone **B** on the left (his side: the boss plays black) and a
+  bone block with a dark gray **W** on the right (yours); the table's picture is 127 wide (foot (63, 94)), everything else where it
+  was. The stools stay in the table's picture (`chairs`, `idle`), so the art's separate `INTRO_BIGBOY_STOOL_B` / `_W` are copied but
+  not wired. Nobody sits on them in the intro (you and the boss stand just past them, on the marks), so the new
+  `INTRO_BIGBOY_STOOL_SEAT_H` (20) moves no one.
+- Stills and GIF refreshed: `bigboy-table-phone.png`, `bigboy-table-desktop.png`, `bigboy-intro-phone.gif`.
+
+Changed checks (old → new):
+
+- `packages/app/test/boss-challenge.test.ts`, "the art: build 21 frames … his table three squares across, the board's slab on its top
+  block": `INTRO_BIGBOY_BLOCKS.w` 111 (three squares) and its foot in the middle square → `[w, foot]` = `[127, 63, 94]` (three squares
+  and 8 px each side); new in it: the stools' tops 24 over the foot a square either side (`stoolOff`), `STOOL_TOP_H` 24 and `SEAT_H` 20,
+  the dark gray face on the west (the boss's, black's) and the bone on the east (yours), and `INTRO_BIGBOY_STOOL_B` / `_W` 51 x 100,
+  foot (25, 94), one `stool` cue in `drop`. The slab-on-the-top-block check is unchanged.
+- Same file, "Big Boy's drawn start marks (his circle's own tiles) are where you stand across…" → "Big Boy's start marks
+  (SHOP_BIGBOY_MARKS, drawn on his rug) are where you stand across…": `marksOf(…, "across")` → `marksOf(…, "across",
+  SHOP_BIGBOY_MARKS)`, plus: you and the boss stand on `SHOP_BIGBOY_MARKS`, and the marks are the same as the layout's own. The pads'
+  squares (`8,10`, `8,11`, `11,10`, `11,11`, none north or south) are unchanged.
+- `e2e/boss-challenge.spec.ts`, "challenging Big Boy in the town": comments only (the rug's marks, his B and your W); its checks are
+  unchanged (you `[11, 10.5]`, he `[8, 10.5]`, the stools `[8.5, 10.5]`, `[10.5, 10.5]`).
+- None of these guards a rule in `docs/rules/eric.md`. No check removed.
+
+Tests run: `packages/app/test/{boss-challenge,shop-room}.test.ts` (66 pass); typecheck (app); e2e `boss-challenge.spec.ts -g "challenging
+Big Boy"`, phone and computer (both pass, under the shared lock on a port of its own).
 
 ## Lane
 
