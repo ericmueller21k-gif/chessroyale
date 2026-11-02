@@ -7,11 +7,11 @@ import { NAME_NOT_ALLOWED, isBlockedText } from "./text-filter.ts";
 import { chatNoticeSeen } from "./chat-mod.ts";
 import { isAdmin, testSwitchesOn, type AdminEnv } from "./admin.ts";
 import { isPaused, pausedBosses, pausedResponse } from "./kill-switches.ts";
-import { battleToken, buyBossCrate, finishSoloBattle, grantTestItems, startSoloBattle } from "./boss-tokens.ts";
+import { battleToken, buyBossCrate, finishSoloBattle, grantTestItems, openBossCrate, startSoloBattle } from "./boss-tokens.ts";
 import { chatIconResponse, chatPostResponse, chatSlice } from "./global-chat-api.ts";
 import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, mayTownChat, reportedLine, signedInReader, townPostResponse, townRemoveResponse, townSlice } from "./town-chat-api.ts";
 import { accountDownload, deleteAccount } from "./account-data.ts";
-import { AGE_GATE, ASK_AGE_LINE, FAIRPLAY, TOO_YOUNG_LINE } from "@chessroyale/core";
+import { AGE_GATE, ASK_AGE_LINE, FAIRPLAY, TOO_YOUNG_LINE, bossCrateDef } from "@chessroyale/core";
 import {
   buyItem,
   cleanEmail,
@@ -392,7 +392,8 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   // (The shop resting, a kill switch: nothing new from it. Equipping what you have still works.)
   if ((path === "/api/shop/buy" || path === "/api/locker/open" || path === "/api/shop/boss-crate") && request.method === "POST" && isPaused(env, "shop")) return pausedResponse("shop");
   // POST /api/shop/boss-crate {crate, way}: buys a boss's crate inside its shop, with 3 of the boss's tokens ("tokens") or a
-  // token and a crate key ("key"), and opens it: one transaction (boss-tokens.ts, buyBossCrate). Answers {roll, item, locker}.
+  // token and a crate key ("key"), into your inventory, unopened (Nov 2): one transaction (boss-tokens.ts, buyBossCrate). Answers
+  // {crate, locker}. (The Crates tab opens it: /api/locker/open.)
   if (path === "/api/shop/boss-crate" && request.method === "POST") {
     const b = (await request.json().catch(() => ({}))) as { crate?: unknown; way?: unknown };
     const r = await buyBossCrate(sql, current.id, b?.crate, b?.way, now, admin);
@@ -411,13 +412,13 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   }
 
   // The locker. GET /api/locker; POST /api/locker/open {crate, fischer?, shiny?} (the test switches: admins, or
-  // TEST_SWITCHES, and only while crates are free); POST /api/locker/equip {slot, item} (item null empties the slot); POST /api/locker/delete
+  // TEST_SWITCHES, and only while crates are free; a boss crate is one you hold, opened once, never with a test switch: openBossCrate); POST /api/locker/equip {slot, item} (item null empties the slot); POST /api/locker/delete
   // {items} (deletes your crate items for good).
   if (path === "/api/locker" && request.method === "GET") return json(await lockerState(sql, current.id, admin));
   if (path === "/api/locker/open" && request.method === "POST") {
     const b = (await request.json().catch(() => ({}))) as { crate?: unknown; fischer?: unknown; shiny?: unknown };
     const force = testSwitchesOn(env as AdminEnv, current) ? { fischer: b.fischer === true, shiny: b.shiny === true } : {};
-    const r = await openCrate(sql, current.id, b.crate, force, now, admin);
+    const r = typeof b.crate === "string" && bossCrateDef(b.crate) ? await openBossCrate(sql, current.id, b.crate, now, admin) : await openCrate(sql, current.id, b.crate, force, now, admin);
     return r.ok ? json(r) : json({ message: r.message }, 400);
   }
   if (path === "/api/locker/equip" && request.method === "POST") {

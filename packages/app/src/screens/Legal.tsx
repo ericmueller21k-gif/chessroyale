@@ -194,12 +194,12 @@ function Privacy() {
         title="Boss tokens"
         what={
           <p>
-            How many of each boss's tokens you have, each token a boss battle gave you (when, and which battle), and when a solo boss
-            battle you're playing began.
+            How many of each boss's tokens you have, each token a boss battle gave you (when, and which battle), when a solo boss
+            battle you're playing began, and the boss crates you bought and haven't opened yet (which, and when you bought each).
           </p>
         }
         why="so a token is yours on every device, the game can tell how many you've had in the last day, and a solo battle's length is timed by our server, not your device."
-        kept="your tokens until you spend them or the account is deleted; each token's record for 30 days; a solo battle's start until it ends."
+        kept="your tokens until you spend them or the account is deleted; each token's record for 30 days; a solo battle's start until it ends; a boss crate until you open it."
       />
       <Item
         title="Chat"
