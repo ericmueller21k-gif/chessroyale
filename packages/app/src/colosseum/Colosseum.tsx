@@ -23,7 +23,6 @@ import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { Board } from "../components/Board.tsx";
 import { Avatar } from "../components/Items.tsx";
 import { CycleRow, MatchMenu } from "../components/MatchMenu.tsx";
-import { crowdAnimations, onPrefsChange } from "../prefs.ts";
 import { COLOSSEUM_CHEER, play, warmFile, type SoundName } from "../sound.ts";
 import { testParams, testSwitchesAllowed } from "../test-switches.ts";
 import { COLISEUM_PLACE, isSprite } from "../town/world.ts";
@@ -49,6 +48,19 @@ const pieceStyle = (): PieceStyle => {
     return pieceStyleOf(localStorage.getItem(PIECES_KEY), localStorage.getItem(OLD_PIECES_KEY));
   } catch {
     return "pixel";
+  }
+};
+/**
+ * The Colosseum's own Animations (Nov 2, Eric: "the default animation toggle should be no animation"; "the colosseum settings
+ * are separate"): the pieces' slide and the crowd's jump. Off unless chosen on, remembered on this device; Settings → Board's
+ * Animations (Crowd, raids, Classic's and Squads' reveals) is its own and unchanged.
+ */
+const ANIM_KEY = "colosseum-animations";
+export const colosseumAnimations = (): boolean => {
+  try {
+    return localStorage.getItem(ANIM_KEY) === "1";
+  } catch {
+    return false;
   }
 };
 const ambientLevel = (): AmbientLevel => {
@@ -120,12 +132,11 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
     };
   }, []);
   const [pieces, setPieces] = useState(pieceStyle);
-  const [anim, setAnim] = useState(crowdAnimations);
+  const [anim, setAnim] = useState(colosseumAnimations);
   /** The railing's strip (arena-railing), drawn once. */
   const [rail] = useState(() => `url(${railingArt()})`);
   const animRef = useRef(anim);
   animRef.current = anim;
-  useEffect(() => onPrefsChange(() => setAnim(crowdAnimations())), []);
 
   // The arena: WebGL 2, its art, its frame loop, the drag to turn.
   useLayoutEffect(() => {
@@ -459,6 +470,17 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
         </button>
         <MatchMenu
           exit={null}
+          animations={{
+            on: anim,
+            toggle: () => {
+              setAnim(!anim);
+              try {
+                localStorage.setItem(ANIM_KEY, anim ? "0" : "1");
+              } catch {
+                // (Not remembered: private mode.)
+              }
+            },
+          }}
           extra={
             <>
               <CycleRow

@@ -3,7 +3,7 @@ import { test } from "./helpers.ts";
 
 /**
  * Inside the Colosseum, the first look (Oct 30; docs/areas/colosseum.md): the town's Colosseum card links in, the arena draws
- * (WebGL 2), opening on the high view behind White in Pixel (Nov 1), Change seat changes the view, a bot game plays on the
+ * (WebGL 2), opening on the high view behind White in Pixel (Nov 1; the art session's pieces since Nov 2), Change seat changes the view, a bot game plays on the
  * floor and the next one starts, the overlay's pieces are there, the gear's Pieces row, and Exit goes back to the town. Phone
  * and computer. Headless WebGL is software (a few frames a second): the checks wait on the game's state, never on a frame rate.
  */
@@ -59,14 +59,14 @@ test("the Colosseum's first look: the card's link in, the arena drawn, Change se
   await expect(page.getByRole("heading", { name: "The Colosseum" })).toBeVisible();
 
   // Again with `?fast` (the bots move at once, the next game comes quickly): the arena draws, with its crowd, opening on the high
-  // view behind White (Nov 1) in Pixel: ten draw calls (the arena, the crowd, one a piece kind, the outline, the scaling up), no railing.
+  // view behind White (Nov 1) in Pixel: three draw calls (the arena, the crowd, the pieces' sprites: Nov 2), no railing.
   await page.goto("/colosseum?fast");
   await expect.poll(async () => (await state(page)).crowd, { message: "the crowd is in", timeout: 60_000 }).toBeGreaterThan(1500);
   const s0 = await state(page);
   expect(s0.backend).toBe("webgl");
   expect(s0.view, "the high view behind White").toBe(10);
   expect((s0 as { pieces?: string }).pieces).toBe("pixel");
-  await expect.poll(async () => (await state(page)).drawCalls, { message: "ten draw calls a frame in Pixel" }).toBe(10);
+  await expect.poll(async () => (await state(page)).drawCalls, { message: "three draw calls a frame in Pixel" }).toBe(3);
   await expect(page.locator(".col-rail")).toBeHidden();
   const a = (await sample(page))!;
   expect(a.sky, "the arena, not an empty sky").toBeLessThan(0.5);
@@ -132,6 +132,12 @@ test("the Colosseum's first look: the card's link in, the arena drawn, Change se
   await expect(panel.getByRole("switch", { name: /Sound/ })).toBeVisible();
   await expect(panel.getByRole("button", { name: /Pieces/ })).toContainText("Pixel");
   await expect(panel.getByRole("switch", { name: /3D pieces/ })).toHaveCount(0);
+  // The Colosseum's own Animations (Nov 2): off by default, kept once chosen; Settings → Board's (brc.crowdAnim) untouched.
+  const anim = panel.getByRole("switch", { name: /Animations/ });
+  await expect(anim).toHaveAttribute("aria-checked", "false");
+  await anim.click();
+  await expect(anim).toHaveAttribute("aria-checked", "true");
+  expect(await page.evaluate(() => [localStorage.getItem("colosseum-animations"), localStorage.getItem("brc.crowdAnim")])).toEqual(["1", null]);
   const amb = panel.getByRole("button", { name: /Ambient crowd noise/ });
   await expect(amb).toContainText("Normal");
   await amb.click();
@@ -153,16 +159,16 @@ test("the Colosseum's first look: the card's link in, the arena drawn, Change se
   expect(errors.filter((e) => !/WebGL|GPU stall|willReadFrequently/i.test(e))).toEqual([]);
 });
 
-test("the gear's Pieces (Pixel by default): a tap steps Pixel, 3D, 2D and back, each at once (draw calls 10, 8, 3), the choice survives a reload, and an old '3D pieces' on comes back as 3D", async ({ page }) => {
+test("the gear's Pieces (Pixel by default): a tap steps Pixel, 3D, 2D and back, each at once (draw calls 3, 8, 3), the choice survives a reload, and an old '3D pieces' on comes back as 3D", async ({ page }) => {
   test.setTimeout(180_000);
   const errors = watchErrors(page);
   const pieces = async () => ((await state(page)) as { pieces?: string }).pieces;
   const row = () => page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: /Pieces/ });
   await page.goto("/colosseum?fast");
   await expect.poll(async () => (await state(page)).crowd, { message: "the crowd is in", timeout: 60_000 }).toBeGreaterThan(1500);
-  // Pixel by default: the whole arena on the pixel grid; the arena's, the crowd's, one a kind (all six on the board at the start), the outline and the scaling up.
+  // Pixel by default (Nov 2: the art session's pieces as sprites, the arena full size): the arena's, the crowd's and the pieces'.
   expect(await pieces()).toBe("pixel");
-  await expect.poll(async () => (await state(page)).drawCalls).toBe(10);
+  await expect.poll(async () => (await state(page)).drawCalls).toBe(3);
   expect(((await state(page)) as { pixelScale?: number }).pixelScale).toBeGreaterThanOrEqual(2);
   await page.getByRole("button", { name: "Match options" }).click();
   await expect(row()).toContainText("Pixel");
@@ -181,7 +187,8 @@ test("the gear's Pieces (Pixel by default): a tap steps Pixel, 3D, 2D and back, 
   // And round to Pixel.
   await row().click();
   await expect(row()).toContainText("Pixel");
-  await expect.poll(async () => (await state(page)).drawCalls).toBe(10);
+  await expect.poll(async () => (await state(page)).drawCalls).toBe(3);
+  expect(await pieces()).toBe("pixel");
   // 3D again, and the game plays on in it.
   await row().click();
   await expect(row()).toContainText("3D");

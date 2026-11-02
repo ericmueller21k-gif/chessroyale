@@ -184,11 +184,12 @@ function SoundRow() {
  * Animations (every mode) and, in a crowd match, Motion trail (Settings → Board, the same prefs, the same rule: the trail
  * is off, and can't be switched, while the animations are off). Kept in step with Settings through onPrefsChange.
  */
-function AnimationRows({ crowd }: { crowd: boolean }) {
+function AnimationRows({ crowd, own }: { crowd: boolean; own?: OwnAnimations }) {
   const [, rerender] = useState(0);
   useEffect(() => onPrefsChange(() => rerender((n) => n + 1)), []);
   const anim = crowdAnimations();
   const trail = crowdTrail();
+  if (own) return <SwitchRow label="Animations" on={own.on} onClick={own.toggle} />;
   return (
     <>
       <SwitchRow label="Animations" on={anim} onClick={() => setCrowdAnimations(!anim)} />
@@ -238,12 +239,19 @@ function useOpen(): [Open, (o: Open) => void] {
   return [open, setOpenNow];
 }
 
+/** A screen's own Animations setting in place of Settings → Board's (the Colosseum's, Nov 2: "the colosseum settings are separate"). */
+export interface OwnAnimations {
+  on: boolean;
+  toggle: () => void;
+}
+
 /**
  * The control at the right end of a match screen's top line: a gear, opening the list in the middle of the screen. `exit`
  * null: nothing to leave right now. `crowd`: the match is a crowd match (Crowd, a raid), which adds the Motion trail row
  * (Animations is in every mode). `extra`: a screen's own rows, after Animations (the Colosseum's Ambient crowd noise).
+ * `animations`: a screen's own Animations setting, shown in that row in place of Settings → Board's (the Colosseum's).
  */
-export function MatchMenu({ exit, crowd = false, extra }: { exit: MatchExit | null; crowd?: boolean; extra?: ComponentChildren }) {
+export function MatchMenu({ exit, crowd = false, extra, animations }: { exit: MatchExit | null; crowd?: boolean; extra?: ComponentChildren; animations?: OwnAnimations }) {
   const [open, setOpen] = useOpen();
   // (Nothing to leave any more, the sheet asking about it goes; Escape closes it.)
   useEffect(() => {
@@ -277,7 +285,7 @@ export function MatchMenu({ exit, crowd = false, extra }: { exit: MatchExit | nu
               </div>
               <div class="mm-list">
                 <SoundRow />
-                <AnimationRows crowd={crowd} />
+                <AnimationRows crowd={crowd} own={animations} />
                 <ThemeRow />
                 {extra}
                 {exit && <ListRow className="mm-exit" icon={<FlagIcon />} label={rowLabel(exit)} onClick={() => setOpen("confirm")} />}

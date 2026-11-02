@@ -428,117 +428,75 @@ describe("the 3D pieces (the gear's 3D pieces; pieces3d.ts)", () => {
   });
 });
 
-describe("the pixel set and the gear's Pieces (Nov 1; pieces-pixel.ts)", () => {
-  it("six meshes, built once: whole triangles, unit normals, standing on the board, inside their squares, real-set heights (the king about twice the pawn), on eight-sided bases", async () => {
-    const { KINDS, MAT, PV, triangulate } = await import("../src/colosseum/pieces3d.ts");
-    const { PIXEL_KNIGHT, pixelMeshes } = await import("../src/colosseum/pieces-pixel.ts");
-    const all = pixelMeshes();
-    let verts = 0;
-    for (const k of KINDS) {
-      const m = all[k];
-      const n = m.verts.length / PV;
-      verts += n;
-      expect(m.index.length % 3, k).toBe(0);
-      expect(Math.max(...m.index), k).toBeLessThan(n);
-      let minY = Infinity;
-      let maxY = -Infinity;
-      let maxR = 0;
-      const foot = new Set<number>();
-      for (let i = 0; i < m.verts.length; i += PV) {
-        const [x, y, z, nx, ny, nz, mat] = m.verts.subarray(i, i + PV);
-        expect(Math.hypot(nx!, ny!, nz!)).toBeCloseTo(1, 4);
-        if (mat === MAT.shadow) continue;
-        minY = Math.min(minY, y!);
-        maxY = Math.max(maxY, y!);
-        maxR = Math.max(maxR, Math.hypot(x!, z!));
-        // (The base's foot: its corners round the board.)
-        if (Math.abs(y!) < 1e-6 && Math.hypot(x!, z!) > 0.1) foot.add(Math.round(((Math.atan2(x!, z!) * 180) / Math.PI + 360) % 360));
+describe("Pixel's pieces (Nov 2; pieces-gba.ts, the art session's models) and the gear's Pieces", () => {
+  it("twelve sprites, every pixel a palette color or empty, each outlined, standing on its foot, heights in the real set's order", async () => {
+    const { FRAME, PALETTE, drawPiece } = await import("../src/colosseum/pieces-gba.ts");
+    const tall: Record<string, number> = {};
+    for (const kind of ["p", "n", "b", "r", "q", "k"] as const)
+      for (const side of ["w", "b"] as const) {
+        const s = drawPiece(kind, side, 0.52);
+        expect([s.w, s.h, s.ax, s.ay]).toEqual([FRAME.w, FRAME.h, FRAME.ax, FRAME.ay]);
+        let top = s.h;
+        let foot = false;
+        for (let y = 0; y < s.h; y++)
+          for (let x = 0; x < s.w; x++) {
+            const k = s.keys[y]![x];
+            if (k === null || k === undefined) continue;
+            expect(PALETTE[k], `${side}${kind} (${x}, ${y}): ${k}`).toMatch(/^#[0-9a-f]{6}$/i);
+            top = Math.min(top, y);
+            if (Math.abs(x - s.ax) <= 1 && Math.abs(y - s.ay) <= 2) foot = true;
+            // Round the shape, its outline: no body pixel touches the empty.
+            const nb = [s.keys[y - 1]?.[x], s.keys[y + 1]?.[x], s.keys[y]![x - 1], s.keys[y]![x + 1]];
+            if (nb.some((n) => !n)) expect(k, `${side}${kind}'s edge at (${x}, ${y})`).toBe(side === "w" ? "k" : "K");
+          }
+        expect(foot, `${side}${kind} stands on its foot`).toBe(true);
+        tall[side + kind] = s.ay - top;
       }
-      expect(minY, `${k} stands on the board`).toBeCloseTo(0, 5);
-      expect(maxY, `${k}'s height is its top`).toBeCloseTo(m.height, 5);
-      expect(maxR, `${k} fits its square`).toBeLessThan(0.5);
-      expect(foot.size, `${k}'s base has eight corners`).toBe(8);
-      // A flat face toward you (+z): no corner straight ahead.
-      expect(foot.has(0) || foot.has(360)).toBe(false);
+    for (const side of ["w", "b"]) {
+      const t = (k: string) => tall[side + k]!;
+      expect(t("p")).toBeLessThan(t("r"));
+      expect(t("r")).toBeLessThan(t("n"));
+      expect(t("n")).toBeLessThanOrEqual(t("b"));
+      expect(t("b")).toBeLessThan(t("q"));
+      expect(t("q")).toBeLessThan(t("k"));
     }
-    expect(verts).toBeLessThan(65536);
-    const h = Object.fromEntries(KINDS.map((k) => [k, all[k].height]));
-    expect(h.p).toBeLessThan(h.r!);
-    expect(h.r).toBeLessThan(h.n!);
-    expect(h.n).toBeLessThan(h.b!);
-    expect(h.b).toBeLessThan(h.q!);
-    expect(h.q).toBeLessThan(h.k!);
-    expect(h.k! / h.p!).toBeGreaterThan(1.8);
-    expect(h.k! / h.p!).toBeLessThan(2.3);
-    // The knight's head: its outline cut into whole triangles.
-    expect(triangulate(PIXEL_KNIGHT).length).toBe((PIXEL_KNIGHT.length - 2) * 3);
   });
 
-  it("as the picture has them (round 2): in the high view behind White, each piece on its square near White as tall as the picture's and its base as wide, outline and all, phone and computer", async () => {
+  it("drawn for your seat: the high view behind White at the mockups' 30 degrees, every view's pitch in range, a square near you about 20 art pixels (phone and computer)", async () => {
     const A = await import("../src/colosseum/arena.ts");
-    const { KINDS, MAT, PV } = await import("../src/colosseum/pieces3d.ts");
-    const { PIXEL_BASE, PIXEL_FIT, PIXEL_TARGET, pixelMeshes } = await import("../src/colosseum/pieces-pixel.ts");
-    const { PAWN_ART_PX, PIXEL_TILT } = await import("../src/colosseum/arena-gl.ts");
-    const all = pixelMeshes();
-    const home: Record<string, string> = { p: "e2", r: "h1", n: "g1", b: "f1", q: "d1", k: "e1" };
+    const { GBA_PITCH, SQUARE_ART_PX, gbaArtPixel, gbaPitch, paintGba } = await import("../src/colosseum/arena-gl.ts");
     for (const [W, H, computer] of [[1440, 848, true], [780, 1688, false]] as const) {
-      const v = A.viewsFor(W / H, computer)[A.HIGH_VIEW]!;
-      const proj = new Float32Array(16);
-      const view = new Float32Array(16);
-      const vp = new Float32Array(16);
-      const fwd = new Float32Array(3);
-      A.perspective(proj, A.fovFor(v, W / H), W / H, 0.2, 120);
-      A.lookAt(view, v.eye, v.at, 0, 0, fwd);
-      A.multiply(vp, proj, view);
-      // As the renderer stands a piece (VS_PIECE_PX): facing the screen, leaning back PIXEL_TILT of the pitch.
-      const fl = Math.hypot(fwd[0]!, fwd[2]!);
-      const F = [-fwd[0]! / fl, 0, -fwd[2]! / fl];
-      const Rt = [F[2]!, 0, -F[0]!];
-      const a = Math.asin(-fwd[1]!) * PIXEL_TILT;
-      const U = [-F[0]! * Math.sin(a), Math.cos(a), -F[2]! * Math.sin(a)];
-      const F2 = [F[0]! * Math.cos(a), Math.sin(a), F[2]! * Math.cos(a)];
-      // The screen's up (square to its right and to the way you look).
-      const up = [Rt[1]! * fwd[2]! - Rt[2]! * fwd[1]!, Rt[2]! * fwd[0]! - Rt[0]! * fwd[2]!, Rt[0]! * fwd[1]! - Rt[1]! * fwd[0]!];
-      const ul = Math.hypot(up[0]!, up[1]!, up[2]!);
-      for (let i = 0; i < 3; i++) up[i] = up[i]! / ul;
-      // The art pixel (arena-gl.ts pixelTarget: a 1 m pawn on the board's middle PAWN_ART_PX art pixels tall), and the outline round it.
-      const k0 = Math.sin(a) / fl;
-      const p0 = A.project(vp, 0, A.BOARD.lift, 0, W, H)!;
-      const p1 = A.project(vp, fwd[0]! * k0, A.BOARD.lift + Math.cos(a), fwd[2]! * k0, W, H)!;
-      const art = Math.max(2, Math.round(Math.abs(p0[1] - p1[1]) / PAWN_ART_PX));
-      for (const k of KINDS) {
-        const [x, z] = A.squareXZ(home[k]!);
-        const l = A.project(vp, x - 0.5, A.BOARD.lift, z, W, H)!;
-        const r = A.project(vp, x + 0.5, A.BOARD.lift, z, W, H)!;
-        const sw = r[0] - l[0];
-        // Laid out as a sprite (Nov 2): flat, a whole number of art pixels a meter at its foot.
-        const foot = A.project(vp, x, A.BOARD.lift, z, W, H)!;
-        const top = A.project(vp, x + up[0]!, A.BOARD.lift + up[1]!, z + up[2]!, W, H)!;
-        const kpx = Math.max(1, Math.round((foot[1] - top[1]) / art)) * art;
-        let y0 = Infinity;
-        let y1 = -Infinity;
-        let b0 = Infinity;
-        let b1 = -Infinity;
-        const m = all[k].verts;
-        for (let i = 0; i < m.length; i += PV) {
-          if (m[i + 6] === MAT.shadow) continue;
-          const [fx, fy] = PIXEL_FIT[k];
-          const [px, py, pz] = [m[i]! * fx, m[i + 1]! * fy, m[i + 2]! * fx];
-          const o = [0, 1, 2].map((j) => Rt[j]! * px + U[j]! * py + F2[j]! * pz);
-          const s = [kpx * (o[0]! * Rt[0]! + o[1]! * Rt[1]! + o[2]! * Rt[2]!), -kpx * (o[0]! * up[0]! + o[1]! * up[1]! + o[2]! * up[2]!)];
-          y0 = Math.min(y0, s[1]!);
-          y1 = Math.max(y1, s[1]!);
-          if (py < 1e-6) {
-            b0 = Math.min(b0, s[0]!);
-            b1 = Math.max(b1, s[0]!);
-          }
+      const views = A.viewsFor(W / H, computer);
+      expect(Math.abs(gbaPitch(views[A.HIGH_VIEW]!) - 0.52)).toBeLessThan(0.02);
+      for (const v of views) {
+        const p = gbaPitch(v);
+        expect(p).toBeGreaterThanOrEqual(0);
+        expect(p).toBeLessThanOrEqual(GBA_PITCH.max);
+        const proj = new Float32Array(16);
+        const view = new Float32Array(16);
+        const vp = new Float32Array(16);
+        A.perspective(proj, A.fovFor(v, W / H), W / H, 0.2, 120);
+        A.lookAt(view, v.eye, v.at, 0, 0, new Float32Array(3));
+        A.multiply(vp, proj, view);
+        const art = gbaArtPixel(vp, v, W, H);
+        expect(art).toBeGreaterThanOrEqual(2);
+        if (v === views[A.HIGH_VIEW]) {
+          // (Whole screen pixels: the nearest whole number of art pixels to SQUARE_ART_PX, or more on a small screen.)
+          const [x, z] = A.squareXZ("e1");
+          const l = A.project(vp, x - 0.5, A.BOARD.lift, z, W, H)!;
+          const r = A.project(vp, x + 0.5, A.BOARD.lift, z, W, H)!;
+          const sq = (r[0] - l[0]) / art;
+          expect(sq, `a square near White in art pixels (${computer ? "computer" : "phone"})`).toBeGreaterThan(SQUARE_ART_PX * 0.75);
+          expect(sq).toBeLessThan(SQUARE_ART_PX * 1.3);
         }
-        const tall = (y1 - y0 + 2 * art) / sw;
-        const wide = (b1 - b0 + 2 * art) / sw;
-        expect(Math.abs(tall - PIXEL_TARGET[k]), `${k} ${tall.toFixed(2)} tall against the picture's ${PIXEL_TARGET[k]} (${computer ? "computer" : "phone"})`).toBeLessThan(0.05);
-        expect(Math.abs(wide - PIXEL_BASE[k]), `${k}'s base ${wide.toFixed(2)} against the picture's ${PIXEL_BASE[k]} (${computer ? "computer" : "phone"})`).toBeLessThan(0.04);
       }
     }
+    // The atlas: each texel a palette color, solid, or empty.
+    const px = new Uint8Array(32 * 6 * 40 * 2 * 4);
+    paintGba(px, 3, true, 0.52);
+    const alpha = new Set<number>();
+    for (let i = 3; i < px.length; i += 4) alpha.add(px[i]!);
+    expect([...alpha].sort((a, b) => a - b)).toEqual([0, 255]);
   });
 
   it("the gear's Pieces: Pixel, 3D, 2D in turn; Pixel by default; a saved choice kept; an old '3D pieces' on keeps 3D", async () => {

@@ -278,6 +278,20 @@ export function gbaPitch(view: View): number {
   return Math.min(GBA_PITCH.max, Math.max(0, Math.round(p / GBA_PITCH.step) * GBA_PITCH.step));
 }
 
+/**
+ * Pixel's art pixel for a view through `vp` on a w × h screen: whole screen pixels, at least 2, so the board square nearest
+ * you (on the line from the board's middle toward your eye) is about SQUARE_ART_PX art pixels across.
+ */
+export function gbaArtPixel(vp: Float32Array, view: View, w: number, h: number): number {
+  const ex = view.eye[0];
+  const ez = view.eye[2];
+  const el = Math.hypot(ex, ez) || 1;
+  const [nx, nz] = [(ex / el) * 3.5, (ez / el) * 3.5];
+  const a = project(vp, nx - (ez / el) * 0.5, BOARD.lift, nz + (ex / el) * 0.5, w, h);
+  const b = project(vp, nx + (ez / el) * 0.5, BOARD.lift, nz - (ex / el) * 0.5, w, h);
+  return a && b ? Math.max(2, Math.round(Math.hypot(a[0] - b[0], a[1] - b[1]) / SQUARE_ART_PX)) : 2;
+}
+
 /** One of Pixel's sprites (pieces-gba.ts `drawPiece`) into the atlas's pixels (RGBA, straight alpha) at its cell. */
 export function paintGba(atlas: Uint8Array, kind: number, black: boolean, pitch: number): void {
   const shot = drawPiece(GBA_KINDS[kind]!, black ? "b" : "w", pitch);
@@ -1082,18 +1096,11 @@ export class ArenaGL {
     f.view = view;
     f.w = w;
     f.h = h;
-    // The square nearest you on the line from the board's middle toward your eye, measured across.
-    const ex = view.eye[0];
-    const ez = view.eye[2];
-    const el = Math.hypot(ex, ez) || 1;
-    const [nx, nz] = [(ex / el) * 3.5, (ez / el) * 3.5];
-    const a = project(this.vp, nx - (ez / el) * 0.5, BOARD.lift, nz + (ex / el) * 0.5, w, h);
-    const b = project(this.vp, nx + (ez / el) * 0.5, BOARD.lift, nz - (ex / el) * 0.5, w, h);
-    this.pixelScale = a && b ? Math.max(2, Math.round(Math.hypot(a[0] - b[0], a[1] - b[1]) / SQUARE_ART_PX)) : 2;
+    this.pixelScale = gbaArtPixel(this.vp, view, w, h);
     this.gbaSprites(gbaPitch(view));
     if (this.sortView !== view) {
       this.sortView = view;
-      this.sortEye = [ex, ez];
+      this.sortEye = [view.eye[0], view.eye[2]];
       this.setPieces(this.last.pieces, this.last.t0);
     }
   }
