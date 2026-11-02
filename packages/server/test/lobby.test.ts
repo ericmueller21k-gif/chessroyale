@@ -323,14 +323,16 @@ describe("lobby: Crowd mode", () => {
       expect(b.fen).toBe(rev.board!.fen);
       expect(b.lastMove).toBe(rev.playedMove);
       expect(b.ply).toBe(round + 1);
-      // The top three moves by votes, most first, the played one (the most popular) leading.
+      // The played move leading (in 50 v 50 drawn from the three most picked), then the most voted of the rest.
       expect(b.votes.length).toBeGreaterThanOrEqual(1);
       expect(b.votes.length).toBeLessThanOrEqual(3);
       expect(b.votes[0]![0]).toBe(toSan(rev.fenBefore!, rev.playedMove!));
       const tally = new Map<string, number>();
       for (const p of rev.picks) if (p.move) tally.set(p.move, (tally.get(p.move) ?? 0) + 1);
-      expect(b.votes[0]![1]).toBe(Math.max(...tally.values()));
-      expect(b.votes.map((v) => v[1])).toEqual([...b.votes.map((v) => v[1])].sort((x, y) => y - x));
+      expect(b.votes[0]![1]).toBe(tally.get(rev.playedMove!));
+      const rest = b.votes.slice(1).map((v) => v[1]);
+      expect(rest).toEqual([...rest].sort((x, y) => y - x));
+      if (rest.length) expect(rest[0]).toBe(Math.max(...[...tally].filter(([m]) => m !== rev.playedMove).map(([, n]) => n)));
       expect(JSON.stringify(b)).not.toMatch(/Ann|Bo|p1|p2|bot/);
       L.advance(10_000);
     }

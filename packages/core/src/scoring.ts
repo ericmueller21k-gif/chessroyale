@@ -140,6 +140,26 @@ export function drawRuleFor(stage: number, settings: Settings = DEFAULT_SETTINGS
   return rules[Math.min(stage, rules.length - 1)] ?? "random";
 }
 
+/**
+ * Crowd 50 v 50's played move (`crowdPlayedFromTop`, Eric, Nov 2): the `top` most-picked moves, each with the odds of
+ * its picks over theirs (45 / 3 / 2: 90% / 6% / 4%), most picked first (ties by move). A tie across the last place
+ * (two moves tied for 3rd of 3) leaves the tied moves out, so a stray pick or two never gets a share by a tie; if that
+ * leaves nothing (every move tied for the most), the tied moves share it evenly.
+ */
+export function crowdTopOdds(moves: readonly string[], top: number): Record<string, number> {
+  const counts = new Map<string, number>();
+  for (const m of moves) counts.set(m, (counts.get(m) ?? 0) + 1);
+  const ranked = [...counts].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  let kept = ranked.slice(0, top);
+  if (ranked.length > top && ranked[top]![1] === ranked[top - 1]![1]) {
+    const cut = ranked[top - 1]![1];
+    kept = kept.filter(([, n]) => n > cut);
+    if (!kept.length) kept = ranked.filter(([, n]) => n === cut);
+  }
+  const total = kept.reduce((s, [, n]) => s + n, 0);
+  return Object.fromEntries(kept.map(([m, n]) => [m, n / total]));
+}
+
 /** Picks the move that continues the board, from the moves picked (one entry per pick) and their losses. */
 export function drawMove(
   moves: readonly string[],
@@ -152,6 +172,13 @@ export function drawMove(
   const among = (xs: readonly string[]) => xs[Math.floor(rng() * xs.length)]!;
   const distinct = [...new Set(moves)];
   if (rule === "party") return partyMove(moves, losses, rng, expected);
+  if (rule === "popular" && settings.crowdPlayedFromTop > 1) {
+    // (One draw, over the odds in their order: most picked first, ties by move.)
+    const odds = Object.entries(crowdTopOdds(moves, settings.crowdPlayedFromTop));
+    let r = rng();
+    for (const [m, p] of odds) if ((r -= p) < 0) return m;
+    return odds[odds.length - 1]![0];
+  }
   if (rule === "popular") {
     const count = (m: string) => moves.filter((x) => x === m).length;
     const top = Math.max(...distinct.map(count));
@@ -320,7 +347,8 @@ export function scoreGroup(
         evaluation.expectedAfter,
       )
     : evaluation.bestMove;
-  return { players, averageLoss, playedMove, drawRule: rule, drawOdds: drawOdds(picks) };
+  const odds = rule === "popular" && settings.crowdPlayedFromTop > 1 ? crowdTopOdds(picked.map((p) => p.move!), settings.crowdPlayedFromTop) : drawOdds(picks);
+  return { players, averageLoss, playedMove, drawRule: rule, drawOdds: odds };
 }
 
 /**

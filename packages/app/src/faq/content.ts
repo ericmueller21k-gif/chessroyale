@@ -248,7 +248,7 @@ function modes(src: FaqSources): FaqSection {
 ### Crowd · 50 v 50 {#mode-crowd}
 
 - **${C.lobbySize} players, one game of chess**, from the first move. Two teams of ${team}: your team plays White or Black all game.
-- Each turn, everyone on the side to move picks a move before the clock runs out, and the **most popular pick is played** (a tie is settled at random).
+- Each turn, everyone on the side to move picks a move before the clock runs out, and **one of the ${n(C.crowdPlayedFromTop, "most popular pick")} is played**, drawn by how many picked each: if 45 pick one move, 3 another and 2 a third, they're played 90%, 6% and 4% of the time. Moves tied for the last of those places are left out. So the crowd's favorite usually plays, but not always.
 - Every pick is scored (see [How your moves are scored](#scoring)). No one goes out for the first ${n(cutAfter(0), "move")}. Then the lowest scorers are cut, the same number from each team: ${cutsFrom("team", 0)}, which leaves ${left(TK)} for the team final. A boss final adds ${n(src.crowdKnockouts.boss.length - TK.length, "more cut")} (${cutsFrom("boss", TK.length)}); a duel adds ${n(src.crowdKnockouts.duel.length - TK.length, "more cut")} (${cutsFrom("duel", TK.length)}). The moves count from the first one the teams play (a Random opening's own moves don't count). Scores carry over all game.
 - **A tie at the cut line goes through:** everyone tied exactly with the last player through stays in, and the cuts still to come take the extra, a little at each. So does anyone within ${n(src.crowdScoring.cutGrace, "point")} of that player ([the bubble](#crowd-scoring)). Only the last cut before the ending breaks a tie, so the ending has its size: fewer points given away before the [opening allowance](#opening-allowance) go through, then less thinking time.
 - **You vote on the ending** before move 1: a team final (the top ${left(src.crowdKnockouts.team)} play on: ${teamSizes.slice(0, -1).join(", ")}, then ${teamSizes.at(-1)} to the end), a boss final (the top ${left(src.crowdKnockouts.boss)} team up against ${finalFoe}) or a duel (the best of each side, 1v1). Then on how it starts, then on the clock.
@@ -504,7 +504,7 @@ The best move leaves the side to move an expected score of ${es(best)}. Four pla
 |---|---|---|---|
 ${exRows}
 
-The group's average loss is (${losses}) / ${picks.length} = ${num(avg)}. A found the best move and scores ${num(avg)} − 0 = ${signed(row("A").roundScore)}; D's blunder scores ${num(avg)} − ${num(row("D").loss!)} = ${signed(row("D").roundScore)}. In Crowd the move B and C share is the most popular, so it's the one played.
+The group's average loss is (${losses}) / ${picks.length} = ${num(avg)}. A found the best move and scores ${num(avg)} − 0 = ${signed(row("A").roundScore)}; D's blunder scores ${num(avg)} − ${num(row("D").loss!)} = ${signed(row("D").roundScore)}. In Crowd the move B and C share is the most popular, so it's the likeliest to be played.
 
 ### Nearly as good costs almost nothing {#near-best}
 
