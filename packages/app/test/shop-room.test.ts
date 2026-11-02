@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { SHOP_BABUR_LAYOUT } from "../src/town/shops/babur-art.ts";
 import { SHOP_PUDDLES_LAYOUT } from "../src/town/shops/puddles-art.ts";
 import { SHOP_ALFIL_LAYOUT } from "../src/town/shops/alfil-art.ts";
+import { SHOP_BIGBOY_LAYOUT } from "../src/town/shops/bigboy-art.ts";
 import { findPath, inTalkRange, makeRoom, onDoor, stepsFrom, tapTarget, walkable, type Room, type Sq } from "../src/town/shops/room.ts";
 import { POOL_LINE, buyBossCrate, canAfford, inInventoryLine, holdLine, priceLine, prizeRows, shopOf, wayText, SHOPS } from "../src/town/shops/shops.ts";
 import { bossCrateOf } from "@chessroyale/core";
@@ -15,13 +16,21 @@ import { SHOP_FEEL } from "../src/town/feel.ts";
 const babur = makeRoom(SHOP_BABUR_LAYOUT, SHOPS.tiger!.keeper);
 const puddles = makeRoom(SHOP_PUDDLES_LAYOUT, SHOPS.gardener!.keeper);
 const alfil = makeRoom(SHOP_ALFIL_LAYOUT, SHOPS.alfil!.keeper);
-const rooms: [string, Room][] = [
-  ["Babur's", babur],
-  ["Puddles'", puddles],
-  ["Alfil's", alfil],
+const bigboy = makeRoom(SHOP_BIGBOY_LAYOUT, SHOPS.bigboy!.keeper);
+/**
+ * Each room, and two far squares you can walk to and a wall square to tap beside: the back corners and the west wall for the first
+ * three; Big Boy's crib is a ball pit (solid) but for its raised floors, so its far squares are the shop platform's back corners and
+ * its wall square the back wall over the platform.
+ */
+const ROUND = { far: [{ c: 2, r: 2 }, { c: 17, r: 1 }], wall: { c: 0, r: 15 } };
+const rooms: [string, Room, { far: Sq[]; wall: Sq }][] = [
+  ["Babur's", babur, ROUND],
+  ["Puddles'", puddles, ROUND],
+  ["Alfil's", alfil, ROUND],
+  ["Big Boy's", bigboy, { far: [{ c: 4, r: 1 }, { c: 15, r: 1 }], wall: { c: 6, r: 0 } }],
 ];
 
-describe.each(rooms)("%s room", (_name, room) => {
+describe.each(rooms)("%s room", (_name, room, spots) => {
   it("is 20 x 20 squares; its walls (the edge) are never walkable", () => {
     expect(room.n).toBe(20);
     for (let i = 0; i < 20; i++) for (const [c, r] of [[i, 0], [i, 19], [0, i], [19, i]] as const) expect(walkable(room, c, r), `${c},${r}`).toBe(false);
@@ -55,7 +64,7 @@ describe.each(rooms)("%s room", (_name, room) => {
     const d = stepsFrom(room, room.start);
     for (let r = 0; r < 20; r++) for (let c = 0; c < 20; c++) if (walkable(room, c, r)) expect(d[r * 20 + c], `${c},${r}`).toBeGreaterThanOrEqual(0);
     const talk = tapTarget(room, room.start, room.keeper[0]!.c, room.keeper[0]!.r).dest!;
-    for (const to of [talk, room.doors[0]!, { c: 2, r: 2 }, { c: 17, r: 1 }]) {
+    for (const to of [talk, room.doors[0]!, ...spots.far]) {
       const path = findPath(room, room.start, to)!;
       expect(path, `${to.c},${to.r}`).not.toBeNull();
       let at: Sq = room.start;
@@ -80,9 +89,9 @@ describe.each(rooms)("%s room", (_name, room) => {
     expect(out.kind).toBe("door");
     expect(onDoor(room, out.dest!.c, out.dest!.r)).toBe(true);
     expect(tapTarget(room, room.start, 6, 15)).toEqual(walkable(room, 6, 15) ? { kind: "square", dest: { c: 6, r: 15 } } : expect.anything());
-    const wall = tapTarget(room, room.start, 0, 15);
+    const wall = tapTarget(room, room.start, spots.wall.c, spots.wall.r);
     expect(wall.kind).toBe("square");
-    expect(Math.max(Math.abs(wall.dest!.c - 0), Math.abs(wall.dest!.r - 15))).toBe(1);
+    expect(Math.max(Math.abs(wall.dest!.c - spots.wall.c), Math.abs(wall.dest!.r - spots.wall.r))).toBe(1);
   });
 });
 
@@ -95,6 +104,29 @@ describe("the rooms' own pieces", () => {
   it("Puddles': the pond garden lies on all of its 5 x 8 squares (columns 14-18, rows 6-13), none walkable; the circle is", () => {
     for (let r = 6; r <= 13; r++) for (let c = 14; c <= 18; c++) expect(walkable(puddles, c, r), `${c},${r}`).toBe(false);
     for (const [c, r] of [[13, 10], [14, 5], [14, 14], [9, 10]] as const) expect(walkable(puddles, c, r), `${c},${r}`).toBe(true);
+  });
+
+  it("Big Boy's: you walk on the walkway, the shop's platform and the battle circle; the ball pit is solid, and so are the airplane's 3 x 3 squares and the props", () => {
+    const at = (c: number, r: number) => walkable(bigboy, c, r);
+    // The walkway: from the door north to the circle, from the circle to the platform, the east arm (under the airplane) and the west arm.
+    for (let r = 15; r <= 18; r++) for (const c of [9, 10]) expect(at(c, r), `walkway ${c},${r}`).toBe(true);
+    for (const r of [5, 6]) for (const c of [9, 10]) expect(at(c, r), `walkway ${c},${r}`).toBe(true);
+    for (let c = 14; c <= 17; c++) for (const r of [10, 11]) expect(at(c, r), `east arm ${c},${r}`).toBe(true);
+    for (let c = 4; c <= 5; c++) for (const r of [10, 11]) expect(at(c, r), `west arm ${c},${r}`).toBe(true);
+    // The platform (columns 4-15, rows 1-4) but the counter (columns 8-11, row 3), its props and the Shopkeeper.
+    for (const [c, r] of [[4, 1], [15, 1], [6, 4], [13, 3], [12, 2]] as const) expect(at(c, r), `platform ${c},${r}`).toBe(true);
+    for (const [c, r] of [[8, 3], [11, 3], [9, 2], [10, 2], [5, 2], [14, 2], [12, 4]] as const) expect(at(c, r), `counter, keeper, props ${c},${r}`).toBe(false);
+    // The circle: its middle squares and its marks (columns 8 and 11, rows 10-11).
+    for (let r = 8; r <= 13; r++) for (let c = 7; c <= 12; c++) expect(at(c, r), `circle ${c},${r}`).toBe(true);
+    // The pit: every square off the raised floors (here a sample round the room), and the airplane over columns 15-17, rows 7-9.
+    for (const [c, r] of [[2, 2], [17, 2], [2, 7], [3, 13], [16, 14], [6, 17], [13, 17], [5, 6], [14, 6], [7, 16], [12, 15]] as const) expect(at(c, r), `pit ${c},${r}`).toBe(false);
+    for (let r = 7; r <= 9; r++) for (let c = 15; c <= 17; c++) expect(at(c, r), `airplane ${c},${r}`).toBe(false);
+    // The rocking horse at the west arm's end (columns 2-3).
+    expect(at(2, 10)).toBe(false);
+    // Every square you can stand on is the walkway's, the platform's, the circle's or the doorway's: none is a pit square.
+    const pit = new Set(SHOP_BIGBOY_LAYOUT.filter((p) => /^pit/.test(p.name)).map((p) => `${p.col},${p.row}`));
+    expect(pit.size).toBeGreaterThan(150);
+    for (let r = 0; r < 20; r++) for (let c = 0; c < 20; c++) if (pit.has(`${c},${r}`)) expect(at(c, r), `pit ${c},${r}`).toBe(false);
   });
 
   it("talking range: three squares either way from the Shopkeeper's squares (SHOP_FEEL.talkRange)", () => {
@@ -118,8 +150,8 @@ describe("the rooms' own pieces", () => {
 });
 
 describe("the shops", () => {
-  it("only Babur's, Puddles' and Alfil's homes have an inside", () => {
-    expect(HOMES.filter((h) => shopOf(h.id)).map((h) => h.id).sort()).toEqual(["alfil", "gardener", "tiger"]);
+  it("only Babur's, Puddles', Alfil's and Big Boy's homes have an inside", () => {
+    expect(HOMES.filter((h) => shopOf(h.id)).map((h) => h.id).sort()).toEqual(["alfil", "bigboy", "gardener", "tiger"]);
   });
 
   it("the crates' words: names, the price line, what you have; the boss's ride is a prize", () => {
@@ -139,10 +171,15 @@ describe("the shops", () => {
     expect(a.crate).toBe("Alfil's Boss Crate");
     expect(priceLine(a)).toBe("3 Alfil tokens, or 1 Alfil token + 1 crate key");
     expect(prizeRows(a)[0]).toMatchObject({ id: "alfil-howdah", name: "Alfil's Howdah", kind: "Mythic ride" });
+    const g = shopOf("bigboy")!;
+    expect(g.crate).toBe("Big Boy's Boss Crate");
+    expect(priceLine(g)).toBe("3 Big Boy tokens, or 1 Big Boy token + 1 crate key");
+    expect(holdLine(g, { tokens: 0, keys: 0 })).toBe("You have 0 Big Boy tokens and 0 crate keys.");
+    expect(prizeRows(g)[0]).toMatchObject({ id: "bigboy-buggy", name: "Big Boy's Buggy", kind: "Mythic ride" });
   });
 
   it("each shop sells its boss's crate (core's BOSS_CRATES), its ride among the prizes; a way's button needs its price held", () => {
-    for (const s of [shopOf("tiger")!, shopOf("gardener")!, shopOf("alfil")!]) {
+    for (const s of [shopOf("tiger")!, shopOf("gardener")!, shopOf("alfil")!, shopOf("bigboy")!]) {
       const crate = bossCrateOf(s.home)!;
       expect(crate.name).toBe(s.crate);
       expect(crate.items).toContain(s.prizes[0]);
