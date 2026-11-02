@@ -4,9 +4,10 @@
  * itself (its art, its drawing) loads only when you go in (ShopRoom.tsx). docs/decisions/2026-11-02-shop-interiors-r1.md.
  *
  * Round 2 (Nov 2, docs/decisions/2026-11-02-boss-tokens.md): what you hold is your locker's (the boss's tokens, your crate keys),
- * and `buyBossCrate` is the purchase: the server takes the price and opens the crate into your locker, in one transaction.
+ * and `buyBossCrate` is the purchase: the server takes the price and puts the crate in your inventory, in one transaction (since
+ * Eric's Nov 2 fixes it isn't opened at once: you open it in the Crates tab, as any crate).
  */
-import { BOSS_CRATE_PRICE, BOSS_CRATE_POOL, bossCrateOf, itemDef, tierInfo, type ItemInstance } from "@chessroyale/core";
+import { BOSS_CRATE_PRICE, BOSS_CRATE_POOL, bossCrateOf, itemDef, tierInfo } from "@chessroyale/core";
 import { buyBossCrateOnServer, tokenCount } from "../../account.ts";
 import type { HomeId } from "../world.ts";
 import type { SkyTone } from "../sky.ts";
@@ -87,25 +88,23 @@ export const canAfford = (h: Holdings, way: CrateWay): boolean => {
   return h.tokens >= p.tokens && h.keys >= p.keys;
 };
 
-/** What a buy came to: done (with the item it gave), or why not (shown under the buttons). */
+/** What a buy came to: done, or why not (shown under the buttons). */
 export interface BuyResult {
   ok: boolean;
   message: string;
-  /** The item the crate opened to (a buy that went through). */
-  item?: ItemInstance;
 }
-/** A buy's answer: "You got Balloon Pup! It's in your Locker." */
-export const gotLine = (def: string) => `You got ${itemDef(def)?.name ?? "an item"}! It's in your Locker.`;
+/** A buy's answer (Eric, Nov 2: "it says when you buy it it's in your inventory"): "Babur's Boss Crate is in your inventory." */
+export const inInventoryLine = (crate: string) => `${crate} is in your inventory.`;
 /**
  * Buys a boss's crate one of its two ways. Every buy button goes through here, and only here: the server takes the price (the
- * tokens, and the key) and opens the crate into your locker, in one transaction (server/boss-tokens.ts), or says why not.
+ * tokens, and the key) and puts the crate in your inventory, unopened, in one transaction (server/boss-tokens.ts), or says why not.
  */
 export async function buyBossCrate(boss: HomeId, way: CrateWay): Promise<BuyResult> {
   const crate = bossCrateOf(boss);
   if (!crate) return { ok: false, message: "This crate isn't sold yet." };
   try {
-    const { item } = await buyBossCrateOnServer(crate.id, way);
-    return { ok: true, message: gotLine(item.def), item };
+    await buyBossCrateOnServer(crate.id, way);
+    return { ok: true, message: inInventoryLine(crate.name) };
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : "Something went wrong." };
   }

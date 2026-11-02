@@ -254,6 +254,8 @@ export interface Locker {
   keys: number | null;
   /** Boss tokens you have, by boss id (only those you have some of; missing from an older server). */
   tokens?: Record<string, number>;
+  /** Boss crates you bought and haven't opened, by crate id ("boss-tiger"; only those you have some of; missing from an older server). */
+  bossCrates?: Record<string, number>;
 }
 
 /** Your crate keys and one boss's tokens, as your locker has them now. */
@@ -263,14 +265,17 @@ export const tokenCount = (boss: string): { tokens: number; keys: number } => {
 };
 
 /**
- * Buys a boss's crate inside its shop (`way`: 3 of its tokens, or a token and a crate key) and opens it, on the server, in one
- * transaction (server/boss-tokens.ts). Your locker comes back with it. Throws the server's message (not enough, the shop resting).
+ * Buys a boss's crate inside its shop (`way`: 3 of its tokens, or a token and a crate key) into your inventory, unopened (Nov 2: the
+ * Crates tab opens it, `openCrate`), on the server, in one transaction (server/boss-tokens.ts). Your locker comes back with it. Throws
+ * the server's message (not enough, the shop resting).
  */
-export async function buyBossCrateOnServer(crate: string, way: "tokens" | "key"): Promise<{ roll: CrateRoll; item: ItemInstance }> {
-  const r = await api<{ roll: CrateRoll; item: ItemInstance; locker: Locker }>("/api/shop/boss-crate", { method: "POST", body: JSON.stringify({ crate, way }) });
+export async function buyBossCrateOnServer(crate: string, way: "tokens" | "key"): Promise<void> {
+  const r = await api<{ crate: string; locker: Locker }>("/api/shop/boss-crate", { method: "POST", body: JSON.stringify({ crate, way }) });
   if (state.profile) set({ profile: { ...state.profile, locker: r.locker } });
-  return { roll: r.roll, item: r.item };
 }
+
+/** How many of a boss crate ("boss-tiger") you hold, unopened, as your locker has it now. */
+export const bossCrateCount = (crate: string): number => state.profile?.locker?.bossCrates?.[crate] ?? 0;
 
 /** An admin's test grant to themselves: crate keys, and a boss's tokens. Your locker comes back with it. */
 export async function grantTestItems(body: { keys?: number; boss?: string; tokens?: number }): Promise<void> {

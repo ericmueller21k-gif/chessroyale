@@ -1,6 +1,7 @@
 import type { ComponentChildren, JSX } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
+  BOSS_CRATES,
   CRATES,
   CRATES_FREE,
   FISCHER,
@@ -9,6 +10,7 @@ import {
   SHOP_ITEMS,
   SLOT_NAMES,
   TIERS,
+  bossCrateDef,
   crateDef,
   fischerOdds,
   isAdminCopy,
@@ -29,6 +31,7 @@ import {
   isPlayable,
   tokenBossName,
   tokenBosses,
+  type BossCrateDef,
   type CrateDef,
   type CrateLook,
   type CrateRoll,
@@ -100,6 +103,12 @@ function getUnseen(): Unseen | null {
   return unseenHere;
 }
 
+/** A crate by its id: the Crates tab's own (free while testing), or a boss's (bought in its shop, held until you open it: Nov 2). */
+const anyCrate = (id: string): CrateDef | undefined => crateDef(id) ?? bossCrateDef(id);
+const isBossCrate = (c: CrateDef): c is BossCrateDef => "boss" in c;
+/** How many of a boss crate your locker holds, unopened. */
+const heldOf = (locker: { bossCrates?: Record<string, number> } | undefined, c: CrateDef) => locker?.bossCrates?.[c.id] ?? 0;
+
 /** A crate's name with its series on a line of its own ("Beta Crate", then "Series 001"): no line ends on the " · ". */
 function CrateName({ name }: { name: string }) {
   const [head, series] = name.split(" · ");
@@ -123,10 +132,10 @@ export function CratesPanel() {
   // A crate you left during its spin opens straight to its reveal (unless that item's gone, e.g. deleted).
   const [resume] = useState(() => {
     const u = getUnseen();
-    if (!u || !crateDef(u.crate) || (locker && !locker.items.some((i) => i.id === u.item.id))) return null;
+    if (!u || !anyCrate(u.crate) || (locker && !locker.items.some((i) => i.id === u.item.id))) return null;
     return u;
   });
-  const [open, setOpen] = useState<CrateDef | null>(() => (resume ? crateDef(resume.crate)! : null));
+  const [open, setOpen] = useState<CrateDef | null>(() => (resume ? anyCrate(resume.crate)! : null));
   const count = (n: number | null | undefined) => (n === null || n === undefined ? "∞" : String(n));
   if (open) return <CratePage crate={open} resume={resume?.crate === open.id ? resume : undefined} onBack={() => setOpen(null)} />;
   return (
@@ -164,6 +173,31 @@ export function CratesPanel() {
         );
       })}
       {CRATES_FREE && <p class="shop-note">Crates are unlimited while we test.</p>}
+      {/* The boss crates (Eric, Nov 2: a buy in a boss's shop "adds the crate to your inventory"): each with how many you hold,
+          greyed at none (shown, not hidden: its page still shows what's inside); opened here as any crate. */}
+      <h3 class="ff-title">Boss crates</h3>
+      {BOSS_CRATES.map((c) => {
+        const { Crate } = CRATE_LOOKS[c.look];
+        const n = heldOf(locker, c);
+        return (
+          <button type="button" key={c.id} class={`ff-window crate-row boss-crate-row${n ? "" : " none"}`} data-crate={c.id} data-held={n} onClick={() => setOpen(c)}>
+            <span class="crate-row-art">
+              <Crate />
+              <span class="crate-row-token">
+                <TokenArt boss={c.boss} />
+              </span>
+            </span>
+            <span class="crate-row-text">
+              <strong>{c.name}</strong>
+              <span class="crate-row-blurb">{c.blurb}</span>
+              <span class="crate-row-held">{n ? `You have ${n}` : "You have none"}</span>
+            </span>
+            <span class="ff-cursor" aria-hidden="true">
+              ▶
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -235,6 +269,9 @@ function AdminGrants() {
 }
 
 function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen; onBack: () => void }) {
+  // A boss crate opens only one you hold (the server's, once each), never with a test switch.
+  const boss = isBossCrate(crate) ? crate : null;
+  const held = heldOf(useAccount().profile?.locker, crate);
   // Test switches (test-switches.ts; the server checks too): ?fischer=1, ?shiny=1 force the roll, until changed with
   // the boxes below. (Read on every render: whether you may is known once your account is.)
   const [fischerSet, setForceFischer] = useState<boolean | null>(null);
@@ -246,7 +283,7 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
   // Commonest first; Legendary and Mythic (Fischer Random) last.
   const items = [...crate.items].sort((a, b) => tierIndex(a) - tierIndex(b));
   if (opening)
-    return <CrateOpening crate={crate} force={{ fischer: forceFischer, shiny: forceShiny }} resume={resume} onClose={() => setOpening(false)} />;
+    return <CrateOpening crate={crate} force={boss ? {} : { fischer: forceFischer, shiny: forceShiny }} resume={resume} onClose={() => setOpening(false)} />;
   return (
     <div class="crate-page">
       <GamblingWarning />
@@ -261,6 +298,11 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
           <CrateName name={crate.name} />
         </strong>
         <span class="small">{crate.blurb}</span>
+        {boss && (
+          <span class="small crate-held" data-held={held}>
+            {held ? `You have ${held}.` : `You have none. ${tokenBossName(boss.boss)}'s shop in the town sells it.`}
+          </span>
+        )}
       </div>
       <h3 class="ff-title">{look.boxes}</h3>
       <p class="small muted">
@@ -341,7 +383,7 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
           ))}
         </div>
       </details>
-      {CRATES_FREE && testSwitchesAllowed() && (
+      {CRATES_FREE && !boss && testSwitchesAllowed() && (
         <div class="test-switches">
           <span class="muted small">Testing:</span>
           <label class="check small">
@@ -352,9 +394,11 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
           </label>
         </div>
       )}
+      {/* (A boss crate: greyed with none to open, shown, not hidden.) */}
       <button
         type="button"
         class="ff-button"
+        disabled={!!boss && held < 1}
         onClick={() => {
           // (A tap: the moment a phone allows sound, so the strip's clicks are heard.)
           unlockAudio();
@@ -362,7 +406,7 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
           setOpening(true);
         }}
       >
-        ▶ Open · uses 1 key
+        {boss ? "▶ Open" : "▶ Open · uses 1 key"}
       </button>
     </div>
   );
@@ -486,6 +530,8 @@ function CrateOpening({
   onClose: () => void;
 }) {
   const [result, setResult] = useState<{ roll: CrateRoll; item: ItemInstance } | null>(resume ?? null);
+  // "Open another": a boss crate only while you hold one more (greyed at none); the Crates tab's own, always.
+  const more = !isBossCrate(crate) || heldOf(useAccount().profile?.locker, crate) > 0;
   const [error, setError] = useState<string | null>(null);
   const [stage, setStage] = useState<"spin" | "fischer" | "unwrap" | "spin2" | "reveal">(resume ? "reveal" : "spin");
   const [round, setRound] = useState(0);
@@ -548,6 +594,7 @@ function CrateOpening({
       {result && stage === "reveal" && (
         <Reveal
           item={result.item}
+          again={more}
           onAgain={() => setRound((r) => r + 1)}
           onClose={onClose}
         />
@@ -576,7 +623,7 @@ function Unwrap({ tier, look }: { tier: PresentTier; look: CrateLook }) {
 }
 
 /** The reveal: an FF-style window with the item, its tier, color, purity and (if so) its shine. */
-function Reveal({ item, onAgain, onClose }: { item: ItemInstance; onAgain: () => void; onClose: () => void }) {
+function Reveal({ item, again = true, onAgain, onClose }: { item: ItemInstance; again?: boolean; onAgain: () => void; onClose: () => void }) {
   const d = itemDef(item.def)!;
   const t = tierInfo(d.tier);
   const shiny = isShiny(item.blemish);
@@ -611,7 +658,7 @@ function Reveal({ item, onAgain, onClose }: { item: ItemInstance; onAgain: () =>
         >
           {worn ? "Wearing it" : "▶ Wear"}
         </button>
-        <button type="button" class="ff-button small" onClick={onAgain}>
+        <button type="button" class="ff-button small" disabled={!again} onClick={onAgain}>
           ▶ Open another
         </button>
         <button type="button" class="ff-button small" onClick={onClose}>
