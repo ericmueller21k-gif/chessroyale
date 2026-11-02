@@ -20,6 +20,8 @@
   --shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
   --gutter: 14px;
   --col: min(100vw, 560px);
+  /* The window's width the game screens lay out in: all of it, less the side menu on a computer (game-frame.css). */
+  --win-w: 100vw;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   color-scheme: dark;
 }
@@ -1024,7 +1026,7 @@ p {
 
 @media (min-width: 900px) and (min-height: 600px) {
   :root {
-    --col: min(100vw, 1100px);
+    --col: min(var(--win-w), 1100px);
   }
   .screen.game {
     display: grid;
@@ -1688,7 +1690,7 @@ p {
     padding: 14px 0 14px 14px;
   }
   .arena .screen {
-    width: min(calc(100vw - 380px), 1000px);
+    width: min(calc(var(--win-w) - 380px), 1000px);
   }
 }
 
@@ -2842,6 +2844,81 @@ button.history-label {
   width: 40px;
   color: #9aa2b1;
 }
+/* Black · White · All: the picked one in white, the others grey (the phone's scoreboard header, MiniTower). */
+.mini-tower-head .mini-picks {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+.mini-tower-head .mini-pick {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0 4px;
+  border: none;
+  background: none;
+  color: #6f7787;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.mini-tower-head .mini-pick.on {
+  color: #ffffff;
+}
+.tower .team-chip {
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+/* (The black mark needs an edge on the scoreboard's dark rows.) */
+.tower .team-chip.b {
+  box-shadow: inset 0 0 0 1px #6f7787;
+}
+/* Light mode (Eric, Nov 1): the 50 v 50 team table follows the Light / Dark pick like the rest of the match: light rows,
+   dark text. The podium's gold, silver and bronze chips, the cut zone, your row's tint and the cut line stay as they are;
+   the rest of the rank squares go light. */
+:root[data-theme="light"] .mini-tower,
+:root[data-theme="light"] .mini-tower .tower {
+  background: var(--surface);
+  color: var(--text);
+}
+:root[data-theme="light"] .mini-tower-head {
+  background: var(--surface-2);
+}
+:root[data-theme="light"] .mini-tower-title,
+:root[data-theme="light"] .mini-tower-toggle,
+:root[data-theme="light"] .mini-tower-head .mini-pick.on {
+  color: var(--text);
+}
+:root[data-theme="light"] .mini-tower-head .mini-pick {
+  color: var(--muted);
+}
+:root[data-theme="light"] .mini-tower .tower-head {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+:root[data-theme="light"] .mini-tower .tower-row {
+  background-color: var(--surface);
+}
+:root[data-theme="light"] .mini-tower .tower-row:nth-child(odd) {
+  background-image: linear-gradient(rgba(0, 0, 0, 0.03), rgba(0, 0, 0, 0.03));
+}
+:root[data-theme="light"] .mini-tower .tower-row:not(.p1):not(.p2):not(.p3):not(.zone):not(.out) .t-pos {
+  background: #e2ded5;
+  color: var(--text);
+}
+:root[data-theme="light"] .mini-tower .t-elo:not(.top),
+:root[data-theme="light"] .mini-tower .t-avg,
+:root[data-theme="light"] .mini-tower .t-bank,
+:root[data-theme="light"] .mini-tower .tower-gap {
+  color: var(--muted);
+}
+:root[data-theme="light"] .mini-tower .team-chip.w {
+  box-shadow: inset 0 0 0 1px #6a6f7a;
+}
 .mini-tower-body {
   flex: 1;
   min-height: 0;
@@ -2935,8 +3012,117 @@ button.history-label {
     font-size: 12px;
     line-height: 14px;
   }
+  /* The line above the board in a 50 v 50 stays one line on every phase at every phone width, so the board keeps main's
+     place (Nov 1, the e2e checks "the board doesn't move" and "the board never moves or resizes"). The play line
+     ("Your pick for Black · 50/50 picked") is about 199 px at 12 px, and beside the clock a 320 px phone has about 188 px
+     for it: under 360 px the line is 11 px (every phase, so the same size everywhere). Nothing is cut or hidden. */
+  @media (max-width: 359px) {
+    .screen.game.crowd-50 .board-area > .opening-name {
+      font-size: 11px;
+    }
+  }
   .screen.game .play-footer {
     gap: 6px;
+  }
+  /* The scoreboard's top sits 4 px under the vote box's foot (the screen's gap is 6 px). */
+  .screen.game.crowd-50 > .under-board,
+  .screen.game.crowd-50 > .mini-tower {
+    margin-top: -2px;
+  }
+  /* The middle box (Nov 1, Eric: "that space must be the scoreboard"): exactly as tall as the vote box, its bars and the one
+     result line, so the scoreboard's top sits right under the result and the scoreboard fills the rest of the screen. It is
+     one height on every phase of a match (the power-up row, the status line and the vote results take turns in it), so the
+     scoreboard never moves (crowd.spec, "the scoreboard never moves"). A bar is 14 px with its gap, the result line 20 px:
+     six bars at most (--slots; Crowd.tsx, useBarSlots, shows as many as the box holds). The board keeps its size. */
+  .screen.game.crowd-50 {
+    --slots: 6;
+    --mid-h: calc(var(--slots) * 14px + 20px);
+  }
+  /* Shorter screens: fewer bars, so the scoreboard keeps its rows (at 664 and 667 it keeps four or five with six). */
+  @media (max-height: 639px) {
+    .screen.game.crowd-50 {
+      --slots: 5;
+    }
+  }
+  @media (max-height: 599px) {
+    .screen.game.crowd-50 {
+      --slots: 4;
+    }
+  }
+  .screen.game.crowd-50 > .play-footer,
+  .screen.game.crowd-50 > .poll {
+    flex: none;
+    height: var(--mid-h);
+    min-height: 0;
+    align-content: start;
+  }
+  /* (The power-up row or the waiting line sits in the middle of the box while it's the picking's: the box's height is the
+     vote box's, so the space is shared out, not left at the foot.) */
+  .screen.game.crowd-50 > .play-footer {
+    align-content: center;
+  }
+  .screen.game.crowd-50 .poll {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    overflow: hidden;
+  }
+  /* A bar: thin (13 px), the move, its bar, the brilliant find's mark, the votes, and "you" on yours. */
+  .screen.game.crowd-50 .poll-row {
+    display: grid;
+    grid-template-columns: 46px minmax(0, 1fr) auto 26px auto;
+    gap: 6px;
+    flex: none;
+    height: 13px;
+    padding: 0 8px;
+    font-size: 12px;
+    line-height: 13px;
+  }
+  .screen.game.crowd-50 .poll-bar {
+    height: 8px;
+  }
+  /* The brilliant find: a small mark on its bar ("‼ +1", "‼ +1 each"), not a line of its own. */
+  .screen.game.crowd-50 .poll-mark .brilliant-line {
+    gap: 2px;
+    height: 13px;
+    padding: 0 4px;
+    border-radius: 6px;
+    font-size: 10px;
+    line-height: 11px;
+  }
+  .screen.game.crowd-50 .poll-mark .brilliant-mark {
+    font-size: 11px;
+    line-height: 11px;
+  }
+  /* The result: one line (the score, then your move, the best move, the opening allowance and the streak), pinned to the
+     foot of the box so the scoreboard starts right under it. Nothing wraps; the words are short enough for 320 px. */
+  .screen.game.crowd-50 .poll-result {
+    flex: none;
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 8px;
+    height: 20px;
+    margin-top: auto;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .screen.game.crowd-50 .poll-result .round-score {
+    font-size: 20px;
+    line-height: 20px;
+  }
+  .screen.game.crowd-50 .result-text {
+    min-width: 0;
+    font-size: 12px;
+    line-height: 20px;
+    font-weight: 700;
+    color: var(--muted);
+  }
+  @media (max-width: 340px) {
+    .screen.game.crowd-50 .result-text {
+      font-size: 11px;
+    }
   }
 
   .screen.game .waiting-banner {
@@ -3274,7 +3460,7 @@ button.history-label {
 }
 .poll-row {
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr) 34px auto;
+  grid-template-columns: 56px minmax(0, 1fr) auto 34px auto;
   align-items: center;
   gap: 8px;
   padding: 4px 8px;
@@ -3340,6 +3526,31 @@ button.history-label {
   line-height: 1.2;
   color: var(--muted);
   white-space: nowrap;
+}
+/* The reveal's extras (the allowance and the streak, Crowd 50 v 50): one line together, cut with an ellipsis if they must. */
+.poll-extras {
+  grid-column: 1 / -1;
+  flex-basis: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--muted);
+}
+.poll-extras .allowance-line {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.poll-extras .streak-note,
+.poll-extras .extras-sep {
+  flex: none;
 }
 .crowd-cut {
   justify-content: center;
@@ -5494,7 +5705,7 @@ button.history-label {
     --gk-off: 2px;
     --gk-screen: var(--col);
     --gk-column: calc(var(--gk-screen) - 2 * var(--gutter) - 368px);
-    --bs-need: calc(var(--bs-reach, 0px) - (100vw - var(--col)) / 2 - var(--gutter));
+    --bs-need: calc(var(--bs-reach, 0px) - (var(--win-w) - var(--col)) / 2 - var(--gutter));
     /* (The board's most by the window's height: all but 288 px, less where Babur's pump makes the bar taller, below.) */
     --bd-h: calc(var(--app-h) - 288px);
     --gk-board: min(var(--gk-column) - 2 * max(0px, var(--bs-need)), var(--bd-h));
@@ -5546,7 +5757,7 @@ button.history-label {
 @media (min-width: 1100px) and (min-height: 600px) {
   /* (The screen beside the leaderboard: see .arena .screen.) */
   .arena .screen.game:has(> .boss-dock) {
-    --gk-screen: min(100vw - 380px, 1000px);
+    --gk-screen: min(var(--win-w) - 380px, 1000px);
   }
 }
 
@@ -6703,6 +6914,24 @@ button.history-label {
   font-size: 17px;
   color: #0891b2;
 }
+/* The shoutout's text (Crowd 50 v 50): one line, its names the part that gives way (ellipsis). */
+.brilliant-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  white-space: nowrap;
+}
+.brilliant-text > strong,
+.brilliant-text > span:not(.brilliant-names) {
+  flex: none;
+}
+.brilliant-names {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* ---- Elimination breakdown ---- */
 .breakdown {
@@ -6973,7 +7202,8 @@ button.history-label {
 }
 .avatar.hb-pieces > piece,
 .avatar > .avatar-items,
-.avatar > .avatar-skin {
+.avatar > .avatar-skin,
+.avatar > .avatar-ride {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -7054,6 +7284,40 @@ button.history-label {
 .crate-opening {
   display: grid;
   gap: 12px;
+}
+/*
+ * The gambling warning (Eric, Nov 1; GamblingWarning.tsx): a small red ring over the top right corner of the crate pages (the Crates
+ * tab and a crate's own page). It's out of the flow, so it takes no room and moves nothing; the 40 px button is a full tap target
+ * round the 30 px ring. Its message box is the locker's dialog (below).
+ */
+.crates,
+.crate-page {
+  position: relative;
+}
+.gamble-ring {
+  position: absolute;
+  top: -3px;
+  right: -4px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--danger);
+  cursor: pointer;
+}
+.gamble-ring svg {
+  display: block;
+  width: 30px;
+  height: 30px;
+}
+.gamble-dialog p {
+  margin: 4px 0 2px;
+  font-size: 14px;
+  line-height: 1.45;
 }
 .crate-stock {
   display: flex;
@@ -7478,6 +7742,18 @@ button.history-label {
   border: 1px solid #c7d2fe;
   font-size: 11px;
   font-weight: 900;
+}
+/* An admin copy (an admin's, never stored: core/admin-copies.ts), top right: it's never a stack, so no count is there. */
+.locker-admin {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: var(--text);
+  color: var(--surface);
+  font-size: 10px;
+  font-weight: 800;
 }
 /* Holding an item opens its delete dialog: no text selection or the phone's own long-press menu. */
 .locker-item {
@@ -8345,6 +8621,7 @@ button.fd-logo {
 }
 .fd-btn:active:not(:disabled),
 .fd-play:active:not(:disabled),
+.fd-town:active,
 .fd-modes button:active {
   transform: scale(0.97);
 }
@@ -8863,7 +9140,9 @@ button.fd-logo {
 .fd-mode-panel.idle button:active {
   transform: none;
 }
-.fd-play {
+/* (Chess Town's button, `fd-town`, is PLAY's size at every width: it's in each of PLAY's size rules below, so they never part.) */
+.fd-play,
+.fd-town {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -8871,10 +9150,16 @@ button.fd-logo {
   /*
    * (Oct 26, Eric: "the play button is too small": 64 px. Oct 28: "make the play button bigger with the space we gain": the
    * room the compact Other modes cards and the shorter options give back is PLAY's, so the pawn's card, the page and
-   * everything under PLAY keep their size and place. 97 px = 64 + 4 (options) + 20 (Boss Arena) + 28 (the pair) - 15 (the
-   * room under the last card, kept: below) - 4 (the label's room under PLAY).)
+   * everything under PLAY keep their size and place. 97 px = 64 + 4 (options) + 20 (the Boss Arena card, now Chess Town's button) +
+   * 28 (the pair) - 15 (the room under the last card, kept: below) - 4 (the label's room under PLAY). Nov 1: Chess Town's button
+   * took PLAY's size under PLAY, and the card's room with it.)
+   *
+   * A short phone (Nov 1): Chess Town's button is PLAY's size, 33 px taller than the card it replaced, and the pawn's card was already
+   * at its smallest on a 640 px phone, so below 700 px of height the two give the 33 px back together, 17 px less each at the
+   * most, 80 px, reached at 666 px (the page keeps fitting from 360 × 640 up, as it did: "should never have to be scrolling down on
+   * the phone"). From 700 px up they're 97 px as before.
    */
-  height: 97px;
+  height: clamp(80px, calc(97px - (700px - var(--app-h)) / 2), 97px);
   border: 0;
   border-radius: 18px;
   background: var(--fd-gold);
@@ -8888,6 +9173,74 @@ button.fd-logo {
 .fd-play:disabled {
   opacity: 0.45;
   cursor: default;
+}
+/*
+ * Chess Town's button (Eric, Oct 31 and Nov 1; Home.tsx): PLAY's size (the rules above and the computer's below), a little town
+ * scene filling it (home-art/Pic.tsx: one of two pictures, playing its idle) with the name over it in big white letters with a dark
+ * outline. The sky is the pictures' dusk in the light theme and the dark alike (the colors are fixed, not the theme's), and the gold
+ * ring is drawn over the picture (a border would shrink it). The words sit a little above the middle so the picture's lower half
+ * (the doors, the table and its pawns) shows.
+ */
+.fd-town {
+  position: relative;
+  overflow: hidden;
+  padding: 0 0 26px;
+  background: linear-gradient(180deg, #232c4a 0%, #4a3f5e 62%, #6b4f54 100%);
+  color: #fff;
+  white-space: nowrap;
+}
+/*
+ * The sky behind the picture by the device's time of day (Nov 1; home-art/town.ts picks it as the page loads, `data-sky`): the dusk
+ * above is the picture as drawn (17:00 to 19:00); a clear light blue by day (06:00 to 17:00), a deep night blue with the town's
+ * lights on at night (19:00 to 06:00). The same in the light and dark themes, like the dusk.
+ */
+.fd-town[data-sky="day"] {
+  background: linear-gradient(180deg, #5aa9e6 0%, #8cc9f2 60%, #c4e6f8 100%);
+}
+.fd-town[data-sky="night"] {
+  background: linear-gradient(180deg, #050a1e 0%, #0b1433 55%, #16224a 100%);
+}
+.fd-town::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 2px var(--fd-gold);
+  pointer-events: none;
+}
+.fd-town-scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+.fd-town-label {
+  position: relative;
+  z-index: 1;
+  font-size: 32px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #fff;
+  -webkit-text-stroke: 6px #1a1208;
+  paint-order: stroke fill;
+  text-shadow: 0 2px 0 rgba(26, 18, 8, 0.55);
+}
+/* (A 320 px phone: the button is 272 px wide, so the words are a little smaller and still whole.) */
+@media (max-width: 359px) {
+  .fd-town-label {
+    font-size: 28px;
+  }
+}
+/* A computer: PLAY is 76 px tall there (60 in a short window), so the words are smaller and sit lower. */
+@media (min-width: 1024px) {
+  .fd-root.framed .fd-town {
+    padding-bottom: 10px;
+  }
+  .fd-root.framed .fd-town-label {
+    font-size: 30px;
+  }
 }
 /* PLAY, the line under it and an error: spaced as the play column is. */
 .fd-go {
@@ -9107,10 +9460,6 @@ button.fd-logo {
 }
 .rd-face .boss-portrait {
   width: 56px;
-}
-/* Solo Boss Mode's card picture: the crown, in the card's gold (CrownArt, Home.tsx). */
-.fd-crown {
-  color: var(--fd-gold-text);
 }
 /* The card's portrait: a still that moves on to the next boss (BossCardFace), the new one fading in over the last. */
 .rd-face-stack,
@@ -9451,6 +9800,179 @@ button.fd-logo {
   width: 62%;
   height: 62%;
 }
+/* ---- Boss Battle's party on the stage (Eric, Oct 29; docs/decisions/2026-10-30-boss-party.md) ----
+   The invite circle is a button over its platform; a member stands there instead, their own dressed pawn at the back
+   platforms' scale, its feet on the platform's middle; over a head, the leader's crown and a ready member's check (Eric's
+   picture's green check in a white circle). A tap on a member opens a small menu above their head. Nothing moves. */
+.bs-inv-btn,
+.bs-mate {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.bs-inv-btn:disabled {
+  cursor: default;
+}
+.bs-mate {
+  z-index: 1;
+}
+.bs-mate > .fd-pawn {
+  position: absolute;
+  left: -35%;
+  width: 170%;
+  bottom: 24%;
+  pointer-events: none;
+}
+.bs-mate .fd-pawn-stage {
+  display: block;
+}
+.bs-head {
+  position: absolute;
+  left: 50%;
+  top: 19%;
+  width: 0;
+  height: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 2px;
+  z-index: 3;
+  pointer-events: none;
+}
+.bs-me {
+  z-index: 1;
+}
+.bs-head-me {
+  top: 19%;
+}
+.bs-head > * {
+  flex: none;
+}
+.bs-check {
+  display: grid;
+  place-items: center;
+  width: max(22px, 9cqi);
+  height: max(22px, 9cqi);
+  border-radius: 50%;
+  background: #fff;
+  border: 1.5px solid #1d1f24;
+  color: #16a34a;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+.bs-head-me .bs-check {
+  width: max(26px, 11cqi);
+  height: max(26px, 11cqi);
+}
+.bs-check svg {
+  width: 72%;
+  height: 72%;
+}
+.bs-crown {
+  display: block;
+  width: max(22px, 10cqi);
+}
+.bs-head-me .bs-crown {
+  width: max(26px, 12cqi);
+}
+.bs-crown svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.bs-menu-on .dv-st-plat {
+  box-shadow: 0 0 0 2px var(--fd-gold), 0 3px 7px rgba(0, 0, 0, 0.2);
+}
+.bs-menu-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 59;
+}
+/* The member menu: above their head, opening to their right (clear of your pawn and its crown), their name its title. */
+.bs-menu {
+  position: absolute;
+  z-index: 60;
+  bottom: 84%;
+  width: 200px;
+  padding: 4px 6px;
+  background: var(--fd-panel);
+  border: 1px solid var(--fd-line);
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+  font-family: Archivo, system-ui, sans-serif;
+  text-align: left;
+}
+.bs-menu-l {
+  left: 2%;
+  --caret: 12%;
+}
+.bs-menu-r {
+  left: 62%;
+  --caret: 17%;
+}
+.bs-menu::after {
+  content: "";
+  position: absolute;
+  left: calc(var(--caret) - 7px);
+  bottom: -8px;
+  width: 14px;
+  height: 14px;
+  background: var(--fd-panel);
+  border-right: 1px solid var(--fd-line);
+  border-bottom: 1px solid var(--fd-line);
+  transform: rotate(45deg);
+}
+.bs-menu-title {
+  padding: 6px 10px 4px;
+  font-family: "Archivo Black", Archivo, sans-serif;
+  font-size: 15px;
+  color: var(--fd-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bs-menu button {
+  display: block;
+  width: 100%;
+  min-height: 42px;
+  padding: 0 10px;
+  border: 0;
+  border-top: 1px solid var(--fd-line);
+  background: none;
+  text-align: left;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fd-text);
+  cursor: pointer;
+}
+.bs-menu button:disabled {
+  color: var(--fd-dim);
+  cursor: default;
+}
+.bs-menu .bs-danger {
+  color: #c22222;
+}
+/* A member's view: the boss and the difficulty are the leader's (the tiles muted, not tappable; the picked one stays). */
+.bs-theirs .bs-tile:not(.on) {
+  opacity: 0.5;
+  filter: saturate(0.6);
+}
+.bs-theirs .bs-tile {
+  cursor: default;
+}
+/* The line under START / READY: its room always kept, so nothing moves when it changes. */
+.bs-line {
+  min-height: 1.4em;
+  margin: 10px 0 0;
+  text-align: center;
+  font-size: 14px;
+  color: var(--fd-muted);
+}
 /* Its words: a room over the stage (three lines of the bubble), the bubble at its foot, over the boss's side. */
 .bs-say {
   position: relative;
@@ -9661,7 +10183,7 @@ button.fd-logo {
 }
 /*
  * Home's Other modes cards are compact, on a phone as on a computer (Eric, Oct 28: "shrink those down vertically and make the
- * play button bigger with the space we gain"): Boss Arena 64 px (its picture 48 px beside the words; it was 84 px on a
+ * play button bigger with the space we gain"): the Boss Arena card 64 px (now Chess Town's button, PLAY's size; its picture 48 px beside the words; it was 84 px on a
  * phone), and under it Solo Boss Mode and Auto chess side by side (Eric, Oct 26; half width each), each with its picture to
  * the left of the words, 56 px tall (they were 84 px on a phone, with the picture above the words, and 64 px on a computer).
  * No › on the half cards: "Solo Boss Mode" and its picture fill a 172 px card at 390 px with no room for it.
@@ -9713,8 +10235,7 @@ button.fd-logo {
 .fd-root .rd-pair .rd-card.rd-half .rd-card-text span {
   font-size: 12px;
 }
-/* (A 320 px phone: the half card is 137 px wide, so a smaller picture and words keep "Solo Boss Mode" on one line, and Boss Arena's
-   line stays on one line too, so no card grows.) */
+/* (A 320 px phone: the half card is 137 px wide, so a smaller picture and words keep "Solo Boss Mode" on one line, so no card grows.) */
 @media (max-width: 359px) {
   .fd-root .fd-play-col .rd-card {
     gap: 10px;
@@ -9864,6 +10385,7 @@ button.fd-logo {
 }
 .fd-toggle.disabled {
   opacity: 0.55;
+  cursor: default;
 }
 .fd-toggle-text {
   display: flex;
@@ -10981,6 +11503,10 @@ button.fd-seat {
     place-items: center;
     color: var(--fd-gold-text);
   }
+  /* Chess Town's crest (home-art): its own 40 px (a pixel of art a pixel of screen on a computer), in the 34 px icon slot. */
+  .fd-menu-crest {
+    margin: -3px;
+  }
   .fd-right {
     position: sticky;
     /* (Under the maintenance banner, when one shows: --banner-h is 0 otherwise.) */
@@ -11194,7 +11720,8 @@ button.fd-seat {
   }
   /* (Oct 28, Eric: "make the play button bigger with the space we gain": 76 px = 64 + 4 (the options) + 8 (the pair's cards),
      so the live window's board and the page keep their size.) */
-  .fd-root.framed .fd-play {
+  .fd-root.framed .fd-play,
+  .fd-root.framed .fd-town {
     height: 76px;
     font-size: 40px;
   }
@@ -11235,13 +11762,23 @@ button.fd-seat {
     justify-content: flex-end;
     gap: 12px;
   }
+  /*
+   * (Nov 1: Chess Town's button is PLAY's size, 12 px more than the card it replaced, and the live window's board is the column's
+   * elastic part, so under 812 px of height the two give the 12 px back together, 70 px at the least (a 1280 × 800 laptop): the board
+   * keeps the size it had, 233 px at most. From 812 px up, and in a short window (below), they're as they were.)
+   */
+  .fd-root.framed .fd-play,
+  .fd-root.framed .fd-town {
+    height: clamp(70px, calc(76px - (812px - var(--app-h)) / 2), 76px);
+  }
   /* (A short window, a laptop's: the column closer, so the live window keeps a board worth seeing. PLAY 60 px here, up from
      48 (Oct 28; 43 before Oct 26): the board keeps the size it had at 680 px tall.) */
   @media (max-height: 760px) {
     .fd-root.framed .fd-play-col {
       gap: 8px;
     }
-    .fd-root.framed .fd-play {
+    .fd-root.framed .fd-play,
+    .fd-root.framed .fd-town {
       height: 60px;
       font-size: 32px;
     }
@@ -12193,9 +12730,164 @@ img.qicon {
   }
 }
 
+/* A phone's 50 v 50 (Nov 1): one box under the vote box, the scoreboard or the chat (KeptBox, QuickChat.tsx). The header
+   reads Black · White · All, close together, then Chat; the unread count shows on Chat while the scoreboard is up. */
+.screen.game.crowd-50 .mini-tower-head .mini-picks {
+  flex: none;
+}
+.screen.game.crowd-50 .mini-tower-head .mini-pick {
+  flex: none;
+  padding: 0 7px;
+}
+.screen.game.crowd-50 .mini-tower-head .mini-chat-tab {
+  margin-left: 10px;
+}
+/* "Black" in line with "POS" under it (Eric, Nov 1): both start 3 px in, at the rank squares' left edge (a row's 3 px
+   edge). The tab keeps its full height and stays wider than 24 px; the other labels are as they were. */
+@media (max-width: 899px) and (min-height: 520px) {
+  .screen.game.crowd-50 .mini-tower-head .mini-picks > .mini-pick:first-child {
+    padding-left: 3px;
+  }
+  .screen.game.crowd-50 .mini-tower .tower-head span:first-child {
+    padding-left: 3px;
+    text-align: left;
+  }
+}
+/* (The kept box's place in each screen: a hidden marker, the box right after it.) */
+.ub-place {
+  display: none;
+}
+.mini-unread {
+  display: inline-grid;
+  place-items: center;
+  min-width: 16px;
+  height: 16px;
+  margin-left: 4px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #1a1406;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  vertical-align: 1px;
+}
+.qhead-back {
+  flex: none;
+  height: 28px;
+  padding: 0 8px 0 4px;
+  border: 0;
+  background: none;
+  color: var(--qc-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.qchat-tab .qhead {
+  padding-left: 4px;
+}
+/* Team / All: a tap target as tall as the header's buttons (22 px at least, as the split's switch was). */
+.qchat-tab .qto {
+  height: 24px;
+  margin-left: 4px;
+}
+.qchat-tab .qto button {
+  min-width: 30px;
+  padding: 0 6px;
+}
 /* Folded, the scoreboard keeps its share of the width beside chat (or all of it): only its height folds. */
 .screen.game .under-board > .mini-tower.closed {
   flex: 1 1 0;
+}
+/* The chat tab's pickers (Eric, Nov 1): "T" for the phrases and the emoji button, left of "⋯". No rows of buttons under
+   the feed (the feed has the room); a picker opens over the feed's foot, and closes on a send, its button or a tap
+   elsewhere. */
+.qchat-tab {
+  position: relative;
+}
+.qpick-btn.qpick-lines {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 17px;
+}
+.qpick-btn.qpick-emoji {
+  font-size: 16px;
+}
+.qpick-btn.on {
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+}
+/* (Under 360 px the header's four buttons are 28 px wide, so the fold arrow stays in the box at 320.) */
+@media (max-width: 359px) {
+  .qchat-tab .qhead .qhead-btn {
+    width: 28px;
+  }
+}
+.qpick-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.qchat-tab .qpop {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 6px;
+  z-index: 3;
+  max-height: calc(100% - 34px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--qc-edge);
+  border-radius: 10px;
+  background: var(--qc-head);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.4);
+}
+.qchat-tab .qpop .qbuttons {
+  border-top: 0;
+}
+.qchat-tab .qpop .qbuttons.groups {
+  gap: 6px;
+  padding: 8px;
+}
+.qchat-tab .qpop .qgroup-lines {
+  gap: 6px;
+}
+.qchat-tab .qpop .qbuttons.groups .qchip {
+  min-height: 36px;
+  font-size: 13px;
+}
+.qchat-tab .qpop .qbuttons.groups .qchip.emoji {
+  min-width: 40px;
+  font-size: 20px;
+}
+.qchat-tab .qpop .qmenu {
+  padding: 8px;
+}
+/* A shorter phone's box (about 160 px at 664 tall, about 154 at 600): smaller chips (26 px, 24 under 640), so the ten
+   phrases fit whole in three rows without scrolling, and the emoji in one row. */
+@media (max-height: 700px) {
+  .qchat-tab .qpop .qbuttons.groups {
+    gap: 4px;
+    padding: 6px;
+  }
+  .qchat-tab .qpop .qgroup-lines {
+    gap: 4px;
+  }
+  .qchat-tab .qpop .qbuttons.groups .qchip {
+    min-height: 26px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+  .qchat-tab .qpop .qbuttons.groups .qchip.emoji {
+    min-width: 34px;
+    padding: 0 4px;
+    font-size: 18px;
+  }
+}
+@media (max-height: 639px) {
+  .qchat-tab .qpop .qbuttons.groups .qchip {
+    min-height: 24px;
+  }
 }
 
 /* Computers: the column beside the board. 900-1099 px keeps the phone's split (the scoreboard is there); from
@@ -13235,6 +13927,16 @@ img.qicon {
 .fight-banner.power-cut .fb-sub {
   font-size: 3.4cqw;
 }
+/* The big word wraps at its spaces within the words' share of the banner (the portraits stay in view); PowerBanner's
+   fitBigWord makes a word that's still too wide smaller (Eric, Nov 1: "MAMMOTH SLAM!" ran off a computer's board). */
+.fight-banner.power-cut .kc-words {
+  max-width: 42cqw;
+}
+.fight-banner.power-cut .kc-text {
+  white-space: normal;
+  text-wrap: balance;
+  line-height: 0.95;
+}
 /* Ginger's thaw names the pieces it frees: a line that can run longer than its title, so it wraps under it rather than
    widening the words and pushing the faces off the board. */
 .fight-banner.power-cut.thaw .fb-sub {
@@ -13257,6 +13959,19 @@ img.qicon {
   inset: 0 auto 0 0;
   background: linear-gradient(90deg, #f59e0b, #ef4444);
   transition: width 600ms ease-out;
+}
+/* A computer's boss bar: the ultimate's meter twice as long and thicker (Eric, Nov 1: "too small on a computer"). Its fill is
+   still the share of the way to the ultimate, so it fills at the same pace. The bar's padding gives back the four pixels
+   the thicker meter takes, so the bar and the board under it stay where they were. A phone keeps its size. */
+@media (min-width: 900px) and (min-height: 600px) {
+  .boss-bar {
+    padding: 3px 10px 4px;
+  }
+  .boss-bar .rage-meter {
+    width: 88px;
+    height: 10px;
+    border-radius: 5px;
+  }
 }
 .rage-meter.warned,
 .rage-meter.now {
@@ -14960,6 +15675,14 @@ img.qicon {
 }
 .sq-row.out {
   opacity: 0.55;
+}
+/* Your own row, pinned at the top of the standings: a line under it, thicker than a row's edge (the table below is one list). */
+.sq-pin {
+  margin: 0;
+  height: 3px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--line);
 }
 .sq-row-top {
   display: grid;
@@ -21761,4 +22484,463 @@ button.sq-tiny {
   .bs-vs {
     font-size: 32px;
   }
+}
+/* Boss Battle's invite sheet (components/BossParty.tsx): Squads' invite rows; admins' bot buttons side by side. */
+.bp-bots {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+/* ---- Boss Battle's party in the battle (components/BossDock.tsx, PartyMates; docs/decisions/2026-10-30-boss-party.md) ----
+   Your teammates' pawns, small, no names, each on a disc of its seat's color (its arrows' color), a check once it has
+   picked this turn or "…" while it thinks, and for whoever may kick a small Kick under one who hasn't (grey for the first
+   minute). Your own pawn stands on your color's disc. Placed over the dock's room, so nothing in it moves. */
+.pt-disc {
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  width: 44px;
+  height: 9px;
+  margin-left: -22px;
+  border-radius: 50%;
+  background: var(--pt-c);
+  opacity: 0.9;
+}
+.you-pawn > .pt-disc {
+  bottom: 8px;
+}
+.dk-mates {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  pointer-events: none;
+  z-index: 2;
+}
+.dk-mate {
+  position: relative;
+  width: 36px;
+  height: 42px;
+}
+.dk-mate .pt-disc {
+  width: 30px;
+  height: 7px;
+  margin-left: -15px;
+}
+.dk-mate-art {
+  isolation: isolate;
+  z-index: 0;
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  width: 42px;
+  height: 42px;
+  margin-left: -21px;
+}
+.dk-mate-art .avatar {
+  width: 100%;
+  height: 100%;
+}
+.dk-mate-state {
+  position: absolute;
+  left: 50%;
+  top: -12px;
+  translate: -50% 0;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1.5px solid #1d1f24;
+  color: #16a34a;
+}
+.dk-mate-state svg {
+  width: 72%;
+  height: 72%;
+}
+.dk-mate-state.think {
+  width: 28px;
+  height: 16px;
+  border-radius: 8px;
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  justify-content: center;
+}
+.dk-mate-state.think i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #1d1f24;
+  opacity: 0.6;
+}
+.dk-kick {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  translate: -50% 4px;
+  min-width: 44px;
+  height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 13px;
+  background: #c22222;
+  color: #fff;
+  font: 700 12px/26px Archivo, system-ui, sans-serif;
+  pointer-events: auto;
+  z-index: 5;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.dk-kick.off {
+  background: var(--fd-seat, #e4e1da);
+  color: var(--fd-dim, #8f95a0);
+  cursor: default;
+}
+/* A phone's strip: under your pawn and the God King, in the room below them (the panel's row: nothing grows). */
+@media (max-width: 899px) and (min-height: 520px) {
+  .boss-dock.dk-strip.dk-pawn > .dk-mates {
+    grid-column: 3 / 5;
+    grid-row: 2;
+    align-self: start;
+    margin-top: 84px;
+  }
+}
+/* A computer: stacked by the board's corner (Eric, Oct 30: "stack them… rather than shrinking the board"): the God King
+   in his raid place, your pawn above him, your teammates above you. A party's battle has the raid's chat beside the
+   corner, so a row has no room at any width. */
+@media (min-width: 900px) and (min-height: 600px) {
+  .screen.game > .boss-dock.dk-party > .gk-unit {
+    left: calc(100% + var(--gk-off, 2px) + var(--bs-out, 0px));
+  }
+  /* (The chat beside the corner stands a little further out, clear of the God King's cape and sword: nothing hidden.) */
+  .screen.game:has(> .boss-dock.dk-party) > .under-board {
+    margin-left: calc(var(--gk-clear) + 32px);
+  }
+  .screen.game > .boss-dock.dk-party > .you-pawn {
+    --pw: 116px;
+    --feet: 10px;
+    width: 92px;
+    height: 100px;
+    left: calc(100% + var(--gk-off, 2px) + var(--bs-out, 0px) + 14px);
+    bottom: calc(100% - 4px + 132px);
+  }
+  .screen.game > .boss-dock.dk-party > .you-pawn > .pt-disc {
+    width: 50px;
+    height: 9px;
+    margin-left: -25px;
+    bottom: 8px;
+  }
+  .screen.game > .boss-dock.dk-party > .dk-mates {
+    position: absolute;
+    left: calc(100% + var(--gk-off, 2px) + var(--bs-out, 0px));
+    bottom: calc(100% - 4px + 132px + 104px);
+    width: 120px;
+    gap: 0;
+  }
+  .screen.game > .boss-dock.dk-party > .dk-mates .dk-mate {
+    width: 60px;
+    height: 58px;
+  }
+  .screen.game > .boss-dock.dk-party > .dk-mates .dk-mate-art {
+    width: 62px;
+    height: 62px;
+    margin-left: -31px;
+  }
+  /* (Over the teammate's feet: your pawn stands just under them.) */
+  .screen.game > .boss-dock.dk-party > .dk-mates .dk-kick {
+    top: auto;
+    bottom: -4px;
+    translate: -50% 0;
+  }
+}
+
+/* ---------------- Timber (components/Timber.tsx; docs/decisions/2026-11-01-timber.md) ---------------- */
+/* His cast by the board's corner, as every boss's (phone and computer): his frame is 98 x 129 (37 rows of it over his hat, for his entrance's drop). */
+.pm-caster.pm-by-timber {
+  aspect-ratio: 98 / 129;
+  width: 31%;
+  left: -6%;
+  top: -13%;
+}
+/* At rest his drawing reaches 43 sprite px right of his feet (his tail): 10 sprite px further out, as Folio's 6 (the frame's box
+   would otherwise run 18 px over the board's left edge). */
+.boss-char.place-side.ch-timber {
+  --bc-shift: calc(-10 * var(--bc-scale));
+}
+/* His banners: planks of his workshop, an orange edge (his hard hat). */
+.fight-banner.power-cut.timber .fb-band {
+  background: repeating-linear-gradient(180deg, #7d4a27 0 3.2cqw, #9c6334 3.2cqw 3.6cqw);
+  border-color: #f08a24;
+}
+/* The workshop strip, in the boss bar's prop slot (right of his bars, under the status): his five pieces in a row, each with a bar
+   filling toward its cost and its count, his woodpecker foreman at the end. Positioned at the slot's top right (a phone's speech
+   bubble sits at the bar's foot, under it), the same size
+   whatever it shows, never taking a tap: nothing in the bar moves for it. */
+.ws-strip {
+  position: absolute;
+  right: 0;
+  top: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  pointer-events: none;
+}
+.ws-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 22px;
+  gap: 1px;
+}
+.ws-strip .ws-piece {
+  position: relative;
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+.ws-strip .ws-piece piece {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  will-change: auto;
+}
+.ws-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+/* A computer's bar is one short row (his figure stands by the board): the strip takes the free room's left part over both rows,
+   between his bars and "Move 2", centered on the bar's height. */
+@media (min-width: 900px) and (min-height: 600px) {
+  .boss-bar .boss-prop:has(> .ws-strip) {
+    grid-column: 2;
+    grid-row: 1 / 3;
+  }
+  .boss-bar .ws-strip {
+    top: 50%;
+    right: auto;
+    left: 4px;
+    transform: translateY(-50%);
+  }
+}
+.ws-bar {
+  position: relative;
+  width: 18px;
+  height: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+.ws-bar i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, #f7b267, #e8742c);
+}
+.ws-count {
+  font-size: 9px;
+  line-height: 1;
+  font-weight: 800;
+  color: #ffe0b8;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* A finished piece glows until it drops. */
+.ws-slot.done .ws-piece {
+  filter: drop-shadow(0 0 3px #ffd36b);
+}
+.ws-slot.done .ws-count {
+  color: #ffd36b;
+}
+/* A scrap landing on it: a small bump. */
+.ws-bump {
+  animation: ws-bump 420ms ease-out;
+}
+@keyframes ws-bump {
+  0% {
+    transform: translateY(-6px) scale(1.18);
+  }
+  60% {
+    transform: translateY(1px);
+  }
+  100% {
+    transform: none;
+  }
+}
+.ws-foreman {
+  display: block;
+  width: 26px;
+  height: 26px;
+  margin-left: 1px;
+}
+.ws-foreman canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  transform-origin: 50% 95%;
+}
+/* Each scrap that lands, the foreman pecks (two quick nods). */
+.ws-foreman canvas.ws-peck {
+  animation: ws-peck 160ms steps(2) 3;
+}
+@keyframes ws-peck {
+  50% {
+    transform: rotate(-10deg) translateX(-1px);
+  }
+}
+/* Closed after his last drop: greyed, "Closed" over it. */
+.ws-strip.closed .ws-slot,
+.ws-strip.closed .ws-foreman {
+  opacity: 0.4;
+  filter: grayscale(1);
+}
+.ws-closed {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #ffe0b8;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ws-bump,
+  .ws-foreman canvas.ws-peck {
+    animation: none;
+  }
+}
+/* His moments on the board: his teeth gnawing their way to your pawn, the splinters as it goes, a plank falling onto a dropped
+   piece's square and its puff of sawdust. On the board's own squares (eighths of --board-size), never taking a tap. */
+.tb-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.tb-teeth,
+.tb-splinters,
+.tb-plank {
+  position: absolute;
+  width: calc(var(--board-size, 100%) / 8);
+  height: calc(var(--board-size, 100%) / 8);
+  z-index: 9;
+  pointer-events: none;
+}
+.tb-teeth {
+  left: calc(var(--board-size, 100%) * var(--x0));
+  top: calc(var(--board-size, 100%) * var(--y0));
+  animation-name: tb-teeth;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+}
+@keyframes tb-teeth {
+  to {
+    left: calc(var(--board-size, 100%) * var(--x1));
+    top: calc(var(--board-size, 100%) * var(--y1));
+  }
+}
+.tb-teeth::after {
+  content: "";
+  position: absolute;
+  inset: 8%;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' shape-rendering='crispEdges'%3E%3Cpath d='M2 3h16v8H2z' fill='%237d4a27' stroke='%231e130d'/%3E%3Cpath d='M5 10h5v8H5zM10 10h5v8h-5z' fill='%23fff6dc' stroke='%231e130d'/%3E%3Cpath d='M8 5h4v3H8z' fill='%23140c08'/%3E%3C/svg%3E") center / contain no-repeat;
+  animation: tb-chomp 170ms steps(2) infinite;
+  transform-origin: 50% 30%;
+}
+@keyframes tb-chomp {
+  50% {
+    transform: scaleY(0.7);
+  }
+}
+.tb-splinters,
+.tb-plank {
+  left: calc(var(--board-size, 100%) * var(--sq-x, 0) / 8);
+  top: calc(var(--board-size, 100%) * var(--sq-y, 0) / 8);
+}
+/* The splinters: a burst of wood chips off the square, out and gone. */
+.tb-splinters::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3px;
+  height: 3px;
+  background: #b97f4a;
+  box-shadow: 9px -7px 0 #9c6334, -10px -5px 0 #d4ad86, 7px 9px 0 #7d4a27, -8px 8px 0 #b97f4a, 0 -11px 0 #9c6334, 12px 2px 0 #d4ad86;
+  animation: tb-burst 520ms ease-out both;
+  animation-delay: inherit;
+}
+@keyframes tb-burst {
+  from {
+    transform: scale(0.3);
+    opacity: 1;
+  }
+  to {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+/* The plank: falls onto the square, tipping level as it lands; then a puff of sawdust. */
+.tb-plank::before {
+  content: "";
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 40%;
+  height: 20%;
+  border: 1px solid #1e130d;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #d9a066, #a8692f);
+  animation: tb-plank 600ms ease-in both;
+  animation-delay: inherit;
+}
+@keyframes tb-plank {
+  0% {
+    transform: translateY(-160%) rotate(-24deg);
+    opacity: 1;
+  }
+  53% {
+    transform: translateY(0) rotate(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) rotate(0);
+    opacity: 0;
+  }
+}
+.tb-plank::after {
+  content: "";
+  position: absolute;
+  inset: 20%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(232, 214, 180, 0.85), rgba(232, 214, 180, 0));
+  animation: tb-dust 600ms ease-out both;
+  animation-delay: inherit;
+}
+@keyframes tb-dust {
+  0%,
+  53% {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+/* Auto chess's reveals while you buy (Eric, Nov 2): a piece of yours the opponent hasn't seen yet is slightly grayed; the next of yours to be revealed has a thin yellow border (a warning). */
+.ac-root .hb piece.ac-unseen {
+  filter: grayscale(0.9) opacity(0.6);
+}
+.ac-next {
+  box-sizing: border-box;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 2px #ffd60a;
 }

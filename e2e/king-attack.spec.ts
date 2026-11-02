@@ -1,6 +1,8 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { KING_ATTACK, LAST_STAND } from "@chessroyale/chess";
+import { BOSS_ROSTER } from "@chessroyale/core";
+import { BOSS_KITS } from "../packages/app/src/characters/kits.ts";
 import { BOARD_SEL, test, bossAloneFromHome } from "./helpers.ts";
 
 /**
@@ -149,7 +151,7 @@ test("the God King's Last Stand against Hollow: Hollow lashes him, then he falls
  * slides back, on the side toward the board's middle (his drawing mirrored to face him), a hit on every beat with its
  * gold "−N", his own sounds, his figure wholly on screen; then the Last Stand ends as always. No page errors.
  */
-for (const b of [
+const ASSAULTS = [
   { id: "sawyer", name: "Sawyer", facesLeft: true, sounds: ["sawyerCut", "sawyerSwing"] },
   { id: "pig", name: "Wrangler", facesLeft: true, sounds: ["pigYank", "pigCatch"] },
   { id: "clown", name: "Boingo", facesLeft: false, sounds: ["clownSplat", "clownSqueak"] },
@@ -162,8 +164,20 @@ for (const b of [
   { id: "gardener", name: "Puddles", facesLeft: true, sounds: ["gardenerJet", "gardenerSpurt"] },
   { id: "tiger", name: "Babur", facesLeft: true, sounds: ["tigerBonk", "tigerPop"] },
   { id: "folio", name: "Folio", facesLeft: true, sounds: ["folioScratch", "folioDab"] },
-])
-  test(`the God King's Last Stand against ${b.name}: ${b.name} assaults him, then he falls and you pick again`, async ({ page }) => {
+];
+/** How many squares wide a boss's attack figure is drawn (its kit's: before the shrink near the board's top). */
+const attackWidth = (id: string) => {
+  const ka = BOSS_KITS[BOSS_ROSTER.find((d) => d.id === id)!.kit!]!.kingAttack!;
+  return ka.ch.w / ka.perSquare;
+};
+/**
+ * On a computer, the two widest figures only (Nov 2): the rest of what's checked is the same on either, and a computer's board is the
+ * bigger one, so its widest figures are the ones that could leave the screen. The phone runs every boss.
+ */
+const COMPUTER = new Set([...ASSAULTS].sort((a, b) => attackWidth(b.id) - attackWidth(a.id)).slice(0, 2).map((b) => b.id));
+for (const b of ASSAULTS)
+  test(`the God King's Last Stand against ${b.name}: ${b.name} assaults him, then he falls and you pick again`, async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === "desktop" && !COMPUTER.has(b.id), "a computer runs the two widest figures; the phone runs every boss");
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await page.goto(`/?debug&clock=60&boss=${b.id}&laststand=1`);

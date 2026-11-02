@@ -230,7 +230,7 @@ describe("resigning online: Crowd 50 v 50 and raids", () => {
 
   it("already out (cut): leaving takes them home; their result stands, recorded with everyone's when the match ends", () => {
     // Two moves before the cut (each team picks once); both people miss theirs, so the cut takes them.
-    const L = crowd(2, { firstStageRounds: 2 });
+    const L = crowd(2, { stageRounds: [], firstStageRounds: 2 });
     L.until(() => L.core.record.phase === "stageBreak");
     const out = L.runner().state.players.filter((p) => !p.isBot && !p.alive).map((p) => p.id);
     expect(out.sort()).toEqual(["p1", "p2"]);
@@ -279,7 +279,7 @@ describe("resigning online: Crowd 50 v 50 and raids", () => {
     // Both people on White, so both pick every White move: a lobby seed that does it, searched for. (No cut for a
     // while: p2's misses mustn't put him out.)
     const start = (seed: number) => {
-      const L = setup({ ...modeSettings("crowd", { augments: false }), firstStageRounds: 10, roundsPerStage: 10 }, seed);
+      const L = setup({ ...modeSettings("crowd", { augments: false }), stageRounds: [], firstStageRounds: 10, roundsPerStage: 10 }, seed);
       L.core.setAuto(L.now + 60_000);
       join(L, 2);
       L.advance(60_000);

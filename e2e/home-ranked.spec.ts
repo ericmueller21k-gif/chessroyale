@@ -13,7 +13,7 @@ const run = Date.now().toString(36).slice(-5);
 const sideways = (p: Page) => p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 const box = async (p: Page, sel: string) => (await p.locator(sel).first().boundingBox())!;
 
-test("the RANKED row: a label over 50 v 50, 1 v 1 and Squads, three equal buttons whole at every width; PLAY under it, then Other modes with the Boss Arena card, full width (a phone and a computer alike)", async ({ page }) => {
+test("the RANKED row: a label over 50 v 50, 1 v 1 and Squads, three equal buttons whole at every width; PLAY under it, then Chess Town's button, PLAY's size, then Other modes (a phone and a computer alike)", async ({ page }) => {
   await named(page, "Ranked");
   const widths = desktop() ? [[1280, 800], [1024, 768]] : [[320, 640], [360, 740], [390, 844]];
   for (const [w, h] of widths) {
@@ -24,8 +24,8 @@ test("the RANKED row: a label over 50 v 50, 1 v 1 and Squads, three equal button
     // Every text, exactly.
     await expect(page.locator(".fd-ranked .fd-label")).toHaveText("RANKED");
     await expect(row.getByRole("radio")).toHaveText(["50 v 50Crowd chess", "1 v 1Classic chess", "Squads8 squads of 4"]);
-    const card = page.getByRole("main").getByRole("button", { name: /^Boss Arena/ });
-    await expect(card).toHaveText(/^Boss ArenaParty up and take on the bosses›$/);
+    const card = page.getByRole("main").getByRole("button", { name: "Chess Town", exact: true });
+    await expect(card).toHaveText("Chess Town");
     // The label sits right above the row; the three buttons are the same size, side by side, their words whole.
     const label = await box(page, ".fd-ranked .fd-label");
     const r = (await row.boundingBox())!;
@@ -54,22 +54,23 @@ test("the RANKED row: a label over 50 v 50, 1 v 1 and Squads, three equal button
       expect(b.font).toBeGreaterThanOrEqual(11);
     }
     expect(buttons.map((b) => b.x)).toEqual([...buttons.map((b) => b.x)].sort((a, b) => a - b));
-    // The card's words whole too, and it's prominent: the column's full width, as tall as a big button.
+    // Chess Town's button is PLAY's size exactly (Eric, Nov 1): the column's full width, as tall as PLAY, its words whole.
     const c = (await card.boundingBox())!;
-    expect(c.height).toBeGreaterThanOrEqual(desktop() ? 60 : 64);
-    expect(Math.abs(c.width - r.width), `${w}: full width`).toBeLessThan(2);
-    // (Whole in the page's own font: the cards' words never wrap since Oct 28, so for the moment Archivo is loading, the fallback
-    // font's wider words can run past their box.)
-    await page.evaluate(() => document.fonts.ready);
-    expect(await card.evaluate((e) => [...e.querySelectorAll(".rd-card-text > *")].every((x) => x.scrollWidth <= x.clientWidth + 0.5)), `${w}`).toBe(true);
     const play = (await page.getByRole("button", { name: "PLAY", exact: true }).boundingBox())!;
-    // The row, then PLAY, then "Other modes" and the card (Eric, Oct 19: chess first; Oct 24: Auto chess under it), on a
-    // phone and a computer alike.
+    expect(Math.abs(c.height - play.height), `${w}: Chess Town as tall as PLAY`).toBeLessThan(0.5);
+    expect(Math.abs(c.width - play.width), `${w}: Chess Town as wide as PLAY`).toBeLessThan(0.5);
+    expect(Math.abs(c.width - r.width), `${w}: full width`).toBeLessThan(2);
+    // (Whole in the page's own font: while Archivo is loading, the fallback font's wider words can run past their box.)
+    await page.evaluate(() => document.fonts.ready);
+    expect(await card.locator(".fd-town-label").evaluate((e) => e.scrollWidth <= e.clientWidth + 0.5 && e.getBoundingClientRect().width <= e.closest("button")!.clientWidth), `${w}`).toBe(true);
+    // The row, then PLAY, then Chess Town, then "Other modes" and its cards (Eric, Oct 19: chess first; Nov 1: Chess Town's
+    // button under PLAY, the old Boss Arena card gone), on a phone and a computer alike.
     expect(play.y, `${w}`).toBeGreaterThan(r.y + r.height);
-    expect(c.y, `${w}`).toBeGreaterThan(play.y + play.height);
+    expect(c.y, `${w}: Chess Town under PLAY`).toBeGreaterThanOrEqual(play.y + play.height);
     const other = await box(page, ".fd-other-label");
-    expect(other.y, `${w}: Other modes under PLAY`).toBeGreaterThanOrEqual(play.y + play.height);
-    expect(c.y, `${w}: the Boss raid card under Other modes`).toBeGreaterThanOrEqual(other.y + other.height);
+    expect(other.y, `${w}: Other modes under Chess Town`).toBeGreaterThanOrEqual(c.y + c.height);
+    const solo = await box(page, ".rd-card");
+    expect(solo.y, `${w}: the cards under Other modes`).toBeGreaterThanOrEqual(other.y + other.height);
     expect(await sideways(page), `${w}`).toBe(0);
   }
 });
@@ -197,30 +198,37 @@ test("the hidden /bosses opens the solo boss picker straight away (a player too)
   expect(new URL(page.url()).search).toBe("");
 });
 
-test("Other modes under PLAY: the label, then the Boss Arena card full width, then Boss Battle and Auto chess side by side at half width each (a knight's picture, the card's look); Auto chess opens /autochess, and its back button is home", async ({ page }) => {
+test("Other modes under Chess Town: the label, then Boss Battle (the rotating boss faces) and Auto chess (the army picture) side by side at half width each, the card's look; Auto chess opens /autochess, and its back button is home", async ({ page }) => {
   await named(page, "Knight");
   await page.goto("/");
   const main = page.getByRole("main");
   const label = main.getByRole("heading", { name: "Other modes", exact: true });
-  const boss = main.getByRole("button", { name: /^Boss Arena/ });
+  const town = main.getByRole("button", { name: "Chess Town", exact: true });
   const solo = main.getByRole("button", { name: /^Boss Battle/ });
   const auto = main.getByRole("button", { name: /^Auto chess/ });
   await expect(label).toBeVisible();
   await expect(auto).toHaveText(/^Auto chessBuild an army$/);
-  await expect(auto.locator("svg.fd-knight")).toBeVisible();
+  // Auto chess's picture is the drawn army (a canvas at its own size, with pixels on it), no longer the board's knight.
+  await expect(auto.locator("svg.fd-knight")).toHaveCount(0);
+  const army = auto.locator(".rd-face canvas");
+  await expect(army).toBeVisible();
+  expect(await army.evaluate((c: HTMLCanvasElement) => c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data.some((v, i) => i % 4 === 3 && v > 0)), "the army is drawn").toBe(true);
+  // Boss Battle's picture is the rotating boss faces (from the old Boss Arena card), no longer the crown.
+  await expect(solo.locator(".rd-face .rd-face-stack")).toHaveCount(1);
+  await expect(solo.locator("svg.fd-crown")).toHaveCount(0);
   const at = async (l: import("@playwright/test").Locator) => (await l.boundingBox())!;
   const play = await at(main.getByRole("button", { name: "PLAY", exact: true }));
-  const [l, b, s, a] = [await at(label), await at(boss), await at(solo), await at(auto)];
-  expect(l.y).toBeGreaterThanOrEqual(play.y + play.height);
-  expect(b.y).toBeGreaterThanOrEqual(l.y + l.height);
-  // (Eric, Oct 26: Boss Arena is full width; Boss Battle and Auto chess sit side by side, half width each, the same size.
-  // This replaces "the same size as the Boss Arena card": Auto chess is no longer full width.)
-  expect(Math.abs(b.width - (a.x + a.width - s.x)), "Boss Arena as wide as the pair").toBeLessThan(2);
+  const [l, t, s, a] = [await at(label), await at(town), await at(solo), await at(auto)];
+  expect(t.y, "Chess Town under PLAY").toBeGreaterThanOrEqual(play.y + play.height);
+  expect(l.y, "Other modes under Chess Town").toBeGreaterThanOrEqual(t.y + t.height);
+  expect(s.y, "the cards under Other modes").toBeGreaterThanOrEqual(l.y + l.height);
+  // (Eric, Oct 26: Boss Battle and Auto chess sit side by side, half width each, the same size; the pair is as wide as Chess Town's
+  // button, PLAY's width.)
+  expect(Math.abs(t.width - (a.x + a.width - s.x)), "Chess Town as wide as the pair").toBeLessThan(2);
   expect(Math.abs(s.width - a.width), "the two half cards the same width").toBeLessThan(2);
   expect(Math.abs(s.height - a.height), "the two half cards the same height").toBeLessThan(2);
   expect(Math.abs(s.y - a.y), "the two half cards side by side").toBeLessThan(2);
   expect(s.x + s.width, "Boss Battle left of Auto chess").toBeLessThanOrEqual(a.x + 1);
-  expect(s.y, "the pair under Boss Arena").toBeGreaterThanOrEqual(b.y + b.height);
   await auto.click();
   await expect(page.locator(".ac-title strong")).toHaveText("Auto chess");
   expect(new URL(page.url()).pathname).toBe("/autochess");
@@ -229,7 +237,7 @@ test("Other modes under PLAY: the label, then the Boss Arena card full width, th
   expect(new URL(page.url()).pathname).toBe("/");
 });
 
-test("home keeps still: no click on a mode or an option moves or resizes the board preview, the line above PLAY, PLAY, the panel or the Boss raid card (phone and computer)", async ({ page }) => {
+test("home keeps still: no click on a mode or an option moves or resizes the board preview, the line above PLAY, PLAY, Chess Town's button, the panel or the cards (phone and computer)", async ({ page }) => {
   // (Eric, Oct 18: "nothing should actually be forced moving around the size of the board or where the play button
   // is"; docs/decisions/2026-10-18-home-steady-layout.md.)
   await named(page, "Still");
@@ -252,7 +260,7 @@ test("home keeps still: no click on a mode or an option moves or resizes the boa
     ["50 v 50", () => radio(/^50 v 50/).click()],
   ];
   // (The panel last: what moves is checked before what's new.)
-  const parts = { board: ".fd-livewin", ranked: ".fd-ranked", hint: ".fd-hint", play: ".fd-play", boss: ".rd-card", panel: ".fd-mode-panel" };
+  const parts = { board: ".fd-livewin", ranked: ".fd-ranked", hint: ".fd-hint", play: ".fd-play", town: ".fd-town", boss: ".rd-card", panel: ".fd-mode-panel" };
   const measure = async () => {
     const out: Record<string, { x: number; y: number; width: number; height: number }> = {};
     for (const [k, s] of Object.entries(parts)) if ((k !== "board" || desktop()) && (await page.locator(s).count())) out[k] = await box(page, s);
@@ -379,8 +387,8 @@ test("home, said once (Eric, Oct 28): no ⓘ; the three options are titles only 
   // ("3 times in this screen it says the same thing": docs/decisions/2026-10-28-home-said-once.md.)
   await named(page, "Once");
   const sizes: [number, number, number][] = desktop()
-    ? [[1280, 800, 72], [1440, 900, 72], [1280, 680, 56]]
-    : [[390, 844, 90], [320, 640, 90]];
+    ? [[1280, 800, 68], [1440, 900, 72], [1280, 680, 56]]
+    : [[390, 844, 90], [320, 640, 78]];
   for (const [w, h, playMin] of sizes) {
     const at = `${w}×${h}`;
     await page.setViewportSize({ width: w, height: h });
@@ -439,17 +447,22 @@ test("home, said once (Eric, Oct 28): no ⓘ; the three options are titles only 
     for (const d of ["x", "y", "width", "height"] as const) expect(Math.abs(hint[d] - hint0[d]), `${at}: the line's ${d} after the picks`).toBeLessThanOrEqual(1);
     expect(hint.y + hint.height, `${at}: the line above PLAY`).toBeLessThanOrEqual(playBox.y);
     expect(playBox.y - (hint.y + hint.height), `${at}: the line just above PLAY`).toBeLessThan(12);
+    // (Nov 1: Chess Town's button is between PLAY and Other modes: PLAY's size, right under it, and the label right under that.)
+    const town = await rect(".fd-town");
     const other = await rect(".fd-other-label");
-    expect(other.y, `${at}: nothing between PLAY and Other modes`).toBeLessThan(playBox.y + playBox.height + 20);
+    expect(town.y, `${at}: Chess Town right under PLAY`).toBeLessThan(playBox.y + playBox.height + 20);
+    expect(Math.abs(town.height - playBox.height), `${at}: Chess Town as tall as PLAY`).toBeLessThan(0.5);
+    expect(other.y, `${at}: nothing between Chess Town and Other modes`).toBeLessThan(town.y + town.height + 20);
     // (One line for what PLAY does, and it's the one above.)
     await expect(page.locator(".fd-hint")).toHaveCount(1);
 
     // The Other modes cards: the picture left of the words, vertically level with the card's middle, the words whole and on one
-    // line, and the cards shorter (Boss Arena was 84 px on a phone, the pair 84 px on a phone and 64 px on a computer).
+    // line, and the cards shorter (the pair was 84 px on a phone and 64 px on a computer; Nov 1: the full-width Boss Arena card is
+    // gone, Chess Town's button above Other modes is PLAY's size).
     const cards = page.getByRole("main").locator(".rd-card");
-    await expect(cards).toHaveCount(3);
+    await expect(cards).toHaveCount(2);
     const heights: number[] = [];
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 2; i++) {
       const card = cards.nth(i);
       const c = (await card.boundingBox())!;
       const face = (await card.locator(".rd-face").boundingBox())!;
@@ -461,9 +474,8 @@ test("home, said once (Eric, Oct 28): no ⓘ; the three options are titles only 
       expect(whole, `${at}: card ${i}: the words whole, each on one line`).toBe(true);
       heights.push(c.height);
     }
-    expect(heights[0]!, `${at}: Boss Arena no taller than before on a computer (64), shorter on a phone (was 84)`).toBeLessThanOrEqual(64.5);
-    expect(heights[1]!, `${at}: the pair shorter (was 84 on a phone, 64 on a computer)`).toBeLessThanOrEqual(57);
-    expect(heights[2]!, `${at}: the pair shorter`).toBeLessThanOrEqual(57);
+    expect(heights[0]!, `${at}: the pair shorter (was 84 on a phone, 64 on a computer)`).toBeLessThanOrEqual(57);
+    expect(heights[1]!, `${at}: the pair shorter`).toBeLessThanOrEqual(57);
 
     // PLAY: taller than it was (64 px on a phone and on a computer; 48 px in a short window), and home as before: a phone
     // still fits with no scrolling and keeps its last card's foot where it was (25 px up from the screen's edge); a

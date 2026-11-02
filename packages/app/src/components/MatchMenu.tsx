@@ -2,6 +2,7 @@ import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { isMuted, onMuteChange, setMuted, unlockAudio } from "../sound.ts";
 import { crowdAnimations, crowdTrail, onPrefsChange, setCrowdAnimations, setCrowdTrail } from "../prefs.ts";
+import { setThemePref, useTheme } from "../theme.ts";
 import { openReport } from "./Problems.tsx";
 
 /**
@@ -9,8 +10,8 @@ import { openReport } from "./Problems.tsx";
  * every mode"), and the match's options (Eric, Oct 24 and Oct 25; docs/decisions/2026-10-24-match-menu.md and
  * 2026-10-25-gear-everywhere.md). In the top line of every screen with a chessboard, at its right end, the same on a
  * phone and a computer: a gear button opening a list in the middle of the screen, over the match, which is blurred and
- * faded: Sound, Animations, Motion trail (a crowd match only), Resign or Leave, and Report a bug. A tap outside the
- * list, its X or Escape closes it. Resign, Leave and Report a bug each ask once more in a centered confirm, Cancel
+ * faded: Sound, Animations, Motion trail (a crowd match only), Light / Dark, Resign or Leave, and Report a bug. A tap
+ * outside the list, its X or Escape closes it. Resign, Leave and Report a bug each ask once more in a centered confirm, Cancel
  * focused. No undo, no draw offers (Eric: not now).
  */
 
@@ -29,6 +30,9 @@ export interface MatchExit {
 
 /** The game's computer layout (styles.css, "Computer layout"). */
 export const COMPUTER_LAYOUT = "(min-width: 900px) and (min-height: 600px)";
+/** A computer with a mouse (not a touch screen: a tablet on its side keeps its layout, Nov 1): the screens of Nov 1's
+ * computer layout (the side menu, the boss bar at the top, the column's tools). */
+export const MOUSE_LAYOUT = "(min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine)";
 
 /** A flag (resign), drawn so it looks the same everywhere (an emoji flag doesn't). */
 export function FlagIcon({ size = 18 }: { size?: number }) {
@@ -144,6 +148,21 @@ export function SwitchRow({ icon, label, on, disabled, onClick }: { icon?: Compo
   );
 }
 
+/**
+ * A row with a few settings a tap steps through, the gear's own pill showing the one chosen (lit unless it's the last,
+ * "Off"): a three-way choice in the space of an on/off row, so the list keeps its size. (A screen's own rows: `extra`.)
+ */
+export function CycleRow({ icon, label, value, lit, onClick }: { icon?: ComponentChildren; label: string; value: string; lit: boolean; onClick: () => void }) {
+  return (
+    <ListRow
+      icon={icon}
+      label={label}
+      onClick={onClick}
+      control={<span class={`mm-switch${lit ? " on" : ""}`}>{value}</span>}
+    />
+  );
+}
+
 /** Sound on or off (the same switch as the sound button). */
 function SoundRow() {
   const [m, setM] = useState(isMuted());
@@ -176,6 +195,16 @@ function AnimationRows({ crowd }: { crowd: boolean }) {
       {crowd && <SwitchRow label="Motion trail" on={anim && trail} disabled={!anim} onClick={() => setCrowdTrail(!trail)} />}
     </>
   );
+}
+
+/**
+ * Light or dark (Eric, Nov 1): the same pick as Settings → Theme (theme.ts, shared and remembered on this device), shown as
+ * the theme on screen now; a tap picks the other one. Settings lists it as "Light" or "Dark" too.
+ */
+function ThemeRow() {
+  const { theme } = useTheme();
+  const light = theme === "light";
+  return <CycleRow icon={light ? "☀️" : "🌙"} label="Light / Dark" value={light ? "Light" : "Dark"} lit onClick={() => setThemePref(light ? "dark" : "light")} />;
 }
 
 /**
@@ -249,6 +278,7 @@ export function MatchMenu({ exit, crowd = false, extra }: { exit: MatchExit | nu
               <div class="mm-list">
                 <SoundRow />
                 <AnimationRows crowd={crowd} />
+                <ThemeRow />
                 {extra}
                 {exit && <ListRow className="mm-exit" icon={<FlagIcon />} label={rowLabel(exit)} onClick={() => setOpen("confirm")} />}
                 <ListRow icon="🐞" label="Report a bug" onClick={() => setOpen("report")} />

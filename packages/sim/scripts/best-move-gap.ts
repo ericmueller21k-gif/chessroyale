@@ -24,7 +24,7 @@
  *   npx tsx packages/sim/scripts/best-move-gap.ts summary      -> reports/best-move-gap.md
  * (The data behind the report is committed gzipped: reports/best-move-gap/seedN.jsonl.gz.)
  */
-import { CROWD_KNOCKOUTS, DEFAULT_SETTINGS, OPENING_ALLOWANCE, botPick, botSkillSpread, mulberry32, openingAllowance, shuffle, type Rng } from "@chessroyale/core";
+import { CROWD_KNOCKOUTS, CROWD_STAGE_ROUNDS, DEFAULT_SETTINGS, OPENING_ALLOWANCE, botPick, botSkillSpread, mulberry32, openingAllowance, shuffle, type Rng } from "@chessroyale/core";
 import { START_FEN, applyMove, fenAfter, gameEnd, judgedBoard, legalMoves, materialSlips, moveNumber, recheckTargets, runQuickJob, type JudgeJob, type MoveScore, type Opening } from "@chessroyale/chess";
 import { STOCKFISH_FULL_BUILD, createNodeEngine } from "@chessroyale/chess/node";
 import { appendFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
@@ -96,15 +96,18 @@ async function run(games: number, seed: number, engineCount: number) {
 type Engine = Awaited<ReturnType<typeof createNodeEngine>>;
 
 async function playGame(w: { lite: Engine; full: Engine }, game: number, kind: Row["kind"], start: string, rng: Rng, file: string) {
-  // Crowd: each team's bots, strongest first; the weakest go out at each cut (from ply 20, every 2 plies).
+  // Crowd: each team's bots, strongest first; the weakest go out at each cut (after each stage's plies, CROWD_STAGE_ROUNDS).
   const skills = shuffle(rng, botSkillSpread(100));
   const teams = [skills.filter((_, i) => i % 2 === 0).sort((a, b) => a - b), skills.filter((_, i) => i % 2 === 1).sort((a, b) => a - b)];
   const cuts = CROWD_KNOCKOUTS.boss;
+  // The ply each cut comes after (the stages' rounds added up).
+  const cutAt = cuts.map((_, i) => CROWD_STAGE_ROUNDS.slice(0, i + 1).reduce((a, b) => a + b, 0));
   let alive = 100;
   let fen = start;
   const maxPlies = kind === "crowd" ? 64 : 40;
   for (let ply = 0; ply < maxPlies && !gameEnd(fen, []) && legalMoves(fen).length >= 2; ply++) {
-    if (kind === "crowd" && ply >= 20 && ply % 2 === 0) alive = Math.max(4, alive - (cuts[(ply - 20) / 2] ?? 0));
+    const cut = cutAt.indexOf(ply);
+    if (kind === "crowd" && cut >= 0) alive = Math.max(4, alive - cuts[cut]!);
     const side = fen.split(" ")[1] === "w" ? 0 : 1;
     const botSkills = kind === "crowd" ? teams[side]!.slice(0, Math.max(0, Math.ceil(alive / 2) - 2)) : shuffle(rng, skills).slice(0, 6);
     const top = await w.lite.topMoves(fen, RULES.botCandidateMoves);

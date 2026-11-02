@@ -1,4 +1,4 @@
-import { useContext, useLayoutEffect } from "preact/hooks";
+import { useContext, useLayoutEffect, useRef } from "preact/hooks";
 import { BoardTurn, type QuarterTurn } from "../board-view.ts";
 import type { ComponentChildren, JSX } from "preact";
 import type { PowerEventKind, WaterGrowth } from "@chessroyale/core";
@@ -218,13 +218,41 @@ export function Flight({ name, anim, square, orientation, since, ms, aim = false
   );
 }
 
+/** The share of the banner's width its words take (the portraits, their gaps and a margin take the rest: styles.css). */
+const WORDS_SHARE = 0.42;
+
+/**
+ * Fits the big word between the two portraits: when its longest word is wider than the words' share of the banner, it's
+ * made smaller, by the ratio, measured in the page's own font (a canvas: no layout per frame, once as the banner appears).
+ * The phrase wraps at its spaces (styles.css). Eric, Nov 1: "MAMMOTH SLAM!" ran off a computer's board ("you can't read any
+ * of it"), and the same banner cut its portraits off the edges; now every power's banner fits its board.
+ */
+function fitBigWord(banner: HTMLElement | null) {
+  const word = banner?.querySelector<HTMLElement>(".kc-text");
+  if (!banner || !word) return;
+  word.style.fontSize = "";
+  const style = getComputedStyle(word);
+  const size = parseFloat(style.fontSize);
+  const ctx = document.createElement("canvas").getContext("2d");
+  if (!ctx || !size) return;
+  ctx.font = `${style.fontStyle} ${style.fontWeight} ${size}px ${style.fontFamily}`;
+  if ("letterSpacing" in ctx) (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = style.letterSpacing;
+  // (The stroke around the letters, 3 px each side, is the margin.)
+  const longest = Math.max(...(word.textContent ?? "").split(" ").map((w) => ctx.measureText(w).width)) + 6;
+  const room = banner.clientWidth * WORDS_SHARE;
+  if (longest > room) word.style.fontSize = `${((size * room) / longest).toFixed(2)}px`;
+}
+
 /**
  * The power's banner: the God King's cut-in style, the boss on the left and the God King on the right; off the board by
  * `ms` (BOSS_BANNER.ms, or sooner where the power starts sooner: PowerMoment's `banner`).
  */
 export function PowerBanner({ boss, side, text, sub, tone = "", ms }: { boss: BossView; side: "w" | "b"; text: string; sub?: string; tone?: string; ms: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  // (Before the first paint: the banner is drawn at its fitted size from its first frame.)
+  useLayoutEffect(() => fitBigWord(ref.current), [text]);
   return (
-    <div class={`fight-banner king-cut power-cut ${tone}`} style={bannerLength(ms)} role="alert" aria-label={sub ? `${boss.name}: ${text} ${sub}` : `${boss.name}: ${text}`}>
+    <div ref={ref} class={`fight-banner king-cut power-cut ${tone}`} style={bannerLength(ms)} role="alert" aria-label={sub ? `${boss.name}: ${text} ${sub}` : `${boss.name}: ${text}`}>
       <div class="fb-flash" />
       <div class="fb-band">
         <div class="fb-lines" />

@@ -89,6 +89,12 @@ for (const x of e.top.slice(0, 5)) {
   const what = x.source === "server" ? `server ${x.kind}` : `client error ${quote("a device's name for its error", x.kind)}`;
   lines.push(`  ${String(x.day).padStart(4)} in 24 h (${x.thisHour} this hour)  ${what}, message ${quote("error message", x.message)}  (last ${utc(x.lastSeen)}; ${x.versions})`);
 }
+// (Not errors: counted apart. The reasons are the server's own list, TOWN_GL_FALLBACK; a reason a device made up isn't counted.)
+const fb = h.townFallbacks;
+if (fb) {
+  const reasons = Object.entries(fb.byReason).filter(([r, n]) => /^[a-z0-9-]{1,20}$/.test(r) && n.week > 0);
+  lines.push(`Town WebGL fallbacks (drew with Canvas 2D): ${fb.day} in 24 hours, ${fb.week} in 7 days${reasons.length ? ` (${reasons.map(([r, n]) => `${r} ${n.day} / ${n.week}`).join(", ")})` : ""}`);
+}
 const doEntries = Object.entries(h.durableObjects.byEntry);
 lines.push(`Durable Objects: ${doEntries.length ? doEntries.map(([k, n]) => `${k} ${n}`).join(", ") : "no errors"} in 24 hours`);
 const kinds = [count(h.reports.day.bug ?? 0, "bug"), `${h.reports.day.feedback ?? 0} feedback`, count(h.reports.day.idea ?? 0, "idea")];

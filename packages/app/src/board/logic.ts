@@ -290,7 +290,7 @@ export function pressUp(b: PressBoard, selected: string | null, p: Press, to: st
 
 // ---------------- Arrows ----------------
 
-export type Brush = "green" | "blue" | "red" | "yellow" | "paleGrey" | "paleBlue";
+export type Brush = "green" | "blue" | "red" | "yellow" | "paleGrey" | "paleBlue" | "party0" | "party1" | "party2";
 
 /** Each arrow color: its color, see-through-ness and line width (in 64ths of a square). */
 export const BRUSHES: Record<Brush, { color: string; opacity: number; width: number }> = {
@@ -300,7 +300,15 @@ export const BRUSHES: Record<Brush, { color: string; opacity: number; width: num
   yellow: { color: "#e68f00", opacity: 1, width: 10 },
   paleBlue: { color: "#003088", opacity: 0.4, width: 15 },
   paleGrey: { color: "#4a4a4a", opacity: 0.35, width: 15 },
+  // A Boss Battle party's picks, live, each in its seat's color (PARTY_COLORS; docs/decisions/2026-10-30-boss-party.md).
+  party0: { color: "#e8820c", opacity: 0.85, width: 13 },
+  party1: { color: "#2f6fe0", opacity: 0.85, width: 13 },
+  party2: { color: "#c2349b", opacity: 0.85, width: 13 },
 };
+
+/** A Boss Battle party's seat colors (seat 0 orange, 1 blue, 2 pink), the same on every device: arrows and the discs under pawns. */
+export const PARTY_COLORS = [BRUSHES.party0.color, BRUSHES.party1.color, BRUSHES.party2.color] as const;
+export const partyBrush = (seat: number): Brush => (seat === 1 ? "party1" : seat === 2 ? "party2" : "party0");
 
 export interface ArrowShape {
   move: string;

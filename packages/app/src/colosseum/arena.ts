@@ -1,6 +1,6 @@
 /**
  * The Colosseum's layout (Oct 30, the first look: docs/decisions/2026-10-30-colosseum-look.md): where everything stands,
- * the ten views and the camera's math. Pure numbers, no drawing, so it's tested on its own (test/colosseum.test.ts).
+ * the views and the camera's math. Pure numbers, no drawing, so it's tested on its own (test/colosseum.test.ts).
  *
  * World units are meters, one board square a meter. The board lies in the middle of the floor, its middle at the origin,
  * y up; files run along x (a at -x), ranks along z, White's end at +z (rank 1 at z = 3.5). Angles round the arena are
@@ -40,17 +40,19 @@ export const landingDepth = (k: number): number => (k === STANDS.landingAfter ? 
 export const aisleAngle = (i: number): number => ((i + 0.5) / SEATING.aisles) * Math.PI * 2;
 
 /**
- * The pillars on the floor with their torches, between the board's corners and the wall: eight places round it, half-way
- * between the seats' angles (so none stands between a seat and the board), two of them the statues' (a generic stone pawn in a
- * gladiator's helm, on a plinth, never the town's bronze statue).
+ * The pillars on the floor with their torches (arena-pillar: `h` is its capital's top; its brazier and flame stand above),
+ * by the arena wall: eight places round it, half-way between the seats' angles, two of them the statues' (arena-statue: a
+ * generic marble pawn champion on its plinth, never the town's bronze statue; `h` its height, plinth and all). Close to the
+ * wall, so none hides any of the board from any of the ten views (half-way between the seats, nearer the board, a pillar
+ * stood in the line from a seat to the board's near corners; test/colosseum.test.ts).
  */
-export const PILLARS = { places: 8, r: 7.7, half: 0.28, h: 2.1, offset: Math.PI / 8 } as const;
+export const PILLARS = { places: 8, r: 9.4, h: 2.1, offset: Math.PI / 8 } as const;
 const placeAngle = (i: number): number => PILLARS.offset + (i / PILLARS.places) * Math.PI * 2;
 /** Which of the eight places are statues (the rest pillars). */
 const STATUE_PLACES = [1, 5];
 export const PILLAR_ANGLES: readonly number[] = Array.from({ length: PILLARS.places }, (_, i) => i).filter((i) => !STATUE_PLACES.includes(i)).map(placeAngle);
-export const STATUE = { r: 8.2, h: 3.0, angles: STATUE_PLACES.map(placeAngle) } as const;
-/** The crown banners: on the arena wall between the pillars, and on the gallery wall. */
+export const STATUE = { r: 9.5, h: 3.0, angles: STATUE_PLACES.map(placeAngle) } as const;
+/** The crown banners (arena-banner, hung by its rod's top, swaying): on the arena wall between the pillars (`wallTop` to `wallBottom`), and on the gallery wall. */
 export const BANNERS = { wall: 8, gallery: 12, wallW: 0.9, wallTop: 2.35, wallBottom: 0.55, galleryW: 1.2 } as const;
 
 /** A person seated in the stands: where (their foot on the step), which way they face (toward the middle), which row. */
@@ -111,10 +113,74 @@ function seatView(deg: number, row: number): View {
   return { eye, at: [0, 1.1, 0], fov };
 }
 /**
- * The ten views (Eric, Oct 30): eight seats round the stands, lower and higher, each at its own angle (the eight angles
- * between the pillars), all good for watching the board ("Change seat" picks another of them at random); then White's and
- * Black's player views ("as if a real board was in front of you … about 20 feet above the board, in line with your side": 6 m
- * up, behind your own end).
+ * The high views (the director, Nov 1, on Eric's picture of Oct 31: "this vantage point of watching the game is pretty much
+ * exactly what I'm envisioning … the viewpoints, they're all way too close to the board"): four, going round the board,
+ * behind White, on its right (the h-file's side), behind Black and on its left, each high up and looking down `pitch` at the
+ * board's middle, the whole board, the floor round it and the lower stands in view. How far back the eye is depends on the
+ * screen's shape (`highView`), so the board fills the frame as in the picture on a phone and a computer: `share` of the
+ * arena's height for the board and its border (on a computer the overlay takes the top and the right, and the lens is
+ * shifted into what it leaves, so less), never more than `wide` of its width.
+ */
+export const HIGH = { pitch: (47 * Math.PI) / 180, fov: (30 * Math.PI) / 180, at: 0.55, phone: { share: 0.56, wide: 0.76, ahead: 0.6 }, computer: { share: 0.42, wide: 0.46, ahead: 1.0 } } as const;
+/** A high view's eye's distance from the board's middle, the nearest and farthest it may be (inside the gallery wall). */
+const HIGH_D = { min: 12, max: 32 } as const;
+
+/**
+ * High view `k` (0 behind White, 1 its right, 2 behind Black, 3 its left) on a screen of this shape: the eye back along
+ * `pitch` as far as makes the board and its border take `share` of the lens's height (and no more than `wide` of its
+ * width), through the lens that screen gets (fovFor).
+ */
+export function highView(k: number, aspect: number, computer: boolean): View {
+  const a = (k * Math.PI) / 2;
+  const fit = computer ? HIGH.computer : HIGH.phone;
+  // (Aimed `ahead` meters past the board's middle, so the board sits low in the frame and the far wall and the lower stands
+  // show above it, as in the picture.)
+  const at = [-Math.sin(a) * fit.ahead, HIGH.at, -Math.cos(a) * fit.ahead] as const;
+  const at3 = (d: number): View => ({
+    eye: [at[0] + Math.sin(a) * Math.cos(HIGH.pitch) * d, HIGH.at + Math.sin(HIGH.pitch) * d, at[2] + Math.cos(a) * Math.cos(HIGH.pitch) * d],
+    at,
+    fov: HIGH.fov,
+  });
+  const B = BOARD.half + BOARD.rim;
+  const fits = (v: View) => {
+    perspective(HV.proj, fovFor(v, aspect), aspect, 0.2, 120);
+    lookAt(HV.view, v.eye, v.at, 0, 0, HV.fwd);
+    multiply(HV.m, HV.proj, HV.view);
+    let x0 = Infinity;
+    let x1 = -Infinity;
+    let y0 = Infinity;
+    let y1 = -Infinity;
+    for (const x of [-B, B])
+      for (const z of [-B, B]) {
+        const p = project(HV.m, x, BOARD.lift, z, 1, 1);
+        if (!p) return false;
+        x0 = Math.min(x0, p[0]);
+        x1 = Math.max(x1, p[0]);
+        y0 = Math.min(y0, p[1]);
+        y1 = Math.max(y1, p[1]);
+      }
+    return y1 - y0 <= fit.share && x1 - x0 <= fit.wide;
+  };
+  let lo: number = HIGH_D.min;
+  let hi: number = HIGH_D.max;
+  for (let i = 0; i < 24; i++) {
+    const mid = (lo + hi) / 2;
+    if (fits(at3(mid))) hi = mid;
+    else lo = mid;
+  }
+  return at3(hi);
+}
+const HV = { proj: new Float32Array(16), view: new Float32Array(16), m: new Float32Array(16), fwd: new Float32Array(3) };
+
+/** The screen shape the views below are made for (a computer's arena, 1440 × 848); `viewsFor` makes them for any other. */
+const REF = { aspect: 1440 / 848, computer: true } as const;
+
+/**
+ * The views (Eric, Oct 30): eight seats round the stands, lower and higher, each at its own angle (the eight angles between
+ * the pillars), all good for watching the board; White's and Black's player views ("as if a real board was in front of you
+ * … about 20 feet above the board, in line with your side": 6 m up, behind your own end); then the four high views (Nov 1),
+ * here for a computer's screen (`viewsFor`: any screen's). "Change seat" picks another of the seats and the high views at
+ * random.
  */
 export const VIEWS: readonly View[] = [
   seatView(0, 3),
@@ -127,23 +193,42 @@ export const VIEWS: readonly View[] = [
   seatView(315, 7),
   { eye: [0, 6, 9.4], at: [0, 0, 0.4], fov: (56 * Math.PI) / 180 },
   { eye: [0, 6, -9.4], at: [0, 0, -0.4], fov: (56 * Math.PI) / 180 },
+  ...[0, 1, 2, 3].map((k) => highView(k, REF.aspect, REF.computer)),
 ];
 export const SEAT_VIEWS = 8;
 export const WHITE_VIEW = 8;
 export const BLACK_VIEW = 9;
+/** The first high view (behind White: where the page opens); the four go round the board from it. */
+export const HIGH_VIEW = 10;
+export const HIGH_VIEWS = 4;
+/** The views before the high views: the ones the bosses' seats were chosen against (Oct 30), so the high views move none. */
+export const FIRST_VIEWS = 10;
+/** Whether view `i` is one of the four high views. */
+export const isHigh = (i: number): boolean => i >= HIGH_VIEW && i < HIGH_VIEW + HIGH_VIEWS;
 
-/** Another of the eight seats, picked at random (never the one you're in). `rnd`: 0 to 1. */
+/** Every view for a screen of this shape: the high views' eyes set for it (made when the screen's size changes, never a frame). */
+export function viewsFor(aspect: number, computer: boolean): View[] {
+  return VIEWS.map((v, i) => (isHigh(i) ? highView(i - HIGH_VIEW, aspect, computer) : v));
+}
+
+/** The views "Change seat" picks among: the eight seats and the four high views. */
+const CHANGE = [...Array.from({ length: SEAT_VIEWS }, (_, i) => i), ...Array.from({ length: HIGH_VIEWS }, (_, i) => HIGH_VIEW + i)];
+
+/** Another of the eight seats and the four high views, picked at random (never the one you're in). `rnd`: 0 to 1. */
 export function otherSeat(now: number, rnd: number): number {
-  const pick = Math.floor(rnd * (SEAT_VIEWS - 1)) % (SEAT_VIEWS - 1);
-  const from = now >= 0 && now < SEAT_VIEWS ? now : -1;
-  return from < 0 ? pick : pick >= from ? pick + 1 : pick;
+  const from = CHANGE.indexOf(now);
+  const n = from < 0 ? CHANGE.length : CHANGE.length - 1;
+  const pick = Math.floor(rnd * n) % n;
+  return CHANGE[from < 0 ? pick : pick >= from ? pick + 1 : pick]!;
 }
 
-/** The view an address asks for: `?view=white` or `?view=black` (the player views' test switch), else a seat. */
-export function viewFor(asked: string | null, seat: number): number {
-  return asked === "white" ? WHITE_VIEW : asked === "black" ? BLACK_VIEW : seat;
+/**
+ * The view an address asks for: `?view=white` or `?view=black` (the player views' test switch); else the high view behind
+ * White, where the page opens (the director, Nov 1: Eric found the seats too close).
+ */
+export function viewFor(asked: string | null): number {
+  return asked === "white" ? WHITE_VIEW : asked === "black" ? BLACK_VIEW : HIGH_VIEW;
 }
-
 
 /** A screen's lens for a view: the vertical field of view, widened on a tall screen so the board fits across it. */
 export function fovFor(v: View, aspect: number): number {
@@ -167,6 +252,42 @@ export function turnLimits(v: View, aspect: number, out: { yaw: number; pitch: n
   out.pitch = Math.max(halfV * 0.25, halfV - ang);
   return out;
 }
+
+/**
+ * How far up you may look (radians, from the view's own pitch; the board moves down the screen) with the board (its squares,
+ * and so the pieces on them) still above
+ * the railing at the screen's foot (art.ts `railingArt`: in the seats' views, `rail` the share of the screen's height it
+ * takes), the lens shifted down by `shiftY` (NDC: a computer's, Colosseum.tsx) and turned by any yaw up to `yaw`: never more
+ * than `max` (turnLimits' pitch), 0 when the board would touch it without turning.
+ */
+export function railPitch(v: View, aspect: number, shiftY: number, rail: number, yaw: number, max: number): number {
+  perspective(RP.proj, fovFor(v, aspect), aspect, 0.2, 120);
+  RP.proj[9] = shiftY;
+  const clear = (pitch: number) => {
+    for (const y of [-yaw, 0, yaw]) {
+      lookAt(RP.view, v.eye, v.at, y, pitch, RP.fwd);
+      multiply(RP.m, RP.proj, RP.view);
+      // The board's lowest points: its squares' corners (the pieces stand above them).
+      for (const x of [-BOARD.half, BOARD.half])
+        for (const z of [-BOARD.half, BOARD.half]) {
+          const p = project(RP.m, x, BOARD.lift, z, 1, 1);
+          if (p && p[1] > 1 - rail) return false;
+        }
+    }
+    return true;
+  };
+  if (!clear(0)) return 0;
+  if (clear(max)) return max;
+  let lo = 0;
+  let hi = max;
+  for (let i = 0; i < 16; i++) {
+    const mid = (lo + hi) / 2;
+    if (clear(mid)) lo = mid;
+    else hi = mid;
+  }
+  return lo;
+}
+const RP = { proj: new Float32Array(16), view: new Float32Array(16), m: new Float32Array(16), fwd: new Float32Array(3) };
 
 // ---- Matrices (column-major, into arrays made once: nothing allocated a frame).
 
@@ -259,4 +380,87 @@ export function squareXZ(sq: string): [number, number] {
   const f = sq.charCodeAt(0) - 97;
   const r = sq.charCodeAt(1) - 49;
   return [f - 3.5, 3.5 - r];
+}
+
+/** A boss's seat and its sidekick's beside it: where each stands, and the seats (indices into `seats()`) they take from the pawns. */
+export interface BossSeat {
+  boss: Seat;
+  kid: Seat;
+  taken: readonly number[];
+}
+
+/** How big a boss and a sidekick stand (half their width and their height, meters, a jump's height on top): what mustn't cover the board. */
+const BOSS_BOX = { hw: 0.8, h: 1.75 } as const;
+const KID_BOX = { hw: 0.42, h: 1.0 } as const;
+
+/**
+ * Whether a figure standing at `p` (its feet), `hw` wide each way and `h` tall, covers any of the board (its squares and the
+ * pieces on them) from view `v`: some line from the eye through the figure meets the board behind it.
+ */
+export function coversBoard(v: View, p: { x: number; y: number; z: number }, hw: number, h: number): boolean {
+  const proj = new Float32Array(16);
+  const view = new Float32Array(16);
+  const m = new Float32Array(16);
+  // (Any lens from the eye gives the same answer: which lines meet what doesn't depend on the lens.)
+  perspective(proj, (100 * Math.PI) / 180, 1, 0.1, 200);
+  lookAt(view, v.eye, v.at, 0, 0, new Float32Array(3));
+  multiply(m, proj, view);
+  const B = BOARD.half + BOARD.rim;
+  const board: [number, number, number][] = [];
+  for (const x of [-B, B]) for (const z of [-B, B]) for (const y of [BOARD.lift, BOARD.lift + 1.3]) board.push([x, y, z]);
+  const pb = board.map((q) => project(m, q[0], q[1], q[2], 100, 100)).filter((q): q is [number, number, number] => !!q);
+  const mid = project(m, 0, BOARD.lift, 0, 100, 100);
+  const dx = v.eye[0] - p.x;
+  const dz = v.eye[2] - p.z;
+  const l = Math.hypot(dx, dz) || 1;
+  const rx = dz / l;
+  const rz = -dx / l;
+  const fig: [number, number, number][] = [];
+  for (const s of [-hw, hw]) for (const y of [p.y, p.y + h]) fig.push([p.x + rx * s, y, p.z + rz * s]);
+  const pf = fig.map((q) => project(m, q[0], q[1], q[2], 100, 100));
+  // Behind the eye, or farther than the board's middle: it can't stand in front of the board.
+  if (pf.some((q) => !q) || !mid || Math.max(...pf.map((q) => q![2])) > mid[2]) return false;
+  const box = (q: readonly [number, number, number][]): [number, number, number, number] => [Math.min(...q.map((a) => a[0])), Math.min(...q.map((a) => a[1])), Math.max(...q.map((a) => a[0])), Math.max(...q.map((a) => a[1]))];
+  const [a0, b0, a1, b1] = box(pb);
+  const [c0, d0, c1, d1] = box(pf as [number, number, number][]);
+  return c0 < a1 && c1 > a0 && d0 < b1 && d1 > b0;
+}
+
+/**
+ * Where the bosses who watch sit (Eric, Oct 30: "the boss and their sidekicks next to each other in the crowd in the first 3
+ * rows"): `n` of them, each across two seats with its sidekick in the next, in rows 1 to 3, spread evenly round the ring, at
+ * seats that never change (the same in every view, on every load), and never where one would cover the board from any of the
+ * ten views (`coversBoard`; the high views, added Nov 1, move none of them: FIRST_VIEWS, and none covers the board from them
+ * either, tested).
+ */
+export function bossSeats(n: number): BossSeat[] {
+  const all = seats();
+  const views = VIEWS.slice(0, FIRST_VIEWS);
+  const free = (i: number) => !views.some((v) => coversBoard(v, all[i]!, KID_BOX.hw, KID_BOX.h));
+  // Three seats in a row, side by side (no aisle between): the boss across the first two, its sidekick in the third.
+  const triples: { i: number; a: number; row: number; boss: Seat }[] = [];
+  for (let i = 0; i + 2 < all.length; i++) {
+    const s = all.slice(i, i + 3);
+    if (s[0]!.row > 2 || s.some((q) => q.row !== s[0]!.row)) continue;
+    const gap = (a: Seat, b: Seat) => Math.hypot(a.x - b.x, a.z - b.z);
+    if (gap(s[0]!, s[1]!) > SEATING.seatGap * 1.5 || gap(s[1]!, s[2]!) > SEATING.seatGap * 1.5) continue;
+    const boss: Seat = { ...s[0]!, x: (s[0]!.x + s[1]!.x) / 2, z: (s[0]!.z + s[1]!.z) / 2, face: (s[0]!.face + s[1]!.face) / 2 };
+    if (views.some((v) => coversBoard(v, boss, BOSS_BOX.hw, BOSS_BOX.h)) || !free(i + 2)) continue;
+    triples.push({ i, a: Math.atan2(boss.x, boss.z), row: s[0]!.row, boss });
+  }
+  const out: BossSeat[] = [];
+  const used = new Set<number>();
+  for (let k = 0; k < n; k++) {
+    const target = ((k + 0.5) / n) * Math.PI * 2 - Math.PI;
+    const row = k % 3;
+    const off = (t: (typeof triples)[number]) => Math.abs(Math.atan2(Math.sin(t.a - target), Math.cos(t.a - target))) + (t.row === row ? 0 : 0.2);
+    let best: (typeof triples)[number] | null = null;
+    // (Never one boss just behind another: at least 9° apart round the ring.)
+    const near = (t: (typeof triples)[number]) => out.some((o) => Math.abs(Math.atan2(Math.sin(t.a - Math.atan2(o.boss.x, o.boss.z)), Math.cos(t.a - Math.atan2(o.boss.x, o.boss.z)))) < (9 * Math.PI) / 180);
+    for (const t of triples) if (![t.i - 1, t.i, t.i + 1, t.i + 2, t.i + 3].some((j) => used.has(j)) && !near(t) && (!best || off(t) < off(best))) best = t;
+    if (!best) break;
+    for (const j of [best.i, best.i + 1, best.i + 2]) used.add(j);
+    out.push({ boss: best.boss, kid: all[best.i + 2]!, taken: [best.i, best.i + 1, best.i + 2] });
+  }
+  return out;
 }

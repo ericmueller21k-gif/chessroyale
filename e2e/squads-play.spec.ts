@@ -103,9 +103,10 @@ async function fits(page: Page) {
 test("Pairs (a test lobby): your partner's pick shows live, both squads' tokens and block points show, lock in a different pick, then the coin-flip reveal; Next round moves on", async ({ page }) => {
   test.setTimeout(240_000);
   await testLobby(page, "pairs");
-  // Every squad's clock is on screen (the strip on a phone, the side panel on a computer).
+  // Every squad's clock is on screen (the strip on a phone, the side panel on a computer). The side panel has your own squad
+  // pinned at the top as well as in its place: nine rows (Nov 1).
   const standings = page.locator(test.info().project.name === "desktop" ? ".sq-side .sq-row" : ".sq-strip-chip");
-  await expect(standings).toHaveCount(8);
+  await expect(standings).toHaveCount(test.info().project.name === "desktop" ? 9 : 8);
   const s = await nextDuty(page, null);
   expect(s.duty!.role).toBe("pick");
   await expect(page.locator(".sq-status")).toContainText(/^Pick with /);

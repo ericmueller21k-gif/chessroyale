@@ -121,11 +121,13 @@ const snap = (page: Page): Promise<Snap & { anim: string | null }> =>
 /**
  * Says one line in the boss's voice (the test hook `sayBoss`, speech.tsx) and measures its bubble once it's drawn: its rows
  * (the distinct tops of its text's boxes), its box, and the bar, status, name column and room it has to fit in. Animations are
- * finished at once, so the box is measured at its final size.
+ * finished at once, so the box is measured at its final size. Measured as soon as it shows (Nov 2): the box is at its full size from
+ * its first frame (the words not typed yet hold their place, unseen: `.speech-rest`, speech.tsx), so its rows and box are the same
+ * then as once it has typed out. `typed`: it waits for the last letter too (for the picture of the bar with its longest line).
  */
-const sayLine = (page: Page, text: string): Promise<LineRes> =>
+const sayLine = (page: Page, text: string, typed = false): Promise<LineRes> =>
   page.evaluate(
-    async ({ text, plain }) => {
+    async ({ text, plain, typedOut }) => {
       const say = (globalThis as { sayBoss?: (t: string) => boolean }).sayBoss;
       if (!say) return { text, missing: true as const, seen: "no hook" };
       const shown = () => document.querySelector<HTMLElement>(".bc-bar-bubble");
@@ -157,16 +159,18 @@ const sayLine = (page: Page, text: string): Promise<LineRes> =>
         await document.fonts.ready;
         await new Promise((r) => setTimeout(r, 50));
         for (let i = 0; i < 3; i++) await frameNow();
-        // (The words type out a letter at a time, the rest held hidden: measure and picture the line once its last letter is in.)
-        const typedBy = performance.now() + 8000;
-        const typed = () => {
-          const rest = shown()?.querySelector(".speech-rest");
-          return !rest || ((rest.textContent ?? "") === "" && !rest.querySelector(".line-icon"));
-        };
-        while (!typed() && performance.now() < typedBy) await frameNow();
+        // (The words type out a letter at a time, the rest held hidden in their place: only a picture of it waits for its last letter.)
+        if (typedOut) {
+          const typedBy = performance.now() + 8000;
+          const typed = () => {
+            const rest = shown()?.querySelector(".speech-rest");
+            return !rest || ((rest.textContent ?? "") === "" && !rest.querySelector(".line-icon"));
+          };
+          while (!typed() && performance.now() < typedBy) await frameNow();
+        }
         el = shown();
         if (!el || el.getAttribute("aria-label") !== plain) {
-          last = "replaced while it typed out";
+          last = "replaced while it settled";
           continue;
         }
         for (const a of el.getAnimations({ subtree: true })) {
@@ -220,7 +224,7 @@ const sayLine = (page: Page, text: string): Promise<LineRes> =>
       }
       return { text, missing: true as const, seen: `lost in three rounds: ${last}` };
     },
-    { text, plain: plainLine(text) },
+    { text, plain: plainLine(text), typedOut: typed },
   );
 
 /** Whether the bar's bubble stays empty for `ms` (a boss's own line, its entrance or its idle moment, has taken the box before then). */
@@ -256,63 +260,69 @@ async function sheet(page: Page, title: string, bars: { name: string; png: Buffe
   await testInfo.attach(`${title}.png`, { body: png, contentType: "image/png" });
 }
 
-test("every playable boss's phone bar: one bar and one figure box for all, the figure at its size and in the room at rest, every line inside its bar", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "phone", "one run is enough: a computer's bar is unchanged");
-  test.setTimeout(3_000_000);
+// (One test for the bar's sameness across every boss, and one a boss for its lines: they run side by side, Nov 2.)
+test.describe.configure({ mode: "parallel" });
+test.skip(({ isMobile }) => !isMobile, "the phone project only: a computer's bar is unchanged");
+
+/** A boss's battle (Boss alone) on a phone, its bar up. */
+async function battle(page: Page, id: string) {
+  await page.goto(`${BASE}&boss=${id}`);
+  await bossAloneFromHome(page);
+  await expect(page.locator(".boss-bar")).toBeVisible({ timeout: 60_000 });
+}
+
+test("every playable boss's phone bar: one bar and one figure box for all, the figure at its size and in the room at rest", async ({ page }, testInfo) => {
+  test.setTimeout(1_200_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   const snaps: Record<string, Partial<Record<number, Snap>>> = {};
-  const lines: Record<string, Partial<Record<number, LineRes[]>>> = {};
   const pngs: Record<number, { name: string; png: Buffer }[]> = { 320: [], 390: [], 428: [] };
   const lineup: { name: string; png: Buffer; box: Box }[] = [];
-  /** Each boss's longest line, held up in its bubble (typed out): the bar as it reads with a line in it, for the sheets. */
-  const lined: Record<number, { name: string; png: Buffer }[]> = { 320: [], 390: [], 428: [] };
   const boards: Record<number, Record<string, Box | null>> = { 320: {}, 390: {}, 428: {} };
   for (const def of PLAYABLE) {
-    await page.goto(`${BASE}&boss=${def.id}`);
-    await bossAloneFromHome(page);
-    await expect(page.locator(".boss-bar")).toBeVisible({ timeout: 60_000 });
+    await battle(page, def.id);
     snaps[def.id] = {};
-    lines[def.id] = {};
     for (const [w, h] of SIZES) {
       await page.setViewportSize({ width: w, height: h });
-      // (The figure at rest: its idle frame drawn, nothing else of its moments.)
-      await expect.poll(async () => (await snap(page)).anim, { timeout: 20_000 }).toBe("idle");
-      await page.waitForTimeout(300);
-      const s = await snap(page);
+      // (The figure at rest: its idle frame drawn, nothing else of its moments, in the snap that's measured. Taken a moment after the
+      // battle begins now (no lines in between, Nov 2), a snap 300 ms after the idle could land in the entrance that follows it, whose
+      // frames reach further: so the measured snap itself must be idle.)
+      const rest: { s?: Snap } = {};
+      await expect
+        .poll(
+          async () => {
+            if ((await snap(page)).anim !== "idle") return "not idle";
+            await page.waitForTimeout(300);
+            rest.s = await snap(page);
+            return rest.s.anim;
+          },
+          { timeout: 30_000 },
+        )
+        .toBe("idle");
+      const s = rest.s!;
       snaps[def.id]![w] = s;
       boards[w]![def.id] = s.board;
       // (A clip of the page, not the element's own screenshot: the bar's live parts keep moving, so Playwright never finds it still.
-      // Its box is waited for first: the bar is redrawn when a boss's screen settles.)
-      await expect.poll(() => page.locator(".boss-bar").boundingBox(), { timeout: 20_000, message: `${def.id} at ${w}: the bar has a box` }).not.toBeNull();
-      const at = (await page.locator(".boss-bar").boundingBox())!;
-      pngs[w]!.push({ name: `${def.name}`, png: await page.screenshot({ clip: at }) });
+      // Its box and the picture are taken together, again until both come: the bar is redrawn when a boss's screen settles, and a box
+      // read a moment before could be gone by the picture.)
+      const got: { at?: { x: number; y: number; width: number; height: number }; png?: Buffer } = {};
+      await expect(async () => {
+        const b = await page.locator(".boss-bar").boundingBox();
+        expect(b, `${def.id} at ${w}: the bar has a box`).not.toBeNull();
+        got.png = await page.screenshot({ clip: b! });
+        got.at = b!;
+      }).toPass({ timeout: 20_000 });
+      const at = got.at!;
+      pngs[w]!.push({ name: `${def.name}`, png: got.png! });
       if (w === 390) {
         // The lineup's figure: from the screen's left edge to the name column, from the top to the bar's bottom (the HUD's text and the name are cut off).
         const fig = { x: 0, y: 0, width: 88, height: at.y + at.height + 2 };
         lineup.push({ name: def.name, png: await page.screenshot({ clip: fig }), box: s.box });
       }
-      // (The boss's own lines settle first: its entrance and its first idle moment take the box as the battle begins. The line check
-      // starts once the box has been empty for a moment.)
-      await expect.poll(() => bubbleQuiet(page, 1500), { timeout: 60_000, message: `${def.id} at ${w}: the boss is quiet` }).toBe(true);
-      const out: LineRes[] = [];
-      const all = linesOf(def.kit!);
-      const longest = all.reduce((a, b) => (plainLine(b).length > plainLine(a).length ? b : a), all[0] ?? "");
-      for (const text of all) {
-        const r = await sayLine(page, text);
-        out.push(r);
-        if (text === longest && !("missing" in r)) {
-          // (Its picture while it's up: a line holds for seconds after it has typed out, and this is taken at once.)
-          const bar = await page.locator(".boss-bar").boundingBox();
-          if (bar) lined[w]!.push({ name: def.name, png: await page.screenshot({ clip: bar }) });
-        }
-      }
-      lines[def.id]![w] = out;
     }
   }
   expect(errors, "no page errors").toEqual([]);
 
-  const rowsWrong: string[] = [];
   for (const [w] of SIZES) {
     const at = (id: string) => snaps[id]![w]!;
     const all = PLAYABLE.map((d) => d.id);
@@ -354,11 +364,67 @@ test("every playable boss's phone bar: one bar and one figure box for all, the f
       expect.soft(p.minY, `${who}: never covers the "BOSS · move N" text`).toBeGreaterThanOrEqual(s.hudText!.b + 1);
       expect.soft(p.maxY, `${who}: nothing of the figure below the bar`).toBeLessThanOrEqual(s.bar.b + TOL);
     }
+  }
+
+  // The board's size for the PR: per size, the board's box.
+  testInfo.annotations.push({ type: "boards", description: JSON.stringify(boards) });
+  // A stacked sheet of every boss's bar at each size, and the lineup of the figures at 390 (each at its own size, feet on one line).
+  for (const [w] of SIZES) await sheet(page, `boss bar at ${w}`, pngs[w]!, testInfo);
+  await testInfo.attach("lineup.json", { body: Buffer.from(JSON.stringify(lineup.map((l) => ({ name: l.name, box: l.box })))), contentType: "application/json" });
+  for (const l of lineup) await testInfo.attach(`lineup-${l.name}.png`, { body: l.png, contentType: "image/png" });
+  // (For a person to compare: the bars and the lineup as PNG files, when a directory is given: BAR_SHEET_DIR.)
+  const dir = process.env.BAR_SHEET_DIR;
+  if (dir) {
+    mkdirSync(dir, { recursive: true });
+    for (const [w] of SIZES) for (const b of pngs[w]!) writeFileSync(`${dir}/after-${w}-${safe(b.name)}.png`, b.png);
+    for (const l of lineup) writeFileSync(`${dir}/lineup-${safe(l.name)}.png`, l.png);
+  }
+});
+
+const safe = (n: string) => n.replace(/[^a-zA-Z0-9]+/g, "-");
+
+for (const def of PLAYABLE) {
+  test(`${def.name}${def.name.endsWith("s") ? "'" : "'s"} phone bar: every line inside its bar at 320, 390 and 428 px, in the rows its width asks for`, async ({ page }, testInfo) => {
+    test.setTimeout(600_000);
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    const lines: Partial<Record<number, LineRes[]>> = {};
+    /** Its longest line, held up in its bubble (typed out): the bar as it reads with a line in it, for a person to look at. */
+    const lined: { w: number; png: Buffer }[] = [];
+    await battle(page, def.id);
+    const all = linesOf(def.kit!);
+    const longest = all.reduce((a, b) => (plainLine(b).length > plainLine(a).length ? b : a), all[0] ?? "");
+    for (const [w, h] of SIZES) {
+      await page.setViewportSize({ width: w, height: h });
+      // (The boss's own lines settle first: its entrance and its first idle moment take the box as the battle begins. The line check
+      // starts once the box has been empty for a moment.)
+      await expect.poll(() => bubbleQuiet(page, 1500), { timeout: 60_000, message: `${def.id} at ${w}: the boss is quiet` }).toBe(true);
+      const out: LineRes[] = [];
+      for (const text of all) {
+        const r = await sayLine(page, text, text === longest);
+        out.push(r);
+        if (text === longest && !("missing" in r)) {
+          // (Its picture while it's up: a line holds for seconds after it has typed out, and this is taken at once.)
+          const bar = await page.locator(".boss-bar").boundingBox();
+          if (bar) lined.push({ w, png: await page.screenshot({ clip: bar }) });
+        }
+      }
+      lines[w] = out;
+    }
+    expect(errors, "no page errors").toEqual([]);
+    for (const l of lined) await testInfo.attach(`${def.name} at ${l.w}, with its longest line.png`, { body: l.png, contentType: "image/png" });
+    const dir = process.env.BAR_SHEET_DIR;
+    if (dir) {
+      mkdirSync(dir, { recursive: true });
+      for (const l of lined) writeFileSync(`${dir}/lined-${l.w}-${safe(def.name)}.png`, l.png);
+    }
+
     // Every line, inside the bar and beside the status, in at most three rows (two of them the same pitch as at 390); a one-row line
     // never past 60% of its room.
-    for (const id of all) {
-      for (const r of lines[id]![w] ?? []) {
-        const who = `${id} at ${w}: "${r.text}"`;
+    const rowsWrong: string[] = [];
+    for (const [w] of SIZES) {
+      for (const r of lines[w] ?? []) {
+        const who = `${def.id} at ${w}: "${r.text}"`;
         expect.soft("missing" in r ? `missing (seen: ${r.seen})` : "ok", `${who}: said and drawn`).toBe("ok");
         if ("missing" in r) continue;
         // The rows the line gets (Eric, Oct 24): one row when its one-row width is at most 60% of the room's text width; else two
@@ -376,24 +442,7 @@ test("every playable boss's phone bar: one bar and one figure box for all, the f
         expect.soft(r.bubble.x, `${who}: from the name column's left edge`).toBeGreaterThanOrEqual(r.name.x - TOL);
       }
     }
-  }
-
-  // The board's size for the PR: per size, the board's box.
-  testInfo.annotations.push({ type: "boards", description: JSON.stringify(boards) });
-  // A stacked sheet of every boss's bar at each size, and the lineup of the figures at 390 (each at its own size, feet on one line).
-  for (const [w] of SIZES) await sheet(page, `boss bar at ${w}`, pngs[w]!, testInfo);
-  for (const [w] of SIZES) await sheet(page, `boss bar at ${w}, with its longest line`, lined[w]!, testInfo);
-  await testInfo.attach("lineup.json", { body: Buffer.from(JSON.stringify(lineup.map((l) => ({ name: l.name, box: l.box })))), contentType: "application/json" });
-  for (const l of lineup) await testInfo.attach(`lineup-${l.name}.png`, { body: l.png, contentType: "image/png" });
-  // (For a person to compare: the bars and the lineup as PNG files, when a directory is given: BAR_SHEET_DIR.)
-  const dir = process.env.BAR_SHEET_DIR;
-  if (dir) {
-    mkdirSync(dir, { recursive: true });
-    const safe = (n: string) => n.replace(/[^a-zA-Z0-9]+/g, "-");
-    for (const [w] of SIZES) for (const b of pngs[w]!) writeFileSync(`${dir}/after-${w}-${safe(b.name)}.png`, b.png);
-    for (const [w] of SIZES) for (const b of lined[w]!) writeFileSync(`${dir}/lined-${w}-${safe(b.name)}.png`, b.png);
-    for (const l of lineup) writeFileSync(`${dir}/lineup-${safe(l.name)}.png`, l.png);
-  }
-  // The rows are a hard check: every line of every boss at every size has the rows its width asks for (see sayLine).
-  expect(rowsWrong, "every line's rows: one row, two balanced, or three").toEqual([]);
-});
+    // The rows are a hard check: every line at every size has the rows its width asks for (see sayLine).
+    expect(rowsWrong, "every line's rows: one row, two balanced, or three").toEqual([]);
+  });
+}

@@ -440,6 +440,9 @@ export interface Pose {
   hop: number;
   /** -1 to 1 over a step. */
   tilt: number;
+  /** Taking a step, and how far through it (0 to 1, even in time; 0 standing): a ride's move plays one cycle a step (Oct 31). */
+  step: boolean;
+  t: number;
 }
 
 /** Claims are numbered in the order they're made: the earlier claim on a square keeps it (keepApart). */
@@ -450,6 +453,11 @@ export class Walker {
   c: number;
   r: number;
   facing: 1 | -1 = 1;
+  /**
+   * The way it last walked, for a ride's views (Nov 1, rides v2): 0 left or right (its side; `facing` says which), 1 up the
+   * screen (away: its back), 2 down (toward you: its front). Standing, the one it last walked in.
+   */
+  view: 0 | 1 | 2 = 0;
   /** When it claimed the square it will end on (its goal): the order of `go`s, 0 for where it first stood. */
   claim = 0;
   private queue: Sq[] = [];
@@ -457,7 +465,8 @@ export class Walker {
   private step: { fc: number; fr: number; to: Sq; dc: number; dr: number; t0: number; first: boolean; last: boolean } | null = null;
   constructor(
     sq: Sq,
-    readonly stepMs: number,
+    /** How long a step takes (ms): a ride may make it shorter (RIDES.speed: Town.tsx sets it as the look is put on). */
+    public stepMs: number,
     readonly hobble: boolean,
     /** How much the walk eases into its first step and out of its last (TOWN_FEEL.walkEase; 0 = even steps). */
     readonly ease = 0,
@@ -516,6 +525,8 @@ export class Walker {
     const dc = wrapF(to.c - this.c);
     const dr = wrapF(to.r - this.r);
     if (dc) this.facing = dc < 0 ? -1 : 1;
+    if (dc) this.view = 0;
+    else if (dr) this.view = dr > 0 ? 1 : 2;
     this.step = { fc: this.c, fr: this.r, to, dc, dr, t0, first, last: this.queue.length === 0 };
   }
   /** Its pose at `now`, into `out`. */
@@ -526,12 +537,16 @@ export class Walker {
       out.y = this.r;
       out.hop = 0;
       out.tilt = 0;
+      out.step = false;
+      out.t = 0;
       return out;
     }
     const t = Math.max(0, Math.min(1, (now - s.t0) / this.stepMs));
     const e = this.ease ? ease(t, s.first, s.last, this.ease) : t;
     out.x = s.fc + s.dc * e;
     out.y = s.fr + s.dr * e;
+    out.step = true;
+    out.t = t;
     out.hop = this.hobble ? Math.sin(Math.PI * t) : 0;
     out.tilt = this.hobble ? Math.sin(2 * Math.PI * t) : 0;
     return out;
@@ -774,13 +789,13 @@ export function addCrowd(t: Town, n: number): void {
  * id, a profile icon and a rating, standing still on the free square nearest you, so a test can tap it and see the card a
  * real player will get (its picture opens their profile). Kept out of the crowd, which wanders. Answers its index in the people.
  */
-export function addTestPlayer(t: Town, who: { uid: string; name: string; icon?: string; rating?: number }): number {
+export function addTestPlayer(t: Town, who: { uid: string; name: string; icon?: string; rating?: number; wear?: ItemLook | null }): number {
   const at = t.you.walker.here();
   const sq = spotNear(t, t.you.walker, at, true) ?? freeSpot(t.rnd, at, 2, [], t, 1);
   const p: Person = {
     id: `player:${who.uid}`,
     name: who.name,
-    look: { side: "light", tint: null, wear: null },
+    look: { side: "light", tint: null, wear: who.wear ?? null },
     you: false,
     walker: new Walker(sq, TOWN_FEEL.botStepMs, true),
     sit: false,

@@ -92,6 +92,8 @@ export interface ShopState {
   equipped: Record<EquipSlot, string>;
   /** Quick chat: the lines and emoji they picked to see in their games (the defaults until they choose). */
   chat: ChatPicks;
+  /** An admin's: the items in `owned` that are admin copies (admin-copies.ts; never stored). */
+  admin?: string[];
 }
 
 /** The look of what's equipped in a slot (the starter if nothing valid is). */

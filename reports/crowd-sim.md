@@ -24,3 +24,27 @@ Reading:
   when players move quickly (the round locks once everyone has picked).
 - In 50 v 50 the result is usually clear by the end (one team's crowd outplays the other's), which makes the team win
   on your record meaningful.
+
+## The new cut schedule, before → after (Nov 1, 2026)
+
+`npx tsx packages/sim/scripts/crowd-sim.ts 10` (the team final, the usual start): 10 matches of 100 bots, 100k nodes,
+seeds 900 to 909, on today's code. "Before" is the same script with the old schedule put back (a cut after every move
+from move 10: 16, 14, 12, 10, 8, 8, 6, 6, 4, 4, 4; the cap's old stages, `capFrom` [0, 1, 5, 9]); "after" is the new one
+(cuts after moves 10, 15, 19, 23, 26 and 29: 30, 22, 16, 12, 8, 4). docs/decisions/2026-11-01-crowd-cuts.md.
+
+| | before | after |
+|---|---|---|
+| The team final starts at move | 21 | 30 |
+| Game ended (and restarted) before the final | 0 of 10 matches | 1 of 10 (once) |
+| Final cut short by the game ending | 0% | 0% |
+| Rank correlation, skill vs placement | 0.75 | 0.73 |
+| Strongest bot reaches the final | 20% | 40% |
+| Top-5 bots in the final (of 8 seats, average) | 1.4 | 1.9 |
+| Plies per match (of which the final) | 126 (86) | 158 (100) |
+| Game decided at the end (mate, or 60%+) | 80% | 90% |
+| Mean pick loss before the final, raw (counted) | 1.93 (1.00) | 1.80 (1.05) |
+
+Reading: the final starts 9 moves later (move 30, was 21), and a game now and then ends before it (one restart in 10
+matches; none before), which `replaceBoard` handles as before: a new board of the same kind, and the cuts carry on. The
+strongest bots reach the final a little more often (fewer cuts, so fewer chances for one bad move to cost them); 10
+matches is a small sample, so read the strength numbers as "no worse". All bots: the sim has no people.

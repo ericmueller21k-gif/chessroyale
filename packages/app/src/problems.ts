@@ -1,4 +1,4 @@
-import { OPS } from "@chessroyale/core";
+import { OPS, TOWN_GL_FALLBACK, type TownGlFallback } from "@chessroyale/core";
 import { account } from "./account.ts";
 
 /**
@@ -85,6 +85,18 @@ export function captureError(kind: string, error: unknown, at = "") {
   if (recent.length > 3) recent.shift();
   queue.push({ kind, message, stack, where, trail: [...trail] });
   timer ??= setTimeout(() => send(false), OPS.client.batchMs);
+}
+
+let fellBack = false;
+/**
+ * The town asked for WebGL and drew with Canvas 2D instead (Town.tsx): reported once a page, whatever the reason and however
+ * often the town opens, as its own kind with the reason as its message (TOWN_GL_FALLBACK), in the same request an error
+ * goes in. Nothing shows: it isn't an error to the player.
+ */
+export function reportTownFallback(why: TownGlFallback) {
+  if (fellBack) return;
+  fellBack = true;
+  captureError(TOWN_GL_FALLBACK.kind, why);
 }
 
 /** A worker's error event (Stockfish's, Maia's, the sound worker's): reported as `worker:<name>`. */

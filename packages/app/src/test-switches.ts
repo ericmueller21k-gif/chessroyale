@@ -1,3 +1,4 @@
+import { RIDES } from "@chessroyale/core";
 import { account, type AccountState } from "./account.ts";
 
 /**
@@ -72,3 +73,26 @@ export const bannerPlusFor = (asked: number | null, allowed: () => boolean, onDe
 export const bannerPlusAsked = (): number | null => bannerPlusFor(TIMING_ASKED.banner, testSwitchesAllowed, gameOnDevice);
 /** What `?talkplus=` adds to every speech line's read time now (ms; 0 without it, or where the switches don't count). */
 export const talkPlusMs = (): number => (TIMING_ASKED.talk !== null && testSwitchesAllowed() ? TIMING_ASKED.talk : 0);
+
+/**
+ * `?rideScale=0.75` (Nov 1, Eric: "scale down the riders with just a button so to speak… I wanna see it at 75%"): every ride
+ * drawn at that size on this page, over each ride's own (RIDES.scale), so sizes can be tried live. From 0.5 to 1.25
+ * (RIDES.tryScale); anything else is ignored. Read from the address once, as the page opens; whether it counts, each time
+ * it's asked (testSwitchesAllowed): a rider's frames are composed once, so it applies to the riders made from then on.
+ */
+export function rideScaleValue(value: string | null): number | null {
+  if (value === null || value.trim() === "") return null;
+  const k = Number(value);
+  const [lo, hi] = RIDES.tryScale;
+  return Number.isFinite(k) && k >= lo && k <= hi ? k : null;
+}
+const RIDE_SCALE_ASKED = (() => {
+  try {
+    return rideScaleValue(new URLSearchParams(globalThis.location?.search ?? "").get("rideScale"));
+  } catch {
+    return null;
+  }
+})();
+/** The ride size this page's `?rideScale=` asks for, if it counts now (allowed); else null: each ride's own. */
+export const rideScaleFor = (asked: number | null, allowed: () => boolean): number | null => (asked !== null && allowed() ? asked : null);
+export const rideScaleAsked = (): number | null => rideScaleFor(RIDE_SCALE_ASKED, testSwitchesAllowed);

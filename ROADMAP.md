@@ -118,6 +118,15 @@ decisions. In this order:
 
 Eric: "too big a change for now". Recorded so they aren't lost; nothing gets built until he says so.
 
+- **The beaver builder** (Eric, Oct 20): a new boss who builds pieces in a workshop above the board from scrap wood (one
+  scrap every 15 s), drops each finished piece in, and whose ultimate gnaws one of your pawns into 8 scraps; beaver tokens
+  for the players facing him unlock a beaver hat. Orange hard hat and vest, yellow tool belt, planks on his back. Full
+  notes: [docs/ideas/beaver-builder.md](docs/ideas/beaver-builder.md).
+- **Boss Series Crate #1** (Eric, Oct 29): one item from every boss, rides as the rarest. Art drawn (Oct 30–31); the crate
+  itself isn't built. Notes: [docs/ideas/boss-series-crate.md](docs/ideas/boss-series-crate.md).
+- **Bosses think out loud** (Eric, Oct 24): engine-based lines in each boss's voice, and call-outs on the player's move.
+  Notes: [docs/ideas/bosses-think-out-loud.md](docs/ideas/bosses-think-out-loud.md).
+
 - **A plain boss mode.** Bare-bones chess against Stockfish at a choice of difficulty levels: no God King, no powers,
   no power-ups. Eric thinks many players will want exactly this.
 - **How a 50 v 50 plays out, as a pre-game vote** (another vote round, like format and speed), so players choose each
@@ -476,7 +485,7 @@ Colosseum's gate, with ten chess tables, and made the Colosseum about twice its 
 
 **A new name and a first-visit tour** (Eric, Oct 26: "we've kind of outgrown boss arena… we're going to have this ability to
 challenge other players here, not just the bosses"). Not started; Eric is picking the name (maybe "Town square").
-- **Rename Boss Arena** on home's card and the computer's side menu once Eric has the name.
+- ~~**Rename Boss Arena** on home's card and the computer's side menu once Eric has the name.~~ Done Nov 1: **Chess Town** (Eric's name), a little town scene under PLAY on home and the crest in the computer's side menu ([2026-11-01-home-chess-town.md](docs/decisions/2026-11-01-home-chess-town.md)).
 - **A first-visit tour on home**: the rest of the page dims, and a pointer steps through it with Next: 50 v 50 first, then the
   other modes, and last the town's card with a short pitch ("open world style": walk around, meet the bosses, play people at
   the park). A flag on the player's account remembers they've seen it, so it shows once.
@@ -503,6 +512,8 @@ challenge other players here, not just the bosses"). Not started; Eric is pickin
   on each building's sign, never drawn into the art.
 
 ## Auto chess: a TFT-style economy (Eric, Oct 25, 2026; for another day, needs testing)
+
+**Built Nov 1** (queen 9, income 10 +2 a round up to 20, the rest as below, scaled to whole gold): [docs/decisions/2026-11-01-autochess-tft-economy.md](docs/decisions/2026-11-01-autochess-tft-economy.md). Next: Eric's feel test.
 
 Eric: rework Auto chess's gold so it plays like Teamfight Tactics, with buying, rolling and leveling in small whole numbers.
 "Will need to test it a bit so it feels like TFT… not sure yet but this is for another day." His numbers, with today's in

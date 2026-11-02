@@ -30,7 +30,7 @@ import { MOVE_MEAN_DB, MOVE_PEAK } from "../src/characters/synth.ts";
 import type { KingAttackKit } from "../src/characters/kits.ts";
 import { frameKeys, renderFrame, type Anim } from "../src/characters/sprite.ts";
 import { ATTACK_ROOM_ABOVE, KING_MIDDLE, attackTop, kingAttackBeat, kingAttackPlace } from "../src/components/KingAttack.tsx";
-import { evalBarOn, onPrefsChange, setEvalBarOn } from "../src/prefs.ts";
+import { evalBarOn } from "../src/prefs.ts";
 
 // A boss's attack on a king (Eric, Oct 10: Hollow first): the kit's `kingAttack`, his frames on the shared beats, the
 // God King's blows on its lashes in his Last Stand, and the hits on the king's square.
@@ -442,7 +442,7 @@ describe("the attack on a king's moments (kingAttackBeat)", () => {
   });
 });
 
-describe("the eval bar's setting (prefs.ts)", () => {
+describe("the eval bar is off for everyone (prefs.ts)", () => {
   const store = new Map<string, string>();
   const g = globalThis as { localStorage?: unknown };
   afterEach(() => {
@@ -450,21 +450,15 @@ describe("the eval bar's setting (prefs.ts)", () => {
     delete g.localStorage;
   });
 
-  it("is on by default, off when switched off, remembered, and tells the screens", () => {
+  it("is off whatever a device stored: a stored choice of on is ignored, and nothing is written", () => {
     g.localStorage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) };
-    expect(evalBarOn()).toBe(true);
-    let told = 0;
-    const off = onPrefsChange(() => told++);
-    setEvalBarOn(false);
     expect(evalBarOn()).toBe(false);
-    expect(store.get("brc.evalBar")).toBe("0");
-    setEvalBarOn(true);
-    expect(evalBarOn()).toBe(true);
-    expect(told).toBe(2);
-    off();
+    store.set("brc.evalBar", "1");
+    expect(evalBarOn()).toBe(false);
+    expect(store.get("brc.evalBar")).toBe("1");
   });
 
-  it("stays on when the device keeps nothing (private window, blocked storage)", () => {
+  it("is off where the device keeps nothing too (private window, blocked storage)", () => {
     g.localStorage = {
       getItem: () => {
         throw new Error("blocked");
@@ -473,7 +467,6 @@ describe("the eval bar's setting (prefs.ts)", () => {
         throw new Error("blocked");
       },
     };
-    expect(evalBarOn()).toBe(true);
-    expect(() => setEvalBarOn(false)).not.toThrow();
+    expect(evalBarOn()).toBe(false);
   });
 });

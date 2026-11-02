@@ -30,16 +30,51 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     server, about 55 s), `boss-character.spec.ts` (a whole Boss alone battle, Boingo, home to results on a phone and a
     computer, about 40 s) and `lobby-chat.spec.ts` (two players in one lobby through the real server, the bots fill
     it, the match starts; Solo's queue; a private lobby, about 85 s). About 3 minutes of test time, so 1 shard.
+  - **Traced modules** (Nov 1, `docs/decisions/2026-11-01-ci-selection.md`; `traced` in `areas.json`):
+    `packages/core/src/settings.ts`, `packages/core/src/boss.ts`, `e2e/helpers.ts`, the app's `net.ts`, `solo.ts`,
+    `main.tsx`, `board/OwnBoard.tsx`, `account.ts`, and since Nov 2 `game.ts`, `prefs.ts`, `test-switches.ts`,
+    `screens/Hud.tsx` and `components/EvalBar.tsx` are followed through the code instead of running everything. The
+    plan reads the module before and after (`traceModule`, plain text, no parser: about a second): the top-level
+    declarations the diff changes (a settings object, a helper, a function or class; comments and types don't run),
+    anything in the module that uses them (and the module state a changed function names; not a constant holding a plain
+    value, a storage key's name say, which nothing can write: Nov 2), then the files that import
+    the module, or its package's entry, and name one of them (`usersOf`). Each of those counts as a changed path: its
+    area's specs, a spec itself, a unit test nothing. So a settings change runs the specs of the files that read that
+    object, and a helper's change the specs that call it. It still runs everything when a user is a shared foundation
+    or in no area, when it reaches `App.tsx` (`traced.hubs`: it hands the matches and the account to every screen),
+    or when the change can't be placed (the module new or removed, code outside any declaration, a file that doesn't
+    read cleanly). The plan's table says, per traced module, what changed and who uses it. A file reached through a
+    trace counts like the table counts its own changes, nothing more: what it passes on to other files isn't followed.
   - **The whole suite on a PR** when it touches a shared foundation (`full` in `areas.json`: package.json, the
-    lockfile, the Playwright and Wrangler config, `e2e/helpers.ts`, this workflow and its scripts, `packages/core`, the
-    runner, the protocol and chess's shared rules, the server's entry points (`index.ts`, `api.ts`, `lobby.ts`,
-    `lobby-do.ts`) and its stored-data, sign-in, money, ranked and fair-play files, the app's entry, board, match flow
-    (`game.ts`, `solo.ts`, `net.ts`), the play screen and the components every mode shares), or a path no area has
-    (a new file: add it to its area, or leave it out if it's shared). **To force it**, add the `full-e2e` label to the
+    lockfile, the Playwright and Wrangler config, this workflow and its scripts, `packages/core` (but settings.ts and
+    boss.ts, traced), the runner, the protocol and chess's shared rules, the server's entry points (`index.ts`,
+    `api.ts`, `lobby.ts`, `lobby-do.ts`) and its stored-data, sign-in, money, ranked and fair-play files, the app's
+    entry, board, match flow (`game.ts`; `solo.ts` and `net.ts` traced), the play screen and the components every
+    mode shares), or a path no area has (a new file: add it to its area, or leave it out if it's shared). **To force it**, add the `full-e2e` label to the
     PR (that starts a new run, and every push after runs everything until the label is removed): the full lane's PRs
     do. Or Actions → e2e → Run workflow on the PR's branch (a manual run tests everything).
-  - **On every push to main: the whole suite**, both projects, on 5 shards (about 17 minutes in all, 1 for setup):
-    the full run after each merge, which the director checks before the next merge.
+  - **On every push to main: the whole suite**, both projects, on 5 shards (about 44 minutes in all since Oct 30,
+    1 for setup; 22 on Oct 18): the full run after each merge, which the director checks before the next merge.
+    **One main run at a time** (Nov 1; `check` too): a push while main's run is going waits (the run going is never
+    cancelled), and a newer push replaces the one waiting. A merge whose own run was skipped is tested by the next run,
+    which runs every spec on main with every merge since the last run; its summary starts with "The merges this run
+    covers" (and the WebGL jobs go by all of them). **When that run is red,** the culprit is one of those merges: the
+    failed test's `file:line` and error usually name its area, and the plan table of each merge's own PR run says
+    whether it ran that spec; if it isn't clear, re-run the failed spec locally on each merge in turn (`git checkout
+    <merge>`, `npx playwright test <spec>`), oldest first.
+  - **The town on WebGL** (Oct 30; docs/decisions/2026-10-30-town-webgl.md, "Oct 30, later"): a change to the town's
+    area (`webgl` in `areas.json`: a path of the town square's area, or one of the specs below) also runs the town's
+    drawing specs (`town`, `town-desktop`, `town-tags`, `town-webgl`) again on a `VITE_TOWN_GL=1` build, WebGL the town's
+    default (software WebGL: the runners have no GPU). Two more jobs beside the shards, `webgl-phone` and `webgl-desktop`
+    in the shard matrix ("the town on WebGL, webgl-phone"): one project each, one worker (two software-WebGL pages on a
+    runner's 4 CPUs make every check slow enough to miss the chat's and the tags' timings), `TOWN_GL_BUILD=1` for the
+    one check that reads the default. About 10 minutes of tests each (measured locally: 9 for the phone, 10.5 for the
+    computer) plus setup, side by side with the shards, so a town PR's run is about as long as before (its town-chat
+    shard is the longer one); about 25 runner minutes more per run. Their records are in `result`'s summary as shards
+    `webgl-phone` and `webgl-desktop` (their times kept out of the timings table). On a pull request, a push to main that
+    merged such a change (the plan diffs `HEAD^1`) and the full-e2e label; a manual run always. The chat's two specs
+    aren't in it: HTML over the canvas, nothing in them depends on the backend, and on software WebGL they'd need about
+    four more such jobs.
   - **Layout:** `plan`, then the `shard` jobs side by side, then `result`. Each shard runs whole spec files of the
     plan's list (every spec file on main), spread by their measured test time (`e2e/ci-shard.mjs` reads
     `e2e/ci-timings.json`; a new spec counts as the median until the table is refreshed); inside a file the tests run
@@ -55,9 +90,11 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     report with the retries' traces (`e2e-report-shard-N`, kept 7 days; `npx playwright show-report <folder>`).
     Each shard's record (`e2e-summary-N`: its failed and flaky tests) is kept 90 days, for a look at which tests
     catch real bugs and which only flake (Eric, Oct 18; the first look about two weeks on).
-  - **Try the table locally:** `node e2e/ci-select.mjs files <path>...` prints what a PR changing those paths runs;
-    its tests are `packages/server/test/ci-select.test.ts` (one area's file, docs only, foundations, unknown paths,
-    changed and removed specs, every spec reachable, shard counts).
+  - **Try the table locally:** `node e2e/ci-select.mjs files <path>...` prints what a PR changing those paths runs
+    (a traced module's change is read from where your branch left `origin/main` to your working tree); its tests are
+    `packages/server/test/ci-select.test.ts` (one area's file, docs only, foundations, unknown paths, changed and
+    removed specs, every spec reachable, shard counts; traced: a settings key, a helper, a shared module and the hub,
+    comments and types only, changes it can't place).
   - **Retries and traces:** `--retries 1` in CI (PR and main) until the flaky-test batch lands; the goal is 0, as
     `playwright.config.ts` has it. A test that passes only on its retry is "flaky": the summary lists it first, so
     it stays in view. Traces only on that retry (`on-first-retry`): recording every test measured about 8% slower.
@@ -68,7 +105,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   - **Caches:** npm (`setup-node`) and Playwright's Chromium (headless shell only, the browser headless runs use;
     `~/.cache/ms-playwright`, keyed by Playwright's version).
   - **Concurrency:** a new push to a PR (or a label added to it) cancels that PR's run still going; pushes to `main`
-    each get their own run. A full run takes 7 jobs (plan, 5 shards, result), a PR's fast check 3 to 7: the account's
+    each get their own run. A full run takes 7 jobs (plan, 5 shards, result), a PR's fast check 3 to 7, and the town's
+    WebGL jobs two more when they run: the account's
     limit on jobs at once (20 on GitHub Free) queues the rest.
   - **Not a required check yet;** if it becomes one, require `result` (one name, whatever the shard count).
 - **Schema at runtime:** D1 tables are made by the Worker (`CREATE TABLE IF NOT EXISTS`, then `ALTER TABLE` migrations
@@ -117,24 +155,26 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     `testSwitches` where the server has them on, `/api/me` says `admin`): all of the above, and `debug` (the match on
     `window`), `nolanding`, `boss=<id>` (skips the boss menu), `win`, `mate`, `phase`, `laststand`, `side`, `wip` and
     `kit`, a crate page's `fischer` and `shiny` and its "Testing:" boxes, and 1 v 1's `fewAfter=SECONDS` (the "Few players
-    online" choice sooner) and `clock` (the bot game's clock too), and `cardMs=MS` (home's Boss Arena card turns to the
-  next boss this often instead of every 30 s), and `barslot=1` (the boss bar's free room for a boss's own prop drawn with a
+    online" choice sooner) and `clock` (the bot game's clock too), and `cardMs=MS` (home's Boss Battle card turns to the
+  next boss this often instead of every 30 s), and `town=A` or `town=B` (home's Chess Town button shows that picture instead of a random one: not gated, anyone's address), and `barslot=1` (the boss bar's free room for a boss's own prop drawn with a
   dashed outline, so a screenshot shows it; nothing else changes), and `bannerplus=SECONDS` (0 to 3: the extra time on
   every banner over the board, and everything after a banner that much later, for the games on the device; online the
   server's default) and `talkplus=SECONDS` (0 to 3: added to every speech line's read time), both read from the address
-  once as the page opens, so they hold for the page (Oct 24). The `sayBoss(text)` hook (speech.tsx: a boss's voice says
+  once as the page opens, so they hold for the page (Oct 24), and `rideScale=K` (0.5 to 1.25: every ride drawn at that size
+  under its pawn on the page, over RIDES.scale, to try sizes; read once as the page opens; town-square.md, "Rides"; Nov 1). The `sayBoss(text)` hook (speech.tsx: a boss's voice says
   any line at once, for e2e/boss-bar-same.spec.ts).
   - **Kept for everyone** (the home screen's own choices): `mode` and a raid's boss picked from the menu; preferences
     and pages (`anim`, `trail`, `crates`); the town square's `crowd=N` (N more pawns with names, up to 100, wandering the
     square, drawn on this device only) and `fps` (a frame-rate pill), to measure the frame rate: switches until Oct 30, then
     anyone's (Eric: no admin needed, the site is behind Cloudflare Access). Gone on Oct 15: `turns` (Crowd is always team turns), `moves` (Classic plays
     its default opening moves) and `soundlab` (its choice is Settings' Reveal sound).
-  - **Testers' options** (Settings → Testing, admins): practice mode and the eval bar count only where the switches do
-    (`practiceOn` and `evalBarOn` in `prefs.ts`); online the lobby takes a `hello`'s practice only from an admin's
-    socket or where TEST_SWITCHES is "1" (`lobby-do.ts`; `lobby-do-practice.test.ts`).
+  - **Testers' options** (Settings → Testing, admins): practice mode counts only where the switches do (`practiceOn` in
+    `prefs.ts`); online the lobby takes a `hello`'s practice only from an admin's socket or where TEST_SWITCHES is "1"
+    (`lobby-do.ts`; `lobby-do-practice.test.ts`). The eval bar is off for everyone since Nov 1 (`evalBarOn()` is false).
   - **Admins only already:** "Trigger ultimate (testing)" (online the lobby checks too), "Engine move", the boss brain
     picker (`brain`), the Hidden Boss in Boss alone (from the hidden `/bosses` picker since Oct 16: his tile on the Boss
-    raid screen is locked for everyone). Squads' test lobbies and controls: admins or `SQUADS_TEST`.
+    raid screen is locked for everyone). Squads' test lobbies and controls: admins or `SQUADS_TEST`. One of every item in
+    the locker, never stored (admins only, not `TEST_SWITCHES`: [shop.md](shop.md)).
   - **No record from a switched game:** for a player the switches can't apply, so everything the server records
     (results, ranking, fair-play signals, Squads' coins and crates, crate items) comes from a game made without them.
     Solo results are posted by the browser and are never ranked and earn nothing.
@@ -203,7 +243,7 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-error-capture-
   Reload instead of a blank page; the error is still thrown on once as a page error, so the console and the e2e
   error checks see it). Each kind of error is sent once per page load, at most `OPS.client.maxErrorsPerPage`, a few
   seconds at a time (`OPS.client.batchMs`), by sendBeacon when the page is hidden. Browser extensions' errors and
-  "Script error." are skipped.
+  "Script error." are skipped. The town's WebGL fallback goes the same way as a kind of its own (below, "Health").
 - **What each error carries:** the message and a trimmed stack (12 lines, 1000 characters); the build's version (the commit's first 12
   characters, put in by `vite.config.ts` from `WORKERS_CI_COMMIT_SHA` or git; `dist/version.json` says the same for
   the deploy); the screen (a boss battle's moment too: loading, intro, lights out, fall, the turn's power events), mode,
@@ -297,7 +337,18 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-health-view-an
   - the deployed build (`version.json`: version, commit, when built);
   - the live hub's numbers: online, people in lobbies, and each mode's lobbies waiting and playing and their people,
     Squads included (`LiveBoard.health`);
-  - errors this hour, the hour before and in the last 24 hours (rows are per clock hour), how many kinds, the top 10;
+  - errors this hour, the hour before and in the last 24 hours (rows are per clock hour), how many kinds, the top 10
+    (the town's WebGL fallbacks left out: they have their own count, next);
+  - **the town's WebGL fallbacks** (Oct 30; docs/decisions/2026-10-30-town-webgl.md, "Oct 30, later"): page loads whose
+    town asked for WebGL and drew with Canvas 2D instead, in the last 24 hours and 7 days, in all and by reason
+    (`townFallbacks`). The page reports one at most (`reportTownFallback` in the app's problems.ts, never on the frame
+    loop, nothing shown to the player) through the error reporting, as the kind `town-gl-fallback` with its reason as the
+    message (`TOWN_GL_FALLBACK` in core's settings.ts: `no-webgl2`, `no-context`, `shader`, `lost-twice`, `not-back`):
+    exactly what an error sends (no GPU name, nothing typed), under the same limits, caps, fair counts and 30 days in
+    `ops_errors` (no new table or column). Only those five reasons are counted (anyone can post an error of any kind);
+    each reason's row, with its latest device, is in `/admin/ops`'s error list. `/admin/ops` shows a line, and
+    `npm run ops:report` prints one ("Town WebGL fallbacks (drew with Canvas 2D): 3 in 24 hours, 10 in 7 days (…)");
+    never "Needs attention".
   - the Durable Objects' own errors (kinds named `Class.method`) by class and entry point;
   - players' reports in the last 24 hours by kind, and the latest 5;
   - the engine server: on or off, searches used of today's budget (`engine_usage`, UTC day), its last answer and last

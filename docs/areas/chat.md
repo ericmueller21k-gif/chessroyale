@@ -13,10 +13,17 @@ Lane: `social`.
 - **Quick chat in a match.** A chat button and panel in the places the design names (the match screens are the
   director's: no change to the board, clock, picks or reveal). Four groups of phrases: Hello and Sporting can go to
   everyone (the Team / All switch); Reactions and Plans stay inside your team, so plans stay secret. Emoji can go to
-  everyone and float up from the sender's scoreboard row. On a phone the space under the board is split between the
-  scoreboard and chat (one view at a time, never an empty box). In the split, the Team / All switch takes the chat
-  header's title place, tighter, with 28 px buttons beside it, so both labels fit whole down to 320 px
-  (`e2e/panel.spec.ts`).
+  everyone and float up from the sender's scoreboard row. On a phone's 50 v 50 the chat is a tab in the scoreboard's
+  header (Black · White · All · Chat; the unread count shows on Chat while the scoreboard is up): Chat replaces the
+  scoreboard in the same box and "‹ Back" returns to it (`KeptBox` / `CrowdBox`, `components/QuickChat.tsx`: one element
+  for the whole match). The Team / All switch sits in that header beside Back, so both labels fit whole down to 320 px
+  (`e2e/panel.spec.ts`). The tab has no rows of buttons (Eric, Nov 1): "T" (Quick phrases) and 😊 (Emoji) in its header,
+  left of "⋯", open the picks over the feed's foot; a send, the button again or a tap elsewhere closes them
+  (`e2e/chat.spec.ts`). Solo's 50 v 50 has chat too (Nov 1): `SoloLobbyChat` carries on into the match with teams, and the
+  bots chat as online plus, now and then, a teammate's everyday pick (`QUICK_CHAT.botChatter*`), never on the cut screen
+  (docs/decisions/2026-11-01-crowd-steady-box.md). Elsewhere (a
+  computer, a raid, Classic) a phone's space under the board is split between the scoreboard and chat, one view at a
+  time, never an empty box.
 - **The town square's chat log** is its own thing (a fading log in the top left of `/town`: the bosses' and kids' chatter,
   and signed-in players' typed messages, below): its look in [town-square.md](town-square.md), "The chat log".
 - **Your picks.** Each player's profile chooses which lines they see in their games: up to `QUICK_CHAT.maxLines`

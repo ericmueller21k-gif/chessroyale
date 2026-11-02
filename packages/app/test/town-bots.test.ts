@@ -86,7 +86,9 @@ describe("town square: the bots (Oct 27)", () => {
   });
 
   it("each sidekick's baked sheet is its sprite as drawn (scripts/bake-sidekicks.ts): idle, walk, sit, wave, every pixel", async () => {
-    const files = readdirSync(new URL("../src/characters/sidekicks/", import.meta.url)).filter((f) => f.endsWith(".ts"));
+    // (Timber's woodpecker foreman is on his workshop strip, not in the town square yet: no baked sheet. Nov 1.)
+    const notInTown = ["timber.ts"];
+    const files = readdirSync(new URL("../src/characters/sidekicks/", import.meta.url)).filter((f) => f.endsWith(".ts") && !notInTown.includes(f));
     expect(files).toHaveLength(14);
     for (const file of files) {
       const name = file.replace(/\.ts$/, "") as keyof typeof SIDEKICK_SHEETS;

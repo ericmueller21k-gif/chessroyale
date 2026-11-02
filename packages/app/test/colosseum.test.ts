@@ -1,6 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { START_FEN, applyMove } from "@chessroyale/chess";
-import { BLACK_VIEW, BOARD_SPHERE, PILLARS, PILLAR_ANGLES, SEAT_VIEWS, STATUE, VIEWS, WHITE_VIEW, fovFor, lookAt, multiply, onAisle, otherSeat, perspective, project, seats, squareXZ, turnLimits, viewFor } from "../src/colosseum/arena.ts";
+import { BLACK_VIEW, BOARD, BOARD_SPHERE, FLOOR_R, GALLERY_H, GALLERY_R, HIGH, HIGH_VIEW, HIGH_VIEWS, PILLARS, PILLAR_ANGLES, SEAT_VIEWS, STANDS, STATUE, VIEWS, WHITE_VIEW, fovFor, isHigh, lookAt, multiply, onAisle, otherSeat, perspective, project, railPitch, rowR, rowY, seats, squareXZ, turnLimits, viewFor, viewsFor } from "../src/colosseum/arena.ts";
+import { PILLAR_TOP_PX } from "../src/colosseum/art.ts";
+import { ARENA_PILLAR } from "../src/colosseum/sprites/arena-pillar.ts";
+import { ARENA_STATUE } from "../src/colosseum/sprites/arena-statue.ts";
+import { AMBIENT_DB, AMBIENT_LEVELS, AMBIENT_LEVEL_NAME, ambientLevelOf } from "../src/colosseum/ambient.ts";
 import { FLOOR, FloorMatch, PLAYERS, clockText, evalText, piecesAfter, piecesOf, resultText, viewersText, type FloorDeps } from "../src/colosseum/match.ts";
 import { BOTS } from "../src/town/world.ts";
 
@@ -20,6 +24,8 @@ const SCREENS = [
   ["phone's arena", 390, 262],
   ["computer", 1440, 848],
 ] as const;
+/** Every view as a screen of this shape gets it (the high views' eyes set for it). */
+const viewsOf = (w: number, h: number) => viewsFor(w / h, w > 900);
 
 describe("the arena", () => {
   it("seats some two thousand people, every row full but its aisles", () => {
@@ -30,8 +36,8 @@ describe("the arena", () => {
     for (const s of all.slice(0, 50)) expect(Math.cos(s.face - Math.atan2(-s.x, -s.z))).toBeCloseTo(1, 6);
   });
 
-  it("has ten views: eight seats at eight angles (lower and higher), then White's and Black's player views", () => {
-    expect(VIEWS).toHaveLength(10);
+  it("has fourteen views: eight seats at eight angles (lower and higher), White's and Black's player views, then the four high views going round the board", () => {
+    expect(VIEWS).toHaveLength(14);
     expect(SEAT_VIEWS).toBe(8);
     const angles = VIEWS.slice(0, 8).map((v) => Math.round((Math.atan2(v.eye[0], v.eye[2]) * 180) / Math.PI + 360) % 360);
     expect(new Set(angles).size).toBe(8);
@@ -41,9 +47,71 @@ describe("the arena", () => {
     expect(VIEWS[WHITE_VIEW]!.eye[1]).toBe(6);
     expect(VIEWS[WHITE_VIEW]!.eye[2]).toBeGreaterThan(4);
     expect(VIEWS[BLACK_VIEW]!.eye[2]).toBeLessThan(-4);
-    expect(viewFor("white", 3)).toBe(WHITE_VIEW);
-    expect(viewFor("black", 3)).toBe(BLACK_VIEW);
-    expect(viewFor(null, 3)).toBe(3);
+    expect(viewFor("white")).toBe(WHITE_VIEW);
+    expect(viewFor("black")).toBe(BLACK_VIEW);
+    // The page opens on the high view behind White (the director, Nov 1: Eric found the seats too close).
+    expect(viewFor(null)).toBe(HIGH_VIEW);
+    expect(HIGH_VIEWS).toBe(4);
+    expect([...VIEWS.keys()].filter(isHigh)).toEqual([10, 11, 12, 13]);
+    // Behind White, its right (the h-file's side), behind Black, its left: high up, looking down 40 to 47 degrees at the board's middle.
+    for (const [w, h] of SCREENS.map(([, w, h]) => [w, h]))
+      viewsOf(w, h).forEach((v, i) => {
+        if (!isHigh(i)) return;
+        const deg = Math.round((Math.atan2(v.eye[0], v.eye[2]) * 180) / Math.PI + 360) % 360;
+        expect(deg).toBe([0, 90, 180, 270][i - HIGH_VIEW]);
+        const down = (Math.atan2(v.eye[1] - v.at[1], Math.hypot(v.eye[0] - v.at[0], v.eye[2] - v.at[2])) * 180) / Math.PI;
+        expect(down).toBeGreaterThanOrEqual(40);
+        expect(down).toBeLessThanOrEqual(47.01);
+        // (Aimed a little past the board's middle, along the way you look.)
+        expect(Math.hypot(v.at[0], v.at[2])).toBeLessThan(1.5);
+        expect(v.eye[1]).toBeGreaterThan(12);
+      });
+  });
+
+  it.each(SCREENS)("the high views: the whole board and the floor round it, the board filling the frame about as Eric's picture does, the lower stands in view, nothing in the stands between the eye and the board (%s)", (_, w, h) => {
+    const all = viewsOf(w, h);
+    const computer = w > 900;
+    for (let i = HIGH_VIEW; i < HIGH_VIEW + HIGH_VIEWS; i++) {
+      const v = all[i]!;
+      const at = screenOf(v, w, h);
+      const B = BOARD.half + BOARD.rim;
+      const pts = [-B, B].flatMap((x) => [-B, B].map((z) => at(x, BOARD.lift, z)!));
+      const ys = pts.map((p) => p[1]);
+      const xs = pts.map((p) => p[0]);
+      // The board and its border: about the share the picture gives it (computer: the overlay takes the top and the right).
+      const share = (Math.max(...ys) - Math.min(...ys)) / h;
+      expect(share).toBeGreaterThan((computer ? HIGH.computer.share : HIGH.phone.share) - 0.02);
+      expect(share).toBeLessThanOrEqual((computer ? HIGH.computer.share : HIGH.phone.share) + 1e-6);
+      expect((Math.max(...xs) - Math.min(...xs)) / w).toBeLessThanOrEqual((computer ? HIGH.computer.wide : HIGH.phone.wide) + 1e-6);
+      // The floor round it: the arena wall's foot across the board from you is on screen, and so are the lower stands where
+      // they come round on either side (row 2's front, 50 degrees from straight across).
+      const a = Math.atan2(v.eye[0], v.eye[2]) + Math.PI;
+      const wall = at(Math.sin(a) * FLOOR_R, 0, Math.cos(a) * FLOOR_R)!;
+      expect(wall[1]).toBeGreaterThan(0);
+      for (const side of [-1, 1]) {
+        const b = a + (side * 50 * Math.PI) / 180;
+        const row = at(Math.sin(b) * rowR(1), rowY(1), Math.cos(b) * rowR(1))!;
+        expect(row[0]).toBeGreaterThan(0);
+        expect(row[0]).toBeLessThan(w);
+        expect(row[1]).toBeGreaterThan(0);
+        expect(row[1]).toBeLessThan(h);
+      }
+      // Inside the gallery wall and above it, so no step, row or wall stands between the eye and any of the board.
+      const r = Math.hypot(v.eye[0], v.eye[2]);
+      expect(r).toBeLessThan(GALLERY_R);
+      for (const x of [-B, B])
+        for (const z of [-B, B]) {
+          for (let k = 0; k < STANDS.rows; k++) {
+            // Where the line from the eye to this corner crosses row k's front edge (if it does), it's well above the row's heads.
+            const R0 = rowR(k);
+            const d0 = Math.hypot(x, z);
+            if (R0 > r || R0 < d0) continue;
+            const t = (r - R0) / (r - d0);
+            expect(v.eye[1] + (BOARD.lift - v.eye[1]) * t).toBeGreaterThan(rowY(k) + 1.5);
+          }
+          expect(v.eye[1]).toBeGreaterThan(rowY(STANDS.rows - 1) + GALLERY_H);
+        }
+    }
   });
 
   it("no pillar or statue stands between a seat and the board (each seat's angle half-way between two)", () => {
@@ -57,9 +125,63 @@ describe("the arena", () => {
     expect(PILLAR_ANGLES.length + STATUE.angles.length).toBe(PILLARS.places);
   });
 
+  it.each(SCREENS)("no pillar or statue hides any of the board (its squares and border) from any of the views (%s)", (_, sw, sh) => {
+    // Each figure as drawn (arena-gl.ts buildFigures): a picture its drawing's shape, turned to face the eye. Lines from the eye
+    // through points all over it, carried on to the board's height: none lands on the board behind it.
+    const pillarTall = (PILLARS.h * ARENA_PILLAR.h) / (ARENA_PILLAR.h - PILLAR_TOP_PX);
+    const figures = [
+      ...PILLAR_ANGLES.map((a) => ({ a, r: PILLARS.r, h: pillarTall, hw: (pillarTall * ARENA_PILLAR.w) / ARENA_PILLAR.h / 2 })),
+      ...STATUE.angles.map((a) => ({ a, r: STATUE.r, h: STATUE.h, hw: (STATUE.h * ARENA_STATUE.w) / ARENA_STATUE.h / 2 })),
+    ];
+    const B = BOARD.half + BOARD.rim;
+    const views = viewsOf(sw, sh);
+    for (const v of views)
+      for (const f of figures) {
+        const px = Math.sin(f.a) * f.r;
+        const pz = Math.cos(f.a) * f.r;
+        const l = Math.hypot(v.eye[0] - px, v.eye[2] - pz);
+        const rx = (v.eye[2] - pz) / l;
+        const rz = -(v.eye[0] - px) / l;
+        for (let i = 0; i <= 20; i++)
+          for (let j = 0; j <= 40; j++) {
+            const s = -f.hw + (2 * f.hw * i) / 20;
+            const q = [px + rx * s, (f.h * j) / 40, pz + rz * s];
+            const dy = q[1]! - v.eye[1];
+            if (dy >= 0) continue;
+            const t = (BOARD.lift - v.eye[1]) / dy;
+            const x = v.eye[0] + (q[0]! - v.eye[0]) * t;
+            const z = v.eye[2] + (q[2]! - v.eye[2]) * t;
+            expect(t < 1 || Math.abs(x) > B || Math.abs(z) > B, `a figure at ${Math.round((f.a * 180) / Math.PI)}° hides the board from view ${views.indexOf(v)}`).toBe(true);
+          }
+      }
+  });
+
+  it.each(SCREENS)("the railing at the foot of a seat's view never covers the board: at rest, turned either way, and looking up as far as it may (%s)", (_, w, h) => {
+    // (The computer's lens is shifted down by the cards along the top: Colosseum.tsx, about 102 px.)
+    const shift = w > 900 ? 102 / h : 0;
+    const rail = 32 / h;
+    const lim = { yaw: 0, pitch: 0 };
+    for (const v of VIEWS.slice(0, SEAT_VIEWS)) {
+      turnLimits(v, w / h, lim);
+      const up = railPitch(v, w / h, shift, rail, lim.yaw, lim.pitch);
+      expect(up, "you can still look up a little").toBeGreaterThan(0);
+      for (const yaw of [-lim.yaw, 0, lim.yaw])
+        for (const pitch of [0, up, -lim.pitch]) {
+          const p = new Float32Array(16);
+          const m = new Float32Array(16);
+          const vp = new Float32Array(16);
+          perspective(p, fovFor(v, w / h), w / h, 0.2, 120);
+          p[9] = shift;
+          lookAt(m, v.eye, v.at, yaw, pitch, new Float32Array(3));
+          multiply(vp, p, m);
+          for (const [x, z] of [[-4, -4], [4, -4], [4, 4], [-4, 4]]) expect(project(vp, x!, BOARD.lift, z!, w, h)![1]).toBeLessThan(h * (1 - rail));
+        }
+    }
+  });
+
   it.each(SCREENS)("every view shows the whole board, turned as far as it may go each way (%s)", (_, w, h) => {
     const lim = { yaw: 0, pitch: 0 };
-    for (const v of VIEWS) {
+    for (const v of viewsOf(w, h)) {
       turnLimits(v, w / h, lim);
       expect(lim.yaw).toBeGreaterThan(0);
       for (const [yaw, pitch] of [[0, 0], [lim.yaw, 0], [-lim.yaw, 0], [0, lim.pitch], [0, -lim.pitch]] as const) {
@@ -95,20 +217,22 @@ describe("the arena", () => {
     expect(w(...([squareXZ("a1")[0], 0, squareXZ("a1")[1]] as const))![0]).toBeLessThan(w(squareXZ("h1")[0], 0, squareXZ("h1")[1])![0]);
   });
 
-  it("Change seat always picks another of the eight seats, each of them in time", () => {
-    for (let from = 0; from < 8; from++) {
+  it("Change seat always picks another of the eight seats and the four high views, each of them in time, never a player view", () => {
+    const pickable = [0, 1, 2, 3, 4, 5, 6, 7, 10, 11, 12, 13];
+    for (const from of pickable) {
       const seen = new Set<number>();
-      for (let i = 0; i < 70; i++) {
-        const to = otherSeat(from, i / 70);
+      for (let i = 0; i < 110; i++) {
+        const to = otherSeat(from, i / 110);
         expect(to).not.toBe(from);
-        expect(to).toBeGreaterThanOrEqual(0);
-        expect(to).toBeLessThan(8);
+        expect(pickable).toContain(to);
         seen.add(to);
       }
-      expect(seen.size).toBe(7);
+      expect(seen.size).toBe(11);
     }
-    // From a player view: any seat.
-    expect(otherSeat(WHITE_VIEW, 0.99)).toBeLessThan(8);
+    // From a player view: any of the twelve.
+    const seen = new Set([0, 0.2, 0.4, 0.6, 0.8, 0.99].map((r) => otherSeat(WHITE_VIEW, r)));
+    for (const v of seen) expect(pickable).toContain(v);
+    expect(otherSeat(WHITE_VIEW, 0.99)).toBe(13);
   });
 });
 
@@ -185,10 +309,235 @@ describe("the game on the floor", () => {
     expect(FLOOR.incMs).toBe(2_000);
   });
 
+  it("marks each move's piece sound as a played game's: a move, castling, a capture (Eric, Oct 31)", async () => {
+    const line = ["e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "f8c5", "e1g1", "c5f2"];
+    const knocks: string[] = [];
+    let ply = 0;
+    const m = new FloorMatch(
+      {
+        move: (fen) => (ply < line.length && fen ? Promise.resolve(line[ply++]!) : new Promise(() => {})),
+        evaluate: async () => null,
+        now: () => 0,
+        random: () => 0.3,
+        wait: async () => true,
+        think: () => 10,
+        nextMs: () => 10,
+      },
+      (s) => {
+        if (s.knock) knocks.push(s.knock);
+        s.knock = null; // (The screen clears it once played: an eval's update after doesn't play it again.)
+      },
+    );
+    void m.run();
+    await vi.waitFor(() => expect(knocks).toHaveLength(8));
+    m.stop();
+    expect(knocks).toEqual(["move", "move", "move", "move", "move", "move", "castle", "capture"]);
+  });
+
+  it("the gear's ambient levels: Normal 4 dB and Low 12 dB under the file as made; the old On is Normal, Off stays Off", () => {
+    expect(AMBIENT_LEVELS).toEqual(["normal", "low", "off"]);
+    expect(AMBIENT_DB).toMatchObject({ normal: -4, low: -12 });
+    expect(Object.values(AMBIENT_LEVEL_NAME)).toEqual(["Normal", "Low", "Off"]);
+    expect([null, "on", "normal", "low", "off", "junk"].map(ambientLevelOf)).toEqual(["normal", "normal", "normal", "low", "off", "normal"]);
+  });
+
   it("flags the side to move (the e2e's way to end a game at once) and calls a flag a loss on time", () => {
     const m = new FloorMatch({ move: () => new Promise(() => {}), evaluate: async () => null, now: () => 0, random: () => 0.5, wait: async () => true }, () => {});
     m.state.status = "playing";
     m.flag();
     expect(m.state).toMatchObject({ status: "over", result: "0-1", reason: "time" });
+  });
+});
+
+describe("the bosses in the crowd (Eric, Oct 30)", () => {
+  it("each boss with a sidekick sits once, its sidekick beside it, in rows 1 to 3, at the same seats whatever the view, never covering the board", async () => {
+    const { buildCrowd } = await import("../src/colosseum/arena-gl.ts");
+    const { bossSeats, coversBoard, rowY, seatR } = await import("../src/colosseum/arena.ts");
+    const homes = BOTS.flatMap((b) => ("sprite" in b.look && b.boss ? [b.boss] : []));
+    expect(homes.length).toBeGreaterThan(10);
+    const r = { u0: 0, v0: 0, u1: 1, v1: 1 };
+    // A crowd's cells as crowdArt makes them: pawns, the sidekicks, the bosses (each cell's u0 marks which it is).
+    const cells = [
+      ...[0, 1, 2].map((i) => ({ rect: { ...r, u0: i / 100 }, foot: 1, meters: 0.6, kind: "pawn" as const })),
+      ...homes.map((h, i) => ({ rect: { ...r, u0: 0.2 + i / 100 }, foot: 1, meters: 0.64, kind: "sidekick" as const, home: h })),
+      ...homes.map((h, i) => ({ rect: { ...r, u0: 0.5 + i / 100 }, foot: 1, meters: 1.4, kind: "boss" as const, home: h })),
+    ];
+    const a = buildCrowd({ cells });
+    expect(buildCrowd({ cells }), "the same seats on every build").toEqual(a);
+    const at = (u0: number) => {
+      const out: { x: number; y: number; z: number }[] = [];
+      for (let o = 0; o < a.length; o += 20) if (Math.abs(a[o + 4]! - u0) < 1e-6) out.push({ x: a[o]!, y: a[o + 1]!, z: a[o + 2]! });
+      return out;
+    };
+    homes.forEach((_, i) => {
+      const kid = at(0.2 + i / 100);
+      const boss = at(0.5 + i / 100);
+      expect(kid.length, "each sidekick once").toBe(1);
+      expect(boss.length, "each boss once").toBe(1);
+      expect(Math.hypot(kid[0]!.x - boss[0]!.x, kid[0]!.z - boss[0]!.z), "side by side").toBeLessThan(1.3);
+      expect(kid[0]!.y).toBe(boss[0]!.y);
+      expect(boss[0]!.y, "rows 1 to 3").toBeLessThanOrEqual(rowY(2) + 1e-6);
+    });
+    // The seats come from the layout alone (no view goes in), and none covers the board from any of the views, the high views
+    // (Nov 1) on a phone and a computer too (the bosses keep the seats they had: the high views take no part in choosing them).
+    const seatsNow = bossSeats(homes.length);
+    expect(seatsNow).toEqual(bossSeats(homes.length));
+    for (const v of [...VIEWS, ...SCREENS.flatMap(([, w, h]) => viewsOf(w, h).filter((_, i) => isHigh(i)))])
+      for (const p of seatsNow) {
+        expect(coversBoard(v, p.boss, 0.8, 1.75)).toBe(false);
+        expect(coversBoard(v, p.kid, 0.42, 1.0)).toBe(false);
+      }
+    // (And the check does catch one: a boss two rows straight in front of the first seat would cover it.)
+    expect(coversBoard(VIEWS[0]!, { x: 0, y: rowY(1), z: seatR(1) }, 0.8, 1.75)).toBe(true);
+  });
+});
+
+describe("the 3D pieces (the gear's 3D pieces; pieces3d.ts)", () => {
+  it("six meshes, built once: whole triangles, unit normals, standing on the board, sized to a square, the king tallest", async () => {
+    const { KINDS, MAT, PV, pieceMeshes, triangulate, KNIGHT_OUTLINE } = await import("../src/colosseum/pieces3d.ts");
+    const all = pieceMeshes();
+    let verts = 0;
+    for (const k of KINDS) {
+      const m = all[k];
+      const n = m.verts.length / PV;
+      verts += n;
+      expect(m.index.length % 3, k).toBe(0);
+      expect(Math.max(...m.index), k).toBeLessThan(n);
+      let minY = Infinity;
+      let maxR = 0;
+      for (let i = 0; i < m.verts.length; i += PV) {
+        const [x, y, z, nx, ny, nz, mat] = m.verts.subarray(i, i + PV);
+        expect(Math.hypot(nx!, ny!, nz!)).toBeCloseTo(1, 4);
+        if (mat === MAT.shadow) continue;
+        minY = Math.min(minY, y!);
+        maxR = Math.max(maxR, Math.hypot(x!, z!));
+      }
+      expect(minY, `${k} stands on the board`).toBeCloseTo(0, 5);
+      expect(maxR, `${k} fits its square`).toBeLessThan(0.5);
+    }
+    // (All six in one 16-bit index buffer.)
+    expect(verts).toBeLessThan(65536);
+    const h = Object.fromEntries(KINDS.map((k) => [k, all[k].height]));
+    expect(h.k).toBeGreaterThan(h.q!);
+    expect(h.q).toBeGreaterThan(h.b!);
+    expect(h.p).toBeLessThan(Math.min(h.n!, h.b!, h.r!));
+    // (The tallest stays within what the views keep on screen: the board and a piece about 1.6 m tall over it.)
+    expect(h.k).toBeLessThan(1.7);
+    // The knight's head: its outline cut into whole triangles.
+    expect(triangulate(KNIGHT_OUTLINE).length).toBe((KNIGHT_OUTLINE.length - 2) * 3);
+  });
+});
+
+describe("the pixel set and the gear's Pieces (Nov 1; pieces-pixel.ts)", () => {
+  it("six meshes, built once: whole triangles, unit normals, standing on the board, inside their squares, real-set heights (the king about twice the pawn), on eight-sided bases", async () => {
+    const { KINDS, MAT, PV, triangulate } = await import("../src/colosseum/pieces3d.ts");
+    const { PIXEL_KNIGHT, pixelMeshes } = await import("../src/colosseum/pieces-pixel.ts");
+    const all = pixelMeshes();
+    let verts = 0;
+    for (const k of KINDS) {
+      const m = all[k];
+      const n = m.verts.length / PV;
+      verts += n;
+      expect(m.index.length % 3, k).toBe(0);
+      expect(Math.max(...m.index), k).toBeLessThan(n);
+      let minY = Infinity;
+      let maxY = -Infinity;
+      let maxR = 0;
+      const foot = new Set<number>();
+      for (let i = 0; i < m.verts.length; i += PV) {
+        const [x, y, z, nx, ny, nz, mat] = m.verts.subarray(i, i + PV);
+        expect(Math.hypot(nx!, ny!, nz!)).toBeCloseTo(1, 4);
+        if (mat === MAT.shadow) continue;
+        minY = Math.min(minY, y!);
+        maxY = Math.max(maxY, y!);
+        maxR = Math.max(maxR, Math.hypot(x!, z!));
+        // (The base's foot: its corners round the board.)
+        if (Math.abs(y!) < 1e-6 && Math.hypot(x!, z!) > 0.1) foot.add(Math.round(((Math.atan2(x!, z!) * 180) / Math.PI + 360) % 360));
+      }
+      expect(minY, `${k} stands on the board`).toBeCloseTo(0, 5);
+      expect(maxY, `${k}'s height is its top`).toBeCloseTo(m.height, 5);
+      expect(maxR, `${k} fits its square`).toBeLessThan(0.5);
+      expect(foot.size, `${k}'s base has eight corners`).toBe(8);
+      // A flat face toward you (+z): no corner straight ahead.
+      expect(foot.has(0) || foot.has(360)).toBe(false);
+    }
+    expect(verts).toBeLessThan(65536);
+    const h = Object.fromEntries(KINDS.map((k) => [k, all[k].height]));
+    expect(h.p).toBeLessThan(h.r!);
+    expect(h.r).toBeLessThan(h.n!);
+    expect(h.n).toBeLessThan(h.b!);
+    expect(h.b).toBeLessThan(h.q!);
+    expect(h.q).toBeLessThan(h.k!);
+    expect(h.k! / h.p!).toBeGreaterThan(1.8);
+    expect(h.k! / h.p!).toBeLessThan(2.3);
+    // The knight's head: its outline cut into whole triangles.
+    expect(triangulate(PIXEL_KNIGHT).length).toBe((PIXEL_KNIGHT.length - 2) * 3);
+  });
+
+  it("as the picture has them (round 2): in the high view behind White, each piece on its square near White as tall as the picture's and its base as wide, outline and all, phone and computer", async () => {
+    const A = await import("../src/colosseum/arena.ts");
+    const { KINDS, MAT, PV } = await import("../src/colosseum/pieces3d.ts");
+    const { PIXEL_BASE, PIXEL_TARGET, pixelMeshes } = await import("../src/colosseum/pieces-pixel.ts");
+    const { PIXEL_TILT } = await import("../src/colosseum/arena-gl.ts");
+    const all = pixelMeshes();
+    const home: Record<string, string> = { p: "e2", r: "h1", n: "g1", b: "f1", q: "d1", k: "e1" };
+    for (const [W, H, computer] of [[1440, 848, true], [780, 1688, false]] as const) {
+      const v = A.viewsFor(W / H, computer)[A.HIGH_VIEW]!;
+      const proj = new Float32Array(16);
+      const view = new Float32Array(16);
+      const vp = new Float32Array(16);
+      const fwd = new Float32Array(3);
+      A.perspective(proj, A.fovFor(v, W / H), W / H, 0.2, 120);
+      A.lookAt(view, v.eye, v.at, 0, 0, fwd);
+      A.multiply(vp, proj, view);
+      // As the renderer stands a piece (VS_PIECE_PX): facing the screen, leaning back PIXEL_TILT of the pitch.
+      const fl = Math.hypot(fwd[0]!, fwd[2]!);
+      const F = [-fwd[0]! / fl, 0, -fwd[2]! / fl];
+      const Rt = [F[2]!, 0, -F[0]!];
+      const a = Math.asin(-fwd[1]!) * PIXEL_TILT;
+      const U = [-F[0]! * Math.sin(a), Math.cos(a), -F[2]! * Math.sin(a)];
+      const F2 = [F[0]! * Math.cos(a), Math.sin(a), F[2]! * Math.cos(a)];
+      // The art pixel (arena-gl.ts pixelTarget: a 1 m pawn on the board's middle 16 art pixels tall), and the outline round it.
+      const k0 = Math.sin(a) / fl;
+      const p0 = A.project(vp, 0, A.BOARD.lift, 0, W, H)!;
+      const p1 = A.project(vp, fwd[0]! * k0, A.BOARD.lift + Math.cos(a), fwd[2]! * k0, W, H)!;
+      const art = Math.max(2, Math.round(Math.abs(p0[1] - p1[1]) / 16));
+      for (const k of KINDS) {
+        const [x, z] = A.squareXZ(home[k]!);
+        const l = A.project(vp, x - 0.5, A.BOARD.lift, z, W, H)!;
+        const r = A.project(vp, x + 0.5, A.BOARD.lift, z, W, H)!;
+        const sw = r[0] - l[0];
+        let y0 = Infinity;
+        let y1 = -Infinity;
+        let b0 = Infinity;
+        let b1 = -Infinity;
+        const m = all[k].verts;
+        for (let i = 0; i < m.length; i += PV) {
+          if (m[i + 6] === MAT.shadow) continue;
+          const [px, py, pz] = [m[i]!, m[i + 1]!, m[i + 2]!];
+          const s = A.project(vp, x + Rt[0]! * px + U[0]! * py + F2[0]! * pz, A.BOARD.lift + U[1]! * py + F2[1]! * pz, z + Rt[2]! * px + U[2]! * py + F2[2]! * pz, W, H)!;
+          y0 = Math.min(y0, s[1]);
+          y1 = Math.max(y1, s[1]);
+          if (py < 1e-6) {
+            b0 = Math.min(b0, s[0]);
+            b1 = Math.max(b1, s[0]);
+          }
+        }
+        const tall = (y1 - y0 + 2 * art) / sw;
+        const wide = (b1 - b0 + 2 * art) / sw;
+        expect(Math.abs(tall - PIXEL_TARGET[k]), `${k} ${tall.toFixed(2)} tall against the picture's ${PIXEL_TARGET[k]} (${computer ? "computer" : "phone"})`).toBeLessThan(0.05);
+        expect(Math.abs(wide - PIXEL_BASE[k]), `${k}'s base ${wide.toFixed(2)} against the picture's ${PIXEL_BASE[k]} (${computer ? "computer" : "phone"})`).toBeLessThan(0.04);
+      }
+    }
+  });
+
+  it("the gear's Pieces: Pixel, 3D, 2D in turn; Pixel by default; a saved choice kept; an old '3D pieces' on keeps 3D", async () => {
+    const { PIECE_STYLES, PIECE_STYLE_NAME, pieceStyleOf } = await import("../src/colosseum/arena-gl.ts");
+    expect(PIECE_STYLES.map((p) => PIECE_STYLE_NAME[p])).toEqual(["Pixel", "3D", "2D"]);
+    expect(pieceStyleOf(null, null)).toBe("pixel");
+    expect(pieceStyleOf(null, "on")).toBe("3d");
+    expect(pieceStyleOf(null, "off")).toBe("pixel");
+    for (const p of PIECE_STYLES) expect(pieceStyleOf(p, "on")).toBe(p);
+    expect(pieceStyleOf("nonsense", null)).toBe("pixel");
   });
 });

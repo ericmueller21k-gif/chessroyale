@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { loadAccount } from "../src/account.ts";
-import { evalBarOn, practiceOn, setEvalBarOn, setPracticeOn } from "../src/prefs.ts";
+import { evalBarOn, practiceOn, setPracticeOn } from "../src/prefs.ts";
 
 /**
- * The testers' options (Settings → Testing, shown to admins; Eric, Oct 15): practice mode and the eval bar count only
- * where the test switches do (an admin, a server with TEST_SWITCHES on, the dev server). For players both are off,
- * whatever the device stored before.
+ * The testers' options (Settings → Testing, shown to admins; Eric, Oct 15): practice mode counts only where the test
+ * switches do (an admin, a server with TEST_SWITCHES on, the dev server). For players it's off, whatever the device stored
+ * before. The eval bar is off for everyone since Nov 1 (prefs.ts, `evalBarOn`).
  */
 
 let stored: Record<string, string> = {};
@@ -33,20 +33,19 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("practice mode and the eval bar: testers only", () => {
-  it("a player: both off, even on a device that had practice on and the bar on", async () => {
+describe("practice mode: testers only; the eval bar off for everyone", () => {
+  it("a player: both off, even on a device that had practice on and the bar stored on", async () => {
     stored = { "brc.practice": "1", "brc.evalBar": "1" };
     await signedIn({});
     expect(practiceOn()).toBe(false);
     expect(evalBarOn()).toBe(false);
   });
 
-  it("an admin: the bar on and practice off until switched, then as switched", async () => {
+  it("an admin: practice off until switched, then as switched; the eval bar off all the same", async () => {
     await signedIn({ admin: true });
-    expect(evalBarOn()).toBe(true);
+    expect(evalBarOn()).toBe(false);
     expect(practiceOn()).toBe(false);
     setPracticeOn(true);
-    setEvalBarOn(false);
     expect(practiceOn()).toBe(true);
     expect(evalBarOn()).toBe(false);
   });
@@ -55,6 +54,6 @@ describe("practice mode and the eval bar: testers only", () => {
     stored = { "brc.practice": "1" };
     await signedIn({ testServer: true });
     expect(practiceOn()).toBe(true);
-    expect(evalBarOn()).toBe(true);
+    expect(evalBarOn()).toBe(false);
   });
 });

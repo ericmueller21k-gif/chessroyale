@@ -20,7 +20,7 @@ import {
   type Sql,
 } from "../src/accounts.ts";
 import { handleAccountApi, isSignedIn, signInRequired } from "../src/api.ts";
-import { deleteLockerItems, equipLocker, lockerState, openCrate } from "../src/locker.ts";
+import { deleteLockerItems, equipLocker, lockerState, looksOf, openCrate } from "../src/locker.ts";
 
 // node:sqlite through require (Vite doesn't know it as a built-in yet).
 const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite") as typeof import("node:sqlite");
@@ -492,6 +492,31 @@ describe("account API", () => {
     expect(merged.equipped[slot]).toBe(r.item.id);
     const emptied = await equipLocker(sql, account.id, slot, null);
     expect(emptied.ok && emptied.locker.equipped[slot]).toBeUndefined();
+  });
+
+  it("a ride (Oct 31): equipped in the ride slot only, one at a time, in your look and in what others see; no other slot takes it", async () => {
+    const sql = memorySql();
+    await ensureSchema(sql);
+    const { user } = await createGuest(sql, 1000, "Rider");
+    // (No crate holds a ride yet: given straight, as the e2e tests give them.)
+    const add = (id: string, def: string, color: string) =>
+      sql.run("INSERT INTO items (id, user_id, def, color, blemish, seed, crate, created_at) VALUES (?, ?, ?, ?, 25, 7, 'test', 900)", id, user.id, def, color);
+    await add("chirp", "riding-chirp", "cobalt");
+    await add("moon", "moon-ride", "pearl");
+    await add("hat", "beanie", "red");
+    expect(await equipLocker(sql, user.id, "head", "chirp")).toEqual({ ok: false, message: "That doesn't go there." });
+    expect(await equipLocker(sql, user.id, "ride", "hat")).toEqual({ ok: false, message: "That doesn't go there." });
+    expect(await equipLocker(sql, user.id, "saddle", "chirp")).toEqual({ ok: false, message: "No such slot." });
+    await equipLocker(sql, user.id, "head", "hat");
+    const on = await equipLocker(sql, user.id, "ride", "chirp");
+    expect(on.ok && on.locker.look).toEqual({ head: { def: "beanie", color: "red", blemish: 25, seed: 7 }, ride: { def: "riding-chirp", color: "cobalt", blemish: 25, seed: 7 } });
+    // One ride at a time: the moon takes the chirp's place.
+    const moon = await equipLocker(sql, user.id, "ride", "moon");
+    expect(moon.ok && moon.locker.equipped.ride).toBe("moon");
+    expect((await looksOf(sql, [user.id])).get(user.id)?.ride).toEqual({ def: "moon-ride", color: "pearl", blemish: 25, seed: 7 });
+    expect((await publicProfile(sql, user.id, 1000))?.look.ride?.def).toBe("moon-ride");
+    const off = await equipLocker(sql, user.id, "ride", null);
+    expect(off.ok && off.locker.look.ride).toBeUndefined();
   });
 
   it("the locker keeps a present's second color, and adding that column again is harmless", async () => {

@@ -84,8 +84,8 @@ export function ClockText({ clock, delayMs, short }: { clock: SquadClock | undef
 }
 
 /**
- * The standings as a side panel (a computer): every squad, best placed first, with its name, members, where it stands
- * in the bracket, and its team clock counting down.
+ * The standings as a side panel (a computer) and in the phone's sheet: every squad, best placed first, with its name, members,
+ * where it stands in the bracket, and its team clock counting down. Your own squad is pinned at the top too (Nov 1).
  */
 export function StandingsPanel({ client, onLeave, exit = null }: { client: SquadsClient; onLeave?: () => void; exit?: MatchExit | null }) {
   const lobby = client.lobby;
@@ -95,30 +95,38 @@ export function StandingsPanel({ client, onLeave, exit = null }: { client: Squad
   const delay = lobby.rules ? lobby.rules.clock.delaySeconds * 1000 : 3000;
   // (Mercenary: every squad's coins, for everyone.)
   const wallets = client.wallets;
+  const row = (id: number) => {
+    const sq = lobby.squads.find((s) => s.id === id)!;
+    const clock = clocks.find((c) => c.squadId === id);
+    return (
+      <div key={id} class={`sq-row${id === mine ? " you" : ""}${clock?.suddenDeath ? " sd" : ""}${sq.placement && sq.placement !== 1 ? " out" : ""}`} style={{ "--sq": squadColour(id) }}>
+        <div class="sq-row-top">
+          <SquadTag id={id} you={id === mine} />
+          <span class="sq-row-pos">{standingLine(lobby, id)}</span>
+          {wallets.length > 0 && <SquadCoins wallets={wallets} id={id} />}
+          <ClockText clock={clock} delayMs={delay} />
+        </div>
+        <div class="sq-row-members">
+          {sq.seats.map((pid) => (
+            <Member key={pid} client={client} id={pid} />
+          ))}
+        </div>
+      </div>
+    );
+  };
   return (
     <section class="sq-standings" aria-label="Squads">
       <h2 class="sq-standings-head">
         Squads <span class="muted">· team clocks</span>
       </h2>
-      {standingsOrder(lobby).map((id) => {
-        const sq = lobby.squads.find((s) => s.id === id)!;
-        const clock = clocks.find((c) => c.squadId === id);
-        return (
-          <div key={id} class={`sq-row${id === mine ? " you" : ""}${clock?.suddenDeath ? " sd" : ""}${sq.placement && sq.placement !== 1 ? " out" : ""}`} style={{ "--sq": squadColour(id) }}>
-            <div class="sq-row-top">
-              <SquadTag id={id} you={id === mine} />
-              <span class="sq-row-pos">{standingLine(lobby, id)}</span>
-              {wallets.length > 0 && <SquadCoins wallets={wallets} id={id} />}
-              <ClockText clock={clock} delayMs={delay} />
-            </div>
-            <div class="sq-row-members">
-              {sq.seats.map((pid) => (
-                <Member key={pid} client={client} id={pid} />
-              ))}
-            </div>
-          </div>
-        );
-      })}
+      {/* (Your own squad first, pinned: then a thicker line, then the whole table as it stands, you in your place too.) */}
+      {mine !== null && (
+        <>
+          {row(mine)}
+          <hr class="sq-pin" aria-hidden="true" />
+        </>
+      )}
+      {standingsOrder(lobby).map(row)}
       {onLeave && <LeaveButton client={client} onLeave={onLeave} exit={exit} />}
     </section>
   );

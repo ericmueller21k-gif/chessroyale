@@ -1,7 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import type { ClientMessage, LobbyCloseReason, Opening, ServerMessage } from "@chessroyale/chess";
 import openings from "@chessroyale/chess/data/openings.json";
-import { LobbyCore, lobbyClosing, newLobbyRecord, type LobbyRecord, type ServerScoreRequest } from "./lobby.ts";
+import { LobbyCore, lobbyClosing, newLobbyRecord, type LobbyRecord, type PartyLobby, type ServerScoreRequest } from "./lobby.ts";
 import { DEVICE_COOKIE, SIGN_IN_TO_PLAY, accountOf, isSignedIn, readCookie, signInRequired, withSecrets } from "./api.ts";
 import { ICONS, d1Sql, ensureSchema, isPixelIcon, recordResult, shopState } from "./accounts.ts";
 import { forgetLobby, recordWait, reportLobby, type LiveMode } from "./live.ts";
@@ -350,9 +350,9 @@ export class Lobby extends DurableObject<Env> {
    * A new lobby under this code: false if the code is in use (a lobby that hasn't closed), so the caller tries
    * another. `keepMs`: how long its results stay up (playtests).
    */
-  async create(code: string, overrides?: LobbyRecord["overrides"], auto?: { fillAt: number | null; botsOff?: boolean; reserve?: number; reserveMs?: number }, keepMs?: number): Promise<boolean | number> {
+  async create(code: string, overrides?: LobbyRecord["overrides"], auto?: { fillAt: number | null; botsOff?: boolean; reserve?: number; reserveMs?: number }, keepMs?: number, party?: PartyLobby): Promise<boolean | number> {
     if (this.record && !(await this.closeIfDue())) return false;
-    this.record = newLobbyRecord(code, Date.now(), overrides);
+    this.record = newLobbyRecord(code, Date.now(), overrides, party);
     this.lastStored.clear();
     this.fairStored = 0;
     this.reservations = [];
@@ -472,7 +472,7 @@ export class Lobby extends DurableObject<Env> {
       const practice = !!msg.practice && (this.env.TEST_SWITCHES === "1" || !!attached?.admin);
       // Their rating is the one stored on their account, never the app's word: a low one claimed would meet a weaker raid
       // boss. None yet, or no account: null, the prior (docs/decisions/2026-10-16-server-side-rating.md).
-      const result = core.connect(msg.token, joining?.name ?? msg.name, msg.device, practice, joining?.rating ?? null, msg.look, attached?.userId, typeof msg.lastBoss === "string" ? msg.lastBoss : null, typeof msg.evalBar === "boolean" ? msg.evalBar : null, !!attached?.admin || this.env.MAIA_TEST === "1");
+      const result = core.connect(msg.token, joining?.name ?? msg.name, msg.device, practice, joining?.rating ?? null, msg.look, attached?.userId, typeof msg.lastBoss === "string" ? msg.lastBoss : null, typeof msg.evalBar === "boolean" ? msg.evalBar : null, !!attached?.admin || this.env.MAIA_TEST === "1", { pass: msg.party, seat: msg.seat });
       // A new player took a seat: one held for the players on their way is theirs (the oldest).
       if (result.ok && this.record.humans.length > before) this.reservations.shift();
       if (!result.ok) {
@@ -500,6 +500,34 @@ export class Lobby extends DurableObject<Env> {
     if (msg.t === "ultimate") core.ultimateTrigger(playerId, !!attached?.admin);
     else core.message(playerId, msg);
     await this.persist(core);
+    await this.tellParty(core);
+  }
+
+  /**
+   * A Boss Battle party's battle tells its party: an AFK kick (out of the party too), and, once, that the battle is over
+   * (its passes go, so a later kick at the stage revokes nothing here). boss-party.ts.
+   */
+  private async tellParty(core: LobbyCore) {
+    const kicks = core.takePartyKicks();
+    const over = core.takePartyOver();
+    if (!kicks && !over) return;
+    await this.persist(core);
+    const code = (kicks ?? over)!.party;
+    const party = this.env.PARTIES.get(this.env.PARTIES.idFromName(code));
+    for (const m of kicks?.members ?? []) await party.kickMember(m).catch((e: unknown) => console.log(`party ${code}: kick ${m}: ${String(e)}`));
+    if (over) await party.battleOver(over.start).catch((e: unknown) => console.log(`party ${code}: battle over: ${String(e)}`));
+  }
+
+  /**
+   * Its party kicked `member` at the stage after START `start`: their pass no longer gets in (and they're out if in).
+   * For another party's or another START's battle (a reused code), or one that's over: nothing.
+   */
+  async revokePartyMember(member: string, party?: { code: string; start: number }): Promise<void> {
+    if (!this.record || (await this.closeIfDue())) return;
+    const core = this.core(this.record.code);
+    core.revokePartyMember(member, party);
+    await this.persist(core);
+    await this.tellParty(core);
   }
 
   async webSocketClose(ws: WebSocket) {
@@ -517,5 +545,6 @@ export class Lobby extends DurableObject<Env> {
     const core = this.core(this.record.code);
     core.alarm();
     await this.persist(core);
+    await this.tellParty(core);
   }
 }

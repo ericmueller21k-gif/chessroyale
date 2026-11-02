@@ -2,10 +2,10 @@ import { expect, type Page } from "@playwright/test";
 import { BOARD_SEL, asAdmin, switchesOff, test, bossAloneFromHome } from "./helpers.ts";
 
 /**
- * The eval bar's switch (Eric, Oct 10): on by default, in Settings only (never on a board screen); off, no bar on any
- * board and the board takes its room, centered, on a phone and a computer; remembered on the device. Since Oct 15 it's
- * for testers only (an admin, or a test server like this one), its switch in Settings → Testing (admins); players never
- * see the bar.
+ * The eval bar (Eric, Nov 1: "it should never actually be displayed… we can keep it in the settings for now, but disable it…
+ * Nothing gets resized when the eval bar isn't enabled"): never shown, to anyone, testers included. Settings → Testing keeps
+ * its row, switched off and not tappable ("Off for now"); a device's stored choice (brc.evalBar) is ignored, and the board
+ * takes its room, as a player's does (desktop-board.spec.ts and board-layout.spec.ts pin the sizes).
  */
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 
@@ -26,36 +26,29 @@ async function boardNow(page: Page) {
   }, BOARD_SEL.squares);
 }
 
-test("the eval bar (testers): on by default, switched off in Settings → Testing, and the board takes its room", async ({ page }, info) => {
+test("the eval bar is never shown (testers too); its Testing row is shown, off and disabled", async ({ page }) => {
   await asAdmin(page);
-  const on = await boardNow(page);
-  expect(on.bars).toBe(1);
-  expect(on.dockOff).toBeLessThanOrEqual(1);
+  // A device that stored it on: ignored.
+  await page.addInitScript(() => localStorage.setItem("brc.evalBar", "1"));
+  const board = await boardNow(page);
+  expect(board.bars).toBe(0);
+  expect(board.dockOff).toBeLessThanOrEqual(1);
+  // The board takes its room: centered, no sideways scroll.
+  expect(Math.abs(board.left - board.right)).toBeLessThanOrEqual(2);
+  expect(board.overflow).toBeLessThanOrEqual(0);
 
   await page.goto("/settings");
   const toggle = page.getByRole("switch", { name: /Eval bar/ });
-  await expect(toggle).toBeChecked();
-  await toggle.click();
+  await expect(toggle).toBeVisible();
+  await expect(toggle).not.toBeChecked();
+  await expect(toggle).toBeDisabled();
+  await expect(page.locator(".fd-toggle", { has: toggle })).toContainText("Off for now");
+  // Tapping its row does nothing (the switch is disabled; the row is just a label for it).
+  await page.locator(".fd-toggle", { has: toggle }).click({ force: true, timeout: 10_000 });
   await expect(toggle).not.toBeChecked();
   await page.reload();
   await expect(page.getByRole("switch", { name: /Eval bar/ })).not.toBeChecked();
-
-  const off = await boardNow(page);
-  expect(off.bars).toBe(0);
-  // The board takes the bar's room: wider on a phone (the width was the limit), never smaller; still centered, no
-  // sideways scroll.
-  if (info.project.name === "phone") expect(off.width).toBeGreaterThan(on.width + 15);
-  else expect(off.width).toBeGreaterThanOrEqual(on.width - 1);
-  expect(Math.abs(off.left - off.right)).toBeLessThanOrEqual(2);
-  expect(off.overflow).toBeLessThanOrEqual(0);
-  expect(off.dockOff).toBeLessThanOrEqual(1);
-
-  // Back on: the bar again, the board as it was.
-  await page.goto("/settings");
-  await page.getByRole("switch", { name: /Eval bar/ }).click();
-  const again = await boardNow(page);
-  expect(again.bars).toBe(1);
-  expect(Math.abs(again.width - on.width)).toBeLessThanOrEqual(1);
+  expect((await boardNow(page)).bars).toBe(0);
 });
 
 test("players never see the eval bar: no bar on the board and no switch, even on a device that had it on", async ({ page }) => {

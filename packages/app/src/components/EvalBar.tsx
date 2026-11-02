@@ -1,8 +1,7 @@
 import { useEffect, useState } from "preact/hooks";
 import { gameEnd, sideToMove } from "@chessroyale/chess";
 import { enginePool } from "../engine.ts";
-import { evalBarOn, onPrefsChange } from "../prefs.ts";
-import { onAccountChange } from "../account.ts";
+import { evalBarOn } from "../prefs.ts";
 
 /**
  * What the bar last showed, and every position's value so far. A screen change
@@ -27,10 +26,9 @@ const remember = (fen: string, w: number) => {
  * King's Last Stand plunges the bar to the crowd's chances after a blunder that
  * never stands on the board, and lets it go back as the piece slides back.
  *
- * For testers only since Oct 15 (prefs.ts, `evalBarOn`: an admin or a test server, and switched off in Settings →
- * Testing): for players nothing shows and the board takes its room (every screen's CSS narrows the board only for
- * `.eval-bar ~ .board-wrap`). The value is still worked out, so what reads it (`knownEval`: the God King's word on how
- * it's going) is the same either way.
+ * Off for everyone since Nov 1 (prefs.ts, `evalBarOn`): nothing is drawn and the board takes its room, as a player's does
+ * (every screen's CSS narrows the board only for `.eval-bar ~ .board-wrap`). The value is still worked out, so what reads
+ * it (`knownEval`: the God King's word on how it's going) is the same.
  */
 export function EvalBar({
   fen,
@@ -44,18 +42,6 @@ export function EvalBar({
   override?: number | null;
 }) {
   const [white, setWhite] = useState<number | null>(() => known.get(fen) ?? lastShown);
-  const [on, setOn] = useState(evalBarOn);
-  useEffect(() => {
-    // (Who's a tester is known once the account loads.)
-    const update = () => setOn(evalBarOn());
-    const offPrefs = onPrefsChange(update);
-    const offAccount = onAccountChange(update);
-    return () => {
-      offPrefs();
-      offAccount();
-    };
-  }, []);
-
   useEffect(() => {
     let live = true;
     const show = (w: number) => {
@@ -94,7 +80,7 @@ export function EvalBar({
     };
   }, [fen]);
 
-  if (!on) return null;
+  if (!evalBarOn()) return null;
   const shown = override ?? white;
   const w = shown ?? 0.5;
   const label = shown === null ? "…" : `${Math.round(w * 100)}%`;

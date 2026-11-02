@@ -187,6 +187,9 @@ const ARROW_COLOUR: Record<Arrow["brush"], string> = {
   yellow: "#e68f00",
   paleGrey: "#4a4a4a",
   paleBlue: "#003088",
+  party0: "#e8820c",
+  party1: "#2f6fe0",
+  party2: "#c2349b",
 };
 
 /**

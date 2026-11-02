@@ -623,11 +623,25 @@ export class MatchRunner {
   }
 
   /**
-   * The bullet clock has run out (the Hidden Boss's ultimate): nobody still in the battle has any time left in their
-   * bank. The battle is lost on time (finishBossBattle).
+   * A Boss Battle party's one team clock (BOSS_CLOCK): every member's bank set to the team's, so each one's allowed time
+   * and bossOutOfTime read the team's. The lobby works it out from the turn's length (the time until it resolved).
+   */
+  setTeamBank(ms: number): void {
+    this.state = { ...this.state, players: this.state.players.map((p) => (p.alive ? { ...p, bankMs: Math.max(0, Math.round(ms)) } : p)) };
+  }
+
+  /** The team's bank now (a party): the first member still in's. */
+  teamBankMs(): number {
+    return this.alive()[0]?.bankMs ?? 0;
+  }
+
+  /**
+   * The battle's bank has run out: under the Hidden Boss's bullet clock (his ultimate), or on Boss Battle's own clock
+   * (`bossClock`, BOSS_CLOCK: 10 + 10), nobody still in the battle has any time left in their bank. The battle is lost on
+   * time (finishBossBattle).
    */
   bossOutOfTime(): boolean {
-    if (!bulletClock(this.state.boss)) return false;
+    if (!this.state.boss || (!bulletClock(this.state.boss) && !this.settings.bossClock)) return false;
     const alive = this.alive();
     return alive.length > 0 && alive.every((p) => p.bankMs <= 0);
   }
@@ -1110,7 +1124,8 @@ export class MatchRunner {
       if (!this.player(id).isBot) continue;
       if (popularLoss >= this.settings.kingBotLoss || (humans > 0 && this.opts.rng() < this.settings.kingBotFollow)) calls++;
     }
-    return { plays: calls * 2 > playerIds.length, calls };
+    // (A Boss Battle party: any one member's call acts for the team, its charges being the team's.)
+    return { plays: this.settings.kingAnyCall ? humans > 0 : calls * 2 > playerIds.length, calls };
   }
 
   /**
@@ -1127,7 +1142,7 @@ export class MatchRunner {
     this.kingStrikers.add(playerId);
     this.strikeBots ??= ids.filter((id) => this.player(id).isBot && this.opts.rng() < this.settings.kingBotFollow).length;
     const calls = ids.filter((id) => this.kingStrikers.has(id)).length + this.strikeBots;
-    if (calls * 2 <= ids.length) return { struck: false, calls };
+    if (this.settings.kingAnyCall ? calls < 1 : calls * 2 <= ids.length) return { struck: false, calls };
     this.state = {
       ...this.state,
       boss: strikeRage({ ...b, kingCharges: Math.max(0, (b.kingCharges ?? 0) - 1), kingStrikes: [...(b.kingStrikes ?? []), b.crowdMoves + 1], staggerNext: true }),
@@ -1153,8 +1168,11 @@ export class MatchRunner {
     results: readonly BoardRound[],
     thinkMs: Readonly<Record<string, number>>,
     usedPowerUp: ReadonlySet<string> = new Set(),
+    /** A Boss Battle party: the turn's length, which comes out of the team's one bank (each pick's own time doesn't). */
+    teamMs?: number,
   ): RoundReport {
     const think: Record<string, number> = { ...thinkMs };
+    const team = teamMs === undefined ? null : { before: this.teamBankMs(), inc: this.roundSettings().timeIncrementSeconds * 1000 };
     for (const r of results) for (const p of r.playerIds) think[p] ??= this.botThink.get(p) ?? 0;
     const used = new Set([...usedPowerUp, ...this.botPowerUps]);
     this.botPowerUps = new Set();
@@ -1173,6 +1191,7 @@ export class MatchRunner {
     const stand = results.find((r) => r.lastStand)?.lastStand;
     // (With this round's clock, worked out before the move count moves on.)
     this.state = applyRound(this.state, this.groups, outcomes, this.roundSettings());
+    if (team) this.setTeamBank(team.before + team.inc - Math.min(teamMs!, team.before + team.inc));
     if (kingPlayed && this.state.boss) {
       const b = this.state.boss;
       this.state = {
@@ -1202,7 +1221,7 @@ export class MatchRunner {
       };
       if (stand) this.forceLastStand = false;
     }
-    // (The bullet clock ran out on this move: the battle is lost on time, and no move is played for the crowd.)
+    // (The bank ran out on this move, the bullet clock's or Boss Battle's: the battle is lost on time, and no move is played.)
     const outOfTime = this.bossOutOfTime();
     // (Rounds whose move a power crossed out after it was played (Folio's Revision): fair play skips them.)
     const crossed = new Set<number>();
@@ -1825,9 +1844,12 @@ export class MatchRunner {
     };
   }
 
-  /** The boss strikes now (every bossKillEvery crowd moves; never a boss that doesn't strike: BossRules.noStrikes). */
+  /**
+   * The boss strikes now (every bossKillEvery crowd moves; never a boss that doesn't strike, BossRules.noStrikes, nor in
+   * Boss Battle, settings.bossNoStrikes).
+   */
   bossKillDue(): boolean {
-    return bossKillDue(this.state, this.settings) && !this.finalGameOver() && !bossRules(this.state.boss)?.noStrikes;
+    return bossKillDue(this.state, this.settings) && !this.finalGameOver() && !bossRules(this.state.boss)?.noStrikes && !this.settings.bossNoStrikes;
   }
 
   /** The boss strikes down the player with the worst recent moves; returns who. */
@@ -1875,10 +1897,10 @@ export class MatchRunner {
     if (!b) return null;
     const board = this.boards.get(this.state.boards[0]!)!;
     const s = this.settings;
-    const same = [b, board, board.fen, board.lastMove, board.history, board.history.length, board.bases, this.alive().length, this.bossLast, justKilled, s.bossMinSurvivors, s.bossMaxMoves, s.bossKillEvery, !!s.raid];
+    const same = [b, board, board.fen, board.lastMove, board.history, board.history.length, board.bases, this.alive().length, this.bossLast, justKilled, s.bossMinSurvivors, s.bossMaxMoves, s.bossKillEvery, !!s.raid, !!s.bossNoStrikes];
     const m = this.bossViewMemo;
     if (m && m.same.length === same.length && m.same.every((x, i) => x === same[i])) return m.view;
-    const key = JSON.stringify([b, board.id, board.generation, board.fen, board.lastMove, board.history.join(" "), this.alive().length, this.bossLast, justKilled, s.bossMinSurvivors, s.bossMaxMoves, s.bossKillEvery, !!s.raid]);
+    const key = JSON.stringify([b, board.id, board.generation, board.fen, board.lastMove, board.history.join(" "), this.alive().length, this.bossLast, justKilled, s.bossMinSurvivors, s.bossMaxMoves, s.bossKillEvery, !!s.raid, !!s.bossNoStrikes]);
     this.bossViewMemo = { key, same, view: m?.key === key ? m.view : this.buildBossView(b, justKilled) };
     return this.bossViewMemo.view;
   }
@@ -1895,7 +1917,7 @@ export class MatchRunner {
     const fen = this.boards.get(this.state.boards[0]!)!.fen;
     const powers = bossPowers(b);
     const p = b.powers;
-    const strikes = this.alive().length > (b.minSurvivors ?? this.settings.bossMinSurvivors) && !b.result && !bossRules(b)?.noStrikes;
+    const strikes = this.alive().length > (b.minSurvivors ?? this.settings.bossMinSurvivors) && !b.result && !bossRules(b)?.noStrikes && !this.settings.bossNoStrikes;
     return {
       board: netBoard(this.boards.get(this.state.boards[0]!)!),
       name: info.name,

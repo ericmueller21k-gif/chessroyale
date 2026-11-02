@@ -894,3 +894,20 @@ each with the test that guards it.
   Eric's new words seem to clash with one, ask him; never read a clash into them.
 - A test that guards one of Eric's rules changes only with his OK. A brief never says "update the specs to the new
   behavior" for one, and every PR lists the test checks it changed or removed.
+
+## A scoreboard that rebuilt itself every phase (Nov 1, 2026)
+
+**What Eric saw:** in a 50 v 50 on his iPhone, the scoreboard's box under the board "flashing… being rebuilt in a weird
+way", a problem seen before.
+
+**The cause:** each phase of a turn (your pick, the counting, the reveal, the other team's turn) is a screen of its own,
+and each built the box under the board anew. The new scoreboard measured its room in a `useEffect`, after its first
+paint, so its first frame showed 3 rows, then all of them, and the rows' area grew over half a second (its height
+transition): the rows wiped in from the top, two or three times a turn. The checks measured the box's place and size,
+which never changed, so none failed.
+
+**How it was found:** a per-frame sampler (the box element, its rows) and the painted frames across turns and a cut at
+390 × 750: 5 box elements in 2 turns and a cut, rows 3 → 9 after each.
+
+**The fix:** one box element for the match (`KeptBox`), and `MiniTower` measuring in a layout effect from its last room.
+docs/decisions/2026-11-01-crowd-steady-box.md.

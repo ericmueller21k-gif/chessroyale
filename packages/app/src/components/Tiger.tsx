@@ -232,8 +232,8 @@ type PumpPlace = { at: "phone" | "side" | "tall" | "bar"; scale: number; x: numb
 const PHONE: PumpPlace = { at: "phone", scale: 2, x: 0, side: null };
 /** styles.css' computer. */
 const COMPUTER = "(min-width: 900px) and (min-height: 600px)";
-/** What the pump keeps clear of beside his figure. */
-const KEEP_CLEAR = ".tower-side, .eval-bar, .board-wrap, .boss-dock, .boss-bar, .under-board, .mini-tower";
+/** What the pump keeps clear of beside his figure (the side menu on a computer, Nov 1: from 900 to 1099 px it stood over it). */
+const KEEP_CLEAR = ".tower-side, .eval-bar, .board-wrap, .boss-dock, .boss-bar, .under-board, .mini-tower, .gm-frame > .fd-side";
 /** The place last worked out, so a screen that hands the bar on starts with the same layout (no jump before it measures). */
 let lastPlace: PumpPlace = PHONE;
 

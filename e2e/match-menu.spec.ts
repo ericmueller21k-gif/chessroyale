@@ -298,3 +298,25 @@ test("Auto chess's gear: a plain gear (no box, border or shadow; 36 px); on a ph
     }
   }
 });
+
+test("Light / Dark in the gear: the row shows the theme on screen, a tap picks the other one, and Settings → Theme shows the same pick (Eric, Nov 1)", async ({ page }) => {
+  test.setTimeout(3 * 60_000);
+  await matchAt(page);
+  const theme = () => page.evaluate(() => document.documentElement.getAttribute("data-theme"));
+  const name = (t: string | null) => (t === "light" ? "Light" : "Dark");
+  const start = await theme();
+  await page.getByRole("button", { name: "Match options" }).click();
+  const list = page.getByRole("dialog", { name: "Match options" });
+  const row = list.getByRole("button", { name: /^Light \/ Dark/ });
+  await expect(row).toContainText(name(start));
+  // A tap picks the other one, and the page shows it at once.
+  const other = start === "light" ? "dark" : "light";
+  await row.click();
+  await expect.poll(theme).toBe(other);
+  await expect(row).toContainText(name(other));
+  // Settings → Theme shows the same pick (the same stored choice on this device).
+  await page.keyboard.press("Escape");
+  await page.goto("/settings");
+  await expect(page.getByRole("radio", { name: name(other) })).toHaveAttribute("aria-checked", "true");
+  await page.getByRole("radio", { name: "Match device" }).click();
+});

@@ -1,4 +1,5 @@
 import { expect, type Page } from "@playwright/test";
+import { adminFirstBosses, playableBosses } from "@chessroyale/core";
 import { named, openBossRaid, openSoloBoss, test } from "./helpers.ts";
 
 /**
@@ -496,11 +497,11 @@ test("the layout: the stage under the tiles, the ways to play under the stage an
   }
 });
 
-test("home's Boss Arena card: a still portrait that moves on to the next boss you can meet, never the Hidden Boss, the card never changing size", async ({ page }) => {
+test("home's Boss Battle card: a still portrait that moves on to the next boss you can meet, never the Hidden Boss, the card never changing size", async ({ page }) => {
   // (?cardMs=: the turn quicker than its 30 s, a test switch: a second, so a busy machine's looks, about every 0.2 s,
   // never miss one.)
   await page.goto("/?debug&cardMs=1000");
-  const card = page.getByRole("main").getByRole("button", { name: /^Boss Arena/ });
+  const card = page.getByRole("main").getByRole("button", { name: /^Boss Battle/ });
   const face = card.locator(".rd-face-stack");
   await expect(face).toBeVisible();
   // (Measured once the page's fonts are in: the card's words in Archivo Black are a little taller than the fallback's.)
@@ -586,10 +587,11 @@ test("Boss alone's menu and the /bosses picker fit any window: whole, or their r
     await expect(alone.getByRole("combobox")).toHaveCount(0);
     await expect(alone.getByText(/BRAIN|Maia/)).toHaveCount(0);
     await expectMenuFits(page, alone, `${w}x${h} Boss alone`);
-    // The full picker (/bosses): every boss and a random one, for an admin the Hidden Boss too: the longest list.
+    // The full picker (/bosses): every boss and a random one, for an admin the Hidden Boss and the admins-first bosses
+    // (Timber, Nov 1) too: the longest list.
     await page.goto("/bosses");
     const all = page.getByRole("dialog", { name: "Choose your boss" });
-    await expect(all.locator(".boss-row")).toHaveCount(16);
+    await expect(all.locator(".boss-row")).toHaveCount(playableBosses().length + adminFirstBosses().length + 2);
     await expectMenuFits(page, all, `${w}x${h} /bosses`);
     expect(await sideways(page), `${w}x${h}`).toBe(0);
   }
@@ -657,7 +659,7 @@ test("Boss Battle (Eric, Oct 29): home's card and the screen's header say so; fi
   // (Boxes on the page, not the window: a tap may scroll the page a little, which moves nothing in it.)
   const frame = () => page.evaluate(() => [".bs-stage", ".bs-start", ".bs-diff", ".bs-dots", ".bs-back.bs-l", ".bs-back.bs-r"].map((q) => { const r = document.querySelector(q)!.getBoundingClientRect(); return [r.x + scrollX, r.y + scrollY, r.width, r.height]; }));
   await expect(page.locator(".bs-dot")).toHaveCount(5);
-  await expect(page.getByRole("img", { name: "Invite a friend (coming soon)" })).toHaveCount(2);
+  await expect(page.getByRole("button", { name: "Invite a friend", exact: true })).toHaveCount(2);
   await expect(page.locator(".bs-back")).toHaveCount(2);
   // Medium is the default (id normal); step down to the end, then up to the other end, then each stop holds.
   await expect(level).toHaveText("Medium");

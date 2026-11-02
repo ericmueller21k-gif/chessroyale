@@ -13,7 +13,7 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   patch `DEFAULT_SETTINGS`. Two are played on these screens:
   - **Crowd 50 v 50** (the main mode): 100 players, one board, two teams of 50, each playing one side all game. Every
     player picks a move on their team's turns; the **most popular** pick is played (`drawRuleByStage: ["popular"]`).
-    Bots fill empty seats (see [matchmaking.md](matchmaking.md)). Always team turns (`crowdTeams` in
+    Bots fill empty seats (see [matchmaking.md](matchmaking.md)); each plays at its own rating ("The bots" below). Always team turns (`crowdTeams` in
     `CROWD_SETTINGS`): the "everyone moves" choice went on Oct 15, 2026 (DECISIONS.md).
   - **Boss raid** (`RAID_SETTINGS`, `crowdTeams: false`): up to 50 people (no bots online) pick the crowd's moves
     together against a boss, from the starting position. Solo's "Boss alone" is a raid with a crowd of one. See
@@ -35,7 +35,8 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   pick's allowance. Counted losses make the round scores (and the group average), standings, cuts, the boss's strikes
   (`finalLosses`), `matchLoss` (`countedLossSum`) and final placements; **raw** losses stay for the board's draw,
   brilliance, ratings and fair play (`lossesByStage`), and a miss costs as before. Bots unchanged. The reveal says it
-  in one line of plain words, one number at most (`allowanceNote` in `game.ts`): "1.2 forgiven · opening", "8 of 9.6
+  in one line of plain words, one number at most (`allowanceNote` in `game.ts`; a phone's 50 v 50 reveal shortens it to
+  `allowanceShort`: "8 forgiven", "no allowance"): "1.2 forgiven · opening", "8 of 9.6
   forgiven · opening", "no allowance · gave up material", "no allowance · missed a capture" (Crowd under the poll,
   Classic under the round score, a boss battle as the dock's second line, shortened under 380 px: "8 of 9.6
   forgiven", "no allowance"); the breakdown says what counted, and the group's average as it counted. Squads isn't scored per move: untouched.
@@ -53,10 +54,12 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   (`round2`); the screens show 2 (`scoreDp`). After power-ups are marked, `MatchRunner.finishRound` runs `crowdBrilliant`:
   a rare find (`brilliance` with `brilliantMinGap`; `brilliantMaxFound` or fewer found it, exactly one when
   `brilliantFewLeft` or fewer picked) adds `brilliantBonus` to the finders and sets `result.brilliant`, which the
-  reveal shows as the shoutout ("Brilliant find! You found Nf5 · +1"; online the reveal message's `brilliant`). The
+  reveal shows as a mark on its bar ("‼ +1", "+1 each" for several finders; its label names the finders; online the
+  reveal message's `brilliant`). The
   standings carry `streak` from `streakFrom` (`NetStanding.streak`), and the scoreboard draws our own fire as a badge on the
   rank square's corner, never in the name's cell, so a name keeps all its room (`components/StreakFire.tsx`, in `RaceTower`'s `.t-pos`: orange, red from 2 more, a white-blue core from 4 more; a flicker, still under reduced
-  motion). The reveal adds "+0.50 streak bonus" under your score, and "not capped · gave up a piece" after the allowance.
+  motion). A phone's 50 v 50 reveal puts the streak ("🔥+0.50") in its one result line; the others' reveal adds "+0.50
+  streak bonus" under your score, and "not capped · gave up a piece" after the allowance.
   Test switches (solo): `?streaks=1` (every seat on a streak, 3 to 9), `?shoutout=1` (your first pick gets a shoutout).
 - **A raid's scoring** (Eric, Oct 25: "Raids should use the 50 v 50 math"; docs/decisions/2026-10-25-raid-scoring.md;
   `RAID_SCORING` in settings.ts, `RAID_SETTINGS.crowdScoring`; measured with Maia raids in `reports/raid-scoring.md`):
@@ -69,8 +72,14 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   away, not by these ([bosses.md](bosses.md), "The strike"). Online raids and a Solo raid (Raid with bots) score this
   way; **Boss alone** keeps the old scoring (`BOSS_ALONE_SCORING`, put over the settings by `SoloMatch` when a raid has
   no bots).
-- **The cut.** After each stage (`firstStageRounds`, then `roundsPerStage`) the lowest scorers are knocked out
-  (`knockoutsPerStage`; in 50 v 50 the same number from each team). **Ties at the line go through** (`cutPlan` in
+- **The cut.** After each stage (`roundsInStage`: Classic `firstStageRounds`, then `roundsPerStage`; 50 v 50 its own
+  list, `stageRounds`) the lowest scorers are knocked out (`knockoutsPerStage`; in 50 v 50 the same number from each team).
+  **50 v 50's cuts** (Eric, Nov 1: fewer, bigger cuts, longer rounds; docs/decisions/2026-11-01-crowd-cuts.md):
+  `CROWD_STAGE_ROUNDS` [20, 10, 8, 8, 6, 6, 6, 4] plies, so cuts after moves 10, 15, 19, 23, 26 and 29 taking
+  `CROWD_KNOCKOUTS` 30, 22, 16, 12, 8 and 4 (100 → 70 → 48 → 32 → 20 → 12 → 8: the team final from move 30), then 4
+  after move 32 (the boss final's four) and 2 after move 34 (the duel). A test's `?rounds=N` empties `stageRounds`, so
+  every stage is N rounds. The top bar counts down in moves, as the board numbers them ("Move 12 · cut in 4"; "cut now"
+  on the stage's last move). **Ties at the line go through** (`cutPlan` in
   `match.ts`): everyone tied exactly (`sameScore`) with the last player through stays in (in 50 v 50 so does anyone within
   `cutGrace` of them, the bubble grace, except at the last cut); nobody goes out on thinking
   time or a coin flip. What that leaves over is owed by the cuts still to come, spread evenly over them (`cutCarry`, per
@@ -132,8 +141,17 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   three finalists on the other boards (`phase2Follows`, `phase2Mates` in `recluse-phase2.ts`). No reward comes from this
   path (rewards only via Squads: ROADMAP.md). Duel: the last two. `finalMaxTurns` caps a final; the engine
   adjudicates.
+- **The bots** (Nov 1; docs/decisions/2026-11-01-bot-lobby.md; Eric: "mostly about 800 to 1500, some range above and
+  below", "a player making the engine's best moves should finish 1st or 2nd"). Each bot has a rating fixed by its name
+  (`botRatingOf`: `BOT_LOBBY.ratings`, a bell curve around 1150, 600 to 2200, in steps of 100), the same player every
+  match, and picks Stockfish-style (`botPick` over the judge's top moves) at the temperature that rating plays like
+  (`botSkillForRating`, `BOT_LOBBY.skillAt`: a Maia player's points given away a move at that rating, matched in the
+  Crowd). `botRoster` seats them everywhere a lobby is filled (solo, online, Squads, a Solo raid). Not Maia: about
+  0.75 s of Maia a team turn on a computer, about 3 s on a phone (`reports/crowd-bots.md`). Test:
+  `npx tsx packages/sim/scripts/crowd-bots-sim.ts tuned 10` (an engine-best player among 99 bots; `summary` writes
+  `reports/crowd-bots.md`).
 - **Test switch `?weakbots=1`** (solo, and a lobby you create; `WEAK_BOTS`): every bot plays loosely (`WEAK_BOT_SKILL`:
-  a temperature of 8 points or more), and people rank above bots in the standings (`peopleFirst`), so every cut takes
+  a temperature of 8 points or more, `botStrength`; since Nov 1 every bot is that loose anyway), and people rank above bots in the standings (`peopleFirst`), so every cut takes
   bots first and a test's player surely reaches the boss final's top 4. Loose bots alone stopped doing it on Oct 15: the
   opening allowance leaves them level with the engine's best move, and one pick the judge's final numbers rank above it
   then decides the strict last cut (docs/decisions/2026-10-16-flaky-e2e-batch-2.md). Never for players.
@@ -153,8 +171,19 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   duel, boss battle) use the same bank, increment and cap; how many moves each bank lasts is in `DECISIONS.md`, "Crowd
   50 v 50: three chess time controls".
 - **Power-ups:** 3 at the start in Crowd (`powerUpsAtStart`); one shows the engine's top 3 moves for that turn.
+- **The phone's layout (Nov 1; docs/decisions/2026-11-01-crowd-phone-scoreboard.md, then 2026-11-01-crowd-phone-tabs.md):**
+  the middle box under the board is one fixed height (`--mid-h`, styles.css, the locked phone screen), exactly the vote
+  box's: its bars (14 px each, six at most; `--slots` steps down on short screens) and the one result line, which sits at
+  its foot. The ⚡ row, the status line and the bars take turns in it. The scoreboard starts 4 px under it and fills the
+  rest of the screen, and never moves. Its header reads Black · White · All · Chat (yours picked when the match starts;
+  tapping the picked one or the rows opens the full list for that pick). Chat replaces the scoreboard in the same box;
+  "‹ Back" returns to the pick. The reveal has no "your team watched" line any more. The box is one element for the
+  whole match (Nov 1: each phase's screen used to build it anew, and its rows wiped in; `KeptBox`, QuickChat.tsx;
+  docs/decisions/2026-11-01-crowd-steady-box.md); "Black" starts in line with "POS".
+  Guards: `e2e/crowd.spec.ts`, "the scoreboard never moves" and "the scoreboard box is built once"; `e2e/panel.spec.ts`,
+  "a phone's 50 v 50 box".
 - **On screen:** every pick appears live on the board as a ghost with a name pill (one name per square, "+N"), live
-  tallies, an optional motion trail (Settings → Board), the eval bar (testers only: [hub.md](hub.md)), the scoreboard
+  tallies, an optional motion trail (Settings → Board), the eval bar (off for everyone since Nov 1: [hub.md](hub.md)), the scoreboard
   and chat under the board. A crowd of one keeps its
   move on the board (no ghost, no snap-back). The board never moves between screens.
 - **What the reveal draws each frame** (Oct 16; docs/decisions/2026-10-16-the-reveal-draws-only-what-changed.md):
@@ -169,7 +198,8 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   top line of every screen with a chessboard ends in the match's control (`components/MatchMenu.tsx`): a gear (Eric, Oct 24
   and 25: the same on a phone and a computer; docs/decisions/2026-10-24-match-menu.md and
   2026-10-25-gear-everywhere.md) that opens a list in the middle of the screen over the blurred match: Sound, Animations
-  (every mode), Motion trail (a crowd match only; the vote screen's and the openings' gears too, Oct 25), Resign or Leave,
+  (every mode), Motion trail (a crowd match only; the vote screen's and the openings' gears too, Oct 25), Light / Dark (Nov 1:
+  the same pick as Settings → Theme, shown as the theme on screen; `ThemeRow`), Resign or Leave,
   Report a bug, which asks first. On a computer the
   gear sits at the right end of the title line over the board's column, after an admin's testing items in boss battles
   (the brain's pill, which ellipsizes first, and "Trigger ultimate (testing)": `Hud.tsx`, `.match-tools`; Eric, Oct 13);
@@ -236,7 +266,7 @@ time controls themselves are in the vote data (`PREGAME_VOTES` in `votes.ts`).
   (each start's board, seeded, the balance window, a Freestyle game through the runner, castling both ways, the snapshot),
   `packages/server/test/lobby.test.ts` ("the start vote online": Freestyle and Random opening, castling, a lobby that
   sleeps), `packages/app/test/board-logic.test.ts`, `faq.test.ts`; e2e `e2e/opening-vote.spec.ts`; the sim
-  `crowd-sim.ts [matches] [start]`.
+  `crowd-sim.ts [matches] [start] [team|boss|duel]` (the cuts, before → after: `reports/crowd-sim.md`, Nov 1).
 - Unit: `packages/core/test/match.test.ts`, `scoring.test.ts`, `votes.test.ts`, `brilliance.test.ts`,
   `packages/chess/test/crowd.test.ts`, `runner.test.ts`, `replay-cache.test.ts`, `long-match.test.ts`. The clock vote:
   `votes.test.ts` (each time control, the bank math, the calibration), `crowd.test.ts` (the runner) and
@@ -248,7 +278,8 @@ time controls themselves are in the vote data (`PREGAME_VOTES` in `votes.ts`).
   (`crowdFinalBoss`), `packages/chess/test/crowd.test.ts` ("50 v 50 boss final"), `packages/server/test/crowd-hidden-boss.test.ts`
   (online: his brain and strength, the God King tried, the bullet clock and a loss on time, his fall then the results),
   `packages/app/test/recluse-phase2.test.ts` (phase 2 in a solo Crowd's final), `faq.test.ts`; e2e
-  `e2e/crowd-hidden.spec.ts` (the card; solo through phase 2; online), `formats.spec.ts`.
+  `e2e/crowd-hidden.spec.ts` (the card; solo through phase 2, no strikes, the God King never comes; online to the result,
+  his replies played by the host's browser: formats.spec.ts' two boss-battle tests merged in, Nov 2).
 - e2e: `e2e/crowd.spec.ts`, `formats.spec.ts`, `votes.spec.ts`, `match-screen.spec.ts`, `panel.spec.ts`,
   `solo.spec.ts`, `multiplayer.spec.ts`, `castling.spec.ts`, `perf.spec.ts`.
 - Frames: `npm run frames:boss` (one move, real taps), `frames:flash` (white flashes), `frames:vote`, `frames:chat`.

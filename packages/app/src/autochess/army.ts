@@ -55,8 +55,8 @@ export const legalCounts = (n: Record<Kind, number>, cfg: AutoChessSettings = AU
 export const priceOf = (kind: Kind, cfg: AutoChessSettings = AUTOCHESS) => cfg.prices[kind];
 /** What a piece has cost in all: its price, and `starUpCost` for each star above the first (v8). */
 export const paidFor = (kind: Kind, stars = 1, cfg: AutoChessSettings = AUTOCHESS) => cfg.prices[kind] + cfg.starUpCost * Math.max(0, stars - 1);
-/** What selling gives back: a share (`sellBack`) of everything paid for the piece (its price and its star-ups), rounded down. */
-export const sellValue = (kind: Kind, cfg: AutoChessSettings = AUTOCHESS, stars = 1) => Math.floor(paidFor(kind, stars, cfg) * cfg.sellBack);
+/** What selling gives back: a share (`sellBack`) of everything paid for the piece (its price and its star-ups), to the nearest whole gold, a half up (so a pawn sells for 1, not 0). */
+export const sellValue = (kind: Kind, cfg: AutoChessSettings = AUTOCHESS, stars = 1) => Math.round(paidFor(kind, stars, cfg) * cfg.sellBack);
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Stars (v8, Eric Oct 22)

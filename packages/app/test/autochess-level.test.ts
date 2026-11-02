@@ -11,8 +11,8 @@ const offer = (kind: Offer["kind"], square: string): Offer => ({ kind, square })
 const L = (level: number, xp = 0) => ({ level, xp });
 
 describe("auto chess: levels (v6)", () => {
-  it("hold the design's numbers: start at level 4, top 10, +2 XP free a round, 4 XP for 20 gold, 4, 8, 12, 16, 20, 24 to the next", () => {
-    expect(AUTOCHESS.levels).toEqual({ start: 4, max: 10, freeXp: 2, buyXp: 4, buyXpCost: 20, xpToNext: [4, 8, 12, 16, 20, 24] });
+  it("hold the design's numbers: start at level 4, top 10, +2 XP free a round, 4 XP for 4 gold, 4, 8, 12, 16, 20, 24 to the next", () => {
+    expect(AUTOCHESS.levels).toEqual({ start: 4, max: 10, freeXp: 2, buyXp: 4, buyXpCost: 4, xpToNext: [4, 8, 12, 16, 20, 24] });
     expect(startLevel()).toEqual({ level: 4, xp: 0 });
     expect([4, 5, 6, 7, 8, 9, 10].map((l) => xpToNext(l))).toEqual([4, 8, 12, 16, 20, 24, null]);
     // Every step from 4 to 10 has its number.
@@ -35,13 +35,13 @@ describe("auto chess: levels (v6)", () => {
     expect(addXp(L(4), 2, { ...AUTOCHESS, levels: { ...AUTOCHESS.levels, xpToNext: [2, 8, 12, 16, 20, 24] } })).toEqual(L(5, 0));
   });
 
-  it("buys 4 XP for 20 gold, and says why not: the top level, or the gold", () => {
-    expect(xpBlock(L(4), 20)).toBeNull();
-    expect(xpBlock(L(4), 19)).toBe("gold");
-    expect(xpBlock(L(10), 500)).toBe("max");
-    expect(buyXp(L(4, 2), 50)).toEqual({ level: 5, xp: 2, gold: 30 });
-    expect(buyXp(L(4), 20)).toEqual({ level: 5, xp: 0, gold: 0 });
-    expect(xpWords("gold", 12)).toBe("Need 8 more");
+  it("buys 4 XP for 4 gold, and says why not: the top level, or the gold", () => {
+    expect(xpBlock(L(4), 4)).toBeNull();
+    expect(xpBlock(L(4), 3)).toBe("gold");
+    expect(xpBlock(L(10), 50)).toBe("max");
+    expect(buyXp(L(4, 2), 10)).toEqual({ level: 5, xp: 2, gold: 6 });
+    expect(buyXp(L(4), 4)).toEqual({ level: 5, xp: 0, gold: 0 });
+    expect(xpWords("gold", 1)).toBe("Need 3 more");
     expect(xpWords("max", 99)).toBe("Top level (10)");
     expect(levelWords(L(4, 2))).toBe("Lv 4 · 2/4 XP");
     expect(levelWords(L(9, 23))).toBe("Lv 9 · 23/24 XP");
@@ -77,26 +77,26 @@ describe("auto chess: levels (v6)", () => {
     expect(heldBlock(held, 0, AUTOCHESS, 5)).toBeNull();
     // Buying from a slot at the limit is refused too (and nothing is paid).
     const shop = { slots: [offer("n", "c1")], rerolls: 0, refills: 0 };
-    expect(buyFromSlot({ army, gold: 100, shop }, 0, 1, AUTOCHESS, 4)).toEqual({ block: "limit" });
-    expect(buyFromSlot({ army, gold: 100, shop }, 0, 1, AUTOCHESS, 5)).toMatchObject({ gold: 70 });
+    expect(buyFromSlot({ army, gold: 10, shop }, 0, 1, AUTOCHESS, 4)).toEqual({ block: "limit" });
+    expect(buyFromSlot({ army, gold: 10, shop }, 0, 1, AUTOCHESS, 5)).toMatchObject({ gold: 7 });
     void buyOffer;
     void newShop;
     void shopSeed;
   });
 
-  it("the bot levels too: it buys XP now and then (20 gold for 4 XP), and its board never holds more than its level", () => {
+  it("the bot levels too: it buys XP now and then (4 gold for 4 XP), and its board never holds more than its level", () => {
     let withXp = 0;
     let levelUps = 0;
     for (let seed = 0; seed < 300; seed++) {
       const level = L(4, seed % 4);
-      const { buys, army, level: after } = botBuys(emptyArmy("b", "e8"), 120 + (seed % 5) * 40, 1 + (seed % 6), mulberry32(seed), AUTOCHESS, level);
+      const { buys, army, level: after } = botBuys(emptyArmy("b", "e8"), 12 + (seed % 5) * 4, 1 + (seed % 6), mulberry32(seed), AUTOCHESS, level);
       const xp = buys.filter((b) => b.type === "xp");
       expect(xp.every((b) => b.price === AUTOCHESS.levels.buyXpCost && b.square === null)).toBe(true);
       expect(xp.length).toBeLessThanOrEqual(AUTOCHESS.bot.maxXpBuys);
       // Its level after what it bought is what it plays with: the board never holds more.
       expect(after).toEqual(addXp(level, xp.length * AUTOCHESS.levels.buyXp));
       expect(Object.keys(army.board).length).toBeLessThanOrEqual(after.level);
-      expect(buys.reduce((sum, b) => sum + b.price, 0)).toBeLessThanOrEqual(120 + (seed % 5) * 40);
+      expect(buys.reduce((sum, b) => sum + b.price, 0)).toBeLessThanOrEqual(12 + (seed % 5) * 4);
       if (xp.length) withXp++;
       if (after.level > level.level) levelUps++;
     }
@@ -106,12 +106,12 @@ describe("auto chess: levels (v6)", () => {
     expect(levelUps).toBeGreaterThan(5);
     // It never levels past the top, and never buys XP at the top.
     for (let seed = 0; seed < 50; seed++) {
-      const { buys, level } = botBuys(emptyArmy("b", "e8"), 400, 6, mulberry32(seed), AUTOCHESS, L(10));
+      const { buys, level } = botBuys(emptyArmy("b", "e8"), 40, 6, mulberry32(seed), AUTOCHESS, L(10));
       expect(buys.filter((b) => b.type === "xp")).toHaveLength(0);
       expect(level).toEqual(L(10));
     }
     // The plan carries its level and XP out for the match.
-    const plan = botPlan("b", "e8", 200, 3, mulberry32(5), AUTOCHESS, [], L(5, 2));
+    const plan = botPlan("b", "e8", 20, 3, mulberry32(5), AUTOCHESS, [], L(5, 2));
     expect(plan.level.level).toBeGreaterThanOrEqual(5);
     expect(Object.keys(plan.army.board).length).toBeLessThanOrEqual(plan.level.level);
   });

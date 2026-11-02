@@ -3,14 +3,16 @@ import { BOSS_POWERS } from "@chessroyale/core";
 import { applyMove, fenAtPly, legalMoves, sideToMove } from "@chessroyale/chess";
 import { Board, type Arrow } from "../components/Board.tsx";
 import { seatKey } from "../board/yours.ts";
+import { partyBrush } from "../board/logic.ts";
 import { seenFen, seenSan } from "../camo.ts";
 import { COUNT_FROM_SECONDS, CenterCount, TimerBar, useTicks } from "../components/Countdown.tsx";
 import { BoardClock } from "../components/BoardClock.tsx";
 import { EvalBar, knownEval } from "../components/EvalBar.tsx";
 import { kingTurn, turnCues } from "../godKing.ts";
 import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
+import { isCrowdFifty } from "../game.ts";
 import type { BoardView, GameView, StrikeState } from "../game.ts";
-import { UnderBoard } from "../components/QuickChat.tsx";
+import { LOCKED_PHONE, UnderBoard, useMedia } from "../components/QuickChat.tsx";
 import { BossPanel, besideBoard, useBossLayout } from "../components/MovePanel.tsx";
 import { PowerUps } from "../components/PowerUpButton.tsx";
 import { BossDock, Dots } from "../components/BossDock.tsx";
@@ -115,6 +117,14 @@ export function PlayScreen({
   const you = standings.find((s) => s.isYou);
   const held = match.practice ? Infinity : (you?.powerUps ?? 0);
   const powerUps = hint !== null ? Math.max(0, held - 1) : held;
+  // (A phone's locked screen: the power-up row goes in the middle box, with the status line, so the scoreboard under it
+  // keeps its place through every phase; a computer keeps the row under the board.)
+  // (50 v 50 only: a boss raid and the boss final keep the power-up row under the board, as on main.)
+  const fifty = isCrowdFifty(match);
+  const lockedPhone = useMedia(LOCKED_PHONE) && fifty;
+  const powerRow = match.boss ? null : (
+    <HistoryNav view={history} total={board.history.length} extra={<PowerUps count={powerUps} max={match.settings.powerUpsMax} used={hint !== null} disabled={waiting} onUse={() => match.usePowerUp()} />} />
+  );
   // Crowd 50 v 50: only your team is picking this turn.
   const alive = standings.filter((s) => !s.out && (s.team == null || s.team === side));
   // Once you've moved, your move stays on the board while the others finish.
@@ -124,6 +134,9 @@ export function PlayScreen({
   const alone = !!match.boss && alive.length === 1;
   const moved = waiting && picked && !crowd ? { fen: applyMove(board.fen, picked), lastMove: picked } : null;
   const doneCount = alive.filter((s) => match.done.has(s.id)).length;
+  // A Boss Battle party's battle: the seats (colors) and your pick this turn, which can still change.
+  const partySeats = match.party?.seats ?? null;
+  const partyPick = partySeats ? (match.myPick ?? null) : null;
   // Boss battle, the re-pick after the God King's Last Stand: the move he took back is grayed out and can't be played.
   const barred = match.boss?.barred && legalMoves(board.fen).includes(match.boss.barred) ? match.boss.barred : null;
   // A boss power limits the moves this turn (a frozen piece, a pie, the blizzard): only those can be played.
@@ -153,6 +166,8 @@ export function PlayScreen({
   const arrows: Arrow[] = [
     ...(!waiting && hint && !history.browsing ? hint.map((h, i) => ({ move: h.move, brush: HINT_BRUSHES[i]!, label: (h.expected * 100).toFixed(1) })) : []),
     ...(barred && !waiting && !history.browsing ? [{ move: barred, brush: "paleGrey" as const, label: "✕" }] : []),
+    // A Boss Battle party: everyone's pick this turn, live, an arrow in each one's color (yours too).
+    ...(partySeats && !waiting && !history.browsing ? (match.livePicks() ?? []).filter((p) => p.at <= now && partySeats[p.playerId] !== undefined).map((p) => ({ move: p.move, brush: partyBrush(partySeats[p.playerId]!) })) : []),
   ];
   const fen = history.fen ?? moved?.fen ?? shown.fen;
   const lastMove = history.browsing ? history.lastMove : (moved?.lastMove ?? shown.lastMove);
@@ -217,7 +232,7 @@ export function PlayScreen({
   }, [board.fen, strike?.at, waiting]);
 
   return (
-    <div class="screen game">
+    <div class={fifty ? "screen game crowd-50" : "screen game"}>
       <Hud match={match} />
       <div class="board-area">
         {/* (A boss battle has no line above its board: its dock says what's happening, and "N/M picked" is in it, Eric, Oct 24.) */}
@@ -269,13 +284,8 @@ export function PlayScreen({
             {crowd && waiting && !history.browsing && <LiveGhosts match={match} fen={board.fen} orientation={orientation} />}
           </Board>
         </div>
-        {!match.boss && (
-          <HistoryNav
-            view={history}
-            total={board.history.length}
-            extra={<PowerUps count={powerUps} max={match.settings.powerUpsMax} used={hint !== null} disabled={waiting} onUse={() => match.usePowerUp()} />}
-          />
-        )}
+        {/* (On a phone the power-up row is in the middle box below, with the status line: see the footer.) */}
+        {!match.boss && !lockedPhone && powerRow}
       </div>
       {match.boss ? (
         <BossDock
@@ -333,6 +343,11 @@ export function PlayScreen({
               // duel's line is), so it's whole on a narrow phone. Until the God King's strike lands: then "Your move.
               // Boss staggered.", the newer news (there's no room for both at 320 px).
               <span class="through-note">{through}</span>
+            ) : partyPick ? (
+              // A party: your pick is your arrow, and can change until the last pick resolves the turn.
+              <span>
+                <strong>Your pick is in.</strong> <span class="muted">{doneCount}/{alive.length} picked</span>
+              </span>
             ) : (
               <span>
                 <strong>Your move.</strong>{" "}
@@ -363,6 +378,7 @@ export function PlayScreen({
         />
       ) : (
         <div class="play-footer">
+        {lockedPhone && powerRow}
         {waiting ? (
           <div class="waiting-banner" role="status">
             <span class="waiting-dots" aria-hidden="true">

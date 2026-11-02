@@ -68,11 +68,12 @@ export function coinCount(stored: { day: number | null; games: number }, day: nu
 
 /**
  * A player joining the queue, as the server reads them (never the app's word): their account's name (filtered, as a
- * lobby seat's), what they wear (the locker), their rank, and their hidden rating (and its deviation now) for pairing.
+ * lobby seat's), what they wear (the locker; `admin`: an admin's, admin copies included), their rank, and their hidden
+ * rating (and its deviation now) for pairing.
  */
-export async function duelEntrant(sql: Sql, user: Pick<User, "id" | "name">, now = Date.now()): Promise<{ player: DuelPlayerView; rating: number; rd: number }> {
+export async function duelEntrant(sql: Sql, user: Pick<User, "id" | "name">, now = Date.now(), admin = false): Promise<{ player: DuelPlayerView; rating: number; rd: number }> {
   const { record } = await rankedRecordOf(sql, user.id);
-  const look = await lockerState(sql, user.id)
+  const look = await lockerState(sql, user.id, admin)
     .then((l) => l.look)
     .catch(() => ({}));
   const { rating, rd } = ratingNow(record, now);

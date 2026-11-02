@@ -7,9 +7,11 @@ import { asServerAdmin, asSignedIn, test } from "./helpers.ts";
  * screen 4 minutes later, and Report still works on it (the server holds each line 5 minutes: TOWN_CHAT.lineMs), for a moderator
  * too (Remove). Its own file, so it runs beside the other chat specs and not after them. The fast checks (a line 4 minutes old on the
  * device by the test hook, the 100-line cap, the clock) are in town-chat.spec.ts; the room's own clock is unit-tested in
- * packages/server/test/town-chat.test.ts. The same wait and checks run on a phone and on a computer.
+ * packages/server/test/town-chat.test.ts. On a phone only (Nov 2): the 4 minutes' wait is the server's and the device's clock, the same
+ * on either; the computer's chat box, its taps and its menu are town-chat.spec.ts's, run on both.
  */
 test.use({ actionTimeout: 15_000 });
+test.skip(({ isMobile }) => !isMobile, "the phone project only: the wait is the same on a computer, whose chat town-chat.spec.ts covers");
 
 const run = Date.now().toString(36).slice(-5);
 const canvas = (p: Page) => p.locator("canvas.town-canvas");

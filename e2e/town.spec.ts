@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { BOTS, STATUES, TABLES, TOWN_LINES, sidekickText } from "../packages/app/src/town/world.ts";
-import { BOARD_SEL, test } from "./helpers.ts";
+import { BOARD_SEL, giveItems, test, wearItem } from "./helpers.ts";
 
 /**
  * The town square (/town; hidden: docs/areas/town-square.md), on a phone and a computer: the page loads, its world is
@@ -166,6 +166,11 @@ const skyTop = (p: Page) =>
     return [r / n, g / n, b / n];
   });
 
+test.describe("a deploy landed", () => {
+  // (No service worker: once it controls the page, it answers the town's styles from its own cache, past the route, so the refusal
+  // never came and the page never loaded again: the flaky "the page loaded again: 1" (Nov 2). The service worker installs on the
+  // page's "load" and takes over at once, so on a quick run it was in charge before the town's chunk asked for its styles.)
+  test.use({ serviceWorkers: "block" });
 test("a deploy landed while the page was open: the town square's files are gone, so the page loads again, once, and the town opens", async ({ page }) => {
   // (After a deploy the old version's files are gone: the first ask for the town's styles fails as it would then.)
   let asked = 0;
@@ -176,11 +181,12 @@ test("a deploy landed while the page was open: the town square's files are gone,
   page.on("framenavigated", (frame) => frame === page.mainFrame() && loads++);
   await page.goto("/town");
   await expect.poll(() => loads, { message: "the page loaded again" }).toBe(2);
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
-  // (The second time the app's service worker serves them: no route sees that ask.)
+  // (The second load fetches the town's chunk again, from the network now: a busy runner took over 5 s.)
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 20_000 });
   expect(asked, "the styles were refused").toBeGreaterThanOrEqual(1);
   expect(loads, "the page loaded again, once").toBe(2);
   expect(await colors(page), "the world is drawn, not blank").toBeGreaterThan(40);
+});
 });
 
 test("the sky by the time of day: ?sky=day and ?sky=night draw different skies (a day's top is light blue, a night's deep navy)", async ({ page }) => {
@@ -216,10 +222,15 @@ async function tapPoint(p: Page, kind: "boss" | "home") {
   const cv = (await canvas(p).boundingBox())!;
   return { x: cv.x + xy.x, y: cv.y + xy.y };
 }
-/** Brings Babur's Circus into view: it's often there from the start; else its chip glides the camera to it. */
+/**
+ * Brings Babur's Circus into view: it's often there from the start; else its chip glides the camera to it. (The click goes to the
+ * chip itself, in the page: the chips slide along the edge while the camera follows your walk (after a tap on a table, say), so a
+ * click at where the chip was a moment before landed on the map, walked you there and called off the glide: the flaky "the circus
+ * comes into view: null", Nov 2.)
+ */
 async function toBabur(p: Page) {
   if (await tapPoint(p, "home")) return;
-  await p.getByRole("button", { name: "Go to Babur's Circus" }).click({ force: true });
+  await p.getByRole("button", { name: "Go to Babur's Circus" }).dispatchEvent("click");
   await expect.poll(() => tapPoint(p, "home"), { message: "the circus comes into view" }).not.toBeNull();
 }
 /**
@@ -1261,4 +1272,247 @@ test("a real player's card (a test player; no real players walk in the town yet)
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
   await expect(card).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+/** A ride's drawing's chunk (Nov 1, rides lazy: components/rides/load.ts): `/assets/<its item id>-<hash>.js`. */
+const DRAWING_CHUNK = /^\/assets\/[a-z]+(-[a-z]+)+-[\w-]{8}\.js$/;
+
+/** What `__townRide()` answers (rides, Oct 31; Nov 1: its view, its step's time and your trail; `coming`: the ride whose frames are on their way). */
+interface RideSeen {
+  you: {
+    ride: string | null;
+    color: string | null;
+    scale: number | null;
+    ready: boolean;
+    coming: string | null;
+    anim: "" | "idle" | "move";
+    frame: number;
+    facing: number;
+    view: number;
+    box: { x0: number; y0: number; x1: number; y1: number; fx: number; fy: number; hy: number } | null;
+    at: [number, number];
+    stepMs: number;
+    marks: { side: number; back: number; front: number; drops: number };
+  };
+  others: { id: string; ride: string; color: string; ready: boolean; box: { y0: number; y1: number; fy: number; hy: number } | null; stepMs: number | null }[];
+}
+const rideNow = (p: Page) => p.evaluate(() => (window as unknown as { __townRide: () => RideSeen }).__townRide());
+/**
+ * A rider's tag's foot and head (its drawn box's `hy`) in the same frame: read together in one call (Nov 2). Read in two calls, a
+ * frame or more apart, the idle's bob had moved the head by a pixel or so between them: the flaky "toBeCloseTo … 319.67 / 318.78".
+ */
+const tagOverHead = (p: Page, id: string, name: string) =>
+  p.evaluate(
+    ([id, name]) => {
+      const w = window as unknown as { __townRide: () => RideSeen; __townTags: () => { text: string; kind: string; y: number; h: number }[] };
+      const r = w.__townRide();
+      const box = id === "you" ? r.you.box : r.others.find((o) => o.id === id)?.box;
+      const tag = w.__townTags().find((t) => (id === "you" ? t.kind === "you" : t.text === name));
+      return { foot: tag ? tag.y + tag.h : null, hy: box?.hy ?? null };
+    },
+    [id, name],
+  );
+/**
+ * Where square (c, r) is on screen once the camera has settled (Nov 1). The camera trails your walk and keeps gliding a moment
+ * after you stop; a square read while it glides moves before the click lands. Beside you on a phone, the next square's middle
+ * is only about a quarter of a square (8 px) clear of your own tap box, so a click a few frames late tapped your own pawn and
+ * you didn't move: what failed main's run on 60975fa ("beside you: 22,17").
+ */
+async function squareSettled(page: Page, c: number, r: number): Promise<{ x: number; y: number }> {
+  const at = () => page.evaluate(([c, r]) => (window as unknown as { __townAt: (k: string, id: [number, number]) => { x: number; y: number } | null }).__townAt("square", [c, r]), [c, r] as [number, number]);
+  let prev = await at();
+  for (let i = 0; i < 40; i++) {
+    await page.waitForTimeout(50);
+    const now = await at();
+    if (now && prev && Math.abs(now.x - prev.x) < 0.25 && Math.abs(now.y - prev.y) < 0.25) return now;
+    prev = now;
+  }
+  throw new Error(`square ${c},${r}: the camera never settled`);
+}
+
+test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride's idle standing and its move walking, its side, back or front the way it goes; its trail instead of the droplets; its tag over its top; nothing fetched for it; another rider as others see them", async ({ page }) => {
+  test.setTimeout(150_000);
+  const errors = watchErrors(page);
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Your profile" })).toBeVisible();
+  // (No crate holds a ride yet: given straight, as only admins have them.)
+  const [chirp, shoes] = await giveItems(page, [
+    { def: "riding-chirp", color: "cobalt", blemish: 40 },
+    { def: "cheetah-shoes", color: "red", blemish: 0 },
+  ]);
+  await wearItem(page, "ride", chirp!);
+  // Nothing is fetched for a ride but its drawing (Nov 1: its frames are drawn from it, no sheets; Nov 1, rides lazy: each ride's
+  // drawing is its own chunk, loaded when it's worn).
+  const fetched: string[] = [];
+  page.on("request", (r) => {
+    const path = new URL(r.url()).pathname;
+    if (/ride/i.test(path) && !DRAWING_CHUNK.test(path)) fetched.push(r.url());
+  });
+  await page.goto("/town?sky=day");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect.poll(async () => (await rideNow(page)).you.ready, { message: "your ride's frames are ready", timeout: 30_000 }).toBe(true);
+  expect(fetched).toEqual([]);
+  // Standing: its idle, frame after frame, at every ride's size (0.75, Nov 1).
+  const seen = new Set<number>();
+  for (let i = 0; i < 24; i++) {
+    const r = await rideNow(page);
+    expect([r.you.ride, r.you.color, r.you.anim, r.you.scale, r.you.stepMs]).toEqual(["riding-chirp", "cobalt", "idle", 0.75, 90]);
+    seen.add(r.you.frame);
+    await page.waitForTimeout(100);
+  }
+  expect(seen.size).toBeGreaterThanOrEqual(4);
+  // Walking: its move, its view and its facing the way it goes, and its trail (watched every frame from before the tap: a step is 90 ms).
+  await page.evaluate(() => {
+    const w = window as unknown as { __townRide: () => RideSeen; __rideSeen: Set<string>; __marksSeen: Set<string> };
+    w.__rideSeen = new Set();
+    w.__marksSeen = new Set();
+    const look = () => {
+      const r = w.__townRide();
+      if (r) {
+        w.__rideSeen.add(`${r.you.anim}:${r.you.view}:${r.you.facing}`);
+        const m = r.you.marks;
+        for (const k of ["side", "back", "front"] as const) if (m[k]) w.__marksSeen.add(k);
+        if (m.drops) w.__marksSeen.add("drops");
+      }
+      requestAnimationFrame(look);
+    };
+    requestAnimationFrame(look);
+  });
+  const walkTo = async (c: number, r: number) => {
+    const at = await squareSettled(page, c, r);
+    const cv = (await canvas(page).boundingBox())!;
+    await page.mouse.click(cv.x + at.x, cv.y + at.y);
+    // (There, or beside it if a bot stands there: one pawn a square.)
+    await expect.poll(async () => Math.abs((await you(page))[0] - c) + Math.abs((await you(page))[1] - r)).toBeLessThanOrEqual(1);
+    await expect.poll(async () => (await rideNow(page)).you.anim).toBe("idle");
+  };
+  // (The bots hold still: none walks across your way. `__townCall(-1)` stops new walks; one already under way, a bot coming out
+  // of its home to a spot near you, say, is let finish first, or it could claim the square beside you as you tap it.)
+  await page.evaluate(() => (window as unknown as { __townCall: (i: number) => void }).__townCall(-1));
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __townBots: () => { name: string; moving: boolean }[] }).__townBots().filter((b) => b.moving).map((b) => b.name)), { message: "the bots stand still", timeout: 15_000 }).toEqual([]);
+  const [c0, r0] = await you(page);
+  // A tap on the square right beside you walks you there, as on foot: your ride's reach isn't you (taps take the pawn's box).
+  for (const c of [c0 + 1, c0]) {
+    const at = await squareSettled(page, c, r0);
+    const cv = (await canvas(page).boundingBox())!;
+    await page.mouse.click(cv.x + at.x, cv.y + at.y);
+    await expect.poll(() => you(page), { message: `beside you: ${c},${r0}` }).toEqual([c, r0]);
+    await expect.poll(async () => (await rideNow(page)).you.anim).toBe("idle");
+  }
+  // (Up the promenade onto the walk, clear of the tables and the lamps, then right, then left, then down.)
+  await walkTo(c0, r0 + 5);
+  // Standing after walking up: its back view's idle.
+  expect([(await rideNow(page)).you.anim, (await rideNow(page)).you.view]).toEqual(["idle", 1]);
+  await walkTo(c0 + 3, r0 + 5);
+  await walkTo(c0 - 1, r0 + 5);
+  // Stopped: the idle again, its side, facing left as it came.
+  expect([(await rideNow(page)).you.anim, (await rideNow(page)).you.view, (await rideNow(page)).you.facing]).toEqual(["idle", 0, -1]);
+  await walkTo(c0 - 1, r0 + 2);
+  // Standing after walking down: its front view's idle.
+  expect([(await rideNow(page)).you.anim, (await rideNow(page)).you.view]).toEqual(["idle", 2]);
+  const steps = await page.evaluate(() => [...(window as unknown as { __rideSeen: Set<string> }).__rideSeen]);
+  // Side (0) walking left and right, mirrored to face its walk; back (1) up and front (2) down, as drawn (never mirrored).
+  expect(steps).toEqual(expect.arrayContaining(["move:0:1", "move:0:-1", "move:1:1", "move:2:1", "idle:0:-1", "idle:1:1", "idle:2:1"]));
+  expect(steps.filter((s) => /^\w+:[12]:-1$/.test(s))).toEqual([]);
+  // Its trail: Chirp's prints on the squares you left, pointing each way you went; never the droplets while it rides.
+  const marks = await page.evaluate(() => [...(window as unknown as { __marksSeen: Set<string> }).__marksSeen]);
+  expect(marks.sort()).toEqual(["back", "front", "side"]);
+  // Nothing while you stand: the last prints fade (in 600 ms) and none come.
+  await page.waitForTimeout(800);
+  expect((await rideNow(page)).you.marks).toEqual({ side: 0, back: 0, front: 0, drops: 0 });
+  // Its tag sits over it (the tag's foot 2 px over its head).
+  const me = await tagOverHead(page, "you", "");
+  expect(me.foot!).toBeCloseTo(me.hy! - 2, 0);
+  // Another rider, as others see them (a test player on Moon's Ride; no real players walk in the town yet): on their ride, drawn
+  // as it, its tag over its head; and one in Cheetah Shoes, whose steps take half a bot's (Nov 1: twice as fast).
+  const look = { ride: { def: "moon-ride", color: "pearl", blemish: 10, seed: 3 } };
+  await page.evaluate(([look]) => (window as unknown as { __townPlayer: (uid: string, name: string, icon?: string, rating?: number, wear?: unknown) => number }).__townPlayer("rider-1", "Moony", undefined, 1500, look), [look]);
+  await page.evaluate(() => (window as unknown as { __townPlayer: (uid: string, name: string, icon?: string, rating?: number, wear?: unknown) => number }).__townPlayer("rider-2", "Speedy", undefined, 1500, { ride: { def: "cheetah-shoes", color: "red", blemish: 0, seed: 1 } }));
+  await expect.poll(async () => (await rideNow(page)).others.map((o) => [o.id, o.ride, o.color, o.ready, !!o.box, o.stepMs]).sort(), { timeout: 30_000 }).toEqual([
+    ["player:rider-1", "moon-ride", "pearl", true, true, 200],
+    ["player:rider-2", "cheetah-shoes", "red", true, true, 100],
+  ]);
+  expect(fetched).toEqual([]);
+  const moony = (await rideNow(page)).others.find((o) => o.id === "player:rider-1")!.box!;
+  const moonyTag = await tagOverHead(page, "player:rider-1", "Moony");
+  expect(moonyTag.foot, "the rider's tag").not.toBeNull();
+  expect(moonyTag.foot!).toBeCloseTo(moonyTag.hy! - 2, 0);
+  expect(moony.hy).toBeLessThan((moony.y0 + moony.fy) / 2);
+  // At a size (Nov 1: every ride 0.75, RIDES.defaultScale; an admin's `?rideScale=1` tries it as drawn): the ride bigger under the
+  // same pawn, standing on the same square. The pawn's tap box is as wide, the picture taller, the head higher (the pawn sits
+  // higher on the bigger ride), the tag still over it.
+  await page.evaluate(() => (window as unknown as { __townCall: (i: number) => void }).__townCall(-1));
+  const small = (await rideNow(page)).you;
+  expect(small.scale).toBe(0.75);
+  await page.goto("/town?sky=day&rideScale=1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect.poll(async () => (await rideNow(page)).you.ready, { message: "your ride's frames are ready", timeout: 30_000 }).toBe(true);
+  await page.evaluate(() => (window as unknown as { __townCall: (i: number) => void }).__townCall(-1));
+  await expect.poll(async () => (await rideNow(page)).you.anim).toBe("idle");
+  // (Facing as it stood: the box's sides are the pawn's either way.)
+  const full = (await rideNow(page)).you;
+  expect([full.ride, full.scale]).toEqual(["riding-chirp", 1]);
+  const [a, b] = [full.box!, small.box!];
+  expect(b.x1 - b.x0).toBeCloseTo(a.x1 - a.x0, 1);
+  expect(b.y1 - b.y0).toBeLessThan(a.y1 - a.y0);
+  expect(b.fy - b.hy).toBeLessThan(a.fy - a.hy);
+  const fullTag = await tagOverHead(page, "you", "");
+  expect(fullTag.foot!).toBeCloseTo(fullTag.hy! - 2, 0);
+  // Cheetah Shoes (Nov 1, Blitz's): your step takes half its time (45 ms, youStepMs / RIDES.speed), and its frames are drawn.
+  await wearItem(page, "ride", shoes!);
+  await page.goto("/town?sky=day");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect.poll(async () => (await rideNow(page)).you.ready, { message: "your shoes' frames are ready", timeout: 30_000 }).toBe(true);
+  expect([(await rideNow(page)).you.ride, (await rideNow(page)).you.stepMs]).toEqual(["cheetah-shoes", 45]);
+  expect(fetched).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+test.describe("rides lazy", () => {
+  // (No service worker: it would serve the ride's chunk from its cache, past the hold.)
+  test.use({ serviceWorkers: "block" });
+  test("rides lazy (Nov 1): while your ride's drawing loads (its own chunk), your pawn is on foot in the box and under the tag it will have on its ride; when it comes, the ride appears there and nothing moves", async ({ page }) => {
+    const errors = watchErrors(page);
+    await page.goto("/");
+    await expect(page.getByRole("button", { name: "Your profile" })).toBeVisible();
+    const [chirp] = await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 40 }]);
+    await wearItem(page, "ride", chirp!);
+    // (Its drawing's chunk held back until the boxes are read.)
+    let open!: () => void;
+    const held = new Promise<void>((r) => (open = r));
+    await page.route(/\/assets\/riding-chirp-[\w-]{8}\.js$/, async (route) => {
+      await held;
+      await route.continue();
+    });
+    await page.goto("/town?sky=day");
+    await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+    await page.evaluate(() => (window as unknown as { __townCall: (i: number) => void }).__townCall(-1));
+    await expect.poll(async () => (await rideNow(page)).you.coming, { message: "your ride is on its way" }).toBe("riding-chirp");
+    /** Your box and your tag once the camera has settled (it glides a moment after the town opens). */
+    const settled = async () => {
+      const read = async () => {
+        const box = (await rideNow(page)).you.box!;
+        const tag = (await page.evaluate(() => (window as unknown as { __townTags: () => { kind: string; x: number; y: number; w: number; h: number }[] }).__townTags())).find((t) => t.kind === "you")!;
+        return [box.x0, box.y0, box.x1, box.y1, box.hy, tag.x, tag.y, tag.w, tag.h].map((v) => Math.round(v * 2) / 2);
+      };
+      let prev = await read();
+      for (let i = 0; i < 40; i++) {
+        await page.waitForTimeout(100);
+        const now = await read();
+        if (now.join() === prev.join()) return now;
+        prev = now;
+      }
+      throw new Error("the camera never settled");
+    };
+    const before = await settled();
+    const onFoot = (await rideNow(page)).you;
+    expect([onFoot.ride, onFoot.ready, onFoot.anim]).toEqual([null, false, ""]);
+    open();
+    await expect.poll(async () => (await rideNow(page)).you.ready, { message: "your ride's frames are ready", timeout: 30_000 }).toBe(true);
+    await expect.poll(async () => (await rideNow(page)).you.anim).toBe("idle");
+    // The ride appears under the same tap box and the same tag: nothing moved.
+    expect(await settled()).toEqual(before);
+    expect((await rideNow(page)).you.coming).toBeNull();
+    expect(errors).toEqual([]);
+  });
 });

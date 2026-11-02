@@ -5,8 +5,8 @@ Boss raid's coming home: a small round world where players walk around and meet 
 the time of day, the curved ground, all fourteen boss homes with their bosses roaming near them, the bots (twenty since Oct
 28: six pawns and the bosses' fourteen sidekicks) and you; slice 4
 added the press, the trail and the cards; **slice 5 the Colosseum** in the middle; **slice 6** made the Colosseum about
-twice its size, the map bigger, and put **the park** with its ten chess tables in front of its gate; **the lights** (Oct 27) light the park's lamps and the homes' windows at dusk and night; **the chat log** (Oct 28; v2, v3 and v4 the same day) is one box in the top left corner, with a chat icon and a gear in the header, where the bosses and their kids say a line now and then and signed-in players type (tap the box to type); **name tags** (Oct 28) show only near you by default, a boss's sidekick's in blue. Home's **Boss Arena** card (Oct 26, Eric)
-opens it, and the computer's side menu's Boss Arena item; the address `/town` opens it directly too (`hunchess.com/town`,
+twice its size, the map bigger, and put **the park** with its ten chess tables in front of its gate; **the lights** (Oct 27) light the park's lamps and the homes' windows at dusk and night; **the chat log** (Oct 28; v2, v3 and v4 the same day) is one box in the top left corner, with a chat icon and a gear in the header, where the bosses and their kids say a line now and then and signed-in players type (tap the box to type); **name tags** (Oct 28) show only near you by default, a boss's sidekick's in blue. Home's **Chess Town** button (Oct 26, Eric, as the Boss Arena card; since Nov 1 a little town scene under PLAY)
+opens it, and the computer's side menu's Chess Town item; the address `/town` opens it directly too (`hunchess.com/town`,
 behind Cloudflare Access like the rest of the site). Phone and computer; **on a computer it sits in the front door's frame** (Oct 29, below).
 
 ## How it works
@@ -17,7 +17,7 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   while you walk round it (Eric's frame-rate rule, `docs/rules/eric.md`); a game with a bot loads it when it opens.
 - **Layout.** A slim bar (the back button, "Town square", and at its right end the chat icon and the gear: "The chat log"),
   then the world fills the rest of the screen. **On a computer (Oct 29, Eric) the town sits in the front door's frame:** the side
-  menu on the left (Boss Arena marked as where you are) and the live panel with the global chat on the right, as on home, and the
+  menu on the left (Chess Town marked as where you are) and the live panel with the global chat on the right, as on home, and the
   town filling the center column's box, edge to edge (`.fd-center`, which is home's middle box: the same left, top, width and
   height at every size from 1024 px up; the box is as high as the window, so at 1024 to 1279 px, where home's own box grows
   taller than the window and scrolls, it's the window's height). Its bar is the box's top line, and the buttons, the chips,
@@ -28,7 +28,7 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   `in-frame` to its screen (`town.css`: in the page's flow, the window's height, not fixed). On a computer **the chat icon sits right
   after the "Town square" title and the gear alone at the right end** (`town-chat.css`: the tools' box `display: contents`, the gear
   `margin-left: auto`): the chat's place was hard to see at the far right. Every side-menu item leaves the town (`goHome` in
-  `App.tsx` closes it), Boss Arena opens it again. Known limit: resizing a mouse window across 1024 px adds or takes away the
+  `App.tsx` closes it), Chess Town opens it again. Known limit: resizing a mouse window across 1024 px adds or takes away the
   frame, which starts the town again at its start square. The world never assumes a screen size: it fills its box and works its camera out
   from the box's shape, so the panels Eric designs around it can change without touching it. The back button, the chat icon, the
   gear and the buttons stay put. **The buttons** (Eric, Oct 28: "remove the 'Back to me' button … replace with circular focus
@@ -80,15 +80,21 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   pages (layers of one array texture) and uploaded again only when render.ts calls `changed` (a tag or a table's board drawn again); clips that are upright
   rectangles cut on the CPU, other shapes a stencil bit each; a stroke's shadow (the table's ring, the pressed square's glow)
   worked out per pixel; the far band's softening in one shader pass (no scratch canvases); lights and their cuts in one
-  blend; text and the bubble drawn once into canvases. No WebGL 2, or no context: Canvas 2D, silently. Context lost: nothing
-  drawn until it's back (textures made again); lost twice within a minute, or not back within 5 s: Canvas 2D for the page. Without `?gl=1`, Canvas 2D
-  exactly as before. The canvas says which (`data-backend`).
+  blend; text and the bubble drawn once into canvases. One shader in three builds (solid; with textures; with the soft
+  modes too), each draw using the least that covers what it holds: the same pixels, much less work for a software
+  renderer. 4x multisampling on a GPU; where the browser would render WebGL in software (no GPU, or SwiftShader in the
+  headless tests: `failIfMajorPerformanceCaveat` refuses the first context), none, which halves a frame there (Oct 30,
+  later). No WebGL 2, no context, or its shader fails: Canvas 2D, silently. Context lost: nothing
+  drawn until it's back (textures made again); lost twice within a minute, or not back within 5 s: Canvas 2D for the page.
+  Each of those fallbacks is reported once a page with its reason, nothing shown (the health view counts them:
+  docs/areas/ops.md, "Health"). Without `?gl=1`, Canvas 2D exactly as before. The canvas says which (`data-backend`).
 - **Taps** (slice 4: `town/press.ts`; cleaned up in slice 5). A finger down presses the square you'd walk to like a
   button: its face dims a little and one bold gold border lies on its edge, glowing outside only, while the finger is
   down; up on the same thing releases it with one short pulse of that border (brighter, a little wider, fading) and you
   set off; moving past `dragPx` first lets it go (no pulse, no walk) and becomes a
   look-around drag. No sound and no vibration (Eric). A small gold ring marks your destination until you arrive. As you
-  run you leave about three soft white droplets on the squares you leave, fading out in about half a second (yours only).
+  run you leave about three soft white droplets on the squares you leave, fading out in about half a second (yours only); on a
+  ride with a trail, its own mark instead (Nov 1: "Rides", below).
   All their numbers are in `feel.ts`.
 - **One pawn a square, like chess** (`world.ts`): a walk may pass through people, but nobody ends on a square someone
   stands on or is headed for (`taken`: a walker's goal). A free square is its own end; a taken one, a person or a boss
@@ -355,6 +361,52 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   under you (Oct 26, Eric: the ring and the shadow together "looks sloppy"); your gold name tag marks you, and your
   shadows are a bot's, sized from the pawn rather than the margin your items are drawn in.
 
+- **Rides** (Oct 31, Eric: "a GIF of it running around town with a piece mounted to it… and then… an idle animation, the usual";
+  docs/decisions/2026-10-31-rides.md; Nov 1, every boss's, with views and trails: docs/decisions/2026-11-01-rides-v2.md). A pawn
+  wearing a ride (crates.ts's `ride` slot: sixteen, all admin-only for now; shop.md, "Rides")
+  sits on it: yours, a bot's or a test player's as others see them (any `PawnLook` whose `wear` has a ride; real players later), the
+  ride's **idle** standing and its **move** walking, **one cycle a step** (the art's frame times scaled to the step: 90 ms yours, 200 a
+  bot's; the walk keeps its pace), lifted by the move's hop (the grasshopper's) instead of the hobble, its shadows shrinking with it;
+  mirrored facing left as a pawn is. **Its view** (Nov 1, Eric: "a run up and a run down"): walking left or right its side, up the
+  screen its back, down the screen its front (never mirrored); standing, the idle of the view it last walked in (`Walker.view`), for
+  you and everyone else alike; a ride without views (Moon's Ride) keeps its side. From behind, the pawn's face items don't show (its
+  hat does: the back view carries the pawn dressed without its face slot). **Its trail** (Nov 1; Eric: "Chirp's… definitely the way to
+  go"): while you run on a ride with a `trail`, each square you leave gets its mark, on its own times and fade (`trail.ms`), pointing the
+  way you went (the side's mirrored going left), at the ride's size, **in place of the droplets**; standing, none come; yours only, as
+  the droplets are. No ride, or Moon's Ride: the droplets. **Its pace**: `RIDES.speed` in settings, one number a ride (Cheetah Shoes
+  2): a step takes `youStepMs` (or a bot's `botStepMs`) over it. The pawn keeps its size (the ride is drawn at the pawn's scale) and its ride stands on the square's
+  middle (its feet, the moon's shadow: `TOWN_FEEL.rides`). **Its name tag sits over the highest of the ride and the pawn standing** (a
+  hat, the moon's stars) and doesn't jump with the hop, as a sidekick's doesn't; the card sits over it as over any tag; tags and the
+  bubble are drawn after every figure, so a ride never covers one. Seated at a table, the pawn sits as before, without its ride.
+  **Drawn as a pawn is: one picture a frame.** Nothing is fetched for a ride but its drawing (Nov 1: the baked WebP sheets, 2 MB for
+  two rides, are gone; Nov 1, rides lazy: each ride's drawing is its own chunk, 1 to 7 KB gzip, loaded only when a ride is drawn, and your
+  own worn ride's is asked for as the app starts, after its first paint: `components/rides/load.ts`,
+  [2026-11-01-rides-lazy.md](../decisions/2026-11-01-rides-lazy.md)). A rider's frames are composed once from the ride's own drawing (`components/rides/draw.tsx`: each layer of each frame as SVG,
+  made into an image, in the ride's colors at the rider's size, as `dressedPawn` makes your dressed pawn), with the pawn on its seat
+  (its back, the pawn, its front), **one frame an animation frame** (`Rider` in `town/rides.ts`), every view, then its trail marks; each
+  view's box comes from `town/ride-cells.ts` (measured ahead by `scripts/measure-rides.ts`, with each view's frames' seats, times and lift,
+  the tile's box and the trail's numbers; a hash test keeps it fresh). Until that's done (its drawing loaded, then about 2 s on a phone)
+  the person walks on foot, **in the box and under the tag the rider will have** (Nov 1, rides lazy: the renderer's `youSoon` and
+  `ridersSoon`), so the ride appears in place and nothing moves. A picture (or the drawing's chunk) that fails is forgotten, so a later
+  rider tries again. **Riders who
+  look the same share one set of frames** (the ride, its colors, the pawn's side, tint and items, its size: `shareRider`), each set freed
+  when no one rides on it and all of them when the town closes (`dropRiders`). A ride shows its colors (both, for a two-color ride),
+  not its copy's blotches or its shine (the sets are shared by color). **Taps** take only the pawn's own box across (as on foot), not
+  the ride's reach, so a tap on the square beside a rider walks there; a rider is drawn from 1.5 squares off the box's sides (a pawn
+  from 1; more for a ride drawn bigger than 1), its ride reaching about 1.46 squares from its foot.
+  **Each ride's size** (Nov 1, Eric: "scale down the riders with just a button so to speak… I wanna see it at 75%";
+  docs/decisions/2026-11-01-ride-scale.md): every ride 0.75 (`RIDES.defaultScale` in core's settings, Nov 1, Eric: "0.75 is good";
+  `RIDES.scale` for a ride that differs). The ride is drawn at that
+  size about its saddle (its first idle frame's: `components/rides/scale.ts`) under a pawn of the usual size, which still sits in the
+  saddle (each frame's seat moves with the scaled saddle; the same share of the pawn hidden in it) while the ride stands on the square,
+  its hop and its shadow scaled too; worked out once as a rider's frames are composed, nothing per frame. The same everywhere a rider
+  is drawn: the town (Canvas 2D and WebGL), the locker, the profiles, home's pawn and ring (`RideLayers`'s `k`; the boxes keep their
+  size; the item's own tile keeps 1). **`?rideScale=K`** (0.5 to 1.25), a test switch (admins on the live site): every ride on that
+  page at K, to try sizes; read once as the page opens (`test-switches.ts`).
+  Test hook: `__townRide()` (yours: its ride, color and size, ready, the
+  animation, frame and view the last frame drew, which way it faced, your box, foot and head on screen, your step's time, your trail's
+  marks and droplets showing; every other rider's, with its step's time; and the sets of frames held); `__townAt("square", [c, r])` says where a square is on screen; `__townPlayer(…, wear)` dresses the
+  test player (a ride too).
 - **The bots and playing them** (Oct 27, Eric: "a few bots… with different skill level… if you tap them you can invite
   them to a game and then you both run over to the chessboard"; `docs/decisions/2026-10-27-town-bots.md`). **Twenty bots
   since Oct 28** (`docs/decisions/2026-10-28-sidekicks-in-town.md`), one table, `BOTS` in `world.ts` (names and ratings
@@ -442,13 +494,58 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
     and the bot across, its card closed (`createTown`'s `seat`); the bot gets up and wanders off after
     `botLeaveAfterGameMs` (4 s), unless its table's card holds it.
 
+## Inside a shop (Nov 2, round 1)
+
+Eric, Nov 2: walk up to Babur's home and go in; inside, the Shopkeeper sells **Babur's Boss Crate**. Round 1 is the town side, with buying
+stubbed behind one function; round 2 adds the stored data (the tokens, the crate keys, the purchase). Decisions:
+[2026-11-02-shop-interiors-r1.md](../decisions/2026-11-02-shop-interiors-r1.md) (this round's calls),
+[2026-11-02-building-interiors.md](../decisions/2026-11-02-building-interiors.md), [2026-11-02-shop-zoom.md](../decisions/2026-11-02-shop-zoom.md)
+and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.md) (the art's, on `claude/boss-art`).
+
+- **Which homes.** Babur's Circus (`tiger`) and Puddles' Botanical Garden (`gardener`): `SHOPS` in `town/shops/shops.ts`. Their home's card
+  adds **"Go in"** (gold) above its greyed "Shop" and "Coming soon", which stay; every other home's card is as it was.
+- **Going in.** "Go in" walks you to the square in front of the door (the plot's front row's middle, a row out); there the town zooms in on
+  the door (a CSS scale of the town's canvas about the door, `SHOP_FEEL.doorZoom` over `doorZoomMs`) and fades to black (`.town-fade`,
+  `fadeMs`), the room's code and art load (only now: `shops/ShopRoom.tsx` and each room's art are chunks of their own), the town waits
+  (`pause`: no frames, nothing moves, its chips put away) and the room fades in from black. **Going out** ("Go out", or the back button,
+  which inside a shop means out, not home): the room fades to black and the town zooms back out from the door, you where you stood.
+- **The room** (`shops/ShopRoom.tsx`): 20 × 20 squares from the art's layout (`shops/babur-art.ts`, `shops/puddles-art.ts`, copied from
+  `claude/boss-art`), drawn as the approved mockup (`scripts/boss-art/shop-view.ts` there) drew it, through `camera.ts` (`setView`'s
+  `sets`: the room's own camera sets): the floor tiles baked once into one picture and laid flat in blocks of two squares (a block drawn
+  large near the camera a square at a time: `floorBlock`, `floorSplitPx`), each upright piece stood at its foot at 37 px a square, Puddles'
+  pond garden (`d: 8`) laid flat on its 40 squares with the strip above its north row (its plants' tops) standing up, the Shopkeeper and
+  you among them far to near; the tent's canvas or the greenhouse's glass above the walls, and the bright day past the low front wall.
+  Babur's three burning hoops glow (their pools and halos, the art's `piece`-keyed lights, `SHOP_FEEL.glow`). Every piece's frames are
+  drawn into canvases as the room loads, behind the black; animated pieces loop on one clock (the hoops, the pond, the palm, the fountain,
+  the crate, the balloon cart). A piece nearer the camera than `nearFull` squares fades out (gone by `nearGone`): the front wall as you
+  stand at the door. One loop on one Canvas 2D canvas; headless, 60 fps walking on a phone and a computer (Nov 2).
+- **The camera.** You start in **Close** (`SHOP_FEEL.close`: h 3.2, back 2.4, pitch 24°, cy 0.3, in place of the town's numbers of those
+  names; the box's shape blends the rest as in the town). The town's − / + switch between Close and the town's zoomed-in camera (the wheel
+  too); a drag looks around (kept inside the room); the focus button brings it back.
+- **Walking** (`shops/room.ts`, pure): a tap walks you a square at a time round what's solid (the walls, the counter, every solid piece's
+  squares, the way out's own squares, the Shopkeeper's); a tap on something solid walks you beside it. There's no joystick (the town has
+  none either). Inside is just you: the town's bots and other players don't come in.
+- **The Shopkeeper**: the boss's kid's sheet (Stripes for Babur, beside the counter's east end: behind it the 58 px counter hides him;
+  Drizzle for Puddles, behind the middle of the low counter), its idle playing, a blue "Shopkeeper" tag. Standing still within
+  `talkRange` (3) squares of it, its card shows (**"Shopkeeper"**, **Talk**); a tap on it or the counter walks you in front of it, the
+  counter between you. A card you close stays closed until you move on.
+- **The crate's card** (Talk): in the middle of the room, **"Babur's Boss Crate"** / **"Puddles' Boss Crate"**, the crate's picture, its
+  prizes (the boss's ride first, always: Balloon Pup; Puddles's Mower), the price line (**"3 Babur tokens, or 1 Babur token + 1 crate key"**,
+  `BOSS_CRATE_PRICE` in core's settings), what you have (**"You have 0 Babur tokens and 0 crate keys."**: `bossHoldings`, none until
+  round 2) and two buttons, **"Buy with 3 Babur tokens"** and **"Buy with 1 Babur token + 1 crate key"**, both through `buyBossCrate(boss,
+  way)`, which in round 1 answers **"Coming soon"** in a row under them that's always there.
+- **The way out**: standing on one of the two squares just inside the door, a card says **"Go out"**. The door is behind you as you look
+  north: walk back toward it, or drag the view back to it and tap it.
+- **Test hooks** (test switches on): the room's canvas `canvas.town-shop-canvas` carries `data-room`, `data-you`, `data-ready`;
+  `__shopAt("keeper" | "door" | "square", [c, r])`, `__shopCam()`, `__shopBench(n)`.
+
 ## Frame-rate pill (`?fps`)
 `/town?fps` shows anyone (Eric, Oct 30: no admin needed, the site is behind Cloudflare Access) a pill in the world's top-right corner, "60 fps · 16.7 ms · 2D": frames over the last second and their mean time, text set twice a second from plain counters in the frame loop, then the drawing's backend ("· WebGL" with `?gl=1`; added by town.css from `data-backend`, so the pill's text stays the numbers). Without `?fps` there is none. `?crowd=N` is anyone's too (only that device draws the pawns).
 `?fps`, `?crowd=N` and `?gl=1` are read once as the page opens (`TOWN_ASKED`, test-switches.ts), so a later replaceState can't lose them; they apply as the town opens.
 
 ## The feel: `town/feel.ts`
 
-Every number that shapes how it feels is in `TOWN_FEEL`, one line each: the walk (90 ms a square, the hobble), the camera
+Every number that shapes how it feels is in `TOWN_FEEL`, one line each: the walk (90 ms a square, the hobble), the rides' feet and shadows, the camera
 sets, the zoom, the camera's follow and glide, the drag, the haze, the clouds' parallax, how often bosses roam and talk,
 how often bots walk, the sizes, the names, the sky's hours and its four looks' colors, the lights at dusk and night (`lightsAt`, their glow's bands, the flicker), the rim line. The earlier value is
 noted wherever a slice changed one.
@@ -469,10 +566,11 @@ noted wherever a slice changed one.
 
 - `packages/app/src/town/`: `TownPage.tsx` (the lazy load, and on a computer the frame round it), `Town.tsx` (the screen, the loop, input, chips, cards, the sky's
   clock, the statues' close-up, the backend and its fallbacks), `press.ts` (a finger as a button), `camera.ts`, `world.ts`, `render.ts`, `paint.ts` (the drawing layer; Canvas 2D),
-  `paint-gl.ts` (its WebGL 2 backend), `you-look.ts`, `sky.ts`, `sky-draw.ts`, `sign-font.ts`, `feel.ts`, `town.css`, `chat.ts`, `TownChat.tsx` and `town-chat.css` (the chat log), `houses/`
+  `paint-gl.ts` (its WebGL 2 backend), `you-look.ts`, `rides.ts`, `ride-cells.ts` (the rides' views measured, generated), `sky.ts`, `sky-draw.ts`, `sign-font.ts`, `feel.ts`, `town.css`, `chat.ts`, `TownChat.tsx` and `town-chat.css` (the chat log), `houses/`
   (one file per home, fourteen in all, the Colosseum's `coliseum.ts`, the park's `park.ts`, the kit of shared pieces and the index),
   `sidekick-sheets.ts` and `sidekicks/*.png` (the sidekicks' baked frames, generated), `CardIcons.tsx` (the card's crossed swords and
-  rating bars, inline SVG).
+  rating bars, inline SVG), `shops/` (inside a shop: `shops.ts` which homes and the crate's words and the buy stub, `room.ts` the room's
+  walking, `ShopRoom.tsx` the room, `babur-art.ts` and `puddles-art.ts` the rooms' art).
 - The sidekicks' art: `packages/app/src/characters/sidekicks/<boss>.ts` (one `Character` each, `sidekick-<boss>`, copied
   as drawn from `claude/boss-art`), baked by `scripts/bake-sidekicks.ts` (`npx tsx scripts/bake-sidekicks.ts`).
 - References: `docs/mockups/town-square/` (the prototype Eric tested, and the pictures for the homes: Eric's for the
@@ -480,6 +578,12 @@ noted wherever a slice changed one.
 
 ## Tests
 
+- `e2e/shop.spec.ts` (Nov 2, inside a shop; phone and computer): Babur's card's "Go in", inside in Close (− and + switch cameras), a tap
+  on the Shopkeeper walks you up and its card's Talk opens "Babur's Boss Crate" (the price line, Balloon Pup, what you have, both buys
+  answering "Coming soon" in a row that doesn't grow the card), then the view dragged back to the door, "Go out" and you're outside at
+  the tent's door; Puddles' greenhouse: Drizzle's crate with Puddles's Mower, and the back button takes you out. Unit:
+  `packages/app/test/shop-room.test.ts` (both rooms' walls, counter, pieces and pond solid, the way out, every free square reachable,
+  the talking range and where a tap on the Shopkeeper sends you; the crates' words; the stub).
 - `e2e/town-webgl.spec.ts` (Oct 30, WebGL): the same held frame drawn by both backends in one page (`__townHold`, `__townBackend`;
   `__townPaint()` gives the backend and the last frame's draw calls, `__townBench(n)` the ms a draw of the held frame),
   compared pixel by pixel, phone and computer: the park by day, the park at night (the lights), a statue up close at night;
@@ -490,14 +594,20 @@ noted wherever a slice changed one.
 - **Every town spec on WebGL:** build with `VITE_TOWN_GL=1 npm run build` (WebGL the default, as `?gl=1`) and run them as usual;
   their pixel reads (`colors`, `skyTop`, the tags' and the lights' reads) work on both backends because a WebGL canvas's
   `getContext("2d")` gives the last frame's pixels under the test switches (Town.tsx's `shim`: the frame drawn again at once
-  and read right after the draw). Not in CI yet. Headless WebGL is software (SwiftShader, 4 to 6 fps), so run them with one
-  worker; the chat's timing checks can come in late there (docs/decisions/2026-10-30-town-webgl.md, "The town's specs").
+  and read right after the draw). Headless WebGL is software (SwiftShader: about 14 fps on a phone, 15 on a computer since
+  Oct 30, later; the page's thread waits for each frame), so run them with **one worker**: with two, a check takes 300 to
+  400 ms and the chat's and the tags' timing checks miss. `TOWN_GL_BUILD=1` tells `town-webgl.spec.ts` which default to
+  expect. All six pass so (docs/decisions/2026-10-30-town-webgl.md, "Oct 30, later").
+- **CI on WebGL** (Oct 30): a change to the town's area (`webgl` in `e2e/areas.json`) also runs the drawing specs (town,
+  town-desktop, town-tags, town-webgl) on a `VITE_TOWN_GL=1` build, in two more jobs beside the shards, `webgl-phone` and
+  `webgl-desktop` (one project, one worker each; about 10 minutes of tests each). The chat's two specs aren't in it (HTML
+  over the canvas; nothing in them depends on the backend). docs/areas/ops.md, "CI e2e".
 
 - `e2e/town-desktop.spec.ts` (Oct 29, the town on a computer): at 1280 × 800, 1440 × 900 and 1920 × 1080 the town's box is home's `.fd-center`
-  (within a pixel), the menu and the right column are home's with the global chat showing, Boss Arena is marked, the chat icon is in the bar's
+  (within a pixel), the menu and the right column are home's with the global chat showing, Chess Town is marked, the chat icon is in the bar's
   left part after the title, the gear at its right end and neither over the title, the world fills the box under a 52 px bar, the buttons keep
   their corner and the chat box its place, the chips and an open card are inside the box and the page doesn't scroll; the side menu's Play and
-  Boss Arena go home and back; the center column, the menu and the right column keep one box each while the town loads; a 900 × 700 mouse
+  Chess Town go home and back; the center column, the menu and the right column keep one box each while the town loads; a 900 × 700 mouse
   window has the whole screen and both icons at the right; and phones (390 × 844, 430 × 932) and tablets (768 × 1024, 1024 × 768 touch) have
   main's boxes (taken at 5e70aeed) for the screen, the bar, its four buttons, the world, the controls and the chat box, and no frame.
 - `packages/app/test/town-camera.test.ts`: the projection (the focus in the middle column, wrapping both ways, a tap picks
@@ -506,6 +616,27 @@ noted wherever a slice changed one.
   always fit), the layout
   (fourteen homes 8 to 10 squares from their nearest neighbors, none near the start, the Colosseum's ground and the park
   clear, and the start south of it on the park's promenade), the walk around a home, and the eased steps meeting the even ones at the same speed.
+- `packages/app/test/town-rides.test.ts` (Oct 31, rides; Nov 1, sizes; Nov 1, every boss's with views and trails): every ride item
+  has its drawing (its name and line the drawing's) and its measured views, every drawing is a ride item; all but Moon's Ride have a
+  back, a front and a trail inside the art's limits; the cells are each drawing as drawn now (the hash: run
+  `npx tsx scripts/measure-rides.ts` after a change); every ride 0.75 by one default, Cheetah Shoes' speed 2; in each view a rider
+  stands its ride's feet on the square's middle, its tag over the higher of the ride and its pawn, its times and lift the view's; from
+  behind it carries the pawn without its face items; at a size, the ride scaled about its saddle, the pawn its size on it, the ride on
+  the square (every view, and its trail mark); its idle on its own times, its move one cycle a step in its drawn shares, its trail on
+  the mark's times; a walker's step progress and its view (side, back walking up, front walking down, kept standing); a step's time
+  settable (the shoes: 45 ms); (Nov 1, rides lazy) the measured numbers are each drawing's (tile box, every view's frames, trail), and
+  only `load.ts` imports a drawing, never statically; riders who look the same share one set of frames, freed by the last one out and by the town's close; a
+  rider whose pictures don't come is forgotten, so the next one makes them again.
+- `e2e/town.spec.ts`, "rides (Oct 31; Nov 1, every boss's)" (phone and desktop): wearing Riding Chirp, nothing is fetched for it but
+  its drawing's chunk;
+  standing, its idle frame after frame at 0.75; a tap on the square beside you walks you there, either way (the square read once the
+  camera has settled, the bots standing still: Nov 1, the fix for main's flaky "beside you"); walking up, right, left and down: its
+  back, its side facing each way and its front (watched every frame; back and front never mirrored), the idle of each view standing;
+  its prints in all three directions and never the droplets, none once you stand; your tag over your head; test players on Moon's
+  Ride and Cheetah Shoes drawn riding (the shoes' steps 100 ms), Moon's tag over it; with `?rideScale=1` your ride as drawn, your tap
+  box as wide, the picture taller, your head higher, the tag over it; Cheetah Shoes worn, your step 45 ms.
+- `e2e/town.spec.ts`, "rides lazy" (Nov 1, phone and desktop): Riding Chirp's chunk held back, you stand on foot in the box and under
+  the tag your rider will have (`__townRide().you.coming`); let through, the ride appears there: the tap box and the tag unchanged.
 - `packages/app/test/town-sky.test.ts`: which look shows when, the looks always adding up to 1 and blending over their
   half hour in order, `?sky=`, and the tint (none by day, softer at dawn than dusk, coolest and darkest at night).
 - `packages/app/test/town-world.test.ts`: one pawn a square (a taken square ends you next to it, the end is always free
@@ -592,7 +723,7 @@ noted wherever a slice changed one.
   wait on the server; a line's menu (your own: Mute and Report greyed; Report reaching fair play's case page with the line; a
   moderator's Remove leaving every log; Profile over the town and back; Mute hiding the player); the switch off ("Chat is
   paused.", the chatter going on); the privacy page's two 5-minute sentences. Only each test's own lines are counted: other tests' players share the room.
-- `e2e/town-chat-history.spec.ts` (phone and desktop; real time, its own file so it runs beside the others): a line another player said is still on
+- `e2e/town-chat-history.spec.ts` (a phone since Nov 2: the wait is the same on a computer; real time, its own file so it runs beside the others): a line another player said is still on
   the screen 4 minutes later, Report reaches fair play with it and a moderator's Remove takes it out of every log (the room holds 5 minutes).
 - `packages/app/test/town-tags.test.ts` (Oct 28, name tags): the near rule's alpha at 4, 4.5, 5, 5.5 and 6 squares (1, 1, 0.5, 0, 0; a straight line between, never rising with
   distance; its numbers are `feel.ts`'), the smaller of it and the far fade, your tag / an open card's figure / a table partner always shown (at any distance), "Everyone"
@@ -660,6 +791,7 @@ title; a bot waiting, two playing (the board's pixels change), a tap on their ga
 
 ## Not built yet
 
-The bottom strip, a player's card's Play and "Invite to party" (their card has the row, with Play greyed: Oct 28), the shop itself, the Colosseum's menu (raids with people,
+The bottom strip, a player's card's Play and "Invite to party" (their card has the row, with Play greyed: Oct 28), buying a boss's crate
+(round 2: the tokens, the keys, the purchase) and the other homes' insides, battles in a shop's circle, your ride inside a shop, the Colosseum's menu (raids with people,
 party), the park's matchmaking (sitting at a table queues you: `ROADMAP.md`, "The park"), quick chats, other people's dressed pawns, the Simple map setting, real players and
 rooms, sounds.

@@ -718,6 +718,7 @@ export function finishFinal(state: MatchState, rng: Rng, winningTeam: 0 | 1 | nu
  */
 export const bossKillDue = (state: MatchState, settings: Settings = DEFAULT_SETTINGS) =>
   !!state.boss &&
+  !settings.bossNoStrikes &&
   !state.boss.barred &&
   state.boss.sinceKill >= settings.bossKillEvery &&
   alivePlayers(state).length > (state.boss.minSurvivors ?? settings.bossMinSurvivors) &&

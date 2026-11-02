@@ -38,6 +38,8 @@ export const POWER_WORDS: Record<PowerId, string> = {
   draft: "marks a piece to fold",
   crease: "Crease",
   revision: "Revision",
+  scraps: "builds pieces from scraps as the clock runs",
+  gnaw: "Gnaw",
 };
 
 /** A boss's card line for its powers: its passive, then its ultimate; empty for a boss without powers yet. */

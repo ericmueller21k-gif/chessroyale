@@ -45,7 +45,7 @@ test("home: the live line comes from the server, the RANKED row changes the line
   // (No buttons under PLAY: the shop, your profile and Play with friends are in a phone's top bar and a computer's side
   // menu, Eric, Oct 18.)
   await expect(page.getByRole("main").getByRole("button", { name: "Play with friends", exact: true })).toHaveCount(0);
-  expect((await page.getByRole("main").getByRole("button", { name: /^Boss Arena/ }).boundingBox())!.height).toBeGreaterThanOrEqual(64);
+  expect((await page.getByRole("main").getByRole("button", { name: "Chess Town", exact: true }).boundingBox())!.height).toBeGreaterThanOrEqual(64);
 });
 
 test("home: Play with friends offers lobbies (practice is Solo, on the home screen)", async ({ page }) => {
@@ -84,13 +84,15 @@ test("settings: the sections in order, the board's choices stick, and Testing (p
   await expect(page.getByRole("switch", { name: /Animations/ })).not.toBeChecked();
   await expect(page.getByRole("switch", { name: /Motion trail/ })).not.toBeChecked();
 
-  // An admin: Testing, last, with practice mode (off until switched; it sticks) and the eval bar (on).
+  // An admin: Testing, last, with practice mode (off until switched; it sticks) and the eval bar (off for everyone since Nov 1:
+  // shown, switched off and not tappable).
   await asAdmin(page);
   await page.reload();
   await expect.poll(labels).toEqual(["THEME", "SOUND", "BOARD", "QUICK CHAT", "HOW TO PLAY", "HELP", "PRIVACY AND TERMS", "TESTING"]);
   const practice = page.getByRole("switch", { name: /Practice mode/ });
   await expect(practice).not.toBeChecked();
-  await expect(page.getByRole("switch", { name: /Eval bar/ })).toBeChecked();
+  await expect(page.getByRole("switch", { name: /Eval bar/ })).not.toBeChecked();
+  await expect(page.getByRole("switch", { name: /Eval bar/ })).toBeDisabled();
   await practice.click();
   await page.reload();
   await expect(page.getByRole("switch", { name: /Practice mode/ })).toBeChecked();

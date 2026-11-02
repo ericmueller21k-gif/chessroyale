@@ -7,10 +7,10 @@ import type { Army, Color, Held, Kind } from "./types.ts";
  * (docs/decisions/2026-10-19-autochess-demo.md, "v4", and "v6" for the bench): the board's pieces still go home each round.
  */
 
-/** A round's income: 100 in round 1, 20 more each round, up to 200. */
+/** A round's income: 10 in round 1, 2 more each round, up to 20. */
 export const incomeFor = (round: number, cfg: AutoChessSettings = AUTOCHESS) => Math.min(cfg.income.max, cfg.income.first + cfg.income.step * Math.max(0, round - 1));
 
-/** Interest on gold banked before the income: 10 for every full 100, up to 30. */
+/** Interest on gold banked before the income: 1 for every full 10, up to 5 (at 50). */
 export const interestFor = (banked: number, cfg: AutoChessSettings = AUTOCHESS) => Math.min(cfg.interest.max, Math.floor(Math.max(0, banked) / cfg.interest.per) * cfg.interest.gold);
 
 /** Gold for a streak of `n` rounds in a row: the highest row of the table that `n` reaches. */
@@ -102,9 +102,9 @@ export const damageFor = (round: number, enemyPiecesLeft: number, cfg: AutoChess
 /** The summed price of some pieces, and `starUps` star-ups (`starUpCost` each) paid on them (v8). */
 export const worth = (kinds: readonly Kind[], cfg: AutoChessSettings = AUTOCHESS, starUps = 0) => kinds.reduce((sum, k) => sum + cfg.prices[k], 0) + starUps * cfg.starUpCost;
 
-/** What a side gets back after a fight: 25% (rounded down) of everything paid for what's still on the board (the prices, and `starUps` star-ups at `starUpCost` each). */
+/** What a side gets back after a fight: 25% of everything paid for what's still on the board (the prices, and `starUps` star-ups at `starUpCost` each), to the nearest whole gold, a half up. */
 export function refundFor(onBoard: readonly Kind[], cfg: AutoChessSettings = AUTOCHESS, starUps = 0): Refund {
-  return { survivors: Math.floor(worth(onBoard, cfg, starUps) * cfg.survivorRefund) };
+  return { survivors: Math.round(worth(onBoard, cfg, starUps) * cfg.survivorRefund) };
 }
 
 export type RoundOutcome = "you" | "bot" | "draw";

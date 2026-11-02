@@ -412,9 +412,12 @@ test("Boingo: pies nobody can move onto (up to two, on their squares), the warni
   expect(pie3.worst, JSON.stringify(pie3.off)).toBeLessThanOrEqual(1);
 });
 
-test("Boingo's funhouse at every angle: a move by tap and a move by drag, the coordinates and the pies on their squares", async ({ page }, info) => {
+test("Boingo's funhouse at every angle (a computer: upside down): a move by tap and a move by drag, the coordinates and the pies on their squares", async ({ page }, info) => {
   test.setTimeout(12 * 60_000);
   const phone = info.project.name === "phone";
+  // (Every angle on a phone; on a computer, the first one he turns it to, upside down, then it stops (Nov 2): the turning is the same
+  // code on either, and the computer's mouse and board size are checked at that angle.)
+  const last = phone ? 15 : 5;
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/?debug&clock=90&bossMoves=20&boss=clown&power=funhouse&laststand=0");
@@ -425,7 +428,7 @@ test("Boingo's funhouse at every angle: a move by tap and a move by drag, the co
   const angles: number[] = [];
   const turns: number[] = [];
   const played: string[] = [];
-  for (let i = 1; i <= 15; i++) {
+  for (let i = 1; i <= last; i++) {
     await expect.poll(() => phase(page), { timeout: 90_000 }).toMatch(/play|results/);
     if ((await phase(page)) !== "play") break;
     const p = await powers(page);
@@ -443,12 +446,12 @@ test("Boingo's funhouse at every angle: a move by tap and a move by drag, the co
     else if (step === 1) played.push(`${p.angle}:drag:${await playByHand(page, "drag", phone, true)}`);
     else await playBest(page, true);
   }
-  expect(turns).toEqual([1, 2, ...Array.from({ length: 13 }, (_, i) => i + 4)]);
-  const side = angles[5];
-  expect([90, 270]).toContain(side);
-  expect(angles).toEqual([0, 0, 180, 180, 180, side, side, side, side, 360 - side!, 360 - side!, 360 - side!, 360 - side!, 0, 0]);
+  expect(turns).toEqual([1, 2, ...Array.from({ length: 13 }, (_, i) => i + 4)].slice(0, last));
+  const side = phone ? angles[5] : 90;
+  if (phone) expect([90, 270]).toContain(side);
+  expect(angles).toEqual([0, 0, 180, 180, 180, side, side, side, side, 360 - side!, 360 - side!, 360 - side!, 360 - side!, 0, 0].slice(0, last));
   console.log(info.project.name, JSON.stringify(played));
-  for (const a of [0, 180, 90, 270]) for (const how of ["tap", "drag"]) expect(played.some((x) => x.startsWith(`${a}:${how}:`)), `${a}° by ${how}`).toBe(true);
+  for (const a of phone ? [0, 180, 90, 270] : [0, 180]) for (const how of ["tap", "drag"]) expect(played.some((x) => x.startsWith(`${a}:${how}:`)), `${a}° by ${how}`).toBe(true);
   expect(errors).toEqual([]);
 });
 

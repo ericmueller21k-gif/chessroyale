@@ -29,15 +29,60 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
      second stripe color comes from its seed instead, `secondColor`, so it's never stored);
   3. **its purity**: 100% minus a blemish of 0–100% (blotches over that share of its color); shiny at 90%+.
   Crates are opened on the server, so nobody can make themselves a Pearl crown. `CRATES_FREE` is on while testing.
-- **Items** have a slot (head, face, skin, weapon), are drawn on the pawn's 100 × 100 square, and fit by anchors
+- **Items** have a slot (head, face, skin, weapon, ride: `ITEM_SLOTS`, the server's check too), are drawn on the pawn's 100 × 100 square, and fit by anchors
   (head, face, eyes, neck, mouth: each piece's own lines; a mustache sits at the mouth, under a snowman's carrot).
   Every face item is tagged above or below a hat (`faceLayer` in crates.ts; Eric, Oct 30): goggles and shades are drawn
   over a hat, every other face item under it (a smiley under a pirate hat's brim). A new face item must say which.
   Weapons don't move with the piece: they're drawn where every piece's side (or shoulder) is. Your
   pawn wears your equipped items on the vote board, the cut screen and your profile; other players' looks come with
   them into a lobby; bots wear simple seeded outfits (`BOT_LOOKS`).
+- **Rides** (Oct 31: [2026-10-31-rides.md](../decisions/2026-10-31-rides.md); Nov 1, every boss's:
+  [2026-11-01-rides-v2.md](../decisions/2026-11-01-rides-v2.md)): items in the `ride` slot, one at a time, that your pawn sits on,
+  all Mythic, with a color, a purity and shine like every item: **Riding Chirp**, **Moon's Ride**, and (Nov 1) **Hollow's Bulb** (two
+  colors: the glass and its glow), **Brush Ride**, **Alfil's Howdah**, **Balloon Pup**, **Big Boy's Buggy**, **Boingo's Pogo**, **Paper
+  Crane**, **Candy Cane Sled**, **Giraffe Gallop**, **Puddles's Mower**, **Sawyer's Dozer**, **Rodeo Bull**, **Cheetah Shoes** (Blitz's:
+  twice as fast in the town) and **The Log Roller** (Timber's). Their names and lines are the drawings' own. **In no crate yet** (the
+  crate comes later): only admins have them, as admin copies (red, emerald second color, 100%: "Admins own one of every item", below).
+  **Where the drawings came from:** copied as drawn from `claude/boss-art` (`scripts/boss-art/out/<ride>/<ride>.tsx`; their
+  `summary.md`, `views-summary.md` and `trail-summary.md` there have the artist's notes; Moon's Ride Oct 30, the rest Nov 1) into
+  `components/rides/` (`kit.ts`: the types; `load.ts`: each drawing its own chunk, loaded when a ride is drawn, Nov 1: town-square.md,
+  "Rides"); only their import lines changed and the `!`s the app's typecheck asks for, and
+  Hollow's Bulb's green cord was taken out of every view by hand (Eric, Nov 1: "we don't really need that"). Moon's Ride stays as it
+  was (its side only; its redraw is on hold) and the old cat, `hollow-steed`, isn't one. Each is a `Back` and a `Front` with the pawn
+  between them, raised onto its seat, maybe tilted and hidden below the seat (`pose`), and two animations: `idle` and `move` (one
+  square of the town's walk): its side; all but Moon's Ride also have `views` (its back, walking up the screen, and its front, walking
+  down) and a `trail` mark (town-square.md, "Rides"). Drawn: the locker's tile (`ItemArt`: the ride with a white pawn on it), the
+  locker's preview and the profiles' pawn (`Avatar`'s `ride`: the pawn and its items on its ride's side, its idle playing, fitted into
+  the same box, so a box never grows), the profile's Wearing rows (last), the town square (town-square.md, "Rides"), and **home** (Nov 1:
+  the big pawn on your card, your ring and the side menu's Profile item; hub.md, "Your ride on home"). Each of those boxes, and where the
+  pawn sits in it, comes from the ride's measured numbers (`town/ride-cells.ts`), so while its drawing loads the pawn sits in place and
+  the ride appears under it (`data-drawn` says when it has; Nov 1, [2026-11-01-rides-lazy.md](../decisions/2026-11-01-rides-lazy.md)).
+  **Each ride's size** under its pawn (Nov 1): every ride 0.75 (`RIDES.defaultScale` in core's settings; Eric: "0.75 is good"), a ride
+  listed in `RIDES.scale` its own, everywhere a rider is drawn but the item's own tile; an admin's `?rideScale=K` tries one size for
+  every ride (town-square.md, "Rides"; [2026-11-01-ride-scale.md](../decisions/2026-11-01-ride-scale.md)).
+  **Not drawn** (the pawn alone, as before): a match's screens, the Colosseum's crowd, the
+  queue's and Squads' cards, the boss stage, the town's person card, and the public profile's Equipped Cosmetics row (four tiles at
+  most; its View all lists the ride). Changing a ride's drawing or the paint (`item-paint.tsx`): `npx tsx scripts/measure-rides.ts`
+  (the town's cells for it; a test fails until it's run).
+- **A boss's crate, sold inside the boss's home** (Nov 2, round 1: Babur's and Puddles'; town-square.md, "Inside a shop"): the
+  Shopkeeper's card shows the crate, its prizes (the boss's ride first), its price (`BOSS_CRATE_PRICE` in core's settings: 3 of the boss's
+  tokens, or 1 token and 1 crate key) and what you have. Buying goes through `buyBossCrate` (`town/shops/shops.ts`), which answers "Coming
+  soon" until round 2 builds the tokens, the keys and the purchase.
+- **The gambling warning** (Eric, Nov 1; `components/GamblingWarning.tsx`): a small red ring, see-through in the middle, with a bubbly
+  solid-red "!" in it, always at the top right of the crate pages: the Crates tab and each crate's own page (not the opening or the
+  reveal). It sits over the page's corner (`gamble-ring` in `styles.css`: out of the flow, a 40 px tap target round a 30 px ring), so it
+  takes no room and moves nothing. A tap opens a short message box (the locker's dialog look, `role="dialog"`): **"Crates are chance, like
+  gambling. Only spend money you're okay losing."**, with a Close button (Escape and a tap outside close it too). Eric approved the
+  wording; the ring and the box are the same in light and dark. Guard: `e2e/crate-banner.spec.ts`, "the gambling warning's red ring…".
 - **The locker** keeps each item you own (its color, blemish and seed) and what's equipped in each slot; it can
   delete items. God King effects from the shop are worn there too.
+- **Admins own one of every item** (`ADMIN_EMAILS`; Oct 31): every crate item and God King effect they don't really own,
+  as an admin copy (`core/admin-copies.ts`: red, emerald second color, 100% purity, id `admin:<item>`), tagged "Admin" in
+  the locker. Never stored: the server adds them in `lockerState` and `shopState`, accepts them in `equipLocker` and
+  `equipItem`, and shows them worn in `publicProfile`, `looksOf` and `duelEntrant` (a worn copy of an item they've since
+  really got shows the purest real one). Deleting ignores them and buying goes by what's really owned. A new item in `ITEM_DEFS` or a new worn shop slot is covered with no change; a new catalog
+  needs its line in `admin-copies.ts`. Chat packs are left out
+  ([2026-10-31-admin-owns-all.md](../decisions/2026-10-31-admin-owns-all.md)).
 - **The icon builder** (the profile): a 48 × 48 pixel drawing with a paint bucket and undo (`UNDO_STEPS`), saved as a
   small PNG data URL (at most 16 KB, checked by the server).
 
@@ -48,8 +93,11 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 | Item list, tiers, colors, crate odds, rolls | `packages/core/src/crates.ts` |
 | Shop cosmetics | `packages/core/src/shop.ts`; drawn by `packages/app/src/components/Cosmetics.tsx` |
 | Item drawings, fit, cards (`ItemArt`, `Avatar`); crate and box art (`WinterCrateArt`, `PresentArt`, `BetaCrateArt`, `SupplyBoxArt`) | `packages/app/src/components/Items.tsx` |
-| Crate page, opening strip, reveal, locker UI (`CRATE_LOOKS`: each crate's art and box) | `packages/app/src/screens/Crates.tsx`; the shop `screens/Shop.tsx` |
+| The paint every item uses (color, shine, `Region`, `LINE`) and its blemish's blotches | `packages/app/src/components/item-paint.tsx` and `blotches.ts` (moved out of Items.tsx, Oct 31) |
+| Rides' drawings (`RIDES`) | `packages/app/src/components/rides/` (`draw.tsx`: one layer as SVG); their town cells: `scripts/measure-rides.ts` |
+| Crate page, opening strip, reveal, locker UI (`CRATE_LOOKS`: each crate's art and box) | `packages/app/src/screens/Crates.tsx`; the shop `screens/Shop.tsx`; the gambling warning `components/GamblingWarning.tsx` |
 | Server rolls and storage (D1 `items`, `equipped_items`) | `packages/server/src/locker.ts`; the shop's API in `api.ts` / `accounts.ts` |
+| Admins' copies of every item (never stored) | `packages/core/src/admin-copies.ts`; added in `locker.ts` and `accounts.ts` (`shopState`) |
 | Bots' outfits | `packages/core/src/bot-looks.ts`, `packages/app/src/looks.ts` |
 | The icon builder | `packages/app/src/components/PixelIcon.tsx`, `icon-pixels.ts`; server check `isPixelIcon` in `accounts.ts` |
 
@@ -60,15 +108,17 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 
 ## Tests and tools
 
-- Unit: `packages/core/test/crates.test.ts`, `bot-looks.test.ts`, `packages/server/test/accounts.test.ts`,
-  `shop-buy.test.ts` (buying with coins, `SHOP_FREE` off), `packages/app/test/blotches.test.ts`, `gift-tube.test.ts`,
+- Unit: `packages/core/test/crates.test.ts` (rides: their slot, no crate, a look keeping its ride), `bot-looks.test.ts`, `packages/server/test/accounts.test.ts` (a ride in the ride slot only),
+  `shop-buy.test.ts` (buying with coins, `SHOP_FREE` off), `admin-copies.test.ts` (admins own one of every item, a ride too), `packages/app/test/blotches.test.ts`, `gift-tube.test.ts`,
   `icon-pixels.test.ts`.
-- e2e: `e2e/icon-editor.spec.ts`, `crate-banner.spec.ts`, `profile.spec.ts`.
+- e2e: `e2e/icon-editor.spec.ts`, `crate-banner.spec.ts`, `profile.spec.ts` (an admin's locker too; rides: the locker's Ride tab, the preview
+  riding in boxes that don't move, the profile's pawn riding and Wearing; `giveItems` in `e2e/helpers.ts` gives items no crate holds,
+  straight in the local database).
 - The Fischer Random banner (`.fischer-stage` in styles.css): its band slants but the words stay level, so its padding
   must clear the words' ends (about 0.06 of their width); `crate-banner.spec.ts` measures that every frame.
 - The fitting sheet: `npm run preview:items -- <scratch>/sheet.png items=<id>[,<id>]` (read the PNG; keep it out of
   the repo). `sheet=1` gives a short sheet to show a batch (cards, both pawns, `colors=`, `outfits=a+b;c`). `scale=1` or `scale=2`
-  renders at that display scale, to look for stray pixels.
+  renders at that display scale, to look for stray pixels. A ride shows ridden on every skin (`with=pirate-hat` for a hat on the rider).
 
 ## Rules for this area (from `.claude/LESSONS.md`)
 

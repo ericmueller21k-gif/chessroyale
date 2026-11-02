@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import { cutLabel, roundLive, scoreDp, towerView, type GameView } from "../game.ts";
+import { cutLabel, myTeam, roundLive, scoreDp, towerView, type GameView, type TeamPick } from "../game.ts";
 import { LeaderboardSheet } from "./LeaderboardSheet.tsx";
 import { RaceTower } from "./RaceTower.tsx";
 import { pickRows } from "../pick-rows.ts";
@@ -9,6 +9,13 @@ import { foldUnderBoard, onPrefsChange, underBoardView } from "../prefs.ts";
 
 const ROW = 22;
 const HEAD = 18;
+
+/** The scoreboard's last room under the board (MiniTower): a new one starts from it. */
+let lastSpace = 0;
+
+/** The team each match's scoreboard shows (Black, White or All): picked on the scoreboard, your team when it starts. */
+const picks = new WeakMap<object, TeamPick>();
+const PICK_LABEL: Record<TeamPick, string> = { b: "Black", w: "White", all: "All" };
 
 /** Height the tower takes for a set of rows (rows, "⋯" gaps and the cut line), matching RaceTower's layout. */
 function towerHeight(keep: Set<number>, cutoff: number, n: number): number {
@@ -24,8 +31,10 @@ function towerHeight(keep: Set<number>, cutoff: number, n: number): number {
 /**
  * The phone's scoreboard under the board. It never scrolls: it shows as many
  * players as fit (you, the leaders, your neighbors and the cut line first),
- * with position, name, points, average, rating and power-ups. Tap it for the
- * full leaderboard; the header's arrow folds it to that header (the space under the board's one remembered view,
+ * with position, name, points, average, rating and power-ups. Its header picks
+ * the team it shows: Black, White or All (your team when the match starts, in
+ * white; the others grey). Tapping the picked one, or the rows, opens the full
+ * list for that pick; the header's arrow folds it to that header (the space under the board's one remembered view,
  * prefs.ts: underBoardView).
  *
  * It's placed by the space under the board (components/QuickChat.tsx, UnderBoard), which passes `open` (that view's)
@@ -39,30 +48,48 @@ export function MiniTower({
   head,
   open: openProp,
   floats,
+  chatTab,
 }: {
   match: GameView;
   narrow?: boolean;
   head?: ComponentChildren;
   open?: boolean;
   floats?: ReadonlyMap<string, ChatFloat>;
+  /** A phone's 50 v 50 (Nov 1): the header's Chat tab, its unread count, and what a tap on it does (chat replaces the list). */
+  chatTab?: { unread: number; onOpen: () => void };
 }) {
   // (Without `open` from its place, the space under the board's view, kept in step.)
   const [own, setOwn] = useState(() => underBoardView().open);
   useEffect(() => (openProp === undefined ? onPrefsChange(() => setOwn(underBoardView().open)) : undefined), [openProp === undefined]);
   const open = openProp ?? own;
   const [sheet, setSheet] = useState(false);
-  const [space, setSpace] = useState(0);
+  // (Measured before the first paint, from the room it last had: a scoreboard drawn anew (the chat tab's Back, a screen
+  // of its own) shows the rows that fit at once, not three until it has measured and the rest wiping in. Off the page (a
+  // phone's 50 v 50 box through a cut) it keeps its last room.)
+  const [space, setSpace] = useState(lastSpace);
   const body = useRef<HTMLDivElement>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = body.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setSpace(el.clientHeight));
+    const fit = () => {
+      if (el.isConnected) setSpace((lastSpace = el.clientHeight));
+    };
+    const ro = new ResizeObserver(fit);
     ro.observe(el);
-    setSpace(el.clientHeight);
+    fit();
     return () => ro.disconnect();
   }, [open]);
 
-  const view = towerView(match);
+  // (In a team match, the header picks the team; a boss battle and a match without teams show what they always did.)
+  const you = myTeam(match);
+  const teamed = !match.boss && you !== null;
+  const [, redraw] = useState(0);
+  const pick: TeamPick = picks.get(match) ?? you ?? "all";
+  const choose = (p: TeamPick) => {
+    picks.set(match, p);
+    redraw((n) => n + 1);
+  };
+  const view = towerView(match, teamed ? pick : undefined);
   const standings = view.standings;
   const cutoff = view.cutoff;
   const alive = standings.filter((s) => !s.out);
@@ -79,10 +106,33 @@ export function MiniTower({
     // (Alone against a boss: your own row, no more; the panel holds just that, not a crowd's worth of empty space.)
     <section class={`mini-tower${open ? "" : " closed"}${narrow ? " narrow" : ""}${standings.length === 1 ? " one" : ""}`} aria-label="Leaderboard">
       <div class="mini-tower-head">
-        <button type="button" class="mini-tower-title" onClick={() => setSheet(true)}>
-          {view.teamLabel ?? "Leaderboard"}
-          {!narrow && alive.length > 1 && <span class="muted"> · tap for all {alive.length}</span>}
-        </button>
+        {teamed ? (
+          // (Black · White · All: the picked one in white, the others grey. A tap on another picks it; a tap on the picked
+          // one opens the full list. The picked one carries the title's class: the list's tap target.)
+          <div class="mini-picks" role="group" aria-label="Show on the scoreboard">
+            {(["b", "w", "all"] as const).map((p) => (
+              <button
+                key={p}
+                type="button"
+                class={`mini-pick${pick === p ? " on mini-tower-title" : ""}`}
+                aria-pressed={pick === p}
+                onClick={() => (pick === p ? setSheet(true) : choose(p))}
+              >
+                {PICK_LABEL[p]}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <button type="button" class="mini-tower-title" onClick={() => setSheet(true)}>
+            {view.teamLabel ?? "Leaderboard"}
+          </button>
+        )}
+        {chatTab && (
+          <button type="button" class="mini-pick mini-chat-tab" onClick={chatTab.onOpen} aria-label="Chat" title={chatTab.unread ? `${chatTab.unread} new` : "Chat"}>
+            Chat
+            {chatTab.unread > 0 && <span class="mini-unread" aria-hidden="true">{chatTab.unread}</span>}
+          </button>
+        )}
         {head}
         {openProp === undefined && (
           <button type="button" class="mini-tower-toggle" onClick={toggle} aria-expanded={open} aria-label={open ? "Minimize the leaderboard" : "Show the leaderboard"}>
@@ -92,10 +142,10 @@ export function MiniTower({
       </div>
       {open && (
         <div class="mini-tower-body" ref={body} onClick={() => setSheet(true)}>
-          <RaceTower standings={standings} cutoff={cutoff} mini keep={keep} done={roundLive(match) ? match.done : undefined} cutLabel={cutLabel(match)} floats={floats} dp={scoreDp(match.settings)} />
+          <RaceTower standings={standings} cutoff={cutoff} mini keep={keep} done={roundLive(match) ? match.done : undefined} cutLabel={cutLabel(match)} floats={floats} dp={scoreDp(match.settings)} teams={view.teams} />
         </div>
       )}
-      {sheet && <LeaderboardSheet match={match} onClose={() => setSheet(false)} />}
+      {sheet && <LeaderboardSheet match={match} pick={teamed ? pick : undefined} onClose={() => setSheet(false)} />}
     </section>
   );
 }

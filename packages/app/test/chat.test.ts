@@ -248,7 +248,7 @@ describe("lobby chat in the app (before the match)", () => {
       s.botsArrived(bots, mulberry32(seed + 200));
       vi.advanceTimersByTime(5_000);
       expect(chat.lines().length).toBeLessThanOrEqual(QUICK_CHAT.botMaxPerMinute);
-      // The match begins: no more chat (solo matches have none); a line still on its way never shows.
+      // A raid begins: no more chat (only a 50 v 50 keeps it); a line still on its way never shows.
       s.botsArrived(["b9"], mulberry32(seed));
       s.close();
       vi.advanceTimersByTime(5_000);
@@ -257,6 +257,75 @@ describe("lobby chat in the app (before the match)", () => {
       expect(chat.lines().some((l) => l.from === "b9")).toBe(false);
       expect(chat.floats().size).toBe(0);
     }
+  });
+
+  it("Solo 50 v 50 (Nov 1): chat carries on into the match with teams; the bots chat as online, a team's lines reach that team only, never on the cut screen", () => {
+    let cut = false;
+    const s = new SoloLobbyChat("you", () => undefined, () => [], () => null, () => cut);
+    s.open();
+    const chat = s.chat;
+    const side = (id: string) => (id === "you" || id.startsWith("w") ? "w" : "b") as "w" | "b";
+    const mates = ["w1", "w2", "w3"];
+    const them = ["b1", "b2", "b3"];
+    // Before the match, a bot's moment says nothing (the queue has its hellos only).
+    s.botsSay({ kind: "start" }, mates, () => 0);
+    vi.advanceTimersByTime(10_000);
+    expect(chat.lines()).toEqual([]);
+    s.startMatch(side, [...mates, ...them]);
+    expect(chat.enabled).toBe(true);
+    expect(chat.hasTeams()).toBe(true);
+    // Your lines: to your team, or to everyone if the line may go there.
+    chat.say("trust-crowd");
+    expect(chat.lines().at(-1)).toMatchObject({ from: "you", say: "trust-crowd", to: "team", team: "w" });
+    chat.setTo("all");
+    vi.advanceTimersByTime(QUICK_CHAT.minGapMs);
+    chat.say("good-luck");
+    expect(chat.lines().at(-1)).toMatchObject({ from: "you", say: "good-luck", to: "all", team: "w" });
+    vi.advanceTimersByTime(60_000);
+    // The other team's great move: their "Nice move!" stays with their team.
+    const before = chat.lines().length;
+    s.botsSay({ kind: "greatMove", loss: 0 }, them, () => 0);
+    vi.advanceTimersByTime(QUICK_CHAT.botDelayMs[1] + 100);
+    expect(chat.lines()).toHaveLength(before);
+    vi.advanceTimersByTime(60_000);
+    // Your team's: a teammate says it, to the team.
+    s.botsSay({ kind: "greatMove", loss: 0 }, mates, () => 0);
+    vi.advanceTimersByTime(QUICK_CHAT.botDelayMs[1] + 100);
+    expect(chat.lines().at(-1)).toMatchObject({ say: "nice-move", to: "team", team: "w" });
+    expect(mates).toContain(chat.lines().at(-1)!.from);
+    // Not a great move: nothing.
+    vi.advanceTimersByTime(60_000);
+    const n = chat.lines().length;
+    s.botsSay({ kind: "greatMove", loss: QUICK_CHAT.botGreatMoveLoss + 5 }, mates, () => 0);
+    vi.advanceTimersByTime(QUICK_CHAT.botDelayMs[1] + 100);
+    expect(chat.lines()).toHaveLength(n);
+    // A line due on the cut screen isn't said.
+    vi.advanceTimersByTime(60_000);
+    s.botsSay({ kind: "end" }, mates, () => 0);
+    cut = true;
+    vi.advanceTimersByTime(QUICK_CHAT.botDelayMs[1] + QUICK_CHAT.botEndMax * 1200);
+    expect(chat.lines()).toHaveLength(n);
+    // Never more than the online cap a minute, however many moments.
+    cut = false;
+    vi.advanceTimersByTime(120_000);
+    const t0 = Date.now();
+    for (let i = 0; i < 20; i++) s.botsSay({ kind: "greatMove", loss: 0 }, mates, mulberry32(i));
+    vi.advanceTimersByTime(60_000);
+    expect(chat.lines().filter((l) => l.at > t0 && l.from !== "you").length).toBeLessThanOrEqual(QUICK_CHAT.botMaxPerMinute);
+    // Now and then, after your team's move: a teammate's everyday pick (one every player has), to the team.
+    const everyday = defaultChatPicks();
+    for (const id of QUICK_CHAT.botChatter) expect([...everyday.lines, ...everyday.emoji]).toContain(id);
+    vi.advanceTimersByTime(120_000);
+    const m = chat.lines().length;
+    s.chatter(mates, () => 0.99);
+    vi.advanceTimersByTime(QUICK_CHAT.botDelayMs[1] + 100);
+    expect(chat.lines()).toHaveLength(m);
+    s.chatter(mates, () => 0);
+    vi.advanceTimersByTime(QUICK_CHAT.botDelayMs[1] + 100);
+    expect(chat.lines().at(-1)).toMatchObject({ say: QUICK_CHAT.botChatter[0], to: "team", team: "w" });
+    expect(mates).toContain(chat.lines().at(-1)!.from);
+    s.close();
+    expect(chat.enabled).toBe(false);
   });
 
   it("Solo: mute and chat off are this device's, as online; a mute isn't kept after the queue", () => {

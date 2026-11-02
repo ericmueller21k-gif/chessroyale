@@ -55,6 +55,10 @@
  * warning's position), the warned creases that didn't land (the guard refusing them as they fell) and its Revision (after
  * which crowd move, what its move cost it and what the crowd's reply found, in pawns).
  *
+ * Timber (id timber): his scraps come by real time (the sim's clock, as the hippo gardener's seeds: `pickSec`). Each row
+ * logs every drop (after which crowd move, the piece, the square), every Gnaw (after which crowd move, the pawn's square or
+ * none) and the scraps landed in all (the clock's, captures', the Gnaw's).
+ *
  * Results go to reports/boss-sim/*.jsonl; `summary` writes reports/boss-calibration.md.
  */
 import { BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, bossElo, bossStumbleChance, botPick, estimateRating, mulberry32, shuffle, type Rng, type Settings } from "@chessroyale/core";
@@ -371,6 +375,18 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
         const band = BOSS_POWERS.balloonBands[last.shape];
         tiger.balloons.push({ at: last.at, shape: last.shape, outcome: last.outcome, nine: !!last.nine, gain: last.gain, inBand: last.gain === null ? null : last.gain >= band[0] && last.gain <= band[1] });
       };
+      // (Timber: every drop and every Gnaw, and his bonus scraps.)
+      const timber = { drops: [] as { at: number; piece: string; square: string }[], gnaws: [] as { at: number; square: string | null }[], bonus: 0 };
+      const timberLook = () => {
+        const w = runner.boss!.powers?.workshop;
+        if (!w) return;
+        if (w.last && !timber.drops.some((x) => x.at === w.last!.at)) timber.drops.push({ ...w.last });
+        if (w.gnaw && !timber.gnaws.some((x) => x.at === w.gnaw!.at)) {
+          timber.gnaws.push({ at: w.gnaw.at, square: w.gnaw.square });
+          ults.push({ kind: "gnaw", turn: w.gnaw.at });
+        }
+        if (w.bonus && w.bonus.at === runner.boss!.crowdMoves) timber.bonus += w.bonus.scraps;
+      };
       // (Moo & Moon: his beams, each flurry's size, each Full Moon with the crowd's material lead as it came and after it.)
       const moo = { beams: 0, flurries: [] as number[], moons: [] as { at: number; before: number; after: number | null }[], best: 0 };
       const lead = () => {
@@ -519,6 +535,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
             const ultsBefore = runner.boss!.powers?.ults ?? 0;
             const tw = Date.now();
             await runner.playBoss(engines[0]);
+            if (bossId === "timber") timberLook();
             if (bossId === "tiger") {
               tigerBalloon();
               const h = runner.boss!.powers?.hoops;
@@ -606,7 +623,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       // (Folio: its marks, folds and marks answered in time; every Crease; its Revision, what its move cost it and what the crowd's reply would have won.)
       const fo = b.powers?.folio;
       const folioRow = fo ? { drafts: fo.drafts, folds: fo.folds, answered: fo.answered, creases, creasesOff, revision: fo.revision ? { at: fo.revision.at, cost: fo.revision.cost, drop: fo.revision.drop } : null } : null;
-      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}), ...(bossId === "moo" ? { moo } : {}), ...(bossId === "gardener" ? { garden } : {}), ...(bossId === "tiger" ? { tiger: { ...tiger, placed: b.powers?.balloon?.placed ?? 0 } } : {}), ...(bossId === "folio" ? { folio: folioRow } : {}) };
+      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}), ...(bossId === "moo" ? { moo } : {}), ...(bossId === "gardener" ? { garden } : {}), ...(bossId === "tiger" ? { tiger: { ...tiger, placed: b.powers?.balloon?.placed ?? 0 } } : {}), ...(bossId === "folio" ? { folio: folioRow } : {}), ...(bossId === "timber" ? { timber: { ...timber, scraps: b.powers?.workshop?.n ?? 0, pickSec } } : {}) };
       appendFileSync(root + `reports/boss-sim/raid-${tag}.jsonl`, JSON.stringify(row) + "\n");
       console.log(JSON.stringify(row));
     }

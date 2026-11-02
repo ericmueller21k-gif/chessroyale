@@ -8,9 +8,9 @@ import { kingSquares } from "../src/autochess/army.ts";
 const ON: AutoChessSettings = { ...AUTOCHESS, lockIn: true };
 
 describe("auto chess: lock in is off (v7), its code kept behind the `lockIn` setting", () => {
-  it("is off, the bonus is still 25 gold, a setting", () => {
+  it("is off, the bonus is still 3 gold, a setting", () => {
     expect(AUTOCHESS.lockIn).toBe(false);
-    expect(AUTOCHESS.lockInBonus).toBe(25);
+    expect(AUTOCHESS.lockInBonus).toBe(3);
   });
 
   it("with it off nobody can lock and nobody gets a bonus, the bot's included, and the step runs its full time with only the last seconds locked", () => {
@@ -36,14 +36,14 @@ describe("auto chess: lock in is off (v7), its code kept behind the `lockIn` set
     let last = 0;
     for (let seed = 0; seed < 300; seed++) {
       const color = seed % 2 ? "w" : "b";
-      const plan = botPlan(color, kingSquares(seed)[color], 100 + (seed % 5) * 30, 1 + (seed % 8), mulberry32(seed));
+      const plan = botPlan(color, kingSquares(seed)[color], 10 + (seed % 5) * 3, 1 + (seed % 8), mulberry32(seed));
       expect(plan.lockAt, `seed ${seed}`).toBeNull();
       for (const e of plan.events) {
         expect(e.at).toBeLessThanOrEqual(open);
         last = Math.max(last, e.at);
       }
       // (With the lock-in on the same seed locks at a time or never; the draw is the same either way.)
-      const on = botPlan(color, kingSquares(seed)[color], 100 + (seed % 5) * 30, 1 + (seed % 8), mulberry32(seed), ON);
+      const on = botPlan(color, kingSquares(seed)[color], 10 + (seed % 5) * 3, 1 + (seed % 8), mulberry32(seed), ON);
       expect(on.army).toEqual(plan.army);
     }
     expect(last).toBeGreaterThan(open * 0.5);
@@ -51,15 +51,15 @@ describe("auto chess: lock in is off (v7), its code kept behind the `lockIn` set
 });
 
 describe("auto chess: lock in (v5), switched on", () => {
-  it("the bonus is 25 gold, a setting", () => {
-    expect(ON.lockInBonus).toBe(25);
+  it("the bonus is 3 gold, a setting", () => {
+    expect(ON.lockInBonus).toBe(3);
   });
 
   it("the first side to lock in gets the bonus, the other gets nothing", () => {
     // You first: the bot's time (10 s) hasn't come at 4 s.
     const first = youLock(noLocks, 4000, 10, ON);
     expect(first).toEqual({ you: 4000, bonus: "you" });
-    expect(bonusFor(first, "you", ON)).toBe(25);
+    expect(bonusFor(first, "you", ON)).toBe(3);
     expect(bonusFor(first, "bot", ON)).toBe(0);
     // The bot's time comes later: it doesn't take the bonus.
     expect(tickLocks(first, 10_000, 10, ON)).toBe(first);
@@ -67,7 +67,7 @@ describe("auto chess: lock in (v5), switched on", () => {
     const second = youLock(noLocks, 6000, 5, ON);
     expect(second.bonus).toBe("bot");
     expect(bonusFor(second, "you", ON)).toBe(0);
-    expect(bonusFor(second, "bot", ON)).toBe(25);
+    expect(bonusFor(second, "bot", ON)).toBe(3);
     // The bot's time comes with nobody locked: it is first, and stays so when you lock after.
     const ticked = tickLocks(noLocks, 5000, 5, ON);
     expect(ticked).toEqual({ you: null, bonus: "bot" });
@@ -106,7 +106,7 @@ describe("auto chess: lock in (v5), switched on", () => {
     const times: number[] = [];
     for (let seed = 0; seed < 400; seed++) {
       const color = seed % 2 ? "w" : "b";
-      const plan = botPlan(color, kingSquares(seed)[color], 100 + (seed % 5) * 30, 1 + (seed % 8), mulberry32(seed), ON);
+      const plan = botPlan(color, kingSquares(seed)[color], 10 + (seed % 5) * 3, 1 + (seed % 8), mulberry32(seed), ON);
       if (plan.lockAt === null) {
         never++;
         continue;
@@ -122,6 +122,6 @@ describe("auto chess: lock in (v5), switched on", () => {
     // Spread over the open part, not one time.
     expect(Math.max(...times) - Math.min(...times)).toBeGreaterThan(open * 0.4);
     // Seeded: the same seed, the same time.
-    expect(botPlan("w", "e1", 100, 1, mulberry32(5), ON).lockAt).toBe(botPlan("w", "e1", 100, 1, mulberry32(5), ON).lockAt);
+    expect(botPlan("w", "e1", 10, 1, mulberry32(5), ON).lockAt).toBe(botPlan("w", "e1", 10, 1, mulberry32(5), ON).lockAt);
   });
 });

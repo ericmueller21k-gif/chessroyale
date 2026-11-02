@@ -14,9 +14,13 @@ import { watchTheme } from "./theme.ts";
 import { applyBoardColors } from "./prefs.ts";
 import { setBannerPlusSource } from "@chessroyale/core";
 import { bannerPlusAsked } from "./test-switches.ts";
+import { account, onAccountChange } from "./account.ts";
+import { loadRide } from "./components/rides/load.ts";
 import "./styles.css";
 // (A computer's board as big as the window's height: after styles.css, whose computer sizes it takes over.)
 import "./board-size.css";
+// (A computer's game screens: the side menu beside them, and a boss battle's top, Nov 1: after board-size.css.)
+import "./game-frame.css";
 
 // Errors on this device are reported (problems.ts), from the start.
 watchErrors();
@@ -51,4 +55,14 @@ render(
     <DuelQueueBar />
   </ErrorBoundary>,
   document.getElementById("app")!,
+);
+
+// Your own worn ride's drawing (its own chunk, rides/load.ts), asked for after the first paint and again whenever your look
+// changes (once a ride: it's kept), so your pawn on home, in your ring and in the town rarely waits for it (Nov 1, rides lazy).
+requestAnimationFrame(() =>
+  setTimeout(() => {
+    const wornRide = () => void loadRide(account().profile?.locker?.look?.ride?.def);
+    onAccountChange(wornRide);
+    wornRide();
+  }),
 );

@@ -1,5 +1,5 @@
 import type { Rng } from "./rng.ts";
-import { DEFAULT_SETTINGS, OPENING_ALLOWANCE, type CrowdScoring, type CrowdStart, type DrawRule, type Settings } from "./settings.ts";
+import { BOSS_PARTY, DEFAULT_SETTINGS, OPENING_ALLOWANCE, cpFromExpected, type CrowdScoring, type CrowdStart, type DrawRule, type Settings } from "./settings.ts";
 
 /**
  * Scoring from buildspec.md. Expected scores are from the mover's side, 0 to 1
@@ -147,9 +147,11 @@ export function drawMove(
   rule: DrawRule,
   rng: Rng,
   settings: Settings = DEFAULT_SETTINGS,
+  expected?: Readonly<Record<string, number>>,
 ): string {
   const among = (xs: readonly string[]) => xs[Math.floor(rng() * xs.length)]!;
   const distinct = [...new Set(moves)];
+  if (rule === "party") return partyMove(moves, losses, rng, expected);
   if (rule === "popular") {
     const count = (m: string) => moves.filter((x) => x === m).length;
     const top = Math.max(...distinct.map(count));
@@ -166,6 +168,22 @@ export function drawMove(
     return moves[moves.length - 1]!;
   }
   return among(moves);
+}
+
+/**
+ * A Boss Battle party's move (Eric, Oct 29 and 30): two or more on one move, it's played, always. No majority: the
+ * engine's best pick, unless another is within BOSS_PARTY.closeCp centipawns of it (cpFromExpected on the judge's
+ * expected scores; without them, the losses' points read as expected scores from the best), then one of those at random.
+ */
+export function partyMove(moves: readonly string[], losses: Readonly<Record<string, number>>, rng: Rng, expected?: Readonly<Record<string, number>>, closeCp: number = BOSS_PARTY.closeCp): string {
+  const among = (xs: readonly string[]) => xs[Math.floor(rng() * xs.length)]!;
+  const distinct = [...new Set(moves)];
+  const count = (m: string) => moves.filter((x) => x === m).length;
+  const top = Math.max(...distinct.map(count));
+  if (top >= 2) return among(distinct.filter((m) => count(m) === top));
+  const cp = (m: string) => cpFromExpected(expected?.[m] ?? 0.5 - (losses[m] ?? 0) / 100);
+  const best = Math.max(...distinct.map(cp));
+  return among(distinct.filter((m) => best - cp(m) <= closeCp + 1e-9));
 }
 
 /** The opening allowance on move number `move` (the position's fullmove number): see OPENING_ALLOWANCE. */
@@ -299,6 +317,7 @@ export function scoreGroup(
         rule,
         rng,
         settings,
+        evaluation.expectedAfter,
       )
     : evaluation.bestMove;
   return { players, averageLoss, playedMove, drawRule: rule, drawOdds: drawOdds(picks) };

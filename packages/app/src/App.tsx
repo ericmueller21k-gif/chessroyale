@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "preact/hooks";
-import { type MatchmakingType, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
+import { type MatchmakingType, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, bossPartySettings, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
 import { bossInUrl, bossTierFromUrl, chosenBoss, chosenHomeMode, chosenMode, lobbyModeOf, raidInUrl, rememberBossPick } from "./screens/Home.tsx";
 import { lastBoss } from "./boss-history.ts";
 import { unlockAudio } from "./components/Countdown.tsx";
@@ -11,7 +11,7 @@ import { bossAlone, cutLabel, elimination, isCrowd, roundLive, scoreDp, towerVie
 import { NetMatch, forgetSeat, hasSeat, lobbyStatus, type LobbyGone, type LobbyResult } from "./net.ts";
 import { exitFor, exitMatch, onExitMatch } from "./match-exit.ts";
 import { useRecluseTalk } from "./recluse-talk.ts";
-import { MatchMenu } from "./components/MatchMenu.tsx";
+import { ConfirmExit, MatchMenu, type MatchExit } from "./components/MatchMenu.tsx";
 import type { LeftHow } from "@chessroyale/chess";
 import { SoloMatch } from "./solo.ts";
 import { FinalScreen } from "./screens/Final.tsx";
@@ -39,7 +39,7 @@ import { TownPage, type BotGameAsk } from "./town/TownPage.tsx";
 import { ColosseumPage } from "./colosseum/ColosseumPage.tsx";
 import { FaqScreen } from "./screens/Faq.tsx";
 import { Logo } from "./components/FrontDoor.tsx";
-import { FrontFrame, type FrontNav } from "./components/FrontMenu.tsx";
+import { FrontFrame, GameFrame, type FrontNav } from "./components/FrontMenu.tsx";
 import { useAccount } from "./screens/Profile.tsx";
 import { LandingScreen } from "./screens/Landing.tsx";
 import { LegalScreen, leaveLegal, legalPageOf, type LegalPage } from "./screens/Legal.tsx";
@@ -51,7 +51,7 @@ import { StageBreakScreen } from "./screens/StageBreak.tsx";
 import { ChatBubble, useMedia } from "./components/QuickChat.tsx";
 import { LobbyChat } from "./components/LobbyChat.tsx";
 import { PartyClient, SquadsClient, createParty, currentParty, currentSquads, forgetSquads, partyStatus, squadsQueue, squadsSeat, squadsStatus, squadsTestLobby } from "./squads.ts";
-import { SquadsQueue, SquadsScreen, squadsWaiting } from "./screens/Squads.tsx";
+import { SquadsQueue, SquadsScreen, squadsExit, squadsWaiting } from "./screens/Squads.tsx";
 import { PartySheet } from "./screens/SquadsParty.tsx";
 import { BotDuel, DuelQueue, NetDuel, savedDuelQueue, setRanked1v1Starter, startRanked1v1, type DuelSession } from "./duel.ts";
 import { confirmLeaveDuelQueue, duelFoundAlert, setAwaySearch } from "./components/DuelQueueBar.tsx";
@@ -107,13 +107,16 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
     ...definedOnly({
       roundsPerStage: n("rounds"),
       firstStageRounds: n("rounds"),
+      // (The same rounds in every stage: the Crowd's own schedule, `stageRounds`, emptied.)
+      stageRounds: n("rounds") ? [] : undefined,
       moveClockSeconds: n("clock"),
       finalMaxTurns: n("finalTurns"),
       bossMaxMoves: n("bossMoves"),
       drawRuleByStage: draw && DRAW_RULES.includes(draw) ? [draw] : undefined,
     }),
-    // (A test link's ?clock= gives Boss alone that clock too: the tests of the clock and of a missed move use it.)
-    ...(n("clock") ? { bossAloneUntimed: false } : {}),
+    // (A test link's ?clock= gives Boss alone that clock instead of Boss Battle's 10 + 10: the tests of the clock and of a
+    // missed move use it.)
+    ...(n("clock") ? { bossAloneClock: false } : {}),
     ...forced,
     ...speed,
     ...start,
@@ -187,6 +190,8 @@ const rejoinCode = (() => {
  * /squads/test or /squads/test/start: the whole tournament from the first vote, bots in every other seat at once).
  */
 const partyLinkCode = location.pathname.match(/^\/squads\/party\/([A-Za-z2-9]{5})\/?$/)?.[1]?.toUpperCase();
+/** Boss Battle's party: its invite link (/boss/party/CODE) opens the Boss Battle screen in that party. */
+const bossPartyLinkCode = location.pathname.match(/^\/boss\/party\/([A-Za-z2-9]{5})\/?$/)?.[1]?.toUpperCase();
 const squadsLinkCode = location.pathname.match(/^\/squads\/([A-Za-z2-9]{5})\/?$/)?.[1]?.toUpperCase();
 const squadsTestStart = ((m) => (m ? (m[1] === undefined || m[1] === "start" ? "votes" : m[1]) : undefined))(location.pathname.match(/^\/squads\/test(?:\/(start|relay|pairs|final))?\/?$/)) as
   | "votes"
@@ -226,6 +231,7 @@ function leftNote(how: LeftHow | null | undefined): string {
   if (how === "away") return "You were away from that match too long: a bot took your seat, and it counted as a loss.";
   if (how === "early") return "You left that match before it began.";
   if (how === "out") return "You left that match after you were out.";
+  if (how === "kicked") return "You were removed from the party.";
   return "You resigned that match.";
 }
 
@@ -245,6 +251,10 @@ const storedGuest = () => {
 };
 
 type AnyMatch = GameView & { dispose(): void };
+/** The pages a computer's side menu goes to from a match (each leaves the match first, App's matchPage). */
+type MatchPage = Exclude<keyof FrontNav, "signIn">;
+/** The game a computer's side menu leaves (App's sideNav): a match, a 1 v 1 duel, a Squads lobby or auto chess. */
+type SideFrom = "match" | "duel" | "squads" | "auto";
 
 /** What's on screen, for error reports (problems.ts): a match's phase (a boss battle's moment too), else the page. */
 function screenOf(match: AnyMatch | null, page: string): string {
@@ -278,7 +288,7 @@ export function App() {
    */
   const [homeIntent, setHomeIntent] = useState<{ kind: "boss" | "friends"; n: number } | null>(() => (location.pathname === "/bosses" ? { kind: "boss", n: 0 } : null));
   /** The Boss raid screen (the Solo Boss Mode card on home, the side menu's Solo Boss Mode, ?mode=raid). */
-  const [raidOpen, setRaidOpen] = useState(raidInUrl);
+  const [raidOpen, setRaidOpen] = useState(() => raidInUrl() || !!bossPartyLinkCode);
   /** That screen is the full one (?mode=raid, the test link: every raid choice), not the Solo Boss Mode form (Eric, Oct 26). */
   const [raidFull, setRaidFull] = useState(raidInUrl);
   const [legal, setLegal] = useState<LegalPage | null>(() => legalPageOf(location.pathname));
@@ -296,6 +306,10 @@ export function App() {
    * town reads it). A reload during that game lands there too: its address carries it (`/town?at=6.0.3`).
    */
   const [townSeat, setTownSeat] = useState<string | null>(() => (location.pathname === "/town" ? new URLSearchParams(location.search).get("at") : null));
+  // A computer's side menu on a match's screen (Nov 1): its item asks Resign or Leave first (the gear's own confirm), then
+  // goes there. `sideAsk`: the confirm on screen, and the item behind it; `sideNext`: the page to go to once the match is out.
+  const [sideAsk, setSideAsk] = useState<{ exit: MatchExit; then: MatchPage } | null>(null);
+  const [sideNext, setSideNext] = useState<{ page: MatchPage; from: SideFrom } | null>(null);
   // Chose "play vs bots as a guest" on the landing page (this device remembers).
   const [guest, setGuest] = useState(storedGuest);
   const [inviteSkipped, setInviteSkipped] = useState(false);
@@ -312,6 +326,9 @@ export function App() {
   const [party, setParty] = useState<PartyClient | null>(null);
   const [partyOpen, setPartyOpen] = useState(!!partyLinkCode);
   const [partyError, setPartyError] = useState<string | null>(null);
+  /** Boss Battle's party (docs/decisions/2026-10-30-boss-party.md): its socket on the Boss Battle screen, and a note. */
+  const [bossParty, setBossParty] = useState<PartyClient | null>(null);
+  const [bossPartyError, setBossPartyError] = useState<string | null>(null);
   const [squadsNote, setSquadsNote] = useState<string | null>(() => (squadsLinkCode && !squadsRejoin ? "That match has ended." : null));
   /**
    * The lobby has closed: home (the address too, so reopening the app lands there) with a note, and your result if
@@ -742,6 +759,52 @@ export function App() {
     setParty(null);
     joinSquads(lobby, pass);
   };
+  /** Boss Battle's party placed in its battle: everyone joins it with the party's pass and their seat. */
+  const bossPlaced = (client: PartyClient) => (lobby: string, pass: string, seat: number) => {
+    const b = client.party?.boss;
+    setBossParty(null);
+    joinLobby(lobby, { party: { pass, seat, boss: b?.id ?? "", difficulty: b?.difficulty ?? "normal" } });
+  };
+  const joinBossParty = async (code: string) => {
+    setBossPartyError(null);
+    const open = await partyStatus(code, "boss");
+    if (open === false) return setBossPartyError("That party has closed.");
+    const p: PartyClient = new PartyClient(code.toUpperCase(), (lobby, pass, seat) => bossPlaced(p)(lobby, pass, seat), "boss");
+    setBossParty((old) => {
+      old?.close();
+      return p;
+    });
+    if (location.pathname.startsWith("/boss/party")) history.replaceState(null, "", `/${location.search}`);
+    p.connect();
+  };
+  /** The Boss Battle screen's invite circles: your party (made the first time), to invite from. */
+  const makeBossParty = async (): Promise<boolean> => {
+    if (bossParty && !bossParty.done) return true;
+    setBossPartyError(null);
+    const r = await createParty("boss");
+    if ("banned" in r) {
+      showBanNotice();
+      return false;
+    }
+    if ("error" in r) {
+      setBossPartyError(r.error);
+      return false;
+    }
+    await joinBossParty(r.code);
+    return true;
+  };
+  const leaveBossParty = () => {
+    bossParty?.leave();
+    setBossParty(null);
+  };
+  // (An invite link, or back on the Boss Battle screen after its battle: into the party, once.)
+  useEffect(() => {
+    if (bossPartyLinkCode) void joinBossParty(bossPartyLinkCode);
+  }, []);
+  useEffect(() => {
+    const code = currentParty("boss");
+    if (raidOpen && !match && code && (!bossParty || bossParty.done)) void joinBossParty(code);
+  }, [raidOpen, !!match]);
   const joinParty = async (code: string) => {
     setPartyError(null);
     setPartyOpen(true);
@@ -845,7 +908,7 @@ export function App() {
    * Into a lobby by code. A queue lobby (PLAY) brings the queue's own settings (the server's, remembered with the
    * code for a reload); a lobby you made, the mode you made it in.
    */
-  const joinLobby = (code: string, opts: { queue?: "crowd" | "raid"; mode?: ModeChoiceId; typed?: boolean; resume?: boolean } = {}) => {
+  const joinLobby = (code: string, opts: { queue?: "crowd" | "raid"; mode?: ModeChoiceId; typed?: boolean; resume?: boolean; party?: { pass: string; seat: number; boss: string; difficulty: string } } = {}) => {
     const key = `brc.queue.${code.toUpperCase()}`;
     let queue = opts.queue;
     try {
@@ -858,9 +921,16 @@ export function App() {
     unlockAudio();
     setError(null);
     const m = new NetMatch(code.toUpperCase(), playerName(), enginePool, queue ? false : practiceOn());
-    m.settings = queue
-      ? { ...DEFAULT_SETTINGS, ...(queue === "raid" ? RAID_SETTINGS : modeSettings("crowd", { augments: true })) }
-      : { ...DEFAULT_SETTINGS, ...overridesFromUrl(opts.mode) };
+    m.settings = opts.party
+      ? { ...DEFAULT_SETTINGS, ...bossPartySettings(opts.party.difficulty), ...(opts.party.boss ? { bossId: opts.party.boss } : {}) }
+      : queue
+        ? { ...DEFAULT_SETTINGS, ...(queue === "raid" ? RAID_SETTINGS : modeSettings("crowd", { augments: true })) }
+        : { ...DEFAULT_SETTINGS, ...overridesFromUrl(opts.mode) };
+    if (opts.party) {
+      m.partyPass = opts.party.pass;
+      m.partySeat = opts.party.seat;
+      m.auto = true;
+    }
     // The queue shows at once (not "Connecting…"); the lobby confirms it.
     if (queue) m.auto = true;
     // A code typed into Join that leads nowhere is "Can't join", not the note.
@@ -1052,7 +1122,7 @@ export function App() {
 
   /** Where the computer's side menu goes (front-door pages and, since Oct 29, the town square, outside a match). */
   const goHome = () => {
-    // (The town square is in the frame on a computer: every menu item leaves it; Boss Arena sets it again.)
+    // (The town square is in the frame on a computer: every menu item leaves it; Chess Town sets it again.)
     setShowTown(false);
     setTownSeat(null);
     closeProfile();
@@ -1068,7 +1138,7 @@ export function App() {
       setHomeIntent(null);
       setRaidOpen(false);
     },
-    bossArena: () => {
+    chessTown: () => {
       goHome();
       setHomeIntent(null);
       setRaidOpen(false);
@@ -1105,6 +1175,62 @@ export function App() {
     },
     signIn: () => chooseGuest(false),
   };
+  /**
+   * A computer's side menu on a game screen (GameFrame, Nov 1): the page it asks for. Something to leave (`exit`): its
+   * confirm first, the same as the gear's (ConfirmExit), then the leaving; the page once that's out (sideNext, below). Nothing
+   * to leave: `idle` leaves at once, then the page.
+   */
+  const sideNav = (from: SideFrom, exit: () => MatchExit | null, idle: () => void): FrontNav => {
+    const page = (k: MatchPage) => () => {
+      const e = exit();
+      if (!e) {
+        idle();
+        nav[k]();
+        return;
+      }
+      setSideAsk({ exit: { ...e, go: () => { setSideNext({ page: k, from }); e.go(); } }, then: k });
+    };
+    return { home: page("home"), chessTown: page("chessTown"), soloBoss: page("soloBoss"), friends: page("friends"), shop: page("shop"), profile: page("profile"), settings: page("settings"), friendsList: page("friendsList") };
+  };
+  const matchNav = sideNav("match", () => (match ? exitFor(match) : null), () => { if (match) leave(); });
+  const duelSnap = duel?.snapshot() ?? null;
+  const duelOver = duelSnap?.phase === "over";
+  const duelNav = sideNav(
+    "duel",
+    () => (duelSnap && !duelOver ? { kind: duelSnap.moves.length < 2 ? "leave" : "resign", note: duelSnap.moves.length < 2 ? "The game is called off: no result, and no rank change." : "It counts as a loss.", go: () => duel!.resign() } : null),
+    leaveDuel,
+  );
+  const squadsNav = sideNav("squads", () => (squads ? squadsExit(squads, { onHome: leaveSquads, onResign: () => squads.resign(), onAgain: squadsAgain, party: !!squads.party }) : null), leaveSquads);
+  // (Auto chess's own leave: its gear's row and question.)
+  const autoBack = () => {
+    setShowAutoChess(false);
+    history.replaceState(null, "", "/");
+  };
+  const autoNav = sideNav("auto", () => ({ kind: "leave", note: "You go home, and this game ends. Nothing is recorded.", go: autoBack, row: "Leave", ask: "Leave this game?" }), () => {});
+  // (Once the game is out, the page the side menu asked for: a match gone or at its results, a duel over, a squad out, auto chess left.)
+  useEffect(() => {
+    const s = sideNext;
+    if (!s) return;
+    const out =
+      s.from === "match"
+        ? !match || match.phase.kind === "results" || (match instanceof NetMatch && match.exited)
+        : s.from === "duel"
+          ? !duel || duelOver
+          : s.from === "squads"
+            ? !squads || !!squads.resigned
+            : !showAutoChess;
+    if (!out) return;
+    setSideNext(null);
+    if (s.from === "match" && match) leave();
+    if (s.from === "duel") leaveDuel();
+    if (s.from === "squads" && squads) leaveSquads();
+    nav[s.page]();
+  });
+  const sideConfirm = sideAsk && (
+    <div class="mm-scrim" onClick={() => setSideAsk(null)}>
+      <ConfirmExit exit={sideAsk.exit} onCancel={() => setSideAsk(null)} />
+    </div>
+  );
   // Friends (friends.ts): what an invite can point at (a private lobby still waiting, your party), making one at the
   // front door in the home screen's mode, and joining someone's. Set every render, so it sees this render's state.
   setInviteHost({
@@ -1163,7 +1289,7 @@ export function App() {
     },
     profile: () => openProfile({ you: true, name: account().profile?.user.name ?? "" }),
     ...Object.fromEntries(
-      (["bossArena", "soloBoss", "friends", "shop", "settings", "friendsList"] as const).map((k) => [
+      (["chessTown", "soloBoss", "friends", "shop", "settings", "friendsList"] as const).map((k) => [
         k,
         () => {
           if (match) leave();
@@ -1198,6 +1324,7 @@ export function App() {
           queue={duelQueue}
           session={duel}
           frame={(stage) => homeFrame(stage, undefined, false)}
+          gameFrame={(board) => <GameFrame nav={duelNav}>{board}</GameFrame>}
           onCancel={leaveDuel}
           onBot={botDuel}
           onAway={duelGoAway}
@@ -1212,6 +1339,7 @@ export function App() {
           }
         />
         {overlayD}
+        {sideConfirm}
       </>
     );
   }
@@ -1243,19 +1371,22 @@ export function App() {
       );
     return (
       <>
-        <SquadsScreen client={squads} actions={{ onHome: leaveSquads, onResign: () => squads.resign(), onAgain: squadsAgain, party: !!squads.party }} />
+        <GameFrame nav={squadsNav}>
+          <SquadsScreen client={squads} actions={{ onHome: leaveSquads, onResign: () => squads.resign(), onAgain: squadsAgain, party: !!squads.party }} />
+        </GameFrame>
         {overlayS}
+        {sideConfirm}
       </>
     );
   }
   if (!match && showAutoChess) {
     return (
-      <AutoChessScreen
-        onBack={() => {
-          setShowAutoChess(false);
-          history.replaceState(null, "", "/");
-        }}
-      />
+      <>
+        <GameFrame nav={autoNav}>
+          <AutoChessScreen onBack={autoBack} />
+        </GameFrame>
+        {sideConfirm}
+      </>
     );
   }
   if (!match && showColosseum) {
@@ -1449,7 +1580,8 @@ export function App() {
         intent={homeIntent}
         raid={raidOpen}
         full={raidFull}
-        onBossArena={nav.bossArena}
+        bossParty={{ client: bossParty, error: bossPartyError, onInvite: makeBossParty, onLeave: leaveBossParty }}
+        onChessTown={nav.chessTown}
         onRaid={(open) => {
           setRaidOpen(open);
           setRaidFull(false);
@@ -1583,66 +1715,74 @@ export function App() {
   if (!tower)
     return (
       <>
-        {screen}
-        {bubble}
-        {overlay}
+        <GameFrame nav={matchNav}>
+          {screen}
+          {bubble}
+          {overlay}
+        </GameFrame>
+        {sideConfirm}
       </>
     );
   return (
-    <div class="arena">
-      {overlay}
-      {noTower ? (
-        <div class="tower-space" aria-hidden="true" />
-      ) : (
-      <aside class="tower-side">
-        {(() => {
-          const v = towerView(match);
-          return (
-            <>
-              {v.teamLabel && <div class="tower-team">{v.teamLabel}</div>}
-              <RaceTower standings={v.standings} cutoff={v.cutoff} done={roundLive(match) ? match.done : undefined} cutLabel={cutLabel(match)} floats={match.chat?.floats()} bank={!(match as GameView).simul} dp={scoreDp(match.settings)} />
-            </>
-          );
-        })()}
-      </aside>
-      )}
-      {screen}
-      {bubble}
-    </div>
-  );
-}
-
-const boardKey = (b: { id: number; generation: number; ply: number }) => `${b.id}:${b.generation}:${b.ply}`;
-
-/** Going back into a match already being played: the splash until its screen comes (not the queue it started in). */
-const resumingSplash = (match: AnyMatch) =>
-  match instanceof NetMatch && match.resuming && (match.phase.kind === "loading" || (match.phase.kind === "lobby" && match.started));
-
-/**
- * Waiting for a match to fill: a queue you joined with PLAY (from the tap, while connecting, and in its lobby), or
- * Solo's bots taking their seats. Private lobbies with a code have their own screen.
- */
-function inQueue(match: AnyMatch): boolean {
-  if (resumingSplash(match)) return false;
-  const k = match.phase.kind;
-  if (match instanceof SoloMatch) return k === "lobby";
-  return match instanceof NetMatch && match.auto && (k === "loading" || k === "lobby");
-}
-
-function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () => void }) {
-  const p = match.phase;
-  if (resumingSplash(match))
-    return (
-      <div class="fd-splash">
-        <Logo />
-      </div>
+    <>
+      <GameFrame nav={matchNav}>
+        <div class="arena">
+          {overlay}
+          {noTower ? (
+            <div class="tower-space" aria-hidden="true" />
+          ) : (
+          <aside class="tower-side">
+            {(() => {
+              const v = towerView(match);
+              return (
+                <>
+                  {v.teamLabel && <div class="tower-team">{v.teamLabel}</div>}
+                  <RaceTower standings={v.standings} cutoff={v.cutoff} done={roundLive(match) ? match.done : undefined} cutLabel={cutLabel(match)} floats={match.chat?.floats()} bank={!(match as GameView).simul} dp={scoreDp(match.settings)} />
+                </>
+              );
+            })()}
+          </aside>
+          )}
+          {screen}
+          {bubble}
+        </div>
+      </GameFrame>
+      {sideConfirm}
+      </>
     );
-  // (The queue, inQueue above, is the home screen's: see App.)
-  switch (p.kind) {
-    case "loading":
+  }
+
+  const boardKey = (b: { id: number; generation: number; ply: number }) => `${b.id}:${b.generation}:${b.ply}`;
+
+  /** Going back into a match already being played: the splash until its screen comes (not the queue it started in). */
+  const resumingSplash = (match: AnyMatch) =>
+    match instanceof NetMatch && match.resuming && (match.phase.kind === "loading" || (match.phase.kind === "lobby" && match.started));
+
+  /**
+   * Waiting for a match to fill: a queue you joined with PLAY (from the tap, while connecting, and in its lobby), or
+   * Solo's bots taking their seats. Private lobbies with a code have their own screen.
+   */
+  function inQueue(match: AnyMatch): boolean {
+    if (resumingSplash(match)) return false;
+    const k = match.phase.kind;
+    if (match instanceof SoloMatch) return k === "lobby";
+    return match instanceof NetMatch && match.auto && (k === "loading" || k === "lobby");
+  }
+
+  function renderPhase(match: AnyMatch, actions: { leave: () => void; again: () => void }) {
+    const p = match.phase;
+    if (resumingSplash(match))
       return (
-        <div class="screen center">
-          <p class="muted">Connecting…</p>
+        <div class="fd-splash">
+          <Logo />
+        </div>
+      );
+    // (The queue, inQueue above, is the home screen's: see App.)
+    switch (p.kind) {
+      case "loading":
+        return (
+          <div class="screen center">
+            <p class="muted">Connecting…</p>
         </div>
       );
     case "lobby":

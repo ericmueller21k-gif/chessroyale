@@ -79,11 +79,17 @@ function healthSection(h: Health): string {
         .join(" · ")
     : "no answer from the live hub";
   const e = h.engine;
+  const fb = h.townFallbacks;
+  const reasons = Object.entries(fb.byReason)
+    .filter(([, n]) => n.week)
+    .map(([r, n]) => `${r} ${n.day} / ${n.week}`)
+    .join(", ");
   return `<h2>Health</h2><div class="card">
 <p><b>Deployed:</b> ${esc(h.deploy.version)}${h.deploy.commit ? ` (commit ${esc(h.deploy.commit.slice(0, 12))})` : ""}${h.deploy.built ? `, built ${esc(h.deploy.built.slice(0, 16).replace("T", " "))}` : ""}</p>
 <p><b>Live:</b> ${h.live ? `${h.live.online} online, ${h.live.players} in lobbies · ${esc(modes)}` : esc(modes)}</p>
 <p><b>Errors:</b> ${h.errors.thisHour} this hour, ${h.errors.lastHour} the hour before, ${h.errors.day} in 24 hours (${h.errors.kinds} kinds) ·
 <b>Durable Objects:</b> ${h.durableObjects.day ? esc(Object.entries(h.durableObjects.byEntry).map(([k, n]) => `${k} ${n}`).join(", ")) : "none"} in 24 hours</p>
+<p><b>Town WebGL fallbacks</b> (asked for WebGL, drew with Canvas 2D; not counted as errors): ${fb.day} in 24 hours, ${fb.week} in 7 days${reasons ? ` · by reason, 24 hours / 7 days: ${esc(reasons)}` : ""}</p>
 <p><b>Reports (24 hours):</b> ${REPORT_KINDS.map((k) => `${h.reports.day[k] ?? 0} ${KIND_NAMES[k].toLowerCase()}`).join(", ")}</p>
 <p><b>Engine server:</b> ${e.on ? "on" : "off"} · ${e.searches} of ${e.cap} searches today · last answer ${ago(e.lastOk, h.at)} · last failure ${e.lastFail ? `${ago(e.lastFail.at, h.at)}: ${esc(e.lastFail.why)}` : "never"}</p>
 <p><b>Fair play's deep re-checks:</b> ${h.fairplay.searches} of ${h.fairplay.cap} searches today · <b>D1:</b> ${h.d1.ok ? `ok (${h.d1.ms} ms)` : `failing: ${esc(h.d1.error ?? "")}`}</p>

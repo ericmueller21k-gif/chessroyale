@@ -1,6 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 import { BOARD_SEL, soloFromHome } from "./helpers.ts";
 
+// (The phone project only, Nov 2: a solo match plays the same on a computer, whose solo screens other specs cover (board-layout,
+// desktop-board), and these two whole matches were 5 minutes of a run.)
+test.skip(({ isMobile }) => !isMobile, "the phone project only: a whole solo match plays the same on a computer");
+
 /**
  * Clicks a move on the main board: tap the piece (again if nothing was picked up: the board takes moves a moment
  * after its countdown ends), then the target square.

@@ -233,6 +233,21 @@ export function rageNow(p: Pick<BossPowerState, "charge" | "lost" | "rageUsed">,
   return Math.max(0, ragePoints(p, s) - (p.rageUsed ?? 0)) * speed;
 }
 
+// ---------------- The real-time meter ----------------
+
+/**
+ * The real-time meter, one block for every power that runs on real time (Puddles' seeds, Timber's scraps; Blitz's next):
+ * how many ticks have come by clock time `now` (ms, the battle's clock: Battle.now, the server's online, the page's
+ * visible time solo, the sims' own) since `since`, one every `everyMs`, and when the next one comes. A pure function of
+ * two numbers, so the server and every device agree with nothing sent as a tick lands, and nothing runs per frame: a
+ * screen reads it on a timer of its own (the seed meter's and the workshop strip's 250 ms) or when it next draws.
+ */
+export function ticksAt(since: number, now: number, everyMs: number): { ticks: number; next: number } {
+  const every = Math.max(1, everyMs);
+  const ticks = Math.floor(Math.max(0, now - since) / every);
+  return { ticks, next: since + (ticks + 1) * every };
+}
+
 // ---------------- The base boss ----------------
 
 /** What a boss's hooks get as a crowd turn begins (prepareTurn). Events go in `events`, in the order they happen. */

@@ -68,6 +68,7 @@ export * from "./bosses/gardener.ts";
 export * from "./bosses/tiger.ts";
 export * from "./bosses/moo.ts";
 export * from "./bosses/folio.ts";
+export * from "./bosses/timber.ts";
 export * from "./bosses/index.ts";
 
 /** A battle's powers as it starts (nothing has happened yet; the first turn is set up by prepareTurn). */

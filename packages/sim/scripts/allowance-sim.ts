@@ -12,7 +12,7 @@
  * simply to still cut players playing poor, and not punish players not playing precise engine lines or slight
  * variations in the opening 10-14 moves."
  */
-import { CROWD_KNOCKOUTS, DEFAULT_SETTINGS, botSkillSpread, modeSettings, mulberry32, shuffle, type FinalFormat, type Settings } from "@chessroyale/core";
+import { CROWD_KNOCKOUTS, CROWD_STAGE_ROUNDS, DEFAULT_SETTINGS, botSkillSpread, modeSettings, mulberry32, shuffle, type FinalFormat, type Settings } from "@chessroyale/core";
 import * as chess from "@chessroyale/chess";
 import { MatchRunner, type Opening } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
@@ -151,7 +151,7 @@ function summary(beforeLabel: string, afterLabel: string, arms: readonly string[
   lines.push("- **Slight variations:** every pick among the engine's top 8.");
   lines.push("");
   for (const cutNo of [0, 1]) {
-    lines.push(`## Cut ${cutNo + 1} (${cutNo === 0 ? "after move 10" : "after move 11"})`);
+    lines.push(`## Cut ${cutNo + 1} (after move ${CROWD_STAGE_ROUNDS.slice(0, cutNo + 1).reduce((x, y) => x + y, 0) / 2})`);
     lines.push("");
     lines.push("| | before | after |");
     lines.push("| --- | ---: | ---: |");

@@ -20,6 +20,7 @@ import { gunzipSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
 import {
   CROWD_KNOCKOUTS,
+  CROWD_STAGE_ROUNDS,
   FAIRPLAY,
   RATING_CURVE,
   honestChance,
@@ -179,7 +180,8 @@ interface Subject {
 // ---------------- A match ----------------
 
 const KNOCKOUTS = CROWD_KNOCKOUTS.team.map((k) => k / 2); // per team
-const FIRST_CUT = 10; // a team's picks before the first cut (20 plies)
+// A team's picks before each cut: CROWD_STAGE_ROUNDS' plies added up, one pick a team in every two (10, 15, 19, …).
+const CUT_AFTER = KNOCKOUTS.map((_, i) => CROWD_STAGE_ROUNDS.slice(0, i + 1).reduce((a, b) => a + b, 0) / 2);
 
 interface Seat {
   subject: Subject | null;
@@ -190,7 +192,7 @@ interface Seat {
   moves: FairMove[];
 }
 
-/** One team's side of a 50 v 50: its seats pick on its plies, cuts after the 10th pick and every pick after. */
+/** One team's side of a 50 v 50: its seats pick on its plies, a cut after each stage's picks (CUT_AFTER). */
 function playTeam(game: Pos[], color: 0 | 1, seats: Seat[], crowdInfo: boolean) {
   const plies = game.filter((p) => p.ply % 2 === color);
   let cut = 0;
@@ -245,8 +247,8 @@ function playTeam(game: Pos[], color: 0 | 1, seats: Seat[], crowdInfo: boolean) 
         ...(pos.recapture ? { recapture: true } : {}),
       });
     }
-    // The cuts: after the 10th pick, then after every pick, the lowest scores go (less thinking wins a tie).
-    if (k + 1 >= FIRST_CUT) {
+    // The cuts: after each stage's picks, the lowest scores go (less thinking wins a tie).
+    if (k + 1 === CUT_AFTER[cut]) {
       const order = alive.sort((a, b) => a.score - b.score || b.think - a.think);
       for (const s of order.slice(0, KNOCKOUTS[cut]!)) s.alive = false;
       cut++;
@@ -652,7 +654,7 @@ out("");
 out(`- **Positions:** \`fairplay-bank.ts\` played ${games.length} Crowd games from the starting position the way a crowd does (50 honest players pick, the most popular move is played), ${positions.length} positions in all. Each was analyzed once: the judges' search (the browser engine, 250k nodes, top 8, plus every other move anyone might pick), Stockfish's own MultiPV-4 lines at depths 1-11, and a strong engine (the full network, 1M nodes, top 3), which stands in for both a cheater's engine app and our deep re-check.`);
 out(`- **Honest players** pick the way Stockfish's limited strength (UCI_Elo) does, emulated exactly from those lines (\`src/skill.ts\`), at 1200 to 2700, with ±100 of form from match to match. The crowd around them is honest players of N(1500, 350). Think time: lognormal, longer on harder moves (3.5 s + 9 s × the share of 1500 players who'd miss the move). A look-away on 2% of moves.`);
 out(`- **Cheaters** copy the engine with 3-12 s delays whatever the move. Their engine agrees with our deep re-check's best ${Math.round(ENGINE_AGREE * 100)}% of the time (else they play our second choice): two strong engines, depths or versions don't always agree, so this is deliberately not 100%. Types: every move; 20-40% of moves (per player) at 1500 and 1900; only in hard positions; only when their own move would lose 5+ points; and a blend of the engine's 1st, 2nd and 3rd choices (50/30/20%). "Same phone": a look-away on 90% of engine moves.`);
-out(`- **A match:** each player is on a team of 50 and picks on its team's plies: 10 picks to the first cut, then a cut after every pick (the team-final schedule, half of each cut per team), to the final eight. The final's few moves aren't simulated (fewer counted moves than real finalists get: conservative).`);
+out(`- **A match:** each player is on a team of 50 and picks on its team's plies: a cut after picks ${CUT_AFTER.join(", ")} (the team-final schedule, half of each cut per team), to the final eight. The final's few moves aren't simulated (fewer counted moves than real finalists get: conservative).`);
 out(`- **The deep re-check** runs on any match that scored ${FAIRPLAY.deep.queueScore}+ or of a player already flagged, before their next match.`);
 out(`- **"Few people":** the same matches with fewer than ${FAIRPLAY.signals.minCrowd} other people picking (bots fill the lobby), so there are no crowd rates and only strength-based chances apply.`);
 out("");

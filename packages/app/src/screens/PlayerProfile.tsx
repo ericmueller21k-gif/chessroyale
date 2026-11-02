@@ -356,7 +356,7 @@ function OwnProfileScreen({
         {head}
         {viewPublic}
         <div class="fd-card">
-          <DressedPawn size="profile" shadow look={own ? me?.locker?.look : undefined} />
+          <DressedPawn size="profile" shadow ride look={own ? me?.locker?.look : undefined} />
           <div class="fd-card-name">{own ? (me?.user.name ?? target.name) : target.name}</div>
           <p class="fd-sub">{error ?? "Loading…"}</p>
         </div>
@@ -372,7 +372,7 @@ function OwnProfileScreen({
       {/* Two columns on a computer: who they are and what they wear; then their numbers. One column on a phone. */}
       <div class="fd-profile-col">
       <div class="fd-card">
-        <DressedPawn size="profile" shadow look={p.look} />
+        <DressedPawn size="profile" shadow ride look={p.look} />
         <h1 class="fd-card-name">{p.name}</h1>
         <div class="fd-seen">
           <span class={`fd-dot small${p.online ? "" : " off"}`} />

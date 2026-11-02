@@ -39,18 +39,26 @@ import { account, onAccountChange, playerName } from "../account.ts";
 import { TOWN_ASKED, testSwitchesAllowed } from "../test-switches.ts";
 import { play, warmSounds } from "../sound.ts";
 import { SELECT_SOUND, TOWN_SOUNDS, townSound } from "../characters/boss-select.ts";
-import { N, proj, wrapF } from "./camera.ts";
-import { TOWN_FEEL } from "./feel.ts";
+import { N, proj, wrapF, wrapI } from "./camera.ts";
+import { SHOP_FEEL, TOWN_FEEL } from "./feel.ts";
+import { shopOf } from "./shops/shops.ts";
+import type { LoadedRoom, ShopCtl, ShopRoom } from "./shops/ShopRoom.tsx";
 import { BarsIcon, SwordsIcon } from "./CardIcons.tsx";
 import { TownChat } from "./TownChat.tsx";
 import { TownChatTools } from "./TownChatTools.tsx";
 import { Press } from "./press.ts";
-import { PAWN_PX, Renderer, pawnImage, type Hit } from "./render.ts";
+import { PAWN_HEAD, PAWN_PX, Renderer, pawnImage, type Hit, type YouArt } from "./render.ts";
+import { dropRiders, leaveRider, ridersHeld, rideArt, shareRider, type Rider, type RiderPawn } from "./rides.ts";
+import { rideSpeed } from "../components/rides/scale.ts";
+import { secondColor } from "@chessroyale/core";
 import { painter2d, type Backend, type Painter } from "./paint.ts";
 import { painterGL } from "./paint-gl.ts";
+import { reportTownFallback } from "../problems.ts";
+import type { TownGlFallback } from "@chessroyale/core";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
 import { BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, tdist, tick, townLine, waitingBot, walkWalker, type HomeId, seatOf, seatText, type Person, type Place, type Seat, type Sq, type StatueId, type Target } from "./world.ts";
-import { dressedPawn, lookKey } from "./you-look.ts";
+import { dressedPawn, lookKey, offFace, offRide } from "./you-look.ts";
+import type { ItemLook } from "@chessroyale/core";
 import type { BotGameAsk } from "./TownPage.tsx";
 import "./town.css";
 
@@ -106,13 +114,81 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, onColosseum, seat =
   const ctl = useRef<Ctl | null>(null);
   const [zoomedOut, setZoomedOut] = useState<boolean>(TOWN_FEEL.startZoomedOut);
   const [card, setCard] = useState<Card | null>(null);
+  // Inside a shop (Nov 2, round 1; shops/ShopRoom.tsx, loaded when you go in): the room, and its zoom (− / + switch Close and the
+  // town's zoomed-in camera there). `fade` is the black the town zooms into and the room fades in from.
+  const [inside, setInside] = useState<{ room: LoadedRoom; View: typeof ShopRoom } | null>(null);
+  const [shopOut, setShopOut] = useState(false);
+  const shopCtl = useRef<ShopCtl | null>(null);
+  const fade = useRef<HTMLDivElement>(null);
+  /** Going in or out: taps wait, and another way in or out isn't started. */
+  const doorBusy = useRef(false);
+  const fadeTo = (to: 0 | 1, ms: number, delay = 0) => {
+    const el = fade.current;
+    if (!el) return;
+    el.style.transition = `opacity ${ms}ms linear ${delay}ms`;
+    el.style.opacity = String(to);
+    el.style.pointerEvents = to ? "auto" : "none";
+  };
+  const townCanvas = () => box.current?.querySelector<HTMLCanvasElement>("canvas.town-canvas") ?? null;
+  const later = (ms: number) => new Promise<void>((ok) => setTimeout(ok, ms));
+  /** You stand at a shop's door (its "Go in"): the town zooms in on the door (`x`, `y` in the box) and fades to black; the room opens. */
+  const goIn = async (id: HomeId, x: number, y: number) => {
+    if (doorBusy.current) return;
+    doorBusy.current = true;
+    const F = SHOP_FEEL;
+    // (Its code and art load now, while the town zooms: nothing of a shop loads while you walk round the town.)
+    const load = import("./shops/ShopRoom.tsx").then((m) => m.loadRoom(id).then((room) => ({ room, View: m.ShopRoom })));
+    const cv = townCanvas();
+    if (cv) {
+      cv.style.transformOrigin = `${x.toFixed(1)}px ${y.toFixed(1)}px`;
+      cv.style.transition = `transform ${F.doorZoomMs}ms ease-in`;
+      cv.style.transform = `scale(${F.doorZoom})`;
+    }
+    fadeTo(1, F.fadeMs, F.doorZoomMs - F.fadeMs);
+    await later(F.doorZoomMs);
+    const got = await load.catch(() => null);
+    if (!got || !box.current) {
+      // (It didn't load: back out to the town as you were.)
+      if (cv) cv.style.transform = "";
+      fadeTo(0, F.fadeMs);
+      doorBusy.current = false;
+      return;
+    }
+    ctl.current?.pause();
+    setShopOut(false);
+    setInside(got);
+  };
+  /** The room drew its first frame: the black lifts. */
+  const shopReady = () => {
+    fadeTo(0, SHOP_FEEL.fadeMs);
+    setTimeout(() => (doorBusy.current = false), SHOP_FEEL.fadeMs);
+  };
+  /** "Go out" (or the back button inside): the room fades to black, and the town zooms back out from the door. */
+  const goOut = async () => {
+    if (doorBusy.current) return;
+    doorBusy.current = true;
+    const F = SHOP_FEEL;
+    fadeTo(1, F.fadeMs);
+    await later(F.fadeMs);
+    setInside(null);
+    ctl.current?.resume();
+    const cv = townCanvas();
+    if (cv) {
+      cv.style.transition = `transform ${F.doorZoomMs}ms ease-out`;
+      cv.style.transform = "";
+    }
+    fadeTo(0, F.fadeMs);
+    await later(F.doorZoomMs);
+    if (cv) cv.style.transition = cv.style.transformOrigin = "";
+    doorBusy.current = false;
+  };
 
   // (A layout effect: the world's first frame is drawn before the screen first shows.)
   useLayoutEffect(() => {
     const t = startTown(box.current!, canvas.current!, chips.current, cardEl.current!, live.current!, setZoomedOut, setCard, seatOf(seat), (s, face) => {
       const b = BOTS[s.bot]!;
       onPlayBot?.({ seat: seatText(s), name: botLabel(b), rating: b.rating, look: isSprite(b.look) ? null : b.look.wear, face });
-    });
+    }, (id, x, y) => void goIn(id, x, y));
     ctl.current = t;
     return t.stop;
   }, []);
@@ -136,17 +212,30 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, onColosseum, seat =
   return (
     <div class={framed ? "town-screen in-frame" : "town-screen"}>
       <header class="town-bar">
-        <button type="button" class="town-back" aria-label="Back" onClick={onBack}>
+        {/* (Inside a shop, back takes you out to the town square.) */}
+        <button type="button" class="town-back" aria-label="Back" onClick={inside ? () => void goOut() : onBack}>
           ‹
         </button>
         <h1>Town square</h1>
         {/* The chat's icon (its three modes) and the gear (Town settings), at the right end of the same line (on a computer, in the frame: the chat icon beside the title, the gear at the right end). */}
         <TownChatTools />
       </header>
-      <div class="town-box" ref={box}>
+      <div class={inside ? "town-box town-inside" : "town-box"} ref={box}>
         <canvas class="town-canvas" ref={canvas} aria-label="The town square" />
         {/* A statue's quote, for screen readers, while you stand up close to it (it's drawn on its pedestal). */}
         <div class="town-sr" ref={live} aria-live="polite" />
+        {/* Inside a shop: the room over the town (the town waits, as you left it). */}
+        {inside && (
+          <inside.View
+            room={inside.room}
+            youArt={() => ctl.current?.youArt() ?? null}
+            youName={playerName}
+            onZoom={setShopOut}
+            onOut={() => void goOut()}
+            onReady={shopReady}
+            ctl={shopCtl}
+          />
+        )}
         <div class="town-overlay">
           {/* The chat log, top left (its own file): under the cards; while it shows it takes every touch on its own area (the map under it gets none), faded none; the chips keep off its box (CHAT_BOX). */}
           <TownChat />
@@ -178,6 +267,12 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, onColosseum, seat =
               <>
                 <h2>{home.name}</h2>
                 {card.line && <p class="town-card-text town-card-line">{card.line}</p>}
+                {/* A home with its inside built (Nov 2: Babur's and Puddles'): you walk to its door and go in. */}
+                {shopOf(home.id) && (
+                  <button type="button" class="town-btn primary" onClick={() => ctl.current?.goIn(card.i)}>
+                    Go in
+                  </button>
+                )}
                 <button type="button" class="town-btn" disabled>
                   Shop
                 </button>
@@ -285,18 +380,21 @@ export function TownScreen({ onBack, onBossAlone, onPlayBot, onColosseum, seat =
             </div>
           ))}
         </div>
+        {/* The black the town zooms into as you go in, and the room fades in from (and back, going out). */}
+        <div class="town-fade" ref={fade} />
         <div class="town-controls">
+          {/* (Inside a shop the same buttons work the room's camera: Close, or the town's zoomed-in camera.) */}
           <div class="town-zoom">
-            <button type="button" aria-label="Zoom out" aria-pressed={zoomedOut} onClick={() => ctl.current?.zoom(true)}>
+            <button type="button" aria-label="Zoom out" aria-pressed={inside ? shopOut : zoomedOut} onClick={() => (inside ? shopCtl.current?.zoom(true) : ctl.current?.zoom(true))}>
               −
             </button>
-            <button type="button" aria-label="Zoom in" aria-pressed={!zoomedOut} onClick={() => ctl.current?.zoom(false)}>
+            <button type="button" aria-label="Zoom in" aria-pressed={inside ? !shopOut : !zoomedOut} onClick={() => (inside ? shopCtl.current?.zoom(false) : ctl.current?.zoom(false))}>
               +
             </button>
           </div>
           {/* The focus button (Eric, Oct 28: "replace with circular focus icon"): a ring, four ticks and a dot, a map's locate-me;
               still named "Back to me", and still brings the camera back to you. */}
-          <button type="button" class="town-recenter" aria-label="Back to me" onClick={() => ctl.current?.recenter()}>
+          <button type="button" class="town-recenter" aria-label="Back to me" onClick={() => (inside ? shopCtl.current?.recenter() : ctl.current?.recenter())}>
             <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
               <circle cx="12" cy="12" r="6.2" fill="none" stroke="currentColor" stroke-width="2" />
               <path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
@@ -320,23 +418,29 @@ function startTown(
   onCard: (c: Card | null) => void,
   seat: Seat | null,
   onPlay: (seat: Seat, face: string | null) => void,
+  onGoIn: (id: HomeId, x: number, y: number) => void,
 ) {
   const f = TOWN_FEEL;
   /** The world's canvas: a new one if the drawing changes backend (a canvas keeps the first kind of context it gave). */
   let cv = cv0;
-  // The drawing (paint.ts): Canvas 2D, or WebGL 2 with `?gl=1` (anyone; read once as the page opened). No WebGL 2, or no
-  // context: Canvas 2D, silently. A lost context: nothing is drawn until it's back; lost twice within a minute, Canvas 2D
-  // for the rest of the page.
+  // The drawing (paint.ts): Canvas 2D, or WebGL 2 with `?gl=1` (anyone; read once as the page opened). No WebGL 2, no
+  // context, or its shader fails: Canvas 2D, silently. A lost context: nothing is drawn until it's back; lost twice within a
+  // minute, or not back within LOST_WAIT_MS, Canvas 2D for the rest of the page. Each of these falls back once and is
+  // reported once a page with its reason (problems.ts, `reportTownFallback`: nothing shows; never on the frame loop).
   const losses: number[] = [];
   let lostWait = 0;
+  const fallBack = (why: TownGlFallback) => {
+    reportTownFallback(why);
+    useBackend("2d");
+  };
   const onLost = (lost: boolean) => {
     clearTimeout(lostWait);
     if (!lost) return void (alive && draw(performance.now()));
     const now = performance.now();
     losses.push(now);
     // (And one that isn't back within a few seconds: the browser isn't giving it back.)
-    if (losses.length >= 2 && now - losses[losses.length - 2]! < 60_000) setTimeout(() => alive && useBackend("2d"));
-    else lostWait = window.setTimeout(() => alive && painter.lost && useBackend("2d"), LOST_WAIT_MS);
+    if (losses.length >= 2 && now - losses[losses.length - 2]! < 60_000) setTimeout(() => alive && fallBack("lost-twice"));
+    else lostWait = window.setTimeout(() => alive && painter.lost && fallBack("not-back"), LOST_WAIT_MS);
   };
   let attached = false;
   /** A new canvas in the old one's place (its class, label, size and data), the input moved over. */
@@ -356,7 +460,8 @@ function startTown(
   const makePainter = (kind: Backend): Painter => {
     if (kind === "webgl") {
       const p = painterGL(cv, onLost);
-      if (p) return shim(p);
+      if (typeof p !== "string") return shim(p);
+      reportTownFallback(p);
       swapCanvas(); // (in case it gave a WebGL context before failing)
     }
     return painter2d(cv);
@@ -418,15 +523,88 @@ function startTown(
   let sky = pinned ?? clock();
   let skyAt = performance.now();
   r.setSky(sky);
-  // Your pawn as your profile shows it (your crate items), drawn again only when your look changes; plain meanwhile.
+  // Your pawn as your profile shows it (your crate items), drawn again only when your look changes; plain meanwhile. On your
+  // ride if you wear one (Oct 31): its frames with you on them composed once (rides.ts), the last ones kept until they're ready.
   let youLook: string | null = null;
   const dress = () => {
     const look = account().profile?.locker?.look;
     const key = lookKey(look);
     if (key === youLook) return;
     youLook = key;
-    if (!key) r.youArt = null;
-    else void dressedPawn(look, pawnImage("light", null), PAWN_PX).then((art) => youLook === key && alive && (r.youArt = art));
+    const wear = offRide(look);
+    // (Your ride's pace, Nov 1: Cheetah Shoes walk twice as fast; RIDES.speed. As the look is put on, before its frames are ready.)
+    town.you.walker.stepMs = f.youStepMs / rideSpeed(look?.ride?.def);
+    // (The ride drawn now stays drawn until the new one's frames are ready; then it's given back. One share of a rider each.)
+    const mount = (art: YouArt | null, back: YouArt | null) => {
+      const prev = youRide;
+      youRide = look?.ride
+        ? ride(look.ride, art, back, pawnImage("light", null), "w", `light||${lookKey(wear)}`, (rd) => {
+            if (rd !== youRide || !alive) return;
+            if (youShown && youShown !== rd) leaveRider(youShown);
+            youShown = r.youRider = rd;
+          })
+        : null;
+      if (prev && (prev !== youShown || prev === youRide)) leaveRider(prev);
+      // (Its frames on their way, the drawing's chunk first: you walk on foot meanwhile, in its box, under its tag.)
+      r.youSoon = youRide;
+      if (!youRide) {
+        if (youShown) leaveRider(youShown);
+        youShown = r.youRider = null;
+      }
+    };
+    if (!lookKey(wear)) {
+      r.youArt = null;
+      mount(null, null);
+    } else
+      void dressed(wear, pawnImage("light", null), !!look?.ride).then(([art, back]) => {
+        if (youLook !== key || !alive) return;
+        r.youArt = art;
+        mount(art, back);
+      });
+  };
+  /**
+   * A pawn's dressed picture, and (`riding`: its ride has a back view) the same seen from behind, its face items left off (Nov 1,
+   * rides v2, the director's call: from behind a face item doesn't show, a hat does).
+   */
+  const dressed = (wear: ItemLook | null, plain: HTMLCanvasElement, riding: boolean): Promise<[YouArt | null, YouArt | null]> => {
+    const front = dressedPawn(wear, plain, PAWN_PX);
+    if (!riding || !wear?.face) return front.then((a) => [a, a]);
+    return Promise.all([front, dressedPawn(offFace(wear), plain, PAWN_PX)]);
+  };
+  /**
+   * A rider (rides.ts) for a pawn wearing `ride`: its dressed picture (or the plain pawn) on it, and from behind (`back`), shared
+   * with anyone whose pawn looks the same (`pawnKey`: its side, tint and items); `done` once it's ready. Null if it isn't a ride.
+   */
+  const ride = (on: NonNullable<ItemLook["ride"]>, art: YouArt | null, back: YouArt | null, plain: HTMLCanvasElement, side: "w" | "b", pawnKey: string, done: (rd: Rider) => void): Rider | null => {
+    const ra = rideArt(on.def);
+    const bare: RiderPawn = { img: plain, pad: 0, top: PAWN_HEAD - 0.75 / 45 };
+    const colors = { color: on.color, color2: secondColor(on) ?? on.color, side };
+    return ra ? shareRider(ra, colors, pawnKey, art ?? bare, back ?? art ?? bare, done) : null;
+  };
+  /** The rider your look asked for last (its frames may still be coming), and the one drawn now: each holds a share. */
+  let youRide: Rider | null = null;
+  let youShown: Rider | null = null;
+  /** Someone else's pawn (a bot, the test player; real players later) as the square draws it, made once: its items, its ride. */
+  const dressPerson = (p: Person) => {
+    const lk = p.look;
+    if (isSprite(lk) || !lk.wear) return;
+    const plain = pawnImage(lk.side, lk.tint);
+    const on = lk.wear.ride;
+    const wear = offRide(lk.wear);
+    // (Its pace on its ride, as yours: Cheetah Shoes twice a bot's.)
+    p.walker.stepMs = TOWN_FEEL.botStepMs / rideSpeed(on?.def);
+    const mount = (art: YouArt | null, back: YouArt | null) => {
+      const rd = on && ride(on, art, back, plain, lk.side === "dark" ? "b" : "w", `${lk.side}|${lk.tint ?? ""}|${lookKey(wear)}`, (rd) => alive && r.riders.set(p.id, rd));
+      // (Its frames on their way: on foot meanwhile, in its rider's box.)
+      if (rd && alive) r.ridersSoon.set(p.id, rd);
+    };
+    if (!lookKey(wear)) mount(null, null);
+    else
+      void dressed(wear, plain, !!on).then(([art, back]) => {
+        if (!alive) return;
+        if (art) r.botArt.set(p.id, art);
+        mount(art, back);
+      });
   };
   const offAccount = onAccountChange(dress);
   dress();
@@ -439,10 +617,7 @@ function startTown(
   }
   // The bots' dressed pawns, drawn once now (their crate items over their pawns), never per frame; plain meanwhile. (The
   // sidekicks' frames are cut from their sheets as the renderer is made.)
-  for (const p of town.bots) {
-    const lk = p.look;
-    if (!isSprite(lk) && lk.wear) void dressedPawn(lk.wear, pawnImage(lk.side, lk.tint), PAWN_PX).then((art) => art && alive && r.botArt.set(p.id, art));
-  }
+  for (const p of town.bots) dressPerson(p);
   // `/town?fps`, anyone's (Eric, Oct 30: no admin needed, the site is behind Cloudflare Access): a pill in the world's top-right
   // corner, "60 fps · 16.7 ms", frames over the last second and their mean time, the text set twice a second. Plain counters in
   // the frame loop, nothing else.
@@ -466,6 +641,10 @@ function startTown(
   let alive = true;
   /** (Tests, `__townHold`) The frame loop held: the last frame stays, and nothing moves. */
   let held = false;
+  /** Inside a shop: the town waits as you left it (no frames, nothing moves) until you come out. */
+  let away = false;
+  /** A home's "Go in" sent you to its door (its index in HOMES; -1: none): you go in once you stand there. */
+  let goingIn = -1;
   /** When the last frame was drawn (its `now`). */
   let drawnAt = performance.now();
   let ready = false;
@@ -630,6 +809,14 @@ function startTown(
         onPlay(s, r.spriteFace(town.meet.bot));
       }
     }
+    // At a shop's door after its "Go in": the town zooms in on the door and you go in (TownScreen's goIn).
+    if (goingIn >= 0 && !town.you.walker.moving()) {
+      const h = HOMES[goingIn]!;
+      goingIn = -1;
+      const at = { x: r.W / 2, y: r.H / 2 };
+      r.squareAt(h.cx, wrapI(h.cy - 1), at);
+      onGoIn(h.id, at.x, at.y);
+    }
     stepClose(dt);
     updateCamera(dt, now);
     draw(now, dt);
@@ -650,7 +837,7 @@ function startTown(
     raf = requestAnimationFrame(frame);
   };
   const run = () => {
-    if (raf || !alive || document.hidden || held) return;
+    if (raf || !alive || document.hidden || held || away) return;
     last = performance.now();
     raf = requestAnimationFrame(frame);
   };
@@ -878,8 +1065,9 @@ function startTown(
     // A tap on anything but the statue you're looking at walks you away from it: the camera glides back out.
     if (p.statue < 0 || p.statue !== closeOn) leaveClose();
     // You sit when a tap on a table sent you to its stool; any other walk stands you up (and calls off a game you were
-    // walking to with a bot).
+    // walking to with a bot, and a way into a shop).
     cancelMeet(town);
+    goingIn = -1;
     town.you.sit = p.card?.kind === "table";
     if (p.dest && walkWalker(town.you.walker, p.dest)) {
       follow = true;
@@ -925,8 +1113,9 @@ function startTown(
 
   // A test hook (e2e, with the test switches on: test-switches.ts): where to tap a boss, a home or the Colosseum (its gate)
   // now, in the box.
-  const hookAt = (kind: "boss" | "home" | "coliseum" | "statue" | "table" | "lamp" | "light" | "bot" | "player", id?: HomeId | StatueId | "coliseum" | number | string) => {
+  const hookAt = (kind: "boss" | "home" | "coliseum" | "statue" | "table" | "lamp" | "light" | "bot" | "player" | "square", id?: HomeId | StatueId | "coliseum" | number | string | readonly [number, number]) => {
     const out = { x: 0, y: 0 };
+    if (kind === "square") return testSwitchesAllowed() && Array.isArray(id) && r.squareAt(id[0]!, id[1]!, out) ? out : null;
     if (kind === "player") return testSwitchesAllowed() && r.tapPoint("person", town.people.findIndex((p) => p.uid === id), out) ? out : null;
     if (kind === "bot") return testSwitchesAllowed() && r.tapPoint("person", town.people.findIndex((p) => p.bot === BOTS[Number(id)]), out) ? out : null;
     if (kind === "table") return testSwitchesAllowed() && r.tapPoint("table", Number(id), out) ? out : null;
@@ -1047,11 +1236,32 @@ function startTown(
     town.turnMs = ms;
     town.nextTurnAt = 0;
   };
-  // ... `__townPlayer(uid, name, icon?, rating?)`: a test player (a pawn with an account id: a real player's card, whose picture opens
-  // their profile) stands still beside you; answers its index in the people. The real town has no players yet.
-  const hookPlayer = (uid: string, name: string, icon?: string, rating?: number): number => (testSwitchesAllowed() ? addTestPlayer(town, { uid, name, icon, rating }) : -1);
+  // ... `__townPlayer(uid, name, icon?, rating?, wear?)`: a test player (a pawn with an account id: a real player's card, whose picture
+  // opens their profile) stands still beside you, wearing `wear` (crate items, a ride: as others see a player); answers its index in
+  // the people. The real town has no players yet.
+  const hookPlayer = (uid: string, name: string, icon?: string, rating?: number, wear?: ItemLook): number => {
+    if (!testSwitchesAllowed()) return -1;
+    const i = addTestPlayer(town, { uid, name, icon, rating, wear });
+    dressPerson(town.people[i]!);
+    return i;
+  };
   // ... `__townFull(on)`: someone unseen on one stool of every table (no table free for you and a bot: its card's Play greys), or not.
   const hookFull = (on: boolean) => testSwitchesAllowed() && fillTables(town, on);
+  // ... `__townRide()` (Oct 31, rides): yours (its ride, color and size (Nov 1), whether its frames are ready, as the last frame drew it: "idle" or
+  // "move" ("" on foot), the frame, which way it faced; your box, foot and head on screen, your square; Nov 1, `coming`: the ride whose
+  // frames are on their way, its drawing loading or its frames being composed, while you walk on foot in its box) and each other rider's.
+  const hookRide = () => {
+    if (!testSwitchesAllowed()) return null;
+    const you = town.people.indexOf(town.you);
+    const h = town.you.walker.here();
+    const rd = r.youRider;
+    return {
+      you: { ride: rd?.id ?? null, color: rd?.color ?? null, scale: rd?.scale ?? null, ready: !!rd?.ready, coming: r.youSoon?.coming ? r.youSoon.id : null, ...r.youRide, box: r.drawnBox(you), at: [h.c, h.r], stepMs: town.you.walker.stepMs, marks: r.marksShown() },
+      others: [...r.riders].map(([id, x]) => ({ id, ride: x.id, color: x.color, scale: x.scale, ready: x.ready, box: r.drawnBox(town.people.findIndex((p) => p.id === id)), stepMs: town.people.find((p) => p.id === id)?.walker.stepMs ?? null })),
+      // (Sets of rider frames held, shared by riders who look the same.)
+      held: ridersHeld(),
+    };
+  };
   // ... `__townHold(on)`: the frame loop stops (the last frame stays, nothing moves) or goes on; `__townBackend("2d" | "webgl")`:
   // the drawing's backend from now on (on a new canvas; the held frame drawn again), answering the one it got; `__townPaint()`:
   // the backend and the last frame's draw calls (WebGL's; 0 for Canvas 2D). For the comparison of the two (e2e/town-webgl.spec.ts).
@@ -1080,7 +1290,7 @@ function startTown(
     const p = painter as Painter & { uploads?: number; resets?: number };
     return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0 };
   };
-  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townBackend?: typeof hookBackend; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench };
+  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townBackend?: typeof hookBackend; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townRide?: typeof hookRide };
   hooks.__townAt = hookAt;
   hooks.__townGlide = hookGlide;
   hooks.__townGather = hookGather;
@@ -1098,6 +1308,7 @@ function startTown(
   hooks.__townBackend = hookBackend;
   hooks.__townPaint = hookPaint;
   hooks.__townBench = hookBench;
+  hooks.__townRide = hookRide;
 
   run();
   draw(performance.now()); // the first frame, before the screen shows
@@ -1133,6 +1344,31 @@ function startTown(
       meet(town, { bot, table, yours, theirs: bot.walker.here() });
     },
     confirm: () => card && setCard({ ...card, confirm: true }),
+    /** A home's "Go in" (a shop's: shops/shops.ts): you walk to the square in front of its door, and go in once there. */
+    goIn: (i: number) => {
+      const h = HOMES[i]!;
+      setCard(null);
+      leaveClose();
+      cancelMeet(town);
+      town.you.sit = false;
+      const to = spotNear(town, town.you.walker, { c: h.cx, r: wrapI(h.cy - 2) }, false);
+      if (!to || !walkWalker(town.you.walker, to)) return;
+      goingIn = i;
+      follow = true;
+      glide = null;
+    },
+    /** Inside a shop the town waits (`away`: no frames); coming out, it goes on. */
+    pause: () => {
+      away = true;
+      goingIn = -1;
+      halt();
+    },
+    resume: () => {
+      away = false;
+      run();
+    },
+    /** Your pawn's picture as the town draws it (your items on), for the room inside a shop. */
+    youArt: () => r.youArt,
     chip: (i: number) => {
       const h = chipPlace[i];
       if (!h) return;
@@ -1145,6 +1381,11 @@ function startTown(
     },
     stop: () => {
       alive = false;
+      // (Every rider's frames freed: they'd stay in memory into a game otherwise.)
+      r.youRider = r.youSoon = null;
+      r.riders.clear();
+      r.ridersSoon.clear();
+      dropRiders();
       clearTimeout(lostWait);
       offAccount();
       fpsEl?.remove();
@@ -1169,6 +1410,7 @@ function startTown(
       delete hooks.__townBackend;
       delete hooks.__townPaint;
       delete hooks.__townBench;
+      delete hooks.__townRide;
       painter.dispose();
       if (card?.kind === "boss") town.bosses[card.i]!.held = false;
       detach();
@@ -1176,7 +1418,7 @@ function startTown(
   };
 }
 
-const POSE = { x: 0, y: 0, hop: 0, tilt: 0 };
+const POSE = { x: 0, y: 0, hop: 0, tilt: 0, step: false, t: 0 };
 /** How long a lost WebGL context may stay lost before the town goes back to Canvas 2D (it's usually back within a second). */
 const LOST_WAIT_MS = 5000;
 /** The frame-rate pill's name for each backend. */

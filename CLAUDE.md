@@ -73,8 +73,10 @@ spelling in names too; older names (e.g. `colour`) stay until touched.
     once the boss kit lands): about 4 to 8 minutes in all (measured Oct 18: 3 m 44 s for the smoke set alone, 5 m 28 s
     for one boss's file). `e2e/areas.json` maps paths to specs; a shared
     foundation (package.json, the lockfile, the Playwright config, `packages/core`, the runner, the protocol, the board,
-    …) or a path it doesn't know runs the whole suite, and so does the `full-e2e` label. Every push to `main` runs the
-    whole suite, both projects, on 5 runners (about 17 minutes). `docs/areas/ops.md`, "CI e2e". A new boss (or any new
+    …) or a path it doesn't know runs the whole suite, and so does the `full-e2e` label. Settings, `e2e/helpers.ts` and
+    a few shared app modules are traced instead (Nov 1): the specs of whatever uses what the diff changes. Every push to
+    `main` runs the whole suite, both projects, on 5 runners (about 44 minutes), one run at a time (a newer push
+    waiting replaces an older one; the next run covers both). `docs/areas/ops.md`, "CI e2e". A new boss (or any new
     area) adds its paths and spec to `e2e/areas.json`, or its PRs keep running everything. CI retries a failed test
     once until the flaky-test batch lands (the goal is no retries); its `result` job lists flaky tests (passed only on
     the retry) first, then failed ones, each with its shard, `file:line`, project and error. Not a required check yet
@@ -152,16 +154,35 @@ Specialist agents live in `.claude/agents/` (one file each: a name, when to use 
   out of hand"; "I should be able to tell you to add a boss and it should take an hour of a few agents running in
   parallel to finish and push"): each change gets exactly what its lane and the helper testing budget under "Test
   lanes" ask for, no more and no less, at the effort its task calls for. A trial: see "Test lanes".
-  - A review round, or a fix round after a merge, goes to a fresh helper with a one-page handoff (the PR, the
-    findings, the files), not to a resumed one carrying hundreds of thousands of tokens. A helper mid-task keeps going.
-  - Waiting (CI, a deploy, a local run) is one background command that reports when it's done, never a loop of looks.
-  - Big output goes to a file: read its tail or grep it. Screenshots: look at the final ones, not every attempt.
-    Small checks go together in one command.
+  - **The director's notes survive restarts only on GitHub.** A container restart wipes everything unpushed (scratchpad,
+    worktrees, watchers, helpers). At every session start the director reads branch `claude/director-notes`:
+    `notes/RULES.md` (every standing rule), `notes/STATUS.md` (the live state and queue), `notes/CHANGELOG.md`; scripts in
+    `notes/tools/`, briefs in `notes/briefs/`. Update and push them after every change. Helpers push work in progress
+    at each real step. (The repo is public by Eric's choice, Nov 1; revisit before launch. Never a secret value.)
+  - **One Opus helper at a time (Eric's rule, restated Nov 1, 2026; first set in October after a night of about ten
+    helpers at once used about 30% of a week's usage).** The director never has more than one Opus helper running;
+    the next starts when it finishes. A Haiku helper for a small UI or docs job may run beside it only if Eric has OK'd
+    that job. Background scripts (CI and deploy watchers) don't count. Nov 1: the rule was lost after a restart and four
+    Opus helpers ran at once; this line is here so it survives restarts.
+  - A review round, a fix round after a merge, or a new job goes to a fresh helper with a one-page handoff (the PR, the
+    findings, the files), never to a resumed one carrying hundreds of thousands of tokens (Nov 1 audit: seven of the ten
+    costliest helpers had been resumed for more rounds or handed the next job). A helper mid-task keeps going.
+  - Waiting: the director waits with one background command that reports when it's done. A helper can't sit idle
+    (ending its turn ends its run), so it waits in one foreground Bash call, `timeout 590 bash -c 'until <done>; do
+    sleep 30; done'`, repeated if needed: never with `Monitor` (Nov 1 audit: helpers re-armed it hundreds of times,
+    every few seconds, each one a full re-read) and never polling more often than every 30 s.
+  - Helpers push and report; they don't open PRs or wait on CI. The director opens the PR (GitHub MCP) from the
+    helper's PR-body file and watches CI.
+  - Locally, run only the tests being written or changed (plus `@perf` where the rules ask); don't re-run the whole
+    area spec before pushing: CI does that.
+  - Big output goes to a file: read its tail or grep it. Images: the final stills only, about 10 a job, not every
+    attempt. Small checks go together in one command.
   - After each batch of work the director runs `python3 .claude/tools/helper-usage.py <its task folder>` (one line per
     helper: steps, peak history, re-read, hours, waits, big outputs, images). Only when a helper stands out or a new
     waste pattern shows, it starts an audit helper (same model, `medium`, read-only) on those helpers. The audit only
     proposes: the director weighs each proposal, and Eric approves any that touch a quality gate (tests, reviews, CI,
-    effort) or this file. Two audits in a row that change nothing retire it. `docs/decisions/2026-10-17-working-lean.md`.
+    effort) or this file. Two audits in a row that change nothing retire it. `docs/decisions/2026-10-17-working-lean.md`;
+    the Nov 1 audit and what came of it: `docs/decisions/2026-11-01-usage-audit.md`.
 - **Any other window works only in its own lane** and doesn't act as the director.
 - **Before starting,** check `git log origin/main` and open PRs for work already in flight.
 - Each piece of work goes on its own branch and PR.

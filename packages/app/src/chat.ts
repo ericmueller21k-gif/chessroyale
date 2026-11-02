@@ -12,6 +12,8 @@ import {
   chatSent,
   noChatSent,
   ownedChatPacks,
+  type BotChatMoment,
+  type BotLine,
   type ChatSay,
   type ChatSent,
   type ChatTo,
@@ -392,10 +394,13 @@ export class MatchChat {
 }
 
 /**
- * Solo's lobby chat: the queue screen while your bots take their seats. There's no server, so this stands in for
- * one, with the same checks (a known line you own, the limits; mute and chat off are the device's own, as online)
- * and a hello or two from the bots as they sit down. Solo matches themselves have no chat, so it closes as the match
- * begins.
+ * Solo's chat: the queue screen while your bots take their seats, then (a 50 v 50, Nov 1) the match itself. There's no
+ * server, so this stands in for one, with the same checks (a known line you own, the limits; mute and chat off are the
+ * device's own, as online). The bots chat as they do online (botChatLines: a hello or two as they sit down, "Good
+ * luck!" as the match begins, "Nice move!" from a teammate after a great crowd move, "GG" at the end) and now and then
+ * besides (chatter: an everyday pick from a teammate after some of your team's moves), at most
+ * QUICK_CHAT.botMaxPerMinute lines a minute in all, never on the cut screen. A team's lines reach that team only, as online.
+ * Other solo matches (raids, Boss alone) have no chat in the match: it closes as the match begins.
  */
 export class SoloLobbyChat {
   readonly chat: MatchChat;
@@ -403,6 +408,10 @@ export class SoloLobbyChat {
   private sent: ChatSent = noChatSent();
   /** When the bots' lines are said (the per-minute cap). */
   private botTimes: number[] = [];
+  /** In a 50 v 50's match: each seat's team (null in a boss battle: one team). Null in the queue. */
+  private sideOf: ((id: string) => "w" | "b" | null) | null = null;
+  /** The bots' lines waiting to be said. */
+  private timers = new Set<ReturnType<typeof setTimeout>>();
 
   constructor(
     private readonly me: string,
@@ -410,15 +419,17 @@ export class SoloLobbyChat {
     /** The shop items your account owns (your chat packs), and the lines and emoji you picked. */
     private readonly owned: () => readonly string[] | undefined,
     picks: () => StoredChatPicks | null | undefined,
+    /** No bot line shows while this says so (the cut screen). */
+    private readonly quiet: () => boolean = () => false,
   ) {
     this.chat = new MatchChat({
-      // (No lobby code: a mute here lasts as long as the queue.)
+      // (No lobby code: a mute here lasts as long as the match.)
       code: () => "",
       me: () => me,
       send: (m) => this.receive(m),
       emit,
       local: (t) => t,
-      teams: () => false,
+      teams: () => !!this.sideOf?.(me),
       picks,
     });
   }
@@ -439,7 +450,56 @@ export class SoloLobbyChat {
     }
   }
 
+  /** A 50 v 50 begins: chat carries on into the match, now with teams, and a bot or two wishes everyone luck. */
+  startMatch(sideOf: (id: string) => "w" | "b" | null, bots: readonly string[]) {
+    if (!this.chat.enabled) return;
+    this.sideOf = sideOf;
+    this.chat.setTo("team");
+    this.botsSay({ kind: "start" }, bots);
+  }
+
+  /**
+   * A moment in the match (botChatLines'): a bot or two may say something a moment later, as online. Nothing in the queue
+   * or once chat has closed; a line due on the cut screen isn't said.
+   */
+  botsSay(moment: BotChatMoment, bots: readonly string[], rng: () => number = Math.random) {
+    const side = this.sideOf;
+    if (!this.chat.enabled || !side) return;
+    const now = Date.now();
+    for (const l of botChatLines(rng, moment, bots, this.botTimes, now)) this.later(l, side, now);
+  }
+
+  /**
+   * Now and then (solo's own, Eric, Nov 1: "have the bots just chatting still"): after your team's move, a teammate may
+   * say one of the everyday picks (QUICK_CHAT.botChatter) to the team, within the same per-minute cap.
+   */
+  chatter(mates: readonly string[], rng: () => number = Math.random) {
+    const side = this.sideOf;
+    if (!this.chat.enabled || !side || !mates.length || rng() >= QUICK_CHAT.botChatterChance) return;
+    const now = Date.now();
+    const [lo, hi] = QUICK_CHAT.botDelayMs;
+    const delayMs = Math.round(lo + rng() * (hi - lo));
+    if (this.botTimes.filter((t) => t > now + delayMs - 60_000).length >= QUICK_CHAT.botMaxPerMinute) return;
+    const say = QUICK_CHAT.botChatter[Math.floor(rng() * QUICK_CHAT.botChatter.length)]!;
+    this.later({ from: mates[Math.floor(rng() * mates.length)]!, say, to: "team", delayMs }, side, now);
+  }
+
+  /** A bot's line, said when its moment comes (unless chat closed, it's the cut screen, or it's the other team's). */
+  private later(l: BotLine, side: (id: string) => "w" | "b" | null, now: number) {
+    this.botTimes = [...this.botTimes.filter((t) => t > now - 120_000), now + l.delayMs];
+    const t = setTimeout(() => {
+      this.timers.delete(t);
+      const team = side(l.from);
+      if (!this.chat.enabled || this.quiet() || (l.to === "team" && team !== null && team !== side(this.me))) return;
+      this.chat.onLine({ n: ++this.n, from: l.from, say: l.say, to: l.to, team, at: Date.now() });
+    }, l.delayMs);
+    this.timers.add(t);
+  }
+
   close() {
+    for (const t of this.timers) clearTimeout(t);
+    this.timers.clear();
+    this.sideOf = null;
     this.chat.close();
   }
 
@@ -454,7 +514,11 @@ export class SoloLobbyChat {
     if (!canSay(line.id, this.owned())) return this.chat.onRefused(say, "locked", now);
     const check = chatCheck(this.sent, line.id, now);
     if (!check.ok) return this.chat.onRefused(say, check.limit, check.retryAt);
+    const side = this.sideOf?.(this.me) ?? null;
+    // (In the match, a line goes to your team, or to everyone if it may: Hello and Sporting lines, and emoji.)
+    if (this.sideOf && m.to === "all" && side && !canSayToAll(line.id)) return this.chat.onRefused(say, "team", now);
     this.sent = chatSent(this.sent, line.id, now);
-    this.chat.onLine({ n: ++this.n, from: this.me, say: line.id, to: "all", team: null, at: now, lobby: true });
+    if (!this.sideOf) return this.chat.onLine({ n: ++this.n, from: this.me, say: line.id, to: "all", team: null, at: now, lobby: true });
+    this.chat.onLine({ n: ++this.n, from: this.me, say: line.id, to: side && m.to !== "all" ? "team" : "all", team: side, at: now });
   }
 }

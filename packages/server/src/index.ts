@@ -28,6 +28,7 @@ import { pruneChatMod } from "./chat-mod.ts";
 import type { AccessEnv } from "./access.ts";
 import { SERVER_RECHECK_NODES, serverScoreAt, warmEngine, type EngineEnv } from "./engine.ts";
 import { isPaused, pausedResponse, switchStatus, type KillSwitchEnv } from "./kill-switches.ts";
+import { RANGED_ASSETS, rangedAsset } from "./ranged.ts";
 
 export { Lobby, SquadsLobby, SquadsParty, Matchmaker, LiveHub, DuelGame };
 export { EngineServer } from "./engine.ts";
@@ -118,6 +119,9 @@ async function handle(request: Request, rawEnv: Env, ctx: ExecutionContext): Pro
   const url = new URL(request.url);
   // (The admin pages, fair play's and ops', are the Worker's own; everything else outside /api is the app.)
   const admin = /^\/admin\/(fairplay|ops)(\/|$)/.test(url.pathname);
+  // (The Colosseum's hour of ambience, streamed: Range requests, which the asset server doesn't answer; ranged.ts.)
+  const ranged = RANGED_ASSETS[url.pathname];
+  if (ranged) return rangedAsset(request, rawEnv.ASSETS, ranged);
   if (!url.pathname.startsWith("/api/") && !admin) return rawEnv.ASSETS.fetch(request);
   // Load-test counters (OPS_STATS set, and the matching key): see ops.ts.
   if (url.pathname === "/api/ops/stats" && rawEnv.OPS_STATS && request.headers.get("x-ops-key") === rawEnv.OPS_STATS) {
@@ -131,7 +135,7 @@ async function handle(request: Request, rawEnv: Env, ctx: ExecutionContext): Pro
     {
       ip: request.headers.get("cf-connecting-ip"),
       session: readCookie(request, SESSION_COOKIE),
-      play: request.method === "POST" && (url.pathname === "/api/play" || url.pathname === "/api/lobby" || url.pathname === "/api/1v1/play" || /^\/api\/squads\/(play|party|lobby)$/.test(url.pathname)),
+      play: request.method === "POST" && (url.pathname === "/api/play" || url.pathname === "/api/lobby" || url.pathname === "/api/1v1/play" || /^\/api\/squads\/(play|party|lobby)$/.test(url.pathname) || url.pathname === "/api/boss/party"),
       friends: request.method === "POST" && url.pathname.startsWith("/api/friends/"),
     },
     t,
@@ -237,6 +241,23 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
       const { overrides, keepMs } = lobbyOptions(url.searchParams, test);
       const code = await openLobbyCode(async (c) => (await env.LOBBIES.get(env.LOBBIES.idFromName(c)).create(c, overrides, undefined, keepMs)) !== false);
       return code ? json({ code }) : json({ message: "Couldn't create a lobby. Try again." }, 500);
+    }
+    // Boss Battle's party (boss-party.ts; docs/decisions/2026-10-30-boss-party.md): POST /api/boss/party → { code } (the
+    // invite link is /boss/party/CODE); GET /api/boss/party/CODE → { open, members, state } | 404; …/ws: its WebSocket.
+    // One Durable Object per party, Squads' (PARTIES, SquadsParty) with kind "boss". Online: a raid's kill switch rests it.
+    if (url.pathname === "/api/boss/party" && request.method === "POST") {
+      if (isPaused(rawEnv, "raid")) return pausedResponse("raid");
+      const refused = await mayPlay(request, env, waitUntil);
+      if (refused) return refused;
+      const code = await openLobbyCode(async (c) => env.PARTIES.get(env.PARTIES.idFromName(c)).create(c, "", 0, "boss"));
+      return code ? json({ code }) : json({ message: "Couldn't make a party. Try again." }, 500);
+    }
+    const bp = url.pathname.match(/^\/api\/boss\/party\/([A-Z2-9]{5})(\/ws)?$/i);
+    if (bp) {
+      const stub = env.PARTIES.get(env.PARTIES.idFromName(bp[1]!.toUpperCase()));
+      if (bp[2]) return (await stub.status()) ? stub.fetch(request) : json({ message: "We couldn't find that party." }, 404);
+      const status = request.method === "GET" ? await stub.status() : null;
+      return status ? json({ open: true, ...status }) : json({ open: false, message: "That party has closed." }, 404);
     }
     // Squads (docs/areas/squads.md, "The server"): its queue, parties and lobbies, and the test lobby.
     const squads = await squadsRoute(request, env, url, waitUntil);
@@ -355,7 +376,7 @@ async function duelRoute(request: Request, env: Env, url: URL, waitUntil: WaitUn
       if (!me) return json({ message: SIGN_IN_TO_PLAY }, 401);
       const sql = d1Sql(env.DB);
       await ensureSchema(sql, env.DB);
-      const { player, rating, rd } = await duelEntrant(sql, me);
+      const { player, rating, rd } = await duelEntrant(sql, me, Date.now(), isAdmin(env, me));
       const clock = Number(url.searchParams.get("clock"));
       const testSeconds = url.searchParams.has("clock") && Number.isFinite(clock) && clock > 0 && (await testSwitches(request, env, waitUntil)) ? Math.min(3600, Math.round(clock)) : null;
       // (The first answer also carries the hidden rating, rounded: the bot a player may choose meets them there.)

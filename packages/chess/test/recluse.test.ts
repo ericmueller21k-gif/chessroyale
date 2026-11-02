@@ -6,6 +6,7 @@ import {
   BOSS_ROSTER,
   DEFAULT_SETTINGS,
   RAID_SETTINGS,
+  adminFirstBosses,
   adminPlayable,
   bossBrainFor,
   bossDef,
@@ -107,9 +108,12 @@ describe("who meets him: hidden from players, an admin's Boss alone, and the Cro
 
   it("the boss menu lists him for an admin picking for Boss alone, after the rest; never for a player, never for a raid", () => {
     const ids = (admin: boolean, raid: boolean) => menuBosses({ admin, raid }).map((b) => b.id);
+    const admitted = [...playableBosses(), ...adminFirstBosses()].map((b) => b.id);
     expect(ids(true, false).at(-1)).toBe("recluse");
-    expect(ids(true, false).slice(0, -1)).toEqual(playableBosses().map((b) => b.id));
-    for (const [admin, raid] of [[false, false], [false, true], [true, true]] as const) expect(ids(admin, raid)).toEqual(playableBosses().map((b) => b.id));
+    // (The rest for an admin: the playable bosses and the admins-first ones (Timber, Nov 1), then the hidden one.)
+    expect(ids(true, false).slice(0, -1)).toEqual(admitted);
+    for (const [admin, raid] of [[false, false], [false, true]] as const) expect(ids(admin, raid)).toEqual(playableBosses().map((b) => b.id));
+  expect(ids(true, true)).toEqual(admitted);
   });
 
   it("his bar's level is unknown, \"LVL ???\": null, with no base, from the first view and through the battle", async () => {

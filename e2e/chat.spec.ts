@@ -155,15 +155,32 @@ test("quick chat picks in the profile: search, a check, n/10, locked lines to th
   await expect(phone.locator(".qchat-lobby .qrow:not(.emoji) .qchip")).toHaveText(phonePicks);
   for (const p of [desk, phone]) await expect.poll(() => phase(p), { timeout: 90_000 }).toMatch(/play|watching/);
   const same = (await team(desk)) === (await team(phone));
+  /** The phone's chat tab: open a picker ("Quick phrases" or "Emoji") and tap a line in it. */
+  const sayOnPhone = async (picker: string, text: string) => {
+    if (!(await phone.locator(".qchat-tab .qpop").count())) await phone.getByRole("button", { name: picker, exact: true }).click();
+    await phone.locator(".qchat-tab .qpop .qchip", { hasText: text }).click();
+  };
 
-  // Phone: chat shares the space under the board with the scoreboard (narrow), side by side. Never over the board.
-  await expect(phone.locator(".under-board.ub-split .mini-tower.narrow")).toBeVisible();
-  const split = phone.locator(".under-board.ub-split .qchat-split");
+  // Phone (Nov 1): one box under the vote box, the scoreboard, with Chat as its tab. Chat replaces the scoreboard in the
+  // same box (same place, same size); it never covers the board.
+  await expect(phone.locator(".under-board.ub-tab .mini-tower")).toBeVisible();
+  await expect(phone.locator(".under-board .qchat")).toHaveCount(0);
+  const boxBefore = (await rect(phone, ".under-board.ub-tab"))!;
+  await phone.getByRole("button", { name: "Chat", exact: true }).click();
+  const split = phone.locator(".under-board.ub-tab .qchat-tab");
   await expect(split).toBeVisible();
-  expect(overlaps((await rect(phone, ".qchat-split"))!, (await rect(phone, `.board-area ${BOARD_SEL.squares}`))!)).toBe(false);
-  // Exactly the lines picked in the profile, in that order; the emoji picked.
-  await expect(phone.locator(".qchat-split .qrow:not(.emoji) .qchip")).toHaveText(phonePicks);
-  await expect(phone.locator(".qchat-split .qrow.emoji .qchip")).toHaveText(["👍", "👏", "😂", "😮", "😬", "🔥", "🎉"]);
+  await expect(phone.locator(".under-board .mini-tower")).toHaveCount(0);
+  expect(await rect(phone, ".under-board.ub-tab")).toEqual(boxBefore);
+  expect(overlaps((await rect(phone, ".qchat-tab"))!, (await rect(phone, `.board-area ${BOARD_SEL.squares}`))!)).toBe(false);
+  // (Nov 1, Eric: no rows of buttons under the feed; "T" opens the phrases, the emoji button the emoji.) Exactly the lines
+  // picked in the profile, in that order; the emoji picked.
+  await expect(phone.locator(".qchat-tab .qbuttons")).toHaveCount(0);
+  await phone.getByRole("button", { name: "Quick phrases", exact: true }).click();
+  await expect(phone.locator(".qchat-tab .qpop .qgroup-lines:not(.emoji) .qchip")).toHaveText(phonePicks);
+  await phone.getByRole("button", { name: "Emoji", exact: true }).click();
+  await expect(phone.locator(".qchat-tab .qpop .qgroup-lines.emoji .qchip")).toHaveText(["👍", "👏", "😂", "😮", "😬", "🔥", "🎉"]);
+  await phone.getByRole("button", { name: "Emoji", exact: true }).click();
+  await expect(phone.locator(".qchat-tab .qpop")).toHaveCount(0);
   // Computer: the chat panel in the column beside the board (the leaderboard has the side of the screen).
   await expect(desk.locator(".under-board.side .qchat-side")).toBeVisible();
   await expect(desk.locator(".tower-side")).toBeVisible();
@@ -176,18 +193,23 @@ test("quick chat picks in the profile: search, a check, n/10, locked lines to th
   // In All, plans can't be sent; emoji can.
   await expect(desk.locator(".qchat-side .qchip", { hasText: "Defend the king!" })).toBeDisabled();
   await desk.locator(".qchat-side .qchip", { hasText: "For the crown!" }).click();
-  await expect(phone.locator(".qchat-split .qline", { hasText: "For the crown!" }).filter({ hasText: "Desky" })).toBeVisible();
+  await expect(phone.locator(".qchat-tab .qline", { hasText: "For the crown!" }).filter({ hasText: "Desky" })).toBeVisible();
   await desk.locator(".qto button", { hasText: "Team" }).click();
 
-  // A plan goes to your team only. Right after sending, the buttons gray out (one message every 3 s).
-  await phone.locator(".qchat-split .qchip", { hasText: "Push the pawns!" }).click();
-  await expect(phone.locator(".qchat-split .qline.you", { hasText: "Push the pawns!" })).toBeVisible();
-  await expect(phone.locator(".qchat-split .qchip", { hasText: "Wow!" })).toBeDisabled();
+  // A plan goes to your team only. Sending closes the phrases; right after, the buttons gray out (one message every 3 s).
+  await sayOnPhone("Quick phrases", "Push the pawns!");
+  await expect(phone.locator(".qchat-tab .qline.you", { hasText: "Push the pawns!" })).toBeVisible();
+  await expect(phone.locator(".qchat-tab .qpop")).toHaveCount(0);
+  await phone.getByRole("button", { name: "Quick phrases", exact: true }).click();
+  await expect(phone.locator(".qchat-tab .qchip", { hasText: "Wow!" })).toBeDisabled();
   await desk.waitForTimeout(1000);
   expect(await desk.locator(".qchat-side .qline", { hasText: "Push the pawns!" }).count()).toBe(same ? 1 : 0);
-  await expect(phone.locator(".qchat-split .qchip", { hasText: "Wow!" })).toBeEnabled({ timeout: 4000 });
+  await expect(phone.locator(".qchat-tab .qchip", { hasText: "Wow!" })).toBeEnabled({ timeout: 4000 });
   // The same line again stays grayed for a while.
-  await expect(phone.locator(".qchat-split .qchip", { hasText: "Push the pawns!" })).toBeDisabled();
+  await expect(phone.locator(".qchat-tab .qchip", { hasText: "Push the pawns!" })).toBeDisabled();
+  // A tap elsewhere (the feed) closes the phrases.
+  await phone.locator(".qchat-tab .qfeed").click({ position: { x: 5, y: 5 } });
+  await expect(phone.locator(".qchat-tab .qpop")).toHaveCount(0);
 
   // The server drops free text and lines from packs you don't own (the phone hasn't got the God King pack).
   await phone.evaluate(() => {
@@ -200,7 +222,8 @@ test("quick chat picks in the profile: search, a check, n/10, locked lines to th
   expect(await desk.evaluate(() => (window as any).match.chat.list.filter((l: any) => l.say === "gk-crown").length)).toBe(1);
 
   // An emoji to the team floats over its sender's row on the computer's leaderboard (when they're on the same team).
-  await phone.locator(".qchat-split .qrow.emoji .qchip").first().click();
+  await phone.getByRole("button", { name: "Emoji", exact: true }).click();
+  await phone.locator(".qchat-tab .qpop .qchip.emoji").first().click();
   if (same) await expect(desk.locator(".tower-side .t-float")).toBeVisible();
 
   // An emoji to everyone: it reaches the phone whichever team it's on. On the other team's scoreboard (no row for
@@ -208,17 +231,20 @@ test("quick chat picks in the profile: search, a check, n/10, locked lines to th
   await desk.locator(".qto button", { hasText: "All" }).click();
   const fire = desk.locator(".qchat-side .qgroup-lines.emoji .qchip", { hasText: "🔥" });
   await expect(fire).toBeEnabled();
+  // (The floats are on the scoreboard: the phone is on it while the emoji comes in, then its chat again.)
+  await phone.getByRole("button", { name: "Back", exact: true }).click();
   await fire.click();
-  await expect(phone.locator(".qchat-split .qline.emoji", { hasText: "🔥" }).filter({ hasText: "Desky" })).toBeVisible();
-  expect(await phone.evaluate(() => (window as any).match.chat.list.find((l: any) => l.say === "e-fire")?.to)).toBe("all");
   await expect(phone.locator(".mini-tower .t-float").first()).toBeVisible();
   if (!same) await expect(phone.locator(".mini-tower .tower-floats .t-float.away .team-chip")).toBeVisible();
+  await phone.getByRole("button", { name: "Chat", exact: true }).click();
+  await expect(phone.locator(".qchat-tab .qline.emoji", { hasText: "🔥" }).filter({ hasText: "Desky" })).toBeVisible();
+  expect(await phone.evaluate(() => (window as any).match.chat.list.find((l: any) => l.say === "e-fire")?.to)).toBe("all");
   await desk.locator(".qto button", { hasText: "Team" }).click();
 
   // The computer mutes the phone (a tap on the name): their lines disappear, and the server stops sending them.
   await phone.waitForTimeout(3100);
   await phone.locator(".qto button", { hasText: "All" }).click();
-  await phone.locator(".qchat-split .qchip", { hasText: "Have fun!" }).click();
+  await sayOnPhone("Quick phrases", "Have fun!");
   const line = desk.locator(".qchat-side .qline", { hasText: "Have fun!" }).filter({ hasText: "Phoney" });
   await expect(line).toBeVisible();
   await line.locator(".qline-name").click();
@@ -226,33 +252,43 @@ test("quick chat picks in the profile: search, a check, n/10, locked lines to th
   await expect(line).toHaveCount(0);
   await expect(desk.locator(".qchat-side .qfeed-empty", { hasText: "Muted: Phoney" })).toBeVisible();
   await phone.waitForTimeout(3100);
-  await phone.locator(".qchat-split .qchip", { hasText: "Good luck!" }).click();
-  await expect(phone.locator(".qchat-split .qline.you", { hasText: "Good luck!" })).toBeVisible();
+  await sayOnPhone("Quick phrases", "Good luck!");
+  await expect(phone.locator(".qchat-tab .qline.you", { hasText: "Good luck!" })).toBeVisible();
   await desk.waitForTimeout(800);
   expect(await desk.evaluate(() => (window as any).match.chat.list.some((l: any) => l.say === "good-luck" && !/^bot/.test(l.from)))).toBe(false);
   await phone.locator(".qto button", { hasText: "Team" }).click();
 
-  // The phone, chat full width: the emoji in one row, no scrolling; the board still takes a move by two taps.
+  // The phone, on its chat tab (the whole box): the emoji picker inside the box, every emoji whole, no sideways scroll, every
+  // tap target 24 px or more (its two buttons too); the board still takes a move by two taps.
   const boardBefore = (await rect(phone, `.board-area ${BOARD_SEL.squares}`))!;
-  await phone.getByRole("button", { name: "Chat full width" }).click();
-  await expect(phone.locator(".under-board.ub-chat .qchat-full")).toBeVisible();
+  await expect(phone.locator(".under-board.ub-tab .qchat-tab")).toBeVisible();
   await expect(phone.locator(".under-board .mini-tower")).toHaveCount(0);
-  const emojiRow = phone.locator(".qchat-full .qrow.emoji");
-  expect(await emojiRow.evaluate((el) => el.scrollWidth - el.clientWidth)).toBe(0);
-  expect(new Set(await emojiRow.locator(".qchip").evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)))).size).toBe(1);
+  await phone.getByRole("button", { name: "Emoji", exact: true }).click();
+  const pop = phone.locator(".qchat-tab .qpop");
+  expect(await pop.evaluate((el) => el.scrollWidth - el.clientWidth)).toBe(0);
+  const inBox = (await rect(phone, ".qchat-tab"))!;
+  for (const b of await pop.locator(".qchip").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().toJSON()))) {
+    expect(Math.min(b.width, b.height)).toBeGreaterThanOrEqual(24);
+    expect(b.left >= inBox.x - 0.5 && b.right <= inBox.x + inBox.width + 0.5).toBe(true);
+  }
+  for (const name of ["Quick phrases", "Emoji"]) {
+    const b = (await phone.getByRole("button", { name, exact: true }).boundingBox())!;
+    expect(Math.min(b.width, b.height)).toBeGreaterThanOrEqual(24);
+  }
+  await phone.getByRole("button", { name: "Emoji", exact: true }).click();
+  await expect(pop).toHaveCount(0);
   await untilMyTurn(phone, desk);
-  expect(overlaps((await rect(phone, ".qchat-full"))!, (await rect(phone, `.board-area ${BOARD_SEL.squares}`))!)).toBe(false);
+  expect(overlaps((await rect(phone, ".qchat-tab"))!, (await rect(phone, `.board-area ${BOARD_SEL.squares}`))!)).toBe(false);
   const picked = () => phone.evaluate(() => (window as any).__picked ?? []);
   const first = await tapMove(phone);
   await expect.poll(picked).toEqual([first]);
   // The board never moved or resized for chat.
   expect(await rect(phone, `.board-area ${BOARD_SEL.squares}`)).toEqual(boardBefore);
 
-  // Scoreboard full width (chat hidden): a new line shows as a bubble under the top bar, never over the board, and a
+  // The scoreboard (chat hidden, "‹ Back"): a new line shows as a bubble under the top bar, never over the board, and a
   // move made while it shows still lands.
-  await phone.getByRole("button", { name: "Side by side" }).click();
-  await phone.getByRole("button", { name: "Leaderboard full width" }).click();
-  await expect(phone.locator(".under-board.ub-board .qchat")).toHaveCount(0);
+  await phone.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(phone.locator(".under-board .qchat")).toHaveCount(0);
   await untilMyTurn(phone, desk);
   await desk.locator(".qto button", { hasText: "All" }).click();
   await desk.locator(".qchat-side .qchip", { hasText: "GG" }).click();
@@ -264,12 +300,12 @@ test("quick chat picks in the profile: search, a check, n/10, locked lines to th
   expect(await bubble.evaluate((el) => getComputedStyle(el).pointerEvents)).toBe("none");
   const second = await tapMove(phone);
   await expect.poll(picked).toEqual([first, second]);
-  // While chat is hidden the scoreboard's header counts what's new; a tap brings chat back beside it.
-  const unread = phone.locator(".mini-tower-head .qunread");
+  // While chat is hidden the scoreboard's Chat tab counts what's new; a tap opens chat in the same box.
+  const unread = phone.locator(".under-board .mini-chat-tab .mini-unread");
   await expect(unread).toBeVisible();
-  await unread.click();
-  await expect(phone.locator(".under-board.ub-split .qchat-split")).toBeVisible();
-  await expect(phone.locator(".qchat-split .qline", { hasText: "GG" }).filter({ hasText: "Desky" })).toBeVisible();
+  await phone.locator(".under-board .mini-chat-tab").click();
+  await expect(phone.locator(".under-board.ub-tab .qchat-tab")).toBeVisible();
+  await expect(phone.locator(".qchat-tab .qline", { hasText: "GG" }).filter({ hasText: "Desky" })).toBeVisible();
   await expect(unread).toHaveCount(0);
   expect(await rect(phone, `.board-area ${BOARD_SEL.squares}`)).toEqual(boardBefore);
 });

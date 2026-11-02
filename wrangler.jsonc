@@ -15,7 +15,7 @@
     "directory": "packages/app/dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*", "/admin/fairplay", "/admin/fairplay/*", "/admin/ops", "/admin/ops/*"]
+    "run_worker_first": ["/api/*", "/admin/fairplay", "/admin/fairplay/*", "/admin/ops", "/admin/ops/*", "/sounds/colosseum/ambient.mp3"]
   },
   "durable_objects": {
     "bindings": [

@@ -211,7 +211,7 @@ function Picture({ p, loading }: { p: PublicProfile | null; loading: boolean }) 
               {icon}
             </span>
           ))}
-        {!loading && <DressedPawn size="avatar" look={p?.look} />}
+        {!loading && <DressedPawn size="avatar" ride look={p?.look} />}
       </span>
       {p?.online && !p.hidden && <span class="pp-online" role="img" aria-label="Online" />}
     </div>

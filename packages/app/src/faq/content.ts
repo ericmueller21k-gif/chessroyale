@@ -14,6 +14,8 @@
  */
 import {
   BOSS_BRAIN,
+  BOSS_CLOCK,
+  BOSS_PARTY,
   BOSS_DIFFICULTY,
   BOSS_LEVEL,
   BOSS_POWERS,
@@ -54,6 +56,7 @@ import {
   isPlayable,
   maiaTopRating,
   rankedMinHumans,
+  roundsInStage,
   kingCharges,
   lastStandBar,
   liveStrip,
@@ -211,6 +214,12 @@ function modes(src: FaqSources): FaqSection {
     return o ? `**${o.label}**` : timeControl(p);
   };
   const teamSizes = S.teamFinalSizes.map((x) => `${x}v${x}`);
+  // The cuts (CROWD_KNOCKOUTS, CROWD_STAGE_ROUNDS): how many go at each and after which move the teams play (a stage's
+  // rounds are plies, one move from each team). The team final's cuts, then the ones the boss final and the duel add.
+  const cutAfter = (i: number) => Math.ceil(sum(Array.from({ length: i + 1 }, (_, j) => roundsInStage(C, j))) / 2);
+  const andList = (xs: readonly string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}` : (xs[0] ?? ""));
+  const TK = src.crowdKnockouts.team;
+  const cutsFrom = (f: FinalFormat, from: number) => andList(src.crowdKnockouts[f].slice(from).map((k, i) => `${k} after move ${cutAfter(from + i)}`));
   // The start vote's options by their id (their labels and opening moves from the vote's data).
   const SV = src.startVote;
   const startBy = (id: string) => SV.options.find((o) => o.patch.crowdStart === id);
@@ -228,23 +237,25 @@ function modes(src: FaqSources): FaqSection {
 
 - **${C.lobbySize} players, one game of chess**, from the first move. Two teams of ${team}: your team plays White or Black all game.
 - Each turn, everyone on the side to move picks a move before the clock runs out, and the **most popular pick is played** (a tie is settled at random).
-- Every pick is scored (see [How your moves are scored](#scoring)). No one goes out for the first ${n(C.firstStageRounds / 2, "move")}; after that, the lowest scorers are cut after every move, the same number from each team. Scores carry over all game.
+- Every pick is scored (see [How your moves are scored](#scoring)). No one goes out for the first ${n(cutAfter(0), "move")}. Then the lowest scorers are cut, the same number from each team: ${cutsFrom("team", 0)}, which leaves ${left(TK)} for the team final. A boss final adds ${n(src.crowdKnockouts.boss.length - TK.length, "more cut")} (${cutsFrom("boss", TK.length)}); a duel adds ${n(src.crowdKnockouts.duel.length - TK.length, "more cut")} (${cutsFrom("duel", TK.length)}). The moves count from the first one the teams play (a Random opening's own moves don't count). Scores carry over all game.
 - **A tie at the cut line goes through:** everyone tied exactly with the last player through stays in, and the cuts still to come take the extra, a little at each. So does anyone within ${n(src.crowdScoring.cutGrace, "point")} of that player ([the bubble](#crowd-scoring)). Only the last cut before the ending breaks a tie, so the ending has its size: fewer points given away before the [opening allowance](#opening-allowance) go through, then less thinking time.
 - **You vote on the ending** before move 1: a team final (the top ${left(src.crowdKnockouts.team)} play on: ${teamSizes.slice(0, -1).join(", ")}, then ${teamSizes.at(-1)} to the end), a boss final (the top ${left(src.crowdKnockouts.boss)} team up against ${finalFoe}) or a duel (the best of each side, 1v1). Then on how it starts, then on the clock.
 - **How it starts**, voted on before move 1: ${startLabel("normal")}, the usual starting position; ${startLabel("random")}, a real, balanced opening already ${n(randomMoves, "move")} in for each side, so the game picks up at move ${randomMoves + 1}; or ${startLabel("freestyle")}: the pieces on the back row start shuffled, the same for both sides and different every game. To castle in Freestyle, move your king onto its rook: the king lands on the g- or c-file with the rook beside it, as usual. Nobody voting means ${SV.options[SV.defaultOption]?.label}. Both teams play from that start; a boss final is played from the usual starting position.
 - **The clock is a chess time control**, voted on before move 1: ${timeControls.slice(0, -1).join(", ")} or ${timeControls.at(-1)}. Nobody voting means ${V.options[V.defaultOption]?.label}. Your minutes last the whole game, and each of your moves adds its seconds as it starts; the time you take comes out of your bank, so what a quick move doesn't use is saved for later, as on a chess clock. No move can go past its cap, because your whole team picks together; with an empty bank you still get the added seconds. Your bank is beside the board's clock and in the scoreboard's Bank column. A boss raid is ${namedClock(R)}.
 - **${n(C.powerUpsAtStart, "power-up")}** each: a power-up shows the engine's top 3 moves for that turn.
 - Matchmaking: **Default** fills empty seats with bots after a short wait, **Bots off** waits for real players, and **Solo** is you and bots, at once.
+- **Bots are a lobby of players.** Each bot has its own rating, the same every match (most between 800 and 1500, a few above or below), and picks from the engine's moves about as loosely as a player of that rating would.
 
 ### Boss raid and Boss alone {#mode-boss}
 
 - **Boss raid:** up to ${R.lobbySize} players pick the crowd's moves together against a [boss](#boss-brain); the most popular pick is played. Every boss starts from the starting position.
-- **Where:** **Boss Battle** on the home screen. The bosses are at the top: tap one to see it on the stage below, with you and, behind you, two spots for friends (not open yet), or **?** for a random one. Under the boss's name, the arrows pick its difficulty (${src.difficulty.length} levels, shown by the dots), and **START** meets the boss you picked. Raids with people (**Join a raid**, **People only**, **Raid with bots** and **Play with friends**) are moving to the Boss Arena's Colosseum and aren't on the home screen for now.
+- **Where:** **Boss Battle** on the home screen. The bosses are at the top: tap one to see it on the stage below, with you and, behind you, two spots for friends (tap one to invite them), or **?** for a random one. Under the boss's name, the arrows pick its difficulty (${src.difficulty.length} levels, shown by the dots), and **START** meets the boss you picked. Raids with people (**Join a raid**, **People only**, **Raid with bots** and **Play with friends**) are moving to Chess Town's Colosseum and aren't on the home screen for now.
 - **Scoring:** the [50 v 50 way](#raid-scoring), its limit widening with the crowd's moves (Boss alone scores as before).
-- **The boss strikes:** every ${n(S.bossKillEvery, "crowd move")} it knocks out the player who gave away the most points since its last strike (as the judge counts them, before the [scoring's limit](#raid-scoring), after the [opening allowance](#opening-allowance); a missed move counts as ${n(S.finalMissLoss, "point")}, and a tie goes against the weaker player over the match), until half the raid is left${finalBoss ? "" : ` (in the Crowd's boss final, until ${S.bossMinSurvivors} are left)`}. If two are still tied for the worst, nobody is struck: it strikes after the next crowd move instead.
+- **The boss strikes:** every ${n(S.bossKillEvery, "crowd move")} in a raid it knocks out the player who gave away the most points since its last strike (as the judge counts them, before the [scoring's limit](#raid-scoring), after the [opening allowance](#opening-allowance); a missed move counts as ${n(S.finalMissLoss, "point")}, and a tie goes against the weaker player over the match), until half the raid is left${finalBoss ? "" : ` (in the Crowd's boss final, until ${S.bossMinSurvivors} are left)`}. If two are still tied for the worst, nobody is struck: it strikes after the next crowd move instead.
 - **The God King** fights on your side, with ${n(S.kingChargesMax, "charge")} ([more on him](#god-king)).
 - The battle ends in checkmate or a draw, or after ${n(S.bossMaxMoves, "crowd move")}, when the engine judges the position.
-- **Boss alone** (**START** on the Boss Battle screen): just you against the boss you picked there, at a difficulty from ${src.difficulty[0]?.label} to ${src.difficulty.at(-1)?.label}. You pick every move, and there's no clock: take as long as you like.
+- **With friends** (up to ${BOSS_PARTY.max} of you): invite them from the spots behind you. The leader (with the crown) picks the boss and the difficulty; everyone else taps **READY**, and the leader's **START** works once everyone is ready. In the battle everyone picks every move and sees the others' picks as they come. Two or more on one move: it's played. Otherwise the engine's best pick is played, or, if two are within ${BOSS_PARTY.closeCp} centipawns, one of those at random. The team shares one ${BOSS_CLOCK.bankSeconds / 60} + ${BOSS_CLOCK.incrementSeconds} clock, and the turn waits for everyone: ${BOSS_PARTY.afkKickSec} seconds after the turn's first pick, the leader can remove someone who hasn't picked. The boss never strikes anyone down.
+- **Boss alone** (**START** on the Boss Battle screen): just you against the boss you picked there, at a difficulty from ${src.difficulty[0]?.label} to ${src.difficulty.at(-1)?.label}. You pick every move, on a ${BOSS_CLOCK.bankSeconds / 60} + ${BOSS_CLOCK.incrementSeconds} clock: ${BOSS_CLOCK.bankSeconds / 60} minutes for the battle, and ${BOSS_CLOCK.incrementSeconds} seconds added as each move begins. The boss has no clock, and never strikes you down. If your clock runs out, the boss wins on time.
 - **The Crowd's boss final** is ${finalBoss ? `always ${finalFoe}, for` : "the same fight for"} the last ${left(src.crowdKnockouts.boss)} of a 50 v 50.${finalBoss ? " He's met nowhere else." : ""}
 
 ### Squads {#mode-squads}
@@ -445,7 +456,7 @@ function scoring(src: FaqSources): FaqSection {
     body: `
 ### The judge {#judge}
 
-Every pick is scored by **Stockfish**, the chess engine (the judge). For any position, it gives the side to move an **expected score** from 0 to 1: the chance of a win plus half the chance of a draw. 0.50 is level; 0.62 means you'd expect to score 62 out of 100 from here. The eval bar beside the board shows the same number.
+Every pick is scored by **Stockfish**, the chess engine (the judge). For any position, it gives the side to move an **expected score** from 0 to 1: the chance of a win plus half the chance of a draw. 0.50 is level; 0.62 means you'd expect to score 62 out of 100 from here.
 
 The judge looks at the same fixed amount for every pick (${num(S.engineNodes)} positions), so the same position always gets the same score.
 
@@ -818,6 +829,16 @@ Plays from the game so far. A paper crane folded from a page of handwriting. It 
 - **Draft** (passive): from turn ${p.draftFirst}, every ${n(p.draftEvery, "turn")}, Folio writes an ink mark under one of your pieces that one of its pieces attacks, and the line of that attack shows faintly. The piece is the most valuable one that you defend and that no cheaper piece of Folio's attacks (never your king; between pieces of equal value, one at random). You have ${n(p.draftWindow, "move")} to end that attack: move the piece, block the line, take the attacker, or anything else that stops it. If the same piece of Folio's still attacks it after your ${ordinal(p.draftWindow)} move, your piece is folded: it can't move for ${n(p.foldTurns, "turn")} (tap it and the line under the board says so). The mark goes as soon as the attack ends, even when Folio moves its own piece away. One mark at a time.
 - **Crease** (ultimate): when the rage meter fills, the warning shows a faint line on the board: where the crease will fall. As your next turn begins, the board is creased along that line (between two files, or two rows) for ${n(p.creaseTurns, "turn")}: none of your pieces may move across it, knights included, and no castling whose king or rook would cross it. Folio folds the board toward itself: its own pieces cross it freely. Attacks still cross it, so checks and pins work as usual. The engine picks the line when the warning shows: the one that costs you nearest ${num(p.creaseLossMin)} to ${num(p.creaseLossMax)} pawns as the board stands then, never more. It never picks a line that leaves you without a move, takes away your mate in one or hands Folio one, and it checks that again as the crease falls: if the board has changed so that it would, the crease doesn't fall. While it holds, if every move you have crosses it (say, your only way out of check), it lifts for that turn, as Sawyer's board saw does.
 - **Revision** (once a battle): when your move punishes a blunder of Folio's (its move cost it ${n(p.revisionDrop, "pawn")} or more against its best, and your reply found it), it crosses out both moves: the board goes back to before its move, it plays the engine's best move there instead, and you move again. Your picks on the crossed-out move keep their points. Never before turn ${p.revisionFrom}, and never after a move that ends the battle. It only ever rewrites its own mistake, never yours.`,
+
+  // (Timber is in the game for admins first, BOSS_ADMIN_FIRST: his block shows in the FAQ once he's live for everyone.)
+  timber: (p, b) => {
+    const c = p.workshopCosts;
+    return `
+Plays from the game so far. A beaver builder in an orange hard hat, planks on his back, a woodpecker foreman at his workshop. ${b.offset < 0 ? `His powers are why he plays ${Math.abs(b.offset)} under the usual strength.` : b.offset > 0 ? `He plays ${b.offset} over the usual strength.` : "He plays at the usual strength."}
+
+- **Scraps** (passive): his workshop, the strip in his bar, builds a pawn (${num(c.p)} scraps), a knight (${num(c.n)}), a bishop (${num(c.b)}), a rook (${num(c.r)}) and a queen (${num(c.q)}). He gets a scrap every ${num(p.scrapEverySec)} seconds of real time, whoever's turn it is, and ${num(p.scrapsPerCapture)} more for every piece of yours he takes; each scrap goes to one of the pieces not yet finished, at random. Online the server's clock counts; playing alone, it counts only while the game is on your screen. At the end of his turn, one finished piece, the first finished that he could have in a real game (never a ninth pawn, nor an extra piece beyond what his missing pawns could have promoted into: while he has his whole army, nothing can drop), is dropped onto an empty square of his half of the board: never one you attack, never a pawn on the last row, never a check, never a mate in one for either side, never leaving you without a move, and never one that would put him more than ${n(p.workshopLeadMax, "pawn")} ahead of you on material (he rebuilds what he lost): it waits. One a turn, at most ${n(p.workshopDropMax, "piece")} a battle; then his workshop closes. A finished piece's slot starts again from none.
+- **Gnaw** (ultimate): on his turn after the warning, he plays his move, then gnaws one of your pawns, at random: it's gone, and makes ${n(p.gnawScraps, "scrap")} for his workshop. Never a pawn whose going would put your king in check or leave you without a move. If you have no pawns, there's nothing to gnaw.`;
+  },
 };
 
 /**
@@ -1048,7 +1069,8 @@ function credits(src: FaqSources): FaqSection {
 - **Maia-3**, the human-like model ${src.brain.forPlayers ? "behind [the bosses](#maia-brain)" : "[being tested](#maia-brain) for bosses"}: by the CSSLab, University of Toronto, under the AGPL-3.0 ([Maia-3](https://github.com/CSSLab/maia3)). It runs as its own separate program in your browser; our Maia box's [source code](/engine/maia/maia-box-source.tar.gz) is free to download ([notice](/engine/maia/NOTICE.txt), [license](/engine/maia/LICENSE.txt)).
 - **The chess pieces**: drawn by Colin M.L. Burnett, from [Wikimedia Commons](https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces), under the BSD license ([license](/licenses/pieces.txt)). Alfil's elephant is drawn for HunChess on the bishop's base.
 - **Classic piece sounds** and their variations: [PyChess](https://github.com/pychess/pychess/tree/master/sounds) (GPL-3.0). The variations are made from PyChess's sounds by our own script ([license](/engine/COPYING.txt), [how each was made](/sounds/SOURCES.md), [their source](/sounds/pychess-sounds-source.tar.gz)). Like the engines, they're separate files the game plays, not part of its code.
-- **The app** is built with Preact (MIT) and chess.js (BSD), in the Archivo, Archivo Black and Press Start 2P fonts (SIL Open Font License) ([licenses](/licenses/third-party.txt)). Its other sounds are free of rights (CC0) or the game's own.
+- **The Colosseum's crowd cheer**: [Free Crowd Cheering Sounds](https://opengameart.org/content/free-crowd-cheering-sounds) by Gregor Quendel, under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), trimmed, layered and leveled by HunChess ([credits](/sounds/colosseum/CREDITS.md)).
+- **The app** is built with Preact (MIT) and chess.js (BSD), in the Archivo, Archivo Black and Press Start 2P fonts (SIL Open Font License) ([licenses](/licenses/third-party.txt)). Its other sounds are free of rights (CC0), royalty free or the game's own.
 - The same credits are at the foot of Settings.
 `,
   };

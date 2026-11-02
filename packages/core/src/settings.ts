@@ -12,8 +12,8 @@ export type ScoreCarry = "reset" | "carry";
  * - best: the best move picked (a tie is drawn)
  * - weighted: a draw where better moves get more tickets (see drawWeightPoints)
  */
-export type DrawRule = "random" | "popular" | "best" | "weighted";
-export const DRAW_RULES: readonly DrawRule[] = ["random", "popular", "best", "weighted"];
+export type DrawRule = "random" | "popular" | "best" | "weighted" | "party";
+export const DRAW_RULES: readonly DrawRule[] = ["random", "popular", "best", "weighted", "party"];
 
 /** Game modes: Classic (many boards, players rotate) and Crowd (everyone on one board, the most popular move is played). */
 export type GameMode = "classic" | "crowd";
@@ -234,11 +234,27 @@ export interface Settings {
    */
   moveClockSteps: readonly ClockStep[];
   /**
-   * Boss alone (a raid with nobody else in the crowd): no move clock (Eric, Oct 21: "it can just be infinite time when
-   * you're playing by yourself"): nothing counts down and no move is ever played for you. Not under the Hidden Boss's
-   * bullet clock (his ultimate is the clock). A test link's ?clock= turns it off.
+   * Boss alone (a raid with nobody else in the crowd) plays on Boss Battle's clock, BOSS_CLOCK (10 + 10; Eric, Oct 30: "a
+   * normal time control for all bosses probably just 10 min + 10 per move"; it replaces his Oct 21 untimed one). On in
+   * RAID_SETTINGS; a Solo raid (with bots) keeps the raid's clock, and a test link's ?clock= turns it off.
    */
-  bossAloneUntimed?: boolean;
+  bossAloneClock?: boolean;
+  /**
+   * The battle is on a time bank that loses on time (BOSS_CLOCK): a move that empties the bank isn't played, and the boss
+   * wins on time, as under the Hidden Boss's bullet clock. Set with the bank by bossClockSettings, never alone.
+   */
+  bossClock?: boolean;
+  /**
+   * A Boss Battle party (part 2): any one member's call for the God King acts for the team (his move, his strike), as
+   * the charges are the team's; a raid needs more than half the crowd.
+   */
+  kingAnyCall?: boolean;
+  /**
+   * Boss Battle (alone and in a party) has no boss strikes (Eric, Oct 31: "we got to get rid of the strike down thing
+   * altogether. That's only for the 50-person mode"): nobody is ever knocked out, and no count to a strike shows. Raids
+   * and the Crowd keep theirs.
+   */
+  bossNoStrikes?: boolean;
   /** Pre-game votes: whether a player may move their pawn to another zone after voting (Eric: one vote each, for now). */
   voteChangeAllowed: boolean;
   /**
@@ -279,6 +295,12 @@ export interface Settings {
   roundsPerStage: number;
   /** Rounds in stage 1, before the first cut: longer, so one bad start doesn't knock anyone out. */
   firstStageRounds: number;
+  /**
+   * Rounds in each knockout stage in turn, when a mode's stages differ (Crowd 50 v 50: CROWD_STAGE_ROUNDS); the last entry
+   * covers later stages. Set and not empty, it replaces `firstStageRounds` and `roundsPerStage` (`roundsInStage`); a
+   * test's `?rounds=` empties it.
+   */
+  stageRounds?: readonly number[];
   /** Players knocked out at the end of each knockout stage; the 2v2 final follows. */
   knockoutsPerStage: readonly number[];
   scoresBetweenStages: ScoreCarry;
@@ -305,8 +327,9 @@ export interface Settings {
   engineHashMb: number;
   botCandidateMoves: number;
   /**
-   * Bot skill temperatures T (in points of loss), strongest to loosest. Bots get
-   * skills spread evenly on a log scale across this range. Chosen in milestone 2.
+   * Bot skill temperatures T (in points of loss), strongest to loosest. Since Nov 1 a lobby's bots get the temperature
+   * of their rating (BOT_LOBBY, botStrength), never tighter than this range's first number (the ?weakbots=1 floor);
+   * botSkillSpread (the sims) still spreads skills evenly on a log scale across it.
    */
   botSkillRange: readonly [number, number];
   botRandomMoveChance: number;
@@ -393,7 +416,9 @@ export interface CrowdScoring {
 export const CROWD_SCORING: CrowdScoring = {
   cap: [2, 3.5, 5, 8],
   capCurve: "ratio",
-  capFrom: [0, 1, 5, 9],
+  // ±3.5 from cut 1 (move 11), ±5 from cut 2 (move 16), ±8 from cut 3 (move 20) and in the endings: about where they
+  // came when a cut followed every move (moves 11, 15, 19; the cuts changed on Nov 1, docs/decisions/2026-11-01-crowd-cuts.md).
+  capFrom: [0, 1, 2, 3],
   uncapPawns: 3,
   sharedFrom: 5,
   sharedMin: 3,
@@ -416,7 +441,7 @@ export const CROWD_SCORING: CrowdScoring = {
  * A raid's scoring (Eric, Oct 25: "Raids should use the 50 v 50 math: the dampers and the early forgiveness";
  * docs/decisions/2026-10-25-raid-scoring.md, measured in reports/raid-scoring.md): 50 v 50's, but a raid has no cuts, so
  * the cap widens by the crowd's move (`capFromMove`): +-2 for the first 10 crowd moves, as 50 v 50's first 10 picks,
- * then +-3.5, +-5 and +-8 on the same picks as 50 v 50's cuts 1, 5 and 9. A raid often plays on in a decided game, where
+ * then +-3.5, +-5 and +-8 from picks 11, 15 and 19 (where 50 v 50's cuts 1, 5 and 9 came until Nov 1; its cuts 1, 2 and 3 now). A raid often plays on in a decided game, where
  * every move is "strong", so a move counts for streaks only when the crowd gave away `streakMinAverage` points or more on
  * average. No bubble: nothing is cut. The boss's strike still goes by the points given away (strikeVictim), never by
  * these. Boss alone keeps the old scoring (BOSS_ALONE_SCORING).
@@ -566,6 +591,95 @@ export const WEAK_BOT_SKILL: readonly [number, number] = [8, 32];
  */
 export const WEAK_BOTS: Pick<Settings, "botSkillRange" | "peopleFirst"> = { botSkillRange: WEAK_BOT_SKILL, peopleFirst: true };
 
+/**
+ * The bots as a lobby (Eric, Nov 1: "mostly about 800 to 1500, with some range above and below", like a real lobby of
+ * whoever is online; "a player making the engine's best moves should finish 1st or 2nd").
+ * docs/decisions/2026-11-01-bot-lobby.md.
+ *
+ * - `ratings`: each bot's rating, fixed by its name (the same player every match), on a chess site's scale (Maia's,
+ *   Lichess's). A bell curve (`mean`, `sd`), held within `min` to `max`, rounded to `step`. About 89% of bots land
+ *   between 800 and 1500, about 5% on either side.
+ * - `skillAt`: the bot's temperature (botPick, over the judge's top moves with its `botRandomMoveChance`) that gives
+ *   away, in a Crowd 50 v 50, the points a move Maia gives away at that rating (reports/maia-calibration.md's per-move
+ *   table; the temperatures' losses measured by `packages/sim/scripts/crowd-bots-sim.ts probe`, reports/crowd-bots.md).
+ *   No temperature gives away more than about 7.3 a move, so 600 sits at 128. Between points, along a line in
+ *   log(temperature); held at its ends. Stockfish-style, not Maia: Maia is too slow for a team turn on a phone.
+ */
+export const BOT_LOBBY = {
+  ratings: { mean: 1150, sd: 250, min: 600, max: 2200, step: 100 },
+  skillAt: [
+    [600, 128],
+    [900, 67],
+    [1200, 27],
+    [1500, 16.5],
+    [1800, 11.7],
+    [2100, 8.4],
+    [2400, 6.4],
+  ] as readonly (readonly [number, number])[],
+};
+export type BotLobbySettings = typeof BOT_LOBBY;
+
+/** 32-bit FNV-1a of a string (a bot's name: its fixed rating). */
+function nameHash(name: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < name.length; i++) h = Math.imul(h ^ name.charCodeAt(i), 0x01000193) >>> 0;
+  return h >>> 0;
+}
+
+/** A bot's rating, from its name alone (the same every match): BOT_LOBBY.ratings' bell curve. */
+export function botRatingOf(name: string, b: Pick<BotLobbySettings, "ratings"> = BOT_LOBBY): number {
+  const { mean, sd, min, max, step } = b.ratings;
+  let a = nameHash(name);
+  const next = () => {
+    // (mulberry32, inline: rng.ts imports nothing from here, and this file stays free of imports.)
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const u1 = Math.max(next(), 1e-9);
+  const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * next());
+  return Math.max(min, Math.min(max, Math.round((mean + sd * z) / step) * step));
+}
+
+/** The temperature (botPick) that plays like a rating (BOT_LOBBY.skillAt; held at its ends). */
+export function botSkillForRating(rating: number, b: Pick<BotLobbySettings, "skillAt"> = BOT_LOBBY): number {
+  const pts = b.skillAt;
+  if (rating <= pts[0]![0]) return pts[0]![1];
+  for (let i = 1; i < pts.length; i++) {
+    const [r1, s1] = pts[i]!;
+    const [r0, s0] = pts[i - 1]!;
+    if (rating <= r1) return Math.round(Math.exp(Math.log(s0) + ((rating - r0) / (r1 - r0)) * (Math.log(s1) - Math.log(s0))) * 1000) / 1000;
+  }
+  return pts[pts.length - 1]![1];
+}
+
+/** The rating a temperature plays like (botSkillForRating's inverse, held at its ends), rounded to the step. */
+export function botRatingForSkill(skill: number, b: Pick<BotLobbySettings, "skillAt" | "ratings"> = BOT_LOBBY): number {
+  const pts = b.skillAt;
+  const step = b.ratings.step;
+  const snap = (r: number) => Math.round(r / step) * step;
+  if (skill >= pts[0]![1]) return pts[0]![0];
+  for (let i = 1; i < pts.length; i++) {
+    const [r1, s1] = pts[i]!;
+    const [r0, s0] = pts[i - 1]!;
+    if (skill >= s1) return snap(r0 + ((Math.log(s0) - Math.log(skill)) / (Math.log(s0) - Math.log(s1))) * (r1 - r0));
+  }
+  return pts[pts.length - 1]![0];
+}
+
+/**
+ * A bot's rating and temperature as its seat gets them: its name's rating (botRatingOf), as loose as `botSkillRange`
+ * allows at least (the ?weakbots=1 switch: then the rating that temperature plays like).
+ */
+export function botStrength(name: string, settings: Pick<Settings, "botSkillRange"> = DEFAULT_SETTINGS): { rating: number; skill: number } {
+  const rating = botRatingOf(name);
+  const skill = botSkillForRating(rating);
+  const floor = settings.botSkillRange[0];
+  return skill >= floor ? { rating, skill } : { rating: Math.min(rating, botRatingForSkill(floor)), skill: floor };
+}
+
 /** `count` bot skills spread evenly on a log scale across `botSkillRange`, strongest first. */
 export function botSkillSpread(count: number, settings: Settings = DEFAULT_SETTINGS): number[] {
   const [lo, hi] = settings.botSkillRange;
@@ -578,9 +692,9 @@ export const MAX_OPENING_MOVES = 10;
 /** Plies of opening on a board where White starts (Black-start boards get one more). */
 export const openingPlies = (s: Pick<Settings, "openingMoves">) => 2 * Math.max(0, Math.min(MAX_OPENING_MOVES, Math.round(s.openingMoves)));
 
-/** Rounds in a knockout stage (stage 0 is the longer first one). */
-export const roundsInStage = (s: Pick<Settings, "roundsPerStage" | "firstStageRounds">, stage: number) =>
-  stage === 0 ? s.firstStageRounds : s.roundsPerStage;
+/** Rounds in a knockout stage: `stageRounds`' entry when the mode has a list, else the longer first one, then `roundsPerStage`. */
+export const roundsInStage = (s: Pick<Settings, "roundsPerStage" | "firstStageRounds" | "stageRounds">, stage: number) =>
+  s.stageRounds?.length ? s.stageRounds[Math.min(stage, s.stageRounds.length - 1)]! : stage === 0 ? s.firstStageRounds : s.roundsPerStage;
 
 /**
  * The opening allowance (Eric, Oct 15, 2026; docs/decisions/2026-10-15-opening-allowance-and-ties.md): early in a game a
@@ -602,19 +716,29 @@ export const OPENING_ALLOWANCE = {
 /**
  * Crowd 50 v 50 knockouts for each way to end: they leave 8 (team final), 4 (the boss final, against the Hidden Boss) or
  * 2 (duel); `crowdFinalists` says how many. The boss final's are the duel's cuts stopping at four (Eric, Oct 14: "the top
- * four always battle versus [him]"; it was the top 10 against a random boss).
+ * four always battle versus [him]"; it was the top 10 against a random boss). Fewer, bigger cuts (Eric, Nov 1: "we need
+ * fewer eliminations, but we can eliminate more players"): 100 → 70 → 48 → 32 → 20 → 12 → 8 (team final) → 4 (boss
+ * final) → 2 (duel), half of each cut from each team. Each cut comes after CROWD_STAGE_ROUNDS' stage.
+ * docs/decisions/2026-11-01-crowd-cuts.md.
  */
 export const CROWD_KNOCKOUTS: Record<FinalFormat, readonly number[]> = {
-  team: [16, 14, 12, 10, 8, 8, 6, 6, 4, 4, 4],
-  boss: [16, 14, 12, 10, 8, 8, 6, 6, 4, 4, 4, 2, 2],
-  duel: [16, 14, 12, 10, 8, 8, 6, 6, 4, 4, 4, 2, 2, 2],
+  team: [30, 22, 16, 12, 8, 4],
+  boss: [30, 22, 16, 12, 8, 4, 4],
+  duel: [30, 22, 16, 12, 8, 4, 4, 2],
 };
 
 /**
+ * Crowd 50 v 50: the rounds (plies: a move is one from each team) before each cut, CROWD_KNOCKOUTS' stages in order:
+ * cuts after moves 10, 15, 19, 23, 26 and 29 (the team final), 32 (the boss final) and 34 (the duel). Longer rounds, so
+ * the chess has room between cuts (Eric, Nov 1: "it takes away from the chess game because there's too many cuts").
+ */
+export const CROWD_STAGE_ROUNDS: readonly number[] = [20, 10, 8, 8, 6, 6, 6, 4];
+
+/**
  * Crowd mode: 100 players, 50 v 50, on one board from the starting position; each team picks its side's moves and the
- * most popular pick is played. No cuts for the first 10 moves (20 plies), then a cut after every move (2 plies, half
- * from each team) down to the ending the pre-game vote picked (CROWD_KNOCKOUTS). Scores carry over all game (a stage
- * is only one move long). 3 power-ups, none earned.
+ * most popular pick is played. No cuts for the first 10 moves, then a cut every 2 to 5 moves (CROWD_STAGE_ROUNDS, half
+ * of each cut from each team) down to the ending the pre-game vote picked (CROWD_KNOCKOUTS). Scores carry over all game.
+ * 3 power-ups, none earned.
  */
 export const CROWD_SETTINGS: Partial<Settings> = {
   mode: "crowd",
@@ -624,6 +748,8 @@ export const CROWD_SETTINGS: Partial<Settings> = {
   groupSize: 100,
   knockoutsPerStage: CROWD_KNOCKOUTS.team,
   finalFormat: "team",
+  stageRounds: CROWD_STAGE_ROUNDS,
+  // (Used only when `stageRounds` is emptied: a test's ?rounds=, which sets both.)
   firstStageRounds: 20,
   roundsPerStage: 2,
   scoresBetweenStages: "carry",
@@ -670,10 +796,74 @@ export const RAID_SETTINGS: Partial<Settings> = {
   lobbySize: 50,
   groupSize: 50,
   knockoutsPerStage: [],
+  // (No cuts, so no Crowd schedule: firstStageRounds as before.)
+  stageRounds: [],
   openingMoves: 5,
   powerUpsAtStart: 0,
-  bossAloneUntimed: true,
+  bossAloneClock: true,
 };
+
+/**
+ * Boss Battle's clock (Eric, Oct 30: "10 min + 10 per move" for every boss, alone and in a party): a bank of
+ * `bankSeconds`, `incrementSeconds` added as each move begins, no cap on a single move; the boss has none. In a party it's
+ * the team's one bank. Out of time loses. docs/decisions/2026-10-30-boss-battle-clock.md.
+ */
+export const BOSS_CLOCK = { bankSeconds: 600, incrementSeconds: 10 } as const;
+
+/**
+ * Boss Battle's live party (Eric, Oct 29 and 30; docs/decisions/2026-10-30-boss-party.md):
+ * - `max`: you and two on the platforms behind you;
+ * - `closeCp`: with no majority, the engine's best pick is played unless another is within this many centipawns of it,
+ *   then one of those at random (Eric, Oct 30: 30);
+ * - `afkKickSec`: a turn's first pick, then this long, and whoever may kick can kick someone who hasn't picked;
+ * - `joinWaitSec`: after START, how long the battle waits for every member to arrive before it begins without them.
+ */
+export const BOSS_PARTY = { max: 3, closeCp: 30, afkKickSec: 60, joinWaitSec: 30 } as const;
+
+/**
+ * A Boss Battle party's battle's settings (docs/decisions/2026-10-30-boss-party.md), the server's and the app's alike: a
+ * raid of up to BOSS_PARTY.max on the draw rule "party", BOSS_CLOCK as the team's one clock, any member's God King call
+ * for the team, and the boss at the leader's difficulty (its Maia rating and its offset, as Boss alone). The boss itself
+ * (`bossId`) is the caller's to add: a playable one, else random.
+ */
+export function bossPartySettings(difficulty: string): Partial<Settings> {
+  const d = BOSS_DIFFICULTY.find((x) => x.id === difficulty) ?? BOSS_DIFFICULTY.find((x) => x.id === "normal")!;
+  return {
+    ...RAID_SETTINGS,
+    ...bossClockSettings({ bossMaxMoves: RAID_SETTINGS.bossMaxMoves ?? DEFAULT_SETTINGS.bossMaxMoves }),
+    lobbySize: BOSS_PARTY.max,
+    groupSize: BOSS_PARTY.max,
+    drawRuleByStage: ["party"],
+    kingAnyCall: true,
+    bossNoStrikes: true,
+    bossDifficulty: d.elo,
+    bossAloneMaia: d.maia,
+  };
+}
+
+/**
+ * A move's centipawns from the mover's expected score (0 to 1), by Lichess's win-chance curve (expected = 1 / (1 +
+ * e^(-0.00368208 cp))), as the judge measures expected scores, not centipawns. Kept inside +-2000 (a decided position).
+ */
+export function cpFromExpected(expected: number): number {
+  const e = Math.min(0.9994, Math.max(0.0006, expected));
+  return Math.log(e / (1 - e)) / 0.00368208;
+}
+
+/**
+ * The settings for a battle on BOSS_CLOCK: the bank and its increment, and a move clock no bank can reach (the bank plus
+ * the increment on every move a battle can have), so the bank decides. The Hidden Boss's Bullet still replaces it when
+ * it comes (its own bank and increment).
+ */
+export function bossClockSettings(s: Pick<Settings, "bossMaxMoves">, clock: { bankSeconds: number; incrementSeconds: number } = BOSS_CLOCK): Partial<Settings> {
+  return {
+    bossClock: true,
+    timeBankSeconds: clock.bankSeconds,
+    timeIncrementSeconds: clock.incrementSeconds,
+    moveClockSeconds: clock.bankSeconds + clock.incrementSeconds * s.bossMaxMoves,
+    moveClockSteps: [],
+  };
+}
 
 /**
  * Boss alone (you alone against a boss: a raid of one, on this device) scores as before (no cap, streaks or 2
@@ -744,7 +934,7 @@ export const BOSS_POWERS = {
    * Oct 27, after the first sim put it among the easiest; was the brief's start, 1): 2.8 Creases a battle of 50 moves in
    * the raid sim (reports/folio-sim.md).
    */
-  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.3, folio: 1.3 } as Readonly<Record<string, number>>,
+  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.3, folio: 1.3, timber: 0.7 } as Readonly<Record<string, number>>,
   /**
    * The Hidden Boss's ultimate, the bullet clock (Eric, Oct 14: "Meter builds starting turn 1, about 7 turns in he says
    * something about how you're thinking too much and to just play pure chess etc, true to him, then for the rest of phase 1
@@ -1299,7 +1489,34 @@ export const BOSS_POWERS = {
   revisionDrop: 1.5,
   revisionMax: 1,
   revisionFrom: 5,
+  /**
+   * Timber's Workshop (his passive, Scraps; Eric, Nov 1; bosses/timber.ts; docs/decisions/2026-11-01-timber.md): one scrap
+   * every scrapEverySec seconds (Eric's 15; the cap, the lead guard and the Gnaw's pace are the sim's: reports/timber-sim.md) on the battle's clock (the real-time meter: the server's online, the page's visible time solo),
+   * plus scrapsPerCapture for each capture of his. Each goes, at random, to one of the five pieces not yet finished; a piece is
+   * finished at its cost (workshopCosts, in scraps). At the end of his turn one finished piece (the first finished that he can
+   * have) is dropped onto an empty square of his half that you don't attack; at most workshopDropMax a battle (the sim's), then
+   * the workshop closes. A finished slot starts over at 0.
+   */
+  scrapEverySec: 15,
+  scrapsPerCapture: 2,
+  workshopCosts: { p: 2, n: 4, b: 4, r: 6, q: 12 },
+  workshopDropMax: 2,
+  /**
+   * A piece drops only while it leaves him at most workshopLeadMax pawns ahead of you on material (pawn 1, knight and bishop 3,
+   * rook 5, queen 9): he rebuilds what he lost rather than running away with the battle (the sim's call: free pieces with no
+   * limit decided nearly every battle; reports/timber-sim.md). One that would put him further ahead waits on the bench.
+   */
+  workshopLeadMax: 1,
+  /** Timber's Gnaw (his ultimate, the rage meter's: rageSpeed.timber): after his move, one of your pawns eaten, gnawScraps scraps for his workshop. */
+  gnawScraps: 8,
 } as const;
+
+/**
+ * Bosses in the game for admins first (Eric, Nov 1: Timber "admins first"): complete and playable, but only an admin meets
+ * them (the boss select, Boss alone and a Solo raid), until Eric says go. **To put one live for everyone, take its id out of
+ * this list** (core boss.ts's `adminFirst`; nothing else changes).
+ */
+export const BOSS_ADMIN_FIRST: readonly string[] = ["timber"];
 
 /**
  * How Sawyer's split pawn looks (packages/app/src/components/Sawyer.tsx). Looks only: the rules, the engine and the
@@ -2229,6 +2446,13 @@ export const QUICK_CHAT = {
   botLobbyMax: 2,
   botLobbyDelayMs: [300, 900] as readonly [number, number],
   botLobbyGapMs: 500,
+  /**
+   * Solo 50 v 50 only (Eric, Nov 1: "have the bots just chatting still"): after each of your team's moves, with these odds,
+   * a teammate bot says one of these (everyday picks every player has, to the team), within botMaxPerMinute. Online
+   * matches don't use it (their bots keep the moments above).
+   */
+  botChatterChance: 0.35,
+  botChatter: ["trust-crowd", "defend-king", "go-mate", "wow", "oops", "e-thumbs", "e-fire", "e-clap", "e-laugh", "e-wow"] as readonly string[],
   /** The queue's lobby chat on a phone: the feed shows at least this many whole lines (more when there's room). */
   lobbyFeedLines: 2,
   /**
@@ -2487,6 +2711,48 @@ export const OPS = {
     /** Errors and player reports are deleted after this many days (the 15-minute cron). */
     keepDays: 30,
   },
+} as const;
+
+/**
+ * The town's WebGL fallbacks (Oct 30; docs/areas/ops.md, "Health"): a page whose town asked for WebGL and drew with Canvas 2D
+ * instead says so once, through the error reporting (the app's problems.ts, `reportTownFallback`), as this kind with its
+ * reason as the message. The health view counts them by reason, apart from the errors. The reasons: no WebGL 2 in the
+ * browser; it has it, but no context could be made; the shader didn't compile or link; the context was lost twice within a
+ * minute; or it was lost and not given back within 5 s.
+ */
+export const TOWN_GL_FALLBACK = {
+  kind: "town-gl-fallback",
+  reasons: ["no-webgl2", "no-context", "shader", "lost-twice", "not-back"],
+} as const;
+export type TownGlFallback = (typeof TOWN_GL_FALLBACK.reasons)[number];
+
+/**
+ * Rides (Nov 1, Eric: "this cricket is too damn big I wanna see it at 75%"): each ride's size under its pawn, by its item id
+ * (crates.ts, the `ride` slot). The ride is drawn at this scale about the pawn's seat, the pawn at its own size, still sitting
+ * in the saddle, and the ride still standing on the square; everywhere a rider is drawn (the town, the locker, the profiles,
+ * home's pawn and ring). 1 is the size as drawn. Every ride is `defaultScale` (Nov 1, Eric, after trying `?rideScale=`: "0.75
+ * is good, I have a feeling most we will scale to that"; it was 1) unless `scale` lists it. An admin's `?rideScale=`
+ * (`tryScale`'s range) tries one size for every ride on that page (docs/decisions/2026-11-01-ride-scale.md).
+ *
+ * `speed` (Nov 1, the rides v2 brief: Cheetah Shoes, "twice as fast"): how much faster than on foot a pawn walks the town on
+ * its ride, by item id; a ride not listed is 1. Your step takes TOWN_FEEL.youStepMs / speed (a bot's or another player's,
+ * botStepMs / speed). The town's walking isn't sent to the server (no real players walk in the town yet), so there's no
+ * server-side check of it to scale (docs/decisions/2026-11-01-rides-v2.md).
+ */
+export const RIDES = {
+  defaultScale: 0.75,
+  scale: {} as Readonly<Record<string, number>>,
+  speed: { "cheetah-shoes": 2 } as Readonly<Record<string, number>>,
+  tryScale: [0.5, 1.25] as const,
+};
+
+/**
+ * A boss's crate, sold by the Shopkeeper inside the boss's home (Eric, Nov 2: "3 Babur tokens, or 1 Babur token + 1 crate key"):
+ * its two prices, in that boss's tokens and crate keys. Round 1 shows them (packages/app/src/town/shops/); buying is round 2's.
+ */
+export const BOSS_CRATE_PRICE = {
+  tokens: 3,
+  withKey: { tokens: 1, keys: 1 },
 } as const;
 
 /**
@@ -3085,13 +3351,16 @@ export interface ShopOdds {
  * XP (design v4 and v6): each round starts with only the two kings on the boards.
  */
 export interface AutoChessSettings {
-  /** What each piece costs in the shop (a pawn 10 ... a queen 90: the chess value times ten, a bishop a little over a knight). */
+  /**
+   * What each piece costs in the shop: its chess value in whole gold, pawn 1, knight 3, bishop 3, rook 5, queen 9 (the TFT-style economy (Eric, Oct 25 and Nov 1, 2026; docs/decisions/2026-11-01-autochess-tft-economy.md);
+   * it was the chess value times ten, a bishop 32: 10, 30, 32, 50, 90).
+   */
   readonly prices: { readonly p: number; readonly n: number; readonly b: number; readonly r: number; readonly q: number };
   /**
    * The shop (v5, Eric Oct 20; v6 Oct 20 evening; v7 Oct 21): this many offers (4 since v7, was 5), each a piece and a square on
    * your half where it will land; buying an offer rolls a new one into its slot; one reroll of all the offers costs `reroll.first`
-   * gold the first time in a round and `reroll.step` more each time after it, up to `reroll.max` (v7.1, Eric Oct 22: "5+1 per roll up
-   * to 10 max per round": 5, 6, 7, 8, 9, 10, 10, ...), back to the first price at each round's start. The shop refills free at each round's start. **The odds follow the level of whoever's shop it is** (v7, Eric Oct 21: "when
+   * gold the first time in a round and `reroll.step` more each time after it, up to `reroll.max` (the TFT-style economy, Eric Oct 25:
+   * 2, 3, 4, 5, 5, ...; v7.1's was 5, 6, ... 10 on the old ×10 scale), back to the first price at each round's start. The shop refills free at each round's start. **The odds follow the level of whoever's shop it is** (v7, Eric Oct 21: "when
    * you level you have slightly higher chances for better pieces and pawn odds slightly decrease... [queens] shouldn't even appear
    * till level 7 like in TFT"): `oddsByLevel[level - 1]` is the percent of each kind for a shop rolled at that level, level 1 first
    * (play starts at `levels.start`, 4, and tops at `levels.max`, 10); each row adds up to 100. No rooks before level 5, no queens
@@ -3104,7 +3373,8 @@ export interface AutoChessSettings {
     readonly oddsByLevel: readonly ShopOdds[];
     readonly reroll: { readonly first: number; readonly step: number; readonly max: number };
   };
-  /** Selling a piece, from the board or the bench, gives back this share of what was paid for it (its price, and `starUpCost` for each star above the first, v8), rounded down (v6, Eric Oct 20: 75%: P7 N22 B24 R37 Q67). */
+  /** Selling a piece, from the board or the bench, gives back this share of what was paid for it (its price, and `starUpCost` for each star above the first, v8), rounded to the nearest whole gold, a half up (v6, Eric Oct 20: 75%; whole gold since the TFT-style economy, Nov 1: P1 N2 B2 R4 Q7; it was
+   * rounded down on the ×10 scale, P7 N22 B24 R37 Q67). */
   readonly sellBack: number;
   /**
    * The bench (v6, Eric Oct 20: "the bench is going to be a massive strategy"): this many held pieces, each keeping the square it
@@ -3120,12 +3390,21 @@ export interface AutoChessSettings {
    */
   readonly lockIn: boolean;
   readonly lockInBonus: number;
-  /** The buy-and-place step, its locked end (no buying, selling or moving), and how far behind the opponent's circles show. */
+  /**
+   * The buy-and-place step, its locked end (no buying, selling or moving), and how far behind the opponent's circles (and its bench,
+   * gold and level) show: 0 since Nov 2, live (Eric: placing first pays, so who placed first must be seen; it was 2 s from Oct 19).
+   */
   readonly buySeconds: number;
   readonly lockSeconds: number;
   readonly circlesDelaySeconds: number;
-  /** While you buy, one of their pieces (a circle, a pawn too) is revealed at random every this many seconds, and stays shown (v6, Eric Oct 20: 5 s, so 5 in the 30). */
+  /**
+   * While you buy, a piece is revealed every this many seconds (Eric, Nov 1-2: 3 s; was 5 s at random), piece for piece by kind:
+   * a piece shows only with a piece of the other side of its group in `revealGroups` (pawn and pawn, knight or bishop and knight or
+   * bishop, rook and rook, queen and queen), the later placed of a pair first. A kind in no group stays hidden until the move step.
+   * The rules: packages/app/src/autochess/reveal.ts, docs/decisions/2026-11-02-autochess-reveal.md.
+   */
   readonly revealSeconds: number;
+  readonly revealGroups: readonly (readonly ("p" | "n" | "b" | "r" | "q")[])[];
   /**
    * The adjust step, shown to players as the **move step** (v6, Eric Oct 20; v2 Oct 21): `adjustSeconds` long, with their full board
    * shown, in which you make `adjustMoves` change, hidden from them until the fight. `adjustStep` false turns the step off (straight to
@@ -3148,7 +3427,7 @@ export interface AutoChessSettings {
    * Stars (v8, Eric Oct 22: "pieces can now be 2 starred which lets you move the piece once legally during the action phase... 3 star pieces can
    * move anywhere... Pawns can't be starred up"). Every piece but a pawn or the king has 1 (plain), 2 or 3 (`maxStars`) stars. A star changes
    * nothing in the fight (a 3-star rook is a rook); it only lets the piece move in the move step. **A star-up costs a flat `starUpCost` gold**
-   * (Eric: "5 cost to upgrade every time... having it be 5 is already generous"), whatever the piece and its stars, and merges into the piece
+   * (Eric: "5 cost to upgrade every time... having it be 5 is already generous"; 1 since the TFT-style economy, half a pawn rounded up), whatever the piece and its stars, and merges into the piece
    * where it is (board or bench). Selling a piece, and the survivors' refund, count everything paid for it: its price plus `starUpCost` for
    * each star above the first. The move step's length is above (`moveBase`, `movePerStar`; Eric: "a flat 5 seconds no matter what... if you
    * have two and your opponent has two starred up pieces, that's still just... an extra 6 seconds total").
@@ -3251,11 +3530,11 @@ export interface AutoChessSettings {
   readonly piecesPerDamage: number;
   /** Gold at the start of round 1, before its income. */
   readonly startGold: number;
-  /** A round's income: `first` in round 1, `step` more each round, up to `max`. */
+  /** A round's income: `first` in round 1, `step` more each round, up to `max` (10, 12, ... 20 since the TFT-style economy; was 100, 120, ... 200). */
   readonly income: { readonly first: number; readonly step: number; readonly max: number };
-  /** Interest on gold banked before the income: `gold` for every full `per` banked, up to `max`. */
+  /** Interest on gold banked before the income: `gold` for every full `per` banked, up to `max` (Eric, Oct 25: +1 per 10, up to +5 at 50; was 10 per 100, up to 30). */
   readonly interest: { readonly per: number; readonly gold: number; readonly max: number };
-  /** After a fight each side gets this share (rounded down) of everything paid for its pieces still on the board (their prices and their star-ups, v8), win or lose; bench pieces get all of theirs back. */
+  /** After a fight each side gets this share (rounded to the nearest whole gold, a half up, since the TFT-style economy) of everything paid for its pieces still on the board (their prices and their star-ups, v8), win or lose; bench pieces get all of theirs back. */
   readonly survivorRefund: number;
   /**
    * Gold for a streak, at the start of the next round: from `n` rounds in a row, `gold` (the highest row that fits). A draw
@@ -3267,7 +3546,7 @@ export interface AutoChessSettings {
   readonly queenLimit: number;
   readonly maxPawns: number;
   readonly pawnsPerFile: number;
-  /** The bot: the chance it keeps a hundred banked for interest (when it has the gold to), how many moves it tries while adjusting, and the search it uses. */
+  /** The bot: the chance it banks gold for interest (when it has the gold to; whole `interest.per`s, up to the interest's top), how many moves it tries while adjusting, and the search it uses. */
   readonly bot: {
     /** It locks in at a seeded time between these shares of the step's open part (before its locked end), or never, this often. */
     readonly lockFrom: number;
@@ -3276,7 +3555,7 @@ export interface AutoChessSettings {
     /**
      * Its shop rerolls (the same climbing price as yours, `shop.reroll`): at most this many a round, only with this much gold, this often
      * (more often when the shop shows nothing but pawns). v7.1: 4 / 40 / 0.15 / 0.4 became 3 / 70 / 0.06 / 0.2, so the bot rerolls in about a third
-     * of rounds (63% before, at 2 gold a roll) and spends about what it did on rerolls (2 gold a round).
+     * of rounds (63% before, at 2 gold a roll) and spends about what it did on rerolls (2 gold a round). The TFT-style economy (Nov 1): `rerollGold` 7.
      */
     readonly maxRerolls: number;
     readonly rerollGold: number;
@@ -3287,7 +3566,7 @@ export interface AutoChessSettings {
     readonly holdChance: number;
     /** Its pieces go down evenly over the step's open part, the last by this share of it (so something is on its board early, to scout). */
     readonly placeBy: number;
-    /** It buys XP (20 gold for 4) now and then: at most this many a round, with this chance each time it has the gold (more with its board full: a level is room). */
+    /** It buys XP (4 gold for 4 XP) now and then: at most this many a round, with this chance each time it has the gold (more with its board full: a level is room). */
     readonly maxXpBuys: number;
     readonly xpGold: number;
     /** With this much gold it buys XP even when that gives no level yet (it saves up for the next). */
@@ -3295,6 +3574,10 @@ export interface AutoChessSettings {
     readonly xpChance: number;
     readonly xpChanceFull: number;
     readonly saveChance: number;
+    /** When it banks for interest it still spends at least this much (a few pieces' worth). */
+    readonly saveKeep: number;
+    /** It buys a queen only with this much more left after her (it buys one when rich, not with its last coins). */
+    readonly queenChange: number;
     /** Whenever one of its offers is a star-up it can pay for, it buys it this often (Eric: "buys star-ups as a player would", nearly always). */
     readonly starUpChance: number;
     readonly adjustTries: number;
@@ -3305,7 +3588,7 @@ export interface AutoChessSettings {
 }
 
 export const AUTOCHESS: AutoChessSettings = {
-  prices: { p: 10, n: 30, b: 32, r: 50, q: 90 },
+  prices: { p: 1, n: 3, b: 3, r: 5, q: 9 },
   shop: {
     slots: 4,
     // Percent P/N/B/R/Q by level, level 1 first (v7, Eric Oct 21).
@@ -3321,26 +3604,27 @@ export const AUTOCHESS: AutoChessSettings = {
       { p: 42, n: 20, b: 19, r: 14, q: 5 },
       { p: 36, n: 21, b: 20, r: 16, q: 7 },
     ],
-    reroll: { first: 5, step: 1, max: 10 },
+    reroll: { first: 2, step: 1, max: 5 },
   },
   sellBack: 0.75,
   benchSlots: 4,
   lockIn: false,
-  lockInBonus: 25,
+  lockInBonus: 3,
   buySeconds: 30,
   lockSeconds: 3,
-  circlesDelaySeconds: 2,
-  revealSeconds: 5,
+  circlesDelaySeconds: 0,
+  revealSeconds: 3,
+  revealGroups: [["p"], ["n", "b"], ["r"], ["q"]],
   adjustStep: true,
   adjustMode: "stars",
   adjustSeconds: 7,
   adjustMoves: 1,
-  starUpCost: 5,
+  starUpCost: 1,
   maxStars: 3,
   moveBase: 5,
   movePerStar: 3,
   fightGlow: false,
-  levels: { start: 4, max: 10, freeXp: 2, buyXp: 4, buyXpCost: 20, xpToNext: [4, 8, 12, 16, 20, 24] },
+  levels: { start: 4, max: 10, freeXp: 2, buyXp: 4, buyXpCost: 4, xpToNext: [4, 8, 12, 16, 20, 24] },
   kingRanks: 2,
   hopEvery: [7, 10],
   hopSeconds: 1.8,
@@ -3350,7 +3634,7 @@ export const AUTOCHESS: AutoChessSettings = {
   introBubbleMs: 2500,
   fightMoveMs: 600,
   fightNodes: 30000,
-  cashInGold: 5,
+  cashInGold: 2,
   cashInValue: 20,
   fightFastAfter: 30,
   fightFastMoveMs: 300,
@@ -3365,13 +3649,13 @@ export const AUTOCHESS: AutoChessSettings = {
   damagePerRound: 1,
   piecesPerDamage: 3,
   startGold: 0,
-  income: { first: 100, step: 20, max: 200 },
-  interest: { per: 100, gold: 10, max: 30 },
+  income: { first: 10, step: 2, max: 20 },
+  interest: { per: 10, gold: 1, max: 5 },
   survivorRefund: 0.25,
   winStreakGold: [
-    { n: 2, gold: 10 },
-    { n: 4, gold: 20 },
-    { n: 5, gold: 30 },
+    { n: 2, gold: 1 },
+    { n: 4, gold: 2 },
+    { n: 5, gold: 3 },
   ],
   lossStreakGold: [
     { n: 2, gold: 0 },
@@ -3381,5 +3665,5 @@ export const AUTOCHESS: AutoChessSettings = {
   queenLimit: 1,
   maxPawns: 8,
   pawnsPerFile: 3,
-  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 3, rerollGold: 70, rerollChance: 0.06, rerollChanceBare: 0.2, maxHolds: 2, holdChance: 0.5, placeBy: 0.7, maxXpBuys: 3, xpGold: 60, xpRichGold: 140, xpChance: 0.2, xpChanceFull: 0.7, saveChance: 0.3, starUpChance: 0.95, adjustTries: 16, adjustDestinations: 3, adjustNodes: 8000, adjustMargin: 0.02 },
+  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 3, rerollGold: 7, rerollChance: 0.06, rerollChanceBare: 0.2, maxHolds: 2, holdChance: 0.5, placeBy: 0.7, maxXpBuys: 3, xpGold: 6, xpRichGold: 14, xpChance: 0.3, xpChanceFull: 0.8, saveChance: 0.3, saveKeep: 8, queenChange: 4, starUpChance: 0.95, adjustTries: 16, adjustDestinations: 3, adjustNodes: 8000, adjustMargin: 0.02 },
 };

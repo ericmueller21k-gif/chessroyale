@@ -10,6 +10,9 @@ import type { ComponentChildren } from "preact";
 import { AccountBar, BackButton, DressedPawn, FdButton, FriendsIcon, GearIcon, LevelRing, LiveLine, Logo, RankLine, ShopIcon } from "../components/FrontDoor.tsx";
 import { useLive } from "../live.ts";
 import { BossCardFace, BossSelect, RANDOM, selectBosses } from "../components/BossSelect.tsx";
+import { BossInviteSheet } from "../components/BossParty.tsx";
+import type { PartyClient } from "../squads.ts";
+import { openProfile } from "../profile-nav.ts";
 import { BossFace } from "../components/BossCharacter.tsx";
 import { UserIcon } from "../components/PixelIcon.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
@@ -24,7 +27,9 @@ import { ChatNotice } from "../components/ChatNotice.tsx";
 import { homeRankLine, ranked1v1Rank } from "../ranked.ts";
 import { RankEmblem } from "../components/RankEmblem.tsx";
 import { SwordsIcon } from "../town/CardIcons.tsx";
-import { PIECE_SHAPES, type PieceShape } from "../autochess/pieceShapes.ts";
+import { Pic, Scene } from "../home-art/Pic.tsx";
+import { ARENA_AUTO_CARD } from "../home-art/arena-auto-card.ts";
+import { TOWN_PICTURE, TOWN_SCENE, TOWN_SKY } from "../home-art/town.ts";
 
 const MODE_KEY = "brc.mode";
 
@@ -480,12 +485,13 @@ export function HomeScreen({
   onSquads,
   onParty,
   onRaid,
-  onBossArena,
+  onChessTown,
   onAutoChess,
   onProfile,
   onSettings,
   onShop,
   onSignIn,
+  bossParty,
 }: {
   /** In the queue: the queue screen (or the line for a seat), shown in place of the play column. */
   queue?: ComponentChildren;
@@ -524,9 +530,9 @@ export function HomeScreen({
   onParty: () => void;
   /** Open (true) or close the Solo Boss Mode screen. */
   onRaid: (open: boolean) => void;
-  /** Boss Arena's card: the town square, as /town opens it. */
-  onBossArena: () => void;
-  /** Auto chess's card under the Boss Arena and Solo Boss Mode cards: the screen, as /autochess opens it. */
+  /** Chess Town's button: the town square, as /town opens it. */
+  onChessTown: () => void;
+  /** Auto chess's card beside Boss Battle's, under Other modes: the screen, as /autochess opens it. */
   onAutoChess: () => void;
   onProfile: () => void;
   /** The phone's gear in the top bar: Settings, as Profile → Settings opens it. */
@@ -534,6 +540,11 @@ export function HomeScreen({
   /** The phone's shop icon in the top bar. */
   onShop: () => void;
   onSignIn: () => void;
+  /**
+   * Boss Battle's party (docs/decisions/2026-10-30-boss-party.md): its client once there is one, a note, the invite
+   * circles' action (the party made the first time), and leaving it.
+   */
+  bossParty?: { client: PartyClient | null; error: string | null; onInvite: () => Promise<boolean>; onLeave: () => void };
 }) {
   const { profile } = useAccount();
   const live = useLive();
@@ -577,13 +588,24 @@ export function HomeScreen({
   // locked: never stored, so nothing starts against him). Kept for Boss alone, a Solo raid and a raid you make
   // (rememberBossPick); the public queues are always a random boss. A resting boss reads as random.
   const [pick, setPick] = useState(() => {
-    const id = chosenBoss();
+    // (An admin's pick may be a boss in the game for admins first: Timber.)
+    const id = chosenBoss(isAdmin());
     return selectBosses().bosses.some((b) => b.id === id) ? id : RANDOM;
   });
   const hiddenPicked = selectBosses().hidden.some((b) => b.id === pick);
+  // Boss Battle's party: in one with someone else, the stage shows them and START becomes the party's.
+  const bp = bossParty?.client && !bossParty.client.done ? bossParty.client : null;
+  const [, partyDrawn] = useState(0);
+  useEffect(() => bp?.subscribe(() => partyDrawn((n) => n + 1)), [bp]);
+  const pv = bp?.party ?? null;
+  const meId = bp?.memberId ?? null;
+  const inParty = !!pv && !!meId && pv.members.some((m) => m.id === meId) && pv.members.length > 1;
+  const leading = inParty && pv!.leaderId === meId;
+  const [inviting, setInviting] = useState(false);
   const pickTile = (id: string) => {
     setPick(id);
     if (!selectBosses().hidden.some((b) => b.id === id)) rememberBossPick(id);
+    if (leading && !selectBosses().hidden.some((b) => b.id === id)) bp!.choose(id, difficulty);
   };
   // Boss alone's menu ("solo": the difficulty for the tiles' pick) or the full picker (/bosses: "pick").
   const [bossMenu, setBossMenu] = useState<null | "solo" | "pick">(null);
@@ -592,7 +614,16 @@ export function HomeScreen({
   const pickDifficulty = (d: BossDifficultyId) => {
     rememberDifficulty(d);
     setDifficulty(d);
+    if (leading) bp!.choose(pick, d);
   };
+  // (A member sees the leader's boss and difficulty, and keeps them if promoted; leading, the party plays yours.)
+  useEffect(() => {
+    if (!inParty || !pv?.boss) return;
+    if (!leading) {
+      setPick(pv.boss.id);
+      setDifficulty(pv.boss.difficulty);
+    } else if (pv.boss.id !== pick || pv.boss.difficulty !== difficulty) bp!.choose(pick, difficulty);
+  }, [inParty, leading, pv?.boss?.id, pv?.boss?.difficulty]);
   // (Not while Solo and Boss alone rest: the hidden /bosses lands here too, and the Boss raid screen says why.)
   const bossAlone = () => (rest("solo") ? undefined : bossInUrl() ? onSolo("raid") : setBossMenu("solo"));
   // Boss Battle's START: Maia's files fetched ahead as the old Boss alone menu did when it opened, then the battle.
@@ -688,7 +719,7 @@ export function HomeScreen({
       {/* (A phone sizes your pawn to the room the card has. Home shows your tag above the pawn's head, centered (styles.css, `order`); the
           pawn comes first here, as the queue's small card has it beside the pawn.) */}
       <div class="fd-hero-in">
-      <DressedPawn look={look} size="hero" shadow />
+      <DressedPawn look={look} size="hero" shadow ride />
       {/* (Your icon to the left of your name and rating, as beside your name in chat; its height is the two lines'.) */}
       <div class="fd-hero-id">
         <span class="fd-hero-icon">
@@ -755,11 +786,31 @@ export function HomeScreen({
         </div>
       </div>
     );
+  // Boss Battle's party on the stage: the others on the platforms behind you (by seat), the checks and crowns, the menu.
+  const others = inParty ? pv!.members.filter((m) => m.id !== meId).sort((a, b) => (a.seat ?? 0) - (b.seat ?? 0)) : [];
+  const me = inParty ? pv!.members.find((m) => m.id === meId)! : null;
+  const leaderName = inParty ? (pv!.members.find((m) => m.id === pv!.leaderId)?.name ?? "The leader") : "";
+  const waiting = inParty ? pv!.members.filter((m) => m.id !== pv!.leaderId && m.connected && !m.ready) : [];
+  const slot = (m: (typeof others)[number] | undefined) => (m ? { id: m.id, name: m.name, look: m.look, leader: m.id === pv!.leaderId, ready: !!m.ready, ...(m.uid ? { uid: m.uid } : {}), ...(m.bot ? { bot: true } : {}) } : null);
+  const stage = inParty
+    ? {
+        back: [slot(others[0]), slot(others[1])] as const,
+        me: { leader: leading, ready: !!me?.ready },
+        locked: !leading,
+        onProfile: (m: { uid?: string; name: string }) => m.uid && openProfile({ uid: m.uid, name: m.name }),
+        ...(leading ? { onKick: (m: { id: string }) => bp!.kick(m.id), onPromote: (m: { id: string }) => bp!.promote(m.id) } : {}),
+      }
+    : undefined;
+  const names = (xs: { name: string }[]) => (xs.length > 1 ? `${xs.slice(0, -1).map((x) => x.name).join(", ")} and ${xs.at(-1)!.name}` : (xs[0]?.name ?? ""));
+  const partyLine = !inParty ? (bp?.error ?? bossParty?.error ?? "") : leading ? (waiting.length ? `Waiting for ${names(waiting)} to ready up` : "Everyone's ready.") : `${leaderName} picks the boss and the difficulty.`;
+  const invite = () => {
+    void bossParty?.onInvite().then((ok) => ok && setInviting(true));
+  };
   if (raid) {
     // The Boss raid screen (?mode=raid, the test link): every way to play a raid, each through its flow from before (Eric,
     // Oct 16: "from there you can pick if you want to solo against bosses or play with bots or queue with other players").
     // Solo Boss Mode (Eric, Oct 26) is the same screen without the raid choices: the tiles, the stage, Boss alone. Raids
-    // move to the Boss Arena's Colosseum, so they're left off this form (`full` tells the two apart).
+    // move to Chess Town's Colosseum, so they're left off this form (`full` tells the two apart).
     const raidResting = full ? rest("raid") : null;
     const online = (sub: string) => (onlineLocked ? "Online: sign in to play" : sub);
     // (The Hidden Boss picked: every way to play locked.)
@@ -774,7 +825,7 @@ export function HomeScreen({
         {/* (Why you're here: a match that closed while this screen was where you'd come back to, as on home.) */}
         {notice && <Notice notice={notice} />}
         {/* The character select (Eric, Oct 16): the tiles, the stage; the ways to play under it. */}
-        <BossSelect value={pick} difficulty={difficulty} name={name} look={look} onPick={pickTile} onDifficulty={pickDifficulty} />
+        <BossSelect value={pick} difficulty={difficulty} name={name} look={look} onPick={pickTile} onDifficulty={pickDifficulty} onInvite={full || !bossParty ? undefined : invite} party={stage} />
         <div class="rd-options">
           {/* (The public queues share their lobby: always a random boss.) */}
           {full && (
@@ -799,11 +850,24 @@ export function HomeScreen({
           {full ? (
             <RaidOption label="Boss alone" sub={pick === RANDOM ? "Just you vs a random boss" : "Just you vs this boss"} disabled={loading || !!soloResting} locked={locked} onClick={bossAlone} />
           ) : (
-            // (Boss Battle's START: straight into the battle with the picked boss at the screen's difficulty; the old Boss alone menu is skipped.)
-            <button type="button" class="bs-start" disabled={loading || !!soloResting || locked} onClick={start}>
-              <SwordsIcon />
-              START
-            </button>
+            // (Boss Battle's START: straight into the battle with the picked boss at the screen's difficulty; the old Boss alone menu is skipped.
+            // In a party: the leader's START once everyone is ready, a member's READY; the line under it says why.)
+            <>
+              {inParty ? (
+                <button type="button" class="bs-start" disabled={leading ? loading || locked || waiting.length > 0 : false} aria-pressed={leading ? undefined : !!me?.ready} onClick={() => (leading ? bp!.start() : bp!.ready(!me?.ready))}>
+                  <SwordsIcon />
+                  {leading ? "START" : me?.ready ? "READY ✓" : "READY"}
+                </button>
+              ) : (
+                <button type="button" class="bs-start" disabled={loading || !!soloResting || locked} onClick={start}>
+                  <SwordsIcon />
+                  START
+                </button>
+              )}
+              <p class="bs-line" role="status">
+                {partyLine}
+              </p>
+            </>
           )}
           {full && <RaidOption label="Play with friends" sub="Make a raid and share its code, or join one" locked={locked} onClick={() => setFriends(true)} />}
         </div>
@@ -813,6 +877,17 @@ export function HomeScreen({
         {loading && <p class="fd-hint">Loading the engine…</p>}
         {error && <p class="fd-error">{error}</p>}
         {overlays}
+        {inviting && bp && (
+          <BossInviteSheet
+            client={bp}
+            test={testSwitchesAllowed() || isAdmin()}
+            onClose={() => setInviting(false)}
+            onLeave={() => {
+              setInviting(false);
+              bossParty?.onLeave();
+            }}
+          />
+        )}
       </div>
     );
   }
@@ -916,29 +991,23 @@ export function HomeScreen({
       {error && <p class="fd-error">{error}</p>}
     </div>
   );
-  // Boss Arena's card (Eric, Oct 26: Boss raid becomes Boss Arena, the town square): the rotating boss faces, its tap the
-  // town square (/town). It replaces the Boss raid card (Eric, Oct 16: "I don't want it to just be brushed off to the side").
-  const bossArenaCard = (
-    <button type="button" class="rd-card" onClick={onBossArena}>
-      <span class="rd-face" aria-hidden="true">
-        <BossCardFace everyMs={cardEveryMs()} fadeMs={FRONT_DOOR.bossCardFadeMs} />
-      </span>
-      <span class="rd-card-text">
-        <strong>Boss Arena</strong>
-        <span>Party up and take on the bosses</span>
-      </span>
-      <span class="rd-card-go" aria-hidden="true">
-        ›
-      </span>
+  // Chess Town's button (Eric, Oct 31 and Nov 1; it was the Boss Arena card, Oct 26): PLAY's size, under it, the town square (/town)
+  // as a little scene: one of two pictures, picked at random as the page loads, playing its idle, "Chess Town" over it, under the sky
+  // of the device's time of day (day, dusk or night; picked as the page loads too, home-art/town.ts). Its own class, not PLAY's
+  // (`fd-town`; styles.css gives both the same size at every width).
+  const chessTownButton = (
+    <button type="button" class="fd-town" onClick={onChessTown} data-picture={TOWN_PICTURE.id} data-sky={TOWN_SKY}>
+      <Scene ch={TOWN_SCENE} dropBottom={TOWN_PICTURE.dropBottom} groundRow={TOWN_PICTURE.groundRow} class="fd-town-scene" />
+      <span class="fd-town-label">Chess Town</span>
     </button>
   );
-  // Solo Boss Mode's card (Eric, Oct 26): the crown from the side menu's Boss raid item, drawn large, its tap the solo
-  // screen (Boss alone's form of the Boss raid screen). A placeholder picture until one is drawn. A half card, side by side
-  // with Auto chess under Boss Arena (`rd-pair`, styles.css).
+  // Boss Battle's card (Eric, Oct 26 as Solo Boss Mode): the rotating boss faces (from the old Boss Arena card; Nov 1), its tap the
+  // solo screen (Boss alone's form of the Boss raid screen). A half card, side by side with Auto chess under Other modes
+  // (`rd-pair`, styles.css).
   const soloCard = (
     <button type="button" class="rd-card rd-half" onClick={() => onRaid(true)}>
       <span class="rd-face" aria-hidden="true">
-        <CrownArt />
+        <BossCardFace everyMs={cardEveryMs()} fadeMs={FRONT_DOOR.bossCardFadeMs} />
       </span>
       <span class="rd-card-text">
         <strong>Boss Battle</strong>
@@ -946,12 +1015,12 @@ export function HomeScreen({
       </span>
     </button>
   );
-  // Auto chess's card (Eric, Oct 24: "build an army, watch it fight"): the Boss raid card's look and size, its picture the
-  // board's own white knight (KnightArt), its tap the screen /autochess opens.
+  // Auto chess's card (Eric, Oct 24: "build an army, watch it fight"): its picture the army drawn for it (Nov 1; it was the board's
+  // white knight), its tap the screen /autochess opens.
   const autoCard = (
     <button type="button" class="rd-card rd-half fd-auto-card" onClick={onAutoChess}>
       <span class="rd-face" aria-hidden="true">
-        <KnightArt />
+        <Pic ch={ARENA_AUTO_CARD} scale={1} />
       </span>
       <span class="rd-card-text">
         <strong>Auto chess</strong>
@@ -998,8 +1067,8 @@ export function HomeScreen({
         {hero}
         <div class="fd-play-col">
           {/*
-           * The same order on a phone and a computer: the RANKED row, its panel, PLAY and its line, then the Other modes cards
-           * (Boss Arena, Solo Boss Mode, Auto chess; full width) at the bottom (Eric, Oct 19: "chess focused at the heart"; until then the card was on top). A
+           * The same order on a phone and a computer: the RANKED row, its panel, PLAY and its line, Chess Town's button (PLAY's size),
+           * then the Other modes cards (Boss Battle and Auto chess, side by side) at the bottom (Eric, Oct 19: "chess focused at the heart"; until then the card was on top). A
            * computer has the live window above (from 1280 px). Every box keeps its size whatever is picked, so nothing
            * moves on a click.
            */}
@@ -1007,8 +1076,8 @@ export function HomeScreen({
           {ranked}
           {panel}
           {go}
+          {chessTownButton}
           <h2 class="fd-label fd-other-label">Other modes</h2>
-          {bossArenaCard}
           <div class="rd-pair">
             {soloCard}
             {autoCard}
@@ -1017,36 +1086,5 @@ export function HomeScreen({
       </div>
       {overlays}
     </div>
-  );
-}
-
-/**
- * Solo Boss Mode's card picture: the crown from the side menu's Boss raid item (FrontMenu.tsx), drawn large in the card's
- * gold (`.fd-crown`). A placeholder until Opus draws one (Eric, Oct 26).
- */
-function CrownArt() {
-  return (
-    <svg class="fd-crown" viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-      <path d="M5 20h14M6 20l-1.5-11 4.5 3.5L12 5l3 7.5L19.5 9 18 20" />
-    </svg>
-  );
-}
-
-/**
- * A white knight, drawn from the board's own piece art (the cburnett set's shapes, autochess/pieceShapes.ts): Auto chess's
- * card picture. Nothing new is drawn.
- */
-function KnightArt() {
-  const shapes: PieceShape[] = PIECE_SHAPES.nw ?? [];
-  return (
-    <svg class="fd-knight" viewBox="0 0 45 45" width="56" height="56" aria-hidden="true" focusable="false">
-      {shapes.map((s, i) =>
-        s.d ? (
-          <path key={i} d={s.d} transform={s.tf} fill={s.fill} stroke={s.stroke} stroke-width={s.sw} stroke-linecap={s.cap as "butt" | "round" | "square"} stroke-linejoin={s.join as "miter" | "round" | "bevel"} fill-rule={s.eo ? "evenodd" : undefined} />
-        ) : (
-          <circle key={i} cx={s.cx} cy={s.cy} r={s.r} transform={s.tf} fill={s.fill} stroke={s.stroke} stroke-width={s.sw} />
-        ),
-      )}
-    </svg>
   );
 }

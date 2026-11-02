@@ -197,7 +197,10 @@ export function recentRows(ranked: RankedRecentGame[], recent: PublicProfile["re
 
 // ---------------- Equipped Cosmetics ----------------
 
-/** The order worn items are listed in (FrontDoor's WORN_ORDER: this file stays free of components). */
+/**
+ * The order worn items are listed in (FrontDoor's WORN_ORDER: this file stays free of components). Not a ride (Oct 31): the
+ * card's one row holds four tiles at most; its "View all" lists the ride.
+ */
 const WORN: readonly ItemSlot[] = ["skin", "head", "face", "weapon"];
 
 export interface WornTile {

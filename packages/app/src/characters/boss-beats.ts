@@ -81,6 +81,8 @@ export type Beat =
   // Folio's: a marked piece folded, and its Revision (its Draft's mark is `power`, the Crease's warning `ultimateWarn`).
   | "fold"
   | "revision"
+  // Timber's: a Gnaw with none of your pawns to eat (his drop is `power`, its landing `cheer` or `bigCheer`; the Gnaw `ultimate`).
+  | "gnawNone"
   // A boss's attack on a king (its kit's `kingAttack`): the God King in his Last Stand, the crowd's king at its mate.
   | "kingAttack";
 /** The loops it rests in between moments (`ready`: Wrangler's, his meter full). */

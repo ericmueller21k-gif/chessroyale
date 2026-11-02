@@ -1,4 +1,4 @@
-import { RECLUSE_PHASE2, BOSS_ALONE_SCORING, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
+import { RECLUSE_PHASE2, BOSS_ALONE_SCORING, bossClockSettings, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
 import { GUARD_WORDS, MatchRunner, START_FEN, baseAt, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import openingsData from "@chessroyale/chess/data/openings.json";
 import { bulletClock, crowdRace, phase2Numbers, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, fullMoonMs, folioTurnMs, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs } from "@chessroyale/chess";
@@ -51,12 +51,16 @@ export class SoloMatch implements GameView {
   readonly looks = new Map<string, ItemLook>();
   readonly fillAt: number | null = null;
   filledAt: number | null = null;
-  /** Quick chat in the queue (Crowd and raids) while your bots sit down; it closes as the match begins. */
+  /**
+   * Quick chat in the queue (Crowd and raids) while your bots sit down. A 50 v 50 keeps it through the match, the bots
+   * chatting as online (never on the cut screen: Eric, Nov 1); a raid's closes as the match begins.
+   */
   private lobbyChat = new SoloLobbyChat(
     HUMAN,
     () => this.emit(),
     () => account().profile?.shop?.owned,
     () => account().profile?.shop?.chat,
+    () => this.phase.kind === "stageBreak",
   );
   get chat() {
     return this.lobbyChat.chat;
@@ -86,8 +90,10 @@ export class SoloMatch implements GameView {
     /** A boss raid with bots in the crowd (Solo); without, it's you against the boss (Boss alone). Other modes always have bots. */
     private readonly raidBots = false,
   ) {
-    // Boss alone (a raid without bots) keeps the old scoring; a Solo raid scores as every raid (RAID_SCORING).
-    if (baseSettings.raid && !raidBots) this.baseSettings = { ...baseSettings, ...BOSS_ALONE_SCORING };
+    // Boss alone (a raid without bots) keeps the old scoring; a Solo raid scores as every raid (RAID_SCORING). Boss alone
+    // plays on Boss Battle's clock, 10 + 10 (BOSS_CLOCK; Eric, Oct 30), with no boss strikes (Eric, Oct 31); a Solo raid
+    // keeps the raid's clock and strikes.
+    if (baseSettings.raid && !raidBots) this.baseSettings = { ...baseSettings, ...BOSS_ALONE_SCORING, bossNoStrikes: true, ...(baseSettings.bossAloneClock ? bossClockSettings(baseSettings) : {}) };
     // (The hippo gardener's seeds count by this page's visible time, not an earlier online match's server.)
     setGardenSource(null);
     // (A game on this device: a tester's ?bannerplus= counts.)
@@ -339,8 +345,14 @@ export class SoloMatch implements GameView {
       this.emit();
       this.timer = setTimeout(() => {
         this.auto = false;
-        // (Solo matches have no chat.)
-        this.lobbyChat.close();
+        // (A 50 v 50's chat carries on into the match, with teams; a raid has none.)
+        if (this.settings.mode === "crowd" && !this.settings.raid) {
+          const seats = this.runner.state.players;
+          this.lobbyChat.startMatch(
+            (id) => (this.runner.boss ? null : (seats.find((p) => p.id === id)?.colour ?? null)),
+            seats.filter((p) => p.isBot).map((p) => p.id),
+          );
+        } else this.lobbyChat.close();
         this.begin();
       }, holdMs);
     };
@@ -575,8 +587,6 @@ export class SoloMatch implements GameView {
     this.frozen = { at, until: at + ms };
     this.progress.postpone(ms);
     if (this.live) for (const [id, t] of Object.entries(this.live.times)) if (this.live.startsAt + t > at) this.live.times[id] = t + ms;
-    // (Untimed, Boss alone: no clock to stop; your move just waits until the strike is over.)
-    if (this.untimed) return this.set({ ...phase, strike: { calls, needed, mine: true, at, until: at + ms } });
     const deadline = phase.deadline + ms;
     if (this.timer) clearTimeout(this.timer);
     this.timer = setTimeout(() => this.submit(null), deadline - at + this.settings.lateGraceMs);
@@ -774,15 +784,6 @@ export class SoloMatch implements GameView {
    */
   private get alone(): boolean {
     return !!this.runner.boss && this.runner.alive().length === 1;
-  }
-
-  /**
-   * Boss alone has no move clock (bossAloneUntimed; Eric, Oct 21: "it can just be infinite time when you're playing by
-   * yourself"): nothing counts down and no move is played for you. Not under the Hidden Boss's bullet clock (his ultimate
-   * is the clock), and never with bots in the crowd (a Solo raid keeps the raid's clock).
-   */
-  private get untimed(): boolean {
-    return !!this.settings.bossAloneUntimed && !this.raidBots && this.alone && !bulletClock(this.runner.boss);
   }
 
   /** The boss's turn: it thinks (for a moment at least), then its move shows before the crowd picks again. */
@@ -1235,10 +1236,8 @@ export class SoloMatch implements GameView {
     this.playStartedAt = Date.now() + intro;
     this.hint = null;
     const allowed = this.runner.allowedMsFor(HUMAN);
-    // (Untimed, Boss alone: deadline 0, so no clock shows, and no timeout plays a move for you.)
-    const untimed = this.untimed;
-    this.set({ kind: "play", board: boardView(board), startsAt: this.playStartedAt, deadline: untimed ? 0 : this.playStartedAt + allowed, allowedMs: allowed, clock: this.runner.moveClock() });
-    if (!untimed) this.timer = setTimeout(() => this.submit(null), intro + allowed + this.settings.lateGraceMs);
+    this.set({ kind: "play", board: boardView(board), startsAt: this.playStartedAt, deadline: this.playStartedAt + allowed, allowedMs: allowed, clock: this.runner.moveClock() });
+    this.timer = setTimeout(() => this.submit(null), intro + allowed + this.settings.lateGraceMs);
   }
 
   /** The human's pick; final once made. */
@@ -1301,6 +1300,7 @@ export class SoloMatch implements GameView {
     }
     // The God King's Last Stand plays out in the reveal; the next move's clock starts after it (nobody loses time).
     const revealMs = (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000 + (mine.king ? kingMoveMs(this.settings) : 0) + (mine.lastStand ? lastStandMs() : 0);
+    this.moveChat(mine);
     this.set({ kind: "reveal", mine, board, until: Date.now() + revealMs });
     this.timer = setTimeout(() => this.afterReveal(), revealMs);
   }
@@ -1327,8 +1327,19 @@ export class SoloMatch implements GameView {
     if (this.stopped) return;
     const report = this.runner.finishRound(scored.results, scored.thinkMs, scored.powerUps);
     const revealMs = (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000;
+    this.moveChat(report.boards[0]!);
     this.set({ kind: "reveal", mine: report.boards[0]!, board, until: Date.now() + revealMs });
     this.timer = setTimeout(() => this.afterReveal(), revealMs);
+  }
+
+  /** A crowd move just played (a 50 v 50 with chat): a bot on the team that picked it may say it was a great one, as online. */
+  private moveChat(b: RoundReport["boards"][number]) {
+    const loss = b.result.players.find((p) => p.move === b.result.playedMove)?.loss;
+    if (loss == null) return;
+    const bots = b.playerIds.filter((id) => this.runner.player(id).isBot && this.runner.player(id).alive);
+    this.lobbyChat.botsSay({ kind: "greatMove", loss }, bots);
+    // (And now and then, after your team's move, a teammate's everyday line.)
+    if (b.playerIds.includes(HUMAN)) this.lobbyChat.chatter(bots);
   }
 
   skipReveal() {
@@ -1490,6 +1501,7 @@ export class SoloMatch implements GameView {
   }
 
   private finish() {
+    this.lobbyChat.botsSay({ kind: "end" }, this.runner.state.players.filter((p) => p.isBot).map((p) => p.id));
     this.freeBrain();
     this.runner.showdownScout?.reset();
     const winner = this.runner.state.players.find((p) => p.placement === 1);

@@ -355,6 +355,32 @@ export const TOWN_FEEL = {
   /** Your pawn. */
   youSquares: 1.45,
   /**
+   * Rides (Oct 31): a pawn on its ride is the size it is on foot (its ride drawn at the pawn's scale: the art's 100 units are
+   * the pawn's box). Each ride's `foot` is the line on its drawing (in those units) that stands on the square's middle, where
+   * a pawn's base stands: the grasshopper's feet, the moon's shadow; `shadow` sizes the shadows under it as a sidekick's
+   * (0: none; the moon floats and draws its own). Nov 1 (rides v2), every boss's ride: its feet, wheels, runners or tracks (a
+   * unit or two over its lowest drawn row, which `npx tsx scripts/measure-rides.ts` logs), or the shadow it draws itself (the
+   * bulb, the brush, the pup, the pogo, the crane, the log: shadow 0). Its back and front views stand on the same line.
+   */
+  rides: {
+    "riding-chirp": { foot: 97, shadow: 1.15 },
+    "moon-ride": { foot: 96, shadow: 0 },
+    "hollow-bulb": { foot: 96, shadow: 0 },
+    "smudgy-brush": { foot: 94, shadow: 0 },
+    "alfil-howdah": { foot: 99.5, shadow: 1.3 },
+    "balloon-pup": { foot: 97, shadow: 0 },
+    "bigboy-buggy": { foot: 98, shadow: 1.2 },
+    "boingo-pogo": { foot: 98.5, shadow: 0 },
+    "folio-crane": { foot: 98, shadow: 0 },
+    "ginger-sled": { foot: 95, shadow: 1.2 },
+    "jefferson-giraffe": { foot: 96.5, shadow: 1 },
+    "puddles-mower": { foot: 98, shadow: 1.3 },
+    "sawyer-dozer": { foot: 100, shadow: 1.4 },
+    "rodeo-bull": { foot: 97, shadow: 1.2 },
+    "cheetah-shoes": { foot: 95, shadow: 0.9 },
+    "log-roller": { foot: 96, shadow: 0 },
+  } as Readonly<Record<string, { foot: number; shadow: number }>>,
+  /**
    * The shadows under a pawn (and a boss): the soft one this strong (as before), and a contact shadow right under the
    * base, this share of the pawn's width across (about its base's), this many squares deep, this strong (Eric's slice 4
    * test: "the shadows below never change and makes it look like I'm floating")...
@@ -496,7 +522,8 @@ export const TOWN_FEEL = {
   targetSize: 0.5,
 
   // ---- Your trail (slice 4; Eric: "a little trail your guy leaves behind as he runs… like you're leaving little
-  // droplets"). Yours only: other people's pawns leave none.
+  // droplets"). Yours only: other people's pawns leave none. On a ride with a trail (Nov 1, rides v2; Eric: "Chirp's…
+  // definitely the way to go"), its own mark on every square you leave instead, on its own times (rides.ts, `trail`).
   /** A droplet on the square you leave, at most one every this many ms (so about three show while you run)... */
   trailEveryMs: 150,
   /** ...each fading and shrinking out over this many ms... */
@@ -528,4 +555,46 @@ export const TOWN_FEEL = {
    * usual rows).
    */
   tableBoardGrow: 1.2,
+} as const;
+
+/**
+ * Inside a shop (Nov 2, round 1: Babur's circus tent and Puddles' greenhouse; shops/ShopRoom.tsx,
+ * docs/decisions/2026-11-02-shop-interiors-r1.md). The rooms' own numbers (their squares, the door, the shopkeeper's square) are in
+ * shops/rooms.ts.
+ */
+export const SHOP_FEEL = {
+  /**
+   * "Close" (Eric, Nov 2: "super zoomed resembling normal 3rd person sizing", the default inside): the camera comes down and in
+   * behind you and looks more ahead than down. These four replace the town's camTall and camWide numbers of the same names (the
+   * box's shape still blends the rest); `docs/decisions/2026-11-02-shop-zoom.md`. Zoomed out (−) inside is the town's own
+   * zoomed-in camera (camTall / camWide as they are).
+   */
+  close: { h: 3.2, back: 2.4, th: 24, cy: 0.3 },
+  /**
+   * You can talk to the Shopkeeper from this many squares away (either direction, from its nearest square). A tap on it walks
+   * you to the square this far in front of it (the counter between you), as the mockup's "at the counter" view stands.
+   */
+  talkRange: 3,
+  /**
+   * An upright piece nearer the camera than this many squares (its depth: the front wall as you stand at the door, a prop
+   * between the camera and you) fades out, gone by `nearGone`: up close it would fill the screen. (Close puts you about 3.5 deep.)
+   */
+  nearFull: 3,
+  nearGone: 2,
+  /**
+   * Going in (and out): the town zooms in on the door, this many times bigger over `doorZoomMs`, then fades to black over
+   * `fadeMs`, and the room fades in from black over `fadeMs` (going out: the same, backwards).
+   */
+  doorZoom: 2.4,
+  doorZoomMs: 600,
+  fadeMs: 260,
+  /**
+   * The floor is drawn flat on its squares in blocks of this many squares a side (each block two triangles of one baked picture of
+   * the whole floor): 1 is exactly the mockup's (a tile a draw), 2 a quarter of the draws, the room's gentle curve barely bent.
+   */
+  floorBlock: 2,
+  /** ...a block drawn taller than this many pixels (near the camera, where a block's perspective bends most) is drawn a square at a time. */
+  floorSplitPx: 90,
+  /** The fire hoops' glow (Babur's): its warm pool under each hoop this strong (0 to 1, over the art's own `strength`). */
+  glow: 1,
 } as const;

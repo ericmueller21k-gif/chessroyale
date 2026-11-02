@@ -104,6 +104,23 @@
   object-fit: cover;
   pointer-events: none;
 }
+/* The stone railing in front of your seat (art.ts railingArt: arena-railing, 128 x 32, its pixels 1:1 in CSS pixels), along
+   the arena's foot under the overlay; only in a seat's view (Colosseum.tsx keeps the board above it: arena.ts railPitch). */
+.col-rail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 32px;
+  background-repeat: repeat-x;
+  background-position: center bottom;
+  background-size: 128px 32px;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+.col-rail[data-on="0"] {
+  visibility: hidden;
+}
 .col-fps:empty {
   display: none;
 }

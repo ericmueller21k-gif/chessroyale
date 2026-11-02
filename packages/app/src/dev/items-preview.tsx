@@ -27,7 +27,7 @@ const finish = (def: string, blemish = 20) => ({ def, color, color2, blemish, se
 const Cell = ({ look, side, label }: { look: ItemLook; side: "w" | "b"; label: string }) => (
   <div style="width:112px;text-align:center;background:#3a3f48;border-radius:6px;padding:4px;color:#fff;font:11px sans-serif">
     <div style="width:104px;height:104px;position:relative;margin:auto">
-      <Avatar look={look} side={side} />
+      <Avatar look={look} side={side} ride />
     </div>
     {label}
   </div>
@@ -54,7 +54,7 @@ const SheetCard = ({ def, i }: { def: string; i: number }) => {
         </div>
         {(["w", "b"] as const).map((side) => (
           <div style="width:96px;height:96px;position:relative">
-            <Avatar look={look} side={side} />
+            <Avatar look={look} side={side} ride />
           </div>
         ))}
       </div>
@@ -86,7 +86,7 @@ render(
             <div style="display:flex;gap:4px;justify-content:center">
               {(["w", "b"] as const).map((side) => (
                 <div style="width:130px;height:130px;position:relative">
-                  <Avatar look={look} side={side} />
+                  <Avatar look={look} side={side} ride />
                 </div>
               ))}
             </div>

@@ -178,7 +178,8 @@ move.
   - Bots use 1-2 same-move tokens a Pairs match, 76-80% refunded (Mercenary's blocks: `reports/squads-mercenary.md`).
   - The final's vote: a clear majority on 54-72% of moves, the coin on 11-18%.
   - Ties go to the bank, and no longer to the coin (0 of 258: banks are rarely both at zero).
-- **Bots** (`bots.ts`): the existing bot engine (Stockfish's top moves, then `botPick` at a skill; blocked moves left
+- **Bots** (`bots.ts`): the existing bot engine (Stockfish's top moves, then `botPick` at a skill (since Nov 1 the
+  temperature its name's rating plays like: `botRoster`, [crowd.md](crowd.md) "The bots"); blocked moves left
   out, `topAllowed`) for Relay moves, pair picks (never the partner's, unless it's the bot's own best move and an only
   move, `isOnlyMove` at `bots.sameMoveGap`, with a token left: then the same), and the final's votes (`botVotePick`:
   sometimes a person's pick on the squad, `copyHumanChance`). Blocks, sparingly (`botBlock`): the other squad's
@@ -261,7 +262,9 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   the party asks the matchmaker for seats for everyone connected under a fresh pass (again every
   `partyRetryMs` while busy), then tells everyone `placed { lobby, pass }`. Each joins the lobby with
   `hello { party: pass }` and sits in one squad. The leader can queue again after a lobby. A party closes after
-  `partyIdleMinutes` with nobody in it.
+  `partyIdleMinutes` with nobody in it. **Boss Battle's party** (Oct 30) is the same `PartyCore` and Durable Object with kind
+  "boss" (`/api/boss/party`): up to 3 in seats, READY, the leader's boss and difficulty, Kick, Promote, admins' bot
+  members, and START making a private raid lobby instead of queueing (docs/decisions/2026-10-30-boss-party.md).
 - **A lobby's life.** waiting (people join until the fill time, MATCH_FILL_SECONDS as for Crowd, or 32 people) →
   filled (`formSquads`: parties whole, bots in every empty seat; the full grid for FRONT_DOOR.fillShowMs) → vote (Start,
   then Clock, on Crowd's vote machinery; bots vote; each result shows `voteResultSeconds`, 4.2 s since Oct 15, the
@@ -442,7 +445,9 @@ door's look; every class is `sq-`.
   (`squads-view.ts`: `liveBank` runs a bank down during a half from the match's banks, its duties and who has locked
   in; ▼▼ when two moves drain it at once; the exact bank comes with each half). Sudden death turns red and pulses. A
   computer: a side panel (from 1100 px). A phone: a strip of eight chips (name and clock), tapped for the whole table
-  and the bracket. The standings' foot has "Leave the lobby" (it asks again while your squad still plays: "Resign: a
+  and the bracket (the same panel in both: Nov 1, Eric: your own squad pinned at the top, then a thicker line, then the
+  whole table as it stands, you in your place too, one list, your name bold; `StandingsPanel` in `SquadsParts.tsx`). The
+  standings' foot has "Leave the lobby" (it asks again while your squad still plays: "Resign: a
   loss, and a bot takes your seat"). The match's top line ends in the match's control as in every mode
   (`MatchMenu`: the gear, with Sound, Animations and Resign, on a phone and a computer; `squadsExit` says what it offers), and the
   votes' top line too; resigning shows "You resigned" (your record, the bot in your seat), then Queue again or Home.
