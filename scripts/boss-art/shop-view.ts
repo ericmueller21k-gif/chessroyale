@@ -13,7 +13,13 @@ import { renderFrame } from "../../packages/app/src/characters/sprite.ts";
 import { SHOP_BABUR_LAYOUT, SHOP_BABUR_PIECES, SHOP_BABUR_CRATE_AT } from "./out/house-shop-babur/house-shop-babur.ts";
 import { readFileSync } from "node:fs";
 
-const [out = "shop-view.png", cs = "10", rs = "16", ws = "390", hs = "844"] = process.argv.slice(2);
+const [out = "shop-view.png", cs = "10", rs = "16", ws = "390", hs = "844", cam = "town"] = process.argv.slice(2);
+/**
+ * `close` (Eric, Nov 2: a second, much closer zoom inside the shop, "resembling normal 3rd person sizing", about 3x the
+ * town's zoomed-in view): the camera comes down and in behind you and looks more ahead than down. Overrides for camTall.
+ */
+const CLOSE = { h: Number(process.env.CLOSE_H ?? 3.2), back: Number(process.env.CLOSE_BACK ?? 2.4), th: Number(process.env.CLOSE_TH ?? 24), cy: Number(process.env.CLOSE_CY ?? 0.3) };
+if (cam === "close") Object.assign(TOWN_FEEL.camTall, CLOSE), Object.assign(TOWN_FEEL.camWide, CLOSE);
 const PC = Number(cs), PR = Number(rs), W = Number(ws), H = Number(hs);
 const DPR = 2;
 const SQ = TOWN_FEEL.housePxPerSquare;

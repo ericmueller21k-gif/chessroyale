@@ -75,3 +75,5 @@ mockup script, not the art. Stripes stands beside the counter's east end: behind
 
 - In the ring, looking north to the counter: [view-inside-ring.png](house-shop-babur/view-inside-ring.png)
 - Two squares from the counter: [view-at-counter.png](house-shop-babur/view-at-counter.png)
+- The "Close" zoom (Eric, Nov 2: a second, third-person zoom, about 3x; `docs/decisions/2026-11-02-shop-zoom.md`), the same
+  spots: [view-close-at-counter.png](house-shop-babur/view-close-at-counter.png), [view-close-in-ring.png](house-shop-babur/view-close-in-ring.png)
