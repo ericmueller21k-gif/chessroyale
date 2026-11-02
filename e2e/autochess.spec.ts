@@ -5,7 +5,7 @@ import { QUICK_CHAT } from "../packages/app/src/autochess/chat.ts";
 /**
  * Auto chess, the demo (/autochess; docs/areas/autochess.md; shelved: Settings' Testing section, for admins, opens it): a
  * round is played from buying to the fight's end, on a phone and a computer. `?quick=1` (a test switch) shortens the steps (buy 7 s with the last
- * 2 locked, circles half a second behind, a reveal every 1.5 s, the move step still 7 s, a fight move every 60 ms); `?adjust=0` turns the move step
+ * 2 locked, a reveal every 1.5 s, the move step still 7 s, a fight move every 60 ms); `?adjust=0` turns the move step
  * off; `?seed=` fixes the kings, the shop and the bot; `?gold=N` adds gold; `?level=N` starts both sides at level N (rooks and queens in the shop at
  * once); `?lockin=1` turns lock-in on (it is off since v7), `?adjustmode=legal` brings back v7's move step (one piece lit at random, 7 s) and `=teleport` the v6 adjust step; v8's
  * stars: `?stars=n@c2:1,b@d2:2` puts pieces on your board (kind, square, stars 1 to 3), `?benchstars=b@f3:2` holds them for you and `?botbench=n@c7:2` for the bot; `?fightglow=1` keeps the stars' outlines on through the fight.
@@ -1211,74 +1211,106 @@ test("lock in (behind `?lockin=1`): you lock before the opponent, and when it lo
   expect(errors).toEqual([]);
 });
 
-test("while you buy their pieces are plain circles (pawns too), 2 s behind; every few seconds one is revealed at random and stays shown", async ({ page }) => {
-  const errors = watchErrors(page);
-  // (Quick: a reveal every 1.5 s, the circles half a second behind.)
-  await page.goto("/autochess?quick=1&seed=9&intro=0");
-  await expect(root(page)).toHaveAttribute("data-phase", "buy");
-  await expect.poll(() => page.locator(".ac-circle").count(), { timeout: 6000 }).toBeGreaterThan(0);
-  // Watch the board for the step's open part: the real black pieces (not the king) only ever grow, by one at a time, never a pawn drawn as a pawn without being revealed,
-  // and a revealed piece's square has no circle on it (it turned into the piece) but its gold ring.
-  const seen = await page.evaluate(
-    () =>
-      new Promise<{ real: number[]; clash: number; unringed: number }>((resolve) => {
-        const real: number[] = [];
-        let clash = 0;
-        let unringed = 0;
+/** Samples the board every 80 ms while you buy: their real pieces (revealed), their circles, your grayed pieces (unseen by them) and the yellow-bordered one (your next). */
+const watchReveals = (page: Page, ms: number) =>
+  page.evaluate(
+    (ms) =>
+      new Promise<{ t: number; black: string[]; circles: string[]; unseen: string[]; next: string | null; pinged: boolean; clash: boolean; nextOk: boolean }[]>((resolve) => {
+        const out: { t: number; black: string[]; circles: string[]; unseen: string[]; next: string | null; pinged: boolean; clash: boolean; nextOk: boolean }[] = [];
         const t0 = performance.now();
+        const sqs = (sel: string) => [...document.querySelectorAll<HTMLElement>(sel)].map((e) => e.getAttribute("data-square")!).sort();
         const look = () => {
-          // (Only while buying: the next step shows everything for real.)
-          if (document.querySelector(".ac-root")?.getAttribute("data-phase") !== "buy") return resolve({ real, clash, unringed });
-          const pieces = [...document.querySelectorAll<HTMLElement>(".hb-board piece.black:not(.king)")];
-          real.push(pieces.length);
-          for (const p of pieces) {
-            const sq = p.getAttribute("data-square");
-            if (document.querySelector(`.ac-circle[data-square="${sq}"]`)) clash++;
-            if (!document.querySelector(`.ac-ping[data-square="${sq}"]`)) unringed++;
-          }
-          if (performance.now() - t0 < 6200) setTimeout(look, 80);
-          else resolve({ real, clash, unringed });
+          if (document.querySelector(".ac-root")?.getAttribute("data-phase") !== "buy" || performance.now() - t0 > ms) return resolve(out);
+          const black = sqs(".hb-board piece.black:not(.king)");
+          const circles = sqs(".ac-circle");
+          const unseen = sqs(".hb-board piece.white.ac-unseen");
+          const next = document.querySelector(".ac-next")?.getAttribute("data-square") ?? null;
+          out.push({
+            t: (performance.now() - t0) / 1000,
+            black,
+            circles,
+            unseen,
+            next,
+            // (A revealed piece has its gold ring and no circle; the yellow border is only ever on a grayed piece of yours.)
+            pinged: black.every((sq) => !!document.querySelector(`.ac-ping[data-square="${sq}"]`)),
+            clash: black.some((sq) => circles.includes(sq)),
+            nextOk: next === null || unseen.includes(next),
+          });
+          setTimeout(look, 80);
         };
         look();
       }),
+    ms,
   );
-  const real = seen.real;
-  expect(Math.max(...real), "something was revealed").toBeGreaterThan(0);
-  for (let i = 1; i < real.length; i++) {
-    expect(real[i]!, "a revealed piece stays shown").toBeGreaterThanOrEqual(real[i - 1]!);
-    expect(real[i]! - real[i - 1]!, "one reveal at a time").toBeLessThanOrEqual(1);
-  }
-  expect(seen.clash).toBe(0);
-  expect(seen.unringed).toBe(0);
-  // A ping as each circle turns into its piece: one for each reveal.
-  expect(await soundCount(page, "acReveal")).toBe(Math.max(...real));
-  // The reveal shows everything for real: the circles go, and each shows its piece (the revealed ones stayed where they were).
-  const circles = await page.locator(".ac-circle").count();
-  const shown = await page.locator(`${BOARD_SEL.piece}.black:not(.king)`).count();
+/** The first sample (seconds from the watch's start) where `test` holds. */
+const firstWhen = <T,>(samples: T[], test: (s: T) => boolean) => (samples.find(test) as { t: number } | undefined)?.t ?? null;
+
+test("while you buy their pieces are live circles (pawns too); every 1.5 s (quick) a piece is revealed piece for piece by kind: the later placed of a pair first; yours grayed until seen, the next one with a yellow border", async ({ page }) => {
+  const errors = watchErrors(page);
+  // Seed 1: you (king b2) start with a knight on c2 and a bishop on d2 (put down as the step begins: placed first). The bot puts a pawn on a6 at 1.21 s, bishops on d8
+  // at 1.65 s and a5 at 2.16 s, and a knight on h8 at 2.53 s. The reveals (every 1.5 s): 1.5 nothing (no pawn of yours to match a6); 3 their d8 (placed after your
+  // c2: theirs first); 4.5 your c2; 6 their a5 (paired with your d2, which would answer at 7.5: past the step). a6 and h8 have no match: circles to the end.
+  await page.goto("/autochess?quick=1&seed=1&stars=n@c2:1,b@d2:1&intro=0");
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  const s = await watchReveals(page, 6800);
+  const at = (t: number) => s.filter((x) => x.t <= t).at(-1)!;
+  // Circles are live: a6 shows by 1.21 s (sampled within a tick), each placed piece at once.
+  expect(at(0.1).circles).toEqual([]);
+  expect(at(0.1).unseen).toEqual(["c2", "d2"]);
+  const d8 = firstWhen(s, (x) => x.black.includes("d8"))!;
+  const c2 = firstWhen(s, (x) => !x.unseen.includes("c2"))!;
+  const a5 = firstWhen(s, (x) => x.black.includes("a5"))!;
+  expect(firstWhen(s, (x) => x.circles.includes("a6"))!).toBeLessThan(d8 - 1.2);
+  // Their bishop first, your knight 1.5 s later, their other bishop 1.5 s after that; one at a time.
+  expect(c2 - d8).toBeGreaterThan(1.2);
+  expect(c2 - d8).toBeLessThan(1.8);
+  expect(a5 - c2).toBeGreaterThan(1.2);
+  expect(a5 - c2).toBeLessThan(1.8);
+  expect(at(d8 - 0.05).black).toEqual([]);
+  expect(at(a5 - 0.05).black).toEqual(["d8"]);
+  // Your bishop on d2 stays grayed (its answer would come after the step), their pawn and knight stay circles.
+  const last = s.at(-1)!;
+  expect(last.black).toEqual(["a5", "d8"]);
+  expect(last.circles).toEqual(["a6", "h8"]);
+  expect(last.unseen).toEqual(["d2"]);
+  // The yellow border: on your knight once their bishop is down (it is next), never before there's a match, off once it is seen; never on d2 (no tick left for it).
+  expect(at(0.5).next).toBeNull();
+  expect(at(d8 - 0.2).next).toBe("c2");
+  expect(at(c2 - 0.1).next).toBe("c2");
+  expect(s.filter((x) => x.t > c2 + 0.1).every((x) => x.next === null)).toBe(true);
+  expect(s.every((x) => x.nextOk && !x.clash && x.pinged)).toBe(true);
+  // A thin yellow border (2 px, inside the square), no green; and a grayed piece is grayed.
+  await page.goto("/autochess?quick=1&seed=1&stars=n@c2:1,b@d2:1&intro=0");
+  await expect(page.locator('.ac-next[data-square="c2"]')).toHaveCount(1, { timeout: 4000 });
+  expect(await page.locator(".ac-next").evaluate((el) => getComputedStyle(el).boxShadow)).toMatch(/^rgb\(255, 214, 10\) 0px 0px 0px 2px inset$/);
+  expect(await page.locator(`${BOARD_SEL.piece}.white.ac-unseen`).first().evaluate((el) => getComputedStyle(el).filter)).toContain("grayscale");
+  // A ping as each of theirs turns into its piece: one for each reveal of theirs.
+  await expect(page.locator(`${BOARD_SEL.piece}.black:not(.king)`)).toHaveCount(2, { timeout: 8000 });
+  expect(await soundCount(page, "acReveal")).toBe(2);
+  // The move step shows everything for real: no circle, nothing grayed or bordered.
   await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 15_000 });
   await expect(page.locator(".ac-circle")).toHaveCount(0);
-  expect(await page.locator(`${BOARD_SEL.piece}.black:not(.king)`).count()).toBeGreaterThanOrEqual(shown + circles);
+  await expect(page.locator(".ac-unseen, .ac-next")).toHaveCount(0);
+  expect(await page.locator(`${BOARD_SEL.piece}.black:not(.king)`).count()).toBe(4);
   expect(errors).toEqual([]);
 });
 
-test("the reveals come every 5 seconds of the 30 (the first at 5 s, the next at 10 s)", async ({ page }) => {
+test("the reveals come every 3 seconds of the 30: theirs at 6 s, your matching piece at 9 s; nothing of theirs shows while you have no match", async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto("/autochess?seed=9&intro=0");
+  // Seed 11 (the full 30 s): the bot (king h8) puts a bishop on c8 at 3.40 s, then pawns at 6.96, 12.17 and 15.98 s. You start with a knight on c2 (king h1).
+  await page.goto("/autochess?seed=11&stars=n@c2:1&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
-  const t0 = Date.now();
-  const real = () => page.locator(`${BOARD_SEL.piece}.black:not(.king)`).count();
-  expect(await real()).toBe(0);
-  // (Polled every 50 ms: the clock is read every 120 ms, so a reveal shows within a tick of its time.)
-  const waitFor = async (n: number) => {
-    await expect.poll(real, { timeout: 15_000, intervals: [50] }).toBeGreaterThanOrEqual(n);
-    return (Date.now() - t0) / 1000;
-  };
-  const first = await waitFor(1);
-  expect(first).toBeGreaterThan(4.7);
-  expect(first).toBeLessThan(6.4);
-  const second = await waitFor(2);
-  expect(second).toBeGreaterThan(9.7);
-  expect(second).toBeLessThan(11.4);
+  const s = await watchReveals(page, 13_000);
+  const c8 = firstWhen(s, (x) => x.black.includes("c8"))!;
+  const c2 = firstWhen(s, (x) => !x.unseen.includes("c2"))!;
+  // The first tick after their bishop is down is 6 s; yours answers at 9 s.
+  expect(c8).toBeGreaterThan(5.5);
+  expect(c8).toBeLessThan(7.4);
+  expect(c2 - c8).toBeGreaterThan(2.7);
+  expect(c2 - c8).toBeLessThan(3.3);
+  // Their pawns have no match: circles all along; only the bishop shows.
+  expect(s.at(-1)!.black).toEqual(["c8"]);
+  expect(s.at(-1)!.circles.length).toBeGreaterThanOrEqual(2);
   expect(errors).toEqual([]);
 });
 
@@ -2455,11 +2487,13 @@ test("a sale only pays for a piece of yours that is there: selling a piece the p
 // 43, `stars=n@c2:1,b@d2:2,r@a1:1,n@g3:2` (a full board at level 4): king b1; shop bishop a4, knight c2*2, pawn e3, bishop d2*3: a gold card and a rainbow one. The bot (king b8) has no star.
 // 43, `stars=n@g3:2,b@d2:3,r@a1:1,n@c2:1`: the move step with a 2-star knight on g3 (its squares e2, e4, f1, h1), a 3-star bishop on d2, a plain rook and a plain knight; nobody else is starred, so 5 s + 3 s x 2.
 // 16, `benchstars=b@f3:1` (a bishop held for f3): king a2; shop pawn b3, knight c4, bishop f3*2, pawn e3: a gold card for the held bishop. The bot (king a7) has no star.
-// 1, `botbench=n@c7:2,b@f8:3`: the bot (king b7) places a 2-star knight on c7 (shown at 1.5 s) and a 3-star bishop on f8 (shown at 4.5 s) for nothing, and buys nothing starred; you (king b2) have none.
+// 1, `botbench=n@c7:2,b@f8:3&stars=n@c2:1,b@d2:1`: the bot (king b7) places a 2-star knight on c7 (1.17 s) and a 3-star bishop on f8 (1.52 s) for nothing, and buys nothing starred;
+// you (king b2) start with a plain knight on c2 and bishop on d2 (since Nov 2 a piece of theirs shows only with a match of yours: theirs were placed later, so c7 shows
+// at 1.5 s, your c2 at 3 s, f8 at 4.5 s).
 const STARS = "/autochess?quick=1&seed=43&stars=n@c2:1,b@d2:2,r@a1:1,n@g3:2&intro=0";
 const STARMOVE = "/autochess?quick=1&seed=43&stars=n@g3:2,b@d2:3,r@a1:1,n@c2:1&intro=0";
 const STARBENCH = "/autochess?quick=1&seed=16&benchstars=b@f3:1&intro=0";
-const BOTSTARS = "/autochess?quick=1&seed=1&botbench=n@c7:2,b@f8:3&intro=0";
+const BOTSTARS = "/autochess?quick=1&seed=1&botbench=n@c7:2,b@f8:3&stars=n@c2:1,b@d2:1&intro=0";
 const GOLD = "242, 193, 78";
 /** The stars drawn on the board by square, each with its count: they are drawn inside their piece's own element (so they slide with it). */
 const marks = (p: Page) => p.locator(`${BOARD_SEL.piece} .ac-art`).evaluateAll((els) => Object.fromEntries(els.map((e) => [(e.closest("piece") as HTMLElement).dataset.square!, Number((e as HTMLElement).dataset.stars)])));
