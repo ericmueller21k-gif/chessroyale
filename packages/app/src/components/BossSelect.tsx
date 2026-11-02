@@ -226,11 +226,13 @@ export function BossSelect({
     ...hidden.map((b) => tile(b.id, "Locked boss", <BossArt boss={b} class="bs-shadow" />, " bs-locked")),
     tile(RANDOM, "Random boss", <span class="bs-q" aria-hidden="true">?</span>, " bs-random"),
   ];
+  // (On a computer's wide middle column the same tiles go in two rows, `--bs-two` to a row, the first the longer: styles.css.)
+  const two = Math.ceil(tiles.length / 2);
   const rows = rowSizes(tiles.length, TILES_PER_ROW).map((n) => tiles.splice(0, n));
   return (
     <div class="bs-select">
       {/* (Rows are layout only: the radios stay one group, in order.) */}
-      <div class={`bs-tiles${locked ? " bs-theirs" : ""}`} role="radiogroup" aria-label="Bosses" aria-disabled={locked || undefined} style={{ "--bs-per": TILES_PER_ROW }}>
+      <div class={`bs-tiles${locked ? " bs-theirs" : ""}`} role="radiogroup" aria-label="Bosses" aria-disabled={locked || undefined} style={{ "--bs-per": TILES_PER_ROW, "--bs-two": two }}>
         {rows.map((row, i) => (
           <div class="bs-row" role="presentation" key={i}>
             {row}

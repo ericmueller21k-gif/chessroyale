@@ -255,36 +255,54 @@ test("a resting boss has no tile, and a pick of it reads as a random boss", asyn
 const SIZES = () => (desktop() ? [[1280, 800]] : [[320, 568], [360, 740], [390, 844], [428, 777], [430, 932]]);
 const TILE_BEFORE: Record<number, [number, number]> = { 320: [44, 39.6], 360: [50.7, 45.6], 390: [55.7, 50.1], 428: [62, 55.8], 430: [62.3, 56.1], 1280: [76, 68.4] };
 
-/** The grid's boxes (rows, tiles, their art, the block, the column and the header over it). */
+/**
+ * The grid's boxes (rows, tiles, their art, the block, the column and the header over it). A row is the tiles on one line: on a
+ * computer's two rows the `.bs-row`s have no box of their own (display: contents), so the rows are read off the tiles' tops.
+ */
 function measureGrid() {
   const R = (e: Element) => {
     const b = e.getBoundingClientRect();
     return { x: b.x, y: b.y, r: b.right, b: b.bottom, w: b.width, h: b.height };
   };
-  const rows = [...document.querySelectorAll(".bs-row")].map((row) => ({
-    ...R(row),
-    tiles: [...row.querySelectorAll(".bs-tile")].map((t) => {
-      const inner = t.querySelector(".bs-tile-in")!;
-      const art = t.querySelector(".bs-art");
-      return {
-        ...R(t),
-        name: t.getAttribute("aria-label")!,
-        text: (t.textContent ?? "").trim(),
-        // (The slant, the first number of the tile's polygon: its shape's lean in pixels.)
-        slant: Number(getComputedStyle(t).clipPath.match(/^polygon\(([\d.]+)px/)?.[1] ?? NaN),
-        inner: R(inner),
-        fill: getComputedStyle(inner).backgroundImage,
-        art: art ? R(art) : null,
-      };
-    }),
-  }));
+  const tile = (t: Element) => {
+    const inner = t.querySelector(".bs-tile-in")!;
+    const art = t.querySelector(".bs-art");
+    return {
+      ...R(t),
+      name: t.getAttribute("aria-label")!,
+      text: (t.textContent ?? "").trim(),
+      // (The slant, the first number of the tile's polygon: its shape's lean in pixels.)
+      slant: Number(getComputedStyle(t).clipPath.match(/^polygon\(([\d.]+)px/)?.[1] ?? NaN),
+      inner: R(inner),
+      fill: getComputedStyle(inner).backgroundImage,
+      art: art ? R(art) : null,
+    };
+  };
+  const lines: Element[][] = [];
+  let top = NaN;
+  for (const t of document.querySelectorAll(".bs-tile")) {
+    const y = Math.round(t.getBoundingClientRect().top);
+    if (y !== top) lines.push([]);
+    top = y;
+    lines.at(-1)!.push(t);
+  }
+  const rows = lines.map((ts) => {
+    const tiles = ts.map(tile);
+    const x = Math.min(...tiles.map((t) => t.x));
+    const y = Math.min(...tiles.map((t) => t.y));
+    const r = Math.max(...tiles.map((t) => t.r));
+    const b = Math.max(...tiles.map((t) => t.b));
+    return { x, y, r, b, w: r - x, h: b - y, tiles };
+  });
   return { rows, block: R(document.querySelector(".bs-tiles")!), column: R(document.querySelector(".rd-page")!), head: R(document.querySelector(".rd-page .fd-page-head")!) };
 }
+/** The tiles' lines on the page, each as many tiles as it holds (top to bottom). */
+const tileLines = (p: Page) => p.locator(".bs-tile").evaluateAll((es) => [...new Set(es.map((e) => Math.round(e.getBoundingClientRect().top)))].map((y) => es.filter((e) => Math.round(e.getBoundingClientRect().top) === y).length));
 /** What tile (its name) is at each point, null where none is (the page, a gap). */
 const tileAt = (ps: { x: number; y: number }[]) => ps.map((p) => document.elementFromPoint(p.x, p.y)?.closest(".bs-tile")?.getAttribute("aria-label") ?? null);
 
 for (const scheme of ["light", "dark"] as const) {
-  test(`the grid, ${scheme}: tall slanted tiles all the same size with a small gap, five to a row (a short row centered), edge to edge on a phone, bigger than before, 44 px targets, each filled by its boss's figure, nothing sideways`, async ({ page }) => {
+  test(`the grid, ${scheme}: tall slanted tiles all the same size with a small gap, five to a row on a phone (a short row centered), two rows of eight across a computer's column (Eric, Nov 2), edge to edge, bigger than before, 44 px targets, each filled by its boss's figure, nothing sideways`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme });
     for (const [w, h] of SIZES()) {
       const at = `${scheme} ${w}x${h}`;
@@ -295,17 +313,19 @@ for (const scheme of ["light", "dark"] as const) {
       await page.evaluate(() => document.fonts.ready);
       const g = await page.evaluate(measureGrid);
 
-      // Five to a row on a phone and a computer alike: 5, 5, 5 and "?" on its own (sixteen tiles since Folio, Oct 27).
-      expect(g.rows.map((r) => r.tiles.length), at).toEqual([5, 5, 5, 1]);
+      // Five to a row on a phone: 5, 5, 5 and "?" on its own (sixteen tiles since Folio, Oct 27). On a computer's wide column, two rows
+      // of eight (Eric, Nov 2; docs/decisions/2026-11-02-boss-select-rows.md); the narrower window keeps five a row.
+      expect(g.rows.map((r) => r.tiles.length), at).toEqual(desktop() && w! >= 1280 ? [8, 8] : [5, 5, 5, 1]);
       const tiles = g.rows.flatMap((r) => r.tiles);
       const t0 = tiles[0]!;
 
       // Every tile the very same size and shape: tall (its visible width 1 to 1.55 of its height), its slant a fifth of its width.
       for (const t of tiles) {
-        // ("?" is the smaller box since Oct 29, Eric's picture: 0.82 of a tile's width, half its height.)
+        // ("?" is the smaller box since Oct 29, Eric's picture: 0.82 of a tile's width, half its height; in a computer's two rows it's
+        // full height, so its edge runs parallel to its neighbor's: docs/decisions/2026-11-02-boss-select-rows.md.)
         if (t.name === "Random boss") {
           expect(Math.abs(t.w - 0.82 * t0.w), `${at} ${t.name}: width`).toBeLessThan(0.6);
-          expect(Math.abs(t.h - 0.5 * t0.h), `${at} ${t.name}: height`).toBeLessThan(0.6);
+          expect(Math.abs(t.h - (desktop() ? 1 : 0.5) * t0.h), `${at} ${t.name}: height`).toBeLessThan(0.6);
           continue;
         }
         expect(Math.abs(t.w - t0.w), `${at} ${t.name}: width`).toBeLessThan(0.6);
@@ -345,17 +365,13 @@ for (const scheme of ["light", "dark"] as const) {
       const top = g.rows[0]!.y - g.head.b;
       expect(top, `${at}: top buffer`).toBeGreaterThanOrEqual(8);
       expect(top, `${at}: top buffer`).toBeLessThanOrEqual(12);
-      if (desktop()) {
-        // A computer: the tiles stop at 96 px, the block is in the middle of the column, narrower than it.
-        expect(t0.w, `${at}: capped`).toBeCloseTo(96, 0);
-        expect(left, `${at}: room each side`).toBeGreaterThan(20);
-      } else {
-        // A phone: nearly the screen's width, a 10 px buffer each side (a tile's corner is the edge).
-        expect(left, `${at}: left buffer`).toBeGreaterThanOrEqual(8);
-        expect(left, `${at}: left buffer`).toBeLessThanOrEqual(12);
-        expect(right, `${at}: right buffer`).toBeGreaterThanOrEqual(8);
-        expect(right, `${at}: right buffer`).toBeLessThanOrEqual(12);
-      }
+      // A phone: nearly the screen's width. A computer: the middle column's width, two rows of eight (cards 90 px or more, not capped).
+      // Either way a 10 px buffer each side (a tile's corner is the edge).
+      if (desktop()) expect(t0.w, `${at}: cards 90 px or more`).toBeGreaterThanOrEqual(90);
+      expect(left, `${at}: left buffer`).toBeGreaterThanOrEqual(8);
+      expect(left, `${at}: left buffer`).toBeLessThanOrEqual(12);
+      expect(right, `${at}: right buffer`).toBeGreaterThanOrEqual(8);
+      expect(right, `${at}: right buffer`).toBeLessThanOrEqual(12);
 
       // Bigger than the first grid, every tile a 44 px target (its width at mid-height: a slant narrower than its box).
       const [bw, bh] = TILE_BEFORE[w!]!;
@@ -478,8 +494,8 @@ test("the layout: the stage under the tiles, the ways to play under the stage an
     // 800 px tall for it), and at 568 px the boss's name is still in the window with the page scrolling on from there. That's with three
     // rows of tiles; each row past three (a fourth since Folio's tile, Oct 27: sixteen tiles, five to a row) moves both down by its
     // own height and gap, and nothing more.
-    const rows = await page.locator(".bs-row").count();
-    const rowBoxes = await page.locator(".bs-row").evaluateAll((es) => es.map((e) => e.getBoundingClientRect().top));
+    const rows = (await tileLines(page)).length;
+    const rowBoxes = await page.locator(".bs-tile").evaluateAll((es) => es.map((e) => e.getBoundingClientRect().top));
     const pitch = rows > 1 ? (rowBoxes.at(-1)! - rowBoxes[0]!) / (rows - 1) : 0;
     const extra = Math.max(0, rows - 3) * pitch;
     if (h! >= 740) expect(first.y + first.height, `${w}x${h}: the first way to play whole in the window (${rows} rows)`).toBeLessThanOrEqual(h! + extra);
@@ -495,6 +511,26 @@ test("the layout: the stage under the tiles, the ways to play under the stage an
       expect(await sideways(page), `${w} ${name}`).toBe(0);
     }
   }
+});
+
+test("on a computer the tiles go in two rows across the middle column, and START shows at 1280 x 800 (Eric, Nov 2); a window under 1280 px wide keeps five a row", async ({ page }) => {
+  test.skip(!desktop(), "one run is enough: a computer");
+  await named(page, "Tapper");
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/");
+  await openSoloBoss(page);
+  // Two rows of eight (the first eight tiles the first row): the rows fill the column with the same 10 px buffer as a phone's, and START is in the window.
+  expect(await tileLines(page)).toEqual([8, 8]);
+  const column = (await page.locator(".rd-page").boundingBox())!;
+  const rowEnd = (await page.locator(".bs-tile").nth(7).boundingBox())!;
+  const buffer = rowEnd.x + rowEnd.width - (column.x + column.width);
+  expect(buffer, "right buffer").toBeGreaterThanOrEqual(-12);
+  expect(buffer, "right buffer").toBeLessThanOrEqual(-8);
+  const start = (await page.locator(".bs-start").boundingBox())!;
+  expect(start.y + start.height, "START in the window at 1280 x 800").toBeLessThanOrEqual(800);
+  // A narrower window: five a row again, as before.
+  await page.setViewportSize({ width: 1100, height: 800 });
+  expect(await tileLines(page)).toEqual([5, 5, 5, 1]);
 });
 
 test("home's Boss Battle card: a still portrait that moves on to the next boss you can meet, never the Hidden Boss, the card never changing size", async ({ page }) => {
