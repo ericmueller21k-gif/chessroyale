@@ -27,7 +27,8 @@ type Patch = (fen: string) => Partial<BossPowerState>;
 /** A battle against `id`, the crowd White to move on `fen` (the game so far when not given), its powers patched. */
 function battle(id: string, patch: Patch = () => ({}), fen?: string) {
   let blunder = "";
-  const settings = kitSettings({ boss: id, test: "", maxMoves: 50 }, { lastStandFrom: DEFAULT_SETTINGS.lastStandFrom });
+  // (The save on the battle's first move: the first-five-moves rule, lastStandFromMove, off here; last-stand.test.ts.)
+  const settings = kitSettings({ boss: id, test: "", maxMoves: 50 }, { lastStandFrom: DEFAULT_SETTINGS.lastStandFrom, lastStandFromMove: 0 });
   const r = new MatchRunner({ settings, rng: mulberry32(7), engines: [judge(() => blunder)], library: [KIT_OPENING], entrants: [{ id: "h0", name: "H", isBot: false }], raidSide: "w" });
   const boardId = r.state.boards[0]!;
   if (fen) {
