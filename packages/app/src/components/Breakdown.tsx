@@ -86,7 +86,8 @@ export function Breakdown({
           <MoveRow key={`c${m.fen}`} m={m} dp={dp} open={open === m} onOpen={() => setOpen(open === m ? null : m)} />
         ))}
       </ol>
-      <details class="breakdown-all">
+      {/* (On the result page the whole review shows with no tap: its list of every move opens.) */}
+      <details class="breakdown-all" open={inline}>
         <summary>Every move ({played.length})</summary>
         <ol class="breakdown-list">
           {played.map((m) => (
