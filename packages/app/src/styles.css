@@ -11042,6 +11042,62 @@ a.fd-row-link {
   color: var(--muted);
   font-size: 14px;
 }
+
+/* The result page's top part is a box of its own only on a computer, where a boss battle's review sits beside it. */
+.results-top {
+  display: contents;
+}
+.results-review {
+  width: 100%;
+}
+/* A boss battle's review (Breakdown, inline): on the page, not an overlay, and centered like the top part. Its bars, its board
+   and the text under the board are all as wide as the board. */
+.breakdown.inline {
+  position: static;
+  inset: auto;
+  z-index: auto;
+  overflow: visible;
+  padding: 0;
+  background: none;
+  max-width: none;
+  width: min(340px, 86vw);
+  margin: 0 auto;
+}
+.breakdown.inline .breakdown-head {
+  justify-content: center;
+}
+.breakdown.inline .bm-board-wrap {
+  width: 100%;
+}
+.breakdown.inline .bm-board p {
+  width: 100%;
+}
+/* A boss battle on a computer: the top part on the left, the review on the right, both top-aligned. The gear goes to the top
+   right of the top part, beside the title, not alone over the review. A narrow window keeps the phone's single column. */
+@media (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
+  .screen.results.boss-results {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 28px;
+    align-items: start;
+    align-content: start;
+  }
+  .boss-results > .results-top {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+  .boss-results > .results-top > .mm-corner {
+    top: 0;
+    right: 0;
+  }
+  .boss-results > .results-review {
+    min-width: 0;
+  }
+}
 .fd-bar {
   height: 6px;
   border-radius: 3px;

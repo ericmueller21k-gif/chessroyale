@@ -20,6 +20,7 @@ export function Breakdown({
   lastCut,
   onClose,
   dp = 1,
+  inline = false,
 }: {
   moves: readonly MoveRecord[];
   you?: number;
@@ -27,22 +28,31 @@ export function Breakdown({
   placement?: number | null;
   /** You went out at the last cut before the ending, where a tie is broken (not kept in). */
   lastCut?: boolean;
-  onClose: () => void;
+  /** Tapped closed (the overlay's Close button). Not used inline. */
+  onClose?: () => void;
   /** Decimals on the scores (scoreDp: 2 in 50 v 50). */
   dp?: number;
+  /**
+   * On the result page under the stats (a boss battle, Eric's brief): not an overlay, no Close button, and no note on how
+   * scores compare. Crowd's and Classic's breakdowns keep the overlay and the note.
+   */
+  inline?: boolean;
 }) {
   const played = moves.filter((m) => m.bestMove);
   const costly = [...played].filter((m) => m.roundScore < 0).sort((a, b) => a.roundScore - b.roundScore).slice(0, 3);
   const brilliant = played.filter((m) => m.brilliant);
-  const [open, setOpen] = useState<MoveRecord | null>(costly[0] ?? null);
+  // (On the result page the first move's board is open when nothing cost you: the review shows with no tap.)
+  const [open, setOpen] = useState<MoveRecord | null>(costly[0] ?? (inline ? played[0] : null) ?? null);
   const short = you !== undefined && line !== undefined ? line - you : null;
   return (
-    <div class="breakdown" role="dialog" aria-label="Your game, move by move">
+    <div class={inline ? "breakdown inline" : "breakdown"} role={inline ? undefined : "dialog"} aria-label={inline ? undefined : "Your game, move by move"}>
       <div class="breakdown-head">
         <h2>{short !== null ? "Why you went out" : "Your game, move by move"}</h2>
-        <button type="button" class="btn btn-secondary breakdown-close" onClick={onClose}>
-          Close
-        </button>
+        {!inline && (
+          <button type="button" class="btn btn-secondary breakdown-close" onClick={onClose}>
+            Close
+          </button>
+        )}
       </div>
       {short !== null && (
         <div class="breakdown-line">
@@ -77,7 +87,8 @@ export function Breakdown({
           <MoveRow key={`c${m.fen}`} m={m} dp={dp} open={open === m} onOpen={() => setOpen(open === m ? null : m)} />
         ))}
       </ol>
-      <details class="breakdown-all">
+      {/* (On the result page the whole review shows with no tap: its list of every move opens.) */}
+      <details class="breakdown-all" open={inline}>
         <summary>Every move ({played.length})</summary>
         <ol class="breakdown-list">
           {played.map((m) => (
@@ -85,7 +96,7 @@ export function Breakdown({
           ))}
         </ol>
       </details>
-      <p class="muted small">Scores compare your move with everyone who picked that turn. Close calls are re-checked with a deeper search before every cut.</p>
+      {!inline && <p class="muted small">Scores compare your move with everyone who picked that turn. Close calls are re-checked with a deeper search before every cut.</p>}
     </div>
   );
 }

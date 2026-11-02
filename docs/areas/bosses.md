@@ -633,6 +633,13 @@ build): online, phase 1 won is the crowd's victory):
     (he says nothing as he lands). `timber` is in `KING_ATTACKERS`: the mate's longer hold; nothing in his rules (his Gnaws, at most two
     a battle) reads it. Admins first, so e2e plays his Last Stand as an admin.
 
+### The result page (Nov 2, 2026)
+
+A boss battle's result page (`screens/Results.tsx`, class `boss-results`) has no stage table and no best or worst board. Its
+review (`Breakdown` with `inline`) shows under the stats, every move, with the first costly move's board open. On a computer the
+top part is left and the review right. Decision: `docs/decisions/2026-11-02-boss-result-layout.md`. Guard: `e2e/resign.spec.ts`
+("Boss alone: Cancel keeps playing...", the result page's checks).
+
 ## Where the code is
 
 Each boss lives in its own files, one per layer, on a shared base. The shared files only put them together.
