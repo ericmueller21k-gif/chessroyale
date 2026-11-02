@@ -10,7 +10,8 @@ chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-
 [v8: stars](../decisions/2026-10-22-autochess-stars.md), Oct 22, after that;
 [the star look: tiny stars in the piece, an outline round it, a clean board](../decisions/2026-10-22-autochess-star-look.md), Oct 22, after that;
 [the meeting before round 1 (both pawns in the middle, quick chat, the countdown) and the shop in one panel](../decisions/2026-10-24-autochess-meeting.md), Oct 24, after that;
-[a TFT-style economy: whole-number gold, Eric's prices](../decisions/2026-11-01-autochess-tft-economy.md), Nov 1, last).
+[a TFT-style economy: whole-number gold, Eric's prices](../decisions/2026-11-01-autochess-tft-economy.md), Nov 1, after that;
+[the reveal: live circles, piece for piece by kind every 3 s](../decisions/2026-11-02-autochess-reveal.md), Nov 2, last).
 
 ## How it works today (v9)
 
@@ -45,7 +46,7 @@ chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-
   from the shop (its card) onto the bench row to hold it:** you pay now, the piece keeps the square it was offered on, and tapping
   it places it there when that square is free and your level allows ("b4 is taken.", "c2 is your king's square."). Because the colors
   turn each round, a held piece's square turns with them (same file, rank mirrored, as the kings are). What is held counts as owned for
-  the shop's limits. **Both benches are always on screen** (v7; v7.1: each bench's outer edge is on the board's, theirs on its left edge and yours on its right, at every size of the board): theirs at the top left with real pieces and each piece's square (Eric: intentional; drawn 2 s behind, as their circles are),
+  the shop's limits. **Both benches are always on screen** (v7; v7.1: each bench's outer edge is on the board's, theirs on its left edge and yours on its right, at every size of the board): theirs at the top left with real pieces and each piece's square (Eric: intentional; drawn live, as their circles are),
   tap one and its tile gets a red ring and its landing square lights red on their half (a second tap or another piece clears it; it clears when the fight begins), and theirs never drags. **Selling gives back 75%**, to the nearest whole gold, a half up (P1 N2 B2 R4 Q7): tap a piece on the board then "Sell N", or drag a piece from the
   board or the bench onto the shop row; a "+N" floats up from the square or bench slot it was sold from. **A sale only ever pays for a
   piece of yours that is there now, of the kind the hold says** (`sellPiece` and `sellHeld` return null otherwise: no gold, never for
@@ -57,9 +58,17 @@ chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-
 - **Lock in is off** (v7, Eric: "the whole function/feature"; `lockIn: false`): no button, no bonus for anyone (the bot never locks), and every buy step runs its full time. The code stays
   behind the setting (`?lockin=1` for testers): with it on, a gold bar under the shop locks your board, bench and shop for the rest of the step, **the first side to lock in gets 3
   gold at once**, the other side sees "Locked in" by the opponent's name, and when both have locked the step ends at once; the bot locks at a seeded time in the open part of the step, or now and then never.
-- **The opponent's board while you buy:** every piece of theirs is a plain circle, **pawns too**, 2 s behind; **every 5 s of the 30 one
-  piece is revealed at random** (5, 10, 15, 20 and 25 s: five) and stays shown as the piece it is, a gold ring opening on its square
-  and a ping. Their HP, level and XP show by their pawn (the level 2 s behind, as the circles are); the gold is no longer shown (v7).
+- **The opponent's board while you buy (Eric, Nov 1-2: "fair and strategic"; [the reveal](../decisions/2026-11-02-autochess-reveal.md)):**
+  every piece of theirs is a plain circle, **pawns too**, **live** (the 2 s delay is gone). **Every 3 s (3 to 27 s: nine ticks) one piece
+  is revealed, piece for piece by kind:** pawn with pawn, knight or bishop with knight or bishop, rook with rook, queen with queen
+  (`revealGroups`). A piece shows only when the other side has an unrevealed piece of its group to show back, so unmatched (often the
+  dearer) pieces stay hidden until the move step; kings are never hidden. In each group the two sides' pieces pair up in the order they
+  were placed; the pair whose later piece came first opens first; **placing first pays**: the later placer's piece shows first, the
+  first placer's on the next tick (a sold piece leaves its pair: the next of its group answers, or with none the pair breaks). A revealed
+  piece of theirs stays shown, with a gold ring and a ping. **Yours:** a piece the opponent hasn't seen yet is **slightly grayed**
+  (`.ac-unseen`), normal once seen; **the next of yours to be revealed has a thin 2 px yellow border** (`.ac-next`; none when no tick is
+  left for it). The rules are pure and the same for both sides (`reveal.ts`). Their HP, level and XP show by their pawn (live, as the
+  circles are); the gold is no longer shown (v7).
 - **The move step, v8** (the old "adjust" step; `adjustMode: "stars"`, the default; the full reveal: their real pieces show and stay shown): **no piece is lit for you.** It runs every round, **`moveBase` 5 s plus `movePerStar` 3 s for each starred piece on the board of the side
   with more of them** ("if you have two and your opponent has two starred up pieces, that's still just... an extra 6 seconds total"; the bench's stars don't count); with no starred piece it is 5 s to look at the board. Both sides move at once, hidden from each other until the fight. **Only starred pieces on the board move, each
   at most once, in any order:** every starred piece carries its outline (no pulsing box); tap one (or pick it up) and its squares light as dots, then tap a dot or drop it there. **A 2-star** makes one legal chess move that stays on your half (the fight's own move generator, `fightMoves`, in the position as the earlier moves
@@ -159,7 +168,7 @@ chess (shelved demo) ›"). Why it is the way it is: [docs/decisions/2026-10-19-
 ## Settings
 
 `AUTOCHESS` in `packages/core/src/settings.ts`: prices, the shop (slots, the odds by level `oddsByLevel`, the reroll price `reroll` first/step/max), sell back, the bench's slots, lock-in (`lockIn` off, its
-bonus), the steps' seconds, the reveal's interval, the adjust step (on or off, `adjustMode` stars, legal or teleport, seconds 7 and moves for the last two, changes), stars (`starUpCost` 1, `maxStars` 3, the stars step's `moveBase` 5 and `movePerStar` 3, and `fightGlow` false: the outlines stay on through the fight), the levels (start, top, free XP, XP
+bonus), the steps' seconds, the reveal's interval (3 s) and kinds' groups, the circles' delay (0: live), the adjust step (on or off, `adjustMode` stars, legal or teleport, seconds 7 and moves for the last two, changes), stars (`starUpCost` 1, `maxStars` 3, the stars step's `moveBase` 5 and `movePerStar` 3, and `fightGlow` false: the outlines stay on through the fight), the levels (start, top, free XP, XP
 bought and its price, the XP to each level), the king ranks, the fight's pace and search (`fightMoveMs`, `fightFastAfter`,
 `fightFastMoveMs`, `fightNodes`), the cash-in (`cashInGold`, and `cashInValue`: what the engine counts a cash-in's gold as, in centipawns), the move cap, HP and damage (`hp`, `damagePerRound`, `piecesPerDamage`), the pawns' hops (`hopEvery`, `hopSeconds`), start gold, income, interest, the survivors' refund, the streak tables,
 the legal-position limits, the bot's numbers (lock-in times, rerolls, holds, XP, how early it places, saving, `starUpChance`, the adjust search).
@@ -177,7 +186,7 @@ Test switches (where they work): `?quick=1` short steps (buy 7 s with the last 2
   thousands of shops, rerolls, refills, rounds and match seeds; two queens in a level-10 shop is 2.7%),
   `autochess-move.test.ts` (v7's move step, behind `adjustMode: "legal"`: legal moves staying on your half, pins and check, the random seeded pick, no piece able to move, taking back, the bot's pick and move),
   `autochess-lockin.test.ts` (off: no bonus, no lock, the full time; on: v5's rules), `autochess-level.test.ts` (levels, XP, the room a level gives, the bot's levels),
-  `autochess-reveal.test.ts` (the reveal times, what shows when), `autochess-rules.test.ts` (the shop's reasons, selling at 75%, the
+  `autochess-reveal.test.ts` (the reveal ticks, the pairing and order rules, sold and moved pieces, your next, what shows when), `autochess-rules.test.ts` (the shop's reasons, selling at 75%, the
   bench, the kings, placing, the teleport step's change and its off switch), `autochess-match.test.ts` (the economy, the bench through the
   rounds, the bot's buys, holds, XP, rerolls and adjust staying legal over hundreds of seeds and a whole match, fights ending within the
   cap; the fight's rules, cash-ins and their gold; the damage of a lost round and the game length: a Monte Carlo, median 8 rounds), `autochess-hop.test.ts` (the hops' random 7 to 10 s waits, each pawn on its own draws), `autochess-engine.test.ts` (the worker link: answers, the bot's look, the timeout's
@@ -191,7 +200,7 @@ Test switches (where they work): `?quick=1` short steps (buy 7 s with the last 2
   sound hook, the merge's pop), a star-up card never dragged and the "Need 1 more" line, a bench piece's star-up kept into the next round, the stars move step (every starred piece outlined and no box, a 2-star's legal squares, a 3-star's every empty square, "Not starred", each moved once and taken back, 11 s for two stars), the 5 s step with nobody starred,
   the bot's stars (shown once revealed, 5 s + 3 s each), stars following their pieces through the fight and the refund counting them, the stars' size and place at 320 to 428 and on a computer (at most 12%, a triangle or a pair, black on white and white on black, inside the body), the outlines (on the board, the bench and the cards while buying and moving, off in the fight and the result, on with `?fightglow=1`), a starred piece sliding with its outline and a dragged one carrying it (a real finger's drag), reduced motion and mute; and, as before: the four-card shop and its silhouettes (one to a square), a reroll, buying by tap,
   the reasons, selling by tap and drag, the bench (and your whole row lighting while you drag), drags cut off by a step's end, lock-in off for the whole 30 s (and its tests behind `?lockin=1`), a cancelled pointer or lost capture,
-  silhouettes that are only tapped, a sale of a piece that is gone, levels, the odds pill at level 4 and after a level-up, the reveals, their bench tapped (the red square), the phase banners and the clock's bars,
+  silhouettes that are only tapped, a sale of a piece that is gone, levels, the odds pill at level 4 and after a level-up, the reveals (live circles, piece for piece by kind, your pieces grayed until seen and the next with a yellow border, every 3 s), their bench tapped (the red square), the phase banners and the clock's bars,
   v7's move step behind `?adjustmode=legal` (the lit piece, its 7 s, the refusals, taking back, no piece able to move), the step off, the teleport step behind its setting, the kitty-corner layout, the benches on the board's edges (393 x 730, 428 x 777, 320 x 568 and the sizes between: measured boxes, and the board bigger than v7's), the clock in the gold row, the hopping pawns
   (on a fake clock: one hop, then 7 to 10 s, each pawn its own; still under reduced motion), one shadow under each pawn, the reroll price climbing 2, 3, 4, 5 and back to 2 next round, the button feel, the floating
   gold, mute, a fight to a result and the next round, the damage of a lost round 1, a cash-in's "+1", a fight with a silent engine, layouts (320 to 430 and 1280 to 1920: nothing scrolls, every target 44 px, both benches' gaps equal and on the board's edges, the gold row at its widest content,
