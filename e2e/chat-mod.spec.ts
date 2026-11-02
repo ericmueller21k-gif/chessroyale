@@ -99,7 +99,9 @@ test("chat moderation: mute from a name, a report from the profile, a moderator'
   const before = await lobbyChat(ann).locator(".qline").count();
   await bo.evaluate(() => (window as any).match.send({ t: "chat", say: "gg" }));
   await ann.waitForTimeout(1_000);
-  await expect(lobbyChat(ann).locator(".qline", { hasText: "GG" })).toHaveCount(0);
+  // (A line's own words, exactly: a whole line's text is the icon, the name and the words, and `hasText` is a substring in any case, so
+  // "♟Bo4tigGood luck!" (a run's name ending in "g", then "Good") read as a "GG": the flaky "Expected: 0 · Received: 1", Nov 2.)
+  await expect(lobbyChat(ann).locator(".qline .qline-text", { hasText: /^GG$/ })).toHaveCount(0);
   expect(await lobbyChat(ann).locator(".qline").count()).toBe(before);
 
   // Home (Leave, then the app opened again): the notice, once, with the note. Gone for good after "Got it", moving
