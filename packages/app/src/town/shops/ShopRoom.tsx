@@ -28,7 +28,7 @@ import { newPt, newView, proj, setView, type CamPair } from "../camera.ts";
 import { SHOP_FEEL, TOWN_FEEL, type CamSet } from "../feel.ts";
 import type { LightPool, LightSpot } from "../houses/kit.ts";
 import { Press } from "../press.ts";
-import { PAWN_HEAD, pawnImage, type YouArt } from "../render.ts";
+import { PAWN_HEAD, PAWN_PATH, type YouArt } from "../render.ts";
 import { SIDEKICK_SHEETS, type SidekickSheet } from "../sidekick-sheets.ts";
 import { TAG_STYLE, type TagKind } from "../tags.ts";
 import { Walker, type HomeId } from "../world.ts";
@@ -210,6 +210,7 @@ function CratePic({ frames }: { frames: Frames }) {
 /** The pawn's base's foot down its box (render.ts's PAWN_FOOT: the path's bottom at y 39.5, and half its outline). */
 const PAWN_FOOT = (39.5 + 0.75) / 45;
 const SHADOW = "rgb(60,35,10)";
+const PAWN = new Path2D(PAWN_PATH);
 const CAM_KEYS = ["h", "back", "th", "cy"] as const;
 
 /** An upright thing in the room, drawn at its foot, sorted far to near by `z` (its row). */
@@ -503,6 +504,10 @@ function startRoom(
 
   const drawUp = (u: Up, now: number) => {
     if (!P(u.c, u.r)) return;
+    // Near the camera (between it and you, up close: the front wall as you stand at the door) a piece fades out, so it never fills
+    // the screen in front of you.
+    const near = (pt.depth - S.nearGone) / (S.nearFull - S.nearGone);
+    if (near <= 0) return;
     const img = frameAt(u.name, now);
     const ch = frames[u.name]!.ch;
     const s = pt.k / SQ;
@@ -512,6 +517,7 @@ function startRoom(
     const y = pt.y + (u.oy - ch.foot[1]) * s;
     const w = img.width * s;
     if (x > W || x + w < 0 || y > H || y + h * s < 0) return;
+    g.globalAlpha = Math.min(1, near);
     if (u.flip) {
       g.save();
       g.translate(x + w, y);
@@ -519,6 +525,7 @@ function startRoom(
       g.drawImage(img, 0, 0, img.width, h, 0, 0, w, h * s);
       g.restore();
     } else g.drawImage(img, 0, 0, img.width, h, x, y, w, h * s);
+    g.globalAlpha = 1;
   };
   const shadows = (x: number, y: number, k: number, pawnW: number) => {
     g.fillStyle = SHADOW;
@@ -551,7 +558,6 @@ function startRoom(
     you.pose(now, pose);
     if (!P(pose.x, pose.y)) return;
     const a = youArt();
-    const img = a?.img ?? pawnImage("light", null);
     const pad = a?.pad ?? 0;
     const kk = 1 + 2 * pad;
     const h = f.youSquares * kk * pt.k;
@@ -564,8 +570,21 @@ function startRoom(
     g.translate(pt.x, pt.y);
     if (pose.tilt) g.rotate((pose.tilt * f.hobbleTilt * Math.PI) / 180);
     if (you.facing < 0) g.scale(-1, 1);
-    g.imageSmoothingEnabled = h < img.height * 1.5;
-    g.drawImage(img, -h / 2, y0 - pt.y, h, h);
+    if (a) {
+      g.imageSmoothingEnabled = h < a.img.height * 1.5;
+      g.drawImage(a.img, -h / 2, y0 - pt.y, h, h);
+    } else {
+      // The plain pawn drawn as its outline at this size (crisp up close, as the mockup's), not its 160 px picture blown up.
+      const u = h / 45;
+      g.translate(-h / 2, y0 - pt.y);
+      g.scale(u, u);
+      g.fillStyle = "#ffffff";
+      g.fill(PAWN);
+      g.lineWidth = 1.5;
+      g.lineCap = "round";
+      g.strokeStyle = "#000000";
+      g.stroke(PAWN);
+    }
     g.restore();
     g.imageSmoothingEnabled = false;
     Object.assign(youHead, { x: pt.x, y: y0 + head * h - 2, on: true });

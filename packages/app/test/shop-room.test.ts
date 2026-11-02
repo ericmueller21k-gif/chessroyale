@@ -4,6 +4,7 @@ import { SHOP_PUDDLES_LAYOUT } from "../src/town/shops/puddles-art.ts";
 import { findPath, inTalkRange, makeRoom, onDoor, stepsFrom, tapTarget, walkable, type Room, type Sq } from "../src/town/shops/room.ts";
 import { COMING_SOON, buyBossCrate, holdLine, priceLine, prizeRows, shopOf, wayText, SHOPS } from "../src/town/shops/shops.ts";
 import { HOMES } from "../src/town/world.ts";
+import { SHOP_FEEL } from "../src/town/feel.ts";
 
 /**
  * Inside a shop (Nov 2, round 1; shops/room.ts): which squares you can stand on, the way out, the Shopkeeper's talking range and
@@ -92,17 +93,23 @@ describe("the rooms' own pieces", () => {
     for (const [c, r] of [[13, 10], [14, 5], [14, 14], [9, 10]] as const) expect(walkable(puddles, c, r), `${c},${r}`).toBe(true);
   });
 
-  it("talking range: two squares either way from the Shopkeeper's squares", () => {
+  it("talking range: three squares either way from the Shopkeeper's squares (SHOP_FEEL.talkRange)", () => {
+    expect(SHOP_FEEL.talkRange).toBe(3);
     // Stripes beside the counter's east end (12, 2 and 13, 2); Drizzle behind its middle (9, 2 and 10, 2).
-    expect(inTalkRange(babur, 12, 4)).toBe(true);
-    expect(inTalkRange(babur, 15, 4)).toBe(true);
-    expect(inTalkRange(babur, 12, 5)).toBe(false);
-    expect(inTalkRange(babur, 10, 4)).toBe(true);
-    expect(inTalkRange(babur, 9, 4)).toBe(false);
-    expect(inTalkRange(puddles, 8, 4)).toBe(true);
-    expect(inTalkRange(puddles, 12, 4)).toBe(true);
-    expect(inTalkRange(puddles, 9, 5)).toBe(false);
-    expect(inTalkRange(puddles, 13, 4)).toBe(false);
+    expect(inTalkRange(babur, 12, 5)).toBe(true);
+    expect(inTalkRange(babur, 16, 5)).toBe(true);
+    expect(inTalkRange(babur, 9, 4)).toBe(true);
+    expect(inTalkRange(babur, 12, 6)).toBe(false);
+    expect(inTalkRange(babur, 8, 4)).toBe(false);
+    expect(inTalkRange(puddles, 6, 4)).toBe(true);
+    expect(inTalkRange(puddles, 13, 5)).toBe(true);
+    expect(inTalkRange(puddles, 9, 6)).toBe(false);
+    expect(inTalkRange(puddles, 5, 4)).toBe(false);
+  });
+
+  it("a tap on the Shopkeeper walks you in front of it, the counter between you, as far as talking reaches", () => {
+    expect(tapTarget(babur, babur.start, 12, 2).dest).toEqual({ c: 12, r: 5 });
+    expect(tapTarget(puddles, puddles.start, 9, 2).dest).toEqual({ c: 10, r: 5 });
   });
 });
 

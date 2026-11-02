@@ -570,8 +570,17 @@ export const SHOP_FEEL = {
    * zoomed-in camera (camTall / camWide as they are).
    */
   close: { h: 3.2, back: 2.4, th: 24, cy: 0.3 },
-  /** You can talk to the Shopkeeper from this many squares away (either direction: a 5 x 5 area round its square). */
-  talkRange: 2,
+  /**
+   * You can talk to the Shopkeeper from this many squares away (either direction, from its nearest square). A tap on it walks
+   * you to the square this far in front of it (the counter between you), as the mockup's "at the counter" view stands.
+   */
+  talkRange: 3,
+  /**
+   * An upright piece nearer the camera than this many squares (its depth: the front wall as you stand at the door, a prop
+   * between the camera and you) fades out, gone by `nearGone`: up close it would fill the screen. (Close puts you about 3.5 deep.)
+   */
+  nearFull: 3,
+  nearGone: 2,
   /**
    * Going in (and out): the town zooms in on the door, this many times bigger over `doorZoomMs`, then fades to black over
    * `fadeMs`, and the room fades in from black over `fadeMs` (going out: the same, backwards).

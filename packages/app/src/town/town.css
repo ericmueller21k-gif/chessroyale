@@ -478,13 +478,18 @@ button.town-pic.player {
  * Inside a shop (Nov 2, round 1: shops/ShopRoom.tsx): the room's own canvas over the town's (the town waits under it), the town's
  * edge chips put away while you're in, and the black the town zooms into as you go in (and the room fades in from).
  */
+/* (The layer makes no stacking context of its own: its canvas lies under the overlay (the chat box), its card over it, as the town's
+   cards are, and under the buttons.) */
 .town-shop {
   position: absolute;
   inset: 0;
-  z-index: 4;
+}
+.town-shop .town-card {
+  z-index: 6;
 }
 .town-shop-canvas {
   position: absolute;
+  z-index: 4;
   left: 0;
   top: 0;
   display: block;
@@ -499,7 +504,7 @@ button.town-pic.player {
 .town-fade {
   position: absolute;
   inset: 0;
-  z-index: 5;
+  z-index: 7;
   background: #000;
   opacity: 0;
   pointer-events: none;

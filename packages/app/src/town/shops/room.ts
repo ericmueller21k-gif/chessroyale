@@ -150,16 +150,28 @@ function best(room: Room, from: Sq, score: (c: number, r: number) => number | nu
   return out;
 }
 
+/**
+ * How well a square suits talking (lower is better; null: out of range): in front of the Shopkeeper, as far as the range
+ * reaches (the counter between you, the kid in view), as near its middle column as can be.
+ */
+function talkSpot(room: Room, c: number, r: number): number | null {
+  if (!inTalkRange(room, c, r)) return null;
+  const k = room.keeper;
+  const mid = k.reduce((a, s) => a + s.c, 0) / k.length;
+  const front = Math.max(...k.map((s) => s.r)) + SHOP_FEEL.talkRange;
+  return Math.abs(c - mid) + 2 * Math.abs(r - front);
+}
+
 /** What a tap means inside: a square to walk to, the Shopkeeper (walk into talking range) or the door (walk to the way out). */
 export type RoomTap = { kind: "square" | "keeper" | "door"; dest: Sq | null };
 
 /**
- * Where a tap on the square (c, r) sends you from `from`: the Shopkeeper or the counter, into talking range (the nearest square
- * there); the way out or a square just inside it, to the nearest of those; a free square, there; anything else solid, the
+ * Where a tap on the square (c, r) sends you from `from`: the Shopkeeper or the counter, into talking range (`talkSpot`: in
+ * front of it, the counter between you); the way out or a square just inside it, to the nearest of those; a free square, there; anything else solid, the
  * nearest free square to it. `dest` null: nowhere to go.
  */
 export function tapTarget(room: Room, from: Sq, c: number, r: number): RoomTap {
-  if (has(room.keeper, c, r) || has(room.counter, c, r)) return { kind: "keeper", dest: best(room, from, (x, y) => (inTalkRange(room, x, y) ? 0 : null)) };
+  if (has(room.keeper, c, r) || has(room.counter, c, r)) return { kind: "keeper", dest: best(room, from, (x, y) => talkSpot(room, x, y)) };
   if (has(room.exits, c, r) || has(room.doors, c, r)) return { kind: "door", dest: best(room, from, (x, y) => (onDoor(room, x, y) ? Math.abs(x - c) : null)) };
   if (walkable(room, c, r)) return { kind: "square", dest: { c, r } };
   return { kind: "square", dest: best(room, from, (x, y) => Math.max(Math.abs(x - c), Math.abs(y - r))) };
