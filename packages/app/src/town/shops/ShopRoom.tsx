@@ -936,8 +936,11 @@ function startRoom(
     if (!drag || e.pointerId !== drag.id) return;
     if (!press.move(e.clientX, e.clientY)) return;
     follow = false;
+    // As the town's drag (Eric, Nov 2: "when I drag from down to up, it should be the same as the town movement"): the floor
+    // follows the finger, both ways. A room's rows run toward the camera (P's `camY - r`; the town's run away from it), so a
+    // finger going down the screen takes this camY down, where the town's drag adds to its own.
     camX = Math.max(0, Math.min(n - 1, drag.cx - (e.clientX - drag.x) / v.kf));
-    camY = Math.max(0, Math.min(n - 1, drag.cy + (e.clientY - drag.y) / drag.k));
+    camY = Math.max(0, Math.min(n - 1, drag.cy - (e.clientY - drag.y) / drag.k));
   };
   const onUp = (e: PointerEvent) => {
     if (!drag || e.pointerId !== drag.id) return;

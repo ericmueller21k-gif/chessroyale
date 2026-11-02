@@ -131,12 +131,13 @@ test("Babur's tent: Go in, start in Close, talk to the Shopkeeper, the crate's p
   const box = (await room(page).boundingBox())!;
   await expect(async () => {
     if (await shopAt(page, "door")) return;
-    // Back first (down the screen), then sideways toward the door's columns (a drag to the right moves the view left).
+    // Back first (the floor pulled up the screen, as in the town), then sideways toward the door's columns (a drag to the right
+    // moves the view left).
     const [cx, cy] = (await shopCam(page))!.focus;
     const side = cy < 18 ? 0 : Math.sign(cx - 9.5) * 0.15;
-    await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.3);
+    await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.7);
     await page.mouse.down();
-    await page.mouse.move(box.x + box.width * (0.5 + side), box.y + box.height * (cy < 18 ? 0.7 : 0.3), { steps: 8 });
+    await page.mouse.move(box.x + box.width * (0.5 + side), box.y + box.height * (cy < 18 ? 0.3 : 0.7), { steps: 8 });
     await page.mouse.up();
     expect(await shopAt(page, "door")).not.toBeNull();
   }).toPass({ timeout: 30_000 });
@@ -172,6 +173,66 @@ test("Puddles' greenhouse: Go in, Drizzle's crate with Puddles's Mower; the back
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
   await expect(town(page)).toHaveAttribute("data-ready", "1");
   expect(errors).toEqual([]);
+});
+
+/** A drag from `from` to `to`: a finger (real touch events) on the phone, the mouse on the computer. */
+async function dragBy(p: Page, from: { x: number; y: number }, to: { x: number; y: number }) {
+  if (test.info().project.name === "phone") {
+    const cdp = await p.context().newCDPSession(p);
+    const point = (x: number, y: number) => [{ x, y, id: 1 }];
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: point(from.x, from.y) });
+    for (let i = 1; i <= 8; i++) await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: point(from.x + ((to.x - from.x) * i) / 8, from.y + ((to.y - from.y) * i) / 8) });
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await cdp.detach();
+    return;
+  }
+  await p.mouse.move(from.x, from.y);
+  await p.mouse.down();
+  await p.mouse.move(to.x, to.y, { steps: 8 });
+  await p.mouse.up();
+}
+
+/**
+ * How far what's drawn at `at()` moves for a drag that starts on it and goes `dx`, `dy` pixels: down, back up, then right. What's
+ * under the finger follows it (the same sign, about as far), as the town's map does.
+ */
+async function followsFinger(p: Page, at: () => Promise<{ x: number; y: number } | null>, d: number) {
+  const moved: { dx: number; dy: number; x: number; y: number }[] = [];
+  for (const [dx, dy] of [
+    [0, d],
+    [0, -d],
+    [d, 0],
+  ] as const) {
+    const a = (await at())!;
+    await dragBy(p, a, { x: a.x + dx, y: a.y + dy });
+    const b = (await at())!;
+    moved.push({ dx, dy, x: b.x - a.x, y: b.y - a.y });
+  }
+  for (const m of moved) {
+    const finger = m.dx || m.dy;
+    const got = m.dx ? m.x : m.y;
+    // (Perspective stretches it a little, so not exactly the finger's: the same way, and about as far.)
+    expect(got / finger, `the drawn point follows the finger (${JSON.stringify(moved)})`).toBeGreaterThan(0.4);
+    expect(got / finger).toBeLessThan(2.5);
+  }
+  return moved;
+}
+
+test("inside, a drag looks around as the town's does (Eric, Nov 2: \"when I drag from down to up, it should be the same as the town movement\"): what's under the finger follows it, both ways", async ({ page }) => {
+  await page.goto("/town?sky=day");
+  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  // The town: Babur's tent, dragged down, up and sideways, follows the finger.
+  if (!(await homeAt(page, "tiger"))) await page.getByRole("button", { name: "Go to Babur's Circus" }).dispatchEvent("click");
+  await expect.poll(() => homeAt(page, "tiger"), { message: "Babur's tent in view" }).not.toBeNull();
+  const d = Math.round(((await town(page).boundingBox())!.height * 0.1) / 2) * 2;
+  await page.waitForTimeout(1500); // (the camera's glide settles)
+  await followsFinger(page, () => homeAt(page, "tiger"), d);
+  // Inside: a square in front of you, the same.
+  await goIn(page, "tiger", "Babur's Circus");
+  await expect.poll(async () => (await shopCam(page))?.zoom).toBe(0);
+  await page.waitForTimeout(800); // (the camera's spring settles on you)
+  const square = async () => (await shopAt(page, "square", [10, 15])) ?? (await shopAt(page, "square", [10, 13]));
+  await followsFinger(page, square, d);
 });
 
 test("on a ride (Eric, Nov 2: \"your rider goes in with you\"): inside you're on it, its idle standing and its move walking, its back going up to the counter; you come out still on it", async ({ page }) => {
