@@ -464,7 +464,7 @@ describe("Pixel's pieces (Nov 2; pieces-gba.ts, the art session's models) and th
 
   it("drawn for your seat: the high view behind White at the mockups' 30 degrees, every view's pitch in range, a square near you about 20 art pixels (phone and computer)", async () => {
     const A = await import("../src/colosseum/arena.ts");
-    const { GBA_PITCH, SQUARE_ART_PX, gbaArtPixel, gbaPitch, paintGba } = await import("../src/colosseum/arena-gl.ts");
+    const { GBA_ATLAS, GBA_PITCH, GBA_SCALE, SQUARE_ART_PX, gbaArtPixel, gbaPitch, paintGba } = await import("../src/colosseum/arena-gl.ts");
     for (const [W, H, computer] of [[1440, 848, true], [780, 1688, false]] as const) {
       const views = A.viewsFor(W / H, computer);
       expect(Math.abs(gbaPitch(views[A.HIGH_VIEW]!) - 0.52)).toBeLessThan(0.02);
@@ -478,7 +478,8 @@ describe("Pixel's pieces (Nov 2; pieces-gba.ts, the art session's models) and th
         A.perspective(proj, A.fovFor(v, W / H), W / H, 0.2, 120);
         A.lookAt(view, v.eye, v.at, 0, 0, new Float32Array(3));
         A.multiply(vp, proj, view);
-        const art = gbaArtPixel(vp, v, W, H);
+        const { scale: art, near } = gbaArtPixel(vp, v, W, H);
+        expect(near / art).toBeGreaterThan(SQUARE_ART_PX * 0.6);
         expect(art).toBeGreaterThanOrEqual(2);
         if (v === views[A.HIGH_VIEW]) {
           // (Whole screen pixels: the nearest whole number of art pixels to SQUARE_ART_PX, or more on a small screen.)
@@ -491,12 +492,19 @@ describe("Pixel's pieces (Nov 2; pieces-gba.ts, the art session's models) and th
         }
       }
     }
-    // The atlas: each texel a palette color, solid, or empty.
-    const px = new Uint8Array(32 * 6 * 40 * 2 * 4);
-    paintGba(px, 3, true, 0.52);
+    // The atlas: each texel a palette color, solid, or empty; a farther share of a piece smaller, drawn whole.
+    const px = new Uint8Array(GBA_ATLAS.w * GBA_ATLAS.h * 4);
+    const solid = (bucket: number) => {
+      let n = 0;
+      for (let y = 0; y < 40; y++) for (let x = 0; x < 32; x++) n += px[(((bucket * 2 + 1) * 40 + y) * GBA_ATLAS.w + 3 * 32 + x) * 4 + 3]! ? 1 : 0;
+      return n;
+    };
+    for (let b = 0; b < GBA_SCALE.buckets; b++) paintGba(px, 3, true, 0.52, b);
     const alpha = new Set<number>();
     for (let i = 3; i < px.length; i += 4) alpha.add(px[i]!);
     expect([...alpha].sort((a, b) => a - b)).toEqual([0, 255]);
+    for (let b = 1; b < GBA_SCALE.buckets; b++) expect(solid(b), `share ${b}`).toBeLessThan(solid(b - 1));
+    expect(solid(GBA_SCALE.buckets - 1)).toBeGreaterThan(solid(0) * 0.15);
   });
 
   it("the gear's Pieces: Pixel, 3D, 2D in turn; Pixel by default; a saved choice kept; an old '3D pieces' on keeps 3D", async () => {

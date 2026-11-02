@@ -11,8 +11,8 @@
  * shows its profile and a bishop its slit).
  *
  * Every vertex: position, normal, and a material: body, gold trim, the bishop's mitre (where the slit is cut, in the shader),
- * the knight's head (its eye, in the shader), or the soft round shadow under the piece (its alpha in the normal's x); the pixel
- * set (pieces-pixel.ts) adds `band`: its trim, gold on Black and the body's own color on White.
+ * the knight's head (its eye, in the shader), or the soft round shadow under the piece (its alpha in the normal's x); `band` was
+ * the Nov 1 pixel set's trim (since replaced by the art session's models).
  */
 
 /** The six kinds, in the order the renderer draws them. */
@@ -400,7 +400,7 @@ function knight(): PieceMesh {
 
 /**
  * A flat outline `P` (x, y; counter-clockwise) given depth: `T` each side of z = 0, its edge bevelled `bev`, turned `turn`
- * (radians) round the upright axis (the knight's head; pieces-pixel.ts's too).
+ * (radians) round the upright axis (the knight's head).
  */
 export function extrude(b: Builder, P: readonly (readonly [number, number])[], T: number, bev: number, turn: number, m: number): void {
   const N = P.length;

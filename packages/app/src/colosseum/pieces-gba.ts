@@ -3,6 +3,8 @@
  * image", then the gold rook top, mane and bishop slit, then "finish the pieces"). Pure code, no Node or DOM: the game can
  * import it as it is.
  *
+ * (In the game since Nov 2: copied as it is from the branch claude/boss-art, commit b6a7743,
+ * scripts/boss-art/out/arena-pieces-gba/pieces-3d.ts, with arena-pieces-gba.ts beside it; arena-gl.ts draws it as Pixel.)
  * - **Units and axes:** one unit one sprite pixel (a board square near White is about 20 units across, as drawn); y up, the
  *   foot (the middle of the square the piece stands on) at the origin, **+z the piece's front** (toward the viewer), +x its
  *   right as you face it. The knight's head looks toward -x (to the viewer's left); mirror x for the other way.

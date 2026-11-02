@@ -17,14 +17,13 @@
  *
  * - **The 3D pieces** (the gear's Pieces: 3D; pieces3d.ts): the six meshes uploaded once, the pieces as instances written when
  *   a move is made, one draw call a kind on the board. With 2D the pieces are props, as above.
- * - **Pixel** (the gear's Pieces: Pixel, the default since Nov 1; pieces-pixel.ts): the whole arena drawn into a small target
- *   (an art pixel `pixelScale` screen pixels square) and scaled up nearest-neighbor, one chunky pixel grid as Eric's picture;
- *   the pixel set drawn like the 3D pieces (one draw call a kind), cel-shaded in flat tones, each facing the screen and
- *   leaning back a little like a sprite, its axis on a pixel's middle; each piece's one-pixel outline drawn in the small
- *   target, then the scaling up (one read a screen pixel).
+ * - **Pixel** (the gear's Pieces: Pixel, the default; since Nov 2 the art session's models, pieces-gba.ts): the arena and the
+ *   crowd full size as in 3D and 2D; each piece a sprite drawn from its model for your seat's pitch (when the view changes,
+ *   never a frame), farther ones at a smaller share, laid on one texel an art pixel (`pixelScale` screen pixels), its foot on
+ *   an art pixel, so it's crisp and still as it slides. One draw call.
  *
  * Three draw calls a frame with 2D; eight with 3D (the arena, the crowd and one a kind: the props then have nothing to draw);
- * ten with Pixel (those, the outline and the scaling up). A frame sets a few uniforms (the camera, the time, the jump's clock) and draws:
+ * three with Pixel (the arena, the crowd, the sprites). A frame sets a few uniforms (the camera, the time, the jump's clock) and draws:
  * nothing is allocated and nothing uploaded. The crowd jumps (a queen captured) by a uniform too.
  */
 import { BANNERS, BOARD, FLOOR_R, bossSeats, project, type Seat, GALLERY_H, GALLERY_R, PILLARS, PILLAR_ANGLES, SEATING, STANDS, STATUE, WALL_H, WALL_TOP, aisleAngle, fovFor, landingDepth, lookAt, multiply, perspective, rowR, rowY, seatR, seats, squareXZ, VIEWS, type View } from "./arena.ts";
@@ -872,7 +871,7 @@ export class ArenaGL {
 
   /**
    * Pixel: the browser scales the canvas up to the screen nearest-neighbor too (a phone's canvas is capped at 2x, so on a 3x
-   * phone an art pixel's 2 canvas pixels are 3 screen pixels, kept sharp, not blurred); 3D and 2D smooth, as before.
+   * phone a piece's art pixel of 2 canvas pixels is 3 screen pixels, kept sharp, not blurred); 3D and 2D smooth, as before.
    */
   private crisp(): void {
     const c = this.gl.canvas as HTMLCanvasElement;
@@ -1152,6 +1151,8 @@ export class ArenaGL {
   }
 
   dispose(): void {
+    const d = this.gba?.drawing;
+    if (d?.timer) clearTimeout(d.timer);
     this.gl.getExtension("WEBGL_lose_context")?.loseContext();
   }
 }
