@@ -146,8 +146,8 @@ test("the God King's Last Stand against Hollow: Hollow lashes him, then he falls
 });
 
 /**
- * Sawyer's saw, Wrangler's lasso, Boingo's pies, Big Boy's lollipop, Ginger's cane, Jefferson's Roman candle, Chub & Chirp's pitch, Smudgy's brush, Moo & Moon's moonbeams, Puddles' hose, Babur's balloons and Folio's ink on the
- * God King in his Last Stand (Eric, Oct 18: "a relentless assault"), with real taps on a phone and a computer, watched every frame: the boss drops in beside him as the piece
+ * Sawyer's saw, Wrangler's lasso, Boingo's pies, Big Boy's lollipop, Ginger's cane, Jefferson's Roman candle, Chub & Chirp's pitch, Smudgy's brush, Moo & Moon's moonbeams, Puddles' hose, Babur's balloons, Folio's ink and Timber's
+ * hammer and plank on the God King in his Last Stand (Eric, Oct 18: "a relentless assault"), with real taps on a phone and a computer, watched every frame: the boss drops in beside him as the piece
  * slides back, on the side toward the board's middle (his drawing mirrored to face him), a hit on every beat with its
  * gold "−N", his own sounds, his figure wholly on screen; then the Last Stand ends as always. No page errors.
  */
@@ -164,6 +164,8 @@ const ASSAULTS = [
   { id: "gardener", name: "Puddles", facesLeft: true, sounds: ["gardenerJet", "gardenerSpurt"] },
   { id: "tiger", name: "Babur", facesLeft: true, sounds: ["tigerBonk", "tigerPop"] },
   { id: "folio", name: "Folio", facesLeft: true, sounds: ["folioScratch", "folioDab"] },
+  // (Timber, Nov 2: his hammer's whacks and knocks, then his plank's bat and smash; his attack's own sounds.)
+  { id: "timber", name: "Timber", facesLeft: true, sounds: ["timberWhack", "timberKnock"] },
 ];
 /** How many squares wide a boss's attack figure is drawn (its kit's: before the shrink near the board's top). */
 const attackWidth = (id: string) => {

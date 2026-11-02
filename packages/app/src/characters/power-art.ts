@@ -241,6 +241,9 @@
  *                          or low, from the left or right edge: a gold spike and a burst of gold sparks.
  *   sawHit         square  hit<A|B><L|R> (ends empty, about 200 ms): a bite of Sawyer's saw on a king, high or a little
  *                          lower, from the left or right edge: a spark and a burst of sawdust flying up and away.
+ *   chipHit        square  hit<U|S|X><L|R> (ends empty, about 200 ms): wood chips off a hit of Timber's on a king, from the
+ *                          left or right edge: his hammer's whack on its head (up and out), a knock or his plank's bat at its
+ *                          middle (sideways, on away from him), his plank's smash (a bigger burst of splinters).
  *   lassoHit       square  hit<H|L><L|R> (ends empty, about 200 ms): the crack of Wrangler's lasso's end on a king's
  *                          square, high or low, from the left or right edge: a white snap, gold rays, rope fibers.
  *   pieHit         square  hit<H|L><L|R> (ends empty, about 200 ms): a pie in a king's face, side on, at his head or a
@@ -566,6 +569,7 @@ export const EFFECTS: Record<EffectName, Effect> = {
   boardGap: { ch: EFFECT_SPRITES.boardGap, covers: "strip", start: "run", loop: "gap", end: "close", sounds: { split: "sawyerCrack", rejoin: "sawyerRejoin" } },
   ankusHit: { ch: EFFECT_SPRITES.ankusHit, covers: "square", start: "hitHL", sounds: {} },
   sawHit: { ch: EFFECT_SPRITES.sawHit, covers: "square", start: "hitAL", sounds: {} },
+  chipHit: { ch: EFFECT_SPRITES.chipHit, covers: "square", start: "hitUL", sounds: {} },
   lassoHit: { ch: EFFECT_SPRITES.lassoHit, covers: "square", start: "hitHL", sounds: {} },
   pieHit: { ch: EFFECT_SPRITES.pieHit, covers: "square", start: "hitHL", sounds: {} },
   bonkHit: { ch: EFFECT_SPRITES.bonkHit, covers: "square", start: "hitHL", sounds: {} },
@@ -775,6 +779,15 @@ export function ankusItem(square: string, i: number, from: "L" | "R", since: num
 /** Sawyer's i-th bite of his saw on the king's square (high, then a little lower, in turn), from his side. */
 export function sawItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
   return { square, name: "sawHit", anim: `hit${i % 2 ? "B" : "A"}${from}`, since };
+}
+
+/**
+ * Timber's i-th hit on the king's square (his attack's ten, KING_ATTACK's lashes), from his side: his hammer's whacks (the even
+ * ones of the first eight) and knocks (the odd ones) in turn, then his plank's bat (the ninth) and its smash (the last).
+ */
+export function chipItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
+  const kind = i >= 9 ? "X" : i === 8 || i % 2 ? "S" : "U";
+  return { square, name: "chipHit", anim: `hit${kind}${from}`, since };
 }
 
 /** Wrangler's i-th crack of his lasso on the king's square (high, then low, in turn), from his side. */

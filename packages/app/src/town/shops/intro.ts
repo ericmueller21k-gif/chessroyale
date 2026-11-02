@@ -155,7 +155,7 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
           frames: ka.ch.anims[ka.anim]!.frames.map((_, i) => toCanvas(ka.ch, ka.anim, i)),
           ms: ka.ch.anims[ka.anim]!.frames.map((f) => Math.max(16, f.ms)),
           cues: ka.ch.anims[ka.anim]!.frames.map((f) => f.cue),
-          sounds: kit!.sounds,
+          sounds: ka.sounds ?? kit!.sounds,
           facesLeft: !!ka.facesLeft,
           standPx: ka.stand * ka.perSquare,
           beat: KING_ATTACK,

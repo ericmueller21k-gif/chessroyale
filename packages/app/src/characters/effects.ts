@@ -21,6 +21,7 @@ import { MOONBEAM, MOON_HIT, MOON_SCORCH } from "./effects/moo.ts";
 import { GARDEN_PLANT, SEED_FLY, SEED_PLOP, WATER_HIT, WATER_SWEEP } from "./effects/gardener.ts";
 import { BALLOON_FLY, BALLOON_HIT, BALLOON_LAND, HOOP_FLY, HOOP_RING } from "./effects/tiger.ts";
 import { CREASE_EDGE, CREASE_PENCIL, FOLD_PAPER, INK_HIT, INK_LINE, INK_MARK, INK_STRIKE } from "./effects/folio.ts";
+import { CHIP_HIT } from "./effects/timber.ts";
 
 // Each boss's effects are drawn in its own file (effects/<boss>.ts); what they share is in effects/common.ts.
 export { BOARD_CELL, SQUARE } from "./effects/common.ts";
@@ -59,6 +60,7 @@ export const EFFECT_SPRITES = {
   boardGap: BOARD_GAP,
   ankusHit: ANKUS_HIT,
   sawHit: SAW_HIT,
+  chipHit: CHIP_HIT,
   lassoHit: LASSO_HIT,
   pieHit: PIE_HIT,
   bonkHit: BONK_HIT,

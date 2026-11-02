@@ -30,6 +30,7 @@ import { FOLIO } from "./folio.ts";
 import { ATTACK_PER_SQUARE, ATTACK_STAND, FOLIO_ATTACK, FOLIO_PORTRAIT } from "./folio-attack.ts";
 import { FOLIO_LINES } from "./folio-lines.ts";
 import { TIMBER_FIGURE as TIMBER } from "./timber-figure.ts";
+import { BOSS_BEAVER_ATTACK as TIMBER_ATTACK } from "./timber.ts";
 import { TIMBER_CHANCE, TIMBER_LINES } from "./timber-lines.ts";
 import { lineSounds } from "../speech.tsx";
 import type { Stance } from "./stance.ts";
@@ -37,7 +38,7 @@ import { mooPowered } from "./moo-state.ts";
 import { RECLUSE_LINES } from "./recluse-lines.ts";
 import type { BossView } from "../game.ts";
 import type { Character } from "./sprite.ts";
-import { ankusItem, balloonItem, bonkItem, inkItem, carrotItem, frostItem, lashItem, lassoItem, moonItem, paintItem, pieItem, popItem, sawItem, waterItem, type SquareItem } from "./power-art.ts";
+import { ankusItem, balloonItem, bonkItem, chipItem, inkItem, carrotItem, frostItem, lashItem, lassoItem, moonItem, paintItem, pieItem, popItem, sawItem, waterItem, type SquareItem } from "./power-art.ts";
 import { testSwitchesAllowed } from "../test-switches.ts";
 
 /**
@@ -62,6 +63,11 @@ export interface KingAttackKit {
   stand: number;
   /** Each hit on the king's square (the shared board canvas): the i-th, coming in from its left or right edge. */
   hit: (square: string, i: number, from: "L" | "R", since: number) => SquareItem;
+  /**
+   * Its frame cues to sounds, when they aren't the kit's own `sounds` (Timber: his attack's "whack" is his hammer's, while his
+   * kit's "whack" is the gnaw as he takes a piece). Undefined: the kit's.
+   */
+  sounds?: Record<string, SoundName>;
 }
 
 export interface BossKit extends BeatLines {
@@ -801,6 +807,20 @@ export const BOSS_KITS: Record<string, BossKit> = {
     // (His frame is 98 x 129, the art's 88 x 88 with room round it for his entrance's drop: timber-figure.ts. The planks on his back and his
     // tail reach past the usual box on both sides.)
     wide: true,
+    // He drops in hammer high beside the king, hammers it (overhead whacks and side knocks in turn), bats it with the plank off his
+    // back and smashes it down on its head, then chitters and hops off (timber.ts: BOSS_BEAVER_ATTACK; Nov 2, the art's notes:
+    // scripts/boss-art/out/timber-king-attack-nov2.md on claude/boss-art). Wood chips off its square each hit (chipItem). Facing our
+    // left; 40 frame pixels a square keeps him about Big Boy's size, 1.15 off. His attack's cues are his own wood sounds: its whack
+    // is his hammer's (his kit's `whack` is the gnaw as he takes a piece).
+    kingAttack: {
+      ch: TIMBER_ATTACK,
+      anim: "kingAttack",
+      perSquare: 40,
+      stand: 1.15,
+      facesLeft: true,
+      hit: chipItem,
+      sounds: { swoosh: "timberSwoosh", thump: "timberThump", whack: "timberWhack", knock: "timberKnock", slide: "timberSlide", chitter: "timberChitter", hup: "timberHup" },
+    },
   },
   "Hidden Boss": {
     ch: RECLUSE,
