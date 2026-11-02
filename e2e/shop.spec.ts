@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { test } from "./helpers.ts";
+import { giveItems, test, wearItem } from "./helpers.ts";
 
 /**
  * Inside a shop (Nov 2, round 1; docs/areas/town-square.md, "Inside a shop"), on a phone and a computer: walk up to Babur's
@@ -8,8 +8,10 @@ import { test } from "./helpers.ts";
  * says "Shopkeeper" with Talk, Talk opens "Babur's Boss Crate" (the price line, Balloon Pup among the prizes, what you have, and a buy
  * answering "Coming soon"), then the door's "Go out" brings you back outside at the tent's door. And Puddles' greenhouse: Drizzle's
  * crate, his ride, and the back button takes you out.
+ * And on a ride (Nov 2): it comes in with you, and you come out still on it.
  * Test hooks: the room's canvas (`canvas.town-shop-canvas`) carries `data-room`, `data-you="c,r"` and `data-ready="1"`;
- * `window.__shopAt("keeper" | "door" | "square", [c, r]?)` says where to tap; `__shopCam()` the room's camera.
+ * `window.__shopAt("keeper" | "door" | "square", [c, r]?)` says where to tap; `__shopCam()` the room's camera; `__shopRide()` your
+ * ride inside (its id, the animation and frame drawn last, its side and view, the step's time).
  */
 test.use({ actionTimeout: 15_000 });
 
@@ -30,6 +32,8 @@ type Hooks = {
   __townAt?: (k: string, id: string) => { x: number; y: number } | null;
   __shopAt?: (k: string, sq?: readonly [number, number]) => { x: number; y: number } | null;
   __shopCam?: () => { zoom: number; zoomTarget: number; room: string; focus: [number, number] } | null;
+  __shopRide?: () => { ride: string | null; anim: "" | "idle" | "move"; frame: number; facing: number; view: number; stepMs: number } | null;
+  __townRide?: () => { you: { ride: string | null; ready: boolean; anim: string; stepMs: number } };
 };
 
 /** Where to tap a home now (in the page); null while it isn't drawn. */
@@ -166,5 +170,51 @@ test("Puddles' greenhouse: Go in, Drizzle's crate with Puddles's Mower; the back
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
   await expect(town(page)).toHaveAttribute("data-ready", "1");
+  expect(errors).toEqual([]);
+});
+
+test("on a ride (Eric, Nov 2: \"your rider goes in with you\"): inside you're on it, its idle standing and its move walking, its back going up to the counter; you come out still on it", async ({ page }) => {
+  test.setTimeout(150_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Your profile" })).toBeVisible();
+  // (No crate holds a ride yet: given straight, as only admins have them.)
+  const [chirp] = await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 0 }]);
+  await wearItem(page, "ride", chirp!);
+  await page.goto("/town?sky=day");
+  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  const townRide = () => page.evaluate(() => (window as unknown as Hooks).__townRide!().you);
+  await expect.poll(async () => (await townRide()).ready, { message: "your ride's frames are ready", timeout: 30_000 }).toBe(true);
+  const outside = await townRide();
+  await goIn(page, "tiger", "Babur's Circus");
+  const ride = () => page.evaluate(() => (window as unknown as Hooks).__shopRide?.() ?? null);
+  // Inside, standing a step in from the door: on it, its idle, facing the counter (its back), at its own pace as outside.
+  await expect.poll(async () => (await ride())?.anim).toBe("idle");
+  expect(await ride()).toMatchObject({ ride: "riding-chirp", view: 1, stepMs: outside.stepMs });
+  // Walking up to the Shopkeeper: its move, frame after frame; standing there, its idle again.
+  await page.evaluate(() => {
+    const w = window as unknown as { __shopRide: () => { anim: string; frame: number; view: number } | null; __seen: Set<string> };
+    w.__seen = new Set();
+    const tick = () => {
+      const r = w.__shopRide();
+      if (r?.anim) w.__seen.add(`${r.anim}:${r.frame}:${r.view}`);
+      if (w.__shopRide) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  await talk(page);
+  await expect(room(page)).toHaveAttribute("data-you", "12,5");
+  await expect.poll(async () => (await ride())?.anim).toBe("idle");
+  const seen = await page.evaluate(() => [...(window as unknown as { __seen: Set<string> }).__seen]);
+  const moves = seen.filter((k) => k.startsWith("move:"));
+  expect(new Set(moves.map((k) => k.split(":")[1])).size, `its move's frames: ${seen.join(" ")}`).toBeGreaterThan(1);
+  // (Up the room toward the counter: its back, as walking up the screen in the town.)
+  expect(moves.some((k) => k.endsWith(":1")), `its back going up: ${seen.join(" ")}`).toBe(true);
+  // Out by the back button: in the town again, still on it.
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
+  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  expect(await townRide()).toMatchObject({ ride: "riding-chirp", ready: true });
   expect(errors).toEqual([]);
 });
