@@ -69,3 +69,6 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Disk was full (216 MB): removed 29 merged worktrees → 23 GB free. Helper wrangler servers left on 8857/8858, 8866/8867 (respawn after fuser -k).
 - Nov 3: Dash #476: the FAQ fix 4574a2d2 had not been pushed (watcher got 422s for 80 min); pushed, CI watcher bkgg136vj.
   Round 2 brief written: notes/briefs/brief-dash-home.md (start after #476 merges, worktree /home/user/cr-dashhome).
+- #476 check red on 4574a2d2: town-bots wants every sidekick file baked (main's #472). Fixed 3b2fe161: Tick sidekick-blitz.ts -> blitz.ts,
+  baked; node_modules symlink (committed by my audio fix 0eef6e1d) removed, .gitignore `node_modules`. Watcher bu7z583lx. PR comment posted.
+  Worktree node_modules: never symlink to /home/user/chessroyale (resolves @chessroyale/* to main's source); use npm ci.
