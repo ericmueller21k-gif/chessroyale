@@ -19,6 +19,7 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
   branch claude/boss-art; asks Eric once, ~$4-6, cap $8).
 
 ## Queue (one Opus at a time)
+0. Timber's home (Eric, Nov 3): art session drawing 1) his town house (none exists), 2) the shop (lumber walls, varnished + raw wood chess pieces, FOR SALE lawn signs, showpiece its pick; Shopkeeper Rivet if a sprite exists), 3) intro (log carried to the middle, gnaw, shavings storm, board revealed, stump seats, sawdust transition, ~12 s). Then code: place his house on the map, shop, intro (one boss at a time; tell Eric when live).
 0. NEXT after shops r2: Colosseum Pixel pieces (Eric Nov 2): Pixel must pixelate ONLY the pieces, never the crowd/arena
    (today arena-gl.ts draws the whole arena into the small target). Draw the pieces from the new GBA-style sprites (API run
    session_01JuCWRvpifUHBYDWXqYcDtk, scripts/boss-art/out/arena-pieces-gba/, after Eric OKs them). If Eric likes them, he
