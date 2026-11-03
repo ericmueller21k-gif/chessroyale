@@ -18,6 +18,8 @@ class FakeContext {
   destination = node();
   started = 0;
   resumes = 0;
+  on = new Map<string, () => void>();
+  addEventListener = (ev: string, fn: () => void) => this.on.set(ev, fn);
   constructor() {
     FakeContext.made.push(this);
   }
@@ -40,6 +42,8 @@ class FakeContext {
 let clock = 0;
 let visibility: "visible" | "hidden" = "visible";
 const docListeners = new Map<string, () => void>();
+const winListeners = new Map<string, () => void>();
+const deviceListeners = new Map<string, () => void>();
 let sound: typeof import("../src/sound.ts");
 const flush = () => new Promise((ok) => setTimeout(ok, 0));
 const last = () => FakeContext.made.at(-1)!;
@@ -67,6 +71,8 @@ beforeEach(async () => {
   clock = 0;
   visibility = "visible";
   docListeners.clear();
+  winListeners.clear();
+  deviceListeners.clear();
   vi.stubGlobal("AudioContext", FakeContext);
   vi.stubGlobal("document", {
     get visibilityState() {
@@ -74,7 +80,8 @@ beforeEach(async () => {
     },
     addEventListener: (ev: string, fn: () => void) => docListeners.set(ev, fn),
   });
-  vi.stubGlobal("addEventListener", () => undefined);
+  vi.stubGlobal("addEventListener", (ev: string, fn: () => void) => winListeners.set(ev, fn));
+  vi.stubGlobal("navigator", { mediaDevices: { addEventListener: (ev: string, fn: () => void) => deviceListeners.set(ev, fn) } });
   vi.spyOn(performance, "now").mockImplementation(() => clock);
   (globalThis as { __soundLog?: string[] }).__soundLog = [];
   sound = await import("../src/sound.ts");
@@ -292,5 +299,83 @@ describe("sound dying while the page stays (Eric, Nov 3: Timber chittered, then 
     expect(FakeContext.made).toHaveLength(2);
     tap(2000);
     expect(FakeContext.made).toHaveLength(3);
+  });
+});
+
+describe("the computer's sound changing under the page (Eric, Nov 3, Chrome: moved and resized the window, clicked over to another app and back: silent for good)", () => {
+  /** Chrome's context after the device under it changed: "running", its clock moving, nothing coming out. */
+  const tick = (ms: number) => {
+    clock += ms;
+    last().currentTime += ms / 1000;
+  };
+  /** The window loses focus with the page on screen, and gets it back `ms` later. */
+  const otherApp = (ms: number) => {
+    winListeners.get("blur")?.();
+    tick(ms);
+    winListeners.get("focus")?.();
+  };
+  const clickAt = (ms = 1000) => {
+    tick(ms);
+    sound.wakeAudio();
+    sound.play("tick");
+  };
+
+  it("another app for 2 s or more: the next click makes a new context, closes the old one, and its own sound plays", async () => {
+    const old = last();
+    otherApp(5000);
+    clickAt();
+    expect(FakeContext.made).toHaveLength(2);
+    expect(old.state).toBe("closed");
+    await flush();
+    expect(last().state).toBe("running");
+    expect(last().started).toBe(1);
+    clickAt(3000);
+    expect(FakeContext.made).toHaveLength(2);
+  });
+
+  it("a quick switch (under 2 s) keeps it", () => {
+    otherApp(1500);
+    clickAt();
+    expect(FakeContext.made).toHaveLength(1);
+  });
+
+  it("hidden in between (a phone going to another app): the checks for coming back decide, as before", () => {
+    winListeners.get("blur")?.();
+    visibility = "hidden";
+    docListeners.get("visibilitychange")?.();
+    tick(5000);
+    visibility = "visible";
+    docListeners.get("visibilitychange")?.();
+    winListeners.get("focus")?.();
+    clickAt();
+    expect(FakeContext.made).toHaveLength(1);
+  });
+
+  it("the audio devices change (headphones, another app opening the microphone) with the page staying: the next click makes a new one, once", () => {
+    clickAt();
+    deviceListeners.get("devicechange")?.();
+    clickAt();
+    expect(FakeContext.made).toHaveLength(2);
+    clickAt(3000);
+    expect(FakeContext.made).toHaveLength(2);
+  });
+
+  it("the context's own error: the next click makes a new one", () => {
+    last().on.get("error")?.();
+    clickAt();
+    expect(FakeContext.made).toHaveLength(2);
+  });
+
+  it("before sound was ever switched on, a device change does nothing", async () => {
+    vi.resetModules();
+    FakeContext.made = [];
+    deviceListeners.clear();
+    sound = await import("../src/sound.ts");
+    sound.prepareAudio();
+    await new Promise((ok) => setTimeout(ok, 1100));
+    deviceListeners.get("devicechange")?.();
+    sound.wakeAudio();
+    await flush();
+    expect(FakeContext.made).toHaveLength(1);
   });
 });

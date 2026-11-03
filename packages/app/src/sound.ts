@@ -102,6 +102,8 @@ const GREX_WHISTLE_FILE_LEVEL = 0.15;
 function ensureContext() {
   if (ctx) return;
   ctx = new AudioContext();
+  // (Chrome: the audio device failed under it. It may still say "running", its clock moving, and play nothing.)
+  ctx.addEventListener?.("error", markStale);
   master = ctx.createGain();
   master.gain.value = 0.9;
   // A gentle low-pass keeps every sound soft on phone speakers.
@@ -144,6 +146,8 @@ export function prepareAudio() {
     document.addEventListener("visibilitychange", audioReturned);
     addEventListener("pageshow", audioReturned);
     addEventListener("focus", audioReturned);
+    addEventListener("blur", audioLeft);
+    (globalThis as { navigator?: { mediaDevices?: EventTarget } }).navigator?.mediaDevices?.addEventListener?.("devicechange", markStale);
   }
   const make = () => {
     try {
@@ -196,11 +200,38 @@ export function onAudioRebuilt(fn: () => void): () => void {
   return () => rebuiltListeners.delete(fn);
 }
 
+// ---- The computer's sound changing under the page (Eric, Nov 3, Chrome on his computer: the bosses' sounds played; he moved and
+// resized the window, clicked over to another app and back, and every click after was silent, no reload). Chrome can keep a context
+// "running", its clock moving, after the audio device under it changed (headphones, another app opening the microphone and the
+// headset switching mode, the output picked again): nothing the clock checks above can see, and nothing comes out. So a device change
+// (`devicechange`), the context's own error, or the window coming back after losing focus for `AWAY_REBUILD_MS` with the page on
+// screen (an app switch on a computer; a phone going to another app hides the page instead, checked above) marks it stale, and the
+// next tap makes a new one: cheap (the boss sounds are cached by sample rate, the files' decoded buffers serve any context). ----
+/** The next tap makes a new context (`wakeAudio`), whatever the old one says. */
+let stale = false;
+const markStale = () => {
+  if (ctx && loading) stale = true;
+};
+/** When the window lost focus with the page on screen (ms), or -1. */
+let leftAt = -1;
+const AWAY_REBUILD_MS = 2000;
+/** The window lost focus (`blur`). */
+export function audioLeft() {
+  if (leftAt < 0) leftAt = nowMs();
+}
+
 /** The page shows again (visibilitychange, pageshow, focus): resume() now if it isn't running; the next tap checks it. */
 export function audioReturned() {
   const c = ctx;
+  if (pageHidden()) {
+    // (Hidden: the checks below run when it shows again; a blur before it doesn't count.)
+    leftAt = -1;
+    return;
+  }
+  if (leftAt >= 0 && nowMs() - leftAt >= AWAY_REBUILD_MS) markStale();
+  leftAt = -1;
   // (Before sound was ever switched on, the first tap does that as usual.)
-  if (!c || !loading || pageHidden()) return;
+  if (!c || !loading) return;
   back = { at: nowMs(), t: c.state === "running" ? c.currentTime : -1 };
   if (c.state !== "running" && c.state !== "closed") void c.resume().catch(() => undefined);
 }
@@ -246,6 +277,7 @@ let rebuiltAt = -Infinity;
 function rebuildInTap() {
   rebuiltAt = nowMs();
   seen = null;
+  stale = false;
   rebuildAudio();
   (globalThis as { __soundLog?: string[] }).__soundLog?.push("audio:rebuilt");
 }
@@ -259,7 +291,11 @@ export function wakeAudio(e?: Event) {
   const b = back;
   const c = ctx;
   const tapAt = e && e.timeStamp > 0 ? e.timeStamp : nowMs();
-  if (b && c) {
+  if (stale && c && !pageHidden() && nowMs() - rebuiltAt >= REBUILD_GAP_MS) {
+    stale = false;
+    back = null;
+    rebuildInTap();
+  } else if (b && c) {
     const waited = (nowMs() - b.at) / 1000;
     if (c.state !== "running") {
       back = null;
