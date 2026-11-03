@@ -25,6 +25,10 @@ import { BOARD_SEL, asAdmin, asSignedIn, named, test } from "./helpers.ts";
  * Dash (the default intro, Nov 3, until his own in round 3; an admin's town: he's in the game for admins first): in with him to his
  * store's circle, onto its try-on mats; his line; the table pops in; no God King attack was drawn for him, so he stands through the
  * swing's beat; the flash and the wipe, the battle under it, and the gear's Leave back to where you stood.
+ * Hollow (his own intro, Nov 3; everyone's): in with him up his cave to the frozen pond, straight to your seats (no hop back); his line;
+ * the table pops in while it's still lit; his channel line (one of four) as the ball charges; the lanterns go out one by one, the
+ * string drains, his own strand, your pawn; black; the dim light; it closes in on the board; the dark (`canvas.boss-dark`) holds while
+ * the battle loads and lifts off it; nobody moves and the table stays from the drain on; the gear's Leave back to where you stood.
  * CHALLENGE_SHOTS=<dir>: the stills (both projects) and, on the phone, the intro's frames for its GIF (docs/boss-challenge/).
  * Test hooks: the room's canvas `data-intro` (its step); `window.__shopIntro()` (the step, the layout, where you and the boss stand
  * and face, the line, the board and its stools); the storm's canvas `canvas.boss-storm` and the wipe's `canvas.boss-wipe`

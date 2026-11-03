@@ -606,13 +606,13 @@ on right, not vertical… just be sure the table and chairs and pieces all are l
 the pacing and standing clear of the stools (Eric, Nov 2, after Big Boy's live: "it all happens so quick"; "make sure they're not
 standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decisions/2026-11-02-challenge-pacing.md).
 
-- **Hollow's challenge (Nov 3):** the default intro on his pond (his own, the lanterns going out, comes next round), his line "Did
-  you leave a light on?", the wipe his darkness's cast; onto the rings in the ice (`SHOP_HOLLOW_MARKS`); his hop-back place his own
-  (`BossIntro.clear` 2.92, `marksFeel`'s `own`): his lash lies 1.6 squares out in front of his feet, so at the usual 2.6 it reached
-  his stool. The pond is smaller than the other circles (an oval about 6 × 4 squares): there his foot is at the ice's west edge.
+- **Hollow's challenge (Nov 3):** his own intro since Nov 3, round 2 (below: "Hollow's own"); his line "Did you leave a light on?"; the
+  rings in the ice (`SHOP_HOLLOW_MARKS`) give the table's place; his seat his own (`BossIntro.clear` 2.92, `marksFeel`'s `own`): his
+  lash lies 1.6 squares out in front of his feet, so at the usual 2.6 it reached his stool. The pond is smaller than the other circles
+  (an oval about 6 × 4 squares): there his foot is at the ice's west edge. Decision: [2026-11-03-hollow-intro.md](../decisions/2026-11-03-hollow-intro.md).
 - **Which bosses.** Those in `BOSS_INTROS` (`town/shops/challenge.ts`): every boss whose home has an inside (`SHOPS`): Alfil (his own
   intro, `custom: true`), Big Boy (his own, Nov 2), Timber (his own, Nov 3; in an admin's town only while he's in the game for admins
-  first), Babur, Puddles and Dash (the default intro; Dash's since Nov 3, in an admin's town only, until his own in round 3: no God
+  first), Hollow (his own, Nov 3, everyone's), Babur, Puddles and Dash (the default intro; Dash's since Nov 3, in an admin's town only, until his own in round 3: no God
   King attack was drawn for him, so he stands in his idle through the swing's beat, turned to you by his intro's `facesLeft`). Every
   other boss's card works as before (its confirm, Leave, the Boss
   raid screen). Per player: it all happens on your own screen; the boss stays at its home for everyone else.
@@ -634,7 +634,7 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
 - **The flow** (`nextFlow`, pure): the boss's card's **"Challenge alone"**, its confirm **"Challenge Babur?"** / "You'll fight Babur in
   Boss Battle, then come back here." / **Fight** / Stay. Fight keeps where you stand (`standOf`), and you and the boss walk to its
   door (both at `doorStepMs`, the town's walking pace, not your run) and in (the shop's zoom and fade; the room and the intro load only now: `shops/intro.ts`, and Alfil's
-  art, `shops/alfil-intro-art.ts`, Big Boy's, `shops/bigboy-intro-art.ts`, or Timber's, `shops/timber-intro-art.ts` with his moves,
+  art, `shops/alfil-intro-art.ts`, Big Boy's, `shops/bigboy-intro-art.ts`, Timber's, `shops/timber-intro-art.ts` with his moves, or Hollow's, `shops/hollow-intro-art.ts` with his, `characters/hollow-intro.ts`;
   `characters/timber-intro.ts`). Inside (the room in challenge mode: no cards, no walking by tap, its own framing per layout,
   `CHALLENGE_FEEL.cam`, at zoom 1 since Nov 3: the further-out camera, everything in view), you both stand just inside a beat (`insideMs`, from the room's first frame), then walk up to your marks, side
   by side at `walkStepMs` (a slow walk), settle onto their middles and turn to face each other. Every beat is one number in
@@ -668,15 +668,31 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
     his own (`characters/timber-sounds.ts`: hup, thump, gnaw, chomp, clatter, saw, slide, knock, pat, chitter). Then his sawdust sweep
     (`INTRO_TIMBER_STORM` and its front), played as Alfil's sandstorm, his swoosh. Nothing new for anyone else in the town: you both
     go inside, as with every boss.
+  - **Hollow's own** (Nov 3, the dark: `DarkAnims`, `isDark`, `darkAt`; Eric's design and his five changes, the decision above). You
+    both walk on straight to your seats (`seated`, `seatedMarks`: his clear place, yours the usual) and stay there: no hop back. His
+    line (`dark.lineMs`, 1.8 s); a pause; the park table pops in as the default's, still lit, and stands `tableHoldMs`; he charges (his
+    own moves, `BOSS_HOLLOW_INTRO`: `charge`, `dark.chargeMs`) with a channel line over his head (one of `chant`'s four at random,
+    `chantOf`, for `chantMs`), swells, and drinks the light (`drink`: `dark.drain`'s beats as drawn, each times `dark.pace`, 0.85, about
+    5.7 s): the five lanterns go out one by one far to near (`dark.lanterns`; each lantern's own frames, `gutter<k>` from its sway frame,
+    its light and pool going with it), the string's 57 bulbs go dark west to east (`INTRO_HOLLOW_BULB_RUN`; the backdrop's candle with its
+    first), the tree from the bottom up to its star, his own strand a third at a time (`bulbs2` to `bulbs0`), your pawn's light (it greys
+    a touch), each light's motes flying into the ball; your tag fades as it starts. The room darkens with each light gone (the art's
+    `INTRO_HOLLOW_DARK`: its tone over the room, the lights still lit drawn over it, glows then their lit pixels, then the motes); `full`;
+    the blackout and the black (0.9 s: his eyes alone, dim violet slits); the dim light (`INTRO_HOLLOW_DIMPOOL`, steady) round him, the
+    table and you while he settles; the pool closes in on the board (the iris, `irisMs`). No attack. Then his transition, the dark
+    (`startDark`: `canvas.boss-dark`, black from its first frame, held while the battle loads, faded off it over `dark.outMs`). Every
+    beat a number in `CHALLENGE_FEEL.dark` or the art's frames; about 15 s from the marks to the board. His cues each a sound of his own
+    (`characters/hollow-sounds.ts`; the table's the app's pop). Only the room changes: the cave's own art and frames are never touched,
+    so it is lit as ever the next time you go in. Nothing new for anyone else in the town.
   - **The default** (`custom: false`): the table pops in (`pop`: grows from its foot past its size and back over `popMs`, a dust puff
     over `puffMs`, the app's soft "pop"); then the flash and the wipe (`startWipe`: `flashes` white flashes over `flashMs`, black bands
     wiping in from alternate sides over `wipeMs`, the boss's own whoosh; held black while the battle loads; faded off over `wipeOutMs`).
-  Every intro (but Timber's, who walks away from his) then holds the table on its own `tableHoldMs`, and the boss swings its God King attack in place where it stands (its
+  Every intro (but Timber's, who walks away from his, and Hollow's, the dark) then holds the table on its own `tableHoldMs`, and the boss swings its God King attack in place where it stands (its
   kit's `kingAttack` and sounds: its lashes only, looping, no drop-in or leap: `attackStart`, `attackTime(…, inPlace)`) for
   `swingMs` (2 s) until its transition has covered the screen (`coverMs`), and on until the battle shows.
   Each transition is a canvas over the whole page, outside the town (it stays as the town closes); the battle starts under it (the
   app's `challengeFromTown`: Boss alone, as START). The back button calls it off until the transition starts. A tap doesn't skip.
-  About 12 s from Fight to the screen covered for Big Boy and Alfil, 9 for the default (it was about 6; the room's loading adds to it); about 16.5 for Timber (his own intro about 12.7 s from the marks to covered, Eric's "about 12 s").
+  About 12 s from Fight to the screen covered for Big Boy and Alfil, 9 for the default (it was about 6; the room's loading adds to it); about 16.5 for Timber (his own intro about 12.7 s from the marks to covered, Eric's "about 12 s"); about 15 s from the marks to the board for Hollow (Eric: "his startup time can be a few seconds longer").
 - **After the battle:** the result screen's leaving button reads **"Back to town"**; it (and the gear's Leave: "You'll go back to the
   town square.") opens the town with you on the square you stood on, facing the same way (`createTown`'s `stand`). "Play again" keeps it.
 - **The server's lines in the town's chat** (signed-in players; blue, `.tc-server`, no name and no menu): "Ann challenged Alfil!" as the
@@ -685,12 +701,19 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
   " + Alfil token" on the end when the battle dropped one. No spam: while one of your challenges is unfinished (a quit: a leave, an
   early resign), your next challenge posts no start line; its finish posts the outcome and closes it (`TownChat.challenge`, server).
 - **Test hooks:** the room's canvas `data-intro` (its step); `__shopIntro()` (step, layout, where you and the boss stand and face, the
-  line, the table and its stools; Timber's `wood`: his move, the log, the fog, the ring, the stumps); the storm's `canvas.boss-storm` and the wipe's `canvas.boss-wipe` (`data-phase`); `__townYou()`.
+  line, the table and its stools; Timber's `wood`: his move, the log, the fog, the ring, the stumps; Hollow's `chant`, his channel line
+  while it shows, and `dark`: his move, his strand, the lanterns out, the string's bulbs dark, the tree, your tag, the dark's level, the
+  blackout, the dim light, the iris); the storm's `canvas.boss-storm`, the wipe's `canvas.boss-wipe` and Hollow's `canvas.boss-dark`
+  (`data-phase`); `__townYou()`.
 - **Tests:** `packages/app/test/boss-challenge.test.ts` (the flow, the layouts and marks, the stools, the board's turn, the timelines,
-  the pacing beat by beat, the hop back, every figure clear of the stools,
-  the storm's edge, the wipe, back to where you stood), `packages/server/test/town-chat.test.ts` (the lines and the no-spam rule, and
+  the pacing beat by beat, the hop back, every figure clear of the stools; Hollow's dark: his art, the beats, the drain 15% faster, the
+  table before the charge, no figure moving and nothing appearing once the drain starts, the dark and the dim light, his channel line,
+  every cue a sound, the cave's lights as ever without an intro), `packages/app/test/shop-hollow.test.ts` (his intro's moves on the
+  ice, clear of his stool and the rock), the storm's edge, the wipe, back to where you stood), `packages/server/test/town-chat.test.ts` (the lines and the no-spam rule, and
   through the API), `e2e/boss-challenge.spec.ts` (phone and computer: Alfil, a quit then a finished challenge and the lines; Babur's
-  default intro and back; Big Boy's own intro and back; Timber's own as an admin and back; Dash's default as an admin and back), `e2e/shop.spec.ts` (Alfil's Pyramid's, Big Boy's Crib's and Dash's Kicks' crates), `e2e/town.spec.ts` (a boss without an inside, Folio: the
+  default intro and back; Big Boy's own intro and back; Timber's own as an admin and back; Dash's default as an admin and back; Hollow's own and back: in to your seats, his line,
+  the table while it's lit, his channel line, the lanterns one by one, the string, his strand, the black, the dim light, the iris, the
+  dark lifting off the battle, nobody moving and the table there throughout the drain), `e2e/shop.spec.ts` (Alfil's Pyramid's, Big Boy's Crib's and Dash's Kicks' crates), `e2e/town.spec.ts` (a boss without an inside, Folio: the
   Boss raid screen).
 
 ## Frame-rate pill (`?fps`)
