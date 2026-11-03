@@ -67,3 +67,5 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Dash round 1 pushed 1bb18fbe (helper report: crowd 0.15±0.07 vs roster 0.12-0.21; FPS 60/17ms both; time = existing dock clock: bank 10+10 solo/party, 20 s move timer raids; slap −30 s bank or −6 s raid move (≥8 s); scramble 3 s ×5; out of time → random of judge's top 4, never a loss; flip live: remove "dash" from BOSS_ADMIN_FIRST in packages/core/src/settings.ts).
   Review: slap stills show his sprite dropping out of the header over the board (a8/b8) → sent back to helper (also "Yoink! T" mid-typing). Then PR with full-e2e.
 - Disk was full (216 MB): removed 29 merged worktrees → 23 GB free. Helper wrangler servers left on 8857/8858, 8866/8867 (respawn after fuser -k).
+- Nov 3: Dash #476: the FAQ fix 4574a2d2 had not been pushed (watcher got 422s for 80 min); pushed, CI watcher bkgg136vj.
+  Round 2 brief written: notes/briefs/brief-dash-home.md (start after #476 merges, worktree /home/user/cr-dashhome).
