@@ -205,3 +205,92 @@ describe("sound after the page was away", () => {
     expect(last().state).toBe("running");
   });
 });
+
+describe("sound dying while the page stays (Eric, Nov 3: Timber chittered, then Alfil and the fight were silent for good)", () => {
+  /** Eric's steps: a tap that plays (Timber's chitter), then iOS stops the context with the page on screen. */
+  async function playedThenDies(state: State) {
+    tap();
+    expect(last().started).toBe(1);
+    FakeContext.hang = true;
+    last().state = state;
+  }
+
+  it("interrupted, resume waiting for ever: the next tap makes a new context and its own sound plays (Alfil's)", async () => {
+    const first = last();
+    await playedThenDies("interrupted");
+    tap(3000);
+    expect(FakeContext.made).toHaveLength(2);
+    expect(first.state).toBe("closed");
+    expect(last().started).toBe(1);
+    expect((globalThis as { __soundLog: string[] }).__soundLog).toContain("audio:rebuilt");
+    FakeContext.hang = false;
+    last().resume();
+    tap(3000);
+    expect(last().started).toBe(2);
+    expect(FakeContext.made).toHaveLength(2);
+  });
+
+  it("suspended with its resume hanging: a new one on the next tap", async () => {
+    await playedThenDies("suspended");
+    tap(3000);
+    expect(FakeContext.made).toHaveLength(2);
+    expect(last().started).toBe(1);
+  });
+
+  it("closed: a new one on the next tap", async () => {
+    await playedThenDies("closed");
+    tap(3000);
+    expect(FakeContext.made).toHaveLength(2);
+  });
+
+  it("\"running\" with its clock stopped between two taps a second or more apart: a new one; its clock moving: kept", () => {
+    tap();
+    last().currentTime += 2;
+    tap(2000); // moved 2 s in 2 s: alive
+    expect(FakeContext.made).toHaveLength(1);
+    tap(2000); // moved nothing in 2 s: dead
+    expect(FakeContext.made).toHaveLength(2);
+    expect(last().started).toBe(1);
+  });
+
+  it("taps less than a second apart don't judge the clock (a tap's pointerdown, touchend and click); a second on, it's judged", () => {
+    tap();
+    tap(300);
+    tap(300);
+    expect(FakeContext.made).toHaveLength(1);
+    tap(500); // 1.1 s since the first, its clock still where it was
+    expect(FakeContext.made).toHaveLength(2);
+  });
+
+  it("the taps' own time stamps are used: a test's fake clock jumping between taps doesn't make a new one", () => {
+    const at = (ms: number) => ({ timeStamp: ms }) as Event;
+    sound.wakeAudio(at(10_000));
+    clock += 5000; // performance.now jumped (a fake clock); the device's clock moved 100 ms
+    sound.wakeAudio(at(10_100));
+    expect(FakeContext.made).toHaveLength(1);
+  });
+
+  it("never seen running (sound not switched on yet): a tap switches it on, no new context", async () => {
+    vi.resetModules();
+    FakeContext.made = [];
+    sound = await import("../src/sound.ts");
+    sound.prepareAudio();
+    FakeContext.hang = true;
+    tap();
+    tap(3000);
+    expect(FakeContext.made).toHaveLength(1);
+  });
+
+  it("at most one new context every 2 s while it keeps dying (iOS mid phone call)", async () => {
+    await playedThenDies("interrupted");
+    tap(3000);
+    expect(FakeContext.made).toHaveLength(2);
+    last().state = "running";
+    tap(); // seen running
+    last().state = "interrupted";
+    tap(500);
+    expect(FakeContext.made).toHaveLength(2);
+    tap(2000);
+    expect(FakeContext.made).toHaveLength(3);
+  });
+});
