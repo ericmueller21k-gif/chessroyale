@@ -52,7 +52,8 @@ describe("Dash: his roster line and numbers", () => {
 });
 
 describe("Dash: the clock", () => {
-  const boss = (p: object, crowdMoves = 4) => ({ id: "dash", crowdMoves, result: undefined, powers: { seed: 1, turn: crowdMoves + 1, material: 39, lost: 0, nextPassive: 2, events: [], ...p } }) as never;
+  type B = Parameters<typeof dashMoveClock>[0] & object;
+  const boss = (p: object, crowdMoves = 4): B => ({ id: "dash", crowdMoves, result: undefined, powers: { seed: 1, turn: crowdMoves + 1, material: 39, lost: 0, nextPassive: 2, events: [], ...p } }) as unknown as B;
 
   it("a scrambled move's clock is scrambleSeconds, for exactly scrambleMoves crowd turns from the one it came", () => {
     for (const turn of [5, 6, 7, 8, 9]) expect(scrambleOn({ ultAt: 5 }, turn)).toBe(true);
@@ -63,7 +64,7 @@ describe("Dash: the clock", () => {
     expect(dashMoveClock(boss({ ultAt: 5 }, 9), 20)).toBe(20);
     // (Another boss, or his battle over: the clock as it was.)
     expect(dashMoveClock({ ...boss({ ultAt: 5 }, 4), id: "timber" }, 20)).toBe(20);
-    expect(dashMoveClock({ ...boss({ ultAt: 5 }, 4), result: "boss" }, 20)).toBe(20);
+    expect(dashMoveClock({ ...boss({ ultAt: 5 }, 4), result: "boss" } as B, 20)).toBe(20);
   });
 
   it("a raid's slapped move: slapMoveSeconds shorter, never under slapMoveMin nor above the clock; only the next crowd turn", () => {
