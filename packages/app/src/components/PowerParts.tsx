@@ -4,7 +4,7 @@ import type { ComponentChildren, JSX } from "preact";
 import type { PowerEventKind, WaterGrowth } from "@chessroyale/core";
 import type { BossKit } from "../characters/kits.ts";
 import type { BossView } from "../game.ts";
-import { BossFace } from "./BossCharacter.tsx";
+import { BossFace, playInPlace } from "./BossCharacter.tsx";
 import { BossEffect, type BoardItem } from "./BossEffect.tsx";
 import { bannerLength } from "./FightBanner.tsx";
 import { GodKingPortrait, squareXY } from "./GodKing.tsx";
@@ -140,6 +140,20 @@ export interface BossUi {
   noMove?: (boss: BossView) => string | null;
   /** Its layer over the board (PowerBoard): `under` goes beneath the board's power layer, `over` inside it. */
   board?: (p: BoardLayerProps) => { under?: ComponentChildren; over: ComponentChildren };
+  /**
+   * It never steps up to the board's corner to cast: every moment of its plays where it stands (`InPlace`, `pm-stay`), the RAGE
+   * warning's too (Dash, Nov 3: his figure never covers a square).
+   */
+  inPlace?: boolean;
+}
+
+/**
+ * A run of the boss's own animations where it stands (playInPlace), started once per moment (`runKey`) from `since`: for a
+ * moment marked `pm-stay`, whose boss doesn't step up to the board's corner.
+ */
+export function InPlace({ runKey, anims, since }: { runKey: string; anims: readonly string[]; since: number }) {
+  useLayoutEffect(() => playInPlace(runKey, anims, since), [runKey]);
+  return null;
 }
 
 export const at = (square: string, orientation: "white" | "black", turn: QuarterTurn = 0) => {

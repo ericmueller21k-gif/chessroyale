@@ -24,7 +24,7 @@ import { TIGER_UI } from "./Tiger.tsx";
 import { FOLIO_UI } from "./Folio.tsx";
 import { TIMBER_UI } from "./Timber.tsx";
 import { DASH_UI } from "./Dash.tsx";
-import { PowerBanner, kitLine, ragePct, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
+import { InPlace, PowerBanner, kitLine, ragePct, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
 import { CRITICAL, NORMAL, bossVoice, type Priority } from "../speech.tsx";
 import { useFrameNow } from "./Countdown.tsx";
 
@@ -58,13 +58,15 @@ const bossUi = (boss: Pick<BossView, "id"> | null | undefined): BossUi | null =>
 export const WARN: MomentUi = {
   order: 1,
   kit: "ultimateWarn",
-  view: ({ boss, t, banner, cast }: MomentProps) => {
+  view: ({ boss, moment, t, banner, cast, anim }: MomentProps) => {
     const ui = bossUi(boss);
     const when = ui?.ultimate.when ?? "Next turn";
+    // (A boss whose moments all play where it stands, Dash: its warning too, never at the board's corner.)
+    const a = ui?.inPlace ? anim() : null;
     return (
-      <div class="power-moment pm-warn">
+      <div class={`power-moment pm-warn${ui?.inPlace ? " pm-stay" : ""}`}>
         {banner("RAGE!", `${when}: ${ui?.ultimate.name ?? "its ultimate"}`, "rage")}
-        {cast("", 0)}
+        {ui?.inPlace ? a && <InPlace runKey={moment.key} anims={[a]} since={moment.at} /> : cast("", 0)}
       </div>
     );
   },

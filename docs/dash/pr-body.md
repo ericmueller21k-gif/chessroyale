@@ -18,8 +18,9 @@ else changes; his FAQ block is written and shows once he's playable).
   never thinks: `bossThinkMs` waits `dashThinkMs` (350 ms) for him, 1200 for every other boss.
 - **Core:** his roster line (`dash`, "Dash", 🐆, offset −250, powers `clockslap` / `scramble`), his state (`DashState`), his events
   (`slap`, `scramble`, `flag`), his numbers in `BOSS_POWERS`, `"dash"` in `BOSS_ADMIN_FIRST`.
-- **On screen** (`components/Dash.tsx`): the slap's moment (his clock slap cast by the board's corner, the time flying from your
-  clock to him), TIME SCRAMBLE!, the big 3-2-1 over the board on every scrambled move (`ScrambleCount` in `Play.tsx`: the app's own
+- **On screen** (`components/Dash.tsx`): **every moment of his plays where he stands** (a new optional `BossUi.inPlace`: his moments
+  and the RAGE warning are `pm-stay` runs in his own figure, never a cast at the board's corner, so he never covers a square); the
+  slap's moment (his clock slap, the time flying from your clock to him), TIME SCRAMBLE!, the big 3-2-1 over the board on every scrambled move (`ScrambleCount` in `Play.tsx`: the app's own
   `.cc-num` count in his orange, standing in for the move's "Round end" count), his flag's moment, **Tick** in the boss bar's prop
   slot with the time stolen or the scramble's moves left. Nothing new takes room; nothing moves.
 - **Art** from `claude/boss-art`, copied as drawn with a source line each, keeping the art's names: `characters/boss-blitz.ts`
@@ -131,14 +132,16 @@ count is drawn again as its second changes (a timer), the slap's flight is place
 
 ## Visuals (docs/dash/)
 
-`dash.gif` (phone 390 × 844, 5.3 MB: the intro, a Clock Slap with the time flying to him, TIME SCRAMBLE!, the 3-2-1, a move run out
+`dash.gif` (phone 390 × 844, 5.6 MB: the intro, a Clock Slap in his bar with the time flying to him, TIME SCRAMBLE!, the 3-2-1, a move run out
 played for you and his jab, the next scrambled move); stills, phone and computer (1280 × 800): `*-select.png` (his tile, an admin's),
-`*-slap.png`, `*-scramble-banner.png`, `*-countdown.png`, `phone-after-flag.png`.
+`*-slap-flight.png` (the time on its way to him), `*-slap.png` (his line typed out in full), `*-scramble-banner.png`, `*-countdown.png`, `phone-after-flag.png`.
 
 ## Checks changed (old → new)
 
 None removed or loosened; none guards a rule in `docs/rules/eric.md`.
 - `packages/app/test/banners.test.ts`: the bosses' screen files it reads, + `DASH_UI` (TIME SCRAMBLE!'s banner checked as every one).
+- `packages/app/test/boss-bar-same.test.ts`: the bosses it checks, playable ones + Dash (admins first; every moment of his plays in
+  this figure, so every frame must fit the bar's room as any playable boss's).
 - `packages/chess/test/king-save-altered.test.ts`: `AUDIT` + `dash` ("his powers change no square and limit no move").
 - `e2e/boss-smoke.spec.ts`: `PASSIVE_EVENTS` + `clockslap: ["slap"]`.
 - `packages/app/src/town/ride-cells.ts`: Cheetah Shoes' hash (its file's text changed), checked by `town-rides.test.ts` as before.
@@ -152,7 +155,8 @@ Typecheck (all packages); vitest: `dash.test.ts`, `dash-lobby.test.ts`, `dash-wi
 `banners`, `power-words`, `boss-character`, `boss-bar-same`, `boss-difficulty`, `maia-players`, `recluse` (app and chess),
 `timber-sounds`, `king-attack`, `speech`, `town-rides`, core `boss` and `crates`, server `boss-tokens` and `test-switches`,
 `king-save-altered`, `timber`: all pass. e2e under the lock: `e2e/dash.spec.ts` phone and desktop (5 passed, 1 skipped by design),
-`boss-smoke.spec.ts -g Dash` on the phone: pass.
+`boss-smoke.spec.ts -g Dash` on the phone: pass. After the director's review (his slap cast at the board's corner covered squares): every moment in place, re-run
+`dash.spec.ts` (now also: his figure never at the corner, never hidden, its box never over the board) and the smoke test: pass.
 
 ## Lane
 

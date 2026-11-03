@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
+import { createPortal } from "preact/compat";
 import { DASH_ANIM, scrambleLeft, type DashView } from "@chessroyale/chess";
 import { pickLine } from "../characters/boss-beats.ts";
 import { renderFrame } from "../characters/sprite.ts";
@@ -6,14 +7,17 @@ import { sidekickBlitz } from "../characters/sidekicks/sidekick-blitz.ts";
 import { clockShown } from "../clock-text.ts";
 import { BOSS_POWERS } from "@chessroyale/core";
 import type { BossView } from "../game.ts";
-import type { BossUi, Moment, MomentProps, MomentUi } from "./PowerParts.tsx";
+import { InPlace, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
 
 /**
  * Dash's powers on screen (his rules: packages/chess/src/bosses/dash.ts; docs/decisions/2026-11-03-dash.md). "Your time" is the
  * clock you already have, at the dock's right on every boss screen (DockClock: the bank in Boss alone and a party, a raid's move
  * timer), so nothing new takes room and nothing shifts.
- * - **Clock Slap** (`slap`, as your turn after his capture begins): his clock slap where he steps up to cast, and the time he
- *   took flying from your clock to him ("−30s", or "−6s" off a raid's next move), placed once from the two on the page, then CSS.
+ * - **Every moment of his plays where he stands** (`inPlace`: his figure in the boss bar on a phone, beside the board on a
+ *   computer; `pm-stay`), the RAGE warning's too: he never steps up to the board's corner, so he never covers a square (the
+ *   director's review, Nov 3: the corner cast hid a8, b8 and the 7th rank on a phone).
+ * - **Clock Slap** (`slap`, as your turn after his capture begins): his clock slap where he stands, and the time he took flying
+ *   from your clock to him ("−30s", or "−6s" off a raid's next move), placed once from the two on the page, then CSS.
  * - **Time Scramble** (`scramble`, after the RAGE warning a turn before): banner TIME SCRAMBLE! ("Your next 5 moves: 3 seconds
  *   each"), his clock tossed and spun. Then on each scrambled move a big 3-2-1 over the board (`ScrambleCount`, Play.tsx: drawn
  *   again only as the second shown changes, never per frame, and never in the way of a tap), its moves left in Tick's tally.
@@ -44,61 +48,75 @@ export const slapText = (ms: number): string => `−${Math.round(ms / 1000)}s`;
 
 // ---------------- His moments ----------------
 
+/** His figure as drawn now: the boss bar's on a phone, the one beside the board on a computer (the one with a box). */
+function figureBox(): DOMRect | null {
+  for (const el of document.querySelectorAll<HTMLElement>(".boss-char .boss-char-sprite")) {
+    const r = el.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0) return r;
+  }
+  return null;
+}
+
 /**
- * The time he took, flying from your clock (the dock's) to him at the board's corner: where both are is read once as the moment
- * mounts (the page's own layout), then a CSS animation carries it; nothing runs per frame.
+ * The time he took, flying from your clock (the dock's) to him where he stands: where both are is read once as it shows (the
+ * page's own layout), then a CSS animation carries it; nothing runs per frame. On the page's top layer (a portal, fixed), so
+ * nothing clips it on its way from under the board to the bar.
  */
 function SlapFlight({ ms, startAt, now }: { ms: number; startAt: number; now: number }) {
   const ref = useRef<HTMLSpanElement>(null);
   const shown = now >= startAt && now <= startAt + B.slap.flyMs + 200;
   useLayoutEffect(() => {
     const el = ref.current;
-    const root = el?.offsetParent as HTMLElement | null;
-    if (!el || !root) return;
-    const box = root.getBoundingClientRect();
+    if (!el) return;
     const clock = document.querySelector<HTMLElement>(".dk-clock .dk-time") ?? document.querySelector<HTMLElement>(".dk-clock");
-    const caster = root.querySelector<HTMLElement>(".pm-caster");
     const c = clock?.getBoundingClientRect();
-    const d = caster?.getBoundingClientRect();
-    // (No clock on the page: it rises from the board's foot. No caster yet: to the board's top-left corner, where he casts.)
-    const fx = c ? c.left + c.width / 2 - box.left : box.width / 2;
-    const fy = c ? c.top + c.height / 2 - box.top : box.height;
-    const tx = d ? d.left + d.width * 0.5 - box.left : box.width * 0.1;
-    const ty = d ? d.top + d.height * 0.55 - box.top : box.height * 0.05;
+    const d = figureBox();
+    // (No clock on the page: it rises from the screen's foot. No figure: to the screen's top-left, where his bar is.)
+    const fx = c ? c.left + c.width / 2 : window.innerWidth / 2;
+    const fy = c ? c.top + c.height / 2 : window.innerHeight;
+    // (To his chest: the figure's box is his frame, his feet at its foot.)
+    const tx = d ? d.left + d.width * 0.45 : 40;
+    const ty = d ? d.top + d.height * 0.6 : 60;
     el.style.setProperty("--fx", `${fx}px`);
     el.style.setProperty("--fy", `${fy}px`);
     el.style.setProperty("--tx", `${tx - fx}px`);
     el.style.setProperty("--ty", `${ty - fy}px`);
   }, [startAt, shown]);
-  if (!shown) return null;
-  return (
+  if (!shown || typeof document === "undefined") return null;
+  return createPortal(
     <span ref={ref} class="dash-fly" aria-hidden="true">
       {slapText(ms)}
-    </span>
+    </span>,
+    document.body,
   );
 }
 
-function slapMoment({ boss, moment, now, cast }: MomentProps) {
+function slapMoment({ boss, moment, now }: MomentProps) {
   const slap = boss.powers?.dash?.slap;
   return (
-    <div class="power-moment pm-slap" data-ms={slap?.ms ?? 0} data-bank={slap?.bank ? "1" : "0"}>
-      {cast("slam", B.slap.slamAt)}
+    <div class="power-moment pm-slap pm-stay" data-ms={slap?.ms ?? 0} data-bank={slap?.bank ? "1" : "0"}>
+      <InPlace runKey={moment.key} anims={["clockSlap"]} since={moment.at} />
       {slap && <SlapFlight ms={slap.ms} startAt={moment.at + B.slap.slamAt} now={now} />}
     </div>
   );
 }
 
-function scrambleMoment({ moment, banner, cast }: MomentProps & { moment: Moment }) {
+function scrambleMoment({ moment, banner }: MomentProps & { moment: Moment }) {
   return (
-    <div class="power-moment pm-scramble" data-turn={moment.key}>
+    <div class="power-moment pm-scramble pm-stay" data-turn={moment.key}>
       {banner("TIME SCRAMBLE!", DASH_WORDS.scramble(BOSS_POWERS.scrambleMoves, BOSS_POWERS.scrambleSeconds), "dash")}
-      {cast("whoosh", B.scramble.castAt)}
+      <InPlace runKey={moment.key} anims={["timeScramble"]} since={moment.at + B.scramble.castAt} />
     </div>
   );
 }
 
-function flagMoment({ cast }: MomentProps) {
-  return <div class="power-moment pm-flag">{cast("point", 80)}</div>;
+function flagMoment({ moment }: MomentProps) {
+  // (His finger gun: the kit's `cheer`, his `check`.)
+  return (
+    <div class="power-moment pm-flag pm-stay">
+      <InPlace runKey={moment.key} anims={["check"]} since={moment.at} />
+    </div>
+  );
 }
 
 const MOMENTS: Record<"slap" | "scramble" | "flag", MomentUi> = {
@@ -186,6 +204,8 @@ export function TickTally({ boss, moments }: { boss: BossView; moments: () => Mo
 
 export const DASH_UI = {
   id: "dash",
+  // (Every moment where he stands, the warning's too: never over the board.)
+  inPlace: true,
   ultimate: { name: "Time Scramble" },
   moments: MOMENTS,
   // Tick and the time Dash has stolen, in the boss bar's free room right of his bars.

@@ -31,7 +31,7 @@ async function playOne(page: Page) {
 async function watch(page: Page) {
   await page.evaluate(() => {
     const w = window as any;
-    w.__dash = { kinds: [] as string[], banners: [] as string[], secs: [] as string[], fly: [] as string[], tally: [] as string[], board: [] as string[], clock: [] as string[], caster: 0 };
+    w.__dash = { kinds: [] as string[], banners: [] as string[], secs: [] as string[], fly: [] as string[], tally: [] as string[], board: [] as string[], clock: [] as string[], caster: 0, hidden: 0, over: [] as string[] };
     const box = (el: Element | null) => {
       if (!el) return "";
       const r = el.getBoundingClientRect();
@@ -49,13 +49,26 @@ async function watch(page: Page) {
       // (Your clock's right edge and top: its numbers are right aligned, so its width follows "10:00" or "0:03".)
       const ck = document.querySelector(".dk-clock")?.getBoundingClientRect();
       add(r.clock, ck ? `${Math.round(ck.right)},${Math.round(ck.top)}` : "");
-      if (document.querySelector(".pm-slap .pm-caster")) r.caster++;
+      // (He never steps up to the board's corner, his figure is never hidden, and its drawn box never covers a square: on a phone it
+      // sits in the bar over the board, on a computer beside it.)
+      if (document.querySelector(".pm-caster")) r.caster++;
+      const fig = document.querySelector(".boss-char .boss-char-sprite");
+      if (fig && getComputedStyle(fig).visibility === "hidden") r.hidden++;
+      const b = document.querySelector(".board-wrap")?.getBoundingClientRect();
+      const f = fig?.getBoundingClientRect();
+      if (b && f && f.width > 0) {
+        const cs = getComputedStyle(fig!);
+        // (The canvas's own box: his frame, his feet at its foot; drawn pixels inside it. Counted by its overlap with the board.)
+        const ox = Math.min(f.right, b.right) - Math.max(f.left, b.left);
+        const oy = Math.min(f.bottom, b.bottom) - Math.max(f.top, b.top);
+        if (ox > 1 && oy > 1 && cs.visibility !== "hidden") add(r.over, `${w.match?.boss?.powers?.events?.map((e: { kind: string }) => e.kind).join("+")}:${Math.round(ox)}x${Math.round(oy)}`);
+      }
       requestAnimationFrame(look);
     };
     requestAnimationFrame(look);
   });
 }
-type Seen = { kinds: string[]; banners: string[]; secs: string[]; fly: string[]; tally: string[]; board: string[]; clock: string[]; caster: number };
+type Seen = { kinds: string[]; banners: string[]; secs: string[]; fly: string[]; tally: string[]; board: string[]; clock: string[]; caster: number; hidden: number; over: string[] };
 const seen = (page: Page) => page.evaluate(() => (window as any).__dash as Seen);
 const dash = (page: Page) => page.evaluate(() => (window as any).match.boss.powers.dash);
 
@@ -97,7 +110,6 @@ test.describe("Dash", () => {
     let s = await seen(page);
     expect(s.kinds).toContain("slap");
     expect(s.fly).toContain(`−${BOSS_POWERS.slapBankSeconds}s`);
-    expect(s.caster).toBeGreaterThan(0);
     await expect(page.locator(".tk-tally .tk-text")).toHaveText(`−0:${String(BOSS_POWERS.slapBankSeconds).padStart(2, "0")}`);
     const bank1 = await page.evaluate(() => (window as any).match.standings().find((s: any) => s.isYou)?.bankMs ?? null);
     if (bank0 !== null && bank1 !== null) expect(bank1).toBeLessThanOrEqual(bank0 + BOSS_CLOCK.incrementSeconds * 1000 - BOSS_POWERS.slapBankSeconds * 1000);
@@ -131,6 +143,10 @@ test.describe("Dash", () => {
     expect(s.board).toHaveLength(1);
     expect(s.tally).toHaveLength(1);
     expect(s.clock).toHaveLength(1);
+    // He stayed in his place through the slap, the warning, the scramble and his jab: never at the board's corner, never hidden.
+    expect(s.caster).toBe(0);
+    expect(s.hidden).toBe(0);
+    expect(s.over, "his figure's box over the board").toEqual([]);
     expect(errors).toEqual([]);
   });
 

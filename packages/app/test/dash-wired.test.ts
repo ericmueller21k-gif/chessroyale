@@ -11,6 +11,9 @@ import { SELECT_LINES, SELECT_SOUND } from "../src/characters/boss-select.ts";
 import { MOVE_MEAN_DB, MOVE_PEAK } from "../src/characters/synth.ts";
 import { TOKEN_ART } from "../src/components/tokens/index.ts";
 import { DASH_UI, DASH_WORDS, slapText } from "../src/components/Dash.tsx";
+import { WARN } from "../src/components/BossPowers.tsx";
+import type { MomentProps } from "../src/components/PowerParts.tsx";
+import { renderFrame } from "../src/characters/sprite.ts";
 import { POWER_WORDS } from "../src/power-words.ts";
 
 /** Dash's wiring (docs/decisions/2026-11-03-dash.md): his art, lines, sounds, select, token and words. */
@@ -44,6 +47,29 @@ describe("Dash's wiring", () => {
     expect(length("scrambleWarn")).toBe(DASH_ANIM.scrambleWarn);
     expect(length("check")).toBe(DASH_ANIM.check);
     expect(kit.anims).toMatchObject({ power: "clockSlap", ultimateWarn: "scrambleWarn", ultimate: "timeScramble" });
+  });
+
+  it("every moment of his plays where he stands (pm-stay, never cast at the board's corner), the RAGE warning's too", () => {
+    expect(DASH_UI.inPlace).toBe(true);
+    const boss = { id: "dash", name: "Dash", crowdSide: "w", crowdMoves: 2, startMove: 1, board: { id: 0, fen: "", history: [], ply: 0, lastMove: null }, powers: { events: [], turn: 2, dash: { slaps: 1, stolen: 30000, flags: 0, slap: { at: 1, ms: 30000, bank: true } } } } as unknown as MomentProps["boss"];
+    for (const [kind, ui] of [...Object.entries(DASH_UI.moments), ["warn", WARN] as const]) {
+      let cast = 0;
+      const props = { boss, moment: { kind, key: `k:${kind}`, at: 0, ms: 2000 }, now: 500, t: 500, orientation: "white", side: "w", kit, banner: () => null, cast: () => (cast++, null), anim: () => "scrambleWarn" } as unknown as MomentProps;
+      const v = ui!.view(props) as { props: { class: string } };
+      expect(v.props.class, kind).toMatch(/\bpm-stay\b/);
+      expect(cast, `${kind} casts at the board's corner`).toBe(0);
+    }
+  });
+
+  it("no frame of any of his animations drops below his feet by more than the boss bar's padding: in his slot, never over the board", () => {
+    const ch = kit.ch;
+    for (const [name, a] of Object.entries(ch.anims))
+      for (const [i, f] of a.frames.entries()) {
+        const { w, h, data } = renderFrame(ch, f);
+        let low = -1;
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (data[(y * w + x) * 4 + 3]! > 0) low = y;
+        expect(low + 1 - ch.foot[1], `${name} frame ${i}`).toBeLessThanOrEqual(6);
+      }
   });
 
   it("his lines: two or three a moment, short enough for the bubble; his slap, scramble and flag always speak", () => {

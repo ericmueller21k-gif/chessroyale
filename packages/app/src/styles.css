@@ -23249,15 +23249,16 @@ button.sq-tiny {
     transform: translateX(1px);
   }
 }
-/* The slap: the time he took flies from your clock to him (placed once as the moment mounts; then this). */
+/* The slap: the time he took flies from your clock to him where he stands (placed once as it shows; then this). On the page's top
+   layer (a portal into the body), fixed, so the board's box never clips it. */
 .dash-fly {
-  position: absolute;
+  position: fixed;
   left: var(--fx, 50%);
   top: var(--fy, 100%);
-  z-index: 12;
+  z-index: 60;
   pointer-events: none;
   white-space: nowrap;
-  font-size: clamp(15px, 5.5cqw, 24px);
+  font-size: 20px;
   font-weight: 900;
   line-height: 1;
   color: #ffd36b;
@@ -23296,11 +23297,4 @@ button.sq-tiny {
 }
 .dash-count .dc-n.last {
   color: #ee3b3b;
-}
-/* His cast by the board's corner, as every boss's: his frame is 105 x 104 (33 columns on his right for his entrance's zip-in),
-   drawn at the usual boss's scale (26% of the board for 72 frame px), his feet where every caster's are. */
-.pm-caster.pm-by-dash {
-  aspect-ratio: 105 / 104;
-  width: 37.9%;
-  top: -19.5%;
 }
