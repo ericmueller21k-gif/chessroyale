@@ -28,6 +28,10 @@ copy into the app as Dash's shop did, PR #477 merge 23a3a7d4, and Big Boy's, PR 
 - **The challenge:** the default intro for now (his own, the lanterns going out, comes next round). The pond is smaller than the
   other circles: make sure the table, the stools and both figures fit on it and stay clear of the rock.
 - Starting zoom: the further-out one, like every home.
+- **Lanterns in view at the fight's start (Eric, for next round's intro):** his intro will put the lanterns out one by one and draw
+  their light into him, so take a still (phone + computer) from the challenge's own camera at the moment the intro starts (you on
+  your mark on the pond) and count the lanterns and bulb-string runs in view. If fewer than about 4 lanterns show, say so with the
+  still: the art round adds lanterns where that view sees them (don't draw them yourself).
 
 ## Rules
 Phone first; lazy-loaded art (the cave loads only when you go in); the town's frame loop unchanged; the shop's frame rate on the
