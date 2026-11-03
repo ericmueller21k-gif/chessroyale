@@ -91,3 +91,7 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
   #478 now also has admin "Sound report" (Settings → Testing) dc140033, watcher bln1j6nhr. After merge: Eric reproduces, copies report, pastes.
 - #477 Dash home MERGED 23a3a7d4, #478 audio-desktop + sound report MERGED 1a483a56: LIVE 16:03 (deploy took 13 min). Main CI watcher on 1a483a56.
   Eric to reproduce (reload, slow clicks, then 4-5 spam clicks on boss tiles) and paste the sound report or console __soundLog.
+- ROOT CAUSE of all "sound dies for good" (iPhone + desktop): Timber chitter had 1 NaN sample at 48k/24k (bump: sin dips <0, ** 0.7 = NaN)
+  -> master soften BiquadFilter state bad forever (Chrome console warning). PR #479 claude/sound-nan 9f214f9d (bump clamp in timber+dash,
+  buffer() zeroes non-finite once, new boss-sounds-finite test). Watcher b8igr0pk5. Merge on green, tell Eric.
+  Also seen in Eric's console: sw.js:62 manifest.webmanifest fetch blocked by CF Access redirect (CORS), repeated: look at later.
