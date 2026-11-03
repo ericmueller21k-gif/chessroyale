@@ -1048,12 +1048,12 @@ export const SHOP_HOLLOW_SLED = (() => {
     const R = 9;
     const cu = 56;
     const cv_ = R;
-    if (u >= 0 && u <= cu && v >= 0 && v < 3) return v < 1 ? "3" : "5";
+    if (u >= 0 && u <= cu && v >= 0 && v < 4) return v < 1 ? "3" : v < 2 ? "2" : "6";
     const dr = Math.hypot(u - cu, v - cv_);
-    if (u > cu && dr > R - 3 && dr <= R && v < cv_ + R) return dr > R - 1 ? "3" : "6";
+    if (u > cu && dr > R - 4 && dr <= R && v < cv_ + R) return dr > R - 1 ? "3" : "7";
     if (u > cu - 4 && u <= cu && v > cv_ && v < cv_ + R && dr > R - 3 && dr <= R) return "6";
     // Posts up to the deck.
-    for (const pu of [8, 26, 44]) if (u >= pu && u < pu + 3 && v >= 3 && v < 9) return u < pu + 1 ? "7" : "5";
+    for (const pu of [8, 26, 44]) if (u >= pu && u < pu + 4 && v >= 4 && v < 9) return u < pu + 1 ? "8" : "6";
     // The deck: slats across, lit along their tops.
     if (u >= 1 && u <= 54 && v >= 9 && v < 13) return v >= 12 ? "8" : (Math.floor(u) % 9 === 0 ? "4" : v >= 11 ? "7" : "6");
     // The curled rail at the front.
@@ -1550,7 +1550,7 @@ at("armchair", 2, 6, true);
 at("fire-pit", 3, 6, true);
 at("sled", 12, 5, true);
 at("showpiece", 14, 8, true); // columns 14-16, rows 7-8
-at("lantern", 6, 6, false);
+at("lantern", 9, 5, false);
 at("lantern-b", 11, 8, false);
 at("lantern", 9, 11, false);
 at("lantern-b", 17, 12, false);

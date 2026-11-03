@@ -288,7 +288,7 @@ function layers(p: Pose): Layer[] {
     for (let i = -1; i < 9; i++) if (i !== 4 && i !== 5) put(cv, HC[0] + i, HC[1] - 4 - (i === 1 || i === 7 ? 1 : 0), i % 2 ? "h" : "C");
   });
   // The near ear: long and floppy, hanging down the side of his head behind the eye.
-  add("ear-near", (cv) => limb(cv, [[HC[0] - 4, HC[1] - 5], [HC[0] - 6.5, HC[1] + 2 + p.ear], [HC[0] - 6.5, HC[1] + 10 + p.ear]], 2.8, 3.3, 0, 13));
+  add("ear-near", (cv) => limb(cv, [[HC[0] - 3, HC[1] - 6], [HC[0] - 7, HC[1] + 1 + p.ear], [HC[0] - 7.5, HC[1] + 10 + p.ear]], 1.8, 3.4, 0, 13));
   // The near antler, tied on a little askew, and the red string holding both on: round his brow, a bow at the side.
   add("antler-near", (cv) => antler(cv, [HC[0] + 2, HC[1] - 7], 1, p.tilt));
   add("string", (cv) => {
@@ -389,14 +389,14 @@ const sit: Anim = {
 
 /** Wave: he lifts a front paw and waves it, happy, tongue out, tail going; then puts it down. */
 const WAVE_PAWS: readonly [Pt, Pt][] = [
-  [[45, 48], [48, 50]],
-  [[47, 44], [52, 41]],
-  [[48, 42], [56, 36]],
-  [[48, 43], [54, 34]],
-  [[48, 42], [57, 37]],
-  [[48, 43], [54, 34]],
-  [[48, 42], [57, 37]],
-  [[47, 45], [53, 43]],
+  [[46, 48], [50, 50]],
+  [[49, 46], [54, 45]],
+  [[50, 45], [58, 42]],
+  [[50, 44], [56, 35]],
+  [[50, 45], [58, 42]],
+  [[50, 44], [56, 35]],
+  [[50, 45], [58, 42]],
+  [[48, 47], [53, 47]],
 ];
 const wave: Anim = {
   loop: false,

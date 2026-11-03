@@ -332,6 +332,10 @@ await page.evaluate(
     };
     for (const op of up as any[]) {
       if (op.t === "img") {
+        // As the game does (ShopRoom, SHOP_FEEL.nearFull/nearGone): a piece close to the camera fades out.
+        const near = Math.min(1, (op.depth - 2) / (3 - 2));
+        if (near <= 0) continue;
+        g.globalAlpha = near;
         const im = imgs[op.img]!;
         const fx = op.flip ? im.w - 1 - im.foot[0] : im.foot[0];
         g.save();
@@ -342,6 +346,7 @@ await page.evaluate(
         }
         g.drawImage(canv[op.img]!, 0, 0, im.w * op.s, im.h * op.s);
         g.restore();
+        g.globalAlpha = 1;
       } else if (op.t === "kid") {
         shadow(op.x, op.y, sheet.w * op.s * 0.28);
         g.drawImage(kidImg, 0, 0, sheet.w, sheet.h, op.x - sheet.foot[0] * op.s, op.y - sheet.foot[1] * op.s, sheet.w * op.s, sheet.h * op.s);
