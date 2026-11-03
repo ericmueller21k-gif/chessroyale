@@ -40,7 +40,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   [2026-11-01-rides-v2.md](../decisions/2026-11-01-rides-v2.md)): items in the `ride` slot, one at a time, that your pawn sits on,
   all Mythic, with a color, a purity and shine like every item: **Riding Chirp**, **Moon's Ride**, and (Nov 1) **Hollow's Bulb** (two
   colors: the glass and its glow), **Brush Ride**, **Alfil's Howdah**, **Balloon Pup**, **Big Boy's Buggy**, **Boingo's Pogo**, **Paper
-  Crane**, **Candy Cane Sled**, **Giraffe Gallop**, **Puddles's Mower**, **Sawyer's Dozer**, **Rodeo Bull**, **Cheetah Shoes** (Blitz's:
+  Crane**, **Candy Cane Sled**, **Giraffe Gallop**, **Puddles's Mower**, **Sawyer's Dozer**, **Rodeo Bull**, **Cheetah Shoes** (Dash's, in his crate since Nov 3:
   twice as fast in the town) and **The Log Roller** (Timber's). Their names and lines are the drawings' own. **In no crate yet** (the
   crate comes later): only admins have them, as admin copies (red, emerald second color, 100%: "Admins own one of every item", below).
   **Where the drawings came from:** copied as drawn from `claude/boss-art` (`scripts/boss-art/out/<ride>/<ride>.tsx`; their
@@ -94,9 +94,10 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   - **The token pictures** are the drawings from `claude/boss-art` (`scripts/boss-art/out/token-<name>/`), copied into
     `components/tokens/` (only their import lines changed, and the `!`s the app's typecheck asks for), one chunk loaded the first time a
     token shows (`TokenArt.tsx`: 40 × 40 crisp; `animate` plays its idle, the result box's; a plain gold coin for a boss with none). Every
-    live boss and Timber have one; Blitz's is drawn, waiting for its boss.
-  - **The crates** (`BOSS_CRATES` in core's crates.ts, beside `CRATES` but never in it, so the Crates tab can't open one free; Timber's,
-    Nov 3, listed to admins and whoever holds one while he's in the game for admins first, and not in the FAQ): Babur's
+    live boss, Timber and Dash have one (Dash's is the art's `TOKEN_BLITZ`).
+  - **The crates** (`BOSS_CRATES` in core's crates.ts, beside `CRATES` but never in it, so the Crates tab can't open one free; Timber's and
+    Dash's, Nov 3, listed to admins and whoever holds one while they're in the game for admins first, and not in the FAQ; Dash's ride
+    is Cheetah Shoes): Babur's
     and Puddles', each the boss's ride (the only Mythic, the only item behind Fischer Random: 2%) and the Beta Crate's 24 Common to
     Epic items in its boxes, at the existing crates' odds; rolled on the server as every crate.
   - **Buying** (`POST /api/shop/boss-crate {crate, way}`, `buyBossCrate`): one D1 batch, as the coin shop's: the crate goes into your
