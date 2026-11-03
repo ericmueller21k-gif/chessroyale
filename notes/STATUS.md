@@ -95,3 +95,4 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
   -> master soften BiquadFilter state bad forever (Chrome console warning). PR #479 claude/sound-nan 9f214f9d (bump clamp in timber+dash,
   buffer() zeroes non-finite once, new boss-sounds-finite test). Watcher b8igr0pk5. Merge on green, tell Eric.
   Also seen in Eric's console: sw.js:62 manifest.webmanifest fetch blocked by CF Access redirect (CORS), repeated: look at later.
+- #479 sound NaN fix LIVE c7009d1a (16:35). Eric to retest (reload; fast boss clicks; Timber's house; iPhone).
