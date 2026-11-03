@@ -84,3 +84,6 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
   ON HOLD until Eric sends button ideas (from Gemini): the 4 mode buttons (Join a raid, People only, Raid with bots, Boss alone) get a new
   look, one line each ("Join a raid - up to 50 players", "People only - no bots", "Raid with bots - you and 49 bots", Boss alone: something
   cool like "just you and the king"), a 2x2 grid on phone and computer. Card-shrink branch claude/boss-select-compact ebd6d99d waits too.
+- Eric Nov 3 desktop Chrome sound death (moved/resized window, clicked to Claude app; silent for good). Fix PR #478 claude/audio-desktop 1563b006:
+  devicechange / ctx error / blur>=2s-with-page-visible -> stale -> next tap rebuilds. Watcher bu941o1jq. Merge on green, tell Eric.
+- Boss picker: helper's stills were of the old light "Boss raid" screen (buttons), not the live dark Boss Battle (START). All picker work paused (Eric).
