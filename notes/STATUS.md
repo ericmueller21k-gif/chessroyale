@@ -63,3 +63,4 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Timber intro PR #475 (f9ab5548) opened; CI watcher bu3c7w7bk. Helper left wrangler on 8857/8858 (respawn after fuser -k; not killed: PIDs need Eric's OK).
 - Dash round 1 (the boss: kit, sim, sounds, lines, Tick in battle, admins first) helper started, Opus high, /home/user/cr-dash `claude/boss-dash`,
   brief notes/briefs/brief-dash.md. Round 2: home + sneaker store + Tick town sheet. Round 3: his custom intro.
+- LIVE: #475 Timber intro (3a780c73, main CI watcher bhs116o1u); #474 town audio (488e0fb2, main CI watcher bdyerenbj). Eric to retest audio on iPhone.
