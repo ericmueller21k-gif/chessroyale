@@ -110,7 +110,9 @@ export function PlayScreen({
   useTicks(introLeft, COUNT_FROM_SECONDS, intro);
   const total = allowedMs ?? match.settings.moveClockSeconds * 1000;
   const secsLeft = Math.ceil((deadline - now) / 1000);
-  const ending = !waiting && !intro && deadline > 0 && secsLeft > 0 && secsLeft <= COUNT_FROM_SECONDS;
+  // (Dash's Time Scramble: its own 3-2-1 stands in for the round's end count, ScrambleCount.)
+  const scrambled = match.boss?.id === "dash" && !!match.boss.powers?.dash?.scramble;
+  const ending = !waiting && !intro && deadline > 0 && secsLeft > 0 && secsLeft <= COUNT_FROM_SECONDS && !scrambled;
 
   const hint = match.hint;
   // Power-ups you hold (one in use this move already counts as spent).

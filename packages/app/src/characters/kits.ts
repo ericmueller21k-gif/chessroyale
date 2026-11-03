@@ -865,10 +865,11 @@ export const BOSS_KITS: Record<string, BossKit> = {
       oof: "dashOof",
       flag: "dashFlag",
       slump: "dashSlump",
-      // (Tick's, his tortoise's.)
+      // (Tick's, his tortoise's: his clock's ding, his chew, his plod, his duck into the shell.)
       ding: "dashDing",
       chomp: "dashChomp",
       step: "dashStep",
+      poof: "dashStep",
     },
     lines: DASH_LINES,
     chance: DASH_CHANCE,

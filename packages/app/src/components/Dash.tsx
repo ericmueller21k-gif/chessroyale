@@ -16,7 +16,7 @@ import type { BossUi, Moment, MomentProps, MomentUi } from "./PowerParts.tsx";
  *   took flying from your clock to him ("−30s", or "−6s" off a raid's next move), placed once from the two on the page, then CSS.
  * - **Time Scramble** (`scramble`, after the RAGE warning a turn before): banner TIME SCRAMBLE! ("Your next 5 moves: 3 seconds
  *   each"), his clock tossed and spun. Then on each scrambled move a big 3-2-1 over the board (`ScrambleCount`, Play.tsx: drawn
- *   again only as the second shown changes, never per frame, and never in the way of a tap), its moves left under it.
+ *   again only as the second shown changes, never per frame, and never in the way of a tap), its moves left in Tick's tally.
  * - **His flag** (`flag`, as your turn after it begins): your time ran out, a random move was played for you: his finger gun and
  *   his jab, the dock says what happened.
  * - **Tick**, his tortoise, in the boss bar's prop slot (fixed): asleep on his clock; he wakes with a bob at a slap and rattles
@@ -50,6 +50,7 @@ export const slapText = (ms: number): string => `−${Math.round(ms / 1000)}s`;
  */
 function SlapFlight({ ms, startAt, now }: { ms: number; startAt: number; now: number }) {
   const ref = useRef<HTMLSpanElement>(null);
+  const shown = now >= startAt && now <= startAt + B.slap.flyMs + 200;
   useLayoutEffect(() => {
     const el = ref.current;
     const root = el?.offsetParent as HTMLElement | null;
@@ -68,8 +69,8 @@ function SlapFlight({ ms, startAt, now }: { ms: number; startAt: number; now: nu
     el.style.setProperty("--fy", `${fy}px`);
     el.style.setProperty("--tx", `${tx - fx}px`);
     el.style.setProperty("--ty", `${ty - fy}px`);
-  }, [startAt]);
-  if (now < startAt || now > startAt + B.slap.flyMs + 200) return null;
+  }, [startAt, shown]);
+  if (!shown) return null;
   return (
     <span ref={ref} class="dash-fly" aria-hidden="true">
       {slapText(ms)}
@@ -110,9 +111,10 @@ const MOMENTS: Record<"slap" | "scramble" | "flag", MomentUi> = {
 // ---------------- The countdown over the board ----------------
 
 /**
- * A scrambled move's countdown (Play.tsx, over the board on your move): the seconds left, big (3, 2, 1), and the scramble's
- * moves left under them. Drawn again only as the second shown changes (a timer set for that), never per frame; it takes no
- * taps (the board under it plays as ever) and takes no room (it's over the board).
+ * A scrambled move's countdown (Play.tsx, over the board on your move): the seconds left, big (3, 2, 1), in his orange (the
+ * scramble's moves left are Tick's, in the bar: "3s × 4"). Drawn again only as the second shown changes (a timer set for that),
+ * never per frame; it takes no taps (the board under it plays as ever) and takes no room (it's over the board). It stands in for
+ * the move's usual "Round end" count (Play.tsx).
  */
 export function ScrambleCount({ boss, startsAt, deadline }: { boss: BossView | null | undefined; startsAt: number; deadline: number }) {
   const d = boss?.id === "dash" ? (boss.powers?.dash ?? null) : null;
@@ -136,11 +138,6 @@ export function ScrambleCount({ boss, startsAt, deadline }: { boss: BossView | n
           {secs}
         </div>
       )}
-      <span class="dc-moves" aria-hidden="true">
-        {Array.from({ length: d.scramble.moves }, (_, i) => (
-          <i key={i} class={i < d.scramble!.moves - left ? "done" : i === d.scramble!.moves - left ? "now" : ""} />
-        ))}
-      </span>
     </div>
   );
 }
@@ -160,8 +157,7 @@ function TickStill({ mood }: { mood: string }) {
     }
     g.putImageData(tickImage, 0, 0);
   }, []);
-  // (A new mood starts its CSS animation again on a new key: a slap's bob is keyed by the slap.)
-  return <canvas key={mood} ref={cv} class={`tk-still${mood ? ` tk-${mood.split(":")[0]}` : ""}`} width={sidekickBlitz.w} height={sidekickBlitz.h} />;
+  return <canvas ref={cv} class={`tk-still${mood ? ` tk-${mood.split(":")[0]}` : ""}`} width={sidekickBlitz.w} height={sidekickBlitz.h} />;
 }
 
 /**
@@ -178,7 +174,8 @@ export function TickTally({ boss, moments }: { boss: BossView; moments: () => Mo
   return (
     <span class={`tk-tally${left ? " scrambling" : ""}${d.stolen ? "" : " none"}`} role="group" aria-label={left ? `Time Scramble: ${left} moves left` : `Dash has stolen ${clockShown(d.stolen)}`} data-stolen={d.stolen} data-slaps={d.slaps}>
       <span class="tk-tick" aria-hidden="true">
-        <TickStill mood={mood} />
+        {/* (A new mood starts its CSS animation again on a new key, his still drawn again: a slap's bob is keyed by the slap.) */}
+        <TickStill key={mood} mood={mood} />
       </span>
       <b class="tk-text" aria-hidden="true">
         {left ? `${d.scramble!.seconds}s × ${left}` : `−${clockShown(d.stolen)}`}

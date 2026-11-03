@@ -23285,35 +23285,13 @@ button.sq-tiny {
   background: repeating-linear-gradient(115deg, #0b4a4f 0 6cqw, #d2601a 6cqw 12cqw);
   border-color: #ffb860;
 }
-/* A scrambled move's countdown over the board: the app's big 3-2-1 (.cc-num) in his orange, the last second red; his moves
-   left as five pips at the board's foot. Never in the way of a tap (.center-count). */
+/* A scrambled move's countdown over the board: the app's big 3-2-1 (.cc-num) in his orange, the last second red. Never in the
+   way of a tap (.center-count). */
 .dash-count .dc-n {
   color: #f28a2a;
 }
 .dash-count .dc-n.last {
   color: #ee3b3b;
-}
-.dc-moves {
-  position: absolute;
-  left: 50%;
-  bottom: 6%;
-  display: flex;
-  gap: 1.6cqw;
-  transform: translateX(-50%);
-}
-.dc-moves i {
-  display: block;
-  width: 3.2cqw;
-  height: 3.2cqw;
-  border-radius: 50%;
-  border: 0.5cqw solid #fff;
-  background: rgba(0, 0, 0, 0.5);
-}
-.dc-moves i.done {
-  background: #6b6f78;
-}
-.dc-moves i.now {
-  background: #f28a2a;
 }
 /* His cast by the board's corner, as every boss's: his frame is 105 x 104 (33 columns on his right for his entrance's zip-in),
    drawn at the usual boss's scale (26% of the board for 72 frame px), his feet where every caster's are. */
