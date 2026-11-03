@@ -96,3 +96,6 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
   buffer() zeroes non-finite once, new boss-sounds-finite test). Watcher b8igr0pk5. Merge on green, tell Eric.
   Also seen in Eric's console: sw.js:62 manifest.webmanifest fetch blocked by CF Access redirect (CORS), repeated: look at later.
 - #479 sound NaN fix LIVE c7009d1a (16:35). Eric to retest (reload; fast boss clicks; Timber's house; iPhone).
+- Hollow cave (Eric Nov 3): art round started (Opus high, weekly usage OK'd by Eric), /home/user/cr-hollowart on claude/boss-art,
+  brief notes/briefs/brief-hollow-cave-art.md. Shopkeeper: dark dog WITH antlers (Eric OK); Glim stays town kid. No names/quotes/film refs.
+  Then: code round (cave mask floor, rock walls, dog shopkeeper, crate), later his darkness intro.
