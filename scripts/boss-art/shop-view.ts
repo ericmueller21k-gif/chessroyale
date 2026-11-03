@@ -109,8 +109,20 @@ for (const pl of SHOP_BABUR_LAYOUT) {
 }
 // Stripes behind the counter (row 2, middle), and you.
 // KIDSHEET: another kid stands in where a shop's own kid has no town sheet yet (Timber's Rivet, Nov 3).
+// KIDCHAR (<file>#<export>): or the kid's own drawing, its idle's first frame, where it has no town sheet yet (Hollow's dog, Nov 3).
 const KIDSHEET = process.env.KIDSHEET ?? SHOP;
-const sheet = SIDEKICK_SHEETS[KIDSHEET as keyof typeof SIDEKICK_SHEETS];
+let sheet: { w: number; h: number; foot: readonly [number, number]; top: { idle: number } } = SIDEKICK_SHEETS[KIDSHEET as keyof typeof SIDEKICK_SHEETS];
+let kidPng = "";
+if (process.env.KIDCHAR) {
+  const [file, exp] = process.env.KIDCHAR.split("#") as [string, string];
+  const ch = ((await import(file)) as Record<string, import("../../packages/app/src/characters/sprite.ts").Character>)[exp]!;
+  const im = renderFrame(ch, ch.anims.idle!.frames[0]!);
+  let top = 0;
+  while (top < im.h && ![...Array(im.w).keys()].some((x) => im.data[(top * im.w + x) * 4 + 3]! > 0)) top++;
+  sheet = { w: im.w, h: im.h, foot: ch.foot, top: { idle: top } };
+  const { png } = await import("./render.ts");
+  kidPng = png({ w: im.w, h: im.h, data: im.data }).toString("base64");
+}
 // Beside the counter's east end, a little behind it (behind the counter itself the 58 px counter hides it).
 const [kc, kr] = (process.env.KID ?? (SHOP === "babur" ? "12.6,2.6" : "9.5,2")).split(",").map(Number) as [number, number];
 const kid = P(kc, kr)!;
@@ -120,7 +132,7 @@ const me = P(PC, PR)!;
 up.push({ t: "pawn", x: me.x, y: me.y, k: me.k, depth: me.depth });
 up.sort((a, b) => (b as { depth: number }).depth - (a as { depth: number }).depth);
 
-const kidPng = readFileSync(`packages/app/src/town/sidekicks/${KIDSHEET}.png`).toString("base64");
+if (!kidPng) kidPng = readFileSync(`packages/app/src/town/sidekicks/${KIDSHEET}.png`).toString("base64");
 
 const html = `<html><body style="margin:0;background:#000"><canvas id=c></canvas></body></html>`;
 const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM ?? "/opt/pw-browsers/chromium" });
@@ -128,7 +140,7 @@ const page = await browser.newPage({ viewport: { width: W, height: H }, deviceSc
 await page.setContent(html);
 await page.evaluate("window.__name = (f) => f");
 await page.evaluate(
-  async ({ imgs, floor, up, W, H, DPR, kidPng, sheet, glass, stone, nursery, lodge, store }) => {
+  async ({ imgs, floor, up, W, H, DPR, kidPng, sheet, glass, stone, nursery, lodge, store, cave }) => {
     const cv = document.getElementById("c") as HTMLCanvasElement;
     cv.width = W * DPR;
     cv.height = H * DPR;
@@ -137,7 +149,26 @@ await page.evaluate(
     const g = cv.getContext("2d")!;
     g.scale(DPR, DPR);
     g.imageSmoothingEnabled = false;
-    if (store) {
+    if (cave) {
+      // A cave's roof (mockup only, not drawn art): dark stone fading to black overhead, ridges of rock and stalactites.
+      const sky = g.createLinearGradient(0, 0, 0, H * 0.45);
+      sky.addColorStop(0, "#050408");
+      sky.addColorStop(1, "#1c1a24");
+      g.fillStyle = sky;
+      g.fillRect(0, 0, W, H);
+      g.fillStyle = "#14121a";
+      for (let i = 0; i < 26; i++) {
+        const x = ((i * 97) % 41) / 41 * W;
+        const y = H * (0.04 + ((i * 53) % 37) / 37 * 0.36);
+        const w = 10 + ((i * 31) % 17);
+        g.beginPath();
+        g.moveTo(x - w / 2, y - 30);
+        g.lineTo(x + w / 2, y - 30);
+        g.lineTo(x + 1, y + w * 1.6);
+        g.closePath();
+        g.fill();
+      }
+    } else if (store) {
       // A sneaker store's ceiling (mockup only, not drawn art): white ceiling tiles in a pale grid, square light panels.
       const sky = g.createLinearGradient(0, 0, 0, H * 0.45);
       sky.addColorStop(0, "#c9ced6");
@@ -332,7 +363,7 @@ await page.evaluate(
       }
     }
   },
-  { imgs, floor, up, W, H, DPR, kidPng, sheet, glass: SHOP === "puddles", stone: SHOP === "alfil", nursery: SHOP === "bigboy", lodge: SHOP === "timber", store: SHOP === "blitz" },
+  { imgs, floor, up, W, H, DPR, kidPng, sheet, glass: SHOP === "puddles", stone: SHOP === "alfil", nursery: SHOP === "bigboy", lodge: SHOP === "timber", store: SHOP === "blitz", cave: SHOP === "hollow" },
 );
 await page.locator("#c").screenshot({ path: out });
 await browser.close();
