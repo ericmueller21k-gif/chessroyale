@@ -432,11 +432,11 @@ export const INTRO_HOLLOW_DARK = {
 export const INTRO_HOLLOW_DIMPOOL = {
   west: 0.5,
   lift: 0.9,
-  rx: 4.4,
+  rx: 4.6,
   ry: 2.3,
-  level: 0.66,
+  level: 0.72,
   inner: 0.55,
-  tint: "#b4aee6",
+  tint: "#c2bdf0",
   inMs: 700,
 } as const;
 

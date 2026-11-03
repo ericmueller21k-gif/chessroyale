@@ -325,7 +325,7 @@ function plan(t: number): Plan {
   }
   // The ball's own violet glow (INTRO_HOLLOW_BALL_GLOW), by his move.
   {
-    const bg = IN.INTRO_HOLLOW_BALL_GLOW[h.anim as keyof typeof IN.INTRO_HOLLOW_BALL_GLOW];
+    const bg = (IN.INTRO_HOLLOW_BALL_GLOW as unknown as Record<string, { r: number; a: number } | undefined>)[h.anim];
     if (bg && h.ch === BI) {
       const hh = heartAt(t);
       const pulse = 0.85 + 0.15 * Math.sin(t / 90);
