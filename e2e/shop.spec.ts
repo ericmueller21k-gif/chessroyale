@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { bossCrateOf } from "@chessroyale/core";
-import { asServerAdmin, backdateSoloBattle, bossAloneFromHome, giveItems, test, wearItem } from "./helpers.ts";
+import { asAdmin, asServerAdmin, backdateSoloBattle, bossAloneFromHome, giveItems, test, wearItem } from "./helpers.ts";
 
 /**
  * Inside a shop (Nov 2, round 1; docs/areas/town-square.md, "Inside a shop"), on a phone and a computer: walk up to Babur's
@@ -204,6 +204,63 @@ test("Alfil's Pyramid (Nov 2): Go in, Woolly's crate with Alfil's Howdah; the ch
   await expect(crate).toContainText("3 Alfil tokens, or 1 Alfil token + 1 crate key");
   await expect(crate).toContainText("Alfil's Howdah");
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/alfil-crate-${test.info().project.name}.png` });
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("Timber's Lumber Lodge (Nov 3): in an admin's town only; its card is its name and Go in; Rivet keeps the shop, Timber's Boss Crate with The Log Roller", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  type Hook = { __townBots?: () => { name: string }[] | null; __townGlide?: (to: string | readonly [number, number]) => void };
+  const bots = async () => (await page.evaluate(() => (window as unknown as Hook).__townBots?.() ?? []))!.map((b) => b.name);
+  // A player's town: no lodge on its ground west of the Colosseum (open ground there), no Rivet (Timber is in the game for admins first).
+  await page.goto("/town?sky=day");
+  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await page.evaluate(() => (window as unknown as Hook).__townGlide?.([11, 31]));
+  await page.waitForTimeout(1500);
+  expect(await homeAt(page, "timber")).toBeNull();
+  expect(await bots()).toContain("Glim (bot)");
+  expect(await bots()).not.toContain("Rivet (bot)");
+  // An admin's: the lodge there, Rivet among the bots.
+  await asAdmin(page);
+  await page.reload();
+  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  expect(await bots()).toContain("Rivet (bot)");
+  await page.evaluate(() => (window as unknown as Hook).__townGlide?.("timber"));
+  await expect.poll(() => homeAt(page, "timber"), { message: "the lodge comes into view" }).not.toBeNull();
+  if (SHOTS) {
+    await page.waitForTimeout(1500);
+    await page.screenshot({ path: `${SHOTS}/town-lodge-${test.info().project.name}.png` });
+  }
+  await goIn(page, "timber", "Timber's Lumber Lodge");
+  await expect(room(page)).toHaveAttribute("data-room", "timber");
+  await expect(page.getByRole("heading", { name: "Timber's Lumber Lodge" })).toBeVisible();
+  await expect(page.locator(".town-chat")).toHaveAttribute("data-tone", "day");
+  await expect.poll(() => shopAt(page, "keeper"), { message: "Rivet is drawn" }).not.toBeNull();
+  const at = (await shopAt(page, "keeper"))!;
+  await page.mouse.click(at.x, at.y);
+  const card = page.getByRole("dialog", { name: "Shopkeeper", exact: true });
+  await expect(card).toBeVisible({ timeout: 15_000 });
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/counter-${test.info().project.name}.png` });
+  await card.getByRole("button", { name: "Talk" }).click();
+  const crate = page.getByRole("dialog", { name: "Timber's Boss Crate", exact: true });
+  await expect(crate).toBeVisible();
+  await expect(crate).toContainText("3 Timber tokens, or 1 Timber token + 1 crate key");
+  await expect(crate).toContainText("The Log Roller");
+  if (SHOTS) {
+    // The showpiece: from in front of its dais (columns 15-18, rows 3-4), the carved king standing up whole.
+    await page.keyboard.press("Escape");
+    await expect(crate).toBeHidden();
+    await expect(async () => {
+      const sq = (await shopAt(page, "square", [16, 6]))!;
+      await page.mouse.click(sq.x, sq.y);
+      await expect(room(page)).toHaveAttribute("data-you", "16,6", { timeout: 4000 });
+    }).toPass({ timeout: 20_000 });
+    await page.waitForTimeout(1500);
+    await page.screenshot({ path: `${SHOTS}/showpiece-${test.info().project.name}.png` });
+  }
   await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();

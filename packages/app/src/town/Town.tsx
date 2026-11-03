@@ -1243,6 +1243,8 @@ function startTown(
     if (kind === "light") return testSwitchesAllowed() && r.lightAt(id === "coliseum" ? HOMES.length : HOMES.findIndex((h) => h.id === id), out) ? out : null;
     if (kind === "statue") return testSwitchesAllowed() && r.tapPoint("statue", STATUES.findIndex((s) => s.id === id), out) ? out : null;
     const i = kind === "coliseum" ? HOMES.length : HOMES.findIndex((h) => h.id === id);
+    // (A home not in this town, Timber's in a player's: nowhere.)
+    if (i < 0) return null;
     return testSwitchesAllowed() && r.tapPoint(kind === "boss" ? "boss" : "home", i, out) ? out : null;
   };
   // ... `__townCam()`: the camera now: its zoom (0 in, 1 out), its lens (1: none; more up close), where it looks (the
