@@ -28,9 +28,10 @@ const PASSIVE_EVENTS: Partial<Record<PowerId, PowerEventKind[]>> = {
   balloons: ["place"],
   draft: ["draft"],
   scraps: ["build"],
+  clockslap: ["slap"],
 };
 
-// (A boss in the game for admins first, Timber, is checked too: the test plays as an admin.)
+// (A boss in the game for admins first, Timber and Dash, is checked too: the test plays as an admin.)
 const PLAYABLE = BOSS_ROSTER.filter((b) => isPlayable(b) || adminFirst(b));
 /**
  * A boss whose ultimate needs a position the usual start doesn't give: his own test switch's start instead of his

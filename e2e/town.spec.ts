@@ -1477,7 +1477,7 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   expect(b.fy - b.hy).toBeLessThan(a.fy - a.hy);
   const fullTag = await tagOverHead(page, "you", "");
   expect(fullTag.foot!).toBeCloseTo(fullTag.hy! - 2, 0);
-  // Cheetah Shoes (Nov 1, Blitz's): your step takes half its time (45 ms, youStepMs / RIDES.speed), and its frames are drawn.
+  // Cheetah Shoes (Nov 1, Dash's): your step takes half its time (45 ms, youStepMs / RIDES.speed), and its frames are drawn.
   await wearItem(page, "ride", shoes!);
   await page.goto("/town?sky=day");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");

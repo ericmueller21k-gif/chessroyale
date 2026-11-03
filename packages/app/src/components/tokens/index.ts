@@ -1,6 +1,7 @@
 import type { Character } from "../../characters/sprite.ts";
 import { TOKEN_ALFIL } from "./token-alfil.ts";
 import { TOKEN_BEAVER } from "./token-beaver.ts";
+import { TOKEN_BLITZ } from "./token-blitz.ts";
 import { TOKEN_BIGBOY } from "./token-bigboy.ts";
 import { TOKEN_CLOWN } from "./token-clown.ts";
 import { TOKEN_FOLIO } from "./token-folio.ts";
@@ -17,9 +18,9 @@ import { TOKEN_TIGER } from "./token-tiger.ts";
 
 /**
  * Every boss's token picture, by boss id (core's BOSS_ROSTER): copied as drawn from claude/boss-art
- * (`scripts/boss-art/out/token-<name>/token-<name>.ts`; Ginger's and Blitz's approved Nov 1, the rest drawn Nov 2), only their
+ * (`scripts/boss-art/out/token-<name>/token-<name>.ts`; Ginger's and Dash's approved Nov 1, the rest drawn Nov 2), only their
  * import lines changed. One chunk, loaded when a token is first shown (components/TokenArt.tsx). A boss without one here shows
- * a plain coin. (Blitz's is drawn too, waiting for its boss.)
+ * a plain coin. (Dash's file keeps the art's name, token-blitz: Eric named him Dash on Nov 3, "Blitz" being a time control.)
  */
 export const TOKEN_ART: Readonly<Record<string, Character>> = {
   gingerbread: TOKEN_GINGER,
@@ -37,4 +38,5 @@ export const TOKEN_ART: Readonly<Record<string, Character>> = {
   tiger: TOKEN_TIGER,
   folio: TOKEN_FOLIO,
   timber: TOKEN_BEAVER,
+  dash: TOKEN_BLITZ,
 };

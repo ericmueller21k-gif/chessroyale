@@ -347,6 +347,16 @@
       ],
       "specs": ["e2e/gardener.spec.ts", "e2e/king-attack.spec.ts"]
     },
+    "Dash (dash)": {
+      "paths": [
+        "packages/chess/src/bosses/dash.ts",
+        "packages/app/src/characters/dash*.ts",
+        "packages/app/src/characters/boss-blitz.ts",
+        "packages/app/src/characters/sidekicks/blitz.ts",
+        "packages/app/src/components/Dash.tsx"
+      ],
+      "specs": ["e2e/dash.spec.ts", "e2e/boss-smoke.spec.ts"]
+    },
     "Timber (timber)": {
       "paths": [
         "packages/chess/src/bosses/timber.ts",

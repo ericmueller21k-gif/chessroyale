@@ -25,6 +25,7 @@ import { gardenerSound, type GardenerSound } from "./characters/gardener-sounds.
 import { tigerSound, type TigerSound } from "./characters/tiger-sounds.ts";
 import { folioSound, type FolioSound } from "./characters/folio-sounds.ts";
 import { timberSound, type TimberSound } from "./characters/timber-sounds.ts";
+import { dashSound, type DashSound } from "./characters/dash-sounds.ts";
 import { godKingSound } from "./characters/god-king-sounds.ts";
 import { captureWorkerError } from "./problems.ts";
 import { makeBossSound, type BossSound } from "./characters/boss-sounds.ts";
@@ -420,6 +421,7 @@ const gardenerBoss = (name: GardenerSound) => (t: number) => buffer(gardenerSoun
 const tigerBoss = (name: TigerSound) => (t: number) => buffer(tigerSound(name, ctx!.sampleRate), t);
 const folioBoss = (name: FolioSound) => (t: number) => buffer(folioSound(name, ctx!.sampleRate), t);
 const timberBoss = (name: TimberSound) => (t: number) => buffer(timberSound(name, ctx!.sampleRate), t);
+const dashBoss = (name: DashSound) => (t: number) => buffer(dashSound(name, ctx!.sampleRate), t);
 /** Timber's build sound picks one of these each time (Eric, Nov 2: "interchangeable between the tap, the whack, and the knock"). */
 export const TIMBER_BUILD = ["timberTap", "timberWhack", "timberKnock"] as const satisfies readonly SoundName[];
 /** The God King tapped with no charges left: his soft "can't" (god-king-sounds.ts). */
@@ -925,6 +927,26 @@ export type SoundName =
   | "timberBurp"
   // (His build: a tap, a whack or a knock, one at random each time: Eric, Nov 2.)
   | "timberBuild"
+  // Dash, the cheetah (a raid boss): synthesized, sneakers and a chess clock, see characters/dash-sounds.ts.
+  | "dashZip"
+  | "dashSqueak"
+  | "dashClick"
+  | "dashTick"
+  | "dashTicktock"
+  | "dashSnap"
+  | "dashWhoosh"
+  | "dashSlam"
+  | "dashSteal"
+  | "dashWhirr"
+  | "dashFlag"
+  | "dashYeah"
+  | "dashOof"
+  | "dashYawn"
+  | "dashSlump"
+  | "dashHello"
+  | "dashDing"
+  | "dashChomp"
+  | "dashStep"
   | "kingCant"
   // Squads: a short tick in the last seconds of your free time, and the sting as a squad enters sudden death.
   | "sqTick"
@@ -1199,6 +1221,25 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   timberHup: timberBoss("hup"),
   timberBurp: timberBoss("burp"),
   timberBuild: (t: number) => SOUNDS[TIMBER_BUILD[Math.floor(Math.random() * TIMBER_BUILD.length)]!](t),
+  dashZip: dashBoss("zip"),
+  dashSqueak: dashBoss("squeak"),
+  dashClick: dashBoss("click"),
+  dashTick: dashBoss("tick"),
+  dashTicktock: dashBoss("ticktock"),
+  dashSnap: dashBoss("snap"),
+  dashWhoosh: dashBoss("whoosh"),
+  dashSlam: dashBoss("slam"),
+  dashSteal: dashBoss("steal"),
+  dashWhirr: dashBoss("whirr"),
+  dashFlag: dashBoss("flag"),
+  dashYeah: dashBoss("yeah"),
+  dashOof: dashBoss("oof"),
+  dashYawn: dashBoss("yawn"),
+  dashSlump: dashBoss("slump"),
+  dashHello: dashBoss("hello"),
+  dashDing: dashBoss("ding"),
+  dashChomp: dashBoss("chomp"),
+  dashStep: dashBoss("step"),
   kingCant,
   sqTick: (t) => clockTick(t, 0.22),
   sqSting,
@@ -1424,6 +1465,25 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   timberHup: [["timber", "hup"]],
   timberBurp: [["timber", "burp"]],
   timberBuild: [["timber", "tap"], ["timber", "whack"], ["timber", "knock"]],
+  dashZip: [["dash", "zip"]],
+  dashSqueak: [["dash", "squeak"]],
+  dashClick: [["dash", "click"]],
+  dashTick: [["dash", "tick"]],
+  dashTicktock: [["dash", "ticktock"]],
+  dashSnap: [["dash", "snap"]],
+  dashWhoosh: [["dash", "whoosh"]],
+  dashSlam: [["dash", "slam"]],
+  dashSteal: [["dash", "steal"]],
+  dashWhirr: [["dash", "whirr"]],
+  dashFlag: [["dash", "flag"]],
+  dashYeah: [["dash", "yeah"]],
+  dashOof: [["dash", "oof"]],
+  dashYawn: [["dash", "yawn"]],
+  dashSlump: [["dash", "slump"]],
+  dashHello: [["dash", "hello"]],
+  dashDing: [["dash", "ding"]],
+  dashChomp: [["dash", "chomp"]],
+  dashStep: [["dash", "step"]],
   kingCant: [["godKing", "cant"]],
 };
 /** The sound worker (sound-worker.ts), started with the first warmSounds; null where there's none (or it failed). */

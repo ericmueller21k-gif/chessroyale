@@ -83,6 +83,8 @@ export type Beat =
   | "revision"
   // Timber's: a Gnaw with none of your pawns to eat (his drop is `power`, its landing `cheer` or `bigCheer`; the Gnaw `ultimate`).
   | "gnawNone"
+  // Dash's: your time ran out (a random move played for you), his jab (his Clock Slap is `power`, Time Scramble `ultimate`).
+  | "flag"
   // A boss's attack on a king (its kit's `kingAttack`): the God King in his Last Stand, the crowd's king at its mate.
   | "kingAttack";
 /** The loops it rests in between moments (`ready`: Wrangler's, his meter full). */

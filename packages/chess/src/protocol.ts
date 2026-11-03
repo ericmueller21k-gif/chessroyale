@@ -11,6 +11,7 @@ import type { GardenView, WaterAsk } from "./bosses/gardener.ts";
 import type { BalloonAsk, HoopsAsk, TigerView } from "./bosses/tiger.ts";
 import type { CreaseAsk, FolioView } from "./bosses/folio.ts";
 import type { WorkshopView } from "./bosses/timber.ts";
+import type { DashView } from "./bosses/dash.ts";
 import type { MoveScore } from "./uci.ts";
 /**
  * Messages between the browser and the lobby server (one Durable Object per
@@ -426,6 +427,12 @@ export interface NetBossPowers {
    * gives the scraps landed since), his drops and their cap, his last drop, Gnaw and bonus scraps.
    */
   workshop?: WorkshopView | null;
+  /**
+   * Dash (missing for other bosses and from older servers; an older app ignores it): his last Clock Slap (the ms it took and
+   * whether from the bank), his last flag (the move played for you when your time ran out), their counts, and the Time Scramble
+   * under way (the crowd turn it came, its moves and seconds).
+   */
+  dash?: DashView | null;
   /**
    * The circus tiger (missing for other bosses and from older servers; an older app ignores them): the balloon on his
    * nozzle (`balloon`: its shape as everyone sees it, a fake queen's "q"; its color; when it went on and when it's fully

@@ -23,7 +23,8 @@ import { GARDENER_UI } from "./Gardener.tsx";
 import { TIGER_UI } from "./Tiger.tsx";
 import { FOLIO_UI } from "./Folio.tsx";
 import { TIMBER_UI } from "./Timber.tsx";
-import { PowerBanner, kitLine, ragePct, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
+import { DASH_UI } from "./Dash.tsx";
+import { InPlace, PowerBanner, kitLine, ragePct, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
 import { CRITICAL, NORMAL, bossVoice, type Priority } from "../speech.tsx";
 import { useFrameNow } from "./Countdown.tsx";
 
@@ -50,20 +51,22 @@ export { DARK, DarkCost, HOLLOW_CASTER, hollowCastFrom } from "./Hollow.tsx";
 export { PowerBanner, type Moment } from "./PowerParts.tsx";
 
 /** Every boss with powers on screen, by its BOSS_ROSTER id. */
-const BOSS_UI: ReadonlyMap<string, BossUi> = new Map(([GINGER_UI, BOINGO_UI, GREX_UI, HOLLOW_UI, BIGBOY_UI, SAWYER_UI, PIG_UI, RECLUSE_UI, ALFIL_UI, HOPPER_UI, SMUDGY_UI, MOO_UI, GARDENER_UI, TIGER_UI, FOLIO_UI, TIMBER_UI] as BossUi[]).map((u) => [u.id, u]));
+const BOSS_UI: ReadonlyMap<string, BossUi> = new Map(([GINGER_UI, BOINGO_UI, GREX_UI, HOLLOW_UI, BIGBOY_UI, SAWYER_UI, PIG_UI, RECLUSE_UI, ALFIL_UI, HOPPER_UI, SMUDGY_UI, MOO_UI, GARDENER_UI, TIGER_UI, FOLIO_UI, TIMBER_UI, DASH_UI] as BossUi[]).map((u) => [u.id, u]));
 const bossUi = (boss: Pick<BossView, "id"> | null | undefined): BossUi | null => (boss?.id ? (BOSS_UI.get(boss.id) ?? null) : null);
 
 /** The rage warning, the same for every boss: the meter full, its ultimate coming. */
 export const WARN: MomentUi = {
   order: 1,
   kit: "ultimateWarn",
-  view: ({ boss, t, banner, cast }: MomentProps) => {
+  view: ({ boss, moment, t, banner, cast, anim }: MomentProps) => {
     const ui = bossUi(boss);
     const when = ui?.ultimate.when ?? "Next turn";
+    // (A boss whose moments all play where it stands, Dash: its warning too, never at the board's corner.)
+    const a = ui?.inPlace ? anim() : null;
     return (
-      <div class="power-moment pm-warn">
+      <div class={`power-moment pm-warn${ui?.inPlace ? " pm-stay" : ""}`}>
         {banner("RAGE!", `${when}: ${ui?.ultimate.name ?? "its ultimate"}`, "rage")}
-        {cast("", 0)}
+        {ui?.inPlace ? a && <InPlace runKey={moment.key} anims={[a]} since={moment.at} /> : cast("", 0)}
       </div>
     );
   },
@@ -88,6 +91,7 @@ const MOMENT_UI: Record<PowerEventKind, MomentUi> = {
   ...TIGER_UI.moments,
   ...FOLIO_UI.moments,
   ...TIMBER_UI.moments,
+  ...DASH_UI.moments,
 };
 
 /** The moments that play on a screen of their own, in the order they're looked for. */

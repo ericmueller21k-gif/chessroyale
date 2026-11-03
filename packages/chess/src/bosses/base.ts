@@ -236,7 +236,7 @@ export function rageNow(p: Pick<BossPowerState, "charge" | "lost" | "rageUsed">,
 // ---------------- The real-time meter ----------------
 
 /**
- * The real-time meter, one block for every power that runs on real time (Puddles' seeds, Timber's scraps; Blitz's next):
+ * The real-time meter, one block for every power that runs on real time (Puddles' seeds, Timber's scraps):
  * how many ticks have come by clock time `now` (ms, the battle's clock: Battle.now, the server's online, the page's
  * visible time solo, the sims' own) since `since`, one every `everyMs`, and when the next one comes. A pure function of
  * two numbers, so the server and every device agree with nothing sent as a tick lands, and nothing runs per frame: a
@@ -315,6 +315,18 @@ export interface BossRules {
    * who must all reach phase 2's four boards (Oct 14).
    */
   noStrikes?: boolean;
+  /**
+   * Out of time is never a loss against this boss (Dash, Nov 3: the brief's "never an instant loss on time"): the battle's bank
+   * running out doesn't end it (the runner's bossOutOfTime); a move nobody picked in time gets `outOfTime`'s move instead.
+   */
+  noTimeLoss?: boolean;
+  /**
+   * Nobody picked in time (every pick of the round empty, the God King not playing it): the move played for the crowd instead
+   * of the engine's best (Dash's flag: a random one of the judge's top moves; `allowed`, the moves the crowd may play; `ranked`,
+   * the round's scored moves, best first). Null: the engine's best as ever. The runner marks the round `flag`, and
+   * afterCrowdMove's `judged` says so.
+   */
+  outOfTime?(boss: BossState, fen: string, allowed: readonly string[], ranked: readonly string[]): string | null;
   /** Beaten: the board holds this long for its fall before the result screen, solo and online (the Hidden Boss's collapse). */
   fallMs?: number;
   /**
@@ -494,6 +506,8 @@ export interface JudgedMove {
   played: number;
   /** The God King played it. */
   king?: boolean;
+  /** Nobody picked it in time: the boss's rules played it for the crowd (Dash's flag, BossRules.outOfTime). */
+  flag?: boolean;
 }
 
 /** A board's evaluation as the judge works it out: its best move, that move's expected score, and every move's. */

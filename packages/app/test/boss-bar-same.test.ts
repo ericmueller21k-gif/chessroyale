@@ -16,7 +16,8 @@ import { renderFrame } from "../src/characters/sprite.ts";
  * - a one-shot moment (every frame of every animation) may rise anywhere above the bar, but never off the screen.
  * The e2e spec (e2e/boss-bar-same.spec.ts) measures the real page; this checks every frame, which the page can't.
  */
-const PLAYABLE = BOSS_ROSTER.filter(isPlayable);
+// (Dash, in the game for admins first, too: every moment of his plays where he stands, in this figure, so it must fit as any other's.)
+const PLAYABLE = BOSS_ROSTER.filter((b) => isPlayable(b) || b.id === "dash");
 
 /** The room, in px, from the feet (FEET_X, FEET_Y) on the screen. */
 const FEET_X = 48;

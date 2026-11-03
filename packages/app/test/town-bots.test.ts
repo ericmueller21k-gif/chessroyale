@@ -87,9 +87,10 @@ describe("town square: the bots (Oct 27)", () => {
 
   it("each sidekick's baked sheet is its sprite as drawn (scripts/bake-sidekicks.ts): idle, walk, sit, wave, every pixel", async () => {
     // (Rivet, Timber's woodpecker foreman, baked too since Nov 3: he walks in an admin's town and keeps Timber's shop. His sprite's
-    // id is the art's, "sidekick-beaver".)
+    // id is the art's, "sidekick-beaver". Tick, Dash's tortoise, baked too since Nov 3: blitz.ts, the art's name from before Eric
+    // renamed the cheetah; he walks in the town with Dash's home, round 2.)
     const files = readdirSync(new URL("../src/characters/sidekicks/", import.meta.url)).filter((f) => f.endsWith(".ts"));
-    expect(files).toHaveLength(15);
+    expect(files).toHaveLength(16);
     const artId: Record<string, string> = { timber: "sidekick-beaver" };
     for (const file of files) {
       const name = file.replace(/\.ts$/, "") as keyof typeof SIDEKICK_SHEETS;

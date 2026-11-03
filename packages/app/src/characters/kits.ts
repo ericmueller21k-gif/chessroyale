@@ -32,6 +32,8 @@ import { FOLIO_LINES } from "./folio-lines.ts";
 import { TIMBER_FIGURE as TIMBER } from "./timber-figure.ts";
 import { BOSS_BEAVER_ATTACK as TIMBER_ATTACK } from "./timber.ts";
 import { TIMBER_CHANCE, TIMBER_LINES } from "./timber-lines.ts";
+import { DASH_FIGURE as DASH } from "./dash-figure.ts";
+import { DASH_CHANCE, DASH_LINES } from "./dash-lines.ts";
 import { lineSounds } from "../speech.tsx";
 import type { Stance } from "./stance.ts";
 import { mooPowered } from "./moo-state.ts";
@@ -821,6 +823,57 @@ export const BOSS_KITS: Record<string, BossKit> = {
       hit: chipItem,
       sounds: { swoosh: "timberSwoosh", thump: "timberThump", whack: "timberWhack", knock: "timberKnock", slide: "timberSlide", chitter: "timberChitter", hup: "timberHup" },
     },
+  },
+  // Dash, the cheetah (Eric's design and art approved Nov 1, his name Nov 3): docs/decisions/2026-11-03-dash.md. His art is the
+  // art branch's boss-blitz, as drawn (characters/boss-blitz.ts). His sounds are his own: sneakers and a chess clock
+  // (characters/dash-sounds.ts); Tick's ding, chomp and step too.
+  "Dash": {
+    ch: DASH,
+    anims: {
+      // (His periodic strike on a piece in a raid: his capture's double fist pump.)
+      strike: "capture",
+      // Clock Slap: the paw high, the slam, a gold clock face zipping from his clock to his chest (your time, stolen).
+      power: "clockSlap",
+      // Time Scramble's warning: the clock held up, its face tapped twice (its last frame held); the scramble: the clock tossed,
+      // spun in a blur, caught and slammed.
+      ultimateWarn: "scrambleWarn",
+      ultimate: "timeScramble",
+      // Your time ran out (a move played for you): his finger gun.
+      cheer: "check",
+    },
+    sounds: {
+      // (His entrance: the zip in, the sneakers' skid, the clock's click.)
+      zip: "dashZip",
+      skid: "dashSqueak",
+      click: "dashClick",
+      // (Waiting on you: the clock's ticks and his yawn. He never thinks.)
+      tick: "dashTick",
+      yawn: "dashYawn",
+      snap: "dashSnap",
+      point: "dashSnap",
+      yes: "dashYeah",
+      "ta-da": "dashYeah",
+      cheer: "dashYeah",
+      windup: "dashWhoosh",
+      whoosh: "dashWhoosh",
+      slam: "dashSlam",
+      // (Your time zipping into his chest.)
+      steal: "dashSteal",
+      warn: "dashTicktock",
+      tap: "dashTick",
+      whirr: "dashWhirr",
+      oof: "dashOof",
+      flag: "dashFlag",
+      slump: "dashSlump",
+      // (Tick's, his tortoise's: his clock's ding, his chew, his plod, his duck into the shell.)
+      ding: "dashDing",
+      chomp: "dashChomp",
+      step: "dashStep",
+      poof: "dashStep",
+    },
+    lines: DASH_LINES,
+    chance: DASH_CHANCE,
+    portrait: { x: 18, y: 10, w: 38, h: 34, anim: "idle", frame: 0 },
   },
   "Hidden Boss": {
     ch: RECLUSE,

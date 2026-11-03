@@ -163,7 +163,7 @@ export const ITEM_DEFS: readonly ItemDef[] = [
   { id: "puddles-mower", name: "Puddles's Mower", tier: "mythic", slot: "ride", description: "Top speed: a brisk stroll. Puddles insists that's plenty for the lawn and for the war." },
   { id: "sawyer-dozer", name: "Sawyer's Dozer", tier: "mythic", slot: "ride", description: "Pushes dirt, pushes luck, never pushes the brake. Hard hat not included." },
   { id: "rodeo-bull", name: "Rodeo Bull", tier: "mythic", slot: "ride", description: "Eight seconds is the record. He's never once let anyone off early." },
-  { id: "cheetah-shoes", name: "Cheetah Shoes", tier: "mythic", slot: "ride", description: "Spotted, laced and twice as fast. Blitz says the spots are just for show; the speed is not." },
+  { id: "cheetah-shoes", name: "Cheetah Shoes", tier: "mythic", slot: "ride", description: "Spotted, laced and twice as fast. Dash says the spots are just for show; the speed is not." },
   { id: "log-roller", name: "The Log Roller", tier: "mythic", slot: "ride", description: "Timber's favorite commute. Keep your feet moving and never, ever look down." },
 ];
 

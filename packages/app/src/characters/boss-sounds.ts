@@ -16,6 +16,7 @@ import { smudgySound } from "./smudgy-sounds.ts";
 import { tigerSound } from "./tiger-sounds.ts";
 import { folioSound } from "./folio-sounds.ts";
 import { timberSound } from "./timber-sounds.ts";
+import { dashSound } from "./dash-sounds.ts";
 
 /**
  * The bosses' synthesized sounds by module, each name its cache's (synth.ts, soundCache): one table for the page and
@@ -42,6 +43,7 @@ const MAKERS = {
   tiger: tigerSound,
   folio: folioSound,
   timber: timberSound,
+  dash: dashSound,
 } as const;
 
 /** One boss sound: its module and its name there. */
