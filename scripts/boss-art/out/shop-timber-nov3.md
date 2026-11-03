@@ -56,3 +56,9 @@ every piece's size and where it stands). **Timber so far: $6.76** (the house $1.
 - The floor planks' end joints fall into a fairly regular brick pattern.
 - The showpiece is 4 x 2 squares, so the mallet's swing fits.
 - The stove and a third side-wall version were the artist's extras.
+
+## Fix (Nov 3): the start marks lined up with the emblem
+Eric saw the two marks sat higher than the emblem. The drawing placed each mark's middle at row `10.5 * 37` px, the
+middle of row 10, instead of `11 * 37`, the line between rows 10 and 11 where the emblem's middle is. That put the
+marks half a square (18.5 px) too high. Eric OK'd fixing it by hand: one line in `markAt`, nothing redrawn.
+`SHOP_TIMBER_MARKS` was already right. The fix: [circle-marks-fixed.png](house-shop-timber/circle-marks-fixed.png).

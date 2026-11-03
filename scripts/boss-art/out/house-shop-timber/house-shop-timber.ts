@@ -292,7 +292,7 @@ const PAWN_ICON = ["...III...", "..IIIII..", "..IIIII..", "...III...", "..IIIII.
 function markAt(gx: number, gy: number): Key {
   for (const [who, [mc, mr]] of Object.entries(MARKS)) {
     const mx = (mc + 0.5) * T;
-    const my = mr * T;
+    const my = (mr + 0.5) * T; // the row 10.5 is the line between rows 10 and 11 (fixed by hand, Eric OK, Nov 3)
     const X = gx + 0.5 - mx;
     const Y = gy + 0.5 - my;
     const d = Math.hypot(X, Y);
