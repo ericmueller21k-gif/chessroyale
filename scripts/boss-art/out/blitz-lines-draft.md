@@ -1,6 +1,6 @@
-# Blitz's lines: a first draft (Nov 3)
+# Dash's lines: a first draft (Nov 3)
 
-Eric: Blitz is a silly try-hard who uses young people's slang ("yo, this game is chopped, bro", "broski", "fam",
+Eric: Dash is a silly try-hard who uses young people's slang ("yo, this game is chopped, bro", "broski", "fam",
 "cuz"). He's always eyeing your shoes, trying to buy them off you, asking where you got them, or just selling you shoes.
 Eric "will expand on this concept later". A draft for whoever writes his lines (`characters/<boss>-lines.ts`):
 

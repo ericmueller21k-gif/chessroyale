@@ -1,4 +1,4 @@
-# Blitz's home on the town square: Blitz's Kicks (Nov 3)
+# Dash's home on the town square: Dash's Kicks (Nov 3)
 
 Eric's design (relayed by the director): "a straight up sneaker store ... the outside can do the neon lighting, no chess
 clocks needed, it's funnier that way." Brief: `scripts/boss-art/briefs/blitz-house-and-shop.md`. Drawing:
@@ -9,7 +9,7 @@ clocks needed, it's funnier that way." Brief: `scripts/boss-art/briefs/blitz-hou
 and format the runner makes.
 
 ## The home
-![Blitz's Kicks beside the circus tent and the lumber lodge](house-blitz/house-blitz-in-town.png)
+![Dash's Kicks beside the circus tent and the lumber lodge](house-blitz/house-blitz-in-town.png)
 
 - **The shop:** a flat-roofed little store of charcoal painted brick on a concrete plinth, the roof deck showing over its
   parapet, an air-conditioning box on the roof.
@@ -35,8 +35,10 @@ and format the runner makes.
 - `HOUSE_BLITZ_POOLS`: warm light before the window and door, and a faint teal wash along the front.
 
 ## Calls Eric may want to change
-- **The name:** the picture is named "Blitz's Kicks". The game writes the home's name, so this is the wiring helper's
+- **The name:** the picture is named "Dash's Kicks". The game writes the home's name, so this is the wiring helper's
   (or Eric's) to set.
 - **A dark front:** charcoal brick makes the neon pop at night; by day it's the darkest home on the square.
 - **The hanging pair** hangs from a wire to a street pole on its right, the square's only pole.
 - **The sign** is white in a teal frame, not the cream wood of the older homes.
+
+(Eric renamed the cheetah from Blitz to Dash on Nov 3: Blitz is already a kind of chess. File and export ids keep `blitz`.)

@@ -1,4 +1,4 @@
-# Blitz's shop: inside Blitz's Kicks (Nov 3)
+# Dash's shop: inside Dash's Kicks (Nov 3)
 
 Eric's design (relayed by the director): "Just a straight up sneaker store, wall to wall with sneakers on display, also
 some rows/racks with shoes / shoe boxes, a halfpipe, a big pallet of energy drink cases called Cheetah Chug ... no chess
@@ -22,7 +22,7 @@ exports and format the runner makes.
   orange neon sneaker from the roof outside.
 - **Counter (4 x 1):** glossy white with a teal and an orange stripe and a black top, **30 px tall**, so the kid shows
   over it. A register, a sneaker on a clear riser, two shoe boxes, and a blank plaque in a teal frame.
-- **Crate:** Blitz's Boss Crate, a big orange shoe box with a teal lid, a cream paw print and a white stripe, a
+- **Crate:** Dash's Boss Crate, a big orange shoe box with a teal lid, a cream paw print and a white stripe, a
   cheetah-spotted ribbon in a bow on top. Idle: a glint runs along the lid and winks on the bow (6 frames, 220 ms).
 - **Racks and rows:** chrome racks of twelve sneakers (two colorway sets: `rack`, `rack-b`), tall stacks of orange shoe
   boxes (one teal lid, one black box), low white shelves of boxes end-on (`box-row`).
@@ -73,7 +73,7 @@ exports and format the runner makes.
 
 ## Views (mockup; the ceiling and the kid are the mockup's, not the art)
 - [view-close-at-counter.png](house-shop-blitz/view-close-at-counter.png): **the Shopkeeper here is a stand-in** (the
-  bunny kid). Blitz's tortoise has no town sheet yet.
+  bunny kid). Dash's tortoise has no town sheet yet.
 - [view-close-in-circle.png](house-shop-blitz/view-close-in-circle.png),
   [view-inside-circle.png](house-shop-blitz/view-inside-circle.png) (the town zoom).
 - `shop-view.ts` now draws a store ceiling for `SHOP=blitz`: pale ceiling tiles and square light panels.
@@ -89,10 +89,12 @@ exports and format the runner makes.
   panes are placed unflipped (left, middle, right) so the view reads the same way on both sides.
 - Lights: the backdrop's neon sneaker (orange, a 36 px halo, and its teal), the teal fascia tube on the backdrop and the
   back wall's pieces, the cubbies' and shelves' light strips, the fridges' glass, the pedestals' cases.
-- **Blitz's tortoise** (`sidekick-blitz`) needs a town sheet before it can stand behind the counter.
+- **Dash's tortoise** (`sidekick-blitz`) needs a town sheet before it can stand behind the counter.
 
 ## Calls Eric may want to change
 - The halfpipe is the showpiece, not a separate piece beside another animated one.
 - The lane is a teal running lane (with a start line at the door) rather than a rug.
 - The windows look out on a skate park with the city behind it, rather than a street.
 - Two fridges, two pedestals and two benches were my extras, to fill the room's sides without crowding the paths.
+
+(Eric renamed the cheetah from Blitz to Dash on Nov 3: Blitz is already a kind of chess. File and export ids keep `blitz`.)
