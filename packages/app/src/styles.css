@@ -9634,13 +9634,13 @@ button.fd-logo {
 }
 .bs-tiles {
   /* (A row of n tiles with a gap between them is n wide, less n - 1 slants, plus n - 1 gaps; the slant is a fifth of a tile's
-     width and a tile is 1.24 as tall as wide, which makes its visible width 1 to 1.55 of its height. --bs-w: a tile's width in a
-     full row, at most 96 px. cqi: the block's own width.) */
+     width and a tile is 1.08 as tall as wide (Eric, Nov 3: slimmer; TILE_RATIO in boss-select.ts), so its visible width is
+     0.74 of its height. --bs-w: a tile's width in a full row, at most 96 px. cqi: the block's own width.) */
   --bs-per: 5;
   --bs-gap: 5px;
   --bs-w: min(calc((100cqi - (var(--bs-per) - 1) * var(--bs-gap)) / (var(--bs-per) - 0.2 * (var(--bs-per) - 1))), 96px);
   --bs-slant: calc(var(--bs-w) * 0.2);
-  --bs-h: calc(var(--bs-w) * 1.24);
+  --bs-h: calc(var(--bs-w) * 1.08);
   container-type: inline-size;
   display: flex;
   flex-direction: column;

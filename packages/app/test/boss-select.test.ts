@@ -99,7 +99,8 @@ describe("the boss select", () => {
       const { img, ink, tile, fit } = framed(b);
       expect(fit, b.id).toBeDefined();
       expect(fit.at, b.id).toBeGreaterThan(0.3);
-      expect(fit.at, b.id).toBeLessThan(0.7);
+      // (0.8, not 0.7: the tiles are shorter now (TILE_RATIO 1.08), so each neck is set lower on the tile at the same height, Pig's most.)
+      expect(fit.at, b.id).toBeLessThan(0.8);
       // (The tile is TILE_RATIO tall at most: a short screen has it shorter, never taller.) No bare strip down either side.
       expect(tile.left, `${b.id}: the left edge of its frame`).toBeGreaterThanOrEqual(0);
       expect(tile.right, `${b.id}: the right edge of its frame`).toBeLessThanOrEqual(img.w);
