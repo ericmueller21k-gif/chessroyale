@@ -224,26 +224,71 @@ function rebuildAudio() {
   rebuiltListeners.forEach((l) => l());
 }
 
+// ---- Dying while the page stays (Eric, Nov 3, Safari on his iPhone, no switching away: he tapped Timber in the town, who
+// chittered, closed his card, tapped Alfil: silence, and the fight after had none either; the sound "never came back"). iOS can
+// stop the audio with the page on screen (its media process restarting, memory, another sound taking over): the context says
+// "interrupted" or "suspended" and a tap's resume() waits for ever, or it says "running" with its clock stopped. Only coming
+// back to the page was checked; now every tap is. ----
+/** The last tap that found the context running: when (ms, the tap's own time stamp) and its clock then (s). Null: not since made. */
+let seen: { at: number; t: number } | null = null;
 /**
- * Every tap and key (main.tsx, before the page's own handlers see it): switches sound on (`unlockAudio`) until it's on, and the
- * first after the page came back (`audioReturned`) makes a new context if the old one didn't come back.
+ * The clock check judges taps this far apart (s): closer, too soon to tell; further apart is judged by the page coming back
+ * instead. Times are the taps' own event time stamps (the device's clock; a test's fake clock doesn't move them).
  */
-export function wakeAudio() {
+const SEEN_MIN_S = 1;
+const SEEN_MAX_S = 60;
+/** At most one rebuild this often (ms) while the page stays: iOS mid phone call interrupts each new one too. */
+const REBUILD_GAP_MS = 2000;
+let rebuiltAt = -Infinity;
+
+/** `rebuildAudio` from a tap; what the old context's clock said is forgotten. */
+function rebuildInTap() {
+  rebuiltAt = nowMs();
+  seen = null;
+  rebuildAudio();
+  (globalThis as { __soundLog?: string[] }).__soundLog?.push("audio:rebuilt");
+}
+
+/**
+ * Every tap and key (main.tsx, before the page's own handlers see it): switches sound on (`unlockAudio`) until it's on, and checks
+ * that sound that was on still is: on the first tap after the page came back (`audioReturned`), and on every tap while it stays
+ * (`checkStillOn`). Dead, a new context is made inside that tap, and the tap's own sound plays on it.
+ */
+export function wakeAudio(e?: Event) {
   const b = back;
   const c = ctx;
+  const tapAt = e && e.timeStamp > 0 ? e.timeStamp : nowMs();
   if (b && c) {
     const waited = (nowMs() - b.at) / 1000;
     if (c.state !== "running") {
       back = null;
-      rebuildAudio();
+      rebuildInTap();
     } else if (b.t < 0 || waited >= STALL_CHECK_S) {
       // Running: resumed on the way back (fine), or running all along: its clock must have moved meanwhile.
       back = null;
-      if (b.t >= 0 && c.currentTime - b.t < waited / 4) rebuildAudio();
+      if (b.t >= 0 && c.currentTime - b.t < waited / 4) rebuildInTap();
+      else seen = { at: tapAt, t: c.currentTime };
     }
     // (Running, and too soon to tell whether its clock moves: the next tap checks.)
-  }
+  } else if (c && loading && !pageHidden()) checkStillOn(c, tapAt);
   if (!audioUnlocked()) unlockAudio();
+}
+
+/** A tap while the page stayed: a context seen running that isn't now, or whose clock stood still since, is made again. */
+function checkStillOn(c: AudioContext, tapAt: number) {
+  const s = seen;
+  if (c.state === "running") {
+    const apart = s ? (tapAt - s.at) / 1000 : 0;
+    if (s && apart >= SEEN_MIN_S && apart <= SEEN_MAX_S && c.currentTime - s.t < apart / 4 && nowMs() - rebuiltAt >= REBUILD_GAP_MS) {
+      rebuildInTap();
+      return;
+    }
+    if (!s || apart >= SEEN_MIN_S) seen = { at: tapAt, t: c.currentTime };
+    return;
+  }
+  // Not running. Never seen running (sound isn't on yet: the tap switches it on below), or a new one waking inside its tap: wait.
+  if (!s || nowMs() < wakingUntil || nowMs() - rebuiltAt < REBUILD_GAP_MS) return;
+  rebuildInTap();
 }
 
 /** Sound is on and its samples are loading or loaded: a tap has nothing more to do. */
