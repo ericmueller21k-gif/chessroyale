@@ -61,7 +61,11 @@ nothing new when it's 0).
   log lying there as you walk in, his line on the marks (bubble only, not the chat), the walk west (facing west), the heave (the lying
   log gone), the carry, the gnaw (the log gnawed), the fog, the stumps at your sides, the dusting off, his attack from his place, the
   sweep (`canvas.boss-storm`, `data-boss="timber"`) covering, the battle under it, Leave back to where you stood; never the lying log
-  after the heave, never a stump before the fog; no page errors. Passed on the phone and the computer locally.
+  after the heave, never a stump before the fog; no page errors. Passed on the phone locally (before the last two changes: the log
+  moved 0.3 square further west and the fog's faster build, whose pixels are identical); the computer project and a rerun were
+  blocked by the shared e2e lock for over an hour, so CI's run is the first on the computer. The current build was also played end to
+  end on a phone (390 x 844) and a computer (1280 x 800) by the scripts that made the GIF and stills: every step in order, no page
+  errors.
 - Also run: `boss-kits.test.ts`, `packages/chess/test/boss-kit.test.ts`, `town-timber.test.ts`, `shop-room.test.ts`,
   `timber-sounds.test.ts`; `npm run typecheck`.
 
