@@ -72,3 +72,5 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - #476 check red on 4574a2d2: town-bots wants every sidekick file baked (main's #472). Fixed 3b2fe161: Tick sidekick-blitz.ts -> blitz.ts,
   baked; node_modules symlink (committed by my audio fix 0eef6e1d) removed, .gitignore `node_modules`. Watcher bu7z583lx. PR comment posted.
   Worktree node_modules: never symlink to /home/user/chessroyale (resolves @chessroyale/* to main's source); use npm ci.
+- #476 Dash round 1 MERGED 9dc41d67 (green, full e2e). Deploy+main CI watcher byku2wtme. Tell Eric live when deployed.
+- Dash round 2 helper started (Opus high), /home/user/cr-dashhome `claude/dash-home`, brief notes/briefs/brief-dash-home.md.
