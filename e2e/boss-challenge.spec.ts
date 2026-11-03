@@ -304,14 +304,15 @@ test("challenging Hollow in the town: his own intro (in to your seats, his line,
   await page.goto("/town?sky=night");
   await expect(town(page)).toHaveAttribute("data-ready", "1");
   const { confirm, stood } = await toConfirm(page, "hollow", "Hollow");
-  // (The phone's GIF at real timing: every frame from the Fight tap to the board, each with its ms since the tap.)
+  // (The phone's GIF at real timing: every frame from the Fight tap to the board, each with its ms since the tap; JPEGs, the quickest
+  // to take, so the most frames.)
   const frames: { at: number; png: Buffer }[] = [];
   let grabbing = !!SHOTS && project === "phone";
   const fightAt = Date.now();
   await confirm.getByRole("button", { name: "Fight" }).click();
   const grabbed = (async () => {
     while (grabbing) {
-      const png = await page.screenshot({ scale: "css" });
+      const png = await page.screenshot({ scale: "css", type: "jpeg", quality: 85 });
       frames.push({ at: Date.now() - fightAt, png });
     }
   })();
@@ -377,7 +378,7 @@ test("challenging Hollow in the town: his own intro (in to your seats, his line,
   await expect(page.locator("canvas.boss-dark")).toHaveCount(0, { timeout: 10_000 });
   grabbing = false;
   await grabbed;
-  for (const [i, f] of frames.entries()) writeFileSync(`${SHOTS}/hollow-gif-${String(i).padStart(3, "0")}-${String(f.at).padStart(6, "0")}.png`, f.png);
+  for (const [i, f] of frames.entries()) writeFileSync(`${SHOTS}/hollow-gif-${String(i).padStart(3, "0")}-${String(f.at).padStart(6, "0")}.jpg`, f.png);
   // The gear's Leave (or Resign, as the battle offers): back in the town square where you stood.
   await page.getByRole("button", { name: "Match options" }).click();
   const quit = page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: /^(Leave|Resign)$/ });
