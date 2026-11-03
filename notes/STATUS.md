@@ -74,3 +74,6 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
   Worktree node_modules: never symlink to /home/user/chessroyale (resolves @chessroyale/* to main's source); use npm ci.
 - #476 Dash round 1 MERGED 9dc41d67 (green, full e2e). Deploy+main CI watcher byku2wtme. Tell Eric live when deployed.
 - Dash round 2 helper started (Opus high), /home/user/cr-dashhome `claude/dash-home`, brief notes/briefs/brief-dash-home.md.
+- Eric (Nov 3): too many messages; write only when done or his call. Audio: told him fix live, needs his iPhone retest.
+- PR #477 Dash home opened (full-e2e, unsubscribed), head 23854b74, watcher b9gvbyz3x. Desktop counter/halfpipe stills predate panel fix.
+  e2e lock /tmp/claude-0/e2e.lock held by helper's leftover wrangler (8823/9347) since ~13:22: stopping it needs Eric's OK (helper was denied).
