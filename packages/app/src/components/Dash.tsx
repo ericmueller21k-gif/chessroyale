@@ -3,7 +3,7 @@ import { createPortal } from "preact/compat";
 import { DASH_ANIM, scrambleLeft, type DashView } from "@chessroyale/chess";
 import { pickLine } from "../characters/boss-beats.ts";
 import { renderFrame } from "../characters/sprite.ts";
-import { sidekickBlitz } from "../characters/sidekicks/sidekick-blitz.ts";
+import { sidekickBlitz } from "../characters/sidekicks/blitz.ts";
 import { clockShown } from "../clock-text.ts";
 import { BOSS_POWERS } from "@chessroyale/core";
 import type { BossView } from "../game.ts";

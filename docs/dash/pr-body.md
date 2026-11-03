@@ -24,7 +24,7 @@ else changes; his FAQ block is written and shows once he's playable).
   `.cc-num` count in his orange, standing in for the move's "Round end" count), his flag's moment, **Tick** in the boss bar's prop
   slot with the time stolen or the scramble's moves left. Nothing new takes room; nothing moves.
 - **Art** from `claude/boss-art`, copied as drawn with a source line each, keeping the art's names: `characters/boss-blitz.ts`
-  (`BOSS_BLITZ`; its figure's name "Dash", its battle intro left out until round 3), `characters/sidekicks/sidekick-blitz.ts`
+  (`BOSS_BLITZ`; its figure's name "Dash", its battle intro left out until round 3), `characters/sidekicks/blitz.ts`
   (`sidekickBlitz`, named "Tick"), `components/tokens/token-blitz.ts` (`TOKEN_BLITZ`, wired as Timber's: `TOKEN_ART.dash`). His
   figure in a frame 33 px wider on the right (`dash-figure.ts`: the zip-in starts past the art's frame on purpose).
 - **Sounds** (`characters/dash-sounds.ts`, 19, synthesized): sneaker squeaks, his zip-in, a snap, whooshes, the clock's click, tick,

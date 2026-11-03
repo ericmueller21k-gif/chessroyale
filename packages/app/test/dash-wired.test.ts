@@ -6,7 +6,7 @@ import { BOSS_BLITZ } from "../src/characters/boss-blitz.ts";
 import { DASH_FIGURE, DASH_ROOM } from "../src/characters/dash-figure.ts";
 import { DASH_CHANCE, DASH_LINES } from "../src/characters/dash-lines.ts";
 import { DASH_SOUNDS, dashSound, type DashSound } from "../src/characters/dash-sounds.ts";
-import { sidekickBlitz } from "../src/characters/sidekicks/sidekick-blitz.ts";
+import { sidekickBlitz } from "../src/characters/sidekicks/blitz.ts";
 import { SELECT_LINES, SELECT_SOUND } from "../src/characters/boss-select.ts";
 import { MOVE_MEAN_DB, MOVE_PEAK } from "../src/characters/synth.ts";
 import { TOKEN_ART } from "../src/components/tokens/index.ts";
