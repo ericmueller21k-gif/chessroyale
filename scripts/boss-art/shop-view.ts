@@ -66,7 +66,7 @@ for (const pl of SHOP_BABUR_LAYOUT) {
   const wsq = pl.w ?? 1;
   const dsq = (pl as { d?: number }).d ?? 1;
   // Deep pieces drawn as a plan (a pond, a fountain basin) lie flat; a deep but upright one (the toy plane over its loop) stands.
-  if (dsq > 1 && !/airplane/.test(pl.name)) {
+  if (dsq > 1 && !/airplane|showpiece/.test(pl.name)) {
     // A deep piece drawn as a plan (the big pond garden: 5 x 8 squares seen from above): its plan lies flat on its squares,
     // cut into one tile a square, and the strip above its north row (the tall plants' tops) stands up there.
     const rise = im.h - dsq * SQ;
@@ -108,7 +108,9 @@ for (const pl of SHOP_BABUR_LAYOUT) {
   up.push({ t: "img", img: pl.name, x: p.x + ox * s, y: p.y + oy * s, s, flip: !!pl.flip, depth: p.depth + (pl.name === "crate" ? -0.01 : 0) });
 }
 // Stripes behind the counter (row 2, middle), and you.
-const sheet = SIDEKICK_SHEETS[SHOP as keyof typeof SIDEKICK_SHEETS];
+// KIDSHEET: another kid stands in where a shop's own kid has no town sheet yet (Timber's Rivet, Nov 3).
+const KIDSHEET = process.env.KIDSHEET ?? SHOP;
+const sheet = SIDEKICK_SHEETS[KIDSHEET as keyof typeof SIDEKICK_SHEETS];
 // Beside the counter's east end, a little behind it (behind the counter itself the 58 px counter hides it).
 const [kc, kr] = (process.env.KID ?? (SHOP === "babur" ? "12.6,2.6" : "9.5,2")).split(",").map(Number) as [number, number];
 const kid = P(kc, kr)!;
@@ -118,7 +120,7 @@ const me = P(PC, PR)!;
 up.push({ t: "pawn", x: me.x, y: me.y, k: me.k, depth: me.depth });
 up.sort((a, b) => (b as { depth: number }).depth - (a as { depth: number }).depth);
 
-const kidPng = readFileSync(`packages/app/src/town/sidekicks/${SHOP}.png`).toString("base64");
+const kidPng = readFileSync(`packages/app/src/town/sidekicks/${KIDSHEET}.png`).toString("base64");
 
 const html = `<html><body style="margin:0;background:#000"><canvas id=c></canvas></body></html>`;
 const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM ?? "/opt/pw-browsers/chromium" });
@@ -126,7 +128,7 @@ const page = await browser.newPage({ viewport: { width: W, height: H }, deviceSc
 await page.setContent(html);
 await page.evaluate("window.__name = (f) => f");
 await page.evaluate(
-  async ({ imgs, floor, up, W, H, DPR, kidPng, sheet, glass, stone, nursery }) => {
+  async ({ imgs, floor, up, W, H, DPR, kidPng, sheet, glass, stone, nursery, lodge }) => {
     const cv = document.getElementById("c") as HTMLCanvasElement;
     cv.width = W * DPR;
     cv.height = H * DPR;
@@ -135,7 +137,22 @@ await page.evaluate(
     const g = cv.getContext("2d")!;
     g.scale(DPR, DPR);
     g.imageSmoothingEnabled = false;
-    if (nursery) {
+    if (lodge) {
+      // A lodge's ceiling (mockup only, not drawn art): dark planks between heavy beams.
+      const sky = g.createLinearGradient(0, 0, 0, H * 0.45);
+      sky.addColorStop(0, "#2e1d10");
+      sky.addColorStop(1, "#6b4526");
+      g.fillStyle = sky;
+      g.fillRect(0, 0, W, H);
+      g.strokeStyle = "#1c120a";
+      g.lineWidth = 7;
+      for (let i = -12; i <= 12; i++) {
+        g.beginPath();
+        g.moveTo(W / 2 + i * W * 0.05, -H * 0.5);
+        g.lineTo(W / 2 + i * W * 0.18, H * 0.45);
+        g.stroke();
+      }
+    } else if (nursery) {
       // A nursery ceiling (mockup only, not drawn art): soft sky blue with pale clouds and little stars.
       const sky = g.createLinearGradient(0, 0, 0, H * 0.45);
       sky.addColorStop(0, "#7fb4e8");
@@ -297,7 +314,7 @@ await page.evaluate(
       }
     }
   },
-  { imgs, floor, up, W, H, DPR, kidPng, sheet, glass: SHOP === "puddles", stone: SHOP === "alfil", nursery: SHOP === "bigboy" },
+  { imgs, floor, up, W, H, DPR, kidPng, sheet, glass: SHOP === "puddles", stone: SHOP === "alfil", nursery: SHOP === "bigboy", lodge: SHOP === "timber" },
 );
 await page.locator("#c").screenshot({ path: out });
 await browser.close();
