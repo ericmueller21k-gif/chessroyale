@@ -46,8 +46,8 @@ export interface BossIntro {
 /**
  * The bosses with an intro: every boss whose home has an inside (shops/shops.ts SHOPS; Nov 2, round 2: "for other bosses they should
  * just be swinging for a few seconds like discussed"). Alfil has his own (his pyramid and sandstorm), Big Boy his (his toy blocks
- * and lollipop swirl, Nov 2), Timber his (Nov 3: his log, gnawed into the table, and his sawdust sweep); Babur, Puddles and Dash (Nov 3,
- * until his own, round 3) the default.
+ * and lollipop swirl, Nov 2), Timber his (Nov 3: his log, gnawed into the table, and his sawdust sweep); Babur, Puddles, Dash (Nov 3,
+ * until his own, round 3) and Hollow (Nov 3, until his own) the default.
  * The lines are placeholders until Gemini's lines arrive (Part D), each in its boss's voice (characters/*-lines.ts). Alfil's cues are
  * his own synthesized sounds (characters/alfil-sounds.ts): a low rumble as the pyramid rises, the grinding crunch as it cracks, the
  * ground's thud as it falls, the soft glow as the board shows, and a whoosh as the storm comes in. The default's: the app's soft pop
@@ -115,6 +115,15 @@ export const BOSS_INTROS: Readonly<Partial<Record<HomeId, BossIntro>>> = {
     custom: false,
     cues: { table: "pop", wipe: "dashWhoosh" },
     facesLeft: true,
+  },
+  // (Nov 3: the default until his own, the lanterns going out one by one, next round; his line is his entrance's, characters/hollow.ts,
+  // and the wipe his darkness's cast. His pond is smaller than the other circles: the drawn marks, SHOP_HOLLOW_MARKS, the usual spacing.)
+  hollow: {
+    name: "Hollow",
+    line: "Did you leave a light on?",
+    layout: "across",
+    custom: false,
+    cues: { table: "pop", wipe: "hollowCast" },
   },
 };
 

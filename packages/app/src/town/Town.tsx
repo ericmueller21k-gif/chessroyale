@@ -355,10 +355,12 @@ export function TownScreen({
               </>
             )}
             {/* A home with its inside built (Nov 2: Babur's and Puddles'): its name and "Go in", centered, nothing else (Eric, Nov 2: "chop
-                the Shop and Coming soon"); you walk to its door and go in. */}
+                the Shop and Coming soon"); you walk to its door and go in. Hollow Peak's (Nov 3) keeps his line over it, the next each
+                time (Eric's approved words, Oct 28): only its Shop and Coming soon went. */}
             {card && home && !card.confirm && card.kind === "home" && shopOf(home.id) && (
               <>
                 <h2>{home.name}</h2>
+                {card.line && <p class="town-card-text town-card-line">{card.line}</p>}
                 <button type="button" class="town-btn primary" onClick={() => ctl.current?.goIn(card.i)}>
                   Go in
                 </button>

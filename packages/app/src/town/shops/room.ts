@@ -44,6 +44,11 @@ export interface Room {
   counter: readonly Sq[];
   /** Where you stand as you come in: a step inside the door, facing the counter. */
   start: Sq;
+  /**
+   * A room that isn't a box (Hollow's cave, Nov 3): 1 on each square of its floor's shape (the art's mask, `.`), 0 on its rock (`#`,
+   * blocked whatever stands there). Null: a box, its floor every square inside its walls.
+   */
+  floor: Uint8Array | null;
 }
 
 /** The squares a piece covers: `w` wide from its column east, `d` deep from its row north. */
@@ -53,12 +58,21 @@ export function squaresOf(p: ShopPlace): Sq[] {
   return out;
 }
 
-/** A room from its layout and its Shopkeeper's squares. */
-export function makeRoom(layout: readonly ShopPlace[], keeper: readonly Sq[], n = 20): Room {
+/**
+ * A room from its layout and its Shopkeeper's squares; `mask` (a room that isn't a box: Hollow's cave, the art's `SHOP_HOLLOW_FLOOR`,
+ * `n` rows of `n`, `.` floor and `#` rock) blocks every rock square too, besides the edge and the solid pieces.
+ */
+export function makeRoom(layout: readonly ShopPlace[], keeper: readonly Sq[], n = 20, mask?: readonly string[]): Room {
   const blocked = new Uint8Array(n * n);
   const block = (s: Sq) => s.c >= 0 && s.c < n && s.r >= 0 && s.r < n && (blocked[s.r * n + s.c] = 1);
   // The walls are the room's edge, whatever stands there.
   for (let i = 0; i < n; i++) [{ c: i, r: 0 }, { c: i, r: n - 1 }, { c: 0, r: i }, { c: n - 1, r: i }].forEach(block);
+  let floor: Uint8Array | null = null;
+  if (mask) {
+    floor = new Uint8Array(n * n);
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (mask[r]?.[c] === ".") floor[r * n + c] = 1;
+    for (let k = 0; k < n * n; k++) if (!floor[k]) blocked[k] = 1;
+  }
   const exits: Sq[] = [];
   const counter: Sq[] = [];
   for (const p of layout) {
@@ -70,7 +84,38 @@ export function makeRoom(layout: readonly ShopPlace[], keeper: readonly Sq[], n 
   keeper.forEach(block);
   const doors = exits.map((s) => ({ c: s.c, r: s.r - 1 })).filter((s) => !blocked[s.r * n + s.c]);
   const start = { c: doors[doors.length - 1]?.c ?? n >> 1, r: (doors[0]?.r ?? n - 2) - 1 };
-  return { n, blocked, exits, doors, keeper, counter, start };
+  return { n, blocked, exits, doors, keeper, counter, start, floor };
+}
+
+/**
+ * Where the camera may look from, inside (a drag's focus): a box room anywhere over its squares (0 to n - 1 both ways, as before);
+ * a cave over its floor's shape only, the nearest point of it to (x, y), so a drag never takes the view into the rock or past the
+ * cave's edge (Nov 3). Into `out`; no allocation.
+ */
+export function camFocus(room: Room, x: number, y: number, out: { x: number; y: number }): { x: number; y: number } {
+  const { n, floor } = room;
+  out.x = Math.max(0, Math.min(n - 1, x));
+  out.y = Math.max(0, Math.min(n - 1, y));
+  if (!floor) return out;
+  const c = Math.round(out.x);
+  const r = Math.round(out.y);
+  if (floor[r * n + c]) return out;
+  let bd = Infinity;
+  let bx = out.x;
+  let by = out.y;
+  for (let k = 0; k < n * n; k++) {
+    if (!floor[k]) continue;
+    const kc = k % n;
+    const kr = (k - kc) / n;
+    // (The nearest point of the square, a hair inside it so it rounds to that square.)
+    const px = Math.max(kc - 0.49, Math.min(kc + 0.49, out.x));
+    const py = Math.max(kr - 0.49, Math.min(kr + 0.49, out.y));
+    const d = (px - out.x) ** 2 + (py - out.y) ** 2;
+    if (d < bd) ((bd = d), (bx = px), (by = py));
+  }
+  out.x = bx;
+  out.y = by;
+  return out;
 }
 
 /**
