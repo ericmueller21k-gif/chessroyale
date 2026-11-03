@@ -556,16 +556,17 @@ export const INTRO_BLITZ_STORM: Character = {
 /** The leading edge: the rush on its left (so it meets STORM with no seam), round clock-face lobes, a teal neon rim, a
  *  soft glow, and digits and little clock faces flying out ahead. */
 const LOBES = [
-  ...Array.from({ length: 6 }, (_, i) => ({ y: (i * 128) / 6 + grain(i, 1, 81) * 6, x: 14 + grain(i, 2, 81) * 8, r: 10 + grain(i, 3, 81) * 5, p: grain(i, 4, 81) * 6.28 })),
-  ...Array.from({ length: 6 }, (_, i) => ({ y: ((i + 0.5) * 128) / 6 + grain(i, 5, 81) * 4, x: 25 + grain(i, 6, 81) * 6, r: 5 + grain(i, 7, 81) * 3, p: grain(i, 8, 81) * 6.28 })),
+  ...Array.from({ length: 7 }, (_, i) => ({ y: (i * 128) / 7 + grain(i, 1, 81) * 5, x: 13 + grain(i, 2, 81) * 4, r: 9 + grain(i, 3, 81) * 5, p: grain(i, 4, 81) * 6.28 })),
+  ...Array.from({ length: 7 }, (_, i) => ({ y: ((i + 0.5) * 128) / 7 + grain(i, 5, 81) * 4, x: 17 + grain(i, 6, 81) * 3, r: 4 + grain(i, 7, 81) * 4, p: grain(i, 8, 81) * 6.28 })),
 ];
+/** How far a pixel is outside the rush's edge (0: inside). The lobes' middles sit inside the body, so it has no holes. */
 function outside(x: number, y: number, f: number): number {
   const ph = (2 * Math.PI * f) / 6;
-  const body = 10 + 2 * Math.sin((2 * Math.PI * 2 * y) / ST + ph);
+  const body = 13 + 2 * Math.sin((2 * Math.PI * 2 * y) / ST + ph);
   let out = x < body ? 0 : x - body;
   for (const l of LOBES) {
     const cy = l.y + 2 * Math.sin(ph + l.p);
-    const cx = l.x + 3 * Math.cos(ph + l.p);
+    const cx = l.x + 2 * Math.cos(ph + l.p);
     const dy = mod(y + 0.5 - cy + 64, ST) - 64;
     out = Math.min(out, Math.max(0, Math.hypot(x + 0.5 - cx, dy) - l.r));
     if (out === 0) return 0;
@@ -593,7 +594,7 @@ const frontFrames: Frame[] = [0, 1, 2, 3, 4, 5].map((f) => {
   const DIG = "0123456789";
   for (let i = 0; i < 14; i++) {
     const y = Math.floor((i * 128) / 14 + grain(i, 1, 72) * 4);
-    const x = 28 + mod(Math.floor(grain(i, 2, 72) * 18) + 3 * f, 18);
+    const x = 27 + mod(Math.floor(grain(i, 2, 72) * 18) + 3 * f, 18);
     if (i % 3 === 2) {
       // A tiny clock: a ring with a hand.
       for (const [a, b] of [[-1, -2], [0, -2], [1, -2], [2, -1], [2, 0], [2, 1], [1, 2], [0, 2], [-1, 2], [-2, 1], [-2, 0], [-2, -1]] as const) specks.push([x + a, y + b, "H"]);
