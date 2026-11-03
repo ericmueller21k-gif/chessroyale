@@ -69,6 +69,8 @@ const ART: Partial<Record<HomeId, () => Promise<RoomArt>>> = {
   bigboy: () => import("./bigboy-art.ts").then((m) => ({ layout: m.SHOP_BIGBOY_LAYOUT, pieces: m.SHOP_BIGBOY_PIECES, crateAt: m.SHOP_BIGBOY_CRATE_AT, lights: m.SHOP_BIGBOY_LIGHTS, pools: m.SHOP_BIGBOY_POOLS, upright: ["airplane"], marks: m.SHOP_BIGBOY_MARKS })),
   // (The giant king being carved, 4 x 2 squares, stands up whole at its foot.)
   timber: () => import("./timber-art.ts").then((m) => ({ layout: m.SHOP_TIMBER_LAYOUT, pieces: m.SHOP_TIMBER_PIECES, crateAt: m.SHOP_TIMBER_CRATE_AT, lights: m.SHOP_TIMBER_LIGHTS, pools: m.SHOP_TIMBER_POOLS, upright: ["showpiece"], marks: m.SHOP_TIMBER_MARKS })),
+  // (The halfpipe, 4 x 2 squares, its skateboard rolling by itself: deep, so it stands up whole at its foot.)
+  dash: () => import("./blitz-art.ts").then((m) => ({ layout: m.SHOP_BLITZ_LAYOUT, pieces: m.SHOP_BLITZ_PIECES, crateAt: m.SHOP_BLITZ_CRATE_AT, lights: m.SHOP_BLITZ_LIGHTS, pools: m.SHOP_BLITZ_POOLS, upright: ["showpiece"], marks: m.SHOP_BLITZ_MARKS })),
 };
 
 /** A piece's frames, each drawn once into a canvas, and when each ends in its loop. */
@@ -581,6 +583,32 @@ function startRoom(
       }
       rg.fillStyle = "#ffe36a";
       for (const [sx, sy] of [[150, 70], [250, 25], [30, 90], [360, 100], [120, 15]] as const) rg.fillRect(sx * k, sy * k, 4, 4);
+      return;
+    }
+    if (def.roof === "store") {
+      // A sneaker store's ceiling (as the mockup drew it): white ceiling tiles in a pale grid running up to a point, square light panels.
+      const sky = rg.createLinearGradient(0, 0, 0, H * 0.45);
+      sky.addColorStop(0, "#c9ced6");
+      sky.addColorStop(1, "#f1f2f4");
+      rg.fillStyle = sky;
+      rg.fillRect(0, 0, W, H);
+      rg.strokeStyle = "#b3b9c3";
+      rg.lineWidth = 2;
+      for (let i = -12; i <= 12; i++) {
+        rg.beginPath();
+        rg.moveTo(W / 2 + i * W * 0.05, -H * 0.5);
+        rg.lineTo(W / 2 + i * W * 0.18, H * 0.45);
+        rg.stroke();
+      }
+      for (const y of [H * 0.05, H * 0.12, H * 0.21, H * 0.33]) {
+        rg.beginPath();
+        rg.moveTo(0, y);
+        rg.lineTo(W, y);
+        rg.stroke();
+      }
+      const k = W / 390;
+      rg.fillStyle = "#ffffff";
+      for (const [lx, ly, lw, lh] of [[60, 18, 40, 12], [290, 18, 40, 12], [175, 60, 50, 18], [20, 120, 60, 22], [310, 120, 60, 22]] as const) rg.fillRect(lx * k, ly * k, lw * k, lh * k);
       return;
     }
     if (def.roof === "lodge") {

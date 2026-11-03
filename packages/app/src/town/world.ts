@@ -207,7 +207,7 @@ export const tableAt = (c: number, r: number): Table | null => TABLES.find((t) =
  */
 export const START: Sq = { c: PARK.c0 + 9, r: PARK.r1 - 3 };
 
-export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil" | "folio" | "timber";
+export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil" | "folio" | "timber" | "dash";
 
 /**
  * A place with a picture, a name (floating over it and on its sign) and an edge chip: a boss's home, or the Colosseum.
@@ -241,7 +241,7 @@ export interface Home extends Place {
 export const COLISEUM_PLACE: Place = { id: "coliseum", name: "The Colosseum", color: "#1f2530", cx: GATE_X, cy: COLISEUM.r0 + (COLISEUM.size - 1) / 2, half: COLISEUM.size / 2, foot: COLISEUM.size / 2 };
 
 /**
- * The homes (fifteen since Nov 3), spread evenly round the middle (the Colosseum and its park) over the 46 x 46 world that wraps: every
+ * The homes (sixteen since Nov 3), spread evenly round the middle (the Colosseum and its park) over the 46 x 46 world that wraps: every
  * home's nearest neighbor is 8 to 10 squares away, as on slice 3's smaller map, and no home's roaming ground reaches the
  * park or the Colosseum (docs/decisions/2026-10-26-town-square-slice-6.md has the map). Pairs that play off each other
  * stand side by side: Ginger Igloo and Jefferson's Fireworks (ice and fire), Hollow Peak and Moo & Moon Meadow (dark and
@@ -273,6 +273,12 @@ export const ALL_HOMES: readonly Home[] = (
     // place that Eric moved; its door faces the park. 7.8 squares from Boingo's and 8.5 from Moo's. Its ring Timber's hard-hat
     // orange. In an admin's town only while he's in the game for admins first: ADMIN_TOWN. docs/decisions/2026-11-03-timber-home.md.)
     { id: "timber", boss: "Timber", name: "Timber's Lumber Lodge", color: "#ea7816", cx: 11, cy: 32 },
+    // (Nov 3: Dash's, beside Timber's lodge in the west, on the best of the little open ground left: (4, 34), between Boingo's
+    // Funhouse (north), Timber's Lumber Lodge (east), Moo & Moon Meadow (south-east) and Big Boy's Crib (west, across the wrap),
+    // 7.1 to 7.6 squares from each (the map's 8 to 10 no longer fits anywhere; every other free plot has a neighbor nearer). The
+    // hanging sneakers' pole on its right stays on its plot, four open columns from the lodge's. Its ring his jacket's teal. In an
+    // admin's town only while he's in the game for admins first: ADMIN_TOWN. docs/decisions/2026-11-03-dash-home.md.)
+    { id: "dash", boss: "Dash", name: "Dash's Kicks", color: "#137a7a", cx: 4, cy: 34 },
   ] satisfies Omit<Home, "half" | "foot">[]
 ).map((h) => ({ ...h, half: 1.5, foot: 0.5 }));
 /**
@@ -364,8 +370,13 @@ export const BOTS: readonly TownBot[] = [
  * The kids of bosses in the game for admins first (core's BOSS_ADMIN_FIRST), in an admin's town only, after the ladder: Rivet,
  * Timber's woodpecker foreman (Nov 3), at 1650, between Twinkle and Drizzle as Timber's sim puts him (the crowd scores 0.18
  * against him: reports/timber-sim.md; Moo & Moon 0.21, Puddles 0.17). Off the ladder's rungs of 100 while he's a guest there.
+ * Tick, Dash's sleepy tortoise (Nov 3), at 1850, between Bishop Bo and Chip: Dash's sim (the crowd 0.15: reports/dash-sim.md) ties
+ * Sawyer's (0.15, Chip 1900) and sits under Puddles' (0.17, Drizzle 1700), so just under Chip, off the rungs.
  */
-export const ADMIN_BOTS: readonly TownBot[] = [{ name: "Rivet", rating: 1650, look: { sprite: SIDEKICK_SHEETS.timber }, boss: "timber" }];
+export const ADMIN_BOTS: readonly TownBot[] = [
+  { name: "Rivet", rating: 1650, look: { sprite: SIDEKICK_SHEETS.timber }, boss: "timber" },
+  { name: "Tick", rating: 1850, look: { sprite: SIDEKICK_SHEETS.blitz }, boss: "dash" },
+];
 /**
  * The town's bots: the ladder (BOTS), then the admins-first kids whose home is in this town (an admin's). A bot's index here is
  * its index in BOTS for the ladder's twenty, so a seat ("6.0.3") means the same bot in anyone's town. The Colosseum's crowd is

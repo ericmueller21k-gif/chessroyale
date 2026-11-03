@@ -435,6 +435,8 @@ export const CHATTER: Readonly<Record<HomeId, Voices>> = {
   folio: { kid: "Pleat", boss: ["I folded a new crane. Come see it.", "A good move has no wasted folds."], kidSays: ["Pleat folds a little pawn. Fold, fold!"] },
   // (Heard in an admin's town only while Timber is in the game for admins first: the speakers are this town's homes.)
   timber: { kid: "Rivet", boss: ["The Lumber Lodge is open. Mind the sawdust!", "A good board starts with good wood."], kidSays: ["Rat-a-tat! Rivet's on the job!", "Hard hats on! Rivet says so."] },
+  // (The same while Dash is in the game for admins first. Tick is slow and sleepy; Dash sells sneakers.)
+  dash: { kid: "Tick", boss: ["Dash's Kicks is open, fam. Fresh pairs!", "New drop just landed. No cap."], kidSays: ["Tick is almost there. Almost.", "Tick yawns. Slow and steady!"] },
 };
 
 export interface Chatter {
