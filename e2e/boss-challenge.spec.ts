@@ -292,6 +292,61 @@ test("challenging Babur in the town: the default intro (his line, the table pops
   expect(errors).toEqual([]);
 });
 
+test("challenging Hollow in the town: the default intro on his cave's pond (his line, the table pops in, his lash swung in place, the flash and the wipe), the battle; Leave back where you stood", async ({ page }) => {
+  test.setTimeout(240_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  const project = test.info().project.name;
+  if (SHOTS) mkdirSync(SHOTS, { recursive: true });
+  const shot = async (name: string) => SHOTS && (await page.screenshot({ path: `${SHOTS}/${name}-${project}.png` }));
+  // (Hollow is live for everyone: a player's town. Nov 3: the default intro until his own, the lanterns going out, next round.)
+  await page.goto("/town?sky=night");
+  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  const { confirm, stood } = await toConfirm(page, "hollow", "Hollow");
+  await confirm.getByRole("button", { name: "Fight" }).click();
+  // In at the cave's mouth, up the passage to the frozen pond: onto the rings etched in its ice (SHOP_HOLLOW_MARKS).
+  await expect(room(page)).toHaveAttribute("data-room", "hollow", { timeout: 20_000 });
+  await expect(page.getByRole("heading", { name: "Hollow Peak" })).toBeVisible();
+  const step = async () => (await intro(page))?.step ?? "";
+  // The moment the intro starts (you both on your marks): the still his own intro's lanterns are planned from (Eric, next round).
+  await expect.poll(step, { message: "on their marks", timeout: 20_000, intervals: [30] }).not.toBe("walk");
+  await shot("hollow-lanterns");
+  await expect.poll(step, { message: "his line", timeout: 15_000, intervals: [50] }).toBe("line");
+  const atLine = (await intro(page))!;
+  expect(atLine.layout).toBe("across");
+  expect(atLine.you).toEqual([14, 11.5]);
+  expect(atLine.boss).toEqual([11, 11.5]);
+  expect(atLine.facing).toEqual({ you: -1, boss: 1 });
+  expect(atLine.line).toBe(true);
+  // The table pops in on the ice, its stools at your sides; you both hop back clear of them (he a little further: his lash reaches
+  // further, BOSS_INTROS' `clear`).
+  await expect.poll(async () => (await intro(page))?.table, { message: "the table pops in", intervals: [50] }).toBe(true);
+  expect((await intro(page))!.stools).toEqual([[11.5, 11.5], [13.5, 11.5]]);
+  const at = async () => {
+    const i = (await intro(page))!;
+    return [i.you[0], i.you[1], i.boss[0], i.boss[1]].map((v) => Math.round(v * 100) / 100);
+  };
+  await expect.poll(at, { message: "hopped back clear of the stools", intervals: [50] }).toEqual([12.5 + CHALLENGE_FEEL.clear.you, 11.5, 12.5 - 2.92, 11.5]);
+  // His lash, swung in place, for a few seconds; the line gone.
+  await expect.poll(step, { message: "he swings", intervals: [50] }).toBe("swing");
+  expect((await intro(page))!).toMatchObject({ attack: true, line: false, table: true });
+  await shot("hollow-swing");
+  // The flash and the wipe to black, the battle (Boss alone, Hollow) loading under it.
+  await expect(page.locator("canvas.boss-wipe")).toHaveCount(1, { timeout: 10_000 });
+  await expect(page.locator("canvas.boss-wipe")).toHaveAttribute("data-boss", "hollow");
+  await expect(page.locator(BOARD_SEL.wrap).first()).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator("canvas.boss-wipe")).toHaveCount(0, { timeout: 10_000 });
+  // The gear's Leave (or Resign, as the battle offers): back in the town square where you stood.
+  await page.getByRole("button", { name: "Match options" }).click();
+  const quit = page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: /^(Leave|Resign)$/ });
+  const how = (await quit.textContent())!.trim();
+  await quit.click();
+  await page.getByRole("alertdialog").getByRole("button", { name: how, exact: true }).click();
+  if (how === "Resign") await page.getByRole("button", { name: "Back to town" }).click();
+  await backAt(page, stood);
+  expect(errors).toEqual([]);
+});
+
 test("challenging Big Boy in the town: his own intro (his line, his toy blocks build the table, the board plops on, the stools drop in, his attack, the lollipop swirl), the battle; Leave back where you stood", async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
