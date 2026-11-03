@@ -74,16 +74,15 @@ test("Boss alone: Cancel keeps playing; Resign ends the game at once, a loss (\"
   await expect(page.locator(".results .team-result").first()).toHaveText(/Ginger won\./);
   await expect(page.locator(".results")).toContainText("It counts as a loss.");
   // The boss battle's result page (Nov 2): no stage table or best and worst boards, no "Your game, move by move" button; the
-  // review is on the page, and its move bar and board are the same width, centered (the top part's way).
+  // review is on the page, one board with its stepper (◀ ▶, round 2), and the stepper and board are the same width, centered
+  // (the top part's way).
   await expect(page.locator(".results")).not.toContainText("Lower is better");
   await expect(page.locator(".stage-table, .best-worst")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Your game, move by move" })).toHaveCount(0);
-  const reviewBar = page.locator(".breakdown.inline .breakdown-move > button").first();
-  if ((await page.locator(".breakdown.inline .bm-board-wrap").count()) === 0) await reviewBar.click();
   const [review, board, bar] = await Promise.all([
     page.locator(".breakdown.inline").boundingBox(),
     page.locator(".breakdown.inline .bm-board-wrap").boundingBox(),
-    reviewBar.boundingBox(),
+    page.locator(".breakdown.inline .bm-step").boundingBox(),
   ]);
   expect(board!.width).toBeCloseTo(bar!.width, 0);
   expect(bar!.width).toBeCloseTo(review!.width, 0);

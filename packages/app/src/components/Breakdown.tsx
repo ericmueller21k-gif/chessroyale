@@ -1,6 +1,7 @@
-import { useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import { toSan } from "@chessroyale/chess";
 import { Board } from "./Board.tsx";
+import { Chevrons } from "./HistoryNav.tsx";
 import type { MoveRecord } from "../game.ts";
 import { ordinal } from "../screens/StageBreak.tsx";
 
@@ -21,6 +22,7 @@ export function Breakdown({
   onClose,
   dp = 1,
   inline = false,
+  solo = false,
 }: {
   moves: readonly MoveRecord[];
   you?: number;
@@ -34,25 +36,26 @@ export function Breakdown({
   dp?: number;
   /**
    * On the result page under the stats (a boss battle, Eric's brief): not an overlay, no Close button, and no note on how
-   * scores compare. Crowd's and Classic's breakdowns keep the overlay and the note.
+   * scores compare. Crowd's and Classic's breakdowns keep the overlay and the note. Inline is one board stepped with ◀ ▶ (InlineReview).
    */
   inline?: boolean;
+  /** Inline, in a solo boss battle: no "Everyone's average loss" and no "found" count (you play alone). */
+  solo?: boolean;
 }) {
   const played = moves.filter((m) => m.bestMove);
   const costly = [...played].filter((m) => m.roundScore < 0).sort((a, b) => a.roundScore - b.roundScore).slice(0, 3);
   const brilliant = played.filter((m) => m.brilliant);
   // (On the result page the first move's board is open when nothing cost you: the review shows with no tap.)
-  const [open, setOpen] = useState<MoveRecord | null>(costly[0] ?? (inline ? played[0] : null) ?? null);
+  const [open, setOpen] = useState<MoveRecord | null>(costly[0] ?? null);
   const short = you !== undefined && line !== undefined ? line - you : null;
+  if (inline) return <InlineReview moves={moves} dp={dp} solo={solo} />;
   return (
-    <div class={inline ? "breakdown inline" : "breakdown"} role={inline ? undefined : "dialog"} aria-label={inline ? undefined : "Your game, move by move"}>
+    <div class="breakdown" role="dialog" aria-label="Your game, move by move">
       <div class="breakdown-head">
         <h2>{short !== null ? "Why you went out" : "Your game, move by move"}</h2>
-        {!inline && (
-          <button type="button" class="btn btn-secondary breakdown-close" onClick={onClose}>
-            Close
-          </button>
-        )}
+        <button type="button" class="btn btn-secondary breakdown-close" onClick={onClose}>
+          Close
+        </button>
       </div>
       {short !== null && (
         <div class="breakdown-line">
@@ -87,8 +90,7 @@ export function Breakdown({
           <MoveRow key={`c${m.fen}`} m={m} dp={dp} open={open === m} onOpen={() => setOpen(open === m ? null : m)} />
         ))}
       </ol>
-      {/* (On the result page the whole review shows with no tap: its list of every move opens.) */}
-      <details class="breakdown-all" open={inline}>
+      <details class="breakdown-all">
         <summary>Every move ({played.length})</summary>
         <ol class="breakdown-list">
           {played.map((m) => (
@@ -96,7 +98,7 @@ export function Breakdown({
           ))}
         </ol>
       </details>
-      {!inline && <p class="muted small">Scores compare your move with everyone who picked that turn. Close calls are re-checked with a deeper search before every cut.</p>}
+      <p class="muted small">Scores compare your move with everyone who picked that turn. Close calls are re-checked with a deeper search before every cut.</p>
     </div>
   );
 }
@@ -146,5 +148,85 @@ function MoveRow({ m, open, onOpen, dp }: { m: MoveRecord; open: boolean; onOpen
         </div>
       )}
     </li>
+  );
+}
+
+/**
+ * The result page's review (a boss battle): one board, stepped with ◀ ▶ (and the ← → keys on a computer). The stepper row, the
+ * board and the text under it keep their places from move to move: stepping only changes the board, the arrows and the words.
+ */
+function InlineReview({ moves, dp, solo }: { moves: readonly MoveRecord[]; dp: number; solo: boolean }) {
+  const played = moves.filter((m) => m.bestMove);
+  const brilliant = played.filter((m) => m.brilliant);
+  const last = played.length - 1;
+  const [at, setAt] = useState(0);
+  const step = (d: number) => setAt((p) => Math.min(last, Math.max(0, p + d)));
+  useEffect(() => {
+    // The arrow keys step through the review, but not while typing in a field.
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target;
+      if (t instanceof HTMLElement && (t.isContentEditable || t.closest("input, textarea, select"))) return;
+      if (e.key === "ArrowLeft") setAt((p) => Math.max(0, p - 1));
+      else if (e.key === "ArrowRight") setAt((p) => Math.min(last, p + 1));
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [last]);
+  const m = played[at];
+  if (!m) return null;
+  const same = m.move === m.bestMove;
+  const best = m.bestMove ? toSan(m.fen, m.bestMove) : "?";
+  const side = m.fen.split(" ")[1] === "w" ? "white" : "black";
+  return (
+    <div class="breakdown inline">
+      <div class="breakdown-head">
+        <h2>Your game, move by move</h2>
+      </div>
+      {brilliant.length > 0 && (
+        <p class="brilliant-line you">
+          <span class="brilliant-mark" aria-hidden="true">‼</span> {brilliant.length === 1 ? "One brilliant move" : `${brilliant.length} brilliant moves`}:{" "}
+          {brilliant.map((b) => `${moveNo(b.fen)}. ${b.san}`).join(", ")}
+        </p>
+      )}
+      <div class="history-nav bm-step">
+        <button type="button" class="nav-btn" aria-label="Previous move" disabled={at === 0} onClick={() => step(-1)}>
+          <Chevrons back />
+        </button>
+        <div class="nav-middle bm-step-mid">
+          <span class="bm-step-text">
+            Move {at + 1} of {played.length} · {m.move ? m.san : "no move"}
+            {m.brilliant ? " ‼" : ""}
+            {m.usedPowerUp ? " ⚡" : ""} · {same ? "best move" : `best ${best}`}
+            {solo ? "" : ` · ${m.found ?? 0}/${m.pickers ?? 0} found`} ·{" "}
+            <span class={`bm-score ${m.roundScore >= 0 ? "good" : "bad"}`}>{fmt(m.roundScore, dp)}</span>
+          </span>
+        </div>
+        <button type="button" class="nav-btn" aria-label="Next move" disabled={at === last} onClick={() => step(1)}>
+          <Chevrons />
+        </button>
+      </div>
+      <div class="bm-board-wrap">
+        <Board
+          fen={m.fen}
+          orientation={side}
+          small
+          animate={false}
+          arrows={[...(m.move && !same ? [{ move: m.move, brush: "red" as const }] : []), ...(m.bestMove ? [{ move: m.bestMove, brush: "green" as const }] : [])]}
+        />
+      </div>
+      <p class="small bm-text">
+        {m.move ? `You played ${m.san}${m.loss !== null ? ` (${m.loss.toFixed(1)} points from the best${allowanceWords(m)})` : ""}.` : "You didn't move in time."}{" "}
+        {same ? "That was the best move." : `Best was ${best}.`}
+        {!solo && (
+          <>
+            {" "}
+            Everyone's average loss:{" "}
+            {m.avgRaw !== undefined ? `${m.avgRaw.toFixed(1)} (${m.avgLoss?.toFixed(1) ?? "?"} after the opening allowance)` : (m.avgLoss?.toFixed(1) ?? "?")}.
+          </>
+        )}
+      </p>
+    </div>
   );
 }
