@@ -859,7 +859,7 @@ Plays from the game so far. A lanky, cocky cheetah in a backwards orange cap and
 Your time is the clock at the right of the box under the board: alone or in a party it's your time bank for the battle (the team's one bank in a party); in a raid it's each move's timer.
 - **Clock Slap** (passive): every time he takes one of your pieces he slaps his clock and steals your time: ${n(p.slapBankSeconds, "second")} off your bank, or in a raid your next move's timer ${n(p.slapMoveSeconds, "second")} shorter (never under ${n(p.slapMoveMin, "second")}). Tick, in his bar, keeps count of what he's stolen.
 - **Time Scramble** (ultimate): after the warning, your next ${n(p.scrambleMoves, "move")} get ${n(p.scrambleSeconds, "second")} each, counted down over the board. They still come out of your bank, which still gets its extra seconds.
-- **Out of time** against him is never a loss: a random legal move is played for you instead (in a raid, only if nobody picked in time). Your bank can run down to nothing; each move then has just its extra seconds.`,
+- **Out of time** against him is never a loss: a move is played for you instead, picked at random from the ${n(p.flagTop, "best move")} (in a raid, only if nobody picked in time). Your bank can run down to nothing; each move then has just its extra seconds.`,
 };
 
 /**

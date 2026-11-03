@@ -106,8 +106,7 @@ count is drawn again as its second changes (a timer), the slap's flight is place
   / **Clock Slap** (passive): every time he takes one of your pieces he slaps his clock and steals your time: 30 seconds off your bank,
   or in a raid your next move's timer 6 seconds shorter (never under 8 seconds). Tick, in his bar, keeps count of what he's stolen. /
   **Time Scramble** (ultimate): after the warning, your next 5 moves get 3 seconds each, counted down over the board. They still come
-  out of your bank, which still gets its extra seconds. / **Out of time** against him is never a loss: a random legal move is played
-  for you instead (in a raid, only if nobody picked in time). Your bank can run down to nothing; each move then has just its extra
+  out of your bank, which still gets its extra seconds. / **Out of time** against him is never a loss: a move is played for you instead, picked at random from the four best moves (in a raid, only if nobody picked in time). Your bank can run down to nothing; each move then has just its extra
   seconds."
 
 ### His lines (every one)
@@ -135,6 +134,9 @@ count is drawn again as its second changes (a timer), the slap's flight is place
 `dash.gif` (phone 390 × 844, 5.6 MB: the intro, a Clock Slap in his bar with the time flying to him, TIME SCRAMBLE!, the 3-2-1, a move run out
 played for you and his jab, the next scrambled move); stills, phone and computer (1280 × 800): `*-select.png` (his tile, an admin's),
 `*-slap-flight.png` (the time on its way to him), `*-slap.png` (his line typed out in full), `*-scramble-banner.png`, `*-countdown.png`, `phone-after-flag.png`.
+
+- Director, on review: the FAQ's out-of-time sentence said "a random legal move"; it now says what the rules do ("picked at random
+  from the four best moves", from `flagTop`).
 
 ## Checks changed (old → new)
 
