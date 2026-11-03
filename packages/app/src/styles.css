@@ -23289,6 +23289,10 @@ button.sq-tiny {
    way of a tap (.center-count). */
 .dash-count .dc-n {
   color: #f28a2a;
+  /* (No blurred shadow under it: its pop each second scales a big glyph, and a 24 px blur repainted under it cost a frame on a
+     computer's big board. The white stroke reads it on any square.) */
+  text-shadow: none;
+  will-change: transform, opacity;
 }
 .dash-count .dc-n.last {
   color: #ee3b3b;
