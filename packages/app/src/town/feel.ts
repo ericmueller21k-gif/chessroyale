@@ -586,6 +586,12 @@ export const SHOP_FEEL = {
   nearFull: 3,
   nearGone: 2,
   /**
+   * In a cave (a room that isn't a box: Hollow's, Nov 3), an upright piece nearer the camera than you that's drawn over you (the
+   * passage's walls south of you, the mouth's arch as you come in, with the town's far camera behind you) is drawn this opaque, so the
+   * rock never hides you. A box room's walls stand at its edges, so this never comes up there.
+   */
+  seeThrough: 0.35,
+  /**
    * Going in (and out): the town zooms in on the door, this many times bigger over `doorZoomMs`, then fades to black over
    * `fadeMs`, and the room fades in from black over `fadeMs` (going out: the same, backwards).
    */

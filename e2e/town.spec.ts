@@ -351,7 +351,7 @@ test("a home you can go into (Babur's): its card is its name, then 'Go in' under
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
   await toBabur(page);
   const card = await openCard(page, "home", "Babur's Circus");
-  // Its name and Go in, nothing else (a home without a shop keeps "Shop" greyed and "Coming soon": Hollow Peak's, below).
+  // Its name and Go in, nothing else (a home without a shop keeps "Shop" greyed and "Coming soon"; Hollow Peak's, below, keeps his line too).
   await expect(card.locator(":scope > *")).toHaveCount(2);
   await expect(card.getByRole("button")).toHaveText(["Go in"]);
   await expect(card.getByText("Coming soon", { exact: true })).toHaveCount(0);
@@ -836,10 +836,10 @@ test("Hollow's card: one of his three lines (Eric's words), the next one each ti
   };
   await open();
   await expect(card.getByText(lines[0]!, { exact: true })).toBeVisible();
-  // Its shop greyed as before, under the line, and "Coming soon" (a home without a shop keeps its card as it was; one you can go
-  // into shows only its name and "Go in").
-  await expect(card.getByRole("button", { name: "Shop" })).toBeDisabled();
-  await expect(card.getByText("Coming soon", { exact: true })).toBeVisible();
+  // Under the line, "Go in" (Nov 3: his cave has an inside; its Shop and "Coming soon" went, as every home you can go into, and his
+  // line stays: e2e/shop.spec.ts goes in).
+  await expect(card.getByRole("button")).toHaveText(["Go in"]);
+  await expect(card.getByText("Coming soon", { exact: true })).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(card).toBeHidden();
   await open();

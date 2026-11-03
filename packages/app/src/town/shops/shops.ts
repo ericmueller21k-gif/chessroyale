@@ -1,6 +1,6 @@
 /**
  * The homes you can go into (Nov 2, round 1: Babur's circus tent and Puddles' greenhouse, the shops' first interiors; then Alfil's
- * pyramid and Big Boy's crib; Nov 3, Timber's lodge and Dash's sneaker store), what
+ * pyramid and Big Boy's crib; Nov 3, Timber's lodge, Dash's sneaker store and Hollow's cave), what
  * each shop sells, and the words its cards say. Light: the town imports it to know which home's card says "Go in"; the room
  * itself (its art, its drawing) loads only when you go in (ShopRoom.tsx). docs/decisions/2026-11-02-shop-interiors-r1.md.
  *
@@ -22,7 +22,7 @@ export interface ShopDef {
   /** Its crate's name, word for word ("Babur's Boss Crate"). */
   crate: string;
   /** The Shopkeeper: the boss's kid (its sheet's name in town/sidekicks/), drawn at `at` (a square, fractions allowed). */
-  kid: "babur" | "puddles" | "alfil" | "bigboy" | "timber" | "blitz";
+  kid: "babur" | "puddles" | "alfil" | "bigboy" | "timber" | "blitz" | "hollowdog";
   at: readonly [number, number];
   /** The squares the Shopkeeper stands on (nobody else can): you can talk to it within `SHOP_FEEL.talkRange` of one. */
   keeper: readonly Sq[];
@@ -30,10 +30,10 @@ export interface ShopDef {
   prizes: readonly string[];
   /**
    * Above the walls: a tent's canvas, a greenhouse's glass, a pyramid's sandstone, a nursery's sky-blue ceiling with clouds and
-   * stars, a lodge's dark planks between heavy beams or a store's white ceiling tiles and light panels (drawn by the game, not the
-   * art: as the mockup did).
+   * stars, a lodge's dark planks between heavy beams, a store's white ceiling tiles and light panels, or a cave's dark stone and
+   * stalactites (drawn by the game, not the art: as the mockup did).
    */
-  roof: "tent" | "glass" | "stone" | "nursery" | "lodge" | "store";
+  roof: "tent" | "glass" | "stone" | "nursery" | "lodge" | "store" | "cave";
   /**
    * The chat log's text over the room (Eric, Nov 2: "white, or black, depending on darkness of background in the shop"): "night" for
    * a dark room (white words on a dark tint: Babur's tent), "day" for a light one (dark words on a light tint: Puddles' greenhouse),
@@ -60,6 +60,9 @@ export const SHOPS: Readonly<Partial<Record<HomeId, ShopDef>>> = {
   // top; from there his head and the clock on his shell show over it. A light room (pale terrazzo, white walls, sunny windows): the
   // day tone. (Dash's home is in an admin's town only for now: world.ts ADMIN_TOWN.)
   dash: { home: "dash", boss: "Dash", crate: "Dash's Boss Crate", kid: "blitz", at: [9, 1.5], keeper: [{ c: 9, r: 2 }, { c: 10, r: 2 }], prizes: ["cheetah-shoes"], roof: "store", chatTone: "day" },
+  // Hollow's dog stands behind the 30 px counter in the cave's back hollow, round the bend (the counter on columns 4-7 of row 4), on
+  // his squares and drawn at the art's place for him (shop-hollow-nov3.md). He has no name: "Shopkeeper". A dark cave: the night tone.
+  hollow: { home: "hollow", boss: "Hollow", crate: "Hollow's Boss Crate", kid: "hollowdog", at: [5.5, 2.4], keeper: [{ c: 5, r: 2 }, { c: 6, r: 2 }], prizes: ["hollow-bulb"], roof: "cave", chatTone: "night" },
 };
 
 /** The shop inside a home, or null: every other home has no "Go in" yet. */

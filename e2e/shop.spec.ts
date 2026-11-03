@@ -338,6 +338,94 @@ test("Dash's Kicks (Nov 3): in an admin's town only; its card is its name and Go
   expect(errors).toEqual([]);
 });
 
+test("Hollow Peak (Nov 3): Go in (his line on the card), the cave: in at the mouth, up the passage past the pond, round the bend to the counter; his dog keeps the shop, Hollow's Boss Crate with Hollow's Bulb", async ({ page }) => {
+  test.setTimeout(180_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  await page.goto("/town?sky=night");
+  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("hollow"));
+  await expect.poll(() => homeAt(page, "hollow"), { message: "Hollow Peak comes into view" }).not.toBeNull();
+  // (Hollow live for everyone, so his cave is too: a player's town. His card keeps his line over "Go in": the next each time.)
+  await goIn(page, "hollow", "Hollow Peak");
+  await expect(room(page)).toHaveAttribute("data-room", "hollow");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Hollow Peak");
+  // A dark cave: the chat's words white.
+  await expect(page.locator(".town-chat")).toHaveAttribute("data-tone", "night");
+  // In at the mouth, a step in from the way out, zoomed out (the further-out camera, as every home).
+  await expect(room(page)).toHaveAttribute("data-you", "14,17");
+  await expect.poll(async () => (await shopCam(page))?.zoom, { message: "zoomed out" }).toBe(1);
+  const name = test.info().project.name;
+  const still = async (what: string) => {
+    if (!SHOTS) return;
+    await page.waitForTimeout(1200);
+    await page.screenshot({ path: `${SHOTS}/${what}-${name}.png` });
+  };
+  // (The counter is round the bend, out of sight: his tag goes behind the rock with him.)
+  await still("mouth");
+  /** Walks to `sq`, tapping it once it's on screen; the room's floor only (the rock beside it is never walked on). */
+  const walkTo = async (sq: readonly [number, number]) => {
+    await expect(async () => {
+      const at = await shopAt(page, "square", sq);
+      expect(at, `${sq} on screen`).not.toBeNull();
+      await page.mouse.click(at!.x, at!.y);
+      await expect(room(page)).toHaveAttribute("data-you", sq.join(","), { timeout: 6000 });
+    }).toPass({ timeout: 30_000 });
+  };
+  // Up the passage to the pond (the battle spot), then before the tree.
+  await walkTo([13, 14]);
+  await still("pond");
+  await walkTo([15, 10]);
+  await still("tree");
+  // A tap on the rock walks you beside it, never into it: the passage's west wall.
+  const rock = await shopAt(page, "square", [8, 11]);
+  if (rock) {
+    await page.mouse.click(rock.x, rock.y);
+    await expect.poll(async () => (await room(page).getAttribute("data-you"))!, { message: "beside the rock", timeout: 10_000 }).toMatch(/^9,(10|11|12)$/);
+  }
+  // Round the bend at the back, the hollow opening to the west.
+  await walkTo([11, 9]);
+  await walkTo([10, 8]);
+  await still("bend");
+  await walkTo([7, 6]);
+  // The dog behind the counter: a tap on him walks you in front of it, the counter between you; his card says "Shopkeeper".
+  await expect.poll(() => shopAt(page, "keeper"), { message: "the dog is drawn round the bend" }).not.toBeNull();
+  const at = (await shopAt(page, "keeper"))!;
+  await page.mouse.click(at.x, at.y);
+  const card = page.getByRole("dialog", { name: "Shopkeeper", exact: true });
+  await expect(card).toBeVisible({ timeout: 15_000 });
+  await expect(card.getByRole("heading", { name: "Shopkeeper", exact: true })).toBeVisible();
+  await expect(room(page)).toHaveAttribute("data-you", /^[56],5$/);
+  await still("counter");
+  await card.getByRole("button", { name: "Talk" }).click();
+  const crate = page.getByRole("dialog", { name: "Hollow's Boss Crate", exact: true });
+  await expect(crate).toBeVisible();
+  await expect(crate).toContainText("3 Hollow tokens, or 1 Hollow token + 1 crate key");
+  await expect(crate).toContainText("Hollow's Bulb");
+  await expect(crate).toContainText("You have 0 Hollow tokens and 0 crate keys.");
+  await expect(crate.getByRole("button", { name: "Buy with 3 Hollow tokens" })).toBeDisabled();
+  await still("crate");
+  await page.keyboard.press("Escape");
+  await expect(crate).toBeHidden();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
+  if (SHOTS && process.env.CAVE_VIEWS) {
+    // (For the review: in again, the close camera all along the way from the mouth, up the passage, round the bend, to the hollow's back.)
+    await goIn(page, "hollow", "Hollow Peak");
+    await expect(room(page)).toHaveAttribute("data-you", "14,17");
+    await page.getByRole("button", { name: "Zoom in" }).click();
+    await still("close-14-17");
+    for (const sq of [[13, 15], [12, 13], [12, 11], [11, 9], [10, 8], [9, 8], [8, 7], [7, 7], [6, 6], [5, 6], [4, 5], [3, 4]] as const) {
+      await walkTo(sq);
+      await still(`close-${sq.join("-")}`);
+    }
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+    await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
+  }
+  expect(errors).toEqual([]);
+});
+
 test("Big Boy's Crib (Nov 2): Go in, Blocky's crate with Big Boy's Buggy; the chat's words dark over the nursery", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));

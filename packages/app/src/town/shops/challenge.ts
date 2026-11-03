@@ -41,13 +41,18 @@ export interface BossIntro {
    * swing's beat he stands in his idle). A boss with an attack faces as its attack's art does.
    */
   facesLeft?: true;
+  /**
+   * Its own hop-back place, squares from the table's middle, where its figure or its swing reaches further toward its stool than
+   * `CHALLENGE_FEEL.clear.boss` allows (Hollow, Nov 3: his strand's lash lies 1.6 squares out in front of his feet). None: the usual.
+   */
+  clear?: number;
 }
 
 /**
  * The bosses with an intro: every boss whose home has an inside (shops/shops.ts SHOPS; Nov 2, round 2: "for other bosses they should
  * just be swinging for a few seconds like discussed"). Alfil has his own (his pyramid and sandstorm), Big Boy his (his toy blocks
- * and lollipop swirl, Nov 2), Timber his (Nov 3: his log, gnawed into the table, and his sawdust sweep); Babur, Puddles and Dash (Nov 3,
- * until his own, round 3) the default.
+ * and lollipop swirl, Nov 2), Timber his (Nov 3: his log, gnawed into the table, and his sawdust sweep); Babur, Puddles, Dash (Nov 3,
+ * until his own, round 3) and Hollow (Nov 3, until his own) the default.
  * The lines are placeholders until Gemini's lines arrive (Part D), each in its boss's voice (characters/*-lines.ts). Alfil's cues are
  * his own synthesized sounds (characters/alfil-sounds.ts): a low rumble as the pyramid rises, the grinding crunch as it cracks, the
  * ground's thud as it falls, the soft glow as the board shows, and a whoosh as the storm comes in. The default's: the app's soft pop
@@ -115,6 +120,17 @@ export const BOSS_INTROS: Readonly<Partial<Record<HomeId, BossIntro>>> = {
     custom: false,
     cues: { table: "pop", wipe: "dashWhoosh" },
     facesLeft: true,
+  },
+  // (Nov 3: the default until his own, the lanterns going out one by one, next round; his line is his entrance's, characters/hollow.ts,
+  // and the wipe his darkness's cast. His pond is smaller than the other circles: the drawn marks, SHOP_HOLLOW_MARKS, the usual spacing.)
+  hollow: {
+    name: "Hollow",
+    line: "Did you leave a light on?",
+    layout: "across",
+    custom: false,
+    cues: { table: "pop", wipe: "hollowCast" },
+    // (His lash's feet clear of his stool, a tenth from it as every boss's; his whole swing still clear of the cave's west rock.)
+    clear: 2.92,
   },
 };
 
@@ -430,8 +446,8 @@ export function logWalks(a: LogAnims, feel: Pick<typeof CHALLENGE_FEEL, "log" | 
   return { toLog: feel.log.at - feel.standOff.across, carry: feel.log.at - a.reach, toMark: feel.log.clear - a.reach - a.back };
 }
 /** The feel the marks are found with (`marksOf`): Timber's log intro has its own clear place for him (`log.clear`), every other the shared one. */
-export const marksFeel = (a: IntroAnims | null, feel: MarksFeel = CHALLENGE_FEEL): MarksFeel =>
-  a && isLog(a) ? { ...feel, clear: { ...feel.clear, boss: feel.log.clear } } : feel;
+export const marksFeel = (a: IntroAnims | null, feel: MarksFeel = CHALLENGE_FEEL, own?: number): MarksFeel =>
+  own !== undefined ? { ...feel, clear: { ...feel.clear, boss: own } } : a && isLog(a) ? { ...feel, clear: { ...feel.clear, boss: feel.log.clear } } : feel;
 /** How long the boss's transition takes to cover the screen (ms): its own storm's sweep, or the default's flash and wipe. */
 export const coverMs = (custom: boolean, feel: Pick<typeof CHALLENGE_FEEL, "stormInMs" | "flashMs" | "wipeMs"> = CHALLENGE_FEEL): number =>
   custom ? feel.stormInMs : feel.flashMs + feel.wipeMs;

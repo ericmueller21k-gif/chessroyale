@@ -6,6 +6,7 @@ import { SHOP_PUDDLES_LAYOUT } from "../src/town/shops/puddles-art.ts";
 import { SHOP_BIGBOY_LAYOUT, SHOP_BIGBOY_MARKS, SHOP_BIGBOY_PIECES } from "../src/town/shops/bigboy-art.ts";
 import { SHOP_TIMBER_LAYOUT, SHOP_TIMBER_MARKS } from "../src/town/shops/timber-art.ts";
 import { SHOP_BLITZ_LAYOUT, SHOP_BLITZ_MARKS } from "../src/town/shops/blitz-art.ts";
+import { SHOP_HOLLOW_LAYOUT, SHOP_HOLLOW_MARKS } from "../src/town/shops/hollow-art.ts";
 import { INTRO_BIGBOY_BLOCKS, INTRO_BIGBOY_STOOL_B, INTRO_BIGBOY_STOOL_SEAT_H, INTRO_BIGBOY_STOOL_TOP_H, INTRO_BIGBOY_STOOL_W, INTRO_BIGBOY_SWIRL, INTRO_BIGBOY_SWIRL_FRONT, INTRO_BIGBOY_TABLE_PALETTE } from "../src/town/shops/bigboy-intro-art.ts";
 import { TABLE_BOARD } from "../src/town/houses/park.ts";
 import { renderFrame } from "../src/characters/sprite.ts";
@@ -56,9 +57,9 @@ describe("the challenge's flow", () => {
     expect(run(["fight", "atDoor", "cancel", "fight"])).toBe("toDoor");
   });
 
-  it("every boss whose home has an inside has an intro (Alfil, Big Boy and Timber their own, Babur, Puddles and Dash the default); every other boss is challenged as before (the Boss raid screen)", () => {
+  it("every boss whose home has an inside has an intro (Alfil, Big Boy and Timber their own, Babur, Puddles, Dash and Hollow the default); every other boss is challenged as before (the Boss raid screen)", () => {
     const withIntro = ALL_HOMES.filter((h) => introOf(h.id)).map((h) => h.id).sort();
-    expect(withIntro).toEqual(["alfil", "bigboy", "dash", "gardener", "tiger", "timber"]);
+    expect(withIntro).toEqual(["alfil", "bigboy", "dash", "gardener", "hollow", "tiger", "timber"]);
     expect(withIntro).toEqual(Object.keys(SHOPS).sort());
     expect(introOf("alfil")).toMatchObject({ custom: true, line: "I'll show you the power of the old piece." });
     expect(introOf("tiger")).toMatchObject({ custom: false, name: "Babur", line: "Fine. One more show. Then I'm on break." });
@@ -67,33 +68,37 @@ describe("the challenge's flow", () => {
     expect(introOf("timber")).toMatchObject({ custom: true, name: "Timber", line: "Hard hats on. We're building today.", layout: "across", cues: { storm: "timberSwoosh" } });
     // (Dash, Nov 3: the default until his own intro, round 3; his line his entrance's first.)
     expect(introOf("dash")).toMatchObject({ custom: false, name: "Dash", line: "Yo yo yo! Dash in the building, fam!", layout: "across", cues: { table: "pop", wipe: "dashWhoosh" } });
-    expect(introOf("hollow")).toBeNull();
+    // (Hollow, Nov 3: the default until his own, the lanterns going out, next round; his line one of his entrance's.)
+    expect(introOf("hollow")).toMatchObject({ custom: false, name: "Hollow", line: "Did you leave a light on?", layout: "across", cues: { table: "pop", wipe: "hollowCast" } });
+    expect(introOf("folio")).toBeNull();
   });
 
-  it("the layout: across for all six today (the boss on the left, you on the right: Eric's normal look)", () => {
-    for (const id of ["alfil", "tiger", "gardener", "bigboy", "timber", "dash"] as const) expect(introOf(id)!.layout, id).toBe("across");
+  it("the layout: across for all seven today (the boss on the left, you on the right: Eric's normal look)", () => {
+    for (const id of ["alfil", "tiger", "gardener", "bigboy", "timber", "dash", "hollow"] as const) expect(introOf(id)!.layout, id).toBe("across");
   });
 });
 
 describe("the battle circle's marks", () => {
-  const ROOMS = { alfil: SHOP_ALFIL_LAYOUT, tiger: SHOP_BABUR_LAYOUT, gardener: SHOP_PUDDLES_LAYOUT, bigboy: SHOP_BIGBOY_LAYOUT, timber: SHOP_TIMBER_LAYOUT, dash: SHOP_BLITZ_LAYOUT } as const;
+  const ROOMS = { alfil: SHOP_ALFIL_LAYOUT, tiger: SHOP_BABUR_LAYOUT, gardener: SHOP_PUDDLES_LAYOUT, bigboy: SHOP_BIGBOY_LAYOUT, timber: SHOP_TIMBER_LAYOUT, dash: SHOP_BLITZ_LAYOUT, hollow: SHOP_HOLLOW_LAYOUT } as const;
 
   it("across: the boss west of the table, you east, all on the circle's middle row; each a square and a half out, just past its stool", () => {
     for (const [id, layout] of Object.entries(ROOMS)) {
       const m = marksOf(layout, "across")!;
-      // (Babur's ring has his pedestal in its middle: the table stands clearOff south of it, in front.)
-      const r = id === "tiger" ? 10.5 + CHALLENGE_FEEL.clearOff : 10.5;
-      expect(m.table, id).toEqual({ c: 9.5, r });
-      expect(m.boss, id).toEqual({ c: 8, r });
-      expect(m.you, id).toEqual({ c: 11, r });
+      // (Babur's ring has his pedestal in its middle: the table stands clearOff south of it, in front. Hollow's pond, in his cave, is
+      // three columns east and a row south of the box rooms' circles.)
+      const r = id === "tiger" ? 10.5 + CHALLENGE_FEEL.clearOff : id === "hollow" ? 11.5 : 10.5;
+      const c = id === "hollow" ? 12.5 : 9.5;
+      expect(m.table, id).toEqual({ c, r });
+      expect(m.boss, id).toEqual({ c: c - 1.5, r });
+      expect(m.you, id).toEqual({ c: c + 1.5, r });
       // (Each walks to its mark's south square, then the last half square north onto its middle: none for a whole row.)
-      expect(m.youSq, id).toEqual({ c: 11, r: Math.ceil(r) });
-      expect(m.bossSq, id).toEqual({ c: 8, r: Math.ceil(r) });
+      expect(m.youSq, id).toEqual({ c: c + 1.5, r: Math.ceil(r) });
+      expect(m.bossSq, id).toEqual({ c: c - 1.5, r: Math.ceil(r) });
       // Facing each other: the boss right (toward you), you left.
       expect([m.bossFace, m.youFace], id).toEqual([1, -1]);
       // Once the stools are in, each a clear step outside its stool, on the same row (the hop back: CHALLENGE_FEEL.clear).
-      expect(m.youClear, id).toEqual({ c: 9.5 + CHALLENGE_FEEL.clear.you, r });
-      expect(m.bossClear, id).toEqual({ c: 9.5 - CHALLENGE_FEEL.clear.boss, r });
+      expect(m.youClear, id).toEqual({ c: c + CHALLENGE_FEEL.clear.you, r });
+      expect(m.bossClear, id).toEqual({ c: c - CHALLENGE_FEEL.clear.boss, r });
     }
   });
 
@@ -170,6 +175,14 @@ describe("the battle circle's marks", () => {
     expect([drawn.boss, drawn.you]).toEqual([{ c: 8, r: 10.5 }, { c: 11, r: 10.5 }]);
     // (The same squares the circle's own middle gives: the drawn marks only say so.)
     const own = marksOf(SHOP_BLITZ_LAYOUT, "across")!;
+    expect([own.boss, own.you]).toEqual([drawn.boss, drawn.you]);
+  });
+
+  it("Hollow's start marks (SHOP_HOLLOW_MARKS, rings etched in his pond's ice) are where you stand across: the boss west, you east, on the middle line", () => {
+    const drawn = marksOf(SHOP_HOLLOW_LAYOUT, "across", SHOP_HOLLOW_MARKS)!;
+    expect([drawn.boss, drawn.you]).toEqual([{ c: 11, r: 11.5 }, { c: 14, r: 11.5 }]);
+    // (The same squares the pond's own middle gives: the drawn marks only say so.)
+    const own = marksOf(SHOP_HOLLOW_LAYOUT, "across")!;
     expect([own.boss, own.you]).toEqual([drawn.boss, drawn.you]);
   });
 
@@ -778,19 +791,20 @@ describe("the challenge's pacing (Nov 2)", () => {
     for (let y = 0; y < f.h; y++) for (let x = 0; x < ch.foot[0] - PX / 2; x++) if (f.data[(y * f.w + x) * 4 + 3]! > 0) return y;
     return ch.foot[1];
   };
-  const TABLES = { alfil: INTRO_ALFIL_TABLE, tiger: PARK_TABLE, gardener: PARK_TABLE, bigboy: INTRO_BIGBOY_BLOCKS, dash: PARK_TABLE } as const;
+  const TABLES = { alfil: INTRO_ALFIL_TABLE, tiger: PARK_TABLE, gardener: PARK_TABLE, bigboy: INTRO_BIGBOY_BLOCKS, dash: PARK_TABLE, hollow: PARK_TABLE } as const;
   /** Timber's stumps (his table has none in its picture): one `stoolOff` from the table's middle each side; how far out its outer edge is, and its top. */
   const stumps = () => {
     const [l, r] = low(INTRO_TIMBER_STUMP, "idle", INTRO_TIMBER_STUMP.h);
     return { west: F.stoolOff - l / PX, east: F.stoolOff + (r + 1) / PX, top: INTRO_TIMBER_STUMP_SEAT_H / PX };
   };
-  const LAYOUTS = { alfil: SHOP_ALFIL_LAYOUT, tiger: SHOP_BABUR_LAYOUT, gardener: SHOP_PUDDLES_LAYOUT, bigboy: SHOP_BIGBOY_LAYOUT, timber: SHOP_TIMBER_LAYOUT, dash: SHOP_BLITZ_LAYOUT } as const;
+  const LAYOUTS = { alfil: SHOP_ALFIL_LAYOUT, tiger: SHOP_BABUR_LAYOUT, gardener: SHOP_PUDDLES_LAYOUT, bigboy: SHOP_BIGBOY_LAYOUT, timber: SHOP_TIMBER_LAYOUT, dash: SHOP_BLITZ_LAYOUT, hollow: SHOP_HOLLOW_LAYOUT } as const;
   /** The gap (squares) kept between a figure near the floor and the stool's outer edge. */
   const GAP = 0.1;
 
   it("once the stools are in, no figure near the floor is in front of a stool: you (the pawn) and each boss standing, and its attack's feet", () => {
-    for (const id of ["alfil", "tiger", "gardener", "bigboy", "timber", "dash"] as const) {
-      const m = marksOf(LAYOUTS[id], "across", null, id === "timber" ? marksFeel(TIMBER) : F)!;
+    for (const id of ["alfil", "tiger", "gardener", "bigboy", "timber", "dash", "hollow"] as const) {
+      // (Timber's clear place his own, from his log intro; Hollow's his own, BOSS_INTROS' `clear`: his lash reaches further.)
+      const m = marksOf(LAYOUTS[id], "across", null, id === "timber" ? marksFeel(TIMBER) : marksFeel(null, F, introOf(id)!.clear))!;
       const st = id === "timber" ? stumps() : stools(TABLES[id]);
       // (The stools' outer edges, in the room's columns: the boss's west of the table, yours east; up to their tops.)
       const bossEdge = m.table.c - st.west;

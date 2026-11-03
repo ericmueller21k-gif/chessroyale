@@ -42,7 +42,7 @@ import { TAG_STYLE, type TagKind } from "../tags.ts";
 import { Walker, type HomeId } from "../world.ts";
 import type { Rider } from "../rides.ts";
 import { rideSpeed } from "../../components/rides/scale.ts";
-import { STORE_PANELS, ceilingPanel, inTalkRange, isFloor, makeRoom, onDoor, tapTarget, findPath, type Room, type ShopPlace, type Sq } from "./room.ts";
+import { STORE_PANELS, camFocus, ceilingPanel, inTalkRange, lightsAt, litDx, overlaps, upAlpha, youBox, isFloor, makeRoom, onDoor, tapTarget, findPath, type Room, type ShopPlace, type Sq } from "./room.ts";
 import { POOL_LINE, bossHoldings, buyBossCrate, canAfford, holdLine, priceLine, prizeRows, shopOf, wayText, type CrateWay, type ShopDef } from "./shops.ts";
 import { CHALLENGE_FEEL, attackStart, attackTime, frameAt as animFrame, introAt, introCues, introLength, isLog, marksFeel, marksOf, type DrawnMarks, type IntroNow, type LogPlace } from "./challenge.ts";
 import { play } from "../../sound.ts";
@@ -61,6 +61,8 @@ interface RoomArt {
   upright?: readonly string[];
   /** Its battle circle's drawn start marks, when its art exports them (Big Boy's rug: the boss's west, yours east). */
   marks?: DrawnMarks;
+  /** A room that isn't a box (Hollow's cave): its floor's shape, `.` floor and `#` rock (room.ts makeRoom blocks the rock). */
+  floor?: readonly string[];
 }
 const ART: Partial<Record<HomeId, () => Promise<RoomArt>>> = {
   tiger: () => import("./babur-art.ts").then((m) => ({ layout: m.SHOP_BABUR_LAYOUT, pieces: m.SHOP_BABUR_PIECES, crateAt: m.SHOP_BABUR_CRATE_AT, lights: m.SHOP_BABUR_HOOP_LIGHTS, pools: m.SHOP_BABUR_HOOP_POOLS })),
@@ -71,6 +73,8 @@ const ART: Partial<Record<HomeId, () => Promise<RoomArt>>> = {
   timber: () => import("./timber-art.ts").then((m) => ({ layout: m.SHOP_TIMBER_LAYOUT, pieces: m.SHOP_TIMBER_PIECES, crateAt: m.SHOP_TIMBER_CRATE_AT, lights: m.SHOP_TIMBER_LIGHTS, pools: m.SHOP_TIMBER_POOLS, upright: ["showpiece"], marks: m.SHOP_TIMBER_MARKS })),
   // (The halfpipe, 4 x 2 squares, its skateboard rolling by itself: deep, so it stands up whole at its foot.)
   dash: () => import("./blitz-art.ts").then((m) => ({ layout: m.SHOP_BLITZ_LAYOUT, pieces: m.SHOP_BLITZ_PIECES, crateAt: m.SHOP_BLITZ_CRATE_AT, lights: m.SHOP_BLITZ_LIGHTS, pools: m.SHOP_BLITZ_POOLS, upright: ["showpiece"], marks: m.SHOP_BLITZ_MARKS })),
+  // (A cave, not a box: walkable only on its floor's shape. The tree of presents, 3 x 2 squares, stands up whole at its foot.)
+  hollow: () => import("./hollow-art.ts").then((m) => ({ layout: m.SHOP_HOLLOW_LAYOUT, pieces: m.SHOP_HOLLOW_PIECES, crateAt: m.SHOP_HOLLOW_CRATE_AT, lights: m.SHOP_HOLLOW_LIGHTS, pools: m.SHOP_HOLLOW_POOLS, upright: ["showpiece"], marks: m.SHOP_HOLLOW_MARKS, floor: m.SHOP_HOLLOW_FLOOR })),
 };
 
 /** A piece's frames, each drawn once into a canvas, and when each ends in its loop. */
@@ -257,6 +261,17 @@ function CratePic({ frames }: { frames: Frames }) {
   return <canvas class="shop-crate-pic" ref={ref} aria-hidden="true" />;
 }
 
+/** Outside a cave's mouth: snow at night (the art's snow in shade, `W`). */
+const CAVE_SNOW = "#aeb7cf";
+/** A picture's average color (its drawn pixels), once: a cave's rock past its squares. */
+function toneOf(c: HTMLCanvasElement | undefined): string {
+  if (!c) return "#1e1c25";
+  const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
+  let r = 0, gg = 0, b = 0, k = 0;
+  for (let i = 0; i < d.length; i += 4) if (d[i + 3]! > 0) ((r += d[i]!), (gg += d[i + 1]!), (b += d[i + 2]!), k++);
+  return k ? `rgb(${Math.round(r / k)},${Math.round(gg / k)},${Math.round(b / k)})` : "#1e1c25";
+}
+
 /** A Walker's view (the town's: 1 up the screen, its rows running away from the camera) as a room draws it (rows toward the camera). */
 const roomView = (v: 0 | 1 | 2): 0 | 1 | 2 => (v === 1 ? 2 : v === 2 ? 1 : 0);
 
@@ -298,7 +313,7 @@ function startRoom(
   const S = SHOP_FEEL;
   const SQ = f.housePxPerSquare;
   const { def, art, frames } = loaded;
-  const room: Room = makeRoom(art.layout, def.keeper);
+  const room: Room = makeRoom(art.layout, def.keeper, 20, art.floor);
   const n = room.n;
   const g = cv.getContext("2d")!;
   const you = new Walker(room.start, f.youStepMs, true, f.walkEase);
@@ -315,7 +330,7 @@ function startRoom(
   // circle, side by side, at the challenge's pace; each settles onto its mark's middle; facing each other, the intro plays.
   const C = CHALLENGE_FEEL;
   const ci = challenge?.intro ?? null;
-  const marks = ci ? marksOf(art.layout, ci.def.layout, art.marks, marksFeel(ci.anims)) : null;
+  const marks = ci ? marksOf(art.layout, ci.def.layout, art.marks, marksFeel(ci.anims, CHALLENGE_FEEL, ci.def.clear)) : null;
   const across = marks?.layout === "across";
   const boss = ci && marks ? new Walker({ c: room.start.c - 1, r: room.start.r }, C.walkStepMs, false) : null;
   const bossPose = { x: 0, y: 0, hop: 0, tilt: 0, step: false, t: 0 };
@@ -439,6 +454,11 @@ function startRoom(
       fg.restore();
     }
   }
+  /**
+   * A cave (a room with a floor's shape): its rock's tone, the average of its flat rock tile (`floor-rock`), filling the ground past
+   * its squares; null in a box room.
+   */
+  const cave = art.floor ? toneOf(frames["floor-rock"]?.frames[0]) : null;
   // ---- The upright things, far to near; and the deep pieces drawn as plans, which lie flat on their squares.
   const ups: Up[] = [];
   const flats: ShopPlace[] = [];
@@ -482,7 +502,21 @@ function startRoom(
     return c;
   };
   for (const l of [...art.pools, ...art.lights]) glow(l.color);
-  const upOf = new Map(ups.map((u) => [u.name, u]));
+  // Every light on every place its piece stands (Nov 3: a lantern or a bulb string stands in several places; each lights where it
+  // is, mirrored with it): made once as the room loads, so a frame only walks two short lists.
+  // (Not a plan's standing strip: its lights are its whole picture's.)
+  const whole = ups.filter((u) => !u.cut);
+  const poolsAt = lightsAt(art.pools, whole);
+  const halosAt = lightsAt(art.lights, whole, (l) => !!l.halo);
+  /** A light's middle `lx`, `ly` (its piece's pixels) on screen, its piece standing at `u` (P already at its foot): into `lit`. */
+  const lit = { x: 0, y: 0 };
+  const litAt = (u: Up, lx: number, ly: number) => {
+    const ch = frames[u.name]!.ch;
+    const s = pt.k / SQ;
+    // (Mirrored as drawUp mirrors the piece: its pixel x lands at w - 1 - x.)
+    lit.x = pt.x + (u.ox + litDx(lx, ch.foot[0], u.flip)) * s;
+    lit.y = pt.y + (u.oy + ly - ch.foot[1]) * s;
+  };
 
   // ---- Tags: each drawn once (its pill and its words), stamped every frame.
   const tagArt = new Map<string, HTMLCanvasElement>();
@@ -607,6 +641,27 @@ function startRoom(
         rg.stroke();
       }
       // (Its light panels are drawn each frame, cut above the walls: `drawPanels`.)
+      return;
+    }
+    if (def.roof === "cave") {
+      // A cave's roof (as the mockup drew it): dark stone fading to black overhead, stalactites hanging from it.
+      const sky = rg.createLinearGradient(0, 0, 0, H * 0.45);
+      sky.addColorStop(0, "#050408");
+      sky.addColorStop(1, "#1c1a24");
+      rg.fillStyle = sky;
+      rg.fillRect(0, 0, W, H);
+      rg.fillStyle = "#14121a";
+      for (let i = 0; i < 26; i++) {
+        const x = (((i * 97) % 41) / 41) * W;
+        const y = H * (0.04 + (((i * 53) % 37) / 37) * 0.36);
+        const w = 10 + ((i * 31) % 17);
+        rg.beginPath();
+        rg.moveTo(x - w / 2, y - 30);
+        rg.lineTo(x + w / 2, y - 30);
+        rg.lineTo(x + 1, y + w * 1.6);
+        rg.closePath();
+        rg.fill();
+      }
       return;
     }
     if (def.roof === "lodge") {
@@ -747,6 +802,8 @@ function startRoom(
   /** Where things were drawn in the last frame (taps, cards, tests): the kid's box and the head points. */
   const kidBox = { x0: 0, y0: 0, x1: 0, y1: 0, on: false, hx: 0, hy: 0 };
   const youHead = { x: 0, y: 0, on: false };
+  /** Your figure's box this frame and your row (a cave's see-through pieces: drawUp), drawn before anything nearer than you. */
+  const youFig = { x0: 0, y0: 0, x1: 0, y1: 0, z: 0, on: false };
   const dest = { c: 0, r: 0, on: false };
   const pose = { x: 0, y: 0, hop: 0, tilt: 0, step: false, t: 0 };
   const sheet = loaded.kid.sheet;
@@ -758,8 +815,7 @@ function startRoom(
     if (!P(u.c, u.r)) return;
     // Near the camera (between it and you, up close: the front wall as you stand at the door) a piece fades out, so it never fills
     // the screen in front of you.
-    const near = (pt.depth - S.nearGone) / (S.nearFull - S.nearGone);
-    if (near <= 0) return;
+    if (pt.depth <= S.nearGone) return;
     const img = frameAt(u.name, now);
     const ch = frames[u.name]!.ch;
     const s = pt.k / SQ;
@@ -769,7 +825,8 @@ function startRoom(
     const y = pt.y + (u.oy - ch.foot[1]) * s;
     const w = img.width * s;
     if (x > W || x + w < 0 || y > H || y + h * s < 0) return;
-    g.globalAlpha = Math.min(1, near);
+    // (A cave: nearer the camera than you and over you, see-through: SHOP_FEEL.seeThrough.)
+    g.globalAlpha = upAlpha(pt.depth, !!cave && youFig.on && u.z > youFig.z && overlaps(youFig, x, y, x + w, y + h * s), !!cave);
     if (u.flip) {
       g.save();
       g.translate(x + w, y);
@@ -827,6 +884,9 @@ function startRoom(
     g.imageSmoothingEnabled = false;
     g.drawImage(loaded.kid.img, i * sheet.w, 0, sheet.w, sheet.h, x0, y0, sheet.w * s, sheet.h * s);
     Object.assign(kidBox, { x0, y0, x1: x0 + sheet.w * s, y1: y0 + sheet.h * s, on: true, hx: pt.x, hy: pt.y - (sheet.foot[1] - sheet.top.idle) * s - 2 });
+    // (A cave: the counter is round the bend, out of sight from the mouth, so the tag goes with him behind the rock nearer the camera,
+    // drawn now, not over everything.)
+    if (cave && !challenge) drawTag("Shopkeeper", "sidekick", kidBox.hx, kidBox.hy);
   };
   /**
    * You on your ride (town/rides.ts' frames, as the town's drawRider draws them): its idle standing, its move a cycle a step,
@@ -882,9 +942,13 @@ function startRoom(
   };
   const drawYou = (now: number) => {
     youHead.on = false;
+    youFig.on = false;
     seen.anim = "";
     you.pose(now, pose);
     if (!P(pose.x + youOx(now), pose.y + youOy(now))) return;
+    youBox(pt.x, pt.y, pt.k, f.youSquares, youFig);
+    youFig.z = pose.y + youOy(now);
+    youFig.on = true;
     const rd = riding();
     if (rd) return drawRiding(rd, now);
     seen.ride = null;
@@ -1205,27 +1269,31 @@ function startRoom(
     const h = c.height / DPR;
     g.drawImage(c, x - w / 2, y - h + 4, w, h);
   };
+  /** A piece's light fades with it near the camera (drawUp's `near`): 0 gone, 1 whole. P must be at its foot. */
+  const nearOf = () => Math.min(1, (pt.depth - S.nearGone) / (S.nearFull - S.nearGone));
   const drawGlows = (now: number) => {
-    if (!art.pools.length && !art.lights.length) return;
+    if (!poolsAt.length && !halosAt.length) return;
     g.globalCompositeOperation = "lighter";
-    for (const l of art.pools) {
-      const u = upOf.get(l.piece);
-      if (!u || !P(u.c, u.r)) continue;
-      const ch = frames[l.piece]!.ch;
+    for (const { l, at: u } of poolsAt) {
+      if (!P(u.c, u.r)) continue;
+      const near = nearOf();
+      if (near <= 0) continue;
       const s = pt.k / SQ;
-      g.globalAlpha = l.strength * S.glow;
-      g.drawImage(glow(l.color), pt.x + (l.x - ch.foot[0] - l.rx * 2) * s, pt.y + (l.y - ch.foot[1] - l.ry * 2) * s, l.rx * 4 * s, l.ry * 4 * s);
+      litAt(u, l.x, l.y);
+      g.globalAlpha = l.strength * S.glow * near;
+      g.drawImage(glow(l.color), lit.x - l.rx * 2 * s, lit.y - l.ry * 2 * s, l.rx * 4 * s, l.ry * 4 * s);
     }
-    for (const l of art.lights) {
-      const u = upOf.get(l.piece);
-      if (!u || !l.halo || !P(u.c, u.r)) continue;
-      const ch = frames[l.piece]!.ch;
+    for (const { l, at: u } of halosAt) {
+      if (!P(u.c, u.r)) continue;
+      const near = nearOf();
+      if (near <= 0) continue;
       const s = pt.k / SQ;
-      // A torch's slow, gentle flicker (as the town's lights flicker: two slow waves, never dark).
+      // A torch's slow, gentle flicker (as the town's lights flicker: two slow waves, never dark), each place out of step.
       const fl = l.flicker ? 0.85 + 0.1 * Math.sin(now / 170 + u.c) + 0.05 * Math.sin(now / 53 + u.r) : 1;
-      g.globalAlpha = 0.35 * l.strength * S.glow * fl;
-      const r = l.halo * s;
-      g.drawImage(glow(l.color), pt.x + (l.x + l.w / 2 - ch.foot[0]) * s - r, pt.y + (l.y + l.h / 2 - ch.foot[1]) * s - r, 2 * r, 2 * r);
+      g.globalAlpha = 0.35 * l.strength * S.glow * fl * near;
+      const r = l.halo! * s;
+      litAt(u, l.x + l.w / 2, l.y + l.h / 2);
+      g.drawImage(glow(l.color), lit.x - r, lit.y - r, 2 * r, 2 * r);
     }
     g.globalAlpha = 1;
     g.globalCompositeOperation = "source-over";
@@ -1241,11 +1309,22 @@ function startRoom(
     g.imageSmoothingEnabled = false;
     g.drawImage(roof, 0, 0, W, H);
     if (def.roof === "store") drawPanels();
-    // Outside, past the low front wall: the bright day the door opens onto (a flat pale ground).
+    if (cave) {
+      // A cave: past its 20 x 20 squares the rock goes on (its rock's own tone, to the horizon), so no view ends in nothing (Nov 3).
+      g.fillStyle = cave;
+      g.beginPath();
+      g.moveTo(v.rimPx[0]!, H);
+      for (let i = 0; i < v.rimN; i++) g.lineTo(v.rimPx[i]!, v.rimPy[i]!);
+      g.lineTo(v.rimPx[v.rimN - 1]!, H);
+      g.closePath();
+      g.fill();
+    }
+    // Outside, past the low front wall: the bright day the door opens onto (a flat pale ground); a cave's mouth opens onto the snowy
+    // night.
     const q = pq as [typeof pt, typeof pt, typeof pt, typeof pt];
     const near = Math.min(n + 6, camY + v.back - 0.6); // (up to just in front of the camera)
     if (near > n - 0.5 && P(-6, n - 0.5, q[0]) && P(n + 5, n - 0.5, q[1]) && P(n + 5, near, q[2]) && P(-6, near, q[3])) {
-      g.fillStyle = "#e6dfcf";
+      g.fillStyle = cave ? CAVE_SNOW : "#e6dfcf";
       g.beginPath();
       g.moveTo(q[0].x, q[0].y);
       for (let i = 1; i < 4; i++) g.lineTo(q[i]!.x, q[i]!.y);
@@ -1293,7 +1372,7 @@ function startRoom(
       drawUp(u, now);
     }
     while (k < figN) drawFigure(figK[k++]!, now);
-    if (kidBox.on && !ci) drawTag("Shopkeeper", "sidekick", kidBox.hx, kidBox.hy);
+    if (kidBox.on && !ci && !cave) drawTag("Shopkeeper", "sidekick", kidBox.hx, kidBox.hy);
     if (youHead.on) drawTag(youName(), "you", youHead.x, youHead.y);
     if (ci && introNow?.line && bossHead.on) drawBubble(ci.def.line, bossHead.x, bossHead.y);
     placeCard();
@@ -1417,6 +1496,7 @@ function startRoom(
 
   // ---- Input: a tap walks you (to a square, into talking range, to the way out); a drag looks around.
   const press = new Press(f.dragPx);
+  const focus = { x: 0, y: 0 };
   let drag: { id: number; x: number; y: number; cx: number; cy: number; k: number } | null = null;
   let closing = false;
   /** The square under (x, y) in the box, or null: the nearest drawn square whose shape holds the point. */
@@ -1466,8 +1546,10 @@ function startRoom(
     // As the town's drag (Eric, Nov 2: "when I drag from down to up, it should be the same as the town movement"): the floor
     // follows the finger, both ways. A room's rows run toward the camera (P's `camY - r`; the town's run away from it), so a
     // finger going down the screen takes this camY down, where the town's drag adds to its own.
-    camX = Math.max(0, Math.min(n - 1, drag.cx - (e.clientX - drag.x) / v.kf));
-    camY = Math.max(0, Math.min(n - 1, drag.cy - (e.clientY - drag.y) / drag.k));
+    // (Kept over the room: a cave's over its floor's shape, never into the rock or past its edge: room.ts camFocus.)
+    camFocus(room, drag.cx - (e.clientX - drag.x) / v.kf, drag.cy - (e.clientY - drag.y) / drag.k, focus);
+    camX = focus.x;
+    camY = focus.y;
   };
   const onUp = (e: PointerEvent) => {
     if (!drag || e.pointerId !== drag.id) return;
