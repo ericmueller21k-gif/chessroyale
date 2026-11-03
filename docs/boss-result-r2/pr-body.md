@@ -67,6 +67,9 @@ Overlay (Crowd, Classic): unchanged. Same code path; the list and "Everyone's av
 Targeted, UI: the boss result page (`packages/app/src/screens/Results.tsx`, `components/Breakdown.tsx`, `styles.css`), and its e2e.
 Tests run locally: `tsc -p packages/app --noEmit` (clean); the e2e checks above on phone and computer (6 runs, all pass).
 
+## The gear rule
+`docs/rules/eric.md` ("The gear is on every screen with a chessboard"): Eric asked for this himself (Nov 3: "get rid of the little settings icon" on the computer, where Settings is in the side bar). The rule's text now notes the exception; its guard (`e2e/match-menu.spec.ts`) is unchanged.
+
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
 https://claude.ai/code/session_01EKH5j59nMnRVnekEcuZbim

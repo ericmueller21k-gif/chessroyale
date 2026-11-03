@@ -39,7 +39,8 @@ removed (old → new) and says whether any of them guards a rule here.
 - **The opening always plays out.** At a game's start the dealt opening's moves play one by one, on both sides, whatever the
   Animations setting and whichever team moves first. (Eric, Oct 25.) Guard: `e2e/opening-animations.spec.ts`.
 - **The gear is on every screen with a chessboard**, phone and computer, with Sound, Animations (and Motion trail in a crowd
-  match), Resign or Leave, and Report a bug. (Eric, Oct 25.) Guard: `e2e/match-menu.spec.ts`.
+  match), Resign or Leave, and Report a bug. (Eric, Oct 25.) Guard: `e2e/match-menu.spec.ts`. One exception: a computer's boss
+  result page has no gear, since Settings is in the side bar (Eric, Nov 3: "get rid of the little settings icon").
 
 ## The town square
 
