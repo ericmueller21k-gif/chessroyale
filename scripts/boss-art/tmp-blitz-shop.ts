@@ -3,7 +3,7 @@ import { writeFileSync } from "node:fs";
 import { renderFrame } from "../../packages/app/src/characters/sprite.ts";
 import { HOUSE_SHOP_BLITZ as R } from "./out/house-shop-blitz/house-shop-blitz.ts";
 import { blank, blit, png } from "./render.ts";
-const [out, anim = "idle", fs = "0", zs = "1"] = process.argv.slice(2);
+const [out = "out.png", anim = "idle", fs = "0", zs = "1"] = process.argv.slice(2);
 const a = R.anims[anim]!;
 const z = Number(zs);
 const frs = fs === "all" ? a.frames.map((_, i) => i) : fs.split(",").map(Number);

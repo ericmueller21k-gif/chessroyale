@@ -1116,7 +1116,6 @@ at("box-stack", 18, 17, true);
 at("box-stack", 18, 6, true);
 at("showpiece", 15, 4, true); // columns 15-18, rows 3-4
 at("rack", 4, 5, true);
-at("rack-b", 14, 5, true);
 at("box-stack", 6, 17, true);
 at("box-stack", 13, 17, true);
 at("bench", 15, 9, true);
