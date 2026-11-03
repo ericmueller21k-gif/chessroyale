@@ -64,3 +64,6 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Dash round 1 (the boss: kit, sim, sounds, lines, Tick in battle, admins first) helper started, Opus high, /home/user/cr-dash `claude/boss-dash`,
   brief notes/briefs/brief-dash.md. Round 2: home + sneaker store + Tick town sheet. Round 3: his custom intro.
 - LIVE: #475 Timber intro (3a780c73, main CI watcher bhs116o1u); #474 town audio (488e0fb2, main CI watcher bdyerenbj). Eric to retest audio on iPhone.
+- Dash round 1 pushed 1bb18fbe (helper report: crowd 0.15±0.07 vs roster 0.12-0.21; FPS 60/17ms both; time = existing dock clock: bank 10+10 solo/party, 20 s move timer raids; slap −30 s bank or −6 s raid move (≥8 s); scramble 3 s ×5; out of time → random of judge's top 4, never a loss; flip live: remove "dash" from BOSS_ADMIN_FIRST in packages/core/src/settings.ts).
+  Review: slap stills show his sprite dropping out of the header over the board (a8/b8) → sent back to helper (also "Yoink! T" mid-typing). Then PR with full-e2e.
+- Disk was full (216 MB): removed 29 merged worktrees → 23 GB free. Helper wrangler servers left on 8857/8858, 8866/8867 (respawn after fuser -k).
