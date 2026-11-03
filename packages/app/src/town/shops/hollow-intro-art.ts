@@ -469,3 +469,5 @@ export const INTRO_HOLLOW_PIECES: Readonly<Record<string, Character>> = {
 
 // ---- His own moves (characters/hollow-intro.ts), in this chunk too: they load only when you challenge him.
 export { BOSS_HOLLOW_INTRO, HOLLOW_INTRO_BALL_R, HOLLOW_INTRO_HEART } from "../../characters/hollow-intro.ts";
+// ---- The cave's lights and pieces (shops/hollow-art.ts), for code that finds a piece's lit pixels.
+export { SHOP_HOLLOW_LIGHTS, SHOP_HOLLOW_PIECES } from "./hollow-art.ts";

@@ -44,9 +44,10 @@ import type { Rider } from "../rides.ts";
 import { rideSpeed } from "../../components/rides/scale.ts";
 import { STORE_PANELS, camFocus, ceilingPanel, inTalkRange, lightsAt, litDx, overlaps, upAlpha, youBox, isFloor, makeRoom, onDoor, tapTarget, findPath, type Room, type ShopPlace, type Sq } from "./room.ts";
 import { POOL_LINE, bossHoldings, buyBossCrate, canAfford, holdLine, priceLine, prizeRows, shopOf, wayText, type CrateWay, type ShopDef } from "./shops.ts";
-import { CHALLENGE_FEEL, attackStart, attackTime, frameAt as animFrame, introAt, introCues, introLength, isLog, marksFeel, marksOf, type DrawnMarks, type IntroNow, type LogPlace } from "./challenge.ts";
+import { CHALLENGE_FEEL, attackStart, attackTime, chantOf, drainAt, frameAt as animFrame, introAt, introCues, introLength, isDark, isLog, marksFeel, marksOf, seatedMarks, type DarkNow, type DrawnMarks, type IntroNow, type LogPlace } from "./challenge.ts";
+import { HOLLOW, HOLLOW_HEART, hollowBuild } from "../../characters/hollow.ts";
 import { play } from "../../sound.ts";
-import { paintTable, playCue, slabFrontY, type LoadedIntro } from "./intro.ts";
+import { paintTable, playCue, slabFrontY, type Emis, type LoadedIntro } from "./intro.ts";
 import { TABLE_BOARD } from "../houses/park.ts";
 
 /** A room's art, as its file exports it. */
@@ -284,6 +285,9 @@ const CAM_KEYS = ["h", "back", "th", "cy"] as const;
 /** An upright thing in the room, drawn at its foot, sorted far to near by `z` (its row). */
 interface Up {
   name: string;
+  /** Its placement's column (its west-most square), and its place in the room's list (set once sorted). */
+  col: number;
+  i: number;
   /** Its foot: a square (fractions allowed). */
   c: number;
   r: number;
@@ -330,7 +334,14 @@ function startRoom(
   // circle, side by side, at the challenge's pace; each settles onto its mark's middle; facing each other, the intro plays.
   const C = CHALLENGE_FEEL;
   const ci = challenge?.intro ?? null;
-  const marks = ci ? marksOf(art.layout, ci.def.layout, art.marks, marksFeel(ci.anims, CHALLENGE_FEEL, ci.def.clear)) : null;
+  const found = ci ? marksOf(art.layout, ci.def.layout, art.marks, marksFeel(ci.anims, CHALLENGE_FEEL, ci.def.clear)) : null;
+  // (Hollow's: you both walk on straight to your seats and stay there.)
+  const marks = found && ci?.def.seated ? seatedMarks(found) : found;
+  /** Its channel line this time (Hollow's: one of four, at random), or null. */
+  const chant = ci ? chantOf(ci.def) : null;
+  /** Hollow's dark (his intro's art and timing), or null: any other room or boss. */
+  const dk = ci?.dark ?? null;
+  const da = ci?.anims && isDark(ci.anims) ? ci.anims : null;
   const across = marks?.layout === "across";
   const boss = ci && marks ? new Walker({ c: room.start.c - 1, r: room.start.r }, C.walkStepMs, false) : null;
   const bossPose = { x: 0, y: 0, hop: 0, tilt: 0, step: false, t: 0 };
@@ -339,6 +350,8 @@ function startRoom(
   let bossAt = -1;
   let onMarksAt = -1;
   let introNow: IntroNow | null = null;
+  /** Ms into the intro (from you both on your marks), as of the last step. */
+  let introT = 0;
   let cueN = 0;
   let said = false;
   let introDone = false;
@@ -406,11 +419,14 @@ function startRoom(
     if (onMarksAt < 0 && youAt >= 0 && bossAt >= 0) onMarksAt = Math.max(youAt, bossAt) + C.settleMs;
     if (onMarksAt < 0 || now < onMarksAt) {
       introNow = null;
+      darkNow = null;
       if (cv.dataset.intro !== "walk") cv.dataset.intro = "walk";
       return;
     }
     const t = now - onMarksAt;
+    introT = t;
     introNow = introAt(ci.beats, ci.anims, t);
+    darkNow = introNow.dark;
     if (!said) {
       said = true;
       challenge.onMarks?.();
@@ -472,18 +488,19 @@ function startRoom(
       // The plan lies flat on its w x d squares; the strip above its north row (its plants' tops) stands up there.
       flats.push(p);
       const rise = ch.h - d * SQ;
-      if (rise > 0) ups.push({ name: p.name, c: p.col + (w - 1) / 2, r: p.row - d + 0.5, z: p.row - d + 0.5, ox: 0, oy: ch.foot[1] - rise + 1, flip: false, cut: rise });
+      if (rise > 0) ups.push({ name: p.name, col: p.col, i: 0, c: p.col + (w - 1) / 2, r: p.row - d + 0.5, z: p.row - d + 0.5, ox: 0, oy: ch.foot[1] - rise + 1, flip: false, cut: rise });
       continue;
     }
     if (p.name === "crate" && counter) {
       // On the counter, at the art's place for it in the counter's pixels; drawn just after the counter.
       const cp = art.pieces["counter"]!;
-      ups.push({ name: p.name, c: counter.col + ((counter.w ?? 1) - 1) / 2, r: counter.row, z: counter.row + 0.01, ox: art.crateAt[0] - cp.foot[0], oy: art.crateAt[1] - cp.foot[1], flip: false, cut: 0 });
+      ups.push({ name: p.name, col: p.col, i: 0, c: counter.col + ((counter.w ?? 1) - 1) / 2, r: counter.row, z: counter.row + 0.01, ox: art.crateAt[0] - cp.foot[0], oy: art.crateAt[1] - cp.foot[1], flip: false, cut: 0 });
       continue;
     }
-    ups.push({ name: p.name, c: p.col + (w - 1) / 2, r: p.row, z: p.row, ox: 0, oy: 0, flip: !!p.flip, cut: 0 });
+    ups.push({ name: p.name, col: p.col, i: 0, c: p.col + (w - 1) / 2, r: p.row, z: p.row, ox: 0, oy: 0, flip: !!p.flip, cut: 0 });
   }
   ups.sort((a, b) => a.z - b.z);
+  ups.forEach((u, i) => (u.i = i));
 
   // ---- The glow of a fire (Babur's hoops): one soft round sprite per color, made once, stretched into each pool and halo.
   const glowOf = new Map<string, HTMLCanvasElement>();
@@ -517,6 +534,179 @@ function startRoom(
     lit.x = pt.x + (u.ox + litDx(lx, ch.foot[0], u.flip)) * s;
     lit.y = pt.y + (u.oy + ly - ch.foot[1]) * s;
   };
+
+  // ---- Hollow's dark (his challenge intro, Nov 3; shops/challenge.ts darkAt): which cave pieces go out, and how. Made once.
+  const DK = C.dark;
+  /** Each upright piece's part in it, by its place in `ups`: a lantern (its place in `dark.lanterns`' order), -1 none. */
+  const lanternOf = new Int8Array(ups.length).fill(-1);
+  /** A bulb piece: its first bulb in the string's run (-1 none) and how many of the run's are its. */
+  const runFirst = new Int16Array(ups.length).fill(-1);
+  const runCount = new Uint8Array(ups.length);
+  if (dk) {
+    for (const u of ups) {
+      const li = DK.lanterns.findIndex(([c, r]) => u.name.startsWith("lantern") && u.col === c && u.r === r);
+      if (li >= 0) lanternOf[u.i] = li;
+      dk.art.INTRO_HOLLOW_BULB_RUN.forEach((b, i) => {
+        if (b.piece !== u.name || b.col !== u.col || b.row !== u.r) return;
+        if (runFirst[u.i]! < 0) runFirst[u.i] = i;
+        runCount[u.i]!++;
+      });
+    }
+  }
+  /** Hollow's intro now (null: not his, or not yet on the marks). */
+  let darkNow: DarkNow | null = null;
+  /** A room piece's frame index on the room's clock (`frameAt`'s). */
+  const frameIdx = (name: string, t: number): number => {
+    const fr = frames[name]!;
+    if (fr.frames.length === 1) return 0;
+    const u = ((t % fr.loop) + fr.loop) % fr.loop;
+    let i = 0;
+    while (i < fr.ends.length - 1 && u >= fr.ends[i]!) i++;
+    return i;
+  };
+  /** How many of a bulb piece's own bulbs have gone dark now. */
+  const runOut = (u: Up) => (runFirst[u.i]! < 0 || !darkNow ? 0 : Math.min(runCount[u.i]!, Math.max(0, darkNow.run - runFirst[u.i]!)));
+  const gutterMs = da ? da.gutter.reduce((a, b) => a + b, 0) : 0;
+  /** The lit pixels of the piece `darkPiece` looked at last (for over the dark), or null. */
+  let pieceEmis: Emis | null = null;
+  /**
+   * In Hollow's intro, an upright piece's frame now if it differs from the cave's own (a lantern going out or out, bulbs gone dark,
+   * the tree draining or dark), else null (the cave's own); its lit pixels into `pieceEmis` either way.
+   */
+  const darkPiece = (u: Up, now: number): HTMLCanvasElement | null => {
+    pieceEmis = null;
+    if (!dk || !da || !darkNow) return null;
+    const idx = () => frameIdx(u.name, now);
+    const li = lanternOf[u.i]!;
+    if (li >= 0) {
+      const st = darkNow.lanterns[li]!;
+      if (st.since < 0) {
+        pieceEmis = dk.lit[u.name]![idx()] ?? null;
+        return null;
+      }
+      const P = dk.pieces[u.name]!;
+      // (Its going out starts on its sway frame then, `gutter<k>`, and keeps the room's clock; then its dark idle on it.)
+      const lt = st.since < gutterMs ? P[`gutter${frameIdx(u.name, now - st.since)}`]![animFrame(da.gutter, st.since, false)]! : P.idle![idx()]!;
+      pieceEmis = lt.emis;
+      return lt.img;
+    }
+    if (runFirst[u.i]! >= 0) {
+      const n = runOut(u);
+      if (!n) {
+        pieceEmis = dk.lit[u.name]![idx()] ?? null;
+        return null;
+      }
+      const lt = dk.pieces[u.name]![`${u.flip ? "r" : "l"}${n}`]![idx()]!;
+      pieceEmis = lt.emis;
+      return lt.img;
+    }
+    if (u.name === "showpiece") {
+      const f = darkNow.tree.frame;
+      if (f < 0) {
+        pieceEmis = dk.lit.showpiece![idx()] ?? null;
+        return null;
+      }
+      const P = dk.pieces.showpiece!;
+      const lt = f < P.drain!.length ? P.drain![f]! : P.idle![0]!;
+      pieceEmis = lt.emis;
+      return lt.img;
+    }
+    return null;
+  };
+  /**
+   * A light's strength now in Hollow's intro (1 otherwise): its lantern's, its bulbs' share still lit (the backdrop's all gone with its
+   * first, its candle too), the tree's; none from the blackout on.
+   */
+  const lightMul = (u: Up): number => {
+    if (!darkNow) return 1;
+    let m = 1;
+    const li = lanternOf[u.i]!;
+    if (li >= 0) m = darkNow.lanterns[li]!.glow;
+    else if (runFirst[u.i]! >= 0) {
+      const n = runOut(u);
+      m = u.name === "backdrop" && n > 0 ? 0 : 1 - n / Math.max(1, runCount[u.i]!);
+    } else if (u.name === "showpiece") m = 1 - darkNow.tree.out;
+    return m * (1 - darkNow.black);
+  };
+  /** The lit pixels drawn this frame, to draw again over the dark (each its picture, place, size, mirrored, alpha). */
+  let emN = 0;
+  const emImg: HTMLCanvasElement[] = [];
+  const emX = new Float64Array(ups.length + 4);
+  const emY = new Float64Array(ups.length + 4);
+  const emS = new Float64Array(ups.length + 4);
+  const emFlip = new Uint8Array(ups.length + 4);
+  const emA = new Float64Array(ups.length + 4);
+  /** Queues `e` (the lit pixels of a picture `w` pixels wide drawn at (x, y), `s` a pixel, mirrored or not) for over the dark. */
+  const addEmis = (e: Emis | null, x: number, y: number, s: number, w: number, flip: boolean, a: number) => {
+    if (!e || a <= 0 || emN >= emX.length) return;
+    const i = emN++;
+    emImg[i] = e.img;
+    emX[i] = flip ? x + (w - e.x - e.img.width) * s : x + e.x * s;
+    emY[i] = y + e.y * s;
+    emS[i] = s;
+    emFlip[i] = flip ? 1 : 0;
+    emA[i] = a;
+  };
+
+  /**
+   * The motes of light (CHALLENGE_FEEL.dark.mote), made once: each its kind, when it leaves (ms into the intro), and where from: a
+   * piece's pixel at its place (`u`, `lx`, `ly`), one of his own bulbs (`who` 1: his pixels), or your pawn (`who` 2: squares from your
+   * feet). Each lands once (`landed`: ms into the intro; -1 not yet).
+   */
+  interface Mote {
+    kind: string;
+    at: number;
+    who: 0 | 1 | 2;
+    u: Up | null;
+    lx: number;
+    ly: number;
+    landed: number;
+  }
+  const motes: Mote[] = [];
+  /** The tree's lights in its pixels, bottom to top (as the art's mockup): from `x0` across `w` (narrowing by `narrow` to the top, drifting `drift` right), from `y0` up `h`. */
+  const TREE_LIGHTS = { x0: 15, w: 80, narrow: 0.7, drift: 25, y0: 150, h: 110 } as const;
+  /** A lantern's motes leave its glass: round this pixel (its ring's middle, a few pixels down), `spread` pixels across. */
+  const LANTERN_GLASS = { x: 18, y: 59, spread: 5 } as const;
+  if (dk && da && ci) {
+    const M = DK.mote;
+    const d = drainAt();
+    const drink = ci.beats.find((b) => b.step === "drink")!.at;
+    const hash = (n: number) => (((Math.sin(n * 127.1) * 43758.5453) % 1) + 1) % 1;
+    const upAt = (name: string, col: number, row: number) => ups.find((u) => u.name === name && u.col === col && u.r === row) ?? null;
+    const G = LANTERN_GLASS;
+    d.lanterns.forEach((ms, li) => {
+      const [c, r] = DK.lanterns[li]!;
+      const u = ups.find((x) => x.name.startsWith("lantern") && x.col === c && x.r === r) ?? null;
+      for (let j = 0; j < M.perLantern; j++)
+        motes.push({ kind: j < 2 ? "warm-l" : j < 5 ? "warm-m" : "warm-s", at: drink + ms + M.lead + j * M.every, who: 0, u, lx: G.x + (hash(li * 9 + j) - 0.5) * G.spread, ly: G.y + (hash(li * 7 + j + 3) - 0.5) * G.spread, landed: -1 });
+    });
+    const run = dk.art.INTRO_HOLLOW_BULB_RUN;
+    run.forEach((b, i) => {
+      const kind = dk.runMote[i];
+      if (kind) motes.push({ kind: kind + (i % 3 === 1 ? "-s" : ""), at: drink + d.string + (i * d.stringMs) / run.length, who: 0, u: upAt(b.piece, b.col, b.row), lx: b.at[0], ly: b.at[1], landed: -1 });
+    });
+    const tree = ups.find((u) => u.name === "showpiece") ?? null;
+    const cols = ["red", "green", "blue", "gold", "orange", "pink"];
+    const T = TREE_LIGHTS;
+    for (let i = 0; i < M.tree; i++) {
+      const v = i / (M.tree - 1);
+      motes.push({ kind: cols[i % 6]! + (i % 2 ? "-s" : ""), at: drink + d.tree + i * M.treeEvery, who: 0, u: tree, lx: T.x0 + hash(i + 50) * T.w * (1 - v * T.narrow) + v * T.drift, ly: T.y0 - v * T.h, landed: -1 });
+    }
+    const star = dk.art.INTRO_HOLLOW_STAR_AT;
+    for (let i = 0; i < M.star; i++) motes.push({ kind: i === 0 ? "star" : "gold", at: drink + d.tree + M.starAt + i * M.starEvery, who: 0, u: tree, lx: star[0], ly: star[1], landed: -1 });
+    // His own strand, a third at a time, from where his bulbs hang as he drinks.
+    const bulbs = hollowBuild({ crouch: 2, feet: "wide", free: "out", arm: "low", mood: "roar" }).bulbs;
+    d.strand.forEach((ms, third) =>
+      bulbs.forEach((b, n) => {
+        if (n % 3 === 2 - third) motes.push({ kind: ["red", "gold", "blue"][n % 3]!, at: drink + ms + n * M.strandEvery, who: 1, u: null, lx: b[0] + 1.5, ly: b[1] + 3, landed: -1 });
+      }),
+    );
+    for (let i = 0; i < M.pawn; i++) motes.push({ kind: i % 2 ? "pawn-s" : "pawn", at: drink + d.pawn + M.pawnLead + i * M.pawnEvery, who: 2, u: null, lx: (hash(i + 90) - 0.5) * 0.4, ly: -(0.45 + hash(i + 70) * 0.5), landed: -1 });
+  }
+  /** Where his feet are on screen this frame and a pixel of his, as drawBoss drew him; and your feet's, as drawYou drew you. */
+  const hisFoot = { x: 0, y: 0, k: 0, on: false };
+  const youFoot = { x: 0, y: 0, k: 0, on: false };
+  let lastSip = -Infinity;
 
   // ---- Tags: each drawn once (its pill and its words), stamped every frame.
   const tagArt = new Map<string, HTMLCanvasElement>();
@@ -816,7 +1006,8 @@ function startRoom(
     // Near the camera (between it and you, up close: the front wall as you stand at the door) a piece fades out, so it never fills
     // the screen in front of you.
     if (pt.depth <= S.nearGone) return;
-    const img = frameAt(u.name, now);
+    // (Hollow's intro: a lantern going out, bulbs gone dark, the tree draining: its own frame, and its lit pixels for over the dark.)
+    const img = darkPiece(u, now) ?? frameAt(u.name, now);
     const ch = frames[u.name]!.ch;
     const s = pt.k / SQ;
     const fx = u.flip ? ch.w - 1 - ch.foot[0] : ch.foot[0];
@@ -827,6 +1018,7 @@ function startRoom(
     if (x > W || x + w < 0 || y > H || y + h * s < 0) return;
     // (A cave: nearer the camera than you and over you, see-through: SHOP_FEEL.seeThrough.)
     g.globalAlpha = upAlpha(pt.depth, !!cave && youFig.on && u.z > youFig.z && overlaps(youFig, x, y, x + w, y + h * s), !!cave);
+    if (pieceEmis && darkNow && darkNow.level > 0) addEmis(pieceEmis, x, y, s, img.width, u.flip, g.globalAlpha * (1 - darkNow.black));
     if (u.flip) {
       g.save();
       g.translate(x + w, y);
@@ -949,6 +1141,7 @@ function startRoom(
     youBox(pt.x, pt.y, pt.k, f.youSquares, youFig);
     youFig.z = pose.y + youOy(now);
     youFig.on = true;
+    Object.assign(youFoot, { x: pt.x, y: pt.y, k: pt.k, on: true });
     const rd = riding();
     if (rd) return drawRiding(rd, now);
     seen.ride = null;
@@ -973,7 +1166,9 @@ function startRoom(
       const u = h / 45;
       g.translate(-h / 2, y0 - pt.y);
       g.scale(u, u);
-      g.fillStyle = "#ffffff";
+      // (Hollow's intro: its light drawn off, the pawn greys a touch, to a light grey-lilac.)
+      const tint = darkNow?.pawn.tint ?? 0;
+      g.fillStyle = tint ? `rgb(${Math.round(255 - 38 * tint)},${Math.round(255 - 38 * tint)},${Math.round(255 - 26 * tint)})` : "#ffffff";
       g.fill(PAWN);
       g.lineWidth = 1.5;
       g.lineCap = "round";
@@ -1034,6 +1229,42 @@ function startRoom(
     g.imageSmoothingEnabled = false;
     Object.assign(bossHead, { x: pt.x, y: pt.y - (b.ch.foot[1] - b.ch.h * 0.04) * k, on: true });
   };
+  /**
+   * Hollow in his intro (the dark): his own move's frame (BOSS_HOLLOW_INTRO, his strand's bulbs as lit as the drain has left them), or
+   * once he has settled his idle with his strand dark; at his town size, his feet where he stands, as his town figure is drawn. His lit
+   * pixels queued for over the dark, and his eyes alone in the black.
+   */
+  const drawDarkBoss = (now: number, dn: DarkNow) => {
+    boss!.pose(now, bossPose);
+    if (!P(bossPose.x + bossOx(now), bossPose.y + bossOy(now))) return;
+    const b = ci!.boss;
+    const k = (b.squares * pt.k) / b.ch.h;
+    let img: HTMLCanvasElement;
+    let emis: Emis | null = null;
+    let eyes: Emis | null = null;
+    if (dn.move) {
+      const by = dk!.him[dn.move.anim];
+      const lt = (by[dn.bulbs] ?? by.find((x) => x) ?? [])[dn.move.frame]!;
+      img = lt.img;
+      emis = lt.emis;
+      if (dn.move.anim === "full" || dn.move.anim === "settle") eyes = dk!.eyes[dn.move.anim][dn.move.frame] ?? null;
+    } else {
+      const u = now % b.loop;
+      let i = 0;
+      while (i < b.ends.length - 1 && u >= b.ends[i]!) i++;
+      img = dk!.idle0[i]!;
+    }
+    const x0 = pt.x - b.ch.foot[0] * k;
+    const y0 = pt.y - b.ch.foot[1] * k;
+    drawShadows(pt.x, pt.y, b.ch.w * k);
+    g.imageSmoothingEnabled = k < 1.5;
+    g.drawImage(img, x0, y0, img.width * k, img.height * k);
+    g.imageSmoothingEnabled = false;
+    if (dn.level > 0) addEmis(emis, x0, y0, k, img.width, false, 1 - dn.black);
+    if (dn.eyes > 0) addEmis(eyes, x0, y0, k, img.width, false, dn.eyes);
+    Object.assign(hisFoot, { x: pt.x, y: pt.y, k, on: true });
+    Object.assign(bossHead, { x: pt.x, y: y0 + b.squares * pt.k * 0.04, on: true });
+  };
   /** The town's two shadows under a boss (a soft one, `w` wide at most, and the contact one at its feet). */
   const drawShadows = (x: number, y: number, w: number) => {
     const soft = 1.6;
@@ -1050,9 +1281,11 @@ function startRoom(
   };
   const drawBoss = (now: number) => {
     bossHead.on = false;
+    hisFoot.on = false;
     if (!ci || !boss) return;
     const wat = woodAt();
     if (wat) return drawWoodMove(wat);
+    if (dk && darkNow && (darkNow.move || darkNow.bulbs < 3)) return drawDarkBoss(now, darkNow);
     if (attackFrame >= 0 && ci.attack) return drawAttack(now);
     boss.pose(now, bossPose);
     if (!P(bossPose.x + bossOx(now), bossPose.y + bossOy(now))) return;
@@ -1079,6 +1312,7 @@ function startRoom(
     g.restore();
     g.imageSmoothingEnabled = false;
     Object.assign(bossHead, { x: pt.x, y: y0 + h * 0.04, on: true });
+    Object.assign(hisFoot, { x: pt.x, y: pt.y, k: h / b.ch.h, on: true });
   };
   /**
    * Between you (in a challenge): the pyramid's frame, or the table with its board (the crumble's last frames over it). The table's
@@ -1280,7 +1514,8 @@ function startRoom(
       if (near <= 0) continue;
       const s = pt.k / SQ;
       litAt(u, l.x, l.y);
-      g.globalAlpha = l.strength * S.glow * near;
+      g.globalAlpha = Math.min(1, l.strength * S.glow * near * lightMul(u));
+      if (g.globalAlpha <= 0.003) continue;
       g.drawImage(glow(l.color), lit.x - l.rx * 2 * s, lit.y - l.ry * 2 * s, l.rx * 4 * s, l.ry * 4 * s);
     }
     for (const { l, at: u } of halosAt) {
@@ -1290,7 +1525,8 @@ function startRoom(
       const s = pt.k / SQ;
       // A torch's slow, gentle flicker (as the town's lights flicker: two slow waves, never dark), each place out of step.
       const fl = l.flicker ? 0.85 + 0.1 * Math.sin(now / 170 + u.c) + 0.05 * Math.sin(now / 53 + u.r) : 1;
-      g.globalAlpha = 0.35 * l.strength * S.glow * fl * near;
+      g.globalAlpha = Math.min(1, 0.35 * l.strength * S.glow * fl * near * lightMul(u));
+      if (g.globalAlpha <= 0.003) continue;
       const r = l.halo! * s;
       litAt(u, l.x + l.w / 2, l.y + l.h / 2);
       g.drawImage(glow(l.color), lit.x - r, lit.y - r, 2 * r, 2 * r);
@@ -1299,7 +1535,199 @@ function startRoom(
     g.globalCompositeOperation = "source-over";
   };
 
+  /** His void's radius, his pixels (the ball's when it isn't out: the art's notes). */
+  const VOID_R = 5.5;
+  /** Your pawn's light gathering, as the art's mockup draws it: a pale glow `r` squares round a point `up` squares over your feet, at `a` at its strongest. */
+  const PAWN_GLOW = { color: "#e4e0ff", r: 0.9, up: 0.75, a: 0.55 } as const;
+  /** The ball's middle on screen now and its radius (screen pixels), as drawn this frame. */
+  const heart = { x: 0, y: 0, r: 0 };
+  const heartNow = (dn: DarkNow) => {
+    const m = dn.move;
+    const hp = m ? dk!.art.HOLLOW_INTRO_HEART[m.anim]![m.frame]! : HOLLOW_HEART;
+    heart.x = hisFoot.x + (hp[0] - HOLLOW.foot[0]) * hisFoot.k;
+    heart.y = hisFoot.y + (hp[1] - HOLLOW.foot[1]) * hisFoot.k;
+    heart.r = ((m ? dk!.art.HOLLOW_INTRO_BALL_R[m.anim]![m.frame]! : 0) || VOID_R) * hisFoot.k;
+  };
+  const moteMs = dk ? dk.art.INTRO_HOLLOW_MOTE.anims.red!.frames.map((x) => x.ms) : [];
+  const sipMs = dk ? dk.art.INTRO_HOLLOW_MOTE.anims.sip!.frames.map((x) => x.ms) : [];
+  const moteHash = (n: number) => (((Math.sin(n * 127.1) * 43758.5453) % 1) + 1) % 1;
+  /** A mote's flight from (sx, sy) to the ball, `el` ms after it left: into `mp`; true once it's in (at its end, or at the ball's rim). */
+  const mp = { x: 0, y: 0 };
+  const flight = (sx: number, sy: number, el: number): boolean => {
+    const M = DK.mote;
+    const dx = heart.x - sx;
+    const dy = heart.y - sy;
+    const dist = Math.hypot(dx, dy) || 1;
+    const dur = Math.max(M.minMs, Math.min(M.maxMs, M.ms + dist * M.msPerPx));
+    const u = Math.max(0, Math.min(1, el / dur));
+    const e = u ** M.ease;
+    // (A curve bowing upward by `bow` of its length.)
+    const nx = -dy / dist;
+    const ny = dx / dist;
+    const side = ny < 0 ? 1 : -1;
+    const cx = (sx + heart.x) / 2 + nx * side * dist * M.bow;
+    const cy = (sy + heart.y) / 2 + ny * side * dist * M.bow;
+    mp.x = (1 - e) ** 2 * sx + 2 * (1 - e) * e * cx + e * e * heart.x;
+    mp.y = (1 - e) ** 2 * sy + 2 * (1 - e) * e * cy + e * e * heart.y;
+    return u >= 1 || Math.hypot(mp.x - heart.x, mp.y - heart.y) < heart.r * 0.9;
+  };
+  /** The motes in flight now (and each one's sip as it lands, every other one; its sound at most one a `sipGapMs`). */
+  const drawMotes = (t: number) => {
+    if (!dk || !hisFoot.on) return;
+    const M = DK.mote;
+    const art = dk.motes;
+    for (let n = 0; n < motes.length; n++) {
+      const m = motes[n]!;
+      if (t < m.at) continue;
+      if (m.landed >= 0) {
+        const since = t - m.landed;
+        if (n % 2 || since >= M.sipMs) continue;
+        const img = art.sip![animFrame(sipMs, since, false)]!;
+        const s = Math.max(hisFoot.k, M.minScale);
+        g.drawImage(img, heart.x + (moteHash(n) - 0.5) * heart.r - 6 * s, heart.y + (moteHash(n + 1) - 0.5) * heart.r - 6 * s, img.width * s, img.height * s);
+        continue;
+      }
+      let sx: number;
+      let sy: number;
+      let s: number;
+      if (m.who === 0) {
+        if (!m.u || !P(m.u.c, m.u.r)) continue;
+        litAt(m.u, m.lx, m.ly);
+        [sx, sy, s] = [lit.x, lit.y, pt.k / SQ];
+      } else if (m.who === 1) [sx, sy, s] = [hisFoot.x + (m.lx - HOLLOW.foot[0]) * hisFoot.k, hisFoot.y + (m.ly - HOLLOW.foot[1]) * hisFoot.k, hisFoot.k];
+      else {
+        if (!youFoot.on) continue;
+        [sx, sy, s] = [youFoot.x + m.lx * youFoot.k, youFoot.y + m.ly * youFoot.k, youFoot.k / SQ];
+      }
+      if (flight(sx, sy, t - m.at)) {
+        m.landed = t;
+        if (t - lastSip >= DK.sipGapMs) {
+          lastSip = t;
+          playCue(ci!, "sip");
+        }
+        continue;
+      }
+      const x = mp.x;
+      const y = mp.y;
+      const color = dk.art.INTRO_HOLLOW_MOTE_GLOW[m.kind] ?? "#ffffff";
+      const ms = Math.max(s, M.minScale);
+      g.globalCompositeOperation = "lighter";
+      g.globalAlpha = M.glowA;
+      const r = M.glowPx * ms;
+      g.drawImage(glow(color), x - r, y - r, 2 * r, 2 * r);
+      for (let i = 0; i < M.trail.length; i++) {
+        flight(sx, sy, Math.max(0, t - m.at - M.trail[i]!));
+        g.globalAlpha = M.trailA[i]!;
+        const rr = (2.2 - i * 0.4) * ms;
+        g.drawImage(glow(color), mp.x - rr, mp.y - rr, 2 * rr, 2 * rr);
+      }
+      g.globalCompositeOperation = "source-over";
+      g.globalAlpha = 1;
+      const img = art[m.kind]![animFrame(moteMs, t - m.at + n * 23, true)]!;
+      g.drawImage(img, x - 6 * ms, y - 6 * ms, img.width * ms, img.height * ms);
+    }
+  };
+  /**
+   * Hollow's dark over the room (his intro; the art's mockup's order): the dark laid over everything at its level, the dim light's pool
+   * cut out of it and tinted (closing in on the board as the iris), then the lights still lit (their glows, the ball's violet glow, your
+   * pawn's), their lit pixels over that, his eyes in the black, and the motes. Before he's on his mark: the glows only (drawn over the
+   * room in his challenge throughout, as the mockup draws them).
+   */
+  const drawDarkPass = (now: number) => {
+    const dn = darkNow;
+    if (dn && dn.level > 0 && !(marks && P(marks.table.c - dk!.art.INTRO_HOLLOW_DIMPOOL.west, marks.table.r))) {
+      // (The table's place out of the view: the dark alone.)
+      g.globalAlpha = dn.level;
+      g.fillStyle = dk!.art.INTRO_HOLLOW_DARK.tone;
+      g.fillRect(0, 0, W, H);
+      g.globalAlpha = 1;
+    } else if (dn && dn.level > 0 && marks) {
+      const D = dk!.art.INTRO_HOLLOW_DARK;
+      const Q = dk!.art.INTRO_HOLLOW_DIMPOOL;
+      const tone = D.tone;
+      let cx = pt.x;
+      let cy = pt.y - Q.lift * pt.k;
+      let rx = Q.rx * pt.k;
+      let ry = Q.ry * pt.k;
+      if (dn.iris > 0 && P(marks.table.c, marks.table.r)) {
+        // (The iris: the pool closing in on the board, the table's top.)
+        const bx = pt.x;
+        const by = pt.y - (TABLE_BOARD.top * pt.k) / SQ;
+        cx += (bx - cx) * dn.iris;
+        cy += (by - cy) * dn.iris;
+        rx *= 1 - dn.iris;
+        ry *= 1 - dn.iris;
+      }
+      const [tr, tg, tb] = [1, 3, 5].map((j) => parseInt(tone.slice(j, j + 2), 16));
+      if (dn.pool > 0 && rx > 0.5 && ry > 0.5) {
+        // The dark, the pool cut out of it: the room at `level` in its middle out to `inner`, then smoothly to the black at its edge.
+        g.save();
+        g.translate(cx, cy);
+        g.scale(rx, ry);
+        const gr = g.createRadialGradient(0, 0, 0, 0, 0, 1);
+        for (let i = 0; i <= 10; i++) {
+          const u = i / 10;
+          const v = u <= Q.inner ? 1 : 1 - ((u - Q.inner) / (1 - Q.inner)) ** 2 * (3 - 2 * ((u - Q.inner) / (1 - Q.inner)));
+          gr.addColorStop(u, `rgba(${tr},${tg},${tb},${(dn.level * (1 - Q.level * dn.pool * v)).toFixed(3)})`);
+        }
+        g.fillStyle = gr;
+        g.fillRect(-cx / rx, -cy / ry, W / rx, H / ry);
+        // Its cool tint.
+        g.globalCompositeOperation = "multiply";
+        const tint = g.createRadialGradient(0, 0, 0, 0, 0, 1);
+        tint.addColorStop(0, Q.tint);
+        tint.addColorStop(1, "#ffffff");
+        g.globalAlpha = dn.pool;
+        g.fillStyle = tint;
+        g.beginPath();
+        g.arc(0, 0, 1, 0, Math.PI * 2);
+        g.fill();
+        g.restore();
+      } else {
+        g.globalAlpha = dn.level;
+        g.fillStyle = tone;
+        g.fillRect(0, 0, W, H);
+        g.globalAlpha = 1;
+      }
+    }
+    drawGlows(now);
+    if (!dn) return;
+    g.globalCompositeOperation = "lighter";
+    if (hisFoot.on) {
+      heartNow(dn);
+      const BG = dk!.art.INTRO_HOLLOW_BALL_GLOW as Readonly<Record<string, { r: number; a: number } | string>>;
+      const bg = dn.move ? BG[dn.move.anim] : undefined;
+      if (bg && typeof bg !== "string" && dn.black < 1) {
+        const r = bg.r * hisFoot.k + heart.r;
+        g.globalAlpha = Math.min(1, bg.a * (0.85 + 0.15 * Math.sin(now / DK.pulseMs)) * (1 - dn.black));
+        g.drawImage(glow(dk!.art.INTRO_HOLLOW_BALL_GLOW.color), heart.x - r, heart.y - r * 0.9, 2 * r, 2 * r * 0.9);
+      }
+    }
+    if (dn.pawn.glow > 0 && youFoot.on) {
+      g.globalAlpha = PAWN_GLOW.a * dn.pawn.glow;
+      const r = youFoot.k * PAWN_GLOW.r;
+      g.drawImage(glow(PAWN_GLOW.color), youFoot.x - r, youFoot.y - youFoot.k * PAWN_GLOW.up - r, 2 * r, 2 * r);
+    }
+    g.globalCompositeOperation = "source-over";
+    // The lights' own lit pixels over the dark (and his eyes in the black).
+    for (let i = 0; i < emN; i++) {
+      const img = emImg[i]!;
+      const s = emS[i]!;
+      g.globalAlpha = Math.min(1, emA[i]!);
+      if (emFlip[i]) {
+        g.save();
+        g.translate(emX[i]! + img.width * s, emY[i]!);
+        g.scale(-1, 1);
+        g.drawImage(img, 0, 0, img.width * s, img.height * s);
+        g.restore();
+      } else g.drawImage(img, emX[i]!, emY[i]!, img.width * s, img.height * s);
+    }
+    g.globalAlpha = 1;
+    drawMotes(introT);
+  };
+
   const draw = (now: number) => {
+    emN = 0;
     for (const k of CAM_KEYS) {
       tall[k] = S.close[k] + (f.camTall[k] - S.close[k]) * zoomCur;
       wide[k] = S.close[k] + (f.camWide[k] - S.close[k]) * zoomCur;
@@ -1344,7 +1772,8 @@ function startRoom(
       g.ellipse(pt.x, pt.y, pt.k * 0.3, pt.k * 0.11, 0, 0, Math.PI * 2);
       g.stroke();
     } else dest.on = false;
-    drawGlows(now);
+    // (Hollow's challenge: the glows over the room, with his dark: drawDarkPass.)
+    if (!dk) drawGlows(now);
     // Far to near: the pieces by their rows, the Shopkeeper and you (and in a challenge the boss and the board between you) each
     // drawn before the first piece nearer than them.
     you.pose(now, pose);
@@ -1372,9 +1801,17 @@ function startRoom(
       drawUp(u, now);
     }
     while (k < figN) drawFigure(figK[k++]!, now);
+    if (dk) drawDarkPass(now);
     if (kidBox.on && !ci && !cave) drawTag("Shopkeeper", "sidekick", kidBox.hx, kidBox.hy);
-    if (youHead.on) drawTag(youName(), "you", youHead.x, youHead.y);
+    // (Hollow's intro: your tag fades as the drain starts, so the dark isn't broken by a bright label.)
+    const tagA = darkNow?.tag ?? 1;
+    if (youHead.on && tagA > 0) {
+      g.globalAlpha = tagA;
+      drawTag(youName(), "you", youHead.x, youHead.y);
+      g.globalAlpha = 1;
+    }
     if (ci && introNow?.line && bossHead.on) drawBubble(ci.def.line, bossHead.x, bossHead.y);
+    if (chant && introNow?.chant && bossHead.on) drawBubble(chant, bossHead.x, bossHead.y);
     placeCard();
     const h = you.here();
     const key = `${h.c},${h.r}`;
@@ -1618,6 +2055,23 @@ function startRoom(
       // (Timber's own: his move, the log, the fog, the shavings' ring, the stumps.)
       wood: w ? { move: w.move?.anim ?? null, log: w.log?.anim ?? null, fog: w.fog?.anim ?? null, ring: w.ring, stumps: w.stumps?.anim ?? null } : null,
       line: !!introNow?.line && bossHead.on,
+      // (Hollow's own: his channel line this time, while it shows; and the dark: his move, his strand, the lanterns out, the string's
+      // bulbs dark, the tree, the dark's level, the blackout, the dim light, the iris.)
+      chant: introNow?.chant && bossHead.on ? chant : null,
+      dark: darkNow
+        ? {
+            move: darkNow.move?.anim ?? null,
+            bulbs: darkNow.bulbs,
+            lanterns: darkNow.lanterns.filter((l) => l.since >= 0).length,
+            run: darkNow.run,
+            tree: darkNow.tree.out,
+            tag: darkNow.tag,
+            level: darkNow.level,
+            black: darkNow.black,
+            pool: darkNow.pool,
+            iris: darkNow.iris,
+          }
+        : null,
       table: !!introNow?.table,
       stools: introNow?.stools ? [[marks!.bossStool.c, marks!.bossStool.r], [marks!.youStool.c, marks!.youStool.r]] : [],
       pyramid: introNow?.pyramid ?? null,

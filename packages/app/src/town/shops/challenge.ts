@@ -46,13 +46,24 @@ export interface BossIntro {
    * `CHALLENGE_FEEL.clear.boss` allows (Hollow, Nov 3: his strand's lash lies 1.6 squares out in front of his feet). None: the usual.
    */
   clear?: number;
+  /**
+   * Its second line, said as its own art starts (Hollow's channel lines, Nov 3: one picked at random each time, `chantOf`), in the
+   * bubble over its head for `CHALLENGE_FEEL.dark.chantMs`. None: just its entrance line.
+   */
+  chant?: readonly string[];
+  /**
+   * You both walk on straight to your seat spots (its `clear` place, yours the usual) and stay there: no hop back as the stools come
+   * in (Hollow, Nov 3: "you both walk on straight to your seat spots"; the table and stools come in while it's still lit). `seatedMarks`.
+   */
+  seated?: true;
 }
 
 /**
  * The bosses with an intro: every boss whose home has an inside (shops/shops.ts SHOPS; Nov 2, round 2: "for other bosses they should
  * just be swinging for a few seconds like discussed"). Alfil has his own (his pyramid and sandstorm), Big Boy his (his toy blocks
- * and lollipop swirl, Nov 2), Timber his (Nov 3: his log, gnawed into the table, and his sawdust sweep); Babur, Puddles, Dash (Nov 3,
- * until his own, round 3) and Hollow (Nov 3, until his own) the default.
+ * and lollipop swirl, Nov 2), Timber his (Nov 3: his log, gnawed into the table, and his sawdust sweep), Hollow his (Nov 3: the darkness
+ * ball drinking the cave's light, the dim light, an iris to the board); Babur, Puddles and Dash (Nov 3, until his own, round 3) the
+ * default.
  * The lines are placeholders until Gemini's lines arrive (Part D), each in its boss's voice (characters/*-lines.ts). Alfil's cues are
  * his own synthesized sounds (characters/alfil-sounds.ts): a low rumble as the pyramid rises, the grinding crunch as it cracks, the
  * ground's thud as it falls, the soft glow as the board shows, and a whoosh as the storm comes in. The default's: the app's soft pop
@@ -121,21 +132,45 @@ export const BOSS_INTROS: Readonly<Partial<Record<HomeId, BossIntro>>> = {
     cues: { table: "pop", wipe: "dashWhoosh" },
     facesLeft: true,
   },
-  // (Nov 3: the default until his own, the lanterns going out one by one, next round; his line is his entrance's, characters/hollow.ts,
-  // and the wipe his darkness's cast. His pond is smaller than the other circles: the drawn marks, SHOP_HOLLOW_MARKS, the usual spacing.)
+  // (Nov 3: his own, the darkness ball drinking the cave's light, Eric's design with his changes (docs/decisions/2026-11-03-hollow-intro.md);
+  // his entrance line as before (characters/hollow.ts), then a channel line as he starts to charge. His pond is smaller than the other
+  // circles: the drawn marks, SHOP_HOLLOW_MARKS, the usual spacing.)
   hollow: {
     name: "Hollow",
     line: "Did you leave a light on?",
     layout: "across",
-    custom: false,
-    cues: { table: "pop", wipe: "hollowCast" },
-    // (His lash's feet clear of his stool, a tenth from it as every boss's; his whole swing still clear of the cave's west rock.)
+    custom: true,
+    chant: ["The dark is misunderstood.", "It's not the dark you fear. It's not knowing what's in it.", "Shh. The dark never hurt anyone.", "Nobody ever asks the dark how it feels."],
+    seated: true,
+    // His cues, each a sound of his own (characters/hollow-sounds.ts), but the app's pop as the table appears: his hum as the ball
+    // charges (once a loop) and deeper once it's full; his cast, lower, as it swells; a lantern's flame pulled at, then snuffed; the
+    // string's dull run, a tick as each bulb goes dark, the star's last muffled tone; a mote's sip as it lands; your pawn's light
+    // leaving; the blackout's thoom; the ball settling back into him.
+    cues: {
+      table: "pop",
+      hum: "hollowHum",
+      deep: "hollowDeep",
+      swell: "hollowSwell",
+      gutter: "hollowGutter",
+      snuff: "hollowSnuff",
+      drain: "hollowDrain",
+      tink: "hollowTink",
+      star: "hollowStar",
+      sip: "hollowSip",
+      pawn: "hollowPawn",
+      blackout: "hollowBlackout",
+      settle: "hollowSettle",
+    },
+    // (Where he sits: his lash's feet clear of his stool, a tenth from it as every boss's, as when he swung it there; he walks on to it.)
     clear: 2.92,
   },
 };
 
 /** The boss's intro, or null: challenged as before (no intro yet). */
 export const introOf = (id: HomeId): BossIntro | null => BOSS_INTROS[id] ?? null;
+/** Its channel line this time (one of its `chant`, picked by `rand`: Math.random as the room opens), or null: it has none. */
+export const chantOf = (def: BossIntro, rand: () => number = Math.random): string | null =>
+  def.chant?.length ? def.chant[Math.min(def.chant.length - 1, Math.floor(rand() * def.chant.length))]! : null;
 
 /**
  * Every number that shapes the challenge's timing and where everyone stands. The pacing (Eric, Nov 2, after Big Boy's live: "it
@@ -230,6 +265,82 @@ export const CHALLENGE_FEEL = {
    * (his `clear.boss`: a tenth further out than the others' 2.6, as his stump's roots spread wider than a stool).
    */
   log: { at: 3.3, lineLeadMs: 800, walkMs: 420, carryMs: 600, holdMs: 960, clear: 2.7 },
+  /**
+   * Hollow's own (Nov 3; Eric's design: "the darkness ball in his belly powers up… It sucks in the light: the lanterns go out one by
+   * one, the bulb string's lights are drawn in toward him, light from everything around, even from your own chest piece… Everything goes
+   * black. It does NOT all switch back on: darkness everywhere, and a dim, steady light around you, the board and him"; approved with his
+   * changes, docs/decisions/2026-11-03-hollow-intro.md). You both walk on to your seats; his line (`lineMs`, a short one); a pause; the
+   * table pops in, still lit (the default's `popMs`, `tableHoldMs`); he charges (`chargeMs`), his channel line over his head for
+   * `chantMs`; he swells (his art's frames); he drinks the light: the `drain`'s beats as drawn (ms from the drink's start: the lanterns
+   * far to near, the string west to east, the tree, his own strand a third at a time, your pawn, full), every gap times `pace` (Eric:
+   * "15% faster"); full (`fullMs`); the blackout and the black (the art's INTRO_HOLLOW_DARK); the dim light (`dimMs`, coming up over the
+   * art's INTRO_HOLLOW_DIMPOOL.inMs while he settles); the pool closes in on the board (`irisMs`); the match comes up out of the dark
+   * (`outMs`). About 15 s from the marks to the board.
+   */
+  dark: {
+    lineMs: 1800,
+    chantMs: 2500,
+    chargeMs: 2200,
+    pace: 0.85,
+    drain: { lanterns: [140, 740, 1340, 1840, 2340], string: 2940, stringMs: 1800, tree: 4840, strand: [5540, 5690, 5840], pawn: 6040, end: 6740 },
+    /** The lanterns in the order they go out (far to near, the nearest last: the art's call 1), each its column and row in his cave. */
+    lanterns: [[9, 5], [11, 8], [9, 11], [17, 12], [13, 16]],
+    /** A lantern's share of the dark comes on from this far into its going out, over this long (the art's mockup). */
+    lanternDarkAfter: 340,
+    lanternDarkMs: 400,
+    /** Your pawn's light: a pale glow gathers on it (`pawnGlowMs`) and is drawn off over the rest of `pawnMs`; the pawn greys a touch from `pawnTintAfter` in, over `pawnMs`. */
+    pawnMs: 500,
+    pawnGlowMs: 150,
+    pawnTintAfter: 100,
+    /** Your name tag fades as the drain starts (the art's call 10). */
+    tagMs: 300,
+    fullMs: 700,
+    dimMs: 1300,
+    /** His eyes in the black fade out over this long as the dim light comes up. */
+    eyesOutMs: 400,
+    irisMs: 600,
+    /** The match screen comes up out of the dark (a fade from black) over this long, once the battle shows. */
+    outMs: 600,
+    /** The ball's violet glow pulses slowly (0.85 to 1): `sin(t / pulseMs)`. */
+    pulseMs: 90,
+    /** At most one sip a gap, and one tick along the string (else a buzz). */
+    sipGapMs: 80,
+    tinkGapMs: 80,
+    /**
+     * The motes of light (the art's suggestion): `perLantern` from each lantern `every` ms apart from `lead` into its going out; one from
+     * each lit bulb as it goes dark; `tree` up the tree `treeEvery` apart, then `star` from its star from `starAt`, `starEvery` apart; one
+     * from each of his bulbs, `strandEvery` apart; `pawn` from yours from `pawnLead`, `pawnEvery` apart. Each flies `ms` + `msPerPx` a
+     * screen pixel (held between `minMs` and `maxMs`) on a curve bowing up by `bow` of its length, eased in (`ease`: it speeds up into
+     * the ball), a soft glow `glowPx` of its pixels round it (`glowA`), and a trail of glows where it was `trail` ms before (`trailA`); a
+     * sip (`sipMs`) where every other one lands. Drawn at least `minScale` times its pixels.
+     */
+    mote: {
+      perLantern: 8,
+      lead: 40,
+      every: 75,
+      tree: 16,
+      treeEvery: 55,
+      star: 3,
+      starAt: 880,
+      starEvery: 60,
+      strandEvery: 12,
+      pawn: 6,
+      pawnLead: 60,
+      pawnEvery: 70,
+      ms: 380,
+      msPerPx: 1.6,
+      minMs: 450,
+      maxMs: 1000,
+      bow: 0.28,
+      ease: 1.7,
+      glowPx: 5,
+      glowA: 0.5,
+      trail: [30, 60, 90],
+      trailA: [0.45, 0.28, 0.14],
+      sipMs: 150,
+      minScale: 1.2,
+    },
+  },
 } as const;
 
 // ---- The flow, from the card's tap to the battle.
@@ -344,6 +455,14 @@ export function marksOf(layout: readonly ShopPlace[], how: IntroLayout, drawn?: 
 }
 
 /**
+ * A seated intro's marks (BossIntro `seated`, Hollow's): you both walk on straight to where you sit, the clear places, and stand
+ * there (the squares each walks to, then the last part of a square onto it, as onto a mark): nothing to hop back from.
+ */
+export function seatedMarks(m: Marks): Marks {
+  return { ...m, you: m.youClear, boss: m.bossClear, youSq: { c: Math.ceil(m.youClear.c), r: Math.ceil(m.youClear.r) }, bossSq: { c: Math.floor(m.bossClear.c), r: Math.ceil(m.bossClear.r) } };
+}
+
+/**
  * The board on the table, as each side sees it: where a square's middle is on the table (x east, z north, in squares of the board
  * from its middle: -3.5 to 3.5) for a file (0 the a-file) and rank (0 white's back rank). White's (yours) nearest you, black's
  * (the boss's) nearest it; the a-file on your left. Across (you east, facing west): the ranks run east to west, the a-file nearest
@@ -415,18 +534,69 @@ export function logAnims(w: { mover: ArtLike; log: ArtLike; fog: ArtLike; stump:
     back: (footX(fr(w.mover, "idle")[0]!) - footX(done[done.length - 1]!)) / perSq,
   };
 }
-/** A boss's own art's animations: a pyramid (Alfil's), toy blocks (Big Boy's) or a log (Timber's). */
-export type IntroAnims = PyramidAnims | BlocksAnims | LogAnims;
+/** Hollow's moves (characters/hollow-intro.ts BOSS_HOLLOW_INTRO): the ball charging, swelling, drinking the light, full, settling back. */
+export const DARK_MOVES = ["charge", "swell", "drink", "full", "settle"] as const;
+export type DarkMove = (typeof DARK_MOVES)[number];
+/**
+ * Hollow's darkness (Nov 3; CHALLENGE_FEEL.dark), from his art (shops/hollow-intro-art.ts): each frame's ms and cue for his moves, a
+ * lantern going out (`gutter`, INTRO_HOLLOW_LANTERN_OUT) and the tree (`tree`, INTRO_HOLLOW_SHOWPIECE_OUT's drain); a lantern's light
+ * on each gutter frame (INTRO_HOLLOW_LANTERN_GLOW); how many bulbs the string's run has (INTRO_HOLLOW_BULB_RUN); the dark's steps, the
+ * blackout and the black, his eyes in it (INTRO_HOLLOW_DARK); how long the dim light takes to come up (INTRO_HOLLOW_DIMPOOL).
+ */
+export interface DarkAnims {
+  moves: { readonly [m in DarkMove]: readonly number[] };
+  cues: { readonly [m in DarkMove | "gutter" | "tree"]: readonly (string | undefined)[] };
+  gutter: readonly number[];
+  tree: readonly number[];
+  glow: readonly number[];
+  bulbs: number;
+  steps: { readonly lantern: number; readonly string: number; readonly tree: number; readonly strand: number; readonly pawn: number };
+  blackoutMs: number;
+  blackMs: number;
+  eyesAlpha: number;
+  poolInMs: number;
+}
+/** Hollow's DarkAnims from his art (shops/hollow-intro-art.ts's exports, as named there). */
+export function darkAnims(w: {
+  mover: ArtLike;
+  lantern: ArtLike;
+  tree: ArtLike;
+  glow: readonly number[];
+  run: readonly unknown[];
+  dark: { steps: DarkAnims["steps"]; blackoutMs: number; blackMs: number; eyesAlpha: number };
+  pool: { inMs: number };
+}): DarkAnims {
+  const fr = (ch: ArtLike, a: string) => ch.anims[a]!.frames;
+  const of = <T>(get: (m: DarkMove) => T) => Object.fromEntries(DARK_MOVES.map((m) => [m, get(m)])) as Record<DarkMove, T>;
+  return {
+    moves: of((m) => fr(w.mover, m).map((f) => f.ms)),
+    cues: { ...of((m) => fr(w.mover, m).map((f) => f.cue)), gutter: fr(w.lantern, "gutter0").map((f) => f.cue), tree: fr(w.tree, "drain").map((f) => f.cue) },
+    gutter: fr(w.lantern, "gutter0").map((f) => f.ms),
+    tree: fr(w.tree, "drain").map((f) => f.ms),
+    glow: w.glow,
+    bulbs: w.run.length,
+    steps: w.dark.steps,
+    blackoutMs: w.dark.blackoutMs,
+    blackMs: w.dark.blackMs,
+    eyesAlpha: w.dark.eyesAlpha,
+    poolInMs: w.pool.inMs,
+  };
+}
+/** A boss's own art's animations: a pyramid (Alfil's), toy blocks (Big Boy's), a log (Timber's) or the dark (Hollow's). */
+export type IntroAnims = PyramidAnims | BlocksAnims | LogAnims | DarkAnims;
 export const isBlocks = (a: IntroAnims): a is BlocksAnims => "build" in a;
-export const isLog = (a: IntroAnims): a is LogAnims => "moves" in a;
+export const isLog = (a: IntroAnims): a is LogAnims => "props" in a;
+export const isDark = (a: IntroAnims): a is DarkAnims => "gutter" in a;
 /**
  * The intro's steps. Timber's own (a log): "toLog" (he walks west to it, his line still over his head), "lift", "carry" (to the middle),
  * "setDown", "gnaw", the shavings' "rise", "hold" (the table and stumps swap in under it) and "settle", the stumps' "pop", "dust" (his
- * `done`: he dusts off his paws) and "toMark" (he walks to where he swings).
+ * `done`: he dusts off his paws) and "toMark" (he walks to where he swings). Hollow's own (the dark): after the table, "charge",
+ * "swell", "drink" (the drain), "full", "blackout", "black", "dim" (the dim light, his settle) and "iris" (the pool closing on the board).
  */
 export type IntroStep =
   | "face" | "line" | "pause" | "rise" | "idle" | "crack" | "crumble" | "build" | "drop" | "plop" | "chairs" | "pop" | "table" | "swing" | "done"
-  | "toLog" | "lift" | "carry" | "setDown" | "gnaw" | "hold" | "settle" | "dust" | "toMark";
+  | "toLog" | "lift" | "carry" | "setDown" | "gnaw" | "hold" | "settle" | "dust" | "toMark"
+  | "charge" | "swell" | "drink" | "full" | "blackout" | "black" | "dim" | "iris";
 export interface IntroBeat {
   step: IntroStep;
   at: number;
@@ -435,8 +605,22 @@ export interface IntroBeat {
 const sum = (ms: readonly number[]) => ms.reduce((a, b) => a + b, 0);
 type BeatFeel = Pick<
   typeof CHALLENGE_FEEL,
-  "faceMs" | "lineMs" | "afterLineMs" | "holdMs" | "gapMs" | "tableHoldMs" | "boardDropMs" | "popMs" | "swingMs" | "stormInMs" | "flashMs" | "wipeMs" | "log" | "standOff" | "clear"
+  "faceMs" | "lineMs" | "afterLineMs" | "holdMs" | "gapMs" | "tableHoldMs" | "boardDropMs" | "popMs" | "swingMs" | "stormInMs" | "flashMs" | "wipeMs" | "log" | "standOff" | "clear" | "dark"
 >;
+/** Hollow's drain, ms from the drink's start (CHALLENGE_FEEL.dark.drain as drawn, every gap times `pace`). */
+export function drainAt(feel: Pick<typeof CHALLENGE_FEEL, "dark"> = CHALLENGE_FEEL) {
+  const D = feel.dark;
+  const k = (ms: number) => Math.round(ms * D.pace);
+  return {
+    lanterns: D.drain.lanterns.map(k),
+    string: k(D.drain.string),
+    stringMs: k(D.drain.stringMs),
+    tree: k(D.drain.tree),
+    strand: D.drain.strand.map(k),
+    pawn: k(D.drain.pawn),
+    end: k(D.drain.end),
+  };
+}
 /**
  * Timber's walks, in squares: from his mark west to the log, carrying it from there to where he works (`reach` west of the table's
  * middle), and from where his dusting off leaves him to where he swings (`log.clear` from the middle). His mark is `standOff.across`
@@ -467,6 +651,25 @@ export function introBeats(a: IntroAnims | null, feel: BeatFeel = CHALLENGE_FEEL
     t += ms;
   };
   add("face", feel.faceMs);
+  if (a && isDark(a)) {
+    // Hollow's own: his line, a pause, the table pops in while it's still lit and stands a beat; then the ball charges, swells and
+    // drinks the light; full; the blackout, the black; the dim light; the iris to the board. (No attack: the dark is his transition.)
+    const D = feel.dark;
+    add("line", D.lineMs);
+    add("pause", feel.afterLineMs);
+    add("pop", feel.popMs);
+    add("table", feel.tableHoldMs);
+    add("charge", D.chargeMs);
+    add("swell", sum(a.moves.swell));
+    add("drink", drainAt(feel).end);
+    add("full", D.fullMs);
+    add("blackout", a.blackoutMs);
+    add("black", a.blackMs - a.blackoutMs);
+    add("dim", D.dimMs);
+    add("iris", D.irisMs);
+    out.push({ step: "done", at: t, end: Infinity });
+    return out;
+  }
   if (a && isLog(a)) {
     // Timber's own: his line, and while it still shows he sets off west for the log; he heaves it up, carries it to the middle, sets
     // it down, gnaws it; the shavings boil up, hold (the table and stumps swap in under them) and settle; the stumps pop up; he dusts
@@ -553,6 +756,91 @@ export interface IntroNow {
   hop: number;
   /** Timber's own intro (his log, gnawed into the table): what he and the props show now; null for every other intro. */
   wood: WoodNow | null;
+  /** The boss's channel line is over its head (Hollow's, from his charge's start for `dark.chantMs`). */
+  chant: boolean;
+  /** Hollow's own intro (the dark): what the light and he do now; null for every other intro. */
+  dark: DarkNow | null;
+}
+/**
+ * Hollow's intro `t` ms in: what he plays and what the light does (CHALLENGE_FEEL.dark; the art's INTRO_HOLLOW_DARK and _DIMPOOL).
+ * Only the light changes once the drain starts: nobody moves from their place and nothing new appears (the motes are the light).
+ */
+export interface DarkNow {
+  /** His own move and frame (BOSS_HOLLOW_INTRO), or null: his town figure (his idle) before the charge and once he has settled. */
+  move: { anim: DarkMove; frame: number } | null;
+  /** His strand's bulbs still lit, in thirds (3 all, 0 none: HOLLOW_LOOKS `bulbs3` to `bulbs0`). */
+  bulbs: number;
+  /** Each lantern (in `dark.lanterns`' order): ms into its going out (-1: still lit; at or past its `gutter`'s length: out), and its light (1 lit, 0 out). */
+  lanterns: { since: number; glow: number }[];
+  /** How many of the string's bulbs (INTRO_HOLLOW_BULB_RUN, in its order) have gone dark. */
+  run: number;
+  /** The tree: its drain's frame (-1: still lit; its frames' count: dark), and how far its light has gone (0 to 1). */
+  tree: { frame: number; out: number };
+  /** Your pawn: how grey it has gone (0 to 1), and the pale glow gathering on it and drawn off (0 to 1). */
+  pawn: { tint: number; glow: number };
+  /** Your name tag's alpha (it fades as the drain starts). */
+  tag: number;
+  /** The dark laid over the room (0 to 1), and how far the blackout has come (0 to 1: everything's light gone from then on). */
+  level: number;
+  black: number;
+  /** His eyes in the black (alpha): two dim violet slits. */
+  eyes: number;
+  /** The dim light: how far it has come up (0 to 1), and how far it has closed in on the board (0 to 1). */
+  pool: number;
+  iris: number;
+}
+const ramp = (t: number, from: number, ms: number) => Math.min(1, Math.max(0, (t - from) / Math.max(1, ms)));
+const smooth = (u: number) => u * u * (3 - 2 * u);
+/** Hollow's intro `t` ms in (his beats, `introBeats`): see DarkNow. */
+export function darkAt(beats: readonly IntroBeat[], a: DarkAnims, t: number, feel: Pick<typeof CHALLENGE_FEEL, "dark"> = CHALLENGE_FEEL): DarkNow {
+  const D = feel.dark;
+  const at = (s: IntroStep) => beats.find((x) => x.step === s)!.at;
+  const drink = at("drink");
+  const d = drainAt(feel);
+  const gutterMs = sum(a.gutter);
+  const lanterns = d.lanterns.map((ms) => {
+    const since = t - (drink + ms);
+    return since < 0 ? { since: -1, glow: 1 } : { since, glow: since >= gutterMs ? 0 : (a.glow[frameAt(a.gutter, since, false)] ?? 0) };
+  });
+  const S = drink + d.string;
+  const run = t < S ? 0 : Math.min(a.bulbs, Math.floor(((t - S) / Math.max(1, d.stringMs)) * a.bulbs) + 1);
+  const T = drink + d.tree;
+  const treeMs = sum(a.tree);
+  const tree = t < T ? { frame: -1, out: 0 } : { frame: t - T >= treeMs ? a.tree.length : frameAt(a.tree, t - T, false), out: ramp(t, T, treeMs) };
+  const strandOut = d.strand.filter((ms) => t >= drink + ms).length;
+  const P = drink + d.pawn;
+  const glow = t < P ? 0 : t < P + D.pawnGlowMs ? ramp(t, P, D.pawnGlowMs) : 1 - ramp(t, P + D.pawnGlowMs, D.pawnMs - D.pawnGlowMs);
+  const st = a.steps;
+  const lit =
+    st.lantern * d.lanterns.reduce((s, ms) => s + ramp(t, drink + ms + D.lanternDarkAfter, D.lanternDarkMs), 0) +
+    st.string * ramp(t, S, d.stringMs) +
+    st.tree * tree.out +
+    st.strand * (strandOut / d.strand.length) +
+    st.pawn * ramp(t, P, D.pawnMs);
+  const black = ramp(t, at("blackout"), a.blackoutMs);
+  const dim = at("dim");
+  // His moves: charging, swelling, drinking (looping), full through the black, settling in the dim light; his idle before and after.
+  let move: DarkNow["move"] = null;
+  const M = a.moves;
+  if (t >= at("charge") && t < at("swell")) move = { anim: "charge", frame: frameAt(M.charge, t - at("charge"), true) };
+  else if (t >= at("swell") && t < drink) move = { anim: "swell", frame: frameAt(M.swell, t - at("swell"), false) };
+  else if (t >= drink && t < at("full")) move = { anim: "drink", frame: frameAt(M.drink, t - drink, true) };
+  else if (t >= at("full") && t < dim) move = { anim: "full", frame: frameAt(M.full, t - at("full"), true) };
+  else if (t >= dim && t < dim + sum(M.settle)) move = { anim: "settle", frame: frameAt(M.settle, t - dim, false) };
+  return {
+    move,
+    bulbs: 3 - strandOut,
+    lanterns,
+    run,
+    tree,
+    pawn: { tint: t < P ? 0 : ramp(t, P + D.pawnTintAfter, D.pawnMs), glow },
+    tag: 1 - ramp(t, drink, D.tagMs),
+    level: Math.min(1, lit + (1 - lit) * black),
+    black,
+    eyes: black > 0 ? black * a.eyesAlpha * (1 - ramp(t, dim, D.eyesOutMs)) : 0,
+    pool: ramp(t, dim, a.poolInMs),
+    iris: smooth(ramp(t, at("iris"), D.irisMs)),
+  };
 }
 /** Where Timber's foot is through his intro: his mark, the log, where he works (`reach` west of the table's middle), a step back from there (`back`), where he swings (the boss's clear place). */
 export type LogPlace = "mark" | "log" | "work" | "stepped" | "clear";
@@ -577,6 +865,8 @@ const easeOutBack = (u: number) => 1 + 2.2 * (u - 1) ** 3 + 1.2 * (u - 1) ** 2;
  * starting to drop; Alfil's table showing through the crumble).
  */
 export function hopStart(beats: readonly IntroBeat[], a: IntroAnims | null): number {
+  // (Hollow's: you walked on to your seats; nothing to hop back from.)
+  if (a && isDark(a)) return Infinity;
   if (!a || isLog(a)) return stepAt(beats, "pop");
   if (isBlocks(a)) return stepAt(beats, "chairs");
   return stepAt(beats, "crumble") + sum(a.crumble.slice(0, a.tableFrame));
@@ -618,19 +908,21 @@ export function woodAt(beats: readonly IntroBeat[], a: LogAnims, t: number): Woo
   if (t < at("swing").at) return { ...stand, move: me("walk", frameAt(a.moves.walk, t - at("toMark").at, true), true), from: "stepped", to: "clear", u: u("toMark") };
   return { ...stand, move: null, from: "clear", to: "clear", u: 0 };
 }
-export function introAt(beats: readonly IntroBeat[], a: IntroAnims | null, t: number, feel: Pick<typeof CHALLENGE_FEEL, "popMs" | "puffMs" | "dropFrom" | "hopMs" | "lineMs"> = CHALLENGE_FEEL): IntroNow {
+export function introAt(beats: readonly IntroBeat[], a: IntroAnims | null, t: number, feel: Pick<typeof CHALLENGE_FEEL, "popMs" | "puffMs" | "dropFrom" | "hopMs" | "lineMs" | "dark"> = CHALLENGE_FEEL): IntroNow {
   const b = beats.find((x) => t < x.end) ?? beats[beats.length - 1]!;
   const h = Math.min(1, Math.max(0, (t - hopStart(beats, a)) / feel.hopMs));
-  const base = { step: b.step, pyramid: null, blocks: null, drop: 0, drift: false, pop: 1, puff: -1, line: b.step === "line", back: h * h * (3 - 2 * h), hop: h > 0 && h < 1 ? Math.sin(Math.PI * h) : 0, wood: null };
+  const base = { step: b.step, pyramid: null, blocks: null, drop: 0, drift: false, pop: 1, puff: -1, line: b.step === "line", back: h * h * (3 - 2 * h), hop: h > 0 && h < 1 ? Math.sin(Math.PI * h) : 0, wood: null, chant: false, dark: null };
   if (a && isLog(a)) {
     // (Timber's line stays its `lineMs` from its beat's start, over his head as he sets off for the log.)
     const line = stepAt(beats, "line");
     return { ...base, line: t >= line && t < line + feel.lineMs, wood: woodAt(beats, a, t), table: t >= stepAt(beats, "hold"), stools: t >= stepAt(beats, "pop") };
   }
-  if (!a) {
+  if (!a || isDark(a)) {
     const p = t - stepAt(beats, "pop");
+    // (Hollow's: the table pops in as the default's, still lit; his channel line from his charge's start.)
+    const dark = a && isDark(a) ? { chant: t >= stepAt(beats, "charge") && t < stepAt(beats, "charge") + feel.dark.chantMs, dark: darkAt(beats, a, t, feel) } : null;
     const shown = p >= 0;
-    return { ...base, table: shown, stools: shown, pop: shown ? easeOutBack(Math.min(1, p / feel.popMs)) : 0, puff: shown && p < feel.puffMs ? p / feel.puffMs : -1 };
+    return { ...base, ...dark, table: shown, stools: shown, pop: shown ? easeOutBack(Math.min(1, p / feel.popMs)) : 0, puff: shown && p < feel.puffMs ? p / feel.puffMs : -1 };
   }
   if (isBlocks(a)) {
     // (Nothing until the blocks drop in; they stack (held built through the gap), the board falls and plops on (held through the
@@ -670,6 +962,7 @@ export function introAt(beats: readonly IntroBeat[], a: IntroAnims | null, t: nu
 export function introCues(beats: readonly IntroBeat[], a: IntroAnims | null): { cue: string; at: number }[] {
   const at = (s: IntroStep) => stepAt(beats, s);
   if (!a) return [{ cue: "table", at: at("pop") }];
+  if (isDark(a)) return darkCues(beats, a);
   if (isLog(a)) {
     // (Timber's: each move's and prop's own cues on their frames, through their beats: looping ones over and over to its end.)
     const out: { cue: string; at: number }[] = [];
@@ -721,13 +1014,51 @@ export function introCues(beats: readonly IntroBeat[], a: IntroAnims | null): { 
   ];
 }
 
+/**
+ * Hollow's cues, and when (his intro's beats; CHALLENGE_FEEL.dark): the table's pop; his moves' own on their frames (his hum each
+ * charge loop, the swell, the hum once a full loop: `deep`, lower); each lantern's flutter and snuff on its gutter's frames; the
+ * string's run as it starts, a tick as its bulbs go dark (at most one a `tinkGapMs`); the tree's run and its star on its frames; your
+ * pawn's light leaving; the blackout; his settle. (A mote's sip is the room's: when one lands, at most one a `sipGapMs`.)
+ */
+export function darkCues(beats: readonly IntroBeat[], a: DarkAnims, feel: Pick<typeof CHALLENGE_FEEL, "dark"> = CHALLENGE_FEEL): { cue: string; at: number }[] {
+  const at = (s: IntroStep) => stepAt(beats, s);
+  const out: { cue: string; at: number }[] = [{ cue: "table", at: at("pop") }];
+  const play = (ms: readonly number[], cues: readonly (string | undefined)[], from: number, to: number, loop: boolean, as?: string) => {
+    let t = from;
+    for (let i = 0; t < to; i = (i + 1) % ms.length) {
+      const cue = cues[i];
+      if (cue) out.push({ cue: as ?? cue, at: t });
+      t += ms[i]!;
+      if (!loop && i === ms.length - 1) break;
+    }
+  };
+  const M = a.moves;
+  const drink = at("drink");
+  const d = drainAt(feel);
+  play(M.charge, a.cues.charge, at("charge"), at("swell"), true);
+  play(M.swell, a.cues.swell, at("swell"), drink, false);
+  for (const ms of d.lanterns) play(a.gutter, a.cues.gutter, drink + ms, Infinity, false);
+  out.push({ cue: "drain", at: drink + d.string });
+  let tink = -Infinity;
+  for (let i = 0; i < a.bulbs; i++) {
+    const t = drink + d.string + (i * d.stringMs) / a.bulbs;
+    if (t - tink >= feel.dark.tinkGapMs) out.push({ cue: "tink", at: (tink = Math.round(t)) });
+  }
+  play(a.tree, a.cues.tree, drink + d.tree, Infinity, false);
+  out.push({ cue: "pawn", at: drink + d.pawn });
+  play(M.full, a.cues.full, at("full"), at("blackout"), true, "deep");
+  out.push({ cue: "blackout", at: at("blackout") });
+  play(M.settle, a.cues.settle, at("dim"), at("iris"), false);
+  return out.sort((x, y) => x.at - y.at);
+}
+
 // ---- The boss's attack (its God King attack: its kit's `kingAttack`).
 
 /**
  * When the attack starts, ms into the intro: as it swings (after the table's beat on its own), in place where it stands, clear of
  * its stool (every intro since Nov 2's pacing: `attackTime`'s `inPlace`); `swingMs` before its transition has covered the screen.
  */
-export const attackStart = (beats: readonly IntroBeat[]): number => stepAt(beats, "swing");
+export const attackStart = (beats: readonly IntroBeat[]): number => beats.find((x) => x.step === "swing")?.at ?? Infinity;
 /**
  * Where its animation is, `t` ms into it: as it plays at the God King (its drop-in, its first lashes), and from the moment it would
  * leap off, its lashes again and again (`lashAt` to `leaveAt`), so it keeps on until the screen is covered. `inPlace` (the default
