@@ -15,7 +15,9 @@ Title: Dash's Kicks in the town, Tick in the town, Dash's sneaker store (admins 
 - **Dash's shop** (the art branch's `house-shop-blitz`; `town/shops/blitz-art.ts`, its room still and review strips left there): "Go in"
   from the store's card (its name and Go in only), **Tick the Shopkeeper**, "Dash's Boss Crate" in `BOSS_CRATES` with his ride, Cheetah
   Shoes, first; the crate at `SHOP_BLITZ_CRATE_AT`; `SHOP_BLITZ_MARKS` (his try-on mats) passed as Timber's are; the halfpipe (4 x 2)
-  stands up whole (`RoomArt.upright`); the day tone; a store's ceiling (the mockup's white tiles and light panels); the further-out
+  stands up whole (`RoomArt.upright`); the day tone; a store's ceiling (the mockup's white tiles, and its light panels drawn each frame cut at the highest wall top on
+  screen, so none ever shows through the gaps between the side walls' pieces or over a wall, at any zoom or camera place: the
+  director's review); the further-out
   starting zoom, as every home. Tick stands on the counter's middle squares as Rivet does, but is **drawn half a square back and west**
   (`at` [9, 1.5]): a low tortoise with his head out front on his right, at Rivet's spot only the clock on his shell showed over the 30 px
   counter (its shoe boxes hid his head); now his head and clock show.
@@ -58,7 +60,7 @@ counter with Tick), `halfpipe-phone.png`, `halfpipe-desktop.png` (the halfpipe, 
   the square, no path; the pole on its own plot with open ground east of it; its neighbors; walkable all round, nothing cut off; Tick
   after Rivet, his door, Dash's start); `town-bots.test.ts` (Tick's entry, rung and baked sheet's frames, he shows over a 30 px counter;
   a player's town has no store and no Tick); `shop-room.test.ts` (Dash's room: the halfpipe's 4 x 2, the props, the lane, the marks,
-  Tick's squares and draw spot, the crate's place; the crate's words); `boss-challenge.test.ts` (his intro, his marks, his walk in, his
+  Tick's squares and draw spot, the crate's place; the crate's words; the ceiling panels cut at the wall tops at any width); `boss-challenge.test.ts` (his intro, his marks, his walk in, his
   stance clear of the stools); `town-chat.test.ts` (chatter); `town-timber.test.ts` (its new neighbor); server `town-chat.test.ts` (no
   line for his challenge, start and finish through the API), `boss-tokens.test.ts` (his crate's ride). All pass; typecheck passes.
 - e2e (both projects, locally, under the shared lock): `e2e/shop.spec.ts`, "Dash's Kicks (Nov 3)…": a player's town has no store and no
