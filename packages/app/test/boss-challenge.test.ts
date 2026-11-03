@@ -8,9 +8,10 @@ import { SHOP_TIMBER_LAYOUT, SHOP_TIMBER_MARKS } from "../src/town/shops/timber-
 import { INTRO_BIGBOY_BLOCKS, INTRO_BIGBOY_STOOL_B, INTRO_BIGBOY_STOOL_SEAT_H, INTRO_BIGBOY_STOOL_TOP_H, INTRO_BIGBOY_STOOL_W, INTRO_BIGBOY_SWIRL, INTRO_BIGBOY_SWIRL_FRONT, INTRO_BIGBOY_TABLE_PALETTE } from "../src/town/shops/bigboy-intro-art.ts";
 import { TABLE_BOARD } from "../src/town/houses/park.ts";
 import { renderFrame } from "../src/characters/sprite.ts";
-import { BOSS_INTROS, CHALLENGE_FEEL, attackStart, attackTime, boardSquare, coverMs, frameAt, hopStart, introAt, introBeats, introCues, introLength, introOf, marksOf, nextFlow, stormEdge, wipeAt, type BlocksAnims, type ChallengeEvent, type ChallengeFlow, type IntroAnims, type IntroBeat } from "../src/town/shops/challenge.ts";
+import { BOSS_INTROS, CHALLENGE_FEEL, attackStart, logAnims, logWalks, marksFeel, woodAt, isLog, attackTime, boardSquare, coverMs, frameAt, hopStart, introAt, introBeats, introCues, introLength, introOf, marksOf, nextFlow, stormEdge, wipeAt, type BlocksAnims, type LogAnims, type ChallengeEvent, type ChallengeFlow, type IntroAnims, type IntroBeat } from "../src/town/shops/challenge.ts";
 import { PARK_TABLE } from "../src/town/houses/park.ts";
 import { INTRO_ALFIL_TABLE } from "../src/town/shops/alfil-intro-art.ts";
+import { BOSS_BEAVER_INTRO, INTRO_TIMBER_FRONT, INTRO_TIMBER_LOG, INTRO_TIMBER_SHAVINGS, INTRO_TIMBER_STORM, INTRO_TIMBER_STUMP, INTRO_TIMBER_STUMP_SEAT_H, INTRO_TIMBER_TABLE, INTRO_TIMBER_TABLE_PALETTE, TIMBER_INTRO_LIFT_AT, TIMBER_INTRO_REACH } from "../src/town/shops/timber-intro-art.ts";
 import { findPath, makeRoom } from "../src/town/shops/room.ts";
 import { SHOPS } from "../src/town/shops/shops.ts";
 import { ALL_HOMES, HOMES, START, Walker, createTown, standOf } from "../src/town/world.ts";
@@ -26,6 +27,9 @@ import type { Character } from "../src/characters/sprite.ts";
  * intro (Babur's and Puddles': the table pops in, the attack swung in place, a flash and a wipe).
  */
 const ms = (a: "rise" | "idle" | "crack" | "crumble") => INTRO_ALFIL_PYRAMID.anims[a]!.frames.map((f) => f.ms);
+/** Timber's log (Nov 3), as shops/intro.ts makes it from his art: his pixels his town figure's, `bossSquares` tall. */
+const TIMBER_PER_SQ = BOSS_ART.timber.h / (TOWN_FEEL.bossSquares * (TOWN_FEEL.bossScale.timber ?? 1));
+const TIMBER: LogAnims = logAnims({ mover: BOSS_BEAVER_INTRO, log: INTRO_TIMBER_LOG, fog: INTRO_TIMBER_SHAVINGS, stump: INTRO_TIMBER_STUMP, reach: TIMBER_INTRO_REACH }, TIMBER_PER_SQ);
 const ALFIL: IntroAnims = { rise: ms("rise"), idle: ms("idle"), crack: ms("crack"), crumble: ms("crumble"), tableFrame: INTRO_ALFIL_PYRAMID.anims.crumble!.frames.findIndex((f) => f.cue === "table") };
 
 describe("the challenge's flow", () => {
@@ -51,7 +55,7 @@ describe("the challenge's flow", () => {
     expect(run(["fight", "atDoor", "cancel", "fight"])).toBe("toDoor");
   });
 
-  it("every boss whose home has an inside has an intro (Alfil and Big Boy their own, Babur, Puddles and Timber the default); every other boss is challenged as before (the Boss raid screen)", () => {
+  it("every boss whose home has an inside has an intro (Alfil, Big Boy and Timber their own, Babur and Puddles the default); every other boss is challenged as before (the Boss raid screen)", () => {
     const withIntro = ALL_HOMES.filter((h) => introOf(h.id)).map((h) => h.id).sort();
     expect(withIntro).toEqual(["alfil", "bigboy", "gardener", "tiger", "timber"]);
     expect(withIntro).toEqual(Object.keys(SHOPS).sort());
@@ -59,12 +63,12 @@ describe("the challenge's flow", () => {
     expect(introOf("tiger")).toMatchObject({ custom: false, name: "Babur", line: "Fine. One more show. Then I'm on break." });
     expect(introOf("gardener")).toMatchObject({ custom: false, name: "Puddles", line: "Wipe your feet. Then let's see what grows." });
     expect(introOf("bigboy")).toMatchObject({ custom: true, name: "Big Boy", line: "My blocks! My board! Big boy go first!" });
-    expect(introOf("timber")).toMatchObject({ custom: false, name: "Timber", line: "Hard hats on. We're building today.", layout: "across", cues: { table: "pop", wipe: "timberSwoosh" } });
+    expect(introOf("timber")).toMatchObject({ custom: true, name: "Timber", line: "Hard hats on. We're building today.", layout: "across", cues: { storm: "timberSwoosh" } });
     expect(introOf("hollow")).toBeNull();
   });
 
-  it("the layout: across for all four today (the boss on the left, you on the right: Eric's normal look)", () => {
-    for (const id of ["alfil", "tiger", "gardener", "bigboy"] as const) expect(introOf(id)!.layout, id).toBe("across");
+  it("the layout: across for all five today (the boss on the left, you on the right: Eric's normal look)", () => {
+    for (const id of ["alfil", "tiger", "gardener", "bigboy", "timber"] as const) expect(introOf(id)!.layout, id).toBe("across");
   });
 });
 
@@ -381,6 +385,193 @@ describe("the intro's timeline (Big Boy's toy blocks, Nov 2)", () => {
   });
 });
 
+describe("the intro's timeline (Timber's log, Nov 3)", () => {
+  const T = TIMBER;
+  const beats = introBeats(T);
+  const at = (t: number) => introAt(beats, T, t);
+  const F = CHALLENGE_FEEL;
+  const beat = (s: string) => beats.find((b) => b.step === s)!;
+  const PX = TOWN_FEEL.housePxPerSquare;
+
+  it("the art: his moves (walk 6, lift 6, carry 6, setDown 5, gnaw 8, done 6) facing east, the log's gnawing 6, the fog's rise 8, hold 4 and settle 10, a stump's pop 6; the log stands about a square in front of him as he works; his table the park table's geometry, its stumps apart; the sweep tiles as Alfil's", () => {
+    expect(isLog(T)).toBe(true);
+    expect(Object.fromEntries(Object.entries(T.moves).map(([k, v]) => [k, v.length]))).toEqual({ walk: 6, lift: 6, carry: 6, setDown: 5, gnaw: 8, done: 6 });
+    expect(Object.fromEntries(Object.entries(T.props).map(([k, v]) => [k, v.length]))).toEqual({ gnawed: 6, rise: 8, hold: 4, settle: 10, pop: 6 });
+    // (TIMBER_INTRO_REACH: 34 of his pixels east of his foot, his town size: about 1.16 squares; his dusting off steps him 3 back.)
+    expect(T.reach).toBeCloseTo(34 / TIMBER_PER_SQ);
+    expect(T.reach).toBeGreaterThan(1);
+    expect(T.reach).toBeLessThan(1.3);
+    expect(T.back).toBeCloseTo(3 / TIMBER_PER_SQ);
+    // He lifts the log at his feet (TIMBER_INTRO_LIFT_AT: straight under him), so he walks to its place.
+    expect(TIMBER_INTRO_LIFT_AT[0]).toBe(0);
+    expect([INTRO_TIMBER_TABLE.w, INTRO_TIMBER_TABLE.foot[0], INTRO_TIMBER_TABLE.foot[1]]).toEqual([PARK_TABLE.w, PARK_TABLE.foot[0], PARK_TABLE.foot[1]]);
+    expect(INTRO_TIMBER_SHAVINGS.foot[1] - INTRO_TIMBER_SHAVINGS.h).toBeLessThan(0);
+    expect(INTRO_TIMBER_TABLE_PALETTE).toMatchObject({ L: "#efcf94", D: "#94603a" });
+    for (const k of ["1", "2", "4", "L", "D"]) expect(INTRO_TIMBER_TABLE_PALETTE[k], k).toMatch(/^#[0-9a-f]{6}$/);
+    expect([INTRO_TIMBER_STORM.w, INTRO_TIMBER_STORM.h, INTRO_TIMBER_FRONT.w, INTRO_TIMBER_FRONT.h]).toEqual([128, 128, 48, 128]);
+  });
+
+  it("the fog's frames are the art's pixel for pixel (shops/timber-intro-art.ts's one change, for its load time, keeps them: a new copy of the art updates this hash)", async () => {
+    const { createHash } = await import("node:crypto");
+    const h = createHash("sha1");
+    const ch = INTRO_TIMBER_SHAVINGS;
+    for (const a of ["rise", "hold", "settle"]) for (const fr of ch.anims[a]!.frames) h.update(renderFrame(ch, fr).data);
+    expect(h.digest("hex")).toBe("08f46ae00df09d803befa210bbb54db0e5c6b702");
+  });
+
+  it("his room's marks are the timeline's: his `standOff` from the table's middle, his clear place `log.clear`; the log lies west of his mark, clear of it and on the circle's floor", () => {
+    const m = marksOf(SHOP_TIMBER_LAYOUT, "across", SHOP_TIMBER_MARKS, marksFeel(T))!;
+    expect(m.table.c - m.boss.c).toBe(F.standOff.across);
+    expect(m.table.c - m.bossClear.c).toBeCloseTo(F.log.clear);
+    // (His own clear place, a touch further out than the others': every other boss's stays `clear.boss`.)
+    expect(F.log.clear).toBeGreaterThanOrEqual(F.clear.boss);
+    expect(marksFeel(ALFIL)).toBe(F);
+    expect(marksFeel(null)).toBe(F);
+    expect(F.log.at).toBeGreaterThan(F.standOff.across);
+    // (The log lies a whole square and more past his mark; it's 64 of his pixels long, half of it each side of its middle.)
+    const half = 32 / TIMBER_PER_SQ;
+    expect(m.table.c - F.log.at + half).toBeLessThan(m.boss.c - 0.3);
+    expect(m.table.c - F.log.at - half).toBeGreaterThan(0);
+    // He works where the log he sets down stands on the table's place: his reach west of it, between his mark and the table.
+    expect(m.table.c - T.reach).toBeGreaterThan(m.boss.c);
+    expect(m.table.c - T.reach).toBeLessThan(m.table.c);
+    const w = logWalks(T);
+    expect(w.toLog).toBeCloseTo(F.log.at - F.standOff.across);
+    expect(w.carry).toBeCloseTo(F.log.at - T.reach);
+    expect(w.toMark).toBeGreaterThan(0);
+  });
+
+  it("the beats in order, each from where the last ended: facing each other, his line, to the log, the heave, the carry, the set-down, the gnaw, the fog's rise, hold and settle, the stumps' pop, his dusting off, to his place, his attack; then the sweep. About 12 s (Eric's target): 11 to 13", () => {
+    expect(beats.map((b) => b.step)).toEqual(["face", "line", "toLog", "lift", "carry", "setDown", "gnaw", "rise", "hold", "settle", "pop", "dust", "toMark", "swing", "done"]);
+    for (let i = 1; i < beats.length; i++) expect(beats[i]!.at, beats[i]!.step).toBe(beats[i - 1]!.end);
+    for (const b of beats.slice(0, -1)) expect(b.end, b.step).toBeGreaterThan(b.at);
+    expect(introLength(beats)).toBeGreaterThanOrEqual(11_000);
+    expect(introLength(beats)).toBeLessThanOrEqual(13_000);
+    // Every beat a number: the feel's, or the art's frames.
+    const sum = (ms: readonly number[]) => ms.reduce((x, y) => x + y, 0);
+    const len = (s: string) => beat(s).end - beat(s).at;
+    expect(len("face")).toBe(F.faceMs);
+    expect(len("line")).toBe(F.log.lineLeadMs);
+    expect(len("toLog")).toBe(Math.round((F.log.at - F.standOff.across) * F.log.walkMs));
+    expect(beats.every((b) => Number.isInteger(b.at))).toBe(true);
+    expect(len("lift")).toBeCloseTo(sum(T.moves.lift));
+    expect(len("carry")).toBe(Math.round((F.log.at - T.reach) * F.log.carryMs));
+    expect(len("setDown")).toBeCloseTo(sum(T.moves.setDown));
+    expect(len("gnaw")).toBeCloseTo(sum(T.props.gnawed));
+    expect(len("rise")).toBeCloseTo(sum(T.props.rise));
+    expect(len("hold")).toBeCloseTo(F.log.holdMs);
+    expect(len("settle")).toBeCloseTo(sum(T.props.settle));
+    expect(len("pop")).toBeCloseTo(sum(T.props.pop));
+    expect(len("dust")).toBeCloseTo(sum(T.moves.done));
+    expect(len("toMark")).toBe(Math.round((F.log.clear - T.reach - T.back) * F.log.walkMs));
+    expect(len("swing")).toBeCloseTo(F.swingMs - F.stormInMs);
+  });
+
+  it("his line: in the bubble for its whole `lineMs` from its beat, riding his head as he sets off for the log", () => {
+    const l = beat("line").at;
+    expect(at(l - 1).line).toBe(false);
+    expect(at(l).line).toBe(true);
+    expect(at(l + F.lineMs - 1).line).toBe(true);
+    expect(at(l + F.lineMs - 1).step).not.toBe("line");
+    expect(at(l + F.lineMs).line).toBe(false);
+    expect(F.lineMs).toBeLessThan(beat("carry").end - l);
+  });
+
+  it("where he is and how he faces: his town figure on his mark for the line's lead; walking west (mirrored) to the log; facing east (the art's way) to heave, carry, set down, gnaw and dust off; west again to his place; his town figure there to swing", () => {
+    const w = (t: number) => woodAt(beats, T, t);
+    expect(w(beat("line").at)).toMatchObject({ move: null, from: "mark", to: "mark" });
+    expect(w(beat("toLog").at + 1)).toMatchObject({ move: { anim: "walk", flip: true }, from: "mark", to: "log" });
+    expect(w((beat("toLog").at + beat("toLog").end) / 2).u).toBeCloseTo(0.5, 1);
+    expect(w(beat("lift").at)).toMatchObject({ move: { anim: "lift", frame: 0, flip: false }, from: "log", to: "log" });
+    expect(w(beat("carry").at + 1)).toMatchObject({ move: { anim: "carry", flip: false }, from: "log", to: "work" });
+    expect(w(beat("carry").end - 1).u).toBeGreaterThan(0.99);
+    for (const s of ["setDown", "gnaw", "rise", "hold", "settle", "pop", "dust"]) expect(w(beat(s).at), s).toMatchObject({ from: "work", to: "work", move: { flip: false } });
+    expect(w(beat("gnaw").at).move?.anim).toBe("gnaw");
+    expect(w(beat("rise").at).move?.anim).toBe("gnaw");
+    expect(w(beat("hold").at).move?.anim).toBe("idle");
+    expect(w(beat("dust").at).move?.anim).toBe("done");
+    expect(w(beat("toMark").at + 1)).toMatchObject({ move: { anim: "walk", flip: true }, from: "stepped", to: "clear" });
+    expect(w(beat("swing").at)).toMatchObject({ move: null, from: "clear", to: "clear" });
+    // His attack starts on his place, once he's there.
+    expect(attackStart(beats)).toBe(beat("toMark").end);
+  });
+
+  it("the log: lying on the floor from the walk in, hidden the moment the heave starts (it's in his paws, his own frames); standing in front of him from the set-down's last frame (the first without it in his paws); gnawed through the gnaw and the fog's rise; gone under the fog's hold", () => {
+    const w = (t: number) => woodAt(beats, T, t);
+    expect(w(0).log).toEqual({ anim: "lying", frame: 0 });
+    expect(w(beat("lift").at - 1).log).toEqual({ anim: "lying", frame: 0 });
+    expect(w(beat("lift").at).log).toBeNull();
+    expect(w(beat("carry").at + 1).log).toBeNull();
+    const sd = beat("setDown").at;
+    const lastAt = sd + T.moves.setDown.slice(0, -1).reduce((x, y) => x + y, 0);
+    expect(w(lastAt - 1).log).toBeNull();
+    expect(w(lastAt).log).toEqual({ anim: "standing", frame: 0 });
+    expect(w(beat("gnaw").at).log).toEqual({ anim: "gnawed", frame: 0 });
+    expect(w(beat("gnaw").end - 1).log).toEqual({ anim: "gnawed", frame: 5 });
+    expect(w(beat("rise").at).log).toEqual({ anim: "gnawed", frame: 5 });
+    expect(w(beat("hold").at).log).toBeNull();
+    for (let t = beat("hold").at; t < introLength(beats) + 1000; t += 50) expect(w(t).log, `${t}`).toBeNull();
+  });
+
+  it("the table and stumps are swapped in under the fog's hold, never visible before: the table from the hold's first frame (the fog covering it until it settles), the stumps popping up once it has settled; its last frame (the ring of shavings) kept to the sweep", () => {
+    for (let t = 0; t < beat("hold").at; t += 10) {
+      const n = at(t);
+      expect(n.table, `${t}`).toBe(false);
+      expect(n.stools, `${t}`).toBe(false);
+      expect(n.wood!.stumps, `${t}`).toBeNull();
+    }
+    for (let t = beat("hold").at; t < beat("pop").at; t += 10) {
+      const n = at(t);
+      expect(n.table, `${t}`).toBe(true);
+      expect(n.wood!.fog, `${t}: the fog over it`).not.toBeNull();
+      expect(n.wood!.stumps, `${t}`).toBeNull();
+    }
+    expect(at(beat("rise").at).wood!.fog).toEqual({ anim: "rise", frame: 0 });
+    expect(at(beat("hold").at).wood!.fog).toEqual({ anim: "hold", frame: 0 });
+    expect(at(beat("settle").at).wood!.fog).toEqual({ anim: "settle", frame: 0 });
+    expect(at(beat("pop").at).wood).toMatchObject({ fog: null, ring: true, stumps: { anim: "pop", frame: 0 } });
+    expect(at(beat("pop").at)).toMatchObject({ table: true, stools: true });
+    expect(at(beat("dust").at).wood!.stumps).toEqual({ anim: "idle", frame: 0 });
+    expect(at(introLength(beats) + 500).wood).toMatchObject({ ring: true, stumps: { anim: "idle" } });
+    expect(hopStart(beats, T)).toBe(beat("pop").at);
+  });
+
+  it("the stumps sit at the table's foot ± 37 (the stools' places: `stoolOff` a side, a square of the room's 37 pixels), on its row; the table's middle on the drawn marks' midpoint", () => {
+    const m = marksOf(SHOP_TIMBER_LAYOUT, "across", SHOP_TIMBER_MARKS)!;
+    expect((m.table.c - m.bossStool.c) * PX).toBe(37);
+    expect((m.youStool.c - m.table.c) * PX).toBe(37);
+    expect([m.bossStool.r, m.youStool.r]).toEqual([m.table.r, m.table.r]);
+    expect(m.table).toEqual({ c: 9.5, r: 10.5 });
+  });
+
+  it("every cue on his frames and the props' has a sound of his own (characters/timber-sounds.ts), on its beat: his hup as he heaves, the thump as it stands, his gnaws and chomps, the fog's clatter, saw and slide, a knock as the stumps pop, his pat and chitter; the sweep's swoosh", () => {
+    const def = introOf("timber")!;
+    const cues = introCues(beats, T);
+    for (const c of cues) expect(def.cues[c.cue], c.cue).toMatch(/^timber[A-Z]/);
+    expect(def.cues.storm).toBe("timberSwoosh");
+    // (Every cue the art has, played: none left out.)
+    const named = new Set(cues.map((c) => c.cue));
+    for (const k of Object.keys(def.cues).filter((k) => k !== "storm")) expect(named.has(k), k).toBe(true);
+    const inBeat = (cue: string, s: string) => {
+      const ts = cues.filter((c) => c.cue === cue).map((c) => c.at);
+      expect(ts.length, cue).toBeGreaterThan(0);
+      for (const t of ts) expect(t >= beat(s).at && t < beat(s).end, `${cue} in ${s}`).toBe(true);
+      return ts;
+    };
+    expect(inBeat("hup", "lift")).toHaveLength(1);
+    expect(inBeat("thump", "setDown")).toHaveLength(1);
+    expect(inBeat("gnaw", "gnaw").length + inBeat("chomp", "gnaw").length).toBeGreaterThanOrEqual(6);
+    expect(inBeat("clatter", "rise")).toEqual([beat("rise").at]);
+    expect(inBeat("saw", "hold")[0]).toBe(beat("hold").at);
+    expect(inBeat("slide", "settle")).toEqual([beat("settle").at]);
+    expect(inBeat("knock", "pop")).toHaveLength(1);
+    expect(inBeat("pat", "dust")).toHaveLength(1);
+    expect(inBeat("chitter", "dust")).toHaveLength(1);
+    // In time order.
+    expect(cues.map((c) => c.at)).toEqual([...cues.map((c) => c.at)].sort((x, y) => x - y));
+  });
+});
+
 describe("the storm's edge", () => {
   it("in: from its front just off the left to just off the right (covered); out: from covered to its front off the right", () => {
     const w = 390;
@@ -538,8 +729,8 @@ describe("the challenge's pacing (Nov 2)", () => {
     expect(F.swingMs).toBe(2000);
   });
 
-  it("the hop back: as the stools come in (the default's pop, Big Boy's stools dropping, Alfil's table showing), over hopMs, up and down again", () => {
-    for (const a of [null, BB, ALFIL] as const) {
+  it("the hop back: as the stools come in (the default's pop, Big Boy's stools dropping, Alfil's table showing, Timber's stumps popping up), over hopMs, up and down again", () => {
+    for (const a of [null, BB, ALFIL, TIMBER] as const) {
       const beats = introBeats(a);
       const h = hopStart(beats, a);
       const at = (t: number) => introAt(beats, a, t);
@@ -576,15 +767,20 @@ describe("the challenge's pacing (Nov 2)", () => {
     for (let y = 0; y < f.h; y++) for (let x = 0; x < ch.foot[0] - PX / 2; x++) if (f.data[(y * f.w + x) * 4 + 3]! > 0) return y;
     return ch.foot[1];
   };
-  const TABLES = { alfil: INTRO_ALFIL_TABLE, tiger: PARK_TABLE, gardener: PARK_TABLE, bigboy: INTRO_BIGBOY_BLOCKS, timber: PARK_TABLE } as const;
+  const TABLES = { alfil: INTRO_ALFIL_TABLE, tiger: PARK_TABLE, gardener: PARK_TABLE, bigboy: INTRO_BIGBOY_BLOCKS } as const;
+  /** Timber's stumps (his table has none in its picture): one `stoolOff` from the table's middle each side; how far out its outer edge is, and its top. */
+  const stumps = () => {
+    const [l, r] = low(INTRO_TIMBER_STUMP, "idle", INTRO_TIMBER_STUMP.h);
+    return { west: F.stoolOff - l / PX, east: F.stoolOff + (r + 1) / PX, top: INTRO_TIMBER_STUMP_SEAT_H / PX };
+  };
   const LAYOUTS = { alfil: SHOP_ALFIL_LAYOUT, tiger: SHOP_BABUR_LAYOUT, gardener: SHOP_PUDDLES_LAYOUT, bigboy: SHOP_BIGBOY_LAYOUT, timber: SHOP_TIMBER_LAYOUT } as const;
   /** The gap (squares) kept between a figure near the floor and the stool's outer edge. */
   const GAP = 0.1;
 
   it("once the stools are in, no figure near the floor is in front of a stool: you (the pawn) and each boss standing, and its attack's feet", () => {
     for (const id of ["alfil", "tiger", "gardener", "bigboy", "timber"] as const) {
-      const m = marksOf(LAYOUTS[id], "across")!;
-      const st = stools(TABLES[id]);
+      const m = marksOf(LAYOUTS[id], "across", null, id === "timber" ? marksFeel(TIMBER) : F)!;
+      const st = id === "timber" ? stumps() : stools(TABLES[id]);
       // (The stools' outer edges, in the room's columns: the boss's west of the table, yours east; up to their tops.)
       const bossEdge = m.table.c - st.west;
       const youEdge = m.table.c + st.east;

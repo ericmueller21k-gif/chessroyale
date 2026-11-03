@@ -517,7 +517,7 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   crowd stays the ladder's. His crate (`BOSS_CRATES`) shows in the Crates tab to admins (or whoever holds one), not in the FAQ; the
   server posts no town-chat line for a challenge of a boss in the game for admins first. Taking `timber` out of `BOSS_ADMIN_FIRST`
   puts all of it in everyone's town. docs/decisions/2026-11-03-timber-home.md.
-- **Which homes.** Babur's Circus (`tiger`), Puddles' Botanical Garden (`gardener`) and Alfil's Pyramid (`alfil`, Nov 2: Woolly the Shopkeeper, "Alfil's Boss Crate" with Alfil's Howdah, a sandstone ceiling, the chat's day tone) and Big Boy's Crib (`bigboy`, Nov 2: Blocky the Shopkeeper, "Big Boy's Boss Crate" with Big Boy's Buggy, a nursery ceiling of sky, clouds and stars, the chat's day tone; a ball pit, solid, under a walkway, the shop's platform and the battle circle you walk on, the circle in the walkway's foam squares with a zoo-animal rug in its middle; his toy airplane, three squares deep, stands up whole at its foot, `RoomArt.upright`, rather than lying flat as a plan) and Timber's Lumber Lodge (`timber`, Nov 3, an admin's town only: Rivet the Shopkeeper behind the middle of the workbench, "Timber's Boss Crate" with The Log Roller, a lodge's ceiling of dark planks between heavy beams, the chat's day tone; the giant king being carved on its dais, 4 × 2 squares, stands up whole, `RoomArt.upright`; the circle's branded start marks, `SHOP_TIMBER_MARKS`, passed as Big Boy's are; his challenge the default intro, his line "Hard hats on. We're building today."): `SHOPS` in `town/shops/shops.ts`. Their home's card
+- **Which homes.** Babur's Circus (`tiger`), Puddles' Botanical Garden (`gardener`) and Alfil's Pyramid (`alfil`, Nov 2: Woolly the Shopkeeper, "Alfil's Boss Crate" with Alfil's Howdah, a sandstone ceiling, the chat's day tone) and Big Boy's Crib (`bigboy`, Nov 2: Blocky the Shopkeeper, "Big Boy's Boss Crate" with Big Boy's Buggy, a nursery ceiling of sky, clouds and stars, the chat's day tone; a ball pit, solid, under a walkway, the shop's platform and the battle circle you walk on, the circle in the walkway's foam squares with a zoo-animal rug in its middle; his toy airplane, three squares deep, stands up whole at its foot, `RoomArt.upright`, rather than lying flat as a plan) and Timber's Lumber Lodge (`timber`, Nov 3, an admin's town only: Rivet the Shopkeeper behind the middle of the workbench, "Timber's Boss Crate" with The Log Roller, a lodge's ceiling of dark planks between heavy beams, the chat's day tone; the giant king being carved on its dais, 4 × 2 squares, stands up whole, `RoomArt.upright`; the circle's branded start marks, `SHOP_TIMBER_MARKS`, passed as Big Boy's are; his challenge his own intro since Nov 3, the log he gnaws into the table, his line "Hard hats on. We're building today."): `SHOPS` in `town/shops/shops.ts`. Their home's card
   is its name, centered, and **"Go in"** (gold) under it, centered, nothing else (Eric, Nov 2: "chop the Shop and Coming soon": a short
   card, `.town-card.town-door`); every other home's card is as it was (its name, Hollow's line, "Shop" greyed and "Coming soon").
 - **Going in.** "Go in" walks you to the square in front of the door (the plot's front row's middle, a row out); there the town zooms in on
@@ -581,9 +581,10 @@ the pacing and standing clear of the stools (Eric, Nov 2, after Big Boy's live: 
 standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decisions/2026-11-02-challenge-pacing.md).
 
 - **Which bosses.** Those in `BOSS_INTROS` (`town/shops/challenge.ts`): every boss whose home has an inside (`SHOPS`): Alfil (his own
-  intro, `custom: true`), Big Boy (his own, Nov 2), Babur and Puddles (the default intro). Every other boss's card works as before (its confirm, Leave, the Boss
+  intro, `custom: true`), Big Boy (his own, Nov 2), Timber (his own, Nov 3; in an admin's town only while he's in the game for admins
+  first), Babur and Puddles (the default intro). Every other boss's card works as before (its confirm, Leave, the Boss
   raid screen). Per player: it all happens on your own screen; the boss stays at its home for everyone else.
-- **The layout** (`layout`, per boss): **"across"** (the default, all four today): the boss on the table's west (the screen's
+- **The layout** (`layout`, per boss): **"across"** (the default, all five today): the boss on the table's west (the screen's
   left), you on its east, side by side on the circle's middle row, each `standOff.across` (1.5) squares out, facing each other;
   **"facing"**: the boss north, you south (`standOff.facing`, 2.5: the circles' old marks). `marksOf(layout, how)` finds the circle's
   middle from its floor (`circle-*`, `ring-*`, `emblem-*`), moved `clearOff` south when a piece stands there (Babur's pedestal).
@@ -601,7 +602,8 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
 - **The flow** (`nextFlow`, pure): the boss's card's **"Challenge alone"**, its confirm **"Challenge Babur?"** / "You'll fight Babur in
   Boss Battle, then come back here." / **Fight** / Stay. Fight keeps where you stand (`standOf`), and you and the boss walk to its
   door (both at `doorStepMs`, the town's walking pace, not your run) and in (the shop's zoom and fade; the room and the intro load only now: `shops/intro.ts`, and Alfil's
-  art, `shops/alfil-intro-art.ts`, or Big Boy's, `shops/bigboy-intro-art.ts`). Inside (the room in challenge mode: no cards, no walking by tap, its own framing per layout,
+  art, `shops/alfil-intro-art.ts`, Big Boy's, `shops/bigboy-intro-art.ts`, or Timber's, `shops/timber-intro-art.ts` with his moves,
+  `characters/timber-intro.ts`). Inside (the room in challenge mode: no cards, no walking by tap, its own framing per layout,
   `CHALLENGE_FEEL.cam`, at zoom 1 since Nov 3: the further-out camera, everything in view), you both stand just inside a beat (`insideMs`, from the room's first frame), then walk up to your marks, side
   by side at `walkStepMs` (a slow walk), settle onto their middles and turn to face each other. Every beat is one number in
   `CHALLENGE_FEEL`, laid out by `introBeats`: facing each other `faceMs`; the line alone in a speech bubble over its head for `lineMs`
@@ -615,15 +617,34 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
     and stools (their own picture, no park table); the board is lifted until its slab's front rests on the top block (`slabFrontY`),
     so the slab doesn't hide the upper blocks. Then his lollipop swirl (`INTRO_BIGBOY_SWIRL` and its front), played as Alfil's
     sandstorm (`startStorm`), his swish.
+  - **Timber's own** (Nov 3, a log: `LogAnims`, `isLog`, `woodAt`; Eric: "When he walks in, to the left there's a giant thick wooden
+    log. He picks it up and walks it over… sets it in the middle where the chessboard goes. Then he starts gnawing at it… a big storm of
+    wood shavings and sawdust comes up like a fog… you see he's chewed it into a board… The seats are little wooden stumps"). His own
+    beats replace the line, pause and table beats (`introBeats`, every number in `CHALLENGE_FEEL.log` or the art's frames; about 12 s
+    from the marks to the sweep): the giant log lies on the floor `log.at` (3.3) squares west of the table's middle from the walk in;
+    his line shows `log.lineLeadMs` alone, then he walks west to the log (his own moves, `BOSS_BEAVER_INTRO`, drawn at his town size,
+    mirrored to walk west; `log.walkMs` a square) while the bubble stays its `lineMs` over his head; he heaves it up (the lying log hidden
+    from the heave's first frame: it's in his paws), carries it east (`log.carryMs` a square) to where he works, his art's `reach` (about
+    1.16 squares) west of the table's middle, sets it down (the log on its own, standing on the table's place behind him, from the
+    set-down's last frame), gnaws it (the log's own gnawing; his gnaw looping, its sounds his teeth's); the shavings' fog boils up over
+    the table's place and both of you (`rise`, at the room's size, its foot the table's), holds `log.holdMs` (the log gone, his table and
+    its board swapped in under it) and settles (its last frame, a ring of shavings, kept till the sweep); the stumps pop up at the stools'
+    places (`stoolOff`, 37 room pixels a side; you hop back clear as for the others); he dusts off his paws (`done`) and walks west to
+    his place, `log.clear` (2.7: his stump's roots spread wider than a stool, so he stands a tenth further out than `clear.boss`;
+    `marksFeel`); his attack. His table: `INTRO_TIMBER_TABLE` (the park table's geometry, a gnawed log pedestal, no stools in its
+    picture) in `INTRO_TIMBER_TABLE_PALETTE` (maple and walnut squares), the real board on it (`paintTable`). His cues each a sound of
+    his own (`characters/timber-sounds.ts`: hup, thump, gnaw, chomp, clatter, saw, slide, knock, pat, chitter). Then his sawdust sweep
+    (`INTRO_TIMBER_STORM` and its front), played as Alfil's sandstorm, his swoosh. Nothing new for anyone else in the town: you both
+    go inside, as with every boss.
   - **The default** (`custom: false`): the table pops in (`pop`: grows from its foot past its size and back over `popMs`, a dust puff
     over `puffMs`, the app's soft "pop"); then the flash and the wipe (`startWipe`: `flashes` white flashes over `flashMs`, black bands
     wiping in from alternate sides over `wipeMs`, the boss's own whoosh; held black while the battle loads; faded off over `wipeOutMs`).
-  Every intro then holds the table on its own `tableHoldMs`, and the boss swings its God King attack in place where it stands (its
+  Every intro (but Timber's, who walks away from his) then holds the table on its own `tableHoldMs`, and the boss swings its God King attack in place where it stands (its
   kit's `kingAttack` and sounds: its lashes only, looping, no drop-in or leap: `attackStart`, `attackTime(…, inPlace)`) for
   `swingMs` (2 s) until its transition has covered the screen (`coverMs`), and on until the battle shows.
   Each transition is a canvas over the whole page, outside the town (it stays as the town closes); the battle starts under it (the
   app's `challengeFromTown`: Boss alone, as START). The back button calls it off until the transition starts. A tap doesn't skip.
-  About 12 s from Fight to the screen covered for Big Boy and Alfil, 9 for the default (it was about 6; the room's loading adds to it).
+  About 12 s from Fight to the screen covered for Big Boy and Alfil, 9 for the default (it was about 6; the room's loading adds to it); about 16.5 for Timber (his own intro about 12.7 s from the marks to covered, Eric's "about 12 s").
 - **After the battle:** the result screen's leaving button reads **"Back to town"**; it (and the gear's Leave: "You'll go back to the
   town square.") opens the town with you on the square you stood on, facing the same way (`createTown`'s `stand`). "Play again" keeps it.
 - **The server's lines in the town's chat** (signed-in players; blue, `.tc-server`, no name and no menu): "Ann challenged Alfil!" as the
@@ -632,12 +653,12 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
   " + Alfil token" on the end when the battle dropped one. No spam: while one of your challenges is unfinished (a quit: a leave, an
   early resign), your next challenge posts no start line; its finish posts the outcome and closes it (`TownChat.challenge`, server).
 - **Test hooks:** the room's canvas `data-intro` (its step); `__shopIntro()` (step, layout, where you and the boss stand and face, the
-  line, the table and its stools); the storm's `canvas.boss-storm` and the wipe's `canvas.boss-wipe` (`data-phase`); `__townYou()`.
+  line, the table and its stools; Timber's `wood`: his move, the log, the fog, the ring, the stumps); the storm's `canvas.boss-storm` and the wipe's `canvas.boss-wipe` (`data-phase`); `__townYou()`.
 - **Tests:** `packages/app/test/boss-challenge.test.ts` (the flow, the layouts and marks, the stools, the board's turn, the timelines,
   the pacing beat by beat, the hop back, every figure clear of the stools,
   the storm's edge, the wipe, back to where you stood), `packages/server/test/town-chat.test.ts` (the lines and the no-spam rule, and
   through the API), `e2e/boss-challenge.spec.ts` (phone and computer: Alfil, a quit then a finished challenge and the lines; Babur's
-  default intro and back; Big Boy's own intro and back), `e2e/shop.spec.ts` (Alfil's Pyramid's and Big Boy's Crib's crates), `e2e/town.spec.ts` (a boss without an inside, Folio: the
+  default intro and back; Big Boy's own intro and back; Timber's own as an admin and back), `e2e/shop.spec.ts` (Alfil's Pyramid's and Big Boy's Crib's crates), `e2e/town.spec.ts` (a boss without an inside, Folio: the
   Boss raid screen).
 
 ## Frame-rate pill (`?fps`)

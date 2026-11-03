@@ -44,7 +44,7 @@ import type { Rider } from "../rides.ts";
 import { rideSpeed } from "../../components/rides/scale.ts";
 import { inTalkRange, isFloor, makeRoom, onDoor, tapTarget, findPath, type Room, type ShopPlace, type Sq } from "./room.ts";
 import { POOL_LINE, bossHoldings, buyBossCrate, canAfford, holdLine, priceLine, prizeRows, shopOf, wayText, type CrateWay, type ShopDef } from "./shops.ts";
-import { CHALLENGE_FEEL, attackStart, attackTime, frameAt as animFrame, introAt, introCues, introLength, marksOf, type DrawnMarks, type IntroNow } from "./challenge.ts";
+import { CHALLENGE_FEEL, attackStart, attackTime, frameAt as animFrame, introAt, introCues, introLength, isLog, marksFeel, marksOf, type DrawnMarks, type IntroNow, type LogPlace } from "./challenge.ts";
 import { play } from "../../sound.ts";
 import { paintTable, playCue, slabFrontY, type LoadedIntro } from "./intro.ts";
 import { TABLE_BOARD } from "../houses/park.ts";
@@ -313,7 +313,7 @@ function startRoom(
   // circle, side by side, at the challenge's pace; each settles onto its mark's middle; facing each other, the intro plays.
   const C = CHALLENGE_FEEL;
   const ci = challenge?.intro ?? null;
-  const marks = ci ? marksOf(art.layout, ci.def.layout, art.marks) : null;
+  const marks = ci ? marksOf(art.layout, ci.def.layout, art.marks, marksFeel(ci.anims)) : null;
   const across = marks?.layout === "across";
   const boss = ci && marks ? new Walker({ c: room.start.c - 1, r: room.start.r }, C.walkStepMs, false) : null;
   const bossPose = { x: 0, y: 0, hop: 0, tilt: 0, step: false, t: 0 };
@@ -345,6 +345,21 @@ function startRoom(
   const bossOy = (now: number) => (marks ? settle(bossAt, marks.boss.r - marks.bossSq.r, now) + back() * (marks.bossClear.r - marks.boss.r) : 0);
   /** How high the hop back lifts you both now, in squares. */
   const hopLift = () => (introNow?.hop ?? 0) * C.hopUp;
+  /**
+   * Timber's own intro (his log): where he is while he plays his own moves (`introNow.wood.move`), on his row: his foot `u` of the way
+   * between two places, each a column (his mark; the log, `log.at` west of the table's middle; where he works, his art's `reach` west of
+   * it, so the log he sets down stands on the table's place; a step back from there, his dusting off's; where he swings). Null: his town
+   * figure, where the walk in and the hop back put him.
+   */
+  const woodAt = (): { c: number; r: number } | null => {
+    const w = introNow?.wood;
+    if (!w?.move || !marks || !ci?.anims || !isLog(ci.anims)) return null;
+    const a = ci.anims;
+    const place = (p: LogPlace) =>
+      p === "mark" ? marks.boss.c : p === "log" ? marks.table.c - C.log.at : p === "work" ? marks.table.c - a.reach : p === "stepped" ? marks.table.c - a.reach - a.back : marks.bossClear.c;
+    const from = place(w.from);
+    return { c: from + (place(w.to) - from) * w.u, r: marks.boss.r };
+  };
   /** The challenge, a frame on: the walk in, then the intro's beats (its line said once, in the bubble by his head; its cues' sounds). */
   const stepIntro = (now: number) => {
     if (!ci || !boss || !marks || !challenge) return;
@@ -884,9 +899,47 @@ function startRoom(
     g.restore();
     g.imageSmoothingEnabled = false;
   };
+  /**
+   * Timber's own moves (his log intro): his frame (BOSS_BEAVER_INTRO, drawn facing east; mirrored about his foot to walk west) at his
+   * town size, his foot at `at`, the town's shadows under him; his head (for his line's bubble) where his town figure's is.
+   */
+  const drawWoodMove = (at: { c: number; r: number }) => {
+    const wd = ci!.wood!;
+    const mv = introNow!.wood!.move!;
+    if (!P(at.c, at.r)) return;
+    const b = ci!.boss;
+    const k = (b.squares * pt.k) / b.ch.h;
+    const ch = wd.mover.ch;
+    const img = wd.mover.frames[mv.anim][mv.frame]!;
+    drawShadows(pt.x, pt.y, b.ch.w * k);
+    g.save();
+    g.translate(pt.x, 0);
+    if (mv.flip) g.scale(-1, 1);
+    g.imageSmoothingEnabled = k < 1.5;
+    g.drawImage(img, -ch.foot[0] * k, pt.y - ch.foot[1] * k, img.width * k, img.height * k);
+    g.restore();
+    g.imageSmoothingEnabled = false;
+    Object.assign(bossHead, { x: pt.x, y: pt.y - (b.ch.foot[1] - b.ch.h * 0.04) * k, on: true });
+  };
+  /** The town's two shadows under a boss (a soft one, `w` wide at most, and the contact one at its feet). */
+  const drawShadows = (x: number, y: number, w: number) => {
+    const soft = 1.6;
+    g.fillStyle = SHADOW;
+    g.globalAlpha = f.shadowAlpha;
+    g.beginPath();
+    g.ellipse(x, y, Math.min(w * 0.42, pt.k * 0.42 * soft), pt.k * 0.12 * soft, 0, 0, Math.PI * 2);
+    g.fill();
+    g.globalAlpha = f.contactShadowAlpha;
+    g.beginPath();
+    g.ellipse(x, y, pt.k * f.contactShadowW * 1.45 * 1.2, pt.k * f.contactShadowDepth, 0, 0, Math.PI * 2);
+    g.fill();
+    g.globalAlpha = 1;
+  };
   const drawBoss = (now: number) => {
     bossHead.on = false;
     if (!ci || !boss) return;
+    const wat = woodAt();
+    if (wat) return drawWoodMove(wat);
     if (attackFrame >= 0 && ci.attack) return drawAttack(now);
     boss.pose(now, bossPose);
     if (!P(bossPose.x + bossOx(now), bossPose.y + bossOy(now))) return;
@@ -899,17 +952,7 @@ function startRoom(
     const w = (h * b.ch.w) / b.ch.h;
     const x0 = pt.x - (b.ch.foot[0] / b.ch.w) * w;
     const y0 = pt.y - (b.ch.foot[1] / b.ch.h) * h - hopLift() * pt.k;
-    const soft = 1.6;
-    g.fillStyle = SHADOW;
-    g.globalAlpha = f.shadowAlpha;
-    g.beginPath();
-    g.ellipse(pt.x, pt.y, Math.min(w * 0.42, pt.k * 0.42 * soft), pt.k * 0.12 * soft, 0, 0, Math.PI * 2);
-    g.fill();
-    g.globalAlpha = f.contactShadowAlpha;
-    g.beginPath();
-    g.ellipse(pt.x, pt.y, pt.k * f.contactShadowW * 1.45 * 1.2, pt.k * f.contactShadowDepth, 0, 0, Math.PI * 2);
-    g.fill();
-    g.globalAlpha = 1;
+    drawShadows(pt.x, pt.y, w);
     g.save();
     // (Its town figure faces the way its attack's art does, as its kit says: Babur's and Puddles' left. Turned to face `facing`.)
     if ((boss.facing < 0) !== !!ci.attack?.facesLeft) {
@@ -932,12 +975,14 @@ function startRoom(
    */
   const drawCenter = () => {
     const n = introNow;
-    if (!ci || !marks || !n || !P(marks.table.c, marks.table.r)) return;
+    if (!ci || !marks || !(n || ci.wood) || !P(marks.table.c, marks.table.r)) return;
     const s = pt.k / SQ;
     const x = pt.x;
     const y = pt.y;
     const put = (img: HTMLCanvasElement, ch: Character, fx = ch.foot[0]) => g.drawImage(img, x - fx * s, y - ch.foot[1] * s, img.width * s, img.height * s);
     g.imageSmoothingEnabled = false;
+    if (ci.wood) return drawWood(x, y, s);
+    if (!n) return;
     const bl = ci.blocks;
     if (bl) {
       if (n.blocks) put(bl.frames[n.blocks.anim][n.blocks.frame]!, bl.ch);
@@ -975,6 +1020,47 @@ function startRoom(
     if (n.pyramid) put(py.frames[n.pyramid.anim][n.pyramid.frame]!, py.ch);
     else if (n.drift) put(py.frames.crumble[py.frames.crumble.length - 1]!, py.ch);
   };
+  /**
+   * Timber's props between you (his log intro; from the walk in), the table's foot at (x, y), `s` a room pixel: the log lying where it waits (at his
+   * size: it's the log he lifts, its foot where his art's `liftAt` puts it from his foot as he lifts it); the ring of shavings left on
+   * the floor; the stumps at the stools' places (popping up, then standing); his table (a gnawed pedestal, its middle alone: no stools
+   * in its picture) and its slab and board (`paintTable`, in his table's woods); the log standing and gnawed in front of him (his art's
+   * `reach` from his foot, behind him). The fog itself is drawn over you both (`drawFog`).
+   */
+  const drawWood = (x: number, y: number, s: number) => {
+    const wd = ci!.wood!;
+    // (Walking in, before the intro: the log lies there already.)
+    const w = introNow?.wood ?? { log: { anim: "lying", frame: 0 }, ring: false, stumps: null };
+    const b = ci!.boss;
+    const kb = (b.squares * pt.k) / b.ch.h;
+    const L = wd.log;
+    const putAt = (img: HTMLCanvasElement, ch: Character, fx: number, fy: number, k: number) => g.drawImage(img, fx - ch.foot[0] * k, fy - ch.foot[1] * k, img.width * k, img.height * k);
+    if (w.log?.anim === "lying" && P(marks!.table.c - C.log.at, marks!.boss.r)) putAt(L.frames.lying[0]!, L.ch, pt.x + wd.liftAt[0] * kb, pt.y + wd.liftAt[1] * kb, kb);
+    if (w.ring) {
+      const fr = wd.fog.frames.settle;
+      putAt(fr[fr.length - 1]!, wd.fog.ch, x, y, s);
+    }
+    const st = wd.stump;
+    if (w.stumps)
+      for (const at of [marks!.bossStool, marks!.youStool]) if (P(at.c, at.r)) putAt(st.frames[w.stumps.anim][w.stumps.frame]!, st.ch, pt.x, pt.y, s);
+    if (introNow?.table && P(marks!.table.c, marks!.table.r)) {
+      const T = ci!.table;
+      putAt(T.img, T.ch, pt.x, pt.y, s);
+      paintTable(g, v, marks!.table.c - camX, camY - marks!.table.r, T.palette, marks!.layout);
+    }
+    const me = woodAt();
+    if ((w.log?.anim === "standing" || w.log?.anim === "gnawed") && me && P(me.c, me.r)) putAt(L.frames[w.log.anim][w.log.frame]!, L.ch, pt.x + wd.reach[0] * kb, pt.y + wd.reach[1] * kb, kb);
+  };
+  /** Timber's shavings' fog (rising, holding, settling), over the table's place and over you both: its foot is the table's. */
+  const drawFog = () => {
+    const fog = introNow?.wood?.fog;
+    if (!ci?.wood || !fog || !marks || !P(marks.table.c, marks.table.r)) return;
+    const F = ci.wood.fog;
+    const s = pt.k / SQ;
+    const img = F.frames[fog.anim][fog.frame]!;
+    g.imageSmoothingEnabled = false;
+    g.drawImage(img, pt.x - F.ch.foot[0] * s, pt.y - F.ch.foot[1] * s, img.width * s, img.height * s);
+  };
   /** A stool on its own (facing: the table's north one, or its south one), as the table's picture has it. */
   const drawStool = (at: { c: number; r: number }) => {
     const n = introNow;
@@ -1000,11 +1086,11 @@ function startRoom(
     g.globalAlpha = 1;
   };
   /**
-   * What stands among the pieces this frame (the Shopkeeper 0, you 1, the boss 2, the board 3, and facing the boss's stool 4 and
-   * yours 5), by row: drawn far to near.
+   * What stands among the pieces this frame (the Shopkeeper 0, you 1, the boss 2, the board 3, facing the boss's stool 4 and yours 5,
+   * and Timber's shavings' fog 6), by row: drawn far to near.
    */
-  const figZ = new Float64Array(6);
-  const figK = new Uint8Array(6);
+  const figZ = new Float64Array(7);
+  const figK = new Uint8Array(7);
   let figN = 0;
   const addFig = (z: number, k: number) => {
     let i = figN++;
@@ -1016,7 +1102,8 @@ function startRoom(
     figZ[i] = z;
     figK[i] = k;
   };
-  const drawFigure = (k: number, now: number) => (k === 0 ? drawKid(now) : k === 1 ? drawYou(now) : k === 2 ? drawBoss(now) : k === 3 ? drawCenter() : drawStool(k === 4 ? marks!.bossStool : marks!.youStool));
+  const drawFigure = (k: number, now: number) =>
+    k === 0 ? drawKid(now) : k === 1 ? drawYou(now) : k === 2 ? drawBoss(now) : k === 3 ? drawCenter() : k === 6 ? drawFog() : drawStool(k === 4 ? marks!.bossStool : marks!.youStool);
   /** A speech bubble's lines (wrapped once for its words). */
   const bubbles = new Map<string, { lines: string[]; w: number }>();
   /** The boss's line in a speech bubble (the town's: white, rounded, its tail pointing down at the speaker's head). */
@@ -1133,13 +1220,16 @@ function startRoom(
     you.pose(now, pose);
     figN = 0;
     addFig(def.at[1], 0);
-    addFig(pose.y + youOy(now), 1);
+    // (In a challenge you're drawn a hair nearer than your row: in front of Timber's fog on the table's row, as of the boss.)
+    addFig(pose.y + youOy(now) + (ci ? 0.002 : 0), 1);
     if (boss && marks) {
       boss.pose(now, bossPose);
-      addFig(bossPose.y + bossOy(now), 2);
-      if (introNow) {
-        // (Across, you and the boss stand on the table's row, at its stools: the table first, you in front of yours.)
+      addFig(woodAt()?.r ?? bossPose.y + bossOy(now), 2);
+      if (introNow || ci?.wood) {
+        // (Across, you and the boss stand on the table's row, at its stools: the table first, you in front of yours. Timber's log
+        // lies there from the walk in; his fog over him, as it boils up round where he works.)
         addFig(across ? marks.table.r - 0.01 : marks.table.r, 3);
+        if (introNow?.wood?.fog) addFig(marks.table.r + 0.001, 6);
         if (!across) {
           addFig(marks.bossStool.r, 4);
           addFig(marks.youStool.r, 5);
@@ -1383,13 +1473,17 @@ function startRoom(
     const now = performance.now();
     you.pose(now, pose);
     boss.pose(now, bossPose);
+    const wat = woodAt();
+    const w = introNow?.wood ?? null;
     return {
       step: introNow?.step ?? "walk",
       layout: marks!.layout,
       attack: attackFrame >= 0,
       you: [pose.x + youOx(now), pose.y + youOy(now)],
-      boss: [bossPose.x + bossOx(now), bossPose.y + bossOy(now)],
-      facing: { you: you.facing, boss: boss.facing },
+      boss: wat ? [wat.c, wat.r] : [bossPose.x + bossOx(now), bossPose.y + bossOy(now)],
+      facing: { you: you.facing, boss: w?.move ? (w.move.flip ? -1 : 1) : boss.facing },
+      // (Timber's own: his move, the log, the fog, the shavings' ring, the stumps.)
+      wood: w ? { move: w.move?.anim ?? null, log: w.log?.anim ?? null, fog: w.fog?.anim ?? null, ring: w.ring, stumps: w.stumps?.anim ?? null } : null,
       line: !!introNow?.line && bossHead.on,
       table: !!introNow?.table,
       stools: introNow?.stools ? [[marks!.bossStool.c, marks!.bossStool.r], [marks!.youStool.c, marks!.youStool.r]] : [],

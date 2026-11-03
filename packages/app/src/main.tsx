@@ -37,8 +37,9 @@ setBannerPlusSource(bannerPlusAsked);
 // Browsers allow sound only after a tap. iPhones don't count every event as one (a pointerdown alone isn't
 // enough), so every tap tries until sound is on (cheap once it is). The audio graph is made beforehand, while the page
 // is idle, so the first tap (often a game's first move) only switches it on and starts the samples loading after its
-// own frame. Coming back from another app, the first tap brings sound back (wakeAudio: a new audio context if iOS left the
-// old one dead; Eric, Nov 3). Capture: it runs before the page's own handlers, so that tap's sound plays too.
+// own frame. Every tap also checks the sound is still on and brings it back if not (wakeAudio: a new audio context if iOS left
+// the old one dead, coming back from another app or with the page on screen; Eric, Nov 3). Capture: it runs before the page's
+// own handlers, so that tap's sound plays too.
 prepareAudio();
 for (const ev of ["pointerdown", "touchend", "click", "keydown"]) window.addEventListener(ev, wakeAudio, { passive: true, capture: true });
 // The kill switches and the maintenance banner (status.ts), asked now and every minute.

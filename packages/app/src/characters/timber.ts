@@ -28,7 +28,7 @@ import { canvas, inEllipse, inPoly, roundLight, toGrid, type Canvas } from "./pa
 import type { Anim, Character, Frame, Layer, Part, Speck } from "./sprite.ts";
 import { KING_ATTACK } from "@chessroyale/chess";
 
-const PALETTE: Record<string, string> = {
+export const PALETTE: Record<string, string> = {
   k: "#1e130d", // outline
   a: "#3e2415", // fur, dark to light
   b: "#5d361d",
@@ -80,7 +80,7 @@ const PALETTE: Record<string, string> = {
   z: "#0d0e12", // ground shadow
 };
 
-type Pt = readonly [number, number];
+export type Pt = readonly [number, number];
 type Inside = (x: number, y: number) => boolean;
 type Key = (x: number, y: number) => string;
 interface Painted {
@@ -88,11 +88,11 @@ interface Painted {
   at: Pt;
 }
 
-const W = 88;
+export const W = 88;
 const H = 88;
 const GROUND = 82;
 /** Headroom: the drawing sits this far down the frame. */
-const OY = 2;
+export const OY = 2;
 
 const ramp = (r: string, l: number) => r[Math.max(0, Math.min(r.length - 1, Math.floor(l * r.length)))]!;
 const and = (...fs: Inside[]): Inside => (x, y) => fs.every((f) => f(x, y));
@@ -145,7 +145,7 @@ const BROWS: Record<Brow, { far: readonly string[]; fx: number; fy: number; near
   up: { far: [".bb", "b.."], fx: 27, fy: 17, near: [".aaa.", "a...a"], nx: 35, ny: 16 },
 };
 
-function head(mood: Mood, brow: Brow = "cheer", mouth: Mouth = "smile", jaw = 0, tongue = false): Painted {
+function head(mood: Mood, brow: Brow = "cheer", mouth: Mouth = "smile", jaw = 0, tongue = false, puff = 0): Painted {
   const p = pic(10, 10, 48, 37);
   const light = roundLight(33, 20, 16, 14, 0.08);
   const fur: Key = (x, y) => ramp("abcde", light(x, y));
@@ -156,8 +156,9 @@ function head(mood: Mood, brow: Brow = "cheer", mouth: Mouth = "smile", jaw = 0,
   p.F(inEllipse(52.7, 21.3, 1.8, 1.8), () => "a");
   // A round skull and chubby cheeks.
   p.F(inEllipse(38.5, 27, 14.5, 12.5), fur);
-  p.F(inEllipse(31, 32, 10, 7.5), fur);
-  p.F(inEllipse(45, 32.5, 8.5, 6.5), fur);
+  // (Puffed out with effort when `puff` > 0: the intro's strain under the log.)
+  p.F(inEllipse(31 - puff * 0.4, 32 + puff * 0.3, 10 + puff, 7.5 + puff * 0.6), fur);
+  p.F(inEllipse(45 + puff * 0.4, 32.5 + puff * 0.3, 8.5 + puff, 6.5 + puff * 0.6), fur);
   // The muzzle: pale, pointing to our left.
   const ml = roundLight(23, 28, 8, 6, 0.12);
   p.F(inEllipse(25.5, 31, 7.6, 5.6), (x, y) => ramp("mnN", ml(x, y)));
@@ -507,7 +508,7 @@ function elbowOf(s: Pt, t: Pt, l1 = 10, l2 = 10): Pt {
 
 // ---- Parts and poses.
 
-const PARTS: Record<string, Part> = {};
+export const PARTS: Record<string, Part> = {};
 const AT: Record<string, Pt> = {};
 function use(name: string, make: () => Painted): string {
   if (!PARTS[name]) {
@@ -534,20 +535,22 @@ const PLANK_UP: Pt = (() => {
   return [dx / l, dy / l];
 })();
 
-interface Arm {
+export interface Arm {
   /** The paw, in rest pixels (it rides his breath, crouch and lean). */
   h: Pt;
   /** The elbow (bent by itself when left out). */
   e?: Pt;
 }
 
-interface Pose {
+export interface Pose {
   mood?: Mood;
   brows?: Brow;
   mouth?: Mouth;
   /** His jaw dropped this many pixels under the teeth (with `mouth: "open"`). */
   jaw?: number;
   tongue?: boolean;
+  /** Cheeks puffed out this much (straining). */
+  puff?: number;
   /** His chest up a pixel (breathing in): body, arms, planks, head and hat. */
   breath?: number;
   /** The head a little further (a proud chin up). */
@@ -654,8 +657,8 @@ function layers(p: Pose): Layer[] {
   const hammerL = p.hammer !== undefined ? [U(use(`hammer:${k2(AL.hand)}:${Math.round(p.hammer)}`, () => hammerHeld(AL.hand, Math.round(p.hammer!))))] : [];
   const hammerR = p.hammerR !== undefined ? [U(use(`hammer:${k2(AR.hand)}:${Math.round(p.hammerR)}`, () => hammerHeld(AR.hand, Math.round(p.hammerR!))))] : [];
   const held = p.held ? [U(use(`held:${k2(p.held.top)}:${k2(p.held.bot)}`, () => plank(p.held!.top, p.held!.bot, 4.2, 99)))] : [];
-  const hk = `head:${p.mood ?? "smile"}:${p.brows ?? "cheer"}:${p.mouth ?? "smile"}:${p.jaw ?? 0}:${p.tongue ? 1 : 0}`;
-  const headL = L(use(hk, () => head(p.mood ?? "smile", p.brows ?? "cheer", p.mouth ?? "smile", p.jaw ?? 0, p.tongue ?? false)), hx, hy);
+  const hk = `head:${p.mood ?? "smile"}:${p.brows ?? "cheer"}:${p.mouth ?? "smile"}:${p.jaw ?? 0}:${p.tongue ? 1 : 0}${p.puff ? `:puff${p.puff}` : ""}`;
+  const headL = L(use(hk, () => head(p.mood ?? "smile", p.brows ?? "cheer", p.mouth ?? "smile", p.jaw ?? 0, p.tongue ?? false, p.puff ?? 0)), hx, hy);
   const tilt = Math.round(p.hatTilt ?? 0);
   const hatL = p.hatOff ? [] : [L(use(`hat:${tilt}`, () => hat(tilt)), hx + (p.hat?.[0] ?? 0), hy + (p.hat?.[1] ?? 0))];
   if (p.frontR) {
@@ -695,7 +698,7 @@ function dust(t: number): Speck[] {
   return out.filter(([x, y]) => x >= 1 && x < W - 1 && y >= 1 && y < H - 1);
 }
 
-const f = (ms: number, p: Pose, extra: Partial<Frame> = {}): Frame => {
+export const f = (ms: number, p: Pose, extra: Partial<Frame> = {}): Frame => {
   const hy = -(p.breath ?? 0) + (p.headDy ?? 0) + (p.sink ?? 0) + (p.head?.[1] ?? 0) - (p.air ?? 0);
   const hx = (p.lean ?? 0) + (p.head?.[0] ?? 0) + (p.dx ?? 0);
   const specks: Speck[] = [...whiskers(hy + OY, hx), ...(p.dust !== undefined ? dust(p.dust).map(([x, y, k]): Speck => [x + (p.dx ?? 0), y + OY, k]) : []), ...(extra.specks ?? [])];
@@ -725,7 +728,7 @@ const idle: Anim = {
 
 // ---- Things on his frames: chips, sawdust, sweat, the ground's dust. Drawing pixels (the frame adds OY).
 
-const px = (x: number, y: number, k: string): Speck => [Math.round(x), Math.round(y) + OY, k];
+export const px = (x: number, y: number, k: string): Speck => [Math.round(x), Math.round(y) + OY, k];
 const WOOD = "HhjJ";
 /** Wood chips flung from (x, y), `t` frames on: a fan of them heading `dir` (-1 our left, 1 right), falling. */
 function chips(x: number, y: number, t: number, seed = 0, n = 7, dir = -1): Speck[] {
@@ -764,7 +767,7 @@ function splinters(x: number, y: number, t: number, seed = 0): Speck[] {
   return out;
 }
 /** A puff of sawdust at (x, y), `t` frames on. */
-function puff(x: number, y: number, t: number): Speck[] {
+export function puff(x: number, y: number, t: number): Speck[] {
   const ring: Record<number, readonly (readonly [number, number, string])[]> = {
     0: [[0, 0, "C"], [1, 0, "C"], [-1, 0, "D"], [0, -1, "C"], [1, -1, "D"], [-1, -1, "C"], [2, 0, "D"]],
     1: [[-2, 0, "C"], [3, 0, "C"], [0, -2, "C"], [-1, -2, "D"], [2, -2, "C"], [-2, -1, "D"], [3, -1, "D"], [1, -3, "C"]],
@@ -773,7 +776,7 @@ function puff(x: number, y: number, t: number): Speck[] {
   return (ring[Math.min(2, t)] ?? []).map(([dx, dy, k]) => px(x + dx, y + dy, k));
 }
 /** Dust kicked up either side of his feet, `t` frames after he lands. */
-function feetDust(t: number): Speck[] {
+export function feetDust(t: number): Speck[] {
   const out: Speck[] = [];
   for (const side of [-1, 1]) {
     const x0 = side < 0 ? 15 : 63;
