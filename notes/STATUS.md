@@ -89,3 +89,5 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Boss picker: helper's stills were of the old light "Boss raid" screen (buttons), not the live dark Boss Battle (START). All picker work paused (Eric).
 - Eric: sound died on desktop after FAST CLICKS on boss tiles (no app switch). Can't repro headless (300+ clicks at 44.1/48/96k: running, loud, no NaN).
   #478 now also has admin "Sound report" (Settings → Testing) dc140033, watcher bln1j6nhr. After merge: Eric reproduces, copies report, pastes.
+- #477 Dash home MERGED 23a3a7d4, #478 audio-desktop + sound report MERGED 1a483a56: LIVE 16:03 (deploy took 13 min). Main CI watcher on 1a483a56.
+  Eric to reproduce (reload, slow clicks, then 4-5 spam clicks on boss tiles) and paste the sound report or console __soundLog.
