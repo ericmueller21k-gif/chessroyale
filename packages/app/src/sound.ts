@@ -807,6 +807,18 @@ export type SoundName =
   | "hollowRelight"
   | "hollowClink"
   | "hollowLash"
+  | "hollowGutter"
+  | "hollowSnuff"
+  | "hollowDrain"
+  | "hollowTink"
+  | "hollowStar"
+  | "hollowSip"
+  | "hollowPawn"
+  | "hollowBlackout"
+  | "hollowSettle"
+  // (His intro's swell and his full ball's deep hum: his cast and hum, played slower and so lower.)
+  | "hollowSwell"
+  | "hollowDeep"
   // Big Boy (a raid boss, the baby): synthesised, see characters/bigboy-sounds.ts.
   | "bigboyGiggle"
   | "bigboySlurp"
@@ -1114,6 +1126,17 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   hollowRelight: hollow("relight"),
   hollowClink: hollow("clink"),
   hollowLash: hollow("lash"),
+  hollowGutter: hollow("gutter"),
+  hollowSnuff: hollow("snuff"),
+  hollowDrain: hollow("drain"),
+  hollowTink: hollow("tink"),
+  hollowStar: hollow("star"),
+  hollowSip: hollow("sip"),
+  hollowPawn: hollow("pawn"),
+  hollowBlackout: hollow("blackout"),
+  hollowSettle: hollow("settle"),
+  hollowSwell: (t) => buffer(hollowSound("cast", ctx!.sampleRate), t, 0.7),
+  hollowDeep: (t) => buffer(hollowSound("hum", ctx!.sampleRate), t, 0.75),
   bigboyGiggle: bigBoy("giggle"),
   bigboySlurp: bigBoy("slurp"),
   bigboyWail: bigBoy("wail"),
@@ -1358,6 +1381,17 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   hollowRelight: [["hollow", "relight"]],
   hollowClink: [["hollow", "clink"]],
   hollowLash: [["hollow", "lash"]],
+  hollowGutter: [["hollow", "gutter"]],
+  hollowSnuff: [["hollow", "snuff"]],
+  hollowDrain: [["hollow", "drain"]],
+  hollowTink: [["hollow", "tink"]],
+  hollowStar: [["hollow", "star"]],
+  hollowSip: [["hollow", "sip"]],
+  hollowPawn: [["hollow", "pawn"]],
+  hollowBlackout: [["hollow", "blackout"]],
+  hollowSettle: [["hollow", "settle"]],
+  hollowSwell: [["hollow", "cast"]],
+  hollowDeep: [["hollow", "hum"]],
   bigboyGiggle: [["bigBoy", "giggle"]],
   bigboySlurp: [["bigBoy", "slurp"]],
   bigboyWail: [["bigBoy", "wail"]],
