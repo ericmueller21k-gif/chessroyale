@@ -416,7 +416,7 @@ test("Hollow Peak (Nov 3): Go in (his line on the card), the cave: in at the mou
     await expect(room(page)).toHaveAttribute("data-you", "14,17");
     await page.getByRole("button", { name: "Zoom in" }).click();
     await still("close-14-17");
-    for (const sq of [[13, 15], [12, 13], [12, 11], [11, 9], [10, 8], [9, 8], [8, 7], [7, 7], [5, 6], [4, 5], [3, 4]] as const) {
+    for (const sq of [[13, 15], [12, 13], [12, 11], [11, 9], [10, 8], [9, 8], [8, 7], [7, 7], [6, 6], [5, 6], [4, 5], [3, 4]] as const) {
       await walkTo(sq);
       await still(`close-${sq.join("-")}`);
     }
