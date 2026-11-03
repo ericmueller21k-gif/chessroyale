@@ -1,3 +1,7 @@
+> **Renamed Nov 3: the cheetah is DASH, not Blitz** (Eric: "Blitz is too confusing", it's a chess time control; "we could always
+> change it later"). Picked by the director: short, fast, no chess meaning, no brand or real person. File/export ids stay `blitz`;
+> every player-visible word says Dash (incl. Cheetah Shoes' description "Blitz says the spots…" → "Dash says…").
+
 # Blitz's lines (draft, Nov 3): the try-hard slang cheetah
 
 Eric: "a bit silly… use the slang… 'Yo, this game is chopped, bro'… trying to fit in with the younger crowd, but not really…

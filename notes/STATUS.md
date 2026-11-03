@@ -51,3 +51,8 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Bot ratings: 800-1500 chess-site scale (live) or scoreboard scale?
 - Boss lines from Gemini (he sends them slowly; kids are family; names Rivet/Tick).
 - Crate key picture; payments later.
+
+## Nov 3 (later)
+- Cheetah renamed **Dash** (Eric: Blitz confusing). Ids stay `blitz`; player text says Dash. Art session told (send_message).
+- Town audio bug (Eric's iPhone, no app switch: Timber chittered → Alfil silent → fight silent, never back): PR #474 `claude/town-audio`
+  (worktree /home/user/cr-audio), per-tap health check in `wakeAudio`. CI watcher b9b89ki3f on 0eef6e1d.

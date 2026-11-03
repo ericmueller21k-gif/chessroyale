@@ -1,0 +1,5 @@
+
+> typecheck
+> tsc -p packages/core --noEmit && tsc -p packages/chess --noEmit && tsc -p packages/sim --noEmit && tsc -p packages/app --noEmit && tsc -p packages/server --noEmit && tsc -p packages/maia-worker --noEmit
+
+exit 0
