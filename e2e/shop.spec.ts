@@ -4,8 +4,8 @@ import { asServerAdmin, backdateSoloBattle, bossAloneFromHome, giveItems, test, 
 
 /**
  * Inside a shop (Nov 2, round 1; docs/areas/town-square.md, "Inside a shop"), on a phone and a computer: walk up to Babur's
- * Circus, its card's "Go in" (you walk to the door, the town zooms in on it and fades), you start inside in Close (the third-person
- * camera; − and + switch to the town's zoomed-in camera and back), a tap on the Shopkeeper walks you up to the counter and its card
+ * Circus, its card's "Go in" (you walk to the door, the town zooms in on it and fades), you start inside zoomed out (the town's
+ * zoomed-in camera, Eric, Nov 3; + and − switch to Close, the third-person camera, and back), a tap on the Shopkeeper walks you up to the counter and its card
  * says "Shopkeeper" with Talk, Talk opens "Babur's Boss Crate" (the price line, Balloon Pup among the prizes, what you have, and both
  * buys greyed with nothing to pay), then the door's "Go out" brings you back outside at the tent's door. Inside, the header says the
  * shop's name. And Puddles' greenhouse: Drizzle's crate, his ride, and the back button takes you out.
@@ -101,21 +101,21 @@ test("Babur's tent: Go in, start in Close, talk to the Shopkeeper, the crate's p
   const door = await town(page).getAttribute("data-you");
   const [dc, dr] = door!.split(",").map(Number) as [number, number];
   expect(Math.abs(dc - 28) + Math.abs(dr - 2), `at the door (28, 2): ${door}`).toBeLessThanOrEqual(2);
-  // Inside: a step in from the door, in Close (the + is the pressed one), the town's chips put away; the header says the shop's name.
+  // Inside: a step in from the door, zoomed out (the − is the pressed one: Eric, Nov 3), the town's chips put away; the header says the shop's name.
   await expect(room(page)).toHaveAttribute("data-room", "tiger");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Babur's Circus");
   // The chat log over the dark tent: white words (Eric, Nov 2), by day outside too (?sky=day).
   await expect(page.locator(".town-chat")).toHaveAttribute("data-tone", "night");
   await expect(room(page)).toHaveAttribute("data-you", "10,17");
-  expect((await shopCam(page))!.zoom).toBe(0);
-  await expect(page.getByRole("button", { name: "Zoom in" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator(".town-chip").first()).toBeHidden();
-  // − zooms out to the town's zoomed-in camera, + back into Close.
-  await page.getByRole("button", { name: "Zoom out" }).click();
-  await expect.poll(async () => (await shopCam(page))!.zoom).toBe(1);
+  expect((await shopCam(page))!.zoom).toBe(1);
   await expect(page.getByRole("button", { name: "Zoom out" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".town-chip").first()).toBeHidden();
+  // + zooms into Close, − back out to the town's zoomed-in camera.
   await page.getByRole("button", { name: "Zoom in" }).click();
   await expect.poll(async () => (await shopCam(page))!.zoom).toBe(0);
+  await expect(page.getByRole("button", { name: "Zoom in" })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Zoom out" }).click();
+  await expect.poll(async () => (await shopCam(page))!.zoom).toBe(1);
 
   // The Shopkeeper (Stripes, beside the counter): a tap walks you up in front of it; its card; Talk opens the crate's.
   await talk(page);
@@ -301,7 +301,7 @@ test("inside, a drag looks around as the town's does (Eric, Nov 2: \"when I drag
   await followsFinger(page, tent, d);
   // Inside: a square in front of you, the same.
   await goIn(page, "tiger", "Babur's Circus");
-  await expect.poll(async () => (await shopCam(page))?.zoom).toBe(0);
+  await expect.poll(async () => (await shopCam(page))?.zoom).toBe(1);
   await page.waitForTimeout(800); // (the camera's spring settles on you)
   const square = async () => (await shopAt(page, "square", [10, 15])) ?? (await shopAt(page, "square", [10, 13]));
   await followsFinger(page, square, d);

@@ -9,8 +9,8 @@
  * north row standing up (unless the room's art says it stands up whole: Big Boy's airplane), the Shopkeeper (the boss's kid, its idle
  * playing, a blue "Shopkeeper" tag) and you, far to near; a tent's canvas, a greenhouse's glass, a pyramid's sandstone or a nursery's
  * sky above the walls. Animated pieces loop (the fire hoops, the pond, the palm, the fountain, the
- * crate). You start in Close (SHOP_FEEL.close, the third-person camera); the town's − / + switch between Close and the town's
- * zoomed-in camera. Inside is just you: the town's bots and other players don't come in.
+ * crate). You start at the town's zoomed-in camera (SHOP_FEEL.startZoom, Eric, Nov 3: the further out of the two); the town's − / +
+ * switch between it and Close (SHOP_FEEL.close, the third-person camera). Inside is just you: the town's bots and other players don't come in.
  *
  * Your ride comes in with you (Eric, Nov 2: "your rider goes in with you"; SHOP_FEEL.rideInside): the town's own rider, its frames
  * composed as the town drew them (town/rides.ts: the ride at its scale, 0.75 of the pawn), drawn under you at the room's camera,
@@ -505,7 +505,7 @@ function startRoom(
   const sets: CamPair = { tall, wide };
   // (A challenge: its own framing, CHALLENGE_FEEL.cam for its layout, from the start.)
   const cam = marks ? C.cam[marks.layout] : null;
-  let zoomCur = cam ? cam.zoom : 0;
+  let zoomCur: number = cam ? cam.zoom : S.startZoom;
   let zoomTarget = zoomCur;
   let camX = you.c;
   let camY = you.r;

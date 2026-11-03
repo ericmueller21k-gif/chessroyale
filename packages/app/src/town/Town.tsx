@@ -193,7 +193,8 @@ export function TownScreen({
       return;
     }
     ctl.current?.pause();
-    setShopOut(false);
+    // (You start inside zoomed out, the − pressed: SHOP_FEEL.startZoom, a challenge's camera too.)
+    setShopOut(F.startZoom === 1);
     if (fight) step("inside");
     setInside({ ...got, intro: fight ? { intro: fight.intro, onMarks: () => step("onMarks"), onDone: () => void stormIn(id, fight.m, fight.intro) } : null });
   };

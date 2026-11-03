@@ -120,9 +120,10 @@ export const CHALLENGE_FEEL = {
   /**
    * The room's camera through a challenge, by layout: looking at this many squares south of the table (and west of it: the boss is
    * wider than you, and stands further out), at this zoom (0 Close, 1 the town's zoomed-in camera): you, the table, both stools and
-   * the boss all in view, the boss's line under the chat log.
+   * the boss all in view, the boss's line under the chat log. Both at 1, as a home starts (Eric, Nov 3: the further out of the two
+   * "when you challenge the boss, so you can see everything"; they were 0.8 and 0.6).
    */
-  cam: { across: { south: 0.8, west: 0.75, zoom: 0.8 }, facing: { south: 1.5, west: 0, zoom: 0.6 } },
+  cam: { across: { south: 0.8, west: 0.75, zoom: 1 }, facing: { south: 1.5, west: 0, zoom: 1 } },
   /**
    * How far (squares) each of you stands from the table's middle, by layout, walking in and saying the line: across, on the start
    * marks just outside the stools (the park table's stools stand `stoolOff` from its middle); facing, on the circle's drawn north
