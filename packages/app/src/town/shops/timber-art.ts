@@ -12,7 +12,8 @@
  * west one mirrored (`flip`).
  *
  * Copied as drawn from `claude/boss-art` (scripts/boss-art/out/house-shop-timber/house-shop-timber.ts, Nov 3), its imports moved, its
- * room still and review strips (HOUSE_SHOP_TIMBER) left there. Built as Big Boy's shop is (shops/bigboy-art.ts).
+ * room still and review strips (HOUSE_SHOP_TIMBER) left there, and the showpiece's squares made its picture's four (below). Built as
+ * Big Boy's shop is (shops/bigboy-art.ts).
  */
 import { frameKeys, type Anim, type Character, type Frame, type Layer, type Part } from "../../characters/sprite.ts";
 import { grain, groundShadow, paint, signBoard, signFace, TORCH, WARM, type LightPool, type LightSpot, type Pt } from "../houses/kit.ts";
@@ -1259,7 +1260,9 @@ export const SHOP_TIMBER_SHOWPIECE = (() => {
       cropBit(dust, false),
     );
   });
-  return def("showpiece", [3, 2], SPW, SPH, [Math.floor(SPW / 2), SPF], frames, 110);
+  // (The app's copy: [4, 2], its picture's own 4 squares (SPW) and the art's notes' "4 x 2 squares, columns 15-18"; the art's file
+  // said [3, 2], which stood it a half square west of its dais and left column 18 walkable under it. Nothing drawn changes.)
+  return def("showpiece", [4, 2], SPW, SPH, [Math.floor(SPW / 2), SPF], frames, 110);
 })();
 
 // ==== The lumber, round the sides.
@@ -1533,7 +1536,7 @@ at("sale-sign", 4, 8, true);
 at("knight-big", 2, 11, true);
 at("sale-sign", 3, 11, true);
 at("display-table", 2, 14, true);
-at("showpiece", 15, 4, true); // columns 15-17, rows 3-4
+at("showpiece", 15, 4, true); // columns 15-18, rows 3-4
 at("carving-rough", 15, 8, true);
 at("stove", 2, 3, true);
 at("plank-stack", 4, 2, true);

@@ -3,7 +3,7 @@ import { TOWN_CHAT } from "@chessroyale/core";
 import { CHAT, CHATTER, CHAT_BACKGROUND_LABEL, CHAT_BACKGROUND_NOTE, CHAT_MODES, CHAT_MODE_CHOICE, CHAT_MODE_LABEL, ChatLog, Stick, chatBackground, chatBlurs, chatMode, chatShows, clampBox, chatterDelay, clockText, loadChatBackground, loadChatMode, loadChatPos, nextChatMode, onChatBackground, onChatMode, onTownChatLineTap, pickChatter, saveChatBackground, saveChatMode, saveChatPos, say, setChatBackground, setChatMode, setTownChatLineTap, startChatter, tooSoonText, townTone, unsay, type ChatKind } from "../src/town/chat.ts";
 import { NAME_COLORS, NAME_COLOR_LIMIT, nameColorIndex, pickNameColor } from "../src/town/names.ts";
 import { skyTone, skyWeights } from "../src/town/sky.ts";
-import { HOMES } from "../src/town/world.ts";
+import { ALL_HOMES, HOMES } from "../src/town/world.ts";
 
 /** The town square's chat log (Eric, Oct 28): the time's format, the three modes (their cycle, what each shows, remembered on
  * this device), the fade and the way back, the tap that brings the faded lines back, the stream pinned to its foot unless scrolled
@@ -570,10 +570,11 @@ describe("the stream stays at its foot unless it's scrolled up (Eric, Oct 28)", 
 });
 
 describe("the chatter table (placeholders until real players chat)", () => {
-  const all = HOMES.map((h) => ({ home: h, v: CHATTER[h.id] }));
+  // (Every home, an admin's town's too: Timber's, Nov 3.)
+  const all = ALL_HOMES.map((h) => ({ home: h, v: CHATTER[h.id] }));
 
   it("has every boss with a home: two lines each, and a kid with one or two", () => {
-    expect(Object.keys(CHATTER).sort()).toEqual(HOMES.map((h) => h.id).sort());
+    expect(Object.keys(CHATTER).sort()).toEqual(ALL_HOMES.map((h) => h.id).sort());
     for (const { home, v } of all) {
       expect(v.boss, home.boss).toHaveLength(2);
       expect(v.kidSays.length, v.kid).toBeGreaterThanOrEqual(1);
@@ -581,8 +582,8 @@ describe("the chatter table (placeholders until real players chat)", () => {
     }
   });
 
-  it("names the fourteen kids from the sidekicks brief", () => {
-    expect(all.map(({ v }) => v.kid).sort()).toEqual(["Blocky", "Bun & Bug", "Chip", "Crumb", "Dabble", "Drizzle", "Glim", "Pleat", "Sparky", "Squirt", "Stripes", "Tex", "Twinkle", "Woolly"].sort());
+  it("names the fifteen kids from the sidekicks brief (Rivet, Timber's, Nov 3)", () => {
+    expect(all.map(({ v }) => v.kid).sort()).toEqual(["Blocky", "Bun & Bug", "Chip", "Crumb", "Dabble", "Drizzle", "Glim", "Pleat", "Rivet", "Sparky", "Squirt", "Stripes", "Tex", "Twinkle", "Woolly"].sort());
   });
 
   it("keeps every line short (under 60 characters), distinct, plain and kind", () => {

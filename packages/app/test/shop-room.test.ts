@@ -3,10 +3,11 @@ import { SHOP_BABUR_LAYOUT } from "../src/town/shops/babur-art.ts";
 import { SHOP_PUDDLES_LAYOUT } from "../src/town/shops/puddles-art.ts";
 import { SHOP_ALFIL_LAYOUT } from "../src/town/shops/alfil-art.ts";
 import { SHOP_BIGBOY_LAYOUT } from "../src/town/shops/bigboy-art.ts";
+import { SHOP_TIMBER_LAYOUT, SHOP_TIMBER_MARKS } from "../src/town/shops/timber-art.ts";
 import { findPath, inTalkRange, makeRoom, onDoor, stepsFrom, tapTarget, walkable, type Room, type Sq } from "../src/town/shops/room.ts";
 import { POOL_LINE, buyBossCrate, canAfford, inInventoryLine, holdLine, priceLine, prizeRows, shopOf, wayText, SHOPS } from "../src/town/shops/shops.ts";
 import { bossCrateOf } from "@chessroyale/core";
-import { HOMES } from "../src/town/world.ts";
+import { ALL_HOMES } from "../src/town/world.ts";
 import { SHOP_FEEL } from "../src/town/feel.ts";
 
 /**
@@ -17,6 +18,7 @@ const babur = makeRoom(SHOP_BABUR_LAYOUT, SHOPS.tiger!.keeper);
 const puddles = makeRoom(SHOP_PUDDLES_LAYOUT, SHOPS.gardener!.keeper);
 const alfil = makeRoom(SHOP_ALFIL_LAYOUT, SHOPS.alfil!.keeper);
 const bigboy = makeRoom(SHOP_BIGBOY_LAYOUT, SHOPS.bigboy!.keeper);
+const timber = makeRoom(SHOP_TIMBER_LAYOUT, SHOPS.timber!.keeper);
 /**
  * Each room, and two far squares you can walk to and a wall square to tap beside: the back corners and the west wall for the first
  * three; Big Boy's crib is a ball pit (solid) but for its raised floors, so its far squares are the shop platform's back corners and
@@ -28,6 +30,7 @@ const rooms: [string, Room, { far: Sq[]; wall: Sq }][] = [
   ["Puddles'", puddles, ROUND],
   ["Alfil's", alfil, ROUND],
   ["Big Boy's", bigboy, { far: [{ c: 4, r: 1 }, { c: 15, r: 1 }], wall: { c: 6, r: 0 } }],
+  ["Timber's", timber, ROUND],
 ];
 
 describe.each(rooms)("%s room", (_name, room, spots) => {
@@ -129,6 +132,24 @@ describe("the rooms' own pieces", () => {
     for (let r = 0; r < 20; r++) for (let c = 0; c < 20; c++) if (pit.has(`${c},${r}`)) expect(at(c, r), `pit ${c},${r}`).toBe(false);
   });
 
+  it("Timber's: the counter, the carved king's dais (4 x 2), the stove and the props are solid; the battle circle, its marks and the way to the counter are walkable", () => {
+    const at = (c: number, r: number) => walkable(timber, c, r);
+    // The showpiece stands up whole on columns 15-18, rows 3-4 (its foot on row 4): all eight squares solid.
+    for (let r = 3; r <= 4; r++) for (let c = 15; c <= 18; c++) expect(at(c, r), `showpiece ${c},${r}`).toBe(false);
+    // The stove, the plank stack, the big king and queen, the knight, the display table, the log pile, the chopping block, the rough
+    // carving, the sawhorse, the toolbox and the east plank stack.
+    for (const [c, r] of [[2, 3], [4, 2], [5, 2], [2, 8], [3, 8], [2, 11], [2, 14], [3, 14], [1, 17], [2, 17], [4, 17], [15, 8], [16, 8], [15, 12], [16, 12], [17, 15], [15, 17], [16, 17]] as const) expect(at(c, r), `prop ${c},${r}`).toBe(false);
+    // Columns 8-11 are clear from the door to the counter; the circle's middle squares and both start marks.
+    for (let r = 4; r <= 18; r++) for (const c of [9, 10]) expect(at(c, r), `aisle ${c},${r}`).toBe(true);
+    for (const m of [SHOP_TIMBER_MARKS.boss, SHOP_TIMBER_MARKS.you]) expect(at(m[0], Math.floor(m[1])) && at(m[0], Math.ceil(m[1])), `mark ${m}`).toBe(true);
+    expect(SHOP_TIMBER_MARKS).toEqual({ boss: [8, 10.5], you: [11, 10.5] });
+    // Round the showpiece: in front of its dais and beside it.
+    for (const [c, r] of [[15, 5], [18, 5], [14, 4], [14, 3]] as const) expect(at(c, r), `by the showpiece ${c},${r}`).toBe(true);
+    // Rivet behind the middle of the workbench, as Blocky and Woolly stand.
+    expect(SHOPS.timber!.keeper).toEqual([{ c: 9, r: 2 }, { c: 10, r: 2 }]);
+    expect(tapTarget(timber, timber.start, 9, 2).dest).toEqual({ c: 10, r: 5 });
+  });
+
   it("talking range: three squares either way from the Shopkeeper's squares (SHOP_FEEL.talkRange)", () => {
     expect(SHOP_FEEL.talkRange).toBe(3);
     // Stripes beside the counter's east end (12, 2 and 13, 2); Drizzle behind its middle (9, 2 and 10, 2).
@@ -150,8 +171,8 @@ describe("the rooms' own pieces", () => {
 });
 
 describe("the shops", () => {
-  it("only Babur's, Puddles', Alfil's and Big Boy's homes have an inside", () => {
-    expect(HOMES.filter((h) => shopOf(h.id)).map((h) => h.id).sort()).toEqual(["alfil", "bigboy", "gardener", "tiger"]);
+  it("only Babur's, Puddles', Alfil's, Big Boy's and Timber's homes have an inside", () => {
+    expect(ALL_HOMES.filter((h) => shopOf(h.id)).map((h) => h.id).sort()).toEqual(["alfil", "bigboy", "gardener", "tiger", "timber"]);
   });
 
   it("the crates' words: names, the price line, what you have; the boss's ride is a prize", () => {
@@ -176,10 +197,16 @@ describe("the shops", () => {
     expect(priceLine(g)).toBe("3 Big Boy tokens, or 1 Big Boy token + 1 crate key");
     expect(holdLine(g, { tokens: 0, keys: 0 })).toBe("You have 0 Big Boy tokens and 0 crate keys.");
     expect(prizeRows(g)[0]).toMatchObject({ id: "bigboy-buggy", name: "Big Boy's Buggy", kind: "Mythic ride" });
+    const t = shopOf("timber")!;
+    expect(t.crate).toBe("Timber's Boss Crate");
+    expect(priceLine(t)).toBe("3 Timber tokens, or 1 Timber token + 1 crate key");
+    expect(holdLine(t, { tokens: 0, keys: 0 })).toBe("You have 0 Timber tokens and 0 crate keys.");
+    expect(prizeRows(t)[0]).toMatchObject({ id: "log-roller", name: "The Log Roller", kind: "Mythic ride" });
+    expect([t.kid, t.roof, t.chatTone]).toEqual(["timber", "lodge", "day"]);
   });
 
   it("each shop sells its boss's crate (core's BOSS_CRATES), its ride among the prizes; a way's button needs its price held", () => {
-    for (const s of [shopOf("tiger")!, shopOf("gardener")!, shopOf("alfil")!, shopOf("bigboy")!]) {
+    for (const s of [shopOf("tiger")!, shopOf("gardener")!, shopOf("alfil")!, shopOf("bigboy")!, shopOf("timber")!]) {
       const crate = bossCrateOf(s.home)!;
       expect(crate.name).toBe(s.crate);
       expect(crate.items).toContain(s.prizes[0]);
