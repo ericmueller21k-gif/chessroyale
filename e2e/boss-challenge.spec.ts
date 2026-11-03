@@ -1,7 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { CHALLENGE_FEEL } from "../packages/app/src/town/shops/challenge.ts";
-import { BOARD_SEL, asSignedIn, named, test } from "./helpers.ts";
+import { BOARD_SEL, asAdmin, asSignedIn, named, test } from "./helpers.ts";
 
 /**
  * A boss challenged from the town, Pokémon-gym style (Eric, Nov 2; docs/areas/town-square.md, "Challenging a boss"), Alfil first, on a
@@ -18,6 +18,10 @@ import { BOARD_SEL, asSignedIn, named, test } from "./helpers.ts";
  * Big Boy (his own intro, Nov 2): in with him to his crib's circle, onto its rug's marks across the table's place from him, his line, his
  * toy blocks building the table, the board dropping and plopping on, the stools (his B, your W) dropping in, his attack beside it before his lollipop swirl
  * (`canvas.boss-storm`) covers the screen, the battle under it, and the gear's Leave back to where you stood.
+ * Timber (his own intro, Nov 3; an admin's town: he's in the game for admins first): in with him to his lodge's circle, onto its branded
+ * marks; his line; he walks west to the giant log, heaves it up, carries it to the middle, sets it down and gnaws it; the shavings' fog
+ * boils up, holds (his table swaps in under it) and settles; the stumps pop up; he dusts off his paws and walks to his place; his
+ * attack; his sawdust sweep (`canvas.boss-storm`) covers the screen, the battle under it, and the gear's Leave back to where you stood.
  * CHALLENGE_SHOTS=<dir>: the stills (both projects) and, on the phone, the intro's frames for its GIF (docs/boss-challenge/).
  * Test hooks: the room's canvas `data-intro` (its step); `window.__shopIntro()` (the step, the layout, where you and the boss stand
  * and face, the line, the board and its stools); the storm's canvas `canvas.boss-storm` and the wipe's `canvas.boss-wipe`
@@ -38,7 +42,8 @@ test.beforeEach(async ({ page }) => {
 });
 
 type Stand = { c: number; r: number; facing: number; view: number; moving: boolean };
-type Intro = { step: string; layout: string; attack: boolean; you: [number, number]; boss: [number, number]; facing: { you: number; boss: number }; line: boolean; table: boolean; stools: [number, number][]; pyramid: { anim: string; frame: number } | null; blocks: { anim: string; frame: number } | null; drop: number };
+type Wood = { move: string | null; log: string | null; fog: string | null; ring: boolean; stumps: string | null };
+type Intro = { step: string; layout: string; attack: boolean; you: [number, number]; boss: [number, number]; facing: { you: number; boss: number }; line: boolean; table: boolean; stools: [number, number][]; pyramid: { anim: string; frame: number } | null; blocks: { anim: string; frame: number } | null; drop: number; wood: Wood | null };
 type Hooks = {
   __townAt?: (k: string, id: string) => { x: number; y: number } | null;
   __townYou?: () => Stand | null;
@@ -358,6 +363,119 @@ test("challenging Big Boy in the town: his own intro (his line, his toy blocks b
   await expect(page.locator(BOARD_SEL.wrap).first()).toBeVisible({ timeout: 60_000 });
   await expect(storm(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Big Boy's Crib" })).toHaveCount(0);
+  // The gear's Leave (or Resign, as the battle offers): back in the town square where you stood.
+  await page.getByRole("button", { name: "Match options" }).click();
+  const quit = page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: /^(Leave|Resign)$/ });
+  const how = (await quit.textContent())!.trim();
+  await quit.click();
+  await page.getByRole("alertdialog").getByRole("button", { name: how, exact: true }).click();
+  if (how === "Resign") await page.getByRole("button", { name: "Back to town" }).click();
+  await backAt(page, stood);
+  expect(errors).toEqual([]);
+});
+
+test("challenging Timber in an admin's town: his own intro (his line, the log carried to the middle and gnawed, the shavings' fog, his table and stumps, his attack, the sawdust sweep), the battle; Leave back where you stood", async ({ page }) => {
+  test.setTimeout(240_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  const project = test.info().project.name;
+  if (SHOTS) mkdirSync(SHOTS, { recursive: true });
+  const shot = async (name: string) => SHOTS && (await page.screenshot({ path: `${SHOTS}/${name}-${project}.png` }));
+  // (Timber is in the game for admins first: his lodge is in an admin's town only.)
+  await asAdmin(page);
+  await page.goto("/town?sky=day");
+  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  const { confirm, stood } = await toConfirm(page, "timber", "Timber");
+  // (The phone's GIF at real timing: every frame from the Fight tap to the sweep covering, each with its ms since the tap.)
+  const frames: { at: number; png: Buffer }[] = [];
+  let grabbing = !!SHOTS && project === "phone";
+  const fightAt = Date.now();
+  await confirm.getByRole("button", { name: "Fight" }).click();
+  const grabbed = (async () => {
+    while (grabbing) {
+      const png = await page.screenshot({ scale: "css" });
+      frames.push({ at: Date.now() - fightAt, png });
+    }
+  })();
+  // In his Lumber Lodge: you both walk in onto his circle's branded marks (SHOP_TIMBER_MARKS: his west, yours east).
+  await expect(room(page)).toHaveAttribute("data-room", "timber", { timeout: 20_000 });
+  await expect(page.getByRole("heading", { name: "Timber's Lumber Lodge" })).toBeVisible();
+  const seen = new Set<string>();
+  const woods: Wood[] = [];
+  let attacked = false;
+  const step = async () => {
+    const i = await intro(page);
+    const s = i?.step ?? "";
+    seen.add(s);
+    if (i?.wood) woods.push(i.wood);
+    if (i?.attack && (await storm(page).getAttribute("data-covered", { timeout: 50 }).catch(() => null)) !== "1") attacked = true;
+    return s;
+  };
+  // Walking in: the giant log already lies there, on the left.
+  await expect.poll(async () => (await intro(page))?.wood?.log ?? null, { message: "the log lies there as you walk in", timeout: 15_000, intervals: [50] }).toBe("lying");
+  await expect.poll(step, { message: "on their marks: his line", timeout: 15_000, intervals: [50] }).toBe("line");
+  const atLine = (await intro(page))!;
+  expect(atLine.layout).toBe("across");
+  expect(atLine.you).toEqual([11, 10.5]);
+  expect(atLine.boss).toEqual([8, 10.5]);
+  expect(atLine.facing).toEqual({ you: -1, boss: 1 });
+  expect(atLine.line).toBe(true);
+  expect(atLine.wood).toMatchObject({ move: null, log: "lying", fog: null, stumps: null });
+  await shot("tm-line");
+  await expect(page.locator(".tc-line").filter({ hasText: "Hard hats on. We're building today." })).toHaveCount(0);
+  // He walks west to the log (facing it), his line still over his head; heaves it up (the lying log gone: it's in his paws).
+  await expect.poll(step, { message: "he walks to the log", intervals: [50] }).toBe("toLog");
+  const toLog = (await intro(page))!;
+  expect(toLog.facing.boss).toBe(-1);
+  expect(toLog.boss[0]).toBeLessThanOrEqual(8);
+  await expect.poll(step, { message: "he heaves it up", intervals: [50] }).toMatch(/lift|carry/);
+  expect((await intro(page))!.wood!.log).toBeNull();
+  await expect.poll(step, { message: "he carries it to the middle", intervals: [50] }).toMatch(/carry|setDown/);
+  await shot("tm-carry");
+  await expect.poll(step, { message: "he gnaws it", intervals: [50] }).toBe("gnaw");
+  expect((await intro(page))!.wood).toMatchObject({ move: "gnaw", log: "gnawed" });
+  await shot("tm-gnaw");
+  // The fog boils up and hides it; the table swaps in under it; it settles.
+  await expect.poll(step, { message: "the shavings' fog", intervals: [50] }).toMatch(/rise|hold/);
+  await expect.poll(step, { message: "it holds", intervals: [50] }).toMatch(/hold|settle/);
+  await shot("tm-fog");
+  // The stumps pop up at your sides; you hop back clear of yours; he dusts off his paws and walks to his place.
+  await expect.poll(async () => (await intro(page))?.stools.length, { message: "the stumps pop up", intervals: [50] }).toBe(2);
+  expect((await intro(page))!.stools).toEqual([[8.5, 10.5], [10.5, 10.5]]);
+  expect((await intro(page))!.table).toBe(true);
+  await expect.poll(step, { message: "he dusts off his paws", intervals: [50] }).toMatch(/dust|toMark|swing/);
+  await shot("tm-table");
+  await expect.poll(step, { message: "he walks to his place and swings", intervals: [50] }).toBe("swing");
+  const swing = (await intro(page))!;
+  expect(swing).toMatchObject({ table: true, line: false, wood: { move: null, log: null, fog: null, ring: true, stumps: "idle" } });
+  expect(swing.boss[0]).toBeCloseTo(9.5 - CHALLENGE_FEEL.log.clear);
+  expect(swing.you[0]).toBeCloseTo(9.5 + CHALLENGE_FEEL.clear.you);
+  await expect.poll(async () => (await step(), attacked), { message: "his attack, before the sweep covers", intervals: [50] }).toBe(true);
+  await shot("tm-attack");
+  // The table and stumps never showed before the fog's hold.
+  const order = [...seen];
+  expect(order.indexOf("hold") >= 0 || order.indexOf("settle") >= 0).toBe(true);
+  // His sawdust sweep (played as Alfil's sandstorm), the battle loading under it.
+  await expect(storm(page)).toHaveCount(1, { timeout: 10_000 });
+  await expect(storm(page)).toHaveAttribute("data-boss", "timber");
+  await expect(storm(page)).toHaveAttribute("data-covered", "1");
+  const coveredMs = Date.now() - fightAt;
+  await shot("tm-sweep");
+  grabbing = false;
+  await grabbed;
+  if (SHOTS) writeFileSync(`${SHOTS}/timber-timing-${project}.txt`, `Fight to covered: ${coveredMs} ms\n`);
+  for (const [i, f] of frames.entries()) writeFileSync(`${SHOTS}/timber-gif-${String(i).padStart(3, "0")}-${String(f.at).padStart(6, "0")}.png`, f.png);
+  expect([...seen].filter((s) => ["line", "toLog", "lift", "carry", "setDown", "gnaw", "rise", "hold", "settle", "pop", "dust", "toMark", "swing"].includes(s)).length).toBeGreaterThanOrEqual(8);
+  // (Never the lying log after he lifted it, never the stumps before the fog.)
+  const lifted = woods.findIndex((w) => w.move === "lift");
+  expect(lifted).toBeGreaterThanOrEqual(0);
+  expect(woods.slice(lifted).some((w) => w.log === "lying")).toBe(false);
+  const fogged = woods.findIndex((w) => w.fog !== null);
+  expect(woods.slice(0, fogged).some((w) => w.stumps !== null)).toBe(false);
+  await expect(page.locator(BOARD_SEL.wrap).first()).toBeVisible({ timeout: 60_000 });
+  await expect(storm(page)).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.getByRole("heading", { name: "Timber's Lumber Lodge" })).toHaveCount(0);
+  await shot("tm-battle");
   // The gear's Leave (or Resign, as the battle offers): back in the town square where you stood.
   await page.getByRole("button", { name: "Match options" }).click();
   const quit = page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: /^(Leave|Resign)$/ });
