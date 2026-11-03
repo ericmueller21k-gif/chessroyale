@@ -17,6 +17,7 @@ import { HOUSE_SAWYER, HOUSE_SAWYER_SIGN, HOUSE_SAWYER_LIGHTS, HOUSE_SAWYER_POOL
 import { HOUSE_SMUDGY, HOUSE_SMUDGY_SIGN, HOUSE_SMUDGY_LIGHTS, HOUSE_SMUDGY_POOLS } from "./smudgy.ts";
 import { HOUSE_TIGER, HOUSE_TIGER_SIGN, HOUSE_TIGER_LIGHTS, HOUSE_TIGER_POOLS } from "./tiger.ts";
 import { HOUSE_FOLIO, HOUSE_FOLIO_SIGN, HOUSE_FOLIO_LIGHTS, HOUSE_FOLIO_POOLS } from "./folio.ts";
+import { HOUSE_TIMBER, HOUSE_TIMBER_SIGN, HOUSE_TIMBER_LIGHTS, HOUSE_TIMBER_POOLS } from "./timber.ts";
 
 export interface HouseArt {
   ch: Character;
@@ -43,6 +44,8 @@ export const HOUSES: Record<HomeId, HouseArt> = {
   gardener: { ch: HOUSE_GARDENER, sign: HOUSE_GARDENER_SIGN, lights: HOUSE_GARDENER_LIGHTS, pools: HOUSE_GARDENER_POOLS },
   alfil: { ch: HOUSE_ALFIL, sign: HOUSE_ALFIL_SIGN, lights: HOUSE_ALFIL_LIGHTS, pools: HOUSE_ALFIL_POOLS },
   folio: { ch: HOUSE_FOLIO, sign: HOUSE_FOLIO_SIGN, lights: HOUSE_FOLIO_LIGHTS, pools: HOUSE_FOLIO_POOLS },
+  // (In an admin's town only while Timber is in the game for admins first: world.ts ADMIN_TOWN.)
+  timber: { ch: HOUSE_TIMBER, sign: HOUSE_TIMBER_SIGN, lights: HOUSE_TIMBER_LIGHTS, pools: HOUSE_TIMBER_POOLS },
 };
 
 /** The Colosseum's picture (slice 5), and the icon on its edge chip (a crown over the board's squares, 24 x 24). */

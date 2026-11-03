@@ -433,6 +433,8 @@ export const CHATTER: Readonly<Record<HomeId, Voices>> = {
   hopper: { kid: "Bun & Bug", boss: ["Chirp found a carrot by the fountain!", "Hop to it! The tables are filling up."], kidSays: ["Bun and Bug found a carrot. Hop hop!", "Bug rides on Bun. Hop hop, chirp chirp!"] },
   tiger: { kid: "Stripes", boss: ["No roaring today. Balloons and chess only.", "Don't rush the artist. Or the endgame."], kidSays: ["Stripes has a purple balloon. Don't pop it!", "Stripes tried a roar. It came out squeaky."] },
   folio: { kid: "Pleat", boss: ["I folded a new crane. Come see it.", "A good move has no wasted folds."], kidSays: ["Pleat folds a little pawn. Fold, fold!"] },
+  // (Heard in an admin's town only while Timber is in the game for admins first: the speakers are this town's homes.)
+  timber: { kid: "Rivet", boss: ["The Lumber Lodge is open. Mind the sawdust!", "A good board starts with good wood."], kidSays: ["Rat-a-tat! Rivet's on the job!", "Hard hats on! Rivet says so."] },
 };
 
 export interface Chatter {

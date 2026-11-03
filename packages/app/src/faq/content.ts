@@ -57,6 +57,7 @@ import {
   crowdFinalists,
   fixedLevel,
   isPlayable,
+  adminFirst,
   maiaTopRating,
   rankedMinHumans,
   roundsInStage,
@@ -153,7 +154,8 @@ export const FAQ_DEFAULTS: FaqSources = {
   ratingMinMoves: RATING_MIN_MOVES,
   rankedShare: RANKING.rankedMinHumanShare,
   crates: CRATES,
-  bossCrates: BOSS_CRATES,
+  // (Not the crate of a boss in the game for admins first, Timber's: his block shows once he's live for everyone.)
+  bossCrates: BOSS_CRATES.filter((c) => !adminFirst({ id: c.boss })),
   bossTokens: BOSS_TOKENS,
   bossCratePrice: BOSS_CRATE_PRICE,
   colors: ITEM_COLORS,

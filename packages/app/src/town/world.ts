@@ -5,9 +5,10 @@
  * bots without touching either. The bots are one source that moves its people. Ported from the prototype Eric tested (docs/mockups/town-square/prototype.html): the same
  * square-to-square walk, the same hobble, the same pauses. Every number that shapes the feel is in feel.ts.
  */
-import type { ItemLook } from "@chessroyale/core";
+import { adminFirst, type ItemLook } from "@chessroyale/core";
 import { SELECT_LINES } from "../characters/boss-select.ts";
 import { N, wrapF, wrapI } from "./camera.ts";
+import { ADMIN_TOWN } from "./admin-town.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { SIDEKICK_SHEETS, type SidekickSheet } from "./sidekick-sheets.ts";
 
@@ -206,7 +207,7 @@ export const tableAt = (c: number, r: number): Table | null => TABLES.find((t) =
  */
 export const START: Sq = { c: PARK.c0 + 9, r: PARK.r1 - 3 };
 
-export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil" | "folio";
+export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil" | "folio" | "timber";
 
 /**
  * A place with a picture, a name (floating over it and on its sign) and an edge chip: a boss's home, or the Colosseum.
@@ -240,13 +241,13 @@ export interface Home extends Place {
 export const COLISEUM_PLACE: Place = { id: "coliseum", name: "The Colosseum", color: "#1f2530", cx: GATE_X, cy: COLISEUM.r0 + (COLISEUM.size - 1) / 2, half: COLISEUM.size / 2, foot: COLISEUM.size / 2 };
 
 /**
- * The fourteen homes, spread evenly round the middle (the Colosseum and its park) over the 46 x 46 world that wraps: every
+ * The homes (fifteen since Nov 3), spread evenly round the middle (the Colosseum and its park) over the 46 x 46 world that wraps: every
  * home's nearest neighbor is 8 to 10 squares away, as on slice 3's smaller map, and no home's roaming ground reaches the
  * park or the Colosseum (docs/decisions/2026-10-26-town-square-slice-6.md has the map). Pairs that play off each other
  * stand side by side: Ginger Igloo and Jefferson's Fireworks (ice and fire), Hollow Peak and Moo & Moon Meadow (dark and
  * night). Names: "Ginger Igloo", "Hollow Peak" and "Moo & Moon Meadow" are Eric's; the rest the director's.
  */
-export const HOMES: readonly Home[] = (
+export const ALL_HOMES: readonly Home[] = (
   [
     { id: "gingerbread", boss: "Ginger", name: "Ginger Igloo", color: "#3fae4f", cx: 39, cy: 11 },
     { id: "grex", boss: "Jefferson", name: "Jefferson's Fireworks", color: "#e5566a", cx: 39, cy: 3 },
@@ -267,8 +268,18 @@ export const HOMES: readonly Home[] = (
     // from the colosseum it's gotta get moved a bit"); 35 is as far as the 8 to 10 squares between neighbors allows, Big Boy's
     // Crib being at 43. docs/decisions/2026-10-28-town-chat-v2.md.)
     { id: "folio", boss: "Folio", name: "Folio's Folded House", color: "#d8432a", cx: 35, cy: 30 },
+    // (Nov 3: Timber's, west of the Colosseum, in the one open ground left: between Boingo's Funhouse (south-west), Moo & Moon
+    // Meadow (north-west) and the Colosseum's west wall, 4 squares of open ground between them, a square more than Folio's first
+    // place that Eric moved; its door faces the park. 7.8 squares from Boingo's and 8.5 from Moo's. Its ring Timber's hard-hat
+    // orange. In an admin's town only while he's in the game for admins first: ADMIN_TOWN. docs/decisions/2026-11-03-timber-home.md.)
+    { id: "timber", boss: "Timber", name: "Timber's Lumber Lodge", color: "#ea7816", cx: 11, cy: 32 },
   ] satisfies Omit<Home, "half" | "foot">[]
 ).map((h) => ({ ...h, half: 1.5, foot: 0.5 }));
+/**
+ * Every home in this town: all of them in an admin's (ADMIN_TOWN), and none of a boss in the game for admins first (core's
+ * BOSS_ADMIN_FIRST: Timber's) in anyone else's, so its plot is open ground there.
+ */
+export const HOMES: readonly Home[] = ALL_HOMES.filter((h) => ADMIN_TOWN || !adminFirst(h));
 /** Every place: the homes (in the bosses' order), then the Colosseum. */
 export const PLACES: readonly Place[] = [...HOMES, COLISEUM_PLACE];
 
@@ -349,6 +360,18 @@ export const BOTS: readonly TownBot[] = [
   { name: "Sparky", rating: 2400, look: { sprite: SIDEKICK_SHEETS.jefferson }, boss: "grex" },
   { name: "Glim", rating: 2500, look: { sprite: SIDEKICK_SHEETS.hollow }, boss: "hollow" },
 ];
+/**
+ * The kids of bosses in the game for admins first (core's BOSS_ADMIN_FIRST), in an admin's town only, after the ladder: Rivet,
+ * Timber's woodpecker foreman (Nov 3), at 1650, between Twinkle and Drizzle as Timber's sim puts him (the crowd scores 0.18
+ * against him: reports/timber-sim.md; Moo & Moon 0.21, Puddles 0.17). Off the ladder's rungs of 100 while he's a guest there.
+ */
+export const ADMIN_BOTS: readonly TownBot[] = [{ name: "Rivet", rating: 1650, look: { sprite: SIDEKICK_SHEETS.timber }, boss: "timber" }];
+/**
+ * The town's bots: the ladder (BOTS), then the admins-first kids whose home is in this town (an admin's). A bot's index here is
+ * its index in BOTS for the ladder's twenty, so a seat ("6.0.3") means the same bot in anyone's town. The Colosseum's crowd is
+ * the ladder's alone.
+ */
+export const TOWN_BOTS: readonly TownBot[] = [...BOTS, ...ADMIN_BOTS.filter((b) => HOMES.some((h) => h.id === b.boss))];
 /** A bot's name as the town and the game show it: "Pin Pete (bot)" (Eric: "in parentheses like bot after their name"). */
 export const botLabel = (b: TownBot): string => `${b.name} (bot)`;
 /** A rating as a card's line says it ("Rating 2200"). */
@@ -724,7 +747,7 @@ export function seatOf(text: string | null | undefined): Seat | null {
   if (!m) return null;
   const table = Number(m[1]);
   const bot = Number(m[3]);
-  return table < TABLES.length && bot < BOTS.length ? { table, stool: Number(m[2]) as 0 | 1, bot } : null;
+  return table < TABLES.length && bot < TOWN_BOTS.length ? { table, stool: Number(m[2]) as 0 | 1, bot } : null;
 }
 
 /**
@@ -748,7 +771,7 @@ export function createTown(now: number, seed = 20261025, seat: Seat | null = nul
   const bosses: Boss[] = HOMES.map((home) => ({ home, walker: new Walker({ c: home.cx, r: wrapI(home.cy - 2) }, f.bossStepMs, false), nextAt: null, onScreen: false, held: false, lastLine: null }));
   // Who's out (`botsOut` of them, shuffled by the town's seed, so the town opens the same way every time, as the tests
   // need; back from a game, the bot you played among them); the others are at home, and the turns change who's out.
-  const order = BOTS.map((_, i) => i);
+  const order = TOWN_BOTS.map((_, i) => i);
   for (let i = order.length - 1; i > 0; i--) {
     const j = Math.floor(rnd() * (i + 1));
     [order[i], order[j]] = [order[j]!, order[i]!];
@@ -757,7 +780,7 @@ export function createTown(now: number, seed = 20261025, seat: Seat | null = nul
   const out = new Set(order.slice(0, outN));
   // The bots out stand around you in the park, apart (`freeSpot`).
   const bots: Person[] = [];
-  for (const [i, b] of BOTS.entries()) {
+  for (const [i, b] of TOWN_BOTS.entries()) {
     // (Back from a game: the bot you played sits across from you.)
     const sq = seat && i === seat.bot ? theirs! : out.has(i) ? freeSpot(rnd, yours, 3, [...(theirs ? [theirs] : []), ...bots.filter((o) => !o.home).map((o) => o.walker.here())]) : START;
     bots.push({ id: `bot:${bots.length}`, name: botLabel(b), look: b.look, you: false, walker: new Walker(sq, f.botStepMs, true), sit: true, bot: b, waved: -Infinity, home: !out.has(i), came: -Infinity, leaves: Infinity, going: false, trip: null, due: false });
@@ -1395,7 +1418,7 @@ export function meetSeat(t: Town): Seat | null {
   if (!m || !m.bot.bot) return null;
   const h = t.you.walker.here();
   const stool = m.table.stools.findIndex((s) => s.c === h.c && s.r === h.r);
-  return stool < 0 ? null : { table: m.table.i, stool: stool as 0 | 1, bot: BOTS.indexOf(m.bot.bot) };
+  return stool < 0 ? null : { table: m.table.i, stool: stool as 0 | 1, bot: TOWN_BOTS.indexOf(m.bot.bot) };
 }
 
 /** The bot sitting at a table with nobody else there (but you, across from it), or null. */

@@ -40,7 +40,7 @@ export interface BossIntro {
 /**
  * The bosses with an intro: every boss whose home has an inside (shops/shops.ts SHOPS; Nov 2, round 2: "for other bosses they should
  * just be swinging for a few seconds like discussed"). Alfil has his own (his pyramid and sandstorm), Big Boy his (his toy blocks
- * and lollipop swirl, Nov 2); Babur and Puddles the default.
+ * and lollipop swirl, Nov 2); Babur, Puddles and Timber (Nov 3, until his own) the default.
  * The lines are placeholders until Gemini's lines arrive (Part D), each in its boss's voice (characters/*-lines.ts). Alfil's cues are
  * his own synthesized sounds (characters/alfil-sounds.ts): a low rumble as the pyramid rises, the grinding crunch as it cracks, the
  * ground's thud as it falls, the soft glow as the board shows, and a whoosh as the storm comes in. The default's: the app's soft pop
@@ -76,6 +76,14 @@ export const BOSS_INTROS: Readonly<Partial<Record<HomeId, BossIntro>>> = {
     layout: "across",
     custom: true,
     cues: { block: "bigboyClack", "block-top": "bigboyBonk", drop: "bigboyToss", plop: "bigboyPoof", stool: "bigboyClack", storm: "bigboySwish" },
+  },
+  // (Nov 3: the default until his own intro's art comes; his line is his entrance's first, characters/timber-lines.ts.)
+  timber: {
+    name: "Timber",
+    line: "Hard hats on. We're building today.",
+    layout: "across",
+    custom: false,
+    cues: { table: "pop", wipe: "timberSwoosh" },
   },
 };
 

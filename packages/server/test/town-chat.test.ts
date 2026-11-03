@@ -282,6 +282,10 @@ describe("town chat: the API", () => {
     // A guest's challenge: nothing in the town's chat.
     await start(guest.token, "alfil");
     expect((await texts()).length).toBe(3);
+    // A boss in the game for admins first (Timber, BOSS_ADMIN_FIRST): his challenge and its finish post nothing (Nov 3).
+    const b4 = await start(a.token, "timber");
+    await finish(a.token, b4, { outcome: "won", moves: 30 });
+    expect((await texts()).length).toBe(3);
     // The lines read as the server's own: no account, no name.
     const read = await live(await call("/api/live?town=0", a.token));
     expect(read.town!.lines.every((l) => l.from === "" && l.name === "")).toBe(true);

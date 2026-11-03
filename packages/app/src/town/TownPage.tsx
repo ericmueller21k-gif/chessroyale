@@ -1,6 +1,7 @@
 import type { FunctionComponent } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import type { ItemLook } from "@chessroyale/core";
+import { account, onAccountChange } from "../account.ts";
 import { FrontFrame, type FrontNav } from "../components/FrontMenu.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import type { Stand } from "./world.ts";
@@ -42,6 +43,14 @@ type Screen = FunctionComponent<Props & { framed: boolean }>;
  */
 const COMPUTER = "(min-width: 1024px) and (hover: hover) and (pointer: fine)";
 
+/** Whether your account is known: the server's answer, and your profile where there are accounts (or none: no server). */
+const accountKnown = () => {
+  const a = account();
+  return !!a.config && (!a.config.accounts || !!a.profile);
+};
+/** The longest the town waits for your account before it loads without it (ms). */
+const ACCOUNT_WAIT_MS = 3000;
+
 /**
  * The town square's page (/town), loaded when it opens: its code, art and styles are their own chunk, never in the main
  * bundle. Until it arrives (a moment) the page is its plain background: no loading bar. `onBossAlone`: a boss's card's
@@ -57,7 +66,24 @@ export function TownPage({ nav, ...props }: Props & { nav: FrontNav }) {
   useEffect(() => {
     let live = true;
     // (No module when its chunk was gone after a deploy: the page is loading again, stale.ts.)
-    void import("./Town.tsx").then((m) => live && m && setTown(() => m.TownScreen));
+    const load = () => void import("./Town.tsx").then((m) => live && m && setTown(() => m.TownScreen));
+    // Your account first (a moment, on a page opened at /town; at once from home): an admin's town has the homes of the bosses in
+    // the game for admins first (admin-town.ts), read as the town's code loads. Not waiting past ACCOUNT_WAIT_MS: a town without them.
+    if (accountKnown()) load();
+    else {
+      const go = () => {
+        off();
+        clearTimeout(timer);
+        load();
+      };
+      const off = onAccountChange(() => accountKnown() && go());
+      const timer = setTimeout(go, ACCOUNT_WAIT_MS);
+      return () => {
+        live = false;
+        off();
+        clearTimeout(timer);
+      };
+    }
     return () => void (live = false);
   }, []);
   const screen = Town ? <Town {...props} framed={framed} /> : <div class="screen" />;

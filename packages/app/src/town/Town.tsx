@@ -57,7 +57,7 @@ import { painterGL } from "./paint-gl.ts";
 import { reportTownFallback } from "../problems.ts";
 import type { TownGlFallback } from "@chessroyale/core";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
-import { BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, tdist, tick, townLine, waitingBot, walkWalker, type HomeId, seatOf, seatText, standOf, type Person, type Place, type Seat, type Sq, type Stand, type StatueId, type Target } from "./world.ts";
+import { TOWN_BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, tdist, tick, townLine, waitingBot, walkWalker, type HomeId, seatOf, seatText, standOf, type Person, type Place, type Seat, type Sq, type Stand, type StatueId, type Target } from "./world.ts";
 import { dressedPawn, lookKey, offFace, offRide } from "./you-look.ts";
 import type { ItemLook } from "@chessroyale/core";
 import type { BotGameAsk } from "./TownPage.tsx";
@@ -250,7 +250,7 @@ export function TownScreen({
   // (A layout effect: the world's first frame is drawn before the screen first shows.)
   useLayoutEffect(() => {
     const t = startTown(box.current!, canvas.current!, chips.current, cardEl.current!, live.current!, setZoomedOut, setCard, seatOf(seat), (s, face) => {
-      const b = BOTS[s.bot]!;
+      const b = TOWN_BOTS[s.bot]!;
       onPlayBot?.({ seat: seatText(s), name: botLabel(b), rating: b.rating, look: isSprite(b.look) ? null : b.look.wear, face });
     }, (id, x, y, challenge) => void goIn(id, x, y, challenge), stand, () => step("cancel"));
     ctl.current = t;
@@ -1237,7 +1237,7 @@ function startTown(
     const out = { x: 0, y: 0 };
     if (kind === "square") return testSwitchesAllowed() && Array.isArray(id) && r.squareAt(id[0]!, id[1]!, out) ? out : null;
     if (kind === "player") return testSwitchesAllowed() && r.tapPoint("person", town.people.findIndex((p) => p.uid === id), out) ? out : null;
-    if (kind === "bot") return testSwitchesAllowed() && r.tapPoint("person", town.people.findIndex((p) => p.bot === BOTS[Number(id)]), out) ? out : null;
+    if (kind === "bot") return testSwitchesAllowed() && r.tapPoint("person", town.people.findIndex((p) => p.bot === TOWN_BOTS[Number(id)]), out) ? out : null;
     if (kind === "table") return testSwitchesAllowed() && r.tapPoint("table", Number(id), out) ? out : null;
     if (kind === "lamp") return testSwitchesAllowed() && r.lampAt(Number(id), out) ? out : null;
     if (kind === "light") return testSwitchesAllowed() && r.lightAt(id === "coliseum" ? HOMES.length : HOMES.findIndex((h) => h.id === id), out) ? out : null;
@@ -1294,14 +1294,14 @@ function startTown(
     }
   };
   const hookTables = () => (testSwitchesAllowed() ? tableStates(town.people).map((s) => (s.kind === "waiting" ? `waiting:${s.free}` : s.kind)) : null);
-  // ... `__townCall(i)`: the bot BOTS[i] walks to stand beside you (out from home first, if it's there), and every bot holds
+  // ... `__townCall(i)`: the bot TOWN_BOTS[i] walks to stand beside you (out from home first, if it's there), and every bot holds
   // still from then on (to tap it);
-  // `__townBots()`: each bot (BOTS' order): its name, its square ("c,r"), the table it sits at (-1: none), whether it walks.
+  // `__townBots()`: each bot (TOWN_BOTS' order): its name, its square ("c,r"), the table it sits at (-1: none), whether it walks.
   const hookCall = (i: number) => {
     if (!testSwitchesAllowed()) return;
     town.nextBotAt = Infinity;
     town.leave = null;
-    const b = town.bots.find((p) => p.bot === BOTS[i]);
+    const b = town.bots.find((p) => p.bot === TOWN_BOTS[i]);
     if (b?.home) comeOut(town, b, performance.now(), 3);
     if (b) stayOut(b);
     const to = b && destFor(town, b.walker, { kind: "beside", at: town.you.walker.here() });
@@ -1309,7 +1309,7 @@ function startTown(
   };
   const hookBots = () =>
     testSwitchesAllowed()
-      ? BOTS.map((bt) => {
+      ? TOWN_BOTS.map((bt) => {
           const p = town.bots.find((q) => q.bot === bt)!;
           const h = p.walker.here();
           const now = performance.now();
