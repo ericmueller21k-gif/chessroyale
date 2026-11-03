@@ -24,6 +24,7 @@ import { SAWYER } from "../characters/sawyer.ts";
 import { SMUDGY } from "../characters/smudgy.ts";
 import { TIGER_FIGURE } from "../characters/tiger-figure.ts";
 import { FOLIO } from "../characters/folio.ts";
+import { BOSS_BEAVER } from "../characters/timber.ts";
 import { N, bandOf, clamp, drawable, enterOf, farOf, forEachSquare, hazeMix, newPt, newView, pastCurve, pickSquare, proj, radial, rimYAt, setView, tableLift, wrapF, type Quad, type TableLift, type View } from "./camera.ts";
 import { CHAT_BOX } from "./chat.ts";
 import { TOWN_FEEL } from "./feel.ts";
@@ -57,6 +58,8 @@ export const BOSS_ART: Record<HomeId, Character> = {
   gardener: GARDENER,
   alfil: ALFIL,
   folio: FOLIO,
+  // (His approved drawing, without the room his game figure keeps over his head for his entrance's drop: timber-figure.ts.)
+  timber: BOSS_BEAVER,
 };
 /**
  * Each boss's head in its first idle frame (x, y and a side, in its pixels): what its edge chip shows. (Slice 1 cropped
@@ -78,6 +81,8 @@ export const BOSS_FACE: Record<HomeId, readonly [x: number, y: number, size: num
   alfil: [10, 16, 38],
   // (Its head and beak, at its rest.)
   folio: [3, 12, 28],
+  // (His hard hat and face.)
+  timber: [14, 5, 40],
 };
 
 // ---- Colors (the prototype's, sampled from Eric's reference picture).

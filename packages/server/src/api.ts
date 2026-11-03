@@ -11,7 +11,7 @@ import { battleToken, buyBossCrate, endSoloBattle, grantTestItems, openBossCrate
 import { chatIconResponse, chatPostResponse, chatSlice } from "./global-chat-api.ts";
 import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, mayTownChat, reportedLine, signedInReader, townChallengeNote, townPostResponse, townRemoveResponse, townSlice } from "./town-chat-api.ts";
 import { accountDownload, deleteAccount } from "./account-data.ts";
-import { AGE_GATE, ASK_AGE_LINE, FAIRPLAY, TOO_YOUNG_LINE, bossCrateDef, bossDef, tokenBossName } from "@chessroyale/core";
+import { AGE_GATE, ASK_AGE_LINE, FAIRPLAY, TOO_YOUNG_LINE, adminFirst, bossCrateDef, bossDef, tokenBossName } from "@chessroyale/core";
 import {
   buyItem,
   cleanEmail,
@@ -497,7 +497,8 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
       env.LIVE ? townChallengeNote(sql, liveHub(env as Required<Pick<AccountEnv, "LIVE">>), asker, boss, n, now).catch(() => null) : null;
     if (path === "/api/boss/solo/start") {
       const battle = await startSoloBattle(sql, current.id, now, signInRequired(env));
-      if (typeof b?.town === "string" && bossDef(b.town)) await note(b.town, { kind: "start", boss: b.town, battle });
+      // (Not a boss in the game for admins first, Timber: everyone reads the town's chat, and only admins meet him. Nov 3.)
+      if (typeof b?.town === "string" && bossDef(b.town) && !adminFirst(bossDef(b.town))) await note(b.town, { kind: "start", boss: b.town, battle });
       return json({ battle });
     }
     const done = await endSoloBattle(sql, current.id, b?.battle, now, { off: pausedBosses(env, now), signedInOnly: signInRequired(env) });

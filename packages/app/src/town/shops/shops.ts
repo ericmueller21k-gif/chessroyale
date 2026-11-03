@@ -1,6 +1,6 @@
 /**
  * The homes you can go into (Nov 2, round 1: Babur's circus tent and Puddles' greenhouse, the shops' first interiors; then Alfil's
- * pyramid and Big Boy's crib), what
+ * pyramid and Big Boy's crib; Nov 3, Timber's lodge), what
  * each shop sells, and the words its cards say. Light: the town imports it to know which home's card says "Go in"; the room
  * itself (its art, its drawing) loads only when you go in (ShopRoom.tsx). docs/decisions/2026-11-02-shop-interiors-r1.md.
  *
@@ -22,17 +22,17 @@ export interface ShopDef {
   /** Its crate's name, word for word ("Babur's Boss Crate"). */
   crate: string;
   /** The Shopkeeper: the boss's kid (its sheet's name in town/sidekicks/), drawn at `at` (a square, fractions allowed). */
-  kid: "babur" | "puddles" | "alfil" | "bigboy";
+  kid: "babur" | "puddles" | "alfil" | "bigboy" | "timber";
   at: readonly [number, number];
   /** The squares the Shopkeeper stands on (nobody else can): you can talk to it within `SHOP_FEEL.talkRange` of one. */
   keeper: readonly Sq[];
   /** What the crate can give (its items' ids in core's ITEM_DEFS): the boss's ride first, always. */
   prizes: readonly string[];
   /**
-   * Above the walls: a tent's canvas, a greenhouse's glass, a pyramid's sandstone or a nursery's sky-blue ceiling with clouds and
-   * stars (drawn by the game, not the art: as the mockup did).
+   * Above the walls: a tent's canvas, a greenhouse's glass, a pyramid's sandstone, a nursery's sky-blue ceiling with clouds and
+   * stars or a lodge's dark planks between heavy beams (drawn by the game, not the art: as the mockup did).
    */
-  roof: "tent" | "glass" | "stone" | "nursery";
+  roof: "tent" | "glass" | "stone" | "nursery" | "lodge";
   /**
    * The chat log's text over the room (Eric, Nov 2: "white, or black, depending on darkness of background in the shop"): "night" for
    * a dark room (white words on a dark tint: Babur's tent), "day" for a light one (dark words on a light tint: Puddles' greenhouse),
@@ -51,6 +51,9 @@ export const SHOPS: Readonly<Partial<Record<HomeId, ShopDef>>> = {
   alfil: { home: "alfil", boss: "Alfil", crate: "Alfil's Boss Crate", kid: "alfil", at: [9.5, 2], keeper: [{ c: 9, r: 2 }, { c: 10, r: 2 }], prizes: ["alfil-howdah"], roof: "stone", chatTone: "day" },
   // Blocky stands behind the middle of the low letter-block counter (29 px: Blocky shows over it), as the mockup has him.
   bigboy: { home: "bigboy", boss: "Big Boy", crate: "Big Boy's Boss Crate", kid: "bigboy", at: [9.5, 2], keeper: [{ c: 9, r: 2 }, { c: 10, r: 2 }], prizes: ["bigboy-buggy"], roof: "nursery", chatTone: "day" },
+  // Rivet stands behind the middle of the 30 px workbench (his 50 px show over it), as the art's notes have him. A light room (honey
+  // planks, big windows): the day tone. (Timber's home is in an admin's town only for now: world.ts ADMIN_TOWN.)
+  timber: { home: "timber", boss: "Timber", crate: "Timber's Boss Crate", kid: "timber", at: [9.5, 2], keeper: [{ c: 9, r: 2 }, { c: 10, r: 2 }], prizes: ["log-roller"], roof: "lodge", chatTone: "day" },
 };
 
 /** The shop inside a home, or null: every other home has no "Go in" yet. */

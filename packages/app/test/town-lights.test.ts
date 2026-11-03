@@ -7,7 +7,7 @@ import { COLISEUM_ART, HOUSES, type HouseArt } from "../src/town/houses/index.ts
 import { PARK_LAMP, PARK_LAMP_HEAD, PARK_LAMP_LIGHTS, PARK_LAMP_POOLS } from "../src/town/houses/park.ts";
 import { STATUE_W, statueH } from "../src/town/houses/statues.ts";
 import { mixLights, skyOverride, skyWeights } from "../src/town/sky.ts";
-import { APRON, COLISEUM, HOMES, LAMPS, PARK, PAVING, PROPS, START, STATUES, TABLES, findPath, groundAt, plotDist, stepsFrom, stoolAt, tableAt, walkable } from "../src/town/world.ts";
+import { ALL_HOMES, APRON, COLISEUM, HOMES, LAMPS, PARK, PAVING, PROPS, START, STATUES, TABLES, findPath, groundAt, plotDist, stepsFrom, stoolAt, tableAt, walkable } from "../src/town/world.ts";
 
 /** The lights at dusk and night (Oct 27): the park's lamps, and the homes and the Colosseum glowing from inside. */
 
@@ -106,7 +106,8 @@ describe("town square lights: the homes and the Colosseum glow from inside", () 
   const all: [string, HouseArt][] = [...Object.entries(HOUSES), ["coliseum", COLISEUM_ART]];
 
   it("every home and the Colosseum has its lights, each inside its picture, lighting some of its pixels, warm (Ginger's cold) and of a sensible strength", () => {
-    expect(all).toHaveLength(HOMES.length + 1);
+    // Every home's art, admins-first ones included: HOUSES holds them all, HOMES only the ones players see.
+    expect(all).toHaveLength(ALL_HOMES.length + 1);
     for (const [id, art] of all) {
       const { ch } = art;
       expect(art.lights.length, `${id} has lights`).toBeGreaterThan(0);

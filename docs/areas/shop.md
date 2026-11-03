@@ -95,7 +95,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
     `components/tokens/` (only their import lines changed, and the `!`s the app's typecheck asks for), one chunk loaded the first time a
     token shows (`TokenArt.tsx`: 40 × 40 crisp; `animate` plays its idle, the result box's; a plain gold coin for a boss with none). Every
     live boss and Timber have one; Blitz's is drawn, waiting for its boss.
-  - **The crates** (`BOSS_CRATES` in core's crates.ts, beside `CRATES` but never in it, so the Crates tab can't open one free): Babur's
+  - **The crates** (`BOSS_CRATES` in core's crates.ts, beside `CRATES` but never in it, so the Crates tab can't open one free; Timber's,
+    Nov 3, listed to admins and whoever holds one while he's in the game for admins first, and not in the FAQ): Babur's
     and Puddles', each the boss's ride (the only Mythic, the only item behind Fischer Random: 2%) and the Beta Crate's 24 Common to
     Epic items in its boxes, at the existing crates' odds; rolled on the server as every crate.
   - **Buying** (`POST /api/shop/boss-crate {crate, way}`, `buyBossCrate`): one D1 batch, as the coin shop's: the crate goes into your

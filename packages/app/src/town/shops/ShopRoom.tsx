@@ -67,6 +67,8 @@ const ART: Partial<Record<HomeId, () => Promise<RoomArt>>> = {
   gardener: () => import("./puddles-art.ts").then((m) => ({ layout: m.SHOP_PUDDLES_LAYOUT, pieces: m.SHOP_PUDDLES_PIECES, crateAt: m.SHOP_PUDDLES_CRATE_AT, lights: [], pools: [] })),
   alfil: () => import("./alfil-art.ts").then((m) => ({ layout: m.SHOP_ALFIL_LAYOUT, pieces: m.SHOP_ALFIL_PIECES, crateAt: m.SHOP_ALFIL_CRATE_AT, lights: m.SHOP_ALFIL_LIGHTS, pools: m.SHOP_ALFIL_POOLS })),
   bigboy: () => import("./bigboy-art.ts").then((m) => ({ layout: m.SHOP_BIGBOY_LAYOUT, pieces: m.SHOP_BIGBOY_PIECES, crateAt: m.SHOP_BIGBOY_CRATE_AT, lights: m.SHOP_BIGBOY_LIGHTS, pools: m.SHOP_BIGBOY_POOLS, upright: ["airplane"], marks: m.SHOP_BIGBOY_MARKS })),
+  // (The giant king being carved, 4 x 2 squares, stands up whole at its foot.)
+  timber: () => import("./timber-art.ts").then((m) => ({ layout: m.SHOP_TIMBER_LAYOUT, pieces: m.SHOP_TIMBER_PIECES, crateAt: m.SHOP_TIMBER_CRATE_AT, lights: m.SHOP_TIMBER_LIGHTS, pools: m.SHOP_TIMBER_POOLS, upright: ["showpiece"], marks: m.SHOP_TIMBER_MARKS })),
 };
 
 /** A piece's frames, each drawn once into a canvas, and when each ends in its loop. */
@@ -564,6 +566,23 @@ function startRoom(
       }
       rg.fillStyle = "#ffe36a";
       for (const [sx, sy] of [[150, 70], [250, 25], [30, 90], [360, 100], [120, 15]] as const) rg.fillRect(sx * k, sy * k, 4, 4);
+      return;
+    }
+    if (def.roof === "lodge") {
+      // A lodge's ceiling (as the mockup drew it): dark planks between heavy beams running up to a point.
+      const sky = rg.createLinearGradient(0, 0, 0, H * 0.45);
+      sky.addColorStop(0, "#2e1d10");
+      sky.addColorStop(1, "#6b4526");
+      rg.fillStyle = sky;
+      rg.fillRect(0, 0, W, H);
+      rg.strokeStyle = "#1c120a";
+      rg.lineWidth = 7;
+      for (let i = -12; i <= 12; i++) {
+        rg.beginPath();
+        rg.moveTo(W / 2 + i * W * 0.05, -H * 0.5);
+        rg.lineTo(W / 2 + i * W * 0.18, H * 0.45);
+        rg.stroke();
+      }
       return;
     }
     if (def.roof === "stone") {

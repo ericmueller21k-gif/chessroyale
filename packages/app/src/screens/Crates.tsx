@@ -29,6 +29,7 @@ import {
   tierInfo,
   wornFromLocker,
   isPlayable,
+  adminFirst,
   tokenBossName,
   tokenBosses,
   type BossCrateDef,
@@ -178,7 +179,8 @@ export function CratesPanel() {
       {/* The boss crates (Eric, Nov 2: a buy in a boss's shop "adds the crate to your inventory"): each with how many you hold,
           greyed at none (shown, not hidden: its page still shows what's inside); opened here as any crate. */}
       <h3 class="ff-title">Boss crates</h3>
-      {BOSS_CRATES.map((c) => {
+      {/* (A boss in the game for admins first, Timber: his crate on an admin's list only, or one you hold.) */}
+      {BOSS_CRATES.filter((c) => profile?.admin || heldOf(locker, c) > 0 || !adminFirst({ id: c.boss })).map((c) => {
         const { Crate } = CRATE_LOOKS[c.look];
         const n = heldOf(locker, c);
         return (

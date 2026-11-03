@@ -6,10 +6,10 @@ import type { Character } from "../src/characters/sprite.ts";
 import { SIDEKICK_SHEETS } from "../src/town/sidekick-sheets.ts";
 import { N, wrapF, wrapI } from "../src/town/camera.ts";
 import { TOWN_FEEL } from "../src/town/feel.ts";
-import { APRON, BOTS, CROWD_MAX, HOMES, addCrowd, START, TABLES, Walker, anyTableFree, canGoHome, homeDoor, inSquare, plotDist, sendHome, botLabel, cancelMeet, comeOut, createTown, tdist, walkable, holdBot, isSprite, meet, meetReady, meetSeat, playAtTableText, ratingText, seatOf, seatText, seated, sidekickText, spriteAnim, stepsFrom, tableFor, tableStates, tick, townLine, waitingBot, waveMs, walkWalker, type HomeId, type Person, type Sq, type Town } from "../src/town/world.ts";
+import { ADMIN_BOTS, APRON, BOTS, CROWD_MAX, HOMES, TOWN_BOTS, addCrowd, START, TABLES, Walker, anyTableFree, canGoHome, homeDoor, inSquare, plotDist, sendHome, botLabel, cancelMeet, comeOut, createTown, tdist, walkable, holdBot, isSprite, meet, meetReady, meetSeat, playAtTableText, ratingText, seatOf, seatText, seated, sidekickText, spriteAnim, stepsFrom, tableFor, tableStates, tick, townLine, waitingBot, waveMs, walkWalker, type HomeId, type Person, type Sq, type Town } from "../src/town/world.ts";
 
 /** Each sidekick's sprite file (and its id, `sidekick-<file>`), by its boss's home. */
-const HOME_FILE: Record<HomeId, string> = { clown: "boingo", pig: "wrangler", smudgy: "smudgy", bigboy: "bigboy", hopper: "chubchirp", folio: "folio", moo: "moo", gardener: "puddles", sawyer: "sawyer", tiger: "babur", alfil: "alfil", gingerbread: "ginger", grex: "jefferson", hollow: "hollow" };
+const HOME_FILE: Record<HomeId, string> = { clown: "boingo", pig: "wrangler", smudgy: "smudgy", bigboy: "bigboy", hopper: "chubchirp", folio: "folio", moo: "moo", gardener: "puddles", sawyer: "sawyer", tiger: "babur", alfil: "alfil", gingerbread: "ginger", grex: "jefferson", hollow: "hollow", timber: "timber" };
 
 /**
  * Playing a town bot (Oct 27, Eric): the bot table (short names, a rating each, one or two crate items), its card's
@@ -86,16 +86,17 @@ describe("town square: the bots (Oct 27)", () => {
   });
 
   it("each sidekick's baked sheet is its sprite as drawn (scripts/bake-sidekicks.ts): idle, walk, sit, wave, every pixel", async () => {
-    // (Timber's woodpecker foreman is on his workshop strip, not in the town square yet: no baked sheet. Nov 1.)
-    const notInTown = ["timber.ts"];
-    const files = readdirSync(new URL("../src/characters/sidekicks/", import.meta.url)).filter((f) => f.endsWith(".ts") && !notInTown.includes(f));
-    expect(files).toHaveLength(14);
+    // (Rivet, Timber's woodpecker foreman, baked too since Nov 3: he walks in an admin's town and keeps Timber's shop. His sprite's
+    // id is the art's, "sidekick-beaver".)
+    const files = readdirSync(new URL("../src/characters/sidekicks/", import.meta.url)).filter((f) => f.endsWith(".ts"));
+    expect(files).toHaveLength(15);
+    const artId: Record<string, string> = { timber: "sidekick-beaver" };
     for (const file of files) {
       const name = file.replace(/\.ts$/, "") as keyof typeof SIDEKICK_SHEETS;
       const mod = (await import(`../src/characters/sidekicks/${file}`)) as Record<string, unknown>;
       const ch = Object.values(mod).find((v): v is Character => !!v && typeof v === "object" && "anims" in v && "palette" in v)!;
       const sheet = SIDEKICK_SHEETS[name];
-      expect(ch.id, file).toBe(`sidekick-${name}`);
+      expect(ch.id, file).toBe(artId[name] ?? `sidekick-${name}`);
       expect(sheet.id).toBe(ch.id);
       for (const a of ["idle", "walk", "sit", "wave"] as const) expect(sheet.ms[a], `${file}: ${a}`).toEqual(ch.anims[a]!.frames.map((f) => f.ms));
       expect([sheet.w, sheet.h, ...sheet.foot]).toEqual([ch.w, ch.h, ...ch.foot]);
@@ -103,6 +104,21 @@ describe("town square: the bots (Oct 27)", () => {
       expect(sheet.hash, `${file}: run npx tsx scripts/bake-sidekicks.ts`).toBe(sheetHash(ch));
     }
   }, 60_000);
+
+  it("Rivet, Timber's kid (Nov 3): in an admin's town only, after the ladder, at 1650 (Timber's sim between Moo & Moon's and Puddles'); a player's town has the ladder alone", () => {
+    expect(ADMIN_BOTS).toHaveLength(1);
+    const rivet = ADMIN_BOTS[0]!;
+    expect([rivet.name, rivet.rating, rivet.boss]).toEqual(["Rivet", 1650, "timber"]);
+    expect(isSprite(rivet.look) && rivet.look.sprite).toBe(SIDEKICK_SHEETS.timber);
+    for (const a of ["idle", "walk", "sit", "wave"] as const) expect(SIDEKICK_SHEETS.timber.ms[a].length, a).toBeGreaterThan(0);
+    const rung = (n: string) => BOTS.find((b) => b.name === n)!.rating;
+    expect(rivet.rating).toBeGreaterThan(rung("Twinkle"));
+    expect(rivet.rating).toBeLessThan(rung("Drizzle"));
+    // (These tests run as a player: no Timber's home, so no Rivet; the ladder's indexes are the town's.)
+    expect(HOMES.some((h) => h.id === "timber")).toBe(false);
+    expect(TOWN_BOTS).toEqual(BOTS);
+    expect(sidekickText(rivet)).toBeNull();
+  });
 
   it("a sidekick's card says whose it is ('Hollow's sidekick'); a pawn's says nothing more", () => {
     const named = (n: string) => BOTS.find((b) => b.name === n)!;
