@@ -99,3 +99,4 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Hollow cave (Eric Nov 3): art round started (Opus high, weekly usage OK'd by Eric), /home/user/cr-hollowart on claude/boss-art,
   brief notes/briefs/brief-hollow-cave-art.md. Shopkeeper: dark dog WITH antlers (Eric OK); Glim stays town kid. No names/quotes/film refs.
   Then: code round (cave mask floor, rock walls, dog shopkeeper, crate), later his darkness intro.
+- Hollow cave ART DONE a53eba78 on claude/boss-art (notes out/shop-hollow-nov3.md). Stills sent to Eric; waiting his OK, then code round (mask blocking, repeated-piece lights, bake dog sheet, shopkeeper at (5,2)/(6,2)).
