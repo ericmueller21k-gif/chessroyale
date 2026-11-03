@@ -18,7 +18,8 @@ const others = ALL_HOMES.filter((h) => h.id !== "timber");
 describe("an admin's town: Timber's Lumber Lodge (Nov 3)", () => {
   it("has every home, the lodge among them, west of the Colosseum", () => {
     expect(HOMES).toEqual(ALL_HOMES);
-    expect(HOMES).toHaveLength(15);
+    // (Sixteen since Dash's Kicks, Nov 3: town-dash.test.ts.)
+    expect(HOMES).toHaveLength(16);
     expect(lodge).toMatchObject({ boss: "Timber", name: "Timber's Lumber Lodge", cx: 11, cy: 32, half: 1.5, foot: 0.5 });
   });
 
@@ -48,7 +49,9 @@ describe("an admin's town: Timber's Lumber Lodge (Nov 3)", () => {
     const dist = (h: { cx: number; cy: number }) => Math.hypot(wrapF(h.cx - lodge.cx), wrapF(h.cy - lodge.cy));
     const near = [...others].sort((a, b) => dist(a) - dist(b));
     // Boingo's Funhouse 7.8 (south-west), Moo & Moon Meadow 8.5 (north-west): the map's 8 to 10, give or take (it was the open ground left).
-    expect(near.slice(0, 2).map((h) => [h.id, Math.round(dist(h) * 10) / 10])).toEqual([
+    // (Since Nov 3 Dash's Kicks is nearer, 7.3 to the west: the little ground left after the lodge. town-dash.test.ts.)
+    expect(near.slice(0, 3).map((h) => [h.id, Math.round(dist(h) * 10) / 10])).toEqual([
+      ["dash", 7.3],
       ["clown", 7.8],
       ["moo", 8.5],
     ]);

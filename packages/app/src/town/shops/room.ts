@@ -73,6 +73,29 @@ export function makeRoom(layout: readonly ShopPlace[], keeper: readonly Sq[], n 
   return { n, blocked, exits, doors, keeper, counter, start };
 }
 
+/**
+ * A sneaker store's ceiling light panels (Dash's, as the mockup drew them): x, y, width and height in a 390 px wide box, scaled to
+ * the room's width. They're on the screen's backdrop, behind the room, so they're cut at `ceilY` (the highest top of any upright piece
+ * drawn this frame): never seen through the gaps between the side walls' pieces, or over a wall, at any zoom or camera place.
+ */
+export const STORE_PANELS: readonly (readonly [x: number, y: number, w: number, h: number])[] = [
+  [60, 18, 40, 12],
+  [290, 18, 40, 12],
+  [175, 60, 50, 18],
+  [20, 120, 60, 22],
+  [310, 120, 60, 22],
+];
+/** Panel `i` in a room `W` wide, cut at `ceilY` (screen px), into `out`; false when none of it is above `ceilY`. No allocation. */
+export function ceilingPanel(i: number, W: number, ceilY: number, out: { x: number; y: number; w: number; h: number }): boolean {
+  const p = STORE_PANELS[i]!;
+  const k = W / 390;
+  out.x = p[0] * k;
+  out.y = p[1] * k;
+  out.w = p[2] * k;
+  out.h = Math.min(p[3] * k, ceilY - out.y);
+  return out.h > 0;
+}
+
 export const inRoom = (room: Room, c: number, r: number): boolean => c >= 0 && r >= 0 && c < room.n && r < room.n;
 export const walkable = (room: Room, c: number, r: number): boolean => inRoom(room, c, r) && !room.blocked[r * room.n + c];
 const has = (list: readonly Sq[], c: number, r: number) => list.some((s) => s.c === c && s.r === r);

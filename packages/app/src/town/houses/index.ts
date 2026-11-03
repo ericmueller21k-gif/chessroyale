@@ -18,6 +18,7 @@ import { HOUSE_SMUDGY, HOUSE_SMUDGY_SIGN, HOUSE_SMUDGY_LIGHTS, HOUSE_SMUDGY_POOL
 import { HOUSE_TIGER, HOUSE_TIGER_SIGN, HOUSE_TIGER_LIGHTS, HOUSE_TIGER_POOLS } from "./tiger.ts";
 import { HOUSE_FOLIO, HOUSE_FOLIO_SIGN, HOUSE_FOLIO_LIGHTS, HOUSE_FOLIO_POOLS } from "./folio.ts";
 import { HOUSE_TIMBER, HOUSE_TIMBER_SIGN, HOUSE_TIMBER_LIGHTS, HOUSE_TIMBER_POOLS } from "./timber.ts";
+import { HOUSE_BLITZ, HOUSE_BLITZ_SIGN, HOUSE_BLITZ_LIGHTS, HOUSE_BLITZ_POOLS } from "./blitz.ts";
 
 export interface HouseArt {
   ch: Character;
@@ -46,6 +47,8 @@ export const HOUSES: Record<HomeId, HouseArt> = {
   folio: { ch: HOUSE_FOLIO, sign: HOUSE_FOLIO_SIGN, lights: HOUSE_FOLIO_LIGHTS, pools: HOUSE_FOLIO_POOLS },
   // (In an admin's town only while Timber is in the game for admins first: world.ts ADMIN_TOWN.)
   timber: { ch: HOUSE_TIMBER, sign: HOUSE_TIMBER_SIGN, lights: HOUSE_TIMBER_LIGHTS, pools: HOUSE_TIMBER_POOLS },
+  // (Dash's Kicks, the art's house-blitz; in an admin's town only while Dash is in the game for admins first: world.ts ADMIN_TOWN.)
+  dash: { ch: HOUSE_BLITZ, sign: HOUSE_BLITZ_SIGN, lights: HOUSE_BLITZ_LIGHTS, pools: HOUSE_BLITZ_POOLS },
 };
 
 /** The Colosseum's picture (slice 5), and the icon on its edge chip (a crown over the board's squares, 24 x 24). */

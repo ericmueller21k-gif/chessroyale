@@ -570,7 +570,7 @@ describe("the stream stays at its foot unless it's scrolled up (Eric, Oct 28)", 
 });
 
 describe("the chatter table (placeholders until real players chat)", () => {
-  // (Every home, an admin's town's too: Timber's, Nov 3.)
+  // (Every home, an admin's town's too: Timber's and Dash's, Nov 3.)
   const all = ALL_HOMES.map((h) => ({ home: h, v: CHATTER[h.id] }));
 
   it("has every boss with a home: two lines each, and a kid with one or two", () => {
@@ -582,8 +582,8 @@ describe("the chatter table (placeholders until real players chat)", () => {
     }
   });
 
-  it("names the fifteen kids from the sidekicks brief (Rivet, Timber's, Nov 3)", () => {
-    expect(all.map(({ v }) => v.kid).sort()).toEqual(["Blocky", "Bun & Bug", "Chip", "Crumb", "Dabble", "Drizzle", "Glim", "Pleat", "Rivet", "Sparky", "Squirt", "Stripes", "Tex", "Twinkle", "Woolly"].sort());
+  it("names the sixteen kids from the sidekicks brief (Rivet, Timber's, and Tick, Dash's, Nov 3)", () => {
+    expect(all.map(({ v }) => v.kid).sort()).toEqual(["Blocky", "Bun & Bug", "Chip", "Crumb", "Dabble", "Drizzle", "Glim", "Pleat", "Rivet", "Sparky", "Squirt", "Stripes", "Tex", "Tick", "Twinkle", "Woolly"].sort());
   });
 
   it("keeps every line short (under 60 characters), distinct, plain and kind", () => {

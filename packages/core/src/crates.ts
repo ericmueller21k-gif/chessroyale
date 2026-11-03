@@ -345,8 +345,9 @@ const bossCrate = (boss: string, name: string, ride: string): BossCrateDef => ({
 });
 
 /**
- * Every boss's crate (only those whose home has a shop so far: Babur's, Puddles', Alfil's, Big Boy's and Timber's). Timber's (Nov 3)
- * is shown and sold to admins only while he's in the game for admins first (BOSS_ADMIN_FIRST): only an admin holds his tokens.
+ * Every boss's crate (only those whose home has a shop so far: Babur's, Puddles', Alfil's, Big Boy's, Timber's and Dash's). Timber's
+ * and Dash's (Nov 3) are shown and sold to admins only while they're in the game for admins first (BOSS_ADMIN_FIRST): only an admin
+ * holds their tokens.
  */
 export const BOSS_CRATES: readonly BossCrateDef[] = [
   bossCrate("tiger", "Babur's Boss Crate", "balloon-pup"),
@@ -354,6 +355,7 @@ export const BOSS_CRATES: readonly BossCrateDef[] = [
   bossCrate("alfil", "Alfil's Boss Crate", "alfil-howdah"),
   bossCrate("bigboy", "Big Boy's Boss Crate", "bigboy-buggy"),
   bossCrate("timber", "Timber's Boss Crate", "log-roller"),
+  bossCrate("dash", "Dash's Boss Crate", "cheetah-shoes"),
 ];
 
 export const bossCrateDef = (id: string) => BOSS_CRATES.find((c) => c.id === id);

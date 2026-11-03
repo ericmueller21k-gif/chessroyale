@@ -48,7 +48,7 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   cleared and copied whole for each thing, cost the frames south of the park, where the whole park and the Colosseum
   are in the far band. docs/decisions/2026-10-28-bots-rotation.md.)
 - **The layout** (`town/world.ts`, `HOMES`): fourteen homes spread evenly round the middle over the world that wraps, so
-  neighbors stand 8 to 10 squares apart (and in an admin's town a fifteenth, **Timber's Lumber Lodge**, Nov 3, below); the Colosseum on its 12 × 12 ground (`COLISEUM`, columns 17 to 28, rows 28 to 39),
+  neighbors stand 8 to 10 squares apart (and in an admin's town a fifteenth and sixteenth, **Timber's Lumber Lodge** and **Dash's Kicks**, Nov 3, below); the Colosseum on its 12 × 12 ground (`COLISEUM`, columns 17 to 28, rows 28 to 39),
   its gate facing south onto its apron (`APRON`: columns 17 to 28, rows 25 to 27, paved, kept open for people to gather),
   then a walk of 4 rows (`WALK_ROWS`, the promenade paved across it), the park south of that (`PARK`, below; it stands back
   from the Colosseum since Oct 26: `docs/decisions/2026-10-26-town-square-park-stands-back.md`), and your start (`START`,
@@ -517,7 +517,15 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   crowd stays the ladder's. His crate (`BOSS_CRATES`) shows in the Crates tab to admins (or whoever holds one), not in the FAQ; the
   server posts no town-chat line for a challenge of a boss in the game for admins first. Taking `timber` out of `BOSS_ADMIN_FIRST`
   puts all of it in everyone's town. docs/decisions/2026-11-03-timber-home.md.
-- **Which homes.** Babur's Circus (`tiger`), Puddles' Botanical Garden (`gardener`) and Alfil's Pyramid (`alfil`, Nov 2: Woolly the Shopkeeper, "Alfil's Boss Crate" with Alfil's Howdah, a sandstone ceiling, the chat's day tone) and Big Boy's Crib (`bigboy`, Nov 2: Blocky the Shopkeeper, "Big Boy's Boss Crate" with Big Boy's Buggy, a nursery ceiling of sky, clouds and stars, the chat's day tone; a ball pit, solid, under a walkway, the shop's platform and the battle circle you walk on, the circle in the walkway's foam squares with a zoo-animal rug in its middle; his toy airplane, three squares deep, stands up whole at its foot, `RoomArt.upright`, rather than lying flat as a plan) and Timber's Lumber Lodge (`timber`, Nov 3, an admin's town only: Rivet the Shopkeeper behind the middle of the workbench, "Timber's Boss Crate" with The Log Roller, a lodge's ceiling of dark planks between heavy beams, the chat's day tone; the giant king being carved on its dais, 4 × 2 squares, stands up whole, `RoomArt.upright`; the circle's branded start marks, `SHOP_TIMBER_MARKS`, passed as Big Boy's are; his challenge his own intro since Nov 3, the log he gnaws into the table, his line "Hard hats on. We're building today."): `SHOPS` in `town/shops/shops.ts`. Their home's card
+- **Dash's Kicks and Tick (Nov 3): an admin's town only,** exactly as Timber's lodge and Rivet (Dash is in `BOSS_ADMIN_FIRST` too).
+  His sneaker store (`houses/blitz.ts`, the art branch's `house-blitz`, 144 × 134: charcoal brick, a neon sneaker on the roof, the
+  hanging pair on a wire to a pole on its own plot's east column) stands at (4, 34), beside the lodge in the west: the best of the
+  little open ground left (7.1 to 7.6 squares from Boingo's, Moo & Moon's, the lodge and Big Boy's; the map's 8 to 10 fits nowhere
+  now), its roaming ground on plain board, four open columns to the lodge. **Tick**, his sleepy tortoise (`ADMIN_BOTS`, after Rivet),
+  rated 1850 (Dash's sim, 0.15, ties Sawyer's under Puddles': between Bishop Bo and Chip), "Dash's sidekick". His crate as Timber's
+  (admins, or whoever holds one; not in the FAQ); no town-chat line for his challenge. Taking `dash` out of `BOSS_ADMIN_FIRST` puts
+  it all in everyone's town. docs/decisions/2026-11-03-dash-home.md.
+- **Which homes.** Babur's Circus (`tiger`), Puddles' Botanical Garden (`gardener`) and Alfil's Pyramid (`alfil`, Nov 2: Woolly the Shopkeeper, "Alfil's Boss Crate" with Alfil's Howdah, a sandstone ceiling, the chat's day tone) and Big Boy's Crib (`bigboy`, Nov 2: Blocky the Shopkeeper, "Big Boy's Boss Crate" with Big Boy's Buggy, a nursery ceiling of sky, clouds and stars, the chat's day tone; a ball pit, solid, under a walkway, the shop's platform and the battle circle you walk on, the circle in the walkway's foam squares with a zoo-animal rug in its middle; his toy airplane, three squares deep, stands up whole at its foot, `RoomArt.upright`, rather than lying flat as a plan) and Timber's Lumber Lodge (`timber`, Nov 3, an admin's town only: Rivet the Shopkeeper behind the middle of the workbench, "Timber's Boss Crate" with The Log Roller, a lodge's ceiling of dark planks between heavy beams, the chat's day tone; the giant king being carved on its dais, 4 × 2 squares, stands up whole, `RoomArt.upright`; the circle's branded start marks, `SHOP_TIMBER_MARKS`, passed as Big Boy's are; his challenge his own intro since Nov 3, the log he gnaws into the table, his line "Hard hats on. We're building today.")) and Dash's Kicks (`dash`, Nov 3, an admin's town only: Tick the Shopkeeper on the counter's middle squares, drawn half a square back and west (`at` [9, 1.5]) so the low tortoise's head shows over the 30 px counter, clear of its shoe boxes; "Dash's Boss Crate" with Cheetah Shoes; a store's ceiling of white tiles and light panels; the chat's day tone; the halfpipe, 4 × 2 squares, stands up whole, `RoomArt.upright`; his try-on mats, `SHOP_BLITZ_MARKS`, passed as Timber's are): `SHOPS` in `town/shops/shops.ts`. Their home's card
   is its name, centered, and **"Go in"** (gold) under it, centered, nothing else (Eric, Nov 2: "chop the Shop and Coming soon": a short
   card, `.town-card.town-door`); every other home's card is as it was (its name, Hollow's line, "Shop" greyed and "Coming soon").
 - **Going in.** "Go in" walks you to the square in front of the door (the plot's front row's middle, a row out); there the town zooms in on
@@ -582,7 +590,9 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
 
 - **Which bosses.** Those in `BOSS_INTROS` (`town/shops/challenge.ts`): every boss whose home has an inside (`SHOPS`): Alfil (his own
   intro, `custom: true`), Big Boy (his own, Nov 2), Timber (his own, Nov 3; in an admin's town only while he's in the game for admins
-  first), Babur and Puddles (the default intro). Every other boss's card works as before (its confirm, Leave, the Boss
+  first), Babur, Puddles and Dash (the default intro; Dash's since Nov 3, in an admin's town only, until his own in round 3: no God
+  King attack was drawn for him, so he stands in his idle through the swing's beat, turned to you by his intro's `facesLeft`). Every
+  other boss's card works as before (its confirm, Leave, the Boss
   raid screen). Per player: it all happens on your own screen; the boss stays at its home for everyone else.
 - **The layout** (`layout`, per boss): **"across"** (the default, all five today): the boss on the table's west (the screen's
   left), you on its east, side by side on the circle's middle row, each `standOff.across` (1.5) squares out, facing each other;
@@ -658,7 +668,7 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
   the pacing beat by beat, the hop back, every figure clear of the stools,
   the storm's edge, the wipe, back to where you stood), `packages/server/test/town-chat.test.ts` (the lines and the no-spam rule, and
   through the API), `e2e/boss-challenge.spec.ts` (phone and computer: Alfil, a quit then a finished challenge and the lines; Babur's
-  default intro and back; Big Boy's own intro and back; Timber's own as an admin and back), `e2e/shop.spec.ts` (Alfil's Pyramid's and Big Boy's Crib's crates), `e2e/town.spec.ts` (a boss without an inside, Folio: the
+  default intro and back; Big Boy's own intro and back; Timber's own as an admin and back; Dash's default as an admin and back), `e2e/shop.spec.ts` (Alfil's Pyramid's, Big Boy's Crib's and Dash's Kicks' crates), `e2e/town.spec.ts` (a boss without an inside, Folio: the
   Boss raid screen).
 
 ## Frame-rate pill (`?fps`)

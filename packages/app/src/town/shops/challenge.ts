@@ -36,12 +36,18 @@ export interface BossIntro {
   custom: boolean;
   /** A sound for each cue that has a fitting one (the boss's own pack; the default's "table" pop and "wipe"): none is silent. */
   cues: Readonly<Record<string, string>>;
+  /**
+   * Its town figure faces left as drawn, for a boss whose kit has no God King attack to say so (Dash, Nov 3: none was drawn; his
+   * swing's beat he stands in his idle). A boss with an attack faces as its attack's art does.
+   */
+  facesLeft?: true;
 }
 
 /**
  * The bosses with an intro: every boss whose home has an inside (shops/shops.ts SHOPS; Nov 2, round 2: "for other bosses they should
  * just be swinging for a few seconds like discussed"). Alfil has his own (his pyramid and sandstorm), Big Boy his (his toy blocks
- * and lollipop swirl, Nov 2), Timber his (Nov 3: his log, gnawed into the table, and his sawdust sweep); Babur and Puddles the default.
+ * and lollipop swirl, Nov 2), Timber his (Nov 3: his log, gnawed into the table, and his sawdust sweep); Babur, Puddles and Dash (Nov 3,
+ * until his own, round 3) the default.
  * The lines are placeholders until Gemini's lines arrive (Part D), each in its boss's voice (characters/*-lines.ts). Alfil's cues are
  * his own synthesized sounds (characters/alfil-sounds.ts): a low rumble as the pyramid rises, the grinding crunch as it cracks, the
  * ground's thud as it falls, the soft glow as the board shows, and a whoosh as the storm comes in. The default's: the app's soft pop
@@ -100,6 +106,15 @@ export const BOSS_INTROS: Readonly<Partial<Record<HomeId, BossIntro>>> = {
       chitter: "timberChitter",
       storm: "timberSwoosh",
     },
+  },
+  // (Nov 3: the default until his own intro, round 3; his line is his entrance's first, characters/dash-lines.ts.)
+  dash: {
+    name: "Dash",
+    line: "Yo yo yo! Dash in the building, fam!",
+    layout: "across",
+    custom: false,
+    cues: { table: "pop", wipe: "dashWhoosh" },
+    facesLeft: true,
   },
 };
 

@@ -271,6 +271,73 @@ test("Timber's Lumber Lodge (Nov 3): in an admin's town only; its card is its na
   expect(errors).toEqual([]);
 });
 
+test("Dash's Kicks (Nov 3): in an admin's town only; its card is its name and Go in; Tick keeps the shop, Dash's Boss Crate with Cheetah Shoes; the halfpipe", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  type Hook = { __townBots?: () => { name: string }[] | null; __townGlide?: (to: string | readonly [number, number]) => void; __townBossBack?: (id: string) => void };
+  const bots = async () => (await page.evaluate(() => (window as unknown as Hook).__townBots?.() ?? []))!.map((b) => b.name);
+  // A player's town: no store on its ground beside Timber's (open ground there), no Tick (Dash is in the game for admins first).
+  await page.goto("/town?sky=day");
+  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await page.evaluate(() => (window as unknown as Hook).__townGlide?.([4, 33]));
+  await page.waitForTimeout(1500);
+  expect(await homeAt(page, "dash")).toBeNull();
+  expect(await bots()).toContain("Glim (bot)");
+  expect(await bots()).not.toContain("Tick (bot)");
+  // An admin's: the store there, Tick among the bots.
+  await asAdmin(page);
+  for (const sky of SHOTS ? ["night", "day"] : ["day"]) {
+    await page.goto(`/town?sky=${sky}`);
+    await expect(town(page)).toHaveAttribute("data-ready", "1");
+    expect(await bots()).toContain("Tick (bot)");
+    await page.evaluate(() => (window as unknown as Hook).__townGlide?.("dash"));
+    await expect.poll(() => homeAt(page, "dash"), { message: "the store comes into view" }).not.toBeNull();
+    if (SHOTS) {
+      // (Day, and night so the neon shows; Dash sent round behind his store, so its front shows whole.)
+      await page.evaluate(() => (window as unknown as Hook).__townBossBack?.("dash"));
+      await page.waitForTimeout(4000);
+      await page.screenshot({ path: `${SHOTS}/town-kicks-${sky}-${test.info().project.name}.png` });
+    }
+  }
+  await goIn(page, "dash", "Dash's Kicks");
+  await expect(room(page)).toHaveAttribute("data-room", "dash");
+  await expect(page.getByRole("heading", { name: "Dash's Kicks" })).toBeVisible();
+  await expect(page.locator(".town-chat")).toHaveAttribute("data-tone", "day");
+  // You start inside zoomed out (the further-out camera), as in every home.
+  await expect.poll(async () => (await shopCam(page))?.zoom, { message: "zoomed out" }).toBe(1);
+  await expect.poll(() => shopAt(page, "keeper"), { message: "Tick is drawn" }).not.toBeNull();
+  const at = (await shopAt(page, "keeper"))!;
+  await page.mouse.click(at.x, at.y);
+  const card = page.getByRole("dialog", { name: "Shopkeeper", exact: true });
+  await expect(card).toBeVisible({ timeout: 15_000 });
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/counter-${test.info().project.name}.png` });
+  await card.getByRole("button", { name: "Talk" }).click();
+  const crate = page.getByRole("dialog", { name: "Dash's Boss Crate", exact: true });
+  await expect(crate).toBeVisible();
+  await expect(crate).toContainText("3 Dash tokens, or 1 Dash token + 1 crate key");
+  await expect(crate).toContainText("Cheetah Shoes");
+  if (SHOTS) {
+    // The showpiece: from in front of the halfpipe (columns 15-18, rows 3-4), its skateboard rolling by itself.
+    await page.keyboard.press("Escape");
+    await expect(crate).toBeHidden();
+    // (A step at a time toward it, each square tapped once it's on screen.)
+    for (const step of [[12, 6], [14, 6], [16, 6]] as const) {
+      await expect(async () => {
+        const sq = await shopAt(page, "square", step);
+        expect(sq, `${step} on screen`).not.toBeNull();
+        await page.mouse.click(sq!.x, sq!.y);
+        await expect(room(page)).toHaveAttribute("data-you", step.join(","), { timeout: 4000 });
+      }).toPass({ timeout: 20_000 });
+    }
+    await page.waitForTimeout(1500);
+    await page.screenshot({ path: `${SHOTS}/halfpipe-${test.info().project.name}.png` });
+  }
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test("Big Boy's Crib (Nov 2): Go in, Blocky's crate with Big Boy's Buggy; the chat's words dark over the nursery", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
