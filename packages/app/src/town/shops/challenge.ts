@@ -789,6 +789,19 @@ export interface DarkNow {
   pool: number;
   iris: number;
 }
+/**
+ * A cave light's strength in Hollow's intro now (`dn`; null: no intro, the cave as it always is: 1): a lantern's (its place in
+ * `dark.lanterns`), a bulb piece's share still lit (`out` of its `of` bulbs dark; the backdrop's all gone with its first, its candle
+ * too), the tree's; any other light as it is. None from the blackout on.
+ */
+export function caveLight(dn: DarkNow | null, role: { lantern: number } | { out: number; of: number; backdrop: boolean } | "tree" | null): number {
+  if (!dn) return 1;
+  let m = 1;
+  if (role === "tree") m = 1 - dn.tree.out;
+  else if (role && "lantern" in role) m = dn.lanterns[role.lantern]!.glow;
+  else if (role) m = role.backdrop && role.out > 0 ? 0 : 1 - role.out / Math.max(1, role.of);
+  return m * (1 - dn.black);
+}
 const ramp = (t: number, from: number, ms: number) => Math.min(1, Math.max(0, (t - from) / Math.max(1, ms)));
 const smooth = (u: number) => u * u * (3 - 2 * u);
 /** Hollow's intro `t` ms in (his beats, `introBeats`): see DarkNow. */

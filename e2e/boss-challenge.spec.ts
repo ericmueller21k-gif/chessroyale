@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { CHALLENGE_FEEL } from "../packages/app/src/town/shops/challenge.ts";
+import { CHALLENGE_FEEL, introOf } from "../packages/app/src/town/shops/challenge.ts";
 import { BOARD_SEL, asAdmin, asSignedIn, named, test } from "./helpers.ts";
 
 /**
@@ -46,7 +46,8 @@ test.beforeEach(async ({ page }) => {
 
 type Stand = { c: number; r: number; facing: number; view: number; moving: boolean };
 type Wood = { move: string | null; log: string | null; fog: string | null; ring: boolean; stumps: string | null };
-type Intro = { step: string; layout: string; attack: boolean; you: [number, number]; boss: [number, number]; facing: { you: number; boss: number }; line: boolean; table: boolean; stools: [number, number][]; pyramid: { anim: string; frame: number } | null; blocks: { anim: string; frame: number } | null; drop: number; wood: Wood | null };
+type Dark = { move: string | null; bulbs: number; lanterns: number; run: number; tree: number; tag: number; level: number; black: number; pool: number; iris: number };
+type Intro = { step: string; layout: string; attack: boolean; you: [number, number]; boss: [number, number]; facing: { you: number; boss: number }; line: boolean; table: boolean; stools: [number, number][]; pyramid: { anim: string; frame: number } | null; blocks: { anim: string; frame: number } | null; drop: number; wood: Wood | null; chant: string | null; dark: Dark | null };
 type Hooks = {
   __townAt?: (k: string, id: string) => { x: number; y: number } | null;
   __townYou?: () => Stand | null;
@@ -292,50 +293,91 @@ test("challenging Babur in the town: the default intro (his line, the table pops
   expect(errors).toEqual([]);
 });
 
-test("challenging Hollow in the town: the default intro on his cave's pond (his line, the table pops in, his lash swung in place, the flash and the wipe), the battle; Leave back where you stood", async ({ page }) => {
+test("challenging Hollow in the town: his own intro (in to your seats, his line, the table pops in still lit, his channel line as the ball charges, the lanterns out one by one, the string, the tree, his strand, your pawn, the blackout, the dim light, the iris to the board), the battle out of the dark; Leave back where you stood", async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   const project = test.info().project.name;
   if (SHOTS) mkdirSync(SHOTS, { recursive: true });
   const shot = async (name: string) => SHOTS && (await page.screenshot({ path: `${SHOTS}/${name}-${project}.png` }));
-  // (Hollow is live for everyone: a player's town. Nov 3: the default intro until his own, the lanterns going out, next round.)
+  // (Hollow is live for everyone: a player's town. Nov 3: his own intro, Eric's design with his changes.)
   await page.goto("/town?sky=night");
   await expect(town(page)).toHaveAttribute("data-ready", "1");
   const { confirm, stood } = await toConfirm(page, "hollow", "Hollow");
+  // (The phone's GIF at real timing: every frame from the Fight tap to the board, each with its ms since the tap.)
+  const frames: { at: number; png: Buffer }[] = [];
+  let grabbing = !!SHOTS && project === "phone";
+  const fightAt = Date.now();
   await confirm.getByRole("button", { name: "Fight" }).click();
-  // In at the cave's mouth, up the passage to the frozen pond: onto the rings etched in its ice (SHOP_HOLLOW_MARKS).
+  const grabbed = (async () => {
+    while (grabbing) {
+      const png = await page.screenshot({ scale: "css" });
+      frames.push({ at: Date.now() - fightAt, png });
+    }
+  })();
+  // In at the cave's mouth, up the passage to the frozen pond: straight to your seats (BOSS_INTROS' `seated`: his clear place, yours
+  // the usual), and you stay there.
   await expect(room(page)).toHaveAttribute("data-room", "hollow", { timeout: 20_000 });
   await expect(page.getByRole("heading", { name: "Hollow Peak" })).toBeVisible();
   const step = async () => (await intro(page))?.step ?? "";
-  // The moment the intro starts (you both on your marks): the still his own intro's lanterns are planned from (Eric, next round).
-  await expect.poll(step, { message: "on their marks", timeout: 20_000, intervals: [30] }).not.toBe("walk");
-  await shot("hollow-lanterns");
-  await expect.poll(step, { message: "his line", timeout: 15_000, intervals: [50] }).toBe("line");
+  const seats = [12.5 + CHALLENGE_FEEL.clear.you, 11.5, 12.5 - 2.92, 11.5];
+  const where = (i: Intro) => [i.you[0], i.you[1], i.boss[0], i.boss[1]].map((v) => Math.round(v * 100) / 100);
+  await expect.poll(step, { message: "his line", timeout: 20_000, intervals: [50] }).toBe("line");
   const atLine = (await intro(page))!;
   expect(atLine.layout).toBe("across");
-  expect(atLine.you).toEqual([14, 11.5]);
-  expect(atLine.boss).toEqual([11, 11.5]);
+  expect(where(atLine)).toEqual(seats);
   expect(atLine.facing).toEqual({ you: -1, boss: 1 });
   expect(atLine.line).toBe(true);
-  // The table pops in on the ice, its stools at your sides; you both hop back clear of them (he a little further: his lash reaches
-  // further, BOSS_INTROS' `clear`).
+  // The table pops in on the ice while it's still lit, its stools at your sides; nobody hops back (you're already in your seats).
   await expect.poll(async () => (await intro(page))?.table, { message: "the table pops in", intervals: [50] }).toBe(true);
-  expect((await intro(page))!.stools).toEqual([[11.5, 11.5], [13.5, 11.5]]);
-  const at = async () => {
+  const atTable = (await intro(page))!;
+  expect(atTable.stools).toEqual([[11.5, 11.5], [13.5, 11.5]]);
+  expect(where(atTable)).toEqual(seats);
+  expect(atTable.dark).toMatchObject({ level: 0, lanterns: 0, run: 0 });
+  await shot("hollow-table");
+  // He starts to channel: one of his four lines over his head, the ball charging.
+  await expect.poll(step, { message: "he charges", intervals: [50] }).toBe("charge");
+  const atCharge = (await intro(page))!;
+  expect(introOf("hollow")!.chant).toContain(atCharge.chant);
+  expect(atCharge).toMatchObject({ line: false, table: true, attack: false, dark: { move: "charge", level: 0 } });
+  // The drain: the lanterns out one by one, then the string, the tree, his strand and your pawn; then black. From here on nobody
+  // moves from their place and the table stays: only the light changes.
+  const looks: Intro[] = [];
+  const look = async () => {
     const i = (await intro(page))!;
-    return [i.you[0], i.you[1], i.boss[0], i.boss[1]].map((v) => Math.round(v * 100) / 100);
+    looks.push(i);
+    return i;
   };
-  await expect.poll(at, { message: "hopped back clear of the stools", intervals: [50] }).toEqual([12.5 + CHALLENGE_FEEL.clear.you, 11.5, 12.5 - 2.92, 11.5]);
-  // His lash, swung in place, for a few seconds; the line gone.
-  await expect.poll(step, { message: "he swings", intervals: [50] }).toBe("swing");
-  expect((await intro(page))!).toMatchObject({ attack: true, line: false, table: true });
-  await shot("hollow-swing");
-  // The flash and the wipe to black, the battle (Boss alone, Hollow) loading under it.
-  await expect(page.locator("canvas.boss-wipe")).toHaveCount(1, { timeout: 10_000 });
-  await expect(page.locator("canvas.boss-wipe")).toHaveAttribute("data-boss", "hollow");
+  await expect.poll(async () => (await look()).dark?.lanterns ?? 0, { message: "the first lantern goes out", intervals: [30] }).toBeGreaterThanOrEqual(1);
+  await expect.poll(async () => (await look()).dark?.lanterns ?? 0, { message: "the third", intervals: [30] }).toBeGreaterThanOrEqual(3);
+  await shot("hollow-drain");
+  await expect.poll(async () => (await look()).dark?.lanterns ?? 0, { message: "all five, one by one", intervals: [30] }).toBe(5);
+  await expect.poll(async () => (await look()).dark?.run ?? 0, { message: "the string drains", intervals: [30] }).toBeGreaterThan(0);
+  await expect.poll(async () => (await look()).dark?.bulbs ?? 3, { message: "his own strand", intervals: [30] }).toBe(0);
+  await expect.poll(async () => (await look()).step, { message: "black", intervals: [30] }).toBe("black");
+  expect((await look()).dark).toMatchObject({ level: 1, black: 1 });
+  await expect.poll(async () => (await look()).dark?.pool ?? 0, { message: "the dim light comes up", intervals: [30] }).toBe(1);
+  await shot("hollow-dim");
+  // (The still as it starts to close: a screenshot takes a good part of the iris's 0.6 s.)
+  await expect.poll(async () => (await look()).dark?.iris ?? 0, { message: "the iris closes in on the board", intervals: [20] }).toBeGreaterThan(0.02);
+  await shot("hollow-iris");
+  for (const i of looks) {
+    expect(where(i), `at ${i.step}: in their seats`).toEqual(seats);
+    expect(i.table, `at ${i.step}: the table`).toBe(true);
+    expect(i.stools.length, `at ${i.step}: the stools`).toBe(2);
+    expect(i.attack, `at ${i.step}: no attack`).toBe(false);
+  }
+  // Into the match: no second blackout, no storm: the dark holds while the battle loads, and the board comes up out of it.
+  await expect(page.locator("canvas.boss-dark")).toHaveCount(1, { timeout: 10_000 });
+  await expect(page.locator("canvas.boss-dark")).toHaveAttribute("data-boss", "hollow");
+  await expect(page.locator("canvas.boss-dark")).toHaveAttribute("data-covered", "1");
+  await expect(page.locator("canvas.boss-wipe")).toHaveCount(0);
+  await expect(page.locator("canvas.boss-storm")).toHaveCount(0);
   await expect(page.locator(BOARD_SEL.wrap).first()).toBeVisible({ timeout: 60_000 });
-  await expect(page.locator("canvas.boss-wipe")).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.locator("canvas.boss-dark")).toHaveCount(0, { timeout: 10_000 });
+  grabbing = false;
+  await grabbed;
+  for (const [i, f] of frames.entries()) writeFileSync(`${SHOTS}/hollow-gif-${String(i).padStart(3, "0")}-${String(f.at).padStart(6, "0")}.png`, f.png);
   // The gear's Leave (or Resign, as the battle offers): back in the town square where you stood.
   await page.getByRole("button", { name: "Match options" }).click();
   const quit = page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: /^(Leave|Resign)$/ });

@@ -44,7 +44,7 @@ import type { Rider } from "../rides.ts";
 import { rideSpeed } from "../../components/rides/scale.ts";
 import { STORE_PANELS, camFocus, ceilingPanel, inTalkRange, lightsAt, litDx, overlaps, upAlpha, youBox, isFloor, makeRoom, onDoor, tapTarget, findPath, type Room, type ShopPlace, type Sq } from "./room.ts";
 import { POOL_LINE, bossHoldings, buyBossCrate, canAfford, holdLine, priceLine, prizeRows, shopOf, wayText, type CrateWay, type ShopDef } from "./shops.ts";
-import { CHALLENGE_FEEL, attackStart, attackTime, chantOf, drainAt, frameAt as animFrame, introAt, introCues, introLength, isDark, isLog, marksFeel, marksOf, seatedMarks, type DarkNow, type DrawnMarks, type IntroNow, type LogPlace } from "./challenge.ts";
+import { CHALLENGE_FEEL, attackStart, attackTime, caveLight, chantOf, drainAt, frameAt as animFrame, introAt, introCues, introLength, isDark, isLog, marksFeel, marksOf, seatedMarks, type DarkNow, type DrawnMarks, type IntroNow, type LogPlace } from "./challenge.ts";
 import { HOLLOW, HOLLOW_HEART, hollowBuild } from "../../characters/hollow.ts";
 import { play } from "../../sound.ts";
 import { paintTable, playCue, slabFrontY, type Emis, type LoadedIntro } from "./intro.ts";
@@ -619,15 +619,10 @@ function startRoom(
    */
   const lightMul = (u: Up): number => {
     if (!darkNow) return 1;
-    let m = 1;
     const li = lanternOf[u.i]!;
-    if (li >= 0) m = darkNow.lanterns[li]!.glow;
-    else if (runFirst[u.i]! >= 0) {
-      const n = runOut(u);
-      m = u.name === "backdrop" && n > 0 ? 0 : 1 - n / Math.max(1, runCount[u.i]!);
-    } else if (u.name === "showpiece") m = 1 - darkNow.tree.out;
-    return m * (1 - darkNow.black);
+    return caveLight(darkNow, li >= 0 ? { lantern: li } : runFirst[u.i]! >= 0 ? { out: runOut(u), of: runCount[u.i]!, backdrop: u.name === "backdrop" } : u.name === "showpiece" ? "tree" : null);
   };
+
   /** The lit pixels drawn this frame, to draw again over the dark (each its picture, place, size, mirrored, alpha). */
   let emN = 0;
   const emImg: HTMLCanvasElement[] = [];
