@@ -885,6 +885,9 @@ function startRoom(
     g.imageSmoothingEnabled = false;
     g.drawImage(loaded.kid.img, i * sheet.w, 0, sheet.w, sheet.h, x0, y0, sheet.w * s, sheet.h * s);
     Object.assign(kidBox, { x0, y0, x1: x0 + sheet.w * s, y1: y0 + sheet.h * s, on: true, hx: pt.x, hy: pt.y - (sheet.foot[1] - sheet.top.idle) * s - 2 });
+    // (A cave: the counter is round the bend, out of sight from the mouth, so the tag goes with him behind the rock nearer the camera,
+    // drawn now, not over everything.)
+    if (cave && !challenge) drawTag("Shopkeeper", "sidekick", kidBox.hx, kidBox.hy);
   };
   /**
    * You on your ride (town/rides.ts' frames, as the town's drawRider draws them): its idle standing, its move a cycle a step,
@@ -1366,7 +1369,7 @@ function startRoom(
       drawUp(u, now);
     }
     while (k < figN) drawFigure(figK[k++]!, now);
-    if (kidBox.on && !ci) drawTag("Shopkeeper", "sidekick", kidBox.hx, kidBox.hy);
+    if (kidBox.on && !ci && !cave) drawTag("Shopkeeper", "sidekick", kidBox.hx, kidBox.hy);
     if (youHead.on) drawTag(youName(), "you", youHead.x, youHead.y);
     if (ci && introNow?.line && bossHead.on) drawBubble(ci.def.line, bossHead.x, bossHead.y);
     placeCard();
