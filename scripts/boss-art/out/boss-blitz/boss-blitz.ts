@@ -1046,7 +1046,7 @@ const NOFF = I_L + W - 2 * 40;
  * Where the dropped thing lands, relative to his foot, in `arrive`'s drop frame: the table's foot (the board, the pieces'
  * pop and the stools all go on the table; the stools at its foot x +- 37). He stands left of his own stool.
  */
-export const BLITZ_INTRO_DROP_AT: Pt = [56, 0];
+export const BLITZ_INTRO_DROP_AT: Pt = [72, 0];
 
 const IPAL: Record<string, string> = {
   ...PALETTE,
