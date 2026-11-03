@@ -77,3 +77,6 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Eric (Nov 3): too many messages; write only when done or his call. Audio: told him fix live, needs his iPhone retest.
 - PR #477 Dash home opened (full-e2e, unsubscribed), head 23854b74, watcher b9gvbyz3x. Desktop counter/halfpipe stills predate panel fix.
   e2e lock /tmp/claude-0/e2e.lock held by helper's leftover wrangler (8823/9347) since ~13:22: stopping it needs Eric's OK (helper was denied).
+- Eric Nov 3: OK'd stopping stuck servers (done: e2e lock freed, all leftover wrangler gone). Dash Kicks house/colors fine.
+  Dash countdown/slap over pieces: Eric to test first; idea: while a finger is down, the countdown goes see-through until release.
+  Boss picker compact (Haiku) started: /home/user/cr-bscompact, brief-boss-select-compact.md. #477 desktop stills retaken 56bb35f5, watcher bspr9tcud.

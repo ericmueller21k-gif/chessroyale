@@ -82,3 +82,4 @@ notes to a private place or strip them). Never put a secret value here or anywhe
 - Helpers never list processes, inspect /proc or the environment, print env vars, call session/agent tools, or read
   auth/config files. Killing PIDs needs Eric's OK. Literal absolute paths for `rm`. Never force-push, push empty
   commits, or rebase a pushed branch. Never disable TLS verification.
+- Eric, Nov 3: stuck processes/servers: I may stop them myself without asking (wait a few minutes to confirm it's stuck; if slow, restart anyway).
