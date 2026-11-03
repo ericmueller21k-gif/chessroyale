@@ -36,6 +36,11 @@ export interface BossIntro {
   custom: boolean;
   /** A sound for each cue that has a fitting one (the boss's own pack; the default's "table" pop and "wipe"): none is silent. */
   cues: Readonly<Record<string, string>>;
+  /**
+   * Its town figure faces left as drawn, for a boss whose kit has no God King attack to say so (Dash, Nov 3: none was drawn; his
+   * swing's beat he stands in his idle). A boss with an attack faces as its attack's art does.
+   */
+  facesLeft?: true;
 }
 
 /**
@@ -109,6 +114,7 @@ export const BOSS_INTROS: Readonly<Partial<Record<HomeId, BossIntro>>> = {
     layout: "across",
     custom: false,
     cues: { table: "pop", wipe: "dashWhoosh" },
+    facesLeft: true,
   },
 };
 

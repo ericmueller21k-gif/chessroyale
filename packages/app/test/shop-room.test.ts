@@ -4,6 +4,7 @@ import { SHOP_PUDDLES_LAYOUT } from "../src/town/shops/puddles-art.ts";
 import { SHOP_ALFIL_LAYOUT } from "../src/town/shops/alfil-art.ts";
 import { SHOP_BIGBOY_LAYOUT } from "../src/town/shops/bigboy-art.ts";
 import { SHOP_TIMBER_LAYOUT, SHOP_TIMBER_MARKS } from "../src/town/shops/timber-art.ts";
+import { SHOP_BLITZ_CRATE_AT, SHOP_BLITZ_LAYOUT, SHOP_BLITZ_MARKS, SHOP_BLITZ_PIECES } from "../src/town/shops/blitz-art.ts";
 import { findPath, inTalkRange, makeRoom, onDoor, stepsFrom, tapTarget, walkable, type Room, type Sq } from "../src/town/shops/room.ts";
 import { POOL_LINE, buyBossCrate, canAfford, inInventoryLine, holdLine, priceLine, prizeRows, shopOf, wayText, SHOPS } from "../src/town/shops/shops.ts";
 import { bossCrateOf } from "@chessroyale/core";
@@ -19,6 +20,7 @@ const puddles = makeRoom(SHOP_PUDDLES_LAYOUT, SHOPS.gardener!.keeper);
 const alfil = makeRoom(SHOP_ALFIL_LAYOUT, SHOPS.alfil!.keeper);
 const bigboy = makeRoom(SHOP_BIGBOY_LAYOUT, SHOPS.bigboy!.keeper);
 const timber = makeRoom(SHOP_TIMBER_LAYOUT, SHOPS.timber!.keeper);
+const dash = makeRoom(SHOP_BLITZ_LAYOUT, SHOPS.dash!.keeper);
 /**
  * Each room, and two far squares you can walk to and a wall square to tap beside: the back corners and the west wall for the first
  * three; Big Boy's crib is a ball pit (solid) but for its raised floors, so its far squares are the shop platform's back corners and
@@ -31,6 +33,7 @@ const rooms: [string, Room, { far: Sq[]; wall: Sq }][] = [
   ["Alfil's", alfil, ROUND],
   ["Big Boy's", bigboy, { far: [{ c: 4, r: 1 }, { c: 15, r: 1 }], wall: { c: 6, r: 0 } }],
   ["Timber's", timber, ROUND],
+  ["Dash's", dash, ROUND],
 ];
 
 describe.each(rooms)("%s room", (_name, room, spots) => {
@@ -150,6 +153,26 @@ describe("the rooms' own pieces", () => {
     expect(tapTarget(timber, timber.start, 9, 2).dest).toEqual({ c: 10, r: 5 });
   });
 
+  it("Dash's: the counter, the halfpipe (4 x 2), the Cheetah Chug, the racks, benches, cases and boxes are solid; the battle circle, its marks and the running lane to the counter are walkable", () => {
+    const at = (c: number, r: number) => walkable(dash, c, r);
+    // The halfpipe stands up whole on columns 15-18, rows 3-4 (its foot on row 4): all eight squares solid.
+    for (let r = 3; r <= 4; r++) for (let c = 15; c <= 18; c++) expect(at(c, r), `halfpipe ${c},${r}`).toBe(false);
+    expect(SHOP_BLITZ_PIECES.showpiece!.w).toBe(4 * 37);
+    // The counter (8-11, row 3), the pallet, the fridges, the plants, the racks, the benches, the pedestals and the boxes.
+    for (let c = 8; c <= 11; c++) expect(at(c, 3), `counter ${c},3`).toBe(false);
+    for (const [c, r] of [[2, 3], [3, 3], [4, 2], [1, 5], [6, 1], [13, 1], [4, 5], [5, 5], [2, 8], [3, 8], [16, 8], [17, 8], [2, 11], [3, 11], [15, 9], [16, 9], [15, 11], [17, 11], [2, 14], [3, 14], [16, 14], [17, 14], [1, 17], [3, 17], [4, 17], [6, 17], [13, 17], [15, 17], [16, 17], [18, 17], [18, 6]] as const) expect(at(c, r), `prop ${c},${r}`).toBe(false);
+    // The lane: columns 9-10 clear from the door to the counter; the circle's middle squares and both start marks (try-on mats).
+    for (let r = 4; r <= 18; r++) for (const c of [9, 10]) expect(at(c, r), `lane ${c},${r}`).toBe(true);
+    for (const m of [SHOP_BLITZ_MARKS.boss, SHOP_BLITZ_MARKS.you]) expect(at(m[0], Math.floor(m[1])) && at(m[0], Math.ceil(m[1])), `mark ${m}`).toBe(true);
+    expect(SHOP_BLITZ_MARKS).toEqual({ boss: [8, 10.5], you: [11, 10.5] });
+    // In front of the halfpipe and beside it.
+    for (const [c, r] of [[15, 5], [18, 5], [14, 4], [14, 3]] as const) expect(at(c, r), `by the halfpipe ${c},${r}`).toBe(true);
+    // Tick behind the middle of the counter (30 px tall: his 42 px show over it), the crate on its east end.
+    expect(SHOPS.dash!.keeper).toEqual([{ c: 9, r: 2 }, { c: 10, r: 2 }]);
+    expect(tapTarget(dash, dash.start, 9, 2).dest).toEqual({ c: 10, r: 5 });
+    expect(SHOP_BLITZ_CRATE_AT).toEqual([124, 16]);
+  });
+
   it("talking range: three squares either way from the Shopkeeper's squares (SHOP_FEEL.talkRange)", () => {
     expect(SHOP_FEEL.talkRange).toBe(3);
     // Stripes beside the counter's east end (12, 2 and 13, 2); Drizzle behind its middle (9, 2 and 10, 2).
@@ -171,8 +194,8 @@ describe("the rooms' own pieces", () => {
 });
 
 describe("the shops", () => {
-  it("only Babur's, Puddles', Alfil's, Big Boy's and Timber's homes have an inside", () => {
-    expect(ALL_HOMES.filter((h) => shopOf(h.id)).map((h) => h.id).sort()).toEqual(["alfil", "bigboy", "gardener", "tiger", "timber"]);
+  it("only Babur's, Puddles', Alfil's, Big Boy's, Timber's and Dash's homes have an inside", () => {
+    expect(ALL_HOMES.filter((h) => shopOf(h.id)).map((h) => h.id).sort()).toEqual(["alfil", "bigboy", "dash", "gardener", "tiger", "timber"]);
   });
 
   it("the crates' words: names, the price line, what you have; the boss's ride is a prize", () => {
@@ -203,10 +226,16 @@ describe("the shops", () => {
     expect(holdLine(t, { tokens: 0, keys: 0 })).toBe("You have 0 Timber tokens and 0 crate keys.");
     expect(prizeRows(t)[0]).toMatchObject({ id: "log-roller", name: "The Log Roller", kind: "Mythic ride" });
     expect([t.kid, t.roof, t.chatTone]).toEqual(["timber", "lodge", "day"]);
+    const d = shopOf("dash")!;
+    expect(d.crate).toBe("Dash's Boss Crate");
+    expect(priceLine(d)).toBe("3 Dash tokens, or 1 Dash token + 1 crate key");
+    expect(holdLine(d, { tokens: 0, keys: 0 })).toBe("You have 0 Dash tokens and 0 crate keys.");
+    expect(prizeRows(d)[0]).toMatchObject({ id: "cheetah-shoes", name: "Cheetah Shoes", kind: "Mythic ride" });
+    expect([d.kid, d.roof, d.chatTone]).toEqual(["blitz", "store", "day"]);
   });
 
   it("each shop sells its boss's crate (core's BOSS_CRATES), its ride among the prizes; a way's button needs its price held", () => {
-    for (const s of [shopOf("tiger")!, shopOf("gardener")!, shopOf("alfil")!, shopOf("bigboy")!, shopOf("timber")!]) {
+    for (const s of [shopOf("tiger")!, shopOf("gardener")!, shopOf("alfil")!, shopOf("bigboy")!, shopOf("timber")!, shopOf("dash")!]) {
       const crate = bossCrateOf(s.home)!;
       expect(crate.name).toBe(s.crate);
       expect(crate.items).toContain(s.prizes[0]);

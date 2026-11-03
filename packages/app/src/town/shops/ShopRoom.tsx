@@ -982,8 +982,9 @@ function startRoom(
     const y0 = pt.y - (b.ch.foot[1] / b.ch.h) * h - hopLift() * pt.k;
     drawShadows(pt.x, pt.y, w);
     g.save();
-    // (Its town figure faces the way its attack's art does, as its kit says: Babur's and Puddles' left. Turned to face `facing`.)
-    if ((boss.facing < 0) !== !!ci.attack?.facesLeft) {
+    // (Its town figure faces the way its attack's art does, as its kit says: Babur's and Puddles' left; a boss without one as its
+    // intro says, Dash's left. Turned to face `facing`.)
+    if ((boss.facing < 0) !== !!(ci.attack ? ci.attack.facesLeft : ci.def.facesLeft)) {
       g.translate(pt.x, 0);
       g.scale(-1, 1);
       g.translate(-pt.x, 0);

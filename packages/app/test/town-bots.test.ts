@@ -9,7 +9,7 @@ import { TOWN_FEEL } from "../src/town/feel.ts";
 import { ADMIN_BOTS, APRON, BOTS, CROWD_MAX, HOMES, TOWN_BOTS, addCrowd, START, TABLES, Walker, anyTableFree, canGoHome, homeDoor, inSquare, plotDist, sendHome, botLabel, cancelMeet, comeOut, createTown, tdist, walkable, holdBot, isSprite, meet, meetReady, meetSeat, playAtTableText, ratingText, seatOf, seatText, seated, sidekickText, spriteAnim, stepsFrom, tableFor, tableStates, tick, townLine, waitingBot, waveMs, walkWalker, type HomeId, type Person, type Sq, type Town } from "../src/town/world.ts";
 
 /** Each sidekick's sprite file (and its id, `sidekick-<file>`), by its boss's home. */
-const HOME_FILE: Record<HomeId, string> = { clown: "boingo", pig: "wrangler", smudgy: "smudgy", bigboy: "bigboy", hopper: "chubchirp", folio: "folio", moo: "moo", gardener: "puddles", sawyer: "sawyer", tiger: "babur", alfil: "alfil", gingerbread: "ginger", grex: "jefferson", hollow: "hollow", timber: "timber" };
+const HOME_FILE: Record<HomeId, string> = { clown: "boingo", pig: "wrangler", smudgy: "smudgy", bigboy: "bigboy", hopper: "chubchirp", folio: "folio", moo: "moo", gardener: "puddles", sawyer: "sawyer", tiger: "babur", alfil: "alfil", gingerbread: "ginger", grex: "jefferson", hollow: "hollow", timber: "timber", dash: "blitz" };
 
 /**
  * Playing a town bot (Oct 27, Eric): the bot table (short names, a rating each, one or two crate items), its card's
@@ -88,7 +88,7 @@ describe("town square: the bots (Oct 27)", () => {
   it("each sidekick's baked sheet is its sprite as drawn (scripts/bake-sidekicks.ts): idle, walk, sit, wave, every pixel", async () => {
     // (Rivet, Timber's woodpecker foreman, baked too since Nov 3: he walks in an admin's town and keeps Timber's shop. His sprite's
     // id is the art's, "sidekick-beaver". Tick, Dash's tortoise, baked too since Nov 3: blitz.ts, the art's name from before Eric
-    // renamed the cheetah; he walks in the town with Dash's home, round 2.)
+    // renamed the cheetah; he walks in an admin's town and keeps Dash's shop since round 2.)
     const files = readdirSync(new URL("../src/characters/sidekicks/", import.meta.url)).filter((f) => f.endsWith(".ts"));
     expect(files).toHaveLength(16);
     const artId: Record<string, string> = { timber: "sidekick-beaver" };
@@ -107,7 +107,7 @@ describe("town square: the bots (Oct 27)", () => {
   }, 60_000);
 
   it("Rivet, Timber's kid (Nov 3): in an admin's town only, after the ladder, at 1650 (Timber's sim between Moo & Moon's and Puddles'); a player's town has the ladder alone", () => {
-    expect(ADMIN_BOTS).toHaveLength(1);
+    expect(ADMIN_BOTS).toHaveLength(2);
     const rivet = ADMIN_BOTS[0]!;
     expect([rivet.name, rivet.rating, rivet.boss]).toEqual(["Rivet", 1650, "timber"]);
     expect(isSprite(rivet.look) && rivet.look.sprite).toBe(SIDEKICK_SHEETS.timber);
@@ -119,6 +119,26 @@ describe("town square: the bots (Oct 27)", () => {
     expect(HOMES.some((h) => h.id === "timber")).toBe(false);
     expect(TOWN_BOTS).toEqual(BOTS);
     expect(sidekickText(rivet)).toBeNull();
+  });
+
+  it("Tick, Dash's kid (Nov 3): in an admin's town only, after Rivet, at 1850 (Dash's sim, 0.15, ties Sawyer's under Puddles'): between Bishop Bo and Chip; his baked sheet's frames", () => {
+    const tick = ADMIN_BOTS[1]!;
+    expect([tick.name, tick.rating, tick.boss]).toEqual(["Tick", 1850, "dash"]);
+    expect(isSprite(tick.look) && tick.look.sprite).toBe(SIDEKICK_SHEETS.blitz);
+    const sheet = SIDEKICK_SHEETS.blitz;
+    expect(sheet.id).toBe("sidekick-blitz");
+    expect([sheet.w, sheet.h, ...sheet.foot]).toEqual([70, 52, 26, 49]);
+    expect([sheet.ms.idle.length, sheet.ms.walk.length, sheet.ms.sit.length, sheet.ms.wave.length]).toEqual([24, 8, 20, 10]);
+    // (Standing, he's 42 px over his foot: he shows over his shop's 30 px counter.)
+    expect(sheet.foot[1] - sheet.top.idle).toBeGreaterThan(30);
+    const rung = (n: string) => BOTS.find((b) => b.name === n)!.rating;
+    expect(tick.rating).toBeGreaterThan(rung("Bishop Bo"));
+    expect(tick.rating).toBeLessThan(rung("Chip"));
+    expect(BOTS.some((b) => b.rating === tick.rating)).toBe(false);
+    // (A player's town: no Dash's home, so no Tick.)
+    expect(HOMES.some((h) => h.id === "dash")).toBe(false);
+    expect(TOWN_BOTS).not.toContain(tick);
+    expect(sidekickText(tick)).toBeNull();
   });
 
   it("a sidekick's card says whose it is ('Hollow's sidekick'); a pawn's says nothing more", () => {

@@ -286,6 +286,10 @@ describe("town chat: the API", () => {
     const b4 = await start(a.token, "timber");
     await finish(a.token, b4, { outcome: "won", moves: 30 });
     expect((await texts()).length).toBe(3);
+    // Dash's too (admins first; his challenge from his home since Nov 3).
+    const b5 = await start(a.token, "dash");
+    await finish(a.token, b5, { outcome: "lost", moves: 25 });
+    expect((await texts()).length).toBe(3);
     // The lines read as the server's own: no account, no name.
     const read = await live(await call("/api/live?town=0", a.token));
     expect(read.town!.lines.every((l) => l.from === "" && l.name === "")).toBe(true);
