@@ -173,6 +173,8 @@ const AUDIT: Record<string, { on: Record<string, Patch>; off: Patch } | { none: 
     },
     off: () => ({ workshop: TIMBER_FRESH }),
   },
+  // (Dash's slaps and his scramble take time, never a square or a move: the save works as ever.)
+  dash: { none: "his powers change no square and limit no move: the save works as ever" },
 };
 
 describe("the God King's Last Stand on a board a boss has changed: every boss", () => {

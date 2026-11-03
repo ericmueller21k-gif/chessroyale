@@ -391,7 +391,7 @@ export const cheetahShoes: RiderDraft = {
   id: "cheetah-shoes",
   name: "Cheetah Shoes",
   tier: "mythic",
-  description: "Spotted, laced and twice as fast. Blitz says the spots are just for show; the speed is not.",
+  description: "Spotted, laced and twice as fast. Dash says the spots are just for show; the speed is not.",
   frame: [12, 4, 82, 94],
   idle: { ms: [320, 90, 90, 90, 90, 220, 110, 140] },
   move: { ms: [70, 70, 70, 70, 70, 70] },

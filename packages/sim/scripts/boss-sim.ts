@@ -59,11 +59,17 @@
  * logs every drop (after which crowd move, the piece, the square), every Gnaw (after which crowd move, the pawn's square or
  * none) and the scraps landed in all (the clock's, captures', the Gnaw's).
  *
+ * Dash (id dash): his Clock Slap and Time Scramble take the player's time, so the sim keeps a player's clock (Boss Battle's
+ * bank of 10 + 10, his slaps taking from it) and a time model (`pickSec`, `rushSec`: RaidPatch): a move the player's drawn
+ * time runs past is nobody's pick, and his rules play a random legal move for the crowd. Each row logs his slaps and the time
+ * they took, the scrambles and the scrambled moves, the moves the player ran out of time on (of them, scrambled) and the
+ * player's lowest bank.
+ *
  * Results go to reports/boss-sim/*.jsonl; `summary` writes reports/boss-calibration.md.
  */
-import { BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, bossElo, bossStumbleChance, botPick, estimateRating, mulberry32, shuffle, type Rng, type Settings } from "@chessroyale/core";
+import { BOSS_CLOCK, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, bossClockSettings, bossElo, bossStumbleChance, botPick, estimateRating, mulberry32, shuffle, type Rng, type Settings } from "@chessroyale/core";
 import { BOSS_POWERS } from "@chessroyale/core";
-import { MatchRunner, PASS_WAIT, creaseCost, powerMomentMs, waterAnswer, inCheck, materialOf, applyMove, bossMoveFrom, passScores, repaintPick, botRoster, carrotSpots, carrotsOf, carrotsOpen, castAnswer, chooseSplit, fenAfter, fuseFrom, gameEndWith, hopFrom, hopOptions, legalMoves, passAnswer, passTurn, pickSlam, pieceAt, raceOn, slamPawnsLost, slamScores, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type EngineLike, type Opening } from "@chessroyale/chess";
+import { MatchRunner, PASS_WAIT, scrambleOn, creaseCost, powerMomentMs, waterAnswer, inCheck, materialOf, applyMove, bossMoveFrom, passScores, repaintPick, botRoster, carrotSpots, carrotsOf, carrotsOpen, castAnswer, chooseSplit, fenAfter, fuseFrom, gameEndWith, hopFrom, hopOptions, legalMoves, passAnswer, passTurn, pickSlam, pieceAt, raceOn, slamPawnsLost, slamScores, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type EngineLike, type Opening } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -241,7 +247,7 @@ function summary() {
 /** The judge's and the boss's search in the raid sims (a little under the game's 250,000, for time). */
 const RAID_NODES = 120_000;
 /** Each boss's ultimate, as the raid sim sees it come: a moment as a turn begins, or one the match runner plays. */
-const ULT_EVENTS = new Set(["blizzard", "candle", "boardsaw", "crease"]);
+const ULT_EVENTS = new Set(["blizzard", "candle", "boardsaw", "crease", "scramble"]);
 
 /**
  * A Solo raid with every power, as solo plays one with nobody watching (simulateRest): 50 bots (the Solo raid's own
@@ -268,6 +274,13 @@ interface RaidPatch {
    * turn's power moments (powerMomentMs) on the sim's clock.
    */
   pickSec?: number;
+  /**
+   * Dash (id dash): the player's time model on Boss Battle's clock (the bank of 10 + 10, his slaps taking from it). A move's
+   * thinking time is drawn from a log-normal with its median `pickSec` (10 s) and spread 0.6; a scrambled move's from one with its
+   * median `rushSec` (2.2 s: a phone player taps a move in about two seconds when they must) and spread 0.35. When it's longer than
+   * the move's time (the bank and the increment, or a scrambled move's 3 s), nobody picked: his flag, a random legal move.
+   */
+  rushSec?: number;
 }
 
 /** His thinking (bossThinkMs, at least 1.2 s) and his move on screen (bossShowMs, 1.8 s) each turn, for the sim's clock. */
@@ -307,7 +320,8 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       const strikeTurns = new Set<number>();
       while (strikeTurns.size < strikes) strikeTurns.add(6 + Math.floor(strikeRng() * 25));
       // (A boss whose powers are built before its art: met as the test link does, bossUnfinished.)
-      const s = { ...settings, ...RAID_SETTINGS, bossId, bossUnfinished: true, engineNodes: RAID_NODES, bossNodes: RAID_NODES, ...(patch.tier ? { bossFixedElo: patch.tier } : {}), ...(patch.difficulty ? { bossDifficulty: patch.difficulty } : {}) } as Settings;
+      // (Dash: Boss Battle's clock, the bank his slaps take from: the player's time model below.)
+      const s = { ...settings, ...RAID_SETTINGS, ...(bossId === "dash" ? bossClockSettings({ ...settings, ...RAID_SETTINGS }) : {}), bossId, bossUnfinished: true, engineNodes: RAID_NODES, bossNodes: RAID_NODES, ...(patch.tier ? { bossFixedElo: patch.tier } : {}), ...(patch.difficulty ? { bossDifficulty: patch.difficulty } : {}) } as Settings;
       // (The clock for the hippo gardener's seeds: the crowd's pick (patch.pickSec), the reveal, his turn and the moments.)
       let clockMs = 0;
       const pickSec = patch.pickSec ?? 10;
@@ -375,6 +389,15 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
         const band = BOSS_POWERS.balloonBands[last.shape];
         tiger.balloons.push({ at: last.at, shape: last.shape, outcome: last.outcome, nine: !!last.nine, gain: last.gain, inBand: last.gain === null ? null : last.gain >= band[0] && last.gain <= band[1] });
       };
+      // (Dash: the player's bank (the sim's own, as the player thinks: the bots' banks are theirs), his slaps, the scrambles, the
+      // moves the player ran out of time on (a random one played) and how many of them were scrambled.)
+      const timeRng = mulberry32(seed * 15485863 + g);
+      const lognormal = (median: number, spread: number) => {
+        const u = Math.max(1e-9, timeRng());
+        const v = timeRng();
+        return median * Math.exp(spread * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v));
+      };
+      const dash = { pickSec, rushSec: patch.rushSec ?? 2.2, bankMs: BOSS_CLOCK.bankSeconds * 1000, minBankMs: BOSS_CLOCK.bankSeconds * 1000, slaps: 0, stolenMs: 0, scrambles: 0, scrambled: 0, flags: 0, scrambleFlags: 0, slapSeen: -1 };
       // (Timber: every drop and every Gnaw, and his bonus scraps.)
       const timber = { drops: [] as { at: number; piece: string; square: string }[], gnaws: [] as { at: number; square: string | null }[], bonus: 0 };
       const timberLook = () => {
@@ -536,6 +559,17 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
             const tw = Date.now();
             await runner.playBoss(engines[0]);
             if (bossId === "timber") timberLook();
+            if (bossId === "dash") {
+              const slap = runner.boss!.powers?.dash?.slap;
+              if (slap && slap.at === runner.boss!.crowdMoves && slap.at !== dash.slapSeen) {
+                dash.slapSeen = slap.at;
+                dash.slaps++;
+                const ms = Math.min(dash.bankMs, BOSS_POWERS.slapBankSeconds * 1000);
+                dash.bankMs -= ms;
+                dash.stolenMs += ms;
+                dash.minBankMs = Math.min(dash.minBankMs, dash.bankMs);
+              }
+            }
             if (bossId === "tiger") {
               tigerBalloon();
               const h = runner.boss!.powers?.hoops;
@@ -610,7 +644,28 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
         const tusksBefore = runner.boss!.powers?.tusks;
         // (The sim's clock: this crowd turn's moments, the crowd's pick, the reveal, then his turn.)
         clockMs += powerMomentMs(runner.boss!.powers?.events) + (pickSec + (s.revealSeconds ?? 0) + GARDEN_TURN_SEC) * 1000;
-        await runner.score(new Map());
+        if (bossId === "dash") {
+          // (The player's time on this move against what it has: the bank and the increment, or the scramble's 3 s.)
+          const p = runner.boss!.powers!;
+          const scrambled = scrambleOn(p, runner.boss!.crowdMoves + 1);
+          if (scrambled) dash.scrambled++;
+          if (p.events.some((e) => e.kind === "scramble")) dash.scrambles++;
+          const allowed = Math.min(runner.moveClock() * 1000, dash.bankMs + BOSS_CLOCK.incrementSeconds * 1000);
+          const think = (scrambled ? lognormal(dash.rushSec, 0.35) : lognormal(pickSec, 0.6)) * 1000;
+          dash.bankMs = Math.max(0, dash.bankMs + BOSS_CLOCK.incrementSeconds * 1000 - Math.min(think, allowed));
+          dash.minBankMs = Math.min(dash.minBankMs, dash.bankMs);
+          if (think > allowed) {
+            // (Out of time: nobody picked; his rules play a random legal move for the crowd.)
+            dash.flags++;
+            if (scrambled) dash.scrambleFlags++;
+            const id = runner.state.boards[0]!;
+            const ids = runner.groups.get(id)!;
+            const top = await runner.topMovesFor(runner.boards.get(id)!.fen);
+            const evaluation = { bestMove: top[0]!.move, bestExpected: top[0]!.expected, expectedAfter: Object.fromEntries(top.map((m) => [m.move, m.expected])) };
+            const round = runner.resolveBoard(id, ids, Object.fromEntries(ids.map((x) => [x, null])), evaluation);
+            runner.finishRound([round], Object.fromEntries(ids.map((x) => [x, allowed])));
+          } else await runner.score(new Map());
+        } else await runner.score(new Map());
         if (tusksBefore && runner.boss!.powers?.fusion?.why === "taken" && runner.boss!.powers.fusion.at === runner.boss!.crowdMoves) alfil.taken++;
         if (runner.boss!.powers?.landed?.early && runner.boss!.powers.landed.at === runner.boss!.crowdMoves) alfil.early++;
         if (runner.bossKillDue()) runner.bossKill();
@@ -623,7 +678,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       // (Folio: its marks, folds and marks answered in time; every Crease; its Revision, what its move cost it and what the crowd's reply would have won.)
       const fo = b.powers?.folio;
       const folioRow = fo ? { drafts: fo.drafts, folds: fo.folds, answered: fo.answered, creases, creasesOff, revision: fo.revision ? { at: fo.revision.at, cost: fo.revision.cost, drop: fo.revision.drop } : null } : null;
-      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}), ...(bossId === "moo" ? { moo } : {}), ...(bossId === "gardener" ? { garden } : {}), ...(bossId === "tiger" ? { tiger: { ...tiger, placed: b.powers?.balloon?.placed ?? 0 } } : {}), ...(bossId === "folio" ? { folio: folioRow } : {}), ...(bossId === "timber" ? { timber: { ...timber, scraps: b.powers?.workshop?.n ?? 0, pickSec } } : {}) };
+      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}), ...(bossId === "moo" ? { moo } : {}), ...(bossId === "gardener" ? { garden } : {}), ...(bossId === "tiger" ? { tiger: { ...tiger, placed: b.powers?.balloon?.placed ?? 0 } } : {}), ...(bossId === "folio" ? { folio: folioRow } : {}), ...(bossId === "timber" ? { timber: { ...timber, scraps: b.powers?.workshop?.n ?? 0, pickSec } } : {}), ...(bossId === "dash" ? { dash: { ...dash, slapSeen: undefined } } : {}) };
       appendFileSync(root + `reports/boss-sim/raid-${tag}.jsonl`, JSON.stringify(row) + "\n");
       console.log(JSON.stringify(row));
     }

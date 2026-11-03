@@ -20,6 +20,7 @@ import { BossFace, BossSide } from "../components/BossCharacter.tsx";
 import { KingCommand, KingSummon, kingSquare } from "../components/GodKing.tsx";
 import { LiveGhosts } from "./Crowd.tsx";
 import { DarkCost, PowerBoard, crowdView } from "../components/BossPowers.tsx";
+import { ScrambleCount } from "../components/Dash.tsx";
 import { duelCount, duelTurn } from "../components/Pig.tsx";
 import { bulletControl, bulletIncrementOn, bulletOn, kingBlocked } from "../components/Recluse.tsx";
 import { WipPreview, wipPower } from "../components/WipPreview.tsx";
@@ -270,6 +271,8 @@ export function PlayScreen({
             {note && !note.pending && <DarkCost square={note.move.slice(2, 4)} since={note.at} now={now} orientation={orientation} />}
             {match.boss && wipPower() && <WipPreview fen={fen} orientation={orientation} crowd={match.boss.crowdSide} />}
             {!waiting && deadline > 0 && <TimerBar startsAt={startsAt} deadline={deadline} total={total} frozen={strike?.at ? { at: strike.at, until: strike.until! } : undefined} />}
+            {/* (Dash's Time Scramble: a scrambled move's big 3-2-1 over the board, taking no taps.) */}
+            {match.boss?.id === "dash" && !waiting && deadline > 0 && <ScrambleCount boss={match.boss} startsAt={startsAt} deadline={deadline} />}
             {match.settings.mode === "crowd" && !match.boss && deadline > 0 && <BoardClock match={match} you={you} turn={{ startsAt, deadline, yours: true, done: waiting }} />}
             {intro && (
               <CenterCount

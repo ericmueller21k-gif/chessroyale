@@ -36,17 +36,17 @@ import { powerRoll, turnOf, warnThenUnleash, type Battle, type BossRules } from 
 /**
  * His animations' lengths (ms; the art's, scripts/boss-art/out/boss-blitz on claude/boss-art, copied into
  * packages/app/src/characters/boss-blitz.ts): the Clock Slap (`clockSlap`: the slam at slapHitAt, then a gold clock face
- * zips from his clock to his chest), the scramble's warning (`scrambleWarn`, its last frame held) and the Time Scramble
+ * zips from his clock to his chest by stealAt), his finger gun (`check`: his jab at your flag), the scramble's warning (`scrambleWarn`, its last frame held) and the Time Scramble
  * (`timeScramble`: the clock tossed, spun, caught and slammed).
  */
-export const DASH_ANIM = { clockSlap: 1130, slapHitAt: 410, scrambleWarn: 1470, timeScramble: 2000 } as const;
+export const DASH_ANIM = { clockSlap: 1130, slapHitAt: 270, stealAt: 690, scrambleWarn: 1470, timeScramble: 2000, check: 1050 } as const;
 
 /**
  * How long each of his moments holds the screen (ms; POWER_FX in boss-timing.ts, so the server waits for them and your clock
  * starts after them): the slap (his clock slap, your time flying to him), the Time Scramble (its banner's 1500 ms, then his
- * spin). His flag (your time ran out) holds nothing: his jab as your turn begins.
+ * spin) and his flag (your time ran out: his finger gun and his jab).
  */
-export const DASH_FX = { slap: DASH_ANIM.clockSlap, scramble: 1500 + DASH_ANIM.timeScramble, flag: 0 } as const;
+export const DASH_FX = { slap: DASH_ANIM.clockSlap, scramble: 1500 + DASH_ANIM.timeScramble, flag: DASH_ANIM.check } as const;
 
 type DashSettings = Pick<BossPowerSettings, "slapBankSeconds" | "slapMoveSeconds" | "slapMoveMin" | "scrambleMoves" | "scrambleSeconds">;
 
@@ -114,11 +114,9 @@ export const DASH: BossRules = {
   },
   // (His slaps come at his turn's end, after a capture: afterBossMove.)
   passive() {},
-  // A turn your time ran out on (nobody picked: a move was played for you) or a scrambled one doesn't count for fair play.
-  powerTurn: (boss) => {
-    const p = boss.powers;
-    return !!p && scrambleOn(p, turnOf(boss));
-  },
+  // (No powerTurn: his powers take time, never a square or a move, so every turn counts for fair play as ever and the God
+  // King's Last Stand works as ever. A turn nobody picked has no picks to count, and its random move, unscored, is never one
+  // he takes back.)
   outOfTime(boss, _fen, allowed) {
     return boss.powers ? flagMove(boss.powers.seed, turnOf(boss), allowed) : null;
   },

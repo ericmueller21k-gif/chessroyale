@@ -23169,3 +23169,156 @@ button.sq-tiny {
   border-radius: 3px;
   box-shadow: inset 0 0 0 2px #ffd60a;
 }
+
+/* ---------------- Dash, the cheetah (components/Dash.tsx; docs/decisions/2026-11-03-dash.md) ---------------- */
+/* Tick and the time Dash has stolen, in the boss bar's prop slot: a phone's at its top right under the status, a computer's left of
+   "Move N" (as Timber's strip). The same size whatever it shows, never taking a tap: nothing in the bar moves for it. */
+.tk-tally {
+  position: absolute;
+  right: 0;
+  top: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  pointer-events: none;
+}
+.tk-tick {
+  display: block;
+  width: 35px;
+  height: 26px;
+}
+.tk-still {
+  display: block;
+  width: 35px;
+  height: 26px;
+  image-rendering: pixelated;
+}
+.tk-text {
+  display: block;
+  min-width: 3.6em;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 800;
+  text-align: right;
+  white-space: nowrap;
+  color: #ffd6a0;
+  font-variant-numeric: tabular-nums;
+}
+.tk-tally.none .tk-text {
+  opacity: 0.45;
+}
+.tk-tally.scrambling .tk-text {
+  color: #ff9b5c;
+}
+@media (min-width: 900px) and (min-height: 600px) {
+  .boss-bar .boss-prop:has(> .tk-tally) {
+    grid-column: 2;
+    grid-row: 1 / 3;
+  }
+  .boss-bar .tk-tally {
+    top: 50%;
+    right: auto;
+    left: 4px;
+    transform: translateY(-50%);
+  }
+}
+/* At a slap Tick bobs awake (once); through a scramble he rattles (a step animation: a few positions, no smooth tween). */
+.tk-ding {
+  animation: tk-ding 600ms ease-out;
+}
+@keyframes tk-ding {
+  0%,
+  100% {
+    transform: none;
+  }
+  30% {
+    transform: translateY(-4px) rotate(-6deg);
+  }
+  60% {
+    transform: translateY(0) rotate(4deg);
+  }
+}
+.tk-rattle {
+  animation: tk-rattle 240ms steps(2) infinite;
+}
+@keyframes tk-rattle {
+  0% {
+    transform: translateX(-1px);
+  }
+  100% {
+    transform: translateX(1px);
+  }
+}
+/* The slap: the time he took flies from your clock to him (placed once as the moment mounts; then this). */
+.dash-fly {
+  position: absolute;
+  left: var(--fx, 50%);
+  top: var(--fy, 100%);
+  z-index: 12;
+  pointer-events: none;
+  white-space: nowrap;
+  font-size: clamp(15px, 5.5cqw, 24px);
+  font-weight: 900;
+  line-height: 1;
+  color: #ffd36b;
+  -webkit-text-stroke: 1px #3a2405;
+  paint-order: stroke fill;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.55);
+  transform: translate(-50%, -50%);
+  animation: dash-fly 420ms cubic-bezier(0.35, 0, 0.45, 1) forwards;
+}
+@keyframes dash-fly {
+  0% {
+    transform: translate(-50%, -50%) scale(1.35);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(calc(-50% + var(--tx, 0px)), calc(-50% + var(--ty, 0px))) scale(0.7);
+    opacity: 0.95;
+  }
+}
+/* Time Scramble's banner: his teal and orange. */
+.fight-banner.power-cut.dash .fb-band {
+  background: repeating-linear-gradient(115deg, #0b4a4f 0 6cqw, #d2601a 6cqw 12cqw);
+  border-color: #ffb860;
+}
+/* A scrambled move's countdown over the board: the app's big 3-2-1 (.cc-num) in his orange, the last second red; his moves
+   left as five pips at the board's foot. Never in the way of a tap (.center-count). */
+.dash-count .dc-n {
+  color: #f28a2a;
+}
+.dash-count .dc-n.last {
+  color: #ee3b3b;
+}
+.dc-moves {
+  position: absolute;
+  left: 50%;
+  bottom: 6%;
+  display: flex;
+  gap: 1.6cqw;
+  transform: translateX(-50%);
+}
+.dc-moves i {
+  display: block;
+  width: 3.2cqw;
+  height: 3.2cqw;
+  border-radius: 50%;
+  border: 0.5cqw solid #fff;
+  background: rgba(0, 0, 0, 0.5);
+}
+.dc-moves i.done {
+  background: #6b6f78;
+}
+.dc-moves i.now {
+  background: #f28a2a;
+}
+/* His cast by the board's corner, as every boss's: his frame is 105 x 104 (33 columns on his right for his entrance's zip-in),
+   drawn at the usual boss's scale (26% of the board for 72 frame px), his feet where every caster's are. */
+.pm-caster.pm-by-dash {
+  aspect-ratio: 105 / 104;
+  width: 37.9%;
+  top: -19.5%;
+}
