@@ -33,8 +33,12 @@ export type DashSound =
 /** Noise with its highs rolled off twice: a soft breath or rumble, never a hiss. */
 const murk = (rate: number, cut: number, seed: number): Voice => lowpass(rate, cut, lowpass(rate, cut, noise(seed)));
 
-/** A smooth bump from 0 up to 1 and back over `len` seconds from `at` (0 outside it). */
-const bump = (t: number, at: number, len: number, power = 1) => (t < at || t > at + len ? 0 : Math.sin((Math.PI * (t - at)) / len) ** power);
+/**
+ * A smooth bump from 0 up to 1 and back over `len` seconds from `at` (0 outside it). Never below 0: at its last sample rounding can
+ * put the sine a hair under 0, and a fractional power of that is NaN (Timber's chitter at 48 kHz, Nov 3: one NaN sample broke the
+ * sound's filter for good, on Eric's iPhone and his computer).
+ */
+const bump = (t: number, at: number, len: number, power = 1) => (t < at || t > at + len ? 0 : Math.max(0, Math.sin((Math.PI * (t - at)) / len)) ** power);
 
 /**
  * A hard plastic click at `at` (the clock's button, its tick): a couple of short-lived modes and a tap of noise. Silent before
