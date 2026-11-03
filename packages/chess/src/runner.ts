@@ -110,6 +110,7 @@ import {
   pigBattle,
   pigTurn,
   bulletClock,
+  dashMoveClock,
   bulletIncrement,
   stopReason,
   alfilBattle,
@@ -264,6 +265,8 @@ export interface HumanPick {
 export interface BoardRound {
   /** Boss battle: the King played the move (the crowd called him), and how many called. */
   king?: boolean;
+  /** Boss battle: nobody picked in time and the boss's rules played this move for the crowd (Dash's flag: BossRules.outOfTime). */
+  flag?: boolean;
   kingCalls?: number;
   boardId: number;
   fenBefore: string;
@@ -597,7 +600,8 @@ export class MatchRunner {
 
   /** This round's move clock in seconds (see moveClockAt): the same everywhere a clock is set. */
   moveClock(boardId?: number): number {
-    return moveClockAt(this.settings, this.clockMove(boardId));
+    // (Dash's clock: a scrambled move's seconds, a slapped move's shorter clock on a raid's timer: dashMoveClock.)
+    return dashMoveClock(this.state.boss, moveClockAt(this.settings, this.clockMove(boardId)));
   }
 
   /**
@@ -644,6 +648,8 @@ export class MatchRunner {
    */
   bossOutOfTime(): boolean {
     if (!this.state.boss || (!bulletClock(this.state.boss) && !this.settings.bossClock)) return false;
+    // (Against a boss with noTimeLoss, Dash, an empty bank isn't a loss: a move nobody picked in time is played for the crowd.)
+    if (bossRules(this.state.boss)?.noTimeLoss) return false;
     const alive = this.alive();
     return alive.length > 0 && alive.every((p) => p.bankMs <= 0);
   }
@@ -992,6 +998,10 @@ export class MatchRunner {
     if (this.state.boss) bossRules(this.state.boss)?.scoreRound?.(this.battle, result.players);
     const king = this.kingDecision(playerIds, result);
     if (king.plays) result.playedMove = evaluation.bestMove;
+    // Nobody picked in time: a boss's rules may play another move for the crowd than the engine's best (Dash's flag: a random
+    // legal one). The lobby resolves its rounds here too, so solo and online agree.
+    const flag = this.state.boss && !king.plays && !pickList.some((m) => m) ? (bossRules(this.state.boss)?.outOfTime?.(this.state.boss, board.fen, this.crowdAllowed(boardId) ?? legalMoves(board.fen)) ?? null) : null;
+    if (flag) result.playedMove = flag;
     const lastStand = king.plays ? undefined : this.lastStandFor(board.fen, result.playedMove, best, scored, rawEvaluation);
     // Fair play where the boss's judge changed the numbers (Chub & Chirp's race): the turn counts only when the engine's
     // best keeps its own score, i.e. it is the race's best too (the race keeps only the race's best's score, and raises
@@ -1019,6 +1029,7 @@ export class MatchRunner {
       ...(lastStand ? { lastStand } : {}),
       ...(power || raceOff ? { power: true } : {}),
       ...(fairScored ? { fairScored } : {}),
+      ...(flag ? { flag: true } : {}),
     };
   }
 
@@ -1264,7 +1275,7 @@ export class MatchRunner {
       // burns what was left on its tiles; Folio's Revision reads the judge's numbers).
       if (this.state.boss?.powers) {
         this.state = { ...this.state, boss: { ...this.state.boss, powers: { ...this.state.boss.powers, judged: moverExpected } } };
-        this.afterCrowdMove(r.result.playedMove, { best: Math.max(moverExpected, r.scored[0]?.expected ?? moverExpected), played: moverExpected, ...(r.king ? { king: true } : {}) });
+        this.afterCrowdMove(r.result.playedMove, { best: Math.max(moverExpected, r.scored[0]?.expected ?? moverExpected), played: moverExpected, ...(r.king ? { king: true } : {}), ...(r.flag ? { flag: true } : {}) });
         if (bossRules(this.state.boss)?.crossedOut?.(this.state.boss!)) crossed.add(r.boardId);
       }
     }

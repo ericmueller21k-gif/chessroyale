@@ -77,7 +77,7 @@ export interface BossInfo {
 }
 
 /** The boss powers there are: a passive (or opening) and an ultimate per boss. */
-export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint" | "moonbeam" | "fullmoon" | "seeds" | "water" | "balloons" | "hoops" | "draft" | "crease" | "revision" | "scraps" | "gnaw";
+export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint" | "moonbeam" | "fullmoon" | "seeds" | "water" | "balloons" | "hoops" | "draft" | "crease" | "revision" | "scraps" | "gnaw" | "clockslap" | "scramble";
 /**
  * Every power, for the test switch (?power=<id>: a boss's ultimate comes early; its passive as usual, but for Wrangler's
  * drag and Alfil's Tusks, which come sooner and more often, the hopper's Leapfrog, whose battle starts with a hop due
@@ -92,7 +92,7 @@ export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | 
  * crease lands as the third does); ?power=revision, its once-a-battle third power (not on its BOSS_ROSTER line), comes at
  * the first crowd move it may follow (turn 5 on), whatever the evaluation says.
  */
-export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops", "draft", "crease", "revision", "scraps", "gnaw"];
+export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops", "draft", "crease", "revision", "scraps", "gnaw", "clockslap", "scramble"];
 
 /**
  * A raid boss: the base template every boss fills in. Its powers' rules (which moves are allowed, what happens after
@@ -239,6 +239,13 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // rageSpeed 0.7: the crowd scores 0.18 in 46 moves over 36 battles, in the pack (reports/timber-sim.md). Admins first:
   // BOSS_ADMIN_FIRST in settings.ts (the test links `?boss=timber`, `&power=scraps`, `&power=gnaw`).
   { id: "timber", name: "Timber", icon: "🦫", kit: "Timber", offset: -250, powers: { passive: "scraps", ultimate: "gnaw" } },
+  // Dash, a lanky, cocky cheetah in a backwards orange cap and a teal and orange track jacket, with a chess clock (Eric's design
+  // and art approved Nov 1; his name Nov 3, not "Blitz", the time control): Clock Slap, each capture of his steals time from
+  // your clock; and Time Scramble, after the usual warning, your next five moves get three seconds each. Out of time against him
+  // is never a loss: a random legal move is played for you (bosses/dash.ts; docs/decisions/2026-11-03-dash.md;
+  // reports/dash-sim.md). Admins first: BOSS_ADMIN_FIRST in settings.ts (the test links `?boss=dash`, `&power=clockslap`,
+  // `&power=scramble`).
+  { id: "dash", name: "Dash", icon: "🐆", kit: "Dash", offset: -250, powers: { passive: "clockslap", ultimate: "scramble" } },
   { id: "recluse", name: "Hidden Boss", icon: "📕", kit: "Hidden Boss", offset: 0, powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true, crowdFinal: true, the: true, levelUnknown: true },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },
   { id: "archer", name: "The Bone Archer", icon: "💀", kit: null, offset: 0, powers: null },
@@ -660,6 +667,8 @@ export interface BossPowerState {
   folio?: FolioState | null;
   /** Timber's Workshop (his passive, Scraps) and his last Gnaw (his ultimate). */
   workshop?: WorkshopState | null;
+  /** Dash's clock (his passive, Clock Slap; his ultimate, Time Scramble; the flag when your time runs out). */
+  dash?: DashState | null;
   /** What happened as this turn began, for the screens' moments (the same for everyone). */
   events: PowerEvent[];
 }
@@ -872,6 +881,22 @@ export interface WorkshopState {
   gnaw?: { at: number; square: string | null; scraps: number } | null;
   bonus?: { at: number; scraps: number; from: "capture" | "gnaw" | "both" } | null;
   gnaws: number;
+}
+
+/**
+ * Dash's clock (id dash; the chess package's bosses/dash.ts; docs/decisions/2026-11-03-dash.md):
+ * - `slap`: his last Clock Slap (after crowd move `at`, his capture): `ms` taken from your clock (`bank`: from the battle's
+ *   time bank, Boss alone and a Boss Battle party; else off your next move's clock, a raid's move timer).
+ * - `slaps`: his slaps this battle; `stolen`: the ms they took in all.
+ * - `flag`: the last crowd move your time ran out on (after crowd move `at`): the random legal move played for you.
+ * - `flags`: how many this battle.
+ */
+export interface DashState {
+  slap?: { at: number; ms: number; bank: boolean } | null;
+  slaps: number;
+  stolen: number;
+  flag?: { at: number; move: string } | null;
+  flags: number;
 }
 
 export interface FolioState {
@@ -1336,7 +1361,10 @@ export type PowerEventKind =
   | "creaseEnd"
   | "revision"
   | "build"
-  | "gnaw";
+  | "gnaw"
+  | "slap"
+  | "scramble"
+  | "flag";
 export interface PowerEvent {
   kind: PowerEventKind;
   turn: number;
@@ -1377,6 +1405,13 @@ export interface PowerEvent {
   moves?: string[];
   /** Timber's Gnaw: the scraps the pawn made (its square: `square`; none to gnaw: no square). */
   scraps?: number;
+  /** Dash's Clock Slap: the ms it took from your clock (`bank`: from the time bank, else off your next move's clock). */
+  ms?: number;
+  bank?: boolean;
+  /** Dash's Time Scramble: how many of your moves it covers (`count`) and the seconds each gets; his flag: the move played for you. */
+  count?: number;
+  seconds?: number;
+  move?: string;
 }
 
 /** The settings behind the God King's Last Stand. */

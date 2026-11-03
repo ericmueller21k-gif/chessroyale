@@ -999,7 +999,7 @@ export const BOSS_POWERS = {
    * Oct 27, after the first sim put it among the easiest; was the brief's start, 1): 2.8 Creases a battle of 50 moves in
    * the raid sim (reports/folio-sim.md).
    */
-  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.3, folio: 1.3, timber: 0.7 } as Readonly<Record<string, number>>,
+  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.3, folio: 1.3, timber: 0.7, dash: 1 } as Readonly<Record<string, number>>,
   /**
    * The Hidden Boss's ultimate, the bullet clock (Eric, Oct 14: "Meter builds starting turn 1, about 7 turns in he says
    * something about how you're thinking too much and to just play pure chess etc, true to him, then for the rest of phase 1
@@ -1584,6 +1584,28 @@ export const BOSS_POWERS = {
    * (Smudgy's Repaint keeps its own cap, repaintMax.) docs/decisions/2026-11-02-nov2-fixes.md.
    */
   maxUltimates: { timber: 2 } as Readonly<Record<string, number>>,
+  /**
+   * Dash's Clock Slap (his passive; Eric's design, Nov 1; bosses/dash.ts; docs/decisions/2026-11-03-dash.md): each capture of
+   * his steals time from your clock. On a time bank (Boss alone and a Boss Battle party: BOSS_CLOCK's 10 + 10, the team's one
+   * bank in a party) `slapBankSeconds` come off the bank; on a raid's move timer (the Solo raid, a Boss raid) your next move's
+   * clock is `slapMoveSeconds` shorter, never under `slapMoveMin` (one slap a move: they don't add up). The sim's numbers:
+   * reports/dash-sim.md.
+   */
+  slapBankSeconds: 30,
+  slapMoveSeconds: 6,
+  slapMoveMin: 8,
+  /**
+   * Dash's Time Scramble (his ultimate, the rage meter's: rageSpeed.dash; Eric's design): after the usual warning, your next
+   * `scrambleMoves` moves get `scrambleSeconds` each (a raid's move timer and a bank alike; a bank still pays for them and still
+   * gets its increment). Eric's 5 and 3.
+   */
+  scrambleMoves: 5,
+  scrambleSeconds: 3,
+  /**
+   * Dash never thinks (Eric's design: "his moves come instantly"): the least he waits before his move shows (ms), where every
+   * other boss waits 1200 (bossThinkMs). A queen taken still waits for QUEEN SLAIN!.
+   */
+  dashThinkMs: 350,
 } as const;
 
 /**
@@ -1591,7 +1613,7 @@ export const BOSS_POWERS = {
  * them (the boss select, Boss alone and a Solo raid), until Eric says go. **To put one live for everyone, take its id out of
  * this list** (core boss.ts's `adminFirst`; nothing else changes).
  */
-export const BOSS_ADMIN_FIRST: readonly string[] = ["timber"];
+export const BOSS_ADMIN_FIRST: readonly string[] = ["timber", "dash"];
 
 /**
  * How Sawyer's split pawn looks (packages/app/src/components/Sawyer.tsx). Looks only: the rules, the engine and the
