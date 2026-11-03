@@ -60,3 +60,6 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
   BOSS_BLITZ_INTRO (blitz-intro 150x108, foot [96,103], faces right; bolt/arrive(drop f4)/dashBy/brag), BLITZ_INTRO_DROP_AT [72,0];
   props `house-intro-blitz.ts` (shoe-box TABLE+_PALETTE/_INK, STOOL seat 11, DUST, POP, STORM/FRONT like Alfil's); ~10.3 s;
   table/board/pieces/stools land on dashes 1-4; cues whoosh/skid/drop/thud/brush/ding (Dash needs his own sound set). → fold into Dash build brief.
+- Timber intro PR #475 (f9ab5548) opened; CI watcher bu3c7w7bk. Helper left wrangler on 8857/8858 (respawn after fuser -k; not killed: PIDs need Eric's OK).
+- Dash round 1 (the boss: kit, sim, sounds, lines, Tick in battle, admins first) helper started, Opus high, /home/user/cr-dash `claude/boss-dash`,
+  brief notes/briefs/brief-dash.md. Round 2: home + sneaker store + Tick town sheet. Round 3: his custom intro.
