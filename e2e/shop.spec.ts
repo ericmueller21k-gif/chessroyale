@@ -253,11 +253,15 @@ test("Timber's Lumber Lodge (Nov 3): in an admin's town only; its card is its na
     // The showpiece: from in front of its dais (columns 15-18, rows 3-4), the carved king standing up whole.
     await page.keyboard.press("Escape");
     await expect(crate).toBeHidden();
-    await expect(async () => {
-      const sq = (await shopAt(page, "square", [16, 6]))!;
-      await page.mouse.click(sq.x, sq.y);
-      await expect(room(page)).toHaveAttribute("data-you", "16,6", { timeout: 4000 });
-    }).toPass({ timeout: 20_000 });
+    // (A step at a time toward it, each square tapped once it's on screen.)
+    for (const step of [[12, 6], [14, 6], [16, 6]] as const) {
+      await expect(async () => {
+        const sq = await shopAt(page, "square", step);
+        expect(sq, `${step} on screen`).not.toBeNull();
+        await page.mouse.click(sq!.x, sq!.y);
+        await expect(room(page)).toHaveAttribute("data-you", step.join(","), { timeout: 4000 });
+      }).toPass({ timeout: 20_000 });
+    }
     await page.waitForTimeout(1500);
     await page.screenshot({ path: `${SHOTS}/showpiece-${test.info().project.name}.png` });
   }

@@ -48,7 +48,7 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   cleared and copied whole for each thing, cost the frames south of the park, where the whole park and the Colosseum
   are in the far band. docs/decisions/2026-10-28-bots-rotation.md.)
 - **The layout** (`town/world.ts`, `HOMES`): fourteen homes spread evenly round the middle over the world that wraps, so
-  neighbors stand 8 to 10 squares apart; the Colosseum on its 12 × 12 ground (`COLISEUM`, columns 17 to 28, rows 28 to 39),
+  neighbors stand 8 to 10 squares apart (and in an admin's town a fifteenth, **Timber's Lumber Lodge**, Nov 3, below); the Colosseum on its 12 × 12 ground (`COLISEUM`, columns 17 to 28, rows 28 to 39),
   its gate facing south onto its apron (`APRON`: columns 17 to 28, rows 25 to 27, paved, kept open for people to gather),
   then a walk of 4 rows (`WALK_ROWS`, the promenade paved across it), the park south of that (`PARK`, below; it stands back
   from the Colosseum since Oct 26: `docs/decisions/2026-10-26-town-square-park-stands-back.md`), and your start (`START`,
@@ -505,7 +505,19 @@ column, on up to two smaller lines in the bar's same height, the full name as it
 [2026-11-02-building-interiors.md](../decisions/2026-11-02-building-interiors.md), [2026-11-02-shop-zoom.md](../decisions/2026-11-02-shop-zoom.md)
 and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.md) (the art's, on `claude/boss-art`).
 
-- **Which homes.** Babur's Circus (`tiger`), Puddles' Botanical Garden (`gardener`) and Alfil's Pyramid (`alfil`, Nov 2: Woolly the Shopkeeper, "Alfil's Boss Crate" with Alfil's Howdah, a sandstone ceiling, the chat's day tone) and Big Boy's Crib (`bigboy`, Nov 2: Blocky the Shopkeeper, "Big Boy's Boss Crate" with Big Boy's Buggy, a nursery ceiling of sky, clouds and stars, the chat's day tone; a ball pit, solid, under a walkway, the shop's platform and the battle circle you walk on, the circle in the walkway's foam squares with a zoo-animal rug in its middle; his toy airplane, three squares deep, stands up whole at its foot, `RoomArt.upright`, rather than lying flat as a plan): `SHOPS` in `town/shops/shops.ts`. Their home's card
+- **Timber's Lumber Lodge and Rivet (Nov 3): an admin's town only.** Timber is in the game for admins first (core's
+  `BOSS_ADMIN_FIRST`: only on an admin's boss select), so his home, his roaming, his chatter and his kid are too: `ALL_HOMES` has the
+  fifteen, `HOMES` this town's (`town/admin-town.ts` `ADMIN_TOWN`: your profile's `admin`, read once as the town's code loads;
+  `TownPage` waits for your account first, up to 3 s). In a player's town its plot is open ground. The lodge stands at (11, 32),
+  west of the Colosseum: the one open ground left, between Boingo's Funhouse (7.8 squares, south-west) and Moo & Moon Meadow (8.5,
+  north-west), 4 open squares to the Colosseum's wall (a square more than Folio's first place, which Eric moved), its door facing the
+  park. Its art (`houses/timber.ts`) is the art branch's, 144 × 134. **Rivet**, Timber's woodpecker foreman (`ADMIN_BOTS`), walks
+  with the bots there (`TOWN_BOTS`: the ladder's twenty, then Rivet, so a seat means the same bot in anyone's town), rated 1650
+  (Timber's sim puts him between Moo & Moon and Puddles), "Timber's sidekick"; his sheet is baked as the others' are. The Colosseum's
+  crowd stays the ladder's. His crate (`BOSS_CRATES`) shows in the Crates tab to admins (or whoever holds one), not in the FAQ; the
+  server posts no town-chat line for a challenge of a boss in the game for admins first. Taking `timber` out of `BOSS_ADMIN_FIRST`
+  puts all of it in everyone's town. docs/decisions/2026-11-03-timber-home.md.
+- **Which homes.** Babur's Circus (`tiger`), Puddles' Botanical Garden (`gardener`) and Alfil's Pyramid (`alfil`, Nov 2: Woolly the Shopkeeper, "Alfil's Boss Crate" with Alfil's Howdah, a sandstone ceiling, the chat's day tone) and Big Boy's Crib (`bigboy`, Nov 2: Blocky the Shopkeeper, "Big Boy's Boss Crate" with Big Boy's Buggy, a nursery ceiling of sky, clouds and stars, the chat's day tone; a ball pit, solid, under a walkway, the shop's platform and the battle circle you walk on, the circle in the walkway's foam squares with a zoo-animal rug in its middle; his toy airplane, three squares deep, stands up whole at its foot, `RoomArt.upright`, rather than lying flat as a plan) and Timber's Lumber Lodge (`timber`, Nov 3, an admin's town only: Rivet the Shopkeeper behind the middle of the workbench, "Timber's Boss Crate" with The Log Roller, a lodge's ceiling of dark planks between heavy beams, the chat's day tone; the giant king being carved on its dais, 4 × 2 squares, stands up whole, `RoomArt.upright`; the circle's branded start marks, `SHOP_TIMBER_MARKS`, passed as Big Boy's are; his challenge the default intro, his line "Hard hats on. We're building today."): `SHOPS` in `town/shops/shops.ts`. Their home's card
   is its name, centered, and **"Go in"** (gold) under it, centered, nothing else (Eric, Nov 2: "chop the Shop and Coming soon": a short
   card, `.town-card.town-door`); every other home's card is as it was (its name, Hollow's line, "Shop" greyed and "Coming soon").
 - **Going in.** "Go in" walks you to the square in front of the door (the plot's front row's middle, a row out); there the town zooms in on
