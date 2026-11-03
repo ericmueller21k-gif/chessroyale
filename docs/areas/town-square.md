@@ -523,8 +523,10 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   drawn into canvases as the room loads, behind the black; animated pieces loop on one clock (the hoops, the pond, the palm, the fountain,
   the crate, the balloon cart). A piece nearer the camera than `nearFull` squares fades out (gone by `nearGone`): the front wall as you
   stand at the door. One loop on one Canvas 2D canvas; headless, 60 fps walking on a phone and a computer (Nov 2).
-- **The camera.** You start in **Close** (`SHOP_FEEL.close`: h 3.2, back 2.4, pitch 24°, cy 0.3, in place of the town's numbers of those
-  names; the box's shape blends the rest as in the town). The town's − / + switch between Close and the town's zoomed-in camera (the wheel
+- **The camera.** You start at **the town's zoomed-in camera** (`SHOP_FEEL.startZoom` 1, the − pressed; Eric, Nov 3: "the further out of
+  the two by default"; it was Close until then: docs/decisions/2026-11-03-home-zoom-out.md). + goes to **Close** (`SHOP_FEEL.close`: h 3.2,
+  back 2.4, pitch 24°, cy 0.3, in place of the town's numbers of those names; the box's shape blends the rest as in the town). The town's
+  − / + switch between the two (the wheel
   too); a drag looks around (kept inside the room) exactly as the town's does, the floor following the finger both ways (Eric, Nov 2: "when I
   drag from down to up, it should be the same as the town movement"; the room's rows run toward the camera where the town's run away, so
   its camY goes the other way); the focus button brings it back.
@@ -588,7 +590,7 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
   Boss Battle, then come back here." / **Fight** / Stay. Fight keeps where you stand (`standOf`), and you and the boss walk to its
   door (both at `doorStepMs`, the town's walking pace, not your run) and in (the shop's zoom and fade; the room and the intro load only now: `shops/intro.ts`, and Alfil's
   art, `shops/alfil-intro-art.ts`, or Big Boy's, `shops/bigboy-intro-art.ts`). Inside (the room in challenge mode: no cards, no walking by tap, its own framing per layout,
-  `CHALLENGE_FEEL.cam`), you both stand just inside a beat (`insideMs`, from the room's first frame), then walk up to your marks, side
+  `CHALLENGE_FEEL.cam`, at zoom 1 since Nov 3: the further-out camera, everything in view), you both stand just inside a beat (`insideMs`, from the room's first frame), then walk up to your marks, side
   by side at `walkStepMs` (a slow walk), settle onto their middles and turn to face each other. Every beat is one number in
   `CHALLENGE_FEEL`, laid out by `introBeats`: facing each other `faceMs`; the line alone in a speech bubble over its head for `lineMs`
   (2.5 s; not the chat log; `BOSS_INTROS[id].line`, placeholders until Gemini's lines); a pause (`afterLineMs`); then:
@@ -665,7 +667,7 @@ noted wherever a slice changed one.
 
 ## Tests
 
-- `e2e/shop.spec.ts` (Nov 2, inside a shop; phone and computer): Babur's card's "Go in", inside in Close (− and + switch cameras), a tap
+- `e2e/shop.spec.ts` (Nov 2, inside a shop; phone and computer): Babur's card's "Go in", inside zoomed out (+ and − switch to Close and back), a tap
   on the Shopkeeper walks you up and its card's Talk opens "Babur's Boss Crate" (the price line, Balloon Pup, what you have, both buys
   greyed with nothing to pay), the header saying "Babur's Circus", then the view dragged back to the door, "Go out" and you're outside
   at the tent's door ("Town square" again); Puddles' greenhouse: Drizzle's crate with Puddles's Mower, and the back button takes you out.

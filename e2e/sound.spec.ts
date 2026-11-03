@@ -50,3 +50,78 @@ test("only piece sounds, clock ticks and the reveal reel play, and muting silenc
   const after: string[] = await page.evaluate(() => (window as any).__soundLog);
   expect(after.every((l) => l.endsWith(":muted"))).toBe(true);
 });
+
+/**
+ * Eric, Nov 3, on his iPhone, outside Big Boy's Crib: switched to another app and back, and no sound. iOS suspends the audio
+ * context while the page is away and sometimes leaves it dead; here the page's visibility is switched by hand and the context is
+ * suspended (it comes back: resumed on the way back) or closed (dead: the first tap after makes a new one). Each time Big Boy's
+ * card, opened with a tap, is heard (`bigboyClack:running` in window.__soundLog).
+ */
+test("coming back from another app, sound is back on the first tap: a suspended context resumes, a dead one is replaced", async ({ page }) => {
+  await page.addInitScript(() => {
+    const w = window as any;
+    w.__soundLog = [];
+    // Every audio context the page makes (to suspend or close one as iOS would), and the page's visibility, switched by hand.
+    const Real = window.AudioContext;
+    w.__contexts = [];
+    w.AudioContext = class extends Real {
+      constructor(o?: AudioContextOptions) {
+        super(o);
+        w.__contexts.push(this);
+      }
+    };
+    let vis: DocumentVisibilityState = "visible";
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => vis });
+    Object.defineProperty(document, "hidden", { configurable: true, get: () => vis === "hidden" });
+    w.__away = async (how: "suspend" | "close") => {
+      vis = "hidden";
+      document.dispatchEvent(new Event("visibilitychange"));
+      await w.__contexts.at(-1)[how]();
+      vis = "visible";
+      document.dispatchEvent(new Event("visibilitychange"));
+    };
+    // (The town's chat log lies over a corner of the map and takes taps there: this aims at the map.)
+    document.addEventListener("DOMContentLoaded", () => {
+      const s = document.createElement("style");
+      s.textContent = ".town-chat,.town-chat *{pointer-events:none!important}";
+      document.head.append(s);
+    });
+  });
+  const contexts = () => page.evaluate(() => ((window as any).__contexts as AudioContext[]).map((c) => c.state));
+  const heard = () => page.evaluate(() => ((window as any).__soundLog as string[]).filter((l) => l.startsWith("bigboyClack:")));
+  await page.goto("/town?sky=day");
+  await expect(page.locator("canvas.town-canvas")).toHaveAttribute("data-ready", "1");
+  await page.evaluate(() => (window as any).__townGlide?.("bigboy"));
+  /** A tap on Big Boy (his card opens and he makes his sound), then the card closed again. */
+  const tapBigBoy = async () => {
+    const card = page.getByRole("dialog", { name: "Big Boy", exact: true });
+    await expect(async () => {
+      const xy = await page.evaluate(() => (window as any).__townAt?.("boss", "bigboy") ?? null);
+      expect(xy, "Big Boy drawn").not.toBeNull();
+      const cv = (await page.locator("canvas.town-canvas").boundingBox())!;
+      await page.mouse.click(cv.x + xy.x, cv.y + xy.y);
+      await expect(card).toBeVisible({ timeout: 1500 });
+    }).toPass({ timeout: 20_000 });
+    await page.keyboard.press("Escape");
+    await expect(card).toBeHidden();
+  };
+  // Sound switched on by a key, then heard.
+  await page.keyboard.press("Shift");
+  await expect.poll(contexts).toEqual(["running"]);
+  await tapBigBoy();
+  expect((await heard()).at(-1)).toBe("bigboyClack:running");
+  // Away and back, the context suspended: resumed on the way back, the same one; the next tap is heard.
+  await page.evaluate(() => (window as any).__away("suspend"));
+  await expect.poll(contexts).toEqual(["running"]);
+  await tapBigBoy();
+  expect((await heard()).at(-1)).toBe("bigboyClack:running");
+  // Away and back, the context dead (closed): the first tap makes a new one, running, and it plays (that tap's own sound starts as
+  // it wakes); the next tap's is heard on it.
+  const before = (await heard()).length;
+  await page.evaluate(() => (window as any).__away("close"));
+  await tapBigBoy();
+  await expect.poll(contexts).toEqual(["closed", "running"]);
+  expect((await heard()).length).toBe(before + 1);
+  await tapBigBoy();
+  expect((await heard()).at(-1)).toBe("bigboyClack:running");
+});

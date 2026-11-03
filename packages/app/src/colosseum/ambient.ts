@@ -7,7 +7,7 @@
  * the game's Sound is on and the tab shows; if the browser won't start it before a tap, it starts on the next tap or key.
  * A change of level fades over the same second. Nothing here runs on the frame loop.
  */
-import { isMuted, mediaGain, onMuteChange } from "../sound.ts";
+import { isMuted, mediaGain, onAudioRebuilt, onMuteChange } from "../sound.ts";
 
 export const AMBIENT_URL = "/sounds/colosseum/ambient.mp3";
 /** The file's length (s), to pick the start before its header has loaded. */
@@ -33,11 +33,13 @@ export class Ambient {
   private stopTimer = 0;
   private waiting = false;
   private readonly offMute: () => void;
+  private readonly offRebuilt: () => void;
   /** Where in the hour it started (s). */
   readonly start = 1 + Math.random() * (LENGTH_S - 2);
 
   constructor(private level: AmbientLevel) {
     this.offMute = onMuteChange(this.update);
+    this.offRebuilt = onAudioRebuilt(this.renew);
     document.addEventListener("visibilitychange", this.update);
     this.update();
   }
@@ -55,29 +57,46 @@ export class Ambient {
 
   dispose() {
     this.offMute();
+    this.offRebuilt();
     document.removeEventListener("visibilitychange", this.update);
     this.stopWaiting();
     clearTimeout(this.stopTimer);
-    if (this.el) {
-      this.el.pause();
-      this.el.removeAttribute("src");
-      this.el.load();
-    }
+    if (this.el) this.drop(this.el);
   }
+
+  private drop(el: HTMLAudioElement) {
+    el.pause();
+    el.removeAttribute("src");
+    el.load();
+  }
+
+  /**
+   * A new audio context (sound.ts, after iOS left the old one dead on coming back to the page): the element is wired to the old
+   * one for good, so a new element carries on from where it was (inside the tap that made the context, so it may start).
+   */
+  private renew = () => {
+    const old = this.el;
+    if (!old) return;
+    this.el = null;
+    const at = old.currentTime;
+    this.drop(old);
+    this.element(at > 0 ? at : this.start);
+    this.update();
+  };
 
   private should = () => this.level !== "off" && !isMuted() && document.visibilityState !== "hidden";
 
   private update = () => (this.should() ? this.play() : this.fadeOut());
 
-  private element() {
+  private element(start = this.start) {
     if (this.el) return this.el;
     const el = new Audio();
     el.loop = true;
     el.preload = "auto";
     // The start as a media fragment, so the first request is already for it; if a browser ignores the fragment, a seek.
-    el.src = `${AMBIENT_URL}#t=${this.start.toFixed(1)}`;
+    el.src = `${AMBIENT_URL}#t=${start.toFixed(1)}`;
     el.addEventListener("loadedmetadata", () => {
-      if (el.currentTime < 1) el.currentTime = Math.min(this.start, (Number.isFinite(el.duration) ? el.duration : LENGTH_S) - 1);
+      if (el.currentTime < 1) el.currentTime = Math.min(start, (Number.isFinite(el.duration) ? el.duration : LENGTH_S) - 1);
     }, { once: true });
     this.el = el;
     return el;

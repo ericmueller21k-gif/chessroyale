@@ -564,12 +564,16 @@ export const TOWN_FEEL = {
  */
 export const SHOP_FEEL = {
   /**
-   * "Close" (Eric, Nov 2: "super zoomed resembling normal 3rd person sizing", the default inside): the camera comes down and in
-   * behind you and looks more ahead than down. These four replace the town's camTall and camWide numbers of the same names (the
-   * box's shape still blends the rest); `docs/decisions/2026-11-02-shop-zoom.md`. Zoomed out (−) inside is the town's own
-   * zoomed-in camera (camTall / camWide as they are).
+   * "Close" (Eric, Nov 2: "super zoomed resembling normal 3rd person sizing"; + inside): the camera comes down and in behind you and
+   * looks more ahead than down. These four replace the town's camTall and camWide numbers of the same names (the box's shape still
+   * blends the rest). Zoomed out (−) inside is the town's own zoomed-in camera (camTall / camWide as they are).
    */
   close: { h: 3.2, back: 2.4, th: 24, cy: 0.3 },
+  /**
+   * The zoom you start at inside a home (0 Close, 1 the town's zoomed-in camera). Eric, Nov 3: "When you walk into the house, the
+   * zoom should be the further out of the two by default" (it was Close); `docs/decisions/2026-11-03-home-zoom-out.md`.
+   */
+  startZoom: 1 as 0 | 1,
   /**
    * You can talk to the Shopkeeper from this many squares away (either direction, from its nearest square). A tap on it walks
    * you to the square this far in front of it (the counter between you), as the mockup's "at the counter" view stands.
