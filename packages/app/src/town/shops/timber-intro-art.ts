@@ -524,15 +524,22 @@ const domeOf = (bs: readonly Billow[]) => {
   if (!live.length) return { hw: 0, ht: 0 };
   return { hw: Math.max(...live.map((b) => Math.abs(b.x - VCX))) * 0.98, ht: Math.max(...live.map((b) => VF - b.y)) * 0.97 };
 };
+/**
+ * (The app's one change to this file, for its load time: each frame's dome worked out once, not once a pixel, and a billow's box
+ * looked at before its distance. The very same pixels (a unit test keeps a hash of every frame); the fog builds in a fraction of the time.)
+ */
+const domes = new WeakMap<readonly Billow[], ReturnType<typeof domeOf>>();
 function cloudKey(bs: readonly Billow[], ph: number, x: number, y: number): Key {
   const X = x + 0.5;
   const Y = y + 0.5;
-  const dome = domeOf(bs);
+  let dome = domes.get(bs);
+  if (!dome) domes.set(bs, (dome = domeOf(bs)));
   for (let n = bs.length - 1; n >= 0; n--) {
     const b = bs[n]!;
     if (b.r < 1) continue;
     const nx = (X - b.x) / b.r;
     const ny = (Y - b.y) / (b.r * 0.92);
+    if (nx > 1 || nx < -1 || ny > 1 || ny < -1) continue;
     const d = Math.hypot(nx, ny);
     if (d > 1) continue;
     let l = 0.6 - 0.3 * nx - 0.45 * ny;
@@ -547,7 +554,7 @@ function cloudKey(bs: readonly Billow[], ph: number, x: number, y: number): Key 
   }
   // Between the billows (inside two of them grown by a third): the fog's body, in the shade of the lumps round it.
   let near = 0;
-  for (const b of bs) if (b.r >= 4 && Math.hypot(X - b.x, Y - b.y) < b.r * 1.22) near++;
+  for (const b of bs) if (b.r >= 4 && Math.abs(X - b.x) < b.r * 1.22 && Math.abs(Y - b.y) < b.r * 1.22 && Math.hypot(X - b.x, Y - b.y) < b.r * 1.22) near++;
   if (near >= 2) {
     // Between the billows: the fog's body, in the shade of the lumps round it.
     const g = grain(x, y, 62);

@@ -411,6 +411,14 @@ describe("the intro's timeline (Timber's log, Nov 3)", () => {
     expect([INTRO_TIMBER_STORM.w, INTRO_TIMBER_STORM.h, INTRO_TIMBER_FRONT.w, INTRO_TIMBER_FRONT.h]).toEqual([128, 128, 48, 128]);
   });
 
+  it("the fog's frames are the art's pixel for pixel (shops/timber-intro-art.ts's one change, for its load time, keeps them: a new copy of the art updates this hash)", async () => {
+    const { createHash } = await import("node:crypto");
+    const h = createHash("sha1");
+    const ch = INTRO_TIMBER_SHAVINGS;
+    for (const a of ["rise", "hold", "settle"]) for (const fr of ch.anims[a]!.frames) h.update(renderFrame(ch, fr).data);
+    expect(h.digest("hex")).toBe("08f46ae00df09d803befa210bbb54db0e5c6b702");
+  });
+
   it("his room's marks are the timeline's: his `standOff` from the table's middle, his clear place `log.clear`; the log lies west of his mark, clear of it and on the circle's floor", () => {
     const m = marksOf(SHOP_TIMBER_LAYOUT, "across", SHOP_TIMBER_MARKS, marksFeel(T))!;
     expect(m.table.c - m.boss.c).toBe(F.standOff.across);
