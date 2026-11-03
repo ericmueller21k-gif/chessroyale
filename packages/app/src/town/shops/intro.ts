@@ -30,7 +30,7 @@ import { TOWN_FEEL } from "../feel.ts";
 import { PARK_TABLE, TABLE_BOARD, TABLE_INK, TABLE_PIECES } from "../houses/park.ts";
 import { BOSS_ART } from "../render.ts";
 import type { HomeId } from "../world.ts";
-import { CHALLENGE_FEEL, DARK_MOVES, boardSquare, darkAnims, introBeats, introOf, stormEdge, wipeAt, type BossIntro, type DarkMove, type IntroAnims, type IntroBeat, type IntroLayout, type LogMove, LOG_MOVES, logAnims } from "./challenge.ts";
+import { CHALLENGE_FEEL, DARK_MOVES, boardSquare, darkAnims, drainAt, frameAt, introBeats, introOf, stormEdge, wipeAt, type BossIntro, type DarkMove, type IntroAnims, type IntroBeat, type IntroLayout, type LogMove, LOG_MOVES, logAnims } from "./challenge.ts";
 
 /**
  * A boss's intro art, as its file exports it: a pyramid that brings in its table (Alfil's), or toy blocks that are the table and its
@@ -310,35 +310,48 @@ function painted(ch: Character, frame: Frame, look?: string) {
   c.getContext("2d")!.putImageData(new ImageData(new Uint8ClampedArray(data), w, h), 0, 0);
   return { c, data, w, h };
 }
-/** A frame's lit pixels alone: those `lit(key, x, y)` keeps and bright enough (recolored `to`), cropped; null when none is. */
-function emisOf(ch: Character, frame: Frame, data: Uint8ClampedArray, lit: (k: string, x: number, y: number) => boolean, to?: string): Emis | null {
-  const keys = frameKeys(ch, frame);
+/** Where a picture's lights are: boxes of its pixels (x0, y0 to x1, y1 exclusive) and the keys lit in each. */
+type LitBox = { x0: number; y0: number; x1: number; y1: number; keys: ReadonlySet<string> };
+/**
+ * A frame's lit pixels alone (its keys `keys`, its pixels `data`): those of a box's keys in it, bright enough (recolored `to`), cropped;
+ * null when none is. Only the boxes are walked (Nov 3: walking every pixel of every frame made his intro slow to load on a phone).
+ */
+function emisOf(w: number, h: number, keys: ReturnType<typeof frameKeys>, data: Uint8ClampedArray, boxes: readonly LitBox[], to?: string): Emis | null {
   let x0 = Infinity, y0 = Infinity, x1 = -1, y1 = -1;
-  const keep = new Uint8Array(ch.w * ch.h);
-  for (let y = 0; y < ch.h; y++)
-    for (let x = 0; x < ch.w; x++) {
-      const k = keys[y]?.[x];
-      if (!k || !lit(k, x, y)) continue;
-      const i = (y * ch.w + x) * 4;
-      if ((0.3 * data[i]! + 0.59 * data[i + 1]! + 0.11 * data[i + 2]!) / 255 < LIT_LUM || !data[i + 3]) continue;
-      keep[y * ch.w + x] = 1;
-      [x0, y0, x1, y1] = [Math.min(x0, x), Math.min(y0, y), Math.max(x1, x), Math.max(y1, y)];
+  const keep = new Uint8Array(w * h);
+  for (const b of boxes)
+    for (let y = Math.max(0, b.y0); y < Math.min(h, b.y1); y++) {
+      const row = keys[y];
+      if (!row) continue;
+      for (let x = Math.max(0, b.x0); x < Math.min(w, b.x1); x++) {
+        const k = row[x];
+        if (!k || !b.keys.has(k)) continue;
+        const i = (y * w + x) * 4;
+        if (!data[i + 3] || (0.3 * data[i]! + 0.59 * data[i + 1]! + 0.11 * data[i + 2]!) / 255 < LIT_LUM) continue;
+        keep[y * w + x] = 1;
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+      }
     }
   if (x1 < 0) return null;
-  const w = x1 - x0 + 1;
-  const h = y1 - y0 + 1;
-  const out = new Uint8ClampedArray(w * h * 4);
+  const cw = x1 - x0 + 1;
+  const ch = y1 - y0 + 1;
+  const out = new Uint8ClampedArray(cw * ch * 4);
   const rgb = to ? [1, 3, 5].map((j) => parseInt(to.slice(j, j + 2), 16)) : null;
   for (let y = y0; y <= y1; y++)
     for (let x = x0; x <= x1; x++) {
-      if (!keep[y * ch.w + x]) continue;
-      const i = (y * ch.w + x) * 4;
-      const o = ((y - y0) * w + (x - x0)) * 4;
-      if (rgb) out.set([rgb[0]!, rgb[1]!, rgb[2]!, data[i + 3]!], o);
-      else out.set(data.subarray(i, i + 4), o);
+      if (!keep[y * w + x]) continue;
+      const i = (y * w + x) * 4;
+      const o = ((y - y0) * cw + (x - x0)) * 4;
+      out[o] = rgb ? rgb[0]! : data[i]!;
+      out[o + 1] = rgb ? rgb[1]! : data[i + 1]!;
+      out[o + 2] = rgb ? rgb[2]! : data[i + 2]!;
+      out[o + 3] = data[i + 3]!;
     }
-  const img = canvasOf(w, h);
-  img.getContext("2d")!.putImageData(new ImageData(out, w, h), 0, 0);
+  const img = canvasOf(cw, ch);
+  img.getContext("2d")!.putImageData(new ImageData(out, cw, ch), 0, 0);
   return { img, x: x0, y: y0 };
 }
 /**
@@ -346,63 +359,87 @@ function emisOf(ch: Character, frame: Frame, data: Uint8ClampedArray, lit: (k: s
  * bulbs' anims the run reaches on each placement, his moves at the strand's counts he plays them with), and each one's lit pixels.
  */
 function buildDark(m: typeof import("./hollow-intro-art.ts")): DarkArt {
-  const L = m.SHOP_HOLLOW_LIGHTS;
-  const spotsOf = (name: string) => L.filter((l) => l.piece === name);
-  const litIn = (name: string) => {
-    const spots = spotsOf(name);
-    return (k: string, x: number, y: number) => spots.some((s) => s.keys?.includes(k) && x >= s.x && x < s.x + s.w && y >= s.y && y < s.y + s.h);
-  };
-  const litFrames = (ch: Character, anim: string, lit: (k: string, x: number, y: number) => boolean, look?: string): Lit[] =>
-    ch.anims[anim]!.frames.map((fr) => {
+  /** A cave piece's lights' boxes (SHOP_HOLLOW_LIGHTS). */
+  const boxesOf = (name: string): LitBox[] =>
+    m.SHOP_HOLLOW_LIGHTS.filter((l) => l.piece === name && l.keys).map((l) => ({ x0: Math.floor(l.x), y0: Math.floor(l.y), x1: Math.ceil(l.x + l.w), y1: Math.ceil(l.y + l.h), keys: new Set(l.keys) }));
+  /** A move's frames drawn (`only`: just these, the rest left out: never shown), each with its lit pixels (and its eyes alone). */
+  const litFrames = (ch: Character, anim: string, boxes: readonly LitBox[], look?: string, eyes?: LitBox[], eyesTo?: string, only?: ReadonlySet<number>): (Lit & { eyes: Emis | null })[] =>
+    ch.anims[anim]!.frames.map((fr, i) => {
+      if (only && !only.has(i)) return undefined as unknown as Lit & { eyes: Emis | null };
       const p = painted(ch, fr, look);
-      return { img: p.c, emis: emisOf(ch, fr, p.data, lit, undefined) };
+      const keys = frameKeys(ch, fr);
+      return { img: p.c, emis: emisOf(ch.w, ch.h, keys, p.data, boxes), eyes: eyes ? emisOf(ch.w, ch.h, keys, p.data, eyes, eyesTo) : null };
     });
-  const emisFrames = (ch: Character, anim: string, lit: (k: string, x: number, y: number) => boolean) =>
-    ch.anims[anim]!.frames.map((fr) => emisOf(ch, fr, painted(ch, fr).data, lit));
+  const emisFrames = (ch: Character, anim: string, boxes: readonly LitBox[]) =>
+    ch.anims[anim]!.frames.map((fr) => emisOf(ch.w, ch.h, frameKeys(ch, fr), renderFrame(ch, fr).data, boxes));
   const pieces: DarkArt["pieces"] = {};
   const lit: DarkArt["lit"] = {};
   // The lanterns: each `gutter<k>` (k its sway frame as it starts) and its dark `idle`; the cave's own lit frames' lit pixels.
   for (const [name, ch] of [["lantern", m.INTRO_HOLLOW_LANTERN_OUT], ["lantern-b", m.INTRO_HOLLOW_LANTERN_B_OUT]] as const) {
-    const on = litIn(name);
+    const on = boxesOf(name);
     pieces[name] = Object.fromEntries(Object.keys(ch.anims).filter((a) => a !== "lit").map((a) => [a, litFrames(ch, a, on)]));
     lit[name] = emisFrames(m.SHOP_HOLLOW_PIECES[name]!, "idle", on);
   }
-  // The bulbs: on each placement, the anims the run reaches (`l<n>`, or `r<n>` on a mirrored placement); `l0` is the cave's own.
-  const need = new Map<string, Set<string>>();
+  // The bulbs: on each placement, the anims the run reaches (`l<n>`, or `r<n>` on a mirrored placement); `l0` is the cave's own. One
+  // on the way to the last (all its bulbs dark) shows a bulb's turn, about 30 ms: its first flicker frame alone stands for all of them.
+  const need = new Map<string, Map<string, boolean>>();
   const count = new Map<string, number>();
   for (const b of m.INTRO_HOLLOW_BULB_RUN) {
     const key = `${b.piece}|${b.col}|${b.row}`;
     count.set(key, (count.get(key) ?? 0) + 1);
-    const set = need.get(b.piece) ?? new Set<string>();
-    set.add(`${b.flip ? "r" : "l"}${count.get(key)}`);
-    need.set(b.piece, set);
   }
+  for (const b of m.INTRO_HOLLOW_BULB_RUN) {
+    const n = m.INTRO_HOLLOW_BULB_RUN.filter((x) => x.piece === b.piece && x.col === b.col && x.row === b.row).indexOf(b) + 1;
+    const anims = need.get(b.piece) ?? new Map<string, boolean>();
+    const last = n === count.get(`${b.piece}|${b.col}|${b.row}`);
+    const a = `${b.flip ? "r" : "l"}${n}`;
+    anims.set(a, (anims.get(a) ?? false) || last);
+    need.set(b.piece, anims);
+  }
+  const first = new Set([0]);
   for (const [name, anims] of need) {
     const ch = m.INTRO_HOLLOW_BULB_PIECES[name]!;
-    const on = litIn(name);
-    pieces[name] = Object.fromEntries([...anims].map((a) => [a, litFrames(ch, a, on)]));
+    const on = boxesOf(name);
+    pieces[name] = Object.fromEntries([...anims].map(([a, last]) => [a, litFrames(ch, a, on, undefined, undefined, undefined, last ? undefined : first)]));
     lit[name] = emisFrames(m.SHOP_HOLLOW_PIECES[name]!, "idle", on);
   }
   // The tree: its `drain` and its dark `idle`.
   {
     const ch = m.INTRO_HOLLOW_SHOWPIECE_OUT;
-    const on = litIn("showpiece");
+    const on = boxesOf("showpiece");
     pieces.showpiece = { drain: litFrames(ch, "drain", on), idle: litFrames(ch, "idle", on) };
     lit.showpiece = emisFrames(m.SHOP_HOLLOW_PIECES.showpiece!, "idle", on);
   }
-  // Him: each move at the strand's counts he plays it with; his eyes alone (dim violet) in the black.
+  // Him: each move at the strand's counts he plays it with (his lit pixels: his eyes, the ball's violet, his bulbs); his eyes alone
+  // (dim violet) in the black, as he stands full and settles.
   const H = m.BOSS_HOLLOW_INTRO;
-  const his = (k: string) => HIS_LIT.has(k);
+  const D = m.INTRO_HOLLOW_DARK;
+  const whole = (keys: Iterable<string>): LitBox[] => [{ x0: 0, y0: 0, x1: H.w, y1: H.h, keys: new Set(keys) }];
+  const his = whole(HIS_LIT);
+  const eyeBox = whole(["e", "E"]);
   const looks: Record<DarkMove, readonly number[]> = { charge: [3], swell: [3], drink: [3, 2, 1, 0], full: [0], settle: [0] };
+  // (His drink with two thirds and one third of his strand lit shows a beat each, `dark.drain.strand`'s gaps: just its frames then.)
+  const d = drainAt();
+  const drinkMs = H.anims.drink!.frames.map((x) => x.ms);
+  const shown = (from: number, to: number) => {
+    const out = new Set<number>();
+    for (let t = from; t < to; t += 5) out.add(frameAt(drinkMs, t, true));
+    return out;
+  };
+  const drinkOnly: Partial<Record<number, ReadonlySet<number>>> = { 2: shown(d.strand[0]!, d.strand[1]!), 1: shown(d.strand[1]!, d.strand[2]!) };
+  const eyes = { full: [] as (Emis | null)[], settle: [] as (Emis | null)[] };
   const him = Object.fromEntries(
     DARK_MOVES.map((a) => {
       const by: (Lit[] | undefined)[] = [];
-      for (const n of looks[a]) by[n] = litFrames(H, a, his, `bulbs${n}`);
+      for (const n of looks[a]) {
+        const dark = a === "full" || a === "settle";
+        const fr = litFrames(H, a, his, `bulbs${n}`, dark ? eyeBox : undefined, D.eyes, a === "drink" ? drinkOnly[n] : undefined);
+        if (dark) eyes[a] = fr.map((x) => x.eyes);
+        by[n] = fr;
+      }
       return [a, by];
     }),
   ) as DarkArt["him"];
-  const D = m.INTRO_HOLLOW_DARK;
-  const eyesOf = (a: "full" | "settle") => H.anims[a]!.frames.map((fr) => emisOf(H, fr, painted(H, fr, "bulbs0").data, (k) => k === "e" || k === "E", D.eyes));
   const idleCh = BOSS_ART.hollow;
   const idle0 = idleCh.anims.idle!.frames.map((fr) => painted(idleCh, fr, "bulbs0").c);
   // The motes: each kind's twinkle, and the sip.
@@ -420,7 +457,7 @@ function buildDark(m: typeof import("./hollow-intro-art.ts")): DarkArt {
       }
     return null;
   });
-  return { him, idle0, eyes: { full: eyesOf("full"), settle: eyesOf("settle") }, pieces, lit, motes, runMote, art: m };
+  return { him, idle0, eyes, pieces, lit, motes, runMote, art: m };
 }
 
 /** Plays a cue's sound, if the boss has one for it (none: silent). */

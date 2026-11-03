@@ -596,7 +596,9 @@ function startRoom(
         pieceEmis = dk.lit[u.name]![idx()] ?? null;
         return null;
       }
-      const lt = dk.pieces[u.name]![`${u.flip ? "r" : "l"}${n}`]![idx()]!;
+      // (One on the way to the last has its first flicker frame alone: it shows for a bulb's turn.)
+      const fr = dk.pieces[u.name]![`${u.flip ? "r" : "l"}${n}`]!;
+      const lt = fr[idx()] ?? fr[0]!;
       pieceEmis = lt.emis;
       return lt.img;
     }
@@ -1239,9 +1241,12 @@ function startRoom(
     let eyes: Emis | null = null;
     if (dn.move) {
       const by = dk!.him[dn.move.anim];
-      const lt = (by[dn.bulbs] ?? by.find((x) => x) ?? [])[dn.move.frame]!;
-      img = lt.img;
-      emis = lt.emis;
+      // (At the strand's count now; a frame not drawn at it (never shown there) from the nearest count that has it.)
+      const f = dn.move.frame;
+      let lt = by[dn.bulbs]?.[f];
+      for (let n = 0; !lt && n <= 3; n++) lt = by[dn.bulbs - n]?.[f] ?? by[dn.bulbs + n]?.[f];
+      img = lt!.img;
+      emis = lt!.emis;
       if (dn.move.anim === "full" || dn.move.anim === "settle") eyes = dk!.eyes[dn.move.anim][dn.move.frame] ?? null;
     } else {
       const u = now % b.loop;
