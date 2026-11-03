@@ -101,3 +101,4 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
   Then: code round (cave mask floor, rock walls, dog shopkeeper, crate), later his darkness intro.
 - Hollow cave ART DONE a53eba78 on claude/boss-art (notes out/shop-hollow-nov3.md). Stills sent to Eric; waiting his OK, then code round (mask blocking, repeated-piece lights, bake dog sheet, shopkeeper at (5,2)/(6,2)).
 - Eric approved Hollow cave art. Code round helper (Opus high) /home/user/cr-hollowshop claude/hollow-shop, brief brief-hollow-shop.md. Intro: proposed lanterns-out/bulbs-on ~12s; Eric to confirm.
+- Hollow cave code DONE 53988c7d → PR #480 (full-e2e), CI watcher running; merge on green, tell Eric when live. Lanterns in fight-start view: 4/5 (OK, no art touch-up). Asked Eric: Hollow stands at pond west edge during swing (clear 2.92) — fine or widen pond in art round? Next: Hollow intro round per notes/hollow-intro-eric.md.
