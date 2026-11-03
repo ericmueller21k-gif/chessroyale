@@ -105,3 +105,4 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Hollow intro ART round started (Opus high, weekly usage, /home/user/cr-hollowart claude/boss-art, brief brief-hollow-intro-art.md). Then code round.
 - Cave #480 LIVE (f7b2aa5f, 20:47). Hollow intro ART DONE 3238dbf4 on claude/boss-art (notes out/intro-hollow-nov3.md, 15.8 s). Sent GIF to Eric; waiting OK on calls (eyes in black, violet dim light, table in black). Then code round.
 - Eric approved Hollow intro w/ changes (basic park table+stools in while lit, walk straight to seats, channel lines x4, drain 15% faster, director: iris into match). Code helper Opus high /home/user/cr-hollowintro claude/hollow-intro, brief brief-hollow-intro.md.
+- Hollow intro code DONE 036605a8 → PR #481 (targeted), CI watcher; merge on green, tell Eric live. Later: Hollow cave art load ~4.5 s at 4x CPU (own job).
