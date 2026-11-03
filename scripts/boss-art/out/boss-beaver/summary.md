@@ -1,71 +1,70 @@
 # Boss art: boss-beaver
 
-- Model claude-opus-5-5, effort high, adaptive thinking. 27 turns, 16 renders.
-- Spend: **$2.09** of the $5 cap (58 input, 137,690 cache-write, 2,750,124 cache-read, 42,546 output tokens).
+- Model claude-opus-5-5, effort high, adaptive thinking. 29 turns, 19 renders.
+- Spend: **$3.33** of the $5 cap (60 input, 267,304 cache-write, 3,893,792 cache-read, 60,728 output tokens).
 - Finished: it called done.
 - The drawing: scripts/boss-art/out/boss-beaver/boss-beaver.ts.
 - Previews: scripts/boss-art/out/boss-beaver/preview/ (GIFs, the frame sheet, the comparison). Each look it took: scripts/boss-art/out/boss-beaver/looks/.
 
 ## Its notes
 
-I've added BOSS_BEAVER_ATTACK (id "timber-attack", name "Timber (his attack)") to the end of boss-beaver.ts. It spreads BOSS_BEAVER, so it uses his own parts and palette. His existing parts and animations are unchanged; the only edit above the new code is the KING_ATTACK import from packages/chess/src/boss-timing.ts. I couldn't open boss-timing.ts, so the times below assume the brief's numbers (landAt 470, lashAt 560, every 170 ms, 10 hits, leaveAt 2380, ms 2780). All frame times are worked out from KING_ATTACK, so they follow it if it changes.
+I've added `BOSS_BEAVER_INTRO` (id `timber-intro`) to boss-beaver.ts, after `BOSS_BEAVER_ATTACK`. It spreads `BOSS_BEAVER` and is drawn with his own rig. I rendered and checked every intro animation frame by frame on both backgrounds, mostly at 2x. Gnaw's 8 frames don't fit at 2x, so I checked them 4 at a time at 3x. His normal idle still renders unchanged beside Big Boy.
 
-Check this: the render tool only shows the file's first exported character, so to look at kingAttack I briefly removed "export" from BOSS_BEAVER. It's restored, and his own idle renders as before, but worth a look in the diff.
+**Changes to existing code (outputs unchanged):**
+- `head()` takes an optional `puff` (puffed cheeks); at 0 it draws exactly as before.
+- `Pose` has a new `puff` field, which only adds to the head part's name when it's set.
+- No existing animation or part changed.
 
-What I looked at: kingAttack frame by frame at 2x (and the face at 4x) on dark and light backgrounds, and its idle beside Big Boy. The hammer and plank stay inside the frame, and the last render gave no edge warnings.
+**Facing:** he faces our right (toward the middle). His frames are mirrored: each part is flipped and repositioned, and the specks and shake are mirrored too. One side effect is that his light comes from the top right in the intro.
 
-FRAME AND FOOT: 110 x 108, foot at (62, 102). That's 22 px of room on the king's side (our left), 18 px above for the drop, and 2 px below so the landing shake stays inside. The idle is one still: him at rest.
+**Frame:** 118 x 98, foot [52, 88]. The palette is his, plus three log colors: `p` #fff0c8 (the pale sapwood), and `-` / `+` (the log's see-through ground shadow).
 
-HOW IT GOES (frame: ms):
-- f0 0–103: empty, a small shadow.
-- f1 103–202: empty, the shadow spreads.
-- f2 202–291: he falls in from 18 px up, eyes wide, hammer raised off his belt, hat lifting.
-- f3 291–381: 9 px up.
-- f4 381–470: 3 px up.
-- f5 470–560: lands with a squash, hammer wound up, sawdust puffs and dust at his feet, a shake.
-- Hits 1–7 (f6–f19): a 90 ms hit frame on each beat (560 + 170·i), then an 80 ms wind-up for the next.
-  - Whacks at 560, 900, 1240, 1580 come down on the king's head, with a steel swish arc.
-  - Knocks at 730, 1070, 1410 swing across the king's middle, with speed lines.
-  - Every hit has a small white impact burst and wood chips flung left.
-- f20 1750: knock 8.
-- f21 1840–1880: the hammer goes back on his belt as his far paw slides the plank out of its strap.
-- f22 1880–1920: the plank drawn back like a bat.
-- f23 1920–2010: hit 9, the plank swung flat into the king.
-- f24 2010–2090: the plank raised up behind his head.
-- f25 2090–2190: hit 10, the plank smashed down on the king's head (big arc, chips both ways, heavy shake).
-- f26 2190–2250: he holds it there, grinning.
-- f27 2250–2310: he hefts the plank across his chest.
-- f28 2310–2380: slides it back into its strap.
-- f29–f32 2380–2580: his beat, 50 ms a frame: a buck-toothed laugh, head thrown back with his jaw open, shoulders bobbing, a wink at the end.
-- f33 2580–2640: crouch.
-- f34 2640–2690: hops up 8 px.
-- f35 2690–2740: 18 px up.
-- f36 2740–2760: his shadow alone.
-- f37 2760–2780: empty.
+**The log:** it is the props file's own log. I copied its code (grain, `barkKey`, `ringKey`, `lyingKey`, and `standKey` with no bites) and evaluate it at the same picture pixels in the same 80 x 70 picture, foot [40, 64]. The bark, rings, knots and grain therefore match pixel for pixel, at the same 64 x 30 lying and 32 x 52 standing sizes. The shadows use the same ellipses. During the swing it is the lying log turned 42°.
 
-CUES (frame @ ms):
-- swoosh f2 @202 (he drops in)
-- thump f5 @470 (landing)
-- whack f6 @560, knock f8 @730, whack f10 @900, knock f12 @1070, whack f14 @1240, knock f16 @1410, whack f18 @1580, knock f20 @1750 (hammer hits)
-- slide f21 @1840 (plank out)
-- whack f23 @1920 (plank bat swing)
-- thump f25 @2090 (plank smash)
-- slide f28 @2310 (plank back in)
-- chitter f29 @2380 (his laugh)
-- hup f34 @2640 (he hops off)
+**Exports:**
+- `TIMBER_INTRO_REACH = [34, -2]`: the standing log's foot relative to his foot, in setDown's last frame and in gnaw. The log is centered 34 px to our right and 2 px further back, so code should draw the log piece behind him. His snout and teeth overlap its upper-left front.
+- `TIMBER_INTRO_LIFT_AT = [0, 2]`: the lying log's foot relative to his foot in lift's first frame. It lies just in front of his feet, so code should place him with this offset over the lying piece and hide that piece when lift starts.
 
-FOR THE KIT:
-- perSquare 40: he's about 80 px tall with his hat, so he stands about 2 squares, close to Big Boy's 1.9 at 36. At 36 he'd tower over Big Boy.
-- stand 1.15: the hammer head lands about 1.1 squares from his feet and the plank's end about 1.3. At 1.15 the hammer hits the king's middle and his paw stays clear of the king's edge.
-- facesLeft: true (the king on our left, his hammer paw's side).
-- Hit effect (for code to draw): wood chips and sawdust bursting off the king's square with a short white flash, like Sawyer's sawItem in wood colours (#f6d38e, #e0aa5c, #b47b36, #7e5222, sawdust #e8d2a4).
-  - Chips spray up and out for the whacks (hits 1, 3, 5, 7).
-  - Sideways from the side he hits for the knocks and the plank bat (hits 2, 4, 6, 8, 9).
-  - A bigger splinter burst for the plank smash (hit 10).
+**Animations:**
+- **walk** (6 x 110 ms, loops): a waddle with nothing in his paws.
+  - Each foot lifts up to 4 px and steps 3 px forward in turn.
+  - His body sways up to 2 px onto the planted foot and bobs up over it.
+  - His arms swing against his feet, his tail wags, and he grins.
+  - It's drawn facing right. For the walk left to the log, code can mirror it.
+- **lift** (600 ms; 100, 100, 90, 90, 110, 110):
+  - f0: he bends over the log at his feet, paws on its top. The lying log and its shadow are in his frame.
+  - f1: he squats deeper and squeezes, eyes shut, cheeks puffed.
+  - f2: `hup`. The log comes 6 px up, mouth open, dust at his feet.
+  - f3: 13 px up.
+  - f4: 18 px up, wide-eyed.
+  - f5: settled in the carry hold, the log across his belly 16 px off the floor. His chin rests on it, his arms hug its front and his paws are on top.
+- **carry** (6 x 110 ms, loops): the same waddle under the log, strained (cheeks puffed, eyes squinting and squeezing). The log bobs 0–2 px a beat behind his steps, with a drop of sweat.
+- **setDown** (500 ms; 110, 90, 120, 90, 90):
+  - f0: he heaves it up and 6 px to our right.
+  - f1: it swings down, tilted 42°, its right end dropping.
+  - f2: `thump` with a shake. It stands on end at REACH, with sawdust puffs at its foot. His near paw is on its side and his far arm hangs.
+  - f3: a pleased beat, paw still on it.
+  - f4: no log. His paws are drawing back, and the last puffs drift.
+- **gnaw** (8 x 90 ms, loops): he crouches by the log, near paw on it, head leaning in.
+  - Open-jaw frames (jaw 4, 3, 5, 3) alternate with teeth-shut frames.
+  - On the four shut frames his head bobs down and in, with a 1 px shake and a sawdust puff.
+  - Cues: f1 `gnaw`, f3 `chomp`, f5 `gnaw`, f7 `chomp`.
+  - Each bite throws a fan of 2–3 px chips (a light face and a dark edge, so they show on the pale top and the bark). The chips fly up and out both ways for 4 frames and wrap round the loop.
+  - Only Timber and the chips are drawn; the log is the separate piece.
+- **done** (800 ms; 100, 110, 110, 150, 130, 200):
+  - f0: he steps back with the near foot raised. He stays 3 px back (to our left) from here on, so his foot ends 3 px left of where it started.
+  - f1–f2: he rubs his paws together at his chest, with puffs of sawdust. Cue `pat` on f1.
+  - f3: a buck-toothed grin, cue `chitter`.
+  - f4: a breath.
+  - f5: a wink and a grin.
+- **idle**: one frame of him standing, for the preview.
 
-CHOICES YOU MIGHT WANT TO CHANGE:
-- I kept his usual hammer size, so a hammer hit is small at phone size. The swish arcs and speed lines carry them, and the plank hits are the big ones. A bigger cartoon hammer would be a new part.
-- No tail slap: his tail is rooted behind him and can't reach the king without a new tail part. The plank bat and smash take its place.
-- The plank swap is two quick 40 ms frames.
-- There's an extra "slide" cue at 1840, between hits 8 and 9.
-- At f27 the plank is hefted across his chest rather than resting on his shoulder.
+**All cues:** lift f2 `hup`; setDown f2 `thump`; gnaw f1/f5 `gnaw` and f3/f7 `chomp`; done f1 `pat` and f3 `chitter`.
+
+**Choices you might change:**
+- The far arm can't reach the standing log, so he sets it down with the near paw on it and the far arm hanging.
+- In gnaw his snout overlaps the log's upper-left front. With the log drawn behind him, he looks to be biting into its near side, just under the rim.
+- The chip spray is fairly fine at phone size.
+- The log hides most of his body while carried. Only his head, paws and feet show.
+- The `pat` cue in done is my addition.
+- The `REVIEW` flag (false) draws the standing log behind him in gnaw if set true, for checking the two together.

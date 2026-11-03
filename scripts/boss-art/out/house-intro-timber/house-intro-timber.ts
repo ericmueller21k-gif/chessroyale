@@ -196,7 +196,7 @@ function standKey(g: Gnaw, x: number, y: number): Key {
     if (fr < 0.3) l += 0.22;
     else if (fr > 0.78) l -= 0.3;
     if (p < 1.8) return grain(x, y, 3) > 0.5 ? "b" : "J"; // the torn bark at its edge
-    return ramp("JjhH", l);
+    return ramp("JjhhH", l - 0.1);
   }
   return barkKey(l, Math.asin(nx) / Math.PI + 0.5, Y, x, y);
 }
@@ -232,9 +232,9 @@ function chipSpray(at: Pt, side: number, seed: number): Speck[] {
     const r = 5 + grain(i, seed, 8) * 12;
     const x = Math.round(LCX + at[0] + side * Math.cos(a) * r);
     const y = Math.round(at[1] + Math.sin(a) * r * 0.9);
-    const k = "pHhj"[i % 4]!;
+    const k = "pHhH"[i % 4]!;
     out.push([x, y, k]);
-    if (i % 3 === 0) out.push([x + side, y, "j"]);
+    if (i % 3 !== 2) out.push([x + side, y, i % 3 ? "j" : "d"]);
   }
   return out;
 }
@@ -334,11 +334,12 @@ const tableLeg = paint(TCX - 12, TOP_Y + 4, 25, TFOOT - TOP_Y - 4, (x, y) => {
     return barkKey(l - (j <= 1 ? 0.15 : 0), Math.asin(nx) / Math.PI + 0.5, j * 2, x, y);
   }
   if (j >= 22) return j === 23 ? (X < 2 ? "p" : "H") : X < 0 ? "H" : X < 4 ? "h" : "j"; // the flat-chewed top, under the slab
-  // Chisel marks: rows of scallops, lit along their tops, offset row to row.
-  const t = (j + 0.9 * Math.sin(Math.asin(nx) * 3 + Math.floor(j / 3) * 2)) / 3;
-  const fr = t - Math.floor(t);
-  if (fr > 0.72) l += 0.22;
-  else if (fr < 0.25) l -= 0.32;
+  // Chisel marks: rows of scallops (each a tooth's bite), lit along their tops, offset row to row.
+  const row = Math.floor(j / 3);
+  const u = (((X + row * 2) % 5) + 5) % 5 - 2;
+  const loc = (((j + Math.round(u * u * 0.3)) % 3) + 3) % 3;
+  if (loc === 2) l += 0.24;
+  else if (loc === 0) l -= 0.3;
   return ramp("JjhhH", l - 0.08);
 });
 
@@ -577,7 +578,7 @@ const VF = 146;
 const BILLOWS: readonly (readonly [number, number, number])[] = (() => {
   // Rows of lumps filling a dome 160 wide and 140 tall, the back (top) rows first; sizes and places jittered.
   const out: [number, number, number][] = [];
-  const rows = [120, 104, 88, 72, 54, 36, 18];
+  const rows = [120, 104, 88, 72, 54, 36, 18, 3];
   rows.forEach((up, ri) => {
     const hw = 60 * Math.sqrt(Math.max(0.1, 1 - (up / 140) ** 2));
     const n = Math.max(2, Math.round((2 * hw) / 28) + 1);
@@ -585,7 +586,7 @@ const BILLOWS: readonly (readonly [number, number, number])[] = (() => {
       const t = n === 1 ? 0.5 : i / (n - 1);
       const g = grain(ri, i, 91);
       const edgeS = Math.abs(t - 0.5) * 2; // 1 at the row's ends
-      const r = (ri === rows.length - 1 ? 17 : 16 + g * 8) * (1 - edgeS * 0.15);
+      const r = (ri === rows.length - 1 ? 12 + g * 3 : 16 + g * 8) * (1 - edgeS * 0.15);
       out.push([(t - 0.5) * 2 * hw + (grain(ri, i, 92) - 0.5) * 8, up + (grain(ri, i, 93) - 0.5) * 7, r]);
     }
   });
@@ -617,8 +618,8 @@ function cloudKey(bs: readonly Billow[], ph: number, x: number, y: number): Key 
     const sw = (((a - ph - b.i * 1.7) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
     if (b.r > 11 && b.i % 3 !== 1 && Math.abs(d - 0.55) < 0.08 && sw < 2.2) return sw < 0.7 ? "H" : sw < 1.5 ? "h" : "F"; // a streak of shavings churning round in it
     const g = grain(x, y, 61);
-    if (g > 0.975) return l > 0.5 ? "h" : "j";
-    if (g < 0.012) return "b";
+    if (g > 0.975) return l > 0.5 ? "H" : "h";
+    if (g < 0.008) return "j";
     return ramp("fFGGgg", l * 0.85 + (0.47 - 0.25 * ((X - VCX) / (dome.hw + 1)) + 0.3 * ((VF - Y) / (dome.ht + 1))) * 0.15);
   }
   // Between the billows (inside two of them grown by a third): the fog's body, in the shade of the lumps round it.
@@ -773,8 +774,10 @@ const settleFrames: Frame[] = Array.from({ length: 10 }, (_, f) => {
     const y0 = VF - up;
     const yl = VF - 3 + (k % 3) * 2;
     const y = Math.min(yl, y0 + (yl - y0) * Math.min(1, (u * 1.3) ** 2 * (1 + k * 0.1)));
-    const x = VCX + dx * (1 + 0.3 * u) * (Math.abs(dx) < 15 ? 2.6 : 1);
-    if (Math.abs(x - VCX) < 12 && y > VF - 30) return; // never onto the table
+    let x = VCX + dx * (1 + 0.3 * u) * (Math.abs(dx) < 15 ? 2.6 : 1);
+    const ax = Math.abs(x - VCX);
+    if (Math.abs(ax - PX) < 13 && y > VF - 26) x = VCX + Math.sign(x - VCX) * (ax < PX ? PX - 15 : PX + 15); // never onto a stump
+    if (Math.abs(x - VCX) < 13 && y > VF - 30) return; // nor the table
     layers.push(curlLayer(k, x - 3, y - 4, y >= yl ? k : f + k));
   });
   const specks: Speck[] = [];
@@ -802,10 +805,297 @@ export const INTRO_TIMBER_SHAVINGS: Character = {
 };
 
 // ================================================================================================================
-// The review sheet (for now: one piece at a time while drawing).
+// 5. The sawdust transition: STORM (128 x 128, tiles both ways) and FRONT (48 x 128, tiles top to bottom), 6 frames.
+//    As Alfil's sandstorm: three layers race right, each a whole number of pixels a frame, a whole repeat in 6 frames.
 // ================================================================================================================
 
-const DEV = INTRO_TIMBER_SHAVINGS as Character | null;
+const ST = 128;
+const FW = 48;
+const mod = (a: number, n: number) => ((a % n) + n) % n;
+const cum = (steps: number[]) => steps.map((_, i) => steps.slice(0, i).reduce((s, v) => s + v, 0));
+const SHIFT = {
+  back: cum([5, 5, 6, 5, 5, 6]), // 32
+  mid: cum([21, 22, 21, 22, 21, 21]), // 128
+  front: cum([21, 21, 22, 21, 21, 22]), // 128
+};
+type Pat = Key[][];
+const pat = (w: number): Pat => Array.from({ length: ST }, () => Array<Key>(w).fill(null));
+const stamp = (p: Pat, x: number, y: number, k: string) => (p[mod(Math.round(y), ST)]![mod(Math.round(x), p[0]!.length)] = k);
+
+/** The haze: bands of sawdust (pale to toasted) blowing in long waves, their seams ragged (opaque, the storm's body). */
+const BACK_BANDS = "GFgjhFGgFjhgGFgh";
+const BAND_TOP = cum([9, 6, 11, 7, 5, 10, 8, 6, 12, 7, 9, 5, 8, 10, 7, 8]);
+const backPat: Pat = pat(32);
+for (let y = 0; y < ST; y++)
+  for (let u = 0; u < 32; u++) {
+    const run = (b: number) => Math.floor(grain(Math.floor((u + b * 5) / 4) % 8, b, 31) * 3.2) - 1;
+    const wave = 1.2 * Math.sin((2 * Math.PI * 3 * y) / ST);
+    const by0 = mod(y + wave, ST);
+    let b0 = 0;
+    while (b0 < 15 && BAND_TOP[b0 + 1]! <= by0) b0++;
+    const band = by0 - BAND_TOP[b0]! < run(b0) ? mod(b0 - 1, 16) : b0;
+    backPat[y]![u] = BACK_BANDS[band]!;
+  }
+
+/** The gusts: toasted wind-shaped blobs, long curling shavings unrolling in the wind, pale dust wisps. */
+const midPat: Pat = pat(ST);
+for (let i = 0; i < 11; i++) {
+  const ex = Math.floor(grain(i, 1, 51) * ST);
+  const ey = Math.floor(i * 11.6) + Math.floor(grain(i, 2, 51) * 8);
+  const rx = 15 + Math.floor(grain(i, 3, 51) * 9);
+  const ry = 3 + Math.floor(grain(i, 4, 51) * 3);
+  for (let dx = -rx * 2; dx <= rx; dx++) {
+    const t = dx / rx;
+    const h = t > 0 ? ry * Math.sqrt(1 - t * t) : ry * Math.pow(Math.max(0, 1 + t / 2), 1.3);
+    for (let dy = -Math.ceil(h); dy <= Math.ceil(h); dy++) {
+      if (Math.abs(dy) > h) continue;
+      stamp(midPat, ex + dx, ey + dy, Math.abs(dy) < h * 0.5 && t > -1.2 ? "f" : "F");
+    }
+  }
+}
+for (let i = 0; i < 7; i++) {
+  // A shaving: a ribbon of raw wood trailing in from the left, curling up into a roll at its head (2 px thick).
+  const cx = Math.floor(grain(i, 5, 52) * ST);
+  const cy = i * 18 + 8 + Math.floor(grain(i, 6, 52) * 8);
+  const R = 4 + (i % 2);
+  for (let x = -18; x <= 0; x++) {
+    const wy = Math.round(Math.sin(x / 4 + i) * 1.2);
+    stamp(midPat, cx + x, cy + R + wy, x < -12 ? "h" : "H");
+    stamp(midPat, cx + x, cy + R + wy + 1, "j");
+  }
+  for (let a = 0; a < 2 * Math.PI * 1.2; a += 0.05) {
+    const r = R * (1 - a / (2 * Math.PI * 1.6));
+    const th = Math.PI / 2 - a;
+    const px = cx + r * Math.cos(th + Math.PI);
+    const py = cy - r * Math.sin(th + Math.PI);
+    stamp(midPat, px, py, a > 4.2 ? "p" : "H");
+    stamp(midPat, px + 1, py + 1, "j");
+  }
+}
+for (let i = 0; i < 5; i++) {
+  const ex = Math.floor(grain(i, 7, 53) * ST);
+  const ey = i * 26 + 18;
+  for (let x = 0; x < 30 + (i % 3) * 12; x++) stamp(midPat, ex + x, ey + 2 * Math.sin(x / 6 + i), x > 8 && x < 34 ? "g" : "G");
+}
+
+/** The streaks and chips: dashes of pale wood brightest at their heads (right), bark chips, little curls, grains. */
+const frontPat: Pat = pat(ST);
+for (let i = 0; i < 42; i++) {
+  const ex = Math.floor(grain(i, 1, 61) * ST);
+  const ey = Math.floor(grain(i, 2, 61) * ST);
+  const len = 6 + Math.floor(grain(i, 3, 61) * 22);
+  const kind = grain(i, 4, 61);
+  const keys = kind < 0.55 ? "pHh" : kind < 0.85 ? "Hhj" : "gGF";
+  for (let x = 0; x < len; x++) {
+    const t = x / len;
+    stamp(frontPat, ex - x, ey, keys[t < 0.3 ? 0 : t < 0.7 ? 1 : 2]!);
+    if (kind > 0.4 && kind < 0.7 && x > 1 && x < len * 0.6) stamp(frontPat, ex - x - 2, ey + 1, keys[1]!);
+  }
+}
+const CURL_STAMPS = [["Hh", "j.", ".j"], [".pH", "h.j", ".j."], ["dc", "cb"], ["e.", "cb"], ["pH", "hj"]];
+for (let i = 0; i < 34; i++) {
+  const ex = Math.floor(grain(i, 8, 63) * ST);
+  const ey = Math.floor(grain(i, 9, 63) * ST);
+  CURL_STAMPS[i % CURL_STAMPS.length]!.forEach((row, j) => [...row].forEach((k, x) => k !== "." && stamp(frontPat, ex + x, ey + j, k)));
+}
+for (let i = 0; i < 80; i++) {
+  const ex = Math.floor(grain(i, 5, 62) * ST);
+  const ey = Math.floor(grain(i, 6, 62) * ST);
+  const g = grain(i, 7, 62);
+  stamp(frontPat, ex, ey, g < 0.12 ? "b" : g < 0.55 ? "p" : "H");
+  for (let x = 1; x <= 1 + (i % 3); x++) stamp(frontPat, ex - x, ey, g < 0.55 ? "g" : "h");
+}
+
+const stormKey = (x: number, y: number, f: number): string =>
+  frontPat[mod(y, ST)]![mod(x - SHIFT.front[f]!, ST)] ?? midPat[mod(y, ST)]![mod(x - SHIFT.mid[f]!, ST)] ?? backPat[mod(y, ST)]![mod(x - SHIFT.back[f]!, 32)]!;
+
+const stormParts: Record<string, Part> = {};
+const stormFrames: Frame[] = [0, 1, 2, 3, 4, 5].map((f) => {
+  stormParts[`s${f}`] = full((x, y) => stormKey(x, y, f), ST, ST, false);
+  return { ms: 70, layers: [{ part: `s${f}`, x: 0, y: 0 }], ...(f === 0 ? { cue: "swoosh" } : {}) };
+});
+export const INTRO_TIMBER_STORM: Character = {
+  id: "intro-timber-storm",
+  name: "Timber's sawdust storm (tile)",
+  w: ST,
+  h: ST,
+  foot: [ST / 2, ST - 1],
+  palette: PALETTE,
+  parts: stormParts,
+  anims: { idle: { loop: true, frames: stormFrames } },
+};
+
+/** The leading edge: the storm on its left (so it meets STORM with no seam), billowing lobes, thinning dust, chips ahead. */
+const LOBES = [
+  ...Array.from({ length: 6 }, (_, i) => ({ y: (i * 128) / 6 + grain(i, 1, 81) * 6, x: 15 + grain(i, 2, 81) * 6, r: 12 + grain(i, 3, 81) * 5, p: grain(i, 4, 81) * 6.28 })),
+  ...Array.from({ length: 6 }, (_, i) => ({ y: ((i + 0.5) * 128) / 6 + grain(i, 5, 81) * 4, x: 25 + grain(i, 6, 81) * 5, r: 6 + grain(i, 7, 81) * 3, p: grain(i, 8, 81) * 6.28 })),
+];
+function outside(x: number, y: number, f: number): number {
+  const ph = (2 * Math.PI * f) / 6;
+  const body = 17 + 2 * Math.sin((2 * Math.PI * 2 * y) / ST + ph);
+  let out = x < body ? 0 : x - body;
+  for (const l of LOBES) {
+    const cy = l.y + 2 * Math.sin(ph + l.p);
+    const cx = l.x + 3 * Math.cos(ph + l.p);
+    const r = l.r * (1 + 0.12 * Math.sin(ph + l.p * 2));
+    const dy = mod(y + 0.5 - cy + 64, ST) - 64;
+    out = Math.min(out, Math.max(0, Math.hypot(x + 0.5 - cx, dy * 1.1) - r));
+    if (out === 0) return 0;
+  }
+  return out;
+}
+function frontKey(x: number, y: number, f: number): Key {
+  const out = outside(x, y, f);
+  if (out === 0) {
+    const o = (dx: number, dy: number) => outside(x + dx, y + dy, f) > 0;
+    if (o(0, -2) || o(-2, -1)) return o(0, -1) ? "p" : "g";
+    if (o(0, 2)) return o(0, 1) ? "f" : "F";
+    if (o(1, 0)) return "G";
+    if (o(2, 0)) return "h";
+    return stormKey(x, y, f);
+  }
+  if (out < 1.5) return "q";
+  if (out < 3.5) return "Q";
+  const wisp = grain(mod(Math.floor((x - 3 * f) / 6), 3), y >> 1, 71);
+  if (out < 7) return wisp > 0.3 ? "%" : null;
+  if (out < 12) return wisp > 0.72 ? "%" : null;
+  return null;
+}
+const frontParts: Record<string, Part> = {};
+const frontFrames: Frame[] = [0, 1, 2, 3, 4, 5].map((f) => {
+  frontParts[`e${f}`] = full((x, y) => frontKey(x, y, f), FW, ST, false);
+  // Chips and curls flying ahead: each runs 3 px a frame over an 18 px stretch, so it comes round in 6 frames.
+  const specks: Speck[] = [];
+  for (let i = 0; i < 18; i++) {
+    const y = Math.floor((i * 128) / 18 + grain(i, 1, 72) * 5);
+    const x = 28 + mod(Math.floor(grain(i, 2, 72) * 18) + 3 * f, 18);
+    if (i % 3 === 0) specks.push([x, y, "H"], [x + 1, y, "h"], [x, y + 1, "j"], [x - 1, y, "Q"]); // a little curl
+    else if (i % 3 === 1) specks.push([x, y, "c"], [x + 1, y, "b"], [x - 1, y, "Q"]); // a bark chip
+    else specks.push([x, y, "p"], [x - 1, y, "q"], [x - 2, y, "Q"]); // a grain
+  }
+  return { ms: 70, layers: [{ part: `e${f}`, x: 0, y: 0 }], specks: specks.filter(([x, y]) => x < FW && y >= 0 && y < ST) };
+});
+export const INTRO_TIMBER_FRONT: Character = {
+  id: "intro-timber-front",
+  name: "Timber's sawdust storm (leading edge)",
+  w: FW,
+  h: ST,
+  foot: [0, ST - 1],
+  palette: PALETTE,
+  parts: frontParts,
+  anims: { idle: { loop: true, frames: frontFrames } },
+};
+
+// ================================================================================================================
+// 6. The review sheet: every piece side by side; one animation per piece animation; the storm tiled 3 x 2 with its front.
+// ================================================================================================================
+
+function place(sheetParts: Record<string, Part>, prefix: string, ch: Character, frame: Frame, dx: number, dy: number): { layers: Layer[]; specks: Speck[] } {
+  const layers = frame.layers.map((l) => {
+    const name = `${prefix}:${l.part}`;
+    sheetParts[name] = ch.parts[l.part]!;
+    return { ...l, part: name, x: l.x + dx, y: l.y + dy };
+  });
+  const specks = (frame.specks ?? []).map(([x, y, k]): Speck => [x + dx, y + dy, k]);
+  return { layers, specks };
+}
+type Slot = { prefix: string; ch: Character; frame: Frame; at: Pt };
+function compose(parts: Record<string, Part>, slots: Slot[], ms: number, cue?: string): Frame {
+  const layers: Layer[] = [];
+  const specks: Speck[] = [];
+  for (const s of slots) {
+    const p = place(parts, s.prefix, s.ch, s.frame, s.at[0], s.at[1]);
+    layers.push(...p.layers);
+    specks.push(...p.specks);
+  }
+  return { ms, layers, specks, ...(cue ? { cue } : {}) };
+}
+
+const AT = { lying: [2, 2] as Pt, standing: [2, 76] as Pt, shav: [86, 2] as Pt, set: [266, 4] as Pt, stump: [300, 58] as Pt, board: [270, 104] as Pt, grid: [382, 2] as Pt };
+const GRID_W = 3 * ST + FW;
+const GRID_H = 2 * ST;
+const SHEET_W = AT.grid[0] + GRID_W + 2;
+const SHEET_H = GRID_H + 6;
+const stormGridSlots = (f: number): Slot[] => [
+  ...[0, 1, 2].flatMap((i) => [0, 1].map((j) => ({ prefix: `storm${i}${j}`, ch: INTRO_TIMBER_STORM, frame: stormFrames[f]!, at: [AT.grid[0] + i * ST, AT.grid[1] + j * ST] as Pt }))),
+  ...[0, 1].map((j) => ({ prefix: `front${j}`, ch: INTRO_TIMBER_FRONT, frame: frontFrames[f]!, at: [AT.grid[0] + 3 * ST, AT.grid[1] + j * ST] as Pt })),
+];
+/** The table set, under the storm (same foot), for the hold and settle checks. */
+const SET_UNDER: Pt = [AT.shav[0] + VCX - TCX, AT.shav[1] + VF - TFOOT];
+const sheetParts: Record<string, Part> = {};
+interface Over {
+  lying?: Frame;
+  standing?: Frame;
+  shav?: Frame;
+  under?: boolean;
+  set?: Frame;
+  stump?: Frame;
+  grid?: number;
+}
+function sheetFrame(o: Over, ms: number, cue?: string): Frame {
+  const setIdle = TABLE_SET.anims.idle!.frames[0]!;
+  return compose(
+    sheetParts,
+    [
+      { prefix: "ly", ch: INTRO_TIMBER_LOG, frame: o.lying ?? lyingFrame, at: AT.lying },
+      { prefix: "stl", ch: INTRO_TIMBER_LOG, frame: o.standing ?? standingFrame, at: AT.standing },
+      ...(o.under ? [{ prefix: "under", ch: TABLE_SET, frame: setIdle, at: SET_UNDER }] : []),
+      { prefix: "sv", ch: INTRO_TIMBER_SHAVINGS, frame: o.shav ?? holdFrames[0]!, at: AT.shav },
+      { prefix: "set", ch: TABLE_SET, frame: o.set ?? setIdle, at: AT.set },
+      { prefix: "stp", ch: INTRO_TIMBER_STUMP, frame: o.stump ?? stumpIdle, at: AT.stump },
+      { prefix: "brd", ch: TABLE_SET, frame: TABLE_SET.anims.board!.frames[0]!, at: AT.board },
+      ...stormGridSlots(o.grid ?? 0),
+    ],
+    ms,
+    cue,
+  );
+}
+const sheetAnims: Record<string, Anim> = { idle: { loop: true, frames: [sheetFrame({}, 1000)] } };
+const each = (anim: Anim, over: (fr: Frame) => Over): Anim => ({ loop: anim.loop, frames: anim.frames.map((fr) => sheetFrame(over(fr), fr.ms, fr.cue)) });
+sheetAnims["log-lying"] = each(INTRO_TIMBER_LOG.anims.lying!, (fr) => ({ lying: fr }));
+sheetAnims["log-standing"] = each(INTRO_TIMBER_LOG.anims.standing!, (fr) => ({ standing: fr }));
+sheetAnims["log-gnawed"] = each(INTRO_TIMBER_LOG.anims.gnawed!, (fr) => ({ standing: fr }));
+sheetAnims["shavings-rise"] = each(INTRO_TIMBER_SHAVINGS.anims.rise!, (fr) => ({ shav: fr }));
+sheetAnims["shavings-hold"] = each(INTRO_TIMBER_SHAVINGS.anims.hold!, (fr) => ({ shav: fr, under: true }));
+sheetAnims["shavings-settle"] = each(INTRO_TIMBER_SHAVINGS.anims.settle!, (fr) => ({ shav: fr, under: true }));
+sheetAnims.table = { loop: true, frames: [sheetFrame({}, 1000)] };
+sheetAnims["stump-idle"] = each(INTRO_TIMBER_STUMP.anims.idle!, (fr) => ({ stump: fr }));
+sheetAnims["stump-pop"] = { loop: false, frames: popFrames.map((fr, i) => sheetFrame({ stump: fr, set: TABLE_SET.anims.pop!.frames[i]! }, fr.ms, fr.cue)) };
+sheetAnims.storm = { loop: true, frames: [0, 1, 2, 3, 4, 5].map((f) => sheetFrame({ grid: f }, 70, f === 0 ? "swoosh" : undefined)) };
+
+/** (While drawing, a single piece can be reviewed on its own here; the sheet when null.) */
+const overParts: Record<string, Part> = {};
+const OVER: Character = {
+  id: "over",
+  name: "The storm over the table",
+  w: VW,
+  h: VH,
+  foot: [VCX, VF],
+  palette: PALETTE,
+  parts: overParts,
+  anims: Object.fromEntries(
+    (["rise", "hold", "settle"] as const).map((n) => [
+      n,
+      {
+        loop: n === "hold",
+        frames: INTRO_TIMBER_SHAVINGS.anims[n]!.frames.map((fr) =>
+          compose(overParts, [...(n !== "rise" ? [{ prefix: "t", ch: TABLE_SET, frame: TABLE_SET.anims.idle!.frames[0]!, at: [VCX - TCX, VF - TFOOT] as Pt }] : [{ prefix: "l", ch: INTRO_TIMBER_LOG, frame: standingFrame, at: [VCX - LCX, VF - LF] as Pt }]), { prefix: "s", ch: INTRO_TIMBER_SHAVINGS, frame: fr, at: [0, 0] }], fr.ms),
+        ),
+      },
+    ]),
+  ),
+};
+const DEV = null as Character | null;
+void OVER; // (OVER: the storm over the table / the log, same foot: set DEV = OVER to review it)
 export const HOUSE_INTRO_TIMBER: Character = DEV
   ? { ...DEV, id: "house-intro-timber", anims: { idle: DEV.anims.lying ?? DEV.anims.idle ?? DEV.anims.hold!, ...DEV.anims } }
-  : { id: "house-intro-timber", name: "", w: 1, h: 1, foot: [0, 0], palette: PALETTE, parts: {}, anims: {} };
+  : {
+      id: "house-intro-timber",
+      name: "Timber's battle intro (review sheet)",
+      w: SHEET_W,
+      h: SHEET_H,
+      foot: [SHEET_W / 2, SHEET_H - 4],
+      palette: PALETTE,
+      parts: sheetParts,
+      anims: sheetAnims,
+    };
