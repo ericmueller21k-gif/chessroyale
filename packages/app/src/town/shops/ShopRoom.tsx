@@ -44,7 +44,7 @@ import type { Rider } from "../rides.ts";
 import { rideSpeed } from "../../components/rides/scale.ts";
 import { inTalkRange, isFloor, makeRoom, onDoor, tapTarget, findPath, type Room, type ShopPlace, type Sq } from "./room.ts";
 import { POOL_LINE, bossHoldings, buyBossCrate, canAfford, holdLine, priceLine, prizeRows, shopOf, wayText, type CrateWay, type ShopDef } from "./shops.ts";
-import { CHALLENGE_FEEL, attackStart, attackTime, frameAt as animFrame, introAt, introCues, introLength, isLog, marksOf, type DrawnMarks, type IntroNow, type LogPlace } from "./challenge.ts";
+import { CHALLENGE_FEEL, attackStart, attackTime, frameAt as animFrame, introAt, introCues, introLength, isLog, marksFeel, marksOf, type DrawnMarks, type IntroNow, type LogPlace } from "./challenge.ts";
 import { play } from "../../sound.ts";
 import { paintTable, playCue, slabFrontY, type LoadedIntro } from "./intro.ts";
 import { TABLE_BOARD } from "../houses/park.ts";
@@ -313,7 +313,7 @@ function startRoom(
   // circle, side by side, at the challenge's pace; each settles onto its mark's middle; facing each other, the intro plays.
   const C = CHALLENGE_FEEL;
   const ci = challenge?.intro ?? null;
-  const marks = ci ? marksOf(art.layout, ci.def.layout, art.marks) : null;
+  const marks = ci ? marksOf(art.layout, ci.def.layout, art.marks, marksFeel(ci.anims)) : null;
   const across = marks?.layout === "across";
   const boss = ci && marks ? new Walker({ c: room.start.c - 1, r: room.start.r }, C.walkStepMs, false) : null;
   const bossPose = { x: 0, y: 0, hop: 0, tilt: 0, step: false, t: 0 };

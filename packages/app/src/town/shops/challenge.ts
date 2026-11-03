@@ -195,9 +195,10 @@ export const CHALLENGE_FEEL = {
    * table's middle (on the boss's row, past his mark); his line shows `lineLeadMs` alone before he sets off for it (the bubble stays
    * its `lineMs`, riding his head); he walks there at `walkMs` a square and carries it to the middle at `carryMs` a square (a slower,
    * strained waddle); the shavings' fog holds `holdMs` (its loop twice) while the table and stumps swap in under it. Every other beat
-   * is the art's own frames (characters/timber-intro.ts, shops/timber-intro-art.ts).
+   * is the art's own frames (characters/timber-intro.ts, shops/timber-intro-art.ts). He swings `clear` squares from the table's middle
+   * (his `clear.boss`: a tenth further out than the others' 2.6, as his stump's roots spread wider than a stool).
    */
-  log: { at: 3, lineLeadMs: 800, walkMs: 420, carryMs: 600, holdMs: 960 },
+  log: { at: 3.3, lineLeadMs: 800, walkMs: 420, carryMs: 600, holdMs: 960, clear: 2.7 },
 } as const;
 
 // ---- The flow, from the card's tap to the battle.
@@ -265,7 +266,15 @@ export interface DrawnMarks {
  * without a circle. The circles' drawn start marks (Alfil's and Puddles') are where the layout puts you (a unit test keeps them so).
  * A room whose art exports its marks (`drawn`: Big Boy's, west and east) has you stand on them across, the table halfway between.
  */
-export function marksOf(layout: readonly ShopPlace[], how: IntroLayout, drawn?: DrawnMarks | null, feel: Pick<typeof CHALLENGE_FEEL, "standOff" | "stoolOff" | "clearOff" | "clear"> = CHALLENGE_FEEL): Marks | null {
+/** The numbers `marksOf` places you, the boss and the stools by (CHALLENGE_FEEL's, or a boss's own clear place: `marksFeel`). */
+export interface MarksFeel {
+  standOff: { readonly across: number; readonly facing: number };
+  stoolOff: number;
+  clearOff: number;
+  clear: { readonly you: number; readonly boss: number };
+  log: { readonly clear: number };
+}
+export function marksOf(layout: readonly ShopPlace[], how: IntroLayout, drawn?: DrawnMarks | null, feel: Omit<MarksFeel, "log"> = CHALLENGE_FEEL): Marks | null {
   let c0 = Infinity, c1 = -Infinity, r0 = Infinity, r1 = -Infinity;
   for (const p of layout) {
     if (!/^(circle|ring|emblem)-/.test(p.name)) continue;
@@ -337,7 +346,8 @@ export interface BlocksAnims {
   cues: { readonly build: readonly (string | undefined)[]; readonly plop: readonly (string | undefined)[]; readonly chairs: readonly (string | undefined)[] };
 }
 /** Timber's moves (characters/timber-intro.ts BOSS_BEAVER_INTRO): his empty-handed waddle, the heave, the carry, the set-down, his gnaw, his dusting off. */
-export type LogMove = "walk" | "lift" | "carry" | "setDown" | "gnaw" | "done";
+export const LOG_MOVES = ["walk", "lift", "carry", "setDown", "gnaw", "done"] as const;
+export type LogMove = (typeof LOG_MOVES)[number];
 /** The props' animations Timber's intro plays (shops/timber-intro-art.ts): the log's gnawing, the shavings' fog, a stump's pop. */
 export type LogProp = "gnawed" | "rise" | "hold" | "settle" | "pop";
 /**
@@ -351,6 +361,28 @@ export interface LogAnims {
   cues: { readonly [m in LogMove | LogProp]: readonly (string | undefined)[] };
   reach: number;
   back: number;
+}
+/** A picture's animations, as LogAnims needs them (characters/sprite.ts Character's: each frame's ms and cue, and its layers' parts and x). */
+type ArtLike = { anims: Readonly<Record<string, { frames: readonly { ms: number; cue?: string; layers: readonly { part: string; x: number }[] }[] } | undefined>> };
+/**
+ * Timber's LogAnims from his art (shops/timber-intro-art.ts): his moves (`mover`, BOSS_BEAVER_INTRO), the log's gnawing, the fog, a
+ * stump's pop, and his `reach` (TIMBER_INTRO_REACH), `perSq` of his pixels a square. His dusting off's step back: the way his foot's
+ * layer moves from his still to the move's last frame.
+ */
+export function logAnims(w: { mover: ArtLike; log: ArtLike; fog: ArtLike; stump: ArtLike; reach: readonly [number, number] }, perSq: number): LogAnims {
+  const fr = (ch: ArtLike, a: string) => ch.anims[a]!.frames;
+  const msOf = (ch: ArtLike, a: string) => fr(ch, a).map((f) => f.ms);
+  const cuesOf = (ch: ArtLike, a: string) => fr(ch, a).map((f) => f.cue);
+  const footX = (f: { layers: readonly { part: string; x: number }[] }) => f.layers.find((l) => l.part.startsWith("foot"))?.x ?? 0;
+  const done = fr(w.mover, "done");
+  const of = <T>(get: (m: LogMove) => T) => Object.fromEntries(LOG_MOVES.map((m) => [m, get(m)])) as Record<LogMove, T>;
+  return {
+    moves: of((m) => msOf(w.mover, m)),
+    props: { gnawed: msOf(w.log, "gnawed"), rise: msOf(w.fog, "rise"), hold: msOf(w.fog, "hold"), settle: msOf(w.fog, "settle"), pop: msOf(w.stump, "pop") },
+    cues: { ...of((m) => cuesOf(w.mover, m)), gnawed: cuesOf(w.log, "gnawed"), rise: cuesOf(w.fog, "rise"), hold: cuesOf(w.fog, "hold"), settle: cuesOf(w.fog, "settle"), pop: cuesOf(w.stump, "pop") },
+    reach: w.reach[0] / perSq,
+    back: (footX(fr(w.mover, "idle")[0]!) - footX(done[done.length - 1]!)) / perSq,
+  };
 }
 /** A boss's own art's animations: a pyramid (Alfil's), toy blocks (Big Boy's) or a log (Timber's). */
 export type IntroAnims = PyramidAnims | BlocksAnims | LogAnims;
@@ -376,12 +408,15 @@ type BeatFeel = Pick<
 >;
 /**
  * Timber's walks, in squares: from his mark west to the log, carrying it from there to where he works (`reach` west of the table's
- * middle), and from where his dusting off leaves him to where he swings (`clear.boss` from the middle). His mark is `standOff.across`
+ * middle), and from where his dusting off leaves him to where he swings (`log.clear` from the middle). His mark is `standOff.across`
  * from the middle (his room's drawn marks are: a unit test keeps them so).
  */
 export function logWalks(a: LogAnims, feel: Pick<typeof CHALLENGE_FEEL, "log" | "standOff" | "clear"> = CHALLENGE_FEEL): { toLog: number; carry: number; toMark: number } {
-  return { toLog: feel.log.at - feel.standOff.across, carry: feel.log.at - a.reach, toMark: feel.clear.boss - a.reach - a.back };
+  return { toLog: feel.log.at - feel.standOff.across, carry: feel.log.at - a.reach, toMark: feel.log.clear - a.reach - a.back };
 }
+/** The feel the marks are found with (`marksOf`): Timber's log intro has its own clear place for him (`log.clear`), every other the shared one. */
+export const marksFeel = (a: IntroAnims | null, feel: MarksFeel = CHALLENGE_FEEL): MarksFeel =>
+  a && isLog(a) ? { ...feel, clear: { ...feel.clear, boss: feel.log.clear } } : feel;
 /** How long the boss's transition takes to cover the screen (ms): its own storm's sweep, or the default's flash and wipe. */
 export const coverMs = (custom: boolean, feel: Pick<typeof CHALLENGE_FEEL, "stormInMs" | "flashMs" | "wipeMs"> = CHALLENGE_FEEL): number =>
   custom ? feel.stormInMs : feel.flashMs + feel.wipeMs;
@@ -407,9 +442,9 @@ export function introBeats(a: IntroAnims | null, feel: BeatFeel = CHALLENGE_FEEL
     // off his paws and walks to where he swings; the attack. (No table beat on its own: he's walking away from it.)
     const w = logWalks(a, feel);
     add("line", feel.log.lineLeadMs);
-    add("toLog", w.toLog * feel.log.walkMs);
+    add("toLog", Math.round(w.toLog * feel.log.walkMs));
     add("lift", sum(a.moves.lift));
-    add("carry", w.carry * feel.log.carryMs);
+    add("carry", Math.round(w.carry * feel.log.carryMs));
     add("setDown", sum(a.moves.setDown));
     add("gnaw", sum(a.props.gnawed));
     add("rise", sum(a.props.rise));
@@ -417,7 +452,7 @@ export function introBeats(a: IntroAnims | null, feel: BeatFeel = CHALLENGE_FEEL
     add("settle", sum(a.props.settle));
     add("pop", sum(a.props.pop));
     add("dust", sum(a.moves.done));
-    add("toMark", w.toMark * feel.log.walkMs);
+    add("toMark", Math.round(w.toMark * feel.log.walkMs));
     add("swing", Math.max(0, feel.swingMs - coverMs(true, feel)));
     out.push({ step: "done", at: t, end: Infinity });
     return out;

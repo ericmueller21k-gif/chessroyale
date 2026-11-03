@@ -22,14 +22,14 @@
  */
 import { KING_ATTACK } from "@chessroyale/chess";
 import { bossKit } from "../../characters/kits.ts";
-import { renderFrame, type Character, type Frame } from "../../characters/sprite.ts";
+import { renderFrame, type Character } from "../../characters/sprite.ts";
 import { play, warmSounds, type SoundName } from "../../sound.ts";
 import { newPt, proj, tableLift, type TableLift, type View } from "../camera.ts";
 import { TOWN_FEEL } from "../feel.ts";
 import { PARK_TABLE, TABLE_BOARD, TABLE_INK, TABLE_PIECES } from "../houses/park.ts";
 import { BOSS_ART } from "../render.ts";
 import type { HomeId } from "../world.ts";
-import { CHALLENGE_FEEL, boardSquare, introBeats, introOf, stormEdge, wipeAt, type BossIntro, type IntroAnims, type IntroBeat, type IntroLayout, type LogAnims, type LogMove } from "./challenge.ts";
+import { CHALLENGE_FEEL, boardSquare, introBeats, introOf, stormEdge, wipeAt, type BossIntro, type IntroAnims, type IntroBeat, type IntroLayout, type LogMove, LOG_MOVES, logAnims } from "./challenge.ts";
 
 /**
  * A boss's intro art, as its file exports it: a pyramid that brings in its table (Alfil's), or toy blocks that are the table and its
@@ -71,7 +71,6 @@ const ART: Partial<Record<HomeId, () => Promise<IntroArt>>> = {
 
 type PyramidAnim = "rise" | "idle" | "crack" | "crumble";
 type BlocksAnim = "build" | "plop" | "chairs" | "idle";
-const LOG_MOVES = ["walk", "lift", "carry", "setDown", "gnaw", "done"] as const;
 
 /** The storm's frames, ready: each tile `stormScale` times its size, the front and the front mirrored, and each frame's ms. */
 export interface StormArt {
@@ -171,24 +170,8 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
     const all = <A extends string>(ch: Character, names: readonly A[]) => Object.fromEntries(names.map((a) => [a, ch.anims[a]!.frames.map((_, i) => toCanvas(ch, a, i))])) as Record<A, HTMLCanvasElement[]>;
     if (art?.wood) {
       const w = art.wood;
-      const msOf = (ch: Character, a: string) => ch.anims[a]!.frames.map((f) => f.ms);
-      const cuesOf = (ch: Character, a: string) => ch.anims[a]!.frames.map((f) => f.cue);
-      // (Its places in squares: his pixels are his town figure's, BOSS_ART's, `bossSquares` tall. His dusting off steps him back: the
-      // way his foot's layer moves from his still to the move's last frame.)
-      const perSq = BOSS_ART[home].h / (TOWN_FEEL.bossSquares * (TOWN_FEEL.bossScale[home] ?? 1));
-      const footX = (fr: Frame) => fr.layers.find((l) => l.part.startsWith("foot"))?.x ?? 0;
-      const back = (footX(w.mover.anims.idle!.frames[0]!) - footX(w.mover.anims.done!.frames.at(-1)!)) / perSq;
-      const moves = Object.fromEntries(LOG_MOVES.map((m) => [m, msOf(w.mover, m)])) as Record<LogMove, number[]>;
-      const props = { gnawed: msOf(w.log, "gnawed"), rise: msOf(w.fog, "rise"), hold: msOf(w.fog, "hold"), settle: msOf(w.fog, "settle"), pop: msOf(w.stump, "pop") };
-      const cues = {
-        ...(Object.fromEntries(LOG_MOVES.map((m) => [m, cuesOf(w.mover, m)])) as Record<LogMove, (string | undefined)[]>),
-        gnawed: cuesOf(w.log, "gnawed"),
-        rise: cuesOf(w.fog, "rise"),
-        hold: cuesOf(w.fog, "hold"),
-        settle: cuesOf(w.fog, "settle"),
-        pop: cuesOf(w.stump, "pop"),
-      };
-      anims = { moves, props, cues, reach: w.reach[0] / perSq, back } satisfies LogAnims;
+      // (His pixels are his town figure's, BOSS_ART's, `bossSquares` tall.)
+      anims = logAnims(w, BOSS_ART[home].h / (TOWN_FEEL.bossSquares * (TOWN_FEEL.bossScale[home] ?? 1)));
       wood = {
         mover: { ch: w.mover, frames: all(w.mover, [...LOG_MOVES, "idle"]) },
         liftAt: w.liftAt,
