@@ -442,7 +442,19 @@ export function previewPieceSound(kind: PieceSoundKind, id: string): void {
 }
 
 /** Plays synthesised samples (a boss character's sounds, see characters/), at `rate` (a little higher or lower). */
+/** Synthesized sounds already checked for samples that aren't numbers (`buffer`). */
+const checked = new WeakSet<Float32Array>();
+/**
+ * A sound made by code (the bosses', the God King's, Auto chess's), started now. Each one's samples are checked once and any that
+ * isn't a number is made 0: one NaN sample reaching the soft low-pass every sound goes through (`ensureContext`) breaks that filter
+ * for good, and every sound after is silent while the context still says "running" (Timber's chitter at 48 kHz, Nov 3; Chrome:
+ * "BiquadFilterNode: state is bad").
+ */
 function buffer(data: Float32Array, at: number, rate = 1) {
+  if (!checked.has(data)) {
+    for (let i = 0; i < data.length; i++) if (!Number.isFinite(data[i]!)) data[i] = 0;
+    checked.add(data);
+  }
   const c = ctx!;
   const buf = c.createBuffer(1, data.length, c.sampleRate);
   buf.getChannelData(0).set(data);
