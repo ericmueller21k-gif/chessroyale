@@ -866,7 +866,9 @@ describe("lobby: Crowd mode", () => {
     expect(v.picks.every((p) => p.move)).toBe(true);
   });
   it("the God King's Last Stand online: everyone sees it, the clock waits for it, then the crowd picks again without the blunder", () => {
-    const L = setup({ ...RAID_SETTINGS });
+    // (On the battle's first move: the first-five-moves rule, lastStandFromMove, off here; it's lastStandDue's, the
+    // same runner online and solo: last-stand.test.ts.)
+    const L = setup({ ...RAID_SETTINGS, lastStandFromMove: 0 });
     L.core.connect(undefined, "Ann", "computer", false, 1500);
     L.core.connect(undefined, "Bo", "phone", false, 1500);
     L.core.message("p1", { t: "start" });

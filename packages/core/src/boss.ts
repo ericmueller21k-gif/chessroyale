@@ -1382,7 +1382,7 @@ export interface PowerEvent {
 /** The settings behind the God King's Last Stand. */
 export type LastStandSettings = Pick<
   Settings,
-  "lastStandLoss" | "lastStandChargedExtra" | "lastStandLossFloor" | "lastStandDecayMoves" | "lastStandFrom" | "lastStandShareBelow" | "lastStandShare"
+  "lastStandLoss" | "lastStandChargedExtra" | "lastStandLossFloor" | "lastStandDecayMoves" | "lastStandFrom" | "lastStandShareBelow" | "lastStandShare" | "lastStandFromMove"
 >;
 
 /**
@@ -1405,8 +1405,11 @@ export function lastStandBar(best: number, crowdMoves: number, charges: number, 
  * Whether the crowd's played move calls for the Last Stand: it gave away at least the bar (`loss`, in points; see
  * lastStandBar), and the position wasn't already lost (the best move was worth at least lastStandFrom, `best`
  * being the mover's expected score after it, 0-1). The engine's judgment decides, not the material: a sacrifice it
- * likes gives nothing away. Once per game: the caller checks he hasn't fallen already.
+ * likes gives nothing away. Never on the crowd's first lastStandFromMove moves of the battle (Eric, Nov 2):
+ * `crowdMoves` is the crowd's moves already played in this battle, so the move being judged is its crowdMoves + 1th,
+ * and with lastStandFromMove 5 the first one he can save is the 6th (crowdMoves 5). Once per game: the caller checks
+ * he hasn't fallen already.
  */
 export function lastStandDue(loss: number, best: number, crowdMoves: number, charges: number, s: LastStandSettings): boolean {
-  return best * 100 >= s.lastStandFrom && loss >= lastStandBar(best, crowdMoves, charges, s);
+  return crowdMoves >= s.lastStandFromMove && best * 100 >= s.lastStandFrom && loss >= lastStandBar(best, crowdMoves, charges, s);
 }

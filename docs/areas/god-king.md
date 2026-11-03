@@ -40,6 +40,12 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   `lastStandShare` (half) of the chances left, when that's lower. Never when the best move is worth under
   `lastStandFrom` (20%: a lost position). Charges he falls with go to the crowd as power-ups. The round's scores
   stand.
+- **Not on the crowd's first five moves** (Eric, Nov 2: "always hard set each side five moves in no matter what before
+  it will even look to make a save"; docs/decisions/2026-11-02-last-stand-from-move-6.md). `lastStandFromMove` (5):
+  `lastStandDue` says no while the battle's `crowdMoves` (moves already played, the judged one not yet counted) is under
+  it, so the 5th move stands and the 6th is the first he can save, with the bar as it falls from move 1. It counts the
+  battle's own moves, whatever the opening (Random opening, Freestyle, a battle picking up a game in progress), solo,
+  online and in the sims alike. The test switch `?laststand=1` still calls him on any move.
 - **Never on a board a boss has changed** (Eric, Oct 24: inside Babur's hoop it took back his queen's capture, fearing
   a recapture the hoop's walls forbid; docs/decisions/2026-10-24-king-save-off-on-altered-boards.md). The judge's numbers
   are plain chess's, so while a boss's power has changed the board the Last Stand sits out: the move stands, nothing is
@@ -92,13 +98,14 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
 - **How he judges a blunder** (Eric, Oct 10: option 3 of the Last Stand proposals). He judges the crowd's move as
   it's played, before the boss replies, by how much it lowers the crowd's chances (the judge's expected score, the eval
   bar's number), not by the material: players sometimes sacrifice on purpose, and a sacrifice the engine likes gives
-  nothing away. From 40% up, one move must throw away the plain bar (35 points on the first move with charges, easing
-  to 18 by move 22): a hung queen from an even position costs 50 to 70 points. From 20% to 40%, half of the chances
+  nothing away. From 40% up, one move must throw away the plain bar (35 points from the first move with charges, 31.1 on
+  move 6, the first he can save, easing to 18 by move 22): a hung queen from an even position costs 50 to 70 points. From 20% to 40%, half of the chances
   left is enough (from 30%, 15 points; from 25%, 12.5), or the plain bar if that's lower. Under 20% the game counts as
   already lost. Charges only raise the plain bar by 5; solo and online are the same; it never waits for the boss to
   take the piece. Eric's two games, replayed in Solo by `scripts/repro-last-stand.ts`: losing on purpose (moves giving
   away 4 to 21 points, none a disaster for where they were played) and then the queen hung from 12% (in Eric's own game,
-  19%): no Last Stand, the game being lost by then; the queen hung on move 1 (55% to 4%): Last Stand.
+  19%): no Last Stand, the game being lost by then; the queen hung on move 1 (55% to 4%): Last Stand (since Nov 2,
+  the first five moves stand: the same queen hung there is played).
 - **Looks.** Pixel art in the boss characters' format, in white and black versions (a recolor of the armor only,
   in the crowd's color). SNES/Fire Emblem style: pixel portraits, slanted cut-in banners, retro sounds, a Press
   Start 2P speech bubble. Drama yes, gore no (cracks, sparks and a few stylized red drops are the limit).
@@ -152,7 +159,7 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
 - Sims: `packages/sim/scripts/last-stand-sim.ts`, `last-stand-blunders.ts` (`reports/last-stand.md`).
 - Replays in the real Solo app, the runner's own numbers logged move by move: `npx tsx scripts/repro-last-stand.ts
   [phone|desktop] [boss] [hang=35]` (a slow slide, then the queen hung once the crowd's chances are under `hang`%:
-  no Last Stand from under 20%; a queen hung on move 1: Last Stand).
+  no Last Stand from under 20%; a queen hung on move 1: Last Stand until Nov 2, none since: the first five moves stand).
 - e2e for his lines' time: `e2e/boss-speech.spec.ts` (his opening line held for its full time; each boss's line gone
   on time). Unit:
   `packages/app/test/speech.test.ts`.

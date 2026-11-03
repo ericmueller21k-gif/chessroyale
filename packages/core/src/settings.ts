@@ -191,6 +191,15 @@ export interface Settings {
   lastStandShareBelow: number;
   lastStandShare: number;
   /**
+   * No Last Stand on the crowd's first this many moves of the battle; from the next one on, as above. It counts the
+   * moves played in this battle, whatever the opening (a Random opening, Freestyle, a battle that starts from a game in
+   * progress). The test switch (?laststand=1) still calls him on any move. Eric, Nov 2: "sometimes it triggers on the
+   * first move… it doesn't matter if it's a random position opening like Fischer Random or a piece gets eaten or
+   * whatever… always hard set each side five moves in no matter what before it will even look to make a save… it can
+   * literally be disabled until it detects that you've played five moves and then it can flip on."
+   */
+  lastStandFromMove: number;
+  /**
    * The Last Stand: he falls with his charges unspent, and leaves them to the crowd. Every player still in gets this
    * many power-ups (the engine's top 3 moves, as in Crowd) for each charge he had left.
    */
@@ -538,6 +547,7 @@ export const DEFAULT_SETTINGS: Settings = {
   lastStandFrom: 20,
   lastStandShareBelow: 40,
   lastStandShare: 0.5,
+  lastStandFromMove: 5,
   lastStandPowerUps: 1,
   bossStumbleBelow: 2100,
   bossStumbleMax: 0.25,

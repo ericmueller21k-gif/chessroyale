@@ -81,10 +81,11 @@ test("Babur's hoops: a move the God King would save stands inside the walls, a c
   const cast = await state(page);
   const blocks: string[] = cast.boss.powers.hoops.blocks;
   expect(blocks.length).toBeGreaterThan(0);
-  // From here every move the crowd plays calls for him, whatever it gives away: the bar at nothing, never "already lost".
+  // From here every move the crowd plays calls for him, whatever it gives away: the bar at nothing, never "already lost",
+  // and from any move (the first-five-moves rule off: the hoops can be out before the crowd's 6th move).
   await page.evaluate(() => {
     const r = (window as any).match.runner;
-    r.opts.settings = { ...r.opts.settings, lastStandFrom: 0, lastStandLoss: 0, lastStandLossFloor: 0, lastStandChargedExtra: 0 };
+    r.opts.settings = { ...r.opts.settings, lastStandFrom: 0, lastStandLoss: 0, lastStandLossFloor: 0, lastStandChargedExtra: 0, lastStandFromMove: 0 };
   });
   await watchStand(page);
 

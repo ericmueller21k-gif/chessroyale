@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_BRAIN, BOSS_DIFFICULTY, BOSS_POWERS, BOSS_ROSTER, BOSS_TIERS, CROWD_KNOCKOUTS, CROWD_START, DEFAULT_SETTINGS, LEAVING, RANKED_1V1, RECLUSE_PHASE2, crowdFinalBoss, crowdFinalists, fixedLevel, isPlayable, maiaRatingFor, maiaTopRating } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_DIFFICULTY, BOSS_POWERS, BOSS_ROSTER, BOSS_TIERS, CROWD_KNOCKOUTS, CROWD_START, DEFAULT_SETTINGS, LEAVING, RANKED_1V1, RECLUSE_PHASE2, crowdFinalBoss, crowdFinalists, fixedLevel, isPlayable, lastStandBar, maiaRatingFor, maiaTopRating } from "@chessroyale/core";
 import { BOSS_BLOCKS, FAQ_DEFAULTS, eloExpected, faqAnchors, faqPage, faqPlainText, faqSections, ranked1v1, type FaqSources } from "../src/faq/content.ts";
 import { inlineText, linksOf, parse, plainText } from "../src/faq/markdown.ts";
 
@@ -191,6 +191,25 @@ describe("the FAQ's numbers come from the settings", () => {
     expect(moved).toContain("Under 15%: no save");
     expect(moved).toContain("From 15% to 45%");
     expect(moved).toContain(`starts at ${40 + s.lastStandChargedExtra} with charges`);
+  });
+
+  it("the Last Stand's first five moves (Eric, Nov 2): none before move 6, from the settings", () => {
+    const t = section("god-king");
+    expect(DEFAULT_SETTINGS.lastStandFromMove).toBe(5);
+    expect(t).toContain("Not before move 6. He never steps in on the crowd's first 5 moves of the battle: he's ready from its 6th move on.");
+    expect(t).toContain("however it began (a Random opening, Freestyle, or a battle that picks up a game in progress)");
+    const at6 = (charges: number) => (Math.round(lastStandBar(0.5, 5, charges, DEFAULT_SETTINGS) * 10) / 10).toString();
+    expect(t).toContain(`(30 without), is ${at6(1)} (${at6(0)}) on move 6, the first he can save, and eases to`);
+    expect(t).toContain("Move 6, with charges");
+    expect(t).toContain("On move 6, from a level position, the crowd hangs its queen");
+    expect(t).toContain("the same queen hung on move 5 would stand");
+    const moved = section("god-king", withSettings({ lastStandFromMove: 3 }));
+    expect(moved).toContain("Not before move 4. He never steps in on the crowd's first 3 moves of the battle");
+    expect(moved).toContain("Move 4, with charges");
+    const off = section("god-king", withSettings({ lastStandFromMove: 0 }));
+    expect(off).not.toContain("Not before move");
+    expect(off).toContain("First move, with charges");
+    expect(off).not.toContain("would stand");
   });
 
   it("the handover: Maia's rating lines, the crowd's margin, the worked example, the bridge and where Stockfish takes over", () => {

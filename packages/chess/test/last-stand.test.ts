@@ -42,10 +42,14 @@ function judge(script: { best?: string; bestExpected: number; blunder: string; b
   };
 }
 
-/** Solo boss raid (just you), the God King with all his charges unless told otherwise. */
+/**
+ * Solo boss raid (just you), the God King with all his charges unless told otherwise. These tests are about the save
+ * itself, from the battle's first move: the first-five-moves rule (lastStandFromMove) is off here unless patched in, and
+ * has its own tests below ("not on the crowd's first five moves").
+ */
 function raid(engine: EngineLike, patch: Partial<Settings> = {}, players = 1) {
   // (G-REX: the boss this seed met before Big Boy joined the draw.)
-  const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, raidOpening: true, bossFixedElo: 2000, bossId: "grex", ...patch } as Settings;
+  const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, raidOpening: true, bossFixedElo: 2000, bossId: "grex", lastStandFromMove: 0, ...patch } as Settings;
   return new MatchRunner({
     settings,
     rng: mulberry32(5),
@@ -60,7 +64,8 @@ const pick = (move: string | null) => new Map([["h0", { move, thinkMs: 1000 }]])
 
 describe("the God King's Last Stand: the rule", () => {
   it("the bar starts at lastStandLoss (higher while he has charges) and falls to the floor over lastStandDecayMoves", () => {
-    const s = { ...DEFAULT_SETTINGS, lastStandLoss: 30, lastStandChargedExtra: 5, lastStandLossFloor: 14, lastStandDecayMoves: 20 };
+    // (The bar from the first move: the first-five-moves rule off, its own test below.)
+    const s = { ...DEFAULT_SETTINGS, lastStandLoss: 30, lastStandChargedExtra: 5, lastStandLossFloor: 14, lastStandDecayMoves: 20, lastStandFromMove: 0 };
     expect(lastStandBar(0.55, 0, 0, s)).toBe(30);
     expect(lastStandBar(0.55, 0, 3, s)).toBe(35);
     expect(lastStandBar(0.55, 10, 0, s)).toBe(22);
@@ -83,19 +88,36 @@ describe("the God King's Last Stand: the rule", () => {
     expect(lastStandBar(0.2, 0, 0, s)).toBeCloseTo(10, 9);
     // Late in a long battle with no charges the plain bar (13) can be the lower: it stands.
     expect(lastStandBar(0.39, s.lastStandDecayMoves, 0, s)).toBe(s.lastStandLossFloor);
+    // (On the crowd's 6th move, 5 played: the first he can save since Eric, Nov 2.)
     // A big blunder at 25% (to 5%: 20 points, 80% of what was left) calls for him; a 10-point slip there doesn't.
-    expect(lastStandDue(20, 0.25, 0, 3, s)).toBe(true);
-    expect(lastStandDue(10, 0.25, 0, 3, s)).toBe(false);
+    expect(lastStandDue(20, 0.25, 5, 3, s)).toBe(true);
+    expect(lastStandDue(10, 0.25, 5, 3, s)).toBe(false);
     // Eric's game 1 as PR #129 replayed it: from 19%, the hung queen (9 points). Under 20% is lost: never.
-    expect(lastStandDue(19, 0.19, 0, 3, s)).toBe(false);
-    expect(lastStandDue(10, 0.2, 0, 3, s)).toBe(true);
-    // Eric's game 2: the queen hung on move 1, from 72% to 0: far over the plain bar, as before.
-    expect(lastStandDue(72, 0.72, 0, 3, s)).toBe(true);
+    expect(lastStandDue(19, 0.19, 5, 3, s)).toBe(false);
+    expect(lastStandDue(10, 0.2, 5, 3, s)).toBe(true);
+    // Eric's game 2: the queen hung on move 1, from 72% to 0. Since Nov 2 that move stands (the first five moves are
+    // the crowd's own); the same blunder on move 6 is far over the plain bar.
+    expect(lastStandDue(72, 0.72, 0, 3, s)).toBe(false);
+    expect(lastStandDue(72, 0.72, 5, 3, s)).toBe(true);
     // The engine's judgment, not the material: a sacrifice it likes gives nothing away, in any position.
-    expect(lastStandDue(0, 0.6, 0, 3, s)).toBe(false);
+    expect(lastStandDue(0, 0.6, 5, 3, s)).toBe(false);
     expect(lastStandDue(6, 0.6, 30, 0, s)).toBe(false);
-    expect(lastStandDue(0, 0.3, 0, 3, s)).toBe(false);
+    expect(lastStandDue(0, 0.3, 5, 3, s)).toBe(false);
     expect(lastStandDue(5, 0.3, 30, 0, s)).toBe(false);
+  });
+
+  it("not on the crowd's first five moves of the battle (Eric, Nov 2): the 5th never, the 6th as before", () => {
+    const s = DEFAULT_SETTINGS;
+    expect(s.lastStandFromMove).toBe(5);
+    // `crowdMoves` is the crowd's moves already played in the battle: the move judged is the crowdMoves + 1th. A lost
+    // queen from a winning position, the biggest disaster there is, on the 1st to 5th move: never.
+    for (let played = 0; played < 5; played++) expect(lastStandDue(99, 0.99, played, 3, s), `move ${played + 1}`).toBe(false);
+    // The 6th: the save as before, with its usual bar (the bar's fall still counts from the battle's first move).
+    expect(lastStandDue(99, 0.99, 5, 3, s)).toBe(true);
+    expect(lastStandDue(lastStandBar(0.55, 5, 3, s), 0.55, 5, 3, s)).toBe(true);
+    expect(lastStandDue(lastStandBar(0.55, 5, 3, s) - 0.1, 0.55, 5, 3, s)).toBe(false);
+    // Off with 0: from the first move, as before Nov 2.
+    expect(lastStandDue(99, 0.99, 0, 3, { ...s, lastStandFromMove: 0 })).toBe(true);
   });
 
   it("a disaster: the move is taken back, the scores stand, he falls (his charges go), and the crowd picks again without it", async () => {
@@ -207,6 +229,41 @@ describe("the God King's Last Stand: the rule", () => {
     expect(r.boards[0]!.lastStand).toMatchObject({ loss: 20, bar: late.settings.lastStandLossFloor + late.settings.lastStandChargedExtra });
   });
 
+  it("the first five moves in a match (Eric, Nov 2): the battle's 5th move stands, its 6th is saved; the test switch still forces him", async () => {
+    const engine = judge({ bestExpected: 0.55, blunder: BLUNDER, blunderExpected: 0.05 });
+    const on = { lastStandFromMove: DEFAULT_SETTINGS.lastStandFromMove };
+    // The battle's 1st move, though the game is at move 6 (the raid starts 10 plies into the Ruy Lopez): the moves
+    // count from the battle's start, whatever the opening. The blunder is played.
+    const first = raid(engine, on);
+    expect(first.boards.get(0)!.fen.endsWith(" 6")).toBe(true);
+    first.deal();
+    expect((await first.score(pick(BLUNDER))).boards[0]!.lastStand).toBeUndefined();
+    expect(first.bossToMove()).toBe(true);
+    // The 5th (4 played): played too.
+    const fifth = raid(engine, on);
+    fifth.state = { ...fifth.state, boss: { ...fifth.state.boss!, crowdMoves: 4 } };
+    const fen = fifth.boards.get(0)!.fen;
+    fifth.deal();
+    expect((await fifth.score(pick(BLUNDER))).boards[0]!.lastStand).toBeUndefined();
+    expect(fifth.boards.get(0)!.fen).not.toBe(fen);
+    expect(fifth.boss!.crowdMoves).toBe(5);
+    expect(fifth.boss!.lastStand).toBeUndefined();
+    // The 6th (5 played): he saves it, as before.
+    const sixth = raid(engine, on);
+    sixth.state = { ...sixth.state, boss: { ...sixth.state.boss!, crowdMoves: 5 } };
+    sixth.deal();
+    const r = await sixth.score(pick(BLUNDER));
+    expect(r.boards[0]!.lastStand).toMatchObject({ move: BLUNDER, loss: 50 });
+    expect(sixth.boss!.lastStand).toMatchObject({ atMove: 6 });
+    expect(sixth.boards.get(0)!.fen).toBe(fen);
+    // The test switch (?laststand=1) still calls him on the battle's 1st move.
+    const forced = raid(engine, on);
+    forced.forceLastStand = true;
+    forced.deal();
+    expect((await forced.score(pick(BLUNDER))).boards[0]!.lastStand?.move).toBe(BLUNDER);
+    expect(forced.boss!.lastStand).toMatchObject({ atMove: 1 });
+  });
+
   it("once per game; never when the God King plays the move himself", async () => {
     const engine = judge({ bestExpected: 0.55, blunder: BLUNDER, blunderExpected: 0.05 });
     const runner = raid(engine);
@@ -275,9 +332,9 @@ describe("the God King's Last Stand: the rule", () => {
     const engine = judge({ bestExpected: 0.55, blunder: "d2d4", blunderExpected: 0.08 });
     const ids = ["h0", "h1", "h2", "h3", "h4"];
     const runner = new MatchRunner({ settings, rng: mulberry32(9), engines: [engine], library: [opening(RUY)], entrants: ids.map((id) => ({ id, name: id, isBot: false })) });
-    // The boss has just struck, after crowd move 3. (Late in the game, past the opening allowance, so every point the
-    // picks below give away counts: the board's move number is 20.)
-    runner.state = { ...runner.state, boss: { ...runner.state.boss!, minSurvivors: 1, crowdMoves: 3, sinceKill: 0 } };
+    // The boss has just struck, after crowd move 5 (the Last Stand waits for the 6th: lastStandFromMove). (Late in the
+    // game, past the opening allowance, so every point the picks below give away counts: the board's move number is 20.)
+    runner.state = { ...runner.state, boss: { ...runner.state.boss!, minSurvivors: 1, crowdMoves: 5, sinceKill: 0 } };
     const late = runner.boards.get(0)!;
     runner.boards.set(0, { ...late, fen: late.fen.replace(/\d+$/, "20") });
     runner.deal();
@@ -285,11 +342,11 @@ describe("the God King's Last Stand: the rule", () => {
       new Map(ids.map((id) => [id, { move: blunderers.includes(id) ? blunder : others, thinkMs: 1000 }]));
     const r = await runner.score(picks(["h0", "h1", "h2"], "d2d4", (await engine.topMoves(runner.boards.get(0)!.fen, 1))[0]!.move));
     expect(r.boards[0]!.lastStand?.move).toBe("d2d4");
-    expect(runner.state.boss).toMatchObject({ crowdMoves: 3, sinceKill: 0 });
+    expect(runner.state.boss).toMatchObject({ crowdMoves: 5, sinceKill: 0 });
     expect(runner.bossView()!.strikeIn).toBe(settings.bossKillEvery);
-    // The re-pick (crowd move 4), then moves 5 and 6: the three play the best, the other two a little worse (2 to 7
+    // The re-pick (crowd move 6), then moves 7 and 8: the three play the best, the other two a little worse (2 to 7
     // points a move); h1 plays the worse move once too, so one of the three is clearly the worst (a tie waits). The
-    // strike comes after move 6, as it would have without him.
+    // strike comes after move 8, as it would have without him.
     const due: number[] = [];
     for (let i = 0; i < 3; i++) {
       while (runner.bossToMove()) await runner.playBoss();
@@ -298,7 +355,7 @@ describe("the God King's Last Stand: the rule", () => {
       await runner.score(picks(i === 1 ? ["h0", "h2"] : ["h0", "h1", "h2"], top[0]!.move, top[1]!.move));
       if (runner.bossKillDue()) due.push(runner.state.boss!.crowdMoves);
     }
-    expect(due).toEqual([6]);
+    expect(due).toEqual([8]);
     // It weighs all four rounds since its last strike, the taken-back one too, so one of the three who blundered there
     // (47 points) goes, not h3 or h4 (at most 28). Leaving that round out, the three would have lost nothing.
     expect(["h0", "h1", "h2"]).toContain(runner.bossKill());
@@ -385,15 +442,15 @@ describe("the God King's Last Stand: real blunders, the real judge", () => {
   }, 30_000);
   afterAll(() => engine.close());
 
-  // Real raid starts (named openings, 10 plies in, White to move), and an early blunder in each, on crowd move 1
-  // with all three of his charges: the highest the bar ever is.
+  // Real raid starts (named openings, 10 plies in, White to move), and an early blunder in each, on crowd move 6 (5
+  // played: the first he can save, lastStandFromMove) with all three of his charges: the highest bar he ever saves at.
   const cases: [string, string[], string, "q" | "n" | "b"][] = [
     ["hangs the queen: Sicilian, Open", sanLineToUci(["e4", "c5", "Nf3", "d6", "d4", "cxd4", "Nxd4", "Nf6", "Nc3", "Nc6"]), "Qg4", "q"],
     ["hangs a knight to a pawn: Queen's Gambit Declined, Exchange", sanLineToUci(["d4", "d5", "c4", "e6", "Nc3", "Nf6", "cxd5", "exd5", "Bg5", "c6"]), "Ne4", "n"],
     ["hangs a bishop: King's Indian, Fianchetto", sanLineToUci(["d4", "Nf6", "c4", "g6", "Nc3", "Bg7", "Nf3", "d6", "g3", "O-O"]), "Bh6", "b"],
   ];
   for (const [name, moves, san, piece] of cases) {
-    it(`${name}: ${san} calls for the Last Stand from move 1`, async () => {
+    it(`${name}: ${san} calls for the Last Stand on the battle's 6th move`, async () => {
       const runner = new MatchRunner({
         // (G-REX: the boss this seed met before Big Boy joined the draw.)
         settings: { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, raidOpening: true, bossFixedElo: 3190, bossId: "grex" } as Settings,
@@ -405,11 +462,12 @@ describe("the God King's Last Stand: real blunders, the real judge", () => {
       const fen = fenAfter(moves);
       const blunder = legalMoves(fen).find((m) => toSan(fen, m).replace(/[+#]$/, "") === san)!;
       expect(blunder).toBeTruthy();
+      runner.state = { ...runner.state, boss: { ...runner.state.boss!, crowdMoves: 5 } };
       runner.deal();
       const r = await runner.score(pick(blunder));
       const stand = r.boards[0]!.lastStand;
       expect(stand, `the judge gave ${blunder} a loss of ${r.boards[0]!.scored.find((m) => m.move === blunder)?.loss}`).toBeDefined();
-      expect(stand!.bar).toBe(lastStandBar(stand!.before!, 0, 3, runner.settings));
+      expect(stand!.bar).toBe(Math.round(lastStandBar(stand!.before!, 5, 3, runner.settings) * 10) / 10);
       expect(stand!.loss).toBeGreaterThan(stand!.bar + 5);
       expect(runner.boards.get(0)!.fen).toBe(fen);
       // What it loses, from the judge's own search: the boss's best reply takes the piece.
