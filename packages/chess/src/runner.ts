@@ -998,9 +998,9 @@ export class MatchRunner {
     if (this.state.boss) bossRules(this.state.boss)?.scoreRound?.(this.battle, result.players);
     const king = this.kingDecision(playerIds, result);
     if (king.plays) result.playedMove = evaluation.bestMove;
-    // Nobody picked in time: a boss's rules may play another move for the crowd than the engine's best (Dash's flag: a random
-    // legal one). The lobby resolves its rounds here too, so solo and online agree.
-    const flag = this.state.boss && !king.plays && !pickList.some((m) => m) ? (bossRules(this.state.boss)?.outOfTime?.(this.state.boss, board.fen, this.crowdAllowed(boardId) ?? legalMoves(board.fen)) ?? null) : null;
+    // Nobody picked in time: a boss's rules may play another move for the crowd than the engine's best (Dash's flag: one of the
+    // judge's top moves at random). The lobby resolves its rounds here too, so solo and online agree.
+    const flag = this.state.boss && !king.plays && !pickList.some((m) => m) ? (bossRules(this.state.boss)?.outOfTime?.(this.state.boss, board.fen, this.crowdAllowed(boardId) ?? legalMoves(board.fen), scored.map((m) => m.move)) ?? null) : null;
     if (flag) result.playedMove = flag;
     const lastStand = king.plays ? undefined : this.lastStandFor(board.fen, result.playedMove, best, scored, rawEvaluation);
     // Fair play where the boss's judge changed the numbers (Chub & Chirp's race): the turn counts only when the engine's

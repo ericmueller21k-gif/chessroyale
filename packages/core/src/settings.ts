@@ -1602,6 +1602,12 @@ export const BOSS_POWERS = {
   scrambleMoves: 5,
   scrambleSeconds: 3,
   /**
+   * Out of time against Dash is never a loss (the brief): nobody picked in time, so a move is played for you at random from the
+   * judge's top `flagTop` moves (0: from every legal move). The sim's call: any legal move at random hung a piece too often and
+   * decided the battle (reports/dash-sim.md).
+   */
+  flagTop: 4,
+  /**
    * Dash never thinks (Eric's design: "his moves come instantly"): the least he waits before his move shows (ms), where every
    * other boss waits 1200 (bossThinkMs). A queen taken still waits for QUEEN SLAIN!.
    */

@@ -322,10 +322,11 @@ export interface BossRules {
   noTimeLoss?: boolean;
   /**
    * Nobody picked in time (every pick of the round empty, the God King not playing it): the move played for the crowd instead
-   * of the engine's best (Dash's flag: a random one of `allowed`, the moves the crowd may play). Null: the engine's best as ever.
-   * The runner marks the round `flag`, and afterCrowdMove's `judged` says so.
+   * of the engine's best (Dash's flag: a random one of the judge's top moves; `allowed`, the moves the crowd may play; `ranked`,
+   * the round's scored moves, best first). Null: the engine's best as ever. The runner marks the round `flag`, and
+   * afterCrowdMove's `judged` says so.
    */
-  outOfTime?(boss: BossState, fen: string, allowed: readonly string[]): string | null;
+  outOfTime?(boss: BossState, fen: string, allowed: readonly string[], ranked: readonly string[]): string | null;
   /** Beaten: the board holds this long for its fall before the result screen, solo and online (the Hidden Boss's collapse). */
   fallMs?: number;
   /**

@@ -18,8 +18,8 @@
  * moment (`scramble`) as the first begins; the countdown over the board on every one of them.
  *
  * **Out of time is never a loss against him** (`noTimeLoss`; the brief): a move whose time runs out, a scrambled one's 3 s or an
- * empty bank's, gets a random legal move played for you (`outOfTime`: seeded, from the moves allowed), his jab as your next turn
- * begins (`flag`). In a raid that's only when nobody picked in time: the crowd's picks made in time are played as ever. The bank
+ * empty bank's, gets a move played for you at random (`outOfTime`: seeded, from the judge's top flagTop moves allowed; the sim's
+ * call: any legal move at random hung a piece too often and decided the battle), his jab as your next turn begins (`flag`). In a raid that's only when nobody picked in time: the crowd's picks made in time are played as ever. The bank
  * stays at 0 and refills by its increment.
  *
  * Fair play: online the server sets every deadline (the runner's allowedMsFor reads his clock: lobby.ts), so a scrambled move's
@@ -87,11 +87,16 @@ function scrambleNext(p: BossPowerState, crowdMoves: number, s: DashSettings): b
   return p.warnAt !== undefined || !!p.ultNext;
 }
 
-/** The random legal move played for you when your time ran out (seeded by the battle and the turn: the same on every device). */
-export function flagMove(seed: number, turn: number, allowed: readonly string[]): string | null {
+/**
+ * The move played for you when your time ran out: at random (seeded by the battle and the turn: the same on every device) from
+ * the judge's top `flagTop` moves allowed this turn (`ranked`: the round's scored moves, best first); with none of them, or
+ * flagTop 0, from every move allowed.
+ */
+export function flagMove(seed: number, turn: number, allowed: readonly string[], ranked: readonly string[] = [], s: Pick<BossPowerSettings, "flagTop"> = BOSS_POWERS): string | null {
   if (!allowed.length) return null;
-  const sorted = [...allowed].sort();
-  return sorted[Math.floor(powerRoll(seed, "flag", turn) * sorted.length)]!;
+  const top = s.flagTop > 0 ? ranked.filter((m) => allowed.includes(m)).slice(0, s.flagTop) : [];
+  const from = top.length ? [...top].sort() : [...allowed].sort();
+  return from[Math.floor(powerRoll(seed, "flag", turn) * from.length)]!;
 }
 
 export const DASH: BossRules = {
@@ -117,8 +122,8 @@ export const DASH: BossRules = {
   // (No powerTurn: his powers take time, never a square or a move, so every turn counts for fair play as ever and the God
   // King's Last Stand works as ever. A turn nobody picked has no picks to count, and its random move, unscored, is never one
   // he takes back.)
-  outOfTime(boss, _fen, allowed) {
-    return boss.powers ? flagMove(boss.powers.seed, turnOf(boss), allowed) : null;
+  outOfTime(boss, _fen, allowed, ranked) {
+    return boss.powers ? flagMove(boss.powers.seed, turnOf(boss), allowed, ranked) : null;
   },
   opening: {
     setUp() {
