@@ -80,9 +80,9 @@ export interface LoadedIntro {
   storm: StormArt | null;
   /**
    * Its God King attack (its kit's `kingAttack`), or null: a boss without one skips it. Its frames, each one's ms and cue, its
-   * sounds by cue (the kit's), how it faces, where its feet stand off its target (frame pixels: `stand` squares of `perSquare`).
+   * sounds by cue (the kit's), how it faces. (Swung where the boss stands, clear of its stool: not off the board, as at a king.)
    */
-  attack: { ch: Character; frames: HTMLCanvasElement[]; ms: number[]; cues: (string | undefined)[]; sounds: Readonly<Record<string, SoundName>>; facesLeft: boolean; standPx: number; beat: typeof KING_ATTACK } | null;
+  attack: { ch: Character; frames: HTMLCanvasElement[]; ms: number[]; cues: (string | undefined)[]; sounds: Readonly<Record<string, SoundName>>; facesLeft: boolean; beat: typeof KING_ATTACK } | null;
 }
 
 const canvasOf = (w: number, h: number) => {
@@ -178,7 +178,6 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
           cues: ka.ch.anims[ka.anim]!.frames.map((f) => f.cue),
           sounds: ka.sounds ?? kit!.sounds,
           facesLeft: !!ka.facesLeft,
-          standPx: ka.stand * ka.perSquare,
           beat: KING_ATTACK,
         }
       : null;

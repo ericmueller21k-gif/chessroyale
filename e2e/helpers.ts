@@ -353,9 +353,23 @@ export async function asSignedIn(page: Page, label = "player") {
   return withEmail(page, `${label}-${test.info().project.name}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}@e2e.test`);
 }
 
+/**
+ * This page's own account's id. The page makes its guest account with its first /api/me, and the town square shows before that
+ * answer comes (App.tsx renders the town ahead of the account's splash), so a test can get here first: `page.request` would
+ * then go without the session cookie and make a second guest, and the page's own answer, landing after, would put its cookie
+ * back. The email went on the other guest and the reload was a guest's (main 356dc03, town-chat.spec.ts "two signed-in
+ * players…", Bo's typing line greyed "Sign in to chat"). So this waits for the page's session cookie before it asks.
+ */
+async function pageAccountId(page: Page): Promise<string> {
+  // (A page that hasn't opened the app yet has no request of its own in flight: its /api/me here makes its account.)
+  if (page.url() !== "about:blank")
+    await expect.poll(async () => (await page.context().cookies()).some((c) => c.name === "hc_session"), { message: "the page's own account (its session cookie)", timeout: 20_000 }).toBe(true);
+  return ((await (await page.request.get("/api/me")).json()) as { user: { id: string } }).user.id;
+}
+
 /** Puts `email` on this page's account in the local database (taking it off any other account first). Answers the id. */
 async function withEmail(page: Page, email: string) {
-  const id = ((await (await page.request.get("/api/me")).json()) as { user: { id: string } }).user.id;
+  const id = await pageAccountId(page);
   await localSql(page, `UPDATE users SET email = NULL WHERE email = '${email}'; UPDATE users SET email = '${email}' WHERE id = '${id}'`);
   return id;
 }
@@ -380,7 +394,7 @@ async function localSql(page: Page, sql: string) {
  * `wearItem`; reload for the app to see them.
  */
 export async function giveItems(page: Page, items: readonly { def: string; color: string; blemish?: number; seed?: number }[]) {
-  const user = ((await (await page.request.get("/api/me")).json()) as { user: { id: string } }).user.id;
+  const user = await pageAccountId(page);
   const ids = items.map((_, i) => `e2e-${user.slice(0, 8)}-${Date.now().toString(36)}-${i}`);
   const rows = items.map((it, i) => `('${ids[i]}', '${user}', '${it.def}', '${it.color}', ${it.blemish ?? 20}, ${it.seed ?? 7 + i}, 'e2e', 0)`);
   await localSql(page, `INSERT INTO items (id, user_id, def, color, blemish, seed, crate, created_at) VALUES ${rows.join(", ")}`);
@@ -392,7 +406,7 @@ export async function giveItems(page: Page, items: readonly { def: string; color
  * (packages/server/src/boss-tokens.ts), so a test's short battle can count as one of 5 minutes or more.
  */
 export async function backdateSoloBattle(page: Page, ms: number) {
-  const user = ((await (await page.request.get("/api/me")).json()) as { user: { id: string } }).user.id;
+  const user = await pageAccountId(page);
   await localSql(page, `UPDATE solo_battles SET started_at = started_at - ${Math.round(ms)} WHERE user_id = '${user}'`);
 }
 

@@ -7,13 +7,16 @@ import { SHOP_BIGBOY_LAYOUT, SHOP_BIGBOY_MARKS, SHOP_BIGBOY_PIECES } from "../sr
 import { INTRO_BIGBOY_BLOCKS, INTRO_BIGBOY_STOOL_B, INTRO_BIGBOY_STOOL_SEAT_H, INTRO_BIGBOY_STOOL_TOP_H, INTRO_BIGBOY_STOOL_W, INTRO_BIGBOY_SWIRL, INTRO_BIGBOY_SWIRL_FRONT, INTRO_BIGBOY_TABLE_PALETTE } from "../src/town/shops/bigboy-intro-art.ts";
 import { TABLE_BOARD } from "../src/town/houses/park.ts";
 import { renderFrame } from "../src/characters/sprite.ts";
-import { BOSS_INTROS, CHALLENGE_FEEL, attackStart, attackTime, boardSquare, frameAt, introAt, introBeats, introCues, introLength, introOf, marksOf, nextFlow, stormEdge, wipeAt, type BlocksAnims, type ChallengeEvent, type ChallengeFlow, type IntroAnims } from "../src/town/shops/challenge.ts";
+import { BOSS_INTROS, CHALLENGE_FEEL, attackStart, attackTime, boardSquare, coverMs, frameAt, hopStart, introAt, introBeats, introCues, introLength, introOf, marksOf, nextFlow, stormEdge, wipeAt, type BlocksAnims, type ChallengeEvent, type ChallengeFlow, type IntroAnims, type IntroBeat } from "../src/town/shops/challenge.ts";
 import { PARK_TABLE } from "../src/town/houses/park.ts";
 import { INTRO_ALFIL_TABLE } from "../src/town/shops/alfil-intro-art.ts";
 import { findPath, makeRoom } from "../src/town/shops/room.ts";
 import { SHOPS } from "../src/town/shops/shops.ts";
 import { HOMES, START, Walker, createTown, standOf } from "../src/town/world.ts";
-import { TOWN_FEEL } from "../src/town/feel.ts";
+import { SHOP_FEEL, TOWN_FEEL } from "../src/town/feel.ts";
+import { BOSS_ART, PAWN_PATH } from "../src/town/render.ts";
+import { bossKit } from "../src/characters/kits.ts";
+import type { Character } from "../src/characters/sprite.ts";
 
 /**
  * A boss challenged from the town, Pokémon-gym style (Nov 2; town/shops/challenge.ts): the flow from the card's Fight to the battle,
@@ -79,6 +82,9 @@ describe("the battle circle's marks", () => {
       expect(m.bossSq, id).toEqual({ c: 8, r: Math.ceil(r) });
       // Facing each other: the boss right (toward you), you left.
       expect([m.bossFace, m.youFace], id).toEqual([1, -1]);
+      // Once the stools are in, each a clear step outside its stool, on the same row (the hop back: CHALLENGE_FEEL.clear).
+      expect(m.youClear, id).toEqual({ c: 9.5 + CHALLENGE_FEEL.clear.you, r });
+      expect(m.bossClear, id).toEqual({ c: 9.5 - CHALLENGE_FEEL.clear.boss, r });
     }
   });
 
@@ -91,7 +97,7 @@ describe("the battle circle's marks", () => {
     for (const [id, layout] of Object.entries(ROOMS)) {
       const mm = marksOf(layout, "across")!;
       const solid = new Set(layout.filter((p) => p.solid).flatMap((p) => Array.from({ length: p.w ?? 1 }, (_, i) => Array.from({ length: p.d ?? 1 }, (_, j) => `${p.col + i},${p.row - j}`)).flat()));
-      for (const at of [mm.you, mm.boss, mm.table, mm.youStool, mm.bossStool])
+      for (const at of [mm.you, mm.boss, mm.table, mm.youStool, mm.bossStool, mm.youClear, mm.bossClear])
         for (const c of [Math.floor(at.c), Math.ceil(at.c)]) for (const r of [Math.floor(at.r), Math.ceil(at.r)]) expect(solid.has(`${c},${r}`), `${id} ${c},${r}`).toBe(false);
     }
   });
@@ -169,8 +175,10 @@ describe("the battle circle's marks", () => {
       expect(boss, id).not.toBeNull();
       // (The boss keeps to your west, row for row.)
       for (let i = 0; i < Math.min(you.length, boss.length); i++) if (you[i]!.r === boss[i]!.r) expect(boss[i]!.c, `${id} step ${i}`).toBeLessThan(you[i]!.c);
-      // Under 6 s in all: the walk in at the challenge's pace is about a second.
-      expect(Math.max(you.length, boss.length) * CHALLENGE_FEEL.walkStepMs, id).toBeLessThanOrEqual(1200);
+      // A slow walk up to the marks (Nov 2: "slowly walk up to the chessboard"): about a second and a half, under two.
+      const ms = Math.max(you.length, boss.length) * CHALLENGE_FEEL.walkStepMs;
+      expect(ms, id).toBeGreaterThanOrEqual(1000);
+      expect(ms, id).toBeLessThanOrEqual(2000);
     }
   });
 
@@ -208,37 +216,35 @@ describe("the intro's timeline (Alfil's art)", () => {
     expect(INTRO_ALFIL_PYRAMID.anims.idle!.loop).toBe(true);
   });
 
-  it("the line, the pyramid rising under it, holding till the line's done, cracking, crumbling, the table alone; then the storm", () => {
-    expect(beats.map((b) => b.step)).toEqual(["line", "rise", "idle", "crack", "crumble", "table", "done"]);
-    expect(at(0)).toMatchObject({ step: "line", pyramid: null, line: true, table: false });
-    expect(at(CHALLENGE_FEEL.riseAtMs)).toMatchObject({ step: "rise", pyramid: { anim: "rise", frame: 0 }, line: true });
-    const idle = beats.find((b) => b.step === "idle")!;
-    expect(idle.end).toBe(CHALLENGE_FEEL.lineMs);
-    expect(at(idle.at + 1)).toMatchObject({ step: "idle", pyramid: { anim: "idle", frame: 0 }, line: true });
-    const crack = beats.find((b) => b.step === "crack")!;
-    // (The line is over once it cracks.)
-    expect(at(crack.at)).toMatchObject({ step: "crack", pyramid: { anim: "crack", frame: 0 }, line: false, table: false });
-    const crumble = beats.find((b) => b.step === "crumble")!;
+  it("facing each other, the line alone, a pause, the pyramid rising, holding, cracking, crumbling, the table alone, his attack; then the storm", () => {
+    const F = CHALLENGE_FEEL;
+    expect(beats.map((b) => b.step)).toEqual(["face", "line", "pause", "rise", "idle", "crack", "crumble", "table", "swing", "done"]);
+    const beat = (s: string) => beats.find((b) => b.step === s)!;
+    const len = (s: string) => beat(s).end - beat(s).at;
+    expect([len("face"), len("line"), len("pause"), len("idle"), len("table")]).toEqual([F.faceMs, F.lineMs, F.afterLineMs, F.holdMs, F.tableHoldMs]);
+    // Facing each other a moment: nothing yet, no line.
+    expect(at(0)).toMatchObject({ step: "face", pyramid: null, line: false, table: false, stools: false });
+    // The line on its own, nothing rising under it; gone after it, and a pause.
+    expect(at(beat("line").at)).toMatchObject({ step: "line", pyramid: null, line: true, table: false });
+    expect(at(beat("line").end - 1)).toMatchObject({ step: "line", pyramid: null, line: true });
+    expect(at(beat("pause").at)).toMatchObject({ step: "pause", pyramid: null, line: false });
+    expect(at(beat("rise").at)).toMatchObject({ step: "rise", pyramid: { anim: "rise", frame: 0 }, line: false });
+    expect(at(beat("idle").at + 1)).toMatchObject({ step: "idle", pyramid: { anim: "idle", frame: 0 } });
+    expect(at(beat("crack").at)).toMatchObject({ step: "crack", pyramid: { anim: "crack", frame: 0 }, line: false, table: false });
+    const crumble = beat("crumble");
     expect(at(crumble.at)).toMatchObject({ pyramid: { anim: "crumble", frame: 0 }, table: false });
     const clear = crumble.at + ALFIL.crumble[0]! + ALFIL.crumble[1]!;
     expect(at(clear - 1).table).toBe(false);
     expect(at(clear)).toMatchObject({ pyramid: { anim: "crumble", frame: 2 }, table: true });
     expect(at(crumble.end)).toMatchObject({ step: "table", pyramid: null, table: true, drift: true });
+    expect(at(beat("swing").at)).toMatchObject({ step: "swing", table: true, drift: true });
     expect(at(introLength(beats))).toMatchObject({ step: "done", table: true });
-  });
-
-  it("is short: the line to the storm about 4 s, and the whole challenge, the walk in and the storm too, under 6 s", () => {
-    const len = introLength(beats);
-    expect(len).toBeGreaterThan(3000);
-    expect(len).toBeLessThan(4500);
-    const walk = 9 * CHALLENGE_FEEL.walkStepMs + CHALLENGE_FEEL.settleMs;
-    expect(walk + len + CHALLENGE_FEEL.stormInMs).toBeLessThan(6000);
   });
 
   it("the cues (their sounds) come on their beats: rumble as it rises, crack, crumble, and table on the clear frame", () => {
     const crumble = beats.find((b) => b.step === "crumble")!;
     expect(introCues(beats, ALFIL)).toEqual([
-      { cue: "rumble", at: CHALLENGE_FEEL.riseAtMs },
+      { cue: "rumble", at: beats.find((b) => b.step === "rise")!.at },
       { cue: "crack", at: beats.find((b) => b.step === "crack")!.at },
       { cue: "crumble", at: crumble.at },
       { cue: "table", at: crumble.at + ALFIL.crumble[0]! + ALFIL.crumble[1]! },
@@ -312,27 +318,32 @@ describe("the intro's timeline (Big Boy's toy blocks, Nov 2)", () => {
     for (const c of [INTRO_BIGBOY_SWIRL, INTRO_BIGBOY_SWIRL_FRONT]) expect(c.anims.idle!).toMatchObject({ loop: true, frames: { length: 6 } });
   });
 
-  it("the line, the blocks building under it, the board dropping and plopping on, the stools dropping in, the table alone; then the swirl", () => {
-    expect(beats.map((b) => b.step)).toEqual(["line", "build", "drop", "plop", "chairs", "table", "done"]);
-    expect(beat("build").at).toBe(F.riseAtMs);
+  it("facing each other, the line alone, a pause, the blocks stacking, a gap, the board dropping and plopping on, a gap, the stools dropping in, the table alone, his attack; then the swirl", () => {
+    expect(beats.map((b) => b.step)).toEqual(["face", "line", "pause", "build", "pause", "drop", "plop", "pause", "chairs", "table", "swing", "done"]);
+    const gaps = beats.filter((b) => b.step === "pause");
+    expect(gaps.map((b) => b.end - b.at)).toEqual([F.afterLineMs, F.gapMs, F.gapMs]);
     expect(beat("build").end - beat("build").at).toBe(B.build.reduce((a, b) => a + b, 0));
     expect(beat("drop").end - beat("drop").at).toBe(F.boardDropMs);
     expect(beat("table").end - beat("table").at).toBe(F.tableHoldMs);
-    // The line alone, nothing between you yet.
-    expect(at(100)).toMatchObject({ step: "line", line: true, blocks: null, table: false, stools: false, pyramid: null });
-    // The blocks landing, one by one, under the line.
-    expect(at(F.riseAtMs + 10)).toMatchObject({ step: "build", line: true, blocks: { anim: "build", frame: 0 }, table: false });
-    // The board falling from above onto the built table (its last frame), still above it, then lower; the line done.
+    // The line alone, nothing between you yet; then a pause.
+    expect(at(beat("line").at + 100)).toMatchObject({ step: "line", line: true, blocks: null, table: false, stools: false, pyramid: null });
+    expect(at(gaps[0]!.at + 1)).toMatchObject({ step: "pause", line: false, blocks: null, table: false });
+    // The blocks landing, one by one, after the line; held built through the gap.
+    expect(at(beat("build").at + 10)).toMatchObject({ step: "build", line: false, blocks: { anim: "build", frame: 0 }, table: false });
+    expect(at(gaps[1]!.at + 1)).toMatchObject({ step: "pause", blocks: { anim: "build", frame: B.build.length - 1 }, table: false });
+    // The board falling from above onto the built table (its last frame), still above it, then lower.
     const d0 = at(beat("drop").at + 1);
     const d1 = at(beat("drop").at + F.boardDropMs * 0.8);
     expect(d0).toMatchObject({ step: "drop", line: false, blocks: { anim: "build", frame: B.build.length - 1 }, table: true, stools: false });
     expect(d0.drop).toBeGreaterThan(F.dropFrom * 0.95);
     expect(d1.drop).toBeGreaterThan(0);
     expect(d1.drop).toBeLessThan(d0.drop);
-    // On it as it plops (dust and stars), then the stools drop in, then it all stands.
+    // On it as it plops (dust and stars), held through the gap; then the stools drop in, then it all stands.
     expect(at(beat("plop").at)).toMatchObject({ step: "plop", blocks: { anim: "plop", frame: 0 }, table: true, drop: 0, stools: false });
+    expect(at(gaps[2]!.at + 1)).toMatchObject({ step: "pause", blocks: { anim: "plop", frame: B.plop.length - 1 }, table: true, stools: false });
     expect(at(beat("chairs").at + 1)).toMatchObject({ step: "chairs", blocks: { anim: "chairs", frame: 0 }, table: true, stools: true });
     expect(at(beat("table").at + 1)).toMatchObject({ step: "table", blocks: { anim: "idle", frame: 0 }, table: true, stools: true, drop: 0 });
+    expect(at(beat("swing").at + 1)).toMatchObject({ step: "swing", blocks: { anim: "idle", frame: 0 }, table: true, stools: true });
     expect(at(introLength(beats) + 50)).toMatchObject({ step: "done", table: true, stools: true });
   });
 
@@ -352,15 +363,11 @@ describe("the intro's timeline (Big Boy's toy blocks, Nov 2)", () => {
     for (const c of [...new Set(cues.map((x) => x.cue)), "storm"]) expect(map[c], c).toMatch(/^bigboy[A-Z]/);
   });
 
-  it("is short: the line to the swirl under 4 s, and the whole challenge, the walk in and the swirl too, under 6 s; his attack from 2 s before the swirl covers", () => {
-    const len = introLength(beats);
-    expect(len).toBeLessThanOrEqual(4000);
-    const walk = 9 * F.walkStepMs + F.settleMs;
-    expect(walk + len + F.stormInMs).toBeLessThan(6000);
+  it("his attack: after the table's beat, swung for swingMs until the swirl has covered the screen", () => {
     const a = attackStart(beats);
-    expect(a).toBe(len + F.stormInMs - F.attackLeadMs);
-    expect(a).toBeGreaterThan(beat("drop").at);
-    expect(a).toBeLessThan(len);
+    expect(a).toBe(beat("swing").at);
+    expect(a).toBe(beat("table").end);
+    expect(introLength(beats) + F.stormInMs - a).toBe(F.swingMs);
   });
 });
 
@@ -403,10 +410,11 @@ describe("the boss's attack in its intro (its God King attack)", () => {
   const beats = introBeats(ALFIL);
   const beat = { lashAt: 560, leaveAt: 2380 };
 
-  it("starts attackLeadMs before the storm covers the screen (so during the crumble), and keeps on until the battle shows", () => {
+  it("starts after the table's beat, swingMs before the storm has covered the screen, and keeps on until the battle shows", () => {
     const at = attackStart(beats);
-    expect(at).toBe(introLength(beats) + CHALLENGE_FEEL.stormInMs - CHALLENGE_FEEL.attackLeadMs);
-    expect(introAt(beats, ALFIL, at).step).toMatch(/crack|crumble|table/);
+    expect(at).toBe(beats.find((b) => b.step === "swing")!.at);
+    expect(introLength(beats) + coverMs(true) - at).toBe(CHALLENGE_FEEL.swingMs);
+    expect(introAt(beats, ALFIL, at)).toMatchObject({ step: "swing", table: true, stools: true, back: 1 });
     expect(attackTime(0, beat)).toBe(0);
     expect(attackTime(1000, beat)).toBe(1000);
     // (Where it would leap off, its lashes again, over and over.)
@@ -425,50 +433,47 @@ describe("the default intro (Babur's and Puddles')", () => {
   const at = (t: number) => introAt(beats, null, t);
   const F = CHALLENGE_FEEL;
 
-  it("the line, then the attack swung in place; then done (the flash and the wipe)", () => {
-    expect(beats.map((b) => b.step)).toEqual(["line", "swing", "done"]);
-    expect(beats[0]).toMatchObject({ at: 0, end: F.lineMs });
-    expect(beats[1]).toMatchObject({ at: F.lineMs, end: F.lineMs + F.swingMs });
-    expect(introLength(beats)).toBe(F.lineMs + F.swingMs);
-    // A few seconds of swinging (Eric: "just be swinging for a few seconds").
+  it("facing each other, the line alone, a pause, the table pops in, the table alone, then the attack swung in place; then done (the flash and the wipe)", () => {
+    expect(beats.map((b) => b.step)).toEqual(["face", "line", "pause", "pop", "table", "swing", "done"]);
+    const beat = (s: string) => beats.find((b) => b.step === s)!;
+    expect(beat("line")).toMatchObject({ at: F.faceMs, end: F.faceMs + F.lineMs });
+    expect(beat("pop").end - beat("pop").at).toBe(F.popMs);
+    expect(beat("table").end - beat("table").at).toBe(F.tableHoldMs);
+    // A couple of seconds of swinging before the screen is covered (Eric: "just be swinging for a few seconds").
+    expect(introLength(beats) + coverMs(false) - attackStart(beats)).toBe(F.swingMs);
     expect(F.swingMs).toBeGreaterThanOrEqual(1500);
     expect(F.swingMs).toBeLessThanOrEqual(3500);
   });
 
-  it("the table pops in during the line (growing past its size and back), a dust puff round its foot; no pyramid", () => {
-    expect(at(0)).toMatchObject({ step: "line", line: true, table: false, pyramid: null, puff: -1 });
-    expect(at(F.popAtMs - 1).table).toBe(false);
-    expect(at(F.popAtMs)).toMatchObject({ table: true, puff: 0 });
-    expect(at(F.popAtMs).pop).toBeCloseTo(0);
-    const mid = at(F.popAtMs + F.popMs * 0.7);
+  it("the table pops in after the line and its pause (growing past its size and back), a dust puff round its foot; no pyramid", () => {
+    const pop = beats.find((b) => b.step === "pop")!.at;
+    expect(at(F.faceMs)).toMatchObject({ step: "line", line: true, table: false, pyramid: null, puff: -1 });
+    expect(at(pop - 1)).toMatchObject({ step: "pause", line: false, table: false });
+    expect(at(pop)).toMatchObject({ table: true, puff: 0 });
+    expect(at(pop).pop).toBeCloseTo(0);
+    const mid = at(pop + F.popMs * 0.7);
     expect(mid.pop).toBeGreaterThan(1);
-    expect(at(F.popAtMs + F.popMs).pop).toBeCloseTo(1);
-    expect(at(F.popAtMs + F.puffMs).puff).toBe(-1);
-    expect(F.popAtMs + F.popMs).toBeLessThan(F.lineMs);
-    // The line goes as it swings; the table stays.
-    expect(at(F.lineMs)).toMatchObject({ step: "swing", line: false, table: true, pop: 1, pyramid: null });
+    expect(at(pop + F.popMs).pop).toBeCloseTo(1);
+    expect(at(pop + F.puffMs).puff).toBe(-1);
+    // It swings with the table in.
+    expect(at(attackStart(beats))).toMatchObject({ step: "swing", line: false, table: true, pop: 1, pyramid: null });
     expect(at(introLength(beats))).toMatchObject({ step: "done", table: true });
-    expect(introCues(beats, null)).toEqual([{ cue: "table", at: F.popAtMs }]);
+    expect(introCues(beats, null)).toEqual([{ cue: "table", at: pop }]);
   });
 
   it("its attack starts as it swings, in place: its lashes only, from the first, over and over (no drop-in, no leap off)", () => {
     const beat = { lashAt: 560, leaveAt: 2380 };
-    expect(attackStart(beats)).toBe(F.lineMs);
+    expect(attackStart(beats)).toBe(beats.find((b) => b.step === "swing")!.at);
     expect(attackTime(0, beat, true)).toBe(560);
     expect(attackTime(1000, beat, true)).toBe(1560);
     expect(attackTime(1820, beat, true)).toBe(560);
-    // (Alfil's own: its drop-in first, as before.)
+    // (Every intro swings it in place since Nov 2's pacing, each boss standing clear of its stool; played at a king, its drop-in first.)
     expect(attackTime(0, beat)).toBe(0);
   });
 
   it("the cues: the app's pop as the table appears and the boss's own whoosh as the screen flashes", () => {
     expect(introOf("tiger")!.cues).toEqual({ table: "pop", wipe: "tigerWhoosh" });
     expect(introOf("gardener")!.cues).toEqual({ table: "pop", wipe: "gardenerWhoosh" });
-  });
-
-  it("is short: the walk in, the intro and the flash and wipe under about 6 s", () => {
-    const walk = 9 * F.walkStepMs + F.settleMs;
-    expect(walk + introLength(beats) + F.flashMs + F.wipeMs).toBeLessThan(6000);
   });
 
   it("Babur's and Puddles' kits have their attacks", async () => {
@@ -489,3 +494,109 @@ describe("the default transition: a flash, then a wipe to black", () => {
   });
 });
 
+
+/**
+ * The pacing (Eric, Nov 2, after Big Boy's live: "it happens so damn fast… It takes only, like, 2 seconds… Stretch that out a few more
+ * seconds"): the whole challenge, from Fight to the screen covered, beat by beat; and standing clear of the stools ("Make sure
+ * they're not standing where the chair blocks are; that looks like bad design").
+ */
+describe("the challenge's pacing (Nov 2)", () => {
+  const F = CHALLENGE_FEEL;
+  const BB = blocksOf();
+  /** From Fight to covered, ms: the walk to the door (`door` squares), the zoom in, a beat inside, the walk up (`walk` squares, the rooms' 7), the settle, the intro, the cover. */
+  const whole = (beats: IntroBeat[], custom: boolean, door = 3, walk = 7): number =>
+    door * F.doorStepMs + SHOP_FEEL.doorZoomMs + F.insideMs + walk * F.walkStepMs + F.settleMs + introLength(beats) + coverMs(custom);
+
+  it("about 10 to 12 s from Fight to the cover (it was about 5 to 6): Big Boy's and Alfil's 11 to 12.5, the default's (the fewest steps) 8.5 to 11", () => {
+    expect(whole(introBeats(BB), true)).toBeGreaterThanOrEqual(11_000);
+    expect(whole(introBeats(BB), true)).toBeLessThanOrEqual(12_500);
+    expect(whole(introBeats(ALFIL), true)).toBeGreaterThanOrEqual(11_000);
+    expect(whole(introBeats(ALFIL), true)).toBeLessThanOrEqual(12_500);
+    expect(whole(introBeats(null), false)).toBeGreaterThanOrEqual(8_500);
+    expect(whole(introBeats(null), false)).toBeLessThanOrEqual(11_000);
+  });
+
+  it("each beat: a calm walk (the town's walking pace, slower in the room), the line long enough to read, a small gap between steps, a couple of seconds' swing", () => {
+    expect(F.doorStepMs).toBe(TOWN_FEEL.botStepMs);
+    expect(F.doorStepMs).toBeGreaterThan(TOWN_FEEL.youStepMs);
+    expect(F.walkStepMs).toBeGreaterThanOrEqual(150);
+    expect(F.lineMs).toBeGreaterThanOrEqual(2400);
+    for (const ms of [F.faceMs, F.afterLineMs, F.gapMs, F.tableHoldMs, F.holdMs]) {
+      expect(ms).toBeGreaterThanOrEqual(250);
+      expect(ms).toBeLessThanOrEqual(800);
+    }
+    expect(F.swingMs).toBe(2000);
+  });
+
+  it("the hop back: as the stools come in (the default's pop, Big Boy's stools dropping, Alfil's table showing), over hopMs, up and down again", () => {
+    for (const a of [null, BB, ALFIL] as const) {
+      const beats = introBeats(a);
+      const h = hopStart(beats, a);
+      const at = (t: number) => introAt(beats, a, t);
+      expect(at(h - 1)).toMatchObject({ back: 0, hop: 0 });
+      expect(at(h - 1).stools).toBe(false);
+      expect(at(h).stools).toBe(true);
+      expect(at(h + F.hopMs / 2).back).toBeCloseTo(0.5);
+      expect(at(h + F.hopMs / 2).hop).toBeCloseTo(1);
+      expect(at(h + F.hopMs)).toMatchObject({ back: 1, hop: 0 });
+      // Landed before the attack starts.
+      expect(h + F.hopMs).toBeLessThanOrEqual(attackStart(beats));
+    }
+  });
+
+  /** A picture's drawn pixels' columns (from its foot, art pixels) in its rows from its foot up `up` art pixels: [left, right]. */
+  const low = (ch: Character, anim: string, up: number): [number, number] => {
+    let x0 = Infinity;
+    let x1 = -Infinity;
+    for (const fr of ch.anims[anim]!.frames) {
+      const f = renderFrame(ch, fr);
+      for (let y = Math.max(0, Math.floor(ch.foot[1] - up)); y < f.h; y++)
+        for (let x = 0; x < f.w; x++) if (f.data[(y * f.w + x) * 4 + 3]! > 0) [x0, x1] = [Math.min(x0, x - ch.foot[0]), Math.max(x1, x - ch.foot[0])];
+    }
+    return [x0, x1];
+  };
+  const PX = TOWN_FEEL.housePxPerSquare;
+  /** A table picture's stools (squares from its foot): how far out each stool's outer edge is, and its top. */
+  const stools = (ch: Character) => {
+    const [l, r] = low(ch, "idle", ch.h);
+    return { west: -l / PX, east: (r + 1) / PX, top: (ch.foot[1] - topOf(ch)) / PX };
+  };
+  const topOf = (ch: Character) => {
+    const f = renderFrame(ch, ch.anims.idle!.frames[0]!);
+    for (let y = 0; y < f.h; y++) for (let x = 0; x < ch.foot[0] - PX / 2; x++) if (f.data[(y * f.w + x) * 4 + 3]! > 0) return y;
+    return ch.foot[1];
+  };
+  const TABLES = { alfil: INTRO_ALFIL_TABLE, tiger: PARK_TABLE, gardener: PARK_TABLE, bigboy: INTRO_BIGBOY_BLOCKS } as const;
+  const LAYOUTS = { alfil: SHOP_ALFIL_LAYOUT, tiger: SHOP_BABUR_LAYOUT, gardener: SHOP_PUDDLES_LAYOUT, bigboy: SHOP_BIGBOY_LAYOUT } as const;
+  /** The gap (squares) kept between a figure near the floor and the stool's outer edge. */
+  const GAP = 0.1;
+
+  it("once the stools are in, no figure near the floor is in front of a stool: you (the pawn) and each boss standing, and its attack's feet", () => {
+    for (const id of ["alfil", "tiger", "gardener", "bigboy"] as const) {
+      const m = marksOf(LAYOUTS[id], "across")!;
+      const st = stools(TABLES[id]);
+      // (The stools' outer edges, in the room's columns: the boss's west of the table, yours east; up to their tops.)
+      const bossEdge = m.table.c - st.west;
+      const youEdge = m.table.c + st.east;
+      const band = st.top + 0.1;
+      // The boss, facing you (east): its town figure as ShopRoom draws it (mirrored when its art faces left), `bossSquares` tall.
+      const ch = BOSS_ART[id];
+      const k = (TOWN_FEEL.bossSquares * (TOWN_FEEL.bossScale[id] ?? 1)) / ch.h;
+      const kit = bossKit(introOf(id)!.name)!;
+      const toward = ([l, r]: [number, number], left: boolean) => (left ? -l : r);
+      const body = toward(low(ch, "idle", band / k), !!kit.kingAttack?.facesLeft) * k;
+      expect(m.bossClear.c + body, `${id}: the boss's front near the floor, west of its stool`).toBeLessThanOrEqual(bossEdge - GAP);
+      // Its attack, swung where it stands: its feet (the lowest 0.3 of a square) clear of the stool too.
+      const ka = kit.kingAttack!;
+      const feet = toward(low(ka.ch, ka.anim, 0.3 / k), !!ka.facesLeft) * k;
+      expect(m.bossClear.c + feet, `${id}: its attack's feet`).toBeLessThanOrEqual(bossEdge - GAP);
+      // You: the plain pawn (its base, from PAWN_PATH, `youSquares` tall), facing the boss (west).
+      const [, x0, x1] = /([\d.]+),39\.5 H ([\d.]+)/.exec(PAWN_PATH)!.map(Number);
+      const half = (((x1! - x0!) / 2) * TOWN_FEEL.youSquares) / 45;
+      expect(m.youClear.c - half, `${id}: you, east of your stool`).toBeGreaterThanOrEqual(youEdge + GAP);
+      // On the marks (walking in and the line) the stools aren't there yet; the hop takes each from its mark out, never in.
+      expect(m.youClear.c).toBeGreaterThan(m.you.c);
+      expect(m.bossClear.c).toBeLessThan(m.boss.c);
+    }
+  });
+});

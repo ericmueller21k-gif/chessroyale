@@ -1,4 +1,4 @@
-import { devices, expect, type Browser, type Page, type Request } from "@playwright/test";
+import { devices, expect, request as apiRequest, type Browser, type Page, type Request } from "@playwright/test";
 import { CHAT, tooSoonText } from "../packages/app/src/town/chat.ts";
 import { NAME_COLORS } from "../packages/app/src/town/names.ts";
 import { asServerAdmin, asSignedIn, test } from "./helpers.ts";
@@ -1315,6 +1315,21 @@ test("two signed-in players see each other's lines within a few seconds; a guest
   expect(asked, "a guest never asks for players' lines").toEqual([]);
   await guest.evaluate(() => (window as any).__townSay("Hollow", "The park gets quiet after dark.", "boss"));
   await expect(guest.locator(".tc-boss")).toHaveCount(1);
+});
+
+test("signing in a page whose own first /api/me answers after the town shows: the email goes on the page's account, not a second guest (main 356dc03's red: Bo greyed)", async ({ page, baseURL }) => {
+  // (The page's first /api/me, which makes its guest, held 1.5 s and answered from outside its cookies: it lands after the helper
+  // has asked. asSignedIn waits for the page's own session first: e2e/helpers.ts pageAccountId.)
+  const api = await apiRequest.newContext({ baseURL });
+  let first = true;
+  await page.route("**/api/me*", async (route) => {
+    if (!first || route.request().method() !== "GET") return route.continue();
+    first = false;
+    await new Promise((ok) => setTimeout(ok, 1500));
+    return route.fulfill({ response: await api.get("/api/me") });
+  });
+  await openSignedIn(page);
+  await api.dispose();
 });
 
 test("the server decides: a refused message says why in a gray line only you see, in the stream (one at a time) and keeps your words; 80 characters; the 15 s wait is the server's too", async ({ page }) => {
