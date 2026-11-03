@@ -128,7 +128,7 @@ const page = await browser.newPage({ viewport: { width: W, height: H }, deviceSc
 await page.setContent(html);
 await page.evaluate("window.__name = (f) => f");
 await page.evaluate(
-  async ({ imgs, floor, up, W, H, DPR, kidPng, sheet, glass, stone, nursery, lodge }) => {
+  async ({ imgs, floor, up, W, H, DPR, kidPng, sheet, glass, stone, nursery, lodge, store }) => {
     const cv = document.getElementById("c") as HTMLCanvasElement;
     cv.width = W * DPR;
     cv.height = H * DPR;
@@ -137,7 +137,25 @@ await page.evaluate(
     const g = cv.getContext("2d")!;
     g.scale(DPR, DPR);
     g.imageSmoothingEnabled = false;
-    if (lodge) {
+    if (store) {
+      // A sneaker store's ceiling (mockup only, not drawn art): white ceiling tiles in a pale grid, square light panels.
+      const sky = g.createLinearGradient(0, 0, 0, H * 0.45);
+      sky.addColorStop(0, "#c9ced6");
+      sky.addColorStop(1, "#f1f2f4");
+      g.fillStyle = sky;
+      g.fillRect(0, 0, W, H);
+      g.strokeStyle = "#b3b9c3";
+      g.lineWidth = 2;
+      for (let i = -12; i <= 12; i++) {
+        g.beginPath();
+        g.moveTo(W / 2 + i * W * 0.05, -H * 0.5);
+        g.lineTo(W / 2 + i * W * 0.18, H * 0.45);
+        g.stroke();
+      }
+      for (const y of [H * 0.05, H * 0.12, H * 0.21, H * 0.33]) g.beginPath(), g.moveTo(0, y), g.lineTo(W, y), g.stroke();
+      g.fillStyle = "#ffffff";
+      for (const [lx, ly, lw, lh] of [[60, 18, 40, 12], [290, 18, 40, 12], [175, 60, 50, 18], [20, 120, 60, 22], [310, 120, 60, 22]] as const) g.fillRect(lx, ly, lw, lh);
+    } else if (lodge) {
       // A lodge's ceiling (mockup only, not drawn art): dark planks between heavy beams.
       const sky = g.createLinearGradient(0, 0, 0, H * 0.45);
       sky.addColorStop(0, "#2e1d10");
@@ -314,7 +332,7 @@ await page.evaluate(
       }
     }
   },
-  { imgs, floor, up, W, H, DPR, kidPng, sheet, glass: SHOP === "puddles", stone: SHOP === "alfil", nursery: SHOP === "bigboy", lodge: SHOP === "timber" },
+  { imgs, floor, up, W, H, DPR, kidPng, sheet, glass: SHOP === "puddles", stone: SHOP === "alfil", nursery: SHOP === "bigboy", lodge: SHOP === "timber", store: SHOP === "blitz" },
 );
 await page.locator("#c").screenshot({ path: out });
 await browser.close();
