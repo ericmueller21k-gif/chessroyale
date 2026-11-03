@@ -138,6 +138,12 @@ function loadSamples() {
  * graph starts suspended; nothing is fetched or played until a tap (unlockAudio).
  */
 export function prepareAudio() {
+  // (The page coming back from another app or a locked phone: see `audioReturned`.)
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", audioReturned);
+    addEventListener("pageshow", audioReturned);
+    addEventListener("focus", audioReturned);
+  }
   const make = () => {
     try {
       ensureContext();
@@ -154,11 +160,90 @@ export function prepareAudio() {
 export function unlockAudio() {
   try {
     ensureContext();
-    void ctx!.resume();
+    void ctx!.resume().catch(() => undefined);
     loadSamples();
   } catch {
     // No audio on this device: the game works silently.
   }
+}
+
+// ---- Coming back to the page (Eric, Nov 3, on his iPhone: "whenever I switch away and come back" the sound was gone) ----
+/**
+ * iOS suspends or "interrupts" the audio context while the page is hidden (another app, the phone locked), and coming back it
+ * doesn't always recover: resume() can wait for ever, the context can be closed, or it can say "running" with its clock stopped.
+ * So when the page comes back (visibilitychange to visible, pageshow, focus) it tries resume() at once (some browsers allow it
+ * then), and the first tap or key after that (`wakeAudio`; iOS only starts sound inside one) checks the context: running with its
+ * clock moving, all is well; anything else, a new context and master chain are made inside that tap (the old one closed), the
+ * boss sounds made for it again (`warmSounds`' cache is by sample rate; the recorded files' decoded buffers serve any context),
+ * `onAudioRebuilt` listeners hear of it (the Colosseum's streamed ambience), and that tap's own sound plays as it wakes.
+ * Nothing waits to play on the way back: a sound asked for while the page is hidden is dropped (`play`).
+ */
+let back: { at: number; t: number } | null = null;
+/** Until then (ms), a sound plays on a new context waking inside its tap (suspended, its resume asked for): the tap's own sound. */
+let wakingUntil = 0;
+const WAKE_MS = 400;
+/** A context that says "running" this long (s) after coming back but whose clock moved less than a quarter of that is dead. */
+const STALL_CHECK_S = 0.25;
+const nowMs = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
+const pageHidden = () => typeof document !== "undefined" && document.visibilityState === "hidden";
+/** Every boss sound `warmSounds` has made, to make again for a new context. */
+const warmed = new Set<SoundName>();
+const rebuiltListeners = new Set<() => void>();
+/** Calls `fn` whenever the audio context is replaced (`mediaGain`'s elements then need a new element). */
+export function onAudioRebuilt(fn: () => void): () => void {
+  rebuiltListeners.add(fn);
+  return () => rebuiltListeners.delete(fn);
+}
+
+/** The page shows again (visibilitychange, pageshow, focus): resume() now if it isn't running; the next tap checks it. */
+export function audioReturned() {
+  const c = ctx;
+  // (Before sound was ever switched on, the first tap does that as usual.)
+  if (!c || !loading || pageHidden()) return;
+  back = { at: nowMs(), t: c.state === "running" ? c.currentTime : -1 };
+  if (c.state !== "running" && c.state !== "closed") void c.resume().catch(() => undefined);
+}
+
+/** A new audio context in place of a dead one, inside a tap (`wakeAudio`). */
+function rebuildAudio() {
+  const old = ctx;
+  ctx = null;
+  master = null;
+  try {
+    void old?.close().catch(() => undefined);
+  } catch {
+    // Already closed.
+  }
+  try {
+    ensureContext();
+  } catch {
+    return; // No audio now: the game works silently.
+  }
+  wakingUntil = nowMs() + WAKE_MS;
+  warmSounds([...warmed]);
+  rebuiltListeners.forEach((l) => l());
+}
+
+/**
+ * Every tap and key (main.tsx, before the page's own handlers see it): switches sound on (`unlockAudio`) until it's on, and the
+ * first after the page came back (`audioReturned`) makes a new context if the old one didn't come back.
+ */
+export function wakeAudio() {
+  const b = back;
+  const c = ctx;
+  if (b && c) {
+    const waited = (nowMs() - b.at) / 1000;
+    if (c.state !== "running") {
+      back = null;
+      rebuildAudio();
+    } else if (b.t < 0 || waited >= STALL_CHECK_S) {
+      // Running: resumed on the way back (fine), or running all along: its clock must have moved meanwhile.
+      back = null;
+      if (b.t >= 0 && c.currentTime - b.t < waited / 4) rebuildAudio();
+    }
+    // (Running, and too soon to tell whether its clock moves: the next tap checks.)
+  }
+  if (!audioUnlocked()) unlockAudio();
 }
 
 /** Sound is on and its samples are loading or loaded: a tap has nothing more to do. */
@@ -1350,6 +1435,7 @@ function makeIdle(sound: BossSound, rate: number) {
  */
 export function warmSounds(names: readonly SoundName[]): void {
   if (!ctx) return;
+  for (const n of names) warmed.add(n);
   const rate = ctx.sampleRate;
   const todo = [...new Set(names)].flatMap((n) => MAKE[n] ?? []).filter((s) => !cached(s, rate) && !pending.has(JSON.stringify([s, rate])));
   const w = soundWorker();
@@ -1381,7 +1467,9 @@ export function playOnTap(name: SoundName) {
 export function play(name: SoundName, voice?: ReelVoice) {
   // Tests read this log (set window.__soundLog = [] to start one).
   (globalThis as { __soundLog?: string[] }).__soundLog?.push(`${name}:${ctx?.state ?? "none"}${muted ? ":muted" : ""}`);
-  if (muted || !ctx || !master || ctx.state !== "running") return;
+  if (muted || !ctx || !master || pageHidden()) return;
+  // (Running; or a new context waking inside the tap that made it: the sound starts as it wakes.)
+  if (ctx.state !== "running" && !(ctx.state === "suspended" && nowMs() < wakingUntil)) return;
   const chosen = reelVoice;
   if (voice) reelVoice = voice;
   try {

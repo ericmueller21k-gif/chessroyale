@@ -9,7 +9,7 @@ import { startStatus } from "./status.ts";
 import { setUpInstall } from "./install.ts";
 import { watchErrors } from "./problems.ts";
 import { watchStaleChunks } from "./stale.ts";
-import { audioUnlocked, prepareAudio, unlockAudio } from "./sound.ts";
+import { prepareAudio, wakeAudio } from "./sound.ts";
 import { watchTheme } from "./theme.ts";
 import { applyBoardColors } from "./prefs.ts";
 import { setBannerPlusSource } from "@chessroyale/core";
@@ -37,9 +37,10 @@ setBannerPlusSource(bannerPlusAsked);
 // Browsers allow sound only after a tap. iPhones don't count every event as one (a pointerdown alone isn't
 // enough), so every tap tries until sound is on (cheap once it is). The audio graph is made beforehand, while the page
 // is idle, so the first tap (often a game's first move) only switches it on and starts the samples loading after its
-// own frame.
+// own frame. Coming back from another app, the first tap brings sound back (wakeAudio: a new audio context if iOS left the
+// old one dead; Eric, Nov 3). Capture: it runs before the page's own handlers, so that tap's sound plays too.
 prepareAudio();
-for (const ev of ["pointerdown", "touchend", "click", "keydown"]) window.addEventListener(ev, () => audioUnlocked() || unlockAudio(), { passive: true });
+for (const ev of ["pointerdown", "touchend", "click", "keydown"]) window.addEventListener(ev, wakeAudio, { passive: true, capture: true });
 // The kill switches and the maintenance banner (status.ts), asked now and every minute.
 startStatus();
 // (Fair play's ban notice sits over any screen: PLAY, a new lobby or joining one can bring it up; so does the
