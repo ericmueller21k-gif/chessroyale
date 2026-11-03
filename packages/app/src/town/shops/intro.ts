@@ -1,7 +1,8 @@
 /**
  * A boss's intro, drawn (shops/challenge.ts has the timing; ShopRoom.tsx plays it in the room): loaded only when you challenge the
- * boss (its art is a chunk of its own: Alfil's is shops/alfil-intro-art.ts, Big Boy's shops/bigboy-intro-art.ts, copied from
- * `claude/boss-art`), every frame drawn into a canvas of its own as it loads, behind the town's fade, never in a frame loop.
+ * boss (its art is a chunk of its own: Alfil's is shops/alfil-intro-art.ts, Big Boy's shops/bigboy-intro-art.ts, Timber's
+ * shops/timber-intro-art.ts with his own moves, characters/timber-intro.ts, copied from `claude/boss-art`), every frame drawn into a
+ * canvas of its own as it loads, behind the town's fade, never in a frame loop.
  *
  * - The board coming in: the pyramid's frames (its `rise`, `idle`, `crack` and `crumble`), or the toy blocks' (Big Boy's: `build`,
  *   `plop`, `chairs` and `idle`: the blocks are his table and its stools, the board dropped onto them), the table (the town's park table, in the
@@ -10,6 +11,9 @@
  *   the table's stone, its squares in its colors (the palette's `L` / `D`), the pieces in the town's own ink (TABLE_INK), turned to the
  *   layout (challenge.ts `boardSquare`): white's ranks nearest you, black's nearest the boss. The table's picture is three squares
  *   across, a stool in each outer one: across, as it is; facing, its middle square alone and a stool on each player's side.
+ *   Timber's (`wood`): his own moves (BOSS_BEAVER_INTRO: walk, lift, carry, setDown, gnaw, done), the log (lying, standing, gnawed),
+ *   the shavings' fog (rise, hold, settle), his table (a gnawed log pedestal, no stools: its picture's middle alone) and a stump for
+ *   each seat (idle, pop).
  * - The boss itself (its town sprite, BOSS_ART: its `idle`), walking in and standing on its mark.
  * - The transition (`startTransition`): a boss's own (`startStorm`, Alfil's sandstorm), or the default (`startWipe`: a flash and a
  *   wipe to black). Each a canvas over the whole page (outside the town's tree, so it stays as the town closes and the
@@ -18,37 +22,56 @@
  */
 import { KING_ATTACK } from "@chessroyale/chess";
 import { bossKit } from "../../characters/kits.ts";
-import { renderFrame, type Character } from "../../characters/sprite.ts";
+import { renderFrame, type Character, type Frame } from "../../characters/sprite.ts";
 import { play, warmSounds, type SoundName } from "../../sound.ts";
 import { newPt, proj, tableLift, type TableLift, type View } from "../camera.ts";
 import { TOWN_FEEL } from "../feel.ts";
 import { PARK_TABLE, TABLE_BOARD, TABLE_INK, TABLE_PIECES } from "../houses/park.ts";
 import { BOSS_ART } from "../render.ts";
 import type { HomeId } from "../world.ts";
-import { CHALLENGE_FEEL, boardSquare, introBeats, introOf, stormEdge, wipeAt, type BossIntro, type IntroAnims, type IntroBeat, type IntroLayout } from "./challenge.ts";
+import { CHALLENGE_FEEL, boardSquare, introBeats, introOf, stormEdge, wipeAt, type BossIntro, type IntroAnims, type IntroBeat, type IntroLayout, type LogAnims, type LogMove } from "./challenge.ts";
 
 /**
  * A boss's intro art, as its file exports it: a pyramid that brings in its table (Alfil's), or toy blocks that are the table and its
  * stools (Big Boy's); the slab's and board's colors; its storm (a tile and its front).
  */
 type IntroArt = (
-  | { pyramid: Character; table: Character; blocks?: undefined }
-  | { blocks: Character; pyramid?: undefined; table?: undefined }
+  | { pyramid: Character; table: Character; blocks?: undefined; wood?: undefined }
+  | { blocks: Character; pyramid?: undefined; table?: undefined; wood?: undefined }
+  | { wood: WoodArt; table: Character; pyramid?: undefined; blocks?: undefined }
 ) & {
   /** The slab's keys "1" to "5" and the board's squares `L` / `D`. */
   palette: Readonly<Record<string, string>>;
   storm: Character;
   front: Character;
 };
+/** Timber's: his own moves (facing east), where the lying log and the standing one are from his foot (his pixels), the props. */
+interface WoodArt {
+  mover: Character;
+  liftAt: readonly [number, number];
+  reach: readonly [number, number];
+  log: Character;
+  fog: Character;
+  stump: Character;
+}
 const ART: Partial<Record<HomeId, () => Promise<IntroArt>>> = {
   alfil: () =>
     import("./alfil-intro-art.ts").then((m) => ({ pyramid: m.INTRO_ALFIL_PYRAMID, table: m.INTRO_ALFIL_TABLE, palette: m.INTRO_ALFIL_TABLE_PALETTE, storm: m.INTRO_ALFIL_STORM, front: m.INTRO_ALFIL_FRONT })),
   bigboy: () =>
     import("./bigboy-intro-art.ts").then((m) => ({ blocks: m.INTRO_BIGBOY_BLOCKS, palette: m.INTRO_BIGBOY_TABLE_PALETTE, storm: m.INTRO_BIGBOY_SWIRL, front: m.INTRO_BIGBOY_SWIRL_FRONT })),
+  timber: () =>
+    import("./timber-intro-art.ts").then((m) => ({
+      wood: { mover: m.BOSS_BEAVER_INTRO, liftAt: m.TIMBER_INTRO_LIFT_AT, reach: m.TIMBER_INTRO_REACH, log: m.INTRO_TIMBER_LOG, fog: m.INTRO_TIMBER_SHAVINGS, stump: m.INTRO_TIMBER_STUMP },
+      table: m.INTRO_TIMBER_TABLE,
+      palette: m.INTRO_TIMBER_TABLE_PALETTE,
+      storm: m.INTRO_TIMBER_STORM,
+      front: m.INTRO_TIMBER_FRONT,
+    })),
 };
 
 type PyramidAnim = "rise" | "idle" | "crack" | "crumble";
 type BlocksAnim = "build" | "plop" | "chairs" | "idle";
+const LOG_MOVES = ["walk", "lift", "carry", "setDown", "gnaw", "done"] as const;
 
 /** The storm's frames, ready: each tile `stormScale` times its size, the front and the front mirrored, and each frame's ms. */
 export interface StormArt {
@@ -69,6 +92,19 @@ export interface LoadedIntro {
   pyramid: { ch: Character; frames: Record<PyramidAnim, HTMLCanvasElement[]> } | null;
   /** Its toy blocks (Big Boy's: the table and its stools, built as you watch; null: none). */
   blocks: { ch: Character; frames: Record<BlocksAnim, HTMLCanvasElement[]> } | null;
+  /**
+   * Timber's log (null: another's): his own moves' frames (drawn at his town size, facing east: mirrored to walk west), where the lying
+   * log's foot and the standing log's are from his foot (his pixels: TIMBER_INTRO_LIFT_AT, TIMBER_INTRO_REACH), and the props' frames:
+   * the log (at his size: it's the log in his paws), the shavings' fog and a stump (at the room's: the table's size).
+   */
+  wood: {
+    mover: { ch: Character; frames: Record<LogMove | "idle", HTMLCanvasElement[]> };
+    liftAt: readonly [number, number];
+    reach: readonly [number, number];
+    log: { ch: Character; frames: Record<"lying" | "standing" | "gnawed", HTMLCanvasElement[]> };
+    fog: { ch: Character; frames: Record<"rise" | "hold" | "settle", HTMLCanvasElement[]> };
+    stump: { ch: Character; frames: Record<"idle" | "pop", HTMLCanvasElement[]> };
+  } | null;
   /**
    * The table: its picture (three squares across: a stool, the leg, a stool), its middle square alone (`leg`) and a stool alone
    * (`stool`, its foot at its middle), and the slab's and board's colors.
@@ -130,8 +166,38 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
     let anims: IntroAnims | null = null;
     let pyramid: LoadedIntro["pyramid"] = null;
     let blocks: LoadedIntro["blocks"] = null;
+    let wood: LoadedIntro["wood"] = null;
     let storm: StormArt | null = null;
-    if (art?.blocks) {
+    const all = <A extends string>(ch: Character, names: readonly A[]) => Object.fromEntries(names.map((a) => [a, ch.anims[a]!.frames.map((_, i) => toCanvas(ch, a, i))])) as Record<A, HTMLCanvasElement[]>;
+    if (art?.wood) {
+      const w = art.wood;
+      const msOf = (ch: Character, a: string) => ch.anims[a]!.frames.map((f) => f.ms);
+      const cuesOf = (ch: Character, a: string) => ch.anims[a]!.frames.map((f) => f.cue);
+      // (Its places in squares: his pixels are his town figure's, BOSS_ART's, `bossSquares` tall. His dusting off steps him back: the
+      // way his foot's layer moves from his still to the move's last frame.)
+      const perSq = BOSS_ART[home].h / (TOWN_FEEL.bossSquares * (TOWN_FEEL.bossScale[home] ?? 1));
+      const footX = (fr: Frame) => fr.layers.find((l) => l.part.startsWith("foot"))?.x ?? 0;
+      const back = (footX(w.mover.anims.idle!.frames[0]!) - footX(w.mover.anims.done!.frames.at(-1)!)) / perSq;
+      const moves = Object.fromEntries(LOG_MOVES.map((m) => [m, msOf(w.mover, m)])) as Record<LogMove, number[]>;
+      const props = { gnawed: msOf(w.log, "gnawed"), rise: msOf(w.fog, "rise"), hold: msOf(w.fog, "hold"), settle: msOf(w.fog, "settle"), pop: msOf(w.stump, "pop") };
+      const cues = {
+        ...(Object.fromEntries(LOG_MOVES.map((m) => [m, cuesOf(w.mover, m)])) as Record<LogMove, (string | undefined)[]>),
+        gnawed: cuesOf(w.log, "gnawed"),
+        rise: cuesOf(w.fog, "rise"),
+        hold: cuesOf(w.fog, "hold"),
+        settle: cuesOf(w.fog, "settle"),
+        pop: cuesOf(w.stump, "pop"),
+      };
+      anims = { moves, props, cues, reach: w.reach[0] / perSq, back } satisfies LogAnims;
+      wood = {
+        mover: { ch: w.mover, frames: all(w.mover, [...LOG_MOVES, "idle"]) },
+        liftAt: w.liftAt,
+        reach: w.reach,
+        log: { ch: w.log, frames: all(w.log, ["lying", "standing", "gnawed"]) },
+        fog: { ch: w.fog, frames: all(w.fog, ["rise", "hold", "settle"]) },
+        stump: { ch: w.stump, frames: all(w.stump, ["idle", "pop"]) },
+      };
+    } else if (art?.blocks) {
       const bl = art.blocks;
       const ms = (a: BlocksAnim) => bl.anims[a]!.frames.map((f) => f.ms);
       const cues = (a: BlocksAnim) => bl.anims[a]!.frames.map((f) => f.cue);
@@ -159,7 +225,8 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
         ms: stormFrames.map((f) => Math.max(16, f.ms)),
       };
     }
-    // The table: the boss's own (its blocks, built), or the town's park table in its stone (the same geometry: a stool, the leg, a stool).
+    // The table: the boss's own (its blocks, built; Timber's gnawed pedestal, its stumps apart), or the town's park table in its stone
+    // (the same geometry: a stool, the leg, a stool).
     const tch = art?.blocks ?? art?.table ?? PARK_TABLE;
     const img = toCanvas(tch, "idle", 0);
     const table = { ch: tch, img, leg: third(img, 1), stool: third(img, 0), palette: art?.palette ?? PARK_TABLE.palette };
@@ -190,6 +257,7 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
       beats: introBeats(anims),
       pyramid,
       blocks,
+      wood,
       table,
       boss: { ch: bossCh, frames: bossIdle.map((_, i) => toCanvas(bossCh, "idle", i)), ends, loop: t, squares: TOWN_FEEL.bossSquares * (TOWN_FEEL.bossScale[home] ?? 1) },
       storm,
