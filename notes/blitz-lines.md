@@ -25,3 +25,7 @@ boxes, a halfpipe, a "Cheetah Chug" energy-drink pallet; no chess clocks); **a c
 off in a dust trail three times, dropping the board, then the pieces, then both chairs; his screen cover is numbers and clocks);
 **shoe-hustler slang** lines: the art session's draft is `scripts/boss-art/out/blitz-lines-draft.md` on `claude/boss-art`. The build
 helper merges both drafts. Tick (the tortoise) needs a town sheet baked, as Rivet did.
+- Nov 3 04:40: Blitz's house (`HOUSE_BLITZ`, 144x134) and shop (`SHOP_BLITZ_PIECES`, marks boss [8,10.5] you [11,10.5], halfpipe
+  showpiece 4x2 upright) drawn on weekly usage, on `claude/boss-art`: notes `house-blitz-nov3.md`, `shop-blitz-nov3.md`. His intro art
+  waits on Eric's OK of the room. Queue: Timber intro wiring (brief-timber-intro.md) → Blitz build (boss kit + home + shop + Tick's
+  sheet + lines), one Opus at a time unless Eric OKs two.
