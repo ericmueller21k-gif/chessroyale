@@ -274,7 +274,7 @@ test("Timber's Lumber Lodge (Nov 3): in an admin's town only; its card is its na
 test("Dash's Kicks (Nov 3): in an admin's town only; its card is its name and Go in; Tick keeps the shop, Dash's Boss Crate with Cheetah Shoes; the halfpipe", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
-  type Hook = { __townBots?: () => { name: string }[] | null; __townGlide?: (to: string | readonly [number, number]) => void };
+  type Hook = { __townBots?: () => { name: string }[] | null; __townGlide?: (to: string | readonly [number, number]) => void; __townBossBack?: (id: string) => void };
   const bots = async () => (await page.evaluate(() => (window as unknown as Hook).__townBots?.() ?? []))!.map((b) => b.name);
   // A player's town: no store on its ground beside Timber's (open ground there), no Tick (Dash is in the game for admins first).
   await page.goto("/town?sky=day");
@@ -293,8 +293,9 @@ test("Dash's Kicks (Nov 3): in an admin's town only; its card is its name and Go
     await page.evaluate(() => (window as unknown as Hook).__townGlide?.("dash"));
     await expect.poll(() => homeAt(page, "dash"), { message: "the store comes into view" }).not.toBeNull();
     if (SHOTS) {
-      // (Day, and night so the neon shows.)
-      await page.waitForTimeout(1500);
+      // (Day, and night so the neon shows; Dash sent round behind his store, so its front shows whole.)
+      await page.evaluate(() => (window as unknown as Hook).__townBossBack?.("dash"));
+      await page.waitForTimeout(4000);
       await page.screenshot({ path: `${SHOTS}/town-kicks-${sky}-${test.info().project.name}.png` });
     }
   }

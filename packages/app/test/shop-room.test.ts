@@ -167,8 +167,10 @@ describe("the rooms' own pieces", () => {
     expect(SHOP_BLITZ_MARKS).toEqual({ boss: [8, 10.5], you: [11, 10.5] });
     // In front of the halfpipe and beside it.
     for (const [c, r] of [[15, 5], [18, 5], [14, 4], [14, 3]] as const) expect(at(c, r), `by the halfpipe ${c},${r}`).toBe(true);
-    // Tick behind the middle of the counter (30 px tall: his 42 px show over it), the crate on its east end.
+    // Tick behind the counter on its middle squares (30 px tall), drawn half a square back and west so his head shows over it, clear
+    // of the shoe boxes; the crate on its east end.
     expect(SHOPS.dash!.keeper).toEqual([{ c: 9, r: 2 }, { c: 10, r: 2 }]);
+    expect(SHOPS.dash!.at).toEqual([9, 1.5]);
     expect(tapTarget(dash, dash.start, 9, 2).dest).toEqual({ c: 10, r: 5 });
     expect(SHOP_BLITZ_CRATE_AT).toEqual([124, 16]);
   });

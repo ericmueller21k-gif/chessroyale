@@ -55,9 +55,11 @@ export const SHOPS: Readonly<Partial<Record<HomeId, ShopDef>>> = {
   // Rivet stands behind the middle of the 30 px workbench (his 50 px show over it), as the art's notes have him. A light room (honey
   // planks, big windows): the day tone. (Timber's home is in an admin's town only for now: world.ts ADMIN_TOWN.)
   timber: { home: "timber", boss: "Timber", crate: "Timber's Boss Crate", kid: "timber", at: [9.5, 2], keeper: [{ c: 9, r: 2 }, { c: 10, r: 2 }], prizes: ["log-roller"], roof: "lodge", chatTone: "day" },
-  // Tick stands behind the middle of the 30 px sneaker counter (his 42 px show over it), as Rivet does. A light room (pale terrazzo,
-  // white walls, sunny windows): the day tone. (Dash's home is in an admin's town only for now: world.ts ADMIN_TOWN.)
-  dash: { home: "dash", boss: "Dash", crate: "Dash's Boss Crate", kid: "blitz", at: [9.5, 2], keeper: [{ c: 9, r: 2 }, { c: 10, r: 2 }], prizes: ["cheetah-shoes"], roof: "store", chatTone: "day" },
+  // Tick stands behind the 30 px sneaker counter, on its squares as Rivet does, but drawn half a square further back and west
+  // (`at`): a low tortoise, his head out front at his right, which on row 2 behind the counter's middle hid under its shoe boxes and
+  // top; from there his head and the clock on his shell show over it. A light room (pale terrazzo, white walls, sunny windows): the
+  // day tone. (Dash's home is in an admin's town only for now: world.ts ADMIN_TOWN.)
+  dash: { home: "dash", boss: "Dash", crate: "Dash's Boss Crate", kid: "blitz", at: [9, 1.5], keeper: [{ c: 9, r: 2 }, { c: 10, r: 2 }], prizes: ["cheetah-shoes"], roof: "store", chatTone: "day" },
 };
 
 /** The shop inside a home, or null: every other home has no "Go in" yet. */

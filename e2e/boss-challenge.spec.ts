@@ -381,9 +381,9 @@ test("challenging Dash in an admin's town: the default intro in his store (his l
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
-  // (Dash is in the game for admins first: his store is in an admin's town only. Round 3 brings his own intro.)
+  // (Dash is in the game for admins first: his store is in an admin's town only. Round 3 brings his own intro. `debug`: window.match.)
   await asAdmin(page);
-  await page.goto("/town?sky=day");
+  await page.goto("/town?sky=day&debug");
   await expect(town(page)).toHaveAttribute("data-ready", "1");
   const { confirm, stood } = await toConfirm(page, "dash", "Dash");
   await confirm.getByRole("button", { name: "Fight" }).click();
