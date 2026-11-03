@@ -80,3 +80,7 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Eric Nov 3: OK'd stopping stuck servers (done: e2e lock freed, all leftover wrangler gone). Dash Kicks house/colors fine.
   Dash countdown/slap over pieces: Eric to test first; idea: while a finger is down, the countdown goes see-through until release.
   Boss picker compact (Haiku) started: /home/user/cr-bscompact, brief-boss-select-compact.md. #477 desktop stills retaken 56bb35f5, watcher bspr9tcud.
+- Boss picker (Nov 3, Eric on the stills): KEEP the gap above "vs" (pawns are bigger, the boss drops in); don't raise the "?" platform.
+  ON HOLD until Eric sends button ideas (from Gemini): the 4 mode buttons (Join a raid, People only, Raid with bots, Boss alone) get a new
+  look, one line each ("Join a raid - up to 50 players", "People only - no bots", "Raid with bots - you and 49 bots", Boss alone: something
+  cool like "just you and the king"), a 2x2 grid on phone and computer. Card-shrink branch claude/boss-select-compact ebd6d99d waits too.
