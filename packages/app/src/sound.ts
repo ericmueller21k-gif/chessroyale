@@ -34,6 +34,10 @@ import { CASTLE_SOUND, MOVE_SOUNDS, CAPTURE_SOUNDS, defaultPieceSound, onPieceSo
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
+/** The last node before the speakers (the soft low-pass): the sound report listens here. */
+let out: AudioNode | null = null;
+/** Audio contexts made this visit (the sound report). */
+let made = 0;
 const samples = new Map<string, AudioBuffer>();
 /** Every recorded file, fetched and decoded once, by its path (the piece sounds share them with SAMPLE_FILES). */
 const files = new Map<string, Promise<AudioBuffer | null>>();
@@ -101,7 +105,12 @@ const GREX_WHISTLE_FILE_LEVEL = 0.15;
 /** The audio graph, made once (prepareAudio, while the page is idle; failing that, on the first tap). */
 function ensureContext() {
   if (ctx) return;
-  ctx = new AudioContext();
+  const c = (ctx = new AudioContext());
+  made++;
+  note(`made #${made}: ${c.sampleRate} Hz, ${c.state}`);
+  c.addEventListener?.("statechange", () => note(`#${made} ${c.state}`));
+  // (Chrome: the audio device failed under it. It may still say "running", its clock moving, and play nothing.)
+  c.addEventListener?.("error", () => markStale("context error"));
   master = ctx.createGain();
   master.gain.value = 0.9;
   // A gentle low-pass keeps every sound soft on phone speakers.
@@ -109,6 +118,7 @@ function ensureContext() {
   soften.type = "lowpass";
   soften.frequency.value = 6000;
   master.connect(soften).connect(ctx.destination);
+  out = soften;
 }
 
 let loading = false;
@@ -144,6 +154,8 @@ export function prepareAudio() {
     document.addEventListener("visibilitychange", audioReturned);
     addEventListener("pageshow", audioReturned);
     addEventListener("focus", audioReturned);
+    addEventListener("blur", audioLeft);
+    (globalThis as { navigator?: { mediaDevices?: EventTarget } }).navigator?.mediaDevices?.addEventListener?.("devicechange", () => markStale("devices changed"));
   }
   const make = () => {
     try {
@@ -196,11 +208,41 @@ export function onAudioRebuilt(fn: () => void): () => void {
   return () => rebuiltListeners.delete(fn);
 }
 
+// ---- The computer's sound changing under the page (Eric, Nov 3, Chrome on his computer: the bosses' sounds played; he moved and
+// resized the window, clicked over to another app and back, and every click after was silent, no reload). Chrome can keep a context
+// "running", its clock moving, after the audio device under it changed (headphones, another app opening the microphone and the
+// headset switching mode, the output picked again): nothing the clock checks above can see, and nothing comes out. So a device change
+// (`devicechange`), the context's own error, or the window coming back after losing focus for `AWAY_REBUILD_MS` with the page on
+// screen (an app switch on a computer; a phone going to another app hides the page instead, checked above) marks it stale, and the
+// next tap makes a new one: cheap (the boss sounds are cached by sample rate, the files' decoded buffers serve any context). ----
+/** The next tap makes a new context (`wakeAudio`), whatever the old one says. */
+let stale = false;
+const markStale = (why: string) => {
+  note(`stale? ${why}${ctx && loading ? "" : " (sound not on yet)"}`);
+  if (ctx && loading) stale = true;
+};
+/** When the window lost focus with the page on screen (ms), or -1. */
+let leftAt = -1;
+const AWAY_REBUILD_MS = 2000;
+/** The window lost focus (`blur`). */
+export function audioLeft() {
+  note("window lost focus");
+  if (leftAt < 0) leftAt = nowMs();
+}
+
 /** The page shows again (visibilitychange, pageshow, focus): resume() now if it isn't running; the next tap checks it. */
 export function audioReturned() {
   const c = ctx;
+  note(pageHidden() ? "page hidden" : `page back (${c?.state ?? "no sound yet"})`);
+  if (pageHidden()) {
+    // (Hidden: the checks below run when it shows again; a blur before it doesn't count.)
+    leftAt = -1;
+    return;
+  }
+  if (leftAt >= 0 && nowMs() - leftAt >= AWAY_REBUILD_MS) markStale(`away ${((nowMs() - leftAt) / 1000).toFixed(1)} s`);
+  leftAt = -1;
   // (Before sound was ever switched on, the first tap does that as usual.)
-  if (!c || !loading || pageHidden()) return;
+  if (!c || !loading) return;
   back = { at: nowMs(), t: c.state === "running" ? c.currentTime : -1 };
   if (c.state !== "running" && c.state !== "closed") void c.resume().catch(() => undefined);
 }
@@ -246,6 +288,8 @@ let rebuiltAt = -Infinity;
 function rebuildInTap() {
   rebuiltAt = nowMs();
   seen = null;
+  stale = false;
+  note("rebuilt in a tap");
   rebuildAudio();
   (globalThis as { __soundLog?: string[] }).__soundLog?.push("audio:rebuilt");
 }
@@ -259,7 +303,11 @@ export function wakeAudio(e?: Event) {
   const b = back;
   const c = ctx;
   const tapAt = e && e.timeStamp > 0 ? e.timeStamp : nowMs();
-  if (b && c) {
+  if (stale && c && !pageHidden() && nowMs() - rebuiltAt >= REBUILD_GAP_MS) {
+    stale = false;
+    back = null;
+    rebuildInTap();
+  } else if (b && c) {
     const waited = (nowMs() - b.at) / 1000;
     if (c.state !== "running") {
       back = null;
@@ -1572,6 +1620,7 @@ export function playOnTap(name: SoundName) {
 export function play(name: SoundName, voice?: ReelVoice) {
   // Tests read this log (set window.__soundLog = [] to start one).
   (globalThis as { __soundLog?: string[] }).__soundLog?.push(`${name}:${ctx?.state ?? "none"}${muted ? ":muted" : ""}`);
+  note(`play ${name}: ${ctx?.state ?? "none"}${ctx ? ` t=${ctx.currentTime.toFixed(2)}` : ""}${muted ? " muted" : ""}${pageHidden() ? " hidden" : ""}`);
   if (muted || !ctx || !master || pageHidden()) return;
   // (Running; or a new context waking inside the tap that made it: the sound starts as it wakes.)
   if (ctx.state !== "running" && !(ctx.state === "suspended" && nowMs() < wakingUntil)) return;
@@ -1584,4 +1633,51 @@ export function play(name: SoundName, voice?: ReelVoice) {
   } finally {
     reelVoice = chosen;
   }
+}
+
+// ---- The sound report (Eric, Nov 3: on his computer the sound died after fast clicks on the bosses, and a test browser can't make
+// it happen). Admins, Settings → Testing: what the sound did lately (contexts made, their states, the page going and coming back,
+// each sound asked for), the device's numbers, and a test tick measured at the last node before the speakers: a loud number there
+// with nothing heard means the device stopped; zero or "not numbers" means the sound inside the game broke. Kept in memory only. ----
+const NOTES_MAX = 400;
+const notes: string[] = [];
+function note(line: string) {
+  notes.push(`${(nowMs() / 1000).toFixed(2)} ${line}`);
+  if (notes.length > NOTES_MAX) notes.splice(0, notes.length - NOTES_MAX);
+}
+
+/** The sound report: plays a tick, measures it at the speakers' input for 0.4 s, and returns everything as text. */
+export async function soundReport(): Promise<string> {
+  const c = ctx;
+  let heard = "no sound on";
+  if (c && out && c.state === "running") {
+    const an = c.createAnalyser();
+    an.fftSize = 2048;
+    out.connect(an);
+    const buf = new Float32Array(an.fftSize);
+    let peak = 0;
+    let bad = 0;
+    play("tick");
+    for (let i = 0; i < 20; i++) {
+      await new Promise((ok) => setTimeout(ok, 20));
+      an.getFloatTimeDomainData(buf);
+      for (const v of buf) {
+        if (!Number.isFinite(v)) bad++;
+        else peak = Math.max(peak, Math.abs(v));
+      }
+    }
+    out.disconnect(an);
+    heard = `peak ${peak.toFixed(3)}${bad ? `, ${bad} not numbers` : ""}`;
+  } else if (c) heard = `not running (${c.state})`;
+  const n = (globalThis as { navigator?: { userAgent?: string } }).navigator;
+  const lat = c as (AudioContext & { outputLatency?: number; sinkId?: unknown }) | null;
+  return [
+    `HunChess sound report, ${new Date().toISOString()}`,
+    `browser: ${n?.userAgent ?? "?"}`,
+    `sound: ${c ? `#${made} ${c.state}, t=${c.currentTime.toFixed(2)}, ${c.sampleRate} Hz, latency ${c.baseLatency ?? "?"}/${lat?.outputLatency ?? "?"}, sink ${JSON.stringify(lat?.sinkId ?? "")}` : "none"}; muted ${muted}; switched on ${loading}; stale ${stale}`,
+    `test tick: ${heard}`,
+    `page: ${pageHidden() ? "hidden" : "shown"}, ${(nowMs() / 1000).toFixed(2)} s in`,
+    "",
+    ...notes,
+  ].join("\n");
 }

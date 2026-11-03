@@ -9,7 +9,7 @@ import { BackButton } from "../components/FrontDoor.tsx";
 import { signOut, tooYoung } from "../account.ts";
 import { BOARD_COLORS, boardColors, boardMarksOn, chatBubbles, chatOff, crowdAnimations, crowdTrail, onPrefsChange, practiceOn, premovesOn, setBoardColors, setBoardMarksOn, setChatBubbles, setChatOff, setCrowdAnimations, setCrowdTrail, setPracticeOn, setPremovesOn, type BoardColors } from "../prefs.ts";
 import { clearAllPremoves } from "../board/yours.ts";
-import { REEL_VOICES, getReelVoice, isMuted, onMuteChange, previewPieceSound, previewReel, setMuted, setReelVoice, unlockAudio, type ReelVoice } from "../sound.ts";
+import { REEL_VOICES, getReelVoice, isMuted, onMuteChange, previewPieceSound, previewReel, setMuted, setReelVoice, soundReport, unlockAudio, type ReelVoice } from "../sound.ts";
 import { PIECE_SOUNDS, pieceSound, setPieceSound } from "../piece-sounds.ts";
 import { useAccount } from "./Profile.tsx";
 import { setThemePref, useTheme, type ThemePref } from "../theme.ts";
@@ -153,6 +153,45 @@ function BoardColorsChoice() {
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * The sound report (admins; Eric, Nov 3: the sound died on his computer after fast clicks on the bosses and a test browser can't
+ * make it happen): a tap plays a test tick, measures it, and shows what the sound did lately, to copy and paste to Claude. A second
+ * tap copies it (Safari only lets a tap itself copy).
+ */
+function SoundReport() {
+  const [text, setText] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  return (
+    <div class="sound-report">
+      <button
+        type="button"
+        class="fd-row-link"
+        onClick={() => {
+          setCopied(false);
+          setText("Listening…");
+          void soundReport().then(setText);
+        }}
+      >
+        Sound report (after sound stops working) ›
+      </button>
+      {text && (
+        <>
+          <textarea class="sound-report-text" readOnly rows={8} value={text} />
+          <button
+            type="button"
+            class="fd-row-link"
+            onClick={() => {
+              void navigator.clipboard?.writeText(text).then(() => setCopied(true), () => undefined);
+            }}
+          >
+            {copied ? "Copied: paste it to Claude" : "Copy the report"}
+          </button>
+        </>
+      )}
     </div>
   );
 }
@@ -369,6 +408,7 @@ export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => v
           <Toggle title="Eval bar" checked={false} disabled onChange={() => undefined}>
             Off for now: the engine's winning chances in a bar beside the board, shown on no screen.
           </Toggle>
+          <SoundReport />
           {/* (Auto chess, the demo, shelved: Eric, Oct 19. Testers only; its screen is /autochess.) */}
           {onAutoChess && (
             <button type="button" class="fd-row-link" onClick={onAutoChess}>
