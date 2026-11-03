@@ -11095,8 +11095,10 @@ a.fd-row-link {
    right of the top part, beside the title, not alone over the review. A narrow window keeps the phone's single column. */
 @media (min-width: 900px) and (min-height: 600px) and (hover: hover) and (pointer: fine) {
   .screen.results.boss-results {
+    /* (The room beside the side menu, not the 1100 px column: the review's board is about double, Eric, round 2.) */
+    width: var(--win-w);
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
     column-gap: 28px;
     align-items: start;
     align-content: start;
@@ -11119,7 +11121,7 @@ a.fd-row-link {
   /* The review's board: about double (the column's width, 680 px at most), and no taller than the window leaves room for the
      stepper, the board and its text (no scroll). */
   .breakdown.inline {
-    width: min(680px, 100%, calc(100vh - 250px));
+    width: min(680px, 100%, calc(100vh - 180px));
   }
 }
 .fd-bar {
@@ -13662,8 +13664,10 @@ img.qicon {
 .boss-bar.has-char .boss-icon-face {
   display: none;
 }
+/* (The box is as tall as the drawing's head room: its feet are at the box's bottom, so a figure drawn taller than the box, from
+   its feet up, would stand over the title above it. Eric, round 2: "You resigned" is never behind the boss.) */
 .boss-char.place-results.tall {
-  height: 180px;
+  --bc-box: 180px;
 }
 /* A computer: by the board's bottom-left corner (the God King by its bottom-right, mirroring him: see .boss-dock). */
 .boss-side {
@@ -13672,8 +13676,9 @@ img.qicon {
 /* The results: his bow. */
 .boss-char.place-results {
   --bc-scale: 2;
+  --bc-box: 124px;
   width: 96px;
-  height: 124px;
+  height: max(var(--bc-box), calc(var(--bc-fy) * var(--bc-scale) * 1px));
   margin: 4px auto 0;
 }
 /* Portraits: banners, the entrance card, the bar on a computer. */
@@ -13846,7 +13851,7 @@ img.qicon {
 }
 .boss-char.place-results.ch-recluse {
   --bc-scale: 1.25;
-  height: 172px;
+  --bc-box: 172px;
 }
 /* (Beside him on the results, never over him: as wide as the room to his right, so it needn't move into view.) */
 .place-results.ch-recluse .bc-bubble {
