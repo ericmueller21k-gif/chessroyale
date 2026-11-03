@@ -90,7 +90,7 @@ async function talk(p: Page) {
   await card.getByRole("button", { name: "Talk" }).click();
 }
 
-test("Babur's tent: Go in, start in Close, talk to the Shopkeeper, the crate's price and Balloon Pup, then Go out at the tent's door", async ({ page }) => {
+test("Babur's tent: Go in, start zoomed out, talk to the Shopkeeper, the crate's price and Balloon Pup, then Go out at the tent's door", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
@@ -110,6 +110,7 @@ test("Babur's tent: Go in, start in Close, talk to the Shopkeeper, the crate's p
   expect((await shopCam(page))!.zoom).toBe(1);
   await expect(page.getByRole("button", { name: "Zoom out" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".town-chip").first()).toBeHidden();
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/first-view-${test.info().project.name}.png` });
   // + zooms into Close, − back out to the town's zoomed-in camera.
   await page.getByRole("button", { name: "Zoom in" }).click();
   await expect.poll(async () => (await shopCam(page))!.zoom).toBe(0);

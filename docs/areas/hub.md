@@ -278,6 +278,12 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   every source and license in `public/sounds/SOURCES.md`.
 - **The first tap of a visit** doesn't wait for sound (Oct 12): the audio graph is made while the page is idle
   (`prepareAudio`), so a tap only switches it on; the samples start loading after that tap's frame.
+- **Coming back from another app** (Eric, Nov 3, iPhone: the sound was gone after switching apps): the page coming back
+  (visibilitychange, pageshow, focus) tries `resume()`; the first tap or key after it (`wakeAudio`, a capture listener ahead of
+  the page's) makes a new audio context if the old one isn't running with its clock moving (iOS: suspended, interrupted, closed,
+  or "running" but stopped), warms the boss sounds again and moves the Colosseum's ambience to a new element
+  (`onAudioRebuilt`). That tap's own sound plays as the new context wakes; nothing plays while the page is hidden.
+  `packages/app/test/sound-return.test.ts`, `e2e/sound.spec.ts`; docs/decisions/2026-11-03-sound-after-app-switch.md.
 - **The FAQ, "How HunChess works"** (Eric, Oct 11): Settings → HOW TO PLAY → "📖 FAQ · How it works" (`/faq`; back
   goes to Settings), or "📖 How each mode works" (`/faq#faq-modes`). Settings keeps no rules of its own: the FAQ is
   the one copy (Oct 15). A long page for the curious: a table of contents with tap-to-jump links, then the modes, how
