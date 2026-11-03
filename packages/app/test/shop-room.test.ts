@@ -5,7 +5,7 @@ import { SHOP_ALFIL_LAYOUT } from "../src/town/shops/alfil-art.ts";
 import { SHOP_BIGBOY_LAYOUT } from "../src/town/shops/bigboy-art.ts";
 import { SHOP_TIMBER_LAYOUT, SHOP_TIMBER_MARKS } from "../src/town/shops/timber-art.ts";
 import { SHOP_BLITZ_CRATE_AT, SHOP_BLITZ_LAYOUT, SHOP_BLITZ_MARKS, SHOP_BLITZ_PIECES } from "../src/town/shops/blitz-art.ts";
-import { findPath, inTalkRange, makeRoom, onDoor, stepsFrom, tapTarget, walkable, type Room, type Sq } from "../src/town/shops/room.ts";
+import { STORE_PANELS, ceilingPanel, findPath, inTalkRange, makeRoom, onDoor, stepsFrom, tapTarget, walkable, type Room, type Sq } from "../src/town/shops/room.ts";
 import { POOL_LINE, buyBossCrate, canAfford, inInventoryLine, holdLine, priceLine, prizeRows, shopOf, wayText, SHOPS } from "../src/town/shops/shops.ts";
 import { bossCrateOf } from "@chessroyale/core";
 import { ALL_HOMES } from "../src/town/world.ts";
@@ -173,6 +173,26 @@ describe("the rooms' own pieces", () => {
     expect(SHOPS.dash!.at).toEqual([9, 1.5]);
     expect(tapTarget(dash, dash.start, 9, 2).dest).toEqual({ c: 10, r: 5 });
     expect(SHOP_BLITZ_CRATE_AT).toEqual([124, 16]);
+  });
+
+  it("Dash's ceiling light panels never show below the walls' tops (the director's review, Nov 3): each is cut at the highest wall top, at any width", () => {
+    const out = { x: 0, y: 0, w: 0, h: 0 };
+    for (const W of [320, 390, 770, 1440])
+      for (let ceilY = -50; ceilY <= 900; ceilY += 7) {
+        let shown = 0;
+        for (let i = 0; i < STORE_PANELS.length; i++) {
+          if (!ceilingPanel(i, W, ceilY, out)) continue;
+          shown++;
+          // Wholly above the wall tops, never taller than the mockup's panel, inside the box's width.
+          expect(out.y + out.h, `${W} ${ceilY} panel ${i}`).toBeLessThanOrEqual(ceilY);
+          expect(out.h).toBeGreaterThan(0);
+          expect(out.h).toBeLessThanOrEqual((STORE_PANELS[i]![3] * W) / 390 + 1e-9);
+          expect(out.x >= 0 && out.x + out.w <= W).toBe(true);
+        }
+        // With the wall tops at the screen's top (or above it) none shows; with them low enough, all five whole.
+        if (ceilY <= 0) expect(shown).toBe(0);
+        if (ceilY >= (142 * W) / 390) expect(shown).toBe(STORE_PANELS.length);
+      }
   });
 
   it("talking range: three squares either way from the Shopkeeper's squares (SHOP_FEEL.talkRange)", () => {

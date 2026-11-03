@@ -42,7 +42,7 @@ import { TAG_STYLE, type TagKind } from "../tags.ts";
 import { Walker, type HomeId } from "../world.ts";
 import type { Rider } from "../rides.ts";
 import { rideSpeed } from "../../components/rides/scale.ts";
-import { inTalkRange, isFloor, makeRoom, onDoor, tapTarget, findPath, type Room, type ShopPlace, type Sq } from "./room.ts";
+import { STORE_PANELS, ceilingPanel, inTalkRange, isFloor, makeRoom, onDoor, tapTarget, findPath, type Room, type ShopPlace, type Sq } from "./room.ts";
 import { POOL_LINE, bossHoldings, buyBossCrate, canAfford, holdLine, priceLine, prizeRows, shopOf, wayText, type CrateWay, type ShopDef } from "./shops.ts";
 import { CHALLENGE_FEEL, attackStart, attackTime, frameAt as animFrame, introAt, introCues, introLength, isLog, marksFeel, marksOf, type DrawnMarks, type IntroNow, type LogPlace } from "./challenge.ts";
 import { play } from "../../sound.ts";
@@ -606,9 +606,7 @@ function startRoom(
         rg.lineTo(W, y);
         rg.stroke();
       }
-      const k = W / 390;
-      rg.fillStyle = "#ffffff";
-      for (const [lx, ly, lw, lh] of [[60, 18, 40, 12], [290, 18, 40, 12], [175, 60, 50, 18], [20, 120, 60, 22], [310, 120, 60, 22]] as const) rg.fillRect(lx * k, ly * k, lw * k, lh * k);
+      // (Its light panels are drawn each frame, cut above the walls: `drawPanels`.)
       return;
     }
     if (def.roof === "lodge") {
@@ -780,6 +778,29 @@ function startRoom(
       g.restore();
     } else g.drawImage(img, 0, 0, img.width, h, x, y, w, h * s);
     g.globalAlpha = 1;
+  };
+  /** Where an upright piece's top is on screen this frame, as drawUp places it; Infinity when it isn't drawn (off screen, faded out). */
+  const upTop = (u: Up): number => {
+    if (!P(u.c, u.r)) return Infinity;
+    if ((pt.depth - S.nearGone) / (S.nearFull - S.nearGone) <= 0) return Infinity;
+    const fr = frames[u.name]!;
+    const img = fr.frames[0]!;
+    const s = pt.k / SQ;
+    const x = pt.x + (u.ox - (u.flip ? fr.ch.w - 1 - fr.ch.foot[0] : fr.ch.foot[0])) * s;
+    const y = pt.y + (u.oy - fr.ch.foot[1]) * s;
+    return x > W || x + img.width * s < 0 || y > H ? Infinity : y;
+  };
+  /**
+   * A store's ceiling light panels (room.ts STORE_PANELS), on the backdrop behind the room, cut at the highest top of any upright piece
+   * drawn this frame: the gaps between the side walls' pieces (and a near wall fading out) show the backdrop, and a panel there read as
+   * floating over the shelves (the director's review, Nov 3). Nothing allocated.
+   */
+  const panel = { x: 0, y: 0, w: 0, h: 0 };
+  const drawPanels = () => {
+    let top = Infinity;
+    for (const u of ups) top = Math.min(top, upTop(u));
+    g.fillStyle = "#ffffff";
+    for (let i = 0; i < STORE_PANELS.length; i++) if (ceilingPanel(i, W, top, panel)) g.fillRect(panel.x, panel.y, panel.w, panel.h);
   };
   const shadows = (x: number, y: number, k: number, pawnW: number) => {
     g.fillStyle = SHADOW;
@@ -1219,6 +1240,7 @@ function startRoom(
     g.setTransform(DPR, 0, 0, DPR, 0, 0);
     g.imageSmoothingEnabled = false;
     g.drawImage(roof, 0, 0, W, H);
+    if (def.roof === "store") drawPanels();
     // Outside, past the low front wall: the bright day the door opens onto (a flat pale ground).
     const q = pq as [typeof pt, typeof pt, typeof pt, typeof pt];
     const near = Math.min(n + 6, camY + v.back - 0.6); // (up to just in front of the camera)
