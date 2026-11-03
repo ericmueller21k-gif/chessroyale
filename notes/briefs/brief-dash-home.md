@@ -1,6 +1,6 @@
 # Brief: Dash round 2: his home (Dash's Kicks), Tick in the town, his sneaker store (intro later)
 
-Worktree `/home/user/cr-dashhome`, branch `claude/dash-home` (from main, AFTER #476 Dash round 1 is merged). Opus high.
+Worktree `/home/user/cr-dashhome`, branch `claude/dash-home` (from main, main at 9dc41d67, #476 Dash round 1 merged; the worktree and branch exist and are pushed, `npm ci` done). Opus high.
 Include notes/briefs/rules-common.md. Push as you go.
 
 The cheetah is **Dash** (renamed from Blitz, Nov 3). Art file and export ids keep `blitz`; every player-visible text says Dash.
@@ -13,9 +13,10 @@ Art on `origin/claude/boss-art` (read with git show; copy into the app as Timber
   if it's free and fits the paths; else say where and why, with a still). The hanging sneakers' wire runs to a pole on its
   right: keep that pole clear of paths and other homes. Dash is admins-first (`BOSS_ADMIN_FIRST`): his house shows exactly as
   Timber's did while Timber was admins-first (match that; say which).
-- **Tick's town sheet**: Tick the tortoise (`sidekicks/sidekick-blitz.ts`) needs a town sheet like Rivet's got
-  (`town/sidekick-sheets.ts`, `town/sidekicks/*.png`): make it the way Rivet's was made, so Tick walks in the town like the
-  other kids and stands as the Shopkeeper. Update `packages/app/test/town-bots.test.ts` with care, old → new.
+- **Tick in the town**: his town sheet is ALREADY baked (#476: his art is `characters/sidekicks/blitz.ts`, id
+  "sidekick-blitz"; `town/sidekicks/blitz.png`; `SIDEKICK_SHEETS.blitz`). Wire him as Rivet was wired for Timber (`ADMIN_BOTS`:
+  in an admin's town while Dash is admins-first, a rating from Dash's sim between the right rungs, his card "Dash's sidekick")
+  and stand him as the Shopkeeper. Update `packages/app/test/town-bots.test.ts` with care, old → new.
 - Shop: `scripts/boss-art/out/shop-blitz-nov3.md` (+ `house-shop-blitz/`): built like Timber's (Go in, room, chat tone,
   Tick the Shopkeeper, "Dash's Boss Crate" in BOSS_CRATES with his ride first if he has one), marks
   `SHOP_BLITZ_MARKS = { boss: [8,10.5], you: [11,10.5] }`, the counter 30 px tall so Tick shows over it, the crate at
