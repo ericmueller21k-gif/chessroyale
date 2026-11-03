@@ -141,6 +141,37 @@ export function ceilingPanel(i: number, W: number, ceilY: number, out: { x: numb
   return out.h > 0;
 }
 
+/**
+ * Every light of `lights` on every place its piece stands among `places`, place by place (Nov 3: a lantern or a bulb string stands in
+ * several places; each place lights, not only one). `keep` picks the lights wanted (a halo, say). Made once as a room loads.
+ */
+export function lightsAt<L extends { piece: string }, P extends { name: string }>(lights: readonly L[], places: readonly P[], keep: (l: L) => boolean = () => true): { l: L; at: P }[] {
+  const out: { l: L; at: P }[] = [];
+  for (const at of places) for (const l of lights) if (l.piece === at.name && keep(l)) out.push({ l, at });
+  return out;
+}
+/** A light's x in its piece's pixels, from the piece's foot, as the piece is drawn there: mirrored with a mirrored piece. */
+export const litDx = (x: number, footX: number, flip: boolean): number => (flip ? footX - x : x - footX);
+
+/** Your figure's box on screen, your feet at (x, y), `k` pixels a square, `sq` squares tall: into `out`. */
+export function youBox(x: number, y: number, k: number, sq: number, out: { x0: number; y0: number; x1: number; y1: number }): void {
+  out.x0 = x - 0.35 * sq * k;
+  out.x1 = x + 0.35 * sq * k;
+  out.y0 = y - sq * k;
+  out.y1 = y;
+}
+/**
+ * How opaque an upright piece is drawn: faded out near the camera (`nearFull` to `nearGone` deep, as before); in a cave, at most
+ * `seeThrough` where it stands nearer the camera than you and its picture's box is over yours (`over`), so the rock never hides you.
+ */
+export function upAlpha(depth: number, over: boolean, cave: boolean): number {
+  const near = Math.min(1, (depth - SHOP_FEEL.nearGone) / (SHOP_FEEL.nearFull - SHOP_FEEL.nearGone));
+  return cave && over ? Math.min(near, SHOP_FEEL.seeThrough) : near;
+}
+/** Two boxes overlap. */
+export const overlaps = (a: { x0: number; y0: number; x1: number; y1: number }, x0: number, y0: number, x1: number, y1: number): boolean =>
+  a.x0 < x1 && x0 < a.x1 && a.y0 < y1 && y0 < a.y1;
+
 export const inRoom = (room: Room, c: number, r: number): boolean => c >= 0 && r >= 0 && c < room.n && r < room.n;
 export const walkable = (room: Room, c: number, r: number): boolean => inRoom(room, c, r) && !room.blocked[r * room.n + c];
 const has = (list: readonly Sq[], c: number, r: number) => list.some((s) => s.c === c && s.r === r);

@@ -41,6 +41,11 @@ export interface BossIntro {
    * swing's beat he stands in his idle). A boss with an attack faces as its attack's art does.
    */
   facesLeft?: true;
+  /**
+   * Its own hop-back place, squares from the table's middle, where its figure or its swing reaches further toward its stool than
+   * `CHALLENGE_FEEL.clear.boss` allows (Hollow, Nov 3: his strand's lash lies 1.6 squares out in front of his feet). None: the usual.
+   */
+  clear?: number;
 }
 
 /**
@@ -124,6 +129,8 @@ export const BOSS_INTROS: Readonly<Partial<Record<HomeId, BossIntro>>> = {
     layout: "across",
     custom: false,
     cues: { table: "pop", wipe: "hollowCast" },
+    // (His lash's feet clear of his stool, a tenth from it as every boss's; his whole swing still clear of the cave's west rock.)
+    clear: 2.92,
   },
 };
 
@@ -439,8 +446,8 @@ export function logWalks(a: LogAnims, feel: Pick<typeof CHALLENGE_FEEL, "log" | 
   return { toLog: feel.log.at - feel.standOff.across, carry: feel.log.at - a.reach, toMark: feel.log.clear - a.reach - a.back };
 }
 /** The feel the marks are found with (`marksOf`): Timber's log intro has its own clear place for him (`log.clear`), every other the shared one. */
-export const marksFeel = (a: IntroAnims | null, feel: MarksFeel = CHALLENGE_FEEL): MarksFeel =>
-  a && isLog(a) ? { ...feel, clear: { ...feel.clear, boss: feel.log.clear } } : feel;
+export const marksFeel = (a: IntroAnims | null, feel: MarksFeel = CHALLENGE_FEEL, own?: number): MarksFeel =>
+  own !== undefined ? { ...feel, clear: { ...feel.clear, boss: own } } : a && isLog(a) ? { ...feel, clear: { ...feel.clear, boss: feel.log.clear } } : feel;
 /** How long the boss's transition takes to cover the screen (ms): its own storm's sweep, or the default's flash and wipe. */
 export const coverMs = (custom: boolean, feel: Pick<typeof CHALLENGE_FEEL, "stormInMs" | "flashMs" | "wipeMs"> = CHALLENGE_FEEL): number =>
   custom ? feel.stormInMs : feel.flashMs + feel.wipeMs;

@@ -42,7 +42,7 @@ import { TAG_STYLE, type TagKind } from "../tags.ts";
 import { Walker, type HomeId } from "../world.ts";
 import type { Rider } from "../rides.ts";
 import { rideSpeed } from "../../components/rides/scale.ts";
-import { STORE_PANELS, camFocus, ceilingPanel, inTalkRange, isFloor, makeRoom, onDoor, tapTarget, findPath, type Room, type ShopPlace, type Sq } from "./room.ts";
+import { STORE_PANELS, camFocus, ceilingPanel, inTalkRange, lightsAt, litDx, overlaps, upAlpha, youBox, isFloor, makeRoom, onDoor, tapTarget, findPath, type Room, type ShopPlace, type Sq } from "./room.ts";
 import { POOL_LINE, bossHoldings, buyBossCrate, canAfford, holdLine, priceLine, prizeRows, shopOf, wayText, type CrateWay, type ShopDef } from "./shops.ts";
 import { CHALLENGE_FEEL, attackStart, attackTime, frameAt as animFrame, introAt, introCues, introLength, isLog, marksFeel, marksOf, type DrawnMarks, type IntroNow, type LogPlace } from "./challenge.ts";
 import { play } from "../../sound.ts";
@@ -330,7 +330,7 @@ function startRoom(
   // circle, side by side, at the challenge's pace; each settles onto its mark's middle; facing each other, the intro plays.
   const C = CHALLENGE_FEEL;
   const ci = challenge?.intro ?? null;
-  const marks = ci ? marksOf(art.layout, ci.def.layout, art.marks, marksFeel(ci.anims)) : null;
+  const marks = ci ? marksOf(art.layout, ci.def.layout, art.marks, marksFeel(ci.anims, CHALLENGE_FEEL, ci.def.clear)) : null;
   const across = marks?.layout === "across";
   const boss = ci && marks ? new Walker({ c: room.start.c - 1, r: room.start.r }, C.walkStepMs, false) : null;
   const bossPose = { x: 0, y: 0, hop: 0, tilt: 0, step: false, t: 0 };
@@ -504,20 +504,17 @@ function startRoom(
   for (const l of [...art.pools, ...art.lights]) glow(l.color);
   // Every light on every place its piece stands (Nov 3: a lantern or a bulb string stands in several places; each lights where it
   // is, mirrored with it): made once as the room loads, so a frame only walks two short lists.
-  const poolsAt: { l: LightPool; u: Up }[] = [];
-  const halosAt: { l: LightSpot; u: Up }[] = [];
-  for (const u of ups) {
-    if (u.cut) continue; // (a plan's standing strip: its lights are its whole picture's)
-    for (const l of art.pools) if (l.piece === u.name) poolsAt.push({ l, u });
-    for (const l of art.lights) if (l.piece === u.name && l.halo) halosAt.push({ l, u });
-  }
+  // (Not a plan's standing strip: its lights are its whole picture's.)
+  const whole = ups.filter((u) => !u.cut);
+  const poolsAt = lightsAt(art.pools, whole);
+  const halosAt = lightsAt(art.lights, whole, (l) => !!l.halo);
   /** A light's middle `lx`, `ly` (its piece's pixels) on screen, its piece standing at `u` (P already at its foot): into `lit`. */
   const lit = { x: 0, y: 0 };
   const litAt = (u: Up, lx: number, ly: number) => {
     const ch = frames[u.name]!.ch;
     const s = pt.k / SQ;
     // (Mirrored as drawUp mirrors the piece: its pixel x lands at w - 1 - x.)
-    lit.x = pt.x + (u.ox + (u.flip ? ch.w - 1 - lx - (ch.w - 1 - ch.foot[0]) : lx - ch.foot[0])) * s;
+    lit.x = pt.x + (u.ox + litDx(lx, ch.foot[0], u.flip)) * s;
     lit.y = pt.y + (u.oy + ly - ch.foot[1]) * s;
   };
 
@@ -805,6 +802,8 @@ function startRoom(
   /** Where things were drawn in the last frame (taps, cards, tests): the kid's box and the head points. */
   const kidBox = { x0: 0, y0: 0, x1: 0, y1: 0, on: false, hx: 0, hy: 0 };
   const youHead = { x: 0, y: 0, on: false };
+  /** Your figure's box this frame and your row (a cave's see-through pieces: drawUp), drawn before anything nearer than you. */
+  const youFig = { x0: 0, y0: 0, x1: 0, y1: 0, z: 0, on: false };
   const dest = { c: 0, r: 0, on: false };
   const pose = { x: 0, y: 0, hop: 0, tilt: 0, step: false, t: 0 };
   const sheet = loaded.kid.sheet;
@@ -816,8 +815,7 @@ function startRoom(
     if (!P(u.c, u.r)) return;
     // Near the camera (between it and you, up close: the front wall as you stand at the door) a piece fades out, so it never fills
     // the screen in front of you.
-    const near = (pt.depth - S.nearGone) / (S.nearFull - S.nearGone);
-    if (near <= 0) return;
+    if (pt.depth <= S.nearGone) return;
     const img = frameAt(u.name, now);
     const ch = frames[u.name]!.ch;
     const s = pt.k / SQ;
@@ -827,7 +825,8 @@ function startRoom(
     const y = pt.y + (u.oy - ch.foot[1]) * s;
     const w = img.width * s;
     if (x > W || x + w < 0 || y > H || y + h * s < 0) return;
-    g.globalAlpha = Math.min(1, near);
+    // (A cave: nearer the camera than you and over you, see-through: SHOP_FEEL.seeThrough.)
+    g.globalAlpha = upAlpha(pt.depth, !!cave && youFig.on && u.z > youFig.z && overlaps(youFig, x, y, x + w, y + h * s), !!cave);
     if (u.flip) {
       g.save();
       g.translate(x + w, y);
@@ -943,9 +942,13 @@ function startRoom(
   };
   const drawYou = (now: number) => {
     youHead.on = false;
+    youFig.on = false;
     seen.anim = "";
     you.pose(now, pose);
     if (!P(pose.x + youOx(now), pose.y + youOy(now))) return;
+    youBox(pt.x, pt.y, pt.k, f.youSquares, youFig);
+    youFig.z = pose.y + youOy(now);
+    youFig.on = true;
     const rd = riding();
     if (rd) return drawRiding(rd, now);
     seen.ride = null;
@@ -1271,7 +1274,7 @@ function startRoom(
   const drawGlows = (now: number) => {
     if (!poolsAt.length && !halosAt.length) return;
     g.globalCompositeOperation = "lighter";
-    for (const { l, u } of poolsAt) {
+    for (const { l, at: u } of poolsAt) {
       if (!P(u.c, u.r)) continue;
       const near = nearOf();
       if (near <= 0) continue;
@@ -1280,7 +1283,7 @@ function startRoom(
       g.globalAlpha = l.strength * S.glow * near;
       g.drawImage(glow(l.color), lit.x - l.rx * 2 * s, lit.y - l.ry * 2 * s, l.rx * 4 * s, l.ry * 4 * s);
     }
-    for (const { l, u } of halosAt) {
+    for (const { l, at: u } of halosAt) {
       if (!P(u.c, u.r)) continue;
       const near = nearOf();
       if (near <= 0) continue;

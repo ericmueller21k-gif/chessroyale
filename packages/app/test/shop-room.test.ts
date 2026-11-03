@@ -216,8 +216,8 @@ describe("the rooms' own pieces", () => {
 });
 
 describe("the shops", () => {
-  it("only Babur's, Puddles', Alfil's, Big Boy's, Timber's and Dash's homes have an inside", () => {
-    expect(ALL_HOMES.filter((h) => shopOf(h.id)).map((h) => h.id).sort()).toEqual(["alfil", "bigboy", "dash", "gardener", "tiger", "timber"]);
+  it("only Babur's, Puddles', Alfil's, Big Boy's, Timber's, Dash's and Hollow's homes have an inside", () => {
+    expect(ALL_HOMES.filter((h) => shopOf(h.id)).map((h) => h.id).sort()).toEqual(["alfil", "bigboy", "dash", "gardener", "hollow", "tiger", "timber"]);
   });
 
   it("the crates' words: names, the price line, what you have; the boss's ride is a prize", () => {
@@ -254,10 +254,16 @@ describe("the shops", () => {
     expect(holdLine(d, { tokens: 0, keys: 0 })).toBe("You have 0 Dash tokens and 0 crate keys.");
     expect(prizeRows(d)[0]).toMatchObject({ id: "cheetah-shoes", name: "Cheetah Shoes", kind: "Mythic ride" });
     expect([d.kid, d.roof, d.chatTone]).toEqual(["blitz", "store", "day"]);
+    const h = shopOf("hollow")!;
+    expect(h.crate).toBe("Hollow's Boss Crate");
+    expect(priceLine(h)).toBe("3 Hollow tokens, or 1 Hollow token + 1 crate key");
+    expect(holdLine(h, { tokens: 0, keys: 0 })).toBe("You have 0 Hollow tokens and 0 crate keys.");
+    expect(prizeRows(h)[0]).toMatchObject({ id: "hollow-bulb", name: "Hollow's Bulb", kind: "Mythic ride" });
+    expect([h.kid, h.roof, h.chatTone]).toEqual(["hollowdog", "cave", "night"]);
   });
 
   it("each shop sells its boss's crate (core's BOSS_CRATES), its ride among the prizes; a way's button needs its price held", () => {
-    for (const s of [shopOf("tiger")!, shopOf("gardener")!, shopOf("alfil")!, shopOf("bigboy")!, shopOf("timber")!, shopOf("dash")!]) {
+    for (const s of [shopOf("tiger")!, shopOf("gardener")!, shopOf("alfil")!, shopOf("bigboy")!, shopOf("timber")!, shopOf("dash")!, shopOf("hollow")!]) {
       const crate = bossCrateOf(s.home)!;
       expect(crate.name).toBe(s.crate);
       expect(crate.items).toContain(s.prizes[0]);
