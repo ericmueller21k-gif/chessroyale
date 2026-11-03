@@ -18,3 +18,10 @@ broski, fam, cuz." Short enough for the speech bubble. The build helper wires th
 - **Challenge again:** "Run it back, cuz?"
 - **Leaving, you won:** "Respect, fam. You ate that."
 - **Leaving, you lost:** "Touch grass and come back, broski."
+
+## Nov 3, later (from the art session)
+Eric, in the art session's dialog: weekly usage confirmed for Blitz; a **sneaker store** (neon outside; walls of sneakers, shoe
+boxes, a halfpipe, a "Cheetah Chug" energy-drink pallet; no chess clocks); **a custom intro** (you both walk to your spots; he bolts
+off in a dust trail three times, dropping the board, then the pieces, then both chairs; his screen cover is numbers and clocks);
+**shoe-hustler slang** lines: the art session's draft is `scripts/boss-art/out/blitz-lines-draft.md` on `claude/boss-art`. The build
+helper merges both drafts. Tick (the tortoise) needs a town sheet baked, as Rivet did.
