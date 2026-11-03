@@ -11060,8 +11060,27 @@ a.fd-row-link {
   padding: 0;
   background: none;
   max-width: none;
-  width: min(340px, 86vw);
+  width: calc(100vw - 32px);
   margin: 0 auto;
+}
+/* The review's stepper (one move at a time, ◀ ▶ as the game's replay buttons): one line at a fixed height, as wide as the board,
+   the text ellipsed if it is too long, so the board under it never moves. */
+.breakdown.inline .bm-step {
+  height: 36px;
+  width: 100%;
+}
+.bm-step-mid {
+  min-width: 0;
+}
+.bm-step-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 .breakdown.inline .breakdown-head {
   justify-content: center;
@@ -11096,6 +11115,11 @@ a.fd-row-link {
   }
   .boss-results > .results-review {
     min-width: 0;
+  }
+  /* The review's board: about double (the column's width, 680 px at most), and no taller than the window leaves room for the
+     stepper, the board and its text (no scroll). */
+  .breakdown.inline {
+    width: min(680px, 100%, calc(100vh - 250px));
   }
 }
 .fd-bar {

@@ -6,16 +6,18 @@ import { Breakdown } from "../components/Breakdown.tsx";
 import { ordinal } from "./StageBreak.tsx";
 import { GodKingEpilogue, LastStandCard } from "../components/LastStand.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
-import { ChatSection } from "../components/QuickChat.tsx";
+import { ChatSection, useMedia } from "../components/QuickChat.tsx";
 import { bossInText, crowdFinalists, rankedMinHumans } from "@chessroyale/core";
 import { BossCharacter, hasCharacter } from "../components/BossCharacter.tsx";
-import { FlagIcon, MatchMenu } from "../components/MatchMenu.tsx";
+import { FlagIcon, MOUSE_LAYOUT, MatchMenu } from "../components/MatchMenu.tsx";
 import { exitFor } from "../match-exit.ts";
 import { TokenBox } from "../components/TokenBox.tsx";
 
 export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeText = "Home" }: { match: GameView; placement: number; winner: string; onAgain: () => void; onHome: () => void; /** Its leaving button's words: "Back to town" after a boss challenged in the town. */ homeText?: string }) {
   const played = match.moves.filter((m) => m.move !== null);
   const [review, setReview] = useState(false);
+  // A computer has the side bar (its Settings); a boss battle's gear is left out there (Eric, round 2).
+  const sidebar = useMedia(MOUSE_LAYOUT);
   // Out at a cut (Crowd): the breakdown measures you against the line you missed.
   const elim = elimination.current;
   const best = [...played].sort((a, b) => b.roundScore - a.roundScore)[0];
@@ -53,9 +55,11 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
     <div class={`screen results mm-screen${bossResult ? " boss-results" : ""}`}>
       {/* (The top part: a box of its own only on a computer, where a boss battle's review sits beside it.) */}
       <div class="results-top">
-        <div class="mm-corner">
-          <MatchMenu exit={exitFor(match)} />
-        </div>
+        {!(bossResult && sidebar) && (
+          <div class="mm-corner">
+            <MatchMenu exit={exitFor(match)} />
+          </div>
+        )}
         <div class={`trophy${resigned ? " resigned" : ""}`} aria-hidden="true">
           {resigned ? <FlagIcon size={56} /> : bossResult ? (bossResult === "crowd" ? "🏆" : bossResult === "boss" ? "💀" : "🤝") : placement === 1 ? "🏆" : placement <= 4 ? "🥈" : "♟️"}
         </div>
@@ -233,7 +237,7 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
       {/* A boss battle's review: every move, on the page (the first costly move's board open), no tap needed (Eric's brief). */}
       {bossResult && played.some((m) => m.bestMove) && (
         <div class="results-review">
-          <Breakdown inline moves={match.moves} dp={scoreDp(match.settings)} />
+          <Breakdown inline moves={match.moves} dp={scoreDp(match.settings)} solo={!match.serverPaced} />
         </div>
       )}
       {/* A boss battle that dropped you a token: its box, over the screen (Eric, Nov 2). */}
