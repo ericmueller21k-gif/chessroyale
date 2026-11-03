@@ -56,3 +56,7 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Cheetah renamed **Dash** (Eric: Blitz confusing). Ids stay `blitz`; player text says Dash. Art session told (send_message).
 - Town audio bug (Eric's iPhone, no app switch: Timber chittered → Alfil silent → fight silent, never back): PR #474 `claude/town-audio`
   (worktree /home/user/cr-audio), per-tap health check in `wakeAudio`. CI watcher b9b89ki3f on 0eef6e1d.
+- Dash's intro art DONE (weekly usage, Eric OK'd) on claude/boss-art: notes `scripts/boss-art/out/intro-blitz-nov3.md`;
+  BOSS_BLITZ_INTRO (blitz-intro 150x108, foot [96,103], faces right; bolt/arrive(drop f4)/dashBy/brag), BLITZ_INTRO_DROP_AT [72,0];
+  props `house-intro-blitz.ts` (shoe-box TABLE+_PALETTE/_INK, STOOL seat 11, DUST, POP, STORM/FRONT like Alfil's); ~10.3 s;
+  table/board/pieces/stools land on dashes 1-4; cues whoosh/skid/drop/thud/brush/ding (Dash needs his own sound set). → fold into Dash build brief.
