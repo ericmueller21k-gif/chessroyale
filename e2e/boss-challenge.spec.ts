@@ -22,6 +22,9 @@ import { BOARD_SEL, asAdmin, asSignedIn, named, test } from "./helpers.ts";
  * marks; his line; he walks west to the giant log, heaves it up, carries it to the middle, sets it down and gnaws it; the shavings' fog
  * boils up, holds (his table swaps in under it) and settles; the stumps pop up; he dusts off his paws and walks to his place; his
  * attack; his sawdust sweep (`canvas.boss-storm`) covers the screen, the battle under it, and the gear's Leave back to where you stood.
+ * Dash (the default intro, Nov 3, until his own in round 3; an admin's town: he's in the game for admins first): in with him to his
+ * store's circle, onto its try-on mats; his line; the table pops in; no God King attack was drawn for him, so he stands through the
+ * swing's beat; the flash and the wipe, the battle under it, and the gear's Leave back to where you stood.
  * CHALLENGE_SHOTS=<dir>: the stills (both projects) and, on the phone, the intro's frames for its GIF (docs/boss-challenge/).
  * Test hooks: the room's canvas `data-intro` (its step); `window.__shopIntro()` (the step, the layout, where you and the boss stand
  * and face, the line, the board and its stools); the storm's canvas `canvas.boss-storm` and the wipe's `canvas.boss-wipe`
@@ -363,6 +366,50 @@ test("challenging Big Boy in the town: his own intro (his line, his toy blocks b
   await expect(page.locator(BOARD_SEL.wrap).first()).toBeVisible({ timeout: 60_000 });
   await expect(storm(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Big Boy's Crib" })).toHaveCount(0);
+  // The gear's Leave (or Resign, as the battle offers): back in the town square where you stood.
+  await page.getByRole("button", { name: "Match options" }).click();
+  const quit = page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: /^(Leave|Resign)$/ });
+  const how = (await quit.textContent())!.trim();
+  await quit.click();
+  await page.getByRole("alertdialog").getByRole("button", { name: how, exact: true }).click();
+  if (how === "Resign") await page.getByRole("button", { name: "Back to town" }).click();
+  await backAt(page, stood);
+  expect(errors).toEqual([]);
+});
+
+test("challenging Dash in an admin's town: the default intro in his store (his line, the table pops in, no attack of his drawn: he stands, the flash and the wipe), the battle; Leave back where you stood", async ({ page }) => {
+  test.setTimeout(240_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  // (Dash is in the game for admins first: his store is in an admin's town only. Round 3 brings his own intro.)
+  await asAdmin(page);
+  await page.goto("/town?sky=day");
+  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  const { confirm, stood } = await toConfirm(page, "dash", "Dash");
+  await confirm.getByRole("button", { name: "Fight" }).click();
+  // In his store: you both walk in onto his try-on mats (SHOP_BLITZ_MARKS: his west, yours east), facing each other.
+  await expect(room(page)).toHaveAttribute("data-room", "dash", { timeout: 20_000 });
+  await expect(page.getByRole("heading", { name: "Dash's Kicks" })).toBeVisible();
+  const step = async () => (await intro(page))?.step ?? "";
+  await expect.poll(step, { message: "on their marks: his line", timeout: 15_000, intervals: [50] }).toBe("line");
+  const atLine = (await intro(page))!;
+  expect(atLine.layout).toBe("across");
+  expect(atLine.you).toEqual([11, 10.5]);
+  expect(atLine.boss).toEqual([8, 10.5]);
+  expect(atLine.facing).toEqual({ you: -1, boss: 1 });
+  expect(atLine.line).toBe(true);
+  // The table pops in, its stools at your sides; you both hop back clear of them.
+  await expect.poll(async () => (await intro(page))?.table, { message: "the table pops in", intervals: [50] }).toBe(true);
+  await clearOfStools(page, 10.5);
+  // The swing's beat: no God King attack was drawn for him (round 1), so he stands in his idle.
+  await expect.poll(step, { message: "the swing's beat", intervals: [50] }).toBe("swing");
+  expect((await intro(page))!).toMatchObject({ attack: false, line: false, table: true });
+  // The flash and the wipe to black, the battle (Boss alone, Dash) loading under it.
+  await expect(page.locator("canvas.boss-wipe")).toHaveCount(1, { timeout: 10_000 });
+  await expect(page.locator("canvas.boss-wipe")).toHaveAttribute("data-boss", "dash");
+  await expect(page.locator(BOARD_SEL.wrap).first()).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator("canvas.boss-wipe")).toHaveCount(0, { timeout: 10_000 });
+  expect(await page.evaluate(() => (window as unknown as { match?: { boss?: { id: string } } }).match?.boss?.id)).toBe("dash");
   // The gear's Leave (or Resign, as the battle offers): back in the town square where you stood.
   await page.getByRole("button", { name: "Match options" }).click();
   const quit = page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: /^(Leave|Resign)$/ });
