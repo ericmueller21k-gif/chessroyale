@@ -229,7 +229,8 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
           <button type="button" class="btn btn-secondary" style={{ whiteSpace: "nowrap" }} onClick={onHome}>
             {homeText}
           </button>
-          <button type="button" class="btn btn-primary" onClick={onAgain}>
+          {/* (A boss battle's two buttons on one line, as Home's: the review's narrower column wrapped "Play again".) */}
+          <button type="button" class="btn btn-primary" style={bossResult ? { whiteSpace: "nowrap" } : undefined} onClick={onAgain}>
             Play again
           </button>
         </div>
