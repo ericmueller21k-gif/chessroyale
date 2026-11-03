@@ -1195,21 +1195,21 @@ function ix(ms: number, pose: Pose, o: IX = {}): Frame {
 // ---- The run (4 frames): leaning hard forward, legs in full stride, the near arm pumping against the near leg, ears
 // back, tail streaming, a determined grin. Ankles are placed from each hip (his own pixels, forward is to his left).
 function run(t: number, extra: Pose = {}): [Pose, Stride] {
-  const lean = -4;
+  const lean = -6;
   const contact = t % 2 === 0;
   const hf = 37 + lean;
   const hn = 44 + lean;
-  const fwd = (hx: number): Pt => [hx - 11, ANKLE_Y];
-  const kick = (hx: number): Pt => [hx + 10, ANKLE_Y - 6];
+  const fwd = (hx: number): Pt => [hx - 12, ANKLE_Y];
+  const kick = (hx: number): Pt => [hx + 12, ANKLE_Y - 8];
   const under = (hx: number): Pt => [hx + 2, ANKLE_Y];
-  const tuck = (hx: number): Pt => [hx - 6, ANKLE_Y - 9];
+  const tuck = (hx: number): Pt => [hx - 8, ANKLE_Y - 11];
   const g: Stride =
     t === 0 ? { lean, near: fwd(hn), far: kick(hf), tipF: true }
     : t === 1 ? { lean, near: under(hn), far: tuck(hf), tipF: true, tipN: true }
     : t === 2 ? { lean, far: fwd(hf), near: kick(hn), tipN: true }
     : { lean, far: under(hf), near: tuck(hn), tipN: true, tipF: true };
   const arm: Pt = t === 0 ? [55, 58] : t === 2 ? [31, 47] : t === 1 ? [46, 56] : [40, 52];
-  return [{ sink: contact ? 2 : 0, lift: contact ? 0 : 1, tail: contact ? 4 : 3, ears: 2, eyes2: "sly", mouth: "grin", brow: 1, head: [-2, 1], at: arm, ...extra }, g];
+  return [{ sink: contact ? 2 : 0, lift: contact ? 0 : 1, tail: contact ? 4 : 3, ears: 2, eyes2: "sly", mouth: "grin", brow: 1, head: [-3, 1], at: arm, ...extra }, g];
 }
 /** Speed lines trailing him (intro pixels): from just behind his back, running away behind him. */
 const RUN_YS = [26, 40, 52, 64, 76, 88, 100];
@@ -1234,15 +1234,15 @@ const bolt: Anim = {
     }),
     ix(60, ...((): [Pose, IX] => {
       const [p, g] = run(0, { head: [-3, 2], ears: 3, eyes: "wide", eyes2: undefined });
-      return [p, { face: "left", g: { ...g, lean: -6 }, dx: -34, ghosts: 2, cue: "whoosh", over: [cloud([[SPOT, FLOOR - 4, 5], [SPOT - 7, FLOOR - 3, 4], [SPOT + 7, FLOOR - 3, 4]])], specks: [...trail("left", -34, 26), ...grit([[SPOT + 10, FLOOR - 8], [SPOT - 9, FLOOR - 10], [SPOT + 2, FLOOR - 13]])] }];
+      return [p, { face: "left", g: { ...g, lean: -8 }, dx: -34, ghosts: 2, cue: "whoosh", over: [cloud([[SPOT, FLOOR - 6, 7], [SPOT - 9, FLOOR - 4, 6], [SPOT + 9, FLOOR - 4, 6]])], specks: [...trail("left", -34, 26), ...grit([[SPOT + 10, FLOOR - 8], [SPOT - 9, FLOOR - 10], [SPOT + 2, FLOOR - 13]])] }];
     })()),
     ix(60, ...((): [Pose, IX] => {
       const [p, g] = run(2, { head: [-3, 2], ears: 3 });
-      return [p, { face: "left", g, dx: -100, ghosts: 2, over: [cloud([[SPOT, FLOOR - 7, 7], [SPOT - 10, FLOOR - 5, 6], [SPOT + 9, FLOOR - 5, 5], [SPOT - 19, FLOOR - 3, 4]])], specks: [...trail("left", -100, 60), ...grit([[SPOT + 14, FLOOR - 12], [SPOT - 14, FLOOR - 16], [SPOT + 4, FLOOR - 20]])] }];
+      return [p, { face: "left", g, dx: -100, ghosts: 2, over: [cloud([[SPOT, FLOOR - 10, 10], [SPOT - 13, FLOOR - 8, 8], [SPOT + 12, FLOOR - 8, 7], [SPOT - 25, FLOOR - 4, 6]])], specks: [...trail("left", -100, 60), ...grit([[SPOT + 14, FLOOR - 12], [SPOT - 14, FLOOR - 16], [SPOT + 4, FLOOR - 20]])] }];
     })()),
     ix(120, {}, {
       gone: true,
-      over: [cloud([[SPOT, FLOOR - 9, 8], [SPOT - 11, FLOOR - 7, 7], [SPOT + 10, FLOOR - 6, 6], [SPOT - 22, FLOOR - 4, 5], [SPOT - 31, FLOOR - 3, 3]])],
+      over: [cloud([[SPOT, FLOOR - 14, 11], [SPOT - 14, FLOOR - 10, 10], [SPOT + 13, FLOOR - 9, 8], [SPOT - 29, FLOOR - 6, 7], [SPOT - 40, FLOOR - 4, 4]])],
       specks: RUN_YS.flatMap((y, i) => istreak(4 + (i % 3) * 9, y, 30 + (i % 2) * 24, 1).map(([x, yy, k]): Speck => [x, yy, k === "O" ? "M" : k === "N" ? "M" : "J"])),
     }),
   ],
@@ -1251,10 +1251,10 @@ const bolt: Anim = {
 // ---- arrive (7 frames, 730 ms): a blur in from our left (whoosh), a skid past his spot in a spray of dust (skid), a
 // wind-up, the toss toward the table (drop: code shows the dropped thing from here), a held "there", and he stands.
 const skidDust = (t: number): Layer[] =>
-  t === 0 ? [cloud([[SPOT + 16, FLOOR - 4, 4], [SPOT + 23, FLOOR - 3, 3]])]
-  : t === 1 ? [cloud([[SPOT + 17, FLOOR - 6, 6], [SPOT + 27, FLOOR - 4, 5], [SPOT + 9, FLOOR - 3, 4]])]
-  : t === 2 ? [cloud([[SPOT + 18, FLOOR - 8, 7], [SPOT + 29, FLOOR - 6, 6], [SPOT + 9, FLOOR - 4, 5]], 1)]
-  : [cloud([[SPOT + 20, FLOOR - 10, 7], [SPOT + 31, FLOOR - 8, 6], [SPOT + 10, FLOOR - 5, 5]], 2)];
+  t === 0 ? [cloud([[SPOT + 21, FLOOR - 6, 6], [SPOT + 30, FLOOR - 4, 4]])]
+  : t === 1 ? [cloud([[SPOT + 22, FLOOR - 9, 8], [SPOT + 35, FLOOR - 6, 7], [SPOT + 12, FLOOR - 4, 6]])]
+  : t === 2 ? [cloud([[SPOT + 23, FLOOR - 12, 10], [SPOT + 38, FLOOR - 9, 8], [SPOT + 12, FLOOR - 6, 7]], 1)]
+  : [cloud([[SPOT + 26, FLOOR - 15, 10], [SPOT + 40, FLOOR - 12, 8], [SPOT + 13, FLOOR - 8, 7]], 2)];
 /** The toss: a fan of speed lines off his paw toward the table (intro pixels), and two glints. */
 const TOSS_PAW: Pt = [I_L + W - 1 - 17, 52 + I_T];
 const tossLines = (t: number): Speck[] => [
