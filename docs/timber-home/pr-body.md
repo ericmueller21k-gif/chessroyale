@@ -67,6 +67,8 @@ with Rivet), `showpiece-phone.png`, `showpiece-desktop.png` (the carved king on 
 - `shop-room.test.ts`: "only Babur's, Puddles', Alfil's and Big Boy's homes have an inside" (over `HOMES`) → "… and Timber's" (over
   `ALL_HOMES`); the shops loop gains Timber's.
 - `boss-tokens.test.ts` (server): the crates' rides gain `["timber", "log-roller"]`.
+- `town-lights.test.ts`, "every home and the Colosseum has its lights": `toHaveLength(HOMES.length + 1)` →
+  `toHaveLength(ALL_HOMES.length + 1)` (`HOUSES` holds every home's art, the admins-first lodge included).
 
 ## Lane
 Targeted (screens and the town's world, a small server guard); the town square, shop and challenge specs, plus the server's.
