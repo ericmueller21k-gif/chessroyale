@@ -1,8 +1,8 @@
 # Director status: the current state only (keep under ~40 lines; old entries go to CHANGELOG.md). Rules: RULES.md.
 
-## Live on main (356dc03, Nov 2 22:11 UTC)
+## Live on main (5fd736a, Nov 3 00:20 UTC)
 Nov 1 work plus Nov 2: #456 auto chess reveal, #457 brush ink, #458 shops r1 (Babur, Puddles; buy = Coming soon), #459 Timber
-sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise moves 1-10, #461 boss picker 2 rows on computer, #462 boss tokens + keys + boss crate buying, #463 Colosseum GBA pieces, #464 bot spread, #465 batch B, #466 boss challenge (Alfil custom; Babur, Puddles default), #467 Big Boy home + intro, Timber king attack.
+sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise moves 1-10, #461 boss picker 2 rows on computer, #462 boss tokens + keys + boss crate buying, #463 Colosseum GBA pieces, #464 bot spread, #465 batch B, #466 boss challenge (Alfil custom; Babur, Puddles default), #467 Big Boy home + intro, Timber king attack, #468 challenge pacing (~12 s) + hop clear of stools + e2e sign-in race fix, #469 Last Stand from move 6, #470 boss result screen (two columns, review inline).
 
 ## Running
 - PR #458 shop interiors r1 (CI watcher). Next: round 2 at xhigh (tokens + purchase).
@@ -19,13 +19,6 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
   branch claude/boss-art; asks Eric once, ~$4-6, cap $8).
 
 ## Queue (one Opus at a time)
-0a. NEXT: God King's Last Stand off until the crowd has played 5 moves of the battle (Eric, Nov 2: "hard set… five moves in no
-   matter what before it will even look to make a save… whatever the opening, Fischer Random or a piece eaten"). A setting
-   (`lastStandFromMove: 5`) checked in core `lastStandDue` (boss.ts ~1405, used by runner.ts lastStandFor: solo and online);
-   check what `b.crowdMoves` counts at that call (runner.ts 1058/1248); the FAQ's Last Stand section says it; last-stand.test
-   pins old → new; the ?laststand=1 test switch still forces it.
-  then Alfil's intro (sand pyramid, table, sandstorm).
-- Gemini Part D (challenge lines) prompt: scratchpad lines/hunchess-boss-challenge-lines-for-gemini.txt, sent to Eric.
 0. NEXT after shops r2: Colosseum Pixel pieces (Eric Nov 2): Pixel must pixelate ONLY the pieces, never the crowd/arena
    (today arena-gl.ts draws the whole arena into the small target). Draw the pieces from the new GBA-style sprites (API run
    session_01JuCWRvpifUHBYDWXqYcDtk, scripts/boss-art/out/arena-pieces-gba/, after Eric OKs them). If Eric likes them, he
