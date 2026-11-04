@@ -77,7 +77,8 @@ export function ReplayTag({ square, names, orientation, tone }: { square: string
 interface Spot {
   x: number;
   y: number;
-  r: number;
+  w: number;
+  h: number;
 }
 
 function spotOf(sel: string): Spot | null {
@@ -85,7 +86,8 @@ function spotOf(sel: string): Spot | null {
   if (!el) return null;
   const b = el.getBoundingClientRect();
   if (!b.width) return null;
-  return { x: b.left + b.width / 2, y: b.top + b.height / 2, r: Math.max(b.width, b.height) / 2 + 6 };
+  // (A rounded box round the button, a little bigger, so two side by side each keep their own.)
+  return { x: b.left - 3, y: b.top - 3, w: b.width + 6, h: b.height + 6 };
 }
 
 /**
@@ -120,7 +122,7 @@ export function ReplayTip({ code }: { code: string | null }) {
   };
   const w = innerWidth;
   const h = innerHeight;
-  const top = Math.max(spots.replay.y + spots.replay.r, spots.gear.y + spots.gear.r) + 14;
+  const top = Math.max(spots.replay.y + spots.replay.h, spots.gear.y + spots.gear.h) + 12;
   return (
     <div class="rp-tip" role="dialog" aria-modal="true" aria-labelledby="rp-tip-title">
       <svg class="rp-tip-dim" width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true">
@@ -128,13 +130,13 @@ export function ReplayTip({ code }: { code: string | null }) {
           <mask id="rp-tip-holes">
             <rect width={w} height={h} fill="#fff" />
             {[spots.replay, spots.gear].map((s, i) => (
-              <circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#000" />
+              <rect key={i} x={s.x} y={s.y} width={s.w} height={s.h} rx={14} fill="#000" />
             ))}
           </mask>
         </defs>
         <rect width={w} height={h} fill="rgba(0,0,0,0.62)" mask="url(#rp-tip-holes)" />
         {[spots.replay, spots.gear].map((s, i) => (
-          <circle key={i} class="rp-tip-ring" cx={s.x} cy={s.y} r={s.r} />
+          <rect key={i} class="rp-tip-ring" x={s.x} y={s.y} width={s.w} height={s.h} rx={14} />
         ))}
       </svg>
       <div class="rp-tip-box" style={{ top: `${Math.min(top, h - 260)}px` }}>

@@ -23472,7 +23472,7 @@ button.sq-tiny {
   position: absolute;
   z-index: 3;
   left: clamp(0px, calc(var(--board-size, 100%) * (var(--sq-x, 0) + 0.5) / 8 - var(--rp-w) / 2), calc(var(--board-size, 100%) - var(--rp-w)));
-  top: max(0px, calc(var(--board-size, 100%) * var(--sq-y, 0) / 8 - var(--rp-h) * 0.55));
+  top: max(0px, calc(var(--board-size, 100%) * var(--sq-y, 0) / 8 - var(--rp-h) * 0.8));
   width: var(--rp-w);
   height: var(--rp-h);
   box-sizing: border-box;
