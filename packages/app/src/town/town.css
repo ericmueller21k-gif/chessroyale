@@ -187,42 +187,107 @@
   image-rendering: pixelated;
   pointer-events: none;
 }
-/* The buttons, one row in the map's bottom right corner (Eric, Oct 28): the −/+ pair on the left, the focus button to its right. */
+/*
+ * The map's bottom right corner (Eric, Nov 4, town-arrow-keys-v3): the arrow keys on top (up over the middle; left, down, right in a
+ * row), and under them the zoom pill and the focus button, together as wide as the keys (3 keys and 2 gaps: 87 px), right-aligned.
+ */
 .town-controls {
   position: absolute;
   right: calc(14px + env(safe-area-inset-right));
   bottom: calc(14px + env(safe-area-inset-bottom));
   z-index: 6;
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  min-width: 0;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.town-keys {
+  display: grid;
+  grid-template-columns: repeat(3, 27px);
+  grid-template-rows: repeat(2, 27px);
+  gap: 3px;
+}
+/* A key: see-through white, a thin dark outline, a chevron; held (a press or a key), dark with a white chevron, a pixel lower. */
+.town-key {
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(31, 37, 48, 0.55);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.55);
+  color: #1f2530;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.town-key svg {
+  display: block;
+  width: 12px;
+  height: 12px;
+}
+.town-key.on {
+  background: rgba(31, 37, 48, 0.72);
+  border-color: rgba(31, 37, 48, 0.8);
+  color: #fff;
+  transform: translateY(1px);
+}
+.town-key-up {
+  grid-column: 2;
+  grid-row: 1;
+}
+.town-key-left {
+  grid-column: 1;
+  grid-row: 2;
+}
+.town-key-down {
+  grid-column: 2;
+  grid-row: 2;
+}
+.town-key-right {
+  grid-column: 3;
+  grid-row: 2;
+}
+.town-hud {
+  display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 3px;
 }
 .town-zoom {
   display: flex;
+  width: 57px;
+  height: 27px;
+  box-sizing: border-box;
   border-radius: 999px;
   background: #fff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   overflow: hidden;
 }
 .town-zoom button {
-  width: 44px;
-  height: 36px;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 27px;
+  padding: 0;
   border: 0;
   background: #fff;
   color: #1f2530;
-  font: 700 18px Archivo, sans-serif;
+  font: 700 15px Archivo, sans-serif;
   cursor: pointer;
 }
 .town-zoom button[aria-pressed="true"] {
   background: #1f2530;
   color: #fff;
 }
-/* The focus button: round, as high as the −/+ buttons, an icon and no words (its name, "Back to me", is its aria-label). */
+/* The focus button: round, as high as the keys, an icon and no words (its name, "Back to me", is its aria-label). */
 .town-recenter {
   flex: none;
-  width: 36px;
-  height: 36px;
+  width: 27px;
+  height: 27px;
   padding: 0;
   display: grid;
   place-items: center;
@@ -235,6 +300,8 @@
 }
 .town-recenter svg {
   display: block;
+  width: 16px;
+  height: 16px;
 }
 /*
  * The cards over a boss, a home, the Colosseum, a chess table or a person (slice 4's cards; since Oct 28, Eric's mockup: "dark card",

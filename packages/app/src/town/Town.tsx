@@ -48,6 +48,7 @@ import { BarsIcon, SwordsIcon } from "./CardIcons.tsx";
 import { TownChat } from "./TownChat.tsx";
 import { TownChatTools } from "./TownChatTools.tsx";
 import { Press } from "./press.ts";
+import { anyHeld, hold, isHeld, keyWalk, listenKeys, onHeld, type Dir } from "./arrows.ts";
 import { PAWN_HEAD, PAWN_PX, Renderer, pawnImage, type Hit, type YouArt } from "./render.ts";
 import { dropRiders, leaveRider, ridersHeld, rideArt, shareRider, type Rider, type RiderPawn } from "./rides.ts";
 import { rideSpeed } from "../components/rides/scale.ts";
@@ -57,7 +58,7 @@ import { painterGL } from "./paint-gl.ts";
 import { reportTownFallback } from "../problems.ts";
 import type { TownGlFallback } from "@chessroyale/core";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
-import { TOWN_BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, tdist, tick, townLine, waitingBot, walkWalker, type HomeId, seatOf, seatText, standOf, type Person, type Place, type Seat, type Sq, type Stand, type StatueId, type Target } from "./world.ts";
+import { TOWN_BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, taken, tdist, tick, townLine, walkable, waitingBot, walkWalker, type HomeId, seatOf, seatText, standOf, type Person, type Place, type Seat, type Sq, type Stand, type StatueId, type Target } from "./world.ts";
 import { dressedPawn, lookKey, offFace, offRide } from "./you-look.ts";
 import type { ItemLook } from "@chessroyale/core";
 import type { BotGameAsk } from "./TownPage.tsx";
@@ -481,6 +482,18 @@ export function TownScreen({
         {/* The black the town zooms into as you go in, and the room fades in from (and back, going out). */}
         <div class="town-fade" ref={fade} />
         <div class="town-controls">
+          {/* The arrow keys (Eric, Nov 4): hold one to walk that way (arrows.ts; the keyboard's arrows and WASD do the same). A press
+              is the walk; the key lights while it's held. Inside a shop they walk you in the room. */}
+          <div class="town-keys" aria-hidden="true">
+            {ARROW_KEYS.map((d) => (
+              <div key={d} class={`town-key town-key-${d}`} data-dir={d} onPointerDown={(e) => padPress(e, d, true)} onPointerUp={(e) => padPress(e, d, false)} onPointerCancel={(e) => padPress(e, d, false)} onLostPointerCapture={(e) => padPress(e, d, false)}>
+                <svg viewBox="0 0 12 12" aria-hidden="true">
+                  <path d={ARROW_CHEVRON[d]} fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </div>
+            ))}
+          </div>
+          <div class="town-hud">
           {/* (Inside a shop the same buttons work the room's camera: Close, or the town's zoomed-in camera.) */}
           <div class="town-zoom">
             <button type="button" aria-label="Zoom out" aria-pressed={inside ? shopOut : zoomedOut} onClick={() => (inside ? shopCtl.current?.zoom(true) : ctl.current?.zoom(true))}>
@@ -499,10 +512,23 @@ export function TownScreen({
               <circle cx="12" cy="12" r="2.1" fill="currentColor" />
             </svg>
           </button>
+          </div>
         </div>
       </div>
     </div>
   );
+}
+
+/** The on-screen arrows: their directions, and their chevrons (12 × 12, the stroke in the key's color). */
+const ARROW_KEYS: readonly Dir[] = ["up", "left", "down", "right"];
+const ARROW_CHEVRON: Readonly<Record<Dir, string>> = { up: "M2.8 7.6 6 4.4l3.2 3.2", down: "M2.8 4.4 6 7.6l3.2-3.2", left: "M7.6 2.8 4.4 6l3.2 3.2", right: "M4.4 2.8 7.6 6 4.4 9.2" };
+/** A press on an on-screen arrow holds its direction until it's let go (the pointer is captured, so a slide off it still ends it). */
+function padPress(e: PointerEvent, d: Dir, down: boolean): void {
+  if (down) {
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    e.preventDefault();
+  }
+  hold(d, down);
 }
 
 /** Runs the world in `box` on `cv`: the loop, the camera, the input and the chips. Returns its controls and its stop. */
@@ -599,6 +625,14 @@ function startTown(
   };
   const town = createTown(performance.now(), undefined, seat, undefined, stand);
   const r = new Renderer(painter, town, HOMES);
+  // The arrow keys (arrows.ts): hold one and you walk that way, on squares you can stand on and nobody's (the walker's own check).
+  const keys = keyWalk(town.you.walker, (c, r) => walkable(c, r) && !taken(town, c, r, town.you.walker), wrapI);
+  const keyEls = [...box.querySelectorAll<HTMLElement>(".town-key")];
+  const paintKeys = () => {
+    for (const el of keyEls) el.classList.toggle("on", isHeld(el.dataset.dir as Dir));
+  };
+  const stopKeys = listenKeys();
+  const offHeld = onHeld(paintKeys);
   // (The signs' pixel font is the game's own; it's loaded on first use, so ask for it now.)
   void document.fonts?.load('8px "Press Start 2P"').catch(() => {});
   // The bosses' sounds for a tap on one, made ahead off the page's thread (the sound worker), so a tap never costs a frame.
@@ -913,6 +947,7 @@ function startTown(
       const w = clock();
       if (!sameWeights(w, sky)) r.setSky((sky = w));
     }
+    keysWalk();
     tick(town, now);
     // A bot's card: whether a table is free for you both, to grey its Play (checked only while one is open: no search).
     if (card?.kind === "person" && town.people[card.i]!.bot) {
@@ -1137,6 +1172,35 @@ function startTown(
     }
     return { key, dest: destFor(town, town.you.walker, target), card: c, statue };
   };
+  /** Any walk of yours, a tap or the arrow keys: it stands you up, calls off a game you were walking to with a bot and a way into a shop. */
+  const walkOff = () => {
+    cancelMeet(town);
+    goingIn = -1;
+    if (challenging >= 0) {
+      endChallenge();
+      onChallengeOff();
+    }
+    town.you.sit = false;
+  };
+  // The arrow keys set off: as a tap walk does, the card closes, the camera follows you and the walk stands you up. Held, the walker
+  // runs on (keys.start: each frame while it stands still; the walk itself asks for each next square).
+  let keysOn = false;
+  const keysWalk = () => {
+    if (!anyHeld()) {
+      keysOn = false;
+      return;
+    }
+    if (!keysOn) {
+      keysOn = true;
+      leaveClose();
+      walkOff();
+      if (card) setCard(null);
+      follow = true;
+      glide = null;
+      if (town.you.walker.moving()) town.you.walker.go([]);
+    }
+    keys.start();
+  };
   const onDown = (e: PointerEvent) => {
     cv.setPointerCapture?.(e.pointerId);
     // Pixels per square at the focus point, across and along (for the drag).
@@ -1182,14 +1246,8 @@ function startTown(
     r.release(now, true);
     // A tap on anything but the statue you're looking at walks you away from it: the camera glides back out.
     if (p.statue < 0 || p.statue !== closeOn) leaveClose();
-    // You sit when a tap on a table sent you to its stool; any other walk stands you up (and calls off a game you were
-    // walking to with a bot, and a way into a shop).
-    cancelMeet(town);
-    goingIn = -1;
-    if (challenging >= 0) {
-      endChallenge();
-      onChallengeOff();
-    }
+    // You sit when a tap on a table sent you to its stool; any other walk stands you up (walkOff).
+    walkOff();
     town.you.sit = p.card?.kind === "table";
     if (p.dest && walkWalker(town.you.walker, p.dest)) {
       follow = true;
@@ -1552,6 +1610,8 @@ function startTown(
       ro.disconnect();
       document.removeEventListener("visibilitychange", onVisibility);
       removeEventListener("keydown", onKey);
+      stopKeys();
+      offHeld();
       delete hooks.__townAt;
       delete hooks.__townGlide;
       delete hooks.__townGather;
