@@ -133,3 +133,4 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - 50v50 DONE 89f7a72d → PR #485 (full-e2e), CI watcher bj6ktcn86. Jefferson ART started (Opus high, cr-hollowart). #484 bigger figures: CI watcher b46wa044a on b09d56ae.
 - Jefferson ART DONE 0e4f6482 (16x16 floor, 7 crew + dealer). Jefferson CODE started (Opus high, /home/user/cr-jefferson claude/jefferson-home from 2437cc27, ports 8995/9495). #484 fix 0887b5ff (Timber over side menu OK), CI watcher bx4d6pi9m. #485 CI watcher bj6ktcn86.
 - #485 50v50 MERGED 5d17e6fa; deploy+main CI watcher running.
+- #484 bigger figures MERGED 8af7ee6a; deploy+main CI watcher running (main has #485 + #484 together now).
