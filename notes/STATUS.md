@@ -136,3 +136,4 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - #484 bigger figures MERGED 8af7ee6a; deploy+main CI watcher running (main has #485 + #484 together now).
 - 50v50 LIVE (5d17e6fa 08:28). Main e2e after #485 RED: town.spec:348 Babur card centering (33/4.9 px: card read in 3 calls while it moves with the camera) → PR #486 (one-frame read), CI b94wgec9d; also home-polish:149 hop flaky (passed on retry; look later). #484 main CI watcher bnyzycpkp.
 - Jefferson CODE DONE ea4c6cf6 → PR #487 (full-e2e), CI watcher b49xshuai. Arrow keys STARTED (Haiku, /home/user/cr-arrows claude/town-arrow-keys from 8af7ee6a). Then phone boss bar (Haiku). Killed helper wrangler on 8995 (Eric OK).
+- #486 MERGED 099a8840 (deploy watcher bbjzgbb41). #484 LIVE 09:04. Arrow keys DONE 74242d35 → PR #488 (targeted), CI b2yv5a6mv. Phone boss bar STARTED (Haiku, /home/user/cr-phonebar from 099a8840). #487 Jefferson CI b49xshuai.
