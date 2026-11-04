@@ -110,13 +110,13 @@ const nightSnow = (gx: number, gy: number) => (hash(gx, gy, 9) < 0.03 ? "*" : ha
 
 // -- The battle spot: glossy ice, a frosted rim, his mark (a peppermint) and yours (a snowflake).
 
-const CX = 10 * T + 18.5; // its middle in the room's floor pixels: (10, 10.5), the table's spot
-const CY = 10.5 * T + 18.5;
+const CX = 9.5 * T + 18.5; // its middle in the room's floor pixels: (9.5, 9.5), the room's middle and the table's spot
+const CY = 9.5 * T + 18.5;
 const ZX = 104; // its half-width and half-depth (an ellipse)
 const ZY = 78;
 const zoneD = (gx: number, gy: number) => Math.hypot((gx + 0.5 - CX) / ZX, (gy + 0.5 - CY) / ZY) - 1;
-/** His mark (west) and yours (east), in squares: the table stands halfway between them, at (10, 10.5). */
-export const SHOP_GINGER_MARKS = { boss: [8.5, 10.5], you: [11.5, 10.5] } as const;
+/** His mark (west) and yours (east), in squares: the table stands halfway between them, at (9.5, 9.5), the room's middle. */
+export const SHOP_GINGER_MARKS = { boss: [8, 9.5], you: [11, 9.5] } as const;
 const markPx = (m: readonly number[]): Pt => [m[0]! * T + 18.5, m[1]! * T + 18.5];
 /** The marks' size: 26 px across. */
 export const SHOP_GINGER_MARK = 26;
@@ -198,15 +198,18 @@ for (let row = 0; row < N; row++)
 /** The heights over a card's foot (px). */
 const H = 150;
 const F = H - 1; // the foot's row in a card's picture
+/** Every wall card is 45 px wide: its square's 37 and 4 px over each neighbour, so the curve shows no gaps between them. */
+const CARD = 45;
+const OV = 4;
 const yOf = (h: number) => F - h;
 /** The catwalk's deck: its top (where a figure's feet stand) is 40 px over the floor. */
 export const SHOP_GINGER_DECK_H = 40;
 const DECK = { top: 38, face: 33 } as const; // the deck's lit top (seen from a little above) from 38 to 41, its plank face 33 to 37
-const BIN = { y: yOf(32), h: 18, w: 15, xs: [2, 20] } as const; // the bins: 15 x 18, their tops 32 px up; their chutes' feet 11 px up
-const TUBE = { y: yOf(103), h: 47, w: 9, xs: [2, 14, 26] } as const; // the tubes: 9 wide, from 103 px up to 57; their spouts' feet 53 px up
+const BIN = { y: yOf(32), h: 18, w: 15, xs: [2 + OV, 20 + OV] } as const; // the bins: 15 x 18, their tops 32 px up; their chutes' feet 11 px up
+const TUBE = { y: yOf(103), h: 47, w: 9, xs: [2 + OV, 14 + OV, 26 + OV] } as const; // the tubes: 9 wide, from 103 px up to 57; their spouts' feet 53 px up
 const LEDGE: { top: number; foot: number } = { top: 52, foot: 42 }; // the tubes' shelf behind the deck
 const RIM: { top: number; foot: number } = { top: 109, foot: 104 }; // the top shelf over the tubes
-/** A dispenser's chute foot (px over the foot of its card) and its middle (px across the card), per row: where the candy comes out. */
+/** A dispenser's chute foot (px over the foot of its card) and its middle (px across its 45 px card), per row: where the candy comes out. */
 export const SHOP_GINGER_CHUTES = {
   lower: { h: 11, x: BIN.xs.map((x) => x + Math.floor(BIN.w / 2)) },
   upper: { h: 53, x: TUBE.xs.map((x) => x + Math.floor(TUBE.w / 2)) },
@@ -219,33 +222,35 @@ function iceFace(c: Cv, x0: number, y0: number, w: number, h: number, gx: number
 /** The cabinet's wood behind the bins: a dark board frame, posts at the card's edges (shared with the next card). */
 function cabinet(c: Cv, seed: number) {
   for (let y = yOf(DECK.face - 1); y <= F; y++)
-    for (let x = 0; x < T; x++) {
-      const post = x === 0 || x === T - 1 || x === 18;
+    for (let x = 0; x < CARD; x++) {
+      const post = x === OV || x === OV + T - 1 || x === OV + 18;
       const kick = y > F - 5;
       if (kick) put(c, x, y, y === F - 4 ? "U" : Math.floor((x + y) / 3) % 2 ? "r" : "x"); // a candy-striped kick plate
-      else put(c, x, y, post ? (x === 18 ? "u" : "w") : hash(x, y >> 2, seed) < 0.15 ? "w" : "V");
+      else put(c, x, y, post ? (x === OV + 18 ? "u" : "w") : hash(x, y >> 2, seed) < 0.15 ? "w" : "V");
     }
 }
 /** The catwalk across a card: its plank face (a string of warm bulbs along it) and its lit top, a shadow line at its back. */
 function deck(c: Cv, seed: number, lit = true) {
-  for (let x = 0; x < T; x++) {
+  for (let x = 0; x < CARD; x++) {
     for (let h = DECK.face; h < DECK.top; h++) put(c, x, yOf(h), h === DECK.face ? "w" : h === DECK.top - 1 ? "v" : (x + seed * 5) % 13 === 0 ? "w" : "u");
     for (let h = DECK.top; h <= DECK.top + 3; h++) put(c, x, yOf(h), h === DECK.top + 3 ? "w" : (x + seed * 3) % 9 === 0 ? "U" : h === DECK.top ? "U" : "v");
   }
-  bulbs(c, 0, T - 1, yOf(DECK.face + 3), 12, seed, lit);
+  if (lit) bulbs(c, 0, CARD - 1, yOf(DECK.face + 3), 12, seed, true);
 }
 /** The tubes' shelf behind the deck and the top shelf over them, both wood; candy-striped trim on the top one. */
 function shelves(c: Cv) {
-  for (let x = 0; x < T; x++) {
+  for (let x = 0; x < CARD; x++) {
     for (let h = LEDGE.foot; h <= LEDGE.top; h++) put(c, x, yOf(h), h === LEDGE.top ? "U" : h === LEDGE.top - 1 ? "u" : "w");
-    for (let h = LEDGE.top + 1; h < RIM.foot; h++) put(c, x, yOf(h), x === 0 || x === T - 1 ? "w" : "V"); // dark behind the tubes
+    for (let h = LEDGE.top + 1; h < RIM.foot; h++) put(c, x, yOf(h), x === OV || x === OV + T - 1 ? "w" : "V"); // dark behind the tubes
     for (let h = RIM.foot; h <= RIM.top; h++) put(c, x, yOf(h), h === RIM.top ? "v" : h === RIM.foot ? "w" : h === RIM.foot + 1 ? (Math.floor(x / 3) % 2 ? "x" : "r") : "u");
   }
 }
-type BayOpts = { bins?: readonly [Mix, Mix] | null; lids?: string; tubes?: readonly (Mix | null)[] | null; lower?: "door" | "door-open" | "jars"; upper?: "sign-w" | "sign-e"; post?: boolean };
+type BayOpts = { bins?: readonly [Mix, Mix] | null; lids?: string; tubes?: readonly (Mix | null)[] | null; lower?: "door" | "door-open" | "jars" | "none"; post?: boolean; ledge?: boolean; iceTop?: number };
 function bayCard(seed: number, o: BayOpts): Cv {
-  const c = cv(T, H);
-  iceFace(c, 0, 0, T, yOf(RIM.top) + 1, seed * T, seed);
+  const c = cv(CARD, H);
+  const iceTop = o.iceTop ?? H - 1;
+  iceFace(c, 0, yOf(iceTop), CARD, iceTop - RIM.top + 1, seed * T - OV, seed);
+  if (o.iceTop) for (let x = 0; x < CARD; x++) put(c, x, yOf(iceTop), hash(x, 0, seed) < 0.6 ? "*" : "~");
   shelves(c);
   cabinet(c, seed);
   // Lower row.
@@ -256,18 +261,18 @@ function bayCard(seed: number, o: BayOpts): Cv {
   if (o.tubes) o.tubes.forEach((m, i) => m && candyTube(c, TUBE.xs[i]!, TUBE.y, TUBE.w, TUBE.h, m, seed * 11 + i));
   if (o.post) {
     // A corner card: a stout wooden upright at its middle, the catwalk's and the shelves' join.
-    for (let h = LEDGE.top + 1; h < RIM.foot; h++) for (let x = 15; x <= 21; x++) put(c, x, yOf(h), x === 15 ? "v" : x === 21 ? "w" : "u");
+    for (let h = LEDGE.top + 1; h < RIM.foot; h++) for (let x = 15 + OV; x <= 21 + OV; x++) put(c, x, yOf(h), x === 15 + OV ? "v" : x === 21 + OV ? "w" : "u");
   }
-  deck(c, seed);
+  // The catwalk's deck (lit bulbs along it); round the sides a plain ledge (no bulbs: not walked on).
+  deck(c, seed, !o.ledge);
   // Icicles under the top shelf, between the tubes.
-  for (const x of [11, 23, 35]) for (let j = 0; j < 2 + (hash(x, seed, 4) < 0.5 ? 1 : 0); j++) put(c, x, yOf(RIM.foot - 1) + j, j ? "~" : "*");
-  icicles(c, 0, yOf(RIM.top) - 1 - 0, T, seed, 3);
+  for (const x of [11, 23, 35]) for (let j = 0; j < 2 + (hash(x, seed, 4) < 0.5 ? 1 : 0); j++) put(c, x + OV, yOf(RIM.foot - 1) + j, j ? "~" : "*");
   return c;
 }
 /** The stockroom door (under the catwalk, beside the stand): an arched plank door in a candy-cane frame; open, the warm stockroom. */
 function door(c: Cv, open: boolean) {
-  const x0 = 6;
-  const x1 = 30;
+  const x0 = 6 + OV;
+  const x1 = 30 + OV;
   const top = 31;
   for (let h = 0; h <= top; h++)
     for (let x = x0; x <= x1; x++) {
@@ -278,7 +283,7 @@ function door(c: Cv, open: boolean) {
       const y = yOf(h);
       if (frame) put(c, x, y, Math.floor((x + y) / 2) % 2 ? "x" : "r");
       else if (open) put(c, x, y, h < 2 ? "J" : hash(x, h, 5) < 0.06 ? "f" : h < 10 ? "J" : "N");
-      else put(c, x, y, (x - x0) % 5 === 1 ? "w" : x < 16 ? "U" : "u");
+      else put(c, x, y, (x - x0) % 5 === 1 ? "w" : x < 16 + OV ? "U" : "u");
     }
   if (!open) {
     put(c, x1 - 6, yOf(13), "z"); // its knob
@@ -286,17 +291,17 @@ function door(c: Cv, open: boolean) {
     // A wreath of candy on it: a little ring of gumdrops.
     for (let i = 0; i < 10; i++) {
       const a = (i / 10) * Math.PI * 2;
-      put(c, 18 + Math.round(Math.cos(a) * 4), yOf(21) + Math.round(Math.sin(a) * 4), "grgy"[i % 4]!);
+      put(c, 18 + OV + Math.round(Math.cos(a) * 4), yOf(21) + Math.round(Math.sin(a) * 4), "grgy"[i % 4]!);
     }
   } else {
     // Boxes and a sack on shelves inside, in the warm glow.
-    rect(c, 10, yOf(14), 8, 5, (i, j) => (j === 0 ? "v" : i === 7 ? "u" : "U"));
-    rect(c, 20, yOf(9), 6, 7, (i, j) => (j === 0 ? "x" : Math.floor(i / 2) % 2 ? "r" : "x"));
+    rect(c, 10 + OV, yOf(14), 8, 5, (i, j) => (j === 0 ? "v" : i === 7 ? "u" : "U"));
+    rect(c, 20 + OV, yOf(9), 6, 7, (i, j) => (j === 0 ? "x" : Math.floor(i / 2) % 2 ? "r" : "x"));
   }
 }
 /** The back shelf behind the stand: two shelves of glass jars (lollipops, gumdrops, rock candy). */
 function jars(c: Cv, seed: number) {
-  for (const sh of [4, 18]) for (let x = 1; x < T - 1; x++) put(c, x, yOf(sh), "u"), put(c, x, yOf(sh - 1), "w");
+  for (const sh of [4, 18]) for (let x = 0; x < CARD; x++) put(c, x, yOf(sh), "u"), put(c, x, yOf(sh - 1), "w");
   const JAR: [number, number, number, Mix | null][] = [
     [3, 5, 9, MIXES.gumMix!],
     [12, 5, 8, MIXES.mint!],
@@ -306,7 +311,8 @@ function jars(c: Cv, seed: number) {
     [14, 19, 9, MIXES.gumPink!],
     [24, 19, 8, null],
   ];
-  JAR.forEach(([x, h0, hh, m], n) => {
+  JAR.forEach(([x0, h0, hh, m], n) => {
+    const x = x0 + OV;
     const w = 6;
     for (let j = 0; j < hh; j++)
       for (let i = 0; i < w; i++) {
@@ -341,21 +347,21 @@ function bigText(c: Cv, x: number, y: number, s: string, ink: string, edge: stri
 /** The CANDY sign over the stand (on both centre cards, 74 px): a white board in a candy-stripe frame, red letters, two peppermints. */
 function signBoth(): [Cv, Cv] {
   const W2 = 2 * T;
-  const c = cv(W2, H);
+  const c = cv(W2 + 2 * OV, H);
   for (let i = 0; i < 2; i++) {
     const half = bayCard(40 + i, { lower: "jars" });
-    half.forEach((row, y) => row.forEach((k, x) => put(c, x + i * T, y, k)));
+    half.forEach((row, y) => row.forEach((k, x) => (i === 0 || x >= OV) && put(c, x + i * T, y, k)));
   }
   const top = yOf(98);
   const bot = yOf(62);
   for (let y = top; y <= bot; y++)
-    for (let x = 3; x < W2 - 3; x++) {
-      const frame = y - top < 3 || bot - y < 3 || x < 6 || x > W2 - 7;
+    for (let x = OV + 3; x < OV + W2 - 3; x++) {
+      const frame = y - top < 3 || bot - y < 3 || x < OV + 6 || x > OV + W2 - 7;
       put(c, x, y, frame ? (Math.floor((x + y) / 3) % 2 ? "x" : "r") : (y - top) % 9 === 4 && hash(x, y, 3) < 0.05 ? "X" : "x");
     }
-  bigText(c, Math.round(W2 / 2 - (textWidth("CANDY") * 2) / 2), top + 9, "CANDY", "r", "R");
+  bigText(c, Math.round(OV + W2 / 2 - (textWidth("CANDY") * 2) / 2), top + 9, "CANDY", "r", "R");
   // Two peppermints either side under the letters, and a row of gumdrops along its foot.
-  for (const px of [14, W2 - 15])
+  for (const px of [OV + 14, OV + W2 - 15])
     for (let j = -4; j <= 4; j++)
       for (let i = -4; i <= 4; i++) {
         const r = Math.hypot(i, j);
@@ -363,20 +369,21 @@ function signBoth(): [Cv, Cv] {
         const a = Math.atan2(j, i) + r * 0.2;
         put(c, px + i, bot - 8 + j, r > 3.6 ? "R" : Math.floor(((a + Math.PI) / (2 * Math.PI)) * 8) % 2 ? "x" : "r");
       }
-  for (let x = 20; x < W2 - 20; x += 5) {
-    const ink = "gyhtp"[(x / 5) % 5]!;
+  for (let x = OV + 20; x < OV + W2 - 20; x += 5) {
+    const ink = "gyhtp"[Math.floor(x / 5) % 5]!;
     put(c, x, bot - 5, ink), put(c, x + 1, bot - 5, ink), put(c, x, bot - 6, "x");
   }
   // The posts holding it up from the catwalk's rail.
-  for (const px of [10, W2 - 11]) for (let y = bot + 1; y < yOf(LEDGE.top); y++) put(c, px, y, "w"), put(c, px + 1, y, "u");
-  const l = cv(T, H);
-  const r = cv(T, H);
-  c.forEach((row, y) => row.forEach((k, x) => (x < T ? (l[y]![x] = k) : (r[y]![x - T] = k))));
+  for (const px of [OV + 10, OV + W2 - 11]) for (let y = bot + 1; y < yOf(LEDGE.top); y++) put(c, px, y, "w"), put(c, px + 1, y, "u");
+  // Its two cards, each 45 wide, overlapping over the middle.
+  const l = cv(CARD, H);
+  const r = cv(CARD, H);
+  c.forEach((row, y) => row.forEach((k, x) => (x < CARD && (l[y]![x] = k), x >= T && (r[y]![x - T] = k))));
   return [l, r];
 }
 
 const M = MIXES;
-const bayDef = (name: string, seed: number, o: BayOpts) => def(name, [1, 1], T, H, [18, F], [[whole(bayCard(seed, o), true)]]);
+const bayDef = (name: string, seed: number, o: BayOpts) => def(name, [1, 1], CARD, H, [22, F], [[whole(bayCard(seed, o), true)]]);
 export const SHOP_GINGER_BAY_A = bayDef("bay-a", 1, { bins: [M.jelly!, M.gumRed!], lids: "rt", tubes: [M.gumYellow!, M.sprinkle!, M.gumBlue!] });
 export const SHOP_GINGER_BAY_B = bayDef("bay-b", 2, { bins: [M.sour!, M.mint!], lids: "gr", tubes: [M.redWhite!, M.lemon!, M.jelly!] });
 export const SHOP_GINGER_BAY_DOOR = bayDef("bay-door", 3, { lower: "door", tubes: [M.gumPink!, M.choc!, M.sour!] });
@@ -386,32 +393,49 @@ export const SHOP_GINGER_BAY_D = bayDef("bay-d", 5, { bins: [M.lemon!, M.pinkWhi
 export const SHOP_GINGER_BAY_E = bayDef("bay-e", 6, { bins: [M.jelly!, M.grape!], lids: "rp", tubes: [M.blueWhite!, M.sprinkle!, M.lemon!] });
 /** The two back corners (behind the curve's steps, so its join never shows a gap): a bay with a wooden upright at its middle. */
 export const SHOP_GINGER_BAY_CORNER = bayDef("bay-corner", 7, { bins: [M.gumMix!, M.sour!], lids: "gt", tubes: [M.mint!, null, M.gumRed!], post: true });
+/**
+ * The candy wall going on round both sides (Eric, Nov 5: "extend the dispensers further round the curved walls"): the same bays,
+ * bins below and tubes above, on a plain ledge (no bulbs: the catwalk ends at the stairs), the dome's ice over them lower (126).
+ * West: (5, 5) and (4, 7) corners, (4, 8) to (4, 11); east the same, mirrored.
+ */
+export const SHOP_GINGER_SIDE_CORNER = bayDef("side-corner", 13, { bins: [M.lemon!, M.gumBlue!], lids: "yt", tubes: [M.jelly!, null, M.grape!], post: true, ledge: true, iceTop: 126 });
+export const SHOP_GINGER_SIDE_A = bayDef("side-a", 9, { bins: [M.gumPink!, M.sprinkle!], lids: "hg", tubes: [M.lemon!, M.redWhite!, M.gumBlue!], ledge: true, iceTop: 126 });
+export const SHOP_GINGER_SIDE_B = bayDef("side-b", 10, { bins: [M.orange!, M.spearmint!], lids: "or", tubes: [M.gumMix!, M.grape!, M.mint!], ledge: true, iceTop: 124 });
+export const SHOP_GINGER_SIDE_C = bayDef("side-c", 11, { bins: [M.choc!, M.jelly!], lids: "tp", tubes: [M.sour!, M.blueWhite!, M.gumRed!], ledge: true, iceTop: 120 });
+export const SHOP_GINGER_SIDE_D = bayDef("side-d", 12, { bins: [M.gumYellow!, M.redWhite!], lids: "gy", tubes: [M.pinkWhite!, M.lemon!, M.sprinkle!], ledge: true, iceTop: 114 });
 const [SIGN_W, SIGN_E] = signBoth();
-export const SHOP_GINGER_SIGN_W = def("bay-sign-w", [1, 1], T, H, [18, F], [[whole(SIGN_W, true)]]);
-export const SHOP_GINGER_SIGN_E = def("bay-sign-e", [1, 1], T, H, [18, F], [[whole(SIGN_E, true)]]);
+export const SHOP_GINGER_SIGN_W = def("bay-sign-w", [1, 1], CARD, H, [22, F], [[whole(SIGN_W, true)]]);
+export const SHOP_GINGER_SIGN_E = def("bay-sign-e", [1, 1], CARD, H, [22, F], [[whole(SIGN_E, true)]]);
 
-// ==== The stairs: a little wooden staircase at each end of the catwalk, curving with the wall, two squares, four steps (8 px each)
-//      up from the floor, the fifth onto the deck at 40. Candy-cane banisters on the open side.
+// ==== The stairs: a little wooden staircase at each end of the catwalk, curving with the wall, two squares, eight 5 px steps from
+//      the floor up to the deck (40). Candy-cane banisters on the open side, running on into the catwalk's edge.
 
-/** The ice wall behind the stairs (and round the sides): blocks to `top` px, a frosted lip with icicles. */
-function iceWall(seed: number, top: number, gx: number, w = T): Cv {
-  const c = cv(w, H);
-  iceFace(c, 0, yOf(top), w, top + 1, gx, seed);
-  for (let x = 0; x < w; x++) put(c, x, yOf(top), hash(x, 0, seed) < 0.6 ? "*" : "~");
-  icicles(c, 0, yOf(top) + 1, w, seed, 6);
-  // Frost creeping up from the foot.
-  for (let x = 0; x < w; x++) for (let h = 0; h < 3 + Math.floor(hash(x >> 1, 9, seed) * 4); h++) put(c, x, yOf(h), h === 0 ? "c" : hash(x, h, seed) < 0.5 ? "C" : "*");
+/** An ice wall card (45 px): blocks up to its top, which slopes from `topL` at its west edge to `topR` at its east (the dome coming
+ * down toward you round the sides), a frosted lip with icicles, frost creeping up from the foot. */
+function iceWall(seed: number, topL: number, gx: number, topR = topL): Cv {
+  const c = cv(CARD, H);
+  for (let x = 0; x < CARD; x++) {
+    const top = Math.round(topL + ((topR - topL) * x) / (CARD - 1));
+    for (let h = 0; h <= top; h++) put(c, x, yOf(h), iceBlock(gx + x, yOf(h), 10, 16, seed));
+    put(c, x, yOf(top), hash(x, 0, seed) < 0.6 ? "*" : "~");
+    if (x % 2 === 0 && hash(x >> 1, 0, seed) > 0.45) {
+      const len = 2 + Math.floor(hash(x, 1, seed) * 5);
+      for (let j = 1; j <= len && top - j > 2; j++) put(c, x, yOf(top - j), j === len ? "~" : "*");
+    }
+    for (let h = 0; h < 3 + Math.floor(hash(x >> 1, 9, seed) * 4); h++) put(c, x, yOf(h), h === 0 ? "c" : hash(x, h, seed) < 0.5 ? "C" : "*");
+  }
   return c;
 }
-/** A step's block: its riser face from the floor to `h` (wood, a plank line every 5 px), its tread on top (lit, seen from above), x0..x1. */
-function stepBlock(c: Cv, x0: number, x1: number, h: number) {
+/** A step's block: its riser face from the floor to `h` (wood, a plank line every 5 px), its tread on top (lit, seen from above,
+ * `deep` px: a deeper one is a landing running back), x0..x1. */
+function stepBlock(c: Cv, x0: number, x1: number, h: number, deep = 3) {
   for (let x = x0; x <= x1; x++)
-    for (let y = yOf(h) - 2; y <= F; y++) {
+    for (let y = yOf(h) - deep + 1; y <= F; y++) {
       const hh = F - y;
-      const tread = hh > h - 1; // its top: 3 px of lit plank seen from a little above
-      put(c, x, y, tread ? (hh === h + 2 ? "v" : hh === h ? "u" : "U") : x === x0 ? "v" : x === x1 ? "w" : hh % 5 === 0 ? "w" : hh < 3 ? "V" : "u");
+      const tread = hh > h - 1;
+      put(c, x, y, tread ? (hh === h + deep - 1 ? "v" : hh === h ? "u" : (x - x0) % 7 === 3 && deep > 3 ? "u" : "U") : x === x0 ? "v" : x === x1 ? "w" : hh % 5 === 0 ? "w" : hh < 3 ? "V" : "u");
     }
-  put(c, x0, yOf(h) - 2, "~"); // frost on its front corner
+  put(c, x0, yOf(h) - deep + 1, "~"); // frost on its front corner
 }
 /** Candy-cane banister: a post on each step's front (`[x, h]`: its foot on the tread), a rail 11 px over the treads from post to post. */
 function banister(c: Cv, posts: readonly [number, number][]) {
@@ -421,7 +445,7 @@ function banister(c: Cv, posts: readonly [number, number][]) {
     const nxt = posts[i + 1];
     if (nxt) {
       const [x2, h2] = nxt;
-      const n = Math.abs(x2 - x);
+      const n = Math.abs(x2 - x) || 1;
       for (let st = 0; st <= n; st++) {
         const xx = x + Math.sign(x2 - x) * st;
         const hh = h + 11 + ((h2 - h) * st) / n;
@@ -431,54 +455,38 @@ function banister(c: Cv, posts: readonly [number, number][]) {
     }
   }
 }
-/** The stairs' step height (px), and each quarter of a stair card's lift (west to east, x 0-8, 9-17, 18-26, 27-36). */
+/** The stairs' step height (px), and each quarter of a stair card's lift (west to east, across its square's 37 px: x 4-12, 13-21, 22-30, 31-40). */
 export const SHOP_GINGER_STEP = 5;
-const QX = [[0, 8], [9, 17], [18, 26], [27, 36]] as const;
+const QX = [[0, OV + 8], [OV + 9, OV + 17], [OV + 18, OV + 26], [OV + 27, CARD - 1]] as const;
 const LO_W = [20, 15, 10, 5] as const; // the west low stair (5, 7): rising westward from the floor at its east edge
 const HI_W = [25, 30, 35, 40] as const; // the west high stair (5, 6): rising eastward to the deck (40) at its east edge
 /**
  * The west staircase, drawn as it stands on its squares (the east one is these mirrored): `lo` on (5, 7) and `hi` on (5, 6), eight
- * steps of 5 px, a quarter of a card each, curving with the wall: up westward across the low square (entered from the floor at its
- * east edge), north onto the high square, up eastward across it to the catwalk's deck (40) on (6, 5). Candy-cane banisters on the
- * open side. The figure's lift on a stair square is the step under its feet (SHOP_GINGER_STAIRS).
+ * steps of 5 px, a quarter of a square each, curving with the wall: up westward across the low square (from the floor at its east
+ * edge: a drift of snow at its foot), north onto the high square (the low one's top step is a landing running back to it), up
+ * eastward across it to the catwalk's deck: its top step is a landing level with the deck (40) running on 4 px into the catwalk's
+ * card, and its banister runs on level into the deck's edge. Behind the high stair, the candy wall: tubes on their shelf over it.
  */
-const STAIR_LO = cv(T, H);
+const STAIR_LO = cv(CARD, H);
 {
-  // (No wall behind it on its own card: the high stair stands just behind it, and the side wall (4, 7) to its west.)
-  QX.forEach(([a, b], i) => stepBlock(STAIR_LO, a, b, LO_W[i]!));
-  banister(STAIR_LO, QX.map(([a, b], i) => [Math.round((a + b) / 2), LO_W[i]!] as [number, number]).reverse());
+  // (No wall behind it on its own card: the high stair stands just behind it, and the side bay (4, 7) to its west.)
+  QX.forEach(([a, b], i) => stepBlock(STAIR_LO, a, b, LO_W[i]!, i === 0 ? 9 : 3));
+  banister(STAIR_LO, [[CARD - 3, 5], [OV + 22, 10], [OV + 13, 15], [OV + 4, 20], [1, 20]]);
+  // Snow drifted at its foot, where it meets the floor.
+  for (let x = OV + 24; x < CARD; x++) for (let h = 0; h < 2 + (x % 3 === 0 ? 1 : 0); h++) put(STAIR_LO, x, yOf(h), h ? "4" : "3");
 }
-const STAIR_HI = cv(T, H);
+const STAIR_HI = cv(CARD, H);
 {
-  // The dome's ice behind it, from over its banister up (below that the low stair in front and its own steps show).
-  const w = iceWall(22, 124, 5 * T + 400);
-  w.forEach((row, y) => row.forEach((k, x) => k !== "." && F - y >= 30 + Math.round(x / 3) && put(STAIR_HI, x, y, k)));
-  QX.forEach(([a, b], i) => stepBlock(STAIR_HI, a, b, HI_W[i]!));
-  banister(STAIR_HI, QX.map(([a, b], i) => [Math.round((a + b) / 2), HI_W[i]!] as [number, number]));
+  // The candy wall behind it: a bay's upper half (its ledge, three tubes, the top shelf, the ice), from over its banister up.
+  const back = bayCard(14, { lower: "none", tubes: [M.gumRed!, M.lemon!, M.blueWhite!] });
+  back.forEach((row, y) => row.forEach((k, x) => k !== "." && F - y >= LEDGE.foot + 4 && put(STAIR_HI, x, y, k)));
+  QX.forEach(([a, b], i) => stepBlock(STAIR_HI, a, b, HI_W[i]!, i === 3 ? 8 : 3));
+  // The banister up the steps and on, level, into the catwalk's edge.
+  banister(STAIR_HI, [[1, 25], [OV + 13, 30], [OV + 22, 35], [OV + 31, 40], [CARD - 1, 40]]);
 }
-export const SHOP_GINGER_STAIR_LO = def("stair-lo", [1, 1], T, H, [18, F], [[whole(STAIR_LO, true)]]);
-export const SHOP_GINGER_STAIR_HI = def("stair-hi", [1, 1], T, H, [18, F], [[whole(STAIR_HI, true)]]);
+export const SHOP_GINGER_STAIR_LO = def("stair-lo", [1, 1], CARD, H, [22, F], [[whole(STAIR_LO, true)]]);
+export const SHOP_GINGER_STAIR_HI = def("stair-hi", [1, 1], CARD, H, [22, F], [[whole(STAIR_HI, true)]]);
 
-/** Plain ice walls: the dome's sides (taller toward the back), the corners behind the curve, an ice lantern on one. */
-const sideDef = (name: string, seed: number, top: number, more?: (c: Cv) => void) => {
-  const c = iceWall(seed, top, seed * 41);
-  more?.(c);
-  return def(name, [1, 1], T, H, [18, F], [[whole(c, true)]]);
-};
-export const SHOP_GINGER_ICE = sideDef("ice", 31, 126);
-export const SHOP_GINGER_ICE_B = sideDef("ice-b", 32, 118, (c) => frostFlower(c, 18, yOf(70), 32));
-/** A carved ice lantern in a niche, a warm candle inside (a light). */
-export const SHOP_GINGER_ICE_LAMP = sideDef("ice-lamp", 33, 112, (c) => {
-  for (let h = 46; h <= 70; h++) for (let x = 9; x <= 27; x++) {
-    const u = (x - 18) / 9;
-    const arch = 64 + Math.round(6 * Math.sqrt(Math.max(0, 1 - u * u)));
-    if (h > arch) continue;
-    put(c, x, yOf(h), x === 9 || x === 27 || h === arch ? "a" : "A");
-  }
-  // The lantern: a block of clear ice, a warm flame in it.
-  rect(c, 13, yOf(64), 11, 15, (i, j) => (i === 0 || j === 0 ? "C" : i === 10 || j === 14 ? "b" : j > 5 && j < 12 && i > 3 && i < 7 ? (j < 8 ? "F" : "f") : "c"));
-  put(c, 18, yOf(64) + 5, "f");
-});
 /** A frost flower (a big snowflake etched on the ice). */
 function frostFlower(c: Cv, cx: number, cy: number, seed: number) {
   for (let i = 0; i < 6; i++) {
@@ -487,18 +495,32 @@ function frostFlower(c: Cv, cx: number, cy: number, seed: number) {
   }
   put(c, cx, cy, "*");
 }
-export const SHOP_GINGER_ICE_C = sideDef("ice-c", 37, 100);
-export const SHOP_GINGER_ICE_MID = sideDef("ice-mid", 38, 78);
-export const SHOP_GINGER_ICE_LOW = sideDef("ice-low", 34, 52);
-/** The near ring and the tunnel: low ice walls (the dome comes down toward you), a fat snowy lip, icicles. */
-export const SHOP_GINGER_HEM = (() => {
-  const c = iceWall(35, 14, 0);
-  return def("hem", [1, 1], T, H, [18, F], [[whole(c, true)]]);
-})();
-export const SHOP_GINGER_TUNNEL = (() => {
-  const c = iceWall(36, 22, 0);
-  return def("tunnel", [1, 1], T, H, [18, F], [[whole(c, true)]]);
-})();
+/** The dome's ice walls toward you (the candy stops at row 11): their tops by row, sloping down from the back to the front. */
+const ICE_TOP: Record<number, number> = { 12: 72, 13: 46, 14: 28, 15: 22, 16: 20, 17: 18, 18: 16 };
+const iceTop = (r: number) => ICE_TOP[Math.max(12, Math.min(18, r))]!;
+/** An ice card for row `r` (its top sloping from the row behind's height at its back edge to its own at its front edge). */
+const iceDef = (name: string, r: number, seed: number, more?: (c: Cv) => void) => {
+  const back = r === 12 ? 100 : iceTop(r - 1);
+  const c = iceWall(seed, Math.round((iceTop(r) + iceTop(r + 1)) / 2), seed * 41, Math.round((back + iceTop(r)) / 2));
+  more?.(c);
+  return def(name, [1, 1], CARD, H, [22, F], [[whole(c, true)]]);
+};
+export const SHOP_GINGER_ICE_12 = iceDef("ice-12", 12, 31, (c) => frostFlower(c, 26, yOf(44), 32));
+/** A carved ice lantern in a niche, a warm candle inside (a light): on row 12, where the candy wall ends. */
+export const SHOP_GINGER_ICE_LAMP = iceDef("ice-lamp", 12, 33, (c) => {
+  for (let h = 30; h <= 56; h++)
+    for (let x = 13; x <= 31; x++) {
+      const u = (x - 22) / 9;
+      const arch = 50 + Math.round(6 * Math.sqrt(Math.max(0, 1 - u * u)));
+      if (h > arch) continue;
+      put(c, x, yOf(h), x === 13 || x === 31 || h === arch ? "a" : "A");
+    }
+  rect(c, 17, yOf(50), 11, 15, (i, j) => (i === 0 || j === 0 ? "C" : i === 10 || j === 14 ? "b" : j > 5 && j < 12 && i > 3 && i < 7 ? (j < 8 ? "F" : "f") : "c"));
+});
+export const SHOP_GINGER_ICE_13 = iceDef("ice-13", 13, 34);
+export const SHOP_GINGER_HEM = iceDef("hem", 14, 35);
+export const SHOP_GINGER_HEM_15 = iceDef("hem-15", 15, 39);
+export const SHOP_GINGER_TUNNEL = iceDef("tunnel", 16, 36);
 /** The way out: the igloo's low doorway (2 x 1), a round arch of ice blocks onto the snowy night, a star or two. */
 const EW = 2 * T;
 const EH = 72;
@@ -527,9 +549,9 @@ export const SHOP_GINGER_ENTRANCE = (() => {
 
 /** The shopkeeper's stand: a small half-round table (its flat side to the wall), a wooden top seen from a little above, a candy-stripe skirt. */
 const CW = 2 * T;
-const CH = 44;
-const C_TOP = 16; // its top's front edge, px over its foot
-const CF = 34; // its foot row (its round front's foot: 4 px south of row 6's middle... drawn at the square's middle, see footOf)
+const CH = 38;
+const C_TOP = 10; // its top's front edge, px over its foot (low: the gnome-ish shopkeeper's head and beard show over it)
+const CF = 28; // its foot row (its round front's foot: 4 px south of row 6's middle... drawn at the square's middle, see footOf)
 export const SHOP_GINGER_COUNTER_TOP = C_TOP;
 export const SHOP_GINGER_COUNTER = (() => {
   const c = cv(CW, CH);
@@ -630,22 +652,23 @@ export const SHOP_GINGER_BOXES = (() => {
 
 const WARM = "#ffcf8a"; // the candy shop's warm glow: the catwalk's bulbs, the lanterns
 const ICE = "#a8dcff"; // the ice's cool light: the battle spot, the doorway's night
-const BAYS = ["bay-a", "bay-b", "bay-door", "bay-door-open", "bay-c", "bay-d", "bay-e", "bay-corner", "bay-sign-w", "bay-sign-e"];
+const BAYS = ["bay-a", "bay-b", "bay-door", "bay-door-open", "bay-c", "bay-d", "bay-e", "bay-corner", "bay-sign-w", "bay-sign-e", "stair-hi"];
+const SIDES = ["side-a", "side-b", "side-c", "side-d", "side-corner"];
 /** The catwalk's bulbs on every bay (warm, a soft halo), the ice lanterns, the doorway's night, the stockroom (when its door opens). */
 export const SHOP_GINGER_LIGHTS: readonly (LightSpot & { piece: string })[] = [
-  ...BAYS.map((piece) => ({ piece, x: 0, y: yOf(DECK.face + 6), w: T, h: 5, keys: "F", color: WARM, strength: 0.7, halo: 8 })),
-  { piece: "ice-lamp", x: 13, y: yOf(64), w: 11, h: 15, keys: "Ff", color: WARM, strength: 1, flicker: true, halo: 26 },
+  ...BAYS.filter((b) => b !== "stair-hi").map((piece) => ({ piece, x: 0, y: yOf(DECK.face + 6), w: CARD, h: 5, keys: "F", color: WARM, strength: 0.7, halo: 8 })),
+  { piece: "ice-lamp", x: 17, y: yOf(50), w: 11, h: 15, keys: "Ff", color: WARM, strength: 1, flicker: true, halo: 26 },
   { piece: "entrance", x: 10, y: 6, w: EW - 20, h: EH - 30, keys: "Ej*", color: ICE, strength: 0.4 },
-  { piece: "bay-door-open", x: 9, y: yOf(28), w: 19, h: 27, keys: "JNf", color: WARM, strength: 0.6, halo: 14 },
+  { piece: "bay-door-open", x: 9 + OV, y: yOf(28), w: 19, h: 27, keys: "JNf", color: WARM, strength: 0.6, halo: 14 },
 ];
 /** ... and pools on the floor: warm along the bays' foot, cool on the battle spot's ice, cool before the doorway. */
 export const SHOP_GINGER_POOLS: readonly (LightPool & { piece: string })[] = [
-  ...BAYS.map((piece) => ({ piece, x: 18, y: F + 10, rx: 26, ry: 9, color: WARM, strength: 0.18 })),
-  { piece: "ice-lamp", x: 18, y: F + 8, rx: 34, ry: 12, color: WARM, strength: 0.25 },
+  ...[...BAYS, ...SIDES].map((piece) => ({ piece, x: 22, y: F + 10, rx: 26, ry: 9, color: WARM, strength: 0.18 })),
+  { piece: "ice-lamp", x: 22, y: F + 8, rx: 34, ry: 12, color: WARM, strength: 0.25 },
   { piece: "entrance", x: EW / 2, y: EH - 4, rx: 30, ry: 9, color: ICE, strength: 0.2 },
 ];
 /** The battle spot's own cool shine (a pool on the floor at the table's spot, in the room's squares). */
-export const SHOP_GINGER_ICE_POOL = { at: [10, 10.5], rx: ZX, ry: ZY * 0.9, color: ICE, strength: 0.16 } as const;
+export const SHOP_GINGER_ICE_POOL = { at: [9.5, 9.5], rx: ZX, ry: ZY * 0.9, color: ICE, strength: 0.16 } as const;
 
 // ==== The layout.
 
@@ -716,9 +739,11 @@ const BACK: [string, number, number, boolean?][] = [
 const placedWall = new Set<string>();
 for (const [name, c, r, flip] of BACK) at(name, c, r, true, flip ? { flip: true } : {}), placedWall.add(`${c},${r}`);
 // The two back corners behind the curve's steps (so no gap shows between the bays), the stairs' back corners.
-for (const [name, c, r, flip] of [["bay-corner", 7, 4], ["bay-corner", 12, 4, true], ["ice", 5, 5], ["ice", 14, 5, true], ["ice", 4, 7], ["ice", 15, 7, true]] as [string, number, number, boolean?][])
+// The candy wall goes on round both sides (side bays, a plain ledge, no catwalk), rows 5 to 11.
+const SIDE_RUN: [string, number, number][] = [["side-corner", 5, 5], ["side-corner", 4, 7], ["side-a", 4, 8], ["side-b", 4, 9], ["side-c", 4, 10], ["side-d", 4, 11]];
+for (const [name, c, r, flip] of [["bay-corner", 7, 4], ["bay-corner", 12, 4, true], ...SIDE_RUN, ...SIDE_RUN.map(([n, c, r]) => [n, 19 - c, r, true])] as [string, number, number, boolean?][])
   at(name, c, r, true, flip ? { flip: true } : {}), placedWall.add(`${c},${r}`);
-// The rest of the ring: the sides (an ice lantern on each), the near walls coming down, the tunnel's walls, the doorway.
+// The rest of the ring: the dome's ice coming down toward you (an ice lantern on each side at row 12), the tunnel's walls, the doorway.
 for (let row = 0; row < N; row++)
   for (let col = 0; col < N; col++) {
     const k = `${col},${row}`;
@@ -727,25 +752,23 @@ for (let row = 0; row < N; row++)
     if (!near) continue;
     const east = col > MID;
     const flip = east ? { flip: true } : {};
-    if (row >= 15 && (col === 8 || col === 11)) at(row === 18 ? "hem" : "tunnel", col, row, true, flip);
-    else if (row >= 14) at("hem", col, row, true, flip);
-    else if (row === 13) at("ice-low", col, row, true, flip);
-    else if (row === 12) at("ice-mid", col, row, true, flip);
-    else if (row === 9) at("ice-lamp", col, row, true, flip);
-    else if (row >= 10) at(row === 10 ? "ice-b" : "ice-c", col, row, true, flip);
-    else at(row % 2 ? "ice-b" : "ice", col, row, true, flip);
+    if (row >= 16) at("tunnel", col, row, true, flip);
+    else if (row === 15) at("hem-15", col, row, true, flip);
+    else if (row === 14) at("hem", col, row, true, flip);
+    else if (row === 13) at("ice-13", col, row, true, flip);
+    else at(col === 5 || col === 14 ? "ice-lamp" : "ice-12", col, row, true, flip);
   }
 at("entrance", 9, 18, false, { exit: true });
 
 // -- On the floor.
 at("counter", 9, 6, true); // the shopkeeper's half-round stand, the Boss Crate on it (SHOP_GINGER_CRATE_AT)
 at("crate", 9, 6, false); // (its place is the stand's: drawn on its top)
-at("barrel-canes", 5, 9, true);
-at("barrel-candy", 5, 10, true);
+at("barrel-canes", 5, 11, true);
+at("barrel-mint", 14, 11, true);
 at("sack", 6, 12, true);
-at("barrel-mint", 14, 9, true);
-at("barrel-canes-b", 14, 10, true);
 at("barrel-gum", 13, 12, true);
+at("barrel-candy", 7, 13, true);
+at("barrel-canes-b", 12, 13, true);
 at("boxes", 8, 13, true);
 
 /** Where every piece goes: name, column (its west-most square), row (its south-most), solid; floor tiles first, then the upright pieces north to south. */
@@ -774,7 +797,7 @@ export const SHOP_GINGER_UPPER = {
 } as const;
 /**
  * The two staircases, each from the floor to the catwalk: the floor square at its foot, its two squares (low, high) with the lift
- * of each quarter of the square (west to east, a quarter of its card each: x 0-8, 9-17, 18-26, 27-36), and the catwalk square at
+ * of each quarter of the square (west to east, a quarter of its 37 px each: x 4-12, 13-21, 22-30, 31-40 of its 45 px card), and the catwalk square at
  * its top. Eight steps of SHOP_GINGER_STEP (5 px); the last is level with the deck (40). The east one is the west one mirrored.
  */
 export const SHOP_GINGER_STAIRS = {
@@ -811,8 +834,8 @@ export const SHOP_GINGER_DISPENSERS = [
 
 // -- The dispensing pair's loop (elf A with the box, elf B with the notepad).
 
-/** Px across a card into squares from its middle. */
-const across = (x: number) => (x - 18.5) / T;
+/** Px across a (45 px) card into squares from its middle. */
+const across = (x: number) => (x - OV - 18.5) / T;
 /** How far ahead of his foot elf A holds the box (px; the elves' rig, npc-ginger-elf). */
 export const ELF_BOX_DX = 7;
 type Stop = { at: readonly [number, number]; lvl: "floor" | "up"; h: number; stop?: { row: "lower" | "upper"; piece: string; slot: number; face: 1 | -1 }; b?: readonly [number, number, number] };
@@ -881,22 +904,22 @@ export const SHOP_GINGER_KEEPER = { at: [9.5, 5.2], keeper: [{ c: 9, r: 5 }, { c
  */
 export const SHOP_GINGER_WALKERS = {
   red: [
-    { at: [6.2, 8.4], pause: 1400 },
-    { at: [6.2, 11.6], pause: 0 },
-    { at: [7.6, 12.6], pause: 1800 },
-    { at: [6.2, 11.6], pause: 0 },
+    { at: [6.0, 8.6], pause: 1400 },
+    { at: [6.0, 11.3], pause: 0 },
+    { at: [6.9, 12.2], pause: 1800 },
+    { at: [6.0, 11.3], pause: 0 },
   ],
   green: [
-    { at: [13.2, 8.2], pause: 1600 },
-    { at: [12.6, 7.4], pause: 0 },
-    { at: [9.0, 7.6], pause: 1200 },
-    { at: [12.6, 7.4], pause: 0 },
+    { at: [12.8, 8.4], pause: 1600 },
+    { at: [12.3, 7.2], pause: 0 },
+    { at: [9.0, 7.2], pause: 1200 },
+    { at: [12.3, 7.2], pause: 0 },
   ],
   blue: [
-    { at: [11.4, 12.8], pause: 1500 },
-    { at: [12.6, 11.6], pause: 0 },
-    { at: [13.2, 9.0], pause: 1300 },
-    { at: [12.6, 11.6], pause: 0 },
+    { at: [11.6, 12.4], pause: 1500 },
+    { at: [12.4, 11.4], pause: 0 },
+    { at: [13.0, 9.4], pause: 1300 },
+    { at: [12.4, 11.4], pause: 0 },
   ],
 } as const;
 
@@ -968,5 +991,5 @@ export const SHOP_GINGER_PALETTE: Readonly<Record<string, string>> = PALETTE;
 /** The room still's top margin (px above row 0), for the review scripts. */
 export const SHOP_GINGER_TOP = TOP;
 /** A card's height (px) and where in it a given height over the floor is: for the mockups. */
-export const SHOP_GINGER_CARD = { h: H, foot: F } as const;
+export const SHOP_GINGER_CARD = { w: CARD, h: H, foot: [22, F], over: OV } as const;
 export type { LightPool, LightSpot };

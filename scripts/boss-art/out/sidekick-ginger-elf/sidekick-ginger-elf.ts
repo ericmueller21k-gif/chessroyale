@@ -1,11 +1,12 @@
 /**
  * The shopkeeper elf (id "sidekick-ginger-elf"), who keeps Ginger's candy shop behind the little half-round stand at the back of
- * his igloo (Eric, Nov 5): a happy little elf in a Santa hat (red, a white fur band and pom), a green tunic with zigzag points and a
- * gold-buckled belt, red-and-white tights, curly-toed shoes with bells. The crew's elf (out/npc-ginger-elf/elf-rig.ts), 1:1 at the
- * room's scale (37 px a square): about 37 px from his shoes to his hat, about the kids' size (sidekickSquares 0.87 is 32 px: draw
- * him at his art's size, `tall: 37`, or at the kids' size, either reads). Three-quarters, facing our right. Drawn by hand (Nov 5).
+ * his igloo (Eric, Nov 5; redrawn smaller and gnome-ish the same day): a happy little gnome-ish elf in a Santa hat (red, a white
+ * fur band and pom), a little white beard, a big round nose, a green round tunic with a gold-buckled belt, stubby legs and big boots.
+ * The crew's elf (out/npc-ginger-elf/elf-rig.ts), 1:1 at the room's scale (37 px a square): about 25 px from his boots to his hat
+ * (`tall: 25`: draw him at his art's size; the kids' 0.87 squares would make him bigger than the other elves). Three-quarters,
+ * facing our right. Drawn by hand (Nov 5).
  *
- * Frame 48 x 64, his foot at [22, 60].
+ * Frame 36 x 44, his foot at [17, 41].
  * - `idle` (loops, 12 frames, about 2.3 s): a breath, a blink, a happy little bounce on his toes, a look to the dispensers and back,
  *   the hat's pom bobbing (cue `jingle` f6: the bells on his shoes, soft).
  * - `walk` (loops, 6 x 110 ms): a bouncy walk, arms swinging (cue `step` f0, f3).
@@ -15,7 +16,7 @@
 import type { Anim, Character } from "../../../../packages/app/src/characters/sprite.ts";
 import { elfPalette, FOOT, frame, H, OUTFITS, PARTS, W, WALK, WALK_ARMS, type Look } from "../npc-ginger-elf/elf-rig.ts";
 
-const KEEPER: Look = { id: "keeper", hat: "santa" };
+const KEEPER: Look = { id: "keeper", hat: "santa", beard: true };
 
 const idle: Anim = {
   loop: true,
@@ -40,18 +41,18 @@ const walk: Anim = {
 };
 const sit: Anim = {
   loop: true,
-  frames: Array.from({ length: 10 }, (_, i) => frame(KEEPER, 220, { sit: 11, bob: i % 5 === 2 ? 1 : 0, eyes: i === 6 ? "blink" : "open", mouth: i >= 3 && i <= 5 ? "grin" : "smile", near: [2, 6], far: [1, 6] })),
+  frames: Array.from({ length: 10 }, (_, i) => frame(KEEPER, 220, { sit: 11, bob: i % 5 === 2 ? 1 : 0, eyes: i === 6 ? "blink" : "open", mouth: i >= 3 && i <= 5 ? "grin" : "smile", near: [2, 4], far: [1, 4] })),
 };
 const wave: Anim = {
   loop: false,
   frames: [
-    frame(KEEPER, 120, { mouth: "grin", near: [3, -4] }),
-    frame(KEEPER, 120, { mouth: "open", near: [5, -12], eyes: "happy" }),
-    frame(KEEPER, 140, { mouth: "open", near: [8, -14], bob: -2, feet: [[0, 2], [0, 2]], eyes: "happy", flop: 1 }, { cue: "jingle" }),
-    frame(KEEPER, 140, { mouth: "grin", near: [3, -15], bob: 0, eyes: "happy", flop: -1 }),
-    frame(KEEPER, 140, { mouth: "open", near: [8, -14], eyes: "happy", flop: 1 }),
-    frame(KEEPER, 140, { mouth: "grin", near: [3, -15], eyes: "happy" }),
-    frame(KEEPER, 130, { mouth: "grin", near: [3, -4] }),
+    frame(KEEPER, 120, { mouth: "grin", near: [2, -3] }),
+    frame(KEEPER, 120, { mouth: "open", near: [4, -7], eyes: "happy" }),
+    frame(KEEPER, 140, { mouth: "open", near: [6, -9], bob: -2, feet: [[0, 2], [0, 2]], eyes: "happy", flop: 1 }, { cue: "jingle" }),
+    frame(KEEPER, 140, { mouth: "grin", near: [2, -10], bob: 0, eyes: "happy", flop: -1 }),
+    frame(KEEPER, 140, { mouth: "open", near: [6, -9], eyes: "happy", flop: 1 }),
+    frame(KEEPER, 140, { mouth: "grin", near: [2, -10], eyes: "happy" }),
+    frame(KEEPER, 130, { mouth: "grin", near: [2, -3] }),
     frame(KEEPER, 160, { mouth: "smile" }),
   ],
 };
@@ -68,4 +69,4 @@ export const sidekickGingerElf: Character = {
   anims: { idle, walk, sit, wave },
 };
 /** His height from his idle's top to his foot (px, 1:1 at the room's 37 a square). */
-export const KEEPER_TALL = 37;
+export const KEEPER_TALL = 25;

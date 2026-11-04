@@ -15,6 +15,7 @@ import { renderFrame, type Character, type Frame } from "../../packages/app/src/
 import { GINGERBREAD } from "../../packages/app/src/characters/gingerbread.ts";
 import * as SHOP from "./out/house-shop-ginger/house-shop-ginger.ts";
 import { elvesAt, introAt, restingFigures, type Fig } from "./ginger-place.ts";
+import * as IN0 from "./out/house-intro-ginger/house-intro-ginger.ts";
 
 const [dir = ".", device = "phone", timesArg = "0"] = process.argv.slice(2);
 const SCENE = process.env.SCENE ?? "intro";
@@ -23,7 +24,9 @@ const HEAD = 52;
 const [W, H] = device === "phone" ? [390, 844 - HEAD] : [1280, 720 - HEAD];
 const SQ = 37;
 const TABLE = { c: (SHOP.SHOP_GINGER_MARKS.boss[0] + SHOP.SHOP_GINGER_MARKS.you[0]) / 2, r: (SHOP.SHOP_GINGER_MARKS.boss[1] + SHOP.SHOP_GINGER_MARKS.you[1]) / 2 };
-const camX = TABLE.c - 0.75, camY = TABLE.r + 0.8;
+// Ginger's own framing (Nov 5): the challenge camera's 0.8 squares south, but centred on the table (west 0, not 0.75), so the
+// centred battle spot and both staircases at the catwalk's ends are in view on the phone (IN.INTRO_GINGER_CAM).
+const camX = TABLE.c - IN0.INTRO_GINGER_CAM.west, camY = TABLE.r + IN0.INTRO_GINGER_CAM.south;
 const v = newView();
 setView(v, W, H, 0);
 const pt = newPt();

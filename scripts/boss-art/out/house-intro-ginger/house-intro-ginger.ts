@@ -4,12 +4,12 @@
  *
  * 1. INTRO_GINGER_BLAST: his staff's blast, a spinning comet of frost (`fly`) shot from his cane's hook up over the battle spot,
  *    where it bursts (`burst`) and the ice shard forms in it.
- * 2. INTRO_GINGER_SHARD: the ice shard, a block of clear ice with a flat top and a spiked bottom: `form` in the burst, `fall`
- *    (it plummets: the code drops it), `land` (its spikes drive into the floor and it settles, chips flying). It is the table.
+ * 2. INTRO_GINGER_SHARD: the ice shard, one big icicle, tall and pointed, with a round flat top: `form` in the burst, `fall`
+ *    (it plummets point first: the code drops it), `land` (it stabs into the floor and settles, chips flying). It is the table.
  * 3. INTRO_GINGER_CRACK (flat, laid on the floor at the table's spot) and INTRO_GINGER_PUFF (a puff of snow round its foot): the
  *    icy ground cracking where it lands.
- * 4. INTRO_GINGER_TABLE: the shard landed, its spikes sunk in the cracked ice, its slab's top INTRO_GINGER_TABLE_TOP (27 px, the
- *    park table's) over the floor; frost glints run over it (`idle`). The renderer draws the board on it (INTRO_GINGER_TABLE_INK).
+ * 4. INTRO_GINGER_TABLE: the icicle stabbed into the cracked ice, its round flat top INTRO_GINGER_TABLE_TOP (27 px, the park
+ *    table's) over the floor; frost glints run over it (`idle`). The renderer draws the board on it (INTRO_GINGER_TABLE_INK).
  * 5. INTRO_GINGER_BOARD: the board the two elves carry out of the stockroom and toss up onto the table (a flat board, its squares
  *    ice-blue and white, `carry` and `spin`).
  * 6. INTRO_GINGER_LIGHT: the small white magic light his cast makes on the board, out of which the pieces appear (`appear`,
@@ -118,108 +118,100 @@ export const INTRO_GINGER_BLAST: Character = {
 };
 
 // ================================================================================================================
-// 2. The ice shard (the table): a slab of clear ice, flat on top, spikes underneath. 111 x 96, its foot [55, 90]: where its spikes'
-//    tips touch the floor as it falls (lift 0 there), and where the table stands once it has sunk in.
+// 2. The ice shard (the table): one big icicle, tall and pointed, with a round flat top (the table's surface is a circle; Eric,
+//    Nov 5). 111 x 112, its foot [55, 106]: where its point touches the floor as it falls (lift 0 there), and where the table
+//    stands once it has stabbed in.
 // ================================================================================================================
 
 const SW = 111;
-const SH = 96;
-const SF = 90; // the foot row
+const SH = 112;
+const SF = 106; // the foot row
 const SX = 55;
-const SLAB = { half: 38, thick: 10, deep: 9 } as const; // the slab: 77 px across, a 10 px face, its top 9 px deep as seen
-const SPIKE = 30; // the spikes' length below the slab, as it falls
-/** Its slab's top over the floor once landed: the park table's (27), so no step is needed for you. */
+const DISC = { rx: 34, deep: 9, rim: 5 } as const; // the round top: 69 px across, its top seen 9 px deep, a 5 px rim
+const BODY = { r: 20, len: 84 } as const; // the icicle under it: 40 px across at the top, 84 px down to its point
+/** Its round top's height over the floor once it has stabbed in: the park table's (27), so no step is needed for you. */
 export const INTRO_GINGER_TABLE_TOP = 27;
-const SUNK = SPIKE - (INTRO_GINGER_TABLE_TOP - SLAB.thick); // how far the spikes sink in: 13 px
-/** The spikes (seven, the middle ones longest), their tips' x and lengths. */
-const SPIKES = [-31, -21, -11, 0, 11, 21, 31].map((dx, i) => ({ dx, len: SPIKE - [10, 5, 1, 0, 2, 6, 11][i]!, w: [4, 5, 6, 7, 6, 5, 4][i]! }));
-/** The shard with its slab's top `top` px over the foot and its spikes cut at the floor (`cut`: the floor's row, sunk in). */
+const FALL_TOP = BODY.len + DISC.rim; // its top's height over its point as it falls: 89
+const SUNK = FALL_TOP - INTRO_GINGER_TABLE_TOP; // how far it stabs into the floor: 62 px
+/** The icicle's half-width `t` of the way down its body (0 under the top, 1 its point): a long concave point. */
+const bodyR = (t: number) => BODY.r * Math.pow(Math.max(0, 1 - t), 1.35);
+/** The icicle with its top's front edge `top` px over the foot; `cut`: nothing under the floor's line (stabbed in). */
 function shardPic(top: number, opts: { cut?: boolean; glint?: number; frost?: number; form?: number } = {}): Cv {
   const c = cv(SW, SH);
-  const yTop = SF - top; // the slab's top face's front edge
-  const face0 = yTop; // its front face: yTop to yTop + thick
   const form = opts.form ?? 1;
-  // The spikes, behind the slab's face: clear ice, lit on the left, a bright edge, darker toward the tip.
-  for (const s of SPIKES) {
-    const x0 = SX + s.dx;
-    const yb = face0 + SLAB.thick;
-    const len = Math.round(s.len * form);
-    for (let j = 0; j < len; j++) {
-      const y = yb + j;
-      if (opts.cut && y > SF) break;
-      const half = (s.w * (1 - j / len)) / 1;
-      for (let x = Math.round(x0 - half); x <= Math.round(x0 + half); x++) {
-        const u = (x - (x0 - half)) / (2 * half + 0.01);
-        put(c, x, y, u < 0.25 ? "8" : u < 0.55 ? "7" : u < 0.85 ? "6" : "/");
-      }
-      if (j % 6 === 2) put(c, Math.round(x0 - half * 0.4), y, "9");
-    }
-  }
-  // The slab: its top face (seen from a little above), its front face; frosty white edges, clear blue body with streaks.
-  const half = Math.round(SLAB.half * (0.5 + 0.5 * form));
-  for (let y = yTop - SLAB.deep; y < yTop + SLAB.thick; y++)
-    for (let x = SX - half; x <= SX + half; x++) {
-      const top = y < yTop;
-      // The top face's corners rounded off at the back, a little.
-      const back = yTop - SLAB.deep;
-      if (top && y === back && (x < SX - half + 3 || x > SX + half - 3)) continue;
-      if (top && y === back + 1 && (x < SX - half + 1 || x > SX + half - 1)) continue;
-      let k: string;
-      if (top) k = y === back || y === back + 1 ? "9" : y === yTop - 1 ? "~" : (x - y * 2) % 23 === 0 ? "9" : "8";
-      else {
-        const u = (x - (SX - half)) / (2 * half);
-        k = y === yTop ? "*" : y === yTop + SLAB.thick - 1 ? "/" : u < 0.08 ? "8" : u > 0.92 ? "6" : (x + y * 3) % 17 === 0 ? "8" : (x + y) % 11 === 0 ? "/" : "7";
-      }
+  const yTop = SF - top; // the top's front edge (the rim's top)
+  const yBody = yTop + DISC.rim; // where the body starts, under the rim
+  const len = Math.round(BODY.len * form);
+  // The body: clear ice lit on the left, ridges running down it, a bright edge, darker toward the point and the right.
+  for (let j = 0; j <= len; j++) {
+    const y = yBody + j;
+    if (opts.cut && y > SF) break;
+    const t = j / len;
+    const half = bodyR(t) * (0.6 + 0.4 * form);
+    for (let x = Math.round(SX - half); x <= Math.round(SX + half); x++) {
+      const u = (x + 0.5 - (SX - half)) / (2 * half + 0.01);
+      const ridge = Math.abs(Math.sin(u * Math.PI * 4 + t * 2)) < 0.12;
+      let k = u < 0.12 ? "9" : u < 0.3 ? "8" : u < 0.62 ? "7" : u < 0.88 ? "6" : "/";
+      if (ridge && u > 0.12 && u < 0.88) k = u < 0.5 ? "9" : "/";
+      if (t > 0.8 && u > 0.5) k = "/";
       put(c, x, y, k);
     }
-  // Frost along its top edge, a glint running across the face.
-  for (let x = SX - half; x <= SX + half; x += 3) put(c, x, yTop - 1, "*");
-  if (opts.glint !== undefined) {
-    const gx = SX - half + 4 + ((opts.glint * 13) % (2 * half - 8));
-    sparkle(c, gx, yTop + 3, true);
+    if (j % 9 === 4 && t < 0.7) put(c, Math.round(SX - half * 0.55), y, "*"); // a glint down its lit side
   }
-  if (opts.frost) for (let i = 0; i < opts.frost * 6; i++) sparkle(c, SX - half + Math.floor(hash(i, 1, 7) * 2 * half), yTop - SLAB.deep + Math.floor(hash(i, 2, 7) * (SLAB.deep + SLAB.thick + 10)));
+  // The round flat top: its rim (a 5 px band round the front, curving down at the sides), then its top face (an ellipse).
+  const rx = Math.round(DISC.rx * (0.55 + 0.45 * form));
+  for (let x = SX - rx; x <= SX + rx; x++) {
+    const u = (x + 0.5 - SX) / rx;
+    if (Math.abs(u) > 1) continue;
+    const front = Math.round(DISC.deep / 2 * Math.sqrt(1 - u * u)); // the top face's front edge, below its middle line
+    const yMid = yTop - Math.round(DISC.deep / 2);
+    // The top face: the ellipse from its back edge to its front edge.
+    for (let y = yMid - front; y <= yMid + front; y++) {
+      const v = (y - yMid) / (front || 1);
+      put(c, x, y, v < -0.6 ? "9" : u < -0.55 ? "9" : (x - y * 2) % 19 === 0 ? "9" : v > 0.75 ? "~" : "8");
+    }
+    // The rim below its front edge.
+    for (let j = 1; j <= DISC.rim; j++) put(c, x, yMid + front + j, j === 1 ? "*" : u < -0.6 ? "8" : u > 0.65 ? "6" : j === DISC.rim ? "/" : "7");
+  }
+  if (opts.glint !== undefined) {
+    const gx = SX - rx + 6 + ((opts.glint * 13) % (2 * rx - 12));
+    sparkle(c, gx, yTop + 2, true);
+  }
+  if (opts.frost) for (let i = 0; i < opts.frost * 6; i++) sparkle(c, SX - rx + Math.floor(hash(i, 1, 7) * 2 * rx), yTop - DISC.deep + Math.floor(hash(i, 2, 7) * (DISC.deep + 30)));
   return c;
 }
 const shardParts: Record<string, Part> = {};
-/** Ice chips flung out as it lands, `t` frames on (frame px). */
+/** Ice chips flung out as it stabs in, `t` frames on (frame px). */
 const chips = (t: number): Speck[] =>
   [[-1, -1.2], [1.1, -1.4], [-1.6, -0.6], [1.7, -0.7], [-0.6, -1.8], [0.5, -1.7], [-2, -0.3], [2, -0.4]].flatMap(([vx, vy], i): Speck[] => {
-    const x = Math.round(SX + (i % 2 ? 20 : -20) * 0.4 + vx! * (8 + t * 7));
+    const x = Math.round(SX + (i % 2 ? 12 : -12) + vx! * (8 + t * 7));
     const y = Math.round(SF - 2 + vy! * (6 + t * 6) + t * t * 1.6);
     return y < SF ? [[x, y, i % 3 ? "8" : "*"], [x + 1, y, "~"]] : [];
   });
+/** Its top's height over the floor through `land`, per frame: it stabs in fast, jolts and settles at 27. */
+const LAND_TOP = [56, 34, 25, 28, 27] as const;
 export const INTRO_GINGER_SHARD: Character = {
   id: "intro-ginger-shard",
-  name: "Ginger's ice shard (it becomes the table)",
+  name: "Ginger's ice shard: a big icicle with a round flat top (it becomes the table)",
   w: SW,
   h: SH,
   foot: [SX, SF],
   palette: PALETTE,
   parts: shardParts,
   anims: {
-    /** Forming in the burst (once, 4 x 80 ms): the frost packs into the block, its spikes growing (cue `freeze` f0). */
-    form: { loop: false, frames: framesOf("s-form-", shardParts, [0.3, 0.55, 0.8, 1].map((fm, i) => ({ bits: [cropped(shardPic(SPIKE + SLAB.thick, { form: fm, frost: 3 - i }))], ms: 80, ...(i === 0 ? { cue: "freeze" } : {}) }))) },
-    /** Hanging a beat, then falling (loops, 2 x 60 ms): speed streaks over it. Drop it from INTRO_GINGER_BLAST_TO's lift to 0. */
+    /** Forming in the burst (once, 4 x 80 ms): the frost packs into the icicle, its point growing (cue `freeze` f0). */
+    form: { loop: false, frames: framesOf("s-form-", shardParts, [0.3, 0.55, 0.8, 1].map((fm, i) => ({ bits: [cropped(shardPic(FALL_TOP, { form: fm, frost: 3 - i }))], ms: 80, ...(i === 0 ? { cue: "freeze" } : {}) }))) },
+    /** Falling point first (loops, 2 x 60 ms): speed streaks over its top. Drop it from INTRO_GINGER_BLAST_TO's lift less 40 to 0. */
     fall: {
       loop: true,
-      frames: framesOf("s-fall-", shardParts, [0, 1].map((f) => ({ bits: [cropped(shardPic(SPIKE + SLAB.thick))], ms: 60, specks: [-28, -14, 2, 16, 30].flatMap((dx, i): Speck[] => Array.from({ length: 6 + ((i + f) % 3) * 2 }, (_, j): Speck => [SX + dx + ((i + f) % 2), SF - SPIKE - SLAB.thick - SLAB.deep - 3 - j * 2 - f, j < 2 ? "~" : "8"])) }))),
+      frames: framesOf("s-fall-", shardParts, [0, 1].map((f) => ({ bits: [cropped(shardPic(FALL_TOP))], ms: 60, specks: [-26, -13, 0, 13, 26].flatMap((dx, i): Speck[] => Array.from({ length: 6 + ((i + f) % 3) * 2 }, (_, j): Speck => [SX + dx + ((i + f) % 2), SF - FALL_TOP - DISC.deep - 3 - j * 2 - f, j < 2 ? "~" : "8"])) }))),
     },
-    /** Landing (once, 5 frames, 0.42 s): the spikes drive in (cut at the floor), a jolt and a bounce, chips flung out (cue `crunch` f0). */
-    land: {
-      loop: false,
-      frames: framesOf("s-land-", shardParts, [
-        { top: SPIKE + SLAB.thick - 6, ms: 60 },
-        { top: SPIKE + SLAB.thick - 11, ms: 70 },
-        { top: INTRO_GINGER_TABLE_TOP - 1, ms: 80 },
-        { top: INTRO_GINGER_TABLE_TOP + 1, ms: 90 },
-        { top: INTRO_GINGER_TABLE_TOP, ms: 120 },
-      ].map((s, i) => ({ bits: [cropped(shardPic(s.top, { cut: true }))], ms: s.ms, specks: chips(i), ...(i === 0 ? { cue: "crunch" } : {}) }))),
-    },
+    /** Stabbing in (once, 5 frames, 0.42 s): the point drives into the floor (cut at the floor line), a jolt, chips flung out (cue `crunch` f0). */
+    land: { loop: false, frames: framesOf("s-land-", shardParts, LAND_TOP.map((top, i) => ({ bits: [cropped(shardPic(top, { cut: true }))], ms: [60, 70, 80, 90, 120][i]!, specks: chips(i), ...(i === 0 ? { cue: "crunch" } : {}) }))) },
   },
 };
-/** How far the spikes sink into the floor as it lands (px), and its slab's top over the floor through `land`, per frame. */
-export const INTRO_GINGER_SHARD_SINK = { sunk: SUNK, landTop: [34, 29, 26, 28, 27] } as const;
+/** How far its point stabs into the floor as it lands (px), and its top's height over the floor through `land`, per frame. */
+export const INTRO_GINGER_SHARD_SINK = { sunk: SUNK, landTop: LAND_TOP } as const;
 
 // ================================================================================================================
 // 3. The crack in the ice (flat: lay it on the floor centred on the table's spot, 3 squares by 2) and the puff of snow (upright).
@@ -568,23 +560,29 @@ export const INTRO_GINGER_FRONT: Character = {
 // 8. Where things go (squares; lifts in the room's px over the floor).
 // ================================================================================================================
 
-/** The blast flies from his hook (BOSS_GINGER_INTRO's INTRO_GINGER_BLAST_FROM, on his frame) to here: over the table's spot, 120 px up. */
-export const INTRO_GINGER_BLAST_TO = { at: [10, 10.5], lift: 120 } as const;
-/** The shard forms there and falls from that lift to 0 (its spikes' tips on the floor), then lands at the table's spot. */
-export const INTRO_GINGER_TABLE_AT = [10, 10.5] as const;
 /**
- * The board carriers' route (the board's middle; elf A, the front, 0.45 squares east of it, elf B 0.45 west, both facing east):
- * out of the stockroom door (bay-door at (8, 4): swap it for `bay-door-open` while they come out), south down column 8, east along
- * row 8.4 (behind both of you, north of the table), to the toss spot just behind the table. At 3.5 squares a second, `carry`.
+ * Ginger's challenge camera (a new BossIntro field for the code: CHALLENGE_FEEL.cam.across's south and zoom, but centred on the
+ * table, west 0 rather than 0.75): his battle spot is the round room's middle, and this keeps both staircases at the catwalk's
+ * ends in the phone's narrow view (Eric, Nov 5: "keep the east staircase on screen ... by the camera framing").
+ */
+export const INTRO_GINGER_CAM = { south: 0.8, west: 0, zoom: 1 } as const;
+/** The blast flies from his hook (BOSS_GINGER_INTRO's INTRO_GINGER_BLAST_FROM, on his frame) to here: over the table's spot, 120 px up. */
+export const INTRO_GINGER_BLAST_TO = { at: [9.5, 9.5], lift: 120 } as const;
+/** The shard forms there and falls from that lift to 0 (its spikes' tips on the floor), then lands at the table's spot. */
+export const INTRO_GINGER_TABLE_AT = [9.5, 9.5] as const;
+/**
+ * The board carriers' route (the board's middle; elf A, the front, 0.4 squares east of it, elf B 0.4 west, both facing east):
+ * out of the stockroom door (bay-door at (8, 4): swap it for `bay-door-open` while they come out), south down column 8 past the stand,
+ * east along row 7 (behind the battle spot's ice), to the toss spot just behind the table. At 3.5 squares a second, `carry`.
  */
 export const INTRO_GINGER_BOARD_ROUTE = [
   [8, 4.75],
-  [8, 8.4],
-  [10, 8.4],
-  [10, 9.1],
+  [8, 7.0],
+  [9.5, 7.0],
+  [9.5, 8.2],
 ] as const;
 /** The carriers either side of the board (squares from its middle) and where they go to watch once it's on (each faces the table). */
 export const INTRO_GINGER_ELF_SPOTS = {
-  carry: { a: 0.45, b: -0.45 },
-  watch: { a: { at: [11.7, 9.0], face: -1 }, b: { at: [7.3, 8.7], face: 1 } },
+  carry: { a: 0.4, b: -0.4 },
+  watch: { a: { at: [11.3, 7.9], face: -1 }, b: { at: [7.0, 7.9], face: 1 } },
 } as const;

@@ -211,10 +211,10 @@ export function introAt(t: number): IntroNow {
   const SH = IN.INTRO_GINGER_SHARD;
   const tableAt = IN.INTRO_GINGER_TABLE_AT;
   let slab: IntroNow["slab"] = null;
-  if (t >= T.form && t < T.fall[0]) props.push({ ch: SH, anim: t < T.form + lenOf(SH, "form") ? "form" : "fall", ms: t - T.form, at: tableAt, lift: to.lift - 40, depthBias: -0.01 });
+  if (t >= T.form && t < T.fall[0]) props.push({ ch: SH, anim: t < T.form + lenOf(SH, "form") ? "form" : "fall", ms: t - T.form, at: tableAt, lift: to.lift - 50, depthBias: -0.01 });
   else if (t >= T.fall[0] && t < T.land) {
     const u = (t - T.fall[0]) / (T.fall[1] - T.fall[0]);
-    props.push({ ch: SH, anim: "fall", ms: t - T.fall[0], at: tableAt, lift: (to.lift - 40) * (1 - u * u), depthBias: -0.01 });
+    props.push({ ch: SH, anim: "fall", ms: t - T.fall[0], at: tableAt, lift: (to.lift - 50) * (1 - u * u), depthBias: -0.01 });
   } else if (t >= T.land && t < T.land + lenOf(SH, "land")) props.push({ ch: SH, anim: "land", ms: t - T.land, at: tableAt, depthBias: -0.01 });
   else if (t >= T.land) {
     props.push({ ch: IN.INTRO_GINGER_TABLE, anim: "idle", ms: t, at: tableAt, depthBias: -0.01, slab: true });

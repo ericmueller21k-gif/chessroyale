@@ -1,49 +1,51 @@
 /**
- * Ginger's elves (Nov 5, drawn by hand on the weekly plan usage): one elf, dressed and recolored for each job (the shopkeeper in a
- * Santa hat, the walkers with their big candy canes, the dispensing pair, the two who carry the board in the intro). A happy little
- * elf about a square tall at the room's scale (37 px a square, drawn 1:1): a big round head, a pointed ear, rosy cheeks, a pointed
- * hat with a white band and a pom, a tunic with zigzag points and a belt, striped tights, curly-toed shoes with a bell on each.
- * Three-quarters, facing our right (mirror to face left), light from the top left.
+ * Ginger's elves (Nov 5, redrawn the same day as Eric asked: "more like gnome-ish elves, and smaller"; drawn by hand on the weekly
+ * plan usage): one little gnome-ish elf, dressed and recolored for each job (the shopkeeper in a Santa hat, the walkers with their big
+ * candy canes, the dispensing pair, the two who carry the board in the intro). Short and round, about two thirds of a square tall at
+ * the room's scale (37 px a square, drawn 1:1): a big pointy hat with a white band and a pom, a round head with a big round nose and
+ * rosy cheeks, a little white beard on some, a round tunic with a belt, stubby legs, big round boots. Three-quarters, facing our right
+ * (mirror to face left), light from the top left.
  *
- * Frame: 48 x 64, the foot (the ground between the feet) at [22, 60]. Rigging: each part is painted from a pose (a handful of
- * numbers: the bob, the head's offset, each foot, each arm's hand, the eyes and mouth, what he holds) and a look (the hat, the
- * outfit's three keys), every part its own outlined layer, back to front; parts are made once per pose and shared between frames
- * and between elves (`PARTS`): every elf's outfit is the keys `o`, `O`, `p`, set by his own palette (`elfPalette`).
+ * Frame: 36 x 44, the foot (the ground between the boots) at [17, 41]. Rigging: each part is painted from a pose (a handful of
+ * numbers: the bob, the head's offset, each foot, each hand, the eyes and mouth, what he holds) and a look (the hat, a beard, a
+ * sack), every part its own outlined layer, back to front; parts are made once per pose and shared between frames and between elves
+ * (`PARTS`): every elf's outfit is the keys `o`, `O`, `p`, set by his own palette (`elfPalette`).
  */
 import type { Frame, Layer, Part, Speck } from "../../../../packages/app/src/characters/sprite.ts";
 
 export type Pt = readonly [number, number];
-export const W = 48;
-export const H = 64;
-export const GROUND = 60;
-export const FOOT: Pt = [22, GROUND];
-/** An elf's height at rest from his feet to his hat's top (px, 1:1 at the room's 37 a square): for drawing him at his art's size. */
-export const ELF_TALL = 37;
+export const W = 36;
+export const H = 44;
+export const GROUND = 41;
+export const FOOT: Pt = [17, GROUND];
+/** An elf's height at rest from his boots to his hat's tip (px, 1:1 at the room's 37 a square). */
+export const ELF_TALL = 25;
 
 const BASE: Record<string, string> = {
   k: "#1d1410", // outline
   s: "#f7cda6", // skin: mid, shade, lit
   S: "#dc9d78",
   L: "#ffe4c8",
+  n: "#f29a86", // the big round nose: mid, its shine
+  N: "#ffd0c0",
   c: "#f2848a", // rosy cheeks
   e: "#2a1810", // eyes
   m: "#8a2a24", // the mouth
-  n: "#8c5228", // hair: mid, dark
-  N: "#5c321a",
-  w: "#fbfaf6", // white trim, fur, the box; its shade
+  w: "#fbfaf6", // white trim, fur, the beard, the box; its shade
   W: "#d3d0cf",
   b: "#2b1e18", // the belt
   y: "#ffd23a", // gold: buckles, bells; its shade
   Y: "#c58f10",
-  q: "#5a3a26", // shoes: mid, dark
-  Q: "#3a2416",
+  q: "#6a4026", // boots: mid, dark, lit
+  Q: "#3e2414",
+  j: "#93603a",
   r: "#e02a34", // the Santa hat's red, its shade (and the box's stripe)
   R: "#991a24",
   "~": "#fbfaf3", // the notepad's paper, its lines; the pencil
   "`": "#b9c6d8",
   z: "#ffcf3a",
   Z: "#9a6a3a",
-  u: "#c9a46c", // the back sack (burlap): mid, shade, its string
+  u: "#c9a46c", // the back sack (burlap): mid, shade
   U: "#957240",
   // Candies (the stream, the full box): red, yellow, green, blue, pink, orange, purple, white.
   "1": "#ff3b45",
@@ -74,7 +76,7 @@ export function elfPalette(o: Outfit): Record<string, string> {
   return { ...BASE, o: o[0], O: o[1], p: o[2] };
 }
 
-// ---- A little painter: canvases, filled discs, thick lines, every part cropped and placed.
+// ---- A little painter.
 
 type Cv = string[][];
 const cv = (): Cv => Array.from({ length: H }, () => Array<string>(W).fill("."));
@@ -93,7 +95,7 @@ function disc(c: Cv, cx: number, cy: number, rx: number, ry: number, k: (x: numb
       if (kk) put(c, x, y, kk);
     }
 }
-/** A thick line through points (a limb), radius `r`; `k(t, side)`: t 0 to 1 along it, side -1 to 1 across it (its lit side negative). */
+/** A thick line through points, radius `r`; `k(t, side)`: t 0 to 1 along it, side -1 to 1 across it. */
 function limb(c: Cv, pts: readonly Pt[], r: number, k: (t: number, side: number) => string | null) {
   const segs: [Pt, Pt, number, number][] = [];
   let L = 0;
@@ -120,10 +122,7 @@ function limb(c: Cv, pts: readonly Pt[], r: number, k: (t: number, side: number)
         if (d < best) {
           best = d;
           bt = (l0 + t * l) / (L || 1);
-          // The side: which way off the line (toward the top left is lit).
-          const nx = -dy;
-          const ny = dx;
-          bs = ((x + 0.5 - px) * nx + (y + 0.5 - py) * ny) / (Math.sqrt(len2) * r || 1);
+          bs = ((x + 0.5 - px) * -dy + (y + 0.5 - py) * dx) / (Math.sqrt(len2) * r || 1);
         }
       }
       if (best > r) continue;
@@ -132,6 +131,7 @@ function limb(c: Cv, pts: readonly Pt[], r: number, k: (t: number, side: number)
     }
 }
 export const PARTS: Record<string, Part> = {};
+const PLACES = new Map<string, Layer | null>();
 /** A canvas cropped to its drawing, stored once by name, as a layer at its place. */
 function part(name: string, paint: (c: Cv) => void, outline = true): Layer | null {
   const cached = PLACES.get(name);
@@ -149,7 +149,6 @@ function part(name: string, paint: (c: Cv) => void, outline = true): Layer | nul
   PLACES.set(name, l);
   return l;
 }
-const PLACES = new Map<string, Layer | null>();
 
 // ---- The pose and the look.
 
@@ -157,6 +156,8 @@ export type Hat = "elf" | "santa";
 export interface Look {
   id: string;
   hat: Hat;
+  /** A little white beard (some of them). */
+  beard?: boolean;
   /** A burlap sack on his back (the dispensing elf A, who tips each full box into it). */
   sack?: boolean;
 }
@@ -164,23 +165,21 @@ export type Hold = "none" | "cane" | "caneUp" | "box" | "boxOut" | "boxTip" | "p
 export interface Pose {
   /** Down a px (a breath, a step's dip); up (negative: a hop). */
   bob?: number;
-  /** The whole elf sideways (px). */
   dx?: number;
   /** The head's offset (a look, a nod), and the hat's flop (-1 to 1: its tip swung back or forward). */
   hx?: number;
   hy?: number;
   flop?: number;
-  /** Each foot's offset from its place [dx, lift] (far, near). */
+  /** Each foot's offset [dx, lift] (far, near). */
   feet?: readonly [Pt, Pt];
-  /** Each hand (far, near): where, from the shoulder (px). None: hanging at his side. */
+  /** Each hand (far, near), from its shoulder (px). None: by what he holds, or hanging at his side. */
   far?: Pt;
   near?: Pt;
   eyes?: "open" | "blink" | "happy" | "up";
   mouth?: "smile" | "open" | "o" | "grin";
   hold?: Hold;
-  /** The box's fill (0 empty to 4 full) and the candy stream (0 none, 1-3: falling, its phase). */
+  /** The box's fill (0 empty to 4 full). */
   fill?: number;
-  stream?: number;
   /** The pencil's place on the pad (0-3), the cane's sway (deg). */
   pencil?: number;
   sway?: number;
@@ -188,26 +187,38 @@ export interface Pose {
   sit?: number;
 }
 
-const SHOULDER = { far: [21, 42] as Pt, near: [24, 42] as Pt };
-const HIP = { far: [21, 50] as Pt, near: [24, 50] as Pt };
-const HEAD: Pt = [24, 34]; // the head's middle at rest
-const HANG: Record<"far" | "near", Pt> = { far: [-2, 7], near: [-1, 7] };
+const SHOULDER = { far: [15, 32] as Pt, near: [18, 32] as Pt };
+const HIP = { far: [15, 37] as Pt, near: [19, 37] as Pt };
+const HEAD: Pt = [18, 27]; // the head's middle at rest
+const BODY: Pt = [17, 34.5]; // the tunic's middle
+const HANG: Record<"far" | "near", Pt> = { far: [-1, 4], near: [0, 4] };
+/** Where the hands go for what he holds (from the shoulders). */
+const HOLD: Partial<Record<Hold, { far?: Pt; near?: Pt }>> = {
+  cane: { near: [5, 0] },
+  caneUp: { near: [5, -2] },
+  box: { near: [3, 4] },
+  boxOut: { near: [6, -1], far: [5, 0] },
+  boxTip: { far: [-3, -10] },
+  pad: { far: [4, 1], near: [5, -1] },
+  boardBack: { near: [-5, 0], far: [-6, 1] },
+  boardFront: { near: [6, 0], far: [5, 1] },
+};
 
-/** A candy cane held in his hand at (hx, hy): its foot on the ground ahead of him, the hook high over his head, striped white and his outfit's color. */
+/** A big candy cane held in his hand at (hx, hy): its foot on the ground ahead of him, its hook up past his hat, white and his outfit's color. */
 function paintCane(c: Cv, hx: number, hy: number, up: boolean, sway: number) {
   const a = ((up ? -6 : 8) + sway) * (Math.PI / 180);
-  const top = [hx + Math.sin(a) * 16, hy - Math.cos(a) * 16] as const;
-  const foot = [hx - Math.sin(a) * (up ? 6 : 15), hy + Math.cos(a) * (up ? 6 : 15)] as const;
-  const r = 1.5;
-  const hook = 4;
+  const top = [hx + Math.sin(a) * 13, hy - Math.cos(a) * 13] as const;
+  const foot = [hx - Math.sin(a) * (up ? 4 : 8), hy + Math.cos(a) * (up ? 4 : 8)] as const;
+  const r = 1.25;
+  const hook = 3;
   const pts: [number, number, number][] = [];
   const len = Math.hypot(top[0] - foot[0], top[1] - foot[1]);
   for (let s = 0; s <= len; s += 0.25) pts.push([foot[0] + ((top[0] - foot[0]) * s) / len, foot[1] + ((top[1] - foot[1]) * s) / len, s]);
   const ux = (top[0] - foot[0]) / len;
   const uy = (top[1] - foot[1]) / len;
-  // The hook curls forward (toward +x), half a turn.
-  const hcx = top[0] - uy * -hook;
-  const hcy = top[1] + ux * -hook;
+  // The hook's middle: to the front (+x) of the shaft's top.
+  const hcx = top[0] - uy * hook;
+  const hcy = top[1] + ux * hook;
   const a0 = Math.atan2(top[1] - hcy, top[0] - hcx);
   for (let t = 0; t <= Math.PI * 1.1; t += 0.06) pts.push([hcx + Math.cos(a0 + t) * hook, hcy + Math.sin(a0 + t) * hook, len + t * hook]);
   for (let y = 0; y < H; y++)
@@ -220,53 +231,34 @@ function paintCane(c: Cv, hx: number, hy: number, up: boolean, sway: number) {
         if (d < best) ((best = d), (bs = s), (bd = x + 0.5 - px + (y + 0.5 - py)));
       }
       if (best > r * r) continue;
-      const stripe = Math.floor((bs + bd * 0.5) / 2.4) % 2 === 0;
+      const stripe = Math.floor((bs + bd * 0.5) / 2) % 2 === 0;
       put(c, x, y, stripe ? (bd > 0.3 ? "O" : "o") : bd > 0.3 ? "W" : "w");
     }
 }
-/** The candy box: white, a red stripe round it, open at the top, its candies heaped `fill` (0-4) high; its top-left (x, y), 8 x 6. */
+/** The candy box: white, a red stripe, open at the top, its candies heaped `fill` (0-4) high; its top-left (x, y), 6 x 5. */
 function paintBox(c: Cv, x: number, y: number, fill: number, tip = 0) {
-  for (let j = 0; j < 6; j++)
-    for (let i = 0; i < 8; i++) {
-      const yy = y + j + (tip ? Math.round(((tip > 0 ? i - 3 : 4 - i) * Math.abs(tip)) / 3) * Math.sign(tip) * (tip > 0 ? -1 : -1) : 0);
-      put(c, x + i, yy, j === 0 ? (i === 0 ? "w" : "W") : j === 3 ? "r" : i === 7 ? "W" : "w");
-    }
-  // The candies inside: a heap over the rim as it fills.
+  const sk = (i: number) => (tip ? Math.round(((5 - i) * tip) / 3) : 0);
+  for (let j = 0; j < 5; j++) for (let i = 0; i < 6; i++) put(c, x + i, y + j - sk(i), j === 0 ? (i === 0 ? "w" : "W") : j === 3 ? "r" : i === 5 ? "W" : "w");
   const inks = "12345678";
-  for (let i = 1; i < 7; i++) {
-    const hgt = fill <= 0 ? -1 : Math.round(fill / 2 + (fill >= 3 ? 1 - Math.abs(i - 3.5) / 3.5 : 0) * 1.5);
-    for (let j = 0; j <= hgt; j++) put(c, x + i, y + 1 - j, inks[(i * 3 + j * 5) % 8]!);
+  for (let i = 1; i < 5; i++) {
+    const hgt = fill <= 0 ? -1 : Math.round(fill / 2 + (fill >= 3 ? 1 - Math.abs(i - 2.5) / 2.5 : 0));
+    for (let j = 0; j <= hgt; j++) put(c, x + i, y + 1 - j - sk(i), inks[(i * 3 + j * 5) % 8]!);
   }
 }
 function paintPad(c: Cv, x: number, y: number) {
-  // A little notepad: a brown back, white paper with lines, a ring binding at its top.
-  for (let j = 0; j < 7; j++) for (let i = 0; i < 6; i++) put(c, x + i, y + j, j === 0 ? (i % 2 ? "Y" : "y") : i === 5 || j === 6 ? "`" : j % 2 === 0 && i > 0 && i < 5 ? "`" : "~");
+  for (let j = 0; j < 5; j++) for (let i = 0; i < 5; i++) put(c, x + i, y + j, j === 0 ? (i % 2 ? "Y" : "y") : i === 4 || j === 4 ? "`" : j % 2 === 0 && i > 0 ? "`" : "~");
 }
 
 /** The elf's layers for a pose and a look, back to front. */
 export function build(look: Look, p: Pose): Layer[] {
   const dx = p.dx ?? 0;
-  const bob = p.bob ?? 0;
-  const sit = p.sit ?? 0;
-  const up = bob - sit; // the body's shift down
+  const up = (p.bob ?? 0) - (p.sit ?? 0);
   const [ff, fn] = p.feet ?? [[0, 0], [0, 0]];
   const hx = p.hx ?? 0;
   const hy = p.hy ?? 0;
   const hold = p.hold ?? "none";
   const out: (Layer | null)[] = [];
-  const key = (s: string) => s;
   const sh = (s: Pt): Pt => [s[0] + dx, s[1] + up];
-  // Hands by what he holds (from the shoulder).
-  const HOLD: Partial<Record<Hold, { far?: Pt; near?: Pt }>> = {
-    cane: { near: [10, 1] },
-    caneUp: { near: [10, -2] },
-    box: { near: [3, 6] },
-    boxOut: { near: [6, 3], far: [5, 4] },
-    boxTip: { far: [-5, -12] },
-    pad: { far: [4, 3], near: [5, 1] },
-    boardBack: { near: [-7, 1], far: [-8, 2] },
-    boardFront: { near: [8, 1], far: [7, 2] },
-  };
   const hf = p.far ?? HOLD[hold]?.far ?? HANG.far;
   const hn = p.near ?? HOLD[hold]?.near ?? HANG.near;
   const sf = sh(SHOULDER.far);
@@ -274,161 +266,123 @@ export function build(look: Look, p: Pose): Layer[] {
   const handF: Pt = [sf[0] + hf[0], sf[1] + hf[1]];
   const handN: Pt = [sn[0] + hn[0], sn[1] + hn[1]];
 
-  // The back sack (behind everything).
   if (look.sack)
     out.push(
-      part(key(`sack:${dx}:${up}`), (c) => {
-        disc(c, 16 + dx, 43 + up, 5.5, 6.5, (x, y, u, v) => (v < -0.75 ? "U" : u < -0.3 ? "u" : u > 0.5 || v > 0.6 ? "U" : (x + y) % 5 === 0 ? "U" : "u"));
-        put(c, 17 + dx, 36 + up, "u"), put(c, 18 + dx, 36 + up, "U"), put(c, 18 + dx, 35 + up, "r");
+      part(`sack:${dx}:${up}`, (c) => {
+        disc(c, 11 + dx, 32 + up, 4, 4.8, (x, y, u, v) => (v < -0.7 ? "U" : u < -0.3 ? "u" : u > 0.5 || v > 0.6 ? "U" : (x + y) % 4 === 0 ? "U" : "u"));
+        put(c, 12 + dx, 27 + up, "u"), put(c, 12 + dx, 26 + up, "r");
       }),
     );
-  // The far arm (behind the body).
+  // An arm: a short sleeve and a round mitten.
   const arm = (name: string, s: Pt, h: Pt) =>
-    part(key(`${name}:${s.join(",")}:${h.join(",")}`), (c) => {
-      const mid: Pt = [(s[0] + h[0]) / 2 + (h[1] < s[1] ? 1 : -0.5), (s[1] + h[1]) / 2 + 0.5];
-      limb(c, [s, mid, h], 1.6, (t, side) => (t > 0.86 ? (side < 0 ? "s" : "S") : t > 0.72 ? "w" : side < -0.2 ? "p" : side > 0.4 ? "O" : "o"));
-      disc(c, h[0], h[1], 1.4, 1.4, (_x, _y, u, v) => (u + v > 0.6 ? "S" : "s"));
+    part(`${name}:${s.join(",")}:${h.join(",")}`, (c) => {
+      limb(c, [s, h], 1.3, (t, side) => (t > 0.7 ? "w" : side < -0.2 ? "p" : side > 0.4 ? "O" : "o"));
+      disc(c, h[0], h[1], 1.3, 1.3, (_x, _y, u, v) => (u + v > 0.6 ? "S" : "s"));
     });
   out.push(arm("armF", sf, handF));
   const behind: Layer[] = [];
-  // The legs and shoes (far first): striped tights, curly toes with a bell.
+  // The stubby legs and big round boots (far first).
   const leg = (name: string, hip: Pt, off: Pt) => {
-    const foot: Pt = [hip[0] + off[0] + (name === "legF" ? -1 : 0), GROUND - 1 - off[1] - (sit ? 0 : 0)];
+    const sit = p.sit ?? 0;
     const h: Pt = [hip[0] + dx, hip[1] + up];
-    return part(key(`${name}:${h.join(",")}:${foot.join(",")}:${dx}:${sit}`), (c) => {
-      const f: Pt = [foot[0] + dx, sit ? h[1] + 6 : foot[1]];
-      const kneeOut: Pt = sit ? [h[0] + 4, h[1] + 1] : [(h[0] + f[0]) / 2, (h[1] + f[1]) / 2];
-      limb(c, [h, kneeOut, [f[0], f[1] - 1]], 1.3, (t, side) => {
-        const yy = h[1] + (f[1] - h[1]) * t;
-        return Math.floor(yy / 2) % 2 ? (side > 0.3 ? "O" : "o") : side > 0.3 ? "W" : "w";
-      });
-      // The shoe: from the heel forward, its toe curling up, a bell on the tip.
-      for (let i = -1; i <= 3; i++) put(c, f[0] + i, f[1], i < 1 ? "Q" : "q"), put(c, f[0] + i, f[1] - 1, i === -1 ? "Q" : "q");
-      put(c, f[0] + 4, f[1] - 1, "q");
-      put(c, f[0] + 5, f[1] - 2, "q");
-      put(c, f[0] + 5, f[1] - 3, "y");
+    const f: Pt = sit ? [h[0] + 3, h[1] + 3] : [hip[0] + off[0] + dx, GROUND - 1 - off[1]];
+    return part(`${name}:${h.join(",")}:${f.join(",")}`, (c) => {
+      limb(c, [h, [f[0], f[1] - 1]], 1, (_t, side) => (side > 0.3 ? "O" : "o"));
+      disc(c, f[0] + 1, f[1] - 0.6, 2.6, 1.7, (_x, _y, u, v) => (v < -0.4 && u < 0 ? "j" : u + v > 0.6 ? "Q" : "q"));
     });
   };
   out.push(leg("legF", HIP.far, ff));
   out.push(leg("legN", HIP.near, fn));
-  // The tunic: flared, zigzag points at its hem, a belt and a gold buckle, a zigzag white collar.
+  // The round tunic: a belt with a gold buckle, a white hem.
+  const bx = BODY[0] + dx;
+  const by = BODY[1] + up;
   out.push(
-    part(key(`tunic:${dx}:${up}`), (c) => {
-      for (let y = 40; y <= 52; y++) {
-        const t = (y - 40) / 12;
-        const x0 = Math.round(19.5 - t * 3.5) + dx;
-        const x1 = Math.round(27 + t * 3) + dx;
-        for (let x = x0; x <= x1; x++) {
-          const zig = y >= 50 && (y - 50) > Math.abs(((x - dx) % 4) - 2);
-          if (zig) continue;
-          const yy = y + up;
-          if (y === 46 || y === 47) put(c, x, yy, x >= x1 - 2 && x <= x1 - 1 + 0 ? "y" : "b");
-          else if (y >= 49 && (y - 49) >= Math.abs(((x - dx) % 4) - 2) - 1 && y >= 50) put(c, x, yy, "w");
-          else put(c, x, yy, x < x0 + 2 ? "p" : x > x1 - 2 ? "O" : "o");
-        }
-      }
-      // The collar points.
-      for (let x = 19; x <= 28; x++) {
-        const d = Math.abs((x % 3) - 1);
-        for (let j = 0; j <= 1 - d; j++) put(c, x + dx, 40 + up + j, "w");
-      }
+    part(`tunic:${bx},${by}`, (c) => {
+      disc(c, bx, by, 4.8, 4.1, (_x, y, u, v) => {
+        if (v > 0.62) return "w";
+        if (Math.abs(y + 0.5 - (by + 0.6)) < 0.8) return u > 0.35 && u < 0.75 ? "y" : "b";
+        return u < -0.5 && v < 0.2 ? "p" : u + v > 0.7 ? "O" : "o";
+      });
     }),
   );
-  // The head: big and round, a pointed ear back, rosy cheek, eye, nose, mouth; a tuft of hair under the hat.
+  // The head: round, a big round nose, rosy cheek, eyes, a small pointed ear back; a little white beard (some).
   const hcx = HEAD[0] + dx + hx;
   const hcy = HEAD[1] + up + hy;
   const eyes = p.eyes ?? "open";
   const mouth = p.mouth ?? "smile";
   out.push(
-    part(key(`head:${hcx},${hcy}:${eyes}:${mouth}`), (c) => {
-      disc(c, hcx, hcy, 6, 5.6, (_x, _y, u, v) => (u - v * 0.4 > 0.55 && v > 0.2 ? "S" : u < -0.5 && v < -0.2 ? "L" : "s"));
-      // The ear: a long point out of the back of his head, up and back (over whatever's there, outside the head).
-      for (let j = 0; j < 7; j++) {
-        const len = 6 - j * 0.8;
-        for (let i = 0; i < len; i++) {
-          const x = hcx - 4 - i - j * 0.55;
-          const y = hcy + 2 - j * 0.75;
-          if (c[Math.round(y)]?.[Math.round(x)] === ".") put(c, x, y, i < 1.5 ? "S" : j < 2 ? "S" : "s");
-        }
-      }
-      // Hair at the back under the hat.
-      for (let i = -6; i <= -2; i++) for (let j = -4; j <= -2; j++) if (i + j > -9) put(c, hcx + i, hcy + j, j === -2 && i % 2 ? "N" : "n");
-      // The face (to our right).
-      if (eyes === "open") put(c, hcx + 2, hcy - 1, "e"), put(c, hcx + 2, hcy, "e"), put(c, hcx + 4, hcy - 1, "e"), put(c, hcx + 4, hcy, "e");
-      else if (eyes === "up") put(c, hcx + 2, hcy - 2, "e"), put(c, hcx + 2, hcy - 1, "e"), put(c, hcx + 4, hcy - 2, "e"), put(c, hcx + 4, hcy - 1, "e");
-      else if (eyes === "blink") put(c, hcx + 2, hcy, "e"), put(c, hcx + 4, hcy, "e");
-      else for (const ex of [2, 4]) put(c, hcx + ex - 0.5, hcy, "e"), put(c, hcx + ex, hcy - 1, "e"), put(c, hcx + ex + 0.6, hcy, "e"); // happy ^ ^
-      put(c, hcx + 3, hcy + 2, "c"), put(c, hcx + 4, hcy + 2, "c"), put(c, hcx - 0, hcy + 2, "c");
-      put(c, hcx + 6, hcy + 1, "s"), put(c, hcx + 6, hcy, "S"); // the nose
-      if (mouth === "smile") put(c, hcx + 2, hcy + 3, "m"), put(c, hcx + 3, hcy + 4, "m"), put(c, hcx + 4, hcy + 4, "m"), put(c, hcx + 5, hcy + 3, "m");
-      else if (mouth === "grin") for (let i = 2; i <= 5; i++) put(c, hcx + i, hcy + 3, "m"), put(c, hcx + i, hcy + 4, i === 2 || i === 5 ? "s" : "m"), put(c, hcx + 3, hcy + 3, "w");
-      else if (mouth === "open") for (let i = 2; i <= 4; i++) for (let j = 3; j <= 4; j++) put(c, hcx + i + 0.5, hcy + j, "m");
-      else put(c, hcx + 3, hcy + 3, "m"), put(c, hcx + 3, hcy + 4, "m");
+    part(`head:${hcx},${hcy}:${eyes}:${mouth}:${look.beard ? 1 : 0}`, (c) => {
+      disc(c, hcx, hcy, 4.4, 4.2, (_x, _y, u, v) => (u - v * 0.4 > 0.55 && v > 0.2 ? "S" : u < -0.5 && v < -0.2 ? "L" : "s"));
+      for (const [ex, ey, k] of [[-5, 0, "s"], [-6, -1, "s"], [-7, -2, "S"], [-5, 1, "S"]] as const) if (c[hcy + ey]?.[hcx + ex] === ".") put(c, hcx + ex, hcy + ey, k);
+      if (eyes === "open") put(c, hcx + 1, hcy - 1, "e"), put(c, hcx + 3, hcy - 1, "e");
+      else if (eyes === "up") put(c, hcx + 1, hcy - 2, "e"), put(c, hcx + 3, hcy - 2, "e");
+      else if (eyes === "blink") put(c, hcx + 1, hcy - 1, "S"), put(c, hcx + 3, hcy - 1, "S");
+      else for (const ex of [1, 3]) put(c, hcx + ex, hcy - 2, "e"), put(c, hcx + ex - 1, hcy - 1, "e"), put(c, hcx + ex + 1, hcy - 1, "e");
+      put(c, hcx, hcy + 1, "c"), put(c, hcx - 1, hcy + 1, "c");
+      if (mouth === "grin" || mouth === "open") put(c, hcx + 2, hcy + 3, "m"), put(c, hcx + 3, hcy + 3, "m"), put(c, hcx + 2, hcy + 4, mouth === "open" ? "m" : "s");
+      else if (mouth === "o") put(c, hcx + 3, hcy + 3, "m");
+      else put(c, hcx + 2, hcy + 3, "m"), put(c, hcx + 3, hcy + 3, "m");
+      if (look.beard)
+        disc(c, hcx + 1.2, hcy + 3.6, 3.6, 2.4, (x, y, u, v) => (mouth !== "smile" && x >= hcx + 2 && x <= hcx + 3 && y === hcy + 3 ? null : v < -0.3 && u < -0.6 ? null : u + v > 0.7 ? "W" : "w"));
+      disc(c, hcx + 4.3, hcy + 0.8, 1.7, 1.6, (_x, _y, u, v) => (u + v < -0.6 ? "N" : "n"));
     }),
   );
-  // The hat: an elf's pointed hat (his outfit's color, a white band, a pom on its flopping tip) or the shopkeeper's Santa hat.
+  // The hat: a big pointy hat (his outfit's color, a white band, a pom at its tip), or the shopkeeper's floppy Santa hat.
   const flop = p.flop ?? 0;
   out.push(
-    part(key(`hat:${look.hat}:${hcx},${hcy}:${flop}`), (c) => {
+    part(`hat:${look.hat}:${hcx},${hcy}:${flop}`, (c) => {
       const santa = look.hat === "santa";
       const ink = santa ? ["r", "R", "r"] : ["o", "O", "p"];
-      const by = hcy - 5; // the band's foot
-      const baseL = hcx - 6.5;
-      const baseR = hcx + 6;
+      const band = hcy - 4;
+      const baseL = hcx - 5.3;
+      const baseR = hcx + 5;
       let tip: Pt;
       if (santa) {
-        // A Santa hat: a soft red cone up from the band, its top flopping over and down behind his head, the pom hanging there.
         const path: [number, number, number][] = [
-          [hcx, by - 2, 6.4],
-          [hcx - 1, by - 5, 5.2],
-          [hcx - 3, by - 8, 3.8],
-          [hcx - 6 - flop, by - 9, 2.6],
-          [hcx - 9 - flop, by - 7, 1.7],
-          [hcx - 10 - flop, by - 5, 1.2],
+          [hcx, band - 2, 5.2],
+          [hcx - 1, band - 5, 4],
+          [hcx - 3, band - 8, 2.8],
+          [hcx - 6 - flop, band - 9, 1.9],
+          [hcx - 8 - flop, band - 7, 1.3],
         ];
         for (let i = 1; i < path.length; i++)
           for (let s2 = 0; s2 <= 1; s2 += 0.1) {
             const [x0, y0, r0] = path[i - 1]!;
             const [x1, y1, r1] = path[i]!;
-            const x = x0 + (x1 - x0) * s2;
-            const y = y0 + (y1 - y0) * s2;
             const r = r0 + (r1 - r0) * s2;
-            disc(c, x, y, r, r * (i === 1 ? 0.8 : 1), (_x, _y, u, v) => (u + v * 0.6 > 0.45 ? ink[1]! : ink[0]!));
+            disc(c, x0 + (x1 - x0) * s2, y0 + (y1 - y0) * s2, r, r * (i === 1 ? 0.85 : 1), (_x, _y, u, v) => (u + v * 0.6 > 0.45 ? ink[1]! : ink[0]!));
           }
-        tip = [hcx - 10 - flop, by - 4];
+        tip = [hcx - 8 - flop, band - 5.5];
       } else {
-        tip = [hcx - 7 - flop * 2, hcy - 15 + Math.abs(flop)];
-        for (let y = Math.floor(Math.min(tip[1], by - 9)); y <= by; y++)
-          for (let x = Math.floor(Math.min(tip[0], baseL) - 2); x <= baseR + 1; x++) {
-            // Inside the triangle base-left, base-right, tip, its right edge bowed out (a soft cone).
-            const t = (by - y) / (by - tip[1]);
-            if (t < 0 || t > 1) continue;
+        // A tall cone, its tip leaning back and flopping.
+        tip = [hcx - 4 - flop * 2, hcy - 16 + Math.abs(flop)];
+        for (let y = Math.floor(tip[1]); y <= band; y++)
+          for (let x = Math.floor(Math.min(tip[0], baseL) - 2); x <= baseR + 2; x++) {
+            const t = (band - y) / (band - tip[1]);
             const l = baseL + (tip[0] - baseL) * t;
-            const r = baseR + (tip[0] - baseR) * t + 2.2 * Math.sin(t * Math.PI);
+            const r = baseR + (tip[0] - baseR) * t + 1.6 * Math.sin(t * Math.PI);
             if (x < l || x > r) continue;
-            put(c, x, y, x < l + 1.6 && t < 0.8 ? ink[2]! : x > r - 1.6 ? ink[1]! : ink[0]!);
+            put(c, x, y, x < l + 1.4 && t < 0.85 ? ink[2]! : x > r - 1.4 ? ink[1]! : ink[0]!);
           }
       }
-      // The band (white fur for the Santa hat: thicker).
-      for (let x = Math.round(baseL - 1); x <= Math.round(baseR + 1); x++) for (let j = 0; j < (santa ? 3 : 2); j++) put(c, x, by - j, j === 0 ? "W" : "w");
-      // The pom.
-      disc(c, tip[0] - 0.5, tip[1] + 0.5, santa ? 2.2 : 1.6, santa ? 2.2 : 1.6, (_x, _y, u, v) => (u + v > 0.7 ? "W" : "w"));
+      for (let x = Math.round(baseL - 0.5); x <= Math.round(baseR + 0.5); x++) for (let j = 0; j < (santa ? 3 : 2); j++) put(c, x, band - j, j === 0 ? "W" : "w");
+      disc(c, tip[0] - 0.3, tip[1] + 0.3, santa ? 1.9 : 1.4, santa ? 1.9 : 1.4, (_x, _y, u, v) => (u + v > 0.7 ? "W" : "w"));
     }),
   );
-  // What he holds, then the near arm over it (or under it: the box out is held in front of his hand).
+  // What he holds, and the near arm.
   const holdPart = (() => {
     switch (hold) {
       case "cane":
       case "caneUp":
-        return part(key(`cane:${handN.join(",")}:${hold}:${p.sway ?? 0}`), (c) => paintCane(c, handN[0], handN[1], hold === "caneUp", p.sway ?? 0));
+        return part(`cane:${handN.join(",")}:${hold}:${p.sway ?? 0}`, (c) => paintCane(c, handN[0], handN[1], hold === "caneUp", p.sway ?? 0));
       case "box":
-        return part(key(`box:${handN.join(",")}:${p.fill ?? 0}`), (c) => paintBox(c, handN[0] - 3, handN[1] - 3, p.fill ?? 0));
+        return part(`box:${handN.join(",")}:${p.fill ?? 0}`, (c) => paintBox(c, handN[0] - 2, handN[1] - 2, p.fill ?? 0));
       case "boxOut":
-        return part(key(`boxOut:${handN.join(",")}:${p.fill ?? 0}`), (c) => paintBox(c, handN[0] - 2, handN[1] - 2, p.fill ?? 0));
+        return part(`boxOut:${handN.join(",")}:${p.fill ?? 0}`, (c) => paintBox(c, handN[0] - 2, handN[1] - 1, p.fill ?? 0));
       case "boxTip":
-        return part(key(`boxTip:${handF.join(",")}:${p.fill ?? 0}`), (c) => paintBox(c, handF[0] - 6, handF[1] - 4, p.fill ?? 0, -2));
+        return part(`boxTip:${handF.join(",")}:${p.fill ?? 0}`, (c) => paintBox(c, handF[0] - 4, handF[1] - 3, p.fill ?? 0, -2));
       case "pad":
-        return part(key(`pad:${handF.join(",")}`), (c) => paintPad(c, handF[0] - 1, handF[1] - 5));
+        return part(`pad:${handF.join(",")}`, (c) => paintPad(c, handF[0] - 1, handF[1] - 4));
       default:
         return null;
     }
@@ -439,10 +393,10 @@ export function build(look: Look, p: Pose): Layer[] {
   if (hold === "boxTip" && holdPart) behind.push(holdPart);
   if (hold === "pad")
     out.push(
-      part(key(`pencil:${handN.join(",")}:${p.pencil ?? 0}`), (c) => {
-        const px = handN[0] + (p.pencil ?? 0) % 2;
+      part(`pencil:${handN.join(",")}:${p.pencil ?? 0}`, (c) => {
+        const px = handN[0] + ((p.pencil ?? 0) % 2);
         const py = handN[1] - 1 - ((p.pencil ?? 0) > 1 ? 1 : 0);
-        put(c, px, py, "z"), put(c, px + 1, py - 1, "z"), put(c, px + 2, py - 2, "Z"), put(c, px - 1, py + 1, "e");
+        put(c, px, py, "z"), put(c, px + 1, py - 1, "z"), put(c, px + 2, py - 2, "Z");
       }),
     );
   const list = out.filter((l): l is Layer => l !== null);
@@ -458,37 +412,35 @@ export function frame(look: Look, ms: number, p: Pose, extra: { specks?: Speck[]
 }
 function shadow(dx: number, k: number): Layer {
   const name = `shadow:${dx}:${k}`;
-  if (!PARTS[name]) {
-    const rx = Math.round(8 * k);
-    PARTS[name] = { grid: Array.from({ length: 3 }, (_, j) => Array.from({ length: 2 * rx + 1 }, (_, i) => ((i - rx) / rx) ** 2 + ((j - 1) / 1.2) ** 2 <= 1 ? "-" : ".").join("")), outline: false };
-  }
-  return { part: name, x: FOOT[0] + 1 + dx - Math.round(8 * k), y: GROUND - 2 };
+  const rx = Math.round(6 * k);
+  if (!PARTS[name]) PARTS[name] = { grid: Array.from({ length: 3 }, (_, j) => Array.from({ length: 2 * rx + 1 }, (_, i) => ((i - rx) / rx) ** 2 + ((j - 1) / 1.2) ** 2 <= 1 ? "-" : ".").join("")), outline: false };
+  return { part: name, x: FOOT[0] + 1 + dx - rx, y: GROUND - 2 };
 }
 
-/** A walk cycle (6 frames, the feet passing, a bob): far and near feet [dx, lift] and the bob per frame. */
+/** A walk cycle (6 frames, little stumpy steps, a bob): far and near feet [dx, lift] and the bob per frame. */
 export const WALK: readonly { feet: readonly [Pt, Pt]; bob: number }[] = [
-  { feet: [[-4, 0], [4, 0]], bob: 1 },
-  { feet: [[-2, 0], [2, 2]], bob: 0 },
+  { feet: [[-2, 0], [2, 0]], bob: 1 },
+  { feet: [[-1, 0], [1, 2]], bob: 0 },
   { feet: [[1, 0], [-1, 1]], bob: 0 },
-  { feet: [[4, 0], [-4, 0]], bob: 1 },
-  { feet: [[2, 2], [-2, 0]], bob: 0 },
+  { feet: [[2, 0], [-2, 0]], bob: 1 },
+  { feet: [[1, 2], [-1, 0]], bob: 0 },
   { feet: [[-1, 1], [1, 0]], bob: 0 },
 ];
 /** The arms swinging with the walk (far, near hands from the shoulders). */
 export const WALK_ARMS: readonly [Pt, Pt][] = [
-  [[1, 7], [-3, 6]],
-  [[0, 7], [-1, 7]],
-  [[-1, 7], [1, 7]],
-  [[-3, 6], [2, 6]],
-  [[-1, 7], [1, 7]],
-  [[0, 7], [-1, 7]],
+  [[1, 4], [-2, 3]],
+  [[0, 4], [-1, 4]],
+  [[-1, 4], [1, 4]],
+  [[-2, 3], [2, 3]],
+  [[-1, 4], [1, 4]],
+  [[0, 4], [-1, 4]],
 ];
-/** Running (6 frames, 80 ms each): longer strides, a hop. */
+/** Running (6 frames, 80 ms each): quick stumpy strides, a hop. */
 export const RUN: readonly { feet: readonly [Pt, Pt]; bob: number }[] = [
-  { feet: [[-5, 1], [5, 0]], bob: 0 },
-  { feet: [[-2, 0], [3, 3]], bob: -1 },
-  { feet: [[2, 2], [-1, 2]], bob: -1 },
-  { feet: [[5, 0], [-5, 1]], bob: 0 },
-  { feet: [[3, 3], [-2, 0]], bob: -1 },
-  { feet: [[-1, 2], [2, 2]], bob: -1 },
+  { feet: [[-3, 1], [3, 0]], bob: 0 },
+  { feet: [[-1, 0], [2, 2]], bob: -1 },
+  { feet: [[1, 2], [-1, 1]], bob: -1 },
+  { feet: [[3, 0], [-3, 1]], bob: 0 },
+  { feet: [[2, 2], [-1, 0]], bob: -1 },
+  { feet: [[-1, 1], [1, 2]], bob: -1 },
 ];

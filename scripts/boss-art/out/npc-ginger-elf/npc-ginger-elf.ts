@@ -1,6 +1,6 @@
 /**
  * Ginger's elves (Nov 5, drawn by hand on the weekly plan usage), all one elf (elf-rig.ts) in different outfits, 1:1 at the room's
- * scale (37 px a square), 48 x 64, foot [22, 60], facing our right (mirror them to face left). Every elf has `idle` and `walk`
+ * scale (37 px a square), little gnome-ish elves 25 px tall (redrawn smaller, Eric, Nov 5), 36 x 44, foot [17, 41], facing our right (mirror them to face left). Every elf has `idle` and `walk`
  * (6 x 110 ms, cue `step` f0 and f3, soft); each job adds its own.
  *
  * - The walkers (`npc-ginger-elf-red`, `-green`, `-blue`): each carries a big candy cane striped white and his outfit's color.
@@ -58,23 +58,23 @@ const caneWalk = (look: Look): Anim => ({
   loop: true,
   frames: WALK.map((w, i) => frame(look, 110, { hold: "cane", feet: w.feet, bob: w.bob, sway: [-3, -1, 1, 3, 1, -1][i], far: WALK_ARMS[i]![0], flop: w.bob }, i === 0 || i === 3 ? { cue: "step" } : {})),
 });
-const walker = (color: keyof typeof OUTFITS) => {
-  const look: Look = { id: color, hat: "elf" };
+const walker = (color: keyof typeof OUTFITS, beard = false) => {
+  const look: Look = { id: color, hat: "elf", beard };
   return ELF(`npc-ginger-elf-${color}`, `Ginger's elf (${color}, with a candy cane)`, OUTFITS[color], { idle: caneIdle(look), walk: caneWalk(look) });
 };
-export const NPC_GINGER_ELF_RED = walker("red");
+export const NPC_GINGER_ELF_RED = walker("red", true);
 export const NPC_GINGER_ELF_GREEN = walker("green");
-export const NPC_GINGER_ELF_BLUE = walker("blue");
+export const NPC_GINGER_ELF_BLUE = walker("blue", true);
 
 // ---- The dispensing pair.
 
 const A: Look = { id: "box", hat: "elf", sack: true };
-/** The candy stream falling into the box held out (box at hand +2 down): a column of candies a px wide, its phase moving down. */
+/** The candy stream falling into the box held out : a column of candies a px wide, its phase moving down. */
 const STREAM_X = FOOT[0] + 7; // the box's middle: ELF_BOX_DX (7) ahead of his foot
 const stream = (phase: number, len = 5): Speck[] =>
-  Array.from({ length: len }, (_, j): Speck => [STREAM_X + ((j + phase) % 3 === 0 ? 1 : 0), GROUND - 13 - len + j, "12345678"[(j * 3 + phase * 5) % 8]!]);
-/** The box held out: the near hand at the box's side, under the chute (the box's top 12 px over his feet). */
-const OUT: Pose = { hold: "boxOut", near: [5, 3], far: [6, 4] };
+  Array.from({ length: len }, (_, j): Speck => [STREAM_X + ((j + phase) % 3 === 0 ? 1 : 0), GROUND - 11 - len + j, "12345678"[(j * 3 + phase * 5) % 8]!]);
+/** The box held out: the near hand at the box's side, under the chute (the box's top 11 px over his feet). */
+const OUT: Pose = { hold: "boxOut" };
 export const NPC_GINGER_ELF_BOX = ELF("npc-ginger-elf-box", "Ginger's elf (the box, with a sack)", OUTFITS.yellow, {
   idle: {
     loop: true,
@@ -84,13 +84,13 @@ export const NPC_GINGER_ELF_BOX = ELF("npc-ginger-elf-box", "Ginger's elf (the b
   tap: {
     loop: false,
     frames: [
-      frame(A, 120, { hold: "box", far: [5, -4], eyes: "up" }),
-      frame(A, 110, { hold: "box", far: [7, -6], eyes: "up", mouth: "o" }, { cue: "tap" }),
-      frame(A, 120, { hold: "box", far: [6, -3], eyes: "up" }),
-      frame(A, 110, { hold: "box", far: [3, 3] }),
+      frame(A, 120, { hold: "box", far: [4, -3], eyes: "up" }),
+      frame(A, 110, { hold: "box", far: [6, -6], eyes: "up", mouth: "o", bob: -1 }, { cue: "tap" }),
+      frame(A, 120, { hold: "box", far: [5, -3], eyes: "up" }),
+      frame(A, 110, { hold: "box", far: [2, 2] }),
     ],
   },
-  boxOut: { loop: false, frames: [frame(A, 120, { ...OUT, near: [4, 5], far: [4, 6], fill: 0 }), frame(A, 130, { ...OUT, fill: 0, eyes: "up" })] },
+  boxOut: { loop: false, frames: [frame(A, 120, { ...OUT, near: [4, 2], far: [4, 3], fill: 0 }), frame(A, 130, { ...OUT, fill: 0, eyes: "up" })] },
   fill: {
     loop: false,
     frames: [0, 1, 1, 2, 2, 3, 3, 4].map((fl, i) => frame(A, 150, { ...OUT, fill: fl, bob: i % 4 === 3 ? 1 : 0, eyes: i < 6 ? "up" : "happy", mouth: i < 6 ? "o" : "grin" }, { specks: i < 7 ? stream(i, i === 0 ? 3 : 5) : [], ...(i === 0 ? { cue: "pour" } : {}) })),
@@ -100,16 +100,16 @@ export const NPC_GINGER_ELF_BOX = ELF("npc-ginger-elf-box", "Ginger's elf (the b
     frames: [
       frame(A, 120, { ...OUT, fill: 4, eyes: "happy", mouth: "grin", bob: 1 }),
       frame(A, 130, { hold: "boxTip", fill: 4, hx: -1, mouth: "grin", bob: -1 }),
-      frame(A, 140, { hold: "boxTip", fill: 1, hx: -1, eyes: "happy", mouth: "open" }, { cue: "tip", specks: [[15, 34, "1"], [17, 33, "2"], [14, 32, "4"], [16, 31, "5"]] }),
+      frame(A, 140, { hold: "boxTip", fill: 1, hx: -1, eyes: "happy", mouth: "open" }, { cue: "tip", specks: [[12, 27, "1"], [11, 28, "2"], [13, 28, "4"], [12, 29, "5"]] }),
       frame(A, 120, { hold: "boxTip", fill: 0, mouth: "grin" }),
       frame(A, 120, { hold: "box", fill: 0, bob: 1 }),
     ],
   },
 });
 /** Elf A's box: where it is (its middle at its top, px over his foot and ahead of it) while held out; ELF_BOX_DX in the room is 7. */
-export const ELF_BOX_AT = { dx: 7, h: 12 } as const;
+export const ELF_BOX_AT = { dx: 7, h: 11 } as const;
 
-const B: Look = { id: "pad", hat: "elf" };
+const B: Look = { id: "pad", hat: "elf", beard: true };
 const PAD: Pose = { hold: "pad" };
 export const NPC_GINGER_ELF_PAD = ELF("npc-ginger-elf-pad", "Ginger's elf (the notepad)", OUTFITS.purple, {
   idle: { loop: true, frames: BREATH.map((b, i) => frame(B, 200, { ...PAD, bob: b, eyes: i === 3 ? "blink" : "open", pencil: 0 })) },
@@ -123,7 +123,7 @@ export const NPC_GINGER_ELF_PAD = ELF("npc-ginger-elf-pad", "Ginger's elf (the n
       frame(B, 110, { ...PAD, pencil: 2, hy: 1 }),
       frame(B, 110, { ...PAD, pencil: 3, hy: 1 }),
       frame(B, 110, { ...PAD, pencil: 0, hy: 1 }),
-      frame(B, 160, { ...PAD, pencil: 3, hy: 1, mouth: "grin" }, { specks: [[30, 44, "3"], [31, 45, "3"], [32, 43, "3"]] }),
+      frame(B, 160, { ...PAD, pencil: 3, hy: 1, mouth: "grin" }, { specks: [[20, 31, "3"], [21, 32, "3"], [22, 30, "3"]] }),
       frame(B, 220, { ...PAD, eyes: "happy", mouth: "grin" }),
     ],
   },
@@ -141,18 +141,18 @@ const boardAnims = (look: Look, hold: "boardBack" | "boardFront"): Record<string
     frames: [
       frame(look, 120, { hold, bob: 2, feet: [[-2, 0], [2, 0]], mouth: "o", eyes: "up" }),
       frame(look, 110, { hold, bob: 3, feet: [[-2, 0], [2, 0]], mouth: "o", eyes: "up", hy: 1 }),
-      frame(look, 100, { hold, bob: -2, feet: [[-1, 2], [1, 2]], mouth: "grin", eyes: "up", ...(hold === "boardBack" ? { near: [-5, -6], far: [-6, -5] } : { near: [7, -6], far: [6, -5] }) }, { cue: "heave" }),
-      frame(look, 120, { bob: -3, feet: [[-1, 3], [1, 3]], far: [-3, -14], near: [9, -3], mouth: "open", eyes: "up" }),
-      frame(look, 140, { bob: 0, far: [-3, -12], near: [8, -2], mouth: "grin", eyes: "happy" }),
+      frame(look, 100, { hold, bob: -2, feet: [[-1, 2], [1, 2]], mouth: "grin", eyes: "up", ...(hold === "boardBack" ? { near: [-4, -4], far: [-5, -3] } : { near: [6, -4], far: [5, -3] }) }, { cue: "heave" }),
+      frame(look, 120, { bob: -3, feet: [[-1, 3], [1, 3]], far: [-2, -9], near: [6, -3], mouth: "open", eyes: "up" }),
+      frame(look, 140, { bob: 0, far: [-2, -8], near: [6, -2], mouth: "grin", eyes: "happy" }),
     ],
   },
   cheer: {
     loop: true,
     frames: [
-      frame(look, 140, { far: [-3, -14], near: [9, -4], mouth: "grin", eyes: "happy" }),
-      frame(look, 120, { bob: -2, feet: [[-1, 2], [1, 2]], far: [-2, -16], near: [10, -6], mouth: "open", eyes: "happy", flop: 1 }),
-      frame(look, 140, { far: [-3, -14], near: [9, -4], mouth: "grin", eyes: "happy" }),
-      frame(look, 160, { bob: 1, far: [-4, -12], near: [8, -2], mouth: "grin", eyes: "open", flop: -1 }),
+      frame(look, 140, { far: [-2, -9], near: [6, -3], mouth: "grin", eyes: "happy" }),
+      frame(look, 120, { bob: -2, feet: [[-1, 2], [1, 2]], far: [-1, -10], near: [7, -4], mouth: "open", eyes: "happy", flop: 1 }),
+      frame(look, 140, { far: [-2, -9], near: [6, -3], mouth: "grin", eyes: "happy" }),
+      frame(look, 160, { bob: 1, far: [-3, -8], near: [6, -2], mouth: "grin", eyes: "open", flop: -1 }),
     ],
   },
 });
@@ -160,11 +160,11 @@ export const NPC_GINGER_ELF_BOARD_A = ELF("npc-ginger-elf-board-a", "Ginger's el
 export const NPC_GINGER_ELF_BOARD_B = ELF("npc-ginger-elf-board-b", "Ginger's elf (the board's back)", OUTFITS.teal, boardAnims({ id: "board-b", hat: "elf" }, "boardFront"));
 /**
  * The board's height while carried (px over a carrier's foot: the top of their hands), per frame of `carry` and of `toss` (null:
- * let go, the code flies it to the table). The front elf (A) holds it 7 px behind his foot, the back one (B) 8 px ahead of his.
+ * let go, the code flies it to the table). The front elf (A) holds it 5 px behind his foot, the back one (B) 6 px ahead of his.
  */
 export const ELF_BOARD_HANDS = {
-  carry: RUN.map((r) => 18 - r.bob),
-  toss: [16, 15, 23, null, null] as const,
-  dx: { a: -7, b: 8 },
+  carry: RUN.map((r) => 10 - r.bob),
+  toss: [8, 7, 15, null, null] as const,
+  dx: { a: -5, b: 6 },
 } as const;
 export { ELF_TALL };
