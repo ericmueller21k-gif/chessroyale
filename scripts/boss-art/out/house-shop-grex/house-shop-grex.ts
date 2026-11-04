@@ -722,8 +722,8 @@ export const SHOP_GREX_FORK_PATH = [
   { at: [15, 18], beat: "drop" }, // forksDown: it's on the floor again, the pallet's the floor's
   { at: [13, 18], beat: "home" }, // backs away home
 ] as const;
-/** The floor pallet's spot (its foot, squares): where lap A picks it up and lap B sets it down (the forks' middle, 41 px ahead of the forklift's foot at (15, 18)). */
-export const SHOP_GREX_PALLET_AT = [16.1, 18] as const;
+/** The floor pallet's spot (its foot, squares): where lap A picks it up and lap B sets it down (the forks' middle, 43 px ahead of the forklift's foot at (15, 18): NPC_GREX_FORK_AT x 89 - its foot 46). */
+export const SHOP_GREX_PALLET_AT = [16.16, 18] as const;
 /** The idle crew's spots (they stand there; no paths) and which way each faces (1 east, -1 west: mirrored). */
 export const SHOP_GREX_CREW = {
   "leaner-a": { at: [2, 16], face: 1 }, // against the bare west wall, under the NO SMOKING sign

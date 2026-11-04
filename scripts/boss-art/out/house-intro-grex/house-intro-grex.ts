@@ -226,33 +226,36 @@ function sky(x: number, y: number): string {
 }
 /** The bursts: where (tiling), how big, the inks (core, mid, rim), and their phase in the 6-frame loop. */
 const BURSTS = [
-  { x: 30, y: 30, r: 22, inks: "QzW", p: 0 },
-  { x: 92, y: 22, r: 18, inks: "QXt", p: 2 },
-  { x: 70, y: 78, r: 24, inks: "QSg", p: 4 },
-  { x: 14, y: 96, r: 16, inks: "Qhs", p: 3 },
-  { x: 112, y: 104, r: 14, inks: "QzO", p: 1 },
+  { x: 28, y: 28, r: 20, inks: "QzW", p: 0 },
+  { x: 94, y: 20, r: 17, inks: "QXt", p: 2 },
+  { x: 68, y: 72, r: 22, inks: "QSg", p: 4 },
+  { x: 14, y: 98, r: 15, inks: "Qhs", p: 3 },
+  { x: 110, y: 100, r: 15, inks: "QzO", p: 1 },
+  { x: 60, y: 30, r: 11, inks: "QsW", p: 5 },
+  { x: 104, y: 60, r: 12, inks: "QzE", p: 3 },
+  { x: 36, y: 66, r: 10, inks: "QXS", p: 1 },
 ] as const;
-/** A burst's key at (dx, dy) from its middle on frame f: rays of dots opening out, then falling and fading. */
+/** A burst's key at (dx, dy) from its middle on frame f: twelve thick rays opening out, tipped with stars, then drooping and thinning. */
 function burstKey(dx: number, dy: number, R: number, inks: string, t: number): Key {
-  // t: 0..5, how far through it is: the ring opens out (t 0-3), the dots droop and thin (4-5).
-  const open = [0.3, 0.55, 0.78, 0.95, 1, 1][t]!;
-  const droop = [0, 0, 0.5, 1.2, 2.4, 3.6][t]!;
-  const yy = dy - droop * (Math.hypot(dx, dy) / R);
+  // t: 0..5, how far through it is: the ring opens out (t 0-3), the rays droop and thin (4-5).
+  const open = [0.35, 0.6, 0.8, 0.95, 1, 1][t]!;
+  const droop = [0, 0, 0.6, 1.4, 2.6, 3.8][t]!;
+  const yy = dy - droop * (Math.hypot(dx, dy) / R) ** 2;
   const r = Math.hypot(dx, yy);
   const a = Math.atan2(yy, dx);
   const rays = 12;
-  const ray = Math.abs(mod(a * (rays / (2 * Math.PI)) + 0.5, 1) - 0.5) * 2 * Math.PI * r / rays; // px off the nearest ray
+  const ray = (Math.abs(mod(a * (rays / (2 * Math.PI)) + 0.5, 1) - 0.5) * 2 * Math.PI * r) / rays; // px off the nearest ray
   const tip = R * open;
-  if (t <= 1 && r < 2.2) return inks[0]!;
-  if (r > tip + 1.2) return null;
-  if (ray > 0.9) return null;
-  // Along each ray: dots (every 3 px), brightest at the tip, the inner ones gone as it opens.
-  const inner = tip * [0, 0.25, 0.45, 0.6, 0.72, 0.8][t]!;
+  if (t <= 1 && r < 3) return t === 0 ? inks[0]! : inks[1]!; // the bright heart as it pops
+  if (r > tip + 1.6) return null;
+  // A star at each ray's tip (a plus), brightest while it opens.
+  if (r > tip - 1.6 && ray < 1.6) return t >= 4 ? inks[2]! : inks[0]!;
+  if (ray > 1.0) return null;
+  const inner = tip * [0, 0.2, 0.4, 0.55, 0.68, 0.78][t]!;
   if (r < inner) return null;
-  if (mod(Math.round(r) - Math.round(tip), 3) !== 0 && r < tip - 1) return null;
-  const fade = t === 5 && hash(Math.round(dx), Math.round(dy), 7) < 0.45;
-  if (fade) return null;
-  return r > tip - 2 ? (t >= 4 ? inks[2]! : inks[0]!) : r > tip * 0.7 ? inks[1]! : inks[2]!;
+  if (t >= 4 && mod(Math.round(r), 2) === 0) return null; // thinning to dots
+  if (t === 5 && hash(Math.round(dx), Math.round(dy), 7) < 0.4) return null;
+  return r > tip * 0.66 ? inks[1]! : inks[2]!;
 }
 /** The sparkler trails: wavy glitter ribbons drifting across, their sparkle moving along them a step a frame. */
 function trailKey(x: number, y: number, f: number): Key {
@@ -270,9 +273,10 @@ function starKey(x: number, y: number, f: number): Key {
     const sy = Math.floor(hash(n, 2, 61) * ST);
     const dx = mod(x - sx + 64, ST) - 64;
     const dy = mod(y - sy + 64, ST) - 64;
-    const big = (n + f) % 6 < 2;
+    const big = (n + f) % 6 < 3;
     if (dx === 0 && dy === 0) return "*";
-    if (big && ((Math.abs(dx) === 1 && dy === 0) || (Math.abs(dy) === 1 && dx === 0))) return "Q";
+    if ((Math.abs(dx) === 1 && dy === 0) || (Math.abs(dy) === 1 && dx === 0)) return big ? "Q" : "c";
+    if (big && ((Math.abs(dx) === 2 && dy === 0) || (Math.abs(dy) === 2 && dx === 0))) return "s";
   }
   return null;
 }

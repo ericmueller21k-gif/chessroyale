@@ -26,6 +26,32 @@ if (cmd === "room") {
   const im = renderFrame(ch, ch.anims.idle!.frames[Number(rest[0] ?? 0)]!, { bg: "#1b1a20" });
   const img = { w: im.w, h: im.h, data: im.data };
   extra?.place?.(img);
+  if (process.env.CREW) {
+    // The crew in their places (1:1), north first: the dealer in his corner (mirrored), the idle crew, the machines at home, the pallet.
+    const N = await import("./out/npc-grex/npc-grex.ts");
+    const { sidekickGrexDealer } = await import("./out/sidekick-grex-dealer/sidekick-grex-dealer.ts");
+    const TOP = m.SHOP_GREX_TOP as number;
+    const C = m.SHOP_GREX_CREW as Record<string, { at: readonly number[]; face: number }>;
+    const K = m.SHOP_GREX_KEEPER as { at: readonly number[]; face: number };
+    const PA = m.SHOP_GREX_PALLET_AT as readonly number[];
+    const who: [Character, string, readonly number[], boolean][] = [
+      [sidekickGrexDealer, "idle", K.at, K.face < 0],
+      [N.NPC_GREX_LEANER_A, "idle", C["leaner-a"]!.at, false],
+      [N.NPC_GREX_LEANER_B, "idle", C["leaner-b"]!.at, false],
+      [N.NPC_GREX_CREW_C, "idle", C["crew-c"]!.at, false],
+      [N.NPC_GREX_CREW_D, "idle", C["crew-d"]!.at, false],
+      [N.NPC_GREX_LIFT, "idle", C.lift!.at, false],
+      [N.NPC_GREX_FORKLIFT, "idle", C.forklift!.at, false],
+      [N.NPC_GREX_PALLET, "idle", PA, false],
+    ];
+    who.sort((a, b) => a[2][1]! - b[2][1]!);
+    for (const [ch, anim, at, flip] of who) {
+      const r = renderFrame(ch, ch.anims[anim]!.frames[0]!);
+      const im = flip ? flipImg({ w: r.w, h: r.h, data: r.data }) : { w: r.w, h: r.h, data: r.data };
+      const fx = flip ? ch.w - 1 - ch.foot[0] : ch.foot[0];
+      blit(img, im, Math.round(at[0]! * 37 + 18.5 - fx), Math.round(TOP + at[1]! * 37 + 18.5 - ch.foot[1]), 1);
+    }
+  }
   writeFileSync(out!, png(img));
   console.log(`wrote ${out} (${im.w} x ${im.h})`);
 } else if (cmd === "sheet") {
