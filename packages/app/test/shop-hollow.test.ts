@@ -12,6 +12,7 @@ import { PARK_TABLE } from "../src/town/houses/park.ts";
 import { SHOP_FEEL, TOWN_FEEL } from "../src/town/feel.ts";
 import { newPt, newView, proj, setView } from "../src/town/camera.ts";
 import { renderFrame, type Character, type Frame } from "../src/characters/sprite.ts";
+import { BOSS_HOLLOW_INTRO } from "../src/characters/hollow-intro.ts";
 import { bossKit } from "../src/characters/kits.ts";
 
 /**
@@ -336,8 +337,8 @@ describe("his challenge on the pond", () => {
     }
     return [(l - ch.foot[0]) * k, (r + 1 - ch.foot[0]) * k];
   };
-  it("the default intro for now, across, his line his entrance's", () => {
-    expect(introOf("hollow")).toMatchObject({ custom: false, name: "Hollow", line: "Did you leave a light on?", layout: "across", cues: { table: "pop", wipe: "hollowCast" }, clear: 2.92 });
+  it("his own intro (Nov 3: the dark), across, his line his entrance's; you both sit at your clear places", () => {
+    expect(introOf("hollow")).toMatchObject({ custom: true, name: "Hollow", line: "Did you leave a light on?", layout: "across", seated: true, cues: { table: "pop" }, clear: 2.92 });
   });
 
   it("the table, its stools and you fit on the ice; Hollow stands on it on his mark, and hops back to its west edge, his whole swing clear of the rock", () => {
@@ -379,6 +380,15 @@ describe("his challenge on the pond", () => {
     const [bl] = extent(ch, ch.anims.idle!.frames, sq);
     expect(m.bossClear.c + Math.min(al, bl), "his swing clear of the west rock").toBeGreaterThan(8.5);
     expect(m.youClear.c + half).toBeLessThan(17.5);
+    // His intro's moves (Nov 3: he sits there through it all, braced wide as he drinks): his feet clear of his stool, all of him
+    // clear of the west rock. (The stool's outer edge: the park table's, a square and a half west of its middle.)
+    for (const a of ["charge", "swell", "drink", "full", "settle"]) {
+      const [il, ir] = extent(BOSS_HOLLOW_INTRO, BOSS_HOLLOW_INTRO.anims[a]!.frames, sq);
+      const [, feet] = extent(BOSS_HOLLOW_INTRO, BOSS_HOLLOW_INTRO.anims[a]!.frames, sq, 0.3);
+      expect(m.bossClear.c + il, `${a}: clear of the west rock`).toBeGreaterThan(8.5);
+      expect(m.bossClear.c + feet, `${a}: his feet clear of his stool`).toBeLessThanOrEqual(m.table.c - 1.5);
+      expect(ir).toBeGreaterThan(0);
+    }
   });
 
 });

@@ -8,7 +8,10 @@
  */
 import { bandpass, lowpass, noise, osc, render, rng, sine, soft, type Voice, soundCache } from "./synth.ts";
 
-export type HollowSound = "hum" | "cast" | "whisper" | "pop" | "smash" | "tick" | "found" | "miss" | "relight" | "clink" | "lash";
+export type HollowSound =
+  | "hum" | "cast" | "whisper" | "pop" | "smash" | "tick" | "found" | "miss" | "relight" | "clink" | "lash"
+  // His challenge intro (Nov 3: the darkness ball drinking the cave's light; shops/challenge.ts BOSS_INTROS.hollow's cues).
+  | "gutter" | "snuff" | "drain" | "tink" | "star" | "sip" | "pawn" | "blackout" | "settle";
 
 /** Short bursts at the given times, each shaped by `burst(age, i)`. */
 function grains(times: readonly number[], burst: (age: number, i: number) => number): Voice {
@@ -149,10 +152,74 @@ const SOUNDS: Record<HollowSound, (rate: number) => Float32Array> = {
       return 1.6 * swing * whoosh(t) + hit * (0.9 * snap(t) + 1.4 * thud(t)) + 1.2 * wire(t) * Math.min(1, rattle(t));
     });
   },
+  // ---- His challenge intro (Nov 3): the ball drinking the cave's light. Dark like the rest (no chimes, Eric, Oct 9): where the art's
+  // notes ask for a chime run or a bright chime (the string, the star), they're low, muffled knocks and tones instead.
+  // A lantern's flame pulled at: a soft, breathy flutter.
+  gutter: (rate) => {
+    const breath = bandpass(rate, (t) => 320 + 220 * Math.min(1, t / 0.4), 1.2, murk(rate, 900, 211));
+    return render(rate, 0.5, (t) => Math.sin(Math.PI * Math.min(1, t / 0.5)) ** 1.5 * (0.75 + 0.25 * Math.sin(2 * Math.PI * 17 * t)) * 2.2 * breath(t));
+  },
+  // It goes out: a small, low puff and a soft thup.
+  snuff: (rate) => {
+    const puffN = murk(rate, 420, 213);
+    const thup = osc(rate, (t) => 70 + 50 * Math.exp(-t / 0.02), sine);
+    return render(rate, 0.2, (t) => Math.min(1, t / 0.006) * Math.exp(-t / 0.05) * (2.4 * puffN(t) + 0.6 * thup(t)));
+  },
+  // The string draining: a run of dull, muffled knocks falling in pitch along it, a breath sinking under them.
+  drain: (rate) => {
+    const knocks = Array.from({ length: 14 }, (_, i) => ({ at: i * 0.1, f: 380 * 0.92 ** i }));
+    const body = knocks.map((k) => ({ at: k.at, v: osc(rate, () => k.f, sine) }));
+    const breath = bandpass(rate, (t) => 420 - 260 * Math.min(1, t / 1.5), 1.3, murk(rate, 800, 217));
+    return render(rate, 1.6, (t) => {
+      let v = 0;
+      for (const b of body) v += t < b.at ? (b.v(t), 0) : Math.exp(-(t - b.at) / 0.04) * b.v(t);
+      return 0.55 * v + 1.2 * Math.sin(Math.PI * Math.min(1, t / 1.6)) * breath(t);
+    });
+  },
+  // A bulb going dark along the run: a very quiet, dull tick.
+  tink: (rate) => {
+    const body = osc(rate, () => 260, sine);
+    const tap = murk(rate, 500, 219);
+    return render(rate, 0.07, (t) => Math.min(1, t / 0.003) * Math.exp(-t / 0.012) * (body(t) + 1.2 * tap(t)));
+  },
+  // The star going out last: a low, muffled tone (a minor third) cut short, and a soft thump.
+  star: (rate) => {
+    const a = osc(rate, () => 196, sine);
+    const b = osc(rate, () => 233, sine);
+    const thump = osc(rate, (t) => 55 + 40 * Math.exp(-t / 0.03), sine);
+    return render(rate, 0.34, (t) => {
+      const cut = t < 0.22 ? 1 : Math.max(0, 1 - (t - 0.22) / 0.03);
+      return Math.min(1, t / 0.01) * cut * Math.exp(-t / 0.18) * (0.6 * a(t) + 0.45 * b(t)) + Math.exp(-t / 0.06) * 0.7 * thump(t);
+    });
+  },
+  // A mote landing on the ball: a tiny, soft suck (a breath rising and cut).
+  sip: (rate) => {
+    const pull = bandpass(rate, (t) => 160 + 260 * Math.min(1, t / 0.1), 1.4, murk(rate, 700, 223));
+    return render(rate, 0.12, (t) => Math.min(1, t / 0.1) ** 2 * (t < 0.1 ? 1 : Math.max(0, 1 - (t - 0.1) / 0.02)) * 2.4 * pull(t));
+  },
+  // Your pawn's light leaving: a pale, airy rising tone (low, soft: a breath round it).
+  pawn: (rate) => {
+    const tone = osc(rate, (t) => 220 + 110 * Math.min(1, t / 0.5), sine);
+    const air = bandpass(rate, (t) => 300 + 300 * Math.min(1, t / 0.5), 1.1, murk(rate, 900, 227));
+    return render(rate, 0.55, (t) => Math.sin(Math.PI * Math.min(1, t / 0.55)) ** 1.3 * (0.45 * tone(t) + 1.6 * air(t)));
+  },
+  // The blackout: a deep thoom sinking away (then silence: nothing plays in the black).
+  blackout: (rate) => {
+    const boom = osc(rate, (t) => 34 + 30 * Math.exp(-t / 0.15), sine);
+    const rumble = murk(rate, 140, 229);
+    return render(rate, 1.2, (t) => Math.min(1, t / 0.01) * Math.exp(-t / 0.35) * (boom(t) + 1.6 * rumble(t)));
+  },
+  // The ball settling back into him in the dim light: a low breath out, sinking.
+  settle: (rate) => {
+    const breath = bandpass(rate, (t) => 420 - 240 * Math.min(1, t / 0.8), 1.2, murk(rate, 700, 233));
+    const sub = osc(rate, (t) => 52 - 10 * Math.min(1, t / 0.8), sine);
+    return render(rate, 0.85, (t) => Math.sin(Math.PI * Math.min(1, t / 0.85)) ** 1.4 * (1.8 * breath(t) + 0.5 * sub(t)));
+  },
 };
 
 /** Trims each to sit a little under a move's loudness, as the other bosses' do; a soft ceiling keeps the peaks well under its. */
-const LEVEL: Record<HollowSound, number> = { hum: 0.095, cast: 0.22, whisper: 0.75, pop: 0.32, smash: 0.26, tick: 0.255, found: 0.21, miss: 0.185, relight: 0.116, clink: 0.25, lash: 0.22 };
+const LEVEL: Record<HollowSound, number> = { hum: 0.095, cast: 0.22, whisper: 0.75, pop: 0.32, smash: 0.26, tick: 0.255, found: 0.21, miss: 0.185, relight: 0.116, clink: 0.25, lash: 0.22,
+  gutter: 0.48, snuff: 0.3, drain: 0.29, tink: 0.15, star: 0.2, sip: 0.3, pawn: 0.2, blackout: 0.2, settle: 0.2 };
 
 const cache = soundCache("hollow");
 /** The samples for one of his sounds at a sample rate (made once, then reused). */

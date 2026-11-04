@@ -6,10 +6,12 @@ import { SHOP_PUDDLES_LAYOUT } from "../src/town/shops/puddles-art.ts";
 import { SHOP_BIGBOY_LAYOUT, SHOP_BIGBOY_MARKS, SHOP_BIGBOY_PIECES } from "../src/town/shops/bigboy-art.ts";
 import { SHOP_TIMBER_LAYOUT, SHOP_TIMBER_MARKS } from "../src/town/shops/timber-art.ts";
 import { SHOP_BLITZ_LAYOUT, SHOP_BLITZ_MARKS } from "../src/town/shops/blitz-art.ts";
-import { SHOP_HOLLOW_LAYOUT, SHOP_HOLLOW_MARKS } from "../src/town/shops/hollow-art.ts";
+import { SHOP_HOLLOW_FLOOR, SHOP_HOLLOW_LAYOUT, SHOP_HOLLOW_MARKS, SHOP_HOLLOW_PIECES } from "../src/town/shops/hollow-art.ts";
+import { BOSS_HOLLOW_INTRO, HOLLOW_INTRO_BALL_R, HOLLOW_INTRO_HEART, INTRO_HOLLOW_BULB_RUN, INTRO_HOLLOW_DARK, INTRO_HOLLOW_DIMPOOL, INTRO_HOLLOW_LANTERN_GLOW, INTRO_HOLLOW_LANTERN_OUT, INTRO_HOLLOW_PIECES, INTRO_HOLLOW_SHOWPIECE_OUT } from "../src/town/shops/hollow-intro-art.ts";
 import { INTRO_BIGBOY_BLOCKS, INTRO_BIGBOY_STOOL_B, INTRO_BIGBOY_STOOL_SEAT_H, INTRO_BIGBOY_STOOL_TOP_H, INTRO_BIGBOY_STOOL_W, INTRO_BIGBOY_SWIRL, INTRO_BIGBOY_SWIRL_FRONT, INTRO_BIGBOY_TABLE_PALETTE } from "../src/town/shops/bigboy-intro-art.ts";
 import { TABLE_BOARD } from "../src/town/houses/park.ts";
 import { renderFrame } from "../src/characters/sprite.ts";
+import { DARK_MOVES, caveLight, chantOf, darkAnims, drainAt, seatedMarks, type DarkAnims, type IntroStep } from "../src/town/shops/challenge.ts";
 import { BOSS_INTROS, CHALLENGE_FEEL, attackStart, logAnims, logWalks, marksFeel, woodAt, isLog, attackTime, boardSquare, coverMs, frameAt, hopStart, introAt, introBeats, introCues, introLength, introOf, marksOf, nextFlow, stormEdge, wipeAt, type BlocksAnims, type LogAnims, type ChallengeEvent, type ChallengeFlow, type IntroAnims, type IntroBeat } from "../src/town/shops/challenge.ts";
 import { PARK_TABLE } from "../src/town/houses/park.ts";
 import { INTRO_ALFIL_TABLE } from "../src/town/shops/alfil-intro-art.ts";
@@ -57,7 +59,7 @@ describe("the challenge's flow", () => {
     expect(run(["fight", "atDoor", "cancel", "fight"])).toBe("toDoor");
   });
 
-  it("every boss whose home has an inside has an intro (Alfil, Big Boy and Timber their own, Babur, Puddles, Dash and Hollow the default); every other boss is challenged as before (the Boss raid screen)", () => {
+  it("every boss whose home has an inside has an intro (Alfil, Big Boy, Timber and Hollow their own, Babur, Puddles and Dash the default); every other boss is challenged as before (the Boss raid screen)", () => {
     const withIntro = ALL_HOMES.filter((h) => introOf(h.id)).map((h) => h.id).sort();
     expect(withIntro).toEqual(["alfil", "bigboy", "dash", "gardener", "hollow", "tiger", "timber"]);
     expect(withIntro).toEqual(Object.keys(SHOPS).sort());
@@ -68,8 +70,8 @@ describe("the challenge's flow", () => {
     expect(introOf("timber")).toMatchObject({ custom: true, name: "Timber", line: "Hard hats on. We're building today.", layout: "across", cues: { storm: "timberSwoosh" } });
     // (Dash, Nov 3: the default until his own intro, round 3; his line his entrance's first.)
     expect(introOf("dash")).toMatchObject({ custom: false, name: "Dash", line: "Yo yo yo! Dash in the building, fam!", layout: "across", cues: { table: "pop", wipe: "dashWhoosh" } });
-    // (Hollow, Nov 3: the default until his own, the lanterns going out, next round; his line one of his entrance's.)
-    expect(introOf("hollow")).toMatchObject({ custom: false, name: "Hollow", line: "Did you leave a light on?", layout: "across", cues: { table: "pop", wipe: "hollowCast" } });
+    // (Hollow, Nov 3: his own, the dark; his line one of his entrance's, then a channel line; you both walk on to your seats.)
+    expect(introOf("hollow")).toMatchObject({ custom: true, name: "Hollow", line: "Did you leave a light on?", layout: "across", seated: true, cues: { table: "pop", blackout: "hollowBlackout" } });
     expect(introOf("folio")).toBeNull();
   });
 
@@ -593,6 +595,182 @@ describe("the intro's timeline (Timber's log, Nov 3)", () => {
     expect(inBeat("chitter", "dust")).toHaveLength(1);
     // In time order.
     expect(cues.map((c) => c.at)).toEqual([...cues.map((c) => c.at)].sort((x, y) => x - y));
+  });
+});
+
+/**
+ * Hollow's own intro (Nov 3; CHALLENGE_FEEL.dark): Eric's design, approved with his changes (docs/decisions/2026-11-03-hollow-intro.md):
+ * nothing jumps in the dark (the table and stools in while it's still lit, you both walk on straight to your seats and stay there), a
+ * channel line as he starts to charge, the light-drinking 15% faster, the rest kept as drawn, and into the match by an iris to the board.
+ */
+describe("the intro's timeline (Hollow's dark, Nov 3)", () => {
+  const F = CHALLENGE_FEEL;
+  const D = F.dark;
+  const HO: DarkAnims = darkAnims({ mover: BOSS_HOLLOW_INTRO, lantern: INTRO_HOLLOW_LANTERN_OUT, tree: INTRO_HOLLOW_SHOWPIECE_OUT, glow: INTRO_HOLLOW_LANTERN_GLOW, run: INTRO_HOLLOW_BULB_RUN, dark: INTRO_HOLLOW_DARK, pool: INTRO_HOLLOW_DIMPOOL });
+  const beats = introBeats(HO);
+  const at = (s: IntroStep) => beats.find((b) => b.step === s)!;
+  const now = (t: number) => introAt(beats, HO, t);
+  const dark = (t: number) => now(t).dark!;
+  const drink = at("drink").at;
+  const d = drainAt();
+
+  it("the art: his moves (charge 8, swell 4, drink 8, full 8, settle 6) in his own frame, each with its heart and ball; a lantern's going out 6 x 170 ms (its flutter on the first, its snuff on the fourth) from each sway frame; the tree's drain 10 (its run first, its star on the ninth); the string's 57 bulbs west to east", () => {
+    expect(Object.fromEntries(Object.entries(HO.moves).map(([m, ms]) => [m, ms.length]))).toEqual({ charge: 8, swell: 4, drink: 8, full: 8, settle: 6 });
+    expect([BOSS_HOLLOW_INTRO.w, BOSS_HOLLOW_INTRO.h, BOSS_HOLLOW_INTRO.foot]).toEqual([BOSS_ART.hollow.w, BOSS_ART.hollow.h, BOSS_ART.hollow.foot]);
+    for (const m of DARK_MOVES) {
+      expect(HOLLOW_INTRO_HEART[m]!.length, m).toBe(HO.moves[m].length);
+      expect(HOLLOW_INTRO_BALL_R[m]!.length, m).toBe(HO.moves[m].length);
+    }
+    expect(HO.gutter).toEqual([170, 170, 170, 170, 170, 170]);
+    expect(HO.cues.gutter).toEqual(["gutter", undefined, undefined, "snuff", undefined, undefined]);
+    for (let k = 0; k < 8; k++) expect(INTRO_HOLLOW_LANTERN_OUT.anims[`gutter${k}`]!.frames.length).toBe(6);
+    expect(HO.tree.length).toBe(10);
+    expect(HO.cues.tree[0]).toBe("drain");
+    expect(HO.cues.tree[8]).toBe("star");
+    expect(HO.bulbs).toBe(57);
+    // (West to east: from the corner behind the counter to the tree.)
+    expect(INTRO_HOLLOW_BULB_RUN[0]).toMatchObject({ col: 2, row: 2 });
+    expect(INTRO_HOLLOW_BULB_RUN[56]).toMatchObject({ col: 16, row: 6 });
+    // (The swapped pieces are the intro's own: the cave's own art is never changed by them.)
+    for (const [name, ch] of Object.entries(INTRO_HOLLOW_PIECES)) expect(ch, name).not.toBe(SHOP_HOLLOW_PIECES[name]);
+  });
+
+  it("the beats in order, each from where the last ended: facing each other, his line, a pause, the table popping in and standing a beat, the charge, the swell, the drink, full, the blackout, the black, the dim light, the iris; about 15 s from the marks to the board (14 to 15.5)", () => {
+    expect(beats.map((b) => b.step)).toEqual(["face", "line", "pause", "pop", "table", "charge", "swell", "drink", "full", "blackout", "black", "dim", "iris", "done"]);
+    for (let i = 1; i < beats.length; i++) expect(beats[i]!.at, beats[i]!.step).toBe(beats[i - 1]!.end);
+    expect(beats.map((b) => b.end - b.at).slice(0, -1)).toEqual([F.faceMs, D.lineMs, F.afterLineMs, F.popMs, F.tableHoldMs, D.chargeMs, 470, d.end, D.fullMs, INTRO_HOLLOW_DARK.blackoutMs, INTRO_HOLLOW_DARK.blackMs - INTRO_HOLLOW_DARK.blackoutMs, D.dimMs, D.irisMs]);
+    expect(introLength(beats)).toBeGreaterThanOrEqual(14_000);
+    expect(introLength(beats)).toBeLessThanOrEqual(15_500);
+    // No attack: the dark is his transition.
+    expect(attackStart(beats)).toBe(Infinity);
+  });
+
+  it("the light-drinking 15% faster: every gap of the drain as drawn times 0.85 (about 5.7 s, it was 6.7); the lanterns far to near, one by one, each seen on its own; then the string, the tree, his strand, your pawn", () => {
+    expect(D.pace).toBe(0.85);
+    expect(at("drink").end - drink).toBe(Math.round(6740 * 0.85));
+    expect(d.end).toBeGreaterThanOrEqual(5_600);
+    expect(d.end).toBeLessThanOrEqual(5_800);
+    expect(d.lanterns).toEqual([140, 740, 1340, 1840, 2340].map((ms) => Math.round(ms * 0.85)));
+    expect(d.stringMs).toBe(Math.round(1800 * 0.85));
+    // (Far to near: the back, the middle of the passage, his wall, off the right edge, the nearest last.)
+    expect(D.lanterns).toEqual([[9, 5], [11, 8], [9, 11], [17, 12], [13, 16]]);
+    // One by one: each starts going out only once the last has dropped from its flare (two of its frames, its light down to 0.35).
+    for (let i = 1; i < 5; i++) expect(d.lanterns[i]! - d.lanterns[i - 1]!).toBeGreaterThanOrEqual(2 * 170);
+    expect(d.lanterns[4]!).toBeLessThan(d.string);
+    expect(d.string + d.stringMs).toBeLessThanOrEqual(d.tree);
+    expect(d.tree).toBeLessThan(d.strand[0]!);
+    expect(d.strand[2]!).toBeLessThan(d.pawn);
+    expect(d.pawn + D.pawnMs).toBeLessThanOrEqual(d.end);
+    // Each lantern's light as it goes out (the art's), each in its turn.
+    for (const [i, ms] of d.lanterns.entries()) {
+      expect(dark(drink + ms - 1).lanterns[i]).toEqual({ since: -1, glow: 1 });
+      expect(dark(drink + ms).lanterns[i]!.glow).toBe(INTRO_HOLLOW_LANTERN_GLOW[0]);
+      expect(dark(drink + ms + 1020).lanterns[i]!.glow).toBe(0);
+    }
+    // At the drain's end everything is out: the string's 57, the tree, his strand.
+    expect(dark(at("full").at)).toMatchObject({ run: 57, tree: { out: 1 }, bulbs: 0 });
+    expect(dark(at("full").at).lanterns.every((l) => l.glow === 0)).toBe(true);
+  });
+
+  it("the table and stools come in before the charge, while it's still lit (the default's pop), and stay", () => {
+    expect(now(at("pop").at - 1)).toMatchObject({ table: false, stools: false });
+    expect(now(at("pop").at)).toMatchObject({ table: true, stools: true });
+    const lit = now(at("charge").at - 1);
+    expect(lit).toMatchObject({ table: true, stools: true, pop: 1 });
+    expect(lit.dark!.level).toBe(0);
+    expect(introCues(beats, HO)[0]).toEqual({ cue: "table", at: at("pop").at });
+  });
+
+  it("you both walk on straight to your seats (his clear place, yours the usual) and stay there: no hop back; from the drain's start nobody moves and nothing appears, only the light changes", () => {
+    const m = seatedMarks(marksOf(SHOP_HOLLOW_LAYOUT, "across", SHOP_HOLLOW_MARKS, marksFeel(null, F, introOf("hollow")!.clear))!);
+    expect([m.you, m.boss]).toEqual([m.youClear, m.bossClear]);
+    expect(m.you).toEqual({ c: 12.5 + F.clear.you, r: 11.5 });
+    expect(m.boss.c).toBeCloseTo(12.5 - 2.92);
+    // (Each walks to its seat's square, then onto it, as onto a mark; both paths clear.)
+    const room = makeRoom(SHOP_HOLLOW_LAYOUT, SHOPS.hollow!.keeper, 20, SHOP_HOLLOW_FLOOR);
+    expect(findPath(room, room.start, m.youSq)).not.toBeNull();
+    expect(findPath(room, { c: room.start.c - 1, r: room.start.r }, m.bossSq)).not.toBeNull();
+    expect(Math.abs(m.you.c - m.youSq.c)).toBeLessThan(1);
+    expect(Math.abs(m.boss.c - m.bossSq.c)).toBeLessThan(1);
+    expect(hopStart(beats, HO)).toBe(Infinity);
+    for (let t = 0; t < introLength(beats) + 500; t += 10) {
+      const n = now(t);
+      expect(n.back, `${t}`).toBe(0);
+      expect(n.hop, `${t}`).toBe(0);
+      if (t >= drink) expect(n, `${t}`).toMatchObject({ table: true, stools: true, pop: 1, puff: -1 });
+    }
+  });
+
+  it("the dark: none before the drain; it deepens with each light gone, never back; black from the blackout on (his eyes alone, two dim slits, about 0.9 s); the dim light comes up steady, then closes in on the board", () => {
+    let last = 0;
+    for (let t = 0; t < introLength(beats) + 500; t += 10) {
+      const k = dark(t);
+      expect(k.level, `${t}`).toBeGreaterThanOrEqual(last);
+      last = k.level;
+      if (t < drink) expect(k.level, `${t}`).toBe(0);
+      if (t >= at("blackout").end) expect(k.level, `${t}`).toBe(1);
+      if (t < at("blackout").at) expect(k.eyes, `${t}`).toBe(0);
+      if (t >= at("dim").at + D.eyesOutMs) expect(k.eyes, `${t}`).toBe(0);
+      if (t < at("dim").at) expect(k.pool, `${t}`).toBe(0);
+      if (t < at("iris").at) expect(k.iris, `${t}`).toBe(0);
+    }
+    expect(dark(at("blackout").at - 1).level).toBeLessThan(0.7);
+    expect(dark(at("black").at + 100).eyes).toBeCloseTo(INTRO_HOLLOW_DARK.eyesAlpha);
+    expect(at("dim").at - at("blackout").at).toBe(INTRO_HOLLOW_DARK.blackMs);
+    // (Steady: up over the art's 700 ms, then 1, no flicker or breathing.)
+    for (let t = at("dim").at + INTRO_HOLLOW_DIMPOOL.inMs; t < at("iris").at; t += 10) expect(dark(t).pool).toBe(1);
+    expect(dark(at("iris").end).iris).toBe(1);
+    // His moves: his idle, the charge (looping), the swell, the drink (looping), full through the black, the settle in the dim light, his idle.
+    const moveAt = (t: number) => dark(t).move?.anim ?? null;
+    expect([at("table").at, at("charge").at, at("swell").at, drink, at("full").at, at("black").at, at("dim").at, at("iris").at].map(moveAt)).toEqual([null, "charge", "swell", "drink", "full", "full", "settle", null]);
+    // Your tag fades as the drain starts.
+    expect(dark(drink - 1).tag).toBe(1);
+    expect(dark(drink + D.tagMs).tag).toBe(0);
+    // The cave's lights: as always without an intro (and so when you come back from the match); all out from the blackout on.
+    for (const role of [{ lantern: 0 }, { out: 0, of: 4, backdrop: false }, "tree", null] as const) {
+      expect(caveLight(null, role)).toBe(1);
+      expect(caveLight(dark(at("blackout").end), role)).toBe(0);
+    }
+    expect(caveLight(dark(drink + d.string + 200), { out: 1, of: 16, backdrop: true })).toBe(0);
+    expect(caveLight(dark(drink + d.string + 200), { out: 1, of: 4, backdrop: false })).toBeCloseTo(0.75);
+  });
+
+  it("his channel line: one of his four, at random each time, over his head from the charge's start for chantMs (his entrance line stays at the walk-on)", () => {
+    const def = introOf("hollow")!;
+    expect(def.chant).toEqual(["The dark is misunderstood.", "It's not the dark you fear. It's not knowing what's in it.", "Shh. The dark never hurt anyone.", "Nobody ever asks the dark how it feels."]);
+    expect([0, 0.3, 0.6, 0.99].map((r) => chantOf(def, () => r))).toEqual(def.chant);
+    for (let i = 0; i < 20; i++) expect(def.chant).toContain(chantOf(def));
+    expect(chantOf(introOf("tiger")!)).toBeNull();
+    expect(now(at("line").at)).toMatchObject({ line: true, chant: false });
+    expect(now(at("charge").at - 1)).toMatchObject({ line: false, chant: false });
+    expect(now(at("charge").at)).toMatchObject({ line: false, chant: true });
+    expect(now(at("charge").at + D.chantMs - 1).chant).toBe(true);
+    expect(now(at("charge").at + D.chantMs).chant).toBe(false);
+    expect(D.chantMs).toBeGreaterThanOrEqual(F.lineMs);
+    // (Off his head before the first lantern goes.)
+    expect(at("charge").at + D.chantMs).toBeLessThanOrEqual(drink + d.lanterns[0]!);
+  });
+
+  it("every cue has a sound of his own (the table's the app's pop), each on its beat, in order; the notes' cues all there", () => {
+    const def = introOf("hollow")!;
+    const cues = introCues(beats, HO);
+    for (const c of cues) expect(def.cues[c.cue], c.cue).toMatch(/^(hollow[A-Z]\w+|pop)$/);
+    for (let i = 1; i < cues.length; i++) expect(cues[i]!.at).toBeGreaterThanOrEqual(cues[i - 1]!.at);
+    const names = new Set(cues.map((c) => c.cue));
+    // (Every cue in the art's notes; a mote's sip is the room's, as one lands.)
+    for (const c of ["table", "hum", "deep", "swell", "gutter", "snuff", "drain", "tink", "star", "pawn", "blackout", "settle"]) expect(names.has(c), c).toBe(true);
+    expect(def.cues.sip).toBe("hollowSip");
+    // Each lantern's flutter as it starts going out, its snuff three frames on.
+    for (const ms of d.lanterns) {
+      expect(cues).toContainEqual({ cue: "gutter", at: drink + ms });
+      expect(cues).toContainEqual({ cue: "snuff", at: drink + ms + 3 * 170 });
+    }
+    // The ticks along the string: at most one a tinkGapMs.
+    const ticks = cues.filter((c) => c.cue === "tink").map((c) => c.at);
+    for (let i = 1; i < ticks.length; i++) expect(ticks[i]! - ticks[i - 1]!).toBeGreaterThanOrEqual(D.tinkGapMs);
+    // Nothing sounds in the black but the blackout's thoom; the settle in the dim light.
+    expect(cues.filter((c) => c.at > at("blackout").at && c.at < at("dim").at)).toEqual([]);
+    expect(cues).toContainEqual({ cue: "settle", at: at("dim").at });
   });
 });
 

@@ -22,29 +22,34 @@
  */
 import { KING_ATTACK } from "@chessroyale/chess";
 import { bossKit } from "../../characters/kits.ts";
-import { renderFrame, type Character } from "../../characters/sprite.ts";
+import { BULB_KEYS } from "../../characters/hollow.ts";
+import { frameKeys, renderFrame, type Character, type Frame } from "../../characters/sprite.ts";
 import { play, warmSounds, type SoundName } from "../../sound.ts";
 import { newPt, proj, tableLift, type TableLift, type View } from "../camera.ts";
 import { TOWN_FEEL } from "../feel.ts";
 import { PARK_TABLE, TABLE_BOARD, TABLE_INK, TABLE_PIECES } from "../houses/park.ts";
 import { BOSS_ART } from "../render.ts";
 import type { HomeId } from "../world.ts";
-import { CHALLENGE_FEEL, boardSquare, introBeats, introOf, stormEdge, wipeAt, type BossIntro, type IntroAnims, type IntroBeat, type IntroLayout, type LogMove, LOG_MOVES, logAnims } from "./challenge.ts";
+import { CHALLENGE_FEEL, DARK_MOVES, boardSquare, darkAnims, drainAt, frameAt, introBeats, introOf, stormEdge, wipeAt, type BossIntro, type DarkMove, type IntroAnims, type IntroBeat, type IntroLayout, type LogMove, LOG_MOVES, logAnims } from "./challenge.ts";
 
 /**
  * A boss's intro art, as its file exports it: a pyramid that brings in its table (Alfil's), or toy blocks that are the table and its
  * stools (Big Boy's); the slab's and board's colors; its storm (a tile and its front).
  */
-type IntroArt = (
-  | { pyramid: Character; table: Character; blocks?: undefined; wood?: undefined }
-  | { blocks: Character; pyramid?: undefined; table?: undefined; wood?: undefined }
-  | { wood: WoodArt; table: Character; pyramid?: undefined; blocks?: undefined }
-) & {
-  /** The slab's keys "1" to "5" and the board's squares `L` / `D`. */
-  palette: Readonly<Record<string, string>>;
-  storm: Character;
-  front: Character;
-};
+type IntroArt =
+  | ((
+      | { pyramid: Character; table: Character; blocks?: undefined; wood?: undefined }
+      | { blocks: Character; pyramid?: undefined; table?: undefined; wood?: undefined }
+      | { wood: WoodArt; table: Character; pyramid?: undefined; blocks?: undefined }
+    ) & {
+      dark?: undefined;
+      /** The slab's keys "1" to "5" and the board's squares `L` / `D`. */
+      palette: Readonly<Record<string, string>>;
+      storm: Character;
+      front: Character;
+    })
+  // Hollow's: the dark (his moves, the cave's lights going out, the motes); the park table; no storm (the dark is his transition).
+  | { dark: typeof import("./hollow-intro-art.ts"); pyramid?: undefined; blocks?: undefined; wood?: undefined; table?: undefined; palette?: undefined; storm?: undefined; front?: undefined };
 /** Timber's: his own moves (facing east), where the lying log and the standing one are from his foot (his pixels), the props. */
 interface WoodArt {
   mover: Character;
@@ -67,6 +72,7 @@ const ART: Partial<Record<HomeId, () => Promise<IntroArt>>> = {
       storm: m.INTRO_TIMBER_STORM,
       front: m.INTRO_TIMBER_FRONT,
     })),
+  hollow: () => import("./hollow-intro-art.ts").then((m) => ({ dark: m })),
 };
 
 type PyramidAnim = "rise" | "idle" | "crack" | "crumble";
@@ -118,6 +124,38 @@ export interface LoadedIntro {
    * sounds by cue (the kit's), how it faces. (Swung where the boss stands, clear of its stool: not off the board, as at a king.)
    */
   attack: { ch: Character; frames: HTMLCanvasElement[]; ms: number[]; cues: (string | undefined)[]; sounds: Readonly<Record<string, SoundName>>; facesLeft: boolean; beat: typeof KING_ATTACK } | null;
+  /** Hollow's dark (null: another's): his moves' frames, the cave's pieces going out, the motes; see DarkArt. */
+  dark: DarkArt | null;
+}
+
+/** A picture's lit pixels alone (its lights' own pixels, to draw over the dark), cropped: drawn at (x, y) of its picture's pixels. */
+export interface Emis {
+  img: HTMLCanvasElement;
+  x: number;
+  y: number;
+}
+/** A frame and its lit pixels (null: none lit). */
+export interface Lit {
+  img: HTMLCanvasElement;
+  emis: Emis | null;
+}
+/**
+ * Hollow's dark, ready (shops/hollow-intro-art.ts; ShopRoom draws it): his moves' frames at each count of his strand's bulbs he plays
+ * them with (`him[move][bulbs]`: the charge and swell all lit, the drink at each, full and settle none), his idle with his strand dark
+ * (once he has settled), his eyes alone in the black (full, settle); the cave's pieces going out (`pieces[name][anim]`: the lanterns'
+ * `gutter<k>` and dark `idle`, the bulbs' `l<n>` / `r<n>`, the tree's `drain` and dark `idle`) and, for the cave's own frames still lit,
+ * their lit pixels (`lit[name]`, by the room's frame); the motes and their sip; and the art's numbers.
+ */
+export interface DarkArt {
+  him: Record<DarkMove, (Lit[] | undefined)[]>;
+  idle0: HTMLCanvasElement[];
+  eyes: Record<"full" | "settle", (Emis | null)[]>;
+  pieces: Record<string, Record<string, Lit[]>>;
+  lit: Record<string, (Emis | null)[]>;
+  motes: Record<string, HTMLCanvasElement[]>;
+  /** Each bulb of the string's run (INTRO_HOLLOW_BULB_RUN): its mote's kind, from its glass (null: a burnt-out one sends none). */
+  runMote: (string | null)[];
+  art: typeof import("./hollow-intro-art.ts");
 }
 
 const canvasOf = (w: number, h: number) => {
@@ -167,8 +205,13 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
     let blocks: LoadedIntro["blocks"] = null;
     let wood: LoadedIntro["wood"] = null;
     let storm: StormArt | null = null;
+    let dark: DarkArt | null = null;
     const all = <A extends string>(ch: Character, names: readonly A[]) => Object.fromEntries(names.map((a) => [a, ch.anims[a]!.frames.map((_, i) => toCanvas(ch, a, i))])) as Record<A, HTMLCanvasElement[]>;
-    if (art?.wood) {
+    if (art?.dark) {
+      const m = art.dark;
+      anims = darkAnims({ mover: m.BOSS_HOLLOW_INTRO, lantern: m.INTRO_HOLLOW_LANTERN_OUT, tree: m.INTRO_HOLLOW_SHOWPIECE_OUT, glow: m.INTRO_HOLLOW_LANTERN_GLOW, run: m.INTRO_HOLLOW_BULB_RUN, dark: m.INTRO_HOLLOW_DARK, pool: m.INTRO_HOLLOW_DIMPOOL });
+      dark = buildDark(m);
+    } else if (art?.wood) {
       const w = art.wood;
       // (His pixels are his town figure's, BOSS_ART's, `bossSquares` tall.)
       anims = logAnims(w, BOSS_ART[home].h / (TOWN_FEEL.bossSquares * (TOWN_FEEL.bossScale[home] ?? 1)));
@@ -198,7 +241,7 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
       for (const a of ["rise", "idle", "crack", "crumble"] as const) frames[a] = py.anims[a]!.frames.map((_, i) => toCanvas(py, a, i));
       pyramid = { ch: py, frames };
     }
-    if (art) {
+    if (art?.storm) {
       const k = CHALLENGE_FEEL.stormScale;
       const stormFrames = art.storm.anims.idle!.frames;
       storm = {
@@ -219,7 +262,8 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
     const ends = bossIdle.map((f) => (t += Math.max(16, f.ms)));
     // Its God King attack, if its kit has one (every playable boss's does, Timber's too since Nov 2; the Hidden Boss has no home).
     const kit = bossKit(def.name);
-    const ka = kit?.kingAttack ?? null;
+    // (Hollow's own intro has none: the dark is his transition.)
+    const ka = dark ? null : (kit?.kingAttack ?? null);
     const attack = ka
       ? {
           ch: ka.ch,
@@ -245,11 +289,175 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
       boss: { ch: bossCh, frames: bossIdle.map((_, i) => toCanvas(bossCh, "idle", i)), ends, loop: t, squares: TOWN_FEEL.bossSquares * (TOWN_FEEL.bossScale[home] ?? 1) },
       storm,
       attack,
+      dark,
     };
   });
   p.catch(() => loading.delete(home));
   loading.set(home, p);
   return p;
+}
+
+// ---- Hollow's dark (his intro's art drawn: shops/hollow-intro-art.ts).
+
+/** A pixel bright enough to be a light's own (the art's mockup: its lit pixels drawn over the dark). */
+const LIT_LUM = 0.28;
+/** His own lit pixels: his eyes, the ball's bright violet and the light landing on it, his strand's bulbs. */
+const HIS_LIT = new Set(["e", "E", "U", "x", "a", "b", ...BULB_KEYS.flat()]);
+/** A frame drawn (with a look), and its pixels' keys. */
+function painted(ch: Character, frame: Frame, look?: string) {
+  const { w, h, data } = renderFrame(ch, frame, { look });
+  const c = canvasOf(w, h);
+  c.getContext("2d")!.putImageData(new ImageData(new Uint8ClampedArray(data), w, h), 0, 0);
+  return { c, data, w, h };
+}
+/** Where a picture's lights are: boxes of its pixels (x0, y0 to x1, y1 exclusive) and the keys lit in each. */
+type LitBox = { x0: number; y0: number; x1: number; y1: number; keys: ReadonlySet<string> };
+/**
+ * A frame's lit pixels alone (its keys `keys`, its pixels `data`): those of a box's keys in it, bright enough (recolored `to`), cropped;
+ * null when none is. Only the boxes are walked (Nov 3: walking every pixel of every frame made his intro slow to load on a phone).
+ */
+function emisOf(w: number, h: number, keys: ReturnType<typeof frameKeys>, data: Uint8ClampedArray, boxes: readonly LitBox[], to?: string): Emis | null {
+  let x0 = Infinity, y0 = Infinity, x1 = -1, y1 = -1;
+  const keep = new Uint8Array(w * h);
+  for (const b of boxes)
+    for (let y = Math.max(0, b.y0); y < Math.min(h, b.y1); y++) {
+      const row = keys[y];
+      if (!row) continue;
+      for (let x = Math.max(0, b.x0); x < Math.min(w, b.x1); x++) {
+        const k = row[x];
+        if (!k || !b.keys.has(k)) continue;
+        const i = (y * w + x) * 4;
+        if (!data[i + 3] || (0.3 * data[i]! + 0.59 * data[i + 1]! + 0.11 * data[i + 2]!) / 255 < LIT_LUM) continue;
+        keep[y * w + x] = 1;
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+      }
+    }
+  if (x1 < 0) return null;
+  const cw = x1 - x0 + 1;
+  const ch = y1 - y0 + 1;
+  const out = new Uint8ClampedArray(cw * ch * 4);
+  const rgb = to ? [1, 3, 5].map((j) => parseInt(to.slice(j, j + 2), 16)) : null;
+  for (let y = y0; y <= y1; y++)
+    for (let x = x0; x <= x1; x++) {
+      if (!keep[y * w + x]) continue;
+      const i = (y * w + x) * 4;
+      const o = ((y - y0) * cw + (x - x0)) * 4;
+      out[o] = rgb ? rgb[0]! : data[i]!;
+      out[o + 1] = rgb ? rgb[1]! : data[i + 1]!;
+      out[o + 2] = rgb ? rgb[2]! : data[i + 2]!;
+      out[o + 3] = data[i + 3]!;
+    }
+  const img = canvasOf(cw, ch);
+  img.getContext("2d")!.putImageData(new ImageData(out, cw, ch), 0, 0);
+  return { img, x: x0, y: y0 };
+}
+/**
+ * Hollow's dark, every frame drawn as it loads (behind the town's fade, never in a frame loop): only the frames the intro plays (the
+ * bulbs' anims the run reaches on each placement, his moves at the strand's counts he plays them with), and each one's lit pixels.
+ */
+function buildDark(m: typeof import("./hollow-intro-art.ts")): DarkArt {
+  /** A cave piece's lights' boxes (SHOP_HOLLOW_LIGHTS). */
+  const boxesOf = (name: string): LitBox[] =>
+    m.SHOP_HOLLOW_LIGHTS.filter((l) => l.piece === name && l.keys).map((l) => ({ x0: Math.floor(l.x), y0: Math.floor(l.y), x1: Math.ceil(l.x + l.w), y1: Math.ceil(l.y + l.h), keys: new Set(l.keys) }));
+  /** A move's frames drawn (`only`: just these, the rest left out: never shown), each with its lit pixels (and its eyes alone). */
+  const litFrames = (ch: Character, anim: string, boxes: readonly LitBox[], look?: string, eyes?: LitBox[], eyesTo?: string, only?: ReadonlySet<number>): (Lit & { eyes: Emis | null })[] =>
+    ch.anims[anim]!.frames.map((fr, i) => {
+      if (only && !only.has(i)) return undefined as unknown as Lit & { eyes: Emis | null };
+      const p = painted(ch, fr, look);
+      const keys = frameKeys(ch, fr);
+      return { img: p.c, emis: emisOf(ch.w, ch.h, keys, p.data, boxes), eyes: eyes ? emisOf(ch.w, ch.h, keys, p.data, eyes, eyesTo) : null };
+    });
+  const emisFrames = (ch: Character, anim: string, boxes: readonly LitBox[]) =>
+    ch.anims[anim]!.frames.map((fr) => emisOf(ch.w, ch.h, frameKeys(ch, fr), renderFrame(ch, fr).data, boxes));
+  const pieces: DarkArt["pieces"] = {};
+  const lit: DarkArt["lit"] = {};
+  // The lanterns: each `gutter<k>` (k its sway frame as it starts) and its dark `idle`; the cave's own lit frames' lit pixels.
+  for (const [name, ch] of [["lantern", m.INTRO_HOLLOW_LANTERN_OUT], ["lantern-b", m.INTRO_HOLLOW_LANTERN_B_OUT]] as const) {
+    const on = boxesOf(name);
+    pieces[name] = Object.fromEntries(Object.keys(ch.anims).filter((a) => a !== "lit").map((a) => [a, litFrames(ch, a, on)]));
+    lit[name] = emisFrames(m.SHOP_HOLLOW_PIECES[name]!, "idle", on);
+  }
+  // The bulbs: on each placement, the anims the run reaches (`l<n>`, or `r<n>` on a mirrored placement); `l0` is the cave's own. One
+  // on the way to the last (all its bulbs dark) shows a bulb's turn, about 30 ms: its first flicker frame alone stands for all of them.
+  const need = new Map<string, Map<string, boolean>>();
+  const count = new Map<string, number>();
+  for (const b of m.INTRO_HOLLOW_BULB_RUN) {
+    const key = `${b.piece}|${b.col}|${b.row}`;
+    count.set(key, (count.get(key) ?? 0) + 1);
+  }
+  for (const b of m.INTRO_HOLLOW_BULB_RUN) {
+    const n = m.INTRO_HOLLOW_BULB_RUN.filter((x) => x.piece === b.piece && x.col === b.col && x.row === b.row).indexOf(b) + 1;
+    const anims = need.get(b.piece) ?? new Map<string, boolean>();
+    const last = n === count.get(`${b.piece}|${b.col}|${b.row}`);
+    const a = `${b.flip ? "r" : "l"}${n}`;
+    anims.set(a, (anims.get(a) ?? false) || last);
+    need.set(b.piece, anims);
+  }
+  const first = new Set([0]);
+  for (const [name, anims] of need) {
+    const ch = m.INTRO_HOLLOW_BULB_PIECES[name]!;
+    const on = boxesOf(name);
+    pieces[name] = Object.fromEntries([...anims].map(([a, last]) => [a, litFrames(ch, a, on, undefined, undefined, undefined, last ? undefined : first)]));
+    lit[name] = emisFrames(m.SHOP_HOLLOW_PIECES[name]!, "idle", on);
+  }
+  // The tree: its `drain` and its dark `idle`.
+  {
+    const ch = m.INTRO_HOLLOW_SHOWPIECE_OUT;
+    const on = boxesOf("showpiece");
+    pieces.showpiece = { drain: litFrames(ch, "drain", on), idle: litFrames(ch, "idle", on) };
+    lit.showpiece = emisFrames(m.SHOP_HOLLOW_PIECES.showpiece!, "idle", on);
+  }
+  // Him: each move at the strand's counts he plays it with (his lit pixels: his eyes, the ball's violet, his bulbs); his eyes alone
+  // (dim violet) in the black, as he stands full and settles.
+  const H = m.BOSS_HOLLOW_INTRO;
+  const D = m.INTRO_HOLLOW_DARK;
+  const whole = (keys: Iterable<string>): LitBox[] => [{ x0: 0, y0: 0, x1: H.w, y1: H.h, keys: new Set(keys) }];
+  const his = whole(HIS_LIT);
+  const eyeBox = whole(["e", "E"]);
+  const looks: Record<DarkMove, readonly number[]> = { charge: [3], swell: [3], drink: [3, 2, 1, 0], full: [0], settle: [0] };
+  // (His drink with two thirds and one third of his strand lit shows a beat each, `dark.drain.strand`'s gaps: just its frames then.)
+  const d = drainAt();
+  const drinkMs = H.anims.drink!.frames.map((x) => x.ms);
+  const shown = (from: number, to: number) => {
+    const out = new Set<number>();
+    for (let t = from; t < to; t += 5) out.add(frameAt(drinkMs, t, true));
+    return out;
+  };
+  const drinkOnly: Partial<Record<number, ReadonlySet<number>>> = { 2: shown(d.strand[0]!, d.strand[1]!), 1: shown(d.strand[1]!, d.strand[2]!) };
+  const eyes = { full: [] as (Emis | null)[], settle: [] as (Emis | null)[] };
+  const him = Object.fromEntries(
+    DARK_MOVES.map((a) => {
+      const by: (Lit[] | undefined)[] = [];
+      for (const n of looks[a]) {
+        const dark = a === "full" || a === "settle";
+        const fr = litFrames(H, a, his, `bulbs${n}`, dark ? eyeBox : undefined, D.eyes, a === "drink" ? drinkOnly[n] : undefined);
+        if (dark) eyes[a] = fr.map((x) => x.eyes);
+        by[n] = fr;
+      }
+      return [a, by];
+    }),
+  ) as DarkArt["him"];
+  const idleCh = BOSS_ART.hollow;
+  const idle0 = idleCh.anims.idle!.frames.map((fr) => painted(idleCh, fr, "bulbs0").c);
+  // The motes: each kind's twinkle, and the sip.
+  const M = m.INTRO_HOLLOW_MOTE;
+  const motes = Object.fromEntries(Object.keys(M.anims).map((a) => [a, M.anims[a]!.frames.map((fr) => painted(M, fr).c)]));
+  // Each bulb's mote, from its glass (the key at its middle, or one next to it).
+  const runMote = m.INTRO_HOLLOW_BULB_RUN.map((b) => {
+    const ch = m.SHOP_HOLLOW_PIECES[b.piece]!;
+    const keys = frameKeys(ch, ch.anims.idle!.frames[0]!);
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++) {
+        const k = keys[Math.round(b.at[1]) + dy]?.[Math.round(b.at[0]) + dx];
+        const kind = k ? m.INTRO_HOLLOW_BULB_MOTE[k] : undefined;
+        if (kind) return kind;
+      }
+    return null;
+  });
+  return { him, idle0, eyes, pieces, lit, motes, runMote, art: m };
 }
 
 /** Plays a cue's sound, if the boss has one for it (none: silent). */
@@ -421,7 +629,7 @@ export interface Storm {
  * (`data-phase`: "in", "covered", "out"; `data-covered="1"` once it has covered the screen) for tests.
  */
 /** The boss's transition: its own (Alfil's sandstorm), or the default (the flash and the wipe). */
-export const startTransition = (intro: LoadedIntro): Storm => (intro.storm ? startStorm(intro) : startWipe(intro));
+export const startTransition = (intro: LoadedIntro): Storm => (intro.dark ? startDark(intro) : intro.storm ? startStorm(intro) : startWipe(intro));
 
 export function startStorm(intro: LoadedIntro): Storm {
   const F = CHALLENGE_FEEL;
@@ -592,3 +800,35 @@ export function startWipe(intro: LoadedIntro): Storm {
   return { covered, out };
 }
 
+// ---- Hollow's: the dark (Nov 3, the director's call, Eric may change it: no second blackout, no storm). The room has closed the dim
+// light in on the board to black (its iris); this black takes over at once, holds while the battle loads, and the match comes up out
+// of it (a fade from black over `dark.outMs`).
+
+/**
+ * Starts Hollow's transition: a black canvas over the whole page (as the wipe's: outside the town's tree, taking every tap), covering
+ * from its first frame (the room is already black under it); `out()` fades it off the battle. `data-phase` "covered" then "out".
+ */
+export function startDark(intro: LoadedIntro): Storm {
+  const F = CHALLENGE_FEEL;
+  const cv = document.createElement("canvas");
+  cv.className = "boss-dark";
+  cv.setAttribute("aria-hidden", "true");
+  cv.dataset.boss = intro.home;
+  cv.width = cv.height = 1;
+  // (One black pixel stretched over the page: its opacity fades it, nothing to redraw.)
+  cv.style.cssText = `position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:2147483000;touch-action:none;pointer-events:auto;background:#000;opacity:1;transition:opacity ${F.dark.outMs}ms ease-out`;
+  document.body.append(cv);
+  cv.dataset.phase = "covered";
+  cv.dataset.covered = "1";
+  const coveredAt = performance.now();
+  const covered = Promise.resolve();
+  const out = async () => {
+    const wait = coveredAt + F.coveredMinMs - performance.now();
+    if (wait > 0) await new Promise((ok) => setTimeout(ok, wait));
+    cv.dataset.phase = "out";
+    cv.style.opacity = "0";
+    await new Promise((ok) => setTimeout(ok, F.dark.outMs));
+    cv.remove();
+  };
+  return { covered, out };
+}
