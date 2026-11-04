@@ -46,3 +46,10 @@ The board stand at (4, 3) (visible from the challenge camera); the pens (white k
 the star where the table stands; his red star mat, your denim horseshoe mat; you both stand clear of the stools from the start (7.2 and
 11.6) so nobody moves when the bale and buckets come in; black bucket his (from our left), white yours (from our right); the bale's drag
 curves past him; Pen Pony matches the pawn's colour, only the blanket takes the item colour; new sounds slide, clatter, jingle, pop.
+
+## Bucket changes (Eric, Nov 4, art after 80ef87f1; use the head the director names)
+- The seat buckets: straight 5-gallon pails, thick double rim band, wire handle; "HunChess" printed normally, so on the landed
+  (upside-down) stools it reads upside down (intended). Black bucket white text (his), white bucket black text (yours). Seat height
+  from `INTRO_PIG_BUCKET_SEAT_H` (higher than the park stools): seat figures at that height.
+- Decoration buckets in the barn (muted green, red, yellow, black, white; HunChess reading normally) and a few in **Puddles' shop**:
+  copy the gardener shop's updated art in too (same PR).
