@@ -647,11 +647,38 @@ function startRoom(
     return c;
   };
   for (const l of [...art.pools, ...art.lights]) glow(l.color);
+  // (Ginger's battle spot's own cool shine on its ice: baked into the floor's picture once, not drawn over the room each frame.)
+  const ip = art.icePool;
+  if (ip) {
+    const fg = floor.getContext("2d")!;
+    fg.globalCompositeOperation = "lighter";
+    fg.globalAlpha = Math.min(1, ip.strength * S.glow);
+    fg.drawImage(glow(ip.color), ip.at[0] * SQ + SQ / 2 - ip.rx * 2, ip.at[1] * SQ + SQ / 2 - ip.ry * 2, ip.rx * 4, ip.ry * 4);
+    fg.globalAlpha = 1;
+    fg.globalCompositeOperation = "source-over";
+  }
   // Every light on every place its piece stands (Nov 3: a lantern or a bulb string stands in several places; each lights where it
   // is, mirrored with it): made once as the room loads, so a frame only walks two short lists.
   // (Not a plan's standing strip: its lights are its whole picture's.)
   const whole = ups.filter((u) => !u.cut);
-  const poolsAt = lightsAt(art.pools, whole);
+  // (Ginger's igloo: its pools of light along the walls' feet don't change, so they're baked into the floor's picture once, as the
+  // battle spot's shine is: two dozen glows a frame were the most of the room's cost over Jefferson's warehouse on a phone. Every other
+  // room draws them each frame, as before: Hollow's go dark in his intro.)
+  const bakePools = !!art.icePool;
+  const poolsAt = bakePools ? [] : lightsAt(art.pools, whole);
+  if (bakePools) {
+    const fg = floor.getContext("2d")!;
+    fg.globalCompositeOperation = "lighter";
+    for (const { l, at: u } of lightsAt(art.pools, whole)) {
+      const ch = frames[u.name]!.ch;
+      const x = u.c * SQ + SQ / 2 + u.ox + litDx(l.x, ch.foot[0], u.flip);
+      const y = u.r * SQ + SQ / 2 + u.oy + l.y - ch.foot[1];
+      fg.globalAlpha = Math.min(1, l.strength * S.glow);
+      fg.drawImage(glow(l.color), x - l.rx * 2, y - l.ry * 2, l.rx * 4, l.ry * 4);
+    }
+    fg.globalAlpha = 1;
+    fg.globalCompositeOperation = "source-over";
+  }
   const halosAt = lightsAt(art.lights, whole, (l) => !!l.halo);
   /** A light's middle `lx`, `ly` (its piece's pixels) on screen, its piece standing at `u` (P already at its foot): into `lit`. */
   const lit = { x: 0, y: 0 };
@@ -2514,13 +2541,6 @@ function startRoom(
   const drawGlows = (now: number) => {
     if (!poolsAt.length && !halosAt.length) return;
     g.globalCompositeOperation = "lighter";
-    // (Ginger's battle spot's own cool shine on its ice.)
-    const ip = art.icePool;
-    if (ip && P(ip.at[0], ip.at[1]) && nearOf() > 0) {
-      const s = pt.k / SQ;
-      g.globalAlpha = Math.min(1, ip.strength * S.glow * nearOf());
-      g.drawImage(glow(ip.color), pt.x - ip.rx * 2 * s, pt.y - ip.ry * 2 * s, ip.rx * 4 * s, ip.ry * 4 * s);
-    }
     for (const { l, at: u } of poolsAt) {
       if (!P(u.c, u.r)) continue;
       const near = nearOf();
