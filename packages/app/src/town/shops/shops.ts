@@ -1,6 +1,6 @@
 /**
  * The homes you can go into (Nov 2, round 1: Babur's circus tent and Puddles' greenhouse, the shops' first interiors; then Alfil's
- * pyramid and Big Boy's crib; Nov 3, Timber's lodge, Dash's sneaker store and Hollow's cave), what
+ * pyramid and Big Boy's crib; Nov 3, Timber's lodge, Dash's sneaker store and Hollow's cave; Nov 4, Wrangler's barn), what
  * each shop sells, and the words its cards say. Light: the town imports it to know which home's card says "Go in"; the room
  * itself (its art, its drawing) loads only when you go in (ShopRoom.tsx). docs/decisions/2026-11-02-shop-interiors-r1.md.
  *
@@ -22,18 +22,23 @@ export interface ShopDef {
   /** Its crate's name, word for word ("Babur's Boss Crate"). */
   crate: string;
   /** The Shopkeeper: the boss's kid (its sheet's name in town/sidekicks/), drawn at `at` (a square, fractions allowed). */
-  kid: "babur" | "puddles" | "alfil" | "bigboy" | "timber" | "blitz" | "hollowdog";
+  kid: "babur" | "puddles" | "alfil" | "bigboy" | "timber" | "blitz" | "hollowdog" | "rooster";
   at: readonly [number, number];
+  /**
+   * How far the Shopkeeper stands raised over `at` (the room's art pixels, 37 a square): on the counter's top rather than behind it
+   * (Wrangler's rooster, Nov 4: Eric's pick, "on the counter", so he reads clearly). None: on the floor, as every other.
+   */
+  lift?: number;
   /** The squares the Shopkeeper stands on (nobody else can): you can talk to it within `SHOP_FEEL.talkRange` of one. */
   keeper: readonly Sq[];
   /** What the crate can give (its items' ids in core's ITEM_DEFS): the boss's ride first, always. */
   prizes: readonly string[];
   /**
    * Above the walls: a tent's canvas, a greenhouse's glass, a pyramid's sandstone, a nursery's sky-blue ceiling with clouds and
-   * stars, a lodge's dark planks between heavy beams, a store's white ceiling tiles and light panels, or a cave's dark stone and
-   * stalactites (drawn by the game, not the art: as the mockup did).
+   * stars, a lodge's dark planks between heavy beams, a store's white ceiling tiles and light panels, a cave's dark stone and
+   * stalactites, or a barn's dark rafters and cross beams (drawn by the game, not the art: as the mockup did).
    */
-  roof: "tent" | "glass" | "stone" | "nursery" | "lodge" | "store" | "cave";
+  roof: "tent" | "glass" | "stone" | "nursery" | "lodge" | "store" | "cave" | "barn";
   /**
    * The chat log's text over the room (Eric, Nov 2: "white, or black, depending on darkness of background in the shop"): "night" for
    * a dark room (white words on a dark tint: Babur's tent), "day" for a light one (dark words on a light tint: Puddles' greenhouse),
@@ -63,6 +68,10 @@ export const SHOPS: Readonly<Partial<Record<HomeId, ShopDef>>> = {
   // Hollow's dog stands behind the 30 px counter in the cave's back hollow, round the bend (the counter on columns 4-7 of row 4), on
   // his squares and drawn at the art's place for him (shop-hollow-nov3.md). He has no name: "Shopkeeper". A dark cave: the night tone.
   hollow: { home: "hollow", boss: "Hollow", crate: "Hollow's Boss Crate", kid: "hollowdog", at: [5.5, 2.4], keeper: [{ c: 5, r: 2 }, { c: 6, r: 2 }], prizes: ["hollow-bulb"], roof: "cave", chatTone: "night" },
+  // Wrangler's rooster stands ON the 30 px counter (Eric's pick, Nov 4), on its middle (column 9.5 of row 3, its own row, between
+  // the corn basket and the rope coil), raised to its plank top (`lift`: the counter's foot is 27 px under it, shop-pig-nov4.md);
+  // his squares are behind it, as every Shopkeeper's. He has no name: "Shopkeeper". A plank barn in the evening light: the day tone.
+  pig: { home: "pig", boss: "Wrangler", crate: "Wrangler's Boss Crate", kid: "rooster", at: [9.5, 3], lift: 27, keeper: [{ c: 9, r: 2 }, { c: 10, r: 2 }], prizes: ["pen-pony"], roof: "barn", chatTone: "day" },
 };
 
 /** The shop inside a home, or null: every other home has no "Go in" yet. */

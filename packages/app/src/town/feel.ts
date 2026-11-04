@@ -379,6 +379,7 @@ export const TOWN_FEEL = {
     "rodeo-bull": { foot: 97, shadow: 1.2 },
     "cheetah-shoes": { foot: 95, shadow: 0.9 },
     "log-roller": { foot: 96, shadow: 0 },
+    "pen-pony": { foot: 98.5, shadow: 1.3 },
   } as Readonly<Record<string, { foot: number; shadow: number }>>,
   /**
    * The shadows under a pawn (and a boss): the soft one this strong (as before), and a contact shadow right under the

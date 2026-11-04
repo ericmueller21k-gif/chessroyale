@@ -3,12 +3,13 @@
  * down on its catch, the rope snapping taut and dragging, a hop's thump, his snort and his snorting laugh (a pig's
  * grunt through the nose: no real voice), a spur stomp, the double lasso winding up, and the quick-draw sting for
  * "DRAW!" (a low twang, a slide and a knock, like a western's). Nothing bright: no chimes, no dings (the spur is a dull
- * clink, the twang low and damped). Each is a pure function of the sample rate (its noise is seeded), so a test can
+ * clink, the twang low and damped). His challenge intro's (Nov 4): the hay bale's scrape across the straw, a plastic bucket's
+ * clatter, the spurs jingling and a toy cap's pop as his wipe comes in. Each is a pure function of the sample rate (its noise is seeded), so a test can
  * measure it: every one stays quieter than a piece's move (peak and loudness).
  */
 import { bandpass, lowpass, noise, osc, render, rng, saw, sine, soft, type Voice, soundCache } from "./synth.ts";
 
-export type PigSound = "whirl" | "throw" | "catch" | "tug" | "tip" | "laugh" | "snort" | "stomp" | "windup" | "hop" | "draw" | "yank";
+export type PigSound = "whirl" | "throw" | "catch" | "tug" | "tip" | "laugh" | "snort" | "stomp" | "windup" | "hop" | "draw" | "yank" | "slide" | "clatter" | "jingle" | "pop";
 
 /** Noise with its highs rolled off twice: a soft rumble or breath, never a hiss. */
 const murk = (rate: number, cut: number, seed: number): Voice => lowpass(rate, cut, lowpass(rate, cut, noise(seed)));
@@ -135,10 +136,37 @@ const SOUNDS: Record<PigSound, (rate: number) => Float32Array> = {
     const land = thump(rate, 0.16, 120, 0.04, 523);
     return render(rate, 0.3, (t) => (t < 0.12 ? Math.sin((Math.PI * t) / 0.12) * 2.4 * fwip(t) : 0) + 0.9 * land(t));
   },
+  // The hay bale dragged across the boards (Nov 4, his intro; once a slide loop): a dry, low scrape of straw, bumping as it goes.
+  slide: (rate) => {
+    const scrape = bandpass(rate, (t) => 340 + 80 * Math.sin(2 * Math.PI * 6 * t), 1.3, murk(rate, 1800, 541));
+    const straw = bandpass(rate, () => 900, 2, murk(rate, 2400, 547));
+    return render(rate, 0.38, (t) => Math.sin(Math.PI * Math.min(1, t / 0.38)) * (0.75 + 0.25 * Math.sin(2 * Math.PI * 11 * t)) * (2.4 * scrape(t) + 0.8 * straw(t)));
+  },
+  // A plastic bucket tumbling (his intro): a hollow clonk (a low body ringing a little) and its wire handle rattling after it.
+  clatter: (rate) => {
+    const body = thump(rate, 0.004, 210, 0.05, 557);
+    const ring = bandpass(rate, () => 330, 9, thump(rate, 0.004, 330, 0.06, 563));
+    const rattle = bandpass(rate, () => 1200, 5, noise(569));
+    const ticks = [0.05, 0.085, 0.115, 0.16];
+    return render(rate, 0.26, (t) => body(t) + 1.4 * ring(t) + ticks.reduce((s, at) => s + (t >= at ? 1.1 * Math.exp(-(t - at) / 0.008) : 0), 0) * rattle(t));
+  },
+  // His wipe coming in: spur rowels jingling, a few dull clinks (no chimes: low, damped, as his stomp's).
+  jingle: (rate) => {
+    const clink = lowpass(rate, 1600, bandpass(rate, () => 1050, 7, noise(571)));
+    const clink2 = lowpass(rate, 1600, bandpass(rate, () => 820, 7, noise(577)));
+    const at = [0, 0.07, 0.15, 0.22, 0.31];
+    return render(rate, 0.42, (t) => at.reduce((s, a, i) => s + (t >= a ? Math.exp(-(t - a) / 0.03) * (i % 2 ? clink2(t) : clink(t)) : 0), 0) * 1.8);
+  },
+  // A toy cap gun's pop (his wipe): a small dry snap and a puff, not a gunshot.
+  pop: (rate) => {
+    const snap = lowpass(rate, 2000, murk(rate, 3000, 587));
+    const puff = thump(rate, 0.002, 160, 0.03, 593);
+    return render(rate, 0.16, (t) => 3 * Math.exp(-t / 0.008) * snap(t) + 0.8 * puff(t));
+  },
 };
 
 /** Trims each to sit a little under a move's loudness, as the other bosses' do; a soft ceiling keeps the peaks well under its. */
-const LEVEL: Record<PigSound, number> = { whirl: 0.206, throw: 0.204, catch: 0.284, tug: 0.148, tip: 0.29, laugh: 0.212, snort: 0.186, stomp: 0.213, windup: 0.19, hop: 0.25, draw: 0.33, yank: 0.207 };
+const LEVEL: Record<PigSound, number> = { whirl: 0.206, throw: 0.204, catch: 0.284, tug: 0.148, tip: 0.29, laugh: 0.212, snort: 0.186, stomp: 0.213, windup: 0.19, hop: 0.25, draw: 0.33, yank: 0.207, slide: 0.3, clatter: 0.04, jingle: 0.2, pop: 0.28 };
 
 const cache = soundCache("pig");
 /** The samples for one of his sounds at a sample rate (made once, then reused). Each sits under a move's mean loudness, its peaks under half a move's. */

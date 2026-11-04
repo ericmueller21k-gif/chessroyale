@@ -7,6 +7,8 @@ import { SHOP_BIGBOY_LAYOUT, SHOP_BIGBOY_MARKS, SHOP_BIGBOY_PIECES } from "../sr
 import { SHOP_TIMBER_LAYOUT, SHOP_TIMBER_MARKS } from "../src/town/shops/timber-art.ts";
 import { SHOP_BLITZ_LAYOUT, SHOP_BLITZ_MARKS } from "../src/town/shops/blitz-art.ts";
 import { SHOP_HOLLOW_FLOOR, SHOP_HOLLOW_LAYOUT, SHOP_HOLLOW_MARKS, SHOP_HOLLOW_PIECES } from "../src/town/shops/hollow-art.ts";
+import { SHOP_PIG_LAYOUT, SHOP_PIG_MARKS } from "../src/town/shops/pig-art.ts";
+import { BOSS_PIG_INTRO, INTRO_PIG_BUCKET_B, INTRO_PIG_BUCKET_SEAT_H, INTRO_PIG_BUCKET_W } from "../src/town/shops/pig-intro-art.ts";
 import { BOSS_HOLLOW_INTRO, HOLLOW_INTRO_BALL_R, HOLLOW_INTRO_HEART, INTRO_HOLLOW_BULB_RUN, INTRO_HOLLOW_DARK, INTRO_HOLLOW_DIMPOOL, INTRO_HOLLOW_LANTERN_GLOW, INTRO_HOLLOW_LANTERN_OUT, INTRO_HOLLOW_PIECES, INTRO_HOLLOW_SHOWPIECE_OUT } from "../src/town/shops/hollow-intro-art.ts";
 import { INTRO_BIGBOY_BLOCKS, INTRO_BIGBOY_STOOL_B, INTRO_BIGBOY_STOOL_SEAT_H, INTRO_BIGBOY_STOOL_TOP_H, INTRO_BIGBOY_STOOL_W, INTRO_BIGBOY_SWIRL, INTRO_BIGBOY_SWIRL_FRONT, INTRO_BIGBOY_TABLE_PALETTE } from "../src/town/shops/bigboy-intro-art.ts";
 import { TABLE_BOARD } from "../src/town/houses/park.ts";
@@ -59,9 +61,9 @@ describe("the challenge's flow", () => {
     expect(run(["fight", "atDoor", "cancel", "fight"])).toBe("toDoor");
   });
 
-  it("every boss whose home has an inside has an intro (Alfil, Big Boy, Timber and Hollow their own, Babur, Puddles and Dash the default); every other boss is challenged as before (the Boss raid screen)", () => {
+  it("every boss whose home has an inside has an intro (Alfil, Big Boy, Timber, Hollow and Wrangler their own, Babur, Puddles and Dash the default); every other boss is challenged as before (the Boss raid screen)", () => {
     const withIntro = ALL_HOMES.filter((h) => introOf(h.id)).map((h) => h.id).sort();
-    expect(withIntro).toEqual(["alfil", "bigboy", "dash", "gardener", "hollow", "tiger", "timber"]);
+    expect(withIntro).toEqual(["alfil", "bigboy", "dash", "gardener", "hollow", "pig", "tiger", "timber"]);
     expect(withIntro).toEqual(Object.keys(SHOPS).sort());
     expect(introOf("alfil")).toMatchObject({ custom: true, line: "I'll show you the power of the old piece." });
     expect(introOf("tiger")).toMatchObject({ custom: false, name: "Babur", line: "Fine. One more show. Then I'm on break." });
@@ -72,20 +74,24 @@ describe("the challenge's flow", () => {
     expect(introOf("dash")).toMatchObject({ custom: false, name: "Dash", line: "Yo yo yo! Dash in the building, fam!", layout: "across", cues: { table: "pop", wipe: "dashWhoosh" } });
     // (Hollow, Nov 3: his own, the dark; his line one of his entrance's, then a channel line; you both walk on to your seats.)
     expect(introOf("hollow")).toMatchObject({ custom: true, name: "Hollow", line: "Did you leave a light on?", layout: "across", seated: true, cues: { table: "pop", blackout: "hollowBlackout" } });
+    // (Wrangler, Nov 4: his own, the lasso; his line a placeholder until Eric's Gemini lines; you both walk on to where you stand clear.)
+    expect(introOf("pig")).toMatchObject({ custom: true, name: "Wrangler", line: "Saddle up, partner. The board's comin' to us.", layout: "across", seated: true });
     expect(introOf("folio")).toBeNull();
   });
 
-  it("the layout: across for all seven today (the boss on the left, you on the right: Eric's normal look)", () => {
-    for (const id of ["alfil", "tiger", "gardener", "bigboy", "timber", "dash", "hollow"] as const) expect(introOf(id)!.layout, id).toBe("across");
+  it("the layout: across for all eight today (the boss on the left, you on the right: Eric's normal look)", () => {
+    for (const id of ["alfil", "tiger", "gardener", "bigboy", "timber", "dash", "hollow", "pig"] as const) expect(introOf(id)!.layout, id).toBe("across");
   });
 });
 
 describe("the battle circle's marks", () => {
-  const ROOMS = { alfil: SHOP_ALFIL_LAYOUT, tiger: SHOP_BABUR_LAYOUT, gardener: SHOP_PUDDLES_LAYOUT, bigboy: SHOP_BIGBOY_LAYOUT, timber: SHOP_TIMBER_LAYOUT, dash: SHOP_BLITZ_LAYOUT, hollow: SHOP_HOLLOW_LAYOUT } as const;
+  const ROOMS = { alfil: SHOP_ALFIL_LAYOUT, tiger: SHOP_BABUR_LAYOUT, gardener: SHOP_PUDDLES_LAYOUT, bigboy: SHOP_BIGBOY_LAYOUT, timber: SHOP_TIMBER_LAYOUT, dash: SHOP_BLITZ_LAYOUT, hollow: SHOP_HOLLOW_LAYOUT, pig: SHOP_PIG_LAYOUT } as const;
 
   it("across: the boss west of the table, you east, all on the circle's middle row; each a square and a half out, just past its stool", () => {
     for (const [id, layout] of Object.entries(ROOMS)) {
-      const m = marksOf(layout, "across")!;
+      // (Wrangler's lasso ring's tiles run a row further south than north of its middle: his room's drawn marks, SHOP_PIG_MARKS, say
+      // where its middle line is, as ShopRoom passes them.)
+      const m = marksOf(layout, "across", id === "pig" ? SHOP_PIG_MARKS : null)!;
       // (Babur's ring has his pedestal in its middle: the table stands clearOff south of it, in front. Hollow's pond, in his cave, is
       // three columns east and a row south of the box rooms' circles.)
       const r = id === "tiger" ? 10.5 + CHALLENGE_FEEL.clearOff : id === "hollow" ? 11.5 : 10.5;
@@ -970,20 +976,27 @@ describe("the challenge's pacing (Nov 2)", () => {
     return ch.foot[1];
   };
   const TABLES = { alfil: INTRO_ALFIL_TABLE, tiger: PARK_TABLE, gardener: PARK_TABLE, bigboy: INTRO_BIGBOY_BLOCKS, dash: PARK_TABLE, hollow: PARK_TABLE } as const;
+  /** Wrangler's buckets (his stools, upside down: their `stool`), one `stoolOff` from the table's middle each side; their outer edges, and their seat. */
+  const buckets = () => {
+    const [l] = low(INTRO_PIG_BUCKET_B, "stool", INTRO_PIG_BUCKET_B.h);
+    const [, r] = low(INTRO_PIG_BUCKET_W, "stool", INTRO_PIG_BUCKET_W.h);
+    return { west: F.stoolOff - l / PX, east: F.stoolOff + (r + 1) / PX, top: INTRO_PIG_BUCKET_SEAT_H / PX };
+  };
   /** Timber's stumps (his table has none in its picture): one `stoolOff` from the table's middle each side; how far out its outer edge is, and its top. */
   const stumps = () => {
     const [l, r] = low(INTRO_TIMBER_STUMP, "idle", INTRO_TIMBER_STUMP.h);
     return { west: F.stoolOff - l / PX, east: F.stoolOff + (r + 1) / PX, top: INTRO_TIMBER_STUMP_SEAT_H / PX };
   };
-  const LAYOUTS = { alfil: SHOP_ALFIL_LAYOUT, tiger: SHOP_BABUR_LAYOUT, gardener: SHOP_PUDDLES_LAYOUT, bigboy: SHOP_BIGBOY_LAYOUT, timber: SHOP_TIMBER_LAYOUT, dash: SHOP_BLITZ_LAYOUT, hollow: SHOP_HOLLOW_LAYOUT } as const;
+  const LAYOUTS = { alfil: SHOP_ALFIL_LAYOUT, tiger: SHOP_BABUR_LAYOUT, gardener: SHOP_PUDDLES_LAYOUT, bigboy: SHOP_BIGBOY_LAYOUT, timber: SHOP_TIMBER_LAYOUT, dash: SHOP_BLITZ_LAYOUT, hollow: SHOP_HOLLOW_LAYOUT, pig: SHOP_PIG_LAYOUT } as const;
   /** The gap (squares) kept between a figure near the floor and the stool's outer edge. */
   const GAP = 0.1;
 
   it("once the stools are in, no figure near the floor is in front of a stool: you (the pawn) and each boss standing, and its attack's feet", () => {
-    for (const id of ["alfil", "tiger", "gardener", "bigboy", "timber", "dash", "hollow"] as const) {
-      // (Timber's clear place his own, from his log intro; Hollow's his own, BOSS_INTROS' `clear`: his lash reaches further.)
-      const m = marksOf(LAYOUTS[id], "across", null, id === "timber" ? marksFeel(TIMBER) : marksFeel(null, F, introOf(id)!.clear))!;
-      const st = id === "timber" ? stumps() : stools(TABLES[id]);
+    for (const id of ["alfil", "tiger", "gardener", "bigboy", "timber", "dash", "hollow", "pig"] as const) {
+      // (Timber's clear place his own, from his log intro; Hollow's his own, BOSS_INTROS' `clear`: his lash reaches
+      // further.)
+      const m = marksOf(LAYOUTS[id], "across", id === "pig" ? SHOP_PIG_MARKS : null, id === "timber" ? marksFeel(TIMBER) : marksFeel(null, F, introOf(id)!.clear))!;
+      const st = id === "timber" ? stumps() : id === "pig" ? buckets() : stools(TABLES[id]);
       // (The stools' outer edges, in the room's columns: the boss's west of the table, yours east; up to their tops.)
       const bossEdge = m.table.c - st.west;
       const youEdge = m.table.c + st.east;
@@ -995,11 +1008,20 @@ describe("the challenge's pacing (Nov 2)", () => {
       const toward = ([l, r]: [number, number], left: boolean) => (left ? -l : r);
       // (A boss without a God King attack, Dash: facing as its intro says, ShopRoom's `facesLeft`.)
       const body = toward(low(ch, "idle", band / k), !!(kit.kingAttack ? kit.kingAttack.facesLeft : introOf(id)!.facesLeft)) * k;
-      expect(m.bossClear.c + body, `${id}: the boss's front near the floor, west of its stool`).toBeLessThanOrEqual(bossEdge - GAP);
+      // (Wrangler's town figure is mirrored only walking in: in his intro he stands as drawn, below.)
+      if (id !== "pig") expect(m.bossClear.c + body, `${id}: the boss's front near the floor, west of its stool`).toBeLessThanOrEqual(bossEdge - GAP);
+      // (Wrangler: in his intro his figure and his moves as drawn, not mirrored; from the double yank on, once the buckets land.)
+      if (id === "pig") {
+        expect(m.bossClear.c + low(ch, "idle", band / k)[1] * k, "pig: his idle as drawn").toBeLessThanOrEqual(bossEdge - GAP);
+        for (const a of ["doubleYank", "brag"]) expect(m.bossClear.c + low(BOSS_PIG_INTRO, a, band / k)[1] * k, `pig: his ${a}`).toBeLessThanOrEqual(bossEdge - GAP);
+      }
       // Its attack, swung where it stands: its feet (the lowest 0.3 of a square) clear of the stool too. (Dash has none: he stands.)
       const ka = kit.kingAttack;
       expect(!!ka, `${id} has a God King attack`).toBe(id !== "dash");
-      if (ka) {
+      // (Wrangler's lasso lashes the floor nearly two squares out in front of him (0.95 at its rope's crack, 1.94 at its lash): clear
+      // of his bucket he'd stand 3.5 squares out, his spin off a phone's left edge (Eric, Nov 4: sprites always on screen). He stands
+      // at the usual place, his feet and all of him standing clear of it; only the swung rope crosses over it. Nov 4, Eric to confirm.)
+      if (ka && id !== "pig") {
         const feet = toward(low(ka.ch, ka.anim, 0.3 / k), !!ka.facesLeft) * k;
         expect(m.bossClear.c + feet, `${id}: its attack's feet`).toBeLessThanOrEqual(bossEdge - GAP);
       }

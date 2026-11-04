@@ -173,6 +173,11 @@ test("Puddles' greenhouse: Go in, Drizzle's crate with Puddles's Mower; the back
   await expect(room(page)).toHaveAttribute("data-room", "gardener");
   // The chat log over the light greenhouse: dark words (Eric, Nov 2), by night outside.
   await expect(page.locator(".town-chat")).toHaveAttribute("data-tone", "day");
+  // (For the review: his HunChess buckets, Nov 4, from the door: the stack by the potting bench, one by the fountain.)
+  if (SHOTS && process.env.PUDDLES_BUCKETS) {
+    await page.waitForTimeout(1200);
+    await page.screenshot({ path: `${SHOTS}/puddles-buckets-${test.info().project.name}.png` });
+  }
   await talk(page);
   const crate = page.getByRole("dialog", { name: "Puddles' Boss Crate", exact: true });
   await expect(crate).toBeVisible();
@@ -423,6 +428,53 @@ test("Hollow Peak (Nov 3): Go in (his line on the card), the cave: in at the mou
     await page.getByRole("button", { name: "Back", exact: true }).click();
     await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   }
+  expect(errors).toEqual([]);
+});
+
+test("Wrangler's Stall (Nov 4): Go in (its card its name and Go in), his barn: the pens, the board on its hay bale, the lanterns; his rooster keeps the shop on the counter, Wrangler's Boss Crate with Pen Pony", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  // (Wrangler is live for everyone, so his barn is too: a player's town.)
+  await page.goto("/town?sky=day");
+  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("pig"));
+  await expect.poll(() => homeAt(page, "pig"), { message: "Wrangler's Stall comes into view" }).not.toBeNull();
+  await goIn(page, "pig", "Wrangler's Stall");
+  await expect(room(page)).toHaveAttribute("data-room", "pig");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Wrangler's Stall");
+  // A plank barn in the evening light: the chat's words dark.
+  await expect(page.locator(".town-chat")).toHaveAttribute("data-tone", "day");
+  await expect.poll(async () => (await shopCam(page))?.zoom, { message: "zoomed out" }).toBe(1);
+  const name = test.info().project.name;
+  const still = async (what: string) => {
+    if (!SHOTS) return;
+    await page.waitForTimeout(1200);
+    await page.screenshot({ path: `${SHOTS}/${what}-${name}.png` });
+  };
+  // (Just in the doorway: the barn, the battle spot, the pens' knights hopping, the counter and the rooster on it.)
+  await still("room");
+  // The rooster on the counter: a tap on him walks you in front of it; his card says "Shopkeeper".
+  await expect.poll(() => shopAt(page, "keeper"), { message: "the rooster is drawn" }).not.toBeNull();
+  const at = (await shopAt(page, "keeper"))!;
+  await page.mouse.click(at.x, at.y);
+  const card = page.getByRole("dialog", { name: "Shopkeeper", exact: true });
+  await expect(card).toBeVisible({ timeout: 15_000 });
+  await expect(card.getByRole("heading", { name: "Shopkeeper", exact: true })).toBeVisible();
+  await expect(room(page)).toHaveAttribute("data-you", /^(9|10),(4|5)$/);
+  await still("counter");
+  await card.getByRole("button", { name: "Talk" }).click();
+  const crate = page.getByRole("dialog", { name: "Wrangler's Boss Crate", exact: true });
+  await expect(crate).toBeVisible();
+  await expect(crate).toContainText("3 Wrangler tokens, or 1 Wrangler token + 1 crate key");
+  await expect(crate).toContainText("Pen Pony");
+  await expect(crate).toContainText("You have 0 Wrangler tokens and 0 crate keys.");
+  await expect(crate.getByRole("button", { name: "Buy with 3 Wrangler tokens" })).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await expect(crate).toBeHidden();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
   expect(errors).toEqual([]);
 });
 

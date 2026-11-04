@@ -854,6 +854,11 @@ export type SoundName =
   | "pigHop"
   | "pigDraw"
   | "pigYank"
+  // (His challenge intro, Nov 4: the bale's scrape, a bucket's clatter, the wipe's spurs and cap pop.)
+  | "pigSlide"
+  | "pigClatter"
+  | "pigJingle"
+  | "pigPop"
   // The Hidden Boss (admins only, for now): synthesised, see characters/recluse-sounds.ts.
   | "recluseFlip"
   | "recluseShut"
@@ -1169,6 +1174,10 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   pigHop: pig("hop"),
   pigDraw: pig("draw"),
   pigYank: pig("yank"),
+  pigSlide: pig("slide"),
+  pigClatter: pig("clatter"),
+  pigJingle: pig("jingle"),
+  pigPop: pig("pop"),
   recluseFlip: recluse("flip"),
   recluseShut: recluse("shut"),
   recluseRustle: recluse("rustle"),
@@ -1424,6 +1433,10 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   pigHop: [["pig", "hop"]],
   pigDraw: [["pig", "draw"]],
   pigYank: [["pig", "yank"]],
+  pigSlide: [["pig", "slide"]],
+  pigClatter: [["pig", "clatter"]],
+  pigJingle: [["pig", "jingle"]],
+  pigPop: [["pig", "pop"]],
   recluseFlip: [["recluse", "flip"]],
   recluseShut: [["recluse", "shut"]],
   recluseRustle: [["recluse", "rustle"]],
