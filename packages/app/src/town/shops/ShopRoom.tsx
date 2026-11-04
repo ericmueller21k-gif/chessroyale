@@ -1349,7 +1349,7 @@ function startRoom(
     return findPath(elfRoom!, from, to);
   };
   /** (Tests, Ginger's igloo) Your figure as drawn, frame by frame (hookElves). */
-  const youTrail: { x: number; y: number; up: number; sy: number; z: number; t: number }[] = new Array(1200);
+  const youTrail: { x: number; y: number; up: number; sy: number; z: number; t: number }[] = new Array(6000);
   let youTrailN = 0;
   /** Where you're waiting to go while the elves are in your way (a tap's square), or null. */
   let waitFor: Sq | null = null;

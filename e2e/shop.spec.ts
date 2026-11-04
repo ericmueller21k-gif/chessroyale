@@ -627,26 +627,33 @@ test("Ginger Igloo (Nov 5): Go in (its card its name and Go in), the round igloo
   await tapTo([7, 9]);
   await expect.poll(async () => (await elvesOf(page))!.pairT, { message: "the pair's loop back at its start", timeout: 60_000, intervals: [200] }).toBeLessThan(3000);
   await clear();
+  // (`data-you` names your square as soon as you're on it, before your figure has finished its step there: a lift is read from the
+  // last frame drawn once your feet are on the square's middle.)
+  const settled = async (sq: readonly [number, number]) => {
+    const at = async () => (await elvesOf(page))!.trail.at(-1)!;
+    await expect.poll(async () => { const f = await at(); return Math.hypot(f.x - sq[0], f.y - sq[1]) < 0.01; }, { message: `your feet on (${sq})`, timeout: 10_000, intervals: [100] }).toBe(true);
+    return at();
+  };
   // Up the west stairs by taps: onto the low step from its foot, then the high step. Your feet on the step's height (the curve's).
   await elvesOf(page, true);
   await tapTo([5, 6]);
   await tapTo([6, 5]);
   await still("on-stair", 300);
-  const onStair = (await elvesOf(page))!.trail.at(-1)!;
+  const onStair = await settled([6, 5]);
   expect(onStair.up, "on the high step: its middle between the steps 30 and 35 px up").toBeGreaterThan(30);
   expect(onStair.up).toBeLessThan(35);
   // A tap on a deck square as it's drawn (up on the catwalk) walks you along it.
   await tapTo([9, 4]);
   await still("on-catwalk", 300);
-  expect((await elvesOf(page))!.trail.at(-1)!.up, "on the deck").toBe(40);
+  expect((await settled([9, 4])).up, "on the deck").toBe(40);
   // Down the east stairs to their foot: along the catwalk round its curve onto the high step, then a tap on the floor at the foot
   // walks you down (never off the deck's front). (The camera follows you: each square tapped once it's on screen.)
   await tapTo([11, 4]);
   await tapTo([13, 5]);
   await tapTo([14, 6]);
   await still("stair-foot", 300);
+  expect((await settled([14, 6])).up, "back on the floor").toBe(0);
   const t1 = (await elvesOf(page))!.trail;
-  expect(t1.at(-1)!.up, "back on the floor").toBe(0);
   // Every frame of the way: never off the chain (no square in front of the deck), and the lift never jumps for how far you went.
   /** The floor square a point is well inside (not on its edge, where the catwalk's diagonal steps cross a corner), or "". */
   const sqOf = (x: number, y: number) => (Math.abs(x - Math.round(x)) < 0.45 && Math.abs(y - Math.round(y)) < 0.45 ? `${Math.round(x)},${Math.round(y)}` : "");
