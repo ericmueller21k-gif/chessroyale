@@ -127,3 +127,4 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Wrangler code DONE 6edc3e5d → PR #483 (full-e2e), CI watcher b2b7bfz38; merge on green, tell Eric live. Killed stuck wrangler dev on 8981 (Eric standing OK). Open for Eric: his lash crosses his bucket during his God King attack (kept); he stands at 2.6 not 7.2.
 - Bigger-figures round STARTED (resumed battlefix helper, branch claude/bigger-side-figures, ports 8985/9485), alongside nothing else Opus. Then 50v50, then arrow keys (+ shrink zoom/recenter, v3 sketch pending Eric OK).
 - #483 Wrangler MERGED 2437cc27 (CI fix: profile ride count 16→17, mine). Deploy watcher running; tell Eric LIVE.
+- Bigger figures DONE 28a27b90 → PR #484 (targeted), CI watcher boyp3fikw. 50v50 batch STARTED (Opus high, /home/user/cr-crowdafk claude/crowd-votes-afk from 2437cc27). Next: arrow keys + smaller zoom/recenter.
