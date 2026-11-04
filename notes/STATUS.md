@@ -158,3 +158,4 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Eric Ginger fixes: center battle circle; icicle-shaped falling ice (taller, pointier, round flat top); more candy dispensers wrapping walls; stairs connected to catwalk; no wall gaps. Sent to the Ginger art helper (same art job, Eric-approved pairing).
 - Ginger stairs joined 6ef02ce9 (one flight per side, rising along back wall into deck; bays a/e gone). Eric's fallback if he dislikes: straight back-to-front flights. Asked Eric which.
 - Ginger CODE started (Eric OK'd stairs 'fine for now; real test = run up with pawn'). Brief brief-ginger-code.md, /home/user/cr-ginger, claude/ginger-home, ports 8983/9483.
+- Ginger code DONE dcf4a6c5 → PR #493 (full-e2e), CI watcher bh5qn5ne7. Note: arrows up fixed in every shop; doorway phone fps 35.7 vs 40.8.
