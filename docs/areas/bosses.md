@@ -644,10 +644,12 @@ build): online, phase 1 won is the crowd's victory):
   him at the board's top-left, half off the window at 2000 × 1250 (Eric, Nov 4). Moments that carry him onto the board (Big Boy's bounce,
   Sawyer's leaps, Wrangler's, Boingo's funhouse, Lights out) are unchanged; their own art still starts at the board's top-left.
 - **Their size.** From 1100 px wide the boss grows with the board (`characters/side-size.ts`: `SIDE_FEEL.boardPerPx` 240, 2 to 4.5
-  screen px a sprite px, in quarter steps) as far as his room left of the board and the window's top let him (`SIDE_REACH`, his drawing's
-  reach at rest and where each beat ends, measured by a test); the God King and your pawn by `--king-k` as the room right of the board
-  lets them. Babur keeps 2 (his pump's room). BossSide sets `--side-s` and `--king-k` on the screen; styles.css reads them. The board,
-  a phone and 900 to 1099 px are unchanged. Was 2 since Oct 8 (the boss) and 120 px (the God King) while the board grew Oct 29 / Nov 1.
+  screen px a sprite px) as far as his room left of the board and the window's top let him (`SIDE_REACH`, his drawing's reach at rest and
+  where each beat ends, measured by a test) and as far as the room right of the board lets the mirror: your pawn (else the God King) keeps
+  its left edge off the board and its middle as far out as the boss's, so it and the God King grow with him (`--king-k` = 1 + his middle's
+  move / 60), the God King's whole frame inside the window. Babur and a party's battle keep 2. BossSide sets `--side-s` and `--king-k` on
+  the screen; styles.css reads them. The board, a phone and 900 to 1099 px are unchanged. Was 2 since Oct 8 (the boss) and 120 px (the God
+  King) while the board grew Oct 29 / Nov 1.
 - **Eric's rule (Nov 4):** every figure whole on screen at rest and where each beat ends (docs/rules/eric.md); guard
   `e2e/boss-side.spec.ts`. Stills: `scripts/stills-battle-desktop.mjs` (sides, cast, cave). Decision:
   [2026-11-04-battle-desktop-fixes.md](../decisions/2026-11-04-battle-desktop-fixes.md).

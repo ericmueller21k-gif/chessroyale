@@ -30,7 +30,8 @@ removed (old → new) and says whether any of them guards a rule here.
   look cool"); cut off by the page's edge never is. Only mid-motion (a jump, a dash across) may it pass off screen.
   - Guard: `e2e/boss-side.spec.ts`, "Eric's rule (Nov 4): <boss> and the God King whole on screen at rest and at the end of every beat,
     phone and computer", one per boss with a character (BOSS_KITS), at 390 × 844 and at 1280 × 800, 1440 × 900, 1920 × 1080 and
-    2000 × 1250: every frame it rests in and the last frame of every animation, drawn where it stands, inside the window (and your pawn).
+    2000 × 1250: every frame it rests in and the last frame of every animation, drawn where it stands, inside the window (and your pawn),
+    and no sideways scroll (a figure's frame past the window's edge scrolls the page).
   - Decision: [2026-11-04-battle-desktop-fixes.md](../decisions/2026-11-04-battle-desktop-fixes.md).
 
 ## Home

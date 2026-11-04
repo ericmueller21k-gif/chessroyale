@@ -16,12 +16,17 @@ of each move, phone and computer; over the board or a menu is fine (docs/rules/e
 - **The old sizes:** the boss at 2 screen px a sprite px (box 96 × 120) since Boingo's first figure (7581a98d, Oct 8; 1× from 900 to
   1099 px since 6285b1cb, Oct 14), the God King in a 120 px box (his pixels doubled, d6c38776, Oct 8). They never shrank: the board grew round them (#406, Oct 29: 470 px
   to the window's height less the room, and #443, Nov 1: the title line gone), from 470 px to 600 to 1120 px.
-- **The new sizes:** the board's side over 240 (2.5 at 1280 × 800) up to 4.5, in quarter steps, as far as the room left of the board
-  (to the empty column's edge) and the window's top let each boss's drawing at rest and at each beat's end (`SIDE_REACH`); the God
-  King and your pawn the boss's wanted size over 2, as far as the room right of the board lets them (1.15 at 1280 and 1440, 1.5 at
-  1920, 1.25 at 2000). Calls: Babur keeps 2 (his pump stands beside him in that room; bigger, it went into the taller bar and the
-  board shrank, which Eric said to leave); a party's stacked God King is unchanged; non-integer scales are fine (the town and the God
-  King already draw that way).
+- **The new sizes:** the board's side over 240 (2.5 at 1280 × 800) up to 4.5, as far as three rooms allow: left of the board (to the
+  empty column's edge) and the window's top for each boss's drawing at rest and at each beat's end (`SIDE_REACH`); and right of the board,
+  because of the mirror (Eric, Oct 11 and Oct 28; `e2e/board-layout.spec.ts`, `boss-character.spec.ts`): your pawn (else the God King)
+  keeps its left edge 24 to 32 px off the board and its middle as far from the board as the boss's, so as the boss grows and his middle
+  moves out, your pawn and the God King grow with him (`k` = 1 + that move / 60), and the God King's whole frame (his canvas, which scrolls
+  the page if it passes the window's edge) must stay inside the window. That right-hand room is what holds them all back: the boss about
+  1.08× at 1280 × 800 and 1440 × 900, 1.33× at 1920 × 1080, 1.13× at 2000 × 1250, the God King and your pawn 1.11×, 1.47×, 1.18×.
+  PR #482's first run had them bigger (the God King grown from his middle, the pawn pushed out): it broke the mirror by 12.5 px and the
+  God King's frame scrolled the page sideways at 1280 to 1920 px. Bigger would need the boss to stand over the board's edge (Eric's
+  Nov 4 rule allows it; the Oct 28 "clear of the board" check doesn't), or the figures right of the board laid out differently: the
+  director's call. Babur keeps 2 (his pump's room); a party's battle keeps 2 (its figures stacked by the corner).
 - **The cave's bubble:** its font 0.11 of the boss's drawn frame height (11 to 32 px: about 22 px at 1440 × 900, 2.5 times the old 11),
   its tail just over the top of his drawing (not his frame's head room). A phone's is 11 to 13 px, as before, now just over his head.
 - Unchanged: the board's size and place, a phone's layout, 900 to 1099 px, moments that carry the boss onto the board (their art still
