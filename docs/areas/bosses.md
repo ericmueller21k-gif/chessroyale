@@ -643,13 +643,16 @@ build): online, phase 1 won is the crowd's victory):
   hands (`SIDE_FROM`). His figure hides only while a moment draws him elsewhere (`.boss-moment`: on the board). Before, the computer drew
   him at the board's top-left, half off the window at 2000 × 1250 (Eric, Nov 4). Moments that carry him onto the board (Big Boy's bounce,
   Sawyer's leaps, Wrangler's, Boingo's funhouse, Lights out) are unchanged; their own art still starts at the board's top-left.
-- **Their size.** From 1100 px wide the boss grows with the board (`characters/side-size.ts`: `SIDE_FEEL.boardPerPx` 240, 2 to 4.5
-  screen px a sprite px) as far as his room left of the board and the window's top let him (`SIDE_REACH`, his drawing's reach at rest and
-  where each beat ends, measured by a test) and as far as the room right of the board lets the mirror: your pawn (else the God King) keeps
-  its left edge off the board and its middle as far out as the boss's, so it and the God King grow with him (`--king-k` = 1 + his middle's
-  move / 60), the God King's whole frame inside the window. Babur and a party's battle keep 2. BossSide sets `--side-s` and `--king-k` on
-  the screen; styles.css reads them. The board, a phone and 900 to 1099 px are unchanged. Was 2 since Oct 8 (the boss) and 120 px (the God
-  King) while the board grew Oct 29 / Nov 1.
+- **Their size and place (round 2, Nov 4).** From 1100 px wide the figures grow toward twice their old size (`characters/side-size.ts`:
+  the boss `SIDE_FEEL.boardPerPx` 170, 2 to 4 screen px a sprite px; the God King and your pawn half that, 1 to 2): the boss in the room
+  left of the board (to the empty column's edge), your pawn and the God King in the room right of it (to the window's edge, or a chat
+  beside the corner). Each stands a 12 px gap off the board where its room allows and comes over the board's outer edge, by at most
+  `SIDE_FEEL.over` (0.05) of its side, where it doesn't; the boss is drawn over the board there (`.boss-side` z 6). The reach of each
+  drawing at rest and where each beat ends is `SIDE_REACH` / `KING_REACH` (measured by a test). BossSide sets `--side-s`, `--side-d`,
+  `--king-k`, `--first-d` and `--king-room` (the God King's words and menu fit it) on the screen; the God King's frame past the window's
+  edge is clipped (`.gm-main`), never scrolled to. The mirror (your pawn's middle as far from the board as the boss's) gave way to this:
+  each side by its own room. Babur and a party's battle keep 2 and their places. The board, a phone and 900 to 1099 px are unchanged.
+  Decision: [2026-11-04-bigger-side-figures.md](../decisions/2026-11-04-bigger-side-figures.md).
 - **Eric's rule (Nov 4):** every figure whole on screen at rest and where each beat ends (docs/rules/eric.md); guard
   `e2e/boss-side.spec.ts`. Stills: `scripts/stills-battle-desktop.mjs` (sides, cast, cave). Decision:
   [2026-11-04-battle-desktop-fixes.md](../decisions/2026-11-04-battle-desktop-fixes.md).

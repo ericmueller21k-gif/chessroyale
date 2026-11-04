@@ -2,20 +2,24 @@ import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { BOSS_KITS } from "../packages/app/src/characters/kits.ts";
 import { GOD_KING } from "../packages/app/src/characters/god-king.ts";
+import { SIDE_FEEL } from "../packages/app/src/characters/side-size.ts";
 import { renderFrame, type Character } from "../packages/app/src/characters/sprite.ts";
 import { BOARD_SEL, asAdmin, bossAloneFromHome, submitMove, test } from "./helpers.ts";
 
 /**
- * A boss beside the board on a computer stands clear of it (Eric, Oct 28: Folio "behind the board when idling";
- * docs/decisions/2026-10-28-folio-desktop-fixes.md): with no eval bar, as every player's board is, the drawn pixels of its
- * idle (not its frame, which has room around the drawing) stop short of the board's left edge. The bosses whose drawings
- * reach furthest toward the board: Folio's wing, Wrangler's lasso, Hollow, Sawyer, Smudgy and Jefferson.
+ * A boss beside the board on a computer stands by its bottom-left corner: a small gap off it where his room allows, and over its edge
+ * by at most SIDE_FEEL.over of its side where it doesn't (Eric, Nov 4: overlapping the board is fine, "it can even create a cool
+ * effect"; docs/decisions/2026-11-04-bigger-side-figures.md). Was (Oct 28, Folio "behind the board when idling"): clear of it, his
+ * drawing's right edge short of the board's left edge. With no eval bar, as every player's board is: the drawn pixels of its idle (not
+ * its frame, which has room around the drawing). The bosses whose drawings reach furthest toward the board: Folio's wing, Wrangler's
+ * lasso, Hollow, Sawyer, Smudgy and Jefferson.
  */
 
 const WIDE = ["folio", "pig", "hollow", "sawyer", "smudgy", "grex"];
 
-/** The board's left edge less the rightmost drawn pixel of the boss's idle, the most it reaches over 2 s (its frames move). */
-async function gap(page: Page): Promise<number> {
+/** The board's left edge less the rightmost drawn pixel of the boss's idle (negative: over the board), the most it reaches over 2 s (its frames move), and the board's side. */
+async function gap(page: Page): Promise<{ gap: number; side: number }> {
+  let side = 0;
   let least = Infinity;
   for (let i = 0; i < 10; i++) {
     const g = await page.evaluate((sel) => {
@@ -25,23 +29,29 @@ async function gap(page: Page): Promise<number> {
       const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
       let right = -1;
       for (let y = 0; y < c.height; y++) for (let x = c.width - 1; x > right; x--) if (d[(y * c.width + x) * 4 + 3]! > 0) right = x;
-      return board.left - (box.left + ((right + 1) * box.width) / c.width);
+      return { g: board.left - (box.left + ((right + 1) * box.width) / c.width), side: board.width };
     }, BOARD_SEL.wrap);
-    least = Math.min(least, g);
+    least = Math.min(least, g.g);
+    side = g.side;
     await page.waitForTimeout(200);
   }
-  return least;
+  return { gap: least, side };
 }
 
 for (const boss of WIDE) {
-  test(`${boss} beside the board stands clear of it, no eval bar`, async ({ page }) => {
+  test(`${boss} beside the board stands by its corner, over its edge by at most ${SIDE_FEEL.over} of its side, no eval bar`, async ({ page }) => {
     test.skip(test.info().project.name !== "desktop", "the boss stands beside the board on a computer only");
     await page.addInitScript(() => localStorage.setItem("brc.evalBar", "0"));
     await page.goto(`/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=${boss}`);
     await bossAloneFromHome(page);
     await expect.poll(() => page.evaluate(() => (window as any).match?.phase.kind ?? "none"), { timeout: 60_000 }).toBe("play");
     await expect(page.locator(".boss-char.place-side .boss-char-sprite")).toBeVisible();
-    expect(await gap(page)).toBeGreaterThanOrEqual(0);
+    for (const [w, h] of [[1280, 800], [2000, 1250]] as const) {
+      await page.setViewportSize({ width: w, height: h });
+      await page.waitForTimeout(400);
+      const g = await gap(page);
+      expect(g.gap, `${w}: over the board by at most ${SIDE_FEEL.over} of its side`).toBeGreaterThanOrEqual(-g.side * SIDE_FEEL.over - 1);
+    }
   });
 }
 
@@ -103,7 +113,7 @@ for (const [name, kit] of Object.entries(BOSS_KITS)) {
           const b = e?.getBoundingClientRect();
           return b ? [b.left, b.top, b.right, b.bottom] : null;
         };
-        return { boss: box(".boss-char:not(.place-results) .boss-char-sprite"), king: box(".boss-dock .gk-unit .gk-canvas"), you: box(".boss-dock .you-pawn-bob"), win: [innerWidth, innerHeight], scroll: [document.documentElement.scrollWidth, document.documentElement.clientWidth] };
+        return { boss: box(".boss-char:not(.place-results) .boss-char-sprite"), king: box(".boss-dock .gk-unit .gk-canvas"), you: box(".boss-dock .you-pawn-bob"), moves: box(".mv-side"), win: [innerWidth, innerHeight], scroll: [document.documentElement.scrollWidth, document.documentElement.clientWidth] };
       });
       const inside = (b: number[], what: string) => {
         expect(b[0]!, `${w} × ${h}: ${what} ${b} past the window's left`).toBeGreaterThanOrEqual(0);
@@ -111,10 +121,16 @@ for (const [name, kit] of Object.entries(BOSS_KITS)) {
         expect(b[2]!, `${w} × ${h}: ${what} ${b} past its right`).toBeLessThanOrEqual(r.win[0]!);
         expect(b[3]!, `${w} × ${h}: ${what} ${b} past its bottom`).toBeLessThanOrEqual(r.win[1]!);
       };
+      // (Never over the move list's text: Nov 4, round 2.)
+      const clearOf = (b: number[], what: string) => {
+        if (r.moves) expect(b[0]! < r.moves[2]! && r.moves[0]! < b[2]! && b[1]! < r.moves[3]! && r.moves[1]! < b[3]!, `${w} × ${h}: ${what} ${b} over the move list ${r.moves}`).toBe(false);
+      };
       expect(r.boss, `${w} × ${h}: ${name} drawn`).not.toBeNull();
       inside(onPage(boss, r.boss!, ch.w, ch.h), name);
+      clearOf(onPage(boss, r.boss!, ch.w, ch.h), name);
       expect(r.king, `${w} × ${h}: the God King drawn`).not.toBeNull();
       inside(onPage(KING_BOXES, r.king!, GOD_KING.w, GOD_KING.h), "the God King");
+      clearOf(onPage(KING_BOXES, r.king!, GOD_KING.w, GOD_KING.h), "the God King");
       if (r.you) inside(r.you.map(Math.round), "your pawn");
       // (A figure's frame past the window's edge, drawn or not, scrolls the page sideways: never.)
       expect(r.scroll[0], `${w} × ${h}: no sideways scroll`).toBeLessThanOrEqual(r.scroll[1]!);

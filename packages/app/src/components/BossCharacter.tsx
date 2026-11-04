@@ -26,7 +26,8 @@ import { CRITICAL, LOW, NORMAL, VoiceBubble, bossVoice, holdMs, type Priority } 
 import { mateAttack, prewarmKingAttack } from "./KingAttack.tsx";
 import { lightsId, syncLights } from "../characters/lights.ts";
 import { seenFen } from "../camo.ts";
-import { SIDE_REACH, sideSizes } from "../characters/side-size.ts";
+import { KING_REACH, SIDE_FEEL, SIDE_REACH, sideSizes } from "../characters/side-size.ts";
+import { GOD_KING } from "../characters/god-king.ts";
 
 /**
  * A raid boss as a character (if it has one: see characters/kits.ts), standing across the board from the God King: on a
@@ -488,59 +489,100 @@ export function BossSide({ match }: { match: GameView }) {
 /** Where the figures beside the board are sized (styles.css reads `--side-s` and `--king-k` there): a computer from 1100 px wide. */
 const SIDES = "(min-width: 1100px) and (min-height: 600px)";
 /**
- * The figures' sizes on this screen for the room beside its board (sideSizes), set on the screen: `--side-s` (the boss), `--king-k` (the
- * God King and your pawn, growing from their left edge so the first one's middle mirrors the boss's).
+ * The figures' sizes and places on this screen for the room beside its board (sideSizes), set on the screen: `--side-s` (the boss's size),
+ * `--side-d` (his box's middle, px left of his anchor), `--king-k` (the God King's and your pawn's size) and `--first-d` (the middle of the
+ * first figure right of the board, px right of the dock's edge). Removed where they don't apply (a phone, 900 to 1099 px).
  */
 function fitSides(side: HTMLElement | null, name: string) {
   const screen = side?.closest<HTMLElement>(".screen");
   if (!side || !screen) return;
+  const vars = ["--side-s", "--side-d", "--side-lift", "--king-k", "--first-d", "--king-room"];
   if (!matchMedia(SIDES).matches) {
-    for (const v of ["--side-s", "--king-k"]) screen.style.removeProperty(v);
+    for (const v of vars) screen.style.removeProperty(v);
     return;
   }
-  const board = screen.querySelector(".board-row .board-wrap")?.getBoundingClientRect();
+  const rect = (e: Element | null | undefined) => {
+    const b = e?.getBoundingClientRect();
+    return b?.width ? b : null;
+  };
+  const wrap = rect(screen.querySelector(".board-row .board-wrap"));
   // (How far his drawing reaches, at rest and where each beat ends (SIDE_REACH), from his feet in his frame's box as it stands now,
   // whichever frame is showing: his entrance may be mid-drop.)
   const kit = bossKit(name);
-  const box = side.querySelector(".boss-char")?.getBoundingClientRect();
-  const cv = side.querySelector<HTMLCanvasElement>(".boss-char-sprite")?.getBoundingClientRect();
+  const box = rect(side.querySelector(".boss-char"));
+  const cv = rect(side.querySelector(".boss-char-sprite"));
   const reach = kit ? SIDE_REACH[kit.ch.id] : undefined;
-  if (!board?.width || !box?.width || !cv?.width || !kit || !reach) return;
+  if (!wrap || !box || !cv || !kit || !reach) return;
   const sx = cv.width / kit.ch.w;
   const now = (v: string, d: number) => parseFloat(screen.style.getPropertyValue(v)) || d;
   const s = now("--side-s", 2);
   const k = now("--king-k", 1);
-  const edge = side.getBoundingClientRect().left;
-  // Right of the board: your pawn (Boss alone), else the God King, and everything of theirs (his frame reaches past his box).
-  const dock = screen.querySelector(".boss-dock");
+  const anchor = side.getBoundingClientRect().left;
+  // (The board's edge on his side: the eval bar's, where it shows.)
+  const left = rect(screen.querySelector(".board-row > .eval-bar"))?.left ?? wrap.left;
+  // Right of the board: your pawn (Boss alone), else the God King; the drawings of both (his frame is wider than his drawing).
+  const dock = screen.querySelector(":scope > .boss-dock");
   const unit = dock?.querySelector(":scope > .gk-unit");
-  const first = (dock?.querySelector(":scope > .you-pawn") ?? unit)?.getBoundingClientRect();
-  let right: { left: number; span: number } | null = null;
-  if (first?.width && unit) {
-    const ends = [unit, ...unit.querySelectorAll(".gk-canvas, .god-king"), ...dock!.querySelectorAll(":scope > .you-pawn, :scope > .you-pawn .you-pawn-bob")].map((e) => e.getBoundingClientRect().right);
-    right = { left: first.left, span: (Math.max(...ends) - first.left) / k };
+  const pawn = rect(dock?.querySelector(":scope > .you-pawn"));
+  const art = rect(dock?.querySelector(":scope > .you-pawn .you-pawn-bob"));
+  const king = rect(unit?.querySelector(".gk-canvas"));
+  const kx = king ? king.width / GOD_KING.w : 0;
+  let right: { mid: number; inner: number; outer: number; over: boolean } | null = null;
+  if (unit && king) {
+    const kingRight = king.left + (GOD_KING.foot[0] + KING_REACH[2]) * kx;
+    const first = pawn ?? unit.getBoundingClientRect();
+    const mid = first.left + first.width / 2;
+    // (Your pawn's box is its inner edge, a hair wider than its drawing; the God King alone keeps his box off the board.)
+    right = pawn && art ? { mid, inner: pawn.left, outer: Math.max(kingRight, art.left + art.width * (0.5 + SIDE_FEEL.pawnHalf)), over: true } : { mid, inner: first.left, outer: kingRight, over: false };
   }
-  const sizes = sideSizes(
+  const space = rect(document.querySelector(".tower-space"));
+  // (Right of the board the room ends at the window's edge, or at a chat beside the board's corner.)
+  const chat = rect(screen.querySelector(":scope > .under-board"));
+  const place = sideSizes(
     {
-      board: board.width,
-      boardLeft: edge,
-      boardBottom: board.bottom,
-      leftLimit: (() => {
-        const space = document.querySelector(".tower-space")?.getBoundingClientRect();
-        return space?.width ? space.left : screen.getBoundingClientRect().left;
-      })(),
-      winW: document.documentElement.clientWidth,
+      board: wrap.width,
+      boardLeft: left,
+      boardRight: wrap.right,
+      boardBottom: wrap.bottom,
+      leftLimit: space?.left ?? screen.getBoundingClientRect().left,
+      rightLimit: Math.min(document.documentElement.clientWidth, chat && chat.left > wrap.right ? chat.left : Infinity),
       s,
-      k,
       bossLeft: cv.left + (kit.ch.foot[0] - reach[0]) * sx,
+      bossRight: cv.left + (kit.ch.foot[0] + reach[2]) * sx,
       bossTop: cv.top + (kit.ch.foot[1] - reach[1]) * sx,
-      grow: (edge - (box.left + box.width / 2)) / s,
+      bossMid: box.left + box.width / 2,
+      k,
       right,
       fixed: !!dock?.classList.contains("dk-party"),
+      // (A raid's boss stands over its scoreboard's edge, where he was: no empty column beside the board for him to grow into.)
+      bossFixed: !space,
     },
     undefined,
     kit.ch.id,
   );
-  screen.style.setProperty("--side-s", String(sizes.s));
-  screen.style.setProperty("--king-k", String(sizes.k));
+  screen.style.setProperty("--side-s", String(place.s));
+  screen.style.setProperty("--king-k", String(place.k));
+  if (place.bossMid === null) {
+    screen.style.removeProperty("--side-d");
+    screen.style.removeProperty("--side-lift");
+  } else {
+    screen.style.setProperty("--side-d", `${Math.round((anchor - place.bossMid) * 10) / 10}px`);
+    // Over the board's edge, the few pixels his drawing has under his feet (SIDE_REACH's down) would lie over the dock's row under the
+    // board: he stands that much higher there.
+    const row = rect(dock?.querySelector(":scope > .boss-dock-main"));
+    const overRow = place.bossMid + (cv.left + (kit.ch.foot[0] + reach[2]) * sx - (box.left + box.width / 2)) * (place.s / s) > (row?.left ?? Infinity);
+    const under = reach[3] * place.s;
+    const lift = row && overRow ? Math.max(0, Math.ceil(wrap.bottom + under - row.top + 1)) : 0;
+    screen.style.setProperty("--side-lift", `${lift}px`);
+  }
+  const edge = dock?.getBoundingClientRect().right;
+  if (place.firstMid === null || edge === undefined) {
+    screen.style.removeProperty("--first-d");
+    screen.style.removeProperty("--king-room");
+    return;
+  }
+  screen.style.setProperty("--first-d", `${Math.round((place.firstMid - edge) * 10) / 10}px`);
+  // (The room his words and his menu open into: from his box's left edge (and their 4 px in) to the window's, less the margin.)
+  const kingLeft = place.firstMid + (pawn ? 60 : -60) * place.k;
+  screen.style.setProperty("--king-room", `${Math.floor(document.documentElement.clientWidth - SIDE_FEEL.margin - kingLeft - 4)}px`);
 }

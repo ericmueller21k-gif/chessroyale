@@ -13719,9 +13719,15 @@ img.qicon {
    its middle stays as far from the board as the boss's (the mirror: k = 1 + its middle's move / 60), and the room right of the board
    for the God King's whole frame holds them both back. The board, the room it leaves and a phone are unchanged. docs/decisions/2026-11-04-battle-desktop-fixes.md. */
 @media (min-width: 1100px) and (min-height: 600px) {
+  /* (His box's middle `--side-d` px left of his anchor, set with his size; where it isn't, where it was: 14 px and the eval bar's room
+     out, scaled.) Over the board, where his room makes him stand over its edge (Eric, Nov 4: overlapping it is fine). */
+  .boss-side {
+    z-index: 6;
+  }
   .boss-char.place-side {
     --bc-scale: var(--side-s, 2);
-    right: calc((14px + var(--bs-out, 0px)) * var(--bc-scale) / 2);
+    right: calc(var(--side-d, calc((14px + var(--bs-out, 0px)) * var(--bc-scale) / 2 + 24px * var(--bc-scale))) - 24px * var(--bc-scale));
+    bottom: var(--side-lift, 0px);
     width: calc(48px * var(--bc-scale));
     height: calc(60px * var(--bc-scale));
   }
@@ -13746,17 +13752,35 @@ img.qicon {
     width: calc(116px * var(--king-k, 1));
     height: calc(116px * var(--king-k, 1));
   }
+  /* The first figure right of the board (your pawn, else the God King): its middle `--first-d` px right of the dock's edge, set with the
+     sizes (where it isn't, where it was); the God King right of your pawn. Your pawn's box stands on the board's bottom line (its feet
+     there), so it never lies over the dock's row under the board where it comes over the board's corner. */
   .screen.game > .boss-dock.dk-pawn:not(.dk-party) > .you-pawn {
     --pw: calc(168px * var(--king-k, 1));
+    --feet: 0px;
+    translate: 0 -14px;
+    left: calc(100% + var(--first-d, calc(var(--gk-off, 2px) + var(--bs-out, 0px) + 60px * var(--king-k, 1))) - 60px * var(--king-k, 1));
     width: calc(120px * var(--king-k, 1));
-    height: calc(120px * var(--king-k, 1) + 14px);
+    height: calc(120px * var(--king-k, 1));
   }
   .screen.game > .boss-dock.dk-pawn:not(.dk-party) > .gk-unit {
-    left: calc(100% + var(--gk-off, 2px) + var(--bs-out, 0px) + 120px * var(--king-k, 1));
+    left: calc(100% + var(--first-d, calc(var(--gk-off, 2px) + var(--bs-out, 0px) + 60px * var(--king-k, 1))) + 60px * var(--king-k, 1));
   }
-  /* (His words open right of him: narrower by as much as he stands further out, so they stay in the window: board-size.css.) */
-  .screen.game:has(> .boss-dock.dk-pawn):has(.you-pawn) > .boss-dock:not(.dk-party) .gk-bubble {
-    max-width: min(250px, calc(var(--side-w, 340px) - 98px - 120px * (var(--king-k, 1) - 1)));
+  .screen.game > .boss-dock:not(.dk-party):not(.dk-pawn) > .gk-unit {
+    left: calc(100% + var(--first-d, calc(var(--gk-off, 26px) + 60px * var(--king-k, 1))) - 60px * var(--king-k, 1));
+  }
+  /* (His words and his menu open right of him: no wider than the room from his left edge to the window's (`--king-room`, set with the
+     sizes), so they stay in the window: board-size.css had it from the column's width.) */
+  .screen.game.screen:has(> .boss-dock):has(.gk-unit) > .boss-dock:not(.dk-party) .gk-bubble {
+    max-width: min(250px, var(--king-room, 250px));
+  }
+  .screen.game.screen:has(> .boss-dock):has(.gk-unit) > .boss-dock:not(.dk-party) .gk-command {
+    width: min(176px, var(--king-room, 176px));
+  }
+  /* (The God King's frame is wider than his drawing: past the window's edge, its empty part is cut, not scrolled to. His drawing stays
+     inside the window: sideSizes, and e2e/boss-side.spec.ts.) */
+  .gm-main:has(.screen.game > .boss-dock) {
+    overflow-x: clip;
   }
 }
 /* His words: a pixel text box beside him (above him by the board), like the God King's. */

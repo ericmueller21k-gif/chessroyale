@@ -1,3 +1,4 @@
+import { SIDE_FEEL } from "../packages/app/src/characters/side-size.ts";
 import { expect, type Page } from "@playwright/test";
 import { BOARD_SEL, test, bossAloneFromHome } from "./helpers.ts";
 
@@ -44,9 +45,10 @@ test("Boingo the Clown: a raid boss as a character, across the board from the Go
     const fig = (await page.locator(".gk-unit .gk-unit-btn").first().boundingBox())!;
     const pawn = (await page.locator(".you-pawn").boundingBox())!;
     const wrap = (await page.locator(".board-wrap").first().boundingBox())!;
-    expect(pawn.x, "your pawn by the board's corner").toBeGreaterThanOrEqual(board.x + board.width);
-    // (Your pawn now mirrors the boss: its middle as far from the board as his, as the God King's was, the director's note, Oct 28.)
-    expect(Math.abs(pawn.x + pawn.width / 2 - (wrap.x + wrap.width) - (wrap.x - (box.x + box.width / 2))), "your pawn's middle as far from the board as the boss's").toBeLessThanOrEqual(2);
+    // (Your pawn by the board's corner: a small gap off it, or over its edge by at most SIDE_FEEL.over of its side where its room needs it;
+    // Nov 4, round 2: docs/decisions/2026-11-04-bigger-side-figures.md. Was the mirror: its middle as far from the board as the boss's.)
+    expect(pawn.x, "your pawn by the board's corner").toBeGreaterThanOrEqual(board.x + board.width - board.width * SIDE_FEEL.over - 1);
+    expect(pawn.x, "your pawn by the board's corner").toBeLessThanOrEqual(board.x + board.width + 32);
     expect(fig.x, "the God King right of your pawn").toBeGreaterThanOrEqual(pawn.x + pawn.width - 1);
     expect(Math.abs(fig.y + fig.height - (box.y + box.height))).toBeLessThanOrEqual(2);
     const status = (await page.locator(".boss-dock-main").boundingBox())!;
