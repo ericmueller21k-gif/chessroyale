@@ -586,7 +586,32 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   starts moving again"). The machines and the floor pallet block your walking where they are: a tap finds a way round them; one stepping
   into your way stops you where you are. Each client runs them from its own room's clock (no server state). Test hook `__shopCrew()`.
   docs/decisions/2026-11-04-jefferson-home.md.
-- **Which homes.** Babur's Circus (`tiger`), Puddles' Botanical Garden (`gardener`) and Alfil's Pyramid (`alfil`, Nov 2: Woolly the Shopkeeper, "Alfil's Boss Crate" with Alfil's Howdah, a sandstone ceiling, the chat's day tone) and Big Boy's Crib (`bigboy`, Nov 2: Blocky the Shopkeeper, "Big Boy's Boss Crate" with Big Boy's Buggy, a nursery ceiling of sky, clouds and stars, the chat's day tone; a ball pit, solid, under a walkway, the shop's platform and the battle circle you walk on, the circle in the walkway's foam squares with a zoo-animal rug in its middle; his toy airplane, three squares deep, stands up whole at its foot, `RoomArt.upright`, rather than lying flat as a plan) and Timber's Lumber Lodge (`timber`, Nov 3, an admin's town only: Rivet the Shopkeeper behind the middle of the workbench, "Timber's Boss Crate" with The Log Roller, a lodge's ceiling of dark planks between heavy beams, the chat's day tone; the giant king being carved on its dais, 4 × 2 squares, stands up whole, `RoomArt.upright`; the circle's branded start marks, `SHOP_TIMBER_MARKS`, passed as Big Boy's are; his challenge his own intro since Nov 3, the log he gnaws into the table, his line "Hard hats on. We're building today.")) and Dash's Kicks (`dash`, Nov 3, an admin's town only: Tick the Shopkeeper on the counter's middle squares, drawn half a square back and west (`at` [9, 1.5]) so the low tortoise's head shows over the 30 px counter, clear of its shoe boxes; "Dash's Boss Crate" with Cheetah Shoes; a store's ceiling of white tiles and light panels; the chat's day tone; the halfpipe, 4 × 2 squares, stands up whole, `RoomArt.upright`; his try-on mats, `SHOP_BLITZ_MARKS`, passed as Timber's are) and Hollow Peak (`hollow`, Nov 3, everyone's town: below, "Hollow's cave") and Wrangler's Stall (`pig`, Nov 4, everyone's town: above, "Wrangler's barn") and Jefferson's Fireworks (`grex`, Nov 4, everyone's town: above, "Jefferson's warehouse"): `SHOPS` in `town/shops/shops.ts`. Their home's card
+- **Ginger's igloo (Nov 5).** Ginger is live, so his igloo is in everyone's town. Its art (`shops/ginger-art.ts`, the art branch's
+  `house-shop-ginger` at 6ef02ce9, with its `shops/candy-kit.ts`, which imports `warehouse-kit.ts`) is a candy shop inside his igloo
+  run by little gnome-ish elves: a round floor 10 squares across round (9.5, 9.5) (`SHOP_GINGER_FLOOR`, a floor's shape as Hollow's,
+  not a cave), the entry tunnel and the stairs' feet; the walls one curve of overlapping 45 px cards (no gaps), the candy wall of gravity
+  bins and tall tubes round the back and both sides, ice lanterns, barrels of candy canes and loose candy; the battle spot glossy ice with
+  his peppermint and your snowflake as its marks (`SHOP_GINGER_MARKS`). Its roof: the dome's ice blocks arching overhead (`roof: "igloo"`);
+  outside the doorway the snowy night; the chat's day tone. Its pools of light and the battle spot's cool shine are baked into the
+  floor's picture (they never change: no glows a frame). **The Shopkeeper:** the elf in a Santa hat (`characters/sidekicks/elf.ts`,
+  baked as the others; not a town bot: Crumb stays Ginger's kid) behind his half-round stand at the back middle, under the CANDY sign,
+  on (9, 5) and (10, 5), drawn at his art's size (`ShopDef.tall` 25). "Ginger's Boss Crate" with the Candy Cane Sled.
+  **The second level** (`shops/levels.ts`, the first shop with one): a catwalk 40 px up along the back curve ((7, 5), (8, 4) to (11, 4),
+  (12, 5); the steps round the curve diagonal), and a straight flight of stairs at each end on its own row (west (5, 5) low, (6, 5) high,
+  its foot (5, 6); east mirrored, (14, 5), (13, 5), foot (14, 6)). Those squares are walkable only along their chain (`Room.levels`,
+  `around`): from the floor only from a foot, never off the deck's front edge. Your figure (and every elf) is lifted by one height curve,
+  `liftAt`: the steps' heights from the art (each quarter of a square a 5 px step) joined in straight lines between the steps' middles,
+  easing up off the floor over the half square in front of the low step; drawn half a square nearer up there (`levelZ`), in front of the
+  cards it stands on. A tap on the deck as drawn walks you there (the nearer free staircase); the arrow keys go along the chain (left and
+  right along the flight and round the curve, up from a foot climbs on, up and down on the deck nothing). Inside every room, the up arrow
+  now walks you up the screen (rows run toward a room's camera: it walked you down). **The elves** (`shops/ginger-elves.ts`, drawn from
+  their sprites as the room loads, about a hundred small frames): three walkers on their loops round the battle spot, and the dispensing
+  pair (box and notepad) on their 47.5 s loop: the lower row's bins, up the east stairs, the upper row's tubes along the catwalk, down
+  the west stairs. Each waits while you (or the boss walking in) stand on or just ahead of its way (`SHOP_FEEL.elves.look`), and takes its
+  square (and, walking, the one just ahead): a tap walks you round them (up the other staircase if one is on the nearer); one in your way
+  as you walk and you wait, then go on or round; an elf waiting for you while you wait for it and you give way. No server state. Test
+  hook `__shopElves()` (with your figure's lift frame by frame). docs/decisions/2026-11-05-ginger-home.md.
+- **Which homes.** Babur's Circus (`tiger`), Puddles' Botanical Garden (`gardener`) and Alfil's Pyramid (`alfil`, Nov 2: Woolly the Shopkeeper, "Alfil's Boss Crate" with Alfil's Howdah, a sandstone ceiling, the chat's day tone) and Big Boy's Crib (`bigboy`, Nov 2: Blocky the Shopkeeper, "Big Boy's Boss Crate" with Big Boy's Buggy, a nursery ceiling of sky, clouds and stars, the chat's day tone; a ball pit, solid, under a walkway, the shop's platform and the battle circle you walk on, the circle in the walkway's foam squares with a zoo-animal rug in its middle; his toy airplane, three squares deep, stands up whole at its foot, `RoomArt.upright`, rather than lying flat as a plan) and Timber's Lumber Lodge (`timber`, Nov 3, an admin's town only: Rivet the Shopkeeper behind the middle of the workbench, "Timber's Boss Crate" with The Log Roller, a lodge's ceiling of dark planks between heavy beams, the chat's day tone; the giant king being carved on its dais, 4 × 2 squares, stands up whole, `RoomArt.upright`; the circle's branded start marks, `SHOP_TIMBER_MARKS`, passed as Big Boy's are; his challenge his own intro since Nov 3, the log he gnaws into the table, his line "Hard hats on. We're building today.")) and Dash's Kicks (`dash`, Nov 3, an admin's town only: Tick the Shopkeeper on the counter's middle squares, drawn half a square back and west (`at` [9, 1.5]) so the low tortoise's head shows over the 30 px counter, clear of its shoe boxes; "Dash's Boss Crate" with Cheetah Shoes; a store's ceiling of white tiles and light panels; the chat's day tone; the halfpipe, 4 × 2 squares, stands up whole, `RoomArt.upright`; his try-on mats, `SHOP_BLITZ_MARKS`, passed as Timber's are) and Hollow Peak (`hollow`, Nov 3, everyone's town: below, "Hollow's cave") and Wrangler's Stall (`pig`, Nov 4, everyone's town: above, "Wrangler's barn") and Jefferson's Fireworks (`grex`, Nov 4, everyone's town: above, "Jefferson's warehouse") and Ginger Igloo (`gingerbread`, Nov 5, everyone's town: above, "Ginger's igloo"): `SHOPS` in `town/shops/shops.ts`. Their home's card
   is its name, centered, and **"Go in"** (gold) under it, centered, nothing else (Eric, Nov 2: "chop the Shop and Coming soon": a short
   card, `.town-card.town-door`); every other home's card is as it was (its name, Hollow's line, "Shop" greyed and "Coming soon").
 - **Going in.** "Go in" walks you to the square in front of the door (the plot's front row's middle, a row out); there the town zooms in on
@@ -678,6 +703,17 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
   the crew are on their loops again (no walk back). Every beat is `CHALLENGE_FEEL.crew` or the art's frames (`crewAt`, `crewTimes`,
   `crewCues`); about 13 s from the marks to the wipe. Ten new sounds (`grexShout`, `grexStep`, `grexSnort`, `grexHiss`, `grexClunk`,
   `grexCreak`, `grexCreakSoft`, `grexRocket`, `grexPopSoft`, `grexBang`), every cue his own.
+- **Ginger's challenge (Nov 5, his own; Eric's design, intro-ginger-nov5.md):** his own camera, centred on the table (`BossIntro.cam`,
+  `introCam`; every other boss's is `CHALLENGE_FEEL.cam` as before), so both staircases show on a phone. You both walk on to the marks
+  (his peppermint west, your snowflake east) and stand there: no stools. His line (a placeholder until Eric's Gemini lines): "Cold enough
+  for you?". He charges his staff and blasts the air over the battle spot; the icicle forms in the burst, falls point first and stabs the
+  floor (a crack that stays, a puff of snow): its round flat top is the table, 27 px up (a park table's). The stockroom door opens and two
+  elves bring the board out ("Coming, boss!" over them), run round behind you both and toss it up onto the table; he casts and the pieces
+  appear as the small white light on the board fades; his brag; his God King attack; his blizzard of snowflakes and colored candy canes
+  (`INTRO_GINGER_STORM` and `_FRONT`). The table and the board are in place long before the cover, and the carriers at their watch spots
+  before his brag. The room's own elves keep working. Every beat is `CHALLENGE_FEEL.ice` or the art's frames (`iceTimes`, `iceAt`,
+  `iceCues`); about 13.2 s from the marks to the wipe. Twelve new sounds (`gingerCharge`, `gingerBlast`, `gingerBurst`, `gingerWhoosh`,
+  `gingerStab`, `gingerStep`, `gingerHeave`, `gingerClack`, `gingerCast`, `gingerSparkle`, `gingerThump`, `gingerGust`), every cue his own.
 - **Hollow's challenge (Nov 3):** his own intro since Nov 3, round 2 (below: "Hollow's own"); his line "Did you leave a light on?"; the
   rings in the ice (`SHOP_HOLLOW_MARKS`) give the table's place; his seat his own (`BossIntro.clear` 2.92, `marksFeel`'s `own`): his
   lash lies 1.6 squares out in front of his feet, so at the usual 2.6 it reached his stool. The pond is smaller than the other circles
@@ -688,7 +724,7 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
   as before (11 to 13 px), just over his head; it stays in the view. Decision: [2026-11-04-battle-desktop-fixes.md](../decisions/2026-11-04-battle-desktop-fixes.md).
 - **Which bosses.** Those in `BOSS_INTROS` (`town/shops/challenge.ts`): every boss whose home has an inside (`SHOPS`): Alfil (his own
   intro, `custom: true`), Big Boy (his own, Nov 2), Timber (his own, Nov 3; in an admin's town only while he's in the game for admins
-  first), Hollow (his own, Nov 3, everyone's), Wrangler (his own, Nov 4, everyone's: below), Jefferson (his own, Nov 4, everyone's: below), Babur, Puddles and Dash (the default intro; Dash's since Nov 3, in an admin's town only, until his own in round 3: no God
+  first), Hollow (his own, Nov 3, everyone's), Wrangler (his own, Nov 4, everyone's: below), Jefferson (his own, Nov 4, everyone's: below), Ginger (his own, Nov 5, everyone's: above), Babur, Puddles and Dash (the default intro; Dash's since Nov 3, in an admin's town only, until his own in round 3: no God
   King attack was drawn for him, so he stands in his idle through the swing's beat, turned to you by his intro's `facesLeft`). Every
   other boss's card works as before (its confirm, Leave, the Boss
   raid screen). Per player: it all happens on your own screen; the boss stays at its home for everyone else.
