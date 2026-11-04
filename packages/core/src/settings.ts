@@ -2541,6 +2541,14 @@ export const SQUADS_LOBBY = {
    * `jumpAfterMs` after your move (time to see your piece land: your move shows nowhere else until the half ends).
    */
   watching: { coalesceMs: 1000, shown: 4, jumpToNext: true, jumpAfterMs: 600 },
+  /**
+   * Move replay on screen (Eric, Nov 5; the rule's free time: SQUADS.replaySecondsPerMove). Coming back to a board, the
+   * moves played there since you last played it land one by one: the first `firstMs` after your half begins, then one
+   * every `stepMs`, the last held until the extra free time is over (SQUADS.replaySecondsPerMove a move, so it always fits).
+   * `on`: the replay button's setting on a device (an account) that hasn't set it. A name tag over each moved piece:
+   * `tagChars` letters at most, then "…".
+   */
+  replay: { on: true, firstMs: 150, stepMs: 450, tagChars: 12 },
   /** A party (an invite code or link, up to SQUADS.partyMax): closes after this long with nobody in it. */
   partyIdleMinutes: 60,
   /** A party in line asks the matchmaker again this often while it's busy. */
@@ -3249,6 +3257,13 @@ export interface SquadsSettings {
    * one per-move ceiling for every option, this long: a lobby in play across that deploy keeps its numbers and this cap.
    */
   legacyCapSeconds: number;
+  /**
+   * Move replay (Eric, Nov 5): coming back to a board (Relay's rotation, Pairs' slots), a move's free seconds grow by
+   * this much for each move played on that board since you last played it there (3 moves: +1.5 s), whether the replay
+   * is shown or not, so watching the moves you missed never costs your own time. Each match carries its own
+   * (`SquadsMatch.replayMsPerMove`).
+   */
+  replaySecondsPerMove: number;
   /** A missed move earns no increment. */
   incrementOnMiss: boolean;
   /** The silent safety cap on every board, in moves per side: then material decides (as does "Next round"). */
@@ -3414,6 +3429,8 @@ export const SQUADS: SquadsSettings = {
   clockDefault: "blitz",
   // The one ceiling every option had before the time controls (20 s, not the brief's starting 40).
   legacyCapSeconds: 20,
+  // Eric, Nov 5: "+ 0.5 s per move played since you last played".
+  replaySecondsPerMove: 0.5,
   incrementOnMiss: false,
   safetyCap: 120,
   material: { p: 1, n: 3, b: 3, r: 5, q: 9 },

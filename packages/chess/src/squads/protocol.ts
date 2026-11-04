@@ -185,6 +185,14 @@ export interface NetDuty {
   players: string[];
   /** When their time is up (server time): the time control's cap on a move, or in sudden death the free seconds (Time chips count). */
   deadline: number;
+  /**
+   * The move's free time (ms from the half's start) before its squad's bank drains: the match's `delayMs`, and with
+   * move replay (Eric, Nov 5) 0.5 s more for each move played on this board since its player last played it. Missing
+   * (an older server): `delayMs`.
+   */
+  freeMs?: number;
+  /** Each of `players`: the moves played on this board since they last played it (move replay: what replays on their screen). */
+  replay?: number[];
 }
 
 /** The half being played: White's moves on every board, then Black's (the final: the White squad's move, then Black's). */

@@ -28,6 +28,7 @@ import { enginePool, engineSpeed } from "./engine.ts";
 import { showBanNotice } from "./components/FairPlay.tsx";
 import { play } from "./sound.ts";
 import { testParams } from "./test-switches.ts";
+import { byOfHalf } from "./move-replay.ts";
 import { LOW_BANK_MS, blockName, coinText, dutyOf, freeMs, itemText, liveBank, movesOfHalf, sideIn, squadName, squadOf, type LocalBoard, type LocalMatch } from "./squads-view.ts";
 
 /**
@@ -577,13 +578,16 @@ export class SquadsClient {
     };
   }
 
-  private localMatch(m: NetSquadsMatch, moves: (i: number) => string[]): LocalMatch {
+  private localMatch(m: NetSquadsMatch, moves: (i: number) => string[], by: (i: number, moves: string[]) => string[][] = (_, mv) => mv.map(() => [])): LocalMatch {
     return {
       ...m,
       startsAt: m.startsAt === null ? null : this.local(m.startsAt),
       current: this.localHalf(m.current),
       ...(m.armageddonChoice ? { armageddonChoice: { ...m.armageddonChoice, until: this.local(m.armageddonChoice.until) } } : {}),
-      boards: m.boards.map((b, i): LocalBoard => ({ ...b, moves: moves(i) })),
+      boards: m.boards.map((b, i): LocalBoard => {
+        const mv = moves(i);
+        return { ...b, moves: mv, by: by(i, mv) };
+      }),
       visible: {},
       locked: [],
       lockedAt: {},
@@ -650,7 +654,12 @@ export class SquadsClient {
       case "match": {
         const had = this.matches.get(msg.match.key);
         const same = !!had?.current && !!msg.match.current && had.current.seq === msg.match.current.seq;
-        const m = this.localMatch(msg.match, (i) => msg.match.boards[i]!.moves ?? had?.boards[i]?.moves ?? []);
+        const m = this.localMatch(
+          msg.match,
+          (i) => msg.match.boards[i]!.moves ?? had?.boards[i]?.moves ?? [],
+          // (Who played each move, as far as this page saw them played.)
+          (i, mv) => mv.map((_, k) => had?.boards[i]?.by?.[k] ?? []),
+        );
         m.last = had?.last ?? null;
         if (same) {
           m.lockedAt = had!.lockedAt;
@@ -842,11 +851,18 @@ export class SquadsClient {
     const had = this.matches.get(msg.key);
     const before = had?.boards.map((b) => b.fen) ?? msg.match.boards.map((b) => b.fen);
     let off = false;
-    const m = this.localMatch(msg.match, (i) => {
-      const moves = [...(had?.boards[i]?.moves ?? []), ...movesOfHalf(msg.events, i)];
-      if (moves.length !== msg.match.boards[i]!.ply) off = true;
-      return moves;
-    });
+    const m = this.localMatch(
+      msg.match,
+      (i) => {
+        const moves = [...(had?.boards[i]?.moves ?? []), ...movesOfHalf(msg.events, i)];
+        if (moves.length !== msg.match.boards[i]!.ply) off = true;
+        return moves;
+      },
+      (i, mv) => {
+        const by = [...(had?.boards[i]?.moves ?? []).map((_, k) => had?.boards[i]?.by?.[k] ?? []), ...byOfHalf(msg.events, i)];
+        return mv.map((_, k) => by[k] ?? []);
+      },
+    );
     m.last = { seq: msg.seq, events: msg.events, before, at: Date.now(), until: m.startsAt ?? Date.now(), missed: msg.missed };
     this.freshHalf(m);
     // Blocks just placed carry on (in effect now) from when they were placed.
@@ -939,7 +955,7 @@ export class SquadsClient {
     }
     const d = this.myId ? dutyOf(m, this.myId) : null;
     if (!d || m.locked.includes(this.myId!)) return;
-    const free = freeMs(m);
+    const free = freeMs(m, d.duty.board);
     const left = m.current.startedAt + free - now;
     const secs = Math.ceil(left / 1000);
     if (left <= 0 || secs > TICK_FREE_FROM || secs >= Math.ceil(free / 1000)) return;

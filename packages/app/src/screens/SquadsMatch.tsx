@@ -11,6 +11,8 @@ import { ShadeMoves, type ShadeMove } from "../components/ShadeMoves.tsx";
 import { ClockText, Member, SquadTag, SquadsBoards, StandingsStrip, Watchers, shownTurn, useNow } from "../components/SquadsParts.tsx";
 import { BlockArrows, BlockPicker, ChipIcon, LockIcon, PickTags, SquadResources, TokenBreakdown, squareAt } from "../components/SquadsBlocks.tsx";
 import { Coins, ItemIcon, KitIcons } from "../components/MercenaryShop.tsx";
+import { ReplayButton, ReplayIcon, ReplayTag, ReplayTip, useReplayOn } from "../components/MoveReplay.tsx";
+import { replayFrameAt, replayFrames, replayTimes, type ReplayFrame } from "../move-replay.ts";
 import { ownEngine } from "../engine.ts";
 import { onPrefsChange, setSquadsJumpNext, squadsJumpNext } from "../prefs.ts";
 import type { SquadsClient } from "../squads.ts";
@@ -33,6 +35,7 @@ import {
   colourOf,
   dutyOf,
   freeMs,
+  replayCount,
   liveBank,
   chipLeftMs,
   chipsLeft,
@@ -49,6 +52,7 @@ import {
   notWatchers,
   studyBoard,
   walletOf,
+  type LocalBoard,
   type LocalMatch,
 } from "../squads-view.ts";
 
@@ -233,7 +237,9 @@ function ClockLine({ client, m, board }: { client: SquadsClient; m: LocalMatch; 
   const mine = sideIn(m, client.myId);
   const order: Side[] = mine === 1 ? [1, 0] : [0, 1];
   const live = m.state === "half" && m.current;
-  const free = live ? Math.max(0, m.current!.startedAt + freeMs(m) - now) : 0;
+  // (The free seconds of this board's move: coming back to a board, 0.5 s more for each move replayed, Eric, Nov 5.)
+  const free = live ? Math.max(0, m.current!.startedAt + freeMs(m, board) - now) : 0;
+  const replayLeft = live ? Math.max(0, m.current!.startedAt + freeMs(m, board) - m.delayMs - now) : 0;
   // Mercenary: a Time chip on this board's move shows on its squad's clock (20 s left with a chip: 50), counting down
   // while the bank stands still.
   const duty = live ? m.current!.duties.find((d) => d.board === board) : undefined;
@@ -251,8 +257,10 @@ function ClockLine({ client, m, board }: { client: SquadsClient; m: LocalMatch; 
       {order.map((side, i) => (
         <>
           {i === 1 && (
-            <span key="free" class={`sq-free${free > 0 ? " on" : live ? " running" : ""}`} title="Free seconds: the team clock runs after them">
-              {free > 0 ? `free ${(free / 1000).toFixed(1)}` : ""}
+            <span key="free" class={`sq-free${free > 0 ? " on" : live ? " running" : ""}${replayLeft > 0 ? " replay" : ""}`} title="Free seconds: the team clock runs after them (coming back to a board, 0.5 s more for each move you missed)">
+              {/* (While the replay's extra lasts, its icon in place of the word: the pill keeps its size.) */}
+              {replayLeft > 0 && <ReplayIcon size={11} />}
+              {free > 0 ? `${replayLeft > 0 ? "" : "free "}${(free / 1000).toFixed(1)}` : ""}
             </span>
           )}
           <span key={side} class={`sq-clockline-side${side === mine ? " you" : ""}`}>
@@ -293,6 +301,66 @@ function Banner({ title, sub, until, children }: { title: string; sub?: Componen
       {secs !== null && secs > 0 && <div class="sq-banner-count">{secs}</div>}
     </div>
   );
+}
+
+/**
+ * Move replay (Eric, Nov 5; move-replay.ts): at the start of your move on a board the rotation brings you back to, the
+ * moves played there since you last played it, one by one, within the extra free time they gave you (the server's
+ * `freeMs`), then the board as it stands. Not with the replay button off, while you browse the moves, or once skipped
+ * (a tap on the board). `me`: you, on your own board (null: nothing to replay).
+ */
+function useMoveReplay(m: LocalMatch, b: LocalBoard, me: string | null, browsing: boolean): { frame: ReplayFrame | null; step: number; count: number; skip: () => void } {
+  const on = useReplayOn();
+  const d = me && m.state === "half" && m.current ? m.current.duties.find((x) => x.board === b.id && x.players.includes(me)) : undefined;
+  const n = replayCount(d, me);
+  const total = d ? freeMs(m, b.id) - m.delayMs : 0;
+  const half = m.current ? `${m.key}/${m.current.seq}` : "";
+  const [skipped, setSkipped] = useState<string | null>(null);
+  const frames = useMemo(() => (n > 0 && total > 0 ? replayFrames(b.startFen, b.moves, b.by ?? [], n) : []), [half, n, total, b.moves.length]);
+  const startedAt = m.current?.startedAt ?? 0;
+  const frame = on && !browsing && skipped !== half && frames.length > 1 ? replayFrameAt(frames, total, Date.now() - startedAt) : null;
+  // (Drawn again as each move lands, and as it ends.)
+  const [, redraw] = useState(0);
+  useEffect(() => {
+    if (!frame) return;
+    const next = [...replayTimes(frames.length - 1, total), total].map((x) => startedAt + x).find((x) => x > Date.now());
+    if (next === undefined) return;
+    const t = setTimeout(() => redraw((k) => k + 1), next - Date.now() + 5);
+    return () => clearTimeout(t);
+  });
+  return { frame, step: frame ? frames.indexOf(frame) : 0, count: frames.length - 1, skip: () => setSkipped(half) };
+}
+
+/**
+ * A replay's step over the big board: the position then (a board of its own over the real one, which stays ready for
+ * your move under it), the move just played marked, and a name tag over the moved piece: who played it.
+ */
+function ReplayLayer({ client, m, frame, orientation }: { client: SquadsClient; m: LocalMatch; frame: ReplayFrame; orientation: "white" | "black" }) {
+  const me = client.myId;
+  const mySide = sideIn(m, me);
+  const names = frame.by.map((id) => (id === me ? "You" : client.nameOf(id)));
+  const tone = frame.by.includes(me ?? "") ? "you" : mySide !== null && frame.by.some((id) => m.sides[mySide].seats.includes(id)) ? "mate" : "them";
+  return (
+    <div class="rp-over" aria-hidden="true">
+      <Board fen={frame.fen} orientation={orientation} lastMove={frame.lastMove} />
+      {frame.lastMove && <ReplayTag key={frame.lastMove + frame.fen} square={frame.lastMove.slice(2, 4)} names={names} orientation={orientation} tone={tone} />}
+    </div>
+  );
+}
+
+/** Seconds as the screen says them: "2", "5.5". */
+const secs = (ms: number) => String(Math.round(ms / 100) / 10);
+
+/**
+ * Your move's free time in words: "2 s free, then your squad's clock runs."; coming back to a board, with move replay's
+ * extra (Eric, Nov 5): "5.5 s free (+3.5 s for 7 moves missed), then your squad's clock runs."
+ */
+export function freeLine(m: LocalMatch, me: string | null): string {
+  const d = me ? m.current?.duties.find((x) => x.players.includes(me)) : undefined;
+  const free = d ? freeMs(m, d.board) : m.delayMs;
+  const n = replayCount(d, me);
+  const extra = free - m.delayMs;
+  return extra > 0 && n > 0 ? `${secs(free)} s free (+${secs(extra)} s for ${n} ${n === 1 ? "move" : "moves"} missed), then your squad's clock runs.` : `${secs(free)} s free, then your squad's clock runs.`;
 }
 
 /** One line of plain-language rules for each format. */
@@ -431,6 +499,8 @@ function MatchView({
   const b = m.boards[boardId]!;
   const now = Date.now();
   const history = useHistoryView(b.moves, [{ ply: 0, fen: b.startFen }]);
+  // Move replay (Eric, Nov 5): back on a board, the moves you missed land first (a tap on the board skips it).
+  const replay = useMoveReplay(m, b, onMine && !client.me?.botPlays ? me : null, history.browsing);
   // (A bot plays your seat after repeated misses: nothing to choose until you take it back.)
   const d = onMine && !client.me?.botPlays ? dutyOf(m, me) : null;
   const mySide = sideIn(m, me);
@@ -495,7 +565,11 @@ function MatchView({
   const arrowKey = arrows.map((a) => a.move + a.brush).join();
   const liveArrows = useMemo(() => arrows, [arrowKey]);
   const myDeadline = d && m.current ? d.duty.deadline : null;
-  const status = revealing && reveal ? revealCaption(client, reveal, before, now - m.last!.at, Math.max(1500, m.last!.until - m.last!.at)) : statusLine(client, m, boardId, onMine, watching, studying, d, scout, revealing, blocking);
+  const status = revealing && reveal
+    ? revealCaption(client, reveal, before, now - m.last!.at, Math.max(1500, m.last!.until - m.last!.at))
+    : replay.frame
+      ? `Your move · Board ${boardId + 1} · replay ${replay.step} of ${replay.count}`
+      : statusLine(client, m, boardId, onMine, watching, studying, d, scout, revealing, blocking);
   // Who else is watching this board (their pawns over it): never you or its own players this turn; each pawn in its
   // player's color here. (Strings, so the pawns are drawn again only when these change or someone comes or goes.)
   const notWatching = notWatchers({ ...m, turn: shownTurn(m) }, boardId, me).join(",");
@@ -549,9 +623,11 @@ function MatchView({
             Next round
           </button>
         )}
-        {/* The gear: its list has Sound, Animations, Resign and Report a bug. */}
+        {/* Move replay's button, then the gear (its list has Sound, Animations, Resign and Report a bug). */}
+        <ReplayButton />
         <MatchMenu exit={exit} />
       </div>
+      <ReplayTip code={client.code} />
       <StandingsStrip client={client} onLeave={onLeave} exit={exit} />
       <SquadsBoards client={client} watching={`${m.key}/${boardId}`} onWatch={canWatch ? onWatch : null} />
       <div class="board-area">
@@ -575,12 +651,14 @@ function MatchView({
           </div>
           <Watchers client={client} board={`${m.key}/${boardId}`} hide={notWatching} colours={colours} />
         </div>
-        <div class="board-row">
+        {/* (During a move replay, a tap on the board skips it; the tap goes on to the board under it, so a move can start with it.) */}
+        <div class="board-row" onPointerDownCapture={replay.frame ? replay.skip : undefined}>
           <Board fen={fen} orientation={orientation} lastMove={lastMove} interactive={choosing && !blocking} moves={allowed} onMove={(mv) => client.choose(m.key, mv)} arrows={boardArrows}>
+            {replay.frame && <ReplayLayer client={client} m={m} frame={replay.frame} orientation={orientation} />}
             {(choosing || canBlock) && myDeadline && m.current && <TimerBar startsAt={m.current.startedAt} deadline={myDeadline} total={Math.max(1, myDeadline - m.current.startedAt)} quiet />}
             {revealing && reveal && <Reveal client={client} e={reveal} fen={before} orientation={orientation} at={m.last!.at} until={m.last!.until} />}
-            <BlockArrows blocks={shownBlocks} since={m.blockAt} orientation={orientation} />
-            {tags.length > 0 && !blocking && <PickTags picks={tags} orientation={orientation} />}
+            {!replay.frame && <BlockArrows blocks={shownBlocks} since={m.blockAt} orientation={orientation} />}
+            {tags.length > 0 && !blocking && !replay.frame && <PickTags picks={tags} orientation={orientation} />}
             {blocking && mySide !== null && (
               <BlockPicker
                 fen={b.fen}
@@ -987,7 +1065,7 @@ function DutyPanel({
     return (
       <div class="sq-duty move">
         <strong>{mine ? `You played ${san(mine)}` : "Your move"}</strong>
-        <span class="muted small">{mine ? "Tap a tiny board to watch it." : `${Math.round(freeMs(m) / 1000)} s free, then your squad's clock runs.`}</span>
+        <span class="muted small">{mine ? "Tap a tiny board to watch it." : freeLine(m, client.myId)}</span>
         {placedLine}
         {blockButton}
         {shieldLine}

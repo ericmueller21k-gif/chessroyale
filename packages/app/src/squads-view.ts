@@ -33,8 +33,11 @@ import { clockShown } from "./clock-text.ts";
  * server's on arrival).
  */
 
-/** A board with its moves in this match (the client keeps them from the "match" message and each "half"). */
-export type LocalBoard = NetSquadsBoard & { moves: string[] };
+/**
+ * A board with its moves in this match (the client keeps them from the "match" message and each "half"), and who played
+ * each (from each half's events; for moves from before this page joined, none known: move replay's name tags).
+ */
+export type LocalBoard = NetSquadsBoard & { moves: string[]; by?: string[][] };
 
 /** A match as the client keeps it: its boards' moves, the live choices it may see, and the last half played. */
 export interface LocalMatch extends Omit<NetSquadsMatch, "boards"> {
@@ -178,7 +181,6 @@ export function scouting(m: Pick<NetSquadsMatch, "state" | "current">, playerId:
  */
 export function liveBank(m: Pick<LocalMatch, "state" | "current" | "banks" | "delayMs" | "locked" | "lockedAt">, side: Side, now: number): number {
   const start = m.banks[side];
-  const delay = freeMs(m);
   if (m.state !== "half" || !m.current || start <= 0) return Math.max(0, start);
   const t0 = m.current.startedAt;
   const t = now - t0;
@@ -188,7 +190,8 @@ export function liveBank(m: Pick<LocalMatch, "state" | "current" | "banks" | "de
     const done = d.players.every((p) => m.locked.includes(p));
     const end = done ? Math.max(...d.players.map((p) => (m.lockedAt[p] ?? now) - t0)) : Math.min(t, d.deadline - t0);
     // (A Time chip on the move holds the bank still for its seconds.)
-    drained += spanLess(delay, Math.min(end, t), chipWindowsNow(m, d.board));
+    // (Each move past its own free time: coming back to a board, more for the moves replayed, Eric, Nov 5.)
+    drained += spanLess(dutyFreeMs(m, d), Math.min(end, t), chipWindowsNow(m, d.board));
   }
   return Math.max(0, start - drained);
 }
@@ -204,7 +207,7 @@ function spanLess(from: number, to: number, windows: readonly (readonly [number,
 /** Mercenary: the Time chips tapped on a board's move this half, and when they hold its squad's bank still (ms into the half). */
 export const chipsTapped = (m: Pick<LocalMatch, "current">, board: number) => (m.current?.chips ?? []).filter((c) => c.board === board);
 export const chipWindowsNow = (m: Pick<LocalMatch, "current" | "delayMs">, board: number, s: SquadsSettings = SQUADS): [number, number][] =>
-  chipWindows(chipsTapped(m, board).map((c) => c.at), m.delayMs, s.mercenary.chipSeconds * 1000);
+  chipWindows(chipsTapped(m, board).map((c) => c.at), freeMs(m, board), s.mercenary.chipSeconds * 1000);
 
 /**
  * The chip time still to come on a board's move (ms): what its clock shows on top of the bank (20 s left with a chip:
@@ -235,16 +238,32 @@ export function canTapChip(m: Pick<LocalMatch, "mode" | "chips" | "state" | "cur
   return chipsLeft(m, d.side) > 0;
 }
 
-/** The free time a move (ms), before a squad's bank starts to drain. */
-export const freeMs = (m: Pick<LocalMatch, "delayMs">): number => m.delayMs;
+/**
+ * A duty's free time (ms from the half's start) before its squad's bank drains: the server's (the match's free seconds,
+ * and move replay's 0.5 s for each move played on that board since its player last played it: Eric, Nov 5), else the
+ * match's free seconds. The same whether the replay is shown or not.
+ */
+export const dutyFreeMs = (m: Pick<LocalMatch, "delayMs">, d: Pick<NetDuty, "freeMs">): number => d.freeMs ?? m.delayMs;
+
+/** The free time of the move on `board` this half (ms), before its squad's bank starts to drain (no board, or no move there: the match's). */
+export function freeMs(m: Pick<LocalMatch, "delayMs"> & { current?: LocalMatch["current"] }, board?: number): number {
+  const d = board === undefined ? undefined : m.current?.duties.find((x) => x.board === board);
+  return d ? dutyFreeMs(m, d) : m.delayMs;
+}
+
+/** Move replay: the moves played on your board since you last played it (Relay and Pairs, coming back to it), this half. */
+export function replayCount(d: Pick<NetDuty, "players" | "replay"> | null | undefined, playerId: string | null): number {
+  if (!d || !playerId) return 0;
+  const i = d.players.indexOf(playerId);
+  return i < 0 ? 0 : (d.replay?.[i] ?? 0);
+}
 
 /** How many of a side's moves are draining its bank right now (2: Relay's two movers, twice as fast). */
 export function drainRate(m: Pick<LocalMatch, "state" | "current" | "banks" | "delayMs" | "locked">, side: Side, now: number): number {
   if (m.state !== "half" || !m.current || m.banks[side] <= 0) return 0;
   const t = now - m.current.startedAt;
-  if (t <= freeMs(m)) return 0;
   const held = (board: number) => chipWindowsNow(m, board).some(([a, b]) => t >= a && t < b);
-  return m.current.duties.filter((d) => d.side === side && !d.players.every((p) => m.locked.includes(p)) && now < d.deadline && !held(d.board)).length;
+  return m.current.duties.filter((d) => d.side === side && t > dutyFreeMs(m, d) && !d.players.every((p) => m.locked.includes(p)) && now < d.deadline && !held(d.board)).length;
 }
 
 /** A squad's team clock for the screen: its bank now, sudden death, and whether it's running (draining). */

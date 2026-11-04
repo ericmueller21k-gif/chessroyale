@@ -70,8 +70,8 @@ function findArm(arm: SquadsMatch, moves: Record<string, string>, want: (o: Retu
 describe("Squads final: the majority vote", () => {
   it("on a squad's move its whole squad picks, from move 1; the other squad has nothing to choose", () => {
     const m = final();
-    expect(halfDuties(m).duties).toEqual([{ board: 0, side: 0, role: "pick", players: ["a0", "a1", "a2", "a3"], deadlineMs: CEILING }]);
-    expect(halfDuties({ ...m, half: "b" }).duties).toEqual([{ board: 0, side: 1, role: "pick", players: ["b0", "b1", "b2", "b3"], deadlineMs: CEILING }]);
+    expect(halfDuties(m).duties).toEqual([{ board: 0, side: 0, role: "pick", players: ["a0", "a1", "a2", "a3"], deadlineMs: CEILING, freeMs: DELAY, replay: [0, 0, 0, 0] }]);
+    expect(halfDuties({ ...m, half: "b" }).duties).toEqual([{ board: 0, side: 1, role: "pick", players: ["b0", "b1", "b2", "b3"], deadlineMs: CEILING, freeMs: DELAY, replay: [0, 0, 0, 0] }]);
     // The squad given Black by the coin picks on Black's moves.
     expect(halfDuties(final(START_FEN, 1, 1)).duties[0]).toMatchObject({ side: 1, role: "pick" });
     expect(dutyOf(m, "a2")).toEqual({ duty: halfDuties(m).duties[0], partner: null, team: ["a0", "a1", "a3"] });

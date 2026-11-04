@@ -18,7 +18,7 @@ import {
 import { allowedMoves, checkBlock, isBlocked, liftBlocks, type BlockError, type BlockLift, type BlockPiece, type SquadsBlock } from "./blocks.ts";
 import { ROUND_FORMAT, coin, squadsRng, type Squad, type SquadsFormat, type SquadsRound } from "./lobby.ts";
 import { boardCoins, brilliantCandidate, captureCoins, capturedPiece, itemCounts, type BrilliantCandidate, type CapturePiece, type CoinWhy, type ItemCounts } from "./mercenary.ts";
-import { pairSchedule, relaySeat } from "./schedule.ts";
+import { movesSinceLastPlayed, pairSchedule, relaySeat } from "./schedule.ts";
 import type { TokenUse, TokenVerdict } from "./tokens.ts";
 import { defaultClock, modeOf, upgradeClock, type SquadsMode, type SquadsRules } from "./votes.ts";
 
@@ -48,6 +48,8 @@ import { defaultClock, modeOf, upgradeClock, type SquadsMode, type SquadsRules }
  *   within the free seconds. A move not made in time is a missed action: a random legal move. No flag falls.
  * - Each move made in time earns the increment (`incrementMs`), credited to the bank after the half, as on a chess
  *   clock: a quick move earns time back, and a squad in sudden death that keeps making its moves in time lives on it.
+ * - Move replay (Eric, Nov 5): a move on a board the rotation brings its player back to gets more free seconds,
+ *   `replayMsPerMove` for each move played there since they last played it (`Duty.freeMs`), replay shown or not.
  */
 
 /** A squad in a match: its id and its players' ids in seat order. */
@@ -91,6 +93,11 @@ export interface SquadsMatch {
   incrementMs: number;
   /** The time control's cap on one move while a squad's bank lasts (ms; Time chips push a move's later). */
   capMs: number;
+  /**
+   * Move replay (Eric, Nov 5): more free time on a move for each move played on its board since its player last played
+   * there, when they come back to it (ms a move; `Duty.freeMs`). 0 in a match stored before it (its clock never changes).
+   */
+  replayMsPerMove: number;
   /** The silent safety cap, in moves per side. */
   safetyMoves: number;
   /** Each side's same-move tokens left (Pairs only; null in other formats). */
@@ -140,16 +147,19 @@ export interface AssistUse {
  *   (`delays`): a squad that brought one plays on with the match's own free seconds;
  * - from before the Time chip (Oct 13): no chips (a time coin bought then is already in its bank);
  * - from before the time controls (Oct 13): no cap of its own: the one ceiling every option had then
- *   (`legacyCapSeconds`), so a match in play keeps its clock's numbers.
+ *   (`legacyCapSeconds`), so a match in play keeps its clock's numbers;
+ * - from before move replay (Nov 5): no extra free seconds (`replayMsPerMove` 0).
  */
 export function upgradeMatch(m: SquadsMatch, s: SquadsSettings = SQUADS): SquadsMatch {
   const old = m as Partial<SquadsMatch> & SquadsMatch & { delays?: unknown };
   const kitOk = !old.kit || old.kit.every((k) => !("breather" in k) && !("time" in k));
-  if (old.mode && old.stockfish && old.shields && old.chips && old.assists && old.coins && old.kit !== undefined && kitOk && !("delays" in old) && typeof old.capMs === "number") return m;
+  if (old.mode && old.stockfish && old.shields && old.chips && old.assists && old.coins && old.kit !== undefined && kitOk && !("delays" in old) && typeof old.capMs === "number" && typeof old.replayMsPerMove === "number") return m;
   const { delays: _gone, ...rest } = old;
   return {
     ...rest,
     capMs: typeof old.capMs === "number" ? old.capMs : s.legacyCapSeconds * 1000,
+    // (From before move replay, Nov 5: no extra free time, so its clock stays the one it started on.)
+    replayMsPerMove: typeof old.replayMsPerMove === "number" ? old.replayMsPerMove : 0,
     mode: old.mode ?? "classic",
     kit: old.kit ? [itemCounts(old.kit[0]), itemCounts(old.kit[1])] : null,
     stockfish: old.stockfish ?? [0, 0],
@@ -217,6 +227,8 @@ export interface MatchSetup {
   incrementMs: number;
   /** The cap on one move while a bank lasts (ms); default the default Clock option's. */
   capMs?: number;
+  /** Move replay's extra free time a move missed (ms); default SQUADS.replaySecondsPerMove. */
+  replayMsPerMove?: number;
   armageddon?: boolean;
   /** Each side's block bank coming in (Armageddon: what the final left); default the bank for a match. */
   blockBanks?: readonly [number, number];
@@ -253,6 +265,7 @@ export function createSquadsMatch(o: MatchSetup, s: SquadsSettings = SQUADS): Sq
     delayMs: o.delayMs,
     incrementMs: o.incrementMs,
     capMs: o.capMs ?? defaultClock(s).capSeconds * 1000,
+    replayMsPerMove: o.replayMsPerMove ?? Math.round(s.replaySecondsPerMove * 1000),
     safetyMoves: s.safetyCap,
     tokens: o.format === "pairs" && !o.armageddon ? [s.tokens.perMatch, s.tokens.perMatch] : null,
     blockBanks: o.blockBanks ? [o.blockBanks[0], o.blockBanks[1]] : [s.blocks.bankPerMatch, s.blocks.bankPerMatch],
@@ -364,9 +377,16 @@ export interface Duty {
   players: readonly string[];
   /**
    * How long they have (ms): the time control's cap on a move; in sudden death (the squad's bank at zero), the free
-   * seconds. (A bank running out during the half cuts its moves off sooner: see `resolveHalf`. Time chips: later.)
+   * seconds (`freeMs`). (A bank running out during the half cuts its moves off sooner: see `resolveHalf`. Time chips: later.)
    */
   deadlineMs: number;
+  /**
+   * The move's free time (ms) before its squad's bank drains: the match's free seconds, and with move replay (Eric,
+   * Nov 5) `replayMsPerMove` more for each move in `replay`'s largest (a pair shares one move's time).
+   */
+  freeMs: number;
+  /** Each of `players` (in order): the moves played on this board since they last played it, coming back to it (else 0). */
+  replay: readonly number[];
 }
 
 export interface HalfDuties {
@@ -385,23 +405,33 @@ export const movesAllowed = (m: Pick<SquadsMatch, "blocks" | "boards">, board: n
 
 const seatsOf = (m: SquadsMatch, side: Side, seats: readonly number[]) => seats.map((i) => m.sides[side].seats[i]!);
 
+/**
+ * A duty on a board for these seats: its players, each one's moves to replay (coming back to the board: Eric, Nov 5),
+ * its free time (the match's free seconds, and `replayMsPerMove` for each of the most moves missed) and its deadline
+ * (the cap while the bank lasts; in sudden death the free time).
+ */
+function dutyFor(m: SquadsMatch, b: SquadsBoard, side: Side, role: Role, seats: readonly number[]): Duty {
+  const black = m.half === "b";
+  const replay = m.armageddon ? seats.map(() => 0) : seats.map((seat) => movesSinceLastPlayed(m.format, m.boards.length, seat, b.id, m.turn, black, b.moves.length));
+  const freeMs = m.delayMs + Math.max(0, ...replay) * (m.replayMsPerMove ?? 0);
+  return { board: b.id, side, role, players: seatsOf(m, side, seats), deadlineMs: m.banks[side] > 0 ? m.capMs : freeMs, freeMs, replay };
+}
+
 /** Who acts in the half being played, board by board, and their deadlines. */
 export function halfDuties(m: SquadsMatch, s: SquadsSettings = SQUADS): HalfDuties {
   const out: HalfDuties = { duties: [], scouts: [], forced: [] };
   if (m.result) return out;
   const n = m.boards.length;
-  const deadline = (side: Side) => (m.banks[side] > 0 ? m.capMs : m.delayMs);
   for (const b of m.boards) {
     const side = sideOf(b, m.half);
-    const deadlineMs = deadline(side);
     if (m.format === "relay") {
-      const duty: Duty = { board: b.id, side, role: "move", players: seatsOf(m, side, [relaySeat(n, b.id, m.turn)]), deadlineMs };
+      const duty = dutyFor(m, b, side, "move", [relaySeat(n, b.id, m.turn)]);
       (b.result ? out.scouts : out.duties).push(duty);
       continue;
     }
     if (m.format === "pairs") {
       const [slot0, slot1] = pairSchedule(m.turn);
-      const duty: Duty = { board: b.id, side, role: "pick", players: seatsOf(m, side, n === 1 ? slot0 : b.id === 0 ? slot0 : slot1), deadlineMs };
+      const duty = dutyFor(m, b, side, "pick", n === 1 ? slot0 : b.id === 0 ? slot0 : slot1);
       if (b.result) out.scouts.push(duty);
       else if (movesAllowed(m, b.id).length === 1) out.forced.push(b.id);
       else out.duties.push(duty);
@@ -413,7 +443,7 @@ export function halfDuties(m: SquadsMatch, s: SquadsSettings = SQUADS): HalfDuti
       out.forced.push(b.id);
       continue;
     }
-    out.duties.push({ board: b.id, side, role: "pick", players: [...m.sides[side].seats], deadlineMs });
+    out.duties.push(dutyFor(m, b, side, "pick", m.sides[side].seats.map((_, i) => i)));
   }
   return out;
 }
@@ -623,31 +653,35 @@ export function chipWindows(taps: readonly number[], delayMs: number, chipMs: nu
   return out;
 }
 
-/** A board's chip windows this half. */
-export const chipWindowsOn = (m: Pick<SquadsMatch, "delayMs">, inputs: Pick<HalfInputs, "chips">, board: number, s: SquadsSettings = SQUADS): [number, number][] =>
-  chipWindows((inputs.chips ?? []).filter((c) => c.board === board).map((c) => c.at), m.delayMs, s.mercenary.chipSeconds * 1000);
+/** A board's chip windows this half (`freeMs`: its move's free time, the duty's; default the match's free seconds). */
+export const chipWindowsOn = (m: Pick<SquadsMatch, "delayMs">, inputs: Pick<HalfInputs, "chips">, board: number, s: SquadsSettings = SQUADS, freeMs: number = m.delayMs): [number, number][] =>
+  chipWindows((inputs.chips ?? []).filter((c) => c.board === board).map((c) => c.at), freeMs, s.mercenary.chipSeconds * 1000);
 
 /**
  * A squad's bank over a half: its moves, each ending at `end` (ms after the half began) and holding the bank still in
- * its chip `windows`, drain it together past `delayMs`. When it runs out (Infinity: it lasts) and what they drained.
+ * its chip `windows`, drain it together, each past its own `free` time (default `delayMs`: move replay gives a move
+ * coming back to its board more). When it runs out (Infinity: it lasts) and what they drained.
  */
-export function bankTimeline(moves: readonly { end: number; windows?: readonly (readonly [number, number])[] }[], delayMs: number, bankMs: number): { out: number; drained: number } {
-  const points = new Set<number>([delayMs]);
+export function bankTimeline(moves: readonly { end: number; free?: number; windows?: readonly (readonly [number, number])[] }[], delayMs: number, bankMs: number): { out: number; drained: number } {
+  const freeOf = (mv: { free?: number }) => mv.free ?? delayMs;
+  const first = moves.length ? Math.min(...moves.map(freeOf)) : delayMs;
+  const points = new Set<number>([first]);
   for (const mv of moves) {
+    points.add(freeOf(mv));
     if (Number.isFinite(mv.end)) points.add(mv.end);
     for (const [a, b] of mv.windows ?? []) {
       points.add(a);
       points.add(b);
     }
   }
-  const ts = [...points].filter((t) => t >= delayMs).sort((a, b) => a - b);
+  const ts = [...points].filter((t) => t >= first).sort((a, b) => a - b);
   let left = bankMs;
   let drained = 0;
   for (let i = 0; i + 1 < ts.length; i++) {
     const t0 = ts[i]!;
     const t1 = ts[i + 1]!;
     const mid = (t0 + t1) / 2;
-    const rate = moves.filter((mv) => mid < mv.end && !(mv.windows ?? []).some(([a, b]) => mid > a && mid < b)).length;
+    const rate = moves.filter((mv) => mid > freeOf(mv) && mid < mv.end && !(mv.windows ?? []).some(([a, b]) => mid > a && mid < b)).length;
     if (!rate) continue;
     const span = (t1 - t0) * rate;
     if (span >= left) return { out: t0 + left / rate, drained: drained + left };
@@ -670,8 +704,8 @@ export function moveCutoffs(m: SquadsMatch, inputs: HalfInputs, side: Side, duti
     for (const d of duties) cutoffs.set(d.board, dutyDeadline(inputs, d, s));
     return { cutoffs, out: 0, drained: 0 };
   }
-  const windows = duties.map((d) => chipWindowsOn(m, inputs, d.board, s));
-  const t = bankTimeline(duties.map((d, i) => ({ end: ends[i]!, windows: windows[i] })), m.delayMs, bank);
+  const windows = duties.map((d) => chipWindowsOn(m, inputs, d.board, s, d.freeMs ?? m.delayMs));
+  const t = bankTimeline(duties.map((d, i) => ({ end: ends[i]!, free: d.freeMs ?? m.delayMs, windows: windows[i] })), m.delayMs, bank);
   duties.forEach((d, i) => {
     const holding = windows[i]!.find(([a, b]) => t.out >= a && t.out < b);
     const cut = t.out === Infinity ? Infinity : holding ? holding[1] : t.out;

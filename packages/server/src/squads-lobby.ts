@@ -2337,7 +2337,7 @@ export class SquadsCore {
   }
 
   private netDuty(lm: LiveMatch, d: Duty): NetDuty {
-    return { board: d.board, side: d.side, role: d.role, players: [...d.players], deadline: lm.half!.startedAt + dutyDeadline(lm.half!.inputs, d, this.s) };
+    return { board: d.board, side: d.side, role: d.role, players: [...d.players], deadline: lm.half!.startedAt + dutyDeadline(lm.half!.inputs, d, this.s), freeMs: d.freeMs, replay: [...d.replay] };
   }
 
   private netHalf(lm: LiveMatch): NetSquadsHalf | null {
