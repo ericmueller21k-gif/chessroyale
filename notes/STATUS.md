@@ -139,3 +139,4 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - #486 MERGED 099a8840 (deploy watcher bbjzgbb41). #484 LIVE 09:04. Arrow keys DONE 74242d35 → PR #488 (targeted), CI b2yv5a6mv. Phone boss bar STARTED (Haiku, /home/user/cr-phonebar from 099a8840). #487 Jefferson CI b49xshuai.
 - #487 Jefferson MERGED e12ae43e (merge API 502 but it went through); deploy+main CI watcher. Main green after #484.
 - Phone boss bar DONE 16ca2677 → PR #489 (targeted), CI bkbm336aq. Queue now empty after #488/#489. Morning: one short summary to Eric.
+- #488 arrow keys: CI never started (0 check runs, GitHub 500s at push); merged main in (conflict in ShopRoom frame step: kept keysWalk + crew halt), 4592ddf6, CI watching. #489 phone bar red (boss-bar.spec prop room at 320) → helper fixing. Jefferson LIVE e12ae43e 10:04.
