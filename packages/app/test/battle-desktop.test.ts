@@ -39,28 +39,31 @@ describe("the figures beside the board on a computer (sideSizes)", () => {
       expect(SIDE_REACH[ch.id], ch.id).toEqual([ch.foot[0] - x0, ch.foot[1] - y0]);
     }
   });
-  // The rooms measured on main at 2× (scripts/stills-battle-desktop.mjs sides): the board, Hollow's and Folio's drawings (Folio's reaches
-  // furthest left), the God King's box, the empty column's left edge (90 px at 1280 and 1440, 256 at 1920, 242 at 2000).
+  // The rooms measured on main at 2× (scripts/stills-battle-desktop.mjs sides): the board, its left edge (the boss's anchor) and bottom,
+  // the empty column's left edge, the boss's middle 43 px out per unit (no eval bar), your pawn's left edge 26 px right of the board, and
+  // the God King's whole frame 254 px past it (at 1280 × 800, his canvas 14 px past his 120 px box).
   const rooms: Record<string, Omit<SideRoom, "bossLeft" | "bossTop">> = {
-    "1280x800": { board: 600, boardLeft: 346, boardRight: 946, boardBottom: 663, leftLimit: 90, winW: 1280, s: 2, k: 1, kingRight: 1228 },
-    "1440x900": { board: 760, boardLeft: 346, boardRight: 1106, boardBottom: 823, leftLimit: 90, winW: 1440, s: 2, k: 1, kingRight: 1388 },
-    "1920x1080": { board: 952, boardLeft: 536, boardRight: 1488, boardBottom: 1015, leftLimit: 256, winW: 1920, s: 2, k: 1, kingRight: 1770 },
-    "2000x1250": { board: 1120, boardLeft: 522, boardRight: 1642, boardBottom: 1183, leftLimit: 242, winW: 2000, s: 2, k: 1, kingRight: 1924 },
+    "1280x800": { board: 600, boardLeft: 346, boardBottom: 663, leftLimit: 90, winW: 1280, s: 2, k: 1, grow: 43, right: { left: 946 + 26, span: 254 } },
+    "1440x900": { board: 760, boardLeft: 346, boardBottom: 823, leftLimit: 90, winW: 1440, s: 2, k: 1, grow: 43, right: { left: 1106 + 26, span: 254 } },
+    "1920x1080": { board: 952, boardLeft: 536, boardBottom: 1015, leftLimit: 256, winW: 1920, s: 2, k: 1, grow: 43, right: { left: 1488 + 26, span: 254 } },
+    "2000x1250": { board: 1120, boardLeft: 522, boardBottom: 1183, leftLimit: 242, winW: 2000, s: 2, k: 1, grow: 43, right: { left: 1642 + 26, span: 254 } },
   };
   const reach = { hollow: [132, 156], folio: [188, 160], recluse: [130, 264] } as const;
   for (const [size, r] of Object.entries(rooms))
-    it(`${size}: bigger where there's room, never past it or the window's top, never smaller than before`, () => {
+    it(`${size}: bigger where there's room, never past it, the window's top or its right; the mirror kept; never smaller than before`, () => {
       for (const [id, [left, up]] of Object.entries(reach)) {
         const { s, k } = sideSizes({ ...r, bossLeft: r.boardLeft - left, bossTop: r.boardBottom - up }, SIDE_FEEL, id);
         expect(s, `${id}`).toBeGreaterThan(2);
         expect(s).toBeLessThanOrEqual(SIDE_FEEL.max);
         expect(r.boardLeft - (left / 2) * s, `${id}: his drawing in his room`).toBeGreaterThanOrEqual(r.leftLimit + SIDE_FEEL.margin - 0.01);
         expect(r.boardBottom - (up / 2) * s, `${id}: under the window's top`).toBeGreaterThanOrEqual(SIDE_FEEL.margin - 0.01);
-        expect(k, "the God King no smaller").toBeGreaterThanOrEqual(1);
-        expect(r.boardRight + (r.kingRight - r.boardRight) * k, "the God King inside the window").toBeLessThanOrEqual(r.winW - SIDE_FEEL.margin + 0.01);
+        // The mirror: your pawn's middle (its left edge kept, its box 120 k) moves out exactly as far as the boss's middle does.
+        expect(60 * k - 60, `${id}: the mirror`).toBeCloseTo((s - 2) * r.grow, 1);
+        expect(r.right!.left + r.right!.span * k, `${id}: the God King's whole frame inside the window`).toBeLessThanOrEqual(r.winW - SIDE_FEEL.margin + 0.01);
       }
-      // Babur keeps his size (his pump's room beside him).
-      expect(sideSizes({ ...r, bossLeft: r.boardLeft - 144, bossTop: r.boardBottom - 146 }, SIDE_FEEL, "tiger").s).toBe(2);
+      // Babur keeps his size (his pump's room beside him), and a party's (its figures stacked by the corner) keeps it too.
+      expect(sideSizes({ ...r, bossLeft: r.boardLeft - 144, bossTop: r.boardBottom - 146 }, SIDE_FEEL, "tiger")).toEqual({ s: 2, k: 1 });
+      expect(sideSizes({ ...r, bossLeft: r.boardLeft - 132, bossTop: r.boardBottom - 156, fixed: true }, SIDE_FEEL, "hollow")).toEqual({ s: 2, k: 1 });
     });
 });
 

@@ -13765,9 +13765,10 @@ img.qicon {
 /* From 1100 px wide the figures beside the board grow with it (Eric, Nov 4: "we have space on the desktop. They should be kind of
    bigger"): `--side-s`, the boss's screen px a sprite px (2 before; set on the screen by BossSide, characters/side-size.ts: the board's
    side over 240, as far as his room left of the board and the window's top let him), and `--king-k`, the God King's and your pawn's
-   size against their old one (the boss's over 2, as far as the room right of the board lets them). Everything scales about the board's
-   edge: the boss's box, his distance out (so his drawing clears the board as before) and his words' place over him. The board, the
-   room it leaves and a phone are unchanged. docs/decisions/2026-11-04-battle-desktop-fixes.md. */
+   size against their old one. Everything scales about the board's edge: the boss's box, his distance out (so his drawing clears the
+   board as before) and his words' place over him; your pawn (else the God King) keeps its left edge by the board and grows right, so
+   its middle stays as far from the board as the boss's (the mirror: k = 1 + its middle's move / 60), and the room right of the board
+   for the God King's whole frame holds them both back. The board, the room it leaves and a phone are unchanged. docs/decisions/2026-11-04-battle-desktop-fixes.md. */
 @media (min-width: 1100px) and (min-height: 600px) {
   .boss-char.place-side {
     --bc-scale: var(--side-s, 2);

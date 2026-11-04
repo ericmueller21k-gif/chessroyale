@@ -50,7 +50,8 @@ for (const boss of WIDE) {
  * board or a menu is fine; cut off by the page's edge never; only mid-motion may it pass off screen). Every boss with a character and the
  * God King (and your pawn beside him), at a phone's 390 × 844 and a computer's 1280 × 800, 1440 × 900, 1920 × 1080 and 2000 × 1250: each
  * frame it can rest in (its loops' frames) and the last frame of every one-shot (where each beat ends), drawn in its box as it stands,
- * inside the window. docs/rules/eric.md; docs/decisions/2026-11-04-battle-desktop-fixes.md.
+ * inside the window, and nothing of theirs scrolling the page sideways (PR #482's first run: the God King's frame past the window's edge
+ * at 1280 to 1920 px scrolled it). docs/rules/eric.md; docs/decisions/2026-11-04-battle-desktop-fixes.md.
  */
 const SIZES = { phone: [[390, 844]], desktop: [[1280, 800], [1440, 900], [1920, 1080], [2000, 1250]] } as const;
 /** Each frame's drawn box in its frame (sprite px), for the frames a figure rests in or ends a beat on. */
@@ -102,7 +103,7 @@ for (const [name, kit] of Object.entries(BOSS_KITS)) {
           const b = e?.getBoundingClientRect();
           return b ? [b.left, b.top, b.right, b.bottom] : null;
         };
-        return { boss: box(".boss-char:not(.place-results) .boss-char-sprite"), king: box(".boss-dock .gk-unit .gk-canvas"), you: box(".boss-dock .you-pawn-bob"), win: [innerWidth, innerHeight] };
+        return { boss: box(".boss-char:not(.place-results) .boss-char-sprite"), king: box(".boss-dock .gk-unit .gk-canvas"), you: box(".boss-dock .you-pawn-bob"), win: [innerWidth, innerHeight], scroll: [document.documentElement.scrollWidth, document.documentElement.clientWidth] };
       });
       const inside = (b: number[], what: string) => {
         expect(b[0]!, `${w} × ${h}: ${what} ${b} past the window's left`).toBeGreaterThanOrEqual(0);
@@ -115,6 +116,8 @@ for (const [name, kit] of Object.entries(BOSS_KITS)) {
       expect(r.king, `${w} × ${h}: the God King drawn`).not.toBeNull();
       inside(onPage(KING_BOXES, r.king!, GOD_KING.w, GOD_KING.h), "the God King");
       if (r.you) inside(r.you.map(Math.round), "your pawn");
+      // (A figure's frame past the window's edge, drawn or not, scrolls the page sideways: never.)
+      expect(r.scroll[0], `${w} × ${h}: no sideways scroll`).toBeLessThanOrEqual(r.scroll[1]!);
     }
   });
 }

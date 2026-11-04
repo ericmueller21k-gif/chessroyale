@@ -8,13 +8,13 @@
  * reads them from 1100 px wide up (from 900 to 1099 px he stays at 1×: no room).
  */
 export const SIDE_FEEL = {
-  /** The figures' size by the board's: the boss's screen px a sprite px is the board's side over this (600 px: 2.5, 1120 px: 4.7). */
+  /** The figures' size by the board's: the boss's screen px a sprite px is the board's side over this (600 px: 2.5, 1120 px: 4.7, as the room allows). */
   boardPerPx: 240,
   /** Never smaller than they were (2 px a sprite px; the God King 1×), never past this. */
   min: 2,
   max: 4.5,
-  /** In steps of this (a quarter px a sprite px), so a window's small change doesn't redraw the figure. */
-  step: 0.25,
+  /** In steps of this, so a window's small change doesn't redraw the figure. */
+  step: 0.05,
   /** Room kept free between a figure and the edge of its room, px (the window's, or the menu's beside an empty column). */
   margin: 8,
   /**
@@ -22,9 +22,8 @@ export const SIDE_FEEL = {
    * bar and the board shrinks: docs/decisions/2026-10-24-babur-desktop-pump.md).
    */
   keep: ["tiger"] as readonly string[],
-  /** The God King and your pawn grow as the board does (`--king-k` the boss's wanted size over 2), as the room beside the board lets them. */
+  /** The God King and your pawn grow with the boss (the mirror: sideSizes), at most this. */
   kingMax: 2.25,
-  kingStep: 0.05,
 } as const;
 
 /**
@@ -52,28 +51,38 @@ export const SIDE_REACH: Readonly<Record<string, readonly [left: number, up: num
   recluse: [30, 135],
 };
 
-/** What a figure's size is worked out from, in screen px (from getBoundingClientRect). */
+/** What a figure's size is worked out from, in screen px (from getBoundingClientRect), at the sizes now (`s`, `k`). */
 export type SideRoom = {
-  /** The board's side, its left and right edges, and its bottom (the figures' feet line). */
+  /** The board's side, its left edge (the boss's anchor, where his row starts), and its bottom (the figures' feet line). */
   board: number;
   boardLeft: number;
-  boardRight: number;
   boardBottom: number;
   /** Where the boss's room ends on the left (the empty column's left edge, or the screen's), and the window's width. */
   leftLimit: number;
   winW: number;
-  /** At the size now (`s`): how far left and up the boss's drawing reaches (px: SIDE_REACH on the page), the God King's right (his box's, and his cape past it) and `k`. */
   s: number;
+  k: number;
+  /** How far left and up the boss's drawing reaches at rest and where each beat ends (px: SIDE_REACH on the page). */
   bossLeft: number;
   bossTop: number;
-  k: number;
-  kingRight: number;
+  /** How far the boss's middle is from his anchor per unit of `s` (he scales about the anchor). */
+  grow: number;
+  /**
+   * Right of the board (null: no God King in his place here): the left edge of the first figure there (your pawn, else the God King),
+   * which stays where it is, and the room the figures there take from it to the right edge of everything of theirs (the God King's
+   * whole frame: its box is what the page scrolls by), per unit of `k`.
+   */
+  right: { left: number; span: number } | null;
+  /** The figures right of the board don't grow here (a party's, stacked by the corner): the boss keeps his size too, for the mirror. */
+  fixed?: boolean;
 };
 
 /**
- * The figures' sizes for the room: the boss's `s` (screen px a sprite px) and the God King's `k`. Everything beside the board scales about
- * the board's edge (the boss's box, its distance out and its drawing; the God King's and your pawn's boxes), so a figure's reach from it is
- * its reach now over its size now, times the new size.
+ * The figures' sizes for the room: the boss's `s` (screen px a sprite px) and the God King's and your pawn's `k`. The boss scales about
+ * the board's edge (his box, his distance out, his drawing). The first figure right of the board keeps its left edge, a small gap off the
+ * board, and its middle as far from the board as the boss's (the mirror, Eric, Oct 11 and Oct 28): so it grows exactly as far as his
+ * middle moves out, `k` = 1 + (s − 2) × grow / 60 (its box 120 px at 1). So the room right of the board (the God King's whole frame
+ * inside the window, at most `kingMax`) holds the boss back too.
  */
 export function sideSizes(r: SideRoom, feel: typeof SIDE_FEEL = SIDE_FEEL, boss = ""): { s: number; k: number } {
   const down = (v: number, step: number) => Math.floor(v / step + 1e-6) * step;
@@ -83,9 +92,9 @@ export function sideSizes(r: SideRoom, feel: typeof SIDE_FEEL = SIDE_FEEL, boss 
   const up = (r.boardBottom - r.bossTop) / r.s;
   const fitLeft = left > 0 ? (r.boardLeft - r.leftLimit - feel.margin) / left : Infinity;
   const fitUp = up > 0 ? (r.boardBottom - feel.margin) / up : Infinity;
-  const s = feel.keep.includes(boss) ? feel.min : Math.max(feel.min, Math.min(feel.max, down(Math.min(want, fitLeft, fitUp), feel.step)));
-  const right = (r.kingRight - r.boardRight) / r.k;
-  const fitRight = right > 0 ? (r.winW - feel.margin - r.boardRight) / right : Infinity;
-  const k = Math.max(1, Math.min(feel.kingMax, down(Math.min(want / 2, fitRight), feel.kingStep)));
-  return { s, k: Math.round(k * 100) / 100 };
+  // (Right: the God King's size the room there allows, and the boss's that makes it.)
+  const kFit = Math.min(feel.kingMax, r.right && r.right.span > 0 ? (r.winW - feel.margin - r.right.left) / r.right.span : Infinity);
+  const fitRight = r.grow > 0 ? feel.min + ((kFit - 1) * 60) / r.grow : Infinity;
+  const s = feel.keep.includes(boss) || r.fixed ? feel.min : Math.max(feel.min, Math.min(feel.max, down(Math.min(want, fitLeft, fitUp, fitRight), feel.step)));
+  return { s: Math.round(s * 100) / 100, k: Math.round((1 + ((s - feel.min) * r.grow) / 60) * 1000) / 1000 };
 }
