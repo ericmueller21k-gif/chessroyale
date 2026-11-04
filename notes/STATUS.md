@@ -145,3 +145,4 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - #489: e2e shards 2,3 stuck queued >1h (runner never started; rerun 403 = no permission, not routed around); merged main in (2f4eabc2, real merge) to re-run CI; watcher running.
 - #489 phone bar MERGED eb8e5231; deploy+main CI watcher. Night queue DONE. Morning summary to Eric owed.
 - #489 phone bar LIVE eb8e5231 (13:02). Main e2e red: gardener.spec:475 seed meter "one row" (stale vs Eric stacked layout; #489 PR lane did not select it) → PR #490 (check updated; passes locally phone+desktop), CI byu5faw4i.
+- #490 MERGED 6fe94b58; main CI watcher (should be green).
