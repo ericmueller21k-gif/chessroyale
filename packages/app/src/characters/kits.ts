@@ -103,16 +103,21 @@ export interface BossKit extends BeatLines {
    * edge nor the boss's name cuts into him. */
   wide?: boolean;
   /**
-   * The figure's size in a phone's boss bar (Eric, Oct 24): 1 is full size, never less. The big animals (Alfil, Puddles, Moo & Moon,
-   * Babur) at 4/3, or the largest step of 1/12 that fits the bar's room at rest (docs/decisions/2026-10-24-boss-bar-same.md). Undefined: 1.
+   * The figure's size in a phone's boss bar (Eric, Oct 24; Nov 4: every boss whole inside the bar): the largest size that fits the
+   * bar's height at rest, at most the kit's own, in 1/12 steps for the big animals (Alfil, Puddles, Moo & Moon, Babur) and in
+   * hundredths for the rest (Jefferson and Dash, a little smaller to fit). Undefined: 1. See docs/decisions/2026-11-04-phone-bar-fit.md.
    */
   barScale?: number;
   /**
-   * The drawing's horizontal shift inside a phone's bar's figure box, px (+ right): for a boss wider on one side than the other, so
-   * its drawing fits the room beside the bar's left edge and the name column (the box, the name column and the baseline stay as they
-   * are for every boss). Undefined: 0.
+   * The drawing's horizontal shift inside a phone's bar, px (+ right): its drawing sits whole inside the bar's left edge (2 px in),
+   * for a boss wider on one side than the other. The feet, the box and the bar stay as they are for every boss. Undefined: 0.
    */
   barShift?: number;
+  /**
+   * The name column's extra room, px (+ right): the name, level, meters and words start this far further right, so a figure that
+   * reaches past the column's usual left edge (89 px) keeps 2 px clear of it. Undefined: 0.
+   */
+  barName?: number;
   /** A recolor (one of the character's `looks`) from the battle's state: Big Boy's black pawn. */
   lookOf?: (boss: BossView) => string | undefined;
   /** Its attack on a king (the God King's Last Stand, its mate), if it has one: see KingAttackKit. */
@@ -147,6 +152,7 @@ const FOLIO_BAR: Character = (() => {
 export const BOSS_KITS: Record<string, BossKit> = {
   "Boingo the Clown": {
     barScale: 1,
+    barShift: 1,
     ch: CLOWN,
     anims: { strike: "capture", power: "pieThrow", ultimateWarn: "check", ultimate: "funhouse" },
     sounds: {
@@ -169,6 +175,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
   "Ginger": {
     barScale: 1,
+    barShift: 4,
     ch: GINGERBREAD,
     anims: { strike: "capture", power: "freezeCast", ultimateWarn: "check", ultimate: "blizzard" },
     sounds: { jingle: "gingerJingle", crunch: "gingerCrunch", crackle: "gingerCrackle", freeze: "gingerCrackle", blizzard: "gingerCrackle" },
@@ -180,8 +187,9 @@ export const BOSS_KITS: Record<string, BossKit> = {
     kingAttack: { ch: GINGER_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1, hit: frostItem },
   },
   "Jefferson": {
-    barScale: 1,
-    barShift: -2,
+    barScale: 0.93,
+    barShift: 8,
+    barName: 9,
     ch: GREX,
     anims: { strike: "capture", power: "ignite", powerHit: "capture", ultimateWarn: "candleWarn", ultimate: "romanCandle", ultimateHit: "capture" },
     sounds: {
@@ -208,6 +216,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
   "Hollow": {
     barScale: 1,
+    barShift: 6,
+    barName: 6,
     ch: HOLLOW,
     anims: { strike: "capture", power: "darkCast", darkFirst: "darkCast", ultimateWarn: "check", ultimate: "lightsOut", claim: "claimDark", found: "testFound", missed: "testMiss", lightsBack: "lightsBack" },
     sounds: {
@@ -234,6 +244,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
   "Big Boy": {
     barScale: 1,
+    barShift: -2,
     ch: BIGBOY,
     anims: {
       entrance: "swing",
@@ -278,6 +289,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
   "Sawyer": {
     barScale: 1,
+    barShift: 7,
+    barName: 5,
     ch: SAWYER,
     anims: {
       entrance: "rev",
@@ -314,6 +327,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
   "Wrangler": {
     barScale: 1,
+    barShift: 7,
+    barName: 6,
     ch: PIG,
     anims: {
       entrance: "taunt",
@@ -365,7 +380,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
   // Alfil, the woolly mammoth (Eric, Oct 17): docs/decisions/2026-10-17-alfil-wired.md.
   "Alfil": {
     barScale: 13 / 12,
-    barShift: 3,
+    barShift: 18,
+    barName: 14,
     ch: ALFIL,
     anims: {
       strike: "capture",
@@ -413,6 +429,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
   // Chub & Chirp, a rabbit riding a grasshopper (Eric, Oct 18): docs/decisions/2026-10-18-hopper-wired.md.
   "Chub & Chirp": {
     barScale: 1,
+    barShift: 5,
     ch: HOPPER,
     anims: {
       strike: "capture",
@@ -464,7 +481,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
   // Smudgy, the chameleon painter (Eric, Oct 19): docs/decisions/2026-10-19-smudgy-wired.md.
   "Smudgy": {
     barScale: 1,
-    barShift: 3,
+    barShift: 18,
+    barName: 16,
     ch: SMUDGY,
     anims: {
       // The boss's periodic strike on a piece is his capture cheer. (`strike` the beat is not `strike` the animation: his
@@ -510,8 +528,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
   // Moo & Moon, a cow and his friend the Moon (Eric, Oct 20): docs/decisions/2026-10-20-moo-wired.md.
   "Moo": {
-    barScale: 14 / 12,
-    barShift: -1,
+    barScale: 1,
+    barShift: 2,
     ch: MOO,
     anims: {
       // The periodic strike on a piece is his capture cheer.
@@ -582,8 +600,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
   // Puddles, the hippo gardener (Eric, Oct 20-21): docs/decisions/2026-10-23-gardener-wired.md.
   "Gardener": {
-    barScale: 15 / 12,
-    barShift: 2,
+    barScale: 14 / 12,
+    barShift: 5,
     ch: GARDENER,
     // (A phone's bar: the same drawing with the water off, which would run past his box into his name.)
     bar: GARDENER_BAR,
@@ -641,7 +659,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
   // Babur, the circus tiger (Eric, Oct 23-24): docs/decisions/2026-10-24-tiger-wired.md.
   "Tiger": {
-    barScale: 16 / 12,
+    barScale: 1,
     barShift: -1,
     ch: TIGER_FIGURE,
     anims: {
@@ -705,12 +723,14 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
   // Folio, the paper crane (the director's, Oct 26; "it" everywhere): docs/decisions/2026-10-27-folio-wired.md.
   "Folio": {
+    barScale: 1,
+    barShift: 13,
+    barName: 14,
     ch: FOLIO,
     // (A phone's boss bar: the same drawing and animations without its faint halo, a pixel to the left, its frame stopping 5 px short
     // on the left where a 320 px screen's edge is. With the halo its idle is 87 px across, the bar's room 85 at full size, and it's
     // never drawn smaller; on the bar's dark ground the halo doesn't show.)
     bar: FOLIO_BAR,
-    barShift: -1,
     anims: {
       // (Its periodic strike on a piece, the God King's: its capture, the piece folded into a paper pawn under its wing.)
       strike: "capture",
@@ -760,6 +780,9 @@ export const BOSS_KITS: Record<string, BossKit> = {
   // Timber, the beaver builder (Eric's idea, Oct 20; approved Nov 1): docs/decisions/2026-11-01-timber.md. His sounds are his own,
   // all wood (Eric, Nov 2: "a gnawing wood sound… Wood knocking, cutting, saw, thumping"): characters/timber-sounds.ts.
   "Timber": {
+    barScale: 1,
+    barShift: 6,
+    barName: 13,
     ch: TIMBER,
     anims: {
       // (His periodic strike on a piece, the God King's: his hammer whack.)
@@ -828,6 +851,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
   // art branch's boss-blitz, as drawn (characters/boss-blitz.ts). His sounds are his own: sneakers and a chess clock
   // (characters/dash-sounds.ts); Tick's ding, chomp and step too.
   "Dash": {
+    barScale: 0.97,
+    barShift: 6,
     ch: DASH,
     anims: {
       // (His periodic strike on a piece in a raid: his capture's double fist pump.)
@@ -876,6 +901,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
     portrait: { x: 18, y: 10, w: 38, h: 34, anim: "idle", frame: 0 },
   },
   "Hidden Boss": {
+    barScale: 1,
+    barShift: -10,
     ch: RECLUSE,
     // (A phone's boss bar: his bust, head and shoulders, the same animations.)
     bar: RECLUSE_BUST,
