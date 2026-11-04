@@ -511,9 +511,19 @@ test("the seed meter in the bar at 320, 360, 390 and 1280: under the rage meter,
     });
     if (!desktop()) expect(withMeter, `${w}: the bar and the board stay put`).toEqual(without);
     else expect(withMeter[0]!, `${w}: the bar holds the meter's row`).toBeGreaterThan(without[0]!);
-    // The meter's own parts, whole: icon, label and bar in one row.
-    const parts = await page.locator(".seed-meter").evaluate((e) => [...e.children].map((c) => c.getBoundingClientRect().top + c.getBoundingClientRect().height / 2));
-    expect(Math.max(...parts) - Math.min(...parts), `${w}: one row`).toBeLessThanOrEqual(3);
+    // The meter's own parts, whole. A phone (Eric, Nov 4: stacked): the icon and "Seeds N" on one row, its bar on its own row under
+    // them, the bar's left edge at the label row's. A computer: icon, label and bar in one row.
+    const parts = await page.locator(".seed-meter").evaluate((e) => {
+      const r = (sel: string) => e.querySelector(sel)!.getBoundingClientRect();
+      const mid = (b: DOMRect) => b.top + b.height / 2;
+      const icon = r(".seed-icon"), label = r(".seed-label"), bar = r(".seed-bar");
+      return { icon: mid(icon), label: mid(label), bar: mid(bar), barTop: bar.top, labelBottom: label.bottom, rowLeft: Math.min(icon.left, label.left), barLeft: bar.left };
+    });
+    expect(Math.abs(parts.icon - parts.label), `${w}: the icon and its label on one row`).toBeLessThanOrEqual(3);
+    if (!desktop()) {
+      expect(parts.barTop, `${w}: the bar on its own row, under "Seeds N"`).toBeGreaterThanOrEqual(parts.labelBottom - 1);
+      expect(Math.abs(parts.barLeft - parts.rowLeft), `${w}: the bar left aligned with its label row`).toBeLessThanOrEqual(1);
+    } else expect(Math.abs(parts.bar - parts.label), `${w}: one row`).toBeLessThanOrEqual(3);
     // The figure whole on the screen, his name clear of it (a phone).
     const fig = await page.locator(".boss-char canvas:visible").first().evaluate((c: HTMLCanvasElement) => {
       const r = c.getBoundingClientRect();
