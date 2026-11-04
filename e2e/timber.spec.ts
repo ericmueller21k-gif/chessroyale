@@ -125,7 +125,7 @@ test.describe("Timber", () => {
     expect(BOSS_POWERS.gnawScraps).toBe(8);
     expect(errors).toEqual([]);
   });
-  test("on a computer his figure stands beside the board at rest (his drawing over the board's edge by at most SIDE_FEEL.over of its side, never over the bar or the side menu); his cast plays where he stands, never at the board's corner", async ({ page }) => {
+  test("on a computer his figure stands beside the board at rest (his drawing over the board's edge by at most SIDE_FEEL.over of its side, over the side menu if need be, never over the bar or off the window); his cast plays where he stands, never at the board's corner", async ({ page }) => {
     test.setTimeout(400_000);
     test.skip(test.info().project.name !== "desktop", "his figure stands beside the board on a computer only");
     await asAdmin(page);
@@ -191,7 +191,6 @@ test.describe("Timber", () => {
       const board = await box(BOARD_SEL.wrap);
       expect(board).toEqual(folioBoard);
       const bar = await box(".boss-bar");
-      const nav = await box("nav");
       // The Gnaw by the admins' trigger; his teeth and cast come on his turn after the warning.
       await page.locator(".ult-test").click();
       await playOne(page);
@@ -199,11 +198,13 @@ test.describe("Timber", () => {
       const geo = await page.evaluate(() => (window as any).__geo as { rest: number[][]; cast: number[][]; anims: string[] });
       const hit = (a: number[], b: number[] | null) => !!b && a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
       expect(geo.rest.length).toBeGreaterThan(0);
-      // (Over the board's left edge by at most SIDE_FEEL.over of its side, Eric's Nov 4 rule; never over the bar or the side menu.)
+      // (Eric's Nov 4 rule: over the board's left edge by at most SIDE_FEEL.over of its side, over the side menu is fine (it lets
+      // every tap through), never cut off by the window, never over the bar.)
       const side = board![2] - board![0];
       for (const r of geo.rest) {
         expect(r[2] - board![0], `rest ${r} over the board ${board} by at most ${SIDE_FEEL.over} of its side`).toBeLessThanOrEqual(side * SIDE_FEEL.over + 1);
-        for (const other of [bar, nav]) expect(hit(r, other), `rest ${r} over ${other}`).toBe(false);
+        expect(hit(r, bar), `rest ${r} over the bar ${bar}`).toBe(false);
+        expect(r[0], `rest ${r} whole in the window`).toBeGreaterThanOrEqual(0);
       }
       // (On a computer every boss casts where it stands, by the board's bottom-left corner, never at its top-left: Eric, Nov 4.)
       expect(geo.cast, "no cast at the board's corner").toEqual([]);
