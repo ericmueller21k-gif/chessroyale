@@ -146,3 +146,4 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - #489 phone bar MERGED eb8e5231; deploy+main CI watcher. Night queue DONE. Morning summary to Eric owed.
 - #489 phone bar LIVE eb8e5231 (13:02). Main e2e red: gardener.spec:475 seed meter "one row" (stale vs Eric stacked layout; #489 PR lane did not select it) → PR #490 (check updated; passes locally phone+desktop), CI byu5faw4i.
 - #490 MERGED 6fe94b58; main CI watcher (should be green).
+- NIGHT DONE: main GREEN at 6fe94b58 (14:03). Live: #483 Wrangler, #484 bigger figures, #485 50v50, #486/#490 test fixes, #487 Jefferson, #488 arrow keys, #489 phone bar. Morning summary sent.
