@@ -124,7 +124,7 @@ test.describe("Timber", () => {
     expect(BOSS_POWERS.gnawScraps).toBe(8);
     expect(errors).toEqual([]);
   });
-  test("on a computer his figure stands beside the board at rest (never over the board, the bar or the side menu); his cast plays where he stands, never at the board's corner", async ({ page }) => {
+  test("on a computer his figure stands beside the board at rest (his drawing never over the board, the bar or the side menu); his cast plays where he stands, never at the board's corner", async ({ page }) => {
     test.setTimeout(400_000);
     test.skip(test.info().project.name !== "desktop", "his figure stands beside the board on a computer only");
     await asAdmin(page);
@@ -156,9 +156,28 @@ test.describe("Timber", () => {
           return [Math.round(r.left), Math.round(r.top), Math.round(r.right), Math.round(r.bottom)];
         };
         const same = (a: number[][], b: number[] | null) => !!b && JSON.stringify(a[a.length - 1]) !== JSON.stringify(b);
+        // (His drawn pixels, not his frame's box: the frame has room round the drawing, which may lie over the menu. Eric, Nov 4.)
+        const drawn = (q: string) => {
+          const c = document.querySelector<HTMLCanvasElement>(q);
+          const r = c?.getBoundingClientRect();
+          if (!c || !r?.width) return null;
+          const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
+          let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
+          for (let y = 0; y < c.height; y++)
+            for (let x = 0; x < c.width; x++)
+              if (d[(y * c.width + x) * 4 + 3]! > 0) {
+                x0 = Math.min(x0, x);
+                x1 = Math.max(x1, x);
+                y0 = Math.min(y0, y);
+                y1 = Math.max(y1, y);
+              }
+          if (x1 < 0) return null;
+          const sx = r.width / c.width, sy = r.height / c.height;
+          return [r.left + x0 * sx, r.top + y0 * sy, r.left + (x1 + 1) * sx, r.top + (y1 + 1) * sy].map(Math.round);
+        };
         const look = () => {
           const g = w.__geo;
-          const rest = box(".boss-char.place-side .boss-char-sprite");
+          const rest = drawn(".boss-char.place-side .boss-char-sprite");
           if (rest && same(g.rest, rest)) g.rest.push(rest);
           const cast = box(".pm-caster");
           if (cast && same(g.cast, cast)) g.cast.push(cast);

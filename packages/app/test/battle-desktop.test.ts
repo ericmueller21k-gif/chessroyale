@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { SIDE_FEEL, sideSizes, type SideRoom } from "../src/characters/side-size.ts";
+import { SIDE_FEEL, SIDE_REACH, sideSizes, type SideRoom } from "../src/characters/side-size.ts";
+import { BOSS_KITS } from "../src/characters/kits.ts";
 import { BOSS_INTROS, CHALLENGE_FEEL, bubbleSize, drawnTop } from "../src/town/shops/challenge.ts";
 import { BOSS_ART } from "../src/town/render.ts";
 import { TOWN_FEEL } from "../src/town/feel.ts";
@@ -20,6 +21,24 @@ describe("a computer's corner casts", () => {
 });
 
 describe("the figures beside the board on a computer (sideSizes)", () => {
+  it("SIDE_REACH is every boss's drawing's reach from its feet, at rest and where each beat ends (its loops' frames, each animation's last)", () => {
+    for (const kit of Object.values(BOSS_KITS)) {
+      const ch = kit.ch;
+      let x0 = Infinity;
+      let y0 = Infinity;
+      for (const a of Object.values(ch.anims))
+        for (const f of a.loop ? a.frames : a.frames.slice(-1)) {
+          const { w, h, data } = renderFrame(ch, f);
+          for (let y = 0; y < h; y++)
+            for (let x = 0; x < w; x++)
+              if (data[(y * w + x) * 4 + 3]! > 0) {
+                x0 = Math.min(x0, x);
+                y0 = Math.min(y0, y);
+              }
+        }
+      expect(SIDE_REACH[ch.id], ch.id).toEqual([ch.foot[0] - x0, ch.foot[1] - y0]);
+    }
+  });
   // The rooms measured on main at 2× (scripts/stills-battle-desktop.mjs sides): the board, Hollow's and Folio's drawings (Folio's reaches
   // furthest left), the God King's box, the empty column's left edge (90 px at 1280 and 1440, 256 at 1920, 242 at 2000).
   const rooms: Record<string, Omit<SideRoom, "bossLeft" | "bossTop">> = {

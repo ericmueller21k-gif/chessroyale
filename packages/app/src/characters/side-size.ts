@@ -27,6 +27,31 @@ export const SIDE_FEEL = {
   kingStep: 0.05,
 } as const;
 
+/**
+ * How far each boss's drawing reaches from its feet, left and up (sprite px), over every frame it rests in (its loops) and the last frame
+ * of each animation (where each beat ends): what must stay whole on screen (Eric's rule, Nov 4). By its character's id; a unit test
+ * measures them from the art (test/battle-desktop.test.ts), so a change to a drawing that reaches further fails until this is updated.
+ */
+export const SIDE_REACH: Readonly<Record<string, readonly [left: number, up: number]>> = {
+  clown: [33, 89],
+  gingerbread: [36, 86],
+  grex: [42, 100],
+  hollow: [38, 82],
+  bigboy: [30, 71],
+  sawyer: [39, 67],
+  pig: [39, 70],
+  alfil: [46, 82],
+  hopper: [37, 78],
+  smudgy: [50, 77],
+  moo: [34, 93],
+  gardener: [46, 78],
+  tiger: [31, 89],
+  folio: [46, 80],
+  timber: [38, 84],
+  dash: [39, 95],
+  recluse: [30, 135],
+};
+
 /** What a figure's size is worked out from, in screen px (from getBoundingClientRect). */
 export type SideRoom = {
   /** The board's side, its left and right edges, and its bottom (the figures' feet line). */
@@ -37,7 +62,7 @@ export type SideRoom = {
   /** Where the boss's room ends on the left (the empty column's left edge, or the screen's), and the window's width. */
   leftLimit: number;
   winW: number;
-  /** At the size now (`s`): the boss's drawn left and top (px), the God King's right (his box's, and his cape past it) and `k`. */
+  /** At the size now (`s`): how far left and up the boss's drawing reaches (px: SIDE_REACH on the page), the God King's right (his box's, and his cape past it) and `k`. */
   s: number;
   bossLeft: number;
   bossTop: number;

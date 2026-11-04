@@ -151,6 +151,7 @@ test("Hollow's darkness on a computer: he casts where he stands, by the board's 
       };
       requestAnimationFrame(look);
     });
+    await expect.poll(() => page.evaluate(() => (window as any).__cast.length)).toBeGreaterThan(2);
     const rest = (await page.evaluate(() => (window as any).__cast.at(-1).fig)) as number[];
     const fen = await page.evaluate(() => (window as any).match.phase.board.fen as string);
     const mv = new Chess(fen).moves({ verbose: true }).find((m) => m.piece === "n")!;

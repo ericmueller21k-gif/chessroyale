@@ -26,7 +26,7 @@ import { CRITICAL, LOW, NORMAL, VoiceBubble, bossVoice, holdMs, type Priority } 
 import { mateAttack, prewarmKingAttack } from "./KingAttack.tsx";
 import { lightsId, syncLights } from "../characters/lights.ts";
 import { seenFen } from "../camo.ts";
-import { sideSizes } from "../characters/side-size.ts";
+import { SIDE_REACH, sideSizes } from "../characters/side-size.ts";
 
 /**
  * A raid boss as a character (if it has one: see characters/kits.ts), standing across the board from the God King: on a
@@ -497,11 +497,13 @@ function fitSides(side: HTMLElement | null, name: string) {
     return;
   }
   const board = screen.querySelector(".board-row .board-wrap")?.getBoundingClientRect();
-  // (His drawing at rest, his idle's first frame, wherever the frame showing now is: his entrance may be mid-drop.)
+  // (How far his drawing reaches, at rest and where each beat ends (SIDE_REACH), from his feet in his frame's box as it stands now,
+  // whichever frame is showing: his entrance may be mid-drop.)
   const kit = bossKit(name);
-  const cv = side.querySelector<HTMLCanvasElement>(".boss-char-sprite");
-  const idle = kit?.ch.anims[kit.loops?.idle ?? "idle"]?.frames[0] ?? kit?.ch.anims.idle?.frames[0];
-  const drawn = cv && kit && idle ? drawnBox(frameImage(kit.ch, idle), cv.getBoundingClientRect()) : null;
+  const cv = side.querySelector<HTMLCanvasElement>(".boss-char-sprite")?.getBoundingClientRect();
+  const reach = kit ? SIDE_REACH[kit.ch.id] : undefined;
+  const sx = cv && kit ? cv.width / kit.ch.w : 0;
+  const drawn = cv?.width && kit && reach ? { left: cv.left + (kit.ch.foot[0] - reach[0]) * sx, top: cv.top + (kit.ch.foot[1] - reach[1]) * sx } : null;
   if (!board?.width || !drawn) return;
   const space = document.querySelector(".tower-space")?.getBoundingClientRect();
   const king = screen.querySelector(".boss-dock:not(.dk-party) > .gk-unit")?.getBoundingClientRect();
@@ -524,19 +526,4 @@ function fitSides(side: HTMLElement | null, name: string) {
   }, undefined, kit?.ch.id);
   screen.style.setProperty("--side-s", String(sizes.s));
   screen.style.setProperty("--king-k", String(king?.width ? sizes.k : 1));
-}
-/** A frame's drawn pixels' box on the page, drawn in the canvas `r` (its frame has room around the drawing). */
-function drawnBox(img: ImageData, r: DOMRect): { left: number; top: number } | null {
-  const { data: d, width: w, height: h } = img;
-  if (!r.width) return null;
-  let x0 = w;
-  let y0 = h;
-  for (let y = 0; y < h; y++)
-    for (let x = 0; x < w; x++)
-      if (d[(y * w + x) * 4 + 3]! > 0) {
-        if (x < x0) x0 = x;
-        if (y < y0) y0 = y;
-      }
-  if (x0 >= w) return null;
-  return { left: r.left + (x0 * r.width) / w, top: r.top + (y0 * r.height) / h };
 }
