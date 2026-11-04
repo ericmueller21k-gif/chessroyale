@@ -417,8 +417,8 @@ export const SHOP_GREX_RACK_SIDE = sideRack("rack-side", [[[["roman", 28]]], [[[
 export const SHOP_GREX_RACK_SIDE_B = sideRack("rack-side-b", [[[["timber", 15], ["fizz", 14]]], [[["bigboy", 28]]], [[["dash", 15], ["dash", 13]]], [[["hollow", 22]]]], 6);
 export const SHOP_GREX_RACK_SIDE_C = sideRack("rack-side-c", [[[["puddles", 28]]], [[["stripes", 15], ["neck", 14]]], [[["wrangler", 28]]], [[["tall", 14]]]], 7);
 export const SHOP_GREX_RACK_SIDE_SLOT = sideRack("rack-side-slot", [[[["moon", 15], ["moon", 14]]], [null], [[["roman", 28]]], [[["boingo", 18]]]], 8);
-/** The forklift's shelf slot: the east side rack at (18, 13), level 1 (its beam's top 46 px over the floor). */
-export const SHOP_GREX_SHELF_SLOT = { col: 18, row: 13, level: 1, lift: LEVELS[1] } as const;
+/** The forklift's shelf slot: the east side rack at (18, 17), level 1 (its beam's top 46 px over the floor). */
+export const SHOP_GREX_SHELF_SLOT = { col: 18, row: 17, level: 1, lift: LEVELS[1] } as const;
 
 /**
  * The dealer's corner (2 x 1, columns 16-17 of row 2, at the floor's north-east corner): no racking, a bare stretch of the
@@ -482,7 +482,7 @@ export const SHOP_GREX_CONE = (() => {
 })();
 
 /** The board on its stand, as it always stands in the battle spot: the crate stack (house-intro-grex: INTRO_GREX_TABLE's), its plank slab and the chessboard. */
-export const SHOP_GREX_TABLE_TOP = 56; // the slab's top over the foot, px (TABLE_BOARD.top is 27: this one is 29 higher)
+export const SHOP_GREX_TABLE_TOP = 59; // the slab's top over the foot, px (TABLE_BOARD.top is 27: this one is 32 higher)
 /**
  * The stack: five crates, the biggest at the foot, each a little askew, the top one carrying the slab. `sway`: the top three
  * crates shifted that many px (the wobble). Drawn on a 111-wide canvas (the tables' geometry), the foot at [55, h - 6].
@@ -503,10 +503,10 @@ export function crateStack(c: Cv, fx: number, fy: number, sway = 0): void {
     // A shadow under each crate's overhang on the one below.
     for (let x = fx - Math.floor(s.w / 2) + s.dx + sw; x < fx + Math.ceil(s.w / 2) + s.dx + sw; x++) if (get(c, x, y + s.h + s.lid) !== ".") put(c, x, y + s.h + s.lid, "V");
   });
-  // (The stack's top is the slab's foot: SHOP_GREX_TABLE_TOP - 3 over the foot.)
+  // (The stack is 56 px tall: its top is the slab's foot, SHOP_GREX_TABLE_TOP - 3 over the foot.)
 }
 const TW = 3 * T;
-const TH = 72;
+const TH = 76;
 const TF = TH - 6;
 export const SHOP_GREX_BOARD_STAND = (() => {
   const c = cv(TW, TH);
@@ -632,7 +632,7 @@ for (let row = 0; row < 20; row++)
     if (CIRCLE.has(k)) at(`circle-${col}-${row}`, col, row, false);
     else if (row === 3) at("floor-line-n", col, row, false); // a "keep clear" line along the racks
     else if (row >= 15 && (col === 9 || col === 10)) at(col === 9 ? "floor-line-w" : "floor-line-e", col, row, false); // the walkway from the door
-    else if (col === 14 && (row === 11 || row === 15)) at("floor-arrow", col, row, false); // the forklift's lane
+    else if (col === 14 && row === 16) at("floor-arrow", col, row, false); // the forklift's lane
     else if (CRACK.has(k)) at("floor-c", col, row, false);
     else if (OIL.has(k)) at("floor-d", col, row, false);
     else at((col + row) % 2 ? "floor-b" : "floor-a", col, row, false);
@@ -656,10 +656,10 @@ at("hem-post", 19, 19, true, { flip: true });
 at("corner-shop", 16, 2, true);
 const SIDES = ["rack-side", "rack-side-b", "rack-side-c"];
 for (let row = 2; row < 19; row++) {
-  // West: racks, but a bare stretch of wall at rows 11-14 (the leaners' wall, the NO SMOKING sign on row 12).
-  if (row >= 11 && row <= 14) at(row === 12 ? "wall-side-sign" : "wall-side", 1, row, true);
+  // West: racks, but a bare stretch of wall at rows 15-18 (the leaners' wall, the NO SMOKING sign on row 16).
+  if (row >= 15) at(row === 16 ? "wall-side-sign" : "wall-side", 1, row, true);
   else at(SIDES[row % 3]!, 1, row, true);
-  // East: racks all the way, the forklift's empty slot at row 13.
+  // East: racks all the way, the forklift's empty slot at row 17.
   at(row === SHOP_GREX_SHELF_SLOT.row ? "rack-side-slot" : SIDES[(row + 1) % 3]!, 18, row, true); // (not mirrored: the lettering reads)
 }
 
@@ -668,10 +668,10 @@ at("board-stand", SHOP_GREX_BOARD_AT.col, SHOP_GREX_BOARD_AT.row, true); // the 
 at("crate", SHOP_GREX_CRATE_AT.col, SHOP_GREX_CRATE_AT.row, true); // Jefferson's Boss Crate, by the dealer
 at("pallet-stack-b", 12, 4, true); // the clipboard guy checks this one
 at("pallet-seat", 4, 17, true); // the dozer's pallet
-at("pallet-stack", 3, 16, true);
-at("pallet-stack", 16, 17, true);
+at("pallet-stack", 3, 18, true);
+at("pallet-stack", 16, 15, true);
 at("box-open", 7, 17, true);
-at("box-open-b", 12, 17, true);
+at("box-open-b", 12, 15, true);
 at("box-open-b", 3, 9, true);
 at("cone", 16, 11, true);
 for (const [c, r] of [[5, 6], [14, 6], [5, 14], [14, 14]] as const) at("lamp", c, r, false);
@@ -684,53 +684,54 @@ export const SHOP_GREX_LAYOUT: readonly ShopPlace[] = [...LAYOUT.slice(0, FLOOR_
 /** The dealer (the Shopkeeper): his squares and where he's drawn, in the corner by his sign, facing west (mirrored). */
 export const SHOP_GREX_KEEPER = { at: [16.8, 3.2], keeper: [{ c: 16, r: 3 }, { c: 17, r: 3 }], face: -1 } as const;
 /**
- * The lift guy's loop: his scissor lift shuttles along row 5 in front of the west racks, stopping twice each way to raise its
- * platform a hair (`up`) and look at the stock. Each stop: [col, row, beat]. Faces east going east, west coming back (mirrored).
+ * The lift guy's loop: his scissor lift shuttles along row 5 in front of the west racks (columns 4-8), stopping three times to
+ * raise its platform a hair (`up`, `upIdle`, `down`) and look at the stock. Each stop: its foot (squares) and the beat there.
+ * It faces east going east and west coming back (mirrored). Wholly in view from the challenge camera on phone and computer.
  */
 export const SHOP_GREX_LIFT_PATH = [
-  { at: [3, 5], beat: "start" },
-  { at: [5, 5], beat: "up" },
+  { at: [4, 5], beat: "start" },
+  { at: [6, 5], beat: "up" },
   { at: [8, 5], beat: "up" },
   { at: [6, 5], beat: "up" },
-  { at: [3, 5], beat: "end" },
+  { at: [4, 5], beat: "end" },
 ] as const;
 /**
- * The forklift's loop, two laps: A, the floor pallet up onto the shelf slot; B, back down off it onto the floor (so the pallet
- * is always somewhere: on the floor, on the forks or on the shelf). Each waypoint: the forklift's foot (squares), the beat
- * there, and which way it faces (1 east, its forks ahead; -1 west, mirrored). It drives forward or backs up between waypoints
- * keeping the facing it had (it backs out of the shelf and away from the pallet). See shop-grex-nov4.md for the beats.
+ * The forklift's loop, in the south-east corner (rows 17-18, columns 13-17: out of view from the challenge camera on phone and
+ * computer), two laps: A, the floor pallet up onto the shelf slot; B, back down off it onto the floor (so the pallet is always
+ * somewhere: on the floor, on the forks or on the shelf). It always faces east (its forks ahead): it drives forward east and
+ * backs up west (`reverse`, a soft beep). Each waypoint: its foot (squares) and the beat there (shop-grex-nov4.md).
  */
 export const SHOP_GREX_FORK_PATH = [
   // Lap A: pick the pallet off the floor, stack it on the shelf.
-  { at: [12, 16], face: 1, beat: "home" },
-  { at: [15, 16], face: 1, beat: "pick" }, // forks slide under the floor pallet: forksDown, then liftPallet to carry
-  { at: [14, 16], face: 1, beat: "back" }, // backs off a square
-  { at: [14, 13], face: 1, beat: "turn" }, // up the lane
-  { at: [17, 13], face: 1, beat: "stack" }, // forks into the slot: raise to the shelf, set it down, lower a little
-  { at: [15, 13], face: 1, beat: "back" }, // backs out, forks down to carry
-  { at: [14, 13], face: -1, beat: "turn" },
-  { at: [14, 16], face: -1, beat: "turn" },
-  { at: [12, 16], face: 1, beat: "home" },
+  { at: [13, 18], beat: "home" },
+  { at: [15, 18], beat: "pick" }, // forks slide under the floor pallet: forksDown, then forksUp (with it) to carry
+  { at: [14, 18], beat: "back" }, // backs off a square
+  { at: [14, 17], beat: "turn" }, // up the lane a row
+  { at: [17, 17], beat: "stack" }, // forks into the slot: raisePallet to the shelf, set it down onto the beam, the pallet's the shelf's
+  { at: [15, 17], beat: "back" }, // backs out, lowerFrom to carry
+  { at: [14, 17], beat: "back" },
+  { at: [14, 18], beat: "turn" },
+  { at: [13, 18], beat: "home" },
   // Lap B: fetch it back off the shelf, set it down on the floor.
-  { at: [14, 16], face: 1, beat: "turn" },
-  { at: [14, 13], face: 1, beat: "turn" },
-  { at: [17, 13], face: 1, beat: "unstack" }, // empty forks raised into the slot, lift it off, lower to carry
-  { at: [15, 13], face: 1, beat: "back" },
-  { at: [14, 13], face: 1, beat: "turn" },
-  { at: [14, 16], face: 1, beat: "turn" },
-  { at: [15, 16], face: 1, beat: "drop" }, // lowers it to the floor, forks down
-  { at: [12, 16], face: 1, beat: "home" }, // backs away home
+  { at: [14, 18], beat: "turn" },
+  { at: [14, 17], beat: "turn" },
+  { at: [17, 17], beat: "unstack" }, // raise (empty) to under it, lift it off the beam, the pallet's the forks'
+  { at: [15, 17], beat: "back" }, // backs out, lower to carry
+  { at: [14, 17], beat: "back" },
+  { at: [14, 18], beat: "turn" },
+  { at: [15, 18], beat: "drop" }, // forksDown: it's on the floor again, the pallet's the floor's
+  { at: [13, 18], beat: "home" }, // backs away home
 ] as const;
-/** The floor pallet's spot (its foot, squares): where lap A picks it up and lap B sets it down. */
-export const SHOP_GREX_PALLET_AT = [15.78, 16] as const;
+/** The floor pallet's spot (its foot, squares): where lap A picks it up and lap B sets it down (the forks' middle, 41 px ahead of the forklift's foot at (15, 18)). */
+export const SHOP_GREX_PALLET_AT = [16.1, 18] as const;
 /** The idle crew's spots (they stand there; no paths) and which way each faces (1 east, -1 west: mirrored). */
 export const SHOP_GREX_CREW = {
-  "leaner-a": { at: [2, 12], face: 1 },
-  "leaner-b": { at: [2, 14], face: 1 },
+  "leaner-a": { at: [2, 16], face: 1 }, // against the bare west wall, under the NO SMOKING sign
+  "leaner-b": { at: [2, 18], face: 1 },
   "crew-c": { at: [11, 4], face: 1 }, // the clipboard guy, checking the pallet at (12, 4)
   "crew-d": { at: [4, 17], face: 1 }, // the dozer, on his pallet (seat SHOP_GREX_PALLET_SEAT_H up)
-  lift: { at: [3, 5], face: 1 }, // (the lift's home: its loop's start)
-  forklift: { at: [12, 16], face: 1 }, // (the forklift's home)
+  lift: { at: [4, 5], face: 1 }, // (the lift's home: its loop's start)
+  forklift: { at: [13, 18], face: 1 }, // (the forklift's home)
 } as const;
 
 // ==== The room still: the floor flat on its squares, each upright piece stood at its foot, north first.

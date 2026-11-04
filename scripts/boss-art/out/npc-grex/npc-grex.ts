@@ -192,8 +192,8 @@ export const NPC_GREX_CREW_D_SEAT = SEAT;
 // ==== The machines (room scale, side on, facing our right).
 
 const VW = 112;
-const VH = 132;
-const VG = 128; // the ground (the first row under the wheels)
+const VH = 144;
+const VG = 128; // the ground (the first row under the wheels); 16 px below it for a guy stepped off in front
 const VPAL: Record<string, string> = { ...CREW_PALETTE };
 /** A guy on a machine: his layers moved so his foot is at (x, y) in the machine's frame. */
 const moved = (layers: Layer[], x: number, y: number): Layer[] => layers.map((l) => ({ ...l, x: l.x + x - FOOT[0], y: l.y + y - FOOT[1] }));
@@ -329,17 +329,23 @@ const liftAnims: Record<string, Anim> = {
 };
 /** The platform's rise over rest per frame of `up` / `upIdle` / `down` (px; 0 elsewhere). */
 export const NPC_GREX_RISE: Readonly<Record<string, readonly number[]>> = { up: RISE.up, upIdle: [7, 7, 7, 7], down: RISE.down };
-// Stepping off: he climbs over the rear rail (f0-f1) and hops down behind it (f2-f3), to the ground behind the chassis.
+// Stepping off: he turns to the near side (f0), steps over the toe board (f1) and hops down in front of the lift (f2-f3), to the
+// ground on its near side, NPC_GREX_STEP_OFF.lift from its foot (drawn in front of it).
+const OFF_Y = 11; // a third of a square in front of (south of) the machine's foot
 {
   const deckTop = VG - DECK0;
-  const g = (p: Pose, x: number, y: number) => moved(build(LOOKS.lift, p).layers.slice(y >= VG - 1 ? 0 : 1), x, y);
+  const g = (p: Pose, x: number, y: number, shadow = false) => moved(build(LOOKS.lift, p).layers.slice(shadow ? 0 : 1), x, y);
+  const front = (who: Layer[]): Frame => {
+    const f = liftFrame(0, 0, 0, "off");
+    return { ...f, layers: [...f.layers, ...who] };
+  };
   liftAnims.stepOff = {
     loop: false,
     frames: [
-      { ...liftFrame(0, 0, 0, g({ armF: ARMS.rail, armN: ARMS.hangN, hx: -2 }, 44, deckTop + 1)), ms: 140 },
-      { ...liftFrame(0, 0, 0, g({ armF: ARMS.wave, armN: ARMS.hangN, feet: [[-4, 6], [2, 0]], hx: -2 }, 34, deckTop + 1)), ms: 140, cue: "step" },
-      { ...liftFrame(0, 0, 0, g({ armF: ARMS.wave, armN: ARMS.waveOut, feet: [[-3, 2], [3, 2]], bob: -1 }, 18, VG - 8)), ms: 110 },
-      { ...liftFrame(0, 0, 0, g({ bob: 2, feet: [[-4, 0], [4, 0]] }, 16, VG)), ms: 140, cue: "step" },
+      { ...liftFrame(0, 0, 0, g({ armF: ARMS.rail, armN: ARMS.hangN, hx: 1, bob: 1 }, 52, deckTop + 1)), ms: 140 },
+      { ...front(g({ armF: ARMS.wave, armN: ARMS.rail, feet: [[-4, 0], [3, 6]], bob: -1 }, 54, deckTop + 4)), ms: 140, cue: "step" },
+      { ...front(g({ armF: ARMS.wave, armN: ARMS.waveOut, feet: [[-3, 2], [3, 2]], bob: -1 }, 56, VG + OFF_Y - 9)), ms: 110 },
+      { ...front(g({ bob: 2, feet: [[-4, 0], [4, 0]] }, 56, VG + OFF_Y, true)), ms: 140, cue: "step" },
     ],
   };
 }
@@ -442,23 +448,33 @@ forkAnim("lower", false, steps(HF.shelf, HF.carry, 7).map((h, i) => ({ h, ms: 12
 forkAnim("lowerFrom", false, steps(HF.set, HF.carry, 6).map((h, i) => ({ h, ms: 120, ...(i === 0 ? { cue: "hydraulic" } : {}) })));
 forkAnim("parked", true, [{ h: HF.down, ms: 1000, who: "off" }]);
 {
-  const g = (p: Pose, x: number, y: number) => moved(build(LOOKS.fork, p).layers.slice(y >= VG - 1 ? 0 : 1), x, y);
-  forkAnim("stepOff", false, [
-    { h: HF.down, ms: 140, who: g({ sit: 30, armF: ARMS.wheel, armN: ARMS.hangN, feet: [[-8, 16], [-2, 16]] }, 30, VG) },
-    { h: HF.down, ms: 140, who: g({ armF: ARMS.wave, armN: ARMS.hangN, feet: [[-3, 0], [3, 0]], bob: 2 }, 26, VG - 26), cue: "step" },
-    { h: HF.down, ms: 110, who: g({ armF: ARMS.wave, armN: ARMS.waveOut, feet: [[-3, 2], [3, 2]] }, 12, VG - 9) },
-    { h: HF.down, ms: 140, who: g({ bob: 2 }, 8, VG), cue: "step" },
-  ]);
+  // He swings his legs out to the near side (f0), stands on the step (f1), hops down (f2) and stands in front of it (f3).
+  const g = (p: Pose, x: number, y: number, shadow = false) => moved(build(LOOKS.fork, p).layers.slice(shadow ? 0 : 1), x, y);
+  const front = (who: Layer[], h: number): Frame => {
+    const f = forkFrame(h, 0, 0, "off");
+    return { ...f, layers: [...f.layers, ...who] };
+  };
+  FORK_AT.stepOff = [];
+  const fr0 = forkFrame(HF.down, 0, 0, g({ sit: 30, armF: ARMS.wheel, armN: ARMS.hangN, feet: [[-2, 12], [2, 12]], hx: 1 }, 32, VG));
+  FORK_AT.stepOff.push(FORK_AT.__last![0]!);
+  const rest = [
+    { ...front(g({ armF: ARMS.wave, armN: ARMS.hangN, feet: [[-3, 0], [3, 0]], bob: 2 }, 36, VG - 10), HF.down), ms: 140, cue: "step" },
+    { ...front(g({ armF: ARMS.wave, armN: ARMS.waveOut, feet: [[-3, 2], [3, 2]], bob: -1 }, 40, VG + OFF_Y - 7), HF.down), ms: 110 },
+    { ...front(g({ bob: 2 }, 40, VG + OFF_Y, true), HF.down), ms: 140, cue: "step" },
+  ];
+  for (let i = 0; i < rest.length; i++) FORK_AT.stepOff.push(FORK_AT.__last![0]!);
+  forkAnims.stepOff = { loop: false, frames: [{ ...fr0, ms: 140 }, ...rest] };
 }
 delete FORK_AT.__last;
 /** Where the pallet's foot (its bottom middle) goes, per forklift animation and frame, in the forklift's pixels: on the tines. */
 export const NPC_GREX_FORK_AT: Readonly<Record<string, readonly Pt[]>> = FORK_AT;
 export const NPC_GREX_FORKLIFT: Character = { ...NPC_GREX_LIFT, id: "npc-grex-forklift", name: "The forklift (with the forklift guy)", foot: NPC_GREX_FORK_FOOT, anims: forkAnims };
 /**
- * Where each guy stands on the ground once off his machine (the last frame of its `stepOff`), from the machine's foot, facing
- * right: put his own figure there (walk, watch). Mirror x when the machine faces left.
+ * Where each guy stands on the ground once off his machine (the last frame of its `stepOff`), from the machine's foot (px, x
+ * then y: y is south, so he's in front of it), facing right: put his own figure there (walk, watch), drawn in front of the
+ * machine. Mirror x when the machine faces left.
  */
-export const NPC_GREX_STEP_OFF = { lift: [16 - NPC_GREX_LIFT_FOOT[0], 0], forklift: [8 - NPC_GREX_FORK_FOOT[0], 0] } as const;
+export const NPC_GREX_STEP_OFF = { lift: [56 - NPC_GREX_LIFT_FOOT[0], OFF_Y], forklift: [40 - NPC_GREX_FORK_FOOT[0], OFF_Y] } as const;
 
 // ---- The loose pallet: a wooden pallet, two MOON SHOT cartons on it, shrink-wrapped. 36 x 36, its foot (bottom middle) [18, 35].
 
