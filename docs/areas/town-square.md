@@ -610,6 +610,10 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
   rings in the ice (`SHOP_HOLLOW_MARKS`) give the table's place; his seat his own (`BossIntro.clear` 2.92, `marksFeel`'s `own`): his
   lash lies 1.6 squares out in front of his feet, so at the usual 2.6 it reached his stool. The pond is smaller than the other circles
   (an oval about 6 × 4 squares): there his foot is at the ice's west edge. Decision: [2026-11-03-hollow-intro.md](../decisions/2026-11-03-hollow-intro.md).
+- **The intro's bubble (Nov 4, every boss's line and Hollow's channel lines):** sized for the boss as drawn (`CHALLENGE_FEEL.bubble`:
+  its font 0.11 of his drawn frame's height, 11 to 32 px; `bubbleSize`) and its tail just over the top of his drawing (`drawnTop`, the
+  loaded intro's `boss.head`), not over his frame's head room. Eric: it was a name tag's size, far above his head. A phone's stays about
+  as before (11 to 13 px), just over his head; it stays in the view. Decision: [2026-11-04-battle-desktop-fixes.md](../decisions/2026-11-04-battle-desktop-fixes.md).
 - **Which bosses.** Those in `BOSS_INTROS` (`town/shops/challenge.ts`): every boss whose home has an inside (`SHOPS`): Alfil (his own
   intro, `custom: true`), Big Boy (his own, Nov 2), Timber (his own, Nov 3; in an admin's town only while he's in the game for admins
   first), Hollow (his own, Nov 3, everyone's), Babur, Puddles and Dash (the default intro; Dash's since Nov 3, in an admin's town only, until his own in round 3: no God
