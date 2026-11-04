@@ -47,3 +47,11 @@ node_modules symlink. Push as you go. Ports: 8995, inspector 9495. Include notes
   phone and computer. No GIFs.
 - PR body `docs/jefferson-home/pr-body.md` (every player-visible change and new text, changed checks old → new, lane full e2e: the
   crate is shared). Push; no PR. Short report.
+
+## Addition (Eric, Nov 4): the extra crew (about 8 giraffes in all)
+- Place the two wall leaners (sparklers in their mouths, one lifting it from his side with a smoke puff) and the two extra crew as
+  idle figures (no paths) where the art puts them; they block walking where they stand.
+- **All the crew come over in the intro** to their spots round the table, and are back in place after the match.
+- **Frame rate:** measure the warehouse (phone 390x844 and computer 1440x900, headless, walking 5 s, medians of a few runs) against
+  Wrangler's barn; if it's more than ~3 fps slower, cut cost (shared/baked frames, fewer idle frames) before trimming any giraffe.
+  Report the numbers.

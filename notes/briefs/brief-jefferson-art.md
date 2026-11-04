@@ -69,3 +69,15 @@ Notes `scripts/boss-art/out/shop-grex-nov4.md` (room: piece table, mask, layout,
 height, the dealer, calls) and `out/intro-grex-nov4.md` (exports, feet, cues, timeline, calls). A handful of stills (the room, the
 fight-start view on phone and computer, the intro key frames as one sheet, the crew and vehicles sheet). Push. Reply with the head sha,
 file paths and calls.
+
+## Addition (Eric, Nov 4): more of the crew, about 8 giraffes in all (Jefferson included)
+- **Two shady giraffes leaning against a wall**, each with a **sparkler in place of a cigarette** (clearly a sparkler: the stick and
+  the fizzing spark, funnier that way). One holds it at his side, then lifts it to his mouth, and a little smoke puff comes out; the other
+  keeps it in his mouth, fizzing. Shady but not mean-spirited: firework guys who love chess.
+- **Two more crew** of your choosing (e.g. one with a clipboard checking boxes, one dozing on a pallet, or carrying a box), idle only,
+  no paths.
+- They can share a base look (same giraffe, different hat/vest/shades/colors); only Jefferson must look unique.
+- `npc-grex-leaner-a`, `npc-grex-leaner-b`, `npc-grex-crew-c`, `npc-grex-crew-d`: idle (their loop), walk (to come over in the intro).
+- **All the crew come over in the intro** and stand round the table (a loose ring behind it, none hiding the board, you or Jefferson
+  from the challenge camera); give each a spot.
+- Keep it cheap: small idle loops, shared frames where possible. The code round measures frame rate against Wrangler's barn.
