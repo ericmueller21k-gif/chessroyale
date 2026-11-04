@@ -9,9 +9,10 @@
  *    the foot; the bale alone, the renderer draws the slab and the board), the same bale as the barn's `board-stand`. `idle`,
  *    `slide` (dragged: bumping, straw flying), `land` (it stops in the middle). INTRO_PIG_TABLE_PALETTE, INTRO_PIG_TABLE_INK,
  *    INTRO_PIG_TABLE_LIFT (the slab's lift on each slide frame).
- * 3. INTRO_PIG_BUCKET_B and INTRO_PIG_BUCKET_W: the black bucket (from our left) and the white one (from our right), 5-gallon
- *    pails with wire handles, the rope's end knotted on the handle: `tumble` (end over end), `land` (upside down, a clatter
- *    and a thunk), `stool` (upside down: a seat, its top at the park stools' seat height). INTRO_PIG_BUCKET_HANDLE.
+ * 3. INTRO_PIG_BUCKET_B and INTRO_PIG_BUCKET_W: the black bucket (from our left) and the white one (from our right), big
+ *    hardware-store 5-gallon pails with wire handles, the rope's end knotted on the handle: `tumble` (end over end), `land`
+ *    (upside down, a clatter and a thunk), `stool` (upside down: its flat base the seat, INTRO_PIG_BUCKET_SEAT_H over the
+ *    foot). INTRO_PIG_BUCKET_HANDLE.
  * 4. INTRO_PIG_STORM (128 x 128, tiles both ways) and INTRO_PIG_FRONT (48 x 128): the wipe into the match, played as
  *    Alfil's sandstorm is: a dusty sunset, tumbleweeds rolling, spurs spinning, toy cap guns popping BANG! flags.
  */
@@ -281,94 +282,122 @@ export const INTRO_PIG_TABLE_INK = {
 } as const;
 
 // ================================================================================================================
-// 3. The buckets: 40 x 40, foot [20, 35]. A 5-gallon pail (15 px across its mouth, 11 tall), a wire handle with a grip, two
-//    ribs under the rim; the rope's end knotted on the handle. Upside down as a stool, its bottom (the seat) at SEAT_H over the
-//    foot (the park stools' seat).
+// 3. The buckets (Eric, Nov 4: "bigger... like those hardware-store 5-gallon buckets... more cylindrical"): 64 x 72, foot
+//    [32, 64]. A tall plastic pail, 27 px across its open top, tapering a little to 23 at its base, 25 tall; a thick rolled
+//    lip, three stacked rim ribs under it with stiffening struts between, a thin wire handle from two ears with a plastic
+//    grip, the rope's end knotted on the grip. Upside down as a stool, its flat base on top is its seat:
+//    INTRO_PIG_BUCKET_SEAT_H (25) over the foot, higher than the park stools' (11), as Eric allowed.
 // ================================================================================================================
 
-export const INTRO_PIG_BUCKET_SEAT_H = SEAT_H;
-const BW = 40;
-const BH = 40;
-const BF: Pt = [20, 35];
-const HALF_MOUTH = 7.6;
-const HALF_BASE = 6.1;
-const TALL = 10.5; // the pail, mouth to bottom: upside down, its seat (its bottom) is SEAT_H (11) over the foot
-type Ink = { body: string; shade: string; deep: string; lit: string };
+const BW = 64;
+const BH = 72;
+const BF: Pt = [32, 64];
+const HALF_MOUTH = 13.5;
+const HALF_BASE = 11.5;
+const TALL = 25; // the pail, mouth to base
+export const INTRO_PIG_BUCKET_SEAT_H = TALL;
+type Ink = { body: string; shade: string; deep: string; lit: string; inside: string; insideFar: string };
 const INK: Record<"w" | "b", Ink> = {
-  w: { body: "(", shade: ")", deep: "[", lit: "(" },
-  b: { body: "]", shade: "|", deep: "{", lit: "}" },
+  w: { body: "(", shade: ")", deep: "[", lit: "^", inside: "[", insideFar: ")" },
+  b: { body: "]", shade: "|", deep: "{", lit: "}", inside: "<", insideFar: "|" },
 };
 /**
- * The pail at angle `a` (radians, 0 mouth up; turning clockwise) with its middle at (cx, cy): its body (lit to the top
- * left), the ribs, the end cap that faces up (the open mouth, dark inside, or its bottom), the handle (swung by `swing`),
- * the knot of rope on the handle's grip (or none). Returns the bits and where the grip is.
+ * The pail at angle `a` (radians, 0 mouth up; turning clockwise) with its middle at (cx, cy): its body (a cylinder lit from
+ * the top left), the rolled lip and the rim ribs by the mouth, the end cap that faces up the screen (the open mouth with
+ * the dark inside when the mouth is up, or the flat base with its recessed ring when the base is up), the wire handle
+ * (swung by `swing`, never below the floor), the knot of rope on its grip. Returns the bits and where the grip is.
  */
 function pail(ink: Ink, cx: number, cy: number, a: number, swing: number, knot: boolean): { bits: Bit[]; grip: Pt } {
   const body = cv(BW, BH);
   const ca = Math.cos(a);
   const sa = Math.sin(a);
-  // Local (u across, v along: v < 0 toward the mouth) to the frame.
+  // Local (u across, v along: v < 0 toward the mouth) to the frame, and back.
   const toF = (u: number, v: number): Pt => [cx + u * ca - v * sa, cy + u * sa + v * ca];
   const toL = (x: number, y: number): Pt => [(x - cx) * ca + (y - cy) * sa, -(x - cx) * sa + (y - cy) * ca];
+  const halfAt = (t: number) => HALF_MOUTH + (HALF_BASE - HALF_MOUTH) * t;
   for (let y = 0; y < BH; y++)
     for (let x = 0; x < BW; x++) {
       const [u, v] = toL(x + 0.5, y + 0.5);
-      const t = (v + TALL / 2) / TALL; // 0 at the mouth, 1 at the bottom
+      const t = (v + TALL / 2) / TALL; // 0 at the mouth, 1 at the base
       if (t < 0 || t > 1) continue;
-      const half = HALF_MOUTH + (HALF_BASE - HALF_MOUTH) * t;
+      const lipOut = t < 0.08 ? 0.9 : 0; // the rolled lip stands proud of the wall
+      const half = halfAt(t) + lipOut;
       if (Math.abs(u) > half) continue;
-      // Lit from the top left in the frame: its normal's direction.
-      const nx = (u / half) * ca;
-      const ny = (u / half) * sa;
-      const l = 0.55 - 0.45 * nx - 0.35 * ny;
-      const rib = Math.abs(t - 0.14) < 0.045 || Math.abs(t - 0.26) < 0.045;
-      let k = l > 0.78 ? ink.lit : l > 0.42 ? ink.body : l > 0.18 ? ink.shade : ink.deep;
-      if (rib) k = l > 0.5 ? ink.shade : ink.deep;
-      if (t < 0.06) k = l > 0.4 ? ink.lit : ink.shade; // the rolled rim
+      // Lit from the top left in the frame: the wall's normal there.
+      const nu = u / half;
+      const l = 0.58 - 0.5 * (nu * ca) - 0.4 * (nu * sa) + 0.18 * Math.sqrt(Math.max(0, 1 - nu * nu));
+      let k = l > 0.86 ? ink.lit : l > 0.5 ? ink.body : l > 0.22 ? ink.shade : ink.deep;
+      const tp = t * TALL; // px from the mouth
+      if (tp < 2) k = l > 0.45 ? ink.lit : ink.shade; // the lip
+      else if (tp < 2.6) k = ink.deep; // its shadow under it
+      else if (Math.abs(tp - 4.2) < 0.55 || Math.abs(tp - 6.4) < 0.55 || Math.abs(tp - 8.6) < 0.55) k = l > 0.5 ? ink.lit : ink.shade; // three rim ribs
+      else if (tp < 9.2 && Math.abs(((u + 40) % 3.4) - 1.7) < 0.5) k = ink.shade; // the struts between them
+      else if (tp > TALL - 1.2) k = ink.deep; // the base's edge
       put(body, x, y, k);
     }
-  // The end cap facing up the screen: the mouth (dark inside, a rim round it) when the mouth is up, else its bottom.
+  // The handle's ears: a round boss either side just under the ribs.
+  for (const side of [-1, 1]) {
+    const [ex, ey] = toF(side * (halfAt(0.4) - 0.6), -TALL / 2 + 10);
+    stampRows(body, Math.round(ex) - 1, Math.round(ey) - 1, [ink.shade + ink.lit, ink.deep + ink.shade]);
+  }
+  // The end cap facing up the screen: the mouth (lip round it, the dark inside, the far inner wall lit) or the base.
   const cap = cv(BW, BH);
   const mouthUp = ca > 0;
   const capV = mouthUp ? -TALL / 2 : TALL / 2;
-  const capHalf = mouthUp ? HALF_MOUTH : HALF_BASE;
-  const depth = Math.abs(ca) * 2.6 + 0.4;
-  if (Math.abs(ca) > 0.3) {
+  const capHalf = (mouthUp ? HALF_MOUTH + 0.9 : HALF_BASE) - 0.2;
+  const depth = Math.abs(ca) * 6.5 + 0.6;
+  if (Math.abs(ca) > 0.25) {
     for (let y = 0; y < BH; y++)
       for (let x = 0; x < BW; x++) {
         const [u, v] = toL(x + 0.5, y + 0.5);
-        const e = (u / capHalf) ** 2 + ((v - capV) / depth) ** 2;
+        const dv = (v - capV) * (mouthUp ? 1 : -1); // < 0 toward the far edge
+        const e = (u / capHalf) ** 2 + (dv / depth) ** 2;
         if (e > 1) continue;
-        put(cap, x, y, mouthUp ? (e > 0.55 ? ink.lit : ink === INK.w ? "[" : "{") : e > 0.6 ? ink.shade : ink.lit);
+        let k: string;
+        if (mouthUp) {
+          if (e > 0.6) k = dv < 0 || e > 0.85 ? ink.lit : ink.body; // the lip, all round
+          else k = dv > depth * 0.15 ? ink.insideFar : ink.inside; // the inside: its far wall lit, the depth dark
+        } else {
+          k = e > 0.8 ? ink.shade : Math.abs(e - 0.45) < 0.08 ? ink.shade : dv < -depth * 0.2 ? ink.lit : ink.body; // the flat base, a recessed ring
+        }
+        put(cap, x, y, k);
       }
   }
-  // The handle: a wire arc from its ears (under the rim, either side) out over the mouth, swung; a black grip in the middle.
+  // The handle: a thin wire from ear to ear, swung over the mouth (swing 0) or down along its side; a plastic grip in the middle.
   const handle = cv(BW, BH);
-  const ear = TALL / 2 - TALL * 0.2;
-  // Its ears under the rim, either side; its top (the grip) swung over the mouth (swing 0) or down along its side (swing
-  // near a quarter turn: then it lies on the pail's front, a little lower on the screen).
-  const [lx, ly] = toF(-HALF_MOUTH + 0.6, -ear);
-  const [rx, ry] = toF(HALF_MOUTH - 0.6, -ear);
-  const [ax, ay0] = toF(0, -ear - 8 * Math.cos(swing));
-  const ay = ay0 + 3.5 * Math.abs(Math.sin(swing));
+  const [lx, ly] = toF(-(halfAt(0.4) - 0.6), -TALL / 2 + 10);
+  const [rx, ry] = toF(halfAt(0.4) - 0.6, -TALL / 2 + 10);
+  const [ax, ay0] = toF(0, -TALL / 2 + 10 - 21 * Math.cos(swing));
+  const ay = ay0 + 8 * Math.abs(Math.sin(swing));
   const qx = 2 * ax - (lx + rx) / 2;
   const qy = 2 * ay - (ly + ry) / 2;
   let grip: Pt = [Math.round(ax), Math.round(ay)];
-  for (let i = 0; i <= 30; i++) {
-    const t = i / 30;
+  for (let i = 0; i <= 60; i++) {
+    const t = i / 60;
     const x = (1 - t) ** 2 * lx + 2 * (1 - t) * t * qx + t * t * rx;
-    const y = (1 - t) ** 2 * ly + 2 * (1 - t) * t * qy + t * t * ry;
-    const mid = i >= 12 && i <= 18;
-    put(handle, x, y, mid ? "<" : i % 4 === 0 ? "n" : "M");
-    if (i === 15) grip = [Math.round(x), Math.round(y)];
+    const y = Math.min(BF[1] - 0.5, (1 - t) ** 2 * ly + 2 * (1 - t) * t * qy + t * t * ry); // (it lies on the floor, never under it)
+    const mid = i >= 24 && i <= 36;
+    put(handle, x, y, mid ? "<" : i % 6 === 0 ? "n" : "M");
+    if (mid) put(handle, x, y + 1, "<"); // the grip is thicker than the wire
+    if (i === 30) grip = [Math.round(x), Math.round(y)];
   }
   const knotC = cv(BW, BH);
   if (knot) stampRows(knotC, grip[0] - 1, grip[1] - 1, ["rRr", "RtR", ".r."]);
-  return { bits: [cropBit(body)!, ...(cropBit(cap, false) ? [cropBit(cap, false)!] : []), ...(cropBit(handle, false) ? [cropBit(handle, false)!] : []), ...(cropBit(knotC) ? [cropBit(knotC)!] : [])], grip };
+  const handleBehind = !mouthUp && Math.abs(ca) > 0.6; // upside down: the handle hangs on its far side...
+  const bits = [cropBit(body)!, ...(cropBit(cap, false) ? [cropBit(cap, false)!] : [])];
+  const h = cropBit(handle, false);
+  return { bits: h ? (handleBehind ? [h, ...bits] : [...bits, h]).concat(cropBit(knotC) ? [cropBit(knotC)!] : []) : bits, grip };
 }
-/** Its middle when it stands upside down on its spot: its rim on the floor. */
-const REST_C: Pt = [BF[0], BF[1] - TALL / 2 - 0.5];
+/** Its middle so its lowest point rests on the floor at angle `a`, lifted `hop`. */
+function restY(a: number, hop = 0): number {
+  const ca = Math.cos(a);
+  const sa = Math.sin(a);
+  let low = -Infinity;
+  for (const [u, v] of [[-HALF_MOUTH - 0.9, -TALL / 2], [HALF_MOUTH + 0.9, -TALL / 2], [-HALF_BASE, TALL / 2], [HALF_BASE, TALL / 2]] as const) low = Math.max(low, u * sa + v * ca);
+  return BF[1] - low - hop;
+}
 const HANDLE: Record<string, Pt[]> = {};
+const shadowB = () => groundShadow(BF[0], BF[1], 15, 2.2);
 function bucket(color: "w" | "b", dir: 1 | -1): Character {
   const ink = INK[color];
   const parts: Record<string, Part> = {};
@@ -376,21 +405,21 @@ function bucket(color: "w" | "b", dir: 1 | -1): Character {
   // tumble: end over end, 8 frames (a turn every 8), rolling toward the middle (dir 1: from our left, turning clockwise).
   const tumble = Array.from({ length: 8 }, (_, f) => {
     const a = dir * ((f * Math.PI) / 4);
-    const hop = Math.abs(Math.sin((f * Math.PI) / 4)) * 2.5;
-    const p = pail(ink, BF[0], REST_C[1] - 2 - hop, a, Math.sin(f * 1.7) * 0.8, true);
-    return { bits: [groundShadow(BF[0], BF[1], 9, 1.6), ...p.bits], ms: 60, grip: p.grip, cue: f % 4 === 0 ? "clatter" : undefined };
+    const hop = Math.abs(Math.sin((f * Math.PI) / 4)) * 4;
+    const p = pail(ink, BF[0], restY(a, hop), a, Math.sin(f * 1.7) * 0.7, true);
+    return { bits: [shadowB(), ...p.bits], ms: 60, grip: p.grip, cue: f % 4 === 0 ? "clatter" : undefined };
   });
   // land: it comes down upside down (mouth to the floor), a bounce, a thunk, it settles; the rope slack, untied.
   const landList = [
-    { a: Math.PI * 0.82, dy: -6, sw: 0.6, knot: true, ms: 70, cue: "clatter" },
-    { a: Math.PI, dy: 0.5, sw: 1.2, knot: true, ms: 90, cue: "thunk" },
-    { a: Math.PI * 1.04, dy: -2, sw: 1.4, knot: false, ms: 80 },
-    { a: Math.PI, dy: 0, sw: 1.5, knot: false, ms: 140 },
+    { a: Math.PI * 0.84, hop: 7, sw: 0.6, knot: true, ms: 70, cue: "clatter" },
+    { a: Math.PI, hop: -1, sw: 1.2, knot: true, ms: 90, cue: "thunk" },
+    { a: Math.PI * 1.04, hop: 3, sw: 1.4, knot: false, ms: 80 },
+    { a: Math.PI, hop: 0, sw: 1.5, knot: false, ms: 140 },
   ].map((l) => {
-    const p = pail(ink, BF[0], REST_C[1] + l.dy, dir * l.a, dir * l.sw, l.knot);
-    return { bits: [groundShadow(BF[0], BF[1], 9, 1.6), ...p.bits], ms: l.ms, cue: l.cue, grip: p.grip };
+    const p = pail(ink, BF[0], restY(dir * l.a, l.hop), dir * l.a, dir * l.sw, l.knot);
+    return { bits: [shadowB(), ...p.bits], ms: l.ms, cue: l.cue, grip: p.grip };
   });
-  const stoolP = pail(ink, BF[0], REST_C[1], Math.PI, dir * 1.5, false);
+  const stoolP = pail(ink, BF[0], restY(Math.PI), Math.PI, dir * 1.5, false);
   HANDLE[`${color}:tumble`] = tumble.map((t) => t.grip);
   HANDLE[`${color}:land`] = landList.map((t) => t.grip);
   return {
@@ -402,8 +431,8 @@ function bucket(color: "w" | "b", dir: 1 | -1): Character {
     palette: PALETTE,
     parts,
     anims: {
-      idle: { loop: true, frames: framesOf("idle-", parts, [{ bits: [groundShadow(BF[0], BF[1], 9, 1.6), ...stoolP.bits], ms: 1000 }], BW, BH) },
-      stool: { loop: true, frames: framesOf("stool-", parts, [{ bits: [groundShadow(BF[0], BF[1], 9, 1.6), ...stoolP.bits], ms: 1000 }], BW, BH) },
+      idle: { loop: true, frames: framesOf("idle-", parts, [{ bits: [shadowB(), ...stoolP.bits], ms: 1000 }], BW, BH) },
+      stool: { loop: true, frames: framesOf("stool-", parts, [{ bits: [shadowB(), ...stoolP.bits], ms: 1000 }], BW, BH) },
       tumble: { loop: true, frames: framesOf("tumble-", parts, tumble, BW, BH) },
       land: { loop: false, frames: framesOf("land-", parts, landList, BW, BH) },
     },

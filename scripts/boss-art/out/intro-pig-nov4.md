@@ -15,7 +15,7 @@ spinning spurs, tumbleweeds and toy cap guns popping a BANG! flag. The boss is o
   [computer](house-intro-pig/view-fight-start-computer.png). The board on its hay bale is in view top left on both.
 - **The intro's key frames, one sheet** (phone, 1.0 to 11.5 s): [view-intro-keyframes.png](house-intro-pig/view-intro-keyframes.png).
   These are the line, the spin, the throw, the catch, the drag, the bale in the middle, the cross throw, the buckets
-  tumbling, the stools landed, the brag and the wipe half across. Every figure is fully on screen at rest and at the end of
+  tumbling, the stools landed, the brag and the wipe half across. Re-rendered with the bigger buckets (Nov 4). Every figure is fully on screen at rest and at the end of
   every move.
 - **His moves and the props at 3x/4x:** [view-moves-and-props.png](house-intro-pig/view-moves-and-props.png).
 - The camera is CHALLENGE_FEEL.cam.across (0.75 squares west and 0.8 south of the table's middle, zoom 1), under the room's
@@ -76,17 +76,28 @@ spinning spurs, tumbleweeds and toy cap guns popping a BANG! flag. The boss is o
 - **`INTRO_PIG_TABLE_PALETTE`:** the slab is a plank board ("1" #e0b070 to "5" #52301a). The squares are straw cream `L`
   #efd9a4 and barn red `D` #b5523a. **`INTRO_PIG_TABLE_INK`** gives the same squares with their shades and lines. As with
   Alfil's, keep the town's `TABLE_INK` for the pieces: the charcoal pieces read on the barn red.
-- **`INTRO_PIG_BUCKET_B`** (black, from our left: his stool) and **`INTRO_PIG_BUCKET_W`** (white, from our right: yours):
-  - The size is 40 x 40, foot [20, 35]. Each is a 5-gallon pail with two ribs under its rim and a wire handle with a black
-    grip, the rope's end knotted on the grip.
+- **`INTRO_PIG_BUCKET_B`** (black, from our left: his stool) and **`INTRO_PIG_BUCKET_W`** (white, from our right: yours),
+  **redrawn bigger (Eric, Nov 4)**: "like those hardware-store 5-gallon buckets... more cylindrical... at least twice that
+  size".
+  - **The size is 64 x 72, foot [32, 64]** (it was 40 x 40, foot [20, 35]). Each is a generic 5-gallon hardware pail with no
+    brand or text: a tall plastic cylinder **27 px across its open top, tapering a little to 23 at its base, 25 tall** (it
+    was 15 x 11). It has a thick rolled lip, three stacked rim ribs under it with stiffening struts between, two handle ears,
+    a thin wire handle with a plastic grip, and the rope's end knotted on the grip.
   - `tumble`: 8 x 60 ms, loops, with `clatter` f0 and f4. End over end, turning toward the middle (the black clockwise, the
-    white the other way), with a little hop.
+    white the other way), with a little hop. Its lowest point stays on the floor. **When its mouth faces up toward us, the
+    open mouth shows**: the lip all round, the dark inside and its far inner wall.
   - `land`: 70, 90, 80, 140 ms, with `clatter` f0 and `thunk` f1. It comes down upside down, mouth to the floor, bounces,
     and settles. The knot is untied from f2.
-  - `stool` (and `idle`): upside down. **Its seat (the pail's bottom) is `INTRO_PIG_BUCKET_SEAT_H` (11) over the foot**, the
-    park stools' seat height. Place one at the table's foot x - 37 (black) and + 37 (white).
+  - `stool` (and `idle`): upside down, **the flat base on top** (a recessed ring in it), the rim ribs and lip at the floor,
+    the handle lying along the floor behind it.
+  - **`INTRO_PIG_BUCKET_SEAT_H` = 25** (it was 11, the park stools' seat): its seat (the base) is 25 px over the foot, so
+    you and he sit higher than on the park stools, nearly level with the table's slab (27). Eric said that's fine. Sit
+    figures at this height on these stools.
+  - Place one at the table's foot x - 37 (black) and + 37 (white), as before. **Checked** in the key frames and on the
+    computer camera: each bucket's edge is about 7 px clear of the bale, his clear place and yours, with nobody moving. The
+    black one lands just right of his coil and the white just left of your pawn, all on screen.
   - **`INTRO_PIG_BUCKET_HANDLE`**: by `<w|b>:<tumble|land>` and frame, where the handle's grip is (the rope's end), in the
-    bucket's pixels.
+    bucket's new pixels.
 - **`INTRO_PIG_STORM`** (128 x 128, tiles both ways) and **`INTRO_PIG_FRONT`** (48 x 128, tiles top to bottom): 6 x 70 ms,
   looping, with cues `jingle` f0 and `pop` f3 on the storm. Play them exactly like Alfil's sandstorm: the tile at 3x behind
   its front, sweeping in from the left.
@@ -143,8 +154,8 @@ bale and the buckets come in without anyone moving. Code can walk him there, or 
    left, so his arms are crossed when he throws. On the yank he flings them wide, and the ropes cross in front of him.
 3. **The bale's drag** curves down the west side and swings east into the middle, so it passes beside him rather than
    through him.
-4. **The buckets are the park stools' size** (their seats at the stools' height), so they look small beside the bale. A
-   bigger pail would put you higher than the table.
+4. **The buckets are big hardware-store pails now** (Eric, Nov 4), as tall as the bale, their seats at 25 px (the park
+   stools' are 11).
 5. **In the mockup, he and you stand at your clear places from the start.**
 6. **The wipe's toy guns** are chunky red and blue plastic with orange safety tips, and their flags read BANG!
 7. **The table's slab is a plank board, and the board is straw cream and barn red.**
