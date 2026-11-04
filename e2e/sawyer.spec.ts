@@ -244,7 +244,7 @@ test("Sawyer's board saw (?power=boardsaw): he saws up the middle, the board spl
   // answered only diagonally, by a knight or outside the crowd's half: "Your king's in check!" at move 4 on CI, Oct 18).
   // Then it waits a turn more.
   expect(p3.cut ?? null).toBeNull();
-  const cutSeen = await watchFor(page, { banner: { selector: ".fight-banner.power-cut", text: /SAW CUT!/ }, caster: { selector: ".pm-cut .pm-caster" } });
+  const cutSeen = await watchFor(page, { banner: { selector: ".fight-banner.power-cut", text: /SAW CUT!/ }, caster: { selector: '.pm-cut .pm-caster, .screen:has(.pm-cut) .boss-char.place-side[data-anim="sawDown"]' } });
   const crowd = await page.evaluate(() => (window as any).match.boss.crowdSide as "w" | "b");
   for (;;) {
     await play(page, await allowedMove(page, ["h2h3", "a2a3", "h7h6", "a7a6"]));

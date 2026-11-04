@@ -26,6 +26,7 @@ import { CRITICAL, LOW, NORMAL, VoiceBubble, bossVoice, holdMs, type Priority } 
 import { mateAttack, prewarmKingAttack } from "./KingAttack.tsx";
 import { lightsId, syncLights } from "../characters/lights.ts";
 import { seenFen } from "../camo.ts";
+import { SIDE_REACH, sideSizes } from "../characters/side-size.ts";
 
 /**
  * A raid boss as a character (if it has one: see characters/kits.ts), standing across the board from the God King: on a
@@ -465,10 +466,81 @@ export function BossArt({ boss, class: cls = "" }: { boss: { id: string; name: s
  * board (by its bottom-right). Goes first in a screen's `.board-row`; on a phone it's hidden (the boss bar has him).
  */
 export function BossSide({ match }: { match: GameView }) {
+  const el = useRef<HTMLDivElement>(null);
+  const name = match.boss?.name;
+  // Its size and the God King's by the room beside the board (characters/side-size.ts): measured as it's first drawn and as the window
+  // changes, never per frame.
+  useLayoutEffect(() => {
+    if (!name) return;
+    const fit = () => fitSides(el.current, name);
+    fit();
+    addEventListener("resize", fit);
+    return () => removeEventListener("resize", fit);
+  }, [name]);
   if (!hasCharacter(match)) return null;
   return (
-    <div class="boss-side">
+    <div ref={el} class="boss-side">
       <BossCharacter match={match} place="side" />
     </div>
   );
+}
+
+/** Where the figures beside the board are sized (styles.css reads `--side-s` and `--king-k` there): a computer from 1100 px wide. */
+const SIDES = "(min-width: 1100px) and (min-height: 600px)";
+/**
+ * The figures' sizes on this screen for the room beside its board (sideSizes), set on the screen: `--side-s` (the boss), `--king-k` (the
+ * God King and your pawn, growing from their left edge so the first one's middle mirrors the boss's).
+ */
+function fitSides(side: HTMLElement | null, name: string) {
+  const screen = side?.closest<HTMLElement>(".screen");
+  if (!side || !screen) return;
+  if (!matchMedia(SIDES).matches) {
+    for (const v of ["--side-s", "--king-k"]) screen.style.removeProperty(v);
+    return;
+  }
+  const board = screen.querySelector(".board-row .board-wrap")?.getBoundingClientRect();
+  // (How far his drawing reaches, at rest and where each beat ends (SIDE_REACH), from his feet in his frame's box as it stands now,
+  // whichever frame is showing: his entrance may be mid-drop.)
+  const kit = bossKit(name);
+  const box = side.querySelector(".boss-char")?.getBoundingClientRect();
+  const cv = side.querySelector<HTMLCanvasElement>(".boss-char-sprite")?.getBoundingClientRect();
+  const reach = kit ? SIDE_REACH[kit.ch.id] : undefined;
+  if (!board?.width || !box?.width || !cv?.width || !kit || !reach) return;
+  const sx = cv.width / kit.ch.w;
+  const now = (v: string, d: number) => parseFloat(screen.style.getPropertyValue(v)) || d;
+  const s = now("--side-s", 2);
+  const k = now("--king-k", 1);
+  const edge = side.getBoundingClientRect().left;
+  // Right of the board: your pawn (Boss alone), else the God King, and everything of theirs (his frame reaches past his box).
+  const dock = screen.querySelector(".boss-dock");
+  const unit = dock?.querySelector(":scope > .gk-unit");
+  const first = (dock?.querySelector(":scope > .you-pawn") ?? unit)?.getBoundingClientRect();
+  let right: { left: number; span: number } | null = null;
+  if (first?.width && unit) {
+    const ends = [unit, ...unit.querySelectorAll(".gk-canvas, .god-king"), ...dock!.querySelectorAll(":scope > .you-pawn, :scope > .you-pawn .you-pawn-bob")].map((e) => e.getBoundingClientRect().right);
+    right = { left: first.left, span: (Math.max(...ends) - first.left) / k };
+  }
+  const sizes = sideSizes(
+    {
+      board: board.width,
+      boardLeft: edge,
+      boardBottom: board.bottom,
+      leftLimit: (() => {
+        const space = document.querySelector(".tower-space")?.getBoundingClientRect();
+        return space?.width ? space.left : screen.getBoundingClientRect().left;
+      })(),
+      winW: document.documentElement.clientWidth,
+      s,
+      k,
+      bossLeft: cv.left + (kit.ch.foot[0] - reach[0]) * sx,
+      bossTop: cv.top + (kit.ch.foot[1] - reach[1]) * sx,
+      grow: (edge - (box.left + box.width / 2)) / s,
+      right,
+      fixed: !!dock?.classList.contains("dk-party"),
+    },
+    undefined,
+    kit.ch.id,
+  );
+  screen.style.setProperty("--side-s", String(sizes.s));
+  screen.style.setProperty("--king-k", String(sizes.k));
 }

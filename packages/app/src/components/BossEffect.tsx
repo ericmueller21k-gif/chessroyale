@@ -222,11 +222,14 @@ export function BossEffect({ name, anim, since, then, id, class: cls, style, qui
   return <SpriteAnim ch={fx.ch} anim={a} since={since} then={then ?? (a === fx.start ? fx.loop : undefined)} sounds={quiet ? {} : fx.sounds} id={id} class={cls} style={style} />;
 }
 
-/** A boss's own animation (a power moment) somewhere other than his usual spot: Boingo's funhouse on the board. */
+/**
+ * A boss's own animation (a power moment) somewhere other than his usual spot: Boingo's funhouse on the board. Marked `boss-moment`:
+ * while a moment draws him elsewhere, his figure where he stands hides (styles.css).
+ */
 export function BossMoment({ boss, anim, since, then, class: cls, style, look }: { boss: string; anim: string; since: number; then?: string; class?: string; style?: Record<string, string | number>; look?: string }) {
   const kit = bossKit(boss);
   if (!kit) return null;
-  return <SpriteAnim ch={kit.ch} anim={anim} since={since} then={then} sounds={kit.sounds} id="moment" class={cls} style={style} look={look} />;
+  return <SpriteAnim ch={kit.ch} anim={anim} since={since} then={then} sounds={kit.sounds} id="moment" class={`boss-moment${cls ? ` ${cls}` : ""}`} style={style} look={look} />;
 }
 
 /** One effect on a square of the board, for <BoardEffects>. */

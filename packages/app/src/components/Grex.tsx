@@ -7,7 +7,7 @@ import type { BossView } from "../game.ts";
 import { BossFace } from "./BossCharacter.tsx";
 import { BoardEffects, BossEffect, BossMoment, prewarm, prewarmSprite, type BoardItem } from "./BossEffect.tsx";
 import { squareXY } from "./GodKing.tsx";
-import { Flight, onSquare, stageSince, type BossUi, type Moment, type MomentProps } from "./PowerParts.tsx";
+import { Cast, Flight, onSquare, stageSince, type BossUi, type Moment, type MomentProps } from "./PowerParts.tsx";
 import { CRITICAL } from "../speech.tsx";
 
 /**
@@ -270,12 +270,10 @@ export const FIREPROOF_LINES = ["Ha! My pieces don't burn. Perks!", "Fireproof! 
 export const fireproofLine = (pick: number | undefined) => FIREPROOF_LINES[(pick ?? 0) % FIREPROOF_LINES.length]!;
 
 /** His smug look by the board's corner as he says it, and a cool glint over his piece standing in the flames. */
-function fireproofMoment({ boss, moment, t, orientation }: MomentProps) {
+function fireproofMoment({ boss, moment, now, t, orientation }: MomentProps) {
   return (
     <div class="power-moment pm-fireproof">
-      <span class="pm-caster">
-        <BossMoment boss={boss.name} anim="smug" since={moment.at} then="idle" />
-      </span>
+      <Cast boss={boss.name} anim="smug" since={moment.at} now={now} runKey={`${moment.key}:smug`} />
       {moment.square && t < 1800 && <span class="pw-fireproof" style={{ ...onSquare(moment.square, orientation), animationDelay: `${-t}ms` }} data-square={moment.square} />}
     </div>
   );

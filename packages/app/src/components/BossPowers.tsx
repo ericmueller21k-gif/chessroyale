@@ -6,7 +6,6 @@ import { KING_ATTACK, bannerLeadMs, bossRules, mateMoments, powerFxMs, powerMome
 import { bossKit, poweredKit, type BossKit } from "../characters/kits.ts";
 import { cueAt } from "../characters/power-art.ts";
 import type { BossView } from "../game.ts";
-import { BossMoment } from "./BossEffect.tsx";
 import { BOINGO_UI, angleView } from "./Boingo.tsx";
 import { BIGBOY_UI } from "./BigBoy.tsx";
 import { GINGER_UI } from "./Ginger.tsx";
@@ -24,7 +23,7 @@ import { TIGER_UI } from "./Tiger.tsx";
 import { FOLIO_UI } from "./Folio.tsx";
 import { TIMBER_UI } from "./Timber.tsx";
 import { DASH_UI } from "./Dash.tsx";
-import { InPlace, PowerBanner, kitLine, ragePct, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
+import { Cast, InPlace, PowerBanner, kitLine, ragePct, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
 import { CRITICAL, NORMAL, bossVoice, type Priority } from "../speech.tsx";
 import { useFrameNow } from "./Countdown.tsx";
 
@@ -253,18 +252,13 @@ export function PowerMoment({ boss, moment, now: wall, orientation, side }: { bo
     const on = from === 0 ? wall >= moment.at - (moment.lead ?? 0) && t < ms : t >= from && t < from + shown;
     return on ? <PowerBanner key={moment.key} boss={boss} side={side} text={text} sub={sub} tone={tone} ms={shown} /> : null;
   };
-  /** The boss casting by the board's top-left corner, its animation's `hit` cue landing at `hitAt` (ms into the moment). */
+  /** The boss casting (by the board's top-left corner on a phone, where it stands on a computer: Cast), its animation's `hit` cue landing at `hitAt` (ms into the moment). */
   const cast = (hit: string, hitAt: number) => {
     const anim = kitAnim(kit, moment.kind);
     if (!anim) return null;
     const a = kit!.ch.anims[anim]!;
     const since = moment.at + hitAt - (cueAt(a, hit) ?? 0);
-    if (now < since) return null;
-    return (
-      <span class={`pm-caster pm-by-${kit!.ch.id}`}>
-        <BossMoment boss={boss.name} anim={anim} since={since} then="idle" />
-      </span>
-    );
+    return <Cast boss={boss.name} anim={anim} since={since} now={now} runKey={`${moment.key}:cast`} class={`pm-by-${kit!.ch.id}`} />;
   };
   return MOMENT_UI[moment.kind].view({ boss, moment, now, t, orientation, side, kit, banner, cast, anim: () => kitAnim(kit, moment.kind) });
 }
