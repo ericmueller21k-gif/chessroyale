@@ -326,6 +326,13 @@ export interface Settings {
    * 4%). Boss battles keep 1.
    */
   crowdPlayedFromTop: number;
+  /**
+   * With `crowdPlayedFromTop` over 1: when the most-picked move has at least this share of the team's picks, it's played,
+   * always, a blunder too (Eric, Nov 4: "10 people on white, a 7-2-1 split, the 7 should always win, but a 6-3-1 could
+   * go to the 3"; 50 v 50's 0.7). Below it, the draw (crowdTopOdds). Only real picks count, never a miss's pick made for
+   * it (CrowdMisses). 1: only a unanimous pick is sure.
+   */
+  crowdSureShare: number;
   /** Opening moves per side played on each board before the first round (0-10, a lobby setting). Boards where Black starts get one ply more. */
   openingMoves: number;
   /**
@@ -352,6 +359,12 @@ export interface Settings {
   botRandomMoveChance: number;
   /** Crowd 50 v 50's bots (CROWD_BOTS): spread over the good lines with each turn's shared lean. Unset: botPick as before. */
   crowdBots?: CrowdBotSpread;
+  /**
+   * Crowd 50 v 50's misses (CROWD_MISSES, Eric, Nov 4): a pick made for a player who picks nothing, the score a miss
+   * gets, and the removal for being away. Unset or null (every other mode, and the `?afk=0` test switch): a miss
+   * scores as before (missedMoveScore, or CrowdScoring.missCaps) and nobody is removed for it.
+   */
+  crowdMisses?: CrowdMisses | null;
   /** Bots' recorded thinking time, for tie-breaks (seconds). */
   botThinkSeconds: readonly [number, number];
   /** The 2v2 final: moves each finalist makes (fewer if the game ends first). */
@@ -588,6 +601,7 @@ export const DEFAULT_SETTINGS: Settings = {
   drawRuleByStage: ["popular", "best"],
   drawWeightPoints: 4,
   crowdPlayedFromTop: 1,
+  crowdSureShare: 1,
   openingMoves: 4,
   openingBalance: [0.4, 0.6],
   engineNodes: 250_000,
@@ -775,6 +789,25 @@ export interface CrowdBotSpread {
   lean: readonly [number, number];
   powerUpChance: number;
 }
+/**
+ * Crowd 50 v 50's misses (Eric, Nov 4: "no move at all = default to a random top 5 move, but your penalty is simply you
+ * get the lowest score given to a player on your team that round; but if you miss more than 3 moves in the game you are
+ * removed for being AFK, so people don't cleverly abuse AFK if they don't know a move and it's nearing the end";
+ * docs/decisions/2026-11-04-crowd-votes-afk.md). A player who picks nothing in a turn:
+ * - gets a pick made for them, one of the engine's `defaultFromTop` best moves at random (shown to them, never counted
+ *   in the team's tally: it would sway or dilute the vote). Nobody on the team picked: the team plays one of those
+ *   moves at random (in team turns; a final's mover and a boss battle as before: the engine's best, or the boss's rule);
+ * - scores the lowest round score of anyone in the group who picked (never better than the worst real pick; nobody
+ *   picked: CrowdScoring.missCaps as before);
+ * - with more than `allowed` misses in the game (the 4th), is removed for being away: today's "left the match"
+ *   (LeftHow "afk": a loss, out in the last place still open, a bot in the seat where one takes it). Bots never miss.
+ */
+export interface CrowdMisses {
+  defaultFromTop: number;
+  allowed: number;
+}
+export const CROWD_MISSES: CrowdMisses = { defaultFromTop: 5, allowed: 3 };
+
 export const CROWD_BOTS: CrowdBotSpread = {
   // (Eric, Nov 2, on the first tune: the plurality was the engine's best 39% of turns and the played move a top-3 line
   // 74%: "spread better across the best 4-5 moves, or even 7 moves when it's early game". Wider: 7 lines, a looser focus,
@@ -817,7 +850,9 @@ export const CROWD_SETTINGS: Partial<Settings> = {
   colourPerStage: false,
   drawRuleByStage: ["popular"],
   crowdPlayedFromTop: 3,
+  crowdSureShare: 0.7,
   crowdBots: CROWD_BOTS,
+  crowdMisses: CROWD_MISSES,
   powerUpsAtStart: 3,
   powerUpsPerStage: 0,
   openingMoves: 0,
@@ -857,6 +892,8 @@ export const RAID_SETTINGS: Partial<Settings> = {
   // (The most popular pick is played, and bots pick as everywhere else: 50 v 50's crowdPlayedFromTop and crowdBots are off.)
   crowdPlayedFromTop: 1,
   crowdBots: undefined,
+  // (A raid keeps its misses as before: 50 v 50's CROWD_MISSES are off.)
+  crowdMisses: undefined,
   augments: false,
   lobbySize: 50,
   groupSize: 50,
@@ -2526,8 +2563,6 @@ export const QUICK_CHAT = {
   feedSize: 30,
   /** The server keeps this many lines (both teams together) to send a player who reconnects. */
   logSize: 60,
-  /** Phone: the newest message shows this long as a one-line bubble under the top bar, while chat is hidden. */
-  bubbleMs: 2_000,
   /** An emoji floats above its sender's row on the scoreboard this long. */
   emojiFloatMs: 2_400,
   /** The soft tick for a team message, at most this often; its level is a fraction of the clock's tick (itself softer than a move). */

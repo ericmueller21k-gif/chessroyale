@@ -300,6 +300,19 @@ export class SoloMatch implements GameView {
     this.emit();
   }
 
+  /**
+   * Crowd 50 v 50: removed for being away (more misses in the game than CrowdMisses allows): as resigning, the match
+   * stops here, a loss, out in the last place still open; the results say why ("Removed for being away").
+   */
+  private removeAway() {
+    this.halt();
+    resetKingSpeech();
+    bossVoice.reset();
+    const placement = this.runner.retire(HUMAN);
+    this.phase = { kind: "results", placement, winner: "", youWon: false, left: { how: "afk", misses: this.you.misses ?? 0 } };
+    this.emit();
+  }
+
   get you(): PlayerState {
     return this.runner.player(HUMAN);
   }
@@ -1285,6 +1298,8 @@ export class SoloMatch implements GameView {
     const mine = report.boards.find((b) => b.playerIds.includes(HUMAN))!;
     const record = moveRecordFrom(report.stage, report.round, mine, (id) => id === HUMAN);
     if (record) this.moves.push(record);
+    // Crowd 50 v 50: your miss past CrowdMisses.allowed (the 4th in the game) removes you for being away, as resigning.
+    if (report.away?.includes(HUMAN)) return this.removeAway();
     if (inFinal) return this.showFinalMove(report);
     if (this.alone && !mine.king && move !== null) {
       // Alone, your move is already on the board: no reveal, straight to the boss's reply. Only a Last Stand stops
@@ -1428,7 +1443,7 @@ export class SoloMatch implements GameView {
     const p = b.result.players[0]!;
     // Team final: when a step ends, the weakest on each side go out.
     const out = this.runner.afterFinalTurn();
-    this.setFinal({ playerId: p.playerId, move: b.result.playedMove, san: toSan(b.fenBefore, b.result.playedMove), loss: p.loss }, out);
+    this.setFinal({ playerId: p.playerId, move: b.result.playedMove, san: toSan(b.fenBefore, b.result.playedMove), loss: p.loss, ...(p.missNo ? { missNo: p.missNo } : {}) }, out);
     this.set({ kind: "final", final: this.finalState! });
     this.timer = setTimeout(() => this.afterFinalMove(), out.length ? FINAL_SHOW_MS + 1800 : FINAL_SHOW_MS);
   }

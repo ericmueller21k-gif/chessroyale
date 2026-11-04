@@ -147,7 +147,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   the crate and the solo game are exactly the ones made without them.
   - **The server's:** a new lobby's `rounds`, `clock`, `finalTurns`, `bossMoves`, `draw`, `power`, `format`, `speed`, `start`,
     `weakbots`, `keep`, `pace=quick` (a test switch since Oct 15: players always play the mode's own pace), `augments=0`
-    (no pre-game votes; a test switch since Oct 15: players always vote), a boss's fixed strength (`boss=1600`) and a boss outside a raid (`lobby-options.ts`); a queue's
+    (no pre-game votes; a test switch since Oct 15: players always vote), `afk=0` (50 v 50's AFK rule off, CrowdMisses: for tests that
+    idle on purpose; also with a test `pool` on `/api/play`), a boss's fixed strength (`boss=1600`) and a boss outside a raid (`lobby-options.ts`); a queue's
     own `pool` (`/api/play`, `/api/squads/play`, `/api/squads/party`, `/api/1v1/play`: `testPool` in `index.ts`); a 1 v 1
     game's own `clock=SECONDS` (each side's clock, no increment: `/api/1v1/play`); a crate's forced
     `fischer` and `shiny` (`/api/locker/open`). One check, `testSwitchesOn` (`admin.ts`).

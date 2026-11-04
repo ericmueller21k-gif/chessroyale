@@ -46,7 +46,9 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
   const alone = !!bossResult && match.totalPlayers === 1;
   // You left before the end: you resigned (a loss), or you were already out (your place stood; no winner yet).
   const left = match.phase.kind === "results" ? match.phase.left : undefined;
-  const resigned = left?.how === "resigned";
+  // (Crowd 50 v 50's removal for being away counts as resigning: CrowdMisses.)
+  const afk = left?.how === "afk";
+  const resigned = left?.how === "resigned" || afk;
   const topName = (() => {
     const w = standings.find((s) => s.placement === 1);
     return w ? <PlayerName name={winner} uid={w.uid} bot={w.isBot} /> : winner;
@@ -64,7 +66,9 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
           {resigned ? <FlagIcon size={56} /> : bossResult ? (bossResult === "crowd" ? "🏆" : bossResult === "boss" ? "💀" : "🤝") : placement === 1 ? "🏆" : placement <= 4 ? "🥈" : "♟️"}
         </div>
         <h1>
-          {resigned ? (
+          {afk ? (
+            "Removed for being away"
+          ) : resigned ? (
             "You resigned"
           ) : alone ? (
             bossResult === "crowd" ? "Victory!" : bossResult === "boss" ? "Defeated" : "A draw"
@@ -81,7 +85,7 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
           !alone && (
             <p class="muted left-line">
               {resigned
-                ? `Out in ${placement}${ordinal(placement)} place of ${match.totalPlayers}.${
+                ? `${afk ? `You missed ${left.misses ?? 0} moves. ` : ""}Out in ${placement}${ordinal(placement)} place of ${match.totalPlayers}.${
                     !match.serverPaced ? "" : left.bot ? " A bot plays your seat." : " The match goes on without you."
                   }`
                 : "You left before the end. Your place stands."}

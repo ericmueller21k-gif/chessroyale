@@ -5,15 +5,15 @@ import { onAccountChange, refreshChatStanding } from "../account.ts";
 import type { ChatLine, MatchChat } from "../chat.ts";
 import { chatBlockText } from "../chat-mod.ts";
 import { isCrowdFifty, type GameView } from "../game.ts";
-import { chatBubbles, foldUnderBoard, onPrefsChange, setChatBubbles, showUnderBoard, underBoardView, type UnderBoardView } from "../prefs.ts";
+import { foldUnderBoard, onPrefsChange, showUnderBoard, underBoardView, type UnderBoardView } from "../prefs.ts";
 import { openProfile } from "../profile-nav.ts";
 import { MiniTower } from "./MiniTower.tsx";
 import { UserIcon } from "./PixelIcon.tsx";
 
 /**
  * Quick chat in a match: preset lines and emoji only (see DECISIONS.md, "Quick chat in matches"). It never covers
- * the board and never takes a tap meant for it: the panels sit under the board (a phone) or beside it (a computer),
- * and the bubble lets every tap through.
+ * the board and never takes a tap meant for it: the panels sit under the board (a phone) or beside it (a computer).
+ * Nothing of chat shows over or above the board (Eric, Nov 4: the new-message bubble went; chat stays in its box).
  */
 
 /** The computer's frame: the leaderboard moves to the side, and chat gets the column beside the board. */
@@ -433,7 +433,7 @@ export function ChatPanel({ people, chat, variant, head, fold, back }: { people:
         </div>
       ) : options ? (
         <div class="qoptions" ref={feed}>
-          <ChatOptions people={people} chat={chat} bubbles={variant === "split" || variant === "full" || variant === "tab"} onDone={() => setOptions(false)} />
+          <ChatOptions people={people} chat={chat} onDone={() => setOptions(false)} />
         </div>
       ) : (
         <>
@@ -501,19 +501,13 @@ export function ChatPanel({ people, chat, variant, head, fold, back }: { people:
   }
 }
 
-/** Chat's switches: the bubble (phones), chat off, and the players muted this match. */
-function ChatOptions({ people, chat, bubbles, onDone }: { people: ChatPeople; chat: MatchChat; bubbles: boolean; onDone: () => void }) {
+/** Chat's switches: chat off, and the players muted this match. */
+function ChatOptions({ people, chat, onDone }: { people: ChatPeople; chat: MatchChat; onDone: () => void }) {
   const [, redraw] = useState(0);
   useEffect(() => onPrefsChange(() => redraw((n) => n + 1)), []);
   const muted = chat.mutedIds();
   return (
     <>
-      {bubbles && (
-        <label class="qopt">
-          <input type="checkbox" checked={chatBubbles()} onChange={(e) => setChatBubbles((e.target as HTMLInputElement).checked)} />
-          <span>Show new messages as a bubble while chat is hidden</span>
-        </label>
-      )}
       <label class="qopt">
         <input type="checkbox" checked={chat.off} onChange={(e) => chat.setOff((e.target as HTMLInputElement).checked)} />
         <span>Chat off (no messages, on this device)</span>
@@ -681,42 +675,3 @@ export function ChatSection({ match }: { match: GameView }) {
   return <ChatPanel people={matchPeople(match)} chat={chat} variant="page" />;
 }
 
-/**
- * The newest message for a moment, as one line under the top bar while no chat is on screen. It sits between the
- * top bar and the board, never over the board, and lets every tap through.
- */
-export function ChatBubble({ match }: { match: GameView }) {
-  const chat = chatOf(match);
-  const line = chat?.bubble() ?? null;
-  const box = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    const screen = document.querySelector(".screen");
-    const bar = document.querySelector(".screen .hud-row")?.getBoundingClientRect();
-    const board = document.querySelector(".screen .hb-container, .screen .board-wrap")?.getBoundingClientRect();
-    const area = screen?.getBoundingClientRect();
-    const h = el.offsetHeight;
-    let top = bar ? bar.bottom + 2 : Math.max(4, (area?.top ?? 0) + 4);
-    // Never over the board: if there's no room between the bar and the board, it rides up over the bar instead.
-    if (board && board.top > 0 && top + h > board.top - 2) top = Math.max(2, board.top - h - 2);
-    el.style.top = `${Math.round(top)}px`;
-    if (area) {
-      el.style.left = `${Math.round(area.left + area.width / 2)}px`;
-      el.style.maxWidth = `${Math.round(area.width - 24)}px`;
-    }
-  }, [line?.n]);
-  if (!chat || !line) return null;
-  const say = chatSay(line.say);
-  if (!say) return null;
-  const who = sender(matchPeople(match), line.from);
-  const tag = lineTag(line, chat.hasTeams());
-  return (
-    <div class="qbubble" ref={box} role="status" aria-live="polite" key={line.n}>
-      <ChatIcon chat={chat} id={line.from} />
-      <strong>{who.name}</strong>
-      <span class={say.kind === "emoji" ? "emoji" : ""}>{say.text}</span>
-      {tag && <span class="qline-to">{tag}</span>}
-    </div>
-  );
-}

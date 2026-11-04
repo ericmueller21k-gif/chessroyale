@@ -13,16 +13,18 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   patch `DEFAULT_SETTINGS`. Two are played on these screens:
   - **Crowd 50 v 50** (the main mode): 100 players, one board, two teams of 50, each playing one side all game. Every
     player picks a move on their team's turns; one of the team's **3 most-picked** moves is played, drawn by their picks
-    (`drawRuleByStage: ["popular"]` with `crowdPlayedFromTop: 3`, `crowdTopOdds`: 45 / 3 / 2 plays 90% / 6% / 4%; moves
+    (`drawRuleByStage: ["popular"]` with `crowdPlayedFromTop: 3`, `crowdTopOdds`: 30 / 15 / 5 plays 60% / 30% / 10%; moves
     tied across 3rd place are left out; a boss battle keeps the most popular; Nov 2,
-    docs/decisions/2026-11-02-crowd-bot-spread.md). The reveal's line adds the played move's chance when it wasn't sure.
+    docs/decisions/2026-11-02-crowd-bot-spread.md). **A big majority always wins** (Eric, Nov 4; `crowdSureShare` 0.7):
+    a move with 70% or more of the team's real picks is played, always, a blunder too (7-2-1 plays the 7; 6-3-1 draws).
+    The reveal's line adds the played move's chance when it wasn't sure.
     Bots fill empty seats (see [matchmaking.md](matchmaking.md)); each plays at its own rating ("The bots" below). Always team turns (`crowdTeams` in
     `CROWD_SETTINGS`): the "everyone moves" choice went on Oct 15, 2026 (DECISIONS.md).
   - **Boss raid** (`RAID_SETTINGS`, `crowdTeams: false`): up to 50 people (no bots online) pick the crowd's moves
     together against a boss, from the starting position. Solo's "Boss alone" is a raid with a crowd of one. See
     [bosses.md](bosses.md).
 - **Scoring.** Every pick is scored by how much expected score it gives away against the best move (1 point = 0.01 of
-  expected score), from the judge's numbers. A miss scores `missedMoveScore`. Scores carry over all game in Crowd. A
+  expected score), from the judge's numbers. A miss scores `missedMoveScore` (in 50 v 50, the AFK rule below). Scores carry over all game in Crowd. A
   **brilliant** move is one that separated the field (among enough pickers); a pick made after a power-up's hints
   can't be brilliant.
 - **The opening allowance** (Eric, Oct 15; docs/decisions/2026-10-15-opening-allowance-and-ties.md;
@@ -96,6 +98,18 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   The cut is a judgment: every player's pawn in a 10 × 10 grid, the gavel, the verdict ("N out · M left", or "Nobody
   out, ties go through"), "Why was I cut?" (the elimination breakdown: "level with the last player through" only at the
   last cut, with why). `stageBreakSeconds` 10.
+- **The AFK rule (50 v 50; Eric, Nov 4; `CROWD_MISSES`, docs/decisions/2026-11-04-crowd-votes-afk.md).** A miss gets a
+  pick made for it, one of the engine's top `defaultFromTop` (5) at random by the position and the player (`hashPick`:
+  nothing drawn from the match's random source), kept in `defaultMove` with `move` still null, so it never counts in the
+  tally, the draw, the average or the sure share; nobody on the team picked, the team plays one of those at random (team
+  turns only; a final's mover and a boss battle as before). It scores the lowest round score of anyone in the group who
+  picked (`scoreGroup`; nobody picked: `missCaps` as before). The reveal's line says "Missed: a move was picked for you (1 of
+  3)" (`missLine` in `game.ts`; "Missed: picked for you (1 of 3)" under 380 px; the finals' "missed (2 of 3)"; `missNo` on
+  the result and `NetPick`). More than `allowed` (3) misses in the game (the 4th) and you're removed for being away
+  (`MatchRunner.awayOut`, `RoundReport.away`): online `LobbyCore.leaveMatch(h, "afk")`, solo `SoloMatch.removeAway`, as
+  resigning (a loss, out in the last place still open, a bot in the seat where one takes it); the results read "Removed for
+  being away" and "You missed 4 moves. Out in Nth place of 100."; home's note if you come back. Bots never miss. Test switch
+  `?afk=0` (solo, a lobby you create, a test pool's PLAY): misses as before, for tests that idle on purpose.
 - **Pre-game votes (50 v 50, `augments`).** Before move 1 everyone votes by dragging their pawn into one of three zones
   on an empty board (or tapping a zone, which puts your pawn there, Eric, Nov 2; or tapping a card; the zone takes the tap, never the board
   under it). The options are words only: their emoji (on the cards, the zones and the winner's banner) were deleted (Eric, Nov 2; Squads'
@@ -226,7 +240,7 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
     seat to a bot under a new id (`runner.handOver`; Default and private Crowd lobbies, and with Bots off only a final's
     seat or the last of a side; otherwise `runner.retire`). Before move 1 nothing is recorded (`runner.withdraw` if no
     bot sits in). Already out: their place is recorded with everyone's at the end. The match stays ranked as it was.
-  - **Away:** gone longer than `LEAVING.awayMs` (120 s) is resigning (`sweepAway`); a move locks once everyone still
+  - **Away:** gone longer than `LEAVING.awayMs` (120 s) is resigning (`sweepAway`); in 50 v 50 so is the 4th miss in a game (the AFK rule, above); a move locks once everyone still
     here has moved (`roundDone`). Nobody left: the match ends at once and the lobby closes (`wrapUpIfEmpty`).
 - **Classic** (64 players, 8 boards, rotating) still runs but is frozen: Eric will rework it; don't invest in it.
 
@@ -250,7 +264,7 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 
 ## Settings
 
-`OPENING_ALLOWANCE` (points, flatThrough, goneBy, materialPawns), `CROWD_SCORING` (the cap and its stages and curve, the piece bar, the shared-blunder relief, streaks, rare finds, a miss, the bubble grace), `RAID_SCORING` (50 v 50's, the cap by crowd move, streaks on live moves only, no bubble), `BOSS_ALONE_SCORING`, `CROWD_START` (the start vote's random opening length), `LEAVING` (the away time, the seat's bot, the app's wait for an answer), `DEFAULT_SETTINGS`, `CROWD_SETTINGS`, `RAID_SETTINGS`, `CROWD_KNOCKOUTS` (and `crowdFinalists`), `QUICK_PACE`
+`OPENING_ALLOWANCE` (points, flatThrough, goneBy, materialPawns), `CROWD_MISSES` (the AFK rule), `crowdSureShare`, `CROWD_SCORING` (the cap and its stages and curve, the piece bar, the shared-blunder relief, streaks, rare finds, a miss, the bubble grace), `RAID_SCORING` (50 v 50's, the cap by crowd move, streaks on live moves only, no bubble), `BOSS_ALONE_SCORING`, `CROWD_START` (the start vote's random opening length), `LEAVING` (the away time, the seat's bot, the app's wait for an answer), `DEFAULT_SETTINGS`, `CROWD_SETTINGS`, `RAID_SETTINGS`, `CROWD_KNOCKOUTS` (and `crowdFinalists`), `QUICK_PACE`
 (the `?pace=quick` test switch, per mode; players always play the mode's own pace), the clock (`timeBankSeconds`, `timeIncrementSeconds`, `moveClockSeconds`;
 `moveClockSteps` for a rising clock, unused today), the vote keys (`voteSeconds`, `voteBotSkip`, …), `teamFinal*`. The
 time controls themselves are in the vote data (`PREGAME_VOTES` in `votes.ts`).
@@ -268,6 +282,9 @@ time controls themselves are in the vote data (`PREGAME_VOTES` in `votes.ts`).
   picks one move, Eric's castle included; the plurality moves between good lines; the top-3 odds and ties; the draw),
   `packages/chess/test/judge.test.ts` (the lean from the seed alone), `packages/server/test/lobby.test.ts` (the live
   window leads with the played move). Probe: `packages/sim/scripts/crowd-spread-probe.ts`.
+- 50 v 50's sure majority and the AFK rule: unit `packages/core/test/crowd-afk.test.ts`, `packages/chess/test/crowd.test.ts`
+  ("50 v 50's misses"), `packages/server/test/resign.test.ts` ("50 v 50's AFK rule"); e2e `e2e/crowd.spec.ts` ("50 v 50's
+  AFK rule": the line at 390 and 320 px, the removal).
 - 50 v 50's scoring: unit `packages/core/test/crowd-scoring.test.ts` (the cap's shape and its stages, pieces uncapped,
   the shared relief's thresholds, streaks and their start and ramp, a miss, rare finds and the switch, the bubble grace
   and what carries, 2 decimals), `packages/app/test/faq.test.ts`; e2e `e2e/crowd-scoring.spec.ts` (the fire's tiers,

@@ -145,6 +145,46 @@ describe("resigning online: Crowd 50 v 50 and raids", () => {
     expect(L.core.connect(token, "P2", "phone")).toEqual({ ok: false, message: LEFT_MATCH, ended: true, left: { how: "resigned", result: { placement: 100, players: 100, ranked: false } } });
   });
 
+  it("50 v 50's AFK rule (CrowdMisses, Eric, Nov 4): a miss is shown as a pick made for you (1 of 3), and the 4th miss in the game removes you as leaving the match (\"afk\": a loss, a bot in the seat); someone who picks plays on", () => {
+    const L = crowd(2);
+    const seen: number[] = [];
+    let picks = 0;
+    for (let i = 0; i < 4000 && !L.last("p1", "resigned"); i++) {
+      // p2 picks on its team's turns; p1 never does.
+      const r = L.last("p2", "round");
+      if (L.core.record.phase === "play" && r && !r.watching && L.core.record.round?.key === r.key && !L.core.record.round.picks.p2 && L.now >= r.startsAt) {
+        L.core.message("p2", { t: "pick", key: r.key, move: legalMoves(r.board!.fen)[0]! });
+        picks++;
+      }
+      const rv = L.last("p1", "reveal");
+      const me = rv?.picks.find((p) => p.playerId === "p1");
+      if (me?.missNo && seen.at(-1) !== me.missNo) {
+        // Shown: the pick made for you (never your move: it doesn't count), your misses so far, the team's lowest score.
+        expect(me.move).toBeNull();
+        expect(me.defaultMove).toBeTruthy();
+        expect(me.roundScore).toBe(Math.min(...rv!.picks.filter((p) => p.move !== null).map((p) => p.roundScore - (p.brilliantBonus ?? 0))));
+        seen.push(me.missNo);
+      }
+      if (!L.scores()) L.step(2_000);
+    }
+    expect(seen).toEqual([1, 2, 3]);
+    const left = L.last("p1", "resigned")!;
+    expect(left).toMatchObject({ how: "afk", result: { players: 100, ranked: false } });
+    expect(L.closed).toContain("p1");
+    expect(L.core.record.humans.map((h) => h.id)).toEqual(["p2"]);
+    // A bot plays the seat, and the loss is on the record, as resigning.
+    expect(L.runner().state.players.some((p) => p.id === "p1")).toBe(false);
+    expect(L.core.takeLeftResults()).toMatchObject([{ playerId: "p1", teamWon: false }]);
+    expect(L.core.record.left).toMatchObject([{ id: "p1", how: "afk" }]);
+    // p2 picked (never a miss), so plays on: never away.
+    expect(picks).toBeGreaterThan(0);
+    expect(L.runner().state.players.find((p) => p.id === "p2")).toMatchObject({ alive: true });
+    expect(L.runner().state.players.find((p) => p.id === "p2")!.misses ?? 0).toBe(0);
+    // Back with the old seat's token: told how they left.
+    const token = L.core.record.left![0]!.token;
+    expect(L.core.connect(token, "P1", "phone")).toMatchObject({ ok: false, ended: true, left: { how: "afk" } });
+  });
+
   it("a rated loss: in a ranked match the resign counts for ranking, and the match stays ranked for everyone who stays", () => {
     const L = crowd(30);
     expect(L.core.ranked()).toBe(true);

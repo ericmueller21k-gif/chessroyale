@@ -1108,7 +1108,7 @@ export class LobbyCore {
   }
 
   /** The work of leaving (see resign), without wrapping the match up. */
-  private leaveMatch(h: Human, why: "resigned" | "away" | "kicked") {
+  private leaveMatch(h: Human, why: "resigned" | "away" | "kicked" | "afk") {
     const runner = this.runner!;
     const id = h.id;
     const now = this.io.now();
@@ -2376,11 +2376,18 @@ export class LobbyCore {
     this.noteFeats(report);
     this.noteFair(report, lastMoves);
     this.r.scoreRequest = null;
+    // Crowd 50 v 50: a miss past CrowdMisses.allowed (the 4th in the game) is removed for being away, as leaving the match
+    // ("afk": a loss, out in the last place still open, a bot in the seat where one takes it). Nobody left: it ends now.
+    for (const id of report.away ?? []) {
+      const h = this.human(id);
+      if (h) this.leaveMatch(h, "afk");
+    }
+    if (report.away?.length && this.wrapUpIfEmpty()) return;
     if (runner.final) {
       // The final: everyone sees the move just played and its loss, then the next turn.
       const b = report.boards[0]!;
       const p = b.result.players[0]!;
-      const last: NetFinal["last"] = { playerId: p.playerId, move: b.result.playedMove, san: toSan(b.fenBefore, b.result.playedMove), loss: p.loss };
+      const last: NetFinal["last"] = { playerId: p.playerId, move: b.result.playedMove, san: toSan(b.fenBefore, b.result.playedMove), loss: p.loss, ...(p.missNo ? { missNo: p.missNo } : {}) };
       this.noteLiveVotes(b);
       // Team final: when a step ends, the weakest on each side go out.
       const out = runner.afterFinalTurn();
@@ -2421,7 +2428,7 @@ export class LobbyCore {
         fenBefore: mine?.fenBefore ?? null,
         bestMove: mine?.bestMove ?? null,
         playedMove: mine?.result.playedMove ?? null,
-        picks: mine?.result.players.map((p) => ({ playerId: p.playerId, move: p.move, loss: p.loss, ...(p.counted !== undefined ? { counted: p.counted } : {}), ...(p.material ? { material: p.material } : {}), roundScore: p.roundScore, ...(p.usedPowerUp ? { usedPowerUp: true } : {}), ...(p.uncapped ? { uncapped: p.uncapped } : {}), ...(p.streakBonus ? { streak: p.streak, streakBonus: p.streakBonus } : {}), ...(p.brilliantBonus ? { brilliantBonus: p.brilliantBonus } : {}) })) ?? [],
+        picks: mine?.result.players.map((p) => ({ playerId: p.playerId, move: p.move, loss: p.loss, ...(p.counted !== undefined ? { counted: p.counted } : {}), ...(p.material ? { material: p.material } : {}), roundScore: p.roundScore, ...(p.usedPowerUp ? { usedPowerUp: true } : {}), ...(p.uncapped ? { uncapped: p.uncapped } : {}), ...(p.streakBonus ? { streak: p.streak, streakBonus: p.streakBonus } : {}), ...(p.brilliantBonus ? { brilliantBonus: p.brilliantBonus } : {}), ...(p.defaultMove ? { defaultMove: p.defaultMove, missNo: p.missNo } : {}) })) ?? [],
         drawRule: mine?.result.drawRule ?? "random",
         ...(mine?.result.brilliant ? { brilliant: mine.result.brilliant } : {}),
         ...(mine?.king !== undefined ? { king: mine.king, kingCalls: mine.kingCalls } : {}),

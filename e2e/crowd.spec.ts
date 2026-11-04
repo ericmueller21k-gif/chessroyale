@@ -142,8 +142,9 @@ test("the opening allowance on the reveal: a sound move off the engine's line is
 test("online, once you're out, a later cut says so (not \"You're through\") and the gavel strikes again", async ({ page }) => {
   test.setTimeout(5 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
-  // A lobby of one (and 99 bots) where you never pick: -25 a move puts you at the bottom of your team.
-  await page.goto("/?debug&pace=quick&mode=crowd&format=team&rounds=1&clock=4");
+  // A lobby of one (and 99 bots) where you never pick: -25 a move puts you at the bottom of your team. (?afk=0: the miss
+  // as before Nov 4, CrowdMisses off; since then a miss scores the team's lowest, and the 4th takes you out of the match.)
+  await page.goto("/?debug&pace=quick&mode=crowd&format=team&rounds=1&clock=4&afk=0");
   await createLobbyFromHome(page);
   await page.getByRole("button", { name: /Start with 1 player/ }).click();
   const cut = () => page.evaluate(() => {
@@ -177,6 +178,78 @@ test("online, once you're out, a later cut says so (not \"You're through\") and 
   await expect(page.locator(".crowd-cut .safe-msg")).toHaveCount(0);
   await expect(page.locator(".crowd-cut")).not.toContainText("You're through");
   await expect(page.getByRole("button", { name: "Why was I cut?" })).toHaveCount(0);
+});
+
+test("50 v 50's AFK rule (Eric, Nov 4): each miss says a move was picked for you (1 of 3), whole on one line at 390 and 320 px, scores your team's lowest and never counts in the vote; the 4th removes you", async ({ page }) => {
+  test.setTimeout(5 * 60_000);
+  test.skip(test.info().project.name !== "phone", "one run is enough");
+  const stills = process.env.CROWD_AFK_STILLS;
+  // You never pick (bots fill the other 99 seats, and they always do).
+  await page.goto("/?debug&pace=quick&mode=crowd&clock=6&augments=0");
+  await soloFromHome(page);
+  await expect.poll(() => phase(page), { timeout: 30_000 }).toMatch(/play|watching/);
+  // Every frame from here: each miss's reveal, as the screen and the match have it.
+  await page.evaluate(() => {
+    const w = window as any;
+    w.__misses = [];
+    const tick = () => {
+      const m = w.match;
+      const ph = m?.phase;
+      const el = document.querySelector(".poll-result") as HTMLElement | null;
+      if (ph?.kind === "reveal" && el && /Missed/.test(el.textContent ?? "")) {
+        const me = ph.mine.result.players.find((p: any) => m.isYou(p.playerId));
+        if (me?.missNo && !w.__misses.some((x: any) => x.n === me.missNo)) {
+          const real = ph.mine.result.players.filter((p: any) => p.move !== null);
+          const shown = [...el.querySelectorAll(".result-text > span")].filter((s) => getComputedStyle(s).display !== "none");
+          w.__misses.push({
+            n: me.missNo,
+            width: innerWidth,
+            line: shown.map((s) => s.textContent).join(""),
+            clip: el.scrollWidth - el.clientWidth,
+            move: me.move,
+            defaultMove: me.defaultMove,
+            score: me.roundScore,
+            low: Math.min(...real.map((p: any) => p.roundScore - (p.brilliantBonus ?? 0))),
+            votes: document.querySelector(".opening-name")?.textContent ?? "",
+            real: real.length,
+            team: ph.mine.playerIds.length,
+          });
+        }
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  const misses = () => page.evaluate(() => (window as any).__misses as any[]);
+  // The first at 390 px, the second at 320 (the short words), the third at 390 again.
+  await expect.poll(async () => (await misses()).length, { timeout: 90_000 }).toBe(1);
+  await page.setViewportSize({ width: 320, height: 700 });
+  await expect.poll(async () => (await misses()).length, { timeout: 90_000 }).toBe(2);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator(".poll-result")).toContainText("(3 of 3)", { timeout: 90_000 });
+  if (stills) await page.screenshot({ path: `${stills}/miss-line-phone.png` });
+  await expect.poll(async () => (await misses()).length, { timeout: 10_000 }).toBe(3);
+  const seen = await misses();
+  expect(seen.map((x) => x.n)).toEqual([1, 2, 3]);
+  expect(seen.map((x) => x.line)).toEqual(["Missed: a move was picked for you (1 of 3)", "Missed: picked for you (2 of 3)", "Missed: a move was picked for you (3 of 3)"]);
+  for (const x of seen) {
+    // Whole on its one line.
+    expect(x.clip, `${x.width} px: ${x.line}`).toBeLessThanOrEqual(0);
+    // A move was picked for you, but your move is none: it never counts in the vote (the line over the board counts the
+    // real picks: everyone on the team but you).
+    expect(x.move).toBeNull();
+    expect(x.defaultMove).toBeTruthy();
+    expect(x.real).toBe(x.team - 1);
+    expect(x.votes).toContain(`${x.real} votes`);
+    // Your score: the lowest of your team's real picks.
+    expect(x.score).toBe(x.low);
+  }
+  // The 4th: removed for being away, as resigning (out in the last place still open; solo, the match stops there).
+  await expect.poll(() => phase(page), { timeout: 90_000 }).toBe("results");
+  await expect(page.getByRole("heading", { name: "Removed for being away" })).toBeVisible();
+  await expect(page.locator(".left-line")).toHaveText(/^You missed 4 moves\. Out in \d+(st|nd|rd|th) place of 100\.$/);
+  expect(await page.evaluate(() => (window as any).match.phase.left)).toMatchObject({ how: "afk", misses: 4 });
+  if (stills) await page.screenshot({ path: `${stills}/removed-phone.png` });
 });
 
 test("Crowd 50 v 50: plays your team's turns, watches the other team's, survives cuts, through the team final to results", async ({ page }) => {

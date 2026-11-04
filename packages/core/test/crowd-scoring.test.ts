@@ -206,10 +206,12 @@ describe("streaks", () => {
 });
 
 describe("a miss", () => {
-  it("scores missCaps times the stage's cap below zero, and missedMoveScore with no cap", () => {
-    const r = scoreGroup(picksOf(["best", null]), evalOf({}), rng, S, "popular", undefined, ctx(0));
+  it("without 50 v 50's CrowdMisses (a raid, the ?afk=0 switch): scores missCaps times the stage's cap below zero, and missedMoveScore with no cap", () => {
+    // (Since Nov 4, 50 v 50's misses score the team's lowest: crowd-afk.test.ts. Off, they score as before.)
+    const off: Settings = { ...S, crowdMisses: null };
+    const r = scoreGroup(picksOf(["best", null]), evalOf({}), rng, off, "popular", undefined, ctx(0));
     expect(score(r, "p1")).toBe(round2(-CS.missCaps * capFor(CS, 0)!));
-    const S2: Settings = { ...S, crowdScoring: { ...CS, cap: [null], capFrom: [0] } };
+    const S2: Settings = { ...off, crowdScoring: { ...CS, cap: [null], capFrom: [0] } };
     expect(score(scoreGroup(picksOf(["best", null]), evalOf({}), rng, S2, "popular", undefined, ctx(0)), "p1")).toBe(S.missedMoveScore);
   });
 });

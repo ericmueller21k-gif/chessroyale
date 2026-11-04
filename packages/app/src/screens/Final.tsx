@@ -93,7 +93,8 @@ export function FinalScreen({ match, final }: { match: GameView; final: FinalVie
                 <strong>{match.isYou(final.last.playerId) ? "You" : match.nameOf(final.last.playerId)}</strong> played{" "}
                 <strong>{final.last.san}</strong>{" "}
                 <span class={final.last.loss === null ? "bad" : final.last.loss < 0.5 ? "good" : final.last.loss > 5 ? "bad" : ""}>
-                  {final.last.loss === null ? "missed" : final.last.loss < 0.05 ? "best move" : `−${final.last.loss.toFixed(1)}`}
+                  {/* (50 v 50: how many of the misses the game allows, CrowdMisses.) */}
+                  {final.last.loss === null ? (final.last.missNo && match.settings.crowdMisses ? `missed (${final.last.missNo} of ${match.settings.crowdMisses.allowed})` : "missed") : final.last.loss < 0.05 ? "best move" : `−${final.last.loss.toFixed(1)}`}
                 </span>
                 <div class="muted small">
                   Next: {match.isYou(final.mover) ? "your move" : `${match.nameOf(final.mover)} is thinking…`}

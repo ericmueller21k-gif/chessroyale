@@ -18,7 +18,7 @@ import { LastStand, clearSquare, lastStandBoard } from "../components/LastStand.
 import { KING_COMMAND, KING_SUMMON, LAST_STAND, lastStandMs } from "@chessroyale/chess";
 import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossSide } from "../components/BossCharacter.tsx";
-import { allowanceNote, allowanceShort, bossAlone, elimination, finalName, isCrowdFifty, myTeam, scoreDp, type BoardView, type GameView, type GroupReveal, type Standing } from "../game.ts";
+import { allowanceNote, allowanceShort, bossAlone, missLine, elimination, finalName, isCrowdFifty, myTeam, scoreDp, type BoardView, type GameView, type GroupReveal, type Standing } from "../game.ts";
 import { StreakFire } from "../components/StreakFire.tsx";
 import { GavelPiece } from "../components/Gavel.tsx";
 import { Avatar } from "../components/Items.tsx";
@@ -416,7 +416,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
                 </span>
               );
               const youLine = (
-                <span class={`dock-line muted${me && allowanceNote(me) ? " allowance-words" : ""}`}>
+                <span class={`dock-line muted${me && (allowanceNote(me) || missLine(me, match.settings.crowdMisses?.allowed)) ? " allowance-words" : ""}`}>
                   {!me
                     ? `You watched · best ${seenSan(fen, mine.bestMove)}`
                     : !me.move
@@ -424,7 +424,13 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
                         ? picks.length > 1
                           ? `${mine.kingCalls} of ${picks.length} called him · no score`
                           : "You called him · no score"
-                        : "No move from you."
+                        : missLine(me, match.settings.crowdMisses?.allowed) ? (
+                          // (50 v 50's boss final: a miss's words as on the poll's line, shorter on the narrowest phones.)
+                          <>
+                            <span class="wide-only">{missLine(me, match.settings.crowdMisses?.allowed)}</span>
+                            <span class="narrow-only">{missLine(me, match.settings.crowdMisses?.allowed, true)}</span>
+                          </>
+                        ) : "No move from you."
                       : allowanceNote(me) ? (
                         // The opening allowance on your pick, when it made a difference: the note alone (the line is short;
                         // shorter still on the narrowest phones).
@@ -476,6 +482,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
     const mark = landed && shout ? shout : null;
     const youFound = !!mark && mark.players.some((id) => match.isYou(id));
     const allowance = me ? allowanceShort(me) : null;
+    const miss = me ? missLine(me, match.settings.crowdMisses?.allowed) : null;
     return (
       <div class="poll" role="status" ref={pollBox}>
         {bars.map((r) => {
@@ -530,8 +537,14 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
           <div class="poll-result">
             <span class={`round-score ${me.roundScore >= 0 ? "good" : "bad"}`}>{fmt(me.roundScore, dp)}</span>
             <span class="result-text">
-              {me.move ? `you ${seenSan(fen, me.move)}` : "no move"}
-              {me.move && me.move === mine.bestMove ? " · best move" : ` · best ${seenSan(fen, mine.bestMove)}`}
+              {/* (50 v 50's miss: a move was picked for you, and how many misses you've used: CrowdMisses.) */}
+              {miss ? (
+                <>
+                  <span class="miss-wide">{miss}</span>
+                  <span class="miss-narrow">{missLine(me!, match.settings.crowdMisses?.allowed, true)}</span>
+                </>
+              ) : me.move ? `you ${seenSan(fen, me.move)}` : "no move"}
+              {miss ? "" : me.move && me.move === mine.bestMove ? " · best move" : ` · best ${seenSan(fen, mine.bestMove)}`}
               {allowance && ` · ${allowance}`}
               {!!me.streakBonus && (
                 <>

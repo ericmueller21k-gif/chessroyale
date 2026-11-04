@@ -84,7 +84,8 @@ test("the panel under the board is never empty: every tap, every remembered layo
   test.skip(test.info().project.name !== "phone", "a phone's layout");
   const p = await (await browser.newContext({ ...devices["iPhone 13"], browserName: undefined, colorScheme: "light" } as any)).newPage();
   await named(p, "Folder");
-  await p.goto("/?debug&pool=panel");
+  // (?afk=0: 50 v 50's AFK rule off, CrowdMisses: this player never picks, and the 4th miss would take them out of the match.)
+  await p.goto("/?debug&pool=panel&afk=0");
   await pickMode(p);
   await p.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect.poll(() => p.evaluate(() => (window as any).match?.chat?.enabled ?? false), { timeout: 90_000 }).toBe(true);
@@ -227,7 +228,8 @@ test("the chat tab's Team / All switch: both labels whole at 320, 360 and 390 px
   test.skip(test.info().project.name !== "phone", "a phone's layout");
   const p = await (await browser.newContext({ ...devices["iPhone 13"], browserName: undefined } as any)).newPage();
   await named(p, "Switcher");
-  await p.goto("/?debug&pool=switch");
+  // (?afk=0: 50 v 50's AFK rule off, CrowdMisses: this player never picks, and the 4th miss would take them out of the match.)
+  await p.goto("/?debug&pool=switch&afk=0");
   await pickMode(p);
   await p.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect.poll(() => p.evaluate(() => (window as any).match?.chat?.enabled ?? false), { timeout: 90_000 }).toBe(true);

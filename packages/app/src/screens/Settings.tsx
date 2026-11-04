@@ -7,7 +7,7 @@ import { SignIn } from "../components/SignIn.tsx";
 import { AccountData } from "../components/AccountData.tsx";
 import { BackButton } from "../components/FrontDoor.tsx";
 import { signOut, tooYoung } from "../account.ts";
-import { BOARD_COLORS, boardColors, boardMarksOn, chatBubbles, chatOff, crowdAnimations, crowdTrail, onPrefsChange, practiceOn, premovesOn, setBoardColors, setBoardMarksOn, setChatBubbles, setChatOff, setCrowdAnimations, setCrowdTrail, setPracticeOn, setPremovesOn, type BoardColors } from "../prefs.ts";
+import { BOARD_COLORS, boardColors, boardMarksOn, chatOff, crowdAnimations, crowdTrail, onPrefsChange, practiceOn, premovesOn, setBoardColors, setBoardMarksOn, setChatOff, setCrowdAnimations, setCrowdTrail, setPracticeOn, setPremovesOn, type BoardColors } from "../prefs.ts";
 import { clearAllPremoves } from "../board/yours.ts";
 import { REEL_VOICES, getReelVoice, isMuted, onMuteChange, previewPieceSound, previewReel, setMuted, setReelVoice, soundReport, unlockAudio, type ReelVoice } from "../sound.ts";
 import { PIECE_SOUNDS, pieceSound, setPieceSound } from "../piece-sounds.ts";
@@ -211,7 +211,6 @@ export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => v
   const [anim, setAnim] = useState(crowdAnimations);
   const [trail, setTrail] = useState(crowdTrail);
   const [chatOn, setChatOn] = useState(() => !chatOff());
-  const [bubbles, setBubbles] = useState(chatBubbles);
   const [busy, setBusy] = useState(false);
   // (Arrows and highlights are drawn with a mouse: greyed on a device without one.)
   const [mouse] = useState(() => typeof matchMedia === "function" && matchMedia("(any-pointer: fine)").matches);
@@ -313,17 +312,6 @@ export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => v
           }}
         >
           Preset lines and emoji in online matches (no typing): pick yours in your profile, under Quick chat and emoji. Off: no messages show, and you send none.
-        </Toggle>
-        <Toggle
-          title="New-message bubble"
-          checked={chatOn && bubbles}
-          disabled={!chatOn}
-          onChange={(on) => {
-            setBubbles(on);
-            setChatBubbles(on);
-          }}
-        >
-          On a phone, while chat is hidden, the newest message shows for a moment under the top bar (never over the board).
         </Toggle>
       </section>
 
