@@ -216,8 +216,8 @@ describe("the rooms' own pieces", () => {
 });
 
 describe("the shops", () => {
-  it("only Babur's, Puddles', Alfil's, Big Boy's, Timber's, Dash's and Hollow's homes have an inside", () => {
-    expect(ALL_HOMES.filter((h) => shopOf(h.id)).map((h) => h.id).sort()).toEqual(["alfil", "bigboy", "dash", "gardener", "hollow", "tiger", "timber"]);
+  it("only Babur's, Puddles', Alfil's, Big Boy's, Timber's, Dash's, Hollow's and Wrangler's homes have an inside", () => {
+    expect(ALL_HOMES.filter((h) => shopOf(h.id)).map((h) => h.id).sort()).toEqual(["alfil", "bigboy", "dash", "gardener", "hollow", "pig", "tiger", "timber"]);
   });
 
   it("the crates' words: names, the price line, what you have; the boss's ride is a prize", () => {
@@ -260,10 +260,16 @@ describe("the shops", () => {
     expect(holdLine(h, { tokens: 0, keys: 0 })).toBe("You have 0 Hollow tokens and 0 crate keys.");
     expect(prizeRows(h)[0]).toMatchObject({ id: "hollow-bulb", name: "Hollow's Bulb", kind: "Mythic ride" });
     expect([h.kid, h.roof, h.chatTone]).toEqual(["hollowdog", "cave", "night"]);
+    const w = shopOf("pig")!;
+    expect(w.crate).toBe("Wrangler's Boss Crate");
+    expect(priceLine(w)).toBe("3 Wrangler tokens, or 1 Wrangler token + 1 crate key");
+    expect(holdLine(w, { tokens: 0, keys: 0 })).toBe("You have 0 Wrangler tokens and 0 crate keys.");
+    expect(prizeRows(w)[0]).toMatchObject({ id: "pen-pony", name: "Pen Pony", kind: "Mythic ride" });
+    expect([w.kid, w.roof, w.chatTone]).toEqual(["rooster", "barn", "day"]);
   });
 
   it("each shop sells its boss's crate (core's BOSS_CRATES), its ride among the prizes; a way's button needs its price held", () => {
-    for (const s of [shopOf("tiger")!, shopOf("gardener")!, shopOf("alfil")!, shopOf("bigboy")!, shopOf("timber")!, shopOf("dash")!, shopOf("hollow")!]) {
+    for (const s of [shopOf("tiger")!, shopOf("gardener")!, shopOf("alfil")!, shopOf("bigboy")!, shopOf("timber")!, shopOf("dash")!, shopOf("hollow")!, shopOf("pig")!]) {
       const crate = bossCrateOf(s.home)!;
       expect(crate.name).toBe(s.crate);
       expect(crate.items).toContain(s.prizes[0]);

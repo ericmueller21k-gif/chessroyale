@@ -166,15 +166,14 @@ export const BOSS_INTROS: Readonly<Partial<Record<HomeId, BossIntro>>> = {
   },
   // (Nov 4: his own, Eric's design: the lasso, the hay bale with the board dragged to the middle, the buckets yanked in for the stools,
   // and his wipe of spurs, tumbleweeds and cap guns; docs/decisions/2026-11-04-wrangler-home.md. His line a placeholder until Eric's
-  // Gemini lines. You both walk on straight to where you stand through it all, clear of the stools (the art's 7.2 and the usual
-  // 2.2 east): nobody moves when the bale and the buckets come in, nor after.)
+  // Gemini lines. You both walk on straight to where you stand through it all, clear of the stools (the usual clear places: at the
+  // art's 7.2 the rope coil in his other fist hung in front of his bucket): nobody moves when the bale and the buckets come in, nor after.)
   pig: {
     name: "Wrangler",
     line: "Saddle up, partner. The board's comin' to us.",
     layout: "across",
     custom: true,
     seated: true,
-    clear: 2.3,
     // His cues, each a sound of his own (characters/pig-sounds.ts): the lasso whirling, thrown (twice at once for the cross throw),
     // the loop slapping down on the bale and snapping taut, each yank, the bale's scrape across the straw, the thunk as it and each
     // bucket land, the loop flicked free (his throw), the double lasso winding up, the buckets' clatter, his hat tip, his snorting

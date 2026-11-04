@@ -310,7 +310,8 @@ describe("the dog keeps the shop", () => {
 describe("Hollow's Boss Crate", () => {
   it("in BOSS_CRATES with his ride, Hollow's Bulb, first; its words as the others'", () => {
     const crate = bossCrateOf("hollow")!;
-    expect(BOSS_CRATES.at(-1)).toBe(crate);
+    // (Wrangler's came after it, Nov 4.)
+    expect(BOSS_CRATES).toContain(crate);
     expect(crate.name).toBe("Hollow's Boss Crate");
     expect(crate.ride).toBe("hollow-bulb");
     expect(crate.items).toContain("hollow-bulb");

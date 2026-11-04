@@ -64,6 +64,8 @@ interface RoomArt {
   marks?: DrawnMarks;
   /** A room that isn't a box (Hollow's cave): its floor's shape, `.` floor and `#` rock (room.ts makeRoom blocks the rock). */
   floor?: readonly string[];
+  /** The board on its stand (Wrangler's barn: the `board-stand` piece's square), which his intro ropes and drags to the table's place. */
+  stand?: { readonly col: number; readonly row: number };
 }
 const ART: Partial<Record<HomeId, () => Promise<RoomArt>>> = {
   tiger: () => import("./babur-art.ts").then((m) => ({ layout: m.SHOP_BABUR_LAYOUT, pieces: m.SHOP_BABUR_PIECES, crateAt: m.SHOP_BABUR_CRATE_AT, lights: m.SHOP_BABUR_HOOP_LIGHTS, pools: m.SHOP_BABUR_HOOP_POOLS })),
@@ -77,7 +79,7 @@ const ART: Partial<Record<HomeId, () => Promise<RoomArt>>> = {
   // (A cave, not a box: walkable only on its floor's shape. The tree of presents, 3 x 2 squares, stands up whole at its foot.)
   hollow: () => import("./hollow-art.ts").then((m) => ({ layout: m.SHOP_HOLLOW_LAYOUT, pieces: m.SHOP_HOLLOW_PIECES, crateAt: m.SHOP_HOLLOW_CRATE_AT, lights: m.SHOP_HOLLOW_LIGHTS, pools: m.SHOP_HOLLOW_POOLS, upright: ["showpiece"], marks: m.SHOP_HOLLOW_MARKS, floor: m.SHOP_HOLLOW_FLOOR })),
   // (A box barn. Its two pens of knights, 3 x 2 squares each, stand up whole at their foot; his red mat and your denim one are its marks.)
-  pig: () => import("./pig-art.ts").then((m) => ({ layout: m.SHOP_PIG_LAYOUT, pieces: m.SHOP_PIG_PIECES, crateAt: m.SHOP_PIG_CRATE_AT, lights: m.SHOP_PIG_LIGHTS, pools: m.SHOP_PIG_POOLS, upright: ["pen", "pen-b"], marks: m.SHOP_PIG_MARKS })),
+  pig: () => import("./pig-art.ts").then((m) => ({ layout: m.SHOP_PIG_LAYOUT, pieces: m.SHOP_PIG_PIECES, crateAt: m.SHOP_PIG_CRATE_AT, lights: m.SHOP_PIG_LIGHTS, pools: m.SHOP_PIG_POOLS, upright: ["pen", "pen-b"], marks: m.SHOP_PIG_MARKS, stand: m.SHOP_PIG_BOARD_AT })),
 };
 
 /** A piece's frames, each drawn once into a canvas, and when each ends in its loop. */
@@ -344,6 +346,8 @@ function startRoom(
   /** Hollow's dark (his intro's art and timing), or null: any other room or boss. */
   const dk = ci?.dark ?? null;
   const da = ci?.anims && isDark(ci.anims) ? ci.anims : null;
+  /** Wrangler's lasso (his intro's art and timing), or null: any other room or boss. */
+  const rp = ci?.rope ?? null;
   const across = marks?.layout === "across";
   const boss = ci && marks ? new Walker({ c: room.start.c - 1, r: room.start.r }, C.walkStepMs, false) : null;
   const bossPose = { x: 0, y: 0, hop: 0, tilt: 0, step: false, t: 0 };
@@ -1026,6 +1030,8 @@ function startRoom(
   const kidEnds = sheet.ms.idle.map((ms) => (kidT += Math.max(16, ms)));
 
   const drawUp = (u: Up, now: number) => {
+    // (Wrangler's intro: from the yank, the board on its stand is his bale, drawn as it's dragged: drawRopeCenter.)
+    if (introNow?.rope?.bale && u.name === "board-stand") return;
     if (!P(u.c, u.r)) return;
     // Near the camera (between it and you, up close: the front wall as you stand at the door) a piece fades out, so it never fills
     // the screen in front of you.
@@ -1294,6 +1300,232 @@ function startRoom(
     Object.assign(hisFoot, { x: pt.x, y: pt.y, k, on: true });
     Object.assign(bossHead, { x: pt.x, y: y0 + b.ch.h * b.head * k, on: true, px: b.squares * pt.k });
   };
+  // ---- Wrangler's lasso (his intro, Nov 4; challenge.ts ropeAt): he stands where he walked on to all along, his moves as drawn.
+  /** Where each of his fists holds a rope this frame (screen px; `on` false: no rope in it), and his frame's last grips (his pixels). */
+  const fist1 = { x: 0, y: 0, on: false };
+  const fist2 = { x: 0, y: 0, on: false };
+  let grip1: readonly [number, number] = [15, 47];
+  let grip2: readonly [number, number] = [61, 50];
+  /** Where the loop's line meets it on the bale this frame (screen px), and each bucket's handle grip. */
+  const knot = { x: 0, y: 0, on: false };
+  const grips = { b: { x: 0, y: 0, on: false }, w: { x: 0, y: 0, on: false } };
+  /**
+   * Him in his intro: his own move's frame (BOSS_PIG_INTRO), or his idle, as drawn (not mirrored: his moves throw and haul to our left
+   * and right as drawn; his attack, after, faces you as every boss's), at his town size, his feet where he stands; his fists' grips.
+   */
+  const drawRopeBoss = (now: number) => {
+    boss!.pose(now, bossPose);
+    if (!P(bossPose.x + bossOx(now), bossPose.y + bossOy(now))) return;
+    const b = ci!.boss;
+    const mv = introNow!.rope!.move;
+    let img: HTMLCanvasElement;
+    if (mv) img = rp!.mover.frames[mv.anim][mv.frame]!;
+    else {
+      const u = now % b.loop;
+      let i = 0;
+      while (i < b.ends.length - 1 && u >= b.ends[i]!) i++;
+      img = b.frames[i]!;
+    }
+    const ch = rp!.mover.ch;
+    const k = (b.squares * pt.k) / ch.h;
+    const x0 = pt.x - ch.foot[0] * k;
+    const y0 = pt.y - ch.foot[1] * k;
+    drawShadows(pt.x, pt.y, ch.w * k);
+    g.imageSmoothingEnabled = k < 1.5;
+    g.drawImage(img, x0, y0, img.width * k, img.height * k);
+    g.imageSmoothingEnabled = false;
+    // (A fist without a rope's grip this frame keeps its last: the line still runs to it as he stands, or reels in to it.)
+    const h1 = mv ? rp!.hands[mv.anim]?.[mv.frame] : null;
+    const h2 = mv ? rp!.hands2[mv.anim]?.[mv.frame] : null;
+    if (h1) grip1 = h1;
+    if (h2) grip2 = h2;
+    Object.assign(fist1, { x: x0 + grip1[0] * k, y: y0 + grip1[1] * k, on: true });
+    Object.assign(fist2, { x: x0 + grip2[0] * k, y: y0 + grip2[1] * k, on: true });
+    Object.assign(bossHead, { x: pt.x, y: y0 + b.ch.h * b.head * k, on: true, px: b.squares * pt.k });
+    Object.assign(hisFoot, { x: pt.x, y: pt.y, k, on: true });
+  };
+  /** The bale's place now (squares): on its stand until it slides, along its curve (control point CHALLENGE_FEEL.rope.bend), then the table's. */
+  const baleSq = { c: 0, r: 0 };
+  const ropeBale = () => {
+    const st = art.stand ?? { col: marks!.table.c, row: marks!.table.r };
+    const u = introNow?.rope?.bale?.u ?? 0;
+    const [qc, qr] = C.rope.bend;
+    const T = marks!.table;
+    baleSq.c = (1 - u) ** 2 * st.col + 2 * (1 - u) * u * qc + u * u * T.c;
+    baleSq.r = (1 - u) ** 2 * st.row + 2 * (1 - u) * u * qr + u * u * T.r;
+    return baleSq;
+  };
+  /**
+   * The bale with the board (his table; INTRO_PIG_TABLE) where it's dragged, its slab and board on it (`paintTable`, raised by its
+   * slide's lift), and the loop round it (dropping over it, cinched, flicked free: from the stand, before the bale takes its place).
+   */
+  const drawRopeCenter = () => {
+    const n = introNow!.rope!;
+    knot.on = false;
+    const at = ropeBale();
+    if (!P(at.c, at.r)) return;
+    const s = pt.k / SQ;
+    const x = pt.x;
+    const y = pt.y;
+    g.imageSmoothingEnabled = false;
+    let lift = 0;
+    if (n.bale) {
+      const B = rp!.bale;
+      lift = B.lift[n.bale.anim]?.[n.bale.frame] ?? 0;
+      const img = B.frames[n.bale.anim][n.bale.frame]!;
+      g.drawImage(img, x - B.ch.foot[0] * s, y - B.ch.foot[1] * s, img.width * s, img.height * s);
+      g.save();
+      g.translate(0, -lift * s);
+      paintTable(g, v, at.c - camX, camY - at.r, ci!.table.palette, marks!.layout);
+      g.restore();
+      P(at.c, at.r);
+    }
+    const ls = n.lasso;
+    if (ls && ls.anim !== "fly") {
+      const L = rp!.loop;
+      const img = L.frames[ls.anim][ls.frame]!;
+      const ly = y - lift * s;
+      g.drawImage(img, x - L.ch.foot[0] * s, ly - L.ch.foot[1] * s, img.width * s, img.height * s);
+      const kn = L.knot[ls.anim]?.[ls.frame];
+      if (kn) Object.assign(knot, { x: x + (kn[0] - L.ch.foot[0]) * s, y: ly + (kn[1] - L.ch.foot[1]) * s, on: true });
+    }
+  };
+  /** A bucket's place (squares): from just off the screen's edge on its side (`offCol`), along the floor, to its stool's place. */
+  const bucketSq = { b: { c: 0, r: 0 }, w: { c: 0, r: 0 } };
+  const offAt = { b: { c: 0, r: 0 }, w: { c: 0, r: 0 } };
+  /**
+   * Where a bucket starts (and its rope's thrown to): the nearest column out from the table on its side (our left for the black, right
+   * for the white) where the whole bucket is off the screen, `tumbleSouth` in front of the table's row; kept inside the barn's walls.
+   */
+  const offSq = (side: "b" | "w") => {
+    const T = marks!.table;
+    const dir = side === "b" ? -1 : 1;
+    const r = T.r + C.rope.tumbleSouth;
+    const ch = rp!.buckets[side].ch;
+    let c = T.c + dir;
+    for (let i = 0; i < 60; i++, c += dir * 0.25) {
+      if (!P(c, r)) break;
+      const s = pt.k / SQ;
+      if (dir < 0 ? pt.x + (ch.w - ch.foot[0]) * s < 0 : pt.x - ch.foot[0] * s > W) break;
+    }
+    const o = offAt[side];
+    o.c = Math.max(0.6, Math.min(n - 1.6, c));
+    o.r = r;
+    return o;
+  };
+  const bucketAt = (side: "b" | "w") => {
+    const o = offSq(side);
+    const u = introNow?.rope?.buckets?.u ?? 0;
+    const to = side === "b" ? marks!.bossStool : marks!.youStool;
+    const q = bucketSq[side];
+    q.c = o.c + (to.c - o.c) * u;
+    q.r = o.r + (to.r - o.r) * u;
+    return q;
+  };
+  /** A bucket (INTRO_PIG_BUCKET_B, his, or _W, yours) tumbling in, landing upside down, standing as its stool; its handle's grip. */
+  const drawBucket = (side: "b" | "w") => {
+    const bk = introNow?.rope?.buckets;
+    grips[side].on = false;
+    if (!bk) return;
+    const at = bucketAt(side);
+    if (!P(at.c, at.r)) return;
+    const B = rp!.buckets[side];
+    const s = pt.k / SQ;
+    const img = B.frames[bk.anim][bk.frame]!;
+    g.imageSmoothingEnabled = false;
+    g.drawImage(img, pt.x - B.ch.foot[0] * s, pt.y - B.ch.foot[1] * s, img.width * s, img.height * s);
+    const gp = rp!.handle[`${side}:${bk.anim === "drop" ? "land" : "tumble"}`]?.[bk.frame];
+    if (gp && bk.anim !== "stool") Object.assign(grips[side], { x: pt.x + (gp[0] - B.ch.foot[0]) * s, y: pt.y + (gp[1] - B.ch.foot[1]) * s, on: true });
+  };
+  /** A rope's line from (ax, ay) to (bx, by), bowing down `sag` px at its middle (INTRO_PIG_ROPE_INK: an outline, the cord, a twist tick every `twist` art px). */
+  const ropeLine = (ax: number, ay: number, bx: number, by: number, sag: number, s: number) => {
+    const I = rp!.ink;
+    g.beginPath();
+    g.moveTo(ax, ay);
+    g.quadraticCurveTo((ax + bx) / 2, (ay + by) / 2 + 2 * sag, bx, by);
+    g.lineCap = "round";
+    g.strokeStyle = I.outline;
+    g.lineWidth = (I.width + 1.6) * s;
+    g.stroke();
+    g.strokeStyle = I.mid;
+    g.lineWidth = I.width * s;
+    g.stroke();
+    g.setLineDash([s, I.twist * s - s]);
+    g.strokeStyle = I.dark;
+    g.stroke();
+    g.setLineDash([]);
+  };
+  /** A loop in flight (its `fly` frame `f`), its middle at (x, y), `s` a room pixel: and where its knot is, into `fly`. */
+  const fly = { x: 0, y: 0 };
+  const drawFly = (f: number, x: number, y: number, s: number) => {
+    const L = rp!.loop;
+    const img = L.frames.fly[f % L.frames.fly.length]!;
+    g.drawImage(img, x - L.ch.foot[0] * s, y - L.ch.foot[1] * s, img.width * s, img.height * s);
+    const kn = L.knot.fly?.[f % L.frames.fly.length] ?? L.ch.foot;
+    fly.x = x + (kn[0] - L.ch.foot[0]) * s;
+    fly.y = y + (kn[1] - L.ch.foot[1]) * s;
+  };
+  /**
+   * His ropes' lines, over the room (as the art's mockup draws them): the lasso flying to the bale on the stand (its loop with it,
+   * arcing up), then taut to its knot through the catch and the drag, reeled in once it's free; the two ropes thrown out each way
+   * (the black bucket's from his other fist, to our left, the white's from his lasso fist, to our right: crossed), taut to just off the
+   * screen, then to the buckets' handles as they tumble in, reeled in once untied.
+   */
+  const drawRopeLines = () => {
+    const n = introNow!.rope!;
+    if (!fist1.on || !hisFoot.on || !marks) return;
+    const s = hisFoot.k * (ci!.boss.ch.h / (ci!.boss.squares * SQ));
+    const R = C.rope;
+    const I = rp!.ink;
+    g.imageSmoothingEnabled = false;
+    const ls = n.lasso;
+    if (ls?.anim === "fly") {
+      const st = art.stand ?? { col: marks.table.c, row: marks.table.r };
+      if (P(st.col, st.row)) {
+        const ss = pt.k / SQ;
+        const u = Math.min(1, ls.u);
+        const tx = pt.x;
+        const ty = pt.y - 4 * ss;
+        const x = fist1.x + (tx - fist1.x) * u;
+        const y = fist1.y + (ty - fist1.y) * u - Math.sin(Math.PI * u) * R.flyArc * pt.k;
+        drawFly(ls.frame, x, y, ss);
+        ropeLine(fist1.x, fist1.y, fly.x, fly.y, I.sag * Math.hypot(fly.x - fist1.x, fly.y - fist1.y), s);
+      }
+    } else if (ls && knot.on) {
+      ropeLine(fist1.x, fist1.y, knot.x, knot.y, ls.anim === "catch" ? 3 * s : 0, s);
+      Object.assign(reelFrom, { x: knot.x, y: knot.y });
+    } else if (n.reel >= 0) {
+      ropeLine(fist1.x, fist1.y, reelFrom.x + (fist1.x - reelFrom.x) * n.reel, reelFrom.y + (fist1.y - reelFrom.y) * n.reel, 2 * s * (1 - n.reel), s);
+    }
+    for (const side of ["b", "w"] as const) {
+      const fist = side === "b" ? fist2 : fist1;
+      const gp = grips[side];
+      if (n.tied && n.buckets && gp.on) {
+        ropeLine(fist.x, fist.y, gp.x, gp.y, 1.5 * s, s);
+        Object.assign(reelTo[side], { x: gp.x, y: gp.y });
+      } else if (n.reel2 >= 0) {
+        const e = reelTo[side];
+        ropeLine(fist.x, fist.y, e.x + (fist.x - e.x) * n.reel2, e.y + (fist.y - e.y) * n.reel2, 2 * s * (1 - n.reel2), s);
+      } else if (n.out >= 0 && !n.buckets) {
+        const o = offSq(side);
+        if (!P(o.c, o.r)) continue;
+        const ss = pt.k / SQ;
+        const ex = pt.x;
+        const ey = pt.y - 14 * ss;
+        const u = n.out;
+        const x = fist.x + (ex - fist.x) * u;
+        const y = fist.y + (ey - fist.y) * u - Math.sin(Math.PI * u) * R.offArc * pt.k;
+        if (u < 1) {
+          drawFly(Math.floor(introT / 60), x, y, ss);
+          ropeLine(fist.x, fist.y, fly.x, fly.y, I.sag * Math.hypot(fly.x - fist.x, fly.y - fist.y) * (1 - u), s);
+        } else ropeLine(fist.x, fist.y, x, y, 0, s);
+        Object.assign(reelTo[side], { x, y });
+      }
+    }
+  };
+  /** Where a reeling line starts from: the loop's knot as it was freed, each bucket's grip as it came untied. */
+  const reelFrom = { x: 0, y: 0 };
+  const reelTo = { b: { x: 0, y: 0 }, w: { x: 0, y: 0 } };
   /** The town's two shadows under a boss (a soft one, `w` wide at most, and the contact one at its feet). */
   const drawShadows = (x: number, y: number, w: number) => {
     const soft = 1.6;
@@ -1311,10 +1543,12 @@ function startRoom(
   const drawBoss = (now: number) => {
     bossHead.on = false;
     hisFoot.on = false;
+    fist1.on = fist2.on = false;
     if (!ci || !boss) return;
     const wat = woodAt();
     if (wat) return drawWoodMove(wat);
     if (dk && darkNow && (darkNow.move || darkNow.bulbs < 3)) return drawDarkBoss(now, darkNow);
+    if (rp && introNow?.rope && attackFrame < 0) return drawRopeBoss(now);
     if (attackFrame >= 0 && ci.attack) return drawAttack(now);
     boss.pose(now, bossPose);
     if (!P(bossPose.x + bossOx(now), bossPose.y + bossOy(now))) return;
@@ -1480,7 +1714,7 @@ function startRoom(
     figK[i] = k;
   };
   const drawFigure = (k: number, now: number) =>
-    k === 0 ? drawKid(now) : k === 1 ? drawYou(now) : k === 2 ? drawBoss(now) : k === 3 ? drawCenter() : k === 6 ? drawFog() : drawStool(k === 4 ? marks!.bossStool : marks!.youStool);
+    k === 0 ? drawKid(now) : k === 1 ? drawYou(now) : k === 2 ? drawBoss(now) : k === 3 ? (rp ? drawRopeCenter() : drawCenter()) : k === 6 ? drawFog() : rp ? drawBucket(k === 4 ? "b" : "w") : drawStool(k === 4 ? marks!.bossStool : marks!.youStool);
   /** A speech bubble's lines (wrapped once for its words, at its size). */
   const bubbles = new Map<string, { lines: string[]; w: number }>();
   /**
@@ -1821,7 +2055,14 @@ function startRoom(
     if (boss && marks) {
       boss.pose(now, bossPose);
       addFig(woodAt()?.r ?? bossPose.y + bossOy(now), 2);
-      if (introNow || ci?.wood) {
+      if (rp && introNow) {
+        // (Wrangler's: the bale where it's dragged (the loop on the stand before), the buckets where they tumble: each by its row.)
+        addFig(ropeBale().r - 0.01, 3);
+        if (introNow.rope?.buckets) {
+          addFig(bucketAt("b").r, 4);
+          addFig(bucketAt("w").r, 5);
+        }
+      } else if (introNow || ci?.wood) {
         // (Across, you and the boss stand on the table's row, at its stools: the table first, you in front of yours. Timber's log
         // lies there from the walk in; his fog over him, as it boils up round where he works.)
         addFig(across ? marks.table.r - 0.01 : marks.table.r, 3);
@@ -1838,6 +2079,7 @@ function startRoom(
       drawUp(u, now);
     }
     while (k < figN) drawFigure(figK[k++]!, now);
+    if (rp && introNow?.rope) drawRopeLines();
     if (dk) drawDarkPass(now);
     if (kidBox.on && !ci && !cave) drawTag("Shopkeeper", "sidekick", kidBox.hx, kidBox.hy);
     // (Hollow's intro: your tag fades as the drain starts, so the dark isn't broken by a bright label.)
@@ -2107,6 +2349,19 @@ function startRoom(
             black: darkNow.black,
             pool: darkNow.pool,
             iris: darkNow.iris,
+          }
+        : null,
+      // (Wrangler's own: his move, the lasso's loop, the bale (how far along its drag; the stand hidden from the yank), the ropes out,
+      // the buckets.)
+      rope: introNow?.rope
+        ? {
+            move: introNow.rope.move?.anim ?? null,
+            lasso: introNow.rope.lasso?.anim ?? null,
+            bale: introNow.rope.bale ? Math.round(introNow.rope.bale.u * 100) / 100 : null,
+            baleAt: introNow.rope.bale ? [Math.round(ropeBale().c * 100) / 100, Math.round(ropeBale().r * 100) / 100] : null,
+            standHidden: !!introNow.rope.bale,
+            out: introNow.rope.out,
+            buckets: introNow.rope.buckets?.anim ?? null,
           }
         : null,
       table: !!introNow?.table,
