@@ -36,13 +36,14 @@ import { newPt, newView, proj, setView, type CamPair } from "../camera.ts";
 import { SHOP_FEEL, TOWN_FEEL, type CamSet } from "../feel.ts";
 import type { LightPool, LightSpot } from "../houses/kit.ts";
 import { Press } from "../press.ts";
+import { anyHeld, keyWalk } from "../arrows.ts";
 import { PAWN_HEAD, PAWN_PATH, type YouArt } from "../render.ts";
 import { SIDEKICK_SHEETS, type SidekickSheet } from "../sidekick-sheets.ts";
 import { TAG_STYLE, type TagKind } from "../tags.ts";
 import { Walker, type HomeId } from "../world.ts";
 import type { Rider } from "../rides.ts";
 import { rideSpeed } from "../../components/rides/scale.ts";
-import { STORE_PANELS, camFocus, ceilingPanel, inTalkRange, lightsAt, litDx, overlaps, upAlpha, youBox, isFloor, makeRoom, onDoor, tapTarget, findPath, type Room, type ShopPlace, type Sq } from "./room.ts";
+import { STORE_PANELS, camFocus, ceilingPanel, inTalkRange, lightsAt, litDx, overlaps, upAlpha, walkable, youBox, isFloor, makeRoom, onDoor, tapTarget, findPath, type Room, type ShopPlace, type Sq } from "./room.ts";
 import { POOL_LINE, bossHoldings, buyBossCrate, canAfford, holdLine, priceLine, prizeRows, shopOf, wayText, type CrateWay, type ShopDef } from "./shops.ts";
 import { CHALLENGE_FEEL, attackStart, attackTime, bubbleSize, caveLight, chantOf, drainAt, frameAt as animFrame, introAt, introCues, introLength, isDark, isLog, marksFeel, marksOf, seatedMarks, type DarkNow, type DrawnMarks, type IntroNow, type LogPlace } from "./challenge.ts";
 import { HOLLOW, HOLLOW_HEART, hollowBuild } from "../../characters/hollow.ts";
@@ -350,6 +351,10 @@ function startRoom(
   const rp = ci?.rope ?? null;
   const across = marks?.layout === "across";
   const boss = ci && marks ? new Walker({ c: room.start.c - 1, r: room.start.r }, C.walkStepMs, false) : null;
+  // The arrow keys walk you about the room (arrows.ts): a square the floor has and nobody's (the challenge's boss, if it's here).
+  // Not during a challenge's intro, whose script walks you.
+  const keys = keyWalk(you, (c, r) => walkable(room, c, r) && !(boss && boss.goalC() === c && boss.goalR() === r));
+  let keysOn = false;
   const bossPose = { x: 0, y: 0, hop: 0, tilt: 0, step: false, t: 0 };
   /** When you and the boss each reached your mark's square (-1: walking), and when you both stood on your marks' middles (the intro's 0). */
   let youAt = -1;
@@ -2162,6 +2167,21 @@ function startRoom(
   let raf = 0;
   let last = performance.now();
   let alive = true;
+  /** Held arrow keys walk you (the town's rule: a key set off closes the room's card and clears a tap's walk; the walk runs on). */
+  const keysWalk = () => {
+    if (ci) return;
+    if (!anyHeld()) {
+      keysOn = false;
+      return;
+    }
+    if (!keysOn) {
+      keysOn = true;
+      dest.on = false;
+      follow = true;
+      if (you.moving()) you.go([]);
+    }
+    keys.start();
+  };
   const frame = (now: number) => {
     raf = 0;
     if (!alive) return;
@@ -2171,6 +2191,7 @@ function startRoom(
     if (Math.abs(zoomTarget - zoomCur) < 0.001) zoomCur = zoomTarget;
     // (On your ride inside, at its pace: RIDES.speed, as in the town.)
     if (!ci) you.stepMs = f.youStepMs / rideSpeed(riding()?.id);
+    keysWalk();
     you.update(now);
     stepIntro(now);
     stepCards();
