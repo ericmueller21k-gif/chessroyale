@@ -703,6 +703,8 @@
         "packages/app/src/components/SquadsBlocks.tsx",
         "packages/app/src/components/SquadsParts.tsx",
         "packages/app/src/components/MercenaryShop.tsx",
+        "packages/app/src/components/MoveReplay.tsx",
+        "packages/app/src/move-replay.ts",
         "packages/server/src/squads-*.ts",
         "e2e/squads-client.ts"
       ],
@@ -711,6 +713,7 @@
         "e2e/squads-clocks.spec.ts",
         "e2e/squads-mercenary.spec.ts",
         "e2e/squads-play.spec.ts",
+        "e2e/squads-replay.spec.ts",
         "e2e/squads-test-tools.spec.ts",
         "e2e/squads-v2.spec.ts",
         "e2e/squads-watch.spec.ts",

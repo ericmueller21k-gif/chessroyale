@@ -129,3 +129,22 @@ How Eric likes design work run (Eric, Oct 29). These are habits, not hard rules;
   - Guards: `packages/app/test/banners.test.ts`, "no emoji stands in for a boss in the boss screen's lines"; `e2e/smudgy.spec.ts`, the status-line checks ("Smudgy plays d6").
 - **Town cards' text is centered** (every card: the challenge card, the homes, the raid confirm, the shop's cards). A person's row keeps its layout.
   - Guard: `packages/app/test/town-card.test.ts`, "Eric, Nov 5: every town card's text centered".
+
+## Squads: move replay (Eric, Nov 5)
+
+- **Coming back to a board, the moves you missed replay, then your free seconds run; the free time is the free seconds +
+  0.5 s for each move played there since you last played it, replay on or off.** Every mode where you come back to a board
+  (Relay, Pairs). Each move lands one by one with its from and to marked; a tap on the board (or starting a move) skips it.
+  The rule is the server's (`SQUADS.replaySecondsPerMove`, `Duty.freeMs`), and the clock on screen runs from it.
+  - Guards: `packages/chess/test/squads-replay.test.ts` (every check: "Move replay: the free time grows by 0.5 s a move…");
+    `packages/app/test/move-replay.test.ts` ("the moves you missed, in order…", "turning the replay off changes nothing on the
+    clock"); `e2e/squads-replay.spec.ts`, "Relay: coming back to a board, the moves you missed replay…", phone and computer.
+  - Decision: [2026-11-05-move-replay.md](../decisions/2026-11-05-move-replay.md).
+- **Who played each replayed move: a name tag over the moved piece, one box size; a long name smaller; over 12 characters cut
+  with "…" ("Christopher…").** Guards: `packages/app/test/move-replay.test.ts`, "a name tag's words…"; the e2e above (every
+  tag the same size, the long name smaller and cut).
+- **The replay button sits next to the gear, on or off (per account, on this device); on, a few dots chase slowly round its
+  edge; off, the plain icon.** Guard: the e2e above (the trail only while on).
+- **The first time an account queues for Squads, a tip: the screen dimmed, the gear and the replay button lit, a box saying what
+  each does, "Don't show this again" and OK; not ticked, it shows the next time they queue.** Guard: `e2e/squads-replay.spec.ts`,
+  "the first-time tip…", phone and computer.

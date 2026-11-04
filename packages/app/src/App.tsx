@@ -50,6 +50,7 @@ import { SpectateScreen } from "./screens/Spectate.tsx";
 import { StageBreakScreen } from "./screens/StageBreak.tsx";
 import { useMedia } from "./components/QuickChat.tsx";
 import { LobbyChat } from "./components/LobbyChat.tsx";
+import { queuedSquads } from "./move-replay.ts";
 import { PartyClient, SquadsClient, createParty, currentParty, currentSquads, forgetSquads, partyStatus, squadsQueue, squadsSeat, squadsStatus, squadsTestLobby } from "./squads.ts";
 import { SquadsQueue, SquadsScreen, squadsExit, squadsWaiting } from "./screens/Squads.tsx";
 import { PartySheet } from "./screens/SquadsParty.tsx";
@@ -470,8 +471,11 @@ export function App() {
     testMade.current = true;
     void squadsTestLobby(squadsTestStart, new URLSearchParams(location.search).get("clock"), new URLSearchParams(location.search)).then((r) => {
       setRejoining(false);
-      if ("code" in r) joinSquads(r.code);
-      else {
+      if ("code" in r) {
+        // (`?replaytip`, a test switch: this test lobby counts as queueing, for the first-time tip.)
+        if (testParams().has("replaytip")) queuedSquads(r.code);
+        joinSquads(r.code);
+      } else {
         history.replaceState(null, "", "/");
         setSquadsNote("error" in r ? r.error : "Couldn't make a test lobby.");
       }
@@ -772,8 +776,11 @@ export function App() {
     if (run !== lineRun.current || !r) return;
     setInLine(null);
     setLoading(false);
-    if ("code" in r) joinSquads(r.code);
-    else if ("banned" in r) showBanNotice();
+    if ("code" in r) {
+      // (Queued for Squads: the first-time tip for move replay, until it's dismissed for good.)
+      queuedSquads(r.code);
+      joinSquads(r.code);
+    } else if ("banned" in r) showBanNotice();
     else if ("error" in r) setError(r.error);
   };
   const leaveSquads = () => {
@@ -785,6 +792,7 @@ export function App() {
   /** A party: its sheet, and its socket (placed: everyone joins the lobby with the party's pass). */
   const partyPlaced = (lobby: string, pass: string) => {
     setParty(null);
+    queuedSquads(lobby);
     joinSquads(lobby, pass);
   };
   /** Boss Battle's party placed in its battle: everyone joins it with the party's pass and their seat. */

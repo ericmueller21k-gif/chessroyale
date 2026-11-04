@@ -34,3 +34,28 @@ export function pairSchedule(turn: number): readonly [readonly [number, number],
   const rest = [1, 2, 3].filter((x) => x !== partner) as [number, number];
   return mod(turn, 2) === 0 ? [withOne, rest] : [rest, withOne];
 }
+
+/**
+ * The board a seat is on at `turn` (Relay: its board this turn; Pairs: its slot's board), or null where nobody changes
+ * boards (the final, Armageddon, any one-board match).
+ */
+export function seatBoard(format: "relay" | "pairs" | "final", boards: number, seat: number, turn: number): number | null {
+  if (boards <= 1 || format === "final") return null;
+  if (format === "relay") return relayBoardOf(seat, turn, boards);
+  return pairSchedule(turn)[0].includes(seat) ? 0 : 1;
+}
+
+/**
+ * Move replay (Eric, Nov 5): how many moves were played on `board` since `seat` last played it, when the rotation
+ * brings the seat back to it this turn (it was on another board last turn); 0 when it stays on its board (it watched
+ * every move there) or never changes boards. `ply`: the moves played on that board in this match so far. Every board
+ * gets one move a half until it's over, and a seat always has the same color on a board, so its last move there was
+ * ply `2 × lastTurn + (Black ? 1 : 0)`; a board it never played: every move since the match began.
+ */
+export function movesSinceLastPlayed(format: "relay" | "pairs" | "final", boards: number, seat: number, board: number, turn: number, black: boolean, ply: number): number {
+  if (turn <= 0 || seatBoard(format, boards, seat, turn) !== board || seatBoard(format, boards, seat, turn - 1) === board) return 0;
+  let last: number | null = null;
+  for (let t = turn - 1; t >= 0 && last === null; t--) if (seatBoard(format, boards, seat, t) === board) last = t;
+  const since = last === null ? ply : ply - (2 * last + (black ? 1 : 0) + 1);
+  return Math.max(0, Math.min(ply, since));
+}

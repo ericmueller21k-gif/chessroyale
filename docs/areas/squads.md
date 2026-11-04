@@ -68,6 +68,13 @@ move.
     movers each half) drain it twice as fast (`bankRunsOut`).
   - **The cap on a move** (the option's `capSeconds`, the match's `capMs`) bounds every move while the bank lasts. A
     mover or picker who hasn't chosen by then misses (a random move it may play), the bank draining meanwhile.
+  - **Move replay's free time** (Eric, Nov 5; docs/decisions/2026-11-05-move-replay.md): coming back to a board
+    (Relay's rotation, Pairs' slots; your board last turn was another), a move's free seconds grow by
+    `replaySecondsPerMove` (0.5 s) for each move played there since you last played it (`movesSinceLastPlayed` in
+    schedule.ts; Relay once round: 7 moves, +3.5 s; Pairs after a turn away: 3, +1.5 s; a board never played: every
+    move on it), whether the replay is shown or not. Each duty carries it (`Duty.freeMs`, `Duty.replay`; a pair: the
+    larger of the two), and the drain, the chips' windows and sudden death's deadline use it. Each match carries its
+    own `replayMsPerMove` (0 for one stored before it). Bots think as before.
   - **The increment** banks, as on a chess clock: each move made in time earns it, credited after the half (`earned`;
     a missed move earns none, `incrementOnMiss`). A move quicker than the free seconds and the increment together
     adds to the bank (not capped at its start); a slower one costs only what's past them. So a squad's bank settles
@@ -421,7 +428,10 @@ says); e2e `e2e/squads.spec.ts` (a party through the real server; a test lobby a
 in its deadlines, and the clock line whole at 320 px); `e2e/squads-watch.spec.ts` (Jump to my next board on by
 default and switched off, remembered; a headless teammate showing your board: his pawn, dressed, and the eye over it,
 the board not moving, gone when he looks away or disconnects); `e2e/squads-mercenary.spec.ts` (choosing Mercenary in the Mode vote, earning coins, the shop between rounds, a
-Stockfish token and a shield). The full-lobby run: `npx tsx scripts/squads-headless.ts
+Stockfish token and a shield); `e2e/squads-replay.spec.ts` (move replay: coming back to a board in Relay the missed
+moves replay with their players' name tags, then the clock; a tap skips it and starts your move; off, no replay and the
+same free time; the button's trail; the first-time tip and "Don't show this again"); unit: `packages/chess/test/squads-replay.test.ts`
+(the free-time rule), `packages/app/test/move-replay.test.ts` (the frames, the pace, the tags, the clock on and off). The full-lobby run: `npx tsx scripts/squads-headless.ts
 --url http://localhost:8787 --device` against `wrangler dev` (`--var SQUADS_TEST:1` for test lobbies, `--var TEST_SWITCHES:1` for `--pool`).
 
 ## The screens (phase 3)
@@ -478,6 +488,18 @@ door's look; every class is `sq-`.
     go. Static, and it listens for who's watching itself (`client.onViewers`): a `viewers` message redraws these pawns
     and nothing else (each pawn memoized), never the whole screen; a clock tick or a move doesn't redraw them.
   - **Relay:** your move shows on your board at once and stays (no snap-back); "Moved · waiting for the half to end".
+  - **Move replay** (Eric, Nov 5; `move-replay.ts`, `components/MoveReplay.tsx`): back on a board (Relay, Pairs), the
+    moves played there since you last played it land one by one on a board drawn over the big board (from and to marked,
+    a name tag over each moved piece: who played it, one box size, a long name smaller, over 12 letters cut with "…"),
+    within the extra free time (`SQUADS_LOBBY.replay`: 150 ms in, one every 450 ms, the last held), then the board as it
+    stands. The line above the board: "Your move · Board 2 · replay 2 of 3"; the free pill shows the replay icon in
+    place of "free" while the extra lasts; your move's panel: "4.5 s free (+1.5 s for 3 moves missed), then your
+    squad's clock runs.". A tap on the board skips it (the same tap reaches the real board under it). **The replay
+    button** (left of the gear in the match's and the votes' top lines): on (a dot trail runs round it) or off (no
+    replay; the extra time stays), per account on this device (`brc.squads.replay.<id>`). **The first-time tip**: the
+    first time an account queues (solo PLAY or a party's; a test link with `?replaytip`), over its lobby's votes, the
+    screen dimmed but for the button and the gear, a box saying what each does, "Don't show this again" and OK
+    (`brc.squads.tip.<id>`; not ticked: again next queue).
   - **Pairs:** your pick green, your partner's live in blue; lock in. Their move too: "Same move: it plays for sure,
     and uses a token"; with none left the board won't take it ("No same-move tokens left: pick a different move").
     The reveal is Crowd's ghost-move reveal (`ShadeMoves`): both picks slide in with their pickers' names, a reel steps
@@ -558,6 +580,7 @@ door's look; every class is `sq-`.
 | What the screens work out (clocks run down, YOU/NEXT, the board to jump to, who's watching, standings, names) | `packages/app/src/squads-view.ts` |
 | The waiting room, votes, bracket phase, knocked out, results | `packages/app/src/screens/Squads.tsx` |
 | A match: Relay, Pairs, the final's vote, reveals, staging, blocking | `packages/app/src/screens/SquadsMatch.tsx` |
+| Move replay: its frames and pace, who played each move, the button's setting and the tip's (per account) | `packages/app/src/move-replay.ts`, `components/MoveReplay.tsx` |
 | Blocked moves' arrows, the block picker, pick tags, block points and tokens, the token breakdown | `packages/app/src/components/SquadsBlocks.tsx` |
 | The party sheet | `packages/app/src/screens/SquadsParty.tsx` |
 | Standings, clocks, tiny boards, the bracket, who's watching (the eye and pawns) | `packages/app/src/components/SquadsParts.tsx` |
