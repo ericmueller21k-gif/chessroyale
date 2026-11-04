@@ -40,3 +40,7 @@ Unit (the free-time rule: +0.5 s a move since you last played, on and off the sa
 when on; the first-time tip with the dim and both lit, "Don't show this again" sticks). Stills `docs/move-replay/` (the tip, the
 button on/off, a replay mid-way), phone and computer. PR body `docs/move-replay/pr-body.md` (every player-visible change and text,
 changed checks old → new, lane full-e2e). Push; no PR. Short report.
+
+## Addition (Eric, Nov 5): who played each replayed move
+During a replay, a name tag above the moved piece shows who played it (teammate or opponent), in the same look as the names over
+pieces in other modes. Fixed box size: long names shrink the text; over 12 characters, cut with "…".
