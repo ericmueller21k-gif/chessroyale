@@ -4,7 +4,7 @@ Worktree `/home/user/cr-jefferson`, branch `claude/jefferson-home`, from main (t
 node_modules symlink. Push as you go. Ports: 8995, inspector 9495. Include notes/briefs/rules-common.md. Eric approved the whole build
 (Nov 4) to go **live overnight** with no review stops; Jefferson (kit `grex`) is live, so this goes to everyone.
 
-**Art** on `origin/claude/boss-art` (head named by the director): read `scripts/boss-art/out/shop-grex-nov4.md` and
+**Art** on `origin/claude/boss-art` (head 0e4f6482): read `scripts/boss-art/out/shop-grex-nov4.md` and
 `intro-grex-nov4.md` whole first. Copy in as Wrangler's (#483) and Hollow's (#480) were.
 
 ## 1. The warehouse (as Wrangler's barn #483; the floor mask as Hollow's cave #480)
@@ -55,3 +55,11 @@ node_modules symlink. Push as you go. Ports: 8995, inspector 9495. Include notes
 - **Frame rate:** measure the warehouse (phone 390x844 and computer 1440x900, headless, walking 5 s, medians of a few runs) against
   Wrangler's barn; if it's more than ~3 fps slower, cut cost (shared/baked frames, fewer idle frames) before trimming any giraffe.
   Report the numbers.
+
+## Art calls to keep (0e4f6482: shop-grex-nov4.md / intro-grex-nov4.md)
+Floor 16 x 16 (cols 2-17, rows 3-18) so the table sits at (9.5, 10.5); crate stack 56 px, slab top 59; your lift rises 32 px; the dealer in
+the NE corner by the taped SHOP sign on a steel column, the Boss Crate on the floor at (15, 3) (`_CRATE_AT` is a floor square); the
+dealer is 79 px tall: draw him at his art's size, not the usual sidekick size; shared `warehouse-kit.ts` and `npc-grex/giraffe-rig.ts`
+copied in beside the shop art; the forklift faces east and backs west, a two-lap loop (floor → shelf (18, 17) level 1, 46 px up → floor);
+the dozer gets `wake` in the intro; all seven ring spots on screen; about 13.5 s; new sounds shout, step, snort, hiss, clunk, creak,
+whistle, pop, soft bang.
