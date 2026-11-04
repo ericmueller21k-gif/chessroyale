@@ -83,3 +83,9 @@ notes to a private place or strip them). Never put a secret value here or anywhe
   auth/config files. Killing PIDs needs Eric's OK. Literal absolute paths for `rm`. Never force-push, push empty
   commits, or rebase a pushed branch. Never disable TLS verification.
 - Eric, Nov 3: stuck processes/servers: I may stop them myself without asking (wait a few minutes to confirm it's stuck; if slow, restart anyway).
+
+## Sprites always on screen (Eric, Nov 4)
+Every character sprite (bosses, God King, player figure, sidekicks), on phone and computer, must be fully on screen wherever it
+stands, idles or ends a move. Overlapping the board or a menu is fine (can even look cool); cut off by the page edge is never fine.
+Only mid-motion (jumping, dashing) may it pass off screen. This outranks "don't cover the board". Every brief that places a figure
+checks it (stills at phone + computer sizes). Guard: docs/rules/eric.md + a check (battle-desktop-fixes round).
