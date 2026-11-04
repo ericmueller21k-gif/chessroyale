@@ -14006,6 +14006,19 @@ img.qicon {
 .screen:has(.power-moment:not(.pm-stay)) .boss-char > .bc-engine.on {
   visibility: hidden;
 }
+/* A computer: the boss casts where it stands, by the board's bottom-left corner, its words beside it (PowerParts.tsx, Cast; Eric,
+   Nov 4: Hollow's darkness drew him at the board's top-left, half off the window). Its figure there hides only while a moment draws
+   it somewhere else (`.boss-moment`: on the board, Wrangler's leap, Boingo's funhouse, Hollow's Lights out…). */
+@media (min-width: 900px) and (min-height: 600px) {
+  .screen:has(.power-moment:not(.pm-stay)) .boss-char.place-side .boss-char-sprite,
+  .screen:has(.power-moment:not(.pm-stay)) .boss-char.place-side > .bc-engine.on {
+    visibility: visible;
+  }
+  .screen:has(.power-moment .boss-moment) .boss-char.place-side .boss-char-sprite,
+  .screen:has(.power-moment .boss-moment) .boss-char.place-side > .bc-engine.on {
+    visibility: hidden;
+  }
+}
 /* Boingo's funhouse: he drops onto the middle of the board (his animation), and bounces off at the end. */
 .pm-pogo {
   position: absolute;

@@ -30,7 +30,7 @@ import { TOWN_FEEL } from "../feel.ts";
 import { PARK_TABLE, TABLE_BOARD, TABLE_INK, TABLE_PIECES } from "../houses/park.ts";
 import { BOSS_ART } from "../render.ts";
 import type { HomeId } from "../world.ts";
-import { CHALLENGE_FEEL, DARK_MOVES, boardSquare, darkAnims, drainAt, frameAt, introBeats, introOf, stormEdge, wipeAt, type BossIntro, type DarkMove, type IntroAnims, type IntroBeat, type IntroLayout, type LogMove, LOG_MOVES, logAnims } from "./challenge.ts";
+import { CHALLENGE_FEEL, DARK_MOVES, boardSquare, darkAnims, drainAt, drawnTop, frameAt, introBeats, introOf, stormEdge, wipeAt, type BossIntro, type DarkMove, type IntroAnims, type IntroBeat, type IntroLayout, type LogMove, LOG_MOVES, logAnims } from "./challenge.ts";
 
 /**
  * A boss's intro art, as its file exports it: a pyramid that brings in its table (Alfil's), or toy blocks that are the table and its
@@ -115,8 +115,11 @@ export interface LoadedIntro {
    * (`stool`, its foot at its middle), and the slab's and board's colors.
    */
   table: { ch: Character; img: HTMLCanvasElement; leg: HTMLCanvasElement; stool: HTMLCanvasElement; palette: Readonly<Record<string, string>> };
-  /** The boss: its sprite's idle frames, when each ends, and how many squares tall it stands (the town's size). */
-  boss: { ch: Character; frames: HTMLCanvasElement[]; ends: number[]; loop: number; squares: number };
+  /**
+   * The boss: its sprite's idle frames, when each ends, how many squares tall it stands (the town's size), and the top of its drawing
+   * at rest (`head`, a share of its frame's height: challenge.ts drawnTop), where its line's bubble sits.
+   */
+  boss: { ch: Character; frames: HTMLCanvasElement[]; ends: number[]; loop: number; squares: number; head: number };
   /** Its storm (null: the default transition, the flash and the wipe). */
   storm: StormArt | null;
   /**
@@ -286,7 +289,7 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
       blocks,
       wood,
       table,
-      boss: { ch: bossCh, frames: bossIdle.map((_, i) => toCanvas(bossCh, "idle", i)), ends, loop: t, squares: TOWN_FEEL.bossSquares * (TOWN_FEEL.bossScale[home] ?? 1) },
+      boss: { ch: bossCh, frames: bossIdle.map((_, i) => toCanvas(bossCh, "idle", i)), ends, loop: t, squares: TOWN_FEEL.bossSquares * (TOWN_FEEL.bossScale[home] ?? 1), head: drawnTop(bossIdle.map((f) => renderFrame(bossCh, f).data), bossCh.w, bossCh.h) },
       storm,
       attack,
       dark,

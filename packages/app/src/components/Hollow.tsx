@@ -5,8 +5,8 @@ import { EFFECTS, animLength, cueAt, darkItem } from "../characters/power-art.ts
 import { HOLLOW_CAST_FROM } from "../characters/hollow.ts";
 import { pickLine } from "../characters/boss-beats.ts";
 import type { BossView } from "../game.ts";
-import { BoardEffects, BossEffect, BossMoment } from "./BossEffect.tsx";
-import { Flight, at, onSquare, stageSince, type BossUi, type Moment, type MomentProps } from "./PowerParts.tsx";
+import { BoardEffects, BossEffect } from "./BossEffect.tsx";
+import { Cast, Flight, at, onSquare, stageSince, type BossUi, type Moment, type MomentProps } from "./PowerParts.tsx";
 import { CRITICAL, NORMAL } from "../speech.tsx";
 import { syncLights } from "../characters/lights.ts";
 
@@ -107,12 +107,8 @@ function darkMoment({ boss, moment, now, t, orientation, kit, banner }: MomentPr
   return (
     <div class="power-moment pm-dark">
       {banner("DARKNESS!", moment.square ? `Dark on ${moment.square}` : undefined, "dark", DARK.bannerMs)}
-      {cast && now >= castSince && (
-        <span class="pm-caster pm-hollow" style={{ aspectRatio: `${kit!.ch.w} / ${kit!.ch.h}` }}>
-          {/* (His strand lit in full as he casts, as in every pose: the strip by the bar counts down.) */}
-          <BossMoment boss={boss.name} anim="darkCast" since={castSince} then="idle" />
-        </span>
-      )}
+      {/* (His strand lit in full as he casts, as in every pose: the strip by the bar counts down.) */}
+      {cast && <Cast boss={boss.name} anim="darkCast" since={castSince} now={now} runKey={`${moment.key}:cast`} class="pm-hollow" style={{ aspectRatio: `${kit!.ch.w} / ${kit!.ch.h}` }} />}
       {moment.square && t >= DARK.pourAt && t < DARK.landAt && <Flight name="darkPour" square={moment.square} orientation={orientation} since={moment.at + DARK.pourAt} ms={DARK.landAt - DARK.pourAt} aim from={fromPt} />}
       {/* (His words as the darkness pours, his first cover's always and a taunt now and then, are in his text box.) */}
     </div>

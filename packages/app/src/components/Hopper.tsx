@@ -10,7 +10,7 @@ import { play } from "../sound.ts";
 import { CRITICAL } from "../speech.tsx";
 import { BoardEffects, BossEffect, BossMoment, prewarm, prewarmSprite, type BoardItem } from "./BossEffect.tsx";
 import { squareXY } from "./GodKing.tsx";
-import { PIECE_WORD, SoundAt, hash, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
+import { Cast, PIECE_WORD, SoundAt, hash, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
 
 /**
  * Chub & Chirp's powers on screen (the code id: hopper; their rules: packages/chess/src/bosses/hopper.ts and carrots.ts;
@@ -165,11 +165,8 @@ function AirPiece({ code, at, square, scale = 1, opacity = 1 }: { code: string; 
 
 /** His figure at the board's corner playing `anim` from `since` (the race won or lost, his fifth carrot's cheer). */
 function Caster({ boss, anim, since, then }: { boss: BossView; anim: string; since: number; then?: string }) {
-  return (
-    <span class="pm-caster pm-by-hopper">
-      <BossMoment boss={boss.name} anim={anim} since={since} then={then} />
-    </span>
-  );
+  // (Where he stands on a computer: Cast. Drawn from the moment's start, as before: `now` is the time it begins.)
+  return <Cast boss={boss.name} anim={anim} since={since} now={Math.max(Date.now(), since)} then={then} runKey={`hopper:${anim}:${since}`} class="pm-by-hopper" />;
 }
 
 /** "LEAPFROG!", then the hop: his pawn takes off from its square, arcs over yours and lands beyond it. */

@@ -192,6 +192,13 @@ export const CHALLENGE_FEEL = {
   faceMs: 300,
   /** The line in the bubble over the boss's head (ms): long enough to read. */
   lineMs: 2500,
+  /**
+   * The bubble over the boss's head (his intro's line, Hollow's chant): a speech bubble for his size, just over his drawn head
+   * (Eric, Nov 4: it was a name tag's size, far above him). Its text `font` times the boss's drawn height (px), never under `min`
+   * (the old 11 px: a far camera, a phone) nor over `max`; its lines wrap at `wrapEm` of its font; its tail's tip `gap` of his height
+   * over the top of his drawing. bubbleSize.
+   */
+  bubble: { font: 0.085, min: 11, max: 30, wrapEm: 12.7, gap: 0.02 },
   /** The pause after the line, before the board starts coming in (ms). */
   afterLineMs: 300,
   /** Alfil's pyramid holds this long (its idle, ms) once it has risen, before it cracks. */
@@ -1110,3 +1117,32 @@ export function wipeAt(t: number, feel: Pick<typeof CHALLENGE_FEEL, "flashes" | 
   return { flash: 0, wipe: u * u * (3 - 2 * u) };
 }
 
+
+/**
+ * The intro bubble's size for a boss drawn `bossPx` tall on screen (CHALLENGE_FEEL.bubble): its font, the width its lines wrap at, and
+ * `s`, its scale against the old 11 px bubble (its padding, line height, corners and tail grow with it); `gap`, px from his drawn head
+ * up to the tail's tip.
+ */
+export function bubbleSize(bossPx: number, feel: Pick<typeof CHALLENGE_FEEL, "bubble"> = CHALLENGE_FEEL): { font: number; wrap: number; s: number; gap: number } {
+  const b = feel.bubble;
+  const font = Math.round(Math.min(b.max, Math.max(b.min, bossPx * b.font)));
+  return { font, wrap: font * b.wrapEm, s: font / 11, gap: Math.round(bossPx * b.gap) };
+}
+
+/**
+ * The top of a figure's drawing in its frame (a share of the frame's height, 0 its top): the highest row any of its frames has a
+ * pixel in. Its intro bubble sits just over it, not over the frame's head room (`pixels`: each frame's RGBA, `w` × `h`).
+ */
+export function drawnTop(pixels: readonly ArrayLike<number>[], w: number, h: number): number {
+  let top = h;
+  for (const d of pixels)
+    for (let y = 0; y < top; y++) {
+      let hit = false;
+      for (let x = 0; x < w && !hit; x++) hit = d[(y * w + x) * 4 + 3]! > 0;
+      if (hit) {
+        top = y;
+        break;
+      }
+    }
+  return top >= h ? 0 : top / h;
+}

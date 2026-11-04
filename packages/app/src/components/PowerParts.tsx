@@ -5,7 +5,8 @@ import type { PowerEventKind, WaterGrowth } from "@chessroyale/core";
 import type { BossKit } from "../characters/kits.ts";
 import type { BossView } from "../game.ts";
 import { BossFace, playInPlace } from "./BossCharacter.tsx";
-import { BossEffect, type BoardItem } from "./BossEffect.tsx";
+import { BossEffect, BossMoment, type BoardItem } from "./BossEffect.tsx";
+import { COMPUTER_LAYOUT } from "./MatchMenu.tsx";
 import { bannerLength } from "./FightBanner.tsx";
 import { GodKingPortrait, squareXY } from "./GodKing.tsx";
 import type { Priority } from "../speech.tsx";
@@ -156,6 +157,26 @@ export function InPlace({ runKey, anims, since }: { runKey: string; anims: reado
   return null;
 }
 
+/** Whether the screen is a computer's (the boss stands by the board's bottom-left corner, not in a phone's bar). One query, read as it's drawn. */
+const computer = typeof matchMedia === "function" ? matchMedia(COMPUTER_LAYOUT) : null;
+export const onComputer = () => !!computer?.matches;
+
+/**
+ * The boss casting for a moment, its `anim` from `since` (timed so its cue lands on the effect). On a phone it steps up to the
+ * board's top-left corner (`.pm-caster`, just under the bar where it stands; its usual spot empty meanwhile). On a computer it
+ * casts where it stands, by the board's bottom-left corner, its words beside it (Eric, Nov 4: Hollow's darkness drew him at the
+ * board's top-left, half off the window, his words left at the bottom: docs/decisions/2026-11-04-battle-desktop-fixes.md).
+ */
+export function Cast({ boss, anim, since, now, then = "idle", runKey, class: cls = "", style }: { boss: string; anim: string; since: number; now: number; then?: string; runKey: string; class?: string; style?: Record<string, string> }) {
+  if (onComputer()) return <InPlace runKey={runKey} anims={[anim]} since={since} />;
+  if (now < since) return null;
+  return (
+    <span class={`pm-caster ${cls}`} style={style}>
+      <BossMoment boss={boss} anim={anim} since={since} then={then} />
+    </span>
+  );
+}
+
 export const at = (square: string, orientation: "white" | "black", turn: QuarterTurn = 0) => {
   const { x, y } = squareXY(square, orientation, turn);
   return { left: `${(x - 50) / 8}%`, top: `${(y - 50) / 8}%` };
@@ -211,10 +232,13 @@ export function kitLine(kit: BossKit | null, moment: KitMoment, key: string): st
  * Something flying from the boss's corner of the board (its top-left) to a square: the ice bolt (pointed at its
  * target) or the pie (tumbling), over `ms`.
  */
+/** Where a flight leaves on a computer (the board 800 across): the board's left edge, at the standing boss's hands. */
+const SIDE_FROM = { x: -16, y: 680 } as const;
 export function Flight({ name, anim, square, orientation, since, ms, aim = false, from: fromPct }: { name: "iceBolt" | "pieFly" | "sparkFly" | "darkPour" | "blockFly"; anim?: string; square: string; orientation: "white" | "black"; since: number; ms: number; aim?: boolean; from?: { x: number; y: number } }) {
   const { x, y } = squareXY(square, orientation, useContext(BoardTurn));
-  // (From the boss's corner of the board; Hollow's darkness from the void in his chest, given in % of the board.)
-  const from = fromPct ? { x: fromPct.x * 8, y: fromPct.y * 8 } : { x: 60, y: 30 };
+  // (From the boss's corner of the board; Hollow's darkness from the void in his chest, given in % of the board. On a computer from
+  // where the boss stands, by the board's bottom-left corner: Cast.)
+  const from = onComputer() ? SIDE_FROM : fromPct ? { x: fromPct.x * 8, y: fromPct.y * 8 } : { x: 60, y: 30 };
   const angle = (Math.atan2(y - from.y, x - from.x) * 180) / Math.PI;
   const style: Record<string, string> = {
     left: `${(from.x - 50) / 8}%`,

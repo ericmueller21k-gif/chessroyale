@@ -44,7 +44,7 @@ import type { Rider } from "../rides.ts";
 import { rideSpeed } from "../../components/rides/scale.ts";
 import { STORE_PANELS, camFocus, ceilingPanel, inTalkRange, lightsAt, litDx, overlaps, upAlpha, youBox, isFloor, makeRoom, onDoor, tapTarget, findPath, type Room, type ShopPlace, type Sq } from "./room.ts";
 import { POOL_LINE, bossHoldings, buyBossCrate, canAfford, holdLine, priceLine, prizeRows, shopOf, wayText, type CrateWay, type ShopDef } from "./shops.ts";
-import { CHALLENGE_FEEL, attackStart, attackTime, caveLight, chantOf, drainAt, frameAt as animFrame, introAt, introCues, introLength, isDark, isLog, marksFeel, marksOf, seatedMarks, type DarkNow, type DrawnMarks, type IntroNow, type LogPlace } from "./challenge.ts";
+import { CHALLENGE_FEEL, attackStart, attackTime, bubbleSize, caveLight, chantOf, drainAt, frameAt as animFrame, introAt, introCues, introLength, isDark, isLog, marksFeel, marksOf, seatedMarks, type DarkNow, type DrawnMarks, type IntroNow, type LogPlace } from "./challenge.ts";
 import { HOLLOW, HOLLOW_HEART, hollowBuild } from "../../characters/hollow.ts";
 import { play } from "../../sound.ts";
 import { paintTable, playCue, slabFrontY, type Emis, type LoadedIntro } from "./intro.ts";
@@ -1177,7 +1177,7 @@ function startRoom(
     Object.assign(youHead, { x: pt.x, y: y0 + head * h - 2, on: true });
   };
   /** The boss (in a challenge): its town sprite, its idle playing, at the town's size, its shadows as the town draws a boss's. */
-  const bossHead = { x: 0, y: 0, on: false };
+  const bossHead = { x: 0, y: 0, on: false, px: 0 };
   /**
    * The boss's God King attack, at the boss's own size in the room: its lashes swung in place (no drop-in, no leap off), its feet
    * where the boss stands (clear of its stool, Nov 2), facing you. Turned to face the way it should (the art faces right, or left
@@ -1224,7 +1224,7 @@ function startRoom(
     g.drawImage(img, -ch.foot[0] * k, pt.y - ch.foot[1] * k, img.width * k, img.height * k);
     g.restore();
     g.imageSmoothingEnabled = false;
-    Object.assign(bossHead, { x: pt.x, y: pt.y - (b.ch.foot[1] - b.ch.h * 0.04) * k, on: true });
+    Object.assign(bossHead, { x: pt.x, y: pt.y - (b.ch.foot[1] - b.ch.h * b.head) * k, on: true, px: b.squares * pt.k });
   };
   /**
    * Hollow in his intro (the dark): his own move's frame (BOSS_HOLLOW_INTRO, his strand's bulbs as lit as the drain has left them), or
@@ -1263,7 +1263,7 @@ function startRoom(
     if (dn.level > 0) addEmis(emis, x0, y0, k, img.width, false, 1 - dn.black);
     if (dn.eyes > 0) addEmis(eyes, x0, y0, k, img.width, false, dn.eyes);
     Object.assign(hisFoot, { x: pt.x, y: pt.y, k, on: true });
-    Object.assign(bossHead, { x: pt.x, y: y0 + b.squares * pt.k * 0.04, on: true });
+    Object.assign(bossHead, { x: pt.x, y: y0 + b.ch.h * b.head * k, on: true, px: b.squares * pt.k });
   };
   /** The town's two shadows under a boss (a soft one, `w` wide at most, and the contact one at its feet). */
   const drawShadows = (x: number, y: number, w: number) => {
@@ -1311,7 +1311,7 @@ function startRoom(
     g.drawImage(img, x0, y0, w, h);
     g.restore();
     g.imageSmoothingEnabled = false;
-    Object.assign(bossHead, { x: pt.x, y: y0 + h * 0.04, on: true });
+    Object.assign(bossHead, { x: pt.x, y: y0 + h * b.head, on: true, px: h });
     Object.assign(hisFoot, { x: pt.x, y: pt.y, k: h / b.ch.h, on: true });
   };
   /**
@@ -1452,50 +1452,57 @@ function startRoom(
   };
   const drawFigure = (k: number, now: number) =>
     k === 0 ? drawKid(now) : k === 1 ? drawYou(now) : k === 2 ? drawBoss(now) : k === 3 ? drawCenter() : k === 6 ? drawFog() : drawStool(k === 4 ? marks!.bossStool : marks!.youStool);
-  /** A speech bubble's lines (wrapped once for its words). */
+  /** A speech bubble's lines (wrapped once for its words, at its size). */
   const bubbles = new Map<string, { lines: string[]; w: number }>();
-  /** The boss's line in a speech bubble (the town's: white, rounded, its tail pointing down at the speaker's head). */
-  const drawBubble = (text: string, ax: number, ay: number) => {
-    g.font = `500 11px Archivo, system-ui, sans-serif`;
-    let b = bubbles.get(text);
+  /**
+   * The boss's line in a speech bubble (the town's: white, rounded, its tail pointing down at the speaker's head `ax`, `ay`), sized for
+   * the boss drawn `px` tall (challenge.ts bubbleSize: Eric, Nov 4, a speech bubble for his size, just over his head), inside the view.
+   */
+  const drawBubble = (text: string, ax: number, ay: number, px: number) => {
+    const z = bubbleSize(px);
+    const s = z.s;
+    g.font = `500 ${z.font}px Archivo, system-ui, sans-serif`;
+    const key = `${z.font}|${text}`;
+    let b = bubbles.get(key);
     if (!b) {
       const lines: string[] = [];
       let line = "";
       for (const w of text.split(" ")) {
         const tt = line ? `${line} ${w}` : w;
-        if (g.measureText(tt).width > 140 && line) {
+        if (g.measureText(tt).width > z.wrap && line) {
           lines.push(line);
           line = w;
         } else line = tt;
       }
       if (line) lines.push(line);
-      b = { lines, w: Math.max(...lines.map((l) => g.measureText(l).width)) + 16 };
-      bubbles.set(text, b);
+      b = { lines, w: Math.max(...lines.map((l) => g.measureText(l).width)) + 16 * s };
+      if (bubbles.size > 40) bubbles.clear();
+      bubbles.set(key, b);
     }
-    const lh = 14;
-    const h = b.lines.length * lh + 8;
+    const lh = 14 * s;
+    const h = b.lines.length * lh + 8 * s;
     const bx = Math.max(6, Math.min(W - b.w - 6, ax - b.w / 2));
-    const by = Math.max(6, ay - h - 9);
+    const by = Math.max(6, ay - z.gap - h - 7 * s);
     g.save();
     g.shadowColor = "rgba(0,0,0,.25)";
-    g.shadowBlur = 8;
-    g.shadowOffsetY = 2;
+    g.shadowBlur = 8 * s;
+    g.shadowOffsetY = 2 * s;
     g.fillStyle = "#fff";
     g.beginPath();
-    g.roundRect(bx, by, b.w, h, 12);
+    g.roundRect(bx, by, b.w, h, 12 * s);
     g.fill();
-    const tx = Math.max(bx + 14, Math.min(bx + b.w - 14, ax));
+    const tx = Math.max(bx + 14 * s, Math.min(bx + b.w - 14 * s, ax));
     g.beginPath();
-    g.moveTo(tx - 6, by + h - 1);
-    g.lineTo(tx + 6, by + h - 1);
-    g.lineTo(tx, by + h + 7);
+    g.moveTo(tx - 6 * s, by + h - 1);
+    g.lineTo(tx + 6 * s, by + h - 1);
+    g.lineTo(tx, by + h + 7 * s);
     g.closePath();
     g.fill();
     g.restore();
     g.fillStyle = "#1d1b19";
     g.textAlign = "center";
     g.textBaseline = "middle";
-    for (let i = 0; i < b.lines.length; i++) g.fillText(b.lines[i]!, bx + b.w / 2, by + 5 + lh / 2 + i * lh);
+    for (let i = 0; i < b.lines.length; i++) g.fillText(b.lines[i]!, bx + b.w / 2, by + 5 * s + lh / 2 + i * lh);
   };
   const drawTag = (text: string, kind: TagKind, x: number, y: number) => {
     const c = tag(text, kind);
@@ -1810,8 +1817,8 @@ function startRoom(
       drawTag(youName(), "you", youHead.x, youHead.y);
       g.globalAlpha = 1;
     }
-    if (ci && introNow?.line && bossHead.on) drawBubble(ci.def.line, bossHead.x, bossHead.y);
-    if (chant && introNow?.chant && bossHead.on) drawBubble(chant, bossHead.x, bossHead.y);
+    if (ci && introNow?.line && bossHead.on) drawBubble(ci.def.line, bossHead.x, bossHead.y, bossHead.px);
+    if (chant && introNow?.chant && bossHead.on) drawBubble(chant, bossHead.x, bossHead.y, bossHead.px);
     placeCard();
     const h = you.here();
     const key = `${h.c},${h.r}`;
