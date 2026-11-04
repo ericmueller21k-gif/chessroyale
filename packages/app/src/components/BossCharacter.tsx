@@ -26,6 +26,7 @@ import { CRITICAL, LOW, NORMAL, VoiceBubble, bossVoice, holdMs, type Priority } 
 import { mateAttack, prewarmKingAttack } from "./KingAttack.tsx";
 import { lightsId, syncLights } from "../characters/lights.ts";
 import { seenFen } from "../camo.ts";
+import { sideSizes } from "../characters/side-size.ts";
 
 /**
  * A raid boss as a character (if it has one: see characters/kits.ts), standing across the board from the God King: on a
@@ -465,10 +466,77 @@ export function BossArt({ boss, class: cls = "" }: { boss: { id: string; name: s
  * board (by its bottom-right). Goes first in a screen's `.board-row`; on a phone it's hidden (the boss bar has him).
  */
 export function BossSide({ match }: { match: GameView }) {
+  const el = useRef<HTMLDivElement>(null);
+  const name = match.boss?.name;
+  // Its size and the God King's by the room beside the board (characters/side-size.ts): measured as it's first drawn and as the window
+  // changes, never per frame.
+  useLayoutEffect(() => {
+    if (!name) return;
+    const fit = () => fitSides(el.current, name);
+    fit();
+    addEventListener("resize", fit);
+    return () => removeEventListener("resize", fit);
+  }, [name]);
   if (!hasCharacter(match)) return null;
   return (
-    <div class="boss-side">
+    <div ref={el} class="boss-side">
       <BossCharacter match={match} place="side" />
     </div>
   );
+}
+
+/** Where the figures beside the board are sized (styles.css reads `--side-s` and `--king-k` there): a computer from 1100 px wide. */
+const SIDES = "(min-width: 1100px) and (min-height: 600px)";
+/** The figures' sizes on this screen for the room beside its board (sideSizes), set on the screen as `--side-s` and `--king-k`. */
+function fitSides(side: HTMLElement | null, name: string) {
+  const screen = side?.closest<HTMLElement>(".screen");
+  if (!side || !screen) return;
+  if (!matchMedia(SIDES).matches) {
+    screen.style.removeProperty("--side-s");
+    screen.style.removeProperty("--king-k");
+    return;
+  }
+  const board = screen.querySelector(".board-row .board-wrap")?.getBoundingClientRect();
+  // (His drawing at rest, his idle's first frame, wherever the frame showing now is: his entrance may be mid-drop.)
+  const kit = bossKit(name);
+  const cv = side.querySelector<HTMLCanvasElement>(".boss-char-sprite");
+  const idle = kit?.ch.anims[kit.loops?.idle ?? "idle"]?.frames[0] ?? kit?.ch.anims.idle?.frames[0];
+  const drawn = cv && kit && idle ? drawnBox(frameImage(kit.ch, idle), cv.getBoundingClientRect()) : null;
+  if (!board?.width || !drawn) return;
+  const space = document.querySelector(".tower-space")?.getBoundingClientRect();
+  const king = screen.querySelector(".boss-dock:not(.dk-party) > .gk-unit")?.getBoundingClientRect();
+  const now = (v: string, d: number) => parseFloat(screen.style.getPropertyValue(v)) || d;
+  const k = now("--king-k", 1);
+  const edge = side.getBoundingClientRect().left;
+  const sizes = sideSizes({
+    board: board.width,
+    boardLeft: edge,
+    boardRight: board.right,
+    boardBottom: board.bottom,
+    leftLimit: space?.width ? space.left : screen.getBoundingClientRect().left,
+    winW: document.documentElement.clientWidth,
+    s: now("--side-s", 2),
+    bossLeft: drawn.left,
+    bossTop: drawn.top,
+    k,
+    // (His cape reaches a few px past his box: .boss-dock's --gk-clear. No God King in his place: his size stays.)
+    kingRight: king?.width ? king.right + 8 * k : board.right,
+  }, undefined, kit?.ch.id);
+  screen.style.setProperty("--side-s", String(sizes.s));
+  screen.style.setProperty("--king-k", String(king?.width ? sizes.k : 1));
+}
+/** A frame's drawn pixels' box on the page, drawn in the canvas `r` (its frame has room around the drawing). */
+function drawnBox(img: ImageData, r: DOMRect): { left: number; top: number } | null {
+  const { data: d, width: w, height: h } = img;
+  if (!r.width) return null;
+  let x0 = w;
+  let y0 = h;
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++)
+      if (d[(y * w + x) * 4 + 3]! > 0) {
+        if (x < x0) x0 = x;
+        if (y < y0) y0 = y;
+      }
+  if (x0 >= w) return null;
+  return { left: r.left + (x0 * r.width) / w, top: r.top + (y0 * r.height) / h };
 }

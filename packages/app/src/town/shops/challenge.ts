@@ -198,7 +198,7 @@ export const CHALLENGE_FEEL = {
    * (the old 11 px: a far camera, a phone) nor over `max`; its lines wrap at `wrapEm` of its font; its tail's tip `gap` of his height
    * over the top of his drawing. bubbleSize.
    */
-  bubble: { font: 0.085, min: 11, max: 30, wrapEm: 12.7, gap: 0.02 },
+  bubble: { font: 0.11, min: 11, max: 32, wrapEm: 12.7, gap: 0.02 },
   /** The pause after the line, before the board starts coming in (ms). */
   afterLineMs: 300,
   /** Alfil's pyramid holds this long (its idle, ms) once it has risen, before it cracks. */

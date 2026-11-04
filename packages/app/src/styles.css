@@ -13762,6 +13762,53 @@ img.qicon {
     --bs-reach: 0px;
   }
 }
+/* From 1100 px wide the figures beside the board grow with it (Eric, Nov 4: "we have space on the desktop. They should be kind of
+   bigger"): `--side-s`, the boss's screen px a sprite px (2 before; set on the screen by BossSide, characters/side-size.ts: the board's
+   side over 240, as far as his room left of the board and the window's top let him), and `--king-k`, the God King's and your pawn's
+   size against their old one (the boss's over 2, as far as the room right of the board lets them). Everything scales about the board's
+   edge: the boss's box, his distance out (so his drawing clears the board as before) and his words' place over him. The board, the
+   room it leaves and a phone are unchanged. docs/decisions/2026-11-04-battle-desktop-fixes.md. */
+@media (min-width: 1100px) and (min-height: 600px) {
+  .boss-char.place-side {
+    --bc-scale: var(--side-s, 2);
+    right: calc((14px + var(--bs-out, 0px)) * var(--bc-scale) / 2);
+    width: calc(48px * var(--bc-scale));
+    height: calc(60px * var(--bc-scale));
+  }
+  .boss-char.place-side .bc-bubble {
+    bottom: calc(100% + 17px * var(--bc-scale));
+  }
+  .screen.game > .boss-dock:not(.dk-party) > .gk-unit {
+    width: calc(120px * var(--king-k, 1));
+  }
+  .screen.game > .boss-dock:not(.dk-party) .gk-unit {
+    height: calc(120px * var(--king-k, 1) + 14px);
+  }
+  .screen.game > .boss-dock:not(.dk-party) .gk-unit-btn,
+  .screen.game > .boss-dock:not(.dk-party) .gk-unit .god-king {
+    width: calc(120px * var(--king-k, 1));
+    height: calc(120px * var(--king-k, 1));
+  }
+  .screen.game > .boss-dock:not(.dk-party) .gk-unit.fallen.has-power .gk-unit-btn {
+    height: calc(106px * var(--king-k, 1));
+  }
+  .screen.game > .boss-dock:not(.dk-party) .gk-unit.fallen .god-king.fallen {
+    width: calc(116px * var(--king-k, 1));
+    height: calc(116px * var(--king-k, 1));
+  }
+  .screen.game > .boss-dock.dk-pawn:not(.dk-party) > .you-pawn {
+    --pw: calc(168px * var(--king-k, 1));
+    width: calc(120px * var(--king-k, 1));
+    height: calc(120px * var(--king-k, 1) + 14px);
+  }
+  .screen.game > .boss-dock.dk-pawn:not(.dk-party) > .gk-unit {
+    left: calc(100% + var(--gk-off, 2px) + var(--bs-out, 0px) + 120px * var(--king-k, 1));
+  }
+  /* (His words open right of him: narrower by as much as he stands further out, so they stay in the window: board-size.css.) */
+  .screen.game:has(> .boss-dock.dk-pawn):has(.you-pawn) > .boss-dock:not(.dk-party) .gk-bubble {
+    max-width: min(250px, calc(var(--side-w, 340px) - 98px - 120px * (var(--king-k, 1) - 1)));
+  }
+}
 /* His words: a pixel text box beside him (above him by the board), like the God King's. */
 .bc-bubble {
   position: absolute;

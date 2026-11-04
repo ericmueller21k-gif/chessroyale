@@ -25,6 +25,13 @@ removed (old → new) and says whether any of them guards a rule here.
 - **No platform named means both.** When Eric doesn't say "phone" or "computer", a change is for both. When unsure, ask.
   (Eric, Oct 25.)
 - **Simple beats flashy** (Eric, Oct 14): the least code, the least lag on a phone, the fewest ways to break.
+- **Every character sprite is whole on screen (Eric, Nov 4).** Every figure (a boss, the God King, your own figure or pawn), on a phone
+  and a computer, is fully on screen wherever it stands, idles or ends a move. Over the board or a menu is fine ("better, even: it can
+  look cool"); cut off by the page's edge never is. Only mid-motion (a jump, a dash across) may it pass off screen.
+  - Guard: `e2e/boss-side.spec.ts`, "Eric's rule (Nov 4): <boss> and the God King whole on screen at rest and at the end of every beat,
+    phone and computer", one per boss with a character (BOSS_KITS), at 390 × 844 and at 1280 × 800, 1440 × 900, 1920 × 1080 and
+    2000 × 1250: every frame it rests in and the last frame of every animation, drawn where it stands, inside the window (and your pawn).
+  - Decision: [2026-11-04-battle-desktop-fixes.md](../decisions/2026-11-04-battle-desktop-fixes.md).
 
 ## Home
 

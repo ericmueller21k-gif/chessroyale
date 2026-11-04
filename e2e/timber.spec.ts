@@ -124,7 +124,7 @@ test.describe("Timber", () => {
     expect(BOSS_POWERS.gnawScraps).toBe(8);
     expect(errors).toEqual([]);
   });
-  test("on a computer his figure stands beside the board at rest (never over the board, the bar or the side menu); his cast by the board's corner never over the side menu", async ({ page }) => {
+  test("on a computer his figure stands beside the board at rest (never over the board, the bar or the side menu); his cast plays where he stands, never at the board's corner", async ({ page }) => {
     test.setTimeout(400_000);
     test.skip(test.info().project.name !== "desktop", "his figure stands beside the board on a computer only");
     await asAdmin(page);
@@ -148,7 +148,7 @@ test.describe("Timber", () => {
       await yourMove(page);
       await page.evaluate(() => {
         const w = window as any;
-        w.__geo = { rest: [] as number[][], cast: [] as number[][] };
+        w.__geo = { rest: [] as number[][], cast: [] as number[][], anims: [] as string[] };
         const box = (q: string) => {
           const el = document.querySelector(q);
           if (!el) return null;
@@ -162,6 +162,8 @@ test.describe("Timber", () => {
           if (rest && same(g.rest, rest)) g.rest.push(rest);
           const cast = box(".pm-caster");
           if (cast && same(g.cast, cast)) g.cast.push(cast);
+          const anim = document.querySelector(".boss-char.place-side")?.getAttribute("data-anim");
+          if (anim && g.anims.at(-1) !== anim) g.anims.push(anim);
           requestAnimationFrame(look);
         };
         requestAnimationFrame(look);
@@ -174,13 +176,13 @@ test.describe("Timber", () => {
       await page.locator(".ult-test").click();
       await playOne(page);
       await yourMove(page);
-      const geo = await page.evaluate(() => (window as any).__geo as { rest: number[][]; cast: number[][] });
+      const geo = await page.evaluate(() => (window as any).__geo as { rest: number[][]; cast: number[][]; anims: string[] });
       const hit = (a: number[], b: number[] | null) => !!b && a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
       expect(geo.rest.length).toBeGreaterThan(0);
-      expect(geo.cast.length).toBeGreaterThan(0);
       for (const r of geo.rest) for (const other of [board, bar, nav]) expect(hit(r, other), `rest ${r} over ${other}`).toBe(false);
-      // (His cast stands by the board's corner for its moment, as every boss's does: docs/areas/bosses.md.)
-      for (const c of geo.cast) expect(hit(c, nav), `cast ${c} over the side menu ${nav}`).toBe(false);
+      // (On a computer every boss casts where it stands, by the board's bottom-left corner, never at its top-left: Eric, Nov 4.)
+      expect(geo.cast, "no cast at the board's corner").toEqual([]);
+      expect(geo.anims, "his Gnaw's cast where he stands").toContain("gnaw");
     }
   });
 });
