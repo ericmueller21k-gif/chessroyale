@@ -173,6 +173,11 @@ test("Puddles' greenhouse: Go in, Drizzle's crate with Puddles's Mower; the back
   await expect(room(page)).toHaveAttribute("data-room", "gardener");
   // The chat log over the light greenhouse: dark words (Eric, Nov 2), by night outside.
   await expect(page.locator(".town-chat")).toHaveAttribute("data-tone", "day");
+  // (For the review: his HunChess buckets, Nov 4, from the door: the stack by the potting bench, one by the fountain.)
+  if (SHOTS && process.env.PUDDLES_BUCKETS) {
+    await page.waitForTimeout(1200);
+    await page.screenshot({ path: `${SHOTS}/puddles-buckets-${test.info().project.name}.png` });
+  }
   await talk(page);
   const crate = page.getByRole("dialog", { name: "Puddles' Boss Crate", exact: true });
   await expect(crate).toBeVisible();

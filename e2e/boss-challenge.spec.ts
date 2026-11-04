@@ -458,7 +458,6 @@ test("challenging Wrangler in the town: his own intro (in to where you stand, hi
   // His wipe (spurs, tumbleweeds and cap guns) sweeps in over the barn, the battle loads under it, and it slides off the board.
   await expect(storm(page)).toHaveCount(1, { timeout: 10_000 });
   await expect(storm(page)).toHaveAttribute("data-boss", "pig");
-  await page.waitForTimeout(250);
   await shot("wrangler-wipe");
   await expect(page.locator(BOARD_SEL.wrap).first()).toBeVisible({ timeout: 60_000 });
   await expect(storm(page)).toHaveCount(0, { timeout: 10_000 });

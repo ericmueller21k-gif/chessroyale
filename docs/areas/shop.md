@@ -41,7 +41,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   all Mythic, with a color, a purity and shine like every item: **Riding Chirp**, **Moon's Ride**, and (Nov 1) **Hollow's Bulb** (two
   colors: the glass and its glow), **Brush Ride**, **Alfil's Howdah**, **Balloon Pup**, **Big Boy's Buggy**, **Boingo's Pogo**, **Paper
   Crane**, **Candy Cane Sled**, **Giraffe Gallop**, **Puddles's Mower**, **Sawyer's Dozer**, **Rodeo Bull**, **Cheetah Shoes** (Dash's, in his crate since Nov 3:
-  twice as fast in the town) and **The Log Roller** (Timber's). Their names and lines are the drawings' own. **In no crate yet** (the
+  twice as fast in the town), **The Log Roller** (Timber's) and **Pen Pony** (Wrangler's, Nov 4, in his crate from the start: a pen
+  knight saddled, the knight your pawn's color, only its blanket the item's color). Their names and lines are the drawings' own. **In no crate yet** (the
   crate comes later): only admins have them, as admin copies (red, emerald second color, 100%: "Admins own one of every item", below).
   **Where the drawings came from:** copied as drawn from `claude/boss-art` (`scripts/boss-art/out/<ride>/<ride>.tsx`; their
   `summary.md`, `views-summary.md` and `trail-summary.md` there have the artist's notes; Moon's Ride Oct 30, the rest Nov 1) into
@@ -64,7 +65,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   queue's and Squads' cards, the boss stage, the town's person card, and the public profile's Equipped Cosmetics row (four tiles at
   most; its View all lists the ride). Changing a ride's drawing or the paint (`item-paint.tsx`): `npx tsx scripts/measure-rides.ts`
   (the town's cells for it; a test fails until it's run).
-- **A boss's crate, sold inside the boss's home** (Nov 2, round 1: Babur's and Puddles'; since, Alfil's, Big Boy's, Timber's, Dash's and, Nov 3, Hollow's with Hollow's Bulb, shown to everyone; town-square.md, "Inside a shop"): the
+- **A boss's crate, sold inside the boss's home** (Nov 2, round 1: Babur's and Puddles'; since, Alfil's, Big Boy's, Timber's, Dash's and, Nov 3, Hollow's with Hollow's Bulb, shown to everyone; Nov 4, Wrangler's with Pen Pony, everyone's; town-square.md, "Inside a shop"): the
   Shopkeeper's card shows the crate, its prizes (the boss's ride first), its price (`BOSS_CRATE_PRICE` in core's settings: 3 of the boss's
   tokens, or 1 token and 1 crate key) and what you have. Since round 2 (below) buying is real.
 - **Boss tokens, crate keys and buying a boss crate** (Nov 2, round 2; [2026-11-02-boss-tokens.md](../decisions/2026-11-02-boss-tokens.md);
