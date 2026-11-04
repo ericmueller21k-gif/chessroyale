@@ -111,7 +111,7 @@ describe("the rooster keeps the shop, on the counter (Eric's pick)", () => {
     const there = tapTarget(room, room.start, def.keeper[0]!.c, def.keeper[0]!.r);
     expect(there.kind).toBe("keeper");
     expect([4, 5]).toContain(there.dest!.r);
-    expect(inTalkRange(room, there.dest!)).toBe(true);
+    expect(inTalkRange(room, there.dest!.c, there.dest!.r)).toBe(true);
   });
 });
 
