@@ -140,3 +140,4 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - #487 Jefferson MERGED e12ae43e (merge API 502 but it went through); deploy+main CI watcher. Main green after #484.
 - Phone boss bar DONE 16ca2677 → PR #489 (targeted), CI bkbm336aq. Queue now empty after #488/#489. Morning: one short summary to Eric.
 - #488 arrow keys: CI never started (0 check runs, GitHub 500s at push); merged main in (conflict in ShopRoom frame step: kept keysWalk + crew halt), 4592ddf6, CI watching. #489 phone bar red (boss-bar.spec prop room at 320) → helper fixing. Jefferson LIVE e12ae43e 10:04.
+- #488 arrow keys MERGED 233ef3ad; deploy+main CI watcher. #489 phone bar fix 8e77c991 (prop room ≥60 at 320 for name-moved bosses), CI bois622yj. Main green after Jefferson.
