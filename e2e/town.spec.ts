@@ -1535,3 +1535,36 @@ test.describe("rides lazy", () => {
     expect(errors).toEqual([]);
   });
 });
+
+// The arrow keys (Eric, Nov 4; docs/areas/town-square.md, "Arrow keys"): hold ArrowUp and you walk up the town, and the on-screen up key
+// lights while it's held; the on-screen down arrow walks you back the same way (WASD does what the arrows do); a release stops you.
+test("the arrow keys: holding ArrowUp walks you up and the up key lights while it's held; the on-screen down arrow walks you back; a release stops you", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/town");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await page.waitForTimeout(800); // (the first walk settles)
+  const up = page.locator(".town-key-up");
+  const [, r0] = await you(page);
+  await page.keyboard.down("ArrowUp");
+  await expect(up, "the key lights while it's held").toHaveClass(/\bon\b/);
+  await expect.poll(async () => (await you(page))[1], { message: "holding up walks you up", timeout: 8000 }).toBeGreaterThanOrEqual(r0 + 3);
+  await page.keyboard.up("ArrowUp");
+  await expect(up, "and goes dark on release").not.toHaveClass(/\bon\b/);
+  await page.waitForTimeout(900); // (the step in progress ends)
+  const stopped = await you(page);
+  await page.waitForTimeout(600);
+  expect(await you(page), "stops on release").toEqual(stopped);
+
+  // The on-screen down arrow, held with a finger (a mouse here): it walks you back the way you came, and it lights while held.
+  // (The Colosseum's wall stops an upward walk a few squares on, so the way back is the open one.)
+  const down = page.locator(".town-key-down");
+  const [, r1] = await you(page);
+  const b = (await down.boundingBox())!;
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+  await page.mouse.down();
+  await expect(down).toHaveClass(/\bon\b/);
+  await expect.poll(async () => (await you(page))[1], { message: "the on-screen down arrow walks you down", timeout: 8000 }).toBeLessThanOrEqual(r1 - 2);
+  await page.mouse.up();
+  await expect(down).not.toHaveClass(/\bon\b/);
+  expect(errors, "no page or console errors").toEqual([]);
+});

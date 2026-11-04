@@ -33,7 +33,8 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   from the box's shape, so the panels Eric designs around it can change without touching it. The back button, the chat icon, the
   gear and the buttons stay put. **The buttons** (Eric, Oct 28: "remove the 'Back to me' button … replace with circular focus
   icon … zoom button on left, focus button to right but are in the bottom right corner") are one row in the map's bottom right
-  corner, 14 px in: the −/+ pair, then the **focus button**, a round white button as high as the pair (36 px) with a ring, four
+  corner, 14 px in: the arrow keys on top (see "Arrow keys" below), and under them, together as wide as the keys (87 px, right-aligned),
+  the −/+ pair (57 × 27) and then the **focus button**, a round white button as high as the keys (27 px) with a ring, four
   ticks and a dot (a map's locate-me, our own inline SVG) and no words; its accessible name is still "Back to me" and it does what
   "Back to me" did (the camera comes back to you). `.town-controls` is the row's box: the edge chips, the statue close-up and the
   chat box (`clampBox`) keep clear of it (`keepClear`, `buttons()`), so they follow it to its new place; the town card has never
@@ -120,6 +121,15 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   soon"; a home you can go into (a shop: "Inside a shop", below) only its name and **"Go in"**, centered. The Colosseum (slice 5): "The Colosseum", **"Raids with people"** greyed and "Coming soon" (Eric's menu for
   raids with people will live there). The boss stays put while its card is open. Tapping something both opens its card
   and walks you next to it.
+- **Arrow keys** (Eric, Nov 4, `town-arrow-keys-v3`; `town/arrows.ts`). Hold an arrow and your character runs that way, square to
+  square at a tap's pace, as long as it's held; two held is a diagonal (the axes alternate, one square each); a release stops you after
+  the step in progress; walls, the floor and people stop you as they stop a tap. The on-screen keys (27 px, three across and one up,
+  see-through white with a chevron; held: dark, a pixel lower) and the keyboard (the arrows and WASD, never while typing in a box or
+  a chat log) feed the same held directions, and the matching key lights while held. A key's walk stands you up, closes a card and
+  calls off a game you were walking to, as a tap does. Inside a shop the keys walk you about the room (not during a challenge's intro).
+  Walking is `Walker.run` (world.ts): the walker asks for its next square as each step begins, so a held key runs on without a stop.
+  Numbers: `TOWN_FEEL.youStepMs` (the same pace as a tap); the sizes are the CSS in `town.css`. Test: `e2e/town.spec.ts`, "the arrow
+  keys"; unit: `packages/app/test/town-arrows.test.ts`. Decision: `docs/decisions/2026-11-04-town-arrow-keys.md`.
 - **Looking around.** Drag to look
   around; the focus button ("Back to me") brings the camera back; − / + (and the mouse wheel) zoom. The chips at the box's edge show the
   bosses whose homes are off screen (the nearest few: `maxChips` in `feel.ts`, 4), and the Colosseum's crown when none of
