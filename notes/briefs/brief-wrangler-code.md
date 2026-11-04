@@ -1,10 +1,10 @@
 # Brief: Wrangler's barn and his intro, into the game (code; Opus high)
 
-Worktree `/home/user/cr-wrangler`, branch `claude/wrangler-home`, from main. Set it up with `git worktree add` + `npm ci` (never a
+Worktree `/home/user/cr-wrangler`, branch `claude/wrangler-home`, from main **after PR #482 (bigger figures, the cave bubble) merges** — it touches the same intro/bubble code. Set it up with `git worktree add` + `npm ci` (never a
 node_modules symlink). Push as you go. Ports: 8981, inspector 9481. Include notes/briefs/rules-common.md.
 Eric approved the whole build (Nov 4) and wants it **live**; Wrangler is live, so this goes to everyone (not admins-first).
 
-**Art** on `origin/claude/boss-art` (head named in the director's message; read with `git show`; copy in as Hollow's and Timber's
+**Art** on `origin/claude/boss-art` (head 606565da; read with `git show`; copy in as Hollow's and Timber's
 were): the notes `scripts/boss-art/out/shop-pig-nov4.md` and `intro-pig-nov4.md` first, whole. `house-shop-pig`,
 `sidekick-pig-rooster`, `ride-pen-pony`, `boss-pig` (`BOSS_PIG_INTRO`), `house-intro-pig`.
 
@@ -12,7 +12,8 @@ were): the notes `scripts/boss-art/out/shop-pig-nov4.md` and `intro-pig-nov4.md`
 - Wrangler's Stall's card: his line, then **"Go in"** (no "Shop" / "Coming soon").
 - Inside: the header "Wrangler's Stall", the room from the art (box room), the lights at every placement, the pens' knights hopping
   (idle), the board on its hay bale in its corner (drawn as a room piece until the intro takes it).
-- **The shopkeeper: the rooster** on his counter squares, tag and card "Shopkeeper", "Talk"; baked with `scripts/bake-sidekicks.ts`
+- **The shopkeeper: the rooster** (art: behind the counter at [9.5, 2], only his head shows; Eric's pick was ON the counter: add a
+  shopkeeper lift so he stands on the counter top and reads clearly, without breaking the other shops), tag and card "Shopkeeper", "Talk"; baked with `scripts/bake-sidekicks.ts`
   (`town/sidekicks/<name>.png`, `sidekick-sheets.ts`; update town-bots' count). The piglet stays a town bot.
 - **Wrangler's Boss Crate** in `BOSS_CRATES`, its ride **Pen Pony** (`pen-pony`, mythic, slot ride, a one-line description in the
   house style, e.g. "One of Wrangler's pen knights, saddled. It only ever hops in an L."); the ride wired like the other rides
@@ -39,3 +40,9 @@ were): the notes `scripts/boss-art/out/shop-pig-nov4.md` and `intro-pig-nov4.md`
   No GIFs.
 - PR body `docs/wrangler-home/pr-body.md` (every player-visible change and new text, changed checks old → new, the lane: full e2e,
   the crate is shared). Push; no PR. Short report.
+
+## Art calls to keep (shop-pig-nov4.md / intro-pig-nov4.md)
+The board stand at (4, 3) (visible from the challenge camera); the pens (white knights / black knights); the straw bed in a lasso ring with
+the star where the table stands; his red star mat, your denim horseshoe mat; you both stand clear of the stools from the start (7.2 and
+11.6) so nobody moves when the bale and buckets come in; black bucket his (from our left), white yours (from our right); the bale's drag
+curves past him; Pen Pony matches the pawn's colour, only the blanket takes the item colour; new sounds slide, clatter, jingle, pop.
