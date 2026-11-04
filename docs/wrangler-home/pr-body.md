@@ -61,6 +61,7 @@ Decision note: `docs/decisions/2026-11-04-wrangler-home.md`. Area pages: `docs/a
 - `crates.test.ts` (core): `NO_CRATE_YET` and the rides list gain `pen-pony`.
 - `town-rides.test.ts`: the ride ids gain `pen-pony`.
 - `boss-tokens.test.ts` (server): the crates' rides gain `["pig", "pen-pony"]`.
+- `e2e/profile.spec.ts`, "rides for an admin…": the ride count `toBe(16)` → `toBe(17)` (Pen Pony).
 - New: `packages/app/test/shop-wrangler.test.ts` covers the room, the stand, the marks, the lights, the rooster on the counter, the
   crate, Puddles' buckets, and the intro (beats in order at 11 to 13 s, no hop, the stand hidden from the yank, the bale and buckets
   landing where the table and stools stand, every cue a sound).

@@ -388,7 +388,7 @@ test("rides for an admin (Oct 31; admins own one of every item): the Ride tab ha
   await page.getByRole("tab", { name: "Ride", exact: true }).click();
   const grid = page.locator(".locker-grid").first();
   const rides = ITEM_DEFS.filter((d) => d.slot === "ride").length;
-  expect(rides).toBe(16);
+  expect(rides).toBe(17);
   await expect(grid.locator(".locker-item")).toHaveCount(rides);
   await expect(grid.locator(".locker-admin")).toHaveCount(rides);
   const chirp = grid.getByRole("button", { name: /^Riding Chirp, / });
