@@ -138,3 +138,4 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Jefferson CODE DONE ea4c6cf6 → PR #487 (full-e2e), CI watcher b49xshuai. Arrow keys STARTED (Haiku, /home/user/cr-arrows claude/town-arrow-keys from 8af7ee6a). Then phone boss bar (Haiku). Killed helper wrangler on 8995 (Eric OK).
 - #486 MERGED 099a8840 (deploy watcher bbjzgbb41). #484 LIVE 09:04. Arrow keys DONE 74242d35 → PR #488 (targeted), CI b2yv5a6mv. Phone boss bar STARTED (Haiku, /home/user/cr-phonebar from 099a8840). #487 Jefferson CI b49xshuai.
 - #487 Jefferson MERGED e12ae43e (merge API 502 but it went through); deploy+main CI watcher. Main green after #484.
+- Phone boss bar DONE 16ca2677 → PR #489 (targeted), CI bkbm336aq. Queue now empty after #488/#489. Morning: one short summary to Eric.
