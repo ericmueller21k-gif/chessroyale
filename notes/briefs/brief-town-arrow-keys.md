@@ -12,4 +12,10 @@ Eric approved the look (Nov 4): `notes/briefs/assets/town-arrow-keys.png` (optio
 - Every number in the town's feel; phone and computer stills; e2e: holding up moves you up; the on-screen key lights with the arrow key.
 - **Update (Eric, Nov 4): shrink the zoom pill and the recenter button** so together they span exactly the arrow keys' width
   (3 keys + 2 gaps, ~87 px), right edges aligned, the keys just above them: `notes/briefs/assets/town-arrow-keys-v3.png`
-  (pending Eric's OK on v3). Keep them tappable; same look as today, just smaller.
+  (Eric asked for it; build it). Keep them tappable; same look as today, just smaller.
+
+## Setup
+Worktree `/home/user/cr-arrows`, branch `claude/town-arrow-keys`, from main (set up by the director, node_modules from npm ci).
+Ports 8975, inspector 9475. Include notes/briefs/rules-common.md. Before/after stills (phone 390x844 and computer 1440x900) in
+`docs/town-arrow-keys/`, PR body `docs/town-arrow-keys/pr-body.md` (every player-visible change, changed checks old → new, lane:
+targeted, the town). Push; no PR. Short report.
