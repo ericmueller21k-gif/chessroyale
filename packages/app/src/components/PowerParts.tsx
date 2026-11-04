@@ -8,7 +8,9 @@ import { BossFace, playInPlace } from "./BossCharacter.tsx";
 import { BossEffect, BossMoment, type BoardItem } from "./BossEffect.tsx";
 import { COMPUTER_LAYOUT } from "./MatchMenu.tsx";
 import { bannerLength } from "./FightBanner.tsx";
-import { GodKingPortrait, squareXY } from "./GodKing.tsx";
+import { squareXY } from "./GodKing.tsx";
+import { Avatar } from "./Items.tsx";
+import { pawnLook } from "../looks.ts";
 import type { Priority } from "../speech.tsx";
 import { play, type SoundName } from "../sound.ts";
 
@@ -279,6 +281,17 @@ function fitBigWord(banner: HTMLElement | null) {
   const longest = Math.max(...(word.textContent ?? "").split(" ").map((w) => ctx.measureText(w).width)) + 6;
   const room = banner.clientWidth * WORDS_SHARE;
   if (longest > room) word.style.fontSize = `${((size * room) / longest).toFixed(2)}px`;
+  // The boss's name on one line, made smaller when it's wider than the words' share (Eric, Nov 5: "Wrangler" cut off the
+  // strip's top; a long name like "Boingo the Clown" wrapped to two lines and pushed the stack out of the strip).
+  const label = banner.querySelector<HTMLElement>(".kc-label");
+  if (!label) return;
+  label.style.fontSize = "";
+  const lstyle = getComputedStyle(label);
+  const lsize = parseFloat(lstyle.fontSize);
+  ctx.font = `${lstyle.fontStyle} ${lstyle.fontWeight} ${lsize}px ${lstyle.fontFamily}`;
+  if ("letterSpacing" in ctx) (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = lstyle.letterSpacing;
+  const nameWide = ctx.measureText(label.textContent ?? "").width;
+  if (nameWide > room) label.style.fontSize = `${((lsize * room) / nameWide).toFixed(2)}px`;
 }
 
 /**
@@ -302,8 +315,9 @@ export function PowerBanner({ boss, side, text, sub, tone = "", ms }: { boss: Bo
           <span class="fb-text kc-text">{text}</span>
           {sub && <span class="fb-sub">{sub}</span>}
         </span>
-        <span class="kc-target pc-king">
-          <GodKingPortrait side={side} />
+        {/* (Your own pawn, as your profile has it: the God King keeps his banner only for his save, LastStand.tsx.) */}
+        <span class="kc-target pc-pawn">
+          <Avatar look={pawnLook({ id: "", isYou: true, isBot: false }).look} side={side} />
         </span>
       </div>
     </div>

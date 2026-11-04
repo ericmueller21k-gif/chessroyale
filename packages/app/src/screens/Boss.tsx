@@ -31,7 +31,7 @@ import { LightsDock, LightsOutLayer, lightsStatus } from "../components/LightsOu
 import { seenKey, useStillKey } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
 import { BossDock, Dots } from "../components/BossDock.tsx";
-import { BossCharacter, BossFace, BossSide, hasCharacter, resetBeats } from "../components/BossCharacter.tsx";
+import { BossCharacter, BossFace, BossSide, BossTag, hasCharacter, resetBeats } from "../components/BossCharacter.tsx";
 import { WipPreview, wipPower } from "../components/WipPreview.tsx";
 import { ordinal } from "./StageBreak.tsx";
 import { CRITICAL, VoiceBubble, bossVoice } from "../speech.tsx";
@@ -436,7 +436,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
                 <strong>Remember where his pieces are.</strong>
               ) : snacking ? (
                 <>
-                  {boss.icon} <strong>You start a pawn down.</strong>
+                  <BossTag boss={boss} />: <strong>You start a pawn down.</strong>
                 </>
               ) : intro ? (
                 <strong>{boss.raid ? (alone ? "You vs the boss." : "All of you vs the boss.") : finalistsLine()}</strong>
@@ -448,11 +448,11 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
               ) : funMove?.move ? (
                 // (Short enough for a phone's dock with the move in it: his icon says who.)
                 <>
-                  {boss.icon} Plays <strong>your</strong> move{funPlayed ? <>: <strong>{funMove.san}</strong></> : "…"}
+                  <BossTag boss={boss} /> plays <strong>your</strong> move{funPlayed ? <>: <strong>{funMove.san}</strong></> : "…"}
                 </>
               ) : momentLine ? (
                 <>
-                  {boss.icon} <strong>{momentLine}</strong>
+                  <BossTag boss={boss} />: <strong>{momentLine}</strong>
                 </>
               ) : victim ? (
                 <strong class="bad">
@@ -469,11 +469,11 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
               ) : boss.lastMove ? (
                 <>
                   {/* (His reveal isn't named until the paint drips: "Boss plays …", smudgyFen's `hush`.) */}
-                  {boss.icon} Boss plays <strong>{smudgy?.hush ? "…" : boss.lastMove.san}</strong>
+                  <BossTag boss={boss} /> plays <strong>{smudgy?.hush ? "…" : boss.lastMove.san}</strong>
                 </>
               ) : noMove ? (
                 <>
-                  {boss.icon} <strong>{noMove}</strong>
+                  <BossTag boss={boss} />: <strong>{noMove}</strong>
                 </>
               ) : null}
             </span>
@@ -557,7 +557,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
                   💀
                 </span>
                 <span class="boss-strike-text">
-                  {boss.icon} {boss.name} struck down
+                  <BossTag boss={boss} /> struck down
                 </span>
                 <strong class="boss-strike-name">{name(victim)}</strong>
               </div>

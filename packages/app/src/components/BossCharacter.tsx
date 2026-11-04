@@ -408,6 +408,19 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
 }
 
 /** A boss's portrait (head and shoulders, from its drawing), for banners and its entrance card; else its emoji. */
+/**
+ * A boss's name with his small portrait, where a line used to put his emoji (Eric, Nov 5: "it should say Wrangler there or a
+ * small picture of him or both"): "[portrait] Wrangler plays d4". `The ` is left off the name, as the banners do.
+ */
+export function BossTag({ boss }: { boss: Pick<BossView, "name" | "icon"> }) {
+  return (
+    <span class="boss-tag">
+      <BossFace boss={boss} class="boss-tag-face" label="" />
+      {boss.name.replace(/^The /, "")}
+    </span>
+  );
+}
+
 export function BossFace({ boss, class: cls = "", label }: { boss: Pick<BossView, "name" | "icon">; class?: string; /** Its name for a screen reader (the boss's own unless given; "": none, its button names it). */ label?: string }) {
   const kit = bossKit(boss.name);
   const cv = useRef<HTMLCanvasElement>(null);
@@ -417,7 +430,8 @@ export function BossFace({ boss, class: cls = "", label }: { boss: Pick<BossView
     const frame = kit.ch.anims[p.anim]!.frames[p.frame]!;
     cv.current.getContext("2d")?.putImageData(frameImage(kit.ch, frame), -p.x, -p.y, p.x, p.y, p.w, p.h);
   }, [kit]);
-  if (!kit) return <>{boss.icon}</>;
+  // (A boss with no drawing shows nothing here: no emoji stands in for a boss, Eric, Nov 5; BossTag says his name.)
+  if (!kit) return null;
   return <canvas ref={cv} class={`boss-portrait ${cls}`} width={kit.portrait.w} height={kit.portrait.h} {...(label === "" ? { "aria-hidden": "true" } : { role: "img", "aria-label": label ?? boss.name })} />;
 }
 

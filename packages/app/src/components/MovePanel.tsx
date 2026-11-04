@@ -6,7 +6,7 @@ import { crossedOut } from "./Folio.tsx";
 import { battleStartPly, moveNumber, moverOf, newPlyCache, noteTurns, pieceOn, plyRows, timeShown, turnBook, turnMs, type Mover, type PieceType, type PlyCache, type PlyRow } from "../move-list.ts";
 import { camoHidden, seenFen } from "../camo.ts";
 import { pawnLook } from "../looks.ts";
-import { bossPortraitUrl } from "./BossCharacter.tsx";
+import { BossFace, bossPortraitUrl } from "./BossCharacter.tsx";
 import { godKingPortraitUrl } from "./GodKing.tsx";
 import { Avatar } from "./Items.tsx";
 import { TowerFit } from "./MiniTower.tsx";
@@ -80,7 +80,7 @@ const Pc = ({ color, type }: { color: "w" | "b"; type: PieceType }) => (
 function Who({ mover, boss, alone }: { mover: Mover; boss: BossView; alone: boolean }) {
   if (mover === "boss") {
     const url = bossPortraitUrl(boss.name);
-    return <span class="mv-who">{url ? <img src={url} alt="" /> : boss.icon}</span>;
+    return <span class="mv-who">{url ? <img src={url} alt="" /> : <BossFace boss={boss} label="" />}</span>;
   }
   if (mover === "king") {
     const url = godKingPortraitUrl(boss.crowdSide);

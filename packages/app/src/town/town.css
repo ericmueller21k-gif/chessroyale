@@ -328,6 +328,8 @@
   /* (Not a button: the pointer stays the ordinary arrow over the card's words and a bot's picture.) */
   cursor: default;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.38);
+  /* (Eric, Nov 5: every card's text centered, the challenge card and the homes alike; a person's row keeps its own layout.) */
+  text-align: center;
 }
 /* The tail: a square turned on its corner, bordered on the two sides that make the point, over the card's own border. */
 .town-card::after {
@@ -448,6 +450,7 @@ a.town-btn.town-look {
   max-width: none;
   height: 53px;
   padding: 0 7px 0 6px;
+  text-align: left;
 }
 /* The picture: a round ring in the kind's color on a white disc. A sidekick's is blue (`#4575fa`, the same family as the sidekicks' name tags but lighter: the ring needs 3:1 on this
    dark card, the tag's `#1d4ed8` needs white text on it at 4.5:1), a pawn's and a real player's ivory (the white of theirs): both read on the dark card (ivory 12:1). A real player's is a button for their profile; a bot's
