@@ -115,3 +115,4 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - NOTE (Eric Nov 4): boss QUOTES need expanding per boss (Gemini, Eric to return): challenge lines (shop intro), before fight, after fight
   (win/lose), talk-to lines; challenge lines distinct from in-fight barks. Eric also has another boss idea (later).
 - Eric OK (Nov 4): Wrangler full build, my picks (rooster shopkeeper, hay-bale stand, Pen Pony ride, placeholder line), push LIVE, NO GIFs to him. Art helper Opus high on /home/user/cr-hollowart claude/boss-art, brief brief-wrangler-art.md; then code round, PR, merge, tell Eric live.
+- Eric Nov 4: Wrangler is a TRIAL of start-to-finish with no review stops. If major issues show up live, go back to the slow rollout (Eric reviews stills/GIFs between art and code rounds) for later bosses.
