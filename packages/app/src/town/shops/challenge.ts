@@ -9,7 +9,11 @@
  * A boss without an intro here is challenged as before (the Boss raid screen, its tile picked).
  */
 import type { HomeId } from "../world.ts";
+import { CREW_SHEETS } from "./grex-crew-sheets.ts";
 import type { ShopPlace } from "./room.ts";
+
+/** Jefferson's machine guys' step-off and the dozer's wake (their baked sheets' frames: times and cues), for his intro's cues. */
+const CREW_SHEET_CUES = { stepOff: CREW_SHEETS.lift.anims.stepOff, wake: CREW_SHEETS["crew-d"].anims.wake };
 
 /**
  * Where you and the boss stand at the table (Eric, Nov 2, round 2: "I also prefer the normal look is boss on left, you on right, not
@@ -25,6 +29,11 @@ export interface BossIntro {
   name: string;
   /** Said out loud in a speech bubble by its head (not the chat log: Eric, Nov 2) as you face each other. */
   line: string;
+  /**
+   * Its line picked at random each time from these (Jefferson's calls to his crew, Nov 4: `lineOf`), `line` the first; none: `line`
+   * every time.
+   */
+  lines?: readonly string[];
   /** Where you and it stand at the table. */
   layout: IntroLayout;
   /**
@@ -197,10 +206,46 @@ export const BOSS_INTROS: Readonly<Partial<Record<HomeId, BossIntro>>> = {
       pop: "pigPop",
     },
   },
+  // (Nov 4: his own, Eric's design: in his firework warehouse he hollers for his crew, who stop work and come round the table to
+  // watch; the floor tile at your mark lifts you level with the board on its crates; his brag; the wipe of sparklers and fireworks.
+  // docs/decisions/2026-11-04-jefferson-home.md. His call one of four at random, placeholders until Eric's Gemini lines. You both walk
+  // on to the marks and stand there: he stands (no stool), you on your lift.)
+  grex: {
+    name: "Jefferson",
+    line: "Boys! We got a challenger!",
+    lines: ["Boys! We got a challenger!", "Take five, everybody. We're playing chess.", "Who wants a fifteen-minute break?", "Forks down, boys. Somebody wants a game."],
+    layout: "across",
+    custom: true,
+    // His cues, each a sound of his own (characters/grex-sounds.ts): his holler (twice), his whoosh as he waves them over, a hoof's
+    // clop on the concrete for each step (the crew's walks, the machine guys stepping off), the dozer's startled snort, your lift's
+    // hydraulic hiss and its clunk as it locks, the crates creaking (soft as they wobble, louder as your lift clunks home), his brag's
+    // laugh (his crackle), sparkler fizz and stomp (his poof); and the wipe's rising whistle, a little pop and a soft, muffled bang.
+    cues: {
+      shout: "grexShout",
+      whoosh: "grexWhoosh",
+      step: "grexStep",
+      snort: "grexSnort",
+      hiss: "grexHiss",
+      clunk: "grexClunk",
+      creak: "grexCreak",
+      creakSoft: "grexCreakSoft",
+      laugh: "grexCrackle",
+      fizz: "grexFizz",
+      stomp: "grexPoof",
+      whistle: "grexRocket",
+      pop: "grexPopSoft",
+      bang: "grexBang",
+      // (The wipe's front, a wall of sparkler fizz, as it sweeps in.)
+      storm: "grexFizz",
+    },
+  },
 };
 
 /** The boss's intro, or null: challenged as before (no intro yet). */
 export const introOf = (id: HomeId): BossIntro | null => BOSS_INTROS[id] ?? null;
+/** Its line this time: one of its `lines` (picked by `rand`: Math.random as the room opens), or its `line`. */
+export const lineOf = (def: BossIntro, rand: () => number = Math.random): string =>
+  def.lines?.length ? def.lines[Math.min(def.lines.length - 1, Math.floor(rand() * def.lines.length))]! : def.line;
 /** Its channel line this time (one of its `chant`, picked by `rand`: Math.random as the room opens), or null: it has none. */
 export const chantOf = (def: BossIntro, rand: () => number = Math.random): string | null =>
   def.chant?.length ? def.chant[Math.min(def.chant.length - 1, Math.floor(rand() * def.chant.length))]! : null;
@@ -320,6 +365,34 @@ export const CHALLENGE_FEEL = {
    * About 12 s from the marks to the wipe.
    */
   rope: { spinMs: 1000, flyMs: 440, flyArc: 1.1, yankLeadMs: 100, slideMs: 1600, bend: [5, 9], freeAfterMs: 200, reelMs: 200, offMs: 400, offArc: 0.8, tumbleMs: 760, tumbleSouth: 0.4 },
+  /**
+   * Jefferson's own (Nov 4; Eric's design: "he hollers for his crew. The crew stop what they're doing and come over… they stand round
+   * the table behind, watching… The floor tile at your mark rises on its piston and lifts you level with the board"; the art's
+   * timeline, intro-grex-nov4.md). After his line (the shared `lineMs`) he hollers (his `call`); `stopMs` into it the crew stop (the
+   * machines park where they are, the guys step off, the dozer wakes); he waves them over (his `waveOver`, `waves` loops); `setOffMs`
+   * after the stop they set off for their spots round the table (each after the art's INTRO_GREX_CREW_SETOFF, and the machine guys
+   * once off, the dozer once awake), round its north side by these waypoints (`via`, squares, each member's), at `speed` squares a
+   * second or faster: each is there by the time your lift locks; `walkMs` after they set off your lift rises (its frames), the
+   * crates creak as it locks (theirs); his brag (his frames); his attack. Their steps' clop at most one a `stepGapMs`. About 13 s
+   * from the marks to the wipe.
+   */
+  crew: {
+    stopMs: 900,
+    waves: 2,
+    setOffMs: 400,
+    walkMs: 4200,
+    speed: 3.2,
+    stepGapMs: 90,
+    via: {
+      "lift-guy": [[5.2, 7.6]],
+      "fork-guy": [[13.4, 14], [13.4, 10.6]],
+      "leaner-a": [[4.6, 14], [5.2, 10.5]],
+      "leaner-b": [[4.8, 15], [5.4, 12], [6.2, 8.9], [10.6, 7.9]],
+      "crew-c": [[9.5, 5.8]],
+      "crew-d": [[5, 13], [6, 8.6]],
+      dealer: [[12.5, 5.6]],
+    },
+  },
   /**
    * Hollow's own (Nov 3; Eric's design: "the darkness ball in his belly powers up… It sucks in the light: the lanterns go out one by
    * one, the bulb string's lights are drawn in toward him, light from everything around, even from your own chest piece… Everything goes
@@ -666,12 +739,39 @@ export function ropeAnims(w: { mover: ArtLike; rope: ArtLike; table: ArtLike; bu
     release: w.release,
   };
 }
-/** A boss's own art's animations: a pyramid (Alfil's), toy blocks (Big Boy's), a log (Timber's), the dark (Hollow's) or the lasso (Wrangler's). */
-export type IntroAnims = PyramidAnims | BlocksAnims | LogAnims | DarkAnims | RopeAnims;
+/** Jefferson's moves (characters/grex-intro.ts BOSS_GREX_INTRO): his call to his crew, waving them over, his brag. */
+export const CREW_MOVES = ["call", "waveOver", "brag"] as const;
+export type CrewMove = (typeof CREW_MOVES)[number];
+/**
+ * Jefferson's crew (Nov 4; CHALLENGE_FEEL.crew): each frame's ms and cue (the art's) for his moves, your lift's rise (INTRO_GREX_LIFT)
+ * and the crate-stack table's wobbles (INTRO_GREX_TABLE: `tableIdle`, and its bigger `creak` as your lift clunks home).
+ */
+export interface CrewAnims {
+  moves: { readonly [m in CrewMove]: readonly number[] };
+  rise: readonly number[];
+  creak: readonly number[];
+  tableIdle: readonly number[];
+  cues: { readonly [k in CrewMove | "rise" | "creak" | "tableIdle"]: readonly (string | undefined)[] };
+}
+/** Jefferson's CrewAnims from his art (shops/grex-intro-art.ts): his moves, your lift, the table. */
+export function crewAnims(w: { mover: ArtLike; lift: ArtLike; table: ArtLike }): CrewAnims {
+  const fr = (ch: ArtLike, a: string) => ch.anims[a]!.frames;
+  const of = <T>(get: (m: CrewMove) => T) => Object.fromEntries(CREW_MOVES.map((m) => [m, get(m)])) as Record<CrewMove, T>;
+  return {
+    moves: of((m) => fr(w.mover, m).map((f) => f.ms)),
+    rise: fr(w.lift, "rise").map((f) => f.ms),
+    creak: fr(w.table, "creak").map((f) => f.ms),
+    tableIdle: fr(w.table, "idle").map((f) => f.ms),
+    cues: { ...of((m) => fr(w.mover, m).map((f) => f.cue)), rise: fr(w.lift, "rise").map((f) => f.cue), creak: fr(w.table, "creak").map((f) => f.cue), tableIdle: fr(w.table, "idle").map((f) => f.cue) },
+  };
+}
+/** A boss's own art's animations: a pyramid (Alfil's), toy blocks (Big Boy's), a log (Timber's), the dark (Hollow's), the lasso (Wrangler's) or the crew (Jefferson's). */
+export type IntroAnims = PyramidAnims | BlocksAnims | LogAnims | DarkAnims | RopeAnims | CrewAnims;
 export const isBlocks = (a: IntroAnims): a is BlocksAnims => "build" in a;
 export const isLog = (a: IntroAnims): a is LogAnims => "props" in a;
 export const isDark = (a: IntroAnims): a is DarkAnims => "gutter" in a;
 export const isRope = (a: IntroAnims): a is RopeAnims => "release" in a;
+export const isCrew = (a: IntroAnims): a is CrewAnims => "creak" in a && "tableIdle" in a;
 /**
  * The intro's steps. Timber's own (a log): "toLog" (he walks west to it, his line still over his head), "lift", "carry" (to the middle),
  * "setDown", "gnaw", the shavings' "rise", "hold" (the table and stumps swap in under it) and "settle", the stumps' "pop", "dust" (his
@@ -679,13 +779,16 @@ export const isRope = (a: IntroAnims): a is RopeAnims => "release" in a;
  * "swell", "drink" (the drain), "full", "blackout", "black", "dim" (the dim light, his settle) and "iris" (the pool closing on the board).
  * Wrangler's own (the lasso): after the line, "spin", "throw", "catch" (the loop flying to the bale and cinching), "drag" (the yank and the
  * bale's slide), "land" (it lands; the loop flicked free, the line reeled in), "cross" (the cross throw), "haul" (the double yank), "stools"
- * (the buckets tumbling in and landing, the ropes reeled in) and "brag", then the attack.
+ * (the buckets tumbling in and landing, the ropes reeled in) and "brag", then the attack. Jefferson's own (the crew): after the line, "call"
+ * (he hollers; the crew stop in it), "wave" (he waves them over), "walk" (they walk round to their spots), "lift" (your lift rises),
+ * "creak" (the crates wobble as it locks) and "brag", then the attack.
  */
 export type IntroStep =
   | "face" | "line" | "pause" | "rise" | "idle" | "crack" | "crumble" | "build" | "drop" | "plop" | "chairs" | "pop" | "table" | "swing" | "done"
   | "toLog" | "lift" | "carry" | "setDown" | "gnaw" | "hold" | "settle" | "dust" | "toMark"
   | "charge" | "swell" | "drink" | "full" | "blackout" | "black" | "dim" | "iris"
-  | "spin" | "throw" | "catch" | "drag" | "land" | "cross" | "haul" | "stools" | "brag";
+  | "spin" | "throw" | "catch" | "drag" | "land" | "cross" | "haul" | "stools" | "brag"
+  | "call" | "wave" | "walk" | "creak";
 export interface IntroBeat {
   step: IntroStep;
   at: number;
@@ -694,7 +797,7 @@ export interface IntroBeat {
 const sum = (ms: readonly number[]) => ms.reduce((a, b) => a + b, 0);
 type BeatFeel = Pick<
   typeof CHALLENGE_FEEL,
-  "faceMs" | "lineMs" | "afterLineMs" | "holdMs" | "gapMs" | "tableHoldMs" | "boardDropMs" | "popMs" | "swingMs" | "stormInMs" | "flashMs" | "wipeMs" | "log" | "standOff" | "clear" | "dark" | "rope"
+  "faceMs" | "lineMs" | "afterLineMs" | "holdMs" | "gapMs" | "tableHoldMs" | "boardDropMs" | "popMs" | "swingMs" | "stormInMs" | "flashMs" | "wipeMs" | "log" | "standOff" | "clear" | "dark" | "rope" | "crew"
 >;
 /** Hollow's drain, ms from the drink's start (CHALLENGE_FEEL.dark.drain as drawn, every gap times `pace`). */
 export function drainAt(feel: Pick<typeof CHALLENGE_FEEL, "dark"> = CHALLENGE_FEEL) {
@@ -740,6 +843,24 @@ export function introBeats(a: IntroAnims | null, feel: BeatFeel = CHALLENGE_FEEL
     t += ms;
   };
   add("face", feel.faceMs);
+  if (a && isCrew(a)) {
+    // Jefferson's own: his line; his call (the crew stop `stopMs` into it); his wave over; the crew walking round to their spots
+    // (they set off `setOffMs` after the stop; your lift rises `walkMs` after that); your lift rising; the crates' creak as it locks;
+    // his brag; the attack. (No pause after the line: the art's 2.6 s.)
+    const K = feel.crew;
+    const M = a.moves;
+    add("line", feel.lineMs);
+    add("call", sum(M.call));
+    add("wave", sum(M.waveOver) * K.waves);
+    // (The walk from the call's end: its start is the call's; your lift rises `walkMs` after they set off.)
+    add("walk", Math.max(0, K.stopMs + K.setOffMs + K.walkMs - sum(M.call) - sum(M.waveOver) * K.waves));
+    add("lift", sum(a.rise));
+    add("creak", sum(a.creak));
+    add("brag", sum(M.brag));
+    add("swing", Math.max(0, feel.swingMs - coverMs(true, feel)));
+    out.push({ step: "done", at: t, end: Infinity });
+    return out;
+  }
   if (a && isRope(a)) {
     // Wrangler's own: his line; the spin; the throw (the loop flies from its release frame and cinches round the bale); the yank and
     // the drag; the bale lands, the loop flicked free and reeled in; the cross throw; the double yank, the buckets tumbling in on its
@@ -872,6 +993,48 @@ export interface IntroNow {
   dark: DarkNow | null;
   /** Wrangler's own intro (the lasso): what he, his ropes, the bale and the buckets do now; null for every other intro. */
   rope: RopeNow | null;
+  /** Jefferson's own intro (the crew): what he, his crew, your lift and the table do now; null for every other intro. */
+  crew: CrewNow | null;
+}
+/**
+ * Jefferson's intro `t` ms in (CHALLENGE_FEEL.crew): his move, the crew's clock (the room walks each of them), your lift and the table.
+ * He and you stand on your marks from the start to the end (he stands; you on your lift).
+ */
+export interface CrewNow {
+  /** His own move and frame (BOSS_GREX_INTRO, as drawn), or null: his idle (his town figure's frames). */
+  move: { anim: CrewMove; frame: number } | null;
+  /** Ms since the crew stopped work (-1: not yet): the machines parked where they are, the guys stepping off, the dozer waking. */
+  stopped: number;
+  /** Ms since the crew set off for the table (-1: not yet); each goes after his own delay (the art's INTRO_GREX_CREW_SETOFF). */
+  walk: number;
+  /** Ms left until your lift locks at the top (each walker is at his spot by then). */
+  untilLocked: number;
+  /** Your lift (INTRO_GREX_LIFT): flush with the floor (your mark), rising, up. */
+  lift: { anim: "flush" | "rise" | "up"; frame: number };
+  /** The crate-stack table: its slight wobble, or its bigger one as your lift clunks home. */
+  table: { anim: "idle" | "creak"; frame: number };
+}
+/** When things happen in Jefferson's intro (ms in): the crew stop, they set off, your lift starts rising, it locks. */
+export function crewTimes(beats: readonly IntroBeat[], a: CrewAnims, feel: Pick<typeof CHALLENGE_FEEL, "crew"> = CHALLENGE_FEEL) {
+  const K = feel.crew;
+  const stop = stepAt(beats, "call") + K.stopMs;
+  const setOff = stop + K.setOffMs;
+  const lift = stepAt(beats, "lift");
+  return { stop, setOff, lift, locked: lift + sum(a.rise) };
+}
+/** Jefferson's intro `t` ms in (his beats, `introBeats`): see CrewNow. */
+export function crewAt(beats: readonly IntroBeat[], a: CrewAnims, t: number, feel: Pick<typeof CHALLENGE_FEEL, "crew"> = CHALLENGE_FEEL): CrewNow {
+  const at = (s: IntroStep) => stepAt(beats, s);
+  const T = crewTimes(beats, a, feel);
+  const me = (anim: CrewMove, ms: number, loop: boolean) => ({ anim, frame: frameAt(a.moves[anim], ms, loop) });
+  let move: CrewNow["move"] = null;
+  if (t >= at("call") && t < at("wave")) move = me("call", t - at("call"), false);
+  else if (t >= at("wave") && t < at("walk")) move = me("waveOver", t - at("wave"), true);
+  else if (t >= at("brag") && t < at("swing")) move = me("brag", t - at("brag"), false);
+  const lift: CrewNow["lift"] = t < T.lift ? { anim: "flush", frame: 0 } : t < T.locked ? { anim: "rise", frame: frameAt(a.rise, t - T.lift, false) } : { anim: "up", frame: 0 };
+  const creaking = t >= at("creak") && t < at("creak") + sum(a.creak);
+  const table: CrewNow["table"] = creaking ? { anim: "creak", frame: frameAt(a.creak, t - at("creak"), false) } : { anim: "idle", frame: frameAt(a.tableIdle, t, true) };
+  return { move, stopped: t >= T.stop ? t - T.stop : -1, walk: t >= T.setOff ? t - T.setOff : -1, untilLocked: T.locked - t, lift, table };
 }
 /**
  * Wrangler's intro `t` ms in (CHALLENGE_FEEL.rope): his move, his ropes, the bale with the board and the buckets. Nobody walks: he and
@@ -1079,8 +1242,8 @@ const easeOutBack = (u: number) => 1 + 2.2 * (u - 1) ** 3 + 1.2 * (u - 1) ** 2;
  * starting to drop; Alfil's table showing through the crumble).
  */
 export function hopStart(beats: readonly IntroBeat[], a: IntroAnims | null): number {
-  // (Hollow's and Wrangler's: you walked on to your seats, or clear of them; nothing to hop back from.)
-  if (a && (isDark(a) || isRope(a))) return Infinity;
+  // (Hollow's and Wrangler's: you walked on to your seats, or clear of them; Jefferson's: no stools; nothing to hop back from.)
+  if (a && (isDark(a) || isRope(a) || isCrew(a))) return Infinity;
   if (!a || isLog(a)) return stepAt(beats, "pop");
   if (isBlocks(a)) return stepAt(beats, "chairs");
   return stepAt(beats, "crumble") + sum(a.crumble.slice(0, a.tableFrame));
@@ -1122,10 +1285,14 @@ export function woodAt(beats: readonly IntroBeat[], a: LogAnims, t: number): Woo
   if (t < at("swing").at) return { ...stand, move: me("walk", frameAt(a.moves.walk, t - at("toMark").at, true), true), from: "stepped", to: "clear", u: u("toMark") };
   return { ...stand, move: null, from: "clear", to: "clear", u: 0 };
 }
-export function introAt(beats: readonly IntroBeat[], a: IntroAnims | null, t: number, feel: Pick<typeof CHALLENGE_FEEL, "popMs" | "puffMs" | "dropFrom" | "hopMs" | "lineMs" | "dark" | "rope"> = CHALLENGE_FEEL): IntroNow {
+export function introAt(beats: readonly IntroBeat[], a: IntroAnims | null, t: number, feel: Pick<typeof CHALLENGE_FEEL, "popMs" | "puffMs" | "dropFrom" | "hopMs" | "lineMs" | "dark" | "rope" | "crew"> = CHALLENGE_FEEL): IntroNow {
   const b = beats.find((x) => t < x.end) ?? beats[beats.length - 1]!;
   const h = Math.min(1, Math.max(0, (t - hopStart(beats, a)) / feel.hopMs));
-  const base = { step: b.step, pyramid: null, blocks: null, drop: 0, drift: false, pop: 1, puff: -1, line: b.step === "line", back: h * h * (3 - 2 * h), hop: h > 0 && h < 1 ? Math.sin(Math.PI * h) : 0, wood: null, chant: false, dark: null, rope: null };
+  const base = { step: b.step, pyramid: null, blocks: null, drop: 0, drift: false, pop: 1, puff: -1, line: b.step === "line", back: h * h * (3 - 2 * h), hop: h > 0 && h < 1 ? Math.sin(Math.PI * h) : 0, wood: null, chant: false, dark: null, rope: null, crew: null };
+  if (a && isCrew(a)) {
+    // (Jefferson's: the board on its crates is there from the start; no stools: he stands, you on your lift.)
+    return { ...base, crew: crewAt(beats, a, t), table: true, stools: false };
+  }
   if (a && isRope(a)) {
     // (Wrangler's: the table in its place once the bale lands; the stools once the buckets have.)
     const T = ropeTimes(beats, a);
@@ -1183,6 +1350,7 @@ export function introCues(beats: readonly IntroBeat[], a: IntroAnims | null): { 
   if (!a) return [{ cue: "table", at: at("pop") }];
   if (isDark(a)) return darkCues(beats, a);
   if (isRope(a)) return ropeCues(beats, a);
+  if (isCrew(a)) return crewCues(beats, a);
   if (isLog(a)) {
     // (Timber's: each move's and prop's own cues on their frames, through their beats: looping ones over and over to its end.)
     const out: { cue: string; at: number }[] = [];
@@ -1271,6 +1439,47 @@ export function ropeCues(beats: readonly IntroBeat[], a: RopeAnims, feel: Pick<t
   play(M.doubleYank, C.doubleYank, at("haul"), at("stools"), false);
   play(G.tumble, C.tumble, T.tumble, T.land, true);
   play(G.drop, C.drop, T.land, at("brag"), false);
+  play(M.brag, C.brag, at("brag"), at("swing"), false);
+  return out.sort((x, y) => x.at - y.at);
+}
+
+/**
+ * Jefferson's cues, and when (his intro's beats; CHALLENGE_FEEL.crew): his moves' own on their frames (his two hollers, his whoosh each
+ * wave, his brag's laugh, fizz and stomp); the crew stopping: the machine guys' steps as they climb off (their `stepOff`'s, both
+ * machines' as one: they step off together), the dozer's snort as he wakes; your lift's hiss and its clunk as it locks; the crates'
+ * creak on each wobble (`creakSoft`: their slight one, all through) and the louder one as your lift clunks home. (The crew's steps as
+ * they walk are the room's: where each is depends on where his machine stopped.) `stepOff` and `wake`: the frames' times and cues
+ * of the machines' step-off and the dozer's wake (the room's baked sheets).
+ */
+export function crewCues(
+  beats: readonly IntroBeat[],
+  a: CrewAnims,
+  feel: Pick<typeof CHALLENGE_FEEL, "crew"> = CHALLENGE_FEEL,
+  sheet: { stepOff: { ms: readonly number[]; cues: readonly (string | null)[] }; wake: { ms: readonly number[]; cues: readonly (string | null)[] } } = CREW_SHEET_CUES,
+): { cue: string; at: number }[] {
+  const at = (s: IntroStep) => stepAt(beats, s);
+  const out: { cue: string; at: number }[] = [];
+  const play = (ms: readonly number[], cues: readonly (string | null | undefined)[], from: number, to: number, loop: boolean, rename?: string) => {
+    if (sum(ms) <= 0) return;
+    let t = from;
+    for (let i = 0; t < to; i = (i + 1) % ms.length) {
+      const cue = cues[i];
+      if (cue) out.push({ cue: rename ?? cue, at: t });
+      t += ms[i]!;
+      if (!loop && i === ms.length - 1) break;
+    }
+  };
+  const M = a.moves;
+  const C = a.cues;
+  const T = crewTimes(beats, a, feel);
+  play(M.call, C.call, at("call"), at("wave"), false);
+  play(M.waveOver, C.waveOver, at("wave"), at("walk"), true);
+  play(sheet.stepOff.ms, sheet.stepOff.cues, T.stop, Infinity, false);
+  play(sheet.wake.ms, sheet.wake.cues, T.stop, Infinity, false);
+  play(a.tableIdle, C.tableIdle, 0, at("creak"), true, "creakSoft");
+  play(a.rise, C.rise, T.lift, T.locked + 1, false);
+  play(a.creak, C.creak, at("creak"), at("brag"), false);
+  play(a.tableIdle, C.tableIdle, at("brag"), at("done"), true, "creakSoft");
   play(M.brag, C.brag, at("brag"), at("swing"), false);
   return out.sort((x, y) => x.at - y.at);
 }

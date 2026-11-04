@@ -1,6 +1,6 @@
 /**
  * The homes you can go into (Nov 2, round 1: Babur's circus tent and Puddles' greenhouse, the shops' first interiors; then Alfil's
- * pyramid and Big Boy's crib; Nov 3, Timber's lodge, Dash's sneaker store and Hollow's cave; Nov 4, Wrangler's barn), what
+ * pyramid and Big Boy's crib; Nov 3, Timber's lodge, Dash's sneaker store and Hollow's cave; Nov 4, Wrangler's barn and Jefferson's warehouse), what
  * each shop sells, and the words its cards say. Light: the town imports it to know which home's card says "Go in"; the room
  * itself (its art, its drawing) loads only when you go in (ShopRoom.tsx). docs/decisions/2026-11-02-shop-interiors-r1.md.
  *
@@ -22,8 +22,17 @@ export interface ShopDef {
   /** Its crate's name, word for word ("Babur's Boss Crate"). */
   crate: string;
   /** The Shopkeeper: the boss's kid (its sheet's name in town/sidekicks/), drawn at `at` (a square, fractions allowed). */
-  kid: "babur" | "puddles" | "alfil" | "bigboy" | "timber" | "blitz" | "hollowdog" | "rooster";
+  kid: "babur" | "puddles" | "alfil" | "bigboy" | "timber" | "blitz" | "hollowdog" | "rooster" | "dealer";
   at: readonly [number, number];
+  /**
+   * Drawn at the art's own size, this many of the room's pixels (37 a square) from its feet to the top of its idle, rather than the
+   * kids' `sidekickSquares` (Jefferson's dealer, Nov 4: a giraffe, 79 px, drawn 1:1 as the art has him). None: the kids' size.
+   */
+  tall?: number;
+  /** Faces west (the sheet mirrored): Jefferson's dealer, in the north-east corner, looking along the floor. None: as drawn (east). */
+  flip?: true;
+  /** The pieces whose squares mean "talk" when tapped, besides the counter's (a shop with no counter: Jefferson's crate and corner). */
+  talk?: readonly string[];
   /**
    * How far the Shopkeeper stands raised over `at` (the room's art pixels, 37 a square): on the counter's top rather than behind it
    * (Wrangler's rooster, Nov 4: Eric's pick, "on the counter", so he reads clearly). None: on the floor, as every other.
@@ -36,9 +45,10 @@ export interface ShopDef {
   /**
    * Above the walls: a tent's canvas, a greenhouse's glass, a pyramid's sandstone, a nursery's sky-blue ceiling with clouds and
    * stars, a lodge's dark planks between heavy beams, a store's white ceiling tiles and light panels, a cave's dark stone and
-   * stalactites, or a barn's dark rafters and cross beams (drawn by the game, not the art: as the mockup did).
+   * stalactites, a barn's dark rafters and cross beams, or a warehouse's dark steel trusses (drawn by the game, not the art: as the
+   * mockup did).
    */
-  roof: "tent" | "glass" | "stone" | "nursery" | "lodge" | "store" | "cave" | "barn";
+  roof: "tent" | "glass" | "stone" | "nursery" | "lodge" | "store" | "cave" | "barn" | "warehouse";
   /**
    * The chat log's text over the room (Eric, Nov 2: "white, or black, depending on darkness of background in the shop"): "night" for
    * a dark room (white words on a dark tint: Babur's tent), "day" for a light one (dark words on a light tint: Puddles' greenhouse),
@@ -72,6 +82,11 @@ export const SHOPS: Readonly<Partial<Record<HomeId, ShopDef>>> = {
   // the corn basket and the rope coil), raised to its plank top (`lift`: the counter's foot is 27 px under it, shop-pig-nov4.md);
   // his squares are behind it, as every Shopkeeper's. He has no name: "Shopkeeper". A plank barn in the evening light: the day tone.
   pig: { home: "pig", boss: "Wrangler", crate: "Wrangler's Boss Crate", kid: "rooster", at: [9.5, 3], lift: 27, keeper: [{ c: 9, r: 2 }, { c: 10, r: 2 }], prizes: ["pen-pony"], roof: "barn", chatTone: "day" },
+  // Jefferson's shop is "literally just a guy in the corner" (Eric, Nov 4): the shady dealer giraffe in the floor's north-east corner
+  // by the taped SHOP sign, facing west, drawn at his art's size (79 px: shop-grex-nov4.md), on his squares; no counter, so a tap on
+  // his Boss Crate (on the floor beside him) or the bare corner behind him means talk too. He has no name: "Shopkeeper". Bright
+  // concrete under high-bay lamps: the day tone.
+  grex: { home: "grex", boss: "Jefferson", crate: "Jefferson's Boss Crate", kid: "dealer", at: [16.8, 3.2], tall: 79, flip: true, talk: ["crate", "corner-shop"], keeper: [{ c: 16, r: 3 }, { c: 17, r: 3 }], prizes: ["jefferson-giraffe"], roof: "warehouse", chatTone: "day" },
 };
 
 /** The shop inside a home, or null: every other home has no "Go in" yet. */

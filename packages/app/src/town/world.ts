@@ -544,10 +544,26 @@ export class Walker {
   goal(): Sq {
     return { c: this.goalC(), r: this.goalR() };
   }
+  /** The next square of its path, after the step it's on (null: none). */
+  peek(): Sq | null {
+    return this.queue[0] ?? null;
+  }
+  /** Drops the rest of its path: it stops once the step it's on ends (Jefferson's crew in the way, Nov 4). */
+  halt(): void {
+    this.queue = [];
+  }
   /** Walk this path (after the step it's on), claiming its last square. */
   go(path: Sq[]): void {
     this.queue = path.slice();
     this.claim = ++claims;
+  }
+  /**
+   * Asked (with the square it's beginning from) when a step begins and nothing is queued after it: the square to walk to next, or
+   * null to stop after this step (the keys' walk: arrows.ts). Asked before the step's ease is set, so a held key runs on with no stop.
+   */
+  private runner: ((fc: number, fr: number) => Sq | null) | null = null;
+  run(next: ((fc: number, fr: number) => Sq | null) | null): void {
+    this.runner = next;
   }
   update(now: number): void {
     for (let g = 0; g < 64; g++) {
@@ -574,6 +590,10 @@ export class Walker {
     if (dc) this.facing = dc < 0 ? -1 : 1;
     if (dc) this.view = 0;
     else if (dr) this.view = dr > 0 ? 1 : 2;
+    if (!this.queue.length && this.runner) {
+      const n = this.runner(to.c, to.r);
+      if (n) this.queue.push(n);
+    }
     this.step = { fc: this.c, fr: this.r, to, dc, dr, t0, first, last: this.queue.length === 0 };
   }
   /** Its pose at `now`, into `out`. */

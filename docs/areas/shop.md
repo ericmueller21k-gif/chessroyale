@@ -65,7 +65,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   queue's and Squads' cards, the boss stage, the town's person card, and the public profile's Equipped Cosmetics row (four tiles at
   most; its View all lists the ride). Changing a ride's drawing or the paint (`item-paint.tsx`): `npx tsx scripts/measure-rides.ts`
   (the town's cells for it; a test fails until it's run).
-- **A boss's crate, sold inside the boss's home** (Nov 2, round 1: Babur's and Puddles'; since, Alfil's, Big Boy's, Timber's, Dash's and, Nov 3, Hollow's with Hollow's Bulb, shown to everyone; Nov 4, Wrangler's with Pen Pony, everyone's; town-square.md, "Inside a shop"): the
+- **A boss's crate, sold inside the boss's home** (Nov 2, round 1: Babur's and Puddles'; since, Alfil's, Big Boy's, Timber's, Dash's and, Nov 3, Hollow's with Hollow's Bulb, shown to everyone; Nov 4, Wrangler's with Pen Pony and Jefferson's with Giraffe Gallop, everyone's; town-square.md, "Inside a shop"): the
   Shopkeeper's card shows the crate, its prizes (the boss's ride first), its price (`BOSS_CRATE_PRICE` in core's settings: 3 of the boss's
   tokens, or 1 token and 1 crate key) and what you have. Since round 2 (below) buying is real.
 - **Boss tokens, crate keys and buying a boss crate** (Nov 2, round 2; [2026-11-02-boss-tokens.md](../decisions/2026-11-02-boss-tokens.md);

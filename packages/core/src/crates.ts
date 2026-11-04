@@ -348,7 +348,8 @@ const bossCrate = (boss: string, name: string, ride: string): BossCrateDef => ({
 
 /**
  * Every boss's crate (only those whose home has a shop so far: Babur's, Puddles', Alfil's, Big Boy's, Timber's, Dash's, Hollow's (Nov 3,
- * with Hollow's Bulb) and Wrangler's (Nov 4, with Pen Pony; `pig`, his home's id). Timber's
+ * with Hollow's Bulb), Wrangler's (Nov 4, with Pen Pony; `pig`, his home's id) and Jefferson's (Nov 4, with Giraffe Gallop; `grex`,
+ * his home's id). Timber's
  * and Dash's (Nov 3) are shown and sold to admins only while they're in the game for admins first (BOSS_ADMIN_FIRST): only an admin
  * holds their tokens.
  */
@@ -361,6 +362,7 @@ export const BOSS_CRATES: readonly BossCrateDef[] = [
   bossCrate("dash", "Dash's Boss Crate", "cheetah-shoes"),
   bossCrate("hollow", "Hollow's Boss Crate", "hollow-bulb"),
   bossCrate("pig", "Wrangler's Boss Crate", "pen-pony"),
+  bossCrate("grex", "Jefferson's Boss Crate", "jefferson-giraffe"),
 ];
 
 export const bossCrateDef = (id: string) => BOSS_CRATES.find((c) => c.id === id);

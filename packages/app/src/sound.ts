@@ -795,6 +795,18 @@ export type SoundName =
   | "grexRoar"
   | "grexSmack"
   | "grexWhistle"
+  // (His challenge intro in his warehouse, Nov 4: his holler, a hoof's clop, the dozer's snort, your lift's hiss and clunk, the crates'
+  // creak and soft creak, the wipe's rocket, little pop and soft bang.)
+  | "grexShout"
+  | "grexStep"
+  | "grexSnort"
+  | "grexHiss"
+  | "grexClunk"
+  | "grexCreak"
+  | "grexCreakSoft"
+  | "grexRocket"
+  | "grexPopSoft"
+  | "grexBang"
   // Hollow (a raid boss, the Darkness boss): synthesised, see characters/hollow-sounds.ts.
   | "hollowHum"
   | "hollowCast"
@@ -1120,6 +1132,17 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   grexRoar: grex("roar"),
   grexSmack: grex("smack"),
   grexWhistle,
+  grexShout: grex("shout"),
+  // (Seven giraffes walking at once: each clop a little higher or lower.)
+  grexStep: (t) => buffer(grexSound("step", ctx!.sampleRate), t, 0.9 + 0.2 * Math.random()),
+  grexSnort: grex("snort"),
+  grexHiss: grex("hiss"),
+  grexClunk: grex("clunk"),
+  grexCreak: grex("creak"),
+  grexCreakSoft: grex("creakSoft"),
+  grexRocket: grex("rocket"),
+  grexPopSoft: grex("popSoft"),
+  grexBang: grex("bang"),
   hollowHum: hollow("hum"),
   hollowCast: hollow("cast"),
   hollowWhisper: hollow("whisper"),
@@ -1379,6 +1402,16 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   grexRoar: [["grex", "roar"]],
   grexSmack: [["grex", "smack"]],
   grexWhistle: [...WHISTLES, "sparkle" as const].map((w): BossSound => ["grex", w]),
+  grexShout: [["grex", "shout"]],
+  grexStep: [["grex", "step"]],
+  grexSnort: [["grex", "snort"]],
+  grexHiss: [["grex", "hiss"]],
+  grexClunk: [["grex", "clunk"]],
+  grexCreak: [["grex", "creak"]],
+  grexCreakSoft: [["grex", "creakSoft"]],
+  grexRocket: [["grex", "rocket"]],
+  grexPopSoft: [["grex", "popSoft"]],
+  grexBang: [["grex", "bang"]],
   hollowHum: [["hollow", "hum"]],
   hollowCast: [["hollow", "cast"]],
   hollowWhisper: [["hollow", "whisper"]],

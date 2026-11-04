@@ -150,9 +150,11 @@ test("a mouse window narrower than the frame (900 × 700) has the whole screen a
 });
 
 /**
- * Phones and tablets: the town's boxes are main's (5e70aeed), to the pixel, with the frame absent: each is the whole screen, the bar's
- * back button, title, chat icon and gear, the world, the zoom pair and the focus button, and the chat box. Measured on main the same way
- * (`devices["iPhone 13"]` with each window size: a touch screen, a tablet on its side included). The town animates, so boxes, not pixels.
+ * Phones and tablets: the town's boxes, with the frame absent: each is the whole screen, the bar's back button, title, chat icon and
+ * gear, the world, the arrow keys over the zoom pair and the focus button (Eric, Nov 4: the pair and the focus button 27 px and 57 px
+ * wide, 87 px together with the keys' width, right-aligned: town-arrow-keys-v3), and the chat box. The bar, the world and the chat box
+ * are main's (5e70aeed), to the pixel; the controls' boxes are the arrow keys' layout. Measured the same way (`devices["iPhone 13"]`
+ * with each window size: a touch screen, a tablet on its side included). The town animates, so boxes, not pixels.
  */
 const MAIN: Record<string, Record<keyof typeof PARTS, Box>> = {
   "390x844": {
@@ -164,9 +166,9 @@ const MAIN: Record<string, Record<keyof typeof PARTS, Box>> = {
     gear: [340, 7.5, 36, 36],
     box: [0, 52, 390, 792],
     canvas: [0, 52, 390, 792],
-    controls: [242, 794, 134, 36],
-    zoom: [242, 794, 88, 36],
-    focus: [340, 794, 36, 36],
+    controls: [289, 740, 87, 90],
+    zoom: [289, 803, 57, 27],
+    focus: [349, 803, 27, 27],
     chat: [8, 60, 249.4, 182.2],
   },
   "430x932": {
@@ -178,9 +180,9 @@ const MAIN: Record<string, Record<keyof typeof PARTS, Box>> = {
     gear: [380, 7.5, 36, 36],
     box: [0, 52, 430, 880],
     canvas: [0, 52, 430, 880],
-    controls: [282, 882, 134, 36],
-    zoom: [282, 882, 88, 36],
-    focus: [380, 882, 36, 36],
+    controls: [329, 828, 87, 90],
+    zoom: [329, 891, 57, 27],
+    focus: [389, 891, 27, 27],
     chat: [8, 60, 275.8, 202.4],
   },
   "768x1024": {
@@ -192,9 +194,9 @@ const MAIN: Record<string, Record<keyof typeof PARTS, Box>> = {
     gear: [718, 7.5, 36, 36],
     box: [0, 52, 768, 972],
     canvas: [0, 52, 768, 972],
-    controls: [620, 974, 134, 36],
-    zoom: [620, 974, 88, 36],
-    focus: [718, 974, 36, 36],
+    controls: [667, 920, 87, 90],
+    zoom: [667, 983, 57, 27],
+    focus: [727, 983, 27, 27],
     chat: [8, 60, 300, 223.5],
   },
   "1024x768": {
@@ -206,9 +208,9 @@ const MAIN: Record<string, Record<keyof typeof PARTS, Box>> = {
     gear: [974, 7.5, 36, 36],
     box: [0, 52, 1024, 716],
     canvas: [0, 52, 1024, 716],
-    controls: [876, 718, 134, 36],
-    zoom: [876, 718, 88, 36],
-    focus: [974, 718, 36, 36],
+    controls: [923, 664, 87, 90],
+    zoom: [923, 727, 57, 27],
+    focus: [983, 727, 27, 27],
     chat: [8, 60, 500, 340],
   }
 };
