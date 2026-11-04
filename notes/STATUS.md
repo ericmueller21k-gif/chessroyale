@@ -134,3 +134,4 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Jefferson ART DONE 0e4f6482 (16x16 floor, 7 crew + dealer). Jefferson CODE started (Opus high, /home/user/cr-jefferson claude/jefferson-home from 2437cc27, ports 8995/9495). #484 fix 0887b5ff (Timber over side menu OK), CI watcher bx4d6pi9m. #485 CI watcher bj6ktcn86.
 - #485 50v50 MERGED 5d17e6fa; deploy+main CI watcher running.
 - #484 bigger figures MERGED 8af7ee6a; deploy+main CI watcher running (main has #485 + #484 together now).
+- 50v50 LIVE (5d17e6fa 08:28). Main e2e after #485 RED: town.spec:348 Babur card centering (33/4.9 px: card read in 3 calls while it moves with the camera) → PR #486 (one-frame read), CI b94wgec9d; also home-polish:149 hop flaky (passed on retry; look later). #484 main CI watcher bnyzycpkp.
