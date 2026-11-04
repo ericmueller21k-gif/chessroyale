@@ -31,7 +31,7 @@ describe("the rides", () => {
   it("every ride item has a drawing and its measured views, and every drawing is a ride item, with the drawing's own name and line (Nov 1: every boss's)", () => {
     const rides = ITEM_DEFS.filter((d) => d.slot === "ride");
     expect(rides.map((d) => d.id).sort()).toEqual(
-      ["riding-chirp", "moon-ride", "hollow-bulb", "smudgy-brush", "alfil-howdah", "balloon-pup", "bigboy-buggy", "boingo-pogo", "folio-crane", "ginger-sled", "jefferson-giraffe", "puddles-mower", "sawyer-dozer", "rodeo-bull", "cheetah-shoes", "log-roller"].sort(),
+      ["riding-chirp", "moon-ride", "hollow-bulb", "smudgy-brush", "alfil-howdah", "balloon-pup", "bigboy-buggy", "boingo-pogo", "folio-crane", "ginger-sled", "jefferson-giraffe", "puddles-mower", "sawyer-dozer", "rodeo-bull", "cheetah-shoes", "log-roller", "pen-pony"].sort(),
     );
     expect(Object.keys(RIDES).sort()).toEqual(rides.map((d) => d.id).sort());
     expect(Object.keys(RIDE_CELLS).sort()).toEqual(rides.map((d) => d.id).sort());

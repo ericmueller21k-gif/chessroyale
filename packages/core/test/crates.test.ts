@@ -29,7 +29,7 @@ import {
 
 /** Items in no crate yet (Oct 31: the rides; admins have them, and their crate comes later). One by one, never a whole slot. */
 // (Every ride, Nov 1: admins only until their crate comes.)
-const NO_CRATE_YET = ["riding-chirp", "moon-ride", "hollow-bulb", "smudgy-brush", "alfil-howdah", "balloon-pup", "bigboy-buggy", "boingo-pogo", "folio-crane", "ginger-sled", "jefferson-giraffe", "puddles-mower", "sawyer-dozer", "rodeo-bull", "cheetah-shoes", "log-roller"];
+const NO_CRATE_YET = ["riding-chirp", "moon-ride", "hollow-bulb", "smudgy-brush", "alfil-howdah", "balloon-pup", "bigboy-buggy", "boingo-pogo", "folio-crane", "ginger-sled", "jefferson-giraffe", "puddles-mower", "sawyer-dozer", "rodeo-bull", "cheetah-shoes", "log-roller", "pen-pony"];
 
 const crate = crateDef("winter-1")!;
 const beta = crateDef("beta-001")!;
@@ -383,6 +383,7 @@ describe("rides (Oct 31)", () => {
       ["rodeo-bull", "Rodeo Bull", "mythic"],
       ["cheetah-shoes", "Cheetah Shoes", "mythic"],
       ["log-roller", "The Log Roller", "mythic"],
+      ["pen-pony", "Pen Pony", "mythic"],
     ]);
     for (const d of rides) {
       expect(CRATES.some((c) => c.items.includes(d.id)), d.id).toBe(false);

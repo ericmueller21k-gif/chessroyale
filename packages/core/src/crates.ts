@@ -165,6 +165,8 @@ export const ITEM_DEFS: readonly ItemDef[] = [
   { id: "rodeo-bull", name: "Rodeo Bull", tier: "mythic", slot: "ride", description: "Eight seconds is the record. He's never once let anyone off early." },
   { id: "cheetah-shoes", name: "Cheetah Shoes", tier: "mythic", slot: "ride", description: "Spotted, laced and twice as fast. Dash says the spots are just for show; the speed is not." },
   { id: "log-roller", name: "The Log Roller", tier: "mythic", slot: "ride", description: "Timber's favorite commute. Keep your feet moving and never, ever look down." },
+  // (Nov 4: Wrangler's, one of the pen knights in his barn, saddled; in his crate from the start. Its line is the drawing's.)
+  { id: "pen-pony", name: "Pen Pony", tier: "mythic", slot: "ride", description: "One of Wrangler's pen knights, saddled up. It won't go straight, but it hops like nobody's business." },
 ];
 
 export const itemDef = (id: string) => ITEM_DEFS.find((d) => d.id === id);
@@ -345,8 +347,8 @@ const bossCrate = (boss: string, name: string, ride: string): BossCrateDef => ({
 });
 
 /**
- * Every boss's crate (only those whose home has a shop so far: Babur's, Puddles', Alfil's, Big Boy's, Timber's, Dash's and, Nov 3,
- * Hollow's, with Hollow's Bulb). Timber's
+ * Every boss's crate (only those whose home has a shop so far: Babur's, Puddles', Alfil's, Big Boy's, Timber's, Dash's, Hollow's (Nov 3,
+ * with Hollow's Bulb) and Wrangler's (Nov 4, with Pen Pony; `pig`, his home's id). Timber's
  * and Dash's (Nov 3) are shown and sold to admins only while they're in the game for admins first (BOSS_ADMIN_FIRST): only an admin
  * holds their tokens.
  */
@@ -358,6 +360,7 @@ export const BOSS_CRATES: readonly BossCrateDef[] = [
   bossCrate("timber", "Timber's Boss Crate", "log-roller"),
   bossCrate("dash", "Dash's Boss Crate", "cheetah-shoes"),
   bossCrate("hollow", "Hollow's Boss Crate", "hollow-bulb"),
+  bossCrate("pig", "Wrangler's Boss Crate", "pen-pony"),
 ];
 
 export const bossCrateDef = (id: string) => BOSS_CRATES.find((c) => c.id === id);

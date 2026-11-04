@@ -30,7 +30,7 @@ import { TOWN_FEEL } from "../feel.ts";
 import { PARK_TABLE, TABLE_BOARD, TABLE_INK, TABLE_PIECES } from "../houses/park.ts";
 import { BOSS_ART } from "../render.ts";
 import type { HomeId } from "../world.ts";
-import { CHALLENGE_FEEL, DARK_MOVES, boardSquare, darkAnims, drainAt, drawnTop, frameAt, introBeats, introOf, stormEdge, wipeAt, type BossIntro, type DarkMove, type IntroAnims, type IntroBeat, type IntroLayout, type LogMove, LOG_MOVES, logAnims } from "./challenge.ts";
+import { CHALLENGE_FEEL, DARK_MOVES, ROPE_MOVES, boardSquare, darkAnims, drainAt, drawnTop, frameAt, introBeats, introOf, ropeAnims, stormEdge, wipeAt, type BossIntro, type DarkMove, type IntroAnims, type IntroBeat, type IntroLayout, type LogMove, type RopeMove, LOG_MOVES, logAnims } from "./challenge.ts";
 
 /**
  * A boss's intro art, as its file exports it: a pyramid that brings in its table (Alfil's), or toy blocks that are the table and its
@@ -41,15 +41,17 @@ type IntroArt =
       | { pyramid: Character; table: Character; blocks?: undefined; wood?: undefined }
       | { blocks: Character; pyramid?: undefined; table?: undefined; wood?: undefined }
       | { wood: WoodArt; table: Character; pyramid?: undefined; blocks?: undefined }
+      | { rope: typeof import("./pig-intro-art.ts"); table: Character; pyramid?: undefined; blocks?: undefined; wood?: undefined }
     ) & {
       dark?: undefined;
+      rope?: typeof import("./pig-intro-art.ts");
       /** The slab's keys "1" to "5" and the board's squares `L` / `D`. */
       palette: Readonly<Record<string, string>>;
       storm: Character;
       front: Character;
     })
   // Hollow's: the dark (his moves, the cave's lights going out, the motes); the park table; no storm (the dark is his transition).
-  | { dark: typeof import("./hollow-intro-art.ts"); pyramid?: undefined; blocks?: undefined; wood?: undefined; table?: undefined; palette?: undefined; storm?: undefined; front?: undefined };
+  | { dark: typeof import("./hollow-intro-art.ts"); rope?: undefined; pyramid?: undefined; blocks?: undefined; wood?: undefined; table?: undefined; palette?: undefined; storm?: undefined; front?: undefined };
 /** Timber's: his own moves (facing east), where the lying log and the standing one are from his foot (his pixels), the props. */
 interface WoodArt {
   mover: Character;
@@ -73,17 +75,23 @@ const ART: Partial<Record<HomeId, () => Promise<IntroArt>>> = {
       front: m.INTRO_TIMBER_FRONT,
     })),
   hollow: () => import("./hollow-intro-art.ts").then((m) => ({ dark: m })),
+  // (Wrangler's: his moves, the lasso's loop, the bale (his table: the barn's board stand), the buckets, his wipe; one chunk.)
+  pig: () => import("./pig-intro-art.ts").then((m) => ({ rope: m, table: m.INTRO_PIG_TABLE, palette: m.INTRO_PIG_TABLE_PALETTE, storm: m.INTRO_PIG_STORM, front: m.INTRO_PIG_FRONT })),
 };
 
 type PyramidAnim = "rise" | "idle" | "crack" | "crumble";
 type BlocksAnim = "build" | "plop" | "chairs" | "idle";
 
-/** The storm's frames, ready: each tile `stormScale` times its size, the front and the front mirrored, and each frame's ms. */
+/**
+ * The storm's frames, ready: each tile `stormScale` times its size, the front and the front mirrored, and each frame's ms; and the cues
+ * on its frames as it comes in (its first loop's, but "storm", which the storm's start plays: Wrangler's spurs' jingle and cap's pop).
+ */
 export interface StormArt {
   tiles: HTMLCanvasElement[];
   fronts: HTMLCanvasElement[];
   backs: HTMLCanvasElement[];
   ms: number[];
+  cues: { cue: string; at: number }[];
 }
 
 /** An intro ready to play: its timing, its frames, its boss. */
@@ -129,6 +137,26 @@ export interface LoadedIntro {
   attack: { ch: Character; frames: HTMLCanvasElement[]; ms: number[]; cues: (string | undefined)[]; sounds: Readonly<Record<string, SoundName>>; facesLeft: boolean; beat: typeof KING_ATTACK } | null;
   /** Hollow's dark (null: another's): his moves' frames, the cave's pieces going out, the motes; see DarkArt. */
   dark: DarkArt | null;
+  /** Wrangler's lasso (null: another's): his moves' frames, his ropes, the bale, the buckets; see RopeArt. */
+  rope: RopeArt | null;
+}
+
+/**
+ * Wrangler's lasso, ready (shops/pig-intro-art.ts; ShopRoom draws it): his moves' frames (BOSS_PIG_INTRO, at his town figure's
+ * pixels, as drawn: not mirrored) and where each rope leaves his fists on them (PIG_INTRO_HANDS, _HANDS2: his frame's pixels); the
+ * loop's frames and where its line meets it (INTRO_PIG_ROPE_KNOT); the bale's (INTRO_PIG_TABLE: its slab and board raised by
+ * INTRO_PIG_TABLE_LIFT); each bucket's, `b` the black (his, from our left) and `w` the white (yours, from our right), and where its
+ * handle's grip is (INTRO_PIG_BUCKET_HANDLE); the line's ink (INTRO_PIG_ROPE_INK). All at the room's scale but his.
+ */
+export interface RopeArt {
+  mover: { ch: Character; frames: Record<RopeMove, HTMLCanvasElement[]> };
+  hands: Readonly<Record<string, readonly (readonly [number, number] | null)[]>>;
+  hands2: Readonly<Record<string, readonly (readonly [number, number] | null)[]>>;
+  loop: { ch: Character; frames: Record<"fly" | "catch" | "cinched" | "free", HTMLCanvasElement[]>; knot: Readonly<Record<string, readonly (readonly [number, number])[]>> };
+  bale: { ch: Character; frames: Record<"idle" | "slide" | "land", HTMLCanvasElement[]>; lift: Readonly<Record<string, readonly number[]>> };
+  buckets: Record<"b" | "w", { ch: Character; frames: Record<"tumble" | "drop" | "stool", HTMLCanvasElement[]> }>;
+  handle: Readonly<Record<string, readonly (readonly [number, number])[]>>;
+  ink: { outline: string; dark: string; mid: string; light: string; width: number; twist: number; sag: number };
 }
 
 /** A picture's lit pixels alone (its lights' own pixels, to draw over the dark), cropped: drawn at (x, y) of its picture's pixels. */
@@ -209,8 +237,26 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
     let wood: LoadedIntro["wood"] = null;
     let storm: StormArt | null = null;
     let dark: DarkArt | null = null;
+    let rope: RopeArt | null = null;
     const all = <A extends string>(ch: Character, names: readonly A[]) => Object.fromEntries(names.map((a) => [a, ch.anims[a]!.frames.map((_, i) => toCanvas(ch, a, i))])) as Record<A, HTMLCanvasElement[]>;
-    if (art?.dark) {
+    if (art?.rope) {
+      const m = art.rope;
+      anims = ropeAnims({ mover: m.BOSS_PIG_INTRO, rope: m.INTRO_PIG_ROPE, table: m.INTRO_PIG_TABLE, bucket: m.INTRO_PIG_BUCKET_B, release: m.PIG_INTRO_RELEASE });
+      const bucket = (ch: Character) => {
+        const f = all(ch, ["tumble", "land", "stool"]);
+        return { ch, frames: { tumble: f.tumble, drop: f.land, stool: f.stool } };
+      };
+      rope = {
+        mover: { ch: m.BOSS_PIG_INTRO, frames: all(m.BOSS_PIG_INTRO, ROPE_MOVES) },
+        hands: m.PIG_INTRO_HANDS,
+        hands2: m.PIG_INTRO_HANDS2,
+        loop: { ch: m.INTRO_PIG_ROPE, frames: all(m.INTRO_PIG_ROPE, ["fly", "catch", "cinched", "free"]), knot: m.INTRO_PIG_ROPE_KNOT },
+        bale: { ch: m.INTRO_PIG_TABLE, frames: all(m.INTRO_PIG_TABLE, ["idle", "slide", "land"]), lift: m.INTRO_PIG_TABLE_LIFT },
+        buckets: { b: bucket(m.INTRO_PIG_BUCKET_B), w: bucket(m.INTRO_PIG_BUCKET_W) },
+        handle: m.INTRO_PIG_BUCKET_HANDLE,
+        ink: m.INTRO_PIG_ROPE_INK,
+      };
+    } else if (art?.dark) {
       const m = art.dark;
       anims = darkAnims({ mover: m.BOSS_HOLLOW_INTRO, lantern: m.INTRO_HOLLOW_LANTERN_OUT, tree: m.INTRO_HOLLOW_SHOWPIECE_OUT, glow: m.INTRO_HOLLOW_LANTERN_GLOW, run: m.INTRO_HOLLOW_BULB_RUN, dark: m.INTRO_HOLLOW_DARK, pool: m.INTRO_HOLLOW_DIMPOOL });
       dark = buildDark(m);
@@ -247,7 +293,14 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
     if (art?.storm) {
       const k = CHALLENGE_FEEL.stormScale;
       const stormFrames = art.storm.anims.idle!.frames;
+      let at = 0;
+      const stormCues: { cue: string; at: number }[] = [];
+      for (const f of stormFrames) {
+        if (f.cue && f.cue !== "storm") stormCues.push({ cue: f.cue, at });
+        at += Math.max(16, f.ms);
+      }
       storm = {
+        cues: stormCues,
         tiles: stormFrames.map((_, i) => scaled(toCanvas(art.storm, "idle", i), k)),
         fronts: art.front.anims.idle!.frames.map((_, i) => scaled(toCanvas(art.front, "idle", i), k)),
         backs: art.front.anims.idle!.frames.map((_, i) => scaled(toCanvas(art.front, "idle", i), k, true)),
@@ -293,6 +346,7 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
       storm,
       attack,
       dark,
+      rope,
     };
   });
   p.catch(() => loading.delete(home));
@@ -699,6 +753,8 @@ export function startStorm(intro: LoadedIntro): Storm {
   raf = requestAnimationFrame(frame);
   cv.dataset.phase = phase;
   playCue(intro, "storm");
+  // (Its frames' own cues as it sweeps in, once: Wrangler's spurs jingling and a toy cap's pop.)
+  for (const c of art.cues) setTimeout(() => playCue(intro, c.cue), c.at);
   // (The phases go by the clock, not by frames: a hidden tab still gets to the battle.)
   const covered = new Promise<void>((ok) =>
     setTimeout(() => {

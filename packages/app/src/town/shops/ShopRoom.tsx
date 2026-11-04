@@ -76,6 +76,8 @@ const ART: Partial<Record<HomeId, () => Promise<RoomArt>>> = {
   dash: () => import("./blitz-art.ts").then((m) => ({ layout: m.SHOP_BLITZ_LAYOUT, pieces: m.SHOP_BLITZ_PIECES, crateAt: m.SHOP_BLITZ_CRATE_AT, lights: m.SHOP_BLITZ_LIGHTS, pools: m.SHOP_BLITZ_POOLS, upright: ["showpiece"], marks: m.SHOP_BLITZ_MARKS })),
   // (A cave, not a box: walkable only on its floor's shape. The tree of presents, 3 x 2 squares, stands up whole at its foot.)
   hollow: () => import("./hollow-art.ts").then((m) => ({ layout: m.SHOP_HOLLOW_LAYOUT, pieces: m.SHOP_HOLLOW_PIECES, crateAt: m.SHOP_HOLLOW_CRATE_AT, lights: m.SHOP_HOLLOW_LIGHTS, pools: m.SHOP_HOLLOW_POOLS, upright: ["showpiece"], marks: m.SHOP_HOLLOW_MARKS, floor: m.SHOP_HOLLOW_FLOOR })),
+  // (A box barn. Its two pens of knights, 3 x 2 squares each, stand up whole at their foot; his red mat and your denim one are its marks.)
+  pig: () => import("./pig-art.ts").then((m) => ({ layout: m.SHOP_PIG_LAYOUT, pieces: m.SHOP_PIG_PIECES, crateAt: m.SHOP_PIG_CRATE_AT, lights: m.SHOP_PIG_LIGHTS, pools: m.SHOP_PIG_POOLS, upright: ["pen", "pen-b"], marks: m.SHOP_PIG_MARKS })),
 };
 
 /** A piece's frames, each drawn once into a canvas, and when each ends in its loop. */
@@ -851,6 +853,31 @@ function startRoom(
       }
       return;
     }
+    if (def.roof === "barn") {
+      // A barn's roof (as the mockup drew it): dark rafters running up to the ridge, planks between, two heavy cross beams.
+      const sky = rg.createLinearGradient(0, 0, 0, H * 0.45);
+      sky.addColorStop(0, "#1e120b");
+      sky.addColorStop(1, "#5a3a22");
+      rg.fillStyle = sky;
+      rg.fillRect(0, 0, W, H);
+      rg.strokeStyle = "#140c07";
+      rg.lineWidth = 6;
+      for (let i = -12; i <= 12; i++) {
+        rg.beginPath();
+        rg.moveTo(W / 2 + i * W * 0.05, -H * 0.5);
+        rg.lineTo(W / 2 + i * W * 0.18, H * 0.45);
+        rg.stroke();
+      }
+      rg.strokeStyle = "#2a190e";
+      rg.lineWidth = 10;
+      for (const y of [H * 0.08, H * 0.2]) {
+        rg.beginPath();
+        rg.moveTo(0, y);
+        rg.lineTo(W, y);
+        rg.stroke();
+      }
+      return;
+    }
     if (def.roof === "lodge") {
       // A lodge's ceiling (as the mockup drew it): dark planks between heavy beams running up to a point.
       const sky = rg.createLinearGradient(0, 0, 0, H * 0.45);
@@ -1064,15 +1091,17 @@ function startRoom(
     kidBox.on = false;
     if (!P(def.at[0], def.at[1])) return;
     const s = (kidSquares * pt.k) / sheet.h;
+    // (Raised onto the counter's top, `lift` of the room's pixels: Wrangler's rooster. His shadows there too.)
+    const fy = pt.y - ((def.lift ?? 0) * pt.k) / SQ;
     const x0 = pt.x - sheet.foot[0] * s;
-    const y0 = pt.y - sheet.foot[1] * s;
+    const y0 = fy - sheet.foot[1] * s;
     const t = now % kidEnds[kidEnds.length - 1]!;
     let i = 0;
     while (i < kidEnds.length - 1 && t >= kidEnds[i]!) i++;
-    shadows(pt.x, pt.y, pt.k, sheet.w * s * 0.6);
+    shadows(pt.x, fy, pt.k, sheet.w * s * 0.6);
     g.imageSmoothingEnabled = false;
     g.drawImage(loaded.kid.img, i * sheet.w, 0, sheet.w, sheet.h, x0, y0, sheet.w * s, sheet.h * s);
-    Object.assign(kidBox, { x0, y0, x1: x0 + sheet.w * s, y1: y0 + sheet.h * s, on: true, hx: pt.x, hy: pt.y - (sheet.foot[1] - sheet.top.idle) * s - 2 });
+    Object.assign(kidBox, { x0, y0, x1: x0 + sheet.w * s, y1: y0 + sheet.h * s, on: true, hx: pt.x, hy: fy - (sheet.foot[1] - sheet.top.idle) * s - 2 });
     // (A cave: the counter is round the bend, out of sight from the mouth, so the tag goes with him behind the rock nearer the camera,
     // drawn now, not over everything.)
     if (cave && !challenge) drawTag("Shopkeeper", "sidekick", kidBox.hx, kidBox.hy);
@@ -1785,7 +1814,8 @@ function startRoom(
     // drawn before the first piece nearer than them.
     you.pose(now, pose);
     figN = 0;
-    addFig(def.at[1], 0);
+    // (A Shopkeeper on the counter's top stands on its row: drawn just after the counter.)
+    addFig(def.at[1] + (def.lift ? 0.005 : 0), 0);
     // (In a challenge you're drawn a hair nearer than your row: in front of Timber's fog on the table's row, as of the boss.)
     addFig(pose.y + youOy(now) + (ci ? 0.002 : 0), 1);
     if (boss && marks) {

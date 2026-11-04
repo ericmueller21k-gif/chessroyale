@@ -29,6 +29,7 @@ const DRAWINGS: Readonly<Record<string, () => Promise<RiderDraft>>> = {
   "rodeo-bull": () => import("./rodeo-bull.tsx").then((m) => m.rodeoBull),
   "cheetah-shoes": () => import("./cheetah-shoes.tsx").then((m) => m.cheetahShoes),
   "log-roller": () => import("./log-roller.tsx").then((m) => m.logRoller),
+  "pen-pony": () => import("./pen-pony.tsx").then((m) => m.penPony),
 };
 
 /** Every ride's item id. */

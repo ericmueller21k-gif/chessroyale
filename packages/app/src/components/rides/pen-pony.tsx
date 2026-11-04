@@ -1,5 +1,6 @@
 // Copied as drawn from `claude/boss-art` (scripts/boss-art/out/ride-pen-pony/ride-pen-pony.tsx at 0e4c00c6, Nov 4: the side view, its front
-// and back views, its trail mark): only the import lines changed (the app's kit: ./kit.ts and ../item-paint.tsx). Notes: docs/areas/shop.md, "Rides".
+// and back views, its trail mark): only the import lines changed (the app's kit: ./kit.ts and ../item-paint.tsx) and its id
+// ("pen-pony", the item's, as every ride's drawing). Notes: docs/areas/shop.md, "Rides".
 /**
  * Pen Pony (id ride-pen-pony, mythic): the ride in Wrangler's Boss Crate. One of the chess knights from the pens in his barn
  * (out/house-shop-pig), saddled: a big knight piece (its carved horse's head and neck rising at the front of its round
@@ -432,7 +433,7 @@ function BasePrint({ f, view, n: k }: TrailProps): ComponentChildren {
 }
 
 export const penPony: RiderDraft = {
-  id: "ride-pen-pony",
+  id: "pen-pony",
   name: "Pen Pony",
   tier: "mythic",
   description: "One of Wrangler's pen knights, saddled up. It won't go straight, but it hops like nobody's business.",

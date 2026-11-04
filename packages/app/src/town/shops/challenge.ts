@@ -164,6 +164,40 @@ export const BOSS_INTROS: Readonly<Partial<Record<HomeId, BossIntro>>> = {
     // (Where he sits: his lash's feet clear of his stool, a tenth from it as every boss's, as when he swung it there; he walks on to it.)
     clear: 2.92,
   },
+  // (Nov 4: his own, Eric's design: the lasso, the hay bale with the board dragged to the middle, the buckets yanked in for the stools,
+  // and his wipe of spurs, tumbleweeds and cap guns; docs/decisions/2026-11-04-wrangler-home.md. His line a placeholder until Eric's
+  // Gemini lines. You both walk on straight to where you stand through it all, clear of the stools (the art's 7.2 and the usual
+  // 2.2 east): nobody moves when the bale and the buckets come in, nor after.)
+  pig: {
+    name: "Wrangler",
+    line: "Saddle up, partner. The board's comin' to us.",
+    layout: "across",
+    custom: true,
+    seated: true,
+    clear: 2.3,
+    // His cues, each a sound of his own (characters/pig-sounds.ts): the lasso whirling, thrown (twice at once for the cross throw),
+    // the loop slapping down on the bale and snapping taut, each yank, the bale's scrape across the straw, the thunk as it and each
+    // bucket land, the loop flicked free (his throw), the double lasso winding up, the buckets' clatter, his hat tip, his snorting
+    // laugh and snort, his spur stomp; and the wipe's spurs jingling and a toy cap's pop.
+    cues: {
+      whirl: "pigWhirl",
+      throw: "pigThrow",
+      catch: "pigCatch",
+      snap: "pigTug",
+      yank: "pigYank",
+      slide: "pigSlide",
+      thunk: "pigHop",
+      flick: "pigThrow",
+      windup: "pigWindup",
+      clatter: "pigClatter",
+      tip: "pigTip",
+      laugh: "pigLaugh",
+      snort: "pigSnort",
+      stomp: "pigStomp",
+      jingle: "pigJingle",
+      pop: "pigPop",
+    },
+  },
 };
 
 /** The boss's intro, or null: challenged as before (no intro yet). */
@@ -272,6 +306,21 @@ export const CHALLENGE_FEEL = {
    * (his `clear.boss`: a tenth further out than the others' 2.6, as his stump's roots spread wider than a stool).
    */
   log: { at: 3.3, lineLeadMs: 800, walkMs: 420, carryMs: 600, holdMs: 960, clear: 2.7 },
+  /**
+   * Wrangler's own (Nov 4; Eric's design: "he spins his lasso overhead, throws it at the corner, and yanks the hay bale with the board
+   * on it into the middle… Then he crosses his arms and throws two ropes at once, one each way, off screen. He yanks, and a white bucket
+   * and a black bucket come tumbling in from either side and land upside down as the stools"; the art's timeline, intro-pig-nov4.md).
+   * After his line he spins (`spinMs`); throws (his art's frames): the loop leaves his hand on the throw's release frame and flies to
+   * the bale on the board's stand over `flyMs`, `flyArc` squares up at its top; it drops over it and cinches (its frames); he yanks,
+   * and `yankLeadMs` in the bale slides to the table's place over `slideMs` (eased in and out, a curve whose control point is `bend`,
+   * a column and row: down the west side, swung east, behind him), and lands (its frames); `freeAfterMs` on, the loop is flicked free
+   * (its frames) and the line reels in to his hand over `reelMs`. The cross throw (his frames): both ropes fly out each way from its
+   * release frame over `offMs` (`offArc` squares up), to just off the screen's edges; on the double yank's first heave the buckets
+   * tumble in along the floor from there (`tumbleMs`, eased, `tumbleSouth` squares in front of the table's row, to the stools' places)
+   * and land upside down (their frames); the knots come untied and the ropes reel in (`reelMs`); his brag (his frames); his attack.
+   * About 12 s from the marks to the wipe.
+   */
+  rope: { spinMs: 1000, flyMs: 440, flyArc: 1.1, yankLeadMs: 100, slideMs: 1600, bend: [5, 9], freeAfterMs: 200, reelMs: 200, offMs: 400, offArc: 0.8, tumbleMs: 760, tumbleSouth: 0.4 },
   /**
    * Hollow's own (Nov 3; Eric's design: "the darkness ball in his belly powers up… It sucks in the light: the lanterns go out one by
    * one, the bulb string's lights are drawn in toward him, light from everything around, even from your own chest piece… Everything goes
@@ -589,21 +638,55 @@ export function darkAnims(w: {
     poolInMs: w.pool.inMs,
   };
 }
-/** A boss's own art's animations: a pyramid (Alfil's), toy blocks (Big Boy's), a log (Timber's) or the dark (Hollow's). */
-export type IntroAnims = PyramidAnims | BlocksAnims | LogAnims | DarkAnims;
+/** Wrangler's moves (characters/pig-intro.ts BOSS_PIG_INTRO): the spin, the throw, the yank, the cross throw, the double yank, the brag. */
+export const ROPE_MOVES = ["spin", "throw", "yank", "crossThrow", "doubleYank", "brag"] as const;
+export type RopeMove = (typeof ROPE_MOVES)[number];
+/** His props' animations (shops/pig-intro-art.ts): the loop's flight, catch and flick free; the bale's slide and landing; a bucket's tumble and its landing (`drop`). */
+export const ROPE_GEAR = ["fly", "catch", "free", "slide", "land", "tumble", "drop"] as const;
+export type RopeGear = (typeof ROPE_GEAR)[number];
+/**
+ * Wrangler's lasso (Nov 4; CHALLENGE_FEEL.rope): each frame's ms and cue (the art's) for his moves and his props', and the frame each
+ * throw's rope leaves his sprite and becomes the code's (PIG_INTRO_RELEASE).
+ */
+export interface RopeAnims {
+  moves: { readonly [m in RopeMove]: readonly number[] };
+  gear: { readonly [g in RopeGear]: readonly number[] };
+  cues: { readonly [k in RopeMove | RopeGear]: readonly (string | undefined)[] };
+  release: { readonly throw: number; readonly crossThrow: number };
+}
+/** Wrangler's RopeAnims from his art (shops/pig-intro-art.ts): his moves, the loop, the bale (the table) and a bucket. */
+export function ropeAnims(w: { mover: ArtLike; rope: ArtLike; table: ArtLike; bucket: ArtLike; release: { throw: number; crossThrow: number } }): RopeAnims {
+  const fr = (ch: ArtLike, a: string) => ch.anims[a]!.frames;
+  const of = <K extends string, T>(keys: readonly K[], get: (k: K) => T) => Object.fromEntries(keys.map((k) => [k, get(k)])) as Record<K, T>;
+  const gearOf = (g: RopeGear): readonly { ms: number; cue?: string }[] =>
+    g === "fly" || g === "catch" || g === "free" ? fr(w.rope, g) : g === "slide" || g === "land" ? fr(w.table, g) : fr(w.bucket, g === "tumble" ? "tumble" : "land");
+  return {
+    moves: of(ROPE_MOVES, (m) => fr(w.mover, m).map((f) => f.ms)),
+    gear: of(ROPE_GEAR, (g) => gearOf(g).map((f) => f.ms)),
+    cues: { ...of(ROPE_MOVES, (m) => fr(w.mover, m).map((f) => f.cue)), ...of(ROPE_GEAR, (g) => gearOf(g).map((f) => f.cue)) },
+    release: w.release,
+  };
+}
+/** A boss's own art's animations: a pyramid (Alfil's), toy blocks (Big Boy's), a log (Timber's), the dark (Hollow's) or the lasso (Wrangler's). */
+export type IntroAnims = PyramidAnims | BlocksAnims | LogAnims | DarkAnims | RopeAnims;
 export const isBlocks = (a: IntroAnims): a is BlocksAnims => "build" in a;
 export const isLog = (a: IntroAnims): a is LogAnims => "props" in a;
 export const isDark = (a: IntroAnims): a is DarkAnims => "gutter" in a;
+export const isRope = (a: IntroAnims): a is RopeAnims => "release" in a;
 /**
  * The intro's steps. Timber's own (a log): "toLog" (he walks west to it, his line still over his head), "lift", "carry" (to the middle),
  * "setDown", "gnaw", the shavings' "rise", "hold" (the table and stumps swap in under it) and "settle", the stumps' "pop", "dust" (his
  * `done`: he dusts off his paws) and "toMark" (he walks to where he swings). Hollow's own (the dark): after the table, "charge",
  * "swell", "drink" (the drain), "full", "blackout", "black", "dim" (the dim light, his settle) and "iris" (the pool closing on the board).
+ * Wrangler's own (the lasso): after the line, "spin", "throw", "catch" (the loop flying to the bale and cinching), "drag" (the yank and the
+ * bale's slide), "land" (it lands; the loop flicked free, the line reeled in), "cross" (the cross throw), "haul" (the double yank), "stools"
+ * (the buckets tumbling in and landing, the ropes reeled in) and "brag", then the attack.
  */
 export type IntroStep =
   | "face" | "line" | "pause" | "rise" | "idle" | "crack" | "crumble" | "build" | "drop" | "plop" | "chairs" | "pop" | "table" | "swing" | "done"
   | "toLog" | "lift" | "carry" | "setDown" | "gnaw" | "hold" | "settle" | "dust" | "toMark"
-  | "charge" | "swell" | "drink" | "full" | "blackout" | "black" | "dim" | "iris";
+  | "charge" | "swell" | "drink" | "full" | "blackout" | "black" | "dim" | "iris"
+  | "spin" | "throw" | "catch" | "drag" | "land" | "cross" | "haul" | "stools" | "brag";
 export interface IntroBeat {
   step: IntroStep;
   at: number;
@@ -612,7 +695,7 @@ export interface IntroBeat {
 const sum = (ms: readonly number[]) => ms.reduce((a, b) => a + b, 0);
 type BeatFeel = Pick<
   typeof CHALLENGE_FEEL,
-  "faceMs" | "lineMs" | "afterLineMs" | "holdMs" | "gapMs" | "tableHoldMs" | "boardDropMs" | "popMs" | "swingMs" | "stormInMs" | "flashMs" | "wipeMs" | "log" | "standOff" | "clear" | "dark"
+  "faceMs" | "lineMs" | "afterLineMs" | "holdMs" | "gapMs" | "tableHoldMs" | "boardDropMs" | "popMs" | "swingMs" | "stormInMs" | "flashMs" | "wipeMs" | "log" | "standOff" | "clear" | "dark" | "rope"
 >;
 /** Hollow's drain, ms from the drink's start (CHALLENGE_FEEL.dark.drain as drawn, every gap times `pace`). */
 export function drainAt(feel: Pick<typeof CHALLENGE_FEEL, "dark"> = CHALLENGE_FEEL) {
@@ -658,6 +741,27 @@ export function introBeats(a: IntroAnims | null, feel: BeatFeel = CHALLENGE_FEEL
     t += ms;
   };
   add("face", feel.faceMs);
+  if (a && isRope(a)) {
+    // Wrangler's own: his line; the spin; the throw (the loop flies from its release frame and cinches round the bale); the yank and
+    // the drag; the bale lands, the loop flicked free and reeled in; the cross throw; the double yank, the buckets tumbling in on its
+    // first heave and landing as the stools, the ropes reeled in; his brag; the attack. (No pause after the line: the art's 2.8 s.)
+    const R = feel.rope;
+    const M = a.moves;
+    const G = a.gear;
+    add("line", feel.lineMs);
+    add("spin", R.spinMs);
+    add("throw", sum(M.throw));
+    add("catch", sum(M.throw.slice(0, a.release.throw)) + R.flyMs + sum(G.catch) - sum(M.throw));
+    add("drag", R.yankLeadMs + R.slideMs);
+    add("land", R.freeAfterMs + sum(G.free) + R.reelMs);
+    add("cross", sum(M.crossThrow));
+    add("haul", sum(M.doubleYank));
+    add("stools", M.doubleYank[0]! + R.tumbleMs + sum(G.drop) + R.reelMs - sum(M.doubleYank));
+    add("brag", sum(M.brag));
+    add("swing", Math.max(0, feel.swingMs - coverMs(true, feel)));
+    out.push({ step: "done", at: t, end: Infinity });
+    return out;
+  }
   if (a && isDark(a)) {
     // Hollow's own: his line, a pause, the table pops in while it's still lit and stands a beat; then the ball charges, swells and
     // drinks the light; full; the blackout, the black; the dim light; the iris to the board. (No attack: the dark is his transition.)
@@ -767,6 +871,97 @@ export interface IntroNow {
   chant: boolean;
   /** Hollow's own intro (the dark): what the light and he do now; null for every other intro. */
   dark: DarkNow | null;
+  /** Wrangler's own intro (the lasso): what he, his ropes, the bale and the buckets do now; null for every other intro. */
+  rope: RopeNow | null;
+}
+/**
+ * Wrangler's intro `t` ms in (CHALLENGE_FEEL.rope): his move, his ropes, the bale with the board and the buckets. Nobody walks: he and
+ * you stand where you walked on to, clear of the stools, from the start to the end.
+ */
+export interface RopeNow {
+  /** His own move and frame (BOSS_PIG_INTRO, as drawn: not mirrored), or null: his idle (his town figure's frames, as drawn). */
+  move: { anim: RopeMove; frame: number } | null;
+  /** The lasso's loop: flying to the bale (`u` 0 his hand to 1 the bale), dropping over it, cinched round it, flicked free; null: none. */
+  lasso: { anim: "fly" | "catch" | "cinched" | "free"; frame: number; u: number } | null;
+  /** The loop's line reeling in to his hand once it's free (0 to 1); -1: none. */
+  reel: number;
+  /** The bale with the board (null: not yet: the room's own board stand stands there): `u` along its drag (0 the stand, 1 the table's place), its animation and frame. */
+  bale: { u: number; anim: "idle" | "slide" | "land"; frame: number } | null;
+  /** The two ropes thrown out each way: how far out (0 to 1), or -1: not thrown (or reeled in). */
+  out: number;
+  /** The buckets: `u` along their tumble (0 just off the screen's edge, 1 at the stools' places), their animation and frame; null: not yet. */
+  buckets: { u: number; anim: "tumble" | "drop" | "stool"; frame: number } | null;
+  /** The ropes on the buckets' handles (tied, until their knots come untied as they land), then reeling in (0 to 1); -1: none. */
+  tied: boolean;
+  reel2: number;
+}
+/** Wrangler's intro `t` ms in (his beats, `introBeats`): see RopeNow. */
+export function ropeAt(beats: readonly IntroBeat[], a: RopeAnims, t: number, feel: Pick<typeof CHALLENGE_FEEL, "rope"> = CHALLENGE_FEEL): RopeNow {
+  const R = feel.rope;
+  const M = a.moves;
+  const G = a.gear;
+  const at = (s: IntroStep) => stepAt(beats, s);
+  const me = (anim: RopeMove, ms: number, loop: boolean) => ({ anim, frame: frameAt(M[anim], ms, loop) });
+  let move: RopeNow["move"] = null;
+  if (t >= at("spin") && t < at("throw")) move = me("spin", t - at("spin"), true);
+  else if (t >= at("throw") && t < at("drag")) move = me("throw", t - at("throw"), false);
+  else if (t >= at("drag") && t < at("land")) move = me("yank", t - at("drag"), true);
+  else if (t >= at("cross") && t < at("haul")) move = me("crossThrow", t - at("cross"), false);
+  else if (t >= at("haul") && t < at("brag")) move = me("doubleYank", t - at("haul"), false);
+  else if (t >= at("brag") && t < at("swing")) move = me("brag", t - at("brag"), false);
+  // The loop: from its release, flying; on the bale, its catch; cinched through the drag; flicked free; its line reeled in.
+  const fly = ropeTimes(beats, a, feel);
+  let lasso: RopeNow["lasso"] = null;
+  if (t >= fly.release && t < fly.arrive) lasso = { anim: "fly", frame: frameAt(G.fly, t - fly.release, true), u: (t - fly.release) / R.flyMs };
+  else if (t >= fly.arrive && t < fly.arrive + sum(G.catch)) lasso = { anim: "catch", frame: frameAt(G.catch, t - fly.arrive, false), u: 1 };
+  else if (t >= fly.arrive && t < fly.free) lasso = { anim: "cinched", frame: 0, u: 1 };
+  else if (t >= fly.free && t < fly.freed) lasso = { anim: "free", frame: frameAt(G.free, t - fly.free, false), u: 1 };
+  const reel = t >= fly.freed && t < fly.freed + R.reelMs ? (t - fly.freed) / R.reelMs : -1;
+  // The bale: at the stand from the yank (the room's own hidden), sliding, landing in the middle, standing there.
+  let bale: RopeNow["bale"] = null;
+  if (t >= at("drag")) {
+    if (t < fly.slide) bale = { u: 0, anim: "idle", frame: 0 };
+    else if (t < at("land")) bale = { u: smooth(ramp(t, fly.slide, R.slideMs)), anim: "slide", frame: frameAt(G.slide, t - fly.slide, true) };
+    else if (t < at("land") + sum(G.land)) bale = { u: 1, anim: "land", frame: frameAt(G.land, t - at("land"), false) };
+    else bale = { u: 1, anim: "idle", frame: 0 };
+  }
+  // The ropes out each way, the buckets tumbling in on them and landing upside down, the knots untied, the ropes reeled in.
+  const out = t < fly.out ? -1 : t < fly.untie + R.reelMs ? ramp(t, fly.out, R.offMs) : -1;
+  let buckets: RopeNow["buckets"] = null;
+  if (t >= fly.tumble) {
+    if (t < fly.land) buckets = { u: smooth(ramp(t, fly.tumble, R.tumbleMs)), anim: "tumble", frame: frameAt(G.tumble, t - fly.tumble, true) };
+    else if (t < fly.land + sum(G.drop)) buckets = { u: 1, anim: "drop", frame: frameAt(G.drop, t - fly.land, false) };
+    else buckets = { u: 1, anim: "stool", frame: 0 };
+  }
+  return { move, lasso, reel, bale, out, buckets, tied: t >= fly.out && t < fly.untie, reel2: t >= fly.untie && t < fly.untie + R.reelMs ? (t - fly.untie) / R.reelMs : -1 };
+}
+/**
+ * When things happen in Wrangler's intro (ms in): the loop leaves his hand (`release`), lands on the bale (`arrive`), the bale starts
+ * sliding (`slide`), the loop's flicked free (`free`, `freed` once its frames are done); the ropes fly out (`out`), the buckets start
+ * tumbling in (`tumble`: the double yank's first heave), land (`land`) and come untied (`untie`: the knot gone from their landing's
+ * third frame).
+ */
+export function ropeTimes(beats: readonly IntroBeat[], a: RopeAnims, feel: Pick<typeof CHALLENGE_FEEL, "rope"> = CHALLENGE_FEEL) {
+  const R = feel.rope;
+  const M = a.moves;
+  const G = a.gear;
+  const at = (s: IntroStep) => stepAt(beats, s);
+  const release = at("throw") + sum(M.throw.slice(0, a.release.throw));
+  const arrive = release + R.flyMs;
+  const free = at("land") + R.freeAfterMs;
+  const tumble = at("haul") + M.doubleYank[0]!;
+  const land = tumble + R.tumbleMs;
+  return {
+    release,
+    arrive,
+    slide: at("drag") + R.yankLeadMs,
+    free,
+    freed: free + sum(G.free),
+    out: at("cross") + sum(M.crossThrow.slice(0, a.release.crossThrow)),
+    tumble,
+    land,
+    untie: land + sum(G.drop.slice(0, 2)),
+  };
 }
 /**
  * Hollow's intro `t` ms in: what he plays and what the light does (CHALLENGE_FEEL.dark; the art's INTRO_HOLLOW_DARK and _DIMPOOL).
@@ -885,8 +1080,8 @@ const easeOutBack = (u: number) => 1 + 2.2 * (u - 1) ** 3 + 1.2 * (u - 1) ** 2;
  * starting to drop; Alfil's table showing through the crumble).
  */
 export function hopStart(beats: readonly IntroBeat[], a: IntroAnims | null): number {
-  // (Hollow's: you walked on to your seats; nothing to hop back from.)
-  if (a && isDark(a)) return Infinity;
+  // (Hollow's and Wrangler's: you walked on to your seats, or clear of them; nothing to hop back from.)
+  if (a && (isDark(a) || isRope(a))) return Infinity;
   if (!a || isLog(a)) return stepAt(beats, "pop");
   if (isBlocks(a)) return stepAt(beats, "chairs");
   return stepAt(beats, "crumble") + sum(a.crumble.slice(0, a.tableFrame));
@@ -928,10 +1123,15 @@ export function woodAt(beats: readonly IntroBeat[], a: LogAnims, t: number): Woo
   if (t < at("swing").at) return { ...stand, move: me("walk", frameAt(a.moves.walk, t - at("toMark").at, true), true), from: "stepped", to: "clear", u: u("toMark") };
   return { ...stand, move: null, from: "clear", to: "clear", u: 0 };
 }
-export function introAt(beats: readonly IntroBeat[], a: IntroAnims | null, t: number, feel: Pick<typeof CHALLENGE_FEEL, "popMs" | "puffMs" | "dropFrom" | "hopMs" | "lineMs" | "dark"> = CHALLENGE_FEEL): IntroNow {
+export function introAt(beats: readonly IntroBeat[], a: IntroAnims | null, t: number, feel: Pick<typeof CHALLENGE_FEEL, "popMs" | "puffMs" | "dropFrom" | "hopMs" | "lineMs" | "dark" | "rope"> = CHALLENGE_FEEL): IntroNow {
   const b = beats.find((x) => t < x.end) ?? beats[beats.length - 1]!;
   const h = Math.min(1, Math.max(0, (t - hopStart(beats, a)) / feel.hopMs));
-  const base = { step: b.step, pyramid: null, blocks: null, drop: 0, drift: false, pop: 1, puff: -1, line: b.step === "line", back: h * h * (3 - 2 * h), hop: h > 0 && h < 1 ? Math.sin(Math.PI * h) : 0, wood: null, chant: false, dark: null };
+  const base = { step: b.step, pyramid: null, blocks: null, drop: 0, drift: false, pop: 1, puff: -1, line: b.step === "line", back: h * h * (3 - 2 * h), hop: h > 0 && h < 1 ? Math.sin(Math.PI * h) : 0, wood: null, chant: false, dark: null, rope: null };
+  if (a && isRope(a)) {
+    // (Wrangler's: the table in its place once the bale lands; the stools once the buckets have.)
+    const T = ropeTimes(beats, a);
+    return { ...base, rope: ropeAt(beats, a, t), table: t >= stepAt(beats, "land"), stools: t >= T.land };
+  }
   if (a && isLog(a)) {
     // (Timber's line stays its `lineMs` from its beat's start, over his head as he sets off for the log.)
     const line = stepAt(beats, "line");
@@ -983,6 +1183,7 @@ export function introCues(beats: readonly IntroBeat[], a: IntroAnims | null): { 
   const at = (s: IntroStep) => stepAt(beats, s);
   if (!a) return [{ cue: "table", at: at("pop") }];
   if (isDark(a)) return darkCues(beats, a);
+  if (isRope(a)) return ropeCues(beats, a);
   if (isLog(a)) {
     // (Timber's: each move's and prop's own cues on their frames, through their beats: looping ones over and over to its end.)
     const out: { cue: string; at: number }[] = [];
@@ -1032,6 +1233,47 @@ export function introCues(beats: readonly IntroBeat[], a: IntroAnims | null): { 
     { cue: "crumble", at: at("crumble") },
     { cue: "table", at: at("crumble") + sum(a.crumble.slice(0, a.tableFrame)) },
   ];
+}
+
+/**
+ * Wrangler's cues, and when (his intro's beats; CHALLENGE_FEEL.rope): his moves' own on their frames (the spin's whirl each loop, the
+ * throw, the yank's heaves each loop, the cross throw's wind-up and its two throws a hair apart, the double yank's heaves, the brag's
+ * whirl, tip, laugh, snort and stomp); the loop's catch and snap, and its flick free; the bale's scrape each slide loop and its thunk;
+ * the buckets' clatter as they tumble and land, and their thunk (both buckets as one: they tumble in step).
+ */
+export function ropeCues(beats: readonly IntroBeat[], a: RopeAnims, feel: Pick<typeof CHALLENGE_FEEL, "rope"> = CHALLENGE_FEEL): { cue: string; at: number }[] {
+  const at = (s: IntroStep) => stepAt(beats, s);
+  const out: { cue: string; at: number }[] = [];
+  const play = (ms: readonly number[], cues: readonly (string | undefined)[], from: number, to: number, loop: boolean) => {
+    if (sum(ms) <= 0) return;
+    let t = from;
+    for (let i = 0; t < to; i = (i + 1) % ms.length) {
+      const cue = cues[i];
+      if (cue) out.push({ cue, at: t });
+      t += ms[i]!;
+      if (!loop && i === ms.length - 1) break;
+    }
+  };
+  const M = a.moves;
+  const G = a.gear;
+  const C = a.cues;
+  const T = ropeTimes(beats, a, feel);
+  play(M.spin, C.spin, at("spin"), at("throw"), true);
+  play(M.throw, C.throw, at("throw"), at("drag"), false);
+  play(G.catch, C.catch, T.arrive, at("drag"), false);
+  play(M.yank, C.yank, at("drag"), at("land"), true);
+  play(G.slide, C.slide, T.slide, at("land"), true);
+  play(G.land, C.land, at("land"), at("cross"), false);
+  play(G.free, C.free, T.free, at("cross"), false);
+  play(M.crossThrow, C.crossThrow, at("cross"), at("haul"), false);
+  // (Two ropes thrown at once: the second throw's whoosh a hair after the first.)
+  const second = out.filter((c) => c.cue === "throw" && c.at >= at("cross")).map((c) => ({ cue: "throw", at: c.at + 40 }));
+  out.push(...second);
+  play(M.doubleYank, C.doubleYank, at("haul"), at("stools"), false);
+  play(G.tumble, C.tumble, T.tumble, T.land, true);
+  play(G.drop, C.drop, T.land, at("brag"), false);
+  play(M.brag, C.brag, at("brag"), at("swing"), false);
+  return out.sort((x, y) => x.at - y.at);
 }
 
 /**
