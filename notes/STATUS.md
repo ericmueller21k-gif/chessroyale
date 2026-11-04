@@ -126,3 +126,4 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Eric chose arrow keys A, ~37% smaller, right edge aligned with recenter. Brief brief-town-arrow-keys.md (+ assets/town-arrow-keys.png). Queue: Wrangler code → bigger figures → 50v50 → arrow keys.
 - Wrangler code DONE 6edc3e5d → PR #483 (full-e2e), CI watcher b2b7bfz38; merge on green, tell Eric live. Killed stuck wrangler dev on 8981 (Eric standing OK). Open for Eric: his lash crosses his bucket during his God King attack (kept); he stands at 2.6 not 7.2.
 - Bigger-figures round STARTED (resumed battlefix helper, branch claude/bigger-side-figures, ports 8985/9485), alongside nothing else Opus. Then 50v50, then arrow keys (+ shrink zoom/recenter, v3 sketch pending Eric OK).
+- #483 Wrangler MERGED 2437cc27 (CI fix: profile ride count 16→17, mine). Deploy watcher running; tell Eric LIVE.
