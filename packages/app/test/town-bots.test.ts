@@ -90,10 +90,11 @@ describe("town square: the bots (Oct 27)", () => {
     // id is the art's, "sidekick-beaver". Tick, Dash's tortoise, baked too since Nov 3: blitz.ts, the art's name from before Eric
     // renamed the cheetah; he walks in an admin's town and keeps Dash's shop since round 2. Hollow's dog, Nov 3: hollowdog.ts, the
     // art's id "sidekick-hollow-dog"; he keeps Hollow's shop and isn't a town bot. Wrangler's rooster, Nov 4: rooster.ts, the art's id
-    // "sidekick-pig-rooster"; he keeps Wrangler's shop and isn't a town bot either.)
+    // "sidekick-pig-rooster"; he keeps Wrangler's shop and isn't a town bot either. Jefferson's dealer, Nov 4: dealer.ts, the art's id
+    // "sidekick-grex-dealer"; he keeps Jefferson's shop, not a town bot.)
     const files = readdirSync(new URL("../src/characters/sidekicks/", import.meta.url)).filter((f) => f.endsWith(".ts"));
-    expect(files).toHaveLength(18);
-    const artId: Record<string, string> = { timber: "sidekick-beaver", hollowdog: "sidekick-hollow-dog", rooster: "sidekick-pig-rooster" };
+    expect(files).toHaveLength(19);
+    const artId: Record<string, string> = { timber: "sidekick-beaver", hollowdog: "sidekick-hollow-dog", rooster: "sidekick-pig-rooster", dealer: "sidekick-grex-dealer" };
     for (const file of files) {
       const name = file.replace(/\.ts$/, "") as keyof typeof SIDEKICK_SHEETS;
       const mod = (await import(`../src/characters/sidekicks/${file}`)) as Record<string, unknown>;

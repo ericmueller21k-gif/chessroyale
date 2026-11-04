@@ -472,6 +472,93 @@ test("challenging Wrangler in the town: his own intro (in to where you stand, hi
   expect(errors).toEqual([]);
 });
 
+test("challenging Jefferson in the town: his own intro (in to your marks, one of his calls, he hollers, the crew stop and come round the table to watch, your lift raises you level with the board, his brag, his attack, his wipe of sparklers and fireworks), the battle; Leave back where you stood", async ({ page }) => {
+  test.setTimeout(240_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  const project = test.info().project.name;
+  if (SHOTS) mkdirSync(SHOTS, { recursive: true });
+  const shot = async (name: string) => SHOTS && (await page.screenshot({ path: `${SHOTS}/${name}-${project}.png` }));
+  type Fig = { name: string; anim: string; at: [number, number]; flip: boolean; up: number };
+  type Crew = { move: string | null; stopped: number; walk: number; lift: string; plate: number; table: string; tableAt: [number, number]; figs: Fig[] };
+  const crewOf = (i: Intro | null) => (i as unknown as { crew: Crew | null } | null)?.crew ?? null;
+  const lineOf = (i: Intro | null) => (i as unknown as { lineText: string | null } | null)?.lineText ?? null;
+  // (Jefferson is live for everyone: a player's town. Nov 4: his own intro, Eric's design.)
+  await page.goto("/town?sky=day");
+  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  const { confirm, stood } = await toConfirm(page, "grex", "Jefferson");
+  await confirm.getByRole("button", { name: "Fight" }).click();
+  // In at the warehouse's door, to the marks: his red plate west of the board on its crates, your lift's plate east; you stand there
+  // through it all (he stands: no stool).
+  await expect(room(page)).toHaveAttribute("data-room", "grex", { timeout: 20_000 });
+  await expect(page.getByRole("heading", { name: "Jefferson's Fireworks" })).toBeVisible();
+  const step = async () => (await intro(page))?.step ?? "";
+  const marks = [11, 10.5, 8, 10.5];
+  const where = (i: Intro) => [i.you[0], i.you[1], i.boss[0], i.boss[1]].map((v) => Math.round(v * 100) / 100);
+  const looks: Intro[] = [];
+  const look = async () => {
+    const i = (await intro(page))!;
+    looks.push(i);
+    return i;
+  };
+  await expect.poll(step, { message: "his line", timeout: 20_000, intervals: [50] }).toBe("line");
+  const atLine = await look();
+  expect(atLine.layout).toBe("across");
+  expect(where(atLine)).toEqual(marks);
+  expect(atLine.line).toBe(true);
+  // One of his four calls (placeholders until Eric's Gemini lines), in the big bubble.
+  expect(["Boys! We got a challenger!", "Take five, everybody. We're playing chess.", "Who wants a fifteen-minute break?", "Forks down, boys. Somebody wants a game."]).toContain(lineOf(atLine));
+  // The board on its crates is there from the start, where the room's stood; your lift flush with the floor; the crew at work.
+  expect(crewOf(atLine)).toMatchObject({ move: null, stopped: -1, lift: "flush", plate: 0, tableAt: [9.5, 10.514] });
+  expect(atLine.table).toBe(true);
+  expect(atLine.stools).toEqual([]);
+  await shot("jefferson-start");
+  // He hollers; the crew stop work (the machines park, their guys step off, the dozer wakes); he waves them over.
+  await expect.poll(async () => crewOf(await look())?.move, { message: "he hollers", intervals: [30] }).toBe("call");
+  await expect.poll(async () => (crewOf(await look())?.stopped ?? -1) >= 0, { message: "the crew stop", intervals: [30] }).toBe(true);
+  await expect.poll(async () => crewOf(await look())?.move, { message: "he waves them over", intervals: [30] }).toBe("waveOver");
+  await expect.poll(async () => (crewOf(await look())?.figs ?? []).filter((f) => f.anim === "walk").length, { message: "they walk over", intervals: [30] }).toBeGreaterThan(2);
+  // By the time your lift rises they're all round the table, watching (the dealer his idle), the machines parked where they stopped.
+  await expect.poll(async () => crewOf(await look())?.lift, { message: "your lift rises", timeout: 15_000, intervals: [30] }).toBe("rise");
+  await expect.poll(async () => crewOf(await look())?.lift, { message: "it locks at the top", intervals: [30] }).toBe("up");
+  await expect.poll(async () => crewOf(await look())?.table, { message: "the crates creak as it locks", intervals: [30] }).toBe("creak");
+  const ring = crewOf(await look())!;
+  expect(ring.plate, "level with the board: its slab 59 px up, 27 over your feet").toBe(32);
+  const spot = (n: string) => ring.figs.filter((f) => f.name === n);
+  for (const n of ["lift-guy", "fork-guy", "leaner-a", "leaner-b", "crew-c", "crew-d"]) expect(spot(n).map((f) => f.anim), n).toEqual(["watch"]);
+  expect(spot("dealer").map((f) => f.anim)).toEqual(["idle"]);
+  expect(spot("lift").map((f) => f.anim)).toEqual(["parked"]);
+  expect(spot("forklift").map((f) => f.anim)).toEqual(["parked"]);
+  // Every one of them behind the table (north of it, of him and of you).
+  for (const f of ring.figs.filter((x) => !["lift", "forklift", "pallet"].includes(x.name))) expect(f.at[1], f.name).toBeLessThan(10.5);
+  await shot("jefferson-ring");
+  // His brag (you up on your lift), then his attack swung in place before the wipe.
+  await expect.poll(async () => crewOf(await look())?.move, { message: "his brag", intervals: [30] }).toBe("brag");
+  await shot("jefferson-lifted");
+  await expect.poll(step, { message: "he swings", intervals: [30] }).toBe("swing");
+  expect(await look()).toMatchObject({ attack: true, line: false, table: true });
+  // Nobody of you two moved, from the line to the swing; you stayed up on your lift from the lock on.
+  for (const i of looks) expect(where(i), `at ${i.step}: where you stand`).toEqual(marks);
+  const locked = looks.findIndex((i) => crewOf(i)?.lift === "up");
+  for (const i of looks.slice(locked)) expect(crewOf(i)?.plate, `at ${i.step}`).toBe(32);
+  // His wipe (sparklers and fireworks) sweeps in over the warehouse, the battle loads under it, and it slides off the board.
+  await expect(storm(page)).toHaveCount(1, { timeout: 10_000 });
+  await expect(storm(page)).toHaveAttribute("data-boss", "grex");
+  await page.waitForTimeout(350);
+  await shot("jefferson-wipe");
+  await expect(page.locator(BOARD_SEL.wrap).first()).toBeVisible({ timeout: 60_000 });
+  await expect(storm(page)).toHaveCount(0, { timeout: 10_000 });
+  // The gear's Leave (or Resign, as the battle offers): back in the town square where you stood.
+  await page.getByRole("button", { name: "Match options" }).click();
+  const quit = page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: /^(Leave|Resign)$/ });
+  const how = (await quit.textContent())!.trim();
+  await quit.click();
+  await page.getByRole("alertdialog").getByRole("button", { name: how, exact: true }).click();
+  if (how === "Resign") await page.getByRole("button", { name: "Back to town" }).click();
+  await backAt(page, stood);
+  expect(errors).toEqual([]);
+});
+
 test("challenging Big Boy in the town: his own intro (his line, his toy blocks build the table, the board plops on, the stools drop in, his attack, the lollipop swirl), the battle; Leave back where you stood", async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
