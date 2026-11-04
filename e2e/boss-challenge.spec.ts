@@ -394,6 +394,85 @@ test("challenging Hollow in the town: his own intro (in to your seats, his line,
   expect(errors).toEqual([]);
 });
 
+test("challenging Wrangler in the town: his own intro (in to where you stand, his line, the lasso thrown to the board on its hay bale, the bale dragged to the middle, the two ropes thrown out, the buckets yanked in as the stools, his brag, his attack, his wipe), the battle; Leave back where you stood", async ({ page }) => {
+  test.setTimeout(240_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  const project = test.info().project.name;
+  if (SHOTS) mkdirSync(SHOTS, { recursive: true });
+  const shot = async (name: string) => SHOTS && (await page.screenshot({ path: `${SHOTS}/${name}-${project}.png` }));
+  type Rope = { move: string | null; lasso: string | null; bale: number | null; baleAt: [number, number] | null; standHidden: boolean; out: number; buckets: string | null };
+  const ropeOf = (i: Intro | null) => (i as unknown as { rope: Rope | null } | null)?.rope ?? null;
+  // (Wrangler is live for everyone: a player's town. Nov 4: his own intro, Eric's design.)
+  await page.goto("/town?sky=day");
+  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  const { confirm, stood } = await toConfirm(page, "pig", "Wrangler");
+  await confirm.getByRole("button", { name: "Fight" }).click();
+  // In at the barn's doorway, straight to where you stand through it all (BOSS_INTROS' `seated`: the usual clear places, so nobody
+  // moves when the bale and the buckets come in), on his mats' line.
+  await expect(room(page)).toHaveAttribute("data-room", "pig", { timeout: 20_000 });
+  await expect(page.getByRole("heading", { name: "Wrangler's Stall" })).toBeVisible();
+  const step = async () => (await intro(page))?.step ?? "";
+  const seats = [9.5 + CHALLENGE_FEEL.clear.you, 10.5, 9.5 - CHALLENGE_FEEL.clear.boss, 10.5];
+  const where = (i: Intro) => [i.you[0], i.you[1], i.boss[0], i.boss[1]].map((v) => Math.round(v * 100) / 100);
+  const looks: Intro[] = [];
+  const look = async () => {
+    const i = (await intro(page))!;
+    looks.push(i);
+    return i;
+  };
+  await expect.poll(step, { message: "his line", timeout: 20_000, intervals: [50] }).toBe("line");
+  const atLine = (await look())!;
+  expect(atLine.layout).toBe("across");
+  expect(where(atLine)).toEqual(seats);
+  expect(atLine.line).toBe(true);
+  expect(atLine.table).toBe(false);
+  // (The board still on its stand in the corner, the room's own.)
+  expect(ropeOf(atLine)).toMatchObject({ standHidden: false, bale: null, buckets: null });
+  await shot("wrangler-start");
+  // The spin, the throw: the loop flies to the bale on the stand and cinches round it.
+  await expect.poll(async () => ropeOf(await look())?.move, { message: "he spins the lasso", intervals: [30] }).toBe("spin");
+  await expect.poll(async () => ropeOf(await look())?.lasso, { message: "the loop flies", intervals: [30] }).toBe("fly");
+  await expect.poll(async () => ropeOf(await look())?.lasso, { message: "it cinches round the bale", intervals: [30] }).toBe("cinched");
+  // The yank: from then the corner's board is his bale, dragged in; it lands where the table stands.
+  await expect.poll(async () => ropeOf(await look())?.standHidden, { message: "the yank takes the board from its corner", intervals: [30] }).toBe(true);
+  await expect.poll(async () => ropeOf(await look())?.bale ?? 0, { message: "the bale slides", intervals: [30] }).toBeGreaterThan(0.2);
+  await shot("wrangler-drag");
+  await expect.poll(async () => (await look()).table, { message: "the bale lands in the middle", intervals: [30] }).toBe(true);
+  expect(ropeOf(await look())?.baleAt).toEqual([9.5, 10.5]);
+  // The cross throw, the ropes out each way; the buckets tumble in and land upside down as the stools.
+  await expect.poll(async () => ropeOf(await look())?.move, { message: "the cross throw", intervals: [30] }).toBe("crossThrow");
+  await expect.poll(async () => ropeOf(await look())?.buckets, { message: "the buckets tumble in", intervals: [30] }).toBe("tumble");
+  await expect.poll(async () => (await look()).stools.length, { message: "the stools land", intervals: [30] }).toBe(2);
+  expect((await look()).stools).toEqual([[8.5, 10.5], [10.5, 10.5]]);
+  await expect.poll(async () => ropeOf(await look())?.buckets, { message: "standing as the stools", intervals: [30] }).toBe("stool");
+  await shot("wrangler-stools");
+  // His brag, then his attack swung in place before the wipe.
+  await expect.poll(async () => ropeOf(await look())?.move, { message: "his brag", intervals: [30] }).toBe("brag");
+  await expect.poll(step, { message: "he swings", intervals: [30] }).toBe("swing");
+  expect((await look())!).toMatchObject({ attack: true, line: false, table: true });
+  // Nobody moved, from the line to the swing; nothing came or went after the stools (the table and the stools stay).
+  for (const i of looks) expect(where(i), `at ${i.step}: where you stand`).toEqual(seats);
+  const landed = looks.findIndex((i) => i.stools.length === 2);
+  for (const i of looks.slice(landed)) expect([i.table, i.stools.length], `at ${i.step}`).toEqual([true, 2]);
+  // His wipe (spurs, tumbleweeds and cap guns) sweeps in over the barn, the battle loads under it, and it slides off the board.
+  await expect(storm(page)).toHaveCount(1, { timeout: 10_000 });
+  await expect(storm(page)).toHaveAttribute("data-boss", "pig");
+  await page.waitForTimeout(250);
+  await shot("wrangler-wipe");
+  await expect(page.locator(BOARD_SEL.wrap).first()).toBeVisible({ timeout: 60_000 });
+  await expect(storm(page)).toHaveCount(0, { timeout: 10_000 });
+  // The gear's Leave (or Resign, as the battle offers): back in the town square where you stood.
+  await page.getByRole("button", { name: "Match options" }).click();
+  const quit = page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: /^(Leave|Resign)$/ });
+  const how = (await quit.textContent())!.trim();
+  await quit.click();
+  await page.getByRole("alertdialog").getByRole("button", { name: how, exact: true }).click();
+  if (how === "Resign") await page.getByRole("button", { name: "Back to town" }).click();
+  await backAt(page, stood);
+  expect(errors).toEqual([]);
+});
+
 test("challenging Big Boy in the town: his own intro (his line, his toy blocks build the table, the board plops on, the stools drop in, his attack, the lollipop swirl), the battle; Leave back where you stood", async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];

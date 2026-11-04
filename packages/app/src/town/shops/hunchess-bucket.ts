@@ -6,7 +6,9 @@
  * handle hooked into two lugs just under the band; a soft highlight stripe down its lit side; "HunChess" in bold pixel
  * letters on its body (white on the black bucket, black on the white one), printed the normal way (it reads right way up
  * with the bucket rim up; upside down on a stool). Colors: black, white (the intro's stools), muted green, red and yellow
- * (decoration). Keys: BUCKET_PALETTE (U+00C0 to U+00E7), plus the outline (k), the rope's (r R t) and the wire's (M n).
+ * (decoration). Nov 4, Eric's correction after the art round (made in the code round): every frame the side view his white
+ * bucket's sideways tumble frame has (a straight body, the rim band at one end, the wire handle, Hun / Chess), with no open
+ * mouth or hole anywhere: the end cap (the dark inside, the base's oval) is gone. Keys: BUCKET_PALETTE (U+00C0 to U+00E7), plus the outline (k), the rope's (r R t) and the wire's (M n).
  *
  * Copied as drawn from `claude/boss-art` (scripts/boss-art/out/house-shop-pig/hunchess-bucket.ts at 0e4c00c6, Nov 4), its import
  * moved: next to the barn's art (shops/pig-art.ts), Puddles' (shops/puddles-art.ts) and the intro's (shops/pig-intro-art.ts).
@@ -99,9 +101,10 @@ const LOGO: Set<string> = (() => {
 const LOGO_AT = 14.5;
 /**
  * The pail at angle `a` (radians, 0 mouth up; turning clockwise) with its middle at (cx, cy): its body (a cylinder lit from
- * the top left, a highlight stripe down its lit side), the rim band at the mouth, the logo, the end cap that faces up the
- * screen (the open mouth with the dark inside, or the flat base), the wire handle from its lugs (swung by `swing`, never
- * below the floor), the knot of rope on its grip. Returns the bits and where the grip is.
+ * the top left, a highlight stripe down its lit side), the rim band at the mouth, the logo, the wire handle from its lugs
+ * (swung by `swing`, never below the floor), the knot of rope on its grip: always seen from the side, at every angle (Eric's
+ * correction, Nov 4: no open mouth and no base seen from above, on the stools, the tumble or the decoration). Returns the bits
+ * and where the grip is.
  */
 export function pail(ink: Ink, cx: number, cy: number, a: number, swing: number, knot: boolean, back = false): { bits: Bit[]; grip: Pt } {
   const body = cv(BW, BH);
@@ -139,29 +142,9 @@ export function pail(ink: Ink, cx: number, cy: number, a: number, swing: number,
     const [ex, ey] = toF(side * (HALF_BODY - 0.5), -TALL / 2 + LUG);
     stampRows(body, Math.round(ex) - 1, Math.round(ey) - 1, [ink.lit + ink.shade, ink.shade + ink.deep]);
   }
-  // The end cap facing up the screen: the mouth (lip round it, the dark inside, the far inner wall lit) or the base.
-  const cap = cv(BW, BH);
-  const mouthUp = ca > 0;
-  const capV = mouthUp ? -TALL / 2 : TALL / 2;
-  const capHalf = (mouthUp ? HALF_BAND : HALF_BODY) - 0.2;
-  const depth = Math.abs(ca) * (mouthUp ? 6.5 : 4.5) + 0.6;
-  if (Math.abs(ca) > 0.25) {
-    for (let y = 0; y < BH; y++)
-      for (let x = 0; x < BW; x++) {
-        const [u, v] = toL(x + 0.5, y + 0.5);
-        const dv = (v - capV) * (mouthUp ? 1 : -1); // < 0 toward the far edge
-        const e = (u / capHalf) ** 2 + (dv / depth) ** 2;
-        if (e > 1) continue;
-        let k: string;
-        if (mouthUp) {
-          if (e > 0.6) k = dv < 0 || e > 0.85 ? ink.lit : ink.body; // the lip, all round
-          else k = dv > depth * 0.15 ? ink.insideFar : ink.inside; // the inside: its far wall lit, the depth dark
-        } else {
-          k = e > 0.8 ? ink.shade : Math.abs(e - 0.45) < 0.08 ? ink.shade : dv < -depth * 0.2 ? ink.lit : ink.body; // the flat base, a recessed ring
-        }
-        put(cap, x, y, k);
-      }
-  }
+  // (No end cap: Eric, Nov 4, "is what it should always look like": the side view alone, at every angle, no open mouth or base
+  // seen from above. The band's lit top row is its rim, the base's dark row its closed bottom.)
+  const mouthUp = Math.cos(a) > 0;
   // The handle: a thin wire from ear to ear, swung over the mouth (swing 0) or down along its side; a plastic grip in the middle.
   const handle = cv(BW, BH);
   const [lx, ly] = toF(-(HALF_BODY - 0.5), -TALL / 2 + LUG);
@@ -183,7 +166,7 @@ export function pail(ink: Ink, cx: number, cy: number, a: number, swing: number,
   const knotC = cv(BW, BH);
   if (knot) stampRows(knotC, grip[0] - 1, grip[1] - 1, ["rRr", "RtR", ".r."]);
   const handleBehind = back || (!mouthUp && Math.abs(ca) > 0.6); // upside down: the handle hangs on its far side...
-  const bits = [cropBit(body)!, ...(cropBit(cap, false) ? [cropBit(cap, false)!] : [])];
+  const bits = [cropBit(body)!];
   const h = cropBit(handle, false);
   return { bits: h ? (handleBehind ? [h, ...bits] : [...bits, h]).concat(cropBit(knotC) ? [cropBit(knotC)!] : []) : bits, grip };
 }
