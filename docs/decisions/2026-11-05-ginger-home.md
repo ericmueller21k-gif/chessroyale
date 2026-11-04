@@ -44,5 +44,5 @@ art (`ginger-sled`) is the game's already: not copied.
   (390 × 844, the phone project) 37.5 against 34.9 fps, computer (1440 × 900) 36.6 against 34.8. Standing just inside the door and
   walking left and right there (the tunnel's walls near the camera): phone 35.7 against 40.8, computer 33.7 against 33.5. Cut: the
   room's two dozen pools of light and the battle spot's shine are baked into the floor's picture (they never change) instead of drawn
-  each frame; no elf trimmed (removing the glows and every upright piece together brought the doorway to Jefferson's: it's the art's
+  each frame; no elf trimmed (removing the glows and every upright piece together brought the doorway near Jefferson's: it's the art's
   ring of overlapping wall cards, and inside the room the igloo is the faster).
