@@ -108,3 +108,9 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Hollow intro code DONE 036605a8 → PR #481 (targeted), CI watcher; merge on green, tell Eric live. Later: Hollow cave art load ~4.5 s at 4x CPU (own job).
 - Hollow intro #481 LIVE (33ad8967, 00:08). Eric Nov 4: desktop battle bugs (Hollow throw figure jumps off page, bubble stays), figures bigger on computer (what were they before?), cave intro bubble 3x and lower. Helper Opus high /home/user/cr-battlefix claude/battle-desktop-fixes, brief brief-battle-desktop-fixes.md. Table rise idea: waiting on Eric.
 - Battle desktop fixes DONE 39f73ef4 → PR #482 (full-e2e), CI watcher; merge on green, tell Eric live. Follow-up (not done): board-carrying moments (Big Boy bounce, Sawyer/Wrangler leaps, Boingo funhouse, Jefferson candle, Lights out) + Smudgy blob, Chub&Chirp hop, Babur hoops still start at board top-left on computer.
+- Eric Nov 4 (driving): next boss = Wrangler, full start-to-finish (barn interior/shop, intro, transition), weekly usage. Scope proposal sent; waiting his OK.
+  His design: barn, hay, wooden pens with black+white knight pieces hop-skipping; a board on a stand set back in a corner; Wrangler spins lasso,
+  yanks board to center; two ropes cross-armed, throws both ways, yanks off-screen buckets (white + black 5-gal, handles) that tumble in and land
+  upside down as stools; transition: spurs + clearly-toy pistols. Process going forward: each boss built start to finish.
+- NOTE (Eric Nov 4): boss QUOTES need expanding per boss (Gemini, Eric to return): challenge lines (shop intro), before fight, after fight
+  (win/lose), talk-to lines; challenge lines distinct from in-fight barks. Eric also has another boss idea (later).
