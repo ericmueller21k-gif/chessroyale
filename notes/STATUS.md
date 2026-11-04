@@ -149,3 +149,4 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - NIGHT DONE: main GREEN at 6fe94b58 (14:03). Live: #483 Wrangler, #484 bigger figures, #485 50v50, #486/#490 test fixes, #487 Jefferson, #488 arrow keys, #489 phone bar. Morning summary sent.
 - Eric Nov 5 AM: Jefferson perfect. Fixes: Wrangler name clipped on banner; challenge card text not centered; banners show God King (should be your pawn except his save); "🤠 Boss plays d4" emoji → name+portrait, all bosses. Brief brief-banners-emoji-cards.md (Haiku).
 - Banners/emoji/cards DONE 02883a11 → PR #491 (targeted), CI bqg74o3ph.
+- #491 banners/emoji/cards MERGED a1f1de50 (fix: "Plays your move: X" keeps words, portrait only); deploy+main CI watcher.
