@@ -357,13 +357,16 @@ test("a home you can go into (Babur's): its card is its name, then 'Go in' under
   await expect(card.getByText("Coming soon", { exact: true })).toHaveCount(0);
   // Centered: the name's words and the button in the middle of the card (within a pixel), the button under the name.
   const mid = (b: { x: number; width: number }) => b.x + b.width / 2;
-  const box = (await card.boundingBox())!;
-  const go = (await card.getByRole("button", { name: "Go in" }).boundingBox())!;
-  const name = await card.locator("h2").evaluate((h) => {
+  // (All three in one look: the card follows its home on screen while the camera settles, so boxes read at different moments
+  // can be a few px apart even when the card is centered.)
+  const { box, go, name } = await card.evaluate((c) => {
     const r = document.createRange();
+    const h = c.querySelector("h2")!;
     r.selectNodeContents(h);
     const t = r.getBoundingClientRect();
-    return { x: t.x, width: t.width, bottom: h.getBoundingClientRect().bottom };
+    const b = c.getBoundingClientRect();
+    const g = [...c.querySelectorAll("button")].find((x) => x.textContent?.trim() === "Go in")!.getBoundingClientRect();
+    return { box: { x: b.x, width: b.width }, go: { x: g.x, y: g.y, width: g.width }, name: { x: t.x, width: t.width, bottom: h.getBoundingClientRect().bottom } };
   });
   expect(Math.abs(mid(name) - mid(box)), "the name centered").toBeLessThan(1.5);
   expect(Math.abs(mid(go) - mid(box)), "Go in centered").toBeLessThan(1.5);
