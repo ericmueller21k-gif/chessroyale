@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { BOTS, TABLES, addCrowd, addTestPlayer, anyTableFree, createTown, fillTables, ratingLine, ratingText, tableFor, tdist, type Town } from "../src/town/world.ts";
 
@@ -64,5 +65,17 @@ describe("the person card (Oct 28)", () => {
     expect(ratingLine(2200)).toBe("Rating 2200");
     for (const b of BOTS) expect(ratingText(b)).toBe(ratingLine(b.rating));
     expect(ratingText(BOTS.find((b) => b.name === "Woolly")!)).toBe("Rating 2200");
+  });
+});
+
+/** Eric, Nov 5: every town card's text is centered (the challenge card was left-aligned, the homes centered); a person's row keeps its own layout. */
+describe("Eric, Nov 5: every town card's text centered", () => {
+  const css = readFileSync(new URL("../src/town/town.css", import.meta.url), "utf8");
+  const block = (sel: string) => css.slice(css.indexOf(`${sel} {`), css.indexOf("}", css.indexOf(`${sel} {`)));
+  it("the card's base rule centers its text (the challenge card, the homes, the raid confirm and the shop's cards alike)", () => {
+    expect(block(".town-card")).toMatch(/text-align: center;/);
+  });
+  it("a person's card keeps its own layout: its row's text stays left", () => {
+    expect(block(".town-card.town-person")).toMatch(/text-align: left;/);
   });
 });

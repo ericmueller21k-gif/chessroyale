@@ -8,7 +8,7 @@ import { GodKingEpilogue, LastStandCard } from "../components/LastStand.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
 import { ChatSection, useMedia } from "../components/QuickChat.tsx";
 import { bossInText, crowdFinalists, rankedMinHumans } from "@chessroyale/core";
-import { BossCharacter, hasCharacter } from "../components/BossCharacter.tsx";
+import { BossCharacter, BossTag, hasCharacter } from "../components/BossCharacter.tsx";
 import { FlagIcon, MOUSE_LAYOUT, MatchMenu } from "../components/MatchMenu.tsx";
 import { exitFor } from "../match-exit.ts";
 import { TokenBox } from "../components/TokenBox.tsx";
@@ -110,7 +110,7 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
         {bossResult && match.boss && <BossCharacter match={match} place="results" />}
         {bossResult && match.boss && (
           <p class={`team-result ${bossResult === "crowd" && survived ? "good" : bossResult === "boss" ? "bad" : ""}`}>
-            {hasCharacter(match) ? null : <>{match.boss.icon} </>}
+            {hasCharacter(match) ? null : <><BossTag boss={match.boss} /> </>}
             {simul
               ? // (The Hidden Boss's phase 2: every board must be won.)
                 simul.won === simul.of

@@ -154,7 +154,20 @@ test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the b
   await playBest(page);
   // As the second turn begins: FREEZE!, then RAGE! (its ultimate next turn); the clock waits for them.
   await expect(banner(page, "FREEZE!")).toBeVisible({ timeout: 30_000 });
-  await expect(banner(page, "FREEZE!").locator(".gk-portrait")).toBeVisible();
+  // Eric's rule (Nov 5): the power's banner shows your pawn on the right, never the God King; his name whole on the strip.
+  await expect(banner(page, "FREEZE!").locator(".kc-target.pc-pawn .avatar")).toBeVisible();
+  await expect(banner(page, "FREEZE!").locator(".gk-portrait")).toHaveCount(0);
+  const strip = await banner(page, "FREEZE!").evaluate((b) => {
+    // (The strip and its words unskewed: offsets, not the skewed boxes.)
+    const band = b.querySelector<HTMLElement>(".fb-band")!;
+    const words = b.querySelector<HTMLElement>(".kc-words")!;
+    const label = b.querySelector<HTMLElement>(".kc-label")!;
+    const top = (el: HTMLElement) => { let y = 0; for (let e: HTMLElement | null = el; e && e !== band; e = e.offsetParent as HTMLElement | null) y += e.offsetTop; return y; };
+    return { bandH: band.clientHeight, labelTop: top(label), labelH: label.offsetHeight, labelFont: parseFloat(getComputedStyle(label).fontSize), wordsTop: top(words), wordsBottom: top(words) + words.offsetHeight };
+  });
+  expect(strip.labelTop, "the name's top inside the strip").toBeGreaterThanOrEqual(0);
+  expect(strip.wordsBottom, "the stack ends inside the strip").toBeLessThanOrEqual(strip.bandH);
+  expect(strip.labelH, "the name on one line").toBeLessThanOrEqual(strip.labelFont * 1.5);
   await expect(banner(page, "RAGE!")).toBeVisible({ timeout: 10_000 });
   await expect(page.locator(".rage-meter.warned")).toBeVisible();
   await expect.poll(() => phase(page), { timeout: 20_000 }).toBe("play");

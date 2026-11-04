@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { afterEach, describe, expect, it } from "vitest";
 import { BOSS_BANNER, BANNER_PLUS_MS, DEFAULT_SETTINGS, SQUADS, bannerPlusMs, bossBannerMs, setBannerPlusSource, voteResultMs, type PowerEventKind } from "@chessroyale/core";
 import { ALFIL_BEATS, BLOCK, BOARD_SAW, BOSS_INTRO, BOUNCE, HOOPS_BEATS, HOPPER_BEATS, KING_COMMAND, KING_SUMMON, LAST_STAND, LIGHTS_OUT, POWER_BANNERS, POWER_FX, PULL, RECLUSE_FX, SAW_CUT, SHOWDOWN, SPLIT, START_FEN, bannerLeadMs, bannerWaitMs, bossIntroTimeline, bossShowMs, bossThinkMs, kingStrikeMs, lastStandMs, lightsOutTimeline, powerFxMs, powerMomentMs } from "@chessroyale/chess";
@@ -342,3 +342,33 @@ describe("every banner longer by BANNER_PLUS_MS (Eric, Oct 24), the same for all
   });
 });
 
+
+/**
+ * Eric, Nov 5: a power's banner shows your pawn on the right, never the God King (only his save, LastStand, has him), and a
+ * boss's name is drawn whole on its banner (PowerParts' fitBigWord; the strip is taller than the king-cut's). Guards by source:
+ * the DOM isn't rendered in these tests. e2e/boss-powers.spec.ts checks the rendered banner too.
+ */
+describe("Eric, Nov 5: a power's banner shows your pawn, never the God King", () => {
+  const dir = new URL("../src/components/", import.meta.url);
+  const parts = readFileSync(new URL("PowerParts.tsx", dir), "utf8");
+  const powerBanner = parts.slice(parts.indexOf("export function PowerBanner("), parts.indexOf("/**\n * Plays a sound once per key"));
+  it("PowerBanner's right portrait is your own pawn (pawnLook of you), and it draws no God King", () => {
+    expect(powerBanner).toMatch(/<Avatar look=\{pawnLook\(\{ id: "", isYou: true, isBot: false \}\)\.look\} side=\{side\} \/>/);
+    expect(powerBanner).not.toMatch(/GodKingPortrait/);
+  });
+  it("the God King keeps his banner only for his save: LastStand draws him, and no other file draws a power's banner", () => {
+    expect(readFileSync(new URL("LastStand.tsx", dir), "utf8")).toMatch(/GodKingPortrait/);
+    const files = readdirSync(dir).filter((f) => f.endsWith(".tsx") && readFileSync(new URL(f, dir), "utf8").includes("power-cut"));
+    expect(files).toEqual(["PowerParts.tsx"]);
+  });
+  it("no emoji stands in for a boss in the boss screen's lines: the status line says his name with his portrait (BossTag)", () => {
+    const boss = readFileSync(new URL("../src/screens/Boss.tsx", import.meta.url), "utf8");
+    expect(boss).not.toMatch(/\{boss\.icon\}/);
+    expect(boss).toMatch(/<BossTag boss=\{boss\} \/> plays/);
+  });
+  it("a boss's name stays on one line and fits the words' share of the strip (fitBigWord), and the strip is taller for the stack", () => {
+    expect(parts).toMatch(/nameWide > room/);
+    expect(css).toMatch(/\.fight-banner\.power-cut \.fb-band \{\s*\/\*[^*]*\*\/\s*height: 44%;/);
+    expect(css).toMatch(/\.fight-banner\.power-cut \.kc-label \{\s*color: #fecaca;\s*white-space: nowrap;/);
+  });
+});

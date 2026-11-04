@@ -119,3 +119,13 @@ How Eric likes design work run (Eric, Oct 29). These are habits, not hard rules;
 - **Mockup first for new screens and big mockup work.** Before building, send Eric a quick static mockup or picture so he
   can catch problems early. Eric: "just draw up a… non-program sketch or… fake mock-up… before we start and then I would
   have caught these things."
+
+## Banners, boss lines and town cards (Eric, Nov 5)
+
+- **Power banners show the player's own pawn; the God King appears on a banner only for his save.** Phone and computer.
+  - Guard: `packages/app/test/banners.test.ts`, "Eric, Nov 5: a power's banner shows your pawn, never the God King"; `e2e/boss-powers.spec.ts`, the Freeze test (your pawn on the banner, no God King).
+  - Decision: [2026-11-05-banners-emoji-cards.md](../decisions/2026-11-05-banners-emoji-cards.md).
+- **No emoji stands in for a boss or character in the game's own text; use the name and/or a small portrait.** The status line says "[portrait] Wrangler plays d4".
+  - Guards: `packages/app/test/banners.test.ts`, "no emoji stands in for a boss in the boss screen's lines"; `e2e/smudgy.spec.ts`, the status-line checks ("Smudgy plays d6").
+- **Town cards' text is centered** (every card: the challenge card, the homes, the raid confirm, the shop's cards). A person's row keeps its layout.
+  - Guard: `packages/app/test/town-card.test.ts`, "Eric, Nov 5: every town card's text centered".
