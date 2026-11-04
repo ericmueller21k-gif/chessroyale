@@ -60,9 +60,10 @@ export function squaresOf(p: ShopPlace): Sq[] {
 
 /**
  * A room from its layout and its Shopkeeper's squares; `mask` (a room that isn't a box: Hollow's cave, the art's `SHOP_HOLLOW_FLOOR`,
- * `n` rows of `n`, `.` floor and `#` rock) blocks every rock square too, besides the edge and the solid pieces.
+ * `n` rows of `n`, `.` floor and `#` rock) blocks every rock square too, besides the edge and the solid pieces. `talk`: the pieces
+ * whose squares mean "talk" as the counter's do (a shop with no counter: Jefferson's crate and his bare corner, Nov 4).
  */
-export function makeRoom(layout: readonly ShopPlace[], keeper: readonly Sq[], n = 20, mask?: readonly string[]): Room {
+export function makeRoom(layout: readonly ShopPlace[], keeper: readonly Sq[], n = 20, mask?: readonly string[], talk: readonly string[] = []): Room {
   const blocked = new Uint8Array(n * n);
   const block = (s: Sq) => s.c >= 0 && s.c < n && s.r >= 0 && s.r < n && (blocked[s.r * n + s.c] = 1);
   // The walls are the room's edge, whatever stands there.
@@ -79,7 +80,7 @@ export function makeRoom(layout: readonly ShopPlace[], keeper: readonly Sq[], n 
     if (isFloor(p.name)) continue;
     if (p.solid) squaresOf(p).forEach(block);
     if (p.exit) exits.push(...squaresOf(p));
-    if (p.name === "counter") counter.push(...squaresOf(p));
+    if (p.name === "counter" || talk.includes(p.name)) counter.push(...squaresOf(p));
   }
   keeper.forEach(block);
   const doors = exits.map((s) => ({ c: s.c, r: s.r - 1 })).filter((s) => !blocked[s.r * n + s.c]);
