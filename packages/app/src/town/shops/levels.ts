@@ -138,3 +138,16 @@ export const linksOf = (lv: Levels | null, k: number): readonly number[] => lv?.
 const NONE: readonly number[] = [];
 /** A stair or catwalk square. */
 export const isUp = (lv: Levels | null, c: number, r: number): boolean => !!lv && c >= 0 && r >= 0 && c < lv.n && r < lv.n && lv.up[r * lv.n + c]! > 0;
+
+/** The square a figure whose foot is at (x, y) stands on (a stair or catwalk square when it's up there; else the nearest), into `out`. */
+export function squareOf(lv: Levels | null, x: number, y: number, out: Sq): Sq {
+  const k = lv ? upAt(lv, x, y) : -1;
+  if (k >= 0) {
+    out.c = k % lv!.n;
+    out.r = (k - out.c) / lv!.n;
+  } else {
+    out.c = Math.round(x);
+    out.r = Math.round(y);
+  }
+  return out;
+}
