@@ -151,3 +151,4 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Banners/emoji/cards DONE 02883a11 → PR #491 (targeted), CI bqg74o3ph.
 - #491 banners/emoji/cards MERGED a1f1de50 (fix: "Plays your move: X" keeps words, portrait only); deploy+main CI watcher.
 - Eric Nov 5: next boss GINGER full build (igloo circle ~10, candy dispensers 2 rows + catwalk + curved stairs (2nd walk level), elf shopkeeper + elves w/ candy canes, dispensing pair loop, barrels; intro: staff charge, blast, ice shard table cracks floor, 2 elves toss board ("Coming, boss!"), cast pieces from white light; wipe blizzard + colored candy canes). Eric wants a VIEW OF THE SHOP (walls/rows/catwalk) when art done. Crate: ginger-sled. Brief brief-ginger-art.md. Art started.
+- #491 LIVE a1f1de50 (17:18), main green.
