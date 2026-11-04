@@ -478,6 +478,88 @@ test("Wrangler's Stall (Nov 4): Go in (its card its name and Go in), his barn: t
   expect(errors).toEqual([]);
 });
 
+type CrewHook = {
+  __shopCrew?: () => {
+    lift: { at: [number, number]; anim: string; waiting: boolean; leg: number };
+    forklift: { at: [number, number]; anim: string; waiting: boolean; leg: number };
+    pallet: string;
+    figs: { name: string; anim: string; at: [number, number]; flip: boolean; up: number }[];
+    you: [number, number];
+  } | null;
+};
+const crew = (p: Page) => p.evaluate(() => (window as unknown as CrewHook).__shopCrew?.() ?? null);
+
+test("Jefferson's Fireworks (Nov 4): Go in (its card its name and Go in), his warehouse: the racking, the board on its crates, the crew at work; the dealer keeps the shop in his corner, Jefferson's Boss Crate with Giraffe Gallop; the scissor lift waits while you stand in its way and goes on once you step aside", async ({ page }) => {
+  test.setTimeout(180_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  // (Jefferson is live for everyone, so his warehouse is too: a player's town.)
+  await page.goto("/town?sky=day");
+  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("grex"));
+  await expect.poll(() => homeAt(page, "grex"), { message: "Jefferson's Fireworks comes into view" }).not.toBeNull();
+  await goIn(page, "grex", "Jefferson's Fireworks");
+  await expect(room(page)).toHaveAttribute("data-room", "grex");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Jefferson's Fireworks");
+  // Bright concrete under the lamps: the chat's words dark.
+  await expect(page.locator(".town-chat")).toHaveAttribute("data-tone", "day");
+  await expect.poll(async () => (await shopCam(page))?.zoom, { message: "zoomed out" }).toBe(1);
+  const name = test.info().project.name;
+  const still = async (what: string) => {
+    if (!SHOTS) return;
+    await page.waitForTimeout(1200);
+    await page.screenshot({ path: `${SHOTS}/${what}-${name}.png` });
+  };
+  // The crew: the two leaners, the clipboard guy and the dozer at their places, the lift and the forklift on their loops, the pallet.
+  const c0 = (await crew(page))!;
+  expect(c0.figs.map((f) => f.name).sort()).toEqual(["crew-c", "crew-d", "forklift", "leaner-a", "leaner-b", "lift", "pallet"]);
+  expect(c0.lift.at[1]).toBe(5);
+  await still("room");
+  // The dealer in his corner: a tap on him walks you in front of him; his card says "Shopkeeper".
+  await expect.poll(() => shopAt(page, "keeper"), { message: "the dealer is drawn" }).not.toBeNull();
+  const at = (await shopAt(page, "keeper"))!;
+  await page.mouse.click(at.x, at.y);
+  const card = page.getByRole("dialog", { name: "Shopkeeper", exact: true });
+  await expect(card).toBeVisible({ timeout: 20_000 });
+  await expect(card.getByRole("heading", { name: "Shopkeeper", exact: true })).toBeVisible();
+  await expect(room(page)).toHaveAttribute("data-you", /^(16|17),6$/);
+  await still("dealer");
+  await card.getByRole("button", { name: "Talk" }).click();
+  const crate = page.getByRole("dialog", { name: "Jefferson's Boss Crate", exact: true });
+  await expect(crate).toBeVisible();
+  await expect(crate).toContainText("3 Jefferson tokens, or 1 Jefferson token + 1 crate key");
+  await expect(crate).toContainText("Giraffe Gallop");
+  await expect(crate).toContainText("You have 0 Jefferson tokens and 0 crate keys.");
+  await expect(crate.getByRole("button", { name: "Buy with 3 Jefferson tokens" })).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await expect(crate).toBeHidden();
+  // In the lift's way: stand on its row, a square past its next stop, and it waits for you (Eric, Nov 4: "If you block it, it stops");
+  // step aside and it goes on ("If you move out of the way, it starts moving again").
+  const walkTo = async (sq: readonly [number, number]) => {
+    await expect.poll(() => shopAt(page, "square", sq), { message: `(${sq}) is on screen` }).not.toBeNull();
+    const xy = (await shopAt(page, "square", sq))!;
+    await page.mouse.click(xy.x, xy.y);
+    await expect(room(page)).toHaveAttribute("data-you", `${sq[0]},${sq[1]}`, { timeout: 30_000 });
+  };
+  for (const sq of [[12, 6], [9, 6], [7, 6]] as const) await walkTo(sq);
+  // (Once it's back at the west end of its row: from there its next stop is (6, 5), and you'll stand on the square after it.)
+  await expect.poll(async () => (await crew(page))!.lift.at[0], { message: "the lift at its row's west end", timeout: 40_000 }).toBeLessThanOrEqual(5.5);
+  await walkTo([7, 5]);
+  await expect.poll(async () => (await crew(page))!.lift.waiting, { message: "the lift waits for you", timeout: 40_000 }).toBe(true);
+  const held = (await crew(page))!.lift;
+  expect([5, 6]).toContain(held.at[0]);
+  await page.waitForTimeout(1500);
+  expect((await crew(page))!.lift, "still waiting, where it was").toMatchObject({ waiting: true, at: held.at });
+  await still("blocked");
+  await walkTo([7, 7]);
+  await expect.poll(async () => (await crew(page))!.lift.waiting, { message: "it goes on", timeout: 10_000 }).toBe(false);
+  await expect.poll(async () => (await crew(page))!.lift.at[0], { message: "it moves", timeout: 10_000 }).not.toBe(held.at[0]);
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test("Big Boy's Crib (Nov 2): Go in, Blocky's crate with Big Boy's Buggy; the chat's words dark over the nursery", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));

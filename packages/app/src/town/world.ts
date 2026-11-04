@@ -544,6 +544,14 @@ export class Walker {
   goal(): Sq {
     return { c: this.goalC(), r: this.goalR() };
   }
+  /** The next square of its path, after the step it's on (null: none). */
+  peek(): Sq | null {
+    return this.queue[0] ?? null;
+  }
+  /** Drops the rest of its path: it stops once the step it's on ends (Jefferson's crew in the way, Nov 4). */
+  halt(): void {
+    this.queue = [];
+  }
   /** Walk this path (after the step it's on), claiming its last square. */
   go(path: Sq[]): void {
     this.queue = path.slice();

@@ -158,7 +158,12 @@ export interface CrewArt {
   mover: { ch: Character; frames: Record<CrewMove, HTMLCanvasElement[]> };
   table: { ch: Character; frames: Record<"idle" | "creak", HTMLCanvasElement[]>; sway: Readonly<Record<string, readonly (readonly [number, number])[]>>; top: number };
   lift: { ch: Character; frames: Record<"flush" | "rise" | "up", HTMLCanvasElement[]>; h: Readonly<Record<string, readonly number[]>> };
+  /** The crew's spots round the table (squares, a figure's foot; facing), and each one's delay setting off (ms): the art's. */
+  spots: Readonly<Record<CrewKey, { readonly at: readonly [number, number]; readonly face: number }>>;
+  setoff: Readonly<Record<CrewKey, number>>;
 }
+/** The crew who come over, by the art's names. */
+export type CrewKey = "lift-guy" | "fork-guy" | "leaner-a" | "leaner-b" | "crew-c" | "crew-d" | "dealer";
 
 /**
  * Wrangler's lasso, ready (shops/pig-intro-art.ts; ShopRoom draws it): his moves' frames (BOSS_PIG_INTRO, at his town figure's
@@ -266,6 +271,8 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
         mover: { ch: m.BOSS_GREX_INTRO, frames: all(m.BOSS_GREX_INTRO, CREW_MOVES) },
         table: { ch: m.INTRO_GREX_TABLE, frames: all(m.INTRO_GREX_TABLE, ["idle", "creak"]), sway: m.INTRO_GREX_TABLE_SWAY, top: m.INTRO_GREX_TABLE_TOP },
         lift: { ch: m.INTRO_GREX_LIFT, frames: all(m.INTRO_GREX_LIFT, ["flush", "rise", "up"]), h: m.INTRO_GREX_LIFT_H },
+        spots: m.INTRO_GREX_CREW_SPOTS,
+        setoff: m.INTRO_GREX_CREW_SETOFF,
       };
     } else if (art?.rope) {
       const m = art.rope;

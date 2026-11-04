@@ -613,4 +613,13 @@ export const SHOP_FEEL = {
    * draws it. false: it waits outside and you walk in on foot (round 1's way), and come out on it.
    */
   rideInside: true as boolean,
+  /**
+   * Jefferson's moving crew (Nov 4; Eric: "If you block it, it stops. If you move out of the way, it starts moving again"; the art's
+   * loops, shop-grex-nov4.md; shops/grex-crew.ts): the scissor lift and the forklift drive their loops a square every `stepMs` (a slow
+   * walk), the lift holding its platform up `upHoldMs` at each stop and resting `endMs` at its row's west end, the forklift resting
+   * `homeMs` at home between its laps. Before each square a machine looks at it and the one after it: anyone standing there and it
+   * waits, going on once they're clear. The pallet's last few px onto the shelf slot (or off it) take `palletEaseMs`. Each client
+   * runs them from its own room's clock: no server state.
+   */
+  crew: { stepMs: 620, upHoldMs: 1760, endMs: 1200, homeMs: 1400, palletEaseMs: 150 },
 } as const;
