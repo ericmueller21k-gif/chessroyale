@@ -1,4 +1,5 @@
 import { devices, expect, type Browser, type Page } from "@playwright/test";
+import { SIDE_FEEL } from "../packages/app/src/characters/side-size.ts";
 import { BOARD_SEL, bossAloneFromHome, engineTop, named, openBossRaid, soloFromHome, submitMove, test } from "./helpers.ts";
 
 /**
@@ -168,13 +169,21 @@ async function check(page: Page, screen: Screen, size: Size) {
     expect(x.r, `${at}: the ${k} inside the window`).toBeLessThanOrEqual(w + 0.5);
     if (k !== "scoreboard") expect(x.b, `${at}: the ${k} inside the window`).toBeLessThanOrEqual(h + 0.5);
   }
-  // Nothing over anything else. (By design: the boss in a raid stands over the scoreboard's edge, as before this change.)
+  // Nothing over anything else. (By design: the boss in a raid stands over the scoreboard's edge, as before this change. And Nov 4, round 2:
+  // the figures by the board's bottom corners, the boss, your pawn and the God King, may come over the board's edge by at most
+  // SIDE_FEEL.over of its side, where their room needs it: docs/decisions/2026-11-04-bigger-side-figures.md.)
+  const over = (g.board.r - g.board.x) * SIDE_FEEL.over;
+  const figure = (p: string) => ["boss", "pawn", "king"].includes(p);
   const allowed = (p: string, q: string) => [p, q].includes("boss") && [p, q].includes("scoreboard");
   for (let i = 0; i < all.length; i++)
     for (let j = i + 1; j < all.length; j++) {
       const [p, a] = all[i]!;
       const [q, c] = all[j]!;
-      if (!allowed(p, q)) expect(overlap(a, c), `${at}: the ${p} clear of the ${q}: ${JSON.stringify([a, c])}`).toBe(false);
+      if (allowed(p, q)) continue;
+      if ((p === "board" && figure(q)) || (q === "board" && figure(p))) {
+        const across = Math.min(a.r, c.r) - Math.max(a.x, c.x);
+        expect(across, `${at}: the ${p === "board" ? q : p} over the board's edge by at most ${over}: ${JSON.stringify([a, c])}`).toBeLessThanOrEqual(over + 1);
+      } else expect(overlap(a, c), `${at}: the ${p} clear of the ${q}: ${JSON.stringify([a, c])}`).toBe(false);
     }
   // What sits beside the board follows it.
   const m = g.around.moves?.[0];
@@ -195,7 +204,8 @@ async function check(page: Page, screen: Screen, size: Size) {
     expect(Math.abs(k.b - g.board.b - 14), `${at}: the God King on the board's bottom line`).toBeLessThanOrEqual(16);
     const p = g.around.pawn?.[0];
     if (p) {
-      expect(p.x - g.board.r, `${at}: your pawn by the board`).toBeGreaterThanOrEqual(24);
+      // (A small gap off the board, or over its edge by at most SIDE_FEEL.over of its side: was 24 to 32 px off it.)
+      expect(p.x - g.board.r, `${at}: your pawn by the board`).toBeGreaterThanOrEqual(-over - 1);
       expect(p.x - g.board.r, `${at}: your pawn by the board`).toBeLessThanOrEqual(32);
       expect(k.x, `${at}: the God King right of your pawn`).toBeGreaterThanOrEqual(p.r - 1);
     }
@@ -204,7 +214,7 @@ async function check(page: Page, screen: Screen, size: Size) {
     expect(Math.abs(row.x - g.board.x) + Math.abs(row.r - g.board.r), `${at}: the dock's row the board's width`).toBeLessThanOrEqual(2);
     expect(row.y, `${at}: the row under the board`).toBeGreaterThanOrEqual(g.board.b);
   }
-  if (g.boss) expect(g.boss.r, `${at}: the boss left of the board`).toBeLessThanOrEqual((g.evalBar ?? g.board).x);
+  if (g.boss) expect(g.boss.r, `${at}: the boss by the board's left, over it by at most ${over}`).toBeLessThanOrEqual((g.evalBar ?? g.board).x + over + 1);
   const t = g.around.scoreboard?.[0];
   if (t) {
     expect(t.r, `${at}: the scoreboard left of the board`).toBeLessThanOrEqual((g.evalBar ?? g.board).x);

@@ -1,4 +1,5 @@
 import { devices, expect, type Browser, type Page } from "@playwright/test";
+import { SIDE_FEEL } from "../packages/app/src/characters/side-size.ts";
 import { Chess } from "chess.js";
 import { BOARD_SEL, bossAloneFromHome, engineTop, openBossRaid, submitMove, test } from "./helpers.ts";
 
@@ -299,21 +300,25 @@ test("a computer: Boss alone has no scoreboard and your pawn left of the God Kin
     // What's under the moves in the column moves up with them (a raid's scoreboard from 900 to 1099 px).
     if (b.mini) expect(Math.abs(b.mini.y - side.b - 12), `${at}: the scoreboard under the moves`).toBeLessThanOrEqual(1);
     if (!raid) {
-      // Your pawn: right of the board, by it, standing on the God King's line, he to its right, about his size. (As far from the
-      // board as the boss is on its other side: 26 px, the director's --bs-out keeps that without the eval bar too.)
+      // Your pawn: right of the board, by it (a small gap off it, or over its edge by at most SIDE_FEEL.over of its side: Nov 4, round
+      // 2; was 24 to 32 px off it, as far as the boss), standing on the God King's line (its box ends at its feet, his under his crowns'
+      // 14 px row: Nov 4, round 2, so it never lies over the dock's row), he to its right, about his size.
       const pawn = b.pawn!;
       expect(pawn, `${at}: your pawn`).toBeTruthy();
-      expect(pawn.x - board.r, `${at}: clear of the board as the boss is`).toBeGreaterThanOrEqual(24);
+      expect(pawn.x - board.r, `${at}: by the board, over it by at most ${SIDE_FEEL.over} of its side`).toBeGreaterThanOrEqual(-(board.r - board.x) * SIDE_FEEL.over - 1);
       expect(pawn.x - board.r, `${at}: by the board`).toBeLessThanOrEqual(32);
-      expect(Math.abs(pawn.b - king.b), `${at}: on his line`).toBeLessThanOrEqual(1);
+      // (From 1100 px wide, where the figures grow: below it they're as before, its box as tall as his.)
+      const crowns = w >= 1100 ? 14 : 0;
+      expect(Math.abs(pawn.b + crowns - king.b), `${at}: on his line`).toBeLessThanOrEqual(1);
       expect(Math.abs(pawn.r - pawn.x - (king.r - king.x)), `${at}: his width`).toBeLessThanOrEqual(1);
-      expect(Math.abs(pawn.b - pawn.y - (king.b - king.y)), `${at}: his height`).toBeLessThanOrEqual(1);
+      expect(Math.abs(pawn.b - pawn.y + crowns - (king.b - king.y)), `${at}: his height (less his crowns' row)`).toBeLessThanOrEqual(1);
       expect(king.x, `${at}: the God King to its right`).toBeGreaterThanOrEqual(pawn.r - 1);
       expect(king.x - pawn.r, `${at}: beside it`).toBeLessThanOrEqual(8);
       expect(pawn.b, `${at}: the board's bottom line`).toBeLessThanOrEqual(b.row!.b);
       expect(king.r, `${at}: inside the window`).toBeLessThanOrEqual(w);
       expect(side.b, `${at}: the moves above your pawn`).toBeLessThanOrEqual(pawn.y);
-      expect(overlap(pawn, board) || overlap(pawn, side) || overlap(pawn, king) || overlap(pawn, b.row!), `${at}: your pawn over nothing`).toBe(false);
+      // (Over the board's edge by at most SIDE_FEEL.over of its side, checked above; over nothing else.)
+      expect(overlap(pawn, side) || overlap(pawn, king) || overlap(pawn, b.row!), `${at}: your pawn over nothing but the board's edge`).toBe(false);
       // His words open above him: clear of your pawn and of the board (they can reach up over the end of the list, never the other way).
       const words = page.locator(".boss-dock .gk-bubble:not(.leaving)");
       if (await words.isVisible()) {
@@ -332,7 +337,7 @@ test("a computer: Boss alone has no scoreboard and your pawn left of the God Kin
   }
 });
 
-test("no eval bar (every player's board): your pawn is as far from the board as the boss is on its other side, and the list is still a small gap off the board", async ({ browser }) => {
+test("no eval bar (every player's board): your pawn and the boss by the board's bottom corners, each over its edge by at most SIDE_FEEL.over of its side, and the list is still a small gap off the board", async ({ browser }) => {
   test.skip(test.info().project.name !== "desktop", "it opens its own windows");
   test.setTimeout(6 * 60_000);
   for (const size of ["1280x800", "1920x1080"]) {
@@ -349,10 +354,13 @@ test("no eval bar (every player's board): your pawn is as far from the board as 
       return { wrap: r(".board-area .board-row > .board-wrap"), board: r(".board-area .board-row > .board-wrap .hb-container"), pawn: r(".boss-dock .you-pawn"), boss: r(".boss-char.place-side"), king: r(".boss-dock .gk-unit"), side: r(".mv-side") };
     });
     const at = `no eval bar ${size}`;
-    // (The mirror, middle to middle, as boss-character.spec.ts checks it with the eval bar: the boss stands 24 px further out then.)
-    expect(Math.abs(g.pawn.x + g.pawn.w / 2 - g.wrap.r - (g.wrap.x - (g.boss.x + g.boss.w / 2))), `${at}: your pawn's middle as far from the board as the boss's`).toBeLessThanOrEqual(2);
-    expect(g.pawn.x - g.board.r, `${at}: as clear of the board as with the bar`).toBeGreaterThanOrEqual(24);
-    expect(g.pawn.x - g.board.r, `${at}: as clear of the board as with the bar`).toBeLessThanOrEqual(32);
+    // (Nov 4, round 2: the figures grow toward twice their size, each a small gap off the board where its room allows and over its edge
+    // by at most SIDE_FEEL.over of its side where it doesn't: docs/decisions/2026-11-04-bigger-side-figures.md. Was the mirror, your
+    // pawn's middle as far from the board as the boss's, and your pawn 24 to 32 px off the board.)
+    const over = g.board.w * SIDE_FEEL.over;
+    expect(g.pawn.x - g.board.r, `${at}: your pawn over the board by at most ${over}`).toBeGreaterThanOrEqual(-over - 1);
+    expect(g.pawn.x - g.board.r, `${at}: your pawn by the board`).toBeLessThanOrEqual(32);
+    expect(g.boss.x + g.boss.w / 2, `${at}: the boss left of the board`).toBeLessThan(g.wrap.x);
     expect(g.king.x, `${at}: the God King to its right`).toBeGreaterThanOrEqual(g.pawn.r - 1);
     expect(g.side.x - g.board.r, `${at}: the list a small gap off the board`).toBeGreaterThanOrEqual(12);
     expect(g.side.x - g.board.r, `${at}: the list a small gap off the board`).toBeLessThanOrEqual(16.5);
