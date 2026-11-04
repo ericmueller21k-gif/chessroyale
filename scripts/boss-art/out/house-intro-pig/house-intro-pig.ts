@@ -281,7 +281,7 @@ export const INTRO_PIG_TABLE_INK = {
 } as const;
 
 // ================================================================================================================
-// 3. The buckets: 40 x 40, foot [20, 35]. A 5-gallon pail (17 px across its mouth, 15 tall), a wire handle with a grip, two
+// 3. The buckets: 40 x 40, foot [20, 35]. A 5-gallon pail (15 px across its mouth, 11 tall), a wire handle with a grip, two
 //    ribs under the rim; the rope's end knotted on the handle. Upside down as a stool, its bottom (the seat) at SEAT_H over the
 //    foot (the park stools' seat).
 // ================================================================================================================
@@ -290,9 +290,9 @@ export const INTRO_PIG_BUCKET_SEAT_H = SEAT_H;
 const BW = 40;
 const BH = 40;
 const BF: Pt = [20, 35];
-const HALF_MOUTH = 8.5;
-const HALF_BASE = 6.8;
-const TALL = 13; // the pail, mouth to bottom (upside down it stands this tall, its seat at SEAT_H, its rim and lip under)
+const HALF_MOUTH = 7.6;
+const HALF_BASE = 6.1;
+const TALL = 10.5; // the pail, mouth to bottom: upside down, its seat (its bottom) is SEAT_H (11) over the foot
 type Ink = { body: string; shade: string; deep: string; lit: string };
 const INK: Record<"w" | "b", Ink> = {
   w: { body: "(", shade: ")", deep: "[", lit: "(" },

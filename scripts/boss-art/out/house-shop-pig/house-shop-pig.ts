@@ -1139,7 +1139,7 @@ at("hem-post", 19, 19, true, { flip: true });
 // -- The barn and its things.
 at("counter", 8, 3, true);
 at("crate", 8, 3, false); // on the counter (see SHOP_PIG_CRATE_AT): its place is the counter's
-at("board-stand", 3, 2, true); // the board on its hay bale, in the north-west corner (the intro lassos it)
+at("board-stand", 4, 3, true); // the board on its hay bale, set back in the north-west corner (the intro lassos it)
 at("hay-stack", 1, 1, true);
 at("saddle", 5, 1, true);
 at("barrel", 7, 1, true);
@@ -1168,7 +1168,7 @@ at("lantern", 14, 15, false);
 /** Where every piece goes: name, column (its west-most square), row (its south-most), solid; floor tiles first, then the upright pieces north to south. */
 export const SHOP_PIG_LAYOUT: readonly ShopPlace[] = [...LAYOUT.slice(0, FLOOR_COUNT), ...LAYOUT.slice(FLOOR_COUNT).sort((a, b) => a.row - b.row || a.col - b.col)];
 /** The board on its stand: its square (the intro's lasso target; INTRO_PIG_TABLE's foot starts here). */
-export const SHOP_PIG_BOARD_AT = { col: 3, row: 2 } as const;
+export const SHOP_PIG_BOARD_AT = { col: 4, row: 3 } as const;
 
 // ==== The room still: the floor flat on its squares, each upright piece stood at its foot, north first.
 
