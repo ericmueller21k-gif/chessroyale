@@ -142,7 +142,8 @@ test("quick chat picks in the profile: search, a check, n/10, locked lines to th
 
   // Into a match (a fresh load: the picks come from the account).
   for (const p of [desk, phone]) {
-    await p.goto("/?debug&pool=chat");
+    // (?afk=0: 50 v 50's AFK rule off, CrowdMisses: the computer never picks, and the 4th miss would take it out of the match.)
+    await p.goto("/?debug&pool=chat&afk=0");
     await pickMode(p);
     await p.getByRole("button", { name: "PLAY", exact: true }).click();
     await expect(p.locator(".fd-seats")).toBeVisible();
@@ -323,7 +324,8 @@ test("a name's menu and the chat options stay open when the round moves on (each
   test.skip(test.info().project.name !== "desktop", "the computer's chat column");
   const desk = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
   await named(desk, "Menus");
-  await desk.goto("/?debug&pool=chatmenu");
+  // (?afk=0: 50 v 50's AFK rule off, CrowdMisses: this player never picks, and the 4th miss would take them out of the match.)
+  await desk.goto("/?debug&pool=chatmenu&afk=0");
   await pickMode(desk);
   await desk.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect.poll(() => phase(desk), { timeout: 90_000 }).toMatch(/play|watching/);
