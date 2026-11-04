@@ -159,3 +159,4 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Ginger stairs joined 6ef02ce9 (one flight per side, rising along back wall into deck; bays a/e gone). Eric's fallback if he dislikes: straight back-to-front flights. Asked Eric which.
 - Ginger CODE started (Eric OK'd stairs 'fine for now; real test = run up with pawn'). Brief brief-ginger-code.md, /home/user/cr-ginger, claude/ginger-home, ports 8983/9483.
 - Ginger code DONE dcf4a6c5 → PR #493 (full-e2e), CI watcher bh5qn5ne7. Note: arrows up fixed in every shop; doorway phone fps 35.7 vs 40.8.
+- Ginger LIVE 3ad40dde (22:35 UTC). Main e2e red: Ginger stairs spec read lift before step settled (no SHOTS on CI). Fix PR #494 c0e710b2 (settled() + trail 6000), CI watcher brngboghh. Smudgy desktop flaky once in same run (passed on retry).
