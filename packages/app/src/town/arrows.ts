@@ -113,7 +113,16 @@ const setStep = (s: KeyStep, axis: 0 | 1, dc: number, dr: number): void => {
  * frame while a direction is held: a walker standing still takes its first step. The walker asks `run` for the square after each
  * step it begins, so a held key keeps it going (no stop between squares); with no key held, the walk ends after the step it's on.
  */
-export function keyWalk(w: Walker, ok: (c: number, r: number) => boolean, wrap: (v: number) => number = (v) => v): { start: () => void } {
+export function keyWalk(
+  w: Walker,
+  ok: (c: number, r: number) => boolean,
+  wrap: (v: number) => number = (v) => v,
+  /**
+   * The square a step `dc` across and `dr` along takes the walker to from (c, r) (null: none), when that isn't simply the next square
+   * (a shop's room: its rows run toward the camera, and Ginger's catwalk goes round a curve: room.ts `stepFor`). `ok` still decides.
+   */
+  to?: (c: number, r: number, dc: number, dr: number) => Sq | null,
+): { start: () => void } {
   let lastAxis: 0 | 1 = 0;
   const steps: KeyStep[] = [
     { dc: 0, dr: 0, axis: 0 },
@@ -123,11 +132,13 @@ export function keyWalk(w: Walker, ok: (c: number, r: number) => boolean, wrap: 
     const n = keySteps(lastAxis, steps);
     for (let i = 0; i < n; i++) {
       const s = steps[i]!;
-      const c = wrap(fc + s.dc);
-      const r = wrap(fr + s.dr);
+      const sq = to ? to(fc, fr, s.dc, s.dr) : null;
+      if (to && !sq) continue;
+      const c = sq ? sq.c : wrap(fc + s.dc);
+      const r = sq ? sq.r : wrap(fr + s.dr);
       if (ok(c, r)) {
         lastAxis = s.axis;
-        return { c, r };
+        return sq ?? { c, r };
       }
     }
     return null;

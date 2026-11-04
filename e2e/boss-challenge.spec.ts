@@ -559,6 +559,104 @@ test("challenging Jefferson in the town: his own intro (in to your marks, one of
   expect(errors).toEqual([]);
 });
 
+test("challenging Ginger in the town: his own intro (in to your marks in his igloo, his line, he charges his staff and blasts the air, the icicle falls point first and stabs the floor, its round top the table; two elves bring the board out of the stockroom and toss it up onto it; he casts and the pieces appear; his brag, his attack, his blizzard), the battle; Leave back where you stood", async ({ page }) => {
+  test.setTimeout(240_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  const project = test.info().project.name;
+  if (SHOTS) mkdirSync(SHOTS, { recursive: true });
+  const shot = async (name: string) => SHOTS && (await page.screenshot({ path: `${SHOTS}/${name}-${project}.png` }));
+  type Ice = {
+    move: string | null;
+    blast: string | null;
+    shard: { anim: string; lift: number } | null;
+    table: boolean;
+    crack: string | null;
+    door: boolean;
+    carriers: { at: [number, number]; anim: string }[] | null;
+    board: { at: [number, number]; lift: number } | null;
+    onTable: boolean;
+    light: string | null;
+    pieces: number;
+    crewLine: boolean;
+  };
+  const iceOf = (i: Intro | null) => (i as unknown as { ice: Ice | null } | null)?.ice ?? null;
+  const lineOf = (i: Intro | null) => (i as unknown as { lineText: string | null } | null)?.lineText ?? null;
+  // (Ginger is live for everyone: a player's town. Nov 5: his own intro, Eric's design.)
+  await page.goto("/town?sky=day");
+  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  const { confirm, stood } = await toConfirm(page, "gingerbread", "Ginger");
+  await confirm.getByRole("button", { name: "Fight" }).click();
+  // In at the igloo's doorway, to the marks: his peppermint west of the battle spot's middle, your snowflake east; you both stand
+  // there through it all (no stools).
+  await expect(room(page)).toHaveAttribute("data-room", "gingerbread", { timeout: 20_000 });
+  await expect(page.getByRole("heading", { name: "Ginger Igloo" })).toBeVisible();
+  const step = async () => (await intro(page))?.step ?? "";
+  const marks = [11, 9.5, 8, 9.5];
+  const where = (i: Intro) => [i.you[0], i.you[1], i.boss[0], i.boss[1]].map((v) => Math.round(v * 100) / 100);
+  const looks: Intro[] = [];
+  const look = async () => {
+    const i = (await intro(page))!;
+    looks.push(i);
+    return i;
+  };
+  await expect.poll(step, { message: "his line", timeout: 20_000, intervals: [50] }).toBe("line");
+  const atLine = await look();
+  expect(atLine.layout).toBe("across");
+  expect(where(atLine)).toEqual(marks);
+  expect(atLine.line).toBe(true);
+  // His line (a placeholder until Eric's Gemini lines), in the big bubble; no table yet, the battle spot's ice whole.
+  expect(lineOf(atLine)).toBe("Cold enough for you?");
+  expect(iceOf(atLine)).toMatchObject({ move: null, table: false, crack: null, carriers: null, onTable: false, pieces: 0 });
+  await shot("ginger-start");
+  // He charges his staff and blasts; the blast flies and bursts over the battle spot; the icicle forms there and falls point first.
+  await expect.poll(async () => iceOf(await look())?.move, { message: "he charges", intervals: [30] }).toBe("charge");
+  await expect.poll(async () => iceOf(await look())?.blast, { message: "the blast flies", intervals: [30] }).toBe("fly");
+  await expect.poll(async () => iceOf(await look())?.shard?.anim, { message: "the icicle falls", intervals: [20] }).toBe("fall");
+  // It stabs in: the crack, and its round top is the table from then on (in place before any cover).
+  await expect.poll(async () => iceOf(await look())?.table, { message: "the table", timeout: 5000, intervals: [30] }).toBe(true);
+  expect(iceOf(await look())?.crack).not.toBeNull();
+  await shot("ginger-icicle");
+  // The stockroom door opens and the two carriers come out with the board ("Coming, boss!"), run round behind you both and toss it.
+  await expect.poll(async () => iceOf(await look())?.door, { message: "the door opens", intervals: [30] }).toBe(true);
+  await expect.poll(async () => iceOf(await look())?.crewLine, { message: "their line", intervals: [30] }).toBe(true);
+  await expect.poll(async () => iceOf(await look())?.carriers?.[0]?.anim, { message: "they toss it", timeout: 5000, intervals: [30] }).toBe("toss");
+  await expect.poll(async () => iceOf(await look())?.onTable, { message: "the board on the table", timeout: 5000, intervals: [30] }).toBe(true);
+  // He casts; the light on the board; the pieces come in as it fades.
+  await expect.poll(async () => iceOf(await look())?.move, { message: "he casts", intervals: [30] }).toBe("cast");
+  await expect.poll(async () => iceOf(await look())?.light, { message: "the light", intervals: [30] }).toBe("shine");
+  await expect.poll(async () => iceOf(await look())?.pieces, { message: "the pieces in", timeout: 5000, intervals: [30] }).toBe(1);
+  await shot("ginger-board");
+  // His brag, then his attack swung in place before the blizzard.
+  await expect.poll(async () => iceOf(await look())?.move, { message: "his brag", intervals: [30] }).toBe("brag");
+  await expect.poll(step, { message: "he swings", intervals: [30] }).toBe("swing");
+  const swing = await look();
+  expect(swing).toMatchObject({ attack: true, line: false });
+  // The carriers watching from their spots, behind the table; the board and its pieces on it; the door shut. Nobody steps from here on.
+  expect(iceOf(swing)).toMatchObject({ table: true, onTable: true, pieces: 1, door: false, board: null, light: null });
+  expect(iceOf(swing)!.carriers!.map((c) => [c.at, c.anim])).toEqual([
+    [[11.3, 7.9], "idle"],
+    [[7, 7.9], "idle"],
+  ]);
+  // Neither of you two moved, from the line to the swing.
+  for (const i of looks) expect(where(i), `at ${i.step}: where you stand`).toEqual(marks);
+  // His blizzard (snowflakes and candy canes) sweeps in over the igloo, the battle loads under it, and it slides off the board.
+  await expect(storm(page)).toHaveCount(1, { timeout: 10_000 });
+  await expect(storm(page)).toHaveAttribute("data-boss", "gingerbread");
+  await page.waitForTimeout(350);
+  await shot("ginger-wipe");
+  await expect(page.locator(BOARD_SEL.wrap).first()).toBeVisible({ timeout: 60_000 });
+  await expect(storm(page)).toHaveCount(0, { timeout: 10_000 });
+  await page.getByRole("button", { name: "Match options" }).click();
+  const quit = page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: /^(Leave|Resign)$/ });
+  const how = (await quit.textContent())!.trim();
+  await quit.click();
+  await page.getByRole("alertdialog").getByRole("button", { name: how, exact: true }).click();
+  if (how === "Resign") await page.getByRole("button", { name: "Back to town" }).click();
+  await backAt(page, stood);
+  expect(errors).toEqual([]);
+});
+
 test("challenging Big Boy in the town: his own intro (his line, his toy blocks build the table, the board plops on, the stools drop in, his attack, the lollipop swirl), the battle; Leave back where you stood", async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];

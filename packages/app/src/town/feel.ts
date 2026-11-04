@@ -622,4 +622,24 @@ export const SHOP_FEEL = {
    * runs them from its own room's clock: no server state.
    */
   crew: { stepMs: 620, upHoldMs: 1760, endMs: 1200, homeMs: 1400, palletEaseMs: 150 },
+  /**
+   * Ginger's elves at work in his igloo (Nov 5; the art's loops, shop-ginger-nov5.md; shops/ginger-elves.ts): the walkers at
+   * `walkerSpeed` squares a second, each starting `walkerStart` ms into its loop (so they don't move as one); the dispensing pair at
+   * `pairSpeed`, standing `stopBeatMs` after A's four jobs at each stop (tap, boxOut, fill, full: his art's times), elf B `bBehind`
+   * squares behind A and taking `bMoveMs` to step over to his place at a stop and back. Before walking on, an elf looks at the points
+   * `look` squares ahead of it: anyone there (you, the boss walking in) and it waits where it is. Each elf takes its own square and,
+   * walking, the square `takesAhead` ahead: you can't walk there; a tap walks you round them (up
+   * the other staircase if one stands on the nearer), and one in your way as you walk has you wait where you are, then go on (or round
+   * by the other way once it's open). Each client runs them from its own room's clock.
+   */
+  elves: {
+    walkerSpeed: 1.6,
+    walkerStart: { red: 0, green: 2600, blue: 5200 },
+    pairSpeed: 1.4,
+    stopBeatMs: 300,
+    bBehind: 0.5,
+    bMoveMs: 300,
+    look: [0.35, 0.7, 1.05],
+    takesAhead: 0.5,
+  },
 } as const;

@@ -30,6 +30,7 @@ import { TOWN_FEEL } from "../feel.ts";
 import { PARK_TABLE, TABLE_BOARD, TABLE_INK, TABLE_PIECES } from "../houses/park.ts";
 import { BOSS_ART } from "../render.ts";
 import type { HomeId } from "../world.ts";
+import { ICE_ELF, ICE_GEAR, ICE_MOVES, iceAnims, type IceElf, type IceGear, type IceMove } from "./challenge.ts";
 import { CHALLENGE_FEEL, CREW_MOVES, DARK_MOVES, ROPE_MOVES, crewAnims, type CrewMove, boardSquare, darkAnims, drainAt, drawnTop, frameAt, introBeats, introOf, ropeAnims, stormEdge, wipeAt, type BossIntro, type DarkMove, type IntroAnims, type IntroBeat, type IntroLayout, type LogMove, type RopeMove, LOG_MOVES, logAnims } from "./challenge.ts";
 
 /**
@@ -43,8 +44,10 @@ type IntroArt =
       | { wood: WoodArt; table: Character; pyramid?: undefined; blocks?: undefined }
       | { rope: typeof import("./pig-intro-art.ts"); table: Character; pyramid?: undefined; blocks?: undefined; wood?: undefined }
       | { crew: typeof import("./grex-intro-art.ts"); table: Character; rope?: undefined; pyramid?: undefined; blocks?: undefined; wood?: undefined }
+      | { ice: IceMods; table: Character; crew?: undefined; rope?: undefined; pyramid?: undefined; blocks?: undefined; wood?: undefined }
     ) & {
       dark?: undefined;
+      ice?: IceMods;
       rope?: typeof import("./pig-intro-art.ts");
       crew?: typeof import("./grex-intro-art.ts");
       /** The slab's keys "1" to "5" and the board's squares `L` / `D`. */
@@ -53,7 +56,13 @@ type IntroArt =
       front: Character;
     })
   // Hollow's: the dark (his moves, the cave's lights going out, the motes); the park table; no storm (the dark is his transition).
-  | { dark: typeof import("./hollow-intro-art.ts"); rope?: undefined; crew?: undefined; pyramid?: undefined; blocks?: undefined; wood?: undefined; table?: undefined; palette?: undefined; storm?: undefined; front?: undefined };
+  | { dark: typeof import("./hollow-intro-art.ts"); ice?: undefined; rope?: undefined; crew?: undefined; pyramid?: undefined; blocks?: undefined; wood?: undefined; table?: undefined; palette?: undefined; storm?: undefined; front?: undefined };
+/** Ginger's: his props (shops/ginger-intro-art.ts), his moves (characters/ginger-intro.ts) and his elves (the board carriers). */
+interface IceMods {
+  props: typeof import("./ginger-intro-art.ts");
+  moves: typeof import("../../characters/ginger-intro.ts");
+  elves: typeof import("./ginger-elves-art.ts");
+}
 /** Timber's: his own moves (facing east), where the lying log and the standing one are from his foot (his pixels), the props. */
 interface WoodArt {
   mover: Character;
@@ -82,6 +91,16 @@ const ART: Partial<Record<HomeId, () => Promise<IntroArt>>> = {
   // (Jefferson's: his moves, the crate-stack table (the warehouse's board stand without its slab and board), your lift, his wipe; one
   // chunk. His crew are the room's: their baked sheets.)
   grex: () => import("./grex-intro-art.ts").then((m) => ({ crew: m, table: m.INTRO_GREX_TABLE, palette: m.INTRO_GREX_TABLE_PALETTE, storm: m.INTRO_GREX_STORM, front: m.INTRO_GREX_FRONT })),
+  // (Ginger's: his moves, the blast, the icicle (his table), the crack and the puff, the light, the board and its two carriers, his
+  // blizzard; the room's own elves keep working.)
+  gingerbread: () =>
+    Promise.all([import("./ginger-intro-art.ts"), import("../../characters/ginger-intro.ts"), import("./ginger-elves-art.ts")]).then(([props, moves, elves]) => ({
+      ice: { props, moves, elves },
+      table: props.INTRO_GINGER_TABLE,
+      palette: props.INTRO_GINGER_TABLE_PALETTE,
+      storm: props.INTRO_GINGER_STORM,
+      front: props.INTRO_GINGER_FRONT,
+    })),
 };
 
 type PyramidAnim = "rise" | "idle" | "crack" | "crumble";
@@ -146,6 +165,32 @@ export interface LoadedIntro {
   rope: RopeArt | null;
   /** Jefferson's crew (null: another's): his moves' frames, the crate-stack table, your lift; see CrewArt. */
   crew: CrewArt | null;
+  /** Ginger's icicle (null: another's): his moves' frames, his props', the carriers', where things go; see IceArt. */
+  ice: IceArt | null;
+}
+
+/**
+ * Ginger's intro, ready (shops/ginger-intro-art.ts, characters/ginger-intro.ts, the carriers of shops/ginger-elves-art.ts; ShopRoom
+ * draws it): his moves' frames (BOSS_GINGER_INTRO, at his town figure's pixels, as drawn: not mirrored) and where the blast leaves his
+ * hook on them; each prop's frames by its animation (ICE_GEAR) with its sprite (its foot); the carriers' frames and the board's
+ * heights in their hands; the route, the spots, the table's place and its top's height. At the room's scale (1:1), but his.
+ */
+export interface IceArt {
+  mover: { ch: Character; frames: Record<IceMove, HTMLCanvasElement[]>; blastFrom: readonly [number, number] };
+  props: Record<IceGear, { ch: Character; frames: HTMLCanvasElement[] }>;
+  carriers: { a: { ch: Character; frames: Record<IceElf, HTMLCanvasElement[]> }; b: { ch: Character; frames: Record<IceElf, HTMLCanvasElement[]> } };
+  /** The board as they carry it (its `carry` frame). */
+  board: { ch: Character; carry: HTMLCanvasElement };
+  /** Where things are, as iceAt wants them (the art's). */
+  at: {
+    route: readonly (readonly [number, number])[];
+    table: readonly [number, number];
+    top: number;
+    hands: { carry: readonly number[]; toss: readonly (number | null)[] };
+    spots: { carry: { a: number; b: number }; watch: { a: { at: readonly [number, number]; face: number }; b: { at: readonly [number, number]; face: number } } };
+  };
+  /** The blast's target (over the table's spot, `lift` px up). */
+  blastTo: { at: readonly [number, number]; lift: number };
 }
 
 /**
@@ -263,8 +308,38 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
     let dark: DarkArt | null = null;
     let rope: RopeArt | null = null;
     let crew: CrewArt | null = null;
+    let ice: IceArt | null = null;
     const all = <A extends string>(ch: Character, names: readonly A[]) => Object.fromEntries(names.map((a) => [a, ch.anims[a]!.frames.map((_, i) => toCanvas(ch, a, i))])) as Record<A, HTMLCanvasElement[]>;
-    if (art?.crew) {
+    if (art?.ice) {
+      const { props: m, moves: g, elves: e } = art.ice;
+      const route = m.INTRO_GINGER_BOARD_ROUTE;
+      const len = route.reduce((s, p, i) => (i ? s + Math.hypot(p[0] - route[i - 1]![0], p[1] - route[i - 1]![1]) : 0), 0);
+      const letGo = Math.max(0, e.ELF_BOARD_HANDS.toss.findIndex((h) => h === null));
+      const pieces = { mover: g.BOSS_GINGER_INTRO, blast: m.INTRO_GINGER_BLAST, shard: m.INTRO_GINGER_SHARD, crack: m.INTRO_GINGER_CRACK, puff: m.INTRO_GINGER_PUFF, table: m.INTRO_GINGER_TABLE, light: m.INTRO_GINGER_LIGHT, board: m.INTRO_GINGER_BOARD, carrier: e.NPC_GINGER_ELF_BOARD_A };
+      anims = iceAnims(pieces, letGo, len);
+      const where: Record<IceGear, [Character, string]> = {
+        fly: [m.INTRO_GINGER_BLAST, "fly"],
+        burst: [m.INTRO_GINGER_BLAST, "burst"],
+        form: [m.INTRO_GINGER_SHARD, "form"],
+        fall: [m.INTRO_GINGER_SHARD, "fall"],
+        land: [m.INTRO_GINGER_SHARD, "land"],
+        crack: [m.INTRO_GINGER_CRACK, "crack"],
+        puff: [m.INTRO_GINGER_PUFF, "puff"],
+        tableIdle: [m.INTRO_GINGER_TABLE, "idle"],
+        appear: [m.INTRO_GINGER_LIGHT, "appear"],
+        shine: [m.INTRO_GINGER_LIGHT, "shine"],
+        fade: [m.INTRO_GINGER_LIGHT, "fade"],
+        spin: [m.INTRO_GINGER_BOARD, "spin"],
+      };
+      ice = {
+        mover: { ch: g.BOSS_GINGER_INTRO, frames: all(g.BOSS_GINGER_INTRO, ICE_MOVES), blastFrom: g.INTRO_GINGER_BLAST_FROM },
+        props: Object.fromEntries(ICE_GEAR.map((k) => [k, { ch: where[k][0], frames: all(where[k][0], [where[k][1]])[where[k][1]]! }])) as IceArt["props"],
+        carriers: { a: { ch: e.NPC_GINGER_ELF_BOARD_A, frames: all(e.NPC_GINGER_ELF_BOARD_A, ICE_ELF) }, b: { ch: e.NPC_GINGER_ELF_BOARD_B, frames: all(e.NPC_GINGER_ELF_BOARD_B, ICE_ELF) } },
+        board: { ch: m.INTRO_GINGER_BOARD, carry: toCanvas(m.INTRO_GINGER_BOARD, "carry", 0) },
+        at: { route, table: m.INTRO_GINGER_TABLE_AT, top: m.INTRO_GINGER_TABLE_TOP, hands: e.ELF_BOARD_HANDS, spots: m.INTRO_GINGER_ELF_SPOTS },
+        blastTo: m.INTRO_GINGER_BLAST_TO,
+      };
+    } else if (art?.crew) {
       const m = art.crew;
       anims = crewAnims({ mover: m.BOSS_GREX_INTRO, lift: m.INTRO_GREX_LIFT, table: m.INTRO_GREX_TABLE });
       crew = {
@@ -383,6 +458,7 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
       dark,
       rope,
       crew,
+      ice,
     };
   });
   p.catch(() => loading.delete(home));
@@ -636,7 +712,7 @@ export function slabFrontY(v: View, dx: number, dz: number): number | null {
  * gold far edge, the 8 x 8 squares lying flat, the pieces standing on them, far ones first, turned for the layout (`boardSquare`:
  * white's nearest you). `alpha`: how much it shows.
  */
-export function paintTable(g: CanvasRenderingContext2D, v: View, dx: number, dz: number, pal: Readonly<Record<string, string>>, how: IntroLayout, alpha = 1): void {
+export function paintTable(g: CanvasRenderingContext2D, v: View, dx: number, dz: number, pal: Readonly<Record<string, string>>, how: IntroLayout, alpha = 1, pieces = 1): void {
   const B = TABLE_BOARD;
   if (!proj(v, dx, dz, 0, bp)) return;
   const fx = bp.x;
@@ -699,6 +775,12 @@ export function paintTable(g: CanvasRenderingContext2D, v: View, dx: number, dz:
   // The pieces, far ones first (by their row on the table, north to south). Across, the knights face the other side: yours west
   // (left, toward the boss), its east; facing, black's turned (as the town's tables have them).
   g.imageSmoothingEnabled = false;
+  // (`pieces`: how much the pieces show: Ginger's come in as his light fades.)
+  if (pieces <= 0) {
+    g.restore();
+    return;
+  }
+  g.globalAlpha = alpha * Math.min(1, pieces);
   for (const p of tablePieces(how)) {
     if (!proj(v, dx + p.x * sq, z + p.z * sq, top, bq)) continue;
     const img = pieceImg(p.kind, p.light, how === "across" ? p.light : !p.light);

@@ -61,9 +61,9 @@ describe("the challenge's flow", () => {
     expect(run(["fight", "atDoor", "cancel", "fight"])).toBe("toDoor");
   });
 
-  it("every boss whose home has an inside has an intro (Alfil, Big Boy, Timber, Hollow, Wrangler and Jefferson their own, Babur, Puddles and Dash the default); every other boss is challenged as before (the Boss raid screen)", () => {
+  it("every boss whose home has an inside has an intro (Alfil, Big Boy, Timber, Hollow, Wrangler, Jefferson and Ginger their own, Babur, Puddles and Dash the default); every other boss is challenged as before (the Boss raid screen)", () => {
     const withIntro = ALL_HOMES.filter((h) => introOf(h.id)).map((h) => h.id).sort();
-    expect(withIntro).toEqual(["alfil", "bigboy", "dash", "gardener", "grex", "hollow", "pig", "tiger", "timber"]);
+    expect(withIntro).toEqual(["alfil", "bigboy", "dash", "gardener", "gingerbread", "grex", "hollow", "pig", "tiger", "timber"]);
     expect(withIntro).toEqual(Object.keys(SHOPS).sort());
     expect(introOf("alfil")).toMatchObject({ custom: true, line: "I'll show you the power of the old piece." });
     expect(introOf("tiger")).toMatchObject({ custom: false, name: "Babur", line: "Fine. One more show. Then I'm on break." });
@@ -80,11 +80,14 @@ describe("the challenge's flow", () => {
     // the marks: he stands, you on your lift.)
     expect(introOf("grex")).toMatchObject({ custom: true, name: "Jefferson", line: "Boys! We got a challenger!", layout: "across" });
     expect(introOf("grex")!.seated).toBeUndefined();
+    // (Ginger, Nov 5: his own, the icicle; his line a placeholder until Eric's Gemini lines; you both stand on the marks, no stools.)
+    expect(introOf("gingerbread")).toMatchObject({ custom: true, name: "Ginger", line: "Cold enough for you?", layout: "across", crewLine: "Coming, boss!" });
+    expect(introOf("gingerbread")!.seated).toBeUndefined();
     expect(introOf("folio")).toBeNull();
   });
 
-  it("the layout: across for all nine today (the boss on the left, you on the right: Eric's normal look)", () => {
-    for (const id of ["alfil", "tiger", "gardener", "bigboy", "timber", "dash", "hollow", "pig", "grex"] as const) expect(introOf(id)!.layout, id).toBe("across");
+  it("the layout: across for all ten today (the boss on the left, you on the right: Eric's normal look)", () => {
+    for (const id of ["alfil", "tiger", "gardener", "bigboy", "timber", "dash", "hollow", "pig", "grex", "gingerbread"] as const) expect(introOf(id)!.layout, id).toBe("across");
   });
 });
 

@@ -560,6 +560,151 @@ test("Jefferson's Fireworks (Nov 4): Go in (its card its name and Go in), his wa
   expect(errors).toEqual([]);
 });
 
+type ElvesHook = {
+  elves: { name: string; at: [number, number]; up: number; anim: string; waiting: boolean }[];
+  taken: [number, number][];
+  you: [number, number];
+  waiting: [number, number] | null;
+  pairT: number;
+  trail: { x: number; y: number; up: number; sy: number; z: number; t: number }[];
+};
+/** Ginger's igloo's elves and your figure as drawn frame by frame (`clear`: start the trail afresh). */
+const elvesOf = (p: Page, clear = false) => p.evaluate((c) => (window as unknown as { __shopElves?: (c: boolean) => ElvesHook | null }).__shopElves?.(c) ?? null, clear);
+
+test("Ginger Igloo (Nov 5): Go in (its card its name and Go in), the round igloo: the candy wall, the catwalk and its two staircases, the elves at work; the shopkeeper elf keeps the shop, Ginger's Boss Crate with the Candy Cane Sled; you run up one staircase, along the catwalk and down the other, by taps and by the arrow keys, your feet on the steps all the way; an elf waits while you stand in its way and goes on once you step aside", async ({ page }) => {
+  test.setTimeout(240_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  // (Ginger is live for everyone, so his igloo is too: a player's town.)
+  await page.goto("/town?sky=day");
+  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("gingerbread"));
+  await expect.poll(() => homeAt(page, "gingerbread"), { message: "Ginger Igloo comes into view" }).not.toBeNull();
+  await goIn(page, "gingerbread", "Ginger Igloo");
+  await expect(room(page)).toHaveAttribute("data-room", "gingerbread");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Ginger Igloo");
+  await expect(page.locator(".town-chat")).toHaveAttribute("data-tone", "day");
+  await expect.poll(async () => (await shopCam(page))?.zoom, { message: "zoomed out" }).toBe(1);
+  const name = test.info().project.name;
+  const still = async (what: string, wait = 600) => {
+    if (!SHOTS) return;
+    await page.waitForTimeout(wait);
+    await page.screenshot({ path: `${SHOTS}/${what}-${name}.png` });
+  };
+  // The elves: the three walkers and the dispensing pair, all on the floor or the levels' curve.
+  const e0 = (await elvesOf(page))!;
+  expect(e0.elves.map((e) => e.name)).toEqual(["red", "green", "blue", "box", "pad"]);
+  await still("room", 1200);
+  // The shopkeeper elf behind his stand: a tap on him walks you in front of it; his card says "Shopkeeper".
+  await expect.poll(() => shopAt(page, "keeper"), { message: "the shopkeeper is drawn" }).not.toBeNull();
+  const at = (await shopAt(page, "keeper"))!;
+  await page.mouse.click(at.x, at.y);
+  const card = page.getByRole("dialog", { name: "Shopkeeper", exact: true });
+  await expect(card).toBeVisible({ timeout: 20_000 });
+  await expect(card.getByRole("heading", { name: "Shopkeeper", exact: true })).toBeVisible();
+  await still("shopkeeper");
+  await card.getByRole("button", { name: "Talk" }).click();
+  const crate = page.getByRole("dialog", { name: "Ginger's Boss Crate", exact: true });
+  await expect(crate).toBeVisible();
+  await expect(crate).toContainText("3 Ginger tokens, or 1 Ginger token + 1 crate key");
+  await expect(crate).toContainText("Candy Cane Sled");
+  await expect(crate).toContainText("You have 0 Ginger tokens and 0 crate keys.");
+  await expect(crate.getByRole("button", { name: "Buy with 3 Ginger tokens" })).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await expect(crate).toBeHidden();
+
+  const tapTo = async (sq: readonly [number, number]) => {
+    // (Within talking range of the shopkeeper his card is open: closed first, or the tap would close it.)
+    if (await page.getByRole("dialog").isVisible()) await page.keyboard.press("Escape");
+    await expect.poll(() => shopAt(page, "square", sq), { message: `(${sq}) is on screen` }).not.toBeNull();
+    const xy = (await shopAt(page, "square", sq))!;
+    await page.mouse.click(xy.x, xy.y);
+    await expect(room(page)).toHaveAttribute("data-you", `${sq[0]},${sq[1]}`, { timeout: 30_000 });
+  };
+  // (The pair work the lower row's middle and east bins from about 8 to 22 s into their loop, clear of the west stairs, the catwalk
+  // and, until 22 s, the east stairs: you go up and over then.)
+  const clear = async () => expect.poll(async () => (await elvesOf(page))!.pairT, { message: "the pair at the lower row's east bins", timeout: 60_000, intervals: [200] }).toBeGreaterThan(7500);
+  await tapTo([7, 9]);
+  await expect.poll(async () => (await elvesOf(page))!.pairT, { message: "the pair's loop back at its start", timeout: 60_000, intervals: [200] }).toBeLessThan(3000);
+  await clear();
+  // Up the west stairs by taps: onto the low step from its foot, then the high step. Your feet on the step's height (the curve's).
+  await elvesOf(page, true);
+  await tapTo([5, 6]);
+  await tapTo([6, 5]);
+  await still("on-stair", 300);
+  const onStair = (await elvesOf(page))!.trail.at(-1)!;
+  expect(onStair.up, "on the high step: its middle between the steps 30 and 35 px up").toBeGreaterThan(30);
+  expect(onStair.up).toBeLessThan(35);
+  // A tap on a deck square as it's drawn (up on the catwalk) walks you along it.
+  await tapTo([9, 4]);
+  await still("on-catwalk", 300);
+  expect((await elvesOf(page))!.trail.at(-1)!.up, "on the deck").toBe(40);
+  // Down the east stairs to their foot: along the catwalk round its curve onto the high step, then a tap on the floor at the foot
+  // walks you down (never off the deck's front). (The camera follows you: each square tapped once it's on screen.)
+  await tapTo([11, 4]);
+  await tapTo([13, 5]);
+  await tapTo([14, 6]);
+  await still("stair-foot", 300);
+  const t1 = (await elvesOf(page))!.trail;
+  expect(t1.at(-1)!.up, "back on the floor").toBe(0);
+  // Every frame of the way: never off the chain (no square in front of the deck), and the lift never jumps for how far you went.
+  /** The floor square a point is well inside (not on its edge, where the catwalk's diagonal steps cross a corner), or "". */
+  const sqOf = (x: number, y: number) => (Math.abs(x - Math.round(x)) < 0.45 && Math.abs(y - Math.round(y)) < 0.45 ? `${Math.round(x)},${Math.round(y)}` : "");
+  let most = 0;
+  for (let i = 1; i < t1.length; i++) {
+    const a = t1[i - 1]!;
+    const b = t1[i]!;
+    const d = Math.hypot(b.x - a.x, b.y - a.y);
+    most = Math.max(most, Math.abs(b.up - a.up) - 40 * d);
+    expect(["8,5", "9,5", "10,5", "11,5", "6,6", "13,6"], `frame ${i}: never in front of the deck or under the high steps`).not.toContain(b.up > 0 ? sqOf(b.x, b.y) : "");
+  }
+  expect(most, "no pops: the lift changes no faster than the steps rise").toBeLessThanOrEqual(0.05);
+  expect(Math.max(...t1.map((p) => p.up)), "up on the deck on the way").toBe(40);
+
+  // By the arrow keys: up from the east foot climbs on, left runs along the flight and the catwalk; up does nothing on the deck.
+  await clear();
+  await elvesOf(page, true);
+  await page.keyboard.down("ArrowUp");
+  await expect(room(page)).toHaveAttribute("data-you", "14,5", { timeout: 10_000 });
+  await page.keyboard.up("ArrowUp");
+  await page.keyboard.down("ArrowLeft");
+  // (A step is 90 ms: watched every frame, in the page.)
+  await page.waitForFunction(() => document.querySelector<HTMLCanvasElement>("canvas.town-shop-canvas")?.dataset.you === "10,4", null, { timeout: 10_000 });
+  await page.keyboard.up("ArrowLeft");
+  await page.waitForTimeout(400);
+  const keyed = (await room(page).getAttribute("data-you"))!;
+  expect(["10,4", "9,4", "8,4"], "it stops on the catwalk once the key's let go").toContain(keyed);
+  await page.keyboard.down("ArrowUp");
+  await page.waitForTimeout(500);
+  await page.keyboard.up("ArrowUp");
+  await expect(room(page)).toHaveAttribute("data-you", keyed);
+  await page.keyboard.down("ArrowDown");
+  await page.waitForTimeout(500);
+  await page.keyboard.up("ArrowDown");
+  await expect(room(page), "down on the deck: not off its front edge").toHaveAttribute("data-you", keyed);
+  const t2 = (await elvesOf(page))!.trail;
+  for (let i = 1; i < t2.length; i++) expect(Math.abs(t2[i]!.up - t2[i - 1]!.up) - 40 * Math.hypot(t2[i]!.x - t2[i - 1]!.x, t2[i]!.y - t2[i - 1]!.y), `frame ${i}`).toBeLessThanOrEqual(0.05);
+  // Back down the west stairs by taps.
+  await tapTo([7, 5]);
+  await tapTo([5, 7]);
+
+  // In an elf's way: the red walker goes up and down column 6 by the sack, between (6, 11.3) and (6, 8.6). Stand on (6, 9) and he
+  // waits for you (Eric, Nov 4, of Jefferson's crew: "If you block it, it stops"); step aside and he goes on.
+  await tapTo([6, 9]);
+  const red = async () => (await elvesOf(page))!.elves.find((e) => e.name === "red")!;
+  await expect.poll(async () => (await red()).waiting, { message: "the red walker waits for you", timeout: 30_000 }).toBe(true);
+  const held = await red();
+  await page.waitForTimeout(1200);
+  expect(await red(), "still waiting, where he was").toMatchObject({ waiting: true, at: held.at });
+  await still("elf-blocked", 0);
+  await tapTo([5, 8]);
+  await expect.poll(async () => (await red()).waiting, { message: "he goes on", timeout: 10_000 }).toBe(false);
+  await expect.poll(async () => (await red()).at, { message: "he moves", timeout: 10_000 }).not.toEqual(held.at);
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
+  expect(errors).toEqual([]);
+});
+
 test("Big Boy's Crib (Nov 2): Go in, Blocky's crate with Big Boy's Buggy; the chat's words dark over the nursery", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));

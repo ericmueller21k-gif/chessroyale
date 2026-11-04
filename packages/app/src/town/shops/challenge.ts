@@ -65,6 +65,14 @@ export interface BossIntro {
    * in (Hollow, Nov 3: "you both walk on straight to your seat spots"; the table and stools come in while it's still lit). `seatedMarks`.
    */
   seated?: true;
+  /**
+   * Its own camera through the challenge (Ginger, Nov 5: his battle spot is his round igloo's middle, and the challenge camera centred
+   * on the table keeps both staircases at the catwalk's ends on a phone: the art's INTRO_GINGER_CAM). None: CHALLENGE_FEEL.cam for
+   * its layout, as every other boss's (`introCam`).
+   */
+  cam?: { readonly south: number; readonly west: number; readonly zoom: number };
+  /** What its helpers call out as they come (Ginger's board carriers: "Coming, boss!"), in a bubble over them; none: they're quiet. */
+  crewLine?: string;
 }
 
 /**
@@ -210,6 +218,43 @@ export const BOSS_INTROS: Readonly<Partial<Record<HomeId, BossIntro>>> = {
   // watch; the floor tile at your mark lifts you level with the board on its crates; his brag; the wipe of sparklers and fireworks.
   // docs/decisions/2026-11-04-jefferson-home.md. His call one of four at random, placeholders until Eric's Gemini lines. You both walk
   // on to the marks and stand there: he stands (no stool), you on your lift.)
+  // (Nov 5: his own, Eric's design: in his igloo candy shop he charges his candy-cane staff and blasts the air over the battle spot;
+  // an icicle forms in the burst and falls point first, stabbing the floor (a crack, a puff of snow): its round flat top is the table.
+  // Two elves come out of the stockroom with the board ("Coming, boss!"), run round behind you and toss it up onto it; he casts and
+  // the pieces appear from a small white light; his brag; his attack; the blizzard of snowflakes and candy canes.
+  // docs/decisions/2026-11-05-ginger-home.md. His line a placeholder until Eric's Gemini lines. You both walk on to the marks and
+  // stand there: no stools (the table is 27 px up, a park table's). His own camera, centred on the table.)
+  gingerbread: {
+    name: "Ginger",
+    line: "Cold enough for you?",
+    layout: "across",
+    custom: true,
+    cam: { south: 0.8, west: 0, zoom: 1 },
+    crewLine: "Coming, boss!",
+    // His cues, each a sound of his own (characters/gingerbread-sounds.ts): his staff's icy hum as it charges, the blast's frosty zap,
+    // his whoosh (the blast flying, the board tossed, the wipe's front), the burst's glassy pop, the ice forming (his crackle), the
+    // icicle stabbing the floor (the big crunch-crack), the elves' little steps, their "hup" as they toss, the board's clack on the
+    // table, his cast's rising shimmer, the twinkle as the pieces appear, his laugh (his jingle) and his cane's thump; the blizzard's
+    // wind and a gust over it. (The table's glint is silent.)
+    cues: {
+      charge: "gingerCharge",
+      blast: "gingerBlast",
+      whoosh: "gingerWhoosh",
+      burst: "gingerBurst",
+      freeze: "gingerCrackle",
+      crunch: "gingerStab",
+      step: "gingerStep",
+      heave: "gingerHeave",
+      clack: "gingerClack",
+      cast: "gingerCast",
+      sparkle: "gingerSparkle",
+      laugh: "gingerJingle",
+      thump: "gingerThump",
+      blizzard: "gingerWind",
+      gust: "gingerGust",
+      storm: "gingerWhoosh",
+    },
+  },
   grex: {
     name: "Jefferson",
     line: "Boys! We got a challenger!",
@@ -243,6 +288,8 @@ export const BOSS_INTROS: Readonly<Partial<Record<HomeId, BossIntro>>> = {
 
 /** The boss's intro, or null: challenged as before (no intro yet). */
 export const introOf = (id: HomeId): BossIntro | null => BOSS_INTROS[id] ?? null;
+/** The room's camera through a boss's challenge: its own (Ginger's), or CHALLENGE_FEEL.cam for its layout. */
+export const introCam = (def: BossIntro, layout: IntroLayout = def.layout): { readonly south: number; readonly west: number; readonly zoom: number } => def.cam ?? CHALLENGE_FEEL.cam[layout];
 /** Its line this time: one of its `lines` (picked by `rand`: Math.random as the room opens), or its `line`. */
 export const lineOf = (def: BossIntro, rand: () => number = Math.random): string =>
   def.lines?.length ? def.lines[Math.min(def.lines.length - 1, Math.floor(rand() * def.lines.length))]! : def.line;
@@ -392,6 +439,42 @@ export const CHALLENGE_FEEL = {
       "crew-d": [[5, 13], [6, 8.6]],
       dealer: [[12.5, 5.6]],
     },
+  },
+  /**
+   * Ginger's own (Nov 5; Eric's design, the art's timeline: intro-ginger-nov5.md). After his line he charges his staff (his `charge`)
+   * and blasts (his `blast`): the blast leaves his hook on its release frame and flies `flyMs` to over the table's spot (`blastUp` px
+   * up, on an arc `flyArc` px high at its middle), and bursts there; `formAfterMs` into the burst the icicle forms (`fallFrom` px up,
+   * the burst's middle), hangs `hangMs`, and falls to the floor over `fallMs`, faster and faster; it stabs in (its `land`, the crack and
+   * the puff from its first frame) and from its last it's the table (27 px up). `doorAfterMs` on the stockroom door opens (for
+   * `doorOpenMs`); `outAfterMs` after that the two carriers come out with the board and run its route at `carrySpeed` squares a second,
+   * their line over them from `lineFrom` for `lineMs`; `tossLeadMs` after they're there they toss it (their `toss`), the board leaving
+   * their hands on its let-go frame and flying `boardFlyMs` onto the table (`boardArc` px over the straight line at its middle); they
+   * cheer `cheerMs` and walk `toWatchMs` to their watch spots. `castLeadMs` after the board lands he casts (his `cast`): on its light
+   * frame the white light appears on the board, shines `shineMs` and fades, the pieces coming in as it fades; `bragLeadMs` on, his
+   * brag; his attack. About 13.2 s from the marks to the wipe.
+   */
+  ice: {
+    flyMs: 450,
+    blastUp: 120,
+    flyArc: 30,
+    formAfterMs: 120,
+    fallFrom: 70,
+    hangMs: 170,
+    fallMs: 320,
+    doorAfterMs: 260,
+    doorOpenMs: 1300,
+    outAfterMs: 100,
+    carrySpeed: 3.5,
+    lineFrom: 200,
+    lineMs: 1400,
+    tossLeadMs: 400,
+    boardFlyMs: 450,
+    boardArc: 34,
+    cheerMs: 500,
+    toWatchMs: 500,
+    castLeadMs: 220,
+    shineMs: 500,
+    bragLeadMs: 150,
   },
   /**
    * Hollow's own (Nov 3; Eric's design: "the darkness ball in his belly powers up… It sucks in the light: the lanterns go out one by
@@ -765,8 +848,65 @@ export function crewAnims(w: { mover: ArtLike; lift: ArtLike; table: ArtLike }):
     cues: { ...of((m) => fr(w.mover, m).map((f) => f.cue)), rise: fr(w.lift, "rise").map((f) => f.cue), creak: fr(w.table, "creak").map((f) => f.cue), tableIdle: fr(w.table, "idle").map((f) => f.cue) },
   };
 }
-/** A boss's own art's animations: a pyramid (Alfil's), toy blocks (Big Boy's), a log (Timber's), the dark (Hollow's), the lasso (Wrangler's) or the crew (Jefferson's). */
-export type IntroAnims = PyramidAnims | BlocksAnims | LogAnims | DarkAnims | RopeAnims | CrewAnims;
+/** Ginger's moves (characters/ginger-intro.ts BOSS_GINGER_INTRO): his staff charging, its blast, his cast at the board, his brag. */
+export const ICE_MOVES = ["charge", "blast", "cast", "brag"] as const;
+export type IceMove = (typeof ICE_MOVES)[number];
+/** His props' animations (shops/ginger-intro-art.ts): the blast, the icicle, the crack, the puff, the table, the light, the board. */
+export const ICE_GEAR = ["fly", "burst", "form", "fall", "land", "crack", "puff", "tableIdle", "appear", "shine", "fade", "spin"] as const;
+export type IceGear = (typeof ICE_GEAR)[number];
+/** The board carriers' (shops/ginger-elves-art.ts NPC_GINGER_ELF_BOARD_A and _B: the same timing). */
+export const ICE_ELF = ["carry", "toss", "cheer", "walk", "idle"] as const;
+export type IceElf = (typeof ICE_ELF)[number];
+/**
+ * Ginger's intro (Nov 5; CHALLENGE_FEEL.ice): each frame's ms and cue (the art's) for his moves, his props and the carriers; the frames
+ * things happen on (the blast leaving his hook, the board leaving the carriers' hands, the light starting on the board); and the
+ * board's route's length (squares, INTRO_GINGER_BOARD_ROUTE).
+ */
+export interface IceAnims {
+  ice: true;
+  moves: { readonly [m in IceMove]: readonly number[] };
+  gear: { readonly [m in IceGear]: readonly number[] };
+  elf: { readonly [m in IceElf]: readonly number[] };
+  cues: { moves: { readonly [m in IceMove]: readonly (string | undefined)[] }; gear: { readonly [m in IceGear]: readonly (string | undefined)[] }; elf: { readonly [m in IceElf]: readonly (string | undefined)[] } };
+  key: { blast: number; letGo: number; light: number };
+  route: number;
+}
+/** Ginger's IceAnims from his art: his moves, the props (their animations by ICE_GEAR's names), a carrier, and the route's length. */
+export function iceAnims(
+  w: { mover: ArtLike; blast: ArtLike; shard: ArtLike; crack: ArtLike; puff: ArtLike; table: ArtLike; light: ArtLike; board: ArtLike; carrier: ArtLike },
+  letGo: number,
+  route: number,
+): IceAnims {
+  const where: Record<IceGear, [ArtLike, string]> = {
+    fly: [w.blast, "fly"],
+    burst: [w.blast, "burst"],
+    form: [w.shard, "form"],
+    fall: [w.shard, "fall"],
+    land: [w.shard, "land"],
+    crack: [w.crack, "crack"],
+    puff: [w.puff, "puff"],
+    tableIdle: [w.table, "idle"],
+    appear: [w.light, "appear"],
+    shine: [w.light, "shine"],
+    fade: [w.light, "fade"],
+    spin: [w.board, "spin"],
+  };
+  const fr = (ch: ArtLike, a: string) => ch.anims[a]!.frames;
+  const by = <K extends string, T>(keys: readonly K[], get: (k: K) => T) => Object.fromEntries(keys.map((k) => [k, get(k)])) as Record<K, T>;
+  const at = (ch: ArtLike, a: string, cue: string) => Math.max(0, fr(ch, a).findIndex((f) => f.cue === cue));
+  return {
+    ice: true,
+    moves: by(ICE_MOVES, (m) => fr(w.mover, m).map((f) => f.ms)),
+    gear: by(ICE_GEAR, (g) => fr(...where[g]).map((f) => f.ms)),
+    elf: by(ICE_ELF, (e) => fr(w.carrier, e).map((f) => f.ms)),
+    cues: { moves: by(ICE_MOVES, (m) => fr(w.mover, m).map((f) => f.cue)), gear: by(ICE_GEAR, (g) => fr(...where[g]).map((f) => f.cue)), elf: by(ICE_ELF, (e) => fr(w.carrier, e).map((f) => f.cue)) },
+    key: { blast: at(w.mover, "blast", "blast"), letGo, light: at(w.mover, "cast", "cast") },
+    route,
+  };
+}
+/** A boss's own art's animations: a pyramid (Alfil's), toy blocks (Big Boy's), a log (Timber's), the dark (Hollow's), the lasso (Wrangler's), the crew (Jefferson's) or the icicle (Ginger's). */
+export type IntroAnims = PyramidAnims | BlocksAnims | LogAnims | DarkAnims | RopeAnims | CrewAnims | IceAnims;
+export const isIce = (a: IntroAnims): a is IceAnims => "ice" in a;
 export const isBlocks = (a: IntroAnims): a is BlocksAnims => "build" in a;
 export const isLog = (a: IntroAnims): a is LogAnims => "props" in a;
 export const isDark = (a: IntroAnims): a is DarkAnims => "gutter" in a;
@@ -788,7 +928,8 @@ export type IntroStep =
   | "toLog" | "lift" | "carry" | "setDown" | "gnaw" | "hold" | "settle" | "dust" | "toMark"
   | "charge" | "swell" | "drink" | "full" | "blackout" | "black" | "dim" | "iris"
   | "spin" | "throw" | "catch" | "drag" | "land" | "cross" | "haul" | "stools" | "brag"
-  | "call" | "wave" | "walk" | "creak";
+  | "call" | "wave" | "walk" | "creak"
+  | "blast" | "fall" | "stab" | "toss" | "cast";
 export interface IntroBeat {
   step: IntroStep;
   at: number;
@@ -797,8 +938,41 @@ export interface IntroBeat {
 const sum = (ms: readonly number[]) => ms.reduce((a, b) => a + b, 0);
 type BeatFeel = Pick<
   typeof CHALLENGE_FEEL,
-  "faceMs" | "lineMs" | "afterLineMs" | "holdMs" | "gapMs" | "tableHoldMs" | "boardDropMs" | "popMs" | "swingMs" | "stormInMs" | "flashMs" | "wipeMs" | "log" | "standOff" | "clear" | "dark" | "rope" | "crew"
+  "faceMs" | "lineMs" | "afterLineMs" | "holdMs" | "gapMs" | "tableHoldMs" | "boardDropMs" | "popMs" | "swingMs" | "stormInMs" | "flashMs" | "wipeMs" | "log" | "standOff" | "clear" | "dark" | "rope" | "crew" | "ice"
 >;
+/**
+ * When things happen in Ginger's intro (ms from the marks; CHALLENGE_FEEL.ice): his charge and blast; the blast flying and bursting;
+ * the icicle forming, falling and stabbing in; the table; the door opening and shutting; the carriers setting off, there, tossing (the
+ * board let go and landed), cheering and at their watch spots; his cast, the light's appearing, shining and fading (the pieces in by
+ * `lit`); his brag; his attack.
+ */
+export function iceTimes(a: IceAnims, feel: Pick<typeof CHALLENGE_FEEL, "faceMs" | "lineMs" | "ice"> = CHALLENGE_FEEL) {
+  const I = feel.ice;
+  const charge = feel.faceMs + feel.lineMs;
+  const blast = charge + sum(a.moves.charge);
+  const fly = blast + sum(a.moves.blast.slice(0, a.key.blast));
+  const burst = fly + I.flyMs;
+  const form = burst + I.formAfterMs;
+  const fall = form + sum(a.gear.form) + I.hangMs;
+  const land = fall + I.fallMs;
+  const table = land + sum(a.gear.land);
+  const door = table + I.doorAfterMs;
+  const setOff = door + I.outAfterMs;
+  const arrive = setOff + Math.round((a.route / I.carrySpeed) * 1000);
+  const toss = arrive + I.tossLeadMs;
+  const letGo = toss + sum(a.elf.toss.slice(0, a.key.letGo));
+  const landed = letGo + I.boardFlyMs;
+  const cheer = toss + sum(a.elf.toss);
+  const toWatch = cheer + I.cheerMs;
+  const watching = toWatch + I.toWatchMs;
+  const cast = landed + I.castLeadMs;
+  const light = cast + sum(a.moves.cast.slice(0, a.key.light));
+  const shine = light + sum(a.gear.appear);
+  const fade = shine + I.shineMs;
+  const lit = fade + sum(a.gear.fade);
+  const brag = Math.max(cast + sum(a.moves.cast), lit) + I.bragLeadMs;
+  return { charge, blast, fly, burst, form, fall, land, table, door, doorShut: door + I.doorOpenMs, setOff, arrive, toss, letGo, landed, cheer, toWatch, watching, cast, light, shine, fade, lit, brag };
+}
 /** Hollow's drain, ms from the drink's start (CHALLENGE_FEEL.dark.drain as drawn, every gap times `pace`). */
 export function drainAt(feel: Pick<typeof CHALLENGE_FEEL, "dark"> = CHALLENGE_FEEL) {
   const D = feel.dark;
@@ -843,6 +1017,24 @@ export function introBeats(a: IntroAnims | null, feel: BeatFeel = CHALLENGE_FEEL
     t += ms;
   };
   add("face", feel.faceMs);
+  if (a && isIce(a)) {
+    // Ginger's own: his line; the charge; the blast (flying, bursting, the icicle forming and hanging); its fall; its stab (from its
+    // last frame the table); the carriers coming with the board; their toss (to the board landing); his cast and the light; his
+    // brag; the attack. (No pause after the line: the art's timeline.)
+    const T = iceTimes(a, feel);
+    add("line", feel.lineMs);
+    add("charge", T.blast - T.charge);
+    add("blast", T.fall - T.blast);
+    add("fall", T.land - T.fall);
+    add("stab", T.table - T.land);
+    add("carry", T.toss - T.table);
+    add("toss", T.landed - T.toss);
+    add("cast", T.brag - T.landed);
+    add("brag", sum(a.moves.brag));
+    add("swing", Math.max(0, feel.swingMs - coverMs(true, feel)));
+    out.push({ step: "done", at: t, end: Infinity });
+    return out;
+  }
   if (a && isCrew(a)) {
     // Jefferson's own: his line; his call (the crew stop `stopMs` into it); his wave over; the crew walking round to their spots
     // (they set off `setOffMs` after the stop; your lift rises `walkMs` after that); your lift rising; the crates' creak as it locks;
@@ -995,6 +1187,191 @@ export interface IntroNow {
   rope: RopeNow | null;
   /** Jefferson's own intro (the crew): what he, his crew, your lift and the table do now; null for every other intro. */
   crew: CrewNow | null;
+  /** Ginger's own intro (the icicle): what he, his props and the board carriers do now; null for every other intro. */
+  ice: IceNow | null;
+}
+/** A board carrier in Ginger's intro: where (squares), which way, its animation and frame; null: still in the stockroom. */
+export interface CarrierNow {
+  c: number;
+  r: number;
+  face: 1 | -1;
+  anim: IceElf;
+  frame: number;
+}
+/** Ginger's intro `t` ms in (CHALLENGE_FEEL.ice): see each field. He and you stand on your marks from the start to the end. */
+export interface IceNow {
+  /** His own move and frame (BOSS_GINGER_INTRO, as drawn), or null: his idle (his town figure's frames). */
+  move: { anim: IceMove; frame: number } | null;
+  /** The blast: flying (`u` of its way, 0 to 1) or bursting over the table's spot; null: none. */
+  blast: { anim: "fly" | "burst"; frame: number; u: number } | null;
+  /** The icicle forming, falling and stabbing in (`lift` px over the floor), before it's the table; null: none. */
+  shard: { anim: "form" | "fall" | "land"; frame: number; lift: number } | null;
+  /** The table (the icicle stabbed into the floor, its round top 27 px up): its idle's frame; -1: not yet. */
+  table: number;
+  /** The crack round its foot (cracking, then cracked: it stays); null: not yet. */
+  crack: { anim: "crack" | "idle"; frame: number } | null;
+  /** The puff of snow at its foot: its frame; -1: none. */
+  puff: number;
+  /** The stockroom door is open. */
+  door: boolean;
+  /** The two carriers (A the front, B the back), or null: in the stockroom. */
+  carriers: readonly [CarrierNow, CarrierNow] | null;
+  /** Their line over them. */
+  line: boolean;
+  /** The board in their hands or flying (its middle, squares; `lift` px over the floor), or null: on the table (`onTable`) or not out yet. */
+  board: { c: number; r: number; lift: number; anim: "carry" | "spin"; frame: number } | null;
+  onTable: boolean;
+  /** The white light on the board, or null. */
+  light: { anim: "appear" | "shine" | "fade"; frame: number } | null;
+  /** How far the real pieces have come in (0 to 1). */
+  pieces: number;
+}
+const lerp = (a: number, b: number, u: number) => a + (b - a) * u;
+/** A point `d` squares along a route (held at its ends), into `out`, with the way it goes. */
+function onRoute(pts: readonly (readonly [number, number])[], d: number, out: { c: number; r: number; face: 1 | -1 }): void {
+  let left = Math.max(0, d);
+  for (let i = 1; i < pts.length; i++) {
+    const p = pts[i - 1]!;
+    const q = pts[i]!;
+    const L = Math.hypot(q[0] - p[0], q[1] - p[1]);
+    if (left <= L || i === pts.length - 1) {
+      const u = L > 0 ? Math.min(1, left / L) : 1;
+      out.c = lerp(p[0], q[0], u);
+      out.r = lerp(p[1], q[1], u);
+      if (q[0] !== p[0]) out.face = q[0] > p[0] ? 1 : -1;
+      return;
+    }
+    left -= L;
+  }
+}
+/**
+ * Ginger's intro `t` ms in (his beats; `iceTimes`). The carriers run the board's `route` (its middle), A `spots.carry.a` squares east
+ * of it and B `spots.carry.b`, both facing east; toss at its end (the board on their hands, `hands`' heights by frame, until it's let
+ * go), cheer, and walk to their watch spots (`spots.watch`). The board flies from the route's end to the table's spot (`table`), from
+ * its let-go height up onto the round top (`top` px), on an arc.
+ */
+export function iceAt(
+  a: IceAnims,
+  t: number,
+  art: {
+    route: readonly (readonly [number, number])[];
+    table: readonly [number, number];
+    top: number;
+    hands: { carry: readonly number[]; toss: readonly (number | null)[] };
+    spots: { carry: { a: number; b: number }; watch: { a: { at: readonly [number, number]; face: number }; b: { at: readonly [number, number]; face: number } } };
+  },
+  feel: Pick<typeof CHALLENGE_FEEL, "faceMs" | "lineMs" | "ice"> = CHALLENGE_FEEL,
+): IceNow {
+  const I = feel.ice;
+  const T = iceTimes(a, feel);
+  const M = a.moves;
+  const G = a.gear;
+  let move: IceNow["move"] = null;
+  const mv = (anim: IceMove, from: number) => (t >= from && t < from + sum(M[anim]) ? { anim, frame: frameAt(M[anim], t - from, false) } : null);
+  move = mv("charge", T.charge) ?? mv("blast", T.blast) ?? mv("cast", T.cast) ?? mv("brag", T.brag);
+  const blast: IceNow["blast"] =
+    t >= T.fly && t < T.burst ? { anim: "fly", frame: frameAt(G.fly, t - T.fly, true), u: (t - T.fly) / I.flyMs } : t >= T.burst && t < T.burst + sum(G.burst) ? { anim: "burst", frame: frameAt(G.burst, t - T.burst, false), u: 1 } : null;
+  let shard: IceNow["shard"] = null;
+  if (t >= T.form && t < T.fall) shard = { anim: "form", frame: frameAt(G.form, t - T.form, false), lift: I.fallFrom };
+  else if (t >= T.fall && t < T.land) {
+    const u = (t - T.fall) / I.fallMs;
+    shard = { anim: "fall", frame: frameAt(G.fall, t - T.fall, true), lift: I.fallFrom * (1 - u * u) };
+  } else if (t >= T.land && t < T.table) shard = { anim: "land", frame: frameAt(G.land, t - T.land, false), lift: 0 };
+  const crack: IceNow["crack"] = t < T.land ? null : t < T.land + sum(G.crack) ? { anim: "crack", frame: frameAt(G.crack, t - T.land, false) } : { anim: "idle", frame: 0 };
+  const puff = t >= T.land && t < T.land + sum(G.puff) ? frameAt(G.puff, t - T.land, false) : -1;
+  // The carriers and the board.
+  let carriers: IceNow["carriers"] = null;
+  let board: IceNow["board"] = null;
+  const E = a.elf;
+  const end = art.route[art.route.length - 1]!;
+  const S = art.spots;
+  if (t >= T.setOff) {
+    const mid = { c: 0, r: 0, face: 1 as 1 | -1 };
+    onRoute(art.route, ((t - T.setOff) / 1000) * I.carrySpeed, mid);
+    const pair = (anim: IceElf, frame: number, c: number, r: number): [CarrierNow, CarrierNow] => [
+      { c: c + S.carry.a, r, face: 1, anim, frame },
+      { c: c + S.carry.b, r, face: 1, anim, frame },
+    ];
+    if (t < T.toss) {
+      // (Running with it, then standing a beat behind the table before the toss: their run's first frame.)
+      const running = t < T.arrive;
+      const fr = running ? frameAt(E.carry, t - T.setOff, true) : 0;
+      carriers = pair("carry", fr, mid.c, mid.r);
+      board = { c: mid.c, r: mid.r, lift: art.hands.carry[fr] ?? art.hands.carry[0]!, anim: "carry", frame: 0 };
+    } else if (t < T.cheer) {
+      const fr = frameAt(E.toss, t - T.toss, false);
+      carriers = pair("toss", fr, end[0], end[1]);
+      if (t < T.letGo) board = { c: end[0], r: end[1], lift: art.hands.toss[fr] ?? 15, anim: "carry", frame: 0 };
+    } else if (t < T.toWatch) carriers = pair("cheer", frameAt(E.cheer, t - T.cheer, true), end[0], end[1]);
+    else {
+      const u = Math.min(1, (t - T.toWatch) / I.toWatchMs);
+      const walk = (from: number, w: { at: readonly [number, number]; face: number }): CarrierNow => {
+        const c = lerp(end[0] + from, w.at[0], u);
+        return u < 1
+          ? { c, r: lerp(end[1], w.at[1], u), face: w.at[0] >= end[0] + from ? 1 : -1, anim: "walk", frame: frameAt(E.walk, t - T.toWatch, true) }
+          : { c: w.at[0], r: w.at[1], face: w.face < 0 ? -1 : 1, anim: "idle", frame: frameAt(E.idle, t - T.watching, true) };
+      };
+      carriers = [walk(S.carry.a, S.watch.a), walk(S.carry.b, S.watch.b)];
+    }
+    if (t >= T.letGo && t < T.landed) {
+      const u = (t - T.letGo) / I.boardFlyMs;
+      const from = art.hands.toss[a.key.letGo - 1] ?? 15;
+      board = { c: lerp(end[0], art.table[0], u), r: lerp(end[1], art.table[1], u), lift: lerp(from, art.top, u) + Math.sin(Math.PI * u) * I.boardArc, anim: "spin", frame: frameAt(G.spin, t - T.letGo, true) };
+    }
+  }
+  const light: IceNow["light"] =
+    t < T.light || t >= T.lit ? null : t < T.shine ? { anim: "appear", frame: frameAt(G.appear, t - T.light, false) } : t < T.fade ? { anim: "shine", frame: frameAt(G.shine, t - T.shine, true) } : { anim: "fade", frame: frameAt(G.fade, t - T.fade, false) };
+  return {
+    move,
+    blast,
+    shard,
+    table: t >= T.table ? frameAt(G.tableIdle, t - T.table, true) : -1,
+    crack,
+    puff,
+    door: t >= T.door && t < T.doorShut,
+    carriers,
+    line: t >= T.setOff + I.lineFrom && t < T.setOff + I.lineFrom + I.lineMs,
+    board,
+    onTable: t >= T.landed,
+    light,
+    pieces: t < T.fade ? 0 : Math.min(1, (t - T.fade) / Math.max(1, T.lit - T.fade)),
+  };
+}
+/**
+ * Ginger's cues, and when (CHALLENGE_FEEL.ice): his moves' own on their frames (the charge's hum, the blast's zap, the cast, the brag's
+ * laugh and thump); the blast's whoosh as it flies and its burst; the ice forming; the icicle's crunch as it stabs in; the carriers'
+ * steps as they run and walk to watch, their heave; the board's whoosh as it's tossed and its clack as it lands; the light's sparkle.
+ */
+export function iceCues(a: IceAnims, feel: Pick<typeof CHALLENGE_FEEL, "faceMs" | "lineMs" | "ice"> = CHALLENGE_FEEL): { cue: string; at: number }[] {
+  const T = iceTimes(a, feel);
+  const out: { cue: string; at: number }[] = [];
+  const play = (ms: readonly number[], cues: readonly (string | undefined)[], from: number, to: number, loop: boolean) => {
+    if (sum(ms) <= 0) return;
+    let t = from;
+    for (let i = 0; t < to; i = (i + 1) % ms.length) {
+      const cue = cues[i];
+      if (cue) out.push({ cue, at: t });
+      t += ms[i]!;
+      if (!loop && i === ms.length - 1) break;
+    }
+  };
+  const { moves: M, gear: G, elf: E } = a;
+  const C = a.cues;
+  play(M.charge, C.moves.charge, T.charge, T.blast, false);
+  play(M.blast, C.moves.blast, T.blast, T.fall, false);
+  play(G.fly, C.gear.fly, T.fly, T.fly + 1, false);
+  play(G.burst, C.gear.burst, T.burst, T.form, false);
+  play(G.form, C.gear.form, T.form, T.fall, false);
+  play(G.land, C.gear.land, T.land, T.table, false);
+  play(E.carry, C.elf.carry, T.setOff, T.arrive, true);
+  play(E.toss, C.elf.toss, T.toss, T.cheer, false);
+  play(G.spin, C.gear.spin, T.letGo, T.letGo + 1, false);
+  out.push({ cue: "clack", at: T.landed });
+  play(E.walk, C.elf.walk, T.toWatch, T.watching, true);
+  play(M.cast, C.moves.cast, T.cast, T.cast + sum(M.cast), false);
+  play(G.appear, C.gear.appear, T.light, T.shine, false);
+  play(M.brag, C.moves.brag, T.brag, T.brag + sum(M.brag), false);
+  return out.sort((x, y) => x.at - y.at);
 }
 /**
  * Jefferson's intro `t` ms in (CHALLENGE_FEEL.crew): his move, the crew's clock (the room walks each of them), your lift and the table.
@@ -1243,7 +1620,7 @@ const easeOutBack = (u: number) => 1 + 2.2 * (u - 1) ** 3 + 1.2 * (u - 1) ** 2;
  */
 export function hopStart(beats: readonly IntroBeat[], a: IntroAnims | null): number {
   // (Hollow's and Wrangler's: you walked on to your seats, or clear of them; Jefferson's: no stools; nothing to hop back from.)
-  if (a && (isDark(a) || isRope(a) || isCrew(a))) return Infinity;
+  if (a && (isDark(a) || isRope(a) || isCrew(a) || isIce(a))) return Infinity;
   if (!a || isLog(a)) return stepAt(beats, "pop");
   if (isBlocks(a)) return stepAt(beats, "chairs");
   return stepAt(beats, "crumble") + sum(a.crumble.slice(0, a.tableFrame));
@@ -1288,7 +1665,11 @@ export function woodAt(beats: readonly IntroBeat[], a: LogAnims, t: number): Woo
 export function introAt(beats: readonly IntroBeat[], a: IntroAnims | null, t: number, feel: Pick<typeof CHALLENGE_FEEL, "popMs" | "puffMs" | "dropFrom" | "hopMs" | "lineMs" | "dark" | "rope" | "crew"> = CHALLENGE_FEEL): IntroNow {
   const b = beats.find((x) => t < x.end) ?? beats[beats.length - 1]!;
   const h = Math.min(1, Math.max(0, (t - hopStart(beats, a)) / feel.hopMs));
-  const base = { step: b.step, pyramid: null, blocks: null, drop: 0, drift: false, pop: 1, puff: -1, line: b.step === "line", back: h * h * (3 - 2 * h), hop: h > 0 && h < 1 ? Math.sin(Math.PI * h) : 0, wood: null, chant: false, dark: null, rope: null, crew: null };
+  const base = { step: b.step, pyramid: null, blocks: null, drop: 0, drift: false, pop: 1, puff: -1, line: b.step === "line", back: h * h * (3 - 2 * h), hop: h > 0 && h < 1 ? Math.sin(Math.PI * h) : 0, wood: null, chant: false, dark: null, rope: null, crew: null, ice: null };
+  if (a && isIce(a)) {
+    // (Ginger's: the icicle is the table once it's stabbed in; no stools. What his props show: the room's iceAt, its art in hand.)
+    return { ...base, table: t >= stepAt(beats, "carry"), stools: false };
+  }
   if (a && isCrew(a)) {
     // (Jefferson's: the board on its crates is there from the start; no stools: he stands, you on your lift.)
     return { ...base, crew: crewAt(beats, a, t), table: true, stools: false };
@@ -1351,6 +1732,7 @@ export function introCues(beats: readonly IntroBeat[], a: IntroAnims | null): { 
   if (isDark(a)) return darkCues(beats, a);
   if (isRope(a)) return ropeCues(beats, a);
   if (isCrew(a)) return crewCues(beats, a);
+  if (isIce(a)) return iceCues(a);
   if (isLog(a)) {
     // (Timber's: each move's and prop's own cues on their frames, through their beats: looping ones over and over to its end.)
     const out: { cue: string; at: number }[] = [];

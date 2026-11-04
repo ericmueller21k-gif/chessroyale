@@ -1,6 +1,6 @@
 /**
  * The homes you can go into (Nov 2, round 1: Babur's circus tent and Puddles' greenhouse, the shops' first interiors; then Alfil's
- * pyramid and Big Boy's crib; Nov 3, Timber's lodge, Dash's sneaker store and Hollow's cave; Nov 4, Wrangler's barn and Jefferson's warehouse), what
+ * pyramid and Big Boy's crib; Nov 3, Timber's lodge, Dash's sneaker store and Hollow's cave; Nov 4, Wrangler's barn and Jefferson's warehouse; Nov 5, Ginger's igloo), what
  * each shop sells, and the words its cards say. Light: the town imports it to know which home's card says "Go in"; the room
  * itself (its art, its drawing) loads only when you go in (ShopRoom.tsx). docs/decisions/2026-11-02-shop-interiors-r1.md.
  *
@@ -22,7 +22,7 @@ export interface ShopDef {
   /** Its crate's name, word for word ("Babur's Boss Crate"). */
   crate: string;
   /** The Shopkeeper: the boss's kid (its sheet's name in town/sidekicks/), drawn at `at` (a square, fractions allowed). */
-  kid: "babur" | "puddles" | "alfil" | "bigboy" | "timber" | "blitz" | "hollowdog" | "rooster" | "dealer";
+  kid: "babur" | "puddles" | "alfil" | "bigboy" | "timber" | "blitz" | "hollowdog" | "rooster" | "dealer" | "elf";
   at: readonly [number, number];
   /**
    * Drawn at the art's own size, this many of the room's pixels (37 a square) from its feet to the top of its idle, rather than the
@@ -45,10 +45,10 @@ export interface ShopDef {
   /**
    * Above the walls: a tent's canvas, a greenhouse's glass, a pyramid's sandstone, a nursery's sky-blue ceiling with clouds and
    * stars, a lodge's dark planks between heavy beams, a store's white ceiling tiles and light panels, a cave's dark stone and
-   * stalactites, a barn's dark rafters and cross beams, or a warehouse's dark steel trusses (drawn by the game, not the art: as the
-   * mockup did).
+   * stalactites, a barn's dark rafters and cross beams, a warehouse's dark steel trusses, or an igloo's dome of ice blocks arching overhead (drawn by
+   * the game, not the art: as the mockup did).
    */
-  roof: "tent" | "glass" | "stone" | "nursery" | "lodge" | "store" | "cave" | "barn" | "warehouse";
+  roof: "tent" | "glass" | "stone" | "nursery" | "lodge" | "store" | "cave" | "barn" | "warehouse" | "igloo";
   /**
    * The chat log's text over the room (Eric, Nov 2: "white, or black, depending on darkness of background in the shop"): "night" for
    * a dark room (white words on a dark tint: Babur's tent), "day" for a light one (dark words on a light tint: Puddles' greenhouse),
@@ -86,6 +86,11 @@ export const SHOPS: Readonly<Partial<Record<HomeId, ShopDef>>> = {
   // by the taped SHOP sign, facing west, drawn at his art's size (79 px: shop-grex-nov4.md), on his squares; no counter, so a tap on
   // his Boss Crate (on the floor beside him) or the bare corner behind him means talk too. He has no name: "Shopkeeper". Bright
   // concrete under high-bay lamps: the day tone.
+  // Ginger's igloo candy shop (Nov 5): the shopkeeper elf in his Santa hat behind the little half-round stand at the back middle,
+  // under the CANDY sign, drawn at his art's size (25 px: shop-ginger-nov5.md), facing our right, on his squares. He has no name:
+  // "Shopkeeper". Packed snow under warm candy-shop light: the day tone. The room's second walking level (the catwalk and its two
+  // staircases) is its art's (shops/levels.ts).
+  gingerbread: { home: "gingerbread", boss: "Ginger", crate: "Ginger's Boss Crate", kid: "elf", at: [9.5, 5.2], tall: 25, keeper: [{ c: 9, r: 5 }, { c: 10, r: 5 }], prizes: ["ginger-sled"], roof: "igloo", chatTone: "day" },
   grex: { home: "grex", boss: "Jefferson", crate: "Jefferson's Boss Crate", kid: "dealer", at: [16.8, 3.2], tall: 79, flip: true, talk: ["crate", "corner-shop"], keeper: [{ c: 16, r: 3 }, { c: 17, r: 3 }], prizes: ["jefferson-giraffe"], roof: "warehouse", chatTone: "day" },
 };
 
