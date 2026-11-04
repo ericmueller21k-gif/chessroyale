@@ -89,3 +89,8 @@ Every character sprite (bosses, God King, player figure, sidekicks), on phone an
 stands, idles or ends a move. Overlapping the board or a menu is fine (can even look cool); cut off by the page edge is never fine.
 Only mid-motion (jumping, dashing) may it pass off screen. This outranks "don't cover the board". Every brief that places a figure
 checks it (stills at phone + computer sizes). Guard: docs/rules/eric.md + a check (battle-desktop-fixes round).
+
+## Eric, Nov 5
+- Power banners show the player's own pawn portrait; the God King appears on a banner only when he saves you.
+- No default/random emoji standing in for a boss or character: use its name and/or a small portrait.
+- Town cards' text centered, all of them.
