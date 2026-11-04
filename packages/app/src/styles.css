@@ -790,6 +790,19 @@ p {
   color: var(--bad);
 }
 
+/* A 50 v 50 miss's words on the reveal's line (CrowdMisses): shorter under 380 px, so the one line keeps them whole. */
+.result-text .miss-narrow {
+  display: none;
+}
+@media (max-width: 379px) {
+  .result-text .miss-wide {
+    display: none;
+  }
+  .result-text .miss-narrow {
+    display: inline;
+  }
+}
+
 .round-score-label {
   font-size: 14px;
   font-weight: 600;

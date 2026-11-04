@@ -36,6 +36,7 @@ import {
   OPENING_ALLOWANCE,
   CROWD_SCORING,
   type CrowdScoring,
+  type CrowdMisses,
   PREGAME_VOTES,
   PRIOR_RATING,
   PURITY_BANDS,
@@ -250,7 +251,7 @@ function modes(src: FaqSources): FaqSection {
 ### Crowd · 50 v 50 {#mode-crowd}
 
 - **${C.lobbySize} players, one game of chess**, from the first move. Two teams of ${team}: your team plays White or Black all game.
-- Each turn, everyone on the side to move picks a move before the clock runs out, and **one of the ${n(C.crowdPlayedFromTop, "most popular pick")} is played**, drawn by how many picked each: if 45 pick one move, 3 another and 2 a third, they're played 90%, 6% and 4% of the time. Moves tied for the last of those places are left out. So the crowd's favorite usually plays, but not always.
+- Each turn, everyone on the side to move picks a move before the clock runs out, and **one of the ${n(C.crowdPlayedFromTop, "most popular pick")} is played**, drawn by how many picked each: if 45 pick one move, 3 another and 2 a third, they're played 90%, 6% and 4% of the time. Moves tied for the last of those places are left out. So the crowd's favorite usually plays, but not always.${C.crowdSureShare < 1 ? ` **A big majority always wins:** a move ${pct(C.crowdSureShare, 0)} or more of the team picked is always played, even a blunder (of 10 picks, ${Math.ceil(C.crowdSureShare * 10 - 1e-9)} on one move always play it; ${Math.ceil(C.crowdSureShare * 10 - 1e-9) - 1} on it can still lose to another).` : ""}${C.crowdMisses ? ` Pick nothing and a move is picked for you, one of the engine's top ${C.crowdMisses.defaultFromTop}, but it doesn't count in the vote ([a missed move](#crowd-scoring)).` : ""}
 - Every pick is scored (see [How your moves are scored](#scoring)). No one goes out for the first ${n(cutAfter(0), "move")}. Then the lowest scorers are cut, the same number from each team: ${cutsFrom("team", 0)}, which leaves ${left(TK)} for the team final. A boss final adds ${n(src.crowdKnockouts.boss.length - TK.length, "more cut")} (${cutsFrom("boss", TK.length)}); a duel adds ${n(src.crowdKnockouts.duel.length - TK.length, "more cut")} (${cutsFrom("duel", TK.length)}). The moves count from the first one the teams play (a Random opening's own moves don't count). Scores carry over all game.
 - **A tie at the cut line goes through:** everyone tied exactly with the last player through stays in, and the cuts still to come take the extra, a little at each. So does anyone within ${n(src.crowdScoring.cutGrace, "point")} of that player ([the bubble](#crowd-scoring)). Only the last cut before the ending breaks a tie, so the ending has its size: fewer points given away before the [opening allowance](#opening-allowance) go through, then less thinking time.
 - **You vote on the ending** before move 1: a team final (the top ${left(src.crowdKnockouts.team)} play on: ${teamSizes.slice(0, -1).join(", ")}, then ${teamSizes.at(-1)} to the end), a boss final (the top ${left(src.crowdKnockouts.boss)} team up against ${finalFoe}) or a duel (the best of each side, 1v1). Then on how it starts, then on the clock.
@@ -404,7 +405,7 @@ ${item("Shield", "shield", "cancels the next block against your squad that would
  * Crowd 50 v 50's scoring in a player's words (docs/decisions/2026-10-24-crowd-scoring.md): the soft limit by stage,
  * pieces hung, shared blunders, streaks, rare brilliant finds, a miss and the bubble. Every number from CrowdScoring.
  */
-export function crowdScoringWords(cs: CrowdScoring): string {
+export function crowdScoringWords(cs: CrowdScoring, misses?: CrowdMisses | null): string {
   const limit = (cap: number | null) => (cap === null ? "no limit" : `about ±${num(cap)}`);
   const when = (from: number) => (from === 0 ? "before the first cut" : from === 1 ? "from the first cut" : `from the ${ordinal(from)} cut`);
   const caps = cs.cap.map((c, i) => `${limit(c)} ${when(cs.capFrom[i] ?? 0)}`);
@@ -418,7 +419,11 @@ export function crowdScoringWords(cs: CrowdScoring): string {
 - **When everyone fell for it:** when ${cs.sharedMin} or more of your team (or ${pct(cs.sharedShare, 0)} of it) pick the same move and it gives away ${n(cs.sharedFrom, "point")} or more, it counts less for each of them: the bigger their share, the less it costs, down to ${pct(cs.sharedFloor, 0)} of it.
 - **Streaks:** a move within ${n(cs.streakStrong, "point")} of the engine's best is a strong move. ${cs.streakFrom} strong moves in a row put you on a streak, shown by the fire and its count on your place number on the scoreboard (orange, then red from ${cs.streakFrom + 2}, then white-blue from ${cs.streakFrom + 4}). Each strong move on it adds a bonus on top of its score: ${ramp.join(", ")} in a row${cs.streakBonus.length > 1 ? `, and +${num(last)} from then on` : " and after"}. Any other move, or a missed one, ends it. From the usual start, streaks count from your ${ordinal(cs.streakFromMove)} move; in a Random opening or Freestyle, from your first.
 - **Rare brilliant finds:** a [brilliant move](#brilliant) that ${cs.brilliantMaxFound} or fewer of your team found (just one, when ${cs.brilliantFewLeft} or fewer are picking), while the rest gave away ${n(cs.brilliantMinGap, "point")} or more on average, earns +${num(cs.brilliantBonus)} and a shoutout naming who found it. It doesn't change the move played.
-- **A missed move** scores ${cs.missCaps} times the limit below zero${firstCap === null ? "" : ` (${num(-cs.missCaps * firstCap)} before the first cut)`}.
+${
+    misses
+      ? `- **A missed move** (no pick in time): a move is picked for you, one of the engine's top ${misses.defaultFromTop} at random, but it never counts in your team's vote. You score the lowest score anyone on your team who picked got that move, so missing is never better than the worst real pick (if nobody on your team picked, ${cs.missCaps} times the limit below zero). The reveal tells you each time ("Missed: a move was picked for you (1 of ${misses.allowed})"). **Miss more than ${n(misses.allowed, "move")} in a game and you're removed for being away**: it counts as resigning, a loss, out in the last place still open, and a bot takes your seat.`
+      : `- **A missed move** scores ${cs.missCaps} times the limit below zero${firstCap === null ? "" : ` (${num(-cs.missCaps * firstCap)} before the first cut)`}.`
+  }
 - **The bubble:** at a cut, anyone within ${n(cs.cutGrace, "point")} of the last player through goes through too, like a tie (except at the last cut before the ending).`;
 }
 
@@ -492,7 +497,7 @@ ${openingAllowanceWords(src.allowance)}
 
 ### Scoring in 50 v 50 {#crowd-scoring}
 
-${crowdScoringWords(src.crowdScoring)}
+${crowdScoringWords(src.crowdScoring, src.crowd.crowdMisses)}
 
 ### Scoring in a boss raid {#raid-scoring}
 

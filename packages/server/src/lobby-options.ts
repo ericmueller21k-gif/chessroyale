@@ -10,7 +10,7 @@ import type { LobbyRecord } from "./lobby.ts";
  *     admin, or TEST_SWITCHES on: testSwitchesOn in admin.ts); for anyone else they're dropped, silently, so the lobby
  *     is exactly the one made without them.
  */
-export const LOBBY_TEST_SWITCHES = ["rounds", "clock", "finalTurns", "bossMoves", "draw", "power", "format", "speed", "weakbots", "keep", "pace", "augments", "start"] as const;
+export const LOBBY_TEST_SWITCHES = ["rounds", "clock", "finalTurns", "bossMoves", "draw", "power", "format", "speed", "weakbots", "keep", "pace", "augments", "start", "afk"] as const;
 
 /** `?boss=` is the creator's pick only in a raid, as a boss's id: a fixed strength (a tier), or a boss in another mode, is a test's. */
 const testBoss = (q: URLSearchParams) => q.has("boss") && (q.get("mode") !== "raid" || BOSS_TIERS.includes(Number(q.get("boss"))));
@@ -75,6 +75,8 @@ export function lobbyOptions(query: URLSearchParams, test: boolean): { overrides
     ...(mode === "crowd" && !raid ? (startOption(q.get("start"))?.patch ?? {}) : {}),
     // ?weakbots=1: every bot plays loosely and people rank above bots (for testing: a person surely survives the cuts).
     ...(q.get("weakbots") === "1" ? WEAK_BOTS : {}),
+    // ?afk=0: a 50 v 50 miss as before Nov 4 (CrowdMisses off), for a test that idles on purpose. Never for players.
+    ...(q.get("afk") === "0" ? { crowdMisses: null } : {}),
   };
   // ?keep=SECONDS: its results stay up this long (5 s up to the usual 15 minutes), for tests.
   const keepMs = q.has("keep") ? Math.max(5, Math.min(LOBBY_LIFE.lobbyResultsKeepMinutes * 60, Number(q.get("keep")) || 0)) * 1000 : undefined;

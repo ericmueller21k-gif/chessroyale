@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "preact/hooks";
-import { type MatchmakingType, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, bossPartySettings, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
+import { type MatchmakingType, CROWD_MISSES, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, bossPartySettings, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
 import { bossInUrl, bossTierFromUrl, chosenBoss, chosenHomeMode, chosenMode, lobbyModeOf, prefetchBossAlone, raidInUrl, rememberBossPick } from "./screens/Home.tsx";
 import { lastBoss } from "./boss-history.ts";
 import { unlockAudio } from "./components/Countdown.tsx";
@@ -149,6 +149,9 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
     // Testing: ?weakbots=1, every bot plays loosely and people rank above bots (WEAK_BOTS), so a test's player surely
     // survives the cuts.
     ...(q.get("weakbots") === "1" ? WEAK_BOTS : {}),
+    // Testing: ?afk=0, a 50 v 50 miss as before Nov 4 (CrowdMisses off: no pick made for it, the old miss score, nobody
+    // removed for being away), for a test that idles on purpose (to be cut, or to watch the screens). Never for players.
+    ...(q.get("afk") === "0" ? { crowdMisses: null } : {}),
     // Testing: ?laststand=0, the God King never makes his Last Stand (a test that leaves a piece to burn on purpose).
     ...(q.get("laststand") === "0" ? { lastStandFrom: 999 } : {}),
     // Testing, solo: ?boss=<id>&wip=1 meets a boss whose powers are built before its art is (placeholders show).
@@ -233,6 +236,7 @@ function leftNote(how: LeftHow | null | undefined): string {
   if (how === "early") return "You left that match before it began.";
   if (how === "out") return "You left that match after you were out.";
   if (how === "kicked") return "You were removed from the party.";
+  if (how === "afk") return `You were removed from that match for being away (you missed ${CROWD_MISSES.allowed + 1} moves): it counted as a loss.`;
   return "You resigned that match.";
 }
 
@@ -387,7 +391,7 @@ export function App() {
     const feats = me ? matchFeats(runner.player(me.id), match.settings.knockoutsPerStage.length, runner.boss, raid) : null;
     const bossResult = match.phase.bossResult;
     // You resigned: a loss (on your team's record, or against the boss), and you didn't see a boss battle through.
-    const resigned = match.phase.left?.how === "resigned";
+    const resigned = match.phase.left?.how === "resigned" || match.phase.left?.how === "afk";
     void recordSoloResult({
       mode: raid ? "boss" : match.settings.mode,
       placement: match.phase.placement,
@@ -1022,6 +1026,8 @@ export function App() {
       // (?pool=NAME: a queue of its own, a test switch.)
       const pool = testParams().get("pool");
       if (pool) q.set("pool", pool);
+      // (?afk=0 with it: the pool's 50 v 50 misses as before Nov 4, for a test that idles on purpose.)
+      if (pool && testParams().get("afk") === "0") q.set("afk", "0");
       // (Already in line: from "let bots fill" when the servers were busy.)
       if (ticket) q.set("ticket", ticket);
       for (;;) {

@@ -64,6 +64,16 @@ export interface MoveRecord {
 }
 
 /**
+ * Crowd 50 v 50's miss on the reveal (CrowdMisses, Eric, Nov 4), so a removal is never a surprise: a move was picked for
+ * you (it doesn't count in the vote), and how many of the misses the game allows you've used: "Missed: a move was picked
+ * for you (1 of 3)"; `short` (phones under 380 px): "Missed: picked for you (1 of 3)". Null: not a miss, or misses as before.
+ */
+export function missLine(p: { move: string | null; defaultMove?: string; missNo?: number }, allowed: number | undefined, short = false): string | null {
+  if (p.move !== null || !p.defaultMove || !p.missNo || allowed === undefined) return null;
+  return `Missed: ${short ? "picked" : "a move was picked"} for you (${p.missNo} of ${allowed})`;
+}
+
+/**
  * The opening allowance on a pick, in a few plain words for the reveal (one line, even at 320 px), one number at most:
  * what it forgave ("1.2 forgiven · opening", "8 of 9.6 forgiven · opening"), or why it didn't cover the pick
  * ("no allowance · gave up material", "no allowance · missed a capture"); in 50 v 50 after the allowance, a piece given
@@ -255,7 +265,10 @@ export interface SimulView {
 
 /** How you left a match before its end (the results screen says so). */
 export interface LeftResult {
-  how: "resigned" | "out";
+  /** `afk`: Crowd 50 v 50's removal for being away (CrowdMisses: more misses in the game than it allows). */
+  how: "resigned" | "out" | "afk";
+  /** `afk`: the misses that removed you. */
+  misses?: number;
   /** Online: a bot took your seat (else the match went on without it). */
   bot?: boolean;
 }

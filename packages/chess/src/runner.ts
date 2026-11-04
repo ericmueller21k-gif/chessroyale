@@ -38,6 +38,7 @@ import {
   type RetireReason,
   type BotLean,
   type Rng,
+  hashPick,
   type Settings,
   type Side,
   estimateRating,
@@ -333,6 +334,8 @@ export interface RoundReport {
   boards: BoardRound[];
   /** Boards replaced before this round was dealt, and why. */
   retired: { boardId: number; reason: RetireReason }[];
+  /** Crowd 50 v 50: people this round's miss took past CrowdMisses.allowed (awayOut): the lobby or SoloMatch removes them. */
+  away?: string[];
 }
 
 export interface RunnerSnapshot {
@@ -993,6 +996,7 @@ export class MatchRunner {
       return { high, list };
     };
     const { high: best, list: scored } = scoredFrom(evaluation);
+    this.missesOn(board.fen, result, scored);
     for (const id of abstained) result.players.push({ playerId: id, move: null, loss: null, roundScore: 0, abstained: true });
     // The boss's own costs on the round (Hollow's wrong attempts into the dark).
     if (this.state.boss) bossRules(this.state.boss)?.scoreRound?.(this.battle, result.players);
@@ -1031,6 +1035,35 @@ export class MatchRunner {
       ...(fairScored ? { fairScored } : {}),
       ...(flag ? { flag: true } : {}),
     };
+  }
+
+  /**
+   * Crowd 50 v 50's misses (CrowdMisses): each miss gets a pick made for it, one of the engine's top `defaultFromTop`
+   * moves (the judge's best first) picked by the position and the player, not the match's random source, so a miss moves
+   * nothing drawn after it; shown to them only (`move` stays null: never in the tally). Its number in the game too. Nobody
+   * in a team turn picked: the team plays one of those moves at random (a final's mover and a boss battle as before).
+   */
+  private missesOn(fen: string, result: GroupResult, scored: readonly { move: string }[]) {
+    const cm = this.settings.crowdMisses;
+    if (!cm) return;
+    const top = scored.slice(0, cm.defaultFromTop).map((m) => m.move);
+    if (!top.length) return;
+    for (const p of result.players) {
+      if (p.move !== null || p.abstained) continue;
+      p.defaultMove = top[hashPick(`${fen}|${p.playerId}`, top.length)]!;
+      p.missNo = (this.player(p.playerId).misses ?? 0) + 1;
+    }
+    if (!this.state.boss && !this.state.final && !result.players.some((p) => p.move !== null)) result.playedMove = top[Math.floor(this.opts.rng() * top.length)]!;
+  }
+
+  /**
+   * Crowd 50 v 50: the people with more misses in the game than CrowdMisses allows (the 4th), still in: removed for being
+   * away (the lobby and SoloMatch take them out as "left the match", LeftHow "afk"). Bots never: they always pick.
+   */
+  awayOut(): string[] {
+    const cm = this.settings.crowdMisses;
+    if (!cm) return [];
+    return this.state.players.filter((p) => p.alive && !p.isBot && (p.misses ?? 0) > cm.allowed).map((p) => p.id);
   }
 
   /**
@@ -1279,7 +1312,8 @@ export class MatchRunner {
         if (bossRules(this.state.boss)?.crossedOut?.(this.state.boss!)) crossed.add(r.boardId);
       }
     }
-    return { stage: this.state.stage, round: this.state.round - 1, boards: results.map((r) => (crossed.has(r.boardId) ? { ...r, power: true } : r)), retired: this.retiredThisRound };
+    const away = this.awayOut();
+    return { stage: this.state.stage, round: this.state.round - 1, boards: results.map((r) => (crossed.has(r.boardId) ? { ...r, power: true } : r)), retired: this.retiredThisRound, ...(away.length ? { away } : {}) };
   }
 
   /** Records a bot's thinking time (when bot picks come from outside, e.g. the lobby host). */

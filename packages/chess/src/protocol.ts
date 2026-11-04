@@ -109,6 +109,9 @@ export interface NetPick {
   streak?: number;
   streakBonus?: number;
   brilliantBonus?: number;
+  /** Crowd 50 v 50, a miss (PlayerRoundResult, CrowdMisses): the pick made for them (never counted), and their misses so far. */
+  defaultMove?: string;
+  missNo?: number;
 }
 
 /** What the host's browser computes for one board after picks lock. */
@@ -181,7 +184,7 @@ export interface NetFinal {
   /** Each finalist's average loss per move in the final (null before their first move) and moves made. */
   scores: Record<string, { avg: number | null; moves: number; matchLoss?: number | null; rating?: number | null }>;
   /** The move just played, with its loss (null loss = missed, then the engine's move was played). */
-  last: null | { playerId: string; move: string; san: string; loss: number | null };
+  last: null | { playerId: string; move: string; san: string; loss: number | null; missNo?: number };
   /** classic (fixed moves each), team (4v4, 3v3, then 2v2 to the end) or duel (1v1 to the end). */
   format?: "classic" | "team" | "duel";
   /** Team final: turns until the next cut (null on the last step), and who has gone out so far. */
@@ -623,8 +626,11 @@ export type LobbyCloseReason = "ended" | "idle" | "abandoned";
  * counted as resigning); they left before move 1 ("early": nothing recorded); or they left after they were already
  * out ("out": their result as it stands, recorded when the match ends).
  */
-/** `kicked`: a Boss Battle party's AFK kick (the leader's, or a teammate's who had picked). */
-export type LeftHow = "resigned" | "away" | "early" | "out" | "kicked";
+/**
+ * `kicked`: a Boss Battle party's AFK kick (the leader's, or a teammate's who had picked). `afk`: Crowd 50 v 50's removal
+ * for being away, more misses in the game than CrowdMisses allows (counted as resigning).
+ */
+export type LeftHow = "resigned" | "away" | "early" | "out" | "kicked" | "afk";
 
 /**
  * Someone who left: how, and their result as it was recorded then (`placement` of `players`; a loss unless they were

@@ -36,3 +36,13 @@ export function weightedIndex(rng: Rng, weights: readonly number[]): number {
   }
   return weights.length - 1;
 }
+
+/**
+ * An index below `n` chosen by `key` alone (FNV-1a, mixed by one step of mulberry32): random-looking, the same every
+ * time, and drawing nothing from a match's random source (a 50 v 50 miss's pick made for it: CrowdMisses).
+ */
+export function hashPick(key: string, n: number): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 0x01000193) >>> 0;
+  return Math.floor(mulberry32(h)() * n);
+}

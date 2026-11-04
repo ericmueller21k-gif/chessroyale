@@ -373,7 +373,9 @@ export class NetMatch implements GameView {
     this.ranked = m.result.ranked;
     this.placement = m.result.placement;
     this.leftPlayers = m.result.players;
-    this.setPhase({ kind: "results", placement: m.result.placement, winner: "", youWon: false, left: { how: "resigned", bot: this.seatToBot } });
+    // (Crowd 50 v 50's removal for being away is a resign of the server's: the same results, its own words.)
+    const afk = m.how === "afk" ? { how: "afk" as const, misses: (this.settings.crowdMisses?.allowed ?? 3) + 1 } : { how: "resigned" as const };
+    this.setPhase({ kind: "results", placement: m.result.placement, winner: "", youWon: false, left: { ...afk, bot: this.seatToBot } });
   }
   get isHost() {
     return this.myId !== null && this.myId === this.hostId;
