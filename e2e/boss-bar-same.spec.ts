@@ -16,6 +16,8 @@ import { bossAloneFromHome, test } from "./helpers.ts";
  * Every playable boss, at 320x568, 390x844 and 428x777, on a phone (a computer's bar is unchanged, so one run is enough there).
  */
 const PLAYABLE = BOSS_ROSTER.filter(isPlayable);
+/** A boss whose figure reaches past the usual name column: its name column moved right (kits.ts barName). */
+const nameMoved = (id: string) => (BOSS_KITS[PLAYABLE.find((d) => d.id === id)!.kit!]?.barName ?? 0) > 0;
 const SIZES: [number, number][] = [[320, 568], [390, 844], [428, 777]];
 const BASE = "/?debug&pace=quick&clock=60&laststand=0&brain=stockfish";
 /** A pixel of slack for rounding (the box's edges are fractional at some widths). */
@@ -29,7 +31,7 @@ const FEET_PAD = 6;
 /** The status's one line: taller than this, it has wrapped. */
 const STATUS_ONE_LINE = 16;
 /** The room at rest (px): the drawn left edge 2 px in from the screen, 2 px short of the name column, 1 px under the HUD's text. */
-const SCREEN_CLEAR = 2;
+const BAR_CLEAR = 2;
 const NAME_CLEAR = 2;
 /** Rows of a bubble's text: the pitch of a 320 px line matches a 390 px line's (10.8 px). */
 const ROW_PITCH_MIN = 10;
@@ -46,6 +48,8 @@ type Snap = {
   level: Box | null;
   rage: Box | null;
   passive: Box | null;
+  /** A seed meter's bar (Puddles): stacked under its label, in the passive row. */
+  seed: Box | null;
   status: Box;
   prop: Box | null;
   /** The "BOSS · move N" line's own text (the line above the bar), as drawn. */
@@ -110,6 +114,7 @@ const snap = (page: Page): Promise<Snap & { anim: string | null }> =>
       level: box(".boss-level .lv-text"),
       rage: box(".boss-ult .rage-meter"),
       passive: box(".boss-passive > *"),
+      seed: box(".seed-bar"),
       status: box(".boss-next")!,
       prop: box(".boss-prop"),
       hudText,
@@ -334,16 +339,19 @@ test("every playable boss's phone bar: one bar and one figure box for all, the f
     expect.soft(Math.abs(at(all[0]!).box.w - BOX_W), `${w}: the box is ${BOX_W} px wide`).toBeLessThanOrEqual(TOL);
     expect.soft(Math.abs(at(all[0]!).box.h - BOX_H), `${w}: the box is ${BOX_H} px tall`).toBeLessThanOrEqual(TOL);
     // The same place for the name, level, bars, status and the free room, for every boss (±1 px).
+    // (Nov 4: a figure that reaches past the usual name column moves its name column right, kits.ts barName, so the name and the free
+    // room's x vary by boss ("it's fine if the names don't all start at the same x; fitting matters more"): their y and the status's x stay.)
+    // (At 320 px a name column moved right leaves less room, so its status may take two lines and push the room down: those bosses are
+    // left out of the status's and the room's y and the room's height there.)
+    const same = w === 320 ? all.filter((id) => !nameMoved(id)) : all;
     for (const key of ["name", "status", "prop"] as const) {
-      const xs = all.map((id) => at(id)[key]!);
-      expect.soft(spread(xs.map((b) => b.x)), `${w}: ${key}'s x is the same`).toBeLessThanOrEqual(TOL);
+      const xs = (key === "name" ? all : same).map((id) => at(id)[key]!);
+      if (key === "status") expect.soft(spread(xs.map((b) => b.x)), `${w}: ${key}'s x is the same`).toBeLessThanOrEqual(TOL);
       expect.soft(spread(xs.map((b) => b.y)), `${w}: ${key}'s y is the same`).toBeLessThanOrEqual(TOL);
     }
-    expect.soft(spread(all.map((id) => at(id).prop!.w)), `${w}: the free room is the same width`).toBeLessThanOrEqual(TOL);
-    expect.soft(spread(all.map((id) => at(id).prop!.h)), `${w}: the free room is the same height`).toBeLessThanOrEqual(TOL);
+    expect.soft(spread(same.map((id) => at(id).prop!.h)), `${w}: the free room is the same height`).toBeLessThanOrEqual(TOL);
     for (const key of ["level", "rage"] as const) {
       const xs = all.map((id) => at(id)[key]!);
-      expect.soft(spread(xs.map((b) => b.x)), `${w}: ${key} x is the same`).toBeLessThanOrEqual(TOL);
       expect.soft(spread(xs.map((b) => b.y)), `${w}: ${key} y is the same`).toBeLessThanOrEqual(TOL);
     }
     const withPassive = all.filter((id) => at(id).passive);
@@ -352,17 +360,25 @@ test("every playable boss's phone bar: one bar and one figure box for all, the f
       const s = at(id);
       const who = `${id} at ${w}`;
       expect.soft(s.nameWhole, `${who}: the name whole`).toBe(true);
-      expect.soft(s.status.h, `${who}: the status on one line`).toBeLessThanOrEqual(STATUS_ONE_LINE);
+      if (!(w === 320 && nameMoved(id))) expect.soft(s.status.h, `${who}: the status on one line`).toBeLessThanOrEqual(STATUS_ONE_LINE);
+      // A seed meter (Puddles) is stacked under its rage meter: both bars start at one x and are one width (Nov 4).
+      if (s.seed) {
+        expect.soft(Math.abs(s.seed.x - s.rage!.x), `${who}: the seed bar starts where the rage meter does`).toBeLessThanOrEqual(TOL);
+        expect.soft(Math.abs(s.seed.w - s.rage!.w), `${who}: the seed bar is as wide as the rage meter`).toBeLessThanOrEqual(TOL);
+        expect.soft(s.seed.y, `${who}: the seed bar is under the rage meter`).toBeGreaterThan(s.rage!.y);
+      }
       // The figure: feet on the bar's baseline, the same box.
       expect.soft(Math.abs(s.box.b - (s.bar.b - FEET_PAD)), `${who}: feet on the baseline`).toBeLessThanOrEqual(TOL);
       expect(s.pixels, `${who}: drawn`).not.toBeNull();
       const p = s.pixels!;
-      // At rest: the drawing 2 px inside the screen's left edge, 2 px clear of the name column, under the HUD's text, and no lower than the
-      // bar's bottom. It may hang out of the bar's top and left edge (Eric: "the only thing hanging out would be the boss").
-      expect.soft(p.minX, `${who}: 2 px inside the screen's left edge`).toBeGreaterThanOrEqual(SCREEN_CLEAR);
+      // At rest (Nov 4, Eric's Puddles): the drawing whole inside the bar, 2 px in from its left edge and clear of its top and bottom, 2 px
+      // clear of the name column, under the HUD's text.
+      expect.soft(p.minX, `${who}: 2 px inside the bar's left edge`).toBeGreaterThanOrEqual(s.bar.x + BAR_CLEAR);
+      expect.soft(p.maxX, `${who}: inside the bar's right edge`).toBeLessThanOrEqual(s.bar.r - BAR_CLEAR);
+      expect.soft(p.minY, `${who}: not above the bar's top`).toBeGreaterThanOrEqual(s.bar.y);
       expect.soft(p.maxX, `${who}: 2 px clear of the name column`).toBeLessThanOrEqual(s.name.x - NAME_CLEAR);
       expect.soft(p.minY, `${who}: never covers the "BOSS · move N" text`).toBeGreaterThanOrEqual(s.hudText!.b + 1);
-      expect.soft(p.maxY, `${who}: nothing of the figure below the bar`).toBeLessThanOrEqual(s.bar.b + TOL);
+      expect.soft(p.maxY, `${who}: nothing of the figure below the bar`).toBeLessThanOrEqual(s.bar.b - BAR_CLEAR);
     }
   }
 
@@ -431,7 +447,9 @@ for (const def of PLAYABLE) {
         // balanced rows when two rows hold the line at the room's width; else three, never four. Both widths are measured here.
         const room = r.main.w - r.frame;
         const want = r.w1 <= 0.6 * room ? 1 : r.roomRows <= 2 ? 2 : 3;
-        if (r.rows !== want) rowsWrong.push(`${who}: ${r.rows} rows, want ${want} (one row ${r.w1.toFixed(1)} px, room ${room.toFixed(1)} px, ${r.roomRows} rows at the room's width)`);
+        // (At 320 px, where the name column moved, a line may take one row more, never four.)
+        const more = w === 320 && nameMoved(def.id) ? 1 : 0;
+        if (r.rows > want + more || r.rows < want) rowsWrong.push(`${who}: ${r.rows} rows, want ${want} (one row ${r.w1.toFixed(1)} px, room ${room.toFixed(1)} px, ${r.roomRows} rows at the room's width)`);
         expect.soft(r.rows, `${who}: rows`).toBeLessThanOrEqual(3);
         if (r.rows >= 2) expect.soft(r.pitch, `${who}: the rows' pitch`).toBeGreaterThanOrEqual(ROW_PITCH_MIN);
         expect.soft(r.bubble.x, `${who}: inside the bar, left`).toBeGreaterThanOrEqual(r.bar.x - TOL);

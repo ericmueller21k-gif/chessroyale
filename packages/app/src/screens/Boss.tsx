@@ -102,7 +102,8 @@ export function BossBar({ boss, match, move }: { boss: BossView; match?: GameVie
   // (Test link ?barslot=1: the prop's room outlined, so a screenshot shows it.)
   const slot = testParams().get("barslot") === "1";
   return (
-    <div class={`boss-bar${char ? " has-char" : ""}${slot ? " barslot" : ""}`} role="status" aria-label={`${boss.name}, threat ${boss.threat} of 5`}>
+    // (A phone's name column starts this far right of its usual place, for a figure that reaches past it: kits.ts barName.)
+    <div class={`boss-bar${char ? " has-char" : ""}${slot ? " barslot" : ""}`} style={{ "--bc-name": `${bossKit(boss.name)?.barName ?? 0}px` }} role="status" aria-label={`${boss.name}, threat ${boss.threat} of 5`}>
       {char && <BossCharacter match={match!} place="bar" />}
       <span class={`boss-icon${char ? " boss-icon-face" : ""}`} aria-hidden="true">
         <BossFace boss={boss} />

@@ -13601,6 +13601,8 @@ img.qicon {
   }
   .boss-bar.has-char .boss-main {
     grid-template-columns: 130px minmax(0, 1fr) auto;
+    /* (A figure that reaches past the usual name column moves it right: kits.ts barName, set on the bar as --bc-name.) */
+    padding-left: var(--bc-name, 0px);
   }
   .boss-bar.has-char .boss-name {
     justify-content: flex-start;
@@ -13608,6 +13610,27 @@ img.qicon {
   /* (The meter at the top of its row: a boss's own piece beside it, Moo's moon, may be taller, and must not move the meter.) */
   .boss-bar.has-char .boss-ult {
     align-items: flex-start;
+  }
+  /* A seed meter (Puddles, Nov 4): "Seeds 5" on its own line above its bar, and the bar as wide as the rage meter above it, both
+     starting at the name column's left edge. */
+  .boss-bar.has-char .seed-meter {
+    display: inline-grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas: "icon label" "bar bar";
+    justify-items: start;
+    align-items: center;
+    column-gap: 3px;
+    row-gap: 2px;
+  }
+  .boss-bar.has-char .seed-icon {
+    grid-area: icon;
+  }
+  .boss-bar.has-char .seed-label {
+    grid-area: label;
+  }
+  .boss-bar.has-char .seed-bar {
+    grid-area: bar;
+    width: 44px;
   }
 }
 .boss-bar.has-char .boss-icon-face {
