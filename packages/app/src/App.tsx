@@ -48,7 +48,7 @@ import { VoteScreen } from "./screens/Vote.tsx";
 import { BossScreen } from "./screens/Boss.tsx";
 import { SpectateScreen } from "./screens/Spectate.tsx";
 import { StageBreakScreen } from "./screens/StageBreak.tsx";
-import { ChatBubble, useMedia } from "./components/QuickChat.tsx";
+import { useMedia } from "./components/QuickChat.tsx";
 import { LobbyChat } from "./components/LobbyChat.tsx";
 import { PartyClient, SquadsClient, createParty, currentParty, currentSquads, forgetSquads, partyStatus, squadsQueue, squadsSeat, squadsStatus, squadsTestLobby } from "./squads.ts";
 import { SquadsQueue, SquadsScreen, squadsExit, squadsWaiting } from "./screens/Squads.tsx";
@@ -1724,8 +1724,6 @@ export function App() {
       </FrontFrame>
     </div>
   );
-  // Quick chat's bubble: the newest message for a moment while no chat is on screen (it lets every tap through).
-  const bubble = <ChatBubble match={match} />;
   // Waiting for the match to fill (PLAY, or Solo's bots taking their seats): the home screen, in the queue.
   if (inQueue(match)) {
     const q = match as NetMatch | SoloMatch;
@@ -1734,7 +1732,6 @@ export function App() {
     return (
       <>
         {home(<QueueScreen match={q} onCancel={leave} onLetBotsFill={letBots} chat={!computer} />, computer ? <LobbyChat match={q} /> : undefined, computer)}
-        {bubble}
         {overlay}
       </>
     );
@@ -1762,7 +1759,6 @@ export function App() {
       <>
         <GameFrame nav={matchNav}>
           {screen}
-          {bubble}
           {overlay}
         </GameFrame>
         {sideConfirm}
@@ -1789,7 +1785,6 @@ export function App() {
           </aside>
           )}
           {screen}
-          {bubble}
         </div>
       </GameFrame>
       {sideConfirm}

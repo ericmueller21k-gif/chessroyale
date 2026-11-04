@@ -2526,8 +2526,6 @@ export const QUICK_CHAT = {
   feedSize: 30,
   /** The server keeps this many lines (both teams together) to send a player who reconnects. */
   logSize: 60,
-  /** Phone: the newest message shows this long as a one-line bubble under the top bar, while chat is hidden. */
-  bubbleMs: 2_000,
   /** An emoji floats above its sender's row on the scoreboard this long. */
   emojiFloatMs: 2_400,
   /** The soft tick for a team message, at most this often; its level is a fraction of the clock's tick (itself softer than a move). */

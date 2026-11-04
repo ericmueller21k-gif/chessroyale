@@ -5,7 +5,7 @@ import { BOARD_SEL, named, test, pickMode } from "./helpers.ts";
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
 const team = (p: Page) => p.evaluate(() => (window as any).match.standings().find((s: any) => s.isYou)?.team as "w" | "b");
 
-/** The page's board and the box a panel or bubble takes, to check they never overlap. */
+/** The page's board and the box a panel takes, to check they never overlap. */
 const rect = (p: Page, sel: string) => p.locator(sel).first().boundingBox();
 const overlaps = (a: { x: number; y: number; width: number; height: number }, b: { x: number; y: number; width: number; height: number }) =>
   a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
@@ -285,24 +285,30 @@ test("quick chat picks in the profile: search, a check, n/10, locked lines to th
   // The board never moved or resized for chat.
   expect(await rect(phone, `.board-area ${BOARD_SEL.squares}`)).toEqual(boardBefore);
 
-  // The scoreboard (chat hidden, "‹ Back"): a new line shows as a bubble under the top bar, never over the board, and a
-  // move made while it shows still lands.
+  // The scoreboard (chat hidden, "‹ Back"): a new line shows nowhere over or above the board (Eric, Nov 4: the
+  // new-message bubble went; chat stays in its box), watched from before it's sent; a move made meanwhile still lands.
   await phone.getByRole("button", { name: "Back", exact: true }).click();
   await expect(phone.locator(".under-board .qchat")).toHaveCount(0);
   await untilMyTurn(phone, desk);
+  await phone.evaluate(() => {
+    const w = window as any;
+    w.__outside = [];
+    // (Any text with "GG" added anywhere but the box under the board: the old bubble, or anything like it.)
+    const look = (n: Node) => {
+      const el = n.nodeType === 1 ? (n as Element) : n.parentElement;
+      if (el && !el.closest(".under-board") && /\bGG\b/.test(n.textContent ?? "")) w.__outside.push(el.className || el.tagName);
+    };
+    new MutationObserver((ms) => ms.forEach((m) => (m.type === "characterData" ? look(m.target) : m.addedNodes.forEach(look)))).observe(document.body, { subtree: true, childList: true, characterData: true });
+  });
   await desk.locator(".qto button", { hasText: "All" }).click();
   await desk.locator(".qchat-side .qchip", { hasText: "GG" }).click();
-  const bubble = phone.locator(".qbubble");
-  await expect(bubble).toBeVisible();
-  await expect(bubble).toContainText("GG");
-  expect(overlaps((await rect(phone, ".qbubble"))!, (await rect(phone, `.board-area ${BOARD_SEL.squares}`))!)).toBe(false);
-  // It lets taps through.
-  expect(await bubble.evaluate((el) => getComputedStyle(el).pointerEvents)).toBe("none");
   const second = await tapMove(phone);
   await expect.poll(picked).toEqual([first, second]);
   // While chat is hidden the scoreboard's Chat tab counts what's new; a tap opens chat in the same box.
   const unread = phone.locator(".under-board .mini-chat-tab .mini-unread");
   await expect(unread).toBeVisible();
+  await expect(phone.locator(".qbubble")).toHaveCount(0);
+  expect(await phone.evaluate(() => (window as any).__outside), "nothing of the new line outside the box under the board").toEqual([]);
   await phone.locator(".under-board .mini-chat-tab").click();
   await expect(phone.locator(".under-board.ub-tab .qchat-tab")).toBeVisible();
   await expect(phone.locator(".qchat-tab .qline", { hasText: "GG" }).filter({ hasText: "Desky" })).toBeVisible();

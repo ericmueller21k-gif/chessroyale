@@ -24,6 +24,12 @@ Lane: `social`.
   (docs/decisions/2026-11-01-crowd-steady-box.md). Elsewhere (a
   computer, a raid, Classic) a phone's space under the board is split between the scoreboard and chat, one view at a
   time, never an empty box.
+- **Nothing of chat over or above the board** (Eric, Nov 4: "delete it, chat stays in the chat box below, not above the
+  board, never approved that"; docs/decisions/2026-11-04-crowd-votes-afk.md). The new-message bubble (the newest line
+  for a moment under the top bar while chat was hidden), its two switches (Settings' "New-message bubble", the chat
+  options' "Show new messages as a bubble while chat is hidden") and its pref (`brc.chatBubbles`) are gone, in every
+  mode: a line shows only in the chat box or tab (and an emoji's float on the scoreboard); while chat is hidden the
+  Chat tab counts what's new. e2e `chat.spec.ts` watches that nothing of a new line shows outside the box.
 - **The town square's chat log** is its own thing (a fading log in the top left of `/town`: the bosses' and kids' chatter,
   and signed-in players' typed messages, below): its look in [town-square.md](town-square.md), "The chat log".
 - **Your picks.** Each player's profile chooses which lines they see in their games: up to `QUICK_CHAT.maxLines`

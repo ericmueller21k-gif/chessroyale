@@ -12409,8 +12409,7 @@ img.qicon {
 .qline.you .qline-name {
   color: var(--accent);
 }
-.qline .team-chip,
-.qbubble .team-chip {
+.qline .team-chip {
   flex: none;
   width: 9px;
   height: 9px;
@@ -12620,68 +12619,6 @@ img.qicon {
   font-style: italic;
 }
 
-/* The newest message for a moment under the top bar (phone, chat hidden). It never takes a tap. */
-.qbubble {
-  position: fixed;
-  z-index: 45;
-  top: var(--banner-h);
-  left: 50%;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 26px;
-  max-width: calc(100vw - 24px);
-  padding: 0 11px 0 4px;
-  border: 1px solid #4a5160;
-  border-radius: 13px;
-  background: #2f3440;
-  color: #eef0f4;
-  font-size: 12px;
-  white-space: nowrap;
-  overflow: hidden;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
-  pointer-events: none;
-  transform: translateX(-50%);
-  animation: qbubble 2s linear forwards;
-}
-.qbubble strong {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: #c9d1dd;
-}
-.qbubble > span:not(.qline-to) {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.qbubble .emoji {
-  font-size: 16px;
-}
-:root[data-theme="light"] .qbubble {
-  border-color: transparent;
-  background: rgba(16, 18, 22, 0.93);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-}
-@keyframes qbubble {
-  0% {
-    opacity: 0;
-    transform: translate(-50%, -4px);
-  }
-  7% {
-    opacity: 1;
-    transform: translate(-50%, 0);
-  }
-  85% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-
 /* An emoji floats up from its sender's row on the scoreboard. */
 .t-float {
   position: absolute;
@@ -12780,8 +12717,7 @@ img.qicon {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .t-float,
-  .qbubble {
+  .t-float {
     animation-timing-function: steps(1, end);
   }
 }

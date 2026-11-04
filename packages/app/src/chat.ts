@@ -21,7 +21,7 @@ import {
 } from "@chessroyale/core";
 import type { ChatBlock, ChatRefusal, ClientMessage, NetChatLine } from "@chessroyale/chess";
 import { chatBlockNow, mutes, setChatBlock } from "./chat-mod.ts";
-import { chatBubbles, chatOff, onPrefsChange, setChatOff } from "./prefs.ts";
+import { chatOff, onPrefsChange, setChatOff } from "./prefs.ts";
 import { play } from "./sound.ts";
 
 /** A chat line as this device keeps it: `at` is local time (when it shows). */
@@ -87,7 +87,7 @@ export class MatchChat {
   private blockedUntil = 0;
   /** Lines up to this number have been seen (with chat on screen); later ones count as unread. */
   private seenN = 0;
-  /** Chat panels on screen right now (while one is, nothing is unread and no bubble shows). */
+  /** Chat panels on screen right now (while one is, nothing is unread). */
   private onScreen = new Set<object>();
   private timers = new Set<ReturnType<typeof setTimeout>>();
   private lastTick = 0;
@@ -267,7 +267,7 @@ export class MatchChat {
     return this.lines(now).filter((l) => l.n > this.seenN && l.from !== me).length;
   }
 
-  /** A chat panel is on screen (it says so while it is): nothing is unread, and no bubble. */
+  /** A chat panel is on screen (it says so while it is): nothing is unread. */
   shown(panel: object, on: boolean) {
     const had = this.onScreen.size > 0;
     if (on) this.onScreen.add(panel);
@@ -280,15 +280,6 @@ export class MatchChat {
     return this.onScreen.size > 0;
   }
 
-  /** The newest line from someone else, for the bubble: while chat is hidden, for QUICK_CHAT.bubbleMs after it shows. */
-  bubble(now = Date.now()): ChatLine | null {
-    if (chatOff() || !chatBubbles() || this.visible) return null;
-    const me = this.host.me();
-    const last = this.lines(now).filter((l) => l.from !== me).at(-1);
-    return last && now - last.at < QUICK_CHAT.bubbleMs && last.n > this.seenBeforeBubble ? last : null;
-  }
-  /** Lines seen on screen before the panel was hidden don't bubble up again. */
-  private seenBeforeBubble = 0;
 
   /**
    * Emoji floating above their senders' rows on the scoreboard right now (by sender). `team` marks one sent to
@@ -329,10 +320,9 @@ export class MatchChat {
   private markSeen() {
     const top = Math.max(0, ...this.list.filter((l) => l.at <= Date.now()).map((l) => l.n));
     this.seenN = Math.max(this.seenN, top);
-    this.seenBeforeBubble = this.seenN;
   }
 
-  /** A line is on screen now: a soft tick for a team message, and everyone redraws (the feed, the bubble, a float). */
+  /** A line is on screen now: a soft tick for a team message, and everyone redraws (the feed, a float). */
   private arrived(l: ChatLine) {
     const me = this.host.me();
     if (this.visible) this.markSeen();
@@ -341,8 +331,8 @@ export class MatchChat {
       play("chat");
     }
     this.host.emit();
-    // Redraw again once its bubble and float are over.
-    this.wakeAt(l.at + Math.max(QUICK_CHAT.bubbleMs, QUICK_CHAT.emojiFloatMs) + 50);
+    // Redraw again once its float is over.
+    this.wakeAt(l.at + QUICK_CHAT.emojiFloatMs + 50);
   }
 
   /** A bot's line shows a moment after it was sent. */
