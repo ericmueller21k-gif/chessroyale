@@ -5,7 +5,8 @@ Brief: `notes/briefs/brief-ginger-art.md` (Eric's design, Nov 5, and his photo o
 1. the battle spot and the table centred in the room;
 2. the falling ice as a tall icicle with a round flat top (intro-ginger-nov5.md);
 3. the candy dispensers carried on round both curved side walls;
-4. the staircases joined to the catwalk and the floor;
+4. the staircases joined to the catwalk and the floor: after his second look (his crop of room.png), each is now **one straight
+   flight on the catwalk's own row**, so it joins in the flat room still as well as from the camera;
 5. no gaps in the igloo's walls;
 6. smaller, gnome-ish elves.
 
@@ -31,7 +32,10 @@ The drawings:
     on the catwalk at bay-c's tubes.
   - [computer, the pair at the lower row](house-shop-ginger/view-lower-row-computer.png).
   - On both, the candy wall runs from the near side walls on the left, round the back and down the right. The stairs at each end
-    of the catwalk show at the phone's two edges, with the lower bins, the deck, the tubes and the top shelf. On the computer the
+    of the catwalk show at the phone's two edges, with the lower bins, the deck, the tubes and the top shelf.
+- **The stairways close up, 3x:** [house-shop-ginger/stairs-west.png](house-shop-ginger/stairs-west.png) and
+  [house-shop-ginger/stairs-east.png](house-shop-ginger/stairs-east.png). Each shows the flat room still (left) and the computer's
+  challenge camera (right). On the computer the
     dome's ice over the top shelf is cut by the screen's top; nothing that matters is.
 - **The elves:** [npc-ginger-elf/elves-sheet.png](npc-ginger-elf/elves-sheet.png) (4x):
   - the shopkeeper: idle, walk, sit, wave;
@@ -57,7 +61,8 @@ zoom, **but centred on the table (west 0, not 0.75)**.
 ## The room: 20 x 20 squares, 37 px a square, a round floor 10 across
 
 ### The floor mask: `SHOP_GINGER_FLOOR`
-A square is floor when its middle is under 5 squares from (9.5, 9.5), plus the tunnel. Block every `#` square, as for Hollow's.
+A square is floor when its middle is under 5 squares from (9.5, 9.5), plus the tunnel and **the four squares at the stairs' feet:
+(5, 6), (5, 7), (14, 6), (14, 7)**. Block every `#` square, as for Hollow's.
 
 ```
 ####################   row 0
@@ -66,8 +71,8 @@ A square is floor when its middle is under 5 squares from (9.5, 9.5), plus the t
 ####################
 ####################   row 4: the back wall (the catwalk is up here, see below)
 ########....########   row 5: columns 8-11
-######........######   rows 6-7: columns 6-13
-######........######
+#####..........#####   rows 6-7: columns 6-13, and the stairs' feet (5, 6), (5, 7), (14, 6), (14, 7)
+#####..........#####
 #####..........#####   rows 8-11: columns 5-14
 #####..........#####
 #####..........#####
@@ -86,6 +91,9 @@ A square is floor when its middle is under 5 squares from (9.5, 9.5), plus the t
 - Every square round the floor has a wall card, including the corner squares the curve steps across, so there are no holes.
 - **Every wall card is 45 x 150, foot [22, 149]: its square's 37 px and 4 px more each side.** Each overlaps its neighbours by 4 px,
   so the stepped curve shows no gaps or notches between cards at any camera place.
+- **No outside colour shows inside the room:** the floor tile under every wall card is the floor's snow (a shade bluer at the wall's
+  foot), and under the back curve's bays and stairs it is wooden boards with a candy-trim kick board. So nothing dark shows between
+  the cards' feet and the floor, the deck's front, the stairs or the side walls.
 - The dome's ice comes down smoothly toward you.
   - Each near wall card's top slopes from its row's height to the next.
   - Row 11 and back are the candy wall (ice over it from 114 to 149 px).
@@ -96,10 +104,9 @@ A square is floor when its middle is under 5 squares from (9.5, 9.5), plus the t
 | square(s) | piece | what it is |
 | --- | --- | --- |
 | (4, 11), (4, 10), (4, 9), (4, 8) | `side-d`, `side-c`, `side-b`, `side-a` | **the candy wall carried on down the west side** (Eric's fix 3): two bins and three tubes each, on a plain ledge (no bulbs: not walked on); the ice over them 114-126 |
-| (4, 7), (5, 5) | `side-corner` | the side's corners: a bin pair, two tubes and a wooden upright |
-| (5, 7) | `stair-lo` | the west stairs' low square |
-| (5, 6) | `stair-hi` | the west stairs' high square; behind it the candy wall's tubes on their shelf |
-| (6, 5) | `bay-a` | bins: jelly beans, red gumballs; tubes: lemon gumballs, sprinkles, blue gumballs |
+| (4, 7), (4, 6), (4, 5) | `side-corner` | the side's corners: a bin pair, two tubes and a wooden upright |
+| (5, 5) | `stair-lo` | **the west stairs' low square**: steps 5-20 on the catwalk's row, the cabinet's wood behind, the tubes above |
+| (6, 5) | `stair-hi` | **the west stairs' high square**: steps 25-35, its east quarter the deck itself (40); tubes above |
 | (7, 5) | `bay-b` | bins: sours, peppermints; tubes: red and white beans, lemon drops, jelly beans |
 | (7, 4) | `bay-corner` | behind the curve's step: a bay with a wooden upright |
 | (8, 4) | `bay-door` | **the stockroom door** under the catwalk (the board carriers come out of it); tubes above. `bay-door-open` is the same card with the door open on the warm stockroom |
@@ -107,9 +114,8 @@ A square is floor when its middle is under 5 squares from (9.5, 9.5), plus the t
 | (11, 4) | `bay-c` | bins: blue gumballs, chocolates; tubes: orange drops, mixed gumballs, spearmints |
 | (12, 4) | `bay-corner` (mirrored) | behind the curve's step |
 | (12, 5) | `bay-d` | bins: lemon drops, pink and white beans; tubes: grape drops, red and white beans, yellow gumballs |
-| (13, 5) | `bay-e` | bins: jelly beans, grape drops; tubes: blue and white gumballs, sprinkles, lemon drops |
-| (14, 6), (14, 7) | `stair-hi`, `stair-lo` (mirrored) | the east stairs |
-| (14, 5), (15, 7) | `side-corner` (mirrored) | |
+| (13, 5), (14, 5) | `stair-hi`, `stair-lo` (mirrored) | the east stairs, the same flight mirrored |
+| (15, 5), (15, 6), (15, 7) | `side-corner` (mirrored) | |
 | (15, 8) to (15, 11) | `side-a` to `side-d` (mirrored) | the candy wall down the east side |
 | rows 12-13 | `ice-12`, `ice-lamp`, `ice-13` | the dome's ice where the candy ends; an **ice lantern** in a niche at (5, 12) and (14, 12) (a block of clear ice with a warm candle) |
 | rows 14-17 | `hem`, `hem-15`, `tunnel` | the low near ring and the tunnel's walls |
@@ -123,7 +129,8 @@ square's own 37 px are x 4-40.
   - A striped lid, a glare down the plastic and a handle on the right.
   - **A steel chute under each, its foot 11 px up at x 13 and 31** (`SHOP_GINGER_CHUTES.lower`).
 - **The catwalk's deck:**
-  - its plank face 33-37, with a string of warm bulbs along it (round the sides a plain ledge);
+  - its plank face 33-37, with a string of warm bulbs along it and **a candy-cane edge** along its top (round the sides a plain
+    ledge);
   - its lit top 38-41. **A figure up there stands at 40** (`SHOP_GINGER_DECK_H`).
 - **42-52:** the tubes' wooden shelf.
 - **The upper row: three tall clear tubes of candy.**
@@ -134,26 +141,39 @@ square's own 37 px are x 4-40.
 
 ### The two walking levels
 - **`SHOP_GINGER_UPPER`** (the catwalk) is at **h 40**. Its squares, west to east:
-  **(6, 5), (7, 5), (8, 4), (9, 4), (10, 4), (11, 4), (12, 5), (13, 5)**.
+  **(7, 5), (8, 4), (9, 4), (10, 4), (11, 4), (12, 5)**.
+  - It is six squares now: (6, 5) and (13, 5) are the stairs' high squares, whose top quarters are the deck.
   - They are back-wall squares, reached only by the stairs.
   - Walk them as a chain, one square to the next. **The steps round the curve ((7, 5)-(8, 4) and (11, 4)-(12, 5)) are diagonal.**
   - A figure up there stands on its square's middle row, lifted 40 px.
   - The side bays' ledges are not part of it.
-- **`SHOP_GINGER_STAIRS`**: two squares each, **eight steps of 5 px** (`SHOP_GINGER_STEP`), a quarter of the square each.
+- **`SHOP_GINGER_STAIRS`**: **one straight flight per side, on the catwalk's own row** (Eric's second look, Nov 5: "one continuous
+  flight per side").
+  - Two squares each, **eight steps of 5 px** (`SHOP_GINGER_STEP`), a quarter of the square each.
   - The quarters are x 4-12, 13-21, 22-30 and 31-40 of the 45 px card. The outer quarters run on over the overlaps.
   - The figure's lift is the step under its feet:
 
 | stairs | foot (floor) | low square: lift by quarter, west to east | high square: lift by quarter, west to east | top (catwalk) |
 | --- | --- | --- | --- | --- |
-| west | (6, 7) | (5, 7): 20, 15, 10, 5 (from the floor at its east edge) | (5, 6): 25, 30, 35, 40 (entered at its west quarter) | (6, 5) |
-| east | (13, 7) | (14, 7): 5, 10, 15, 20 | (14, 6): 40, 35, 30, 25 | (13, 5) |
+| west | **(5, 6)** | **(5, 5)**: 5, 10, 15, 20 (entered from the foot at its west quarter) | **(6, 5)**: 25, 30, 35, 40 (its east quarter is the deck) | **(7, 5)** |
+| east | **(14, 6)** | **(14, 5)**: 20, 15, 10, 5 (entered from the foot at its east quarter) | **(13, 5)**: 40, 35, 30, 25 (its west quarter is the deck) | **(12, 5)** |
 
-- **How they join** (Eric's fix 4):
-  - The low stair's foot stands on a little drift of snow on the floor.
-  - Its top step (20) is a deep landing running back to the high stair's first step.
-  - **The high stair's top step is a landing level with the deck (40).** It runs on over the card's overlap into the catwalk's card.
-  - **Its candy-cane banister runs up the steps and on, level, into the deck's edge.**
-  - Behind the high stair, the candy wall's tubes stand on their shelf, so the stair climbs in front of the candy.
+- **Why it joins now:**
+  - Both stair cards stand on the same row as the catwalk's, so the flight is one piece both laid out flat and from the camera.
+  - Its foot steps off onto the floor square in front, (5, 6) or (14, 6).
+  - **Every step is a solid wooden block down to the floor**, each one touching the next.
+  - **The top step is the deck itself:** the catwalk's planks, its bulbs and its candy-cane edge, on a wooden support down to the
+    floor, running on into the catwalk at (7, 5) or (12, 5).
+  - **One candy-cane banister runs unbroken** from the foot along the whole flight onto the deck's candy-cane edge: the same rail line
+    across both cards.
+  - Behind the flight are the cabinet's wood (a candy-trim kick board at its foot), the tubes on their shelf, the top shelf and the
+    ice.
+- **What changed for it:**
+  - the stairs moved from (5, 6)-(5, 7) and (14, 6)-(14, 7) to (5, 5)-(6, 5) and (13, 5)-(14, 5);
+  - their old squares are floor (the feet);
+  - bay-a and bay-e, which stood at (6, 5) and (13, 5), are gone. Their candy is on the stairs' wall above the steps, and the side
+    bays carry the rest round.
+  - The dispensing loop changed with it (below).
 - **Drawing a figure up there** (the catwalk or the stairs):
   - Draw it just in front of the cards it stands on and next to. The mockup draws it at the depth of the row one nearer.
   - Put a small dark shadow on the planks under its feet: an ellipse 16 x 4 px of the room's scale, #140c04 at 45%.
@@ -197,7 +217,7 @@ They stand toward the front, clear of the candy wall and the battle spot.
 ### Pieces
 | piece | size (px) | foot | squares |
 | --- | --- | --- | --- |
-| bay-a to -e, bay-door, bay-door-open, bay-sign-w, -e, bay-corner, side-a to -d, side-corner, stair-lo, stair-hi, ice-12, ice-lamp, ice-13, hem, hem-15, tunnel | **45 x 150** | **22, 149** | 1 x 1 (4 px over each neighbour) |
+| bay-b, -c, -d, bay-door, bay-door-open, bay-sign-w, -e, bay-corner, side-a to -d, side-corner, stair-lo, stair-hi, ice-12, ice-lamp, ice-13, hem, hem-15, tunnel | **45 x 150** | **22, 149** | 1 x 1 (4 px over each neighbour) |
 | counter | 74 x 38 | 37, 28 | 2 x 1 |
 | crate | 30 x 32 | 13, 30 (on the stand: SHOP_GINGER_CRATE_AT) | (the stand's) |
 | barrel-canes, -canes-b, -candy, -mint, -gum | 37 x 64 | 18, 59 | 1 x 1 |
@@ -271,28 +291,31 @@ They stand toward the front, clear of the candy wall and the battle spot.
 - **Where A stands:**
   - at a lower stop, on the floor just in front of the bin (r = the bin's row + 0.6);
   - at an upper stop, on the catwalk (lift 40).
-- The loop runs about 48.7 s.
-- The stops are where they were: the back wall didn't move.
+- The stops moved with the stairs: bay-a and bay-e are gone, so bay-b and bay-d each give two (both their bins below; bay-b two
+  tubes above).
 
 | # | A at (c, r) | lvl, h | stop: bay, chute (x in its 45 px card), face | B at (c, r, lift) |
 | --- | --- | --- | --- | --- |
-| 0 | (6, 7) | floor 0 | the west stairs' foot: start | |
-| L1 | (6.04, 5.6) | floor 0 | bay-a, bin 2 (x 31), east | (5.59, 5.9, 0) |
+| 0 | (4.85, 6.3) | floor 0 | the west stairs' foot (5, 6): start | |
+| L1 | (6.55, 5.6) | floor 0 | bay-b, bin 1 (x 13), east | (6.10, 5.9, 0) |
 | L2 | (7.04, 5.6) | floor 0 | bay-b, bin 2 (x 31), east | (6.59, 5.9, 0) |
 | | (8, 7.2) → (11, 7.2) | floor 0 | round the stand's front, behind the ice's rim | |
 | L3 | (11.04, 4.6) | floor 0 | bay-c, bin 2 (x 31), east | (10.59, 4.9, 0) |
 | L4 | (11.55, 5.6) | floor 0 | bay-d, bin 1 (x 13), east | (11.10, 5.9, 0) |
-| L5 | (13.04, 5.6) | floor 0 | bay-e, bin 2 (x 31), east | (12.59, 5.9, 0) |
-| | (13.2, 7) → (14, 7) → (14, 6) | stairs 5 → 40 | up the east stairs | |
-| U1 | (13.18, 5) | up 40 | bay-e, tube 2 (x 22), west | (13.50, 5.39, 36): the stairs' top |
-| U2 | (11.85, 5) | up 40 | bay-d, tube 1 (x 10), west | (12.35, 5, 40) |
+| L5 | (12.04, 5.6) | floor 0 | bay-d, bin 2 (x 31), east | (11.59, 5.9, 0) |
+| | (14.3, 6.2) | floor 0 | the east stairs' foot (14, 6) | |
+| | (14.3, 5) → (12.62, 5) | stairs 5 → 40 | up the east flight, westward, onto the deck | |
+| U1 | (12.18, 5) | up 40 | bay-d, tube 2 (x 22), west | (12.68, 5, 40): the stairs' deck quarter |
 | | (11.5, 4.5) | up 40 | round the curve | |
-| U3 | (11.18, 4) | up 40 | bay-c, tube 2 (x 22), west | (11.45, 4.42, 40) |
+| U2 | (11.18, 4) | up 40 | bay-c, tube 2 (x 22), west | (11.45, 4.42, 40) |
 | | (9.5, 4) | up 40 | over the stand | |
-| U4 | (8.18, 4) | up 40 | bay-door, tube 2 (x 22), west | (8.68, 4, 40) |
+| U3 | (8.18, 4) | up 40 | bay-door, tube 2 (x 22), west | (8.68, 4, 40) |
 | | (7.5, 4.5) | up 40 | round the curve | |
-| U5 | (6.85, 5) | up 40 | bay-b, tube 1 (x 10), west | (7.25, 4.7, 40) |
-| | (6, 5) → (5, 6) → (5, 7) → (6, 7) | down the west stairs | back at the start | |
+| U4 | (7.18, 5) | up 40 | bay-b, tube 2 (x 22), west | (7.45, 4.58, 40) |
+| U5 | (6.85, 5) | up 40 | bay-b, tube 1 (x 10), west | (7.27, 4.86, 40) |
+| | (6.38, 5) → (4.65, 5) → (4.85, 6.3) | stairs 40 → 5, floor | down the west flight, westward, off its foot | back at the start |
+
+The loop runs about 47.5 s.
 
 ### Sprites on screen (Eric, Nov 4)
 `intro-ginger-view.ts CHECK=1` checks every resting place on Ginger's camera:
@@ -332,16 +355,16 @@ They stand toward the front, clear of the candy wall and the battle spot.
    - Round the sides it stands on a plain ledge with no bulbs (the catwalk is only the back curve, between the stairs).
    - The ice takes over at row 12, with a lantern each side.
 3. **The walls overlap** (45 px cards) and slope down smoothly toward you, so the igloo reads as one curve with no holes.
-4. **The stairs join:**
-   - their top step is a landing level with the deck, running into it;
-   - the banister runs on into the deck's edge;
-   - the foot stands on a drift of snow;
-   - tubes of candy stand on the wall behind them.
+4. **The stairs join** (I shipped the joined version, not Eric's straight back-to-front fallback):
+   - each is one straight flight along the back wall on the catwalk's own row, rising into the deck;
+   - its top step is the deck itself, and one banister runs unbroken onto the deck's candy-cane edge;
+   - it joins in the flat room still (the 3x crops) as from the camera;
+   - it costs two bays (a and e), and two stair feet become floor.
 5. **The elves are little gnome-ish elves, 25 px**, with big hats, big round noses, big boots and beards on four of them.
    - They reach the bins' handles and the tubes' levers with a little hop.
    - The stand is lowered to 10 px so the shopkeeper shows over it.
 6. Unchanged:
-   - the catwalk (8 squares at 40 px, no front rail);
+   - the catwalk at 40 px, no front rail (now 6 squares plus the stairs' deck quarters);
    - the stockroom door and the CANDY sign;
    - two bins and three tubes a bay;
    - elf A tipping full boxes into his sack, elf B writing;

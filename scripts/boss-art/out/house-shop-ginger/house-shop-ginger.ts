@@ -67,7 +67,9 @@ const inTunnel = (c: number, r: number) => (c === 9 || c === 10) && r >= 15 && r
  * The walkable floor: a circle 10 squares across (columns 5-14, rows 5-14), its rows 8-11 columns 5-14, rows 6-7 and 12-13
  * columns 6-13, rows 5 and 14 columns 8-11; the tunnel (columns 9-10, rows 15-17) and the way out (row 18). Every `#` is ice.
  */
-export const SHOP_GINGER_FLOOR: readonly string[] = Array.from({ length: N }, (_, r) => Array.from({ length: N }, (_, c) => (inCircle(c, r) || inTunnel(c, r) ? "." : "#")).join(""));
+/** The stairs' feet (floor squares added to the circle, Nov 5: each flight now stands on the catwalk's own row, its foot in front). */
+const STAIR_FEET = new Set(["5,6", "5,7", "14,6", "14,7"]);
+export const SHOP_GINGER_FLOOR: readonly string[] = Array.from({ length: N }, (_, r) => Array.from({ length: N }, (_, c) => (inCircle(c, r) || inTunnel(c, r) || STAIR_FEET.has(`${c},${r}`) ? "." : "#")).join(""));
 const isOpen = (c: number, r: number) => SHOP_GINGER_FLOOR[r]?.[c] === ".";
 
 // ==== The floor: packed snow (soft wind ripples, sparkles, a few boot prints), the dome's ice round it.
@@ -232,7 +234,7 @@ function cabinet(c: Cv, seed: number) {
 /** The catwalk across a card: its plank face (a string of warm bulbs along it) and its lit top, a shadow line at its back. */
 function deck(c: Cv, seed: number, lit = true) {
   for (let x = 0; x < CARD; x++) {
-    for (let h = DECK.face; h < DECK.top; h++) put(c, x, yOf(h), h === DECK.face ? "w" : h === DECK.top - 1 ? "v" : (x + seed * 5) % 13 === 0 ? "w" : "u");
+    for (let h = DECK.face; h < DECK.top; h++) put(c, x, yOf(h), h === DECK.face ? "w" : h === DECK.top - 1 ? (lit ? (Math.floor(x / 2) % 2 ? "x" : "r") : "v") : (x + seed * 5) % 13 === 0 ? "w" : "u");
     for (let h = DECK.top; h <= DECK.top + 3; h++) put(c, x, yOf(h), h === DECK.top + 3 ? "w" : (x + seed * 3) % 9 === 0 ? "U" : h === DECK.top ? "U" : "v");
   }
   if (lit) bulbs(c, 0, CARD - 1, yOf(DECK.face + 3), 12, seed, true);
@@ -384,13 +386,11 @@ function signBoth(): [Cv, Cv] {
 
 const M = MIXES;
 const bayDef = (name: string, seed: number, o: BayOpts) => def(name, [1, 1], CARD, H, [22, F], [[whole(bayCard(seed, o), true)]]);
-export const SHOP_GINGER_BAY_A = bayDef("bay-a", 1, { bins: [M.jelly!, M.gumRed!], lids: "rt", tubes: [M.gumYellow!, M.sprinkle!, M.gumBlue!] });
 export const SHOP_GINGER_BAY_B = bayDef("bay-b", 2, { bins: [M.sour!, M.mint!], lids: "gr", tubes: [M.redWhite!, M.lemon!, M.jelly!] });
 export const SHOP_GINGER_BAY_DOOR = bayDef("bay-door", 3, { lower: "door", tubes: [M.gumPink!, M.choc!, M.sour!] });
 export const SHOP_GINGER_BAY_DOOR_OPEN = bayDef("bay-door-open", 3, { lower: "door-open", tubes: [M.gumPink!, M.choc!, M.sour!] });
 export const SHOP_GINGER_BAY_C = bayDef("bay-c", 4, { bins: [M.gumBlue!, M.choc!], lids: "tp", tubes: [M.orange!, M.gumMix!, M.spearmint!] });
 export const SHOP_GINGER_BAY_D = bayDef("bay-d", 5, { bins: [M.lemon!, M.pinkWhite!], lids: "yh", tubes: [M.grape!, M.redWhite!, M.gumYellow!] });
-export const SHOP_GINGER_BAY_E = bayDef("bay-e", 6, { bins: [M.jelly!, M.grape!], lids: "rp", tubes: [M.blueWhite!, M.sprinkle!, M.lemon!] });
 /** The two back corners (behind the curve's steps, so its join never shows a gap): a bay with a wooden upright at its middle. */
 export const SHOP_GINGER_BAY_CORNER = bayDef("bay-corner", 7, { bins: [M.gumMix!, M.sour!], lids: "gt", tubes: [M.mint!, null, M.gumRed!], post: true });
 /**
@@ -458,32 +458,57 @@ function banister(c: Cv, posts: readonly [number, number][]) {
 /** The stairs' step height (px), and each quarter of a stair card's lift (west to east, across its square's 37 px: x 4-12, 13-21, 22-30, 31-40). */
 export const SHOP_GINGER_STEP = 5;
 const QX = [[0, OV + 8], [OV + 9, OV + 17], [OV + 18, OV + 26], [OV + 27, CARD - 1]] as const;
-const LO_W = [20, 15, 10, 5] as const; // the west low stair (5, 7): rising westward from the floor at its east edge
-const HI_W = [25, 30, 35, 40] as const; // the west high stair (5, 6): rising eastward to the deck (40) at its east edge
+const LO_W = [5, 10, 15, 20] as const; // the west stairs' low square (5, 5): rising eastward from its foot (5, 6)
+const HI_W = [25, 30, 35, 40] as const; // its high square (6, 5): on up eastward to the deck (40) on (7, 5)
 /**
- * The west staircase, drawn as it stands on its squares (the east one is these mirrored): `lo` on (5, 7) and `hi` on (5, 6), eight
- * steps of 5 px, a quarter of a square each, curving with the wall: up westward across the low square (from the floor at its east
- * edge: a drift of snow at its foot), north onto the high square (the low one's top step is a landing running back to it), up
- * eastward across it to the catwalk's deck: its top step is a landing level with the deck (40) running on 4 px into the catwalk's
- * card, and its banister runs on level into the deck's edge. Behind the high stair, the candy wall: tubes on their shelf over it.
+ * The west staircase (Nov 5, redrawn so it plainly joins): **one straight flight on the catwalk's own row**, (5, 5) and (6, 5),
+ * eight steps of 5 px, a quarter of a square each, rising eastward from its foot on the floor at (5, 6) to its top step, level with
+ * the deck and drawn as the deck (the same planks, the same candy-cane edge), which runs on into the catwalk at (7, 5). Both its
+ * cards stand on the same row as the catwalk's, so the flight is one piece from the camera and laid out flat. Every step is a solid
+ * wooden block down to the floor (no gap under it); one candy-cane banister runs unbroken from the foot along the steps and onto the
+ * deck's candy-cane edge. Behind it the candy wall: the bins' cabinet, the tubes on their shelf, the top shelf, the dome's ice. The
+ * east one is these mirrored, on (14, 5) and (13, 5).
  */
-const STAIR_LO = cv(CARD, H);
-{
-  // (No wall behind it on its own card: the high stair stands just behind it, and the side bay (4, 7) to its west.)
-  QX.forEach(([a, b], i) => stepBlock(STAIR_LO, a, b, LO_W[i]!, i === 0 ? 9 : 3));
-  banister(STAIR_LO, [[CARD - 3, 5], [OV + 22, 10], [OV + 13, 15], [OV + 4, 20], [1, 20]]);
-  // Snow drifted at its foot, where it meets the floor.
-  for (let x = OV + 24; x < CARD; x++) for (let h = 0; h < 2 + (x % 3 === 0 ? 1 : 0); h++) put(STAIR_LO, x, yOf(h), h ? "4" : "3");
+/** The banister's rail height (px over the floor) along the flight, by px along it from the low square's west edge (0) to the high square's east edge (74). */
+const railH = (g: number) => 16 + Math.max(0, Math.min(1, (g - 2) / 68)) * 35;
+function stairCard(hi: boolean, seed: number, tubes: readonly Mix[]): Cv {
+  const c = bayCard(seed, { lower: "none", tubes, ledge: true });
+  // The wall behind the steps: the cabinet's dark wood, from the floor up to the tubes' shelf (no deck band but at the top step).
+  for (let x = 0; x < CARD; x++) for (let h = 0; h < LEDGE.foot; h++) put(c, x, yOf(h), h < 5 ? (Math.floor((x + h) / 3) % 2 ? "r" : "x") : x % 18 === OV ? "w" : "V");
+  const steps = hi ? HI_W : LO_W;
+  QX.forEach(([a, b], i) => {
+    if (hi && i === 3) return;
+    stepBlock(c, a, b, steps[i]!, 3);
+  });
+  if (hi) {
+    // The top step is the deck itself: its plank face and lit top (the catwalk's), on a solid wooden support down to the floor.
+    const d = cv(CARD, H);
+    deck(d, seed, true);
+    d.forEach((row, y) => row.forEach((k, x) => k !== "." && x >= QX[3][0] && put(c, x, y, k)));
+    for (let x = QX[3][0]; x < CARD; x++) for (let h = 0; h < DECK.face; h++) put(c, x, yOf(h), x === QX[3][0] ? "v" : h % 5 === 0 ? "w" : h < 3 ? "V" : "u");
+  } else {
+    // Snow drifted at its foot, where it meets the floor.
+    for (let x = 0; x < OV + 9; x++) for (let h = 0; h < 2 + (x % 3 === 0 ? 1 : 0); h++) put(c, x, yOf(h), h ? "4" : "3");
+  }
+  // The banister: posts at each step's middle, one rail along the whole flight (the same line on both cards), its last post on the deck's edge.
+  const g0 = hi ? T : 0; // px along the flight at this card's square's west edge
+  for (let x = 0; x < CARD; x++) {
+    const g = g0 + x - OV;
+    if (g < 1 || g > 2 * T + OV - 1) continue;
+    const hh = Math.round(railH(g));
+    put(c, x, yOf(hh), Math.floor(g / 2) % 2 ? "r" : "x");
+    put(c, x, yOf(hh) + 1, "R");
+  }
+  const posts = hi ? [OV + 4, OV + 13, OV + 22, CARD - 1] : [OV + 1, OV + 13, OV + 22, OV + 31];
+  posts.forEach((x, i) => {
+    const step = hi && i === 3 ? DECK.top - 1 : steps[Math.min(3, i)]!;
+    const top = Math.round(railH(g0 + x - OV));
+    for (let h = step + 1; h < top; h++) put(c, x, yOf(h), Math.floor(h / 2) % 2 ? "r" : "x");
+  });
+  return c;
 }
-const STAIR_HI = cv(CARD, H);
-{
-  // The candy wall behind it: a bay's upper half (its ledge, three tubes, the top shelf, the ice), from over its banister up.
-  const back = bayCard(14, { lower: "none", tubes: [M.gumRed!, M.lemon!, M.blueWhite!] });
-  back.forEach((row, y) => row.forEach((k, x) => k !== "." && F - y >= LEDGE.foot + 4 && put(STAIR_HI, x, y, k)));
-  QX.forEach(([a, b], i) => stepBlock(STAIR_HI, a, b, HI_W[i]!, i === 3 ? 8 : 3));
-  // The banister up the steps and on, level, into the catwalk's edge.
-  banister(STAIR_HI, [[1, 25], [OV + 13, 30], [OV + 22, 35], [OV + 31, 40], [CARD - 1, 40]]);
-}
+const STAIR_LO = stairCard(false, 21, [M.gumRed!, M.lemon!, M.blueWhite!]);
+const STAIR_HI = stairCard(true, 22, [M.sprinkle!, M.gumYellow!, M.jelly!]);
 export const SHOP_GINGER_STAIR_LO = def("stair-lo", [1, 1], CARD, H, [22, F], [[whole(STAIR_LO, true)]]);
 export const SHOP_GINGER_STAIR_HI = def("stair-hi", [1, 1], CARD, H, [22, F], [[whole(STAIR_HI, true)]]);
 
@@ -652,7 +677,7 @@ export const SHOP_GINGER_BOXES = (() => {
 
 const WARM = "#ffcf8a"; // the candy shop's warm glow: the catwalk's bulbs, the lanterns
 const ICE = "#a8dcff"; // the ice's cool light: the battle spot, the doorway's night
-const BAYS = ["bay-a", "bay-b", "bay-door", "bay-door-open", "bay-c", "bay-d", "bay-e", "bay-corner", "bay-sign-w", "bay-sign-e", "stair-hi"];
+const BAYS = ["bay-b", "bay-door", "bay-door-open", "bay-c", "bay-d", "bay-corner", "bay-sign-w", "bay-sign-e", "stair-hi"];
 const SIDES = ["side-a", "side-b", "side-c", "side-d", "side-corner"];
 /** The catwalk's bulbs on every bay (warm, a soft halo), the ice lanterns, the doorway's night, the stockroom (when its door opens). */
 export const SHOP_GINGER_LIGHTS: readonly (LightSpot & { piece: string })[] = [
@@ -702,11 +727,20 @@ const PRINTS: Record<string, [number, number][]> = {
   "10,16": [[20, 28], [14, 15]],
   "12,7": [[8, 26], [16, 17]],
 };
+/** A wall square (next to the floor, or touching it at a corner): its tile shows in front of its card, inside the room. */
+const ringSq = (c: number, r: number) => [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]].some(([dc, dr]) => isOpen(c + dc!, r + dr!));
+/** The squares under the back curve's bays and stairs: wooden floor boards there (the cabinets' and the steps' footing). */
+const BAY_ROW = new Set(["5,5", "6,5", "7,5", "7,4", "8,4", "9,4", "10,4", "11,4", "12,4", "12,5", "13,5", "14,5"]);
+/** Planks (the boards under the cabinets), running across, a dark seam every 6 px, a candy-trim kick board along their north edge. */
+const planks = (x: number, y: number) => (y < 3 ? (Math.floor(x / 3) % 2 ? "r" : "x") : y % 6 === 0 ? "w" : hash(x >> 2, y, 7) < 0.15 ? "U" : "u");
+/** Snow at a wall's foot: the floor's snow, a shade bluer toward the wall (north). */
+const snowEdge = (gx: number, gy: number, ly: number) => (ly < 6 ? (hash(gx, gy, 3) < 0.5 ? "2" : "1") : ly < 14 ? (hash(gx, gy, 4) < 0.35 ? "2" : "3") : snow(gx, gy, 1));
 for (let row = 0; row < N; row++)
   for (let col = 0; col < N; col++) {
     const k = `${col},${row}`;
     if (!isOpen(col, row)) {
       if (row >= 18) tileDef(`floor-out-${col}-${row}`, (x, y) => nightSnow(col * T + x, row * T + y)), at(`floor-out-${col}-${row}`, col, row, false);
+      else if (ringSq(col, row)) tileDef(`floor-ice-${col}-${row}`, (x, y) => (BAY_ROW.has(`${col},${row}`) ? planks(x, y) : snowEdge(col * T + x, row * T + y, y))), at(`floor-ice-${col}-${row}`, col, row, false);
       else tileDef(`floor-ice-${col}-${row}`, (x, y) => deep(col * T + x, row * T + y)), at(`floor-ice-${col}-${row}`, col, row, false);
       continue;
     }
@@ -723,24 +757,22 @@ const FLOOR_COUNT = LAYOUT.length;
 // -- The walls, round the floor: every ice square next to it (or touching a corner) has a piece.
 /** The back curve, west to east: the stairs' squares, the bays under the catwalk, the CANDY sign's two cards behind the stand. */
 const BACK: [string, number, number, boolean?][] = [
-  ["stair-lo", 5, 7],
-  ["stair-hi", 5, 6],
-  ["bay-a", 6, 5],
+  ["stair-lo", 5, 5],
+  ["stair-hi", 6, 5],
   ["bay-b", 7, 5],
   ["bay-door", 8, 4],
   ["bay-sign-w", 9, 4],
   ["bay-sign-e", 10, 4],
   ["bay-c", 11, 4],
   ["bay-d", 12, 5],
-  ["bay-e", 13, 5],
-  ["stair-hi", 14, 6, true],
-  ["stair-lo", 14, 7, true],
+  ["stair-hi", 13, 5, true],
+  ["stair-lo", 14, 5, true],
 ];
 const placedWall = new Set<string>();
 for (const [name, c, r, flip] of BACK) at(name, c, r, true, flip ? { flip: true } : {}), placedWall.add(`${c},${r}`);
 // The two back corners behind the curve's steps (so no gap shows between the bays), the stairs' back corners.
 // The candy wall goes on round both sides (side bays, a plain ledge, no catwalk), rows 5 to 11.
-const SIDE_RUN: [string, number, number][] = [["side-corner", 5, 5], ["side-corner", 4, 7], ["side-a", 4, 8], ["side-b", 4, 9], ["side-c", 4, 10], ["side-d", 4, 11]];
+const SIDE_RUN: [string, number, number][] = [["side-corner", 4, 5], ["side-corner", 4, 6], ["side-corner", 4, 7], ["side-a", 4, 8], ["side-b", 4, 9], ["side-c", 4, 10], ["side-d", 4, 11]];
 for (const [name, c, r, flip] of [["bay-corner", 7, 4], ["bay-corner", 12, 4, true], ...SIDE_RUN, ...SIDE_RUN.map(([n, c, r]) => [n, 19 - c, r, true])] as [string, number, number, boolean?][])
   at(name, c, r, true, flip ? { flip: true } : {}), placedWall.add(`${c},${r}`);
 // The rest of the ring: the dome's ice coming down toward you (an ice lantern on each side at row 12), the tunnel's walls, the doorway.
@@ -785,51 +817,48 @@ export const SHOP_GINGER_LAYOUT: readonly ShopPlace[] = [...LAYOUT.slice(0, FLOO
 export const SHOP_GINGER_UPPER = {
   h: SHOP_GINGER_DECK_H,
   squares: [
-    { c: 6, r: 5 },
     { c: 7, r: 5 },
     { c: 8, r: 4 },
     { c: 9, r: 4 },
     { c: 10, r: 4 },
     { c: 11, r: 4 },
     { c: 12, r: 5 },
-    { c: 13, r: 5 },
   ],
 } as const;
 /**
- * The two staircases, each from the floor to the catwalk: the floor square at its foot, its two squares (low, high) with the lift
- * of each quarter of the square (west to east, a quarter of its 37 px each: x 4-12, 13-21, 22-30, 31-40 of its 45 px card), and the catwalk square at
- * its top. Eight steps of SHOP_GINGER_STEP (5 px); the last is level with the deck (40). The east one is the west one mirrored.
+ * The two staircases, each one straight flight on the catwalk's row: the floor square at its foot (in front of its low square), its
+ * two squares (low, high) with the lift of each quarter of the square (west to east, a quarter of its 37 px each: x 4-12, 13-21,
+ * 22-30, 31-40 of its 45 px card), and the catwalk square at its top. Eight steps of SHOP_GINGER_STEP (5 px); the top quarter is
+ * level with the deck (40) and joins it. The east one is the west one mirrored.
  */
 export const SHOP_GINGER_STAIRS = {
   step: SHOP_GINGER_STEP,
   west: {
-    foot: { c: 6, r: 7 },
+    foot: { c: 5, r: 6 },
     squares: [
-      { c: 5, r: 7, quarters: [...LO_W] }, // entered from the east (from the foot): 5, 10, 15, 20 going west
-      { c: 5, r: 6, quarters: [...HI_W] }, // entered from the south (its west quarter, 25): 30, 35, 40 going east
+      { c: 5, r: 5, quarters: [...LO_W] }, // entered from the south (its foot) at its west quarter, 5; 10, 15, 20 going east
+      { c: 6, r: 5, quarters: [...HI_W] }, // 25, 30, 35, 40 going east; its east quarter is the deck
     ],
-    top: { c: 6, r: 5 },
+    top: { c: 7, r: 5 },
   },
   east: {
-    foot: { c: 13, r: 7 },
+    foot: { c: 14, r: 6 },
     squares: [
-      { c: 14, r: 7, quarters: [...LO_W].reverse() }, // entered from the west: 5, 10, 15, 20 going east
-      { c: 14, r: 6, quarters: [...HI_W].reverse() }, // entered from the south (its east quarter, 25): 30, 35, 40 going west
+      { c: 14, r: 5, quarters: [...LO_W].reverse() }, // entered from the south at its east quarter, 5; 10, 15, 20 going west
+      { c: 13, r: 5, quarters: [...HI_W].reverse() }, // 25, 30, 35, 40 going west; its west quarter is the deck
     ],
-    top: { c: 13, r: 5 },
+    top: { c: 12, r: 5 },
   },
 } as const;
 /**
  * The dispensers: each bay's square and what it holds (two bins below, three tubes above); every chute's foot is
- * SHOP_GINGER_CHUTES (lower: 11 px over the floor at x 9 and 27 of its card; upper: 53 px over the floor at x 6, 18 and 30).
+ * SHOP_GINGER_CHUTES (lower: 11 px over the floor at x 13 and 31 of its 45 px card; upper: 53 px over the floor at x 10, 22 and 34).
  */
 export const SHOP_GINGER_DISPENSERS = [
-  { piece: "bay-a", c: 6, r: 5, lower: 2, upper: 3 },
   { piece: "bay-b", c: 7, r: 5, lower: 2, upper: 3 },
   { piece: "bay-door", c: 8, r: 4, lower: 0, upper: 3 },
   { piece: "bay-c", c: 11, r: 4, lower: 2, upper: 3 },
   { piece: "bay-d", c: 12, r: 5, lower: 2, upper: 3 },
-  { piece: "bay-e", c: 13, r: 5, lower: 2, upper: 3 },
 ] as const;
 
 // -- The dispensing pair's loop (elf A with the box, elf B with the notepad).
@@ -866,33 +895,32 @@ function behind(path: Stop[], i: number, d = 0.5): readonly [number, number, num
  * Elf A's loop (squares: his foot; `lvl` floor or up; `h` his lift there, px), waypoint to waypoint in straight lines (each line
  * stays on floor or catwalk squares). At a `stop`, he faces the dispenser (`face` 1 east, -1 west), plays tap, boxOut, fill, full;
  * elf B stands at `b` ([c, r, lift]), facing the same way, and plays `write`. Between stops B follows A along the same waypoints,
- * half a square behind. Five on the lower row (west to east, round the stand's front), up the east stairs, five on the upper row
- * (east to west, over the stand), down the west stairs; then again.
+ * half a square behind. Five on the lower row (west to east, round the stand's front), up the east stairs (one flight on the
+ * catwalk's row), five on the upper row (east to west, over the stand), down the west stairs; then again.
  */
 const RAW_PATH: Stop[] = [
-  { at: [6, 7], lvl: "floor", h: 0 }, // the west stairs' foot: the loop's start
-  lowStop(6, 5, 1, "bay-a"), // L1: bay-a's east bin (jelly beans? no: its gumballs)
+  { at: [4.85, 6.3], lvl: "floor", h: 0 }, // the west stairs' foot (5, 6): the loop's start
+  lowStop(7, 5, 0, "bay-b"), // L1: bay-b's west bin (sours)
   lowStop(7, 5, 1, "bay-b"), // L2: bay-b's east bin (peppermints)
   { at: [8, 7.2], lvl: "floor", h: 0 }, // round the stand's front (it and the shopkeeper are on rows 5-6, columns 9-10)
   { at: [11, 7.2], lvl: "floor", h: 0 },
   lowStop(11, 4, 1, "bay-c"), // L3: bay-c's east bin (chocolates)
   lowStop(12, 5, 0, "bay-d"), // L4: bay-d's west bin (lemon drops)
-  lowStop(13, 5, 1, "bay-e"), // L5: bay-e's east bin (grape drops)
-  { at: [13.2, 7], lvl: "floor", h: 0 }, // the east stairs' foot
-  { at: [14, 7], lvl: "floor", h: 15 }, // up: the low stair square (5, 10, 15, 20 going east; its middle 15)
-  { at: [14, 6], lvl: "floor", h: 30 }, // the high stair square (25, 30, 35, 40 going west; its middle 30)
-  upStop(13, 5, 1, "bay-e"), // U1: bay-e's middle tube
-  upStop(12, 5, 0, "bay-d"), // U2: bay-d's west tube
+  lowStop(12, 5, 1, "bay-d"), // L5: bay-d's east bin (pink and white beans)
+  { at: [14.3, 6.2], lvl: "floor", h: 0 }, // the east stairs' foot (14, 6)
+  { at: [14.3, 5], lvl: "floor", h: 5 }, // up: onto the low square's east quarter (5), then west: 10, 15, 20
+  { at: [12.62, 5], lvl: "up", h: 40 }, // across the high square (25, 30, 35) onto its deck quarter (40)
+  upStop(12, 5, 1, "bay-d"), // U1: bay-d's middle tube
   { at: [11.5, 4.5], lvl: "up", h: 40 }, // round the curve (between (12, 5) and (11, 4))
-  upStop(11, 4, 1, "bay-c"), // U3: bay-c's middle tube
+  upStop(11, 4, 1, "bay-c"), // U2: bay-c's middle tube
   { at: [9.5, 4], lvl: "up", h: 40 }, // over the stand, behind the CANDY sign's posts
-  upStop(8, 4, 1, "bay-door"), // U4: over the stockroom door, its middle tube
+  upStop(8, 4, 1, "bay-door"), // U3: over the stockroom door, its middle tube
   { at: [7.5, 4.5], lvl: "up", h: 40 }, // round the curve (between (8, 4) and (7, 5))
+  upStop(7, 5, 1, "bay-b"), // U4: bay-b's middle tube
   upStop(7, 5, 0, "bay-b"), // U5: bay-b's west tube
-  { at: [6, 5], lvl: "up", h: 40 },
-  { at: [5, 6], lvl: "floor", h: 30 }, // down: the high stair square (40, 35, 30, 25 going west; its middle 30)
-  { at: [5, 7], lvl: "floor", h: 15 }, // the low stair square (20, 15, 10, 5 going east; its middle 15)
-  { at: [6, 7], lvl: "floor", h: 0 }, // back at the start
+  { at: [6.38, 5], lvl: "up", h: 40 }, // the west stairs' top (the high square's deck quarter)
+  { at: [4.65, 5], lvl: "floor", h: 5 }, // down the flight westward: 35, 30, 25, 20, 15, 10, 5
+  { at: [4.85, 6.3], lvl: "floor", h: 0 }, // off its foot onto the floor: back at the start
 ];
 export const SHOP_GINGER_DISPENSE_PATH: readonly Stop[] = RAW_PATH.map((p, i) => (p.stop?.row === "upper" ? { ...p, b: behind(RAW_PATH, i) } : p));
 /** The shopkeeper: his squares and where he's drawn, behind the stand at the back middle, facing our right (as drawn). */
