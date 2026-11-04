@@ -448,7 +448,8 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
               ) : funMove?.move ? (
                 // (Short enough for a phone's dock with the move in it: his icon says who.)
                 <>
-                  <BossTag boss={boss} /> plays <strong>your</strong> move{funPlayed ? <>: <strong>{funMove.san}</strong></> : "…"}
+                  {/* (Only his picture here, as the line always had: the name would push "Not scored." out of a phone's dock.) */}
+                  <BossFace boss={boss} class="boss-tag-face" label={boss.name} /> Plays <strong>your</strong> move{funPlayed ? <>: <strong>{funMove.san}</strong></> : "…"}
                 </>
               ) : momentLine ? (
                 <>

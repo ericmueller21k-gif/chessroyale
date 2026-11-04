@@ -13,4 +13,6 @@ Calls made:
   banner is 44% of the board tall instead of 36%, so the name, the word and its line stack inside it.
 - Every town card's text is centered; a person's row keeps its own left layout.
 
+The "plays your move" line keeps its words ("Plays your move: Ke2") with only his small portrait in front: the name would push "Not scored." out of a phone's dock (one row, the first line keeps its width, the second is clipped).
+
 Not changed: the boss-select screen's fallback and the public profile's boss face keep their emoji (not battles).
