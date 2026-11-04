@@ -216,8 +216,8 @@ describe("the rooms' own pieces", () => {
 });
 
 describe("the shops", () => {
-  it("only Babur's, Puddles', Alfil's, Big Boy's, Timber's, Dash's, Hollow's and Wrangler's homes have an inside", () => {
-    expect(ALL_HOMES.filter((h) => shopOf(h.id)).map((h) => h.id).sort()).toEqual(["alfil", "bigboy", "dash", "gardener", "hollow", "pig", "tiger", "timber"]);
+  it("only Babur's, Puddles', Alfil's, Big Boy's, Timber's, Dash's, Hollow's, Wrangler's and Jefferson's homes have an inside", () => {
+    expect(ALL_HOMES.filter((h) => shopOf(h.id)).map((h) => h.id).sort()).toEqual(["alfil", "bigboy", "dash", "gardener", "grex", "hollow", "pig", "tiger", "timber"]);
   });
 
   it("the crates' words: names, the price line, what you have; the boss's ride is a prize", () => {
@@ -266,10 +266,16 @@ describe("the shops", () => {
     expect(holdLine(w, { tokens: 0, keys: 0 })).toBe("You have 0 Wrangler tokens and 0 crate keys.");
     expect(prizeRows(w)[0]).toMatchObject({ id: "pen-pony", name: "Pen Pony", kind: "Mythic ride" });
     expect([w.kid, w.roof, w.chatTone]).toEqual(["rooster", "barn", "day"]);
+    const j = shopOf("grex")!;
+    expect(j.crate).toBe("Jefferson's Boss Crate");
+    expect(priceLine(j)).toBe("3 Jefferson tokens, or 1 Jefferson token + 1 crate key");
+    expect(holdLine(j, { tokens: 0, keys: 0 })).toBe("You have 0 Jefferson tokens and 0 crate keys.");
+    expect(prizeRows(j)[0]).toMatchObject({ id: "jefferson-giraffe", name: "Giraffe Gallop", kind: "Mythic ride" });
+    expect([j.kid, j.roof, j.chatTone]).toEqual(["dealer", "warehouse", "day"]);
   });
 
   it("each shop sells its boss's crate (core's BOSS_CRATES), its ride among the prizes; a way's button needs its price held", () => {
-    for (const s of [shopOf("tiger")!, shopOf("gardener")!, shopOf("alfil")!, shopOf("bigboy")!, shopOf("timber")!, shopOf("dash")!, shopOf("hollow")!, shopOf("pig")!]) {
+    for (const s of [shopOf("tiger")!, shopOf("gardener")!, shopOf("alfil")!, shopOf("bigboy")!, shopOf("timber")!, shopOf("dash")!, shopOf("hollow")!, shopOf("pig")!, shopOf("grex")!]) {
       const crate = bossCrateOf(s.home)!;
       expect(crate.name).toBe(s.crate);
       expect(crate.items).toContain(s.prizes[0]);
