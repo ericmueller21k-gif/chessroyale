@@ -118,7 +118,8 @@ describe("the rooster keeps the shop, on the counter (Eric's pick)", () => {
 describe("Wrangler's Boss Crate and Pen Pony", () => {
   it("in BOSS_CRATES with his ride, Pen Pony, first; sold to everyone (Wrangler is live); its words as the others'", () => {
     const crate = bossCrateOf("pig")!;
-    expect(BOSS_CRATES.at(-1)).toBe(crate);
+    // (Jefferson's came after it, Nov 4.)
+    expect(BOSS_CRATES).toContain(crate);
     expect([crate.id, crate.name, crate.ride]).toEqual(["boss-pig", "Wrangler's Boss Crate", "pen-pony"]);
     expect(crate.items).toContain("pen-pony");
     expect(adminFirst(bossDef("pig")!)).toBe(false);

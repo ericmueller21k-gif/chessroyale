@@ -8,7 +8,30 @@
  */
 import { bandpass, lowpass, noise, osc, render, rng, saw, sine, soft, type Voice, soundCache } from "./synth.ts";
 
-export type GrexSound = "crackle" | "whoosh" | "fizz" | "poof" | "pop" | "roar" | "smack" | "whistle1" | "whistle2" | "whistle3" | "sparkle";
+export type GrexSound =
+  | "crackle"
+  | "whoosh"
+  | "fizz"
+  | "poof"
+  | "pop"
+  | "roar"
+  | "smack"
+  | "whistle1"
+  | "whistle2"
+  | "whistle3"
+  | "sparkle"
+  // (His challenge intro in his warehouse, Nov 4: his holler for the crew, a hoof's clop on concrete, the dozer's snort, your lift's
+  // hiss and clunk, the crate stack's creak (and its soft one), the wipe's rising whistle, little pop and soft bang.)
+  | "shout"
+  | "step"
+  | "snort"
+  | "hiss"
+  | "clunk"
+  | "creak"
+  | "creakSoft"
+  | "rocket"
+  | "popSoft"
+  | "bang";
 
 /** Short bursts at the given times, each shaped by `burst(age, i)`. */
 function grains(times: readonly number[], burst: (age: number, i: number) => number): Voice {
@@ -51,6 +74,17 @@ function whistle(rate: number, o: { f0: number; f1: number; dur: number; curve: 
     const rough = 1 + o.rasp * Math.max(-1, Math.min(1, 9 * buzz(t)));
     return env * (0.8 + 0.2 * (t / o.dur)) * (0.62 * tone(t) * rough + 1.5 * hiss(t)) + 1.2 * Math.exp(-t / 0.035) * thoomp(t);
   });
+}
+
+/** Wood creaking (`dur` s): grains of the wood's stick and slip, their rate wavering, through a woody band; faded in and out. */
+function creakOf(rate: number, dur: number, seed: number): Float32Array {
+  const r = rng(seed);
+  const times: number[] = [];
+  for (let t = 0; t < dur; t += 0.011 + 0.012 * r()) times.push(t);
+  const n = noise(seed + 1);
+  const stick = grains(times, (age) => Math.exp(-age / 0.0025));
+  const wood = bandpass(rate, (t) => 620 + 160 * Math.sin(2 * Math.PI * 2.3 * t), 3.5, (t) => stick(t) * (0.6 + 0.4 * n(t)));
+  return render(rate, dur, (t) => Math.sin(Math.PI * Math.min(1, t / dur)) * wood(t));
 }
 
 /** How long each of the candle's whistles lasts (s). */
@@ -125,6 +159,67 @@ const SOUNDS: Record<GrexSound, (rate: number) => Float32Array> = {
     const bang = lowpass(rate, 700, noise(109));
     return render(rate, 0.75, (t) => 1.4 * snap(t) * (1 - 0.6 * (t / 0.75)) + 0.9 * Math.exp(-t / 0.03) * bang(t));
   },
+  // His holler to the crew: a short cocky "hey!" (a buzzy voice sliding up and settling, through two vowel formants), a little rasp.
+  shout: (rate) => {
+    const pitch = (t: number) => 210 + 120 * Math.sin(Math.PI * Math.min(1, t / 0.2)) * (t < 0.2 ? 1 : 0.7) + 8 * Math.sin(2 * Math.PI * 7 * t);
+    const voice = osc(rate, pitch, saw);
+    const f1 = bandpass(rate, (t) => 620 + 180 * Math.min(1, t / 0.12), 2.4, voice);
+    const f2 = bandpass(rate, (t) => 1700 + 300 * Math.min(1, t / 0.12), 3, voice);
+    const rasp = bandpass(rate, () => 2400, 1.2, noise(113));
+    return render(rate, 0.34, (t) => {
+      const env = Math.min(1, t / 0.025) * (t < 0.22 ? 1 : Math.max(0, 1 - (t - 0.22) / 0.12));
+      return env * (1.4 * f1(t) + 0.8 * f2(t) + 0.25 * rasp(t));
+    });
+  },
+  // A hoof's clop on concrete, soft: a short hard knock and a little thump under it.
+  step: (rate) => {
+    const knock = bandpass(rate, () => 1500, 2.2, noise(127));
+    const thump = osc(rate, (t) => 150 + 90 * Math.exp(-t / 0.01), sine);
+    return render(rate, 0.09, (t) => Math.exp(-t / 0.012) * 1.6 * knock(t) + 0.7 * Math.exp(-t / 0.02) * thump(t));
+  },
+  // The dozer waking with a start: a short nasal snort (a low buzz and a puff of breath through the nose).
+  snort: (rate) => {
+    const buzz = lowpass(rate, 700, osc(rate, (t) => 120 + 40 * Math.sin(Math.PI * Math.min(1, t / 0.2)), saw));
+    const breath = bandpass(rate, () => 900, 1.1, noise(131));
+    return render(rate, 0.26, (t) => Math.sin(Math.PI * Math.min(1, t / 0.26)) ** 0.7 * (0.9 * buzz(t) + 1.1 * breath(t)));
+  },
+  // Your lift's hydraulics: a hiss of air rising in pitch as the piston pushes up, easing in and out.
+  hiss: (rate) => {
+    const air = bandpass(rate, (t) => 1400 + 2000 * Math.min(1, t / 1.1), 1.6, noise(137));
+    return render(rate, 1.2, (t) => Math.min(1, t / 0.08) * (t < 0.95 ? 1 : Math.max(0, 1 - (t - 0.95) / 0.25)) * air(t));
+  },
+  // The lift locking at the top: a heavy metal clunk (a dull thud, a short steel ring, the latch's click).
+  clunk: (rate) => {
+    const thud = osc(rate, (t) => 70 + 60 * Math.exp(-t / 0.02), sine);
+    const modes = [
+      [410, 0.05, 0.6],
+      [980, 0.03, 0.35],
+      [1650, 0.018, 0.2],
+    ].map(([f, d, a]) => ({ v: osc(rate, () => f!, sine), d: d!, a: a! }));
+    const click = bandpass(rate, () => 2600, 1, noise(139));
+    return render(rate, 0.36, (t) => {
+      let ring = 0;
+      for (const m of modes) ring += m.a * Math.exp(-t / m.d) * m.v(t);
+      return 1.1 * Math.exp(-t / 0.06) * thud(t) + ring + 0.8 * Math.exp(-t / 0.004) * click(t);
+    });
+  },
+  // Wooden crates creaking: the wood's stick and slip, quick grains through a woody band, its pitch wavering.
+  creak: (rate) => creakOf(rate, 0.5, 149),
+  creakSoft: (rate) => creakOf(rate, 0.3, 151),
+  // The wipe's rocket: a short rising whistle (his whistle's voice, quick and soft).
+  rocket: (rate) => whistle(rate, { f0: 1500, f1: 3200, dur: 0.55, curve: 0.7, warble: 20, wobble: 6, rasp: 0.25, seed: 157 }),
+  // A little firework pop, toy-like: a quick round knock with a puff.
+  popSoft: (rate) => {
+    const knock = osc(rate, (t) => 320 * Math.exp(-t / 0.03) + 110, sine);
+    const puff = bandpass(rate, () => 1800, 1, noise(163));
+    return render(rate, 0.14, (t) => Math.exp(-t / 0.03) * (1.1 * knock(t) + 0.6 * puff(t)));
+  },
+  // A firework far off: a soft, muffled bang (a low thump in a cloud of dark noise), never sharp.
+  bang: (rate) => {
+    const boom = lowpass(rate, 260, noise(167));
+    const thump = osc(rate, (t) => 48 + 50 * Math.exp(-t / 0.05), sine);
+    return render(rate, 0.6, (t) => Math.min(1, t / 0.012) * (Math.exp(-t / 0.16) * 2.2 * boom(t) + Math.exp(-t / 0.12) * thump(t)));
+  },
   // The roar: a huge wobbling growl (a buzzy low tone and a rumble), pitch climbing then sagging, that ends in a tiny squeak.
   roar: (rate) => {
     const growl = lowpass(rate, 900, osc(rate, (t) => 85 + 40 * Math.sin(Math.PI * Math.min(1, t / 0.85)) + 6 * Math.sin(2 * Math.PI * 9 * t), saw));
@@ -139,7 +234,30 @@ const SOUNDS: Record<GrexSound, (rate: number) => Float32Array> = {
 };
 
 /** Trims each to sit a little under a move's loudness (as Ginger's and Boingo's do); a soft ceiling keeps the peaks well under its. */
-const LEVEL: Record<GrexSound, number> = { crackle: 0.9, whoosh: 0.27, fizz: 0.18, poof: 0.33, pop: 0.31, roar: 0.15, smack: 0.3, whistle1: 0.018, whistle2: 0.02, whistle3: 0.017, sparkle: 0.2 };
+const LEVEL: Record<GrexSound, number> = {
+  crackle: 0.9,
+  whoosh: 0.27,
+  fizz: 0.18,
+  poof: 0.33,
+  pop: 0.31,
+  roar: 0.15,
+  smack: 0.3,
+  whistle1: 0.018,
+  whistle2: 0.02,
+  whistle3: 0.017,
+  sparkle: 0.2,
+  shout: 0.055,
+  // (Seven giraffes walking at once: quiet.)
+  step: 0.12,
+  snort: 0.14,
+  hiss: 0.16,
+  clunk: 0.3,
+  creak: 0.35,
+  creakSoft: 0.16,
+  rocket: 0.02,
+  popSoft: 0.22,
+  bang: 0.22,
+};
 
 const cache = soundCache("grex");
 /** The samples for one of his sounds at a sample rate (made once, then reused). */

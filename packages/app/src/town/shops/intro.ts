@@ -30,7 +30,7 @@ import { TOWN_FEEL } from "../feel.ts";
 import { PARK_TABLE, TABLE_BOARD, TABLE_INK, TABLE_PIECES } from "../houses/park.ts";
 import { BOSS_ART } from "../render.ts";
 import type { HomeId } from "../world.ts";
-import { CHALLENGE_FEEL, DARK_MOVES, ROPE_MOVES, boardSquare, darkAnims, drainAt, drawnTop, frameAt, introBeats, introOf, ropeAnims, stormEdge, wipeAt, type BossIntro, type DarkMove, type IntroAnims, type IntroBeat, type IntroLayout, type LogMove, type RopeMove, LOG_MOVES, logAnims } from "./challenge.ts";
+import { CHALLENGE_FEEL, CREW_MOVES, DARK_MOVES, ROPE_MOVES, crewAnims, type CrewMove, boardSquare, darkAnims, drainAt, drawnTop, frameAt, introBeats, introOf, ropeAnims, stormEdge, wipeAt, type BossIntro, type DarkMove, type IntroAnims, type IntroBeat, type IntroLayout, type LogMove, type RopeMove, LOG_MOVES, logAnims } from "./challenge.ts";
 
 /**
  * A boss's intro art, as its file exports it: a pyramid that brings in its table (Alfil's), or toy blocks that are the table and its
@@ -42,16 +42,18 @@ type IntroArt =
       | { blocks: Character; pyramid?: undefined; table?: undefined; wood?: undefined }
       | { wood: WoodArt; table: Character; pyramid?: undefined; blocks?: undefined }
       | { rope: typeof import("./pig-intro-art.ts"); table: Character; pyramid?: undefined; blocks?: undefined; wood?: undefined }
+      | { crew: typeof import("./grex-intro-art.ts"); table: Character; rope?: undefined; pyramid?: undefined; blocks?: undefined; wood?: undefined }
     ) & {
       dark?: undefined;
       rope?: typeof import("./pig-intro-art.ts");
+      crew?: typeof import("./grex-intro-art.ts");
       /** The slab's keys "1" to "5" and the board's squares `L` / `D`. */
       palette: Readonly<Record<string, string>>;
       storm: Character;
       front: Character;
     })
   // Hollow's: the dark (his moves, the cave's lights going out, the motes); the park table; no storm (the dark is his transition).
-  | { dark: typeof import("./hollow-intro-art.ts"); rope?: undefined; pyramid?: undefined; blocks?: undefined; wood?: undefined; table?: undefined; palette?: undefined; storm?: undefined; front?: undefined };
+  | { dark: typeof import("./hollow-intro-art.ts"); rope?: undefined; crew?: undefined; pyramid?: undefined; blocks?: undefined; wood?: undefined; table?: undefined; palette?: undefined; storm?: undefined; front?: undefined };
 /** Timber's: his own moves (facing east), where the lying log and the standing one are from his foot (his pixels), the props. */
 interface WoodArt {
   mover: Character;
@@ -77,6 +79,9 @@ const ART: Partial<Record<HomeId, () => Promise<IntroArt>>> = {
   hollow: () => import("./hollow-intro-art.ts").then((m) => ({ dark: m })),
   // (Wrangler's: his moves, the lasso's loop, the bale (his table: the barn's board stand), the buckets, his wipe; one chunk.)
   pig: () => import("./pig-intro-art.ts").then((m) => ({ rope: m, table: m.INTRO_PIG_TABLE, palette: m.INTRO_PIG_TABLE_PALETTE, storm: m.INTRO_PIG_STORM, front: m.INTRO_PIG_FRONT })),
+  // (Jefferson's: his moves, the crate-stack table (the warehouse's board stand without its slab and board), your lift, his wipe; one
+  // chunk. His crew are the room's: their baked sheets.)
+  grex: () => import("./grex-intro-art.ts").then((m) => ({ crew: m, table: m.INTRO_GREX_TABLE, palette: m.INTRO_GREX_TABLE_PALETTE, storm: m.INTRO_GREX_STORM, front: m.INTRO_GREX_FRONT })),
 };
 
 type PyramidAnim = "rise" | "idle" | "crack" | "crumble";
@@ -139,7 +144,26 @@ export interface LoadedIntro {
   dark: DarkArt | null;
   /** Wrangler's lasso (null: another's): his moves' frames, his ropes, the bale, the buckets; see RopeArt. */
   rope: RopeArt | null;
+  /** Jefferson's crew (null: another's): his moves' frames, the crate-stack table, your lift; see CrewArt. */
+  crew: CrewArt | null;
 }
+
+/**
+ * Jefferson's intro, ready (shops/grex-intro-art.ts; ShopRoom draws it): his moves' frames (BOSS_GREX_INTRO, at his town figure's
+ * pixels, as drawn: not mirrored); the crate-stack table's frames (INTRO_GREX_TABLE: its slab and board drawn on it `top` px over its
+ * foot, shifted by `sway` a frame, as the top crate wobbles); your lift's (INTRO_GREX_LIFT: the plate `h` px up a frame). At the
+ * room's scale but his.
+ */
+export interface CrewArt {
+  mover: { ch: Character; frames: Record<CrewMove, HTMLCanvasElement[]> };
+  table: { ch: Character; frames: Record<"idle" | "creak", HTMLCanvasElement[]>; sway: Readonly<Record<string, readonly (readonly [number, number])[]>>; top: number };
+  lift: { ch: Character; frames: Record<"flush" | "rise" | "up", HTMLCanvasElement[]>; h: Readonly<Record<string, readonly number[]>> };
+  /** The crew's spots round the table (squares, a figure's foot; facing), and each one's delay setting off (ms): the art's. */
+  spots: Readonly<Record<CrewKey, { readonly at: readonly [number, number]; readonly face: number }>>;
+  setoff: Readonly<Record<CrewKey, number>>;
+}
+/** The crew who come over, by the art's names. */
+export type CrewKey = "lift-guy" | "fork-guy" | "leaner-a" | "leaner-b" | "crew-c" | "crew-d" | "dealer";
 
 /**
  * Wrangler's lasso, ready (shops/pig-intro-art.ts; ShopRoom draws it): his moves' frames (BOSS_PIG_INTRO, at his town figure's
@@ -238,8 +262,19 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
     let storm: StormArt | null = null;
     let dark: DarkArt | null = null;
     let rope: RopeArt | null = null;
+    let crew: CrewArt | null = null;
     const all = <A extends string>(ch: Character, names: readonly A[]) => Object.fromEntries(names.map((a) => [a, ch.anims[a]!.frames.map((_, i) => toCanvas(ch, a, i))])) as Record<A, HTMLCanvasElement[]>;
-    if (art?.rope) {
+    if (art?.crew) {
+      const m = art.crew;
+      anims = crewAnims({ mover: m.BOSS_GREX_INTRO, lift: m.INTRO_GREX_LIFT, table: m.INTRO_GREX_TABLE });
+      crew = {
+        mover: { ch: m.BOSS_GREX_INTRO, frames: all(m.BOSS_GREX_INTRO, CREW_MOVES) },
+        table: { ch: m.INTRO_GREX_TABLE, frames: all(m.INTRO_GREX_TABLE, ["idle", "creak"]), sway: m.INTRO_GREX_TABLE_SWAY, top: m.INTRO_GREX_TABLE_TOP },
+        lift: { ch: m.INTRO_GREX_LIFT, frames: all(m.INTRO_GREX_LIFT, ["flush", "rise", "up"]), h: m.INTRO_GREX_LIFT_H },
+        spots: m.INTRO_GREX_CREW_SPOTS,
+        setoff: m.INTRO_GREX_CREW_SETOFF,
+      };
+    } else if (art?.rope) {
       const m = art.rope;
       anims = ropeAnims({ mover: m.BOSS_PIG_INTRO, rope: m.INTRO_PIG_ROPE, table: m.INTRO_PIG_TABLE, bucket: m.INTRO_PIG_BUCKET_B, release: m.PIG_INTRO_RELEASE });
       const bucket = (ch: Character) => {
@@ -347,6 +382,7 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
       attack,
       dark,
       rope,
+      crew,
     };
   });
   p.catch(() => loading.delete(home));

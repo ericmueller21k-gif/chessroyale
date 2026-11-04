@@ -45,7 +45,10 @@ import type { Rider } from "../rides.ts";
 import { rideSpeed } from "../../components/rides/scale.ts";
 import { STORE_PANELS, camFocus, ceilingPanel, inTalkRange, lightsAt, litDx, overlaps, upAlpha, walkable, youBox, isFloor, makeRoom, onDoor, tapTarget, findPath, type Room, type ShopPlace, type Sq } from "./room.ts";
 import { POOL_LINE, bossHoldings, buyBossCrate, canAfford, holdLine, priceLine, prizeRows, shopOf, wayText, type CrateWay, type ShopDef } from "./shops.ts";
-import { CHALLENGE_FEEL, attackStart, attackTime, bubbleSize, caveLight, chantOf, drainAt, frameAt as animFrame, introAt, introCues, introLength, isDark, isLog, marksFeel, marksOf, seatedMarks, type DarkNow, type DrawnMarks, type IntroNow, type LogPlace } from "./challenge.ts";
+import { CHALLENGE_FEEL, attackStart, attackTime, bubbleSize, caveLight, chantOf, drainAt, frameAt as animFrame, introAt, introCues, introLength, isDark, isLog, lineOf, marksFeel, marksOf, seatedMarks, type DarkNow, type DrawnMarks, type IntroNow, type LogPlace } from "./challenge.ts";
+import { CREW_D_SEAT, CREW_FORK_AT, CREW_SHEETS, CREW_STEP_OFF, type CrewName } from "./grex-crew-sheets.ts";
+import { Machine, along, forkLegs, frameOf, liftLegs, routeLength, type MachinePose, type Sq as CrewSq, type Waypoint } from "./grex-crew.ts";
+import type { CrewKey } from "./intro.ts";
 import { HOLLOW, HOLLOW_HEART, hollowBuild } from "../../characters/hollow.ts";
 import { play } from "../../sound.ts";
 import { paintTable, playCue, slabFrontY, type Emis, type LoadedIntro } from "./intro.ts";
@@ -67,6 +70,19 @@ interface RoomArt {
   floor?: readonly string[];
   /** The board on its stand (Wrangler's barn: the `board-stand` piece's square), which his intro ropes and drags to the table's place. */
   stand?: { readonly col: number; readonly row: number };
+  /** Its foot this many room pixels south of its row's middle (Jefferson's: on the marks' line), as the art places it. */
+  standDy?: number;
+  /** Jefferson's crew (his warehouse): the machines' loops, the idle crew's places, the pallet's floor and shelf spots. */
+  crew?: CrewPlaces;
+}
+/** Jefferson's warehouse's crew, as its art places them (shops/grex-art.ts). */
+interface CrewPlaces {
+  liftPath: readonly Waypoint[];
+  forkPath: readonly Waypoint[];
+  /** The idle crew's places (a figure's foot, squares) and facing (1 east), and the machines' homes. */
+  places: Readonly<Record<"leaner-a" | "leaner-b" | "crew-c" | "crew-d", { readonly at: readonly [number, number]; readonly face: number }>>;
+  palletAt: readonly [number, number];
+  shelf: { readonly col: number; readonly row: number; readonly lift: number };
 }
 const ART: Partial<Record<HomeId, () => Promise<RoomArt>>> = {
   tiger: () => import("./babur-art.ts").then((m) => ({ layout: m.SHOP_BABUR_LAYOUT, pieces: m.SHOP_BABUR_PIECES, crateAt: m.SHOP_BABUR_CRATE_AT, lights: m.SHOP_BABUR_HOOP_LIGHTS, pools: m.SHOP_BABUR_HOOP_POOLS })),
@@ -81,6 +97,21 @@ const ART: Partial<Record<HomeId, () => Promise<RoomArt>>> = {
   hollow: () => import("./hollow-art.ts").then((m) => ({ layout: m.SHOP_HOLLOW_LAYOUT, pieces: m.SHOP_HOLLOW_PIECES, crateAt: m.SHOP_HOLLOW_CRATE_AT, lights: m.SHOP_HOLLOW_LIGHTS, pools: m.SHOP_HOLLOW_POOLS, upright: ["showpiece"], marks: m.SHOP_HOLLOW_MARKS, floor: m.SHOP_HOLLOW_FLOOR })),
   // (A box barn. Its two pens of knights, 3 x 2 squares each, stand up whole at their foot; his red mat and your denim one are its marks.)
   pig: () => import("./pig-art.ts").then((m) => ({ layout: m.SHOP_PIG_LAYOUT, pieces: m.SHOP_PIG_PIECES, crateAt: m.SHOP_PIG_CRATE_AT, lights: m.SHOP_PIG_LIGHTS, pools: m.SHOP_PIG_POOLS, upright: ["pen", "pen-b"], marks: m.SHOP_PIG_MARKS, stand: m.SHOP_PIG_BOARD_AT })),
+  // (A warehouse with a floor's shape (16 x 16, racking all round), as Hollow's cave; no counter: the crate stands on the floor by the
+  // dealer. The board on its crates in the battle spot, its foot on the marks' line; the crew and their machines.)
+  grex: () =>
+    import("./grex-art.ts").then((m) => ({
+      layout: m.SHOP_GREX_LAYOUT,
+      pieces: m.SHOP_GREX_PIECES,
+      crateAt: [0, 0] as const,
+      lights: m.SHOP_GREX_LIGHTS,
+      pools: m.SHOP_GREX_POOLS,
+      marks: m.SHOP_GREX_MARKS,
+      floor: m.SHOP_GREX_FLOOR,
+      stand: m.SHOP_GREX_BOARD_AT,
+      standDy: m.SHOP_GREX_BOARD_AT.footDy,
+      crew: { liftPath: m.SHOP_GREX_LIFT_PATH, forkPath: m.SHOP_GREX_FORK_PATH, places: m.SHOP_GREX_CREW, palletAt: m.SHOP_GREX_PALLET_AT, shelf: m.SHOP_GREX_SHELF_SLOT },
+    })),
 };
 
 /** A piece's frames, each drawn once into a canvas, and when each ends in its loop. */
@@ -97,6 +128,8 @@ export interface LoadedRoom {
   frames: Record<string, Frames>;
   /** The kid's sheet (its picture loaded). */
   kid: { sheet: SidekickSheet; img: HTMLImageElement };
+  /** Jefferson's crew's baked sheets (their pictures loaded), or null: another room. */
+  crew: Readonly<Record<CrewName, HTMLImageElement>> | null;
 }
 
 const toCanvas = (ch: Character, i: number): HTMLCanvasElement => {
@@ -110,6 +143,17 @@ const toCanvas = (ch: Character, i: number): HTMLCanvasElement => {
 const SHEET_URL: Record<string, string> = Object.fromEntries(
   Object.entries(import.meta.glob<string>("../sidekicks/*.png", { eager: true, query: "?url", import: "default" })).map(([path, url]) => [path.replace(/^.*\/|\.png$/g, ""), url]),
 );
+const CREW_URL: Record<string, string> = Object.fromEntries(
+  Object.entries(import.meta.glob<string>("./grex-crew/*.png", { eager: true, query: "?url", import: "default" })).map(([path, url]) => [path.replace(/^.*\/|\.png$/g, ""), url]),
+);
+/** A picture, loaded. */
+const picture = (url: string, what: string) =>
+  new Promise<HTMLImageElement>((ok, no) => {
+    const img = new Image();
+    img.onload = () => ok(img);
+    img.onerror = () => no(new Error(`${what} didn't load`));
+    img.src = url;
+  });
 const loading = new Map<HomeId, Promise<LoadedRoom>>();
 /** Loads a home's room (its art's chunk, every piece's frames drawn, the kid's sheet), once. */
 export function loadRoom(home: HomeId): Promise<LoadedRoom> {
@@ -123,7 +167,9 @@ export function loadRoom(home: HomeId): Promise<LoadedRoom> {
     img.onerror = () => no(new Error(`the ${def.kid} sheet didn't load`));
     img.src = SHEET_URL[def.kid]!;
   });
-  p = Promise.all([ART[home]!(), kid]).then(([art]) => {
+  // (Jefferson's warehouse: his crew's nine sheets too.)
+  const crew = home === "grex" ? Promise.all((Object.keys(CREW_SHEETS) as CrewName[]).map((k) => picture(CREW_URL[k]!, `the ${k} sheet`).then((img) => [k, img] as const))).then((l) => Object.fromEntries(l) as Record<CrewName, HTMLImageElement>) : Promise.resolve(null);
+  p = Promise.all([ART[home]!(), kid, crew]).then(([art, , crewImgs]) => {
     const frames: Record<string, Frames> = {};
     for (const [name, ch] of Object.entries(art.pieces)) {
       const idle = ch.anims.idle!;
@@ -131,7 +177,7 @@ export function loadRoom(home: HomeId): Promise<LoadedRoom> {
       const ends = idle.frames.map((f) => (t += Math.max(16, f.ms)));
       frames[name] = { ch, frames: idle.frames.map((_, i) => toCanvas(ch, i)), ends, loop: t };
     }
-    return { def, art, frames, kid: { sheet, img } };
+    return { def, art, frames, kid: { sheet, img }, crew: crewImgs };
   });
   p.catch(() => loading.delete(home));
   loading.set(home, p);
@@ -278,6 +324,9 @@ function toneOf(c: HTMLCanvasElement | undefined): string {
   return k ? `rgb(${Math.round(r / k)},${Math.round(gg / k)},${Math.round(b / k)})` : "#1e1c25";
 }
 
+/** The most of Jefferson's crew drawn in a frame (seven giraffes, two machines, the pallet). */
+const CREW_MAX = 12;
+
 /** A Walker's view (the town's: 1 up the screen, its rows running away from the camera) as a room draws it (rows toward the camera). */
 const roomView = (v: 0 | 1 | 2): 0 | 1 | 2 => (v === 1 ? 2 : v === 2 ? 1 : 0);
 
@@ -322,7 +371,10 @@ function startRoom(
   const S = SHOP_FEEL;
   const SQ = f.housePxPerSquare;
   const { def, art, frames } = loaded;
-  const room: Room = makeRoom(art.layout, def.keeper, 20, art.floor);
+  const room: Room = makeRoom(art.layout, def.keeper, 20, art.floor, def.talk);
+  // (Jefferson's idle crew stand on their squares: nobody walks through them. His machines and the floor pallet block where they are
+  // now: crewTakes.)
+  if (art.crew) for (const k of ["leaner-a", "leaner-b", "crew-c", "crew-d"] as const) room.blocked[art.crew.places[k].at[1] * room.n + art.crew.places[k].at[0]] = 1;
   const n = room.n;
   const g = cv.getContext("2d")!;
   const you = new Walker(room.start, f.youStepMs, true, f.walkEase);
@@ -344,6 +396,8 @@ function startRoom(
   const marks = found && ci?.def.seated ? seatedMarks(found) : found;
   /** Its channel line this time (Hollow's: one of four, at random), or null. */
   const chant = ci ? chantOf(ci.def) : null;
+  /** Its line this time (Jefferson's: one of his four calls, at random). */
+  const introLine = ci ? lineOf(ci.def) : "";
   /** Hollow's dark (his intro's art and timing), or null: any other room or boss. */
   const dk = ci?.dark ?? null;
   const da = ci?.anims && isDark(ci.anims) ? ci.anims : null;
@@ -485,7 +539,8 @@ function startRoom(
    * A cave (a room with a floor's shape): its rock's tone, the average of its flat rock tile (`floor-rock`), filling the ground past
    * its squares; null in a box room.
    */
-  const cave = art.floor ? toneOf(frames["floor-rock"]?.frames[0]) : null;
+  // (Jefferson's warehouse has a floor's shape too, its racking all round, but it's a box room: no rock, nothing in front of you.)
+  const cave = art.floor && frames["floor-rock"] ? toneOf(frames["floor-rock"].frames[0]) : null;
   // ---- The upright things, far to near; and the deep pieces drawn as plans, which lie flat on their squares.
   const ups: Up[] = [];
   const flats: ShopPlace[] = [];
@@ -508,7 +563,9 @@ function startRoom(
       ups.push({ name: p.name, col: p.col, i: 0, c: counter.col + ((counter.w ?? 1) - 1) / 2, r: counter.row, z: counter.row + 0.01, ox: art.crateAt[0] - cp.foot[0], oy: art.crateAt[1] - cp.foot[1], flip: false, cut: 0 });
       continue;
     }
-    ups.push({ name: p.name, col: p.col, i: 0, c: p.col + (w - 1) / 2, r: p.row, z: p.row, ox: 0, oy: 0, flip: !!p.flip, cut: 0 });
+    // (Jefferson's board on its crates stands with its foot `standDy` south of its row's middle, on the marks' line.)
+    const dr = p.name === "board-stand" && art.standDy ? art.standDy / SQ : 0;
+    ups.push({ name: p.name, col: p.col, i: 0, c: p.col + (w - 1) / 2, r: p.row + dr, z: p.row + dr, ox: 0, oy: 0, flip: !!p.flip, cut: 0 });
   }
   ups.sort((a, b) => a.z - b.z);
   ups.forEach((u, i) => (u.i = i));
@@ -862,6 +919,38 @@ function startRoom(
       }
       return;
     }
+    if (def.roof === "warehouse") {
+      // A warehouse's roof (as the mockup drew it): dark steel trusses over the high-bay lamps, a pale corrugated deck between them.
+      const sky = rg.createLinearGradient(0, 0, 0, H * 0.45);
+      sky.addColorStop(0, "#1b1f2a");
+      sky.addColorStop(1, "#4a5262");
+      rg.fillStyle = sky;
+      rg.fillRect(0, 0, W, H);
+      rg.strokeStyle = "#11141b";
+      rg.lineWidth = 5;
+      for (let i = -12; i <= 12; i++) {
+        rg.beginPath();
+        rg.moveTo(W / 2 + i * W * 0.05, -H * 0.5);
+        rg.lineTo(W / 2 + i * W * 0.18, H * 0.45);
+        rg.stroke();
+      }
+      // The trusses' chords and their zigzag web.
+      rg.lineWidth = 4;
+      for (const [y0, y1] of [[H * 0.06, H * 0.12], [H * 0.2, H * 0.28]] as const) {
+        rg.beginPath();
+        rg.moveTo(0, y0);
+        rg.lineTo(W, y0);
+        rg.moveTo(0, y1);
+        rg.lineTo(W, y1);
+        rg.stroke();
+        rg.lineWidth = 2;
+        rg.beginPath();
+        for (let x = 0, up = true; x <= W + 30; x += 30, up = !up) (x === 0 ? rg.moveTo : rg.lineTo).call(rg, x, up ? y0 : y1);
+        rg.stroke();
+        rg.lineWidth = 4;
+      }
+      return;
+    }
     if (def.roof === "barn") {
       // A barn's roof (as the mockup drew it): dark rafters running up to the ridge, planks between, two heavy cross beams.
       const sky = rg.createLinearGradient(0, 0, 0, H * 0.45);
@@ -1030,13 +1119,246 @@ function startRoom(
   const dest = { c: 0, r: 0, on: false };
   const pose = { x: 0, y: 0, hop: 0, tilt: 0, step: false, t: 0 };
   const sheet = loaded.kid.sheet;
-  const kidSquares = f.sidekickSquares / (sheet.foot[1] / sheet.h - sheet.top.idle / sheet.h);
+  // (Drawn at the art's own size when the shop says so: Jefferson's dealer, `tall` room pixels from his feet to his top.)
+  const kidSquares = (def.tall ? def.tall / SQ : f.sidekickSquares) / (sheet.foot[1] / sheet.h - sheet.top.idle / sheet.h);
   let kidT = 0;
   const kidEnds = sheet.ms.idle.map((ms) => (kidT += Math.max(16, ms)));
+
+  // ---- Jefferson's crew (his warehouse, Nov 4; shops/grex-crew.ts): the scissor lift and the forklift on their loops (they wait for
+  // anyone in their way), the idle crew at their places; in his intro they stop work and come round the table to watch. Drawn from
+  // their baked sheets (grex-crew-sheets.ts), 1:1 at the room's scale, each by its row among the pieces.
+  const cw = art.crew ?? null;
+  const KC = C.crew;
+  const lift = cw ? new Machine("lift", liftLegs(cw.liftPath, S.crew)) : null;
+  const fork = cw ? new Machine("forklift", forkLegs(cw.forkPath, S.crew)) : null;
+  const liftPose: MachinePose = { c: 0, r: 0, anim: "idle", frame: 0, flip: false, waiting: false };
+  const forkPose: MachinePose = { c: 0, r: 0, anim: "idle", frame: 0, flip: false, waiting: false };
+  /** Someone stands on the square, or is stepping onto it: you, or the boss walking in with you. */
+  const figureOn = (c: number, r: number): boolean => {
+    if (you.hereC() === c && you.hereR() === r) return true;
+    return !!boss && boss.hereC() === c && boss.hereR() === r;
+  };
+  /** The floor pallet's square (the forklift's loop picks it up there and sets it down again). */
+  const palletSq = cw ? { c: Math.round(cw.palletAt[0]), r: Math.round(cw.palletAt[1]) } : { c: -1, r: -1 };
+  /** A machine or the pallet on the floor takes the square now: nobody walks onto it. */
+  const crewTakes = (c: number, r: number): boolean =>
+    !!cw && (lift!.occupies(c, r) || fork!.occupies(c, r) || (fork!.pallet === "floor" && c === palletSq.c && r === palletSq.r));
+  /** A way from `from` to `to` round the machines and the pallet where they are now (else the room's own way: you stop if one's in it). */
+  const crewRoom: Room | null = cw ? { ...room, blocked: new Uint8Array(room.blocked) } : null;
+  const findWay = (from: Sq, to: Sq): Sq[] | null => {
+    if (!crewRoom) return findPath(room, from, to);
+    const b = crewRoom.blocked as Uint8Array;
+    b.set(room.blocked);
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (crewTakes(c, r)) b[r * n + c] = 1;
+    return findPath(crewRoom, from, to) ?? findPath(room, from, to);
+  };
+  /** One of the crew to draw this frame: a frame of a sheet, its foot at (c, r), mirrored or not, raised `up` px; drawn by `z`. */
+  interface CrewFig {
+    img: HTMLImageElement | null;
+    sx: number;
+    sy: number;
+    w: number;
+    h: number;
+    fx: number;
+    fy: number;
+    k: number;
+    c: number;
+    r: number;
+    z: number;
+    flip: boolean;
+    up: number;
+  }
+  const crewFigs: CrewFig[] = Array.from({ length: CREW_MAX }, () => ({ img: null, sx: 0, sy: 0, w: 0, h: 0, fx: 0, fy: 0, k: 1, c: 0, r: 0, z: 0, flip: false, up: 0 }));
+  let crewN = 0;
+  const sheetAnim = (name: CrewName, anim: string) => (CREW_SHEETS[name].anims as Record<string, { row: number; loop: boolean; ms: readonly number[]; cues: readonly (string | null)[] }>)[anim]!;
+  /** Adds a frame of a crew sheet (its foot at c, r). */
+  const addCrew = (name: CrewName, anim: string, frame: number, c: number, r: number, flip: boolean, z = r, up = 0) => {
+    if (crewN >= CREW_MAX || !loaded.crew) return;
+    const sh = CREW_SHEETS[name];
+    const a = sheetAnim(name, anim);
+    Object.assign(crewFigs[crewN++]!, { img: loaded.crew[name], sx: frame * sh.w, sy: a.row * sh.h, w: sh.w, h: sh.h, fx: sh.foot[0], fy: sh.foot[1], k: 1, c, r, z, flip, up });
+  };
+  /** Adds a frame of the dealer's sheet (the Shopkeeper's: its idle row 0, walk row 1), at his size. */
+  const addDealer = (row: 0 | 1, frame: number, c: number, r: number, flip: boolean) => {
+    if (crewN >= CREW_MAX) return;
+    Object.assign(crewFigs[crewN++]!, { img: loaded.kid.img, sx: frame * sheet.w, sy: row * sheet.h, w: sheet.w, h: sheet.h, fx: sheet.foot[0], fy: sheet.foot[1], k: (kidSquares * SQ) / sheet.h, c, r, z: r, flip, up: 0 });
+  };
+  /** The pallet with the forklift (`at` its pose): on its forks, on the shelf (eased the last few px onto the slot), or on the floor. */
+  const addPallet = (at: MachinePose) => {
+    const F = CREW_SHEETS.forklift;
+    const onForks = (anim: string, frame: number) => {
+      const p = CREW_FORK_AT[anim]?.[frame] ?? CREW_FORK_AT.idle![0]!;
+      return { c: at.c + (p[0] - F.foot[0]) / SQ, up: F.foot[1] - p[1] };
+    };
+    const since = fork!.clock - fork!.palletSince;
+    const ease = Math.min(1, Math.max(0, since / S.crew.palletEaseMs));
+    if (fork!.pallet === "forks") {
+      const p = onForks(at.anim, at.frame);
+      // (Just lifted off the shelf: eased from the slot's middle onto the forks.)
+      const c = fork!.palletSince > -Infinity && ease < 1 && at.anim === "lift" ? cw!.shelf.col + (p.c - cw!.shelf.col) * ease : p.c;
+      addCrew("pallet", "idle", 0, c, at.r, false, at.r + 0.001, p.up);
+    } else if (fork!.pallet === "shelf") {
+      const from = onForks("set", 1).c;
+      addCrew("pallet", "idle", 0, from + (cw!.shelf.col - from) * ease, cw!.shelf.row, false, cw!.shelf.row + 0.002, cw!.shelf.lift);
+    } else addCrew("pallet", "idle", 0, cw!.palletAt[0], cw!.palletAt[1], false);
+  };
+  /** Each idle crew member's loop starts at its own place in it (so they don't move as one). */
+  const OFFSET: Readonly<Record<string, number>> = { "leaner-a": 0, "leaner-b": 700, "crew-c": 300, "crew-d": 1100 };
+  const IDLE = ["leaner-a", "leaner-b", "crew-c", "crew-d"] as const;
+  /** The crew walking over in his intro: each one's way (from where he set off, round the table's north side, to his spot), when he goes (ms after the stop), how fast. */
+  interface Walk {
+    key: CrewKey;
+    pts: CrewSq[];
+    start: number;
+    speed: number;
+    spot: readonly [number, number];
+    face: number;
+    lastFrame: number;
+  }
+  let walks: Walk[] | null = null;
+  const at3 = { c: 0, r: 0, face: 1 as 1 | -1, done: false };
+  let lastStep = -Infinity;
+  /** The crew stop (his intro): the machines park where they are, each walker's way is set from where he is. */
+  const planCrew = () => {
+    const cr = ci?.crew;
+    if (!cr || !cw || !ci?.anims) return;
+    lift!.stop();
+    fork!.stop();
+    lift!.pose(liftPose);
+    fork!.pose(forkPose);
+    const rise = ci.anims && "rise" in ci.anims ? ci.anims.rise.reduce((a, b) => a + b, 0) : 0;
+    const off = (sheet: CrewName) => sheetAnim(sheet, "stepOff").ms.reduce((a, b) => a + b, 0);
+    const wake = sheetAnim("crew-d", "wake").ms.reduce((a, b) => a + b, 0);
+    const from: Record<CrewKey, CrewSq> = {
+      "lift-guy": { c: liftPose.c + ((liftPose.flip ? -1 : 1) * CREW_STEP_OFF.lift[0]) / SQ, r: liftPose.r + CREW_STEP_OFF.lift[1] / SQ },
+      "fork-guy": { c: forkPose.c + CREW_STEP_OFF.forklift[0] / SQ, r: forkPose.r + CREW_STEP_OFF.forklift[1] / SQ },
+      "leaner-a": { c: cw.places["leaner-a"].at[0], r: cw.places["leaner-a"].at[1] },
+      "leaner-b": { c: cw.places["leaner-b"].at[0], r: cw.places["leaner-b"].at[1] },
+      "crew-c": { c: cw.places["crew-c"].at[0], r: cw.places["crew-c"].at[1] },
+      "crew-d": { c: cw.places["crew-d"].at[0], r: cw.places["crew-d"].at[1] },
+      dealer: { c: def.at[0], r: def.at[1] },
+    };
+    walks = (Object.keys(cr.spots) as CrewKey[]).map((key) => {
+      const own = KC.setOffMs + cr.setoff[key];
+      // (The machine guys once they're off; the dozer once he's awake.)
+      const start = key === "lift-guy" ? Math.max(own, off("lift")) : key === "fork-guy" ? Math.max(own, off("forklift")) : key === "crew-d" ? own + wake : own;
+      const spot = cr.spots[key];
+      const pts = [from[key], ...KC.via[key].map(([c, r]) => ({ c, r })), { c: spot.at[0], r: spot.at[1] }];
+      // (At least `speed`; faster if he must, to be at his spot by the time your lift locks.)
+      const left = Math.max(500, KC.setOffMs + KC.walkMs + rise - start);
+      return { key, pts, start, speed: Math.max(KC.speed, routeLength(pts) / (left / 1000)), spot: spot.at, face: spot.face, lastFrame: -1 };
+    });
+  };
+  /** The machines a frame on (until the crew stop in his intro). */
+  const stepCrew = (dtMs: number, now: number) => {
+    if (!cw) return;
+    const cn = introNow?.crew;
+    if (cn && cn.stopped >= 0) {
+      if (!walks) planCrew();
+      stepWalkSounds(cn.stopped, now);
+      return;
+    }
+    lift!.update(dtMs, figureOn);
+    fork!.update(dtMs, figureOn);
+  };
+  /** The crew's steps as they walk over: each walk frame's `step` cue, at most one a `stepGapMs`. */
+  const stepWalkSounds = (since: number, now: number) => {
+    if (!walks || !ci) return;
+    for (const w of walks) {
+      const t = since - w.start;
+      if (t < 0) continue;
+      along(w.pts, w.speed, t, at3);
+      if (at3.done) continue;
+      const ms = w.key === "dealer" ? sheet.ms.walk : sheetAnim(crewSheet(w.key), "walk").ms;
+      const fr = frameOf(ms, t, true);
+      if (fr === w.lastFrame) continue;
+      w.lastFrame = fr;
+      const cue = w.key === "dealer" ? (fr === 0 || fr === 3 ? "step" : null) : sheetAnim(crewSheet(w.key), "walk").cues[fr];
+      if (cue && now - lastStep >= KC.stepGapMs) {
+        lastStep = now;
+        playCue(ci, cue);
+      }
+    }
+  };
+  const crewSheet = (k: CrewKey): CrewName => (k === "lift-guy" ? "lift-guy" : k === "fork-guy" ? "fork-guy" : k === "dealer" ? "crew-c" : k);
+  /** Who of the crew stands where this frame (each a frame of its sheet), into `crewFigs`. */
+  const collectCrew = (now: number) => {
+    crewN = 0;
+    if (!cw || !loaded.crew) return;
+    const cn = introNow?.crew;
+    const stopped = cn && cn.stopped >= 0 && walks ? cn.stopped : -1;
+    lift!.pose(liftPose);
+    fork!.pose(forkPose);
+    if (stopped < 0) {
+      for (const k of IDLE) {
+        const pl = cw.places[k];
+        const a = sheetAnim(k, "idle");
+        // (The dozer on his pallet: drawn after it.)
+        addCrew(k, "idle", frameOf(a.ms, now + OFFSET[k]!, true), pl.at[0], pl.at[1], pl.face < 0, pl.at[1] + (k === "crew-d" ? 0.005 : 0));
+      }
+      addCrew("lift", liftPose.anim, liftPose.frame, liftPose.c, liftPose.r, liftPose.flip);
+      addCrew("forklift", forkPose.anim, forkPose.frame, forkPose.c, forkPose.r, false);
+      addPallet(forkPose);
+      // (In his challenge, before the stop, the dealer stands in his corner too.)
+      if (ci) addDealer(0, frameOf(sheet.ms.idle, now, true), def.at[0], def.at[1], !!def.flip);
+      return;
+    }
+    // His intro, from the stop: the machines park (their guys step off), each of the crew goes when it's his turn.
+    for (const [name, pose] of [["lift", liftPose], ["forklift", forkPose]] as const) {
+      const so = sheetAnim(name, "stepOff");
+      const len = so.ms.reduce((a, b) => a + b, 0);
+      const anim = stopped < len ? "stepOff" : "parked";
+      const fr = anim === "stepOff" ? frameOf(so.ms, stopped, false) : 0;
+      addCrew(name, anim, fr, pose.c, pose.r, name === "lift" && pose.flip);
+      if (name === "forklift") addPallet({ ...pose, anim, frame: fr });
+    }
+    const wakeA = sheetAnim("crew-d", "wake");
+    const wakeLen = wakeA.ms.reduce((a, b) => a + b, 0);
+    for (const w of walks!) {
+      const t = stopped - w.start;
+      if (t < 0) {
+        // (Not his turn yet: the machine guys are still climbing off (their machines' frames); the dozer waking; the rest as they were.)
+        if (w.key === "lift-guy" || w.key === "fork-guy") continue;
+        if (w.key === "dealer") addDealer(0, frameOf(sheet.ms.idle, now, true), def.at[0], def.at[1], !!def.flip);
+        else if (w.key === "crew-d") addCrew("crew-d", "wake", frameOf(wakeA.ms, stopped, false), w.pts[0]!.c, w.pts[0]!.r, false, w.pts[0]!.r + 0.005);
+        else addCrew(w.key, "idle", 0, w.pts[0]!.c, w.pts[0]!.r, cw.places[w.key].face < 0);
+        continue;
+      }
+      along(w.pts, w.speed, t, at3);
+      const flip = (at3.done ? w.face : at3.face) < 0;
+      if (w.key === "dealer") {
+        if (at3.done) addDealer(0, frameOf(sheet.ms.idle, now, true), at3.c, at3.r, flip);
+        else addDealer(1, frameOf(sheet.ms.walk, t, true), at3.c, at3.r, flip);
+        continue;
+      }
+      const name = crewSheet(w.key);
+      if (at3.done) addCrew(name, "watch", frameOf(sheetAnim(name, "watch").ms, now + (OFFSET[w.key] ?? 400), true), at3.c, at3.r, flip);
+      else addCrew(name, "walk", frameOf(sheetAnim(name, "walk").ms, t, true), at3.c, at3.r, flip);
+      void wakeLen;
+    }
+  };
+  /** One of the crew (`crewFigs[i]`), its foot on its square, its shadows the town's. */
+  const drawCrewFig = (i: number) => {
+    const fg = crewFigs[i]!;
+    if (!fg.img || !P(fg.c, fg.r)) return;
+    const s = (pt.k / SQ) * fg.k;
+    const y = pt.y - fg.up * (pt.k / SQ);
+    if (fg.w < 100 && fg.up === 0 && fg.h > 60) shadows(pt.x, pt.y, pt.k, fg.w * s * 0.45);
+    g.imageSmoothingEnabled = false;
+    if (fg.flip) {
+      g.save();
+      g.translate(pt.x, 0);
+      g.scale(-1, 1);
+      g.drawImage(fg.img, fg.sx, fg.sy, fg.w, fg.h, -fg.fx * s, y - fg.fy * s, fg.w * s, fg.h * s);
+      g.restore();
+    } else g.drawImage(fg.img, fg.sx, fg.sy, fg.w, fg.h, pt.x - fg.fx * s, y - fg.fy * s, fg.w * s, fg.h * s);
+  };
 
   const drawUp = (u: Up, now: number) => {
     // (Wrangler's intro: from the yank, the board on its stand is his bale, drawn as it's dragged: drawRopeCenter.)
     if (introNow?.rope?.bale && u.name === "board-stand") return;
+    // (Jefferson's challenge: his intro's crate stack stands in its place from the walk in, the same picture: drawCrewCenter.)
+    if (cw && ci?.crew && u.name === "board-stand") return;
     if (!P(u.c, u.r)) return;
     // Near the camera (between it and you, up close: the front wall as you stand at the door) a piece fades out, so it never fills
     // the screen in front of you.
@@ -1052,7 +1374,9 @@ function startRoom(
     const w = img.width * s;
     if (x > W || x + w < 0 || y > H || y + h * s < 0) return;
     // (A cave: nearer the camera than you and over you, see-through: SHOP_FEEL.seeThrough.)
-    g.globalAlpha = upAlpha(pt.depth, !!cave && youFig.on && u.z > youFig.z && overlaps(youFig, x, y, x + w, y + h * s), !!cave);
+    // (Jefferson's warehouse too: its tall roll-up door, nearer the camera than you just inside it.)
+    const thru = !!cave || !!cw;
+    g.globalAlpha = upAlpha(pt.depth, thru && youFig.on && u.z > youFig.z && overlaps(youFig, x, y, x + w, y + h * s), thru);
     if (pieceEmis && darkNow && darkNow.level > 0) addEmis(pieceEmis, x, y, s, img.width, u.flip, g.globalAlpha * (1 - darkNow.black));
     if (u.flip) {
       g.save();
@@ -1100,6 +1424,8 @@ function startRoom(
   };
   const drawKid = (now: number) => {
     kidBox.on = false;
+    // (Jefferson's challenge: his dealer is one of the crew, who come over to watch: drawCrewFig.)
+    if (cw && ci) return;
     if (!P(def.at[0], def.at[1])) return;
     const s = (kidSquares * pt.k) / sheet.h;
     // (Raised onto the counter's top, `lift` of the room's pixels: Wrangler's rooster. His shadows there too.)
@@ -1111,7 +1437,14 @@ function startRoom(
     while (i < kidEnds.length - 1 && t >= kidEnds[i]!) i++;
     shadows(pt.x, fy, pt.k, sheet.w * s * 0.6);
     g.imageSmoothingEnabled = false;
-    g.drawImage(loaded.kid.img, i * sheet.w, 0, sheet.w, sheet.h, x0, y0, sheet.w * s, sheet.h * s);
+    if (def.flip) {
+      // (Facing west: mirrored about his feet.)
+      g.save();
+      g.translate(pt.x, 0);
+      g.scale(-1, 1);
+      g.drawImage(loaded.kid.img, i * sheet.w, 0, sheet.w, sheet.h, -sheet.foot[0] * s, y0, sheet.w * s, sheet.h * s);
+      g.restore();
+    } else g.drawImage(loaded.kid.img, i * sheet.w, 0, sheet.w, sheet.h, x0, y0, sheet.w * s, sheet.h * s);
     Object.assign(kidBox, { x0, y0, x1: x0 + sheet.w * s, y1: y0 + sheet.h * s, on: true, hx: pt.x, hy: fy - (sheet.foot[1] - sheet.top.idle) * s - 2 });
     // (A cave: the counter is round the bend, out of sight from the mouth, so the tag goes with him behind the rock nearer the camera,
     // drawn now, not over everything.)
@@ -1174,7 +1507,10 @@ function startRoom(
     youFig.on = false;
     seen.anim = "";
     you.pose(now, pose);
+    // (Jefferson's intro: your lift under you, you standing on its plate, lifted with it.)
+    if (cw && introNow?.crew) drawLift();
     if (!P(pose.x + youOx(now), pose.y + youOy(now))) return;
+    if (cw && introNow?.crew) pt.y -= (plateUp() * pt.k) / SQ;
     youBox(pt.x, pt.y, pt.k, f.youSquares, youFig);
     youFig.z = pose.y + youOy(now);
     youFig.on = true;
@@ -1346,6 +1682,26 @@ function startRoom(
     if (h2) grip2 = h2;
     Object.assign(fist1, { x: x0 + grip1[0] * k, y: y0 + grip1[1] * k, on: true });
     Object.assign(fist2, { x: x0 + grip2[0] * k, y: y0 + grip2[1] * k, on: true });
+    Object.assign(bossHead, { x: pt.x, y: y0 + b.ch.h * b.head * k, on: true, px: b.squares * pt.k });
+    Object.assign(hisFoot, { x: pt.x, y: pt.y, k, on: true });
+  };
+  /**
+   * Jefferson in his intro: his own move's frame (BOSS_GREX_INTRO: his call, his wave over, his brag), as drawn (not mirrored: he faces
+   * you, east), at his town size, his feet where he stands.
+   */
+  const drawCrewBoss = (now: number, mv: { anim: "call" | "waveOver" | "brag"; frame: number }) => {
+    boss!.pose(now, bossPose);
+    if (!P(bossPose.x + bossOx(now), bossPose.y + bossOy(now))) return;
+    const b = ci!.boss;
+    const M = ci!.crew!.mover;
+    const img = M.frames[mv.anim][mv.frame]!;
+    const k = (b.squares * pt.k) / M.ch.h;
+    const x0 = pt.x - M.ch.foot[0] * k;
+    const y0 = pt.y - M.ch.foot[1] * k;
+    drawShadows(pt.x, pt.y, M.ch.w * k);
+    g.imageSmoothingEnabled = k < 1.5;
+    g.drawImage(img, x0, y0, img.width * k, img.height * k);
+    g.imageSmoothingEnabled = false;
     Object.assign(bossHead, { x: pt.x, y: y0 + b.ch.h * b.head * k, on: true, px: b.squares * pt.k });
     Object.assign(hisFoot, { x: pt.x, y: pt.y, k, on: true });
   };
@@ -1554,6 +1910,7 @@ function startRoom(
     if (wat) return drawWoodMove(wat);
     if (dk && darkNow && (darkNow.move || darkNow.bulbs < 3)) return drawDarkBoss(now, darkNow);
     if (rp && introNow?.rope && attackFrame < 0) return drawRopeBoss(now);
+    if (ci.crew && introNow?.crew?.move && attackFrame < 0) return drawCrewBoss(now, introNow.crew.move);
     if (attackFrame >= 0 && ci.attack) return drawAttack(now);
     boss.pose(now, bossPose);
     if (!P(bossPose.x + bossOx(now), bossPose.y + bossOy(now))) return;
@@ -1637,6 +1994,54 @@ function startRoom(
     else if (n.drift) put(py.frames.crumble[py.frames.crumble.length - 1]!, py.ch);
   };
   /**
+   * Jefferson's table (his intro, from the walk in): the crate stack where the room's board stand stood (the same picture, its foot on
+   * the marks' line), its slight wobble or its bigger one, and on it the slab and board (`paintTable`), `top` px over its foot (32 higher
+   * than a park table's), riding on the top crate (its sway).
+   */
+  const crewCenter = { c: 0, r: 0 };
+  const crewTableAt = () => {
+    const st = art.stand ?? { col: marks!.table.c - 0.5, row: marks!.table.r };
+    crewCenter.c = st.col + 0.5;
+    crewCenter.r = st.row + (art.standDy ?? 0) / SQ;
+    return crewCenter;
+  };
+  const drawCrewCenter = (now: number) => {
+    const cr = ci?.crew;
+    if (!cr || !marks) return;
+    const at = crewTableAt();
+    if (!P(at.c, at.r)) return;
+    const T = cr.table;
+    const n = introNow?.crew;
+    const anim = n?.table.anim ?? "idle";
+    const fr = n ? n.table.frame : animFrame(T.ch.anims.idle!.frames.map((x) => x.ms), now, true);
+    const img = T.frames[anim][fr]!;
+    const s = pt.k / SQ;
+    g.imageSmoothingEnabled = false;
+    g.drawImage(img, pt.x - T.ch.foot[0] * s, pt.y - T.ch.foot[1] * s, img.width * s, img.height * s);
+    const [dx, dy] = T.sway[anim]?.[fr] ?? [0, 0];
+    g.save();
+    g.translate(dx * s, (dy - (T.top - TABLE_BOARD.top)) * s);
+    paintTable(g, v, at.c - camX, camY - at.r, ci!.table.palette, marks.layout);
+    g.restore();
+  };
+  /** Your lift's plate now (px over the floor, Jefferson's intro: INTRO_GREX_LIFT_H), 0 otherwise. */
+  const plateUp = (): number => {
+    const n = introNow?.crew;
+    if (!n || !ci?.crew) return 0;
+    return ci.crew.lift.h[n.lift.anim]?.[n.lift.frame] ?? 0;
+  };
+  /** Your lift at your mark (its plate the mark's; Jefferson's intro), drawn just before you on it. */
+  const drawLift = () => {
+    const n = introNow?.crew;
+    const L = ci?.crew?.lift;
+    if (!n || !L || !marks || !P(marks.you.c, marks.you.r, pq[3])) return;
+    const q = pq[3]!;
+    const img = L.frames[n.lift.anim][n.lift.frame]!;
+    const s = q.k / SQ;
+    g.imageSmoothingEnabled = false;
+    g.drawImage(img, q.x - L.ch.foot[0] * s, q.y - L.ch.foot[1] * s, img.width * s, img.height * s);
+  };
+  /**
    * Timber's props between you (his log intro; from the walk in), the table's foot at (x, y), `s` a room pixel: the log lying where it waits (at his
    * size: it's the log he lifts, its foot where his art's `liftAt` puts it from his foot as he lifts it); the ring of shavings left on
    * the floor; the stumps at the stools' places (popping up, then standing); his table (a gnawed pedestal, its middle alone: no stools
@@ -1705,8 +2110,8 @@ function startRoom(
    * What stands among the pieces this frame (the Shopkeeper 0, you 1, the boss 2, the board 3, facing the boss's stool 4 and yours 5,
    * and Timber's shavings' fog 6), by row: drawn far to near.
    */
-  const figZ = new Float64Array(7);
-  const figK = new Uint8Array(7);
+  const figZ = new Float64Array(8 + CREW_MAX);
+  const figK = new Uint8Array(8 + CREW_MAX);
   let figN = 0;
   const addFig = (z: number, k: number) => {
     let i = figN++;
@@ -1719,7 +2124,7 @@ function startRoom(
     figK[i] = k;
   };
   const drawFigure = (k: number, now: number) =>
-    k === 0 ? drawKid(now) : k === 1 ? drawYou(now) : k === 2 ? drawBoss(now) : k === 3 ? (rp ? drawRopeCenter() : drawCenter()) : k === 6 ? drawFog() : rp ? drawBucket(k === 4 ? "b" : "w") : drawStool(k === 4 ? marks!.bossStool : marks!.youStool);
+    k >= 8 ? drawCrewFig(k - 8) : k === 0 ? drawKid(now) : k === 1 ? drawYou(now) : k === 2 ? drawBoss(now) : k === 3 ? (cw && ci?.crew ? drawCrewCenter(now) : rp ? drawRopeCenter() : drawCenter()) : k === 6 ? drawFog() : rp ? drawBucket(k === 4 ? "b" : "w") : drawStool(k === 4 ? marks!.bossStool : marks!.youStool);
   /** A speech bubble's lines (wrapped once for its words, at its size). */
   const bubbles = new Map<string, { lines: string[]; w: number }>();
   /**
@@ -2027,7 +2432,8 @@ function startRoom(
     const q = pq as [typeof pt, typeof pt, typeof pt, typeof pt];
     const near = Math.min(n + 6, camY + v.back - 0.6); // (up to just in front of the camera)
     if (near > n - 0.5 && P(-6, n - 0.5, q[0]) && P(n + 5, n - 0.5, q[1]) && P(n + 5, near, q[2]) && P(-6, near, q[3])) {
-      g.fillStyle = cave ? CAVE_SNOW : "#e6dfcf";
+      // (A warehouse's roll-up door opens onto the night lot: dark asphalt.)
+      g.fillStyle = cave ? CAVE_SNOW : def.roof === "warehouse" ? "#3a3d4a" : "#e6dfcf";
       g.beginPath();
       g.moveTo(q[0].x, q[0].y);
       for (let i = 1; i < 4; i++) g.lineTo(q[i]!.x, q[i]!.y);
@@ -2067,7 +2473,7 @@ function startRoom(
           addFig(bucketAt("b").r, 4);
           addFig(bucketAt("w").r, 5);
         }
-      } else if (introNow || ci?.wood) {
+      } else if (introNow || ci?.wood || (cw && ci?.crew)) {
         // (Across, you and the boss stand on the table's row, at its stools: the table first, you in front of yours. Timber's log
         // lies there from the walk in; his fog over him, as it boils up round where he works.)
         addFig(across ? marks.table.r - 0.01 : marks.table.r, 3);
@@ -2078,6 +2484,9 @@ function startRoom(
         }
       }
     }
+    // (Jefferson's crew, each by his row.)
+    collectCrew(now);
+    for (let i = 0; i < crewN; i++) addFig(crewFigs[i]!.z, 8 + i);
     let k = 0;
     for (const u of ups) {
       while (k < figN && figZ[k]! < u.z) drawFigure(figK[k++]!, now);
@@ -2094,7 +2503,7 @@ function startRoom(
       drawTag(youName(), "you", youHead.x, youHead.y);
       g.globalAlpha = 1;
     }
-    if (ci && introNow?.line && bossHead.on) drawBubble(ci.def.line, bossHead.x, bossHead.y, bossHead.px);
+    if (ci && introNow?.line && bossHead.on) drawBubble(introLine, bossHead.x, bossHead.y, bossHead.px);
     if (chant && introNow?.chant && bossHead.on) drawBubble(chant, bossHead.x, bossHead.y, bossHead.px);
     placeCard();
     const h = you.here();
@@ -2192,8 +2601,14 @@ function startRoom(
     // (On your ride inside, at its pace: RIDES.speed, as in the town.)
     if (!ci) you.stepMs = f.youStepMs / rideSpeed(riding()?.id);
     keysWalk();
+    // (Jefferson's crew: one in your way (a machine, the pallet on the floor) and you stop where you are; tap again to go round.)
+    if (cw && !ci) {
+      const nx = you.peek();
+      if (nx && crewTakes(nx.c, nx.r)) you.halt();
+    }
     you.update(now);
     stepIntro(now);
+    stepCrew(dt * 1000, now);
     stepCards();
     if (follow) {
       // A critically damped spring toward you (the town's), solved exactly for the frame; in a challenge, toward its framing.
@@ -2296,7 +2711,8 @@ function startRoom(
     const xy = local(e);
     const p = plan(xy.x, xy.y);
     if (!p?.dest) return;
-    const path = findPath(room, you.here(), p.dest);
+    // (Round Jefferson's machines where they are now.)
+    const path = findWay(you.here(), p.dest);
     if (!path) return;
     you.go(path);
     Object.assign(dest, { c: p.dest.c, r: p.dest.r, on: path.length > 0 });
@@ -2385,12 +2801,46 @@ function startRoom(
             buckets: introNow.rope.buckets?.anim ?? null,
           }
         : null,
+      // (Jefferson's own: his move, the line he called this time, the crew (stopped, walking, each one where and doing what), your
+      // lift and its plate's height, the table's wobble, where it stands.)
+      lineText: introNow?.line && bossHead.on ? introLine : null,
+      crew: introNow?.crew
+        ? {
+            move: introNow.crew.move?.anim ?? null,
+            stopped: introNow.crew.stopped,
+            walk: introNow.crew.walk,
+            lift: introNow.crew.lift.anim,
+            plate: plateUp(),
+            table: introNow.crew.table.anim,
+            tableAt: [Math.round(crewTableAt().c * 1000) / 1000, Math.round(crewTableAt().r * 1000) / 1000],
+            figs: crewHook(),
+          }
+        : null,
       table: !!introNow?.table,
       stools: introNow?.stools ? [[marks!.bossStool.c, marks!.bossStool.r], [marks!.youStool.c, marks!.youStool.r]] : [],
       pyramid: introNow?.pyramid ?? null,
       blocks: introNow?.blocks ?? null,
       drop: introNow?.drop ?? 0,
     };
+  };
+  /** (Tests) The crew drawn last frame: each one's sheet's row's animation, where (squares), mirrored, raised. */
+  const crewHook = () =>
+    crewFigs.slice(0, crewN).map((fg) => {
+      const name = fg.img === loaded.kid.img ? "dealer" : (Object.keys(CREW_SHEETS) as CrewName[]).find((k) => loaded.crew?.[k] === fg.img) ?? "?";
+      const anims = name === "dealer" ? { idle: { row: 0 }, walk: { row: 1 } } : (CREW_SHEETS[name as CrewName].anims as Record<string, { row: number }>);
+      const anim = Object.entries(anims).find(([, a]) => a.row * fg.h === fg.sy)?.[0] ?? "?";
+      return { name, anim, frame: Math.round(fg.sx / fg.w), at: [Math.round(fg.c * 100) / 100, Math.round(fg.r * 100) / 100], flip: fg.flip, up: fg.up };
+    });
+  /**
+   * (Tests) Jefferson's machines and crew in his shop: each machine's foot, animation, whether it's waiting for someone in its way, the
+   * squares it takes; the pallet; every figure drawn.
+   */
+  const hookCrew = () => {
+    if (!testSwitchesAllowed() || !cw) return null;
+    lift!.pose(liftPose);
+    fork!.pose(forkPose);
+    const m = (p: MachinePose, mc: Machine) => ({ at: [Math.round(p.c * 100) / 100, Math.round(p.r * 100) / 100], anim: p.anim, waiting: p.waiting, leg: mc.i });
+    return { lift: m(liftPose, lift!), forklift: m(forkPose, fork!), pallet: fork!.pallet, figs: crewHook(), you: [you.hereC(), you.hereR()] };
   };
   const hookBench = (k: number) => {
     if (!testSwitchesAllowed()) return null;
@@ -2400,8 +2850,9 @@ function startRoom(
     for (let i = 0; i < k; i++) draw(now);
     return (performance.now() - t0) / k;
   };
-  const hooks = window as unknown as { __shopAt?: typeof hookAt; __shopCam?: typeof hookCam; __shopBench?: typeof hookBench; __shopRide?: typeof hookRide; __shopIntro?: typeof hookIntro };
+  const hooks = window as unknown as { __shopAt?: typeof hookAt; __shopCam?: typeof hookCam; __shopBench?: typeof hookBench; __shopRide?: typeof hookRide; __shopIntro?: typeof hookIntro; __shopCrew?: typeof hookCrew };
   hooks.__shopAt = hookAt;
+  hooks.__shopCrew = hookCrew;
   hooks.__shopIntro = hookIntro;
   hooks.__shopRide = hookRide;
   hooks.__shopCam = hookCam;
@@ -2433,6 +2884,7 @@ function startRoom(
       delete hooks.__shopBench;
       delete hooks.__shopRide;
       delete hooks.__shopIntro;
+      delete hooks.__shopCrew;
     },
   };
 }

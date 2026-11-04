@@ -565,7 +565,28 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   Shopkeeper (his feet, his shadows, his tag and card) onto the counter's plank top, his place its middle on the counter's own row,
   drawn just after the counter; every other shop has no lift and is as it was. "Shopkeeper", no name, Talk. "Wrangler's Boss Crate"
   with Pen Pony. His home's card: its name and "Go in" (it has no line). docs/decisions/2026-11-04-wrangler-home.md.
-- **Which homes.** Babur's Circus (`tiger`), Puddles' Botanical Garden (`gardener`) and Alfil's Pyramid (`alfil`, Nov 2: Woolly the Shopkeeper, "Alfil's Boss Crate" with Alfil's Howdah, a sandstone ceiling, the chat's day tone) and Big Boy's Crib (`bigboy`, Nov 2: Blocky the Shopkeeper, "Big Boy's Boss Crate" with Big Boy's Buggy, a nursery ceiling of sky, clouds and stars, the chat's day tone; a ball pit, solid, under a walkway, the shop's platform and the battle circle you walk on, the circle in the walkway's foam squares with a zoo-animal rug in its middle; his toy airplane, three squares deep, stands up whole at its foot, `RoomArt.upright`, rather than lying flat as a plan) and Timber's Lumber Lodge (`timber`, Nov 3, an admin's town only: Rivet the Shopkeeper behind the middle of the workbench, "Timber's Boss Crate" with The Log Roller, a lodge's ceiling of dark planks between heavy beams, the chat's day tone; the giant king being carved on its dais, 4 × 2 squares, stands up whole, `RoomArt.upright`; the circle's branded start marks, `SHOP_TIMBER_MARKS`, passed as Big Boy's are; his challenge his own intro since Nov 3, the log he gnaws into the table, his line "Hard hats on. We're building today.")) and Dash's Kicks (`dash`, Nov 3, an admin's town only: Tick the Shopkeeper on the counter's middle squares, drawn half a square back and west (`at` [9, 1.5]) so the low tortoise's head shows over the 30 px counter, clear of its shoe boxes; "Dash's Boss Crate" with Cheetah Shoes; a store's ceiling of white tiles and light panels; the chat's day tone; the halfpipe, 4 × 2 squares, stands up whole, `RoomArt.upright`; his try-on mats, `SHOP_BLITZ_MARKS`, passed as Timber's are) and Hollow Peak (`hollow`, Nov 3, everyone's town: below, "Hollow's cave") and Wrangler's Stall (`pig`, Nov 4, everyone's town: above, "Wrangler's barn"): `SHOPS` in `town/shops/shops.ts`. Their home's card
+- **Jefferson's warehouse (Nov 4).** Jefferson is live, so his warehouse is in everyone's town. Its art (`shops/grex-art.ts`, the art
+  branch's `house-shop-grex` at 0e4f6482, with its shared `shops/warehouse-kit.ts`) is a shady firework warehouse with a floor's shape
+  as Hollow's cave (`SHOP_GREX_FLOOR`: 16 × 16, columns 2-17, rows 3-18, racking all round, blocked) but no rock (`cave` stays null: it's
+  a box room otherwise; its tall roll-up door goes see-through over you as a cave's rock does). Blue and orange pallet racking loaded with
+  made-up firework cartons, grey concrete with yellow lines, four high-bay lamps (lit at every placement), a NO SMOKING sign; the battle
+  spot a hazard-striped zone, his red plate and your lift's steel plate its marks (`SHOP_GREX_MARKS`), the board already standing on a
+  wobbly stack of crates at (9-10, 10), its foot 19 px south on the marks' line (`RoomArt.standDy`). Its roof: dark steel trusses
+  (`roof: "warehouse"`); outside the door the night lot (dark asphalt); the chat's day tone. **The Shopkeeper:** "literally just a guy in
+  the corner" (Eric): the shady dealer giraffe (`characters/sidekicks/dealer.ts`, baked as the others; not a town bot: Sparky stays
+  Jefferson's kid) in the north-east corner by the taped SHOP sign, on (16, 3) and (17, 3), facing west (`ShopDef.flip`), drawn at his
+  art's size (`ShopDef.tall`, 79 of the room's pixels, not the kids' `sidekickSquares`). No counter: a tap on his Boss Crate (on the floor
+  at (15, 3)) or the bare corner behind him means talk too (`ShopDef.talk`, `makeRoom`'s `talk`). "Jefferson's Boss Crate" with Giraffe
+  Gallop. **The crew** (`shops/grex-crew.ts`, drawn from baked sheets: `scripts/bake-grex-crew.ts` → `shops/grex-crew/*.png` and
+  `grex-crew-sheets.ts`, a test checks each sheet's hash against the art): two sparkler leaners under the NO SMOKING sign, the clipboard
+  guy at his pallet and the dozer asleep on his, standing where the art puts them (nobody walks through them); the scissor lift
+  shuttling along row 5 and the forklift working the south-east corner on two laps (floor pallet up onto the shelf slot, then back down),
+  a square every `SHOP_FEEL.crew.stepMs`. Before each square a machine looks at it and the one after it: anyone standing there (you, or
+  a boss walking in) and it waits, going on once they're clear (Eric, Nov 4: "If you block it, it stops. If you move out of the way, it
+  starts moving again"). The machines and the floor pallet block your walking where they are: a tap finds a way round them; one stepping
+  into your way stops you where you are. Each client runs them from its own room's clock (no server state). Test hook `__shopCrew()`.
+  docs/decisions/2026-11-04-jefferson-home.md.
+- **Which homes.** Babur's Circus (`tiger`), Puddles' Botanical Garden (`gardener`) and Alfil's Pyramid (`alfil`, Nov 2: Woolly the Shopkeeper, "Alfil's Boss Crate" with Alfil's Howdah, a sandstone ceiling, the chat's day tone) and Big Boy's Crib (`bigboy`, Nov 2: Blocky the Shopkeeper, "Big Boy's Boss Crate" with Big Boy's Buggy, a nursery ceiling of sky, clouds and stars, the chat's day tone; a ball pit, solid, under a walkway, the shop's platform and the battle circle you walk on, the circle in the walkway's foam squares with a zoo-animal rug in its middle; his toy airplane, three squares deep, stands up whole at its foot, `RoomArt.upright`, rather than lying flat as a plan) and Timber's Lumber Lodge (`timber`, Nov 3, an admin's town only: Rivet the Shopkeeper behind the middle of the workbench, "Timber's Boss Crate" with The Log Roller, a lodge's ceiling of dark planks between heavy beams, the chat's day tone; the giant king being carved on its dais, 4 × 2 squares, stands up whole, `RoomArt.upright`; the circle's branded start marks, `SHOP_TIMBER_MARKS`, passed as Big Boy's are; his challenge his own intro since Nov 3, the log he gnaws into the table, his line "Hard hats on. We're building today.")) and Dash's Kicks (`dash`, Nov 3, an admin's town only: Tick the Shopkeeper on the counter's middle squares, drawn half a square back and west (`at` [9, 1.5]) so the low tortoise's head shows over the 30 px counter, clear of its shoe boxes; "Dash's Boss Crate" with Cheetah Shoes; a store's ceiling of white tiles and light panels; the chat's day tone; the halfpipe, 4 × 2 squares, stands up whole, `RoomArt.upright`; his try-on mats, `SHOP_BLITZ_MARKS`, passed as Timber's are) and Hollow Peak (`hollow`, Nov 3, everyone's town: below, "Hollow's cave") and Wrangler's Stall (`pig`, Nov 4, everyone's town: above, "Wrangler's barn") and Jefferson's Fireworks (`grex`, Nov 4, everyone's town: above, "Jefferson's warehouse"): `SHOPS` in `town/shops/shops.ts`. Their home's card
   is its name, centered, and **"Go in"** (gold) under it, centered, nothing else (Eric, Nov 2: "chop the Shop and Coming soon": a short
   card, `.town-card.town-door`); every other home's card is as it was (its name, Hollow's line, "Shop" greyed and "Coming soon").
 - **Going in.** "Go in" walks you to the square in front of the door (the plot's front row's middle, a row out); there the town zooms in on
@@ -642,6 +663,21 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
   he faces you mirrored only walking in and in his attack. Every beat is `CHALLENGE_FEEL.rope` or the art's frames (`ropeAt`,
   `ropeTimes`, `ropeCues`); about 12.3 s from the marks to the wipe. The ropes' lines are the code's (`INTRO_PIG_ROPE_INK`), drawn over
   the room. Four new sounds (`pigSlide`, `pigClatter`, `pigJingle`, `pigPop`), every cue his own.
+- **Jefferson's challenge (Nov 4, his own; Eric's design, intro-grex-nov4.md):** you both walk on to the marks (his red plate west, your
+  lift's plate east) and stand there throughout: he stands (no stool), there's no hop back. His call, one of four at random (`lines`,
+  `lineOf`; placeholders until Eric's Gemini lines): "Boys! We got a challenger!", "Take five, everybody. We're playing chess.", "Who
+  wants a fifteen-minute break?", "Forks down, boys. Somebody wants a game." in the big bubble. He hollers (his `call`); in it the crew
+  stop work: the machines park where they are and their guys step off toward the camera, the dozer wakes with a snort; he waves them over
+  (`waveOver`, twice); they walk round the table's north side (each by its waypoints, `CHALLENGE_FEEL.crew.via`, after the art's
+  setoff delays, at 3.2 squares a second or as much faster as he must to be there as your lift locks) to their spots in a loose ring
+  behind the table (`INTRO_GREX_CREW_SPOTS`), all on screen, watching (the dealer his idle). The board on its crates is there from the
+  walk in (the intro's `INTRO_GREX_TABLE` drawn where the room's stood, the same picture, its slab and the real board on it 59 px up,
+  riding its sway). The floor tile at your mark rises on its piston (`INTRO_GREX_LIFT`) and lifts you 32 px, level with the board; the
+  crates creak as it locks; his brag; his God King attack swung in place; his wipe (`INTRO_GREX_STORM` and `_FRONT`: fireworks, sparkler
+  trails, a wall of sparkler fizz), its own frame cues (a rocket's whistle, a little pop, a soft bang) as it sweeps in. After the match
+  the crew are on their loops again (no walk back). Every beat is `CHALLENGE_FEEL.crew` or the art's frames (`crewAt`, `crewTimes`,
+  `crewCues`); about 13 s from the marks to the wipe. Ten new sounds (`grexShout`, `grexStep`, `grexSnort`, `grexHiss`, `grexClunk`,
+  `grexCreak`, `grexCreakSoft`, `grexRocket`, `grexPopSoft`, `grexBang`), every cue his own.
 - **Hollow's challenge (Nov 3):** his own intro since Nov 3, round 2 (below: "Hollow's own"); his line "Did you leave a light on?"; the
   rings in the ice (`SHOP_HOLLOW_MARKS`) give the table's place; his seat his own (`BossIntro.clear` 2.92, `marksFeel`'s `own`): his
   lash lies 1.6 squares out in front of his feet, so at the usual 2.6 it reached his stool. The pond is smaller than the other circles
@@ -652,7 +688,7 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
   as before (11 to 13 px), just over his head; it stays in the view. Decision: [2026-11-04-battle-desktop-fixes.md](../decisions/2026-11-04-battle-desktop-fixes.md).
 - **Which bosses.** Those in `BOSS_INTROS` (`town/shops/challenge.ts`): every boss whose home has an inside (`SHOPS`): Alfil (his own
   intro, `custom: true`), Big Boy (his own, Nov 2), Timber (his own, Nov 3; in an admin's town only while he's in the game for admins
-  first), Hollow (his own, Nov 3, everyone's), Wrangler (his own, Nov 4, everyone's: below), Babur, Puddles and Dash (the default intro; Dash's since Nov 3, in an admin's town only, until his own in round 3: no God
+  first), Hollow (his own, Nov 3, everyone's), Wrangler (his own, Nov 4, everyone's: below), Jefferson (his own, Nov 4, everyone's: below), Babur, Puddles and Dash (the default intro; Dash's since Nov 3, in an admin's town only, until his own in round 3: no God
   King attack was drawn for him, so he stands in his idle through the swing's beat, turned to you by his intro's `facesLeft`). Every
   other boss's card works as before (its confirm, Leave, the Boss
   raid screen). Per player: it all happens on your own screen; the boss stays at its home for everyone else.
