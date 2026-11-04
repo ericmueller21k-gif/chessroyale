@@ -50,6 +50,29 @@ removed (old → new) and says whether any of them guards a rule here.
   match), Resign or Leave, and Report a bug. (Eric, Oct 25.) Guard: `e2e/match-menu.spec.ts`. One exception: a computer's boss
   result page has no gear, since Settings is in the side bar (Eric, Nov 3: "get rid of the little settings icon").
 
+- **50 v 50: a big majority always wins (Eric, Nov 4: "10 people on white, a 7-2-1 split, the 7 should always win, but a
+  6-3-1 could go to the 3").** When the most-picked move has at least `crowdSureShare` (0.7) of the team's real picks, it's
+  played, always, a blunder too; below it, the draw from the top 3. A miss's pick made for it never counts in that share.
+  - Guard: `packages/core/test/crowd-afk.test.ts`, "a big majority always wins": "10 on a team, 7-2-1: the 7 always (every seed);
+    85%: always, a blunder too", "6-3-1: the draw as before (60 / 30 / 10), so the 3 sometimes", "the share counts real picks only".
+  - Decision: [2026-11-04-crowd-votes-afk.md](../decisions/2026-11-04-crowd-votes-afk.md).
+- **50 v 50: the AFK rule (Eric, Nov 4: "no move at all = default to a random top 5 move, but your penalty is simply you get the
+  lowest score given to a player on your team that round; but if you miss more than 3 moves in the game you are removed for being
+  AFK").** A player who picks nothing gets a pick made for them, one of the engine's top 5 at random, that never counts in the
+  team's tally; they score the lowest score any teammate who picked got that move; the reveal says so ("Missed: a move was picked
+  for you (1 of 3)"); the 4th miss in the game removes them for being away, as leaving the match (a loss, a bot in the seat), and
+  they don't come back. Bots never miss. (`CROWD_MISSES`; the `?afk=0` test switch turns it off for tests that idle on purpose.)
+  - Guards: `packages/core/test/crowd-afk.test.ts`, "a miss in 50 v 50"; `packages/chess/test/crowd.test.ts`, "50 v 50's misses
+    (CrowdMisses, Eric, Nov 4): …" (both); `packages/server/test/resign.test.ts`, "50 v 50's AFK rule (CrowdMisses, Eric, Nov 4): …";
+    `e2e/crowd.spec.ts`, "50 v 50's AFK rule (Eric, Nov 4): each miss says a move was picked for you (1 of 3) …", phone.
+  - Decision: [2026-11-04-crowd-votes-afk.md](../decisions/2026-11-04-crowd-votes-afk.md).
+- **Chat never shows over or above the board (Eric, Nov 4: "delete it, chat stays in the chat box below, not above the board, never
+  approved that").** No new-message bubble, in any mode, and no switch for one: a line shows only in the chat box or tab.
+  - Guard: `e2e/chat.spec.ts`, "quick chat picks in the profile: … exactly those lines in a match" (with the scoreboard up, nothing
+    of a new line shows outside the box under the board, watched from before it's sent); `packages/app/test/chat.test.ts`, "while a
+    panel is on screen nothing is unread; hidden, a new line counts as unread (no bubble: Eric, Nov 4)".
+  - Decision: [2026-11-04-crowd-votes-afk.md](../decisions/2026-11-04-crowd-votes-afk.md).
+
 ## The town square
 
 - **Keep the frame rate (Eric, Oct 27): "we don't want any frame drops from a clever programming solution… we can always
