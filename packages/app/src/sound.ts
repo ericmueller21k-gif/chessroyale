@@ -785,6 +785,19 @@ export type SoundName =
   | "gingerJingle"
   | "gingerCrackle"
   | "gingerWind"
+  // (His challenge intro's, Nov 5.)
+  | "gingerCharge"
+  | "gingerBlast"
+  | "gingerBurst"
+  | "gingerWhoosh"
+  | "gingerStab"
+  | "gingerStep"
+  | "gingerHeave"
+  | "gingerClack"
+  | "gingerCast"
+  | "gingerSparkle"
+  | "gingerThump"
+  | "gingerGust"
   // G-REX (a raid boss, the Fire boss): synthesised, see characters/grex-sounds.ts.
   | "grexCrackle"
   | "grexWhoosh"
@@ -1123,6 +1136,19 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   gingerJingle: ginger("jingle"),
   gingerCrackle: ginger("crackle"),
   gingerWind: ginger("wind"),
+  gingerCharge: ginger("charge"),
+  gingerBlast: ginger("blast"),
+  gingerBurst: ginger("burst"),
+  gingerWhoosh: ginger("whoosh"),
+  gingerStab: ginger("stab"),
+  // (The elves' steps a little random in pitch, as Jefferson's crew's clops.)
+  gingerStep: (t) => buffer(gingerSound("step", ctx!.sampleRate), t, 0.9 + 0.2 * Math.random()),
+  gingerHeave: ginger("heave"),
+  gingerClack: ginger("clack"),
+  gingerCast: ginger("cast"),
+  gingerSparkle: ginger("sparkle"),
+  gingerThump: ginger("thump"),
+  gingerGust: ginger("gust"),
   grexCrackle: grex("crackle"),
   grexWhoosh: grex("whoosh"),
   grexFizz: grex("fizz"),
@@ -1393,6 +1419,18 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   gingerJingle: [["ginger", "jingle"]],
   gingerCrackle: [["ginger", "crackle"]],
   gingerWind: [["ginger", "wind"]],
+  gingerCharge: [["ginger", "charge"]],
+  gingerBlast: [["ginger", "blast"]],
+  gingerBurst: [["ginger", "burst"]],
+  gingerWhoosh: [["ginger", "whoosh"]],
+  gingerStab: [["ginger", "stab"]],
+  gingerStep: [["ginger", "step"]],
+  gingerHeave: [["ginger", "heave"]],
+  gingerClack: [["ginger", "clack"]],
+  gingerCast: [["ginger", "cast"]],
+  gingerSparkle: [["ginger", "sparkle"]],
+  gingerThump: [["ginger", "thump"]],
+  gingerGust: [["ginger", "gust"]],
   grexCrackle: [["grex", "crackle"]],
   grexWhoosh: [["grex", "whoosh"]],
   grexFizz: [["grex", "fizz"]],

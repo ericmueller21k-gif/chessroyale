@@ -45,6 +45,7 @@ import type { Rider } from "../rides.ts";
 import { rideSpeed } from "../../components/rides/scale.ts";
 import { STORE_PANELS, camFocus, ceilingPanel, inTalkRange, lightsAt, litDx, overlaps, upAlpha, walkable, youBox, isFloor, makeRoom, onDoor, tapTarget, findPath, stepFor, type Room, type ShopPlace, type Sq } from "./room.ts";
 import { POOL_LINE, bossHoldings, buyBossCrate, canAfford, holdLine, priceLine, prizeRows, shopOf, wayText, type CrateWay, type ShopDef } from "./shops.ts";
+import { iceAt, introCam, isIce, type IceNow } from "./challenge.ts";
 import { CHALLENGE_FEEL, attackStart, attackTime, bubbleSize, caveLight, chantOf, drainAt, frameAt as animFrame, introAt, introCues, introLength, isDark, isLog, lineOf, marksFeel, marksOf, seatedMarks, type DarkNow, type DrawnMarks, type IntroNow, type LogPlace } from "./challenge.ts";
 import { CREW_D_SEAT, CREW_FORK_AT, CREW_SHEETS, CREW_STEP_OFF, type CrewName } from "./grex-crew-sheets.ts";
 import { Machine, along, forkLegs, frameOf, liftLegs, routeLength, type MachinePose, type Sq as CrewSq, type Waypoint } from "./grex-crew.ts";
@@ -470,6 +471,8 @@ function startRoom(
   let bossAt = -1;
   let onMarksAt = -1;
   let introNow: IntroNow | null = null;
+  /** Ginger's intro now (his props, the carriers, the board), or null. */
+  let iceNow: IceNow | null = null;
   /** Ms into the intro (from you both on your marks), as of the last step. */
   let introT = 0;
   let cueN = 0;
@@ -547,6 +550,8 @@ function startRoom(
     introT = t;
     introNow = introAt(ci.beats, ci.anims, t);
     darkNow = introNow.dark;
+    // (Ginger's: his props and his board carriers, from his art's places.)
+    iceNow = ci.ice && ci.anims && isIce(ci.anims) ? iceAt(ci.anims, t, ci.ice.at) : null;
     if (!said) {
       said = true;
       challenge.onMarks?.();
@@ -867,7 +872,8 @@ function startRoom(
   const wide: CamSet = { ...f.camWide };
   const sets: CamPair = { tall, wide };
   // (A challenge: its own framing, CHALLENGE_FEEL.cam for its layout, from the start.)
-  const cam = marks ? C.cam[marks.layout] : null;
+  // (Ginger's own, centred on his table: BossIntro.cam.)
+  const cam = marks && ci ? introCam(ci.def, marks.layout) : null;
   let zoomCur: number = cam ? cam.zoom : S.startZoom;
   let zoomTarget = zoomCur;
   let camX = you.c;
@@ -1375,9 +1381,24 @@ function startRoom(
     Object.assign(crewFigs[crewN++]!, { img: loaded.kid.img, elf: false, sx: frame * sheet.w, sy: row * sheet.h, w: sheet.w, h: sheet.h, fx: sheet.foot[0], fy: sheet.foot[1], k: (kidSquares * SQ) / sheet.h, c, r, z: r, flip, up: 0 });
   };
   const ELF_NAMES: readonly ElfName[] = ["red", "green", "blue", "box", "pad"];
-  /** Ginger's elves where they stand this frame (their poses from stepElves), lifted by the height curve, into `crewFigs`. */
+  /** Ginger's elves where they stand this frame (their poses from stepElves), lifted by the height curve, into `crewFigs`; in his intro, the board carriers and the board too. */
   const collectElves = () => {
     if (!EA || !ef) return;
+    const I = ci?.ice;
+    if (I && iceNow?.carriers) {
+      for (const [i, cn] of iceNow.carriers.entries()) {
+        if (crewN >= CREW_MAX) break;
+        const ca = i === 0 ? I.carriers.a : I.carriers.b;
+        const img = ca.frames[cn.anim][cn.frame]!;
+        Object.assign(crewFigs[crewN++]!, { img, elf: true, sx: 0, sy: 0, w: img.width, h: img.height, fx: ca.ch.foot[0], fy: ca.ch.foot[1], k: 1, c: cn.c, r: cn.r, z: cn.r, flip: cn.face < 0, up: 0 });
+      }
+    }
+    if (I && iceNow?.board && crewN < CREW_MAX) {
+      const bd = iceNow.board;
+      const img = bd.anim === "spin" ? I.props.spin.frames[bd.frame]! : I.board.carry;
+      // (Just in front of them; over the table's top as it lands.)
+      Object.assign(crewFigs[crewN++]!, { img, elf: false, sx: 0, sy: 0, w: img.width, h: img.height, fx: I.board.ch.foot[0], fy: I.board.ch.foot[1], k: 1, c: bd.c, r: bd.r, z: bd.r + 0.02, flip: false, up: bd.lift });
+    }
     for (let i = 0; i < 5; i++) {
       if (crewN >= CREW_MAX) return;
       const p = elfPoses[i]!;
@@ -1568,6 +1589,13 @@ function startRoom(
     } else g.drawImage(fg.img, fg.sx, fg.sy, fg.w, fg.h, pt.x - fg.fx * s, y - fg.fy * s, fg.w * s, fg.h * s);
   };
 
+  /** Your figure's middle (its middle third across), for the igloo's see-through walls. */
+  const youCore = { x0: 0, y0: 0, x1: 0, y1: 0 };
+  const youMid = () => {
+    const m = (youFig.x0 + youFig.x1) / 2;
+    const half = (youFig.x1 - youFig.x0) / 6;
+    return Object.assign(youCore, { x0: m - half, x1: m + half, y0: youFig.y0, y1: youFig.y1 });
+  };
   const drawUp = (u: Up, now: number) => {
     // (Wrangler's intro: from the yank, the board on its stand is his bale, drawn as it's dragged: drawRopeCenter.)
     if (introNow?.rope?.bale && u.name === "board-stand") return;
@@ -1578,7 +1606,8 @@ function startRoom(
     // the screen in front of you.
     if (pt.depth <= S.nearGone) return;
     // (Hollow's intro: a lantern going out, bulbs gone dark, the tree draining: its own frame, and its lit pixels for over the dark.)
-    const img = darkPiece(u, now) ?? frameAt(u.name, now);
+    // (Ginger's intro: the stockroom door open while the board carriers come out.)
+    const img = darkPiece(u, now) ?? frameAt(iceNow?.door && u.name === "bay-door" ? "bay-door-open" : u.name, now);
     const ch = frames[u.name]!.ch;
     const s = pt.k / SQ;
     const fx = u.flip ? ch.w - 1 - ch.foot[0] : ch.foot[0];
@@ -1589,9 +1618,11 @@ function startRoom(
     if (x > W || x + w < 0 || y > H || y + h * s < 0) return;
     // (A cave: nearer the camera than you and over you, see-through: SHOP_FEEL.seeThrough.)
     // (Jefferson's warehouse too: its tall roll-up door, nearer the camera than you just inside it.)
-    // (Ginger's igloo too: its near walls and the tunnel's, nearer the camera than you.)
+    // (Ginger's igloo too: its near walls, the tunnel's and its doorway's arch, nearer the camera than you; there only over your
+    // figure's middle, so the candy wall beside a stair's foot, a row nearer, isn't ghosted for covering your edge.)
     const thru = !!cave || !!art.floor;
-    g.globalAlpha = upAlpha(pt.depth, thru && youFig.on && u.z > youFig.z && overlaps(youFig, x, y, x + w, y + h * s), thru);
+    const over = lv ? overlaps(youMid(), x, y, x + w, y + h * s) : overlaps(youFig, x, y, x + w, y + h * s);
+    g.globalAlpha = upAlpha(pt.depth, thru && youFig.on && u.z > youFig.z && over, thru);
     if (pieceEmis && darkNow && darkNow.level > 0) addEmis(pieceEmis, x, y, s, img.width, u.flip, g.globalAlpha * (1 - darkNow.black));
     if (u.flip) {
       g.save();
@@ -1924,6 +1955,80 @@ function startRoom(
     Object.assign(bossHead, { x: pt.x, y: y0 + b.ch.h * b.head * k, on: true, px: b.squares * pt.k });
     Object.assign(hisFoot, { x: pt.x, y: pt.y, k, on: true });
   };
+  /** Ginger in his intro: his own move's frame (BOSS_GINGER_INTRO: his charge, blast, cast, brag), as drawn, at his town size. */
+  const drawIceBoss = (now: number, mv: { anim: "charge" | "blast" | "cast" | "brag"; frame: number }) => {
+    boss!.pose(now, bossPose);
+    if (!P(bossPose.x + bossOx(now), bossPose.y + bossOy(now))) return;
+    const b = ci!.boss;
+    const M = ci!.ice!.mover;
+    const img = M.frames[mv.anim][mv.frame]!;
+    const k = (b.squares * pt.k) / M.ch.h;
+    const x0 = pt.x - M.ch.foot[0] * k;
+    const y0 = pt.y - M.ch.foot[1] * k;
+    drawShadows(pt.x, pt.y, M.ch.w * k);
+    g.imageSmoothingEnabled = k < 1.5;
+    g.drawImage(img, x0, y0, img.width * k, img.height * k);
+    g.imageSmoothingEnabled = false;
+    Object.assign(bossHead, { x: pt.x, y: y0 + b.ch.h * b.head * k, on: true, px: b.squares * pt.k });
+    Object.assign(hisFoot, { x: pt.x, y: pt.y, k, on: true });
+    // (Where his hook is on screen: the blast leaves it.)
+    Object.assign(hisHook, { x: x0 + M.blastFrom[0] * k, y: y0 + M.blastFrom[1] * k, on: true });
+  };
+  const hisHook = { x: 0, y: 0, on: false };
+  /** A prop's frame at its foot on screen (x, y), `s` screen px a room px, mirrored or not. */
+  const putProp = (img: CanvasImageSource & { width: number; height: number }, foot: readonly number[], x: number, y: number, s: number) =>
+    g.drawImage(img, x - foot[0]! * s, y - foot[1]! * s, img.width * s, img.height * s);
+  /**
+   * Ginger's table (his intro): the icicle forming over the table's spot, falling and stabbing in, then the table (its round flat top
+   * 27 px up) with the board on it once it lands (`paintTable`, its pieces coming in as the light fades), the white light on it, and
+   * the puff of snow at its foot.
+   */
+  const drawIceCenter = (now: number) => {
+    const n = iceNow;
+    const I = ci?.ice;
+    if (!n || !I || !marks || !P(I.at.table[0], I.at.table[1])) return;
+    const s = pt.k / SQ;
+    const x = pt.x;
+    const y = pt.y;
+    g.imageSmoothingEnabled = false;
+    if (n.shard) {
+      const pr = I.props[n.shard.anim];
+      putProp(pr.frames[n.shard.frame]!, pr.ch.foot, x, y - n.shard.lift * s, s);
+    }
+    if (n.table >= 0) {
+      const pr = I.props.tableIdle;
+      putProp(pr.frames[n.table]!, pr.ch.foot, x, y, s);
+      if (n.onTable) {
+        // (On its round top, 27 px up: the park table's 26 and a pixel.)
+        g.save();
+        g.translate(0, -(I.at.top - TABLE_BOARD.top) * s);
+        paintTable(g, v, I.at.table[0] - camX, camY - I.at.table[1], ci!.table.palette, marks.layout, 1, n.pieces);
+        g.restore();
+      }
+    }
+    if (n.light) {
+      const pr = I.props[n.light.anim];
+      putProp(pr.frames[n.light.frame]!, pr.ch.foot, x, y - (I.at.top + 4) * s, s);
+    }
+    if (n.puff >= 0) putProp(I.props.puff.frames[n.puff]!, I.props.puff.ch.foot, x, y + 2 * s, s);
+  };
+  /** Ginger's blast (his intro): flying from his hook to over the table's spot on a little arc, then bursting there. Over everything. */
+  const drawIceBlast = () => {
+    const n = iceNow;
+    const I = ci?.ice;
+    if (!n?.blast || !I || !P(I.blastTo.at[0], I.blastTo.at[1])) return;
+    const s = pt.k / SQ;
+    const tx = pt.x;
+    const ty = pt.y - I.blastTo.lift * s;
+    const pr = I.props[n.blast.anim];
+    const u = n.blast.u;
+    const fx = hisHook.on ? hisHook.x : tx;
+    const fy = hisHook.on ? hisHook.y : ty;
+    const x = fx + (tx - fx) * u;
+    const y = fy + (ty - fy) * u - Math.sin(Math.PI * u) * C.ice.flyArc * s;
+    g.imageSmoothingEnabled = false;
+    putProp(pr.frames[n.blast.frame]!, pr.ch.foot, x, y, s);
+  };
   /** The bale's place now (squares): on its stand until it slides, along its curve (control point CHALLENGE_FEEL.rope.bend), then the table's. */
   const baleSq = { c: 0, r: 0 };
   const ropeBale = () => {
@@ -2122,6 +2227,7 @@ function startRoom(
   };
   const drawBoss = (now: number) => {
     bossHead.on = false;
+    hisHook.on = false;
     hisFoot.on = false;
     fist1.on = fist2.on = false;
     if (!ci || !boss) return;
@@ -2130,6 +2236,7 @@ function startRoom(
     if (dk && darkNow && (darkNow.move || darkNow.bulbs < 3)) return drawDarkBoss(now, darkNow);
     if (rp && introNow?.rope && attackFrame < 0) return drawRopeBoss(now);
     if (ci.crew && introNow?.crew?.move && attackFrame < 0) return drawCrewBoss(now, introNow.crew.move);
+    if (ci.ice && iceNow?.move && attackFrame < 0) return drawIceBoss(now, iceNow.move);
     if (attackFrame >= 0 && ci.attack) return drawAttack(now);
     boss.pose(now, bossPose);
     if (!P(bossPose.x + bossOx(now), bossPose.y + bossOy(now))) return;
@@ -2343,7 +2450,7 @@ function startRoom(
     figK[i] = k;
   };
   const drawFigure = (k: number, now: number) =>
-    k >= 8 ? drawCrewFig(k - 8) : k === 0 ? drawKid(now) : k === 1 ? drawYou(now) : k === 2 ? drawBoss(now) : k === 3 ? (cw && ci?.crew ? drawCrewCenter(now) : rp ? drawRopeCenter() : drawCenter()) : k === 6 ? drawFog() : rp ? drawBucket(k === 4 ? "b" : "w") : drawStool(k === 4 ? marks!.bossStool : marks!.youStool);
+    k >= 8 ? drawCrewFig(k - 8) : k === 0 ? drawKid(now) : k === 1 ? drawYou(now) : k === 2 ? drawBoss(now) : k === 3 ? (ci?.ice ? drawIceCenter(now) : cw && ci?.crew ? drawCrewCenter(now) : rp ? drawRopeCenter() : drawCenter()) : k === 6 ? drawFog() : rp ? drawBucket(k === 4 ? "b" : "w") : drawStool(k === 4 ? marks!.bossStool : marks!.youStool);
   /** A speech bubble's lines (wrapped once for its words, at its size). */
   const bubbles = new Map<string, { lines: string[]; w: number }>();
   /**
@@ -2672,6 +2779,12 @@ function startRoom(
       const d = p.d ?? 1;
       flat(img, 0, img.height - d * SQ, p.col, p.row - d + 1, p.w ?? 1, d, S.floorBlock);
     }
+    // (Ginger's intro: the crack round the icicle's foot, flat on the ice, 3 squares by 2, centred on the table's spot.)
+    if (iceNow?.crack && ci?.ice) {
+      const fr = ci.ice.props.crack.frames;
+      const img = iceNow.crack.anim === "crack" ? fr[iceNow.crack.frame]! : fr[fr.length - 1]!;
+      flat(img, 0, 0, ci.ice.at.table[0] - 1, ci.ice.at.table[1] - 0.5, 3, 2, 1);
+    }
     // Your destination: a small gold ring on its square until you're there.
     if (dest.on && (you.moving() || waitFor) && P(dest.c, dest.r)) {
       // (On Ginger's catwalk or stairs: on the deck or the step there.)
@@ -2724,6 +2837,7 @@ function startRoom(
       drawUp(u, now);
     }
     while (k < figN) drawFigure(figK[k++]!, now);
+    if (iceNow) drawIceBlast();
     if (rp && introNow?.rope) drawRopeLines();
     if (dk) drawDarkPass(now);
     if (kidBox.on && !ci && !cave) drawTag("Shopkeeper", "sidekick", kidBox.hx, kidBox.hy);
@@ -2736,6 +2850,12 @@ function startRoom(
     }
     if (ci && introNow?.line && bossHead.on) drawBubble(introLine, bossHead.x, bossHead.y, bossHead.px);
     if (chant && introNow?.chant && bossHead.on) drawBubble(chant, bossHead.x, bossHead.y, bossHead.px);
+    // (Ginger's board carriers call out as they come: over them, their size.)
+    const cl = ci?.def.crewLine;
+    if (cl && iceNow?.line && iceNow.carriers) {
+      const [a, b] = iceNow.carriers;
+      if (P((a.c + b.c) / 2, (a.r + b.r) / 2)) drawBubble(cl, pt.x, pt.y - 28 * (pt.k / SQ), 25 * (pt.k / SQ));
+    }
     placeCard();
     const h = you.here();
     const key = `${h.c},${h.r}`;
@@ -3032,6 +3152,23 @@ function startRoom(
       // (Timber's own: his move, the log, the fog, the shavings' ring, the stumps.)
       wood: w ? { move: w.move?.anim ?? null, log: w.log?.anim ?? null, fog: w.fog?.anim ?? null, ring: w.ring, stumps: w.stumps?.anim ?? null } : null,
       line: !!introNow?.line && bossHead.on,
+      // (Ginger's own: his move, the blast, the icicle, the table, the crack, the door, the carriers, the board, the light, the pieces.)
+      ice: iceNow
+        ? {
+            move: iceNow.move?.anim ?? null,
+            blast: iceNow.blast?.anim ?? null,
+            shard: iceNow.shard ? { anim: iceNow.shard.anim, lift: Math.round(iceNow.shard.lift) } : null,
+            table: iceNow.table >= 0,
+            crack: iceNow.crack?.anim ?? null,
+            door: iceNow.door,
+            carriers: iceNow.carriers?.map((c) => ({ at: [Math.round(c.c * 100) / 100, Math.round(c.r * 100) / 100], anim: c.anim })) ?? null,
+            board: iceNow.board ? { at: [Math.round(iceNow.board.c * 100) / 100, Math.round(iceNow.board.r * 100) / 100], lift: Math.round(iceNow.board.lift) } : null,
+            onTable: iceNow.onTable,
+            light: iceNow.light?.anim ?? null,
+            pieces: Math.round(iceNow.pieces * 100) / 100,
+            crewLine: !!iceNow.line,
+          }
+        : null,
       // (Hollow's own: his channel line this time, while it shows; and the dark: his move, his strand, the lanterns out, the string's
       // bulbs dark, the tree, the dark's level, the blackout, the dim light, the iris.)
       chant: introNow?.chant && bossHead.on ? chant : null,
