@@ -10,3 +10,6 @@ Eric approved the look (Nov 4): `notes/briefs/assets/town-arrow-keys.png` (optio
 - Computer: the keyboard's arrow keys (and WASD only if it doesn't clash with anything: check chat inputs) do the same, and the
   matching on-screen key shows pressed while held. Never when typing in an input.
 - Every number in the town's feel; phone and computer stills; e2e: holding up moves you up; the on-screen key lights with the arrow key.
+- **Update (Eric, Nov 4): shrink the zoom pill and the recenter button** so together they span exactly the arrow keys' width
+  (3 keys + 2 gaps, ~87 px), right edges aligned, the keys just above them: `notes/briefs/assets/town-arrow-keys-v3.png`
+  (pending Eric's OK on v3). Keep them tappable; same look as today, just smaller.
