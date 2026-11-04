@@ -282,7 +282,7 @@ test("Smudgy: his tile picks him, his two forced moves, then the splash covers h
   }
   const log = await frames(page);
   expect(log.filter((r) => r.hidden && r.pieces[r.hidden] === "br").length, "a rook drawn on the hidden square").toBe(0);
-  for (const name of named) expect(log.some((r) => r.dock.includes(`Boss plays ${name}`)), `"Boss plays ${name}" shown`).toBe(true);
+  for (const name of named) expect(log.some((r) => r.dock.includes(`Smudgy plays ${name}`)), `"Smudgy plays ${name}" shown`).toBe(true);
   expect(errors).toEqual([]);
 });
 
@@ -330,8 +330,8 @@ test("Smudgy's hidden rook is drawn as a pawn in every position; a move the boar
   expect(s1.boss.lastMove.san).toBe("d6");
   await expectMasked(page, "after his step");
   let log = await frames(page);
-  expect(log.some((r) => /Boss plays d6/.test(r.dock))).toBe(true);
-  expect(log.some((r) => /Boss plays R/.test(r.dock))).toBe(false);
+  expect(log.some((r) => /Smudgy plays d6/.test(r.dock))).toBe(true);
+  expect(log.some((r) => /Smudgy plays R/.test(r.dock))).toBe(false);
   // (Every frame while it hides: his one other rook is the only rook drawn, and none on the hidden square. A frame may still
   // draw the position before his move, the pawn a square behind: no state ahead of the page shows a rook.)
   const leaks = (list: Rec[]) => list.filter((r) => r.hidden && (r.pieces[r.hidden] === "br" || count(r.pieces, "br") !== 1)).map((r) => `${r.kind} hidden ${r.hidden} drawn ${JSON.stringify(r.pieces)} dock "${r.dock}"`);
@@ -372,7 +372,7 @@ test("Smudgy's hidden rook is drawn as a pawn in every position; a move the boar
   expect(during(log, "unmask", "rook").length).toBeGreaterThan(0);
   expect(during(log, "unmask", "rook").every((r) => r.pieces["d2"] === "br")).toBe(true);
   // (Not named before the drip: the dock says "…", then his words for it.)
-  expect(log.filter((r) => r.unmask === "pawn").some((r) => /Rd2|Boss plays R/.test(r.dock))).toBe(false);
+  expect(log.filter((r) => r.unmask === "pawn").some((r) => /Rd2|Smudgy plays R/.test(r.dock))).toBe(false);
   expect(log.some((r) => /His pawn was a rook!/.test(r.dock))).toBe(true);
   expect(await heard(page)).toContain("smudgyDrip");
 
@@ -399,8 +399,8 @@ test("Smudgy's hidden rook taken: stepped like a pawn, named as one, then your r
   expect(s.boss.powers.camo.square).toBe("d5");
   await expectMasked(page, "before the capture");
   let log = await frames(page);
-  expect(log.some((r) => /Boss plays d6/.test(r.dock)) && log.some((r) => /Boss plays d5/.test(r.dock))).toBe(true);
-  expect(log.some((r) => /Boss plays R/.test(r.dock))).toBe(false);
+  expect(log.some((r) => /Smudgy plays d6/.test(r.dock)) && log.some((r) => /Smudgy plays d5/.test(r.dock))).toBe(true);
+  expect(log.some((r) => /Smudgy plays R/.test(r.dock))).toBe(false);
   // Your rook takes the pawn on d5 (the board you see: a pawn; the game: his rook).
   await tap(page, "d1");
   expect(await dots(page)).toContain("d5");

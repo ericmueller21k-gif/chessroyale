@@ -361,6 +361,11 @@ describe("Eric, Nov 5: a power's banner shows your pawn, never the God King", ()
     const files = readdirSync(dir).filter((f) => f.endsWith(".tsx") && readFileSync(new URL(f, dir), "utf8").includes("power-cut"));
     expect(files).toEqual(["PowerParts.tsx"]);
   });
+  it("no emoji stands in for a boss in the boss screen's lines: the status line says his name with his portrait (BossTag)", () => {
+    const boss = readFileSync(new URL("../src/screens/Boss.tsx", import.meta.url), "utf8");
+    expect(boss).not.toMatch(/\{boss\.icon\}/);
+    expect(boss).toMatch(/<BossTag boss=\{boss\} \/> plays/);
+  });
   it("a boss's name stays on one line and fits the words' share of the strip (fitBigWord), and the strip is taller for the stack", () => {
     expect(parts).toMatch(/nameWide > room/);
     expect(css).toMatch(/\.fight-banner\.power-cut \.fb-band \{\s*\/\*[^*]*\*\/\s*height: 44%;/);

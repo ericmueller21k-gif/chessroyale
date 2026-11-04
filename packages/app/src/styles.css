@@ -13662,15 +13662,15 @@ img.qicon {
 }
 /* A boss's name with his small portrait, where his emoji was (BossTag: a status line, a strike, a result). */
 .boss-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3em;
   white-space: nowrap;
 }
+/* (Inline, not a flex row: the words keep the line's baseline beside the picture.) */
 .boss-tag-face {
-  flex: none;
+  display: inline-block;
+  vertical-align: -0.3em;
   width: 1.6em;
   height: auto;
+  margin-right: 0.25em;
 }
 .boss-icon .boss-portrait {
   width: 48px;
