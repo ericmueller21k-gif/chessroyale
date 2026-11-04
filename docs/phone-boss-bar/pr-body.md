@@ -31,12 +31,17 @@ boss bar's guards). No computer change.
 - Bubble rows at 320 px: rows must equal the wanted rows → for a boss whose name column moved, one more row is allowed (never four).
 - New: a seed bar starts at the rage meter's x and is as wide (Puddles).
 
+`e2e/boss-bar.spec.ts` (CI red on #489, shard 4):
+- "room to draw in (wide)": prop width ≥ 80 px at 320 px → ≥ 60 px at 320 px for a boss whose name column moved (kits.ts barName > 0); still 80 at 320 px for the others, 120 wider.
+  Why: at 320 px a figure whole inside the bar with its name column clear of it leaves at most 65 px of room (Smudgy, measured 65; Alfil 67, Folio 67, Timber 68, Jefferson 72, Hollow 75, Sawyer 76, Wrangler 75). Reaching 80 px needed a figure about 15% smaller at 320 px only, which is not "slightly", so the check changed instead.
+
 Unchanged: the Nov 4 sprite rule (`e2e/boss-side.spec.ts`, "whole on screen") and the feet baseline.
 
 ## Checks run
 - `npx vitest run packages/app/test/boss-bar-same.test.ts`: 61 passed.
 - `npm run typecheck`: passed.
 - `e2e/boss-bar-same.spec.ts` on the phone project (local, under the shared lock): 15 passed.
+- `e2e/boss-bar.spec.ts` and `e2e/boss-side.spec.ts`, phone project, local: passed (with boss-bar-same: 62 passed in all, exit 0).
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 

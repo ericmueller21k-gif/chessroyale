@@ -15,3 +15,5 @@ don't line up. Before, the bar let a figure hang out of its top and left edge (O
 - Phone only. A computer's bar and the figure beside the board are unchanged.
 - At 320 px the narrower room may wrap the status to two lines, or add a row to a bubble line, for the bosses whose name column moved
   (never four rows). Eric's call if he wants it otherwise.
+- At 320 px, a name column moved right leaves the free room at most 65 px (Smudgy). The check "room to draw in ≥ 80 px at 320" is now
+  ≥ 60 px for those bosses only (e2e/boss-bar.spec.ts). Reaching 80 would have meant a figure about 15% smaller at 320 px only.

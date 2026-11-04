@@ -1,6 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { BOSS_ROSTER, isPlayable } from "@chessroyale/core";
+import { BOSS_KITS } from "../packages/app/src/characters/kits.ts";
 import { bossAloneFromHome, submitMove, test } from "./helpers.ts";
 
 /**
@@ -117,7 +118,10 @@ PLAYABLE.forEach((def) => {
       expect(prop.x, `${at}: clear of the column`).toBeGreaterThanOrEqual(m.column.r - 1);
       expect(m.bar.r - prop.r, `${at}: at the bar's right`).toBeLessThanOrEqual(12);
       expect(prop.b, `${at}: inside the bar`).toBeLessThanOrEqual(m.bar.b);
-      expect(prop.w, `${at}: room to draw in (wide)`).toBeGreaterThanOrEqual(w < 360 ? 80 : 120);
+      // (Nov 4: at 320 px a figure that reaches past the usual name column moved the column right (kits.ts barName), so its room is
+      // narrower: at most 65 px there for Smudgy, the widest. Its figure is whole in the bar; a smaller figure would be the other way.)
+      const wide = w < 360 ? (BOSS_KITS[def.kit!]?.barName ?? 0) > 0 ? 60 : 80 : 120;
+      expect(prop.w, `${at}: room to draw in (wide)`).toBeGreaterThanOrEqual(wide);
       // (A computer's bar has no figure to be as tall as: its column's height less the status's row, 22 px for a boss with no passive bar; a phone's is 33 or more.)
       expect(prop.h, `${at}: room to draw in (tall)`).toBeGreaterThanOrEqual(desktop() ? 20 : 30);
       expect(m.sideways, `${at}: nothing sideways`).toBeLessThanOrEqual(0);
