@@ -196,7 +196,8 @@ describe("the Crowd's boss final online: always the Hidden Boss (Eric, Oct 14)",
   });
 
   it("his bullet clock online (?power=bullet: from turn 2): each person's deadline is their bank, the bullet bank, with no cap; everyone out of time, he wins on time (the results say so)", () => {
-    const L = crowdFinal({ bossPowerTest: "bullet" });
+    // (Nobody picks, on purpose: 50 v 50's AFK rule off, CrowdMisses, as the ?afk=0 switch; it would remove them at the 4th miss.)
+    const L = crowdFinal({ bossPowerTest: "bullet", crowdMisses: null });
     let deadline: number | null = null;
     let plus: { allowed: number; bank: number } | null = null;
     for (let i = 0; i < 6000 && L.core.record.phase !== "results"; i++) {

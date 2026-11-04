@@ -49,25 +49,20 @@ describe("quick chat in the app", () => {
     expect(chat.unread()).toBe(1);
   });
 
-  it("while a panel is on screen nothing is unread and no bubble shows; hidden, the newest shows for a moment", () => {
+  it("while a panel is on screen nothing is unread; hidden, a new line counts as unread (no bubble: Eric, Nov 4)", () => {
     const { chat, line } = setup();
     chat.onLog([], ["basics", "emoji-basics"]);
     const panel = {};
     chat.shown(panel, true);
     chat.onLine(line(1, "p2", "nice-move"));
     expect(chat.unread()).toBe(0);
-    expect(chat.bubble()).toBeNull();
     chat.shown(panel, false);
-    // Seen on screen: it doesn't bubble up again when the panel goes.
-    expect(chat.bubble()).toBeNull();
     chat.onLine(line(2, "p3", "wow"));
-    expect(chat.bubble()?.say).toBe("wow");
     expect(chat.unread()).toBe(1);
-    vi.advanceTimersByTime(QUICK_CHAT.bubbleMs);
-    expect(chat.bubble()).toBeNull();
-    // Your own lines never bubble or count.
+    // (The new-message bubble is gone: nothing of chat shows over or above the board.)
+    expect("bubble" in chat).toBe(false);
+    // Your own lines never count.
     chat.onLine(line(3, "p1", "gg"));
-    expect(chat.bubble()).toBeNull();
     expect(chat.unread()).toBe(1);
   });
 

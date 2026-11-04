@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_TIERS, bossDef, crowdFinalBoss, crowdFinalists, fixedLevel, isPlayable, maiaTopRating, CROWD_KNOCKOUTS, DEFAULT_SETTINGS, roundsInStage, RAID_SETTINGS, raidBossElo, bossElo, bossStartPly, bossInfo, botVotes, clockAfterVote, modeSettings, mulberry32, tallyVotes, voteZoneAt, PREGAME_VOTES, type Settings } from "@chessroyale/core";
+import { BOSS_TIERS, CROWD_MISSES, crowdTopOdds, bossDef, crowdFinalBoss, crowdFinalists, fixedLevel, isPlayable, maiaTopRating, CROWD_KNOCKOUTS, DEFAULT_SETTINGS, roundsInStage, RAID_SETTINGS, raidBossElo, bossElo, bossStartPly, bossInfo, botVotes, clockAfterVote, modeSettings, mulberry32, tallyVotes, voteZoneAt, PREGAME_VOTES, type Settings } from "@chessroyale/core";
 import { bossIntroTimeline, bossShowMs, legalMoves, MatchRunner, moveNumber, START_FEN, sanLineToUci, type EngineLike, type Opening } from "../src/index.ts";
 
 const hash = (s: string) => {
@@ -65,7 +65,8 @@ describe("Crowd mode", () => {
 
   it("50 v 50 team final: down to 8, then 4v4 alternating, 3v3, 2v2 to the end", async () => {
     const settings: Settings = { ...base, finalMaxTurns: 70 };
-    const { runner, sizes, plies } = await playKnockouts(settings, 1);
+    // (Seed 5: Nov 4's sure majority, crowdSureShare, changed every seed's game; seed 1's now keeps 4 over at a cut.)
+    const { runner, sizes, plies } = await playKnockouts(settings, 5);
     // The plan's sizes, but for the bubble grace (CROWD_SCORING.cutGrace, Oct 24): a cut can keep a player or two in
     // within it, the cuts after take those places (cutCarry), and the ending has its size.
     // Six cuts, after moves 10, 15, 19, 23, 26 and 29 (Eric, Nov 1: fewer, bigger cuts).
@@ -159,6 +160,66 @@ describe("Crowd mode", () => {
     expect(early.state.players).toHaveLength(99);
   });
 
+  it("50 v 50's misses (CrowdMisses, Eric, Nov 4): a pick made for you from the engine's top 5 that never counts, the team's lowest score, and the 4th miss in the game removes you; bots never", async () => {
+    const runner = new MatchRunner({
+      settings: base,
+      rng: mulberry32(3),
+      engines: [fake],
+      library,
+      entrants: Array.from({ length: 100 }, (_, i) => ({ id: `b${i}`, name: `B${i}`, isBot: i > 0, skill: 1 + (i % 20) })),
+    });
+    let misses = 0;
+    while (misses < 4) {
+      const ids = [...runner.deal().values()][0]!;
+      const report = await runner.score(new Map());
+      // (Nobody but b0 is ever away: the bots always pick.)
+      expect((report.away ?? []).every((id) => id === "b0")).toBe(true);
+      if (!ids.includes("b0")) continue;
+      misses++;
+      const b = report.boards[0]!;
+      const me = b.result.players.find((p) => p.playerId === "b0")!;
+      const real = b.result.players.filter((p) => p.move !== null);
+      // The pick made for you: one of the engine's top 5, with your misses so far; your move stays none.
+      expect(me.move).toBeNull();
+      expect(b.scored.slice(0, 5).map((m) => m.move)).toContain(me.defaultMove);
+      expect(me.missNo).toBe(misses);
+      expect(runner.player("b0").misses).toBe(misses);
+      // Your score: the lowest of your team's real picks.
+      expect(me.roundScore).toBe(Math.min(...real.map((p) => p.roundScore - (p.brilliantBonus ?? 0))));
+      // It never counts in the tally: the odds are the real picks' alone (and with them, the played move).
+      expect(real).toHaveLength(ids.length - 1);
+      expect(b.result.drawOdds).toEqual(crowdTopOdds(real.map((p) => p.move!), base.crowdPlayedFromTop, base.crowdSureShare));
+      // The 4th removes you (the lobby and SoloMatch take you out); the first three never.
+      expect(report.away ?? []).toEqual(misses > CROWD_MISSES.allowed ? ["b0"] : []);
+    }
+    // Off (a raid, the ?afk=0 switch): no pick made for it, nobody away.
+    const off = new MatchRunner({ settings: { ...base, crowdMisses: null }, rng: mulberry32(3), engines: [fake], library, entrants: Array.from({ length: 100 }, (_, i) => ({ id: `b${i}`, name: `B${i}`, isBot: i > 0, skill: 1 + (i % 20) })) });
+    for (let i = 0; i < 10; i++) {
+      off.deal();
+      const report = await off.score(new Map());
+      expect(report.away).toBeUndefined();
+      expect(report.boards[0]!.result.players.find((p) => p.playerId === "b0")?.defaultMove).toBeUndefined();
+    }
+    expect(off.player("b0").misses).toBeGreaterThan(CROWD_MISSES.allowed);
+  });
+
+  it("50 v 50's misses: nobody on the team picked, the team plays one of the engine's top 5 at random (not always the best)", async () => {
+    const settings: Settings = { ...base, lobbySize: 6, groupSize: 6 };
+    const playedRanks: number[] = [];
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      const runner = new MatchRunner({ settings, rng: mulberry32(seed), engines: [fake], library, entrants: Array.from({ length: 6 }, (_, i) => ({ id: `h${i}`, name: `H${i}`, isBot: false })) });
+      for (let i = 0; i < 2; i++) {
+        runner.deal();
+        const b = (await runner.score(new Map())).boards[0]!;
+        const top = b.scored.slice(0, 5).map((m) => m.move);
+        expect(b.result.players.every((p) => p.move === null && top.includes(p.defaultMove!))).toBe(true);
+        expect(top).toContain(b.result.playedMove);
+        playedRanks.push(top.indexOf(b.result.playedMove));
+      }
+    }
+    expect(playedRanks.some((r) => r > 0)).toBe(true);
+  });
+
   it("50 v 50 duel: the best of each side play 1v1; the game's winner places first", async () => {
     const settings: Settings = { ...base, finalFormat: "duel", knockoutsPerStage: CROWD_KNOCKOUTS.duel, finalMaxTurns: 40 };
     const { runner, sizes } = await playKnockouts(settings, 3);
@@ -181,7 +242,9 @@ describe("Crowd mode", () => {
   it("50 v 50 boss final: always the Hidden Boss (whatever boss was picked), the top 4 against him, from the starting position, at his fixed strength and brain", async () => {
     // (A boss picked or met last makes no difference: Eric, Oct 14, "that mode is always just versus [him]".)
     const settings: Settings = { ...base, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 20, bossId: "bigboy", bossAvoid: "recluse" };
-    const { runner, sizes, plies } = await playKnockouts(settings, 4);
+    // (A seed whose cuts take exactly the plan, nobody kept in by the bubble grace: 58 since Nov 4's sure majority,
+    // crowdSureShare, changed every seed's game; 4 was until then.)
+    const { runner, sizes, plies } = await playKnockouts(settings, 58);
     expect(crowdFinalists("boss")).toBe(4);
     expect(sizes.at(-1)).toBe(4);
     // The duel's cuts, stopping at four: two from each team at the last, after move 32.
