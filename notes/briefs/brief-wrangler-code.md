@@ -4,7 +4,7 @@ Worktree `/home/user/cr-wrangler`, branch `claude/wrangler-home`, from main **af
 node_modules symlink). Push as you go. Ports: 8981, inspector 9481. Include notes/briefs/rules-common.md.
 Eric approved the whole build (Nov 4) and wants it **live**; Wrangler is live, so this goes to everyone (not admins-first).
 
-**Art** on `origin/claude/boss-art` (head 606565da; read with `git show`; copy in as Hollow's and Timber's
+**Art** on `origin/claude/boss-art` (head 0e4c00c6; read with `git show`; copy in as Hollow's and Timber's
 were): the notes `scripts/boss-art/out/shop-pig-nov4.md` and `intro-pig-nov4.md` first, whole. `house-shop-pig`,
 `sidekick-pig-rooster`, `ride-pen-pony`, `boss-pig` (`BOSS_PIG_INTRO`), `house-intro-pig`.
 
@@ -47,7 +47,7 @@ the star where the table stands; his red star mat, your denim horseshoe mat; you
 11.6) so nobody moves when the bale and buckets come in; black bucket his (from our left), white yours (from our right); the bale's drag
 curves past him; Pen Pony matches the pawn's colour, only the blanket takes the item colour; new sounds slide, clatter, jingle, pop.
 
-## Bucket changes (Eric, Nov 4, art after 80ef87f1; use the head the director names)
+## Bucket changes (Eric, Nov 4; in 0e4c00c6: the shared `house-shop-pig/hunchess-bucket.ts`, the barn and `house-shop-puddles` pieces, see shop-pig-nov4.md)
 - The seat buckets: straight 5-gallon pails, thick double rim band, wire handle; "HunChess" printed normally, so on the landed
   (upside-down) stools it reads upside down (intended). Black bucket white text (his), white bucket black text (yours). Seat height
   from `INTRO_PIG_BUCKET_SEAT_H` (higher than the park stools): seat figures at that height.
