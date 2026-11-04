@@ -11,3 +11,9 @@ above the board; Puddles is cut off by the bar's left edge (his arm and hose cli
 - Eric's Nov 4 rule (sprites always on screen) covers this: extend the rule guard in `e2e/boss-side.spec.ts` (or the phone bar's spec)
   so each boss's drawing must lie inside the bar's box on a phone.
 - Stills: a contact sheet of all bosses' phone bars before/after (390 x 844). PR body with changed checks old → new.
+
+## Setup
+Worktree `/home/user/cr-phonebar`, branch `claude/phone-boss-bar`, from main (set up by the director, node_modules from npm ci).
+Ports 8977, inspector 9477. Include notes/briefs/rules-common.md. Stills in `docs/phone-boss-bar/` (all bosses' phone bars
+before/after at 390x844, plus 375x667 and 430x932 after). PR body `docs/phone-boss-bar/pr-body.md` (every player-visible change,
+changed checks old → new, lane: targeted). Push; no PR. Short report. Eric is asleep: make the calls yourself and list them.
