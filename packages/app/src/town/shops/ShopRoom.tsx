@@ -951,6 +951,38 @@ function startRoom(
       }
       return;
     }
+    if (def.roof === "igloo") {
+      // An igloo's dome (as the mockup's stand-in drew it): courses of packed-snow ice blocks arching overhead, pale and cool, a shade
+      // darker toward the top, each course's joints staggered from the one under it.
+      const sky = rg.createLinearGradient(0, 0, 0, H * 0.45);
+      sky.addColorStop(0, "#6f93b4");
+      sky.addColorStop(1, "#d6e8f5");
+      rg.fillStyle = sky;
+      rg.fillRect(0, 0, W, H);
+      rg.strokeStyle = "rgba(70,105,140,0.55)";
+      rg.lineWidth = 2;
+      const rows = [0.03, 0.09, 0.16, 0.24, 0.33, 0.43];
+      const sagOf = (i: number) => H * 0.03 * (1 + i * 0.4);
+      for (let i = 0; i < rows.length; i++) {
+        // (Each course an arc sagging toward the middle of the screen: the dome curving away overhead.)
+        const y = H * rows[i]!;
+        rg.beginPath();
+        rg.moveTo(-10, y);
+        rg.quadraticCurveTo(W / 2, y + sagOf(i) * 2, W + 10, y);
+        rg.stroke();
+        if (i === 0) continue;
+        const y0 = H * rows[i - 1]!;
+        const bw = W * (0.07 + i * 0.022);
+        for (let x = (i % 2) * bw * 0.5; x < W + bw; x += bw) {
+          const u = Math.max(0, Math.min(1, x / W));
+          rg.beginPath();
+          rg.moveTo(x, y0 + sagOf(i - 1) * 2 * 2 * u * (1 - u));
+          rg.lineTo(x, y + sagOf(i) * 2 * 2 * u * (1 - u));
+          rg.stroke();
+        }
+      }
+      return;
+    }
     if (def.roof === "barn") {
       // A barn's roof (as the mockup drew it): dark rafters running up to the ridge, planks between, two heavy cross beams.
       const sky = rg.createLinearGradient(0, 0, 0, H * 0.45);

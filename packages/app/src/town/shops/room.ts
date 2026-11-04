@@ -5,6 +5,7 @@
  * No DOM; tested in packages/app/test/shop-room.test.ts.
  */
 import { SHOP_FEEL } from "../feel.ts";
+import { isUp, linksOf, type Levels } from "./levels.ts";
 
 export interface Sq {
   c: number;
@@ -49,6 +50,11 @@ export interface Room {
    * blocked whatever stands there). Null: a box, its floor every square inside its walls.
    */
   floor: Uint8Array | null;
+  /**
+   * A room with a second walking level (Ginger's igloo, Nov 5: a catwalk and its two staircases, levels.ts): its stair and catwalk
+   * squares are walkable, but only along their chain; null: one level.
+   */
+  levels: Levels | null;
 }
 
 /** The squares a piece covers: `w` wide from its column east, `d` deep from its row north. */
@@ -63,7 +69,7 @@ export function squaresOf(p: ShopPlace): Sq[] {
  * `n` rows of `n`, `.` floor and `#` rock) blocks every rock square too, besides the edge and the solid pieces. `talk`: the pieces
  * whose squares mean "talk" as the counter's do (a shop with no counter: Jefferson's crate and his bare corner, Nov 4).
  */
-export function makeRoom(layout: readonly ShopPlace[], keeper: readonly Sq[], n = 20, mask?: readonly string[], talk: readonly string[] = []): Room {
+export function makeRoom(layout: readonly ShopPlace[], keeper: readonly Sq[], n = 20, mask?: readonly string[], talk: readonly string[] = [], levels: Levels | null = null): Room {
   const blocked = new Uint8Array(n * n);
   const block = (s: Sq) => s.c >= 0 && s.c < n && s.r >= 0 && s.r < n && (blocked[s.r * n + s.c] = 1);
   // The walls are the room's edge, whatever stands there.
@@ -83,9 +89,11 @@ export function makeRoom(layout: readonly ShopPlace[], keeper: readonly Sq[], n 
     if (p.name === "counter" || talk.includes(p.name)) counter.push(...squaresOf(p));
   }
   keeper.forEach(block);
+  // (The levels' squares are the back wall's, rock on the mask and solid cards: walkable, along their chain only.)
+  if (levels) for (let k = 0; k < n * n; k++) if (levels.up[k]) blocked[k] = 0;
   const doors = exits.map((s) => ({ c: s.c, r: s.r - 1 })).filter((s) => !blocked[s.r * n + s.c]);
   const start = { c: doors[doors.length - 1]?.c ?? n >> 1, r: (doors[0]?.r ?? n - 2) - 1 };
-  return { n, blocked, exits, doors, keeper, counter, start, floor };
+  return { n, blocked, exits, doors, keeper, counter, start, floor, levels };
 }
 
 /**
@@ -180,8 +188,8 @@ const has = (list: readonly Sq[], c: number, r: number) => list.some((s) => s.c 
 export const onDoor = (room: Room, c: number, r: number): boolean => has(room.doors, c, r);
 /** How far a square is from the Shopkeeper: the larger of the two directions, to its nearest square. */
 export const talkDist = (room: Room, c: number, r: number): number => Math.min(...room.keeper.map((k) => Math.max(Math.abs(k.c - c), Math.abs(k.r - r))));
-/** Near enough to talk to the Shopkeeper (`SHOP_FEEL.talkRange`). */
-export const inTalkRange = (room: Room, c: number, r: number, range: number = SHOP_FEEL.talkRange): boolean => talkDist(room, c, r) <= range;
+/** Near enough to talk to the Shopkeeper (`SHOP_FEEL.talkRange`): on the floor (not up on a catwalk over him). */
+export const inTalkRange = (room: Room, c: number, r: number, range: number = SHOP_FEEL.talkRange): boolean => !isUp(room.levels, c, r) && talkDist(room, c, r) <= range;
 
 const DIRS = [
   [1, 0],
@@ -189,6 +197,42 @@ const DIRS = [
   [0, 1],
   [0, -1],
 ] as const;
+
+/**
+ * The squares one step from (c, r), walkable or not: the four next to it on the floor, and in a room with levels its links along
+ * the chain (a stair's foot to its low square, the stairs and the catwalk square to square; levels.ts). A stair or catwalk square
+ * steps only along its chain, and no floor square steps onto one except by a link.
+ */
+export function around(room: Room, c: number, r: number): Sq[] {
+  const lv = room.levels;
+  const out: Sq[] = [];
+  if (!isUp(lv, c, r))
+    for (const [dc, dr] of DIRS) {
+      const nc = c + dc;
+      const nr = r + dr;
+      if (!isUp(lv, nc, nr)) out.push({ c: nc, r: nr });
+    }
+  if (lv && inRoom(room, c, r)) for (const k of linksOf(lv, r * room.n + c)) out.push({ c: k % room.n, r: Math.floor(k / room.n) });
+  return out;
+}
+/**
+ * The square an arrow key takes you to from (c, r) (`dc` across, `dr` along the room's rows), walkable or not, or null: one the
+ * room steps to that way (`around`). Across (left, right): the one that way, straight or round the catwalk's curve (a diagonal
+ * link); along (up, down): only straight, so on the catwalk up and down go nowhere, and from a stair's foot up climbs onto it.
+ */
+export function stepFor(room: Room, c: number, r: number, dc: number, dr: number): Sq | null {
+  let diag: Sq | null = null;
+  for (const s of around(room, c, r)) {
+    const sc = Math.sign(s.c - c);
+    const sr = Math.sign(s.r - r);
+    if (dc !== 0) {
+      if (sc !== Math.sign(dc)) continue;
+      if (sr === 0) return s;
+      if (Math.abs(s.c - c) === Math.abs(s.r - r)) diag ??= s;
+    } else if (dr !== 0 && sc === 0 && sr === Math.sign(dr)) return s;
+  }
+  return diag;
+}
 
 /** Steps from `from` to every square (-1: can't get there), a square at a time, round what's blocked. */
 export function stepsFrom(room: Room, from: Sq): Int16Array {
@@ -202,12 +246,10 @@ export function stepsFrom(room: Room, from: Sq): Int16Array {
     const k = q[i]!;
     const c = k % n;
     const r = (k - c) / n;
-    for (const [dc, dr] of DIRS) {
-      const nc = c + dc;
-      const nr = r + dr;
-      if (!walkable(room, nc, nr) || d[nr * n + nc] !== -1) continue;
-      d[nr * n + nc] = d[k]! + 1;
-      q.push(nr * n + nc);
+    for (const s of around(room, c, r)) {
+      if (!walkable(room, s.c, s.r) || d[s.r * n + s.c] !== -1) continue;
+      d[s.r * n + s.c] = d[k]! + 1;
+      q.push(s.r * n + s.c);
     }
   }
   return d;
@@ -223,7 +265,7 @@ export function findPath(room: Room, from: Sq, to: Sq): Sq[] | null {
   let at = from;
   while (at.c !== to.c || at.r !== to.r) {
     const k = d[at.r * room.n + at.c]!;
-    const next = DIRS.map(([dc, dr]) => ({ c: at.c + dc, r: at.r + dr })).find((s) => walkable(room, s.c, s.r) && d[s.r * room.n + s.c] === k - 1)!;
+    const next = around(room, at.c, at.r).find((s) => walkable(room, s.c, s.r) && d[s.r * room.n + s.c] === k - 1)!;
     path.push(next);
     at = next;
   }
