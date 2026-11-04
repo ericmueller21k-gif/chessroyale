@@ -6,7 +6,7 @@
  *
  * Weathered plank walls and beams, a red top beam, straw on a plank floor, hay bales stacked high, two hanging lanterns'
  * worth of light, his coiled ropes hung on the walls, a saddle on a rail, a water trough. Two wooden pens with chess
- * knights in them (white ones in one, black in the other) hopping round in little L-shaped hops, with a skip now and
+ * knights in them (two white and two black in each: Eric, Nov 4, after the art round) hopping round in little L-shaped hops, with a skip now and
  * then. The board on its stand, set back in the north-west corner: a hay bale with the chessboard on it (the intro lassos
  * it and drags it to the middle). The counter at the back, 30 px tall, a blank plaque on it, Wrangler's Boss Crate on it
  * (a wooden crate with a rope round it and a gold star brand). In the middle, the battle spot: a straw bed in a ring of
@@ -980,11 +980,19 @@ function knightAt(c: Cv, fx: number, fy: number, color: "w" | "b", right: boolea
     }),
   );
 }
-/** One knight's tour in the pen: four L moves round a diamond, each a long hop (2) and a short one (1) at a right angle. */
-type Tour = { o: Pt; ux: number; uy: number; moves: readonly Pt[] };
+/**
+ * One knight's tour in the pen: four L moves round a diamond, each a long hop (2) and a short one (1) at a right angle.
+ * Four knights a pen (Eric, Nov 4, after the art round: "mixed", two white and two black in each, spread evenly), one in each
+ * quarter of the pen, the colors set like a board's (`dark`: the pen's first knight's color flipped), each its own tour.
+ */
+type Tour = { o: Pt; ux: number; uy: number; moves: readonly Pt[]; dark: boolean };
+const LOOP: readonly Pt[] = [[2, 1], [-2, 1], [-2, -1], [2, -1]];
+const LOOP_M: readonly Pt[] = [[-2, 1], [2, 1], [2, -1], [-2, -1]];
 const TOURS: readonly Tour[] = [
-  { o: [30, PN + 13], ux: 11, uy: 9, moves: [[2, 1], [-2, 1], [-2, -1], [2, -1]] },
-  { o: [68, PN + 22], ux: 10, uy: 9, moves: [[1, 2], [1, -2], [-1, -2], [-1, 2]] },
+  { o: [30, PN + 13], ux: 6, uy: 6, moves: LOOP, dark: false },
+  { o: [78, PN + 13], ux: 6, uy: 6, moves: LOOP_M, dark: true },
+  { o: [22, PN + 35], ux: 6, uy: 6, moves: LOOP_M, dark: true },
+  { o: [86, PN + 35], ux: 6, uy: 6, moves: LOOP, dark: false },
 ];
 /** 8 frames a move: a long hop (3 frames in the air), a short hop (2), a landing squash, a rest (one knight skips in it). */
 const HOP_LONG = [0.35, 0.8, 0.98];
@@ -1032,7 +1040,7 @@ function knightPose(tour: Tour, f: number, skip: boolean): { x: number; y: numbe
   const dir = mx !== 0 ? mx > 0 : true;
   return { x: tour.o[0] + x * tour.ux, y: tour.o[1] + y * tour.uy, z, right: dir, squash };
 }
-function penDef(name: string, color: "w" | "b", phase: number) {
+function penDef(name: string, first: "w" | "b", phase: number) {
   const frames = Array.from({ length: KN_FRAMES }, (_, f) => {
     const floor = cv(PW, PH);
     // The pen's floor: straw over boards inside the fence.
@@ -1066,13 +1074,15 @@ function penDef(name: string, color: "w" | "b", phase: number) {
     // The knights, far to near.
     const kn = cv(PW, PH);
     const shadows: Bit[] = [];
-    const poses = TOURS.map((tour, i) => knightPose(tour, (f + phase + i * 12) % KN_FRAMES, i === 1));
+    // (Out of step with each other; one of each color skips in its rest.)
+    const poses = TOURS.map((tour, i) => knightPose(tour, (f + phase + i * 9) % KN_FRAMES, i === 1 || i === 3));
+    const colorOf = (t: Tour): "w" | "b" => (t.dark ? (first === "w" ? "b" : "w") : first);
     poses
       .map((p, i) => ({ p, i }))
       .sort((a, b) => a.p.y - b.p.y)
-      .forEach(({ p }) => {
+      .forEach(({ p, i }) => {
         shadows.push(groundShadow(p.x, p.y, 5 - p.z * 0.2, 1.6));
-        knightAt(kn, Math.round(p.x), Math.round(p.y - p.z), color, p.right, p.squash);
+        knightAt(kn, Math.round(p.x), Math.round(p.y - p.z), colorOf(TOURS[i]!), p.right, p.squash);
       });
     // The front fence.
     const front = cv(PW, PH);
@@ -1082,7 +1092,10 @@ function penDef(name: string, color: "w" | "b", phase: number) {
   });
   return def(name, [3, 2], PW, PH, [Math.floor(PW / 2), PF], frames, 110);
 }
-/** The pen of white knights (`pen`) and of black knights (`pen-b`): deep (3 x 2) but upright, as Dash's halfpipe. */
+/**
+ * The two pens (`pen`, `pen-b`), each of two white knights and two black (Eric, Nov 4: mixed, not a pen a color; `pen` with a white
+ * one in its north-west quarter, `pen-b` a black): deep (3 x 2) but upright, as Dash's halfpipe.
+ */
 export const SHOP_PIG_PEN = penDef("pen", "w", 0);
 export const SHOP_PIG_PEN_B = penDef("pen-b", "b", 17);
 
@@ -1170,11 +1183,11 @@ at("hay-stack", 1, 1, true);
 at("saddle", 5, 1, true);
 at("barrel", 7, 1, true);
 at("barrel", 12, 1, true);
-at("pen", 13, 4, true); // columns 13-15, rows 3-4: the white knights
+at("pen", 13, 4, true); // columns 13-15, rows 3-4: two white knights, two black (Eric, Nov 4)
 at("hay-stack", 17, 2, true);
 at("hay-bale", 18, 4, true);
 at("trough", 16, 7, true);
-at("pen-b", 1, 9, true); // columns 1-3, rows 8-9: the black knights
+at("pen-b", 1, 9, true); // columns 1-3, rows 8-9: two black, two white
 at("hay-bale", 1, 6, true);
 at("saddle", 16, 11, true);
 at("hay-bale", 18, 13, true);
@@ -1189,7 +1202,7 @@ at("hay-stack", 17, 17, true);
 at("bucket-stack", 11, 6, true); // HunChess buckets, standing the right way up
 at("bucket-c", 6, 5, true);
 at("bucket", 18, 7, true); // by the trough
-at("bucket-b", 4, 9, true); // by the black knights' pen
+at("bucket-b", 4, 9, true); // by the west pen
 at("lantern", 5, 6, false);
 at("lantern-b", 14, 7, false);
 at("lantern-b", 5, 15, false);
