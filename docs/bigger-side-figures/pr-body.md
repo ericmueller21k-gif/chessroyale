@@ -50,6 +50,7 @@ the board as the boss's) and the "clear of the board" check held the figures to 
 - `e2e/desktop-board.spec.ts`, "nothing over anything": the boss, your pawn and the God King may come over the board by at most
   0.05 × board (was: clear of it); "your pawn by the board" 24 to 32 px → −0.05 × board to 32 px; "the boss left of the board" → "by the
   board's left, over it by at most 0.05 × board".
+- `e2e/timber.spec.ts`, the computer test: "his drawing never over the board, the bar or the side menu" → "over the board's edge by at most SIDE_FEEL.over of its side, never over the bar or the side menu" (his rest drawing came 26 px over a 600 px board at 1280).
 - Unit (`packages/app/test/battle-desktop.test.ts`): `SIDE_REACH` and `KING_REACH` measured with the reach down; `sideSizes` at the four
   sizes: at least 3 px a sprite px for the boss and 1.4 for the God King, each in its room, over the board by at most 0.05 × board, the God
   King's drawing in the window; a gap off the board where there's room; Babur, a party and a raid's boss as before.

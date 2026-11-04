@@ -2,6 +2,7 @@ import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { BOSS_POWERS } from "@chessroyale/core";
 import { BOARD_SEL, asAdmin, bossAloneFromHome, openBossRaid, submitMove, test } from "./helpers.ts";
+import { SIDE_FEEL } from "../packages/app/src/characters/side-size.ts";
 
 /**
  * Timber, the beaver builder (docs/decisions/2026-11-01-timber.md), in the game for admins first (BOSS_ADMIN_FIRST): his tile
@@ -124,7 +125,7 @@ test.describe("Timber", () => {
     expect(BOSS_POWERS.gnawScraps).toBe(8);
     expect(errors).toEqual([]);
   });
-  test("on a computer his figure stands beside the board at rest (his drawing never over the board, the bar or the side menu); his cast plays where he stands, never at the board's corner", async ({ page }) => {
+  test("on a computer his figure stands beside the board at rest (his drawing over the board's edge by at most SIDE_FEEL.over of its side, never over the bar or the side menu); his cast plays where he stands, never at the board's corner", async ({ page }) => {
     test.setTimeout(400_000);
     test.skip(test.info().project.name !== "desktop", "his figure stands beside the board on a computer only");
     await asAdmin(page);
@@ -198,7 +199,12 @@ test.describe("Timber", () => {
       const geo = await page.evaluate(() => (window as any).__geo as { rest: number[][]; cast: number[][]; anims: string[] });
       const hit = (a: number[], b: number[] | null) => !!b && a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
       expect(geo.rest.length).toBeGreaterThan(0);
-      for (const r of geo.rest) for (const other of [board, bar, nav]) expect(hit(r, other), `rest ${r} over ${other}`).toBe(false);
+      // (Over the board's left edge by at most SIDE_FEEL.over of its side, Eric's Nov 4 rule; never over the bar or the side menu.)
+      const side = board![2] - board![0];
+      for (const r of geo.rest) {
+        expect(r[2] - board![0], `rest ${r} over the board ${board} by at most ${SIDE_FEEL.over} of its side`).toBeLessThanOrEqual(side * SIDE_FEEL.over + 1);
+        for (const other of [bar, nav]) expect(hit(r, other), `rest ${r} over ${other}`).toBe(false);
+      }
       // (On a computer every boss casts where it stands, by the board's bottom-left corner, never at its top-left: Eric, Nov 4.)
       expect(geo.cast, "no cast at the board's corner").toEqual([]);
       expect(geo.anims, "his Gnaw's cast where he stands").toContain("gnaw");
