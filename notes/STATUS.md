@@ -128,3 +128,4 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Bigger-figures round STARTED (resumed battlefix helper, branch claude/bigger-side-figures, ports 8985/9485), alongside nothing else Opus. Then 50v50, then arrow keys (+ shrink zoom/recenter, v3 sketch pending Eric OK).
 - #483 Wrangler MERGED 2437cc27 (CI fix: profile ride count 16→17, mine). Deploy watcher running; tell Eric LIVE.
 - Bigger figures DONE 28a27b90 → PR #484 (targeted), CI watcher boyp3fikw. 50v50 batch STARTED (Opus high, /home/user/cr-crowdafk claude/crowd-votes-afk from 2437cc27). Next: arrow keys + smaller zoom/recenter.
+- Eric Nov 4: phone boss bar: bosses clipped at the bar left edge (Puddles); stack/align his meters; check all bosses. Brief brief-phone-boss-bar.md. Queue after 50v50: arrow keys, phone bar (both UI/Haiku: could run as Haiku beside an Opus only with Eric OK).
