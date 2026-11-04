@@ -25,7 +25,7 @@ if (cmd === "room") {
   const img = { w: im.w, h: im.h, data: im.data };
   if (process.env.ELVES) {
     const { placeElves } = await import("./ginger-place.ts");
-    for (const [c, anim, at, lift, flip] of placeElves(0)) {
+    for (const [c, anim, at, lift, flip] of placeElves(0, Number(process.env.PAIR_T ?? 0))) {
       const r = renderFrame(c, c.anims[anim]!.frames[0]!);
       const pic = flip ? flipImg({ w: r.w, h: r.h, data: r.data }) : { w: r.w, h: r.h, data: r.data };
       const fx = flip ? c.w - 1 - c.foot[0] : c.foot[0];

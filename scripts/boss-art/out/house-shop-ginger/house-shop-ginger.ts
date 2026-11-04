@@ -103,7 +103,7 @@ const snowTile = (col: number, row: number, seed: number, more?: (x: number, y: 
 const deep = (gx: number, gy: number) => {
   const v = Math.sin(gx * 0.07 + Math.sin(gy * 0.05) * 2) + Math.sin(gy * 0.09 - gx * 0.02) * 0.8;
   if (hash(gx, gy, 5) < 0.02) return "b";
-  return v > 1.1 ? "b" : v < -1.3 ? "A" : "a";
+  return v > 1.55 ? "b" : v < -1.65 ? "A" : "a";
 };
 /** Outside, by the doorway: night snow, bluish. */
 const nightSnow = (gx: number, gy: number) => (hash(gx, gy, 9) < 0.03 ? "*" : hash(gx >> 2, gy >> 2, 8) < 0.3 ? "b" : "B");
@@ -204,8 +204,8 @@ export const SHOP_GINGER_DECK_H = 40;
 const DECK = { top: 38, face: 33 } as const; // the deck's lit top (seen from a little above) from 38 to 41, its plank face 33 to 37
 const BIN = { y: yOf(32), h: 18, w: 15, xs: [2, 20] } as const; // the bins: 15 x 18, their tops 32 px up; their chutes' feet 11 px up
 const TUBE = { y: yOf(103), h: 47, w: 9, xs: [2, 14, 26] } as const; // the tubes: 9 wide, from 103 px up to 57; their spouts' feet 53 px up
-const LEDGE = { top: 52, foot: 42 } as const; // the tubes' shelf behind the deck
-const RIM = { top: 109, foot: 104 } as const; // the top shelf over the tubes
+const LEDGE: { top: number; foot: number } = { top: 52, foot: 42 }; // the tubes' shelf behind the deck
+const RIM: { top: number; foot: number } = { top: 109, foot: 104 }; // the top shelf over the tubes
 /** A dispenser's chute foot (px over the foot of its card) and its middle (px across the card), per row: where the candy comes out. */
 export const SHOP_GINGER_CHUTES = {
   lower: { h: 11, x: BIN.xs.map((x) => x + Math.floor(BIN.w / 2)) },

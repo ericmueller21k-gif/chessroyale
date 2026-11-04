@@ -24,9 +24,9 @@ import { CANDY_PALETTE, caneOn, cv, hash, put, type Bit, type Cv, type Key, type
 const PALETTE: Record<string, string> = {
   ...CANDY_PALETTE,
   // The blizzard's haze: deep, mid, pale; the flakes are "*" and "~".
-  d: "#7f9cc0",
-  D: "#9fb8d8",
-  K: "#c3d4ea",
+  d: "#a9c0dc",
+  D: "#c4d5ea",
+  K: "#dce7f4",
 };
 const L = (part: string, at: Pt): Layer => ({ part, x: at[0], y: at[1] });
 function framesOf(prefix: string, parts: Record<string, Part>, list: { bits: (Bit | null)[]; ms: number; cue?: string; specks?: Speck[] }[]): Frame[] {
@@ -68,14 +68,15 @@ function comet(f: number): Cv {
       const dx = x + 0.5 - cx, dy = y + 0.5 - cy;
       const r = Math.hypot(dx, dy);
       const a = Math.atan2(dy, dx) + f * (Math.PI / 4);
-      const star = r < 3.2 + 3.5 * Math.abs(Math.cos(2 * a)) ** 6;
-      if (r < 2.2) c[y]![x] = "*";
-      else if (star && r < 7) c[y]![x] = r < 4 ? "~" : "8";
+      const star = r < 5 + 7 * Math.abs(Math.cos(2 * a)) ** 6;
+      if (r < 3.6) c[y]![x] = "*";
+      else if (star && r < 12) c[y]![x] = r < 6 ? "~" : r < 9 ? "8" : "7";
+      else if (r < 7.5) c[y]![x] = "8";
     }
-  for (let s = 0; s < 14; s++) {
-    const tx = cx - 5 - s * 1.1;
-    const ty = cy + 4 + s * 0.85;
-    if (hash(s, f, 3) < 0.75) put(c, tx + Math.round(Math.sin(s + f) * 1.5), ty, s < 5 ? "~" : s < 9 ? "8" : "7");
+  for (let s = 0; s < 20; s++) {
+    const tx = cx - 7 - s * 0.85;
+    const ty = cy + 6 + s * 0.65;
+    for (const w of [-1, 0, 1]) if (hash(s, f + w, 3) < 0.8 - s * 0.03) put(c, tx + w + Math.round(Math.sin(s + f) * 1.5), ty - w, s < 6 ? "*" : s < 12 ? "~" : "8");
   }
   return c;
 }
@@ -450,12 +451,13 @@ const ST = 128;
 const FW = 48;
 const mod = (a: number, m: number) => ((a % m) + m) % m;
 function haze(x: number, y: number): string {
-  const v = Math.sin((2 * Math.PI * (x + y * 0.5)) / ST) * 0.5 + Math.sin((2 * Math.PI * 2 * y) / ST + 1) * 0.5;
-  return v > 0.45 ? "K" : v > -0.3 ? "D" : "d";
+  // Soft bands of blowing snow slanting down to the right (no blotches): mostly pale, a darker gust band.
+  const v = Math.sin((2 * Math.PI * (2 * y - x)) / ST) + 0.35 * Math.sin((2 * Math.PI * 3 * (2 * y - x)) / ST + 1);
+  return v > -0.1 ? "K" : v > -0.9 ? "D" : "d";
 }
 /** Driving snow: streaks slanting down to the right, moving a step a frame (the tile scrolls with them). */
 function streakKey(x: number, y: number, f: number): Key {
-  for (let n = 0; n < 26; n++) {
+  for (let n = 0; n < 44; n++) {
     const sx = Math.floor(hash(n, 1, 81) * ST);
     const sy = Math.floor(hash(n, 2, 81) * ST);
     const len = 5 + Math.floor(hash(n, 3, 81) * 7);
@@ -584,5 +586,5 @@ export const INTRO_GINGER_BOARD_ROUTE = [
 /** The carriers either side of the board (squares from its middle) and where they go to watch once it's on (each faces the table). */
 export const INTRO_GINGER_ELF_SPOTS = {
   carry: { a: 0.45, b: -0.45 },
-  watch: { a: { at: [11.7, 9.0], face: -1 }, b: { at: [8.9, 8.6], face: 1 } },
+  watch: { a: { at: [11.7, 9.0], face: -1 }, b: { at: [7.3, 8.7], face: 1 } },
 } as const;

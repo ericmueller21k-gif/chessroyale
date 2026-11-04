@@ -14,7 +14,7 @@
  *   up and to the right (cue `blast` f1: the props' blast flies on from INTRO_GINGER_BLAST_FROM), a recoil, the glow fading.
  * - `cast` (once, 8 frames, about 0.9 s): the cane swung down and pointed at the board to his right (our right), glowing, a white
  *   sparkle leaving its tip (cue `cast` f3: the pieces' white light starts on the board), back to the cane at rest.
- * - `brag` (once, 9 frames, about 1.3 s): a cackle, a fist up, the cane thumped on the floor in a puff of frost (cues `laugh` f1,
+ * - `brag` (once, 9 frames, about 1.2 s): a cackle, a fist up, the cane thumped on the floor in a puff of frost (cues `laugh` f1,
  *   `thump` f5). It ends on his idle's first frame.
  * - `idle`: his idle's first frame.
  */

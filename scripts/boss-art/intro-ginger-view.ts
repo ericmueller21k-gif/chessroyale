@@ -79,7 +79,8 @@ for (const pl of SHOP.SHOP_GINGER_LAYOUT) {
   const p = P(pl.col + (isCrate ? 0.5 : ((pl.w ?? 1) - 1) / 2), pl.row);
   if (!p) continue;
   const lift = isCrate ? SHOP.SHOP_GINGER_PIECES.counter!.foot[1] - SHOP.SHOP_GINGER_CRATE_AT[1] : 0;
-  room.push({ img: pic(ch, "idle", 0), x: p.x, y: p.y - lift * (p.k / SQ), s: p.k / SQ, flip: !!pl.flip, depth: p.depth - (isCrate ? 0.001 : 0), name: pl.name });
+  const dx = isCrate ? SHOP.SHOP_GINGER_CRATE_AT[0] - SHOP.SHOP_GINGER_PIECES.counter!.foot[0] : 0;
+  room.push({ img: pic(ch, "idle", 0), x: p.x + dx * (p.k / SQ), y: p.y - lift * (p.k / SQ), s: p.k / SQ, flip: !!pl.flip, depth: p.depth - (isCrate ? 0.001 : 0), name: pl.name });
   pic(SHOP.SHOP_GINGER_PIECES["bay-door-open"]!, "idle", 0);
 }
 
@@ -267,7 +268,7 @@ await page.evaluate(
         // The stand-in board on the ice table's slab (the renderer draws the real one at INTRO_GINGER_TABLE_TOP).
         const s = sl.s;
         const ty = sl.y - sl.top * s;
-        const half = 0.36 * 37 * s, deep = 0.2 * 37 * s;
+        const half = 30 * s, deep = 8 * s; // (the ice slab's top: 77 px across, 9 deep)
         for (let j = 0; j < 8; j++)
           for (let i = 0; i < 8; i++) {
             g.fillStyle = (i + j) % 2 ? ink.dark : ink.light;
