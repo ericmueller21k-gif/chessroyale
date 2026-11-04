@@ -19,6 +19,7 @@
  */
 import { frameKeys, type Anim, type Character, type Frame, type Layer, type Part } from "../../../../packages/app/src/characters/sprite.ts";
 import { grain, groundShadow, LANTERN_LIGHT, paint, signBoard, signFace, WARM, type LightPool, type LightSpot, type Pt } from "../../../../packages/app/src/town/houses/kit.ts";
+import { BUCKET_PALETTE, standingBucket } from "./hunchess-bucket.ts";
 
 const PALETTE: Record<string, string> = {
   k: "#2b1411", // outline (Wrangler's)
@@ -80,6 +81,7 @@ const PALETTE: Record<string, string> = {
   K: "#f7e4b8",
   "-": "#0d0e1280", // ground shadow: core, rim
   "+": "#0d0e1244",
+  ...BUCKET_PALETTE, // the HunChess buckets (hunchess-bucket.ts)
 };
 
 const T = 37;
@@ -838,6 +840,26 @@ export const SHOP_PIG_TROUGH = (() => {
   return def("trough", [2, 1], W_, H_, [W_ / 2, F], frames, 260);
 })();
 
+// ==== HunChess buckets, standing the right way up, as decoration (hunchess-bucket.ts): muted green, red and yellow, and a
+//      little stack (a yellow one, a green one with a white one nested in it). "HunChess" reads normally on each.
+
+const BK_W = T;
+const BK_H = 44;
+const BK_F = 40;
+const oneBucket = (name: string, color: "green" | "red" | "yellow", swing: number) =>
+  def(name, [1, 1], BK_W, BK_H, [18, BK_F], [[groundShadow(18, BK_F, 15, 2), ...standingBucket(color, 18, BK_F, swing)]]);
+export const SHOP_PIG_BUCKET = oneBucket("bucket", "green", 1.3);
+export const SHOP_PIG_BUCKET_B = oneBucket("bucket-b", "red", -1.3);
+export const SHOP_PIG_BUCKET_C = oneBucket("bucket-c", "yellow", 1.3);
+export const SHOP_PIG_BUCKET_STACK = (() => {
+  const W_ = 2 * T;
+  const H_ = 52;
+  const F = 48;
+  return def("bucket-stack", [2, 1], W_, H_, [W_ / 2, F], [
+    [groundShadow(W_ / 2, F, 34, 3), ...standingBucket("yellow", 19, F, -1.3), ...standingBucket("w", 54, F - 1, 1.2, 9), ...standingBucket("green", 54, F, 1.3)],
+  ]);
+})();
+
 // ==== The lanterns: iron lanterns on chains from the rafters, lit, swaying a little (out of step: two pieces).
 
 const LT_TOP = 46; // the lantern's ring, this far down its picture (its chain runs up out of the top)
@@ -1160,6 +1182,10 @@ at("barrel", 6, 17, true);
 at("barrel", 13, 17, true);
 at("hay-bale", 15, 17, true);
 at("hay-stack", 17, 17, true);
+at("bucket-stack", 11, 6, true); // HunChess buckets, standing the right way up
+at("bucket-c", 6, 5, true);
+at("bucket", 18, 7, true); // by the trough
+at("bucket-b", 4, 9, true); // by the black knights' pen
 at("lantern", 5, 6, false);
 at("lantern-b", 14, 7, false);
 at("lantern-b", 5, 15, false);
@@ -1266,7 +1292,7 @@ const reviewRow = (name: string, props: string[], z = 3) => {
   anims[name] = { loop: true, frames: [{ ms: 1000, layers }] };
 };
 reviewRow("review-walls", ["wall", "wall-b", "wall-c", "wall-win", "wall-post", "wall-side", "wall-side-b", "hem", "entrance"]);
-reviewRow("review-props", ["board-stand", "hay-bale", "hay-stack", "barrel", "saddle", "trough", "lantern", "counter", "crate"]);
+reviewRow("review-props", ["board-stand", "hay-bale", "hay-stack", "barrel", "saddle", "trough", "lantern", "counter", "crate", "bucket", "bucket-b", "bucket-c", "bucket-stack"]);
 reviewRow("review-pens", ["pen", "pen-b"]);
 
 /** Every piece by its name (as SHOP_PIG_LAYOUT names them), each its own Character `shop-pig-<name>`. */

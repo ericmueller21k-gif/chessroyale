@@ -38,6 +38,11 @@ format match what the runner makes.
 - **His things:** `saddle` (2 x 1: his saddle on a sawhorse rail, a red blanket under it, a gold star on the skirt, a
   stirrup), `trough` (2 x 1: a plank water trough, its ripples and a glint drifting, 4 frames, 260 ms), `barrel` (iron
   hoops, a pitchfork stood in it).
+- **HunChess buckets** (Nov 4, Eric): the same buckets as the intro's stools, standing rim up as decoration, in muted
+  colors with "HunChess" reading normally (black or white letters, whichever contrasts). They are `bucket` (green, by the
+  trough at 18,7), `bucket-b` (red, by the black knights' pen at 4,9), `bucket-c` (yellow, at 6,5), and `bucket-stack`
+  (2 x 1 at 11,6: a yellow one, and a green one with a white one nested in it). The stack and the yellow one are in view
+  from the challenge camera. They're only props: the intro's buckets come from off screen.
 - **The two pens** (`pen` and `pen-b`, each 3 x 2): split-rail corrals with straw inside. `pen` holds two **white knights**
   and `pen-b` two **black knights** (the town's cream and charcoal). They are chess knight pieces, about 12 x 16 px. Each
   knight hops round a little tour of four **L-shaped moves**. Each L is a long hop of two then a short hop of one at a right
@@ -61,6 +66,8 @@ format match what the runner makes.
 | crate | 34 x 30 | 17, 28 | on the counter at `SHOP_PIG_CRATE_AT` (124, 16) | 8,3 |
 | board-stand (the board on its hay bale) | 37 x 50 | 18, 44 | 1 x 1 | **4,3** |
 | pen (white knights), pen-b (black) | 111 x 112 | 55, 89 | 3 x 2, deep but upright | 13,4 (cols 13-15, rows 3-4) / 1,9 (cols 1-3, rows 8-9) |
+| bucket, bucket-b, bucket-c (HunChess buckets) | 37 x 44 | 18, 40 | 1 x 1 | 18,7 / 4,9 / 6,5 |
+| bucket-stack | 74 x 52 | 37, 48 | 2 x 1 | 11,6 |
 | hay-stack | 74 x 82 | 37, 78 | 2 x 1 | 1,1; 17,2; 1,17; 17,17 |
 | hay-bale | 37 x 32 | 18, 28 | 1 x 1 | 18,4; 1,6; 1,13; 18,13; 3,17; 15,17 |
 | saddle | 74 x 56 | 37, 52 | 2 x 1 | 5,1; 16,11 |
@@ -119,6 +126,8 @@ then the same mirrored (`flip`) except the windows, which are placed unflipped.
 - The description reads: "One of Wrangler's pen knights, saddled up. It won't go straight, but it hops like nobody's business."
 
 ## For the code helper
+- **The HunChess bucket** is drawn by `house-shop-pig/hunchess-bucket.ts` (shared with the intro and Puddles' shop):
+  copy it next to the shop's art.
 - **Exports:** `SHOP_PIG_PIECES`, `SHOP_PIG_LAYOUT`, `HOUSE_SHOP_PIG`, `SHOP_PIG_COUNTER_SIGN`, `SHOP_PIG_CRATE_AT`,
   `SHOP_PIG_MARKS`, `SHOP_PIG_LIGHTS`, `SHOP_PIG_POOLS`. New: `SHOP_PIG_BOARD_AT` (the stand's square, the intro's lasso
   target), `SHOP_PIG_PALETTE` (the intro props use the same colors) and `standBale` (draws the stand's bale; the intro's
@@ -133,6 +142,18 @@ then the same mirrored (`flip`) except the windows, which are placed unflipped.
   behind the counter. I suggest `at: [9.5, 2]` and keeper squares `{ c: 9, r: 2 }, { c: 10, r: 2 }`, as the other shops.
 - **The roof:** a barn roof (dark rafters), like the mockup's. The tone is day.
 - **Pen Pony** moves into Items.tsx like the other rides (`penPony`: id `ride-pen-pony`, name "Pen Pony", tier mythic).
+
+## Puddles' shop: HunChess buckets too (Nov 4)
+Eric asked for a few of the same buckets in Puddles' shop, by his plants and watering things.
+`house-shop-puddles/house-shop-puddles.ts` now has three new pieces, in its layout, with `BUCKET_PALETTE` spread into its
+palette (keys U+00C0 to U+00E7, free there). It imports `standingBucket` from `house-shop-pig/hunchess-bucket.ts`:
+- `bucket-stack` (2 x 1, 74 x 52, foot [37, 48]) at **(4, 3)**, beside the potting bench: a green one, and a yellow one
+  with a red one nested in it.
+- `bucket` (green, 37 x 44, foot [18, 40]) at **(5, 9)**, by the fountain.
+- `bucket-b` (yellow) at **(18, 16)**, by the hose reel.
+- All are solid. For the code round: copy `hunchess-bucket.ts` next to the shop's art (`town/shops/`), and copy the three
+  `def`s, the palette spread and the three `at(...)` lines into `town/shops/puddles-art.ts`. Nothing else in his shop
+  changed. [room.png](house-shop-puddles/room.png) is re-rendered.
 
 ## Calls Eric may want to change
 1. **The board's stand is at (4, 3)**, beside his saddle, not right in the corner square (2, 2). At (2, 2) or (3, 2) it was

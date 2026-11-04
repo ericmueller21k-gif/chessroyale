@@ -12,6 +12,7 @@
  */
 import { frameKeys, type Anim, type Character, type Frame, type Layer, type Part } from "../../../../packages/app/src/characters/sprite.ts";
 import { crate, flower, grain, groundShadow, paint, signBoard, signFace, type Pt } from "../../../../packages/app/src/town/houses/kit.ts";
+import { BUCKET_PALETTE, standingBucket } from "../house-shop-pig/hunchess-bucket.ts";
 
 const PALETTE: Record<string, string> = {
   k: "#1d1019", // outline (Puddles')
@@ -80,6 +81,7 @@ const PALETTE: Record<string, string> = {
   "@": "#cbc2b1",
   j: "#e2865a", // a koi under the water: body, head
   p: "#f0ad82",
+  ...BUCKET_PALETTE, // the HunChess buckets (house-shop-pig/hunchess-bucket.ts; Nov 4)
 };
 
 const T = 37;
@@ -1662,6 +1664,18 @@ export const SHOP_PUDDLES_WHEELBARROW = (() => {
 
 //@@PIECES@@
 
+// ==== HunChess buckets (Nov 4, Eric): a few of the same buckets as Wrangler's barn, by his plants and watering things,
+//      standing rim up in muted colors, "HunChess" reading normally on each. `bucket-stack`: a green and a yellow one
+//      with a red one nested in it.
+
+const oneBucket = (name: string, color: "green" | "red" | "yellow", swing: number) =>
+  def(name, [1, 1], T, 44, [18, 40], [[groundShadow(18, 40, 15, 2), ...standingBucket(color, 18, 40, swing)]]);
+export const SHOP_PUDDLES_BUCKET = oneBucket("bucket", "green", 1.3);
+export const SHOP_PUDDLES_BUCKET_B = oneBucket("bucket-b", "yellow", -1.3);
+export const SHOP_PUDDLES_BUCKET_STACK = def("bucket-stack", [2, 1], 2 * T, 52, [T, 48], [
+  [groundShadow(T, 48, 34, 3), ...standingBucket("green", 19, 48, -1.3), ...standingBucket("red", 54, 47, 1.2, 9), ...standingBucket("yellow", 54, 48, 1.3)],
+]);
+
 // ==== The layout.
 
 export interface ShopPlace {
@@ -1752,6 +1766,9 @@ at("pond-garden", 14, 13, true); // columns 14-18, rows 6-13 (its picture rises 
 at("hose-reel", 17, 17, true);
 at("flower-bed", 2, 14, true);
 at("wheelbarrow", 16, 15, true);
+at("bucket-stack", 4, 3, true); // HunChess buckets (Nov 4): beside the potting bench,
+at("bucket", 5, 9, true); // by the fountain,
+at("bucket-b", 18, 16, true); // and by the hose reel
 
 /** Where every piece goes: name, column (its west-most square), row (its south-most), solid; floor tiles first, then the upright pieces north to south. */
 export const SHOP_PUDDLES_LAYOUT: readonly ShopPlace[] = [...LAYOUT.slice(0, FLOOR_COUNT), ...LAYOUT.slice(FLOOR_COUNT).sort((a, b) => a.row - b.row || a.col - b.col)];
