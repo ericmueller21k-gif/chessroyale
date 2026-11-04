@@ -66,7 +66,7 @@ for (const pl of SHOP_BABUR_LAYOUT) {
   const wsq = pl.w ?? 1;
   const dsq = (pl as { d?: number }).d ?? 1;
   // Deep pieces drawn as a plan (a pond, a fountain basin) lie flat; a deep but upright one (the toy plane over its loop) stands.
-  if (dsq > 1 && !/airplane|showpiece/.test(pl.name)) {
+  if (dsq > 1 && !/airplane|showpiece|^pen/.test(pl.name)) {
     // A deep piece drawn as a plan (the big pond garden: 5 x 8 squares seen from above): its plan lies flat on its squares,
     // cut into one tile a square, and the strip above its north row (the tall plants' tops) stands up there.
     const rise = im.h - dsq * SQ;
@@ -140,7 +140,7 @@ const page = await browser.newPage({ viewport: { width: W, height: H }, deviceSc
 await page.setContent(html);
 await page.evaluate("window.__name = (f) => f");
 await page.evaluate(
-  async ({ imgs, floor, up, W, H, DPR, kidPng, sheet, glass, stone, nursery, lodge, store, cave }) => {
+  async ({ imgs, floor, up, W, H, DPR, kidPng, sheet, glass, stone, nursery, lodge, store, cave, barn }) => {
     const cv = document.getElementById("c") as HTMLCanvasElement;
     cv.width = W * DPR;
     cv.height = H * DPR;
@@ -149,7 +149,25 @@ await page.evaluate(
     const g = cv.getContext("2d")!;
     g.scale(DPR, DPR);
     g.imageSmoothingEnabled = false;
-    if (cave) {
+    if (barn) {
+      // A barn's roof (mockup only, not drawn art): dark rafters running up to the ridge, planks between, a hay loft's edge.
+      const sky = g.createLinearGradient(0, 0, 0, H * 0.45);
+      sky.addColorStop(0, "#1e120b");
+      sky.addColorStop(1, "#5a3a22");
+      g.fillStyle = sky;
+      g.fillRect(0, 0, W, H);
+      g.strokeStyle = "#140c07";
+      g.lineWidth = 6;
+      for (let i = -12; i <= 12; i++) {
+        g.beginPath();
+        g.moveTo(W / 2 + i * W * 0.05, -H * 0.5);
+        g.lineTo(W / 2 + i * W * 0.18, H * 0.45);
+        g.stroke();
+      }
+      g.strokeStyle = "#2a190e";
+      g.lineWidth = 10;
+      for (const y of [H * 0.08, H * 0.2]) g.beginPath(), g.moveTo(0, y), g.lineTo(W, y), g.stroke();
+    } else if (cave) {
       // A cave's roof (mockup only, not drawn art): dark stone fading to black overhead, ridges of rock and stalactites.
       const sky = g.createLinearGradient(0, 0, 0, H * 0.45);
       sky.addColorStop(0, "#050408");
@@ -368,7 +386,7 @@ await page.evaluate(
       }
     }
   },
-  { imgs, floor, up, W, H, DPR, kidPng, sheet, glass: SHOP === "puddles", stone: SHOP === "alfil", nursery: SHOP === "bigboy", lodge: SHOP === "timber", store: SHOP === "blitz", cave: SHOP === "hollow" },
+  { imgs, floor, up, W, H, DPR, kidPng, sheet, glass: SHOP === "puddles", stone: SHOP === "alfil", nursery: SHOP === "bigboy", lodge: SHOP === "timber", store: SHOP === "blitz", cave: SHOP === "hollow", barn: SHOP === "pig" },
 );
 await page.locator("#c").screenshot({ path: out });
 await browser.close();
