@@ -141,3 +141,4 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Phone boss bar DONE 16ca2677 → PR #489 (targeted), CI bkbm336aq. Queue now empty after #488/#489. Morning: one short summary to Eric.
 - #488 arrow keys: CI never started (0 check runs, GitHub 500s at push); merged main in (conflict in ShopRoom frame step: kept keysWalk + crew halt), 4592ddf6, CI watching. #489 phone bar red (boss-bar.spec prop room at 320) → helper fixing. Jefferson LIVE e12ae43e 10:04.
 - #488 arrow keys MERGED 233ef3ad; deploy+main CI watcher. #489 phone bar fix 8e77c991 (prop room ≥60 at 320 for name-moved bosses), CI bois622yj. Main green after Jefferson.
+- #488 arrow keys LIVE 233ef3ad (11:33). Workers Builds check FAILED after upload: wrangler post-deploy lookup "version could not be found" (CF API race); deployments API shows a1f19b5d at 100% (the new one), /api/status OK, main e2e green. No action; note for Eric. #489 CI bois622yj.
