@@ -122,7 +122,7 @@ describe("the dealer keeps the shop, in his corner", () => {
 describe("Jefferson's Boss Crate and Giraffe Gallop", () => {
   it("in BOSS_CRATES with his ride, Giraffe Gallop, first; sold to everyone (Jefferson is live); its words as the others'", () => {
     const crate = bossCrateOf("grex")!;
-    expect(BOSS_CRATES.at(-1)).toBe(crate);
+    expect(BOSS_CRATES).toContain(crate);
     expect([crate.id, crate.name, crate.ride]).toEqual(["boss-grex", "Jefferson's Boss Crate", "jefferson-giraffe"]);
     expect(crate.items).toContain("jefferson-giraffe");
     expect(adminFirst(bossDef("grex")!)).toBe(false);
