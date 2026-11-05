@@ -668,6 +668,27 @@ function startRoom(
     return c;
   };
   for (const l of [...art.pools, ...art.lights]) glow(l.color);
+  /**
+   * A tint's soft round sprite (Folio's pools, laid over the paper by multiply): its colour fading to that colour see-through, not to
+   * black (a glow's black edge, multiplied, would leave a grey ring).
+   */
+  const tintOf = new Map<string, HTMLCanvasElement>();
+  const tint = (color: string) => {
+    let c = tintOf.get(color);
+    if (c) return c;
+    c = document.createElement("canvas");
+    c.width = c.height = 64;
+    const gg = c.getContext("2d")!;
+    const n = parseInt(color.slice(1), 16);
+    const rgb = `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+    const grad = gg.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0, `rgba(${rgb},1)`);
+    grad.addColorStop(1, `rgba(${rgb},0)`);
+    gg.fillStyle = grad;
+    gg.fillRect(0, 0, 64, 64);
+    tintOf.set(color, c);
+    return c;
+  };
   // (Ginger's battle spot's own cool shine on its ice: baked into the floor's picture once, not drawn over the room each frame.)
   const ip = art.icePool;
   if (ip) {
@@ -2629,16 +2650,16 @@ function startRoom(
     const T = marks.table;
     // (Falling flat from the plane's height to the top, faster and faster, swaying a hair: the art's 280 ms.)
     if (z.packet) flatAt(F.board.frames.packet[0]!, T.c + Math.sin(z.packet.u * 6) * 0.05, T.r, sq, sq, top + (z.packet.from - top) * (1 - z.packet.u * z.packet.u));
-    if (z.board) flatAt(F.board.frames[z.board.anim][z.board.frame]!, T.c, T.r, sq, sq, top);
-    if (z.real && proj(v, T.c - camX, camY - T.r, TABLE_BOARD.top / SQ, foC)) {
-      // (The park table's board lifted to this table's top, and grown about its middle until its squares are the unfolded sheet's.)
-      const k = sq / (2 * TABLE_BOARD.board);
+    if (z.board) {
+      g.globalAlpha = 1 - z.swap;
+      flatAt(F.board.frames[z.board.anim][z.board.frame]!, T.c, T.r, sq, sq, top);
+      g.globalAlpha = 1;
+    }
+    if (z.real) {
+      // (The game's own board, as on every boss's table, lifted to this table's top: it comes in over the unfolded sheet.)
       g.save();
       g.translate(0, -(F.table.top - TABLE_BOARD.top) * s);
-      g.translate(foC.x, foC.y);
-      g.scale(k, k);
-      g.translate(-foC.x, -foC.y);
-      paintTable(g, v, T.c - camX, camY - T.r, ci!.table.palette, marks.layout);
+      paintTable(g, v, T.c - camX, camY - T.r, ci!.table.palette, marks.layout, z.swap);
       g.restore();
     }
   };
@@ -2769,7 +2790,7 @@ function startRoom(
       litAt(u, l.x + (u.flip ? -d.x : d.x), l.y + d.y);
       g.globalAlpha = Math.min(1, l.strength * S.glow * near * lightMul(u));
       if (g.globalAlpha <= 0.003) continue;
-      g.drawImage(glow(l.color), lit.x - l.rx * 2 * s, lit.y - l.ry * 2 * s, l.rx * 4 * s, l.ry * 4 * s);
+      g.drawImage(art.poolBlend ? tint(l.color) : glow(l.color), lit.x - l.rx * 2 * s, lit.y - l.ry * 2 * s, l.rx * 4 * s, l.ry * 4 * s);
     }
     g.globalCompositeOperation = "lighter";
     for (const { l, at: u } of halosAt) {
@@ -3226,6 +3247,12 @@ function startRoom(
       vy = (vy - w * jy * dt) * e;
     } else vx = vy = 0;
     draw(now);
+    // (Folio's: once its intro hands over to the crumple, the room is under the crumple's cover, its last frame what the crumple
+    // took: it stops drawing, so the crumple has the page's thread to itself.)
+    if (fo && introDone) {
+      raf = 0;
+      return;
+    }
     raf = requestAnimationFrame(frame);
   };
   const run = () => {
@@ -3411,6 +3438,19 @@ function startRoom(
             light: iceNow.light?.anim ?? null,
             pieces: Math.round(iceNow.pieces * 100) / 100,
             crewLine: !!iceNow.line,
+          }
+        : null,
+      // (Folio's own: its move, the stools' and table's folding (sheet, fold, idle), the plane, the packet, the board on the table, the
+      // game's own board.)
+      folio: introNow?.folio
+        ? {
+            move: introNow.folio.move.anim,
+            stools: introNow.folio.stools.map((x) => x.anim),
+            table: introNow.folio.table.anim,
+            plane: introNow.folio.plane ? { anim: introNow.folio.plane.anim, at: [Math.round(introNow.folio.plane.c * 100) / 100, Math.round(introNow.folio.plane.r * 100) / 100], lift: Math.round(introNow.folio.plane.lift * 100) / 100 } : null,
+            packet: !!introNow.folio.packet,
+            board: introNow.folio.board?.anim ?? null,
+            real: introNow.folio.real,
           }
         : null,
       // (Hollow's own: his channel line this time, while it shows; and the dark: his move, his strand, the lanterns out, the string's

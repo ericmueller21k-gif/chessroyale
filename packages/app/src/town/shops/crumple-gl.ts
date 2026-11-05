@@ -65,7 +65,7 @@ void main() {
 function glOn(cv: HTMLCanvasElement) {
   let gl: WebGLRenderingContext | null = null;
   try {
-    gl = cv.getContext("webgl", { alpha: false, antialias: true, premultipliedAlpha: false, preserveDrawingBuffer: false });
+    gl = cv.getContext("webgl", { alpha: false, antialias: false, premultipliedAlpha: false, preserveDrawingBuffer: false });
   } catch {
     gl = null;
   }
@@ -154,14 +154,18 @@ const cover = (home: string) => {
   return cv;
 };
 const wait = (ms: number) => new Promise<void>((ok) => setTimeout(ok, ms));
+/** The open waits at most this long (ms) for the page's thread to be idle. */
+const IDLE_MS = 700;
+/** Resolves once the page's thread is idle (or after `IDLE_MS`; at once where there's no idle callback). */
+const idle = () => new Promise<void>((ok) => ("requestIdleCallback" in window ? requestIdleCallback(() => ok(), { timeout: IDLE_MS }) : ok()));
 const cue = (intro: LoadedIntro, name: string) => {
   const s = intro.def.cues[name];
   if (s) play(s as SoundName);
 };
-/** Frame times, for the frame-rate check (test switches on): ms between frames from the crumple's start to its end. */
-const frameLog = (): number[] | null => {
+/** Each frame's time and phase, for the frame-rate check (test switches on), from the crumple's start to its end. */
+const frameLog = (): { t: number; phase: string; js: number }[] | null => {
   if (!testSwitchesAllowed()) return null;
-  const w = window as unknown as { __crumpleFrames?: number[] };
+  const w = window as unknown as { __crumpleFrames?: { t: number; phase: string; js: number }[] };
   return (w.__crumpleFrames = []);
 };
 
@@ -235,7 +239,6 @@ export function startCrumple(intro: LoadedIntro): Storm {
   };
   const frame = (now: number) => {
     if (gone) return;
-    if (log && t0) log.push(now);
     const t = now - t0;
     if (failed) {
       // Through black: the last drawn frame dims to black over `fadeMs` (held there until out() fades the cover off the match).
@@ -252,8 +255,11 @@ export function startCrumple(intro: LoadedIntro): Storm {
       return;
     }
     // (Waiting as a ball for the match's picture: nothing moves but the ball's slow turn; drawn as any frame.)
+    const f0 = log ? performance.now() : 0;
     if (cv.dataset.phase !== b.phase) {
       cv.dataset.phase = b.phase;
+      // (Every phase it went through, in order, for tests: a slow test's looks can miss a short one.)
+      cv.dataset.phases = `${cv.dataset.phases ?? ""} ${b.phase}`.trim();
       if (b.phase === "open") cue(intro, "open");
       if (b.phase === "linger") cv.style.mixBlendMode = "multiply";
     }
@@ -264,6 +270,7 @@ export function startCrumple(intro: LoadedIntro): Storm {
     const live = b.phase === "linger";
     fillMesh(mesh, b.p, { ...opts, turn: b.turn }, live ? lingerShadeP(b.linger) : b.p);
     if (!r.draw(mesh, b.mix, live)) fail("context-lost");
+    if (log) log.push({ t: now, phase: b.phase, js: performance.now() - f0 });
     raf = requestAnimationFrame(frame);
   };
   const covered = layer.img.then((img) => {
@@ -282,10 +289,14 @@ export function startCrumple(intro: LoadedIntro): Storm {
     fillMesh(mesh, 0, opts);
     r.draw(mesh, 0, false);
     cv.style.visibility = "visible";
-    cv.dataset.phase = "crumple";
-    cv.dataset.covered = "1";
+    cv.dataset.phase = cv.dataset.phases = "crumple";
     cue(intro, "crumple");
     raf = requestAnimationFrame(frame);
+    // (Covered once it's a ball: the battle starts loading then, not during the crumple, so the crumple has the page's thread to itself.
+    // By the clock, so a hidden tab still gets to the battle.)
+    return wait(T.crumpleMs).then(() => {
+      cv.dataset.covered = "1";
+    });
   });
   let fallback: Storm | null = null;
   const out = async () => {
@@ -298,6 +309,9 @@ export function startCrumple(intro: LoadedIntro): Storm {
       const snap = await snapPage(innerWidth, innerHeight, dpr, MATCH_DOM_MS);
       if (!failed && r.upload(1, snap.canvas)) {
         cv.dataset.match = snap.dom ? "1" : "0";
+        // (The open waits, as a ball, for the page's thread to have room (the battle starting under the cover), at most `IDLE_MS`: so it
+        // opens smoothly.)
+        await idle();
         readyAt = performance.now();
       } else fail("match-texture");
     } catch {

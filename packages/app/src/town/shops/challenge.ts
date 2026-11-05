@@ -531,7 +531,8 @@ export const CHALLENGE_FEEL = {
    * art's frames), the east one `stoolGapMs` after it, the table `tableAfterMs` after that; `planeAfterMs` after the table stands the
    * plane comes in along its route (the art's INTRO_FOLIO_PLANE_ROUTE: its points and times, eased between), banks over the table and
    * lets the board go; the packet falls to the table's top over `fallMs`; `unfoldLeadMs` on, the board unfolds (its frames), and from
-   * then on the game's own board is on the table; `bowAfterMs` on, it bows (its frames) and `quietLeadMs` into its bow says its quiet
+   * then on the game's own board is on the table (the unfolded sheet cross-fading into it over `swapMs`: the game draws its boards
+   * tilted toward you, the art's sheet lies flat); `bowAfterMs` on, it bows (its frames) and `quietLeadMs` into its bow says its quiet
    * line for `quietMs`; `crumpleAfterMs` after the line has gone, the crumple. About 11.1 s from the marks to the crumple, 13.4 s to
    * the match; about 15.5 s from just inside the door (the art's 14.9 s from its shorter walk-on).
    *
@@ -553,6 +554,7 @@ export const CHALLENGE_FEEL = {
     quietLeadMs: 100,
     quietMs: 2400,
     crumpleAfterMs: 250,
+    swapMs: 250,
     crumple: { crumpleMs: 800, holdMs: 400, openMs: 800, lingerMs: 260, maxHoldMs: 4000, fadeMs: 350 },
   },
   /**
@@ -1720,8 +1722,9 @@ export interface FolioNow {
   packet: { from: number; u: number } | null;
   /** The board's top-view picture on the table: the packet lying, its unfold's frame; null: none (not landed, or the real board's on). */
   board: { anim: "packet" | "unfold"; frame: number } | null;
-  /** The game's own board is on the table (from the unfold's end). */
+  /** The game's own board is on the table (from the unfold's end), coming in over the unfolded sheet (`swap` 0 to 1). */
   real: boolean;
+  swap: number;
 }
 const easeIO = (u: number) => u * u * (3 - 2 * u);
 /** Where the plane is `pt` ms along its route (eased between its points, as the art plays it): into `out`. */
@@ -1760,8 +1763,9 @@ export function folioAt(a: FolioAnims, t: number, feel: Pick<typeof CHALLENGE_FE
     const u = (t - T.drop) / (T.land - T.drop);
     packet = { from: a.route[3]!.at[2], u };
   }
-  const board: FolioNow["board"] = t < T.land || t >= T.board ? null : t < T.unfold ? { anim: "packet", frame: 0 } : { anim: "unfold", frame: frameAt(a.unfold, t - T.unfold, false) };
-  return { move, stools: [fold(T.stoolW, a.stool), fold(T.stoolE, a.stool)], table: fold(T.table, a.table), plane, packet, board, real: t >= T.board };
+  const swap = Math.min(1, Math.max(0, (t - T.board) / feel.folio.swapMs));
+  const board: FolioNow["board"] = t < T.land || swap >= 1 ? null : t < T.unfold ? { anim: "packet", frame: 0 } : { anim: "unfold", frame: frameAt(a.unfold, t - T.unfold, false) };
+  return { move, stools: [fold(T.stoolW, a.stool), fold(T.stoolE, a.stool)], table: fold(T.table, a.table), plane, packet, board, real: t >= T.board, swap };
 }
 /**
  * Folio's cues, and when (CHALLENGE_FEEL.folio): each stool's and the table's own on their frames (a fold for each crease, `set` as it

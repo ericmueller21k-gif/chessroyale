@@ -486,6 +486,68 @@ test("Wrangler's Stall (Nov 4): Go in (its card its name and Go in), his barn: t
   expect(errors).toEqual([]);
 });
 
+test("Folio's Folded House (Nov 5): Go in (its card its name and Go in), its sanctuary: the clean page, the fountain, the windows' pools drifting, the \"being written\" edge; its paper turtle keeps the shop behind the low counter, Folio's Boss Crate with the Paper Crane", async ({ page }) => {
+  test.setTimeout(150_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  // (Folio is live for everyone, so its sanctuary is too: a player's town.)
+  await page.goto("/town?sky=day");
+  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("folio"));
+  await expect.poll(() => homeAt(page, "folio"), { message: "Folio's Folded House comes into view" }).not.toBeNull();
+  await goIn(page, "folio", "Folio's Folded House");
+  await expect(room(page)).toHaveAttribute("data-room", "folio");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Folio's Folded House");
+  // A room of pale paper: the chat's words dark. It starts at the further-out camera, as every home.
+  await expect(page.locator(".town-chat")).toHaveAttribute("data-tone", "day");
+  await expect.poll(async () => (await shopCam(page))?.zoom, { message: "zoomed out" }).toBe(1);
+  const name = test.info().project.name;
+  const still = async (what: string) => {
+    if (!SHOTS) return;
+    await page.waitForTimeout(1200);
+    await page.screenshot({ path: `${SHOTS}/${what}-${name}.png` });
+  };
+  /** Taps a square and waits until you stand on it. */
+  const walkTo = async (sq: readonly [number, number]) => {
+    await expect.poll(() => shopAt(page, "square", sq), { message: `square ${sq} drawn` }).not.toBeNull();
+    const at = (await shopAt(page, "square", sq))!;
+    await page.mouse.click(at.x, at.y);
+    await expect(room(page)).toHaveAttribute("data-you", `${sq[0]},${sq[1]}`, { timeout: 20_000 });
+  };
+  // (Just inside the door: the clean page and its marks ahead, the shop at the back.)
+  await still("door");
+  await walkTo([10, 12]);
+  await still("page");
+  await walkTo([7, 9]);
+  await still("fountain");
+  // The turtle behind the counter: a tap on it walks you up to the counter; its card says "Shopkeeper", no name.
+  await expect.poll(() => shopAt(page, "keeper"), { message: "the turtle is drawn" }).not.toBeNull();
+  const at = (await shopAt(page, "keeper"))!;
+  await page.mouse.click(at.x, at.y);
+  const card = page.getByRole("dialog", { name: "Shopkeeper", exact: true });
+  await expect(card).toBeVisible({ timeout: 20_000 });
+  await expect(card.getByRole("heading")).toHaveText(["Shopkeeper"]);
+  await expect(room(page)).toHaveAttribute("data-you", /^(9|10),(4|5)$/);
+  await still("counter");
+  await card.getByRole("button", { name: "Talk" }).click();
+  const crate = page.getByRole("dialog", { name: "Folio's Boss Crate", exact: true });
+  await expect(crate).toBeVisible();
+  await expect(crate).toContainText("3 Folio tokens, or 1 Folio token + 1 crate key");
+  // (Its ride first among the prizes.)
+  await expect(crate.locator(".shop-prize-name").first()).toHaveText("Paper Crane");
+  await expect(crate).toContainText("You have 0 Folio tokens and 0 crate keys.");
+  await expect(crate.getByRole("button", { name: "Buy with 3 Folio tokens" })).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await expect(crate).toBeHidden();
+  // The "being written" edge: the west-back corner, the margin line, the sketched lantern and lattice.
+  await walkTo([3, 5]);
+  await still("edge");
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 type CrewHook = {
   __shopCrew?: () => {
     lift: { at: [number, number]; anim: string; waiting: boolean; leg: number };

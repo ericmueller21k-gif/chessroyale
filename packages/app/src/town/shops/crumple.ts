@@ -25,7 +25,7 @@
  *   The creases' shade lingers a little after the sheet is flat and fades out (`creaseLinger`), so it reads as paper
  *   smoothed out, not a cut.
  *
- * Copied as drawn from `claude/boss-art` (scripts/boss-art/out/house-intro-folio/crumple.ts at e7e08bcf, Nov 5), its imports moved; nothing else changed: the maths the WebGL crumple (crumple-gl.ts) runs. The
+ * Copied as drawn from `claude/boss-art` (scripts/boss-art/out/house-intro-folio/crumple.ts at e7e08bcf, Nov 5), its imports moved; the maths the WebGL crumple (crumple-gl.ts) runs, as drawn (only `creaseField`'s per-seed constants worked out once: the same field), and the game's own helpers after it. The
  * notes: scripts/boss-art/out/shop-folio-nov5.md and intro-folio-nov5.md on that branch.
  */
 
@@ -68,15 +68,27 @@ const rnd = (i: number, seed: number) => {
   return x - Math.floor(x);
 };
 
-/** The ridged crease field at a point of the flat sheet (px): about -0.5 to 0.5. */
-export function creaseField(x: number, y: number, seed: number): number {
-  let s = 0;
+/** Each seed's seven waves (their direction's cos and sin times their scale, and their phase), worked out once (the game's, Nov 5). */
+const WAVES = new Map<number, Float64Array>();
+function wavesOf(seed: number): Float64Array {
+  let w = WAVES.get(seed);
+  if (w) return w;
+  w = new Float64Array(21);
   for (let i = 0; i < 7; i++) {
     const a = rnd(i, seed) * Math.PI;
     const k = 1 / (38 + rnd(i + 10, seed) * 70);
-    const ph = rnd(i + 20, seed) * 6.28;
-    s += Math.abs(Math.sin((x * Math.cos(a) + y * Math.sin(a)) * k + ph));
+    w[i * 3] = Math.cos(a) * k;
+    w[i * 3 + 1] = Math.sin(a) * k;
+    w[i * 3 + 2] = rnd(i + 20, seed) * 6.28;
   }
+  WAVES.set(seed, w);
+  return w;
+}
+/** The ridged crease field at a point of the flat sheet (px): about -0.5 to 0.5. (Its waves' constants cached: the same numbers.) */
+export function creaseField(x: number, y: number, seed: number): number {
+  const w = wavesOf(seed);
+  let s = 0;
+  for (let i = 0; i < 21; i += 3) s += Math.abs(Math.sin(x * w[i]! + y * w[i + 1]! + w[i + 2]!));
   return s / 7 - 0.64;
 }
 
@@ -185,15 +197,13 @@ export function crumpleAt(t: number, T = CRUMPLE_TIMING): { p: number; turn: num
   return { p: 0, turn: 0, image: "match", mix: 1, linger: Math.max(0, 1 - (o - T.open) / T.creaseLinger) };
 }
 
-// ---- The game's (Nov 5, crumple-gl.ts draws it with WebGL): the mesh for a screen's shape, its vertices filled into arrays a frame
+// ---- The game's (Nov 5, crumple-gl.ts draws it with WebGL): the mesh for a screen's shape (its fixed parts worked out once), its vertices filled into arrays a frame
 // (no allocation), and the beat's clock with a hold that waits for the match screen. Pure; tested in packages/app/test/shop-folio.test.ts.
 
-/** About this many cells in all (the notes' 16 x 34 on a phone), shared out so a cell stays about square on any screen's shape. */
-export const CRUMPLE_CELLS = 16 * 34;
-/** The mesh for a W x H screen: 16 x 34 on a phone (390 x 844), wider than tall on a computer (30 x 18 at 1280 x 800). */
+/** The mesh (the notes'): 16 columns by 34 rows on a portrait screen (a phone: cells about 24 px), turned (34 by 16) on a landscape one. */
+export const CRUMPLE_MESH = { cols: 16, rows: 34 } as const;
 export function meshSize(W: number, H: number): { cols: number; rows: number } {
-  const cols = Math.max(4, Math.round(Math.sqrt((CRUMPLE_CELLS * W) / H)));
-  return { cols, rows: Math.max(4, Math.round(CRUMPLE_CELLS / cols)) };
+  return W <= H ? { ...CRUMPLE_MESH } : { cols: CRUMPLE_MESH.rows, rows: CRUMPLE_MESH.cols };
 }
 /** Each triangle's three corners as (cell column, cell row) offsets: the cut alternating cell to cell, as `crumpleMesh`'s. */
 const CUT_A = [[0, 0], [1, 0], [1, 1], [0, 0], [1, 1], [0, 1]] as const;
@@ -214,6 +224,44 @@ export interface MeshBuf {
   /** The grid's points at p, and at the shade's p (scratch: (cols + 1) x (rows + 1) x 3). */
   grid: Float32Array;
   sgrid: Float32Array;
+  /**
+   * Each grid point's parts that never change (worked out once, so a frame only blends them: `crumplePoint` as drawn, faster): its
+   * flat place (x, y), its edge lead (`p`'s shift), its place on the ball before the turn (bx, by, bz), and its three wrinkle fields.
+   */
+  fixed: Float64Array;
+  /** The options its fixed parts were worked out for (a change of seed, ball or creases works them out again). */
+  for: string;
+}
+/** A grid point's fixed parts: 9 numbers. */
+const FIX = 9;
+function fixParts(b: MeshBuf, o: CrumpleOpts): void {
+  const key = `${o.seed}|${o.ball}|${o.creases}`;
+  if (b.for === key) return;
+  b.for = key;
+  const { W, H } = b;
+  const rmax = Math.hypot(W / 2, H / 2);
+  const R = o.ball * Math.min(W, H);
+  let k = 0;
+  for (let j = 0; j <= b.rows; j++)
+    for (let i = 0; i <= b.cols; i++) {
+      const x = (i / b.cols - 0.5) * W;
+      const y = (j / b.rows - 0.5) * H;
+      const r = Math.hypot(x, y);
+      const phi = Math.PI * Math.pow(r / rmax, 0.85);
+      const th = Math.atan2(y, x);
+      const Rr = R * (1 + o.creases * creaseField(x, y, o.seed) * 2);
+      const f = b.fixed;
+      f[k] = x;
+      f[k + 1] = y;
+      f[k + 2] = 0.35 * (1 - r / rmax);
+      f[k + 3] = Rr * Math.sin(phi) * Math.cos(th);
+      f[k + 4] = Rr * Math.sin(phi) * Math.sin(th);
+      f[k + 5] = Rr * Math.cos(phi);
+      f[k + 6] = creaseField(y * 1.3 + 50, x * 1.3 - 20, o.seed + 7) * 2;
+      f[k + 7] = creaseField(x * 0.9 + 13, y * 0.9, o.seed + 3) * 2;
+      f[k + 8] = creaseField(y * 0.9 - 31, x * 0.9 + 7, o.seed + 5) * 2;
+      k += FIX;
+    }
 }
 export function meshBuf(W: number, H: number): MeshBuf {
   const { cols, rows } = meshSize(W, H);
@@ -227,18 +275,41 @@ export function meshBuf(W: number, H: number): MeshBuf {
         uv[k++] = (j + dj) / rows;
       }
   const g = (cols + 1) * (rows + 1) * 3;
-  return { cols, rows, W, H, pos: new Float32Array(n * 3), uv, shade: new Float32Array(n), back: new Float32Array(n), grid: new Float32Array(g), sgrid: new Float32Array(g) };
+  return {
+    cols,
+    rows,
+    W,
+    H,
+    pos: new Float32Array(n * 3),
+    uv,
+    shade: new Float32Array(n),
+    back: new Float32Array(n),
+    grid: new Float32Array(g),
+    sgrid: new Float32Array(g),
+    fixed: new Float64Array((g / 3) * FIX),
+    for: "",
+  };
 }
-/** Fills the grid's points at `p` into `out`. */
+/** Fills the grid's points at `p` into `out`: `crumplePoint` for each, from its fixed parts. */
 function gridAt(b: MeshBuf, p: number, o: CrumpleOpts, out: Float32Array): void {
-  let k = 0;
-  for (let j = 0; j <= b.rows; j++)
-    for (let i = 0; i <= b.cols; i++) {
-      const q = crumplePoint((i / b.cols - 0.5) * b.W, (j / b.rows - 0.5) * b.H, p, b.W, b.H, o);
-      out[k++] = q[0];
-      out[k++] = q[1];
-      out[k++] = q[2];
-    }
+  fixParts(b, o);
+  const f = b.fixed;
+  const c = Math.cos(o.turn);
+  const sn = Math.sin(o.turn);
+  const n = out.length / 3;
+  for (let q = 0, k = 0; q < n; q++, k += FIX) {
+    const x = f[k]!;
+    const y = f[k + 1]!;
+    const pv = smooth(clamp01(p * 1.35 - f[k + 2]!));
+    let bx = f[k + 3]!;
+    let bz = f[k + 5]!;
+    if (o.turn) [bx, bz] = [bx * c + bz * sn, -bx * sn + bz * c];
+    const mid = Math.sin(Math.PI * pv);
+    const w = o.wrinkle * mid;
+    out[q * 3] = x + (bx - x) * pv + w * 0.6 * f[k + 7]!;
+    out[q * 3 + 1] = y + (f[k + 4]! - y) * pv + w * 0.6 * f[k + 8]!;
+    out[q * 3 + 2] = bz * pv + w * f[k + 6]!;
+  }
 }
 /**
  * The mesh at crumple `p` (0 flat, 1 a ball), shaded as at `shadeP` (the creases lingering on the flat sheet), into `b`: each vertex

@@ -119,7 +119,11 @@ async function domImage(W: number, H: number, big: readonly HTMLCanvasElement[],
     const k = root[i]!;
     if (k.startsWith("--")) vars.push(`${k}:${root.getPropertyValue(k)}`);
   }
-  html.setAttribute("style", `${html.getAttribute("style") ?? ""};${vars.join(";")};width:${W}px;height:${H}px;overflow:hidden`);
+  // (Under the big canvases the page's own background is drawn first, by `compose`: the copy's root and body are see-through then, or
+  // they'd cover the canvases' pixels.)
+  const see = big.length ? ";background:transparent!important" : "";
+  html.setAttribute("style", `${html.getAttribute("style") ?? ""};${vars.join(";")};width:${W}px;height:${H}px;overflow:hidden${see}`);
+  if (see) copy.style.setProperty("background", "transparent", "important");
   const head = document.createElementNS(XHTML, "head");
   const style = document.createElementNS(XHTML, "style");
   style.textContent = pageCss();
