@@ -90,3 +90,33 @@ His words, trimmed:
 - **PR body** in `docs/street-town-fixed/pr-body.md` (full e2e), a decision note `docs/decisions/2026-11-05-street-fixed-view.md`
   quoting Eric, and a short report.
 - Don't open the PR.
+
+## Addendum (Eric, Nov 5, later): drag to look around
+"When you hold your finger [phone] or click and move your mouse … it should actually rotate now instead of just doing a pan … you could
+be running down the street, hold your mouse, move it a little to the left and bring it back to the right … so you could see what
+the houses are to your left … but not where your pawn is standing or which direction he's facing … The arrow keys don't have anything
+to do with this … when you start to run again, it snaps back to the normal view that we're always used to."
+
+**Design (the director's call):**
+- **A drag rotates the camera around your pawn,** turning only (no tilt), freely and all the way round. This replaces the street
+  town's drag-to-pan. Dragging left turns the view so you see more to the left, so it feels as if you grabbed the world and turned it.
+  Tune the sensitivity so a drag across the screen width is about half a turn.
+- **Your pawn doesn't move or turn.** Its facing is unchanged; it's drawn from the matching view as the camera goes round it.
+- **Letting go keeps the turned view.** It stays until you move: the first step by arrow, tap or the on-screen arrows eases the camera
+  back to the normal north view, over about 0.3 s.
+- **Arrows are always the normal view's screen directions** (up = north). When you press one while turned, the view starts easing
+  back at once and you walk north. Up never means a different way than the normal view's up.
+- **A tap while turned** walks you to the square under your finger. Work it out from the view at the moment of the tap, then ease
+  back.
+- **A tap versus a drag** uses the existing threshold. A drag never walks you.
+- **On a home's front strip,** the strip's turn is the "normal" view there. A drag looks around from it, and stepping off goes back
+  to north.
+- **Desktop:** mouse drag (left button). Phone: one-finger drag. Pinch and the − / + steps still zoom.
+- **Boss homes stay where they are,** including on the south sides of streets (their fronts face north, away from the camera). Eric
+  wondered about moving them. A drag, or stepping onto a home's strip, shows any of them, so no move is needed. Say so in the decision
+  note.
+- **Tests:**
+  - unit: drag → heading, a tap while turned maps to the right square, the ease back on the first step, and the arrows unchanged;
+  - e2e (phone and computer): drag to turn, check that the pawn's square and facing are unchanged and a home on the south side shows,
+    then press up and check that the view eases back and you walk north;
+  - a still of a turned look-around.
