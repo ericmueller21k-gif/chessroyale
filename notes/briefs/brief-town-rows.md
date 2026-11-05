@@ -148,3 +148,19 @@ that we're trying to capture. It doesn't have to be exact."
   at its ends. The phone frame rate must not fall below round 3's.
 - **The 2D fallback** (no WebGL) may keep a higher view along the heading if a true low chase camera can't be done well in 2D. Say
   which in the decision note.
+
+## Eric's run-through frames (Nov 5, later): eric-ref8..14-run.jpg
+Eric: "we're definitely getting very close to what I'm visualizing" (about the mockup stills). "The buildings sometimes are pretty large…
+the Coliseum… make it taller and bigger, so it really feels like a true overwhelmingly large kind of building… we can do that later."
+
+Tuning taken from the frames (the director's read):
+- **The camera is a bit lower and closer** than the mockup. It sits about at the player's head height, just behind them, so the
+  horizon is near the middle of the screen and the ground takes up roughly the lower 40%. In the mockup the ground takes about 55%.
+  The fronts should fill more of the screen.
+- **Buildings are big next to the player:** about 3 to 5 times a figure's height, with wide fronts. Scale the rows up, the
+  look-alikes and the homes together, until a front towers over the pawn as in the frames. Check that the rows still read on the
+  zoomed-out view.
+- **The turn lags.** You turn first, and the camera swings round after you, over about 0.6 to 0.8 s. Mid-swing you see your figure
+  side-on (our side view). Tune from the 0.4 s toward that if it feels better.
+- **Later (not this round):** the Colosseum taller and bigger, so it looms over the town when it comes into view. It's in the
+  director's follow-ups.
