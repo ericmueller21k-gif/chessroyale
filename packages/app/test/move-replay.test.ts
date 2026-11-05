@@ -4,6 +4,8 @@ import { START_FEN, applyMove } from "@chessroyale/chess";
 import type { NetDuty, NetSquadsHalf, SquadsEvent } from "@chessroyale/chess/squads";
 import {
   COACH_MARKS,
+  arriveAt,
+  seenAt,
   byOfHalf,
   coachDone,
   coachDue,
@@ -11,11 +13,10 @@ import {
   queuedSquads,
   nextReplayMode,
   readReplayMode,
-  replayDue,
   replayFrameAt,
   replayFrames,
   replayMode,
-  replayMovesFor,
+  replayRange,
   replayTimes,
   setReplayMode,
   tagText,
@@ -162,23 +163,33 @@ describe("The replay button's three settings (Eric, Nov 5, round 2)", () => {
     expect(readReplayMode("junk")).toBeNull();
   });
 
-  it("the last 2 replays your teammate's last move there and the opponent's reply; all, every move missed; off, none", () => {
-    expect(replayMovesFor("two", 7)).toBe(2);
-    expect(replayMovesFor("two", 1)).toBe(1);
-    expect(replayMovesFor("all", 7)).toBe(7);
-    expect(replayMovesFor("off", 7)).toBe(0);
-    const f = replayFrames(START_FEN, MOVES, [], replayMovesFor("two", 7));
-    expect(f.slice(1).map((x) => x.lastMove)).toEqual(MOVES.slice(-2));
+  it("replays the moves made on the board while you weren't viewing it; the last 2 of them, or all; off, none", () => {
+    // Back on a board 7 moves after you last played it (moves 1-7 of 8 missed), arriving as your move starts.
+    const back = { total: 8, missed: 7, arrivedAt: 8 };
+    expect(replayRange({ mode: "all", ...back })).toEqual([1, 8]);
+    // The last 2: your teammate's last move there and the opponent's reply, then it's your move.
+    expect(replayRange({ mode: "two", ...back })).toEqual([6, 8]);
+    const f = replayFrames(START_FEN, MOVES.slice(0, 8), [], 2);
+    expect(f.slice(1).map((x) => x.lastMove)).toEqual(MOVES.slice(6, 8));
+    expect(replayRange({ mode: "off", ...back })).toBeNull();
   });
 
-  it("only when it's your turn, on a board you came to as your move began: never on one you sat at waiting", () => {
-    // Your move this half (seq 9), the board on screen since this half: it replays.
-    expect(replayDue(9, 9)).toBe(true);
-    // On screen since an earlier half (you waited there, or Quick board jump took you there early): skipped.
-    expect(replayDue(9, 8)).toBe(false);
-    expect(replayDue(9, -1)).toBe(false);
-    // Not your move: never.
-    expect(replayDue(null, 9)).toBe(false);
+  it("moves watched live never replay: sat at the board all along, nothing; Quick board jump there early, only those before you came", () => {
+    // You sat there since you last played it (it came on screen before then): nothing.
+    expect(replayRange({ mode: "all", total: 8, missed: 7, arrivedAt: 1, seenBefore: 0 })).toBeNull();
+    // Quick board jump took you there after move 5 (seen last after move 1, when you played it): moves 2-5 replay, not 6-8.
+    expect(replayRange({ mode: "all", total: 8, missed: 7, arrivedAt: 5, seenBefore: 1 })).toEqual([1, 5]);
+    expect(replayRange({ mode: "two", total: 8, missed: 7, arrivedAt: 5, seenBefore: 1 })).toEqual([3, 5]);
+    // Looked in on it (a tap on its tiny board) after move 4: only what came after.
+    expect(replayRange({ mode: "all", total: 8, missed: 7, arrivedAt: 8, seenBefore: 4 })).toEqual([4, 8]);
+    // Not your move there (nothing since you last played it): nothing.
+    expect(replayRange({ mode: "all", total: 8, missed: 0, arrivedAt: 8 })).toBeNull();
+  });
+
+  it("a board's views on this device: when it came on screen, and when it was last seen before", () => {
+    expect(arriveAt("r0m9/1", 3)).toEqual({ arrivedAt: 3 });
+    seenAt("r0m9/1", 5);
+    expect(arriveAt("r0m9/1", 9)).toEqual({ arrivedAt: 9, seenBefore: 5 });
   });
 });
 

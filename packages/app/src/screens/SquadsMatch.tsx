@@ -14,7 +14,7 @@ import { testParams } from "../test-switches.ts";
 import { BlockArrows, BlockPicker, ChipIcon, LockIcon, PickTags, SquadResources, TokenBreakdown, squareAt } from "../components/SquadsBlocks.tsx";
 import { Coins, ItemIcon, KitIcons } from "../components/MercenaryShop.tsx";
 import { CoachMarks, ReplayButton, ReplayIcon, ReplayTag, useReplayMode } from "../components/MoveReplay.tsx";
-import { replayDue, replayFrameAt, replayFrames, replayMovesFor, replayTimes, type ReplayFrame } from "../move-replay.ts";
+import { arriveAt, replayFrameAt, replayFrames, replayRange, replayTimes, seenAt, type ReplayFrame } from "../move-replay.ts";
 import { ownEngine } from "../engine.ts";
 import { onPrefsChange, setSquadsJumpNext, squadsJumpNext } from "../prefs.ts";
 import type { SquadsClient } from "../squads.ts";
@@ -312,25 +312,27 @@ function Banner({ title, sub, until, children }: { title: string; sub?: Componen
 }
 
 /**
- * Move replay (Eric, Nov 5; move-replay.ts): at the start of your move on a board the rotation brings you back to, the
- * moves played there since you last played it (the replay button: the last 2, or all of them), one by one, within the
- * extra free time they gave you (the server's `freeMs`; the last 2 sooner done), then the board as it stands. Only when
- * it's your turn, on a board you came to as it began (Nov 5, round 2: never on one you sat at waiting); not with the
- * button off, while you browse the moves, or once skipped (a tap on the board). `me`: you, on your own board (null:
- * nothing to replay).
+ * Move replay (Eric, Nov 5; move-replay.ts): when your move on a board starts, the moves made there while you weren't
+ * viewing it (`replayRange`; the replay button: the last 2 of them, or all), one by one, within the extra free time
+ * the rule gave you (the server's `freeMs`; the last 2 sooner done), then the board as it stands. Moves you watched live
+ * never replay. Not while you browse the moves, or once skipped (a tap on the board). `me`: you, on your own board
+ * (null: nothing to replay).
  */
 function useMoveReplay(m: LocalMatch, b: LocalBoard, me: string | null, browsing: boolean): { frame: ReplayFrame | null; step: number; count: number; skip: () => void } {
   const mode = useReplayMode();
   const d = me && m.state === "half" && m.current ? m.current.duties.find((x) => x.board === b.id && x.players.includes(me)) : undefined;
-  // (The half this board came on screen in, or the last one before it, between halves: this view is drawn afresh for each board.)
-  const arrived = useRef<number>(m.current?.seq ?? -1);
-  const due = replayDue(d && m.current ? m.current.seq : null, arrived.current);
-  const n = due ? replayMovesFor(mode, replayCount(d, me)) : 0;
+  // (When this board came on screen, and when it was last seen before: this view is drawn afresh for each board.)
+  const id = `${m.key}/${b.id}`;
+  const view = useRef<ReturnType<typeof arriveAt> | null>(null);
+  view.current ??= arriveAt(id, b.moves.length);
+  useEffect(() => seenAt(id, b.moves.length), [b.moves.length]);
+  const range = d ? replayRange({ mode, total: b.moves.length, missed: replayCount(d, me), ...view.current }) : null;
+  const n = range ? range[1] - range[0] : 0;
   const extra = d ? freeMs(m, b.id) - m.delayMs : 0;
   const total = mode === "two" ? Math.min(extra, SQUADS_LOBBY.replay.firstMs + (n + 1) * SQUADS_LOBBY.replay.stepMs) : extra;
   const half = m.current ? `${m.key}/${m.current.seq}` : "";
   const [skipped, setSkipped] = useState<string | null>(null);
-  const frames = useMemo(() => (n > 0 && total > 0 ? replayFrames(b.startFen, b.moves, b.by ?? [], n) : []), [half, n, total, b.moves.length]);
+  const frames = useMemo(() => (range && total > 0 ? replayFrames(b.startFen, b.moves.slice(0, range[1]), (b.by ?? []).slice(0, range[1]), n) : []), [half, range?.join(), total]);
   const startedAt = m.current?.startedAt ?? 0;
   const frame = !browsing && skipped !== half && frames.length > 1 ? replayFrameAt(frames, total, Date.now() - startedAt) : null;
   // (Drawn again as each move lands, and as it ends.)

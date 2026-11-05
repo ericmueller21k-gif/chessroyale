@@ -1273,8 +1273,9 @@ function tiebreak(m: Pick<SquadsMatch, "seed" | "key" | "banks" | "boards">, poi
 }
 
 /**
- * The match's result, if it's decided. A squad with more than half the points has won (clinched, if boards are
- * still going: the match ends at once; Relay's 3 boards: 2 of 3, best 2 out of 3). Every board finished and level: in
+ * The match's result, if it's decided. A squad the other can't catch up even by winning every board left has won
+ * (clinched, if boards are still going: the match ends at once; Relay's 3 boards: 2 of 3, best 2 out of 3, or 1½–0
+ * with one board left). Every board finished and level: in
  * rounds 1 and 2, `tiebreak` (more draws as Black, then more team bank left, then a coin); a drawn final has no winner
  * yet (Armageddon). Armageddon: a draw is Black's.
  */
@@ -1287,8 +1288,11 @@ export function matchResultOf(m: Pick<SquadsMatch, "seed" | "key" | "format" | "
     return { winner: b.result.winner === "w" ? b.white : otherSide(b.white), points, how: "armageddon" };
   }
   const all = boards.every((b) => b.result);
+  // (Nov 5: decided as soon as the other squad can't catch up even winning every board left, e.g. 1½–0 with one left;
+  // more than half the points, best 2 of 3, is the usual way. A level finish still possible: played out, the tie order.)
+  const left = boards.filter((b) => !b.result).length * s.winPoints;
   for (const side of [0, 1] as const) {
-    if (points[side] > (boards.length * s.winPoints) / 2) return { winner: side, points, how: all ? "boards" : "clinch" };
+    if (points[side] > points[otherSide(side)] + left) return { winner: side, points, how: all ? "boards" : "clinch" };
   }
   if (!all) return null;
   return m.format === "final" ? { winner: null, points, how: "boards" } : tiebreak(m, points, false);

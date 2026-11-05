@@ -181,11 +181,16 @@ describe("Relay on 3 boards: the result", () => {
     return { ...m, banks, boards: m.boards.map((b, i) => (rs[i] === undefined ? b : done(b, rs[i]!))) };
   };
 
-  it("best 2 of 3: two boards won clinch it at once; 1½ doesn't", () => {
+  it("best 2 of 3: two boards won clinch it at once; so does a lead the other can't catch up; a level finish still possible plays on", () => {
     // Side 0 is White on boards 1 and 3.
     expect(matchResultOf(withResults(["w", undefined, "w"]))).toMatchObject({ winner: 0, how: "clinch", points: [2, 0] });
     expect(matchResultOf(withResults(["w", "w", undefined]))).toBeNull();
     expect(matchResultOf(withResults(["w", null, undefined]))).toBeNull();
+    // Ended as soon as the other squad can't catch up even winning every board left. Each finished board shares out one
+    // point, so that is exactly more than half the points: 1½–½ with one board left can still end level, and plays on.
+    expect(matchResultOf(withResults(["w", undefined, null]))).toBeNull();
+    for (let p = 0; p <= 3; p += 0.5) for (let q = 0; q + p <= 3; q += 0.5) for (let left = 0; left <= 3 - p - q; left++) if (p + q + left === 3) expect(p > q + left).toBe(p > 1.5);
+    expect(matchResultOf(withResults(["w", undefined, undefined]))).toBeNull();
     expect(matchResultOf(withResults(["w", null, "b"]))).toMatchObject({ points: [1.5, 1.5] });
     expect(matchResultOf(withResults(["w", "b", "w"]))).toMatchObject({ winner: 0, how: "boards", points: [3, 0] });
     expect(matchResultOf(withResults(["w", "w", "w"]))).toMatchObject({ winner: 0, how: "boards", points: [2, 1] });

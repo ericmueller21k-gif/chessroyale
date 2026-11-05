@@ -133,7 +133,7 @@ describe("squads lobby: votes and the bracket", () => {
   });
 
   it("a full lobby of bots plays the whole bracket to its results: every placement, the final, and the lobby's end", () => {
-    const L = squadsLobby({ seed: 12 });
+    const L = squadsLobby({ seed: 11 });
     const a = L.join("Ann");
     // Wes stays to watch (connected, never playing his seat: after noShowsBeforeBot misses a bot plays it), so the
     // lobby has someone in it and plays on. (With nobody left at all it would end at once: "leaving" below.)
@@ -150,9 +150,9 @@ describe("squads lobby: votes and the bracket", () => {
     // reaches its results before the lobby's safety close for a lobby nobody is in. With devices: about 30 minutes.)
     expect(minutes).toBeGreaterThan(15);
     expect(minutes).toBeLessThan(LOBBY_LIFE.lobbyAbandonedMinutes);
-    // Squads v2: the bots match a partner on an only move; with no device, no refunds.
+    // Squads v2: with no device, no refunds. (That bots match a partner on an only move: "bots use a same-move token on
+    // an only move" below, from a position that has one, not left to how a bracket happens to go.)
     const pairs = L.core.allMatches().filter((m) => m.round === 1);
-    expect(pairs.flatMap((m) => m.m.tokenLog).length).toBeGreaterThan(0);
     expect(pairs.flatMap((m) => m.m.tokenLog).every((u) => u.verdict?.why === "no_judge")).toBe(true);
     // No block points to start (Eric, Oct 19): round 1, before any shop, has no blocks; a later match's come from its kit.
     expect(L.core.allMatches().filter((m) => m.round === 0).every((m) => m.m.blockBanks.every((b) => b === 0) && m.m.blocks.length === 0)).toBe(true);
@@ -744,3 +744,26 @@ function dutyBoard(lm: LiveMatch, id: string): number | null {
   for (const d of lm.half ? halfDuties(lm.m).duties : []) if (d.players.includes(id)) return d.board;
   return null;
 }
+
+describe("squads lobby: bots and same-move tokens", () => {
+  it("bots use a same-move token on an only move (Pairs): both partners pick it, it plays, a token burns", () => {
+    // Every Pairs board from a position with one move far better than the rest: a queen left hanging (exd5); strong bots
+    // (the test link's bots=strong) see it as the only move.
+    const fen = "4k3/8/8/3q4/4P3/8/8/4K3 w - - 0 1";
+    const L = squadsLobby({ seed: 11, test: { start: 1, fen, strong: true }, fillInMs: 5_000 });
+    const a = L.join("Ann");
+    L.advance(5_000 + VOTES_MS + SQUADS_LOBBY.bracketIntroSeconds * 1000);
+    const bots = L.core.allMatches().filter((m) => m.round === 1 && !mineIn(m, a));
+    expect(bots.length).toBeGreaterThan(0);
+    L.runUntil(() => bots.every((m) => m.m.turn > 0 || !!m.m.result), 120_000, "Pairs' first turn");
+    for (const lm of bots) {
+      // White's move on each board: the pair of bots both picked exd5, so it played on a token.
+      const used = lm.m.tokenLog.filter((u) => u.turn === 0 && u.half === "w");
+      expect(used.map((u) => [u.board, u.move])).toEqual([
+        [0, "e4d5"],
+        [1, "e4d5"],
+      ]);
+      for (const side of [0, 1] as const) expect(lm.m.tokens![side]).toBe(SQUADS.tokens.perMatch - lm.m.tokenLog.filter((u) => u.side === side).length);
+    }
+  });
+});

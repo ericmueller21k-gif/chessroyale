@@ -371,7 +371,7 @@ describe("Mercenary on the server: earning and catch-up", () => {
   });
 
   it("a whole bot lobby in Mercenary: every wallet adds up, kits come in, only bot squads use tokens, to its results", () => {
-    const L = squadsLobby({ seed: 3, test: { start: 0, mode: "mercenary" }, fillInMs: 0 });
+    const L = squadsLobby({ seed: 13, test: { start: 0, mode: "mercenary" }, fillInMs: 0 });
     const ann = L.join("Ann", { test: true });
     L.runUntil(() => L.core.record.phase === "results", 3 * 3_600_000, "the results");
     const wallets = L.core.walletsView();
@@ -387,8 +387,7 @@ describe("Mercenary on the server: earning and catch-up", () => {
       expect(w.chips).toBe(w.bought.chip - tapped);
       expect(w.chips).toBeLessThanOrEqual(M.items.chip.cap);
     }
-    // The bots tapped some of their chips (in sudden death, or low on time).
-    expect(L.all(ann, "chip").length).toBeGreaterThan(0);
+    // (That bots tap their chips in sudden death or low on time: "bots tap a Time chip" below, from banks set that low.)
     // Every match from round 2 on brought a kit; tokens used only by bot squads, never more than bought.
     const later = L.core.allMatches().filter((m) => m.round > 0);
     for (const lm of later) {
@@ -402,6 +401,27 @@ describe("Mercenary on the server: earning and catch-up", () => {
     // The finalists shopped for the final (or saved nothing: in the final the bots spend all they can).
     const finalists = L.core.allMatches().find((m) => m.round === 2)!.m.sides.map((x) => x.squadId);
     expect(finalists.some((id) => MERC_ITEMS.some((it) => wallets.find((w) => w.squadId === id)!.bought[it] > 0))).toBe(true);
+  }, 120_000);
+});
+
+describe("Mercenary on the server: bots and Time chips", () => {
+  it("bots tap a Time chip on a move that needs time (in sudden death, or low on bank), never with a full bank; never a squad of people's", () => {
+    const L = squadsLobby({ seed: 13, test: { start: 1, mode: "mercenary" }, fillInMs: 0 });
+    const ann = L.join("Ann", { test: true });
+    L.runUntil(() => L.core.allMatches().some((m) => m.round === 1 && m.state === "half"), 600_000, "Pairs");
+    const pairs = L.core.allMatches().filter((m) => m.round === 1);
+    // Full banks: no taps, whatever chips they hold.
+    for (const lm of pairs) lm.m = { ...lm.m, chips: [3, 3] };
+    L.runUntil(() => pairs.every((m) => m.m.turn >= 1 || !!m.m.result), 120_000, "a turn on full banks");
+    expect(L.all(ann, "chip")).toEqual([]);
+    // Every squad in sudden death (no bank): bots tap (60% a move), people's squads never by a bot.
+    for (const lm of pairs) lm.m = { ...lm.m, chips: [3, 3], banks: [0, 0] };
+    L.runUntil(() => L.all(ann, "chip").length > 0, 120_000, "a bot's chip");
+    for (const c of L.all(ann, "chip")) {
+      const lm = L.core.allMatches().find((m) => m.key === c.key)!;
+      expect(lm.m.sides[c.chip.side].seats.includes(ann)).toBe(false);
+      expect(L.core.record.squads.flatMap((sq) => sq.players).find((p) => p.id === c.chip.by)!.isBot).toBe(true);
+    }
   }, 120_000);
 });
 

@@ -93,16 +93,39 @@ export const REPLAY_MODES: readonly ReplayMode[] = ["off", "two", "all"];
 /** The next setting a tap gives: off → the last 2 → all → off. */
 export const nextReplayMode = (m: ReplayMode): ReplayMode => (m === "off" ? "two" : m === "two" ? "all" : "off");
 
-/** How many of the `missed` moves a setting replays. */
-export const replayMovesFor = (m: ReplayMode, missed: number): number => (m === "off" ? 0 : m === "two" ? Math.min(2, Math.max(0, missed)) : Math.max(0, missed));
+/**
+ * Which moves a replay shows (Eric, Nov 5, round 2; the director's call, Eric's to change): when your move on a board
+ * starts, the moves made there while you weren't viewing it (full size), as moves [from, to) of the board. You viewed
+ * it when you last played it, so never before then (`total - missed`: the server's count since you last played it);
+ * it came on your screen at move `arrivedAt` (this half: now; earlier, when you sat there or Quick board jump took you
+ * there) after you last saw it at `seenBefore` (undefined: not on this page). Moves you watched live never replay;
+ * "two" keeps the last 2 of those you missed; "off", none. Null: nothing to replay.
+ */
+export function replayRange(o: { mode: ReplayMode; total: number; missed: number; arrivedAt: number; seenBefore?: number }): [number, number] | null {
+  if (o.mode === "off" || o.missed <= 0) return null;
+  const to = Math.min(o.total, o.arrivedAt);
+  let from = Math.max(0, o.total - o.missed, o.seenBefore ?? 0);
+  if (o.mode === "two") from = Math.max(from, to - 2);
+  return to > from ? [from, to] : null;
+}
 
 /**
- * Whether a replay plays (Eric, Nov 5, round 2: "replay only when it's your turn"): at the start of your move on a board
- * you've just come to. Never on a board you were already watching when your move there began (you sat there waiting
- * for the opponent, or Quick board jump took you there early: you saw those moves), never when it isn't your move.
- * `arrivedSeq`: the half in which this board came on screen; `dutySeq`: the half of your move on it (null: none).
+ * Where each board was last seen full size on this device (`${match}/${board}` → its move count then), and when a view
+ * of it began: what `replayRange` reads. Kept for the page's life.
  */
-export const replayDue = (dutySeq: number | null, arrivedSeq: number | null): boolean => dutySeq !== null && arrivedSeq !== null && arrivedSeq >= dutySeq;
+const lastSeen = new Map<string, number>();
+
+/** A board came on screen full size with `ply` moves: when, and when it was last seen before. */
+export function arriveAt(board: string, ply: number): { arrivedAt: number; seenBefore?: number } {
+  const seenBefore = lastSeen.get(board);
+  lastSeen.set(board, Math.max(ply, seenBefore ?? 0));
+  return seenBefore === undefined ? { arrivedAt: ply } : { arrivedAt: ply, seenBefore };
+}
+
+/** The board on screen now shows `ply` moves (watched live). */
+export function seenAt(board: string, ply: number) {
+  lastSeen.set(board, Math.max(ply, lastSeen.get(board) ?? 0));
+}
 
 /** A stored setting read as today's: "off", "two", "all"; the first button's "1" (on: every move) and "0" (off). */
 export function readReplayMode(v: string | null): ReplayMode | null {
