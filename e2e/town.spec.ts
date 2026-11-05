@@ -309,37 +309,38 @@ test("the lights at dusk and night: at ?sky=night a park lamp's glass and Babur'
   expect(errors).toEqual([]);
 });
 
-// (Folio's: a boss whose home has no inside, so no challenge in it: Babur's, Puddles' and Alfil's are e2e/boss-challenge.spec.ts's.)
+// (Sawyer's: a boss whose home has no inside, so no challenge in it: Babur's, Puddles' and Alfil's are e2e/boss-challenge.spec.ts's.
+// Folio's was this test's boss until its home got an inside, Nov 5.)
 test("a boss's card: 'Challenge alone', then 'Leave the town square?'; Stay keeps you, Leave opens the Boss raid screen with that boss's tile picked", async ({ page }) => {
   const errors = watchErrors(page);
   await page.addInitScript(() => ((window as any).__soundLog = []));
   await page.goto("/town");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
-  await toBabur(page, "folio", "Folio's Folded House");
-  let card = await openCard(page, "boss", "Folio", "folio");
+  await toBabur(page, "sawyer", "Sawyer's Woodshed");
+  let card = await openCard(page, "boss", "Sawyer", "sawyer");
   // No line on his card (only Hollow's has lines: Oct 28).
   await expect(card.locator(".town-card-line")).toHaveCount(0);
-  // He says something as his card opens (Eric, Oct 27: his town sound, Folio's murmur or hum), once: its confirm opening is the same card.
-  const said = () => page.evaluate(() => ((window as any).__soundLog as string[]).filter((l) => /^folio(Murmur|Hum)/.test(l)).length);
+  // He says something as his card opens (Eric, Oct 27: his town sound, Sawyer's select sound), once: its confirm opening is the same card.
+  const said = () => page.evaluate(() => ((window as any).__soundLog as string[]).filter((l) => /^sawyerRev/.test(l)).length);
   await expect.poll(said).toBe(1);
   await card.getByRole("button", { name: "Challenge alone" }).click();
   let confirm = page.getByRole("dialog", { name: "Leave the town square?" });
   await expect(confirm.getByRole("heading", { name: "Leave the town square?" })).toBeVisible();
   expect(await said()).toBe(1);
-  await expect(confirm.getByText("You'll fight Folio in Boss Battle.")).toBeVisible();
+  await expect(confirm.getByText("You'll fight Sawyer in Boss Battle.")).toBeVisible();
   // Stay: the confirm closes, and you're still in the town square.
   await confirm.getByRole("button", { name: "Stay" }).click();
   await expect(confirm).toBeHidden();
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
-  // Again, and Leave: the Boss raid screen (its tiles and stage), Folio's tile picked.
-  card = await openCard(page, "boss", "Folio", "folio");
+  // Again, and Leave: the Boss raid screen (its tiles and stage), Sawyer's tile picked.
+  card = await openCard(page, "boss", "Sawyer", "sawyer");
   await card.getByRole("button", { name: "Challenge alone" }).click();
   confirm = page.getByRole("dialog", { name: "Leave the town square?" });
   await confirm.getByRole("button", { name: "Leave" }).click();
   const tiles = page.getByRole("radiogroup", { name: "Bosses" });
   await expect(tiles).toBeVisible();
-  await expect(tiles.getByRole("radio", { name: "Folio", exact: true })).toHaveAttribute("aria-checked", "true");
-  await expect(page.locator(".bs-name")).toHaveText("Folio");
+  await expect(tiles.getByRole("radio", { name: "Sawyer", exact: true })).toHaveAttribute("aria-checked", "true");
+  await expect(page.locator(".bs-name")).toHaveText("Sawyer");
   expect(new URL(page.url()).pathname).toBe("/");
   await expect(page.getByRole("heading", { name: "Town square" })).toHaveCount(0);
   expect(errors).toEqual([]);
@@ -551,7 +552,9 @@ test("Folio's Folded House: a tap walks you there and opens its card with its na
     await expect(canvas(page)).toHaveAttribute("data-ready", "1");
     await visit();
     await expect(card.getByRole("heading", { name })).toBeVisible();
-    await expect(card.getByText("Coming soon", { exact: true })).toBeVisible();
+    // (A home you can go into since Nov 5, its sanctuary: its name and Go in, no Coming soon.)
+    await expect(card.getByRole("button")).toHaveText(["Go in"]);
+    await expect(card.getByText("Coming soon", { exact: true })).toHaveCount(0);
     // Its place (Eric, Oct 28: "folio's house is like 2 inches from the colosseum it's gotta get moved a bit"): its plot is columns
     // 34 to 36 now (it was 32 to 34), so you stop on the ring round it, column 33 or further east; the Colosseum's ground ends at
     // column 28 (5 open squares between them, 3 before).
