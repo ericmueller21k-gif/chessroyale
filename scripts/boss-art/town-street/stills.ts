@@ -1,63 +1,73 @@
 /**
- * Every still of the street town mockup (Nov 5): the game-camera views on phone (390 x 844) and computer (1440 x 900), the
- * corner turn's three frames, the near-side options side by side, the seam; written to scripts/boss-art/out/town-street/.
+ * The street town's final stills (Nov 5, round 1: the final art): every street by day on phone (390 x 844) and computer
+ * (1440 x 900), the corner turn's three frames and a dusk frame, a night street, and the three art sheets. Written to
+ * scripts/boss-art/out/town-art/ (the stills) and scripts/boss-art/out/town-buildings/ (the sheets).
  *
  *   npx tsx scripts/boss-art/town-street/stills.ts [only]
+ *   CHECK=1 ... prints every figure's box on screen (any cut off by the frame is flagged either way)
  */
 import { chromium } from "playwright";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { shoot, shootSheet } from "./view.ts";
-import type { Lot } from "./plan.ts";
+import type { HomeId } from "./plan.ts";
 
-const OUT = resolve("scripts/boss-art/out/town-street");
+const OUT = resolve("scripts/boss-art/out/town-art");
+const SHEETS = resolve("scripts/boss-art/out/town-buildings");
 const DAY = { dawn: 0, day: 1, dusk: 0, night: 0 };
 const DUSK = { dawn: 0, day: 0, dusk: 1, night: 0 };
+const NIGHT = { dawn: 0, day: 0, dusk: 0, night: 1 };
 const PHONE = { W: 390, H: 844 };
 const PC = { W: 1440, H: 900 };
 type S = Record<string, unknown>;
+type Boss = { id: HomeId; x: number; y: number; flip?: boolean };
+type Bot = { x: number; y: number; dark?: boolean };
 
-// The near row for the `cut` comparison: Seam Street's south side lined too (rows 40..42, fronts facing north, away from us).
-const nearRow: (Lot & { back: true })[] = [];
-{
-  const items: [Lot["id"], number][] = [["townhouse", 2], ["flats", 3], ["cottage", 3], ["skinny", 3], ["shop", 2], ["bakery", 3], ["townhouse", 2], ["flats", 3]];
-  let c = 3, n = 0;
-  while (c < 21) {
-    const [id, w] = items[n % items.length]!;
-    if (c + w > 21) break;
-    nearRow.push({ kind: "house", id, v: n % 4, c0: c, r0: 40, w, d: 3, facing: "S", street: "seam-st", back: true });
-    c += w;
-    n++;
-  }
-}
-
-// Per device: the phone shows about 9 squares across at the fronts, the computer about 17, so who's in view differs.
-const street = {
-  phone: { x: 11.8, y: -1, heading: 0, near: "open", bosses: [{ id: "gardener", x: 9.4, y: 2.1 }], bots: [{ x: 14.2, y: 1, dark: true }] },
-  computer: { x: 13, y: -1, heading: 0, near: "open", bosses: [{ id: "gardener", x: 9.6, y: 2.1 }, { id: "smudgy", x: 19.2, y: 2.1, flip: true }], bots: [{ x: 15.5, y: 1 }, { x: 7, y: 44.5, dark: true }] },
-};
-const park = {
-  phone: { x: 22.5, y: 11.5, heading: 0, near: "open", bots: [{ x: 20, y: 12, dark: true }, { x: 25, y: 17 }] },
-  computer: { x: 22.5, y: 11.5, heading: 0, near: "open", bots: [{ x: 18, y: 12 }, { x: 20, y: 12, dark: true }, { x: 27, y: 17 }, { x: 25, y: 17, dark: true }] },
-};
+/**
+ * Each street, standing on it 4 squares in front of its fronts (on the street's far half), the bosses out on their
+ * sidewalks (in their wander boxes), a bot or two. The phone shows about 9 squares across at the fronts, the computer about
+ * 17, so who's in view differs.
+ */
+const streets: { tag: string; phone: S & { bosses?: Boss[]; bots?: Bot[] }; computer: S & { bosses?: Boss[]; bots?: Bot[] } }[] = [
+  {
+    tag: "1-seam-street",
+    phone: { x: 11.8, y: -1, heading: 0, bosses: [{ id: "gardener", x: 9.4, y: 2.1 }], bots: [{ x: 14.2, y: 1, dark: true }] },
+    computer: { x: 13, y: -1, heading: 0, bosses: [{ id: "gardener", x: 9.6, y: 2.1 }, { id: "smudgy", x: 19.2, y: 2.1, flip: true }], bots: [{ x: 15.5, y: 1 }, { x: 7, y: 44.5, dark: true }] },
+  },
+  {
+    tag: "2-fountain-street",
+    phone: { x: 8, y: 14, heading: 0, bosses: [{ id: "timber", x: 5.6, y: 17.1 }], bots: [{ x: 9.6, y: 16, dark: true }] },
+    computer: { x: 8.5, y: 14, heading: 0, bosses: [{ id: "timber", x: 5.6, y: 17.1 }, { id: "sawyer", x: 11.4, y: 17.1, flip: true }], bots: [{ x: 3.2, y: 15 }, { x: 13.5, y: 16, dark: true }] },
+  },
+  {
+    tag: "3-colosseum-row",
+    phone: { x: 37.6, y: 22, heading: 0, bosses: [{ id: "bigboy", x: 35.4, y: 25.1 }], bots: [{ x: 39.5, y: 24 }] },
+    computer: { x: 36.5, y: 22, heading: 0, bosses: [{ id: "bigboy", x: 34.6, y: 25.1 }, { id: "blitz", x: 40.6, y: 25.1, flip: true }], bots: [{ x: 31, y: 23, dark: true }, { x: 42.5, y: 24 }] },
+  },
+  {
+    tag: "4-upper-street",
+    phone: { x: 38.6, y: 31, heading: 0, bosses: [{ id: "hollow", x: 38.4, y: 34.1 }], bots: [{ x: 36, y: 33, dark: true }] },
+    computer: { x: 38, y: 31, heading: 0, bosses: [{ id: "moo", x: 34.3, y: 34.1 }, { id: "hollow", x: 39.2, y: 34.1, flip: true }], bots: [{ x: 43.5, y: 32 }, { x: 31.5, y: 33, dark: true }] },
+  },
+  {
+    tag: "5-seam-avenue",
+    phone: { x: -1, y: 9, heading: 90, bots: [{ x: 1, y: 7.5, dark: true }] },
+    computer: { x: -1, y: 9.5, heading: 90, bots: [{ x: 1, y: 6.5, dark: true }, { x: 0, y: 13 }] },
+  },
+];
+// The corner turn: walking west on Seam Street, turning north onto Seam Avenue at the crossing.
 const turn = [
   { x: 3.2, y: -0.5, heading: 0, tag: "before" },
   { x: 0.2, y: 0.9, heading: 45, tag: "mid" },
   { x: -0.5, y: 4.6, heading: 90, tag: "after" },
 ];
-const seam = { x: -0.5, y: -0.5, heading: 0, near: "open", seam: true, bots: [{ x: 3, y: 2, dark: true }] };
 
 const jobs: { file: string; scene: S }[] = [];
 for (const [dev, box] of [["phone", PHONE], ["computer", PC]] as const) {
-  jobs.push({ file: `1-park-${dev}.png`, scene: { ...box, ...park[dev], sky: DAY } });
-  jobs.push({ file: `2-street-day-${dev}.png`, scene: { ...box, ...street[dev], sky: DAY } });
-  jobs.push({ file: `3-street-sunset-${dev}.png`, scene: { ...box, ...street[dev], sky: DUSK } });
-  for (const t of turn) jobs.push({ file: `4-turn-${t.tag}-${dev}.png`, scene: { ...box, ...t, near: "open", sky: DAY } });
-  for (const t of turn) jobs.push({ file: `4-turn-${t.tag}-dusk-${dev}.png`, scene: { ...box, ...t, near: "open", sky: DUSK } });
-  jobs.push({ file: `4-turn-mid-flat-${dev}.png`, scene: { ...box, ...turn[1]!, near: "open", sky: DAY, flat: true } });
-  jobs.push({ file: `5-near-open-${dev}.png`, scene: { ...box, ...street[dev], sky: DAY } });
-  jobs.push({ file: `5-near-cut-${dev}.png`, scene: { ...box, ...street[dev], near: "cut", nearRow, sky: DAY } });
-  jobs.push({ file: `6-seam-${dev}.png`, scene: { ...box, ...seam, sky: DAY } });
+  for (const st of streets) jobs.push({ file: `${st.tag}-day-${dev}.png`, scene: { ...box, ...st[dev], near: "open", sky: DAY } });
+  for (const t of turn) jobs.push({ file: `6-turn-${t.tag}-${dev}.png`, scene: { ...box, ...t, near: "open", sky: DAY } });
+  jobs.push({ file: `6-turn-mid-dusk-${dev}.png`, scene: { ...box, ...turn[1]!, near: "open", sky: DUSK } });
+  jobs.push({ file: `7-night-seam-street-${dev}.png`, scene: { ...box, ...streets[0]![dev], near: "open", sky: NIGHT } });
 }
 
 /** Pictures side by side on one sheet, each with a caption, a title over them. */
@@ -72,55 +82,23 @@ async function sheet(file: string, title: string, cells: { img: string; cap: str
   console.log(`wrote ${file}`);
 }
 
-/** A part of a still (CSS pixels: x, y, w, h of the frame) blown up 2x, nearest neighbour, under a title. */
-async function closeup(file: string, title: string, src: string, x: number, y: number, w: number, h: number) {
-  const data = readFileSync(resolve(OUT, src)).toString("base64");
-  // (The stills are saved at 2 device pixels a CSS pixel, so 2x of the frame is the saved pixels 1:1... shown at 2x of CSS size.)
-  const html = `<html><body style="margin:0;background:#f4efe4;font-family:Archivo,Arial,sans-serif;color:#2a2a2a"><div id=s style="display:inline-block;padding:20px 24px"><h1 style="font-size:22px;margin:0 0 10px">${title}</h1><div style="width:${w * 2}px;height:${h * 2}px;overflow:hidden;border-radius:6px;box-shadow:0 1px 4px #0003"><img src="data:image/png;base64,${data}" style="display:block;image-rendering:pixelated;width:${1440 * 2}px;margin-left:${-x * 2}px;margin-top:${-y * 2}px"></div></div></body></html>`;
-  const browser = await chromium.launch(existsSync(chromium.executablePath()) ? {} : { executablePath: "/opt/pw-browsers/chromium", args: ["--headless", "--no-sandbox"] });
-  const page = await browser.newPage({ viewport: { width: 400, height: 300 }, deviceScaleFactor: 1 });
-  await page.setContent(html);
-  await page.locator("#s").screenshot({ path: resolve(OUT, file) });
-  await browser.close();
-  console.log(`wrote ${file}`);
-}
-
 const only = process.argv[2];
-await shoot(only ? jobs.filter((j) => j.file.includes(only)) : jobs, OUT);
+if (only !== "art") await shoot(only ? jobs.filter((j) => j.file.includes(only)) : jobs, OUT);
 if (!only || only === "sheets") {
-  await sheet("4-turn-phone.png", "Turning the corner from Seam Street onto Seam Avenue (phone)", [
-    { img: "4-turn-before-phone.png", cap: "Before: on Seam Street, walking west, the camera facing north." },
-    { img: "4-turn-mid-phone.png", cap: "Mid-turn: you've turned north at the crossing; the camera swings round, halfway (facing north-east)." },
-    { img: "4-turn-after-phone.png", cap: "After: on Seam Avenue, walking north; the camera faces east, at the avenue's fronts." },
+  await sheet("6-turn-phone.png", "The corner turn: Seam Street onto Seam Avenue (phone)", [
+    { img: "6-turn-before-phone.png", cap: "Before: on Seam Street, walking west, the camera facing north." },
+    { img: "6-turn-mid-phone.png", cap: "Mid-turn (45 degrees): the corner buildings' sides and roofs; the bigger ones behind show theirs." },
+    { img: "6-turn-after-phone.png", cap: "After: on Seam Avenue, walking north, the camera facing east at the avenue's fronts." },
+    { img: "6-turn-mid-dusk-phone.png", cap: "Mid-turn at dusk: the sides take the dusk tint; their windows light as the fronts' do." },
   ], 390);
-  await sheet("4-turn-computer.png", "Turning the corner from Seam Street onto Seam Avenue (computer)", [
-    { img: "4-turn-before-computer.png", cap: "Before: Seam Street, facing north." },
-    { img: "4-turn-mid-computer.png", cap: "Mid-turn: facing north-east." },
-    { img: "4-turn-after-computer.png", cap: "After: Seam Avenue, facing east." },
-  ], 720);
-  await sheet("4-turn-dusk-phone.png", "The same turn at dusk (phone)", [
-    { img: "4-turn-before-dusk-phone.png", cap: "Before: Seam Street, facing north." },
-    { img: "4-turn-mid-dusk-phone.png", cap: "Mid-turn: the sides take the dusk light and tint like the fronts; their windows light up too." },
-    { img: "4-turn-after-dusk-phone.png", cap: "After: Seam Avenue, facing east." },
-  ], 390);
-  await sheet("4-turn-dusk-computer.png", "The same turn at dusk (computer)", [
-    { img: "4-turn-before-dusk-computer.png", cap: "Before." },
-    { img: "4-turn-mid-dusk-computer.png", cap: "Mid-turn." },
-    { img: "4-turn-after-dusk-computer.png", cap: "After." },
-  ], 720);
-  await sheet("4-turn-flat-vs-box-phone.png", "Mid-turn, flat fronts (Eric's comment) and the buildings as boxes (phone)", [
-    { img: "4-turn-mid-flat-phone.png", cap: "Before the fix: each building one flat front; at 45 degrees you can see they're cut-outs." },
-    { img: "4-turn-mid-phone.png", cap: "Now: each building a box: its front, side walls in its own material with its windows and trim carried round, its roof carried back, shaded as the town is lit." },
-  ], 390);
-  await closeup("4-turn-mid-closeup-2x.png", "Mid-turn close-up at 2x (computer frame): the corner bakery at the crossing, its side and roof", "4-turn-mid-computer.png", 360, 60, 560, 420);
-  await closeup("4-turn-mid-dusk-closeup-2x.png", "Mid-turn close-up at 2x, at dusk", "4-turn-mid-dusk-computer.png", 360, 60, 560, 420);
-  await sheet("5-near-phone.png", "The near side of a street: two options (phone, Seam Street)", [
-    { img: "5-near-open-phone.png", cap: "A. No near row (recommended): the near side is the back gardens of the next street's row: a hedge, flower beds, bushes, a shed. Nothing tall, nothing to draw from behind." },
-    { img: "5-near-cut-phone.png", cap: "B. A near row, cut away: buildings on both sides, the near ones drawn as their backs cut off at knee height (a dollhouse cut)." },
-  ], 390);
-  await sheet("5-near-computer.png", "The near side of a street: two options (computer)", [
-    { img: "5-near-open-computer.png", cap: "A. No near row (recommended)." },
-    { img: "5-near-cut-computer.png", cap: "B. A near row, cut away." },
+  await sheet("6-turn-computer.png", "The corner turn: Seam Street onto Seam Avenue (computer)", [
+    { img: "6-turn-before-computer.png", cap: "Before: Seam Street, facing north." },
+    { img: "6-turn-mid-computer.png", cap: "Mid-turn: facing north-east." },
+    { img: "6-turn-after-computer.png", cap: "After: Seam Avenue, facing east." },
   ], 720);
 }
-if (!only || only === "facades") await shootSheet(resolve(OUT, "7-everyday-buildings.png"));
+if (!only || only === "sheets" || only === "art") {
+  await shootSheet(resolve(SHEETS, "buildings-sheet.png"), "sheetBuildings");
+  await shootSheet(resolve(SHEETS, "homes-sheet.png"), "sheetHomes");
+  await shootSheet(resolve(SHEETS, "dressing-sheet.png"), "sheetDressing");
+}

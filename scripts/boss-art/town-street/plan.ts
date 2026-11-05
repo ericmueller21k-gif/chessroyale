@@ -120,16 +120,16 @@ export const STATUES = [
 ];
 
 // ---- Buildings.
-/** A home's id (houses/index.ts HOUSES, plus Timber's and Dash's from out/house-timber, out/house-blitz). */
-export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil" | "folio" | "timber" | "blitz";
-/** The everyday designs (facades.ts). */
-export type Design = "cottage" | "townhouse" | "skinny" | "flats" | "bakery" | "shop" | "block" | "tower";
+import type { HomeId } from "../out/town-buildings/home-boxes.ts";
+import type { Design } from "../out/town-buildings/buildings.ts";
+import { HOME_DOOR_PX } from "../out/town-buildings/home-boxes.ts";
+export type { HomeId, Design };
 export type Facing = "S" | "W";
 export interface Lot {
   /** A boss home, an everyday front-row building, or a bigger one standing behind. */
   kind: "home" | "house" | "tall";
   id: HomeId | Design;
-  /** Its colors (an everyday design's palette swap). */
+  /** Its colourway (an everyday design's: 0..2, buildings.ts COLOURWAYS). */
   v: number;
   /** Its ground: first column and row (its south-west square), across and deep, in squares along the street and away from it. */
   c0: number;
@@ -177,7 +177,7 @@ rowS("seam-st", 3, 25, [
 // Fountain Street (Fire & Ice): r 18, both sides of the seam.
 rowS("fountain-st", 18, 3, [
   ["home", "timber", 4],
-  ["house", "townhouse", 2, 3],
+  ["house", "townhouse", 2, 0],
   ["home", "sawyer", 4],
 ]);
 rowS("fountain-st", 18, 33, [
@@ -193,7 +193,7 @@ rowS("colosseum-row", 26, 3, [
 ]);
 rowS("colosseum-row", 26, 33, [
   ["home", "bigboy", 4],
-  ["house", "townhouse", 2, 0],
+  ["house", "townhouse", 2, 1],
   ["home", "blitz", 4],
 ]);
 // Upper Street (the Meadow): r 35.
@@ -214,7 +214,7 @@ rowW(6, [
 ]);
 rowW(38, [
   ["house", "cottage", 3, 0],
-  ["house", "townhouse", 2, 4],
+  ["house", "townhouse", 2, 2],
 ]);
 // The bigger buildings behind the front rows (you can't reach them): behind Seam Street, behind Upper Street.
 const tall = (id: Design, c0: number, r0: number, w: number, v: number, street: string) => LOTS.push({ kind: "tall", id, v, c0, r0, w, d: 3, facing: "S", street });
@@ -223,7 +223,7 @@ tall("tower", 14, 6, 2, 0, "seam-st");
 tall("block", 17, 6, 4, 1, "seam-st");
 tall("block", 27, 6, 4, 2, "seam-st");
 tall("tower", 33, 6, 2, 1, "seam-st");
-tall("block", 38, 6, 4, 3, "seam-st");
+tall("block", 38, 6, 4, 0, "seam-st");
 tall("block", 6, 38, 4, 1, "upper-st");
 tall("tower", 11, 38, 2, 2, "upper-st");
 tall("block", 34, 38, 4, 2, "upper-st");
@@ -234,10 +234,11 @@ for (const l of LOTS) for (let i = 0; i < l.w; i++) for (let j = 0; j < l.d; j++
 for (let r = 26; r <= 42; r += 2) for (const c of [13.5, 15.5, 29.5, 31.5]) PROPS.push({ kind: "tree", x: c, y: r + (c % 4 > 2 ? 1 : 0), v: (r + c) % 3 | 0 });
 for (let c = 17.5; c <= 28.5; c += 2) for (const r of [40.5, 42]) PROPS.push({ kind: "tree", x: c, y: r, v: (c | 0) % 3 });
 // Lamps along the sidewalks (one every 6 squares on the fronts' side, one every 6 on the near side, offset).
-for (let c = 4; c < 46; c += 6) if (c < 13 || c > 32) for (const r of [12, 17, 25, 29, 34]) PROPS.push({ kind: "lamp", x: c + 0.5, y: r, v: 0 });
-for (let c = 1; c < 46; c += 6) if (c < 20 || c > 25) PROPS.push({ kind: "lamp", x: c + 0.5, y: 2, v: 0 });
-for (let c = 4; c < 46; c += 6) PROPS.push({ kind: "lamp", x: c + 0.5, y: 43, v: 0 });
-for (let r = 4; r < 46; r += 6) PROPS.push({ kind: "lamp", x: 2, y: r + 0.5, v: 0 }, { kind: "lamp", x: 43, y: r + 3.5, v: 0 });
+// (Each lamp stands on a whole sidewalk square, the park's lamp; never on a door square: plan-doc.ts checks.)
+for (let c = 4; c < 46; c += 6) if (c < 13 || c > 32) for (const r of [12, 17, 25, 29, 34]) PROPS.push({ kind: "lamp", x: c, y: r, v: 0 });
+for (let c = 1; c < 46; c += 6) if (c < 20 || c > 25) PROPS.push({ kind: "lamp", x: c, y: 2, v: 0 });
+for (let c = 4; c < 46; c += 6) PROPS.push({ kind: "lamp", x: c, y: 43, v: 0 });
+for (let r = 4; r < 46; r += 6) PROPS.push({ kind: "lamp", x: 2, y: r, v: 0 }, { kind: "lamp", x: 43, y: r + 3, v: 0 });
 // The back gardens' low hedges along the near sidewalks (a hedge prop per square: drawn low, never covering you).
 for (let c = 0; c < N; c++) {
   for (const r of [42, 11, 28, 20]) {
@@ -290,3 +291,50 @@ export const HOME_INFO: Record<HomeId, { boss: string; name: string; color: stri
   moo: { boss: "Moo & Moon", name: "Moo & Moon Meadow", color: "#5d7ad8", theme: "Meadow" },
   hollow: { boss: "Hollow", name: "Hollow Peak", color: "#7a4fd0", theme: "Meadow" },
 };
+
+// ---- What the layout code needs beyond the lots (Nov 5, final): door squares, where bosses wander, where people walk,
+// your start, the camera's turn zones.
+
+/** Where you start: the promenade just south of the fountain, facing north up it (the plaza and the Colosseum ahead). */
+export const START = { c: 22, r: 11, heading: 0 } as const;
+
+/** A home's door square: the sidewalk square in front of its door (Eric, Nov 5: the square a tap on the home walks you to). */
+export function doorSquare(l: Lot): { c: number; r: number } {
+  const px = HOME_DOOR_PX[l.id as HomeId];
+  const picW = l.id === "alfil" ? 208 : 144;
+  const along = Math.floor((px + (l.w * 37 - picW) / 2) / 37);
+  return l.facing === "S" ? { c: wrap(l.c0 + along), r: wrap(l.r0 - 1) } : { c: wrap(l.c0 - 1), r: wrap(l.r0 + l.w - 1 - along) };
+}
+/**
+ * Where a boss may wander (Eric, Nov 5): its own lot's front strip (the yard before its front, inset squares deep) and the
+ * sidewalk in front, the lot's width along. In squares (centres), inclusive: x0..x1 across, y0..y1 deep.
+ */
+export function wanderBox(l: Lot): { x0: number; x1: number; y0: number; y1: number } {
+  return { x0: l.c0 - 0.3, x1: l.c0 + l.w - 0.7, y0: l.r0 - 1.3, y1: l.r0 - 0.15 };
+}
+/** Squares a prop stands on and blocks (a tree, a table and its stools, the fountain, a bench, a lamp, a shed). */
+export function blockedSquares(): Set<number> {
+  const b = new Set<number>();
+  for (const p of PROPS) {
+    if (p.kind === "hedge" || p.kind === "bed" || p.kind === "bush") continue;
+    if (p.kind === "fountain") {
+      for (const [dc, dr] of [[-0.5, 1], [0.5, 1], [-0.5, 2], [0.5, 2]] as const) b.add(at(Math.round(p.x + dc), Math.round(p.y + dr)));
+      continue;
+    }
+    b.add(at(Math.round(p.x), Math.round(p.y)));
+    if (p.kind === "table") (b.add(at(Math.round(p.x) - 1, Math.round(p.y))), b.add(at(Math.round(p.x) + 1, Math.round(p.y))));
+  }
+  return b;
+}
+/** Where people (you and the bots) may walk: the streets, the sidewalks, South Lane, the park's walks and lawns, the Colosseum's apron; not the lots, the gardens, the grove or anything a prop stands on. */
+export function walkable(c: number, r: number, blocked = blockedSquares()): boolean {
+  const g = ground[at(c, r)]!;
+  return (g === BOARD || g === PAVE || g === GRASS) && !blocked.has(at(c, r));
+}
+/** Seam Avenue's four crossings: the squares where the camera faces north while you're on the avenue (rows inclusive, wrapping). */
+export const TURN_ZONES = [
+  { street: "seam-st", rows: [43, 47] },
+  { street: "fountain-st", rows: [12, 17] },
+  { street: "colosseum-row", rows: [21, 25] },
+  { street: "upper-st", rows: [29, 34] },
+] as const;

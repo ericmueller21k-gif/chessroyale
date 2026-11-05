@@ -43,14 +43,14 @@ export async function shoot(jobs: { file: string; scene: Record<string, unknown>
   }
 }
 
-/** The everyday buildings' sheet (harness.ts sheet()). */
-export async function shootSheet(file: string): Promise<void> {
+/** A sheet (harness.ts sheetBuildings, sheetHomes, sheetDressing). */
+export async function shootSheet(file: string, fn: "sheetBuildings" | "sheetHomes" | "sheetDressing"): Promise<void> {
   const js = await bundle();
   const browser = await chromium.launch(existsSync(chromium.executablePath()) ? {} : { executablePath: "/opt/pw-browsers/chromium", args: ["--headless", "--no-sandbox"] });
   const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
   await page.setContent(`<html><body style="margin:0"><canvas id=c></canvas></body></html>`);
   await page.addScriptTag({ content: js });
-  await page.evaluate(() => (window as unknown as { townStreet: { sheet: (c: HTMLCanvasElement) => void } }).townStreet.sheet(document.getElementById("c") as HTMLCanvasElement));
+  await page.evaluate((f) => (window as unknown as { townStreet: Record<string, (c: HTMLCanvasElement) => Promise<void>> }).townStreet[f]!(document.getElementById("c") as HTMLCanvasElement), fn);
   await page.locator("#c").screenshot({ path: file });
   await browser.close();
   console.log(`wrote ${file}`);

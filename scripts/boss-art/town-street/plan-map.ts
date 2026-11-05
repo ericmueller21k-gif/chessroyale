@@ -1,5 +1,5 @@
 /**
- * The street town's overhead plan (Nov 5 mockup), north up, from plan.ts: the streets (the chessboard), the sidewalks, the
+ * The street town's overhead plan (Nov 5, final), north up, from plan.ts: the streets (the chessboard), the sidewalks, the
  * plus park and its 12 tables, the Colosseum in its grove, every lot (the boss homes named, the everyday ones by design,
  * the bigger buildings behind), the back gardens, and the camera's facing on each street.
  *
@@ -7,8 +7,8 @@
  */
 import { chromium } from "playwright";
 import { existsSync } from "node:fs";
-import { ARENA, BOARD, COLISEUM, GARDEN, GRASS, HOME_INFO, LOT, LOTS, N, PAVE, PROPS, STREETS, TABLES, ground, type HomeId } from "./plan.ts";
-import { DESIGN_NAMES } from "./facades.ts";
+import { ARENA, BOARD, COLISEUM, GARDEN, GRASS, HOME_INFO, LOT, LOTS, N, PAVE, PROPS, START, STREETS, TABLES, TURN_ZONES, doorSquare, ground, wanderBox, type Design, type HomeId } from "./plan.ts";
+import { COLOURWAYS } from "../out/town-buildings/buildings.ts";
 
 const out = process.argv[2] ?? "plan.png";
 const S = 19;
@@ -17,11 +17,9 @@ const X = (c: number) => ox + c * S;
 const Y = (r: number) => oy + (N - 1 - r) * S; // top edge of row r
 const C = { bg: "#f4efe4", ink: "#2a2a2a", soft: "#6b6457", light: "#efd9b0", dark: "#d9b27a", pave: "#e3ded4", grass: "#8fca6a", garden: "#b9dc9c", arena: "#c9b48a", tree: "#3f8f3a", water: "#5ab0e0" };
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
-const WALL = ["#f1d78f", "#a9c7e4", "#b1dbbf", "#efb3bf", "#c6bae8", "#f0b88d", "#d8d0c2"];
-const ROOF = ["#b8453a", "#566a8f", "#568c50", "#8a6244", "#3f8c8a"];
 
 let b = "";
-b += `<text x="${ox}" y="38" font-size="26" font-weight="700" fill="${C.ink}">A street town: revised plan (north up)</text>`;
+b += `<text x="${ox}" y="38" font-size="26" font-weight="700" fill="${C.ink}">The street town: the final plan (north up), Nov 5</text>`;
 b += `<text x="${ox}" y="64" font-size="14" fill="${C.soft}">46 × 46 squares, as today, and it still wraps: walk off any edge and you're back on the opposite one. The two seam streets run along the wrap's seams</text>`;
 b += `<text x="${ox}" y="82" font-size="14" fill="${C.soft}">(you see half of each at either edge). Arrows: which way the camera faces on that street. Every street's fronts face the camera; the other side is back gardens.</text>`;
 b += `<defs><clipPath id="m"><rect x="${ox}" y="${oy}" width="${N * S}" height="${N * S}"/></clipPath>
@@ -53,14 +51,14 @@ for (const l of LOTS) {
       b += `<rect x="${x + 1}" y="${y + 1}" width="${W - 4}" height="${H - 4}" fill="#8792a6" stroke="#4d5668" stroke-width="1.5" rx="1"/>`;
       for (let i = 1; i < w * 2; i++) b += `<line x1="${x + 1 + (i * (W - 4)) / (w * 2)}" y1="${y + 4}" x2="${x + 1 + (i * (W - 4)) / (w * 2)}" y2="${y + H - 6}" stroke="#a7b1c3" stroke-width="1"/>`;
     } else {
-      const roof = ROOF[(l.v + l.w) % ROOF.length]!;
+      const roof = COLOURWAYS[l.id as Design][l.v]!.roof[1];
       b += `<rect x="${x + 1}" y="${y + 1}" width="${W - 2}" height="${H - 2}" fill="${roof}" stroke="#3a2d22" stroke-width="1" rx="1"/>`;
       // The ridge, along the street.
       if (l.facing === "S") b += `<line x1="${x + 3}" y1="${y + H / 2}" x2="${x + W - 3}" y2="${y + H / 2}" stroke="#0005" stroke-width="1.5"/>`;
       else b += `<line x1="${x + W / 2}" y1="${y + 3}" x2="${x + W / 2}" y2="${y + H - 3}" stroke="#0005" stroke-width="1.5"/>`;
     }
     // Its front: a bright edge on the street side.
-    const fc = l.kind === "home" ? "#fff" : WALL[(l.v * 3 + l.w) % WALL.length]!;
+    const fc = l.kind === "home" ? "#fff" : l.kind === "tall" ? "#c7cedb" : COLOURWAYS[l.id as Design][l.v]!.wall[1];
     if (l.facing === "S") b += `<rect x="${x + 1}" y="${y + H - 5}" width="${W - 2}" height="4" fill="${fc}" stroke="#3a2d22" stroke-width="0.8"/>`;
     else b += `<rect x="${x + 1}" y="${y + 1}" width="4" height="${H - 2}" fill="${fc}" stroke="#3a2d22" stroke-width="0.8"/>`;
     if (l.side) b += `<rect x="${x + 1}" y="${y + 1}" width="3" height="${H - 2}" fill="${fc}" opacity="0.7"/>`;
@@ -79,6 +77,19 @@ for (const p of PROPS) {
   if (p.kind === "fountain") b += `<circle cx="${X(p.x) + S / 2}" cy="${Y(p.y + 1.5) + S}" r="${S * 0.95}" fill="${C.water}" stroke="#fff" stroke-width="2"/>`;
 }
 for (const t of TABLES) b += `<rect x="${X(t.c) + 3}" y="${Y(t.r) + 3}" width="${S - 6}" height="${S - 6}" fill="#6b4a2a"/><rect x="${X(t.c - 1) + 6}" y="${Y(t.r) + 6}" width="${S - 12}" height="${S - 12}" fill="#cfc4ad"/><rect x="${X(t.c + 1) + 6}" y="${Y(t.r) + 6}" width="${S - 12}" height="${S - 12}" fill="#cfc4ad"/>`;
+// The turn zones (Seam Avenue's crossings: the camera faces north there, east elsewhere on the avenue), hatched.
+b += `<pattern id="hz" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="3" height="6" fill="#1f253055"/></pattern>`;
+for (const z of TURN_ZONES) for (let r = z.rows[0]; r <= z.rows[1]; r++) for (const c of [43, 44, 45, 0, 1, 2]) b += `<rect x="${X(c)}" y="${Y(r % N)}" width="${S}" height="${S}" fill="url(#hz)"/>`;
+// Where each boss wanders (dashed), its door square (gold).
+for (const l of LOTS) {
+  if (l.kind !== "home") continue;
+  const wb = wanderBox(l);
+  b += `<rect x="${X(wb.x0)}" y="${Y(wb.y1)}" width="${(wb.x1 - wb.x0 + 1) * S}" height="${(wb.y1 - wb.y0 + 1) * S}" fill="none" stroke="#fff" stroke-width="1.6" stroke-dasharray="4 3"/>`;
+  const d = doorSquare(l);
+  b += `<rect x="${X(d.c) + 3}" y="${Y(d.r) + 3}" width="${S - 6}" height="${S - 6}" fill="#ffd76a" stroke="#1f2530" stroke-width="1.4"/>`;
+}
+// Your start.
+b += `<circle cx="${X(START.c) + S / 2}" cy="${Y(START.r) + S / 2}" r="${S * 0.42}" fill="#ffd76a" stroke="#1f2530" stroke-width="2"/><text x="${X(START.c) + S / 2}" y="${Y(START.r) + S / 2 + 4}" font-size="10" font-weight="800" text-anchor="middle" fill="#1f2530">You</text>`;
 // Camera arrows: north on the east-west streets (and the park and plaza), east on Seam Avenue.
 const arrow = (x: number, y: number, dx: number, dy: number) => `<line x1="${x - dx * 9}" y1="${y - dy * 9}" x2="${x + dx * 9}" y2="${y + dy * 9}" stroke="#1f2530" stroke-width="3" marker-end="url(#ar)"/>`;
 for (const s of STREETS) {
@@ -153,7 +164,12 @@ b += sw("#8792a6", "A bigger building behind the rows (can't be reached)");
 b += `<line x1="${kx}" y1="${ky - 4}" x2="${kx + 18}" y2="${ky - 4}" stroke="#1f2530" stroke-width="3" marker-end="url(#ar)"/><text x="${kx + 28}" y="${ky + 1}" font-size="14" fill="${C.ink}">Which way the camera faces there</text>`;
 ky += 24;
 b += `<line x1="${kx}" y1="${ky - 4}" x2="${kx + 18}" y2="${ky - 4}" stroke="#1f2530" stroke-width="2" stroke-dasharray="5 3"/><text x="${kx + 28}" y="${ky + 1}" font-size="14" fill="${C.ink}">The wrap's seams (nothing shows there in the game)</text>`;
-ky += 34;
+ky += 24;
+b += sw("#ffd76a", "A home's door square (a tap on the home walks you here)");
+b += sw("none", "Where its boss wanders (its yard and sidewalk)", 'stroke-dasharray="4 3" stroke="#555"');
+b += sw("url(#hz)", "Turn zone: the camera faces north here");
+b += sw("#ffd76a", "Your start (facing north up the promenade)", 'rx="9"');
+ky += 10;
 b += head("The numbers");
 const homes = LOTS.filter((l) => l.kind === "home").length;
 const houses = LOTS.filter((l) => l.kind === "house").length;
@@ -199,4 +215,4 @@ const page = await browser.newPage({ viewport: { width: w, height: h }, deviceSc
 await page.setContent(html);
 await page.locator("#s").screenshot({ path: out });
 await browser.close();
-console.log(`wrote ${out} (${homes} homes, ${houses} everyday, ${talls} behind, ${frontage} squares of front; ${DESIGN_NAMES.cottage ? "" : ""})`);
+console.log(`wrote ${out} (${homes} homes, ${houses} everyday, ${talls} behind, ${frontage} squares of front)`);
