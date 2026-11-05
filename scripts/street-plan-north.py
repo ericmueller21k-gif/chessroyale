@@ -21,6 +21,7 @@ Colosseum plaza"; "the south edge is closed by a row of buildings". What this do
   along the closing row's sidewalk).
 - `wrap`: {"ew": true, "ns": false}: the one switch (Eric may close east-west later).
 Round 5 (the section above `out`): the grove beside the Colosseum and along the back, its walls and gates, the back wall.
+Round 6 (after it): no trees on the grove's squares under the street town's wider Colosseum.
 """
 import json
 import sys
@@ -160,6 +161,16 @@ lots.append(wall("The Colosseum's west wall", 13, 34, 4, 0.5, 166, 32, 0.6))
 lots.append(wall("The Colosseum's east wall", 29, 34, 4, 0.5, 166, 118, 0.6))
 for i, (c0, w) in enumerate([(0, 6), (6, 6), (12, 5), (29, 5), (34, 6), (40, 6)]):
     lots.append(wall(f"The back wall ({i + 1})", c0, 45, w, 1.0, 148, None, 0.5))
+
+# ---- Round 6 (Nov 5, later; Eric: "make it taller and bigger, so it really feels like a true overwhelmingly large kind of building"):
+# the street town's Colosseum is drawn a quarter wider (houses/coliseum.ts STREET: its oval 304 px either side of its axis, 8.2
+# squares), so its sides stand over the grove's inner columns (15, 16 and 29, 30). Those squares stay grove (nobody walks there); the
+# trees and shrubs on them, which would stand inside it, go. The walls and gates keep their lots: their outer halves, gates and all,
+# show beside it.
+COL_AXIS = col["c0"] + (col["size"] - 1) / 2
+COL_HALF = 304 / 37
+UNDER = {(c, r) for (c, r) in GROVE if r >= col["r0"] and abs(c - COL_AXIS) < COL_HALF}
+props = [p for p in props if (round(p["x"]), round(p["y"])) not in UNDER]
 
 out = {
     "size": src["size"],

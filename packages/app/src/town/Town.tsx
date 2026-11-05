@@ -1433,6 +1433,10 @@ function startTown(
           horizon: r.view.hy,
           // The street town's boxes drawn in the last frame and their draws (the 2D fallback's cost; WebGL batches them).
           boxes: r.boxDraws(),
+          // (Round 6: the Colosseum as the last frame drew it, its box on screen and whether from afar; how many of its top's columns
+          // showed over everything drawn after it.)
+          col: r.colDrawn,
+          colTop: r.colTopShows(),
         }
       : null;
   // ... and `__townGather()` sends the three bots nearest you to stand beside you (to see a ring form).

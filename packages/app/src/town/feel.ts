@@ -166,6 +166,11 @@ export const TOWN_FEEL = {
   /** While it turns, the clouds slide this many box widths a quarter turn (the sun stays put). */
   streetTurnClouds: 1.3,
   /**
+   * The street town's Colosseum (Nov 5, round 6: drawn from everywhere, its top tiers over the rows) hazes toward the sky with distance as
+   * the far band does, but never more than this (0 to 1): the landmark you steer by stays clear across the town.
+   */
+  streetColHaze: 0.4,
+  /**
    * The buildings' boxes (Nov 5, round 3; box-draw.ts): a roof face whose drawing would be under this many pixels across is left out
    * (a water tank's legs from afar), and a face is drawn in one piece (not two triangles) when its last corner would land within this
    * many pixels of where one piece puts it.

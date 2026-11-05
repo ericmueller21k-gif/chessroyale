@@ -44,7 +44,7 @@ import { STREET_TOWN } from "./admin-town.ts";
 import { building } from "./buildings.ts";
 import type { TownBox } from "./town-kit.ts";
 import { HEDGE, bed, bush, hedgeFront, hedgeTop, shed } from "./dressing.ts";
-import { colosseumSeen, ROW_GROUND, STREET_BUILDINGS, STREET_GROUND, STREET_GROUND_KEY, STREET_LOTS } from "./street.ts";
+import { ROW_GROUND, STREET_BUILDINGS, STREET_GROUND, STREET_GROUND_KEY, STREET_LOTS } from "./street.ts";
 /** The lots' squares (a camera standing in one, backed up to a front, sees from your square only). */
 const ROW_LOT = STREET_GROUND.map((g) => +(g === STREET_GROUND_KEY.L));
 import { affine, boxPoint, geomOf, lotArt, newPlan, planBox, streetBoxes, type BoxInst, type BoxPlan, type WallPlan } from "./boxes.ts";
@@ -785,8 +785,12 @@ export class Renderer {
   private readonly roofs = new Map<TownBox, Map<string, RoofArt>>();
   /** The camera's heading this frame (degrees from north: the street town's turn). */
   heading = 0;
-  /** (The street town) Whether the Colosseum shows from where you stand this frame (street.ts colosseumSeen). */
-  colSeen = true;
+  /**
+   * (The street town, round 6; tests) The Colosseum as the last frame drew it: its picture's box on screen (null: not drawn), whether from
+   * afar (past the rim, behind everything), and `top`: how many of its top's columns (sampled every 4 px across it) showed over
+   * everything drawn after it (`colTopShows`).
+   */
+  colDrawn: { x0: number; y0: number; x1: number; y1: number; far: boolean } | null = null;
 
   /** What it draws with (paint.ts: Canvas 2D, or WebGL 2 with `?gl=1`), and that one's context. */
   private ctx: Ctx;
@@ -1496,13 +1500,10 @@ export class Renderer {
     // The Colosseum past the rim, its top over the horizon (slice 6: the landmark from anywhere), behind everything.
     const col = this.houseItems[this.homes.length]!;
     this.farOn = false;
-    // (The street town, round 4: only where the rows let you see it, down a street or across a square that opens onto it; near too.)
-    if (STREET_TOWN) {
-      // (From where the camera looks: you, as it follows you; wherever it glides to as you look round.)
-      this.colSeen = colosseumSeen(this.camX, this.camY);
-      if (!this.colSeen) col.on = false;
-      else if (!col.on) this.drawFarColiseum(col, now);
-    } else if (!col.on) this.drawFarColiseum(col, now);
+    // (The street town, round 6; Eric: "make it taller and bigger, so it really feels like a true overwhelmingly large kind of building":
+    // from everywhere, its top tiers over the rows. Round 4 drew it only where a straight line reached it past the lots.)
+    this.colDrawn = null;
+    if (!col.on) this.drawFarColiseum(col, now);
     for (const it of items) {
       if (!it.on) continue;
       if (it.kind === "house") {
@@ -2143,6 +2144,7 @@ export class Renderer {
    * world. It isn't tapped (its chip is), and it has no floating name.
    */
   private drawFarColiseum(it: Item, now: number): void {
+    if (STREET_TOWN) return this.drawFarStreet(it, now);
     const { ctx, view: v, p } = this;
     const f = TOWN_FEEL;
     const R = radial(v, it.dx, it.dz);
@@ -2174,6 +2176,91 @@ export class Renderer {
   }
   /** The Colosseum was drawn from afar this frame (so its chip isn't shown: it's in view). */
   private farOn = false;
+
+  /**
+   * The street town's Colosseum past the rim (Nov 5, round 6): where it really stands, at its size there (the world's curve and all), so
+   * its top tiers rise over the rows from the streets south of it; drawn first, behind everything, only above the horizon (the curve
+   * hides its foot). Hazed as `colHaze` says, as it is just inside the rim, so nothing pops as it crosses. It isn't tapped (its chip is).
+   */
+  private drawFarStreet(it: Item, now: number): void {
+    const { ctx, view: v, p } = this;
+    if (it.dz <= 0 || radial(v, it.dx, it.dz) <= v.rim || v.rimN < 2) return;
+    if (!proj(v, it.dx, it.dz, 0, p)) return;
+    const px = p.k / TOWN_FEEL.housePxPerSquare;
+    const ch = artOf(this.places[it.i]!).ch;
+    const w = ch.w * px;
+    const h = ch.h * px;
+    const x0 = p.x - ch.foot[0] * px;
+    const y0 = p.y - ch.foot[1] * px;
+    if (x0 > this.W || x0 + w < 0 || y0 > v.hy + 4) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(v.rimPx[0]!, -10);
+    for (let i = 0; i < v.rimN; i++) ctx.lineTo(v.rimPx[i]!, v.rimPy[i]!);
+    ctx.lineTo(v.rimPx[v.rimN - 1]!, -10);
+    ctx.closePath();
+    ctx.clip();
+    const s = this.colHaze(it);
+    this.blitSoft(this.houseFrames[it.i]!.at(now, it.i * 613), x0, y0, w, h, s, 0.88 * s);
+    ctx.restore();
+    this.farOn = true;
+    this.colDrawn = { x0, y0, x1: x0 + w, y1: y0 + h, far: true };
+  }
+  /**
+   * The street town's Colosseum's haze (0 to 1): the far band's, near; never more than `streetColHaze`, so the landmark stays clear. It's
+   * drawn solid (no see-through), as a building that big would be: the haze only tints and softens it.
+   */
+  private colHaze(it: Item): number {
+    return Math.min(bandOf(this.view, it.dx, it.dz), TOWN_FEEL.streetColHaze);
+  }
+
+  /**
+   * (Tests) How many of the Colosseum's top's columns the last frame showed (round 6): across its picture every 4 px, the first drawn
+   * pixel of its top (its flag, pennants, rim) where it's on screen and above the horizon if drawn from afar, counted when no item drawn
+   * after it (a front, a roof, a tree, a figure) covers it. Their boxes are wider than what they draw, so this never counts too many.
+   */
+  colTopShows(): number {
+    const d = this.colDrawn;
+    if (!d) return 0;
+    const col = this.houseItems[this.homes.length]!;
+    const ch = artOf(this.places[col.i]!).ch;
+    const tops = this.colTops(col.i, ch);
+    const after = d.far ? 0 : this.items.indexOf(col) + 1;
+    let n = 0;
+    for (let x = Math.max(0, Math.ceil(d.x0)); x < Math.min(this.W, d.x1); x += 4) {
+      const t = tops[Math.floor(((x - d.x0) / (d.x1 - d.x0)) * ch.w)]!;
+      if (t < 0) continue;
+      const y = d.y0 + ((t + 0.5) / ch.h) * (d.y1 - d.y0);
+      if (y < 0 || y >= this.H || (d.far && y >= (rimYAt(this.view, x) ?? -Infinity))) continue;
+      let hidden = false;
+      for (let i = after; i < this.items.length && !hidden; i++) {
+        const o = this.items[i]!;
+        if (o !== col && o.on && x >= o.x0 && x <= o.x1 && y >= o.y0 && y <= o.y1) hidden = true;
+      }
+      if (!hidden) n++;
+    }
+    return n;
+  }
+  /** Each picture column of a house's first frame: its first drawn picture row (-1: none), found once. */
+  private colTops(i: number, ch: Character): Int16Array {
+    let t = this.topRows.get(i);
+    if (!t) {
+      const img = this.houseFrames[i]!.get(0);
+      const d = img.getContext("2d")!.getImageData(0, 0, img.width, img.height).data;
+      t = new Int16Array(ch.w).fill(-1);
+      for (let x = 0; x < ch.w; x++) {
+        const xi = Math.floor(((x + 0.5) / ch.w) * img.width);
+        for (let y = 0; y < img.height; y++)
+          if (d[(y * img.width + xi) * 4 + 3]! > 0) {
+            t[x] = Math.floor((y / img.height) * ch.h);
+            break;
+          }
+      }
+      this.topRows.set(i, t);
+    }
+    return t;
+  }
+  private readonly topRows = new Map<number, Int16Array>();
 
   /** One of the park's things: its picture at the camera's scale (the fountain's water moving). */
   private drawProp(it: Item, now: number): void {
@@ -3076,9 +3163,12 @@ export class Renderer {
     const h = ch.h * px;
     const x0 = p.x - ch.foot[0] * px;
     const y0 = p.y - ch.foot[1] * px;
-    const s = bandOf(v, it.dx, it.dz);
-    const alpha = (1 - 0.6 * s) * enterOf(v, it.dx, it.dz);
+    const street = STREET_TOWN && it.i === this.homes.length;
+    // (The street town's Colosseum: one haze from near to far, solid, no fading in at the rim, as it's drawn past it too: `colHaze`.)
+    const s = street ? this.colHaze(it) : bandOf(v, it.dx, it.dz);
+    const alpha = street ? 1 : (1 - 0.6 * s) * enterOf(v, it.dx, it.dz);
     const img = this.houseFrames[it.i]!.at(now, it.i * 613);
+    if (street) this.colDrawn = { x0, y0, x1: x0 + w, y1: y0 + h, far: false };
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.imageSmoothingEnabled = px < 1.5;
@@ -3650,10 +3740,12 @@ export class Renderer {
 
   /** What's under (x, y) in the box: a home, a boss or a person (nearest first), else a square, else null (the sky). */
   pick(x: number, y: number): Hit | null {
+    let overFront = false;
     for (let i = this.items.length - 1; i >= 0; i--) {
       const it = this.items[i]!;
       if (!it.on || it.faded || x < it.x0 || x > it.x1 || y < it.y0 || y > it.y1) continue;
       if (it.kind === "house") {
+        if (overFront && it.i >= this.homes.length) continue;
         // A home's picture is wide: only its drawn part (not the sky around its roof) counts.
         if (it.i >= this.homes.length) {
           const st = this.statueHit(x, y);
@@ -3664,11 +3756,13 @@ export class Renderer {
         return { kind: "house", home: this.homes[it.i]! };
       }
       if (it.kind === "boss") return { kind: "boss", boss: this.town.bosses[it.i]! };
-      // (A street-town home's side, back or roof: the home. An everyday building's: the ground behind, as its front.)
+      // (A street-town home's side, back or roof: the home. An everyday building's: the ground behind, as its front; never the Colosseum
+      // drawn behind it, round 6, whose top tiers rise over the rows.)
       if (it.kind === "part") {
         const h = this.boxes[it.i >> 2]!.home;
         const home = h ? this.homes.find((o) => o.id === h) : null;
         if (home) return { kind: "house", home };
+        overFront = true;
         continue;
       }
       if (it.kind === "prop") {
