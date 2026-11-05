@@ -265,6 +265,18 @@ export interface Settings {
    * and the Crowd keep theirs.
    */
   bossNoStrikes?: boolean;
+  /**
+   * Hollow in Boss alone (Eric, Nov 5): his ten bulbs instead of points. Each wrong move into the dark puts one out; at
+   * BOSS_POWERS.darkBulbForced (3 and 7) the dark plays a bad move for you; at darkBulbs (10) you lose. Set as the battle
+   * begins (the rules keep it in his powers' `strand`, so a battle keeps the rules it began with). Solo only: crowds,
+   * raids and parties keep the points (Eric, Nov 5: "bulbs only apply in solo for now to avoid a griever spamming bad
+   * moves").
+   */
+  hollowBulbs?: boolean;
+  /** Testing (?bulbs=N): Hollow's strand starts with N of its bulbs already out (to reach 3, 7 and 10 fast). */
+  hollowBulbsOut?: number;
+  /** Testing (?darkblock=2 or 3): his first cover of the dark brings a block of that size too (his 2 x 2, or his 3 x 3). */
+  hollowBlockTest?: 2 | 3;
   /** Pre-game votes: whether a player may move their pawn to another zone after voting (Eric: one vote each, for now). */
   voteChangeAllowed: boolean;
   /**
@@ -1131,6 +1143,31 @@ export const BOSS_POWERS = {
    */
   darkTryCost: 5,
   darkTries: 5,
+  /**
+   * Hollow's bigger darkness (Eric, Nov 5; docs/decisions/2026-11-05-hollow-bulbs.md), everywhere he plays: on these of
+   * his moves (his 6th, 12th and 18th, never one that brings a single cover with darkEvery 3) a 2 x 2 block of squares
+   * goes dark for darkBlockTurns crowd turns; on his darkBigAt-th (his 9th), once a game, a 3 x 3 block for darkBigTurns.
+   * Placement (chooseDarkBlock): wholly on the board, never on either king's square (so never all of a king's escape
+   * squares), holding at least darkBlockMinPieces pieces (the 3 x 3: darkBigMinPieces) when such a block exists. A
+   * square already dark keeps one entry, dark until the later of its two ends.
+   */
+  darkBlockAt: [6, 12, 18] as readonly number[],
+  darkBlockTurns: 4,
+  darkBlockMinPieces: 2,
+  darkBigAt: 9,
+  darkBigTurns: 2,
+  darkBigMinPieces: 3,
+  /**
+   * Hollow in Boss alone (settings.hollowBulbs): his strand of darkBulbs bulbs instead of points. Each wrong move into the
+   * dark puts one out (no points off, no darkTries cutoff); as the darkBulbForced-th goes out, the dark plays that turn's
+   * move for you, a bad one (darkForcedLoss: giving away 15 to 30 points of expected score against the best, the one
+   * nearest 22; never more than darkForcedMaxLogit in log-odds, never one whose line lets him mate, never a mate or a
+   * stalemate itself, never one that hangs the queen); as the last goes out, the battle is his.
+   */
+  darkBulbs: 10,
+  darkBulbForced: [3, 7] as readonly number[],
+  darkForcedLoss: [15, 30] as readonly [number, number],
+  darkForcedMaxLogit: 2,
   /**
    * Lights out (Hollow's ultimate, at the start of his turn, the clocks stopped): a memory test in rounds, each naming
    * this many of his pieces with this long to tap where they are (the usual late grace on top).
