@@ -115,17 +115,19 @@ describe("the two levels: the height curve", () => {
     expect(liftAt(LV, 5, 5)).toBeCloseTo(10 + (5 * (0.5 - 13.5 / 37)) / (9 / 37), 9);
   });
 
-  it("drawn among the pieces half a square nearer once up (in front of the cards it stands on and next to), smoothly", () => {
+  it("drawn among the pieces half a square nearer once up at all (in front of the cards it stands on and next to), never behind the stairs' card for a frame", () => {
     expect(levelZ(4, 40)).toBeCloseTo(4.51, 9);
     expect(levelZ(5, 40)).toBeCloseTo(5.51, 9);
     expect(levelZ(6, 0)).toBe(6);
     // Behind the floor in front: the shopkeeper (5.2) and the stand (row 6) are nearer than a figure on the deck over them.
     expect(levelZ(4, 40)).toBeLessThan(def.at[1]);
-    let prev = levelZ(6, 0);
+    // (Eric, Nov 5: "on the turn for a frame it bugs like crazy". Eased in over the first 5 px as it was, a figure at (5, 5.444) lifted
+    // 0.44 px was drawn at 5.489: behind the stairs' cards on row 5 (5.5) for that frame, between frames in front of them.) Every point
+    // of the way up on the stairs' row (the low square, lifted): in front of the row's cards.
+    expect(levelZ(5.444, 0.44)).toBeGreaterThan(5.5);
     for (const [x, y] of walkPoints(WEST)) {
-      const z = levelZ(y, liftAt(LV, x, y));
-      expect(Math.abs(z - prev)).toBeLessThan(0.02);
-      prev = z;
+      if (y < 4.99 || y >= 5.5) continue;
+      expect(levelZ(y, liftAt(LV, x, y)), `(${x}, ${y})`).toBeGreaterThan(5.5);
     }
   });
 });
