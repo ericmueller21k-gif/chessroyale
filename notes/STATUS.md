@@ -202,3 +202,8 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Nov 5 ~19:20: Eric asked for Squads (Relay on 3 boards, cleaner match screen) to run alongside Folio and OK'd another helper
   (3 Opus at once for this). Brief brief-squads-three-boards.md, branch claude/squads-three-boards (ports 8995/9495). STOPS after
   mockup stills → send Eric → his corrections → PR (full e2e). Open: turn-order list (a) 6 seated + "next in" vs (b) all 8.
+- Nov 5 ~23:45: #506 Folio sanctuary merged 0fd7944d (deploying; tell Eric when live). Squads three boards: Eric reviewing the
+  long-name stills and glide GIFs (merge only on his OK). Ginger steps helper: app fix (shops pick the tap at press, like the town)
+  + test waits. Street town: two helpers in parallel: north edge + 3D Colosseum (claude/street-north-edge, 8987) and controls
+  (hold to run, 10° snap and lock, reset to north in and out of buildings) + minimap (claude/street-controls-map, 8988). Merge
+  north edge first. Asked Eric: default zoom step (4 steps, opens at index 1, the mockup's) vs "the middle of three".
