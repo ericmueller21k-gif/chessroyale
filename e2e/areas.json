@@ -716,6 +716,7 @@
         "e2e/squads-play.spec.ts",
         "e2e/squads-replay.spec.ts",
         "e2e/squads-test-tools.spec.ts",
+        "e2e/squads-three-boards.spec.ts",
         "e2e/squads-v2.spec.ts",
         "e2e/squads-watch.spec.ts",
         "e2e/vote-hint.spec.ts"
