@@ -54,6 +54,10 @@ These stills come from the real game: an admin's street town (`STREET_TOWN`), dr
   - With the arrows: up walks forward, down steps back without turning, and left and right turn you and step that way. A held key
     goes through the way you faced when the hold began, so holding right turns you once and then runs on.
   - Taps work as before. The − button zooms out higher and further back, using round 3's zoom-out numbers.
+- **Figures stay billboards** (Eric's note). A rider's or sidekick's view (back, front or side) is the way it last walked, turned
+  through the camera's heading (`render.ts viewOf`). Walking ahead of the camera shows its back. A figure may look flat for a moment
+  while the camera swings, and that's fine. (This came after the stills were taken: the pawns in them have no views, so they look the
+  same either way.)
 - **The Colosseum hides behind the rows** (`street.ts colosseumSeen`). It shows only when a straight line from your square reaches
   its outline without crossing a lot. That applies to both the near drawing and the far one, and it replaces round 3's rule of showing
   within 45 degrees of north.

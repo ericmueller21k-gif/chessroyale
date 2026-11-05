@@ -48,7 +48,7 @@ import { colosseumSeen, ROW_GROUND, STREET_BUILDINGS, STREET_LOTS } from "./stre
 import { affine, geomOf, lotArt, newPlan, planBox, streetBoxes, type BoxInst, type BoxPlan, type WallPlan } from "./boxes.ts";
 import { bakeRoof, restShade, shadedImg, type Piece, type RoofArt } from "./box-draw.ts";
 import { farColosseumShows } from "./turn.ts";
-import { ARENA, COLISEUM_PLACE, GARDEN, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, groundAt, isSprite, onColiseum, plotAt, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town } from "./world.ts";
+import { ARENA, COLISEUM_PLACE, GARDEN, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, groundAt, isSprite, onColiseum, plotAt, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town, type Walker } from "./world.ts";
 import { TAG_STYLE, TagCache, namesMode, tagAlpha, type NamesMode, type TagKind } from "./tags.ts";
 
 /** Each boss's sprite (its real one: its `idle` frames). */
@@ -1452,7 +1452,7 @@ export class Renderer {
         this.fade = this.edgeFade(it, (f.bossSquares * (f.bossScale[b.home.id] ?? 1) * ch.w) / ch.h / 2);
         it.faded = this.fade < 0.5;
         this.bossAlpha[it.i] = this.fade;
-        if (this.fade > 0.004) this.drawSprite(it, img, f.bossSquares * (f.bossScale[b.home.id] ?? 1), ch.foot[0] / ch.w, ch.foot[1] / ch.h, ch.w / ch.h, 0, 0, b.walker.facing, 1.6);
+        if (this.fade > 0.004) this.drawSprite(it, img, f.bossSquares * (f.bossScale[b.home.id] ?? 1), ch.foot[0] / ch.w, ch.foot[1] / ch.h, ch.w / ch.h, 0, 0, this.faceOf(b.walker), 1.6);
         b.onScreen = !it.faded && it.fx > -40 && it.fx < this.W + 40 && it.fy > 0 && it.hy < this.H && bandOf(v, it.dx, it.dz) < 0.6; // (a boss deep in the haze doesn't talk)
         this.fade = 1;
         if (town.speech.boss === b) {
@@ -1468,7 +1468,8 @@ export class Renderer {
         // Sitting at a chess table: lower, on its stool, facing the board.
         const table = seated(person);
         this.sitting = !!table;
-        const facing = table ? (w.c < table.c ? 1 : -1) : w.facing;
+        const facing = table ? (w.c < table.c ? 1 : -1) : this.faceOf(w);
+        const wview = this.viewOf(w);
         // Up close on a statue, the people in front of it (you, on its square) fade: they'd stand between the camera and it.
         // A bot coming out from home fades in, one going home fades out (Oct 28: they take turns in the square).
         this.fade = (it.dz < this.statueDz ? 1 - f.closeNearFade * this.close.e : 1) * clamp(Math.min(now - person.came, person.leaves - now) / f.botFadeMs, 0, 1) * (person.you ? 1 : this.edgeFade(it, 0.5));
@@ -1480,10 +1481,10 @@ export class Renderer {
           const k = 1 + 2 * (art?.pad ?? 0);
           const pad = art?.pad ?? 0;
           this.youRide.anim = "";
-          if (this.youRider && !table) this.drawRider(it, this.youRider, pose, facing, w.view, f.youSquares, now, this.youRide);
+          if (this.youRider && !table) this.drawRider(it, this.youRider, pose, facing, wview, f.youSquares, now, this.youRide);
           else {
             this.drawSprite(it, art?.img ?? (isSprite(person.look) ? pawnImage("light", null) : pawnImage(person.look.side, person.look.tint)), f.youSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.youHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.youSquares);
-            this.soonBox(it, this.soonOf(person), w.view, f.youSquares);
+            this.soonBox(it, this.soonOf(person), wview, f.youSquares);
           }
           if (this.fade > 0.02) this.tag(person.name, it.fx, it.hy - 2, "you", clamp((11 * this.p.k) / v.kf, 8, 12), this.fade);
         } else {
@@ -1504,10 +1505,10 @@ export class Renderer {
             const k = 1 + 2 * (art?.pad ?? 0);
             const pad = art?.pad ?? 0;
             const rider = this.riders.get(person.id);
-            if (rider && !table) this.drawRider(it, rider, pose, facing, w.view, f.botSquares, now + it.i * 577);
+            if (rider && !table) this.drawRider(it, rider, pose, facing, wview, f.botSquares, now + it.i * 577);
             else {
               this.drawSprite(it, art?.img ?? pawnImage(lk.side, lk.tint), f.botSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.botHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.botSquares);
-              this.soonBox(it, this.soonOf(person), w.view, f.botSquares);
+              this.soonBox(it, this.soonOf(person), wview, f.botSquares);
             }
           }
           // Name tags on the near ones only: not far toward the rim (as before), and (Oct 28, Eric) not far from you either, by default: within
@@ -2007,6 +2008,24 @@ export class Renderer {
         if (k === "front" || k === "shed") it.on = false;
       }
     }
+  }
+  /**
+   * A figure's view and facing as the camera sees it (round 4's chase camera, Eric: figures stay billboards with the views we have):
+   * the way it last walked turned into the camera's frame, so walking ahead of the camera shows its back, toward it its front, across
+   * it its side (flipped to the way it goes). Today's town: the walker's own.
+   */
+  private viewOf(w: Walker): 0 | 1 | 2 {
+    if (!STREET_TOWN) return w.view;
+    const v = this.view;
+    const across = w.wdc * v.hc - w.wdr * v.hs;
+    const ahead = w.wdc * v.hs + w.wdr * v.hc;
+    return Math.abs(across) > Math.abs(ahead) + 1e-6 ? 0 : ahead > 0 ? 1 : 2;
+  }
+  private faceOf(w: Walker): 1 | -1 {
+    if (!STREET_TOWN) return w.facing;
+    const v = this.view;
+    const across = w.wdc * v.hc - w.wdr * v.hs;
+    return Math.abs(across) < 1e-6 ? w.facing : across < 0 ? -1 : 1;
   }
   /** How much of a street-town tree shows, by how far nearer the camera than its focus it stands (1: all; today's town: always all). */
   private nearFade(it: Item): number {

@@ -595,6 +595,9 @@ export class Walker {
    * screen (away: its back), 2 down (toward you: its front). Standing, the one it last walked in.
    */
   view: 0 | 1 | 2 = 0;
+  /** The way it last walked on the world's squares (east, north): the street town's chase camera turns it into a view (render.ts). */
+  wdc = 0;
+  wdr = 1;
   /** When it claimed the square it will end on (its goal): the order of `go`s, 0 for where it first stood. */
   claim = 0;
   private queue: Sq[] = [];
@@ -696,6 +699,7 @@ export class Walker {
   private begin(to: Sq, t0: number, first: boolean): void {
     const dc = wrapF(to.c - this.c);
     const dr = wrapF(to.r - this.r);
+    if (dc || dr) ((this.wdc = Math.sign(dc)), (this.wdr = Math.sign(dr)));
     if (dc) this.facing = dc < 0 ? -1 : 1;
     if (dc) this.view = 0;
     else if (dr) this.view = dr > 0 ? 1 : 2;
