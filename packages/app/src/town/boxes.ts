@@ -20,7 +20,7 @@ import { homeBox, type HomeId as ArtHomeId } from "./home-boxes.ts";
 import { STREET_LOTS, type StreetLot } from "./street.ts";
 import { lookalike } from "./lookalike.ts";
 import { wallArt } from "./wall.ts";
-import type { Facing } from "./rows.ts";
+import { homePx, type Facing } from "./rows.ts";
 import type { Face, RoofTex, SideArt, TownBox } from "./town-kit.ts";
 import { frameKeys, type Character } from "../characters/sprite.ts";
 import type { HomeId } from "./world.ts";
@@ -80,10 +80,10 @@ export const pxOf = (box: TownBox): number => box.px ?? SQ;
 export const BUILD_PX = SQ / TOWN_FEEL.streetBuildScale;
 /** An art drawn bigger (its own copy, so the art's caches stay the art's). */
 const bigger = new WeakMap<TownBox, TownBox>();
-function big(box: TownBox): TownBox {
-  if (box.px === BUILD_PX) return box;
+function big(box: TownBox, px = BUILD_PX): TownBox {
+  if (box.px === px) return box;
   let b = bigger.get(box);
-  if (!b) bigger.set(box, (b = { ...box, px: BUILD_PX }));
+  if (!b || b.px !== px) bigger.set(box, (b = { ...box, px }));
   return b;
 }
 /** A home's back seen from behind (round 4): its own side wall's picture across its body (a home with a `back` keeps that). */
@@ -96,7 +96,8 @@ function withRear(box: TownBox): TownBox {
 }
 /** A lot's building as a box: a home's, an everyday design's, or a row's look-alike (round 4), drawn the street town's bigger size. */
 export function lotArt(l: StreetLot, low = false): TownBox {
-  if (l.kind === "home") return big(withRear(homeBox(l.id as ArtHomeId, low)));
+  // (A home: drawn bigger again where the street town asks, round 6: rows.ts homePx.)
+  if (l.kind === "home") return big(withRear(homeBox(l.id as ArtHomeId, low)), homePx(l.id as ArtHomeId));
   if (l.look) return big(lookalike(l.look));
   if (l.wall) return wallArt(l.wall);
   return big(building(l.id as never, l.w, l.v));

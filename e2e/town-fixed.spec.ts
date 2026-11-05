@@ -24,7 +24,17 @@ const canvas = (p: Page) => p.locator("canvas.town-canvas");
 const you = async (p: Page) => (await canvas(p).getAttribute("data-you"))!.split(",").map(Number) as [number, number];
 type Fig = { name: string; x0: number; y0: number; x1: number; y1: number; fy: number; alpha: number };
 type Box = { id: string; kind: string; facing: string; front: boolean; x: number; y: number };
-type Cam = { heading: number; headingTo: number; headingBase: number; look: number; strip: string | null; figures: Fig[]; boxes: Box[] };
+type Cam = {
+  heading: number;
+  headingTo: number;
+  headingBase: number;
+  look: number;
+  strip: string | null;
+  figures: Fig[];
+  boxes: Box[];
+  col: { x0: number; y0: number; x1: number; y1: number; far: boolean } | null;
+  colTop: number;
+};
 type Me = { c: number; r: number; facing: number; view: number; moving: boolean; way: [number, number] };
 type W = {
   __townWalk: (s: readonly [number, number]) => boolean;
@@ -218,6 +228,24 @@ for (const backend of ["2d", "webgl"] as const) {
     await figuresOnScreen(page, "at the wall");
   });
 
+  // (Round 6; Eric, Nov 5: "make it taller and bigger … you won't actually be able to see the Colosseum unless you're running towards it":
+  // from the streets south of it, its top tiers rise over the rows.)
+  test(`the Colosseum looms (${backend}): its top over the rows from South Street, south of the park, facing north`, async ({ page }) => {
+    test.setTimeout(backend === "webgl" ? 400_000 : 150_000);
+    await open(page, backend);
+    await walkTo(page, [8, 5]);
+    await page.waitForTimeout(500);
+    const c = await cam(page);
+    expect(c.heading, "facing north").toBe(0);
+    expect(c.col, "the Colosseum drawn from South Street").not.toBeNull();
+    expect(c.col!.far, "from afar: past the rim, behind everything").toBe(true);
+    // (Its top's columns every 4 px that no front, roof, tree or figure drawn after it covers: at least about 24 px of it.)
+    expect(c.colTop, "its top showing over the rows").toBeGreaterThanOrEqual(6);
+    const cv = (await canvas(page).boundingBox())!;
+    expect(c.col!.x1 > 0 && c.col!.x0 < cv.width, "across the view").toBe(true);
+    await figuresOnScreen(page, "on South Street");
+  });
+
   test(`looking round (${backend}): a drag turns the camera about your pawn, which doesn't move or turn; the up arrow eases it back and walks you north`, async ({ page }) => {
     test.setTimeout(backend === "webgl" ? 400_000 : 150_000);
     await open(page, backend);
@@ -291,4 +319,27 @@ test("stills: the fixed view (round 5)", async ({ page }) => {
   await walkTo(page, [8, 20]);
   await drag(page, -0.9);
   await shot("7-looking-round");
+});
+
+/** The stills of round 6 (brief: from a street south of the park looking north, from the park, at the plaza; Moo's and Ginger's rows). */
+test("stills: the bigger Colosseum (round 6)", async ({ page }) => {
+  test.skip(!STILLS, "stills only (STILLS=docs/street-colosseum-big)");
+  test.setTimeout(600_000);
+  mkdirSync(STILLS!, { recursive: true });
+  const project = test.info().project.name;
+  const shot = async (name: string) => {
+    await page.waitForTimeout(2500);
+    await page.screenshot({ path: `${STILLS}/${name}-${project}.png` });
+  };
+  await open(page, "2d");
+  await walkTo(page, [8, 5]);
+  await shot("1-south-street-looking-north");
+  await walkTo(page, [22, 24]);
+  await shot("2-colosseum-from-the-park");
+  await walkTo(page, [22, 31]);
+  await shot("3-colosseum-plaza");
+  await walkTo(page, [35, 21]);
+  await shot("4-ginger-row");
+  await walkTo(page, [35, 38]);
+  await shot("5-moo-row");
 });

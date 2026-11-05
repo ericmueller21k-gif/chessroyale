@@ -6,7 +6,7 @@ vi.mock("../src/town/admin-town.ts", () => ({ ADMIN_TOWN: true, STREET_TOWN: tru
 const { layRow, ROW_SIDES, ROW_PX, ROW_OVERLAP_PX, alongSign, homeSpan, splitGap, HOME_BODY, HOME_NO_SIDES } = await import("../src/town/rows.ts");
 const { homeBox } = await import("../src/town/home-boxes.ts");
 const { lookalikeWith } = await import("../src/town/lookalike.ts");
-const { STREET_LOTS, colosseumSeen, homesOn } = await import("../src/town/street.ts");
+const { STREET_LOTS, homesOn } = await import("../src/town/street.ts");
 const { N, WRAP, rowI, colI } = await import("../src/town/camera.ts");
 const { HOMES, PROPS, START, findPath, stepsFrom, tdist, walkable } = await import("../src/town/world.ts");
 const { streetBoxes, boxPoint, solidTop, pxOf } = await import("../src/town/boxes.ts");
@@ -17,7 +17,7 @@ const { TOWN_FEEL } = await import("../src/town/feel.ts");
 /**
  * The street town, round 4 (Nov 5; brief-town-rows.md, docs/decisions/2026-11-05-street-rows.md): every street side one continuous row
  * (shipped and after random slot swaps), every join blended, corners closed, no front low next to the pawn; what the rows let you see;
- * the town wrapping east-west only; the zoom steps and the park's step out; the chase camera's heading; the Colosseum behind the rows.
+ * the town wrapping east-west only; the zoom steps and the park's step out; the chase camera's heading; the Colosseum behind the rows (those two gone since, in rounds 5 and 6).
  */
 const ALL_HOMES = Object.keys(HOME_BODY) as (keyof typeof HOME_BODY)[];
 const MIN_W = 0.6;
@@ -326,12 +326,4 @@ describe("the zoom steps and the park's step out (round 4)", () => {
 
 // (Round 5: the chase camera's heading tests went with it: test/town-fixed.test.ts has the one fixed view.)
 
-describe("the Colosseum hides behind the rows (round 4; replaces round 3's 45 degrees of north)", () => {
-  it("shows up the promenade, across its plaza and down Upper Street, which open onto it; hides from the streets behind the rows", () => {
-    expect(colosseumSeen(22, 27)).toBe(true);
-    expect(colosseumSeen(14, 32)).toBe(true);
-    expect(colosseumSeen(40, 37)).toBe(true);
-    expect(colosseumSeen(8, 21)).toBe(false);
-    expect(colosseumSeen(8, 5)).toBe(false);
-  });
-});
+// (Round 6: "the Colosseum hides behind the rows" went with its line of sight: test/town-colosseum-big.test.ts has its top over the rows.)

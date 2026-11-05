@@ -35,6 +35,8 @@ export const HOME_BODY: Readonly<Record<HomeId, readonly [w: number, x0: number,
 /** The street town's buildings' picture pixels a world square (boxes.ts BUILD_PX: drawn TOWN_FEEL.streetBuildScale bigger than 37). */
 export const ROW_PX = 37 / TOWN_FEEL.streetBuildScale;
 const SQ = ROW_PX;
+/** A home's picture pixels a world square in the street town: the rows', or fewer for one drawn bigger (TOWN_FEEL.streetHomeScale, round 6). */
+export const homePx = (id: HomeId): number => ROW_PX / (TOWN_FEEL.streetHomeScale[id] ?? 1);
 /**
  * The homes with no side walls (a dome or a slope runs to the ground: home-boxes.ts homeBox's left and right are null): one can't turn
  * a row's corner itself, so a slim filler front closes the corner beside it. test/town-rows.test.ts checks it against the art.
@@ -107,8 +109,9 @@ export function homeSpan(id: HomeId, a: number, w: number, facing: Facing): [num
   const [fw, x0, x1] = HOME_BODY[id];
   const mid = a + w / 2 - 0.5;
   const sgn = alongSign(facing);
-  const u0 = (x0 - fw / 2) / SQ;
-  const u1 = (x1 + 1 - fw / 2) / SQ;
+  const px = homePx(id);
+  const u0 = (x0 - fw / 2) / px;
+  const u1 = (x1 + 1 - fw / 2) / px;
   return sgn > 0 ? [mid + u0, mid + u1] : [mid - u1, mid - u0];
 }
 

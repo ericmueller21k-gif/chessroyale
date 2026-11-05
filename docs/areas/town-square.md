@@ -915,6 +915,24 @@ and Seam Avenue's camera turn, is done; then the switch goes). Eric approved its
     `__townAt("tap-square", …)`.
   - **Tests:** `packages/app/test/town-fixed.test.ts`, `e2e/town-fixed.spec.ts`.
   - Decision: [2026-11-05-street-fixed-view.md](../decisions/2026-11-05-street-fixed-view.md). Stills: `docs/street-town-fixed/`.
+- **Round 6 (Nov 5): the Colosseum looms; Moo's and Ginger's homes up in their rows.**
+  - **The street town's Colosseum** (`houses/coliseum.ts`: one `build` from a `Size`; today's, `TODAY`, drawn exactly as before; the
+    street town's, `STREET`) is about twice as tall (its wall 294 px where today's is 150: six tiers of arches, a taller tier of windows,
+    the attic) and a quarter wider (its oval 608 px, 33 bays). Its gate stays on its two squares, taller, under a bigger tablet, relief
+    and a crown medallion; six long banners, six pennants.
+  - **Drawn from everywhere** (`render.ts`): round 4's line of sight (`street.ts colosseumSeen`) is gone. Past the rim it stands where it
+    is, at its true size (`drawFarStreet`), drawn first, behind everything, clipped to the horizon, so its top tiers rise over the rows
+    from the streets south of it; inside the rim it's sorted with everything else, as before. One haze from near to far, never over
+    `streetColHaze`, drawn solid.
+  - **A tap on a row's front** never opens the Colosseum drawn behind it (`pick`).
+  - **The plan** (`scripts/street-plan-north.py`, round 6 section): its sides stand over the grove's inner columns (15, 16, 29, 30),
+    which stay grove; the trees and shrubs there go. The walls and gates keep their lots: their outer halves and gates show beside it.
+  - **Moo's paddock and Ginger's dome** are drawn bigger in the street town (`streetHomeScale`, 1.3; `rows.ts homePx`), their feet on their
+    rows' line, so their height sits with their neighbors'. A home too wide slides inward along its row, as any does.
+  - **Test hooks:** `__townCam()`'s `col` (the Colosseum's box as drawn, `far`) and `colTop` (how many of its top's columns showed over
+    everything drawn after it).
+  - **Tests:** `packages/app/test/town-colosseum-big.test.ts`; `e2e/town-fixed.spec.ts` "the Colosseum looms".
+  - Decision: [2026-11-05-street-colosseum-big.md](../decisions/2026-11-05-street-colosseum-big.md). Stills: `docs/street-colosseum-big/`.
 
 ## Frame-rate pill (`?fps`)
 `/town?fps` shows anyone (Eric, Oct 30: no admin needed, the site is behind Cloudflare Access) a pill in the world's top-right corner, "60 fps · 16.7 ms · 2D": frames over the last second and their mean time, text set twice a second from plain counters in the frame loop, then the drawing's backend ("· WebGL" with `?gl=1`; added by town.css from `data-backend`, so the pill's text stays the numbers). Without `?fps` there is none. `?crowd=N` is anyone's too (only that device draws the pawns).
