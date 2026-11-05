@@ -135,6 +135,26 @@ How Eric likes design work run (Eric, Oct 29). These are habits, not hard rules;
 - **Town cards' text is centered** (every card: the challenge card, the homes, the raid confirm, the shop's cards). A person's row keeps its layout.
   - Guard: `packages/app/test/town-card.test.ts`, "Eric, Nov 5: every town card's text centered".
 
+## Hollow (Eric, Nov 5)
+
+- **Solo against Hollow, ten bulbs instead of points; crowds keep the points.** In Boss alone a string of 10 of his bulbs
+  shows; each wrong move into the dark puts one out (no points, no 5-a-turn cutoff); as the 3rd and the 7th go out the dark
+  plays that turn's move for you, a bad one; as the 10th goes out the screen goes black, he speaks, and you lose. Crowds,
+  raids and parties keep −5 a wrong try and the 5th a missed move (Eric: "bulbs only apply in solo for now to avoid a griever
+  spamming bad moves"). The rules decide every bulb, forced move and loss; the screen only shows them.
+  - Guards: `packages/chess/test/hollow-bulbs.test.ts`, "Hollow's bulbs in Boss alone (Eric, Nov 5)" (every check: the strand
+    only alone; each wrong move one out, no points; the 3rd and 7th the dark's move; the 10th the loss; "a crowd keeps today's
+    points"); `e2e/hollow.spec.ts`, "Hollow's dark, Boss alone: …" and "Hollow's bulbs (Boss alone): …", phone and computer, and
+    "Hollow online: …" (no bulbs online, −5).
+  - Decision: [2026-11-05-hollow-bulbs.md](../decisions/2026-11-05-hollow-bulbs.md).
+- **His bigger darkness, everywhere he plays:** a few 2 × 2 blocks and, once a game, a 3 × 3 for 2 turns; what's in them is
+  hidden ("if you don't know where say the bishop moves to in it, that's just your loss").
+  - Guard: `packages/chess/test/hollow-bulbs.test.ts`, "Hollow's bigger darkness (rule set 2)" (every check).
+- **His taunt on each misplay, alone and in a crowd, at random and never the same twice running** ("Nice try.", "What, can't
+  play in the dark?" and his others).
+  - Guards: `packages/app/test/hollow-bulbs.test.ts`, "his taunts on a misplay (Eric, Nov 5)"; `e2e/hollow.spec.ts` (a taunt in
+    his bubble on a wrong move, alone and online).
+
 ## Squads: move replay (Eric, Nov 5)
 
 - **Coming back to a board, the moves you missed replay, then your free seconds run; the free time is the free seconds +

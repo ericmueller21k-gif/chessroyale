@@ -4,9 +4,11 @@ import { BOARD_SEL, createLobbyFromHome, test, watchFor, bossAloneFromHome } fro
 
 /**
  * Hollow, the Darkness boss, played alone on a phone and a computer with real taps: his first cover of the dark (the
- * square of the piece he moved), a dark square selected (the glow, no dots), a wrong move attempt into the dark (-5,
- * only for you), a legal move out of the dark, the 5-try cutoff (a missed move), and Lights out from the admins' test
- * trigger: the night over every square, a piece found, a wrong square, the misses costing 10 each, the lights back.
+ * square of the piece he moved), a dark square selected (the glow, no dots), Boss alone's ten bulbs (Eric, Nov 5: a wrong
+ * move attempt into the dark puts one out, with his taunt; a legal move out of the dark; the 3rd out, the dark moves for
+ * you; a 2 x 2 block; the 10th out, total darkness and the loss), and Lights out from the admins' test trigger: the
+ * night over every square, a piece found, a wrong square, the misses costing 10 each, the lights back. Online (a crowd)
+ * a wrong attempt still costs -5 (only for you), with his taunt.
  */
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 const powers = (p: Page) => p.evaluate(() => (window as any).match?.boss?.powers ?? null).catch(() => null);
@@ -60,6 +62,14 @@ const empties = (fen: string, squares: string[]) => squares.filter((s) => !new C
 /** The sounds played since the log was started (sound.ts logs every play()), by name. */
 const soundsHeard = (p: Page) => p.evaluate(() => ((window as any).__soundLog ?? []).map((s: string) => s.split(":")[0]) as string[]);
 
+/** His line in his speech bubble now (its whole text), or null. */
+const bubbleLine = (p: Page) => p.evaluate(() => document.querySelector(".bc-bubble")?.getAttribute("aria-label") ?? null).catch(() => null);
+/** His taunts on a misplay (characters/hollow.ts HOLLOW_LINES.misplay). */
+const TAUNTS = /^(Nice try\.|What, can't play in the dark\?|Something was there\. Wasn't it\?|You reached for nothing\.|Feeling around, are we\?|The dark remembers\. You don't\.|Not there\. Never there\.|Wrong\. And it's getting darker\.)$/;
+/** HOLLOW_STILLS=<folder>: the stills for docs/hollow-bulbs/, written there. */
+const STILLS = process.env.HOLLOW_STILLS ?? "";
+const still = (p: Page, name: string) => p.screenshot({ path: `${STILLS}/${name}-${test.info().project.name}.png` });
+
 /** An element's box is wholly on screen, and below the boss bar (nothing over it). */
 const onScreen = (p: Page, selector: string) =>
   p.locator(selector).first().evaluate((el) => {
@@ -68,7 +78,7 @@ const onScreen = (p: Page, selector: string) =>
     return r.height > 0 && r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight && r.right <= innerWidth && (!bar || r.top >= bar.bottom);
   });
 
-test("Hollow's dark: his first cover, a dark square selected, a wrong attempt (-5), a legal move out of the dark, the 5-try cutoff", async ({ page }) => {
+test("Hollow's dark, Boss alone: his first cover, a dark square selected, his ten bulbs, a wrong attempt (a bulb out and a taunt), a legal move out of the dark, the dark's move at the 3rd bulb", async ({ page }) => {
   test.setTimeout(5 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -110,11 +120,24 @@ test("Hollow's dark: his first cover, a dark square selected, a wrong attempt (-
   await expect(page.locator(".board-wrap").first()).toHaveAttribute("data-dark-sel", sq);
   await expect(page.locator(`${BOARD_SEL.square}.selected`)).toHaveCount(1);
   await expect(page.locator(`${BOARD_SEL.square}.move-dest`)).toHaveCount(0);
-  // A move from it that isn't legal (it's his piece): -5, and you pick again.
+  // Boss alone: his strand of ten bulbs, all lit, in the boss bar (Eric, Nov 5).
+  await expect(page.locator(".life-strip")).toHaveAttribute("data-lit", "10");
+  expect(
+    await page.locator(".life-strip").first().evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight;
+    }),
+  ).toBe(true);
+  // A move from it that isn't legal (it's his piece): a bulb goes out (no points), his taunt, and you pick again.
   const before = await myPoints(page);
+  await page.evaluate(() => ((window as any).__soundLog = []));
   await tap(page, empties(await fenNow(page), ["a3", "h3", "a4", "h4"])[0]!);
-  await expect(page.locator(".pw-cost")).toHaveText("−5");
-  await expect(page.locator(".dark-note")).toContainText("4 tries left");
+  await expect(page.locator(".dark-note")).toContainText("Bulb out · 9 left");
+  await expect(page.locator(".pw-cost")).toHaveCount(0);
+  await expect(page.locator(".life-strip")).toHaveAttribute("data-lit", "9");
+  await expect.poll(() => soundsHeard(page), { timeout: 5000 }).toContain("hollowFizz");
+  await expect.poll(() => bubbleLine(page), { timeout: 15_000 }).toMatch(TAUNTS);
+  if (STILLS) await still(page, "bulbs-taunt");
   expect(await phase(page)).toBe("play");
   // A legal move out of the dark. (For the test, the dark falls on your knight: covers land on his pieces or yours at
   // random.) Tap it: no dots; then f3.
@@ -130,27 +153,85 @@ test("Hollow's dark: his first cover, a dark square selected, a wrong attempt (-
   await tap(page, "f3");
   await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
   await expect.poll(() => page.evaluate(() => (window as any).match.moves.at(-1)?.move), { timeout: 30_000 }).toBe("g1f3");
-  // The turn cost you 5 (alone, a move's own score is 0).
-  expect(await page.evaluate(() => (window as any).match.moves.at(-1).roundScore)).toBe(-5);
-  expect(await myPoints(page)).toBe(before - 5);
+  // The bulb cost no points (alone, a move's own score is 0).
+  expect(await page.evaluate(() => (window as any).match.moves.at(-1).roundScore)).toBe(0);
+  expect(await myPoints(page)).toBe(before);
 
-  // Next turn: five wrong attempts into the dark end it as a missed move (never more than a miss costs).
+  // Next turn: two more wrong attempts, and the 3rd bulb out: the dark moves for you (a short dark flash, his line), a bad
+  // move the rules picked, played as yours. No 5-a-turn cutoff alone: the bulbs replace it.
   await yourMove(page);
   const fen = await fenNow(page);
   // (From a dark square that isn't yours, nothing is legal: his piece's, or an empty one.)
   const his = ((await powers(page)).dark as { square: string }[]).map((d) => d.square).find((s) => new Chess(fen).get(s as never)?.color !== "w")!;
   const empty = empties(fen, ["a3", "a4", "a5", "a6", "h3", "h4", "h5", "h6"]);
-  const p0 = await myPoints(page);
-  for (let i = 0; i < 5; i++) {
+  await page.evaluate(() => ((window as any).__soundLog = []));
+  for (let i = 0; i < 2; i++) {
     await tap(page, his);
     await tap(page, empty[i]!);
-    await expect.poll(() => page.evaluate(() => (window as any).match.darkNote?.tries ?? 0), { timeout: 5000 }).toBe(i + 1);
+    await expect.poll(() => page.evaluate(() => (window as any).match.darkNote?.bulbs ?? 0), { timeout: 5000 }).toBe(i + 2);
   }
+  expect(await page.evaluate(() => (window as any).match.darkNote.forced ?? false)).toBe(true);
+  await expect(page.locator(".pw-dark-forced")).toBeVisible();
+  await expect(page.locator(".dark-note")).toContainText("The dark moves for you");
+  await expect.poll(() => bubbleLine(page), { timeout: 5000 }).toBe("The dark moves for you.");
+  if (STILLS) await still(page, "bulbs-forced");
+  await expect(page.locator(".life-strip")).toHaveAttribute("data-lit", "7");
+  // Taps do nothing meanwhile.
+  await tap(page, "a2");
+  await tap(page, "a3");
   await expect.poll(() => page.evaluate(() => (window as any).match.moves.length), { timeout: 30_000 }).toBe(3);
-  const miss = await page.evaluate(() => (window as any).match.moves.at(-1));
-  expect(miss.move).toBeNull();
-  expect(miss.roundScore).toBe(-25);
-  expect(await myPoints(page)).toBe(p0 - 25);
+  const forced = await page.evaluate(() => (window as any).match.runner.state.boss.powers.forced);
+  expect(forced.at).toBe(3);
+  expect(await page.evaluate(() => (window as any).match.moves.at(-1).move)).toBe(forced.move);
+  expect(await soundsHeard(page)).toContain("hollowForced");
+  expect(errors).toEqual([]);
+});
+
+test("Hollow's bulbs (Boss alone): a 2 x 2 block of the dark drawn, then the 10th bulb out: total darkness, his line, the loss", async ({ page }) => {
+  test.setTimeout(4 * 60_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  // (Test switches: 9 bulbs already out; his first cover brings a 2 x 2 block too.)
+  await page.goto("/?debug&clock=60&boss=hollow&laststand=0&bulbs=9&darkblock=2");
+  await bossAloneFromHome(page);
+  await yourMove(page);
+  await expect(page.locator(".life-strip")).toHaveAttribute("data-lit", "1");
+  const seen = await watchFor(page, { banner: { selector: ".fight-banner.power-cut", text: /DEEPER DARK!/ } });
+  await play(page, "e2e4");
+  await expect.poll(async () => (await seen.seen()).banner, { timeout: 30_000 }).toBe(true);
+  await yourMove(page);
+  // The block: four squares in a 2 x 2, each dark and hiding what's there.
+  const block = await page.evaluate(() => (window as any).match.boss.powers.events.find((e: { kind: string }) => e.kind === "darkBlock"));
+  expect(block.size).toBe(2);
+  const f = block.square.charCodeAt(0);
+  const r = Number(block.square[1]);
+  const squares = [0, 1].flatMap((dr) => [0, 1].map((df) => `${String.fromCharCode(f + df)}${r + dr}`));
+  for (const sq of squares) await expect(page.locator(`.power-board .pw-dark[data-square="${sq}"]`)).toHaveAttribute("data-state", "dark");
+  for (const sq of squares) await expect.poll(() => covered(page, sq, ".pw-dark-board"), { timeout: 5000 }).toBe(255);
+  if (STILLS) await still(page, "bulbs-block2");
+  // The last bulb: a wrong move into the dark.
+  const fen = await fenNow(page);
+  const dark = ((await powers(page)).dark as { square: string }[]).map((d) => d.square);
+  const from = dark.find((s) => new Chess(fen).get(s as never)?.color !== "w")!;
+  await page.evaluate(() => ((window as any).__soundLog = []));
+  await tap(page, from);
+  await tap(page, empties(fen, ["a3", "h3", "a4", "h4", "a5", "h5"]).find((s) => s !== from)!);
+  // Total darkness: the screen goes black, his line, why; then the loss, and why.
+  await expect(page.locator(".hollow-blackout")).toBeVisible();
+  await expect(page.locator(".hollow-blackout")).toHaveAttribute("aria-label", "Hollow: Lights out. Forever. Your last bulb went out.");
+  await expect(page.locator(".hollow-blackout .hb-why.on")).toBeVisible({ timeout: 5000 });
+  const cover = await page.locator(".hollow-blackout").evaluate((el) => {
+    const b = el.getBoundingClientRect();
+    return [b.left, b.top, b.right - innerWidth, b.bottom - innerHeight].map(Math.round);
+  });
+  expect(cover).toEqual([0, 0, 0, 0]);
+  if (STILLS) await still(page, "bulbs-blackout");
+  expect(await soundsHeard(page)).toContain("hollowBlackout");
+  await expect.poll(() => phase(page), { timeout: 15_000 }).toBe("results");
+  await expect(page.locator(".results h1")).toHaveText("Defeated");
+  await expect(page.locator(".team-result.bad")).toContainText("won: the last of your ten bulbs went out.");
+  expect(await page.evaluate(() => (window as any).match.phase.blackout)).toBe(true);
+  if (STILLS) await still(page, "bulbs-result");
   expect(errors).toEqual([]);
 });
 
@@ -331,6 +412,10 @@ test("Hollow online: the server judges an attempt into the dark (-5, only for yo
   // The server's answer: wrong, -5, pick again.
   await expect(page.locator(".pw-cost")).toHaveText("−5");
   await expect(page.locator(".dark-note")).toContainText("4 tries left");
+  // His taunt in a crowd too; and no bulbs online (a crowd keeps the points: Eric, Nov 5).
+  await expect.poll(() => bubbleLine(page), { timeout: 15_000 }).toMatch(TAUNTS);
+  expect((await powers(page)).strand).toBeUndefined();
+  await expect(page.locator(".life-strip")).toHaveCount(0);
   expect(await phase(page)).toBe("play");
   await play(page, "d2d4");
   // Lights out at the start of his turn (the meter full as this turn began): the server's rounds.

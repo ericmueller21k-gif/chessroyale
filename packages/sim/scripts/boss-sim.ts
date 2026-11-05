@@ -286,6 +286,8 @@ interface RaidPatch {
    * (BOSS_ALONE_SCORING, no boss strikes) and his solo bulbs (`hollowBulbs`: docs/decisions/2026-11-05-hollow-bulbs.md).
    */
   alone?: boolean;
+  /** Hollow alone: false turns his bulbs off (today's points: a wrong try never decides the battle), for a run to compare. */
+  bulbs?: boolean;
   /**
    * Hollow: a player in the dark. The bots know the board, so on their own they never try a move into the dark. With
    * `darkMiss`, each crowd turn whose planned pick touches a dark square, that player first tries a wrong move into the
@@ -346,7 +348,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       while (strikeTurns.size < strikes) strikeTurns.add(6 + Math.floor(strikeRng() * 25));
       // (A boss whose powers are built before its art: met as the test link does, bossUnfinished.)
       // (Dash: Boss Battle's clock, the bank his slaps take from: the player's time model below.)
-      const s = { ...settings, ...RAID_SETTINGS, ...(bossId === "dash" ? bossClockSettings({ ...settings, ...RAID_SETTINGS }) : {}), bossId, bossUnfinished: true, engineNodes: RAID_NODES, bossNodes: RAID_NODES, ...(patch.tier ? { bossFixedElo: patch.tier } : {}), ...(patch.difficulty ? { bossDifficulty: patch.difficulty } : {}), ...(patch.alone ? { ...BOSS_ALONE_SCORING, bossNoStrikes: true, hollowBulbs: true } : {}) } as Settings;
+      const s = { ...settings, ...RAID_SETTINGS, ...(bossId === "dash" ? bossClockSettings({ ...settings, ...RAID_SETTINGS }) : {}), bossId, bossUnfinished: true, engineNodes: RAID_NODES, bossNodes: RAID_NODES, ...(patch.tier ? { bossFixedElo: patch.tier } : {}), ...(patch.difficulty ? { bossDifficulty: patch.difficulty } : {}), ...(patch.alone ? { ...BOSS_ALONE_SCORING, bossNoStrikes: true, hollowBulbs: patch.bulbs !== false } : {}) } as Settings;
       // (The clock for the hippo gardener's seeds: the crowd's pick (patch.pickSec), the reveal, his turn and the moments.)
       let clockMs = 0;
       const pickSec = patch.pickSec ?? 10;
@@ -747,7 +749,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       // (Folio: its marks, folds and marks answered in time; every Crease; its Revision, what its move cost it and what the crowd's reply would have won.)
       const fo = b.powers?.folio;
       const folioRow = fo ? { drafts: fo.drafts, folds: fo.folds, answered: fo.answered, creases, creasesOff, revision: fo.revision ? { at: fo.revision.at, cost: fo.revision.cost, drop: fo.revision.drop } : null } : null;
-      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}), ...(bossId === "moo" ? { moo } : {}), ...(bossId === "gardener" ? { garden } : {}), ...(bossId === "tiger" ? { tiger: { ...tiger, placed: b.powers?.balloon?.placed ?? 0 } } : {}), ...(bossId === "folio" ? { folio: folioRow } : {}), ...(bossId === "timber" ? { timber: { ...timber, scraps: b.powers?.workshop?.n ?? 0, pickSec } } : {}), ...(bossId === "dash" ? { dash: { ...dash, slapSeen: undefined } } : {}), ...(bossId === "hollow" ? { alone: !!patch.alone, darkMiss: patch.darkMiss ?? 0, hollow } : {}) };
+      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}), ...(bossId === "moo" ? { moo } : {}), ...(bossId === "gardener" ? { garden } : {}), ...(bossId === "tiger" ? { tiger: { ...tiger, placed: b.powers?.balloon?.placed ?? 0 } } : {}), ...(bossId === "folio" ? { folio: folioRow } : {}), ...(bossId === "timber" ? { timber: { ...timber, scraps: b.powers?.workshop?.n ?? 0, pickSec } } : {}), ...(bossId === "dash" ? { dash: { ...dash, slapSeen: undefined } } : {}), ...(bossId === "hollow" ? { alone: !!patch.alone, bulbs: !!patch.alone && patch.bulbs !== false, difficulty: patch.difficulty ?? 0, darkMiss: patch.darkMiss ?? 0, hollow } : {}) };
       appendFileSync(root + `reports/boss-sim/raid-${tag}.jsonl`, JSON.stringify(row) + "\n");
       console.log(JSON.stringify(row));
     }

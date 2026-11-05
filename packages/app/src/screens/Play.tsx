@@ -371,14 +371,19 @@ export function PlayScreen({
               <span>
                 <strong>Your pick is in.</strong> <span class="muted">{doneCount}/{alive.length} picked</span>
               </span>
+            ) : strand && (note?.forced || note?.blackout) ? (
+              // Boss alone: the 3rd or 7th bulb out, the dark moves for you; the last, the battle is his. The whole line.
+              <span class="dark-note" role="status">
+                {note.blackout ? "Your last bulb is out." : "The dark moves for you."}
+              </span>
             ) : (
               <span>
                 <strong>Your move.</strong>{" "}
                 {!alone && <span class="muted">{doneCount}/{alive.length} picked </span>}
                 {note && !note.pending && strand ? (
-                  // Boss alone: your own attempt into the dark wasn't legal: a bulb out, and what it brought.
+                  // Boss alone: your own attempt into the dark wasn't legal: a bulb out, and how many are left.
                   <span class="dark-note" role="status">
-                    {note.blackout ? "Your last bulb is out." : note.forced ? "Bulb out. The dark moves for you…" : `Bulb out · ${strand.of - strand.out} left`}
+                    Bulb out · {strand.of - strand.out} left
                   </span>
                 ) : note && !note.pending ? (
                   // Your own attempt into the dark wasn't legal: what it cost, and the tries you have left.
