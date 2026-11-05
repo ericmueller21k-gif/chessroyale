@@ -1185,9 +1185,30 @@ function startTown(
   // The arrow keys set off: as a tap walk does, the card closes, the camera follows you and the walk stands you up. Held, the walker
   // runs on (keys.start: each frame while it stands still; the walk itself asks for each next square).
   let keysOn = false;
+  /** The place the held arrows last ran you into (its card asked once a hold): "" none. */
+  let keysAsked = "";
+  /**
+   * (Eric, Nov 5: "if I use the arrow keys and you run up to a building, it should also ask you if you want to enter".) Standing
+   * still with one arrow held against a home's plot (or the Colosseum's ground): its card opens, once a hold, as a tap on it would.
+   */
+  const keysAsk = () => {
+    if (town.you.walker.moving()) return;
+    const dc = (isHeld("right") ? 1 : 0) - (isHeld("left") ? 1 : 0);
+    const dr = (isHeld("up") ? 1 : 0) - (isHeld("down") ? 1 : 0);
+    if ((dc === 0) === (dr === 0)) return;
+    const h = town.you.walker.here();
+    const c = wrapI(h.c + dc);
+    const rr = wrapI(h.r + dr);
+    const home = plotAt[rr * N + c];
+    const next: Card | null = home ? { kind: "home", i: HOMES.indexOf(home), confirm: false } : onColiseum(c, rr) ? { kind: "coliseum", i: HOMES.length, confirm: false } : null;
+    const key = next ? `${next.kind}:${next.i}` : "";
+    if (next && key !== keysAsked && !card) setCard(next);
+    keysAsked = key;
+  };
   const keysWalk = () => {
     if (!anyHeld()) {
       keysOn = false;
+      keysAsked = "";
       return;
     }
     if (!keysOn) {
@@ -1200,6 +1221,7 @@ function startTown(
       if (town.you.walker.moving()) town.you.walker.go([]);
     }
     keys.start();
+    keysAsk();
   };
   const onDown = (e: PointerEvent) => {
     cv.setPointerCapture?.(e.pointerId);

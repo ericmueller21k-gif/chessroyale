@@ -1004,6 +1004,16 @@ export function destFor(t: Town, w: Walker, target: Target): Sq | null {
   if (target.kind === "home") {
     const h = target.home;
     const here = w.here();
+    // In front of its door first (Eric, Nov 5: "it should be putting me as close to in front of his building as possible"): the
+    // square before the plot's front row in its middle, then the one either side of it; else, as before, the nearest free square
+    // on the ring round the plot.
+    const front = (c: number, r: number, side: number) => wrapI(r) === wrapI(h.cy - 2) && Math.abs(wrapF(c - h.cx)) <= side;
+    for (const side of [0, 1]) {
+      const goal = (c: number, r: number) => front(c, r, side) && walkable(c, r) && !taken(t, c, r, w);
+      if (goal(here.c, here.r)) return here;
+      const path = findPath(here, goal, walkable);
+      if (path) return path[path.length - 1]!;
+    }
     if (plotDist(h, here.c, here.r) === 1 && !taken(t, here.c, here.r, w)) return here;
     const path = findPath(here, (c, r) => plotDist(h, c, r) === 1 && walkable(c, r) && !taken(t, c, r, w), walkable);
     return path ? path[path.length - 1]! : null;

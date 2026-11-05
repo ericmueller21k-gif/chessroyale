@@ -101,6 +101,11 @@ removed (old → new) and says whether any of them guards a rule here.
   figure and a table partner always show. The one more named exception to "nothing hidden".
   - Guard: `e2e/town-tags.spec.ts`, "name tags show only near you by default…", phone and computer; unit: `packages/app/test/town-tags.test.ts`.
   - Decision: [2026-10-28-name-tags-near-you.md](../decisions/2026-10-28-name-tags-near-you.md).
+- **A tap on a home walks you to the square before its door (or one either side, if someone stands there), and its card opens;
+  running into a home (or the Colosseum) with an arrow key opens its card too (Eric, Nov 5: "as close to in front of his building as
+  possible"; "if I use the arrow keys and you run up to a building, it should also ask you if you want to enter").**
+  - Guards: `packages/app/test/town-world.test.ts`, "tapping a home walks you in front of its door…"; `e2e/town.spec.ts`, "a home's
+    door (Eric, Nov 5)…", phone and computer.
 
 ## Writing
 
