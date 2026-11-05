@@ -174,3 +174,5 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
   3. Town code B: box-building renderer (WebGL + 2D fallback, ~15 draws/building) + camera turn at Seam Avenue crossings (~0.5 s); frame-rate check on phone.
 - Town art round 1 DONE 11a4d903 (out/town-buildings/, town-plan-nov5.json, stills out/town-art/). Round 2 (layout, admins first STREET_TOWN) helper: brief-town-layout.md, /home/user/cr-townlayout claude/town-layout, ports 8993/9493 (parallel helper per Eric).
 - Hollow bulbs helper started (Opus high), /home/user/cr-hollowbulbs claude/hollow-bulbs, ports 8989/9489.
+- #499 street town round 2 (admins, STREET_TOWN) PR open full-e2e 96368a3f, CI watcher bdc92v0bm. #498 igloo one-lane deadlock fix (main red after #496) 365c3b56, CI watcher bgcrum0uq.
+- Town round 3 (boxes + camera turn) helper: brief-town-boxes.md, /home/user/cr-townboxes claude/town-boxes from claude/town-layout, ports 8995/9495. Flip STREET_TOWN for everyone after Eric walks it.
