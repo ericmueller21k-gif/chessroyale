@@ -172,3 +172,4 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
   1. Town art (Opus high, boss-art): final everyday fronts (8 designs x2 colours) + box sides/roofs per material and per boss home, bigger buildings behind, hedges/back gardens, seam streets; exact plan numbers.
   2. Town code A: new layout at today's camera (plus park 12 tables, streets, lots, homes moved, walkable/bots/boss roam, default zoomed-in), town e2e updated.
   3. Town code B: box-building renderer (WebGL + 2D fallback, ~15 draws/building) + camera turn at Seam Avenue crossings (~0.5 s); frame-rate check on phone.
+- Town art round 1 DONE 11a4d903 (out/town-buildings/, town-plan-nov5.json, stills out/town-art/). Round 2 (layout, admins first STREET_TOWN) helper: brief-town-layout.md, /home/user/cr-townlayout claude/town-layout, ports 8993/9493 (parallel helper per Eric).
