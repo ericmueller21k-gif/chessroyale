@@ -163,7 +163,7 @@ export function lightsAt<L extends { piece: string }, P extends { name: string }
   return out;
 }
 /**
- * A pool of light's slow drift (Folio's windows' coloured pools, Nov 5: the art's `PoolDrift`): its middle swings `dx`, `dy` room
+ * A pool of light's slow drift (Folio's windows' colored pools, Nov 5: the art's `PoolDrift`): its middle swings `dx`, `dy` room
  * pixels either way on a sine over `ms`, starting `phase` (0 to 1) into it; every pool on one clock (the sun).
  */
 export interface PoolDrift {

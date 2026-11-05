@@ -77,7 +77,7 @@ describe("Folio's sanctuary", () => {
     expect([INTRO_FOLIO_TABLE_AT, ...INTRO_FOLIO_STOOLS_AT]).toEqual([[m.table.c, m.table.r], [m.bossStool.c, m.bossStool.r], [m.youStool.c, m.youStool.r]]);
   });
 
-  it("lights at every placement: each window's panes light in their own colours wherever it stands (four on each side wall, the east mirrored), and the moon window", () => {
+  it("lights at every placement: each window's panes light in their own colors wherever it stands (four on each side wall, the east mirrored), and the moon window", () => {
     const ups = SHOP_FOLIO_LAYOUT.filter((p) => !isFloor(p.name));
     const wins = ups.filter((p) => p.name === "window" || p.name === "window-b");
     expect(wins).toHaveLength(8);

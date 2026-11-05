@@ -1,7 +1,7 @@
 /**
  * Folio's crumple into the match (Nov 5, Eric's idea; the art's notes, intro-folio-nov5.md beat 5; its maths, crumple.ts): the screen
  * as it is, taken as a picture (snap.ts: the room's canvas and the page's DOM over it, the header and the chat), crumpled over black
- * into a ball in the middle (a WebGL mesh: 16 x 34 on a phone, Lambert shading, the paper's back cream-grey with the screen through it
+ * into a ball in the middle (a WebGL mesh: 16 x 34 on a phone, Lambert shading, the paper's back cream-gray with the screen through it
  * at 13%), held a beat, and opened back up as the real match screen: the match is shown under the cover, taken as a picture the same
  * way, cross-faded in on the small ball, and opened; flat, the creases' shade lingers over the live match screen (the cover multiplies
  * over the page there) and fades, and the cover is gone.
@@ -45,7 +45,7 @@ export function prepareCrumple(): void {
 const VS = `attribute vec3 aPos; attribute vec2 aUv; attribute float aShade; attribute float aBack;
 varying vec2 vUv; varying float vShade; varying float vBack;
 void main() { gl_Position = vec4(aPos, 1.0); vUv = aUv; vShade = aShade; vBack = aBack; }`;
-// (The art's shading: the paper's back cream-grey #e3dccd with the picture through it at 13%; then multiplied by the shade under 1 and
+// (The art's shading: the paper's back cream-gray #e3dccd with the picture through it at 13%; then multiplied by the shade under 1 and
 // screened with a warm sheen over 1. In `uLive`, the shade alone, as a multiply over the live page: the creases lingering.)
 const FS = `precision mediump float;
 uniform sampler2D uA; uniform sampler2D uB; uniform float uMix; uniform float uLive;

@@ -69,7 +69,7 @@ interface RoomArt {
   lights: readonly (LightSpot & { piece: string })[];
   pools: readonly (LightPool & { piece: string; drift?: PoolDrift })[];
   /**
-   * How its pools lie on the floor: added light (the default), or their colour laid over the floor (`multiply`: Folio's stained glass on
+   * How its pools lie on the floor: added light (the default), or their color laid over the floor (`multiply`: Folio's stained glass on
    * its pale paper, where an added light barely shows; the art's mockup).
    */
   poolBlend?: "multiply";
@@ -138,8 +138,8 @@ const ART: Partial<Record<HomeId, () => Promise<RoomArt>>> = {
       standDy: m.SHOP_GREX_BOARD_AT.footDy,
       crew: { liftPath: m.SHOP_GREX_LIFT_PATH, forkPath: m.SHOP_GREX_FORK_PATH, places: m.SHOP_GREX_CREW, palletAt: m.SHOP_GREX_PALLET_AT, shelf: m.SHOP_GREX_SHELF_SLOT },
     })),
-  // (Folio's sanctuary, Nov 5: a box room, the clean page its battle spot (its `page-` tiles); its windows' coloured pools drift with the
-  // sun and lie on the paper as colour, not light.)
+  // (Folio's sanctuary, Nov 5: a box room, the clean page its battle spot (its `page-` tiles); its windows' colored pools drift with the
+  // sun and lie on the paper as color, not light.)
   folio: () =>
     import("./folio-art.ts").then((m) => ({ layout: m.SHOP_FOLIO_LAYOUT, pieces: m.SHOP_FOLIO_PIECES, crateAt: m.SHOP_FOLIO_CRATE_AT, lights: m.SHOP_FOLIO_LIGHTS, pools: m.SHOP_FOLIO_POOLS, marks: m.SHOP_FOLIO_MARKS, poolBlend: "multiply" as const })),
   // (An igloo with a round floor's shape, as Hollow's cave, but not a cave; its catwalk and staircases, a second walking level; the
@@ -669,8 +669,8 @@ function startRoom(
   };
   for (const l of [...art.pools, ...art.lights]) glow(l.color);
   /**
-   * A tint's soft round sprite (Folio's pools, laid over the paper by multiply): its colour fading to that colour see-through, not to
-   * black (a glow's black edge, multiplied, would leave a grey ring).
+   * A tint's soft round sprite (Folio's pools, laid over the paper by multiply): its color fading to that color see-through, not to
+   * black (a glow's black edge, multiplied, would leave a gray ring).
    */
   const tintOf = new Map<string, HTMLCanvasElement>();
   const tint = (color: string) => {
@@ -2778,7 +2778,7 @@ function startRoom(
   const drift = { x: 0, y: 0 };
   const drawGlows = (now: number) => {
     if (!poolsAt.length && !halosAt.length) return;
-    // (Folio's: its pools' colour laid over the paper, then its halos' light added.)
+    // (Folio's: its pools' color laid over the paper, then its halos' light added.)
     g.globalCompositeOperation = art.poolBlend ?? "lighter";
     for (const { l, at: u } of poolsAt) {
       if (!P(u.c, u.r)) continue;

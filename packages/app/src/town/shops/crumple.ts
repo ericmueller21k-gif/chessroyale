@@ -1,7 +1,7 @@
 /**
  * The crumple (Folio's intro, beat 5; Eric's idea): a sketch of the maths, small and pure (no DOM), for the code round to
  * port. The screen as it is is taken as a still and laid on a grid mesh; over black the mesh crumples into a ball in the
- * middle (creases, foreshortened faces, light and shade; where the sheet turns over, its back shows: cream-grey paper with
+ * middle (creases, foreshortened faces, light and shade; where the sheet turns over, its back shows: cream-gray paper with
  * faint ink showing through), holds a beat, and opens back up, and the unfolded sheet is the match screen.
  *
  * - **The mesh:** `cols` x `rows` cells over the screen (W x H px), two triangles a cell. 16 x 34 on a phone (cells about
@@ -14,7 +14,7 @@
  *   creases come up early (a wrinkle in z that peaks halfway), so the sheet buckles before it balls.
  * - **Shading:** each triangle's normal against a light from the top left and in front: Lambert, scaled so the flat sheet
  *   is exactly 1 (it looks unchanged until it moves). A triangle turned away from us (its normal's z below 0) is the
- *   paper's back: cream-grey (#e3dccd) at that shade, the screen showing through at 13% (mirrored, as the screen's own
+ *   paper's back: cream-gray (#e3dccd) at that shade, the screen showing through at 13% (mirrored, as the screen's own
  *   triangle drawn turned over is).
  * - **Drawing:** project each point (a mild perspective, focal length `F`), sort the triangles far to near, and draw each
  *   one as the screen's image mapped on it (an affine map from its three corners), then its shade over it (black at

@@ -412,7 +412,6 @@ const crumpleNow = (p: Page) =>
  * WebGL 2 too (`?gl=1`), as its own e2e runs it. `noGl`: WebGL off (the page can't get a WebGL context): the fade through black.
  */
 async function folioChallenge(page: Page, opts: { gl: boolean; noGl: boolean; gif: boolean }) {
-  const startedAt = Date.now();
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   const project = test.info().project.name;
@@ -429,22 +428,20 @@ async function folioChallenge(page: Page, opts: { gl: boolean; noGl: boolean; gi
   await page.goto(`/town?sky=day${opts.gl ? "&gl=1" : ""}`);
   await expect(town(page)).toHaveAttribute("data-ready", "1");
   const { confirm, stood } = await toConfirm(page, "folio", "Folio");
-  const frames: { at: number; png: Buffer }[] = [];
-  let grabbing = !!SHOTS && opts.gif && project === "phone";
+  // (The phone's GIF: the page's own frames as Chrome draws them (its screencast), each with its time, from the Fight tap to the match:
+  // screenshots taken alongside slow the page, and the cover's WebGL slows them to about one a second.)
+  const gif = !!SHOTS && opts.gif && project === "phone";
+  const cast: { at: number; jpg: Buffer }[] = [];
+  const caster = gif ? await page.context().newCDPSession(page) : null;
+  caster?.on("Page.screencastFrame", (f: { data: string; sessionId: number; metadata: { timestamp?: number } }) => {
+    cast.push({ at: (f.metadata.timestamp ?? Date.now() / 1000) * 1000, jpg: Buffer.from(f.data, "base64") });
+    void caster.send("Page.screencastFrameAck", { sessionId: f.sessionId }).catch(() => {});
+  });
   // (FOLIO_CPU=4: the phone's frame-rate check, its CPU slowed 4x through the crumple's run: the frame times are logged below.)
   const cpu = Number(process.env.FOLIO_CPU ?? 0);
   if (cpu > 1) await (await page.context().newCDPSession(page)).send("Emulation.setCPUThrottlingRate", { rate: cpu });
-  const fightAt = Date.now();
-  // (For the GIF from a recorded video (the cover's WebGL slows screenshots to about one a second): when Fight was tapped, from the
-  // test's start, which is about the video's.)
-  if (grabbing) writeFileSync(`${SHOTS}/folio-fight-at.txt`, String(fightAt - startedAt));
+  await caster?.send("Page.startScreencast", { format: "jpeg", quality: 85, everyNthFrame: 1 });
   await confirm.getByRole("button", { name: "Fight" }).click();
-  const grabbed = (async () => {
-    while (grabbing) {
-      const png = await page.screenshot({ scale: "css", type: "jpeg", quality: 85 });
-      frames.push({ at: Date.now() - fightAt, png });
-    }
-  })();
   await expect(room(page)).toHaveAttribute("data-room", "folio", { timeout: 20_000 });
   await expect(page.getByRole("heading", { name: "Folio's Folded House" })).toBeVisible();
   const looks: (Intro & { folio: FolioState | null })[] = [];
@@ -514,6 +511,12 @@ async function folioChallenge(page: Page, opts: { gl: boolean; noGl: boolean; gi
     )
     .toBe(true);
   await expect(page.locator(BOARD_SEL.wrap).first()).toBeVisible({ timeout: 10_000 });
+  if (caster) {
+    await page.waitForTimeout(1500);
+    await caster.send("Page.stopScreencast");
+    const t0 = cast[0]?.at ?? 0;
+    for (const [i, f] of cast.entries()) writeFileSync(`${SHOTS}/folio-cast-${String(i).padStart(4, "0")}-${String(Math.round(f.at - t0)).padStart(6, "0")}.jpg`, f.jpg);
+  }
   // The crumple's frames (test switches on: crumple-gl.ts logs each one's time), for its frame rate: the median and the slowest.
   const log = await page.evaluate(() => (window as unknown as { __crumpleFrames?: { t: number; phase: string; js: number }[] }).__crumpleFrames ?? []);
   const byPhase = (ph: string) => {
@@ -529,9 +532,6 @@ async function folioChallenge(page: Page, opts: { gl: boolean; noGl: boolean; gi
     test.info().annotations.push({ type: "crumple frames", description: `${gaps.length} frames, median ${med.toFixed(1)} ms (${(1000 / med).toFixed(1)} fps), slowest ${gaps.at(-1)!.toFixed(1)} ms, over 33 ms: ${gaps.filter((g) => g > 33.4).length}${cpu > 1 ? `, CPU ${cpu}x` : ""}` });
     console.log(`crumple frames (${project}${opts.gl ? ", town gl" : ""}): ${`${gaps.length} frames, median ${med.toFixed(1)} ms (${(1000 / med).toFixed(1)} fps), slowest ${gaps.at(-1)!.toFixed(1)} ms, over 33 ms: ${gaps.filter((g) => g > 33.4).length}${cpu > 1 ? `, CPU ${cpu}x` : ""}`}`);
   }
-  grabbing = false;
-  await grabbed;
-  if (SHOTS) for (const [i, f] of frames.entries()) writeFileSync(`${SHOTS}/folio-gif-${String(i).padStart(3, "0")}-${String(f.at).padStart(6, "0")}.jpg`, f.png);
   // (Every phase it went through, as it says; and every look's.)
   const phases = [...new Set([...seen.map((c) => c.phase), ...seen.flatMap((c) => c.phases.split(" "))])];
   if (opts.noGl) {

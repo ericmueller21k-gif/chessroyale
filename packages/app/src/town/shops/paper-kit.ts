@@ -29,7 +29,7 @@ export const PAPER_PALETTE: Record<string, string> = {
   C: "#d3bd95",
   D: "#a58e69",
   E: "#76624c",
-  F: "#e3dccd", // the paper's back: cream-grey
+  F: "#e3dccd", // the paper's back: cream-gray
   f: "#cbc3b3",
   // Ink (Folio's): on lit paper, on mid, on shade; the sketch line, strong and fading; the ruled lines; the margin line.
   i: "#8a93b8",
@@ -48,7 +48,7 @@ export const PAPER_PALETTE: Record<string, string> = {
   // The seal (Folio's): vermilion, pressed deeper.
   v: "#d8432a",
   w: "#a3301e",
-  // Stone paper (the fountain's basin, the pots, the inkstone's rim): lit to deep, grey-blue.
+  // Stone paper (the fountain's basin, the pots, the inkstone's rim): lit to deep, gray-blue.
   "1": "#e4e6ec",
   "2": "#c6cad5",
   "3": "#a3a8b8",
@@ -117,7 +117,7 @@ export function hash(a: number, b: number, s = 0): number {
   return ((h ^ (h >>> 15)) >>> 0) / 4294967296;
 }
 
-/** Is the pixel centre (x + 0.5, y + 0.5) inside the polygon? */
+/** Is the pixel center (x + 0.5, y + 0.5) inside the polygon? */
 export function inPoly(pts: readonly Pt[]): (x: number, y: number) => boolean {
   return (x, y) => {
     const px = x + 0.5;
@@ -273,7 +273,7 @@ export function cursive(c: Cv, x0: number, y0: number, len: number, k: string | 
     prev = lift;
   });
 }
-/** A short paragraph of cursive on a face: `lines` lines `gap` px apart, each a little shorter or longer, centred in [x0, x1]. */
+/** A short paragraph of cursive on a face: `lines` lines `gap` px apart, each a little shorter or longer, centered in [x0, x1]. */
 export function paragraph(c: Cv, x0: number, x1: number, y0: number, lines: number, gap: number, k: string | ((x: number, y: number) => string | null), seed: number, inside?: (x: number, y: number) => boolean) {
   for (let li = 0; li < lines; li++) {
     const shrink = Math.floor(hash(li, 9, seed) * 6);

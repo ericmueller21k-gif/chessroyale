@@ -5,7 +5,7 @@
  *
  * Folio (characters/folio.ts, its home town/houses/folio.ts) is a paper crane folded from one page of handwriting: calm,
  * honest, warm, a little unsettling. **The room is a page still being written.** Near the middle everything is folded,
- * coloured and solid: a floor of folded paper squares, stained-glass windows of tissue paper in folded frames, a fountain
+ * colored and solid: a floor of folded paper squares, stained-glass windows of tissue paper in folded frames, a fountain
  * whose water is ribbons of paper and ink pouring and looping, folded bonsai, hanging strings of small cranes, folding
  * screens, a low writing desk. Toward the edges and the back it thins into ink sketch: the floor's folds drawn only as
  * blue-black lines on blank cream, faint ruled lines, a margin line down the west side; pillars, a bench and a lantern drawn
@@ -369,7 +369,7 @@ function shojiPanel(seed: number): Cv {
 wallDef("side-shoji", [shojiPanel(41)]);
 /**
  * The stained-glass window: tall panes of tissue paper lit from behind, cut in triangles (a fold pattern), in a folded-paper
- * frame (its four faces mitred at the corners, lit top and left), gilt along its inner edge, a sill. Three colours to a
+ * frame (its four faces mitred at the corners, lit top and left), gilt along its inner edge, a sill. Three colors to a
  * window (`set`: light and deep keys), lighter toward the top where the sun comes through.
  */
 const WIN = { x0: 7, y0: 24, x1: 29, y1: 104 } as const;
@@ -433,7 +433,7 @@ function stainedWindow(set: readonly (readonly [string, string])[], seed: number
   gilt(c, [2, 12], [35, 12], { glint: 0.7 });
   return c;
 }
-/** Window colour sets (tissue light / deep): rose, gold, blue; jade, violet, gold. */
+/** Window color sets (tissue light / deep): rose, gold, blue; jade, violet, gold. */
 const GLASS_A = [["p", "P"], ["y", "Y"], ["u", "U"]] as const;
 const GLASS_B = [["q", "Q"], ["x", "X"], ["y", "Y"]] as const;
 wallDef("window", [stainedWindow(GLASS_A, 51)]);
@@ -530,7 +530,7 @@ export const SHOP_FOLIO_BACKDROP = (() => {
     rect(c, x + len, y - 5, 1, 5, "9");
     rect(c, x + Math.floor(len / 2), y - 5, 2, 5, tie);
   };
-  // Stacks of folded tissue, each sheet's edge a colour.
+  // Stacks of folded tissue, each sheet's edge a color.
   const stack = (x: number, y: number, keys: string) =>
     [...keys].forEach((k, j) => {
       rect(c, x + (j % 2), y - 2 - j * 2, 12, 2, k);
@@ -825,7 +825,7 @@ export const SHOP_FOLIO_BONSAI = def("bonsai", [1, 1], BW, BH, [18, BF], [[whole
 export const SHOP_FOLIO_BONSAI_CRANES = def("bonsai-cranes", [1, 1], BW, BH, [18, BF], [0, 0, 0, 0, 1, 0, 1, 0].map((fl) => [whole(bonsaiCv({ seed: 2, cranes: true, flutter: fl }), true)]), 260);
 
 // ==== Strings of small paper cranes hanging from the ceiling (senbazuru), on ink-blue thread, a vermilion and gold tassel at
-// the foot. They sway, more toward the foot; the two pieces are out of step and in a different order of colours.
+// the foot. They sway, more toward the foot; the two pieces are out of step and in a different order of colors.
 
 const HC_H = 130;
 const HC_COLORS = [["p", "P"], ["y", "Y"], ["u", "U"], ["q", "Q"], ["x", "X"], ["A", "C"]] as const;
@@ -1021,12 +1021,12 @@ export const SHOP_FOLIO_SKETCH_LANTERN_B = def("sketch-lantern-b", [1, 1], T, SL
 // ==== The lights, each on its piece (`piece`; x, y in its own pixels). Repeated pieces (the windows) light at every place
 // they stand; a flipped placement mirrors x.
 
-/** The tissue's colours as light (rose, gold, blue, jade, violet), and the moon window's gold. */
+/** The tissue's colors as light (rose, gold, blue, jade, violet), and the moon window's gold. */
 const GLOW: Record<string, string> = { p: "#ffb4a2", y: "#ffe08a", u: "#a8c4ff", q: "#a8f0c0", x: "#d8b8ff" };
 const MOON_GOLD = "#ffe39a";
 const windowSpots = (piece: string, set: readonly (readonly [string, string])[]) =>
   set.map(([lit, deep]) => ({ piece, x: WIN.x0, y: WIN.y0, w: WIN.x1 - WIN.x0 + 1, h: WIN.y1 - WIN.y0 + 1, keys: lit + deep, color: GLOW[lit]!, strength: 0.55, halo: 22 }));
-/** The windows' panes (each colour its own light, so each halo is its colour) and the backdrop's moon window. */
+/** The windows' panes (each color its own light, so each halo is its color) and the backdrop's moon window. */
 export const SHOP_FOLIO_LIGHTS: readonly (LightSpot & { piece: string })[] = [
   ...windowSpots("window", GLASS_A),
   ...windowSpots("window-b", GLASS_B),
@@ -1034,7 +1034,7 @@ export const SHOP_FOLIO_LIGHTS: readonly (LightSpot & { piece: string })[] = [
 ];
 /**
  * A pool's slow drift as the "sun" moves: its middle swings `dx`, `dy` px either way (a sine) over `ms`, starting at `phase`
- * (0 to 1) of the loop. Every window's pools share one sun, so they drift together (the phase differs by colour a hair).
+ * (0 to 1) of the loop. Every window's pools share one sun, so they drift together (the phase differs by color a hair).
  */
 export interface PoolDrift {
   dx: number;
@@ -1043,8 +1043,8 @@ export interface PoolDrift {
   phase: number;
 }
 /**
- * The coloured pools each window throws on the floor (a west-wall window, unflipped, throws them east into the room; the
- * east wall's, flipped, west), its three colours in a slanting line; and the moon window's soft gold before the counter.
+ * The colored pools each window throws on the floor (a west-wall window, unflipped, throws them east into the room; the
+ * east wall's, flipped, west), its three colors in a slanting line; and the moon window's soft gold before the counter.
  */
 const windowPools = (piece: string, set: readonly (readonly [string, string])[]) =>
   set.map(([lit], i) => ({ piece, x: 56 + i * 22, y: WALL_H + 4 + i * 5, rx: 22, ry: 10, color: GLOW[lit]!, strength: 0.42, drift: { dx: 9, dy: 4, ms: 40000, phase: i * 0.04 } as PoolDrift }));

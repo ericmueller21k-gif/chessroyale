@@ -21,7 +21,7 @@
 import type { Anim, Character, Frame, Part } from "../../characters/sprite.ts";
 import { PAPER_PALETTE, crop, cv, face, gilt, line, put, rect, seal, shadow, type Cv, type Pt } from "./paper-kit.ts";
 
-/** The board's own two colours (the park table's ink, town/houses/park.ts TABLE_INK) and their shades, for the stand-in board. */
+/** The board's own two colors (the park table's ink, town/houses/park.ts TABLE_INK) and their shades, for the stand-in board. */
 export const INTRO_FOLIO_PALETTE: Record<string, string> = {
   ...PAPER_PALETTE,
   "%": "#f6f1e6",
