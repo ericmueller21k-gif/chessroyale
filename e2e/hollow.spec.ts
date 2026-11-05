@@ -64,6 +64,26 @@ const soundsHeard = (p: Page) => p.evaluate(() => ((window as any).__soundLog ??
 
 /** His line in his speech bubble now (its whole text), or null. */
 const bubbleLine = (p: Page) => p.evaluate(() => document.querySelector(".bc-bubble")?.getAttribute("aria-label") ?? null).catch(() => null);
+/**
+ * His bubble's line clipped, or "" when it shows whole: its text's scroll size within its box, and every box of the text inside
+ * the bubble (its rows never cut by the box's edge).
+ */
+const bubbleClipped = (p: Page) =>
+  p.evaluate(() => {
+    const el = document.querySelector<HTMLElement>(".bc-bubble");
+    if (!el) return "no bubble";
+    const label = el.getAttribute("aria-label") ?? "";
+    if (el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1) return `${label}: scroll ${el.scrollWidth}x${el.scrollHeight} in ${el.clientWidth}x${el.clientHeight}`;
+    const box = el.getBoundingClientRect();
+    const rg = document.createRange();
+    rg.selectNodeContents(el);
+    const out = [...rg.getClientRects()].filter((q) => q.width > 0.5 && q.height > 0.5).find((q) => q.left < box.left - 0.5 || q.right > box.right + 0.5 || q.top < box.top - 0.5 || q.bottom > box.bottom + 0.5);
+    if (out) return `${label}: a row at ${Math.round(out.left)},${Math.round(out.top)}-${Math.round(out.right)},${Math.round(out.bottom)} past the box ${Math.round(box.left)},${Math.round(box.top)}-${Math.round(box.right)},${Math.round(box.bottom)}`;
+    if (box.left < 0 || box.top < 0 || box.right > innerWidth + 0.5 || box.bottom > innerHeight + 0.5) return `${label}: the box off screen`;
+    return "";
+  });
+/** Every taunt and the dark's move line (characters/hollow.ts HOLLOW_LINES.misplay; components/Hollow.tsx HOLLOW_BULB_LINES). */
+const TAUNT_LINES = ["Nice try.", "What, can't play in the dark?", "Something was there. Wasn't it?", "You reached for nothing.", "Feeling around, are we?", "The dark remembers. You don't.", "Not there. Never there.", "Wrong. And it's getting darker."];
 /** His taunts on a misplay (characters/hollow.ts HOLLOW_LINES.misplay). */
 const TAUNTS = /^(Nice try\.|What, can't play in the dark\?|Something was there\. Wasn't it\?|You reached for nothing\.|Feeling around, are we\?|The dark remembers\. You don't\.|Not there\. Never there\.|Wrong\. And it's getting darker\.)$/;
 /** HOLLOW_STILLS=<folder>: the stills for docs/hollow-bulbs/, written there. */
@@ -137,6 +157,9 @@ test("Hollow's dark, Boss alone: his first cover, a dark square selected, his te
   await expect(page.locator(".life-strip")).toHaveAttribute("data-lit", "9");
   await expect.poll(() => soundsHeard(page), { timeout: 5000 }).toContain("hollowFizz");
   await expect.poll(() => bubbleLine(page), { timeout: 15_000 }).toMatch(TAUNTS);
+  // (Typed out in full: the still shows the whole line.)
+  await expect.poll(() => page.evaluate(() => document.querySelector(".bc-bubble .speech-rest")?.textContent ?? ""), { timeout: 8000 }).toBe("");
+  await expect.poll(() => bubbleClipped(page), { timeout: 3000 }).toBe("");
   if (STILLS) await still(page, "bulbs-taunt");
   expect(await phase(page)).toBe("play");
   // A legal move out of the dark. (For the test, the dark falls on your knight: covers land on his pieces or yours at
@@ -185,6 +208,25 @@ test("Hollow's dark, Boss alone: his first cover, a dark square selected, his te
   expect(await page.evaluate(() => (window as any).match.moves.at(-1).move)).toBe(forced.move);
   expect(await soundsHeard(page)).toContain("hollowForced");
   expect(errors).toEqual([]);
+});
+
+test("Hollow's taunts and \"The dark moves for you.\" show whole in his bubble, typed out: nothing clipped (a phone 390 wide, a computer 1440)", async ({ page }) => {
+  test.setTimeout(3 * 60_000);
+  await page.setViewportSize(test.info().project.name === "phone" ? { width: 390, height: 844 } : { width: 1440, height: 900 });
+  await page.goto("/?debug&clock=60&boss=hollow&laststand=0");
+  await bossAloneFromHome(page);
+  await yourMove(page);
+  const bad: string[] = [];
+  for (const line of [...TAUNT_LINES, "The dark moves for you."]) {
+    await page.evaluate((t) => (globalThis as { sayBoss?: (t: string) => boolean }).sayBoss!(t), line);
+    await expect.poll(() => bubbleLine(page), { timeout: 5000 }).toBe(line);
+    await expect.poll(() => page.evaluate(() => document.querySelector(".bc-bubble .speech-rest")?.textContent ?? "x"), { timeout: 8000 }).toBe("");
+    // (Its box settles to the line, in the pixel font, a frame or two after it shows.)
+    await page.waitForTimeout(150);
+    const clipped = await bubbleClipped(page);
+    if (clipped) bad.push(clipped);
+  }
+  expect(bad).toEqual([]);
 });
 
 test("Hollow's bulbs (Boss alone): a 2 x 2 block of the dark drawn, then the 10th bulb out: total darkness, his line, the loss", async ({ page }) => {

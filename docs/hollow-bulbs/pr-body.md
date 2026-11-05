@@ -52,7 +52,10 @@ Stills (`docs/hollow-bulbs/`): `bulbs-taunt-phone.png`, `bulbs-taunt-desktop.png
 - `packages/chess/test/boss-kit-lib.ts`: `KNOWN_STEPS` + `darkForcedDue`.
 - None guarded a rule in `docs/rules/eric.md`. Eric's three new rules are added there with their guards.
 
-New: `packages/chess/test/hollow-bulbs.test.ts`, `packages/app/test/hollow-bulbs.test.ts`, and in `e2e/hollow.spec.ts` "Hollow's
+New: `e2e/hollow.spec.ts`, "Hollow's taunts and \"The dark moves for you.\" show whole in his bubble, typed out: nothing clipped (a
+phone 390 wide, a computer 1440)" (each line said, typed out, its text's scroll size within its box and every row inside it;
+the director's review: the first taunt still had been taken mid-typing, "Wrong. And it's", its second row still to type; every
+line fits). `packages/chess/test/hollow-bulbs.test.ts`, `packages/app/test/hollow-bulbs.test.ts`, and in `e2e/hollow.spec.ts` "Hollow's
 bulbs (Boss alone): a 2 x 2 block of the dark drawn, then the 10th bulb out: total darkness, his line, the loss" (phone and
 computer).
 

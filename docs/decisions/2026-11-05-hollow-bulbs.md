@@ -61,6 +61,10 @@ confirmed on Nov 5 that the bulbs are for solo only.
   "Something was there. Wasn't it?", "You reached for nothing.", "Feeling around, are we?", "The dark remembers. You don't.",
   "Not there. Never there.", "Wrong. And it's getting darker." Picked on the device (looks only), never the same twice
   running (`hollowTaunt`).
+- **Every line whole in his bubble** (the director's review): the first taunt still showed "Wrong. And it's" because it was taken
+  while the line typed out (its second row held, unseen, in its place). Every taunt and "The dark moves for you." fits the
+  bubble's rows as it is, at 390 and 1440 wide; an e2e check says each one, typed out, and fails if its text overflows its box.
+  The stills now wait for the last letter.
 - **Sounds:** the bulb's fizz and the forced move are new synthesized sounds (low, no chimes, under a move's loudness;
   `boss-sounds-finite.test.ts` passes); the blackout reuses his `blackout` thoom from his challenge intro.
 - **Test switches:** `?bulbs=N` (N bulbs out as the battle begins, never all), `?darkblock=2|3` (that block with his first
