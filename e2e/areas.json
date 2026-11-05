@@ -215,6 +215,7 @@
         "packages/app/src/components/BossDock.tsx",
         "packages/app/src/components/BossPowers.tsx",
         "packages/app/src/boss-history.ts",
+        "packages/app/src/battle-banners.ts",
         "packages/app/src/components/MovePanel.tsx",
         "packages/app/src/move-list.ts"
       ],
