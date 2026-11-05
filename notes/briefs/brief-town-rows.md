@@ -81,3 +81,12 @@ and sky showing between them.
   and computer.
 - **PR body** in `docs/street-town-rows/pr-body.md` (full e2e lane). A decision note in `docs/decisions/2026-11-05-street-rows.md`
   covering slot sizes, the filler rules and the blend types.
+
+## Eric's clarification (Nov 5, later)
+"They don't need to like literally be drawn together. Like the colors are different. They just need to be attached like that. And
+then most of them aren't actually like real buildings… they look alike."
+- **Separate fronts, butted together.** Each building keeps its own colour and shape, set edge to edge. The seams aren't painted
+  over; a blend treatment is used only to hide a real gap or crack.
+- **Most fronts are dummies.** They're look-alikes that can't be entered, made by a parts generator (body, colour, windows, door,
+  roof), which also fills any width.
+- **Boss homes** are the distinct real buildings.
