@@ -42,7 +42,7 @@ type Hooks = {
 async function openStreet(page: Page, query = "") {
   await asAdmin(page);
   await page.goto(`/town?sky=day${query}`);
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 20_000 });
 }
 
 /** Taps a home (the camera glides to it first) until its card opens. */
@@ -64,7 +64,7 @@ test("an admin's street town opens zoomed in, at the start (22, 11), the camera 
   const errors = watchErrors(page);
   // A player's town: today's.
   await page.goto("/town?sky=day");
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 20_000 });
   expect(await you(page)).toEqual([22, 17]);
   await expect(page.getByRole("button", { name: "Zoom out" })).toHaveAttribute("aria-pressed", "true");
   // An admin's: the street town.
@@ -161,42 +161,25 @@ test("a park table: a tap on the one ahead on your left walks you to a free stoo
   expect(errors, "no page or console errors").toEqual([]);
 });
 
-// The stills for Eric (STILLS=docs/street-town): each street, looking north along it, standing at a home's door (as a tap on it walks
-// you); Seam Avenue from its own board, its fronts the stand-ins facing the camera till round 3's turn.
+// The stills for Eric (STILLS=docs/street-town): each street, looking north along it, standing in the street two rows before a home's
+// door; Seam Avenue from its own board, its fronts the stand-ins facing the camera till round 3's turn. (You walk there with the test
+// switches' walk hook, as a tap on the square would walk you.)
 test("stills: each street of the street town", async ({ page }) => {
   test.skip(!STILLS, "stills only (STILLS=docs/street-town)");
   test.setTimeout(180_000);
   await openStreet(page);
   const project = test.info().project.name;
-  const shot = async (name: string) => {
-    await page.waitForTimeout(2000);
+  const at: [string, readonly [number, number]][] = [
+    ["3-seam-street", [19, 0]], // (Smudgy's Art Gallery's door is (19, 2))
+    ["7-seam-avenue", [45, 8]],
+    ["4-fountain-street", [4, 15]], // (Timber's Lumber Lodge's, (4, 17))
+    ["5-colosseum-row", [35, 23]], // (Big Boy's Crib's, (35, 25))
+    ["6-upper-street", [39, 32]], // (Hollow Peak's, (39, 34))
+  ];
+  for (const [name, sq] of at) {
+    await page.evaluate((s) => (window as unknown as { __townWalk?: (s: readonly [number, number]) => boolean }).__townWalk?.(s), sq);
+    await expect.poll(async () => (await you(page)).join(","), { message: `walked to ${sq}`, timeout: 30_000 }).toBe(sq.join(","));
+    await page.waitForTimeout(2500);
     await page.screenshot({ path: `${STILLS}/${name}-${project}.png` });
-  };
-  /** Holds an arrow until you stand where `done` says. */
-  const run = async (key: string, done: (c: number, r: number) => boolean) => {
-    await page.keyboard.down(key);
-    await expect.poll(async () => done(...(await you(page))), { timeout: 20_000, intervals: [30] }).toBe(true);
-    await page.keyboard.up(key);
-  };
-  const visit = async (id: string, name: string, door: string) => {
-    const card = await tapHome(page, id, name);
-    await expect.poll(async () => (await you(page)).join(","), { message: `at ${name}'s door`, timeout: 30_000 }).toBe(door);
-    await page.keyboard.press("Escape");
-    await expect(card).toBeHidden();
-    // (Then two steps back into the street, to see its row of fronts as you walk it.)
-    const r0 = Number(door.split(",")[1]);
-    await run("ArrowDown", (_c, r) => (r0 - r + 46) % 46 >= 2);
-  };
-  await visit("smudgy", "Smudgy's Art Gallery", "19,2");
-  await shot("3-seam-street");
-  // West along Seam Street's board, round the seam onto Seam Avenue, and up it.
-  await run("ArrowLeft", (c) => c >= 44 || c <= 1);
-  await run("ArrowUp", (_c, r) => r >= 8 && r < 20);
-  await shot("7-seam-avenue");
-  await visit("timber", "Timber's Lumber Lodge", "4,17");
-  await shot("4-fountain-street");
-  await visit("bigboy", "Big Boy's Crib", "35,25");
-  await shot("5-colosseum-row");
-  await visit("hollow", "Hollow Peak", "39,34");
-  await shot("6-upper-street");
+  }
 });

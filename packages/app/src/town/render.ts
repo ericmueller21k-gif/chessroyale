@@ -1385,8 +1385,12 @@ export class Renderer {
         const ch = BOSS_ART[b.home.id];
         const img = this.bossFrames[it.i]!.at(now, it.i * 977);
         b.walker.pose(now, pose);
-        this.drawSprite(it, img, f.bossSquares * (f.bossScale[b.home.id] ?? 1), ch.foot[0] / ch.w, ch.foot[1] / ch.h, ch.w / ch.h, 0, 0, b.walker.facing, 1.6);
-        b.onScreen = it.fx > -40 && it.fx < this.W + 40 && it.fy > 0 && it.hy < this.H && bandOf(v, it.dx, it.dz) < 0.6; // (a boss deep in the haze doesn't talk)
+        // (The street town: a boss whose drawing would reach past the box's foot or side fades out first, so none is ever cut off.)
+        this.fade = this.edgeFade(it, (f.bossSquares * (f.bossScale[b.home.id] ?? 1) * ch.w) / ch.h / 2);
+        it.faded = this.fade < 0.5;
+        if (this.fade > 0.004) this.drawSprite(it, img, f.bossSquares * (f.bossScale[b.home.id] ?? 1), ch.foot[0] / ch.w, ch.foot[1] / ch.h, ch.w / ch.h, 0, 0, b.walker.facing, 1.6);
+        b.onScreen = !it.faded && it.fx > -40 && it.fx < this.W + 40 && it.fy > 0 && it.hy < this.H && bandOf(v, it.dx, it.dz) < 0.6; // (a boss deep in the haze doesn't talk)
+        this.fade = 1;
         if (town.speech.boss === b) {
           this.bubble.on = true;
           this.bubble.text = town.speech.line;
@@ -1403,7 +1407,7 @@ export class Renderer {
         const facing = table ? (w.c < table.c ? 1 : -1) : w.facing;
         // Up close on a statue, the people in front of it (you, on its square) fade: they'd stand between the camera and it.
         // A bot coming out from home fades in, one going home fades out (Oct 28: they take turns in the square).
-        this.fade = (it.dz < this.statueDz ? 1 - f.closeNearFade * this.close.e : 1) * clamp(Math.min(now - person.came, person.leaves - now) / f.botFadeMs, 0, 1);
+        this.fade = (it.dz < this.statueDz ? 1 - f.closeNearFade * this.close.e : 1) * clamp(Math.min(now - person.came, person.leaves - now) / f.botFadeMs, 0, 1) * (person.you ? 1 : this.edgeFade(it, 0.5));
         it.faded = this.fade < 0.5;
         if (person.you) {
           // Your shadows are a bot's: sized from the pawn, not from the margin your look's items are drawn in.
@@ -1476,12 +1480,26 @@ export class Renderer {
       }
     }
   }
-  /** How much of a street-town tree shows, by how far nearer the camera than you it stands (1: all). */
+  /** How much of a street-town tree shows, by how far nearer the camera than its focus it stands (1: all; today's town: always all). */
   private nearFade(it: Item): number {
     if (!STREET_TOWN) return 1;
     const f = TOWN_FEEL;
     return clamp((it.dz + f.streetNearCut + f.streetTreeFade) / f.streetTreeFade, 0, 1);
   }
+
+  /**
+   * The street town (Eric, Nov 4: every figure whole on screen, never cut off by the page's edge): how much of a figure (a boss, a bot,
+   * anyone but you) shows, by how near its drawing comes to the box's foot or either side, fading out over the last half square before
+   * it would be cut (1: all; today's town: always all). `halfW`: half its drawing's width, in squares.
+   */
+  private edgeFade(it: Item, halfW: number): number {
+    if (!STREET_TOWN) return 1;
+    const p = this.ep;
+    if (!proj(this.view, it.dx, it.dz, 0, p)) return 0;
+    const m = 0.5 * p.k;
+    return clamp(Math.min(this.H - (p.y + 0.15 * p.k), p.x - halfW * p.k, this.W - (p.x + halfW * p.k)) / m, 0, 1);
+  }
+  private readonly ep = newPt();
 
   /**
    * The Colosseum seen from afar (slice 6): when its foot is past the rim, but not more than `farReach` squares past it, its

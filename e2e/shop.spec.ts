@@ -58,9 +58,17 @@ async function shopAt(p: Page, kind: "keeper" | "door" | "square", sq?: readonly
 }
 const shopCam = (p: Page) => p.evaluate(() => (window as unknown as Hooks).__shopCam?.() ?? null);
 
-/** Walks up to a home (its chip glides the camera there if it's off screen) and opens its card: its "Go in". */
+/**
+ * Walks up to a home (its chip glides the camera there if it's off screen) and opens its card: its "Go in". (An admin's town is the
+ * street town since Nov 5, where a home far off may have no chip, only the nearest few do: then the camera glides there, as a chip's
+ * tap would.)
+ */
 async function goIn(p: Page, id: string, name: string) {
-  if (!(await homeAt(p, id))) await p.getByRole("button", { name: `Go to ${name}` }).dispatchEvent("click");
+  if (!(await homeAt(p, id))) {
+    const chip = p.getByRole("button", { name: `Go to ${name}` });
+    if (await chip.count()) await chip.dispatchEvent("click");
+    else await p.evaluate((h) => (window as unknown as { __townGlide?: (to: string) => void }).__townGlide?.(h), id);
+  }
   await expect.poll(() => homeAt(p, id), { message: `${name} comes into view` }).not.toBeNull();
   const card = p.getByRole("dialog", { name, exact: true });
   await expect(async () => {
