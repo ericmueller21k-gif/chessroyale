@@ -47,3 +47,12 @@ ever intercross like they did?"
 - **PR body** in `docs/banner-events/pr-body.md`: what changed, any player-visible change (should be none beyond banners never
   repeating), changed checks old → new, lane (boss lane; full e2e if shared boss code changes).
 - Push, but don't open a PR. Send a short report.
+
+## Addition (Eric, Nov 5): only from real captures, everywhere
+"The queen banner should happen literally when a capture is written… write something into the engine to read a capture versus
+simply checking the board… there's multiple instances where I can see fails happening because of the boss's moves or freezes."
+- When a move is applied (the shared rules or engine: the boss's, yours, a crowd's), record a capture event: ply, side, from/to, and
+  the piece taken. It goes in the match state or history, so client and server share it and it survives a reload.
+- QUEEN DOWN! and QUEEN SLAIN! read only those records, never the board. A power, freeze, step, bounce or funhouse can't make or hide
+  one. Revision crossing a move out removes its capture.
+- Every boss and mode that shows them. New protocol or stored fields are optional, so old clients and matches still work. Lane: full e2e.
