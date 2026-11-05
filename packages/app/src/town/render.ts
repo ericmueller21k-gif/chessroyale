@@ -3578,13 +3578,35 @@ export class Renderer {
   }
 
   /** A person's item this frame (`i`: its index in the people), or null. */
-  /** Where square (c, r)'s middle is on screen this frame (for tests: to walk somewhere). False if it isn't on screen. */
+  /** Where square (c, r)'s middle is on screen this frame (for tests: a fixed point of the world). False if it isn't on screen. */
   squareAt(c: number, r: number, out: { x: number; y: number }): boolean {
     rel(this.view, this.camX, this.camY, c, r, this.rq);
     if (!proj(this.view, this.rq.dx, this.rq.dz, 0, this.p)) return false;
     out.x = this.p.x;
     out.y = this.p.y;
     return out.x > 0 && out.x < this.W && out.y > 0 && out.y < this.H;
+  }
+  /**
+   * Where a tap on square (c, r) lands this frame (for tests: to walk somewhere): its middle, or, where something stands over that on
+   * screen (a figure and its tag, a lamp, a front: a tap there would hit it, round 4's close chase camera puts your own pawn over the
+   * squares just ahead), the nearest point of the square a tap reaches as that square. False if no part of it is on screen and clear.
+   */
+  tapSquareAt(c: number, r: number, out: { x: number; y: number }): boolean {
+    const wc = colI(c);
+    const wr = rowI(r);
+    for (let k = 0; k < SQUARE_SPOTS.length; k += 2) {
+      rel(this.view, this.camX, this.camY, c + SQUARE_SPOTS[k]!, r + SQUARE_SPOTS[k + 1]!, this.rq);
+      if (!proj(this.view, this.rq.dx, this.rq.dz, 0, this.p)) continue;
+      const x = this.p.x;
+      const y = this.p.y;
+      if (!(x > 0 && x < this.W && y > 0 && y < this.H)) continue;
+      const h = this.pick(x, y);
+      if (h?.kind !== "square" || h.c !== wc || h.r !== wr) continue;
+      out.x = x;
+      out.y = y;
+      return true;
+    }
+    return false;
   }
 
   /** (Tests) Every figure the last frame drew (the bosses, then the people): its name, its box and foot on screen, how strongly it showed. */
@@ -3815,6 +3837,13 @@ function sortFarFirst(a: Item[]): void {
     a[j + 1] = it;
   }
 }
+/** Points of a square to tap (offsets from its middle, squares): the middle first, then nearest outward, kept off its edges. */
+const SQUARE_SPOTS: readonly number[] = (() => {
+  const pts: [number, number][] = [];
+  for (const u of [-0.35, -0.2, 0, 0.2, 0.35]) for (const v of [-0.35, -0.2, 0, 0.2, 0.35]) pts.push([u, v]);
+  pts.sort((a, b) => Math.hypot(a[0], a[1]) - Math.hypot(b[0], b[1]));
+  return pts.flat();
+})();
 const dist2 = (h: Place, x: number, y: number) => wrapFX(h.cx - x) ** 2 + wrapFY(h.cy - y) ** 2;
 /** The Colosseum's chip shows all of its icon. */
 const CHIP_ICON_BOX = [0, 0, COLISEUM_CHIP.w] as const;

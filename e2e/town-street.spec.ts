@@ -210,7 +210,7 @@ async function arrowStep(page: Page, key: string) {
 }
 /** A tap on square (c, r) where it's drawn now: you walk there. */
 async function tapSquare(page: Page, sq: readonly [number, number]) {
-  const xy = await page.evaluate((s) => (window as unknown as Hooks).__townAt?.("square", s as never) ?? null, sq);
+  const xy = await page.evaluate((s) => (window as unknown as Hooks).__townAt?.("tap-square", s as never) ?? null, sq);
   expect(xy, `${sq} drawn`).not.toBeNull();
   const cv = (await canvas(page).boundingBox())!;
   await page.mouse.click(cv.x + xy!.x, cv.y + xy!.y);
@@ -291,11 +291,15 @@ for (const backend of ["2d", "webgl"] as const)
     await tapSquare(page, [to[0]! + 1, 21]);
     await page.evaluate(() => (window as unknown as { __townHeading: (h: number | null) => void }).__townHeading(null));
     await page.waitForTimeout(1200);
-    // After it: a tap still lands where it's aimed, and every figure on screen.
+    // After it: a tap still lands where it's aimed, and every figure on screen. (The mid-turn tap's last leg turns the camera, and a held
+    // key may have taken a second step, so it may now face north or south, where every square of the 4-row street ahead is behind your
+    // own pawn: first walk west along the street, then tap 5 squares ahead on its board (columns 0 to 12, west of the park: nothing
+    // stands there).)
     from = await you(page);
-    const q = ((Math.round((await cam(page)).headingTo / 90) % 4) + 4) % 4;
-    const ahead = ([[0, 3], [3, 0], [0, -3], [-3, 0]] as const)[q]!;
-    await tapSquare(page, [(from[0]! + ahead[0] + 46) % 46, from[1]! + ahead[1]]);
+    await walkTo(page, [from[0]!, 20]);
+    await walkTo(page, [(from[0]! + 44) % 46, 20]);
+    await expect.poll(async () => ((((await cam(page)).heading % 360) + 360) % 360), { timeout: 5000 }).toBe(270);
+    await tapSquare(page, [(from[0]! + 39) % 46, 20]);
     await page.waitForTimeout(1200);
     await figuresOnScreen(page);
     expect(errors, "no page or console errors").toEqual([]);

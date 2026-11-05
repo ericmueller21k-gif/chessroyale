@@ -134,7 +134,13 @@ the arrow that points at it. These are round 2's and round 3's own checks, moved
     chase camera's turn": down Seam Avenue and east into Fountain Street. The camera swings south → east, eased, seen midway; both rows
     are drawn.
   - The arrows: up ahead, down back without turning, left and right turning. Mid-turn, up is the way you're heading (was: the way the
-    screen's up points most nearly). A tap mid-turn and after.
+    screen's up points most nearly). A tap mid-turn and after. The tap after the turn walks west along Fountain Street first, then
+    taps 5 squares ahead on its board. A tap path's last leg turns the camera, so after the mid-turn tap it can face north or south, and
+    every square ahead on the 4-row street is then behind your own pawn or on a sidewalk lamp. That was #503's desktop failure: it aimed
+    3 ahead at (10, 18), a lamp, and was walked to (10, 19).
+  - A new test hook kind, `__townAt("tap-square", …)`, answers a point of the square that a tap reaches as that square: its middle,
+    or the nearest point clear of a figure, a lamp or a front standing over it on screen. The test's taps use it. `"square"` stays the
+    middle (shop.spec uses it as a fixed point under Babur's tent).
   - Removed (stills only, `STILLS`): "stills: each street of the street town" (round 2's) and "stills: the boxes and the turn"
     (round 3's) → `e2e/town-rows.spec.ts` "stills: the rows (round 4)".
 
