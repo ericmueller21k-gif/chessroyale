@@ -571,7 +571,7 @@
       "specs": ["e2e/friends.spec.ts", "e2e/global-chat.spec.ts", "e2e/home-layout.spec.ts", "e2e/live-window.spec.ts"]
     },
     "the town square (/town)": {
-      "paths": ["packages/app/src/town/**", "packages/app/src/stale.ts", "packages/app/src/characters/sidekicks/**", "packages/app/src/characters/ginger-intro.ts"],
+      "paths": ["packages/app/src/town/**", "packages/app/src/stale.ts", "packages/app/src/characters/sidekicks/**", "packages/app/src/characters/ginger-intro.ts", "packages/app/src/characters/dash-intro.ts"],
       "specs": ["e2e/town.spec.ts", "e2e/town-chat.spec.ts", "e2e/town-chat-history.spec.ts", "e2e/town-desktop.spec.ts", "e2e/town-tags.spec.ts", "e2e/town-webgl.spec.ts", "e2e/colosseum.spec.ts", "e2e/shop.spec.ts", "e2e/boss-challenge.spec.ts"]
     },
     "a boss challenged from the town (Pokémon-gym style: the walk in, the intro, the storm, the battle, back to town; the server's chat lines)": {

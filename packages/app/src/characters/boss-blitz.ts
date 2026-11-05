@@ -2,8 +2,9 @@
  * Copied as drawn from the art branch `claude/boss-art` (scripts/boss-art/out/boss-blitz/boss-blitz.ts at af90ecb4, Nov 1, 2026;
  * Eric approved the art Nov 1): every animation as drawn, the file and its export keeping the art's name (BOSS_BLITZ). Changed:
  * the import paths, its id and its name (`dash`, "Dash": Eric, Nov 3, "Blitz" is a time control; every word a player sees says
- * Dash, and the game finds a boss's moments by its figure's name), and his battle intro (added there Nov 3) left out until
- * round 3. The run's report: scripts/boss-art/out/blitz-nov1.md on that branch.
+ * Dash, and the game finds a boss's moments by its figure's name). His battle intro (added there Nov 3) is in dash-intro.ts (round 3,
+ * Nov 5): the rig it shares (PALETTE, PARTS, the legs, shoes, poses, stars and finger gun) is exported here for it, nothing else
+ * changed. The run's report: scripts/boss-art/out/blitz-nov1.md on that branch.
  */
 /**
  * Blitz, the speed-chess cheetah (concept, idle only). A lanky cheetah hustler of the park's speed-chess tables: gold-tan
@@ -13,7 +14,7 @@
 import { canvas, inEllipse, inPoly, toGrid, type Canvas } from "./paint.ts";
 import { lazyParts, partSize, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 
-const PALETTE: Record<string, string> = {
+export const PALETTE: Record<string, string> = {
   k: "#1a1210",
   a: "#7a4a14", // fur: shadow to highlight
   b: "#b9781f",
@@ -55,7 +56,7 @@ const PALETTE: Record<string, string> = {
   V: "#4fa3e0",
 };
 
-type Pt = readonly [number, number];
+export type Pt = readonly [number, number];
 type Inside = (x: number, y: number) => boolean;
 type Key = (x: number, y: number) => string;
 const FUR = "bcde";
@@ -66,9 +67,9 @@ const ramp = (r: string, l: number) => r[Math.max(0, Math.min(r.length - 1, Math
 const union = (...fs: Inside[]): Inside => (x, y) => fs.some((f) => f(x, y));
 const E = inEllipse;
 
-const W = 72;
+export const W = 72;
 const H = 104;
-const GROUND = 99;
+export const GROUND = 99;
 
 type P = { part: Part; at: Pt };
 function painted(
@@ -137,7 +138,7 @@ function tube(pts: readonly Pt[], r: readonly number[]) {
     },
   };
 }
-function elbowOf(s: Pt, t: Pt, [l1, l2]: Pt, down = true): Pt {
+export function elbowOf(s: Pt, t: Pt, [l1, l2]: Pt, down = true): Pt {
   const dist = Math.hypot(t[0] - s[0], t[1] - s[1]) || 0.01;
   const d = Math.min(dist, l1 + l2 - 0.01);
   const [ux, uy] = [(t[0] - s[0]) / dist, (t[1] - s[1]) / dist];
@@ -302,7 +303,7 @@ function arm(sh: Pt, el: Pt, wr: Pt, paw: Pt, dark: number): P {
   });
 }
 
-function leg(hip: Pt, knee: Pt, ankle: Pt, dark: number): P {
+export function leg(hip: Pt, knee: Pt, ankle: Pt, dark: number): P {
   const t = tube([hip, knee, ankle], [3, 2.4, 2]);
   return painted(...t.box, (F) =>
     F(t.inside, (x, y) => {
@@ -314,7 +315,7 @@ function leg(hip: Pt, knee: Pt, ankle: Pt, dark: number): P {
   );
 }
 
-function shoe(ax: number, tip: boolean, dark: boolean): P {
+export function shoe(ax: number, tip: boolean, dark: boolean): P {
   const n = dark ? "M" : "N";
   const o = dark ? "N" : "O";
   const flat = [`...${o}${o}${o}${n}..`, `.${o}${o}${o}${o}${n}${n}${n}M`, `${o}${o}G${n}${n}${n}${n}MM`, "FFFFFFFFF"];
@@ -482,10 +483,10 @@ function flagDown(): P {
 }
 
 // ---- rig
-const { parts: PARTS, add } = lazyParts();
+export const { parts: PARTS, add } = lazyParts();
 add("shadow", shadow);
 const placedAt = new Map<string, Pt>();
-function placed(name: string, make: () => P): { name: string; at: Pt } {
+export function placed(name: string, make: () => P): { name: string; at: Pt } {
   let at = placedAt.get(name);
   if (!at) {
     const m = make();
@@ -495,7 +496,7 @@ function placed(name: string, make: () => P): { name: string; at: Pt } {
   return { name, at };
 }
 
-interface Pose {
+export interface Pose {
   /** On his toes: everything but the shoes up this many pixels. */
   lift?: number;
   /** A knee bend: body down this many pixels. */
@@ -555,7 +556,7 @@ function turnAbout(l: Layer, cx: number, cy: number, q: number): Layer {
 
 const HANDS: Record<string, Pt> = { rest: [28, 52], up: [30, 44], high: [27, 47], down: [25.5, 54] };
 
-function layers(pose: Pose = {}): Layer[] {
+export function layers(pose: Pose = {}): Layer[] {
   const lift = pose.lift ?? 0;
   const sink = pose.sink ?? 0;
   const dy = sink - lift;
@@ -697,7 +698,7 @@ const shift = (s: readonly Speck[], dx: number, dy: number): Speck[] => s.map(([
 /** The idle's click, for a clock moved by (ox, oy). */
 const clickAt = (ox: number, oy: number): Speck[] => shift(click(0), ox, oy);
 /** A twinkle: a white dot with four arms. */
-const star = (x: number, y: number, big = false): Speck[] => [
+export const star = (x: number, y: number, big = false): Speck[] => [
   sp(x, y, "O"),
   ...[[-1, 0], [1, 0], [0, -1], [0, 1]].map(([a, b]) => sp(x + a!, y + b!, "Y")),
   ...(big ? [[-2, 0], [2, 0], [0, -2], [0, 2]].map(([a, b]) => sp(x + a!, y + b!, "H")) : []),
@@ -738,8 +739,8 @@ const tinyClock = (x: number, y: number, ph: number, from?: Pt): Speck[] => {
   return [...trail, ...ring.map(([a, b]) => sp(x + a, y + b, "Y")), sp(x, y, "O"), sp(x + hand[0], y + hand[1], "O")];
 };
 /** The finger gun's speed streaks, back from the fingertip toward the board. */
-const POINT: Pt = [21, 48];
-const pointLines = (dy: number, len = 1): Speck[] => {
+export const POINT: Pt = [21, 48];
+export const pointLines = (dy: number, len = 1): Speck[] => {
   const tx = Math.round(POINT[0]) - 7;
   const ty = Math.round(POINT[1]) - 1 + dy;
   return [...streak(tx, ty, Math.round(14 * len), -1), ...streak(tx - 2, ty - 3, Math.round(8 * len), -1), ...streak(tx - 2, ty + 3, Math.round(8 * len), -1)];

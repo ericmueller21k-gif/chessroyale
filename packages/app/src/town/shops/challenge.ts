@@ -79,8 +79,8 @@ export interface BossIntro {
  * The bosses with an intro: every boss whose home has an inside (shops/shops.ts SHOPS; Nov 2, round 2: "for other bosses they should
  * just be swinging for a few seconds like discussed"). Alfil has his own (his pyramid and sandstorm), Big Boy his (his toy blocks
  * and lollipop swirl, Nov 2), Timber his (Nov 3: his log, gnawed into the table, and his sawdust sweep), Hollow his (Nov 3: the darkness
- * ball drinking the cave's light, the dim light, an iris to the board); Babur, Puddles and Dash (Nov 3, until his own, round 3) the
- * default.
+ * ball drinking the cave's light, the dim light, an iris to the board), Dash his (Nov 5: his four dashes and the clock rush); Babur and
+ * Puddles the default.
  * The lines are placeholders until Gemini's lines arrive (Part D), each in its boss's voice (characters/*-lines.ts). Alfil's cues are
  * his own synthesized sounds (characters/alfil-sounds.ts): a low rumble as the pyramid rises, the grinding crunch as it cracks, the
  * ground's thud as it falls, the soft glow as the board shows, and a whoosh as the storm comes in. The default's: the app's soft pop
@@ -140,13 +140,34 @@ export const BOSS_INTROS: Readonly<Partial<Record<HomeId, BossIntro>>> = {
       storm: "timberSwoosh",
     },
   },
-  // (Nov 3: the default until his own intro, round 3; his line is his entrance's first, characters/dash-lines.ts.)
+  // (Nov 5, round 3: his own, Eric's design (Nov 3): you both walk to your spots and he says his line; he bolts off four times in a
+  // trail of dust and races back each time to toss something onto the spot: the shoe-box table, the board, the pieces with a pop,
+  // both stools; his brag; the clock rush. docs/decisions/2026-11-05-dash-intro.md. His line is his entrance's first
+  // (characters/dash-lines.ts). You both walk on straight to where you stand, clear of the stools, and stay there (`seated`): he at
+  // the spot every toss is drawn from, BLITZ_INTRO_DROP_AT (72 of his pixels, 72 / (104 / 3) squares) west of the table's foot.
+  // No God King attack was drawn for him: he stands through its beat.)
   dash: {
     name: "Dash",
     line: "Yo yo yo! Dash in the building, fam!",
     layout: "across",
-    custom: false,
-    cues: { table: "pop", wipe: "dashWhoosh" },
+    custom: true,
+    seated: true,
+    clear: 2.08,
+    // His cues, each a sound: his own whoosh as he bolts and zips back, his sneakers' squeak as he skids, his zip as he tosses, a
+    // cardboard thud as the shoe boxes land (the table, the board on it, the stools), the app's soft pop as the pieces appear, his
+    // brag's brush (dusting off his jacket) and Tick's ding (the glint as he finger-guns you); the clock rush's whirr as it comes in
+    // and its tick.
+    cues: {
+      whoosh: "dashWhoosh",
+      skid: "dashSqueak",
+      drop: "dashZip",
+      thud: "dashThud",
+      pop: "pop",
+      brush: "dashBrush",
+      ding: "dashDing",
+      tick: "dashTick",
+      storm: "dashWhirr",
+    },
     facesLeft: true,
   },
   // (Nov 3: his own, the darkness ball drinking the cave's light, Eric's design with his changes (docs/decisions/2026-11-03-hollow-intro.md);
@@ -476,6 +497,16 @@ export const CHALLENGE_FEEL = {
     shineMs: 500,
     bragLeadMs: 150,
   },
+  /**
+   * Dash's own (Nov 5; Eric's design, Nov 3: "u both walk up to the spots, then he suddenly bolts away leaving a train of dust and then
+   * comes back very fast drops the board, then again runs off…"; the art's timeline, intro-blitz-nov3.md). His line (`lineMs`: a short
+   * one, as Hollow's); then four dashes, each his `bolt` (his art's frames: his dust trail from its launch frame), `awayMs` out of
+   * sight, his `arrive` (what he brought lands on its toss frame: the table's `land`, the board falling `boardDropMs` from `dropFrom`
+   * squares as Big Boy's, the pop with the pieces from its own frame, both stools' `land`) and `holdMs` standing; his brag; the
+   * attack's beat (none was drawn for him: he stands). About 10 s from his line to the cover (the art's 9.0 s had 0.7 s of standing
+   * where every boss's attack beat is 1.4 s, and a 0.9 s line).
+   */
+  blitz: { lineMs: 1800, awayMs: 200, holdMs: 80 },
   /**
    * Hollow's own (Nov 3; Eric's design: "the darkness ball in his belly powers up… It sucks in the light: the lanterns go out one by
    * one, the bulb string's lights are drawn in toward him, light from everything around, even from your own chest piece… Everything goes
@@ -904,8 +935,47 @@ export function iceAnims(
     route,
   };
 }
-/** A boss's own art's animations: a pyramid (Alfil's), toy blocks (Big Boy's), a log (Timber's), the dark (Hollow's), the lasso (Wrangler's), the crew (Jefferson's) or the icicle (Ginger's). */
-export type IntroAnims = PyramidAnims | BlocksAnims | LogAnims | DarkAnims | RopeAnims | CrewAnims | IceAnims;
+/** Dash's moves (characters/dash-intro.ts BOSS_BLITZ_INTRO): bolting off, racing back with a thing and tossing it onto the table, his brag. */
+export const BLITZ_MOVES = ["bolt", "arrive", "brag"] as const;
+export type BlitzMove = (typeof BLITZ_MOVES)[number];
+/**
+ * His four dashes, each a beat named for what he brings back (Eric, Nov 3, the art's order): the shoe-box table, the board, the
+ * pieces (with a pop), both stools.
+ */
+export const BLITZ_DASHES = ["dashTable", "dashBoard", "dashPieces", "dashStools"] as const;
+/** His props' animations (shops/blitz-intro-art.ts): the table's and a stool's landing, his dust trail, the pieces' pop. */
+export const BLITZ_GEAR = ["table", "stool", "dust", "pop"] as const;
+export type BlitzGear = (typeof BLITZ_GEAR)[number];
+/**
+ * Dash's intro (Nov 5; CHALLENGE_FEEL.blitz): each frame's ms and cue (the art's) for his moves and his props', and the frames things
+ * happen on: the bolt's launch (his dust trail starts at his spot; from it he's running, off his spot), the arrive's skid (from it
+ * he's back on his spot), its toss (what he brought lands: BLITZ_INTRO_DROP_AT, the
+ * table's foot), the pop's (the pieces show).
+ */
+export interface BlitzAnims {
+  blitz: true;
+  moves: { readonly [m in BlitzMove]: readonly number[] };
+  gear: { readonly [g in BlitzGear]: readonly number[] };
+  cues: { readonly [k in BlitzMove | BlitzGear]: readonly (string | undefined)[] };
+  key: { whoosh: number; skid: number; drop: number; pieces: number };
+}
+/** Dash's BlitzAnims from his art: his moves (BOSS_BLITZ_INTRO), the table's and a stool's `land`, the dust trail, the pop. */
+export function blitzAnims(w: { mover: ArtLike; table: ArtLike; stool: ArtLike; dust: ArtLike; pop: ArtLike }): BlitzAnims {
+  const fr = (ch: ArtLike, a: string) => ch.anims[a]!.frames;
+  const by = <K extends string, T>(keys: readonly K[], get: (k: K) => T) => Object.fromEntries(keys.map((k) => [k, get(k)])) as Record<K, T>;
+  const gear: Record<BlitzGear, [ArtLike, string]> = { table: [w.table, "land"], stool: [w.stool, "land"], dust: [w.dust, "idle"], pop: [w.pop, "idle"] };
+  const at = (ch: ArtLike, a: string, cue: string) => Math.max(0, fr(ch, a).findIndex((f) => f.cue === cue));
+  return {
+    blitz: true,
+    moves: by(BLITZ_MOVES, (m) => fr(w.mover, m).map((f) => f.ms)),
+    gear: by(BLITZ_GEAR, (g) => fr(...gear[g]).map((f) => f.ms)),
+    cues: { ...by(BLITZ_MOVES, (m) => fr(w.mover, m).map((f) => f.cue)), ...by(BLITZ_GEAR, (g) => fr(...gear[g]).map((f) => f.cue)) },
+    key: { whoosh: at(w.mover, "bolt", "whoosh"), skid: at(w.mover, "arrive", "skid"), drop: at(w.mover, "arrive", "drop"), pieces: at(w.pop, "idle", "pop") },
+  };
+}
+/** A boss's own art's animations: a pyramid (Alfil's), toy blocks (Big Boy's), a log (Timber's), the dark (Hollow's), the lasso (Wrangler's), the crew (Jefferson's), the icicle (Ginger's) or the dashes (Dash's). */
+export type IntroAnims = PyramidAnims | BlocksAnims | LogAnims | DarkAnims | RopeAnims | CrewAnims | IceAnims | BlitzAnims;
+export const isBlitz = (a: IntroAnims): a is BlitzAnims => "blitz" in a;
 export const isIce = (a: IntroAnims): a is IceAnims => "ice" in a;
 export const isBlocks = (a: IntroAnims): a is BlocksAnims => "build" in a;
 export const isLog = (a: IntroAnims): a is LogAnims => "props" in a;
@@ -929,7 +999,8 @@ export type IntroStep =
   | "charge" | "swell" | "drink" | "full" | "blackout" | "black" | "dim" | "iris"
   | "spin" | "throw" | "catch" | "drag" | "land" | "cross" | "haul" | "stools" | "brag"
   | "call" | "wave" | "walk" | "creak"
-  | "blast" | "fall" | "stab" | "toss" | "cast";
+  | "blast" | "fall" | "stab" | "toss" | "cast"
+  | (typeof BLITZ_DASHES)[number];
 export interface IntroBeat {
   step: IntroStep;
   at: number;
@@ -938,7 +1009,7 @@ export interface IntroBeat {
 const sum = (ms: readonly number[]) => ms.reduce((a, b) => a + b, 0);
 type BeatFeel = Pick<
   typeof CHALLENGE_FEEL,
-  "faceMs" | "lineMs" | "afterLineMs" | "holdMs" | "gapMs" | "tableHoldMs" | "boardDropMs" | "popMs" | "swingMs" | "stormInMs" | "flashMs" | "wipeMs" | "log" | "standOff" | "clear" | "dark" | "rope" | "crew" | "ice"
+  "faceMs" | "lineMs" | "afterLineMs" | "holdMs" | "gapMs" | "tableHoldMs" | "boardDropMs" | "popMs" | "swingMs" | "stormInMs" | "flashMs" | "wipeMs" | "log" | "standOff" | "clear" | "dark" | "rope" | "crew" | "ice" | "blitz"
 >;
 /**
  * When things happen in Ginger's intro (ms from the marks; CHALLENGE_FEEL.ice): his charge and blast; the blast flying and bursting;
@@ -1017,6 +1088,17 @@ export function introBeats(a: IntroAnims | null, feel: BeatFeel = CHALLENGE_FEEL
     t += ms;
   };
   add("face", feel.faceMs);
+  if (a && isBlitz(a)) {
+    // Dash's own: his line; his four dashes (each a bolt off, out of sight, back with a thing tossed onto the table, a beat); his
+    // brag; the attack's beat. (No pause after the line: he's off.)
+    const T = blitzTimes(a, feel);
+    add("line", feel.blitz.lineMs);
+    T.dashes.forEach((d, i) => add(BLITZ_DASHES[i]!, d.end - d.at));
+    add("brag", sum(a.moves.brag));
+    add("swing", Math.max(0, feel.swingMs - coverMs(true, feel)));
+    out.push({ step: "done", at: t, end: Infinity });
+    return out;
+  }
   if (a && isIce(a)) {
     // Ginger's own: his line; the charge; the blast (flying, bursting, the icicle forming and hanging); its fall; its stab (from its
     // last frame the table); the carriers coming with the board; their toss (to the board landing); his cast and the light; his
@@ -1189,6 +1271,8 @@ export interface IntroNow {
   crew: CrewNow | null;
   /** Ginger's own intro (the icicle): what he, his props and the board carriers do now; null for every other intro. */
   ice: IceNow | null;
+  /** Dash's own intro (his dashes): what he and his props do now; null for every other intro. */
+  blitz: BlitzNow | null;
 }
 /** A board carrier in Ginger's intro: where (squares), which way, its animation and frame; null: still in the stockroom. */
 export interface CarrierNow {
@@ -1371,6 +1455,114 @@ export function iceCues(a: IceAnims, feel: Pick<typeof CHALLENGE_FEEL, "faceMs" 
   play(M.cast, C.moves.cast, T.cast, T.cast + sum(M.cast), false);
   play(G.appear, C.gear.appear, T.light, T.shine, false);
   play(M.brag, C.moves.brag, T.brag, T.brag + sum(M.brag), false);
+  return out.sort((x, y) => x.at - y.at);
+}
+/**
+ * When things happen in Dash's intro (ms from the marks; CHALLENGE_FEEL.blitz): each dash's start (his bolt), its launch (his dust
+ * trail from his spot), when he's gone (the bolt's end), back (his arrive's start), the toss (what he brought lands) and its end; the
+ * board touching down on the table (it falls `boardDropMs` from `dropFrom` squares, as Big Boy's), the pieces there (the pop's own
+ * frame), the brag.
+ */
+export function blitzTimes(a: BlitzAnims, feel: Pick<typeof CHALLENGE_FEEL, "faceMs" | "blitz" | "boardDropMs"> = CHALLENGE_FEEL) {
+  const B = feel.blitz;
+  const M = a.moves;
+  let t = feel.faceMs + B.lineMs;
+  const dashes = BLITZ_DASHES.map(() => {
+    const at = t;
+    const gone = at + sum(M.bolt);
+    const back = gone + B.awayMs;
+    const end = back + sum(M.arrive) + B.holdMs;
+    t = end;
+    return { at, launch: at + sum(M.bolt.slice(0, a.key.whoosh)), gone, back, drop: back + sum(M.arrive.slice(0, a.key.drop)), end };
+  });
+  const drop = dashes.map((d) => d.drop);
+  return { dashes, drop, board: drop[1]! + feel.boardDropMs, pieces: drop[2]! + sum(a.gear.pop.slice(0, a.key.pieces)), brag: t };
+}
+/**
+ * Dash's intro `t` ms in (his beats): his move, his dust trail, the table, the board, the pieces' pop, the stools. He stands where he
+ * walked on to all through (his `clear` place, BLITZ_INTRO_DROP_AT west of the table's foot), as you do: every bolt leaves from it and
+ * every arrive ends on it.
+ */
+export interface BlitzNow {
+  /** His own move and frame (BOSS_BLITZ_INTRO, as drawn: facing you), or null: his town figure, standing. */
+  move: { anim: BlitzMove; frame: number } | null;
+  /** He's off, out of sight (from his bolt's end to his arrive's start): none of him shows. */
+  gone: boolean;
+  /**
+   * He stands on his spot (not mid-run: his bolt before its launch, his arrive from its skid, his brag, standing): all of him on the
+   * screen (Eric, Nov 4), and the town's shadows under him.
+   */
+  here: boolean;
+  /** The dust trail's frame at his spot (INTRO_BLITZ_DUST, from the bolt's launch), or -1: none. */
+  dust: number;
+  /** The shoe-box table (from the first toss: its `land`, then its `idle`), or null: not yet. */
+  table: { anim: "land" | "idle"; frame: number } | null;
+  /** The board: how far over its place on the table it is (squares: it falls on from the second toss; 0 on it), or null: not yet. */
+  board: number | null;
+  /** The pieces are on the board (from the pop's own frame). */
+  pieces: boolean;
+  /** The pop's frame over the board (from the third toss), or -1: none. */
+  pop: number;
+  /** Both stools (from the fourth toss: their `land`, then their `idle`), or null: not yet. */
+  stools: { anim: "land" | "idle"; frame: number } | null;
+}
+/** Dash's intro `t` ms in: see BlitzNow. */
+export function blitzAt(a: BlitzAnims, t: number, feel: Pick<typeof CHALLENGE_FEEL, "faceMs" | "blitz" | "boardDropMs" | "dropFrom"> = CHALLENGE_FEEL): BlitzNow {
+  const T = blitzTimes(a, feel);
+  const M = a.moves;
+  const G = a.gear;
+  let move: BlitzNow["move"] = null;
+  let gone = false;
+  let dust = -1;
+  for (const d of T.dashes) {
+    if (t >= d.at && t < d.gone) move = { anim: "bolt", frame: frameAt(M.bolt, t - d.at, false) };
+    else if (t >= d.gone && t < d.back) gone = true;
+    else if (t >= d.back && t < d.back + sum(M.arrive)) move = { anim: "arrive", frame: frameAt(M.arrive, t - d.back, false) };
+    if (t >= d.launch && t < d.launch + sum(G.dust)) dust = frameAt(G.dust, t - d.launch, false);
+  }
+  if (t >= T.brag && t < T.brag + sum(M.brag)) move = { anim: "brag", frame: frameAt(M.brag, t - T.brag, false) };
+  const here = !gone && !(move?.anim === "bolt" && move.frame >= a.key.whoosh) && !(move?.anim === "arrive" && move.frame < a.key.skid);
+  const landed = (from: number, ms: readonly number[]) => (t < from ? null : t < from + sum(ms) ? { anim: "land" as const, frame: frameAt(ms, t - from, false) } : { anim: "idle" as const, frame: 0 });
+  const [d0, d1, d2, d3] = T.drop as [number, number, number, number];
+  const fall = Math.min(1, Math.max(0, (t - d1) / Math.max(1, feel.boardDropMs)));
+  return {
+    move,
+    gone,
+    here,
+    dust,
+    table: landed(d0, G.table),
+    board: t < d1 ? null : feel.dropFrom * (1 - fall * fall),
+    pieces: t >= T.pieces,
+    pop: t >= d2 && t < d2 + sum(G.pop) ? frameAt(G.pop, t - d2, false) : -1,
+    stools: landed(d3, G.stool),
+  };
+}
+/**
+ * Dash's cues, and when (CHALLENGE_FEEL.blitz): his moves' own on their frames (each bolt's whoosh, each arrive's whoosh, skid and
+ * toss, the brag's two brushes and its ding); the table's thud as it lands, the board's as it touches down, the pop as the pieces
+ * appear, the stools' thud (both as one: they land together). (The dust trail's own whoosh is the bolt's, on the same frame: once.)
+ */
+export function blitzCues(a: BlitzAnims, feel: Pick<typeof CHALLENGE_FEEL, "faceMs" | "blitz" | "boardDropMs"> = CHALLENGE_FEEL): { cue: string; at: number }[] {
+  const T = blitzTimes(a, feel);
+  const out: { cue: string; at: number }[] = [];
+  const play = (ms: readonly number[], cues: readonly (string | undefined)[], from: number) => {
+    let t = from;
+    ms.forEach((m, i) => {
+      const cue = cues[i];
+      if (cue) out.push({ cue, at: t });
+      t += m;
+    });
+  };
+  const { moves: M, gear: G, cues: C } = a;
+  for (const d of T.dashes) {
+    play(M.bolt, C.bolt, d.at);
+    play(M.arrive, C.arrive, d.back);
+  }
+  play(G.table, C.table, T.drop[0]!);
+  out.push({ cue: "thud", at: T.board });
+  play(G.pop, C.pop, T.drop[2]!);
+  play(G.stool, C.stool, T.drop[3]!);
+  play(M.brag, C.brag, T.brag);
   return out.sort((x, y) => x.at - y.at);
 }
 /**
@@ -1620,7 +1812,8 @@ const easeOutBack = (u: number) => 1 + 2.2 * (u - 1) ** 3 + 1.2 * (u - 1) ** 2;
  */
 export function hopStart(beats: readonly IntroBeat[], a: IntroAnims | null): number {
   // (Hollow's and Wrangler's: you walked on to your seats, or clear of them; Jefferson's: no stools; nothing to hop back from.)
-  if (a && (isDark(a) || isRope(a) || isCrew(a) || isIce(a))) return Infinity;
+  // (Dash's: you both walk on to where you stand clear of the stools, and nobody steps after they land.)
+  if (a && (isDark(a) || isRope(a) || isCrew(a) || isIce(a) || isBlitz(a))) return Infinity;
   if (!a || isLog(a)) return stepAt(beats, "pop");
   if (isBlocks(a)) return stepAt(beats, "chairs");
   return stepAt(beats, "crumble") + sum(a.crumble.slice(0, a.tableFrame));
@@ -1665,7 +1858,13 @@ export function woodAt(beats: readonly IntroBeat[], a: LogAnims, t: number): Woo
 export function introAt(beats: readonly IntroBeat[], a: IntroAnims | null, t: number, feel: Pick<typeof CHALLENGE_FEEL, "popMs" | "puffMs" | "dropFrom" | "hopMs" | "lineMs" | "dark" | "rope" | "crew"> = CHALLENGE_FEEL): IntroNow {
   const b = beats.find((x) => t < x.end) ?? beats[beats.length - 1]!;
   const h = Math.min(1, Math.max(0, (t - hopStart(beats, a)) / feel.hopMs));
-  const base = { step: b.step, pyramid: null, blocks: null, drop: 0, drift: false, pop: 1, puff: -1, line: b.step === "line", back: h * h * (3 - 2 * h), hop: h > 0 && h < 1 ? Math.sin(Math.PI * h) : 0, wood: null, chant: false, dark: null, rope: null, crew: null, ice: null };
+  const base = { step: b.step, pyramid: null, blocks: null, drop: 0, drift: false, pop: 1, puff: -1, line: b.step === "line", back: h * h * (3 - 2 * h), hop: h > 0 && h < 1 ? Math.sin(Math.PI * h) : 0, wood: null, chant: false, dark: null, rope: null, crew: null, ice: null, blitz: null };
+  if (a && isBlitz(a)) {
+    // (Dash's: the table and its board from the board's toss on (the shoe boxes stand from the first, its own lid on top); the stools
+    // from the last.)
+    const z = blitzAt(a, t);
+    return { ...base, blitz: z, table: z.board !== null, stools: z.stools !== null };
+  }
   if (a && isIce(a)) {
     // (Ginger's: the icicle is the table once it's stabbed in; no stools. What his props show: the room's iceAt, its art in hand.)
     return { ...base, table: t >= stepAt(beats, "carry"), stools: false };
@@ -1733,6 +1932,7 @@ export function introCues(beats: readonly IntroBeat[], a: IntroAnims | null): { 
   if (isRope(a)) return ropeCues(beats, a);
   if (isCrew(a)) return crewCues(beats, a);
   if (isIce(a)) return iceCues(a);
+  if (isBlitz(a)) return blitzCues(a);
   if (isLog(a)) {
     // (Timber's: each move's and prop's own cues on their frames, through their beats: looping ones over and over to its end.)
     const out: { cue: string; at: number }[] = [];

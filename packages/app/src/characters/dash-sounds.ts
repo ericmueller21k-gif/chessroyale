@@ -28,7 +28,9 @@ export type DashSound =
   | "hello"
   | "ding"
   | "chomp"
-  | "step";
+  | "step"
+  | "thud"
+  | "brush";
 
 /** Noise with its highs rolled off twice: a soft breath or rumble, never a hiss. */
 const murk = (rate: number, cut: number, seed: number): Voice => lowpass(rate, cut, lowpass(rate, cut, noise(seed)));
@@ -192,6 +194,19 @@ const SOUNDS: Record<DashSound, (rate: number) => Float32Array> = {
     const crunch = bandpass(rate, () => 900, 1.4, noise(907));
     return render(rate, 0.42, (t) => (bump(t, 0, 0.12, 0.6) + 0.7 * bump(t, 0.24, 0.1, 0.6)) * 1.6 * crunch(t) * (0.6 + 0.4 * Math.sin(2 * Math.PI * 40 * t) ** 2));
   },
+  // His intro's shoe boxes landing (the table, the board on it, the stools: Nov 5): a hollow cardboard thump, a low knock with a
+  // papery slap on top, the box's air puffing out.
+  thud: (rate) => {
+    const knock = osc(rate, (t) => 95 + 70 * Math.exp(-t / 0.015), sine);
+    const box = bandpass(rate, () => 420, 1.6, noise(919));
+    const slap = bandpass(rate, () => 1500, 1.1, noise(929));
+    return render(rate, 0.22, (t) => Math.min(1, t / 0.002) * (Math.exp(-t / 0.045) * knock(t) + 1.4 * Math.exp(-t / 0.03) * box(t) + 0.6 * Math.exp(-t / 0.008) * slap(t)));
+  },
+  // His brag's brush (Nov 5): dusting off his jacket, a quick soft swipe of cloth.
+  brush: (rate) => {
+    const cloth = bandpass(rate, (t) => 2400 - 900 * Math.min(1, t / 0.09), 0.9, murk(rate, 7000, 937));
+    return render(rate, 0.12, (t) => bump(t, 0, 0.1, 0.8) * 2.4 * cloth(t));
+  },
   // Tick's plodding step: a soft, low pat of a foot.
   step: (rate) => {
     const low = osc(rate, (t) => 110 + 60 * Math.exp(-t / 0.02), sine);
@@ -221,6 +236,8 @@ const LEVEL: Record<DashSound, number> = {
   ding: 0.231,
   chomp: 0.51,
   step: 0.226,
+  thud: 0.281,
+  brush: 0.218,
 };
 
 const cache = soundCache("dash");

@@ -22,9 +22,11 @@ import { BOARD_SEL, asAdmin, asSignedIn, named, test } from "./helpers.ts";
  * marks; his line; he walks west to the giant log, heaves it up, carries it to the middle, sets it down and gnaws it; the shavings' fog
  * boils up, holds (his table swaps in under it) and settles; the stumps pop up; he dusts off his paws and walks to his place; his
  * attack; his sawdust sweep (`canvas.boss-storm`) covers the screen, the battle under it, and the gear's Leave back to where you stood.
- * Dash (the default intro, Nov 3, until his own in round 3; an admin's town: he's in the game for admins first): in with him to his
- * store's circle, onto its try-on mats; his line; the table pops in; no God King attack was drawn for him, so he stands through the
- * swing's beat; the flash and the wipe, the battle under it, and the gear's Leave back to where you stood.
+ * Dash (his own intro, Nov 5, round 3; an admin's town: he's in the game for admins first): in with him to his store's circle, both
+ * straight to where you stand through it all; his line; he bolts off four times in a trail of dust and races back each time to toss
+ * something onto the spot (the shoe-box table, the board, the pieces with a pop, both stools); his brag; no God King attack was drawn
+ * for him, so he stands through its beat; his clock rush (`canvas.boss-storm`) covers the screen, the battle under it, and the gear's
+ * Leave back to where you stood. Nothing pops in at the end and nobody steps once the stools land.
  * Hollow (his own intro, Nov 3; everyone's): in with him up his cave to the frozen pond, straight to your seats (no hop back); his line;
  * the table pops in while it's still lit; his channel line (one of four) as the ball charges; the lanterns go out one by one, the
  * string drains, his own strand, your pawn; black; the dim light; it closes in on the board; the dark (`canvas.boss-dark`) holds while
@@ -742,38 +744,104 @@ test("challenging Big Boy in the town: his own intro (his line, his toy blocks b
   expect(errors).toEqual([]);
 });
 
-test("challenging Dash in an admin's town: the default intro in his store (his line, the table pops in, no attack of his drawn: he stands, the flash and the wipe), the battle; Leave back where you stood", async ({ page }) => {
+test("challenging Dash in an admin's town: his own intro in his store (you both walk to where you stand; his line; four dashes: the shoe-box table, the board, the pieces with a pop, both stools; his brag; he stands through the attack's beat; the clock rush), the battle; Leave back where you stood", async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
-  // (Dash is in the game for admins first: his store is in an admin's town only. Round 3 brings his own intro. `debug`: window.match.)
+  const project = test.info().project.name;
+  if (SHOTS) mkdirSync(SHOTS, { recursive: true });
+  const shot = async (name: string) => SHOTS && (await page.screenshot({ path: `${SHOTS}/${name}-${project}.png` }));
+  type Blitz = { move: string | null; frame: number; gone: boolean; here: boolean; dust: boolean; table: string | null; board: number | null; pieces: boolean; pop: boolean; stools: string | null };
+  type Look = Intro & { blitz: Blitz | null };
+  // (CHALLENGE_SHOTS: each still is taken on the frame its moment shows: the page's frames are held while it's taken, then go on.)
+  if (SHOTS)
+    await page.addInitScript(() => {
+      const w = window as unknown as { __hold: boolean; __go: () => void };
+      const raf = window.requestAnimationFrame.bind(window);
+      let held: FrameRequestCallback[] = [];
+      w.__hold = false;
+      window.requestAnimationFrame = (cb) => (w.__hold ? (held.push(cb), 0) : raf(cb));
+      w.__go = () => {
+        w.__hold = false;
+        const h = held;
+        held = [];
+        for (const cb of h) raf(cb);
+      };
+    });
+  // (Dash is in the game for admins first: his store is in an admin's town only. Nov 5, round 3: his own intro. `debug`: window.match.)
   await asAdmin(page);
   await page.goto("/town?sky=day&debug");
   await expect(town(page)).toHaveAttribute("data-ready", "1");
   const { confirm, stood } = await toConfirm(page, "dash", "Dash");
+  // (Every frame's look at the intro, from the page: his moments are a few frames each.)
+  await page.evaluate(() => {
+    const w = window as unknown as { __shopIntro?: () => unknown; __looks: unknown[] };
+    w.__looks = [];
+    const each = () => {
+      const i = w.__shopIntro?.();
+      if (i) w.__looks.push(i);
+      if (w.__looks.length < 5000) requestAnimationFrame(each);
+    };
+    requestAnimationFrame(each);
+  });
   await confirm.getByRole("button", { name: "Fight" }).click();
-  // In his store: you both walk in onto his try-on mats (SHOP_BLITZ_MARKS: his west, yours east), facing each other.
   await expect(room(page)).toHaveAttribute("data-room", "dash", { timeout: 20_000 });
   await expect(page.getByRole("heading", { name: "Dash's Kicks" })).toBeVisible();
   const step = async () => (await intro(page))?.step ?? "";
+  /** Waits (in the page, each frame) until his intro shows this, then takes its still (the page's frames held while it's taken). */
+  const when = async (name: string, pred: string) => {
+    const hold = SHOTS ? "window.__hold = true;" : "";
+    await page.waitForFunction(`(() => { const i = window.__shopIntro?.(); const b = i?.blitz; const ok = !!(i && b && (${pred})); if (ok) { ${hold} } return ok; })()`, null, { timeout: 20_000, polling: 16 });
+    await shot(name);
+    if (SHOTS) await page.evaluate(() => (window as unknown as { __go: () => void }).__go());
+  };
+  // You both walk on straight to where you stand through it all (`seated`): he at his toss's reach west of the table, you clear of
+  // your stool; facing each other.
+  const F = CHALLENGE_FEEL;
+  const marks = [9.5 + F.clear.you, 10.5, 9.5 - introOf("dash")!.clear!, 10.5].map((v) => Math.round(v * 100) / 100);
+  const where = (i: Intro) => [i.you[0], i.you[1], i.boss[0], i.boss[1]].map((v) => Math.round(v * 100) / 100);
   await expect.poll(step, { message: "on their marks: his line", timeout: 15_000, intervals: [50] }).toBe("line");
-  const atLine = (await intro(page))!;
+  const atLine = (await intro(page)) as Look;
   expect(atLine.layout).toBe("across");
-  expect(atLine.you).toEqual([11, 10.5]);
-  expect(atLine.boss).toEqual([8, 10.5]);
+  expect(where(atLine)).toEqual(marks);
   expect(atLine.facing).toEqual({ you: -1, boss: 1 });
   expect(atLine.line).toBe(true);
-  // The table pops in, its stools at your sides; you both hop back clear of them.
-  await expect.poll(async () => (await intro(page))?.table, { message: "the table pops in", intervals: [50] }).toBe(true);
-  await clearOfStools(page, 10.5);
-  // The swing's beat: no God King attack was drawn for him (round 1), so he stands in his idle.
-  await expect.poll(step, { message: "the swing's beat", intervals: [50] }).toBe("swing");
-  expect((await intro(page))!).toMatchObject({ attack: false, line: false, table: true });
-  // The flash and the wipe to black, the battle (Boss alone, Dash) loading under it.
-  await expect(page.locator("canvas.boss-wipe")).toHaveCount(1, { timeout: 10_000 });
-  await expect(page.locator("canvas.boss-wipe")).toHaveAttribute("data-boss", "dash");
+  expect(atLine.blitz).toMatchObject({ move: null, gone: false, here: true, table: null, board: null, pieces: false, stools: null });
+  // The first bolt: off his spot in a trail of dust; the table lands; the board's toss; the pieces' pop; the stools; his brag.
+  await when("dash-bolt", "b.move === 'bolt' && b.frame === 3 && i.step === 'dashTable'");
+  await when("dash-drop", "i.step === 'dashBoard' && b.move === 'arrive' && b.board !== null");
+  await when("dash-pop", "b.pop && b.pieces && i.step === 'dashPieces'");
+  await when("dash-stools", "b.stools === 'idle' && !b.move");
+  await when("dash-brag", "b.move === 'brag' && b.frame >= 4");
+  // The attack's beat: no God King attack was drawn for him, so he stands.
+  await expect.poll(step, { message: "the attack's beat", intervals: [50] }).toBe("swing");
+  expect((await intro(page)) as Look).toMatchObject({ attack: false, line: false, table: true, stools: [[8.5, 10.5], [10.5, 10.5]], blitz: { move: null, here: true, table: "idle", board: 0, pieces: true, stools: "idle" } });
+  // The clock rush sweeps in, the battle loading under it.
+  await expect(storm(page)).toHaveCount(1, { timeout: 10_000 });
+  await expect(storm(page)).toHaveAttribute("data-boss", "dash");
+  await page.waitForTimeout(350);
+  await shot("dash-wipe");
+  const looks = (await page.evaluate(() => (window as unknown as { __looks: unknown[] }).__looks)) as Look[];
+  const on = looks.filter((i) => i.step !== "walk");
+  // His beats in order (each seen), and the things in his: the table, then the board, the pieces, the stools; nothing before its toss.
+  const steps = on.map((i) => i.step).filter((s, n, all) => s !== all[n - 1]);
+  expect(steps).toEqual(["face", "line", "dashTable", "dashBoard", "dashPieces", "dashStools", "brag", "swing", "done"].slice(0, steps.length));
+  expect(steps.length).toBeGreaterThanOrEqual(8);
+  const first = (pred: (i: Look) => boolean) => on.findIndex(pred);
+  const order = [first((i) => !!i.blitz?.table), first((i) => i.blitz?.board != null), first((i) => !!i.blitz?.pieces), first((i) => !!i.blitz?.stools)];
+  for (const n of order) expect(n).toBeGreaterThan(0);
+  expect([...order].sort((x, y) => x - y)).toEqual(order);
+  expect(on[order[0]!]!.step).toBe("dashTable");
+  expect(on[order[1]!]!.step).toBe("dashBoard");
+  expect(on[order[2]!]!.step).toBe("dashPieces");
+  expect(on[order[3]!]!.step).toBe("dashStools");
+  // He's off between each bolt and its arrive, four times; on his spot again after each.
+  expect(on.map((i) => !!i.blitz?.gone).filter((g, n, all) => g && !all[n - 1]).length).toBe(4);
+  // Nothing pops in at the end, and nobody steps: from the stools on, all of it stands; neither of you moves, from the line on.
+  for (const i of on.slice(order[3]!)) expect([i.table, i.stools.length, !!i.blitz?.table, i.blitz?.board != null, i.blitz?.pieces], `at ${i.step}`).toEqual([true, 2, true, true, true]);
+  for (const i of on) expect(where(i), `at ${i.step}: where you stand`).toEqual(marks);
   await expect(page.locator(BOARD_SEL.wrap).first()).toBeVisible({ timeout: 60_000 });
-  await expect(page.locator("canvas.boss-wipe")).toHaveCount(0, { timeout: 10_000 });
+  await expect(storm(page)).toHaveCount(0, { timeout: 10_000 });
   expect(await page.evaluate(() => (window as unknown as { match?: { boss?: { id: string } } }).match?.boss?.id)).toBe("dash");
   // The gear's Leave (or Resign, as the battle offers): back in the town square where you stood.
   await page.getByRole("button", { name: "Match options" }).click();
