@@ -45,8 +45,9 @@ confirmed on Nov 5 that the bulbs are for solo only.
   Forever." types out, then "Your last bulb went out." (2.6 s), his `blackout` thoom; at 4.6 s the loss screen: "Defeated",
   "Hollow won: the last of your ten bulbs went out." So it reads as the bulbs, never as a bug.
 - **Where the bulbs show:** his strand of ten (`lifeStrand`, the same bulbs and battle colors as his figure's strand,
-  `lights.ts`) in the boss bar's free room (`barProp`, as Timber's and Babur's props): under the status on a phone, beside his
-  bars on a computer. The three-bulb countdown to his next cover stays where it was. A bulb going out flickers, sparks and
+  `lights.ts`) in the boss bar's free room (`barProp`, as Timber's and Babur's props): under the status at the bar's right, on a phone
+  and a computer (inside the slot, which keeps its place: `e2e/boss-bar.spec.ts`; a first build moved the computer's slot up
+  beside the status, as Timber's strip does, and failed that check on CI). The three-bulb countdown to his next cover stays where it was. A bulb going out flickers, sparks and
   dies with a small fizz and pop (`hollowFizz`); the dock says "Bulb out · 9 left".
 - **Block placement** (`chooseDarkBlock`): wholly on the board; never on either king's square, so a block can never cover all
   of a king's escape squares (any block holding a king's neighbors on both sides holds the king); holding at least 2 pieces

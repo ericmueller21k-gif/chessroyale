@@ -145,7 +145,10 @@ test("Hollow's dark, Boss alone: his first cover, a dark square selected, his te
   expect(
     await page.locator(".life-strip").first().evaluate((el) => {
       const r = el.getBoundingClientRect();
-      return r.width > 0 && r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight;
+      // (Inside the bar's free room, under the status: e2e/boss-bar.spec.ts keeps that room's place.)
+      const slot = el.closest(".boss-prop")!.getBoundingClientRect();
+      const inSlot = r.left >= slot.left - 0.5 && r.right <= slot.right + 0.5 && r.top >= slot.top - 0.5 && r.bottom <= slot.bottom + 0.5;
+      return r.width > 0 && r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight && inSlot;
     }),
   ).toBe(true);
   // A move from it that isn't legal (it's his piece): a bulb goes out (no points), his taunt, and you pick again.

@@ -20,8 +20,8 @@
 
 ## Player-visible changes and text
 
-- Boss alone vs Hollow: his strand of ten bulbs in the boss bar (his lights' colors), one lit per wrong move left; a bulb going
-  out flickers and fizzes.
+- Boss alone vs Hollow: his strand of ten bulbs in the boss bar's free room under the status (his lights' colors), one lit per
+  wrong move left; a bulb going out flickers and fizzes.
 - Dock, after a wrong move alone: "Your move. Bulb out · 9 left" (was "−5 · 4 tries left"); no "−5" over the square alone (the
   slash stays). In a crowd unchanged: "−5 · 4 tries left".
 - His taunts (in his speech bubble): "Nice try.", "What, can't play in the dark?", "Something was there. Wasn't it?", "You
@@ -50,6 +50,8 @@ Stills (`docs/hollow-bulbs/`): `bulbs-taunt-phone.png`, `bulbs-taunt-desktop.png
   the dark moves for you". The crowd's −5 and 5th-try miss stay checked (the online test; `hollow-bulbs.test.ts`).
 - `e2e/hollow.spec.ts`, "Hollow online: …": added a taunt in his bubble and no bulbs online (checks added, none removed).
 - `packages/chess/test/boss-kit-lib.ts`: `KNOWN_STEPS` + `darkForcedDue`.
+- `e2e/hollow.spec.ts`, the Boss alone dark test: the strand's on-screen check now also requires it inside the bar's prop slot
+  (added). `e2e/boss-bar.spec.ts` is unchanged: the strand no longer moves the computer's slot (CI's red on #500).
 - None guarded a rule in `docs/rules/eric.md`. Eric's three new rules are added there with their guards.
 
 New: `e2e/hollow.spec.ts`, "Hollow's taunts and \"The dark moves for you.\" show whole in his bubble, typed out: nothing clipped (a

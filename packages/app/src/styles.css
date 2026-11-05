@@ -14905,17 +14905,12 @@ img.qicon {
   aspect-ratio: 95 / 15;
   pointer-events: none;
 }
-/* A computer's bar is one short row: the strand left in the free room, centered on the bar's height (as Timber's strip). */
+/* A computer's bar is one short row: the strand stays in the free room under the status (its slot keeps its place: e2e
+   boss-bar.spec.ts), at its right, centered on the slot's height. */
 @media (min-width: 900px) and (min-height: 600px) {
-  .boss-bar .boss-prop:has(> .life-strip) {
-    grid-column: 2;
-    grid-row: 1 / 3;
-  }
   .boss-bar .life-strip {
     top: 50%;
-    right: auto;
-    left: 6px;
-    width: 114px;
+    width: 110px;
     transform: translateY(-50%);
   }
 }
