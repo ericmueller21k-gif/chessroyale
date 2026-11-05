@@ -327,6 +327,14 @@ export interface NetBossPowers {
   cleared?: string[];
   bulbs?: number;
   claimed?: boolean;
+  /**
+   * Hollow in Boss alone (Nov 5): his strand of `of` bulbs, `out` of them out (each wrong move into the dark puts one
+   * out); the dark's move for you (as the 3rd and 7th go out: the crowd turn, the bulb, the move once picked); the last
+   * one out (the battle his). Missing elsewhere: a crowd keeps the points.
+   */
+  strand?: { out: number; of: number };
+  forced?: { turn: number; at: number; move?: string; san?: string };
+  blackout?: { turn: number };
   lightsAt?: number | null;
   /**
    * After a failed Lights out (the crowd's find rate under lightsOutHold): his extra move after his own, before the

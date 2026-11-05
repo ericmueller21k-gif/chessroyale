@@ -113,7 +113,7 @@ export function momentsOf(boss: BossView, until: number): Moment[] {
   return list.map((e) => {
     // (Chub & Chirp's carrots: one pulled by each side in one turn, two moments.)
     const lead = bannerLeadMs(e.kind);
-    const m: Moment = { kind: e.kind, key: `${boss.id}:${e.kind}:${e.turn}${e.by ? `:${e.by}` : ""}`, at: t + lead, ms: powerFxMs(e) - lead, ...(lead ? { lead } : {}), ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: e.squares } : {}), ...(e.fizzled ? { fizzled: e.fizzled } : {}), ...(e.first ? { first: true as const } : {}), ...(e.pick !== undefined ? { pick: e.pick } : {}), ...(e.ult ? { ult: true as const } : {}), ...(e.by ? { by: e.by } : {}), ...(e.tier !== undefined ? { tier: e.tier } : {}), ...(e.prize ? { prize: e.prize } : {}), ...(e.growth ? { growth: e.growth } : {}) };
+    const m: Moment = { kind: e.kind, key: `${boss.id}:${e.kind}:${e.turn}${e.by ? `:${e.by}` : ""}`, at: t + lead, ms: powerFxMs(e) - lead, ...(lead ? { lead } : {}), ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: e.squares } : {}), ...(e.fizzled ? { fizzled: e.fizzled } : {}), ...(e.first ? { first: true as const } : {}), ...(e.size ? { size: e.size } : {}), ...(e.pick !== undefined ? { pick: e.pick } : {}), ...(e.ult ? { ult: true as const } : {}), ...(e.by ? { by: e.by } : {}), ...(e.tier !== undefined ? { tier: e.tier } : {}), ...(e.prize ? { prize: e.prize } : {}), ...(e.growth ? { growth: e.growth } : {}) };
     t += lead + m.ms;
     return m;
   });
