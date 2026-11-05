@@ -180,3 +180,9 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Main GREEN + live abffbf53 (#496 #497 #498 merged; igloo pass-through on stairs). #499 street town re-running after JSON import-attribute fix 56a9a387 (watcher b7vgj00d8). #500 Hollow re-running after boss-bar slot fix d05e25f7 (watcher ba24bg6ix). Town round 3 helper running.
 - #499 CI: only alfil Mammoth Slam phone failed (both tries); not this PR's (no shared code; passes locally x2 on PR build; main green). Commented on PR. Re-run by merging main when #500 merges.
 - #500 Hollow bulbs MERGED b0119b41, LIVE 06:31 UTC (main CI log scratchpad/main-b0119.log, bg). #499 main merged in adcbaf2b, CI watcher bhjot9ros. Banner-events helper running (brief-banner-events.md, /home/user/cr-bannerev, ports 8997/9497) per Eric: banners tethered to events.
+
+## Nov 5 ~07:20 UTC
+- #501 banner events (full-e2e) open, CI watcher b0p5xwej0. #499 street round 2 CI watcher bhjot9ros (adcbaf2b).
+- Round 3 (claude/town-boxes 42809163) DONE, no own PR: folds into round 4's PR (its fixed camera is replaced by the chase cam).
+- Round 4 helper (claude/town-rows, /home/user/cr-townrows, ports 8993/9493): mockup phase → show Eric → "go". Brief has 3 addenda
+  (separate fronts butted, look-alike dummies; walled-in streets & hidden landmarks; chase camera along the street, two zooms).
