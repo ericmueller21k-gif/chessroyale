@@ -25,3 +25,7 @@
   `Claude-Session: https://claude.ai/code/session_01EKH5j59nMnRVnekEcuZbim`.
 - **Sprites always on screen (Eric, Nov 4):** any figure you place or move must be fully on screen at rest and at the end of each
   move, on phone and computer. Overlapping the board or a menu is fine; cut off by the page edge never is. Check it in your stills.
+
+## Spelling (Eric, Nov 5)
+American English everywhere: player-visible text, docs, notes, PR bodies and reports. So: color, center, gray, favorite, honor,
+realize, organize, meter, canceled, traveled. Don't rename existing code identifiers just for spelling.

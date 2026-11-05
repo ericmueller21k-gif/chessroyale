@@ -94,3 +94,6 @@ checks it (stills at phone + computer sizes). Guard: docs/rules/eric.md + a chec
 - Power banners show the player's own pawn portrait; the God King appears on a banner only when he saves you.
 - No default/random emoji standing in for a boss or character: use its name and/or a small portrait.
 - Town cards' text centered, all of them.
+
+- **American English (Eric, Nov 5, second reminder).** Every message to Eric, every brief, doc, PR body and player-visible text:
+  color, center, gray, favorite, honor, realize. Never colour, centre, grey, favourite.
