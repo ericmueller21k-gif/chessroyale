@@ -7,7 +7,7 @@
 import { chromium } from "playwright";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { shoot } from "./view.ts";
+import { shoot, shootSheet } from "./view.ts";
 import type { Lot } from "./plan.ts";
 
 const OUT = resolve("scripts/boss-art/out/town-street");
@@ -92,3 +92,4 @@ if (!only || only === "sheets") {
     { img: "5-near-cut-computer.png", cap: "B. A near row, cut away." },
   ], 720);
 }
+if (!only || only === "facades") await shootSheet(resolve(OUT, "7-everyday-buildings.png"));

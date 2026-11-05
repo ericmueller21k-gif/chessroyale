@@ -266,6 +266,7 @@ const mix = (a: readonly number[], b: readonly number[], t: number) => a.map((x,
 const rgb = (c: readonly number[]) => `rgb(${c[0]! | 0},${c[1]! | 0},${c[2]! | 0})`;
 
 const sky = new SkyPainter();
+let strips = 0;
 interface Item {
   depth: number;
   draw: () => void;
@@ -291,6 +292,7 @@ export async function draw(cv: HTMLCanvasElement, s: Scene): Promise<{ figures: 
   const mist = mixMist(s.sky);
   const lightK = mixLights(s.sky);
   const figures: { name: string; x0: number; y0: number; x1: number; y1: number }[] = [];
+  strips = 0;
 
   // The sky: the town's own. Its clouds slide as the camera turns (as if you'd walked a long way sideways); the sun stays.
   sky.resize(s.W, s.H, DPR);
@@ -346,7 +348,6 @@ export async function draw(cv: HTMLCanvasElement, s: Scene): Promise<{ figures: 
       squares.push({ d: pt.depth, q, fill: rgb(f), seam: rgb(f.map((x) => x * (dd + (1 - dd) * t))) });
     }
   squares.sort((a, b) => b.d - a.d);
-  if ((s as { dbg?: boolean }).dbg) { for (const sq of squares) { const xs=[sq.q[0]!,sq.q[2]!,sq.q[4]!,sq.q[6]!]; if (Math.max(...xs)-Math.min(...xs) > s.W*0.5) console.log('wide', JSON.stringify(sq)); } }
   for (const sq of squares) {
     const q = sq.q;
     g.fillStyle = sq.seam;
@@ -455,9 +456,9 @@ export async function draw(cv: HTMLCanvasElement, s: Scene): Promise<{ figures: 
             const y0 = fy - a.foot[1] * sc;
             const hh = img.height * sc;
             const ww = x1 - x0 + 0.6;
-            if ((s as { dbg?: boolean }).dbg && ww > 60) console.log('wide strip', a.key, ww.toFixed(0), x0.toFixed(0), y0.toFixed(0), hh.toFixed(0), dzm.toFixed(2), dxm.toFixed(2));
             g.globalAlpha = enter;
             g.drawImage(img, i0, 0, STEP, img.height, x0, y0, ww, hh);
+            strips++;
             const hz = Math.min(1, Math.max(0, hazeMix(v, dxm, dzm, mist)));
             if (hz > 0.01) {
               g.globalAlpha = enter * hz;
@@ -467,10 +468,9 @@ export async function draw(cv: HTMLCanvasElement, s: Scene): Promise<{ figures: 
           prev = p;
         }
         g.globalAlpha = 1;
-      },
-    });
-    if (a.glow && !opts.back && lightK > 0.01)
-      glows.push(() => {
+      if (a.glow && !opts.back && lightK > 0.01) {
+        g.save();
+        g.globalCompositeOperation = "lighter";
         let prev: ReturnType<typeof P> = null;
         for (let i = 0; i <= w; i += STEP) {
           const p = P(ox + (ux * i) / SQ, oy + (uy * i) / SQ);
@@ -484,7 +484,11 @@ export async function draw(cv: HTMLCanvasElement, s: Scene): Promise<{ figures: 
           }
           prev = p;
         }
-      });
+      g.restore();
+      }
+        g.globalAlpha = 1;
+      },
+    });
     if (opts.name && m && !near(mdz) && Math.hypot(mdx, mdz) < 7.5 && facingCam) {
       const sc = m.k / SQ;
       const top = m.y - a.foot[1] * sc;
@@ -740,7 +744,7 @@ export async function draw(cv: HTMLCanvasElement, s: Scene): Promise<{ figures: 
   g.globalAlpha = 1;
   for (const t of tags) t();
   if (s.caption) caption(g, s.caption, s.W);
-  return { figures };
+  return { figures, strips, planes: items.length };
 }
 
 const PAWN = new Path2D("m 22.5,9 c -2.21,0 -4,1.79 -4,4 0,0.89 0.29,1.71 0.78,2.38 C 17.33,16.5 16,18.59 16,21 c 0,2.03 0.94,3.84 2.41,5.03 C 15.41,27.09 11,31.58 11,39.5 H 34 C 34,31.58 29.59,27.09 26.59,26.03 28.06,24.84 29,23.03 29,21 29,18.59 27.67,16.5 25.72,15.38 26.21,14.71 26.5,13.89 26.5,13 c 0,-2.21 -1.79,-4 -4,-4 z");
@@ -791,4 +795,76 @@ function caption(g: CanvasRenderingContext2D, text: string, W: number) {
   lines.forEach((l, i) => g.fillText(l, 16, 25 + i * 17));
 }
 
-(window as unknown as { townStreet: unknown }).townStreet = { draw, facade, toCanvas, hedge, bush };
+/**
+ * The everyday buildings' sheet: each design in two colors (2x, flat front on), then how they tile wall to wall: Seam
+ * Street's west row as the plan has it (plus its corner side wall), with the bigger buildings behind it, as an elevation.
+ */
+export function sheet(cv: HTMLCanvasElement): void {
+  const Z = 2;
+  const designs = [["cottage", 3], ["townhouse", 2], ["skinny", 3], ["flats", 3], ["bakery", 3], ["shop", 2], ["block", 4], ["tower", 2]] as const;
+  const names: Record<string, string> = { cottage: "Cottage (3 wide)", townhouse: "Townhouse (2)", skinny: "Skinny houses (3, or 2)", flats: "Small flats (3)", bakery: "Bakery and cafe (3)", shop: "Corner shop (2)", block: "Big block, behind (4)", tower: "Clock tower, behind (2)" };
+  const cellW = 4 * SQ * Z + 24;
+  const rowH = 200 * Z + 40;
+  const W = 4 * cellW * 2 + 40;
+  const elevH = 560;
+  const H = 70 + 2 * rowH + elevH + 40;
+  cv.width = W;
+  cv.height = H;
+  const g = cv.getContext("2d")!;
+  g.imageSmoothingEnabled = false;
+  g.fillStyle = "#f4efe4";
+  g.fillRect(0, 0, W, H);
+  g.fillStyle = "#2a2a2a";
+  g.font = "700 30px Arial, sans-serif";
+  g.fillText("Everyday buildings: eight rough fronts (each in two colors), and how they tile", 24, 44);
+  designs.forEach(([id, wsq], n) => {
+    const col = n % 4, row = Math.floor(n / 4);
+    for (let k = 0; k < 2; k++) {
+      const f = facade(id, wsq, k * 2 + (n % 2));
+      const img = toCanvas(f.ch.id, f.ch);
+      const x0 = 20 + (col * 2 + k) * cellW;
+      const base = 70 + row * rowH + 200 * Z;
+      g.fillStyle = "#d8d4cc";
+      g.fillRect(x0, base - 6, cellW - 20, 10);
+      g.drawImage(img, x0 + (cellW - 20 - img.width * Z) / 2, base - f.ch.foot[1] * Z, img.width * Z, img.height * Z);
+      if (k === 0) {
+        g.fillStyle = "#2a2a2a";
+        g.font = "700 22px Arial, sans-serif";
+        g.fillText(names[id]!, x0, base + 30);
+      }
+    }
+  });
+  // The elevation: Seam Street, c 3..20, its row and the bigger buildings behind it (drawn smaller and higher: farther off).
+  const ey = 70 + 2 * rowH + elevH - 30;
+  g.fillStyle = "#2a2a2a";
+  g.font = "700 22px Arial, sans-serif";
+  g.fillText("Wall to wall: Seam Street's row from c 3 to c 20 as the plan has it (Puddles' and Smudgy's homes among them), the bigger buildings behind, flat front on", 24, 70 + 2 * rowH + 30);
+  const Ze = 1.5;
+  const sky = g.createLinearGradient(0, ey - 470, 0, ey);
+  sky.addColorStop(0, "#7fb8ee");
+  sky.addColorStop(1, "#d4ecfa");
+  g.fillStyle = sky;
+  g.fillRect(20, ey - 470, 18 * SQ * Ze * 1.55 + 40, 470);
+  const ex = (c: number) => 40 + (c - 3) * SQ * Ze * 1.55;
+  for (const l of LOTS.filter((l) => l.street === "seam-st" && l.c0 >= 3 && l.c0 + l.w <= 21).sort((a, b) => (a.kind === "tall" ? -1 : 1) - (b.kind === "tall" ? -1 : 1))) {
+    const a = artOfLot(l);
+    const far = l.kind === "tall" ? 0.85 : 1;
+    const s = Ze * 1.55 * far;
+    const cx = ex(l.c0 + l.w / 2);
+    const fy = l.kind === "tall" ? ey - 38 : ey;
+    if (l.kind === "tall") {
+      g.globalAlpha = 1;
+      g.drawImage(a.img, cx - (a.img.width * s) / 2, fy - a.foot[1] * s, a.img.width * s, a.img.height * s);
+    } else g.drawImage(a.img, cx - (a.img.width * s) / 2, fy - a.foot[1] * s, a.img.width * s, a.img.height * s);
+  }
+  g.fillStyle = "#cfc8b8";
+  g.fillRect(20, ey, 18 * SQ * Ze * 1.55 + 40, 14);
+  g.fillStyle = "#2a2a2a";
+  g.font = "16px Arial, sans-serif";
+  for (let c = 3; c <= 21; c++) {
+    g.fillRect(ex(c - 0.5), ey + 14, 1, 8);
+    if (c <= 20) g.fillText(String(c), ex(c) - 8, ey + 38);
+  }
+}
+
+(window as unknown as { townStreet: unknown }).townStreet = { draw, facade, toCanvas, hedge, bush, sheet };
