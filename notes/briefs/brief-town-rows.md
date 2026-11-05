@@ -164,3 +164,38 @@ Tuning taken from the frames (the director's read):
   side-on (our side view). Tune from the 0.4 s toward that if it feels better.
 - **Later (not this round):** the Colosseum taller and bigger, so it looms over the town when it comes into view. It's in the
   director's follow-ups.
+
+## Eric's corrections to the run-through notes (Nov 5, later). These win over the section above.
+**Camera and zoom.** Eric sent back the mockup's `1-fountain-street-close-dusk-desktop.png` (saved as `eric-default-view.png`): "I
+think this is a pretty good default." The Toontown frames were one player's unusually close camera, not the norm.
+- **The mockup's close view stays the default.** Don't lower the default camera.
+- **3 or 4 zoom steps on + and −:**
+  - fully in: low and close, like the run-through frames, at about head height with the horizon near the middle;
+  - the default: the mockup's view;
+  - out: a step further back and higher than the default;
+  - optionally a high overview beyond that for finding your way.
+- **Turns.** The camera follows you closely. A short smoothing on a street-corner turn is fine (about 0.4 to 0.6 s), with no lag
+  otherwise.
+- **Buildings.** Don't scale the whole town up. Only make sure no front is low next to the pawn: the low left-side fronts and the
+  homes' neighbours step up to at least about 3 pawn heights. The right row in the mockup is about right.
+
+**The world's shape. Eric's call; it replaces "wraps both ways".**
+- **Left and right wrap** (Pac-Man style): east–west stays one loop.
+- **North and south don't wrap.** The town is a big square seen from above:
+  - **The Colosseum sits at the top centre, at the north edge,** in a big plaza. Nothing is behind it and you can't loop round
+    behind it.
+  - The town's streets (the left one, the right one, maybe a middle one) **funnel north into that Colosseum plaza.** To reach the
+    Colosseum you always run up through the town.
+  - **The south edge is closed** by a row of buildings. You can't reach the Colosseum by running down.
+- Rework the plan to match. That means:
+  - moving the Colosseum and its plaza to the north edge;
+  - removing the north–south seam (Seam Street's wrap row and anything that relies on rows wrapping);
+  - closing the south edge;
+  - keeping the park plus in the middle of town;
+  - keeping 46 columns (east–west wrap); rows may change if the funnel needs it, so record it.
+- Boss homes keep their doors on streets. Their lots can move, but keep each home's door-tap and card rules.
+- The minimap, edge chips, `wrapI` users and paths must all handle the town not wrapping north–south. Unit-test that a path never
+  crosses the north or south edge and always does cross east–west.
+- Eric may later close the east–west loop too ("you'd have to go make that full run back"). Keep the wrap a single switch in the
+  plan so that's a small change.
+- Record this in the decision note, quoting Eric.
