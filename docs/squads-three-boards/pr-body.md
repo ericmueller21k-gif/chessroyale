@@ -172,6 +172,17 @@ Same code, with Relay on 3 boards against 4 (median lobby, then 90th percentile)
   points, so a level score always includes a draw.
   - All three drawn always goes to side 1, which is Black on two boards. **For Eric to know.**
 
+## Local runs
+
+- Typecheck: green.
+- Unit tests (core, chess, server, app): all the Squads tests pass. Two unrelated files failed under the shared machine's
+  load and have nothing from this branch: `alfil-landing` (passes on its own) and `autochess-sounds`' timing check.
+- e2e on wrangler dev, phone and computer:
+  - `squads-three-boards`, `squads-replay`, `squads-watch`, `squads-test-tools`, and `squads-play`'s Relay test: 25 runs
+    green.
+  - Three tests failed first and were fixed: the replay tests now follow Eric's rule, a test lobby's opener is never the
+    waiting seat, and the coach marks' OK locator. All three passed on rerun.
+
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
 https://claude.ai/code/session_01EKH5j59nMnRVnekEcuZbim
