@@ -165,7 +165,7 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Nov 5 town direction (Eric): keep 46x46 + wrap (seam street, Pac-Man); streets wall-to-wall dummy buildings, boss homes enterable, bigger bldgs behind, sky visible; chessboard roads; park plus-shape (drop middle table each side, +4 = 12 tables, remove trees in walks); camera ROTATES with street to show fronts (no 3D); default zoomed-in; Colosseum is a flat billboard (Eric right) -> keep front-on or needs angles/3D. Mockups first: art helper on brief-town-street-mockup.md (Opus high).
 - Door taps/arrow ask fix: PR #495 842eb55c (town lane), CI watcher bm9hrge4o.
 - Town street mockups DONE afbbc7e5 (scripts/boss-art/out/town-street/, notes town-street-mockup-nov5.md); sent to Eric. Calls: camera N on E-W streets, E on Seam Avenue (only N-S street); one-sided streets (fronts one side, back gardens near side); Colosseum front-on only in a grove; turn at Seam Avenue crossings ~0.5s; wrap kept via seam streets; park 20x12, 12 tables. Waiting on Eric.
-- Nov 5: Dash intro round 3 was never built (default intro) -> helper started (Opus high) brief-dash-intro.md, /home/user/cr-dashintro claude/dash-intro, ports 8987/9487.
+- Dash intro DONE 7e389547 -> PR #497 (boss lane), CI watcher blljwtc6x.
 - Hollow bulbs/darkness/taunts brief written (brief-hollow-bulbs.md): start AFTER Dash finishes (one Opus). Worktree /home/user/cr-hollowbulbs to create. Eric Nov 5: bulbs SOLO ONLY (griever spam). Eric OK: extra Opus helper beside for the town (medium or high, my call).
 - Igloo stair fix PR #496 d7058fd1 (shop lane), CI watcher bz9il4xd2. Local e2e skipped: lock held by helpers.
 - Nov 5: Eric approved building the street town from the mockups (afbbc7e5 + depth 4b7ada3d). Plan (one Opus at a time, after Dash then Hollow):
@@ -173,3 +173,4 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
   2. Town code A: new layout at today's camera (plus park 12 tables, streets, lots, homes moved, walkable/bots/boss roam, default zoomed-in), town e2e updated.
   3. Town code B: box-building renderer (WebGL + 2D fallback, ~15 draws/building) + camera turn at Seam Avenue crossings (~0.5 s); frame-rate check on phone.
 - Town art round 1 DONE 11a4d903 (out/town-buildings/, town-plan-nov5.json, stills out/town-art/). Round 2 (layout, admins first STREET_TOWN) helper: brief-town-layout.md, /home/user/cr-townlayout claude/town-layout, ports 8993/9493 (parallel helper per Eric).
+- Hollow bulbs helper started (Opus high), /home/user/cr-hollowbulbs claude/hollow-bulbs, ports 8989/9489.
