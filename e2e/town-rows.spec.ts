@@ -115,12 +115,13 @@ test("no sky between the fronts at street level: Fountain Street and South Stree
   }
 });
 
-test("the zoom steps: − and + move a step at a time (in, the default, out, the overview); every figure on screen at each", async ({ page }) => {
+test("the zoom steps: − and + move a step at a time (in, the mockup's, out (the default since Nov 5), the overview); every figure on screen at each", async ({ page }) => {
   test.setTimeout(200_000);
   await open(page, "day", false);
   await walkAlong(page, [1, 20], [4, 20]);
-  expect((await cam(page)).zoomTarget).toBe(1);
-  await page.getByRole("button", { name: "Zoom in" }).click();
+  // (Eric, Nov 5: "we're going with number three for the default": the town opens at step 2.)
+  expect((await cam(page)).zoomTarget).toBe(2);
+  for (let k = 0; k < 2; k++) await page.getByRole("button", { name: "Zoom in" }).click();
   await expect.poll(async () => (await cam(page)).zoom, { timeout: 3000 }).toBe(0);
   await figuresOnScreen(page, "in");
   for (const step of [1, 2, 3]) {
@@ -140,19 +141,20 @@ test("the park zooms a step out as you come in and back as you leave; a press in
   test.setTimeout(200_000);
   await open(page, "day", false);
   await walkAlong(page, [6, 20], [9, 20]);
-  expect((await cam(page)).zoomTarget).toBe(1);
+  // (The default since Nov 5: step 2, so the park's step out is to the overview, 3.)
+  expect((await cam(page)).zoomTarget).toBe(2);
   // In (fully: a square past its edge), out a step over about 0.6 s; you and every figure on screen.
   await walkTo(page, [16, 20]);
-  await expect.poll(async () => (await cam(page)).zoom, { timeout: 3000 }).toBe(2);
-  expect((await cam(page)).parkBefore).toBe(1);
+  await expect.poll(async () => (await cam(page)).zoom, { timeout: 3000 }).toBe(3);
+  expect((await cam(page)).parkBefore).toBe(2);
   await figuresOnScreen(page, "in the park");
   // Out again: back to the step you had.
   await walkTo(page, [9, 20]);
-  await expect.poll(async () => (await cam(page)).zoom, { timeout: 3000 }).toBe(1);
-  // In again, and + in the park: your step stays as you leave.
+  await expect.poll(async () => (await cam(page)).zoom, { timeout: 3000 }).toBe(2);
+  // In again, and + twice in the park: your step stays as you leave (not the 2 you came in with).
   await walkTo(page, [16, 20]);
-  await expect.poll(async () => (await cam(page)).zoomTarget, { timeout: 3000 }).toBe(2);
-  await page.getByRole("button", { name: "Zoom in" }).click();
+  await expect.poll(async () => (await cam(page)).zoomTarget, { timeout: 3000 }).toBe(3);
+  for (let k = 0; k < 2; k++) await page.getByRole("button", { name: "Zoom in" }).click();
   await walkTo(page, [9, 20]);
   await page.waitForTimeout(800);
   expect((await cam(page)).zoomTarget, "your press in the park wins").toBe(1);

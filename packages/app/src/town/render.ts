@@ -943,8 +943,10 @@ export class Renderer {
     setView(this.view, W, H, z, 1, 0, 0, STREET_TOWN ? STREET_CAMS : undefined);
     setHeading(this.view, heading);
     this.lens(z);
-    // (What the rows let you see, round 4: from your square and the camera's, at the in and default steps.)
-    this.cull = STREET_TOWN && TOWN_FEEL.streetCull && zoom <= TOWN_FEEL.streetZoomStart + 0.01;
+    // (What the rows let you see, round 4: from your square and the camera's, at the in step and the mockup's (1, round 4's default). Not
+    // from the higher steps, which see over the rows: the default since Nov 5 (2, Eric: "number three") draws everything in reach, as
+    // round 4's "out" did.)
+    this.cull = STREET_TOWN && TOWN_FEEL.streetCull && zoom <= 1.01;
     if (this.cull) {
       // (From where the camera looks: you, as it follows you; wherever it glides to as you look round. Looking from inside a lot (a
       // glide to a home's middle), nothing is left out.)

@@ -108,8 +108,12 @@ export const TOWN_FEEL = {
       wide: { h: 7.8, th: 36, back: 6.7, R: 30, kx: 0.4, fW: 0.72, cy: 0.39, rim: 11.5, rimX: 2.3 },
     },
   ] as readonly { tall: CamSet; wide: CamSet }[],
-  /** The step the street town opens at (the default, 1) and how long a press of − or + glides (ms). */
-  streetZoomStart: 1,
+  /**
+   * The step the street town opens at and how long a press of − or + glides (ms). Eric, Nov 5: "If number one is the closest, then we're
+   * going with number three for the default": the third step (index 2, "out"), one further back than round 4's default (1, the mockup's
+   * camera, still the second step). The park's step out goes from there to the overview (3).
+   */
+  streetZoomStart: 2,
   streetZoomMs: 350,
   /**
    * The park zooms out a step (Nov 5, round 4; Eric, a trial he may revert: "make it zoom out one level when you hit the area that's the

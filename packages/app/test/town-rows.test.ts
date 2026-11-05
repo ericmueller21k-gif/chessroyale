@@ -246,9 +246,9 @@ describe("the town wraps east-west only (round 4; Eric: the Colosseum at the nor
 
 describe("the zoom steps and the park's step out (round 4)", () => {
   const steps = TOWN_FEEL.streetZoomSteps;
-  it("has four steps (in, the default, out, the overview), the default the mockup's camera", () => {
+  it("has four steps (in, the mockup's camera, out, the overview); the town opens at the third (Eric, Nov 5: \"we're going with number three for the default\")", () => {
     expect(steps).toHaveLength(4);
-    expect(TOWN_FEEL.streetZoomStart).toBe(1);
+    expect(TOWN_FEEL.streetZoomStart).toBe(2);
     expect(steps[1]!.tall).toEqual(TOWN_FEEL.camStreetTall);
     expect(steps[1]!.wide).toEqual(TOWN_FEEL.camStreetWide);
     for (let k = 1; k < 4; k++) expect(steps[k]!.tall.h).toBeGreaterThan(steps[k - 1]!.tall.h);
