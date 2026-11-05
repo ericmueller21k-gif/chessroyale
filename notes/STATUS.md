@@ -187,3 +187,9 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Round 4 helper (claude/town-rows, /home/user/cr-townrows, ports 8993/9493): mockup phase → show Eric → "go". Brief has 3 addenda
   (separate fronts butted, look-alike dummies; walled-in streets & hidden landmarks; chase camera along the street, two zooms).
 - Follow-up (Eric, Nov 5): the Colosseum taller and bigger, so it looms when it comes into view in the street town. After round 4.
+
+## Nov 5 ~11:00 UTC
+- LIVE: #499 street round 2 (admins), #501 banner events, #502 room keys (rowsUp). Main green at d90fc449.
+- #503 street town rounds 3+4 (full-e2e) open, CI watcher bbq7z90is. Merge on green → admins see it; Eric walks it in the morning, then
+  flip STREET_TOWN for everyone on his OK. Follow-ups: bigger Colosseum; Moo paddock / Ginger dome low in rows; bulgy bodies.
+- Disk filled at ~08:00: removed 13 merged+pushed worktrees (clean, nothing ahead). Keep cleaning finished worktrees.
