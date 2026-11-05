@@ -48,7 +48,7 @@ const TRAIL: Record<Exclude<ReplayMode, "off">, readonly (readonly [number, numb
 
 /**
  * The replay button, next to the gear in Squads' top line (Eric, Nov 5; round 2): no box, only the drawn ring. A tap
- * steps off → the last 2 moves → all moves since you last played → off. Off: greyed, nothing turning; the last 2: dots
+ * steps off → the last 2 moves → all moves since you last played → off. Off: grayed, nothing turning; the last 2: dots
  * chase round it at a moderate pace with a short trail; all: twice as fast, a longer trail.
  */
 export function ReplayButton() {

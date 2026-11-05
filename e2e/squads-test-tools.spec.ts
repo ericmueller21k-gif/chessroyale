@@ -69,7 +69,7 @@ test("the start link seats you with bots at once at the first vote; Skip votes; 
     await expect(page.locator(".sq-cheat-lines li")).toHaveCount(3);
     await expect(page.locator(".sq-cheat-lines li").first()).toContainText(/^1 · /);
   }
-  // Your move made: nothing left to choose here, so the arrows go until your next choice (and the switch: greyed on a
+  // Your move made: nothing left to choose here, so the arrows go until your next choice (and the switch: grayed on a
   // phone, gone on a computer).
   const move = new Chess(first.fen).moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? "")).find((m) => m.length === 4)!;
   await tapSquare(page, move.slice(0, 2));

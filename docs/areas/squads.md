@@ -505,10 +505,10 @@ door's look; every class is `sq-`.
     and nothing else (each pawn memoized), never the whole screen; a clock tick or a move doesn't redraw them.
   - **Relay:** your move shows on your board at once and stays (no snap-back); "Moved · waiting for the half to end".
   - **Relay's match screen** (Eric, Nov 5; docs/decisions/2026-11-05-squads-three-boards.md):
-    - **The tiny boards**: each match's 3 side by side, centered. A finished board isn't greyed: a border and a check
+    - **The tiny boards**: each match's 3 side by side, centered. A finished board isn't grayed: a border and a check
       mark in the winning squad's color (`wonBy`, `.sq-done`); a drawn one a neutral border and "½".
     - **The top line**: the test-only "Next round" a tiny icon hard left (admins and test lobbies), and on a phone's
-      Relay Cheat lines a tiny icon beside it (greyed when there's nothing to choose; its lines the arrows on the board).
+      Relay Cheat lines a tiny icon beside it (grayed when there's nothing to choose; its lines the arrows on the board).
     - **Under the board** only the move arrows (with the clocks' line) and **the turn order** (`TurnOrderBox`,
       `boardQueue`, `queueLine`, `foldedRows` in squads-view.ts; Eric's correction): one queue for the board on screen,
       all 8 players in the order they'll move on it, the next there on top (lit while it's their move now), each with
@@ -535,7 +535,7 @@ door's look; every class is `sq-`.
     place of "free" while the extra lasts; your move's panel: "4.5 s free (+1.5 s for 3 moves missed), then your
     squad's clock runs.". A tap on the board skips it (the same tap reaches the real board under it). **The replay
     button** (left of the gear in the match's and the votes' top lines; Nov 5, round 2: no box, only the drawn ring):
-    a tap steps off (greyed, still) → the last 2 moves (your teammate's there and the reply; dots chase round it at the
+    a tap steps off (grayed, still) → the last 2 moves (your teammate's there and the reply; dots chase round it at the
     first button's pace, a short trail) → all since you last played there (twice as fast, a longer trail) → off. Off on
     a device's first match (`SQUADS_LOBBY.replay.mode`); per account on this device (`brc.squads.replay.<id>`: "off",
     "two", "all"; the first button's "1" reads as all, "0" as off). **When it plays** (Eric, Nov 5; `replayMoves`): as

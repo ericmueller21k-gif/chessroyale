@@ -178,7 +178,7 @@ const shots = {
     await play(p, 1);
     const first = await nextDuty(p);
     await shot(p, "your-turn", kind);
-    // The replay button: off (greyed, still), the last 2 (a short trail), all (twice as fast, a longer trail).
+    // The replay button: off (grayed, still), the last 2 (a short trail), all (twice as fast, a longer trail).
     for (const mode of ["off", "two", "all"]) {
       while ((await p.locator(".hud-row .rp-btn").getAttribute("data-mode")) !== mode) await p.locator(".hud-row .rp-btn").click();
       await shot(p, `replay-${mode}`, kind);

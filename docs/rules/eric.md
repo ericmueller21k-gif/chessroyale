@@ -182,7 +182,7 @@ How Eric likes design work run (Eric, Oct 29). These are habits, not hard rules;
 - **Who played each replayed move: a name tag over the moved piece, one box size; a long name smaller; over 12 characters cut
   with "…" ("Christopher…").** Guards: `packages/app/test/move-replay.test.ts`, "a name tag's words…"; the e2e above (every
   tag the same size, the long name smaller and cut).
-- **The replay button sits next to the gear, no box, only the drawn ring (Eric, Nov 5, round 2): a tap steps off (greyed,
+- **The replay button sits next to the gear, no box, only the drawn ring (Eric, Nov 5, round 2): a tap steps off (grayed,
   still) → the last 2 moves (a moderate spin, a short trail) → all (twice as fast, a longer trail) → off; off on a first
   match; per account, on this device.** Guard: the first e2e above (the cycle, the speeds and trails).
 - **At a player's Relay, three coach marks one at a time (settings, the replay button, the tiny boards); a tap or OK goes on;

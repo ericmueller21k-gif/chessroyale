@@ -121,11 +121,11 @@ describe("Relay on 3 boards: the ring", () => {
     for (const side of [0, 1] as const) {
       const moves = squadMoves(side, 12);
       for (let seat = 0; seat < 4; seat++) {
-        const colours = moves.filter((x) => x[3] === seat).map((x) => x[1]);
-        expect(colours).toHaveLength(9);
-        const whites = colours.filter((c) => c === "w").length;
+        const colors = moves.filter((x) => x[3] === seat).map((x) => x[1]);
+        expect(colors).toHaveLength(9);
+        const whites = colors.filter((c) => c === "w").length;
         expect(whites).toBe(side === 0 ? 6 : 3);
-        expect(colours.join("")).not.toMatch(/www|bbb/);
+        expect(colors.join("")).not.toMatch(/www|bbb/);
         // Each board once every three of your moves (3 boards, one along each time).
         const boards = moves.filter((x) => x[3] === seat).map((x) => x[2]);
         for (let i = 3; i < boards.length; i++) expect(boards[i]).toBe(boards[i - 3]);

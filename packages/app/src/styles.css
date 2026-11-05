@@ -16270,7 +16270,7 @@ button.sq-tiny {
   opacity: 0.4;
   filter: grayscale(1);
 }
-/* A finished board (Nov 5, round 2): not greyed, a border in the winning squad's color and its check mark in a corner;
+/* A finished board (Nov 5, round 2): not grayed, a border in the winning squad's color and its check mark in a corner;
    a drawn board a neutral border and "½". */
 .sq-tiny.is-won .tiny-board,
 .sq-tiny.is-draw .tiny-board {
@@ -23557,7 +23557,7 @@ button.sq-tiny {
 /* ---- Move replay in Squads (Eric, Nov 5; components/MoveReplay.tsx, docs/decisions/2026-11-05-move-replay.md) ---- */
 /* The replay button, next to the gear in Squads' top line: the gear's size and look. On, three dots chase slowly round its
    edge (a toggled-on ability); off, the plain icon. */
-/* Nov 5, round 2: no box, only the drawn ring; a tap steps off (greyed, still), the last 2 moves (dots chasing round it at
+/* Nov 5, round 2: no box, only the drawn ring; a tap steps off (grayed, still), the last 2 moves (dots chasing round it at
    the first button's pace, a short trail), all moves (twice as fast, a longer trail). */
 .rp-btn {
   position: relative;

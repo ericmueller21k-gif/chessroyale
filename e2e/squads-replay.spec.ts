@@ -106,7 +106,7 @@ test("Relay: the replay button steps off, the last 2, all; your move on a board 
   expect(first.duty!.replay).toBe(0);
   expect(first.duty!.freeMs).toBe(first.delayMs);
   await expect(page.locator(".rp-over")).toHaveCount(0);
-  // The button (Nov 5, round 2): off on a first match (greyed, nothing turning); a tap: the last 2 (a short trail);
+  // The button (Nov 5, round 2): off on a first match (grayed, nothing turning); a tap: the last 2 (a short trail);
   // again: all (twice as fast, a longer trail); again: off.
   expect(await mode(page)).toBe("off");
   await expect(button(page).locator(".rp-trail")).toHaveCount(0);

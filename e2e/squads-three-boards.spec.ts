@@ -88,7 +88,7 @@ test("a Relay match on 3 boards plays to a result: 12 tiny boards, the finished 
   // Best 2 of 3: White wins all three (side 0 White on boards 1 and 3): 2–1.
   expect(r.points).toEqual([2, 1]);
   expect(r.winner).toBe(0);
-  // The finished boards: not greyed, a border and a check mark in the winning squad's color.
+  // The finished boards: not grayed, a border and a check mark in the winning squad's color.
   const ours = page.locator(".sq-match.ours .sq-tiny.is-won");
   await expect(ours).toHaveCount(3, { timeout: 10_000 });
   await expect(page.locator(".sq-match.ours .sq-done")).toHaveCount(3);
@@ -155,8 +155,8 @@ test("the coach marks: three, one at a time, a tap goes on; unticked they come b
       expect(box.y + box.height).toBeLessThanOrEqual(vp.height);
       if (id === "boards") {
         if (never) await page.getByLabel("Don't show these again").check();
-        await page.getByRole("button", { name: "OK" }).click();
-      } else if (i === 0) await page.getByRole("button", { name: "OK" }).click();
+        await page.locator(".cm-ok").click();
+      } else if (i === 0) await page.locator(".cm-ok").click();
       // (A tap anywhere goes on too.)
       else await page.mouse.click(5, 5);
     }

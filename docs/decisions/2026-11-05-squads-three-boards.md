@@ -6,7 +6,7 @@ and that becomes their static position … the person who's on the first board w
 them … best 2 out of 3."
 
 His screenshots (`notes/briefs/assets/squads-nov5/`): the bottom of the Relay screen cut off under the browser bar, a
-greyed finished mini board, the "Jump to my next board" switch and its line under the board. Stills of what's built:
+grayed finished mini board, the "Jump to my next board" switch and its line under the board. Stills of what's built:
 `docs/squads-three-boards/`.
 
 ## The rules
@@ -42,10 +42,10 @@ greyed finished mini board, the "Jump to my next board" switch and its line unde
 ## The screen
 
 - **Mini boards**: 3 a match, side by side, centered. A finished board: a border and a check mark in the winning squad's
-  color, not greyed; a drawn board: a neutral border and "½" (the director's call).
+  color, not grayed; a drawn board: a neutral border and "½" (the director's call).
 - **"Next round"** (test only): a tiny icon hard left. On a phone's Relay, Cheat lines (test only) is a tiny icon beside
   it, its lines the arrows on the board (the director: OK), so it never pushes the screen down.
-- **The replay button**: no box, only the drawn ring. A tap steps off (greyed) → the last 2 moves (a moderate spin, a
+- **The replay button**: no box, only the drawn ring. A tap steps off (grayed) → the last 2 moves (a moderate spin, a
   short trail) → all moves since you last played there (twice as fast, a longer trail) → off. Off on a device's first
   match; the first button's stored on reads as all, off as off.
 - **When replay plays** (Eric, Nov 5, replacing the director's "only the unseen moves"): as your move on a board starts.
