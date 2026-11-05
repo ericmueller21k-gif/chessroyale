@@ -199,3 +199,16 @@ think this is a pretty good default." The Toontown frames were one player's unus
 - Eric may later close the east–west loop too ("you'd have to go make that full run back"). Keep the wrap a single switch in the
   plan so that's a small change.
 - Record this in the decision note, quoting Eric.
+
+## Auto zoom in the park (Eric, Nov 5, later; a trial he may revert)
+"In the town kind of center area where there's all the chessboards, we want it to be kind of clear that like that's kind of the
+gathering area … make it zoom out one level when you hit the area that's the … center town square … not like a ton more zoom out …
+if it's like a nice transition."
+- **Entering the park** (the plus with the chess tables) eases the camera **one zoom step out** from wherever you are, over about
+  0.6 s (a feel number). Nothing happens if you're already at the furthest step.
+- **Leaving** eases back to the step you had before you came in.
+- If you press + or − inside the park, your choice wins. On leaving, the camera stays where you put it.
+- No pumping at the edge: zoom changes only once you're fully inside or fully outside, with a square of slack.
+- **One switch** in the town feel (`parkZoomOut`), so it's easy to turn off.
+- Unit-test the step logic. An e2e walks into the park and out, checking the step, on phone and computer. Put a still of the park on
+  arrival in the stills.
