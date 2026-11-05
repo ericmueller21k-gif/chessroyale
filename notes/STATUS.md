@@ -168,3 +168,7 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Nov 5: Dash intro round 3 was never built (default intro) -> helper started (Opus high) brief-dash-intro.md, /home/user/cr-dashintro claude/dash-intro, ports 8987/9487.
 - Hollow bulbs/darkness/taunts brief written (brief-hollow-bulbs.md): start AFTER Dash finishes (one Opus). Worktree /home/user/cr-hollowbulbs to create.
 - Igloo stair fix (levelZ step, wait not reverse on chain) on claude/igloo-stair-turn in /home/user/cr-ginger, local Ginger e2e b7p01vtt9 running; then PR.
+- Nov 5: Eric approved building the street town from the mockups (afbbc7e5 + depth 4b7ada3d). Plan (one Opus at a time, after Dash then Hollow):
+  1. Town art (Opus high, boss-art): final everyday fronts (8 designs x2 colours) + box sides/roofs per material and per boss home, bigger buildings behind, hedges/back gardens, seam streets; exact plan numbers.
+  2. Town code A: new layout at today's camera (plus park 12 tables, streets, lots, homes moved, walkable/bots/boss roam, default zoomed-in), town e2e updated.
+  3. Town code B: box-building renderer (WebGL + 2D fallback, ~15 draws/building) + camera turn at Seam Avenue crossings (~0.5 s); frame-rate check on phone.
