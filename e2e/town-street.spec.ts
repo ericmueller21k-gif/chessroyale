@@ -53,9 +53,13 @@ async function openStreet(page: Page, query = "") {
 async function tapHome(page: Page, id: string, name: string) {
   const card = page.getByRole("dialog", { name, exact: true });
   await page.evaluate((h) => (window as unknown as Hooks).__townGlide?.(h), id);
+  // (Round 4: let the glide settle before the first tap, so it lands on the home, not on someone passing.)
+  await page.waitForTimeout(1200);
   await expect(async () => {
     if (await card.isVisible()) return;
     const xy = await page.evaluate((h) => (window as unknown as Hooks).__townAt?.("home", h) ?? null, id);
+    // (Not drawn from where the camera is now (a tap that missed walked you off): look at it again, and try once more.)
+    if (!xy) await page.evaluate((h) => (window as unknown as Hooks).__townGlide?.(h), id);
     expect(xy, "drawn").not.toBeNull();
     const cv = (await canvas(page).boundingBox())!;
     await page.mouse.click(cv.x + xy!.x, cv.y + xy!.y);

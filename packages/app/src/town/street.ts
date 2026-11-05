@@ -1,12 +1,12 @@
 /**
  * The street town's plan (Nov 5; code round 2, the layout): the town Eric approved (streets of the chessboard with sidewalks,
  * the lots and their buildings, the back gardens, the plus-shaped park, the Colosseum in its grove), read from
- * `street-plan.json`, the art's `town-plan-nov5.json` copied as made (claude/boss-art 11a4d903; its doc is
- * scripts/boss-art/out/town-plan-nov5.md there). Data only: world.ts builds the street town's world from it when STREET_TOWN
- * is on (admins only until round 3), and render.ts draws it.
+ * `street-plan.json`: the art's `town-plan-nov5.json` (claude/boss-art 11a4d903; its doc is scripts/boss-art/out/town-plan-nov5.md
+ * there) as round 4 reshaped it (scripts/street-plan-north.py: the Colosseum at the north edge, a closing row along the south edge).
+ * Data only: world.ts builds the street town's world from it when STREET_TOWN is on (admins only), and render.ts draws it.
  *
- * Squares are (c, r): c west to east, r south to north, wrapping (world.ts's way); a position (x, y) is in squares, a
- * square's middle at whole numbers.
+ * Squares are (c, r): c west to east, r south to north, wrapping east-west only (round 4: the plan's `wrap`; camera.ts WRAP); a
+ * position (x, y) is in squares, a square's middle at whole numbers.
  */
 import PLAN from "./street-plan.json" with { type: "json" };
 import { N, WRAP } from "./camera.ts";

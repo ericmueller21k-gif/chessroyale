@@ -879,6 +879,26 @@ and Seam Avenue's camera turn, is done; then the switch goes). Eric approved its
   `heading`, `figures`, `boxes`; `__townHeading(deg | null)` holds the heading (the turn's stills). Tests: `packages/app/test/town-boxes.test.ts`,
   `e2e/town-street.spec.ts` ("the boxes and the turn", both renderers). Decision:
   [2026-11-05-street-town-boxes.md](../decisions/2026-11-05-street-town-boxes.md). Stills: `docs/street-town-boxes/`.
+- **Round 4 (Nov 5): joined rows, the chase camera, the town wrapping east-west only.**
+  - **The plan** (`street-plan.json`, from the art's by `scripts/street-plan-north.py`): its `wrap` switch, `{ ew: true, ns: false }`
+    (`camera.ts WRAP`, `wrapFX`/`wrapFY`, `colI`/`rowI`: -1 off the world). The Colosseum at the north edge in its plaza; South Street
+    (the art's Seam Street) the bottom street, a closing row south of it; Seam Avenue ending at Upper Street. The start is (22, 17).
+  - **The rows** (`town/rows.ts`: each side as data; `lookalike.ts`: the look-alike fronts and the skyline's towers; `street.ts`
+    `withRows`, `homesOn`):
+    - every street's built sides are continuous rows; the homes keep their lots (sliding along a row to fit its end);
+    - look-alikes of 1 to 3 squares and slim fillers fill the rest, each butted 1 px under its neighbours;
+    - corners turn onto the cross street; flat fronts away from corners; rear walls seen from behind;
+    - the tall lots are towers over the rows.
+  - **The camera:**
+    - the chase camera (`turn.ts chaseTarget`; down steps back without turning, left and right turn you);
+    - four zoom steps (`feel.ts streetZoomSteps`; `zoom-steps.ts StreetZoom`);
+    - the park's step out (`parkZoomOut`).
+  - **Drawing only what the rows let you see:** `seen.ts`, at the in and default steps (`streetCull`).
+  - **Smaller fixes:** a home's name only with its home; slanted sign lettering snapped.
+  - **Test hooks:** `__townCam()`'s `zoom` (the step), `parkBefore`, `horizon`.
+  - **Tests:** `packages/app/test/town-rows.test.ts`, `e2e/town-rows.spec.ts`, and round 3's moved to the plan
+    (`town-boxes.test.ts`, `town-street.test.ts`, `e2e/town-street.spec.ts`).
+  - Decision: [2026-11-05-street-rows.md](../decisions/2026-11-05-street-rows.md). Stills: `docs/street-town-rows/`.
 
 ## Frame-rate pill (`?fps`)
 `/town?fps` shows anyone (Eric, Oct 30: no admin needed, the site is behind Cloudflare Access) a pill in the world's top-right corner, "60 fps · 16.7 ms · 2D": frames over the last second and their mean time, text set twice a second from plain counters in the frame loop, then the drawing's backend ("· WebGL" with `?gl=1`; added by town.css from `data-backend`, so the pill's text stays the numbers). Without `?fps` there is none. `?crowd=N` is anyone's too (only that device draws the pawns).

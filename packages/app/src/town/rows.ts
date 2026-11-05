@@ -8,10 +8,11 @@
  *
  * Pure: no canvas. street.ts applies the rows to the plan (the lots they replace, the ground under them, the garden things they cover).
  *
- * Every street's built sides are rows (round 4, the build): both sides of the four east-west streets, west and east of the park (Seam
- * Street's north side either side of the promenade), and Seam Avenue's two short stretches between the corners. A 3-deep block between
- * two streets is two rows back to back (each about 1.2 squares deep); a deep block (Seam Street to Fountain Street, Upper Street to Seam
- * Street) has a row on each street and its gardens and tall blocks in the middle, seen over the roofs: the skyline.
+ * Every street's built sides are rows (round 4, the build): both sides of the four east-west streets, west and east of the park and the
+ * plaza (South Street's north side either side of the promenade), Seam Avenue's own stretch between the corners, and the closing row
+ * along the south edge. A 3-deep block between two streets is two rows back to back (each about 1.2 squares deep); a deep block (South
+ * Street to Fountain Street; behind Upper Street's north row) has a row on its street(s) and its gardens and tall blocks in the middle,
+ * seen over the roofs: the skyline.
  *
  * Away from the corners a look-alike is a flat front (a shallow box with a flat roof, its cap a false front over it): the chase camera
  * sees fronts, not roofs. A corner keeps a deep box, so the end it turns onto the cross street reads as a building.

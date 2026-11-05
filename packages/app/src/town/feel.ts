@@ -136,6 +136,14 @@ export const TOWN_FEEL = {
    * buildings no straight line from your square (or the camera's) reaches past the lots are left out; the skyline's towers always show.
    */
   streetCull: true,
+  /** A skyline tower no ray from you reaches still shows over the rows out to this far (squares); past it, it's in the haze. */
+  streetTowerReach: 8,
+  /**
+   * The 2D fallback smooths a wall's picture only drawn smaller than its own pixels (under this many screen pixels a picture pixel);
+   * bigger, its pixels stay crisp (WebGL: under 1.5). Round 4: the rows put more wall on screen than round 3's lots, and an unsmoothed
+   * wall is cheaper there; between 1 and 1.5 a picture pixel the difference doesn't show.
+   */
+  wallSmooth2D: 1,
   streetTreeFade: 1.5,
   /**
    * The street town's chase camera's turn (Nov 5; round 4 aims it, turn.ts chaseTarget): a quarter turn eases over this many ms, the
@@ -168,10 +176,12 @@ export const TOWN_FEEL = {
    */
   boxStripFine: 1.5,
   boxStripsFine: 24,
-  boxStrip: 4,
-  boxStrips: 8,
-  /** How long a frame may spend getting buildings' roofs ready before they're seen (ms; the nearest first). */
-  boxBakeMs: 2.5,
+  // (Round 4: 4 and 8 before. The rows put more building on screen than round 3's lots; the 2D fallback's strips are coarser to keep
+  // the phone's frame rate, the steps still under the eaves.)
+  boxStrip: 8,
+  boxStrips: 5,
+  /** How long a frame may spend getting buildings' roofs ready before they're seen (ms; the nearest first). (Round 4: 2.5 before.) */
+  boxBakeMs: 1.5,
   /** A home's floating name: how far over its roof it floats (px), and the step it drops by to keep off the buildings behind. */
   nameOverRoof: 6,
   nameDropStep: 3,

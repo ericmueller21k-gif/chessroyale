@@ -48,7 +48,7 @@ import { colosseumSeen, ROW_GROUND, STREET_BUILDINGS, STREET_GROUND, STREET_GROU
 /** The lots' squares (a camera standing in one, backed up to a front, sees from your square only). */
 const ROW_LOT = STREET_GROUND.map((g) => +(g === STREET_GROUND_KEY.L));
 import { affine, boxPoint, geomOf, lotArt, newPlan, planBox, streetBoxes, type BoxInst, type BoxPlan, type WallPlan } from "./boxes.ts";
-import { seenEither, seenFrom } from "./seen.ts";
+import { seenEither, seenFrom, seenReady } from "./seen.ts";
 import { bakeRoof, restShade, shadedImg, type Piece, type RoofArt } from "./box-draw.ts";
 import { ARENA, COLISEUM_PLACE, GARDEN, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, groundAt, isSprite, onColiseum, plotAt, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town, type Walker } from "./world.ts";
 import { TAG_STYLE, TagCache, namesMode, tagAlpha, type NamesMode, type TagKind } from "./tags.ts";
@@ -958,6 +958,13 @@ export class Renderer {
         this.seenKey = key;
         seenEither(seenFrom(yc, yr), cr >= 0 && cc >= 0 && !ROW_LOT[cr * N + cc] ? seenFrom(cc, cr) : seenFrom(yc, yr), this.seen);
       }
+      // (Ahead of need: the square ahead of the focus, then the one ahead of the camera, worked out a frame early, so a step doesn't wait.)
+      if (this.cull) {
+        const ax = Math.round(v.hs);
+        const ay = Math.round(v.hc);
+        if (!seenReady(yc + ax, yr + ay)) seenFrom(yc + ax, yr + ay);
+        else if (cc >= 0 && cr >= 0 && !seenReady(cc + ax, cr + ay)) seenFrom(cc + ax, cr + ay);
+      }
     }
     this.buildCloseUps(now);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -1491,8 +1498,8 @@ export class Renderer {
     this.farOn = false;
     // (The street town, round 4: only where the rows let you see it, down a street or across a square that opens onto it; near too.)
     if (STREET_TOWN) {
-      const w = this.town.you.walker;
-      this.colSeen = colosseumSeen(w.hereC(), w.hereR());
+      // (From where the camera looks: you, as it follows you; wherever it glides to as you look round.)
+      this.colSeen = colosseumSeen(this.camX, this.camY);
       if (!this.colSeen) col.on = false;
       else if (!col.on) this.drawFarColiseum(col, now);
     } else if (!col.on) this.drawFarColiseum(col, now);
@@ -1611,7 +1618,8 @@ export class Renderer {
         ahead[na] = b.i;
         this.aheadD[na++] = R;
       }
-      if (R > v.rim + 4 || this.rq.dz < -v.back - 4 || (this.cull && b.kind !== "tall" && !this.boxSeen(b.i))) {
+      // (What the rows hide is left out; a skyline tower no ray reaches shows over them out to `streetTowerReach`, past it in the haze.)
+      if (R > v.rim + 4 || this.rq.dz < -v.back - 4 || (this.cull && !this.boxSeen(b.i) && (b.kind !== "tall" || R > TOWN_FEEL.streetTowerReach))) {
         p.on = p.front.on = p.left.on = p.right.on = p.back.on = false;
         p.nOrder = 0;
         continue;
@@ -1657,9 +1665,11 @@ export class Renderer {
     if (had) return had;
     let m = this.roofs.get(box);
     if (!m) this.roofs.set(box, (m = new Map()));
-    const key = `${b.facing}${q}`;
+    // (A flat roof is lit the same whichever way the camera faces: one painting serves all four. Round 4's flat fronts are most of them.)
+    const flat = geomOf(box).faces.every((f) => f.nz > 0.999);
+    const key = flat ? "flat" : `${b.facing}${q}`;
     let a = m.get(key);
-    if (!a) m.set(key, (a = bakeRoof(b, box, q)));
+    if (!a) m.set(key, (a = bakeRoof(b, box, flat ? 0 : q)));
     this.instArt[slot]![b.i] = a;
     return a;
   }
@@ -1863,7 +1873,7 @@ export class Renderer {
     const bb = this.bb;
     bb[0] = bb[1] = Infinity;
     bb[2] = bb[3] = -Infinity;
-    this.ctx.imageSmoothingEnabled = Math.max(w.k0, w.k1) / TOWN_FEEL.housePxPerSquare < 1.5;
+    this.ctx.imageSmoothingEnabled = Math.max(w.k0, w.k1) / TOWN_FEEL.housePxPerSquare < (this.paint.kind === "webgl" ? 1.5 : TOWN_FEEL.wallSmooth2D);
     const p0 = w.s0 * pw;
     const pr = (w.s1 - w.s0) * pw;
     for (let j = 0; j < n; j++) {

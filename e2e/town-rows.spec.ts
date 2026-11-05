@@ -164,7 +164,8 @@ test("stills: the rows (round 4)", async ({ page }) => {
     await page.waitForTimeout(2500);
     await page.screenshot({ path: `${STILLS}/${name}-${project}.png` });
   };
-  const gl = process.env.STILLS_2D !== "1";
+  // (The default renderer, Canvas 2D, as Eric sees it; STILLS_GL=1 for WebGL, as the mockup's.)
+  const gl = process.env.STILLS_GL === "1";
   await open(page, "day", gl);
   // Each street by day, walking along it (the chase camera behind you).
   const streets: [string, readonly [number, number], readonly [number, number]][] = [
