@@ -1050,6 +1050,14 @@ export class SquadsCore {
     const opener = this.r.humans[0]?.id;
     if (this.r.test?.white && round === this.r.test.start && opener && mineIn(planned, opener) && !halfDuties(planned, this.s).duties.some((d) => d.players.includes(opener))) {
       planned = planMatch(this.r.plan!, round, index, [this.r.squads[b]!, this.r.squads[a]!], this.library, this.s);
+      // (Relay on 3 boards: the opener may be the squad's waiting seat either way; then their squad's seats start with them.)
+      if (!halfDuties(planned, this.s).duties.some((d) => d.players.includes(opener))) {
+        const side = planned.sides[0].seats.includes(opener) ? 0 : 1;
+        const seats = planned.sides[side].seats;
+        const i = seats.indexOf(opener);
+        const turned = { ...planned.sides[side], seats: [...seats.slice(i), ...seats.slice(0, i)] };
+        planned = { ...planned, sides: side === 0 ? [turned, planned.sides[1]] : [planned.sides[0], turned] };
+      }
     }
     // A test lobby's own position for its first round (tests).
     const fen = this.r.test?.fen && round === this.r.test.start ? this.r.test.fen : null;

@@ -265,6 +265,15 @@ describe("squads v2 server: test lobbies and views", () => {
       const mine = pairs.find((m) => mineIn(m, tess))!;
       expect(halfDuties(mine.m).duties.some((d) => d.players.includes(tess))).toBe(true);
     }
+    // Relay on 3 boards (Nov 5): never the squad's waiting seat either, whatever the seed.
+    for (let seed = 1; seed < 9; seed++) {
+      const L = squadsLobby({ seed, test: { start: 0, white: true, mode: "classic" }, fillInMs: 5_000 });
+      const tess = L.join("Tess");
+      L.advance(5_000 + VOTES_MS + SQUADS_LOBBY.bracketIntroSeconds * 1000);
+      const mine = L.core.allMatches().find((m) => m.round === 0 && mineIn(m, tess))!;
+      expect(mine.m.boards).toHaveLength(3);
+      expect(halfDuties(mine.m).duties.some((d) => d.players.includes(tess))).toBe(true);
+    }
   });
 
   it("every player's match view carries each squad's tokens, block bank, the blocks in effect and the token log (Classic: no blocks)", () => {
