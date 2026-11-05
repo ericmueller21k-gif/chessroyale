@@ -6,7 +6,7 @@
  * nothing is held. Walls, the floor and people are the walker's own checks (`ok`). Nothing here allocates on a frame that walks
  * nowhere. No DOM beyond the window's key events, so the choices are tested on their own.
  */
-import type { Walker, Sq } from "./world.ts";
+import { screenRow, type Walker, type Sq } from "./world.ts";
 
 export type Dir = "up" | "down" | "left" | "right";
 
@@ -74,7 +74,7 @@ export function listenKeys(win: Window = window): () => void {
   };
 }
 
-/** One step on the grid: across (c) or along (r), by `dc` or `dr`. `axis` is the one it moves along (0 across, 1 along). */
+/** One step on the screen: across (c, +1 right) or along (r, +1 up the screen), by `dc` or `dr`. `axis` is the one it moves along (0 across, 1 along). */
 export interface KeyStep {
   dc: number;
   dr: number;
@@ -82,8 +82,8 @@ export interface KeyStep {
 }
 
 /**
- * The steps the held arrows ask for, most wanted first (written into `out`, two at most): up is along +1 (the town's rows run
- * away from you), right is across +1. Two held (a diagonal) gives both axes, the one the last step did not use first, so a
+ * The steps the held arrows ask for, most wanted first (written into `out`, two at most), as the screen sees them: up is along
+ * +1 (up the screen), right is across +1. (`keyWalk` turns along into the walker's rows: its `rowsUp`.) Two held (a diagonal) gives both axes, the one the last step did not use first, so a
  * diagonal is a staircase at the same pace as a walk. Opposite keys cancel. Returns how many (0: none). Writes into the
  * objects it's given: nothing is allocated (a frame may ask every frame).
  */
@@ -108,7 +108,8 @@ const setStep = (s: KeyStep, axis: 0 | 1, dc: number, dr: number): void => {
 };
 
 /**
- * Keeps `w` walking with the held arrows: `ok(c, r)` says whether a square can be stood on (a wall, the floor, someone's square:
+ * Keeps `w` walking with the held arrows, up the screen for up wherever it walks (Eric, Nov 5): a step along is turned into the
+ * walker's rows by its `rowsUp` (a shop's room runs its rows toward the camera, the town's away), here and nowhere else. `ok(c, r)` says whether a square can be stood on (a wall, the floor, someone's square:
  * the walker's own check), `wrap` brings a square into the world (the town's wraps; a room's doesn't). Returns `start`, to call each
  * frame while a direction is held: a walker standing still takes its first step. The walker asks `run` for the square after each
  * step it begins, so a held key keeps it going (no stop between squares); with no key held, the walk ends after the step it's on.
@@ -118,8 +119,8 @@ export function keyWalk(
   ok: (c: number, r: number) => boolean,
   wrap: (v: number) => number = (v) => v,
   /**
-   * The square a step `dc` across and `dr` along takes the walker to from (c, r) (null: none), when that isn't simply the next square
-   * (a shop's room: its rows run toward the camera, and Ginger's catwalk goes round a curve: room.ts `stepFor`). `ok` still decides.
+   * The square a step `dc` across and `dr` along the walker's rows (already turned by its `rowsUp`) takes it to from (c, r) (null:
+   * none), when that isn't simply the next square (Ginger's catwalk goes round a curve: room.ts `stepFor`). `ok` still decides.
    */
   to?: (c: number, r: number, dc: number, dr: number) => Sq | null,
 ): { start: () => void } {
@@ -132,10 +133,11 @@ export function keyWalk(
     const n = keySteps(lastAxis, steps);
     for (let i = 0; i < n; i++) {
       const s = steps[i]!;
-      const sq = to ? to(fc, fr, s.dc, s.dr) : null;
+      const dr = screenRow(s.dr, w.rowsUp);
+      const sq = to ? to(fc, fr, s.dc, dr) : null;
       if (to && !sq) continue;
       const c = sq ? sq.c : wrap(fc + s.dc);
-      const r = sq ? sq.r : wrap(fr + s.dr);
+      const r = sq ? sq.r : wrap(fr + dr);
       if (ok(c, r)) {
         lastAxis = s.axis;
         return sq ?? { c, r };
