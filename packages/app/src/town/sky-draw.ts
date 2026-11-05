@@ -232,8 +232,8 @@ export class SkyPainter {
     return this.stars;
   }
 
-  /** Draws the sky for this frame (before the ground, which covers whatever is below the horizon). */
-  draw(g: Ctx, v: View, camX: number, camY: number, now: number, dt: number): void {
+  /** Draws the sky for this frame (before the ground, which covers whatever is below the horizon); `slide`: the clouds slid left that many px (the street town's turn). */
+  draw(g: Ctx, v: View, camX: number, camY: number, now: number, dt: number, slide = 0): void {
     const { W, H } = this;
     const w = this.weights;
     const f = TOWN_FEEL;
@@ -275,7 +275,7 @@ export class SkyPainter {
     }
     // The clouds, up in the sky: drifting, and shifting a little as you walk.
     this.drift += dt * f.cloudDrift;
-    const off = -camX * v.kf * f.cloudParallax - camY * f.cloudParallaxAhead + this.drift;
+    const off = -camX * v.kf * f.cloudParallax - camY * f.cloudParallaxAhead + this.drift - slide;
     const sw = this.stripW;
     const px = f.cloudPixel;
     for (const l of LOOKS) {
