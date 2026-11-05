@@ -48,6 +48,8 @@ interface HomeSpec {
   door: number;
 }
 const ramp = (a: string, b: string, c: string) => ({ a, b, c });
+/** Ginger Igloo's dome: its faces high up iced, the rest gingerbread crumb. */
+const iced = (faces: Face[]): Face[] => faces.map((f) => (f.pts.reduce((s, p) => s + p[2], 0) / f.pts.length > 62 ? { ...f, tex: "icing" as const } : f));
 const roofRamp = (d: string, e: string, f: string) => ({ d, e, f });
 
 export const HOME_SPECS: Record<HomeId, HomeSpec> = {
@@ -88,7 +90,7 @@ export const HOME_SPECS: Record<HomeId, HomeSpec> = {
   },
   gingerbread: {
     body: [28, 104], eave: null, door: 71,
-    roof: domeRoof(28, 104, 4, 89, "crumb", 10, 5).map((f) => (f.pts.reduce((s, p) => s + p[2], 0) / f.pts.length > 62 ? { ...f, tex: "icing" as const } : f)),
+    roof: iced(domeRoof(28, 104, 4, 89, "crumb", 10, 5)),
     pal: { ...ramp("#7a4320", "#a8622f", "#c9884a"), t: "#ff6f9a", u: "#7fd36a", j: "#9fd4ff", G: "#e9e1f0" },
   },
   grex: {
@@ -172,10 +174,21 @@ function frontOf(id: HomeId): { ch: Character; lights: readonly LightSpot[]; sig
   const h = HOUSES[id === "blitz" ? "dash" : id];
   return { ch: h.ch, lights: h.lights, sign: h.sign };
 }
-const cache = new Map<HomeId, TownBox>();
-/** A home as a box (its lot is 4 squares across, Alfil's 6; 3 deep). */
-export function homeBox(id: HomeId): TownBox {
-  const hit = cache.get(id);
+/**
+ * The domes (and Boingo's vault) with fewer faces, for the 2D fallback (the art's notes, Nov 5: "draw each as one mesh in WebGL. On the
+ * 2D fallback, cut them to 6 x 3 faces"; code round 3).
+ */
+const LOW_ROOF: Partial<Record<HomeId, Face[]>> = {
+  gingerbread: iced(domeRoof(28, 104, 4, 89, "crumb", 6, 3)),
+  hopper: domeRoof(4, 140, 0, 68, "turf", 6, 3),
+  // (Boingo's barrel vault: four faces round instead of eight, so its funhouse keeps to the art's 12 to 20 draws.)
+  clown: [...vaultRoof(28, 116, 90, 111, "canvas", 4), ...blockF(14, 28, 0, 0.22, 0, 104, "slate"), ...blockF(116, 130, 0, 0.22, 0, 104, "slate")],
+};
+const cache = new Map<string, TownBox>();
+/** A home as a box (its lot is 4 squares across, Alfil's 6; 3 deep). `low`: its dome with fewer faces (the 2D fallback's). */
+export function homeBox(id: HomeId, low = false): TownBox {
+  low &&= !!LOW_ROOF[id];
+  const hit = cache.get(low ? `${id}-low` : id);
   if (hit) return hit;
   const s = HOME_SPECS[id];
   const f = frontOf(id);
@@ -196,11 +209,11 @@ export function homeBox(id: HomeId): TownBox {
     left: s.eave ? sideArt(`home-${id}-L`, pal, side, Math.round(slant), s.eave[0], true) : null,
     right: s.eave ? sideArt(`home-${id}-R`, pal, side, Math.round(slant), s.eave[1], false) : null,
     back: s.back ? sideArt(`home-${id}-B`, pal, s.back.side, Math.round((s.body[1] - s.body[0]) * (s.taper ?? 1)), s.back.h, false) : undefined,
-    roof: s.roof,
+    roof: (low && LOW_ROOF[id]) || s.roof,
     roofPal: pal,
     taper: s.taper ?? 1,
   };
-  cache.set(id, b);
+  cache.set(low ? `${id}-low` : id, b);
   return b;
 }
 export const HOME_DOOR_PX: Record<HomeId, number> = Object.fromEntries(Object.entries(HOME_SPECS).map(([k, v]) => [k, v.door])) as Record<HomeId, number>;

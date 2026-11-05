@@ -5,7 +5,8 @@ vi.mock("../src/town/admin-town.ts", () => ({ ADMIN_TOWN: true, STREET_TOWN: tru
 
 const { N, wrapI } = await import("../src/town/camera.ts");
 const PLAN = (await import("../src/town/street-plan.json")).default;
-const { STREET_BUILDINGS } = await import("../src/town/street.ts");
+const { ROW_GROUND, STREET_BUILDINGS, STREET_LOTS } = await import("../src/town/street.ts");
+const { ROW_SIDES } = await import("../src/town/rows.ts");
 const { ALL_HOMES, APRON, ARENA, BOARD_GROUND, COLISEUM, GARDEN, GRASS, HOMES, LAMPS, LOT, PARK, PAVING, PROPS, START, STATUES, TABLES, TOWN_BOTS, bossWalks, createTown, destFor, groundAt, homeDoor, inSquare, inWander, plotAt, stepsFrom, tick, walkable } =
   await import("../src/town/world.ts");
 
@@ -20,14 +21,23 @@ const lotOf = (id: string) => PLAN.lots.find((l) => l.kind === "home" && l.id ==
 const at = (c: number, r: number) => `${c},${r}`;
 
 describe("the street town's layout is the plan's (Nov 5)", () => {
-  it("is 46 x 46, every square's ground as the plan has it", () => {
+  it("is 46 x 46, every square's ground as the plan has it, the rows' squares lots (round 4: a row stands on them, drawn paved)", () => {
     expect(N).toBe(PLAN.size);
-    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) expect(groundAt[r * N + c], at(c, r)).toBe(KEY[PLAN.ground[r]![c]!]);
+    let rows = 0;
+    for (let r = 0; r < N; r++)
+      for (let c = 0; c < N; c++) {
+        const row = ROW_GROUND[r * N + c] === 1;
+        if (row) rows++;
+        expect(groundAt[r * N + c], at(c, r)).toBe(row ? LOT : KEY[PLAN.ground[r]![c]!]);
+        // (A row only stands on the plan's lots and gardens: never a street, a sidewalk or the park.)
+        if (row) expect("Lg", at(c, r)).toContain(PLAN.ground[r]![c]!);
+      }
+    expect(rows).toBeGreaterThan(400);
   });
 
-  it("starts you on the promenade just south of the fountain, (22, 11), on paving", () => {
+  it("starts you on the promenade just south of the fountain, (22, 17) (round 4: the plan's rows moved up 6), on paving", () => {
     expect(START).toEqual({ c: PLAN.start.c, r: PLAN.start.r });
-    expect(START).toEqual({ c: 22, r: 11 });
+    expect(START).toEqual({ c: 22, r: 17 });
     expect(PLAN.start.heading).toBe(0);
     expect(walkable(START.c, START.r)).toBe(true);
   });
@@ -52,18 +62,28 @@ describe("the street town's layout is the plan's (Nov 5)", () => {
     }
   });
 
-  it("stands every everyday building's front on its lot's front line (Seam Avenue's facing the camera for now), and every prop where the plan puts it", () => {
+  it("stands every row's front on its row's building line facing its street (round 4), the skyline's towers on their lots, and every prop where the plan puts it but under a row", () => {
     const fronts = PROPS.filter((p) => p.kind === "front");
     expect(fronts).toHaveLength(STREET_BUILDINGS.length);
-    expect(STREET_BUILDINGS).toHaveLength(PLAN.lots.filter((l) => l.kind !== "home").length);
+    // (The rows replace every everyday building; the tall ones stay, each a tower of look-alike parts.)
+    expect(STREET_BUILDINGS.filter((b) => b.kind === "tall")).toHaveLength(PLAN.lots.filter((l) => l.kind === "tall").length);
+    for (const b of STREET_BUILDINGS) {
+      expect(b.look && b.at, b.name).toBeTruthy();
+      if (b.kind === "tall") continue;
+      const side = ROW_SIDES.find((s) => s.street === b.street && s.facing === b.facing && Math.abs((b.facing === "S" || b.facing === "N" ? b.at!.y : b.at!.x) - (b.facing === "S" || b.facing === "W" ? s.d0 - 0.5 + s.inset : s.d0 + 0.5 - s.inset)) < 1e-9);
+      expect(side, b.name).toBeTruthy();
+    }
     for (const p of fronts) {
       const b = STREET_BUILDINGS[p.lot!]!;
-      expect(p.y, b.name).toBeCloseTo(b.r0 - 0.5 + b.inset, 9);
-      expect(p.x, b.name).toBe(b.facing === "S" ? b.c0 + (b.w - 1) / 2 : b.c0 + (b.d - 1) / 2);
+      expect([p.x, p.y], b.name).toEqual([b.at!.x, b.at!.y]);
     }
     const others = PROPS.filter((p) => p.kind !== "front").map((p) => ({ kind: p.kind, x: p.x, y: p.y, v: p.v }));
-    expect(others).toEqual(PLAN.props);
+    const under = (p: { kind: string; x: number; y: number }) => p.kind !== "lamp" && ROW_GROUND[wrapI(Math.round(p.y)) * N + wrapI(Math.round(p.x))] === 1;
+    expect(others).toEqual(PLAN.props.filter((p) => !under(p)));
     expect(LAMPS).toHaveLength(PLAN.props.filter((p) => p.kind === "lamp").length);
+    // (A lamp stands on a sidewalk, never under a row.)
+    for (const l of LAMPS) expect(ROW_GROUND[l.r * N + l.c], at(l.c, l.r)).toBe(0);
+    expect(STREET_LOTS.filter((l) => l.kind === "home")).toHaveLength(16);
   });
 
   it("walks on the streets, sidewalks and the park, round everything standing there, never on a lot, a garden or the Colosseum", () => {
@@ -95,7 +115,7 @@ describe("the street town's layout is the plan's (Nov 5)", () => {
 
 describe("the park: the plus with its twelve tables (Nov 5)", () => {
   it("has twelve tables where the plan has them, each with a stool west and east, the stools walkable and the tables not", () => {
-    expect(PARK).toEqual({ c0: 13, r1: 20, w: 20, d: 12 });
+    expect(PARK).toEqual({ c0: 13, r1: 26, w: 20, d: 12 });
     expect(TABLES).toHaveLength(12);
     expect(TABLES.map((t) => ({ c: t.c, r: t.r }))).toEqual(PLAN.park.tables);
     for (const t of TABLES) {

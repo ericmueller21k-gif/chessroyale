@@ -1,7 +1,17 @@
 {
  "size": 46,
- "conventions": "squares (c, r): c west to east, r south to north, wrapping; positions (x, y) in squares, a square's middle at whole numbers",
+ "conventions": "squares (c, r): c west to east (wrapping when wrap.ew), r south to north (row 0 the south edge, row 45 the north edge: no wrap); positions (x, y) in squares, a square's middle at whole numbers",
+ "wrap": {
+  "ew": true,
+  "ns": false
+ },
  "ground": [
+  "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL",
+  "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL",
+  "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL",
+  "==============================================",
+  "##############################################",
+  "##############################################",
   "##############################################",
   "##############################################",
   "##==========================================##",
@@ -28,26 +38,20 @@
   "##############################################",
   "##############################################",
   "##==========================================##",
-  "##=LLLLLLLLLLgggg============ggggLLLLLLLLLL=##",
-  "##=LLLLLLLLLLgggg============ggggLLLLLLLLLL=##",
-  "##=LLLLLLLLLLggggAAAAAAAAAAAAggggLLLLLLLLLL=##",
-  "##===========ggggAAAAAAAAAAAAgggg===========##",
-  "#############ggggAAAAAAAAAAAAgggg#############",
-  "#############ggggAAAAAAAAAAAAgggg#############",
-  "#############ggggAAAAAAAAAAAAgggg#############",
-  "#############ggggAAAAAAAAAAAAgggg#############",
-  "##===========ggggAAAAAAAAAAAAgggg===========##",
-  "##=LLLLLLLLLLggggAAAAAAAAAAAAggggLLLLLLLLLL=##",
-  "##=LLLLLLLLLLggggAAAAAAAAAAAAggggLLLLLLLLLL=##",
-  "##=LLLLLLLLLLggggAAAAAAAAAAAAggggLLLLLLLLLL=##",
-  "##=LLLLLLLgLLggggAAAAAAAAAAAAgggggLLLLgggLL=##",
-  "##=LLLLLLLgLLggggAAAAAAAAAAAAgggggLLLLgggLL=##",
-  "##=LLLLLLLgLLgggggggggggggggggggggLLLLgggLL=##",
-  "##=LLLggggggggggggggggggggggggggggggggggggg=##",
-  "##=LLLggggggggggggggggggggggggggggggggggggg=##",
-  "##==========================================##",
-  "##############################################",
-  "##############################################"
+  "##=LLLLLLLLLL====================LLLLLLLLLL=##",
+  "##=LLLLLLLLLL====================LLLLLLLLLL=##",
+  "##=LLLLLLLLLL====AAAAAAAAAAAA====LLLLLLLLLL=##",
+  "##===============AAAAAAAAAAAA===============##",
+  "#############====AAAAAAAAAAAA====#############",
+  "#############====AAAAAAAAAAAA====#############",
+  "#############====AAAAAAAAAAAA====#############",
+  "#############====AAAAAAAAAAAA====#############",
+  "=================AAAAAAAAAAAA=================",
+  "LLLLLLLLLLLLL====AAAAAAAAAAAA====LLLLLLLLLLLLL",
+  "LLLLLLLLLLLLL====AAAAAAAAAAAA====LLLLLLLLLLLLL",
+  "LLLLLLLLLLLLL====AAAAAAAAAAAA====LLLLLLLLLLLLL",
+  "gggLLLLLLLgLL====AAAAAAAAAAAA====gLLLLgggLLggg",
+  "gggLLLLLLLgLL====AAAAAAAAAAAA====gLLLLgggLLggg"
  ],
  "groundKey": {
   "#": "BOARD",
@@ -59,13 +63,13 @@
  },
  "streets": [
   {
-   "id": "seam-st",
-   "name": "Seam Street",
+   "id": "south-st",
+   "name": "South Street",
    "axis": "EW",
    "c0": 0,
    "c1": 45,
-   "r0": 44,
-   "r1": 47,
+   "r0": 4,
+   "r1": 7,
    "cam": 0
   },
   {
@@ -74,8 +78,8 @@
    "axis": "EW",
    "c0": 33,
    "c1": 58,
-   "r0": 13,
-   "r1": 16,
+   "r0": 19,
+   "r1": 22,
    "cam": 0
   },
   {
@@ -84,8 +88,8 @@
    "axis": "EW",
    "c0": 0,
    "c1": 45,
-   "r0": 21,
-   "r1": 24,
+   "r0": 27,
+   "r1": 30,
    "cam": 0
   },
   {
@@ -94,8 +98,8 @@
    "axis": "EW",
    "c0": 33,
    "c1": 58,
-   "r0": 30,
-   "r1": 33,
+   "r0": 36,
+   "r1": 39,
    "cam": 0
   },
   {
@@ -104,89 +108,27 @@
    "axis": "NS",
    "c0": 44,
    "c1": 47,
-   "r0": 0,
-   "r1": 45,
+   "r0": 4,
+   "r1": 39,
    "cam": 90
-  }
- ],
- "turnZones": [
-  {
-   "street": "seam-st",
-   "rows": [
-    43,
-    47
-   ]
-  },
-  {
-   "street": "fountain-st",
-   "rows": [
-    12,
-    17
-   ]
-  },
-  {
-   "street": "colosseum-row",
-   "rows": [
-    21,
-    25
-   ]
-  },
-  {
-   "street": "upper-st",
-   "rows": [
-    29,
-    34
-   ]
   }
  ],
  "start": {
   "c": 22,
-  "r": 11,
+  "r": 17,
   "heading": 0
  },
  "lots": [
-  {
-   "kind": "house",
-   "id": "bakery",
-   "v": 0,
-   "c0": 3,
-   "r0": 3,
-   "w": 3,
-   "d": 3,
-   "facing": "S",
-   "street": "seam-st",
-   "side": true,
-   "art": "building(\"bakery\", 3, 0)",
-   "name": "Bakery and cafe (Cream, red awning)",
-   "inset": 0.12,
-   "depth": 2.6
-  },
-  {
-   "kind": "house",
-   "id": "townhouse",
-   "v": 1,
-   "c0": 6,
-   "r0": 3,
-   "w": 2,
-   "d": 3,
-   "facing": "S",
-   "street": "seam-st",
-   "side": false,
-   "art": "building(\"townhouse\", 2, 1)",
-   "name": "Townhouse (Cream plaster, teal)",
-   "inset": 0.12,
-   "depth": 2.6
-  },
   {
    "kind": "home",
    "id": "gardener",
    "v": 0,
    "c0": 8,
-   "r0": 3,
+   "r0": 9,
    "w": 4,
    "d": 3,
    "facing": "S",
-   "street": "seam-st",
+   "street": "south-st",
    "side": false,
    "art": "homeBox(\"gardener\")",
    "name": "Puddles' Botanical Garden",
@@ -194,61 +136,29 @@
    "depth": 2.3,
    "door": {
     "c": 9,
-    "r": 2
+    "r": 8
    },
    "rest": {
     "c": 11,
-    "r": 2
+    "r": 8
    },
    "wander": {
     "x0": 7.7,
     "x1": 11.3,
-    "y0": 1.7,
-    "y1": 2.85
+    "y0": 7.7,
+    "y1": 8.85
    }
-  },
-  {
-   "kind": "house",
-   "id": "skinny",
-   "v": 0,
-   "c0": 12,
-   "r0": 3,
-   "w": 3,
-   "d": 3,
-   "facing": "S",
-   "street": "seam-st",
-   "side": false,
-   "art": "building(\"skinny\", 3, 0)",
-   "name": "Skinny houses (Mint, peach, lilac)",
-   "inset": 0.12,
-   "depth": 2.6
-  },
-  {
-   "kind": "house",
-   "id": "shop",
-   "v": 1,
-   "c0": 15,
-   "r0": 3,
-   "w": 2,
-   "d": 3,
-   "facing": "S",
-   "street": "seam-st",
-   "side": false,
-   "art": "building(\"shop\", 2, 1)",
-   "name": "Corner shop (Lilac, plum awning)",
-   "inset": 0.12,
-   "depth": 2.6
   },
   {
    "kind": "home",
    "id": "smudgy",
    "v": 0,
    "c0": 17,
-   "r0": 3,
+   "r0": 9,
    "w": 4,
    "d": 3,
    "facing": "S",
-   "street": "seam-st",
+   "street": "south-st",
    "side": false,
    "art": "homeBox(\"smudgy\")",
    "name": "Smudgy's Art Gallery",
@@ -256,17 +166,17 @@
    "depth": 2.3,
    "door": {
     "c": 19,
-    "r": 2
+    "r": 8
    },
    "rest": {
     "c": 17,
-    "r": 2
+    "r": 8
    },
    "wander": {
     "x0": 16.7,
     "x1": 20.3,
-    "y0": 1.7,
-    "y1": 2.85
+    "y0": 7.7,
+    "y1": 8.85
    }
   },
   {
@@ -274,11 +184,11 @@
    "id": "folio",
    "v": 0,
    "c0": 25,
-   "r0": 3,
+   "r0": 9,
    "w": 4,
    "d": 3,
    "facing": "S",
-   "street": "seam-st",
+   "street": "south-st",
    "side": false,
    "art": "homeBox(\"folio\")",
    "name": "Folio's Folded House",
@@ -286,61 +196,29 @@
    "depth": 2.3,
    "door": {
     "c": 26,
-    "r": 2
+    "r": 8
    },
    "rest": {
     "c": 25,
-    "r": 2
+    "r": 8
    },
    "wander": {
     "x0": 24.7,
     "x1": 28.3,
-    "y0": 1.7,
-    "y1": 2.85
+    "y0": 7.7,
+    "y1": 8.85
    }
-  },
-  {
-   "kind": "house",
-   "id": "townhouse",
-   "v": 2,
-   "c0": 29,
-   "r0": 3,
-   "w": 2,
-   "d": 3,
-   "facing": "S",
-   "street": "seam-st",
-   "side": false,
-   "art": "building(\"townhouse\", 2, 2)",
-   "name": "Townhouse (Grey brick, plum)",
-   "inset": 0.12,
-   "depth": 2.6
-  },
-  {
-   "kind": "house",
-   "id": "flats",
-   "v": 0,
-   "c0": 31,
-   "r0": 3,
-   "w": 3,
-   "d": 3,
-   "facing": "S",
-   "street": "seam-st",
-   "side": false,
-   "art": "building(\"flats\", 3, 0)",
-   "name": "Small flats (Red brick)",
-   "inset": 0.12,
-   "depth": 2.6
   },
   {
    "kind": "home",
    "id": "alfil",
    "v": 0,
    "c0": 34,
-   "r0": 3,
+   "r0": 9,
    "w": 6,
    "d": 3,
    "facing": "S",
-   "street": "seam-st",
+   "street": "south-st",
    "side": false,
    "art": "homeBox(\"alfil\")",
    "name": "Alfil's Pyramid",
@@ -348,41 +226,25 @@
    "depth": 2.3,
    "door": {
     "c": 37,
-    "r": 2
+    "r": 8
    },
    "rest": {
     "c": 34,
-    "r": 2
+    "r": 8
    },
    "wander": {
     "x0": 33.7,
     "x1": 39.3,
-    "y0": 1.7,
-    "y1": 2.85
+    "y0": 7.7,
+    "y1": 8.85
    }
-  },
-  {
-   "kind": "house",
-   "id": "cottage",
-   "v": 1,
-   "c0": 40,
-   "r0": 3,
-   "w": 3,
-   "d": 3,
-   "facing": "S",
-   "street": "seam-st",
-   "side": false,
-   "art": "building(\"cottage\", 3, 1)",
-   "name": "Cottage (Sky, slate roof)",
-   "inset": 0.12,
-   "depth": 2.6
   },
   {
    "kind": "home",
    "id": "timber",
    "v": 0,
    "c0": 3,
-   "r0": 18,
+   "r0": 24,
    "w": 4,
    "d": 3,
    "facing": "S",
@@ -394,41 +256,25 @@
    "depth": 2.3,
    "door": {
     "c": 4,
-    "r": 17
+    "r": 23
    },
    "rest": {
     "c": 6,
-    "r": 17
+    "r": 23
    },
    "wander": {
     "x0": 2.7,
     "x1": 6.3,
-    "y0": 16.7,
-    "y1": 17.85
+    "y0": 22.7,
+    "y1": 23.85
    }
-  },
-  {
-   "kind": "house",
-   "id": "townhouse",
-   "v": 0,
-   "c0": 7,
-   "r0": 18,
-   "w": 2,
-   "d": 3,
-   "facing": "S",
-   "street": "fountain-st",
-   "side": false,
-   "art": "building(\"townhouse\", 2, 0)",
-   "name": "Townhouse (Red brick, slate)",
-   "inset": 0.12,
-   "depth": 2.6
   },
   {
    "kind": "home",
    "id": "sawyer",
    "v": 0,
    "c0": 9,
-   "r0": 18,
+   "r0": 24,
    "w": 4,
    "d": 3,
    "facing": "S",
@@ -440,17 +286,17 @@
    "depth": 2.3,
    "door": {
     "c": 10,
-    "r": 17
+    "r": 23
    },
    "rest": {
     "c": 12,
-    "r": 17
+    "r": 23
    },
    "wander": {
     "x0": 8.7,
     "x1": 12.3,
-    "y0": 16.7,
-    "y1": 17.85
+    "y0": 22.7,
+    "y1": 23.85
    }
   },
   {
@@ -458,7 +304,7 @@
    "id": "gingerbread",
    "v": 0,
    "c0": 33,
-   "r0": 18,
+   "r0": 24,
    "w": 4,
    "d": 3,
    "facing": "S",
@@ -470,17 +316,17 @@
    "depth": 2.3,
    "door": {
     "c": 34,
-    "r": 17
+    "r": 23
    },
    "rest": {
     "c": 36,
-    "r": 17
+    "r": 23
    },
    "wander": {
     "x0": 32.7,
     "x1": 36.3,
-    "y0": 16.7,
-    "y1": 17.85
+    "y0": 22.7,
+    "y1": 23.85
    }
   },
   {
@@ -488,7 +334,7 @@
    "id": "grex",
    "v": 0,
    "c0": 37,
-   "r0": 18,
+   "r0": 24,
    "w": 4,
    "d": 3,
    "facing": "S",
@@ -500,41 +346,25 @@
    "depth": 2.3,
    "door": {
     "c": 39,
-    "r": 17
+    "r": 23
    },
    "rest": {
     "c": 37,
-    "r": 17
+    "r": 23
    },
    "wander": {
     "x0": 36.7,
     "x1": 40.3,
-    "y0": 16.7,
-    "y1": 17.85
+    "y0": 22.7,
+    "y1": 23.85
    }
-  },
-  {
-   "kind": "house",
-   "id": "shop",
-   "v": 2,
-   "c0": 41,
-   "r0": 18,
-   "w": 2,
-   "d": 3,
-   "facing": "S",
-   "street": "fountain-st",
-   "side": false,
-   "art": "building(\"shop\", 2, 2)",
-   "name": "Corner shop (Sky, red awning)",
-   "inset": 0.12,
-   "depth": 2.6
   },
   {
    "kind": "home",
    "id": "clown",
    "v": 0,
    "c0": 3,
-   "r0": 26,
+   "r0": 32,
    "w": 4,
    "d": 3,
    "facing": "S",
@@ -546,41 +376,25 @@
    "depth": 2.3,
    "door": {
     "c": 5,
-    "r": 25
+    "r": 31
    },
    "rest": {
     "c": 3,
-    "r": 25
+    "r": 31
    },
    "wander": {
     "x0": 2.7,
     "x1": 6.3,
-    "y0": 24.7,
-    "y1": 25.85
+    "y0": 30.7,
+    "y1": 31.85
    }
-  },
-  {
-   "kind": "house",
-   "id": "shop",
-   "v": 0,
-   "c0": 7,
-   "r0": 26,
-   "w": 2,
-   "d": 3,
-   "facing": "S",
-   "street": "colosseum-row",
-   "side": false,
-   "art": "building(\"shop\", 2, 0)",
-   "name": "Corner shop (Butter, green awning)",
-   "inset": 0.12,
-   "depth": 2.6
   },
   {
    "kind": "home",
    "id": "tiger",
    "v": 0,
    "c0": 9,
-   "r0": 26,
+   "r0": 32,
    "w": 4,
    "d": 3,
    "facing": "S",
@@ -592,17 +406,17 @@
    "depth": 2.3,
    "door": {
     "c": 10,
-    "r": 25
+    "r": 31
    },
    "rest": {
     "c": 12,
-    "r": 25
+    "r": 31
    },
    "wander": {
     "x0": 8.7,
     "x1": 12.3,
-    "y0": 24.7,
-    "y1": 25.85
+    "y0": 30.7,
+    "y1": 31.85
    }
   },
   {
@@ -610,7 +424,7 @@
    "id": "bigboy",
    "v": 0,
    "c0": 33,
-   "r0": 26,
+   "r0": 32,
    "w": 4,
    "d": 3,
    "facing": "S",
@@ -622,41 +436,25 @@
    "depth": 2.3,
    "door": {
     "c": 35,
-    "r": 25
+    "r": 31
    },
    "rest": {
     "c": 33,
-    "r": 25
+    "r": 31
    },
    "wander": {
     "x0": 32.7,
     "x1": 36.3,
-    "y0": 24.7,
-    "y1": 25.85
+    "y0": 30.7,
+    "y1": 31.85
    }
-  },
-  {
-   "kind": "house",
-   "id": "townhouse",
-   "v": 1,
-   "c0": 37,
-   "r0": 26,
-   "w": 2,
-   "d": 3,
-   "facing": "S",
-   "street": "colosseum-row",
-   "side": false,
-   "art": "building(\"townhouse\", 2, 1)",
-   "name": "Townhouse (Cream plaster, teal)",
-   "inset": 0.12,
-   "depth": 2.6
   },
   {
    "kind": "home",
    "id": "blitz",
    "v": 0,
    "c0": 39,
-   "r0": 26,
+   "r0": 32,
    "w": 4,
    "d": 3,
    "facing": "S",
@@ -668,17 +466,17 @@
    "depth": 2.3,
    "door": {
     "c": 41,
-    "r": 25
+    "r": 31
    },
    "rest": {
     "c": 39,
-    "r": 25
+    "r": 31
    },
    "wander": {
     "x0": 38.7,
     "x1": 42.3,
-    "y0": 24.7,
-    "y1": 25.85
+    "y0": 30.7,
+    "y1": 31.85
    }
   },
   {
@@ -686,7 +484,7 @@
    "id": "hopper",
    "v": 0,
    "c0": 3,
-   "r0": 35,
+   "r0": 41,
    "w": 4,
    "d": 3,
    "facing": "S",
@@ -698,41 +496,25 @@
    "depth": 2.3,
    "door": {
     "c": 5,
-    "r": 34
+    "r": 40
    },
    "rest": {
     "c": 3,
-    "r": 34
+    "r": 40
    },
    "wander": {
     "x0": 2.7,
     "x1": 6.3,
-    "y0": 33.7,
-    "y1": 34.85
+    "y0": 39.7,
+    "y1": 40.85
    }
-  },
-  {
-   "kind": "house",
-   "id": "cottage",
-   "v": 2,
-   "c0": 7,
-   "r0": 35,
-   "w": 2,
-   "d": 3,
-   "facing": "S",
-   "street": "upper-st",
-   "side": false,
-   "art": "building(\"cottage\", 2, 2)",
-   "name": "Cottage (Rose, green roof)",
-   "inset": 0.12,
-   "depth": 2.6
   },
   {
    "kind": "home",
    "id": "pig",
    "v": 0,
    "c0": 9,
-   "r0": 35,
+   "r0": 41,
    "w": 4,
    "d": 3,
    "facing": "S",
@@ -744,17 +526,17 @@
    "depth": 2.3,
    "door": {
     "c": 11,
-    "r": 34
+    "r": 40
    },
    "rest": {
     "c": 9,
-    "r": 34
+    "r": 40
    },
    "wander": {
     "x0": 8.7,
     "x1": 12.3,
-    "y0": 33.7,
-    "y1": 34.85
+    "y0": 39.7,
+    "y1": 40.85
    }
   },
   {
@@ -762,7 +544,7 @@
    "id": "moo",
    "v": 0,
    "c0": 33,
-   "r0": 35,
+   "r0": 41,
    "w": 4,
    "d": 3,
    "facing": "S",
@@ -774,17 +556,17 @@
    "depth": 2.3,
    "door": {
     "c": 35,
-    "r": 34
+    "r": 40
    },
    "rest": {
     "c": 33,
-    "r": 34
+    "r": 40
    },
    "wander": {
     "x0": 32.7,
     "x1": 36.3,
-    "y0": 33.7,
-    "y1": 34.85
+    "y0": 39.7,
+    "y1": 40.85
    }
   },
   {
@@ -792,7 +574,7 @@
    "id": "hollow",
    "v": 0,
    "c0": 37,
-   "r0": 35,
+   "r0": 41,
    "w": 4,
    "d": 3,
    "facing": "S",
@@ -804,105 +586,29 @@
    "depth": 2.3,
    "door": {
     "c": 39,
-    "r": 34
+    "r": 40
    },
    "rest": {
     "c": 37,
-    "r": 34
+    "r": 40
    },
    "wander": {
     "x0": 36.7,
     "x1": 40.3,
-    "y0": 33.7,
-    "y1": 34.85
+    "y0": 39.7,
+    "y1": 40.85
    }
-  },
-  {
-   "kind": "house",
-   "id": "skinny",
-   "v": 1,
-   "c0": 41,
-   "r0": 35,
-   "w": 2,
-   "d": 3,
-   "facing": "S",
-   "street": "upper-st",
-   "side": false,
-   "art": "building(\"skinny\", 2, 1)",
-   "name": "Skinny houses (Sky, butter, rose)",
-   "inset": 0.12,
-   "depth": 2.6
-  },
-  {
-   "kind": "house",
-   "id": "flats",
-   "v": 1,
-   "c0": 3,
-   "r0": 6,
-   "w": 3,
-   "d": 3,
-   "facing": "W",
-   "street": "seam-ave",
-   "art": "building(\"flats\", 3, 1)",
-   "name": "Small flats (Tan brick)",
-   "inset": 0.12,
-   "depth": 2.6
-  },
-  {
-   "kind": "house",
-   "id": "skinny",
-   "v": 2,
-   "c0": 3,
-   "r0": 9,
-   "w": 3,
-   "d": 3,
-   "facing": "W",
-   "street": "seam-ave",
-   "art": "building(\"skinny\", 3, 2)",
-   "name": "Skinny houses (Sage, cream, peach)",
-   "inset": 0.12,
-   "depth": 2.6
-  },
-  {
-   "kind": "house",
-   "id": "cottage",
-   "v": 0,
-   "c0": 3,
-   "r0": 38,
-   "w": 3,
-   "d": 3,
-   "facing": "W",
-   "street": "seam-ave",
-   "art": "building(\"cottage\", 3, 0)",
-   "name": "Cottage (Butter, red roof)",
-   "inset": 0.12,
-   "depth": 2.6
-  },
-  {
-   "kind": "house",
-   "id": "townhouse",
-   "v": 2,
-   "c0": 3,
-   "r0": 41,
-   "w": 2,
-   "d": 3,
-   "facing": "W",
-   "street": "seam-ave",
-   "art": "building(\"townhouse\", 2, 2)",
-   "name": "Townhouse (Grey brick, plum)",
-   "inset": 0.12,
-   "depth": 2.6
   },
   {
    "kind": "tall",
    "id": "block",
    "v": 0,
    "c0": 6,
-   "r0": 6,
+   "r0": 12,
    "w": 4,
    "d": 3,
    "facing": "S",
-   "street": "seam-st",
+   "street": "south-st",
    "art": "building(\"block\", 4, 0)",
    "name": "Big block (behind) (Red brick)",
    "inset": 0.3,
@@ -913,11 +619,11 @@
    "id": "tower",
    "v": 0,
    "c0": 14,
-   "r0": 6,
+   "r0": 12,
    "w": 2,
    "d": 3,
    "facing": "S",
-   "street": "seam-st",
+   "street": "south-st",
    "art": "building(\"tower\", 2, 0)",
    "name": "Clock tower (behind) (Warm stone, slate)",
    "inset": 0.3,
@@ -928,11 +634,11 @@
    "id": "block",
    "v": 1,
    "c0": 17,
-   "r0": 6,
+   "r0": 12,
    "w": 4,
    "d": 3,
    "facing": "S",
-   "street": "seam-st",
+   "street": "south-st",
    "art": "building(\"block\", 4, 1)",
    "name": "Big block (behind) (Brown brick)",
    "inset": 0.3,
@@ -943,11 +649,11 @@
    "id": "block",
    "v": 2,
    "c0": 27,
-   "r0": 6,
+   "r0": 12,
    "w": 4,
    "d": 3,
    "facing": "S",
-   "street": "seam-st",
+   "street": "south-st",
    "art": "building(\"block\", 4, 2)",
    "name": "Big block (behind) (Grey brick)",
    "inset": 0.3,
@@ -958,11 +664,11 @@
    "id": "tower",
    "v": 1,
    "c0": 33,
-   "r0": 6,
+   "r0": 12,
    "w": 2,
    "d": 3,
    "facing": "S",
-   "street": "seam-st",
+   "street": "south-st",
    "art": "building(\"tower\", 2, 1)",
    "name": "Clock tower (behind) (Grey stone, green copper)",
    "inset": 0.3,
@@ -973,11 +679,11 @@
    "id": "block",
    "v": 0,
    "c0": 38,
-   "r0": 6,
+   "r0": 12,
    "w": 4,
    "d": 3,
    "facing": "S",
-   "street": "seam-st",
+   "street": "south-st",
    "art": "building(\"block\", 4, 0)",
    "name": "Big block (behind) (Red brick)",
    "inset": 0.3,
@@ -988,9 +694,9 @@
    "id": "block",
    "v": 1,
    "c0": 6,
-   "r0": 38,
+   "r0": 44,
    "w": 4,
-   "d": 3,
+   "d": 2,
    "facing": "S",
    "street": "upper-st",
    "art": "building(\"block\", 4, 1)",
@@ -1003,9 +709,9 @@
    "id": "tower",
    "v": 2,
    "c0": 11,
-   "r0": 38,
+   "r0": 44,
    "w": 2,
-   "d": 3,
+   "d": 2,
    "facing": "S",
    "street": "upper-st",
    "art": "building(\"tower\", 2, 2)",
@@ -1018,9 +724,9 @@
    "id": "block",
    "v": 2,
    "c0": 34,
-   "r0": 38,
+   "r0": 44,
    "w": 4,
-   "d": 3,
+   "d": 2,
    "facing": "S",
    "street": "upper-st",
    "art": "building(\"block\", 4, 2)",
@@ -1033,9 +739,9 @@
    "id": "tower",
    "v": 0,
    "c0": 41,
-   "r0": 38,
+   "r0": 44,
    "w": 2,
-   "d": 3,
+   "d": 2,
    "facing": "S",
    "street": "upper-st",
    "art": "building(\"tower\", 2, 0)",
@@ -1046,7 +752,7 @@
  ],
  "park": {
   "c0": 13,
-  "r1": 20,
+  "r1": 26,
   "w": 20,
   "d": 12,
   "plan": [
@@ -1066,94 +772,94 @@
   "tables": [
    {
     "c": 19,
-    "r": 19
+    "r": 25
    },
    {
     "c": 26,
-    "r": 19
+    "r": 25
    },
    {
     "c": 15,
-    "r": 17
+    "r": 23
    },
    {
     "c": 19,
-    "r": 17
+    "r": 23
    },
    {
     "c": 26,
-    "r": 17
+    "r": 23
    },
    {
     "c": 30,
-    "r": 17
+    "r": 23
    },
    {
     "c": 15,
-    "r": 12
+    "r": 18
    },
    {
     "c": 19,
-    "r": 12
+    "r": 18
    },
    {
     "c": 26,
-    "r": 12
+    "r": 18
    },
    {
     "c": 30,
-    "r": 12
+    "r": 18
    },
    {
     "c": 19,
-    "r": 10
+    "r": 16
    },
    {
     "c": 26,
-    "r": 10
+    "r": 16
    }
   ],
   "fountain": [
    {
     "c": 22,
-    "r": 15
+    "r": 21
    },
    {
     "c": 23,
-    "r": 15
+    "r": 21
    },
    {
     "c": 22,
-    "r": 14
+    "r": 20
    },
    {
     "c": 23,
-    "r": 14
+    "r": 20
    }
   ]
  },
  "coliseum": {
   "c0": 17,
-  "r0": 28,
+  "r0": 34,
   "size": 12,
   "statues": [
    {
     "c": 17,
-    "r": 27
+    "r": 33
    },
    {
     "c": 28,
-    "r": 27
+    "r": 33
    }
   ],
   "gate": [
    {
     "c": 22,
-    "r": 27
+    "r": 33
    },
    {
     "c": 23,
-    "r": 27
+    "r": 33
    }
   ]
  },
@@ -1161,1490 +867,884 @@
   {
    "kind": "lamp",
    "x": 13,
-   "y": 20,
+   "y": 26,
    "v": 0
   },
   {
    "kind": "lamp",
    "x": 20,
-   "y": 20,
+   "y": 26,
    "v": 0
   },
   {
    "kind": "lamp",
    "x": 25,
-   "y": 20,
+   "y": 26,
    "v": 0
   },
   {
    "kind": "lamp",
    "x": 32,
-   "y": 20,
+   "y": 26,
    "v": 0
   },
   {
    "kind": "tree",
    "x": 15,
-   "y": 19,
+   "y": 25,
    "v": 2
   },
   {
    "kind": "table",
    "x": 19,
-   "y": 19,
+   "y": 25,
    "v": 0
   },
   {
    "kind": "table",
    "x": 26,
-   "y": 19,
+   "y": 25,
    "v": 0
   },
   {
    "kind": "tree",
    "x": 30,
-   "y": 19,
+   "y": 25,
    "v": 2
   },
   {
    "kind": "tree",
    "x": 14,
-   "y": 18,
+   "y": 24,
    "v": 1
   },
   {
    "kind": "bench",
    "x": 17,
-   "y": 18,
+   "y": 24,
    "v": 0
   },
   {
    "kind": "bench",
    "x": 28,
-   "y": 18,
+   "y": 24,
    "v": 0
   },
   {
    "kind": "tree",
    "x": 31,
-   "y": 18,
+   "y": 24,
    "v": 0
   },
   {
    "kind": "lamp",
    "x": 13,
-   "y": 17,
+   "y": 23,
    "v": 0
   },
   {
    "kind": "table",
    "x": 15,
-   "y": 17,
+   "y": 23,
    "v": 0
   },
   {
    "kind": "table",
    "x": 19,
-   "y": 17,
+   "y": 23,
    "v": 0
   },
   {
    "kind": "table",
    "x": 26,
-   "y": 17,
+   "y": 23,
    "v": 0
   },
   {
    "kind": "table",
    "x": 30,
-   "y": 17,
+   "y": 23,
    "v": 0
   },
   {
    "kind": "lamp",
    "x": 32,
-   "y": 17,
+   "y": 23,
    "v": 0
   },
   {
    "kind": "fountain",
    "x": 22.5,
-   "y": 13.5,
+   "y": 19.5,
    "v": 0
   },
   {
    "kind": "lamp",
    "x": 13,
-   "y": 12,
-   "v": 0
-  },
-  {
-   "kind": "table",
-   "x": 15,
-   "y": 12,
-   "v": 0
-  },
-  {
-   "kind": "table",
-   "x": 19,
-   "y": 12,
-   "v": 0
-  },
-  {
-   "kind": "table",
-   "x": 26,
-   "y": 12,
-   "v": 0
-  },
-  {
-   "kind": "table",
-   "x": 30,
-   "y": 12,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 32,
-   "y": 12,
-   "v": 0
-  },
-  {
-   "kind": "tree",
-   "x": 14,
-   "y": 11,
-   "v": 1
-  },
-  {
-   "kind": "bench",
-   "x": 17,
-   "y": 11,
-   "v": 0
-  },
-  {
-   "kind": "bench",
-   "x": 28,
-   "y": 11,
-   "v": 0
-  },
-  {
-   "kind": "tree",
-   "x": 31,
-   "y": 11,
-   "v": 0
-  },
-  {
-   "kind": "tree",
-   "x": 15,
-   "y": 10,
-   "v": 2
-  },
-  {
-   "kind": "table",
-   "x": 19,
-   "y": 10,
-   "v": 0
-  },
-  {
-   "kind": "table",
-   "x": 26,
-   "y": 10,
-   "v": 0
-  },
-  {
-   "kind": "tree",
-   "x": 30,
-   "y": 10,
-   "v": 2
-  },
-  {
-   "kind": "lamp",
-   "x": 13,
-   "y": 9,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 20,
-   "y": 9,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 25,
-   "y": 9,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 32,
-   "y": 9,
-   "v": 0
-  },
-  {
-   "kind": "tree",
-   "x": 13.5,
-   "y": 26,
-   "v": 0
-  },
-  {
-   "kind": "tree",
-   "x": 15.5,
-   "y": 27,
-   "v": 2
-  },
-  {
-   "kind": "tree",
-   "x": 29.5,
-   "y": 26,
-   "v": 1
-  },
-  {
-   "kind": "tree",
-   "x": 31.5,
-   "y": 27,
-   "v": 0
-  },
-  {
-   "kind": "tree",
-   "x": 13.5,
-   "y": 28,
-   "v": 2
-  },
-  {
-   "kind": "tree",
-   "x": 15.5,
-   "y": 29,
-   "v": 1
-  },
-  {
-   "kind": "tree",
-   "x": 29.5,
-   "y": 28,
-   "v": 0
-  },
-  {
-   "kind": "tree",
-   "x": 31.5,
-   "y": 29,
-   "v": 2
-  },
-  {
-   "kind": "tree",
-   "x": 13.5,
-   "y": 30,
-   "v": 1
-  },
-  {
-   "kind": "tree",
-   "x": 15.5,
-   "y": 31,
-   "v": 0
-  },
-  {
-   "kind": "tree",
-   "x": 29.5,
-   "y": 30,
-   "v": 2
-  },
-  {
-   "kind": "tree",
-   "x": 31.5,
-   "y": 31,
-   "v": 1
-  },
-  {
-   "kind": "tree",
-   "x": 13.5,
-   "y": 32,
-   "v": 0
-  },
-  {
-   "kind": "tree",
-   "x": 15.5,
-   "y": 33,
-   "v": 2
-  },
-  {
-   "kind": "tree",
-   "x": 29.5,
-   "y": 32,
-   "v": 1
-  },
-  {
-   "kind": "tree",
-   "x": 31.5,
-   "y": 33,
-   "v": 0
-  },
-  {
-   "kind": "tree",
-   "x": 13.5,
-   "y": 34,
-   "v": 2
-  },
-  {
-   "kind": "tree",
-   "x": 15.5,
-   "y": 35,
-   "v": 1
-  },
-  {
-   "kind": "tree",
-   "x": 29.5,
-   "y": 34,
-   "v": 0
-  },
-  {
-   "kind": "tree",
-   "x": 31.5,
-   "y": 35,
-   "v": 2
-  },
-  {
-   "kind": "tree",
-   "x": 13.5,
-   "y": 36,
-   "v": 1
-  },
-  {
-   "kind": "tree",
-   "x": 15.5,
-   "y": 37,
-   "v": 0
-  },
-  {
-   "kind": "tree",
-   "x": 29.5,
-   "y": 36,
-   "v": 2
-  },
-  {
-   "kind": "tree",
-   "x": 31.5,
-   "y": 37,
-   "v": 1
-  },
-  {
-   "kind": "tree",
-   "x": 13.5,
-   "y": 38,
-   "v": 0
-  },
-  {
-   "kind": "tree",
-   "x": 15.5,
-   "y": 39,
-   "v": 2
-  },
-  {
-   "kind": "tree",
-   "x": 29.5,
-   "y": 38,
-   "v": 1
-  },
-  {
-   "kind": "tree",
-   "x": 31.5,
-   "y": 39,
-   "v": 0
-  },
-  {
-   "kind": "tree",
-   "x": 13.5,
-   "y": 40,
-   "v": 2
-  },
-  {
-   "kind": "tree",
-   "x": 15.5,
-   "y": 41,
-   "v": 1
-  },
-  {
-   "kind": "tree",
-   "x": 29.5,
-   "y": 40,
-   "v": 0
-  },
-  {
-   "kind": "tree",
-   "x": 31.5,
-   "y": 41,
-   "v": 2
-  },
-  {
-   "kind": "tree",
-   "x": 13.5,
-   "y": 42,
-   "v": 1
-  },
-  {
-   "kind": "tree",
-   "x": 15.5,
-   "y": 43,
-   "v": 0
-  },
-  {
-   "kind": "tree",
-   "x": 29.5,
-   "y": 42,
-   "v": 2
-  },
-  {
-   "kind": "tree",
-   "x": 31.5,
-   "y": 43,
-   "v": 1
-  },
-  {
-   "kind": "tree",
-   "x": 17.5,
-   "y": 40.5,
-   "v": 2
-  },
-  {
-   "kind": "tree",
-   "x": 17.5,
-   "y": 42,
-   "v": 2
-  },
-  {
-   "kind": "tree",
-   "x": 19.5,
-   "y": 40.5,
-   "v": 1
-  },
-  {
-   "kind": "tree",
-   "x": 19.5,
-   "y": 42,
-   "v": 1
-  },
-  {
-   "kind": "tree",
-   "x": 21.5,
-   "y": 40.5,
-   "v": 0
-  },
-  {
-   "kind": "tree",
-   "x": 21.5,
-   "y": 42,
-   "v": 0
-  },
-  {
-   "kind": "tree",
-   "x": 23.5,
-   "y": 40.5,
-   "v": 2
-  },
-  {
-   "kind": "tree",
-   "x": 23.5,
-   "y": 42,
-   "v": 2
-  },
-  {
-   "kind": "tree",
-   "x": 25.5,
-   "y": 40.5,
-   "v": 1
-  },
-  {
-   "kind": "tree",
-   "x": 25.5,
-   "y": 42,
-   "v": 1
-  },
-  {
-   "kind": "tree",
-   "x": 27.5,
-   "y": 40.5,
-   "v": 0
-  },
-  {
-   "kind": "tree",
-   "x": 27.5,
-   "y": 42,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 4,
-   "y": 12,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 5,
-   "y": 17,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 4,
-   "y": 25,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 4,
-   "y": 29,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 4,
-   "y": 34,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 10,
-   "y": 12,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 11,
-   "y": 17,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 11,
-   "y": 25,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 10,
-   "y": 29,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 10,
-   "y": 34,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 34,
-   "y": 12,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 35,
-   "y": 17,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 34,
-   "y": 25,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 34,
-   "y": 29,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 34,
-   "y": 34,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 40,
-   "y": 12,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 40,
-   "y": 17,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 40,
-   "y": 25,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 40,
-   "y": 29,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 40,
-   "y": 34,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 7,
-   "y": 2,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 13,
-   "y": 2,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 20,
-   "y": 2,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 31,
-   "y": 2,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 38,
-   "y": 2,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 43,
-   "y": 2,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 4,
-   "y": 43,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 10,
-   "y": 43,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 16,
-   "y": 43,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 22,
-   "y": 43,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 28,
-   "y": 43,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 34,
-   "y": 43,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 40,
-   "y": 43,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 2,
-   "y": 4,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 43,
-   "y": 7,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 2,
-   "y": 10,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 43,
-   "y": 19,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 43,
-   "y": 25,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 2,
-   "y": 28,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 2,
-   "y": 34,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 43,
-   "y": 37,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 2,
-   "y": 40,
-   "v": 0
-  },
-  {
-   "kind": "lamp",
-   "x": 43,
-   "y": 43,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 3,
-   "y": 42.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 3,
-   "y": 11.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 3,
-   "y": 28.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 3,
-   "y": 20.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 4,
-   "y": 42.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 4,
-   "y": 11.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 4,
-   "y": 28.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 4,
-   "y": 20.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 5,
-   "y": 42.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 5,
-   "y": 11.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 5,
-   "y": 28.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 5,
-   "y": 20.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 6,
-   "y": 42.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 6,
-   "y": 11.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 6,
-   "y": 28.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 6,
-   "y": 20.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 7,
-   "y": 42.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 7,
-   "y": 11.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 7,
-   "y": 28.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 7,
-   "y": 20.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 8,
-   "y": 42.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 8,
-   "y": 11.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 8,
-   "y": 28.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 8,
-   "y": 20.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 9,
-   "y": 42.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 9,
-   "y": 11.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 9,
-   "y": 28.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 9,
-   "y": 20.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 10,
-   "y": 42.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 10,
-   "y": 11.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 10,
-   "y": 28.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 10,
-   "y": 20.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 11,
-   "y": 42.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 11,
-   "y": 11.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 11,
-   "y": 28.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 11,
-   "y": 20.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 12,
-   "y": 42.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 12,
-   "y": 11.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 12,
-   "y": 28.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 12,
-   "y": 20.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 13,
-   "y": 42.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 13,
-   "y": 28.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 14,
-   "y": 42.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 14,
-   "y": 28.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 15,
-   "y": 42.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 15,
-   "y": 28.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 16,
-   "y": 42.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 16,
-   "y": 28.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 17,
-   "y": 42.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 18,
-   "y": 42.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 19,
-   "y": 42.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 20,
-   "y": 42.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 21,
-   "y": 42.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 22,
-   "y": 42.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 23,
-   "y": 42.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 24,
-   "y": 42.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 25,
-   "y": 42.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 26,
-   "y": 42.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 27,
-   "y": 42.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 28,
-   "y": 42.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 29,
-   "y": 42.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 29,
-   "y": 28.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 30,
-   "y": 42.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 30,
-   "y": 28.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 31,
-   "y": 42.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 31,
-   "y": 28.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 32,
-   "y": 42.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 32,
-   "y": 28.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 33,
-   "y": 42.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 33,
-   "y": 11.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 33,
-   "y": 28.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 33,
-   "y": 20.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 34,
-   "y": 42.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 34,
-   "y": 11.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 34,
-   "y": 28.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 34,
-   "y": 20.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 35,
-   "y": 42.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 35,
-   "y": 11.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 35,
-   "y": 28.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 35,
-   "y": 20.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 36,
-   "y": 42.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 36,
-   "y": 11.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 36,
-   "y": 28.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 36,
-   "y": 20.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 37,
-   "y": 42.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 37,
-   "y": 11.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 37,
-   "y": 28.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 37,
-   "y": 20.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 38,
-   "y": 42.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 38,
-   "y": 11.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 38,
-   "y": 28.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 38,
-   "y": 20.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 39,
-   "y": 42.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 39,
-   "y": 11.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 39,
-   "y": 28.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 39,
-   "y": 20.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 40,
-   "y": 42.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 40,
-   "y": 11.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 40,
-   "y": 28.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 40,
-   "y": 20.45,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 41,
-   "y": 42.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 41,
-   "y": 11.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 41,
-   "y": 28.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 41,
-   "y": 20.45,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 42,
-   "y": 42.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 42,
-   "y": 11.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 42,
-   "y": 28.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 42,
-   "y": 20.45,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 42.45,
-   "y": 3,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 42.45,
-   "y": 4,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 42.45,
-   "y": 5,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 42.45,
-   "y": 6,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 42.45,
-   "y": 7,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 42.45,
-   "y": 8,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 42.45,
-   "y": 9,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 42.45,
-   "y": 10,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 42.45,
-   "y": 11,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 42.45,
    "y": 18,
    "v": 0
   },
   {
+   "kind": "table",
+   "x": 15,
+   "y": 18,
+   "v": 0
+  },
+  {
+   "kind": "table",
+   "x": 19,
+   "y": 18,
+   "v": 0
+  },
+  {
+   "kind": "table",
+   "x": 26,
+   "y": 18,
+   "v": 0
+  },
+  {
+   "kind": "table",
+   "x": 30,
+   "y": 18,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 32,
+   "y": 18,
+   "v": 0
+  },
+  {
+   "kind": "tree",
+   "x": 14,
+   "y": 17,
+   "v": 1
+  },
+  {
+   "kind": "bench",
+   "x": 17,
+   "y": 17,
+   "v": 0
+  },
+  {
+   "kind": "bench",
+   "x": 28,
+   "y": 17,
+   "v": 0
+  },
+  {
+   "kind": "tree",
+   "x": 31,
+   "y": 17,
+   "v": 0
+  },
+  {
+   "kind": "tree",
+   "x": 15,
+   "y": 16,
+   "v": 2
+  },
+  {
+   "kind": "table",
+   "x": 19,
+   "y": 16,
+   "v": 0
+  },
+  {
+   "kind": "table",
+   "x": 26,
+   "y": 16,
+   "v": 0
+  },
+  {
+   "kind": "tree",
+   "x": 30,
+   "y": 16,
+   "v": 2
+  },
+  {
+   "kind": "lamp",
+   "x": 13,
+   "y": 15,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 20,
+   "y": 15,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 25,
+   "y": 15,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 32,
+   "y": 15,
+   "v": 0
+  },
+  {
+   "kind": "tree",
+   "x": 31.5,
+   "y": 33,
+   "v": 0
+  },
+  {
+   "kind": "tree",
+   "x": 31.5,
+   "y": 35,
+   "v": 2
+  },
+  {
+   "kind": "tree",
+   "x": 31.5,
+   "y": 37,
+   "v": 1
+  },
+  {
+   "kind": "tree",
+   "x": 31.5,
+   "y": 39,
+   "v": 0
+  },
+  {
+   "kind": "tree",
+   "x": 31.5,
+   "y": 41,
+   "v": 2
+  },
+  {
+   "kind": "tree",
+   "x": 31.5,
+   "y": 43,
+   "v": 1
+  },
+  {
+   "kind": "tree",
+   "x": 31.5,
+   "y": 45,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 4,
+   "y": 18,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 5,
+   "y": 23,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 4,
+   "y": 31,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 4,
+   "y": 35,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 4,
+   "y": 40,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 10,
+   "y": 18,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 11,
+   "y": 23,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 11,
+   "y": 31,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 10,
+   "y": 35,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 10,
+   "y": 40,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 34,
+   "y": 18,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 35,
+   "y": 23,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 34,
+   "y": 31,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 34,
+   "y": 35,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 34,
+   "y": 40,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 40,
+   "y": 18,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 40,
+   "y": 23,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 40,
+   "y": 31,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 40,
+   "y": 35,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 40,
+   "y": 40,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 7,
+   "y": 8,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 13,
+   "y": 8,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 20,
+   "y": 8,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 31,
+   "y": 8,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 38,
+   "y": 8,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 43,
+   "y": 8,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 2,
+   "y": 10,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 43,
+   "y": 13,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 2,
+   "y": 16,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 43,
+   "y": 25,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 43,
+   "y": 31,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 2,
+   "y": 34,
+   "v": 0
+  },
+  {
+   "kind": "hedge",
+   "x": 3,
+   "y": 17.45,
+   "v": 0
+  },
+  {
+   "kind": "hedge",
+   "x": 3,
+   "y": 34.45,
+   "v": 0
+  },
+  {
+   "kind": "hedge",
+   "x": 3,
+   "y": 26.45,
+   "v": 0
+  },
+  {
+   "kind": "hedge",
+   "x": 4,
+   "y": 17.45,
+   "v": 1
+  },
+  {
+   "kind": "hedge",
+   "x": 4,
+   "y": 34.45,
+   "v": 1
+  },
+  {
+   "kind": "hedge",
+   "x": 4,
+   "y": 26.45,
+   "v": 1
+  },
+  {
+   "kind": "hedge",
+   "x": 5,
+   "y": 17.45,
+   "v": 2
+  },
+  {
+   "kind": "hedge",
+   "x": 5,
+   "y": 34.45,
+   "v": 2
+  },
+  {
+   "kind": "hedge",
+   "x": 5,
+   "y": 26.45,
+   "v": 2
+  },
+  {
+   "kind": "hedge",
+   "x": 6,
+   "y": 17.45,
+   "v": 0
+  },
+  {
+   "kind": "hedge",
+   "x": 6,
+   "y": 34.45,
+   "v": 0
+  },
+  {
+   "kind": "hedge",
+   "x": 6,
+   "y": 26.45,
+   "v": 0
+  },
+  {
+   "kind": "hedge",
+   "x": 7,
+   "y": 17.45,
+   "v": 1
+  },
+  {
+   "kind": "hedge",
+   "x": 7,
+   "y": 34.45,
+   "v": 1
+  },
+  {
+   "kind": "hedge",
+   "x": 7,
+   "y": 26.45,
+   "v": 1
+  },
+  {
+   "kind": "hedge",
+   "x": 8,
+   "y": 17.45,
+   "v": 2
+  },
+  {
+   "kind": "hedge",
+   "x": 8,
+   "y": 34.45,
+   "v": 2
+  },
+  {
+   "kind": "hedge",
+   "x": 8,
+   "y": 26.45,
+   "v": 2
+  },
+  {
+   "kind": "hedge",
+   "x": 9,
+   "y": 17.45,
+   "v": 0
+  },
+  {
+   "kind": "hedge",
+   "x": 9,
+   "y": 34.45,
+   "v": 0
+  },
+  {
+   "kind": "hedge",
+   "x": 9,
+   "y": 26.45,
+   "v": 0
+  },
+  {
+   "kind": "hedge",
+   "x": 10,
+   "y": 17.45,
+   "v": 1
+  },
+  {
+   "kind": "hedge",
+   "x": 10,
+   "y": 34.45,
+   "v": 1
+  },
+  {
+   "kind": "hedge",
+   "x": 10,
+   "y": 26.45,
+   "v": 1
+  },
+  {
+   "kind": "hedge",
+   "x": 11,
+   "y": 17.45,
+   "v": 2
+  },
+  {
+   "kind": "hedge",
+   "x": 11,
+   "y": 34.45,
+   "v": 2
+  },
+  {
+   "kind": "hedge",
+   "x": 11,
+   "y": 26.45,
+   "v": 2
+  },
+  {
+   "kind": "hedge",
+   "x": 12,
+   "y": 17.45,
+   "v": 0
+  },
+  {
+   "kind": "hedge",
+   "x": 12,
+   "y": 34.45,
+   "v": 0
+  },
+  {
+   "kind": "hedge",
+   "x": 12,
+   "y": 26.45,
+   "v": 0
+  },
+  {
+   "kind": "hedge",
+   "x": 33,
+   "y": 17.45,
+   "v": 0
+  },
+  {
+   "kind": "hedge",
+   "x": 33,
+   "y": 34.45,
+   "v": 0
+  },
+  {
+   "kind": "hedge",
+   "x": 33,
+   "y": 26.45,
+   "v": 0
+  },
+  {
+   "kind": "hedge",
+   "x": 34,
+   "y": 17.45,
+   "v": 1
+  },
+  {
+   "kind": "hedge",
+   "x": 34,
+   "y": 34.45,
+   "v": 1
+  },
+  {
+   "kind": "hedge",
+   "x": 34,
+   "y": 26.45,
+   "v": 1
+  },
+  {
+   "kind": "hedge",
+   "x": 35,
+   "y": 17.45,
+   "v": 2
+  },
+  {
+   "kind": "hedge",
+   "x": 35,
+   "y": 34.45,
+   "v": 2
+  },
+  {
+   "kind": "hedge",
+   "x": 35,
+   "y": 26.45,
+   "v": 2
+  },
+  {
+   "kind": "hedge",
+   "x": 36,
+   "y": 17.45,
+   "v": 0
+  },
+  {
+   "kind": "hedge",
+   "x": 36,
+   "y": 34.45,
+   "v": 0
+  },
+  {
+   "kind": "hedge",
+   "x": 36,
+   "y": 26.45,
+   "v": 0
+  },
+  {
+   "kind": "hedge",
+   "x": 37,
+   "y": 17.45,
+   "v": 1
+  },
+  {
+   "kind": "hedge",
+   "x": 37,
+   "y": 34.45,
+   "v": 1
+  },
+  {
+   "kind": "hedge",
+   "x": 37,
+   "y": 26.45,
+   "v": 1
+  },
+  {
+   "kind": "hedge",
+   "x": 38,
+   "y": 17.45,
+   "v": 2
+  },
+  {
+   "kind": "hedge",
+   "x": 38,
+   "y": 34.45,
+   "v": 2
+  },
+  {
+   "kind": "hedge",
+   "x": 38,
+   "y": 26.45,
+   "v": 2
+  },
+  {
+   "kind": "hedge",
+   "x": 39,
+   "y": 17.45,
+   "v": 0
+  },
+  {
+   "kind": "hedge",
+   "x": 39,
+   "y": 34.45,
+   "v": 0
+  },
+  {
+   "kind": "hedge",
+   "x": 39,
+   "y": 26.45,
+   "v": 0
+  },
+  {
+   "kind": "hedge",
+   "x": 40,
+   "y": 17.45,
+   "v": 1
+  },
+  {
+   "kind": "hedge",
+   "x": 40,
+   "y": 34.45,
+   "v": 1
+  },
+  {
+   "kind": "hedge",
+   "x": 40,
+   "y": 26.45,
+   "v": 1
+  },
+  {
+   "kind": "hedge",
+   "x": 41,
+   "y": 17.45,
+   "v": 2
+  },
+  {
+   "kind": "hedge",
+   "x": 41,
+   "y": 34.45,
+   "v": 2
+  },
+  {
+   "kind": "hedge",
+   "x": 41,
+   "y": 26.45,
+   "v": 2
+  },
+  {
+   "kind": "hedge",
+   "x": 42,
+   "y": 17.45,
+   "v": 0
+  },
+  {
+   "kind": "hedge",
+   "x": 42,
+   "y": 34.45,
+   "v": 0
+  },
+  {
+   "kind": "hedge",
+   "x": 42,
+   "y": 26.45,
+   "v": 0
+  },
+  {
    "kind": "hedge",
    "x": 42.45,
-   "y": 19,
+   "y": 9,
+   "v": 0
+  },
+  {
+   "kind": "hedge",
+   "x": 42.45,
+   "y": 10,
    "v": 1
   },
   {
    "kind": "hedge",
    "x": 42.45,
-   "y": 20,
+   "y": 11,
    "v": 2
+  },
+  {
+   "kind": "hedge",
+   "x": 42.45,
+   "y": 12,
+   "v": 0
+  },
+  {
+   "kind": "hedge",
+   "x": 42.45,
+   "y": 13,
+   "v": 1
+  },
+  {
+   "kind": "hedge",
+   "x": 42.45,
+   "y": 14,
+   "v": 2
+  },
+  {
+   "kind": "hedge",
+   "x": 42.45,
+   "y": 15,
+   "v": 0
+  },
+  {
+   "kind": "hedge",
+   "x": 42.45,
+   "y": 16,
+   "v": 1
+  },
+  {
+   "kind": "hedge",
+   "x": 42.45,
+   "y": 17,
+   "v": 2
+  },
+  {
+   "kind": "hedge",
+   "x": 42.45,
+   "y": 24,
+   "v": 0
+  },
+  {
+   "kind": "hedge",
+   "x": 42.45,
+   "y": 25,
+   "v": 1
   },
   {
    "kind": "hedge",
@@ -2655,49 +1755,19 @@
   {
    "kind": "hedge",
    "x": 42.45,
-   "y": 27,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 42.45,
-   "y": 28,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 42.45,
-   "y": 35,
+   "y": 32,
    "v": 2
   },
   {
    "kind": "hedge",
    "x": 42.45,
-   "y": 36,
+   "y": 33,
    "v": 0
   },
   {
    "kind": "hedge",
    "x": 42.45,
-   "y": 37,
-   "v": 1
-  },
-  {
-   "kind": "hedge",
-   "x": 42.45,
-   "y": 38,
-   "v": 2
-  },
-  {
-   "kind": "hedge",
-   "x": 42.45,
-   "y": 39,
-   "v": 0
-  },
-  {
-   "kind": "hedge",
-   "x": 42.45,
-   "y": 40,
+   "y": 34,
    "v": 1
   },
   {
@@ -2713,424 +1783,382 @@
    "v": 0
   },
   {
+   "kind": "hedge",
+   "x": 42.45,
+   "y": 43,
+   "v": 1
+  },
+  {
+   "kind": "hedge",
+   "x": 42.45,
+   "y": 44,
+   "v": 2
+  },
+  {
+   "kind": "hedge",
+   "x": 42.45,
+   "y": 45,
+   "v": 0
+  },
+  {
    "kind": "bush",
    "x": 6.2,
-   "y": 8.9,
+   "y": 14.9,
    "v": 0
   },
   {
    "kind": "bed",
    "x": 6,
-   "y": 10,
+   "y": 16,
    "v": 1
   },
   {
    "kind": "bush",
    "x": 6.2,
-   "y": 10.9,
+   "y": 16.9,
    "v": 2
-  },
-  {
-   "kind": "bed",
-   "x": 6,
-   "y": 41,
-   "v": 2
-  },
-  {
-   "kind": "bush",
-   "x": 6.2,
-   "y": 41.9,
-   "v": 0
   },
   {
    "kind": "bed",
    "x": 7,
-   "y": 10,
+   "y": 16,
    "v": 1
   },
   {
    "kind": "bush",
    "x": 7.2,
-   "y": 10.9,
+   "y": 16.9,
    "v": 0
   },
   {
    "kind": "bush",
    "x": 10.2,
-   "y": 5.9,
+   "y": 11.9,
    "v": 1
   },
   {
    "kind": "bed",
    "x": 10,
-   "y": 7,
+   "y": 13,
    "v": 1
   },
   {
    "kind": "bush",
    "x": 10.2,
-   "y": 7.9,
+   "y": 13.9,
    "v": 0
   },
   {
    "kind": "shed",
    "x": 10,
-   "y": 9.2,
+   "y": 15.2,
    "v": 1
   },
   {
    "kind": "bed",
    "x": 10,
-   "y": 38,
+   "y": 44,
    "v": 2
   },
   {
    "kind": "bush",
    "x": 10.2,
-   "y": 38.9,
-   "v": 1
-  },
-  {
-   "kind": "bed",
-   "x": 10,
-   "y": 40,
-   "v": 1
-  },
-  {
-   "kind": "bush",
-   "x": 10.2,
-   "y": 40.9,
-   "v": 0
-  },
-  {
-   "kind": "shed",
-   "x": 10,
-   "y": 42.2,
+   "y": 44.9,
    "v": 1
   },
   {
    "kind": "bed",
    "x": 11,
-   "y": 7,
+   "y": 13,
    "v": 1
   },
   {
    "kind": "bush",
    "x": 11.2,
-   "y": 7.9,
+   "y": 13.9,
    "v": 1
   },
   {
    "kind": "bed",
    "x": 11,
-   "y": 9,
+   "y": 15,
    "v": 0
   },
   {
    "kind": "bush",
    "x": 11.2,
-   "y": 9.9,
+   "y": 15.9,
    "v": 0
   },
   {
    "kind": "shed",
    "x": 11,
-   "y": 11.2,
+   "y": 17.2,
    "v": 1
-  },
-  {
-   "kind": "bush",
-   "x": 11.2,
-   "y": 40.9,
-   "v": 1
-  },
-  {
-   "kind": "bed",
-   "x": 11,
-   "y": 42,
-   "v": 0
   },
   {
    "kind": "bed",
    "x": 12,
-   "y": 9,
+   "y": 15,
    "v": 0
   },
   {
    "kind": "bush",
    "x": 12.2,
-   "y": 9.9,
+   "y": 15.9,
    "v": 1
   },
   {
    "kind": "bed",
    "x": 12,
-   "y": 11,
+   "y": 17,
    "v": 2
   },
   {
    "kind": "bed",
-   "x": 12,
-   "y": 42,
-   "v": 0
-  },
-  {
-   "kind": "bed",
    "x": 16,
-   "y": 6,
+   "y": 12,
    "v": 0
   },
   {
    "kind": "bush",
    "x": 16.2,
-   "y": 6.9,
+   "y": 12.9,
    "v": 2
   },
   {
    "kind": "bed",
    "x": 16,
-   "y": 8,
+   "y": 14,
    "v": 2
   },
   {
    "kind": "shed",
    "x": 25,
-   "y": 6.2,
+   "y": 12.2,
    "v": 1
   },
   {
    "kind": "bed",
    "x": 26,
-   "y": 6,
+   "y": 12,
    "v": 0
   },
   {
    "kind": "bush",
    "x": 26.2,
-   "y": 6.9,
+   "y": 12.9,
    "v": 0
   },
   {
    "kind": "shed",
    "x": 26,
-   "y": 8.2,
+   "y": 14.2,
    "v": 1
   },
   {
    "kind": "bush",
    "x": 31.2,
-   "y": 5.9,
+   "y": 11.9,
    "v": 1
   },
   {
    "kind": "shed",
    "x": 31,
-   "y": 7.2,
+   "y": 13.2,
    "v": 2
   },
   {
    "kind": "bush",
    "x": 32.2,
-   "y": 5.9,
+   "y": 11.9,
    "v": 2
   },
   {
    "kind": "bed",
    "x": 32,
-   "y": 7,
+   "y": 13,
    "v": 1
   },
   {
    "kind": "bush",
    "x": 32.2,
-   "y": 7.9,
+   "y": 13.9,
    "v": 1
   },
   {
    "kind": "bed",
    "x": 33,
-   "y": 9,
+   "y": 15,
    "v": 0
   },
   {
    "kind": "bush",
    "x": 33.2,
-   "y": 9.9,
+   "y": 15.9,
    "v": 1
   },
   {
    "kind": "shed",
    "x": 33,
-   "y": 11.2,
+   "y": 17.2,
    "v": 2
-  },
-  {
-   "kind": "bed",
-   "x": 33,
-   "y": 40,
-   "v": 1
-  },
-  {
-   "kind": "bush",
-   "x": 33.2,
-   "y": 40.9,
-   "v": 2
-  },
-  {
-   "kind": "bed",
-   "x": 33,
-   "y": 42,
-   "v": 0
   },
   {
    "kind": "bed",
    "x": 34,
-   "y": 9,
+   "y": 15,
    "v": 0
   },
   {
    "kind": "bush",
    "x": 34.2,
-   "y": 9.9,
+   "y": 15.9,
    "v": 2
   },
   {
    "kind": "bed",
    "x": 34,
-   "y": 11,
+   "y": 17,
    "v": 2
-  },
-  {
-   "kind": "bed",
-   "x": 34,
-   "y": 42,
-   "v": 0
   },
   {
    "kind": "bed",
    "x": 35,
-   "y": 11,
+   "y": 17,
    "v": 2
   },
   {
    "kind": "shed",
    "x": 36,
-   "y": 6.2,
+   "y": 12.2,
    "v": 0
   },
   {
    "kind": "bed",
    "x": 37,
-   "y": 6,
+   "y": 12,
    "v": 0
   },
   {
    "kind": "bush",
    "x": 37.2,
-   "y": 6.9,
+   "y": 12.9,
    "v": 2
   },
   {
    "kind": "shed",
    "x": 37,
-   "y": 8.2,
-   "v": 0
-  },
-  {
-   "kind": "shed",
-   "x": 37,
-   "y": 41.2,
+   "y": 14.2,
    "v": 0
   },
   {
    "kind": "bush",
    "x": 38.2,
-   "y": 8.9,
+   "y": 14.9,
    "v": 2
   },
   {
    "kind": "shed",
    "x": 38,
-   "y": 10.2,
+   "y": 16.2,
    "v": 0
   },
   {
    "kind": "bed",
    "x": 38,
-   "y": 39,
+   "y": 45,
    "v": 0
-  },
-  {
-   "kind": "bush",
-   "x": 38.2,
-   "y": 39.9,
-   "v": 0
-  },
-  {
-   "kind": "bed",
-   "x": 38,
-   "y": 41,
-   "v": 2
-  },
-  {
-   "kind": "bush",
-   "x": 38.2,
-   "y": 41.9,
-   "v": 2
   },
   {
    "kind": "bush",
    "x": 39.2,
-   "y": 8.9,
+   "y": 14.9,
    "v": 0
   },
   {
    "kind": "bed",
    "x": 39,
-   "y": 10,
+   "y": 16,
    "v": 1
   },
   {
    "kind": "bush",
    "x": 39.2,
-   "y": 10.9,
+   "y": 16.9,
    "v": 2
-  },
-  {
-   "kind": "bed",
-   "x": 39,
-   "y": 41,
-   "v": 2
-  },
-  {
-   "kind": "bush",
-   "x": 39.2,
-   "y": 41.9,
-   "v": 0
   },
   {
    "kind": "bed",
    "x": 40,
-   "y": 10,
+   "y": 16,
    "v": 1
   },
   {
    "kind": "bush",
    "x": 40.2,
-   "y": 10.9,
+   "y": 16.9,
    "v": 0
   },
   {
    "kind": "bush",
    "x": 42.2,
-   "y": 5.9,
+   "y": 11.9,
    "v": 0
   },
   {
    "kind": "shed",
    "x": 42,
-   "y": 7.2,
+   "y": 13.2,
    "v": 1
+  },
+  {
+   "kind": "lamp",
+   "x": 1,
+   "y": 3,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 7,
+   "y": 3,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 13,
+   "y": 3,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 19,
+   "y": 3,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 25,
+   "y": 3,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 31,
+   "y": 3,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 37,
+   "y": 3,
+   "v": 0
+  },
+  {
+   "kind": "lamp",
+   "x": 43,
+   "y": 3,
+   "v": 0
   }
  ]
 }

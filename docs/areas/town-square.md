@@ -861,11 +861,44 @@ and Seam Avenue's camera turn, is done; then the switch goes). Eric approved its
   square (`Home.door`) and opens its card; an arrow into its lot opens it too. A boss walks its own wander box (`Home.wander`) out
   from its rest square (`Home.rest`) and back, passing a lamp, stopping only there. The bots walk the streets, sidewalks and park
   off every boss's box; a sidekick goes home through its boss's door (`Home.entry`).
-- **The camera:** faces north everywhere this round, and opens zoomed in (`streetStartZoomedOut`). Fronts nearer the camera than
+- **The camera:** faced north everywhere in round 2 (round 3 turns it on Seam Avenue: below), and opens zoomed in (`streetStartZoomedOut`). Fronts nearer the camera than
   its focus less `streetNearCut` aren't drawn, trees there fade (`streetTreeFade`), and a figure fades before the box's foot or side
   would cut it (Eric, Nov 4).
 - Tests: `packages/app/test/town-street.test.ts`, `e2e/town-street.spec.ts`. Decision:
   [2026-11-05-street-town-layout.md](../decisions/2026-11-05-street-town-layout.md). Stills: `docs/street-town/`.
+- **Round 3 (Nov 5): boxes and the turning camera.** Every building is a box as the art drew it (`town/boxes.ts`: where each stands,
+  the sides a neighbour at least as tall covers (skipped), the roof faces' geometry and light, each frame's plan; `town/box-draw.ts`:
+  each roof painted once a heading; `render.ts`: a front, each side, the back and the roof sorted by their own depths among everything
+  else, the roof's faces far to near). The camera faces north everywhere and east on Seam Avenue outside its four crossings
+  (`town/turn.ts` `camAt`, the square you're on), easing over `streetTurnMs`; `camera.ts` turns every world point through the view's
+  heading (`setHeading`, `toCam`, `rel`; `forEachSquare` lays the ground from a turned grid). Taps, the arrow keys (`screenStep`: up is
+  up the screen) and the drag go through it; the clouds slide, the sun stays; the far Colosseum shows within 45 degrees of north. Seam
+  Avenue's fronts face west. A home's floating name sits over its own roof, dropping toward its eave off the buildings behind. Both
+  renderers draw the same pieces (images through an affine transform); the 2D fallback's walls take coarser strips and its domes fewer
+  faces. Numbers in `feel.ts` (`streetTurnMs`, `streetTurnClouds`, `box*`, `nameOverRoof`, `nameDropStep`). Test hooks: `__townCam()`'s
+  `heading`, `figures`, `boxes`; `__townHeading(deg | null)` holds the heading (the turn's stills). Tests: `packages/app/test/town-boxes.test.ts`,
+  `e2e/town-street.spec.ts` ("the boxes and the turn", both renderers). Decision:
+  [2026-11-05-street-town-boxes.md](../decisions/2026-11-05-street-town-boxes.md). Stills: `docs/street-town-boxes/`.
+- **Round 4 (Nov 5): joined rows, the chase camera, the town wrapping east-west only.**
+  - **The plan** (`street-plan.json`, from the art's by `scripts/street-plan-north.py`): its `wrap` switch, `{ ew: true, ns: false }`
+    (`camera.ts WRAP`, `wrapFX`/`wrapFY`, `colI`/`rowI`: -1 off the world). The Colosseum at the north edge in its plaza; South Street
+    (the art's Seam Street) the bottom street, a closing row south of it; Seam Avenue ending at Upper Street. The start is (22, 17).
+  - **The rows** (`town/rows.ts`: each side as data; `lookalike.ts`: the look-alike fronts and the skyline's towers; `street.ts`
+    `withRows`, `homesOn`):
+    - every street's built sides are continuous rows; the homes keep their lots (sliding along a row to fit its end);
+    - look-alikes of 1 to 3 squares and slim fillers fill the rest, each butted 1 px under its neighbours;
+    - corners turn onto the cross street; flat fronts away from corners; rear walls seen from behind;
+    - the tall lots are towers over the rows.
+  - **The camera:**
+    - the chase camera (`turn.ts chaseTarget`; down steps back without turning, left and right turn you);
+    - four zoom steps (`feel.ts streetZoomSteps`; `zoom-steps.ts StreetZoom`);
+    - the park's step out (`parkZoomOut`).
+  - **Drawing only what the rows let you see:** `seen.ts`, at the in and default steps (`streetCull`).
+  - **Smaller fixes:** a home's name only with its home; slanted sign lettering snapped.
+  - **Test hooks:** `__townCam()`'s `zoom` (the step), `parkBefore`, `horizon`.
+  - **Tests:** `packages/app/test/town-rows.test.ts`, `e2e/town-rows.spec.ts`, and round 3's moved to the plan
+    (`town-boxes.test.ts`, `town-street.test.ts`, `e2e/town-street.spec.ts`).
+  - Decision: [2026-11-05-street-rows.md](../decisions/2026-11-05-street-rows.md). Stills: `docs/street-town-rows/`.
 
 ## Frame-rate pill (`?fps`)
 `/town?fps` shows anyone (Eric, Oct 30: no admin needed, the site is behind Cloudflare Access) a pill in the world's top-right corner, "60 fps · 16.7 ms · 2D": frames over the last second and their mean time, text set twice a second from plain counters in the frame loop, then the drawing's backend ("· WebGL" with `?gl=1`; added by town.css from `data-backend`, so the pill's text stays the numbers). Without `?fps` there is none. `?crowd=N` is anyone's too (only that device draws the pawns).
@@ -893,7 +926,7 @@ noted wherever a slice changed one.
 ## Files
 
 - `packages/app/src/town/`: `TownPage.tsx` (the lazy load, and on a computer the frame round it), `Town.tsx` (the screen, the loop, input, chips, cards, the sky's
-  clock, the statues' close-up, the backend and its fallbacks), `press.ts` (a finger as a button), `camera.ts`, `world.ts`, `render.ts`, `paint.ts` (the drawing layer; Canvas 2D),
+  clock, the statues' close-up, the backend and its fallbacks), `press.ts` (a finger as a button), `camera.ts`, `world.ts`, `render.ts`, the street town's `street.ts`, `turn.ts`, `boxes.ts`, `box-draw.ts` (and the art's `town-kit.ts`, `buildings.ts`, `home-boxes.ts`, `dressing.ts`), `paint.ts` (the drawing layer; Canvas 2D),
   `paint-gl.ts` (its WebGL 2 backend), `you-look.ts`, `rides.ts`, `ride-cells.ts` (the rides' views measured, generated), `sky.ts`, `sky-draw.ts`, `sign-font.ts`, `feel.ts`, `town.css`, `chat.ts`, `TownChat.tsx` and `town-chat.css` (the chat log), `houses/`
   (one file per home, fourteen in all, the Colosseum's `coliseum.ts`, the park's `park.ts`, the kit of shared pieces and the index),
   `sidekick-sheets.ts` and `sidekicks/*.png` (the sidekicks' baked frames, generated), `CardIcons.tsx` (the card's crossed swords and

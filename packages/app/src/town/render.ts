@@ -26,7 +26,7 @@ import { TIGER_FIGURE } from "../characters/tiger-figure.ts";
 import { FOLIO } from "../characters/folio.ts";
 import { BOSS_BEAVER } from "../characters/timber.ts";
 import { BOSS_BLITZ } from "../characters/boss-blitz.ts";
-import { N, bandOf, clamp, drawable, enterOf, farOf, forEachSquare, hazeMix, newPt, newView, pastCurve, pickSquare, proj, radial, rimYAt, setView, tableLift, wrapF, type Quad, type TableLift, type View } from "./camera.ts";
+import { N, colI, rowI, bandOf, clamp, drawable, enterOf, farOf, forEachSquare, hazeMix, newPt, newView, pastCurve, pickSquare, proj, radial, rel, rimYAt, setHeading, setView, stepCams, tableLift, toCam, wrapF, wrapFX, wrapFY, type Quad, type TableLift, type View } from "./camera.ts";
 import { CHAT_BOX } from "./chat.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { statueSpot } from "./houses/coliseum.ts";
@@ -42,9 +42,15 @@ import type { SidekickSheet } from "./sidekick-sheets.ts";
 import type { Rider, RiderTrail } from "./rides.ts";
 import { STREET_TOWN } from "./admin-town.ts";
 import { building } from "./buildings.ts";
+import type { TownBox } from "./town-kit.ts";
 import { HEDGE, bed, bush, hedgeFront, hedgeTop, shed } from "./dressing.ts";
-import { STREET_BUILDINGS } from "./street.ts";
-import { ARENA, COLISEUM_PLACE, GARDEN, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, groundAt, isSprite, onColiseum, plotAt, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town } from "./world.ts";
+import { colosseumSeen, ROW_GROUND, STREET_BUILDINGS, STREET_GROUND, STREET_GROUND_KEY, STREET_LOTS } from "./street.ts";
+/** The lots' squares (a camera standing in one, backed up to a front, sees from your square only). */
+const ROW_LOT = STREET_GROUND.map((g) => +(g === STREET_GROUND_KEY.L));
+import { affine, boxPoint, geomOf, lotArt, newPlan, planBox, streetBoxes, type BoxInst, type BoxPlan, type WallPlan } from "./boxes.ts";
+import { seenEither, seenFrom, seenReady } from "./seen.ts";
+import { bakeRoof, restShade, shadedImg, type Piece, type RoofArt } from "./box-draw.ts";
+import { ARENA, COLISEUM_PLACE, GARDEN, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, groundAt, isSprite, onColiseum, plotAt, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town, type Walker } from "./world.ts";
 import { TAG_STYLE, TagCache, namesMode, tagAlpha, type NamesMode, type TagKind } from "./tags.ts";
 
 /** Each boss's sprite (its real one: its `idle` frames). */
@@ -333,7 +339,8 @@ class SpriteFrames {
 
 /** One thing standing on the ground this frame: where it was drawn (for taps, tags and chips) and how to sort it. */
 interface Item {
-  kind: "house" | "boss" | "person" | "prop";
+  /** (`part`: a street-town box's side, back or roof, `i` = its box's index x 4 + 0 left, 1 right, 2 back, 3 roof.) */
+  kind: "house" | "boss" | "person" | "prop" | "part";
   i: number;
   dx: number;
   dz: number;
@@ -576,6 +583,10 @@ function setUp(): TablePiece[] {
   return pcs;
 }
 
+/** The street town's chase camera (round 4): its phone and computer sets in place of the town's. */
+/** The street town's camera this frame: its zoom steps' numbers blended at the step it's at (feel.ts streetZoomSteps). */
+const STREET_CAMS = { tall: { ...TOWN_FEEL.camStreetTall }, wide: { ...TOWN_FEEL.camStreetWide } };
+
 export class Renderer {
   readonly view: View = newView();
   W = 1;
@@ -608,6 +619,8 @@ export class Renderer {
   private sitting = false;
   private readonly pose: Pose = { x: 0, y: 0, hop: 0, tilt: 0, step: false, t: 0 };
   private readonly p = newPt();
+  /** A world point in the camera's frame (camera.ts `rel`): scratch. */
+  private readonly rq = { dx: 0, dz: 0 };
   /**
    * The scratch canvases for softening things in the far band (`blitSoft`): one for each softened this frame, in turn
    * (`nSoft`), each as big as the biggest it has held. (Oct 28: one shared canvas, rewritten for each thing while the
@@ -712,7 +725,7 @@ export class Renderer {
   /** Each home's sign lettering: laid out once, drawn once per size (in device pixels a font pixel). */
   private readonly signs: { lines: string[]; w: number; h: number; art: HTMLCanvasElement[] }[];
   /** Where each place's name floats this frame (drawn over everything, after the homes): x, the building's top, its fade. */
-  private readonly names: { x: number; y: number; a: number; k: number }[];
+  private readonly names: { x: number; y: number; a: number; k: number; eave: number; dz: number }[];
   private readonly tops: number[] = [];
   private readonly bubbles = new Map<string, { lines: string[]; w: number }>();
   private readonly drawSquare: (c: number, r: number, cu: number, ru: number, q: Quad) => void;
@@ -741,6 +754,40 @@ export class Renderer {
   private readonly litBox = new Float32Array(4 * 128);
   private nLit = 0;
 
+  /**
+   * The street town's boxes (Nov 5, round 3; boxes.ts): each one, its plan this frame, which is each place's (a home's; null the
+   * Colosseum's) and each prop's (an everyday building's front, a shed, a hedge), the sides', backs' and roofs' items, each picture's
+   * frames (the sides' and backs'), their lights, and each roof's painting a heading (box-draw.ts: by its art, then "facing:east").
+   */
+  private readonly boxes: BoxInst[];
+  private readonly plans: BoxPlan[];
+  /** Each box's footprint's squares (index r * N + c). */
+  private readonly boxSq: Int32Array[];
+  /**
+   * (The street town, round 4) Leave out what the rows hide this frame (at the close zoom steps: in and the default; from higher up you
+   * see over the roofs), and the squares seen from where you and the camera stand (seen.ts), and which squares they were worked out for.
+   */
+  private cull = false;
+  private readonly seen = new Uint8Array(N * N);
+  private seenKey = -1;
+  /** Whether square (x, y) (world, rounded) is seen this frame (always, when nothing is left out). */
+  private seenAt(x: number, y: number): boolean {
+    if (!this.cull) return true;
+    const c = colI(Math.round(x));
+    const r = rowI(Math.round(y));
+    return c >= 0 && r >= 0 && this.seen[r * N + c] === 1;
+  }
+  private readonly homeBox: (BoxInst | null)[];
+  private readonly propBox: (BoxInst | null)[];
+  private readonly partItems: Item[];
+  private readonly wallFrames = new Map<Character, FrameCache>();
+  private readonly wallGlow = new Map<Character, Glow | null>();
+  private readonly roofs = new Map<TownBox, Map<string, RoofArt>>();
+  /** The camera's heading this frame (degrees from north: the street town's turn). */
+  heading = 0;
+  /** (The street town) Whether the Colosseum shows from where you stand this frame (street.ts colosseumSeen). */
+  colSeen = true;
+
   /** What it draws with (paint.ts: Canvas 2D, or WebGL 2 with `?gl=1`), and that one's context. */
   private ctx: Ctx;
   constructor(
@@ -751,14 +798,36 @@ export class Renderer {
     this.ctx = paint.ctx;
     this.places = [...homes, COLISEUM_PLACE];
     this.houseItems = this.places.map((_, i) => newItem("house", i));
-    this.names = this.places.map(() => ({ x: 0, y: 0, a: 0, k: 0 }));
+    this.names = this.places.map(() => ({ x: 0, y: 0, a: 0, k: 0, eave: NaN, dz: 0 }));
     this.signs = this.places.map((h) => {
       const face = artOf(h).sign;
       return { ...layout(h.name, face.w, face.h), art: [] };
     });
     this.bossItems = town.bosses.map((_, i) => newItem("boss", i));
     this.propItems = PROPS.map((_, i) => newItem("prop", i));
-    this.items = [...this.houseItems, ...this.bossItems, ...this.propItems];
+    // The street town's boxes (Nov 5, round 3): each lot's, shed's and hedge's; its front is its home's or prop's item, its sides, back
+    // and roof items of their own (sorted with everything else); a shed's and a hedge's drawn with their front.
+    this.boxes = STREET_TOWN ? streetBoxes(PROPS) : [];
+    this.plans = this.boxes.map((b) => newPlan(b.box));
+    // (Each box's footprint's squares: it shows when the rows let you see any of them, seen.ts.)
+    const pt = { x: 0, y: 0 };
+    this.boxSq = this.boxes.map((b) => {
+      const ks = new Set<number>();
+      const B = b.box;
+      for (let u = 0; u <= B.front.w; u += 6)
+        for (const t of [0.02, 0.5, 0.98]) {
+          boxPoint(b, B, Math.min(u, B.front.w - 0.5), t, pt);
+          const c = colI(Math.round(pt.x));
+          const r = rowI(Math.round(pt.y));
+          if (c >= 0 && r >= 0) ks.add(r * N + c);
+        }
+      return Int32Array.from(ks);
+    });
+    this.homeBox = this.places.map((h) => this.boxes.find((b) => b.home === h.id) ?? null);
+    this.propBox = PROPS.map((pr, i) => (pr.kind === "front" ? this.boxes.find((b) => b.kind !== "home" && b.lot === STREET_LOTS.indexOf(STREET_BUILDINGS[pr.lot!]!)) : this.boxes.find((b) => b.prop === i || b.props.includes(i))) ?? null);
+    this.partItems = [];
+    for (const b of this.boxes) if (b.kind !== "shed" && b.kind !== "hedge") for (let k = 0; k < 4; k++) this.partItems.push(newItem("part", b.i * 4 + k));
+    this.items = [...this.houseItems, ...this.bossItems, ...this.propItems, ...this.partItems];
     const trees = PARK_TREES.map((t) => new FrameCache(t));
     const bench = new FrameCache(PARK_BENCH);
     const table = new FrameCache(PARK_TABLE);
@@ -774,7 +843,8 @@ export class Renderer {
       if (p.kind === "shed") return art(`shed${p.v}`, () => shed(p.v).front);
       if (p.kind === "front") {
         const b = STREET_BUILDINGS[p.lot!]!;
-        return art(`${b.id}-${b.w}-${b.v}`, () => building(b.id, b.w, b.v).front);
+        const box = lotArt(b);
+        return art(box.id, () => box.front);
       }
       return p.kind === "tree" ? trees[p.v]! : p.kind === "bench" ? bench : p.kind === "table" ? table : p.kind === "lamp" ? lamp : fountain;
     });
@@ -792,8 +862,15 @@ export class Renderer {
       const n = this.nSq;
       if (n >= SQ_MAX) return;
       const m = Math.round(clamp(hazeMix(this.view, cu - this.camX, ru - this.camY, this.mist), 0, 1) * MIX_STEPS);
+      // (Ground the rows hide, round 4: left out.)
+      if (this.cull && r >= 0 && c >= 0 && !this.seen[r * N + c]) return;
+      // (Off the world, past the street town's north or south edge: a meadow, nothing on it.)
+      if (r < 0 || c < 0) {
+        this.sqKey[n] = sqKeyOf(m, 4, (cu + ru) & 1);
+      } else {
       const gk = groundAt[r * N + c]!;
-      this.sqKey[n] = sqKeyOf(m, gk === PAVING ? 2 : gk === GRASS ? 3 : gk === GARDEN || gk === LOT ? 4 : gk === ARENA || plotAt[r * N + c] || onColiseum(c, r) ? 1 : 0, (c + r) & 1);
+      this.sqKey[n] = sqKeyOf(m, gk === PAVING || (STREET_TOWN && ROW_GROUND[r * N + c]) ? 2 : gk === GRASS ? 3 : gk === GARDEN || gk === LOT ? 4 : gk === ARENA || plotAt[r * N + c] || onColiseum(c, r) ? 1 : 0, (c + r) & 1);
+      }
       const o = n * 8;
       const cx = (q[0]! + q[2]! + q[4]! + q[6]!) / 4;
       const cy = (q[1]! + q[3]! + q[5]! + q[7]!) / 4;
@@ -845,22 +922,55 @@ export class Renderer {
     this.lightK = mixLights(w);
   }
 
-  /** Draws one frame. `zoom`: 0 normal, 1 zoomed out (and between, while it glides); `dt`: seconds since the last. */
+  /**
+   * Draws one frame. `zoom`: 0 normal, 1 zoomed out (and between, while it glides); the street town: its zoom step (feel.ts
+   * streetZoomSteps: 0 in, 1 the default, 2 out, 3 the overview; between, while it glides). `dt`: seconds since the last.
+   */
   /** Frames drawn so far (what's worked out once a frame keys on it; the tags drawn once remember when each was last used). */
   private frameNo = 0;
-  draw(now: number, camX: number, camY: number, zoom: number, dt = 0): void {
+  draw(now: number, camX: number, camY: number, zoom: number, dt = 0, heading = this.heading): void {
     const { ctx, W, H, DPR } = this;
     this.paint.frame();
     this.frameNo++;
     this.nSoft = 0;
     this.camX = camX;
     this.camY = camY;
-    setView(this.view, W, H, zoom);
-    this.lens(zoom);
+    this.heading = heading;
+    if (STREET_TOWN) stepCams(TOWN_FEEL.streetZoomSteps, zoom, STREET_CAMS);
+    // (The street town's zoom is its steps' blended numbers: no zoom-out factors over them.)
+    const z = STREET_TOWN ? 0 : zoom;
+    setView(this.view, W, H, z, 1, 0, 0, STREET_TOWN ? STREET_CAMS : undefined);
+    setHeading(this.view, heading);
+    this.lens(z);
+    // (What the rows let you see, round 4: from your square and the camera's, at the in and default steps.)
+    this.cull = STREET_TOWN && TOWN_FEEL.streetCull && zoom <= TOWN_FEEL.streetZoomStart + 0.01;
+    if (this.cull) {
+      // (From where the camera looks: you, as it follows you; wherever it glides to as you look round. Looking from inside a lot (a
+      // glide to a home's middle), nothing is left out.)
+      const yc = colI(Math.round(camX));
+      const yr = rowI(Math.round(camY));
+      if (yc < 0 || yr < 0 || ROW_LOT[yr * N + yc]) this.cull = false;
+      const v = this.view;
+      const cc = colI(Math.round(camX - v.back * v.hs));
+      const cr = rowI(Math.round(camY - v.back * v.hc));
+      const key = ((yr * N + yc) * N + cc) * N + cr;
+      if (this.cull && key !== this.seenKey) {
+        this.seenKey = key;
+        seenEither(seenFrom(yc, yr), cr >= 0 && cc >= 0 && !ROW_LOT[cr * N + cc] ? seenFrom(cc, cr) : seenFrom(yc, yr), this.seen);
+      }
+      // (Ahead of need: the square ahead of the focus, then the one ahead of the camera, worked out a frame early, so a step doesn't wait.)
+      if (this.cull) {
+        const ax = Math.round(v.hs);
+        const ay = Math.round(v.hc);
+        if (!seenReady(yc + ax, yr + ay)) seenFrom(yc + ax, yr + ay);
+        else if (cc >= 0 && cr >= 0 && !seenReady(cc + ax, cr + ay)) seenFrom(cc + ax, cr + ay);
+      }
+    }
     this.buildCloseUps(now);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.globalAlpha = 1;
-    this.sky.draw(ctx, this.view, camX, camY, now, dt);
+    // (The street town's turn: the clouds slide across as the camera turns; the sun stays put.)
+    this.sky.draw(ctx, this.view, camX, camY, now, dt, (heading / 90) * W * TOWN_FEEL.streetTurnClouds);
     this.drawGround();
     this.drawHorizonHaze(); // on the ground, behind every home, boss and pawn
     if (TOWN_FEEL.rimLine) this.drawRimLine();
@@ -904,8 +1014,9 @@ export class Renderer {
     this.statueDz = Infinity;
     if (c.i < 0 || c.e <= 0) return;
     const pl = COLISEUM_PLACE;
-    const dx = wrapF(pl.cx - this.camX);
-    const dz = wrapF(pl.cy - pl.foot - this.camY);
+    rel(v, this.camX, this.camY, pl.cx, pl.cy - pl.foot, this.rq);
+    const dx = this.rq.dx;
+    const dz = this.rq.dz;
     if (!proj(v, dx, dz, 0, p)) return;
     const id = STATUES[c.i]!.id;
     const ch = artOf(pl).ch;
@@ -934,7 +1045,7 @@ export class Renderer {
     const cE = c1 + ((T + B) / 2 - c1) * c.e;
     const x1 = x0 + w / 2;
     const xE = x1 + (X - x1) * c.e;
-    setView(v, W, H, zoom, mag, cE - v.cy - mag * (c1 - v.cy), xE - W / 2 - mag * (x1 - W / 2));
+    setView(v, W, H, zoom, mag, cE - v.cy - mag * (c1 - v.cy), xE - W / 2 - mag * (x1 - W / 2), STREET_TOWN ? STREET_CAMS : undefined);
     this.lensMag = mag;
     this.statueDz = dz - 0.25;
   }
@@ -1320,8 +1431,14 @@ export class Renderer {
       for (let i = 0; i < people.length; i++) this.items.push(newItem("person", i));
     }
     const items = this.items;
+    // The street town's boxes this frame (boxes.ts): what of each shows, and how.
+    if (STREET_TOWN) this.planBoxes();
     // Where each one stands relative to the camera, and whether it's drawn at all.
     for (const it of items) {
+      if (it.kind === "part") {
+        this.partPos(it);
+        continue;
+      }
       let x: number;
       let y: number;
       let margin = 1;
@@ -1356,8 +1473,7 @@ export class Renderer {
           if (rd) margin = rd.margin;
         }
       }
-      it.dx = wrapF(x - this.camX);
-      it.dz = wrapF(y - this.camY);
+      rel(v, this.camX, this.camY, x, y, it);
       if (it.kind === "person" && people[it.i]!.you) {
         // (Where you stand, from the camera: the name tags near you show, the far ones don't.)
         this.youDx = it.dx;
@@ -1365,6 +1481,11 @@ export class Renderer {
       }
       it.sz = it.kind === "prop" ? it.dz + 0.05 : it.dz;
       it.on = drawable(v, it.dx, it.dz, margin, below) && !(it.kind === "person" && people[it.i]!.home);
+      // (A street-town box's front, or a shed or hedge whole: where its plan has it.)
+      const bx = it.kind === "house" ? this.homeBox[it.i] : it.kind === "prop" ? this.propBox[it.i] : null;
+      if (bx) this.frontPos(it, bx);
+      // (A tree, lamp, bench, bush or bed the rows hide: left out, round 4.)
+      else if (this.cull && it.kind === "prop" && it.on && !this.seenAt(x, y)) it.on = false;
     }
     // The street town's near side (Nov 5): no front (nor shed, nor home) between the camera and you; the trees there fade out.
     if (STREET_TOWN) this.nearCut(items);
@@ -1375,11 +1496,25 @@ export class Renderer {
     // The Colosseum past the rim, its top over the horizon (slice 6: the landmark from anywhere), behind everything.
     const col = this.houseItems[this.homes.length]!;
     this.farOn = false;
-    if (!col.on) this.drawFarColiseum(col, now);
+    // (The street town, round 4: only where the rows let you see it, down a street or across a square that opens onto it; near too.)
+    if (STREET_TOWN) {
+      // (From where the camera looks: you, as it follows you; wherever it glides to as you look round.)
+      this.colSeen = colosseumSeen(this.camX, this.camY);
+      if (!this.colSeen) col.on = false;
+      else if (!col.on) this.drawFarColiseum(col, now);
+    } else if (!col.on) this.drawFarColiseum(col, now);
     for (const it of items) {
       if (!it.on) continue;
-      if (it.kind === "house") this.drawHouse(it, now);
-      else if (it.kind === "prop") this.drawProp(it, now);
+      if (it.kind === "house") {
+        const bx = this.homeBox[it.i];
+        if (bx) this.drawBoxFront(it, bx, now);
+        else this.drawHouse(it, now);
+      } else if (it.kind === "prop") {
+        const bx = this.propBox[it.i];
+        if (!bx) this.drawProp(it, now);
+        else if (bx.kind === "shed" || bx.kind === "hedge") this.drawBoxWhole(it, bx, now);
+        else this.drawBoxFront(it, bx, now);
+      } else if (it.kind === "part") this.drawPart(it, now);
       else if (it.kind === "boss") {
         const b = town.bosses[it.i]!;
         const ch = BOSS_ART[b.home.id];
@@ -1388,7 +1523,8 @@ export class Renderer {
         // (The street town: a boss whose drawing would reach past the box's foot or side fades out first, so none is ever cut off.)
         this.fade = this.edgeFade(it, (f.bossSquares * (f.bossScale[b.home.id] ?? 1) * ch.w) / ch.h / 2);
         it.faded = this.fade < 0.5;
-        if (this.fade > 0.004) this.drawSprite(it, img, f.bossSquares * (f.bossScale[b.home.id] ?? 1), ch.foot[0] / ch.w, ch.foot[1] / ch.h, ch.w / ch.h, 0, 0, b.walker.facing, 1.6);
+        this.bossAlpha[it.i] = this.fade;
+        if (this.fade > 0.004) this.drawSprite(it, img, f.bossSquares * (f.bossScale[b.home.id] ?? 1), ch.foot[0] / ch.w, ch.foot[1] / ch.h, ch.w / ch.h, 0, 0, this.faceOf(b.walker), 1.6);
         b.onScreen = !it.faded && it.fx > -40 && it.fx < this.W + 40 && it.fy > 0 && it.hy < this.H && bandOf(v, it.dx, it.dz) < 0.6; // (a boss deep in the haze doesn't talk)
         this.fade = 1;
         if (town.speech.boss === b) {
@@ -1404,21 +1540,23 @@ export class Renderer {
         // Sitting at a chess table: lower, on its stool, facing the board.
         const table = seated(person);
         this.sitting = !!table;
-        const facing = table ? (w.c < table.c ? 1 : -1) : w.facing;
+        const facing = table ? (w.c < table.c ? 1 : -1) : this.faceOf(w);
+        const wview = this.viewOf(w);
         // Up close on a statue, the people in front of it (you, on its square) fade: they'd stand between the camera and it.
         // A bot coming out from home fades in, one going home fades out (Oct 28: they take turns in the square).
         this.fade = (it.dz < this.statueDz ? 1 - f.closeNearFade * this.close.e : 1) * clamp(Math.min(now - person.came, person.leaves - now) / f.botFadeMs, 0, 1) * (person.you ? 1 : this.edgeFade(it, 0.5));
         it.faded = this.fade < 0.5;
+        this.personAlpha[it.i] = this.fade;
         if (person.you) {
           // Your shadows are a bot's: sized from the pawn, not from the margin your look's items are drawn in.
           const art = this.youArt;
           const k = 1 + 2 * (art?.pad ?? 0);
           const pad = art?.pad ?? 0;
           this.youRide.anim = "";
-          if (this.youRider && !table) this.drawRider(it, this.youRider, pose, facing, w.view, f.youSquares, now, this.youRide);
+          if (this.youRider && !table) this.drawRider(it, this.youRider, pose, facing, wview, f.youSquares, now, this.youRide);
           else {
             this.drawSprite(it, art?.img ?? (isSprite(person.look) ? pawnImage("light", null) : pawnImage(person.look.side, person.look.tint)), f.youSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.youHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.youSquares);
-            this.soonBox(it, this.soonOf(person), w.view, f.youSquares);
+            this.soonBox(it, this.soonOf(person), wview, f.youSquares);
           }
           if (this.fade > 0.02) this.tag(person.name, it.fx, it.hy - 2, "you", clamp((11 * this.p.k) / v.kf, 8, 12), this.fade);
         } else {
@@ -1439,10 +1577,10 @@ export class Renderer {
             const k = 1 + 2 * (art?.pad ?? 0);
             const pad = art?.pad ?? 0;
             const rider = this.riders.get(person.id);
-            if (rider && !table) this.drawRider(it, rider, pose, facing, w.view, f.botSquares, now + it.i * 577);
+            if (rider && !table) this.drawRider(it, rider, pose, facing, wview, f.botSquares, now + it.i * 577);
             else {
               this.drawSprite(it, art?.img ?? pawnImage(lk.side, lk.tint), f.botSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.botHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.botSquares);
-              this.soonBox(it, this.soonOf(person), w.view, f.botSquares);
+              this.soonBox(it, this.soonOf(person), wview, f.botSquares);
             }
           }
           // Name tags on the near ones only: not far toward the rim (as before), and (Oct 28, Eric) not far from you either, by default: within
@@ -1462,6 +1600,485 @@ export class Renderer {
     }
   }
 
+  // ---- The street town's boxes (Nov 5, round 3): planned each frame (boxes.ts planBox), drawn here (the art's order: each part by its
+  // own depth among everything else; a roof's faces far to near; a shed and a hedge whole, with their fronts).
+
+  /** Plans every box near enough to show, and gets the roofs near the camera painted ahead (a little a frame, nearest first). */
+  private planBoxes(): void {
+    const v = this.view;
+    const fine = this.paint.kind === "webgl";
+    const cut = -TOWN_FEEL.streetNearCut;
+    const ahead = this.ahead;
+    let na = 0;
+    for (const b of this.boxes) {
+      const p = this.plans[b.i]!;
+      rel(v, this.camX, this.camY, b.fx, b.fy, this.rq);
+      const R = radial(v, this.rq.dx, this.rq.dz);
+      if (R < v.rim + 6 && na < ahead.length) {
+        ahead[na] = b.i;
+        this.aheadD[na++] = R;
+      }
+      // (What the rows hide is left out; a skyline tower no ray reaches shows over them out to `streetTowerReach`, past it in the haze.)
+      if (R > v.rim + 4 || this.rq.dz < -v.back - 4 || (this.cull && !this.boxSeen(b.i) && (b.kind !== "tall" || R > TOWN_FEEL.streetTowerReach))) {
+        p.on = p.front.on = p.left.on = p.right.on = p.back.on = false;
+        p.nOrder = 0;
+        continue;
+      }
+      // (A hedge is low: drawn between the camera and you too, as the art says.)
+      planBox(p, b, fine ? b.box : b.low, v, this.camX, this.camY, fine, b.kind === "hedge" ? -Infinity : cut);
+    }
+    // Paint ahead: the roofs within reach not yet painted for this heading (both while it turns, the north one first), nearest first,
+    // until the frame's budget is spent. (One being drawn this frame and not yet painted is painted then, whatever the budget.)
+    const t0 = performance.now();
+    // (Round 4's chase camera faces any of the four ways: the quarter it faces, and the next one round while it turns.)
+    const hq = ((this.heading % 360) + 360) % 360;
+    const q0 = Math.floor(hq / 90) % 4;
+    for (let pass = 0; pass < 2; pass++) {
+      const q = (q0 + pass) % 4;
+      if (pass === 1 && hq - q0 * 90 < 0.5) continue;
+      for (;;) {
+        let best = -1;
+        for (let j = 0; j < na; j++) {
+          const b = this.boxes[ahead[j]!]!;
+          if (this.instArt[(fine ? 4 : 0) + q]![b.i]) continue;
+          if (best < 0 || this.aheadD[j]! < this.aheadD[best]!) best = j;
+        }
+        if (best < 0 || performance.now() - t0 > TOWN_FEEL.boxBakeMs) break;
+        const b = this.boxes[ahead[best]!]!;
+        this.roofArt(b, fine, q);
+      }
+    }
+  }
+  /** Whether any square of box `i`'s footprint is seen this frame. */
+  private boxSeen(i: number): boolean {
+    const ks = this.boxSq[i]!;
+    for (let j = 0; j < ks.length; j++) if (this.seen[ks[j]!]) return true;
+    return false;
+  }
+  private readonly ahead = new Int32Array(512);
+  private readonly aheadD = new Float64Array(512);
+  /** A box's roof painted for the camera facing north or east (box-draw.ts), made the first time it's asked for (shared by every box of that art facing that way). */
+  private roofArt(b: BoxInst, fine: boolean, q: number): RoofArt {
+    const box = fine ? b.box : b.low;
+    const slot = (fine ? 4 : 0) + q;
+    const had = this.instArt[slot]![b.i];
+    if (had) return had;
+    let m = this.roofs.get(box);
+    if (!m) this.roofs.set(box, (m = new Map()));
+    // (A flat roof is lit the same whichever way the camera faces: one painting serves all four. Round 4's flat fronts are most of them.)
+    const flat = geomOf(box).faces.every((f) => f.nz > 0.999);
+    const key = flat ? "flat" : `${b.facing}${q}`;
+    let a = m.get(key);
+    if (!a) m.set(key, (a = bakeRoof(b, box, flat ? 0 : q)));
+    this.instArt[slot]![b.i] = a;
+    return a;
+  }
+  /** Each box's roof paintings as it last asked for them, by low or full art and heading (no lookup a frame). */
+  private readonly instArt: (RoofArt | undefined)[][] = [[], [], [], [], [], [], [], []];
+
+  /** A box-backed item's place (its front's; a shed or hedge: the whole box's), from its plan. */
+  private frontPos(it: Item, b: BoxInst): void {
+    const p = this.plans[b.i]!;
+    const v = this.view;
+    const whole = b.kind === "shed" || b.kind === "hedge";
+    it.dx = p.front.dx;
+    it.dz = p.front.dz;
+    // (A run of hedge is drawn by its first square's item; the others stand down.)
+    it.on = (whole ? p.on : p.front.on) && radial(v, it.dx, it.dz) < v.rim && (b.props.length === 0 || it.i === b.prop);
+    it.sz = it.kind === "prop" ? it.dz + 0.05 : it.dz;
+  }
+  /** A side's, back's or roof's item: its place from its box's plan. */
+  private partPos(it: Item): void {
+    const b = this.boxes[it.i >> 2]!;
+    const p = this.plans[b.i]!;
+    const k = it.i & 3;
+    const v = this.view;
+    if (k === 3) {
+      it.dx = p.roofDx;
+      it.dz = p.roofDz;
+      it.on = p.nOrder > 0;
+    } else {
+      const w = k === 0 ? p.left : k === 1 ? p.right : p.back;
+      it.dx = w.dx;
+      it.dz = w.dz;
+      it.on = w.on;
+    }
+    it.on &&= radial(v, it.dx, it.dz) < v.rim + 1;
+    it.sz = it.dz;
+    it.faded = false;
+  }
+
+  /** How strongly a part at (dx, dz) shows (its fade at the rim, the far band's), and the band's softening there. */
+  private partAlpha(dx: number, dz: number): number {
+    const v = this.view;
+    return (1 - 0.6 * bandOf(v, dx, dz)) * enterOf(v, dx, dz);
+  }
+
+  /**
+   * A home's or an everyday building's front: facing the camera (upright, its foot level: the town's way, as one picture, softened in
+   * the far band, its sign written, its lights lit), or at a slant (its strips, shaded as it turns from the camera).
+   */
+  private drawBoxFront(it: Item, b: BoxInst, now: number): void {
+    const home = it.kind === "house";
+    const p = this.plans[b.i]!;
+    const w = p.front;
+    const v = this.view;
+    const fc = home ? this.houseFrames[it.i]! : this.propFrames[it.i]!;
+    const ch = fc.ch;
+    const phase = it.i * (home ? 613 : 389);
+    const img = fc.at(now, home ? it.i * 613 : it.i * 211);
+    const s = bandOf(v, w.dx, w.dz);
+    const alpha = (1 - 0.6 * s) * enterOf(v, w.dx, w.dz);
+    const k = (w.k0 + w.k1) / 2;
+    const px = k / TOWN_FEEL.housePxPerSquare;
+    const fy = (w.y0 + w.y1) / 2;
+    const x0 = w.x0;
+    const y0 = fy - ch.foot[1] * px;
+    const W = w.x1 - w.x0;
+    const H = ch.h * px;
+    const glow = this.lightK > 0.01 ? (home ? this.glowOf(it.i) : this.frontGlowOf(fc, PROPS[it.i]!.lot!)) : null;
+    const sign = home ? artOf(this.places[it.i]!).sign : null;
+    if (w.strips === 1 && Math.abs(w.y1 - w.y0) < 0.75 && w.shade < 0.004 && w.s0 === 0 && w.s1 === 1) {
+      const { ctx } = this;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.imageSmoothingEnabled = px < 1.5;
+      if (s > 0.02) this.blitSoft(img, x0, y0, W, H, s, 0.88 * s);
+      else ctx.drawImage(img, x0, y0, W, H);
+      const ta = alpha * clamp(1 - 2 * s, 0, 1);
+      if (sign && TOWN_FEEL.signNames && ta > 0.02) this.writeSign(it.i, x0 + sign.x * px, y0 + sign.y * px, sign.w * px, sign.h * px, ta);
+      ctx.restore();
+      this.cover(img, x0, y0, W, H, alpha);
+      if (glow) this.lightUp(glow, x0, y0, px, alpha * (1 - 0.88 * s), now, phase);
+      this.box(it, k, x0, y0, x0 + W, y0 + H, x0 + W / 2, fy, y0);
+    } else {
+      this.drawWall(w, img, ch, alpha, glow, false, now, phase);
+      const ta = alpha * clamp(1 - 2 * s, 0, 1);
+      if (sign && TOWN_FEEL.signNames && ta > 0.02) {
+        this.wallAffine(w, ch, sign.x, sign.x + sign.w, false);
+        this.writeSignT(it.i, sign, px, ta);
+      }
+      this.box(it, k, Math.min(w.x0, w.x1), Math.min(w.y0 - (ch.foot[1] * w.k0) / TOWN_FEEL.housePxPerSquare, w.y1 - (ch.foot[1] * w.k1) / TOWN_FEEL.housePxPerSquare), Math.max(w.x0, w.x1), Math.max(w.y0, w.y1) + 3 * px, x0 + W / 2, fy, y0);
+    }
+    if (home) {
+      const nm = this.names[it.i]!;
+      nm.x = x0 + W / 2;
+      nm.y = p.topY;
+      nm.eave = p.eaveY;
+      nm.dz = w.dz;
+      nm.a = alpha;
+      nm.k = k;
+    }
+  }
+
+  /** A shed or a square of hedge: its sides, its roof (a hedge's top) and its front, together. */
+  private drawBoxWhole(it: Item, b: BoxInst, now: number): void {
+    const p = this.plans[b.i]!;
+    const fine = this.paint.kind === "webgl";
+    const B = fine ? b.box : b.low;
+    const w = p.front;
+    const alpha = this.partAlpha(w.dx, w.dz);
+    if (alpha <= 0.004) return;
+    if (p.left.on && B.left) this.drawWall(p.left, this.wallFrame(B.left.ch), B.left.ch, alpha, null, true, now, 0);
+    if (p.right.on && B.right) this.drawWall(p.right, this.wallFrame(B.right.ch), B.right.ch, alpha, null, true, now, 0);
+    this.drawRoof(b, B, p, alpha);
+    const fc = this.propFrames[it.i]!;
+    if (w.on) this.drawWall(w, fc.at(now, it.i * 211), fc.ch, alpha, null, false, now, 0);
+    this.box(it, (w.k0 + w.k1) / 2, p.minX, p.minY, p.maxX, p.maxY, (w.x0 + w.x1) / 2, (w.y0 + w.y1) / 2, p.minY);
+  }
+
+  /** A box's side, back or roof. */
+  private drawPart(it: Item, now: number): void {
+    const b = this.boxes[it.i >> 2]!;
+    const p = this.plans[b.i]!;
+    const B = this.paint.kind === "webgl" ? b.box : b.low;
+    const k = it.i & 3;
+    if (k === 3) {
+      this.drawRoof(b, B, p, this.partAlpha(p.roofDx, p.roofDz));
+      this.box(it, 1, p.minX, p.minY, p.maxX, p.maxY, (p.minX + p.maxX) / 2, p.maxY, p.minY);
+      return;
+    }
+    const w = k === 0 ? p.left : k === 1 ? p.right : p.back;
+    const side = k === 0 ? B.left : k === 1 ? B.right : (B.back ?? B.rear);
+    if (!side) return;
+    const alpha = this.partAlpha(w.dx, w.dz);
+    if (alpha <= 0.004) return;
+    const glow = this.lightK > 0.01 ? this.wallGlowOf(side.ch, side.lights) : null;
+    this.drawWall(w, this.wallFrame(side.ch), side.ch, alpha, glow, true, now, b.i * 97 + k);
+    const bb = this.bb;
+    this.box(it, (w.k0 + w.k1) / 2, bb[0]!, bb[1]!, bb[2]!, bb[3]!, (w.x0 + w.x1) / 2, (w.y0 + w.y1) / 2, bb[1]!);
+  }
+  /** A side's or back's picture (one frame), made once. */
+  private wallFrame(ch: Character): HTMLCanvasElement {
+    let fc = this.wallFrames.get(ch);
+    if (!fc) this.wallFrames.set(ch, (fc = new FrameCache(ch)));
+    return fc.get(0);
+  }
+  /** A side's windows lit at dusk and night (the art's: its own lights, baked as a front's are), once a picture. */
+  private wallGlowOf(ch: Character, lights: readonly LightSpot[]): Glow | null {
+    let g = this.wallGlow.get(ch);
+    if (g === undefined) this.wallGlow.set(ch, (g = lights.length ? bakeGlow(ch, lights, []) : null));
+    return g;
+  }
+
+  /** Where on screen a wall's picture column `s` of the way along stands (perspective-correct between its ends): into wq. */
+  private wallAt(w: WallPlan, s0: number): void {
+    // (Its drawn part only: a wall cut at the camera's near plane runs s0..s1 of its picture between its ends.)
+    const s = (s0 - w.s0) / (w.s1 - w.s0 || 1);
+    const a = (1 - s) * w.k0;
+    const c = s * w.k1;
+    const d = a + c || 1;
+    const q = this.wq;
+    q[0] = (a * w.x0 + c * w.x1) / d;
+    q[1] = (a * w.y0 + c * w.y1) / d;
+    q[2] = (w.k0 * w.k1) / ((1 - s) * w.k1 + s * w.k0 || 1);
+  }
+  private readonly wq = new Float64Array(3);
+  /**
+   * The affine (this.M) drawing a wall's picture columns u0..u1 between where they stand: its foot exact at both, its height at the
+   * nearer end's scale (`tall`: so a strip's top steps up under the roof's eave, never down from it) or their mean.
+   */
+  private wallAffine(w: WallPlan, ch: Character, u0: number, u1: number, tall: boolean): void {
+    const pw = ch.w;
+    this.wallAt(w, clamp(u0 / pw, w.s0, w.s1));
+    const xa = this.wq[0]!;
+    const ya = this.wq[1]!;
+    const ka = this.wq[2]!;
+    this.wallAt(w, clamp(u1 / pw, w.s0, w.s1));
+    const xb = this.wq[0]!;
+    const yb = this.wq[1]!;
+    const kb = this.wq[2]!;
+    const ua = clamp(u0, w.s0 * pw, w.s1 * pw);
+    const du = Math.max(1e-3, clamp(u1, w.s0 * pw, w.s1 * pw) - ua);
+    const sc = (tall ? Math.max(ka, kb) : (ka + kb) / 2) / TOWN_FEEL.housePxPerSquare;
+    const m = this.M;
+    m[0] = (xb - xa) / du;
+    m[1] = (yb - ya) / du;
+    m[2] = 0;
+    m[3] = sc;
+    m[4] = xa - ua * m[0];
+    m[5] = ya - ua * m[1] - ch.foot[1] * sc;
+  }
+  private readonly M = new Float64Array(6);
+  /** The last wall's box on screen (x0, y0, x1, y1). */
+  private readonly bb = new Float64Array(4);
+
+  /** A wall in its strips (its shade over each), cutting what it covers out of the lights behind; its own lights. */
+  private drawWall(w: WallPlan, img: HTMLCanvasElement, ch: Character, alpha: number, glow: Glow | null, tall: boolean, now: number, phase: number): void {
+    const n = w.strips;
+    const pw = ch.w;
+    // (Its shade: the picture darkened once a shade, the art's two exactly and every twentieth between them while the camera turns.)
+    const shade = restShade(w.shade) || Math.round(w.shade * 20) / 20;
+    const pic = shade > 0.004 ? shadedImg(img, shade) : img;
+    const bb = this.bb;
+    bb[0] = bb[1] = Infinity;
+    bb[2] = bb[3] = -Infinity;
+    this.ctx.imageSmoothingEnabled = Math.max(w.k0, w.k1) / TOWN_FEEL.housePxPerSquare < (this.paint.kind === "webgl" ? 1.5 : TOWN_FEEL.wallSmooth2D);
+    const p0 = w.s0 * pw;
+    const pr = (w.s1 - w.s0) * pw;
+    for (let j = 0; j < n; j++) {
+      const u0 = p0 + (j * pr) / n;
+      const u1 = p0 + ((j + 1) * pr) / n;
+      this.wallAffine(w, ch, u0, u1, tall);
+      const m = this.M;
+      this.drawT(pic, m, u0, 0, u1 - u0, ch.h, u0, 0, u1 - u0, ch.h, alpha, j < n - 1);
+      this.coverT(img, m, u0, 0, u1 - u0, ch.h, alpha);
+      // (Its box: the strip's corners.)
+      for (let c = 0; c < 4; c++) {
+        const X = c & 1 ? u1 : u0;
+        const Y = c & 2 ? ch.h : 0;
+        const x = m[0]! * X + m[2]! * Y + m[4]!;
+        const y = m[1]! * X + m[3]! * Y + m[5]!;
+        if (x < bb[0]!) bb[0] = x;
+        if (y < bb[1]!) bb[1] = y;
+        if (x > bb[2]!) bb[2] = x;
+        if (y > bb[3]!) bb[3] = y;
+      }
+    }
+    this.untransform();
+    if (glow && this.lightK * alpha > 0.004) {
+      const fl = this.flicker(now, phase);
+      const crisp = Math.max(w.k0, w.k1) / TOWN_FEEL.housePxPerSquare >= 1.5;
+      for (const pc of glow.pieces) {
+        this.wallAffine(w, ch, pc.x, pc.x + pc.cv.width, tall);
+        this.lightT(pc.cv, this.M, pc.x, pc.y, pc.cv.width, pc.cv.height, this.lightK * alpha * (pc.flicker ? fl : 1), crisp);
+      }
+    }
+  }
+
+  /** A box's roof: its faces far to near, the north and east paintings blended as the camera turns. */
+  private drawRoof(b: BoxInst, B: TownBox, p: BoxPlan, alpha: number): void {
+    if (p.nOrder === 0 || alpha <= 0.004) return;
+    const g = geomOf(B);
+    // (Its painting for the quarter the camera faces to 38 degrees round, the next quarter's from 52, the two blended between: a blend
+    // draws twice, so it's kept short.)
+    const hq = ((this.heading % 360) + 360) % 360;
+    const q0 = Math.floor(hq / 90) % 4;
+    const east = clamp((hq - q0 * 90 - 38) / 14, 0, 1);
+    const fine = B === b.box && this.paint.kind === "webgl";
+    const artN = east < 0.996 ? this.roofArt(b, fine, q0) : null;
+    const artE = east > 0.004 ? this.roofArt(b, fine, (q0 + 1) % 4) : null;
+    for (let o = 0; o < p.nOrder; o++) {
+      const i = p.order[o]!;
+      const fg = g.faces[i]!;
+      const fp = p.faces[i]!;
+      for (let pass = 0; pass < 2; pass++) {
+        const art = pass ? artE : artN;
+        if (!art) continue;
+        const a = pass && artN ? alpha * east : alpha;
+        const fa = art.faces[i]!;
+        if (fp.whole) {
+          const l = fg.n - 1;
+          if (affine(fg.tx[0]!, fg.ty[0]!, fp.x[0]!, fp.y[0]!, fg.tx[1]!, fg.ty[1]!, fp.x[1]!, fp.y[1]!, fg.tx[l]!, fg.ty[l]!, fp.x[l]!, fp.y[l]!, this.M)) this.drawPiece(fa.whole, a);
+        } else
+          for (let t = 0; t < fg.n - 2; t++) {
+            const c1 = t + 1;
+            const c2 = t + 2;
+            if (affine(fg.tx[0]!, fg.ty[0]!, fp.x[0]!, fp.y[0]!, fg.tx[c1]!, fg.ty[c1]!, fp.x[c1]!, fp.y[c1]!, fg.tx[c2]!, fg.ty[c2]!, fp.x[c2]!, fp.y[c2]!, this.M)) this.drawPiece(fa.tris[t]!, a);
+          }
+      }
+    }
+    this.untransform();
+  }
+  /** A roof's painted piece through this.M (its texture's points to the screen). */
+  private drawPiece(pc: Piece, a: number): void {
+    const m = this.M;
+    this.ctx.imageSmoothingEnabled = Math.sqrt(Math.abs(m[0]! * m[3]! - m[1]! * m[2]!)) < 1.5;
+    this.drawT(pc.cv, m, pc.sx, pc.sy, pc.w, pc.h, pc.sx - pc.ox, pc.sy - pc.oy, pc.w, pc.h, a, false);
+    this.coverT(pc.cv, m, pc.sx, pc.sy, pc.w, pc.h, a, pc.sx - pc.ox, pc.sy - pc.oy);
+  }
+
+  /** `img`'s (sx, sy, sw, sh) drawn at (dx, dy, dw, dh) through the affine `m` (CSS px), `a` strong (`seam`: half a pixel wider, so strips meet). */
+  private drawT(img: CanvasImageSource, m: Float64Array, sx: number, sy: number, sw: number, sh: number, dx: number, dy: number, dw: number, dh: number, a: number, seam: boolean): void {
+    if (a <= 0.004) return;
+    const { ctx, DPR } = this;
+    ctx.setTransform(DPR * m[0]!, DPR * m[1]!, DPR * m[2]!, DPR * m[3]!, DPR * m[4]!, DPR * m[5]!);
+    ctx.globalAlpha = a;
+    ctx.drawImage(img, sx, sy, sw, sh, dx, dy, seam ? dw + 0.6 / Math.max(0.01, Math.hypot(m[0]!, m[1]!)) : dw, dh);
+    // (The transform is left as it is: the caller puts the town's back once its pieces are drawn, `untransform`.)
+  }
+  /** The town's own transform and full strength back, after pieces drawn through `drawT`. */
+  private untransform(): void {
+    const { ctx, DPR } = this;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.globalAlpha = 1;
+  }
+  /** What was just drawn through `m` cuts its shape out of the lights it covers (as `cover`). */
+  private coverT(img: CanvasImageSource, m: Float64Array, sx: number, sy: number, sw: number, sh: number, a: number, dx = sx, dy = sy): void {
+    if (this.nLit === 0 || a <= 0.02) return;
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (let c = 0; c < 4; c++) {
+      const X = c & 1 ? dx + sw : dx;
+      const Y = c & 2 ? dy + sh : dy;
+      const x = m[0]! * X + m[2]! * Y + m[4]!;
+      const y = m[1]! * X + m[3]! * Y + m[5]!;
+      x0 = Math.min(x0, x);
+      y0 = Math.min(y0, y);
+      x1 = Math.max(x1, x);
+      y1 = Math.max(y1, y);
+    }
+    const b = this.litBox;
+    let cx0 = Infinity;
+    let cy0 = Infinity;
+    let cx1 = -Infinity;
+    let cy1 = -Infinity;
+    for (let k = 0; k < this.nLit * 4; k += 4)
+      if (x0 < b[k + 2]! && x1 > b[k]! && y0 < b[k + 3]! && y1 > b[k + 1]!) {
+        cx0 = Math.min(cx0, b[k]!);
+        cy0 = Math.min(cy0, b[k + 1]!);
+        cx1 = Math.max(cx1, b[k + 2]!);
+        cy1 = Math.max(cy1, b[k + 3]!);
+      }
+    if (cx0 === Infinity) return;
+    const { DPR } = this;
+    const g = this.layer!.g;
+    g.save();
+    g.globalCompositeOperation = "destination-out";
+    g.globalAlpha = Math.min(1, a);
+    g.beginPath();
+    g.rect(cx0, cy0, cx1 - cx0, cy1 - cy0);
+    g.clip();
+    g.setTransform(DPR * m[0]!, DPR * m[1]!, DPR * m[2]!, DPR * m[3]!, DPR * m[4]!, DPR * m[5]!);
+    g.drawImage(img, sx, sy, sw, sh, dx, dy, sw, sh);
+    g.restore();
+  }
+  /** Adds a light through the affine `m` (as `light`): `img` over (x, y, w, h) in the picture's pixels. */
+  private lightT(img: HTMLCanvasElement, m: Float64Array, x: number, y: number, w: number, h: number, a: number, crisp: boolean): void {
+    if (a <= 0.004) return;
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (let c = 0; c < 4; c++) {
+      const X = c & 1 ? x + w : x;
+      const Y = c & 2 ? y + h : y;
+      const sx = m[0]! * X + m[2]! * Y + m[4]!;
+      const sy = m[1]! * X + m[3]! * Y + m[5]!;
+      x0 = Math.min(x0, sx);
+      y0 = Math.min(y0, sy);
+      x1 = Math.max(x1, sx);
+      y1 = Math.max(y1, sy);
+    }
+    if (x0 > this.W || y0 > this.H || x1 < 0 || y1 < 0) return;
+    const { DPR } = this;
+    const L = this.layer!;
+    const g = L.g;
+    g.globalCompositeOperation = "lighter";
+    g.globalAlpha = Math.min(1, a);
+    g.imageSmoothingEnabled = !crisp;
+    g.setTransform(DPR * m[0]!, DPR * m[1]!, DPR * m[2]!, DPR * m[3]!, DPR * m[4]!, DPR * m[5]!);
+    g.drawImage(img, x, y, w, h);
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+    this.markLit(x0, y0, x1 - x0, y1 - y0);
+  }
+  /** Notes a light's box on the screen (what's drawn later over it cuts into it) and its layer's tiles. */
+  private markLit(x: number, y: number, w: number, h: number): void {
+    const L = this.layer!;
+    if (this.nLit * 4 < this.litBox.length) {
+      const b = this.litBox;
+      const k = this.nLit++ * 4;
+      b[k] = x;
+      b[k + 1] = y;
+      b[k + 2] = x + w;
+      b[k + 3] = y + h;
+    }
+    const T = TOWN_FEEL.lightTilePx;
+    const tx1 = Math.min(L.nx - 1, Math.floor((x + w) / T));
+    const ty1 = Math.min(L.ny - 1, Math.floor((y + h) / T));
+    for (let ty = Math.max(0, Math.floor(y / T)); ty <= ty1; ty++) for (let tx = Math.max(0, Math.floor(x / T)); tx <= tx1; tx++) L.tiles[ty * L.nx + tx] = 1;
+  }
+
+  /** A home's name on its sign, through this.M (a front at a slant): its lettering as `writeSign` sizes it, laid in the sign's middle. */
+  private writeSignT(i: number, sign: { x: number; y: number; w: number; h: number }, px: number, alpha: number): void {
+    const { ctx, DPR } = this;
+    const sg = this.signs[i]!;
+    const fit = Math.min((sign.w * px) / sg.w, (sign.h * px) / sg.h) * 0.94;
+    const s = Math.floor(fit * DPR + 0.25);
+    if (s < 1 || (s / DPR) * CAP < TOWN_FEEL.signMinCap) return;
+    let art = sg.art[s];
+    if (!art) art = sg.art[s] = renderLines(sg.lines, sg.w, sg.h, s, SIGN_INK);
+    // (In the picture's pixels: the lettering's CSS size over the front's scale.)
+    const w = (sg.w * s) / DPR / px;
+    const h = (sg.h * s) / DPR / px;
+    const m = this.M;
+    // (Snapped, round 4: the lettering's corner on a whole device pixel, and level when the front's slant over it is under 2%, so the
+    // letters stay crisp and don't shimmer as the camera glides; they still lean with a front seen at a slant.)
+    const lx = sign.x + (sign.w - w) / 2;
+    const ly = sign.y + (sign.h - h) / 2;
+    const level = Math.abs(m[1]!) < 0.02 * Math.abs(m[0]!);
+    const tx = Math.round(DPR * (m[0]! * lx + m[2]! * ly + m[4]!));
+    const ty = Math.round(DPR * (m[1]! * lx + m[3]! * ly + m[5]!));
+    ctx.setTransform(DPR * m[0]!, level ? 0 : DPR * m[1]!, DPR * m[2]!, DPR * m[3]!, tx, ty);
+    ctx.globalAlpha = alpha;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(art, 0, 0, w, h);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.globalAlpha = 1;
+  }
+
   /**
    * The street town (Nov 5, the art's "nothing between the camera and you"): a building's front, a home's or a shed standing more than
    * `streetNearCut` squares nearer the camera than its focus (you, as it follows you) isn't drawn (nor tapped); a tree there fades out over `streetTreeFade` squares
@@ -1479,6 +2096,24 @@ export class Renderer {
         if (k === "front" || k === "shed") it.on = false;
       }
     }
+  }
+  /**
+   * A figure's view and facing as the camera sees it (round 4's chase camera, Eric: figures stay billboards with the views we have):
+   * the way it last walked turned into the camera's frame, so walking ahead of the camera shows its back, toward it its front, across
+   * it its side (flipped to the way it goes). Today's town: the walker's own.
+   */
+  private viewOf(w: Walker): 0 | 1 | 2 {
+    if (!STREET_TOWN) return w.view;
+    const v = this.view;
+    const across = w.wdc * v.hc - w.wdr * v.hs;
+    const ahead = w.wdc * v.hs + w.wdr * v.hc;
+    return Math.abs(across) > Math.abs(ahead) + 1e-6 ? 0 : ahead > 0 ? 1 : 2;
+  }
+  private faceOf(w: Walker): 1 | -1 {
+    if (!STREET_TOWN) return w.facing;
+    const v = this.view;
+    const across = w.wdc * v.hc - w.wdr * v.hs;
+    return Math.abs(across) < 1e-6 ? w.facing : across < 0 ? -1 : 1;
   }
   /** How much of a street-town tree shows, by how far nearer the camera than its focus it stands (1: all; today's town: always all). */
   private nearFade(it: Item): number {
@@ -1629,8 +2264,7 @@ export class Renderer {
   private frontGlowOf(fc: FrameCache, lot: number): Glow | null {
     let g = this.frontGlow.get(fc);
     if (g === undefined) {
-      const b = STREET_BUILDINGS[lot]!;
-      const box = building(b.id, b.w, b.v);
+      const box = lotArt(STREET_BUILDINGS[lot]!);
       g = box.lights.length ? bakeGlow(box.front, box.lights, []) : null;
       this.frontGlow.set(fc, g);
     }
@@ -2068,18 +2702,7 @@ export class Renderer {
     g.globalAlpha = Math.min(1, a);
     g.imageSmoothingEnabled = !crisp;
     g.drawImage(img, x, y, w, h);
-    if (this.nLit * 4 < this.litBox.length) {
-      const b = this.litBox;
-      const k = this.nLit++ * 4;
-      b[k] = x;
-      b[k + 1] = y;
-      b[k + 2] = x + w;
-      b[k + 3] = y + h;
-    }
-    const T = TOWN_FEEL.lightTilePx;
-    const tx1 = Math.min(L.nx - 1, Math.floor((x + w) / T));
-    const ty1 = Math.min(L.ny - 1, Math.floor((y + h) / T));
-    for (let ty = Math.max(0, Math.floor(y / T)); ty <= ty1; ty++) for (let tx = Math.max(0, Math.floor(x / T)); tx <= tx1; tx++) L.tiles[ty * L.nx + tx] = 1;
+    this.markLit(x, y, w, h);
   }
 
   /**
@@ -2201,16 +2824,30 @@ export class Renderer {
       const nm = this.names[i]!;
       if (!it.on || nm.a <= 0.01) continue;
       // How far you are from the edge of its ground (a home's plot is 3 squares across, the Colosseum's 6), in squares.
-      const d = Math.max(0, Math.abs(wrapF(me.x - h.cx)) - h.half, Math.abs(wrapF(me.y - h.cy)) - h.half);
+      const d = Math.max(0, Math.abs(wrapFX(me.x - h.cx)) - h.half, Math.abs(wrapFY(me.y - h.cy)) - h.half);
       const a = nm.a * clamp((f.nameShowFrom - d) / (f.nameShowFrom - f.nameFullAt), 0, 1);
       if (a <= 0.01) continue;
       const size = Math.round(clamp((15 * nm.k) / v.kf, 12, 20));
-      const y = nm.y - 6 + (1 - a) * f.nameRise;
       ctx.globalAlpha = a;
       ctx.font = NAME_FONT[size]!;
       let widths = this.nameW.get(h.name);
       if (!widths) this.nameW.set(h.name, (widths = []));
       const tw = widths[size] ?? (widths[size] = ctx.measureText(h.name).width);
+      let y = nm.y - 6;
+      // The street town (Nov 5, round 3): just over its own roof, and lower (down to its eave) while it would lie over a building behind.
+      if (!Number.isNaN(nm.eave)) {
+        // (Round 4: a name shows only with its home. Not while the home is passing beside the camera (its front cut at the near side,
+        // the mockup's ghost "Lodge"), nor where a nearer building stands over the spot it would take.)
+        const hb = this.homeBox[i];
+        const fp = hb ? this.plans[hb.i]!.front : null;
+        if (fp && (!fp.on || fp.s0 > 0.02 || fp.s1 < 0.98)) continue;
+        // (Nor cut off at the box's side: a home mostly off screen beside the camera, its name half drawn at the edge.)
+        if (nm.x - tw / 2 < 2 || nm.x + tw / 2 > this.W - 2) continue;
+        y = nm.y - f.nameOverRoof;
+        while (y + f.nameDropStep <= nm.eave && this.overBehind(nm.x - tw / 2 - 2, y - size - 2, tw + 4, size + 4, nm.dz)) y += f.nameDropStep;
+        if (this.overNearer(nm.x - tw / 2 - 2, y - size - 2, tw + 4, size + 4, nm.dz)) continue;
+      }
+      y += (1 - a) * f.nameRise;
       this.keepFree(nm.x - tw / 2 - 2, y - size - 2, tw + 4, size + 4);
       ctx.textAlign = "center";
       ctx.textBaseline = "bottom";
@@ -2222,6 +2859,27 @@ export class Renderer {
       ctx.fillText(h.name, nm.x, y);
     }
     ctx.globalAlpha = 1;
+  }
+
+  /** Whether the box (x, y, w, h) on screen lies under a street-town building standing nearer than `dz` (drawn this frame): it'd hide it. */
+  private overNearer(x: number, y: number, w: number, h: number, dz: number): boolean {
+    for (const b of this.boxes) {
+      if (b.kind === "hedge" || b.kind === "shed") continue;
+      const p = this.plans[b.i]!;
+      if (!p.on || p.front.dz >= dz - 0.5 || p.maxX < x || p.minX > x + w || p.maxY < y || p.minY > y + h) continue;
+      return true;
+    }
+    return false;
+  }
+  /** Whether the box (x, y, w, h) on screen lies over a street-town building standing behind `dz` (drawn this frame). */
+  private overBehind(x: number, y: number, w: number, h: number, dz: number): boolean {
+    for (const b of this.boxes) {
+      if (b.kind === "hedge") continue;
+      const p = this.plans[b.i]!;
+      if (!p.on || p.front.dz <= dz + 0.5 || p.maxX < x || p.minX > x + w || p.maxY < y || p.minY > y + h) continue;
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -2629,13 +3287,18 @@ export class Renderer {
 
   /** Square (c, r)'s corners on the screen, into `q4` (far left, far right, near right, near left), scaled about its middle. */
   private squareQuad(c: number, r: number, scale: number, drop: number): boolean {
-    const { view: v, p, q4 } = this;
-    const dx = wrapF(c - this.camX);
-    const dz = wrapF(r - this.camY);
+    const { view: v, p, q4, rq } = this;
+    rel(v, this.camX, this.camY, c, r, rq);
+    const dx = rq.dx;
+    const dz = rq.dz;
     if (radial(v, dx, dz) > v.rim) return false;
     const h = 0.5 * scale;
+    // (Its corners are the world's: turned with the camera, far left first as the quarter it faces most nearly has them.)
+    const q = ((Math.round(v.heading / 90) % 4) + 4) % 4;
     for (let i = 0; i < 4; i++) {
-      if (!proj(v, dx + CORNERS[i * 2]! * h, dz + CORNERS[i * 2 + 1]! * h - drop, 0, p)) return false;
+      const j = (i + q) % 4;
+      toCam(v, CORNERS[j * 2]! * h, CORNERS[j * 2 + 1]! * h, rq);
+      if (!proj(v, dx + rq.dx, dz + rq.dz - drop, 0, p)) return false;
       q4[i * 2] = p.x;
       q4[i * 2 + 1] = p.y;
     }
@@ -2652,7 +3315,8 @@ export class Renderer {
 
   /** Pixels across one square at (c, r) (for line widths). */
   private squarePx(c: number, r: number): number {
-    return proj(this.view, wrapF(c - this.camX), wrapF(r - this.camY), 0, this.p) ? this.p.k : 0;
+    rel(this.view, this.camX, this.camY, c, r, this.rq);
+    return proj(this.view, this.rq.dx, this.rq.dz, 0, this.p) ? this.p.k : 0;
   }
 
   /** Your trail's droplets, your destination's mark, and the pressed square: on the ground, before anyone stands on it. */
@@ -2671,8 +3335,8 @@ export class Renderer {
       if (this.lastC >= 0 && tr) {
         if (this.markRun++ % tr.every === 0) {
           const m = this.marks[this.markNext++ % this.marks.length]!;
-          const dc = wrapF(hc - this.lastC);
-          const dr = wrapF(hr - this.lastR);
+          const dc = wrapFX(hc - this.lastC);
+          const dr = wrapFY(hr - this.lastR);
           m.c = this.lastC;
           m.r = this.lastR;
           m.t0 = now;
@@ -2700,8 +3364,9 @@ export class Renderer {
       while (fi < mt.ends.length - 1 && age >= mt.ends[fi]!) fi++;
       const img = mt.frames[m.view]?.[m.n & 1]?.[fi];
       if (!img || !img.width) continue;
-      const dx = wrapF(m.c - this.camX);
-      const dz = wrapF(m.r - this.camY);
+      rel(this.view, this.camX, this.camY, m.c, m.r, this.rq);
+      const dx = this.rq.dx;
+      const dz = this.rq.dz;
       if (radial(this.view, dx, dz) > this.view.rim || !proj(this.view, dx, dz, 0, this.p)) continue;
       // (Its box is in the pawn's square's units: your pawn's box is youSquares squares across.)
       const u = (this.p.k * f.youSquares) / 100;
@@ -2720,8 +3385,9 @@ export class Renderer {
     for (const d of this.drops) {
       const a = (now - d.t0) / f.trailLifeMs;
       if (a < 0 || a >= 1) continue;
-      const dx = wrapF(d.c - this.camX);
-      const dz = wrapF(d.r - this.camY);
+      rel(this.view, this.camX, this.camY, d.c, d.r, this.rq);
+      const dx = this.rq.dx;
+      const dz = this.rq.dz;
       if (radial(this.view, dx, dz) > this.view.rim || !proj(this.view, dx, dz, 0, this.p)) continue;
       const rx = this.p.k * f.trailSize * 0.5 * (1 - 0.6 * a);
       ctx.globalAlpha = f.trailAlpha * (1 - a) * (1 - a) * enterOf(this.view, dx, dz);
@@ -2744,7 +3410,8 @@ export class Renderer {
       const gc = w.goalC();
       const gr = w.goalR();
       const ps = this.pressSq;
-      if (!(ps.on && ps.c === gc && ps.r === gr) && proj(this.view, wrapF(gc - this.camX), wrapF(gr - this.camY), 0, this.p)) {
+      rel(this.view, this.camX, this.camY, gc, gr, this.rq);
+      if (!(ps.on && ps.c === gc && ps.r === gr) && proj(this.view, this.rq.dx, this.rq.dz, 0, this.p)) {
         const k = this.p.k;
         ctx.strokeStyle = f.pressEdge;
         ctx.fillStyle = "rgba(255,215,106,.35)";
@@ -2911,13 +3578,63 @@ export class Renderer {
   }
 
   /** A person's item this frame (`i`: its index in the people), or null. */
-  /** Where square (c, r)'s middle is on screen this frame (for tests: to walk somewhere). False if it isn't on screen. */
+  /** Where square (c, r)'s middle is on screen this frame (for tests: a fixed point of the world). False if it isn't on screen. */
   squareAt(c: number, r: number, out: { x: number; y: number }): boolean {
-    if (!proj(this.view, wrapF(c - this.camX), wrapF(r - this.camY), 0, this.p)) return false;
+    rel(this.view, this.camX, this.camY, c, r, this.rq);
+    if (!proj(this.view, this.rq.dx, this.rq.dz, 0, this.p)) return false;
     out.x = this.p.x;
     out.y = this.p.y;
     return out.x > 0 && out.x < this.W && out.y > 0 && out.y < this.H;
   }
+  /**
+   * Where a tap on square (c, r) lands this frame (for tests: to walk somewhere): its middle, or, where something stands over that on
+   * screen (a figure and its tag, a lamp, a front: a tap there would hit it, round 4's close chase camera puts your own pawn over the
+   * squares just ahead), the nearest point of the square a tap reaches as that square. False if no part of it is on screen and clear.
+   */
+  tapSquareAt(c: number, r: number, out: { x: number; y: number }): boolean {
+    const wc = colI(c);
+    const wr = rowI(r);
+    for (let k = 0; k < SQUARE_SPOTS.length; k += 2) {
+      rel(this.view, this.camX, this.camY, c + SQUARE_SPOTS[k]!, r + SQUARE_SPOTS[k + 1]!, this.rq);
+      if (!proj(this.view, this.rq.dx, this.rq.dz, 0, this.p)) continue;
+      const x = this.p.x;
+      const y = this.p.y;
+      if (!(x > 0 && x < this.W && y > 0 && y < this.H)) continue;
+      const h = this.pick(x, y);
+      if (h?.kind !== "square" || h.c !== wc || h.r !== wr) continue;
+      out.x = x;
+      out.y = y;
+      return true;
+    }
+    return false;
+  }
+
+  /** (Tests) Every figure the last frame drew (the bosses, then the people): its name, its box and foot on screen, how strongly it showed. */
+  figureBoxes(): { name: string; x0: number; y0: number; x1: number; y1: number; fy: number; alpha: number }[] {
+    const out: { name: string; x0: number; y0: number; x1: number; y1: number; fy: number; alpha: number }[] = [];
+    for (const it of this.items) {
+      if (!it.on || (it.kind !== "boss" && it.kind !== "person")) continue;
+      const name = it.kind === "boss" ? this.town.bosses[it.i]!.home.boss : this.town.people[it.i]!.name;
+      out.push({ name, x0: it.x0, y0: it.y0, x1: it.x1, y1: it.y1, fy: it.fy, alpha: it.kind === "boss" ? this.bossAlpha[it.i] ?? 1 : this.personAlpha[it.i] ?? 1 });
+    }
+    return out;
+  }
+  /**
+   * (Tests) The street town's boxes the last frame drew: each one's art, which way it faces, its draws (strips and faces; the 2D
+   * fallback's cost), whether its front was drawn and faced you, and how many of its sides were drawn.
+   */
+  boxDraws(): { id: string; kind: string; facing: "S" | "N" | "W" | "E"; draws: number; front: boolean; facesYou: boolean; sides: number }[] {
+    return this.boxes
+      .filter((b) => this.plans[b.i]!.on)
+      .map((b) => {
+        const p = this.plans[b.i]!;
+        const f = p.front;
+        // (Its front faces you: turned neither way from the camera, so unshaded.)
+        return { id: b.box.id, kind: b.kind, facing: b.facing, draws: p.draws, front: f.on, facesYou: f.on && f.shade < 0.004, sides: +p.left.on + +p.right.on };
+      });
+  }
+  private readonly bossAlpha: number[] = [];
+  private readonly personAlpha: number[] = [];
 
   /** (Tests) Person i as the last frame drew them: their box on screen, their foot and the top of their head (their tag sits on it). */
   drawnBox(i: number): { x0: number; y0: number; x1: number; y1: number; fx: number; fy: number; hy: number } | null {
@@ -2946,6 +3663,13 @@ export class Renderer {
         return { kind: "house", home: this.homes[it.i]! };
       }
       if (it.kind === "boss") return { kind: "boss", boss: this.town.bosses[it.i]! };
+      // (A street-town home's side, back or roof: the home. An everyday building's: the ground behind, as its front.)
+      if (it.kind === "part") {
+        const h = this.boxes[it.i >> 2]!.home;
+        const home = h ? this.homes.find((o) => o.id === h) : null;
+        if (home) return { kind: "house", home };
+        continue;
+      }
       if (it.kind === "prop") {
         // A chess table (its stools too): its table. A tree, a bench or the fountain: the square under the tap.
         const pr = PROPS[it.i]!;
@@ -3035,8 +3759,9 @@ export class Renderer {
     for (let o = 0; o < order.length && o < chips.length; o++) {
       const i = order[o]!;
       const h = places[i]!;
-      const dx0 = wrapF(h.cx - this.camX);
-      const dz0 = wrapF(h.cy - this.camY);
+      rel(v, this.camX, this.camY, h.cx, h.cy, this.rq);
+      const dx0 = this.rq.dx;
+      const dz0 = this.rq.dz;
       // Aim along the drawn ground when the home is ahead and before the curve; otherwise by its map direction.
       let dx: number;
       let dy: number;
@@ -3112,7 +3837,14 @@ function sortFarFirst(a: Item[]): void {
     a[j + 1] = it;
   }
 }
-const dist2 = (h: Place, x: number, y: number) => wrapF(h.cx - x) ** 2 + wrapF(h.cy - y) ** 2;
+/** Points of a square to tap (offsets from its middle, squares): the middle first, then nearest outward, kept off its edges. */
+const SQUARE_SPOTS: readonly number[] = (() => {
+  const pts: [number, number][] = [];
+  for (const u of [-0.35, -0.2, 0, 0.2, 0.35]) for (const v of [-0.35, -0.2, 0, 0.2, 0.35]) pts.push([u, v]);
+  pts.sort((a, b) => Math.hypot(a[0], a[1]) - Math.hypot(b[0], b[1]));
+  return pts.flat();
+})();
+const dist2 = (h: Place, x: number, y: number) => wrapFX(h.cx - x) ** 2 + wrapFY(h.cy - y) ** 2;
 /** The Colosseum's chip shows all of its icon. */
 const CHIP_ICON_BOX = [0, 0, COLISEUM_CHIP.w] as const;
 

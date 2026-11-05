@@ -39,7 +39,7 @@ import { account, onAccountChange, playerName } from "../account.ts";
 import { TOWN_ASKED, testSwitchesAllowed } from "../test-switches.ts";
 import { play, warmSounds } from "../sound.ts";
 import { SELECT_SOUND, TOWN_SOUNDS, townSound } from "../characters/boss-select.ts";
-import { N, proj, wrapF, wrapI } from "./camera.ts";
+import { N, colI, fromCam, proj, rowI, wrapFX, wrapFY, wrapI } from "./camera.ts";
 import { SHOP_FEEL, TOWN_FEEL } from "./feel.ts";
 import { shopOf } from "./shops/shops.ts";
 import type { LoadedRoom, RoomIntro, ShopCtl, ShopRoom } from "./shops/ShopRoom.tsx";
@@ -49,6 +49,8 @@ import { TownChat } from "./TownChat.tsx";
 import { TownChatTools } from "./TownChatTools.tsx";
 import { Press } from "./press.ts";
 import { anyHeld, hold, isHeld, keyWalk, listenKeys, onHeld, type Dir } from "./arrows.ts";
+import { Turn, chaseTarget, quarterOf, screenStep } from "./turn.ts";
+import { StreetZoom, parkSide } from "./zoom-steps.ts";
 import { PAWN_HEAD, PAWN_PX, Renderer, pawnImage, type Hit, type YouArt } from "./render.ts";
 import { dropRiders, leaveRider, ridersHeld, rideArt, shareRider, type Rider, type RiderPawn } from "./rides.ts";
 import { rideSpeed } from "../components/rides/scale.ts";
@@ -627,13 +629,29 @@ function startTown(
   const town = createTown(performance.now(), undefined, seat, undefined, stand);
   const r = new Renderer(painter, town, HOMES);
   // The arrow keys (arrows.ts): hold one and you walk that way, on squares you can stand on and nobody's (the walker's own check).
-  const keys = keyWalk(town.you.walker, (c, r) => walkable(c, r) && !taken(town, c, r, town.you.walker), wrapI);
+  // (The street town's turning camera, Nov 5, round 3: the keys go through its heading, so up is always up the screen.)
+  const turned = { dc: 0, dr: 0 };
+  const keys = keyWalk(
+    town.you.walker,
+    (c, r) => walkable(c, r) && !taken(town, c, r, town.you.walker),
+    wrapI,
+    STREET_TOWN
+      ? (c, r, dc, dr) => {
+          // (Round 4's chase camera: through the way you faced as the hold began, so a held left or right turns you once and runs on.
+          // keyWalk has turned `dr` by the walker's rowsUp (#502): 1 in the town, so it's still up the screen here.)
+          screenStep(dc, dr, keyQuarter, turned);
+          // (Off the world past the north or south edge: a row of -1, which no one stands on.)
+          return { c: colI(c + turned.dc), r: rowI(r + turned.dr) };
+        }
+      : undefined,
+  );
   const keyEls = [...box.querySelectorAll<HTMLElement>(".town-key")];
   const paintKeys = () => {
     for (const el of keyEls) el.classList.toggle("on", isHeld(el.dataset.dir as Dir));
   };
   const stopKeys = listenKeys();
   const offHeld = onHeld(paintKeys);
+  const offQuarter = onHeld(() => (keyQuarter = quarterOf(turn.to)));
   // (The signs' pixel font is the game's own; it's loaded on first use, so ask for it now.)
   void document.fonts?.load('8px "Press Start 2P"').catch(() => {});
   // The bosses' sounds for a tap on one, made ahead off the page's thread (the sound worker), so a tap never costs a frame.
@@ -644,6 +662,17 @@ function startTown(
   // (On you: back from a game with a bot, you're at its table.)
   let camX = town.you.walker.c;
   let camY = town.you.walker.r;
+  /**
+   * The street town's turning camera (Nov 5, round 3; turn.ts): north everywhere but Seam Avenue, east there, turning in its crossings
+   * as you walk (the square you're on says which), eased; a chip's glide turns it to where it glides. Today's town: always north.
+   */
+  const turn = new Turn(0);
+  let heading = turn.to;
+  /** (The street town's keys: the quarter you faced as the keys held changed.) */
+  let keyQuarter = 0;
+  const legNow = { dc: 0, dr: 0, last: false };
+  /** (Tests) The heading held (the turn's stills), or null. */
+  let pinHeading: number | null = null;
   let follow = true;
   /** The camera's speed while it follows you (squares a second): the spring's state. */
   let vx = 0;
@@ -651,6 +680,10 @@ function startTown(
   let glide: { x: number; y: number } | null = null;
   let zoomCur = (STREET_TOWN ? f.streetStartZoomedOut : f.startZoomedOut) ? 1 : 0;
   let zoomTarget = zoomCur;
+  // The street town's zoom (round 4, zoom-steps.ts): steps, and the park's step out; zoomCur is its step there (0 in .. 3 the overview).
+  const startSq = town.you.walker.here();
+  const sz = new StreetZoom(f.streetStartZoomedOut ? f.streetZoomStart + 1 : f.streetZoomStart, parkSide(startSq.c, startSq.r) !== false);
+  if (STREET_TOWN) zoomCur = zoomTarget = sz.step;
   // The sky by the device's clock, read about once a minute; `?sky=day|dawn|dusk|night` holds one look (for Eric, tests).
   const pinned = skyOverride(new URLSearchParams(location.search).get("sky"));
   const clock = (): SkyWeights => {
@@ -897,9 +930,9 @@ function startTown(
   const updateCamera = (dt: number, now: number) => {
     if (glide) {
       const k = 1 - Math.exp(-f.glideRate * dt);
-      camX += wrapF(glide.x - camX) * k;
-      camY += wrapF(glide.y - camY) * k;
-      if (Math.hypot(wrapF(glide.x - camX), wrapF(glide.y - camY)) < 0.03) glide = null;
+      camX += wrapFX(glide.x - camX) * k;
+      camY += wrapFY(glide.y - camY) * k;
+      if (Math.hypot(wrapFX(glide.x - camX), wrapFY(glide.y - camY)) < 0.03) glide = null;
     } else if (follow) {
       // A critically damped spring toward your pawn (or, up close, the statue's square), solved exactly for the frame
       // (steady at any frame rate).
@@ -907,8 +940,8 @@ function startTown(
       if (closeOn >= 0 && closeIn) ((p.x = STATUES[closeOn]!.c), (p.y = STATUES[closeOn]!.r));
       const w = f.followSpring;
       const e = Math.exp(-w * dt);
-      const x = wrapF(camX - p.x);
-      const y = wrapF(camY - p.y);
+      const x = wrapFX(camX - p.x);
+      const y = wrapFY(camY - p.y);
       const jx = vx + w * x;
       const jy = vy + w * y;
       camX = p.x + (x + jx * dt) * e;
@@ -918,13 +951,21 @@ function startTown(
     }
     if (!follow || glide) vx = vy = 0;
     // (Kept near the world's middle so the numbers never grow, however far you walk round.)
-    camX = START.c + wrapF(camX - START.c);
-    camY = START.r + wrapF(camY - START.r);
+    camX = START.c + wrapFX(camX - START.c);
+    camY = START.r + wrapFY(camY - START.r);
+    // The street town's chase camera (round 4): behind you, the way you walk (turn.ts chaseTarget), eased; a glide or a look round keeps it.
+    if (STREET_TOWN) {
+      if (follow && !glide) {
+        const n = town.you.walker.leg(legNow);
+        if (n) turn.aim(chaseTarget(turn.to, legNow.dc, legNow.dr, n, legNow.last, walkByKeys), now);
+      }
+      heading = pinHeading ?? turn.at(now);
+    }
   };
 
   const draw = (now: number, dt = 0) => {
     drawnAt = now;
-    if (!painter.lost) r.draw(now, camX, camY, zoomCur, dt);
+    if (!painter.lost) r.draw(now, camX, camY, zoomCur, dt, heading);
     placeChips();
     placeCard();
     const h = town.you.walker.here();
@@ -940,8 +981,16 @@ function startTown(
     if (!alive) return;
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
-    zoomCur += (zoomTarget - zoomCur) * (1 - Math.exp(-dt * f.zoomRate));
-    if (Math.abs(zoomTarget - zoomCur) < 0.001) zoomCur = zoomTarget;
+    if (STREET_TOWN) {
+      // (The park's step out as you come fully into it, back as you leave: zoom-steps.ts.)
+      const h = town.you.walker.here();
+      sz.where(parkSide(h.c, h.r), now);
+      zoomCur = sz.at(now);
+      if (zoomTarget !== sz.step) onZoom((zoomTarget = sz.step) > f.streetZoomStart);
+    } else {
+      zoomCur += (zoomTarget - zoomCur) * (1 - Math.exp(-dt * f.zoomRate));
+      if (Math.abs(zoomTarget - zoomCur) < 0.001) zoomCur = zoomTarget;
+    }
     town.you.name = playerName();
     if (!pinned && now - skyAt > f.skyCheckMs) {
       skyAt = now;
@@ -1186,6 +1235,11 @@ function startTown(
   // The arrow keys set off: as a tap walk does, the card closes, the camera follows you and the walk stands you up. Held, the walker
   // runs on (keys.start: each frame while it stands still; the walk itself asks for each next square).
   let keysOn = false;
+  /**
+   * (Round 4) Whether your walk now is the arrows' (until a tap starts another): the chase camera turns for the keys' steps by their own
+   * rule (down steps back without turning), also for a step still under way after the key is let go.
+   */
+  let walkByKeys = false;
   /** The place the held arrows last ran you into (its card asked once a hold): "" none. */
   let keysAsked = "";
   /**
@@ -1198,8 +1252,11 @@ function startTown(
     const dr = (isHeld("up") ? 1 : 0) - (isHeld("down") ? 1 : 0);
     if ((dc === 0) === (dr === 0)) return;
     const h = town.you.walker.here();
-    const c = wrapI(h.c + dc);
-    const rr = wrapI(h.r + dr);
+    // (Through the street town's heading: up is up the screen.)
+    screenStep(dc, dr, quarterOf(heading), turned);
+    const c = colI(h.c + turned.dc);
+    const rr = rowI(h.r + turned.dr);
+    if (c < 0 || rr < 0) return;
     const home = plotAt[rr * N + c];
     const next: Card | null = home ? { kind: "home", i: HOMES.indexOf(home), confirm: false } : onColiseum(c, rr) ? { kind: "coliseum", i: HOMES.length, confirm: false } : null;
     const key = next ? `${next.kind}:${next.i}` : "";
@@ -1212,6 +1269,7 @@ function startTown(
       keysAsked = "";
       return;
     }
+    walkByKeys = true;
     if (!keysOn) {
       keysOn = true;
       leaveClose();
@@ -1236,6 +1294,7 @@ function startTown(
     if (p?.dest) r.pressSquare(p.dest.c, p.dest.r);
     press.down(e.clientX, e.clientY, p?.dest || p?.card ? p.key : "");
   };
+  const dragTo = { dx: 0, dz: 0 };
   const onMove = (e: PointerEvent) => {
     if (!drag || e.pointerId !== drag.id) return;
     const was = press.dragged();
@@ -1247,8 +1306,10 @@ function startTown(
       follow = false;
       glide = null;
     }
-    camX = drag.cx - (e.clientX - drag.x) / drag.kx;
-    camY = drag.cy + (e.clientY - drag.y) / drag.ky;
+    // (Across and along the screen, turned into the world's east and north by the camera's heading.)
+    fromCam(r.view, -(e.clientX - drag.x) / drag.kx, (e.clientY - drag.y) / drag.ky, dragTo);
+    camX = drag.cx + dragTo.dx;
+    camY = drag.cy + dragTo.dz;
   };
   const onUp = (e: PointerEvent) => {
     if (!drag || e.pointerId !== drag.id) return;
@@ -1272,6 +1333,7 @@ function startTown(
     // You sit when a tap on a table sent you to its stool; any other walk stands you up (walkOff).
     walkOff();
     town.you.sit = p.card?.kind === "table";
+    if (p.dest) walkByKeys = false;
     if (p.dest && walkWalker(town.you.walker, p.dest)) {
       follow = true;
       glide = null;
@@ -1310,15 +1372,22 @@ function startTown(
 
   function setZoom(out: boolean) {
     leaveClose();
+    if (STREET_TOWN) {
+      zoomTarget = sz.press(out, performance.now());
+      onZoom(zoomTarget > f.streetZoomStart);
+      return;
+    }
     zoomTarget = out ? 1 : 0;
     onZoom(out);
   }
 
   // A test hook (e2e, with the test switches on: test-switches.ts): where to tap a boss, a home or the Colosseum (its gate)
   // now, in the box.
-  const hookAt = (kind: "boss" | "home" | "coliseum" | "statue" | "table" | "lamp" | "light" | "bot" | "player" | "square", id?: HomeId | StatueId | "coliseum" | number | string | readonly [number, number]) => {
+  const hookAt = (kind: "boss" | "home" | "coliseum" | "statue" | "table" | "lamp" | "light" | "bot" | "player" | "square" | "tap-square", id?: HomeId | StatueId | "coliseum" | number | string | readonly [number, number]) => {
     const out = { x: 0, y: 0 };
     if (kind === "square") return testSwitchesAllowed() && Array.isArray(id) && r.squareAt(id[0]!, id[1]!, out) ? out : null;
+    // (Round 4: where a tap on the square reaches it, clear of whatever stands over its middle on screen.)
+    if (kind === "tap-square") return testSwitchesAllowed() && Array.isArray(id) && r.tapSquareAt(id[0]!, id[1]!, out) ? out : null;
     if (kind === "player") return testSwitchesAllowed() && r.tapPoint("person", town.people.findIndex((p) => p.uid === id), out) ? out : null;
     if (kind === "bot") return testSwitchesAllowed() && r.tapPoint("person", town.people.findIndex((p) => p.bot === TOWN_BOTS[Number(id)]), out) ? out : null;
     if (kind === "table") return testSwitchesAllowed() && r.tapPoint("table", Number(id), out) ? out : null;
@@ -1331,12 +1400,15 @@ function startTown(
     return testSwitchesAllowed() && r.tapPoint(kind === "boss" ? "boss" : "home", i, out) ? out : null;
   };
   // ... `__townCam()`: the camera now: its zoom (0 in, 1 out), its lens (1: none; more up close), where it looks (the
-  // focus square), the statue it's close on (null: none), how far its glide has come, and its quote.
+  // focus square), the statue it's close on (null: none), how far its glide has come, and its quote; the street town's heading, the
+  // figures drawn and the boxes' draws.
   const hookCam = () =>
     testSwitchesAllowed()
       ? {
           zoom: zoomCur,
           zoomTarget,
+          // (The street town: its zoom step's memory in the park: the step you had coming in, null if none.)
+          parkBefore: STREET_TOWN ? sz.before : null,
           mag: r.lensMag,
           focus: [camX, camY],
           statue: closeOn >= 0 ? STATUES[closeOn]!.id : null,
@@ -1346,6 +1418,16 @@ function startTown(
           // The statue up close: its drawn box (top and bottom, as shares of the world's box) and its quote's letters' height.
           box: closeOn >= 0 ? [r.statueBox[closeOn]!.y0 / r.H, r.statueBox[closeOn]!.y1 / r.H] : null,
           cap: r.quoteCap,
+          // The street town's heading (degrees from north; 90 east) as the last frame drew it, and where it's turning to.
+          heading,
+          headingTo: turn.to,
+          // Every figure drawn in the last frame (bosses, you, the bots): its box on screen and how strongly it showed (Eric, Nov 4:
+          // whole on screen at rest).
+          figures: r.figureBoxes(),
+          // (Round 4: the horizon's height in the box, px; the sky over it, the street below.)
+          horizon: r.view.hy,
+          // The street town's boxes drawn in the last frame and their draws (the 2D fallback's cost; WebGL batches them).
+          boxes: r.boxDraws(),
         }
       : null;
   // ... and `__townGather()` sends the three bots nearest you to stand beside you (to see a ring form).
@@ -1425,13 +1507,13 @@ function startTown(
     if (!testSwitchesAllowed()) return;
     if (typeof id !== "string") {
       follow = false;
-      glide = { x: camX + wrapF(id[0] - camX), y: camY + wrapF(id[1] - camY) };
+      glide = { x: camX + wrapFX(id[0] - camX), y: camY + wrapFY(id[1] - camY) };
       return;
     }
     const h = HOMES.find((x) => x.id === id);
     if (!h) return;
     follow = false;
-    glide = { x: camX + wrapF(h.cx - camX), y: camY + wrapF(h.cy - h.foot + 0.5 - f.glideAhead - camY) };
+    glide = { x: camX + wrapFX(h.cx - camX), y: camY + wrapFY(h.cy - h.foot + 0.5 - f.glideAhead - camY) };
   };
   // ... `__townTags()`: the name tags drawn in the last frame: name, kind ("you", "bot", "sidekick"), alpha, pill and ink colors, and
   // where the pill is on the screen (Oct 28: they show only near you unless Town settings says "Everyone"; a sidekick's is blue).
@@ -1464,7 +1546,14 @@ function startTown(
     if (!testSwitchesAllowed()) return false;
     follow = true;
     glide = null;
+    walkByKeys = false;
     return walkYou(town, { kind: "square", c: wrapI(sq[0]), r: wrapI(sq[1]) });
+  };
+  // ... `__townHeading(deg | null)` (the street town's turn, Nov 5, round 3): the camera faces `deg` from north and stays so (the turn's
+  // stills: its middle frame), or (null) turns as you walk again.
+  const hookHeading = (deg: number | null) => {
+    if (!testSwitchesAllowed()) return;
+    pinHeading = deg;
   };
   const hookRide = () => {
     if (!testSwitchesAllowed()) return null;
@@ -1506,7 +1595,7 @@ function startTown(
     const p = painter as Painter & { uploads?: number; resets?: number };
     return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0 };
   };
-  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townBackend?: typeof hookBackend; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townWalk?: typeof hookWalk; __townRide?: typeof hookRide; __townYou?: typeof hookYou };
+  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townBackend?: typeof hookBackend; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townWalk?: typeof hookWalk; __townRide?: typeof hookRide; __townYou?: typeof hookYou; __townHeading?: typeof hookHeading };
   hooks.__townAt = hookAt;
   hooks.__townGlide = hookGlide;
   hooks.__townGather = hookGather;
@@ -1525,6 +1614,7 @@ function startTown(
   hooks.__townPaint = hookPaint;
   hooks.__townBench = hookBench;
   hooks.__townWalk = hookWalk;
+  hooks.__townHeading = hookHeading;
   hooks.__townRide = hookRide;
   hooks.__townYou = hookYou;
 
@@ -1570,6 +1660,7 @@ function startTown(
       cancelMeet(town);
       town.you.sit = false;
       const to = spotNear(town, town.you.walker, h.door, false);
+      walkByKeys = false;
       if (!to || !walkWalker(town.you.walker, to)) return;
       goingIn = i;
       follow = true;
@@ -1588,6 +1679,7 @@ function startTown(
       cancelMeet(town);
       town.you.sit = false;
       const to = spotNear(town, town.you.walker, h.door, false);
+      walkByKeys = false;
       if (!to || !walkWalker(town.you.walker, to)) return false;
       challengeStand = stood;
       challenging = i;
@@ -1627,7 +1719,7 @@ function startTown(
       follow = false;
       // To a few squares in front of its picture's foot (a home's: half a square in front of its plot's middle).
       const y = h.cy - h.foot + 0.5 - f.glideAhead;
-      glide = { x: camX + wrapF(h.cx - camX), y: camY + wrapF(y - camY) };
+      glide = { x: camX + wrapFX(h.cx - camX), y: camY + wrapFY(y - camY) };
     },
     stop: () => {
       alive = false;
@@ -1645,6 +1737,7 @@ function startTown(
       removeEventListener("keydown", onKey);
       stopKeys();
       offHeld();
+      offQuarter();
       delete hooks.__townAt;
       delete hooks.__townGlide;
       delete hooks.__townGather;
@@ -1663,6 +1756,7 @@ function startTown(
       delete hooks.__townPaint;
       delete hooks.__townBench;
       delete hooks.__townWalk;
+      delete hooks.__townHeading;
       delete hooks.__townRide;
       delete hooks.__townYou;
       painter.dispose();
