@@ -161,3 +161,4 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Ginger code DONE dcf4a6c5 → PR #493 (full-e2e), CI watcher bh5qn5ne7. Note: arrows up fixed in every shop; doorway phone fps 35.7 vs 40.8.
 - Ginger LIVE 3ad40dde (22:35 UTC). Main e2e red: Ginger stairs spec read lift before step settled (no SHOTS on CI). Fix PR #494 c0e710b2 (settled() + trail 6000), CI watcher brngboghh. Smudgy desktop flaky once in same run (passed on retry).
 - Main GREEN + live ab6c8c48 (#494 merged). Nothing open on GitHub. Next: Eric's stair test in Ginger's igloo; boss quotes (Gemini) when Eric sends them.
+- Nov 5: Eric: 'the town is not a town'. Sent today's top-down plan + proposed plan (66x66, park centre, 4 avenues, ring street, Colosseum north, 16 boss homes + 6 everyday house designs A-F, hedge edge, no wrap) + Gemini prompt (assets/town-redesign/). Open Qs: wrap vs edge, boss placement, street movers, enterable houses. Waiting on Eric/Gemini concept.

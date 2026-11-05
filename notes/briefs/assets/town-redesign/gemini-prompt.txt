@@ -1,0 +1,24 @@
+Attach: town-proposal.png (the plan), now-start.png and now-gingerbread.png (how the game looks today).
+
+Prompt:
+
+I'm designing the town in my chess game, HunChess. The screenshots show the art style today: chunky pixel art, bright and friendly, a 3/4 top-down camera, and the ground is a tan-and-cream chessboard. Right now the town is just boss homes scattered on an empty chessboard, so it doesn't feel like a town. The plan image is the layout I want. Please paint one bird's-eye concept picture of the whole town following that plan, in the same pixel-art style as the screenshots.
+
+What the town needs:
+- In the middle, a cozy city park: lawns, trees, benches, a fountain at the center, and little stone tables with chessboards on them. A paved cross runs through the park.
+- Four avenues lead out of the park, one on each side. Their street surface is still the tan-and-cream chessboard. Pedestrians walk on it; there are no cars. A plain paved sidewalk runs along both sides, with street lamps and a few trees.
+- A ring street, also chessboard, loops round the middle and joins all four avenues.
+- To the north, past the ring street: a big round Colosseum facing a paved plaza with two statues.
+- Each avenue is lined with houses on small lots with front yards, fences and little paths. Mostly they are ordinary cartoon houses in six designs:
+  - a little cottage with a picket fence
+  - a two-storey townhouse with a stoop
+  - a row of three skinny terraced houses
+  - a small apartment block with balconies
+  - a corner bakery/cafe
+  - a house with a garden shed and veg patch
+  Use lots of colours and keep them cheerful, a bit whimsical and wobbly.
+- Mixed in among them are the special boss homes, each one bigger and themed (an igloo candy shop, a firework stand, a circus tent, a pyramid, an art gallery, a barn stall, a funhouse, and so on).
+- In the south-west corner, a patch of dark spooky woods with one creepy house.
+- A town gate on the south edge. The whole town is ringed by hedges and trees.
+
+Style: an original cartoon neighbourhood with a toy-like, playful feel. Don't copy any existing game's town, characters or logos. No text or labels in the picture.
