@@ -42,7 +42,7 @@ export interface LookSpec {
 // ---- The colours (dark, mid, light): warm cartoon walls, roofs, doors and awnings.
 const WALLS: readonly (readonly [string, string, string])[] = [
   ["#d2ad5c", "#efd48a", "#fbeab4"], // butter
-  ["#7f9fc4", "#a7c4e2", "#d0e2f3"], // sky
+  ["#9a9a52", "#bcbc72", "#dcdca0"], // olive (round 4: was a sky blue, which read as sky between two fronts)
   ["#84b897", "#acd8bb", "#d4efdd"], // mint
   ["#cf8594", "#eeaebb", "#f9d4db"], // rose
   ["#9f90c8", "#c3b6e6", "#e0d8f6"], // lilac

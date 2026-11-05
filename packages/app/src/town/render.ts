@@ -945,14 +945,16 @@ export class Renderer {
     // (What the rows let you see, round 4: from your square and the camera's, at the in and default steps.)
     this.cull = STREET_TOWN && TOWN_FEEL.streetCull && zoom <= TOWN_FEEL.streetZoomStart + 0.01;
     if (this.cull) {
-      const w = this.town.you.walker;
-      const yc = colI(w.hereC());
-      const yr = rowI(w.hereR());
+      // (From where the camera looks: you, as it follows you; wherever it glides to as you look round. Looking from inside a lot (a
+      // glide to a home's middle), nothing is left out.)
+      const yc = colI(Math.round(camX));
+      const yr = rowI(Math.round(camY));
+      if (yc < 0 || yr < 0 || ROW_LOT[yr * N + yc]) this.cull = false;
       const v = this.view;
       const cc = colI(Math.round(camX - v.back * v.hs));
       const cr = rowI(Math.round(camY - v.back * v.hc));
       const key = ((yr * N + yc) * N + cc) * N + cr;
-      if (key !== this.seenKey) {
+      if (this.cull && key !== this.seenKey) {
         this.seenKey = key;
         seenEither(seenFrom(yc, yr), cr >= 0 && cc >= 0 && !ROW_LOT[cr * N + cc] ? seenFrom(cc, cr) : seenFrom(yc, yr), this.seen);
       }

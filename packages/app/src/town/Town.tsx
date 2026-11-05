@@ -957,7 +957,7 @@ function startTown(
     if (STREET_TOWN) {
       if (follow && !glide) {
         const n = town.you.walker.leg(legNow);
-        if (n) turn.aim(chaseTarget(turn.to, legNow.dc, legNow.dr, n, legNow.last, keysOn), now);
+        if (n) turn.aim(chaseTarget(turn.to, legNow.dc, legNow.dr, n, legNow.last, walkByKeys), now);
       }
       heading = pinHeading ?? turn.at(now);
     }
@@ -1235,6 +1235,11 @@ function startTown(
   // The arrow keys set off: as a tap walk does, the card closes, the camera follows you and the walk stands you up. Held, the walker
   // runs on (keys.start: each frame while it stands still; the walk itself asks for each next square).
   let keysOn = false;
+  /**
+   * (Round 4) Whether your walk now is the arrows' (until a tap starts another): the chase camera turns for the keys' steps by their own
+   * rule (down steps back without turning), also for a step still under way after the key is let go.
+   */
+  let walkByKeys = false;
   /** The place the held arrows last ran you into (its card asked once a hold): "" none. */
   let keysAsked = "";
   /**
@@ -1264,6 +1269,7 @@ function startTown(
       keysAsked = "";
       return;
     }
+    walkByKeys = true;
     if (!keysOn) {
       keysOn = true;
       leaveClose();
@@ -1327,6 +1333,7 @@ function startTown(
     // You sit when a tap on a table sent you to its stool; any other walk stands you up (walkOff).
     walkOff();
     town.you.sit = p.card?.kind === "table";
+    if (p.dest) walkByKeys = false;
     if (p.dest && walkWalker(town.you.walker, p.dest)) {
       follow = true;
       glide = null;
@@ -1415,6 +1422,8 @@ function startTown(
           // Every figure drawn in the last frame (bosses, you, the bots): its box on screen and how strongly it showed (Eric, Nov 4:
           // whole on screen at rest).
           figures: r.figureBoxes(),
+          // (Round 4: the horizon's height in the box, px; the sky over it, the street below.)
+          horizon: r.view.hy,
           // The street town's boxes drawn in the last frame and their draws (the 2D fallback's cost; WebGL batches them).
           boxes: r.boxDraws(),
         }
@@ -1535,6 +1544,7 @@ function startTown(
     if (!testSwitchesAllowed()) return false;
     follow = true;
     glide = null;
+    walkByKeys = false;
     return walkYou(town, { kind: "square", c: wrapI(sq[0]), r: wrapI(sq[1]) });
   };
   // ... `__townHeading(deg | null)` (the street town's turn, Nov 5, round 3): the camera faces `deg` from north and stays so (the turn's
@@ -1648,6 +1658,7 @@ function startTown(
       cancelMeet(town);
       town.you.sit = false;
       const to = spotNear(town, town.you.walker, h.door, false);
+      walkByKeys = false;
       if (!to || !walkWalker(town.you.walker, to)) return;
       goingIn = i;
       follow = true;
@@ -1666,6 +1677,7 @@ function startTown(
       cancelMeet(town);
       town.you.sit = false;
       const to = spotNear(town, town.you.walker, h.door, false);
+      walkByKeys = false;
       if (!to || !walkWalker(town.you.walker, to)) return false;
       challengeStand = stood;
       challenging = i;

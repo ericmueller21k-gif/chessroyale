@@ -40,6 +40,118 @@ async function open(page: Page, sky: string, gl: boolean) {
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
 }
 
+/** Every figure drawn (a boss, a bot, you) whole inside the world's box (Eric, Nov 4), its foot on screen; a faded one may be off. */
+type Fig = { name: string; x0: number; y0: number; x1: number; y1: number; fy: number; alpha: number };
+async function figuresOnScreen(page: Page, what: string) {
+  const cv = (await canvas(page).boundingBox())!;
+  const c = (await page.evaluate(() => (window as unknown as { __townCam: () => { figures: Fig[] } }).__townCam()))!;
+  expect(c.figures.length, `${what}: figures drawn`).toBeGreaterThan(0);
+  for (const f of c.figures) {
+    if (f.alpha < 0.5) continue;
+    expect(f.x0, `${what}: ${f.name} not cut off on the left`).toBeGreaterThanOrEqual(-1);
+    expect(f.x1, `${what}: ${f.name} not cut off on the right`).toBeLessThanOrEqual(cv.width + 1);
+    expect(f.y0, `${what}: ${f.name} not cut off at the top`).toBeGreaterThanOrEqual(-1);
+    expect(f.fy, `${what}: ${f.name}'s foot on screen`).toBeLessThanOrEqual(cv.height + 1);
+  }
+}
+
+/**
+ * The share of the box's street-level band at its sides (the outer 15% of its width each side, from 8% of its height over the horizon to
+ * just above it: the fronts' lower floors, not the sky over the farther, lower roofs) that's the sky's own colour: each row's sky taken from the middle of the box, where the street runs away to the sky. Sky between
+ * two fronts (a gap, a missing front, a crack) shows there as that colour.
+ */
+async function skyAtSides(page: Page): Promise<number> {
+  const hy = (await page.evaluate(() => (window as unknown as { __townCam: () => { horizon: number } }).__townCam().horizon))!;
+  return canvas(page).evaluate((cv: HTMLCanvasElement, hy: number) => {
+    const dpr = cv.width / cv.clientWidth;
+    const W = cv.width;
+    const H = cv.clientHeight;
+    const y0 = Math.round((hy - 0.08 * H) * dpr);
+    const y1 = Math.round((hy - 0.01 * H) * dpr);
+    const d = cv.getContext("2d")!.getImageData(0, y0, W, y1 - y0).data;
+    let sky = 0;
+    let n = 0;
+    for (let y = 0; y < y1 - y0; y++) {
+      // The sky's colour on this row: the middle few pixels' (where the street opens to it).
+      const m = (y * W + Math.round(W / 2)) * 4;
+      const ref = [d[m]!, d[m + 1]!, d[m + 2]!];
+      for (let x = 0; x < W; x++) {
+        if (x > W * 0.15 && x < W * 0.85) continue;
+        const k = (y * W + x) * 4;
+        n++;
+        if (Math.abs(d[k]! - ref[0]!) + Math.abs(d[k + 1]! - ref[1]!) + Math.abs(d[k + 2]! - ref[2]!) < 12) sky++;
+      }
+    }
+    return sky / n;
+  }, hy);
+}
+
+test("no sky between the fronts at street level: Fountain Street and South Street, both ways along each (Canvas 2D and WebGL)", async ({ page }) => {
+  test.setTimeout(400_000);
+  for (const gl of [false, true]) {
+    await open(page, "day", gl);
+    for (const [name, a, b] of [["Fountain Street east", [1, 20], [4, 20]], ["Fountain Street west", [42, 20], [39, 20]], ["South Street east", [1, 5], [4, 5]], ["South Street west", [42, 5], [39, 5]]] as const) {
+      await walkAlong(page, a, b);
+      await page.waitForTimeout(800);
+      const share = await skyAtSides(page);
+      expect(share, `${name} (${gl ? "WebGL" : "2D"}): sky at the sides at street level`).toBeLessThan(0.005);
+    }
+  }
+});
+
+test("the zoom steps: − and + move a step at a time (in, the default, out, the overview); every figure on screen at each", async ({ page }) => {
+  test.setTimeout(200_000);
+  await open(page, "day", false);
+  await walkAlong(page, [1, 20], [4, 20]);
+  expect((await cam(page)).zoomTarget).toBe(1);
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  await expect.poll(async () => (await cam(page)).zoom, { timeout: 3000 }).toBe(0);
+  await figuresOnScreen(page, "in");
+  for (const step of [1, 2, 3]) {
+    await page.getByRole("button", { name: "Zoom out" }).click();
+    await expect.poll(async () => (await cam(page)).zoom, { timeout: 3000 }).toBe(step);
+    await figuresOnScreen(page, `step ${step}`);
+  }
+  await page.getByRole("button", { name: "Zoom out" }).click();
+  expect((await cam(page)).zoomTarget, "the overview is the last").toBe(3);
+  await expect(page.getByRole("button", { name: "Zoom out" })).toHaveAttribute("aria-pressed", "true");
+  for (let k = 0; k < 2; k++) await page.getByRole("button", { name: "Zoom in" }).click();
+  await expect.poll(async () => (await cam(page)).zoom, { timeout: 3000 }).toBe(1);
+  await expect(page.getByRole("button", { name: "Zoom in" })).toHaveAttribute("aria-pressed", "true");
+});
+
+test("the park zooms a step out as you come in and back as you leave; a press in it wins", async ({ page }) => {
+  test.setTimeout(200_000);
+  await open(page, "day", false);
+  await walkAlong(page, [6, 20], [9, 20]);
+  expect((await cam(page)).zoomTarget).toBe(1);
+  // In (fully: a square past its edge), out a step over about 0.6 s; you and every figure on screen.
+  await walkTo(page, [16, 20]);
+  await expect.poll(async () => (await cam(page)).zoom, { timeout: 3000 }).toBe(2);
+  expect((await cam(page)).parkBefore).toBe(1);
+  await figuresOnScreen(page, "in the park");
+  // Out again: back to the step you had.
+  await walkTo(page, [9, 20]);
+  await expect.poll(async () => (await cam(page)).zoom, { timeout: 3000 }).toBe(1);
+  // In again, and + in the park: your step stays as you leave.
+  await walkTo(page, [16, 20]);
+  await expect.poll(async () => (await cam(page)).zoomTarget, { timeout: 3000 }).toBe(2);
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  await walkTo(page, [9, 20]);
+  await page.waitForTimeout(800);
+  expect((await cam(page)).zoomTarget, "your press in the park wins").toBe(1);
+});
+
+test("the north edge holds you: past the Colosseum's plaza there's nowhere to go (the town wraps east-west only)", async ({ page }) => {
+  test.setTimeout(200_000);
+  await open(page, "day", false);
+  await walkAlong(page, [14, 41], [14, 45]);
+  await page.keyboard.down("ArrowUp");
+  await page.waitForTimeout(1500);
+  await page.keyboard.up("ArrowUp");
+  expect(await you(page), "still at the edge").toEqual([14, 45]);
+});
+
 /** The stills (brief: each street by day, one at dusk, a corner, a boss home in its row, the turn; the park on arrival; the zoom steps). */
 test("stills: the rows (round 4)", async ({ page }) => {
   test.skip(!STILLS, "stills only (STILLS=docs/street-town-rows)");
