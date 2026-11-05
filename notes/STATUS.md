@@ -176,3 +176,4 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Hollow bulbs helper started (Opus high), /home/user/cr-hollowbulbs claude/hollow-bulbs, ports 8989/9489.
 - #499 street town round 2 (admins, STREET_TOWN) PR open full-e2e 96368a3f, CI watcher bdc92v0bm. #498 igloo one-lane deadlock fix (main red after #496) 365c3b56, CI watcher bgcrum0uq.
 - Town round 3 (boxes + camera turn) helper: brief-town-boxes.md, /home/user/cr-townboxes claude/town-boxes from claude/town-layout, ports 8995/9495. Flip STREET_TOWN for everyone after Eric walks it.
+- Hollow bulbs DONE -> PR #500 (full-e2e) a045a4c8 (main merged in), CI watcher bi5kmycmh. Taunt clip was a mid-typing still; new e2e checks every line fits.
