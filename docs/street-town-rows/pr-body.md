@@ -227,7 +227,14 @@ The mockup Eric saw is in `docs/street-town-rows/mockup/`.
 
 **Full e2e** (the `full-e2e` label): the town's plan, camera, paths and drawing are shared.
 
-LOCAL_RUNS
+Run locally (wrangler dev, phone and computer):
+- unit: `npm test` (4220 passing; `npm run typecheck` clean);
+- e2e: the whole town area in `e2e/areas.json`, 226 passing and 12 skipped (stills only and the like):
+  - `town`, `town-street`, `town-rows`, `town-chat`, `town-chat-history`, `town-desktop`, `town-tags`, `town-webgl`;
+  - `colosseum`, `shop` (#502's room keys) and `boss-challenge`;
+  - `problems` and `profile` (they open the admin's town).
+
+  The run was cut short by the local server stopping at its time limit; the tests it cut were re-run against a fresh server and passed.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 

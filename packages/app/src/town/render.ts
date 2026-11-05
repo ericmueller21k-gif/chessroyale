@@ -2841,6 +2841,8 @@ export class Renderer {
         const hb = this.homeBox[i];
         const fp = hb ? this.plans[hb.i]!.front : null;
         if (fp && (!fp.on || fp.s0 > 0.02 || fp.s1 < 0.98)) continue;
+        // (Nor cut off at the box's side: a home mostly off screen beside the camera, its name half drawn at the edge.)
+        if (nm.x - tw / 2 < 2 || nm.x + tw / 2 > this.W - 2) continue;
         y = nm.y - f.nameOverRoof;
         while (y + f.nameDropStep <= nm.eave && this.overBehind(nm.x - tw / 2 - 2, y - size - 2, tw + 4, size + 4, nm.dz)) y += f.nameDropStep;
         if (this.overNearer(nm.x - tw / 2 - 2, y - size - 2, tw + 4, size + 4, nm.dz)) continue;
