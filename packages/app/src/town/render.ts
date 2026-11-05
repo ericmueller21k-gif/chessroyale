@@ -1335,9 +1335,11 @@ export class Renderer {
         below = h.half > 2 ? 10 : below;
       } else if (it.kind === "prop") {
         const pr = PROPS[it.i]!;
-        x = pr.x;
-        // (A hedge's foot is its face, 0.4 of a square before the back of its top, where the plan puts it.)
-        y = pr.kind === "hedge" ? pr.y - HEDGE.deep : pr.y;
+        // (A hedge's foot is its face, 0.4 of a square before the back of its top, where the plan puts it; Seam Avenue's run north
+        // to south, the middle of their top.)
+        const side = pr.kind === "hedge" && pr.x !== Math.round(pr.x);
+        x = side ? pr.x - HEDGE.deep / 2 : pr.x;
+        y = pr.kind === "hedge" && !side ? pr.y - HEDGE.deep : pr.y;
         // (A front is up to 4 squares wide, and up to 4 tall: drawn from that far off the box's sides, its top showing from under it.)
         margin = pr.kind === "front" ? this.propFrames[it.i]!.ch.w / 2 / f.housePxPerSquare + 0.5 : 2;
         if (pr.kind === "front") below = 4.2;
@@ -1458,12 +1460,13 @@ export class Renderer {
 
   /**
    * The street town (Nov 5, the art's "nothing between the camera and you"): a building's front, a home's or a shed standing more than
-   * `streetNearCut` squares nearer the camera than you isn't drawn (nor tapped); a tree there fades out over `streetTreeFade` squares
+   * `streetNearCut` squares nearer the camera than its focus (you, as it follows you) isn't drawn (nor tapped); a tree there fades out over `streetTreeFade` squares
    * nearer still (`nearFade`, read by drawProp). Hedges, beds and bushes are low: drawn.
    */
   private nearCut(items: Item[]): void {
     const f = TOWN_FEEL;
-    const cut = this.youDz - f.streetNearCut;
+    // (From the camera's focus, which is you as it follows you; looking round, wherever it looks.)
+    const cut = -f.streetNearCut;
     for (const it of items) {
       if (!it.on || it.dz >= cut) continue;
       if (it.kind === "house" && it.i < this.homes.length) it.on = false;
@@ -1477,7 +1480,7 @@ export class Renderer {
   private nearFade(it: Item): number {
     if (!STREET_TOWN) return 1;
     const f = TOWN_FEEL;
-    return clamp((it.dz - (this.youDz - f.streetNearCut - f.streetTreeFade)) / f.streetTreeFade, 0, 1);
+    return clamp((it.dz + f.streetNearCut + f.streetTreeFade) / f.streetTreeFade, 0, 1);
   }
 
   /**
@@ -1535,6 +1538,8 @@ export class Renderer {
     const alpha = (1 - 0.6 * s) * enterOf(v, it.dx, it.dz) * (prop.kind === "tree" ? this.nearFade(it) : 1);
     if (alpha <= 0.004) return;
     const img = fc.at(now, it.i * 211);
+    // A hedge running north to south (along Seam Avenue): its top and the side the camera sees, laid along the ground.
+    if (prop.kind === "hedge" && prop.x !== Math.round(prop.x)) return this.sideHedge(it, img, prop.v, alpha, now);
     // A hedge's top (the street town's): its tile laid flat from its face back over its depth, at its height, before its face.
     if (prop.kind === "hedge") this.hedgeTop(it, prop.v, x0, w, p.y - HEDGE.tall * px, alpha, now);
     // A table waiting for a game: the ring under its free stool, on the ground under the picture.
@@ -1567,6 +1572,41 @@ export class Renderer {
     ctx.drawImage(this.hedgeTops[v % 3]!.at(now, 0), x0, yBack, w, yFace - yBack + 0.5);
     ctx.globalAlpha = 1;
   }
+  /**
+   * A hedge along Seam Avenue (the street town's), which runs north to south, so the north-facing camera sees it end on: its top laid
+   * flat over its depth, then the side facing the camera's column, each its tile mapped onto the ground's square (an affine fit).
+   */
+  private sideHedge(it: Item, face: HTMLCanvasElement, v: number, alpha: number, now: number): void {
+    const { ctx, view: vw, DPR } = this;
+    const S = TOWN_FEEL.housePxPerSquare;
+    const half = HEDGE.deep / 2;
+    // (The face nearer the camera's column: its east one when the hedge is left of the camera, else its west one.)
+    const near = it.dx < 0 ? it.dx + half : it.dx - half;
+    const far = it.dx < 0 ? it.dx - half : it.dx + half;
+    const a = this.hA;
+    const b = this.hB;
+    const c = this.hC;
+    if (!proj(vw, near, it.dz - 0.5, 0, a) || !proj(vw, near, it.dz + 0.5, 0, b) || !proj(vw, far, it.dz - 0.5, 0, c)) return;
+    const up = (q: { y: number; k: number }) => q.y - (HEDGE.tall * q.k) / S;
+    ctx.globalAlpha = alpha;
+    ctx.imageSmoothingEnabled = true;
+    // Its top: the tile's columns along the avenue (south to north), its rows across its depth.
+    const top = this.hedgeTops[v % 3]!.at(now, 0);
+    ctx.setTransform((DPR * (b.x - a.x)) / S, (DPR * (up(b) - up(a))) / S, (DPR * (c.x - a.x)) / S, (DPR * (up(c) - up(a))) / S, DPR * a.x, DPR * up(a));
+    ctx.drawImage(top, 0, 0);
+    // Its side: the face's columns along the avenue, its rows down to the ground (a picture pixel k / 37 screen pixels).
+    const k = (a.k + b.k) / 2;
+    ctx.setTransform((DPR * (b.x - a.x)) / S, (DPR * (up(b) - up(a))) / S, 0, (DPR * k) / S, DPR * a.x, DPR * up(a));
+    ctx.drawImage(face, 0, 0);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.globalAlpha = 1;
+    const x0 = Math.min(a.x, b.x, c.x);
+    const x1 = Math.max(a.x, b.x, c.x);
+    this.box(it, a.depth, x0, Math.min(up(b), up(c)), x1, Math.max(a.y, b.y), (a.x + b.x) / 2, (a.y + b.y) / 2, Math.min(up(b), up(c)));
+  }
+  private readonly hA = newPt();
+  private readonly hB = newPt();
+  private readonly hC = newPt();
   /** A front's lights (its building's), baked once a picture; null: none. */
   private frontGlowOf(fc: FrameCache, lot: number): Glow | null {
     let g = this.frontGlow.get(fc);
