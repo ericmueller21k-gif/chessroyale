@@ -7,14 +7,16 @@ const { N, newView, pickSquare, proj, rel, setHeading, setView, wrapI } = await 
 const PLAN = (await import("../src/town/street-plan.json")).default;
 const { PROPS } = await import("../src/town/world.ts");
 const { geomOf, newPlan, planBox, streetBoxes, faceLight, wallShade, boxPoint } = await import("../src/town/boxes.ts");
-const { Turn, camAt, farColosseumShows, quarterOf, screenStep } = await import("../src/town/turn.ts");
+const { Turn, quarterOf, screenStep } = await import("../src/town/turn.ts");
+const { STREET_LOTS } = await import("../src/town/street.ts");
 const { TOWN_FEEL } = await import("../src/town/feel.ts");
 
 /**
  * The street town, round 3: the buildings as boxes and the turning camera (Nov 5; docs/decisions/2026-11-05-street-town-boxes.md). The
- * boxes' faces and their drawing order; the sides a neighbour at least as tall covers, never drawn; the heading on every square and its
- * easing; taps and the arrow keys through the heading; the Colosseum's far drawing only within 45 degrees of north; each building's
- * draws within the art's budget.
+ * boxes' faces and their drawing order; the sides a neighbour at least as tall covers, never drawn; the turn's easing; taps and the
+ * arrow keys through the heading; each building's draws within the art's budget. Round 4 (the rows, the chase camera, the town wrapping
+ * east-west only): fronts face all four ways, so "before a front" is on its own street whichever way it faces; the heading on every
+ * square (round 3's `camAt`) and the far Colosseum's 45 degrees went with the chase camera (town-rows.test.ts has their successors).
  */
 const BOXES = streetBoxes(PROPS);
 const LOTS = BOXES.filter((b) => b.kind !== "shed" && b.kind !== "hedge");
@@ -26,30 +28,30 @@ function view(heading: number, W = 390, H = 844) {
   setHeading(v, heading);
   return v;
 }
-/** Where the camera stands to look at box `b` from its street: on the street before its front, facing it. */
-function before(b: (typeof BOXES)[number], back = 4): [number, number] {
-  return b.facing === "S" ? [b.fx, b.fy - back] : [b.fx - back, b.fy];
-}
-
-/** The art's own camAt (scripts/boss-art/town-street/plan.ts on claude/boss-art 11a4d903), word for word but for its names. */
-function artCamAt(c: number, r: number): 0 | 90 {
-  const wrap = (v: number) => ((v % N) + N) % N;
-  const cc = wrap(Math.round(c));
-  if (!(cc >= 43 || cc <= 2)) return 0;
-  const rr = wrap(Math.round(r));
-  const crossing = [[43, 47], [12, 17], [21, 25], [29, 34]].some(([a, b]) => (rr >= a! && rr <= b!) || (rr + N >= a! && rr + N <= b!));
-  return crossing ? 0 : 90;
+/** The heading that looks at a front facing `f` (a front facing south is seen looking north). */
+const facingHeading = (f: string) => ({ S: 0, W: 90, N: 180, E: 270 })[f as "S"]!;
+/** Where the camera stands to look at box `b` from its street: on the street before its front, facing it (`side`: that far to its left). */
+function before(b: (typeof BOXES)[number], back = 4, side = 0): [number, number] {
+  // (Out of the front is minus the way back; the camera's left, looking at it, is the front's left too: minus the way along it.)
+  return [b.fx - b.bx * back - b.ux * side, b.fy - b.by * back - b.uy * side];
 }
 
 describe("the street town's buildings are boxes (Nov 5, round 3)", () => {
-  it("every lot is a box: its front on its front line, centred on its lot, facing its street; the sheds and hedges too", () => {
-    expect(LOTS).toHaveLength(PLAN.lots.length);
+  it("every lot is a box facing its street: a home on its lot's front line (centred, or slid along its row to fit), a row's front where its row put it; the sheds and hedges too", () => {
+    expect(LOTS).toHaveLength(STREET_LOTS.length);
     for (const b of LOTS) {
-      const l = PLAN.lots[b.lot]!;
+      const l = STREET_LOTS[b.lot]!;
       expect(b.facing, l.name).toBe(l.facing);
-      // Its front line's middle: the lot's middle along its front, its front edge plus the inset.
-      if (l.facing === "S") expect([b.fx, b.fy]).toEqual([l.c0 + l.w / 2 - 0.5, l.r0 - 0.5 + b.box.inset]);
-      else expect([b.fx, b.fy]).toEqual([l.c0 - 0.5 + b.box.inset, l.r0 + l.w / 2 - 0.5]);
+      // A row's look-alike or a skyline tower: its front line's middle where the rows put it (to the pixel: its width's rounding).
+      if (l.at) {
+        expect(b.fx, l.name).toBeCloseTo(l.at.x, 1);
+        expect(b.fy, l.name).toBeCloseTo(l.at.y, 1);
+      } else {
+        // A home: its lot's middle along its front (plus its slide), its front edge plus the inset.
+        expect(l.kind).toBe("home");
+        expect([b.fx, b.fy]).toEqual([l.c0 + l.w / 2 - 0.5 + (l.shift ?? 0), l.r0 - 0.5 + b.box.inset]);
+        expect(Math.abs(l.shift ?? 0), l.name).toBeLessThan(0.8);
+      }
     }
     expect(BOXES.filter((b) => b.kind === "shed")).toHaveLength(PROPS.filter((p) => p.kind === "shed").length);
     // The hedges in runs along their lines (up to five squares a run, each square once), each drawn by its first square.
@@ -61,8 +63,11 @@ describe("the street town's buildings are boxes (Nov 5, round 3)", () => {
       expect(b.props.length).toBeLessThanOrEqual(5);
       expect(b.box.front.w).toBe(37 * b.props.length);
     }
-    // Seam Avenue's own fronts face west (the camera faces east there), as planned.
-    expect(LOTS.filter((b) => PLAN.lots[b.lot]!.street === "seam-ave").every((b) => b.facing === "W" && b.ux === 0 && b.uy === -1)).toBe(true);
+    // Seam Avenue's own fronts face the avenue: west east of it, east west of it; every way's front runs left to right as you face it.
+    const ave = LOTS.filter((b) => STREET_LOTS[b.lot]!.street === "seam-ave");
+    expect(ave.length).toBeGreaterThanOrEqual(4);
+    for (const b of ave) expect([b.ux, b.uy]).toEqual(b.facing === "W" ? [0, -1] : [0, 1]);
+    for (const b of LOTS) expect(b.ux * b.by - b.uy * b.bx, b.box.id).toBe(1);
   });
 
   it("every roof face's normal points out and up (none faces down), and its texture frame holds its corners", () => {
@@ -82,11 +87,9 @@ describe("the street town's buildings are boxes (Nov 5, round 3)", () => {
   it("is drawn in the art's order: each part by its own depth (back, sides, roof, front), its roof's faces far to near", () => {
     let roofs = 0;
     for (const b of LOTS) {
-      const v = view(b.facing === "S" ? 0 : 90);
-      const [cx, cy] = before(b, 5);
+      const v = view(facingHeading(b.facing));
       // (Off to the left a little, so a side shows.)
-      const x = b.facing === "S" ? cx - 3 : cx;
-      const y = b.facing === "S" ? cy : cy + 3;
+      const [x, y] = before(b, 5, 3);
       const p = newPlan(b.box);
       planBox(p, b, b.box, v, x, y, true, -Infinity);
       expect(p.front.on, b.box.id).toBe(true);
@@ -102,7 +105,8 @@ describe("the street town's buildings are boxes (Nov 5, round 3)", () => {
   });
 
   it("a face turned away from the camera isn't drawn: a gable's far slope, a side wall facing away", () => {
-    const b = LOTS.find((o) => o.box.id.startsWith("bakery"))!;
+    // (Timber's Lumber Lodge: a hipped roof, on Fountain Street's north row.)
+    const b = LOTS.find((o) => o.home === "timber")!;
     const v = view(0);
     const p = newPlan(b.box);
     // From well off to the right: the right side shows, the left faces away.
@@ -119,12 +123,13 @@ describe("the street town's buildings are boxes (Nov 5, round 3)", () => {
 
   it("skips a side a neighbour at least as tall covers: never drawn; a row's end and a taller building's side over a lower one are", () => {
     const hidden = LOTS.filter((b) => b.hideL || b.hideR);
-    // (Seam Street's bakery's right side behind the taller townhouse beside it; the shop's left behind the skinny houses; ...)
-    expect(hidden.length).toBeGreaterThanOrEqual(4);
-    const seamSt = (id: string) => LOTS.find((b) => PLAN.lots[b.lot]!.street === "seam-st" && b.box.id.startsWith(id))!;
-    expect(seamSt("bakery").hideR).toBe(true);
-    expect(seamSt("shop").hideL).toBe(true);
-    expect(seamSt("townhouse").hideL, "the townhouse's left, over the lower bakery").toBe(false);
+    // (Round 4: the rows' party walls. Most fronts butt a neighbour at least as tall on one side or both.)
+    expect(hidden.length).toBeGreaterThanOrEqual(50);
+    // A front's side over a lower neighbour shows (a stepped roofline); a corner's turned end is never hidden.
+    const looks = LOTS.filter((b) => STREET_LOTS[b.lot]!.look);
+    const corners = looks.filter((b) => STREET_LOTS[b.lot]!.look!.corner);
+    expect(corners.length).toBeGreaterThanOrEqual(16);
+    for (const b of corners) expect(STREET_LOTS[b.lot]!.look!.corner === "L" ? b.hideL : b.hideR, b.box.id).toBe(false);
     const eave = (s: { ch: { h: number } } | null) => (s ? s.ch.h - 1 : 0);
     for (const b of hidden) {
       // Its neighbour on that side: the same street line, its facing wall within a third of a square, at least as tall.
@@ -138,20 +143,17 @@ describe("the street town's buildings are boxes (Nov 5, round 3)", () => {
         if (!theirs || eave(theirs) < eave(mine)) return false;
         const q = { x: 0, y: 0 };
         boxPoint(o, o.box, right ? o.box.body.x0 : o.box.body.x1, 0, q);
-        return Math.hypot(((q.x - a.x + N / 2) % N) - N / 2, q.y - a.y) < 0.45 + Math.abs(o.box.inset - b.box.inset);
+        return Math.hypot(((((q.x - a.x + N / 2) % N) + N) % N) - N / 2, q.y - a.y) < 0.45 + Math.abs(o.box.inset - b.box.inset);
       });
       expect(n, `${b.box.id}'s ${right ? "right" : "left"} side`).toBeTruthy();
       // And it's never drawn, from either side.
       for (const dx of [-6, 6]) {
         const p = newPlan(b.box);
-        const [x, y] = before(b, 5);
-        planBox(p, b, b.box, view(b.facing === "S" ? 0 : 90), b.facing === "S" ? x + dx : x, b.facing === "S" ? y : y - dx, true, -Infinity);
+        const [sx, sy] = before(b, 5, dx);
+        planBox(p, b, b.box, view(facingHeading(b.facing)), sx, sy, true, -Infinity);
         expect(right ? p.right.on : p.left.on).toBe(false);
       }
     }
-    // Seam Street's bakery, on the avenue's corner: its left side (the avenue's) is drawn.
-    const bakery = LOTS.find((b) => PLAN.lots[b.lot]!.side && b.box.id.startsWith("bakery"))!;
-    expect(bakery.hideL).toBe(false);
   });
 
   it("lights faces as the art: from the top left (a slope facing left lighter than one facing right), sides 6% left and 30% right, a front none", () => {
@@ -173,11 +175,11 @@ describe("the street town's buildings are boxes (Nov 5, round 3)", () => {
   it("draws each building in about 12 to 20 draws (the art's budget, the 2D fallback's count: strips and faces), twice that mid-turn", () => {
     const counts: number[] = [];
     for (const b of LOTS) {
-      const h = b.facing === "S" ? 0 : 90;
-      const [x, y] = before(b, 4);
-      for (const [dx, heading, limit] of [[0, h, 20], [-4, h, 20], [4, h, 20], [-3, 45, 40]] as const) {
+      const h = facingHeading(b.facing);
+      for (const [dx, heading, limit] of [[0, h, 20], [-4, h, 20], [4, h, 20], [-3, h + 45, 40]] as const) {
         const p = newPlan(b.low);
-        planBox(p, b, b.low, view(heading), b.facing === "S" ? x + dx : x, b.facing === "S" ? y : y - dx, false, -Infinity);
+        const [x, y] = before(b, 4, dx);
+        planBox(p, b, b.low, view(heading), x, y, false, -Infinity);
         expect(p.draws, `${b.box.id} from ${dx} at ${heading}`).toBeLessThanOrEqual(limit);
         if (heading === h && dx === 0) counts.push(p.draws);
       }
@@ -198,7 +200,8 @@ describe("the street town's buildings are boxes (Nov 5, round 3)", () => {
   });
 
   it("leaves out what's nearer the camera than the cut (nothing between the camera and you), hedges aside", () => {
-    const b = LOTS.find((o) => o.box.id.startsWith("bakery"))!;
+    // (A south-facing front on South Street's north row.)
+    const b = LOTS.find((o) => o.facing === "S" && STREET_LOTS[o.lot]!.street === "south-st" && STREET_LOTS[o.lot]!.look)!;
     const p = newPlan(b.box);
     // The camera's focus 3 squares beyond the bakery's front, the cut 0.9 squares nearer than the focus: the front isn't drawn.
     planBox(p, b, b.box, view(0), b.fx, b.fy + 3, true, -TOWN_FEEL.streetNearCut);
@@ -208,17 +211,7 @@ describe("the street town's buildings are boxes (Nov 5, round 3)", () => {
   });
 });
 
-describe("the street town's camera turns (Nov 5, round 3)", () => {
-  it("faces north everywhere but Seam Avenue, east there, north again on its four crossings: as the art's plan, every square", () => {
-    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) expect(camAt(c, r), `${c},${r}`).toBe(artCamAt(c, r));
-    expect(camAt(45, 8)).toBe(90);
-    expect(camAt(45, 14)).toBe(0);
-    expect(camAt(0, 19)).toBe(90);
-    expect(camAt(22, 11)).toBe(0);
-    // Walking east along Fountain Street onto the avenue and up it: north, north on its crossing, then east.
-    expect([[40, 14], [44, 14], [45, 17], [45, 18]].map(([c, r]) => camAt(c!, r!))).toEqual([0, 0, 0, 90]);
-  });
-
+describe("the street town's camera turns (Nov 5, round 3; round 4 aims it at the way you walk)", () => {
   it("eases over about half a second a quarter turn, smoothly, and turns back from wherever it is", () => {
     const t = new Turn(0);
     t.aim(90, 1000);
@@ -281,12 +274,4 @@ describe("the street town's camera turns (Nov 5, round 3)", () => {
     }
   });
 
-  it("the Colosseum's far drawing shows only within 45 degrees of north", () => {
-    expect(farColosseumShows(0)).toBe(true);
-    expect(farColosseumShows(45)).toBe(true);
-    expect(farColosseumShows(46)).toBe(false);
-    expect(farColosseumShows(90)).toBe(false);
-    expect(farColosseumShows(-30)).toBe(true);
-    expect(farColosseumShows(330)).toBe(true);
-  });
 });

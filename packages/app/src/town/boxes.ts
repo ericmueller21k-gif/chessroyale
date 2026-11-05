@@ -244,7 +244,8 @@ export function coverSides(boxes: BoxInst[]): void {
         const them = line(n, !right);
         // (The same street line: their backs' axes agree; the neighbour on the side this wall faces, within a third of a square.)
         const gap = right ? wrapF(them.at - me.at) : wrapF(me.at - them.at);
-        if (gap < -0.05 || gap > 0.34) continue;
+        // (Round 4's rows overlap a neighbour by a pixel or two each (rows.ts ROW_OVERLAP_PX): up to a tenth of a square under it.)
+        if (gap < -0.1 || gap > 0.34) continue;
         if (Math.abs(wrapF(them.front - me.front)) > 1.5) continue;
         if (wrapF(them.front - me.front) > 0.05 || wrapF(them.back - me.back) < -0.05 || them.tall < me.tall) continue;
         if (right) o.hideR = true;

@@ -72,6 +72,13 @@ const inRow = (c: number, r: number) =>
     const [a, d] = s.facing === "S" || s.facing === "N" ? [c, r] : [r, c];
     return alongIn(s, a) !== null && d >= Math.min(s.d0, s.d1) && d <= Math.max(s.d0, s.d1);
   }) ?? null;
+/** The homes anchoring row side `side`: the plan's homes on its lots, facing its way, where along it each lot begins. */
+export function homesOn(side: RowSide, lots: readonly StreetLot[] = PLAN.lots as StreetLot[]): RowHome[] {
+  const across = side.facing === "S" || side.facing === "N";
+  return lots
+    .filter((l) => l.kind === "home" && l.facing === side.facing && inRow(l.c0, l.r0) === side)
+    .map((l) => ({ id: l.id as HomeId, a: alongIn(side, across ? l.c0 : l.r0)!, w: l.w }));
+}
 /**
  * The rows (round 4, rows.ts) over the plan: on each row side, the plan's everyday buildings go (its homes stay, anchoring the row) and
  * look-alike fronts fill the row from corner to corner; the ground under a row is a lot's, and the garden things it covers go.
@@ -86,10 +93,7 @@ function withRows(lots: StreetLot[]): StreetLot[] {
   const out = lots.filter((l) => l.kind === "home" || !covered(l)).map((l) => ({ ...l }));
   for (const side of ROW_SIDES) {
     const across = side.facing === "S" || side.facing === "N";
-    const homes: RowHome[] = out
-      .filter((l) => l.kind === "home" && l.facing === side.facing && inRow(l.c0, l.r0) === side)
-      .map((l) => ({ id: l.id as HomeId, a: alongIn(side, across ? l.c0 : l.r0)!, w: l.w }));
-    for (const p of layRow(side, homes)) {
+    for (const p of layRow(side, homesOn(side, out))) {
       if (p.kind === "home") {
         const lot = out.find((l) => l.kind === "home" && l.id === p.home)!;
         if (p.shift) lot.shift = p.shift;

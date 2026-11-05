@@ -34,6 +34,11 @@ export const HOME_BODY: Readonly<Record<HomeId, readonly [w: number, x0: number,
 /** The street town's buildings' picture pixels a world square (boxes.ts BUILD_PX: drawn TOWN_FEEL.streetBuildScale bigger than 37). */
 export const ROW_PX = 37 / TOWN_FEEL.streetBuildScale;
 const SQ = ROW_PX;
+/**
+ * The homes with no side walls (a dome or a slope runs to the ground: home-boxes.ts homeBox's left and right are null): one can't turn
+ * a row's corner itself, so a slim filler front closes the corner beside it. test/town-rows.test.ts checks it against the art.
+ */
+export const HOME_NO_SIDES: ReadonlySet<HomeId> = new Set<HomeId>(["gingerbread", "hopper", "hollow", "alfil"]);
 /** Which way a row's fronts face: south (onto an east-west street north of the row), north, west (onto Seam Avenue) or east. */
 export type Facing = "S" | "N" | "W" | "E";
 
@@ -163,15 +168,19 @@ export function layRow(side: RowSide, homes: readonly RowHome[]): Placed[] {
     an.span = [an.span[0] + d, an.span[1] + d];
     an.shift += d;
   };
+  // (A home with no side wall at a corner slides inward instead, leaving room for a slim filler that turns the corner.)
+  const walled = (k: number) => !HOME_NO_SIDES.has(anchors[k]!.h.id);
   for (let k = 0; k < anchors.length; k++) {
     const lo = k === 0 ? side.a0 : anchors[k - 1]!.span[1];
     const gap = anchors[k]!.span[0] - lo;
-    if (gap < 0 || (k === 0 && gap < MIN_W)) slide(k, -gap);
+    if (k === 0 && side.corner0 && !walled(k) && gap < MIN_W) slide(k, MIN_W - gap);
+    else if (gap < 0 || (k === 0 && gap < MIN_W)) slide(k, -gap);
   }
   for (let k = anchors.length - 1; k >= 0; k--) {
     const hi = k === anchors.length - 1 ? side.a1 : anchors[k + 1]!.span[0];
     const gap = hi - anchors[k]!.span[1];
-    if (gap < 0 || (k === anchors.length - 1 && gap < MIN_W)) slide(k, gap);
+    if (k === anchors.length - 1 && side.corner1 && !walled(k) && gap < MIN_W) slide(k, gap - MIN_W);
+    else if (gap < 0 || (k === anchors.length - 1 && gap < MIN_W)) slide(k, gap);
   }
   const out: Placed[] = [];
   let at = side.a0;
@@ -216,6 +225,11 @@ export function layRow(side: RowSide, homes: readonly RowHome[]): Placed[] {
     prevTall = 0;
   });
   fill(side.a1, anchors.length === 0 && side.corner0, side.corner1);
+  // A home's neighbours are four floors (Eric, Nov 5: "the homes' neighbours step up to at least about 3 pawn heights"; the homes are
+  // lower than the rows, so each stands out by its own roof and sign, not by a dip).
+  out.forEach((p, i) => {
+    if (p.kind === "look" && (out[i - 1]?.kind === "home" || out[i + 1]?.kind === "home") && p.look!.tall < 2) p.look = { ...p.look!, tall: 2 };
+  });
   // One landmark a side that asks: the widest look-alike of two squares or more, away from the ends and from the homes.
   if (side.landmark) {
     const looks = out.filter((p, i) => p.kind === "look" && i > 0 && i < out.length - 1 && p.s1 - p.s0 >= 1.9 && out[i - 1]!.kind !== "home" && out[i + 1]!.kind !== "home");
