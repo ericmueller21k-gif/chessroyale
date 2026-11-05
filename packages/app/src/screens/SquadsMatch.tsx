@@ -320,7 +320,7 @@ function Banner({ title, sub, until, children }: { title: string; sub?: Componen
  * moves landed (`replayMoves`). Not while you browse the moves, or once skipped (a tap on the board). `me`: you, on your
  * own board (null: nothing to replay).
  */
-function useMoveReplay(m: LocalMatch, b: LocalBoard, me: string | null, browsing: boolean): { frame: ReplayFrame | null; step: number; count: number; skip: () => void } {
+function useMoveReplay(m: LocalMatch, b: LocalBoard, me: string | null, browsing: boolean): { frame: ReplayFrame | null; step: number; count: number; skip: () => void; arrivedAt: number } {
   const mode = useReplayMode();
   const d = me && m.state === "half" && m.current ? m.current.duties.find((x) => x.board === b.id && x.players.includes(me)) : undefined;
   // (The board's move count when it came on screen: this view is drawn afresh for each board, and kept while it shows.)
@@ -342,7 +342,7 @@ function useMoveReplay(m: LocalMatch, b: LocalBoard, me: string | null, browsing
     const t = setTimeout(() => redraw((k) => k + 1), next - Date.now() + 5);
     return () => clearTimeout(t);
   });
-  return { frame, step: frame ? frames.indexOf(frame) : 0, count: frames.length - 1, skip: () => setSkipped(half) };
+  return { frame, step: frame ? frames.indexOf(frame) : 0, count: frames.length - 1, skip: () => setSkipped(half), arrivedAt: arrivedAt.current };
 }
 
 /**
@@ -692,7 +692,8 @@ function MatchView({
           <Watchers client={client} board={`${m.key}/${boardId}`} hide={notWatching} colours={colours} />
         </div>
         {/* (During a move replay, a tap on the board skips it; the tap goes on to the board under it, so a move can start with it.) */}
-        <div class="board-row" onPointerDownCapture={replay.frame ? replay.skip : undefined}>
+        {/* (data-arrived: the board's move count when it came on screen, which decides a replay; tests read it.) */}
+        <div class="board-row" data-arrived={replay.arrivedAt} onPointerDownCapture={replay.frame ? replay.skip : undefined}>
           <Board fen={fen} orientation={orientation} lastMove={lastMove} interactive={choosing && !blocking} moves={allowed} onMove={(mv) => client.choose(m.key, mv)} arrows={boardArrows}>
             {replay.frame && <ReplayLayer client={client} m={m} frame={replay.frame} orientation={orientation} />}
             {(choosing || canBlock) && myDeadline && m.current && <TimerBar startsAt={m.current.startedAt} deadline={myDeadline} total={Math.max(1, myDeadline - m.current.startedAt)} quiet />}

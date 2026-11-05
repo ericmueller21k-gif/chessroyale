@@ -92,8 +92,10 @@ test("a Relay match on 3 boards plays to a result: 12 tiny boards, the finished 
   const ours = page.locator(".sq-match.ours .sq-tiny.is-won");
   await expect(ours).toHaveCount(3, { timeout: 10_000 });
   await expect(page.locator(".sq-match.ours .sq-done")).toHaveCount(3);
-  const filters = await ours.locator(".tiny-board").evaluateAll((els) => els.map((e) => getComputedStyle(e).filter));
-  expect(filters.every((f) => f === "none")).toBe(true);
+  for (let i = 0; i < 3; i++) {
+    await expect(ours.nth(i).locator(".tiny-board")).toHaveCSS("filter", "none");
+    await expect(ours.nth(i).locator(".tiny-board")).toHaveCSS("opacity", "1");
+  }
   void s;
 });
 

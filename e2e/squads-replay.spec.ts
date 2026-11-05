@@ -86,6 +86,26 @@ async function relayLobby(page: Page, extra = "") {
 const button = (page: Page) => page.locator(".hud-row .rp-btn");
 const mode = (page: Page) => button(page).getAttribute("data-mode");
 
+/** The board on screen's move count when it came on screen (the replay's rule reads it). */
+const arrived = (page: Page) => page.locator(".board-area .board-row").first().getAttribute("data-arrived").then(Number);
+
+/**
+ * Eric's rule (Nov 5): no replay if you watched both of the last two moves on the board land. Your next duties until one
+ * where you didn't (each skipped one checked: nothing replays), its move made for you on the way.
+ */
+async function nextReplaying(page: Page, after: number | null): Promise<Seen> {
+  for (let i = 0; i < 4; i++) {
+    const s = await nextDuty(page, after);
+    const total = await plies(page, s.duty!.board);
+    if (s.duty!.replay > 0 && (await arrived(page)) > total - 2) return s;
+    await page.waitForTimeout(600);
+    await expect(page.locator(".rp-over")).toHaveCount(0);
+    await move(page, s.fen!);
+    after = s.seq;
+  }
+  throw new Error("no duty with a replay in four");
+}
+
 /** The moves on a board of your match now. */
 const plies = (page: Page, board: number) =>
   page.evaluate((b) => {
@@ -94,7 +114,7 @@ const plies = (page: Page, board: number) =>
     return m.boards[b].moves.length as number;
   }, board);
 
-test("Relay: the replay button steps off, the last 2, all; your move on a board you come to replays what you missed there (who played each named over its piece), then the clock; a tap skips it; off, none and the same free time", async ({ page }) => {
+test("Relay: the replay button steps off, the last 2, all; your move on a board, unless you watched both of its last two moves land, replays them (who played each named over its piece), then the clock; a tap skips it; off, none and the same free time", async ({ page }) => {
   test.setTimeout(300_000);
   await named(page, "Tess");
   // (Quick board jump off: the game moves you to each board as your move there begins, so every move there was missed.)
@@ -134,7 +154,8 @@ test("Relay: the replay button steps off, the last 2, all; your move on a board 
   });
   await move(page, first.fen!);
 
-  // Your next board: the moves made there since you last saw it replay, then the free seconds run.
+  // Your next board where you didn't watch both of its last two moves land: every move since you last played there
+  // replays, then the free seconds run.
   const tags = await page.evaluate(() => {
     const out: { text: string; w: number; h: number; fs: number }[] = [];
     (window as any).__tags = out;
@@ -149,7 +170,7 @@ test("Relay: the replay button steps off, the last 2, all; your move on a board 
     return true;
   });
   expect(tags).toBe(true);
-  const back = await nextDuty(page, first.seq);
+  const back = await nextReplaying(page, first.seq);
   const n = back.duty!.replay;
   expect(n).toBeGreaterThan(0);
   // The free time: the free seconds + 0.5 s for each move missed (the server's, the clock's).
@@ -183,7 +204,7 @@ test("Relay: the replay button steps off, the last 2, all; your move on a board 
   await button(page).click();
   await button(page).click();
   expect(await mode(page)).toBe("two");
-  const third = await nextDuty(page, back.seq);
+  const third = await nextReplaying(page, back.seq);
   expect(third.duty!.replay).toBeGreaterThan(1);
   await expect(page.locator(".rp-over")).toBeVisible();
   await expect(page.locator(".sq-status")).toContainText(/replay \d of 2$/);

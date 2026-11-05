@@ -27,6 +27,8 @@ deploy finishes on 4 boards). Decision note: `docs/decisions/2026-11-05-squads-t
 **The server:**
 - The first pregame vote opens `SQUADS.firstVoteDelaySeconds` (3) after the full lobby shows. Its timer and the bots'
   votes wait too.
+- A test lobby's `seat=white`: on 3 boards the opener could be the squad's waiting seat, so their squad's seats now
+  start with them.
 
 **The match screen** (`SquadsMatch.tsx`, `SquadsParts.tsx`, `MoveReplay.tsx`, `move-replay.ts`, `squads-view.ts`):
 - **Mini boards:** 3 a match. A finished board gets a border and a check mark in the winning squad's color; a drawn board
@@ -113,6 +115,8 @@ rule text is updated to match.
   - In one, no Pairs bot pair met an only move. In the other, no bot squad's bank went under 20 s.
   - The sim doesn't show 3 boards draining banks less in general (see below).
   - Mercenary is to be revisited (Eric).
+- `packages/server/test/squads-v2-lobby.test.ts` "a test lobby can start from a position…": a new loop checks that
+  in Relay, too, the opener moves in the first half for every seed.
 - `packages/server/test/squads-watching.test.ts`: board 3 → 2; the burst's boards `% 4` → `% 3`; the out-of-range board
   4 → 3.
 - **Five server specs:** `FRONT_DOOR.fillShowMs` → `fillShowMs + SQUADS.firstVoteDelaySeconds × 1000` (the 3 s first-vote
