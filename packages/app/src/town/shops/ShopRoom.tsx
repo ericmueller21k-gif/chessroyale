@@ -52,6 +52,7 @@ import { CREW_D_SEAT, CREW_FORK_AT, CREW_SHEETS, CREW_STEP_OFF, type CrewName } 
 import { Machine, along, forkLegs, frameOf, liftLegs, routeLength, type MachinePose, type Sq as CrewSq, type Waypoint } from "./grex-crew.ts";
 import type { CrewKey } from "./intro.ts";
 import { isUp, levelZ, liftAt, makeLevels, squareOf, type LevelsArt } from "./levels.ts";
+import { pressKey, squareUnder } from "./tap.ts";
 import { ElfLoop, elfB, pairLegs, stopJob, walkerLegs, type DispenseStop, type ElfPose } from "./ginger-elves.ts";
 import { HOLLOW, HOLLOW_HEART, hollowBuild } from "../../characters/hollow.ts";
 import { play } from "../../sound.ts";
@@ -3104,43 +3105,16 @@ function startRoom(
   const focus = { x: 0, y: 0 };
   let drag: { id: number; x: number; y: number; cx: number; cy: number; k: number } | null = null;
   let closing = false;
-  /** The square under (x, y) in the box, or null: the nearest drawn square whose shape holds the point. */
-  const squareAt = (x: number, y: number): Sq | null => {
-    const q = pq as [typeof pt, typeof pt, typeof pt, typeof pt];
-    // (Ginger's catwalk and stairs first, each drawn up where its deck or its steps are: a tap on the deck as you see it is the deck's.)
-    if (lv)
-      for (let r = n - 1; r >= 0; r--)
-        for (let c = 0; c < n; c++) {
-          if (!isUp(lv, c, r)) continue;
-          if (!P(c - 0.5, r - 0.5, q[0]) || !P(c + 0.5, r - 0.5, q[1]) || !P(c + 0.5, r + 0.5, q[2]) || !P(c - 0.5, r + 0.5, q[3])) continue;
-          const lift = liftAt(lv, c, r);
-          for (const p of q) p.y -= (lift * p.k) / SQ;
-          if (inQuad(q, x, y)) return { c, r };
-        }
-    for (let r = n - 1; r >= 0; r--)
-      for (let c = 0; c < n; c++) {
-        if (!P(c - 0.5, r - 0.5, q[0]) || !P(c + 0.5, r - 0.5, q[1]) || !P(c + 0.5, r + 0.5, q[2]) || !P(c - 0.5, r + 0.5, q[3])) continue;
-        if (inQuad(q, x, y)) return { c, r };
-      }
-    return null;
-  };
-  /** (x, y) is inside the four points' shape. */
-  const inQuad = (q: readonly { x: number; y: number }[], x: number, y: number): boolean => {
-    let pos = 0;
-    let neg = 0;
-    for (let i = 0; i < 4; i++) {
-      const a = q[i]!;
-      const b = q[(i + 1) % 4]!;
-      const cross = (b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x);
-      if (cross > 0) pos++;
-      else if (cross < 0) neg++;
-    }
-    return pos === 0 || neg === 0;
-  };
+  /** The square under (x, y) in the box, or null: the nearest drawn square whose shape holds the point (tap.ts). */
+  const squareAt = (x: number, y: number): Sq | null => squareUnder(room, v, camX, camY, SQ, x, y, pq);
+  /** (x, y) is on the Shopkeeper's picture. */
+  const onKid = (x: number, y: number): boolean => kidBox.on && x >= kidBox.x0 && x <= kidBox.x1 && y >= kidBox.y0 && y <= kidBox.y1;
+  /** What a press or its release at (x, y) is on (tap.ts `pressKey`): the same at both walks you, as in the town. */
+  const keyAt = (x: number, y: number): string => (onKid(x, y) ? pressKey(room, true, null) : pressKey(room, false, squareAt(x, y)));
   /** What a tap at (x, y) means: the Shopkeeper (its picture), the way out (its picture), or the square under it. */
   const plan = (x: number, y: number) => {
     const here = you.here();
-    if (kidBox.on && x >= kidBox.x0 && x <= kidBox.x1 && y >= kidBox.y0 && y <= kidBox.y1) return tapTarget(room, here, def.keeper[0]!.c, def.keeper[0]!.r);
+    if (onKid(x, y)) return tapTarget(room, here, def.keeper[0]!.c, def.keeper[0]!.r);
     const sq = squareAt(x, y);
     if (!sq) return null;
     return tapTarget(room, here, sq.c, sq.r);
@@ -3156,7 +3130,11 @@ function startRoom(
     P(camX, camY + 0.5, pq[1]);
     drag = { id: e.pointerId, x: e.clientX, y: e.clientY, cx: camX, cy: camY, k: Math.max(8, pq[1]!.y - pq[0]!.y) };
     closing = !!card;
-    press.down(e.clientX, e.clientY, "tap");
+    if (closing) return press.down(e.clientX, e.clientY, "");
+    // (What's under the finger now, as you see it: the camera may glide on before the release (it trails your walk), and a release
+    // on anything else lets go without walking, as in the town.)
+    const xy = local(e);
+    press.down(e.clientX, e.clientY, keyAt(xy.x, xy.y));
   };
   const onMove = (e: PointerEvent) => {
     if (!drag || e.pointerId !== drag.id) return;
@@ -3173,9 +3151,12 @@ function startRoom(
   const onUp = (e: PointerEvent) => {
     if (!drag || e.pointerId !== drag.id) return;
     drag = null;
-    if (press.up("tap") !== "walk") return;
-    if (closing) return close();
+    if (closing) {
+      if (press.up("") !== "drag") close();
+      return;
+    }
     const xy = local(e);
+    if (press.up(keyAt(xy.x, xy.y)) !== "walk") return;
     const p = plan(xy.x, xy.y);
     if (!p?.dest) return;
     // (Round Jefferson's machines where they are now; round Ginger's elves, or wait where you are while they're in the way.)
