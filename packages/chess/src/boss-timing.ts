@@ -1,5 +1,5 @@
 import { BOSS_POWERS, bannerPlusMs, bossBannerMs } from "@chessroyale/core";
-import { fenAtPly, gameEnd, pieceAt, sideToMove, type Base } from "./rules.ts";
+import { gameEnd, sideToMove, type Base, type Capture } from "./rules.ts";
 import { GINGER_FX } from "./bosses/ginger.ts";
 import { BOINGO_FX } from "./bosses/boingo.ts";
 import { FIRE_BURN_MS, GREX_FX } from "./bosses/grex.ts";
@@ -226,14 +226,23 @@ export const kingStrikeMs = (s: { kingOnBoard?: boolean; kingStrikeMs: number })
 /** Alone: how long the boss's move shows before your turn (the piece's slide, and a beat). */
 export const BOSS_MOVE_ALONE_MS = 450;
 
-/** What queenSlain reads: the sides, the crowd's turn, Big Boy's last bounce, the turn's events, and the board's moves (a boss's view). */
+/** What queenSlain reads: the sides, the crowd's turn, Big Boy's last bounce, the turn's events, and the board's moves and capture records (a boss's view). */
 export interface QueenSlainView {
   /** The boss's id (Dash never thinks: BOSS_POWERS.dashThinkMs). */
   id?: string;
   crowdSide: "w" | "b";
   crowdMoves: number;
   powers?: { bounce?: { at: number } | null; hop?: { at: number } | null; events?: readonly { kind: string }[]; fusion?: { at: number; why?: string } | null; revision?: { at: number } | null } | null;
-  board: { history: readonly string[]; bases?: readonly Base[] | null };
+  board: { history: readonly string[]; bases?: readonly Base[] | null; captures?: readonly Capture[] | null };
+}
+
+/**
+ * The capture the board's newest move made, from its record (BoardState.captures, written as the move was played; Eric,
+ * Nov 5: never read off the board), or null: it took nothing, a Revision crossed it out, or no move has been played.
+ */
+export function newestCapture(board: { history: readonly string[]; captures?: readonly Capture[] | null }): Capture | null {
+  const c = board.captures?.at(-1);
+  return c && c.ply === board.history.length ? c : null;
 }
 
 /**
@@ -247,19 +256,17 @@ const hisStepPlayed = (boss: { crowdMoves: number; powers?: { events?: readonly 
 
 /**
  * The crowd's move has just taken the boss's queen: "QUEEN SLAIN!" plays while he thinks, and he thinks at least as
- * long (bossThinkMs). Only the crowd's own capture of his queen (never his capture of yours: Hollow thinks again after
- * his own move for his extra move), and only in the thinking straight after it: once Big Boy's Big Bounce, or one of
- * Alfil's steps (his cast, the fusion, the Slam), or the hopper's hop, has played between that move and his (his turn's
- * second thinking, the same last move), it's old news (Eric, Oct 16: the banner flashed up again for a second after his
- * bounce).
+ * long (bossThinkMs). Read from the capture record of the board's newest move (newestCapture; a Revision that crossed
+ * the move out removed it), never from the board. Only the crowd's own capture of his queen (never his capture of
+ * yours: Hollow thinks again after his own move for his extra move). For the clock, only the thinking straight after
+ * it waits for the banner: once Big Boy's Big Bounce, one of Alfil's steps (his cast, the fusion, the Slam) or the
+ * hopper's hop has played between that move and his (his turn's second thinking, the same newest move), the banner has
+ * shown (the app shows each once: battle-banners.ts), so that thinking is its usual length.
  */
 export function queenSlain(boss: QueenSlainView): boolean {
-  const { history, bases } = boss.board;
-  const m = history[history.length - 1];
-  // (Folio's Revision crossed that move out: no queen was taken.)
-  if (!m || boss.powers?.bounce?.at === boss.crowdMoves || boss.powers?.hop?.at === boss.crowdMoves || boss.powers?.revision?.at === boss.crowdMoves || hisStepPlayed(boss)) return false;
-  const taken = pieceAt(fenAtPly(history, history.length - 1, bases), m.slice(2, 4));
-  return taken?.type === "q" && taken.color !== boss.crowdSide;
+  const c = newestCapture(boss.board);
+  if (!c || boss.powers?.bounce?.at === boss.crowdMoves || boss.powers?.hop?.at === boss.crowdMoves || hisStepPlayed(boss)) return false;
+  return c.piece === "q" && c.side === boss.crowdSide && c.color !== boss.crowdSide;
 }
 
 /**

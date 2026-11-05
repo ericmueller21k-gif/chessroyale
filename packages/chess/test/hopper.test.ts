@@ -373,7 +373,7 @@ describe("Leapfrog in a battle", () => {
   });
 
   it("QUEEN SLAIN! never again in his thinking after the hop", () => {
-    const board = { history: ["d1d8"], bases: [{ ply: 0, fen: "3qk3/8/8/8/8/8/8/3QK3 w - - 0 1" }] };
+    const board = { history: ["d1d8"], bases: [{ ply: 0, fen: "3qk3/8/8/8/8/8/8/3QK3 w - - 0 1" }], captures: [{ ply: 1, side: "w" as const, from: "d1", to: "d8", piece: "q" as const, color: "b" as const }] };
     const view = { crowdSide: "w" as const, crowdMoves: 5, board, powers: { events: [] as { kind: string }[] } };
     expect(queenSlain(view)).toBe(true);
     expect(queenSlain({ ...view, powers: { events: [{ kind: "hop" }], hop: { at: 5 } } })).toBe(false);

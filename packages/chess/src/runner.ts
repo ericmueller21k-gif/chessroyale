@@ -73,7 +73,7 @@ import type { BoardSlot, NetBoard, NetBoss, NetFinal, NetStanding } from "./prot
 import { BOSS_OPENING, FREESTYLE_OPENING, boardEnd, boardStatus, freestyleBoard, newBoard, playOnBoard, recentMoves, type BoardState } from "./boards.ts";
 import { freestyleStart } from "./chess960.ts";
 import { pickOpenings, type Opening } from "./openings.ts";
-import { START_FEN, applyMove, baseAt, gameEnd, legalMoves, materialSlips, moveNumber, pieceAt, sideToMove, toSan } from "./rules.ts";
+import { START_FEN, applyMove, baseAt, gameEnd, legalMoves, materialSlips, moveNumber, sideToMove, toSan } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
 import { BOSS_BRAIN, BOSS_LEVEL, ENGINE_MAX_ELO, bossBrainFor, bossLevelBase, bossLevelNow, bossRatingShown, type BossBrain, type BossBrainPlan } from "@chessroyale/core";
 import { humanBrainMove, within, type BrainNote, type HumanEngineLike } from "./boss-brain.ts";
@@ -1577,8 +1577,11 @@ export class MatchRunner {
     const m = special && legal.includes(special.play) ? special.play : legal.includes(move) ? move : legal[0]!;
     if (m !== move && !(special && m === special.play)) console.error(`boss move refused: ${move} isn't one he may play in ${board.fen}; ${m} instead`);
     const shown = special && m === special.play ? move : m;
-    this.boards.set(id, playOnBoard(board, m, 1 - board.expected));
-    const captured = pieceAt(board.fen, m.slice(2, 4))?.type;
+    const played = playOnBoard(board, m, 1 - board.expected);
+    this.boards.set(id, played);
+    // (What it took: the record playOnBoard wrote for it.)
+    const taken = played.captures?.at(-1);
+    const captured = taken && taken.ply === played.history.length ? taken.piece : undefined;
     // (A power stops it: it stopped every move he had, so the limit lifted for the turn. The screens say which power.)
     const through = boss?.powers && bossRules(boss)?.bossStops?.(boss)?.(m, board.fen) ? stopReason(boss, board.fen, m) : null;
     this.bossLast = { move: shown, san: special && m === special.play ? special.san : toSan(board.fen, m), ...(staggered ? { staggered: true } : {}), ...(captured ? { captured } : {}), ...(through ? { through } : {}) };
@@ -2792,6 +2795,7 @@ export function netBoard(b: BoardState, withOpening = false): NetBoard {
     recentFrom: recent.from,
     history: [...b.history],
     ...(b.bases?.length ? { bases: b.bases.map((x) => ({ ...x })) } : {}),
+    ...(b.captures?.length ? { captures: b.captures.map((x) => ({ ...x })) } : {}),
     ...(withOpening ? { openingMoves: b.history.slice(0, b.openingPlies) } : {}),
   };
 }

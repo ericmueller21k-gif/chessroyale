@@ -406,6 +406,17 @@ build): online, phase 1 won is the crowd's victory):
   (`powers.bounce.at` this turn: old news), the bounce waits for it online as solo did, and his move after the bounce
   doesn't. It never plays for the boss taking your queen (Hollow thinks again after his own move for his extra move).
   Tests: `packages/chess/test/boss-guard.test.ts`, `bigboy.test.ts`, `packages/server/test/boss-powers-lobby.test.ts`.
+- **The queen banners are events of real captures** (Eric, Nov 5: "the queen banner should happen literally when a
+  capture is written"; docs/decisions/2026-11-05-banner-events.md). `playOnBoard` records every capture as its move is
+  played (`BoardState.captures`: ply, side, from, to, piece, color; `captureOf` in `rules.ts`), sent as
+  `NetBoard.captures` (optional) and kept in the stored match; Folio's Revision removes the records it crosses out. The
+  banners read only those records, never the board, so a burn, bounce, freeze, Slam or plant can't make one or hide one:
+  `packages/app/src/battle-banners.ts` turns them into events (QUEEN DOWN! on the screen where his move lands, QUEEN
+  SLAIN! in his thinking straight after yours), each due only while its move is the board's newest and shown once
+  (`bannerOn`, reset at a battle's intro). `queenSlain` (the clock's wait) reads the same record; the boss's
+  `lastMove.captured` comes from it. Power banners were already tied to their uses (each moment keyed to its kind and
+  turn, drawn within its beats). Tests: `packages/app/test/battle-banners.test.ts`; `e2e/alfil.spec.ts`, the queen-then-
+  Slam test.
 - **What a boss says** (`packages/app/src/speech.tsx`, numbers in `SPEECH`; Eric, Oct 10: Ginger's line came and went
   at once): every line (its powers' moments, its ultimate, its warning, its reactions, Hollow's claim and Lights out
   words, Big Boy's snack) goes into the boss's voice and shows in its text box beside it (in the boss bar on a phone,

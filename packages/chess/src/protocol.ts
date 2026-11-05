@@ -1,5 +1,5 @@
 import type { BossBrain, BounceResult, BurnEvent, Fusion, LassoDrag, LeapfrogHop, LightsOutTarget, LongPull, PowerEvent, PowerId, RepaintResult, SawCut, ShowdownResult, SlamLanding, SlamPiece, SlamResult, SplitPawn, StopReason, TusksCast } from "@chessroyale/core";
-import type { Base } from "./rules.ts";
+import type { Base, Capture } from "./rules.ts";
 import type { ItemLook } from "@chessroyale/core";
 import type { Augment, DrawRule, MaterialSlip } from "@chessroyale/core";
 import type { LastStandRound } from "./runner.ts";
@@ -49,6 +49,11 @@ export interface NetBoard {
   history: string[];
   /** Positions changed between moves (a piece G-REX's fire destroyed): the moves after each are played from it. */
   bases?: Base[];
+  /**
+   * Every capture on this board as it was played (BoardState.captures): what the queen banners read. Optional: a server
+   * from before Nov 5, 2026 sends none (no queen banners then), and an older app passes it by.
+   */
+  captures?: Capture[];
 }
 
 /** A board at a glance, for the strip of tiny boards along the top (slots never move; closed ones stay grayed). */

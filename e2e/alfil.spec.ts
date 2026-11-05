@@ -292,7 +292,13 @@ test("Alfil's Mammoth Slam right after a queen is taken: QUEEN DOWN! and QUEEN S
   let tookAt = -1;
   let took = 0;
   let slew = 0;
-  for (let turn = 0; turn < 14; turn++) {
+  // (Until the Slam has landed, however many moves that takes: a time cap, not a move cap, so the test checks the banners
+  // and not whether he took your queen soon enough. Nov 5: 14 moves ran out before it on CI.)
+  const cap = Date.now() + 7 * 60_000;
+  while (Date.now() < cap) {
+    // (Your turn, or the battle over: then nothing more to play, and the checks below say what's missing.)
+    await expect.poll(async () => (await phase(page)) === "play" || (await page.evaluate(() => !!(window as any).match.boss?.result)), { timeout: 90_000 }).toBe(true);
+    if (await page.evaluate(() => !!(window as any).match.boss?.result)) break;
     await yourMove(page);
     // (His turn is over: the Slam came and his move after it.)
     if ((await count("MAMMOTH SLAM!")) > 0) break;
@@ -317,7 +323,7 @@ test("Alfil's Mammoth Slam right after a queen is taken: QUEEN DOWN! and QUEEN S
   const order = await page.evaluate(() => (window as any).__banners as string[]);
   console.log(`alfil slam after queens: his takes of yours ${took}, yours of his ${slew}; banners in order: ${order.join(" | ")}`);
   expect(took, "he took your queen (the test's setup)").toBeGreaterThan(0);
-  expect(await count("MAMMOTH SLAM!"), "the Slam's own banner, once").toBe(1);
+  expect(await count("MAMMOTH SLAM!"), "the Slam landed within the time cap: its own banner, once").toBe(1);
   expect(await count("QUEEN DOWN!"), "his take of your queen: its banner, once").toBe(took);
   expect(await count("QUEEN SLAIN!"), "your take of his queen: its banner, once").toBe(slew);
   expect(errors).toEqual([]);
