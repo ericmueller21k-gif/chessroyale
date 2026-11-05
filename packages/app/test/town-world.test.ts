@@ -53,6 +53,17 @@ describe("town square: one pawn a square", () => {
     apart(t);
   });
 
+  it("tapping a home walks you in front of its door (Eric, Nov 5): the square before its plot's middle, or one either side if that's taken", () => {
+    for (const h of HOMES) {
+      const t = still();
+      const to = destFor(t, t.you.walker, { kind: "home", home: h })!;
+      expect(to, h.name).not.toBeNull();
+      expect(wrapI(to.r), `${h.name}: the row before its plot's front row`).toBe(wrapI(h.cy - 2));
+      expect(Math.abs(wrapF(to.c - h.cx)), `${h.name}: before its door, or one either side`).toBeLessThanOrEqual(1);
+      expect(walkable(to.c, to.r) && !taken(t, to.c, to.r, t.you.walker)).toBe(true);
+    }
+  });
+
   it("a free square is its own end; tapping a person or a boss ends you beside them", () => {
     const t = still();
     expect(destFor(t, t.you.walker, { kind: "square", ...SPOT })).toEqual(SPOT);

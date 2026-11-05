@@ -1541,6 +1541,36 @@ test.describe("rides lazy", () => {
 
 // The arrow keys (Eric, Nov 4; docs/areas/town-square.md, "Arrow keys"): hold ArrowUp and you walk up the town, and the on-screen up key
 // lights while it's held; the on-screen down arrow walks you back the same way (WASD does what the arrows do); a release stops you.
+test("a home's door (Eric, Nov 5): a tap on Folio's house walks you to the square before its door; from there, the up arrow into it opens its card", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/town");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await page.waitForTimeout(800); // (the first walk settles)
+  const name = "Folio's Folded House";
+  const card = page.getByRole("dialog", { name, exact: true });
+  await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("folio"));
+  // Its plot is columns 34 to 36, rows 29 to 31: the square before its door is (35, 28) (or one either side, if someone stands there).
+  await expect(async () => {
+    if (await card.isVisible()) return;
+    const xy = await page.evaluate(() => (window as unknown as { __townAt?: (k: string, id: string) => { x: number; y: number } | null }).__townAt?.("home", "folio") ?? null);
+    expect(xy, "drawn").not.toBeNull();
+    const cv = (await canvas(page).boundingBox())!;
+    await page.mouse.click(cv.x + xy!.x, cv.y + xy!.y);
+    await expect(card).toBeVisible({ timeout: 1500 });
+  }).toPass({ timeout: 30_000 });
+  await expect.poll(async () => { const [c, r] = await you(page); return r === 28 && Math.abs(c - 35) <= 1; }, { message: "before its door", timeout: 30_000 }).toBe(true);
+  await page.waitForTimeout(600);
+  await page.keyboard.press("Escape");
+  await expect(card).toBeHidden();
+  // Up into the house: you stay where you are and its card asks, as a tap on it would.
+  const at = await you(page);
+  await page.keyboard.down("ArrowUp");
+  await expect(card, "the up arrow against the house opens its card").toBeVisible({ timeout: 5000 });
+  await page.keyboard.up("ArrowUp");
+  expect(await you(page), "you didn't walk into it").toEqual(at);
+  expect(errors, "no page or console errors").toEqual([]);
+});
+
 test("the arrow keys: holding ArrowUp walks you up and the up key lights while it's held; the on-screen down arrow walks you back; a release stops you", async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/town");
