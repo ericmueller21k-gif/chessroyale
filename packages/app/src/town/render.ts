@@ -40,7 +40,11 @@ import type { LightPool, LightSpot } from "./houses/kit.ts";
 import { PARK_BENCH, PARK_FOUNTAIN, PARK_LAMP, PARK_LAMP_HEAD, PARK_LAMP_LIGHTS, PARK_LAMP_POOLS, PARK_TABLE, PARK_TREES, TABLE_BACK_RANK, TABLE_BOARD, TABLE_CLOCK_INK, TABLE_DIGITS, TABLE_INK, TABLE_PIECES, TABLE_RING, TABLE_TOP } from "./houses/park.ts";
 import type { SidekickSheet } from "./sidekick-sheets.ts";
 import type { Rider, RiderTrail } from "./rides.ts";
-import { COLISEUM_PLACE, GRASS, LAMPS, PAVING, PROPS, STATUES, TABLES, groundAt, isSprite, onColiseum, plotAt, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town } from "./world.ts";
+import { STREET_TOWN } from "./admin-town.ts";
+import { building } from "./buildings.ts";
+import { HEDGE, bed, bush, hedgeFront, hedgeTop, shed } from "./dressing.ts";
+import { STREET_BUILDINGS } from "./street.ts";
+import { ARENA, COLISEUM_PLACE, GARDEN, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, groundAt, isSprite, onColiseum, plotAt, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town } from "./world.ts";
 import { TAG_STYLE, TagCache, namesMode, tagAlpha, type NamesMode, type TagKind } from "./tags.ts";
 
 /** Each boss's sprite (its real one: its `idle` frames). */
@@ -108,13 +112,16 @@ const HAZE_LINES = 10;
  * The squares' colors: 65 steps toward the sky, light or dark, and the ground (the board, the board under a home or the
  * Colosseum, the park's paving, its grass); and at most this many squares a frame.
  */
-const GROUNDS = 4;
+const GROUNDS = 5;
 const SQ_KEYS = (MIX_STEPS + 1) * GROUNDS * 2;
 /** The park's paving (a light stone, two tones) and its grass (two greens, mown in squares). */
 const PAVE_LIGHT = [222, 214, 198] as const;
 const PAVE_DARK = [203, 194, 177] as const;
 const GRASS_LIGHT = [128, 184, 84] as const;
 const GRASS_DARK = [113, 170, 74] as const;
+/** The street town's back gardens, its grove and the lots under its buildings (Nov 5; the art's colors): a deeper, unmown green. */
+const GARDEN_LIGHT = [118, 168, 80] as const;
+const GARDEN_DARK = [108, 158, 72] as const;
 const SQ_MAX = 3000;
 
 /**
@@ -128,7 +135,7 @@ interface GroundColors {
   skirt: string;
   horizon: string;
 }
-/** A square's color key: its step toward the sky, its ground (0 board, 1 board under a home, 2 paving, 3 grass), light or dark. */
+/** A square's color key: its step toward the sky, its ground (0 board, 1 board under a home, 2 paving, 3 grass, 4 garden), light or dark. */
 const sqKeyOf = (mix: number, ground: number, alt: number) => (mix * GROUNDS + ground) * 2 + alt;
 function groundColors(skyh: readonly number[]): GroundColors {
   const fill: string[] = [];
@@ -136,14 +143,14 @@ function groundColors(skyh: readonly number[]): GroundColors {
   for (let i = 0; i <= MIX_STEPS; i++)
     for (let g = 0; g < GROUNDS; g++)
       for (let alt = 0; alt < 2; alt++) {
-        let base: readonly number[] = g === 2 ? (alt ? PAVE_DARK : PAVE_LIGHT) : g === 3 ? (alt ? GRASS_DARK : GRASS_LIGHT) : alt ? SQ_DARK : SQ_LIGHT;
+        let base: readonly number[] = g === 2 ? (alt ? PAVE_DARK : PAVE_LIGHT) : g === 3 ? (alt ? GRASS_DARK : GRASS_LIGHT) : g === 4 ? (alt ? GARDEN_DARK : GARDEN_LIGHT) : alt ? SQ_DARK : SQ_LIGHT;
         if (g === 1) base = base.map((x) => x * 0.9); // a faint darker tint under a home (and the Colosseum)
         const t = i / MIX_STEPS;
         const f = mix(base, skyh, t);
         const k = sqKeyOf(i, g, alt);
         fill[k] = rgb(f);
         // The seam fades out too; the grass's is faint (a lawn, not tiles), the paving's a little stronger (its slabs).
-        const d = g === 3 ? 0.95 : g === 2 ? 0.84 : 0.86;
+        const d = g === 3 || g === 4 ? 0.95 : g === 2 ? 0.84 : 0.86;
         seam[k] = rgb(f.map((x) => x * (d + (1 - d) * t)));
       }
   const haze = Array.from({ length: HAZE_LINES }, (_, i) => `rgba(${skyh[0]! | 0},${skyh[1]! | 0},${skyh[2]! | 0},${(0.75 * Math.pow(1 - i / HAZE_LINES, 1.7)).toFixed(3)})`);
@@ -594,6 +601,9 @@ export class Renderer {
   private readonly propItems: Item[];
   private readonly propFrames: FrameCache[];
   private readonly propTop: number[];
+  /** The street town's hedges' tops (a top-down tile each, by its flowers: 0..2), and each front's lights (by its picture). */
+  private readonly hedgeTops: FrameCache[];
+  private readonly frontGlow = new Map<FrameCache, Glow | null>();
   /** This person sits at a chess table (drawn lower, on its stool). */
   private sitting = false;
   private readonly pose: Pose = { x: 0, y: 0, hop: 0, tilt: 0, step: false, t: 0 };
@@ -754,7 +764,21 @@ export class Renderer {
     const table = new FrameCache(PARK_TABLE);
     const fountain = new FrameCache(PARK_FOUNTAIN);
     const lamp = new FrameCache(PARK_LAMP);
-    this.propFrames = PROPS.map((p) => (p.kind === "tree" ? trees[p.v]! : p.kind === "bench" ? bench : p.kind === "table" ? table : p.kind === "lamp" ? lamp : fountain));
+    // (The street town's, Nov 5: the gardens' hedges, bushes, beds and sheds, and the everyday buildings' fronts, one cache a picture.)
+    const street = new Map<string, FrameCache>();
+    const art = (key: string, ch: () => Character) => street.get(key) ?? street.set(key, new FrameCache(ch())).get(key)!;
+    this.propFrames = PROPS.map((p) => {
+      if (p.kind === "hedge") return art(`hedge${p.v}`, () => hedgeFront(p.v));
+      if (p.kind === "bush") return art(`bush${p.v}`, () => bush(p.v));
+      if (p.kind === "bed") return art(`bed${p.v}`, () => bed(p.v));
+      if (p.kind === "shed") return art(`shed${p.v}`, () => shed(p.v).front);
+      if (p.kind === "front") {
+        const b = STREET_BUILDINGS[p.lot!]!;
+        return art(`${b.id}-${b.w}-${b.v}`, () => building(b.id, b.w, b.v).front);
+      }
+      return p.kind === "tree" ? trees[p.v]! : p.kind === "bench" ? bench : p.kind === "table" ? table : p.kind === "lamp" ? lamp : fountain;
+    });
+    this.hedgeTops = STREET_TOWN ? [0, 1, 2].map((v) => new FrameCache(hedgeTop(v))) : [];
     this.propTop = PROPS.map(() => 0);
     this.bossFrames = town.bosses.map((b) => new FrameCache(BOSS_ART[b.home.id]));
     for (const p of town.people) if (isSprite(p.look) && !this.spriteArt.has(p.look.sprite)) this.spriteArt.set(p.look.sprite, new SpriteFrames(p.look.sprite));
@@ -769,7 +793,7 @@ export class Renderer {
       if (n >= SQ_MAX) return;
       const m = Math.round(clamp(hazeMix(this.view, cu - this.camX, ru - this.camY, this.mist), 0, 1) * MIX_STEPS);
       const gk = groundAt[r * N + c]!;
-      this.sqKey[n] = sqKeyOf(m, gk === PAVING ? 2 : gk === GRASS ? 3 : plotAt[r * N + c] || onColiseum(c, r) ? 1 : 0, (c + r) & 1);
+      this.sqKey[n] = sqKeyOf(m, gk === PAVING ? 2 : gk === GRASS ? 3 : gk === GARDEN || gk === LOT ? 4 : gk === ARENA || plotAt[r * N + c] || onColiseum(c, r) ? 1 : 0, (c + r) & 1);
       const o = n * 8;
       const cx = (q[0]! + q[2]! + q[4]! + q[6]!) / 4;
       const cy = (q[1]! + q[3]! + q[5]! + q[7]!) / 4;
@@ -1311,9 +1335,14 @@ export class Renderer {
         below = h.half > 2 ? 10 : below;
       } else if (it.kind === "prop") {
         const pr = PROPS[it.i]!;
-        x = pr.x;
-        y = pr.y;
-        margin = 2;
+        // (A hedge's foot is its face, 0.4 of a square before the back of its top, where the plan puts it; Seam Avenue's run north
+        // to south, the middle of their top.)
+        const side = pr.kind === "hedge" && pr.x !== Math.round(pr.x);
+        x = side ? pr.x - HEDGE.deep / 2 : pr.x;
+        y = pr.kind === "hedge" && !side ? pr.y - HEDGE.deep : pr.y;
+        // (A front is up to 4 squares wide, and up to 4 tall: drawn from that far off the box's sides, its top showing from under it.)
+        margin = pr.kind === "front" ? this.propFrames[it.i]!.ch.w / 2 / f.housePxPerSquare + 0.5 : 2;
+        if (pr.kind === "front") below = 4.2;
       } else {
         const w = it.kind === "boss" ? town.bosses[it.i]!.walker : people[it.i]!.walker;
         w.pose(now, pose);
@@ -1337,6 +1366,8 @@ export class Renderer {
       it.sz = it.kind === "prop" ? it.dz + 0.05 : it.dz;
       it.on = drawable(v, it.dx, it.dz, margin, below) && !(it.kind === "person" && people[it.i]!.home);
     }
+    // The street town's near side (Nov 5): no front (nor shed, nor home) between the camera and you; the trees there fade out.
+    if (STREET_TOWN) this.nearCut(items);
     sortFarFirst(items);
     for (const b of town.bosses) b.onScreen = false;
     for (const b of this.statueBox) b.on = false;
@@ -1354,8 +1385,12 @@ export class Renderer {
         const ch = BOSS_ART[b.home.id];
         const img = this.bossFrames[it.i]!.at(now, it.i * 977);
         b.walker.pose(now, pose);
-        this.drawSprite(it, img, f.bossSquares * (f.bossScale[b.home.id] ?? 1), ch.foot[0] / ch.w, ch.foot[1] / ch.h, ch.w / ch.h, 0, 0, b.walker.facing, 1.6);
-        b.onScreen = it.fx > -40 && it.fx < this.W + 40 && it.fy > 0 && it.hy < this.H && bandOf(v, it.dx, it.dz) < 0.6; // (a boss deep in the haze doesn't talk)
+        // (The street town: a boss whose drawing would reach past the box's foot or side fades out first, so none is ever cut off.)
+        this.fade = this.edgeFade(it, (f.bossSquares * (f.bossScale[b.home.id] ?? 1) * ch.w) / ch.h / 2);
+        it.faded = this.fade < 0.5;
+        if (this.fade > 0.004) this.drawSprite(it, img, f.bossSquares * (f.bossScale[b.home.id] ?? 1), ch.foot[0] / ch.w, ch.foot[1] / ch.h, ch.w / ch.h, 0, 0, b.walker.facing, 1.6);
+        b.onScreen = !it.faded && it.fx > -40 && it.fx < this.W + 40 && it.fy > 0 && it.hy < this.H && bandOf(v, it.dx, it.dz) < 0.6; // (a boss deep in the haze doesn't talk)
+        this.fade = 1;
         if (town.speech.boss === b) {
           this.bubble.on = true;
           this.bubble.text = town.speech.line;
@@ -1372,7 +1407,7 @@ export class Renderer {
         const facing = table ? (w.c < table.c ? 1 : -1) : w.facing;
         // Up close on a statue, the people in front of it (you, on its square) fade: they'd stand between the camera and it.
         // A bot coming out from home fades in, one going home fades out (Oct 28: they take turns in the square).
-        this.fade = (it.dz < this.statueDz ? 1 - f.closeNearFade * this.close.e : 1) * clamp(Math.min(now - person.came, person.leaves - now) / f.botFadeMs, 0, 1);
+        this.fade = (it.dz < this.statueDz ? 1 - f.closeNearFade * this.close.e : 1) * clamp(Math.min(now - person.came, person.leaves - now) / f.botFadeMs, 0, 1) * (person.you ? 1 : this.edgeFade(it, 0.5));
         it.faded = this.fade < 0.5;
         if (person.you) {
           // Your shadows are a bot's: sized from the pawn, not from the margin your look's items are drawn in.
@@ -1428,6 +1463,45 @@ export class Renderer {
   }
 
   /**
+   * The street town (Nov 5, the art's "nothing between the camera and you"): a building's front, a home's or a shed standing more than
+   * `streetNearCut` squares nearer the camera than its focus (you, as it follows you) isn't drawn (nor tapped); a tree there fades out over `streetTreeFade` squares
+   * nearer still (`nearFade`, read by drawProp). Hedges, beds and bushes are low: drawn.
+   */
+  private nearCut(items: Item[]): void {
+    const f = TOWN_FEEL;
+    // (From the camera's focus, which is you as it follows you; looking round, wherever it looks.)
+    const cut = -f.streetNearCut;
+    for (const it of items) {
+      if (!it.on || it.dz >= cut) continue;
+      if (it.kind === "house" && it.i < this.homes.length) it.on = false;
+      else if (it.kind === "prop") {
+        const k = PROPS[it.i]!.kind;
+        if (k === "front" || k === "shed") it.on = false;
+      }
+    }
+  }
+  /** How much of a street-town tree shows, by how far nearer the camera than its focus it stands (1: all; today's town: always all). */
+  private nearFade(it: Item): number {
+    if (!STREET_TOWN) return 1;
+    const f = TOWN_FEEL;
+    return clamp((it.dz + f.streetNearCut + f.streetTreeFade) / f.streetTreeFade, 0, 1);
+  }
+
+  /**
+   * The street town (Eric, Nov 4: every figure whole on screen, never cut off by the page's edge): how much of a figure (a boss, a bot,
+   * anyone but you) shows, by how near its drawing comes to the box's foot or either side, fading out over the last half square before
+   * it would be cut (1: all; today's town: always all). `halfW`: half its drawing's width, in squares.
+   */
+  private edgeFade(it: Item, halfW: number): number {
+    if (!STREET_TOWN) return 1;
+    const p = this.ep;
+    if (!proj(this.view, it.dx, it.dz, 0, p)) return 0;
+    const m = 0.5 * p.k;
+    return clamp(Math.min(this.H - (p.y + 0.15 * p.k), p.x - halfW * p.k, this.W - (p.x + halfW * p.k)) / m, 0, 1);
+  }
+  private readonly ep = newPt();
+
+  /**
    * The Colosseum seen from afar (slice 6): when its foot is past the rim, but not more than `farReach` squares past it, its
    * picture stands on the horizon where it lies, smaller with distance, sunk behind the world's curve (`farSink` squares
    * a square past the rim), hazed like the far band. Only its top shows over the horizon, so it looms from across the
@@ -1478,9 +1552,14 @@ export class Renderer {
     const x0 = p.x - ch.foot[0] * px;
     const y0 = p.y - ch.foot[1] * px;
     const s = bandOf(v, it.dx, it.dz);
-    const alpha = (1 - 0.6 * s) * enterOf(v, it.dx, it.dz);
-    const img = fc.at(now, it.i * 211);
     const prop = PROPS[it.i]!;
+    const alpha = (1 - 0.6 * s) * enterOf(v, it.dx, it.dz) * (prop.kind === "tree" ? this.nearFade(it) : 1);
+    if (alpha <= 0.004) return;
+    const img = fc.at(now, it.i * 211);
+    // A hedge running north to south (along Seam Avenue): its top and the side the camera sees, laid along the ground.
+    if (prop.kind === "hedge" && prop.x !== Math.round(prop.x)) return this.sideHedge(it, img, prop.v, alpha, now);
+    // A hedge's top (the street town's): its tile laid flat from its face back over its depth, at its height, before its face.
+    if (prop.kind === "hedge") this.hedgeTop(it, prop.v, x0, w, p.y - HEDGE.tall * px, alpha, now);
     // A table waiting for a game: the ring under its free stool, on the ground under the picture.
     const ts = prop.kind === "table" ? this.tableAt(prop.table) : null;
     if (ts?.kind === "waiting") this.drawRing(it, ts.free, now, alpha * (1 - 0.88 * s));
@@ -1492,9 +1571,70 @@ export class Renderer {
     this.cover(img, x0, y0, w, h, alpha);
     // A lamp, lit at dusk and night (fading and hazing in the far band as its picture does).
     if (this.lightK > 0.01 && PROPS[it.i]!.kind === "lamp") this.lightUp((this.lampGlow ??= bakeGlow(PARK_LAMP, PARK_LAMP_LIGHTS, PARK_LAMP_POOLS)), x0, y0, px, alpha * (1 - 0.88 * s), now, it.i * 389);
+    // A building's front, its windows lit at dusk and night (the street town's: each picture's lights baked once).
+    if (this.lightK > 0.01 && prop.kind === "front") this.lightUp(this.frontGlowOf(fc, prop.lot!), x0, y0, px, alpha * (1 - 0.88 * s), now, it.i * 389);
     this.propTop[it.i] = p.y - (PROPS[it.i]!.kind === "table" ? TABLE_TOP * px : ch.foot[1] * px);
     this.box(it, p.depth, x0, y0, x0 + w, y0 + h, p.x, p.y, y0);
     if (prop.kind === "table") this.drawBoard(it, prop.table, ts!, now, alpha * (1 - 0.88 * s), s);
+  }
+
+  /** A hedge's top: its tile over the strip from its face (`yFace`, its top's front edge on the screen) back `HEDGE.deep` squares. */
+  private hedgeTop(it: Item, v: number, x0: number, w: number, yFace: number, alpha: number, now: number): void {
+    const { ctx, view: vw } = this;
+    const q = this.bq;
+    if (!proj(vw, it.dx, it.dz + HEDGE.deep, 0, q)) return;
+    const yBack = q.y - (HEDGE.tall * q.k) / TOWN_FEEL.housePxPerSquare;
+    if (yFace - yBack < 0.5) return;
+    ctx.globalAlpha = alpha;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(this.hedgeTops[v % 3]!.at(now, 0), x0, yBack, w, yFace - yBack + 0.5);
+    ctx.globalAlpha = 1;
+  }
+  /**
+   * A hedge along Seam Avenue (the street town's), which runs north to south, so the north-facing camera sees it end on: its top laid
+   * flat over its depth, then the side facing the camera's column, each its tile mapped onto the ground's square (an affine fit).
+   */
+  private sideHedge(it: Item, face: HTMLCanvasElement, v: number, alpha: number, now: number): void {
+    const { ctx, view: vw, DPR } = this;
+    const S = TOWN_FEEL.housePxPerSquare;
+    const half = HEDGE.deep / 2;
+    // (The face nearer the camera's column: its east one when the hedge is left of the camera, else its west one.)
+    const near = it.dx < 0 ? it.dx + half : it.dx - half;
+    const far = it.dx < 0 ? it.dx - half : it.dx + half;
+    const a = this.hA;
+    const b = this.hB;
+    const c = this.hC;
+    if (!proj(vw, near, it.dz - 0.5, 0, a) || !proj(vw, near, it.dz + 0.5, 0, b) || !proj(vw, far, it.dz - 0.5, 0, c)) return;
+    const up = (q: { y: number; k: number }) => q.y - (HEDGE.tall * q.k) / S;
+    ctx.globalAlpha = alpha;
+    ctx.imageSmoothingEnabled = true;
+    // Its top: the tile's columns along the avenue (south to north), its rows across its depth.
+    const top = this.hedgeTops[v % 3]!.at(now, 0);
+    ctx.setTransform((DPR * (b.x - a.x)) / S, (DPR * (up(b) - up(a))) / S, (DPR * (c.x - a.x)) / S, (DPR * (up(c) - up(a))) / S, DPR * a.x, DPR * up(a));
+    ctx.drawImage(top, 0, 0);
+    // Its side: the face's columns along the avenue, its rows down to the ground (a picture pixel k / 37 screen pixels).
+    const k = (a.k + b.k) / 2;
+    ctx.setTransform((DPR * (b.x - a.x)) / S, (DPR * (up(b) - up(a))) / S, 0, (DPR * k) / S, DPR * a.x, DPR * up(a));
+    ctx.drawImage(face, 0, 0);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.globalAlpha = 1;
+    const x0 = Math.min(a.x, b.x, c.x);
+    const x1 = Math.max(a.x, b.x, c.x);
+    this.box(it, a.depth, x0, Math.min(up(b), up(c)), x1, Math.max(a.y, b.y), (a.x + b.x) / 2, (a.y + b.y) / 2, Math.min(up(b), up(c)));
+  }
+  private readonly hA = newPt();
+  private readonly hB = newPt();
+  private readonly hC = newPt();
+  /** A front's lights (its building's), baked once a picture; null: none. */
+  private frontGlowOf(fc: FrameCache, lot: number): Glow | null {
+    let g = this.frontGlow.get(fc);
+    if (g === undefined) {
+      const b = STREET_BUILDINGS[lot]!;
+      const box = building(b.id, b.w, b.v);
+      g = box.lights.length ? bakeGlow(box.front, box.lights, []) : null;
+      this.frontGlow.set(fc, g);
+    }
+    return g;
   }
 
   // ---- The chess tables' boards (Oct 27; Eric: "even tiny little pieces that look like pieces … facing the right way …

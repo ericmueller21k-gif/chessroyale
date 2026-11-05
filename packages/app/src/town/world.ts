@@ -8,7 +8,8 @@
 import { adminFirst, type ItemLook } from "@chessroyale/core";
 import { SELECT_LINES } from "../characters/boss-select.ts";
 import { N, wrapF, wrapI } from "./camera.ts";
-import { ADMIN_TOWN } from "./admin-town.ts";
+import { ADMIN_TOWN, STREET_TOWN } from "./admin-town.ts";
+import { STREET_BUILDINGS, STREET_FOUNTAIN, STREET_GROUND, STREET_HOMES, STREET_PARK, STREET_PROPS, STREET_START, STREET_TABLES, type SqBox } from "./street.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { SIDEKICK_SHEETS, type SidekickSheet } from "./sidekick-sheets.ts";
 
@@ -81,7 +82,7 @@ export const statueAt = (c: number, r: number): Statue | null => STATUES.find((s
  * The park in front of the Colosseum's gate, south of its apron and the walk: 20 squares across (the Colosseum's 12 and 4
  * more each side), 11 deep. `c0` its first column, `r1` its row nearest the gate (the camera looks north, r rising).
  */
-export const PARK = { c0: COLISEUM.c0 - 4, r1: COLISEUM.r0 - APRON_ROWS - WALK_ROWS - 1, w: 20, d: 11 } as const;
+export const PARK: { readonly c0: number; readonly r1: number; readonly w: number; readonly d: number } = STREET_TOWN ? STREET_PARK : { c0: COLISEUM.c0 - 4, r1: COLISEUM.r0 - APRON_ROWS - WALK_ROWS - 1, w: 20, d: 11 };
 /**
  * Its plan, a row a line from the gate's side (north) to the plaza's (south), a square a letter: `=` paving, `.` grass,
  * `t` a tree (on grass), `b` a bench (on grass, facing south), `B` a bench on paving, `T` a chess table (its two stools
@@ -103,10 +104,17 @@ const PARK_PLAN = [
   "====================",
 ] as const;
 
-/** What a square of ground is: the town's board, paving (the park's walks, the Colosseum's apron) or the park's grass. */
+/**
+ * What a square of ground is: the town's board, paving (the park's walks, the Colosseum's apron) or the park's grass. The street
+ * town (STREET_TOWN, Nov 5) adds back gardens (and the Colosseum's grove), the lots under its buildings and the Colosseum's own
+ * ground; there the board is the streets and the paving their sidewalks too.
+ */
 export const BOARD_GROUND = 0;
 export const PAVING = 1;
 export const GRASS = 2;
+export const GARDEN = 3;
+export const LOT = 4;
+export const ARENA = 5;
 /** Each square's ground (index r * N + c). */
 export const groundAt = new Uint8Array(N * N);
 
@@ -117,9 +125,13 @@ export interface Table {
   r: number;
   stools: readonly [Sq, Sq];
 }
-/** Something standing in the park: a tree, a bench, the fountain, a chess table (with its stools) or a lamp. */
+/**
+ * Something standing in the park: a tree, a bench, the fountain, a chess table (with its stools) or a lamp. In the street town
+ * (Nov 5) also the back gardens' hedges, bushes, flower beds and sheds, and every everyday building's front (`front`: its lot is
+ * STREET_BUILDINGS[lot]).
+ */
 export interface Prop {
-  kind: "tree" | "bench" | "fountain" | "table" | "lamp";
+  kind: "tree" | "bench" | "fountain" | "table" | "lamp" | "hedge" | "bush" | "bed" | "shed" | "front";
   /** Its square (the fountain's: its front left one). */
   c: number;
   r: number;
@@ -130,12 +142,16 @@ export interface Prop {
   v: number;
   /** A table's index in TABLES (-1: not a table). */
   table: number;
+  /** A front's building, its index in STREET_BUILDINGS (street.ts); -1 for anything else. */
+  lot?: number;
 }
 const tables: Table[] = [];
 const props: Prop[] = [];
 /** Squares something in the park stands on (walked round). */
 const parkSolid = new Uint8Array(N * N);
-PARK_PLAN.forEach((line, v) => {
+/** The street town's lamps' squares: a boss passes one in its own wander box (round it, in front), never stopping there. */
+const lampSq = new Uint8Array(N * N);
+if (!STREET_TOWN) PARK_PLAN.forEach((line, v) => {
   const r = PARK.r1 - v;
   for (let u = 0; u < PARK.w; u++) {
     const ch = line[u]!;
@@ -157,8 +173,40 @@ PARK_PLAN.forEach((line, v) => {
   }
 });
 // The Colosseum's apron is paved too, and the promenade's 4 squares across the walk between them.
-for (let r = COLISEUM.r0 - APRON_ROWS; r < COLISEUM.r0; r++) for (let c = COLISEUM.c0; c < COLISEUM.c0 + COLISEUM.size; c++) groundAt[r * N + c] = PAVING;
-for (let r = PARK.r1 + 1; r < COLISEUM.r0 - APRON_ROWS; r++) for (let c = PARK.c0 + 8; c < PARK.c0 + 12; c++) groundAt[r * N + c] = PAVING;
+if (!STREET_TOWN) {
+  for (let r = COLISEUM.r0 - APRON_ROWS; r < COLISEUM.r0; r++) for (let c = COLISEUM.c0; c < COLISEUM.c0 + COLISEUM.size; c++) groundAt[r * N + c] = PAVING;
+  for (let r = PARK.r1 + 1; r < COLISEUM.r0 - APRON_ROWS; r++) for (let c = PARK.c0 + 8; c < PARK.c0 + 12; c++) groundAt[r * N + c] = PAVING;
+}
+
+/**
+ * The street town (Nov 5): its ground, its park's tables, the fountain and every prop (trees, benches, lamps, the gardens' hedges,
+ * bushes, beds and sheds) as the plan has them (street.ts). Walked round: the trees, benches, lamps, tables, sheds and the
+ * fountain's four squares where they stand on walkable ground (a stool is a square you stand on). The everyday buildings' fronts
+ * (props too, `front`) come after, from STREET_BUILDINGS.
+ */
+if (STREET_TOWN) {
+  groundAt.set(STREET_GROUND);
+  for (const t of STREET_TABLES) tables.push({ i: tables.length, c: t.c, r: t.r, stools: [{ c: t.c - 1, r: t.r }, { c: t.c + 1, r: t.r }] });
+  for (const f of STREET_FOUNTAIN) parkSolid[f.r * N + f.c] = 1;
+  for (const p of STREET_PROPS) {
+    const c = wrapI(Math.round(p.x));
+    const r = wrapI(Math.round(p.y));
+    // (The fountain's square is its front left one, as in today's park.)
+    const sq = p.kind === "fountain" ? { c: Math.floor(p.x), r: Math.ceil(p.y) } : { c, r };
+    const table = p.kind === "table" ? tables.findIndex((t) => t.c === c && t.r === r) : -1;
+    if (p.kind === "tree" || p.kind === "bench" || p.kind === "lamp" || p.kind === "table" || p.kind === "shed") parkSolid[sq.r * N + sq.c] = 1;
+    if (p.kind === "lamp") lampSq[sq.r * N + sq.c] = 1;
+    props.push({ kind: p.kind, c: sq.c, r: sq.r, x: p.x, y: p.y, v: p.v, table });
+  }
+  // The everyday buildings' fronts, each on its lot's front line, centred on the lot. Seam Avenue's own (facing west) need round 3's
+  // turn of the camera: till then each stands in facing the camera as every other front does, on its lot's south edge
+  // (docs/decisions/2026-11-05-street-town-layout.md).
+  STREET_BUILDINGS.forEach((b, lot) => {
+    const x = b.facing === "S" ? b.c0 + (b.w - 1) / 2 : b.c0 + (b.d - 1) / 2;
+    const y = b.r0 - 0.5 + b.inset;
+    props.push({ kind: "front", c: Math.round(x), r: b.r0, x, y, v: b.v, table: -1, lot });
+  });
+}
 
 /**
  * The park's lamps (Oct 27, Eric: "street lamps or like park style lamps, so when it's night and also dusk that they turn
@@ -169,7 +217,7 @@ for (let r = PARK.r1 + 1; r < COLISEUM.r0 - APRON_ROWS; r++) for (let c = PARK.c
  * park's walk (a corner square: walking round it on the grass inside is no longer). The first is the one ahead on your
  * left as the page opens (the e2e test finds it there).
  */
-export const LAMPS: readonly Sq[] = [
+export const LAMPS: readonly Sq[] = STREET_TOWN ? props.filter((p) => p.kind === "lamp").map((p) => ({ c: p.c, r: p.r })) : [
   { c: PARK.c0 + 7, r: PARK.r1 + 1 },
   { c: PARK.c0 + 12, r: PARK.r1 + 1 },
   { c: PARK.c0 + 7, r: PARK.r1 - 6 },
@@ -181,13 +229,13 @@ export const LAMPS: readonly Sq[] = [
   { c: PARK.c0, r: PARK.r1 - PARK.d + 1 },
   { c: PARK.c0 + PARK.w - 1, r: PARK.r1 - PARK.d + 1 },
 ];
-for (const l of LAMPS) {
+for (const l of STREET_TOWN ? [] : LAMPS) {
   const k = l.r * N + l.c;
   parkSolid[k] = 1;
   groundAt[k] = PAVING;
   props.push({ kind: "lamp", c: l.c, r: l.r, x: l.c, y: l.r, v: 0, table: -1 });
 }
-/** The ten chess tables, in the plan's order (north to south, west to east). */
+/** The ten chess tables, in the plan's order (north to south, west to east); the street town's park has twelve. */
 export const TABLES: readonly Table[] = tables;
 /** Everything standing in the park. */
 export const PROPS: readonly Prop[] = props;
@@ -205,7 +253,7 @@ export const tableAt = (c: number, r: number): Table | null => TABLES.find((t) =
  * facing it (the camera looks north, r rising): the tables round you, the fountain behind you, and the walk across to
  * the Colosseum looming beyond (near enough to stand inside the view's rim, not on its horizon).
  */
-export const START: Sq = { c: PARK.c0 + 9, r: PARK.r1 - 3 };
+export const START: Sq = STREET_TOWN ? STREET_START : { c: PARK.c0 + 9, r: PARK.r1 - 3 };
 
 export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil" | "folio" | "timber" | "dash";
 
@@ -227,11 +275,25 @@ export interface Place {
   foot: number;
 }
 
-/** A boss's home: a 3 x 3 plot. (cx, cy) is its middle square. */
+/**
+ * A boss's home: a 3 x 3 plot, (cx, cy) its middle square. In the street town (Nov 5) its lot, 4 squares across (Alfil's 6) and 3
+ * deep, (cx, cy) its middle (cx a half square for an even width), its picture's foot on its front line.
+ */
 export interface Home extends Place {
   id: HomeId;
   /** The boss's name. */
   boss: string;
+  /** Half its plot's width and depth less half a square (a 3 x 3 plot: 1, 1; a street lot 4 across: 1.5, 1): `plotDist`'s. */
+  hw: number;
+  hd: number;
+  /** The square before its door, where a tap on it (its card's Go in, a challenge) walks you; today's town, the one before its plot's middle. */
+  door: Sq;
+  /** The square of its plot behind its door: where a sidekick fades out going home and in coming out, and the door the town zooms into. */
+  entry: Sq;
+  /** Where its boss first stands, and (the street town) stands whenever it stops. */
+  rest: Sq;
+  /** The street town: the box its boss wanders (its yard and the sidewalk before it); null in today's town (it roams round its plot). */
+  wander: SqBox | null;
 }
 
 /**
@@ -279,8 +341,17 @@ export const ALL_HOMES: readonly Home[] = (
     // hanging sneakers' pole on its right stays on its plot, four open columns from the lodge's. Its ring his jacket's teal. In an
     // admin's town only while he's in the game for admins first: ADMIN_TOWN. docs/decisions/2026-11-03-dash-home.md.)
     { id: "dash", boss: "Dash", name: "Dash's Kicks", color: "#137a7a", cx: 4, cy: 34 },
-  ] satisfies Omit<Home, "half" | "foot">[]
-).map((h) => ({ ...h, half: 1.5, foot: 0.5 }));
+  ] satisfies Omit<Home, "half" | "foot" | "hw" | "hd" | "door" | "entry" | "rest" | "wander">[]
+).map((h) => (STREET_TOWN ? streetHome(h) : { ...h, half: 1.5, foot: 0.5, hw: 1, hd: 1, door: { c: h.cx, r: wrapI(h.cy - 2) }, entry: { c: h.cx, r: wrapI(h.cy - 1) }, rest: { c: h.cx, r: wrapI(h.cy - 2) }, wander: null }));
+/**
+ * A home where the street town's plan has it (Nov 5, street.ts): on its lot (the art calls Dash's "blitz"), its picture's foot on
+ * its front line, its door square, its boss's rest square and wander box as the plan says.
+ */
+function streetHome(h: Omit<Home, "half" | "foot" | "hw" | "hd" | "door" | "entry" | "rest" | "wander">): Home {
+  const lot = STREET_HOMES.find((l) => l.id === (h.id === "dash" ? "blitz" : h.id))!;
+  const cy = lot.r0 + (lot.d - 1) / 2;
+  return { ...h, cx: lot.c0 + (lot.w - 1) / 2, cy, half: 1.5, foot: cy - (lot.r0 - 0.5 + lot.inset), hw: (lot.w - 1) / 2, hd: (lot.d - 1) / 2, door: { ...lot.door }, entry: { c: lot.door.c, r: lot.r0 }, rest: { ...lot.rest }, wander: { ...lot.wander } };
+}
 /**
  * Every home in this town: all of them in an admin's (ADMIN_TOWN), and none of a boss in the game for admins first (core's
  * BOSS_ADMIN_FIRST: Timber's) in anyone else's, so its plot is open ground there.
@@ -417,17 +488,35 @@ export function spriteAnim(p: Person, now: number): SpriteAnim {
 
 /** Which home stands on each square (index r * N + c), or null. */
 export const plotAt: (Home | null)[] = new Array(N * N).fill(null);
-for (const h of HOMES) for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) plotAt[wrapI(h.cy + dr) * N + wrapI(h.cx + dc)] = h;
+for (const h of HOMES) for (let dr = -h.hd; dr <= h.hd; dr++) for (let dc = -h.hw; dc <= h.hw; dc++) plotAt[wrapI(h.cy + dr) * N + wrapI(h.cx + dc)] = h;
 
-/** A square you can stand on: not a home's plot, not the Colosseum's ground, nothing in the park standing on it (a stool is a square you stand on). */
+/**
+ * A square you can stand on: not a home's plot, not the Colosseum's ground, nothing in the park standing on it (a stool is a square
+ * you stand on). The street town (Nov 5): the streets, the sidewalks and the park's walks and lawns, with nothing standing there;
+ * never a lot, a garden, the grove or the Colosseum's ground.
+ */
 export const walkable = (c: number, r: number): boolean => {
   const k = wrapI(r) * N + wrapI(c);
+  if (STREET_TOWN) return groundAt[k]! <= GRASS && !parkSolid[k];
   return plotAt[k] === null && !parkSolid[k] && !onColiseum(c, r);
 };
+/** Whether square (c, r) is in a boss's wander box (the street town: its square's middle inside; its foot stays inside). */
+export const inWander = (h: Home, c: number, r: number): boolean => {
+  const b = h.wander;
+  if (!b) return false;
+  const x = b.x0 + wrapI(c - b.x0);
+  const y = b.y0 + wrapI(r - b.y0);
+  return x <= b.x1 && y <= b.y1;
+};
+/**
+ * The ground a home's boss roams (today's town: within `bossRoam` of its plot; the street town: its wander box). The bots never stop
+ * on any boss's ground, so a boss's door, and the boss, stay free (Nov 5: and a home's door square is in its wander box).
+ */
+export const bossGround = (h: Home, c: number, r: number): boolean => (h.wander ? inWander(h, c, r) : plotDist(h, c, r) <= TOWN_FEEL.bossRoam);
 /** Steps between two squares, the short way round. */
 export const tdist = (a: Sq, b: Sq): number => Math.abs(wrapF(a.c - b.c)) + Math.abs(wrapF(a.r - b.r));
 /** How far a square is from a home's plot (0 on it, 1 on the ring around it). */
-export const plotDist = (h: Home, c: number, r: number): number => Math.max(0, Math.abs(wrapF(c - h.cx)) - 1, Math.abs(wrapF(r - h.cy)) - 1);
+export const plotDist = (h: Home, c: number, r: number): number => Math.max(0, Math.abs(wrapF(c - h.cx)) - h.hw, Math.abs(wrapF(r - h.cy)) - h.hd);
 
 const DIRS = [
   [1, 0],
@@ -798,8 +887,8 @@ export function createTown(now: number, seed = 20261025, seat: Seat | null = nul
     you.walker.facing = stand.facing;
     you.walker.view = stand.view;
   }
-  // Each boss starts on the square in front of its home's middle (toward the camera).
-  const bosses: Boss[] = HOMES.map((home) => ({ home, walker: new Walker({ c: home.cx, r: wrapI(home.cy - 2) }, f.bossStepMs, false), nextAt: null, onScreen: false, held: false, lastLine: null }));
+  // Each boss starts on the square in front of its home's middle (toward the camera); in the street town, on its rest square.
+  const bosses: Boss[] = HOMES.map((home) => ({ home, walker: new Walker(home.rest, f.bossStepMs, false), nextAt: null, onScreen: false, held: false, lastLine: null }));
   // Who's out (`botsOut` of them, shuffled by the town's seed, so the town opens the same way every time, as the tests
   // need; back from a game, the bot you played among them); the others are at home, and the turns change who's out.
   const order = TOWN_BOTS.map((_, i) => i);
@@ -913,7 +1002,7 @@ function freeSpot(rnd: () => number, you: Sq, fromYou: number, others: readonly 
     c = wrapI(START.c - 8 + Math.floor(rnd() * 16));
     r = wrapI(START.r - 4 + Math.floor(rnd() * 14));
     const sq = { c, r };
-    if (walkable(c, r) && !statueAt(c, r) && !stoolAt(c, r) && tdist(sq, you) >= fromYou && !HOMES.some((h) => plotDist(h, c, r) <= TOWN_FEEL.bossRoam) && !others.some((o) => tdist(sq, o) < apart) && !(t && taken(t, c, r, null))) break;
+    if (walkable(c, r) && !statueAt(c, r) && !stoolAt(c, r) && tdist(sq, you) >= fromYou && !HOMES.some((h) => bossGround(h, c, r)) && !others.some((o) => tdist(sq, o) < apart) && !(t && taken(t, c, r, null))) break;
   }
   return { c, r };
 }
@@ -1007,7 +1096,8 @@ export function destFor(t: Town, w: Walker, target: Target): Sq | null {
     // In front of its door first (Eric, Nov 5: "it should be putting me as close to in front of his building as possible"): the
     // square before the plot's front row in its middle, then the one either side of it; else, as before, the nearest free square
     // on the ring round the plot.
-    const front = (c: number, r: number, side: number) => wrapI(r) === wrapI(h.cy - 2) && Math.abs(wrapF(c - h.cx)) <= side;
+    // (The street town, Nov 5: its door square, the plan's, then the sidewalk squares either side of it.)
+    const front = (c: number, r: number, side: number) => wrapI(r) === h.door.r && Math.abs(wrapF(c - h.door.c)) <= side;
     for (const side of [0, 1]) {
       const goal = (c: number, r: number) => front(c, r, side) && walkable(c, r) && !taken(t, c, r, w);
       if (goal(here.c, here.r)) return here;
@@ -1093,6 +1183,10 @@ function bossesRoam(t: Town, now: number): void {
     }
     if (now < b.nextAt) continue;
     b.nextAt = null;
+    if (b.home.wander) {
+      streetRoam(t, b);
+      continue;
+    }
     // A free square of its roaming ground (around its plot), one to a few steps away.
     const h = w.here();
     const near = (c: number, r: number) => walkable(c, r) && plotDist(b.home, c, r) <= f.bossRoam;
@@ -1111,6 +1205,42 @@ function bossesRoam(t: Town, now: number): void {
     if (path && path.length <= n) w.go(path);
   }
 }
+
+/**
+ * A boss's walk in the street town (Nov 5): from its rest square out to a free square of its wander box and back, so it stops only
+ * on its rest square (the art's: the end of its box farther from its door, so its door, its sign and most of its home stay in view).
+ * Away from its rest (held there while its card was open, or a test hook moved it), it walks back to it.
+ */
+function streetRoam(t: Town, b: Boss): void {
+  const w = b.walker;
+  const h = w.here();
+  const rest = b.home.rest;
+  // (Its box is one sidewalk row of whole squares: a lamp in it is passed, round it in front, as the art says: never stopped on.)
+  const ok = (c: number, r: number) => bossWalks(b.home, c, r);
+  const to = (sq: Sq) => (c: number, r: number) => c === sq.c && r === sq.r;
+  if (h.c !== rest.c || h.r !== rest.r) {
+    if (taken(t, rest.c, rest.r, w)) return;
+    const back = findPath(h, to(rest), ok);
+    if (back) w.go(back);
+    return;
+  }
+  const d = stepsFrom(h, ok);
+  const targets: Sq[] = [];
+  const box = b.home.wander!;
+  for (let x = Math.ceil(box.x0); x <= box.x1; x++)
+    for (let y = Math.ceil(box.y0); y <= box.y1; y++) {
+      const c = wrapI(x);
+      const r = wrapI(y);
+      if ((c !== rest.c || r !== rest.r) && walkable(c, r) && d[r * N + c]! > 0 && !taken(t, c, r, w)) targets.push({ c, r });
+    }
+  if (!targets.length) return;
+  const far = pick(t, targets);
+  const out = findPath(h, to(far), ok);
+  const back = out && findPath(far, to(rest), ok);
+  if (out && back) w.go([...out, ...back]);
+}
+/** A square a home's boss may walk over in the street town: its wander box's, walkable or a lamp's (it passes those, never stopping). */
+export const bossWalks = (h: Home, c: number, r: number): boolean => inWander(h, c, r) && (walkable(c, r) || !!lampSq[wrapI(r) * N + wrapI(c)]);
 
 function botsWander(t: Town, now: number): void {
   const f = TOWN_FEEL;
@@ -1152,8 +1282,11 @@ function botsWander(t: Town, now: number): void {
  */
 export const inSquare = (c: number, r: number): boolean => SQUARE_AREA[wrapI(r) * N + wrapI(c)] === 1;
 const SQUARE_AREA = new Uint8Array(N * N);
-for (let r = PARK.r1 - PARK.d + 1; r < COLISEUM.r0; r++)
-  for (let c = PARK.c0; c < PARK.c0 + PARK.w; c++) if (!HOMES.some((h) => plotDist(h, c, r) <= TOWN_FEEL.bossRoam)) SQUARE_AREA[r * N + c] = 1;
+if (!STREET_TOWN)
+  for (let r = PARK.r1 - PARK.d + 1; r < COLISEUM.r0; r++)
+    for (let c = PARK.c0; c < PARK.c0 + PARK.w; c++) if (!HOMES.some((h) => plotDist(h, c, r) <= TOWN_FEEL.bossRoam)) SQUARE_AREA[r * N + c] = 1;
+// The street town (Nov 5): the bots walk the streets, the sidewalks and the park, never a boss's wander box (so never a door square).
+if (STREET_TOWN) for (let k = 0; k < N * N; k++) if (groundAt[k]! <= GRASS && !HOMES.some((h) => bossGround(h, k % N, Math.floor(k / N)))) SQUARE_AREA[k] = 1;
 
 /**
  * A bot's door: a sidekick's is its boss's home's (the middle of its front: its plot's front row, where the bosses start
@@ -1162,7 +1295,7 @@ for (let r = PARK.r1 - PARK.d + 1; r < COLISEUM.r0; r++)
  */
 export function homeDoor(b: TownBot): Sq {
   const h = b.boss ? HOMES.find((x) => x.id === b.boss) : undefined;
-  return h ? { c: h.cx, r: wrapI(h.cy - 1) } : APRON[0]!;
+  return h ? h.entry : APRON[0]!;
 }
 
 /**
@@ -1178,7 +1311,8 @@ function doorway(t: Town, b: TownBot, w: Walker | null): Sq | null {
   }
   for (const dc of [0, -1, 1]) {
     const c = wrapI(door.c + dc);
-    if (!taken(t, c, wrapI(door.r - 1), w)) return { c, r: door.r };
+    // (The street town: a lamp may stand on the sidewalk beside the door.)
+    if (!taken(t, c, wrapI(door.r - 1), w) && (!STREET_TOWN || walkable(c, door.r - 1))) return { c, r: door.r };
   }
   return null;
 }
@@ -1330,7 +1464,8 @@ function wander(t: Town, bot: Person, sitting: boolean): void {
     return;
   }
   // (Only in the square, Oct 28; never on a statue's viewing square: it's kept free for whoever comes to look.)
-  const ok = (c: number, r: number) => inSquare(c, r) && walkable(c, r) && !taken(t, c, r, w) && !t.bosses.some((b) => plotDist(b.home, c, r) === 1) && !statueAt(c, r);
+  // (The street town: inSquare already leaves out every boss's ground.)
+  const ok = (c: number, r: number) => inSquare(c, r) && walkable(c, r) && !taken(t, c, r, w) && (STREET_TOWN || !t.bosses.some((b) => plotDist(b.home, c, r) === 1)) && !statueAt(c, r);
   const targets: Sq[] = [];
   const reach = sitting ? f.botSitReach : hi;
   for (let dc = -reach; dc <= reach; dc++)

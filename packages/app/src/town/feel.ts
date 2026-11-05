@@ -80,6 +80,15 @@ export const TOWN_FEEL = {
   aspectWide: 1.4,
   /** The page opens zoomed out (Eric, Oct 26: "it feels a little nicer"); − / + work as before. (Slice 1: zoomed in.) */
   startZoomedOut: true,
+  /** The street town (an admin's, Nov 5) opens zoomed in instead (Eric, Nov 5); − / + work as before. */
+  streetStartZoomedOut: false,
+  /**
+   * The street town's near side (Nov 5, the art's "nothing between the camera and you"): the buildings' fronts (and the sheds)
+   * standing more than this many squares nearer the camera than you aren't drawn, and the trees fade out over `streetTreeFade`
+   * squares nearer still. The low things there (hedges, beds, bushes) are drawn.
+   */
+  streetNearCut: 0.9,
+  streetTreeFade: 1.5,
   /** Zoomed out: the camera's height x (1 + this). */
   zoomOutHeight: 0.75,
   /** Zoomed out: how far back x (1 + this). */

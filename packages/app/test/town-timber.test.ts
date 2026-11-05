@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 // An admin's town (Nov 3): the homes and kids of the bosses in the game for admins first are in it (admin-town.ts).
-vi.mock("../src/town/admin-town.ts", () => ({ ADMIN_TOWN: true }));
+// (Today's town with those homes: STREET_TOWN off. The street town, an admin's since Nov 5, has its own tests: town-street.test.ts.)
+vi.mock("../src/town/admin-town.ts", () => ({ ADMIN_TOWN: true, STREET_TOWN: false }));
 
 const { N, wrapF, wrapI } = await import("../src/town/camera.ts");
 const { TOWN_FEEL } = await import("../src/town/feel.ts");

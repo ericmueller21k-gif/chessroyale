@@ -8,3 +8,9 @@ import { account } from "../account.ts";
  * everyone's town.
  */
 export const ADMIN_TOWN: boolean = !!account().profile?.admin;
+/**
+ * Whether this town is the street town (Nov 5, round 2: the layout; town-plan-nov5.json, street.ts): an admin's only, so Eric can
+ * walk it while everyone else keeps today's town, until round 3 (the boxes and the camera's turn) is done. Read once, as
+ * ADMIN_TOWN is. Taking this switch away (true for everyone) makes it everyone's town.
+ */
+export const STREET_TOWN: boolean = ADMIN_TOWN;

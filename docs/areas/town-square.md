@@ -844,6 +844,26 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
   dark lifting off the battle, nobody moving and the table there throughout the drain), `e2e/shop.spec.ts` (Alfil's Pyramid's, Big Boy's Crib's and Dash's Kicks' crates), `e2e/town.spec.ts` (a boss without an inside, Folio: the
   Boss raid screen).
 
+## The street town (Nov 5, round 2: admins only)
+
+An admin's town is the street town (`STREET_TOWN`, `town/admin-town.ts`; everyone else keeps the town above until round 3, the boxes
+and Seam Avenue's camera turn, is done; then the switch goes). Eric approved its art and plan Nov 5 (`claude/boss-art` 11a4d903).
+- **From the plan:** `town/street-plan.json` (the art's `town-plan-nov5.json`, as made) read by `town/street.ts`; `world.ts` builds
+  the ground (the streets are the board, their sidewalks paving, the park's walks and lawns, back gardens, lots, the Colosseum), the
+  props (trees, benches, lamps, the twelve tables, the fountain, hedges, bushes, beds, sheds, and every everyday building's front),
+  the start (22, 11) and the homes on their lots from it. Still 46 × 46 and wrapping.
+- **The art:** `town/town-kit.ts`, `buildings.ts`, `home-boxes.ts`, `dressing.ts` (copied in, imports moved). This round draws fronts
+  only (`building(...).front`, the homes' own pictures), each on its lot's front line; Seam Avenue's stand in facing the camera.
+- **Walking:** the streets, sidewalks and park, round everything standing there. A tap on a home (or its plot) walks you to its door
+  square (`Home.door`) and opens its card; an arrow into its lot opens it too. A boss walks its own wander box (`Home.wander`) out
+  from its rest square (`Home.rest`) and back, passing a lamp, stopping only there. The bots walk the streets, sidewalks and park
+  off every boss's box; a sidekick goes home through its boss's door (`Home.entry`).
+- **The camera:** faces north everywhere this round, and opens zoomed in (`streetStartZoomedOut`). Fronts nearer the camera than
+  its focus less `streetNearCut` aren't drawn, trees there fade (`streetTreeFade`), and a figure fades before the box's foot or side
+  would cut it (Eric, Nov 4).
+- Tests: `packages/app/test/town-street.test.ts`, `e2e/town-street.spec.ts`. Decision:
+  [2026-11-05-street-town-layout.md](../decisions/2026-11-05-street-town-layout.md). Stills: `docs/street-town/`.
+
 ## Frame-rate pill (`?fps`)
 `/town?fps` shows anyone (Eric, Oct 30: no admin needed, the site is behind Cloudflare Access) a pill in the world's top-right corner, "60 fps · 16.7 ms · 2D": frames over the last second and their mean time, text set twice a second from plain counters in the frame loop, then the drawing's backend ("· WebGL" with `?gl=1`; added by town.css from `data-backend`, so the pill's text stays the numbers). Without `?fps` there is none. `?crowd=N` is anyone's too (only that device draws the pawns).
 `?fps`, `?crowd=N` and `?gl=1` are read once as the page opens (`TOWN_ASKED`, test-switches.ts), so a later replaceState can't lose them; they apply as the town opens.
