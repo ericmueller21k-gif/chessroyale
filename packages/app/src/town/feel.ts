@@ -75,6 +75,14 @@ export const TOWN_FEEL = {
   camWide: { h: 7.8, th: 36, back: 6.7, R: 30, kx: 0.4, fW: 0.72, cy: 0.39, rim: 11.5, rimX: 2.3 } as CamSet,
   /** The phone's camera (a portrait box, width / height 0.6 or narrower). Between the two, the box's shape blends them. */
   camTall: { h: 9.3, th: 42, back: 5.7, R: 30, kx: 0.42, fW: 1.31, cy: 0.36, rim: 12.5, rimX: 1.16 } as CamSet,
+  /**
+   * The street town's chase camera (Nov 5, round 4; brief-town-rows.md "the player's view"): low behind your pawn, looking down the
+   * street the way you're heading, the horizon about a third of the way down, your pawn from behind in the lower middle, the rows on
+   * both sides filling the screen. Zoomed out (−) it rises and draws back by the zoomOut numbers below. Phone and computer, blended by
+   * the box's shape as the town's are.
+   */
+  camStreetWide: { h: 3.2, th: 18, back: 3.0, R: 30, kx: 0.4, fW: 0.6, cy: 0.4, rim: 16, rimX: 1.6 } as CamSet,
+  camStreetTall: { h: 3.2, th: 18, back: 3.0, R: 30, kx: 0.42, fW: 0.95, cy: 0.42, rim: 16, rimX: 1.2 } as CamSet,
   /** The box shapes (width / height) where the blend is all phone and all computer. */
   aspectTall: 0.6,
   aspectWide: 1.4,
@@ -93,7 +101,7 @@ export const TOWN_FEEL = {
    * The street town's turning camera (Nov 5, round 3): it faces north everywhere but Seam Avenue, where it faces east, and turns in
    * the avenue's four crossings (turn.ts), easing over this many ms a quarter turn (a feel number: about a run across a crossing).
    */
-  streetTurnMs: 500,
+  streetTurnMs: 400,
   /** While it turns, the clouds slide this many box widths a quarter turn (the sun stays put). */
   streetTurnClouds: 1.3,
   /**

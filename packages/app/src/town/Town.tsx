@@ -49,7 +49,7 @@ import { TownChat } from "./TownChat.tsx";
 import { TownChatTools } from "./TownChatTools.tsx";
 import { Press } from "./press.ts";
 import { anyHeld, hold, isHeld, keyWalk, listenKeys, onHeld, type Dir } from "./arrows.ts";
-import { Turn, camAt, quarterOf, screenStep } from "./turn.ts";
+import { Turn, chaseTarget, quarterOf, screenStep } from "./turn.ts";
 import { PAWN_HEAD, PAWN_PX, Renderer, pawnImage, type Hit, type YouArt } from "./render.ts";
 import { dropRiders, leaveRider, ridersHeld, rideArt, shareRider, type Rider, type RiderPawn } from "./rides.ts";
 import { rideSpeed } from "../components/rides/scale.ts";
@@ -636,7 +636,8 @@ function startTown(
     wrapI,
     STREET_TOWN
       ? (c, r, dc, dr) => {
-          screenStep(dc, dr, quarterOf(heading), turned);
+          // (Round 4's chase camera: through the way you faced as the hold began, so a held left or right turns you once and runs on.)
+          screenStep(dc, dr, keyQuarter, turned);
           return { c: wrapI(c + turned.dc), r: wrapI(r + turned.dr) };
         }
       : undefined,
@@ -647,6 +648,7 @@ function startTown(
   };
   const stopKeys = listenKeys();
   const offHeld = onHeld(paintKeys);
+  const offQuarter = onHeld(() => (keyQuarter = quarterOf(turn.to)));
   // (The signs' pixel font is the game's own; it's loaded on first use, so ask for it now.)
   void document.fonts?.load('8px "Press Start 2P"').catch(() => {});
   // The bosses' sounds for a tap on one, made ahead off the page's thread (the sound worker), so a tap never costs a frame.
@@ -661,8 +663,11 @@ function startTown(
    * The street town's turning camera (Nov 5, round 3; turn.ts): north everywhere but Seam Avenue, east there, turning in its crossings
    * as you walk (the square you're on says which), eased; a chip's glide turns it to where it glides. Today's town: always north.
    */
-  const turn = new Turn(STREET_TOWN ? camAt(town.you.walker.c, town.you.walker.r) : 0);
+  const turn = new Turn(0);
   let heading = turn.to;
+  /** (The street town's keys: the quarter you faced as the keys held changed.) */
+  let keyQuarter = 0;
+  const legNow = { dc: 0, dr: 0, last: false };
   /** (Tests) The heading held (the turn's stills), or null. */
   let pinHeading: number | null = null;
   let follow = true;
@@ -941,12 +946,11 @@ function startTown(
     // (Kept near the world's middle so the numbers never grow, however far you walk round.)
     camX = START.c + wrapF(camX - START.c);
     camY = START.r + wrapF(camY - START.r);
-    // The street town's heading: the square you're on says which way (a glide: where it's going), eased; a look round keeps it.
+    // The street town's chase camera (round 4): behind you, the way you walk (turn.ts chaseTarget), eased; a glide or a look round keeps it.
     if (STREET_TOWN) {
-      if (glide) turn.aim(camAt(glide.x, glide.y), now);
-      else if (follow) {
-        const h = town.you.walker.here();
-        turn.aim(camAt(h.c, h.r), now);
+      if (follow && !glide) {
+        const n = town.you.walker.leg(legNow);
+        if (n) turn.aim(chaseTarget(turn.to, legNow.dc, legNow.dr, n, legNow.last, keysOn), now);
       }
       heading = pinHeading ?? turn.at(now);
     }
@@ -1696,6 +1700,7 @@ function startTown(
       removeEventListener("keydown", onKey);
       stopKeys();
       offHeld();
+      offQuarter();
       delete hooks.__townAt;
       delete hooks.__townGlide;
       delete hooks.__townGather;

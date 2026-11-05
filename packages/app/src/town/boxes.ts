@@ -17,7 +17,9 @@ import { TOWN_FEEL } from "./feel.ts";
 import { building } from "./buildings.ts";
 import { HEDGE, hedgeFront, hedgeTop, shed } from "./dressing.ts";
 import { homeBox, type HomeId as ArtHomeId } from "./home-boxes.ts";
-import { STREET_LOTS } from "./street.ts";
+import { STREET_LOTS, type StreetLot } from "./street.ts";
+import { lookalike } from "./lookalike.ts";
+import type { Facing } from "./rows.ts";
 import type { Face, RoofTex, SideArt, TownBox } from "./town-kit.ts";
 import { frameKeys, type Character } from "../characters/sprite.ts";
 import type { HomeId } from "./world.ts";
@@ -34,8 +36,8 @@ export interface BoxInst {
   /** Its art, and (a home with a dome) the same with fewer faces for the 2D fallback. */
   box: TownBox;
   low: TownBox;
-  /** Which way its front faces: south (onto an east-west street) or west (onto Seam Avenue). */
-  facing: "S" | "W";
+  /** Which way its front faces: south or north (onto an east-west street), west or east (onto Seam Avenue). */
+  facing: Facing;
   /** Its front picture's left edge on its front line (world squares), the way along its front (left to right) and the way back. */
   ox: number;
   oy: number;
@@ -59,9 +61,23 @@ export interface BoxInst {
   props: number[];
 }
 
-/** Where a picture `w` px wide stands, centred on (cx, cy) along its front line facing `facing`. */
-function place(facing: "S" | "W", cx: number, cy: number, w: number) {
-  return facing === "S" ? { ox: cx - w / SQ / 2, oy: cy, ux: 1, uy: 0, bx: 0, by: 1 } : { ox: cx, oy: cy + w / SQ / 2, ux: 0, uy: -1, bx: 1, by: 0 };
+/**
+ * Where a picture `w` px wide stands, centred on (cx, cy) along its front line facing `facing`: its left edge, the way along it (left to
+ * right as you face it) and the way back.
+ */
+function place(facing: Facing, cx: number, cy: number, w: number) {
+  const h = w / SQ / 2;
+  if (facing === "S") return { ox: cx - h, oy: cy, ux: 1, uy: 0, bx: 0, by: 1 };
+  if (facing === "N") return { ox: cx + h, oy: cy, ux: -1, uy: 0, bx: 0, by: -1 };
+  if (facing === "W") return { ox: cx, oy: cy + h, ux: 0, uy: -1, bx: 1, by: 0 };
+  return { ox: cx, oy: cy - h, ux: 0, uy: 1, bx: -1, by: 0 };
+}
+
+/** A lot's building as a box: a home's, an everyday design's, or a row's look-alike (round 4). */
+export function lotArt(l: StreetLot): TownBox {
+  if (l.kind === "home") return homeBox(l.id as ArtHomeId);
+  if (l.look) return lookalike(l.look);
+  return building(l.id as never, l.w, l.v);
 }
 
 /** Pictures side by side, in one picture (a run of hedge's squares): each one's parts, moved along. */
@@ -110,15 +126,16 @@ const gameHome = (id: string): HomeId => (id === "blitz" ? "dash" : id) as HomeI
  */
 export function streetBoxes(props: readonly { kind: string; x: number; y: number; v: number }[]): BoxInst[] {
   const out: BoxInst[] = [];
-  const add = (kind: BoxKind, box: TownBox, low: TownBox, facing: "S" | "W", cx: number, cy: number, extra: Partial<BoxInst>) => {
+  const add = (kind: BoxKind, box: TownBox, low: TownBox, facing: Facing, cx: number, cy: number, extra: Partial<BoxInst>) => {
     const p = place(facing, cx, cy, box.front.w);
     out.push({ i: out.length, kind, box, low, facing, ...p, fx: 0, fy: 0, home: null, lot: -1, prop: -1, hideL: false, hideR: false, tile: null, props: [], ...extra });
   };
   STREET_LOTS.forEach((l, lot) => {
-    const box = l.kind === "home" ? homeBox(l.id as ArtHomeId) : building(l.id as never, l.w, l.v);
+    const box = lotArt(l);
     const low = l.kind === "home" ? homeBox(l.id as ArtHomeId, true) : box;
-    // (Its front line: the lot's front edge plus the box's inset; its picture centred on the lot.)
-    if (l.facing === "S") add(l.kind, box, low, "S", l.c0 + l.w / 2 - 0.5, l.r0 - 0.5 + box.inset, { lot, home: l.kind === "home" ? gameHome(l.id) : null });
+    // (Its front line: the lot's front edge plus the box's inset; its picture centred on the lot. A row's look-alike: where the row put it.)
+    if (l.at) add(l.kind, box, low, l.facing, l.at.x, l.at.y, { lot, home: null });
+    else if (l.facing === "S") add(l.kind, box, low, "S", l.c0 + l.w / 2 - 0.5, l.r0 - 0.5 + box.inset, { lot, home: l.kind === "home" ? gameHome(l.id) : null });
     else add(l.kind, box, low, "W", l.c0 - 0.5 + box.inset, l.r0 + l.w / 2 - 0.5, { lot, home: null });
   });
   props.forEach((pr, prop) => {
@@ -362,6 +379,9 @@ export interface WallPlan {
   dz: number;
   strips: number;
   shade: number;
+  /** The part of its picture drawn (0..1 along it): all of it, or (a wall running past the camera, the chase camera's rows) only what's in front of it. */
+  s0: number;
+  s1: number;
 }
 /** A roof face this frame: on screen (its corners' x, y), its depth, in one piece or in triangles. */
 export interface FacePlan {
@@ -397,7 +417,9 @@ export interface BoxPlan {
   /** Draws this frame (strips and faces: what the 2D fallback costs). */
   draws: number;
 }
-const newWall = (): WallPlan => ({ on: false, x0: 0, y0: 0, k0: 0, x1: 0, y1: 0, k1: 0, dx: 0, dz: 0, strips: 1, shade: 0 });
+const newWall = (): WallPlan => ({ on: false, x0: 0, y0: 0, k0: 0, x1: 0, y1: 0, k1: 0, dx: 0, dz: 0, strips: 1, shade: 0, s0: 0, s1: 1 });
+/** A wall is cut this far (squares) in front of the camera: what's nearer (or behind it) isn't drawn. */
+const NEAR = 0.6;
 export function newPlan(box: TownBox): BoxPlan {
   const n = Math.max(geomOf(box).faces.length, 1);
   return {
@@ -445,7 +467,27 @@ function planWall(w: WallPlan, ch: Character | null, u0: number, t0: number, u1:
   w.dx = (ax + cq.dx) / 2;
   w.dz = (az + cq.dz) / 2;
   if (Math.max(az, cq.dz) < CUT) return;
-  if (!proj(v, ax, az, 0, pa) || !proj(v, cq.dx, cq.dz, 0, pb)) return;
+  // (A wall running past the camera, a row's beside you: only its part in front of the camera, cut where it passes the near plane.)
+  let bx = cq.dx;
+  let bz = cq.dz;
+  let ax2 = ax;
+  let az2 = az;
+  const zn = NEAR - v.back;
+  w.s0 = 0;
+  w.s1 = 1;
+  if (az2 < zn && bz < zn) return;
+  if (az2 < zn) {
+    const s = (zn - az) / (bz - az);
+    w.s0 = s;
+    ax2 = ax + (bx - ax) * s;
+    az2 = zn;
+  } else if (bz < zn) {
+    const s = (zn - az) / (bz - az);
+    w.s1 = s;
+    bx = ax + (bx - ax) * s;
+    bz = zn;
+  }
+  if (!proj(v, ax2, az2, 0, pa) || !proj(v, bx, bz, 0, pb)) return;
   // Seen from the front only: its picture runs left to right on screen.
   if (pb.x - pa.x < 0.5) return;
   const h0 = (ch.h * pa.k) / SQ;

@@ -223,17 +223,20 @@ function pack(items: { w: number; h: number; data: Uint8ClampedArray; ox: number
 }
 
 /**
- * Box `b`'s roof (its art `box`: `b.box` or `b.low`), painted for the camera facing north (`east` false) or east: every face, whole and
+ * Box `b`'s roof (its art `box`: `b.box` or `b.low`), painted for the camera facing quarter `q` (0 north, 1 east, 2 south, 3 west): every face, whole and
  * in triangles, packed into sheets.
  */
-export function bakeRoof(b: BoxInst, box: TownBox, east: boolean): RoofArt {
+export function bakeRoof(b: BoxInst, box: TownBox, q: number): RoofArt {
+  // (The camera's quarter: 0 north, 1 east, 2 south, 3 west; its heading's cosine and sine.)
+  const hc = [1, 0, -1, 0][q & 3]!;
+  const hs = [0, 1, 0, -1][q & 3]!;
   const g = geomOf(box);
   const n = { x: 0, y: 0 };
   const items: { w: number; h: number; data: Uint8ClampedArray; ox: number; oy: number }[] = [];
   const shape: number[] = [];
   for (const fg of g.faces) {
     worldNormal(b, fg.nx, fg.ny, n);
-    const light = faceLight(n.x, n.y, fg.nz, east ? 0 : 1, east ? 1 : 0);
+    const light = faceLight(n.x, n.y, fg.nz, hc, hs);
     const whole = facePixels(fg, tilePixels(box, fg.tex, b.tile), light);
     items.push({ w: whole.w, h: whole.h, data: whole.data, ox: 1 - fg.tx0, oy: 1 - fg.ty0 });
     for (let k = 0; k < fg.n - 2; k++) items.push(triPixels(fg, whole, 0, k + 1, k + 2));

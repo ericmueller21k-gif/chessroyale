@@ -44,8 +44,8 @@ import { STREET_TOWN } from "./admin-town.ts";
 import { building } from "./buildings.ts";
 import type { TownBox } from "./town-kit.ts";
 import { HEDGE, bed, bush, hedgeFront, hedgeTop, shed } from "./dressing.ts";
-import { STREET_BUILDINGS, STREET_LOTS } from "./street.ts";
-import { affine, geomOf, newPlan, planBox, streetBoxes, type BoxInst, type BoxPlan, type WallPlan } from "./boxes.ts";
+import { colosseumSeen, ROW_GROUND, STREET_BUILDINGS, STREET_LOTS } from "./street.ts";
+import { affine, geomOf, lotArt, newPlan, planBox, streetBoxes, type BoxInst, type BoxPlan, type WallPlan } from "./boxes.ts";
 import { bakeRoof, restShade, shadedImg, type Piece, type RoofArt } from "./box-draw.ts";
 import { farColosseumShows } from "./turn.ts";
 import { ARENA, COLISEUM_PLACE, GARDEN, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, groundAt, isSprite, onColiseum, plotAt, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town } from "./world.ts";
@@ -581,6 +581,9 @@ function setUp(): TablePiece[] {
   return pcs;
 }
 
+/** The street town's chase camera (round 4): its phone and computer sets in place of the town's. */
+const STREET_CAMS = { tall: TOWN_FEEL.camStreetTall, wide: TOWN_FEEL.camStreetWide };
+
 export class Renderer {
   readonly view: View = newView();
   W = 1;
@@ -763,6 +766,8 @@ export class Renderer {
   private readonly roofs = new Map<TownBox, Map<string, RoofArt>>();
   /** The camera's heading this frame (degrees from north: the street town's turn). */
   heading = 0;
+  /** (The street town) Whether the Colosseum shows from where you stand this frame (street.ts colosseumSeen). */
+  colSeen = true;
 
   /** What it draws with (paint.ts: Canvas 2D, or WebGL 2 with `?gl=1`), and that one's context. */
   private ctx: Ctx;
@@ -805,7 +810,8 @@ export class Renderer {
       if (p.kind === "shed") return art(`shed${p.v}`, () => shed(p.v).front);
       if (p.kind === "front") {
         const b = STREET_BUILDINGS[p.lot!]!;
-        return art(`${b.id}-${b.w}-${b.v}`, () => building(b.id, b.w, b.v).front);
+        const box = lotArt(b);
+        return art(box.id, () => box.front);
       }
       return p.kind === "tree" ? trees[p.v]! : p.kind === "bench" ? bench : p.kind === "table" ? table : p.kind === "lamp" ? lamp : fountain;
     });
@@ -824,7 +830,7 @@ export class Renderer {
       if (n >= SQ_MAX) return;
       const m = Math.round(clamp(hazeMix(this.view, cu - this.camX, ru - this.camY, this.mist), 0, 1) * MIX_STEPS);
       const gk = groundAt[r * N + c]!;
-      this.sqKey[n] = sqKeyOf(m, gk === PAVING ? 2 : gk === GRASS ? 3 : gk === GARDEN || gk === LOT ? 4 : gk === ARENA || plotAt[r * N + c] || onColiseum(c, r) ? 1 : 0, (c + r) & 1);
+      this.sqKey[n] = sqKeyOf(m, gk === PAVING || (STREET_TOWN && ROW_GROUND[r * N + c]) ? 2 : gk === GRASS ? 3 : gk === GARDEN || gk === LOT ? 4 : gk === ARENA || plotAt[r * N + c] || onColiseum(c, r) ? 1 : 0, (c + r) & 1);
       const o = n * 8;
       const cx = (q[0]! + q[2]! + q[4]! + q[6]!) / 4;
       const cy = (q[1]! + q[3]! + q[5]! + q[7]!) / 4;
@@ -887,7 +893,7 @@ export class Renderer {
     this.camX = camX;
     this.camY = camY;
     this.heading = heading;
-    setView(this.view, W, H, zoom);
+    setView(this.view, W, H, zoom, 1, 0, 0, STREET_TOWN ? STREET_CAMS : undefined);
     setHeading(this.view, heading);
     this.lens(zoom);
     this.buildCloseUps(now);
@@ -969,7 +975,7 @@ export class Renderer {
     const cE = c1 + ((T + B) / 2 - c1) * c.e;
     const x1 = x0 + w / 2;
     const xE = x1 + (X - x1) * c.e;
-    setView(v, W, H, zoom, mag, cE - v.cy - mag * (c1 - v.cy), xE - W / 2 - mag * (x1 - W / 2));
+    setView(v, W, H, zoom, mag, cE - v.cy - mag * (c1 - v.cy), xE - W / 2 - mag * (x1 - W / 2), STREET_TOWN ? STREET_CAMS : undefined);
     this.lensMag = mag;
     this.statueDz = dz - 0.25;
   }
@@ -1418,8 +1424,13 @@ export class Renderer {
     // The Colosseum past the rim, its top over the horizon (slice 6: the landmark from anywhere), behind everything.
     const col = this.houseItems[this.homes.length]!;
     this.farOn = false;
-    // (The street town's turn: only while the camera faces within 45 degrees of north.)
-    if (!col.on && farColosseumShows(this.heading)) this.drawFarColiseum(col, now);
+    // (The street town, round 4: only where the rows let you see it, down a street or across a square that opens onto it; near too.)
+    if (STREET_TOWN) {
+      const w = this.town.you.walker;
+      this.colSeen = colosseumSeen(w.hereC(), w.hereR());
+      if (!this.colSeen) col.on = false;
+      else if (!col.on) this.drawFarColiseum(col, now);
+    } else if (!col.on && farColosseumShows(this.heading)) this.drawFarColiseum(col, now);
     for (const it of items) {
       if (!it.on) continue;
       if (it.kind === "house") {
@@ -1545,46 +1556,43 @@ export class Renderer {
     // Paint ahead: the roofs within reach not yet painted for this heading (both while it turns, the north one first), nearest first,
     // until the frame's budget is spent. (One being drawn this frame and not yet painted is painted then, whatever the budget.)
     const t0 = performance.now();
+    // (Round 4's chase camera faces any of the four ways: the quarter it faces, and the next one round while it turns.)
+    const hq = ((this.heading % 360) + 360) % 360;
+    const q0 = Math.floor(hq / 90) % 4;
     for (let pass = 0; pass < 2; pass++) {
-      const east = pass === 1;
-      if (east ? this.heading < 0.5 && !this.nearAve() : this.heading > 89.5) continue;
+      const q = (q0 + pass) % 4;
+      if (pass === 1 && hq - q0 * 90 < 0.5) continue;
       for (;;) {
         let best = -1;
         for (let j = 0; j < na; j++) {
           const b = this.boxes[ahead[j]!]!;
-          if (this.instArt[(fine ? 2 : 0) + (east ? 1 : 0)]![b.i]) continue;
+          if (this.instArt[(fine ? 4 : 0) + q]![b.i]) continue;
           if (best < 0 || this.aheadD[j]! < this.aheadD[best]!) best = j;
         }
         if (best < 0 || performance.now() - t0 > TOWN_FEEL.boxBakeMs) break;
         const b = this.boxes[ahead[best]!]!;
-        this.roofArt(b, fine, east);
+        this.roofArt(b, fine, q);
       }
     }
   }
   private readonly ahead = new Int32Array(512);
   private readonly aheadD = new Float64Array(512);
-  /** Near Seam Avenue (within a dozen squares of it, either side): where the camera may soon face east. */
-  private nearAve(): boolean {
-    const c = ((Math.round(this.camX) % N) + N) % N;
-    return c > 30 || c < 15;
-  }
-
   /** A box's roof painted for the camera facing north or east (box-draw.ts), made the first time it's asked for (shared by every box of that art facing that way). */
-  private roofArt(b: BoxInst, fine: boolean, east: boolean): RoofArt {
+  private roofArt(b: BoxInst, fine: boolean, q: number): RoofArt {
     const box = fine ? b.box : b.low;
-    const slot = (fine ? 2 : 0) + (east ? 1 : 0);
+    const slot = (fine ? 4 : 0) + q;
     const had = this.instArt[slot]![b.i];
     if (had) return had;
     let m = this.roofs.get(box);
     if (!m) this.roofs.set(box, (m = new Map()));
-    const key = `${b.facing}${east ? 1 : 0}`;
+    const key = `${b.facing}${q}`;
     let a = m.get(key);
-    if (!a) m.set(key, (a = bakeRoof(b, box, east)));
+    if (!a) m.set(key, (a = bakeRoof(b, box, q)));
     this.instArt[slot]![b.i] = a;
     return a;
   }
   /** Each box's roof paintings as it last asked for them, by low or full art and heading (no lookup a frame). */
-  private readonly instArt: (RoofArt | undefined)[][] = [[], [], [], []];
+  private readonly instArt: (RoofArt | undefined)[][] = [[], [], [], [], [], [], [], []];
 
   /** A box-backed item's place (its front's; a shed or hedge: the whole box's), from its plan. */
   private frontPos(it: Item, b: BoxInst): void {
@@ -1648,7 +1656,7 @@ export class Renderer {
     const H = ch.h * px;
     const glow = this.lightK > 0.01 ? (home ? this.glowOf(it.i) : this.frontGlowOf(fc, PROPS[it.i]!.lot!)) : null;
     const sign = home ? artOf(this.places[it.i]!).sign : null;
-    if (w.strips === 1 && Math.abs(w.y1 - w.y0) < 0.75 && w.shade < 0.004) {
+    if (w.strips === 1 && Math.abs(w.y1 - w.y0) < 0.75 && w.shade < 0.004 && w.s0 === 0 && w.s1 === 1) {
       const { ctx } = this;
       ctx.save();
       ctx.globalAlpha = alpha;
@@ -1732,7 +1740,9 @@ export class Renderer {
   }
 
   /** Where on screen a wall's picture column `s` of the way along stands (perspective-correct between its ends): into wq. */
-  private wallAt(w: WallPlan, s: number): void {
+  private wallAt(w: WallPlan, s0: number): void {
+    // (Its drawn part only: a wall cut at the camera's near plane runs s0..s1 of its picture between its ends.)
+    const s = (s0 - w.s0) / (w.s1 - w.s0 || 1);
     const a = (1 - s) * w.k0;
     const c = s * w.k1;
     const d = a + c || 1;
@@ -1748,16 +1758,16 @@ export class Renderer {
    */
   private wallAffine(w: WallPlan, ch: Character, u0: number, u1: number, tall: boolean): void {
     const pw = ch.w;
-    this.wallAt(w, clamp(u0 / pw, 0, 1));
+    this.wallAt(w, clamp(u0 / pw, w.s0, w.s1));
     const xa = this.wq[0]!;
     const ya = this.wq[1]!;
     const ka = this.wq[2]!;
-    this.wallAt(w, clamp(u1 / pw, 0, 1));
+    this.wallAt(w, clamp(u1 / pw, w.s0, w.s1));
     const xb = this.wq[0]!;
     const yb = this.wq[1]!;
     const kb = this.wq[2]!;
-    const ua = clamp(u0, 0, pw);
-    const du = Math.max(1e-3, clamp(u1, 0, pw) - ua);
+    const ua = clamp(u0, w.s0 * pw, w.s1 * pw);
+    const du = Math.max(1e-3, clamp(u1, w.s0 * pw, w.s1 * pw) - ua);
     const sc = (tall ? Math.max(ka, kb) : (ka + kb) / 2) / TOWN_FEEL.housePxPerSquare;
     const m = this.M;
     m[0] = (xb - xa) / du;
@@ -1782,9 +1792,11 @@ export class Renderer {
     bb[0] = bb[1] = Infinity;
     bb[2] = bb[3] = -Infinity;
     this.ctx.imageSmoothingEnabled = Math.max(w.k0, w.k1) / TOWN_FEEL.housePxPerSquare < 1.5;
+    const p0 = w.s0 * pw;
+    const pr = (w.s1 - w.s0) * pw;
     for (let j = 0; j < n; j++) {
-      const u0 = (j * pw) / n;
-      const u1 = ((j + 1) * pw) / n;
+      const u0 = p0 + (j * pr) / n;
+      const u1 = p0 + ((j + 1) * pr) / n;
       this.wallAffine(w, ch, u0, u1, tall);
       const m = this.M;
       this.drawT(pic, m, u0, 0, u1 - u0, ch.h, u0, 0, u1 - u0, ch.h, alpha, j < n - 1);
@@ -1816,11 +1828,14 @@ export class Renderer {
   private drawRoof(b: BoxInst, B: TownBox, p: BoxPlan, alpha: number): void {
     if (p.nOrder === 0 || alpha <= 0.004) return;
     const g = geomOf(B);
-    // (Its north painting to 38 degrees round, its east one from 52, the two blended between: a blend draws twice, so it's kept short.)
-    const east = clamp((this.heading - 38) / 14, 0, 1);
+    // (Its painting for the quarter the camera faces to 38 degrees round, the next quarter's from 52, the two blended between: a blend
+    // draws twice, so it's kept short.)
+    const hq = ((this.heading % 360) + 360) % 360;
+    const q0 = Math.floor(hq / 90) % 4;
+    const east = clamp((hq - q0 * 90 - 38) / 14, 0, 1);
     const fine = B === b.box && this.paint.kind === "webgl";
-    const artN = east < 0.996 ? this.roofArt(b, fine, false) : null;
-    const artE = east > 0.004 ? this.roofArt(b, fine, true) : null;
+    const artN = east < 0.996 ? this.roofArt(b, fine, q0) : null;
+    const artE = east > 0.004 ? this.roofArt(b, fine, (q0 + 1) % 4) : null;
     for (let o = 0; o < p.nOrder; o++) {
       const i = p.order[o]!;
       const fg = g.faces[i]!;
@@ -2142,8 +2157,7 @@ export class Renderer {
   private frontGlowOf(fc: FrameCache, lot: number): Glow | null {
     let g = this.frontGlow.get(fc);
     if (g === undefined) {
-      const b = STREET_BUILDINGS[lot]!;
-      const box = building(b.id, b.w, b.v);
+      const box = lotArt(STREET_BUILDINGS[lot]!);
       g = box.lights.length ? bakeGlow(box.front, box.lights, []) : null;
       this.frontGlow.set(fc, g);
     }
@@ -3462,7 +3476,7 @@ export class Renderer {
    * (Tests) The street town's boxes the last frame drew: each one's art, which way it faces, its draws (strips and faces; the 2D
    * fallback's cost), whether its front was drawn and faced you, and how many of its sides were drawn.
    */
-  boxDraws(): { id: string; kind: string; facing: "S" | "W"; draws: number; front: boolean; facesYou: boolean; sides: number }[] {
+  boxDraws(): { id: string; kind: string; facing: "S" | "N" | "W" | "E"; draws: number; front: boolean; facesYou: boolean; sides: number }[] {
     return this.boxes
       .filter((b) => this.plans[b.i]!.on)
       .map((b) => {

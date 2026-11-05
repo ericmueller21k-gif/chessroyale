@@ -202,9 +202,10 @@ if (STREET_TOWN) {
   // turn of the camera: till then each stands in facing the camera as every other front does, on its lot's south edge
   // (docs/decisions/2026-11-05-street-town-layout.md).
   STREET_BUILDINGS.forEach((b, lot) => {
-    const x = b.facing === "S" ? b.c0 + (b.w - 1) / 2 : b.c0 + (b.d - 1) / 2;
-    const y = b.r0 - 0.5 + b.inset;
-    props.push({ kind: "front", c: Math.round(x), r: b.r0, x, y, v: b.v, table: -1, lot });
+    // (A row's look-alike, round 4: where the row put it.)
+    const x = b.at ? b.at.x : b.facing === "S" ? b.c0 + (b.w - 1) / 2 : b.c0 + (b.d - 1) / 2;
+    const y = b.at ? b.at.y : b.r0 - 0.5 + b.inset;
+    props.push({ kind: "front", c: wrapI(Math.round(x)), r: b.at ? wrapI(Math.round(y)) : b.r0, x, y, v: b.v, table: -1, lot });
   });
 }
 
@@ -636,6 +637,25 @@ export class Walker {
   /** The next square of its path, after the step it's on (null: none). */
   peek(): Sq | null {
     return this.queue[0] ?? null;
+  }
+  /** The step being taken (dc, dr) into `out`, and how many steps its leg runs that way from here (this one and the queued ones after it); 0: standing. */
+  leg(out: { dc: number; dr: number; last: boolean }): number {
+    const s = this.step;
+    if (!s) return 0;
+    out.dc = Math.sign(s.dc);
+    out.dr = Math.sign(s.dr);
+    let n = 1;
+    let pc = s.to.c;
+    let pr = s.to.r;
+    for (const q of this.queue) {
+      if (Math.sign(wrapF(q.c - pc)) !== out.dc || Math.sign(wrapF(q.r - pr)) !== out.dr) break;
+      n++;
+      pc = q.c;
+      pr = q.r;
+    }
+    // (The last leg: nothing queued after it turns.)
+    out.last = n === this.queue.length + 1;
+    return n;
   }
   /** Drops the rest of its path: it stops once the step it's on ends (Jefferson's crew in the way, Nov 4). */
   halt(): void {

@@ -81,3 +81,20 @@ export function screenStep(dc: number, dr: number, quarter: number, out: { dc: n
   out.dc = dc * fr + dr * fc || 0;
   out.dr = -dc * fc + dr * fr || 0;
 }
+
+/**
+ * The chase camera's heading (Nov 5, round 4; brief-town-rows.md "the player's view"): behind you, looking the way you walk, snapped to
+ * the four board directions. `cur` is where it's aiming now (any multiple of 90, unwrapped); a step (dc, dr) on a leg of `leg` squares
+ * that way (`last`: the path's last leg) turns it, the shortest way round, when:
+ *  - by the keys (`keys`): any step but one straight back (down steps back without turning; left and right turn you);
+ *  - on a tap's path: a leg of 2 squares or more, or the last leg (so a zig-zag doesn't whip it round).
+ * Answers the heading to aim at (`cur` if it stays).
+ */
+export function chaseTarget(cur: number, dc: number, dr: number, leg: number, last: boolean, keys: boolean): number {
+  if (!dc && !dr) return cur;
+  const want = dc > 0 ? 90 : dc < 0 ? 270 : dr > 0 ? 0 : 180;
+  const d = ((((want - cur) % 360) + 540) % 360) - 180;
+  if (Math.abs(d) < 1) return cur;
+  if (keys) return Math.abs(d) > 179 ? cur : cur + d;
+  return leg >= 2 || last ? cur + (Math.abs(d) > 179 ? 180 : d) : cur;
+}
