@@ -396,6 +396,174 @@ test("challenging Hollow in the town: his own intro (in to your seats, his line,
   expect(errors).toEqual([]);
 });
 
+type FolioState = { move: string; stools: string[]; table: string; plane: { anim: string; at: [number, number]; lift: number } | null; packet: boolean; board: string | null; real: boolean };
+type Crumple = { phase: string; phases: string; mode: string; dom: string; match: string; covered: string; why: string };
+/** Folio's crumple cover's state now (null: none). */
+const crumpleNow = (p: Page) =>
+  p.evaluate(() => {
+    const c = document.querySelector<HTMLCanvasElement>("canvas.boss-crumple");
+    return c ? { phase: c.dataset.phase ?? "", phases: c.dataset.phases ?? "", mode: c.dataset.mode ?? "", dom: c.dataset.dom ?? "", match: c.dataset.match ?? "", covered: c.dataset.covered ?? "", why: c.dataset.why ?? "" } : null;
+  });
+/**
+ * Folio's challenge (Nov 5; everyone's): in with it to the clean page's marks; its line; you both step back a pace; the stools fold up
+ * from their sheets (west, then east), then the table; the plane comes in, the packet falls onto the table and unfolds, and the game's own
+ * board is there; it bows and says one of its five quiet lines; the crumple (`canvas.boss-crumple`) takes the screen, crumples it into a
+ * ball, holds, and opens onto the match screen; gone, the battle; the gear's Leave back to where you stood. `gl`: the town drawn with
+ * WebGL 2 too (`?gl=1`), as its own e2e runs it. `noGl`: WebGL off (the page can't get a WebGL context): the fade through black.
+ */
+async function folioChallenge(page: Page, opts: { gl: boolean; noGl: boolean; gif: boolean }) {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  const project = test.info().project.name;
+  if (SHOTS) mkdirSync(SHOTS, { recursive: true });
+  const shot = async (name: string) => SHOTS && (await page.screenshot({ path: `${SHOTS}/${name}-${project}.png` }));
+  if (opts.noGl)
+    await page.addInitScript(() => {
+      const get = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, kind: string, ...rest: unknown[]) {
+        if (/webgl/.test(kind)) return null;
+        return (get as (...a: unknown[]) => RenderingContext | null).call(this, kind, ...rest);
+      } as typeof get;
+    });
+  await page.goto(`/town?sky=day${opts.gl ? "&gl=1" : ""}`);
+  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  const { confirm, stood } = await toConfirm(page, "folio", "Folio");
+  // (The phone's GIF: the page's own frames as Chrome draws them (its screencast), each with its time, from the Fight tap to the match:
+  // screenshots taken alongside slow the page, and the cover's WebGL slows them to about one a second.)
+  const gif = !!SHOTS && opts.gif && project === "phone";
+  const cast: { at: number; jpg: Buffer }[] = [];
+  const caster = gif ? await page.context().newCDPSession(page) : null;
+  caster?.on("Page.screencastFrame", (f: { data: string; sessionId: number; metadata: { timestamp?: number } }) => {
+    cast.push({ at: (f.metadata.timestamp ?? Date.now() / 1000) * 1000, jpg: Buffer.from(f.data, "base64") });
+    void caster.send("Page.screencastFrameAck", { sessionId: f.sessionId }).catch(() => {});
+  });
+  // (FOLIO_CPU=4: the phone's frame-rate check, its CPU slowed 4x through the crumple's run: the frame times are logged below.)
+  const cpu = Number(process.env.FOLIO_CPU ?? 0);
+  if (cpu > 1) await (await page.context().newCDPSession(page)).send("Emulation.setCPUThrottlingRate", { rate: cpu });
+  await caster?.send("Page.startScreencast", { format: "jpeg", quality: 85, everyNthFrame: 1 });
+  await confirm.getByRole("button", { name: "Fight" }).click();
+  await expect(room(page)).toHaveAttribute("data-room", "folio", { timeout: 20_000 });
+  await expect(page.getByRole("heading", { name: "Folio's Folded House" })).toBeVisible();
+  const looks: (Intro & { folio: FolioState | null })[] = [];
+  const look = async () => {
+    const i = (await intro(page)) as (Intro & { folio: FolioState | null }) | null;
+    if (i) looks.push(i);
+    return i;
+  };
+  const where = (i: Intro) => [i.you[0], i.you[1], i.boss[0], i.boss[1]].map((v) => Math.round(v * 100) / 100);
+  // On the clean page's marks (its art's: Folio at 8, you at 11, on row 10.5), facing each other; its line.
+  await expect.poll(async () => (await look())?.step, { message: "its line", timeout: 20_000, intervals: [50] }).toBe("line");
+  const atLine = (await look())!;
+  expect(atLine.layout).toBe("across");
+  expect(where(atLine)).toEqual([11, 10.5, 8, 10.5]);
+  expect(atLine.facing).toEqual({ you: -1, boss: 1 });
+  expect(atLine.line).toBe(true);
+  expect(atLine.folio).toMatchObject({ stools: ["sheet", "sheet"], table: "sheet", plane: null, board: null, real: false });
+  await shot("folio-line");
+  // You both step back a pace (no hop): Folio to 2.3 squares west of the table's middle, you to the usual 2.2 east.
+  await expect.poll(async () => where((await look())!), { message: "stepped back", intervals: [50] }).toEqual([9.5 + CHALLENGE_FEEL.clear.you, 10.5, 9.5 - 2.3, 10.5]);
+  // The stools fold up, west then east, then the table.
+  await expect.poll(async () => (await look())?.folio?.table, { message: "the table folds", intervals: [30] }).toBe("fold");
+  await shot("folio-fold");
+  // The plane brings the board; the packet falls, lies and unfolds; then the game's own board.
+  await expect.poll(async () => (await look())?.folio?.plane !== null, { message: "the plane", intervals: [30] }).toBe(true);
+  await expect.poll(async () => (await look())?.folio?.board, { message: "the board unfolds", intervals: [30] }).toBe("unfold");
+  await shot("folio-unfold");
+  await expect.poll(async () => (await look())?.folio?.real, { message: "the board on the table", intervals: [30] }).toBe(true);
+  // It bows, and says one of its five quiet lines.
+  await expect.poll(async () => (await look())?.chant ?? null, { message: "its quiet line", intervals: [30] }).not.toBeNull();
+  const quiet = (await look())!;
+  expect(introOf("folio")!.chant).toContain(quiet.chant);
+  await shot("folio-quiet");
+  // The order, from every look: the west stool first, the east one, the table; nobody moved after the step back; no attack.
+  const firstOf = (f: (i: (typeof looks)[number]) => boolean) => looks.findIndex(f);
+  const w = firstOf((i) => i.folio?.stools[0] !== "sheet" && !!i.folio);
+  const e = firstOf((i) => i.folio?.stools[1] !== "sheet" && !!i.folio);
+  const t = firstOf((i) => i.folio?.table !== "sheet" && !!i.folio);
+  expect(w).toBeGreaterThan(0);
+  expect(e).toBeGreaterThanOrEqual(w);
+  expect(t).toBeGreaterThan(e);
+  for (const i of looks.slice(firstOf((x) => x.folio?.stools[0] !== "sheet" && !!x.folio))) {
+    expect(where(i), `at ${i.step}: in their places`).toEqual([9.5 + CHALLENGE_FEEL.clear.you, 10.5, 9.5 - 2.3, 10.5]);
+    expect(i.attack, `at ${i.step}: no attack`).toBe(false);
+  }
+  // The crumple (or, WebGL off, the fade through black), its state watched from before it starts to after it's gone.
+  const seen: Crumple[] = [];
+  await expect
+    .poll(
+      async () => {
+        const c = await crumpleNow(page);
+        if (c) seen.push(c);
+        return !!c;
+      },
+      { message: "the crumple takes the screen", timeout: 15_000, intervals: [20] },
+    )
+    .toBe(true);
+  await expect(page.locator("canvas.boss-storm, canvas.boss-wipe, canvas.boss-dark")).toHaveCount(0);
+  await expect
+    .poll(
+      async () => {
+        const c = await crumpleNow(page);
+        if (c) seen.push(c);
+        return c === null;
+      },
+      { message: "the crumple is gone, the match there", timeout: 60_000, intervals: [20] },
+    )
+    .toBe(true);
+  await expect(page.locator(BOARD_SEL.wrap).first()).toBeVisible({ timeout: 10_000 });
+  if (caster) {
+    await page.waitForTimeout(1500);
+    await caster.send("Page.stopScreencast");
+    const t0 = cast[0]?.at ?? 0;
+    for (const [i, f] of cast.entries()) writeFileSync(`${SHOTS}/folio-cast-${String(i).padStart(4, "0")}-${String(Math.round(f.at - t0)).padStart(6, "0")}.jpg`, f.jpg);
+  }
+  // The crumple's frames (test switches on: crumple-gl.ts logs each one's time), for its frame rate: the median and the slowest.
+  const log = await page.evaluate(() => (window as unknown as { __crumpleFrames?: { t: number; phase: string; js: number }[] }).__crumpleFrames ?? []);
+  const byPhase = (ph: string) => {
+    const g = log.slice(1).flatMap((f, i) => (f.phase === ph && log[i]!.phase === ph ? [f.t - log[i]!.t] : [])).sort((a, b) => a - b);
+    const js = log.filter((f) => f.phase === ph).map((f) => f.js).sort((a, b) => a - b);
+    return g.length ? `${ph} ${(1000 / g[g.length >> 1]!).toFixed(0)} fps (${g.length}; its own work ${js[js.length >> 1]!.toFixed(1)} ms)` : `${ph} -`;
+  };
+  if (log.length > 2) console.log(`crumple by phase (${project}${opts.gl ? ", town gl" : ""}${cpu > 1 ? `, CPU ${cpu}x` : ""}): ${["crumple", "hold", "open", "linger"].map(byPhase).join(", ")}`);
+  const times = log.map((f) => f.t);
+  if (times.length > 2) {
+    const gaps = times.slice(1).map((t, i) => t - times[i]!).sort((a, b) => a - b);
+    const med = gaps[gaps.length >> 1]!;
+    test.info().annotations.push({ type: "crumple frames", description: `${gaps.length} frames, median ${med.toFixed(1)} ms (${(1000 / med).toFixed(1)} fps), slowest ${gaps.at(-1)!.toFixed(1)} ms, over 33 ms: ${gaps.filter((g) => g > 33.4).length}${cpu > 1 ? `, CPU ${cpu}x` : ""}` });
+    console.log(`crumple frames (${project}${opts.gl ? ", town gl" : ""}): ${`${gaps.length} frames, median ${med.toFixed(1)} ms (${(1000 / med).toFixed(1)} fps), slowest ${gaps.at(-1)!.toFixed(1)} ms, over 33 ms: ${gaps.filter((g) => g > 33.4).length}${cpu > 1 ? `, CPU ${cpu}x` : ""}`}`);
+  }
+  // (Every phase it went through, as it says; and every look's.)
+  const phases = [...new Set([...seen.map((c) => c.phase), ...seen.flatMap((c) => c.phases.split(" "))])];
+  if (opts.noGl) {
+    expect(seen.every((c) => c.mode === "fade"), JSON.stringify(seen.slice(0, 3))).toBe(true);
+    expect(phases).toContain("covered");
+  } else {
+    expect(seen.every((c) => c.mode === "gl"), JSON.stringify(seen.slice(0, 3))).toBe(true);
+    // Crumpled, held, opened onto the match's own picture (taken with its DOM), the creases lingering over the live match.
+    for (const ph of ["crumple", "hold", "open"]) expect(phases, JSON.stringify(seen.at(-1))).toContain(ph);
+    expect(seen.some((c) => c.match === "1"), "the match's picture on the ball").toBe(true);
+    expect(seen.at(-1)!.dom, "the room's DOM layer in its picture").toBe("1");
+  }
+  // The gear's Leave (or Resign): back in the town square where you stood.
+  await page.getByRole("button", { name: "Match options" }).click();
+  const quit = page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: /^(Leave|Resign)$/ });
+  const how = (await quit.textContent())!.trim();
+  await quit.click();
+  await page.getByRole("alertdialog").getByRole("button", { name: how, exact: true }).click();
+  if (how === "Resign") await page.getByRole("button", { name: "Back to town" }).click();
+  await backAt(page, stood);
+  expect(errors).toEqual([]);
+}
+for (const gl of [false, true])
+  test(`challenging Folio in the town${gl ? " (the town drawn with WebGL)" : ""}: its own intro (to the clean page's marks, its line, the step back, the stools and the table folding up, the plane bringing the board, the board unfolding, its bow and quiet line), the crumple into the match; Leave back where you stood`, async ({ page }) => {
+    test.setTimeout(240_000);
+    await folioChallenge(page, { gl, noGl: false, gif: !gl });
+  });
+test("challenging Folio with WebGL off: the crumple falls back to a fade through black, and the match starts", async ({ page }) => {
+  test.setTimeout(240_000);
+  await folioChallenge(page, { gl: false, noGl: true, gif: false });
+});
+
 test("challenging Wrangler in the town: his own intro (in to where you stand, his line, the lasso thrown to the board on its hay bale, the bale dragged to the middle, the two ropes thrown out, the buckets yanked in as the stools, his brag, his attack, his wipe), the battle; Leave back where you stood", async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];

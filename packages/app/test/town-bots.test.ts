@@ -92,10 +92,11 @@ describe("town square: the bots (Oct 27)", () => {
     // art's id "sidekick-hollow-dog"; he keeps Hollow's shop and isn't a town bot. Wrangler's rooster, Nov 4: rooster.ts, the art's id
     // "sidekick-pig-rooster"; he keeps Wrangler's shop and isn't a town bot either. Jefferson's dealer, Nov 4: dealer.ts, the art's id
     // "sidekick-grex-dealer"; he keeps Jefferson's shop, not a town bot. Ginger's shopkeeper elf, Nov 5: elf.ts, the art's id
-    // "sidekick-ginger-elf"; he keeps Ginger's shop, not a town bot: Crumb stays Ginger's kid in the town.)
+    // "sidekick-ginger-elf"; he keeps Ginger's shop, not a town bot: Crumb stays Ginger's kid in the town. Folio's paper turtle, Nov 5:
+    // folioturtle.ts, the art's id "sidekick-folio-turtle"; it keeps Folio's shop, not a town bot: Pleat, the frog, stays Folio's kid.)
     const files = readdirSync(new URL("../src/characters/sidekicks/", import.meta.url)).filter((f) => f.endsWith(".ts"));
-    expect(files).toHaveLength(20);
-    const artId: Record<string, string> = { timber: "sidekick-beaver", hollowdog: "sidekick-hollow-dog", rooster: "sidekick-pig-rooster", dealer: "sidekick-grex-dealer", elf: "sidekick-ginger-elf" };
+    expect(files).toHaveLength(21);
+    const artId: Record<string, string> = { timber: "sidekick-beaver", hollowdog: "sidekick-hollow-dog", rooster: "sidekick-pig-rooster", dealer: "sidekick-grex-dealer", elf: "sidekick-ginger-elf", folioturtle: "sidekick-folio-turtle" };
     for (const file of files) {
       const name = file.replace(/\.ts$/, "") as keyof typeof SIDEKICK_SHEETS;
       const mod = (await import(`../src/characters/sidekicks/${file}`)) as Record<string, unknown>;
