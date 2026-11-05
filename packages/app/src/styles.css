@@ -16589,7 +16589,7 @@ button.sq-tiny {
   color: #fff;
 }
 .sq-game.sq-relay .board-area .board-wrap {
-  width: min(100%, calc(var(--app-h) - 362px));
+  width: min(100%, calc(var(--app-h) - 366px));
   /* (The turn order under it: a short phone's least, 360 × 560 with its bars, keeps everything on screen.) */
   min-width: 240px;
 }

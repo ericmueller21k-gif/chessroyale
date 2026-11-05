@@ -13,8 +13,7 @@
  * Mercenary (coins, catch-up, the shop as bots shop, kits, Stockfish tokens; DECISIONS.md, "Squads modes: Mercenary")
  * and adds the economy's tables; its report goes to reports/squads-mercenary.md unless SQUADS_SIM_OUT says otherwise.
  */
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-if (process.env.SQUADS_SIM_MODE === "mercenary" && existsSync("/tmp/claude-0/-home-user-wordtrap/995c05e6-7525-5f8d-aa8a-f83ae6d5177e/scratchpad/stop-merc")) process.exit(0); // TEMP-GUARD
+import { readFileSync, writeFileSync } from "node:fs";
 import { DEFAULT_SETTINGS, SQUADS, botSkillSpread, shuffle, type Candidate, type MercItem, type SquadsClock, type SquadsSettings } from "@chessroyale/core";
 import type { MoveScore, Opening, UciEngine } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
