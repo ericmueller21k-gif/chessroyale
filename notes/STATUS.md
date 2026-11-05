@@ -199,3 +199,6 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
   (like the Wrangler trial): art (brief-folio-sanctuary-art.md, helper running on claude/boss-art) → shop code → intro code incl. the
   screen crumple into the match → PRs → live. Beside-you root-cause helper running (claude/fix-beside-you). Queue for the next Opus slot:
   bigger looming Colosseum in the street town; Moo/Ginger low in rows; board-carrying moments on computer (#110 note).
+- Nov 5 ~19:20: Eric asked for Squads (Relay on 3 boards, cleaner match screen) to run alongside Folio and OK'd another helper
+  (3 Opus at once for this). Brief brief-squads-three-boards.md, branch claude/squads-three-boards (ports 8995/9495). STOPS after
+  mockup stills → send Eric → his corrections → PR (full e2e). Open: turn-order list (a) 6 seated + "next in" vs (b) all 8.
