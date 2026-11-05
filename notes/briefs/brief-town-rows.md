@@ -117,3 +117,34 @@ or layout.
 - **Plazas.** Squares can have a free-standing building on a raised plot (a boss home or the fountain), with sidewalks that have a
   kerb edge.
 - **Our palette and pixel style.** Warm, cartoon and varied, but our own.
+
+## Eric's references, round 3 (Nov 5, later): the player's view
+Files: `eric-ref6-player-view-far.webp` (zoomed out), `eric-ref7-player-view-close.jpg` (zoomed in). Ignore the text on screen.
+Eric: "this is like the viewpoint of the player … one of them's more zoomed in, one of them's zoomed out a bit … the immersiveness
+that we're trying to capture. It doesn't have to be exact."
+
+**The director's design call, from these references:**
+- **A chase camera.** It sits low behind your pawn, looking **along the way you're heading, down the street.**
+  - You see the fronts of both sides of the street at an angle, the street running away to a horizon about a third of the way down
+    the screen, and the sky above the rows.
+  - Your pawn is seen from behind, in the lower middle of the screen, fully on screen.
+  - This replaces round 3's "north, except Seam Avenue east" street heading, which looked across one side.
+  - Streets get rows on both sides wherever the plan allows. A one-sided street with gardens no longer reads.
+- **Headings snap to the four board directions; the camera eases.**
+  - When you turn onto another street, or walk the other way, the camera swings behind you over about 0.4 s (a feel number).
+  - On a tap path that zig-zags, it follows the leg you're on, but only turns for a leg of 2 or more squares, or for the last leg.
+    That way it doesn't whip around.
+- **Controls through the heading.**
+  - Up walks forward. Down steps back without turning.
+  - Left and right turn you 90 degrees and step that way, and the camera swings.
+  - Taps on the ground walk you there as now.
+  - The on-screen arrows match. Record this in the decision note.
+- **Two zooms, like the two references.** The default is close: just behind you, low, the street filling the screen. The zoomed-out
+  view is higher and further back, showing more of the street and rooftops. Zooming out further may go to a high overview for
+  finding your way.
+- **People, trees and lamps** are billboards facing the camera. Building fronts are flat quads seen at an angle, with depth only
+  where it shows (above).
+- **Cost.** Fog or fade at the far end of a street, and draw only what the rows let you see: the street you're on and the openings
+  at its ends. The phone frame rate must not fall below round 3's.
+- **The 2D fallback** (no WebGL) may keep a higher view along the heading if a true low chase camera can't be done well in 2D. Say
+  which in the decision note.
