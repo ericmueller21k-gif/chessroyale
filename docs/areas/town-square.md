@@ -127,6 +127,9 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   see-through white with a chevron; held: dark, a pixel lower) and the keyboard (the arrows and WASD, never while typing in a box or
   a chat log) feed the same held directions, and the matching key lights while held. A key's walk stands you up, closes a card and
   calls off a game you were walking to, as a tap does. Inside a shop the keys walk you about the room (not during a challenge's intro).
+  **Up is up the screen everywhere** (Eric, Nov 5, a standing rule: docs/rules/eric.md): the town's rows run away from the camera and
+  a room's toward it, so the walker carries which way its rows run on screen (`Walker.rowsUp`: 1 the town, -1 a room), and both its
+  view (a ride's back going up, its front going down) and the keys' step (`keyWalk`, through `screenRow`) turn by it, in that one place.
   Walking is `Walker.run` (world.ts): the walker asks for its next square as each step begins, so a held key runs on without a stop.
   Numbers: `TOWN_FEEL.youStepMs` (the same pace as a tap); the sizes are the CSS in `town.css`. Test: `e2e/town.spec.ts`, "the arrow
   keys"; unit: `packages/app/test/town-arrows.test.ts`. Decision: `docs/decisions/2026-11-04-town-arrow-keys.md`.
@@ -604,7 +607,7 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   easing up off the floor over the half square in front of the low step; drawn half a square nearer up there (`levelZ`), in front of the
   cards it stands on. A tap on the deck as drawn walks you there (the nearer free staircase); the arrow keys go along the chain (left and
   right along the flight and round the curve, up from a foot climbs on, up and down on the deck nothing). Inside every room, the up arrow
-  now walks you up the screen (rows run toward a room's camera: it walked you down). **The elves** (`shops/ginger-elves.ts`, drawn from
+  now walks you up the screen (rows run toward a room's camera: it walked you down; since Nov 5 held by `Walker.rowsUp`, see "Arrow keys"). **The elves** (`shops/ginger-elves.ts`, drawn from
   their sprites as the room loads, about a hundred small frames): three walkers on their loops round the battle spot, and the dispensing
   pair (box and notepad) on their 47.5 s loop: the lower row's bins, up the east stairs, the upper row's tubes along the catwalk, down
   the west stairs. Each waits while you (or the boss walking in) stand on or just ahead of its way (`SHOP_FEEL.elves.look`), and takes its

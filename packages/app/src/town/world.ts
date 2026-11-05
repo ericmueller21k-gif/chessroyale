@@ -593,6 +593,12 @@ export interface Stand {
 /** Where `w` stands now (the square it's on or stepping onto) and the way it faces. */
 export const standOf = (w: Walker): Stand => ({ c: w.hereC(), r: w.hereR(), facing: w.facing, view: w.view });
 
+/**
+ * A step along the rows as the screen sees it, or back (the same flip both ways): `dr` rows, where `rowsUp` (Walker.rowsUp) is the
+ * way along them that's up the screen; positive is up the screen. The arrow keys' up (+1 up the screen) is `screenRow(1, rowsUp)` rows.
+ */
+export const screenRow = (dr: number, rowsUp: 1 | -1): number => dr * rowsUp;
+
 /** Claims are numbered in the order they're made: the earlier claim on a square keeps it (keepApart). */
 let claims = 0;
 
@@ -603,12 +609,18 @@ export class Walker {
   facing: 1 | -1 = 1;
   /**
    * The way it last walked, for a ride's views (Nov 1, rides v2): 0 left or right (its side; `facing` says which), 1 up the
-   * screen (away: its back), 2 down (toward you: its front). Standing, the one it last walked in.
+   * screen (away: its back), 2 down (toward you: its front). Standing, the one it last walked in. Up the screen is `rowsUp`'s way.
    */
   view: 0 | 1 | 2 = 0;
   /** The way it last walked on the world's squares (east, north): the street town's chase camera turns it into a view (render.ts). */
   wdc = 0;
   wdr = 1;
+  /**
+   * Which way along its rows is up the screen (Eric, Nov 5: "if you hold up in one of the rooms… it's flipped"): 1 in the town (its
+   * rows run away from the camera: a row more is up), -1 in a shop's room (its rows run toward the camera: a row less is up). Its
+   * `view` and the arrow keys (arrows.ts `keyWalk`) both read it, so up is up the screen wherever it walks: `screenRow`.
+   */
+  rowsUp: 1 | -1 = 1;
   /** When it claimed the square it will end on (its goal): the order of `go`s, 0 for where it first stood. */
   claim = 0;
   private queue: Sq[] = [];
@@ -713,7 +725,7 @@ export class Walker {
     if (dc || dr) ((this.wdc = Math.sign(dc)), (this.wdr = Math.sign(dr)));
     if (dc) this.facing = dc < 0 ? -1 : 1;
     if (dc) this.view = 0;
-    else if (dr) this.view = dr > 0 ? 1 : 2;
+    else if (dr) this.view = screenRow(dr, this.rowsUp) > 0 ? 1 : 2;
     if (!this.queue.length && this.runner) {
       const n = this.runner(to.c, to.r);
       if (n) this.queue.push(n);

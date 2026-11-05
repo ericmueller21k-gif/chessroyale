@@ -637,7 +637,8 @@ function startTown(
     wrapI,
     STREET_TOWN
       ? (c, r, dc, dr) => {
-          // (Round 4's chase camera: through the way you faced as the hold began, so a held left or right turns you once and runs on.)
+          // (Round 4's chase camera: through the way you faced as the hold began, so a held left or right turns you once and runs on.
+          // keyWalk has turned `dr` by the walker's rowsUp (#502): 1 in the town, so it's still up the screen here.)
           screenStep(dc, dr, keyQuarter, turned);
           // (Off the world past the north or south edge: a row of -1, which no one stands on.)
           return { c: colI(c + turned.dc), r: rowI(r + turned.dr) };
