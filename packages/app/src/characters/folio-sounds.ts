@@ -16,7 +16,27 @@
  */
 import { bandpass, lowpass, noise, osc, render, rng, sine, soft, soundCache, type Voice } from "./synth.ts";
 
-export type FolioSound = "rustle" | "fold" | "unfold" | "flap" | "scratch" | "dab" | "page" | "crumple" | "glint" | "hello" | "voice" | "murmur" | "hum";
+export type FolioSound =
+  | "rustle"
+  | "fold"
+  | "unfold"
+  | "flap"
+  | "scratch"
+  | "dab"
+  | "page"
+  | "crumple"
+  | "glint"
+  | "hello"
+  | "voice"
+  | "murmur"
+  | "hum"
+  // (Its sanctuary's intro, Nov 5: a folded piece set standing, the paper plane gliding in, the board's packet landing on the table, the
+  // screen crumpled into a ball, and the ball opened out flat.)
+  | "set"
+  | "glide"
+  | "land"
+  | "ball"
+  | "open";
 
 const clamp01 = (u: number) => Math.max(0, Math.min(1, u));
 const lerp = (a: number, b: number, u: number) => a + (b - a) * clamp01(u);
@@ -152,6 +172,38 @@ const SOUNDS: Record<FolioSound, (rate: number) => Float32Array> = {
   // Its voice, for every line: a paper crinkle, then two quick soft rising chirps.
   voice: (rate) =>
     unit(mix(rate, 0.32, [[0, render(rate, 0.03, (t) => (1 - t / 0.03) * bandpass(rate, () => 4800, 1.4, noise(4131))(t)), 0.35], [0.02, note(rate, 1100, 1450, 0.07), 1], [0.14, note(rate, 1250, 1650, 0.09), 0.85]])),
+  // A folded piece set standing (the stools and the table in its intro): a soft papery tap as it settles on its feet, a little body.
+  set: (rate) => {
+    const tap = bandpass(rate, () => 1400, 1.2, noise(4141));
+    const body = bandpass(rate, () => 520, 1, murk(rate, 2400, 4143));
+    const settle = crackle(rate, 0.07, 5, 3800, 4145, (u) => 1 - u, 0.3);
+    const knock = render(rate, 0.1, (t) => Math.min(1, t / 0.002) * (Math.exp(-t / 0.01) * 1.6 * tap(t) + Math.exp(-t / 0.028) * body(t)));
+    return unit(mix(rate, 0.16, [[0, knock, 1], [0.03, settle, 0.4]]));
+  },
+  // The paper plane gliding in: a long, soft whoosh of air rising and falling, a faint paper flutter in it.
+  glide: (rate) => {
+    const air = bandpass(rate, (t) => lerp(700, 1500, Math.sin(Math.PI * clamp01(t / 0.9))), 0.6, murk(rate, 4000, 4147));
+    const whoosh = render(rate, 0.9, (t) => Math.sin(Math.PI * clamp01(t / 0.9)) ** 1.6 * air(t));
+    const flutter = crackle(rate, 0.5, 10, 4600, 4149, (u) => Math.sin(Math.PI * clamp01(u)), 0.15);
+    return unit(mix(rate, 0.9, [[0, whoosh, 1], [0.2, flutter, 0.25]]));
+  },
+  // The board's packet landing on the table: a soft paper tap, a flat pat with a dry crinkle after it.
+  land: (rate) => {
+    const pat = bandpass(rate, () => 900, 1, murk(rate, 3500, 4151));
+    const tick = bandpass(rate, () => 3200, 1.4, noise(4153));
+    const crinkle = crackle(rate, 0.08, 6, 4200, 4155, (u) => 1 - u, 0.25);
+    const hit = render(rate, 0.1, (t) => Math.min(1, t / 0.0015) * (Math.exp(-t / 0.022) * pat(t) + Math.exp(-t / 0.004) * 0.7 * tick(t)));
+    return unit(mix(rate, 0.18, [[0, hit, 1], [0.04, crinkle, 0.45]]));
+  },
+  // The screen crumpled into a ball (its intro's crumple, 0.8 s): a dense crackle that grows as the sheet is crushed, then tightens.
+  ball: (rate) => unit(crackle(rate, 0.8, 120, 3300, 4157, (u) => clamp01(u * 1.6) ** 0.8 * (1 - 0.55 * clamp01((u - 0.75) / 0.25)), 0.55)),
+  // The ball opened out flat (its open, 0.8 s): looser crackles thinning out, the paper smoothed with a soft slide at the end.
+  open: (rate) => {
+    const pull = crackle(rate, 0.7, 60, 2800, 4159, (u) => (1 - clamp01(u)) ** 0.7, 0.5);
+    const air = bandpass(rate, () => 1800, 0.6, murk(rate, 6000, 4161));
+    const smooth = render(rate, 0.3, (t) => Math.sin(Math.PI * clamp01(t / 0.3)) * air(t));
+    return unit(mix(rate, 0.9, [[0, pull, 1], [0.55, smooth, 0.5]]));
+  },
   // Its town sounds: a low, slow three-syllable murmur, and a soft "mm-hm".
   murmur: (rate) =>
     hum(rate, [
@@ -181,6 +233,11 @@ const LEVEL: Record<FolioSound, number> = {
   voice: 0.04,
   murmur: 0.04,
   hum: 0.04,
+  set: 0.04,
+  glide: 0.03,
+  land: 0.04,
+  ball: 0.04,
+  open: 0.035,
 };
 
 const cache = soundCache("folio");

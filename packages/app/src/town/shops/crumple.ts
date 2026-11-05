@@ -184,3 +184,131 @@ export function crumpleAt(t: number, T = CRUMPLE_TIMING): { p: number; turn: num
   if (o < T.open) return { p: 1 - ease(o / T.open), turn: 0.35 * (1 - smooth(o / T.open)), image: "match", mix: 1, linger: 1 };
   return { p: 0, turn: 0, image: "match", mix: 1, linger: Math.max(0, 1 - (o - T.open) / T.creaseLinger) };
 }
+
+// ---- The game's (Nov 5, crumple-gl.ts draws it with WebGL): the mesh for a screen's shape, its vertices filled into arrays a frame
+// (no allocation), and the beat's clock with a hold that waits for the match screen. Pure; tested in packages/app/test/shop-folio.test.ts.
+
+/** About this many cells in all (the notes' 16 x 34 on a phone), shared out so a cell stays about square on any screen's shape. */
+export const CRUMPLE_CELLS = 16 * 34;
+/** The mesh for a W x H screen: 16 x 34 on a phone (390 x 844), wider than tall on a computer (30 x 18 at 1280 x 800). */
+export function meshSize(W: number, H: number): { cols: number; rows: number } {
+  const cols = Math.max(4, Math.round(Math.sqrt((CRUMPLE_CELLS * W) / H)));
+  return { cols, rows: Math.max(4, Math.round(CRUMPLE_CELLS / cols)) };
+}
+/** Each triangle's three corners as (cell column, cell row) offsets: the cut alternating cell to cell, as `crumpleMesh`'s. */
+const CUT_A = [[0, 0], [1, 0], [1, 1], [0, 0], [1, 1], [0, 1]] as const;
+const CUT_B = [[0, 0], [1, 0], [0, 1], [1, 0], [1, 1], [0, 1]] as const;
+/** The mesh's vertex arrays (6 vertices a cell, two triangles), made once for a screen and refilled each frame by `fillMesh`. */
+export interface MeshBuf {
+  cols: number;
+  rows: number;
+  W: number;
+  H: number;
+  /** Clip-space position and depth (x, y, z) a vertex. */
+  pos: Float32Array;
+  /** The image's point (0 to 1 across, 0 to 1 down) a vertex. */
+  uv: Float32Array;
+  /** Its triangle's shade (1 = as flat) and whether we see its back (1), a vertex. */
+  shade: Float32Array;
+  back: Float32Array;
+  /** The grid's points at p, and at the shade's p (scratch: (cols + 1) x (rows + 1) x 3). */
+  grid: Float32Array;
+  sgrid: Float32Array;
+}
+export function meshBuf(W: number, H: number): MeshBuf {
+  const { cols, rows } = meshSize(W, H);
+  const n = cols * rows * 6;
+  const uv = new Float32Array(n * 2);
+  let k = 0;
+  for (let j = 0; j < rows; j++)
+    for (let i = 0; i < cols; i++)
+      for (const [di, dj] of (i + j) % 2 === 0 ? CUT_A : CUT_B) {
+        uv[k++] = (i + di) / cols;
+        uv[k++] = (j + dj) / rows;
+      }
+  const g = (cols + 1) * (rows + 1) * 3;
+  return { cols, rows, W, H, pos: new Float32Array(n * 3), uv, shade: new Float32Array(n), back: new Float32Array(n), grid: new Float32Array(g), sgrid: new Float32Array(g) };
+}
+/** Fills the grid's points at `p` into `out`. */
+function gridAt(b: MeshBuf, p: number, o: CrumpleOpts, out: Float32Array): void {
+  let k = 0;
+  for (let j = 0; j <= b.rows; j++)
+    for (let i = 0; i <= b.cols; i++) {
+      const q = crumplePoint((i / b.cols - 0.5) * b.W, (j / b.rows - 0.5) * b.H, p, b.W, b.H, o);
+      out[k++] = q[0];
+      out[k++] = q[1];
+      out[k++] = q[2];
+    }
+}
+/**
+ * The mesh at crumple `p` (0 flat, 1 a ball), shaded as at `shadeP` (the creases lingering on the flat sheet), into `b`: each vertex
+ * projected as `crumpleMesh` projects it (a mild perspective, focal F), in clip space (y up), its depth nearer the larger `z`; each
+ * triangle's shade and back side from `shadeOf`. The ball's turn is `o.turn`.
+ */
+export function fillMesh(b: MeshBuf, p: number, o: CrumpleOpts, shadeP = p): void {
+  gridAt(b, p, o, b.grid);
+  const sg = shadeP === p ? b.grid : b.sgrid;
+  if (sg !== b.grid) gridAt(b, shadeP, o, sg);
+  const W1 = b.cols + 1;
+  const at = (g: Float32Array, i: number, j: number): V3 => {
+    const k = (j * W1 + i) * 3;
+    return [g[k]!, g[k + 1]!, g[k + 2]!];
+  };
+  let v = 0;
+  for (let j = 0; j < b.rows; j++)
+    for (let i = 0; i < b.cols; i++) {
+      const cut = (i + j) % 2 === 0 ? CUT_A : CUT_B;
+      for (let t = 0; t < 2; t++) {
+        const c = [cut[t * 3]!, cut[t * 3 + 1]!, cut[t * 3 + 2]!];
+        const { shade, back } = shadeOf(at(sg, i + c[0]![0], j + c[0]![1]), at(sg, i + c[1]![0], j + c[1]![1]), at(sg, i + c[2]![0], j + c[2]![1]));
+        for (const [di, dj] of c) {
+          const q = at(b.grid, i + di, j + dj);
+          const k = o.F / (o.F - q[2]);
+          b.pos[v * 3] = ((q[0] * k) / b.W) * 2;
+          b.pos[v * 3 + 1] = -((q[1] * k) / b.H) * 2;
+          // (Nearer, larger z: smaller depth. Well inside the clip range for any ball.)
+          b.pos[v * 3 + 2] = -q[2] / 4000;
+          b.shade[v] = shade;
+          b.back[v] = back ? 1 : 0;
+          v++;
+        }
+      }
+    }
+}
+
+/** The crumple's beats (ms): CHALLENGE_FEEL.folio.crumple. */
+export interface CrumpleBeats {
+  crumpleMs: number;
+  holdMs: number;
+  openMs: number;
+  lingerMs: number;
+  maxHoldMs: number;
+}
+/**
+ * The whole beat `t` ms from its start, the match screen ready (taken, on its texture) `ready` ms from its start (Infinity: not yet):
+ * crumpled over `crumpleMs`; held as a ball at least `holdMs`, and until the match screen has been ready for half a hold (the swap from
+ * the still to it, cross-faded on the small ball, `mix`); opened over `openMs`; flat, its creases' shade fading over `lingerMs` (`live`:
+ * from there the live match screen shows under the shade); done. Not ready by `crumpleMs + maxHoldMs`: "fail" (the room fades through
+ * black to the match instead). The ball turns a little while held and back as it opens (the art's crumpleAt).
+ */
+export function crumpleBeat(t: number, ready: number, T: CrumpleBeats): { phase: "crumple" | "hold" | "open" | "linger" | "done" | "fail"; p: number; turn: number; mix: number; linger: number; openAt: number } {
+  const ease = (u: number) => (u < 0.5 ? 2 * u * u : 1 - 2 * (1 - u) * (1 - u));
+  const sm = (u: number) => {
+    const c = Math.min(1, Math.max(0, u));
+    return c * c * (3 - 2 * c);
+  };
+  const half = T.holdMs / 2;
+  const openAt = Math.max(T.crumpleMs + T.holdMs, ready + half);
+  if (t < T.crumpleMs) return { phase: "crumple", p: ease(t / T.crumpleMs), turn: 0, mix: 0, linger: 1, openAt };
+  if (t < openAt) {
+    if (ready === Infinity && t >= T.crumpleMs + T.maxHoldMs) return { phase: "fail", p: 1, turn: 0.35, mix: 0, linger: 1, openAt };
+    return { phase: "hold", p: 1, turn: 0.35 * sm((t - T.crumpleMs) / (openAt - T.crumpleMs)), mix: ready === Infinity ? 0 : sm((t - (openAt - half)) / half), linger: 1, openAt };
+  }
+  const o = t - openAt;
+  if (o < T.openMs) return { phase: "open", p: 1 - ease(o / T.openMs), turn: 0.35 * (1 - sm(o / T.openMs)), mix: 1, linger: 1, openAt };
+  const l = o - T.openMs;
+  if (l < T.lingerMs) return { phase: "linger", p: 0, turn: 0, mix: 1, linger: 1 - l / T.lingerMs, openAt };
+  return { phase: "done", p: 0, turn: 0, mix: 1, linger: 0, openAt };
+}
+/** The creases' shade on the flat sheet as it lingers (the art's: as if 0.1 crumpled, fading with `linger`). */
+export const lingerShadeP = (linger: number): number => 0.1 * linger;
