@@ -8,7 +8,7 @@ admin's town only (`STREET_TOWN`); the director flips it for everyone after Eric
 
 - **Boxes** (`town/boxes.ts`: where each stands, its sides a neighbour covers, its roof faces' geometry and light, each frame's plan;
   `town/box-draw.ts`: each roof painted once; `render.ts` draws them). The 43 lots (16 homes, the everyday buildings and the bigger
-  ones behind), the 12 sheds and the 131 squares of hedge. A front stands on its front line; its sides run back from its body's edges;
+  ones behind), the 12 sheds and the 131 squares of hedge (in 28 runs of up to five squares, each drawn as one). A front stands on its front line; its sides run back from its body's edges;
   three homes have a back wall; the roof is the art's faces. Each part is sorted by its own depth among everything else (the art's
   order), the roof's faces far to near inside it.
 - **The camera turns** (`town/turn.ts`, `camera.ts`): north everywhere, east on Seam Avenue outside its four crossings (the plan's
@@ -29,7 +29,8 @@ admin's town only (`STREET_TOWN`); the director flips it for everyone after Eric
    art's two numbers), none facing you. So a front never darkens at rest, and Seam Street's fronts seen from the avenue take the 30%.
 2. **A roof is painted once a heading.** Each face is painted top-down at the art's 37 px a square (its tile, its light, its ink edge,
    a flat roof's rim), whole and in triangles, into a sheet or two a box. The camera rests facing north or east, so a box is painted
-   for each; a turn blends the two (half a second). Painted ahead of being seen, nearest first, `boxBakeMs` a frame.
+   for each; a turn blends the two over 14 degrees in its middle (a blend draws twice). A wall is darkened once a shade (the art's two,
+   and every twentieth between while turning). Painted ahead of being seen, nearest first, `boxBakeMs` a frame.
 3. **One drawing path for both renderers:** every piece is an image through an affine transform (what both backends already draw), so
    WebGL batches them into its few draw calls. A face is drawn in one piece when that lands its last corner within `boxWholePx`,
    else in triangles (exact corners). A wall seen at a slant is drawn in upright strips (perspective): fine in WebGL (a strip is a few
@@ -49,5 +50,7 @@ admin's town only (`STREET_TOWN`); the director flips it for everyone after Eric
 
 ## Frame rate
 
-See the PR body (`docs/street-town-boxes/pr-body.md`): measured as round 2 (headless, phone and computer, 5 s walking, medians of four
-runs in turn), plus the turn (up and down Seam Avenue through two crossings), on both renderers.
+Measured as round 2 (headless, 5 s walking, round 2's build in turn) plus the turn (up and down Seam Avenue through two crossings):
+Canvas 2D phone Fountain Street 57.6 → 57.3, the turn 59.8 → 54.8; computer 59.3 → 58.4 and 59.6 → 53.7. The phone's turn sits at
+the brief's 5 fps limit after the cuts (it was 48.4 before them); details and WebGL in `docs/street-town-boxes/pr-body.md`.
+Round 4 (continuous rows, Eric's correction) builds on this.
