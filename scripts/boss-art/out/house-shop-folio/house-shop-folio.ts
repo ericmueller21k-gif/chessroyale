@@ -98,10 +98,10 @@ function foldedKey(x: number, y: number, turn: boolean): string {
   if (y === 0 || x === 0) return "A";
   if (y === T - 1 || x === T - 1) return "b";
   const u = turn ? T - 1 - x : x;
-  if (u === y) return turn ? "C" : "C";
+  if (u === y) return "b";
   if (u === y + 1) return "A";
   // The half toward the light (north-east of a NW-SE crease; north-west of a NE-SW one) is the lit one.
-  return (turn ? u < y : u > y) ? "B" : "b";
+  return (turn ? u < y : u > y) ? "B" : "c";
 }
 const tile = (name: string, fn: (x: number, y: number) => string) => {
   const c = cv(T, T);
@@ -116,8 +116,8 @@ tile("floor-b", (x, y) => foldedKey(x, y, true));
     const c = cv(T, T);
     for (let y = 0; y < T; y++) for (let x = 0; x < T; x++) c[y]![x] = foldedKey(x, y, turn);
     // Two lines of faint cursive across the lit half.
-    cursive(c, 6, turn ? 11 : 13, 20, (xx, yy) => (get(c, xx, yy) === "B" ? "K" : get(c, xx, yy) === "b" ? "K" : null), seed);
-    cursive(c, 9, turn ? 16 : 18, 15, (xx, yy) => (get(c, xx, yy) === "B" || get(c, xx, yy) === "b" ? "K" : null), seed + 9);
+    cursive(c, 6, turn ? 11 : 13, 20, (xx, yy) => (get(c, xx, yy) === "B" || get(c, xx, yy) === "c" ? "K" : null), seed);
+    cursive(c, 9, turn ? 16 : 18, 15, (xx, yy) => (get(c, xx, yy) === "B" || get(c, xx, yy) === "c" ? "K" : null), seed + 9);
     def(name, [1, 1], T, T, [18, 18], [[whole(c)]]);
   }
 }

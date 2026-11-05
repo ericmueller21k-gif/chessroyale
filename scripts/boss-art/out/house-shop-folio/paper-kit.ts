@@ -22,6 +22,7 @@ export const PAPER_PALETTE: Record<string, string> = {
   a: "#faf2df",
   B: "#f3e7cc",
   b: "#eadbbb",
+  c: "#efe1c4", // the folded floor's half away from the light (a hair under B)
   C: "#d3bd95",
   D: "#a58e69",
   E: "#76624c",
