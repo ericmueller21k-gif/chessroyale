@@ -840,6 +840,8 @@ export type SoundName =
   | "hollowSip"
   | "hollowPawn"
   | "hollowBlackout"
+  | "hollowFizz"
+  | "hollowForced"
   | "hollowSettle"
   // (His intro's swell and his full ball's deep hum: his cast and hum, played slower and so lower.)
   | "hollowSwell"
@@ -1191,6 +1193,8 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   hollowSip: hollow("sip"),
   hollowPawn: hollow("pawn"),
   hollowBlackout: hollow("blackout"),
+  hollowFizz: hollow("fizz"),
+  hollowForced: hollow("forced"),
   hollowSettle: hollow("settle"),
   hollowSwell: (t) => buffer(hollowSound("cast", ctx!.sampleRate), t, 0.7),
   hollowDeep: (t) => buffer(hollowSound("hum", ctx!.sampleRate), t, 0.75),
@@ -1474,6 +1478,8 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   hollowSip: [["hollow", "sip"]],
   hollowPawn: [["hollow", "pawn"]],
   hollowBlackout: [["hollow", "blackout"]],
+  hollowFizz: [["hollow", "fizz"]],
+  hollowForced: [["hollow", "forced"]],
   hollowSettle: [["hollow", "settle"]],
   hollowSwell: [["hollow", "cast"]],
   hollowDeep: [["hollow", "hum"]],

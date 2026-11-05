@@ -9,6 +9,7 @@ import { BoardEffects, BossEffect } from "./BossEffect.tsx";
 import { Cast, Flight, at, onSquare, stageSince, type BossUi, type Moment, type MomentProps } from "./PowerParts.tsx";
 import { CRITICAL, NORMAL } from "../speech.tsx";
 import { syncLights } from "../characters/lights.ts";
+import { useFrameNow } from "./Countdown.tsx";
 
 /**
  * Hollow's powers on screen: his cover of the dark (his cast from the board's corner, the darkness pouring onto its
@@ -44,20 +45,109 @@ function kingOn(fen: string, side: "w" | "b"): string | null {
 }
 
 /**
- * Your own move attempt into the dark that wasn't legal: the red-violet slash on the square it went for (`darkMiss`) and
- * a small "−5" rising off it. Only you see it.
+ * Your own move attempt into the dark that wasn't legal: the red-violet slash on the square it went for (`darkMiss`) and,
+ * in a crowd, a small "−5" rising off it (Boss alone: a bulb of yours goes out instead, by the boss bar). Only you see it.
  */
-export function DarkCost({ square, since, now, orientation }: { square: string; since: number; now: number; orientation: "white" | "black" }) {
+export function DarkCost({ square, since, now, orientation, points = true }: { square: string; since: number; now: number; orientation: "white" | "black"; points?: boolean }) {
   if (now < since || now >= since + 1600) return null;
   return (
     <div class="power-board pw-dark-cost" aria-hidden="true">
       <span class="pw-dark-slash" style={at(square, orientation)}>
         <BossEffect name="darkMiss" since={since} id={`miss-${square}-${since}`} />
       </span>
-      <span class="pw-cost" style={onSquare(square, orientation)} data-square={square}>
-        −{BOSS_POWERS.darkTryCost}
-      </span>
+      {points && (
+        <span class="pw-cost" style={onSquare(square, orientation)} data-square={square}>
+          −{BOSS_POWERS.darkTryCost}
+        </span>
+      )}
     </div>
+  );
+}
+
+/**
+ * The dark's move for you (Boss alone, the 3rd and 7th bulb out; Eric, Nov 5): a short dark flash over the board, the dark
+ * closing in from its edges and lifting, while his line says it ("The dark moves for you."). DARK_FORCED.ms long; then
+ * the move is played.
+ */
+export const DARK_FORCED = { ms: 1700, flashMs: 1300 } as const;
+export function DarkForced({ since, now }: { since: number; now: number }) {
+  if (now < since || now >= since + DARK_FORCED.flashMs) return null;
+  return <div class="pw-dark-forced" aria-hidden="true" style={{ "--df-ms": `${DARK_FORCED.flashMs}ms` }} />;
+}
+
+/** His lines for Boss alone's bulbs: the dark's move for you, and the blackout (placeholders until Eric's own lines). */
+export const HOLLOW_BULB_LINES = { forced: "The dark moves for you.", blackout: "Lights out. Forever." } as const;
+
+/**
+ * Total darkness (Boss alone, the 10th bulb out; Eric, Nov 5): the whole screen fades to black, your ten bulbs dark on
+ * their wire, then his line types out, and a plain line says why ("Your last bulb went out."); then the loss screen.
+ * BLACKOUT.ms long in all (the game's screens wait for it).
+ */
+export const BLACKOUT = { fadeMs: 1400, lineAt: 1500, whyAt: 2600, ms: 4600 } as const;
+export function HollowBlackout({ since, boss }: { since: number; boss: BossView }) {
+  const now = useFrameNow(true);
+  if (now < since) return null;
+  const t = now - since;
+  const line = HOLLOW_BULB_LINES.blackout;
+  const typed = t < BLACKOUT.lineAt ? 0 : Math.min(line.length, Math.floor((t - BLACKOUT.lineAt) / 45) + 1);
+  return (
+    <div class="hollow-blackout" role="alert" aria-label={`${boss.name}: ${line} Your last bulb went out.`} style={{ "--hb-fade": `${BLACKOUT.fadeMs}ms` }}>
+      <div class="hb-inner">
+        <span class="hb-strand">
+          <BossEffect name="lifeStrand" anim="lit0" since={since} id={`blackout-${since}`} quiet />
+        </span>
+        <p class="hb-line" aria-hidden="true">
+          <strong>{boss.name}</strong>
+          <span>
+            {line.slice(0, typed)}
+            <span class="hb-rest">{line.slice(typed)}</span>
+          </span>
+        </p>
+        <p class={`hb-why${t >= BLACKOUT.whyAt ? " on" : ""}`} aria-hidden="true">
+          Your last bulb went out.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * His taunt on a misplay (a wrong move into the dark, alone or in a crowd; Eric, Nov 5): one of his kit's `misplay`
+ * lines at random, never the one he said last (`last`), from `r` (0 to 1).
+ */
+export function nextTaunt(lines: readonly string[], last: string | null, r: number): string | null {
+  const pool = lines.length > 1 ? lines.filter((l) => l !== last) : [...lines];
+  return pool.length ? pool[Math.min(pool.length - 1, Math.floor(r * pool.length))]! : null;
+}
+let lastTaunt: string | null = null;
+/** His next taunt (nextTaunt), remembered on this device so the one after it differs. */
+export function hollowTaunt(lines: readonly string[] | undefined, r: number = Math.random()): string | null {
+  const t = nextTaunt(lines ?? [], lastTaunt, r);
+  if (t) lastTaunt = t;
+  return t;
+}
+
+/** When this device saw your bulbs change, and from how many lit (so the strand plays a bulb going out). */
+const lifeSeen = new Map<string, { lit: number; from: number; at: number }>();
+/**
+ * Your ten bulbs in Boss alone (Eric, Nov 5): his strand of lights in the boss bar's free room (BossUi.barProp), one lit
+ * for each wrong move you have left before the dark takes the battle. A bulb goes out (its fizz) as a wrong move lands.
+ */
+function lifeStrip({ boss }: { boss: BossView }) {
+  const s = boss.powers?.strand;
+  if (!s) return null;
+  syncLights(boss);
+  const lit = Math.max(0, s.of - s.out);
+  const key = `${boss.id}:${boss.startMove}:${boss.board.generation}`;
+  const now = Date.now();
+  let seen = lifeSeen.get(key);
+  if (!seen) lifeSeen.set(key, (seen = { lit, from: lit, at: 0 }));
+  else if (seen.lit !== lit) lifeSeen.set(key, (seen = { lit, from: seen.lit, at: now }));
+  const going = seen.at && lit < seen.from;
+  return (
+    <span class="life-strip" role="img" aria-label={`Your bulbs: ${lit} of ${s.of} lit`} data-lit={lit} data-of={s.of}>
+      <BossEffect name="lifeStrand" anim={going ? `out${seen.from}` : `lit${lit}`} then={going ? `lit${lit}` : undefined} since={going ? seen.at : 0} id={`life-${key}-${lit}-${seen.at}`} />
+    </span>
   );
 }
 
@@ -100,13 +190,18 @@ function bulbStrip({ boss, moments }: { boss: BossView; moments: () => Moment[] 
   );
 }
 
+/** A block's banner (Eric, Nov 5): his 2 x 2 and his 3 x 3, with how long it lasts. */
+export const blockBanner = (size: number): [string, string] =>
+  size === 3 ? ["PITCH BLACK!", `3×3 dark for ${BOSS_POWERS.darkBigTurns} turns`] : ["DEEPER DARK!", `2×2 dark for ${BOSS_POWERS.darkBlockTurns} turns`];
+
 function darkMoment({ boss, moment, now, t, orientation, kit, banner }: MomentProps) {
   const cast = kit?.ch.anims.darkCast;
   const castSince = moment.at + DARK.pourAt - ((cast && cueAt(cast, "cast")) ?? 0);
   const fromPt = hollowCastFrom(kit);
+  const [title, sub] = moment.kind === "darkBlock" ? blockBanner(moment.size ?? 2) : ["DARKNESS!", moment.square ? `Dark on ${moment.square}` : undefined];
   return (
-    <div class="power-moment pm-dark">
-      {banner("DARKNESS!", moment.square ? `Dark on ${moment.square}` : undefined, "dark", DARK.bannerMs)}
+    <div class={`power-moment pm-dark${moment.kind === "darkBlock" ? ` pm-dark-block size${moment.size ?? 2}` : ""}`}>
+      {banner(title, sub, "dark", DARK.bannerMs)}
       {/* (His strand lit in full as he casts, as in every pose: the strip by the bar counts down.) */}
       {cast && <Cast boss={boss.name} anim="darkCast" since={castSince} now={now} runKey={`${moment.key}:cast`} class="pm-hollow" style={{ aspectRatio: `${kit!.ch.w} / ${kit!.ch.h}` }} />}
       {moment.square && t >= DARK.pourAt && t < DARK.landAt && <Flight name="darkPour" square={moment.square} orientation={orientation} since={moment.at + DARK.pourAt} ms={DARK.landAt - DARK.pourAt} aim from={fromPt} />}
@@ -133,10 +228,23 @@ export const HOLLOW_UI = {
       priority: (m) => (m.first ? CRITICAL : NORMAL),
       view: darkMoment,
     },
+    // His block of the dark (Nov 5): a 2 x 2, or his 3 x 3 once a game; cast as a cover is, its new squares going dark as
+    // it lands (a square already dark stays so). A taunt now and then.
+    darkBlock: {
+      order: 1,
+      kit: "power",
+      appearAt: (m, square) => (m.squares?.includes(square) ? m.at + DARK.landAt : undefined),
+      line: (kit, m) => (kit ? pickLine(kit, "power", m.key) : null),
+      lineAt: DARK.pourAt,
+      priority: () => NORMAL,
+      view: darkMoment,
+    },
     // His extra move, after a failed Lights out: its own moment, after the turn's others played with his move.
     extra: { order: 3, kit: "ultimateHit", own: (boss) => boss.powers?.lightsExtra === "played" && boss.powers.events.some((e) => e.kind === "extra"), view: extraMoment },
   },
   bar: bulbStrip,
+  // Boss alone: your ten bulbs, in the bar's free room.
+  barProp: lifeStrip,
   // The dark: each covered square hides its piece (forming as his cast lands, thinning on its last turn), and one that
   // has just cleared lifts; check still shows on a king in the dark.
   board: ({ boss, p, board, orientation, now, appearAt }) => {

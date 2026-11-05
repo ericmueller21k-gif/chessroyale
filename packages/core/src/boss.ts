@@ -567,6 +567,25 @@ export interface BossPowerState {
    * darkTryCost off the turn's score; the darkTries-th ends that player's turn as a missed move. Never sent to screens.
    */
   tries?: { round: number; by: Record<string, number> };
+  /**
+   * Hollow's rule set (Nov 5, 2026): 2 from his bigger darkness (the 2 x 2 blocks and his 3 x 3) on. Set as the battle
+   * begins; a battle begun before it (none) keeps the single squares only.
+   */
+  hv?: number;
+  /**
+   * Hollow in Boss alone (settings.hollowBulbs, set as the battle begins): his strand of BOSS_POWERS.darkBulbs, `out` of
+   * them out (each wrong move into the dark puts one out, instead of points). Unset: points, as in every crowd.
+   */
+  strand?: { out: number };
+  /**
+   * The dark plays your move (Boss alone, as the 3rd and 7th bulbs go out): crowd turn `turn`, the bulb that brought it
+   * (`at`), and the move once picked (the rules' darkForcedMoveFrom; the only move allowed that turn).
+   */
+  forced?: { turn: number; at: number; move?: string; san?: string } | null;
+  /** The last bulb went out on crowd turn `turn`: the battle is his (Boss alone). */
+  blackout?: { turn: number } | null;
+  /** Testing (settings.hollowBlockTest): his first cover brings a block of this size too. */
+  blockTest?: number;
   /** Hollow's Lights out (his ultimate, at the start of his turn): the test once it has begun. Never sent to screens. */
   lightsOut?: LightsOutTest | null;
   /** Big Boy's snack: the crowd's center pawn he ate before move 1 (its square). */
@@ -1312,6 +1331,9 @@ export type PowerEventKind =
   | "fireball"
   | "fireproof"
   | "dark"
+  // Hollow's block of the dark (Nov 5): a 2 x 2 (or, once a game, his 3 x 3) gone dark; `square` its corner nearest a1,
+  // `size` its size, `squares` the ones newly dark (a square already dark just stays so).
+  | "darkBlock"
   | "extra"
   | "block"
   | "bounce"
@@ -1376,6 +1398,8 @@ export interface PowerEvent {
   fizzled?: string[];
   /** Hollow's first cover of the dark (the square of the piece he just moved, with his first-cover line). */
   first?: true;
+  /** Hollow's block of the dark: 2 (a 2 x 2) or 3 (his 3 x 3). */
+  size?: number;
   /**
    * Which of the boss's lines (0-4095 from the seed; the app takes it modulo its lines): Jefferson's fireproof laugh,
    * Boingo's joke as his funhouse plays the crowd's move.

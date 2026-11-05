@@ -12,10 +12,18 @@ import { playOnBoard, type BoardState } from "../boards.ts";
 import { applyMove, inCheck, legalMoves, pieceAt, toSan } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import type { MoveScore } from "../uci.ts";
-import { bossPowers, from, meterFull, moveSquares, other, powerRoll, testSwitch, to, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
+import { bossPowers, from, meterFull, moveSquares, other, powerRoll, testSwitch, to, turnOf, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
+import { funhouseMoveFrom } from "./boingo.ts";
+
+/**
+ * Hollow's rule set (BossPowerState.hv), set as a battle begins: 2 since Nov 5, 2026 (his 2 x 2 blocks and his 3 x 3 of
+ * the dark). A battle without it (begun before) keeps the single squares only. His solo bulbs are their own switch,
+ * also set as the battle begins (`strand`).
+ */
+export const HOLLOW_RULES = 2;
 
 /** How long each of his moments holds the screen (ms; POWER_FX in boss-timing.ts). The extra move: his banner over the board as it lands. */
-export const HOLLOW_FX = { dark: 2700, extra: 2200 } as const;
+export const HOLLOW_FX = { dark: 2700, darkBlock: 2700, extra: 2200 } as const;
 
 /** Hollow's first cover of the dark holds longer, for his first-cover line ("Don't forget what's there…"). */
 export const DARK_FIRST_EXTRA_MS = 1300;
@@ -79,6 +87,57 @@ export function chooseDark(fen: string, crowd: Side, seed: number, turn: number,
   const pick = (side: Side) => board[side].filter((sq) => !taken.has(sq));
   const pool = pick(mine).length ? pick(mine) : pick(other(mine));
   return pool.length ? pool[Math.floor(powerRoll(seed, "dark", turn) * pool.length)]! : null;
+}
+
+/** The squares of a `size` x `size` block whose corner nearest a1 is `corner` (file by file, a rank at a time). */
+export function blockSquares(corner: string, size: number): string[] {
+  const f0 = corner.charCodeAt(0) - 97;
+  const r0 = Number(corner[1]);
+  const out: string[] = [];
+  for (let r = r0; r < r0 + size; r++) for (let f = f0; f < f0 + size; f++) out.push(`${"abcdefgh"[f]}${r}`);
+  return out;
+}
+
+/**
+ * His block of the dark (Eric, Nov 5: "if you don't know where say the bishop moves to in it, that's just your loss"): a
+ * `size` x `size` block, from the seed, among those wholly on the board that hold neither king (so a king always shows
+ * as it falls, and it can never cover all of a king's escape squares: any block holding a king's neighbors on both sides
+ * holds the king), holding at least `minPieces` pieces (kings aside) when any does, else at least one, else any. Squares
+ * already dark may be in it. Null only on a board with no room (never: a king takes one square of 64).
+ */
+export function chooseDarkBlock(fen: string, size: number, seed: number, turn: number, minPieces: number): { corner: string; squares: string[] } | null {
+  const board = occupied(fen);
+  const pieces = new Set([...board.w, ...board.b]);
+  const all: { corner: string; squares: string[]; n: number }[] = [];
+  for (let f = 0; f + size <= 8; f++)
+    for (let r = 1; r + size <= 9; r++) {
+      const corner = `${"abcdefgh"[f]}${r}`;
+      const squares = blockSquares(corner, size);
+      if (squares.some((sq) => board.kings.includes(sq))) continue;
+      all.push({ corner, squares, n: squares.filter((sq) => pieces.has(sq)).length });
+    }
+  const pool = [all.filter((x) => x.n >= minPieces), all.filter((x) => x.n >= 1), all].find((xs) => xs.length) ?? [];
+  if (!pool.length) return null;
+  const pick = pool[Math.floor(powerRoll(seed, "dark-block", size, turn) * pool.length)]!;
+  return { corner: pick.corner, squares: pick.squares };
+}
+
+/**
+ * The dark with a block added (its squares dark from `turn` through `until`): a square already dark keeps its one entry,
+ * dark until the later of its two ends. Returns the new list and the squares newly dark.
+ */
+export function addDarkBlock(dark: readonly DarkSquare[], squares: readonly string[], turn: number, until: number): { dark: DarkSquare[]; fresh: string[] } {
+  const out = dark.map((d) => (squares.includes(d.square) ? { ...d, until: Math.max(d.until, until) } : d));
+  const fresh = squares.filter((sq) => !dark.some((d) => d.square === sq));
+  return { dark: [...out, ...fresh.map((square) => ({ square, at: turn, until }))], fresh };
+}
+
+/** The blocks due after his `n`th move (rule set 2): his 3 x 3 (once a game) and a 2 x 2, as sizes (`test`: the test switch's on his first). */
+export function blocksAfter(n: number, s: Pick<BossPowerSettings, "darkBlockAt" | "darkBigAt"> = BOSS_POWERS, test?: number): number[] {
+  const out: number[] = [];
+  if (n === s.darkBigAt || (test === 3 && n === 1)) out.push(3);
+  if (s.darkBlockAt.includes(n) || (test === 2 && n === 1)) out.push(2);
+  return out;
 }
 
 /** The dark squares as this crowd turn stands (for the board and the judge of move attempts). */
@@ -261,6 +320,33 @@ export const lightsRate = (t: Pick<LightsTally, "found" | "settled">): number | 
 export const lightsHeld = (t: Pick<LightsTally, "found" | "asked">, s: Pick<BossPowerSettings, "lightsOutHold"> = BOSS_POWERS): boolean =>
   t.asked <= 0 || t.found >= s.lightsOutHold * t.asked - 1e-9;
 
+/** The dark's move for you this crowd turn (Boss alone: the 3rd or 7th bulb went out), picked or still to pick. */
+export const forcedNow = (boss: Pick<BossState, "powers" | "crowdMoves"> | null | undefined) => {
+  const f = boss?.powers?.forced;
+  return f && f.turn === turnOf(boss!) ? f : null;
+};
+
+/** The battle is his: the last of the bulbs went out (Boss alone). */
+export const blackedOut = (boss: Pick<BossState, "powers"> | null | undefined): boolean => !!boss?.powers?.blackout;
+
+/**
+ * The bulb that just went out (the `out`-th) brings the dark's move for you: one of darkBulbForced (3 and 7), short of
+ * the last.
+ */
+export const bulbForces = (out: number, s: Pick<BossPowerSettings, "darkBulbForced" | "darkBulbs"> = BOSS_POWERS) => out < s.darkBulbs && s.darkBulbForced.includes(out);
+
+/**
+ * The dark's move for you (Eric, Nov 5: "forced into a bad move"): from the allowed moves less any that ends the game on
+ * the spot (a mate or a stalemate), funhouseMoveFrom's pick in darkForcedLoss (15 to 30 points against the best, nearest
+ * the middle; never past darkForcedMaxLogit in log-odds; never one whose line lets him force mate; never one that leaves
+ * the queen to be taken unless it takes his; short of the range, the weakest move below it; with nothing else, the best).
+ */
+export async function darkForcedMoveFrom(engine: EngineLike, fen: string, allowed: readonly string[] | null = null): Promise<string> {
+  const all = allowed ? [...allowed] : legalMoves(fen);
+  const open = all.filter((m) => legalMoves(applyMove(fen, m)).length > 0);
+  return funhouseMoveFrom(engine, fen, open.length ? open : all, BOSS_POWERS.darkForcedLoss, BOSS_POWERS.darkForcedMaxLogit);
+}
+
 /** Hollow: squares covered in the dark (their pieces hidden), and Lights out, a memory test, at the start of his turn. */
 export const HOLLOW: BossRules = {
   id: "hollow",
@@ -288,14 +374,41 @@ export const HOLLOW: BossRules = {
         t.events.push({ kind: "dark", turn: t.turn, square, ...(n === 1 ? { first: true as const } : {}) });
       }
     }
+    // His bigger darkness (rule set 2, Eric, Nov 5): a 2 x 2 block now and then, and once a game his 3 x 3.
+    if ((next.hv ?? 0) >= 2)
+      for (const size of blocksAfter(n, t.s, next.blockTest)) {
+        const block = chooseDarkBlock(t.fen, size, t.seed, t.turn, size === 3 ? t.s.darkBigMinPieces : t.s.darkBlockMinPieces);
+        if (!block) continue;
+        const { dark, fresh } = addDarkBlock(next.dark, block.squares, t.turn, t.turn + (size === 3 ? t.s.darkBigTurns : t.s.darkBlockTurns) - 1);
+        next.dark = dark;
+        t.events.push({ kind: "darkBlock", turn: t.turn, square: block.corner, size, squares: fresh });
+      }
     next.bulbs = bulbsAt(t.turn, t.s);
   },
-  // Always Black, from the starting position (no opening moves).
-  opening: { fromStart: true, crowdWhite: true },
+  // Always Black, from the starting position (no opening moves). His rule set as the battle begins, and in Boss alone
+  // his strand of bulbs (settings.hollowBulbs: one player, no crowd).
+  opening: {
+    fromStart: true,
+    crowdWhite: true,
+    setUp: (b) => ({
+      hv: HOLLOW_RULES,
+      ...(b.settings.hollowBulbs && b.state.players.length === 1 ? { strand: { out: Math.max(0, Math.min(BOSS_POWERS.darkBulbs - 1, b.settings.hollowBulbsOut ?? 0)) } } : {}),
+      ...(b.settings.hollowBlockTest ? { blockTest: b.settings.hollowBlockTest } : {}),
+    }),
+  },
+  // The dark plays your move (Boss alone, at the 3rd and 7th bulb): once picked, the only move allowed that turn.
+  crowdFilter(allowed, boss) {
+    const f = forcedNow(boss);
+    return f?.move && allowed.includes(f.move) ? [f.move] : allowed;
+  },
+  // (A move the dark played for you isn't yours: it doesn't count for fair play.)
+  powerTurn: (boss) => !!forcedNow(boss),
   // Squares in the dark, their pieces hidden (the God King's Last Stand sits out).
   altersBoard: (boss) => darkSquares(boss).length > 0,
-  // Each wrong attempt into the dark costs darkTryCost; a turn never costs more than missing it.
+  // Each wrong attempt into the dark costs darkTryCost; a turn never costs more than missing it. (Boss alone, his bulbs
+  // instead: no points.)
   scoreRound(b, players) {
+    if (b.state.boss?.powers?.strand) return;
     const tries = hollowBattle.darkTries(b);
     for (const pl of players) {
       const n = tries[pl.playerId] ?? 0;
@@ -307,6 +420,10 @@ export const HOLLOW: BossRules = {
     cleared: p.cleared ?? [],
     bulbs: p.bulbs ?? bulbsAt(p.turn || 1),
     ...(p.claimed ? { claimed: true } : {}),
+    // (Boss alone: his strand, the dark's move for you, the blackout.)
+    ...(p.strand ? { strand: { out: p.strand.out, of: BOSS_POWERS.darkBulbs } } : {}),
+    ...(p.forced ? { forced: { ...p.forced } } : {}),
+    ...(p.blackout ? { blackout: { ...p.blackout } } : {}),
     lightsAt: p.lightsOut ? p.lightsOut.at : null,
     ...(p.lightsOut?.extra ? { lightsExtra: p.lightsOut.extra } : {}),
     // His lights' colors this battle (looks only): from the seed, 12 bits of it.
@@ -436,20 +553,32 @@ export async function extraMoveFrom(engine: EngineLike, fen: string, cap: number
   return rest.length ? pickExtraMove([...top, ...(await engine.scoreMoves(passed, rest))], before, candidates, cap) : null;
 }
 
+/** A move attempt into the dark, judged (hollowBattle.darkTry). */
+export type DarkTryResult =
+  | { kind: "move"; move: string }
+  | { kind: "wrong"; tries: number; out: boolean; bulbs?: number; forced?: boolean; blackout?: boolean }
+  | { kind: "refused" };
+
 /** His part in the match runner (the runner's darkTry, darkTries, Lights out and extra-move methods hand it over). */
 export const hollowBattle = {
   /**
    * The dark: a move attempt that touches a dark square, sent unchecked. A legal (allowed) move is the player's pick
-   * (`move`: a pawn's move to the last rank without a piece named is a queen's). An illegal one costs darkTryCost off the
-   * turn's score (his scoreRound takes it off), and the player picks again; the darkTries-th wrong one ends their turn
-   * as a missed move (`out`). Anything else (no dark on its way, the move the God King took back): refused, free. Bots
-   * never try: they know the board.
+   * (`move`: a pawn's move to the last rank without a piece named is a queen's). An illegal one is wrong, and the player
+   * picks again:
+   * - in a crowd (and a raid, a party): it costs darkTryCost off the turn's score (his scoreRound takes it off); the
+   *   darkTries-th wrong one ends their turn as a missed move (`out`);
+   * - in Boss alone (his strand, `strand`): it puts a bulb out (`bulbs`: how many are out now), no points; as the 3rd and
+   *   the 7th go out, the dark plays this turn's move for you (`forced`: darkForcedDue, then playDarkForced); as the last
+   *   goes out, the battle is his (`blackout`). Either ends the turn (`out`).
+   * Anything else (no dark on its way, the move the God King took back, a turn the dark already moves for you or the
+   * battle already lost): refused, free. Bots never try: they know the board.
    */
-  darkTry(b: Battle, playerId: string, move: string): { kind: "move"; move: string } | { kind: "wrong"; tries: number; out: boolean } | { kind: "refused" } {
+  darkTry(b: Battle, playerId: string, move: string): DarkTryResult {
     const boss = b.state.boss;
     const p = boss?.powers;
     const board = b.boardOf(playerId);
     if (!boss || !p || !board || typeof move !== "string" || !/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move)) return { kind: "refused" };
+    if (forcedNow(boss) || p.blackout || boss.result) return { kind: "refused" };
     const dark = darkSquares(boss);
     const legal = darkAttempt(board.fen, move);
     if (legal) {
@@ -460,8 +589,47 @@ export const hollowBattle = {
     const round = b.state.round;
     const by = p.tries?.round === round ? { ...p.tries.by } : {};
     by[playerId] = (by[playerId] ?? 0) + 1;
+    if (p.strand) {
+      const out = Math.min(BOSS_POWERS.darkBulbs, p.strand.out + 1);
+      const blackout = out >= BOSS_POWERS.darkBulbs;
+      const forced = bulbForces(out);
+      const turn = turnOf(boss);
+      b.state = {
+        ...b.state,
+        boss: { ...boss, powers: { ...p, tries: { round, by }, strand: { out }, ...(forced ? { forced: { turn, at: out } } : {}), ...(blackout ? { blackout: { turn } } : {}) } },
+      };
+      return { kind: "wrong", tries: by[playerId]!, out: forced || blackout, bulbs: out, ...(forced ? { forced } : {}), ...(blackout ? { blackout } : {}) };
+    }
     b.state = { ...b.state, boss: { ...boss, powers: { ...p, tries: { round, by } } } };
     return { kind: "wrong", tries: by[playerId]!, out: by[playerId]! >= BOSS_POWERS.darkTries };
+  },
+
+  /** The dark is to play your move this turn (Boss alone, a 3rd or 7th bulb out), not yet picked. */
+  darkForcedDue(b: Battle): boolean {
+    const f = forcedNow(b.state.boss);
+    return !!f && !f.move && !b.state.boss!.result;
+  },
+
+  /** The dark's move for you, from this device's engine (darkForcedMoveFrom), set as the turn's only move. */
+  async playDarkForced(b: Battle, engine: EngineLike): Promise<string> {
+    const fen = b.boards.get(b.state.boards[0]!)!.fen;
+    return hollowBattle.applyDarkForced(b, await darkForcedMoveFrom(engine, fen, b.crowdAllowed()));
+  },
+
+  /**
+   * Sets the dark's move for you: the turn's only allowed move from now (his crowdFilter). One that isn't allowed (an
+   * engine's slip) gives way to the first allowed move. Once set it stays (asking again returns it).
+   */
+  applyDarkForced(b: Battle, move: string): string {
+    const boss = b.state.boss!;
+    const f = forcedNow(boss);
+    if (!f) return move;
+    if (f.move) return f.move;
+    const fen = b.boards.get(b.state.boards[0]!)!.fen;
+    const allowed = b.crowdAllowed() ?? legalMoves(fen);
+    const m = allowed.includes(move) ? move : allowed[0]!;
+    b.state = { ...b.state, boss: { ...boss, powers: { ...boss.powers!, forced: { ...f, move: m, san: toSan(fen, m) } } } };
+    return m;
   },
 
   /** The dark: each player's wrong attempts into the dark this round. */

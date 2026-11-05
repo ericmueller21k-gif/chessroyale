@@ -100,6 +100,7 @@ export const POWER_BANNERS: Partial<Record<keyof typeof POWER_FX, readonly (read
   spark: [[0, 1450]],
   candle: [[0, 1500]],
   dark: [[0, 1250]],
+  darkBlock: [[0, 1250]],
   extra: [[0, 1500]],
   block: [[0, 1450]],
   bounce: [[0, 1300]],

@@ -7,6 +7,7 @@ import {
   applyMove,
   botLightsFound,
   botLightsMisses,
+  blockSquares,
   bulbsAt,
   bossIntroTimeline,
   chooseDark,
@@ -148,20 +149,33 @@ describe("Hollow's dark", () => {
     expect(sides.b).toBeGreaterThan(150);
   });
 
-  it("in a battle: each dark square lasts 10 crowd turns (thinning on its last), on its square, never two on one; the rage meter's warning never shows", async () => {
+  it("in a battle: each dark square lasts as long as the longest cover over it (10 turns for a single square, 4 for a 2 x 2 block, 2 for the 3 x 3), on its square, never two on one; the rage meter's warning never shows", async () => {
     const r = raid({ patch: { bossMaxMoves: 40 } });
     const seen = new Map<string, { at: number; until: number }>();
+    // (Each square's end as its covers set it: a single cover's darkTurns, a block's its own; overlapping, the later.)
+    const ends = new Map<string, number>();
+    const blocks: number[] = [];
     let first: string | null = null;
     for (let t = 1; t <= 24 && !r.isOver() && !r.stageComplete(); t++) {
       await turn(r);
       const v = r.bossView()!;
       const p = v.powers!;
       const turnNow = p.turn;
+      for (const [sq, until] of ends) if (until < turnNow) ends.delete(sq);
+      for (const e of p.events) {
+        if (e.kind === "dark") ends.set(e.square!, turnNow + BOSS_POWERS.darkTurns - 1);
+        if (e.kind === "darkBlock") {
+          blocks.push(e.size!);
+          const len = e.size === 3 ? BOSS_POWERS.darkBigTurns : BOSS_POWERS.darkBlockTurns;
+          for (const sq of blockSquares(e.square!, e.size!)) ends.set(sq, Math.max(ends.get(sq) ?? 0, turnNow + len - 1));
+        }
+      }
       for (const d of p.dark!) {
         if (!seen.has(d.square + d.at)) seen.set(d.square + d.at, d);
-        expect(d.until - d.at + 1).toBe(BOSS_POWERS.darkTurns);
+        expect(d.until).toBe(ends.get(d.square));
         expect(turnNow).toBeLessThanOrEqual(d.until);
       }
+      expect(p.dark!.map((d) => d.square).sort()).toEqual([...ends.keys()].sort());
       expect(new Set(p.dark!.map((d) => d.square)).size).toBe(p.dark!.length);
       for (const e of p.events) {
         expect(e.kind).not.toBe("warn");
@@ -178,8 +192,8 @@ describe("Hollow's dark", () => {
         }
       }
       expect(p.bulbs).toBe(bulbsAt(turnNow));
-      // About 4 at once, at most.
-      expect(p.dark!.length).toBeLessThanOrEqual(Math.ceil(BOSS_POWERS.darkTurns / BOSS_POWERS.darkEvery));
+      // About 4 single squares at once, at most, and the blocks' squares.
+      expect(p.dark!.length).toBeLessThanOrEqual(Math.ceil(BOSS_POWERS.darkTurns / BOSS_POWERS.darkEvery) + 4 + 9);
       // The dark doesn't make a turn a power turn for fair play (forgetting is never cheat-like).
       expect(powerTurn(r.boss)).toBe(false);
     }

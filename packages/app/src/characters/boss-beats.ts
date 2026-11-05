@@ -41,6 +41,8 @@ export type Beat =
   // Lights out's verdict as the lights come back (Eric, Oct 10): the crowd held the light, or he moves twice.
   | "lightsHeld"
   | "lightsFailed"
+  // Hollow's taunt on a misplay (a wrong move into the dark, alone or in a crowd; Nov 5), at random, never the same twice running.
+  | "misplay"
   // Big Boy's snack before move 1 (the crowd's pawn, eaten).
   | "snack"
   // Sawyer's split pawn after his first move (that pawn sawn in two).
