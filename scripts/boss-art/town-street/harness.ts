@@ -40,6 +40,7 @@ import { HOUSE_TIMBER, HOUSE_TIMBER_LIGHTS } from "../out/house-timber/house-tim
 import { HOUSE_BLITZ, HOUSE_BLITZ_LIGHTS } from "../out/house-blitz/house-blitz.ts";
 import { ARENA, BOARD, COLISEUM, GARDEN, GRASS, HOME_INFO, LOT, LOTS, N, PAVE, PROPS, ground, wrap, wrapF, type HomeId, type Lot } from "./plan.ts";
 import { bed, bush, facade, hedge, shed, type Facade } from "./facades.ts";
+import { boxOf, type BoxModel, type Mat } from "./box.ts";
 
 const SQ = TOWN_FEEL.housePxPerSquare;
 const BOSS: Partial<Record<HomeId, Character>> = {
@@ -63,6 +64,8 @@ export interface Scene {
   bots?: { x: number; y: number; dark?: boolean }[];
   /** Draw the wrap seam as a dotted line on the ground (c = 0 and r = 0 edges). */
   seam?: boolean;
+  /** The flat fronts only, as the first mockups had them (the before for Eric's comparison). */
+  flat?: boolean;
   /** A caption in the top left (mockups only). */
   caption?: string;
 }
@@ -138,19 +141,30 @@ interface Art {
   glow: HTMLCanvasElement | null;
   /** Where the game writes a home's name on its sign (picture pixels). */
   sign?: { x: number; y: number; w: number; h: number };
+  /** Its walls' material (the box's sides). */
+  mat?: Mat;
 }
+/** The homes' sides (Eric: sides that suit them) and how much a round or pointed one narrows toward its back (1: a straight box). */
+const HOME_MAT: Record<HomeId, Mat> = {
+  gardener: "glass", smudgy: "stone", folio: "paper", alfil: "stone", timber: "log", sawyer: "plank", gingerbread: "ice", grex: "brick",
+  clown: "plaster", tiger: "canvas", bigboy: "siding", blitz: "brick", hopper: "plank", pig: "plank", moo: "plank", hollow: "stone",
+};
+const TAPER: Partial<Record<HomeId, number>> = { alfil: 0.3, gingerbread: 0.55, tiger: 0.5, hollow: 0.45 };
+const designMat = (id: string, v: number): Mat =>
+  id === "townhouse" ? (v % 2 ? "brick" : "plaster") : id === "shop" ? (v % 2 ? "plaster" : "siding") : id === "flats" || id === "block" ? "brick" : id === "bakery" ? "plaster" : id === "tower" ? "stone" : "siding";
 function artOfLot(l: Lot): Art {
   if (l.kind === "home") {
     const id = l.id as HomeId;
     const h = id === "timber" ? { ch: HOUSE_TIMBER, lights: HOUSE_TIMBER_LIGHTS } : id === "blitz" ? { ch: HOUSE_BLITZ, lights: HOUSE_BLITZ_LIGHTS } : HOUSES[id as keyof typeof HOUSES];
     const key = `home-${id}`;
     const sign = id === "timber" || id === "blitz" ? undefined : HOUSES[id as keyof typeof HOUSES].sign;
-    return { key, img: toCanvas(key, h.ch), foot: h.ch.foot, glow: glowOf(key, h.ch, h.lights), sign };
+    return { key, img: toCanvas(key, h.ch), foot: h.ch.foot, glow: glowOf(key, h.ch, h.lights), sign, mat: HOME_MAT[id] };
   }
   const f: Facade = facade(l.id as never, l.w, l.v);
   const key = f.ch.id;
-  return { key, img: toCanvas(key, f.ch), foot: f.ch.foot, glow: glowOf(key, f.ch, f.lights) };
+  return { key, img: toCanvas(key, f.ch), foot: f.ch.foot, glow: glowOf(key, f.ch, f.lights), mat: designMat(l.id, l.v) };
 }
+const boxes = new Map<string, BoxModel>();
 /** A building's back as the near row's cut-away shows it: its silhouette in a darker wall color, cut off `cut` px above its foot, a lit cap on the cut. */
 function backOf(a: Art, cut: number): HTMLCanvasElement {
   const k = `${a.key}#back${cut}`;
@@ -181,66 +195,6 @@ function backOf(a: Art, cut: number): HTMLCanvasElement {
   canv.set(k, c);
   return c;
 }
-/** A corner lot's side wall (on Seam Avenue): a plain wall in the building's colors, a window or two, its roof's edge. */
-function sideOf(a: Art, depthPx: number): Art {
-  const k = `${a.key}#side`;
-  if (canv.has(k)) return { key: k, img: canv.get(k)!, foot: [0, a.foot[1]], glow: canv.get(k + "#glow") ?? null };
-  const src = a.img;
-  const w = src.width, h = src.height;
-  const d = src.getContext("2d")!.getImageData(0, 0, w, h).data;
-  // Its height: the picture's tallest opaque column in its middle half; its wall color as for the back.
-  let top = h;
-  for (let y = 0; y < h && top === h; y++) for (let x = Math.floor(w * 0.25); x < w * 0.75; x++) if (d[(y * w + x) * 4 + 3]! > 200) { top = y; break; }
-  let rs = 0, gs = 0, bs = 0, n = 0;
-  for (let y = Math.floor(h * 0.45); y < h * 0.8; y++) for (let x = 0; x < w; x++) { const o = (y * w + x) * 4; if (d[o + 3]! > 200 && d[o]! + d[o + 1]! + d[o + 2]! > 330) (rs += d[o]!, gs += d[o + 1]!, bs += d[o + 2]!, n++); }
-  const wall = n ? [rs / n, gs / n, bs / n] : [190, 170, 150];
-  const c = document.createElement("canvas");
-  c.width = depthPx;
-  c.height = h;
-  const g = c.getContext("2d")!;
-  const wallTop = top + Math.round((a.foot[1] - top) * 0.28);
-  const col = (m: number) => `rgb(${wall[0]! * m | 0},${wall[1]! * m | 0},${wall[2]! * m | 0})`;
-  g.fillStyle = "#2a2118";
-  g.fillRect(0, wallTop - 1, depthPx, a.foot[1] - wallTop + 2);
-  g.fillStyle = col(0.86);
-  g.fillRect(1, wallTop, depthPx - 2, a.foot[1] - wallTop);
-  // The roof's edge seen from the side: a darker band, a little lighter on top.
-  g.fillStyle = "#2a2118";
-  g.fillRect(0, top + 4, depthPx, wallTop - top - 3);
-  g.fillStyle = "#7a5a48";
-  g.fillRect(1, top + 5, depthPx - 2, wallTop - top - 5);
-  g.fillStyle = "#9a7660";
-  g.fillRect(1, top + 5, depthPx - 2, 2);
-  const lit = document.createElement("canvas");
-  lit.width = depthPx;
-  lit.height = h;
-  const lg = lit.getContext("2d")!;
-  for (let wy = wallTop + 8; wy < a.foot[1] - 22; wy += 26)
-    for (let wx = 10; wx < depthPx - 18; wx += 34) {
-      g.fillStyle = "#2a2118";
-      g.fillRect(wx - 1, wy - 1, 14, 18);
-      g.fillStyle = "#f7f1e3";
-      g.fillRect(wx, wy, 12, 16);
-      g.fillStyle = "#3b4d6b";
-      g.fillRect(wx + 1, wy + 1, 10, 14);
-      g.fillStyle = "#8fb4d9";
-      g.fillRect(wx + 1, wy + 1, 4, 5);
-      lg.fillStyle = "#ffb85c";
-      lg.fillRect(wx + 1, wy + 1, 10, 14);
-    }
-  canv.set(k, c);
-  const glow = document.createElement("canvas");
-  glow.width = depthPx;
-  glow.height = h;
-  const gg = glow.getContext("2d")!;
-  gg.filter = "blur(3px)";
-  gg.drawImage(lit, 0, 0);
-  gg.filter = "none";
-  gg.drawImage(lit, 0, 0);
-  canv.set(k + "#glow", glow);
-  return { key: k, img: c, foot: [0, a.foot[1]], glow };
-}
-
 // ---- The camera, turned.
 const v: View = newView();
 const pt = newPt();
@@ -267,12 +221,14 @@ const rgb = (c: readonly number[]) => `rgb(${c[0]! | 0},${c[1]! | 0},${c[2]! | 0
 
 const sky = new SkyPainter();
 let strips = 0;
+let quads = 0;
+let fillPx = 0;
 interface Item {
   depth: number;
   draw: () => void;
 }
 
-export async function draw(cv: HTMLCanvasElement, s: Scene): Promise<{ figures: { name: string; x0: number; y0: number; x1: number; y1: number }[] }> {
+export async function draw(cv: HTMLCanvasElement, s: Scene): Promise<{ figures: { name: string; x0: number; y0: number; x1: number; y1: number }[]; strips: number; quads: number; fill: number; planes: number }> {
   const DPR = 2;
   cv.width = s.W * DPR;
   cv.height = s.H * DPR;
@@ -293,6 +249,8 @@ export async function draw(cv: HTMLCanvasElement, s: Scene): Promise<{ figures: 
   const lightK = mixLights(s.sky);
   const figures: { name: string; x0: number; y0: number; x1: number; y1: number }[] = [];
   strips = 0;
+  quads = 0;
+  fillPx = 0;
 
   // The sky: the town's own. Its clouds slide as the camera turns (as if you'd walked a long way sideways); the sun stays.
   sky.resize(s.W, s.H, DPR);
@@ -416,7 +374,7 @@ export async function draw(cv: HTMLCanvasElement, s: Scene): Promise<{ figures: 
   const near = (dz: number) => dz < -0.9; // between the camera and you
 
   /** A flat picture standing on the line from (ox, oy) along (ux, uy), facing (nx, ny). */
-  function plane(a: Art, ox: number, oy: number, ux: number, uy: number, nx: number, ny: number, opts: { back?: boolean; cut?: number; name?: string; lots?: boolean } = {}) {
+  function plane(a: Art, ox: number, oy: number, ux: number, uy: number, nx: number, ny: number, opts: { back?: boolean; cut?: number; name?: string; lots?: boolean; shade?: number } = {}) {
     const w = a.img.width;
     // Its origin the nearest way round the wrap from the camera (so a plane never straddles the seam: its strips are offsets from it).
     {
@@ -459,6 +417,11 @@ export async function draw(cv: HTMLCanvasElement, s: Scene): Promise<{ figures: 
             g.globalAlpha = enter;
             g.drawImage(img, i0, 0, STEP, img.height, x0, y0, ww, hh);
             strips++;
+            fillPx += ww * hh;
+            if (opts.shade) {
+              g.globalAlpha = enter * opts.shade;
+              g.drawImage(silhouette(a.key, img, "#1a1410"), i0, 0, STEP, img.height, x0, y0, ww, hh);
+            }
             const hz = Math.min(1, Math.max(0, hazeMix(v, dxm, dzm, mist)));
             if (hz > 0.01) {
               g.globalAlpha = enter * hz;
@@ -549,6 +512,137 @@ export async function draw(cv: HTMLCanvasElement, s: Scene): Promise<{ figures: 
     }
   }
 
+  /**
+   * A building's depth (box.ts): its two sides (shaded as the town is lit: from the top left, the side turned left lit,
+   * the other darker), its roof top carried back over the depth, the narrow things on its roof standing up as little boxes.
+   * The front's line runs from (ox, oy) along (ux, uy); (bx, by) points back from the street; D squares deep; `taper` how
+   * much it narrows toward its back.
+   */
+  function box(a: Art, ox: number, oy: number, ux: number, uy: number, bx: number, by: number, D: number, taper: number) {
+    const key = a.key;
+    let m = boxes.get(key);
+    if (!m) boxes.set(key, (m = boxOf(a.img, a.foot, a.mat ?? "plaster", Math.round(D * SQ), a.key.startsWith("home-") ? 40 : 24)));
+    const M = m;
+    {
+      const mx0 = ox + (ux * a.img.width) / 2 / SQ, my0 = oy + (uy * a.img.width) / 2 / SQ;
+      ox += camX + wrapF(mx0 - camX) - mx0;
+      oy += camY + wrapF(my0 - camY) - my0;
+    }
+    const cxp = (M.x0 + M.x1) / 2;
+    const W = (x: number, t: number): [number, number] => {
+      const xx = cxp + (x - cxp) * (1 - t * (1 - taper));
+      return [ox + (ux * xx) / SQ + bx * t * D, oy + (uy * xx) / SQ + by * t * D];
+    };
+    const mid = P(...W(cxp, 0.5));
+    if (!mid) return;
+    const front = P(...W(cxp, 0));
+    if (!front || near(front.dz)) return;
+    const camRight = [cs, -sn];
+    const shadeOf = (nx: number, ny: number) => (nx * camRight[0]! + ny * camRight[1]! < 0 ? 0.05 : 0.3);
+    // The sides: left from its back corner to its front (its trim at the front), right from its front corner back.
+    const side = (from: [number, number], to: [number, number], img: HTMLCanvasElement, glow: HTMLCanvasElement, hgt: number, nx: number, ny: number, tag: string) => {
+      const L = Math.hypot(to[0] - from[0], to[1] - from[1]);
+      const k = L / (img.width / SQ);
+      const sa: Art = { key: `${key}#${tag}`, img, foot: [0, hgt], glow };
+      plane(sa, from[0], from[1], ((to[0] - from[0]) / L) * k, ((to[1] - from[1]) / L) * k, nx, ny, { shade: shadeOf(nx, ny) });
+    };
+    side(W(M.x0, 1), W(M.x0, 0), M.left.img, M.left.glow, M.left.h, -ux, -uy, "L");
+    side(W(M.x1, 0), W(M.x1, 1), M.right.img, M.right.glow, M.right.h, ux, uy, "R");
+    // The roof top: the roof line carried back, a quad per few columns per row of shingles.
+    const Q = (x: number, t: number, hp: number) => {
+      const [wx, wy] = W(x, t);
+      const p = P(wx, wy);
+      if (!p) return null;
+      return { x: p.x, y: p.y - (hp * p.k) / SQ, dx: p.dx, dz: p.dz };
+    };
+    const quad = (pts: ({ x: number; y: number; dx: number; dz: number } | null)[], c: readonly number[], mul: number) => {
+      if (pts.some((p) => !p)) return;
+      const q = pts as { x: number; y: number; dx: number; dz: number }[];
+      const dzm = q.reduce((s2, p) => s2 + p.dz, 0) / q.length, dxm = q.reduce((s2, p) => s2 + p.dx, 0) / q.length;
+      if (q.some((p) => near(p.dz) || p.dz < -v.back + 0.6)) return;
+      // (A quad split by the wrap: its corners far apart in the camera's frame.)
+      if (Math.max(...q.map((p) => p.dx)) - Math.min(...q.map((p) => p.dx)) > 6 || Math.max(...q.map((p) => p.dz)) - Math.min(...q.map((p) => p.dz)) > 6) return;
+      const e = enterOf(v, dxm, dzm);
+      if (e <= 0) return;
+      let area = 0;
+      for (let i = 0; i < q.length; i++) area += q[i]!.x * q[(i + 1) % q.length]!.y - q[(i + 1) % q.length]!.x * q[i]!.y;
+      if (area >= 0) return; // (seen from below, or edge on)
+      const hz = Math.min(1, Math.max(0, hazeMix(v, dxm, dzm, mist)));
+      const col = mix(c.map((x) => Math.min(255, x * mul)), skyh, hz);
+      quads++;
+      fillPx += -area / 2;
+      g.globalAlpha = e;
+      g.fillStyle = rgb(col);
+      g.strokeStyle = rgb(col);
+      g.lineWidth = 0.7;
+      g.beginPath();
+      q.forEach((p, i) => (i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)));
+      g.closePath();
+      g.fill();
+      g.stroke();
+      g.globalAlpha = 1;
+    };
+    const STEPX = 3;
+    const ROWS = [0, 0.2, 0.4, 0.6, 0.8, 1];
+    items.push({
+      depth: mid.depth,
+      draw: () => {
+        for (let x = M.x0; x < M.x1; x += STEPX) {
+          const x2 = Math.min(M.x1, x + STEPX);
+          const h1 = M.h[x]!, h2 = M.h[x2]!;
+          const slope = h2 - h1;
+          const mul = slope > 0.5 ? 1.08 : slope < -0.5 ? 0.84 : 0.97;
+          for (let i = 0; i + 1 < ROWS.length; i++) {
+            const t0 = ROWS[i]!, t1 = ROWS[i + 1]!;
+            quad([Q(x, t0, h1), Q(x2, t0, h2), Q(x2, t1, h2), Q(x, t1, h1)], M.roof[x]!, mul * (i % 2 ? 0.93 : 1));
+          }
+        }
+        // Its outline: the back edge and the two sides' tops; a parapet's light rim on a flat roof.
+        const edge = (pts: ({ x: number; y: number; dx: number; dz: number } | null)[], color: string, lw: number) => {
+          if (enterOf(v, mid.dx, mid.dz) < 0.6) return;
+          const q = pts.filter((p) => p && !near(p.dz) && p.dz > -v.back + 0.6) as { x: number; y: number; dx: number }[];
+          if (q.length && Math.max(...q.map((p) => p.dx)) - Math.min(...q.map((p) => p.dx)) > 8) return;
+          if (q.length < 2) return;
+          g.strokeStyle = color;
+          g.lineWidth = lw;
+          g.beginPath();
+          q.forEach((p, i) => (i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)));
+          g.stroke();
+        };
+        const back: ReturnType<typeof Q>[] = [];
+        for (let x = M.x0; x <= M.x1; x += STEPX) back.push(Q(x, 1, M.h[x]!));
+        const ink = `rgba(42,33,24,${(1 - Math.min(1, hazeMix(v, mid.dx, mid.dz, mist))).toFixed(2)})`;
+        edge(back, ink, 1.2);
+        edge(ROWS.map((t) => Q(M.x0, t, M.h[M.x0]!)), ink, 1.2);
+        edge(ROWS.map((t) => Q(M.x1, t, M.h[M.x1]!)), ink, 1.2);
+        if (M.flat) {
+          const rim: ReturnType<typeof Q>[] = [Q(M.x0 + 2, 0.05, M.h[M.x0 + 2]!), Q(M.x0 + 2, 0.95, M.h[M.x0 + 2]!), Q(M.x1 - 2, 0.95, M.h[M.x1 - 2]!), Q(M.x1 - 2, 0.05, M.h[M.x1 - 2]!)];
+          edge(rim, "rgba(247,241,227,0.9)", 1.6);
+        }
+      },
+    });
+    // The narrow things on the roof (chimneys, tanks): little boxes as deep as about a third of a square, behind the front.
+    for (const sp of M.spikes) {
+      const tb = Math.min(0.9, 0.4 / D);
+      const smid = P(...W((sp.x0 + sp.x1) / 2, tb / 2));
+      if (!smid) continue;
+      items.push({
+        depth: smid.depth - 0.02,
+        draw: () => {
+          for (let x = sp.x0; x < sp.x1; x += 2) {
+            const x2 = Math.min(sp.x1, x + 2);
+            quad([Q(x, 0, M.raw[x]!), Q(x2, 0, M.raw[x2]!), Q(x2, tb, M.raw[x2]!), Q(x, tb, M.raw[x]!)], sp.color, 1.05);
+          }
+          for (const [x, lit] of [[sp.x0, true], [sp.x1, false]] as const) {
+            const pts = [Q(x, 0, M.h[x]!), Q(x, tb, M.h[x]!), Q(x, tb, M.raw[x]!), Q(x, 0, M.raw[x]!)];
+            const pp = lit ? pts : [pts[1]!, pts[0]!, pts[3]!, pts[2]!];
+            quad(pp, sp.color, lit ? 0.92 : 0.7);
+          }
+        },
+      });
+    }
+  }
+
   // The lots: fronts on their front lines (a home's half a square back, so its yard stays off the sidewalk).
   const lots = [...LOTS, ...(s.nearRow ?? [])];
   for (const l of lots) {
@@ -563,13 +657,16 @@ export async function draw(cv: HTMLCanvasElement, s: Scene): Promise<{ figures: 
       if (s.near === "cut") plane(a, cx + w / 2, fy, -1, 0, 0, 1, { back: true, cut: 30 });
       continue;
     }
+    const D = l.d - inset - 0.25;
+    const taper = l.kind === "home" ? (TAPER[l.id as HomeId] ?? 1) : 1;
     if (l.facing === "S") {
       const cx = l.c0 + l.w / 2 - 0.5;
       plane(a, cx - w / 2, l.r0 - 0.5 + inset, 1, 0, 0, -1, { name });
-      if (l.side) plane(sideOf(a, l.d * SQ), l.c0 - 0.5, l.r0 - 0.5 + l.d, 0, -1, -1, 0, {});
+      if (s.flat !== true) box(a, cx - w / 2, l.r0 - 0.5 + inset, 1, 0, 0, 1, D, taper);
     } else {
       const cy = l.r0 + l.w / 2 - 0.5;
       plane(a, l.c0 - 0.5 + inset, cy + w / 2, 0, -1, -1, 0, { name });
+      if (s.flat !== true) box(a, l.c0 - 0.5 + inset, cy + w / 2, 0, -1, 1, 0, D, taper);
     }
   }
   // The Colosseum: its front on its ground's front edge (r 27.5), its statues on its apron (in its picture, as the game does).
@@ -744,7 +841,7 @@ export async function draw(cv: HTMLCanvasElement, s: Scene): Promise<{ figures: 
   g.globalAlpha = 1;
   for (const t of tags) t();
   if (s.caption) caption(g, s.caption, s.W);
-  return { figures, strips, planes: items.length };
+  return { figures, strips, quads, fill: Math.round(fillPx / (s.W * s.H) * 100) / 100, planes: items.length };
 }
 
 const PAWN = new Path2D("m 22.5,9 c -2.21,0 -4,1.79 -4,4 0,0.89 0.29,1.71 0.78,2.38 C 17.33,16.5 16,18.59 16,21 c 0,2.03 0.94,3.84 2.41,5.03 C 15.41,27.09 11,31.58 11,39.5 H 34 C 34,31.58 29.59,27.09 26.59,26.03 28.06,24.84 29,23.03 29,21 29,18.59 27.67,16.5 25.72,15.38 26.21,14.71 26.5,13.89 26.5,13 c 0,-2.21 -1.79,-4 -4,-4 z");

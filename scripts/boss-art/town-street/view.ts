@@ -31,11 +31,11 @@ export async function shoot(jobs: { file: string; scene: Record<string, unknown>
       const res = (await page.evaluate(async (scene) => {
         const t = (window as unknown as { townStreet: { draw: (c: HTMLCanvasElement, s: unknown) => Promise<unknown> } }).townStreet;
         return t.draw(document.getElementById("c") as HTMLCanvasElement, scene);
-      }, job.scene)) as { figures: { name: string; x0: number; y0: number; x1: number; y1: number }[]; strips: number; planes: number };
+      }, job.scene)) as { figures: { name: string; x0: number; y0: number; x1: number; y1: number }[]; strips: number; quads: number; fill: number; planes: number };
       await page.locator("#c").screenshot({ path: resolve(dir, job.file) });
       await page.close();
       const cut = res.figures.filter((f) => f.x0 < 0 || f.y0 < 0 || f.x1 > s.W || f.y1 > s.H);
-      console.log(`wrote ${job.file} (${res.strips} front strips, ${res.planes} things)${cut.length ? `  CUT OFF: ${cut.map((f) => f.name).join(", ")}` : ""}`);
+      console.log(`wrote ${job.file} (${res.strips} wall strips, ${res.quads} roof quads, buildings fill ${res.fill} screens, ${res.planes} things)${cut.length ? `  CUT OFF: ${cut.map((f) => f.name).join(", ")}` : ""}`);
       if (process.env.CHECK) for (const f of res.figures) console.log(`   ${f.name}: ${f.x0.toFixed(0)},${f.y0.toFixed(0)} - ${f.x1.toFixed(0)},${f.y1.toFixed(0)}`);
     }
   } finally {

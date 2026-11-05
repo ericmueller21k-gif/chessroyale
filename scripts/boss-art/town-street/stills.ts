@@ -53,6 +53,8 @@ for (const [dev, box] of [["phone", PHONE], ["computer", PC]] as const) {
   jobs.push({ file: `2-street-day-${dev}.png`, scene: { ...box, ...street[dev], sky: DAY } });
   jobs.push({ file: `3-street-sunset-${dev}.png`, scene: { ...box, ...street[dev], sky: DUSK } });
   for (const t of turn) jobs.push({ file: `4-turn-${t.tag}-${dev}.png`, scene: { ...box, ...t, near: "open", sky: DAY } });
+  for (const t of turn) jobs.push({ file: `4-turn-${t.tag}-dusk-${dev}.png`, scene: { ...box, ...t, near: "open", sky: DUSK } });
+  jobs.push({ file: `4-turn-mid-flat-${dev}.png`, scene: { ...box, ...turn[1]!, near: "open", sky: DAY, flat: true } });
   jobs.push({ file: `5-near-open-${dev}.png`, scene: { ...box, ...street[dev], sky: DAY } });
   jobs.push({ file: `5-near-cut-${dev}.png`, scene: { ...box, ...street[dev], near: "cut", nearRow, sky: DAY } });
   jobs.push({ file: `6-seam-${dev}.png`, scene: { ...box, ...seam, sky: DAY } });
@@ -62,6 +64,19 @@ for (const [dev, box] of [["phone", PHONE], ["computer", PC]] as const) {
 async function sheet(file: string, title: string, cells: { img: string; cap: string }[], cellW: number) {
   const imgs = cells.map((c) => `<figure><img src="data:image/png;base64,${readFileSync(resolve(OUT, c.img)).toString("base64")}" style="width:${cellW}px"><figcaption>${c.cap}</figcaption></figure>`).join("");
   const html = `<html><body style="margin:0;background:#f4efe4;font-family:Archivo,Arial,sans-serif;color:#2a2a2a"><div id=s style="display:inline-block;padding:20px 24px"><h1 style="font-size:22px;margin:0 0 4px">${title}</h1><div style="display:flex;gap:18px;align-items:flex-start">${imgs}</div></div><style>figure{margin:0}figcaption{font-size:14px;line-height:1.35;margin-top:8px;max-width:${cellW}px}img{display:block;border-radius:6px;box-shadow:0 1px 4px #0003}</style></body></html>`;
+  const browser = await chromium.launch(existsSync(chromium.executablePath()) ? {} : { executablePath: "/opt/pw-browsers/chromium", args: ["--headless", "--no-sandbox"] });
+  const page = await browser.newPage({ viewport: { width: 400, height: 300 }, deviceScaleFactor: 1 });
+  await page.setContent(html);
+  await page.locator("#s").screenshot({ path: resolve(OUT, file) });
+  await browser.close();
+  console.log(`wrote ${file}`);
+}
+
+/** A part of a still (CSS pixels: x, y, w, h of the frame) blown up 2x, nearest neighbour, under a title. */
+async function closeup(file: string, title: string, src: string, x: number, y: number, w: number, h: number) {
+  const data = readFileSync(resolve(OUT, src)).toString("base64");
+  // (The stills are saved at 2 device pixels a CSS pixel, so 2x of the frame is the saved pixels 1:1... shown at 2x of CSS size.)
+  const html = `<html><body style="margin:0;background:#f4efe4;font-family:Archivo,Arial,sans-serif;color:#2a2a2a"><div id=s style="display:inline-block;padding:20px 24px"><h1 style="font-size:22px;margin:0 0 10px">${title}</h1><div style="width:${w * 2}px;height:${h * 2}px;overflow:hidden;border-radius:6px;box-shadow:0 1px 4px #0003"><img src="data:image/png;base64,${data}" style="display:block;image-rendering:pixelated;width:${1440 * 2}px;margin-left:${-x * 2}px;margin-top:${-y * 2}px"></div></div></body></html>`;
   const browser = await chromium.launch(existsSync(chromium.executablePath()) ? {} : { executablePath: "/opt/pw-browsers/chromium", args: ["--headless", "--no-sandbox"] });
   const page = await browser.newPage({ viewport: { width: 400, height: 300 }, deviceScaleFactor: 1 });
   await page.setContent(html);
@@ -83,6 +98,22 @@ if (!only || only === "sheets") {
     { img: "4-turn-mid-computer.png", cap: "Mid-turn: facing north-east." },
     { img: "4-turn-after-computer.png", cap: "After: Seam Avenue, facing east." },
   ], 720);
+  await sheet("4-turn-dusk-phone.png", "The same turn at dusk (phone)", [
+    { img: "4-turn-before-dusk-phone.png", cap: "Before: Seam Street, facing north." },
+    { img: "4-turn-mid-dusk-phone.png", cap: "Mid-turn: the sides take the dusk light and tint like the fronts; their windows light up too." },
+    { img: "4-turn-after-dusk-phone.png", cap: "After: Seam Avenue, facing east." },
+  ], 390);
+  await sheet("4-turn-dusk-computer.png", "The same turn at dusk (computer)", [
+    { img: "4-turn-before-dusk-computer.png", cap: "Before." },
+    { img: "4-turn-mid-dusk-computer.png", cap: "Mid-turn." },
+    { img: "4-turn-after-dusk-computer.png", cap: "After." },
+  ], 720);
+  await sheet("4-turn-flat-vs-box-phone.png", "Mid-turn, flat fronts (Eric's comment) and the buildings as boxes (phone)", [
+    { img: "4-turn-mid-flat-phone.png", cap: "Before the fix: each building one flat front; at 45 degrees you can see they're cut-outs." },
+    { img: "4-turn-mid-phone.png", cap: "Now: each building a box: its front, side walls in its own material with its windows and trim carried round, its roof carried back, shaded as the town is lit." },
+  ], 390);
+  await closeup("4-turn-mid-closeup-2x.png", "Mid-turn close-up at 2x (computer frame): the corner bakery at the crossing, its side and roof", "4-turn-mid-computer.png", 360, 60, 560, 420);
+  await closeup("4-turn-mid-dusk-closeup-2x.png", "Mid-turn close-up at 2x, at dusk", "4-turn-mid-dusk-computer.png", 360, 60, 560, 420);
   await sheet("5-near-phone.png", "The near side of a street: two options (phone, Seam Street)", [
     { img: "5-near-open-phone.png", cap: "A. No near row (recommended): the near side is the back gardens of the next street's row: a hedge, flower beds, bushes, a shed. Nothing tall, nothing to draw from behind." },
     { img: "5-near-cut-phone.png", cap: "B. A near row, cut away: buildings on both sides, the near ones drawn as their backs cut off at knee height (a dollhouse cut)." },

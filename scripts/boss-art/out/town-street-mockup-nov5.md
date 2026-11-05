@@ -11,6 +11,11 @@ npx tsx scripts/boss-art/town-street/stills.ts            # every still and shee
 npx tsx scripts/boss-art/town-street/plan-map.ts scripts/boss-art/out/town-street/0-plan.png
 ```
 
+**Update (Nov 5, after Eric's look):** Eric agreed the one-sided streets, the near side and the Colosseum. His one problem,
+"the corner screenshot you can clearly see the houses are flat", is fixed: every building is now a box (its front, side
+walls and a roof top carried back over its lot's depth), and every still was drawn again with the boxes. See
+[Depth](#depth-every-building-is-a-box-nov-5-update) below.
+
 ## The stills (`scripts/boss-art/out/town-street/`)
 
 | File | What it shows |
@@ -19,7 +24,10 @@ npx tsx scripts/boss-art/town-street/plan-map.ts scripts/boss-art/out/town-stree
 | `1-park-phone.png`, `1-park-computer.png` | In the park, just south of the fountain, looking north up the promenade: the new east-west walk crossing at the fountain, the tables tucked into the lawns' corners by the walks, the plaza, and the Colosseum beyond (drawn from afar, sunk behind the curve, as the game does today). Bots at two tables. |
 | `2-street-day-phone.png`, `2-street-day-computer.png` | On Seam Street (the Gallery), by day: the fronts wall to wall (bakery, townhouse, Puddles' Botanical Garden, skinny houses, shop, Smudgy's Art Gallery on the computer), the bigger buildings behind them (blocks with water tanks, a clock tower), the sky over the rooftops. Puddles out on the sidewalk by her home (and Smudgy by his, on the computer). |
 | `3-street-sunset-*.png` | The same at dusk: the town's own dusk sky and tint, the windows, shop fronts and lamps lit. |
-| `4-turn-phone.png`, `4-turn-computer.png` (and the frames `4-turn-before/mid/after-*.png`) | Walking west on Seam Street and turning north onto Seam Avenue at the crossing: before (facing north), mid-turn (north-east), after (facing east, at the avenue's fronts). The camera still follows you; the fronts foreshorten as it swings, people and lamps keep facing you. |
+| `4-turn-phone.png`, `4-turn-computer.png` (and the frames `4-turn-before/mid/after-*.png`) | Walking west on Seam Street and turning north onto Seam Avenue at the crossing: before (facing north), mid-turn (north-east), after (facing east, at the avenue's fronts). The camera still follows you; the buildings are boxes, so mid-turn you see the corner bakery's side and roof, and the taller ones behind show theirs; people and lamps keep facing you. |
+| `4-turn-dusk-phone.png`, `4-turn-dusk-computer.png` (frames `4-turn-*-dusk-*.png`) | The same turn at dusk: the sides take the dusk tint like the fronts, their windows light up. |
+| `4-turn-mid-closeup-2x.png`, `4-turn-mid-dusk-closeup-2x.png` | The mid-turn computer frame blown up 2x round the corner bakery: its plaster side with the front's window rows and string course carried round, its corner trim, its gabled roof carried back; the brick flats beside it, their tank on the roof. By day and at dusk. |
+| `4-turn-flat-vs-box-phone.png` (and `4-turn-mid-flat-*.png`) | Mid-turn on the phone, the flat fronts Eric saw beside the boxes. |
 | `5-near-phone.png`, `5-near-computer.png` (and `5-near-open-*`, `5-near-cut-*`) | The near side of a street, two ways, side by side: A, no near row (back gardens); B, a near row cut away low. |
 | `6-seam-phone.png`, `6-seam-computer.png` | Standing on the corner where both seams cross (Seam Street meets Seam Avenue). The white dotted lines are drawn on only to show where the seams are: in the game nothing shows. |
 | `7-everyday-buildings.png` | The sheet of everyday buildings: eight rough fronts, each in two colors, then Seam Street's west row as the plan has it, wall to wall, with the bigger buildings behind. |
@@ -70,14 +78,52 @@ No more angles and no 3D build. The plan keeps every view of it front on:
   The mid-turn frame is that halfway point (45 degrees).
 - Turning north from westbound Seam Street keeps you running the same way on the screen (left), which is the turn that
   feels best; turning the other way flips which way you run on the screen, as walking round a real corner would.
-- The fronts are flat pictures standing in the world on their lot's front line (not billboards turned to face the
-  camera), so as the camera swings they foreshorten like walls; people, trees and lamps stay billboards, as today.
+- The buildings are boxes standing in the world on their lots (not billboards turned to face the camera), so as the camera
+  swings you see round their corners: fronts, sides and roofs, as real buildings would show. People, trees and lamps stay
+  billboards, as today.
 - The sky is a backdrop: the clouds slide across it as the camera turns, so the turn reads, but the sun stays where it is,
   so the sunset is always in view whichever way the street faces.
 - The hedges along a street's edge are billboards in the mockup, so mid-turn they look stepped (`4-turn-mid-*`). A build
   would stand them up as planes too, like the fronts.
 
-### The seam
+### Depth: every building is a box (Nov 5 update)
+
+Each building is made into a box from its own front picture (`town-street/box.ts`), worked out once per picture:
+
+- **Its body:** the picture's tall columns; fences, signs and yard bits in front stay on the front only.
+- **Its sides:** walls the depth of its lot (2.3 squares for a boss home, 2.6 for an everyday one, 2.4 for the bigger ones
+  behind), as tall as the front at that edge. Each is in the front's own wall color (sampled by the edge) and its material:
+  brick, siding, plaster, stone, logs, planks, glass or ice. The front's window rows and trim bands are carried round the
+  corner (found from the front's own glass and trim pixels; a row a floor where it has none), with a corner trim at the
+  front edge. Windows light at dusk like the front's. The boss homes' sides suit them:
+  - glass: Puddles' glasshouse
+  - stone: Smudgy's gallery, Alfil's pyramid, Hollow Peak
+  - logs: Timber's lodge
+  - planks: Sawyer, Wrangler, Moo & Moon, Chub & Chirp
+  - ice: Ginger's igloo
+  - brick: Jefferson, Dash
+  - siding: Big Boy
+  - canvas: Babur's tent
+  - plaster: Boingo
+  - paper: Folio
+- **Its roof:** the front's roof line carried back over the depth, each column in the front's roof color there, in rows like
+  shingles. A gable front gets a roof whose ridge runs back. A flat roof gets a parapet's light rim. Narrow things standing
+  out of the roof line (chimneys, water tanks, a dormer) stand up as little boxes of their own, about a third of a square
+  deep. The round and pointed homes (the pyramid, the igloo, the circus tent, Hollow Peak) narrow toward the back instead of
+  running straight.
+- **Lit as the town is:** light from the top left. The side turned to the screen's left is lit, the other about a third
+  darker, and roof slopes facing up-left a little lighter than those facing up-right. The dusk tint, the haze and the
+  lights fall on the sides and roofs as on the fronts (`4-turn-dusk-*`).
+- **Wall to wall:** neighbours hide each other's sides: each face is sorted by its own depth, so a side tucked against the
+  next front is drawn first and covered. What shows is what would show in a real street:
+  - the ends of rows and the corner buildings at the crossings (the bakery on Seam Street's corner, `4-turn-mid-*`)
+  - the bigger buildings behind, over the rooftops
+  - a recessed boss home's neighbours' sides
+- **Seen straight on,** on a street, the boxes look as the fronts did (`2-street-*`), with a sliver of roof over each
+  and the sides of the taller buildings behind. They only really show while turning, and at the crossings.
+- **Still flat:** the Colosseum is still one picture (it's only ever seen front on). Trees, lamps and people are still
+  billboards.
+
 
 The wrap stays, and nothing shows when you cross it (`6-seam-*.png`): the world was already a wrapped one, and now the
 seams carry streets, so walking off one side is just walking down Seam Street or Seam Avenue. Stopping the camera at the
@@ -118,8 +164,12 @@ between and over the lower ones. If Eric wants sky over every roof on the comput
 
 ## What's rough or a stand-in
 
-- The everyday fronts are rough (drawn by code, to be drawn properly once Eric picks), and so are the side walls on Seam
-  Avenue's corners, the hedges, beds, bushes and sheds.
+- The everyday fronts are rough (drawn by code, to be drawn properly once Eric picks), and so are the hedges, beds,
+  bushes and sheds.
+- The sides and roofs are worked out from each front automatically, so they are rough too, most of all on the odd-shaped
+  homes. A box's roof is its front's roof line carried straight back, so a funhouse's or a tent's top is a guess. A build
+  would give each home its own side and roof art, or at least its roof's shape (ridge points), and the everyday designs
+  their sides drawn by hand.
 - The chess tables' tops are a plain stand-in (the slab and the board's squares, no pieces). Names are in Arial (the
   game's Archivo Black isn't installed here). Timber's and Dash's homes are the drafts from `out/house-timber` and
   `out/house-blitz` (no sign text).
@@ -134,23 +184,49 @@ between and over the lower ones. If Eric wants sky over every roof on the comput
 2. **The camera turning** (`camera.ts`): a heading; every projection turns world squares into the camera's frame first
    (`harness.ts` `rel`); the ground's square scan becomes a turned one; taps (`pickSquare`) and arrow keys go through the
    heading too; the heading zones and the eased turn (new numbers in `feel.ts`).
-3. **Flat fronts in the world** (`render.ts`): each building drawn as upright slices on its front line (so it follows the
-   curve and foreshortens), its lights and haze the same way; the near-side rule (no buildings drawn between the camera and
-   you; tall props fade); the Colosseum's far drawing only facing north.
-4. **The art**: the eight everyday designs drawn properly, with color variants; corner side walls; hedges and the garden
-   things; Timber's and Dash's homes wired in.
+3. **Buildings as boxes** (`render.ts`):
+   - each front drawn as a few upright slices on its front line (so it follows the curve and foreshortens), and its two
+     sides the same way;
+   - its roof as a handful of quads (one per roof facet: a gable is two, a flat roof one, plus its chimneys and tanks);
+   - each face sorted by its own depth, its lights and haze laid the same way;
+   - a side that a neighbour at least as tall covers is skipped altogether (the plan knows the neighbours);
+   - the near-side rule: no buildings drawn between the camera and you, and tall props fade;
+   - the Colosseum's far drawing only facing north.
+4. **The art:**
+   - the eight everyday designs drawn properly, with color variants, each with its side (a strip per material, tinted:
+     brick, siding, plaster, stone, the bigger blocks) and its roof's shape;
+   - each boss home's side and roof shape;
+   - hedges and the garden things;
+   - Timber's and Dash's homes wired in.
 5. **Tests**: the e2e and unit tests that know today's map (the start square, the lamp ahead on your left, the tables).
 
 ## What could hurt the frame rate
 
-- **The front slices.** The mockup draws each front in 2-pixel slices: about 400 to 580 slices a frame on the phone and
-  650 to 1,000 on the computer (`stills.ts` prints the counts), and twice that where the haze lays its wash. That is fine
-  in the town's WebGL painter (one batch of quads) but too many for the 2D fallback on an older phone. A build needs far
-  fewer: on a straight street the curve is gentle, so 4 to 8 slices a front (100 to 200 a frame) look the same, more only
-  while the camera turns.
-- **The lights at dusk and night** double the slices for every lit front; baking each front's glow into a second texture
-  (as `bakeGlow` does now) keeps that one more draw per slice.
-- **More things on screen**: about 80 to 100 things a frame on the phone and 130 to 170 on the computer, against today's
-  open board (the gardens' props are most of them). They're all small, but they're sorted every frame.
-- **The cut-away near row (B)** adds 30 to 60% more slices; the recommended option (A) draws nothing there.
+What the mockup draws (`stills.ts` prints it for every still: wall strips, roof quads, and how many screens' worth of
+pixels the buildings paint):
+
+| Frame | Flat fronts | Boxes |
+| --- | --- | --- |
+| Mid-turn, phone | 407 strips, 0.28 screens | 779 strips + 1,195 roof quads, 0.61 screens |
+| Mid-turn, computer | 600 strips, 0.43 screens | 1,041 strips + 1,629 roof quads, 0.77 screens |
+| Seam Street, phone | 532 strips | 1,010 strips + 1,864 roof quads, 0.81 screens |
+| Seam Street, computer | 1,014 strips | 1,832 strips + 2,954 roof quads, 1.42 screens |
+| Before the turn, computer (the most) | 1,009 strips | 1,862 strips + 3,149 roof quads, 1.59 screens |
+
+- **Boxes cost about twice the flat fronts' fill**: the sides and roofs behind the fronts are painted, and most are then
+  covered. That is about 0.6 to 1 screen of building pixels a frame on the phone and 0.8 to 1.6 on the computer, before the
+  shade and haze washes. Fill like that is cheap on the GPU (WebGL). The 2D fallback should cope with that much fill, but I haven't measured it on a phone.
+- **The draw count is what matters.** The mockup draws 2-pixel wall strips and a roof quad every 3 pixels by 5 rows:
+  2,000 to 5,000 draws a frame. That's fine to make stills, and probably fine in WebGL as one batch, but far too many for
+  the 2D fallback.
+- **A build needs about 15 draws a building instead:** 4 to 8 slices a front, 1 or 2 a side, and 1 to 6 roof quads (a
+  roof facet each, its shingle rows in its texture). Skipping the sides a neighbour covers removes most side draws. About
+  25 buildings in view comes to roughly 300 to 400 draws a frame. That should be within the 2D fallback's reach (a side or a roof facet is
+  one transformed image or one fill; not measured on a real phone), and the WebGL painter's easily. While the camera turns, the slices could double for
+  smoothness.
+- **The lights at dusk and night** add one more draw per lit face (its glow baked into a second texture, as `bakeGlow`
+  does now).
+- **More things on screen**: 130 to 220 things a frame with the boxes' faces sorted with the props and people (today's
+  open board has far fewer). Sorting a few hundred items a frame is cheap.
+- **The cut-away near row (option B)** would add 30 to 60% more wall draws; the recommended option A draws nothing there.
 - The sky and the ground cost what they do today.
