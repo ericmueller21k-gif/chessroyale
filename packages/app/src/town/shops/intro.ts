@@ -342,6 +342,18 @@ const scaled = (src: HTMLCanvasElement, k: number, flip = false): HTMLCanvasElem
   return c;
 };
 
+/** A picture cut to its drawn pixels (alpha over 40, as the art's mockup lays a flat sheet: its own size, not its frame's). */
+const trimmed = (src: HTMLCanvasElement): HTMLCanvasElement => {
+  const d = src.getContext("2d")!.getImageData(0, 0, src.width, src.height).data;
+  let x0 = src.width, y0 = src.height, x1 = -1, y1 = -1;
+  for (let y = 0; y < src.height; y++)
+    for (let x = 0; x < src.width; x++)
+      if (d[(y * src.width + x) * 4 + 3]! > 40) ((x0 = Math.min(x0, x)), (x1 = Math.max(x1, x)), (y0 = Math.min(y0, y)), (y1 = Math.max(y1, y)));
+  if (x1 < 0) return src;
+  const c = canvasOf(x1 - x0 + 1, y1 - y0 + 1);
+  c.getContext("2d")!.drawImage(src, -x0, -y0);
+  return c;
+};
 /** A picture's third (0 the left square, 1 the middle, 2 the right), as a canvas of its own. */
 const third = (img: HTMLCanvasElement, i: number): HTMLCanvasElement => {
   const w = Math.round(img.width / 3);
@@ -376,7 +388,7 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
       anims = folioAnims({ mover: g.BOSS_FOLIO_INTRO, stool: m.INTRO_FOLIO_STOOL, table: m.INTRO_FOLIO_TABLE, plane: m.INTRO_FOLIO_PLANE, board: m.INTRO_FOLIO_BOARD, route: m.INTRO_FOLIO_PLANE_ROUTE });
       folio = {
         mover: { ch: g.BOSS_FOLIO_INTRO, frames: all(g.BOSS_FOLIO_INTRO, FOLIO_MOVES) },
-        sheets: { stool: toCanvas(m.INTRO_FOLIO_SHEETS, "stool", 0), table: toCanvas(m.INTRO_FOLIO_SHEETS, "table", 0), squares: m.INTRO_FOLIO_SHEET_SQUARES },
+        sheets: { stool: trimmed(toCanvas(m.INTRO_FOLIO_SHEETS, "stool", 0)), table: trimmed(toCanvas(m.INTRO_FOLIO_SHEETS, "table", 0)), squares: m.INTRO_FOLIO_SHEET_SQUARES },
         stool: { ch: m.INTRO_FOLIO_STOOL, frames: all(m.INTRO_FOLIO_STOOL, ["fold", "idle"]) },
         table: { ch: m.INTRO_FOLIO_TABLE, frames: all(m.INTRO_FOLIO_TABLE, ["fold", "idle"]), top: m.INTRO_FOLIO_TABLE_TOP },
         plane: { ch: m.INTRO_FOLIO_PLANE, frames: all(m.INTRO_FOLIO_PLANE, FOLIO_PLANE) },

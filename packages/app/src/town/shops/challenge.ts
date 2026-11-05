@@ -709,7 +709,8 @@ export interface MarksFeel {
 export function marksOf(layout: readonly ShopPlace[], how: IntroLayout, drawn?: DrawnMarks | null, feel: Omit<MarksFeel, "log"> = CHALLENGE_FEEL): Marks | null {
   let c0 = Infinity, c1 = -Infinity, r0 = Infinity, r1 = -Infinity;
   for (const p of layout) {
-    if (!/^(circle|ring|emblem)-/.test(p.name)) continue;
+    // (Folio's clean page, `page-<col>-<row>`, is its battle circle.)
+    if (!/^(circle|ring|emblem|page)-/.test(p.name)) continue;
     c0 = Math.min(c0, p.col);
     c1 = Math.max(c1, p.col);
     r0 = Math.min(r0, p.row);
@@ -1712,8 +1713,11 @@ export interface FolioNow {
   stools: readonly [FoldNow, FoldNow];
   table: FoldNow;
   plane: { anim: FolioPlane; frame: number; c: number; r: number; lift: number } | null;
-  /** The packet falling from the plane to the table's top: `lift` squares over its top, `u` of its fall; null: not falling. */
-  packet: { lift: number; u: number } | null;
+  /**
+   * The packet falling from the plane to the table's top: `from` the plane's height as it let go (squares over the floor), `u` of its
+   * fall (eased in: it speeds up); null: not falling.
+   */
+  packet: { from: number; u: number } | null;
   /** The board's top-view picture on the table: the packet lying, its unfold's frame; null: none (not landed, or the real board's on). */
   board: { anim: "packet" | "unfold"; frame: number } | null;
   /** The game's own board is on the table (from the unfold's end). */
@@ -1754,8 +1758,7 @@ export function folioAt(a: FolioAnims, t: number, feel: Pick<typeof CHALLENGE_FE
   let packet: FolioNow["packet"] = null;
   if (t >= T.drop && t < T.land) {
     const u = (t - T.drop) / (T.land - T.drop);
-    // (From the plane's height as it lets go to the table's top: the caller takes the table's top off.)
-    packet = { lift: a.route[3]!.at[2] * (1 - u * u), u };
+    packet = { from: a.route[3]!.at[2], u };
   }
   const board: FolioNow["board"] = t < T.land || t >= T.board ? null : t < T.unfold ? { anim: "packet", frame: 0 } : { anim: "unfold", frame: frameAt(a.unfold, t - T.unfold, false) };
   return { move, stools: [fold(T.stoolW, a.stool), fold(T.stoolE, a.stool)], table: fold(T.table, a.table), plane, packet, board, real: t >= T.board };

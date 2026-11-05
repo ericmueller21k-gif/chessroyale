@@ -30,8 +30,11 @@ export interface ShopPlace {
   exit?: boolean;
 }
 
-/** A floor tile: lies flat on its square (the floor, the battle circle and its emblem). */
-export const isFloor = (name: string): boolean => /^(floor|ring|circle|emblem)/.test(name);
+/**
+ * A floor tile: lies flat on its square (the floor, the battle circle and its emblem; Folio's clean page, `page-<col>-<row>`: not its
+ * drifting `pages`, which stand up).
+ */
+export const isFloor = (name: string): boolean => /^(floor|ring|circle|emblem|page-)/.test(name);
 
 export interface Room {
   n: number;
@@ -157,6 +160,27 @@ export function ceilingPanel(i: number, W: number, ceilY: number, out: { x: numb
 export function lightsAt<L extends { piece: string }, P extends { name: string }>(lights: readonly L[], places: readonly P[], keep: (l: L) => boolean = () => true): { l: L; at: P }[] {
   const out: { l: L; at: P }[] = [];
   for (const at of places) for (const l of lights) if (l.piece === at.name && keep(l)) out.push({ l, at });
+  return out;
+}
+/**
+ * A pool of light's slow drift (Folio's windows' coloured pools, Nov 5: the art's `PoolDrift`): its middle swings `dx`, `dy` room
+ * pixels either way on a sine over `ms`, starting `phase` (0 to 1) into it; every pool on one clock (the sun).
+ */
+export interface PoolDrift {
+  readonly dx: number;
+  readonly dy: number;
+  readonly ms: number;
+  readonly phase: number;
+}
+/** Where a drifting pool's middle is moved to `now` (room pixels, into `out`; mirrored with a mirrored piece). No drift: 0, 0. */
+export function driftAt(d: PoolDrift | undefined, now: number, flip: boolean, out: { x: number; y: number }): { x: number; y: number } {
+  if (!d) {
+    out.x = out.y = 0;
+    return out;
+  }
+  const s = Math.sin(2 * Math.PI * (now / d.ms + d.phase));
+  out.x = (flip ? -d.dx : d.dx) * s;
+  out.y = d.dy * s;
   return out;
 }
 /** A light's x in its piece's pixels, from the piece's foot, as the piece is drawn there: mirrored with a mirrored piece. */

@@ -43,7 +43,7 @@ import { TAG_STYLE, type TagKind } from "../tags.ts";
 import { Walker, type HomeId } from "../world.ts";
 import type { Rider } from "../rides.ts";
 import { rideSpeed } from "../../components/rides/scale.ts";
-import { STORE_PANELS, camFocus, ceilingPanel, inTalkRange, lightsAt, litDx, overlaps, upAlpha, walkable, youBox, isFloor, makeRoom, onDoor, tapTarget, findPath, stepFor, type Room, type ShopPlace, type Sq } from "./room.ts";
+import { STORE_PANELS, driftAt, type PoolDrift, camFocus, ceilingPanel, inTalkRange, lightsAt, litDx, overlaps, upAlpha, walkable, youBox, isFloor, makeRoom, onDoor, tapTarget, findPath, stepFor, type Room, type ShopPlace, type Sq } from "./room.ts";
 import { POOL_LINE, bossHoldings, buyBossCrate, canAfford, holdLine, priceLine, prizeRows, shopOf, wayText, type CrateWay, type ShopDef } from "./shops.ts";
 import { iceAt, introCam, isIce, type IceNow } from "./challenge.ts";
 import type { BlitzNow } from "./challenge.ts";
@@ -56,6 +56,8 @@ import { ElfLoop, elfB, pairLegs, stopJob, walkerLegs, type DispenseStop, type E
 import { HOLLOW, HOLLOW_HEART, hollowBuild } from "../../characters/hollow.ts";
 import { play } from "../../sound.ts";
 import { paintTable, playCue, slabFrontY, type Emis, type LoadedIntro } from "./intro.ts";
+import { folioTimes, isFolio, type FoldNow } from "./challenge.ts";
+import { prepareCrumple } from "./crumple-gl.ts";
 import { TABLE_BOARD } from "../houses/park.ts";
 
 /** A room's art, as its file exports it. */
@@ -65,7 +67,12 @@ interface RoomArt {
   /** Where the crate sits on the counter, in the counter's pixels. */
   crateAt: readonly [number, number];
   lights: readonly (LightSpot & { piece: string })[];
-  pools: readonly (LightPool & { piece: string })[];
+  pools: readonly (LightPool & { piece: string; drift?: PoolDrift })[];
+  /**
+   * How its pools lie on the floor: added light (the default), or their colour laid over the floor (`multiply`: Folio's stained glass on
+   * its pale paper, where an added light barely shows; the art's mockup).
+   */
+  poolBlend?: "multiply";
   /** Deep pieces that stand up at their foot, as any upright piece (Big Boy's airplane, flying round over three squares by three), not laid flat as a plan. */
   upright?: readonly string[];
   /** Its battle circle's drawn start marks, when its art exports them (Big Boy's rug: the boss's west, yours east). */
@@ -131,6 +138,10 @@ const ART: Partial<Record<HomeId, () => Promise<RoomArt>>> = {
       standDy: m.SHOP_GREX_BOARD_AT.footDy,
       crew: { liftPath: m.SHOP_GREX_LIFT_PATH, forkPath: m.SHOP_GREX_FORK_PATH, places: m.SHOP_GREX_CREW, palletAt: m.SHOP_GREX_PALLET_AT, shelf: m.SHOP_GREX_SHELF_SLOT },
     })),
+  // (Folio's sanctuary, Nov 5: a box room, the clean page its battle spot (its `page-` tiles); its windows' coloured pools drift with the
+  // sun and lie on the paper as colour, not light.)
+  folio: () =>
+    import("./folio-art.ts").then((m) => ({ layout: m.SHOP_FOLIO_LAYOUT, pieces: m.SHOP_FOLIO_PIECES, crateAt: m.SHOP_FOLIO_CRATE_AT, lights: m.SHOP_FOLIO_LIGHTS, pools: m.SHOP_FOLIO_POOLS, marks: m.SHOP_FOLIO_MARKS, poolBlend: "multiply" as const })),
   // (An igloo with a round floor's shape, as Hollow's cave, but not a cave; its catwalk and staircases, a second walking level; the
   // elves at work.)
   gingerbread: () =>
@@ -452,6 +463,11 @@ function startRoom(
   const da = ci?.anims && isDark(ci.anims) ? ci.anims : null;
   /** Wrangler's lasso (his intro's art and timing), or null: any other room or boss. */
   const rp = ci?.rope ?? null;
+  /** Folio's folding (its intro's art and timing: the sheets, the stools and table, the plane, the board), or null. */
+  const fo = ci?.folio ?? null;
+  const foT = fo && ci?.anims && isFolio(ci.anims) ? folioTimes(ci.anims) : null;
+  /** Its crumple's DOM layer has been started (as its quiet line goes: crumple-gl.ts prepareCrumple). */
+  let crumpleReady = false;
   const across = marks?.layout === "across";
   const boss = ci && marks ? new Walker({ c: room.start.c - 1, r: room.start.r }, C.walkStepMs, false) : null;
   if (boss) boss.rowsUp = -1;
@@ -550,6 +566,11 @@ function startRoom(
     introT = t;
     introNow = introAt(ci.beats, ci.anims, t);
     darkNow = introNow.dark;
+    // (Folio's: once its quiet line has gone nothing on the page changes until the crumple, so its DOM layer is taken now.)
+    if (foT && !crumpleReady && t >= foT.quietEnd) {
+      crumpleReady = true;
+      prepareCrumple();
+    }
     // (Ginger's: his props and his board carriers, from his art's places.)
     iceNow = ci.ice && ci.anims && isIce(ci.anims) ? iceAt(ci.anims, t, ci.ice.at) : null;
     if (!said) {
@@ -940,6 +961,23 @@ function startRoom(
         rg.beginPath();
         rg.moveTo(0, y);
         rg.lineTo(W, y);
+        rg.stroke();
+      }
+      return;
+    }
+    if (def.roof === "paper") {
+      // A sanctuary's ceiling (as the mockup drew it): pale folded paper, its pleats running up to a fold far overhead, fading to blank.
+      const sky = rg.createLinearGradient(0, 0, 0, H * 0.5);
+      sky.addColorStop(0, "#e9dfc9");
+      sky.addColorStop(1, "#f7f0e0");
+      rg.fillStyle = sky;
+      rg.fillRect(0, 0, W, H);
+      rg.strokeStyle = "rgba(165,142,105,0.35)";
+      rg.lineWidth = 1.5;
+      for (let i = -14; i <= 14; i++) {
+        rg.beginPath();
+        rg.moveTo(W / 2 + i * W * 0.02, -H * 0.3);
+        rg.lineTo(W / 2 + i * W * 0.16, H * 0.5);
         rg.stroke();
       }
       return;
@@ -2305,6 +2343,7 @@ function startRoom(
     hisFoot.on = false;
     fist1.on = fist2.on = false;
     if (!ci || !boss) return;
+    if (fo) return drawFolioBoss(now);
     const wat = woodAt();
     if (wat) return drawWoodMove(wat);
     if (dk && darkNow && (darkNow.move || darkNow.bulbs < 3)) return drawDarkBoss(now, darkNow);
@@ -2363,6 +2402,7 @@ function startRoom(
     if (ci.wood) return drawWood(x, y, s);
     if (!n) return;
     if (ci.dash) return drawBlitzCenter(n, x, y, s);
+    if (fo) return drawFolioCenter(x, y, s);
     const bl = ci.blocks;
     if (bl) {
       if (n.blocks) put(bl.frames[n.blocks.anim][n.blocks.frame]!, bl.ch);
@@ -2513,6 +2553,104 @@ function startRoom(
     g.imageSmoothingEnabled = false;
     g.drawImage(img, pt.x - F.ch.foot[0] * s, pt.y - F.ch.foot[1] * s, img.width * s, img.height * s);
   };
+  // ---- Folio's intro (Nov 5): its own moves, the sheets folding up into its stools and table, the plane, the board.
+  /** A flat picture laid on the room, its middle at (c, r), `w` x `d` squares, `h` squares up: its whole picture on that rectangle. */
+  const flatAt = (img: HTMLCanvasElement, c: number, r: number, w: number, d: number, h: number) => {
+    const [a, b, cc, dd] = pq as [typeof pt, typeof pt, typeof pt, typeof pt];
+    const L = (x: number, y: number, o: typeof pt) => proj(v, x - camX, camY - y, h, o);
+    if (!L(c - w / 2, r - d / 2, a) || !L(c + w / 2, r - d / 2, b) || !L(c + w / 2, r + d / 2, cc) || !L(c - w / 2, r + d / 2, dd)) return;
+    const iw = img.width;
+    const ih = img.height;
+    tri(img, 0, 0, iw, ih, 0, 0, iw, 0, iw, ih, a.x, a.y, b.x, b.y, cc.x, cc.y);
+    tri(img, 0, 0, iw, ih, 0, 0, iw, ih, 0, ih, a.x, a.y, cc.x, cc.y, dd.x, dd.y);
+  };
+  /** The three sheets lying flat on the clean page (the art's top views, at their size in squares), each until its fold starts. */
+  const drawFolioSheets = () => {
+    const z = introNow?.folio;
+    const F = fo!;
+    const lying = (k: FoldNow | undefined) => !k || k.anim === "sheet";
+    g.imageSmoothingEnabled = false;
+    const [sw, sd] = F.sheets.squares.stool;
+    if (lying(z?.stools[0])) flatAt(F.sheets.stool, marks!.bossStool.c, marks!.bossStool.r, sw, sd, 0);
+    if (lying(z?.stools[1])) flatAt(F.sheets.stool, marks!.youStool.c, marks!.youStool.r, sw, sd, 0);
+    const [tw, td] = F.sheets.squares.table;
+    if (lying(z?.table)) flatAt(F.sheets.table, marks!.table.c, marks!.table.r, tw, td, 0);
+  };
+  /**
+   * Folio itself through its challenge (BOSS_FOLIO_INTRO, at its town figure's size, drawn facing our left: mirrored to face east): its
+   * glide walking on and stepping back, its bow, its idle. Its own warm see-through shadow is in its frames (the art's note 14: FOLIO's
+   * near-black one cut a hard bar on the pale paper), so the town's dark shadows aren't drawn under it.
+   */
+  const drawFolioBoss = (now: number) => {
+    boss!.pose(now, bossPose);
+    if (!P(bossPose.x + bossOx(now), bossPose.y + bossOy(now))) return;
+    const b = ci!.boss;
+    const M = fo!.mover;
+    const k = (b.squares * pt.k) / b.ch.h;
+    const z = introNow?.folio;
+    const fa = ci!.anims && isFolio(ci!.anims) ? ci!.anims : null;
+    const walking = boss!.moving();
+    const anim = z ? z.move.anim : walking ? "glide" : "idle";
+    const frame = z ? z.move.frame : fa ? animFrame(fa.moves[anim], now, true) : 0;
+    const img = M.frames[anim][frame]!;
+    g.save();
+    if (boss!.facing > 0) {
+      g.translate(pt.x, 0);
+      g.scale(-1, 1);
+      g.translate(-pt.x, 0);
+    }
+    g.imageSmoothingEnabled = k < 1.5;
+    g.drawImage(img, pt.x - M.ch.foot[0] * k, pt.y - M.ch.foot[1] * k, img.width * k, img.height * k);
+    g.restore();
+    g.imageSmoothingEnabled = false;
+    Object.assign(bossHead, { x: pt.x, y: pt.y - (b.ch.foot[1] - b.ch.h * b.head) * k, on: true, px: b.squares * pt.k });
+    Object.assign(hisFoot, { x: pt.x, y: pt.y, k, on: true });
+  };
+  /**
+   * Folio's table and stools (its intro), the table's foot at (x, y), `s` a room pixel: each stool folding up and standing at its place,
+   * the table folding up and standing; on its top (`top` px up) the board's top view as the packet falls flat onto it, lies and unfolds
+   * (`INTRO_FOLIO_BOARD_SQUARES` across), then the game's own board (`paintTable`, its squares as wide as the unfolded sheet's).
+   */
+  const foC = newPt();
+  const drawFolioCenter = (x: number, y: number, s: number) => {
+    const z = introNow?.folio;
+    const F = fo;
+    if (!z || !F || !marks) return;
+    const put = (img: HTMLCanvasElement, ch: Character, px: number, py: number, k: number) => g.drawImage(img, px - ch.foot[0] * k, py - ch.foot[1] * k, img.width * k, img.height * k);
+    g.imageSmoothingEnabled = false;
+    z.stools.forEach((st, i) => {
+      if (st.anim === "sheet") return;
+      const at = i ? marks.youStool : marks.bossStool;
+      if (P(at.c, at.r, foC)) put(F.stool.frames[st.anim][st.frame]!, F.stool.ch, foC.x, foC.y, foC.k / SQ);
+    });
+    if (z.table.anim !== "sheet") put(F.table.frames[z.table.anim][z.table.frame]!, F.table.ch, x, y, s);
+    const sq = F.board.squares;
+    const top = F.table.top / SQ;
+    const T = marks.table;
+    // (Falling flat from the plane's height to the top, faster and faster, swaying a hair: the art's 280 ms.)
+    if (z.packet) flatAt(F.board.frames.packet[0]!, T.c + Math.sin(z.packet.u * 6) * 0.05, T.r, sq, sq, top + (z.packet.from - top) * (1 - z.packet.u * z.packet.u));
+    if (z.board) flatAt(F.board.frames[z.board.anim][z.board.frame]!, T.c, T.r, sq, sq, top);
+    if (z.real && proj(v, T.c - camX, camY - T.r, TABLE_BOARD.top / SQ, foC)) {
+      // (The park table's board lifted to this table's top, and grown about its middle until its squares are the unfolded sheet's.)
+      const k = sq / (2 * TABLE_BOARD.board);
+      g.save();
+      g.translate(0, -(F.table.top - TABLE_BOARD.top) * s);
+      g.translate(foC.x, foC.y);
+      g.scale(k, k);
+      g.translate(-foC.x, -foC.y);
+      paintTable(g, v, T.c - camX, camY - T.r, ci!.table.palette, marks.layout);
+      g.restore();
+    }
+  };
+  /** The paper plane (its intro), `lift` squares up over its place on the room, at the room's scale, flying west as drawn. */
+  const drawFolioPlane = (pl: { anim: string; frame: number; c: number; r: number; lift: number }) => {
+    const F = fo!;
+    if (!proj(v, pl.c - camX, camY - pl.r, pl.lift, foC)) return;
+    const img = F.plane.frames[pl.anim as "fly"][pl.frame]!;
+    const k = foC.k / SQ;
+    g.imageSmoothingEnabled = false;
+    g.drawImage(img, foC.x - F.plane.ch.foot[0] * k, foC.y - F.plane.ch.foot[1] * k, img.width * k, img.height * k);
+  };
   /** A stool on its own (facing: the table's north one, or its south one), as the table's picture has it. */
   const drawStool = (at: { c: number; r: number }) => {
     const n = introNow;
@@ -2616,19 +2754,24 @@ function startRoom(
   };
   /** A piece's light fades with it near the camera (drawUp's `near`): 0 gone, 1 whole. P must be at its foot. */
   const nearOf = () => Math.min(1, (pt.depth - S.nearGone) / (S.nearFull - S.nearGone));
+  const drift = { x: 0, y: 0 };
   const drawGlows = (now: number) => {
     if (!poolsAt.length && !halosAt.length) return;
-    g.globalCompositeOperation = "lighter";
+    // (Folio's: its pools' colour laid over the paper, then its halos' light added.)
+    g.globalCompositeOperation = art.poolBlend ?? "lighter";
     for (const { l, at: u } of poolsAt) {
       if (!P(u.c, u.r)) continue;
       const near = nearOf();
       if (near <= 0) continue;
       const s = pt.k / SQ;
-      litAt(u, l.x, l.y);
+      // (A drifting pool (Folio's windows'): its middle on its sine now, one sun for them all.)
+      const d = driftAt(l.drift, now, u.flip, drift);
+      litAt(u, l.x + (u.flip ? -d.x : d.x), l.y + d.y);
       g.globalAlpha = Math.min(1, l.strength * S.glow * near * lightMul(u));
       if (g.globalAlpha <= 0.003) continue;
       g.drawImage(glow(l.color), lit.x - l.rx * 2 * s, lit.y - l.ry * 2 * s, l.rx * 4 * s, l.ry * 4 * s);
     }
+    g.globalCompositeOperation = "lighter";
     for (const { l, at: u } of halosAt) {
       if (!P(u.c, u.r)) continue;
       const near = nearOf();
@@ -2877,6 +3020,8 @@ function startRoom(
       const d = p.d ?? 1;
       flat(img, 0, img.height - d * SQ, p.col, p.row - d + 1, p.w ?? 1, d, S.floorBlock);
     }
+    // (Folio's intro: the three flat sheets on the clean page, each until it starts folding up; from the walk in.)
+    if (fo && marks) drawFolioSheets();
     // (Ginger's intro: the crack round the icicle's foot, flat on the ice, 3 squares by 2, centred on the table's spot.)
     if (iceNow?.crack && ci?.ice) {
       const fr = ci.ice.props.crack.frames;
@@ -2936,6 +3081,7 @@ function startRoom(
     }
     while (k < figN) drawFigure(figK[k++]!, now);
     if (iceNow) drawIceBlast();
+    if (fo && introNow?.folio?.plane) drawFolioPlane(introNow.folio.plane);
     if (rp && introNow?.rope) drawRopeLines();
     if (dk) drawDarkPass(now);
     if (kidBox.on && !ci && !cave) drawTag("Shopkeeper", "sidekick", kidBox.hx, kidBox.hy);
