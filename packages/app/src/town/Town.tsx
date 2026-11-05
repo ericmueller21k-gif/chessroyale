@@ -49,7 +49,10 @@ import { TownChat } from "./TownChat.tsx";
 import { TownChatTools } from "./TownChatTools.tsx";
 import { Press } from "./press.ts";
 import { anyHeld, hold, isHeld, keyWalk, listenKeys, onHeld, type Dir } from "./arrows.ts";
-import { LookAround, Turn, nearestTurn, quarterOf, screenStep } from "./turn.ts";
+import { LookAround, Turn, lockIn, nearestTurn, quarterOf, screenStep } from "./turn.ts";
+import { FingerRun } from "./run.ts";
+import { mapFrame } from "./minimap.ts";
+import { TownMap, type MapFace } from "./TownMap.tsx";
 import { baseHeading, stripAt } from "./strips.ts";
 import { StreetZoom, parkSide } from "./zoom-steps.ts";
 import { PAWN_HEAD, PAWN_PX, Renderer, pawnImage, type Hit, type YouArt } from "./render.ts";
@@ -299,7 +302,7 @@ export function TownScreen({
           <h1>Town square</h1>
         )}
         {/* The chat's icon (its three modes) and the gear (Town settings), at the right end of the same line (on a computer, in the frame: the chat icon beside the title, the gear at the right end). */}
-        <TownChatTools />
+        <TownChatTools map={STREET_TOWN} mapDisabled={!!inside} />
       </header>
       <div class={inside ? "town-box town-inside" : "town-box"} ref={box}>
         <canvas class="town-canvas" ref={canvas} aria-label="The town square" />
@@ -483,6 +486,9 @@ export function TownScreen({
             </div>
           ))}
         </div>
+        {/* The street town's minimap (Nov 5): small at the top right, under the chips and cards; a tap opens it large over everything. Not
+            inside a building (it's the town's). */}
+        {STREET_TOWN && <TownMap hidden={!!inside} faces={() => ctl.current?.mapFaces() ?? []} />}
         {/* The black the town zooms into as you go in, and the room fades in from (and back, going out). */}
         <div class="town-fade" ref={fade} />
         <div class="town-controls">
@@ -673,6 +679,12 @@ function startTown(
   let keyQuarter = 0;
   /** (Round 5) A drag's look round, on top of the normal heading (north, or a home's strip's). */
   const look = new LookAround();
+  /**
+   * The base heading (Nov 5, brief-street-controls-map.md): the normal heading off a home's strip, north, east, south or west. A look round
+   * snapped to a quarter and locked in by a tap or a run sets it (turn.ts lockIn); the arrows never do. North as the town opens and as you
+   * come out of a building (`resume`); a strip's turn leaves it alone (stepping off goes back to it).
+   */
+  let base = 0;
   /** (Tests) The heading held (the turn's stills), or null. */
   let pinHeading: number | null = null;
   let follow = true;
@@ -960,7 +972,7 @@ function startTown(
     // (LookAround), eased back as you set off.
     if (STREET_TOWN) {
       const h = town.you.walker.here();
-      turn.aim(nearestTurn(baseHeading(h.c, h.r), turn.to), now);
+      turn.aim(nearestTurn(baseHeading(h.c, h.r, base), turn.to), now);
       if (town.you.walker.moving()) look.back(now);
       heading = pinHeading ?? turn.at(now) + look.at(now);
     }
@@ -1000,6 +1012,8 @@ function startTown(
       const w = clock();
       if (!sameWeights(w, sky)) r.setSky((sky = w));
     }
+    // (A press held still past the hold time: a run, street town only.)
+    if (press.hold(performance.now())) startRun(performance.now());
     keysWalk();
     tick(town, now);
     // A bot's card: whether a table is free for you both, to grey its Play (checked only while one is open: no search).
@@ -1026,6 +1040,11 @@ function startTown(
     stepClose(dt);
     updateCamera(dt, now);
     draw(now, dt);
+    // (The minimap's dots: you and the way the camera faces; a transform only when they move. minimap.ts.)
+    if (STREET_TOWN) {
+      const y = town.you.walker.pose(now, POSE);
+      mapFrame(y.x, y.y, heading);
+    }
     if (fpsEl) {
       fpsN++;
       if (!fpsAt) fpsAt = fpsPrevAt = now;
@@ -1168,8 +1187,36 @@ function startTown(
   };
   addEventListener("keydown", onKey);
 
-  // ---- Input: a finger presses the square you'd walk to (press.ts); one that moves is a drag (look around).
-  const press = new Press(f.dragPx);
+  // ---- Input: a finger presses the square you'd walk to (press.ts); one that moves is a drag (look around); in the street town, one
+  // held still past `streetHoldMs` is a run (run.ts), steered by the finger, which never turns the camera.
+  const press = new Press(f.dragPx, STREET_TOWN ? f.streetHoldMs : Infinity);
+  /** The finger's run (the street town): the arrows' direction it holds. */
+  const finger = new FingerRun();
+  /** Where the press's finger is now (client px). */
+  const fingerAt = { x: 0, y: 0 };
+  /**
+   * The finger steers the run: the way from your pawn's middle on screen (as the last frame drew it) to the finger, snapped to up, down,
+   * left or right of the normal view (the arrows'), held as an arrow is. Within `streetRunDeadPx` of your pawn, the way it had.
+   */
+  const steer = () => {
+    const rc = box.getBoundingClientRect();
+    const b = r.drawnBox(0);
+    const x = b ? (b.x0 + b.x1) / 2 : r.W / 2;
+    const y = b ? (b.y0 + b.fy) / 2 : r.H * 0.6;
+    finger.steer(fingerAt.x - rc.left - x, fingerAt.y - rc.top - y, f.streetRunDeadPx);
+  };
+  /**
+   * A press held still became a run (Eric, Nov 5: "if you hold it in the direction … right away … it starts running"): the pressed square
+   * lets go, a snapped look round is locked in (the new base heading: the camera stays), and you run the way the finger is.
+   */
+  const startRun = (now: number) => {
+    if (closing) return;
+    r.release(now, false);
+    leaveClose();
+    const b = lockIn(turn, look, now);
+    if (b !== null) base = b;
+    steer();
+  };
   /** The drag's start: the pointer, the camera, and pixels per square across and along. */
   let drag: { id: number; x: number; y: number; cx: number; cy: number; kx: number; ky: number } | null = null;
   /** This press only closes the open card (a tap anywhere else closes it, as in the prototype). */
@@ -1280,23 +1327,40 @@ function startTown(
     keysAsk();
   };
   const onDown = (e: PointerEvent) => {
+    // (The street town: a mouse's left button only, for a tap, a look round and a run alike.)
+    if (STREET_TOWN && e.pointerType === "mouse" && e.button !== 0) return;
+    // (A new press ends a run a finger left going.)
+    finger.stop();
     cv.setPointerCapture?.(e.pointerId);
+    fingerAt.x = e.clientX;
+    fingerAt.y = e.clientY;
     // Pixels per square at the focus point, across and along (for the drag).
     const v = r.view;
     drag = { id: e.pointerId, x: e.clientX, y: e.clientY, cx: camX, cy: camY, kx: v.kf, ky: Math.max(8, rowSpan(r)) };
     closing = !!card;
-    if (closing) return press.down(e.clientX, e.clientY, "");
+    const now = performance.now();
+    if (closing) return press.down(e.clientX, e.clientY, "", now);
     const xy = local(e);
     const p = plan(r.pick(xy.x, xy.y));
     if (p?.dest) r.pressSquare(p.dest.c, p.dest.r);
-    press.down(e.clientX, e.clientY, p?.dest || p?.card ? p.key : "");
+    press.down(e.clientX, e.clientY, p?.dest || p?.card ? p.key : "", now);
   };
   const dragTo = { dx: 0, dz: 0 };
   const onMove = (e: PointerEvent) => {
     if (!drag || e.pointerId !== drag.id) return;
-    const was = press.dragged();
-    if (!press.move(e.clientX, e.clientY)) return;
-    if (!was) {
+    fingerAt.x = e.clientX;
+    fingerAt.y = e.clientY;
+    const was = press.gesture();
+    const now = performance.now();
+    if (!press.move(e.clientX, e.clientY, now)) {
+      // A run (held still past the hold time; a move that comes in late starts it too): the finger steers, the camera never turns.
+      if (press.running()) {
+        if (was !== "run") startRun(now);
+        else if (!closing) steer();
+      }
+      return;
+    }
+    if (was === "press") {
       // Past the threshold: the square lets go (no pulse, no walk) and you look around.
       r.release(performance.now(), false);
       leaveClose();
@@ -1314,8 +1378,11 @@ function startTown(
   const onUp = (e: PointerEvent) => {
     if (!drag || e.pointerId !== drag.id) return;
     drag = null;
-    look.release();
     const now = performance.now();
+    // (Letting go of a look round: in the street town, within `streetSnapDeg` of a quarter it eases there and is snapped, LookAround.)
+    look.release(now, STREET_TOWN ? turn.to : null);
+    // (Letting go of a run: you stop at the next square.)
+    finger.stop();
     if (closing) {
       if (press.up("") !== "drag") setCard(null);
       return;
@@ -1329,6 +1396,11 @@ function startTown(
     }
     // Released on the same thing: the border pulses once and you set off (no sound, no vibration: Eric).
     r.release(now, true);
+    // (A tap's walk after a look round snapped to a quarter locks it in: the new base heading, the camera staying where it is.)
+    if (STREET_TOWN && p.dest) {
+      const b = lockIn(turn, look, now);
+      if (b !== null) base = b;
+    }
     // A tap on anything but the statue you're looking at walks you away from it: the camera glides back out.
     if (p.statue < 0 || p.statue !== closeOn) leaveClose();
     // You sit when a tap on a table sent you to its stool; any other walk stands you up (walkOff).
@@ -1346,7 +1418,8 @@ function startTown(
   };
   const onCancel = () => {
     drag = null;
-    look.release();
+    look.release(performance.now(), STREET_TOWN ? turn.to : null);
+    finger.stop();
     press.cancel();
     r.release(performance.now(), false);
   };
@@ -1412,6 +1485,11 @@ function startTown(
           headingBase: turn.to,
           strip: STREET_TOWN ? (stripAt(town.you.walker.hereC(), town.you.walker.hereR())?.home ?? null) : null,
           look: look.at(performance.now()),
+          // (Nov 5: the base heading, a quarter a let-go snapped to (null: none), the press's gesture and the run's held way.)
+          base,
+          snapped: look.snapped,
+          gesture: press.gesture(),
+          run: finger.dir,
           // (The street town: its zoom step's memory in the park: the step you had coming in, null if none.)
           parkBefore: STREET_TOWN ? sz.before : null,
           mag: r.lensMag,
@@ -1703,12 +1781,28 @@ function startTown(
     pause: () => {
       away = true;
       goingIn = -1;
+      finger.stop();
       halt();
     },
     resume: () => {
       away = false;
+      // (Out of a building: the view is north again, Eric: "It'll always default back to the normal [view] if you go into a building and
+      // come out". Under the black, so nothing is seen to turn.)
+      if (STREET_TOWN) {
+        base = 0;
+        look.reset();
+        const h = town.you.walker.here();
+        turn.set(baseHeading(h.c, h.r, base));
+        heading = turn.to;
+      }
       run();
     },
+    /** The large map's portraits (TownMap.tsx): each boss home's place and its boss's face, as its chip shows it. */
+    mapFaces: (): MapFace[] =>
+      HOMES.map((h) => {
+        const { img, box } = r.chipFace(h);
+        return { id: h.id, x: h.cx, y: h.cy, color: h.color, img, box };
+      }),
     /** Your pawn's picture as the town draws it (your items on), for the room inside a shop. */
     youArt: () => r.youArt,
     /** The rider you're on as the town draws you (its frames ready), or null: on foot. Inside a shop it comes in with you. */

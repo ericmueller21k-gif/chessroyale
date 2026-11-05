@@ -28,6 +28,7 @@ import { BOSS_BEAVER } from "../characters/timber.ts";
 import { BOSS_BLITZ } from "../characters/boss-blitz.ts";
 import { N, colI, rowI, bandOf, clamp, drawable, enterOf, farOf, forEachSquare, hazeMix, newPt, newView, pastCurve, pickSquare, proj, radial, rel, rimYAt, setHeading, setView, stepCams, tableLift, toCam, wrapF, wrapFX, wrapFY, type Quad, type TableLift, type View } from "./camera.ts";
 import { CHAT_BOX } from "./chat.ts";
+import { MAP_BOX } from "./minimap.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { statueSpot } from "./houses/coliseum.ts";
 import { COLISEUM_CHIP, artOf } from "./houses/index.ts";
@@ -1231,6 +1232,9 @@ export class Renderer {
     // The chat log's box (chat.ts), always: shown or faded, wherever it has been put, so a chip never jumps when it comes or goes.
     const cb = CHAT_BOX;
     if (cb.w > 0 && x + r > cb.x && x - r < cb.x + cb.w && y + r > cb.y && y - r < cb.y + cb.h) return true;
+    // The street town's minimap (TownMap.tsx), while it shows.
+    const mb = MAP_BOX;
+    if (mb.w > 0 && x + r > mb.x && x - r < mb.x + mb.w && y + r > mb.y && y - r < mb.y + mb.h) return true;
     for (let m = 0; m < n; m++) {
       const o = this.chips[m]!;
       if (Math.abs(o.x - x) < g && Math.abs(o.y - y) < g) return true;
@@ -3650,6 +3654,9 @@ export class Renderer {
 
   /** What's under (x, y) in the box: a home, a boss or a person (nearest first), else a square, else null (the sky). */
   pick(x: number, y: number): Hit | null {
+    // (Nothing under the street town's minimap: a tap there is the map's. The test hooks' tap points keep off it this way too.)
+    const mb = MAP_BOX;
+    if (mb.w > 0 && x >= mb.x && x <= mb.x + mb.w && y >= mb.y && y <= mb.y + mb.h) return null;
     for (let i = this.items.length - 1; i >= 0; i--) {
       const it = this.items[i]!;
       if (!it.on || it.faded || x < it.x0 || x > it.x1 || y < it.y0 || y > it.y1) continue;

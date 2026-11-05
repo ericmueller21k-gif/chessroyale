@@ -61,5 +61,8 @@ export function stripAt(c: number, r: number): Strip | null {
   return cc < 0 || rr < 0 ? null : (byKey.get(rr * N + cc) ?? null);
 }
 
-/** The camera's normal heading on square (c, r): its strip's, or north. */
-export const baseHeading = (c: number, r: number): number => stripAt(c, r)?.heading ?? 0;
+/**
+ * The camera's normal heading on square (c, r): its strip's, or the base heading `base` (north unless a look round was locked in: Nov 5,
+ * brief-street-controls-map.md). A strip's turn doesn't change the base: stepping off it goes back to the base heading.
+ */
+export const baseHeading = (c: number, r: number, base = 0): number => stripAt(c, r)?.heading ?? base;
