@@ -38,7 +38,7 @@ type Hooks = {
   __townAt?: (k: string, id: string | readonly [number, number]) => { x: number; y: number } | null;
   __shopAt?: (k: string, sq?: readonly [number, number]) => { x: number; y: number } | null;
   __shopCam?: () => { zoom: number; zoomTarget: number; room: string; focus: [number, number] } | null;
-  __shopRide?: () => { ride: string | null; anim: "" | "idle" | "move"; frame: number; facing: number; view: number; stepMs: number } | null;
+  __shopRide?: () => { ride: string | null; anim: "" | "idle" | "move"; frame: number; facing: number; view: number; stepMs: number; foot: [number, number] | null } | null;
   __townRide?: () => { you: { ride: string | null; ready: boolean; anim: string; stepMs: number } };
 };
 
@@ -817,6 +817,125 @@ test("inside, a drag looks around as the town's does (Eric, Nov 2: \"when I drag
   const square = async () => (await shopAt(page, "square", [10, 15])) ?? (await shopAt(page, "square", [10, 13]));
   await followsFinger(page, square, d);
 });
+
+/**
+ * Eric's rule (Nov 5: "if you hold up in one of the rooms, it actually gave you the kind of sensation you're running down. So it's
+ * flipped"): in every room, Up (the key, W, or the on-screen arrow) moves you up the screen and looks it; Down the reverse; Left and
+ * Right go left and right on screen. The rooms: Babur's Circus (an ordinary shop), Alfil's Pyramid (its marks laid out across) and
+ * Hollow Peak (the cave), on foot and on a ride; by the keyboard and by the on-screen arrows. For each: the square you end on is drawn
+ * up / down / left / right of where you were (both read in the same frame), your figure's feet move that way on screen as you go, and
+ * on a ride the view drawn while moving is its back going up, its front going down, its side (facing that way) across.
+ */
+const KEY_ROOMS = [
+  ["tiger", "Babur's Circus"],
+  ["alfil", "Alfil's Pyramid"],
+  ["hollow", "Hollow Peak"],
+] as const;
+type Way = "up" | "down" | "left" | "right";
+const KEY_OF: Record<Way, string> = { up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight" };
+
+/** Holds `way` (a key, or the on-screen arrow) until you're a square on, then lets go; checks you went that way on the screen. */
+async function screenWay(p: Page, way: Way, by: "key" | "pad", ride: boolean) {
+  const label = `${way} by ${by === "key" ? "the key" : "the on-screen arrow"}${ride ? " on a ride" : ""}`;
+  const from = (await room(p).getAttribute("data-you"))!;
+  // (Every frame from the press: your feet on screen, and on a ride the view drawn while moving and which way its side faces.)
+  await p.evaluate(() => {
+    const w = window as unknown as { __shopRide?: () => { anim: string; view: number; facing: number; foot: [number, number] | null } | null; __way: { foot: number[][]; moves: string[]; on: boolean } };
+    w.__way = { foot: [], moves: [], on: true };
+    const tick = () => {
+      if (!w.__way.on || !w.__shopRide) return;
+      const r = w.__shopRide();
+      if (r?.foot) w.__way.foot.push(r.foot);
+      if (r?.anim === "move") w.__way.moves.push(`${r.view}:${r.facing}`);
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  const pad = by === "pad" ? (await p.locator(`.town-key-${way}`).boundingBox())! : null;
+  // (A step is about 90 ms: let go in the page, the frame you're a square on, so you stop a square or two on with both in view.)
+  await p.evaluate(([f, code, way]) => {
+    const w = window as unknown as { __wayOff: boolean };
+    w.__wayOff = false;
+    const tick = () => {
+      if (document.querySelector<HTMLCanvasElement>("canvas.town-shop-canvas")?.dataset.you === f) return void requestAnimationFrame(tick);
+      if (code) window.dispatchEvent(new KeyboardEvent("keyup", { code }));
+      else document.querySelector(`.town-key-${way}`)!.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
+      w.__wayOff = true;
+    };
+    requestAnimationFrame(tick);
+  }, [from, pad ? "" : KEY_OF[way], way] as const);
+  if (pad) {
+    await p.mouse.move(pad.x + pad.width / 2, pad.y + pad.height / 2);
+    await p.mouse.down();
+  } else await p.keyboard.down(KEY_OF[way]);
+  await p.waitForFunction(() => (window as unknown as { __wayOff: boolean }).__wayOff, null, { timeout: 10_000 });
+  if (pad) await p.mouse.up();
+  else await p.keyboard.up(KEY_OF[way]);
+  // (Stopped: the step in progress ends, then the camera's spring settles on you.)
+  await expect.poll(async () => (await p.evaluate(() => (window as unknown as Hooks).__shopRide?.()?.anim)) !== "move" || !ride, { timeout: 10_000 }).toBe(true);
+  await p.waitForTimeout(250);
+  const to = (await room(p).getAttribute("data-you"))!;
+  const [a, b] = [from, to].map((s) => s.split(",").map(Number) as [number, number]);
+  // The square you end on, drawn where the screen puts it: that way of where you were, both read in the same frame.
+  const xy = await p.evaluate(([a, b]) => { const h = (window as unknown as Hooks).__shopAt!; return [h("square", a), h("square", b)]; }, [a, b] as const);
+  expect(xy[0], `${label}: where you were (${from}) still on screen`).not.toBeNull();
+  expect(xy[1], `${label}: where you are (${to}) on screen`).not.toBeNull();
+  const dx = xy[1]!.x - xy[0]!.x;
+  const dy = xy[1]!.y - xy[0]!.y;
+  const msg = `${label}: ${from} -> ${to}, on screen dx ${dx.toFixed(1)} dy ${dy.toFixed(1)}`;
+  if (way === "up") expect(dy, msg).toBeLessThan(-5);
+  if (way === "down") expect(dy, msg).toBeGreaterThan(5);
+  if (way === "left") expect(dx, msg).toBeLessThan(-5);
+  if (way === "right") expect(dx, msg).toBeGreaterThan(5);
+  // (Straight that way: the other axis barely moves; the ground's curve drops a far square a little: camera.ts `proj`.)
+  if (way === "up" || way === "down") expect(Math.abs(dx), msg).toBeLessThan(2 + 0.1 * Math.abs(dy));
+  else expect(Math.abs(dy), msg).toBeLessThan(2 + 0.1 * Math.abs(dx));
+  const seen = await p.evaluate(() => { const w = (window as unknown as { __way: { foot: number[][]; moves: string[]; on: boolean } }).__way; w.on = false; return w; });
+  // Your figure's feet on screen as you went: up the screen for up (the camera follows, so they lead it a little, then it catches up).
+  const ys = seen.foot.map((f) => f[1]!);
+  const xs = seen.foot.map((f) => f[0]!);
+  if (way === "up") expect(Math.min(...ys) - ys[0]!, `${label}: your feet go up the screen`).toBeLessThan(-2);
+  if (way === "down") expect(Math.max(...ys) - ys[0]!, `${label}: your feet go down the screen`).toBeGreaterThan(2);
+  if (way === "up") expect(Math.max(...ys) - ys[0]!, `${label}: never down the screen`).toBeLessThan(1);
+  if (way === "down") expect(Math.min(...ys) - ys[0]!, `${label}: never up the screen`).toBeGreaterThan(-1);
+  if (way === "left") expect(Math.max(...xs) - xs[0]!, `${label}: never right`).toBeLessThan(1);
+  if (way === "right") expect(Math.min(...xs) - xs[0]!, `${label}: never left`).toBeGreaterThan(-1);
+  // On a ride, the view drawn while moving: its back going up, its front going down, its side across (facing that way).
+  if (ride) {
+    const want = way === "up" ? ["1:1", "1:-1"] : way === "down" ? ["2:1", "2:-1"] : way === "left" ? ["0:-1"] : ["0:1"];
+    expect(seen.moves.length, `${label}: its move drawn`).toBeGreaterThan(0);
+    for (const m of new Set(seen.moves)) expect(want, `${label}: the view drawn while moving (view:facing) ${[...new Set(seen.moves)].join(" ")}`).toContain(m);
+  }
+}
+
+for (const ride of [false, true])
+  test(`Eric's rule (Nov 5): up is up the screen in every room: Up, Down, Left and Right go that way on screen, by the keys and the on-screen arrows, in Babur's Circus, Alfil's Pyramid and Hollow Peak, ${ride ? "on a ride (its back going up, its front going down)" : "on foot"}`, async ({ page }) => {
+    test.setTimeout(240_000);
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(String(e)));
+    if (ride) {
+      await page.goto("/");
+      await expect(page.getByRole("button", { name: "Your profile" })).toBeVisible();
+      // (No crate holds a ride yet: given straight, as only admins have them.)
+      const [chirp] = await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 0 }]);
+      await wearItem(page, "ride", chirp!);
+    }
+    await page.goto("/town?sky=day");
+    await expect(town(page)).toHaveAttribute("data-ready", "1");
+    if (ride) await expect.poll(async () => (await page.evaluate(() => (window as unknown as Hooks).__townRide!().you)).ready, { message: "your ride's frames are ready", timeout: 30_000 }).toBe(true);
+    for (const [id, name] of KEY_ROOMS) {
+      await goIn(page, id, name);
+      if (ride) await expect.poll(async () => (await page.evaluate(() => (window as unknown as Hooks).__shopRide?.()?.ride ?? null))).toBe("riding-chirp");
+      await page.waitForTimeout(800); // (the camera's spring settles on you)
+      // (Up first: you start a step in from the door. Then back down, and across both ways.)
+      for (const by of ["key", "pad"] as const) for (const way of ["up", "down", "left", "right"] as const) await screenWay(page, way, by, ride);
+      if (SHOTS) await page.screenshot({ path: `${SHOTS}/room-keys-${id}-${ride ? "ride" : "foot"}-${test.info().project.name}.png` });
+      await page.getByRole("button", { name: "Back", exact: true }).click();
+      await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
+      await expect(town(page)).toHaveAttribute("data-ready", "1");
+    }
+    expect(errors).toEqual([]);
+  });
 
 test("on a ride (Eric, Nov 2: \"your rider goes in with you\"): inside you're on it, its idle standing and its move walking, its back going up to the counter; you come out still on it", async ({ page }) => {
   test.setTimeout(150_000);

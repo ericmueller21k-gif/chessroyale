@@ -107,6 +107,16 @@ removed (old → new) and says whether any of them guards a rule here.
   - Guards: `packages/app/test/town-world.test.ts`, "tapping a home walks you in front of its door…"; `e2e/town.spec.ts`, "a home's
     door (Eric, Nov 5)…", phone and computer.
 
+- **Up is up the screen in every room (Eric, Nov 5: "if I hold up, it goes up in the… chess town, but then if you hold up in one of
+  the rooms, it actually gave you the kind of sensation you're running down. So it's flipped").** Inside every building (each shop, the
+  cave, Ginger's igloo), as in the town: holding Up (the key, W or the on-screen up arrow) moves your figure up the screen and, on a
+  ride, shows its back; Down the reverse (its front); Left and Right go left and right on screen (its side, facing that way). On a phone
+  and a computer, on foot and on a ride. (`Walker.rowsUp`: which way a walker's rows run on screen; its view and `keyWalk` both turn by it.)
+  - Guards: `e2e/shop.spec.ts`, "Eric's rule (Nov 5): up is up the screen in every room: …" (on foot, and on a ride), phone and
+    computer: in Babur's Circus, Alfil's Pyramid and Hollow Peak, each way by the keys and by the on-screen arrows, the square you
+    end on drawn that way of where you were, your feet moving that way on screen, and on a ride the view drawn while moving;
+    `packages/app/test/town-arrows.test.ts`, "Eric's rule (Nov 5): up is up the screen in the town and in every room (Walker.rowsUp)".
+
 ## Writing
 
 - **The Hidden Boss's lines:** never "Soviet(s)" or "Russian(s)", nothing that implies Korchnoi threw games, and real quotes
