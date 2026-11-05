@@ -177,3 +177,4 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - #499 street town round 2 (admins, STREET_TOWN) PR open full-e2e 96368a3f, CI watcher bdc92v0bm. #498 igloo one-lane deadlock fix (main red after #496) 365c3b56, CI watcher bgcrum0uq.
 - Town round 3 (boxes + camera turn) helper: brief-town-boxes.md, /home/user/cr-townboxes claude/town-boxes from claude/town-layout, ports 8995/9495. Flip STREET_TOWN for everyone after Eric walks it.
 - Hollow bulbs DONE -> PR #500 (full-e2e) a045a4c8 (main merged in), CI watcher bi5kmycmh. Taunt clip was a mid-typing still; new e2e checks every line fits.
+- Main GREEN + live abffbf53 (#496 #497 #498 merged; igloo pass-through on stairs). #499 street town re-running after JSON import-attribute fix 56a9a387 (watcher b7vgj00d8). #500 Hollow re-running after boss-bar slot fix d05e25f7 (watcher ba24bg6ix). Town round 3 helper running.
