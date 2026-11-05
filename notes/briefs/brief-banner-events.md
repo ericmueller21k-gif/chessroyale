@@ -1,6 +1,6 @@
 # Brief: tie the battle banners to their events (code; Opus high)
 
-Worktree `/home/user/cr-banners`, branch `claude/banner-events`, made from main (the director creates it). Run `npm ci`. Ports 8997,
+Worktree `/home/user/cr-bannerev`, branch `claude/banner-events`, made from main (the director creates it). Run `npm ci`. Ports 8997,
 inspector 9497. Include notes/briefs/rules-common.md.
 
 ## Eric (Nov 5)
