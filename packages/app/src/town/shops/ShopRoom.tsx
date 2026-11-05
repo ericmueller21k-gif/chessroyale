@@ -1294,7 +1294,10 @@ function startRoom(
   let elfN = 0;
   const esq = { c: 0, r: 0 };
   const eahead = { x: 0, y: 0 };
+  // (On the stairs and the catwalk nobody blocks anyone: one lane wide, an elf waiting for you while you waited for it stood there
+  // for good (main's e2e, Nov 5: you on the east flight's low step, the pair's elf at its foot to go up). Figures pass there.)
   const elfTakes = (c: number, r: number): boolean => {
+    if (isUp(lv, c, r)) return false;
     const k = r * n + c;
     for (let i = 0; i < elfN; i++) if (elfSq[i] === k) return true;
     return false;
@@ -1302,6 +1305,7 @@ function startRoom(
   /** You (the square you're on, leaving or stepping onto) or the boss walking in are on the square under (x, y). */
   const inElfWay = (x: number, y: number): boolean => {
     squareOf(lv, x, y, esq);
+    if (isUp(lv, esq.c, esq.r)) return false;
     return figureOn(esq.c, esq.r) || (you.c === esq.c && you.r === esq.r);
   };
   const takeSq = (x: number, y: number) => {

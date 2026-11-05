@@ -1552,6 +1552,8 @@ test("a home's door (Eric, Nov 5): a tap on Folio's house walks you to the squar
   // Its plot is columns 34 to 36, rows 29 to 31: the square before its door is (35, 28) (or one either side, if someone stands there).
   await expect(async () => {
     if (await card.isVisible()) return;
+    // (Folio strolling in front of his house may take the tap: close his card and tap again, as Folio's test does.)
+    if (await page.getByRole("dialog").isVisible()) await page.keyboard.press("Escape");
     const xy = await page.evaluate(() => (window as unknown as { __townAt?: (k: string, id: string) => { x: number; y: number } | null }).__townAt?.("home", "folio") ?? null);
     expect(xy, "drawn").not.toBeNull();
     const cv = (await canvas(page).boundingBox())!;
