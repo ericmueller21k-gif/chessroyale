@@ -58,7 +58,7 @@ import { painterGL } from "./paint-gl.ts";
 import { reportTownFallback } from "../problems.ts";
 import type { TownGlFallback } from "@chessroyale/core";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
-import { TOWN_BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, taken, tdist, tick, townLine, walkable, waitingBot, walkWalker, type HomeId, seatOf, seatText, standOf, type Person, type Place, type Seat, type Sq, type Stand, type StatueId, type Target } from "./world.ts";
+import { TOWN_BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, walkYou, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, taken, tdist, tick, townLine, walkable, waitingBot, walkWalker, type HomeId, seatOf, seatText, standOf, type Person, type Place, type Seat, type Sq, type Stand, type StatueId, type Target } from "./world.ts";
 import { STREET_TOWN } from "./admin-town.ts";
 import { dressedPawn, lookKey, offFace, offRide } from "./you-look.ts";
 import type { ItemLook } from "@chessroyale/core";
@@ -1458,6 +1458,14 @@ function startTown(
   // frames are on their way, its drawing loading or its frames being composed, while you walk on foot in its box) and each other rider's.
   /** (Tests) Where you stand (your square, the way you face) and whether you're walking: a boss's challenge brings you back here. */
   const hookYou = () => (testSwitchesAllowed() ? { ...standOf(town.you.walker), moving: town.you.walker.moving() } : null);
+  // ... `__townWalk([c, r])`: you walk to that square (or the free one nearest it) as a tap on it would, the camera following (to measure
+  // the frame rate walking a set route, Nov 5). True if there's a way.
+  const hookWalk = (sq: readonly [number, number]) => {
+    if (!testSwitchesAllowed()) return false;
+    follow = true;
+    glide = null;
+    return walkYou(town, { kind: "square", c: wrapI(sq[0]), r: wrapI(sq[1]) });
+  };
   const hookRide = () => {
     if (!testSwitchesAllowed()) return null;
     const you = town.people.indexOf(town.you);
@@ -1498,7 +1506,7 @@ function startTown(
     const p = painter as Painter & { uploads?: number; resets?: number };
     return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0 };
   };
-  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townBackend?: typeof hookBackend; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townRide?: typeof hookRide; __townYou?: typeof hookYou };
+  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townBackend?: typeof hookBackend; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townWalk?: typeof hookWalk; __townRide?: typeof hookRide; __townYou?: typeof hookYou };
   hooks.__townAt = hookAt;
   hooks.__townGlide = hookGlide;
   hooks.__townGather = hookGather;
@@ -1516,6 +1524,7 @@ function startTown(
   hooks.__townBackend = hookBackend;
   hooks.__townPaint = hookPaint;
   hooks.__townBench = hookBench;
+  hooks.__townWalk = hookWalk;
   hooks.__townRide = hookRide;
   hooks.__townYou = hookYou;
 
@@ -1653,6 +1662,7 @@ function startTown(
       delete hooks.__townBackend;
       delete hooks.__townPaint;
       delete hooks.__townBench;
+      delete hooks.__townWalk;
       delete hooks.__townRide;
       delete hooks.__townYou;
       painter.dispose();
