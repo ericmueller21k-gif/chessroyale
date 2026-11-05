@@ -8,6 +8,8 @@ import { asAdmin, test } from "./helpers.ts";
  * north; a tap on Ginger Igloo walks you down Fountain Street to its door square and its card opens; the up arrow into Smudgy's Art
  * Gallery from its door opens his card; a park table works. A player's town is today's (e2e/town.spec.ts and the rest, unchanged).
  * `STILLS=docs/street-town` also writes the stills: each street, the park and a home's card.
+ * Round 3 (Nov 5): the buildings are boxes and the camera turns on Seam Avenue: the turn walked on both renderers (fronts facing you before
+ * and after, a tap and an arrow mid-turn and after, every figure on screen at rest); `STILLS=docs/street-town-boxes` its stills.
  */
 test.use({ actionTimeout: 15_000 });
 
@@ -182,4 +184,150 @@ test("stills: each street of the street town", async ({ page }) => {
     await page.waitForTimeout(2500);
     await page.screenshot({ path: `${STILLS}/${name}-${project}.png` });
   }
+});
+
+// ---- Round 3 (Nov 5): the buildings as boxes and the turning camera (docs/decisions/2026-11-05-street-town-boxes.md).
+
+type Cam = {
+  heading: number;
+  headingTo: number;
+  figures: { name: string; x0: number; y0: number; x1: number; y1: number; fy: number; alpha: number }[];
+  boxes: { id: string; kind: string; facing: "S" | "W"; draws: number; front: boolean; facesYou: boolean; sides: number }[];
+};
+const cam = async (page: Page) => (await page.evaluate(() => (window as unknown as { __townCam: () => Cam }).__townCam()))!;
+const walkTo = async (page: Page, sq: readonly [number, number]) => {
+  await page.evaluate((s) => (window as unknown as { __townWalk: (s: readonly [number, number]) => boolean }).__townWalk(s), sq);
+  await expect.poll(async () => (await you(page)).join(","), { message: `walked to ${sq}`, timeout: 30_000 }).toBe(sq.join(","));
+};
+/** Every figure drawn (a boss, a bot, you) whole inside the world's box (Eric, Nov 4), its foot on screen; a faded one may be off. */
+async function figuresOnScreen(page: Page) {
+  const cv = (await canvas(page).boundingBox())!;
+  const c = await cam(page);
+  expect(c.figures.length, "figures drawn").toBeGreaterThan(0);
+  for (const f of c.figures) {
+    if (f.alpha < 0.5) continue;
+    expect(f.x0, `${f.name} not cut off on the left`).toBeGreaterThanOrEqual(-1);
+    expect(f.x1, `${f.name} not cut off on the right`).toBeLessThanOrEqual(cv.width + 1);
+    expect(f.y0, `${f.name} not cut off at the top`).toBeGreaterThanOrEqual(-1);
+    expect(f.fy, `${f.name}'s foot on screen`).toBeLessThanOrEqual(cv.height + 1);
+  }
+}
+/** Holds an arrow key until you've stepped off (c, r); answers where you ended up. */
+async function arrowStep(page: Page, key: string) {
+  const from = (await you(page)).join(",");
+  await page.keyboard.down(key);
+  await expect.poll(async () => (await you(page)).join(","), { message: `${key} walks you`, timeout: 5000 }).not.toBe(from);
+  await page.keyboard.up(key);
+  await expect.poll(async () => (await page.evaluate(() => (window as unknown as { __townYou: () => { moving: boolean } }).__townYou().moving)), { timeout: 5000 }).toBe(false);
+  return you(page);
+}
+/** A tap on square (c, r) where it's drawn now: you walk there. */
+async function tapSquare(page: Page, sq: readonly [number, number]) {
+  const xy = await page.evaluate((s) => (window as unknown as Hooks).__townAt?.("square", s as never) ?? null, sq);
+  expect(xy, `${sq} drawn`).not.toBeNull();
+  const cv = (await canvas(page).boundingBox())!;
+  await page.mouse.click(cv.x + xy!.x, cv.y + xy!.y);
+  await expect.poll(async () => (await you(page)).join(","), { message: `a tap walks you to ${sq}`, timeout: 15_000 }).toBe(sq.join(","));
+}
+const dist = (a: readonly number[], b: readonly number[]) => Math.abs(((a[0]! - b[0]! + 69) % 46) - 23) + Math.abs(a[1]! - b[1]!);
+
+for (const backend of ["2d", "webgl"] as const)
+  test(`the boxes and the turn (${backend}): walking east along Fountain Street onto Seam Avenue the camera turns, the fronts face you before and after; a tap and an arrow work mid-turn and after; every figure on screen at rest`, async ({ page }) => {
+    // (WebGL in the headless tests is software, about a third of 2D's frame rate: more time.)
+    test.setTimeout(backend === "webgl" ? 400_000 : 150_000);
+    const errors = watchErrors(page);
+    await openStreet(page, backend === "webgl" ? "&gl=1" : "");
+    await expect(canvas(page)).toHaveAttribute("data-backend", backend);
+    // Fountain Street, the camera north: the street's fronts (facing south) face you, drawn as boxes (their roofs and the row's ends).
+    await walkTo(page, [39, 14]);
+    await page.waitForTimeout(1200);
+    let c = await cam(page);
+    expect(c.heading).toBe(0);
+    expect(c.boxes.filter((b) => b.facing === "S" && b.kind !== "hedge" && b.facesYou).length, "Fountain Street's fronts face you").toBeGreaterThanOrEqual(3);
+    expect(c.boxes.some((b) => b.draws > 1), "boxes: roofs and sides").toBe(true);
+    await figuresOnScreen(page);
+    // East along it with the right arrow, onto the avenue's crossing (still north there).
+    await page.keyboard.down("ArrowRight");
+    for (let i = 0; i < 400 && (await you(page))[0]! < 43; i++) await page.waitForTimeout(15);
+    await page.keyboard.up("ArrowRight");
+    expect((await you(page))[1], "along the street").toBe(14);
+    await walkTo(page, [45, 14]);
+    const at = await you(page);
+    expect((await cam(page)).heading).toBe(0);
+    // A tap up the avenue, out of the crossing: the camera turns east as you leave it, easing (seen midway, frame by frame), about you.
+    await page.evaluate(() => {
+      const w = window as unknown as { __headings: number[]; __townCam: () => Cam };
+      w.__headings = [];
+      const t0 = performance.now();
+      const look = () => {
+        w.__headings.push(w.__townCam().heading);
+        if (performance.now() - t0 < 6000) requestAnimationFrame(look);
+      };
+      requestAnimationFrame(look);
+    });
+    await tapSquare(page, [at[0]!, 19]);
+    await expect.poll(async () => (await cam(page)).heading, { timeout: 5000 }).toBe(90);
+    const seen = await page.evaluate(() => (window as unknown as { __headings: number[] }).__headings);
+    expect(seen.some((h) => h > 20 && h < 70), `turned through the middle: ${[...new Set(seen.map(Math.round))].join(" ")}`).toBe(true);
+    for (let i = 1; i < seen.length; i++) expect(seen[i]!, "eased one way, no jumps back").toBeGreaterThanOrEqual(seen[i - 1]!);
+    // Down the avenue past the crossing (north there, east again after): its own fronts (facing west) face you.
+    await walkTo(page, [45, 8]);
+    await expect.poll(async () => (await cam(page)).heading, { timeout: 5000 }).toBe(90);
+    await page.waitForTimeout(1200);
+    c = await cam(page);
+    expect(c.boxes.filter((b) => b.facing === "W" && b.kind !== "hedge" && b.facesYou).length, "Seam Avenue's fronts face you").toBeGreaterThanOrEqual(2);
+    await figuresOnScreen(page);
+    // Mid-turn (held halfway): the up arrow walks you the way the screen's up points most nearly (east), and a tap where a square is drawn
+    // walks you there.
+    await page.evaluate(() => (window as unknown as { __townHeading: (h: number | null) => void }).__townHeading(50));
+    await page.waitForTimeout(300);
+    let from = await you(page);
+    let to = await arrowStep(page, "ArrowUp");
+    expect(to[1], "mid-turn: up is east, so along the row").toBe(from[1]);
+    expect(dist(to, [from[0]! + 1, from[1]!])).toBeLessThanOrEqual(dist(to, [from[0]! - 1, from[1]!]) - 1);
+    await tapSquare(page, [44, 9]);
+    await page.evaluate(() => (window as unknown as { __townHeading: (h: number | null) => void }).__townHeading(null));
+    await expect.poll(async () => (await cam(page)).heading, { timeout: 5000 }).toBe(90);
+    await page.waitForTimeout(800);
+    // After the turn (the camera east): right is south, and a tap still lands where it's aimed.
+    from = await you(page);
+    to = await arrowStep(page, "ArrowRight");
+    expect(to[0], "facing east: right is south, so down the avenue").toBe(from[0]);
+    expect(to[1]).toBeLessThan(from[1]!);
+    await tapSquare(page, [0, 7]);
+    await page.waitForTimeout(1200);
+    expect((await cam(page)).heading).toBe(90);
+    await figuresOnScreen(page);
+    expect(errors, "no page or console errors").toEqual([]);
+  });
+
+// The stills for Eric (STILLS=docs/street-town-boxes): a street by day and at dusk, the turn's three frames (from Fountain Street's
+// crossing onto Seam Avenue: before, halfway (held), after), and a boss home's sides (Boingo's Funhouse on Colosseum Row's corner).
+test("stills: the boxes and the turn", async ({ page }) => {
+  test.skip(!STILLS, "stills only (STILLS=docs/street-town-boxes)");
+  test.setTimeout(240_000);
+  mkdirSync(STILLS!, { recursive: true });
+  const project = test.info().project.name;
+  const shot = async (name: string) => {
+    await page.waitForTimeout(2500);
+    await page.screenshot({ path: `${STILLS}/${name}-${project}.png` });
+  };
+  for (const sky of ["day", "dusk"]) {
+    await asAdmin(page);
+    await page.goto(`/town?sky=${sky}`);
+    await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 20_000 });
+    await walkTo(page, [18, 0]);
+    await shot(`1-seam-street-${sky}`);
+  }
+  await page.goto("/town?sky=day");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 20_000 });
+  await walkTo(page, [45, 15]);
+  await shot("2-turn-1-before");
+  await page.evaluate(() => (window as unknown as { __townHeading: (h: number | null) => void }).__townHeading(45));
+  await shot("2-turn-2-mid");
+  await page.evaluate(() => (window as unknown as { __townHeading: (h: number | null) => void }).__townHeading(null));
+  await walkTo(page, [45, 19]);
+  await shot("2-turn-3-after");
+  await walkTo(page, [1, 23]);
+  await shot("3-home-sides-funhouse");
 });

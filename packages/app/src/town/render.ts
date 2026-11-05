@@ -3430,19 +3430,29 @@ export class Renderer {
     return out.x > 0 && out.x < this.W && out.y > 0 && out.y < this.H;
   }
 
-  /** (Tests) Every figure the last frame drew (the bosses, then the people): its name, its box on screen, how strongly it showed. */
-  figureBoxes(): { name: string; x0: number; y0: number; x1: number; y1: number; alpha: number }[] {
-    const out: { name: string; x0: number; y0: number; x1: number; y1: number; alpha: number }[] = [];
+  /** (Tests) Every figure the last frame drew (the bosses, then the people): its name, its box and foot on screen, how strongly it showed. */
+  figureBoxes(): { name: string; x0: number; y0: number; x1: number; y1: number; fy: number; alpha: number }[] {
+    const out: { name: string; x0: number; y0: number; x1: number; y1: number; fy: number; alpha: number }[] = [];
     for (const it of this.items) {
       if (!it.on || (it.kind !== "boss" && it.kind !== "person")) continue;
       const name = it.kind === "boss" ? this.town.bosses[it.i]!.home.boss : this.town.people[it.i]!.name;
-      out.push({ name, x0: it.x0, y0: it.y0, x1: it.x1, y1: it.y1, alpha: it.kind === "boss" ? this.bossAlpha[it.i] ?? 1 : this.personAlpha[it.i] ?? 1 });
+      out.push({ name, x0: it.x0, y0: it.y0, x1: it.x1, y1: it.y1, fy: it.fy, alpha: it.kind === "boss" ? this.bossAlpha[it.i] ?? 1 : this.personAlpha[it.i] ?? 1 });
     }
     return out;
   }
-  /** (Tests) The street town's boxes the last frame drew: each one's art and its draws (strips and faces; the 2D fallback's cost). */
-  boxDraws(): { id: string; kind: string; draws: number }[] {
-    return this.boxes.filter((b) => this.plans[b.i]!.on).map((b) => ({ id: b.box.id, kind: b.kind, draws: this.plans[b.i]!.draws }));
+  /**
+   * (Tests) The street town's boxes the last frame drew: each one's art, which way it faces, its draws (strips and faces; the 2D
+   * fallback's cost), whether its front was drawn and faced you, and how many of its sides were drawn.
+   */
+  boxDraws(): { id: string; kind: string; facing: "S" | "W"; draws: number; front: boolean; facesYou: boolean; sides: number }[] {
+    return this.boxes
+      .filter((b) => this.plans[b.i]!.on)
+      .map((b) => {
+        const p = this.plans[b.i]!;
+        const f = p.front;
+        // (Its front faces you: turned neither way from the camera, so unshaded.)
+        return { id: b.box.id, kind: b.kind, facing: b.facing, draws: p.draws, front: f.on, facesYou: f.on && f.shade < 0.004, sides: +p.left.on + +p.right.on };
+      });
   }
   private readonly bossAlpha: number[] = [];
   private readonly personAlpha: number[] = [];
