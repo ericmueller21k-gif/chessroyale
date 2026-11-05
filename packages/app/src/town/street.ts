@@ -8,7 +8,7 @@
  * Squares are (c, r): c west to east, r south to north, wrapping (world.ts's way); a position (x, y) is in squares, a
  * square's middle at whole numbers.
  */
-import PLAN from "./street-plan.json";
+import PLAN from "./street-plan.json" with { type: "json" };
 import { N } from "./camera.ts";
 import type { Design } from "./buildings.ts";
 
