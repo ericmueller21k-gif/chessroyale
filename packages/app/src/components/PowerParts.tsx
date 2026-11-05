@@ -36,6 +36,8 @@ export interface Moment {
   fizzled?: string[];
   /** Hollow's first cover of the dark. */
   first?: true;
+  /** Hollow's block of the dark: its size (2 or 3). */
+  size?: number;
   /** Jefferson's fireproof laugh: which of his lines (from the seed). */
   pick?: number;
   /** Wrangler's drag standing in for his showdown (none could be lined up). */

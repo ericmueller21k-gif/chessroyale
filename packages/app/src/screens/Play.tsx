@@ -20,6 +20,10 @@ import { BossFace, BossSide } from "../components/BossCharacter.tsx";
 import { KingCommand, KingSummon, kingSquare } from "../components/GodKing.tsx";
 import { LiveGhosts } from "./Crowd.tsx";
 import { DarkCost, PowerBoard, crowdView } from "../components/BossPowers.tsx";
+import { DarkForced, HOLLOW_BULB_LINES, HollowBlackout, hollowTaunt } from "../components/Hollow.tsx";
+import { bossKit } from "../characters/kits.ts";
+import { CRITICAL, NORMAL, bossVoice } from "../speech.tsx";
+import { play } from "../sound.ts";
 import { ScrambleCount } from "../components/Dash.tsx";
 import { duelCount, duelTurn } from "../components/Pig.tsx";
 import { bulletControl, bulletIncrementOn, bulletOn, kingBlocked } from "../components/Recluse.tsx";
@@ -179,7 +183,20 @@ export function PlayScreen({
   // Hollow's dark: the squares covered (their pieces hidden), and how your last attempt into it went.
   const dark = useMemo(() => (match.boss?.powers?.dark ?? []).map((d) => d.square), [match.boss?.powers?.dark?.map((d) => d.square).join()]);
   const note = match.darkNote;
-  const canMove = !waiting && !intro && !shown.replaying && !history.browsing && !striking && !note?.pending;
+  // (Boss alone, his bulbs: no move of yours while the dark moves for you, nor once the last bulb is out.)
+  const canMove = !waiting && !intro && !shown.replaying && !history.browsing && !striking && !note?.pending && !note?.forced && !note?.blackout;
+  // His word on each wrong move into the dark (a taunt at random, never the same twice running; Eric, Nov 5), and in Boss
+  // alone the dark's move for you and the blackout, each with its sound.
+  const strand = match.boss?.powers?.strand;
+  useEffect(() => {
+    if (!note || note.pending || !match.boss) return;
+    if (note.blackout) return void play("hollowBlackout");
+    if (note.forced) {
+      play("hollowForced");
+      return void bossVoice.say(HOLLOW_BULB_LINES.forced, `forced:${note.at}`, CRITICAL);
+    }
+    bossVoice.say(hollowTaunt(bossKit(match.boss.name)?.lines.misplay), `misplay:${note.at}`, NORMAL);
+  }, [note?.at]);
   // Premoves (chess.com's; docs/areas/board.md): kept by the match, this board and your side through the boss's and the
   // other team's screens; the first plays as soon as you can move (after the opening and the countdown). Not in Classic's
   // rounds (you move every round, then on another board: there's no turn of the other side's to move ahead of) nor in a
@@ -270,7 +287,8 @@ export function PlayScreen({
           <Board fen={fen} unmasked={drawnTrue} orientation={orientation} turn={view.turn} lastMove={lastMove} interactive={canMove} moves={offeredMoves} stopped={stoppedMove} onMove={(m, how) => match.submit(m, how?.premove)} premove={premove} onRefused={match.boss ? (m) => setRefused({ line: refusedLine(match.boss!, board.fen, m), fen: board.fen, at: Date.now() }) : undefined} arrows={arrows} dark={dark} onDarkTry={(m) => match.darkTry(m)} elephants={history.browsing ? undefined : match.boss?.powers?.elephants}>
             {/* (Stepping back through the game keeps the dark on its squares: it belongs to the square.) */}
             {match.boss?.powers && (!history.browsing || dark.length > 0) && <PowerBoard boss={match.boss} orientation={orientation} fen={fen} />}
-            {note && !note.pending && <DarkCost square={note.move.slice(2, 4)} since={note.at} now={now} orientation={orientation} />}
+            {note && !note.pending && <DarkCost square={note.move.slice(2, 4)} since={note.at} now={now} orientation={orientation} points={!strand} />}
+            {note?.forced && <DarkForced since={note.at} now={now} />}
             {match.boss && wipPower() && <WipPreview fen={fen} orientation={orientation} crowd={match.boss.crowdSide} />}
             {!waiting && deadline > 0 && <TimerBar startsAt={startsAt} deadline={deadline} total={total} frozen={strike?.at ? { at: strike.at, until: strike.until! } : undefined} />}
             {/* (Dash's Time Scramble: a scrambled move's big 3-2-1 over the board, taking no taps.) */}
@@ -357,7 +375,12 @@ export function PlayScreen({
               <span>
                 <strong>Your move.</strong>{" "}
                 {!alone && <span class="muted">{doneCount}/{alive.length} picked </span>}
-                {note && !note.pending ? (
+                {note && !note.pending && strand ? (
+                  // Boss alone: your own attempt into the dark wasn't legal: a bulb out, and what it brought.
+                  <span class="dark-note" role="status">
+                    {note.blackout ? "Your last bulb is out." : note.forced ? "Bulb out. The dark moves for you…" : `Bulb out · ${strand.of - strand.out} left`}
+                  </span>
+                ) : note && !note.pending ? (
                   // Your own attempt into the dark wasn't legal: what it cost, and the tries you have left.
                   <span class="dark-note" role="status">
                     −{DARK_COST} · {DARK_TRIES - note.tries} {DARK_TRIES - note.tries === 1 ? "try" : "tries"} left
@@ -414,6 +437,8 @@ export function PlayScreen({
       </div>
       )}
       {match.boss ? besideBoard(match, layout, <UnderBoard match={match} />) : <UnderBoard match={match} />}
+      {/* Boss alone, the last bulb out: the whole screen goes black, his line, then the loss screen. */}
+      {note?.blackout && match.boss && <HollowBlackout since={note.at} boss={match.boss} />}
     </div>
   );
 }

@@ -1229,6 +1229,18 @@ export const HOLLOW_LINES: Partial<Record<Beat, readonly string[]>> = {
   lightsFailed: ["You forgot. The dark moves twice.", "Forgotten. I move twice.", "The dark moves twice."],
   // His attack on a king (the God King in his Last Stand; the crowd's king at his mate), as he lands beside it.
   kingAttack: ["Shh. Sleep now, little king.", "Into the dark with you.", "Lights out, little king."],
+  // A misplay (Eric, Nov 5): your wrong move into the dark, alone or in a crowd; one at random, never the same twice
+  // running (components/Hollow.tsx, hollowTaunt). Eric's first two; the rest ours, placeholders until Eric's own lines.
+  misplay: [
+    "Nice try.",
+    "What, can't play in the dark?",
+    "Something was there. Wasn't it?",
+    "You reached for nothing.",
+    "Feeling around, are we?",
+    "The dark remembers. You don't.",
+    "Not there. Never there.",
+    "Wrong. And it's getting darker.",
+  ],
 };
 export const HOLLOW_CHANCE: Partial<Record<Beat, number>> = {
   entrance: 1,
@@ -1253,6 +1265,7 @@ export const HOLLOW_CHANCE: Partial<Record<Beat, number>> = {
   lightsHeld: 1,
   lightsFailed: 1,
   kingAttack: 1,
+  misplay: 1,
 };
 
 const PIECE_WORD: Record<string, string> = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" };
