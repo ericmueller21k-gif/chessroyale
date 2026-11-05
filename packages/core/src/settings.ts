@@ -3446,7 +3446,8 @@ export const SQUADS: SquadsSettings = {
   squadSize: 4,
   squadCount: 8,
   partyMax: 4,
-  boards: { relay: 4, pairs: 2, final: 1 },
+  // Eric, Nov 5: Relay on 3 boards, each squad's fourth player waiting to slot in (the ring: squads/schedule.ts); 4 before.
+  boards: { relay: 3, pairs: 2, final: 1 },
   voteSeconds: 8,
   // (4.2 s: the winner's banner a second longer, as every banner since Eric, Oct 15; was 3.2.)
   voteResultSeconds: 4.2,
@@ -3523,7 +3524,8 @@ export const SQUADS: SquadsSettings = {
     boardWin: 40,
     mate: 25,
     boardDraw: 15,
-    roundScale: [1, 2, 4],
+    // (Relay ×4/3 since its 3 boards, Nov 5: three boards pay what four did at ×1; Pairs' 2 and the final's 1 as before.)
+    roundScale: [4 / 3, 2, 4],
     matchWin: 150,
     // A brilliant move: 25, never more than a board won (Eric, Oct 13); twice per squad per match at most.
     brilliant: { coins: 25, capPerMatch: 2, gap: 0.5, fromPly: 16, decided: 0.1 },

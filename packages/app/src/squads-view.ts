@@ -5,7 +5,7 @@ import {
   modeOf,
   nextPrice,
   pairSchedule,
-  relayBoardOf,
+  relayMovesOf,
   type AssistUse,
   type Colour,
   type NetWallet,
@@ -112,14 +112,29 @@ export function seatIn(m: Pick<NetSquadsMatch, "sides">, playerId: string | null
 export const colourOf = (b: Pick<NetSquadsBoard, "white">, side: Side): Colour => (b.white === side ? "w" : "b");
 
 /**
- * Your board this turn and next (Relay: one board along each turn; Pairs: your pair's slot; the final: its one board).
- * Null when you're not in the match. `next` is null in the final.
+ * Relay: your moves from this turn on (this turn's first, if you have one), each its turn and board: on 3 boards the
+ * ring (Eric, Nov 5), on 4 (a match stored before) one board along a turn.
+ */
+export function myRelayMoves(m: Pick<NetSquadsMatch, "sides" | "turn" | "boards">, playerId: string | null, count: number, from = m.turn): { turn: number; board: number }[] {
+  const side = sideIn(m, playerId);
+  if (side === null) return [];
+  const seats = m.sides[side].seats;
+  return relayMovesOf(seats.indexOf(playerId!), from, count, m.boards.length, side, seats.length);
+}
+
+/**
+ * Your board this turn and next (Relay: your next two moves' boards, one board along each; this turn's, or where you
+ * slot in when it's your turn to wait; Pairs: your pair's slot; the final: its one board). Null when you're not in the
+ * match. `next` is null in the final.
  */
 export function myBoards(m: Pick<NetSquadsMatch, "format" | "sides" | "turn" | "boards">, playerId: string | null): { you: number; next: number | null } | null {
   const seat = seatIn(m, playerId);
   if (seat < 0) return null;
   const n = m.boards.length;
-  if (m.format === "relay" && n > 1) return { you: relayBoardOf(seat, m.turn, n), next: relayBoardOf(seat, m.turn + 1, n) };
+  if (m.format === "relay" && n > 1) {
+    const [a, b] = myRelayMoves(m, playerId, 2);
+    return { you: a?.board ?? 0, next: b?.board ?? null };
+  }
   if (m.format === "pairs" && n > 1) {
     const slot = (turn: number) => (pairSchedule(turn)[0].includes(seat) ? 0 : 1);
     return { you: slot(m.turn), next: slot(m.turn + 1) };
@@ -128,24 +143,22 @@ export function myBoards(m: Pick<NetSquadsMatch, "format" | "sides" | "turn" | "
 }
 
 /**
- * "Jump to my next board" (Relay; Eric, Oct 14): the board to study once you've moved, the one you play next. That's
- * next turn's board; if it has finished (you'd sit that turn out and scout), the first board after it that's still
- * going. Null when there's none but the one you're on, outside Relay, or when you're not in the match.
+ * Quick board jump (Relay; Eric, Oct 14 as "Jump to my next board"; in the Squads settings since Nov 5): the board to
+ * study once you've moved, the one you play next (one board along). If it has finished (you'd sit that move out and
+ * scout), the first board after it that's still going. Null when there's none but the one you're on, outside Relay, or
+ * when you're not in the match.
  */
 export function studyBoard(m: Pick<NetSquadsMatch, "format" | "sides" | "turn" | "boards">, playerId: string | null): number | null {
   const seat = seatIn(m, playerId);
   const n = m.boards.length;
   if (m.format !== "relay" || n < 2 || seat < 0) return null;
-  for (let k = 1; k < n; k++) {
-    const b = relayBoardOf(seat, m.turn + k, n);
-    if (!m.boards[b]?.result) return b;
-  }
+  for (const x of myRelayMoves(m, playerId, n - 1, m.turn + 1)) if (!m.boards[x.board]?.result) return x.board;
   return null;
 }
 
-/** The switch's name and its (i), in plain words (the FAQ uses the same). */
-export const JUMP_NEXT_LABEL = "Jump to my next board";
-export const JUMP_NEXT_INFO = "On: once you've moved, you go straight to the board you play next turn, to study it while you wait. Off: you stay on your board until the game moves you.";
+/** The setting's name and its (i), in plain words (the FAQ uses the same). */
+export const JUMP_NEXT_LABEL = "Quick board jump";
+export const JUMP_NEXT_INFO = "On: once you've moved in Relay, you go straight to the board you play next, to study it while you wait. Off: you stay on your board until the game moves you.";
 
 /**
  * Who's watching a board full size (Oct 14) shows the people the server says show it, less these: you, and the

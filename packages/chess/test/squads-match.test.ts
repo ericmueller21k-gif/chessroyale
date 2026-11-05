@@ -145,15 +145,15 @@ describe("Squads boards", () => {
 });
 
 describe("Squads starts and setup", () => {
-  it("random openings: each opening on two boards of a match, colors swapped", () => {
+  it("random openings: each opening on two boards of a match, colors swapped (Relay's third board its own)", () => {
     const plan = planLobby(5, rules("random"), library);
     const squads = startTeamClocks(bots32(), NORMAL);
     const m = planMatch(plan, 0, 0, [squads[0]!, squads[1]!], library);
     const ids = m.boards.map((b) => b.start.openingId);
+    expect(ids).toHaveLength(3);
     expect(ids[0]).toBe(ids[1]);
-    expect(ids[2]).toBe(ids[3]);
     expect(ids[0]).not.toBe(ids[2]);
-    expect(m.boards.map((b) => b.white)).toEqual([0, 1, 0, 1]);
+    expect(m.boards.map((b) => b.white)).toEqual([0, 1, 0]);
     expect(m.boards.every((b) => b.fen.split(" ")[1] === "w")).toBe(true);
     expect(m.safetyMoves).toBe(SQUADS.safetyCap);
     const r2 = planMatch(plan, 1, 0, [squads[0]!, squads[1]!], library);
@@ -215,9 +215,11 @@ describe("Squads team clocks across the tournament", () => {
     // Squad 0's movers take 10 s each (past the free seconds), squad 1's no time at all.
     const slow = Object.fromEntries(halfDuties(m).duties.map((d) => [d.players[0]!, d.side === 0 ? 10_000 : 0]));
     m = resolveHalf(m, inputs(m, firstMoves(m)), slow).match;
-    // (Both squads' two moves were made in time: each earns the increment.)
-    const drained = 2 * (10_000 - NORMAL.delaySeconds * 1000) - 2 * NORMAL.incrementSeconds * 1000;
-    const earned = 2 * NORMAL.incrementSeconds * 1000;
+    // (Relay on 3 boards: squad 0 White on two, squad 1 on one. Every move was made in time: each earns the increment.)
+    const [n0 = 0, n1 = 0] = [0, 1].map((side) => halfDuties(planMatch(plan, 0, 0, [squads[0]!, squads[1]!], library)).duties.filter((d) => d.side === side).length);
+    expect([n0, n1]).toEqual([2, 1]);
+    const drained = n0 * (10_000 - NORMAL.delaySeconds * 1000) - n0 * NORMAL.incrementSeconds * 1000;
+    const earned = n1 * NORMAL.incrementSeconds * 1000;
     expect(m.banks).toEqual([NORMAL.bankSeconds * 1000 - drained, NORMAL.bankSeconds * 1000 + earned]);
     squads = settleTeamClocks(squads, m);
     expect(squads[0]!.bankMs).toBe(NORMAL.bankSeconds * 1000 - drained);

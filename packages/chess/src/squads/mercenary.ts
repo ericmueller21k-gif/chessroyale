@@ -70,18 +70,24 @@ export function capturedPiece(fen: string, move: string): CapturePiece | null {
 
 /**
  * A board's coins in a round (captures, its win, mate and draw) are the base times `roundScale[round]`: fewer boards
- * a round, more each (Relay 4 boards, Pairs 2, the final 1), so every round pays about the same (Eric, Oct 13: about
- * 500-800 coins a squad a round). Armageddon is the final's round.
+ * a round, more each (Relay 3 boards ×4/3 since Nov 5, Pairs 2 ×2, the final 1 ×4), so every round pays about the
+ * same (Eric, Oct 13: about 500-800 coins a squad a round). Armageddon is the final's round. `boards`: the match's own
+ * count, when it isn't the round's today (a Relay match stored on 4 boards before Nov 5 keeps ×1: the scale times
+ * today's count over its own).
  */
-export const roundScale = (round: number, s: SquadsSettings = SQUADS): number => s.mercenary.roundScale[round] ?? 1;
+export function roundScale(round: number, s: SquadsSettings = SQUADS, boards?: number): number {
+  const k = s.mercenary.roundScale[round] ?? 1;
+  const today = round === 0 ? s.boards.relay : round === 1 ? s.boards.pairs : s.boards.final;
+  return boards && boards !== today ? (k * today) / boards : k;
+}
 
-/** The coins a capture earns in a round. */
-export const captureCoins = (piece: CapturePiece, round: number, s: SquadsSettings = SQUADS): number => Math.round(s.mercenary.capture[piece] * roundScale(round, s));
+/** The coins a capture earns in a round (`boards`: the match's, as `roundScale`). */
+export const captureCoins = (piece: CapturePiece, round: number, s: SquadsSettings = SQUADS, boards?: number): number => Math.round(s.mercenary.capture[piece] * roundScale(round, s, boards));
 
 /** What a finished board earns in a round: the winning color its win (and the mate bonus), or each color the draw. */
-export function boardCoins(result: BoardResult, round: number, s: SquadsSettings = SQUADS): { colour: Colour; coins: number; why: CoinWhy }[] {
+export function boardCoins(result: BoardResult, round: number, s: SquadsSettings = SQUADS, boards?: number): { colour: Colour; coins: number; why: CoinWhy }[] {
   const c = s.mercenary;
-  const k = roundScale(round, s);
+  const k = roundScale(round, s, boards);
   const draw = Math.round(c.boardDraw * k);
   if (result.winner === null) {
     return draw ? [{ colour: "w", coins: draw, why: "board_draw" }, { colour: "b", coins: draw, why: "board_draw" }] : [];
