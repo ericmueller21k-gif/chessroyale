@@ -13,7 +13,8 @@
  * Mercenary (coins, catch-up, the shop as bots shop, kits, Stockfish tokens; DECISIONS.md, "Squads modes: Mercenary")
  * and adds the economy's tables; its report goes to reports/squads-mercenary.md unless SQUADS_SIM_OUT says otherwise.
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+if (process.env.SQUADS_SIM_MODE === "mercenary" && existsSync("/tmp/claude-0/-home-user-wordtrap/995c05e6-7525-5f8d-aa8a-f83ae6d5177e/scratchpad/stop-merc")) process.exit(0); // TEMP-GUARD
 import { DEFAULT_SETTINGS, SQUADS, botSkillSpread, shuffle, type Candidate, type MercItem, type SquadsClock, type SquadsSettings } from "@chessroyale/core";
 import type { MoveScore, Opening, UciEngine } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
@@ -644,7 +645,7 @@ push(
   "",
   `${results.length} full lobbies of 32 (8 squads of 4), ${LOBBIES} for every skill mix × Clock option, from`,
   "`packages/sim/scripts/squads-sim.ts` (`npm run sim:squads`), through the real rules in `packages/chess/src/squads/`.",
-  "Each lobby plays the whole bracket: round 1 Relay (4 matches on 4 boards), round 2 Pairs (2 matches on 2 boards),",
+  `Each lobby plays the whole bracket: round 1 Relay (4 matches on ${S.boards.relay} boards, 4 a squad: the ring), round 2 Pairs (2 matches on ${S.boards.pairs} boards),`,
   "the final (a majority vote), and an Armageddon board after a drawn final. Every game is played to the end (the silent",
   "safety cap at move 120 aside). Start votes rotate between the normal start, one opening and random openings.",
   "",

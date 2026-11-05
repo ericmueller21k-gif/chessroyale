@@ -5,7 +5,9 @@ import {
   SQUAD_NAMES,
   lastMovesBy,
   relayMover,
-  turnOrder,
+  boardQueue,
+  foldedRows,
+  queueLine,
   bankText,
   cheatArrows,
   cheatEval,
@@ -476,43 +478,54 @@ describe("Mercenary on screen", () => {
   });
 });
 
-describe("The turn order under the board (Relay on 3 boards; Eric, Nov 5: all 8 in ring order, the mover lit)", () => {
+describe("The turn order under the board (Relay on 3 boards; Eric, Nov 5: one queue for the board on screen)", () => {
   const sides = [
     { squadId: 0, seats: ["a0", "a1", "a2", "a3"] },
     { squadId: 1, seats: ["b0", "b1", "b2", "b3"] },
   ];
   const board = (id: number, moves: string[]) => ({ id, white: (id % 2) as 0 | 1, moves, startFen: START_FEN, fen: START_FEN, lastMove: null, result: null });
-  const at = (turn: number, moves: string[][], duties: { board: number; side: 0 | 1; players: string[] }[], locked: string[] = []) =>
+  const at = (moves: string[][], duties: { board: number; side: 0 | 1; players: string[] }[] = [], locked: string[] = []) =>
     ({
       sides,
-      turn,
+      turn: moves[0]!.length >> 1,
       state: "half",
       locked,
       boards: moves.map((mv, i) => board(i, mv)),
-      current: { seq: 1, turn, half: "w", startedAt: 0, duties: duties.map((d) => ({ ...d, role: "move", deadline: 1 })), scouts: [], forced: [], chips: [] },
+      current: { seq: 1, turn: 0, half: "w", startedAt: 0, duties: duties.map((d) => ({ ...d, role: "move", deadline: 1 })), scouts: [], forced: [], chips: [] },
     }) as unknown as LocalMatch;
+  const ids = (m: LocalMatch, b: number, me: string | null = null) => boardQueue(m, b, me).map((r) => r.id);
 
-  it("one size on every board: yours first, 4 a squad in ring order; the movers lit until they've moved", () => {
-    const m = at(0, [[], [], []], [
-      { board: 2, side: 0, players: ["a0"] },
-      { board: 0, side: 0, players: ["a1"] },
-      { board: 1, side: 1, players: ["b0"] },
-    ]);
-    const [mine, theirs] = turnOrder(m, "b2");
-    expect(mine.map((r) => r.id)).toEqual(["b0", "b1", "b2", "b3"]);
-    expect(theirs.map((r) => r.id)).toEqual(["a0", "a1", "a2", "a3"]);
-    expect(theirs.filter((r) => r.lit).map((r) => r.id)).toEqual(["a0", "a1"]);
-    expect(mine.find((r) => r.you)!.id).toBe("b2");
-    // This turn's boards: side 0 board 3, 1, 2 and the fourth waits; side 1 board 2, 3, 1.
-    expect(theirs.map((r) => r.board)).toEqual([2, 0, 1, null]);
-    expect(mine.map((r) => r.board)).toEqual([1, 2, 0, null]);
-    expect(turnOrder({ ...m, locked: ["a0"] } as LocalMatch, "b2")[1].filter((r) => r.lit).map((r) => r.id)).toEqual(["a1"]);
-    for (const t of [1, 2, 3, 4]) for (const col of turnOrder({ ...m, turn: t } as LocalMatch, "a0")) expect(col).toHaveLength(4);
+  it("all 8 players, both squads interleaved, in the order they'll move on this board: the next there on top", () => {
+    const m = at([[], [], []], [{ board: 2, side: 0, players: ["a0"] }]);
+    // Board 3 (side 0 White): a0, then b1 (side 1's Black there), then each squad's player there a turn on (the ring
+    // brings each squad's seats to a board one turn apart: 1, 4, 3, 2).
+    expect(ids(m, 2)).toEqual(["a0", "b1", "a3", "b0", "a2", "b3", "a1", "b2"]);
+    for (const b of [0, 1, 2]) expect(new Set(ids(m, b)).size).toBe(8);
+    expect(boardQueue(m, 2, "a0")[0]).toMatchObject({ id: "a0", lit: true, you: true });
+    expect(boardQueue(m, 2, "a0").filter((r) => r.lit)).toHaveLength(1);
+  });
+
+  it("whoever moves drops to the bottom and everyone moves up", () => {
+    const before = ids(at([[], [], []]), 2);
+    const after = ids(at([[], [], ["e2e4"]]), 2);
+    expect(after).toEqual([...before.slice(1), before[0]]);
+  });
+
+  it("your row says where you stand; a phone's folded 4 keep your row", () => {
+    const m = at([[], [], []]);
+    const q = (me: string) => boardQueue(m, 2, me);
+    expect(queueLine(q("a0"))).toBe("Your turn · play now");
+    expect(queueLine(q("a3"))).toBe("Waiting for 2 players");
+    expect(queueLine(q("b1"))).toBe("Waiting for 1 player");
+    expect(queueLine(q("b2"))).toBe("Waiting for 7 players");
+    expect(queueLine(q("zz"))).toBeNull();
+    expect(foldedRows(q("a3")).map((r) => r.id)).toEqual(["a0", "b1", "a3", "b0"]);
+    // Further down: the top 3, then you.
+    expect(foldedRows(q("b2")).map((r) => r.id)).toEqual(["a0", "b1", "a3", "b2"]);
   });
 
   it("each player's last move, from the schedule: its board and ply (a row's tap shows the position after it)", () => {
-    // Turn 1's White half and Black's reply on every board.
-    const m = at(1, [["e2e4", "e7e5"], ["d2d4", "d7d5"], ["c2c4", "c7c5"]], []);
+    const m = at([["e2e4", "e7e5"], ["d2d4", "d7d5"], ["c2c4", "c7c5"]]);
     expect(relayMover(m, 2, 0)).toBe("a0");
     expect(relayMover(m, 0, 0)).toBe("a1");
     expect(relayMover(m, 1, 1)).toBe("a2");

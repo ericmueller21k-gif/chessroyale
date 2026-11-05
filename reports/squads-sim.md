@@ -2,7 +2,7 @@
 
 108 full lobbies of 32 (8 squads of 4), 12 for every skill mix × Clock option, from
 `packages/sim/scripts/squads-sim.ts` (`npm run sim:squads`), through the real rules in `packages/chess/src/squads/`.
-Each lobby plays the whole bracket: round 1 Relay (4 matches on 4 boards), round 2 Pairs (2 matches on 2 boards),
+Each lobby plays the whole bracket: round 1 Relay (4 matches on 3 boards, 4 a squad: the ring), round 2 Pairs (2 matches on 2 boards),
 the final (a majority vote), and an Armageddon board after a drawn final. Every game is played to the end (the silent
 safety cap at move 120 aside). Start votes rotate between the normal start, one opening and random openings.
 
@@ -11,9 +11,9 @@ when it advances. Each of its moves being thought about drains it past the free 
 final's voting squad; two at once drain it twice as fast), and each move made in time earns the increment back. No move
 goes past its cap. At zero it's sudden death: every move within the free seconds, or it's a random move, until the
 increment for moves made in time lifts it out again. No flag falls. The options:
-- Rapid 5+2: 5 min + 2 s a move · max 20 s, +1 a round, 2 s free a move.
-- Blitz 3+2: 3 min + 2 s a move · max 15 s, +0:30 a round, 2 s free a move.
 - Bullet 1+1: 1 min + 1 s a move · max 10 s, +0:15 a round, 2 s free a move.
+- Blitz 3+2: 3 min + 2 s a move · max 15 s, +0:30 a round, 2 s free a move.
+- Rapid 5+2: 5 min + 2 s a move · max 20 s, +1 a round, 2 s free a move.
 
 **How the seats are played.** Every seat is a person played by a bot: the bot engine (Stockfish 19 lite at
 10,000 nodes, its top 8 moves) then `botPick` at the person's skill, a temperature over each move's loss:
@@ -32,7 +32,7 @@ moves: here this engine's); the engine also judges which of two picks was better
 - Past the cap on a move it's missed. They also miss outright (a distraction) 2.0% of the time: the half waits to their deadline.
 
 A half lasts as long as its slowest player, plus the show: 1 s for a Relay half's moves, 3 s for the pair's reveal,
-4.5 s for the final's reveal. A match starts as soon as its two feeder matches are done, after 20 s of bracket; 33.6 s of votes come first.
+4.5 s for the final's reveal. A match starts as soon as its two feeder matches are done, after 20 s of bracket; 39.6 s of votes (the first opening 3 s in) come first.
 
 ## How long a lobby takes
 
@@ -40,25 +40,25 @@ Minutes from the votes to the final's last move (Armageddon included).
 
 | Clock | Median | 90th percentile | Longest | Shortest | Median if rounds ran in lockstep |
 | --- | --- | --- | --- | --- | --- |
-| Rapid 5+2 (+1 a round, 2 s free, max 20 s) | 35.9 | 52.6 | 82.6 | 25.3 | 36.4 |
-| Blitz 3+2 (+0:30 a round, 2 s free, max 15 s) | 33.5 | 40.9 | 46.6 | 27.9 | 34.3 |
-| Bullet 1+1 (+0:15 a round, 2 s free, max 10 s) | 26.9 | 34.7 | 55.8 | 21.0 | 27.4 |
+| Bullet 1+1 (+0:15 a round, 2 s free, max 10 s) | 31.7 | 37.3 | 45.2 | 25.7 | 32.5 |
+| Blitz 3+2 (+0:30 a round, 2 s free, max 15 s) | 39.4 | 50.2 | 53.9 | 32.9 | 39.8 |
+| Rapid 5+2 (+1 a round, 2 s free, max 20 s) | 45.7 | 54.5 | 70.8 | 34.4 | 46.9 |
 
 By skill mix (median minutes):
 
-| Mix | Rapid | Blitz | Bullet |
+| Mix | Bullet | Blitz | Rapid |
 | --- | --- | --- | --- |
-| Strong | 42.4 | 39.2 | 30.2 |
-| Mixed | 34.8 | 32.7 | 26.9 |
-| Casual | 36.4 | 33.4 | 24.4 |
+| Strong | 32.5 | 41.4 | 47.1 |
+| Mixed | 33.5 | 39.1 | 44.3 |
+| Casual | 30.7 | 39.0 | 47.1 |
 
 A match's length (mean minutes, Armageddon included) and its moves per side (its longest board):
 
 | Clock | Round 1 (Relay): min | Round 2 (Pairs): min | Final: min | Round 1 (Relay): moves | Round 2 (Pairs): moves | Final: moves |
 | --- | --- | --- | --- | --- | --- | --- |
-| Rapid | 10.5 | 11.4 | 13.0 | 36.1 | 37.9 | 32.9 |
-| Blitz | 9.2 | 10.8 | 10.4 | 37.4 | 39.0 | 31.6 |
-| Bullet | 6.1 | 9.2 | 10.3 | 35.2 | 40.6 | 35.4 |
+| Bullet | 6.8 | 11.1 | 10.0 | 30.6 | 36.8 | 31.1 |
+| Blitz | 10.4 | 14.2 | 11.2 | 32.1 | 38.2 | 29.5 |
+| Rapid | 12.2 | 15.3 | 12.7 | 32.3 | 38.5 | 30.8 |
 
 ## Sudden death
 
@@ -66,9 +66,9 @@ A squad whose bank reaches zero plays every move within the free seconds (or it'
 
 | Clock | Squads that reach it | …first in round 1 | …in round 2 | …in the final | Moves made in sudden death | …round 1 | …round 2 | …final | Moves out of time (random) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Rapid | 24.7% | 1.7% | 45.8% | 0.0% | 0.4% | 0.0% | 1.8% | 0.0% | 0.5% |
-| Blitz | 21.5% | 0.7% | 41.7% | 0.0% | 0.4% | 0.0% | 1.6% | 0.0% | 0.6% |
-| Bullet | 30.9% | 0.7% | 60.4% | 0.0% | 0.5% | 0.0% | 2.1% | 0.0% | 0.7% |
+| Bullet | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% |
+| Blitz | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% |
+| Rapid | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% |
 
 ## Bank carried forward
 
@@ -76,9 +76,9 @@ Round 1 winners, split at the median length of their round 1 match: the bank the
 
 | Clock | Bank left, faster R1 wins | Bank left, slower R1 wins | Faster R1 matches (min) | Slower R1 matches (min) | R2: more bank wins | Final: more bank wins |
 | --- | --- | --- | --- | --- | --- | --- |
-| Rapid | 48.5 s | 33.2 s | 9.0 | 12.0 | 54.2% of 72 | 58.3% of 36 |
-| Blitz | 39.7 s | 30.6 s | 7.8 | 10.8 | 58.3% of 72 | 47.2% of 36 |
-| Bullet | 22.7 s | 18.2 s | 5.3 | 7.0 | 66.7% of 72 | 44.4% of 36 |
+| Bullet | 100.5 s | 112.2 s | 5.3 | 8.2 | 51.4% of 72 | 36.1% of 36 |
+| Blitz | 154.9 s | 152.6 s | 8.5 | 12.4 | 52.8% of 72 | 41.7% of 36 |
+| Rapid | 181.8 s | 167.4 s | 9.6 | 14.8 | 45.8% of 72 | 38.9% of 36 |
 
 ## How boards end
 
@@ -86,15 +86,15 @@ All mixes.
 
 | Clock | Round | Mate | Draw by the rules | Safety cap | Left unfinished (clinched) |
 | --- | --- | --- | --- | --- | --- |
-| Rapid | Round 1 (Relay) | 92.5% | 0.3% | 0.0% | 7.1% |
-| Rapid | Round 2 (Pairs) | 98.6% | 1.4% | 0.0% | 0.0% |
-| Rapid | Final | 88.9% | 8.3% | 2.8% | 0.0% |
-| Blitz | Round 1 (Relay) | 93.8% | 0.3% | 0.0% | 5.9% |
-| Blitz | Round 2 (Pairs) | 99.3% | 0.7% | 0.0% | 0.0% |
+| Bullet | Round 1 (Relay) | 81.3% | 0.2% | 0.0% | 18.5% |
+| Bullet | Round 2 (Pairs) | 97.9% | 2.1% | 0.0% | 0.0% |
+| Bullet | Final | 100.0% | 0.0% | 0.0% | 0.0% |
+| Blitz | Round 1 (Relay) | 82.6% | 0.5% | 0.0% | 16.9% |
+| Blitz | Round 2 (Pairs) | 98.6% | 1.4% | 0.0% | 0.0% |
 | Blitz | Final | 100.0% | 0.0% | 0.0% | 0.0% |
-| Bullet | Round 1 (Relay) | 91.8% | 0.0% | 0.0% | 8.2% |
-| Bullet | Round 2 (Pairs) | 99.3% | 0.7% | 0.0% | 0.0% |
-| Bullet | Final | 91.7% | 8.3% | 0.0% | 0.0% |
+| Rapid | Round 1 (Relay) | 81.0% | 0.5% | 0.5% | 18.1% |
+| Rapid | Round 2 (Pairs) | 100.0% | 0.0% | 0.0% | 0.0% |
+| Rapid | Final | 100.0% | 0.0% | 0.0% | 0.0% |
 
 ## Ties
 
@@ -102,17 +102,17 @@ Rounds 1 and 2: a level match goes to the squad with more team bank left (a coin
 
 | Clock | R1 clinched early | R1 level → bank | R2 level → bank | Level → coin | Median bank gap deciding a tie (s) | Final drawn → Armageddon | Armageddon won by Black |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Rapid | 28.5% | 31.3% | 44.4% | 0 of 77 | 9.6 | 11.1% | 25.0% of 4 |
-| Blitz | 23.6% | 42.4% | 50.0% | 0 of 97 | 7.1 | 0.0% | – |
-| Bullet | 32.6% | 31.9% | 45.8% | 0 of 79 | 4.8 | 8.3% | 0.0% of 3 |
+| Bullet | 55.6% | 0.0% | 29.2% | 0 of 21 | 3.6 | 0.0% | – |
+| Blitz | 50.7% | 0.0% | 45.8% | 0 of 33 | 11.0 | 0.0% | – |
+| Rapid | 54.2% | 0.0% | 48.6% | 0 of 35 | 12.0 | 0.0% | – |
 
 ## Missed actions
 
 | Clock | Actions per lobby | Missed (absent or out of time) | Seats handed to a bot, per lobby |
 | --- | --- | --- | --- |
-| Rapid | 1682.1 | 2.2% | 0.0 |
-| Blitz | 1650.6 | 2.3% | 0.0 |
-| Bullet | 1709.9 | 2.4% | 0.0 |
+| Bullet | 1351.5 | 2.1% | 0.0 |
+| Blitz | 1387.9 | 2.0% | 0.0 |
+| Rapid | 1369.4 | 2.2% | 0.0 |
 
 ## Round 2: how often the coin plays the weaker pick
 
@@ -120,9 +120,9 @@ Per pair move (forced moves left out). "Weaker" is by the engine's expected scor
 
 | Mix | Pair moves | Picks 1+ point apart | Coin played the weaker pick (1+ point) | …weaker by 5+ points | …weaker by 20+ points | Moves with a missed slot |
 | --- | --- | --- | --- | --- | --- | --- |
-| Strong | 9768 | 26.9% | 13.3% | 6.0% | 1.8% | 5.3% |
-| Mixed | 9140 | 26.8% | 13.6% | 7.0% | 2.7% | 4.4% |
-| Casual | 8798 | 25.7% | 12.5% | 6.5% | 2.4% | 4.6% |
+| Strong | 8689 | 26.9% | 13.8% | 6.4% | 2.3% | 4.5% |
+| Mixed | 8929 | 27.2% | 13.8% | 6.3% | 2.1% | 4.1% |
+| Casual | 8736 | 24.7% | 11.9% | 6.3% | 2.2% | 4.0% |
 
 ## Round 2: same-move tokens
 
@@ -130,13 +130,13 @@ Per pair move (forced moves left out). "Weaker" is by the engine's expected scor
 
 | Mix | Tokens burned per squad per match | Refunded | Not refunded: another move close | …another move better | …unranked or no judge |
 | --- | --- | --- | --- | --- | --- |
-| Strong | 2.2 | 79.2% | 20.8% | 0.0% | 0.0% |
-| Mixed | 1.8 | 80.1% | 19.9% | 0.0% | 0.0% |
-| Casual | 1.0 | 84.1% | 15.9% | 0.0% | 0.0% |
+| Strong | 2.3 | 76.2% | 23.8% | 0.0% | 0.0% |
+| Mixed | 1.5 | 70.0% | 30.0% | 0.0% | 0.0% |
+| Casual | 1.0 | 74.8% | 25.2% | 0.0% | 0.0% |
 
-## Blocks (every round)
+## Blocks
 
-A 5-point bank per squad per match. Bots block sparingly: the other squad's likely reply to their own move.
+No block points to start: only the shop's (3 for each Block points bought), so none in round 1. Bots block sparingly: the other squad's likely reply to their own move.
 
 | Mix | Round | Blocks per squad per match | Points spent per squad per match | In effect | Lifted: impossible after the move | …in check | …no move left | …mate in one |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -156,9 +156,9 @@ Per move of the final (and its Armageddon), forced moves left out.
 
 | Mix | Moves | Picks counted (mean) | A clear majority (3+ of 4) | 2 of 4 on the top move | A tie (the coin) | Nobody picked | The move played worse than the best pick (1+ point) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Strong | 3283 | 3.9 | 68.5% | 19.2% | 12.4% | 0.0% | 3.2% |
-| Mixed | 2190 | 3.9 | 66.1% | 20.1% | 13.8% | 0.0% | 8.3% |
-| Casual | 2005 | 3.9 | 51.8% | 30.6% | 17.7% | 0.0% | 13.7% |
+| Strong | 2390 | 3.9 | 71.9% | 16.7% | 11.3% | 0.0% | 3.4% |
+| Mixed | 2067 | 3.9 | 65.3% | 21.0% | 13.7% | 0.0% | 8.3% |
+| Casual | 1964 | 3.9 | 56.2% | 27.9% | 15.9% | 0.0% | 12.0% |
 
 The "what this means for fun" section is written by hand below this line.
 

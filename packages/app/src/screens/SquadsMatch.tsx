@@ -14,7 +14,7 @@ import { testParams } from "../test-switches.ts";
 import { BlockArrows, BlockPicker, ChipIcon, LockIcon, PickTags, SquadResources, TokenBreakdown, squareAt } from "../components/SquadsBlocks.tsx";
 import { Coins, ItemIcon, KitIcons } from "../components/MercenaryShop.tsx";
 import { CoachMarks, ReplayButton, ReplayIcon, ReplayTag, useReplayMode } from "../components/MoveReplay.tsx";
-import { arriveAt, replayFrameAt, replayFrames, replayRange, replayTimes, seenAt, type ReplayFrame } from "../move-replay.ts";
+import { replayFrameAt, replayFrames, replayMoves, replayTimes, type ReplayFrame } from "../move-replay.ts";
 import { ownEngine } from "../engine.ts";
 import { onPrefsChange, setSquadsJumpNext, squadsJumpNext } from "../prefs.ts";
 import type { SquadsClient } from "../squads.ts";
@@ -26,7 +26,9 @@ import {
   ROUND_NAME,
   bankText,
   squadColour,
-  turnOrder,
+  boardQueue,
+  foldedRows,
+  queueLine,
   type TurnRow,
   blockBankNow,
   hasBlocks,
@@ -312,27 +314,23 @@ function Banner({ title, sub, until, children }: { title: string; sub?: Componen
 }
 
 /**
- * Move replay (Eric, Nov 5; move-replay.ts): when your move on a board starts, the moves made there while you weren't
- * viewing it (`replayRange`; the replay button: the last 2 of them, or all), one by one, within the extra free time
- * the rule gave you (the server's `freeMs`; the last 2 sooner done), then the board as it stands. Moves you watched live
- * never replay. Not while you browse the moves, or once skipped (a tap on the board). `me`: you, on your own board
- * (null: nothing to replay).
+ * Move replay (Eric, Nov 5; move-replay.ts): when your move on a board starts, the last 2 moves there or all since you
+ * last played it (the replay button), one by one, within the extra free time the rule gave you (the server's `freeMs`;
+ * the last 2 sooner done), then the board as it stands. None if you were watching this board when both of its last two
+ * moves landed (`replayMoves`). Not while you browse the moves, or once skipped (a tap on the board). `me`: you, on your
+ * own board (null: nothing to replay).
  */
 function useMoveReplay(m: LocalMatch, b: LocalBoard, me: string | null, browsing: boolean): { frame: ReplayFrame | null; step: number; count: number; skip: () => void } {
   const mode = useReplayMode();
   const d = me && m.state === "half" && m.current ? m.current.duties.find((x) => x.board === b.id && x.players.includes(me)) : undefined;
-  // (When this board came on screen, and when it was last seen before: this view is drawn afresh for each board.)
-  const id = `${m.key}/${b.id}`;
-  const view = useRef<ReturnType<typeof arriveAt> | null>(null);
-  view.current ??= arriveAt(id, b.moves.length);
-  useEffect(() => seenAt(id, b.moves.length), [b.moves.length]);
-  const range = d ? replayRange({ mode, total: b.moves.length, missed: replayCount(d, me), ...view.current }) : null;
-  const n = range ? range[1] - range[0] : 0;
+  // (The board's move count when it came on screen: this view is drawn afresh for each board, and kept while it shows.)
+  const arrivedAt = useRef(b.moves.length);
+  const n = d ? replayMoves({ mode, total: b.moves.length, missed: replayCount(d, me), arrivedAt: arrivedAt.current }) : 0;
   const extra = d ? freeMs(m, b.id) - m.delayMs : 0;
   const total = mode === "two" ? Math.min(extra, SQUADS_LOBBY.replay.firstMs + (n + 1) * SQUADS_LOBBY.replay.stepMs) : extra;
   const half = m.current ? `${m.key}/${m.current.seq}` : "";
   const [skipped, setSkipped] = useState<string | null>(null);
-  const frames = useMemo(() => (range && total > 0 ? replayFrames(b.startFen, b.moves.slice(0, range[1]), (b.by ?? []).slice(0, range[1]), n) : []), [half, range?.join(), total]);
+  const frames = useMemo(() => (n > 0 && total > 0 ? replayFrames(b.startFen, b.moves, b.by ?? [], n) : []), [half, n, total, b.moves.length]);
   const startedAt = m.current?.startedAt ?? 0;
   const frame = !browsing && skipped !== half && frames.length > 1 ? replayFrameAt(frames, total, Date.now() - startedAt) : null;
   // (Drawn again as each move lands, and as it ends.)
@@ -634,7 +632,7 @@ function MatchView({
   }, [banner?.at]);
   const sideTag = (s: Side) => <SquadTag id={m.sides[s].squadId} you={s === mySide} />;
   const computer = useMedia(COMPUTER_LAYOUT);
-  const turnBox = m.format === "relay" ? <TurnOrderBox client={client} m={m} onRow={canShow ? onShow : null} shownBoard={boardId} shownPly={history.browsing ? history.ply : null} /> : null;
+  const turnBox = m.format === "relay" ? <TurnOrderBox client={client} m={m} board={boardId} computer={computer} onRow={canShow ? onShow : null} shownPly={history.browsing ? history.ply : null} /> : null;
   return (
     <div class={`screen game sq-game sq-${m.format}${m.round === 2 ? " sq-is-final" : ""}`}>
       <div class="hud-row">
@@ -838,52 +836,65 @@ function coachStart(): number {
 
 /**
  * The turn order (Relay; Eric, Nov 5: "you know when you look down right away, being like, oh, I've got 2 turns left";
- * his pick: all 8 in ring order): a box of one size on every board, a column a squad (yours first), its players in the
- * order they move, the player to move lit; each with the board they play this turn (none: their turn to wait) and, on
- * the right, the move they last played (as the scoreboard shows moves). A tap on a row shows the board at the position
- * after that move.
+ * his correction: one queue for the board on screen): all 8 players in the order they'll move on this board, the next
+ * there on top (lit while it's their move now), each with their squad's color and, on the right, the move they last
+ * played (a tap shows that position). Your row says where you stand: "Your turn · play now", or how many move there
+ * before you. A phone shows 4 rows (with you further down, the top 3 and yours) and a tap opens all 8 over the board,
+ * so nothing below moves; a computer all 8. One size per state on every board.
  */
-function TurnOrderBox({ client, m, onRow, shownBoard, shownPly }: { client: SquadsClient; m: LocalMatch; onRow: ((board: number, ply: number) => void) | null; shownBoard: number; shownPly: number | null }) {
-  const cols = turnOrder(m, client.myId);
+function TurnOrderBox({ client, m, board, computer, onRow, shownPly }: { client: SquadsClient; m: LocalMatch; board: number; computer: boolean; onRow: ((board: number, ply: number) => void) | null; shownPly: number | null }) {
+  const [open, setOpen] = useState(false);
+  const queue = boardQueue(m, board, client.myId);
+  const line = queueLine(queue);
   const key = m.boards.map((b) => b.moves.length).join();
   const sans = useMemo(() => {
     const out = new Map<string, string>();
-    for (const r of cols.flat()) {
+    for (const r of queue) {
       if (!r.last) continue;
       const b = m.boards[r.last.board]!;
       out.set(r.id, safeSan(fenAtPly(b.moves, r.last.ply, [{ ply: 0, fen: b.startFen }]), b.moves[r.last.ply]!));
     }
     return out;
-  }, [key, m.turn]);
-  const rows = 4;
+  }, [key, board]);
+  const all = computer || open;
+  const rows = all ? queue : foldedRows(queue);
   const nameOf = (r: TurnRow) => (r.you ? "You" : short(client.nameOf(r.id)));
+  const list = (
+    <div class={`sq-to-list${all ? " all" : ""}`} role="list" aria-label={`Turn order on board ${board + 1}`}>
+      {rows.map((r, i) => {
+        const shown = !!r.last && shownPly !== null && r.last.board === board && r.last.ply + 1 === shownPly;
+        const gap = !all && i === 3 && queue.indexOf(r) > 3;
+        return (
+          <button
+            key={r.id}
+            type="button"
+            role="listitem"
+            class={`sq-to-row${i === 0 ? " top" : ""}${r.lit ? " lit" : ""}${r.you ? " you" : ""}${shown ? " shown" : ""}${gap ? " skip" : ""}`}
+            style={{ "--sq": squadColour(m.sides[r.side].squadId) }}
+            disabled={!r.last || !onRow}
+            onClick={() => r.last && onRow?.(r.last.board, r.last.ply + 1)}
+            aria-label={`${nameOf(r)}${r.you && line ? `, ${line}` : ""}${r.last ? `, last played ${sans.get(r.id)} on board ${r.last.board + 1}` : ""}`}
+          >
+            <span class="sq-to-mark" aria-hidden="true" />
+            <span class="sq-to-name">{nameOf(r)}</span>
+            {r.you && line && <span class="sq-to-where">{line}</span>}
+            <span class="sq-to-move">{r.last ? sans.get(r.id) : ""}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
   return (
-    <div class="sq-to" role="group" aria-label="Turn order">
-      {cols.map((col, c) => (
-        <div key={c} class="sq-to-col" style={{ "--sq": squadColour(m.sides[col[0]?.side ?? 0].squadId) }} role="list">
-          {Array.from({ length: rows }, (_, i) => {
-            const r = col[i];
-            if (!r) return <span key={`gap${i}`} class="sq-to-row gap" aria-hidden="true" />;
-            const shown = !!r.last && shownPly !== null && r.last.board === shownBoard && r.last.ply + 1 === shownPly;
-            const colour = r.board === null ? null : colourOf(m.boards[r.board]!, r.side);
-            return (
-              <button
-                key={r.id}
-                type="button"
-                role="listitem"
-                class={`sq-to-row${r.lit ? " lit" : ""}${r.you ? " you" : ""}${r.board === null ? " waits" : ""}${shown ? " shown" : ""}`}
-                disabled={!r.last || !onRow}
-                onClick={() => r.last && onRow?.(r.last.board, r.last.ply + 1)}
-                aria-label={`${nameOf(r)}${r.lit ? ", to move" : ""}${r.last ? `, last played ${sans.get(r.id)} on board ${r.last.board + 1}` : ""}`}
-              >
-                <span class={`sq-to-board${colour ? ` is-${colour}` : ""}`}>{r.board === null ? "" : r.board + 1}</span>
-                <span class="sq-to-name">{nameOf(r)}</span>
-                <span class="sq-to-move">{r.last ? sans.get(r.id) : ""}</span>
-              </button>
-            );
-          })}
-        </div>
-      ))}
+    <div class={`sq-to${computer ? " computer" : ""}${open ? " open" : ""}`} role="group" aria-label="Turn order">
+      {list}
+      {!computer && (
+        <button type="button" class="sq-to-more" aria-expanded={open} aria-label={open ? "Show the next 4" : "Show all 8"} onClick={() => setOpen(!open)}>
+          <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
+            <path d={open ? "M2.5 7.5L6 4l3.5 3.5" : "M2.5 4.5L6 8l3.5-3.5"} fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span>{open ? "4" : "8"}</span>
+        </button>
+      )}
     </div>
   );
 }

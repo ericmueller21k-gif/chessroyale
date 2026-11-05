@@ -148,11 +148,9 @@ export function myBoards(m: Pick<NetSquadsMatch, "format" | "sides" | "turn" | "
 export interface TurnRow {
   id: string;
   side: Side;
-  /** To move now (lit): a move asked of them this half, not yet made. */
+  /** Moving there now (lit): the move this half on the board is theirs, not yet made. */
   lit: boolean;
   you: boolean;
-  /** The board of their move this turn (null: it's their turn to wait). */
-  board: number | null;
   /** The move they last played in this match: its board and ply (null: none yet). */
   last: { board: number; ply: number } | null;
 }
@@ -181,23 +179,41 @@ export function lastMovesBy(m: Pick<LocalMatch, "sides" | "boards">): Map<string
 }
 
 /**
- * The turn order (Relay; Eric, Nov 5: all 8 players, in ring order, the mover lit): one column a squad, yours first,
- * its players in the order they move, round and round (move k is seat k mod 4's), so a column never reorders and the
- * box keeps one size on every board.
+ * The turn order (Relay; Eric, Nov 5, his correction): one queue for the board on screen, all 8 players (both squads,
+ * interleaved) in the order they'll move on it, the next to move there on top. Each turn every board gets one move a
+ * side, and the ring moves each squad's player there on by one a turn, so the next 8 moves on a board are all 8 players
+ * once: whoever moves drops to the bottom and everyone moves up.
  */
-export function turnOrder(m: Pick<LocalMatch, "sides" | "boards" | "turn" | "state" | "current" | "locked">, me: string | null): [TurnRow[], TurnRow[]] {
-  const mine = sideIn(m, me);
-  const order: Side[] = mine === 1 ? [1, 0] : [0, 1];
-  const n = m.boards.length;
+export function boardQueue(m: Pick<LocalMatch, "sides" | "boards" | "state" | "current" | "locked">, board: number, me: string | null): TurnRow[] {
+  const b = m.boards[board];
+  if (!b) return [];
   const last = lastMovesBy(m);
-  const toMove = new Set(m.state === "half" && m.current ? m.current.duties.filter((d) => d.role === "move").flatMap((d) => d.players).filter((p) => !m.locked.includes(p)) : []);
-  return order.map((side) => {
-    const seats = m.sides[side].seats;
-    return seats.map((id, seat): TurnRow => {
-      const here = relayMovesOf(seat, m.turn, 1, n, side, seats.length)[0];
-      return { id, side, lit: toMove.has(id), you: id === me, board: here && here.turn === m.turn ? here.board : null, last: last.get(id) ?? null };
-    });
-  }) as [TurnRow[], TurnRow[]];
+  const size = m.sides[0].seats.length + m.sides[1].seats.length;
+  const now = m.state === "half" && m.current ? m.current.duties.find((d) => d.board === board && d.role === "move") : undefined;
+  const out: TurnRow[] = [];
+  for (let p = b.moves.length; out.length < size && p < b.moves.length + 4 * size; p++) {
+    const id = relayMover(m, board, p);
+    if (!id || out.some((r) => r.id === id)) continue;
+    const side: Side = m.sides[0].seats.includes(id) ? 0 : 1;
+    out.push({ id, side, lit: p === b.moves.length && !!now && now.players.includes(id) && !m.locked.includes(id), you: id === me, last: last.get(id) ?? null });
+  }
+  return out;
+}
+
+/** Where you stand in a board's queue: "Your turn · play now" on top, else how many move there before you. */
+export function queueLine(rows: readonly TurnRow[]): string | null {
+  const i = rows.findIndex((r) => r.you);
+  if (i < 0) return null;
+  return i === 0 ? "Your turn · play now" : `Waiting for ${i} ${i === 1 ? "player" : "players"}`;
+}
+
+/**
+ * The rows a phone shows with the queue folded (Eric: the top 4, a tap for all 8): the top 4; with you further down,
+ * the top 3 and your row, so it always says where you stand.
+ */
+export function foldedRows(rows: readonly TurnRow[], shown = 4): TurnRow[] {
+  const i = rows.findIndex((r) => r.you);
+  return i < shown ? rows.slice(0, shown) : [...rows.slice(0, shown - 1), rows[i]!];
 }
 
 /**

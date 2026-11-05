@@ -164,30 +164,61 @@ async function topOf(p, name, upTo = ".sq-boards") {
   await p.screenshot({ path: `${out}/${name}-phone.png`, clip: { x: 0, y: 0, width: PHONE.w, height: Math.ceil(end.y + end.height + 6) } });
 }
 
+/** Your row in the turn order of the board on screen: how many move there before you (0: your turn). */
+const myPlace = (p) => p.locator(".sq-to-row.you .sq-to-where").textContent().then((t) => (/^Your turn/.test(t) ? 0 : Number(t.match(/\d+/)?.[0] ?? -1)));
+
 const shots = {
-  /** Your turn and waiting, the turn order (all 8 in ring order, the mover lit); finished boards checked; the replay button's 3 states; settings. */
+  /**
+   * The turn order (one queue for the board on screen): your turn (you on top); waiting, third in a board's queue
+   * ("Waiting for 2 players"); a board where you're further down (a phone: the top 3 and you; a tap: all 8); the
+   * replay button's 3 states; finished boards checked; settings.
+   */
   async play(kind) {
     const { ctx, p } = await open(kind);
-    await play(p, 2);
-    await nextDuty(p);
-    await finishBoards(p);
+    await play(p, 1);
+    const first = await nextDuty(p);
     await shot(p, "your-turn", kind);
-    if (kind === "phone") await topOf(p, "top-finished");
     // The replay button: off (greyed, still), the last 2 (a short trail), all (twice as fast, a longer trail).
     for (const mode of ["off", "two", "all"]) {
       while ((await p.locator(".hud-row .rp-btn").getAttribute("data-mode")) !== mode) await p.locator(".hud-row .rp-btn").click();
       await shot(p, `replay-${mode}`, kind);
       if (kind === "phone") await topOf(p, `replay-${mode}-top`, ".hud-row");
     }
-    // Waiting: your move made, Quick board jump takes you to the board you play next.
-    const s = await seen(p);
-    await move(p, s.fen);
-    await p.waitForTimeout(900);
-    await finishBoards(p);
-    await shot(p, "waiting", kind);
-    // A tap on a row of the turn order: that board at the position after that move.
-    await p.locator(".sq-to-row:not(:disabled)").nth(5).click();
+    // Waiting: your move made; each board of your match in turn, until one has you third and one further down.
+    const want = { third: false, down: false };
+    let s = first;
+    for (let round = 0; round < 6 && !(want.third && want.down); round++) {
+      await move(p, s.fen);
+      await p.waitForTimeout(900);
+      for (let i = 0; i < 3 && !(want.third && want.down); i++) {
+        const tiny = p.locator(".sq-match.ours button.sq-tiny").nth(i);
+        if (!(await tiny.count())) continue;
+        await tiny.click();
+        await p.waitForTimeout(250);
+        const at = await myPlace(p);
+        if (at === 2 && !want.third) {
+          want.third = true;
+          await shot(p, "waiting-third", kind);
+        } else if (at >= 4 && !want.down) {
+          want.down = true;
+          await shot(p, "further-down", kind);
+          if (kind === "phone") {
+            await p.locator(".sq-to-more").click();
+            await shot(p, "further-down-all8", kind);
+            await p.locator(".sq-to-more").click();
+          }
+        }
+      }
+      if (!(want.third && want.down)) s = await nextDuty(p, s.seq);
+    }
+    console.log(kind, "found", want);
+    // A row's tap: that board at the position after that move.
+    await p.locator(".sq-to-row:not(:disabled)").nth(1).click();
     await shot(p, "turn-order-tap", kind);
+    // Finished boards (a mockup on this device's copy): a check in the winner's color, ½ for a draw.
+    await finishBoards(p);
+    if (kind === "phone") await topOf(p, "top-finished");
+    else await shot(p, "top-finished", kind);
     // Settings: the gear's list, with Quick board jump.
     await p.locator(".hud-row .mm-more").click();
     await shot(p, "settings", kind);

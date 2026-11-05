@@ -84,10 +84,21 @@ async function relayLobby(page: Page, extra = "") {
 }
 
 const button = (page: Page) => page.locator(".hud-row .rp-btn");
+const mode = (page: Page) => button(page).getAttribute("data-mode");
 
-test("Relay: coming back to a board, the moves you missed replay (who played each named over its piece), then the clock; a tap skips it and starts your move; off, no replay and the same free time", async ({ page }) => {
+/** The moves on a board of your match now. */
+const plies = (page: Page, board: number) =>
+  page.evaluate((b) => {
+    const s = (window as any).squads;
+    const m = [...s.matches.values()].find((x: any) => x.state !== "over" && x.sides.some((sd: any) => sd.seats.includes(s.myId)));
+    return m.boards[b].moves.length as number;
+  }, board);
+
+test("Relay: the replay button steps off, the last 2, all; your move on a board you come to replays what you missed there (who played each named over its piece), then the clock; a tap skips it; off, none and the same free time", async ({ page }) => {
   test.setTimeout(300_000);
   await named(page, "Tess");
+  // (Quick board jump off: the game moves you to each board as your move there begins, so every move there was missed.)
+  await page.addInitScript(() => localStorage.setItem("brc.squads.jumpNext", "0"));
   await relayLobby(page);
   await page.getByRole("button", { name: "Skip votes" }).click();
   // Turn 1: the board you start on, nothing to replay, the free seconds as they are.
@@ -95,9 +106,25 @@ test("Relay: coming back to a board, the moves you missed replay (who played eac
   expect(first.duty!.replay).toBe(0);
   expect(first.duty!.freeMs).toBe(first.delayMs);
   await expect(page.locator(".rp-over")).toHaveCount(0);
-  // The button: on by default, its dot trail running round it.
-  await expect(button(page)).toHaveAttribute("aria-pressed", "true");
-  await expect(button(page).locator(".rp-trail")).toHaveCount(1);
+  // The button (Nov 5, round 2): off on a first match (greyed, nothing turning); a tap: the last 2 (a short trail);
+  // again: all (twice as fast, a longer trail); again: off.
+  expect(await mode(page)).toBe("off");
+  await expect(button(page).locator(".rp-trail")).toHaveCount(0);
+  await still(page, "button-off");
+  const spin = () => button(page).locator(".rp-trail-spin").evaluate((g) => [parseFloat(getComputedStyle(g).animationDuration), g.querySelectorAll("circle").length]);
+  await button(page).click();
+  expect(await mode(page)).toBe("two");
+  const two = await spin();
+  await button(page).click();
+  expect(await mode(page)).toBe("all");
+  const all = await spin();
+  expect(all[0]).toBeCloseTo(two[0] / 2, 5);
+  expect(all[1]).toBeGreaterThan(two[1]);
+  await button(page).click();
+  expect(await mode(page)).toBe("off");
+  await button(page).click();
+  await button(page).click();
+  expect(await mode(page)).toBe("all");
   await still(page, "button-on");
   // Names over the replayed moves: a teammate's long name, an opponent's short one.
   await page.evaluate(() => {
@@ -107,7 +134,7 @@ test("Relay: coming back to a board, the moves you missed replay (who played eac
   });
   await move(page, first.fen!);
 
-  // Your next board (Black there, never played): every move on it so far replays, then the free seconds run.
+  // Your next board: the moves made there since you last saw it replay, then the free seconds run.
   const tags = await page.evaluate(() => {
     const out: { text: string; w: number; h: number; fs: number }[] = [];
     (window as any).__tags = out;
@@ -151,69 +178,62 @@ test("Relay: coming back to a board, the moves you missed replay (who played eac
   }
   await move(page, back.fen!);
 
-  // The next board: a tap on the board during the replay skips it at once, and the same tap starts your move.
+  // The last 2 (a tap from off): at most 2 replay. A tap on the board during the replay skips it at once, and the same
+  // tap starts your move.
+  await button(page).click();
+  await button(page).click();
+  expect(await mode(page)).toBe("two");
   const third = await nextDuty(page, back.seq);
-  expect(third.duty!.replay).toBeGreaterThan(0);
+  expect(third.duty!.replay).toBeGreaterThan(1);
   await expect(page.locator(".rp-over")).toBeVisible();
+  await expect(page.locator(".sq-status")).toContainText(/replay \d of 2$/);
   const mv = new Chess(third.fen!).moves({ verbose: true }).find((m) => !m.captured && !m.promotion)!;
   await tapSquare(page, mv.from);
   await expect(page.locator(".rp-over")).toHaveCount(0, { timeout: 300 });
   await tapSquare(page, mv.to);
   await expect.poll(async () => (await seen(page)).mine, { timeout: 5_000 }).toBe(mv.from + mv.to);
 
-  // Off: the button plain (no trail), remembered; the next board just shows, with the same free time.
+  // Off: no trail, remembered; the next board just shows, with the same free time.
   await button(page).click();
-  await expect(button(page)).toHaveAttribute("aria-pressed", "false");
+  await button(page).click();
+  expect(await mode(page)).toBe("off");
   await expect(button(page).locator(".rp-trail")).toHaveCount(0);
-  await still(page, "button-off");
   const never = await watchFor(page, { replay: { selector: ".rp-over" } });
   const fourth = await nextDuty(page, third.seq);
   expect(fourth.duty!.replay).toBeGreaterThan(0);
   expect(fourth.duty!.freeMs).toBe(fourth.delayMs + 500 * fourth.duty!.replay);
   await page.waitForTimeout(500 * fourth.duty!.replay + 300);
   expect(await never.seen()).toEqual({ replay: false });
-  await button(page).click();
-  await expect(button(page).locator(".rp-trail")).toHaveCount(1);
 });
 
-test("the first-time tip: the screen dimmed, the gear and the replay button lit; it comes back until \"Don't show this again\" is ticked", async ({ page }) => {
+test("Relay with Quick board jump: on your next board, no replay if you watched both of its last two moves land; arrived after either, the whole replay", async ({ page }) => {
   test.setTimeout(300_000);
   await named(page, "Tess");
-  const tip = page.getByRole("dialog", { name: "Two quick settings" });
-  // Queued (a test lobby's link counts as queueing with ?replaytip): the tip over the votes.
-  await relayLobby(page, "&replaytip");
-  await expect(tip).toBeVisible();
-  await expect(tip).toContainText("Move replay is on: when the rotation brings you back to a board, the moves you missed play back first");
-  await expect(tip).toContainText("to turn off Animations");
-  // Both lit: a ring round each, centered on it; the rest dimmed.
-  const rings = page.locator(".rp-tip-ring");
-  await expect(rings).toHaveCount(2);
-  for (const [i, sel] of [".rp-btn", ".mm-more"].entries()) {
-    const b = (await page.locator(sel).first().boundingBox())!;
-    const r = (await rings.nth(i).boundingBox())!;
-    expect(Math.abs(r.x + r.width / 2 - (b.x + b.width / 2))).toBeLessThan(2);
-    expect(Math.abs(r.y + r.height / 2 - (b.y + b.height / 2))).toBeLessThan(2);
-    expect(r.width).toBeGreaterThan(b.width);
-    expect(r.height).toBeGreaterThan(b.height);
+  await relayLobby(page);
+  await page.getByRole("button", { name: "Skip votes" }).click();
+  let s = await nextDuty(page);
+  while ((await mode(page)) !== "all") await button(page).click();
+  // (Each of your next few moves: whichever way it went, the rule.)
+  const seenCases = new Set<string>();
+  for (let i = 0; i < 4; i++) {
+    await move(page, s.fen!);
+    // A beat later the big board is the one you play next: its moves when you got there.
+    await expect(page.locator(".sq-tiny.on .sq-mark.next")).toHaveCount(1, { timeout: 5_000 });
+    const board = await page.locator(".sq-board-no").innerText().then((t) => Number(t) - 1);
+    const arrived = await plies(page, board);
+    const next = await nextDuty(page, s.seq);
+    expect(next.duty!.board).toBe(board);
+    const total = await plies(page, board);
+    const watchedBoth = arrived <= total - 2;
+    seenCases.add(watchedBoth ? "watched" : "arrived");
+    if (watchedBoth) {
+      await page.waitForTimeout(800);
+      await expect(page.locator(".rp-over")).toHaveCount(0);
+    } else {
+      // Never a partial rewind: every move since you last played there.
+      await expect(page.locator(".sq-status")).toContainText(new RegExp(`replay \\d of ${next.duty!.replay}$`));
+    }
+    s = next;
   }
-  await expect(page.locator(".rp-tip-dim rect[mask]")).toHaveCount(1);
-  // The box is whole on screen.
-  const box = (await page.locator(".rp-tip-box").boundingBox())!;
-  const vp = page.viewportSize()!;
-  expect(box.x).toBeGreaterThanOrEqual(0);
-  expect(box.y + box.height).toBeLessThanOrEqual(vp.height);
-  expect(box.x + box.width).toBeLessThanOrEqual(vp.width);
-  await still(page, "tip");
-  // OK, not ticked: gone now, back the next time.
-  await tip.getByRole("button", { name: "OK" }).click();
-  await expect(tip).toHaveCount(0);
-  await relayLobby(page, "&replaytip");
-  await expect(tip).toBeVisible();
-  await tip.getByLabel("Don't show this again").check();
-  await tip.getByRole("button", { name: "OK" }).click();
-  await expect(tip).toHaveCount(0);
-  // Ticked: never again (this account on this device).
-  await relayLobby(page, "&replaytip");
-  await page.waitForTimeout(1_000);
-  await expect(tip).toHaveCount(0);
+  expect(seenCases.size).toBeGreaterThan(0);
 });

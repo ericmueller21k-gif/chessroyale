@@ -4,7 +4,8 @@ import { BOARD_SEL, named, test, watchFor } from "./helpers.ts";
 import { SquadsClient } from "./squads-client.ts";
 
 /**
- * Squads, Oct 14 (Eric): "Jump to my next board" (Relay; on by default, remembered on the device) and who's watching a
+ * Squads, Oct 14 (Eric): "Jump to my next board" (Relay; on by default, remembered on the device; Quick board jump in the
+ * gear's list since Nov 5) and who's watching a
  * board (the other people showing it full size, as pawns with an eye over it), through the screens on the real server
  * (wrangler dev, SQUADS_TEST on). A second viewer is a headless player in the same lobby (e2e/squads-client.ts).
  */
@@ -78,9 +79,14 @@ async function relayLobby(page: Page, beforeFill?: (code: string) => Promise<voi
   await page.getByRole("button", { name: "Skip votes" }).click();
 }
 
-const jumpSwitch = (page: Page) => page.getByRole("switch", { name: "Jump to my next board" });
+/** Quick board jump (Nov 5: in the gear's list, was the switch under the board "Jump to my next board"), the list open. */
+async function jumpSwitch(page: Page) {
+  if (!(await page.locator(".mm-panel").count())) await page.locator(".hud-row .mm-more").click();
+  return page.getByRole("switch", { name: "Quick board jump" });
+}
+const closeMenu = (page: Page) => page.keyboard.press("Escape");
 
-test("Jump to my next board, on by default: once you've moved, the big board goes to the board you play next; Back to my board stays", async ({ page }) => {
+test("Quick board jump, on by default: once you've moved, the big board goes to the board you play next; a tap on your tiny board brings you back and you stay", async ({ page }) => {
   test.setTimeout(240_000);
   await relayLobby(page);
   const s = await nextDuty(page);
@@ -90,11 +96,10 @@ test("Jump to my next board, on by default: once you've moved, the big board goe
   const [, no, colour] = (await page.locator(".sq-status").innerText()).match(/Board (\d) · you're (White|Black)/)!;
   await expect(page.locator(".sq-board-no")).toHaveText(no!);
   await expect(page.locator(".sq-board-no")).toHaveClass(colour === "White" ? /is-w/ : /is-b/);
-  // The switch is on, with its (i): a sentence on what it does.
-  await expect(jumpSwitch(page)).toBeChecked();
-  await expect(page.locator(".sq-jump-info")).toHaveCount(0);
-  await page.getByRole("button", { name: 'What "Jump to my next board" does' }).click();
-  await expect(page.locator(".sq-jump-info")).toContainText("once you've moved, you go straight to the board you play next turn");
+  // Quick board jump is on, in the gear's list (Nov 5); nothing of it under the board.
+  await expect(await jumpSwitch(page)).toHaveAttribute("aria-checked", "true");
+  await closeMenu(page);
+  await expect(page.locator(".sq-jump, .sq-jump-info")).toHaveCount(0);
   // Your move lands on your board first (a beat), then the big board is next turn's (the NEXT tiny board).
   const order = await watchFor(page, { moved: { selector: ".sq-status", text: /^Moved · Board \d/ }, next: { selector: ".sq-status", text: /^Watching Board \d · your next board$/ } });
   const t0 = Date.now();
@@ -105,15 +110,15 @@ test("Jump to my next board, on by default: once you've moved, the big board goe
   // The number follows the big board: your next board's.
   const [, nextNo] = (await page.locator(".sq-status").innerText()).match(/Watching Board (\d)/)!;
   await expect(page.locator(".sq-board-no")).toHaveText(nextNo!);
-  // Your next board, your side's way up; Back to my board, and it stays there for the rest of the half.
-  await page.getByRole("button", { name: "Back to my board" }).click();
+  // Your next board, your side's way up; a tap on your own tiny board, and it stays there for the rest of the half.
+  await page.locator("button.sq-tiny.is-you").click();
   await expect(page.locator(".sq-tiny.on")).toHaveClass(/is-you/);
   await page.waitForTimeout(1_500);
   await expect(page.locator(".sq-tiny.on")).toHaveClass(/is-you/);
   await expect(page.locator(".sq-status")).toContainText(/^Moved · Board \d|^Their move|is over|landing/);
 });
 
-test("Jump to my next board when you're the last to move: the half ends at once, and the big board still goes to your next board", async ({ page }) => {
+test("Quick board jump when you're the last to move: the half ends at once, and the big board still goes to your next board", async ({ page }) => {
   test.setTimeout(240_000);
   await relayLobby(page);
   const s = await nextDuty(page);
@@ -139,13 +144,14 @@ test("Jump to my next board when you're the last to move: the half ends at once,
   await expect(page.locator(".sq-tiny.on .sq-mark.next")).toHaveCount(1);
 });
 
-test("Jump to my next board, switched off: you stay on your board after moving; the device remembers it", async ({ page }) => {
+test("Quick board jump, switched off: you stay on your board after moving; the device remembers it", async ({ page }) => {
   test.setTimeout(240_000);
   await relayLobby(page);
   const s = await nextDuty(page);
-  await jumpSwitch(page).click();
-  await expect(jumpSwitch(page)).not.toBeChecked();
+  await (await jumpSwitch(page)).click();
+  await expect(await jumpSwitch(page)).toHaveAttribute("aria-checked", "false");
   expect(await page.evaluate(() => localStorage.getItem("brc.squads.jumpNext"))).toBe("0");
+  await closeMenu(page);
   await move(page, s.fen!);
   await expect(page.locator(".sq-status")).toContainText(/^Moved · Board \d/);
   // Well past the jump's beat: still your board.
@@ -154,7 +160,8 @@ test("Jump to my next board, switched off: you stay on your board after moving; 
   await expect(page.getByRole("button", { name: "Back to my board" })).toHaveCount(0);
   // A reload (back into the same lobby): still off.
   await page.reload();
-  await expect(jumpSwitch(page)).not.toBeChecked({ timeout: 30_000 });
+  await expect(page.locator(".hud-row .mm-more")).toBeVisible({ timeout: 30_000 });
+  await expect(await jumpSwitch(page)).toHaveAttribute("aria-checked", "false");
 });
 
 test("who's watching: another player showing your board puts their pawn (their items on) and an eye over it, without moving the board; gone when they look away or leave", async ({ page, baseURL }) => {
@@ -181,7 +188,7 @@ test("who's watching: another player showing your board puts their pawn (their i
     expect(Math.abs(after.y - before.y)).toBeLessThan(0.5);
     expect(Math.abs(after.height - before.height)).toBeLessThan(0.5);
     // He looks at another board: gone. Back on yours, then his socket closes: gone.
-    wes.send({ t: "view", key: s.key, board: (s.duty!.board + 2) % 4 });
+    wes.send({ t: "view", key: s.key, board: (s.duty!.board + 2) % 3 });
     await expect(page.locator(".sq-watchers")).toHaveCount(0, { timeout: 5_000 });
     wes.send({ t: "view", key: s.key, board: s.duty!.board });
     await expect(pawn).toBeVisible({ timeout: 5_000 });

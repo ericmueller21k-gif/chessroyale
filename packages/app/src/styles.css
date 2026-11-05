@@ -23672,36 +23672,52 @@ button.sq-tiny {
 }
 
 /* ---- Squads: Relay on 3 boards and a cleaner match screen (Eric, Nov 5, round 2; docs/decisions/2026-11-05-squads-three-boards.md) ---- */
-/* The turn order under the board: a column a squad (yours first, its color along the top), its 4 players in ring order
-   (the order they move, round and round), the player to move lit, each with the board they play this turn (none and
-   greyed: their turn to wait) and the move they last played. One size on every board. */
+/* The turn order under the board (Eric's correction, Nov 5): one queue for the board on screen, all 8 players in the order
+   they'll move on it, the next there on top; each with their squad's color, your row saying where you stand, and the move
+   they last played on the right. A phone: 4 rows (a fixed box), a tap on the strip at the right opens all 8 over the board
+   (upward, so nothing below moves); a computer: all 8 in the column beside the board. */
 .sq-to {
+  position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) 30px;
+  gap: 4px;
   width: 100%;
+  height: calc(4 * 19px + 3 * 1px + 8px);
   box-sizing: border-box;
 }
-.sq-to-col {
+.sq-to.computer {
+  grid-template-columns: minmax(0, 1fr);
+  height: auto;
+}
+.sq-to-list {
   display: grid;
-  grid-template-rows: repeat(4, 18px);
+  grid-auto-rows: 19px;
   gap: 1px;
+  align-content: start;
   min-width: 0;
-  padding: 3px 3px 3px;
-  border-radius: 9px;
+  padding: 4px;
+  border-radius: 10px;
   background: var(--surface);
-  border-top: 3px solid var(--sq, var(--line));
+  box-sizing: border-box;
+}
+.sq-to.open .sq-to-list {
+  position: absolute;
+  left: 0;
+  right: 34px;
+  bottom: 0;
+  z-index: 6;
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.28);
 }
 .sq-to-row {
   display: grid;
-  grid-template-columns: 15px minmax(0, 1fr) auto auto;
+  grid-template-columns: 4px minmax(0, 1fr) auto 3.6em;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   min-width: 0;
-  height: 18px;
-  padding: 0 4px 0 2px;
+  height: 19px;
+  padding: 0 6px 0 3px;
   border: 0;
-  border-radius: 5px;
+  border-radius: 6px;
   background: none;
   color: var(--text);
   font: inherit;
@@ -23714,40 +23730,30 @@ button.sq-tiny {
   opacity: 1;
   cursor: default;
 }
-.sq-to-row.gap {
-  cursor: default;
+.sq-to-mark {
+  width: 4px;
+  height: 13px;
+  border-radius: 2px;
+  background: var(--sq, var(--line));
+}
+.sq-to-row.top {
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+  font-weight: 800;
 }
 .sq-to-row.lit {
   background: var(--accent);
   color: var(--accent-text);
-  font-weight: 800;
 }
 .sq-to-row.you .sq-to-name {
   font-weight: 800;
 }
-.sq-to-row.waits:not(.lit) {
-  color: var(--muted);
+.sq-to-row.skip {
+  border-top: 1px dashed var(--line);
+  border-radius: 0 0 6px 6px;
 }
 .sq-to-row.shown {
-  box-shadow: inset 0 0 0 1.5px var(--accent);
-}
-.sq-to-board {
-  display: grid;
-  place-items: center;
-  width: 15px;
-  height: 15px;
-  border-radius: 4px;
-  font-size: 10px;
-  font-weight: 900;
-}
-.sq-to-board.is-w {
-  background: #fff;
-  color: #1c1a17;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
-}
-.sq-to-board.is-b {
-  background: #1c1a17;
-  color: #fff;
+  outline: 1.5px solid var(--accent);
+  outline-offset: -1.5px;
 }
 .sq-to-name {
   min-width: 0;
@@ -23755,8 +23761,16 @@ button.sq-tiny {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.sq-to-where {
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+  color: var(--accent);
+}
+.sq-to-row.lit .sq-to-where {
+  color: inherit;
+}
 .sq-to-move {
-  min-width: 3.4em;
   color: var(--muted);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -23765,18 +23779,39 @@ button.sq-tiny {
 .sq-to-row.lit .sq-to-move {
   color: inherit;
 }
+.sq-to-more {
+  grid-column: 2;
+  grid-row: 1;
+  position: relative;
+  z-index: 7;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.sq-to.open .sq-to-more {
+  color: var(--accent);
+}
 @media (min-width: 900px) and (min-height: 600px) {
-  .sq-to {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .sq-to-col {
-    grid-template-rows: repeat(4, 24px);
+  .sq-to-list {
+    grid-auto-rows: 26px;
     gap: 2px;
-    padding: 4px;
   }
   .sq-to-row {
-    height: 24px;
+    height: 26px;
     font-size: 14px;
+  }
+  .sq-to-where {
+    font-size: 12px;
   }
 }
 
@@ -23854,8 +23889,11 @@ button.sq-tiny {
   .sq-relay .sq-boards {
     --tb: 33px;
   }
-  .sq-relay .sq-to-col {
-    grid-template-rows: repeat(4, 16px);
+  .sq-relay .sq-to {
+    height: calc(4 * 16px + 3 * 1px + 8px);
+  }
+  .sq-relay .sq-to-list {
+    grid-auto-rows: 16px;
   }
   .sq-relay .sq-to-row {
     height: 16px;

@@ -188,37 +188,43 @@ test("the final (a test lobby): the whole squad votes, teammates' picks named on
   await expect(page.getByRole("button", { name: /Play again|Back to your party/ })).toBeVisible();
 });
 
-test("Relay (a test lobby): your move on your board shows at once, then the tiny boards open; watch one, back to your board", async ({ page }) => {
+test("Relay (a test lobby): your move on your board shows at once, then the tiny boards open; watch one, a tap on yours brings you back", async ({ page }) => {
   test.setTimeout(240_000);
   await testLobby(page, "relay");
   const s = await nextDuty(page, null);
   expect(s.duty!.role).toBe("move");
   await expect(page.locator(".sq-status")).toContainText(/^Your move · Board \d/);
-  // Every board in the lobby: 16 tiny boards, yours marked.
-  await expect(page.locator(".sq-tiny")).toHaveCount(16);
+  // Every board in the lobby: 12 tiny boards (4 matches on 3 boards, Nov 5), yours marked.
+  await expect(page.locator(".sq-tiny")).toHaveCount(12);
   await expect(page.locator(".sq-mark.you")).toHaveCount(1);
   await expect(page.locator(".sq-mark.next")).toHaveCount(1);
   await expect(page.locator("button.sq-tiny")).toHaveCount(0);
   await fits(page);
   const mine = legal(s.fen!).find((m) => m.length === 4)!;
-  const moved = await watchFor(page, { moved: { selector: ".sq-status", text: /^Moved · Board/ }, played: { selector: ".sq-duty strong", text: /^You played / } });
+  // (Under the board only the arrows and the turn order, Nov 5: you're lit there until you've moved; no "Your move" box.)
+  await expect(page.locator(".sq-to-row.you.lit")).toHaveCount(1);
+  await expect(page.locator(".sq-duty")).toHaveCount(0);
+  const moved = await watchFor(page, { moved: { selector: ".sq-status", text: /^Moved · Board/ } });
   await tapMove(page, mine);
   // At once: your move is on your board (nothing snaps back).
-  await expect.poll(() => moved.seen(), { timeout: 5000 }).toEqual({ moved: true, played: true });
-  // A beat later (Jump to my next board, on by default) the big board is next turn's (e2e/squads-watch.spec.ts).
+  await expect.poll(() => moved.seen(), { timeout: 5000 }).toEqual({ moved: true });
+  await expect(page.locator(".sq-to-row.you.lit")).toHaveCount(0);
+  // A beat later (Quick board jump, on by default) the big board is the one you play next (e2e/squads-watch.spec.ts).
   await expect(page.locator(".sq-tiny.on .sq-mark.next")).toHaveCount(1, { timeout: 5000 });
   // The tiny boards are tappable now: watch another board full size, then back.
   const others = page.locator("button.sq-tiny:not(.is-you)");
   await expect(others.first()).toBeVisible();
-  // The big board's coordinates sit in their own squares, either way up (the letters were a column off): on next
-  // turn's board, then back on yours, where your squad has the other color, so it opens the other way up.
-  const up = await expectCoordsInSquares(page);
-  await page.getByRole("button", { name: "Back to my board" }).click();
-  await expectCoordsInSquares(page, up === "white" ? "black" : "white");
+  // (No "Back to my board" button since Nov 5: a tap on your own tiny board.)
+  await expect(page.getByRole("button", { name: "Back to my board" })).toHaveCount(0);
+  // (The big board's coordinates in their own squares, either way up: on the board you play next, then back on yours.)
+  await expectCoordsInSquares(page);
+  await page.locator("button.sq-tiny.is-you").click();
+  await expect(page.locator(".sq-tiny.on")).toHaveClass(/is-you/);
+  await expectCoordsInSquares(page);
   await others.nth(3).click();
   await expect(page.locator(".sq-status")).toContainText(/^Watching Board \d|is over/);
-  await page.getByRole("button", { name: "Back to my board" }).click();
-  await expect(page.getByRole("button", { name: "Back to my board" })).toHaveCount(0);
+  await page.locator("button.sq-tiny.is-you").click();
+  await expect(page.locator(".sq-tiny.on")).toHaveClass(/is-you/);
   // The half resolves: your move stays on the board, and the bot work came from this device.
   await expect.poll(async () => (await seen(page)).state, { timeout: 40_000 }).not.toBe("half");
   await expect.poll(() => page.evaluate(() => (window as any).squads.botAnswers), { timeout: 30_000 }).toBeGreaterThan(0);
