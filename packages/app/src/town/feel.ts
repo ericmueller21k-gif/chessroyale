@@ -146,11 +146,16 @@ export const TOWN_FEEL = {
   wallSmooth2D: 1,
   streetTreeFade: 1.5,
   /**
-   * The street town's chase camera's turn (Nov 5; round 4 aims it, turn.ts chaseTarget): a quarter turn eases over this many ms, the
-   * camera following you closely otherwise (Eric: "a short smoothing on a street-corner turn is fine (about 0.4 to 0.6 s), with no lag
-   * otherwise"; the mockup's 400).
+   * The street town's camera turn (Nov 5, round 5: the camera faces north, but for a boss home's strip, strips.ts): stepping onto or
+   * off a strip eases a quarter turn over this many ms (the brief: "about 0.5 s"). (Round 4's chase camera turned at corners on it.)
    */
   streetTurnMs: 500,
+  /**
+   * Looking around (Nov 5, round 5, turn.ts LookAround): a drag across the box's width turns the camera this many degrees (Eric's
+   * addendum: "a drag across the screen width is about half a turn"), and the first step after eases it back over this many ms.
+   */
+  streetLookPerWidth: 180,
+  streetLookBackMs: 300,
   /**
    * The street town's buildings drawn this much bigger than their pictures' 37 px a square (the homes and the rows' fronts together;
    * hedges, sheds, lamps, trees and figures don't grow). 1: as drawn. (Nov 5, round 4: tried at 1.3 after the run-through frames; Eric:

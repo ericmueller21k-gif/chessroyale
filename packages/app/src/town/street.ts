@@ -12,6 +12,7 @@ import PLAN from "./street-plan.json" with { type: "json" };
 import { N, WRAP } from "./camera.ts";
 import type { Design } from "./buildings.ts";
 import type { LookSpec } from "./lookalike.ts";
+import type { WallSpec } from "./wall.ts";
 import { layRow, ROW_PX, ROW_SIDES, type Facing, type RowHome, type RowSide } from "./rows.ts";
 import type { HomeId } from "./home-boxes.ts";
 
@@ -39,7 +40,7 @@ export interface SqBox {
  * its front line, the lot's front edge plus `inset` squares, centred on the lot.
  */
 export interface StreetLot {
-  kind: "home" | "house" | "tall";
+  kind: "home" | "house" | "tall" | "wall";
   /** A home's id (the art's: "blitz" is the game's "dash"), or an everyday building's design. */
   id: string;
   /** The colourway (0..2). */
@@ -62,6 +63,8 @@ export interface StreetLot {
   at?: { x: number; y: number };
   /** A home slid along its row to fit (squares east): its lot, door and wander box stay; its picture moves (rows.ts layRow). */
   shift?: number;
+  /** (Round 5) The back wall's and the Colosseum's side walls' recipe (wall.ts). */
+  wall?: WallSpec;
 }
 
 /** Where along a row side square coordinate `a` is: itself, or once round (a row running over the east-west wrap: a1 past N), or null. */
@@ -114,6 +117,8 @@ function withRows(lots: StreetLot[]): StreetLot[] {
   // The skyline (round 4): the bigger buildings behind the rows, towers of look-alike parts taller than any row (6 to 9 floors), windows
   // on every side; their sky shows over them. Each keeps its lot.
   out.forEach((l, i) => {
+    // (Round 5: a wall's front line: its lot's front edge plus its inset, centred along its lot.)
+    if (l.kind === "wall") l.at = { x: l.c0 + l.w / 2 - 0.5, y: l.r0 - 0.5 + l.inset };
     if (l.kind !== "tall") return;
     const tower = l.id === "tower";
     const seed = 7001 + i * 97;

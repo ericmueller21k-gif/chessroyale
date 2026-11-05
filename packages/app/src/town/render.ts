@@ -3623,14 +3623,15 @@ export class Renderer {
    * (Tests) The street town's boxes the last frame drew: each one's art, which way it faces, its draws (strips and faces; the 2D
    * fallback's cost), whether its front was drawn and faced you, and how many of its sides were drawn.
    */
-  boxDraws(): { id: string; kind: string; facing: "S" | "N" | "W" | "E"; draws: number; front: boolean; facesYou: boolean; sides: number }[] {
+  boxDraws(): { id: string; kind: string; facing: "S" | "N" | "W" | "E"; draws: number; front: boolean; facesYou: boolean; sides: number; x: number; y: number }[] {
     return this.boxes
       .filter((b) => this.plans[b.i]!.on)
       .map((b) => {
         const p = this.plans[b.i]!;
         const f = p.front;
         // (Its front faces you: turned neither way from the camera, so unshaded.)
-        return { id: b.box.id, kind: b.kind, facing: b.facing, draws: p.draws, front: f.on, facesYou: f.on && f.shade < 0.004, sides: +p.left.on + +p.right.on };
+        // (Its front line's middle in the world, round 5: what stands where.)
+        return { id: b.box.id, kind: b.kind, facing: b.facing, draws: p.draws, front: f.on, facesYou: f.on && f.shade < 0.004, sides: +p.left.on + +p.right.on, x: ((b.fx % N) + N) % N, y: b.fy };
       });
   }
   private readonly bossAlpha: number[] = [];

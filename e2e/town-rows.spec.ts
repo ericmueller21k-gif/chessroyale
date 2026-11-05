@@ -5,7 +5,8 @@ import { asAdmin, test } from "./helpers.ts";
 /**
  * The street town, round 4 (Nov 5; brief-town-rows.md): the rows on every street, the chase camera, the town that wraps east-west
  * only (the Colosseum at the north edge), the zoom steps and the park's step out. `STILLS=docs/street-town-rows` writes the stills
- * (`SHOTS=a,b` takes some of them).
+ * (`SHOTS=a,b` takes some of them). Round 5: the camera faces north (e2e/town-fixed.spec.ts), so looking along a street is a drag; the
+ * stills here are round 4's (they walk along streets, which no longer turns the camera).
  */
 test.use({ actionTimeout: 15_000 });
 test.beforeEach(async ({ page }) => {
@@ -86,13 +87,28 @@ async function skyAtSides(page: Page): Promise<number> {
   }, hy);
 }
 
-test("no sky between the fronts at street level: Fountain Street and South Street, both ways along each (Canvas 2D and WebGL)", async ({ page }) => {
+/** (Round 5) A drag across the box from its middle, `share` of its width (negative: leftward): a look round, half a turn a width. */
+async function drag(page: Page, share: number) {
+  const b = (await canvas(page).boundingBox())!;
+  const y = b.y + b.height * 0.35;
+  await page.mouse.move(b.x + b.width / 2, y);
+  await page.mouse.down();
+  for (let i = 1; i <= 12; i++) await page.mouse.move(b.x + b.width / 2 + (share * b.width * i) / 12, y);
+  await page.mouse.up();
+}
+
+// (Round 5: the camera faces north; a drag looks round. Looking along a street both ways is a drag a quarter turn each way, from where
+// round 4 walked along it.)
+test("no sky between the fronts at street level: Fountain Street and South Street, looking both ways along each (Canvas 2D and WebGL)", async ({ page }) => {
   test.setTimeout(400_000);
   for (const gl of [false, true]) {
     await open(page, "day", gl);
-    for (const [name, a, b] of [["Fountain Street east", [1, 20], [4, 20]], ["Fountain Street west", [42, 20], [39, 20]], ["South Street east", [1, 5], [4, 5]], ["South Street west", [42, 5], [39, 5]]] as const) {
-      await walkAlong(page, a, b);
+    for (const [name, sq, look] of [["Fountain Street east", [4, 20], 0.5], ["Fountain Street west", [39, 20], -0.5], ["South Street east", [4, 5], 0.5], ["South Street west", [39, 5], -0.5]] as const) {
+      await walkTo(page, sq);
+      await expect.poll(async () => (await cam(page)).heading, { timeout: 5000 }).toBe(0);
+      await drag(page, look);
       await page.waitForTimeout(800);
+      expect(Math.abs((await cam(page)).heading), `${name}: looking a quarter round`).toBeGreaterThan(80);
       const share = await skyAtSides(page);
       expect(share, `${name} (${gl ? "WebGL" : "2D"}): sky at the sides at street level`).toBeLessThan(0.005);
     }
@@ -142,15 +158,8 @@ test("the park zooms a step out as you come in and back as you leave; a press in
   expect((await cam(page)).zoomTarget, "your press in the park wins").toBe(1);
 });
 
-test("the north edge holds you: past the Colosseum's plaza there's nowhere to go (the town wraps east-west only)", async ({ page }) => {
-  test.setTimeout(200_000);
-  await open(page, "day", false);
-  await walkAlong(page, [14, 41], [14, 45]);
-  await page.keyboard.down("ArrowUp");
-  await page.waitForTimeout(1500);
-  await page.keyboard.up("ArrowUp");
-  expect(await you(page), "still at the edge").toEqual([14, 45]);
-});
+// (Round 5: "the north edge holds you" went with the plaza beside the Colosseum: e2e/town-fixed.spec.ts "the Colosseum against the back
+// wall" walks up to it and is stopped beside it.)
 
 /** The stills (brief: each street by day, one at dusk, a corner, a boss home in its row, the turn; the park on arrival; the zoom steps). */
 test("stills: the rows (round 4)", async ({ page }) => {

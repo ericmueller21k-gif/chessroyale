@@ -899,6 +899,22 @@ and Seam Avenue's camera turn, is done; then the switch goes). Eric approved its
   - **Tests:** `packages/app/test/town-rows.test.ts`, `e2e/town-rows.spec.ts`, and round 3's moved to the plan
     (`town-boxes.test.ts`, `town-street.test.ts`, `e2e/town-street.spec.ts`).
   - Decision: [2026-11-05-street-rows.md](../decisions/2026-11-05-street-rows.md). Stills: `docs/street-town-rows/`.
+- **Round 5 (Nov 5): one fixed view, a look round, the Colosseum against the back wall.** Round 4's chase camera is gone.
+  - **The view:** the camera faces north whatever you press. On a boss home's front strip (`town/strips.ts`: the sidewalk squares
+    before its front) it faces that home's front, easing over `streetTurnMs`; every shipped home faces south, so that's north too.
+  - **The arrows** are screen directions (through the strip's view on one).
+  - **A drag looks round** about your pawn (`turn.ts LookAround`: `streetLookPerWidth`, `streetLookBackMs`): letting go keeps it, and
+    your first step eases it back. The arrows stay the normal view's.
+  - **The plan** (`scripts/street-plan-north.py`, its round 5 section):
+    - a grove beside the Colosseum and along the back two rows, not walked on;
+    - a wall with a closed gate either side of it on its front line, and the back wall on the north edge (`town/wall.ts`, lots of kind
+      `wall`);
+    - the back rows' four skyline towers gone.
+  - **The Colosseum's street picture** (`houses/coliseum.ts HOUSE_COLISEUM_STREET`) leaves out its two floating back pawns.
+  - **Test hooks:** `__townCam()`'s `headingBase`, `look`, `strip`, and each box's `x` and `y`; `__townYou()`'s `way`;
+    `__townAt("tap-square", …)`.
+  - **Tests:** `packages/app/test/town-fixed.test.ts`, `e2e/town-fixed.spec.ts`.
+  - Decision: [2026-11-05-street-fixed-view.md](../decisions/2026-11-05-street-fixed-view.md). Stills: `docs/street-town-fixed/`.
 
 ## Frame-rate pill (`?fps`)
 `/town?fps` shows anyone (Eric, Oct 30: no admin needed, the site is behind Cloudflare Access) a pill in the world's top-right corner, "60 fps · 16.7 ms · 2D": frames over the last second and their mean time, text set twice a second from plain counters in the frame loop, then the drawing's backend ("· WebGL" with `?gl=1`; added by town.css from `data-backend`, so the pill's text stays the numbers). Without `?fps` there is none. `?crowd=N` is anyone's too (only that device draws the pawns).

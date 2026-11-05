@@ -2,7 +2,8 @@
 import type { Character } from "../../characters/sprite.ts";
 import type { LightPool, LightSpot } from "./kit.ts";
 import type { HomeId, Place } from "../world.ts";
-import { COLISEUM_CHIP, HOUSE_COLISEUM, HOUSE_COLISEUM_SIGN, HOUSE_COLISEUM_LIGHTS, HOUSE_COLISEUM_POOLS } from "./coliseum.ts";
+import { STREET_TOWN } from "../admin-town.ts";
+import { COLISEUM_CHIP, HOUSE_COLISEUM, HOUSE_COLISEUM_STREET, HOUSE_COLISEUM_SIGN, HOUSE_COLISEUM_LIGHTS, HOUSE_COLISEUM_POOLS } from "./coliseum.ts";
 import { HOUSE_GINGER, HOUSE_GINGER_SIGN, HOUSE_GINGER_LIGHTS, HOUSE_GINGER_POOLS } from "./gingerbread.ts";
 import { HOUSE_GREX, HOUSE_GREX_SIGN, HOUSE_GREX_LIGHTS } from "./grex.ts";
 import { HOUSE_HOLLOW, HOUSE_HOLLOW_SIGN, HOUSE_HOLLOW_LIGHTS } from "./hollow.ts";
@@ -52,7 +53,7 @@ export const HOUSES: Record<HomeId, HouseArt> = {
 };
 
 /** The Colosseum's picture (slice 5), and the icon on its edge chip (a crown over the board's squares, 24 x 24). */
-export const COLISEUM_ART: HouseArt = { ch: HOUSE_COLISEUM, sign: HOUSE_COLISEUM_SIGN, lights: HOUSE_COLISEUM_LIGHTS, pools: HOUSE_COLISEUM_POOLS };
+export const COLISEUM_ART: HouseArt = { ch: STREET_TOWN ? HOUSE_COLISEUM_STREET : HOUSE_COLISEUM, sign: HOUSE_COLISEUM_SIGN, lights: HOUSE_COLISEUM_LIGHTS, pools: HOUSE_COLISEUM_POOLS };
 export { COLISEUM_CHIP };
 
 /** A place's picture: its home's, or the Colosseum's. */
