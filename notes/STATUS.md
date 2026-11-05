@@ -167,7 +167,7 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Town street mockups DONE afbbc7e5 (scripts/boss-art/out/town-street/, notes town-street-mockup-nov5.md); sent to Eric. Calls: camera N on E-W streets, E on Seam Avenue (only N-S street); one-sided streets (fronts one side, back gardens near side); Colosseum front-on only in a grove; turn at Seam Avenue crossings ~0.5s; wrap kept via seam streets; park 20x12, 12 tables. Waiting on Eric.
 - Nov 5: Dash intro round 3 was never built (default intro) -> helper started (Opus high) brief-dash-intro.md, /home/user/cr-dashintro claude/dash-intro, ports 8987/9487.
 - Hollow bulbs/darkness/taunts brief written (brief-hollow-bulbs.md): start AFTER Dash finishes (one Opus). Worktree /home/user/cr-hollowbulbs to create. Eric Nov 5: bulbs SOLO ONLY (griever spam). Eric OK: extra Opus helper beside for the town (medium or high, my call).
-- Igloo stair fix (levelZ step, wait not reverse on chain) on claude/igloo-stair-turn in /home/user/cr-ginger, local Ginger e2e b7p01vtt9 running; then PR.
+- Igloo stair fix PR #496 d7058fd1 (shop lane), CI watcher bz9il4xd2. Local e2e skipped: lock held by helpers.
 - Nov 5: Eric approved building the street town from the mockups (afbbc7e5 + depth 4b7ada3d). Plan (one Opus at a time, after Dash then Hollow):
   1. Town art (Opus high, boss-art): final everyday fronts (8 designs x2 colours) + box sides/roofs per material and per boss home, bigger buildings behind, hedges/back gardens, seam streets; exact plan numbers.
   2. Town code A: new layout at today's camera (plus park 12 tables, streets, lots, homes moved, walkable/bots/boss roam, default zoomed-in), town e2e updated.
