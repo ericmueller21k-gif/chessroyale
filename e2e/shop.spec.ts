@@ -621,7 +621,26 @@ test("Ginger Igloo (Nov 5): Go in (its card its name and Go in), the round igloo
   await page.keyboard.press("Escape");
   await expect(crate).toBeHidden();
 
+  // (The camera trails your walk by about a square and a half and glides on after you stop: a square's point read while it glides has
+  // moved by the time the click lands, at a walk's pace by more than half a square. Main's e2e, Nov 5: a tap read for (5, 7) landed on
+  // the wall square west of it, and the room walked you to the free square nearest that, (5, 6), one short. So each tap is aimed once
+  // you've stopped and the view rests on you: docs/decisions/2026-11-05-ginger-steps.md.)
+  const viewOnYou = () =>
+    expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const cam = (window as unknown as Hooks).__shopCam?.();
+            const you = document.querySelector<HTMLCanvasElement>("canvas.town-shop-canvas")?.dataset.you;
+            if (!cam || !you) return false;
+            const [c, r] = you.split(",").map(Number);
+            return Math.hypot(cam.focus[0] - c!, cam.focus[1] - r!) < 0.01;
+          }),
+        { message: "you've stopped and the view rests on you", timeout: 10_000, intervals: [50] },
+      )
+      .toBe(true);
   const tapTo = async (sq: readonly [number, number]) => {
+    await viewOnYou();
     // (Within talking range of the shopkeeper his card is open: closed first, or the tap would close it.)
     if (await page.getByRole("dialog").isVisible()) await page.keyboard.press("Escape");
     await expect.poll(() => shopAt(page, "square", sq), { message: `(${sq}) is on screen` }).not.toBeNull();
