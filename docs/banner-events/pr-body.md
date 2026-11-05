@@ -73,7 +73,8 @@ Local checks:
 - `npm run typecheck` passes.
 - `vitest` on chess, app, server and core: 4066 passed. One failure, `duel.test.ts` "the result card…", is a 5 s
   timeout that fails the same way on main's code.
-- e2e: see the report.
+- e2e, on a local `wrangler dev`, phone and desktop: the changed Alfil test passed on both (its banners were TUSKS!,
+  QUEEN DOWN!, MAMMOTH SLAM!, each once), and `e2e/banner-time.spec.ts` passed 12 of 12.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
